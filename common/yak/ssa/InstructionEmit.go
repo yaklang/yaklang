@@ -439,7 +439,6 @@ func (f *FunctionBuilder) GetOriginPointerName(obj Value) string {
 }
 
 func (f *FunctionBuilder) GetOriginValue(obj Value) Value {
-	objectValue := f.ReadMemberCallValue(obj, f.EmitConstInstPlaceholder("@value"))
 	p := f.ReadMemberCallValue(obj, f.EmitConstInstPlaceholder("@pointer"))
 
 	n := strings.TrimPrefix(p.String(), "&")
@@ -448,12 +447,14 @@ func (f *FunctionBuilder) GetOriginValue(obj Value) Value {
 	scope := f.CurrentBlock.ScopeTable
 	if variable := GetFristLocalVariableFromScope(scope, originName); variable != nil {
 		if variable.GetGlobalIndex() != originGlobalId {
+			objectValue := f.ReadMemberCallValue(obj, f.EmitConstInstPlaceholder("@value"))
 			return objectValue
 		}
 	}
 
 	if variable := GetFristVariableFromScopeAndParent(scope, originName); variable != nil {
 		if variable.GetCaptured().GetGlobalIndex() != originGlobalId {
+			objectValue := f.ReadMemberCallValue(obj, f.EmitConstInstPlaceholder("@value"))
 			return objectValue
 		}
 		if originValue := variable.GetValue(); originValue != nil {
@@ -461,7 +462,7 @@ func (f *FunctionBuilder) GetOriginValue(obj Value) Value {
 		}
 	}
 
-	return objectValue
+	return f.ReadMemberCallValue(obj, f.EmitConstInstPlaceholder("@value"))
 }
 
 func (f *FunctionBuilder) EmitConstInstWithUnary(i any, un int) *ConstInst {

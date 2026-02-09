@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/log"
+
 	"github.com/yaklang/yaklang/common/utils"
 	cparser "github.com/yaklang/yaklang/common/yak/antlr4c/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -188,17 +190,12 @@ func (b *astbuilder) buildExpression(ast *cparser.ExpressionContext, isLeft bool
 		return b.buildCastExpression(p.(*cparser.CastExpressionContext), isLeft)
 	}
 
-	// 10. 赋值表达式: assignmentExpression
-	if a := ast.AssignmentExpression(); a != nil {
-		return b.buildAssignmentExpression(a.(*cparser.AssignmentExpressionContext)), nil
-	}
-
-	// 11. 语句表达式: statementsExpression
+	// 10. 语句表达式: statementsExpression
 	if s := ast.StatementsExpression(); s != nil {
 		return b.buildStatementsExpression(s.(*cparser.StatementsExpressionContext)), nil
 	}
 
-	// 12. 声明表达式: declarationSpecifier
+	// 11. 声明表达式: declarationSpecifier
 	if d := ast.DeclarationSpecifier(); d != nil {
 		ssatype := b.buildDeclarationSpecifier(d.(*cparser.DeclarationSpecifierContext))
 		return ssa.NewTypeValue(ssatype), nil
@@ -207,25 +204,39 @@ func (b *astbuilder) buildExpression(ast *cparser.ExpressionContext, isLeft bool
 	return b.EmitConstInst(0), b.CreateVariable("")
 }
 
+func (b *astbuilder) buildCoreExpression(ast *cparser.CoreExpressionContext) ssa.Value {
+	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	defer recoverRange()
+
+	var right ssa.Value
+	if u := ast.CastExpression(); u != nil {
+		right, _ = b.buildCastExpression(u.(*cparser.CastExpressionContext), false)
+	} else if a := ast.AssignmentExpression(); a != nil {
+		right = b.buildAssignmentExpression(a.(*cparser.AssignmentExpressionContext))
+	}
+
+	if utils.IsNil(right) {
+		right = b.EmitConstInst(0)
+	}
+	return right
+}
+
 func (b *astbuilder) buildAssignmentExpression(ast *cparser.AssignmentExpressionContext) ssa.Value {
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()
 
-	// 新的语法: leftExpression assignmentOperator expression
+	var right ssa.Value
+
 	if leftExpr := ast.LeftExpression(); leftExpr != nil {
 		if a := ast.AssignmentOperator(); a != nil {
 			if e := ast.Expression(); e != nil {
-				// 获取左值变量
 				_, left := b.buildLeftExpression(leftExpr.(*cparser.LeftExpressionContext), true)
-				// 获取右值表达式
 				newRight, _ := b.buildExpression(e.(*cparser.ExpressionContext), false)
 				if utils.IsNil(newRight) {
 					newRight = b.EmitUndefined(left.GetName())
 				}
 
-				var right ssa.Value
 				if left != nil {
-					// 读取左值的当前值（用于复合赋值）
 					right = b.ReadValue(left.GetName())
 					if utils.IsNil(right) {
 						right = b.EmitUndefined(left.GetName())
@@ -266,26 +277,10 @@ func (b *astbuilder) buildAssignmentExpression(ast *cparser.AssignmentExpression
 					b.AssignVariable(left, right)
 					right.SetType(newRight.GetType())
 				}
-				return right
 			}
 		}
 	}
 
-	// 兼容旧语法: castExpression 或 DigitSequence
-	var right ssa.Value
-	if u := ast.CastExpression(); u != nil {
-		right, _ = b.buildCastExpression(u.(*cparser.CastExpressionContext), false)
-	} else if d := ast.DigitSequence(); d != nil {
-		// DigitSequence 通常用于位域大小或其他数字序列
-		// 尝试解析为整数常量
-		text := d.GetText()
-		if val, err := strconv.ParseInt(text, 10, 64); err == nil {
-			right = b.EmitConstInst(val)
-		} else {
-			// 如果解析失败，作为字符串常量处理
-			right = b.EmitConstInst(text)
-		}
-	}
 	if utils.IsNil(right) {
 		right = b.EmitConstInst(0)
 	}
@@ -449,7 +444,6 @@ func (b *astbuilder) buildPostfixExpression(ast *cparser.PostfixExpressionContex
 func (b *astbuilder) buildPostfixSuffix(ast *cparser.PostfixSuffixContext, right ssa.Value, left *ssa.Variable, isLeft bool) (ssa.Value, *ssa.Variable) {
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()
-
 	// 1. 数组下标：'[' expression ']'
 	if ast.LeftBracket() != nil && ast.RightBracket() != nil {
 		if e := ast.Expression(); e != nil {
@@ -688,7 +682,7 @@ func (b *astbuilder) buildPostfixExpressionLvalue(ast *cparser.PostfixExpression
 		right, left = b.buildPrimaryExpression(p.(*cparser.PrimaryExpressionContext), isLeft)
 		// 处理 postfixSuffixLvalue*
 		for _, suffix := range ast.AllPostfixSuffixLvalue() {
-			right, left = b.buildPostfixSuffixLvalue(suffix.(*cparser.PostfixSuffixLvalueContext), right, left, isLeft)
+			right, left, _ = b.buildPostfixSuffixLvalue(suffix.(*cparser.PostfixSuffixLvalueContext), right, left, isLeft)
 		}
 		return right, left
 	}
@@ -702,18 +696,29 @@ func (b *astbuilder) buildPostfixExpressionLvalue(ast *cparser.PostfixExpression
 		}
 		// 处理 postfixSuffixLvalue*
 		for _, suffix := range ast.AllPostfixSuffixLvalue() {
-			right, left = b.buildPostfixSuffixLvalue(suffix.(*cparser.PostfixSuffixLvalueContext), right, left, isLeft)
+			right, left, _ = b.buildPostfixSuffixLvalue(suffix.(*cparser.PostfixSuffixLvalueContext), right, left, isLeft)
 		}
 		return right, left
+	}
+
+	for _, suffix := range ast.AllPostfixSuffixLvalue() {
+		right, left, _ = b.buildPostfixSuffixLvalue(suffix.(*cparser.PostfixSuffixLvalueContext), right, left, isLeft)
 	}
 
 	return right, left
 }
 
 // buildPostfixSuffixLvalue 处理左值后缀操作（数组下标、成员访问，不包括函数调用）
-func (b *astbuilder) buildPostfixSuffixLvalue(ast *cparser.PostfixSuffixLvalueContext, right ssa.Value, left *ssa.Variable, isLeft bool) (ssa.Value, *ssa.Variable) {
+func (b *astbuilder) buildPostfixSuffixLvalue(ast *cparser.PostfixSuffixLvalueContext, right ssa.Value, left *ssa.Variable, isLeft bool) (ssa.Value, *ssa.Variable, bool) {
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()
+
+	setReference := false
+	log.Infof("postfix = %s\n", ast.GetText())
+
+	if p := ast.PostfixSuffixLvalue(); p != nil {
+		right, left, setReference = b.buildPostfixSuffixLvalue(p.(*cparser.PostfixSuffixLvalueContext), right, left, isLeft)
+	}
 
 	// 1. 数组下标：'[' expression ']'
 	if ast.LeftBracket() != nil && ast.RightBracket() != nil {
@@ -723,7 +728,7 @@ func (b *astbuilder) buildPostfixSuffixLvalue(ast *cparser.PostfixSuffixLvalueCo
 			if isLeft && left != nil {
 				left = b.CreateMemberCallVariable(b.ReadValue(left.GetName()), index)
 			}
-			return right, left
+			return right, left, false
 		}
 	}
 
@@ -733,34 +738,48 @@ func (b *astbuilder) buildPostfixSuffixLvalue(ast *cparser.PostfixSuffixLvalueCo
 		if id := ast.Identifier(); id != nil {
 			key := id.GetText()
 			if right != nil {
-				if t := right.GetType(); t != nil && t.GetTypeKind() == ssa.PointerKind {
+				if t := right.GetType(); isPointer && t != nil && t.GetTypeKind() == ssa.PointerKind {
 					right = b.GetOriginValue(right)
 				}
 				right = b.ReadMemberCallValue(right, b.EmitConstInst(key))
 			}
 			if left != nil {
 				member := b.PeekValue(left.GetName())
-				if member == nil {
-					// 这里是为了处理结构体指针名称不同的问题，暂时加了一个保底以获取正确的值
-					object, _ := left.GetMemberCall()
-					member = b.GetOriginValue(object)
-				}
-				if t := member.GetType(); t != nil && t.GetTypeKind() == ssa.PointerKind {
-					if p, ok := ssa.ToParameter(member); isPointer && ok && !p.IsFreeValue {
-						left = b.CreateMemberCallVariable(member, b.EmitConstInst(key))
-						b.ReferenceParameter(left.GetName(), p.FormalParameterIndex, ssa.PointerSideEffect)
-					} else {
-						member = b.GetOriginValue(member)
-						left = b.CreateMemberCallVariable(member, b.EmitConstInst(key))
+
+				checkParameter := func(target string) {
+					RefParameterIndex := 0
+					if p, ok := ssa.ToParameter(member); ok && !p.IsFreeValue {
+						RefParameterIndex = p.FormalParameterIndex
+					} else if p, ok := ssa.ToParameterMember(member); ok {
+						RefParameterIndex = p.FormalParameterIndex
 					}
-				} else {
-					left = b.CreateMemberCallVariable(member, b.EmitConstInst(key))
+
+					if ref, ok := b.RefParameter[member.GetName()]; ok {
+						RefParameterIndex = ref.Index
+						delete(b.RefParameter, member.GetName())
+					}
+
+					if RefParameterIndex != 0 {
+						b.ReferenceParameter(target, RefParameterIndex, ssa.PointerSideEffect)
+					}
+				}
+
+				if t := member.GetType(); isPointer && t != nil && t.GetTypeKind() == ssa.PointerKind {
+					member = b.GetOriginValue(member)
+					setReference = true
+				}
+
+				left = b.CreateMemberCallVariable(member, b.EmitConstInst(key))
+
+				if setReference {
+					checkParameter(left.GetName())
+					setReference = true
 				}
 			}
 		}
 	}
 
-	return right, left
+	return right, left, setReference
 }
 
 func (b *astbuilder) buildPrimaryExpression(ast *cparser.PrimaryExpressionContext, isLeft bool) (ssa.Value, *ssa.Variable) {

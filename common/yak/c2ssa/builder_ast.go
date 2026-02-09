@@ -677,8 +677,8 @@ func (b *astbuilder) buildAbstractDeclaratorSuffix(ast *cparser.AbstractDeclarat
 		var arraySize int64 = -1 // -1 表示未指定大小或可变长度数组
 
 		// 处理数组大小表达式
-		if a := abstractArraySuffix.AssignmentExpression(); a != nil {
-			expr := b.buildAssignmentExpression(a.(*cparser.AssignmentExpressionContext))
+		if c := abstractArraySuffix.CoreExpression(); c != nil {
+			expr := b.buildCoreExpression(c.(*cparser.CoreExpressionContext))
 			if c, ok := ssa.ToConstInst(expr); ok {
 				if size, err := strconv.ParseInt(c.String(), 10, 64); err == nil {
 					arraySize = size
@@ -1530,8 +1530,8 @@ func (b *astbuilder) buildExpressionStatement(ast *cparser.ExpressionStatementCo
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()
 
-	if a := ast.AssignmentExpressions(); a != nil {
-		return b.buildAssignmentExpressions(a.(*cparser.AssignmentExpressionsContext))
+	if a := ast.CoreExpressions(); a != nil {
+		return b.buildCoreExpressions(a.(*cparser.CoreExpressionsContext))
 	}
 	return nil
 }
@@ -1540,6 +1540,14 @@ func (b *astbuilder) buildAssignmentExpressions(ast *cparser.AssignmentExpressio
 	var ret ssa.Values
 	for _, a := range ast.AllAssignmentExpression() {
 		ret = append(ret, b.buildAssignmentExpression(a.(*cparser.AssignmentExpressionContext)))
+	}
+	return ret
+}
+
+func (b *astbuilder) buildCoreExpressions(ast *cparser.CoreExpressionsContext) ssa.Values {
+	var ret ssa.Values
+	for _, a := range ast.AllCoreExpression() {
+		ret = append(ret, b.buildCoreExpression(a.(*cparser.CoreExpressionContext)))
 	}
 	return ret
 }

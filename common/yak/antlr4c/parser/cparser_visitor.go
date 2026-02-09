@@ -46,8 +46,14 @@ type CParserVisitor interface {
 	// Visit a parse tree produced by CParser#castExpression.
 	VisitCastExpression(ctx *CastExpressionContext) interface{}
 
+	// Visit a parse tree produced by CParser#coreExpression.
+	VisitCoreExpression(ctx *CoreExpressionContext) interface{}
+
 	// Visit a parse tree produced by CParser#assignmentExpression.
 	VisitAssignmentExpression(ctx *AssignmentExpressionContext) interface{}
+
+	// Visit a parse tree produced by CParser#assignmentExpressions.
+	VisitAssignmentExpressions(ctx *AssignmentExpressionsContext) interface{}
 
 	// Visit a parse tree produced by CParser#assignmentOperator.
 	VisitAssignmentOperator(ctx *AssignmentOperatorContext) interface{}
@@ -256,8 +262,8 @@ type CParserVisitor interface {
 	// Visit a parse tree produced by CParser#forCondition.
 	VisitForCondition(ctx *ForConditionContext) interface{}
 
-	// Visit a parse tree produced by CParser#assignmentExpressions.
-	VisitAssignmentExpressions(ctx *AssignmentExpressionsContext) interface{}
+	// Visit a parse tree produced by CParser#coreExpressions.
+	VisitCoreExpressions(ctx *CoreExpressionsContext) interface{}
 
 	// Visit a parse tree produced by CParser#forDeclarations.
 	VisitForDeclarations(ctx *ForDeclarationsContext) interface{}

@@ -59,7 +59,15 @@ func (v *BaseCParserVisitor) VisitCastExpression(ctx *CastExpressionContext) int
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseCParserVisitor) VisitCoreExpression(ctx *CoreExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseCParserVisitor) VisitAssignmentExpression(ctx *AssignmentExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseCParserVisitor) VisitAssignmentExpressions(ctx *AssignmentExpressionsContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -339,7 +347,7 @@ func (v *BaseCParserVisitor) VisitForCondition(ctx *ForConditionContext) interfa
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseCParserVisitor) VisitAssignmentExpressions(ctx *AssignmentExpressionsContext) interface{} {
+func (v *BaseCParserVisitor) VisitCoreExpressions(ctx *CoreExpressionsContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

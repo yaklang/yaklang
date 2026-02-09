@@ -10,9 +10,7 @@ func (b *FunctionBuilder) getFieldValue(object, key Value, wantFunction bool) Va
 	// normal member
 	// use name  peek value
 	if ret := b.PeekValueInThisFunction(res.name); ret != nil {
-		if _, ok := ToParameterMember(ret); !ok {
-			return ret
-		}
+		return ret
 	}
 
 	// default member
