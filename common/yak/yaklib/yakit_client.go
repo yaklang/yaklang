@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -71,6 +72,8 @@ type YakitClient struct {
 	yakLogger *YakLogger
 	send      func(i interface{}) error
 	runtimeID string
+
+	grpcSender *grpcWebhookSender
 }
 
 func NewYakitClient(addr string) *YakitClient {
@@ -104,6 +107,22 @@ func NewYakitClient(addr string) *YakitClient {
 		}
 
 		if client.addr == "" {
+			return nil
+		}
+		// gRPC transport: addr is "grpc://host:port"
+		if strings.HasPrefix(client.addr, "grpc://") {
+			// Lazy init to avoid dialing before the server is ready.
+			if client.grpcSender == nil {
+				client.grpcSender = newGRPCWebhookSender(strings.TrimPrefix(client.addr, "grpc://"))
+			}
+			msgRaw, err := YakitMessageGenerator(i)
+			if err != nil {
+				return err
+			}
+			if err := client.grpcSender.sendRawMessage(msgRaw); err != nil {
+				log.Errorf("grpc yakit webhook send failed: %v", err)
+				return err
+			}
 			return nil
 		}
 
