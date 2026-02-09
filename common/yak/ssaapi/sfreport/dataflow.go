@@ -5,8 +5,10 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/jinzhu/gorm"
+	"github.com/lib/pq"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -449,6 +451,16 @@ func insertAuditNodesMultiValues(db *gorm.DB, items []*ssadb.AuditNode, batchSiz
 		"verbose_name",
 	}
 
+	if raw := strings.TrimSpace(os.Getenv("SSA_STREAM_DATAFLOW_INSERT_MODE")); raw != "" {
+		if raw == "copy" || strings.EqualFold(raw, "copy") {
+			if err := insertAuditNodesCopyIn(db, table, cols, items, batchSize); err == nil {
+				return nil
+			} else {
+				log.Warnf("dataflow nodes copy-in failed, fallback to multi-values: %v", err)
+			}
+		}
+	}
+
 	for i := 0; i < len(items); i += batchSize {
 		j := i + batchSize
 		if j > len(items) {
@@ -518,6 +530,16 @@ func insertAuditEdgesMultiValues(db *gorm.DB, items []*ssadb.AuditEdge, batchSiz
 		"analysis_label",
 	}
 
+	if raw := strings.TrimSpace(os.Getenv("SSA_STREAM_DATAFLOW_INSERT_MODE")); raw != "" {
+		if raw == "copy" || strings.EqualFold(raw, "copy") {
+			if err := insertAuditEdgesCopyIn(db, table, cols, items, batchSize); err == nil {
+				return nil
+			} else {
+				log.Warnf("dataflow edges copy-in failed, fallback to multi-values: %v", err)
+			}
+		}
+	}
+
 	for i := 0; i < len(items); i += batchSize {
 		j := i + batchSize
 		if j > len(items) {
@@ -550,6 +572,121 @@ func insertAuditEdgesMultiValues(db *gorm.DB, items []*ssadb.AuditEdge, batchSiz
 			)
 		}
 		if err := db.Exec(sb.String(), args...).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func insertAuditNodesCopyIn(db *gorm.DB, table string, cols []string, items []*ssadb.AuditNode, batchSize int) error {
+	if db == nil || len(items) == 0 {
+		return nil
+	}
+	if batchSize <= 0 {
+		batchSize = 500
+	}
+	common := db.CommonDB()
+	if common == nil {
+		return utils.Errorf("nil CommonDB")
+	}
+	// COPY is significantly faster than multi-values INSERT for large batches.
+	for i := 0; i < len(items); i += batchSize {
+		j := i + batchSize
+		if j > len(items) {
+			j = len(items)
+		}
+		batch := items[i:j]
+		stmt, err := common.Prepare(pq.CopyIn(table, cols...))
+		if err != nil {
+			return err
+		}
+		now := time.Now()
+		for _, n := range batch {
+			if n == nil {
+				continue
+			}
+			if _, err := stmt.Exec(
+				now,
+				now,
+				n.TaskId,
+				n.ResultId,
+				n.ResultVariable,
+				n.ResultIndex,
+				n.RiskHash,
+				n.RuleName,
+				n.RuleTitle,
+				n.ProgramName,
+				n.IsEntryNode,
+				n.IRCodeID,
+				n.NodeID,
+				n.TmpValue,
+				n.TmpValueFileHash,
+				n.TmpStartOffset,
+				n.TmpEndOffset,
+				n.VerboseName,
+			); err != nil {
+				_ = stmt.Close()
+				return err
+			}
+		}
+		if _, err := stmt.Exec(); err != nil {
+			_ = stmt.Close()
+			return err
+		}
+		if err := stmt.Close(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func insertAuditEdgesCopyIn(db *gorm.DB, table string, cols []string, items []*ssadb.AuditEdge, batchSize int) error {
+	if db == nil || len(items) == 0 {
+		return nil
+	}
+	if batchSize <= 0 {
+		batchSize = 500
+	}
+	common := db.CommonDB()
+	if common == nil {
+		return utils.Errorf("nil CommonDB")
+	}
+	for i := 0; i < len(items); i += batchSize {
+		j := i + batchSize
+		if j > len(items) {
+			j = len(items)
+		}
+		batch := items[i:j]
+		stmt, err := common.Prepare(pq.CopyIn(table, cols...))
+		if err != nil {
+			return err
+		}
+		now := time.Now()
+		for _, e := range batch {
+			if e == nil {
+				continue
+			}
+			if _, err := stmt.Exec(
+				now,
+				now,
+				e.TaskId,
+				e.ResultId,
+				e.FromNode,
+				e.ToNode,
+				e.ProgramName,
+				string(e.EdgeType),
+				e.AnalysisStep,
+				e.AnalysisLabel,
+			); err != nil {
+				_ = stmt.Close()
+				return err
+			}
+		}
+		if _, err := stmt.Exec(); err != nil {
+			_ = stmt.Close()
+			return err
+		}
+		if err := stmt.Close(); err != nil {
 			return err
 		}
 	}
