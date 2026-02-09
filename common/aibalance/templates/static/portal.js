@@ -3791,6 +3791,19 @@ curl '${metaApiUrl}?name=${modelName}'`;
             }
         }, 30000);
 
+        // 自动刷新统计卡片（每3秒），保持并发数和搜索次数实时更新
+        setInterval(async function() {
+            try {
+                const response = await authFetch('/portal/api/data');
+                if (!response || !response.ok) return;
+                const data = await response.json();
+                if (checkAuthInResponse(data)) return;
+                PortalDataLoader.renderStats(data);
+            } catch (e) {
+                // Silently ignore refresh errors to avoid spamming console
+            }
+        }, 3000);
+
         // ==================== API Key Delete Functions ====================
 
         // Delete single API key
