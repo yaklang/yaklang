@@ -54,6 +54,7 @@ common/xlic/*.gzip
 .go-version
 .gocache
 .ace-tool/
+*.a
 
 # gzip_embed generated archives (built by scripts/workflows, do not commit)
 common/ai/aid/aitool/buildinaitools/yakscripttools/*.tar.gz

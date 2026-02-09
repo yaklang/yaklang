@@ -1,15 +1,20 @@
 # Binaries
 *.a
 *.o
+*.obj
 *.so
 *.dll
 *.dylib
 *.exe
 *.bin
+*.out
+*.ll
+*.bc
+*.s
 
 # Generated headers
-# runtime/libyak.h
-# runtime/go_runtime/libyak.h
+runtime/libyak.h
+runtime/runtime_go/libyak.h
 
 # Test binaries
 *.test
