@@ -19,7 +19,6 @@ func (s *Server) QueryAIEvent(ctx context.Context, req *ypb.AIEventQueryRequest)
 	}
 
 	db := s.GetProjectDatabase()
-
 	queryAll := func() []*schema.AiOutputEvent {
 		eventCh := yakit.YieldAIEvent(ctx, db, filter, bizhelper.WithYieldModel_PageSize(50))
 		var events []*schema.AiOutputEvent

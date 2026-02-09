@@ -29,7 +29,20 @@ func AssociateAIEventToProcess(db *gorm.DB, eventId string, processIds []string)
 }
 
 func CreateOrUpdateAIOutputEvent(db *gorm.DB, event *schema.AiOutputEvent) error {
+	if event == nil {
+		return nil
+	}
 	db = db.Model(event)
+
+	// stream-finished is a structured event emitted by the AI emitter to mark the end of a stream.
+	// It includes `event_writer_id` in JSON content; use it to force-flush and close the stream buffer
+	// to reduce extra updates and memory retention.
+	if event.NodeId == "stream-finished" {
+		if streamWriterID := event.GetStreamEventWriterId(); streamWriterID != "" {
+			globalStreamEventBuffer.finish(db, streamWriterID)
+		}
+	}
+
 	if event.EventUUID == "" {
 		event.EventUUID = uuid.NewString()
 	}
@@ -48,20 +61,9 @@ func saveAIEvent(db *gorm.DB, event *schema.AiOutputEvent) error {
 }
 
 func SaveStreamAIEvent(outDb *gorm.DB, event *schema.AiOutputEvent) error {
-	// Use FirstOrCreate pattern without transaction to avoid "database is locked" errors
-	var existingEvent schema.AiOutputEvent
-	if err := outDb.Where("event_uuid = ?", event.EventUUID).First(&existingEvent).Error; err != nil {
-		if gorm.IsRecordNotFoundError(err) {
-			return saveAIEvent(outDb, event)
-		}
-		return err
-	}
-
-	// Event exists, append StreamDelta
-	existingEvent.StreamDelta = append(existingEvent.StreamDelta, event.StreamDelta...)
-	// Use Save to update the event, which handles []byte fields correctly
-	// Without transaction, this minimizes lock time and reduces "database is locked" errors
-	return outDb.Save(&existingEvent).Error
+	// Stream events are extremely frequent (token-by-token). Coalesce updates in-memory and flush in batches
+	// to reduce sqlite write-lock contention.
+	return globalStreamEventBuffer.append(outDb, event)
 }
 
 func FilterEvent(db *gorm.DB, filter *ypb.AIEventFilter) *gorm.DB {
