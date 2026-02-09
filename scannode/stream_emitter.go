@@ -14,6 +14,8 @@ import (
 
 	"github.com/golang/snappy"
 	"github.com/klauspost/compress/zstd"
+	"github.com/tidwall/gjson"
+	"github.com/tidwall/sjson"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/spec"
 	"github.com/yaklang/yaklang/common/utils"
@@ -270,32 +272,44 @@ func (e *StreamEmitter) EmitSSAReportJSON(taskId, runtimeId, subTaskId, reportJS
 		return nil
 	}
 
-	var report sfreport.Report
-	if err := json.Unmarshal([]byte(reportJSON), &report); err != nil {
-		return err
-	}
-
 	state := e.getTaskState(taskId)
 	state.lastActivity = time.Now()
-	state.emitStartOnce(e, taskId, runtimeId, subTaskId, &report)
+	parsed := gjson.Parse(reportJSON)
+	programName := parsed.Get("program_name").String()
+	reportTypeStr := parsed.Get("report_type").String()
+	state.emitStartOnce(e, taskId, runtimeId, subTaskId, programName, reportTypeStr)
 
-	fileIndex := make(map[string]*sfreport.File, len(report.File))
-	fileHashByPath := make(map[string]string, len(report.File))
-	fileHashByBase := make(map[string]string, len(report.File))
-	allFileHashes := make([]string, 0, len(report.File))
+	filesVal := parsed.Get("File")
+	fileIndex := make(map[string]*sfreport.File, len(filesVal.Array()))
+	fileHashByPath := make(map[string]string, len(filesVal.Array()))
+	fileHashByBase := make(map[string]string, len(filesVal.Array()))
+	allFileHashes := make([]string, 0, len(filesVal.Array()))
 	riskFiles := make(map[string][]string)
-	for _, f := range report.File {
-		if f == nil {
-			continue
+	for _, fv := range filesVal.Array() {
+		fileHash := strings.TrimSpace(fv.Get("ir_source_hash").String())
+		if fileHash == "" {
+			fileHash = strings.TrimSpace(fv.Get("IrSourceHash").String())
 		}
-		fileHash := fileHashFor(f)
 		if fileHash == "" {
 			continue
 		}
+		hm := make(map[string]string)
+		for k, v := range fv.Get("hash").Map() {
+			if k != "" {
+				hm[k] = v.String()
+			}
+		}
+		f := &sfreport.File{
+			Path:         fv.Get("path").String(),
+			Length:       fv.Get("length").Int(),
+			Hash:         hm,
+			IrSourceHash: fileHash,
+			Content:      fv.Get("content").String(),
+			LineCount:    int(fv.Get("line_count").Int()),
+		}
 		fileIndex[fileHash] = f
 		allFileHashes = append(allFileHashes, fileHash)
-
-		// Best-effort path index: used when File.Risks is missing in some report variants.
+		// Best-effort path index: used when file->risk mapping is missing.
 		if f.Path != "" {
 			fp := normalizeCodePath(f.Path)
 			if fp != "" {
@@ -310,7 +324,11 @@ func (e *StreamEmitter) EmitSSAReportJSON(taskId, runtimeId, subTaskId, reportJS
 				}
 			}
 		}
-		for _, riskHash := range f.Risks {
+		for _, rh := range fv.Get("risks").Array() {
+			riskHash := strings.TrimSpace(rh.String())
+			if riskHash == "" {
+				continue
+			}
 			riskFiles[riskHash] = append(riskFiles[riskHash], fileHash)
 		}
 	}
@@ -318,27 +336,33 @@ func (e *StreamEmitter) EmitSSAReportJSON(taskId, runtimeId, subTaskId, reportJS
 	riskFlows := make(map[string][]string)
 	flowPayloads := make(map[string][]byte)
 
-	for _, risk := range report.Risks {
-		if risk == nil || len(risk.DataFlowPaths) == 0 {
+	riskMap := parsed.Get("Risks").Map()
+	riskCountInReport := len(riskMap)
+	for rh, rv := range riskMap {
+		riskHash := strings.TrimSpace(rh)
+		if riskHash == "" {
+			riskHash = strings.TrimSpace(rv.Get("hash").String())
+		}
+		if riskHash == "" {
+			riskHash = calcFallbackRiskHashFromFields(
+				rv.Get("title").String(),
+				rv.Get("code_source_url").String(),
+				rv.Get("code_range").String(),
+				rv.Get("program_name").String(),
+				rv.Get("risk_type").String(),
+			)
+		}
+		if riskHash == "" {
 			continue
 		}
-		riskHash := risk.Hash
-		if riskHash == "" {
-			riskHash = calcFallbackRiskHash(risk)
-		}
-		for _, path := range risk.DataFlowPaths {
-			if path == nil {
-				continue
-			}
+		for _, pv := range rv.Get("data_flow_paths").Array() {
 			var raw []byte
-			var err error
 			if e.shouldMinimizeDataflow() {
-				raw, err = sfreport.MarshalStreamMinimalDataFlowPath(path)
+				raw = marshalMinimalDataflowFromJSON(pv)
 			} else {
-				raw, err = json.Marshal(path)
+				raw = []byte(pv.Raw)
 			}
-			if err != nil {
-				log.Errorf("stream marshal dataflow failed: %v", err)
+			if len(raw) == 0 {
 				continue
 			}
 			hash := codec.Sha256(raw)
@@ -364,87 +388,77 @@ func (e *StreamEmitter) EmitSSAReportJSON(taskId, runtimeId, subTaskId, reportJS
 		e.emitDataflow(flowHash, payload, taskId, runtimeId, subTaskId)
 	}
 
-	for _, risk := range report.Risks {
-		if risk == nil {
+	for rh, rv := range riskMap {
+		riskHash := strings.TrimSpace(rh)
+		if riskHash == "" {
+			riskHash = strings.TrimSpace(rv.Get("hash").String())
+		}
+		if riskHash == "" {
+			riskHash = calcFallbackRiskHashFromFields(
+				rv.Get("title").String(),
+				rv.Get("code_source_url").String(),
+				rv.Get("code_range").String(),
+				rv.Get("program_name").String(),
+				rv.Get("risk_type").String(),
+			)
+		}
+		if riskHash == "" {
 			continue
 		}
-		if e.dropInfo && strings.EqualFold(risk.Severity, "info") {
+		if e.dropInfo && strings.EqualFold(rv.Get("severity").String(), "info") {
 			continue
 		}
-		riskCopy := *risk
-		riskCopy.DataFlowPaths = nil
-		if riskCopy.Hash == "" {
-			riskCopy.Hash = calcFallbackRiskHash(&riskCopy)
-		}
-		baseHash := riskCopy.Hash
 
-		// Some report variants don't populate File.Risks; recover file references from CodeSourceURL / filename.
-		filesForRisk := riskFiles[risk.Hash]
-		if len(filesForRisk) == 0 {
-			filesForRisk = riskFiles[riskCopy.Hash]
+		riskJSON := []byte(rv.Raw)
+		if v, err := sjson.DeleteBytes(riskJSON, "data_flow_paths"); err == nil {
+			riskJSON = v
 		}
+		if v, err := sjson.SetBytes(riskJSON, "hash", riskHash); err == nil {
+			riskJSON = v
+		}
+
+		filesForRisk := riskFiles[riskHash]
 		if len(filesForRisk) == 0 {
-			if h := resolveRiskFileHash(risk, fileHashByPath, fileHashByBase); h != "" {
+			codeSourceURL := rv.Get("code_source_url").String()
+			codeRange := rv.Get("code_range").String()
+			if h := resolveRiskFileHashFromFields(codeSourceURL, codeRange, fileHashByPath, fileHashByBase); h != "" {
 				filesForRisk = []string{h}
-			} else if len(report.Risks) == 1 && len(allFileHashes) > 0 {
-				// Single-risk incremental report: treat all files as related to that one risk.
+			} else if riskCountInReport == 1 && len(allFileHashes) > 0 {
 				filesForRisk = append([]string(nil), allFileHashes...)
 			}
 		}
 		if len(filesForRisk) > 0 {
-			riskFiles[riskCopy.Hash] = filesForRisk
-			if risk.Hash != "" {
-				riskFiles[risk.Hash] = filesForRisk
-			}
-		}
-		riskRaw, err := json.Marshal(&riskCopy)
-		if err != nil {
-			log.Errorf("stream marshal risk failed: %v", err)
-			continue
+			riskFiles[riskHash] = filesForRisk
 		}
 
+		riskProgram := rv.Get("program_name").String()
+		if riskProgram == "" {
+			riskProgram = programName
+		}
 		ev := &spec.StreamRiskEvent{
-			RiskHash:       riskCopy.Hash,
-			ProgramName:    coalesceString(risk.ProgramName, report.ProgramName),
-			ReportType:     string(report.ReportType),
-			RiskJSON:       riskRaw,
-			FileHashes:     riskFiles[riskCopy.Hash],
-			DataflowHashes: riskFlows[riskCopy.Hash],
+			RiskHash:       riskHash,
+			ProgramName:    riskProgram,
+			ReportType:     reportTypeStr,
+			RiskJSON:       riskJSON,
+			FileHashes:     riskFiles[riskHash],
+			DataflowHashes: riskFlows[riskHash],
 		}
 		e.emitEnvelope(taskId, runtimeId, subTaskId, spec.StreamEventRisk, ev)
 
 		if e.mockRiskMultiplier > 1 {
 			for i := 1; i < e.mockRiskMultiplier; i++ {
-				mockRisk := riskCopy
-				mockRisk.Hash = fmt.Sprintf("%s-mock-%d", baseHash, i)
-				if mockRisk.Title != "" {
-					mockRisk.Title = fmt.Sprintf("%s [mock-%d]", riskCopy.Title, i)
-				}
-				if mockRisk.TitleVerbose != "" {
-					mockRisk.TitleVerbose = fmt.Sprintf("%s [mock-%d]", riskCopy.TitleVerbose, i)
-				}
-				if mockRisk.CodeRange != "" {
-					mockRisk.CodeRange = fmt.Sprintf("%s;mock-%d", riskCopy.CodeRange, i)
-				} else {
-					mockRisk.CodeRange = fmt.Sprintf("mock-%d", i)
-				}
-				if mockRisk.CodeSourceURL != "" {
-					mockRisk.CodeSourceURL = fmt.Sprintf("%s?mock=%d", riskCopy.CodeSourceURL, i)
-				} else {
-					mockRisk.CodeSourceURL = fmt.Sprintf("/mock/%d", i)
-				}
-				mockRaw, err := json.Marshal(&mockRisk)
-				if err != nil {
-					log.Errorf("stream marshal mock risk failed: %v", err)
-					continue
+				mockHash := fmt.Sprintf("%s-mock-%d", riskHash, i)
+				mockJSON := riskJSON
+				if v, err := sjson.SetBytes(mockJSON, "hash", mockHash); err == nil {
+					mockJSON = v
 				}
 				mockEv := &spec.StreamRiskEvent{
-					RiskHash:       mockRisk.Hash,
-					ProgramName:    coalesceString(risk.ProgramName, report.ProgramName),
-					ReportType:     string(report.ReportType),
-					RiskJSON:       mockRaw,
-					FileHashes:     riskFiles[riskCopy.Hash],
-					DataflowHashes: riskFlows[riskCopy.Hash],
+					RiskHash:       mockHash,
+					ProgramName:    riskProgram,
+					ReportType:     reportTypeStr,
+					RiskJSON:       mockJSON,
+					FileHashes:     riskFiles[riskHash],
+					DataflowHashes: riskFlows[riskHash],
 				}
 				e.emitEnvelope(taskId, runtimeId, subTaskId, spec.StreamEventRisk, mockEv)
 			}
@@ -454,16 +468,13 @@ func (e *StreamEmitter) EmitSSAReportJSON(taskId, runtimeId, subTaskId, reportJS
 	return nil
 }
 
-func calcFallbackRiskHash(risk *sfreport.Risk) string {
-	if risk == nil {
-		return ""
-	}
+func calcFallbackRiskHashFromFields(title, codeSourceURL, codeRange, programName, riskType string) string {
 	return codec.Sha256(fmt.Sprintf("%s|%s|%s|%s|%s",
-		risk.Title,
-		risk.CodeSourceURL,
-		risk.CodeRange,
-		risk.ProgramName,
-		risk.RiskType,
+		title,
+		codeSourceURL,
+		codeRange,
+		programName,
+		riskType,
 	))
 }
 
@@ -514,8 +525,87 @@ func resolveRiskFileHash(risk *sfreport.Risk, byPath map[string]string, byBase m
 	return ""
 }
 
-func (s *taskStreamState) emitStartOnce(e *StreamEmitter, taskId, runtimeId, subTaskId string, report *sfreport.Report) {
-	if s == nil || e == nil || report == nil {
+func resolveRiskFileHashFromFields(codeSourceURL, codeRange string, byPath map[string]string, byBase map[string]string) string {
+	cp := normalizeCodePath(codeSourceURL)
+	if cp != "" {
+		if h := byPath[cp]; h != "" {
+			return h
+		}
+		base := path.Base(cp)
+		if base != "" && base != "." && base != "/" {
+			if h := byBase[base]; h != "" {
+				return h
+			}
+		}
+	}
+	if codeRange != "" {
+		seg := codeRange
+		if i := strings.Index(seg, "["); i > 0 {
+			seg = seg[:i]
+		}
+		seg = strings.TrimSpace(seg)
+		seg = path.Base(normalizeCodePath(seg))
+		if seg != "" && seg != "." && seg != "/" {
+			if h := byBase[seg]; h != "" {
+				return h
+			}
+		}
+	}
+	return ""
+}
+
+func marshalMinimalDataflowFromJSON(pv gjson.Result) []byte {
+	if !pv.Exists() {
+		return nil
+	}
+	min := &sfreport.StreamMinimalDataFlowPath{
+		Description: pv.Get("description").String(),
+		Nodes:       make([]*sfreport.StreamMinimalNodeInfo, 0),
+		Edges:       make([]*sfreport.StreamMinimalEdgeInfo, 0),
+	}
+	nodes := pv.Get("nodes").Array()
+	if len(nodes) > 0 {
+		min.Nodes = make([]*sfreport.StreamMinimalNodeInfo, 0, len(nodes))
+		for _, n := range nodes {
+			if !n.Exists() {
+				continue
+			}
+			min.Nodes = append(min.Nodes, &sfreport.StreamMinimalNodeInfo{
+				NodeID:       n.Get("node_id").String(),
+				IRCode:       n.Get("ir_code").String(),
+				IRSourceHash: n.Get("ir_source_hash").String(),
+				StartOffset:  int(n.Get("start_offset").Int()),
+				EndOffset:    int(n.Get("end_offset").Int()),
+				IsEntryNode:  n.Get("is_entry_node").Bool(),
+			})
+		}
+	}
+	edges := pv.Get("edges").Array()
+	if len(edges) > 0 {
+		min.Edges = make([]*sfreport.StreamMinimalEdgeInfo, 0, len(edges))
+		for _, e := range edges {
+			if !e.Exists() {
+				continue
+			}
+			min.Edges = append(min.Edges, &sfreport.StreamMinimalEdgeInfo{
+				EdgeID:        e.Get("edge_id").String(),
+				FromNodeID:    e.Get("from_node_id").String(),
+				ToNodeID:      e.Get("to_node_id").String(),
+				EdgeType:      e.Get("edge_type").String(),
+				AnalysisStep:  e.Get("analysis_step").Int(),
+				AnalysisLabel: e.Get("analysis_label").String(),
+			})
+		}
+	}
+	raw, err := json.Marshal(min)
+	if err != nil {
+		return nil
+	}
+	return raw
+}
+
+func (s *taskStreamState) emitStartOnce(e *StreamEmitter, taskId, runtimeId, subTaskId, programName, reportType string) {
+	if s == nil || e == nil {
 		return
 	}
 	s.mu.Lock()
@@ -528,8 +618,8 @@ func (s *taskStreamState) emitStartOnce(e *StreamEmitter, taskId, runtimeId, sub
 
 	ev := &spec.StreamTaskStartEvent{
 		TaskId:     taskId,
-		Program:    report.ProgramName,
-		ReportType: string(report.ReportType),
+		Program:    programName,
+		ReportType: reportType,
 	}
 	// Force seq for task_start to preserve ordering relative to risk/file/flow events.
 	e.emitEnvelopeForceSeq(taskId, runtimeId, subTaskId, spec.StreamEventTaskStart, ev)
