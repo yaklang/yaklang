@@ -487,17 +487,21 @@ func TestPortalDataResponse_ContainsNewFields(t *testing.T) {
 func TestWebSearchConfig_AllowFreeUserField(t *testing.T) {
 	EnsureWebSearchApiKeyTable()
 
-	// Get default config
+	// Reset to known state first
 	config, err := GetWebSearchConfig()
 	require.NoError(t, err)
 	require.NotNil(t, config)
+	config.AllowFreeUserWebSearch = false
+	require.NoError(t, SaveWebSearchConfig(config))
 
-	// Default should be false
-	assert.False(t, config.AllowFreeUserWebSearch, "default should be false")
+	// Verify it is false
+	config1, err := GetWebSearchConfig()
+	require.NoError(t, err)
+	assert.False(t, config1.AllowFreeUserWebSearch, "should be false after explicit reset")
 
 	// Set to true
-	config.AllowFreeUserWebSearch = true
-	require.NoError(t, SaveWebSearchConfig(config))
+	config1.AllowFreeUserWebSearch = true
+	require.NoError(t, SaveWebSearchConfig(config1))
 
 	// Read back
 	config2, err := GetWebSearchConfig()

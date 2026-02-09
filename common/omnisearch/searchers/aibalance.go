@@ -6,16 +6,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/aibalanceclient"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/omnisearch/ostype"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
-
-// traceID is a process-unique identifier sent as the Trace-ID header
-// It is generated once at process startup and reused for all web search requests
-var traceID = uuid.New().String()
 
 // AiBalanceSearchConfig contains the configuration for the AiBalance web search relay client
 type AiBalanceSearchConfig struct {
@@ -195,9 +190,9 @@ func (c *AiBalanceSearchClient) Search(query string, page, pageSize int) (*AiBal
 // doSearchRequest sends the actual HTTP request to aibalance with TOTP authentication
 func (c *AiBalanceSearchClient) doSearchRequest(searchURL string, bodyBytes []byte, opts []lowhttp.LowhttpOpt) (*AiBalanceSearchResponse, error) {
 	headers := map[string]string{
-		"Content-Type":  "application/json",
-		"User-Agent":    "Yaklang-AiBalance-OmniSearch/1.0",
-		"Trace-ID":      traceID,
+		"Content-Type": "application/json",
+		"User-Agent":   "Yaklang-AiBalance-OmniSearch/1.0",
+		"Trace-ID":     aibalanceclient.GetTraceID(),
 	}
 
 	// Add Authorization header only if API key is configured
