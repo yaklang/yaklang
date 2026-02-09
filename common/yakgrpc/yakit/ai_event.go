@@ -68,7 +68,9 @@ func SaveStreamAIEvent(outDb *gorm.DB, event *schema.AiOutputEvent) error {
 
 func FilterEvent(db *gorm.DB, filter *ypb.AIEventFilter) *gorm.DB {
 	db = db.Model(&schema.AiOutputEvent{})
-	db = db.Where("event_uuid IN (?)", filter.GetEventUUIDS())
+	if len(filter.GetEventUUIDS()) > 0 {
+		db = db.Where("event_uuid IN (?)", filter.GetEventUUIDS())
+	}
 	db = bizhelper.ExactQueryStringArrayOr(db, "coordinator_id", filter.GetCoordinatorId())
 	db = bizhelper.ExactQueryStringArrayOr(db, "type", filter.GetEventType())
 	db = bizhelper.ExactQueryStringArrayOr(db, "task_index", filter.GetTaskIndex())
