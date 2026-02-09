@@ -56,7 +56,8 @@ import (
 func StartScan(ctx context.Context, opts ...ssaconfig.Option) error {
 	opts = append(opts,
 		ssaconfig.WithScanControlMode(ssaconfig.ControlModeStart),
-		ssaconfig.WithScanConcurrency(5),
+		// Don't override caller-provided concurrency.
+		ssaconfig.WithScanConcurrencyDefault(5),
 	)
 	return Scan(ctx, opts...)
 }
