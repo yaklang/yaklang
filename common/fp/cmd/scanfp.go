@@ -4,7 +4,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
-	"github.com/urfave/cli"
+	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/fp/cmd/scanfpcmd"
 	"github.com/yaklang/yaklang/common/fp/webfingerprint"

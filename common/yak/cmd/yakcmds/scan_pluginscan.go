@@ -14,7 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/olekukonko/tablewriter"
 	"github.com/segmentio/ksuid"
-	"github.com/urfave/cli"
+	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/log"

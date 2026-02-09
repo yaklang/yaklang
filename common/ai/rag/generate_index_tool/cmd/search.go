@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/urfave/cli"
+	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/ai/rag/generate_index_tool"
 )
 

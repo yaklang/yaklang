@@ -14,7 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bot"
 
-	"github.com/urfave/cli"
+	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/aibalance"
 	"github.com/yaklang/yaklang/common/aibalance/aiforwarder"
 	"github.com/yaklang/yaklang/common/consts"

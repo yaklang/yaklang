@@ -3,7 +3,7 @@ package yakcmds
 import (
 	"strings"
 
-	"github.com/urfave/cli"
+	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/utils"
 )
 

@@ -27,7 +27,7 @@ import (
 	"github.com/yaklang/yaklang/common/lowtun/netstack/gvisor/pkg/tcpip/stack"
 	"github.com/yaklang/yaklang/common/utils"
 
-	"github.com/urfave/cli"
+	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/log"
 	tun "github.com/yaklang/yaklang/common/lowtun"
 	"github.com/yaklang/yaklang/common/lowtun/netstack"

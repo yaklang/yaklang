@@ -1,6 +1,6 @@
 package yakcmds
 
-import "github.com/urfave/cli"
+import "github.com/yaklang/yaklang/common/urfavecli"
 
 var PassiveCommands = cli.Command{
 	Name:      "passive-scan",
