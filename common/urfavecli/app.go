@@ -100,6 +100,9 @@ type App struct {
 	// i.e. foobar -o -v -> foobar -ov
 	UseShortOptionHandling bool
 
+	// Boolean to enable ignoring of unknown flags
+	IgnoreUnknownFlags bool
+
 	didSetup bool
 }
 
@@ -187,6 +190,10 @@ func (a *App) newFlagSet() (*flag.FlagSet, error) {
 
 func (a *App) useShortOptionHandling() bool {
 	return a.UseShortOptionHandling
+}
+
+func (a *App) ignoreUnknownFlags() bool {
+	return a.IgnoreUnknownFlags
 }
 
 // Run is the entry point to the cli app. Parses the arguments slice and routes
