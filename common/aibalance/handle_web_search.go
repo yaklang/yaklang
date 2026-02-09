@@ -153,17 +153,31 @@ func (c *ServerConfig) serveWebSearch(conn net.Conn, rawPacket []byte) {
 		return
 	}
 
-	// Check if "web-search" is in the allowed models for this key
-	if !c.KeyAllowedModels.IsModelAllowed(key.Key, "web-search") {
-		c.logError("key %s is not allowed to access web-search", utils.ShrinkString(key.Key, 8))
-		c.writeJSONResponse(conn, http.StatusForbidden, map[string]interface{}{
+	// TOTP verification for web-search (same mechanism as memfit models)
+	totpHeader := lowhttp.GetHTTPPacketHeader(rawPacket, "X-Memfit-OTP-Auth")
+	if totpHeader == "" {
+		c.logError("web search requires TOTP authentication, but X-Memfit-OTP-Auth header is missing")
+		c.writeJSONResponse(conn, http.StatusUnauthorized, map[string]interface{}{
 			"error": map[string]string{
-				"message": "api key does not have permission for web-search",
-				"type":    "permission_error",
+				"message": "TOTP authentication required for web search. Please provide X-Memfit-OTP-Auth header with base64 encoded TOTP code.",
+				"type":    "memfit_totp_auth_required",
 			},
 		})
 		return
 	}
+
+	verified, verifyErr := VerifyMemfitTOTP(totpHeader)
+	if verifyErr != nil || !verified {
+		c.logError("web search TOTP authentication failed: %v", verifyErr)
+		c.writeJSONResponse(conn, http.StatusUnauthorized, map[string]interface{}{
+			"error": map[string]string{
+				"message": "TOTP authentication failed for web search. Please refresh your TOTP secret and try again.",
+				"type":    "memfit_totp_auth_failed",
+			},
+		})
+		return
+	}
+	c.logInfo("TOTP authentication successful for web search request")
 
 	// Resolve search keys: find active keys for the requested type,
 	// or auto-select any available type if searcher_type is empty or has no keys
@@ -195,7 +209,7 @@ func (c *ServerConfig) serveWebSearch(conn net.Conn, rawPacket []byte) {
 		return
 	}
 
-	c.sendWebSearchResponse(conn, results, reqBody.SearcherType, key.Key)
+	c.sendWebSearchResponse(conn, results, reqBody.SearcherType, key.Key, int64(len(body)))
 }
 
 // resolveWebSearchKeys finds active search API keys for the given searcher type.
@@ -337,8 +351,8 @@ func (c *ServerConfig) doWebSearch(sk *schema.WebSearchApiKey, req *WebSearchReq
 	}
 }
 
-// sendWebSearchResponse sends the web search response and updates API key stats
-func (c *ServerConfig) sendWebSearchResponse(conn net.Conn, results []*ostype.OmniSearchResult, searcherType string, apiKey string) {
+// sendWebSearchResponse sends the web search response and updates API key stats with traffic billing
+func (c *ServerConfig) sendWebSearchResponse(conn net.Conn, results []*ostype.OmniSearchResult, searcherType string, apiKey string, inputBytes int64) {
 	resp := &WebSearchResponse{
 		Results:      results,
 		Total:        len(results),
@@ -347,13 +361,24 @@ func (c *ServerConfig) sendWebSearchResponse(conn net.Conn, results []*ostype.Om
 
 	// Update the caller's API key stats asynchronously
 	respBytes, _ := json.Marshal(resp)
+	outputBytes := int64(len(respBytes))
 	go func() {
-		if err := UpdateAiApiKeyStats(apiKey, int64(len(searcherType)), int64(len(respBytes)), true); err != nil {
+		if err := UpdateAiApiKeyStats(apiKey, inputBytes, outputBytes, true); err != nil {
 			log.Errorf("failed to update api key stats for web search: %v", err)
 		}
 		// Increment web search specific counter
 		if err := IncrementAiApiKeyWebSearchCount(apiKey); err != nil {
 			log.Errorf("failed to increment web search count for api key: %v", err)
+		}
+		// Update traffic usage with model multiplier for "web-search"
+		multiplier := GetModelTrafficMultiplier("web-search")
+		totalTraffic := inputBytes + outputBytes
+		adjustedTraffic := int64(float64(totalTraffic) * multiplier)
+		if err := UpdateAiApiKeyTrafficUsed(apiKey, adjustedTraffic); err != nil {
+			log.Errorf("failed to update traffic usage for web search: %v", err)
+		} else {
+			log.Infof("web-search traffic usage updated: key=%s, input=%d, output=%d, multiplier=%.2f, adjusted=%d bytes",
+				utils.ShrinkString(apiKey, 8), inputBytes, outputBytes, multiplier, adjustedTraffic)
 		}
 	}()
 

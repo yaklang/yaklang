@@ -6,26 +6,11 @@ import (
 	"errors"
 	"io"
 	"strings"
-	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/aispec"
-	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/aibalanceclient"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/twofa"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-)
-
-const (
-	// TOTP 密钥在数据库中的存储键
-	AIBALANCE_TOTP_SECRET_KEY = "AIBALANCE_CLIENT_TOTP_SECRET"
-)
-
-// TOTP 密钥内存缓存和初始化控制
-var (
-	totpSecretCache     string
-	totpSecretCacheLock sync.RWMutex
-	totpInitOnce        sync.Once // 控制初始化只执行一次
 )
 
 // ErrMemfitTOTPAuthFailed is the error type for TOTP authentication failures
@@ -347,70 +332,11 @@ func (g *GatewayClient) isMemfitModel() bool {
 	return strings.HasPrefix(strings.ToLower(g.config.Model), "memfit-")
 }
 
-// initTOTPSecretOnce initializes TOTP secret only once per process
-// Priority: Memory cache -> Database -> Server
-func (g *GatewayClient) initTOTPSecretOnce() {
-	totpInitOnce.Do(func() {
-		log.Debugf("Initializing TOTP secret for aibalance client...")
-
-		// 1. Check memory cache first
-		totpSecretCacheLock.RLock()
-		if totpSecretCache != "" {
-			totpSecretCacheLock.RUnlock()
-			// Note: Memory cache hit is normal operation, no need to log every time
-			return
-		}
-		totpSecretCacheLock.RUnlock()
-
-		// 2. Try to load from database
-		db := consts.GetGormProfileDatabase()
-		if db != nil {
-			secret := yakit.GetKey(db, AIBALANCE_TOTP_SECRET_KEY)
-			if secret != "" {
-				log.Debugf("Loaded TOTP secret from database")
-				totpSecretCacheLock.Lock()
-				totpSecretCache = secret
-				totpSecretCacheLock.Unlock()
-				return
-			}
-		}
-
-		// 3. Fetch from server and save to database
-		secret := g.fetchTOTPSecretFromServer()
-		if secret != "" {
-			g.saveTOTPSecretToDatabase(secret)
-			totpSecretCacheLock.Lock()
-			totpSecretCache = secret
-			totpSecretCacheLock.Unlock()
-			log.Debugf("TOTP secret initialized from server")
-		}
-	})
-}
-
-// getTOTPSecret gets TOTP secret with priority:
-// 1. Memory cache
-// 2. Database
-// 3. Fetch from server (and save to database)
+// getTOTPSecret gets TOTP secret using the shared cache (aibalanceclient package)
+// Priority: Memory cache -> Database -> Fetch from server
+// The cache is shared with omnisearch AiBalanceSearchClient
 func (g *GatewayClient) getTOTPSecret() string {
-	// Ensure initialization happened
-	g.initTOTPSecretOnce()
-
-	// Return from cache
-	totpSecretCacheLock.RLock()
-	defer totpSecretCacheLock.RUnlock()
-	return totpSecretCache
-}
-
-// saveTOTPSecretToDatabase saves the TOTP secret to database
-func (g *GatewayClient) saveTOTPSecretToDatabase(secret string) {
-	db := consts.GetGormProfileDatabase()
-	if db != nil {
-		err := yakit.SetKey(db, AIBALANCE_TOTP_SECRET_KEY, secret)
-		if err != nil {
-			log.Errorf("Failed to save TOTP secret to database: %v", err)
-		}
-		// Note: Success is silent to keep logs clean
-	}
+	return aibalanceclient.GetOrFetchTOTPSecret(g.fetchTOTPSecretFromServer)
 }
 
 // fetchTOTPSecretFromServer fetches the TOTP UUID from the server
@@ -473,59 +399,16 @@ func (g *GatewayClient) fetchTOTPSecretFromServer() string {
 	return secret
 }
 
-// refreshTOTPSecretAndSave clears the cache, fetches new secret from server, and saves to database
+// refreshTOTPSecretAndSave clears the shared cache, fetches new secret from server, and saves
 // This function is called when TOTP authentication fails
 func (g *GatewayClient) refreshTOTPSecretAndSave() {
 	log.Debugf("Refreshing TOTP secret due to authentication failure...")
-
-	// Clear memory cache first
-	totpSecretCacheLock.Lock()
-	oldSecret := totpSecretCache
-	totpSecretCache = ""
-	totpSecretCacheLock.Unlock()
-
-	// Fetch new secret from server
-	secret := g.fetchTOTPSecretFromServer()
-	if secret != "" {
-		// Save to database
-		g.saveTOTPSecretToDatabase(secret)
-
-		// Update memory cache
-		totpSecretCacheLock.Lock()
-		totpSecretCache = secret
-		totpSecretCacheLock.Unlock()
-
-		if oldSecret != secret {
-			log.Debugf("TOTP secret refreshed successfully")
-		}
-		// Note: Same secret is normal, no need to warn
-	} else {
-		log.Warnf("Failed to refresh TOTP secret from server")
-		// Restore old secret if refresh failed
-		if oldSecret != "" {
-			totpSecretCacheLock.Lock()
-			totpSecretCache = oldSecret
-			totpSecretCacheLock.Unlock()
-		}
-	}
+	aibalanceclient.RefreshTOTPSecret(g.fetchTOTPSecretFromServer)
 }
 
-// safeSecretPrefix returns first 8 characters of secret for logging
-func safeSecretPrefix(secret string) string {
-	if len(secret) <= 8 {
-		return secret
-	}
-	return secret[:8]
-}
-
-// generateTOTPCode generates TOTP code using the secret
+// generateTOTPCode generates TOTP code using the shared cached secret
 func (g *GatewayClient) generateTOTPCode() string {
-	secret := g.getTOTPSecret()
-	if secret == "" {
-		log.Errorf("Cannot generate TOTP code: no secret available")
-		return ""
-	}
-	return twofa.GetUTCCode(secret)
+	return aibalanceclient.GenerateTOTPCode(g.fetchTOTPSecretFromServer)
 }
 
 func (g *GatewayClient) BuildHTTPOptions() ([]poc.PocConfigOption, error) {

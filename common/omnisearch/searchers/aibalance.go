@@ -1,10 +1,13 @@
 package searchers
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/aibalanceclient"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/omnisearch/ostype"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
@@ -71,7 +74,74 @@ type AiBalanceErrorResponse struct {
 	} `json:"error"`
 }
 
+// fetchTOTPSecretFromServer fetches the TOTP UUID from the aibalance server
+func (c *AiBalanceSearchClient) fetchTOTPSecretFromServer() string {
+	baseURL := strings.TrimSuffix(c.Config.BaseURL, "/v1/web-search")
+	baseURL = strings.TrimSuffix(baseURL, "/")
+	totpURL := baseURL + "/v1/memfit-totp-uuid"
+
+	opts := []lowhttp.LowhttpOpt{}
+	if c.Config.Timeout > 0 {
+		opts = append(opts, lowhttp.WithTimeoutFloat(c.Config.Timeout))
+	}
+	if c.Config.Proxy != "" {
+		opts = append(opts, lowhttp.WithProxy(c.Config.Proxy))
+	}
+
+	raw, err := Request("GET", totpURL, map[string]string{
+		"Accept": "application/json",
+	}, nil, nil, opts...)
+	if err != nil {
+		log.Errorf("failed to fetch TOTP UUID from aibalance server: %v", err)
+		return ""
+	}
+
+	body := lowhttp.GetHTTPPacketBody(raw)
+	var result struct {
+		UUID   string `json:"uuid"`
+		Format string `json:"format"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		log.Errorf("failed to parse TOTP UUID response: %v", err)
+		return ""
+	}
+
+	uuid := result.UUID
+	if uuid == "" {
+		log.Errorf("empty TOTP UUID in response from aibalance server")
+		return ""
+	}
+
+	// Remove MEMFIT-AI prefix and suffix
+	secret := strings.TrimPrefix(uuid, "MEMFIT-AI")
+	secret = strings.TrimSuffix(secret, "MEMFIT-AI")
+	return secret
+}
+
+// generateTOTPCode generates a TOTP code using the shared cached secret (aibalanceclient package)
+// The cache is shared with the AI GatewayClient
+func (c *AiBalanceSearchClient) generateTOTPCode() string {
+	return aibalanceclient.GenerateTOTPCode(c.fetchTOTPSecretFromServer)
+}
+
+// refreshTOTPSecret clears the shared cache and re-fetches the TOTP secret from server
+func (c *AiBalanceSearchClient) refreshTOTPSecret() {
+	aibalanceclient.RefreshTOTPSecret(c.fetchTOTPSecretFromServer)
+}
+
+// isTOTPAuthError checks if the error is a TOTP authentication failure
+func isTOTPAuthError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errStr := err.Error()
+	return strings.Contains(errStr, "memfit_totp_auth_failed") ||
+		strings.Contains(errStr, "memfit_totp_auth_required") ||
+		strings.Contains(errStr, "Memfit TOTP authentication failed")
+}
+
 // Search performs a search through the AiBalance web search relay
+// Supports TOTP authentication with automatic secret refresh and retry on auth failure
 func (c *AiBalanceSearchClient) Search(query string, page, pageSize int) (*AiBalanceSearchResponse, error) {
 	if c.Config.APIKey == "" {
 		return nil, fmt.Errorf("aibalance api key (bearer token) is required")
@@ -96,8 +166,6 @@ func (c *AiBalanceSearchClient) Search(query string, page, pageSize int) (*AiBal
 	}
 
 	// Build the full URL for the web search endpoint
-	// Strip trailing /v1/web-search from BaseURL to avoid double path
-	// (user may pass "https://host/v1/web-search" as baseurl)
 	baseURL := strings.TrimSuffix(c.Config.BaseURL, "/v1/web-search")
 	baseURL = strings.TrimSuffix(baseURL, "/")
 	searchURL := baseURL + "/v1/web-search"
@@ -111,12 +179,34 @@ func (c *AiBalanceSearchClient) Search(query string, page, pageSize int) (*AiBal
 		opts = append(opts, lowhttp.WithProxy(c.Config.Proxy))
 	}
 
-	// Send POST request
-	raw, err := Request("POST", searchURL, map[string]string{
+	// First attempt
+	resp, err := c.doSearchRequest(searchURL, bodyBytes, opts)
+	if err != nil && isTOTPAuthError(err) {
+		// TOTP authentication failed, refresh secret and retry once
+		log.Infof("TOTP authentication failed for aibalance web search, refreshing secret and retrying...")
+		c.refreshTOTPSecret()
+		resp, err = c.doSearchRequest(searchURL, bodyBytes, opts)
+	}
+	return resp, err
+}
+
+// doSearchRequest sends the actual HTTP request to aibalance with TOTP authentication
+func (c *AiBalanceSearchClient) doSearchRequest(searchURL string, bodyBytes []byte, opts []lowhttp.LowhttpOpt) (*AiBalanceSearchResponse, error) {
+	headers := map[string]string{
 		"Content-Type":  "application/json",
 		"Authorization": "Bearer " + c.Config.APIKey,
 		"User-Agent":    "Yaklang-AiBalance-OmniSearch/1.0",
-	}, nil, bodyBytes, opts...)
+	}
+
+	// Add TOTP header for aibalance authentication
+	totpCode := c.generateTOTPCode()
+	if totpCode != "" {
+		encodedCode := base64.StdEncoding.EncodeToString([]byte(totpCode))
+		headers["X-Memfit-OTP-Auth"] = encodedCode
+	}
+
+	// Send POST request
+	raw, err := Request("POST", searchURL, headers, nil, bodyBytes, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send request to aibalance: %v", err)
 	}
