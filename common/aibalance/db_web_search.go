@@ -1,9 +1,11 @@
 package aibalance
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 )
@@ -25,7 +27,11 @@ func GetWebSearchConfig() (*schema.WebSearchConfig, error) {
 	var config schema.WebSearchConfig
 	db := GetDB()
 	if err := db.Where("id = ?", 1).First(&config).Error; err != nil {
-		// Not found, create default
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			// Real DB error (connection issue, etc.), return it directly
+			return nil, fmt.Errorf("failed to query web search config: %v", err)
+		}
+		// Record not found, create default
 		config = schema.WebSearchConfig{}
 		config.ID = 1
 		if createErr := db.Create(&config).Error; createErr != nil {
@@ -124,13 +130,15 @@ func UpdateWebSearchApiKeyStats(id uint, success bool, latencyMs int64) error {
 
 	if success {
 		key.SuccessCount++
+		key.ConsecutiveFailures = 0 // Reset consecutive failure counter on success
 		key.IsHealthy = true
 	} else {
 		key.FailureCount++
+		key.ConsecutiveFailures++
 		// Mark as unhealthy after 3 consecutive failures
-		if key.FailureCount > 0 && key.FailureCount%3 == 0 {
+		if key.ConsecutiveFailures >= 3 {
 			key.IsHealthy = false
-			log.Warnf("web search api key (ID: %d, Type: %s) marked as unhealthy after consecutive failures", id, key.SearcherType)
+			log.Warnf("web search api key (ID: %d, Type: %s) marked as unhealthy after %d consecutive failures", id, key.SearcherType, key.ConsecutiveFailures)
 		}
 	}
 
@@ -147,7 +155,31 @@ func UpdateWebSearchApiKeyStatus(id uint, active bool) error {
 func ResetWebSearchApiKeyHealth(id uint) error {
 	return GetDB().Model(&schema.WebSearchApiKey{}).Where("id = ?", id).
 		Updates(map[string]interface{}{
-			"is_healthy":    true,
-			"failure_count": 0,
+			"is_healthy":            true,
+			"failure_count":         0,
+			"consecutive_failures":  0,
 		}).Error
+}
+
+// IncrementWebSearchConfigTotalRequests atomically increments the persistent total web search request counter.
+// This counter survives process restarts (stored in WebSearchConfig singleton row).
+func IncrementWebSearchConfigTotalRequests() error {
+	db := GetDB()
+	// Ensure the config row exists first
+	_, err := GetWebSearchConfig()
+	if err != nil {
+		return fmt.Errorf("failed to ensure web search config: %v", err)
+	}
+	return db.Model(&schema.WebSearchConfig{}).Where("id = ?", 1).
+		UpdateColumn("total_web_search_requests", gorm.Expr("total_web_search_requests + ?", 1)).Error
+}
+
+// GetTotalWebSearchRequests returns the persistent cumulative web search request count from the database.
+func GetTotalWebSearchRequests() int64 {
+	config, err := GetWebSearchConfig()
+	if err != nil {
+		log.Errorf("failed to get web search config for total requests: %v", err)
+		return 0
+	}
+	return config.TotalWebSearchRequests
 }

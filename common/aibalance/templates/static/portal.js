@@ -1558,13 +1558,6 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
             }, 2000);
         }
 
-        function escapeHtml(text) {
-            if (!text) return '';
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-
         // Auto-update memory display on page load
         setTimeout(function() {
             fetch('/portal/api/memory-stats')
@@ -5028,11 +5021,20 @@ curl '${metaApiUrl}?name=${modelName}'`;
                 return;
             }
             
-            tbody.innerHTML = keys.map(k => `
+            tbody.innerHTML = keys.map(k => {
+                const safeId = parseInt(k.id, 10) || 0;
+                const safeApiKey = escapeHtml(k.api_key);
+                const safeBaseUrl = escapeHtml(k.base_url);
+                const safeLastUsedTime = escapeHtml(k.last_used_time);
+                const safeSuccessCount = parseInt(k.success_count, 10) || 0;
+                const safeFailureCount = parseInt(k.failure_count, 10) || 0;
+                const safeTotalRequests = parseInt(k.total_requests, 10) || 0;
+                const safeLastLatency = parseInt(k.last_latency, 10) || 0;
+                return `
                 <tr>
-                    <td>${k.id}</td>
-                    <td style="font-family: monospace; font-size: 12px;" title="${k.api_key}">${k.api_key}</td>
-                    <td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${k.base_url || '默认'}">${k.base_url || '<span style="color:#999">默认</span>'}</td>
+                    <td>${safeId}</td>
+                    <td style="font-family: monospace; font-size: 12px;" title="${safeApiKey}">${safeApiKey}</td>
+                    <td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${safeBaseUrl || '默认'}">${safeBaseUrl || '<span style="color:#999">默认</span>'}</td>
                     <td>
                         <span style="background: ${k.active ? '#e8f5e9' : '#fce4ec'}; color: ${k.active ? '#2e7d32' : '#c62828'}; padding: 2px 8px; border-radius: 4px; font-size: 12px;">
                             ${k.active ? '启用' : '停用'}
@@ -5043,26 +5045,27 @@ curl '${metaApiUrl}?name=${modelName}'`;
                             ${k.is_healthy ? '健康' : '异常'}
                         </span>
                     </td>
-                    <td><span style="color: #2e7d32">${k.success_count}</span> / <span style="color: #c62828">${k.failure_count}</span></td>
-                    <td>${k.total_requests}</td>
-                    <td>${k.last_latency > 0 ? k.last_latency + 'ms' : '-'}</td>
-                    <td style="font-size: 12px;">${k.last_used_time && k.last_used_time !== '0001-01-01 00:00:00' ? k.last_used_time : '-'}</td>
+                    <td><span style="color: #2e7d32">${safeSuccessCount}</span> / <span style="color: #c62828">${safeFailureCount}</span></td>
+                    <td>${safeTotalRequests}</td>
+                    <td>${safeLastLatency > 0 ? safeLastLatency + 'ms' : '-'}</td>
+                    <td style="font-size: 12px;">${safeLastUsedTime && safeLastUsedTime !== '0001-01-01 00:00:00' ? safeLastUsedTime : '-'}</td>
                     <td>
                         <div style="display: flex; gap: 4px; flex-wrap: wrap;">
-                            <button class="btn btn-sm" id="ws-test-btn-${k.id}" onclick="testWebSearchKey(${k.id})" style="background: #9c27b0; font-size: 11px; padding: 2px 6px;">测试</button>
+                            <button class="btn btn-sm" id="ws-test-btn-${safeId}" onclick="testWebSearchKey(${safeId})" style="background: #9c27b0; font-size: 11px; padding: 2px 6px;">测试</button>
                             ${k.active 
-                                ? `<button class="btn btn-sm" onclick="toggleWebSearchKeyStatus(${k.id}, false)" style="background: #ff9800; font-size: 11px; padding: 2px 6px;">停用</button>`
-                                : `<button class="btn btn-sm" onclick="toggleWebSearchKeyStatus(${k.id}, true)" style="background: #4caf50; font-size: 11px; padding: 2px 6px;">启用</button>`
+                                ? `<button class="btn btn-sm" onclick="toggleWebSearchKeyStatus(${safeId}, false)" style="background: #ff9800; font-size: 11px; padding: 2px 6px;">停用</button>`
+                                : `<button class="btn btn-sm" onclick="toggleWebSearchKeyStatus(${safeId}, true)" style="background: #4caf50; font-size: 11px; padding: 2px 6px;">启用</button>`
                             }
                             ${!k.is_healthy 
-                                ? `<button class="btn btn-sm" onclick="resetWebSearchKeyHealth(${k.id})" style="background: #2196f3; font-size: 11px; padding: 2px 6px;">重置健康</button>`
+                                ? `<button class="btn btn-sm" onclick="resetWebSearchKeyHealth(${safeId})" style="background: #2196f3; font-size: 11px; padding: 2px 6px;">重置健康</button>`
                                 : ''
                             }
-                            <button class="btn btn-sm" onclick="deleteWebSearchKey(${k.id})" style="background: #f44336; font-size: 11px; padding: 2px 6px;">删除</button>
+                            <button class="btn btn-sm" onclick="deleteWebSearchKey(${safeId})" style="background: #f44336; font-size: 11px; padding: 2px 6px;">删除</button>
                         </div>
                     </td>
                 </tr>
-            `).join('');
+                `;
+            }).join('');
         }
         
         function showAddWebSearchKeyModal() {
