@@ -206,14 +206,12 @@ ai mod
 client = ai.Client()
 */
 
-// description: 创建一个 OpenAI 客户端实例，支持 OpenAI 官方 API 及兼容的第三方服务。
+// 创建一个 OpenAI 客户端实例，支持 OpenAI 官方 API 及兼容的第三方服务。
 //
-// category: 核心函数
-//
-// Parameters:
+// 参数：
 // - opts(...aispec.AIConfigOption): 配置选项（必须包含 apiKey）
 //
-// Returns:
+// 返回值：
 // - r1: AI 客户端实例
 //
 // Example:
@@ -233,11 +231,9 @@ client = ai.Client()
 //
 // // 使用自定义 API 地址
 // client = ai.OpenAI(
-//
 //	ai.apiKey("sk-xxx"),
 //	ai.baseURL("https://api.openai-proxy.com/v1"),
 //	ai.model("gpt-4"),
-//
 // )
 // ```
 func OpenAI(opts ...aispec.AIConfigOption) aispec.AIClient {
@@ -261,24 +257,20 @@ func GetAI(t string, opts ...aispec.AIConfigOption) aispec.AIClient {
 	return agent
 }
 
-// description: 创建一个 ChatGLM 客户端实例，用于调用智谱 AI 的 ChatGLM 系列模型。
+// 创建一个 ChatGLM 客户端实例，用于调用智谱 AI 的 ChatGLM 系列模型。
 //
-// category: 核心函数
-//
-// Parameters:
+// 参数:
 // - opts(...aispec.AIConfigOption): 配置选项（必须包含 apiKey）
 //
-// Returns:
+// 返回值:
 // - r1: AI 客户端实例
 //
 // Example:
 // ```go
 // // 创建 ChatGLM 客户端
 // client = ai.ChatGLM(
-//
 //	ai.apiKey("your-api-key"),
 //	ai.model("chatglm_turbo"),
-//
 // )
 //
 // // 调用对话
@@ -294,24 +286,20 @@ func ChatGLM(opts ...aispec.AIConfigOption) aispec.AIClient {
 	return agent
 }
 
-// description: 创建一个 Moonshot 客户端实例，用于调用 Moonshot AI 服务。
+// 创建一个 Moonshot 客户端实例，用于调用 Moonshot AI 服务。
 //
-// category: 核心函数
-//
-// Parameters:
+// 参数：
 // - opts(...aispec.AIConfigOption): 配置选项（必须包含 apiKey）
 //
-// Returns:
+// 返回值：
 // - r1: AI 客户端实例
 //
 // Example:
 // ```go
 // // 创建 Moonshot 客户端
 // client = ai.Moonshot(
-//
 //	ai.apiKey("sk-xxx"),
 //	ai.model("moonshot-v1-8k"),
-//
 // )
 //
 // // 使用客户端
@@ -355,34 +343,30 @@ func GetPrimaryAgent() aispec.AIClient {
 	return agent
 }
 
-// description: Chat 快速调用 AI 服务进行对话，这是最简单的调用方式。
+// Chat 快速调用 AI 服务进行对话，这是最简单的调用方式。
 //
-// category: 核心函数
-//
-// Parameters:
+// 参数：
 // - msg(string): 要发送给 AI 的消息内容
 // - opts(...aispec.AIConfigOption): AI 配置选项（如 apiKey、model 等）
 //
-// Returns:
+// 返回值：
 // - string(string): AI 返回的回复内容
 // - error(error): 错误信息
 //
 // Example:
 // ```go
 // response, err = ai.Chat("介绍一下 Yakit",
-//
 //	ai.baseURL("https://api.openai-proxy.com/v1"),
 //	ai.apiKey("sk-xxx"),
 //	ai.type("openai"),
 //	ai.model("gpt-4"),
 //	ai.proxy("http://127.0.0.1:7890"),
 //	ai.timeout(60),
-//
 // )
 //
-//	if err != nil {
-//	    panic(err)
-//	}
+// if err != nil {
+//	panic(err)
+// }
 //
 // println(response)
 // ```
@@ -580,15 +564,13 @@ func VisionChat(msg string, opts ...aispec.AIConfigOption) (string, error) {
 	return TieredChatWithTier(TierVision, msg, opts...)
 }
 
-// description: 获取结构化的流式输出，支持实时接收 AI 返回的数据。
+// 获取结构化的流式输出，支持实时接收 AI 返回的数据。
 //
-// category: 核心函数
-//
-// Parameters:
+// 参数：
 // - input(string): 输入消息
 // - opts(...aispec.AIConfigOption): 配置选项
 //
-// Returns:
+// 返回值：
 // - r1(chan *aispec.StructuredData): 结构化数据通道
 // - r2(error): 错误信息
 //
@@ -596,20 +578,17 @@ func VisionChat(msg string, opts ...aispec.AIConfigOption) (string, error) {
 // ```go
 // // 获取流式输出
 // stream, err = ai.StructuredStream(
-//
 //	"生成一个端口扫描脚本",
 //	ai.apiKey("sk-xxx"),
 //	ai.type("openai"),
-//
 // )
 // die(err)
 //
 // // 读取流数据
 //
-//	for data = range stream {
-//	    printf("收到数据: %v\n", data)
-//	}
-//
+// for data = range stream {
+//	printf("收到数据: %v\n", data)
+// }
 // ```
 func StructuredStream(input string, opts ...aispec.AIConfigOption) (chan *aispec.StructuredData, error) {
 	config := aispec.NewDefaultAIConfig(opts...)
@@ -642,14 +621,12 @@ func StructuredStream(input string, opts ...aispec.AIConfigOption) (chan *aispec
 	return nil, errors.New("not found valid ai agent or retry times is over")
 }
 
-// description: 列出当前配置下所有可用的 AI 模型。
+// 列出当前配置下所有可用的 AI 模型。
 //
-// category: 核心函数
-//
-// Parameters:
+// 参数：
 // - opts(...aispec.AIConfigOption): 配置选项（如 apiKey、type）
 //
-// Returns:
+// 返回值：
 // - r1([]*aispec.ModelMeta): 模型元数据列表
 // - r2(error): 错误信息
 //
@@ -657,17 +634,14 @@ func StructuredStream(input string, opts ...aispec.AIConfigOption) (chan *aispec
 // ```go
 // // 列出 OpenAI 的所有模型
 // models, err = ai.ListModels(
-//
 //	ai.apiKey("sk-xxx"),
 //	ai.type("openai"),
-//
 // )
 // die(err)
 //
-//	for _, model = range models {
-//	    printf("模型: %s\n", model.Name)
-//	}
-//
+// for _, model = range models {
+//	printf("模型: %s\n", model.Name)
+// }
 // ```
 func ListModels(opts ...aispec.AIConfigOption) ([]*aispec.ModelMeta, error) {
 	config := aispec.NewDefaultAIConfig(opts...)
@@ -678,15 +652,13 @@ func ListModels(opts ...aispec.AIConfigOption) ([]*aispec.ModelMeta, error) {
 	return client.GetModelList()
 }
 
-// description: 根据提供商类型列出可用的 AI 模型。
+// 根据提供商类型列出可用的 AI 模型。
 //
-// category: 核心函数
-//
-// Parameters:
+// 参数：
 // - providerType(string): 提供商类型（如 "openai"、"chatglm"、"moonshot"）
 // - opts(...aispec.AIConfigOption): 配置选项
 //
-// Returns:
+// 返回值：
 //
 // - r1([]*aispec.ModelMeta): 模型元数据列表
 // - r2(error): 错误信息
@@ -695,17 +667,14 @@ func ListModels(opts ...aispec.AIConfigOption) ([]*aispec.ModelMeta, error) {
 // ```go
 // // 列出 ChatGLM 的模型
 // models, err = ai.ListModelByProviderType(
-//
 //	"chatglm",
 //	ai.apiKey("your-key"),
-//
 // )
 // die(err)
 //
-//	for _, model = range models {
-//	    printf("ChatGLM 模型: %s\n", model.Name)
-//	}
-//
+// for _, model = range models {
+//  printf("ChatGLM 模型: %s\n", model.Name)
+// }
 // ```
 func ListModelByProviderType(providerType string, opts ...aispec.AIConfigOption) ([]*aispec.ModelMeta, error) {
 	config := aispec.NewDefaultAIConfig(opts...)
@@ -714,16 +683,14 @@ func ListModelByProviderType(providerType string, opts ...aispec.AIConfigOption)
 	return client.GetModelList()
 }
 
-// description: 让 AI 根据用户输入自动调用预定义的函数，实现智能函数调用能力。
+// 让 AI 根据用户输入自动调用预定义的函数，实现智能函数调用能力。
 //
-// category: 核心函数
-//
-// Parameters:
+// 参数：
 // - input(string): 用户输入的自然语言指令
 // - funcs(any): 函数定义（支持结构体或函数列表）
 // - opts(...aispec.AIConfigOption): AI 配置选项
 //
-// Returns:
+// 返回值：
 //
 // - r1(map[string]any): 函数调用结果
 // - r2(error): 错误信息
@@ -743,13 +710,12 @@ func ListModelByProviderType(providerType string, opts ...aispec.AIConfigOption)
 //
 // // AI 自动识别并调用函数
 // result, err = ai.FunctionCall(
-//
 //	"帮我搜索 SQL 注入漏洞",
 //	funcs,
 //	ai.apiKey("sk-xxx"),
 //	ai.type("openai"),
-//
 // )
+//
 // die(err)
 // dump(result)
 // ```

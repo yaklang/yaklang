@@ -5,9 +5,9 @@ import (
 	"html"
 	"os"
 	"path"
+	"regexp"
 	"sort"
 	"strings"
-	"regexp"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
@@ -21,12 +21,10 @@ import (
 type YakDocParsed struct {
 	Description     string
 	LongDescription string
-	Category	    string			  // 分类
 	Params          map[string]string // 参数名 -> 描述
 	Returns         []string          // 按顺序存储返回值描述
 	Example         string
 }
-
 
 func specialPatchValueStr(ins *yakdoc.LibInstance) string {
 	valueStr := ins.ValueStr
@@ -75,77 +73,81 @@ func parseCommentDetails(doc string) *YakDocParsed {
 	parsed := &YakDocParsed{
 		Params: make(map[string]string),
 	}
-	lines := strings.Split(doc, "\n")
 
-	var currentTag string
+	// 按行分割并清理
+	lines := strings.Split(doc, "\n")
+	var cleanLines []string
+	for _, line := range lines {
+		// 这里的 doc 假设已经去掉了 "//" 前缀，如果没有去掉，需要先在此处 strings.TrimPrefix(line, "//")
+		cleanLines = append(cleanLines, strings.TrimSpace(line))
+	}
+
+	var currentSection string // "", "long_desc", "params", "returns", "example"
 	var longDescLines []string
 	var exampleLines []string
 
-	// 正则匹配: - name(type): description
+	// 正则匹配: - name(type): description 或 - name: description
 	listRegex := regexp.MustCompile(`^\s*-\s*([\w.]+)\s*(?:\(.*\))?\s*[:：]\s*(.*)$`)
 
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		lowerLine := strings.ToLower(trimmed)
+	for i := 0; i < len(cleanLines); i++ {
+		line := cleanLines[i]
+		lowerLine := strings.ToLower(line)
 
-		// 检测标签切换
-		if strings.HasPrefix(lowerLine, "description:") {
-			currentTag = "description"
-			parsed.Description = strings.TrimSpace(strings.TrimPrefix(trimmed, "description:"))
+		// 1. 检测状态切换 (关键字识别)
+		if strings.HasPrefix(line, "参数") {
+			currentSection = "params"
 			continue
-		} else if strings.HasPrefix(lowerLine, "long_description:") {
-			currentTag = "long_description"
-			firstLine := strings.TrimSpace(strings.TrimPrefix(trimmed, "long_description:"))
-			if firstLine != "" {
-				longDescLines = append(longDescLines, firstLine)
-			}
+		} else if strings.HasPrefix(line, "返回值") {
+			currentSection = "returns"
 			continue
-		} else if strings.HasPrefix(lowerLine, "category:") {
-			currentTag = "category"
-			parsed.Category = strings.TrimSpace(strings.TrimPrefix(trimmed, "category:"))
-			continue
-		}else if strings.HasPrefix(lowerLine, "parameters:") {
-			currentTag = "parameters"
-			continue
-		} else if strings.HasPrefix(lowerLine, "returns:") {
-			currentTag = "returns"
-			continue
-		} else if strings.HasPrefix(lowerLine, "example:") {
-			currentTag = "example"
+		} else if strings.HasPrefix(lowerLine, "example") {
+			currentSection = "example"
 			continue
 		}
 
-		// 处理内容
-		switch currentTag {
-			case "long_description":
-				// 只有非空行才加入，避免产生过多的空格
-				if trimmed != "" {
-					// 去除换行符的关键：直接存入 trimmed 后的文本
-					longDescLines = append(longDescLines, trimmed)
-				}
-			case "parameters":
-				matches := listRegex.FindStringSubmatch(line)
-				if len(matches) > 2 {
-					parsed.Params[matches[1]] = matches[2]
-				}
-			case "returns":
-				matches := listRegex.FindStringSubmatch(line)
-				if len(matches) > 2 {
-					parsed.Returns = append(parsed.Returns, matches[2])
-				} else if trimmed != "" && strings.HasPrefix(trimmed, "-") {
-					parsed.Returns = append(parsed.Returns, strings.TrimPrefix(trimmed, "-"))
-				}
-			case "example":
-				// Example 块通常需要保留换行符以维持代码格式，所以这里不去除换行
-				exampleLines = append(exampleLines, line)
+		// 2. 处理内容提取
+		if line == "" && currentSection != "example" {
+			continue // 忽略非代码块中的空行
+		}
+
+		switch currentSection {
+		case "":
+			// 初始状态逻辑：第一行是 Description，之后到“参数”之前的内容是 LongDescription
+			if parsed.Description == "" {
+				parsed.Description = line
+			} else {
+				longDescLines = append(longDescLines, line)
 			}
+
+		case "params":
+			matches := listRegex.FindStringSubmatch(line)
+			if len(matches) > 2 {
+				parsed.Params[matches[1]] = matches[2]
+			}
+
+		case "returns":
+			matches := listRegex.FindStringSubmatch(line)
+			if len(matches) > 2 {
+				parsed.Returns = append(parsed.Returns, matches[2])
+			} else if strings.HasPrefix(line, "-") {
+				parsed.Returns = append(parsed.Returns, strings.TrimSpace(strings.TrimPrefix(line, "-")))
+			}
+
+		case "example":
+			// 保留原始格式（包括空格）
+			exampleLines = append(exampleLines, lines[i])
+		}
 	}
 
-	// 合并 LongDescription：用空格连接各行，并处理可能出现的连续空格
-	rawLongDesc := strings.Join(longDescLines, " ")
-	parsed.LongDescription = strings.Join(strings.Fields(rawLongDesc), "")
-	
+	// 格式化输出
+	// LongDescription 处理：合并行，根据原逻辑使用了 Fields 处理（注意：Fields 会压缩所有空格）
+	if len(longDescLines) > 0 {
+		rawLongDesc := strings.Join(longDescLines, " ")
+		parsed.LongDescription = strings.Join(strings.Fields(rawLongDesc), "")
+	}
+
 	parsed.Example = strings.Join(exampleLines, "\n")
+
 	return parsed
 }
 
@@ -278,45 +280,33 @@ func GenerateSingleFileMDX(basepath string, lib *yakdoc.ScriptLib, description s
 		Parsed *YakDocParsed
 	}
 
-
 	// 将Functions转成list
 	funcList := lo.MapToSlice(lib.Functions, func(key string, value *yakdoc.FuncDecl) FuncInfo {
 		return FuncInfo{Decl: value, Parsed: parseCommentDetails(value.Document)}
 	})
-
-	groups := lo.GroupBy(funcList, func(item FuncInfo) string {
-		if item.Parsed.Category != "" {
-			return item.Parsed.Category
-		}
-		return "未分类函数"
+	// 全局排序：按方法名排序
+	sort.SliceStable(funcList, func(i, j int) bool {
+		return funcList[i].Decl.MethodName < funcList[j].Decl.MethodName
 	})
-	existingCategories := lo.Keys(groups)
 
 	file.WriteString("## 函数索引\n\n")
+	file.WriteString("|函数名|函数描述/介绍|\n")
+	file.WriteString("|:------|:--------|\n")
 
-	for _, cat := range existingCategories {
-		funcs := groups[cat]
-		// 组内按方法名排序
-		sort.SliceStable(funcs, func(i, j int) bool {
-			return funcs[i].Decl.MethodName < funcs[j].Decl.MethodName
-		})
-
-		file.WriteString(fmt.Sprintf("### %s\n\n", cat))
-		file.WriteString("|函数名|函数描述/介绍|\n")
-		file.WriteString("|:------|:--------|\n")
-		for _, f := range funcs {
-			lowerMethodName := strings.ToLower(f.Decl.MethodName)
-			file.WriteString(fmt.Sprintf("| [%s.%s](#%s) | %s |\n",
-				html.EscapeString(f.Decl.LibName),
-				html.EscapeString(f.Decl.MethodName),
-				html.EscapeString(lowerMethodName),
-				html.EscapeString(f.Parsed.Description),
-			))
-		}
-		file.WriteString("\n")
+	for _, f := range funcList {
+		lowerMethodName := strings.ToLower(f.Decl.MethodName)
+		file.WriteString(fmt.Sprintf("| [%s.%s](#%s) | %s |\n",
+			html.EscapeString(f.Decl.LibName),
+			html.EscapeString(f.Decl.MethodName),
+			html.EscapeString(lowerMethodName),
+			f.Parsed.Description,
+		))
 	}
 
+	file.WriteString("\n\n")
+
 	if len(lib.Instances) > 0 {
+		file.WriteString("## 实例索引\n\n")
 		file.WriteString("|实例名|实例描述|\n")
 		file.WriteString("|:------|:--------|\n")
 		keys := lo.Keys(lib.Instances)
@@ -333,68 +323,61 @@ func GenerateSingleFileMDX(basepath string, lib *yakdoc.ScriptLib, description s
 	}
 
 	bufList := make([]strings.Builder, 0, len(funcList))
+	file.WriteString("## API 详情\n\n")
 
-	for _, cat := range existingCategories  {
-		funcs := groups[cat]
-		buf1 := strings.Builder{}
-		buf1.WriteString(fmt.Sprintf("## %s\n\n", cat))
-		bufList = append(bufList, buf1)
+	for _, f := range funcList {
+		fun := f.Decl
+		p := f.Parsed
+		buf := strings.Builder{}
 
-		for _, f := range funcs {
-			fun := f.Decl
-			p := f.Parsed
-			buf := strings.Builder{}
-
-			buf.WriteString(fmt.Sprintf("### %s\n\n", fun.MethodName))
-			buf.WriteString(fmt.Sprintf("- 描述 %s\n\n", p.Description))
-			if p.LongDescription != "" {
-				buf.WriteString(fmt.Sprintf("- 详细描述 %s\n\n", p.LongDescription))
-			}
-			buf.WriteString("\n<Tabs>\n")
-			buf.WriteString(fmt.Sprintf("<TabItem value=\"%s-1\" label=\"定义\" default>\n\n", fun.MethodName))
-			buf.WriteString(fmt.Sprintf("```go\n%s\n```\n\n", html.EscapeString(fun.Decl)))
-
-			if len(fun.Params) > 0 {
-				buf.WriteString("**参数配置信息**\n")
-				buf.WriteString("\n|参数名|参数类型|参数解释|\n")
-				buf.WriteString("|:-----------|:---------- |:-----------|\n")
-				for _, param := range fun.Params {
-					explanation := p.Params[param.Name]
-					buf.WriteString(fmt.Sprintf("| %s | `%s` |  %s |\n", html.EscapeString(param.Name), html.EscapeString(param.Type), explanation))
-				}
-				buf.WriteString("\n")
-			}
-			if len(fun.Results) > 0 {
-				buf.WriteString("**返回值**\n")
-				buf.WriteString("\n|返回值(顺序)|返回值类型|返回值解释|\n")
-				buf.WriteString("|:-----------|:---------- |:-----------|\n")
-				for i, result := range fun.Results {
-					explanation := ""
-					if i < len(p.Returns) {
-						explanation = p.Returns[i]
-					}
-					buf.WriteString(fmt.Sprintf("| %s | `%s` |  %s |\n", html.EscapeString(result.Name), html.EscapeString(result.Type), explanation))
-				}
-				buf.WriteString("\n")
-			}
-			buf.WriteString("</TabItem>\n")
-			if p.Example != "" {
-				buf.WriteString(fmt.Sprintf("<TabItem value=\"%s-2\" label=\"示例\">\n", fun.MethodName))
-				buf.WriteString(fmt.Sprintf("\n\n%s\n\n", p.Example))
-				buf.WriteString("</TabItem>\n")
-			}
-			buf.WriteString("</Tabs>\n\n")
-			buf.WriteString("\n---\n\n")
-			bufList = append(bufList, buf)
+		buf.WriteString(fmt.Sprintf("### %s\n\n", fun.MethodName))
+		buf.WriteString(fmt.Sprintf("- 描述: %s\n\n", p.Description))
+		if p.LongDescription != "" {
+			buf.WriteString(fmt.Sprintf("- 详细描述: %s\n\n", p.LongDescription))
 		}
+		buf.WriteString("\n<Tabs>\n")
+		buf.WriteString(fmt.Sprintf("<TabItem value=\"%s-1\" label=\"定义\" default>\n\n", fun.MethodName))
+		buf.WriteString(fmt.Sprintf("```go\n%s\n```\n\n", html.EscapeString(fun.Decl)))
+
+		if len(fun.Params) > 0 {
+			buf.WriteString("**参数配置信息**\n")
+			buf.WriteString("\n|参数名|参数类型|参数解释|\n")
+			buf.WriteString("|:-----------|:---------- |:-----------|\n")
+			for _, param := range fun.Params {
+				explanation := p.Params[param.Name]
+				buf.WriteString(fmt.Sprintf("| %s | `%s` |  %s |\n", html.EscapeString(param.Name), html.EscapeString(param.Type), explanation))
+			}
+			buf.WriteString("\n")
+		}
+		if len(fun.Results) > 0 {
+			buf.WriteString("**返回值**\n")
+			buf.WriteString("\n|返回值(顺序)|返回值类型|返回值解释|\n")
+			buf.WriteString("|:-----------|:---------- |:-----------|\n")
+			for i, result := range fun.Results {
+				explanation := ""
+				if i < len(p.Returns) {
+					explanation = p.Returns[i]
+				}
+				buf.WriteString(fmt.Sprintf("| %s | `%s` |  %s |\n", html.EscapeString(result.Name), html.EscapeString(result.Type), explanation))
+			}
+			buf.WriteString("\n")
+		}
+		buf.WriteString("</TabItem>\n")
+		if p.Example != "" {
+			buf.WriteString(fmt.Sprintf("<TabItem value=\"%s-2\" label=\"示例\">\n", fun.MethodName))
+			buf.WriteString(fmt.Sprintf("\n\n%s\n\n", p.Example))
+			buf.WriteString("</TabItem>\n")
+		}
+		buf.WriteString("</Tabs>\n\n")
+		buf.WriteString("\n---\n\n")
+		bufList = append(bufList, buf)
 	}
+
 	file.WriteString("\n\n")
 	for _, buf := range bufList {
 		file.WriteString(buf.String())
 	}
 }
-
-
 
 func main() {
 	if len(os.Args) < 2 {
