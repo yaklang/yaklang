@@ -68,6 +68,7 @@ func NewTestReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 		aicommon.WithEnableSelfReflection(false),
 		aicommon.WithDisallowMCPServers(true),
 		aicommon.WithDisableSessionTitleGeneration(true),
+		aicommon.WithDisableIntentRecognition(true),
 	}
 	basicOption = append(basicOption, opts...)
 	ins, err := NewReAct(

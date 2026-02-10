@@ -223,6 +223,7 @@ type Config struct {
 	// task config
 	EnhanceKnowledgeManager            *EnhanceKnowledgeManager
 	DisableEnhanceDirectlyAnswer       bool
+	DisableIntentRecognition           bool // 禁用意图识别（用于测试环境，避免子循环消耗 mock 响应）
 	PerTaskUserInteractiveLimitedTimes int64
 
 	/*
@@ -1275,6 +1276,24 @@ func WithDisableEnhanceDirectlyAnswer(disable bool) ConfigOption {
 		c.m.Lock()
 		c.DisableEnhanceDirectlyAnswer = disable
 		c.m.Unlock()
+		return nil
+	}
+}
+
+// WithDisableIntentRecognition disables intent recognition in loop_default's buildInitTask.
+// This is primarily used in test environments where the mock AI callback cannot handle
+// the intent recognition sub-loop (loop_intent), which would consume mock responses
+// intended for the main test flow.
+func WithDisableIntentRecognition(disable bool) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		c.DisableIntentRecognition = disable
+		c.m.Unlock()
+		// Also set in KV config so buildInitTask can check via GetConfigBool
+		c.SetConfig("DisableIntentRecognition", disable)
 		return nil
 	}
 }
