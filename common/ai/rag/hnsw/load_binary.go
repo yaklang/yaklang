@@ -501,8 +501,7 @@ func (p *Persistent[K]) BuildLazyGraph(dataLoader func(key K, data hnswspec.Lazy
 				}
 				data, err := dataLoader(key, id)
 				if err != nil {
-					log.Errorf("data loader error for key %v: %v", key, err)
-					continue
+					return nil, utils.Wrap(err, "load data")
 				}
 				nodes[uint32(offset)] = hnswspec.NewLazyLayerNode(hnswspec.LazyNodeID(id), func(uid hnswspec.LazyNodeID) (hnswspec.LayerNode[K], error) {
 					return data, nil
@@ -517,8 +516,7 @@ func (p *Persistent[K]) BuildLazyGraph(dataLoader func(key K, data hnswspec.Lazy
 				}
 				data, err := dataLoader(key, id)
 				if err != nil {
-					log.Errorf("data loader error for key %v: %v", key, err)
-					continue
+					return nil, utils.Wrap(err, "load data")
 				}
 				nodes[uint32(offset)] = hnswspec.NewLazyLayerNode(hnswspec.LazyNodeID(id), func(uid hnswspec.LazyNodeID) (hnswspec.LayerNode[K], error) {
 					return data, nil
@@ -537,8 +535,7 @@ func (p *Persistent[K]) BuildLazyGraph(dataLoader func(key K, data hnswspec.Lazy
 		for _, offset := range layer.Nodes {
 			node, exists := nodes[offset]
 			if !exists {
-				log.Warnf("node offset %d not found", offset)
-				continue
+				return nil, utils.Errorf("layer node %d not found", offset)
 			}
 			key := node.GetKey()
 			layerNodes[key] = node
@@ -550,8 +547,7 @@ func (p *Persistent[K]) BuildLazyGraph(dataLoader func(key K, data hnswspec.Lazy
 	for offset, neighbors := range p.Neighbors {
 		node, exists := nodes[offset]
 		if !exists {
-			log.Warnf("neighbor offset %d not found", offset)
-			continue
+			return nil, utils.Errorf("layer node %d not found", offset)
 		}
 
 		for _, neighborOffset := range neighbors {
