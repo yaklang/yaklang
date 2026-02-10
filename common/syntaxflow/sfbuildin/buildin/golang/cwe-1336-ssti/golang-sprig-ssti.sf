@@ -101,9 +101,10 @@ SOLUTION
 REFERENCE
 )
 
-<include('golang-template-html')> as $sink;
+template?{<fullTypeName>?{have: 'text/template'}} as $template;
+template?{<fullTypeName>?{have: 'html/template'}} as $template;
 
-$sink.New as $new;
+$template.New as $new;
 $new().Funcs(* #-> as $param);
 $param?{<fullTypeName>?{have: 'sprig'}} as $low;
 
