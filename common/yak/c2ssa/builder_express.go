@@ -188,12 +188,17 @@ func (b *astbuilder) buildExpression(ast *cparser.ExpressionContext, isLeft bool
 		return b.buildCastExpression(p.(*cparser.CastExpressionContext), isLeft)
 	}
 
-	// 10. 语句表达式: statementsExpression
+	// 10. 赋值表达式: statementsExpression
+	if a := ast.AssignmentExpression(); a != nil {
+		return b.buildAssignmentExpression(a.(*cparser.AssignmentExpressionContext)), nil
+	}
+
+	// 11. 语句表达式: statementsExpression
 	if s := ast.StatementsExpression(); s != nil {
 		return b.buildStatementsExpression(s.(*cparser.StatementsExpressionContext)), nil
 	}
 
-	// 11. 声明表达式: declarationSpecifier
+	// 12. 声明表达式: declarationSpecifier
 	if d := ast.DeclarationSpecifier(); d != nil {
 		ssatype := b.buildDeclarationSpecifier(d.(*cparser.DeclarationSpecifierContext))
 		return ssa.NewTypeValue(ssatype), nil
@@ -329,7 +334,7 @@ func (b *astbuilder) buildUnaryExpression(ast *cparser.UnaryExpressionContext, i
 				if right.GetType().GetTypeKind() == ssa.PointerKind {
 					if param, ok := ssa.ToParameter(right); ok && !param.IsFreeValue {
 						b.ReferenceParameter(right.GetName(), param.FormalParameterIndex, ssa.PointerSideEffect)
-						// left = b.GetAndCreateOriginPointer(b.EmitConstPointer(left))
+						left = b.GetAndCreateOriginPointer(b.EmitConstPointer(left))
 					} else {
 						if isLeft {
 							left = b.GetAndCreateOriginPointer(right)

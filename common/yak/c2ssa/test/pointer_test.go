@@ -203,10 +203,11 @@ int main(){
 	*p = 2;
 	println(a); // 2
 	**pp = 3;
+	println(*p); // 3
 	println(a); // 3
 }
 			
-		`, []string{"2", "3"}, t)
+		`, []string{"2", "3", "3"}, t)
 	})
 
 	t.Run("basic muti pointer overwrite", func(t *testing.T) {
@@ -585,6 +586,7 @@ func Test_Pointer_SideEffect(t *testing.T) {
 
 	t.Run("pointer side-effect with double pointer", func(t *testing.T) {
 		t.Skip()
+		// 现在会生成p的side-effect，但是并不是指针，因此不会影响到a
 		test.CheckPrintlnValue(`#include <stdio.h>
 
 void modify_through_double_pointer(int** pp) {

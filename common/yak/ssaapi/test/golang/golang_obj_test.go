@@ -163,7 +163,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 ioutil?{<fullTypeName>?{have: 'io/ioutil'}} as $entry
 $entry.ReadFile(* #-> as $output)
 		`, map[string][]string{
-			"output": {"\"file\"", "Parameter-r"},
+			"output": {`"file"`, "Parameter-r", "Undefined-http.Request.URL.Query"},
 		}, true, ssaapi.WithLanguage(ssaconfig.GO),
 		)
 	})
@@ -184,7 +184,7 @@ func (c* Context)Cors1() {
 			*.Header()?{have: "Access-Control-Allow-Origin"} as $header
 			$header<getCallee>(,,* #-> as $output)
 		`, map[string][]string{
-			"output": {"\"*\""},
+			"output": {`"*"`, `"POST, GET, OPTIONS, PUT, DELETE"`},
 		},
 			ssaapi.WithLanguage(ssaconfig.GO),
 		)
@@ -206,7 +206,7 @@ func Cors1(c *gin.Context) {
 			$sink.Header()?{have: "Access-Control-Allow-Origin"} as $header
 			$header<getCallee>(,,* #-> as $output)
 		`, map[string][]string{
-			"output": {"\"*\""},
+			"output": {`"*"`, `"POST, GET, OPTIONS, PUT, DELETE"`},
 		},
 			ssaapi.WithLanguage(ssaconfig.GO),
 		)
