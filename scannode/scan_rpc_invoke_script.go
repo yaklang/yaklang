@@ -174,7 +174,15 @@ func (s *ScanNode) createYakitServer(reporter *ScannerAgentReporter, res *scanrp
 	return yaklib.NewYakitServer(
 		0,
 		yaklib.SetYakitServer_ProgressHandler(func(id string, progress float64) {
-			reporter.ReportProcess(progress)
+			// Scripts and libraries may emit multiple progress streams via SetProgressEx(id, progress).
+			// If we treat all of them as the "main" progress, a non-main stream that restarts from 0
+			// will shrink the frontend progress bar (e.g. around phase transitions).
+			id = strings.TrimSpace(id)
+			if id == "" || id == "main" {
+				_ = reporter.ReportProcess(progress)
+				return
+			}
+			_ = reporter.ReportProcessWithSubTask(id, progress)
 		}),
 		yaklib.SetYakitServer_LogHandler(s.createLogHandler(reporter, res)),
 	)
