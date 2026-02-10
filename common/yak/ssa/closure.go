@@ -384,13 +384,6 @@ func handleSideEffect(c *Call, funcTyp *FunctionType, buildPointer bool) {
 				log.Warnf("[ssa.handleSideEffect] skip side effect %s: side effect id is 0", se.Name)
 				continue
 			}
-			// 使用实际的 VerboseName 作为 SideEffectValue 的 key
-			c.SideEffectValue[actualVerboseName] = sideEffectId
-			if buildPointer {
-				if se.parameterMemberInner.MemberCallObjectIndex < len(c.Args) {
-					c.Args[se.parameterMemberInner.MemberCallObjectIndex] = sideEffectId
-				}
-			}
 		}
 	}
 }

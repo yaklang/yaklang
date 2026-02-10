@@ -5,8 +5,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/log"
-
 	"github.com/yaklang/yaklang/common/utils"
 	cparser "github.com/yaklang/yaklang/common/yak/antlr4c/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -714,7 +712,7 @@ func (b *astbuilder) buildPostfixSuffixLvalue(ast *cparser.PostfixSuffixLvalueCo
 	defer recoverRange()
 
 	setReference := false
-	log.Infof("postfix = %s\n", ast.GetText())
+	// log.Infof("postfix = %s\n", ast.GetText())
 
 	if p := ast.PostfixSuffixLvalue(); p != nil {
 		right, left, setReference = b.buildPostfixSuffixLvalue(p.(*cparser.PostfixSuffixLvalueContext), right, left, isLeft)
@@ -724,9 +722,19 @@ func (b *astbuilder) buildPostfixSuffixLvalue(ast *cparser.PostfixSuffixLvalueCo
 	if ast.LeftBracket() != nil && ast.RightBracket() != nil {
 		if e := ast.Expression(); e != nil {
 			index, _ := b.buildExpression(e.(*cparser.ExpressionContext), false)
+			RefParameterIndex := -1
+			if p, ok := ssa.ToParameter(right); ok && !p.IsFreeValue {
+				RefParameterIndex = p.FormalParameterIndex
+			} else if p, ok := ssa.ToParameterMember(right); ok {
+				RefParameterIndex = p.FormalParameterIndex
+			}
+
 			right = b.ReadMemberCallValue(right, index)
 			if isLeft && left != nil {
 				left = b.CreateMemberCallVariable(b.ReadValue(left.GetName()), index)
+			}
+			if RefParameterIndex != -1 {
+				b.ReferenceParameter(left.GetName(), RefParameterIndex, ssa.PointerSideEffect)
 			}
 			return right, left, false
 		}
@@ -747,7 +755,7 @@ func (b *astbuilder) buildPostfixSuffixLvalue(ast *cparser.PostfixSuffixLvalueCo
 				member := b.PeekValue(left.GetName())
 
 				checkParameter := func(target string) {
-					RefParameterIndex := 0
+					RefParameterIndex := -1
 					if p, ok := ssa.ToParameter(member); ok && !p.IsFreeValue {
 						RefParameterIndex = p.FormalParameterIndex
 					} else if p, ok := ssa.ToParameterMember(member); ok {
@@ -759,7 +767,7 @@ func (b *astbuilder) buildPostfixSuffixLvalue(ast *cparser.PostfixSuffixLvalueCo
 						delete(b.RefParameter, member.GetName())
 					}
 
-					if RefParameterIndex != 0 {
+					if RefParameterIndex != -1 {
 						b.ReferenceParameter(target, RefParameterIndex, ssa.PointerSideEffect)
 					}
 				}

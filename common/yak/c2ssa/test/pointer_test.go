@@ -187,7 +187,7 @@ int main(){
 	println(c);
 }
 			
-		`, []string{"1", "2", "Function-add(make(Pointer),make(Pointer)) member[1,\"a#1\",2,\"b#2\"]"}, t)
+		`, []string{"1", "2", "Function-add(make(Pointer),make(Pointer)) member[\"a#1\",1,\"b#2\",2]"}, t)
 	})
 }
 
@@ -537,7 +537,6 @@ func Test_Pointer_SideEffect(t *testing.T) {
 	})
 
 	t.Run("pointer side-effect with nested struct", func(t *testing.T) {
-		t.Skip()
 		test.CheckPrintlnValue(`#include <stdio.h>
 
 	struct Inner {
@@ -557,14 +556,13 @@ func Test_Pointer_SideEffect(t *testing.T) {
 
 		println(outer.inner.x); // 5
 		modify_nested(&outer);
-		println(outer.inner.x); // side-effect(99, outer.inner.x)
+		println(outer.inner.x); // side-effect(99, .inner.x)
 	}
 
-			`, []string{"5", "side-effect(99, outer.inner.x)"}, t)
+			`, []string{"5", "side-effect(99, .inner.x)"}, t)
 	})
 
 	t.Run("pointer side-effect with array", func(t *testing.T) {
-		t.Skip()
 		test.CheckPrintlnValue(`#include <stdio.h>
 
 	void modify_array(int* arr) {
@@ -578,11 +576,11 @@ func Test_Pointer_SideEffect(t *testing.T) {
 		println(arr[0]); // 1
 		println(arr[1]); // 2
 		modify_array(arr);
-		println(arr[0]); // side-effect(FreeValue-arr, arr[0])
-		println(arr[1]); // side-effect(FreeValue-arr, arr[1])
+		println(arr[0]); // side-effect(100, #20[0])
+		println(arr[1]); // side-effect(200, #20[1])
 	}
 
-			`, []string{"1", "2", "side-effect(FreeValue-arr, arr[0])", "side-effect(FreeValue-arr, arr[1])"}, t)
+			`, []string{"1", "2", "side-effect(100, #20[0])", "side-effect(200, #20[1])"}, t)
 	})
 
 	t.Run("pointer side-effect with double pointer", func(t *testing.T) {
