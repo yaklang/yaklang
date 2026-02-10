@@ -17,7 +17,7 @@ type AIYakToolFilter struct {
 	ToolNames     []string
 	ToolPaths     []string
 	OnlyFavorites bool
-	Keywords      string
+	Keywords      []string
 }
 
 func FilterAIYakTools(db *gorm.DB, filter *AIYakToolFilter) *gorm.DB {
@@ -31,7 +31,15 @@ func FilterAIYakTools(db *gorm.DB, filter *AIYakToolFilter) *gorm.DB {
 	if filter.OnlyFavorites {
 		db = db.Where("is_favorite = ?", true)
 	}
-	db = bizhelper.FuzzSearchEx(db, []string{"name", "keywords", "description", "path"}, filter.Keywords, false)
+	var keywords []string
+	for _, kw := range filter.Keywords {
+		kw = strings.TrimSpace(kw)
+		if kw == "" {
+			continue
+		}
+		keywords = append(keywords, kw)
+	}
+	db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{"name", "keywords", "description", "path"}, keywords, false)
 	return db
 }
 
@@ -96,16 +104,28 @@ func SearchAIYakToolBM25(db *gorm.DB, filter *AIYakToolFilter, limit, offset int
 		return nil, utils.Errorf("db is nil")
 	}
 
-	var match string
+	var matches []string
 	if filter != nil {
-		match = strings.TrimSpace(filter.Keywords)
+		for _, m := range filter.Keywords {
+			m = strings.TrimSpace(m)
+			if m == "" {
+				continue
+			}
+			matches = append(matches, m)
+		}
 	}
-	if match == "" {
+	if len(matches) == 0 {
 		return []*schema.AIYakTool{}, nil
 	}
 
 	var res = make([]*schema.AIYakTool, 0)
-	if len(match) < 3 || !schema.IsSQLite(db) || !db.HasTable(defaultAIYakToolFTS5.FTSTable) {
+	maxLen := 0
+	for _, m := range matches {
+		if len(m) > maxLen {
+			maxLen = len(m)
+		}
+	}
+	if maxLen < 3 || !schema.IsSQLite(db) || !db.HasTable(defaultAIYakToolFTS5.FTSTable) {
 		if err := FilterAIYakTools(db, filter).Limit(limit).Offset(offset).Find(&res).Error; err != nil {
 			return nil, err
 		}
@@ -113,8 +133,8 @@ func SearchAIYakToolBM25(db *gorm.DB, filter *AIYakToolFilter, limit, offset int
 	}
 
 	if filter != nil {
-		filter.Keywords = ""
+		filter.Keywords = nil
 	}
 
-	return bizhelper.SQLiteFTS5BM25Match[*schema.AIYakTool](FilterAIYakTools(db, filter), defaultAIYakToolFTS5, match, limit, offset)
+	return bizhelper.SQLiteFTS5BM25Match[*schema.AIYakTool](FilterAIYakTools(db, filter), defaultAIYakToolFTS5, matches, limit, offset)
 }

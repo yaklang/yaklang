@@ -12,7 +12,7 @@ import (
 type VectorDocumentFilter struct {
 	DocumentTypes  []string
 	DocumentIDs    []string
-	Keywords       string
+	Keywords       []string
 	RuntimeID      []string
 	CollectionUUID string
 }
@@ -71,34 +71,58 @@ func SearchVectorStoreDocumentBM25(db *gorm.DB, filter *VectorDocumentFilter, li
 	if db == nil {
 		return nil, utils.Errorf("db is nil")
 	}
-	var match string
+	var matches []string
 	if filter != nil {
-		match = strings.TrimSpace(filter.Keywords)
+		for _, m := range filter.Keywords {
+			m = strings.TrimSpace(m)
+			if m == "" {
+				continue
+			}
+			matches = append(matches, m)
+		}
 	}
 	var res = make([]*schema.VectorStoreDocument, 0)
-	if len(match) < 3 || !schema.IsSQLite(db) || !db.HasTable(defaultVectorStoreDocumentFTS5.FTSTable) {
+	maxLen := 0
+	for _, m := range matches {
+		if len(m) > maxLen {
+			maxLen = len(m)
+		}
+	}
+	if maxLen < 3 || !schema.IsSQLite(db) || !db.HasTable(defaultVectorStoreDocumentFTS5.FTSTable) {
 		if err := FilterVectorDocuments(db, filter).Limit(limit).Offset(offset).Find(&res).Error; err != nil {
 			return nil, err
 		}
 		return res, nil
 	}
-	filter.Keywords = "" // if use FTS5, clear keywords in filter to avoid double filtering
-	return bizhelper.SQLiteFTS5BM25Match[*schema.VectorStoreDocument](FilterVectorDocuments(db, filter), defaultVectorStoreDocumentFTS5, match, limit, offset)
+	filter.Keywords = nil // if use FTS5, clear keywords in filter to avoid double filtering
+	return bizhelper.SQLiteFTS5BM25Match[*schema.VectorStoreDocument](FilterVectorDocuments(db, filter), defaultVectorStoreDocumentFTS5, matches, limit, offset)
 }
 
 func SearchVectorStoreDocumentBM25Yield(ctx context.Context, db *gorm.DB, filter *VectorDocumentFilter, options ...bizhelper.YieldModelOpts) chan *schema.VectorStoreDocument {
 	if db == nil {
 		return nil
 	}
-	var match string
+	var matches []string
 	if filter != nil {
-		match = strings.TrimSpace(filter.Keywords)
+		for _, m := range filter.Keywords {
+			m = strings.TrimSpace(m)
+			if m == "" {
+				continue
+			}
+			matches = append(matches, m)
+		}
 	}
-	if len(match) < 3 || !schema.IsSQLite(db) || !db.HasTable(defaultVectorStoreDocumentFTS5.FTSTable) {
+	maxLen := 0
+	for _, m := range matches {
+		if len(m) > maxLen {
+			maxLen = len(m)
+		}
+	}
+	if maxLen < 3 || !schema.IsSQLite(db) || !db.HasTable(defaultVectorStoreDocumentFTS5.FTSTable) {
 		return YieldVectorDocument(ctx, db, filter, options...)
 	}
-	filter.Keywords = "" // if use FTS5, clear keywords in filter to avoid double filtering
-	return bizhelper.SQLiteFTS5BM25MatchYield[*schema.VectorStoreDocument](ctx, FilterVectorDocuments(db, filter), defaultVectorStoreDocumentFTS5, match, options...)
+	filter.Keywords = nil // if use FTS5, clear keywords in filter to avoid double filtering
+	return bizhelper.SQLiteFTS5BM25MatchYield[*schema.VectorStoreDocument](ctx, FilterVectorDocuments(db, filter), defaultVectorStoreDocumentFTS5, matches, options...)
 }
 
 func FilterVectorDocuments(db *gorm.DB, filter *VectorDocumentFilter) *gorm.DB {
@@ -110,7 +134,15 @@ func FilterVectorDocuments(db *gorm.DB, filter *VectorDocumentFilter) *gorm.DB {
 	db = bizhelper.ExactQueryStringArrayOr(db, "document_id", filter.DocumentIDs)
 	db = bizhelper.ExactQueryStringArrayOr(db, "runtime_id", filter.RuntimeID)
 	db = bizhelper.ExactQueryString(db, "collection_uuid", filter.CollectionUUID)
-	db = bizhelper.FuzzSearchEx(db, []string{"metadata", "content"}, filter.Keywords, false)
+	var keywords []string
+	for _, kw := range filter.Keywords {
+		kw = strings.TrimSpace(kw)
+		if kw == "" {
+			continue
+		}
+		keywords = append(keywords, kw)
+	}
+	db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{"metadata", "content"}, keywords, false)
 	return db
 }
 
