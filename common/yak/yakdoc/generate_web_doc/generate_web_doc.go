@@ -13,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/yakdoc"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 )
@@ -66,6 +67,66 @@ func CheckDocCodeBlockMatched() {
 	if failCount > 0 {
 		panic("code block check not passed")
 	}
+}
+
+// formatYakCode 格式化yak代码，使用 YaklangCompileAndFormat 接口
+// 如果格式化失败，则回退到原始代码
+func formatYakCode(originalCode string) string {
+	if originalCode == "" {
+		return originalCode
+	}
+
+	code := strings.TrimSpace(originalCode)
+
+	// 检查是否包含代码块标记
+	hasCodeBlock := false
+	codeBlockLang := ""
+	codeContent := code
+
+	if strings.HasPrefix(code, "```") {
+		hasCodeBlock = true
+		// 提取语言标识和代码内容
+		lines := strings.Split(code, "\n")
+		if len(lines) > 0 {
+			firstLine := lines[0]
+			codeBlockLang = strings.TrimPrefix(firstLine, "```")
+			codeBlockLang = strings.TrimSpace(codeBlockLang)
+
+			// 去除首尾的代码块标记
+			if len(lines) > 2 {
+				lastLineIdx := len(lines) - 1
+				if strings.HasPrefix(strings.TrimSpace(lines[lastLineIdx]), "```") {
+					codeContent = strings.Join(lines[1:lastLineIdx], "\n")
+				} else {
+					codeContent = strings.Join(lines[1:], "\n")
+				}
+			} else if len(lines) > 1 {
+				codeContent = strings.Join(lines[1:], "\n")
+			}
+		}
+	}
+
+	// 尝试使用 YaklangCompileAndFormat 格式化代码
+	engine := antlr4yak.New()
+	formatted, err := engine.FormattedAndSyntaxChecking(codeContent)
+
+	// 只有在格式化成功且返回非空结果时才使用格式化后的代码
+	if err == nil && formatted != "" {
+		codeContent = formatted
+	} else {
+		// 格式化失败，保持原始代码内容
+		log.Debugf("failed to format yak code: %v, using original code", err)
+	}
+
+	// 如果原本有代码块标记，重新添加
+	if hasCodeBlock {
+		if codeBlockLang != "" {
+			return fmt.Sprintf("```%s\n%s\n```", codeBlockLang, codeContent)
+		}
+		return fmt.Sprintf("```yak\n%s\n```", codeContent)
+	}
+
+	return codeContent
 }
 
 // 辅助函数：解析注释中的参数和返回值描述
@@ -147,6 +208,11 @@ func parseCommentDetails(doc string) *YakDocParsed {
 	}
 
 	parsed.Example = strings.Join(exampleLines, "\n")
+
+	// 格式化example代码
+	if parsed.Example != "" {
+		parsed.Example = formatYakCode(parsed.Example)
+	}
 
 	return parsed
 }
