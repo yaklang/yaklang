@@ -7,9 +7,9 @@ import (
 )
 
 // StreamMinimalDataFlowPath is a reduced dataflow payload used for streaming.
-// It intentionally keeps only the fields required for persisting audit graph:
-// node/edge ids + ir_source_hash + offsets. Heavy fields like dot graph and
-// embedded source snippets are excluded.
+// It keeps only the fields required for persisting audit graph:
+// node/edge ids + ir_source_hash + offsets. Heavy fields like dot graph
+// and embedded source snippets are excluded.
 type StreamMinimalDataFlowPath struct {
 	Description string                   `json:"description"`
 	Nodes       []*StreamMinimalNodeInfo `json:"nodes"`
@@ -34,20 +34,19 @@ type StreamMinimalEdgeInfo struct {
 	AnalysisLabel string `json:"analysis_label,omitempty"`
 }
 
+// MarshalStreamMinimalDataFlowPath converts a full DataFlowPath to a minimal
+// JSON representation for streaming. Returns nil for nil or empty paths.
 func MarshalStreamMinimalDataFlowPath(p *DataFlowPath) ([]byte, error) {
 	if p == nil {
 		return nil, nil
 	}
-	min := &StreamMinimalDataFlowPath{
-		Description: p.Description,
-		Nodes:       make([]*StreamMinimalNodeInfo, 0, len(p.Nodes)),
-		Edges:       make([]*StreamMinimalEdgeInfo, 0, len(p.Edges)),
-	}
+
+	nodes := make([]*StreamMinimalNodeInfo, 0, len(p.Nodes))
 	for _, n := range p.Nodes {
 		if n == nil {
 			continue
 		}
-		min.Nodes = append(min.Nodes, &StreamMinimalNodeInfo{
+		nodes = append(nodes, &StreamMinimalNodeInfo{
 			NodeID:       n.NodeID,
 			IRCode:       n.IRCode,
 			IRSourceHash: n.IRSourceHash,
@@ -56,11 +55,12 @@ func MarshalStreamMinimalDataFlowPath(p *DataFlowPath) ([]byte, error) {
 			IsEntryNode:  n.IsEntryNode,
 		})
 	}
+	edges := make([]*StreamMinimalEdgeInfo, 0, len(p.Edges))
 	for _, e := range p.Edges {
 		if e == nil {
 			continue
 		}
-		min.Edges = append(min.Edges, &StreamMinimalEdgeInfo{
+		edges = append(edges, &StreamMinimalEdgeInfo{
 			EdgeID:        e.EdgeID,
 			FromNodeID:    e.FromNodeID,
 			ToNodeID:      e.ToNodeID,
@@ -69,7 +69,16 @@ func MarshalStreamMinimalDataFlowPath(p *DataFlowPath) ([]byte, error) {
 			AnalysisLabel: e.AnalysisLabel,
 		})
 	}
-	return json.Marshal(min)
+
+	if len(nodes) == 0 && len(edges) == 0 {
+		return nil, nil
+	}
+
+	return json.Marshal(&StreamMinimalDataFlowPath{
+		Description: p.Description,
+		Nodes:       nodes,
+		Edges:       edges,
+	})
 }
 
 func (n *StreamMinimalNodeInfo) ToAuditNode(riskHash string) *ssadb.AuditNode {
@@ -89,13 +98,20 @@ func (n *StreamMinimalNodeInfo) ToAuditNode(riskHash string) *ssadb.AuditNode {
 	return an
 }
 
+// ToAuditEdge converts to an AuditEdge using the node-id → ULID mapping.
+// Returns nil if either endpoint is missing from the mapping.
 func (e *StreamMinimalEdgeInfo) ToAuditEdge(m map[string]string) *ssadb.AuditEdge {
-	if e == nil {
+	if e == nil || m == nil {
+		return nil
+	}
+	from, ok1 := m[e.FromNodeID]
+	to, ok2 := m[e.ToNodeID]
+	if !ok1 || !ok2 {
 		return nil
 	}
 	return &ssadb.AuditEdge{
-		FromNode:      m[e.FromNodeID],
-		ToNode:        m[e.ToNodeID],
+		FromNode:      from,
+		ToNode:        to,
 		EdgeType:      ssadb.ValidEdgeType(e.EdgeType),
 		AnalysisLabel: e.AnalysisLabel,
 		AnalysisStep:  e.AnalysisStep,
