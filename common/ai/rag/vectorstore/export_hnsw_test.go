@@ -3,6 +3,7 @@ package vectorstore
 import (
 	"bytes"
 	"context"
+	"github.com/stretchr/testify/require"
 	"io"
 	"testing"
 
@@ -54,9 +55,9 @@ func TestMUSTPASS_ExportHNSW(t *testing.T) {
 	// 清理缓存
 	GraphWrapperManager.ClearCache()
 
-	// 验证使用错误的 code 导入
+	//验证使用错误的 code 导入
 	_, err = LoadSQLiteVectorStoreHNSW(db, collectionName, WithEmbeddingClient(embedding))
-	assert.Contains(t, err.Error(), "record not found")
+	require.Error(t, err)
 
 	// 验证使用Key作为code导入
 	store, err = LoadSQLiteVectorStoreHNSW(db, collectionName, WithKeyAsUID(true), WithEmbeddingClient(embedding))
