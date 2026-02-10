@@ -482,6 +482,24 @@ func (r *ScannerAgentReporter) ReportProcess(process float64) error {
 	r.agent.feedback(res)
 	return nil
 }
+
+// ReportProcessWithSubTask reports a progress update under a different subtask id.
+// This is useful when the script emits multiple progress streams via SetProgressEx(id, ...):
+// we don't want non-"main" progress resets to shrink the overall progress in the UI.
+func (r *ScannerAgentReporter) ReportProcessWithSubTask(subTaskId string, process float64) error {
+	if strings.TrimSpace(subTaskId) == "" {
+		return r.ReportProcess(process)
+	}
+	res, err := spec.NewScanProcessResult(process)
+	if err != nil {
+		return err
+	}
+	res.RuntimeId = r.RuntimeId
+	res.TaskId = r.TaskId
+	res.SubTaskId = subTaskId
+	r.agent.feedback(res)
+	return nil
+}
 func (r *ScannerAgentReporter) ReportTCPOpenPort(host interface{}, port interface{}) error {
 	var s = r.agent
 
