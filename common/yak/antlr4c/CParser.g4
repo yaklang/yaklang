@@ -213,6 +213,7 @@ expression
     | '(' eos* expression eos* ')'
     | expression ('?' eos* expression ':' eos* expression)
     | castExpression
+    | assignmentExpression
     | statementsExpression
     | declarationSpecifier
     ;

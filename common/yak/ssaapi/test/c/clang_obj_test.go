@@ -214,7 +214,7 @@ void cors1(struct Context* c) {
 			*.header()?{have: "Access-Control-Allow-Origin"} as $header
 			$header<getCallee>(,,* #-> as $output)
 		`, map[string][]string{
-			"output": {"\"*\""},
+			"output": {`"*"`, `"POST, GET, OPTIONS, PUT, DELETE"`},
 		},
 			ssaapi.WithLanguage(ssaconfig.C),
 		)
