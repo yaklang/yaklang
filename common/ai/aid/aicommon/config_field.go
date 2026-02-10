@@ -53,6 +53,10 @@ func (c *Config) GetDisableEnhanceDirectlyAnswer() bool {
 	return c.DisableEnhanceDirectlyAnswer
 }
 
+func (c *Config) GetDisableIntentRecognition() bool {
+	return c.DisableIntentRecognition
+}
+
 func (c *Config) GetAiToolManager() *buildinaitools.AiToolManager {
 	return c.AiToolManager
 }

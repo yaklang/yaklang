@@ -33,10 +33,19 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 			return
 		}
 
+		// === Intent recognition phase ===
+		// Skip intent recognition when disabled (e.g. test environments).
+		// The intent recognition sub-loop (loop_intent) shares the same AI callback,
+		// which in test environments with mocked AI would consume mock responses
+		// intended for the main loop, causing test failures.
+		if config.GetConfigBool("DisableIntentRecognition") {
+			log.Infof("intent recognition disabled via config, skipping")
+			return
+		}
+
 		loop.LoadingStatus("开始意图识别 / Start intent recognition")
 		userInput := task.GetUserInput()
 
-		// === Intent recognition phase ===
 		scale := ClassifyInputScale(userInput)
 		log.Infof("input scale classified as %s for input length %d runes", scale.String(), len([]rune(userInput)))
 
