@@ -868,6 +868,15 @@ func testIsFinished(task aicommon.AIStatefulTask) bool {
 	return task.GetStatus() == aicommon.AITaskState_Completed || task.GetStatus() == aicommon.AITaskState_Aborted || task.GetStatus() == aicommon.AITaskState_Skipped
 }
 
+// ensureLoopDirectory initializes the loop directory metadata for artifact organization.
+// It stores the task directory path and loop name prefix, which are used by
+// GetLoopContentDir to construct flat content directories like:
+//
+//	task_{index}/loop_{name}_action_calls/
+//	task_{index}/loop_{name}_prompts/
+//	task_{index}/loop_{name}_data/
+//
+// This avoids the deep nesting of the old structure (task_{index}/loops/{name}/action_calls/).
 func (r *ReActLoop) ensureLoopDirectory(task aicommon.AIStatefulTask) string {
 	if utils.IsNil(r) || utils.IsNil(task) {
 		return ""
@@ -884,13 +893,55 @@ func (r *ReActLoop) ensureLoopDirectory(task aicommon.AIStatefulTask) string {
 	if loopName == "" {
 		loopName = "unknown_loop"
 	}
-	loopDir := filepath.Join(workdir, fmt.Sprintf("task_%s", taskIndex), "loops", sanitizeActionFilename(loopName))
-	if err := os.MkdirAll(loopDir, 0755); err != nil {
-		log.Errorf("failed to create loop directory %s: %v", loopDir, err)
+
+	taskDir := filepath.Join(workdir, fmt.Sprintf("task_%s", taskIndex))
+	if err := os.MkdirAll(taskDir, 0755); err != nil {
+		log.Errorf("failed to create task directory %s: %v", taskDir, err)
 		return ""
 	}
-	r.Set("loop_directory", loopDir)
-	return loopDir
+
+	loopPrefix := "loop_" + sanitizeActionFilename(loopName)
+	r.Set("task_directory", taskDir)
+	r.Set("loop_name_prefix", loopPrefix)
+
+	// For backward compatibility: "loop_directory" now points to the flat data directory
+	// for callers that write files directly into the loop directory.
+	loopDataDir := filepath.Join(taskDir, loopPrefix+"_data")
+	r.Set("loop_directory", loopDataDir)
+	return loopDataDir
+}
+
+// GetLoopContentDir returns a flat directory for a specific content type within the loop.
+// Format: task_{index}/loop_{name}_{contentType}/
+// Example: task_1-3/loop_default_action_calls/
+//
+// The directory is created if it does not exist. This method can be called by any code
+// that needs to organize loop-specific artifacts into categorized flat directories.
+func (r *ReActLoop) GetLoopContentDir(contentType string) string {
+	taskDir := r.Get("task_directory")
+	prefix := r.Get("loop_name_prefix")
+
+	if taskDir == "" || prefix == "" {
+		// Metadata not initialized yet; try to initialize from current task
+		task := r.GetCurrentTask()
+		if task == nil {
+			return ""
+		}
+		r.ensureLoopDirectory(task)
+		taskDir = r.Get("task_directory")
+		prefix = r.Get("loop_name_prefix")
+	}
+
+	if taskDir == "" || prefix == "" {
+		return ""
+	}
+
+	dir := filepath.Join(taskDir, prefix+"_"+contentType)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		log.Errorf("failed to create loop content directory %s: %v", dir, err)
+		return ""
+	}
+	return dir
 }
 
 func (r *ReActLoop) savePromptToFile(task aicommon.AIStatefulTask, iteration int, prompt string) {
@@ -902,29 +953,10 @@ func (r *ReActLoop) savePromptToFile(task aicommon.AIStatefulTask, iteration int
 		return
 	}
 
-	// Use the loop directory as the base for prompt records,
-	// consistent with emitActionExecutionRecord.
-	var promptDir string
-	if loopDir := r.Get("loop_directory"); loopDir != "" {
-		promptDir = filepath.Join(loopDir, "prompts")
-	} else {
-		loopDir = r.ensureLoopDirectory(task)
-		if loopDir != "" {
-			promptDir = filepath.Join(loopDir, "prompts")
-		} else {
-			workdir := r.config.GetOrCreateWorkDir()
-			if workdir == "" {
-				workdir = consts.GetDefaultBaseHomeDir()
-			}
-			taskIndex := task.GetIndex()
-			if taskIndex == "" {
-				taskIndex = "0"
-			}
-			promptDir = filepath.Join(workdir, fmt.Sprintf("task_%s", taskIndex), "prompts")
-		}
-	}
-	if err := os.MkdirAll(promptDir, 0755); err != nil {
-		log.Errorf("failed to create prompt directory %s: %v", promptDir, err)
+	// Use flat loop content directory: task_{index}/loop_{name}_prompts/
+	promptDir := r.GetLoopContentDir("prompts")
+	if promptDir == "" {
+		log.Errorf("failed to get loop content directory for prompts")
 		return
 	}
 
@@ -955,32 +987,10 @@ func (r *ReActLoop) emitActionExecutionRecord(task aicommon.AIStatefulTask, acti
 		return
 	}
 
-	// Use the loop directory (created by ensureLoopDirectory) as the base for action records.
-	// This ensures each loop's action calls are nested under its own directory
-	// (e.g. task_X/loops/intent/action_calls/ instead of task_X/action_calls/).
-	var actionDir string
-	if loopDir := r.Get("loop_directory"); loopDir != "" {
-		actionDir = filepath.Join(loopDir, "action_calls")
-	} else {
-		// Fallback: try to create/get the loop directory
-		loopDir = r.ensureLoopDirectory(task)
-		if loopDir != "" {
-			actionDir = filepath.Join(loopDir, "action_calls")
-		} else {
-			// Last resort: use the old flat structure
-			workdir := r.config.GetOrCreateWorkDir()
-			if workdir == "" {
-				workdir = consts.GetDefaultBaseHomeDir()
-			}
-			taskIndex := task.GetIndex()
-			if taskIndex == "" {
-				taskIndex = "0"
-			}
-			actionDir = filepath.Join(workdir, fmt.Sprintf("task_%s", taskIndex), "action_calls")
-		}
-	}
-	if err := os.MkdirAll(actionDir, 0755); err != nil {
-		log.Errorf("failed to create action record directory %s: %v", actionDir, err)
+	// Use flat loop content directory: task_{index}/loop_{name}_action_calls/
+	actionDir := r.GetLoopContentDir("action_calls")
+	if actionDir == "" {
+		log.Errorf("failed to get loop content directory for action_calls")
 		return
 	}
 

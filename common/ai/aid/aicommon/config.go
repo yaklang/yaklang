@@ -1862,9 +1862,13 @@ func (c *Config) SetWorkDir(path string) {
 }
 
 // GetOrCreateWorkDir lazily creates and returns the working directory.
-// If the directory has not been created yet, it creates a fallback directory
-// with format: {DatabaseRecordID}_session_{date}_{shortUuid(5)}.
-// Normal flow: ensureWorkDirectory(userInput) will preemptively set a semantic directory name.
+// Resolution order:
+//  1. workDir (lowercase, set by ensureWorkDirectory via SetWorkDir)
+//  2. Workdir (capital W, propagated from parent via ConvertConfigToOptions/WithWorkdir)
+//  3. Fallback: create {DatabaseRecordID}_session_{date}_{shortUuid(5)}
+//
+// Normal flow: ensureWorkDirectory(userInput) will preemptively set both workDir and Workdir.
+// In P&E mode, child configs receive Workdir from parent via ConvertConfigToOptions.
 func (c *Config) GetOrCreateWorkDir() string {
 	c.workDirMu.RLock()
 	if c.workDir != "" {
@@ -1873,6 +1877,14 @@ func (c *Config) GetOrCreateWorkDir() string {
 		return dir
 	}
 	c.workDirMu.RUnlock()
+
+	// Check if Workdir (capital W) was set by parent config via ConvertConfigToOptions.
+	// This ensures P&E sub-invokers and forge executions reuse the parent's work directory
+	// instead of creating their own fallback directories.
+	if c.Workdir != "" {
+		c.SetWorkDir(c.Workdir)
+		return c.Workdir
+	}
 
 	c.workDirOnce.Do(func() {
 		shortUuid := c.Id
@@ -2235,8 +2247,30 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	if i.Language != "" {
 		opts = append(opts, WithLanguage(i.Language))
 	}
+	// Propagate work directory: check both Workdir (capital W, explicitly set) and
+	// the lazy workDir (lowercase, set by ensureWorkDirectory) to ensure P&E sub-invokers,
+	// forge executions, and other child configs share the same artifact directory.
 	if i.Workdir != "" {
 		opts = append(opts, WithWorkdir(i.Workdir))
+	} else if i.IsWorkDirReady() {
+		// The lazy workDir was set (e.g. by ensureWorkDirectory) but Workdir was not.
+		// This shouldn't normally happen after our fix, but handle it defensively.
+		dir := i.GetOrCreateWorkDir()
+		if dir != "" {
+			opts = append(opts, WithWorkdir(dir))
+		}
+	}
+
+	// Propagate DatabaseRecordID so child configs can use it for fallback directory naming.
+	// Without this, child configs would create fallback dirs with DatabaseRecordID=0.
+	if i.DatabaseRecordID > 0 {
+		dbRecordID := i.DatabaseRecordID
+		opts = append(opts, func(c *Config) error {
+			if c.DatabaseRecordID == 0 {
+				c.DatabaseRecordID = dbRecordID
+			}
+			return nil
+		})
 	}
 
 	if i.EventHandler != nil {

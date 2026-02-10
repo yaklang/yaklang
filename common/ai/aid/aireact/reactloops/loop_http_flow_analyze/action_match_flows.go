@@ -170,8 +170,8 @@ var filterAndMatchHTTPFlowsAction = func(r aicommon.AIInvokeRuntime) reactloops.
 			// 总是保存到文件
 			var filename string
 			if invoker != nil {
-				loopDir := loop.Get("loop_directory")
-				filename = filepath.Join(loopDir, fmt.Sprintf("http_flow_match_summary_%d_%s.txt", loop.GetCurrentIterationIndex(), utils.DatetimePretty2()))
+				loopDataDir := loop.GetLoopContentDir("data")
+				filename = filepath.Join(loopDataDir, fmt.Sprintf("http_flow_match_summary_%d_%s.txt", loop.GetCurrentIterationIndex(), utils.DatetimePretty2()))
 				loop.Set("last_query_summary_file", filename)
 				if len(localMatchers) > 0 {
 					loop.Set("last_match_summary_file", filename)
