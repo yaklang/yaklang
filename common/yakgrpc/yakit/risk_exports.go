@@ -276,6 +276,40 @@ func WithRiskParam_Response(i interface{}) RiskParamsOpt {
 	}
 }
 
+// appendPacketPairs 是一个追加形式的选项参数，用于向风险记录中追加一对请求/响应报文
+// 支持 string / []byte / 任意可转成字符串的类型
+// Example:
+// ```
+// risk.NewRisk(target,
+//     risk.appendPacketPairs(req1, rsp1),
+//     risk.appendPacketPairs(req2, rsp2),
+// )
+// ```
+func WithRiskParam_AppendPacketPairs(req, resp interface{}) RiskParamsOpt {
+	return func(r *schema.Risk) {
+		reqStr := limitSize(utils.InterfaceToString(req), MaxSize)
+		respStr := limitSize(utils.InterfaceToString(resp), MaxSize)
+		// 两边都为空就不记录
+		if reqStr == "" && respStr == "" {
+			return
+		}
+
+		// 如果当前还没有单独设置 QuotedRequest/QuotedResponse，则用第一对 PacketPair 填充它们
+		if r.QuotedRequest == "" && reqStr != "" {
+			r.QuotedRequest = utils.InterfaceToQuotedString(reqStr)
+		}
+		if r.QuotedResponse == "" && respStr != "" {
+			r.QuotedResponse = utils.InterfaceToQuotedString(respStr)
+		}
+
+		pp := &schema.PacketPair{
+			Request:  []byte(reqStr),
+			Response: []byte(respStr),
+		}
+		r.PacketPairs = append(r.PacketPairs, pp)
+	}
+}
+
 // details 是一个选项参数，用于指定风险记录的详细信息
 // Example:
 // ```

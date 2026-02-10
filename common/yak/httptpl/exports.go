@@ -14,7 +14,6 @@ import (
 
 	"github.com/samber/lo"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
@@ -360,6 +359,7 @@ func processVulnerability(target any, filterVul filter.Filterable, vCh chan *too
 			)
 			details := make(map[string]interface{}, 2)
 			runtimeId := utils.MapGetString(i, "runtimeId")
+			var packetPairs []*schema.PacketPair
 			if len(tpl.HTTPRequestSequences) > 0 {
 				resp := i["responses"].([]*lowhttp.LowhttpResponse)
 				reqBulk := i["requests"].(*YakRequestBulkConfig)
@@ -372,13 +372,17 @@ func processVulnerability(target any, filterVul filter.Filterable, vCh chan *too
 				calcSha1 = utils.CalcSha1(tpl.Name, resp[0].RemoteAddr, target)
 				if len(resp) == 1 {
 					urls = append(urls, resp[0].Url)
-					details["request"] = string(resp[0].RawRequest)
-					details["response"] = string(resp[0].RawPacket)
+					packetPairs = append(packetPairs, &schema.PacketPair{
+						Request:  resp[0].RawRequest,
+						Response: resp[0].RawPacket,
+					})
 				} else {
-					for idx, r := range resp {
+					for _, r := range resp {
 						urls = append(urls, r.Url)
-						details[fmt.Sprintf("request_%d", idx+1)] = string(r.RawRequest)
-						details[fmt.Sprintf("response_%d", idx+1)] = string(r.RawPacket)
+						packetPairs = append(packetPairs, &schema.PacketPair{
+							Request:  r.RawRequest,
+							Response: r.RawPacket,
+						})
 					}
 				}
 				currTarget = strings.Join(urls, ",")
@@ -393,14 +397,11 @@ func processVulnerability(target any, filterVul filter.Filterable, vCh chan *too
 				calcSha1 = utils.CalcSha1(tpl.Name, resp[0].RawRequest, target)
 
 				currTarget = resp[0].RemoteAddr
-				if len(resp) == 1 {
-					details["request"] = spew.Sdump(resp[0].RawRequest)
-					details["response"] = spew.Sdump(resp[0].RawPacket)
-				} else {
-					for idx, r := range resp {
-						details[fmt.Sprintf("request_%d", idx+1)] = spew.Sdump(r.RawRequest)
-						details[fmt.Sprintf("response_%d", idx+1)] = spew.Sdump(r.RawPacket)
-					}
+				for _, r := range resp {
+					packetPairs = append(packetPairs, &schema.PacketPair{
+						Request:  r.RawRequest,
+						Response: r.RawPacket,
+					})
 				}
 			}
 
@@ -413,6 +414,7 @@ func processVulnerability(target any, filterVul filter.Filterable, vCh chan *too
 				Timestamp:     time.Now().Unix(),
 				Severity:      tpl.Severity,
 				Details:       details,
+				PacketPairs:   packetPairs,
 				CVE:           tpl.CVE,
 				DescriptionZh: tpl.DescriptionZh,
 				Description:   tpl.Description,

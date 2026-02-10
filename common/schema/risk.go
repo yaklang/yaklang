@@ -2,6 +2,8 @@ package schema
 
 import (
 	"bytes"
+	"database/sql/driver"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -53,6 +55,7 @@ type Risk struct {
 	QuotedRequest  string `json:"quoted_request"`
 	QuotedResponse string `json:"quoted_response"`
 
+	PacketPairs PacketPairList `json:"packet_pairs" gorm:"type:text"`
 	// 潜在威胁：用于输出合规性质的漏洞内容
 	IsPotential bool `json:"is_potential"`
 
@@ -69,6 +72,56 @@ type Risk struct {
 	ResultID    uint   `json:"result_id"`
 	Variable    string `json:"variable"`
 	ProgramName string `json:"program_name"`
+}
+
+type PacketPair struct {
+	Request  []byte `json:"request"`
+	Response []byte `json:"response"`
+}
+
+// PacketPairList 是 PacketPair 的集合，用于 JSON 持久化到数据库
+type PacketPairList []*PacketPair
+
+// Value 实现 driver.Valuer，将 PacketPairList 序列化为 JSON 存入数据库
+func (p PacketPairList) Value() (driver.Value, error) {
+	if p == nil {
+		return "[]", nil
+	}
+	raw, err := json.Marshal(p)
+	if err != nil {
+		return nil, err
+	}
+	return string(raw), nil
+}
+
+// Scan 实现 sql.Scanner，从数据库中的 JSON 反序列化为 PacketPairList
+func (p *PacketPairList) Scan(value interface{}) error {
+	if value == nil {
+		*p = nil
+		return nil
+	}
+
+	var data []byte
+	switch v := value.(type) {
+	case []byte:
+		data = v
+	case string:
+		data = []byte(v)
+	default:
+		return fmt.Errorf("unsupported type for PacketPairList Scan: %T", value)
+	}
+
+	if len(data) == 0 {
+		*p = nil
+		return nil
+	}
+
+	var list []*PacketPair
+	if err := json.Unmarshal(data, &list); err != nil {
+		return err
+	}
+	*p = list
+	return nil
 }
 
 func (p *Risk) ColorizedShow() {
@@ -114,6 +167,17 @@ func (p *Risk) ToGRPCModel() *ypb.Risk {
 		response = []byte(p.QuotedResponse)
 	}
 
+	var packetPairs []*ypb.PacketPair
+	for _, pp := range p.PacketPairs {
+		if pp == nil {
+			continue
+		}
+		packetPairs = append(packetPairs, &ypb.PacketPair{
+			Request:  pp.Request,
+			Response: pp.Response,
+		})
+	}
+
 	return &ypb.Risk{
 		Hash:            utils.EscapeInvalidUTF8Byte([]byte(p.Hash)),
 		IP:              utils.EscapeInvalidUTF8Byte([]byte(p.IP)),
@@ -137,8 +201,9 @@ func (p *Risk) ToGRPCModel() *ypb.Risk {
 		UpdatedAt:       p.UpdatedAt.Unix(),
 		Severity:        utils.EscapeInvalidUTF8Byte([]byte(p.Severity)),
 
-		Request:  request,
-		Response: response,
+		Request:     request,
+		Response:    response,
+		PacketPairs: packetPairs,
 
 		RuntimeId: utils.EscapeInvalidUTF8Byte([]byte(p.RuntimeId)),
 		CVE:       utils.EscapeInvalidUTF8Byte([]byte(p.CVE)),
