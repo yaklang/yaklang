@@ -76,15 +76,23 @@ SOLUTION
 REFERENCE
 )
 
-<include('golang-template-html')> as $sink;
-<include('golang-http-source')> as $source
+template?{<fullTypeName>?{have: 'text/template'}} as $template;
+template?{<fullTypeName>?{have: 'html/template'}} as $template;
+$template.New() as $new
 
-$sink.Must(* #{
-    hook:`.Parse(*<slice(index=1)>  as  $target)`,
-}->)
+$new.Must() as $tmpl
+$new.ParseFiles().* as $tmpl
+$template.Must() as $tmpl
+$template.ParseFiles().* as $tmpl
+$tmpl.Execute(* #-> as $target);
+$tmpl.ExecuteTemplate(*<slice(index=3)> #-> as $target);
+
+<include('golang-template-text')> as $temptext;
+$temptext.New().Parse() as $target;
+$temptext.ParseFiles().* -> as $target;
 
 $target #{
-    until: "* & $source",
+    include: "* & $new",
 	exclude: `*?{opcode:const}`,
 }-> as $high;
 
