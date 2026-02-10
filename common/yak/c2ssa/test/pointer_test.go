@@ -708,7 +708,7 @@ void vulnerable_file_list(const char *directory) {
     gets(&command);
     println(command);
 }
-		`, []string{"side-effect(make(any), command)"}, t)
+		`, []string{"make([]byte)"}, t)
 	})
 
 	t.Run("lib-sprintf parameter", func(t *testing.T) {

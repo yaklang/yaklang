@@ -215,6 +215,9 @@ func handleSideEffect(c *Call, funcTyp *FunctionType, buildPointer bool) {
 		}
 
 		modify, ok := c.GetValueById(se.Modify)
+		if modify == nil {
+			modify, _ = se.GetActualParam(c)
+		}
 		if !ok || utils.IsNil(modify) {
 			continue
 		}

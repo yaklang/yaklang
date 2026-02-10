@@ -455,25 +455,22 @@ func BuildFunctionWithSideEffect(b *FunctionBuilder, id string, v any) (value Va
 		funcType := prog.CoverReflectFunctionType(itype, 0)
 		value = NewFunctionWithType(str, funcType)
 		if se, ok := prog.ExternSideEffect[str]; ok {
-			var modify Value
+			var modifyId int64 = -1
 			for i, k := range se {
 				switch k {
 				case uint(SideEffectIn):
 					p := b.NewParam("in")
 					p.FormalParameterIndex = i
-					modify = p
+					modifyId = p.GetId()
 				}
 			}
 			for i, k := range se {
-				if modify == nil {
-					modify = b.EmitMakeBuildWithType(CreateAnyType(), nil, nil)
-				}
 				switch k {
 				case uint(SideEffectOut):
 					funcType.SideEffects = append(funcType.SideEffects, &FunctionSideEffect{
 						Name:        "out",
 						VerboseName: "",
-						Modify:      modify.GetId(),
+						Modify:      modifyId,
 						Variable:    b.CreateVariable("out"),
 						forceCreate: true,
 						Kind:        PointerSideEffect,
