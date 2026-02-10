@@ -27,6 +27,15 @@ import (
 
 var riskDebugCount int32
 
+func ssaRiskCompatEnabled() bool {
+	raw := strings.TrimSpace(os.Getenv("SCANNODE_SSA_RISK_COMPAT"))
+	if raw == "" {
+		// New default: disabled. We now use SSAStreamParts for SSA streaming.
+		return false
+	}
+	return raw == "1" || strings.EqualFold(raw, "true")
+}
+
 func parseChunkDesc(desc string) (string, int, int, bool) {
 	parts := strings.Fields(desc)
 	if len(parts) < 5 {
@@ -232,6 +241,8 @@ func (s *ScanNode) createLogHandler(reporter *ScannerAgentReporter, res *scanrpc
 			s.handleSSAStreamRisk(reporter, info)
 		case "ssa-stream-parts":
 			s.handleSSAStreamParts(reporter, info)
+		case "ssa-stream-parts-raw":
+			s.handleSSAStreamPartsRaw(reporter, info)
 		}
 	}
 }
@@ -350,6 +361,50 @@ func (s *ScanNode) handleSSAStreamParts(reporter *ScannerAgentReporter, info str
 	}
 }
 
+func (s *ScanNode) handleSSAStreamPartsRaw(reporter *ScannerAgentReporter, info string) {
+	if reporter == nil || reporter.agent == nil || reporter.agent.streamer == nil || !reporter.agent.streamer.Enabled() {
+		return
+	}
+	// info is expected to be a raw JSON string of StreamSingleResultParts.
+	raw := strings.TrimSpace(info)
+	if raw == "" {
+		return
+	}
+	var parts sfreport.StreamSingleResultParts
+	if err := json.Unmarshal([]byte(raw), &parts); err != nil {
+		log.Errorf("unmarshal ssa-stream-parts-raw failed: %v", err)
+		return
+	}
+	reporter.agent.streamer.EmitSSATaskStart(reporter.TaskId, reporter.RuntimeId, reporter.SubTaskId, parts.ProgramName, parts.ReportType)
+
+	for _, f := range parts.Files {
+		if f == nil {
+			continue
+		}
+		_ = reporter.agent.streamer.EmitSSAFile(reporter.TaskId, reporter.RuntimeId, reporter.SubTaskId, f)
+	}
+	for _, df := range parts.Dataflows {
+		if df == nil || strings.TrimSpace(df.DataflowHash) == "" || len(df.Payload) == 0 {
+			continue
+		}
+		_ = reporter.agent.streamer.EmitSSADataflow(reporter.TaskId, reporter.RuntimeId, reporter.SubTaskId, df.DataflowHash, []byte(df.Payload))
+	}
+	for _, r := range parts.Risks {
+		if r == nil || strings.TrimSpace(r.RiskHash) == "" || len(r.RiskJSON) == 0 {
+			continue
+		}
+		ev := &spec.StreamRiskEvent{
+			RiskHash:       r.RiskHash,
+			ProgramName:    parts.ProgramName,
+			ReportType:     parts.ReportType,
+			RiskJSON:       r.RiskJSON,
+			FileHashes:     r.FileHashes,
+			DataflowHashes: r.DataflowHashes,
+		}
+		_ = reporter.agent.streamer.EmitSSARisk(reporter.TaskId, reporter.RuntimeId, reporter.SubTaskId, ev)
+	}
+}
+
 // handleFingerprintLog processes fingerprint detection results
 func (s *ScanNode) handleFingerprintLog(reporter *ScannerAgentReporter, info string) {
 	var result fp.MatchResult
@@ -386,7 +441,7 @@ func (s *ScanNode) handleRiskLog(reporter *ScannerAgentReporter, info string) {
 		log.Infof("risk_log_debug keys=%v RiskType=%v DetailsType=%T DetailsLen=%d", keys, rawData["RiskType"], detailRaw, len(utils.InterfaceToString(detailRaw)))
 	}
 
-	if reporter != nil && reporter.agent != nil && reporter.agent.streamer != nil && reporter.agent.streamer.Enabled() {
+	if reporter != nil && reporter.agent != nil && reporter.agent.streamer != nil && reporter.agent.streamer.Enabled() && ssaRiskCompatEnabled() {
 		detailRaw := utils.MapGetFirstRaw(rawData, "Details", "Detail", "details", "detail")
 		var detailMap map[string]interface{}
 		switch t := detailRaw.(type) {

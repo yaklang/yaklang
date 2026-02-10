@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -272,7 +273,9 @@ func (r *ScannerAgentReporter) ReportRisk(
 			v,
 			"RiskType", "risk_type", "riskType", "type", "Type",
 		))
-		if chunkKey, chunkIndex, chunkTotal, chunkData, ok := parseChunkFields(v); chunkKey != "" && r.agent != nil && r.agent.streamer != nil && r.agent.streamer.Enabled() {
+		compat := strings.TrimSpace(os.Getenv("SCANNODE_SSA_RISK_COMPAT"))
+		ssaCompat := compat == "1" || strings.EqualFold(compat, "true")
+		if chunkKey, chunkIndex, chunkTotal, chunkData, ok := parseChunkFields(v); chunkKey != "" && ssaCompat && r.agent != nil && r.agent.streamer != nil && r.agent.streamer.Enabled() {
 			if !ok {
 				log.Warnf("stream ssa chunk skipped: missing fields task=%s key=%s idx=%d total=%d", r.TaskId, chunkKey, chunkIndex, chunkTotal)
 				return nil
@@ -308,7 +311,7 @@ func (r *ScannerAgentReporter) ReportRisk(
 		if lib == nil {
 			lib = make(map[string]interface{})
 		}
-		if chunkKey, chunkIndex, chunkTotal, chunkData, ok := parseChunkFields(lib); chunkKey != "" && r.agent != nil && r.agent.streamer != nil && r.agent.streamer.Enabled() {
+		if chunkKey, chunkIndex, chunkTotal, chunkData, ok := parseChunkFields(lib); chunkKey != "" && ssaCompat && r.agent != nil && r.agent.streamer != nil && r.agent.streamer.Enabled() {
 			if !ok {
 				log.Warnf("stream ssa chunk skipped: missing fields task=%s key=%s idx=%d total=%d", r.TaskId, chunkKey, chunkIndex, chunkTotal)
 				return nil
@@ -320,7 +323,7 @@ func (r *ScannerAgentReporter) ReportRisk(
 			return nil
 		}
 
-		if riskType == "ssa-risk" && r.agent != nil && r.agent.streamer != nil && r.agent.streamer.Enabled() {
+		if riskType == "ssa-risk" && ssaCompat && r.agent != nil && r.agent.streamer != nil && r.agent.streamer.Enabled() {
 			if data := utils.MapGetFirstRaw(lib, "data", "Data"); data != nil {
 				reportJSON := utils.InterfaceToString(data)
 				if reportJSON == "" {

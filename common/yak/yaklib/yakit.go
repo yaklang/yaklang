@@ -213,6 +213,10 @@ func GetExtYakitLibByClient(client *YakitClient) map[string]interface{} {
 		"SSAStreamParts": func(parts any) {
 			_ = client.YakitLog("ssa-stream-parts", string(utils.Jsonify(parts)))
 		},
+		// Prefer raw-json variant to avoid extra marshal/unmarshal cycles in yak runtime.
+		"SSAStreamPartsRaw": func(partsJSON string) {
+			_ = client.YakitLog("ssa-stream-parts-raw", partsJSON)
+		},
 	}
 	if os.Getenv("YAK_DISABLE") == "output" {
 		// YakitExports["Info"] = func(a string, b ...interface{}) {}

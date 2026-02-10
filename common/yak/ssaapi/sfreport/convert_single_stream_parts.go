@@ -39,6 +39,17 @@ type StreamRiskPart struct {
 	DataflowHashes []string        `json:"dataflow_hashes,omitempty"`
 }
 
+// StreamPartsOptions avoids "8 params + 5 bools" callsites.
+type StreamPartsOptions struct {
+	StreamKey        string
+	ReportType       ReportType
+	ShowDataflowPath bool
+	ShowFileContent  bool
+	WithFile         bool
+	DedupFileContent bool
+	DedupDataflow    bool
+}
+
 func dedupUniqueStrings(in []string) []string {
 	if len(in) <= 1 {
 		return in
@@ -60,6 +71,38 @@ func dedupUniqueStrings(in []string) []string {
 	return out
 }
 
+// ConvertSingleResultToStreamPartsJSONWithOptions returns raw JSON of StreamSingleResultParts and basic stats.
+// This is intended for yak scripts that will directly transmit the JSON string (no intermediate map).
+func ConvertSingleResultToStreamPartsJSONWithOptions(result *ssaapi.SyntaxFlowResult, opts StreamPartsOptions) (string, map[string]any, error) {
+	parts, err := ConvertSingleResultToStreamPartsWithOptions(
+		result,
+		opts.StreamKey,
+		opts.ReportType,
+		opts.ShowDataflowPath,
+		opts.ShowFileContent,
+		opts.WithFile,
+		opts.DedupFileContent,
+		opts.DedupDataflow,
+	)
+	if err != nil {
+		return "", nil, err
+	}
+	if parts == nil {
+		return "", map[string]any{"has_payload": false}, nil
+	}
+	raw, err := json.Marshal(parts)
+	if err != nil {
+		return "", nil, err
+	}
+	stats := map[string]any{
+		"has_payload": true,
+		"risk_count":  len(parts.Risks),
+		"file_count":  len(parts.Files),
+		"flow_count":  len(parts.Dataflows),
+	}
+	return string(raw), stats, nil
+}
+
 // ConvertSingleResultToStreamPartsPayload converts one SyntaxFlowResult into stream-friendly parts.
 //
 // Notes:
@@ -75,6 +118,7 @@ func ConvertSingleResultToStreamPartsPayload(
 	dedupFileContent bool,
 	dedupDataflow bool,
 ) (map[string]any, error) {
+	// Backward compatible wrapper; prefer JSONWithOptions in new callsites.
 	parts, err := ConvertSingleResultToStreamPartsWithOptions(
 		result,
 		streamKey,
