@@ -41,6 +41,11 @@ func (c *Coordinator) handleMemoryGenerationInPostIteration(loop *reactloops.ReA
 			c.Done()
 		}()
 
+		// MemoryTriage may be nil in test environments or when not configured
+		if c.MemoryTriage == nil {
+			return
+		}
+
 		// 使用智能记忆处理系统
 		if c.Config.DebugEvent {
 			log.Infof("processing memory for iteration %d with timeline diff: %s", iteration, utils.ShrinkString(diffStr, 200))
