@@ -193,6 +193,26 @@ func GetExtYakitLibByClient(client *YakitClient) map[string]interface{} {
 		"SetProgress":   client.YakitSetProgress,
 		"SetProgressEx": client.YakitSetProgressEx,
 		"Stream":        client.Stream,
+		// SSA stream events: provide a dedicated channel that ScanNode can hook to,
+		// avoiding "risk.NewRisk(type=ssa-risk)" as a transport hack.
+		"SSAStreamTaskStart": func(program string, reportType string) {
+			_ = client.YakitLog("ssa-stream-task-start", string(utils.Jsonify(map[string]any{
+				"program":     program,
+				"report_type": reportType,
+			})))
+		},
+		"SSAStreamFile": func(file any) {
+			_ = client.YakitLog("ssa-stream-file", string(utils.Jsonify(file)))
+		},
+		"SSAStreamDataflow": func(flow any) {
+			_ = client.YakitLog("ssa-stream-dataflow", string(utils.Jsonify(flow)))
+		},
+		"SSAStreamRisk": func(risk any) {
+			_ = client.YakitLog("ssa-stream-risk", string(utils.Jsonify(risk)))
+		},
+		"SSAStreamParts": func(parts any) {
+			_ = client.YakitLog("ssa-stream-parts", string(utils.Jsonify(parts)))
+		},
 	}
 	if os.Getenv("YAK_DISABLE") == "output" {
 		// YakitExports["Info"] = func(a string, b ...interface{}) {}
