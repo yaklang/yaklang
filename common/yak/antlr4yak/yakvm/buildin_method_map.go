@@ -85,8 +85,12 @@ func init() {
 						panic(fmt.Sprintf("runtime error: cannot assign %v to map[index]", v))
 					}
 					callerRefV := reflect.ValueOf(caller.Value)
-					if callerRefV.MapIndex(reflect.ValueOf(k)).IsValid() {
-						refV = refV.Convert(callerRefV.MapIndex(reflect.ValueOf(k)).Type())
+					// use the map's declared value type for conversion (handles []any -> []string, []int, etc.)
+					mapValueType := callerRefV.Type().Elem()
+					if refV.Type() != mapValueType {
+						if convertErr := frame.AutoConvertReflectValueByType(&refV, mapValueType); convertErr != nil {
+							panic(fmt.Sprintf("runtime error: cannot convert %v to %v: %v", refV.Type(), mapValueType, convertErr))
+						}
 					}
 					callerRefV.SetMapIndex(reflect.ValueOf(k), refV)
 					return true

@@ -1,0 +1,108 @@
+/* map slice auto convert test
+   Test auto conversion of []any to typed slices ([]string, []int, etc.)
+   when assigning to typed map values.
+*/
+
+// Test 1: []any -> []string via map index assignment (c["key"] = value)
+// This is the exact case from the bug report
+func testMapStringSliceIndexAssign() {
+    c = map[string][]string{"a": ["1", "2"]}
+    b = []any{"a"}
+    c["b"] = b
+    assert c["b"][0] == "a", "map index assign []any to []string failed"
+    assert len(c["b"]) == 1, "map index assign []any to []string length mismatch"
+    assert len(c["a"]) == 2, "original map entry should not be affected"
+}
+
+// Test 2: []any -> []string via map index assignment (overwrite existing key)
+func testMapStringSliceIndexOverwrite() {
+    c = map[string][]string{"a": ["1", "2"]}
+    b = []any{"x", "y", "z"}
+    c["a"] = b
+    assert c["a"][0] == "x", "map index overwrite []any to []string failed"
+    assert c["a"][1] == "y", "map index overwrite []any to []string failed"
+    assert c["a"][2] == "z", "map index overwrite []any to []string failed"
+    assert len(c["a"]) == 3, "map index overwrite length mismatch"
+}
+
+// Test 3: []any -> []int via map index assignment
+func testMapIntSliceIndexAssign() {
+    c = map[string][]int{"nums": [1, 2, 3]}
+    b = []any{10, 20, 30}
+    c["new_nums"] = b
+    assert c["new_nums"][0] == 10, "map index assign []any to []int failed"
+    assert c["new_nums"][1] == 20, "map index assign []any to []int failed"
+    assert c["new_nums"][2] == 30, "map index assign []any to []int failed"
+}
+
+// Test 4: map.Set() method with []any -> []string
+func testMapSetMethodStringSlice() {
+    c = map[string][]string{"a": ["1"]}
+    b = []any{"hello", "world"}
+    c.Set("b", b)
+    assert c["b"][0] == "hello", "map Set method []any to []string failed"
+    assert c["b"][1] == "world", "map Set method []any to []string failed"
+}
+
+// Test 5: map.Set() method with []any -> []int
+func testMapSetMethodIntSlice() {
+    c = map[string][]int{"a": [1]}
+    b = []any{100, 200}
+    c.Set("b", b)
+    assert c["b"][0] == 100, "map Set method []any to []int failed"
+    assert c["b"][1] == 200, "map Set method []any to []int failed"
+}
+
+// Test 6: empty []any to typed slice
+func testMapEmptyAnySlice() {
+    c = map[string][]string{"a": ["1"]}
+    b = []any{}
+    c["empty"] = b
+    assert len(c["empty"]) == 0, "empty []any to []string should produce empty []string"
+}
+
+// Test 7: map[string]string with string value (should still work as before)
+func testMapStringDirectAssign() {
+    c = map[string]string{"a": "hello"}
+    c["b"] = "world"
+    assert c["b"] == "world", "direct string assign to map should still work"
+    c["a"] = "updated"
+    assert c["a"] == "updated", "direct string overwrite should still work"
+}
+
+// Test 8: map[string]any with []any (should pass through without conversion)
+func testMapAnySlicePassthrough() {
+    c = map[string]any{}
+    b = []any{"a", 1, true}
+    c["mixed"] = b
+    result = c["mixed"]
+    assert len(result) == 3, "any map should accept []any directly"
+}
+
+// Test 9: multiple typed slice conversions in sequence
+func testMapMultipleConversions() {
+    strMap = map[string][]string{}
+    intMap = map[string][]int{}
+
+    data1 = []any{"foo", "bar"}
+    data2 = []any{1, 2, 3}
+
+    strMap["keys"] = data1
+    intMap["vals"] = data2
+
+    assert strMap["keys"][0] == "foo", "string map conversion failed"
+    assert strMap["keys"][1] == "bar", "string map conversion failed"
+    assert intMap["vals"][0] == 1, "int map conversion failed"
+    assert intMap["vals"][1] == 2, "int map conversion failed"
+    assert intMap["vals"][2] == 3, "int map conversion failed"
+}
+
+testMapStringSliceIndexAssign()
+testMapStringSliceIndexOverwrite()
+testMapIntSliceIndexAssign()
+testMapSetMethodStringSlice()
+testMapSetMethodIntSlice()
+testMapEmptyAnySlice()
+testMapStringDirectAssign()
+testMapAnySlicePassthrough()
+testMapMultipleConversions()
