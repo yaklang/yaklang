@@ -4,22 +4,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"os"
 	"strconv"
 	"strings"
-	"sync"
-	"sync/atomic"
-	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/jinzhu/gorm/dialects/postgres"
 	"github.com/yaklang/yaklang/common/fp"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/spec"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bruteutils"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yak/yaklib/tools"
 )
 
@@ -32,21 +26,6 @@ type ScannerAgentReporter struct {
 }
 
 var streamDebugCount int32
-var chunkInspectCount int32
-var chunkAssembleCount int32
-
-type ssaChunkBuffer struct {
-	total    int
-	chunks   map[int]string
-	received int
-	updated  time.Time
-}
-
-var (
-	ssaChunkMu      sync.Mutex
-	ssaChunkPool    = make(map[string]*ssaChunkBuffer)
-	chunkDebugCount int32
-)
 
 // convertRawToString 将原始数据转换为字符串，处理 JSON 反序列化后的各种数据格式
 func convertRawToString(raw interface{}) string {
@@ -70,78 +49,6 @@ func convertRawToString(raw interface{}) string {
 	default:
 		return utils.InterfaceToString(raw)
 	}
-}
-
-func parseChunkFields(m map[string]interface{}) (key string, index int, total int, data string, ok bool) {
-	if m == nil {
-		return "", 0, 0, "", false
-	}
-	key = utils.InterfaceToString(utils.MapGetFirstRaw(m, "chunk_key", "chunkKey", "ChunkKey"))
-	if key == "" {
-		return "", 0, 0, "", false
-	}
-	index = int(utils.InterfaceToFloat64(utils.MapGetFirstRaw(m, "chunk_index", "chunkIndex", "ChunkIndex")))
-	total = int(utils.InterfaceToFloat64(utils.MapGetFirstRaw(m, "chunk_total", "chunkTotal", "ChunkTotal")))
-	data = utils.InterfaceToString(utils.MapGetFirstRaw(m, "chunk_data", "chunkData", "ChunkData"))
-	if total <= 0 || data == "" {
-		return key, index, total, data, false
-	}
-	return key, index, total, data, true
-}
-
-func emitSSAChunk(taskId, runtimeId, subTaskId string, emitter *StreamEmitter, chunkKey string, chunkIndex, chunkTotal int, chunkData string) bool {
-	if emitter == nil || !emitter.Enabled() {
-		return false
-	}
-	fullKey := taskId + ":" + chunkKey
-	ssaChunkMu.Lock()
-	buf := ssaChunkPool[fullKey]
-	if buf == nil {
-		buf = &ssaChunkBuffer{
-			total:  chunkTotal,
-			chunks: make(map[int]string),
-		}
-		ssaChunkPool[fullKey] = buf
-	}
-	if _, ok := buf.chunks[chunkIndex]; !ok {
-		buf.chunks[chunkIndex] = chunkData
-		buf.received++
-	}
-	buf.updated = time.Now()
-	complete := buf.received >= buf.total
-	ssaChunkMu.Unlock()
-
-	if complete {
-		ssaChunkMu.Lock()
-		buf = ssaChunkPool[fullKey]
-		delete(ssaChunkPool, fullKey)
-		ssaChunkMu.Unlock()
-		if buf != nil {
-			var sb strings.Builder
-			for i := 0; i < buf.total; i++ {
-				sb.WriteString(buf.chunks[i])
-			}
-			reportJSON := sb.String()
-			if reportJSON != "" {
-				if atomic.AddInt32(&chunkAssembleCount, 1) <= 5 {
-					log.Infof("stream ssa chunk assembled task=%s len=%d chunks=%d", taskId, len(reportJSON), buf.total)
-				}
-				if atomic.AddInt32(&streamDebugCount, 1) <= 3 {
-					log.Infof("stream ssa report begin task=%s len=%d", taskId, len(reportJSON))
-				}
-				streamErr := emitter.EmitSSAReportJSON(taskId, runtimeId, subTaskId, reportJSON)
-				if streamErr == nil {
-					if atomic.AddInt32(&streamDebugCount, 1) <= 3 {
-						log.Infof("stream ssa report sent task=%s", taskId)
-					}
-					return true
-				}
-				log.Errorf("stream ssa report failed: %v", streamErr)
-			}
-		}
-		return true
-	}
-	return true
 }
 
 func NewScannerAgentReporter(taskId string, subTaskId string, runtimeId string, agent *ScanNode) *ScannerAgentReporter {
@@ -269,30 +176,7 @@ func (r *ScannerAgentReporter) ReportRisk(
 	}
 
 	if v := detailsMap; v != nil {
-		riskType := utils.InterfaceToString(utils.MapGetFirstRaw(
-			v,
-			"RiskType", "risk_type", "riskType", "type", "Type",
-		))
-		compat := strings.TrimSpace(os.Getenv("SCANNODE_SSA_RISK_COMPAT"))
-		ssaCompat := compat == "1" || strings.EqualFold(compat, "true")
-		if chunkKey, chunkIndex, chunkTotal, chunkData, ok := parseChunkFields(v); chunkKey != "" && ssaCompat && r.agent != nil && r.agent.streamer != nil && r.agent.streamer.Enabled() {
-			if !ok {
-				log.Warnf("stream ssa chunk skipped: missing fields task=%s key=%s idx=%d total=%d", r.TaskId, chunkKey, chunkIndex, chunkTotal)
-				return nil
-			}
-			if atomic.AddInt32(&chunkDebugCount, 1) <= 3 {
-				log.Infof("stream ssa chunk received task=%s key=%s idx=%d/%d len=%d", r.TaskId, chunkKey, chunkIndex, chunkTotal, len(chunkData))
-			}
-			_ = emitSSAChunk(r.TaskId, r.RuntimeId, r.SubTaskId, r.agent.streamer, chunkKey, chunkIndex, chunkTotal, chunkData)
-			return nil
-		}
-
 		detailRaw := utils.MapGetFirstRaw(v, "Details", "Detail", "details", "detail")
-		if atomic.AddInt32(&chunkInspectCount, 1) <= 3 {
-			rawStr := utils.InterfaceToString(detailRaw)
-			log.Infof("risk_details_debug task=%s riskType=%s detailType=%T detailLen=%d has_chunk_key=%v",
-				r.TaskId, riskType, detailRaw, len(rawStr), strings.Contains(rawStr, "chunk_key"))
-		}
 		var lib map[string]interface{}
 		switch t := detailRaw.(type) {
 		case map[string]interface{}:
@@ -311,57 +195,6 @@ func (r *ScannerAgentReporter) ReportRisk(
 		if lib == nil {
 			lib = make(map[string]interface{})
 		}
-		if chunkKey, chunkIndex, chunkTotal, chunkData, ok := parseChunkFields(lib); chunkKey != "" && ssaCompat && r.agent != nil && r.agent.streamer != nil && r.agent.streamer.Enabled() {
-			if !ok {
-				log.Warnf("stream ssa chunk skipped: missing fields task=%s key=%s idx=%d total=%d", r.TaskId, chunkKey, chunkIndex, chunkTotal)
-				return nil
-			}
-			if atomic.AddInt32(&chunkDebugCount, 1) <= 3 {
-				log.Infof("stream ssa chunk received task=%s key=%s idx=%d/%d len=%d", r.TaskId, chunkKey, chunkIndex, chunkTotal, len(chunkData))
-			}
-			_ = emitSSAChunk(r.TaskId, r.RuntimeId, r.SubTaskId, r.agent.streamer, chunkKey, chunkIndex, chunkTotal, chunkData)
-			return nil
-		}
-
-		if riskType == "ssa-risk" && ssaCompat && r.agent != nil && r.agent.streamer != nil && r.agent.streamer.Enabled() {
-			if data := utils.MapGetFirstRaw(lib, "data", "Data"); data != nil {
-				reportJSON := utils.InterfaceToString(data)
-				if reportJSON == "" {
-					if enc := utils.MapGetString(lib, "data_gzip_b64"); enc != "" {
-						if raw, err := codec.DecodeBase64(enc); err == nil {
-							if ungzip, err := utils.GzipDeCompress(raw); err == nil {
-								reportJSON = string(ungzip)
-							} else {
-								log.Errorf("stream ssa report gzip decode failed: %v", err)
-							}
-						} else {
-							log.Errorf("stream ssa report base64 decode failed: %v", err)
-						}
-					}
-				}
-				if reportJSON != "" {
-					if atomic.AddInt32(&streamDebugCount, 1) <= 3 {
-						log.Infof("stream ssa report begin task=%s len=%d", r.TaskId, len(reportJSON))
-					}
-					if streamErr := r.agent.streamer.EmitSSAReportJSON(r.TaskId, r.RuntimeId, r.SubTaskId, reportJSON); streamErr == nil {
-						if atomic.AddInt32(&streamDebugCount, 1) <= 3 {
-							log.Infof("stream ssa report sent task=%s", r.TaskId)
-						}
-						return nil
-					} else {
-						log.Errorf("stream ssa report failed: %v", streamErr)
-					}
-				}
-			}
-			if len(lib) == 0 {
-				keys := make([]string, 0, len(v))
-				for k := range v {
-					keys = append(keys, k)
-				}
-				log.Warnf("stream ssa report skipped: empty details riskType=%s keys=%v", riskType, keys)
-			}
-		}
-
 		if ip := net.ParseIP(utils.FixForParseIP(utils.MapGetString(v, "IP"))); ip != nil {
 			vul.IPAddr = ip.String()
 			if i, err := utils.IPv4ToUint32(ip.To4()); err == nil {
