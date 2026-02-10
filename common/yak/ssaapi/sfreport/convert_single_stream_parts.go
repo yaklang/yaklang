@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"sort"
 	"strings"
-	"time"
 	"unicode/utf8"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -13,11 +12,8 @@ import (
 )
 
 // StreamSingleResultParts is a streaming-friendly representation of one SyntaxFlowResult.
-// It is intentionally "transport-shaped": files/dataflows are dedupable by hash, and each
-// risk carries references (file_hashes/dataflow_hashes) to avoid embedding heavy payloads.
-//
-// This is meant to be produced in yak (producer), then delivered to ScanNode via yakit logs,
-// and finally re-packaged into spec.StreamEnvelope events by StreamEmitter.
+// Files/dataflows are dedupable by hash, and each risk carries references
+// (file_hashes/dataflow_hashes) to avoid embedding heavy payloads.
 type StreamSingleResultParts struct {
 	ProgramName string                 `json:"program_name"`
 	ReportType  string                 `json:"report_type"`
@@ -39,7 +35,6 @@ type StreamRiskPart struct {
 	DataflowHashes []string        `json:"dataflow_hashes,omitempty"`
 }
 
-// StreamPartsOptions avoids "8 params + 5 bools" callsites.
 type StreamPartsOptions struct {
 	StreamKey        string
 	ReportType       ReportType
@@ -50,40 +45,9 @@ type StreamPartsOptions struct {
 	DedupDataflow    bool
 }
 
-func dedupUniqueStrings(in []string) []string {
-	if len(in) <= 1 {
-		return in
-	}
-	set := make(map[string]struct{}, len(in))
-	out := make([]string, 0, len(in))
-	for _, v := range in {
-		v = strings.TrimSpace(v)
-		if v == "" {
-			continue
-		}
-		if _, ok := set[v]; ok {
-			continue
-		}
-		set[v] = struct{}{}
-		out = append(out, v)
-	}
-	sort.Strings(out)
-	return out
-}
-
-// ConvertSingleResultToStreamPartsJSONWithOptions returns raw JSON of StreamSingleResultParts and basic stats.
-// This is intended for yak scripts that will directly transmit the JSON string (no intermediate map).
-func ConvertSingleResultToStreamPartsJSONWithOptions(result *ssaapi.SyntaxFlowResult, opts StreamPartsOptions) (string, map[string]any, error) {
-	parts, err := ConvertSingleResultToStreamPartsWithOptions(
-		result,
-		opts.StreamKey,
-		opts.ReportType,
-		opts.ShowDataflowPath,
-		opts.ShowFileContent,
-		opts.WithFile,
-		opts.DedupFileContent,
-		opts.DedupDataflow,
-	)
+// ConvertSingleResultToStreamPartsJSON returns raw JSON of StreamSingleResultParts and basic stats.
+func ConvertSingleResultToStreamPartsJSON(result *ssaapi.SyntaxFlowResult, opts StreamPartsOptions) (string, map[string]any, error) {
+	parts, err := ConvertSingleResultToStreamParts(result, opts)
 	if err != nil {
 		return "", nil, err
 	}
@@ -103,76 +67,22 @@ func ConvertSingleResultToStreamPartsJSONWithOptions(result *ssaapi.SyntaxFlowRe
 	return string(raw), stats, nil
 }
 
-// ConvertSingleResultToStreamPartsPayload converts one SyntaxFlowResult into stream-friendly parts.
-//
-// Notes:
-// - If dedupFileContent is enabled, files already seen in streamKey are not returned again.
-// - Dataflows are always minimized to StreamMinimalDataFlowPath (enough for audit persistence).
-func ConvertSingleResultToStreamPartsPayload(
-	result *ssaapi.SyntaxFlowResult,
-	streamKey string,
-	reportType ReportType,
-	showDataflowPath bool,
-	showFileContent bool,
-	withFile bool,
-	dedupFileContent bool,
-	dedupDataflow bool,
-) (map[string]any, error) {
-	// Backward compatible wrapper; prefer JSONWithOptions in new callsites.
-	parts, err := ConvertSingleResultToStreamPartsWithOptions(
-		result,
-		streamKey,
-		reportType,
-		showDataflowPath,
-		showFileContent,
-		withFile,
-		dedupFileContent,
-		dedupDataflow,
-	)
-	if err != nil {
-		return nil, err
-	}
-	if parts == nil {
-		return map[string]any{"has_payload": false}, nil
-	}
-	raw, err := json.Marshal(parts)
-	if err != nil {
-		return nil, err
-	}
-	// Return as a generic map for yak runtime friendliness.
-	var m map[string]any
-	if err := json.Unmarshal(raw, &m); err != nil {
-		return nil, err
-	}
-	if m == nil {
-		m = map[string]any{}
-	}
-	m["has_payload"] = len(parts.Risks) > 0
-	return m, nil
-}
-
-func ConvertSingleResultToStreamPartsWithOptions(
-	result *ssaapi.SyntaxFlowResult,
-	streamKey string,
-	reportType ReportType,
-	showDataflowPath bool,
-	showFileContent bool,
-	withFile bool,
-	dedupFileContent bool,
-	dedupDataflow bool,
-) (*StreamSingleResultParts, error) {
+// ConvertSingleResultToStreamParts converts one SyntaxFlowResult into stream-friendly parts.
+func ConvertSingleResultToStreamParts(result *ssaapi.SyntaxFlowResult, opts StreamPartsOptions) (*StreamSingleResultParts, error) {
 	if result == nil {
 		return nil, nil
 	}
-	report := NewReport(reportType)
-	if showDataflowPath {
+
+	report := NewReport(opts.ReportType)
+	if opts.ShowDataflowPath {
 		report.config.showDataflowPath = true
 	}
-	if showFileContent {
+	if opts.ShowFileContent {
 		report.config.showFileContent = true
 	}
 	report.AddSyntaxFlowResult(result)
-	if !withFile {
+
+	if !opts.WithFile {
 		report.File = nil
 		report.IrSourceHashes = make(map[string]struct{})
 		report.FileCount = 0
@@ -184,112 +94,103 @@ func ConvertSingleResultToStreamPartsWithOptions(
 	out := &StreamSingleResultParts{
 		ProgramName: report.ProgramName,
 		ReportType:  string(report.ReportType),
-		Files:       nil,
-		Dataflows:   nil,
-		Risks:       make([]*StreamRiskPart, 0, len(report.Risks)),
-		Stats:       make(map[string]interface{}),
 	}
 
-	// Dedup file payloads across the task (streamKey).
-	var fileSeen *streamDedupState
-	if dedupFileContent && streamKey != "" {
-		fileSeen = getStreamDedupState(streamKey)
-	}
-	shouldSendFile := func(h string) bool {
-		if h == "" {
-			return false
-		}
-		if fileSeen == nil {
-			return true
-		}
-		fileSeen.mu.Lock()
-		defer fileSeen.mu.Unlock()
-		k := "file:" + h
-		if _, ok := fileSeen.seen[k]; ok {
-			return false
-		}
-		fileSeen.seen[k] = struct{}{}
-		fileSeen.lastUsed = time.Now()
-		return true
+	// dedup state
+	var dedup *streamDedupState
+	if opts.StreamKey != "" && (opts.DedupFileContent || opts.DedupDataflow) {
+		dedup = getStreamDedupState(opts.StreamKey)
 	}
 
-	flowSeen := fileSeen
-	if !dedupDataflow {
-		flowSeen = nil
-	}
-	shouldSendFlow := func(h string) bool {
-		if h == "" {
-			return false
-		}
-		if flowSeen == nil {
-			return true
-		}
-		flowSeen.mu.Lock()
-		defer flowSeen.mu.Unlock()
-		k := "flow:" + h
-		if _, ok := flowSeen.seen[k]; ok {
-			return false
-		}
-		flowSeen.seen[k] = struct{}{}
-		flowSeen.lastUsed = time.Now()
-		return true
-	}
+	riskFiles := buildFiles(out, report, opts.WithFile, dedup, opts.DedupFileContent)
+	buildDataflowsAndRisks(out, report, dedup, opts.DedupDataflow, riskFiles)
 
-	// Build risk -> fileHashes from report.File[].Risks.
+	maybeSweepStreamDedup()
+
+	out.Stats = map[string]interface{}{
+		"risk_count": len(out.Risks),
+		"file_count": len(out.Files),
+		"flow_count": len(out.Dataflows),
+	}
+	return out, nil
+}
+
+// buildFiles extracts unique files from the report and returns risk→fileHashes mapping.
+func buildFiles(out *StreamSingleResultParts, report *Report, withFile bool, dedup *streamDedupState, dedupFile bool) map[string][]string {
 	riskFiles := make(map[string][]string)
-	if withFile && len(report.File) > 0 {
-		// Prefer report.fileByHash if present (dedup duplicates in report.File).
-		unique := make(map[string]*File, 0)
-		if report.fileByHash != nil && len(report.fileByHash) > 0 {
-			for h, f := range report.fileByHash {
-				if h != "" && f != nil {
-					unique[h] = f
-				}
-			}
-		} else {
-			for _, f := range report.File {
-				if f != nil && f.IrSourceHash != "" {
-					if _, ok := unique[f.IrSourceHash]; !ok {
-						unique[f.IrSourceHash] = f
-					}
-				}
+	if !withFile || len(report.File) == 0 {
+		return riskFiles
+	}
+
+	// Build unique file index, preferring fileByHash if available.
+	unique := make(map[string]*File, len(report.File))
+	if len(report.fileByHash) > 0 {
+		for h, f := range report.fileByHash {
+			if h != "" && f != nil {
+				unique[h] = f
 			}
 		}
-		out.Files = make([]*File, 0, len(unique))
-		for h, f := range unique {
-			if f == nil {
+	} else {
+		for _, f := range report.File {
+			if f == nil || f.IrSourceHash == "" {
 				continue
 			}
-			if !shouldSendFile(h) {
-				// Already sent in this stream; still keep the association via riskFiles.
-			} else {
-				// Ensure JSON-safe UTF-8 for transport (some repos may contain non-utf8 blobs).
-				ff := *f
-				if ff.Content != "" && !utf8.ValidString(ff.Content) {
-					ff.Content = utils.EscapeInvalidUTF8Byte([]byte(ff.Content))
-				}
-				out.Files = append(out.Files, &ff)
+			if _, ok := unique[f.IrSourceHash]; !ok {
+				unique[f.IrSourceHash] = f
 			}
-			for _, rh := range f.Risks {
-				rh = strings.TrimSpace(rh)
-				if rh == "" {
-					continue
-				}
+		}
+	}
+
+	out.Files = make([]*File, 0, len(unique))
+	var fileDedup *streamDedupState
+	if dedupFile {
+		fileDedup = dedup
+	}
+
+	for h, f := range unique {
+		// Always track risk→file associations, even for deduped files.
+		for _, rh := range f.Risks {
+			if rh = strings.TrimSpace(rh); rh != "" {
 				riskFiles[rh] = append(riskFiles[rh], h)
 			}
 		}
-		// Keep deterministic ordering for tests/logs.
-		sort.Slice(out.Files, func(i, j int) bool {
-			if out.Files[i] == nil || out.Files[j] == nil {
-				return i < j
-			}
-			return out.Files[i].IrSourceHash < out.Files[j].IrSourceHash
-		})
+
+		if !fileDedup.markSeen("file:", h) {
+			continue
+		}
+
+		ff := *f
+		if ff.Content != "" && !utf8.ValidString(ff.Content) {
+			ff.Content = utils.EscapeInvalidUTF8Byte([]byte(ff.Content))
+		}
+		out.Files = append(out.Files, &ff)
 	}
 
-	// Build dataflow parts and risk -> flowHashes mapping.
+	sort.Slice(out.Files, func(i, j int) bool {
+		return out.Files[i].IrSourceHash < out.Files[j].IrSourceHash
+	})
+	return riskFiles
+}
+
+// buildDataflowsAndRisks builds dataflow parts and risk parts in a single pass over report.Risks.
+func buildDataflowsAndRisks(
+	out *StreamSingleResultParts,
+	report *Report,
+	dedup *streamDedupState,
+	dedupDataflow bool,
+	riskFiles map[string][]string,
+) {
 	flowPayloads := make(map[string]json.RawMessage)
 	riskFlows := make(map[string][]string)
+
+	var flowDedup *streamDedupState
+	if dedupDataflow {
+		flowDedup = dedup
+	}
+
+	out.Risks = make([]*StreamRiskPart, 0, len(report.Risks))
+	out.Dataflows = make([]*StreamDataflowPart, 0)
+
 	for rh, r := range report.Risks {
 		if r == nil {
 			continue
@@ -304,46 +205,30 @@ func ConvertSingleResultToStreamPartsWithOptions(
 		if out.ProgramName == "" && r.ProgramName != "" {
 			out.ProgramName = r.ProgramName
 		}
-		if len(r.DataFlowPaths) > 0 {
-			for _, p := range r.DataFlowPaths {
-				raw, err := MarshalStreamMinimalDataFlowPath(p)
-				if err != nil || len(raw) == 0 {
-					continue
-				}
-				flowHash := codec.Sha256(raw)
-				if flowHash == "" {
-					continue
-				}
-				flowPayloads[flowHash] = raw
-				riskFlows[riskHash] = append(riskFlows[riskHash], flowHash)
-			}
-		}
-	}
-	out.Dataflows = make([]*StreamDataflowPart, 0, len(flowPayloads))
-	for h, payload := range flowPayloads {
-		if !shouldSendFlow(h) {
-			continue
-		}
-		out.Dataflows = append(out.Dataflows, &StreamDataflowPart{
-			DataflowHash: h,
-			Payload:      payload,
-		})
-	}
-	sort.Slice(out.Dataflows, func(i, j int) bool { return out.Dataflows[i].DataflowHash < out.Dataflows[j].DataflowHash })
 
-	// Build risk parts.
-	for rh, r := range report.Risks {
-		if r == nil {
-			continue
+		// Collect dataflow hashes for this risk.
+		for _, p := range r.DataFlowPaths {
+			raw, err := MarshalStreamMinimalDataFlowPath(p)
+			if err != nil || len(raw) == 0 {
+				continue
+			}
+			flowHash := codec.Sha256(raw)
+			if flowHash == "" {
+				continue
+			}
+			if _, exists := flowPayloads[flowHash]; !exists {
+				flowPayloads[flowHash] = raw
+				if flowDedup.markSeen("flow:", flowHash) {
+					out.Dataflows = append(out.Dataflows, &StreamDataflowPart{
+						DataflowHash: flowHash,
+						Payload:      raw,
+					})
+				}
+			}
+			riskFlows[riskHash] = append(riskFlows[riskHash], flowHash)
 		}
-		riskHash := strings.TrimSpace(rh)
-		if riskHash == "" {
-			riskHash = strings.TrimSpace(r.Hash)
-		}
-		if riskHash == "" {
-			continue
-		}
-		// Strip heavy dataflow payload from risk itself (we send dataflows separately).
+
+		// Build risk part (strip heavy DataFlowPaths).
 		rc := *r
 		rc.Hash = riskHash
 		rc.DataFlowPaths = nil
@@ -354,15 +239,32 @@ func ConvertSingleResultToStreamPartsWithOptions(
 		out.Risks = append(out.Risks, &StreamRiskPart{
 			RiskHash:       riskHash,
 			RiskJSON:       riskJSON,
-			FileHashes:     dedupUniqueStrings(riskFiles[riskHash]),
-			DataflowHashes: dedupUniqueStrings(riskFlows[riskHash]),
+			FileHashes:     dedupStrings(riskFiles[riskHash]),
+			DataflowHashes: dedupStrings(riskFlows[riskHash]),
 		})
 	}
 
-	maybeSweepStreamDedup()
+	sort.Slice(out.Dataflows, func(i, j int) bool {
+		return out.Dataflows[i].DataflowHash < out.Dataflows[j].DataflowHash
+	})
+}
 
-	out.Stats["risk_count"] = len(out.Risks)
-	out.Stats["file_count"] = len(out.Files)
-	out.Stats["flow_count"] = len(out.Dataflows)
-	return out, nil
+func dedupStrings(in []string) []string {
+	if len(in) <= 1 {
+		return in
+	}
+	set := make(map[string]struct{}, len(in))
+	out := make([]string, 0, len(in))
+	for _, v := range in {
+		if v = strings.TrimSpace(v); v == "" {
+			continue
+		}
+		if _, ok := set[v]; ok {
+			continue
+		}
+		set[v] = struct{}{}
+		out = append(out, v)
+	}
+	sort.Strings(out)
+	return out
 }

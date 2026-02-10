@@ -6,6 +6,9 @@ import (
 	"time"
 )
 
+const streamDedupTTL = 15 * time.Minute
+const streamDedupSweepInterval int64 = 60 // seconds
+
 // streamDedupState is a per-stream (usually per task_id) dedup set used by streaming converters.
 // It prevents resending identical file/dataflow payloads across many per-risk events.
 type streamDedupState struct {
@@ -24,11 +27,7 @@ func getStreamDedupState(key string) *streamDedupState {
 		return nil
 	}
 	if v, ok := streamDedup.Load(key); ok {
-		st := v.(*streamDedupState)
-		st.mu.Lock()
-		st.lastUsed = time.Now()
-		st.mu.Unlock()
-		return st
+		return v.(*streamDedupState)
 	}
 	st := &streamDedupState{seen: make(map[string]struct{}, 256), lastUsed: time.Now()}
 	if v, loaded := streamDedup.LoadOrStore(key, st); loaded {
@@ -40,13 +39,12 @@ func getStreamDedupState(key string) *streamDedupState {
 func maybeSweepStreamDedup() {
 	now := time.Now()
 	last := atomic.LoadInt64(&streamDedupSweep)
-	if last > 0 && now.Unix()-last < 60 {
+	if last > 0 && now.Unix()-last < streamDedupSweepInterval {
 		return
 	}
 	if !atomic.CompareAndSwapInt64(&streamDedupSweep, last, now.Unix()) {
 		return
 	}
-	ttl := 15 * time.Minute
 	streamDedup.Range(func(k, v any) bool {
 		key, _ := k.(string)
 		st, _ := v.(*streamDedupState)
@@ -57,19 +55,47 @@ func maybeSweepStreamDedup() {
 		st.mu.Lock()
 		lu := st.lastUsed
 		st.mu.Unlock()
-		if !lu.IsZero() && now.Sub(lu) > ttl {
+		if !lu.IsZero() && now.Sub(lu) > streamDedupTTL {
 			streamDedup.Delete(k)
 		}
 		return true
 	})
 }
 
+// markSeen returns true if key is seen for the first time under the given prefix.
+// nil-safe: returns true for non-empty key when receiver is nil.
+func (s *streamDedupState) markSeen(prefix, key string) bool {
+	if key == "" {
+		return false
+	}
+	if s == nil {
+		return true
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	k := prefix + key
+	if _, ok := s.seen[k]; ok {
+		return false
+	}
+	s.seen[k] = struct{}{}
+	s.lastUsed = time.Now()
+	return true
+}
+
+// len returns the number of entries tracked by this dedup state.
+func (s *streamDedupState) len() int {
+	if s == nil {
+		return 0
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.seen)
+}
+
 // ResetStreamFileDedup clears per-stream file-content dedup state.
-// Intended to be called at the end of a scan task (streamKey=task_id).
 func ResetStreamFileDedup(streamKey string) {
 	if streamKey == "" {
 		return
 	}
 	streamDedup.Delete(streamKey)
 }
-
