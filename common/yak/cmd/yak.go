@@ -1124,6 +1124,7 @@ func main() {
 	app := cli.NewApp()
 	app.Usage = "yaklang core engine"
 	app.Version = yakVersion
+	app.IgnoreUnknownFlags = true
 	consts.SetPalmVersion(yakVersion)
 	consts.SetYakVersion(yakVersion)
 
