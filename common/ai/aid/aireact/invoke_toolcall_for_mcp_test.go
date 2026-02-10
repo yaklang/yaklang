@@ -229,7 +229,9 @@ func TestReAct_MCPToolUse(t *testing.T) {
 		}),
 		aicommon.WithMemoryTriage(nil),
 		aicommon.WithEnableSelfReflection(false),
-		aicommon.WithDisallowMCPServers(false), // Important: enable MCP servers
+		aicommon.WithDisallowMCPServers(false),              // Important: enable MCP servers
+		aicommon.WithDisableIntentRecognition(true),          // Prevent intent sub-loop from consuming mock responses
+		aicommon.WithDisableSessionTitleGeneration(true),     // Prevent title generation from consuming mock responses
 	)
 	if err != nil {
 		t.Fatalf("failed to create ReAct instance: %v", err)
