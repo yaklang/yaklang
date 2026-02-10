@@ -121,6 +121,7 @@ func StructuredStreamBase(
 	}
 	m := new(sync.Mutex)
 	go func() {
+		defer close(schan)
 		_, err := ChatBase(url, model, msg, WithChatBase_PoCOptions(opt), WithChatBase_StreamHandler(func(reader io.Reader) {
 			structured := &streamToStructuredStream{
 				isReason: false,

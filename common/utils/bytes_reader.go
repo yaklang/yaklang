@@ -70,10 +70,13 @@ func ReadWithContextTickCallback(ctx context.Context, rc io.Reader, callback fun
 
 	// one go routine to read
 	var (
-		mux = new(sync.Mutex)
-		buf []byte
+		mux             = new(sync.Mutex)
+		buf             []byte
+		done            = make(chan struct{})
+		lastConsumedLen = 0 // 记录上次消费时的数据长度
 	)
 	go func() {
+		defer close(done)
 		for scanner.Scan() {
 			// 根据上下文退出
 			if ctx.Err() != nil {
@@ -87,20 +90,32 @@ func ReadWithContextTickCallback(ctx context.Context, rc io.Reader, callback fun
 		}
 	}()
 
-	defer callback(buf)
-
 	for {
 		select {
 		case <-ctx.Done():
+			// 上下文取消，直接退出不消费数据
+			return
+		case <-done:
+			// reader 已读取完毕，只有当有新数据时才消费
+			mux.Lock()
+			if len(buf) > lastConsumedLen {
+				callback(buf)
+			}
+			mux.Unlock()
 			return
 		case <-ticker:
 			mux.Lock()
-			flag := callback(buf)
-			mux.Unlock()
-			if flag {
-				continue
+			// 只有当有新数据时才调用 callback
+			if len(buf) > lastConsumedLen {
+				flag := callback(buf)
+				lastConsumedLen = len(buf)
+				mux.Unlock()
+				if !flag {
+					// callback 返回 false，用户要求停止
+					return
+				}
 			} else {
-				return
+				mux.Unlock()
 			}
 		}
 	}
