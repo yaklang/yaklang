@@ -15,12 +15,15 @@ var Exports = map[string]interface{}{
 	"withDataflowPath": WithDataflowPath,
 	"withFileContent":  WithFileContent,
 
+	// Legacy JSON export helpers (not used by the current IRify streaming path),
+	// keep for backward compatibility of external yak scripts/tools.
 	"ConvertSingleResultToJSON": func(result *ssaapi.SyntaxFlowResult, showDataflow bool) (string, error) {
 		return ConvertSingleResultToJSON(result, showDataflow)
 	},
 	"ConvertSingleResultToJSONWithOptions": func(result *ssaapi.SyntaxFlowResult, reportType ReportType, showDataflow bool, showFileContent bool, withFile bool) (string, error) {
 		return ConvertSingleResultToJSONWithOptions(result, reportType, showDataflow, showFileContent, withFile)
 	},
+
 	"ConvertSingleResultToStreamPartsJSONPayload": func(result *ssaapi.SyntaxFlowResult, opts map[string]any) (map[string]any, error) {
 		o := StreamPartsOptions{
 			StreamKey:        utils.InterfaceToString(utils.MapGetFirstRaw(opts, "stream_key", "streamKey")),
