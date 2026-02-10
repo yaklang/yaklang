@@ -80,7 +80,10 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 
 		// create or update a new checkpoint
 		cp := c.CreateAIInteractiveCheckpoint(seq)
-
+		err = c.SubmitCheckpointRequest(cp, request.GetPrompt())
+		if err != nil {
+			c.EmitWarning("ai request save request checkpoint failed err: %v", err)
+		}
 		if c.AiAutoRetry <= 0 {
 			c.AiAutoRetry = 1
 		}
@@ -117,7 +120,7 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 					}
 				} else {
 					request.CallSaveCheckpointCallback(func() (*schema.AiCheckpoint, error) {
-						return cp, c.SubmitCheckpointRequest(cp, &AIResponseSimple{
+						return cp, c.SubmitCheckpointResponse(cp, &AIResponseSimple{
 							Reason: string(reason),
 							Output: string(output),
 						})
