@@ -1088,12 +1088,12 @@ func (v *Value) LeftSliceAssignTo(vir *Frame, val *Value) {
 		}
 		callerRefV := reflect.ValueOf(caller.Value)
 		keyRefV := reflect.ValueOf(key.Value)
-		valueRefV := callerRefV.MapIndex(keyRefV)
-		if valueRefV.IsValid() {
-			if refV.CanConvert(valueRefV.Type()) {
-				refV = refV.Convert(valueRefV.Type())
-			} else {
-				panic(fmt.Sprintf("runtime error: cannot convert %v to %v", val, valueRefV.Type()))
+
+		// use the map's declared value type for conversion (handles []any -> []string, []int, etc.)
+		mapValueType := callerRefV.Type().Elem()
+		if refV.Type() != mapValueType {
+			if convertErr := vir.AutoConvertReflectValueByType(&refV, mapValueType); convertErr != nil {
+				panic(fmt.Sprintf("runtime error: cannot convert %v to %v: %v", refV.Type(), mapValueType, convertErr))
 			}
 		}
 		callerRefV.SetMapIndex(keyRefV, refV)
@@ -1173,8 +1173,13 @@ func (v *Value) LeftMemberAssignTo(vir *Frame, val *Value) {
 		}
 		callerRefV := reflect.ValueOf(callerValue)
 		keyRefV := reflect.ValueOf(key.Value)
-		if callerRefV.MapIndex(keyRefV).IsValid() {
-			refV = refV.Convert(callerRefV.MapIndex(keyRefV).Type())
+
+		// use the map's declared value type for conversion (handles []any -> []string, []int, etc.)
+		mapValueType := callerRefV.Type().Elem()
+		if refV.Type() != mapValueType {
+			if convertErr := vir.AutoConvertReflectValueByType(&refV, mapValueType); convertErr != nil {
+				panic(fmt.Sprintf("runtime error: cannot convert %v to %v: %v", refV.Type(), mapValueType, convertErr))
+			}
 		}
 		callerRefV.SetMapIndex(keyRefV, refV)
 	case reflect.Struct:
