@@ -25,6 +25,9 @@ var csrfFormTemplate = template.Must(template.New("csrf-form").Parse(strings.Tri
 <input type="submit" value="Submit request" />
 </form>
 <script>history.pushState('', '', '/');</script>
+{{- if .AutoSubmit }}
+<script>(function(){var f=document.forms['form1'];if(f)HTMLFormElement.prototype.submit.call(f);})();</script>
+{{- end }}
 </body>
 </html>
 `)))
@@ -51,6 +54,9 @@ xhr.send(new Blob([aBody]));
 <form action="#">
 <input type="button" value="Submit request" onclick="submitRequest();" />
 </form>
+{{- if .AutoSubmit }}
+<script>(function(){var f=document.forms['form1'];if(f)HTMLFormElement.prototype.submit.call(f);})();</script>
+{{- end }}
 </body>
 </html>
 `)))
@@ -66,6 +72,7 @@ type _csrfTemplateConfig struct {
 	ContentType any
 	EncType     any
 	Body        any
+	AutoSubmit  bool
 	Inputs      []_csrfKeyValues
 }
 
@@ -135,16 +142,18 @@ func GenerateCSRFPoc(raw interface{}, opts ...csrfConfig) (string, error) {
 	if config.MultipartDefaultValue {
 		tmpl = csrfJSTemplate
 		templateConfig = &_csrfTemplateConfig{
-			Url:    template.JSStr(u.String()),
-			Method: template.JSStr(method),
-			Inputs: make([]_csrfKeyValues, 0),
+			Url:        template.JSStr(u.String()),
+			Method:     template.JSStr(method),
+			AutoSubmit: config.autoSubmit,
+			Inputs:     make([]_csrfKeyValues, 0),
 		}
 	} else {
 		templateConfig = &_csrfTemplateConfig{
-			Url:     template.HTMLAttr(u.String()),
-			Method:  template.HTMLAttr(method),
-			EncType: template.HTMLAttr("application/x-www-form-urlencoded"),
-			Inputs:  make([]_csrfKeyValues, 0),
+			Url:        template.HTMLAttr(u.String()),
+			Method:     template.HTMLAttr(method),
+			EncType:    template.HTMLAttr("application/x-www-form-urlencoded"),
+			AutoSubmit: config.autoSubmit,
+			Inputs:     make([]_csrfKeyValues, 0),
 		}
 	}
 
@@ -197,18 +206,7 @@ func GenerateCSRFPoc(raw interface{}, opts ...csrfConfig) (string, error) {
 		return "", err
 	}
 
-	poc := builder.String()
-	// AutoSubmit 为 true 时，在返回 HTML 中注入自动提交脚本
-	if config.autoSubmit {
-		const autoSubmitScript = `<script>(function(){var f=document.forms['form1'];if(f)HTMLFormElement.prototype.submit.call(f);})();</script>`
-		if idx := strings.LastIndex(poc, "</body>"); idx != -1 {
-			poc = poc[:idx] + autoSubmitScript + "\n" + poc[idx:]
-		} else {
-			poc += autoSubmitScript
-		}
-	}
-
-	return poc, nil
+	return builder.String(), nil
 }
 
 // multipartDefaultValue 手动设置请求报文是否为multipart/form-data类型
