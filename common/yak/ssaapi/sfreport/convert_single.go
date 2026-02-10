@@ -15,7 +15,11 @@ func ConvertSingleResultToJSONWithOptions(result *ssaapi.SyntaxFlowResult, repor
 		return "", nil
 	}
 
-	report := NewReport(reportType)
+	// NOTE: this helper is legacy and currently unused by IRify's streaming path.
+	// Keep the historical behavior: always build full report shape here, and let
+	// flags like showDataflowPath/showFileContent/withFile further constrain output.
+	_ = reportType
+	report := NewReport(IRifyFullReportType)
 	if showDataflowPath {
 		report.config.showDataflowPath = true
 	}
