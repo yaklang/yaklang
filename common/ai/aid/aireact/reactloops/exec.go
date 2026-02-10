@@ -872,7 +872,7 @@ func (r *ReActLoop) ensureLoopDirectory(task aicommon.AIStatefulTask) string {
 	if utils.IsNil(r) || utils.IsNil(task) {
 		return ""
 	}
-	workdir := consts.TempAIDir(r.config.GetRuntimeId())
+	workdir := r.config.GetOrCreateWorkDir()
 	if workdir == "" {
 		workdir = consts.GetDefaultBaseHomeDir()
 	}
@@ -912,7 +912,7 @@ func (r *ReActLoop) savePromptToFile(task aicommon.AIStatefulTask, iteration int
 		if loopDir != "" {
 			promptDir = filepath.Join(loopDir, "prompts")
 		} else {
-			workdir := consts.TempAIDir(r.config.GetRuntimeId())
+			workdir := r.config.GetOrCreateWorkDir()
 			if workdir == "" {
 				workdir = consts.GetDefaultBaseHomeDir()
 			}
@@ -968,7 +968,7 @@ func (r *ReActLoop) emitActionExecutionRecord(task aicommon.AIStatefulTask, acti
 			actionDir = filepath.Join(loopDir, "action_calls")
 		} else {
 			// Last resort: use the old flat structure
-			workdir := consts.TempAIDir(r.config.GetRuntimeId())
+			workdir := r.config.GetOrCreateWorkDir()
 			if workdir == "" {
 				workdir = consts.GetDefaultBaseHomeDir()
 			}

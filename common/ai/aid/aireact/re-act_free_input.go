@@ -123,11 +123,48 @@ func (r *ReAct) DumpCurrentEnhanceData() string {
 	return data
 }
 
+// sanitizeForTaskId extracts a meaningful prefix from user input for use in task IDs.
+// Keeps ASCII letters, digits, underscores, Chinese characters. Truncates to 30 chars.
+func sanitizeForTaskId(input string) string {
+	input = strings.TrimSpace(input)
+	if input == "" {
+		return "task"
+	}
+	var result []rune
+	for _, r := range strings.ToLower(input) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '_' {
+			result = append(result, r)
+		} else if r == ' ' || r == '-' {
+			result = append(result, '_')
+		}
+		// skip other characters (including Chinese to keep IDs filesystem-safe)
+	}
+	s := string(result)
+	// collapse multiple underscores
+	for strings.Contains(s, "__") {
+		s = strings.ReplaceAll(s, "__", "_")
+	}
+	s = strings.Trim(s, "_")
+	if len(s) > 30 {
+		s = s[:30]
+	}
+	if s == "" {
+		return "task"
+	}
+	return s
+}
+
 // enqueueReTask 将输入事件转换为任务并添加到队列
 func (r *ReAct) enqueueReTask(event *ypb.AIInputEvent) error {
 	// 创建基于aireact.Task的任务（初始状态为created）
+	sanitizedInput := sanitizeForTaskId(event.FreeInput)
+	shortId := ksuid.New().String()
+	if len(shortId) > 8 {
+		shortId = shortId[:8]
+	}
+	taskId := fmt.Sprintf("react-%s-%s", sanitizedInput, shortId)
 	task := aicommon.NewStatefulTaskBase(
-		fmt.Sprintf("re-act-task-%v", ksuid.New().String()),
+		taskId,
 		event.FreeInput,
 		r.config.GetContext(),
 		r.Emitter)

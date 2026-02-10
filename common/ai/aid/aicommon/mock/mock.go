@@ -3,6 +3,7 @@ package mock
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -70,6 +71,11 @@ func (m *MockedAIConfig) GetRuntimeId() string {
 
 func (m *MockedAIConfig) GetAiToolManager() *buildinaitools.AiToolManager {
 	return nil
+}
+
+func (m *MockedAIConfig) GetOrCreateWorkDir() string {
+	dir, _ := os.MkdirTemp("", "mock-workdir-*")
+	return dir
 }
 
 func (m *MockedAIConfig) IsCtxDone() bool {

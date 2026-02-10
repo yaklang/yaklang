@@ -204,17 +204,15 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 		log.Warnf("loading ReAct config took %s, too long, maybe some events happened.", du.String())
 	}
 
-	dirname := consts.TempAIDir(cfg.GetRuntimeId())
-	if existed, _ := utils.PathExists(dirname); !existed {
-		return nil, utils.Errorf("temp ai dir %s not existed", dirname)
-	}
+	// artifacts directory is lazily created when user input arrives (ensureWorkDirectory)
+	// artifacts field starts as nil and is initialized in ensureWorkDirectory or getArtifacts
 	react := &ReAct{
 		config:               cfg,
 		Emitter:              cfg.Emitter, // Use the emitter from config
 		taskQueue:            NewTaskQueue("react-main-queue"),
 		mirrorOfAIInputEvent: make(map[string]func(*ypb.AIInputEvent)),
 		saveTimelineThrottle: utils.NewThrottleEx(3, true, true),
-		artifacts:            filesys.NewRelLocalFs(dirname),
+		artifacts:            nil, // lazy: created in ensureWorkDirectory
 		wg:                   new(sync.WaitGroup),
 	}
 
@@ -247,15 +245,12 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 	if cfg.TimelineDiffer == nil {
 		cfg.TimelineDiffer = aicommon.NewTimelineDiffer(cfg.Timeline)
 	}
-	// Initialize prompt manager
+	// Initialize prompt manager (workdir does not depend on artifacts, which is lazy)
 	workdir := cfg.Workdir
 	if workdir == "" {
-		workdir, _ = react.artifacts.Getwd()
-		if workdir == "" {
-			workdir = filepath.Join(consts.GetDefaultBaseHomeDir(), "code")
-			if utils.GetFirstExistedFile(workdir) == "" {
-				os.MkdirAll(workdir, os.ModePerm)
-			}
+		workdir = filepath.Join(consts.GetDefaultBaseHomeDir(), "code")
+		if utils.GetFirstExistedFile(workdir) == "" {
+			os.MkdirAll(workdir, os.ModePerm)
 		}
 	}
 	react.promptManager = NewPromptManager(react, workdir)
@@ -280,7 +275,7 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 	case <-done:
 	}
 
-	err := yakit.CreateOrUpdateAIAgentRuntime(
+	dbId, err := yakit.CreateOrUpdateAIAgentRuntime(
 		react.config.GetDB(), &schema.AIAgentRuntime{
 			Uuid:              cfg.GetRuntimeId(),
 			Name:              "[re-act-runtime]",
@@ -292,12 +287,8 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	wd, err := react.artifacts.Getwd()
-	if err != nil {
-		return nil, err
-	}
-	react.Emitter.EmitPinDirectory(wd)
+	cfg.DatabaseRecordID = dbId
+	// EmitPinDirectory is deferred to ensureWorkDirectory when user input arrives
 
 	if !react.config.DisallowMCPServers {
 		// load mcp servers into ai-tool

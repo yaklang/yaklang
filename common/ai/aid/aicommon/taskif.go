@@ -98,11 +98,20 @@ type AIStatefulTaskBase struct {
 	uuid          string
 	attachedDatas []*AttachedResource
 
-	focusMode string
+	focusMode     string
+	semanticLabel string
 }
 
 func (s *AIStatefulTaskBase) GetFocusMode() string {
 	return s.focusMode
+}
+
+func (s *AIStatefulTaskBase) GetSemanticLabel() string {
+	return s.semanticLabel
+}
+
+func (s *AIStatefulTaskBase) SetSemanticLabel(label string) {
+	s.semanticLabel = label
 }
 
 func (s *AIStatefulTaskBase) SetFocusMode(mode string) {
