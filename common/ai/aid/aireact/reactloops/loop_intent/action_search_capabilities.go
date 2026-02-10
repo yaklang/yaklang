@@ -55,7 +55,7 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 			db := consts.GetGormProfileDatabase()
 			if db != nil {
 				tools, err := yakit.SearchAIYakToolBM25(db, &yakit.AIYakToolFilter{
-					Keywords: query,
+					Keywords: []string{query},
 				}, 10, 0)
 				if err != nil {
 					log.Warnf("intent loop: BM25 tool search failed: %v", err)
@@ -89,14 +89,14 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 					results.WriteString("### Tools\nNo matching tools found.\n\n")
 				}
 
-			// 2. Search AI Forges via BM25 trigram (with LIKE fallback for short queries)
-			forges, err := yakit.SearchAIForgeBM25(db, &yakit.AIForgeSearchFilter{
-				Keywords: query,
-			}, 10, 0)
-			if err != nil {
-				log.Warnf("intent loop: BM25 forge search failed: %v", err)
-			}
-			if len(forges) > 0 {
+				// 2. Search AI Forges via BM25 trigram (with LIKE fallback for short queries)
+				forges, err := yakit.SearchAIForgeBM25(db, &yakit.AIForgeSearchFilter{
+					Keywords: []string{query},
+				}, 10, 0)
+				if err != nil {
+					log.Warnf("intent loop: BM25 forge search failed: %v", err)
+				}
+				if len(forges) > 0 {
 					results.WriteString("### Matched AI Forges (Blueprints)\n")
 					for _, forge := range forges {
 						name := forge.ForgeName
