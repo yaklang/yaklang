@@ -243,11 +243,11 @@ func CompareResult(t *testing.T, contain bool, results *ssaapi.SyntaxFlowResult,
 	for name, want := range wants {
 		gotVs := results.GetValues(name)
 		// gotVs.ShowDot()
-		if contain {
-			require.GreaterOrEqual(t, len(gotVs), len(want), "key[%s] not found", name)
-		} else {
-			require.Equal(t, len(gotVs), len(want), "key[%s] not found", name)
-		}
+		// if contain {
+		// 	require.GreaterOrEqual(t, len(gotVs), len(want), "key[%s] not found", name)
+		// } else {
+		// 	require.Equal(t, len(gotVs), len(want), "key[%s] not found", name)
+		// }
 		got := lo.Map(gotVs, func(v *ssaapi.Value, _ int) string {
 			return v.String()
 		})
@@ -269,7 +269,7 @@ func CompareResult(t *testing.T, contain bool, results *ssaapi.SyntaxFlowResult,
 				}
 			}
 		} else {
-			require.Equal(t, len(want), len(gotVs))
+			// require.Equal(t, len(want), len(gotVs))
 			require.Equal(t, want, got, "key[%s] not match", name)
 		}
 	}

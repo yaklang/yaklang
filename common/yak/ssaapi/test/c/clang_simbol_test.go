@@ -25,7 +25,6 @@ int main() {
 	})
 
 	t.Run("pointer", func(t *testing.T) {
-		t.Skip()
 		code := `
 #include <stdio.h>
 int main() {
@@ -38,7 +37,7 @@ int main() {
 		ssatest.CheckSyntaxFlowEx(t, code, `
 		p #-> as $target
 		`, true, map[string][]string{
-			"target": {"Undefined-b", "make(Pointer)"},
+			"target": {"a#1", "10", "make(any)"},
 		}, ssaapi.WithLanguage(ssaconfig.C))
 	})
 
@@ -192,7 +191,6 @@ int main() {
 }
 
 func Test_Pointer(t *testing.T) {
-	t.Skip()
 	t.Run("pointer arithmetic", func(t *testing.T) {
 		code := `
 #include <stdio.h>
@@ -206,7 +204,42 @@ int main() {
 		ssatest.CheckSyntaxFlow(t, code, `
 		p #-> as $target
 		`, map[string][]string{
-			"target": {"p", "1"},
+			"target": {"make(object{})", "1", "2", "3"},
+		}, ssaapi.WithLanguage(ssaconfig.C))
+	})
+
+	t.Run("pointer lib", func(t *testing.T) {
+		code := `
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/socket.h>
+
+int main() {
+    // 从标准输入读取重定向URL
+    char user_input[512];
+    if (fgets(user_input, sizeof(user_input), stdin)) {
+        // 直接使用用户输入进行重定向
+        int socket_fd = accept(); // 假设的socket
+        send(socket_fd, user_input, strlen(user_input), 0);
+    }
+    
+    return 0;
+}
+`
+		ssatest.CheckSyntaxFlow(t, code, `
+fgets(*<slice(index=0)> as $user_input);
+
+accept -->?{have: 'write'} as $target;
+accept -->?{have: 'send'} as $target;
+$target<getCallee>(*<slice(index=1)> as $sink);
+
+$sink #{
+    until: '* & $user_input'
+}-> as $low;
+
+		`, map[string][]string{
+			"low": {"make()"},
 		}, ssaapi.WithLanguage(ssaconfig.C))
 	})
 }
