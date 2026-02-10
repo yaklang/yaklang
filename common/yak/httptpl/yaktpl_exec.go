@@ -251,8 +251,18 @@ func (y *YakTemplate) ExecWithUrl(u string, config *Config, opts ...lowhttp.Lowh
 							mocked.Set()
 						})
 						if mocked.IsSet() {
+							remoteAddr := ""
+							if urlStrIns != nil {
+								remoteAddr = urlStrIns.Host
+							}
 							return &lowhttp.LowhttpResponse{
-								RawPacket: mockResponseRaw,
+								RawPacket:  mockResponseRaw,
+								RawRequest: raw,
+								Url:        urlStr,
+								RemoteAddr: remoteAddr,
+								Https:      req.IsHttps,
+								Source:     y.Name,
+								RuntimeId:  config.RuntimeId,
 							}, nil
 						}
 					}

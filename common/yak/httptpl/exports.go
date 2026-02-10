@@ -14,7 +14,6 @@ import (
 
 	"github.com/samber/lo"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
@@ -360,25 +359,23 @@ func processVulnerability(target any, filterVul filter.Filterable, vCh chan *too
 			)
 			details := make(map[string]interface{}, 2)
 			runtimeId := utils.MapGetString(i, "runtimeId")
+			var rawPacketPairs []tools.RawPacketPair
+			var urls []string
+			var singleReq, singleRsp []byte
 			if len(tpl.HTTPRequestSequences) > 0 {
 				resp := i["responses"].([]*lowhttp.LowhttpResponse)
 				reqBulk := i["requests"].(*YakRequestBulkConfig)
 				if runtimeId != "" {
 					runtimeId = resp[0].RuntimeId
 				}
-				// 根据 payload , tpl 名称 , target 条件过滤
-				// calcSha1 = utils.CalcSha1(tpl.Name, resp[0].RawRequest, target)
-				var urls []string
 				calcSha1 = utils.CalcSha1(tpl.Name, resp[0].RemoteAddr, target)
 				if len(resp) == 1 {
 					urls = append(urls, resp[0].Url)
-					details["request"] = string(resp[0].RawRequest)
-					details["response"] = string(resp[0].RawPacket)
+					singleReq, singleRsp = resp[0].RawRequest, resp[0].RawPacket
 				} else {
-					for idx, r := range resp {
+					for _, r := range resp {
 						urls = append(urls, r.Url)
-						details[fmt.Sprintf("request_%d", idx+1)] = string(r.RawRequest)
-						details[fmt.Sprintf("response_%d", idx+1)] = string(r.RawPacket)
+						rawPacketPairs = append(rawPacketPairs, tools.RawPacketPair{Req: r.RawRequest, Rsp: r.RawPacket})
 					}
 				}
 				currTarget = strings.Join(urls, ",")
@@ -391,35 +388,28 @@ func processVulnerability(target any, filterVul filter.Filterable, vCh chan *too
 			if len(tpl.TCPRequestSequences) > 0 {
 				resp := i["responses"].([]*NucleiTcpResponse)
 				calcSha1 = utils.CalcSha1(tpl.Name, resp[0].RawRequest, target)
-
 				currTarget = resp[0].RemoteAddr
-				if len(resp) == 1 {
-					details["request"] = spew.Sdump(resp[0].RawRequest)
-					details["response"] = spew.Sdump(resp[0].RawPacket)
-				} else {
-					for idx, r := range resp {
-						details[fmt.Sprintf("request_%d", idx+1)] = spew.Sdump(r.RawRequest)
-						details[fmt.Sprintf("response_%d", idx+1)] = spew.Sdump(r.RawPacket)
-					}
-				}
 			}
 
 			pv := &tools.PocVul{
-				Source:        "nuclei",
-				Target:        currTarget,
-				PocName:       tpl.Name,
-				MatchedAt:     utils.DatetimePretty(),
-				Tags:          strings.Join(tpl.Tags, ","),
-				Timestamp:     time.Now().Unix(),
-				Severity:      tpl.Severity,
-				Details:       details,
-				CVE:           tpl.CVE,
-				DescriptionZh: tpl.DescriptionZh,
-				Description:   tpl.Description,
-				Payload:       payloads,
-				RuntimeId:     runtimeId,
-				UUID:          tpl.UUID,
-				ScriptName:    tpl.ScriptName,
+				Source:         "nuclei",
+				Target:         currTarget,
+				PocName:        tpl.Name,
+				MatchedAt:      utils.DatetimePretty(),
+				Tags:           strings.Join(tpl.Tags, ","),
+				Timestamp:      time.Now().Unix(),
+				Severity:       tpl.Severity,
+				Details:        details,
+				Request:        singleReq,
+				Response:       singleRsp,
+				RawPacketPairs: rawPacketPairs,
+				CVE:            tpl.CVE,
+				DescriptionZh:  tpl.DescriptionZh,
+				Description:    tpl.Description,
+				Payload:        payloads,
+				RuntimeId:      runtimeId,
+				UUID:           tpl.UUID,
+				ScriptName:     tpl.ScriptName,
 			}
 			if !filterVul.Exist(calcSha1) {
 				filterVul.Insert(calcSha1)

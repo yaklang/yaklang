@@ -24,6 +24,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
 
 type (
@@ -273,6 +274,60 @@ func WithRiskParam_Response(i interface{}) RiskParamsOpt {
 	data = limitSize(data, MaxSize)
 	return func(r *schema.Risk) {
 		r.QuotedResponse = utils.InterfaceToQuotedString(data)
+	}
+}
+
+// appendPacketPairs 是一个追加形式的选项参数，用于向风险记录中追加一对请求/响应报文
+// 会将报文保存为 HTTPFlow，并在 PacketPairs 中记录 httpflow_id 与 url，前端可展示 url 再按 id 查询详情
+// 支持 string / []byte / 任意可转成字符串的类型
+// Example:
+// ```
+// risk.NewRisk(target,
+//
+//	risk.appendPacketPairs(req1, rsp1),
+//	risk.appendPacketPairs(req2, rsp2),
+//
+// )
+// ```
+func WithRiskParam_AppendPacketPairs(req, resp interface{}) RiskParamsOpt {
+	return func(r *schema.Risk) {
+		reqStr := limitSize(utils.InterfaceToString(req), MaxSize)
+		respStr := limitSize(utils.InterfaceToString(resp), MaxSize)
+		// 两边都为空就不记录
+		if reqStr == "" && respStr == "" {
+			return
+		}
+
+		// 如果当前还没有单独设置 QuotedRequest/QuotedResponse，则用第一对 PacketPair 填充它们
+		if r.QuotedRequest == "" && reqStr != "" {
+			r.QuotedRequest = utils.InterfaceToQuotedString(reqStr)
+		}
+		if r.QuotedResponse == "" && respStr != "" {
+			r.QuotedResponse = utils.InterfaceToQuotedString(respStr)
+		}
+
+		reqBytes := []byte(reqStr)
+		respBytes := []byte(respStr)
+		db := consts.GetGormProjectDatabase()
+		if db != nil && len(reqBytes) > 0 {
+			// 从请求行推断 isHttps：绝对 URI 时用 scheme，相对 URI 时默认 http
+			urlStr := ""
+			var urlIns *url.URL
+			urlIns, _ = lowhttp.ExtractURLFromHTTPRequestRaw(reqBytes, false)
+			if urlIns != nil {
+				urlStr = urlIns.String()
+			}
+			isHttps := urlStr != "" && strings.HasPrefix(strings.ToLower(urlStr), "https://")
+			flow, err := SaveFromHTTPFromRaw(db, isHttps, reqBytes, respBytes, "scan", urlStr, "")
+			if err == nil && flow != nil {
+				r.PacketPairs = append(r.PacketPairs, &schema.PacketPair{
+					HTTPFlowId: int64(flow.ID),
+					Url:        urlStr,
+				})
+			} else {
+				log.Warnf("appendPacketPairs: save httpflow failed, skip: %v", err)
+			}
+		}
 	}
 }
 
