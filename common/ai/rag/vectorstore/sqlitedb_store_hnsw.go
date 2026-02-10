@@ -582,7 +582,7 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...*Document) error {
 func (s *SQLiteVectorStoreHNSW) FuzzSearch(ctx context.Context, query string, limit int) (<-chan SearchResult, error) {
 	filter := &yakit.VectorDocumentFilter{
 		CollectionUUID: s.collection.UUID,
-		Keywords:       query,
+		Keywords:       []string{query},
 	}
 	var results = chanx.NewUnlimitedChan[SearchResult](ctx, 100)
 	go func() {

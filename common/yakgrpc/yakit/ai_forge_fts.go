@@ -18,7 +18,7 @@ func AIForgeVTableName() string {
 // It does not depend on ypb.AIForgeFilter to avoid protobuf coupling in the intent layer.
 type AIForgeSearchFilter struct {
 	ForgeNames []string
-	Keywords   string
+	Keywords   []string
 }
 
 // aiForgesTable is the GORM table name for AIForge.
@@ -38,13 +38,21 @@ func FilterAIForgeForSearch(db *gorm.DB, filter *AIForgeSearchFilter) *gorm.DB {
 
 	// Qualify column names with base table to avoid ambiguity during BM25 JOIN
 	db = bizhelper.ExactQueryStringArrayOr(db, aiForgesTable+".forge_name", filter.ForgeNames)
-	db = bizhelper.FuzzSearchEx(db, []string{
+	var keywords []string
+	for _, kw := range filter.Keywords {
+		kw = strings.TrimSpace(kw)
+		if kw == "" {
+			continue
+		}
+		keywords = append(keywords, kw)
+	}
+	db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{
 		aiForgesTable + ".forge_name",
 		aiForgesTable + ".forge_verbose_name",
 		aiForgesTable + ".description",
 		aiForgesTable + ".tool_keywords",
 		aiForgesTable + ".tags",
-	}, filter.Keywords, false)
+	}, keywords, false)
 	return db
 }
 
@@ -89,17 +97,29 @@ func SearchAIForgeBM25(db *gorm.DB, filter *AIForgeSearchFilter, limit, offset i
 		return nil, utils.Errorf("db is nil")
 	}
 
-	var match string
+	var matches []string
 	if filter != nil {
-		match = strings.TrimSpace(filter.Keywords)
+		for _, m := range filter.Keywords {
+			m = strings.TrimSpace(m)
+			if m == "" {
+				continue
+			}
+			matches = append(matches, m)
+		}
 	}
-	if match == "" {
+	if len(matches) == 0 {
 		return []*schema.AIForge{}, nil
 	}
 
 	var res = make([]*schema.AIForge, 0)
+	maxLen := 0
+	for _, m := range matches {
+		if len(m) > maxLen {
+			maxLen = len(m)
+		}
+	}
 	// Short keywords or non-SQLite or no FTS table: fall back to LIKE search
-	if len(match) < 3 || !schema.IsSQLite(db) || !db.HasTable(defaultAIForgeFTS5.FTSTable) {
+	if maxLen < 3 || !schema.IsSQLite(db) || !db.HasTable(defaultAIForgeFTS5.FTSTable) {
 		if err := FilterAIForgeForSearch(db, filter).Limit(limit).Offset(offset).Find(&res).Error; err != nil {
 			return nil, err
 		}
@@ -108,8 +128,8 @@ func SearchAIForgeBM25(db *gorm.DB, filter *AIForgeSearchFilter, limit, offset i
 
 	// BM25 path: clear Keywords to avoid double-filtering, then use FTS5
 	if filter != nil {
-		filter.Keywords = ""
+		filter.Keywords = nil
 	}
 
-	return bizhelper.SQLiteFTS5BM25Match[*schema.AIForge](FilterAIForgeForSearch(db, filter), defaultAIForgeFTS5, match, limit, offset)
+	return bizhelper.SQLiteFTS5BM25Match[*schema.AIForge](FilterAIForgeForSearch(db, filter), defaultAIForgeFTS5, matches, limit, offset)
 }

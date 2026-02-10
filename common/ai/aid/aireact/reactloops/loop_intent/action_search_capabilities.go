@@ -73,7 +73,7 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 			if db != nil {
 				loop.LoadingStatus("Start to load bm25+keyword search results for tools and AI forges... / 开始加载工具和AI蓝图的BM25+关键词搜索结果...")
 				tools, err := yakit.SearchAIYakToolBM25(db, &yakit.AIYakToolFilter{
-					Keywords: query,
+					Keywords: []string{query},
 				}, 10, 0)
 				if err != nil {
 					log.Warnf("intent loop: BM25 tool search failed: %v", err)
@@ -106,7 +106,7 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 
 				// 2. Search AI Forges via BM25 trigram (with LIKE fallback for short queries)
 				forges, err := yakit.SearchAIForgeBM25(db, &yakit.AIForgeSearchFilter{
-					Keywords: query,
+					Keywords: []string{query},
 				}, 10, 0)
 				if err != nil {
 					log.Warnf("intent loop: BM25 forge search failed: %v", err)

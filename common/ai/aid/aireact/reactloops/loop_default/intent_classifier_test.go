@@ -231,15 +231,15 @@ func TestGreetingPatterns_NonGreetings(t *testing.T) {
 
 func TestCountSentences(t *testing.T) {
 	cases := map[string]int{
-		"":                      0,
-		"hello":                 1,
-		"hello. world":          1,
-		"hello. world.":         2,
-		"first\nsecond\nthird":  2, // 2 newlines = 2 terminators, third segment has no terminator
-		"sentence one. two!":    2,
-		"question? answer.":     2,
+		"":                     0,
+		"hello":                1,
+		"hello. world":         1,
+		"hello. world.":        2,
+		"first\nsecond\nthird": 2, // 2 newlines = 2 terminators, third segment has no terminator
+		"sentence one. two!":   2,
+		"question? answer.":    2,
 		"中文句子。第二句。":            2,
-		"混合。mixed! question?": 3,
+		"混合。mixed! question?":  3,
 	}
 
 	for input, expected := range cases {
@@ -388,12 +388,12 @@ func TestNeedsDeepAnalysis(t *testing.T) {
 // This captures the key design decision: input length != task complexity.
 func TestEscalationScenarios(t *testing.T) {
 	scenarios := []struct {
-		name           string
-		input          string
-		isSimpleQuery  bool
-		hasMatches     bool
-		expectDeep     bool
-		explanation    string
+		name          string
+		input         string
+		isSimpleQuery bool
+		hasMatches    bool
+		expectDeep    bool
+		explanation   string
 	}{
 		{
 			name:          "greeting",
@@ -580,7 +580,7 @@ func TestBuildFastMatchSummary_WithLoops(t *testing.T) {
 func TestSearchAIForgeBM25_EmptyQuery(t *testing.T) {
 	// SearchAIForgeBM25 should return empty slice for empty keywords (no DB needed)
 	result, err := yakit.SearchAIForgeBM25(nil, &yakit.AIForgeSearchFilter{
-		Keywords: "",
+		Keywords: []string{},
 	}, 10, 0)
 	if err != nil {
 		// nil db with empty query should return empty, not error
@@ -595,7 +595,7 @@ func TestSearchAIForgeBM25_EmptyQuery(t *testing.T) {
 // TestSearchAIForgeBM25_NilDB verifies behavior when DB is nil.
 func TestSearchAIForgeBM25_NilDB(t *testing.T) {
 	_, err := yakit.SearchAIForgeBM25(nil, &yakit.AIForgeSearchFilter{
-		Keywords: "test query",
+		Keywords: []string{"test query"},
 	}, 10, 0)
 	if err == nil {
 		t.Error("expected error when db is nil")
@@ -605,7 +605,7 @@ func TestSearchAIForgeBM25_NilDB(t *testing.T) {
 // TestSearchAIYakToolBM25_EmptyQuery verifies that empty keyword returns empty results.
 func TestSearchAIYakToolBM25_EmptyQuery(t *testing.T) {
 	result, err := yakit.SearchAIYakToolBM25(nil, &yakit.AIYakToolFilter{
-		Keywords: "",
+		Keywords: []string{},
 	}, 10, 0)
 	if err != nil {
 		t.Logf("expected: nil db returns error or empty: %v", err)
@@ -618,7 +618,7 @@ func TestSearchAIYakToolBM25_EmptyQuery(t *testing.T) {
 // TestSearchAIYakToolBM25_NilDB verifies behavior when DB is nil.
 func TestSearchAIYakToolBM25_NilDB(t *testing.T) {
 	_, err := yakit.SearchAIYakToolBM25(nil, &yakit.AIYakToolFilter{
-		Keywords: "test query",
+		Keywords: []string{"test query"},
 	}, 10, 0)
 	if err == nil {
 		t.Error("expected error when db is nil")
@@ -629,13 +629,13 @@ func TestSearchAIYakToolBM25_NilDB(t *testing.T) {
 func TestAIForgeSearchFilter_Structure(t *testing.T) {
 	filter := &yakit.AIForgeSearchFilter{
 		ForgeNames: []string{"forge-a", "forge-b"},
-		Keywords:   "vulnerability scan",
+		Keywords:   []string{"vulnerability", "scan"},
 	}
 	if len(filter.ForgeNames) != 2 {
 		t.Errorf("expected 2 forge names, got %d", len(filter.ForgeNames))
 	}
-	if filter.Keywords != "vulnerability scan" {
-		t.Errorf("expected keywords to be set, got %q", filter.Keywords)
+	if len(filter.Keywords) != 2 {
+		t.Errorf("expected keywords to be set, got %#v", filter.Keywords)
 	}
 }
 

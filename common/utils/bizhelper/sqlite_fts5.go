@@ -8,6 +8,31 @@ import (
 	"github.com/jinzhu/gorm"
 )
 
+func sqliteFTS5BuildMatchQuery(matches []string) string {
+	var cleaned []string
+	for _, m := range matches {
+		m = strings.TrimSpace(m)
+		if m == "" {
+			continue
+		}
+		cleaned = append(cleaned, m)
+	}
+
+	switch len(cleaned) {
+	case 0:
+		return ""
+	case 1:
+		// Treat as raw FTS5 query string (advanced syntax supported).
+		return cleaned[0]
+	default:
+		// Default relationship: OR
+		for i := range cleaned {
+			cleaned[i] = "(" + cleaned[i] + ")"
+		}
+		return strings.Join(cleaned, " OR ")
+	}
+}
+
 // SQLiteFTS5Config describes how to build and maintain a FTS5 virtual table that indexes an existing table.
 //
 // Notes:
@@ -420,14 +445,15 @@ func SQLiteFTS5Setup(db *gorm.DB, baseCfg *SQLiteFTS5Config, opts ...SQLiteFTS5O
 // SQLiteFTS5BM25MatchInto performs a BM25 ranked FTS5 MATCH search and scans results into dest.
 // dest should be a pointer to a slice of the base table struct (e.g. *[]MyModel) or a pointer to a struct.
 // baseCfg is treated as a template; options are applied on a copy, so baseCfg is not mutated.
-func SQLiteFTS5BM25MatchInto(db *gorm.DB, baseCfg *SQLiteFTS5Config, match string, dest any, limit, offset int, opts ...SQLiteFTS5Option) error {
+func SQLiteFTS5BM25MatchInto(db *gorm.DB, baseCfg *SQLiteFTS5Config, matches []string, dest any, limit, offset int, opts ...SQLiteFTS5Option) error {
 	if db == nil {
 		return fmt.Errorf("nil db")
 	}
 	if dest == nil {
 		return fmt.Errorf("nil dest")
 	}
-	if strings.TrimSpace(match) == "" {
+	matchQuery := sqliteFTS5BuildMatchQuery(matches)
+	if matchQuery == "" {
 		// Keep behavior predictable: empty query returns empty result set.
 		return nil
 	}
@@ -454,7 +480,7 @@ func SQLiteFTS5BM25MatchInto(db *gorm.DB, baseCfg *SQLiteFTS5Config, match strin
 	q := db.Table(base).
 		Select(base+".*").
 		Joins("JOIN "+fts+" ON "+fts+".rowid = "+base+"."+pk).
-		Where(fts+" MATCH ?", match).
+		Where(fts+" MATCH ?", matchQuery).
 		Order("bm25(" + fts + ")").
 		Limit(limit).
 		Offset(offset)
@@ -463,9 +489,9 @@ func SQLiteFTS5BM25MatchInto(db *gorm.DB, baseCfg *SQLiteFTS5Config, match strin
 
 // SQLiteFTS5BM25Match performs a BM25 ranked FTS5 MATCH search and returns base-table structs.
 // baseCfg is treated as a template; options are applied on a copy, so baseCfg is not mutated.
-func SQLiteFTS5BM25Match[T any](db *gorm.DB, baseCfg *SQLiteFTS5Config, match string, limit, offset int, opts ...SQLiteFTS5Option) ([]T, error) {
+func SQLiteFTS5BM25Match[T any](db *gorm.DB, baseCfg *SQLiteFTS5Config, matches []string, limit, offset int, opts ...SQLiteFTS5Option) ([]T, error) {
 	var out []T
-	if err := SQLiteFTS5BM25MatchInto(db, baseCfg, match, &out, limit, offset, opts...); err != nil {
+	if err := SQLiteFTS5BM25MatchInto(db, baseCfg, matches, &out, limit, offset, opts...); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -478,7 +504,7 @@ func SQLiteFTS5BM25Match[T any](db *gorm.DB, baseCfg *SQLiteFTS5Config, match st
 // - WithYieldModel_PageSize(n)
 // - WithYieldModel_Limit(n)
 // - WithYieldModel_CountCallback(func(total int){...}) (best-effort)
-func SQLiteFTS5BM25MatchYield[T any](ctx context.Context, db *gorm.DB, baseCfg *SQLiteFTS5Config, match string, yieldOpts ...YieldModelOpts) chan T {
+func SQLiteFTS5BM25MatchYield[T any](ctx context.Context, db *gorm.DB, baseCfg *SQLiteFTS5Config, matches []string, yieldOpts ...YieldModelOpts) chan T {
 	outC := make(chan T)
 	go func() {
 		defer close(outC)
@@ -486,8 +512,8 @@ func SQLiteFTS5BM25MatchYield[T any](ctx context.Context, db *gorm.DB, baseCfg *
 		if db == nil {
 			return
 		}
-		match = strings.TrimSpace(match)
-		if match == "" {
+		matchQuery := sqliteFTS5BuildMatchQuery(matches)
+		if matchQuery == "" {
 			return
 		}
 
@@ -511,7 +537,7 @@ func SQLiteFTS5BM25MatchYield[T any](ctx context.Context, db *gorm.DB, baseCfg *
 				// Best-effort count; ignore errors.
 				_ = db.Table(base).
 					Joins("JOIN "+fts+" ON "+fts+".rowid = "+base+"."+pk).
-					Where(fts+" MATCH ?", match).
+					Where(fts+" MATCH ?", matchQuery).
 					Count(&count).Error
 				cfg.CountCallback(count)
 			}
@@ -519,7 +545,7 @@ func SQLiteFTS5BM25MatchYield[T any](ctx context.Context, db *gorm.DB, baseCfg *
 
 		total := 0
 		for offset := 0; ; offset += cfg.Size {
-			items, err := SQLiteFTS5BM25Match[T](db, baseCfg, match, cfg.Size, offset)
+			items, err := SQLiteFTS5BM25Match[T](db, baseCfg, matches, cfg.Size, offset)
 			if err != nil {
 				return
 			}
