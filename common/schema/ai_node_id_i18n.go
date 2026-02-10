@@ -13,6 +13,10 @@ type I18n struct {
 }
 
 var nodeIdMapper = map[string]*I18n{
+	"intent": {
+		Zh: "意图识别",
+		En: "Intent Recognition",
+	},
 	"semantic_search_yaklang_samples": {
 		Zh: "Yaklang样本语义搜索",
 		En: "Yaklang Samples Semantic Search",

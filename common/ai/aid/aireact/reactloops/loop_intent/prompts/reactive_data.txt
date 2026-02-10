@@ -1,0 +1,32 @@
+{{ if eq .Language "zh" }}LANGUAGE: 请使用中文进行意图分析和输出。{{ else }}LANGUAGE: Please perform intent analysis and output in English.{{ end }}
+
+## 当前意图识别状态 / Intent Recognition State
+
+### 用户查询 / User Query
+{{.UserQuery}}
+
+### 已获取的搜索结果 / Search Results
+{{if .SearchResults}}
+{{.SearchResults}}
+{{else}}
+{{ if eq .Language "zh" }}尚未执行搜索。请先使用 `search_capabilities` 搜索相关能力。{{ else }}No searches performed yet. Use `search_capabilities` to search for relevant capabilities.{{ end }}
+{{end}}
+
+### 意图分析进度 / Intent Analysis Progress
+{{if .IntentAnalysis}}
+{{.IntentAnalysis}}
+{{else}}
+{{ if eq .Language "zh" }}意图分析尚未完成。{{ else }}Intent analysis has not been performed yet.{{ end }}
+{{end}}
+
+## 操作指引 / Instructions
+
+{{ if eq .Language "zh" }}根据用户的查询和已收集的搜索结果：
+1. 如果尚未搜索，使用 `search_capabilities` 搜索相关的工具和蓝图。对于综合性任务，可能需要多次搜索覆盖不同子任务。
+2. 如果搜索已完成且信息充足，使用 `finalize_enrichment` 生成最终的上下文增强。
+3. 始终聚焦于用户的核心意图，找到能直接解决其需求的能力。
+{{ else }}Based on the user's query and search results gathered so far:
+1. If no searches have been done, use `search_capabilities` to find relevant tools and forges. For composite tasks, multiple searches may be needed.
+2. If searches are complete, use `finalize_enrichment` to produce the final context enrichment.
+3. Focus on finding capabilities that directly address the user's stated intent.
+{{ end }}

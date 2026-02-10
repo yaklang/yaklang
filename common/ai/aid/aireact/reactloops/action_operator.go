@@ -125,10 +125,18 @@ func (l *LoopActionHandlerOperator) GetReflectionData() map[string]interface{} {
 // OnPostIterationOperator allows post-iteration callbacks to control loop behavior
 // This enables the callback to signal that the loop should end, providing a mechanism
 // for external control of the ReAct loop lifecycle.
+//
+// IMPORTANT: Callbacks registered via WithOnPostIteraction run sequentially in
+// registration order. If a callback needs to check the final state of the operator
+// (e.g. ShouldIgnoreError()) AFTER all other callbacks have set their flags, it
+// should use DeferAfterCallbacks to schedule logic that executes after the entire
+// callback chain completes. This solves the ordering problem where a global callback
+// might check ShouldIgnoreError() before a loop-specific callback has called IgnoreError().
 type OnPostIterationOperator struct {
 	shouldEndIteration bool
 	endReason          any
-	ignoreError        bool // 新增：忽略错误，静默退出
+	ignoreError        bool   // 忽略错误，静默退出
+	deferredFuncs      []func() // 在所有回调完成后执行的延迟函数
 }
 
 // newOnPostIterationOperator creates a new OnPostIterationOperator
@@ -170,6 +178,29 @@ func (o *OnPostIterationOperator) IgnoreError() {
 // ShouldIgnoreError 返回是否应该忽略错误
 func (o *OnPostIterationOperator) ShouldIgnoreError() bool {
 	return o.ignoreError
+}
+
+// DeferAfterCallbacks registers a function to run after ALL OnPostIteration
+// callbacks have completed. This is critical for logic that depends on the
+// final state of the operator (e.g. checking ShouldIgnoreError()) because
+// callbacks run in registration order and a flag like IgnoreError() might
+// be set by a later callback.
+//
+// Typical use: the global EmitReActFail/EmitReActSuccess callback defers its
+// emit decision so that loop-specific IgnoreError() calls are respected
+// regardless of callback registration order.
+func (o *OnPostIterationOperator) DeferAfterCallbacks(fn func()) {
+	if fn != nil {
+		o.deferredFuncs = append(o.deferredFuncs, fn)
+	}
+}
+
+// RunDeferredFuncs executes all deferred functions in registration order.
+// Called by callOnPostIteration after the main callback chain completes.
+func (o *OnPostIterationOperator) RunDeferredFuncs() {
+	for _, fn := range o.deferredFuncs {
+		fn()
+	}
 }
 
 // InitTaskOperator allows init task callbacks to control loop behavior

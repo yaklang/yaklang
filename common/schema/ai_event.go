@@ -48,6 +48,7 @@ const (
 	AI_REACT_LOOP_NAME_REPORT_GENERATING = "report_generating"
 	AI_REACT_LOOP_NAME_PYTHON_POC        = "python_poc"
 	AI_REACT_LOOP_NAME_VULN_VERIFY       = "vuln_verify"
+	AI_REACT_LOOP_NAME_INTENT            = "intent"
 )
 
 const (

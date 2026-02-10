@@ -211,11 +211,21 @@ func (r *ReAct) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTas
 		reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, operator *reactloops.OnPostIterationOperator) {
 			r.wg.Add(1)
 
-			if isDone && reason != nil && !operator.ShouldIgnoreError() {
-				r.Emitter.EmitReActFail(fmt.Sprintf("ReAct task execution failed: %v", utils.InterfaceToString(reason)))
-			} else {
-				r.Emitter.EmitReActSuccess("ReAct task execution success")
-			}
+			// Defer the emit decision to after ALL callbacks have completed.
+			// This ensures that IgnoreError() calls from loop-specific callbacks
+			// (e.g. loop_intent, loop_knowledge_enhance) are respected regardless
+			// of callback registration order. Without deferral, this callback might
+			// check ShouldIgnoreError() before a later callback has called IgnoreError().
+			operator.DeferAfterCallbacks(func() {
+				if isDone && reason != nil && !operator.ShouldIgnoreError() {
+					r.Emitter.EmitReActFail(fmt.Sprintf("ReAct task execution failed: %v", utils.InterfaceToString(reason)))
+				} else if !operator.ShouldIgnoreError() {
+					// Only emit success when IgnoreError is not set.
+					// Hidden/internal sub-loops (like loop_intent) that set IgnoreError
+					// should not emit success/fail to avoid confusing UI signals.
+					r.Emitter.EmitReActSuccess("ReAct task execution success")
+				}
+			})
 
 			diffStr, err := r.config.TimelineDiffer.Diff()
 			if err != nil {

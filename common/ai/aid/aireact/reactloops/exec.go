@@ -841,9 +841,15 @@ func (r *ReActLoop) doneCurrentIteration(current int, task aicommon.AIStatefulTa
 }
 
 func (r *ReActLoop) callOnPostIteration(current int, task aicommon.AIStatefulTask, isDone bool, reason any, operator *OnPostIterationOperator) {
+	// Phase 1: Run all registered callbacks in order.
+	// Callbacks may set flags (e.g. IgnoreError()) and register deferred functions.
 	for _, fn := range r.onPostIteration {
 		fn(r, current, task, isDone, reason, operator)
 	}
+	// Phase 2: Run deferred functions after ALL callbacks have completed.
+	// This ensures deferred logic can safely check the final operator state
+	// (e.g. ShouldIgnoreError()) regardless of callback registration order.
+	operator.RunDeferredFuncs()
 }
 
 func (r *ReActLoop) finishIterationLoopWithError(current int, task aicommon.AIStatefulTask, err any) *OnPostIterationOperator {
@@ -896,15 +902,27 @@ func (r *ReActLoop) savePromptToFile(task aicommon.AIStatefulTask, iteration int
 		return
 	}
 
-	workdir := consts.TempAIDir(r.config.GetRuntimeId())
-	if workdir == "" {
-		workdir = consts.GetDefaultBaseHomeDir()
+	// Use the loop directory as the base for prompt records,
+	// consistent with emitActionExecutionRecord.
+	var promptDir string
+	if loopDir := r.Get("loop_directory"); loopDir != "" {
+		promptDir = filepath.Join(loopDir, "prompts")
+	} else {
+		loopDir = r.ensureLoopDirectory(task)
+		if loopDir != "" {
+			promptDir = filepath.Join(loopDir, "prompts")
+		} else {
+			workdir := consts.TempAIDir(r.config.GetRuntimeId())
+			if workdir == "" {
+				workdir = consts.GetDefaultBaseHomeDir()
+			}
+			taskIndex := task.GetIndex()
+			if taskIndex == "" {
+				taskIndex = "0"
+			}
+			promptDir = filepath.Join(workdir, fmt.Sprintf("task_%s", taskIndex), "prompts")
+		}
 	}
-	taskIndex := task.GetIndex()
-	if taskIndex == "" {
-		taskIndex = "0"
-	}
-	promptDir := filepath.Join(workdir, fmt.Sprintf("task_%s", taskIndex), "prompts")
 	if err := os.MkdirAll(promptDir, 0755); err != nil {
 		log.Errorf("failed to create prompt directory %s: %v", promptDir, err)
 		return
@@ -937,15 +955,30 @@ func (r *ReActLoop) emitActionExecutionRecord(task aicommon.AIStatefulTask, acti
 		return
 	}
 
-	workdir := consts.TempAIDir(r.config.GetRuntimeId())
-	if workdir == "" {
-		workdir = consts.GetDefaultBaseHomeDir()
+	// Use the loop directory (created by ensureLoopDirectory) as the base for action records.
+	// This ensures each loop's action calls are nested under its own directory
+	// (e.g. task_X/loops/intent/action_calls/ instead of task_X/action_calls/).
+	var actionDir string
+	if loopDir := r.Get("loop_directory"); loopDir != "" {
+		actionDir = filepath.Join(loopDir, "action_calls")
+	} else {
+		// Fallback: try to create/get the loop directory
+		loopDir = r.ensureLoopDirectory(task)
+		if loopDir != "" {
+			actionDir = filepath.Join(loopDir, "action_calls")
+		} else {
+			// Last resort: use the old flat structure
+			workdir := consts.TempAIDir(r.config.GetRuntimeId())
+			if workdir == "" {
+				workdir = consts.GetDefaultBaseHomeDir()
+			}
+			taskIndex := task.GetIndex()
+			if taskIndex == "" {
+				taskIndex = "0"
+			}
+			actionDir = filepath.Join(workdir, fmt.Sprintf("task_%s", taskIndex), "action_calls")
+		}
 	}
-	taskIndex := task.GetIndex()
-	if taskIndex == "" {
-		taskIndex = "0"
-	}
-	actionDir := filepath.Join(workdir, fmt.Sprintf("task_%s", taskIndex), "action_calls")
 	if err := os.MkdirAll(actionDir, 0755); err != nil {
 		log.Errorf("failed to create action record directory %s: %v", actionDir, err)
 		return
