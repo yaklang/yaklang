@@ -7,10 +7,8 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 // searchCapabilitiesAction creates the search_capabilities action
@@ -51,96 +49,112 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 			var results strings.Builder
 			results.WriteString(fmt.Sprintf("## Capability Search Results for: %s\n\n", query))
 
-			// 1. Search AIYakTool via BM25 trigram
-			db := consts.GetGormProfileDatabase()
-			if db != nil {
-				tools, err := yakit.SearchAIYakToolBM25(db, &yakit.AIYakToolFilter{
-					Keywords: query,
-				}, 10, 0)
-				if err != nil {
-					log.Warnf("intent loop: BM25 tool search failed: %v", err)
-				} else if len(tools) > 0 {
-					results.WriteString("### Matched Tools\n")
-					for _, tool := range tools {
-						name := tool.Name
-						if tool.VerboseName != "" {
-							name = tool.VerboseName + " (" + tool.Name + ")"
-						}
-						desc := tool.Description
-						if len(desc) > 200 {
-							desc = desc[:200] + "..."
-						}
-						results.WriteString(fmt.Sprintf("- **%s**: %s", name, desc))
-						if tool.Keywords != "" {
-							results.WriteString(fmt.Sprintf(" [keywords: %s]", tool.Keywords))
-						}
-						results.WriteString("\n")
-					}
-					results.WriteString("\n")
-					log.Infof("intent loop: found %d tools via BM25", len(tools))
-
-					// Store matched tool names for later reference
-					var toolNames []string
-					for _, t := range tools {
-						toolNames = append(toolNames, t.Name)
-					}
-					loop.Set("matched_tool_names", strings.Join(toolNames, ","))
-				} else {
-					results.WriteString("### Tools\nNo matching tools found.\n\n")
-				}
-
-			// 2. Search AI Forges via BM25 trigram (with LIKE fallback for short queries)
-			forges, err := yakit.SearchAIForgeBM25(db, &yakit.AIForgeSearchFilter{
-				Keywords: query,
-			}, 10, 0)
-			if err != nil {
-				log.Warnf("intent loop: BM25 forge search failed: %v", err)
-			}
-			if len(forges) > 0 {
-					results.WriteString("### Matched AI Forges (Blueprints)\n")
-					for _, forge := range forges {
-						name := forge.ForgeName
-						if forge.ForgeVerboseName != "" {
-							name = forge.ForgeVerboseName + " (" + forge.ForgeName + ")"
-						}
-						desc := forge.Description
-						if len(desc) > 200 {
-							desc = desc[:200] + "..."
-						}
-						results.WriteString(fmt.Sprintf("- **%s**: %s\n", name, desc))
-					}
-					results.WriteString("\n")
-					log.Infof("intent loop: found %d forges", len(forges))
-
-					var forgeNames []string
-					for _, f := range forges {
-						forgeNames = append(forgeNames, f.ForgeName)
-					}
-					loop.Set("matched_forge_names", strings.Join(forgeNames, ","))
-				} else {
-					results.WriteString("### AI Forges\nNo matching forges found.\n\n")
-				}
-			} else {
-				results.WriteString("### Tools & Forges\nDatabase not available.\n\n")
+			// 使用 ToolRecommender 执行 BM25 搜索
+			// 通过类型断言获取 ToolRecommender
+			type toolRecommenderGetter interface {
+				GetToolRecommender() *reactloops.ToolRecommender
 			}
 
-			// 3. Search registered loop metadata
-			matchedLoops := searchLoopMetadata(query)
-			if len(matchedLoops) > 0 {
-				results.WriteString("### Matched Focus Modes\n")
-				for _, meta := range matchedLoops {
-					results.WriteString(fmt.Sprintf("- **%s**: %s\n", meta.Name, meta.Description))
+			getter, ok := r.(toolRecommenderGetter)
+			if !ok {
+				log.Warnf("intent loop: runtime does not support GetToolRecommender")
+				results.WriteString("### Error\nToolRecommender is not available.\n\n")
+				op.Feedback(results.String())
+				op.Continue()
+				return
+			}
+
+			recommender := getter.GetToolRecommender()
+			if recommender == nil {
+				log.Warnf("intent loop: ToolRecommender is nil")
+				results.WriteString("### Error\nToolRecommender is not initialized.\n\n")
+				op.Feedback(results.String())
+				op.Continue()
+				return
+			}
+
+			// 执行搜索并更新缓存
+			toolLimit := 10
+			forgeLimit := 10
+			loopLimit := 10
+
+			if err := recommender.SearchAndUpdateCache(query, toolLimit, forgeLimit, loopLimit); err != nil {
+				log.Warnf("intent loop: capability search failed: %v", err)
+				results.WriteString(fmt.Sprintf("### Error\nSearch failed: %v\n\n", err))
+				op.Feedback(results.String())
+				op.Continue()
+				return
+			}
+
+			// 获取搜索结果
+			tools, forges := recommender.GetCachedToolsAndForges()
+			loops := recommender.GetCachedLoops()
+
+			// 1. 显示匹配的工具
+			if len(tools) > 0 {
+				results.WriteString("### Matched Tools\n")
+				var toolNames []string
+				for _, tool := range tools {
+					name := tool.VerboseName
+					if name == "" {
+						name = tool.Tool.Name
+					} else {
+						name = name + " (" + tool.Tool.Name + ")"
+					}
+					desc := tool.Tool.Description
+					if len(desc) > 200 {
+						desc = desc[:200] + "..."
+					}
+					results.WriteString(fmt.Sprintf("- **%s**: %s", name, desc))
+					if len(tool.Keywords) > 0 {
+						results.WriteString(fmt.Sprintf(" [keywords: %s]", strings.Join(tool.Keywords, ", ")))
+					}
+					results.WriteString("\n")
+					toolNames = append(toolNames, tool.Tool.Name)
 				}
 				results.WriteString("\n")
-				log.Infof("intent loop: found %d matching focus modes", len(matchedLoops))
+				log.Infof("intent loop: found %d tools via BM25", len(tools))
+				loop.Set("matched_tool_names", strings.Join(toolNames, ","))
+			} else {
+				results.WriteString("### Tools\nNo matching tools found.\n\n")
+			}
 
-				var loopNames []string
-				for _, l := range matchedLoops {
-					loopNames = append(loopNames, l.Name)
+			// 2. 显示匹配的 forges
+			if len(forges) > 0 {
+				results.WriteString("### Matched AI Forges (Blueprints)\n")
+				var forgeNames []string
+				for _, forge := range forges {
+					name := forge.ForgeName
+					if forge.ForgeVerboseName != "" {
+						name = forge.ForgeVerboseName + " (" + forge.ForgeName + ")"
+					}
+					desc := forge.Description
+					if len(desc) > 200 {
+						desc = desc[:200] + "..."
+					}
+					results.WriteString(fmt.Sprintf("- **%s**: %s\n", name, desc))
+					forgeNames = append(forgeNames, forge.ForgeName)
 				}
+				results.WriteString("\n")
+				log.Infof("intent loop: found %d forges", len(forges))
+				loop.Set("matched_forge_names", strings.Join(forgeNames, ","))
+			} else {
+				results.WriteString("### AI Forges\nNo matching forges found.\n\n")
+			}
+
+			// 3. 显示匹配的 loops
+			if len(loops) > 0 {
+				results.WriteString("### Matched Focus Modes\n")
+				var loopNames []string
+				for _, meta := range loops {
+					results.WriteString(fmt.Sprintf("- **%s**: %s\n", meta.Name, meta.Description))
+					loopNames = append(loopNames, meta.Name)
+				}
+				results.WriteString("\n")
+				log.Infof("intent loop: found %d matching focus modes", len(loops))
 				loop.Set("matched_loop_names", strings.Join(loopNames, ","))
 			} else {
-				// Also include available focus modes for reference
+				// 也显示可用的专注模式供参考
 				availableModes := loop.Get("available_focus_modes")
 				if availableModes != "" {
 					results.WriteString("### Available Focus Modes (no direct match)\n")
@@ -149,7 +163,7 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 				}
 			}
 
-			// Store search results
+			// 存储搜索结果
 			existingResults := loop.Get("search_results")
 			if existingResults != "" {
 				existingResults += "\n---\n\n"
@@ -160,45 +174,4 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 			op.Continue()
 		},
 	)
-}
-
-// searchLoopMetadata searches registered loop metadata for keyword matches.
-// LoopMetadata is in-memory (not DB-backed), so this uses token-level matching.
-func searchLoopMetadata(query string) []*reactloops.LoopMetadata {
-	allMeta := reactloops.GetAllLoopMetadata()
-	queryLower := strings.ToLower(query)
-	queryTokens := strings.Fields(queryLower)
-	var matched []*reactloops.LoopMetadata
-
-	for _, meta := range allMeta {
-		if meta.IsHidden {
-			continue
-		}
-		searchText := strings.ToLower(meta.Name + " " + meta.Description + " " + meta.UsagePrompt)
-
-		// Full query match
-		if strings.Contains(searchText, queryLower) {
-			matched = append(matched, meta)
-			continue
-		}
-
-		// Token-level match: require at least half of meaningful tokens
-		if len(queryTokens) > 1 {
-			meaningfulTokens := 0
-			matchCount := 0
-			for _, token := range queryTokens {
-				if len(token) < 2 {
-					continue
-				}
-				meaningfulTokens++
-				if strings.Contains(searchText, token) {
-					matchCount++
-				}
-			}
-			if meaningfulTokens > 0 && matchCount > 0 && matchCount >= (meaningfulTokens+1)/2 {
-				matched = append(matched, meta)
-			}
-		}
-	}
-	return matched
 }

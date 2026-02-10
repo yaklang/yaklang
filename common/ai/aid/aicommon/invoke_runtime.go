@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -49,10 +50,10 @@ func NewSelectedKnowledgeBaseResult(reason string, knowledgeBases []string) *Sel
 }
 
 type AIInvokeRuntime interface {
-	GetBasicPromptInfo(tools []*aitool.Tool) (string, map[string]any, error)
 	SetCurrentTask(task AIStatefulTask)
 	GetCurrentTask() AIStatefulTask
 	GetCurrentTaskId() string
+	GetBasicPromptInfo(tools []*aitool.Tool, forges []*schema.AIForge) (string, map[string]any, error)
 
 	ExecuteToolRequiredAndCall(ctx context.Context, name string) (*aitool.ToolResult, bool, error)
 	ExecuteToolRequiredAndCallWithoutRequired(ctx context.Context, toolName string, params aitool.InvokeParams) (*aitool.ToolResult, bool, error)

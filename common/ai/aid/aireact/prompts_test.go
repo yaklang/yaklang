@@ -2,16 +2,32 @@ package aireact
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+// newMockTaskWithUserInput 创建一个带有用户输入的模拟任务
+func newMockTaskWithUserInput(name, userInput string) aicommon.AIStatefulTask {
+	task := aicommon.NewStatefulTaskBase(
+		name,
+		userInput,
+		context.Background(),
+		nil, // emitter
+	)
+	return task
+}
 
 func TestPromptManagerWithDynamicContextProvider(t *testing.T) {
 	// Track if the provider was called
@@ -193,7 +209,7 @@ func TestPromptManager__InPromptGeneration(t *testing.T) {
 		t.Fatalf("Failed to create ReAct instance: %v", err)
 	}
 
-	_, _, err = react.GetBasicPromptInfo(nil)
+	_, _, err = react.GetBasicPromptInfo(nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -682,5 +698,566 @@ func TestPromptManager_GenerateAIBlueprintForgeParamsPrompt(t *testing.T) {
 		}
 
 		t.Logf("Generated prompt with different AIForge:\n%s", prompt)
+	})
+}
+
+// TestRecommendedToolsAndForgesMatchingUserInput 测试根据用户输入推荐 tools 和 forges
+func TestRecommendedToolsAndForgesMatchingUserInput(t *testing.T) {
+	flag := ksuid.New().String()
+	t.Run("测试 AIForge Tags 匹配", func(t *testing.T) {
+		react, err := NewTestReAct(
+			aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
+				rsp.Close()
+				return rsp, nil
+			}),
+			// 添加一些测试 forges
+			aicommon.WithForges(
+				&schema.AIForge{
+					ForgeName:        "network_scanner",
+					ForgeVerboseName: "网络扫描器",
+					Description:      "扫描网络拓扑",
+					Tags:             "网络,扫描,拓扑",
+				},
+				&schema.AIForge{
+					ForgeName:        "port_scan_expert",
+					ForgeVerboseName: "端口扫描专家",
+					Description:      "专业的端口扫描工具",
+					Tags:             flag,
+				},
+				&schema.AIForge{
+					ForgeName:        "code_review_assistant",
+					ForgeVerboseName: "代码审查助手",
+					Description:      "帮助审查代码质量",
+					Tags:             "代码,审查,质量",
+				},
+			),
+		)
+		if err != nil {
+			t.Fatalf("创建 ReAct 实例失败: %v", err)
+		}
+
+		loop, err := reactloops.NewReActLoop("test-loop", react)
+		if err != nil {
+			t.Fatalf("创建 ReActLoop 实例失败: %v", err)
+		}
+		loop.SetCurrentTask(newMockTaskWithUserInput("test-task", flag))
+		// 创建一个包含 "扫描" 关键词的用户输入，确保能匹配 port_scan_expert
+		userInput := flag
+
+		// 创建模拟任务
+		task := newMockTaskWithUserInput("test-task", userInput)
+		react.SetCurrentTask(task)
+
+		// 获取基本提示信息，这会触发推荐逻辑
+		_, forgeSlice := loop.GetRecommendedToolsAndForges()
+		if err != nil {
+			t.Fatalf("获取基本提示信息失败: %v", err)
+		}
+		// 验证 ForgesToUse 长度大于等于 3
+		if len(forgeSlice) < 3 {
+			t.Errorf("ForgesToUse 长度应该大于等于 3，实际: %d", len(forgeSlice))
+		}
+
+		t.Logf("推荐的 Forge 数量: %d", len(forgeSlice))
+
+		// 验证第一个 forge 应该是 port_scan_expert（因为名称和 tag 都匹配）
+		if len(forgeSlice) > 0 {
+			firstForgeName := forgeSlice[0].ForgeName
+			t.Logf("第一个 Forge: %s", firstForgeName)
+
+			if firstForgeName != "port_scan_expert" {
+				t.Errorf("第一个 Forge 应该是 port_scan_expert，但实际是: %s", firstForgeName)
+			}
+
+			// 打印所有推荐的 forges 以便调试
+			for i, forge := range forgeSlice {
+				t.Logf("  [%d] %s (%s) - Tags: %s", i, forge.ForgeName, forge.ForgeVerboseName, forge.Tags)
+			}
+		}
+
+	})
+	t.Run("测试 AIForge Tags 无输入时的匹配", func(t *testing.T) {
+		react, err := NewTestReAct(
+			aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
+				rsp.Close()
+				return rsp, nil
+			}),
+			// 添加一些测试 forges
+			aicommon.WithForges(
+				&schema.AIForge{
+					ForgeName:        "network_scanner",
+					ForgeVerboseName: "网络扫描器",
+					Description:      "扫描网络拓扑",
+					Tags:             "网络,扫描,拓扑",
+				},
+				&schema.AIForge{
+					ForgeName:        "port_scan_expert",
+					ForgeVerboseName: "端口扫描专家",
+					Description:      "专业的端口扫描工具",
+					Tags:             flag,
+				},
+				&schema.AIForge{
+					ForgeName:        "code_review_assistant",
+					ForgeVerboseName: "代码审查助手",
+					Description:      "帮助审查代码质量",
+					Tags:             "代码,审查,质量",
+				},
+			),
+		)
+		if err != nil {
+			t.Fatalf("创建 ReAct 实例失败: %v", err)
+		}
+
+		loop, err := reactloops.NewReActLoop("test-loop", react)
+		if err != nil {
+			t.Fatalf("创建 ReActLoop 实例失败: %v", err)
+		}
+
+		// 获取基本提示信息，这会触发推荐逻辑
+		_, forgeSlice := loop.GetRecommendedToolsAndForges()
+		if err != nil {
+			t.Fatalf("获取基本提示信息失败: %v", err)
+		}
+		// 验证 ForgesToUse 长度大于等于 3
+		if len(forgeSlice) < 3 {
+			t.Errorf("ForgesToUse 长度应该大于等于 3，实际: %d", len(forgeSlice))
+		}
+
+		t.Logf("推荐的 Forge 数量: %d", len(forgeSlice))
+
+		// 验证第一个 forge 应该是 port_scan_expert（因为名称和 tag 都匹配）
+		if len(forgeSlice) > 0 {
+			firstForgeName := forgeSlice[0].ForgeName
+			t.Logf("第一个 Forge: %s", firstForgeName)
+
+			if firstForgeName != "network_scanner" {
+				t.Errorf("第一个 Forge 应该是 port_scan_expert，但实际是: %s", firstForgeName)
+			}
+
+			// 打印所有推荐的 forges 以便调试
+			for i, forge := range forgeSlice {
+				t.Logf("  [%d] %s (%s) - Tags: %s", i, forge.ForgeName, forge.ForgeVerboseName, forge.Tags)
+			}
+		}
+
+	})
+
+	t.Run("测试_Forge_回退机制_没有匹配时返回所有", func(t *testing.T) {
+		react, err := NewTestReAct(
+			aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
+				rsp.Close()
+				return rsp, nil
+			}),
+			aicommon.WithForges(
+				&schema.AIForge{
+					ForgeName:        "test_forge_1",
+					ForgeVerboseName: "测试Forge1",
+					Description:      "第一个测试forge",
+					Tags:             "测试,forge",
+				},
+				&schema.AIForge{
+					ForgeName:        "test_forge_2",
+					ForgeVerboseName: "测试Forge2",
+					Description:      "第二个测试forge",
+					Tags:             "测试,工具",
+				},
+				&schema.AIForge{
+					ForgeName:        "test_forge_3",
+					ForgeVerboseName: "测试Forge3",
+					Description:      "第三个测试forge",
+					Tags:             "扫描,安全",
+				},
+			),
+		)
+		if err != nil {
+			t.Fatalf("创建 ReAct 实例失败: %v", err)
+		}
+
+		loop, err := reactloops.NewReActLoop("test-loop-fallback", react)
+		if err != nil {
+			t.Fatalf("创建 ReActLoop 实例失败: %v", err)
+		}
+
+		// 使用一个完全不匹配的用户输入
+		userInput := uuid.New().String()
+		loop.SetCurrentTask(newMockTaskWithUserInput("test-task-fallback", userInput))
+
+		// 获取推荐的 tools 和 forges
+		_, forgeSlice := loop.GetRecommendedToolsAndForges()
+
+		// 验证返回了 forges（没有匹配时应该回退到返回所有可用的）
+		if len(forgeSlice) == 0 {
+			t.Errorf("没有匹配时应该返回所有可用的 forges，实际返回: 0")
+		}
+
+		// 验证包含所有测试 forges（测试的 3 个应该在前面）
+		forgeNames := make(map[string]bool)
+		for _, forge := range forgeSlice {
+			forgeNames[forge.ForgeName] = true
+		}
+
+		expectedForges := []string{"test_forge_1", "test_forge_2", "test_forge_3"}
+		for _, expected := range expectedForges {
+			if !forgeNames[expected] {
+				t.Errorf("应该包含 forge: %s", expected)
+			}
+		}
+
+		// 验证测试 forges 在前面位置（因为是通过 WithForges 添加的）
+		foundCount := 0
+		for i := 0; i < 3 && i < len(forgeSlice); i++ {
+			for _, expected := range expectedForges {
+				if forgeSlice[i].ForgeName == expected {
+					foundCount++
+					break
+				}
+			}
+		}
+
+		if foundCount < 3 {
+			t.Fatalf("警告: 前 3 个位置只找到 %d 个测试 forges", foundCount)
+		}
+
+		t.Logf("用户输入: %s", userInput)
+		t.Logf("返回的 forge 数量: %d", len(forgeSlice))
+		for i, forge := range forgeSlice {
+			t.Logf("  [%d] %s (%s)", i, forge.ForgeName, forge.ForgeVerboseName)
+		}
+	})
+
+	t.Run("测试工具数量限制", func(t *testing.T) {
+		react, err := NewTestReAct(
+			aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
+				rsp.Close()
+				return rsp, nil
+			}),
+		)
+		if err != nil {
+			t.Fatalf("创建 ReAct 实例失败: %v", err)
+		}
+
+		loop, err := reactloops.NewReActLoop("test-loop-limit", react)
+		if err != nil {
+			t.Fatalf("创建 ReActLoop 实例失败: %v", err)
+		}
+
+		// 设置自定义的工具数量限制为 10
+		loop.Set("max_tools_limit", 10)
+
+		// 创建一个通用的用户输入
+		userInput := "帮我分析一下"
+		loop.SetCurrentTask(newMockTaskWithUserInput("test-task-limit", userInput))
+
+		// 获取推荐的工具
+		toolSlice, _ := loop.GetRecommendedToolsAndForges()
+
+		toolCount := len(toolSlice)
+		t.Logf("推荐的工具数量: %d", toolCount)
+
+		// 验证工具数量不超过 10（我们设置的限制）
+		if toolCount > 10 {
+			t.Errorf("工具数量 %d 超过了限制 10", toolCount)
+		}
+
+		// 验证优先工具在前面
+		if toolCount > 0 {
+			firstToolName := toolSlice[0].Name
+			t.Logf("第一个工具: %s", firstToolName)
+
+			// 检查前几个工具是否包含优先工具
+			priorityTools := []string{"tools_search", "aiforge_search", "now", "bash", "read_file"}
+			foundPriority := false
+			checkCount := 5
+			if toolCount < checkCount {
+				checkCount = toolCount
+			}
+			for i := 0; i < checkCount; i++ {
+				for _, priorityName := range priorityTools {
+					if toolSlice[i].Name == priorityName {
+						foundPriority = true
+						t.Logf("找到优先工具: %s 在位置 %d", toolSlice[i].Name, i)
+						break
+					}
+				}
+			}
+
+			if !foundPriority {
+				t.Fatalf("警告: 前 5 个工具中没有找到优先工具")
+			}
+		}
+
+		t.Logf("用户输入: %s", userInput)
+		t.Logf("验证工具数量限制为 10 个，且优先工具排在前面")
+	})
+
+	t.Run("测试工具匹配和数量限制", func(t *testing.T) {
+		// 创建一些测试工具
+		testTools := []*aitool.Tool{
+			aitool.NewWithoutCallback("file_scanner",
+				aitool.WithVerboseName("文件扫描器"),
+				aitool.WithKeywords([]string{"扫描", "文件"}),
+				aitool.WithDescription("扫描文件系统"),
+			),
+			aitool.NewWithoutCallback("network_analyzer",
+				aitool.WithVerboseName("网络分析器"),
+				aitool.WithKeywords([]string{"网络", "分析"}),
+				aitool.WithDescription("分析网络流量"),
+			),
+			aitool.NewWithoutCallback(flag+"_tool",
+				aitool.WithVerboseName("特殊工具"),
+				aitool.WithKeywords([]string{flag}),
+				aitool.WithDescription("特殊功能工具"),
+			),
+		}
+
+		react, err := NewTestReAct(
+			aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
+				rsp.Close()
+				return rsp, nil
+			}),
+			aicommon.WithTools(testTools...),
+		)
+		if err != nil {
+			t.Fatalf("创建 ReAct 实例失败: %v", err)
+		}
+
+		loop, err := reactloops.NewReActLoop("test-loop-tool-match", react)
+		if err != nil {
+			t.Fatalf("创建 ReActLoop 实例失败: %v", err)
+		}
+
+		// 设置工具数量限制为 5
+		loop.Set("max_tools_limit", 5)
+
+		// 使用包含特殊标记的用户输入
+		userInput := flag
+		loop.SetCurrentTask(newMockTaskWithUserInput("test-task-tool-match", userInput))
+
+		// 获取推荐的工具
+		toolSlice, _ := loop.GetRecommendedToolsAndForges()
+
+		t.Logf("推荐的工具数量: %d", len(toolSlice))
+
+		// 验证工具数量不超过限制
+		if len(toolSlice) > 5 {
+			t.Errorf("工具数量 %d 超过了限制 5", len(toolSlice))
+		}
+
+		// 验证匹配的工具在前面
+		if len(toolSlice) > 0 {
+			found := false
+			for i, tool := range toolSlice {
+				t.Logf("  [%d] %s (%s)", i, tool.Name, tool.VerboseName)
+				if tool.Name == flag+"_tool" {
+					found = true
+					if i > 3 {
+						t.Fatalf("警告: 匹配的工具位置较靠后: %d", i)
+					} else {
+						t.Logf("匹配的工具在前面位置: %d", i)
+					}
+				}
+			}
+
+			if !found {
+				t.Fatalf("警告: 未找到匹配的工具")
+			}
+		}
+
+		t.Logf("用户输入: %s", userInput)
+		t.Logf("验证工具匹配和数量限制")
+	})
+
+	t.Run("测试Forge数量限制", func(t *testing.T) {
+		flag := ksuid.New().String()
+		// 创建多个测试 forges
+		var testForges []*schema.AIForge
+		for i := 1; i <= 10; i++ {
+			testForges = append(testForges, &schema.AIForge{
+				ForgeName:        fmt.Sprintf("test_forge_%d", i),
+				ForgeVerboseName: fmt.Sprintf("测试Forge%d", i),
+				Description:      fmt.Sprintf("第%d个测试forge", i),
+				Tags:             flag,
+			})
+		}
+
+		react, err := NewTestReAct(
+			aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
+				rsp.Close()
+				return rsp, nil
+			}),
+			aicommon.WithForges(testForges...),
+		)
+		if err != nil {
+			t.Fatalf("创建 ReAct 实例失败: %v", err)
+		}
+
+		loop, err := reactloops.NewReActLoop("test-loop-forge-limit", react)
+		if err != nil {
+			t.Fatalf("创建 ReActLoop 实例失败: %v", err)
+		}
+
+		// 设置 forge 数量限制为 5
+		loop.Set("max_forges_limit", 5)
+
+		// 创建一个通用的用户输入
+		userInput := flag
+		loop.SetCurrentTask(newMockTaskWithUserInput("test-task-forge-limit", userInput))
+
+		// 获取推荐的 forges
+		_, forgeSlice := loop.GetRecommendedToolsAndForges()
+
+		t.Logf("推荐的 forge 数量: %d", len(forgeSlice))
+
+		// 验证 forge 数量不超过 5
+		if len(forgeSlice) > 5 {
+			t.Errorf("Forge 数量 %d 超过了限制 5", len(forgeSlice))
+		}
+
+		for i, forge := range forgeSlice {
+			t.Logf("  [%d] %s (%s)", i, forge.ForgeName, forge.ForgeVerboseName)
+		}
+
+		t.Logf("用户输入: %s", userInput)
+		t.Logf("验证 forge 数量限制为 5 个")
+	})
+
+	t.Run("测试多次匹配优先级_新匹配的在最前面", func(t *testing.T) {
+		flag1 := ksuid.New().String()
+		flag2 := ksuid.New().String()
+
+		react, err := NewTestReAct(
+			aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
+				rsp.Close()
+				return rsp, nil
+			}),
+			// 创建多个测试 forges，使用不同的 tags
+			aicommon.WithForges(
+				&schema.AIForge{
+					ForgeName:        "forge_group_a_1",
+					ForgeVerboseName: "组A的Forge1",
+					Description:      "属于组A",
+					Tags:             flag1,
+				},
+				&schema.AIForge{
+					ForgeName:        "forge_group_a_2",
+					ForgeVerboseName: "组A的Forge2",
+					Description:      "属于组A",
+					Tags:             flag1,
+				},
+				&schema.AIForge{
+					ForgeName:        "forge_group_b_1",
+					ForgeVerboseName: "组B的Forge1",
+					Description:      "属于组B",
+					Tags:             flag2,
+				},
+				&schema.AIForge{
+					ForgeName:        "forge_group_b_2",
+					ForgeVerboseName: "组B的Forge2",
+					Description:      "属于组B",
+					Tags:             flag2,
+				},
+				&schema.AIForge{
+					ForgeName:        "forge_unmatched",
+					ForgeVerboseName: "不匹配的Forge",
+					Description:      "不会被匹配",
+					Tags:             "other,tags",
+				},
+			),
+		)
+		if err != nil {
+			t.Fatalf("创建 ReAct 实例失败: %v", err)
+		}
+
+		loop, err := reactloops.NewReActLoop("test-loop-priority", react)
+		if err != nil {
+			t.Fatalf("创建 ReActLoop 实例失败: %v", err)
+		}
+
+		// 第一次匹配：使用 flag1，应该匹配 forge_group_a_1 和 forge_group_a_2
+		t.Logf("=== 第一次匹配 ===")
+		loop.SetCurrentTask(newMockTaskWithUserInput("test-task-1", flag1))
+		_, forgeSlice1 := loop.GetRecommendedToolsAndForges()
+
+		t.Logf("第一次匹配结果（匹配 flag1=%s）:", flag1)
+		for i, forge := range forgeSlice1 {
+			t.Logf("  [%d] %s (%s) - Tags: %s", i, forge.ForgeName, forge.ForgeVerboseName, forge.Tags)
+		}
+
+		// 验证第一次匹配：组A的 forges 应该在前面
+		if len(forgeSlice1) < 2 {
+			t.Fatalf("第一次匹配应该至少返回 2 个 forges")
+		}
+
+		groupACount := 0
+		for i := 0; i < 2 && i < len(forgeSlice1); i++ {
+			if forgeSlice1[i].ForgeName == "forge_group_a_1" || forgeSlice1[i].ForgeName == "forge_group_a_2" {
+				groupACount++
+			}
+		}
+
+		if groupACount != 2 {
+			t.Errorf("第一次匹配：前 2 个应该都是组A的 forges，实际找到 %d 个", groupACount)
+		}
+
+		// 第二次匹配：使用 flag2，应该匹配 forge_group_b_1 和 forge_group_b_2
+		t.Logf("\n=== 第二次匹配 ===")
+		loop.SetCurrentTask(newMockTaskWithUserInput("test-task-2", flag2))
+		_, forgeSlice2 := loop.GetRecommendedToolsAndForges()
+
+		t.Logf("第二次匹配结果（匹配 flag2=%s）:", flag2)
+		for i, forge := range forgeSlice2 {
+			t.Logf("  [%d] %s (%s) - Tags: %s", i, forge.ForgeName, forge.ForgeVerboseName, forge.Tags)
+		}
+
+		// 验证第二次匹配：
+		// 1. 组B的 forges 应该在最前面（新匹配的）
+		// 2. 组A的 forges 应该在后面（上次匹配的）
+		if len(forgeSlice2) < 4 {
+			t.Fatalf("第二次匹配应该至少返回 4 个 forges（2个组B + 2个组A）")
+		}
+
+		// 验证前 2 个是组B的 forges
+		groupBInFirst2 := 0
+		for i := 0; i < 2; i++ {
+			if forgeSlice2[i].ForgeName == "forge_group_b_1" || forgeSlice2[i].ForgeName == "forge_group_b_2" {
+				groupBInFirst2++
+			}
+		}
+
+		if groupBInFirst2 != 2 {
+			t.Errorf("第二次匹配：前 2 个应该都是组B的 forges（新匹配的），实际找到 %d 个", groupBInFirst2)
+			t.Errorf("前 2 个 forges: [0]=%s, [1]=%s", forgeSlice2[0].ForgeName, forgeSlice2[1].ForgeName)
+		}
+
+		// 验证第 3、4 个位置包含组A的 forges（上次匹配的）
+		groupAIn3And4 := 0
+		for i := 2; i < 4 && i < len(forgeSlice2); i++ {
+			if forgeSlice2[i].ForgeName == "forge_group_a_1" || forgeSlice2[i].ForgeName == "forge_group_a_2" {
+				groupAIn3And4++
+			}
+		}
+
+		if groupAIn3And4 != 2 {
+			t.Fatalf("警告: 第 3、4 个位置应该是组A的 forges（上次匹配的），实际找到 %d 个", groupAIn3And4)
+			if len(forgeSlice2) >= 4 {
+				t.Logf("第 3、4 个 forges: [2]=%s, [3]=%s", forgeSlice2[2].ForgeName, forgeSlice2[3].ForgeName)
+			}
+		}
+
+		t.Logf("\n验证完成：新匹配的 forges 排在最前面，上次匹配的排在后面")
 	})
 }

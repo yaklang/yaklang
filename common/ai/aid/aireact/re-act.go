@@ -28,6 +28,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/reactinit"
 )
 
@@ -97,14 +98,17 @@ type ReAct struct {
 	memoryTriage aicommon.MemoryTriage
 
 	pureInvokerMode bool // 纯调用者模式，不启动事件循环和队列处理器
+
+	// 工具和 forge 推荐管理器
+	toolRecommender *reactloops.ToolRecommender
 }
 
 func (r *ReAct) SetCurrentTask(task aicommon.AIStatefulTask) {
 	r.setCurrentTask(task)
 }
 
-func (r *ReAct) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[string]any, error) {
-	return r.promptManager.GetBasicPromptInfo(tools)
+func (r *ReAct) GetBasicPromptInfo(tools []*aitool.Tool, forges []*schema.AIForge) (string, map[string]any, error) {
+	return r.promptManager.GetBasicPromptInfo(tools, forges)
 }
 
 var _ aicommon.AIInvokeRuntime = (*ReAct)(nil)
@@ -113,6 +117,10 @@ const SKIP_AI_REVIEW = "skip_ai_review"
 
 func (r *ReAct) GetConfig() aicommon.AICallerConfigIf {
 	return r.config
+}
+
+func (r *ReAct) GetToolRecommender() *reactloops.ToolRecommender {
+	return r.toolRecommender
 }
 
 func (r *ReAct) SaveTimeline() {
@@ -259,6 +267,9 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 		}
 	}
 	react.promptManager = NewPromptManager(react, workdir)
+
+	// 初始化工具推荐管理器
+	react.toolRecommender = reactloops.NewToolRecommender(react)
 
 	// Register pending context providers
 	react.promptManager.cpm = cfg.ContextProviderManager

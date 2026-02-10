@@ -289,7 +289,7 @@ func (pm *PromptManager) GetAvailableAIForgeBlueprints() string {
 	return result
 }
 
-func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[string]any, error) {
+func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool, forges []*schema.AIForge) (string, map[string]any, error) {
 	result := make(map[string]any)
 	result["CurrentTime"] = time.Now().Format("2006-01-02 15:04:05")
 	result["OSArch"] = fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)
@@ -311,7 +311,33 @@ func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[s
 
 	result["AllowPlan"] = allowPlanAndExec
 	if allowPlanAndExec {
-		result["AIForgeList"] = pm.GetAvailableAIForgeBlueprints()
+		mgr := pm.react.config.GetAIForgeManager()
+		if mgr != nil {
+			// 如果没有推荐的 forges，回退到获取所有可用的 forges
+			forgesToUse := forges
+			if forgesToUse == nil || len(forgesToUse) == 0 {
+				log.Debugf("no forges matched user input, falling back to all available forges")
+				// 首先添加 ExtendedForge
+				forgesToUse = append(forgesToUse, pm.react.config.ExtendedForge...)
+				// 然后查询数据库中的 forges
+				allForges, err := mgr.Query(pm.react.config.GetContext())
+				if err == nil {
+					forgesToUse = append(forgesToUse, allForges...)
+				} else {
+					log.Warnf("failed to query all forges as fallback: %v", err)
+				}
+			}
+			result["ForgesToUse"] = forgesToUse
+			forgeList, err := mgr.GenerateAIForgeListForPrompt(forgesToUse)
+			if err != nil {
+				log.Warnf("failed to generate ai-forge list for prompt: %v", err)
+				result["AIForgeList"] = ""
+			} else {
+				result["AIForgeList"] = forgeList
+			}
+		} else {
+			result["AIForgeList"] = ""
+		}
 	}
 	result["AllowAskForClarification"] = pm.react.config.GetEnableUserInteract()
 	result["AllowKnowledgeEnhanceAnswer"] = pm.react.config.GetEnhanceKnowledgeManager() == nil || !pm.react.config.GetDisableEnhanceDirectlyAnswer()

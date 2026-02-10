@@ -155,14 +155,62 @@ func (r *ReActLoop) GetMaxIterations() int {
 	return r.maxIterations
 }
 
-func (r *ReActLoop) getRenderInfo() (string, map[string]any, error) {
-	var tools []*aitool.Tool
-	if r.toolsGetter == nil {
-		tools = []*aitool.Tool{}
-	} else {
-		tools = r.toolsGetter()
+// getToolRecommender 从 invoker 获取 ToolRecommender
+func (r *ReActLoop) getToolRecommender() *ToolRecommender {
+	// 尝试类型断言，看 invoker 是否有 GetToolRecommender 方法
+	type toolRecommenderGetter interface {
+		GetToolRecommender() *ToolRecommender
 	}
-	temp, info, err := r.invoker.GetBasicPromptInfo(tools)
+	if getter, ok := r.invoker.(toolRecommenderGetter); ok {
+		return getter.GetToolRecommender()
+	}
+	// 如果无法获取，返回一个新的实例
+	return NewToolRecommender(r.invoker)
+}
+
+// GetRecommendedToolsAndForges 根据用户输入通过关键词匹配获取推荐的 tools 和 forges
+func (r *ReActLoop) GetRecommendedToolsAndForges() ([]*aitool.Tool, []*schema.AIForge) {
+	var userInput string
+	if task := r.GetCurrentTask(); task != nil {
+		userInput = task.GetUserInput()
+	}
+
+	// 从 loop 变量中获取限制，如果没有设置则使用默认值
+	maxToolsLimit := r.GetInt("max_tools_limit")
+	if maxToolsLimit <= 0 {
+		maxToolsLimit = 30 // 默认值
+	}
+
+	maxForgesLimit := r.GetInt("max_forges_limit")
+	if maxForgesLimit <= 0 {
+		maxForgesLimit = 200 // 默认值
+	}
+
+	return r.getToolRecommender().GetRecommendedToolsAndForgesWithLimits(userInput, r.config, maxToolsLimit, maxForgesLimit)
+}
+
+// GetRecommendedToolsAndForgesAsync 异步搜索推荐的 tools 和 forges
+// 使用 AiToolManager 进行异步搜索，搜索成功后更新缓存
+// onFinished: 可选的回调函数，在搜索完成后调用
+func (r *ReActLoop) GetRecommendedToolsAndForgesAsync(onFinished ...func()) {
+	var userInput string
+	if task := r.GetCurrentTask(); task != nil {
+		userInput = task.GetUserInput()
+	}
+	r.getToolRecommender().GetRecommendedToolsAndForgesAsync(userInput, r.config, onFinished...)
+}
+
+// WaitRecommendTask 等待所有推荐任务完成
+func (r *ReActLoop) WaitRecommendTask() {
+	r.getToolRecommender().WaitRecommendTask()
+}
+
+func (r *ReActLoop) getRenderInfo() (string, map[string]any, error) {
+	// 直接获取缓存的工具和 forges
+	// 缓存应该在任务开始前或搜索操作中已经更新
+	tools, forges := r.getToolRecommender().GetCachedToolsAndForges()
+
+	temp, info, err := r.invoker.GetBasicPromptInfo(tools, forges)
 	if err != nil {
 		return "", nil, err
 	}
