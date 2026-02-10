@@ -1,7 +1,6 @@
 package sfreport
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/google/uuid"
