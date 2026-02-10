@@ -3,7 +3,6 @@ package reactloops
 import (
 	"bytes"
 	"sync"
-	"time"
 
 	"github.com/yaklang/yaklang/common/log"
 
@@ -207,27 +206,8 @@ func (r *ReActLoop) WaitRecommendTask() {
 }
 
 func (r *ReActLoop) getRenderInfo() (string, map[string]any, error) {
-	// 获取推荐的 tools 和 forges（基于关键词匹配）
-	r.GetRecommendedToolsAndForges()
-
-	// 启动异步搜索，并等待最多1秒
-	done := make(chan struct{}, 1)
-	r.GetRecommendedToolsAndForgesAsync(func() {
-		select {
-		case done <- struct{}{}:
-		default:
-		}
-	})
-
-	// 等待1秒，如果异步搜索完成则使用更新后的缓存，否则继续使用当前缓存
-	select {
-	case <-done:
-		log.Debug("async tools search completed within 1 second")
-	case <-time.After(1 * time.Second):
-		log.Debug("async tools search timeout, continue with current cache")
-	}
-
-	// 获取缓存的工具和 forges
+	// 直接获取缓存的工具和 forges
+	// 缓存应该在任务开始前或搜索操作中已经更新
 	tools, forges := r.getToolRecommender().GetCachedToolsAndForges()
 
 	temp, info, err := r.invoker.GetBasicPromptInfo(tools, forges)

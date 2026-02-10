@@ -7,9 +7,11 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 // ToolRecommender 工具和 forge 推荐管理器
@@ -17,10 +19,12 @@ type ToolRecommender struct {
 	// 缓存的工具和 forge 列表
 	cachedToolsList  []*aitool.Tool
 	cachedForgesList []*schema.AIForge
+	cachedLoopsList  []*LoopMetadata
 
 	// 互斥锁保护缓存
 	cachedToolsListMutex  *sync.Mutex
 	cachedForgesListMutex *sync.Mutex
+	cachedLoopsListMutex  *sync.Mutex
 
 	// 异步任务控制
 	recommendTaskSizeWaitGroup *utils.SizedWaitGroup
@@ -31,6 +35,7 @@ type ToolRecommender struct {
 	// 限制配置
 	maxToolsLimit  int
 	maxForgesLimit int
+	maxLoopsLimit  int
 }
 
 // NewToolRecommender 创建新的工具推荐管理器
@@ -38,12 +43,15 @@ func NewToolRecommender(invoker aicommon.AIInvokeRuntime) *ToolRecommender {
 	return &ToolRecommender{
 		cachedToolsList:            make([]*aitool.Tool, 0),
 		cachedForgesList:           make([]*schema.AIForge, 0),
+		cachedLoopsList:            make([]*LoopMetadata, 0),
 		cachedToolsListMutex:       new(sync.Mutex),
 		cachedForgesListMutex:      new(sync.Mutex),
+		cachedLoopsListMutex:       new(sync.Mutex),
 		recommendTaskSizeWaitGroup: utils.NewSizedWaitGroup(10),
 		invoker:                    invoker,
 		maxToolsLimit:              30,  // 默认限制工具数量为 30 个
 		maxForgesLimit:             200, // 默认限制 forge 数量为 200 个
+		maxLoopsLimit:              10,  // 默认限制 loop 数量为 10 个
 	}
 }
 
@@ -451,4 +459,228 @@ func (tr *ToolRecommender) updateCacheWithMatchedItems(matchedTools []*aitool.To
 		tr.cachedForgesList = newForgesList
 		log.Infof("updated forge cache: matched %d forges, total cache size %d", len(matchedForges), len(tr.cachedForgesList))
 	}
+}
+
+// SearchCapabilitiesBM25 使用 BM25 搜索工具、forge 和 loops
+// 返回搜索到的工具、forges 和 loops
+func (tr *ToolRecommender) SearchCapabilitiesBM25(query string, toolLimit, forgeLimit, loopLimit int) (
+	tools []*aitool.Tool,
+	forges []*schema.AIForge,
+	loops []*LoopMetadata,
+	err error,
+) {
+	query = strings.TrimSpace(query)
+	if query == "" {
+		return nil, nil, nil, utils.Error("search query is empty")
+	}
+
+	// 1. 使用 BM25 搜索工具
+	db := consts.GetGormProfileDatabase()
+	if db != nil {
+		// 搜索 AIYakTool
+		yakTools, err := yakit.SearchAIYakToolBM25(db, &yakit.AIYakToolFilter{
+			Keywords: query,
+		}, toolLimit, 0)
+		if err != nil {
+			log.Warnf("BM25 tool search failed: %v", err)
+		} else if len(yakTools) > 0 {
+			// 转换为 aitool.Tool
+			// 从 AiToolManager 中获取实际的工具实例
+			if tr.invoker != nil {
+				config := tr.invoker.GetConfig()
+				if mgr := config.GetAiToolManager(); mgr != nil {
+					for _, yakTool := range yakTools {
+						if tool, err := mgr.GetToolByName(yakTool.Name); err == nil && tool != nil {
+							tools = append(tools, tool)
+						}
+					}
+				}
+			}
+			log.Infof("BM25 search found %d tools", len(tools))
+		}
+
+		// 2. 使用 BM25 搜索 forges
+		forges, err = yakit.SearchAIForgeBM25(db, &yakit.AIForgeSearchFilter{
+			Keywords: query,
+		}, forgeLimit, 0)
+		if err != nil {
+			log.Warnf("BM25 forge search failed: %v", err)
+		} else if len(forges) > 0 {
+			log.Infof("BM25 search found %d forges", len(forges))
+		}
+	}
+
+	// 3. 搜索 loops（使用关键词匹配）
+	loops = tr.searchLoopMetadata(query, loopLimit)
+	if len(loops) > 0 {
+		log.Infof("Found %d matching loops", len(loops))
+	}
+
+	return tools, forges, loops, nil
+}
+
+// searchLoopMetadata 搜索注册的 loop metadata
+// 参考 action_search_capabilities.go 中的实现
+func (tr *ToolRecommender) searchLoopMetadata(query string, limit int) []*LoopMetadata {
+	allMeta := GetAllLoopMetadata()
+	queryLower := strings.ToLower(query)
+	queryTokens := strings.Fields(queryLower)
+	var matched []*LoopMetadata
+
+	for _, meta := range allMeta {
+		if meta.IsHidden {
+			continue
+		}
+		searchText := strings.ToLower(meta.Name + " " + meta.Description + " " + meta.UsagePrompt)
+
+		// 完整查询匹配
+		if strings.Contains(searchText, queryLower) {
+			matched = append(matched, meta)
+			if limit > 0 && len(matched) >= limit {
+				break
+			}
+			continue
+		}
+
+		// Token 级别匹配：要求至少一半有意义的 token 匹配
+		if len(queryTokens) > 1 {
+			meaningfulTokens := 0
+			matchCount := 0
+			for _, token := range queryTokens {
+				if len(token) < 2 {
+					continue
+				}
+				meaningfulTokens++
+				if strings.Contains(searchText, token) {
+					matchCount++
+				}
+			}
+			if meaningfulTokens > 0 && matchCount > 0 && matchCount >= (meaningfulTokens+1)/2 {
+				matched = append(matched, meta)
+				if limit > 0 && len(matched) >= limit {
+					break
+				}
+			}
+		}
+	}
+	return matched
+}
+
+// GetCachedLoops 获取缓存的 loops
+func (tr *ToolRecommender) GetCachedLoops() []*LoopMetadata {
+	tr.cachedLoopsListMutex.Lock()
+	defer tr.cachedLoopsListMutex.Unlock()
+	return tr.cachedLoopsList
+}
+
+// UpdateCachedLoops 更新缓存的 loops
+func (tr *ToolRecommender) UpdateCachedLoops(loops []*LoopMetadata) {
+	tr.cachedLoopsListMutex.Lock()
+	defer tr.cachedLoopsListMutex.Unlock()
+	tr.cachedLoopsList = loops
+}
+
+// SearchAndUpdateCache 统一的搜索方法，使用 BM25 搜索工具和 forges，关键词搜索 loops
+// 搜索完成后更新缓存
+func (tr *ToolRecommender) SearchAndUpdateCache(query string, toolLimit, forgeLimit, loopLimit int) error {
+	// 执行 BM25 搜索
+	tools, forges, loops, err := tr.SearchCapabilitiesBM25(query, toolLimit, forgeLimit, loopLimit)
+	if err != nil {
+		return err
+	}
+
+	// 更新工具缓存（应用优先级排序）
+	if len(tools) > 0 {
+		tr.cachedToolsListMutex.Lock()
+		prioritizedTools := tr.prioritizeAndLimitTools(tools, toolLimit)
+
+		// 创建工具映射用于去重
+		toolMap := make(map[string]*aitool.Tool)
+		var newToolsList []*aitool.Tool
+
+		// 首先添加新搜索到的工具
+		for _, tool := range prioritizedTools {
+			toolMap[tool.Name] = tool
+			newToolsList = append(newToolsList, tool)
+		}
+
+		// 然后从原缓存中添加未匹配的工具，直到达到限制
+		for _, cachedTool := range tr.cachedToolsList {
+			if len(newToolsList) >= toolLimit {
+				break
+			}
+			if _, exists := toolMap[cachedTool.Name]; !exists {
+				newToolsList = append(newToolsList, cachedTool)
+				toolMap[cachedTool.Name] = cachedTool
+			}
+		}
+
+		tr.cachedToolsList = newToolsList
+		tr.cachedToolsListMutex.Unlock()
+		log.Infof("updated tools cache via BM25: found %d tools, total cache size %d", len(tools), len(tr.cachedToolsList))
+	}
+
+	// 更新 forge 缓存
+	if len(forges) > 0 {
+		tr.cachedForgesListMutex.Lock()
+		limitedForges := tr.limitForges(forges, forgeLimit)
+
+		// 创建 forge 映射用于去重
+		forgeMap := make(map[string]*schema.AIForge)
+		var newForgesList []*schema.AIForge
+
+		// 首先添加新搜索到的 forges
+		for _, forge := range limitedForges {
+			forgeMap[forge.ForgeName] = forge
+			newForgesList = append(newForgesList, forge)
+		}
+
+		// 然后从原缓存中添加未匹配的 forges，直到达到限制
+		for _, cachedForge := range tr.cachedForgesList {
+			if len(newForgesList) >= forgeLimit {
+				break
+			}
+			if _, exists := forgeMap[cachedForge.ForgeName]; !exists {
+				newForgesList = append(newForgesList, cachedForge)
+				forgeMap[cachedForge.ForgeName] = cachedForge
+			}
+		}
+
+		tr.cachedForgesList = newForgesList
+		tr.cachedForgesListMutex.Unlock()
+		log.Infof("updated forges cache via BM25: found %d forges, total cache size %d", len(forges), len(tr.cachedForgesList))
+	}
+
+	// 更新 loops 缓存
+	if len(loops) > 0 {
+		tr.UpdateCachedLoops(loops)
+		log.Infof("updated loops cache: found %d loops", len(loops))
+	}
+
+	return nil
+}
+
+// SearchAndUpdateCacheAsync 异步执行搜索并更新缓存
+func (tr *ToolRecommender) SearchAndUpdateCacheAsync(query string, toolLimit, forgeLimit, loopLimit int, onFinished ...func()) {
+	tr.recommendTaskSizeWaitGroup.Add(1)
+	go func() {
+		defer tr.recommendTaskSizeWaitGroup.Done()
+		defer func() {
+			if err := recover(); err != nil {
+				log.Errorf("panic occurred during async capability search: %v", err)
+			}
+		}()
+		defer func() {
+			// 调用完成回调
+			for _, callback := range onFinished {
+				if callback != nil {
+					callback()
+				}
+			}
+		}()
+
+		if err := tr.SearchAndUpdateCache(query, toolLimit, forgeLimit, loopLimit); err != nil {
+			log.Errorf("async capability search failed: %v", err)
+		}
+	}()
 }
