@@ -116,9 +116,6 @@ type ReActLoop struct {
 	initActionMustUse  []string // Actions that MUST be used (set by init)
 	initActionDisabled []string // Actions that are DISABLED (set by init)
 	initActionApplied  bool     // Whether the init constraints have been applied
-
-	// 工具和 forge 推荐管理器
-	toolRecommender *ToolRecommender
 }
 
 func (r *ReActLoop) PushSatisfactionRecord(satisfactory bool, reason string) {
@@ -159,13 +156,38 @@ func (r *ReActLoop) GetMaxIterations() int {
 	return r.maxIterations
 }
 
+// getToolRecommender 从 invoker 获取 ToolRecommender
+func (r *ReActLoop) getToolRecommender() *ToolRecommender {
+	// 尝试类型断言，看 invoker 是否有 GetToolRecommender 方法
+	type toolRecommenderGetter interface {
+		GetToolRecommender() *ToolRecommender
+	}
+	if getter, ok := r.invoker.(toolRecommenderGetter); ok {
+		return getter.GetToolRecommender()
+	}
+	// 如果无法获取，返回一个新的实例
+	return NewToolRecommender(r.invoker)
+}
+
 // GetRecommendedToolsAndForges 根据用户输入通过关键词匹配获取推荐的 tools 和 forges
 func (r *ReActLoop) GetRecommendedToolsAndForges() ([]*aitool.Tool, []*schema.AIForge) {
 	var userInput string
 	if task := r.GetCurrentTask(); task != nil {
 		userInput = task.GetUserInput()
 	}
-	return r.toolRecommender.GetRecommendedToolsAndForges(userInput, r.config)
+
+	// 从 loop 变量中获取限制，如果没有设置则使用默认值
+	maxToolsLimit := r.GetInt("max_tools_limit")
+	if maxToolsLimit <= 0 {
+		maxToolsLimit = 30 // 默认值
+	}
+
+	maxForgesLimit := r.GetInt("max_forges_limit")
+	if maxForgesLimit <= 0 {
+		maxForgesLimit = 200 // 默认值
+	}
+
+	return r.getToolRecommender().GetRecommendedToolsAndForgesWithLimits(userInput, r.config, maxToolsLimit, maxForgesLimit)
 }
 
 // GetRecommendedToolsAndForgesAsync 异步搜索推荐的 tools 和 forges
@@ -176,12 +198,12 @@ func (r *ReActLoop) GetRecommendedToolsAndForgesAsync(onFinished ...func()) {
 	if task := r.GetCurrentTask(); task != nil {
 		userInput = task.GetUserInput()
 	}
-	r.toolRecommender.GetRecommendedToolsAndForgesAsync(userInput, r.config, onFinished...)
+	r.getToolRecommender().GetRecommendedToolsAndForgesAsync(userInput, r.config, onFinished...)
 }
 
 // WaitRecommendTask 等待所有推荐任务完成
 func (r *ReActLoop) WaitRecommendTask() {
-	r.toolRecommender.WaitRecommendTask()
+	r.getToolRecommender().WaitRecommendTask()
 }
 
 func (r *ReActLoop) getRenderInfo() (string, map[string]any, error) {
@@ -206,7 +228,7 @@ func (r *ReActLoop) getRenderInfo() (string, map[string]any, error) {
 	}
 
 	// 获取缓存的工具和 forges
-	tools, forges := r.toolRecommender.GetCachedToolsAndForges()
+	tools, forges := r.getToolRecommender().GetCachedToolsAndForges()
 
 	temp, info, err := r.invoker.GetBasicPromptInfo(tools, forges)
 	if err != nil {
@@ -318,9 +340,6 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		sameActionTypeSpinThreshold: 3, // 默认连续 3 次相同 Action 触发检测
 		sameLogicSpinThreshold:      3, // 默认连续 3 次相同逻辑触发 AI 检测
 	}
-
-	// 初始化工具推荐管理器
-	r.toolRecommender = NewToolRecommender(r)
 
 	for _, action := range []*LoopAction{
 		loopAction_DirectlyAnswer,

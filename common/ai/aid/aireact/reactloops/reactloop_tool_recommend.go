@@ -25,40 +25,38 @@ type ToolRecommender struct {
 	// 异步任务控制
 	recommendTaskSizeWaitGroup *utils.SizedWaitGroup
 
-	// 关联的 ReActLoop（用于获取配置和任务信息）
-	loop *ReActLoop
+	// 关联的 AIInvokeRuntime（用于获取配置和任务信息）
+	invoker aicommon.AIInvokeRuntime
+
+	// 限制配置
+	maxToolsLimit  int
+	maxForgesLimit int
 }
 
 // NewToolRecommender 创建新的工具推荐管理器
-func NewToolRecommender(loop *ReActLoop) *ToolRecommender {
+func NewToolRecommender(invoker aicommon.AIInvokeRuntime) *ToolRecommender {
 	return &ToolRecommender{
 		cachedToolsList:            make([]*aitool.Tool, 0),
 		cachedForgesList:           make([]*schema.AIForge, 0),
 		cachedToolsListMutex:       new(sync.Mutex),
 		cachedForgesListMutex:      new(sync.Mutex),
 		recommendTaskSizeWaitGroup: utils.NewSizedWaitGroup(10),
-		loop:                       loop,
+		invoker:                    invoker,
+		maxToolsLimit:              30,  // 默认限制工具数量为 30 个
+		maxForgesLimit:             200, // 默认限制 forge 数量为 200 个
 	}
 }
 
 // GetRecommendedToolsAndForges 根据用户输入通过关键词匹配获取推荐的 tools 和 forges
+// 使用默认的限制值
 func (tr *ToolRecommender) GetRecommendedToolsAndForges(userInput string, config aicommon.AICallerConfigIf) ([]*aitool.Tool, []*schema.AIForge) {
-	const defaultMaxToolsLimit = 30   // 默认限制工具数量为 30 个
-	const defaultMaxForgesLimit = 200 // 默认限制 forge 数量为 200 个
+	return tr.GetRecommendedToolsAndForgesWithLimits(userInput, config, tr.maxToolsLimit, tr.maxForgesLimit)
+}
 
-	// 从 loop 变量中获取限制，如果没有设置则使用默认值
-	maxToolsLimit := defaultMaxToolsLimit
-	maxForgesLimit := defaultMaxForgesLimit
-
-	if tr.loop != nil {
-		if customLimit := tr.loop.GetInt("max_tools_limit"); customLimit > 0 {
-			maxToolsLimit = customLimit
-		}
-
-		if customLimit := tr.loop.GetInt("max_forges_limit"); customLimit > 0 {
-			maxForgesLimit = customLimit
-		}
-	}
+// GetRecommendedToolsAndForgesWithLimits 根据用户输入通过关键词匹配获取推荐的 tools 和 forges
+// 支持自定义限制值
+func (tr *ToolRecommender) GetRecommendedToolsAndForgesWithLimits(userInput string, config aicommon.AICallerConfigIf, maxToolsLimit, maxForgesLimit int) ([]*aitool.Tool, []*schema.AIForge) {
+	// 使用传入的限制值
 
 	tr.cachedToolsListMutex.Lock()
 	defer tr.cachedToolsListMutex.Unlock()
@@ -384,22 +382,9 @@ func (tr *ToolRecommender) limitForges(forges []*schema.AIForge, maxCount int) [
 // matchedTools: 新匹配到的工具列表
 // matchedForges: 新匹配到的 forge 列表
 func (tr *ToolRecommender) updateCacheWithMatchedItems(matchedTools []*aitool.Tool, matchedForges []*schema.AIForge) {
-	const defaultMaxToolsLimit = 30
-	const defaultMaxForgesLimit = 200
-
-	// 从 loop 变量中获取限制
-	maxToolsLimit := defaultMaxToolsLimit
-	maxForgesLimit := defaultMaxForgesLimit
-
-	if tr.loop != nil {
-		if customLimit := tr.loop.GetInt("max_tools_limit"); customLimit > 0 {
-			maxToolsLimit = customLimit
-		}
-
-		if customLimit := tr.loop.GetInt("max_forges_limit"); customLimit > 0 {
-			maxForgesLimit = customLimit
-		}
-	}
+	// 使用配置的限制值
+	maxToolsLimit := tr.maxToolsLimit
+	maxForgesLimit := tr.maxForgesLimit
 
 	tr.cachedToolsListMutex.Lock()
 	defer tr.cachedToolsListMutex.Unlock()
