@@ -7,11 +7,14 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
+	"unicode"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -98,7 +101,8 @@ func (r *ReAct) processReActTask(task aicommon.AIStatefulTask) {
 	// 从任务中提取用户输入
 	userInput := task.GetUserInput()
 
-	r.ensureSessionTitle(userInput)
+	r.ensureWorkDirectory(userInput) // must be first: creates artifact dir + session title
+	r.ensureSessionTitle(userInput)  // will skip if already done by ensureWorkDirectory
 
 	r.currentIteration = 0
 	skipStatus, err := r.executeMainLoop(task)
@@ -341,6 +345,143 @@ func init() {
 	aicommon.RegisterDefaultAIRuntimeInvoker(BuildReActInvoker)
 }
 
+const (
+	workDirCreatedKey = "work_dir_created"
+)
+
+// sanitizeFolderName cleans a string for use as a filesystem folder name.
+// Keeps ASCII letters, digits, underscores, hyphens. Replaces everything else with underscore.
+// Converts to lowercase. Truncates to maxLen characters.
+func sanitizeFolderName(name string, maxLen int) string {
+	var result []rune
+	for _, r := range strings.ToLower(strings.TrimSpace(name)) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '_' || r == '-' {
+			result = append(result, r)
+		} else if r == ' ' || r == '/' || r == '\\' {
+			result = append(result, '_')
+		} else if unicode.Is(unicode.Han, r) {
+			// keep Chinese characters for readability
+			result = append(result, r)
+		}
+		// skip other characters
+	}
+	s := string(result)
+	// collapse multiple underscores
+	for strings.Contains(s, "__") {
+		s = strings.ReplaceAll(s, "__", "_")
+	}
+	s = strings.Trim(s, "_")
+	if len(s) > maxLen {
+		s = s[:maxLen]
+	}
+	if s == "" {
+		return "session"
+	}
+	return s
+}
+
+// ensureWorkDirectory lazily creates the artifact working directory with a semantic name.
+// This is called at the start of processReActTask, after user input is available.
+// It uses LiteForge to generate a meaningful folder name, falling back to a generic name.
+// It also generates the session title in the same LiteForge call to save overhead.
+func (r *ReAct) ensureWorkDirectory(userInput string) {
+	cfg := r.config
+	if cfg == nil {
+		return
+	}
+
+	if cfg.IsWorkDirReady() {
+		return
+	}
+
+	if cfg.GetConfigBool(workDirCreatedKey) {
+		return
+	}
+	cfg.SetConfig(workDirCreatedKey, true)
+
+	trimmedInput := strings.TrimSpace(userInput)
+
+	shortUuid := cfg.GetRuntimeId()
+	if len(shortUuid) > 5 {
+		shortUuid = shortUuid[:5]
+	}
+	dateStr := time.Now().Format("20060102")
+
+	var folderName string
+	var sessionTitle string
+
+	// try LiteForge to generate both folder_name and session_title
+	// use a tight timeout to avoid blocking the main flow
+	if trimmedInput != "" && !cfg.GetConfigBool(sessionTitleDisableKey) && cfg.OriginalAICallback != nil {
+		func() {
+			defer func() {
+				if err := recover(); err != nil {
+					log.Warnf("generate semantic folder name panic: %v", err)
+				}
+			}()
+
+			// use a timeout context to avoid blocking the main flow
+			liteForgeCtx, cancel := context.WithTimeout(cfg.GetContext(), 10*time.Second)
+			defer cancel()
+
+			prompt, err := r.promptManager.GenerateRequireConversationTitlePrompt(r.DumpTimeline(), trimmedInput)
+			if err != nil {
+				log.Warnf("generate semantic folder name prompt failed: %v", err)
+				return
+			}
+
+			action, err := r.InvokeLiteForge(liteForgeCtx, "session-init-generator", prompt, []aitool.ToolOption{
+				aitool.WithStringParam("session_title", aitool.WithParam_Description("Concise session title for display"), aitool.WithParam_MaxLength(50), aitool.WithParam_Required(true)),
+				aitool.WithStringParam("folder_name", aitool.WithParam_Description("Short filesystem-safe folder name in snake_case English, describing the task purpose, e.g. sql_injection_scan, http_flow_analysis"), aitool.WithParam_MaxLength(30), aitool.WithParam_Required(true)),
+			})
+			if err != nil {
+				log.Warnf("generate semantic folder name failed: %v", err)
+				return
+			}
+
+			if fn := strings.TrimSpace(action.GetString("folder_name")); fn != "" {
+				folderName = sanitizeFolderName(fn, 30)
+			}
+			if st := strings.TrimSpace(action.GetString("session_title")); st != "" {
+				sessionTitle = st
+			}
+		}()
+	}
+
+	// build the final directory name: {dbId}_{semanticOrSession}_{date}_{shortUuid}
+	if folderName == "" {
+		folderName = "session"
+	}
+	dirName := fmt.Sprintf("%d_%s_%s_%s",
+		cfg.DatabaseRecordID,
+		folderName,
+		dateStr,
+		shortUuid,
+	)
+
+	// create the directory
+	dirPath := consts.TempAIDir(dirName)
+	cfg.SetWorkDir(dirPath)
+
+	// initialize artifacts filesystem
+	r.artifacts = filesys.NewRelLocalFs(dirPath)
+
+	// emit pin directory - at this point the name is final and meaningful
+	r.Emitter.EmitPinDirectory(dirPath)
+
+	// update DB record with work dir and semantic label
+	yakit.UpdateAIAgentRuntimeWorkDir(cfg.GetDB(), cfg.GetRuntimeId(), dirPath, folderName)
+
+	// if we got a session title from the merged LiteForge call, emit it
+	if sessionTitle != "" {
+		cfg.SetConfig("session_title", sessionTitle)
+		cfg.SetConfig(sessionTitleGeneratedKey, true)
+		r.Emitter.EmitSessionTitle(sessionTitle)
+	}
+
+	log.Infof("work directory created: %s (semantic: %s)", dirPath, folderName)
+}
+
 func (r *ReAct) ensureSessionTitle(userInput string) {
 	cfg := r.GetConfig()
 	if cfg == nil {
@@ -395,17 +536,14 @@ func (r *ReAct) ensureSessionTitle(userInput string) {
 
 func BuildReActInvoker(ctx context.Context, options ...aicommon.ConfigOption) (aicommon.AITaskInvokeRuntime, error) {
 	cfg := aicommon.NewConfig(ctx, options...)
-	dirname := consts.TempAIDir(cfg.GetRuntimeId())
-	if existed, _ := utils.PathExists(dirname); !existed {
-		return nil, utils.Errorf("temp ai dir %s not existed", dirname)
-	}
+	// artifacts directory is lazily created when user input arrives (ensureWorkDirectory)
 	invoker := &ReAct{
 		config:               cfg,
 		Emitter:              cfg.Emitter, // Use the emitter from config
 		taskQueue:            NewTaskQueue("react-main-queue"),
 		mirrorOfAIInputEvent: make(map[string]func(*ypb.AIInputEvent)),
 		saveTimelineThrottle: utils.NewThrottleEx(3, true, true),
-		artifacts:            filesys.NewRelLocalFs(dirname),
+		artifacts:            nil, // lazy: created in ensureWorkDirectory
 		wg:                   new(sync.WaitGroup),
 		pureInvokerMode:      true,
 	}
@@ -433,15 +571,12 @@ func BuildReActInvoker(ctx context.Context, options ...aicommon.ConfigOption) (a
 		cfg.TimelineDiffer = aicommon.NewTimelineDiffer(cfg.Timeline)
 	}
 	cfg.EnhanceKnowledgeManager.SetEmitter(cfg.Emitter)
-	// Initialize prompt manager
+	// Initialize prompt manager (workdir does not depend on artifacts, which is lazy)
 	workdir := cfg.Workdir
 	if workdir == "" {
-		workdir, _ = invoker.artifacts.Getwd()
-		if workdir == "" {
-			workdir = filepath.Join(consts.GetDefaultBaseHomeDir(), "code")
-			if utils.GetFirstExistedFile(workdir) == "" {
-				os.MkdirAll(workdir, os.ModePerm)
-			}
+		workdir = filepath.Join(consts.GetDefaultBaseHomeDir(), "code")
+		if utils.GetFirstExistedFile(workdir) == "" {
+			os.MkdirAll(workdir, os.ModePerm)
 		}
 	}
 	invoker.promptManager = NewPromptManager(invoker, workdir)
@@ -449,11 +584,7 @@ func BuildReActInvoker(ctx context.Context, options ...aicommon.ConfigOption) (a
 	// Register pending context providers
 	invoker.promptManager.cpm = cfg.ContextProviderManager
 
-	wd, err := invoker.artifacts.Getwd()
-	if err != nil {
-		return nil, err
-	}
-	invoker.Emitter.EmitPinDirectory(wd)
+	// EmitPinDirectory is deferred to ensureWorkDirectory when user input arrives
 
 	// Start the event loop in background
 	mainloopDone := make(chan struct{})

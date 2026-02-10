@@ -180,6 +180,9 @@ type AiOutputEvent struct {
 	AIService   string
 	AIModelName string
 	SessionId   string `gorm:"index"`
+
+	// semantic label for the task associated with this event
+	TaskSemanticLabel string `json:"task_semantic_label"`
 }
 
 func (e *AiOutputEvent) GetContentJSONPath(p string) string {

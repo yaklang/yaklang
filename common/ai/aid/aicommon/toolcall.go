@@ -599,7 +599,7 @@ func (t *ToolCaller) saveToolCallFiles(
 		workdir = cfg.Workdir
 	}
 	if workdir == "" {
-		workdir = consts.TempAIDir(t.config.GetRuntimeId())
+		workdir = t.config.GetOrCreateWorkDir()
 	}
 	if workdir == "" {
 		workdir = consts.GetDefaultBaseHomeDir()

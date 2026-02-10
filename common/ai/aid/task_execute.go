@@ -377,7 +377,7 @@ func (t *AiTask) saveTaskArtifacts(summary, nextMovements, statusSummary, taskSu
 		workdir = t.Coordinator.Workdir
 	}
 	if workdir == "" && t.Coordinator != nil {
-		workdir = consts.TempAIDir(t.Coordinator.GetRuntimeId())
+		workdir = t.Coordinator.GetOrCreateWorkDir()
 	}
 	if workdir == "" {
 		workdir = consts.GetDefaultBaseHomeDir()

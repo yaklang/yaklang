@@ -71,24 +71,38 @@ func GetReviewCheckpoint(db *gorm.DB, coordinatorUuid string, seq int64) (*schem
 	return &checkpoint, true
 }
 
-func CreateOrUpdateAIAgentRuntime(db *gorm.DB, runtime *schema.AIAgentRuntime) error {
+func CreateOrUpdateAIAgentRuntime(db *gorm.DB, runtime *schema.AIAgentRuntime) (uint, error) {
 	if runtime.Uuid == "" {
-		return db.Create(runtime).Error
+		err := db.Create(runtime).Error
+		return runtime.ID, err
 	}
 
 	var existingRuntime schema.AIAgentRuntime
 	if err := db.Where("uuid = ?", runtime.Uuid).First(&existingRuntime).Error; err != nil {
 		if gorm.IsRecordNotFoundError(err) {
-			return db.Create(runtime).Error
+			err = db.Create(runtime).Error
+			return runtime.ID, err
 		}
-		return err
+		return 0, err
 	}
 
-	return db.Model(&existingRuntime).Updates(runtime).Error
+	err := db.Model(&existingRuntime).Updates(runtime).Error
+	return existingRuntime.ID, err
 }
 
 func UpdateAIAgentRuntimeTimeline(db *gorm.DB, uuid string, timeline string) error {
 	return db.Model(&schema.AIAgentRuntime{}).Where("uuid = ?", uuid).Update("quoted_timeline", timeline).Error
+}
+
+// UpdateAIAgentRuntimeWorkDir updates the working directory and semantic label for an AIAgentRuntime
+func UpdateAIAgentRuntimeWorkDir(db *gorm.DB, uuid string, workDir string, semanticLabel string) error {
+	updates := map[string]interface{}{
+		"work_dir": workDir,
+	}
+	if semanticLabel != "" {
+		updates["semantic_label"] = semanticLabel
+	}
+	return db.Model(&schema.AIAgentRuntime{}).Where("uuid = ?", uuid).Updates(updates).Error
 }
 
 func UpdateAIAgentRuntimeTimelineWithPersistentId(db *gorm.DB, persistentId string, timeline string) error {

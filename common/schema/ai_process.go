@@ -9,8 +9,9 @@ const (
 
 type AiProcess struct {
 	gorm.Model
-	ProcessType string `json:"process_type" gorm:"index"`
-	ProcessId   string `json:"process_id" gorm:"index"`
+	ProcessType   string `json:"process_type" gorm:"index"`
+	ProcessId     string `json:"process_id" gorm:"index"`
+	SemanticLabel string `json:"semantic_label"`
 }
 
 func (a *AiProcess) TableName() string {

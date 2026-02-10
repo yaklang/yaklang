@@ -16,9 +16,10 @@ func (c *Coordinator) CreateDatabaseSchema(input string) *schema.AIAgentRuntime 
 		QuotedUserInput:   codec.StrConvQuote(input),
 		ForgeName:         c.Config.ForgeName,
 	}
-	err := yakit.CreateOrUpdateAIAgentRuntime(c.Config.GetDB(), rt)
+	dbId, err := yakit.CreateOrUpdateAIAgentRuntime(c.Config.GetDB(), rt)
 	if err != nil {
 		log.Errorf("BUG: cannot create coordinator runtime record: %v", err)
 	}
+	c.Config.DatabaseRecordID = dbId
 	return rt
 }

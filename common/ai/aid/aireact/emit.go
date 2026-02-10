@@ -6,6 +6,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 )
@@ -26,27 +27,45 @@ func (r *ReAct) EmitResult(result interface{}) {
 	r.Emitter.EmitResult("result", result, true)
 }
 
+// getArtifacts returns the artifacts filesystem, triggering lazy creation if needed.
+// This ensures the directory exists before any file operations.
+func (r *ReAct) getArtifacts() *filesys.RelLocalFs {
+	if r.artifacts != nil {
+		return r.artifacts
+	}
+	// fallback: trigger lazy creation via config.GetOrCreateWorkDir()
+	cfg := r.config
+	dirPath := cfg.GetOrCreateWorkDir()
+	r.artifacts = filesys.NewRelLocalFs(dirPath)
+	if !cfg.IsArtifactsPinned() {
+		r.Emitter.EmitPinDirectory(dirPath)
+		cfg.SetArtifactsPinned()
+	}
+	return r.artifacts
+}
+
 func (r *ReAct) EmitFileArtifactWithExt(identifier string, ext string, i any) string {
+	artifacts := r.getArtifacts()
 	var name string
 	var suffix string
-	if r.artifacts.Ext(identifier) != ext {
+	if artifacts.Ext(identifier) != ext {
 		suffix = ext
 	}
 	if !strings.HasSuffix(identifier, "_") {
 		identifier = identifier + "_"
 	}
 	name = identifier + utils.DatetimePretty2() + suffix
-	err := r.artifacts.WriteFile(name, utils.InterfaceToBytes(i), 0644)
+	err := artifacts.WriteFile(name, utils.InterfaceToBytes(i), 0644)
 	if err != nil {
 		log.Errorf("Error writing file: %v", err)
 		return ""
 	}
-	wd, err := r.artifacts.Getwd()
+	wd, err := artifacts.Getwd()
 	if err != nil {
 		log.Errorf("Error getting working directory: %v", err)
 		return ""
 	}
-	filename := r.artifacts.Join(wd, name)
+	filename := artifacts.Join(wd, name)
 	r.Emitter.EmitPinFilename(filename)
 	return filename
 }

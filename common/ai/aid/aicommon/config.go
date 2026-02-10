@@ -257,6 +257,17 @@ type Config struct {
 	originOptions []ConfigOption
 
 	ExtendedForge []*schema.AIForge
+
+	/*
+		Lazy WorkDir for semantic artifact directory naming
+	*/
+	// DatabaseRecordID is the gorm primary key ID from AIAgentRuntime
+	DatabaseRecordID uint
+	// workDir is the lazily-created working directory path (set once, never changes)
+	workDir         string
+	workDirOnce     sync.Once
+	workDirMu       sync.RWMutex
+	artifactsPinned bool
 }
 
 // NewConfig creates a new Config with options
@@ -1832,6 +1843,73 @@ func (c *Config) AcquireId() int64 {
 
 func (c *Config) GetRuntimeId() string {
 	return c.Id
+}
+
+// IsWorkDirReady checks if the working directory has been created
+func (c *Config) IsWorkDirReady() bool {
+	c.workDirMu.RLock()
+	defer c.workDirMu.RUnlock()
+	return c.workDir != ""
+}
+
+// SetWorkDir sets the working directory path (called by ensureWorkDirectory, only sets once)
+func (c *Config) SetWorkDir(path string) {
+	c.workDirMu.Lock()
+	defer c.workDirMu.Unlock()
+	if c.workDir == "" {
+		c.workDir = path
+	}
+}
+
+// GetOrCreateWorkDir lazily creates and returns the working directory.
+// If the directory has not been created yet, it creates a fallback directory
+// with format: {DatabaseRecordID}_session_{date}_{shortUuid(5)}.
+// Normal flow: ensureWorkDirectory(userInput) will preemptively set a semantic directory name.
+func (c *Config) GetOrCreateWorkDir() string {
+	c.workDirMu.RLock()
+	if c.workDir != "" {
+		dir := c.workDir
+		c.workDirMu.RUnlock()
+		return dir
+	}
+	c.workDirMu.RUnlock()
+
+	c.workDirOnce.Do(func() {
+		shortUuid := c.Id
+		if len(shortUuid) > 5 {
+			shortUuid = shortUuid[:5]
+		}
+		folderName := fmt.Sprintf("%d_session_%s_%s",
+			c.DatabaseRecordID,
+			time.Now().Format("20060102"),
+			shortUuid,
+		)
+		dirPath := consts.TempAIDir(folderName)
+		c.workDirMu.Lock()
+		if c.workDir == "" {
+			c.workDir = dirPath
+		}
+		c.workDirMu.Unlock()
+		log.Infof("created fallback work directory: %s", dirPath)
+	})
+
+	c.workDirMu.RLock()
+	defer c.workDirMu.RUnlock()
+	return c.workDir
+}
+
+// IsArtifactsPinned checks if EmitPinDirectory has been called
+func (c *Config) IsArtifactsPinned() bool {
+	c.workDirMu.RLock()
+	defer c.workDirMu.RUnlock()
+	return c.artifactsPinned
+}
+
+// SetArtifactsPinned marks that EmitPinDirectory has been called
+func (c *Config) SetArtifactsPinned() {
+	c.workDirMu.Lock()
+	defer c.workDirMu.Unlock()
+	c.artifactsPinned = true
 }
 
 func (c *Config) IsCtxDone() bool {
