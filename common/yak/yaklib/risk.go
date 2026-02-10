@@ -487,6 +487,7 @@ var (
 		"parameter":                        yakit.WithRiskParam_Parameter,
 		"token":                            yakit.WithRiskParam_Token,
 		"details":                          yakit.WithRiskParam_Details,
+		"appendPacketPairs":                yakit.WithRiskParam_AppendPacketPairs,
 		"request":                          yakit.WithRiskParam_Request,
 		"response":                         yakit.WithRiskParam_Response,
 		"runtimeId":                        yakit.WithRiskParam_RuntimeId,

@@ -909,7 +909,10 @@ http:
 		t.Fatal(err)
 	}
 
-	hasRiskInfo := false
+	hasRspFlag := false
+	hasJSONRisk := false
+	hasRiskCard := false
+	var runtimeID string
 	for {
 		rsp, err := stream.Recv()
 		if err != nil {
@@ -918,17 +921,48 @@ http:
 			}
 			t.Errorf("recv Error: %v", err)
 		}
+		if rsp.GetRuntimeID() != "" {
+			runtimeID = rsp.GetRuntimeID()
+		}
 		if rsp.GetIsMessage() {
-			if strings.Contains(string(rsp.GetMessage()), rspFlag) {
-				hasRiskInfo = true
+			msg := string(rsp.GetMessage())
+			if strings.Contains(msg, rspFlag) {
+				hasRspFlag = true
+				continue
 			}
+			level := gjson.Get(msg, "content.level").String()
+			if level == "json-risk" {
+				hasJSONRisk = true
+				continue
+			}
+			if level == "feature-status-card-data" {
+				data := gjson.Get(msg, "content.data").String()
+				if gjson.Get(data, "id").String() == "漏洞/风险/指纹" && gjson.Get(data, "data").Int() > 0 {
+					hasRiskCard = true
+				}
+			}
+		}
+	}
+	risks, err := yakit.GetRisksByRuntimeId(consts.GetGormProjectDatabase(), runtimeID)
+	require.NoError(t, err)
+	for _, riskIns := range risks {
+		rspRaw, _ := strconv.Unquote(riskIns.QuotedResponse)
+		if strings.Contains(rspRaw, rspFlag) || strings.Contains(riskIns.QuotedResponse, rspFlag) {
+			hasRspFlag = true
+			break
 		}
 	}
 	if visitedWebServer {
 		t.Fatal("expected not visited web server")
 	}
-	if !hasRiskInfo {
-		t.Fatal("expected get risk info by mock response")
+	if !hasRspFlag {
+		t.Fatalf("expected rsp flag in stream message, hasRspFlag=%v hasJSONRisk=%v hasRiskCard=%v", hasRspFlag, hasJSONRisk, hasRiskCard)
+	}
+	if !hasJSONRisk {
+		t.Fatalf("expected json-risk message, hasRspFlag=%v hasJSONRisk=%v hasRiskCard=%v", hasRspFlag, hasJSONRisk, hasRiskCard)
+	}
+	if !hasRiskCard {
+		t.Fatalf("expected risk card > 0, hasRspFlag=%v hasJSONRisk=%v hasRiskCard=%v", hasRspFlag, hasJSONRisk, hasRiskCard)
 	}
 }
 

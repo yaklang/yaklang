@@ -5,12 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/yaklib"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"io"
 	"io/ioutil"
 	"os"
@@ -19,6 +13,13 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/hpcloud/tail"
 )
@@ -333,6 +334,9 @@ func PocVulToRisk(p *PocVul) *schema.Risk {
 		title = fmt.Sprintf("%v %v", name, title)
 	}
 	var matchedAt = utils.MapGetString(p.Details, "matched-at")
+	if matchedAt == "" && p.MatchedAt != "" {
+		matchedAt = p.MatchedAt
+	}
 	if matchedAt != "" {
 		title = fmt.Sprintf("%v at %v", title, matchedAt)
 	}
@@ -342,8 +346,8 @@ func PocVulToRisk(p *PocVul) *schema.Risk {
 	} else {
 		desc = p.Description
 	}
-	return yakit.CreateRisk(
-		p.Target,
+
+	opts := []yakit.RiskParamsOpt{
 		yakit.WithRiskParam_Title(title),
 		yakit.WithRiskParam_CVE(p.CVE),
 		yakit.WithRiskParam_Description(desc),
@@ -353,7 +357,15 @@ func PocVulToRisk(p *PocVul) *schema.Risk {
 		yakit.WithRiskParam_Details(p.Details),
 		yakit.WithRiskParam_FromScript(p.ScriptName),
 		yakit.WithRiskParam_YakScriptUUID(p.UUID),
-	)
+	}
+	if len(p.Request) > 0 || len(p.Response) > 0 {
+		opts = append(opts, yakit.WithRiskParam_Request(p.Request), yakit.WithRiskParam_Response(p.Response))
+	}
+	for _, raw := range p.RawPacketPairs {
+		opts = append(opts, yakit.WithRiskParam_AppendPacketPairs(raw.Req, raw.Rsp))
+	}
+
+	return yakit.CreateRisk(p.Target, opts...)
 }
 
 func HandleNucleiResultFromFile(ctx context.Context, fileName string) (chan *PocVul, error) {
@@ -508,6 +520,12 @@ func HandleNucleiResult(raw []byte) []*PocVul {
 	return vuls
 }
 
+// RawPacketPair 表示一对原始请求/响应报文，用于通过 WithRiskParam_AppendPacketPairs 落库并追加引用
+type RawPacketPair struct {
+	Req []byte
+	Rsp []byte
+}
+
 type PocVul struct {
 	Source        string
 	PocName       string
@@ -526,6 +544,12 @@ type PocVul struct {
 	TitleName     string
 	Details       map[string]interface{}
 	RuntimeId     string
+
+	// 仅当单条请求/响应时设置，作为 Risk 的主 request/response，不放入 RawPacketPairs
+	Request  []byte
+	Response []byte
+	// 多条请求/响应对时使用，通过 WithRiskParam_AppendPacketPairs 落库并追加引用（如 httptpl/nuclei）
+	RawPacketPairs []RawPacketPair
 
 	// meta info
 	ScriptName string
