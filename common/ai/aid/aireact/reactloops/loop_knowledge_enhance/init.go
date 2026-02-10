@@ -253,8 +253,8 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 			resourcesInfo.WriteString("\n")
 		}
 
-		loopDir := loop.Get("loop_directory")
-		if loopDir != "" {
+		loopDataDir := loop.GetLoopContentDir("data")
+		if loopDataDir != "" {
 			var markdown strings.Builder
 			markdown.WriteString("# Attached Resources\n\n")
 			markdown.WriteString("## User Query\n\n")
@@ -262,7 +262,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 			markdown.WriteString("\n\n## Resources\n\n")
 			markdown.WriteString(resourcesInfo.String())
 
-			filename := filepath.Join(loopDir, fmt.Sprintf("attached_resources_%s.md", utils.DatetimePretty2()))
+			filename := filepath.Join(loopDataDir, fmt.Sprintf("attached_resources_%s.md", utils.DatetimePretty2()))
 			if err := os.WriteFile(filename, []byte(markdown.String()), 0644); err != nil {
 				log.Warnf("failed to write knowledge enhance resources markdown: %v", err)
 			} else {

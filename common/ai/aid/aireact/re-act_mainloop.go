@@ -462,6 +462,11 @@ func (r *ReAct) ensureWorkDirectory(userInput string) {
 	// create the directory
 	dirPath := consts.TempAIDir(dirName)
 	cfg.SetWorkDir(dirPath)
+	// Also set Workdir (capital W) so ConvertConfigToOptions can propagate it
+	// to child configs (Coordinator, P&E sub-invokers, forge executions).
+	// Without this, child configs created via ConvertConfigToOptions would not
+	// inherit the semantic work directory and would create their own fallback dirs.
+	cfg.Workdir = dirPath
 
 	// initialize artifacts filesystem
 	r.artifacts = filesys.NewRelLocalFs(dirPath)
