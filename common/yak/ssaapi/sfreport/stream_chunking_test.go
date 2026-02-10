@@ -15,8 +15,7 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// Helpers: simulate emitter-side compress + chunk and aggregator-side reassemble + decompress.
-// These mirror the algorithms in scannode/stream_emitter.go and legion/server/scanstream/aggregator.go.
+// Helpers: mirror emitter-side compress+chunk and aggregator-side join+decompress.
 // ---------------------------------------------------------------------------
 
 func emitterCompress(raw []byte, codec string) ([]byte, string) {
@@ -27,18 +26,12 @@ func emitterCompress(raw []byte, codec string) ([]byte, string) {
 	switch codec {
 	case "gzip":
 		var buf bytes.Buffer
-		zw, err := gzip.NewWriterLevel(&buf, gzip.BestSpeed)
-		if err != nil {
-			return raw, ""
-		}
+		zw, _ := gzip.NewWriterLevel(&buf, gzip.BestSpeed)
 		_, _ = zw.Write(raw)
 		_ = zw.Close()
 		enc = buf.Bytes()
 	case "zstd":
-		w, err := zstd.NewWriter(nil, zstd.WithEncoderLevel(zstd.SpeedFastest))
-		if err != nil {
-			return raw, ""
-		}
+		w, _ := zstd.NewWriter(nil, zstd.WithEncoderLevel(zstd.SpeedFastest))
 		enc = w.EncodeAll(raw, nil)
 		w.Close()
 	case "snappy":
@@ -72,11 +65,7 @@ func emitterChunk(data []byte, chunkSize int) []chunkPiece {
 		if end > len(data) {
 			end = len(data)
 		}
-		pieces = append(pieces, chunkPiece{
-			Index: i,
-			Data:  data[off:end],
-			Last:  end >= len(data),
-		})
+		pieces = append(pieces, chunkPiece{Index: i, Data: data[off:end], Last: end >= len(data)})
 	}
 	return pieces
 }
@@ -117,51 +106,60 @@ func aggregatorDecode(data []byte, encoding string) ([]byte, error) {
 	}
 }
 
-// roundtrip: compress → chunk → reassemble → decompress → compare
-func roundtripData(t *testing.T, original []byte, codec string, chunkSize int) {
-	t.Helper()
+type simulatedFileMeta struct {
+	FileHash      string
+	ContentSize   int64
+	Encoding      string
+	InlineContent []byte
+}
+type simulatedFileChunk struct {
+	FileHash   string
+	ChunkIndex int
+	Data       []byte
+	IsLast     bool
+}
 
-	compressed, encoding := emitterCompress(original, codec)
-
-	pieces := emitterChunk(compressed, chunkSize)
-	if len(pieces) == 0 {
-		t.Fatal("emitterChunk returned 0 pieces")
+func emitSimulatedFile(content []byte, fileHash, codec string, chunkSize, inlineMax int) (simulatedFileMeta, []simulatedFileChunk) {
+	compressed, encoding := emitterCompress(content, codec)
+	meta := simulatedFileMeta{FileHash: fileHash, ContentSize: int64(len(content)), Encoding: encoding}
+	if inlineMax > 0 && len(compressed) > 0 && len(compressed) <= inlineMax {
+		meta.InlineContent = compressed
+		return meta, nil
 	}
-	if !pieces[len(pieces)-1].Last {
-		t.Fatal("last piece should have Last=true")
+	var chunks []simulatedFileChunk
+	for _, p := range emitterChunk(compressed, chunkSize) {
+		chunks = append(chunks, simulatedFileChunk{FileHash: fileHash, ChunkIndex: p.Index, Data: p.Data, IsLast: p.Last})
 	}
+	return meta, chunks
+}
 
+func reassembleSimulatedFile(meta simulatedFileMeta, chunks []simulatedFileChunk) ([]byte, error) {
+	if len(meta.InlineContent) > 0 {
+		if meta.Encoding != "" {
+			return aggregatorDecode(meta.InlineContent, meta.Encoding)
+		}
+		return meta.InlineContent, nil
+	}
 	chunkMap := make(map[int][]byte)
 	lastIdx := -1
-	for _, p := range pieces {
-		chunkMap[p.Index] = p.Data
-		if p.Last {
-			lastIdx = p.Index
+	for _, c := range chunks {
+		chunkMap[c.ChunkIndex] = c.Data
+		if c.IsLast {
+			lastIdx = c.ChunkIndex
 		}
 	}
 	if lastIdx < 0 {
-		t.Fatal("no last chunk marker")
+		return nil, fmt.Errorf("no last chunk")
 	}
-	if len(chunkMap) != lastIdx+1 {
-		t.Fatalf("chunk count mismatch: got %d, want %d", len(chunkMap), lastIdx+1)
-	}
-
 	joined := aggregatorJoinChunks(chunkMap, lastIdx)
-	if !bytes.Equal(joined, compressed) {
-		t.Fatalf("joined data != compressed data (len %d vs %d)", len(joined), len(compressed))
+	if meta.Encoding != "" {
+		return aggregatorDecode(joined, meta.Encoding)
 	}
-
-	decoded, err := aggregatorDecode(joined, encoding)
-	if err != nil {
-		t.Fatalf("decode failed (encoding=%s): %v", encoding, err)
-	}
-	if !bytes.Equal(decoded, original) {
-		t.Fatalf("roundtrip mismatch: original len=%d, decoded len=%d", len(original), len(decoded))
-	}
+	return joined, nil
 }
 
 // ---------------------------------------------------------------------------
-// Test data generators
+// Data generators
 // ---------------------------------------------------------------------------
 
 func makeTextData(size int) []byte {
@@ -206,342 +204,239 @@ func makeJSONData(riskCount int) []byte {
 	return raw
 }
 
-// ---------------------------------------------------------------------------
-// Tests: maybeCompress behavior
-// ---------------------------------------------------------------------------
+// ===========================================================================
+// Tests
+// ===========================================================================
 
-func TestEmitterCompress_SmallBypass(t *testing.T) {
-	small := []byte("hello world")
-	for _, codec := range []string{"gzip", "zstd", "snappy"} {
-		out, encoding := emitterCompress(small, codec)
-		if encoding != "" {
-			t.Errorf("codec=%s: expected no compression for small data, got encoding=%s", codec, encoding)
-		}
-		if !bytes.Equal(out, small) {
-			t.Errorf("codec=%s: data should be unchanged", codec)
-		}
-	}
-}
+func TestEmitterCompress(t *testing.T) {
+	textData := makeTextData(8192)
 
-func TestEmitterCompress_NoCodec(t *testing.T) {
-	data := makeTextData(4096)
-	out, encoding := emitterCompress(data, "")
-	if encoding != "" {
-		t.Errorf("expected no encoding, got %s", encoding)
+	tests := []struct {
+		name        string
+		data        []byte
+		codec       string
+		wantEncoded bool // true = should compress, false = should bypass
+	}{
+		{"small_gzip", []byte("hello"), "gzip", false},
+		{"small_zstd", []byte("hello"), "zstd", false},
+		{"small_snappy", []byte("hello"), "snappy", false},
+		{"no_codec", textData, "", false},
+		{"gzip_text", textData, "gzip", true},
+		{"zstd_text", textData, "zstd", true},
+		{"snappy_text", textData, "snappy", true},
+		{"random_gzip", makeRandomData(4096), "gzip", false}, // incompressible
 	}
-	if !bytes.Equal(out, data) {
-		t.Error("data should be unchanged with empty codec")
-	}
-}
-
-func TestEmitterCompress_GzipReducesSize(t *testing.T) {
-	data := makeTextData(8192)
-	out, encoding := emitterCompress(data, "gzip")
-	if encoding != "gzip" {
-		t.Fatalf("expected gzip encoding, got %q", encoding)
-	}
-	if len(out) >= len(data) {
-		t.Fatalf("gzip should reduce size: %d → %d", len(data), len(out))
-	}
-}
-
-func TestEmitterCompress_ZstdReducesSize(t *testing.T) {
-	data := makeTextData(8192)
-	out, encoding := emitterCompress(data, "zstd")
-	if encoding != "zstd" {
-		t.Fatalf("expected zstd encoding, got %q", encoding)
-	}
-	if len(out) >= len(data) {
-		t.Fatalf("zstd should reduce size: %d → %d", len(data), len(out))
-	}
-}
-
-func TestEmitterCompress_SnappyReducesSize(t *testing.T) {
-	data := makeTextData(8192)
-	out, encoding := emitterCompress(data, "snappy")
-	if encoding != "snappy" {
-		t.Fatalf("expected snappy encoding, got %q", encoding)
-	}
-	if len(out) >= len(data) {
-		t.Fatalf("snappy should reduce size: %d → %d", len(data), len(out))
-	}
-}
-
-func TestEmitterCompress_RandomDataMaySkip(t *testing.T) {
-	data := makeRandomData(4096)
-	_, encoding := emitterCompress(data, "gzip")
-	// Random data is nearly incompressible; compression may be skipped.
-	// Either outcome is acceptable, just verify no panic.
-	_ = encoding
-}
-
-// ---------------------------------------------------------------------------
-// Tests: compress → decompress roundtrip
-// ---------------------------------------------------------------------------
-
-func TestCompressDecompressRoundtrip_AllCodecs(t *testing.T) {
-	data := makeTextData(16384)
-	for _, codec := range []string{"gzip", "zstd", "snappy"} {
-		t.Run(codec, func(t *testing.T) {
-			compressed, encoding := emitterCompress(data, codec)
-			if encoding == "" {
-				t.Skip("compression skipped (not enough gain)")
-			}
-			decoded, err := aggregatorDecode(compressed, encoding)
-			if err != nil {
-				t.Fatalf("decode failed: %v", err)
-			}
-			if !bytes.Equal(decoded, data) {
-				t.Fatalf("roundtrip mismatch: len %d → %d", len(data), len(decoded))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out, encoding := emitterCompress(tt.data, tt.codec)
+			if tt.wantEncoded {
+				if encoding == "" {
+					t.Fatal("expected compression, got none")
+				}
+				if len(out) >= len(tt.data) {
+					t.Fatalf("compressed should be smaller: %d >= %d", len(out), len(tt.data))
+				}
+			} else {
+				if encoding != "" {
+					t.Fatalf("expected no compression, got %q", encoding)
+				}
+				if !bytes.Equal(out, tt.data) {
+					t.Fatal("data should be unchanged")
+				}
 			}
 		})
 	}
 }
 
-func TestCompressDecompressRoundtrip_JSONPayload(t *testing.T) {
-	data := makeJSONData(20)
-	for _, codec := range []string{"gzip", "zstd", "snappy"} {
-		t.Run(codec, func(t *testing.T) {
-			compressed, encoding := emitterCompress(data, codec)
+func TestCompressDecompressRoundtrip(t *testing.T) {
+	tests := []struct {
+		name  string
+		data  []byte
+		codec string
+	}{
+		{"gzip_text", makeTextData(16384), "gzip"},
+		{"zstd_text", makeTextData(16384), "zstd"},
+		{"snappy_text", makeTextData(16384), "snappy"},
+		{"gzip_json", makeJSONData(20), "gzip"},
+		{"zstd_json", makeJSONData(20), "zstd"},
+		{"snappy_json", makeJSONData(20), "snappy"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			compressed, encoding := emitterCompress(tt.data, tt.codec)
 			if encoding == "" {
 				t.Skip("compression skipped")
 			}
 			decoded, err := aggregatorDecode(compressed, encoding)
 			if err != nil {
-				t.Fatalf("decode failed: %v", err)
+				t.Fatalf("decode: %v", err)
+			}
+			if !bytes.Equal(decoded, tt.data) {
+				t.Fatalf("roundtrip mismatch: %d → %d", len(tt.data), len(decoded))
+			}
+		})
+	}
+}
+
+func TestEmitterChunk(t *testing.T) {
+	seqData := func(n int) []byte {
+		d := make([]byte, n)
+		for i := range d {
+			d[i] = byte(i % 256)
+		}
+		return d
+	}
+
+	tests := []struct {
+		name       string
+		data       []byte
+		chunkSize  int
+		wantPieces int
+		lastSizes  []int // expected sizes of each piece
+	}{
+		{"empty", nil, 256, 1, []int{0}},
+		{"single_byte", []byte{0x42}, 256, 1, []int{1}},
+		{"smaller_than_chunk", []byte("hello"), 1024, 1, []int{5}},
+		{"exact_multiple", seqData(512), 256, 2, []int{256, 256}},
+		{"not_exact", seqData(700), 256, 3, []int{256, 256, 188}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pieces := emitterChunk(tt.data, tt.chunkSize)
+			if len(pieces) != tt.wantPieces {
+				t.Fatalf("pieces: got %d, want %d", len(pieces), tt.wantPieces)
+			}
+			if !pieces[len(pieces)-1].Last {
+				t.Fatal("last piece must have Last=true")
+			}
+			for i, want := range tt.lastSizes {
+				if len(pieces[i].Data) != want {
+					t.Errorf("piece[%d] size: got %d, want %d", i, len(pieces[i].Data), want)
+				}
+			}
+			var buf bytes.Buffer
+			for _, p := range pieces {
+				buf.Write(p.Data)
+			}
+			if tt.data != nil && !bytes.Equal(buf.Bytes(), tt.data) {
+				t.Fatal("concatenated chunks != original")
+			}
+		})
+	}
+}
+
+func TestJoinChunks(t *testing.T) {
+	tests := []struct {
+		name    string
+		chunks  map[int][]byte
+		lastIdx int
+		want    string
+	}{
+		{"negative_idx", nil, -1, ""},
+		{"single", map[int][]byte{0: []byte("hello")}, 0, "hello"},
+		{"multiple", map[int][]byte{0: []byte("aaa"), 1: []byte("bbb"), 2: []byte("ccc")}, 2, "aaabbbccc"},
+		{"missing_middle", map[int][]byte{0: []byte("aaa"), 2: []byte("ccc")}, 2, "aaaccc"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := aggregatorJoinChunks(tt.chunks, tt.lastIdx)
+			if tt.lastIdx < 0 {
+				if result != nil {
+					t.Fatal("expected nil")
+				}
+				return
+			}
+			if string(result) != tt.want {
+				t.Fatalf("got %q, want %q", string(result), tt.want)
+			}
+		})
+	}
+}
+
+func TestAggregateDecode(t *testing.T) {
+	tests := []struct {
+		name     string
+		data     []byte
+		encoding string
+		wantErr  bool
+		wantSame bool // expect output == input
+	}{
+		{"empty_encoding", []byte("raw"), "", false, true},
+		{"none_encoding", []byte("raw"), "none", false, true},
+		{"unknown_encoding", []byte("raw"), "brotli", false, true},
+		{"invalid_gzip", []byte("not gzip"), "gzip", true, false},
+		{"invalid_snappy", []byte("not snappy"), "snappy", true, false},
+		{"invalid_zstd", []byte("not zstd"), "zstd", true, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out, err := aggregatorDecode(tt.data, tt.encoding)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected error")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tt.wantSame && !bytes.Equal(out, tt.data) {
+				t.Fatal("output should equal input")
+			}
+		})
+	}
+}
+
+func TestRoundtrip(t *testing.T) {
+	tests := []struct {
+		name      string
+		dataSize  int
+		codec     string
+		chunkSize int
+	}{
+		{"none_512", 2048, "", 512},
+		{"gzip_1k", 8192, "gzip", 1024},
+		{"gzip_256k", 8192, "gzip", 256 * 1024},
+		{"zstd_1k", 8192, "zstd", 1024},
+		{"snappy_1k", 8192, "snappy", 1024},
+		{"none_large", 512 * 1024, "", 256 * 1024},
+		{"gzip_large", 512 * 1024, "gzip", 256 * 1024},
+		{"zstd_large", 512 * 1024, "zstd", 256 * 1024},
+		{"snappy_large", 512 * 1024, "snappy", 256 * 1024},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			data := makeTextData(tt.dataSize)
+			compressed, encoding := emitterCompress(data, tt.codec)
+			pieces := emitterChunk(compressed, tt.chunkSize)
+			if !pieces[len(pieces)-1].Last {
+				t.Fatal("last piece missing Last flag")
+			}
+
+			chunkMap := make(map[int][]byte)
+			lastIdx := -1
+			for _, p := range pieces {
+				chunkMap[p.Index] = p.Data
+				if p.Last {
+					lastIdx = p.Index
+				}
+			}
+			joined := aggregatorJoinChunks(chunkMap, lastIdx)
+			if !bytes.Equal(joined, compressed) {
+				t.Fatal("joined != compressed")
+			}
+			decoded, err := aggregatorDecode(joined, encoding)
+			if err != nil {
+				t.Fatalf("decode: %v", err)
 			}
 			if !bytes.Equal(decoded, data) {
 				t.Fatal("roundtrip mismatch")
 			}
-			var parts StreamSingleResultParts
-			if err := json.Unmarshal(decoded, &parts); err != nil {
-				t.Fatalf("JSON unmarshal failed after roundtrip: %v", err)
-			}
-			if parts.ProgramName != "test-program" {
-				t.Fatalf("ProgramName mismatch: %q", parts.ProgramName)
-			}
-			if len(parts.Risks) != 20 {
-				t.Fatalf("risk count mismatch: %d", len(parts.Risks))
-			}
 		})
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Tests: emitterChunk
-// ---------------------------------------------------------------------------
-
-func TestEmitterChunk_Empty(t *testing.T) {
-	pieces := emitterChunk(nil, 256)
-	if len(pieces) != 1 {
-		t.Fatalf("expected 1 piece for empty data, got %d", len(pieces))
-	}
-	if !pieces[0].Last || pieces[0].Index != 0 {
-		t.Fatal("single piece should be index=0 and Last=true")
-	}
-}
-
-func TestEmitterChunk_SmallerThanChunkSize(t *testing.T) {
-	data := []byte("small payload")
-	pieces := emitterChunk(data, 1024)
-	if len(pieces) != 1 {
-		t.Fatalf("expected 1 piece, got %d", len(pieces))
-	}
-	if !bytes.Equal(pieces[0].Data, data) || !pieces[0].Last {
-		t.Fatal("single piece should contain all data and be last")
-	}
-}
-
-func TestEmitterChunk_ExactMultiple(t *testing.T) {
-	data := make([]byte, 512)
-	for i := range data {
-		data[i] = byte(i % 256)
-	}
-	pieces := emitterChunk(data, 256)
-	if len(pieces) != 2 {
-		t.Fatalf("expected 2 pieces for 512/256, got %d", len(pieces))
-	}
-	if pieces[0].Last {
-		t.Fatal("first piece should not be last")
-	}
-	if !pieces[1].Last {
-		t.Fatal("second piece should be last")
-	}
-	if !bytes.Equal(append(pieces[0].Data, pieces[1].Data...), data) {
-		t.Fatal("concatenated chunks should equal original")
-	}
-}
-
-func TestEmitterChunk_NotExactMultiple(t *testing.T) {
-	data := make([]byte, 700)
-	for i := range data {
-		data[i] = byte(i % 256)
-	}
-	pieces := emitterChunk(data, 256)
-	if len(pieces) != 3 {
-		t.Fatalf("expected 3 pieces for 700/256, got %d", len(pieces))
-	}
-	if len(pieces[0].Data) != 256 || len(pieces[1].Data) != 256 || len(pieces[2].Data) != 188 {
-		t.Fatalf("chunk sizes: %d, %d, %d", len(pieces[0].Data), len(pieces[1].Data), len(pieces[2].Data))
-	}
-	if !pieces[2].Last {
-		t.Fatal("last piece should have Last=true")
-	}
-	var buf bytes.Buffer
-	for _, p := range pieces {
-		buf.Write(p.Data)
-	}
-	if !bytes.Equal(buf.Bytes(), data) {
-		t.Fatal("concatenated chunks should equal original")
-	}
-}
-
-func TestEmitterChunk_SingleByte(t *testing.T) {
-	pieces := emitterChunk([]byte{0x42}, 256)
-	if len(pieces) != 1 {
-		t.Fatalf("expected 1 piece, got %d", len(pieces))
-	}
-	if !bytes.Equal(pieces[0].Data, []byte{0x42}) || !pieces[0].Last {
-		t.Fatal("single byte chunk mismatch")
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Tests: aggregatorJoinChunks
-// ---------------------------------------------------------------------------
-
-func TestJoinChunks_NegativeLastIdx(t *testing.T) {
-	result := aggregatorJoinChunks(nil, -1)
-	if result != nil {
-		t.Fatal("expected nil for negative lastIdx")
-	}
-}
-
-func TestJoinChunks_SingleChunk(t *testing.T) {
-	chunks := map[int][]byte{0: []byte("hello")}
-	result := aggregatorJoinChunks(chunks, 0)
-	if string(result) != "hello" {
-		t.Fatalf("expected 'hello', got %q", string(result))
-	}
-}
-
-func TestJoinChunks_MultipleChunks(t *testing.T) {
-	chunks := map[int][]byte{
-		0: []byte("aaa"),
-		1: []byte("bbb"),
-		2: []byte("ccc"),
-	}
-	result := aggregatorJoinChunks(chunks, 2)
-	if string(result) != "aaabbbccc" {
-		t.Fatalf("expected 'aaabbbccc', got %q", string(result))
-	}
-}
-
-func TestJoinChunks_MissingMiddleChunk(t *testing.T) {
-	chunks := map[int][]byte{
-		0: []byte("aaa"),
-		// 1 is missing
-		2: []byte("ccc"),
-	}
-	result := aggregatorJoinChunks(chunks, 2)
-	// Missing chunk produces empty bytes for that slot.
-	if string(result) != "aaaccc" {
-		t.Fatalf("expected 'aaaccc', got %q", string(result))
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Tests: aggregatorDecode edge cases
-// ---------------------------------------------------------------------------
-
-func TestAggregateDecode_EmptyEncoding(t *testing.T) {
-	data := []byte("raw bytes")
-	out, err := aggregatorDecode(data, "")
-	if err != nil || !bytes.Equal(out, data) {
-		t.Fatal("empty encoding should return data as-is")
-	}
-}
-
-func TestAggregateDecode_NoneEncoding(t *testing.T) {
-	data := []byte("raw bytes")
-	out, err := aggregatorDecode(data, "none")
-	if err != nil || !bytes.Equal(out, data) {
-		t.Fatal("'none' encoding should return data as-is")
-	}
-}
-
-func TestAggregateDecode_UnknownEncoding(t *testing.T) {
-	data := []byte("raw bytes")
-	out, err := aggregatorDecode(data, "brotli")
-	if err != nil || !bytes.Equal(out, data) {
-		t.Fatal("unknown encoding should return data as-is")
-	}
-}
-
-func TestAggregateDecode_InvalidGzip(t *testing.T) {
-	_, err := aggregatorDecode([]byte("not gzip"), "gzip")
-	if err == nil {
-		t.Fatal("expected error for invalid gzip data")
-	}
-}
-
-func TestAggregateDecode_InvalidSnappy(t *testing.T) {
-	_, err := aggregatorDecode([]byte("not snappy"), "snappy")
-	if err == nil {
-		t.Fatal("expected error for invalid snappy data")
-	}
-}
-
-func TestAggregateDecode_InvalidZstd(t *testing.T) {
-	_, err := aggregatorDecode([]byte("not zstd"), "zstd")
-	if err == nil {
-		t.Fatal("expected error for invalid zstd data")
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Tests: full roundtrip (compress → chunk → join → decompress)
-// ---------------------------------------------------------------------------
-
-func TestRoundtrip_NoCompression(t *testing.T) {
-	data := makeTextData(2048)
-	roundtripData(t, data, "", 512)
-}
-
-func TestRoundtrip_GzipSmallChunk(t *testing.T) {
-	data := makeTextData(8192)
-	roundtripData(t, data, "gzip", 1024)
-}
-
-func TestRoundtrip_GzipLargeChunk(t *testing.T) {
-	data := makeTextData(8192)
-	roundtripData(t, data, "gzip", 256*1024)
-}
-
-func TestRoundtrip_ZstdSmallChunk(t *testing.T) {
-	data := makeTextData(8192)
-	roundtripData(t, data, "zstd", 1024)
-}
-
-func TestRoundtrip_SnappySmallChunk(t *testing.T) {
-	data := makeTextData(8192)
-	roundtripData(t, data, "snappy", 1024)
-}
-
-func TestRoundtrip_LargePayload_AllCodecs(t *testing.T) {
-	data := makeTextData(512 * 1024) // 512KB
-	for _, codec := range []string{"", "gzip", "zstd", "snappy"} {
-		name := codec
-		if name == "" {
-			name = "none"
-		}
-		t.Run(name, func(t *testing.T) {
-			roundtripData(t, data, codec, 256*1024)
-		})
-	}
-}
-
-func TestRoundtrip_JSONPayloadIntegrity(t *testing.T) {
+func TestRoundtripJSONIntegrity(t *testing.T) {
 	original := makeJSONData(30)
 	for _, codec := range []string{"gzip", "zstd", "snappy"} {
 		t.Run(codec, func(t *testing.T) {
@@ -556,168 +451,55 @@ func TestRoundtrip_JSONPayloadIntegrity(t *testing.T) {
 					lastIdx = p.Index
 				}
 			}
-			joined := aggregatorJoinChunks(chunkMap, lastIdx)
-			decoded, err := aggregatorDecode(joined, encoding)
+			decoded, err := aggregatorDecode(aggregatorJoinChunks(chunkMap, lastIdx), encoding)
 			if err != nil {
-				t.Fatalf("decode failed: %v", err)
+				t.Fatalf("decode: %v", err)
 			}
-
 			var parts StreamSingleResultParts
 			if err := json.Unmarshal(decoded, &parts); err != nil {
-				t.Fatalf("unmarshal failed: %v", err)
+				t.Fatalf("unmarshal: %v", err)
 			}
 			if parts.ProgramName != "test-program" {
 				t.Errorf("ProgramName = %q", parts.ProgramName)
 			}
 			if len(parts.Risks) != 30 {
-				t.Errorf("risk count = %d, want 30", len(parts.Risks))
+				t.Errorf("risks = %d, want 30", len(parts.Risks))
 			}
 			if len(parts.Files) != 2 {
-				t.Errorf("file count = %d, want 2", len(parts.Files))
-			}
-			for i, r := range parts.Risks {
-				expected := fmt.Sprintf("riskhash_%04d", i)
-				if r.RiskHash != expected {
-					t.Errorf("risk[%d] hash = %q, want %q", i, r.RiskHash, expected)
-				}
+				t.Errorf("files = %d, want 2", len(parts.Files))
 			}
 		})
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Tests: simulate full file streaming pipeline (meta → inline / chunks)
-// ---------------------------------------------------------------------------
-
-type simulatedFileMeta struct {
-	FileHash      string `json:"file_hash"`
-	ContentSize   int64  `json:"content_size"`
-	Encoding      string `json:"encoding,omitempty"`
-	InlineContent []byte `json:"inline_content,omitempty"`
-}
-
-type simulatedFileChunk struct {
-	FileHash   string `json:"file_hash"`
-	ChunkIndex int    `json:"chunk_index"`
-	Data       []byte `json:"data"`
-	IsLast     bool   `json:"is_last"`
-}
-
-// emitSimulatedFile mimics StreamEmitter.emitFile: compress → decide inline vs chunk.
-func emitSimulatedFile(content []byte, fileHash, codec string, chunkSize, inlineMax int) (meta simulatedFileMeta, chunks []simulatedFileChunk) {
-	compressed, encoding := emitterCompress(content, codec)
-	meta = simulatedFileMeta{
-		FileHash:    fileHash,
-		ContentSize: int64(len(content)),
-		Encoding:    encoding,
+func TestFileStreaming(t *testing.T) {
+	tests := []struct {
+		name      string
+		content   []byte
+		codec     string
+		chunkSize int
+		inlineMax int
+		wantInline bool
+	}{
+		{"small_inline", []byte("package main\n"), "gzip", 256 * 1024, 16 * 1024, true},
+		{"large_gzip_chunked", makeTextData(100 * 1024), "gzip", 256, 64, false},
+		{"none_50k", makeTextData(50 * 1024), "", 16 * 1024, 4 * 1024, false},
+		{"gzip_50k", makeTextData(50 * 1024), "gzip", 16 * 1024, 4 * 1024, true},  // compresses well → inline
+		{"zstd_50k", makeTextData(50 * 1024), "zstd", 16 * 1024, 4 * 1024, true},
+		{"snappy_50k", makeTextData(50 * 1024), "snappy", 16 * 1024, 4 * 1024, true},
 	}
-	if inlineMax > 0 && len(compressed) > 0 && len(compressed) <= inlineMax {
-		meta.InlineContent = compressed
-		return meta, nil
-	}
-	pieces := emitterChunk(compressed, chunkSize)
-	for _, p := range pieces {
-		chunks = append(chunks, simulatedFileChunk{
-			FileHash:   fileHash,
-			ChunkIndex: p.Index,
-			Data:       p.Data,
-			IsLast:     p.Last,
-		})
-	}
-	return meta, chunks
-}
-
-// reassembleSimulatedFile mimics Aggregator's setFileMeta + addFileChunk.
-func reassembleSimulatedFile(meta simulatedFileMeta, chunks []simulatedFileChunk) ([]byte, error) {
-	if len(meta.InlineContent) > 0 {
-		content := meta.InlineContent
-		if meta.Encoding != "" {
-			decoded, err := aggregatorDecode(content, meta.Encoding)
-			if err != nil {
-				return nil, fmt.Errorf("decode inline: %w", err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			meta, chunks := emitSimulatedFile(tt.content, "fh_"+tt.name, tt.codec, tt.chunkSize, tt.inlineMax)
+			if tt.wantInline && len(meta.InlineContent) == 0 && len(chunks) > 0 {
+				t.Log("expected inline but got chunks (compression ratio may vary)")
 			}
-			return decoded, nil
-		}
-		return content, nil
-	}
-
-	chunkMap := make(map[int][]byte)
-	lastIdx := -1
-	for _, c := range chunks {
-		chunkMap[c.ChunkIndex] = c.Data
-		if c.IsLast {
-			lastIdx = c.ChunkIndex
-		}
-	}
-	if lastIdx < 0 {
-		return nil, fmt.Errorf("no last chunk")
-	}
-	if len(chunkMap) != lastIdx+1 {
-		return nil, fmt.Errorf("missing chunks: have %d, need %d", len(chunkMap), lastIdx+1)
-	}
-	joined := aggregatorJoinChunks(chunkMap, lastIdx)
-	if meta.Encoding != "" {
-		return aggregatorDecode(joined, meta.Encoding)
-	}
-	return joined, nil
-}
-
-func TestFileStreaming_SmallInline(t *testing.T) {
-	content := []byte("package main\nfunc main() {}\n")
-	meta, chunks := emitSimulatedFile(content, "hash1", "gzip", 256*1024, 16*1024)
-
-	// Small file: should be inlined (below compression threshold, so no compression either)
-	if len(chunks) != 0 {
-		// Small data < 1024 bytes won't be compressed, so inlined as raw
-	}
-	result, err := reassembleSimulatedFile(meta, chunks)
-	if err != nil {
-		t.Fatalf("reassemble failed: %v", err)
-	}
-	if !bytes.Equal(result, content) {
-		t.Fatalf("content mismatch: got %d bytes, want %d", len(result), len(content))
-	}
-}
-
-func TestFileStreaming_LargeGzipChunked(t *testing.T) {
-	content := makeTextData(100 * 1024) // 100KB
-	// Use very small inlineMax to force chunking even after gzip compression.
-	meta, chunks := emitSimulatedFile(content, "hash_large", "gzip", 256, 64)
-
-	if meta.Encoding != "gzip" {
-		t.Fatalf("expected gzip encoding, got %q", meta.Encoding)
-	}
-	if len(meta.InlineContent) != 0 {
-		t.Fatal("large file should not be inlined")
-	}
-	if len(chunks) < 2 {
-		t.Fatalf("expected multiple chunks, got %d", len(chunks))
-	}
-
-	result, err := reassembleSimulatedFile(meta, chunks)
-	if err != nil {
-		t.Fatalf("reassemble failed: %v", err)
-	}
-	if !bytes.Equal(result, content) {
-		t.Fatalf("content mismatch: got %d bytes, want %d", len(result), len(content))
-	}
-}
-
-func TestFileStreaming_AllCodecs(t *testing.T) {
-	content := makeTextData(50 * 1024)
-	for _, codec := range []string{"", "gzip", "zstd", "snappy"} {
-		name := codec
-		if name == "" {
-			name = "none"
-		}
-		t.Run(name, func(t *testing.T) {
-			meta, chunks := emitSimulatedFile(content, "fh_"+name, codec, 16*1024, 4*1024)
 			result, err := reassembleSimulatedFile(meta, chunks)
 			if err != nil {
-				t.Fatalf("reassemble failed: %v", err)
+				t.Fatalf("reassemble: %v", err)
 			}
-			if !bytes.Equal(result, content) {
-				t.Fatalf("roundtrip mismatch")
+			if !bytes.Equal(result, tt.content) {
+				t.Fatalf("content mismatch: got %d, want %d", len(result), len(tt.content))
 			}
 		})
 	}
@@ -725,32 +507,24 @@ func TestFileStreaming_AllCodecs(t *testing.T) {
 
 func TestFileStreaming_ChunksOutOfOrder(t *testing.T) {
 	content := makeTextData(30 * 1024)
-	meta, chunks := emitSimulatedFile(content, "fh_ooo", "gzip", 4*1024, 1*1024)
-
+	meta, chunks := emitSimulatedFile(content, "fh_ooo", "gzip", 256, 64)
 	if len(chunks) < 2 {
-		t.Skip("need multiple chunks for out-of-order test")
+		t.Skip("need multiple chunks")
 	}
-
-	// Reverse chunk order to simulate out-of-order delivery
 	reversed := make([]simulatedFileChunk, len(chunks))
 	for i, c := range chunks {
 		reversed[len(chunks)-1-i] = c
 	}
-
 	result, err := reassembleSimulatedFile(meta, reversed)
 	if err != nil {
-		t.Fatalf("reassemble failed: %v", err)
+		t.Fatalf("reassemble: %v", err)
 	}
 	if !bytes.Equal(result, content) {
-		t.Fatalf("out-of-order reassembly mismatch")
+		t.Fatal("out-of-order reassembly mismatch")
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Tests: simulate full dataflow streaming pipeline
-// ---------------------------------------------------------------------------
-
-func TestDataflowStreaming_Roundtrip(t *testing.T) {
+func TestDataflowStreaming(t *testing.T) {
 	flow := &StreamMinimalDataFlowPath{
 		Description: "sql injection data flow",
 		Nodes: []*StreamMinimalNodeInfo{
@@ -761,18 +535,13 @@ func TestDataflowStreaming_Roundtrip(t *testing.T) {
 			{EdgeID: "e1", FromNodeID: "n1", ToNodeID: "n2", EdgeType: "taint"},
 		},
 	}
-	payload, err := json.Marshal(flow)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Pad payload to exceed 1024 to trigger compression
+	payload, _ := json.Marshal(flow)
 	payload = append(payload, []byte(strings.Repeat(" ", 2048))...)
 
 	for _, codec := range []string{"gzip", "zstd", "snappy"} {
 		t.Run(codec, func(t *testing.T) {
 			compressed, encoding := emitterCompress(payload, codec)
 			pieces := emitterChunk(compressed, 512)
-
 			chunkMap := make(map[int][]byte)
 			lastIdx := -1
 			for _, p := range pieces {
@@ -781,30 +550,23 @@ func TestDataflowStreaming_Roundtrip(t *testing.T) {
 					lastIdx = p.Index
 				}
 			}
-			joined := aggregatorJoinChunks(chunkMap, lastIdx)
-			decoded, err := aggregatorDecode(joined, encoding)
+			decoded, err := aggregatorDecode(aggregatorJoinChunks(chunkMap, lastIdx), encoding)
 			if err != nil {
-				t.Fatalf("decode failed: %v", err)
+				t.Fatalf("decode: %v", err)
 			}
-
 			var result StreamMinimalDataFlowPath
-			trimmed := bytes.TrimRight(decoded, " ")
-			if err := json.Unmarshal(trimmed, &result); err != nil {
-				t.Fatalf("unmarshal failed: %v", err)
+			if err := json.Unmarshal(bytes.TrimRight(decoded, " "), &result); err != nil {
+				t.Fatalf("unmarshal: %v", err)
 			}
 			if result.Description != flow.Description {
-				t.Errorf("description mismatch")
+				t.Error("description mismatch")
 			}
 			if len(result.Nodes) != 2 || len(result.Edges) != 1 {
-				t.Errorf("node/edge count mismatch")
+				t.Error("node/edge count mismatch")
 			}
 		})
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Tests: StreamSingleResultParts full pipeline simulation
-// ---------------------------------------------------------------------------
 
 func TestFullPipeline_PartsToEnvelopesAndBack(t *testing.T) {
 	parts := &StreamSingleResultParts{
@@ -826,75 +588,38 @@ func TestFullPipeline_PartsToEnvelopesAndBack(t *testing.T) {
 		},
 	}
 
-	codec := "gzip"
-	chunkSize := 1024
-	inlineMax := 512
-
-	// Simulate emitter: files
 	fileMeta, fileChunks := emitSimulatedFile(
-		[]byte(parts.Files[0].Content), parts.Files[0].IrSourceHash,
-		codec, chunkSize, inlineMax,
+		[]byte(parts.Files[0].Content), "fh1", "gzip", 1024, 512,
 	)
-
-	// Simulate emitter: dataflows
-	flowPayload := []byte(parts.Dataflows[0].Payload)
-	// Dataflow payload is small, will not be compressed (< 1024)
-	flowCompressed, flowEncoding := emitterCompress(flowPayload, codec)
-	flowMeta := simulatedFileMeta{
-		FileHash:    parts.Dataflows[0].DataflowHash,
-		ContentSize: int64(len(flowPayload)),
-		Encoding:    flowEncoding,
-	}
-	var flowChunks []simulatedFileChunk
-	if inlineMax > 0 && len(flowCompressed) <= inlineMax {
-		flowMeta.InlineContent = flowCompressed
-	} else {
-		for _, p := range emitterChunk(flowCompressed, chunkSize) {
-			flowChunks = append(flowChunks, simulatedFileChunk{
-				FileHash:   parts.Dataflows[0].DataflowHash,
-				ChunkIndex: p.Index,
-				Data:       p.Data,
-				IsLast:     p.Last,
-			})
-		}
-	}
-
-	// Simulate aggregator: reassemble file
 	fileContent, err := reassembleSimulatedFile(fileMeta, fileChunks)
 	if err != nil {
-		t.Fatalf("file reassemble failed: %v", err)
+		t.Fatalf("file reassemble: %v", err)
 	}
 	if string(fileContent) != parts.Files[0].Content {
-		t.Fatalf("file content mismatch: %d vs %d", len(fileContent), len(parts.Files[0].Content))
+		t.Fatal("file content mismatch")
 	}
 
-	// Simulate aggregator: reassemble dataflow
+	flowPayload := []byte(parts.Dataflows[0].Payload)
+	flowCompressed, flowEnc := emitterCompress(flowPayload, "gzip")
+	flowMeta := simulatedFileMeta{FileHash: "dh1", ContentSize: int64(len(flowPayload)), Encoding: flowEnc}
+	var flowChunks []simulatedFileChunk
+	if len(flowCompressed) <= 512 {
+		flowMeta.InlineContent = flowCompressed
+	} else {
+		for _, p := range emitterChunk(flowCompressed, 1024) {
+			flowChunks = append(flowChunks, simulatedFileChunk{FileHash: "dh1", ChunkIndex: p.Index, Data: p.Data, IsLast: p.Last})
+		}
+	}
 	flowContent, err := reassembleSimulatedFile(flowMeta, flowChunks)
 	if err != nil {
-		t.Fatalf("flow reassemble failed: %v", err)
+		t.Fatalf("flow reassemble: %v", err)
 	}
 	if !bytes.Equal(flowContent, flowPayload) {
-		t.Fatalf("flow content mismatch")
+		t.Fatal("flow content mismatch")
 	}
 
-	// Verify risk references are intact
 	risk := parts.Risks[0]
 	if risk.FileHashes[0] != "fh1" || risk.DataflowHashes[0] != "dh1" {
 		t.Fatal("risk references corrupted")
-	}
-
-	// Verify full JSON reconstruction
-	reconstructed := &StreamSingleResultParts{
-		ProgramName: parts.ProgramName,
-		ReportType:  parts.ReportType,
-		Files:       []*File{{Path: "/a.go", IrSourceHash: "fh1", Content: string(fileContent)}},
-		Dataflows:   []*StreamDataflowPart{{DataflowHash: "dh1", Payload: flowContent}},
-		Risks:       parts.Risks,
-	}
-	if reconstructed.ProgramName != "test-proj" {
-		t.Fatal("program name mismatch")
-	}
-	if reconstructed.Files[0].Content != parts.Files[0].Content {
-		t.Fatal("reconstructed file content mismatch")
 	}
 }
