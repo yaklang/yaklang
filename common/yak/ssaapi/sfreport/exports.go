@@ -25,6 +25,9 @@ var Exports = map[string]interface{}{
 	"ConvertSingleResultToStreamPayload": func(result *ssaapi.SyntaxFlowResult, streamKey string, reportType ReportType, showDataflow bool, showFileContent bool, withFile bool, dedupFileContent bool) (map[string]any, error) {
 		return ConvertSingleResultToStreamPayload(result, streamKey, reportType, showDataflow, showFileContent, withFile, dedupFileContent)
 	},
+	"ConvertSingleResultToStreamPartsPayload": func(result *ssaapi.SyntaxFlowResult, streamKey string, reportType ReportType, showDataflow bool, showFileContent bool, withFile bool, dedupFileContent bool, dedupDataflow bool) (map[string]any, error) {
+		return ConvertSingleResultToStreamPartsPayload(result, streamKey, reportType, showDataflow, showFileContent, withFile, dedupFileContent, dedupDataflow)
+	},
 	"ResetStreamFileDedup": ResetStreamFileDedup,
 
 	"ImportSSARiskFromJSON": ImportSSARiskFromJSON,

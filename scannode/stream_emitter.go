@@ -468,6 +468,137 @@ func (e *StreamEmitter) EmitSSAReportJSON(taskId, runtimeId, subTaskId, reportJS
 	return nil
 }
 
+// EmitSSATaskStart emits a task_start stream event.
+// Producer (yak script) is expected to call this once before sending file/dataflow/risk parts.
+func (e *StreamEmitter) EmitSSATaskStart(taskId, runtimeId, subTaskId, programName, reportType string) {
+	if !e.Enabled() || taskId == "" {
+		return
+	}
+	state := e.getTaskState(taskId)
+	state.lastActivity = time.Now()
+	state.emitStartOnce(e, taskId, runtimeId, subTaskId, programName, reportType)
+}
+
+// EmitSSAFile emits one file payload (deduped by ir_source_hash per task).
+func (e *StreamEmitter) EmitSSAFile(taskId, runtimeId, subTaskId string, file *sfreport.File) error {
+	if !e.Enabled() {
+		return nil
+	}
+	if file == nil {
+		return nil
+	}
+	fileHash := strings.TrimSpace(file.IrSourceHash)
+	if fileHash == "" {
+		return nil
+	}
+	state := e.getTaskState(taskId)
+	state.lastActivity = time.Now()
+	// Best-effort: if producer forgot to send task_start, keep pipeline moving.
+	state.emitStartOnce(e, taskId, runtimeId, subTaskId, "", "")
+	if !state.markFileSent(fileHash) {
+		return nil
+	}
+	e.emitFile(fileHash, file, taskId, runtimeId, subTaskId)
+	return nil
+}
+
+// EmitSSADataflow emits one dataflow payload (deduped by dataflow_hash per task).
+func (e *StreamEmitter) EmitSSADataflow(taskId, runtimeId, subTaskId string, flowHash string, payload []byte) error {
+	if !e.Enabled() {
+		return nil
+	}
+	flowHash = strings.TrimSpace(flowHash)
+	if flowHash == "" || len(payload) == 0 {
+		return nil
+	}
+	state := e.getTaskState(taskId)
+	state.lastActivity = time.Now()
+	// Best-effort: if producer forgot to send task_start, keep pipeline moving.
+	state.emitStartOnce(e, taskId, runtimeId, subTaskId, "", "")
+	if !state.markFlowSent(flowHash) {
+		return nil
+	}
+	e.emitDataflow(flowHash, payload, taskId, runtimeId, subTaskId)
+	return nil
+}
+
+// EmitSSARisk emits one risk payload. It should carry references to file/dataflow hashes.
+func (e *StreamEmitter) EmitSSARisk(taskId, runtimeId, subTaskId string, ev *spec.StreamRiskEvent) error {
+	if !e.Enabled() {
+		return nil
+	}
+	if ev == nil {
+		return nil
+	}
+	riskHash := strings.TrimSpace(ev.RiskHash)
+	riskJSON := ev.RiskJSON
+	if riskHash == "" && len(riskJSON) > 0 {
+		riskHash = strings.TrimSpace(gjson.GetBytes(riskJSON, "hash").String())
+	}
+	if riskHash == "" && len(riskJSON) > 0 {
+		riskHash = calcFallbackRiskHashFromFields(
+			gjson.GetBytes(riskJSON, "title").String(),
+			gjson.GetBytes(riskJSON, "code_source_url").String(),
+			gjson.GetBytes(riskJSON, "code_range").String(),
+			gjson.GetBytes(riskJSON, "program_name").String(),
+			gjson.GetBytes(riskJSON, "risk_type").String(),
+		)
+	}
+	if riskHash == "" || len(riskJSON) == 0 {
+		return nil
+	}
+	if e.dropInfo && strings.EqualFold(gjson.GetBytes(riskJSON, "severity").String(), "info") {
+		return nil
+	}
+	// Ensure hash field is present and data_flow_paths is not duplicated inside risk_json.
+	if v, err := sjson.DeleteBytes(riskJSON, "data_flow_paths"); err == nil {
+		riskJSON = v
+	}
+	if v, err := sjson.SetBytes(riskJSON, "hash", riskHash); err == nil {
+		riskJSON = v
+	}
+
+	programName := strings.TrimSpace(ev.ProgramName)
+	if programName == "" {
+		programName = strings.TrimSpace(gjson.GetBytes(riskJSON, "program_name").String())
+	}
+	reportType := strings.TrimSpace(ev.ReportType)
+
+	state := e.getTaskState(taskId)
+	state.lastActivity = time.Now()
+	state.emitStartOnce(e, taskId, runtimeId, subTaskId, programName, reportType)
+
+	out := &spec.StreamRiskEvent{
+		RiskHash:       riskHash,
+		ProgramName:    programName,
+		ReportType:     reportType,
+		RiskJSON:       riskJSON,
+		FileHashes:     ev.FileHashes,
+		DataflowHashes: ev.DataflowHashes,
+	}
+	e.emitEnvelope(taskId, runtimeId, subTaskId, spec.StreamEventRisk, out)
+
+	if e.mockRiskMultiplier > 1 {
+		for i := 1; i < e.mockRiskMultiplier; i++ {
+			mockHash := fmt.Sprintf("%s-mock-%d", riskHash, i)
+			mockJSON := riskJSON
+			if v, err := sjson.SetBytes(mockJSON, "hash", mockHash); err == nil {
+				mockJSON = v
+			}
+			mockEv := &spec.StreamRiskEvent{
+				RiskHash:       mockHash,
+				ProgramName:    programName,
+				ReportType:     reportType,
+				RiskJSON:       mockJSON,
+				FileHashes:     ev.FileHashes,
+				DataflowHashes: ev.DataflowHashes,
+			}
+			e.emitEnvelope(taskId, runtimeId, subTaskId, spec.StreamEventRisk, mockEv)
+		}
+	}
+	return nil
+}
+
 func calcFallbackRiskHashFromFields(title, codeSourceURL, codeRange, programName, riskType string) string {
 	return codec.Sha256(fmt.Sprintf("%s|%s|%s|%s|%s",
 		title,

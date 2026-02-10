@@ -249,7 +249,7 @@ alert $op for {
 
 	// check report.file
 	require.Equal(t, len(report.File), 1)
-	require.Equal(t, report.File[0].Path, "a.java")
+	require.Equal(t, report.File[0].Path, "/"+progName+"/a.java")
 
 	// check report.program
 	require.Equal(t, report.ProgramName, progName)

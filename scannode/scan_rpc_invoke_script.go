@@ -18,6 +18,7 @@ import (
 	"github.com/yaklang/yaklang/common/spec"
 	"github.com/yaklang/yaklang/common/synscan"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -217,6 +218,134 @@ func (s *ScanNode) createLogHandler(reporter *ScannerAgentReporter, res *scanrpc
 
 		case "feature-status-card-data":
 			s.handleStatusCardLog(reporter, info)
+
+		// SSA stream producer path (yak -> scannode -> mq -> legion).
+		// This avoids using risk.NewRisk(type=ssa-risk) as a transport hack, and removes the need
+		// for the "SSA Risk Chunk ..." first-layer chunking entirely.
+		case "ssa-stream-task-start":
+			s.handleSSAStreamTaskStart(reporter, info)
+		case "ssa-stream-file":
+			s.handleSSAStreamFile(reporter, info)
+		case "ssa-stream-dataflow":
+			s.handleSSAStreamDataflow(reporter, info)
+		case "ssa-stream-risk":
+			s.handleSSAStreamRisk(reporter, info)
+		case "ssa-stream-parts":
+			s.handleSSAStreamParts(reporter, info)
+		}
+	}
+}
+
+func (s *ScanNode) handleSSAStreamTaskStart(reporter *ScannerAgentReporter, info string) {
+	if reporter == nil || reporter.agent == nil || reporter.agent.streamer == nil || !reporter.agent.streamer.Enabled() {
+		return
+	}
+	var ev struct {
+		Program    string `json:"program"`
+		ReportType string `json:"report_type"`
+	}
+	if err := json.Unmarshal([]byte(info), &ev); err != nil {
+		log.Errorf("unmarshal ssa-stream-task-start failed: %v", err)
+		return
+	}
+	// Always send task_start with forced seq to preserve ordering.
+	reporter.agent.streamer.EmitSSATaskStart(reporter.TaskId, reporter.RuntimeId, reporter.SubTaskId, ev.Program, ev.ReportType)
+}
+
+func (s *ScanNode) handleSSAStreamFile(reporter *ScannerAgentReporter, info string) {
+	if reporter == nil || reporter.agent == nil || reporter.agent.streamer == nil || !reporter.agent.streamer.Enabled() {
+		return
+	}
+	var f sfreport.File
+	if err := json.Unmarshal([]byte(info), &f); err != nil {
+		log.Errorf("unmarshal ssa-stream-file failed: %v", err)
+		return
+	}
+	if strings.TrimSpace(f.IrSourceHash) == "" {
+		return
+	}
+	_ = reporter.agent.streamer.EmitSSAFile(reporter.TaskId, reporter.RuntimeId, reporter.SubTaskId, &f)
+}
+
+func (s *ScanNode) handleSSAStreamDataflow(reporter *ScannerAgentReporter, info string) {
+	if reporter == nil || reporter.agent == nil || reporter.agent.streamer == nil || !reporter.agent.streamer.Enabled() {
+		return
+	}
+	var ev struct {
+		DataflowHash string          `json:"dataflow_hash"`
+		Hash         string          `json:"hash"`
+		Payload      json.RawMessage `json:"payload"`
+	}
+	if err := json.Unmarshal([]byte(info), &ev); err != nil {
+		log.Errorf("unmarshal ssa-stream-dataflow failed: %v", err)
+		return
+	}
+	h := strings.TrimSpace(ev.DataflowHash)
+	if h == "" {
+		h = strings.TrimSpace(ev.Hash)
+	}
+	if h == "" || len(ev.Payload) == 0 {
+		return
+	}
+	_ = reporter.agent.streamer.EmitSSADataflow(reporter.TaskId, reporter.RuntimeId, reporter.SubTaskId, h, []byte(ev.Payload))
+}
+
+func (s *ScanNode) handleSSAStreamRisk(reporter *ScannerAgentReporter, info string) {
+	if reporter == nil || reporter.agent == nil || reporter.agent.streamer == nil || !reporter.agent.streamer.Enabled() {
+		return
+	}
+	var ev spec.StreamRiskEvent
+	if err := json.Unmarshal([]byte(info), &ev); err != nil {
+		log.Errorf("unmarshal ssa-stream-risk failed: %v", err)
+		return
+	}
+	if strings.TrimSpace(ev.RiskHash) == "" || len(ev.RiskJSON) == 0 {
+		return
+	}
+	_ = reporter.agent.streamer.EmitSSARisk(reporter.TaskId, reporter.RuntimeId, reporter.SubTaskId, &ev)
+}
+
+func (s *ScanNode) handleSSAStreamParts(reporter *ScannerAgentReporter, info string) {
+	if reporter == nil || reporter.agent == nil || reporter.agent.streamer == nil || !reporter.agent.streamer.Enabled() {
+		return
+	}
+	var parts sfreport.StreamSingleResultParts
+	if err := json.Unmarshal([]byte(info), &parts); err != nil {
+		log.Errorf("unmarshal ssa-stream-parts failed: %v", err)
+		return
+	}
+	reporter.agent.streamer.EmitSSATaskStart(reporter.TaskId, reporter.RuntimeId, reporter.SubTaskId, parts.ProgramName, parts.ReportType)
+
+	if len(parts.Files) > 0 {
+		for _, f := range parts.Files {
+			if f == nil {
+				continue
+			}
+			_ = reporter.agent.streamer.EmitSSAFile(reporter.TaskId, reporter.RuntimeId, reporter.SubTaskId, f)
+		}
+	}
+	if len(parts.Dataflows) > 0 {
+		for _, df := range parts.Dataflows {
+			if df == nil || strings.TrimSpace(df.DataflowHash) == "" || len(df.Payload) == 0 {
+				continue
+			}
+			_ = reporter.agent.streamer.EmitSSADataflow(reporter.TaskId, reporter.RuntimeId, reporter.SubTaskId, df.DataflowHash, []byte(df.Payload))
+		}
+	}
+	if len(parts.Risks) > 0 {
+		for _, r := range parts.Risks {
+			if r == nil || strings.TrimSpace(r.RiskHash) == "" || len(r.RiskJSON) == 0 {
+				continue
+			}
+			ev := &spec.StreamRiskEvent{
+				RiskHash:       r.RiskHash,
+				ProgramName:    parts.ProgramName,
+				ReportType:     parts.ReportType,
+				RiskJSON:       r.RiskJSON,
+				FileHashes:     r.FileHashes,
+				DataflowHashes: r.DataflowHashes,
+			}
+			_ = reporter.agent.streamer.EmitSSARisk(reporter.TaskId, reporter.RuntimeId, reporter.SubTaskId, ev)
 		}
 	}
 }
