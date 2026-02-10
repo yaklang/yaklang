@@ -78,7 +78,7 @@ func (g *Graph[K]) IsEmpty() bool {
 
 func ExportHNSWGraph[K cmp.Ordered](i *Graph[K]) (*Persistent[K], error) {
 	if i.IsEmpty() {
-		return nil, utils.Errorf("empty HNSW graph")
+		return nil, utils.Errorf("graph is nil")
 	}
 
 	keyType := ""
