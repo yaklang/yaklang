@@ -87,7 +87,8 @@ $template.ParseFiles().* as $tmpl
 $tmpl.Execute(* #-> as $target);
 $tmpl.ExecuteTemplate(*<slice(index=3)> #-> as $target);
 
-<include('golang-template-text')> as $temptext;
+template?{<fullTypeName>?{have: 'text/template'}} as $temptext;
+*temp*?{<fullTypeName>?{have: 'text/template'}} as $temptext;
 $temptext.New().Parse() as $target;
 $temptext.ParseFiles().* -> as $target;
 
