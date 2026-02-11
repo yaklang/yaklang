@@ -70,6 +70,7 @@ var ProfileTables = []interface{}{
 	&OpsUser{},       // for aibalance - operations users
 	&OpsActionLog{},  // for aibalance - operations action logs
 	&AIYakTool{},
+	&AISkill{}, // AI Skills for aiskillloader BM25 search
 
 	&Snippets{}, // Snippets
 	// SSA Projects Config Info

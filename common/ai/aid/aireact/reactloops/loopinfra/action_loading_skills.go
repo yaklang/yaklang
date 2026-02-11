@@ -33,11 +33,6 @@ var loopAction_LoadingSkills = &reactloops.LoopAction{
 			return utils.Error("skills context manager is not available")
 		}
 
-		loader := mgr.GetLoader()
-		if loader == nil {
-			return utils.Error("skill loader is not configured")
-		}
-
 		loop.Set("loading_skill_name", skillName)
 		return nil
 	},

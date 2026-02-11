@@ -23,15 +23,13 @@ type SkillLoader interface {
 	// Returns the fully loaded skill with metadata, filesystem, and content.
 	LoadSkill(name string) (*LoadedSkill, error)
 
-	// ListSkills returns metadata for all available skills.
-	ListSkills() ([]*SkillMeta, error)
-
-	// SearchSkills searches skills by keyword against name and description.
-	SearchSkills(query string) ([]*SkillMeta, error)
-
 	// GetFileSystem returns the read-only filesystem for a specific skill.
 	GetFileSystem(name string) (fi.FileSystem, error)
 
 	// HasSkills returns true if at least one skill is registered.
 	HasSkills() bool
+
+	// AllSkillMetas returns metadata for all available skills.
+	// It is a pure data accessor; filtering/searching should be handled by manager.
+	AllSkillMetas() []*SkillMeta
 }

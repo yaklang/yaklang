@@ -345,9 +345,8 @@ func TestFSSkillLoader_ConcurrentAccess(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_, _ = loader.ListSkills()
+			_ = loader.AllSkillMetas()
 			_, _ = loader.LoadSkill("deploy-app")
-			_, _ = loader.SearchSkills("deploy")
 			_ = loader.HasSkills()
 			_, _ = loader.GetFileSystem("deploy-app")
 		}()
