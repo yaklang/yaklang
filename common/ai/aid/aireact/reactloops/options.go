@@ -2,6 +2,7 @@ package reactloops
 
 import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -368,5 +369,50 @@ func WithVars(vars map[string]any) ReActLoopOption {
 		for key, value := range vars {
 			r.vars.Set(key, value)
 		}
+	}
+}
+
+// WithSkillLoader sets a SkillLoader and creates the SkillsContextManager.
+// The allowSkillLoading and allowSkillViewOffset getters are automatically
+// configured based on the SkillsContextManager state.
+func WithSkillLoader(loader aiskillloader.SkillLoader) ReActLoopOption {
+	return func(r *ReActLoop) {
+		mgr := aiskillloader.NewSkillsContextManager(loader)
+		r.skillsContextManager = mgr
+		r.allowSkillLoading = func() bool {
+			return mgr.HasRegisteredSkills()
+		}
+		r.allowSkillViewOffset = func() bool {
+			return mgr.HasTruncatedViews()
+		}
+	}
+}
+
+// WithSkillsContextManager sets the SkillsContextManager directly.
+func WithSkillsContextManager(mgr *aiskillloader.SkillsContextManager) ReActLoopOption {
+	return func(r *ReActLoop) {
+		r.skillsContextManager = mgr
+		if mgr != nil {
+			r.allowSkillLoading = func() bool {
+				return mgr.HasRegisteredSkills()
+			}
+			r.allowSkillViewOffset = func() bool {
+				return mgr.HasTruncatedViews()
+			}
+		}
+	}
+}
+
+// WithAllowSkillLoadingGetter sets a custom getter for the loading_skills action visibility.
+func WithAllowSkillLoadingGetter(fn func() bool) ReActLoopOption {
+	return func(r *ReActLoop) {
+		r.allowSkillLoading = fn
+	}
+}
+
+// WithAllowSkillViewOffsetGetter sets a custom getter for the change_skill_view_offset action visibility.
+func WithAllowSkillViewOffsetGetter(fn func() bool) ReActLoopOption {
+	return func(r *ReActLoop) {
+		r.allowSkillViewOffset = fn
 	}
 }

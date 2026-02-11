@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -53,12 +54,14 @@ type ReActLoop struct {
 	reflectionOutputExampleProvider ContextProviderFunc
 	reactiveDataBuilder             FeedbackProviderFunc
 
-	allowAIForge      func() bool
-	allowPlanAndExec  func() bool
-	allowRAG          func() bool
-	allowToolCall     func() bool
-	allowUserInteract func() bool
-	actionFilters     []func(action *LoopAction) bool
+	allowAIForge         func() bool
+	allowPlanAndExec     func() bool
+	allowRAG             func() bool
+	allowToolCall        func() bool
+	allowUserInteract    func() bool
+	allowSkillLoading    func() bool
+	allowSkillViewOffset func() bool
+	actionFilters        []func(action *LoopAction) bool
 
 	toolsGetter         func() []*aitool.Tool
 	loopPromptGenerator ReActLoopCoreGenerateCode
@@ -115,6 +118,9 @@ type ReActLoop struct {
 	initActionMustUse  []string // Actions that MUST be used (set by init)
 	initActionDisabled []string // Actions that are DISABLED (set by init)
 	initActionApplied  bool     // Whether the init constraints have been applied
+
+	// Skills context manager for on-demand skill loading
+	skillsContextManager *aiskillloader.SkillsContextManager
 }
 
 func (r *ReActLoop) PushSatisfactionRecord(satisfactory bool, reason string) {
@@ -243,6 +249,11 @@ func (r *ReActLoop) GetEnableSelfReflection() bool {
 	return r.enableSelfReflection
 }
 
+// GetSkillsContextManager returns the skills context manager, or nil if not configured.
+func (r *ReActLoop) GetSkillsContextManager() *aiskillloader.SkillsContextManager {
+	return r.skillsContextManager
+}
+
 func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReActLoopOption) (*ReActLoop, error) {
 	if utils.IsNil(invoker) {
 		return nil, utils.Error("invoker is nil in ReActLoop")
@@ -340,6 +351,20 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 			return nil, utils.Errorf("loop action %s not found", schema.AI_REACT_LOOP_ACTION_ASK_FOR_CLARIFICATION)
 		}
 		r.actions.Set(ac.ActionType, ac)
+	}
+
+	// Register skills actions conditionally
+	if r.skillsContextManager != nil {
+		if r.allowSkillLoading == nil || r.allowSkillLoading() {
+			if loadSkill, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_LOADING_SKILLS); ok {
+				r.actions.Set(loadSkill.ActionType, loadSkill)
+			}
+		}
+		if r.allowSkillViewOffset == nil || r.allowSkillViewOffset() {
+			if changeOffset, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_CHANGE_SKILL_VIEW_OFFSET); ok {
+				r.actions.Set(changeOffset.ActionType, changeOffset)
+			}
+		}
 	}
 
 	if r.emitter == nil {

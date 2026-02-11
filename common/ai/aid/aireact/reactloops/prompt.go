@@ -33,6 +33,14 @@ func (r *ReActLoop) generateSchemaString(disallowExit bool) (string, error) {
 		disableActionList = append(disableActionList, schema.AI_REACT_LOOP_ACTION_TOOL_COMPOSE)
 	}
 
+	// Skills conditional actions
+	if r.allowSkillLoading != nil && !r.allowSkillLoading() {
+		disableActionList = append(disableActionList, schema.AI_REACT_LOOP_ACTION_LOADING_SKILLS)
+	}
+	if r.allowSkillViewOffset != nil && !r.allowSkillViewOffset() {
+		disableActionList = append(disableActionList, schema.AI_REACT_LOOP_ACTION_CHANGE_SKILL_VIEW_OFFSET)
+	}
+
 	// Apply init handler action constraints (if not yet applied)
 	// These constraints are only applied once after init
 	if !r.initActionApplied && len(r.initActionDisabled) > 0 {
@@ -134,11 +142,18 @@ func (r *ReActLoop) generateLoopPrompt(
 		}
 	}
 
+	// Render skills context if the manager is available
+	var skillsContext string
+	if r.skillsContextManager != nil {
+		skillsContext = r.skillsContextManager.Render(nonce)
+	}
+
 	infos["InjectedMemory"] = memory
 	infos["ReactiveData"] = reactiveData
 	infos["Background"] = background
 	infos["PersistentContext"] = persistent
 	infos["OutputExample"] = outputExample
+	infos["SkillsContext"] = skillsContext
 	infos["Nonce"] = nonce
 	infos["UserQuery"] = userInput
 	infos["Schema"] = schema
