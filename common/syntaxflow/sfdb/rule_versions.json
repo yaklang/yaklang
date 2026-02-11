@@ -128,14 +128,14 @@
   {
     "rule_id": "017cae33-9b73-4470-9e98-adbdd10dbc3a",
     "rule_name": "检测Golang中使用Sprig的SSTI漏洞",
-    "hash": "0090bf0069967c98240ed9f8ceb9da07b2ff20e654d8071449f6b94f3dce7081",
-    "version": "20251230.0001"
+    "hash": "236a140f986489f25657d9a29cf3cc6399bedbfda6e7da315e92892cffd22f93",
+    "version": "20260211.0001"
   },
   {
     "rule_id": "215e8ad8-2977-4cd4-9446-d0040ffec286",
     "rule_name": "检测Golang服务器端模板注入漏洞",
-    "hash": "b6bfc4f04fb07c7b91a7d16eb728830053692512216245495c0e2cb1b89c5f5c",
-    "version": "20251230.0001"
+    "hash": "c202f8d4507c840398f25133f11dd60f771c3e2119b9109219ec0378a1ee1082",
+    "version": "20260211.0001"
   },
   {
     "rule_id": "4c742090-cd2c-456b-b8e5-4cb2740abbbd",
@@ -314,8 +314,8 @@
   {
     "rule_id": "f8fd1761-df87-496b-9aef-9a78b1566642",
     "rule_name": "检测到Golang模板引擎中的反射型XSS漏洞",
-    "hash": "3521c7dc9c11981baa58fbddb2730b3de65a66a7a8f5511ec9f94c36bc085dc1",
-    "version": "20251230.0001"
+    "hash": "a00928b4d45042ca0ee4e3142f077cbfb8a7d06a4c5c97b21a44393f5d4f26e8",
+    "version": "20260211.0001"
   },
   {
     "rule_id": "155bfb0e-379f-485a-a10c-cfec1109de1e",
@@ -392,8 +392,8 @@
   {
     "rule_id": "f1f1a062-fcba-4e12-bf59-64a3bf38269d",
     "rule_name": "检测Golang HTTP SSRF漏洞",
-    "hash": "198a335db070e0968da3a872e24005a04810023490b8ab4b0b5a4544444549fc",
-    "version": "20251230.0001"
+    "hash": "a3e2cd2bd0e0c14050bb532172fff0f50f72dccaf8e380c711fb49556cbb2034",
+    "version": "20260211.0001"
   },
   {
     "rule_id": "dc8b9d04-3d71-4ca3-9820-95d21c57b945",
@@ -453,18 +453,6 @@
     "rule_id": "4ba61a38-efec-4cf2-9d38-f77352e05185",
     "rule_name": "审计Golang os包使用",
     "hash": "01a0e84eaefe73d9fa8ff497d76bbfecb826fe6fc8d6b77eca98afb4d6ca02c5",
-    "version": "20251230.0001"
-  },
-  {
-    "rule_id": "d47f5ca9-7bab-441d-bc3b-8c642bac9e97",
-    "rule_name": "审计Golang html/template使用",
-    "hash": "0f8405020ef1963c4344e893d474108752a51aa44d38031a32e6e7cc0fcd4c95",
-    "version": "20251230.0001"
-  },
-  {
-    "rule_id": "79d5f8c5-1c60-445f-bd25-08de89391e6e",
-    "rule_name": "审计Golang text/template使用",
-    "hash": "8c2411c12422fb95cb738afa4030ce03c0cd8c2e63659f319f0e1ad2c04b50d7",
     "version": "20251230.0001"
   },
   {
