@@ -294,6 +294,7 @@ func createOverlayFromLayers(layers ...*Program) *ProgramOverLay {
 		return true
 	})
 
+	overlay.programName = layers[len(layers)-1].GetProgramName()
 	aggregatedFS, err := overlay.aggregateFileSystems()
 	if err != nil {
 		log.Errorf("failed to aggregate file systems: %v", err)
@@ -302,7 +303,11 @@ func createOverlayFromLayers(layers ...*Program) *ProgramOverLay {
 	}
 
 	for _, layer := range overlay.Layers {
-		if layer != nil {
+		if layer != nil && layer.Program != nil {
+			// 设置 overlay，这样 Value.ParentProgram.GetOverlay() 可以返回 overlay
+			if layer.Program.overlay == nil {
+				layer.Program.overlay = overlay
+			}
 			overlay.ensureLayerProgramLoaded(layer)
 		}
 	}
@@ -1154,7 +1159,6 @@ func (p *ProgramOverLay) queryMatch(
 
 					normalizedPath := removeProgramNamePrefix(filePath, layerProgramName)
 					normalizedPath = strings.TrimPrefix(normalizedPath, "/")
-
 					if p.isFileDeleted(normalizedPath, i) {
 						return nil
 					}
@@ -1214,7 +1218,7 @@ func (p *ProgramOverLay) GetCallActualParams(index int, contain bool) (sfvm.Valu
 }
 
 func (p *ProgramOverLay) GetFields() (sfvm.ValueOperator, error) {
-	return nil, utils.Error("ProgramOverLay does not support GetFields")
+	return sfvm.NewEmptyValues(), nil
 }
 
 func (p *ProgramOverLay) GetSyntaxFlowUse() (sfvm.ValueOperator, error) {

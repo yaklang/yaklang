@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
@@ -175,4 +176,58 @@ func LoadProgramRegexp(match string) []*Program {
 	}
 
 	return programs
+}
+
+// GetAggregatedFileSystemForProgramName 从 program name 获取聚合文件系统
+// 如果 program 是增量编译的（IsOverlay=true），返回聚合后的文件系统
+// 否则返回 nil
+// 这个函数专门用于 ssadb 包调用，避免循环导入
+func GetAggregatedFileSystemForProgramName(programName string) filesys_interface.FileSystem {
+	if programName == "" {
+		return nil
+	}
+
+	prog, err := FromDatabase(programName)
+	if err != nil {
+		log.Warnf("failed to load program %s from database: %v", programName, err)
+		return nil
+	}
+
+	if prog == nil {
+		return nil
+	}
+
+	overlay := prog.GetOverlay()
+	if overlay == nil {
+		return nil
+	}
+
+	return overlay.GetAggregatedFileSystem()
+}
+
+// NewProgramFromDB 从数据库加载程序，返回 SyntaxFlowQueryInstance 接口
+// 如果程序有 overlay（已保存的 overlay 或增量编译的 diff program），返回 *ProgramOverLay
+// 否则返回 *Program
+func NewProgramFromDB(programName string) (SyntaxFlowQueryInstance, error) {
+	program, err := FromDatabase(programName)
+	if err != nil {
+		return nil, err
+	}
+	if program == nil {
+		return nil, utils.Errorf("program %s is nil", programName)
+	}
+
+	// 如果程序有 overlay，返回 overlay
+	overlay := program.GetOverlay()
+	if overlay != nil {
+		return overlay, nil
+	}
+
+	// 否则返回 program
+	return program, nil
+}
+
+func init() {
+	// 注册函数到 ssadb 包，避免循环导入
+	ssadb.SetGetAggregatedFileSystemFunc(GetAggregatedFileSystemForProgramName)
 }

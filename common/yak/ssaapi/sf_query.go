@@ -18,6 +18,7 @@ import (
 
 type SyntaxFlowQueryInstance interface {
 	SyntaxFlowWithError(i string, opts ...QueryOption) (*SyntaxFlowResult, error)
+	SyntaxFlowRule(rule *schema.SyntaxFlowRule, opts ...QueryOption) (*SyntaxFlowResult, error)
 }
 
 var _ SyntaxFlowQueryInstance = (*Program)(nil)
@@ -209,7 +210,10 @@ type QueryOption func(*queryConfig)
 func QueryWithProgram(program *Program) QueryOption {
 	return func(c *queryConfig) {
 		c.program = program
-		c.value = program
+		// Only override c.value if it's not already a ProgramOverLay
+		if _, isOverlay := c.value.(*ProgramOverLay); !isOverlay {
+			c.value = program
+		}
 	}
 }
 
@@ -453,6 +457,23 @@ func (ps Programs) SyntaxFlowRule(rule *schema.SyntaxFlowRule, opts ...QueryOpti
 	return QuerySyntaxflow(opts...)
 }
 
+func (p *ProgramOverLay) SyntaxFlowRule(rule *schema.SyntaxFlowRule, opts ...QueryOption) (*SyntaxFlowResult, error) {
+	opts = append(opts,
+		QueryWithValue(p), QueryWithRule(rule),
+		QueryWithSFOption(
+			sfvm.WithRuntimeOption(WithProgramOverlay(p)),
+		),
+	)
+	// Explicitly set config.program to top layer's program for saving risks
+	if len(p.Layers) > 0 {
+		topLayer := p.Layers[len(p.Layers)-1]
+		if topLayer != nil && topLayer.Program != nil {
+			opts = append(opts, QueryWithProgram(topLayer.Program))
+		}
+	}
+	return QuerySyntaxflow(opts...)
+}
+
 func (p *ProgramOverLay) SyntaxFlowWithError(i string, opts ...QueryOption) (*SyntaxFlowResult, error) {
 	opts = append(opts,
 		QueryWithValue(p), QueryWithRuleContent(i),
@@ -460,5 +481,12 @@ func (p *ProgramOverLay) SyntaxFlowWithError(i string, opts ...QueryOption) (*Sy
 			sfvm.WithRuntimeOption(WithProgramOverlay(p)),
 		),
 	)
+	// Explicitly set config.program to top layer's program for saving risks
+	if len(p.Layers) > 0 {
+		topLayer := p.Layers[len(p.Layers)-1]
+		if topLayer != nil && topLayer.Program != nil {
+			opts = append(opts, QueryWithProgram(topLayer.Program))
+		}
+	}
 	return QuerySyntaxflow(opts...)
 }
