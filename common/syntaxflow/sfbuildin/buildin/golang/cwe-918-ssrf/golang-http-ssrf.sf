@@ -102,7 +102,13 @@ SOLUTION
 
 <include('golang-user-input')> as $input;
 
-http.Get(* #-> as $param);
+*.Do(<slice(index=0)>* as $client)
+*.Get(<slice(index=0)>* as $client)
+*.Post(<slice(index=0)>* as $client)
+
+$client?{* #{until: `*<fullTypeName()>?{have: "net/http/Client"}`}->} as $func
+
+$func.Get(* #-> as $param);
 
 $param #{
 	until: "* & $input" 

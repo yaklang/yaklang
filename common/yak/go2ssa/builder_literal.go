@@ -129,7 +129,9 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 			case *ssa.Blueprint: // 处理golang库
 				if bp, ok := ssa.ToClassBluePrintType(t); ok {
 					bp.Build()
-					typ = ssa.CreateAnyType()
+					newtyp := ssa.CreateAnyType()
+					newtyp.SetFullTypeNames(typ.GetFullTypeNames())
+					typ = newtyp
 					kvs = b.buildLiteralValue(s, true)
 				}
 			default:
@@ -154,6 +156,9 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 	typeHandler = func(typ ssa.Type, kvs []keyValue) ssa.Value {
 		var obj ssa.Value
 
+		if len(kvs) == 0 {
+			return getUndefinedObj()
+		}
 		switch typ.GetTypeKind() {
 		case ssa.SliceTypeKind, ssa.BytesTypeKind:
 			if len(kvs) == 0 {
@@ -164,7 +169,6 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 			if kvs[0].value != nil {
 				return kvs[0].value
 			}
-
 			objt := typ.(*ssa.ObjectType)
 			obj = b.InterfaceAddFieldBuild(len(kvs),
 				func(i int) ssa.Value {
@@ -244,7 +248,6 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 						})
 					return newObject
 				}
-
 				return kvs[0].value
 			}
 
@@ -269,9 +272,6 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 		case ssa.AnyTypeKind: // 对于未知类型，这里选择根据LiteralValue的特征来推测其类型
 			var objtyp ssa.Type
 
-			if len(kvs) == 0 {
-				return getUndefinedObj()
-			}
 			if kvs[0].value != nil {
 				return kvs[0].value
 			}
@@ -296,6 +296,8 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 			obj = getUndefinedObj()
 		case ssa.NumberTypeKind, ssa.StringTypeKind, ssa.BooleanTypeKind:
 			return kvs[0].value
+		case ssa.ClassBluePrintTypeKind:
+			obj = getUndefinedObj()
 		default:
 			if kvs[0].value != nil {
 				return kvs[0].value
@@ -308,7 +310,7 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 	}
 
 	rvalue := typeHandler(typ, kvs)
-	if o, ok := typ.(*ssa.ObjectType); ok {
+	if o, ok := ssa.ToObjectType(typ); ok {
 		// 非指针匿名结构体，需要创建对象
 		for n, a := range o.AnonymousField {
 			isFind := false
@@ -330,6 +332,8 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 		for n, f := range typ.GetMethod() {
 			bp.AddMethod(n, f)
 		}
+		rvalue.SetType(typ)
+	} else {
 		rvalue.SetType(typ)
 	}
 
@@ -861,6 +865,7 @@ func coverType(ityp, iwantTyp ssa.Type) {
 		// TODO: 匿名结构体可能是一个指针，修改时应该要连带父类一起修改
 		typ.AnonymousField[n] = a
 	}
+	ityp.SetFullTypeNames(iwantTyp.GetFullTypeNames())
 }
 
 func (b *astbuilder) GetDefaultValue(ityp ssa.Type) ssa.Value {
