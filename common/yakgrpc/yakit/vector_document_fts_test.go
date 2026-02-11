@@ -56,12 +56,12 @@ func TestSearchVectorStoreDocumentBM25_SQLiteFTS5(t *testing.T) {
 	require.NoError(t, db.Create(d1).Error)
 	require.NoError(t, db.Create(d2).Error)
 
-	got, err := SearchVectorStoreDocumentBM25(db, &VectorDocumentFilter{Keywords: "tcp"}, 10, 0)
+	got, err := SearchVectorStoreDocumentBM25(db, &VectorDocumentFilter{Keywords: []string{"tcp"}}, 10, 0)
 	require.NoError(t, err)
 	require.NotEmpty(t, got)
 	require.Equal(t, "doc1", got[0].DocumentID)
 
-	got, err = SearchVectorStoreDocumentBM25(db, &VectorDocumentFilter{Keywords: "yaklang"}, 10, 0)
+	got, err = SearchVectorStoreDocumentBM25(db, &VectorDocumentFilter{Keywords: []string{"yaklang"}}, 10, 0)
 	require.NoError(t, err)
 	require.NotEmpty(t, got)
 	require.Equal(t, "doc1", got[0].DocumentID)

@@ -384,7 +384,7 @@ func _dbQueryKnowledgeExists(keyword string, opts ...DBQueryOption) (*DBQueryKno
 
 	// 查询向量文档，使用 entry_id 作为搜索关键词
 	filter := &yakit.VectorDocumentFilter{
-		Keywords: entryID,
+		Keywords: []string{entryID},
 	}
 	if len(collectionUUIDs) > 0 {
 		filter.CollectionUUID = collectionUUIDs[0]
@@ -449,7 +449,7 @@ func _dbQueryCountVectorsByEntryID(entryID string, opts ...DBQueryOption) (int, 
 
 	// 查询向量文档
 	filter := &yakit.VectorDocumentFilter{
-		Keywords: entryID,
+		Keywords: []string{entryID},
 	}
 	if len(collectionUUIDs) > 0 {
 		filter.CollectionUUID = collectionUUIDs[0]
@@ -768,7 +768,7 @@ func _dbQueryVectorDocument(keyword string, opts ...DBQueryOption) ([]*schema.Ve
 
 	// 使用 yakit 的过滤器和 yield 函数
 	filter := &yakit.VectorDocumentFilter{
-		Keywords: keyword,
+		Keywords: []string{keyword},
 	}
 
 	// 如果指定了集合，只查询第一个集合（后续可以扩展支持多个）

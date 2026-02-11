@@ -199,7 +199,7 @@ func FastIntentMatch(r aicommon.AIInvokeRuntime, input string) *FastMatchResult 
 	if db != nil {
 		// Search AIYakTool via BM25 (FTS5 trigram with LIKE fallback for short queries)
 		tools, err := yakit.SearchAIYakToolBM25(db, &yakit.AIYakToolFilter{
-			Keywords: trimmed,
+			Keywords: []string{trimmed},
 		}, 5, 0)
 		if err != nil {
 			log.Warnf("fast intent match: BM25 tool search failed: %v", err)
@@ -210,7 +210,7 @@ func FastIntentMatch(r aicommon.AIInvokeRuntime, input string) *FastMatchResult 
 
 		// Search AIForge via BM25 (FTS5 trigram with LIKE fallback for short queries)
 		forges, err := yakit.SearchAIForgeBM25(db, &yakit.AIForgeSearchFilter{
-			Keywords: trimmed,
+			Keywords: []string{trimmed},
 		}, 5, 0)
 		if err != nil {
 			log.Warnf("fast intent match: BM25 forge search failed: %v", err)

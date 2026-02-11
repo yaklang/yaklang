@@ -89,19 +89,20 @@ err := bizhelper.SQLiteFTS5Setup(db, cfg)
 ### 5) BM25 + MATCH 搜索（返回原表结构体）
 
 ```go
-rows, err := bizhelper.SQLiteFTS5BM25Match[YourModel](db, cfg, "query", 20, 0)
+rows, err := bizhelper.SQLiteFTS5BM25Match[YourModel](db, cfg, []string{"query"}, 20, 0)
 ```
 
 - 使用 `JOIN <FTSTable> ON <FTSTable>.rowid = <BaseTable>.<RowIDColumn>`
 - 使用 `WHERE <FTSTable> MATCH ?`
 - 使用 `ORDER BY bm25(<FTSTable>)`
 - 返回 `[]YourModel`（即原表结构体切片）
+- **多关键词默认 OR**：传 `matches []string`，内部用 `OR` 连接（例如：`[]string{"yaklang","fts5"}` → `(yaklang) OR (fts5)`）。如需 AND/短语/字段查询，请把完整 FTS5 表达式作为**单个** query string 传入（例如：`[]string{` + "`yaklang AND fts5`" + `}`、`[]string{` + "`\"hello world\"`" + `}`、`[]string{` + "`title:yaklang`" + `}`）。
 
 也可使用扫描到任意容器（例如 `[]struct`）的版本：
 
 ```go
 var out []YourModel
-err := bizhelper.SQLiteFTS5BM25MatchInto(db, cfg, "query", &out, 20, 0)
+err := bizhelper.SQLiteFTS5BM25MatchInto(db, cfg, []string{"query"}, &out, 20, 0)
 ```
 
 #### 保留原表过滤（重要）
@@ -110,7 +111,7 @@ err := bizhelper.SQLiteFTS5BM25MatchInto(db, cfg, "query", &out, 20, 0)
 
 ```go
 filtered := db.Model(&schema.Doc{}).Where("collection_uuid = ?", uuid)
-rows, err := bizhelper.SQLiteFTS5BM25Match[schema.Doc](filtered, cfg, "yaklang", 50, 0)
+rows, err := bizhelper.SQLiteFTS5BM25Match[schema.Doc](filtered, cfg, []string{"yaklang"}, 50, 0)
 ```
 
 > 注意：当你自己写 `Where("content LIKE ?")` 之类条件时，如果 join 后出现字段歧义，请显式写表前缀或用别名（例如：`rag_vector_document_v1.content`）。
@@ -122,7 +123,7 @@ ch := bizhelper.SQLiteFTS5BM25MatchYield[schema.Doc](
   ctx,
   db.Model(&schema.Doc{}).Where("collection_uuid = ?", uuid),
   cfg,
-  "yaklang",
+  []string{"yaklang"},
   bizhelper.WithYieldModel_PageSize(100),
   bizhelper.WithYieldModel_Limit(1000),
 )
@@ -159,7 +160,7 @@ if err := bizhelper.SQLiteFTS5Setup(db, cfg); err != nil {
   return err
 }
 
-docs, err := bizhelper.SQLiteFTS5BM25Match[schema.Doc](db, cfg, `yaklang`, 50, 0)
+docs, err := bizhelper.SQLiteFTS5BM25Match[schema.Doc](db, cfg, []string{`yaklang`}, 50, 0)
 ```
 
 ## 单例默认配置（推荐用法）
@@ -174,7 +175,7 @@ var DefaultDocFTS5 = &bizhelper.SQLiteFTS5Config{
 }
 
 _ = bizhelper.SQLiteFTS5Setup(db, DefaultDocFTS5)
-docs, _ := bizhelper.SQLiteFTS5BM25Match[schema.Doc](db, DefaultDocFTS5, `yaklang`, 50, 0)
+docs, _ := bizhelper.SQLiteFTS5BM25Match[schema.Doc](db, DefaultDocFTS5, []string{`yaklang`}, 50, 0)
 ```
 
 如果某次调用需要临时覆盖（不修改默认配置），可以额外传入 options（可选）：
@@ -183,7 +184,7 @@ docs, _ := bizhelper.SQLiteFTS5BM25Match[schema.Doc](db, DefaultDocFTS5, `yaklan
 docs, _ := bizhelper.SQLiteFTS5BM25Match[schema.Doc](
   db,
   DefaultDocFTS5,
-  `yaklang`,
+  []string{`yaklang`},
   50,
   0,
   bizhelper.WithSQLiteFTS5FTSTable("docs_fts_shadow"),

@@ -41,7 +41,7 @@ func TestSearchAIYakToolBM25_SQLiteFTS5(t *testing.T) {
 		Content:     "print('ok')",
 	}).Error)
 
-	got, err := SearchAIYakToolBM25(db, &AIYakToolFilter{Keywords: "tcp"}, 10, 0)
+	got, err := SearchAIYakToolBM25(db, &AIYakToolFilter{Keywords: []string{"tcp"}}, 10, 0)
 	require.NoError(t, err)
 	require.NotEmpty(t, got)
 	require.Equal(t, "tcp_scan", got[0].Name)

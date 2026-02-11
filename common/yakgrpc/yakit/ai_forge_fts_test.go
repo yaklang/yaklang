@@ -48,7 +48,7 @@ func TestSearchAIForgeBM25_SQLiteFTS5(t *testing.T) {
 	}).Error)
 
 	t.Run("BM25 search for vulnerability", func(t *testing.T) {
-		got, err := SearchAIForgeBM25(db, &AIForgeSearchFilter{Keywords: "vulnerability"}, 10, 0)
+		got, err := SearchAIForgeBM25(db, &AIForgeSearchFilter{Keywords: []string{"vulnerability"}}, 10, 0)
 		require.NoError(t, err)
 		require.NotEmpty(t, got)
 		// vuln_analyzer should rank highest as its name and description contain "vulnerability"
@@ -56,14 +56,14 @@ func TestSearchAIForgeBM25_SQLiteFTS5(t *testing.T) {
 	})
 
 	t.Run("BM25 search for report", func(t *testing.T) {
-		got, err := SearchAIForgeBM25(db, &AIForgeSearchFilter{Keywords: "report"}, 10, 0)
+		got, err := SearchAIForgeBM25(db, &AIForgeSearchFilter{Keywords: []string{"report"}}, 10, 0)
 		require.NoError(t, err)
 		require.NotEmpty(t, got)
 		require.Equal(t, "report_gen", got[0].ForgeName)
 	})
 
 	t.Run("BM25 search for code review", func(t *testing.T) {
-		got, err := SearchAIForgeBM25(db, &AIForgeSearchFilter{Keywords: "code review"}, 10, 0)
+		got, err := SearchAIForgeBM25(db, &AIForgeSearchFilter{Keywords: []string{"code", "review"}}, 10, 0)
 		require.NoError(t, err)
 		require.NotEmpty(t, got)
 		// code_reviewer should match both "code" and "review"
@@ -78,7 +78,7 @@ func TestSearchAIForgeBM25_SQLiteFTS5(t *testing.T) {
 	})
 
 	t.Run("BM25 search for security returns multiple", func(t *testing.T) {
-		got, err := SearchAIForgeBM25(db, &AIForgeSearchFilter{Keywords: "security"}, 10, 0)
+		got, err := SearchAIForgeBM25(db, &AIForgeSearchFilter{Keywords: []string{"security"}}, 10, 0)
 		require.NoError(t, err)
 		// "security" appears in vuln_analyzer (description, keywords), code_reviewer (description, keywords, tags),
 		// and report_gen (description)
@@ -87,7 +87,7 @@ func TestSearchAIForgeBM25_SQLiteFTS5(t *testing.T) {
 
 	t.Run("short query LIKE fallback", func(t *testing.T) {
 		// "vu" is < 3 bytes, should use LIKE fallback instead of FTS5
-		got, err := SearchAIForgeBM25(db, &AIForgeSearchFilter{Keywords: "vu"}, 10, 0)
+		got, err := SearchAIForgeBM25(db, &AIForgeSearchFilter{Keywords: []string{"vu"}}, 10, 0)
 		require.NoError(t, err)
 		// LIKE search should still find forges with "vu" substring
 		// (e.g. "vuln_analyzer" contains "vu")
@@ -95,13 +95,13 @@ func TestSearchAIForgeBM25_SQLiteFTS5(t *testing.T) {
 	})
 
 	t.Run("empty query returns empty", func(t *testing.T) {
-		got, err := SearchAIForgeBM25(db, &AIForgeSearchFilter{Keywords: ""}, 10, 0)
+		got, err := SearchAIForgeBM25(db, &AIForgeSearchFilter{Keywords: []string{}}, 10, 0)
 		require.NoError(t, err)
 		require.Empty(t, got)
 	})
 
 	t.Run("no match returns empty", func(t *testing.T) {
-		got, err := SearchAIForgeBM25(db, &AIForgeSearchFilter{Keywords: "zzzznonexistent"}, 10, 0)
+		got, err := SearchAIForgeBM25(db, &AIForgeSearchFilter{Keywords: []string{"zzzznonexistent"}}, 10, 0)
 		require.NoError(t, err)
 		require.Empty(t, got)
 	})
@@ -109,7 +109,7 @@ func TestSearchAIForgeBM25_SQLiteFTS5(t *testing.T) {
 	t.Run("filter by forge names", func(t *testing.T) {
 		got, err := SearchAIForgeBM25(db, &AIForgeSearchFilter{
 			ForgeNames: []string{"report_gen"},
-			Keywords:   "report",
+			Keywords:   []string{"report"},
 		}, 10, 0)
 		require.NoError(t, err)
 		require.NotEmpty(t, got)
@@ -156,7 +156,7 @@ func TestFilterAIForgeForSearch(t *testing.T) {
 	t.Run("keyword LIKE search", func(t *testing.T) {
 		var results []*schema.AIForge
 		err := FilterAIForgeForSearch(db, &AIForgeSearchFilter{
-			Keywords: "keyword",
+			Keywords: []string{"keyword"},
 		}).Find(&results).Error
 		require.NoError(t, err)
 		require.NotEmpty(t, results)
