@@ -375,9 +375,9 @@ func WithVars(vars map[string]any) ReActLoopOption {
 // WithSkillLoader sets a SkillLoader and creates the SkillsContextManager.
 // The allowSkillLoading and allowSkillViewOffset getters are automatically
 // configured based on the SkillsContextManager state.
-func WithSkillLoader(loader aiskillloader.SkillLoader) ReActLoopOption {
+func WithSkillLoader(loader aiskillloader.SkillLoader, managerOpts ...aiskillloader.ManagerOption) ReActLoopOption {
 	return func(r *ReActLoop) {
-		mgr := aiskillloader.NewSkillsContextManager(loader)
+		mgr := aiskillloader.NewSkillsContextManager(loader, managerOpts...)
 		r.skillsContextManager = mgr
 		r.allowSkillLoading = func() bool {
 			return mgr.HasRegisteredSkills()

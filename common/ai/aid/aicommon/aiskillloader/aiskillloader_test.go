@@ -142,10 +142,7 @@ func TestFSSkillLoader_LoadFromVirtualFS(t *testing.T) {
 		t.Fatal("loader should have skills")
 	}
 
-	skills, err := loader.ListSkills()
-	if err != nil {
-		t.Fatalf("ListSkills failed: %v", err)
-	}
+	skills := loader.AllSkillMetas()
 	if len(skills) != 2 {
 		t.Fatalf("expected 2 skills, got %d", len(skills))
 	}
@@ -186,15 +183,16 @@ func TestFSSkillLoader_LoadSkill_NotFound(t *testing.T) {
 	}
 }
 
-func TestFSSkillLoader_SearchSkills(t *testing.T) {
+func TestSkillsContextManager_SearchSkills(t *testing.T) {
 	vfs := buildTestVFS()
 	loader, err := NewFSSkillLoader(vfs)
 	if err != nil {
 		t.Fatalf("NewFSSkillLoader failed: %v", err)
 	}
+	mgr := NewSkillsContextManager(loader)
 
 	// Search by name
-	results, err := loader.SearchSkills("deploy")
+	results, err := mgr.SearchSkills("deploy")
 	if err != nil {
 		t.Fatalf("SearchSkills failed: %v", err)
 	}
@@ -206,7 +204,7 @@ func TestFSSkillLoader_SearchSkills(t *testing.T) {
 	}
 
 	// Search by description
-	results, err = loader.SearchSkills("code review")
+	results, err = mgr.SearchSkills("code review")
 	if err != nil {
 		t.Fatalf("SearchSkills failed: %v", err)
 	}
@@ -215,7 +213,7 @@ func TestFSSkillLoader_SearchSkills(t *testing.T) {
 	}
 
 	// Search with no match
-	results, err = loader.SearchSkills("zzzzz")
+	results, err = mgr.SearchSkills("zzzzz")
 	if err != nil {
 		t.Fatalf("SearchSkills failed: %v", err)
 	}
@@ -282,10 +280,7 @@ func TestFSSkillLoader_EmptyVFS(t *testing.T) {
 	if loader.HasSkills() {
 		t.Fatal("empty VFS should have no skills")
 	}
-	skills, err := loader.ListSkills()
-	if err != nil {
-		t.Fatalf("ListSkills failed: %v", err)
-	}
+	skills := loader.AllSkillMetas()
 	if len(skills) != 0 {
 		t.Fatalf("expected 0 skills, got %d", len(skills))
 	}

@@ -2,7 +2,6 @@ package aiskillloader
 
 import (
 	"io/fs"
-	"strings"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -111,8 +110,8 @@ func (l *FSSkillLoader) LoadSkill(name string) (*LoadedSkill, error) {
 	}, nil
 }
 
-// ListSkills returns metadata for all available skills.
-func (l *FSSkillLoader) ListSkills() ([]*SkillMeta, error) {
+// AllSkillMetas returns metadata for all available skills.
+func (l *FSSkillLoader) AllSkillMetas() []*SkillMeta {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
 
@@ -120,24 +119,7 @@ func (l *FSSkillLoader) ListSkills() ([]*SkillMeta, error) {
 	for _, entry := range l.skills {
 		result = append(result, entry.meta)
 	}
-	return result, nil
-}
-
-// SearchSkills searches skills by keyword against name and description.
-func (l *FSSkillLoader) SearchSkills(query string) ([]*SkillMeta, error) {
-	l.mu.RLock()
-	defer l.mu.RUnlock()
-
-	query = strings.ToLower(query)
-	var result []*SkillMeta
-	for _, entry := range l.skills {
-		nameMatch := strings.Contains(strings.ToLower(entry.meta.Name), query)
-		descMatch := strings.Contains(strings.ToLower(entry.meta.Description), query)
-		if nameMatch || descMatch {
-			result = append(result, entry.meta)
-		}
-	}
-	return result, nil
+	return result
 }
 
 // GetFileSystem returns the read-only filesystem for a specific skill.
