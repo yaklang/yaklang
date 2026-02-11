@@ -33,6 +33,9 @@ func init() {
 	aispec.Register("openai", func() aispec.AIClient {
 		return &openai.GatewayClient{}
 	})
+	aispec.Register("custom", func() aispec.AIClient {
+		return &openai.GatewayClient{}
+	})
 	aispec.Register("chatglm", func() aispec.AIClient {
 		return &chatglm.GLMClient{}
 	})
