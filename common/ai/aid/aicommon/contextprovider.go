@@ -25,6 +25,7 @@ const (
 	CONTEXT_PROVIDER_TYPE_KNOWLEDGE_BASE = "knowledge_base"
 	CONTEXT_PROVIDER_TYPE_AITOOL         = "aitool"
 	CONTEXT_PROVIDER_TYPE_AIFORGE        = "aiforge"
+	CONTEXT_PROVIDER_TYPE_AISKILL        = "aiskill"
 
 	CONTEXT_PROVIDER_KEY_FILE_PATH    = "file_path"
 	CONTEXT_PROVIDER_KEY_FILE_CONTENT = "file_content"
@@ -284,6 +285,22 @@ func AIForgeContextProvider(aiforgeName string, userPrompt ...string) ContextPro
 	}
 }
 
+// AISkillContextProvider returns a ContextProvider that displays skill metadata.
+// It loads skill information by name and presents it to the AI for reference.
+func AISkillContextProvider(skillName string, userPrompt ...string) ContextProvider {
+	return func(config AICallerConfigIf, emitter *Emitter, key string) (string, error) {
+		baseInfo := fmt.Sprintf("User Prompt: %s\n============== AI Skill Info ==============\nName: %s\n", strings.Join(userPrompt, " "), skillName)
+
+		var infoBuffer bytes.Buffer
+		infoBuffer.WriteString(baseInfo)
+		infoBuffer.WriteString("\n============== Important Instructions ==============\n")
+		infoBuffer.WriteString(fmt.Sprintf("The user has specified to use AI Skill '%s'.\n", skillName))
+		infoBuffer.WriteString("Use the 'loading_skills' action to load this skill into the context window.\n")
+		infoBuffer.WriteString("Once loaded, the skill's SKILL.md content and file tree will be available for reference.\n")
+		return infoBuffer.String(), nil
+	}
+}
+
 func NewContextProvider(typ string, key string, value string, userPrompt ...string) ContextProvider {
 	return func(config AICallerConfigIf, emitter *Emitter, providerKey string) (string, error) {
 		// 构建基本信息（即使出错也要包含）
@@ -324,6 +341,13 @@ func NewContextProvider(typ string, key string, value string, userPrompt ...stri
 				return AIForgeContextProvider(value, userPrompt...)(config, emitter, providerKey)
 			default:
 				return baseInfo + fmt.Sprintf("[Error: unknown aiforge context provider key: %s]", key), utils.Errorf("unknown aiforge context provider key: %s (type: %s, value: %s)", key, typ, value)
+			}
+		case CONTEXT_PROVIDER_TYPE_AISKILL:
+			switch key {
+			case CONTEXT_PROVIDER_KEY_NAME:
+				return AISkillContextProvider(value, userPrompt...)(config, emitter, providerKey)
+			default:
+				return baseInfo + fmt.Sprintf("[Error: unknown aiskill context provider key: %s]", key), utils.Errorf("unknown aiskill context provider key: %s (type: %s, value: %s)", key, typ, value)
 			}
 		}
 		return baseInfo + fmt.Sprintf("[Error: unknown context provider type: %s]", typ), utils.Errorf("unknown context provider type: %s (key: %s, value: %s)", typ, key, value)
