@@ -54,11 +54,14 @@ type ReActLoop struct {
 	reflectionOutputExampleProvider ContextProviderFunc
 	reactiveDataBuilder             FeedbackProviderFunc
 
-	allowAIForge         func() bool
-	allowPlanAndExec     func() bool
-	allowRAG             func() bool
-	allowToolCall        func() bool
-	allowUserInteract    func() bool
+	allowAIForge      func() bool
+	allowPlanAndExec  func() bool
+	allowRAG          func() bool
+	allowToolCall     func() bool
+	allowUserInteract func() bool
+
+	// allowSkill... are the internal getter for the skills context manager
+	// don't use them directly, use GetSkillsContextManager() instead
 	allowSkillLoading    func() bool
 	allowSkillViewOffset func() bool
 	actionFilters        []func(action *LoopAction) bool

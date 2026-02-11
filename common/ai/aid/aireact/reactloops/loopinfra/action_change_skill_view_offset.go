@@ -44,8 +44,7 @@ var loopAction_ChangeSkillViewOffset = &reactloops.LoopAction{
 		}
 
 		offsetRaw := action.GetString("offset")
-		offset := utils.Atoi(offsetRaw)
-		if offset < 1 {
+		if utils.InterfaceToInt(offsetRaw) < 1 {
 			return utils.Error("change_skill_view_offset action requires 'offset' to be a positive integer")
 		}
 
@@ -58,7 +57,7 @@ var loopAction_ChangeSkillViewOffset = &reactloops.LoopAction{
 		skillName := loop.Get("skill_view_offset_name")
 		filePath := loop.Get("skill_view_offset_file")
 		offsetStr := loop.Get("skill_view_offset_value")
-		offset := utils.Atoi(offsetStr)
+		offset := utils.InterfaceToInt(offsetStr)
 
 		if skillName == "" {
 			op.Fail("change_skill_view_offset action: skill_name is empty")

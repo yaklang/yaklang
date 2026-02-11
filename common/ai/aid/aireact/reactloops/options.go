@@ -403,16 +403,3 @@ func WithSkillsContextManager(mgr *aiskillloader.SkillsContextManager) ReActLoop
 	}
 }
 
-// WithAllowSkillLoadingGetter sets a custom getter for the loading_skills action visibility.
-func WithAllowSkillLoadingGetter(fn func() bool) ReActLoopOption {
-	return func(r *ReActLoop) {
-		r.allowSkillLoading = fn
-	}
-}
-
-// WithAllowSkillViewOffsetGetter sets a custom getter for the change_skill_view_offset action visibility.
-func WithAllowSkillViewOffsetGetter(fn func() bool) ReActLoopOption {
-	return func(r *ReActLoop) {
-		r.allowSkillViewOffset = fn
-	}
-}
