@@ -38,7 +38,7 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 
 	toolOpts := []aitool.ToolOption{
 		aitool.WithStringParam("search_query",
-			aitool.WithParam_Description("搜索关键词，从用户输入中提取核心动作词和领域术语。/ Keywords to search for relevant capabilities."),
+			aitool.WithParam_Description("搜索关键词，从用户输入中提取核心动作词和领域术语 ,空格分割。/ Keywords to search for relevant capabilities, split by space."),
 			aitool.WithParam_Required(true),
 		),
 	}
@@ -73,7 +73,7 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 			if db != nil {
 				loop.LoadingStatus("Start to load bm25+keyword search results for tools and AI forges... / 开始加载工具和AI蓝图的BM25+关键词搜索结果...")
 				tools, err := yakit.SearchAIYakToolBM25(db, &yakit.AIYakToolFilter{
-					Keywords: []string{query},
+					Keywords: strings.Split(query, " "),
 				}, 10, 0)
 				if err != nil {
 					log.Warnf("intent loop: BM25 tool search failed: %v", err)
