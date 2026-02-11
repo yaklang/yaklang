@@ -172,6 +172,20 @@ func WithScanConcurrency(concurrency uint32) Option {
 	}
 }
 
+// WithScanConcurrencyDefault sets scan concurrency only when the caller didn't explicitly set it.
+// This is used by high-level helpers (like syntaxflow_scan.StartScan) to avoid overriding user input.
+func WithScanConcurrencyDefault(concurrency uint32) Option {
+	return func(c *Config) error {
+		if err := c.ensureSyntaxFlowScan("Scan Concurrency Default"); err != nil {
+			return err
+		}
+		if c.SyntaxFlowScan.Concurrency <= 0 {
+			c.SyntaxFlowScan.Concurrency = concurrency
+		}
+		return nil
+	}
+}
+
 // WithScanIgnoreLanguage 设置忽略语言
 func WithScanIgnoreLanguage(ignoreLanguage bool) Option {
 	return func(c *Config) error {

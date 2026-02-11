@@ -42,6 +42,9 @@ const (
 	ScanResult_Process ScanResultType = "process"
 
 	ScanResult_StatusCard ScanResultType = "status"
+
+	// 分层流式传输事件
+	ScanResult_StreamEvent ScanResultType = "stream-event"
 )
 
 type ScanResult struct {

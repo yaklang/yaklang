@@ -81,8 +81,8 @@ func SyncRuleFromFileSystem(fsInstance filesys_interface.FileSystem, buildin boo
 			tags = append(tags, block)
 		}
 		content := string(raw)
-		// import builtin rule
-		_, err = sfdb.ImportRuleWithoutValid(name, content, buildin, tags...)
+		// import builtin rule (传递文件路径用于元数据增强)
+		_, err = sfdb.ImportRuleWithoutValidEx(name, content, s, buildin, tags...)
 		if err != nil {
 			log.Warnf("import rule %s error: %s", name, err)
 			return err

@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"sync/atomic"
 
 	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
@@ -17,11 +18,14 @@ import (
 	"github.com/yaklang/yaklang/common/spec"
 	"github.com/yaklang/yaklang/common/synscan"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"github.com/yaklang/yaklang/scannode/scanrpc"
 )
+
+var riskDebugCount int32
 
 func (s *ScanNode) rpc_startScript(ctx context.Context, node string, req *scanrpc.SCAN_StartScriptRequest, broker *mq.Broker) (*scanrpc.SCAN_StartScriptResponse, error) {
 	if req.Content == "" {
@@ -107,6 +111,18 @@ func (s *ScanNode) rpc_invokeScript(ctx context.Context, node string, req *scanr
 		return nil, utils.Errorf("exec yakScript %v failed: %s", scriptFile, err)
 	}
 
+	// If stream-layered SSA events were emitted, send a final task_end marker after the script truly finishes.
+	// This allows the server to finalize without relying on idle timeouts, while preserving audit completeness.
+	if s.streamer != nil && s.streamer.Enabled() {
+		var totalRisks, totalFiles, totalFlows int64
+		if m, ok := res.Data.(map[string]interface{}); ok && m != nil {
+			totalRisks = int64(utils.InterfaceToFloat64(utils.MapGetFirstRaw(m, "risk_count", "riskCount", "RiskCount")))
+			totalFiles = int64(utils.InterfaceToFloat64(utils.MapGetFirstRaw(m, "file_count", "fileCount", "FileCount")))
+			totalFlows = int64(utils.InterfaceToFloat64(utils.MapGetFirstRaw(m, "flow_count", "flowCount", "FlowCount")))
+		}
+		s.streamer.EmitTaskEnd(req.TaskId, req.RuntimeId, req.SubTaskId, totalRisks, totalFiles, totalFlows)
+	}
+
 	return res, nil
 }
 
@@ -134,7 +150,15 @@ func (s *ScanNode) createYakitServer(reporter *ScannerAgentReporter, res *scanrp
 	return yaklib.NewYakitServer(
 		0,
 		yaklib.SetYakitServer_ProgressHandler(func(id string, progress float64) {
-			reporter.ReportProcess(progress)
+			// Scripts and libraries may emit multiple progress streams via SetProgressEx(id, progress).
+			// If we treat all of them as the "main" progress, a non-main stream that restarts from 0
+			// will shrink the frontend progress bar (e.g. around phase transitions).
+			id = strings.TrimSpace(id)
+			if id == "" || id == "main" {
+				_ = reporter.ReportProcess(progress)
+				return
+			}
+			_ = reporter.ReportProcessWithSubTask(id, progress)
 		}),
 		yaklib.SetYakitServer_LogHandler(s.createLogHandler(reporter, res)),
 	)
@@ -143,13 +167,15 @@ func (s *ScanNode) createYakitServer(reporter *ScannerAgentReporter, res *scanrp
 // createLogHandler creates a log handler for processing various types of scan results
 func (s *ScanNode) createLogHandler(reporter *ScannerAgentReporter, res *scanrpc.SCAN_InvokeScriptResponse) func(string, string) {
 	return func(level string, info string) {
+		level = strings.TrimSpace(level)
+		lowerLevel := strings.ToLower(level)
 		shrink := info
 		if len(info) > 256 {
 			shrink = string([]rune(info)[:100]) + "..."
 		}
 		log.Infof("LEVEL: %v INFO: %v", level, shrink)
 
-		switch strings.ToLower(level) {
+		switch lowerLevel {
 		case "fingerprint":
 			s.handleFingerprintLog(reporter, info)
 
@@ -167,7 +193,56 @@ func (s *ScanNode) createLogHandler(reporter *ScannerAgentReporter, res *scanrpc
 
 		case "feature-status-card-data":
 			s.handleStatusCardLog(reporter, info)
+
+		// SSA stream producer path (yak -> scannode -> mq -> legion).
+		// This avoids using risk.NewRisk(type=ssa-risk) as a transport hack.
+		case "ssa-stream":
+			s.handleSSAStream(reporter, info)
 		}
+	}
+}
+
+func (s *ScanNode) handleSSAStream(reporter *ScannerAgentReporter, info string) {
+	if reporter == nil || reporter.agent == nil || reporter.agent.streamer == nil || !reporter.agent.streamer.Enabled() {
+		return
+	}
+	// info is expected to be a raw JSON string of StreamSingleResultParts.
+	raw := strings.TrimSpace(info)
+	if raw == "" {
+		return
+	}
+	var parts sfreport.StreamSingleResultParts
+	if err := json.Unmarshal([]byte(raw), &parts); err != nil {
+		log.Errorf("unmarshal ssa-stream failed: %v", err)
+		return
+	}
+	reporter.agent.streamer.EmitSSATaskStart(reporter.TaskId, reporter.RuntimeId, reporter.SubTaskId, parts.ProgramName, parts.ReportType)
+
+	for _, f := range parts.Files {
+		if f == nil {
+			continue
+		}
+		_ = reporter.agent.streamer.EmitSSAFile(reporter.TaskId, reporter.RuntimeId, reporter.SubTaskId, f)
+	}
+	for _, df := range parts.Dataflows {
+		if df == nil || strings.TrimSpace(df.DataflowHash) == "" || len(df.Payload) == 0 {
+			continue
+		}
+		_ = reporter.agent.streamer.EmitSSADataflow(reporter.TaskId, reporter.RuntimeId, reporter.SubTaskId, df.DataflowHash, []byte(df.Payload))
+	}
+	for _, r := range parts.Risks {
+		if r == nil || strings.TrimSpace(r.RiskHash) == "" || len(r.RiskJSON) == 0 {
+			continue
+		}
+		ev := &spec.StreamRiskEvent{
+			RiskHash:       r.RiskHash,
+			ProgramName:    parts.ProgramName,
+			ReportType:     parts.ReportType,
+			RiskJSON:       r.RiskJSON,
+			FileHashes:     r.FileHashes,
+			DataflowHashes: r.DataflowHashes,
+		}
+		_ = reporter.agent.streamer.EmitSSARisk(reporter.TaskId, reporter.RuntimeId, reporter.SubTaskId, ev)
 	}
 }
 
@@ -197,6 +272,14 @@ func (s *ScanNode) handleRiskLog(reporter *ScannerAgentReporter, info string) {
 	if err := json.Unmarshal([]byte(info), &rawData); err != nil {
 		log.Errorf("unmarshal risk failed: %s", err)
 		return
+	}
+	if atomic.AddInt32(&riskDebugCount, 1) <= 1 {
+		keys := make([]string, 0, len(rawData))
+		for k := range rawData {
+			keys = append(keys, k)
+		}
+		detailRaw := utils.MapGetFirstRaw(rawData, "Details", "Detail", "details", "detail")
+		log.Infof("risk_log_debug keys=%v RiskType=%v DetailsType=%T DetailsLen=%d", keys, rawData["RiskType"], detailRaw, len(utils.InterfaceToString(detailRaw)))
 	}
 
 	// Extract risk title with fallback

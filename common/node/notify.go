@@ -24,6 +24,21 @@ func (n *NodeBase) Notify(key string, msg *spec.Message) {
 	}
 }
 
+func (n *NodeBase) NotifyScanner(msg *spec.Message) {
+	body, err := json.Marshal(msg)
+	if err != nil {
+		log.Error("marshal [%v] failed: %v", spew.Sdump(msg), err)
+		return
+	}
+	err = n.publisher.PublishTo("palm-backend-scanner", "server.backend.scanner", amqp.Publishing{
+		Body: body,
+	})
+	if err != nil {
+		log.Errorf("publish palm-backend-scanner failed: %v", err)
+		return
+	}
+}
+
 func (n *NodeBase) NotifyHeartbeat(key string, msg *spec.Message) {
 	body, err := json.Marshal(msg)
 	if err != nil {

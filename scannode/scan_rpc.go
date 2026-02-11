@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -251,10 +252,15 @@ func (s *ScanNode) feedback(result *spec.ScanResult) {
 		return
 	}
 	msg.Content = raw
+	atomic.AddUint64(&s.feedbackCount, 1)
+	atomic.AddUint64(&s.feedbackBytes, uint64(len(raw)))
+	s.recordTaskStat(result.TaskId, len(raw))
+	if result.Type == spec.ScanResult_Vuln {
+		atomic.AddUint64(&s.feedbackVulnCount, 1)
+		atomic.AddUint64(&s.feedbackVulnBytes, uint64(len(raw)))
+		s.recordTaskVuln(result.TaskId, len(raw))
+	}
 
 	log.Infof("scanner feedback data: %v", msg.Type)
-	s.node.Notify(
-		spec.BackendKey_Scanner,
-		msg,
-	)
+	s.node.NotifyScanner(msg)
 }

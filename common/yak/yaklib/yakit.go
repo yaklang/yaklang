@@ -193,6 +193,14 @@ func GetExtYakitLibByClient(client *YakitClient) map[string]interface{} {
 		"SetProgress":   client.YakitSetProgress,
 		"SetProgressEx": client.YakitSetProgressEx,
 		"Stream":        client.Stream,
+		// SSA stream events: a dedicated channel that ScanNode can hook to, avoiding
+		// "risk.NewRisk(type=ssa-risk)" as a transport hack.
+		//
+		// Expect raw JSON string of sfreport.StreamSingleResultParts.
+		// Keep it as "raw JSON" to avoid extra marshal/unmarshal cycles in yak runtime.
+		"SSAStream": func(partsJSON string) {
+			_ = client.YakitLog("ssa-stream", partsJSON)
+		},
 	}
 	if os.Getenv("YAK_DISABLE") == "output" {
 		// YakitExports["Info"] = func(a string, b ...interface{}) {}

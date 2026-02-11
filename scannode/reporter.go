@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
 
 	"github.com/davecgh/go-spew/spew"
@@ -23,6 +24,8 @@ type ScannerAgentReporter struct {
 
 	agent *ScanNode
 }
+
+var streamDebugCount int32
 
 // convertRawToString 将原始数据转换为字符串，处理 JSON 反序列化后的各种数据格式
 func convertRawToString(raw interface{}) string {
@@ -146,7 +149,52 @@ func (r *ScannerAgentReporter) ReportRisk(
 		TargetType: VulnTargetType_Risk,
 		Plugin:     strings.Join(append([]string{"risk"}, tags...), "/"),
 	}
-	if v, ok := details.(map[string]interface{}); ok {
+	var detailsMap map[string]interface{}
+	switch t := details.(type) {
+	case map[string]interface{}:
+		detailsMap = t
+	case string:
+		rawStr := strings.TrimSpace(t)
+		if rawStr != "" {
+			if strings.HasPrefix(rawStr, "\"") && strings.HasSuffix(rawStr, "\"") {
+				if unq, err := strconv.Unquote(rawStr); err == nil {
+					rawStr = unq
+				}
+			}
+			_ = json.Unmarshal([]byte(rawStr), &detailsMap)
+		}
+	case []byte:
+		rawStr := strings.TrimSpace(string(t))
+		if rawStr != "" {
+			_ = json.Unmarshal([]byte(rawStr), &detailsMap)
+		}
+	case json.RawMessage:
+		rawStr := strings.TrimSpace(string(t))
+		if rawStr != "" {
+			_ = json.Unmarshal([]byte(rawStr), &detailsMap)
+		}
+	}
+
+	if v := detailsMap; v != nil {
+		detailRaw := utils.MapGetFirstRaw(v, "Details", "Detail", "details", "detail")
+		var lib map[string]interface{}
+		switch t := detailRaw.(type) {
+		case map[string]interface{}:
+			lib = t
+		case string:
+			if t != "" {
+				rawStr := t
+				if strings.HasPrefix(rawStr, "\"") && strings.HasSuffix(rawStr, "\"") {
+					if unq, err := strconv.Unquote(rawStr); err == nil {
+						rawStr = unq
+					}
+				}
+				_ = json.Unmarshal([]byte(rawStr), &lib)
+			}
+		}
+		if lib == nil {
+			lib = make(map[string]interface{})
+		}
 		if ip := net.ParseIP(utils.FixForParseIP(utils.MapGetString(v, "IP"))); ip != nil {
 			vul.IPAddr = ip.String()
 			if i, err := utils.IPv4ToUint32(ip.To4()); err == nil {
@@ -159,9 +207,6 @@ func (r *ScannerAgentReporter) ReportRisk(
 		vul.Hash = utils.MapGetString(v, "Hash")
 		vul.FromThreatAnalysisRuntimeId = utils.MapGetString(v, "RuntimeId")
 		vul.FromThreatAnalysisTaskId = r.TaskId
-		Details := utils.MapGetString(v, "Details")
-		var lib map[string]interface{}
-		_ = json.Unmarshal([]byte(Details), &lib)
 		vul.Detail = postgres.Jsonb{RawMessage: utils.Jsonify(lib)}
 		vul.Payload = utils.MapGetString(v, "Payload")
 		vul.RiskTypeVerbose = utils.MapGetString(v, "RiskTypeVerbose")
@@ -270,6 +315,24 @@ func (r *ScannerAgentReporter) ReportProcess(process float64) error {
 	res.RuntimeId = r.RuntimeId
 	res.TaskId = r.TaskId
 	res.SubTaskId = r.SubTaskId
+	r.agent.feedback(res)
+	return nil
+}
+
+// ReportProcessWithSubTask reports a progress update under a different subtask id.
+// This is useful when the script emits multiple progress streams via SetProgressEx(id, ...):
+// we don't want non-"main" progress resets to shrink the overall progress in the UI.
+func (r *ScannerAgentReporter) ReportProcessWithSubTask(subTaskId string, process float64) error {
+	if strings.TrimSpace(subTaskId) == "" {
+		return r.ReportProcess(process)
+	}
+	res, err := spec.NewScanProcessResult(process)
+	if err != nil {
+		return err
+	}
+	res.RuntimeId = r.RuntimeId
+	res.TaskId = r.TaskId
+	res.SubTaskId = subTaskId
 	r.agent.feedback(res)
 	return nil
 }

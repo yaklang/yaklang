@@ -3,6 +3,9 @@ package scannode
 import (
 	"context"
 	"encoding/json"
+	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mq"
@@ -17,6 +20,17 @@ type ScanNode struct {
 	helper   *scanrpc.SCANServerHelper
 	manager  *TaskManager
 	serverIp string
+
+	streamer *StreamEmitter
+
+	feedbackCount uint64
+	feedbackBytes uint64
+
+	feedbackVulnCount uint64
+	feedbackVulnBytes uint64
+
+	perTaskStats sync.Map
+	perTaskVuln  sync.Map
 }
 
 type WebServerConfig struct {
@@ -71,8 +85,98 @@ func NewScanNodeWithAMQPUrl(id, serverPort string, amqpUrl string, serverIp stri
 			}
 		},
 	)
+	agent.startFeedbackStats()
 	node.initScanRPC()
+	node.streamer = NewStreamEmitter(node)
 	return node, nil
+}
+
+func (s *ScanNode) startFeedbackStats() {
+	ticker := time.NewTicker(1 * time.Second)
+	go func() {
+		for range ticker.C {
+			cnt := atomic.SwapUint64(&s.feedbackCount, 0)
+			b := atomic.SwapUint64(&s.feedbackBytes, 0)
+			vulnCnt := atomic.SwapUint64(&s.feedbackVulnCount, 0)
+			vulnBytes := atomic.SwapUint64(&s.feedbackVulnBytes, 0)
+			if cnt > 0 || b > 0 {
+				log.Infof("scanner_feedback_metrics ts=%d tps=%d bytes_per_sec=%d", time.Now().Unix(), cnt, b)
+			}
+			if vulnCnt > 0 || vulnBytes > 0 {
+				log.Infof("scanner_feedback_vuln_metrics ts=%d tps=%d bytes_per_sec=%d", time.Now().Unix(), vulnCnt, vulnBytes)
+			}
+			s.flushPerTaskStats()
+			s.flushPerTaskVuln()
+		}
+	}()
+}
+
+type feedbackStat struct {
+	count    uint64
+	bytes    uint64
+	lastSeen int64
+}
+
+func (s *ScanNode) recordTaskStat(taskID string, size int) {
+	if taskID == "" {
+		return
+	}
+	now := time.Now().Unix()
+	v, _ := s.perTaskStats.LoadOrStore(taskID, &feedbackStat{})
+	stat := v.(*feedbackStat)
+	atomic.AddUint64(&stat.count, 1)
+	atomic.AddUint64(&stat.bytes, uint64(size))
+	atomic.StoreInt64(&stat.lastSeen, now)
+}
+
+func (s *ScanNode) recordTaskVuln(taskID string, size int) {
+	if taskID == "" {
+		return
+	}
+	now := time.Now().Unix()
+	v, _ := s.perTaskVuln.LoadOrStore(taskID, &feedbackStat{})
+	stat := v.(*feedbackStat)
+	atomic.AddUint64(&stat.count, 1)
+	atomic.AddUint64(&stat.bytes, uint64(size))
+	atomic.StoreInt64(&stat.lastSeen, now)
+}
+
+func (s *ScanNode) flushPerTaskStats() {
+	now := time.Now().Unix()
+	s.perTaskStats.Range(func(key, value any) bool {
+		taskID := key.(string)
+		stat := value.(*feedbackStat)
+		cnt := atomic.SwapUint64(&stat.count, 0)
+		b := atomic.SwapUint64(&stat.bytes, 0)
+		last := atomic.LoadInt64(&stat.lastSeen)
+		if cnt > 0 || b > 0 {
+			log.Infof("scanner_feedback_metrics task=%s ts=%d tps=%d bytes_per_sec=%d", taskID, now, cnt, b)
+			return true
+		}
+		if last > 0 && now-last > 60 {
+			s.perTaskStats.Delete(taskID)
+		}
+		return true
+	})
+}
+
+func (s *ScanNode) flushPerTaskVuln() {
+	now := time.Now().Unix()
+	s.perTaskVuln.Range(func(key, value any) bool {
+		taskID := key.(string)
+		stat := value.(*feedbackStat)
+		cnt := atomic.SwapUint64(&stat.count, 0)
+		b := atomic.SwapUint64(&stat.bytes, 0)
+		last := atomic.LoadInt64(&stat.lastSeen)
+		if cnt > 0 || b > 0 {
+			log.Infof("scanner_feedback_vuln_metrics task=%s ts=%d tps=%d bytes_per_sec=%d", taskID, now, cnt, b)
+			return true
+		}
+		if last > 0 && now-last > 60 {
+			s.perTaskVuln.Delete(taskID)
+		}
+		return true
+	})
 }
 
 func NewScanNode(id, serverPort string, amqpConfig *spec.AMQPConfig) (*ScanNode, error) {
