@@ -357,9 +357,18 @@ func (v *Frame) AutoConvertReflectValueByType(
 		if srcKind == reflect.Slice || srcKind == reflect.Array {
 			resValRef := reflect.MakeSlice(targetType, reflectValue.Len(), reflectValue.Len())
 			reflectValueRef := reflect.ValueOf(reflectValue.Interface())
+			elemType := targetType.Elem()
 			for i := 0; i < reflectValueRef.Len(); i++ {
 				val := reflectValueRef.Index(i)
-				err := v.AutoConvertReflectValueByType(&val, targetType)
+				// unwrap interface element to get the underlying value
+				if val.Kind() == reflect.Interface {
+					if val.IsNil() {
+						val = reflect.Zero(elemType)
+					} else {
+						val = val.Elem()
+					}
+				}
+				err := v.AutoConvertReflectValueByType(&val, elemType)
 				if err != nil {
 					return err
 				}
