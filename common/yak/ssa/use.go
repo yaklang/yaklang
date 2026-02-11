@@ -39,12 +39,20 @@ func ReplaceValue(v Value, to Value, skip func(Instruction) bool) {
 			continue
 		}
 
-		// 对于 Phi 节点，先检查它是否真的使用 v
-		// 如果 v 不在 Phi 的 Edge 中，说明这个 Phi 已经不再使用 v（可能因为之前的优化）
+		// 对于实现了 HasValues() 的指令，先检查它是否真的使用 v
+		// 如果 v 不在 GetValues() 中，说明这个指令已经不再使用 v（可能因为之前的优化）
 		// 这种情况下应该跳过，并从 user 列表中移除
-		if phi, ok := ToPhi(user); ok {
-			if !slices.Contains(phi.Edge, v.GetId()) {
-				// Phi 节点不再使用 v，记录为无效 user
+		if user.HasValues() {
+			values := user.GetValues()
+			found := false
+			for _, val := range values {
+				if val.GetId() == v.GetId() {
+					found = true
+					break
+				}
+			}
+			if !found {
+				// 指令不再使用 v，记录为无效 user
 				invalidUsers = append(invalidUsers, user)
 				continue
 			}
@@ -57,6 +65,7 @@ func ReplaceValue(v Value, to Value, skip func(Instruction) bool) {
 	}
 	// 移除不再使用 v 的无效 users
 	for _, invalidUser := range invalidUsers {
+		log.Debugf("removing invalid user: value %s (id=%d) is no longer used by user %s (id=%d)", v.GetVerboseName(), v.GetId(), invalidUser.GetVerboseName(), invalidUser.GetId())
 		v.RemoveUser(invalidUser)
 	}
 	for _, user := range deleteInst {
