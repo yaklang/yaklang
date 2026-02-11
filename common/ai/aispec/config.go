@@ -219,7 +219,7 @@ func WithContext(ctx context.Context) AIConfigOption {
 // client = ai.OpenAI(
 //
 //	ai.apiKey("sk-xxx"),
-//	ai.baseURL("https://api.openai-proxy.com/v1"),
+//	ai.baseURL("https://xxx.com/v1"),
 //
 // )
 // ```
