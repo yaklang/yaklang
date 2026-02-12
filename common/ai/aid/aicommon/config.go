@@ -268,6 +268,11 @@ type Config struct {
 	// Multiple sources can be added via WithSkillsLocalDir, WithSkillsZipFile, WithSkillsFS
 	skillLoader *aiskillloader.AutoSkillLoader
 
+	// disableAutoSkills controls whether to automatically load skills from the default directory
+	// (~/.yakit-projects/ai-skills). Default is false (auto-load enabled).
+	// Use WithDisableAutoSkills() to disable this behavior (e.g., in tests).
+	disableAutoSkills bool
+
 	/*
 		Lazy WorkDir for semantic artifact directory naming
 	*/
@@ -335,6 +340,20 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 	// Restore persistent session if configured
 	if !config.InitStatus.IsPersistentSessionRestored() {
 		config.restorePersistentSession()
+	}
+
+	// Auto-load skills from default directory unless explicitly disabled
+	// This enables automatic skill discovery from ~/.yakit-projects/ai-skills
+	if !config.disableAutoSkills && config.skillLoader == nil {
+		skillsDir := consts.GetDefaultAISkillsDir()
+		if utils.IsDir(skillsDir) {
+			config.ensureSkillLoader()
+			if count, err := config.skillLoader.AddLocalDir(skillsDir); err != nil {
+				log.Warnf("failed to auto-load skills from %s: %v", skillsDir, err)
+			} else if count > 0 {
+				log.Debugf("auto-loaded %d skills from %s", count, skillsDir)
+			}
+		}
 	}
 
 	return config
@@ -807,6 +826,22 @@ func (c *Config) GetSkillLoader() aiskillloader.SkillLoader {
 		return nil
 	}
 	return c.skillLoader
+}
+
+// WithDisableAutoSkills disables automatic loading of skills from the default directory.
+// By default, NewConfig will automatically load skills from ~/.yakit-projects/ai-skills
+// if the directory exists. Use this option to disable that behavior.
+//
+// This is typically used in test environments to isolate tests from user-installed skills.
+//
+// Example:
+//
+//	config := aicommon.NewConfig(ctx, aicommon.WithDisableAutoSkills())
+func WithDisableAutoSkills() ConfigOption {
+	return func(c *Config) error {
+		c.disableAutoSkills = true
+		return nil
+	}
 }
 
 // Consumption pointers
