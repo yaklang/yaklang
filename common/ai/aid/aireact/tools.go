@@ -69,7 +69,7 @@ func NewTestReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 		aicommon.WithDisallowMCPServers(true),
 		aicommon.WithDisableSessionTitleGeneration(true),
 		aicommon.WithDisableIntentRecognition(true),
-		aicommon.WithDisableAutoSkills(), // Disable auto-loading skills from default directory in tests
+		aicommon.WithDisableAutoSkills(true), // Disable auto-loading skills from default directory in tests
 	}
 	basicOption = append(basicOption, opts...)
 	ins, err := NewReAct(

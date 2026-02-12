@@ -12,7 +12,7 @@ import (
 
 // TestConfig_AutoLoadSkillsFromDefaultDir tests that skills are automatically loaded
 // from the default directory (~/.yakit-projects/ai-skills) when NewConfig is called
-// without WithDisableAutoSkills().
+// without WithDisableAutoSkills(true).
 func TestConfig_AutoLoadSkillsFromDefaultDir(t *testing.T) {
 	// Create a temporary directory to simulate yakit-projects
 	tempDir := t.TempDir()
@@ -46,7 +46,7 @@ This skill is automatically loaded from the default directory.
 	// Reset the yakit home cache so it picks up our temp directory
 	consts.ResetYakitHomeOnce()
 
-	// Create Config WITHOUT WithDisableAutoSkills()
+	// Create Config WITHOUT WithDisableAutoSkills(true)
 	// This should auto-load skills from our temp ai-skills directory
 	config := NewConfig(context.Background())
 
@@ -81,7 +81,7 @@ This skill is automatically loaded from the default directory.
 	t.Logf("Successfully auto-loaded %d skill(s)", len(skills))
 }
 
-// TestConfig_DisableAutoSkillsOption tests that WithDisableAutoSkills() prevents
+// TestConfig_DisableAutoSkillsOption tests that WithDisableAutoSkills(true) prevents
 // automatic loading of skills from the default directory.
 func TestConfig_DisableAutoSkillsOption(t *testing.T) {
 	// Create a temporary directory to simulate yakit-projects
@@ -114,16 +114,16 @@ description: This skill should NOT be loaded
 	// Reset the yakit home cache
 	consts.ResetYakitHomeOnce()
 
-	// Create Config WITH WithDisableAutoSkills()
-	config := NewConfig(context.Background(), WithDisableAutoSkills())
+	// Create Config WITH WithDisableAutoSkills(true)
+	config := NewConfig(context.Background(), WithDisableAutoSkills(true))
 
 	// Verify that NO skills were auto-loaded
 	loader := config.GetSkillLoader()
 	if loader != nil {
-		t.Fatal("GetSkillLoader() should return nil when WithDisableAutoSkills() is used")
+		t.Fatal("GetSkillLoader() should return nil when WithDisableAutoSkills(true) is used")
 	}
 
-	t.Log("WithDisableAutoSkills() correctly prevented auto-loading")
+	t.Log("WithDisableAutoSkills(true) correctly prevented auto-loading")
 }
 
 // TestConfig_ManualSkillsWithAutoDisabled tests that even when auto-loading is disabled,
@@ -172,7 +172,7 @@ This skill was added via WithSkillsFS, not auto-loaded.
 	// Create Config with auto-loading disabled, but manually add skills
 	config := NewConfig(
 		context.Background(),
-		WithDisableAutoSkills(),
+		WithDisableAutoSkills(true),
 		WithSkillsFS(vfs),
 	)
 
@@ -228,7 +228,7 @@ func TestConfig_AutoLoadEmptyDirectory(t *testing.T) {
 	// Reset the yakit home cache
 	consts.ResetYakitHomeOnce()
 
-	// Create Config without WithDisableAutoSkills()
+	// Create Config without WithDisableAutoSkills(true)
 	config := NewConfig(context.Background())
 
 	// Verify that skillLoader is nil when no skills are found
@@ -258,7 +258,7 @@ func TestConfig_AutoLoadNonexistentDirectory(t *testing.T) {
 	// Reset the yakit home cache
 	consts.ResetYakitHomeOnce()
 
-	// Create Config without WithDisableAutoSkills()
+	// Create Config without WithDisableAutoSkills(true)
 	config := NewConfig(context.Background())
 
 	// Verify that skillLoader is nil when directory doesn't exist

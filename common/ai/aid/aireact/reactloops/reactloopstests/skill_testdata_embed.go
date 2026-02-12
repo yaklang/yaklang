@@ -27,20 +27,19 @@ This is a test skill for verifying the skill loading functionality.
 2. Check that the content appears in context
 `)
 
-	// Code review skill with additional files
-	vfs.AddFile("code-review/SKILL.md", `---
-name: code-review
-description: Perform automated code review
-keywords: code, review, security, lint
+	// Lint check skill (test-only, not the production code-review skill)
+	vfs.AddFile("test-lint-check/SKILL.md", `---
+name: test-lint-check
+description: A test skill for lint checking in unit tests
 ---
-# Code Review Skill
+# Test Lint Check Skill
 
 ## Steps
 1. Analyze code structure
-2. Check for security issues
+2. Check for lint issues
 3. Suggest improvements
 `)
-	vfs.AddFile("code-review/rules/RULES.md", "# Code Review Rules\n\nAlways check for SQL injection.")
+	vfs.AddFile("test-lint-check/rules/RULES.md", "# Lint Check Rules\n\nAlways check for common lint issues.")
 
 	return vfs
 }
