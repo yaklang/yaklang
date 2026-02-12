@@ -270,7 +270,7 @@ type Config struct {
 
 	// disableAutoSkills controls whether to automatically load skills from the default directory
 	// (~/.yakit-projects/ai-skills). Default is false (auto-load enabled).
-	// Use WithDisableAutoSkills() to disable this behavior (e.g., in tests).
+	// Use WithDisableAutoSkills(true) to disable this behavior (e.g., in tests).
 	disableAutoSkills bool
 
 	/*
@@ -828,20 +828,38 @@ func (c *Config) GetSkillLoader() aiskillloader.SkillLoader {
 	return c.skillLoader
 }
 
-// WithDisableAutoSkills disables automatic loading of skills from the default directory.
-// By default, NewConfig will automatically load skills from ~/.yakit-projects/ai-skills
-// if the directory exists. Use this option to disable that behavior.
+// WithDisableAutoSkills controls automatic loading of skills from the default directory
+// and built-in embedded skills.
+// By default (false), NewConfig will automatically load skills from ~/.yakit-projects/ai-skills
+// if the directory exists, and NewReAct will load built-in skills.
+// Pass true to disable that behavior.
 //
 // This is typically used in test environments to isolate tests from user-installed skills.
 //
 // Example:
 //
-//	config := aicommon.NewConfig(ctx, aicommon.WithDisableAutoSkills())
-func WithDisableAutoSkills() ConfigOption {
+//	config := aicommon.NewConfig(ctx, aicommon.WithDisableAutoSkills(true))
+func WithDisableAutoSkills(disable bool) ConfigOption {
 	return func(c *Config) error {
-		c.disableAutoSkills = true
+		c.disableAutoSkills = disable
 		return nil
 	}
+}
+
+// LoadBuiltinSkillsFS adds a built-in skills filesystem to the skill loader.
+// It respects disableAutoSkills: if auto-skills are disabled, this is a no-op.
+// This is called by aireact.NewReAct to load embedded production skills
+// that ship with the binary.
+func (c *Config) LoadBuiltinSkillsFS(fsys fi.FileSystem) error {
+	if c.disableAutoSkills {
+		return nil
+	}
+	loader := c.ensureSkillLoader()
+	if loader == nil {
+		return utils.Error("failed to ensure skill loader")
+	}
+	_, err := loader.AddSource(fsys)
+	return err
 }
 
 // Consumption pointers

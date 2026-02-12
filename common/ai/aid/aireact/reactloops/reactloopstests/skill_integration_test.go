@@ -215,8 +215,8 @@ func TestReActLoop_Skills_PromptDifference(t *testing.T) {
 		if !strings.Contains(capturedMainPrompt, "test-skill") {
 			t.Error("'test-skill' SHOULD appear in available skills list")
 		}
-		if !strings.Contains(capturedMainPrompt, "code-review") {
-			t.Error("'code-review' SHOULD appear in available skills list")
+		if !strings.Contains(capturedMainPrompt, "test-lint-check") {
+			t.Error("'test-lint-check' SHOULD appear in available skills list")
 		}
 	})
 }
@@ -430,9 +430,9 @@ func TestReActLoop_Skills_MultipleSkills(t *testing.T) {
 				loadedSkills["test-skill"] = true
 				return makeLoadSkillResponse(i, "test-skill")
 			}
-			if !loadedSkills["code-review"] {
-				loadedSkills["code-review"] = true
-				return makeLoadSkillResponse(i, "code-review")
+			if !loadedSkills["test-lint-check"] {
+				loadedSkills["test-lint-check"] = true
+				return makeLoadSkillResponse(i, "test-lint-check")
 			}
 
 			return makeFinishResponse(i)
@@ -461,8 +461,8 @@ func TestReActLoop_Skills_MultipleSkills(t *testing.T) {
 	if !skillNames["test-skill"] {
 		t.Error("test-skill should be loaded")
 	}
-	if !skillNames["code-review"] {
-		t.Error("code-review should be loaded")
+	if !skillNames["test-lint-check"] {
+		t.Error("test-lint-check should be loaded")
 	}
 
 	t.Logf("Successfully loaded %d skills: %v", len(skills), skillNames)
