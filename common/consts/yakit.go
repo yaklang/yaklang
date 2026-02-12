@@ -131,6 +131,7 @@ func initializeYakitDirectories() {
 	GetDefaultYakitEngineDir()   // yakit-projects/yak-engine
 	GetDefaultYakitPprofDir()    // yakit-projects/pprof-log
 	GetDefaultYakitBaseTempDir() // yakit-projects/temp
+	GetDefaultAISkillsDir()      // yakit-projects/ai-skills
 
 	log.Debug("yakit directories initialized")
 }

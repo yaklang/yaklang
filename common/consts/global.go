@@ -63,6 +63,14 @@ func SimpleYakGlobalConfig() {
 	GLOBAL_DB_SAVE_SYNC.SetTo(true)
 }
 
+// ResetYakitHomeOnce resets the sync.Once for YAKIT_HOME initialization.
+// This is primarily used in tests to allow changing the YAKIT_HOME via
+// environment variable between test cases.
+// WARNING: This function is not thread-safe and should only be used in tests.
+func ResetYakitHomeOnce() {
+	OnceYakitHome = new(sync.Once)
+}
+
 const (
 	YAK_PROJECT_DATA_DB_NAME_RECOVERED   = "default-yakit.db"
 	YAK_PROFILE_PLUGIN_DB_NAME_RECOVERED = "yakit-profile-plugin.db"
@@ -294,6 +302,17 @@ func GetDefaultYakitEngineDir() string {
 
 func GetDefaultYakitPprofDir() string {
 	pt := filepath.Join(GetDefaultYakitBaseDir(), "pprof-log")
+	if !utils.IsDir(pt) {
+		os.MkdirAll(pt, 0o777)
+	}
+	return pt
+}
+
+// GetDefaultAISkillsDir returns the default directory for AI skills.
+// Skills are loaded automatically from this directory on startup.
+// Path: ~/yakit-projects/ai-skills
+func GetDefaultAISkillsDir() string {
+	pt := filepath.Join(GetDefaultYakitBaseDir(), "ai-skills")
 	if !utils.IsDir(pt) {
 		os.MkdirAll(pt, 0o777)
 	}
