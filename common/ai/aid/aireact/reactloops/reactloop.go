@@ -307,6 +307,23 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		opt(r)
 	}
 
+	// Auto-apply skillLoader from config if not already set via options
+	// This allows users to configure skills via aicommon.WithSkillsLocalDir etc.
+	if r.skillsContextManager == nil && config != nil {
+		if realConfig, ok := config.(*aicommon.Config); ok {
+			if loader := realConfig.GetSkillLoader(); loader != nil {
+				mgr := aiskillloader.NewSkillsContextManager(loader)
+				r.skillsContextManager = mgr
+				r.allowSkillLoading = func() bool {
+					return mgr.HasRegisteredSkills()
+				}
+				r.allowSkillViewOffset = func() bool {
+					return mgr.HasTruncatedViews()
+				}
+			}
+		}
+	}
+
 	if _, ok := r.actions.Get(schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL); !ok {
 		toolcall, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL)
 		if !ok {

@@ -223,6 +223,58 @@ func (l *AutoSkillLoader) AllSkillMetas() []*SkillMeta {
 	return result
 }
 
+// AddSource adds a new filesystem source and discovers skills from it.
+// This allows adding skills incrementally after the loader is created.
+// Returns the number of new skills discovered from this source.
+func (l *AutoSkillLoader) AddSource(fsys fi.FileSystem) (int, error) {
+	if fsys == nil {
+		return 0, utils.Error("filesystem is nil")
+	}
+
+	// Count skills before adding (read lock only)
+	l.mu.RLock()
+	beforeCount := len(l.skills)
+	l.mu.RUnlock()
+
+	// Add source and discover skills
+	// Note: discoverSkills acquires l.mu.Lock internally per-skill,
+	// so we must NOT hold any lock here.
+	l.mu.Lock()
+	l.sources = append(l.sources, fsys)
+	l.mu.Unlock()
+
+	if err := l.discoverSkills(fsys); err != nil {
+		return 0, err
+	}
+
+	// Count skills after adding
+	l.mu.RLock()
+	afterCount := len(l.skills)
+	l.mu.RUnlock()
+
+	return afterCount - beforeCount, nil
+}
+
+// AddLocalDir adds a local directory as a skill source.
+// This is a convenience method that wraps AddSource.
+func (l *AutoSkillLoader) AddLocalDir(dirPath string) (int, error) {
+	if !utils.IsDir(dirPath) {
+		return 0, utils.Errorf("skill directory does not exist: %s", dirPath)
+	}
+	localFS := filesys.NewRelLocalFs(dirPath)
+	return l.AddSource(localFS)
+}
+
+// AddZipFile adds a zip file as a skill source.
+// This is a convenience method that wraps AddSource.
+func (l *AutoSkillLoader) AddZipFile(zipPath string) (int, error) {
+	zipFS, err := filesys.NewZipFSFromLocal(zipPath)
+	if err != nil {
+		return 0, utils.Wrapf(err, "failed to open zip file: %s", zipPath)
+	}
+	return l.AddSource(zipFS)
+}
+
 // Ensure AutoSkillLoader implements SkillLoader.
 var _ SkillLoader = (*AutoSkillLoader)(nil)
 

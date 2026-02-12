@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/fstools"
@@ -22,6 +23,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/chanx"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -257,6 +259,14 @@ type Config struct {
 	originOptions []ConfigOption
 
 	ExtendedForge []*schema.AIForge
+
+	/*
+		Skill Loader Configuration
+	*/
+	// skillLoader is the loader for AI skills
+	// When set, it enables the loading_skills and change_skill_view_offset actions in ReActLoop
+	// Multiple sources can be added via WithSkillsLocalDir, WithSkillsZipFile, WithSkillsFS
+	skillLoader *aiskillloader.AutoSkillLoader
 
 	/*
 		Lazy WorkDir for semantic artifact directory naming
@@ -680,6 +690,123 @@ func WithPromptHook(hook func(string) string) ConfigOption {
 		c.m.Unlock()
 		return nil
 	}
+}
+
+// ============ Skill Loader Configuration ============
+// These options provide user-friendly ways to configure AI skills.
+// Skills are loaded from SKILL.md files and made available to the ReActLoop
+// via the loading_skills and change_skill_view_offset actions.
+//
+// Multiple sources can be accumulated: calling WithSkillsLocalDir, WithSkillsZipFile,
+// or WithSkillsFS multiple times will add sources to the same loader, not replace it.
+
+// ensureSkillLoader lazily initializes the skill loader on first use.
+func (c *Config) ensureSkillLoader() *aiskillloader.AutoSkillLoader {
+	if c.skillLoader == nil {
+		loader, err := aiskillloader.NewAutoSkillLoader()
+		if err != nil {
+			log.Errorf("failed to create skill loader: %v", err)
+			return nil
+		}
+		c.skillLoader = loader
+	}
+	return c.skillLoader
+}
+
+// WithSkillsLocalDir adds a local directory as a skill source.
+// This is the most user-friendly option for loading skills from a directory.
+// The directory should contain subdirectories, each with a SKILL.md file.
+// Can be called multiple times to add multiple directories.
+//
+// Example:
+//
+//	aicommon.WithSkillsLocalDir("/path/to/skills")
+//	aicommon.WithSkillsLocalDir("/another/path/to/skills")
+func WithSkillsLocalDir(dirPath string) ConfigOption {
+	return func(c *Config) error {
+		loader := c.ensureSkillLoader()
+		if loader == nil {
+			return utils.Error("failed to ensure skill loader")
+		}
+		_, err := loader.AddLocalDir(dirPath)
+		if err != nil {
+			return utils.Wrapf(err, "failed to add skills from directory: %s", dirPath)
+		}
+		return nil
+	}
+}
+
+// WithSkillsZipFile adds a zip file as a skill source.
+// Useful for distributing skills as a single file.
+// The zip file should contain subdirectories, each with a SKILL.md file.
+// Can be called multiple times to add multiple zip files.
+//
+// Example:
+//
+//	aicommon.WithSkillsZipFile("/path/to/skills.zip")
+func WithSkillsZipFile(zipPath string) ConfigOption {
+	return func(c *Config) error {
+		loader := c.ensureSkillLoader()
+		if loader == nil {
+			return utils.Error("failed to ensure skill loader")
+		}
+		_, err := loader.AddZipFile(zipPath)
+		if err != nil {
+			return utils.Wrapf(err, "failed to add skills from zip: %s", zipPath)
+		}
+		return nil
+	}
+}
+
+// WithSkillsFS adds a filesystem as a skill source.
+// Advanced option for custom filesystem implementations.
+// The filesystem should contain subdirectories, each with a SKILL.md file.
+// Can be called multiple times to add multiple filesystems.
+//
+// Example:
+//
+//	vfs := filesys.NewVirtualFs()
+//	vfs.AddFile("my-skill/SKILL.md", skillContent)
+//	aicommon.WithSkillsFS(vfs)
+func WithSkillsFS(fsys fi.FileSystem) ConfigOption {
+	return func(c *Config) error {
+		loader := c.ensureSkillLoader()
+		if loader == nil {
+			return utils.Error("failed to ensure skill loader")
+		}
+		_, err := loader.AddSource(fsys)
+		if err != nil {
+			return utils.Wrapf(err, "failed to add skills from filesystem")
+		}
+		return nil
+	}
+}
+
+// WithSkillLoader replaces the skill loader with a pre-configured one.
+// Advanced option for users who want full control over skill loading.
+// Note: this replaces any previously added sources.
+//
+// Example:
+//
+//	loader, _ := aiskillloader.NewAutoSkillLoader(
+//	    aiskillloader.WithAutoLoad_LocalDir("/path/to/skills"),
+//	)
+//	aicommon.WithSkillLoader(loader)
+func WithSkillLoader(loader *aiskillloader.AutoSkillLoader) ConfigOption {
+	return func(c *Config) error {
+		c.skillLoader = loader
+		return nil
+	}
+}
+
+// GetSkillLoader returns the configured SkillLoader.
+// This is used internally by ReActLoop to access skills.
+// Returns nil interface if no skill loader is configured (avoids typed-nil interface pitfall).
+func (c *Config) GetSkillLoader() aiskillloader.SkillLoader {
+	if c.skillLoader == nil {
+		return nil
+	}
+	return c.skillLoader
 }
 
 // Consumption pointers
