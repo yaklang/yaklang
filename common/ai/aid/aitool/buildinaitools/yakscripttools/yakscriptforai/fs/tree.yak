@@ -1,45 +1,59 @@
-__DESC__ = "一个用于查看目录树形结构的工具，支持显示目录下的文件和子目录层级关系，默认排除 .git/node_modules 等噪声目录。适用于目录结构分析、项目概览等场景。"
+__DESC__ = "一个用于查看目录树形结构的工具，支持显示目录下的文件和子目录层级关系，默认排除 .git/node_modules 等噪声目录。支持名称黑白名单和扩展名黑白名单过滤。适用于目录结构分析、项目概览等场景。"
 __VERBOSE_NAME__ = "目录树形结构查看工具"
-__KEYWORDS__ = "directory tree,目录结构,树形结构,文件系统浏览,directory listing,文件夹结构,文件树,file hierarchy,目录浏览,directory navigation,exclude"
+__KEYWORDS__ = "directory tree,目录结构,树形结构,文件系统浏览,directory listing,文件夹结构,文件树,file hierarchy,目录浏览,directory navigation,exclude,include,extension filter"
 
-/*
-目录树形结构查看工具
+__USAGE__ = <<<USAGE_BLOCK
+Directory Tree Viewing Tool - Parameter Description for JSON Tool Calls
 
-功能特点：
-1. 查看目录的树形结构
-   - 显示目录下的文件和子目录
-   - 层级关系清晰展示
-   - 包含文件和目录的统计信息
+Required Parameters:
+  path            (string)  The absolute or relative directory path to display as a tree.
+                            Must point to an existing directory.
 
-2. 参数说明：
-   --path: 要查看的目录路径 (必需)
-   --exclude: 排除的目录/文件名 (逗号分隔，默认排除 .git,node_modules 等)
-   --max-depth: 最大递归深度 (默认 6)
-   --max-lines: 最大输出行数 (默认 200)
+Optional Parameters:
+  exclude         (string)  Comma-separated list of directory/file names to exclude.
+                            Each name is matched against EVERY path component individually.
+                            For example, "node_modules,.git" will skip any entry whose path
+                            contains a component exactly named "node_modules" or ".git".
+                            This means subdirectories inside excluded directories are also skipped.
+                            Default: ".git,.svn,.hg,node_modules,__pycache__,.DS_Store,.idea,.vscode,.next,.nuxt,.cache"
+                            Set to "" (empty string) to disable all name exclusions.
+  include         (string)  Comma-separated list of name substrings for whitelist filtering.
+                            When set (non-empty), only FILES whose filename contains at least one
+                            of these substrings will appear in the tree output.
+                            IMPORTANT: Directories always pass this filter so their children
+                            can still be explored. Only leaf file names are filtered.
+                            Default: "" (disabled, all filenames pass).
+  exclude-ext     (string)  Comma-separated list of file extensions to exclude (blacklist).
+                            Each extension is matched case-insensitively against file extensions.
+                            The dot prefix is optional: both "pyc" and ".pyc" are accepted.
+                            Directories are NEVER affected by extension filters.
+                            Default: "" (disabled).
+  include-ext     (string)  Comma-separated list of file extensions to include (whitelist).
+                            When set, only files whose extension matches one of these values are shown.
+                            The dot prefix is optional: both "go" and ".go" are accepted.
+                            Directories always pass this filter.
+                            Default: "" (disabled, all extensions pass).
+  max-depth       (int)     Maximum directory depth to recurse into. Entries deeper than this
+                            level are not shown. Default: 6.
+  max-lines       (int)     Maximum total lines in the output. Once reached, remaining entries
+                            are truncated with a notice. Default: 200.
 
-使用示例：
-1. 查看当前目录结构：
-   yak tree.yak --path .
-
-2. 查看指定目录结构(带自定义排除)：
-   yak tree.yak --path /tmp --exclude ".git,node_modules,vendor"
-
-3. 不排除任何目录：
-   yak tree.yak --path /path/to/project --exclude ""
-
-注意事项：
-- 支持绝对路径和相对路径
-- 自动限制深度和输出行数以提高性能
-- 显示文件数量和目录数量统计
-- 如果目录不存在会报错
-- 默认排除 .git, node_modules 等噪声目录以减少输出干扰
-*/
+Filter Evaluation Order:
+  1. exclude name blacklist (path component exact match)
+  2. include name whitelist (filename substring match, directories pass)
+  3. exclude-ext extension blacklist (file extension match, directories pass)
+  4. include-ext extension whitelist (file extension match, directories pass)
+  5. max-depth check
+USAGE_BLOCK
 
 yakit.AutoInitYakit()
 
-// 解析命令行参数
+// Parse CLI arguments
 path := cli.String("path", cli.setRequired(true), cli.setHelp("directory path to display tree structure"))
 excludeRaw := cli.String("exclude", cli.setHelp("comma-separated list of directory/file names to exclude from tree view"), cli.setDefault(".git,.svn,.hg,node_modules,__pycache__,.DS_Store,.idea,.vscode,.next,.nuxt,.cache"))
+includeRaw := cli.String("include", cli.setHelp("comma-separated list of name substrings to include (whitelist, only matching entries shown)"), cli.setDefault(""))
+excludeExtRaw := cli.String("exclude-ext", cli.setHelp("comma-separated list of file extensions to exclude (e.g. '.pyc,.o,.so')"), cli.setDefault(""))
+includeExtRaw := cli.String("include-ext", cli.setHelp("comma-separated list of file extensions to include (whitelist, e.g. '.go,.js,.py')"), cli.setDefault(""))
 maxDepth := cli.Int("max-depth", cli.setHelp("maximum directory depth to display"), cli.setDefault(6))
 maxLines := cli.Int("max-lines", cli.setHelp("maximum number of lines to display"), cli.setDefault(200))
 
@@ -47,7 +61,7 @@ cli.check()
 
 yakit.Info("Viewing directory tree structure: %v", path)
 
-// 检查路径是否存在
+// Check path existence
 if !file.IsExisted(path) {
     errMsg = sprintf("Path does not exist: %v", path)
     yakit.Error(errMsg)
@@ -55,7 +69,7 @@ if !file.IsExisted(path) {
     return
 }
 
-// 检查是否是目录
+// Check is directory
 if !file.IsDir(path) {
     errMsg = sprintf("Path is not a directory: %v", path)
     yakit.Error(errMsg)
@@ -63,7 +77,7 @@ if !file.IsDir(path) {
     return
 }
 
-// 解析 exclude 列表
+// Parse exclude name list
 excludeNames = {}
 for item in str.Split(excludeRaw, ",") {
     item = str.TrimSpace(item)
@@ -72,19 +86,92 @@ for item in str.Split(excludeRaw, ",") {
     }
 }
 
+// Parse include name list (whitelist)
+includeNames = {}
+for item in str.Split(includeRaw, ",") {
+    item = str.TrimSpace(item)
+    if item != "" {
+        includeNames[item] = true
+    }
+}
+hasIncludeFilter = len(includeNames) > 0
+
+// Parse exclude-ext list
+excludeExts = {}
+for item in str.Split(excludeExtRaw, ",") {
+    item = str.TrimSpace(item)
+    if item != "" {
+        if !str.HasPrefix(item, ".") { item = "." + item }
+        excludeExts[str.ToLower(item)] = true
+    }
+}
+
+// Parse include-ext list (whitelist)
+includeExts = {}
+for item in str.Split(includeExtRaw, ",") {
+    item = str.TrimSpace(item)
+    if item != "" {
+        if !str.HasPrefix(item, ".") { item = "." + item }
+        includeExts[str.ToLower(item)] = true
+    }
+}
+hasIncludeExtFilter = len(includeExts) > 0
+
 if len(excludeNames) > 0 {
     yakit.Info("exclude: %v", excludeRaw)
 }
+if hasIncludeFilter {
+    yakit.Info("include: %v", includeRaw)
+}
+if len(excludeExts) > 0 {
+    yakit.Info("exclude-ext: %v", excludeExtRaw)
+}
+if hasIncludeExtFilter {
+    yakit.Info("include-ext: %v", includeExtRaw)
+}
 
-// shouldExcludePath checks if any path component matches the exclude list
-shouldExcludePath = (filePath) => {
-    normalized = str.ReplaceAll(filePath, "\\", "/")
+// shouldFilterPath checks whether a path should be filtered out.
+// Returns true if the entry should be EXCLUDED (not shown).
+// isDir: whether this entry is a directory
+// relPath: relative path from root (normalized with /)
+shouldFilterPath = (relPath, entryName, isDir) => {
+    // 1. Check exclude name blacklist (applies to any path component)
+    normalized = str.ReplaceAll(relPath, "\\", "/")
     parts = str.Split(normalized, "/")
     for part in parts {
         if excludeNames[part] {
             return true
         }
     }
+
+    // 2. Check include name whitelist (if set, entry name must contain one of the substrings)
+    //    For directories: always pass include filter so their children can be explored
+    if hasIncludeFilter && !isDir {
+        matched = false
+        for incName in includeNames {
+            if str.Contains(entryName, incName) {
+                matched = true
+                break
+            }
+        }
+        if !matched { return true }
+    }
+
+    // 3. Extension filters only apply to files, not directories
+    if !isDir {
+        ext = str.ToLower(file.GetExt(entryName))
+        // 3a. Check exclude-ext blacklist
+        if ext != "" && excludeExts[ext] {
+            return true
+        }
+        // 3b. Check include-ext whitelist
+        if hasIncludeExtFilter {
+            if ext == "" || !includeExts[ext] {
+                return true
+            }
+        }
+    }
+
     return false
 }
 
@@ -112,11 +199,14 @@ filesys.Recursive(path, filesys.onStat((isDir, pathname, info) => {
     // Normalize path separators
     relPath = str.ReplaceAll(relPath, "\\", "/")
 
-    // Check exclude
-    if shouldExcludePath(relPath) { return }
+    // Get entry name (last component)
+    parts = str.Split(relPath, "/")
+    entryName = parts[len(parts) - 1]
+
+    // Apply unified filter
+    if shouldFilterPath(relPath, entryName, isDir) { return }
 
     // Check depth
-    parts = str.Split(relPath, "/")
     if len(parts) > maxDepth { return }
 
     lineCount++
@@ -129,7 +219,7 @@ filesys.Recursive(path, filesys.onStat((isDir, pathname, info) => {
     // Build indented tree line
     depth = len(parts) - 1
     indent = str.Repeat("  ", depth)
-    name = parts[len(parts) - 1]
+    name = entryName
     if isDir {
         name = name + "/"
     }
