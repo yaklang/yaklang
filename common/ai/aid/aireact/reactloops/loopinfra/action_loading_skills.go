@@ -35,6 +35,23 @@ var loopAction_LoadingSkills = &reactloops.LoopAction{
 			return utils.Error("skills context manager is not available")
 		}
 
+		// Check if the skill is already loaded and unfolded - reject redundant loading
+		if mgr.IsSkillLoadedAndUnfolded(skillName) {
+			invoker := loop.GetInvoker()
+			viewSummary := mgr.GetSkillViewSummary(skillName)
+			alreadyLoadedMsg := fmt.Sprintf(
+				"IMPORTANT: Skill '%s' is ALREADY loaded and visible in your context. "+
+					"Do NOT load it again. The skill content is already displayed in the "+
+					"SKILLS_CONTEXT section of your prompt (look for '<|SKILLS_CONTEXT_' tags). "+
+					"Read the View Window content that is already available to you. %s",
+				skillName, viewSummary,
+			)
+			invoker.AddToTimeline("skill_already_loaded", alreadyLoadedMsg)
+			return utils.Errorf("skill '%s' is already loaded and active in your context. "+
+				"Check the SKILLS_CONTEXT section in your prompt - the content is already there. "+
+				"Do NOT retry loading the same skill.", skillName)
+		}
+
 		loop.Set("loading_skill_name", skillName)
 		return nil
 	},
@@ -80,10 +97,28 @@ var loopAction_LoadingSkills = &reactloops.LoopAction{
 		}
 
 		invoker := loop.GetInvoker()
-		invoker.AddToTimeline("skill_loaded", "Loaded skill: "+skillName)
+
+		// Build detailed timeline message with view window information
+		viewSummary := mgr.GetSkillViewSummary(skillName)
+		timelineMsg := fmt.Sprintf(
+			"Successfully loaded skill '%s' into context. "+
+				"The skill content is now visible in the SKILLS_CONTEXT section of your prompt "+
+				"(look for '<|SKILLS_CONTEXT_' tags). %s "+
+				"IMPORTANT: Do NOT load this skill again - it is already active. "+
+				"Read the View Window content in your prompt and proceed with your task.",
+			skillName, viewSummary,
+		)
+		invoker.AddToTimeline("skill_loaded", timelineMsg)
 
 		log.Infof("skill %q loaded into context successfully", skillName)
-		op.Feedback("Skill '" + skillName + "' has been loaded into the context. You can now reference its content.")
+		feedbackMsg := fmt.Sprintf(
+			"Skill '%s' has been loaded into the context. "+
+				"The SKILL.md content and file tree are now displayed in the SKILLS_CONTEXT section of your prompt. "+
+				"Read the skill content from your prompt's View Window and proceed with the task. "+
+				"Do NOT load this skill again.",
+			skillName,
+		)
+		op.Feedback(feedbackMsg)
 		op.Continue()
 	},
 }

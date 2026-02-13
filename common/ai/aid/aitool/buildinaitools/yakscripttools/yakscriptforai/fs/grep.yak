@@ -94,6 +94,10 @@ defer func{
 }
 
 end = false
+// Maximum number of matches to log individually via yakit.Info IPC
+// to avoid flooding the IPC channel (each yakit.Info is a network round-trip).
+maxIPCLogCount = 20
+
 // output uses in-memory rawContent ([]byte) to extract context,
 // avoiding per-match file I/O and excessive yakit.File IPC calls.
 output = (targetFile, offset, offsetEnd, rawContent) => {
@@ -109,15 +113,25 @@ output = (targetFile, offset, offsetEnd, rawContent) => {
         end = true
         return
     }
-    
-    // 当有多个文件时，显示文件来源
+
+    displayCount = count - offsetResultCount
+
+    // Build match info string
     var msg
     if multipleFiles {
         msg = "[file: %v] matched at index:%v-%v" % [targetFile, offset, offsetEnd]
     } else {
         msg = "matched in %v at index:%v-%v" % [targetFile, offset, offsetEnd]
     }
-    yakit.Info(msg)
+
+    // Only log first N matches via yakit.Info to avoid IPC flood
+    // (each call is a JSON serialize + network send)
+    if displayCount <= maxIPCLogCount {
+        yakit.Info(msg)
+    } else if displayCount == maxIPCLogCount + 1 {
+        yakit.Info("... (suppressing per-match IPC logs for remaining matches, results still collected)")
+    }
+
     if contextBuffer > 0 && rawContent != nil {
         seekStart = offset - contextBuffer
         if seekStart < 0 {
@@ -132,9 +146,10 @@ output = (targetFile, offset, offsetEnd, rawContent) => {
         }
         raw = rawContent[seekStart:seekEnd]
         if len(raw) > 0 {
-            // format and print the context content
             contentStr := string(raw)
-            yakit.Info("  context: %#v", contentStr)
+            if displayCount <= maxIPCLogCount {
+                yakit.Info("  context: %#v", contentStr)
+            }
             findRes = append(findRes, contentStr)
         }
     }
@@ -228,14 +243,42 @@ for currentPath in validPaths {
     processPath(currentPath)
 }
 
-// print findRes to stdout for AI to consume
+// Maximum results to output via stdout and yakit.Info summary
+// AI tool framework captures stdout as the tool result; keep it reasonable.
+maxStdoutResults = 100
+
+// print findRes summary to yakit.Info (batched, not per-match)
 if len(findRes) > 0 {
-    yakit.Info("=== Grep Results Summary ===")
-    for i := 0; i < len(findRes); i++ {
-        res := findRes[i]
-        yakit.Info("[match %d] %s", i+1, res)
+    yakit.Info("=== Grep Results Summary: %d matches ===", len(findRes))
+    showCount = min(len(findRes), maxStdoutResults)
+    for i := 0; i < showCount; i++ {
+        yakit.Info("[match %d] %s", i+1, findRes[i])
+    }
+    if len(findRes) > maxStdoutResults {
+        yakit.Info("... (%d more matches not shown)", len(findRes) - maxStdoutResults)
     }
     yakit.Info("=== End of Grep Results ===")
+
+    // Write results to stdout (captured by AI tool framework)
+    // Cap output to maxStdoutResults to keep tool result size manageable
+    println(sprintf("=== Grep Results: %d matches (pattern: %s) ===", len(findRes), pattern))
+    for i := 0; i < showCount; i++ {
+        println(sprintf("[match %d] %s", i+1, findRes[i]))
+    }
+    if len(findRes) > maxStdoutResults {
+        println(sprintf("... (%d more matches not shown, use offset to paginate)", len(findRes) - maxStdoutResults))
+    }
+    println("=== End of Grep Results ===")
+} else {
+    println(sprintf("No matches found for pattern: %s", pattern))
 }
 
-yakit.File(pathName, yakit.fileFindAction("content", sprintf("patternMode:[%s] | pattern:[%s]",matchMode,pattern), findRes...))
+// Send structured results to yakit UI via IPC.
+// IMPORTANT: Cap results to prevent IPC hang from oversized payload.
+maxFileResults = 50
+if len(findRes) <= maxFileResults {
+    yakit.File(pathName, yakit.fileFindAction("content", sprintf("patternMode:[%s] | pattern:[%s]",matchMode,pattern), findRes...))
+} else {
+    truncatedRes = findRes[:maxFileResults]
+    yakit.File(pathName, yakit.fileFindAction("content", sprintf("patternMode:[%s] | pattern:[%s] (showing %d of %d)",matchMode,pattern, maxFileResults, len(findRes)), truncatedRes...))
+}
