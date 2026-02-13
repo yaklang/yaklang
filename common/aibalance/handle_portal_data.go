@@ -22,6 +22,7 @@ type PortalDataResponse struct {
 	TotalTrafficStr    string             `json:"total_traffic_str"`
 	ConcurrentRequests int64              `json:"concurrent_requests"` // Current in-flight AI requests (chat + embedding)
 	WebSearchCount     int64              `json:"web_search_count"`    // Persistent cumulative web-search request count (from database)
+	AmapCount          int64              `json:"amap_count"`          // Persistent cumulative amap request count (from database)
 	Providers          []ProviderDataJSON `json:"providers"`
 	APIKeys            []APIKeyDataJSON   `json:"api_keys"`
 	ModelMetas         []ModelInfoJSON    `json:"model_metas"`
@@ -238,6 +239,8 @@ func (c *ServerConfig) servePortalDataAPI(conn net.Conn, request *http.Request) 
 	data.ConcurrentRequests = chatReqs + embeddingReqs
 	// WebSearchCount reads from the persistent database counter (survives process restarts)
 	data.WebSearchCount = GetTotalWebSearchRequests()
+	// AmapCount reads from the persistent database counter (survives process restarts)
+	data.AmapCount = GetTotalAmapRequests()
 
 	// Fill TOTP data
 	data.TOTPSecret = GetTOTPSecret()

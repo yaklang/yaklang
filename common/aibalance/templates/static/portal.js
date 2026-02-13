@@ -113,6 +113,7 @@
                 document.getElementById('stat-total-traffic').textContent = data.total_traffic_str;
                 document.getElementById('stat-concurrent-requests').textContent = data.concurrent_requests || 0;
                 document.getElementById('stat-web-search-count').textContent = data.web_search_count || 0;
+                document.getElementById('stat-amap-count').textContent = data.amap_count || 0;
             },
             
             // 渲染供应商表格
@@ -812,6 +813,11 @@
             // 切换到 Web Search 标签时自动刷新数据和全局配置
             if (tabId === 'web-search') {
                 refreshWebSearchKeys();
+            }
+            // 切换到 Amap 标签时自动刷新数据和全局配置
+            if (tabId === 'amap') {
+                refreshAmapKeys();
+                loadAmapConfig();
             }
         }
 
@@ -1624,6 +1630,9 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                 refreshOpsLogs();
             } else if (initialTabId === 'web-search') {
                 refreshWebSearchKeys();
+            } else if (initialTabId === 'amap') {
+                refreshAmapKeys();
+                loadAmapConfig();
             }
             // --- END: Tab Initialization Logic ---
 
@@ -4896,6 +4905,8 @@ curl '${metaApiUrl}?name=${modelName}'`;
                         refreshOpsLogs();
                     } else if (tabId === 'web-search') {
                         refreshWebSearchKeys();
+                    } else if (tabId === 'amap') {
+                        refreshAmapKeys();
                     }
                 });
             });
@@ -5318,3 +5329,342 @@ curl '${metaApiUrl}?name=${modelName}'`;
         window.testWebSearchKey = testWebSearchKey;
         window.saveWebSearchConfig = saveWebSearchConfig;
         window.loadWebSearchConfig = loadWebSearchConfig;
+
+        // ========== Amap Key Management Functions ==========
+
+        async function refreshAmapKeys() {
+            try {
+                const response = await fetch('/portal/api/amap-keys');
+                if (!response.ok) throw new Error('Failed to fetch amap keys');
+                const data = await response.json();
+                if (isAuthError(data)) { handleAuthError(); return; }
+                if (!data.success) {
+                    showToast('加载高德密钥失败', 'error');
+                    return;
+                }
+                renderAmapKeysTable(data.keys || []);
+            } catch (error) {
+                console.error('Error refreshing amap keys:', error);
+                showToast('加载高德密钥失败', 'error');
+            }
+        }
+
+        // escapeHtmlForAmap escapes HTML special characters to prevent XSS
+        function escapeHtmlForAmap(str) {
+            if (str === null || str === undefined) return '';
+            var s = String(str);
+            var div = document.createElement('div');
+            div.appendChild(document.createTextNode(s));
+            return div.innerHTML;
+        }
+
+        function renderAmapKeysTable(keys) {
+            const tbody = document.getElementById('amap-keys-tbody');
+            if (!tbody) return;
+            // Clear existing content safely
+            while (tbody.firstChild) {
+                tbody.removeChild(tbody.firstChild);
+            }
+            if (keys.length === 0) {
+                var emptyRow = document.createElement('tr');
+                var emptyCell = document.createElement('td');
+                emptyCell.setAttribute('colspan', '11');
+                emptyCell.style.cssText = 'text-align: center; color: #888; padding: 20px;';
+                emptyCell.textContent = '暂无高德地图 API 密钥';
+                emptyRow.appendChild(emptyCell);
+                tbody.appendChild(emptyRow);
+                return;
+            }
+            keys.forEach(function(k) {
+                var tr = document.createElement('tr');
+
+                // ID cell (integer, safe)
+                var tdId = document.createElement('td');
+                tdId.textContent = k.id;
+                tr.appendChild(tdId);
+
+                // API Key cell (use textContent to prevent XSS)
+                var tdKey = document.createElement('td');
+                tdKey.style.cssText = 'font-family: monospace; font-size: 12px;';
+                tdKey.textContent = k.api_key || '';
+                tr.appendChild(tdKey);
+
+                // Active status
+                var tdActive = document.createElement('td');
+                var spanActive = document.createElement('span');
+                spanActive.className = k.active ? 'status-active' : 'status-inactive';
+                spanActive.style.cssText = 'padding: 2px 8px; border-radius: 3px; font-size: 12px;';
+                spanActive.textContent = k.active ? '启用' : '停用';
+                tdActive.appendChild(spanActive);
+                tr.appendChild(tdActive);
+
+                // Health status
+                var tdHealth = document.createElement('td');
+                var spanHealth = document.createElement('span');
+                spanHealth.className = k.is_healthy ? 'status-active' : 'status-inactive';
+                spanHealth.style.cssText = 'padding: 2px 8px; border-radius: 3px; font-size: 12px;';
+                spanHealth.textContent = k.is_healthy ? '健康' : '异常';
+                tdHealth.appendChild(spanHealth);
+                tr.appendChild(tdHealth);
+
+                // Last check time
+                var tdCheckTime = document.createElement('td');
+                tdCheckTime.style.cssText = 'font-size: 12px;';
+                tdCheckTime.textContent = k.health_check_time || '-';
+                tr.appendChild(tdCheckTime);
+
+                // Last check error (use textContent for safety)
+                var tdError = document.createElement('td');
+                tdError.style.cssText = 'font-size: 11px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
+                tdError.title = k.last_check_error || '';
+                tdError.textContent = k.last_check_error || '-';
+                tr.appendChild(tdError);
+
+                // Success/Fail count (integers, safe)
+                var tdCounts = document.createElement('td');
+                tdCounts.textContent = k.success_count + '/' + k.failure_count;
+                tr.appendChild(tdCounts);
+
+                // Total requests
+                var tdTotal = document.createElement('td');
+                tdTotal.textContent = k.total_requests;
+                tr.appendChild(tdTotal);
+
+                // Latency
+                var tdLatency = document.createElement('td');
+                tdLatency.textContent = k.last_latency;
+                tr.appendChild(tdLatency);
+
+                // Last used time
+                var tdUsed = document.createElement('td');
+                tdUsed.style.cssText = 'font-size: 12px;';
+                tdUsed.textContent = k.last_used_time || '-';
+                tr.appendChild(tdUsed);
+
+                // Actions (buttons use integer ID only, safe from injection)
+                var tdActions = document.createElement('td');
+                var btnStyle = 'padding: 2px 8px; font-size: 11px; margin: 1px;';
+                var keyId = parseInt(k.id, 10); // ensure integer
+
+                var btnToggle = document.createElement('button');
+                btnToggle.className = 'btn';
+                btnToggle.style.cssText = btnStyle;
+                btnToggle.textContent = k.active ? '停用' : '启用';
+                btnToggle.addEventListener('click', function() { toggleAmapKey(keyId); });
+                tdActions.appendChild(btnToggle);
+
+                var btnTest = document.createElement('button');
+                btnTest.className = 'btn';
+                btnTest.style.cssText = btnStyle + ' background: #3498db; color: white;';
+                btnTest.textContent = '测试';
+                btnTest.addEventListener('click', function() { testAmapKey(keyId); });
+                tdActions.appendChild(btnTest);
+
+                var btnReset = document.createElement('button');
+                btnReset.className = 'btn';
+                btnReset.style.cssText = btnStyle + ' background: #f39c12; color: white;';
+                btnReset.textContent = '重置';
+                btnReset.addEventListener('click', function() { resetAmapKeyHealth(keyId); });
+                tdActions.appendChild(btnReset);
+
+                var btnDelete = document.createElement('button');
+                btnDelete.className = 'btn';
+                btnDelete.style.cssText = btnStyle + ' background: #e74c3c; color: white;';
+                btnDelete.textContent = '删除';
+                btnDelete.addEventListener('click', function() { deleteAmapKey(keyId); });
+                tdActions.appendChild(btnDelete);
+
+                tr.appendChild(tdActions);
+                tbody.appendChild(tr);
+            });
+        }
+
+        function showAddAmapKeyModal() {
+            document.getElementById('addAmapKeyModal').style.display = 'flex';
+            document.getElementById('amap-new-keys').value = '';
+        }
+
+        function closeAddAmapKeyModal() {
+            document.getElementById('addAmapKeyModal').style.display = 'none';
+        }
+
+        async function submitAddAmapKey() {
+            const keysText = document.getElementById('amap-new-keys').value.trim();
+            if (!keysText) {
+                showToast('请输入至少一个 API 密钥', 'error');
+                return;
+            }
+            try {
+                const response = await fetch('/portal/api/amap-keys', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ api_keys: keysText })
+                });
+                const data = await response.json();
+                if (isAuthError(data)) { handleAuthError(); return; }
+                if (data.success) {
+                    const msg = '成功添加 ' + data.added_count + '/' + data.total + ' 个密钥';
+                    showToast(msg, 'success');
+                    closeAddAmapKeyModal();
+                    refreshAmapKeys();
+                } else {
+                    showToast(data.error || data.message || '添加密钥失败', 'error');
+                }
+            } catch (error) {
+                console.error('Error adding amap keys:', error);
+                showToast('添加密钥失败', 'error');
+            }
+        }
+
+        async function toggleAmapKey(id) {
+            try {
+                const response = await fetch('/portal/toggle-amap-key/keys/' + id, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                if (isAuthError(data)) { handleAuthError(); return; }
+                if (data.success) {
+                    showToast('密钥状态已更新', 'success');
+                    refreshAmapKeys();
+                } else {
+                    showToast(data.message || '切换状态失败', 'error');
+                }
+            } catch (error) {
+                console.error('Error toggling amap key:', error);
+                showToast('切换状态失败', 'error');
+            }
+        }
+
+        async function testAmapKey(id) {
+            showToast('Testing key #' + id + '...', 'info');
+            try {
+                const response = await fetch('/portal/test-amap-key/keys/' + id, {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + getSessionToken() }
+                });
+                const data = await response.json();
+                if (data.success) {
+                    showToast('Test passed! Latency: ' + data.latency_ms + 'ms', 'success');
+                } else {
+                    showToast('Test failed: ' + (data.message || 'unknown error'), 'error');
+                }
+                setTimeout(function() { refreshAmapKeys(); }, 500);
+            } catch (error) {
+                console.error('Error testing amap key:', error);
+                showToast('Failed to test key', 'error');
+            }
+        }
+
+        async function resetAmapKeyHealth(id) {
+            try {
+                const response = await fetch('/portal/reset-amap-key-health/keys/' + id, {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + getSessionToken() }
+                });
+                const data = await response.json();
+                if (data.success) {
+                    showToast('Health status reset', 'success');
+                    refreshAmapKeys();
+                } else {
+                    showToast(data.message || 'Failed to reset', 'error');
+                }
+            } catch (error) {
+                console.error('Error resetting amap key health:', error);
+                showToast('Failed to reset health', 'error');
+            }
+        }
+
+        async function deleteAmapKey(id) {
+            if (!confirm('Delete this Amap API key?')) return;
+            try {
+                const response = await fetch('/portal/api/amap-keys/keys/' + id, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': 'Bearer ' + getSessionToken() }
+                });
+                const data = await response.json();
+                if (data.success) {
+                    showToast('Key deleted', 'success');
+                    refreshAmapKeys();
+                } else {
+                    showToast(data.message || 'Failed to delete', 'error');
+                }
+            } catch (error) {
+                console.error('Error deleting amap key:', error);
+                showToast('Failed to delete key', 'error');
+            }
+        }
+
+        async function checkAllAmapKeys() {
+            showToast('Checking all Amap keys...', 'info');
+            try {
+                const response = await fetch('/portal/api/amap-keys/check-all', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + getSessionToken() }
+                });
+                const data = await response.json();
+                if (data.success) {
+                    showToast('Check complete: ' + data.healthy_count + '/' + data.total + ' healthy', 'success');
+                    refreshAmapKeys();
+                } else {
+                    showToast(data.message || 'Check failed', 'error');
+                }
+            } catch (error) {
+                console.error('Error checking all amap keys:', error);
+                showToast('Failed to check keys', 'error');
+            }
+        }
+
+        async function loadAmapConfig() {
+            try {
+                const response = await fetch('/portal/api/amap-config', {
+                    headers: { 'Authorization': 'Bearer ' + getSessionToken() }
+                });
+                const data = await response.json();
+                if (data.success) {
+                    const checkbox = document.getElementById('amap-allow-free-user');
+                    if (checkbox) {
+                        checkbox.checked = data.allow_free_user_amap || false;
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading amap config:', error);
+            }
+        }
+
+        async function saveAmapConfig() {
+            const allowFreeUser = document.getElementById('amap-allow-free-user').checked;
+            try {
+                const response = await fetch('/portal/api/amap-config', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer ' + getSessionToken(),
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ allow_free_user_amap: allowFreeUser })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    showToast('Config saved', 'success');
+                } else {
+                    showToast(data.message || 'Failed to save config', 'error');
+                }
+            } catch (error) {
+                console.error('Error saving amap config:', error);
+                showToast('Failed to save config', 'error');
+            }
+        }
+
+        // Amap Key Management exports
+        window.refreshAmapKeys = refreshAmapKeys;
+        window.showAddAmapKeyModal = showAddAmapKeyModal;
+        window.closeAddAmapKeyModal = closeAddAmapKeyModal;
+        window.submitAddAmapKey = submitAddAmapKey;
+        window.toggleAmapKey = toggleAmapKey;
+        window.testAmapKey = testAmapKey;
+        window.resetAmapKeyHealth = resetAmapKeyHealth;
+        window.deleteAmapKey = deleteAmapKey;
+        window.checkAllAmapKeys = checkAllAmapKeys;
+        window.loadAmapConfig = loadAmapConfig;
+        window.saveAmapConfig = saveAmapConfig;
