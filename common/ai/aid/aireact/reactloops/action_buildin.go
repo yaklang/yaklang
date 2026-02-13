@@ -53,9 +53,9 @@ var loopAction_DirectlyAnswer = &LoopAction{
 				payload = tagPayload
 			}
 		}
-		//if payload == "" {
-		//	return utils.Error("answer_payload is required for ActionDirectlyAnswer but empty")
-		//}
+		if payload == "" {
+			return utils.Error("answer_payload is required for ActionDirectlyAnswer but empty")
+		}
 		loop.Set("directly_answer_payload", payload)
 		return nil
 	},
