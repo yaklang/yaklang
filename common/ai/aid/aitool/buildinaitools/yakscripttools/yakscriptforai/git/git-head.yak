@@ -2,6 +2,14 @@ __DESC__ = "获取指定Git仓库的最新提交(HEAD)的哈希值。如果获�
 __VERBOSE_NAME__ = "Git HEAD哈希值工具"
 __KEYWORDS__ = "git,仓库,head,哈希,提交,版本控制,信息获取"
 
+__USAGE__ = <<<USAGE_BLOCK
+Git HEAD Hash Tool - Parameter Description for JSON Tool Calls
+
+Required Parameters:
+  repos           (string)  The local path to the target Git repository.
+                            Returns the commit hash of the current HEAD.
+USAGE_BLOCK
+
 yakit.AutoInitYakit()
 
 repos = cli.String("repos", cli.setRequired(true), cli.setHelp("target git repos"))

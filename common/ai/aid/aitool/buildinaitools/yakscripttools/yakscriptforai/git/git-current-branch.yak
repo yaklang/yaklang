@@ -2,6 +2,15 @@ __DESC__ = "一个用于获取指定Git仓库当前HEAD分支名称及其提交�
 __VERBOSE_NAME__ = "Git当前分支及提交范围工具"
 __KEYWORDS__ = "git工具,仓库管理,分支管理,head分支,提交范围,版本控制,代码管理,git信息查询"
 
+__USAGE__ = <<<USAGE_BLOCK
+Git Current Branch Tool - Parameter Description for JSON Tool Calls
+
+Required Parameters:
+  repos           (string)  The local path to the target Git repository.
+                            Returns the current HEAD branch name and its commit range
+                            (start and end commit hashes).
+USAGE_BLOCK
+
 yakit.AutoInitYakit()
 
 repos = cli.String("repos", cli.setRequired(true), cli.setHelp("target git repos"))

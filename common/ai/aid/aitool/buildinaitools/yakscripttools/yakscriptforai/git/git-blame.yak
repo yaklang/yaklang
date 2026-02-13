@@ -2,6 +2,22 @@ __DESC__ = "一个用于执行Git blame操作的工具，可以指定目标Git�
 __VERBOSE_NAME__ = "Git Blame工具"
 __KEYWORDS__ = "git blame,代码溯源,提交记录,代码归属,版本控制,git工具,仓库管理,文件历史"
 
+__USAGE__ = <<<USAGE_BLOCK
+Git Blame Tool - Parameter Description for JSON Tool Calls
+
+Required Parameters:
+  repos           (string)  The local path to the target Git repository.
+  filename        (string)  The file path (relative to the repository root) to blame.
+
+Optional Parameters:
+  ref             (string)  The Git reference (branch, tag, or commit hash) to blame from.
+                            Default: "HEAD".
+  limit           (int)     Maximum number of blame lines to return. Used together with
+                            offset for paginated (chunked) reading. Default: 20.
+  offset          (int)     Number of blame lines to skip from the start. Used together
+                            with limit for paginated reading. Default: 0.
+USAGE_BLOCK
+
 yakit.AutoInitYakit()
 
 repos = cli.String("repos", cli.setRequired(true), cli.setHelp("target git repos"))

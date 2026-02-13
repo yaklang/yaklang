@@ -2,6 +2,30 @@ __DESC__ = "一个统一的用于安全读取文件的工具，支持按字节�
 __VERBOSE_NAME__ = "统一文件读取工具"
 __KEYWORDS__ = "memory management,文件读取,大文件处理,file handling,reading,data processing,buffer,performance,内存安全,偏移读取,chunk size,offset,streaming,文件分块,数据块,文件处理,流式读取,large file,分段读取,lines size,line reading,统一读取"
 
+__USAGE__ = <<<USAGE_BLOCK
+Unified File Reader Tool - Parameter Description for JSON Tool Calls
+
+Required Parameters:
+  file            (string)  The target file path you want to read.
+
+Optional Parameters:
+  mode            (string)  Read mode that determines how the file is read:
+                            - "lines" (default): read by line segments, suitable for text files.
+                            - "chunk": read by byte chunks with offset, suitable for binary
+                              files or precise byte-level access.
+  chunk-size      (int)     Size of the byte chunk to read when mode is "chunk".
+                            Maximum and default: 30000 bytes.
+                            Only effective when mode is "chunk".
+  offset          (int)     Byte offset from the start of the file when mode is "chunk".
+                            Line offset (1-based) when mode is "lines".
+                            Default: 0.
+  lines           (int)     Number of lines to read when mode is "lines".
+                            Default: 50.
+  line-size       (int)     Maximum characters per line when mode is "lines".
+                            Lines exceeding this length will be truncated.
+                            Default: 512.
+USAGE_BLOCK
+
 /*
 统一文件读取工具
 

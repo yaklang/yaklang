@@ -2,6 +2,37 @@ __DESC__ = "一个强大的Git文件系统提取工具，支持从单个提交�
 __VERBOSE_NAME__ = "Git文件系统提取工具"
 __KEYWORDS__ = "git,文件系统,提交提取,日期范围,版本控制,代码管理,文件快照,git工具,commit range,date range"
 
+__USAGE__ = <<<USAGE_BLOCK
+Git Filesystem Extraction Tool - Parameter Description for JSON Tool Calls
+
+Required Parameters:
+  repos           (string)  The local path to the target Git repository.
+
+Optional Parameters:
+  mode            (string)  Extraction mode that determines how commits are selected:
+                            - "single-commit" (default): extract filesystem from a single
+                              commit or ref. Requires "ref" parameter.
+                            - "commit-range": extract from a range of commits.
+                              Requires "start-ref" and "end-ref" parameters.
+                            - "date": extract from all commits on a specific date.
+                              Requires "date" parameter (format: YYYY-MM-DD).
+                            - "date-range": extract from commits within a date range.
+                              Requires "start-date" and "end-date" parameters.
+  ref             (string)  Commit hash, branch name, tag, or ref for "single-commit" mode.
+                            Example: "HEAD", "main", "abc1234".
+  start-ref       (string)  Start commit hash or ref for "commit-range" mode.
+  end-ref         (string)  End commit hash or ref for "commit-range" mode.
+  date            (string)  Date string for "date" mode (format: YYYY-MM-DD).
+  start-date      (string)  Start date for "date-range" mode (format: YYYY-MM-DD).
+  end-date        (string)  End date for "date-range" mode (format: YYYY-MM-DD).
+
+Mode-Parameter Requirements:
+  single-commit : ref
+  commit-range  : start-ref, end-ref
+  date          : date
+  date-range    : start-date, end-date
+USAGE_BLOCK
+
 /*
 Git文件系统提取工具
 

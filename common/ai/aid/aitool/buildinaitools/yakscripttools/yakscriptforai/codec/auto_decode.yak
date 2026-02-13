@@ -2,6 +2,16 @@ __DESC__ = "一个自动尝试多种解码方法来处理给定文本的工具�
 __VERBOSE_NAME__ = "文本自动解码"
 __KEYWORDS__ = "文本解码,自动解码,编码识别,文本处理,解码工具,数据处理"
 
+__USAGE__ = <<<USAGE_BLOCK
+Auto Decode Tool - Parameter Description for JSON Tool Calls
+
+Required Parameters:
+  text            (string)  The encoded text to automatically decode. The tool will
+                            try all possible decoding methods (base64, url, hex, etc.)
+                            and display each successful decode result with the original
+                            text, decode type, and decoded output.
+USAGE_BLOCK
+
 text = cli.String("text", cli.setRequired(true), cli.setHelp("target text"))
 cli.check()
 count := 0

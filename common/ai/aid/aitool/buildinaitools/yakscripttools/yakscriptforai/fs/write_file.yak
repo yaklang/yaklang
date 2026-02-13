@@ -2,6 +2,21 @@ __DESC__ = "一个用于创建和写入文件的工具，支持将指定内容�
 __VERBOSE_NAME__ = "文件写入工具"
 __KEYWORDS__ = "file write,文件写入,文件创建,file creation,content writing,文件操作,file operations,text file,binary file,file save,保存文件,创建文件,写入内容,文件处理"
 
+__USAGE__ = <<<USAGE_BLOCK
+File Write Tool - Parameter Description for JSON Tool Calls
+
+Required Parameters:
+  file            (string)  The target file path to write to. If the parent directory
+                            does not exist, it will be created automatically.
+  content         (string)  The content to write into the file.
+
+Optional Parameters:
+  force           (bool)    Force overwrite if the file already exists.
+                            When false (default), the tool will refuse to overwrite
+                            an existing file and return an error.
+                            Set to true to allow overwriting. Default: false.
+USAGE_BLOCK
+
 yakit.AutoInitYakit()
 
 // 解析命令行参数：目标文件路径和要写入的内容
