@@ -49,13 +49,17 @@ yakit.Info("Viewing directory tree structure: %v", path)
 
 // 检查路径是否存在
 if !file.IsExisted(path) {
-    yakit.Error("Path does not exist: %v", path)
+    errMsg = sprintf("Path does not exist: %v", path)
+    yakit.Error(errMsg)
+    println(errMsg)
     return
 }
 
 // 检查是否是目录
 if !file.IsDir(path) {
-    yakit.Error("Path is not a directory: %v", path)
+    errMsg = sprintf("Path is not a directory: %v", path)
+    yakit.Error(errMsg)
+    println(errMsg)
     return
 }
 
@@ -84,15 +88,21 @@ shouldExcludePath = (filePath) => {
     return false
 }
 
-// Collect paths using filesys.Recursive with filtering
-// Each entry: {relPath: string, isDir: bool}
-entries = []
+// Collect all tree lines into a buffer for single output
+buf = bufio.NewBuffer()
 lineCount = 0
 dirCount = 0
 fileCount = 0
+truncated = false
 
 filesys.Recursive(path, filesys.onStat((isDir, pathname, info) => {
-    if lineCount >= maxLines { return }
+    defer func { recover() }
+
+    if truncated { return }
+    if lineCount >= maxLines {
+        truncated = true
+        return
+    }
 
     // Get relative path
     relPath = str.TrimPrefix(pathname, path)
@@ -123,19 +133,22 @@ filesys.Recursive(path, filesys.onStat((isDir, pathname, info) => {
     if isDir {
         name = name + "/"
     }
-    entries = append(entries, indent + name)
+    buf.WriteString(indent + name + "\n")
 }))
 
-// Output tree
-yakit.Info("Directory Tree Structure:")
-yakit.Info("========================")
-yakit.Info("%v", path)
-for entry in entries {
-    yakit.Info("%v", entry)
+// Build the complete result string
+result = bufio.NewBuffer()
+result.WriteString(sprintf("Directory: %v\n", path))
+result.WriteString("========================\n")
+result.WriteString(buf.String())
+result.WriteString("========================\n")
+result.WriteString(sprintf("%v directories, %v files\n", dirCount, fileCount))
+if truncated {
+    result.WriteString(sprintf("(output truncated at %v lines, use --max-lines to increase)\n", maxLines))
 }
-yakit.Info("========================")
-yakit.Info("%v directories, %v files", dirCount, fileCount)
-if lineCount >= maxLines {
-    yakit.Info("(output truncated at %v lines, use --max-lines to increase)", maxLines)
-}
-yakit.Info("Directory tree view completed")
+
+// Output to stdout (captured by AI tool framework as tool result)
+println(result.String())
+
+// Also log for visibility
+yakit.Info("Directory tree: %v (%v dirs, %v files)", path, dirCount, fileCount)
