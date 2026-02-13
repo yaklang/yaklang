@@ -375,6 +375,57 @@ func (m *SkillsContextManager) ChangeViewOffset(skillName, filePath string, offs
 	return nil
 }
 
+// IsSkillLoaded returns true if the given skill is currently loaded (either folded or unfolded).
+func (m *SkillsContextManager) IsSkillLoaded(skillName string) bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	_, ok := m.loadedSkills.Get(skillName)
+	return ok
+}
+
+// IsSkillLoadedAndUnfolded returns true if the skill is loaded and currently unfolded (fully visible).
+func (m *SkillsContextManager) IsSkillLoadedAndUnfolded(skillName string) bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	state, ok := m.loadedSkills.Get(skillName)
+	if !ok {
+		return false
+	}
+	return !state.IsFolded
+}
+
+// GetSkillViewSummary returns a human-readable summary of a loaded skill's view window state.
+// This is used to inform the AI about what content is already visible in the context.
+// Returns empty string if the skill is not loaded.
+func (m *SkillsContextManager) GetSkillViewSummary(skillName string) string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	state, ok := m.loadedSkills.Get(skillName)
+	if !ok {
+		return ""
+	}
+
+	var buf bytes.Buffer
+	if state.IsFolded {
+		buf.WriteString(fmt.Sprintf("Skill '%s' is loaded but FOLDED. Use loading_skills to unfold it.", skillName))
+		return buf.String()
+	}
+
+	buf.WriteString(fmt.Sprintf("Skill '%s' is loaded and ACTIVE in the SKILLS_CONTEXT section of your prompt. ", skillName))
+	buf.WriteString("View Windows:\n")
+	for filePath, vw := range state.ViewWindows {
+		totalLines := vw.TotalLines()
+		offset := vw.GetOffset()
+		truncInfo := ""
+		if vw.IsTruncated {
+			truncInfo = " (truncated, use change_skill_view_offset to see more)"
+		}
+		buf.WriteString(fmt.Sprintf("  - %s: %d total lines, viewing from line %d%s\n", filePath, totalLines, offset, truncInfo))
+	}
+	return buf.String()
+}
+
 // GetLoader returns the skill loader.
 func (m *SkillsContextManager) GetLoader() SkillLoader {
 	return m.loader
