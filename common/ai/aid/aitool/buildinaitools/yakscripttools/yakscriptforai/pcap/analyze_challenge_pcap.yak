@@ -2,6 +2,24 @@ __DESC__ = "专门用于分析chall.pcapng等网络安全挑战PCAP文件的工�
 __VERBOSE_NAME__ = "挑战PCAP分析工具"
 __KEYWORDS__ = "challenge,ctf,网络安全挑战,隐蔽通信,flag提取,网络工具分析,流量解密,恶意行为检测"
 
+__USAGE__ = <<<USAGE_BLOCK
+Challenge PCAP Analyzer Tool - Parameter Description for JSON Tool Calls
+
+Required Parameters:
+  file            (string)  Challenge PCAP file path to analyze (for example chall.pcapng).
+
+Optional Parameters:
+  extract-flags   (string)  Whether to automatically extract flags from traffic.
+                            Accepted values: "true"/"false". Default: "true".
+  decode-all      (string)  Whether to decode all suspicious encoded content.
+                            Accepted values: "true"/"false". Default: "true".
+  verbose         (string)  Enable verbose output mode.
+                            Accepted values: "true"/"false". Default: "false".
+  enable-reassembly (string)  Enable TCP stream reassembly.
+                            Accepted values: "true"/"false". Default: "true".
+  max-packets     (int)     Maximum packet count to process. Default: 100000.
+USAGE_BLOCK
+
 /*
 挑战PCAP分析工具
 

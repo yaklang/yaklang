@@ -2,6 +2,18 @@ __DESC__ = "检测环境变量PATH中是否存在指定的命令，用于确认�
 __VERBOSE_NAME__ = "命令可用性检测"
 __KEYWORDS__ = "command availability,path检测,环境变量,命令存在性,系统工具,dependency check,依赖检查,环境检查,工具验证,command validation,executable check,PATH环境变量,系统命令,which命令,where命令"
 
+__USAGE__ = <<<USAGE_BLOCK
+Command Availability Checker Tool - Parameter Description for JSON Tool Calls
+
+Required Parameters:
+  commands        (string)  Comma-separated command names to check in PATH.
+                            Example: "git,python,node".
+
+Optional Parameters:
+  verbose         (bool)    Whether to print detailed per-command diagnostics.
+                            Default: false.
+USAGE_BLOCK
+
 yakit.AutoInitYakit()
 
 // 解析命令行参数

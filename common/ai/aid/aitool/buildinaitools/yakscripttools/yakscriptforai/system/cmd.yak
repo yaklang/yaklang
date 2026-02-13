@@ -2,6 +2,17 @@ __DESC__ = "一个强大的Windows CMD命令执行工具，允许用户在受控
 __VERBOSE_NAME__ = "Windows命令执行"
 __KEYWORDS__ = "cmd command,windows命令,命令行工具,系统管理,自动化脚本,运维工具,batch script,command execution,系统操作,cmd脚本,终端命令,system administration,automation tools,操作系统,windows命令"
 
+__USAGE__ = <<<USAGE_BLOCK
+Windows CMD Command Tool - Parameter Description for JSON Tool Calls
+
+Required Parameters:
+  command         (string)  Windows CMD command to execute.
+
+Optional Parameters:
+  timeout         (int)     Timeout in seconds. Command is killed on timeout.
+                            Default: 10.
+USAGE_BLOCK
+
 yakit.AutoInitYakit()
 
 // 解析命令行参数：超时时间和要执行的cmd命令

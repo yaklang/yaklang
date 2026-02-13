@@ -2,6 +2,29 @@ __DESC__ = "一个用于输出信息安全风险的工具，允许用户指定�
 __VERBOSE_NAME__ = "信息安全风险输出工具"
 __KEYWORDS__ = "信息安全风险,漏洞报告,安全审计,风险输出,安全风险,漏洞描述,风险管理,风险报告"
 
+__USAGE__ = <<<USAGE_BLOCK
+Cybersecurity Risk Output Tool - Parameter Description for JSON Tool Calls
+
+Required Parameters:
+  target          (string)  Target affected by the security risk.
+                            Example: URL, IP, or IP:PORT.
+  title-en        (string)  One-line English title describing the risk.
+  title-zh        (string)  One-line Chinese title describing the risk.
+
+Optional Parameters:
+  risktype        (string)  Risk type identifier. Default: "baseline".
+  severity        (string)  Risk severity level. Supported values:
+                            "high", "middle", "low", "info", "debug".
+                            Default: "low".
+  desc            (string)  Detailed description of the risk.
+  solution        (string)  Recommended remediation or mitigation.
+  payload         (string)  Payload used to trigger or verify the risk.
+  http-request    (string)  Raw HTTP request content related to the finding.
+  http-request-file (string)  File path containing HTTP request content.
+  http-response   (string)  Raw HTTP response content or response file path.
+  http-response-file (string)  File path containing HTTP response content.
+USAGE_BLOCK
+
 yakit.AutoInitYakit()
 target := cli.String("target", cli.setHelp("你认为有安全漏洞或风险的目标（URL或者IP或者IP:PORT）"), cli.setRequired(true))
 // target = "www.example.com"

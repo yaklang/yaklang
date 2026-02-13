@@ -2,6 +2,18 @@ __DESC__ = "一个强大的PCAP数据包分析工具，支持解析网络数据�
 __VERBOSE_NAME__ = "PCAP数据包分析工具"
 __KEYWORDS__ = "pcap,packet analysis,网络分析,数据包,流量分析,协议解析,网络调试,packet capture,网络流量,数据包分析"
 
+__USAGE__ = <<<USAGE_BLOCK
+PCAP Analyzer Tool - Parameter Description for JSON Tool Calls
+
+Required Parameters:
+  file            (string)  PCAP file path to analyze (.pcap or .pcapng).
+
+Optional Parameters:
+  filter          (string)  Optional BPF filter expression used to limit packets.
+                            Example: "tcp port 80".
+  max-packets     (int)     Maximum packet count to process. Default: 50000.
+USAGE_BLOCK
+
 /*
 PCAP数据包分析工具
 

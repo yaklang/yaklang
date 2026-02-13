@@ -2,6 +2,25 @@ __DESC__ = "发送基础HTTP请求的工具，允许用户指定请求方法（�
 __VERBOSE_NAME__ = "基础HTTP请求工具(URL)"
 __KEYWORDS__ = "http请求,网络工具,web通信,请求工具,响应查看,基础请求,网络调试"
 
+__USAGE__ = <<<USAGE_BLOCK
+HTTP Request by URL Tool - Parameter Description for JSON Tool Calls
+
+Required Parameters:
+  url             (string)  The full target URL to request.
+
+Optional Parameters:
+  method          (string)  HTTP method to use. Default: "GET".
+  show-request    (string)  Whether to display and save the request packet.
+                            Accepted values: "yes"/"no". Default: "no".
+  param-position  (string)  Where to inject or modify parameter values.
+                            Accepted values: "query" (default), "post_form_encoded".
+  param-name      (string)  Parameter name to add or modify in the request.
+                            Works together with "param-value".
+  param-value     (string)  Parameter value to set for "param-name".
+  keyword         (string)  If provided, highlights and prints content around the
+                            keyword in the response (around 200 bytes context).
+USAGE_BLOCK
+
 yakit.AutoInitYakit()
 url = cli.String("url", cli.setHelp("需要指定的URL"), cli.setRequired(true))
 // url = "http://127.0.0.1:8787/xss/js/in-str?name=admin"

@@ -2,6 +2,15 @@ __DESC__ = "接收一个SSA RiskID获取SSA Risk或者SSA RiskID关联的问题�
 __VERBOSE_NAME_ = "通过SSA Risk ID获取SSA Risk或者SSA RiskID关联的问题代码"
 __KEYWORDS__ = "SSA, Risk, SSA Risk"
 
+__USAGE__ = <<<USAGE_BLOCK
+SSA Risk Query Tool - Parameter Description for JSON Tool Calls
+
+Required Parameters:
+  risk_id         (int)     SSA Risk record ID to query. Must be greater than 0.
+  get_full_code   (bool)    Whether to fetch and include full source code in the
+                            returned risk object when available.
+USAGE_BLOCK
+
 # 获取参数
 risk_id = cli.Int("risk_id", cli.setRequired(true))
 get_full_code = cli.Bool("get_full_code", cli.setRequired(true))

@@ -2,6 +2,26 @@ __DESC__ = "发送原始HTTP请求数据包，并接收完整的HTTP响应。工
 __VERBOSE_NAME__ = "HTTP请求数据包发送与响应分析"
 __KEYWORDS__ = "http请求,网络探测,数据包发送,流量分析,web工具,请求响应,内容匹配,网络测试,抓包"
 
+__USAGE__ = <<<USAGE_BLOCK
+HTTP Raw Packet Request Tool - Parameter Description for JSON Tool Calls
+
+Required Parameters:
+  packet          (string)  Raw HTTP request packet content to send.
+
+Optional Parameters:
+  https           (string)  Whether to use HTTPS transport. Accepted values:
+                            "yes"/"no". Default: "no".
+  match-request   (string)  Whether to run match logic on the request packet too.
+                            Accepted values: "yes"/"no". Default: "no".
+  regexp-match    (string)  Regular expression used to search request/response data.
+  substring-match (string)  Substring keyword used to search request/response data.
+  context-line    (int)     Number of context lines to display around each match.
+                            Default: 3.
+  redirect-times  (int)     Maximum redirect follow count. Set 0 to disable redirects.
+                            Default: 3.
+  timeout-seconds (int)     Request timeout in seconds. Default: 10.
+USAGE_BLOCK
+
 yakit.AutoInitYakit()
 
 // packet = `GET / HTTP/1.1

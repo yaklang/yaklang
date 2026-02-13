@@ -2,6 +2,20 @@ __DESC__ = "一个用于执行多种DNS查询的工具，包括A、AAAA、NS、A
 __VERBOSE_NAME__ = "DNS查询工具"
 __KEYWORDS__ = "domain name,域名解析,a记录,dns查询,dns helper,aaaa record,ns record,txt record,network tools,internet protocols,aaaa记录,dns queries,网络工具,ns记录,txt记录,域名信息,dns lookup,a record,axfr记录"
 
+__USAGE__ = <<<USAGE_BLOCK
+DNS Query Tool - Parameter Description for JSON Tool Calls
+
+Required Parameters:
+  domain          (string)  Target domain name to query.
+
+Optional Parameters:
+  type            (string)  DNS record type to query. Supported values include:
+                            "A", "AAAA", "NS", "TXT", "AXFR", or "*" for all.
+                            If omitted, tool checks common records (NS/A/AAAA/AXFR/TXT).
+  dns-servers     (string)  Comma-separated DNS server list.
+                            Example: "8.8.8.8,1.1.1.1".
+USAGE_BLOCK
+
 target = cli.String("domain", cli.setRequired(true), cli.setHelp("the target domain u want to check")) //"www.example.com"
 dnsType = cli.String("type", cli.setRequired(false), cli.setHelp("the record type you want to check, use '*' to query all, or some specific type name like 'A', 'NS' ... "))
 dnsServersRaw = cli.String("dns-servers", cli.setRequired(false), cli.setHelp("what dns server u want to use, default 8.8.8.8,1.1.1.1, multi-servers use comma ',' split "))

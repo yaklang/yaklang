@@ -2,6 +2,17 @@ __DESC__ = "一个强大的PowerShell命令执行工具，允许用户在受控�
 __VERBOSE_NAME__ = "Windows PowerShell命令执行"
 __KEYWORDS__ = "powershell command,ps1脚本,windows管理,命令行工具,系统管理,自动化脚本,运维工具,powershell script,command execution,系统操作,ps脚本,终端命令,system administration,automation tools,操作系统,windows高级命令,devops工具"
 
+__USAGE__ = <<<USAGE_BLOCK
+Windows PowerShell Command Tool - Parameter Description for JSON Tool Calls
+
+Required Parameters:
+  command         (string)  PowerShell command or script to execute.
+
+Optional Parameters:
+  timeout         (int)     Timeout in seconds. Command is killed on timeout.
+                            Default: 10.
+USAGE_BLOCK
+
 yakit.AutoInitYakit()
 
 // 解析命令行参数：超时时间和要执行的PowerShell命令

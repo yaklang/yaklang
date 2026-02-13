@@ -2,6 +2,19 @@ __DESC__ = "POC模板搜索工具，根据漏洞类型和攻击向量搜索和�
 __VERBOSE_NAME__ = "POC模板搜索工具"
 __KEYWORDS__ = "POC模板,漏洞利用模板,Python POC,代码模板,攻击向量,漏洞利用框架,安全测试模板"
 
+__USAGE__ = <<<USAGE_BLOCK
+POC Template Searcher Tool - Parameter Description for JSON Tool Calls
+
+Required Parameters:
+  vuln_type       (string)  Vulnerability type, such as "sqli", "xss", "rce".
+
+Optional Parameters:
+  attack_vector   (string)  Attack vector description used to refine templates.
+  language        (string)  Target application language for template adaptation.
+  include_examples (bool)   Whether to include usage examples in generated templates.
+                            Default: true.
+USAGE_BLOCK
+
 yakit.AutoInitYakit()
 
 vuln_type := cli.String("vuln_type", cli.setHelp("漏洞类型，如sqli、xss、rce等"), cli.setRequired(true))
