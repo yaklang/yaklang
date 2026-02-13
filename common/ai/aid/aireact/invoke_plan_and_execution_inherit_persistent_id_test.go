@@ -668,6 +668,7 @@ func TestReAct_ForgeExecution_Task_UserQueryContext(t *testing.T) {
 		}),
 		aicommon.WithPersistentSessionId(persistentId),
 		aicommon.WithAgreeYOLO(true),
+		aicommon.WithShowForgeListInPrompt(true), // forge execution test needs forge visible in prompt
 		// 注意：不使用 hijack，让代码真正执行到 forge execution 的参数处理逻辑
 		// 通过监听 START_PLAN_AND_EXECUTION 事件来验证参数
 	)

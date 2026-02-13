@@ -148,12 +148,19 @@ func (r *ReActLoop) generateLoopPrompt(
 		skillsContext = r.skillsContextManager.Render(nonce)
 	}
 
+	// Render extra capabilities discovered via intent recognition
+	var extraCapabilities string
+	if r.extraCapabilities != nil && r.extraCapabilities.HasCapabilities() {
+		extraCapabilities = r.extraCapabilities.Render(nonce)
+	}
+
 	infos["InjectedMemory"] = memory
 	infos["ReactiveData"] = reactiveData
 	infos["Background"] = background
 	infos["PersistentContext"] = persistent
 	infos["OutputExample"] = outputExample
 	infos["SkillsContext"] = skillsContext
+	infos["ExtraCapabilities"] = extraCapabilities
 	infos["Nonce"] = nonce
 	infos["UserQuery"] = userInput
 	infos["Schema"] = schema

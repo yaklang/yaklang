@@ -171,6 +171,7 @@ func TestReAct_PlanAndExecute_TaskCancel(t *testing.T) {
 		}),
 		aicommon.WithAgreeYOLO(true),
 		aicommon.WithTools(mockCancelTool),
+		aicommon.WithShowForgeListInPrompt(true), // forge execution test needs forge visible in prompt
 	)
 	if err != nil {
 		t.Fatal(err)
