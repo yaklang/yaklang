@@ -1,0 +1,427 @@
+__DESC__ = "A powerful HTTP request tool comparable to curl. Supports two modes: URL mode (specify URL, method, headers, body, params) and Packet mode (send raw HTTP request packet). Features include timeout control, redirect handling, keyword/regex matching, proxy support, and HTTPS auto-detection."
+__VERBOSE_NAME__ = "Powerful HTTP Request Tool (curl-like)"
+__KEYWORDS__ = "http request,curl,web,network,packet,raw request,http response,url,post,get,https,proxy,redirect,header,body,api,http tool,web debug,traffic"
+
+__USAGE__ = <<<USAGE_BLOCK
+Powerful HTTP Request Tool - Usage Guide for AI Parameter Generation
+
+This tool supports two modes of operation:
+  1. URL Mode: Provide a URL with optional method, headers, body, and params.
+  2. Packet Mode: Provide a raw HTTP request packet string.
+
+If "packet" is provided, the tool uses Packet Mode. Otherwise, "url" is required
+for URL Mode. Both modes share the common parameters below.
+
+## Parameters
+
+--- URL Mode Parameters ---
+Required (when packet is empty):
+  url             (string)  The full target URL. Example: "https://example.com/api/v1/users".
+
+Optional:
+  method          (string)  HTTP method. Default: "GET".
+  headers         (string)  Custom headers, one per line: "Key: Value\nKey2: Value2".
+  body            (string)  Request body content (for POST/PUT/PATCH).
+  content-type    (string)  Content-Type header value. Example: "application/json".
+  query-params    (string)  URL query parameters: "k1=v1&k2=v2".
+  post-params     (string)  POST form parameters (application/x-www-form-urlencoded): "k1=v1&k2=v2".
+
+--- Packet Mode Parameters ---
+Required (when url is empty):
+  packet          (string)  Raw HTTP request packet to send directly.
+                            IMPORTANT: Raw HTTP packets are multi-line text. You MUST use
+                            AITAG format for the packet parameter to preserve line breaks
+                            and special characters. See examples below.
+
+--- Common Parameters ---
+Optional:
+  https           (string)  Force HTTPS transport: "yes"/"no"/"auto". Default: "auto"
+                            (auto-detect from URL scheme or packet Host header).
+  timeout         (int)     Request timeout in seconds. Default: 10.
+  redirect-times  (int)     Maximum redirects to follow. 0 disables redirects. Default: 3.
+  keyword         (string)  Highlight and print context around this keyword in the response.
+  regexp-match    (string)  Regular expression to search in the response.
+  show-request    (string)  Display the full request packet: "yes"/"no". Default: "no".
+  proxy           (string)  Proxy URL. Example: "http://127.0.0.1:8080" or "socks5://127.0.0.1:1080".
+
+## Few-Shot Examples
+
+Replace {NONCE} with the actual nonce from the response format section.
+
+### Example 1: Simple GET request (URL mode, JSON params)
+
+User intent: "Fetch the homepage of example.com"
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "do_http_request",
+  "identifier": "fetch_homepage",
+  "params": {
+    "url": "https://example.com",
+    "timeout": 10
+  }
+}
+```
+
+### Example 2: POST JSON data (URL mode, AITAG for body)
+
+User intent: "Send a JSON POST to an API endpoint"
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "do_http_request",
+  "identifier": "post_json_api",
+  "params": {
+    "url": "https://api.example.com/v1/users",
+    "method": "POST",
+    "content-type": "application/json",
+    "timeout": 15
+  }
+}
+```
+
+<|TOOL_PARAM_body_{NONCE}|>
+{
+  "username": "admin",
+  "email": "admin@example.com",
+  "role": "administrator"
+}
+<|TOOL_PARAM_body_END_{NONCE}|>
+
+### Example 3: Send raw HTTP packet (Packet mode, AITAG for packet) - RECOMMENDED for complex requests
+
+User intent: "Send a crafted HTTP request with custom headers and body"
+
+This is the most powerful mode. Use AITAG to pass the complete raw HTTP packet,
+preserving exact formatting, headers, and body content.
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "do_http_request",
+  "identifier": "raw_packet_request",
+  "params": {
+    "https": "yes",
+    "timeout": 15,
+    "keyword": "success"
+  }
+}
+```
+
+<|TOOL_PARAM_packet_{NONCE}|>
+POST /api/v1/login HTTP/1.1
+Host: api.example.com
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
+User-Agent: Mozilla/5.0
+Accept: application/json
+
+{"username":"admin","password":"P@ssw0rd"}
+<|TOOL_PARAM_packet_END_{NONCE}|>
+
+### Example 4: Replay a captured request with modifications (Packet mode, AITAG)
+
+User intent: "Replay this HTTP request I captured from the proxy"
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "do_http_request",
+  "identifier": "replay_captured_request",
+  "params": {
+    "https": "auto",
+    "timeout": 10,
+    "redirect-times": 0,
+    "show-request": "yes"
+  }
+}
+```
+
+<|TOOL_PARAM_packet_{NONCE}|>
+GET /admin/dashboard HTTP/1.1
+Host: target.example.com
+Cookie: session=abc123; token=xyz789
+Referer: https://target.example.com/login
+Accept: text/html,application/xhtml+xml
+
+<|TOOL_PARAM_packet_END_{NONCE}|>
+
+### Example 5: URL mode with query params and keyword search
+
+User intent: "Search the API and look for 'error' in response"
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "do_http_request",
+  "identifier": "api_search_check",
+  "params": {
+    "url": "https://api.example.com/search",
+    "query-params": "q=test&page=1&limit=10",
+    "keyword": "error",
+    "timeout": 10
+  }
+}
+```
+USAGE_BLOCK
+
+yakit.AutoInitYakit()
+
+// --- parse parameters ---
+// URL mode params
+urlStr = cli.String("url", cli.setHelp("target URL for URL mode"), cli.setRequired(false))
+method = cli.String("method", cli.setHelp("HTTP method"), cli.setDefault("GET"))
+headers = cli.String("headers", cli.setHelp("custom headers, one per line: Key: Value"), cli.setRequired(false))
+body = cli.String("body", cli.setHelp("request body content"), cli.setRequired(false))
+contentType = cli.String("content-type", cli.setHelp("Content-Type header"), cli.setRequired(false))
+queryParams = cli.String("query-params", cli.setHelp("URL query params: k1=v1&k2=v2"), cli.setRequired(false))
+postParams = cli.String("post-params", cli.setHelp("POST form params: k1=v1&k2=v2"), cli.setRequired(false))
+
+// Packet mode params
+packet = cli.String("packet", cli.setHelp("raw HTTP request packet for Packet mode"), cli.setRequired(false))
+
+// Common params
+httpsMode = cli.String("https", cli.setHelp("force HTTPS: yes/no/auto"), cli.setDefault("auto"))
+timeout = cli.Int("timeout", cli.setHelp("request timeout in seconds"), cli.setDefault(10))
+redirectTimes = cli.Int("redirect-times", cli.setHelp("max redirect follows, 0 to disable"), cli.setDefault(3))
+keyword = cli.String("keyword", cli.setHelp("keyword to highlight in response"), cli.setRequired(false))
+regexpMatch = cli.String("regexp-match", cli.setHelp("regex to search in response"), cli.setRequired(false))
+showRequest = cli.String("show-request", cli.setHelp("display request packet: yes/no"), cli.setDefault("no"))
+proxy = cli.String("proxy", cli.setHelp("proxy URL, e.g. http://127.0.0.1:8080"), cli.setRequired(false))
+cli.check()
+
+// --- validation ---
+if packet == "" && urlStr == "" {
+    yakit.Error("either 'url' (URL mode) or 'packet' (Packet mode) must be provided")
+    return
+}
+
+// --- build poc options ---
+opts = []
+redirectLogs = []
+
+// timeout
+if timeout > 0 {
+    opts.Push(poc.timeout(float64(timeout)))
+}
+
+// redirect handling
+redirectCount = 0
+if redirectTimes <= 0 {
+    opts.Push(poc.noRedirect(true))
+} else {
+    opts.Push(poc.noRedirect(false), poc.redirectTimes(int(redirectTimes)))
+    opts.Push(poc.redirectHandler((redirectIsHttps, redirectReq, redirectRsp) => {
+        redirectCount++
+        redirectUrl = poc.GetHTTPPacketHeader(redirectRsp, "Location")
+        statusCode = poc.GetStatusCodeFromResponse(redirectRsp)
+        yakit.Info("redirect #%d [%v] -> %v", redirectCount, statusCode, redirectUrl)
+        logEntry = sprintf("========== Redirect #%d [Status: %v] ==========\nTarget: %v\n\n--- Request ---\n%v\n\n--- Response ---\n%v\n\n",
+            redirectCount, statusCode, redirectUrl, string(redirectReq), string(redirectRsp))
+        redirectLogs.Push(logEntry)
+        return true
+    }))
+}
+
+// proxy
+if proxy != "" {
+    opts.Push(poc.proxy(proxy))
+    yakit.Info("using proxy: %v", proxy)
+}
+
+// --- determine HTTPS ---
+resolveHttps = func(isAutoDetected) {
+    httpsLower = str.ToLower(httpsMode)
+    if httpsLower == "yes" || httpsLower == "y" || httpsLower == "true" {
+        return true
+    }
+    if httpsLower == "no" || httpsLower == "n" || httpsLower == "false" {
+        return false
+    }
+    // auto mode: use detected value
+    return isAutoDetected
+}
+
+// --- build and send request ---
+rawPacket = undefined
+isHttps = false
+
+if packet != "" {
+    // === Packet Mode ===
+    yakit.Info("mode: Packet (raw HTTP request)")
+    rawPacket = []byte(packet)
+
+    // detect HTTPS from packet Host header
+    host = poc.GetHTTPPacketHeader(rawPacket, "Host")
+    autoHttps = str.HasPrefix(str.ToLower(host), "443") || str.Contains(host, ":443")
+    isHttps = resolveHttps(autoHttps)
+
+    url = poc.GetUrlFromHTTPRequest(isHttps ? "https" : "http", rawPacket)
+    methodStr = poc.GetHTTPRequestMethod(rawPacket)
+    if url != "" {
+        yakit.Info("packet target: [%v] %v (https=%v)", methodStr, url, isHttps)
+    }
+} else {
+    // === URL Mode ===
+    yakit.Info("mode: URL (%v %v)", method, urlStr)
+
+    // parse URL to raw packet
+    autoHttps, parsedPacket, err := poc.ParseUrlToHTTPRequestRaw(method, urlStr)
+    if err != nil {
+        yakit.Error("failed to parse URL to HTTP request: %v", err)
+        return
+    }
+    rawPacket = parsedPacket
+    isHttps = resolveHttps(autoHttps)
+
+    // apply custom Content-Type
+    if contentType != "" {
+        rawPacket = poc.ReplaceHTTPPacketHeader(rawPacket, "Content-Type", contentType)
+    }
+
+    // apply custom headers
+    if headers != "" {
+        for _, line := range str.SplitAndTrim(headers, "\n") {
+            line = str.TrimSpace(line)
+            if line == "" {
+                continue
+            }
+            idx = str.Index(line, ":")
+            if idx <= 0 {
+                continue
+            }
+            hKey = str.TrimSpace(line[:idx])
+            hVal = str.TrimSpace(line[idx+1:])
+            if hKey != "" {
+                rawPacket = poc.ReplaceHTTPPacketHeader(rawPacket, hKey, hVal)
+            }
+        }
+    }
+
+    // apply query params
+    if queryParams != "" {
+        for _, pair := range str.SplitAndTrim(queryParams, "&") {
+            parts = str.SplitN(pair, "=", 2)
+            if len(parts) == 2 {
+                rawPacket = poc.ReplaceHTTPPacketQueryParam(rawPacket, parts[0], parts[1])
+            } elif len(parts) == 1 && parts[0] != "" {
+                rawPacket = poc.ReplaceHTTPPacketQueryParam(rawPacket, parts[0], "")
+            }
+        }
+    }
+
+    // apply post params
+    if postParams != "" {
+        for _, pair := range str.SplitAndTrim(postParams, "&") {
+            parts = str.SplitN(pair, "=", 2)
+            if len(parts) == 2 {
+                rawPacket = poc.ReplaceHTTPPacketPostParam(rawPacket, parts[0], parts[1])
+            } elif len(parts) == 1 && parts[0] != "" {
+                rawPacket = poc.ReplaceHTTPPacketPostParam(rawPacket, parts[0], "")
+            }
+        }
+    }
+
+    // apply body (overrides post-params if both provided)
+    if body != "" {
+        rawPacket = poc.ReplaceHTTPPacketBody(rawPacket, []byte(body))
+    }
+}
+
+opts.Push(poc.https(isHttps))
+
+// --- execute request ---
+rspIns, _, err := poc.HTTPEx(rawPacket, opts...)
+if err != nil {
+    yakit.Error("HTTP request failed: %v", err)
+    return
+}
+
+rsp = rspIns.RawPacket
+req = rspIns.RawRequest
+
+// --- report results ---
+// connection info
+if rspIns.PortIsOpen {
+    yakit.Info("remote %v is open", rspIns.RemoteAddr)
+}
+try {
+    yakit.Info("dns: %v, connect: %v, server: %v, total: %v",
+        rspIns.TraceInfo.DNSTime.String(),
+        rspIns.TraceInfo.ConnTime.String(),
+        rspIns.TraceInfo.ServerTime.String(),
+        rspIns.TraceInfo.TotalTime.String())
+} catch e {}
+
+// status line
+try {
+    rspStr = string(rsp)
+    crlfIdx = str.Index(rspStr, "\r\n")
+    if crlfIdx > 0 {
+        statusLine = rspStr[:crlfIdx]
+        yakit.Info("response: %v (body size: %v)", statusLine, rspIns.ResponseBodySize)
+    } else {
+        yakit.Info("response body size: %v", rspIns.ResponseBodySize)
+    }
+} catch e {
+    yakit.Info("response body size: %v", rspIns.ResponseBodySize)
+}
+
+// save request if requested
+if str.ToLower(showRequest) in ["yes", "y", "true"] {
+    reqFile, err := file.TempFileName("http-request-*.txt")
+    if err == nil {
+        file.Save(reqFile, string(req))
+        yakit.Info("request packet [size:%v] saved to %v", len(req), reqFile)
+    }
+}
+
+// save response
+rspFile, err := file.TempFileName("http-response-*.txt")
+if err != nil {
+    yakit.Error("failed to create temp file for response: %v", err)
+} else {
+    file.Save(rspFile, string(rsp))
+    yakit.Info("response packet [size:%v] saved to %v", len(rsp), rspFile)
+}
+
+// save redirect logs
+if len(redirectLogs) > 0 {
+    redirectFile, err := file.TempFileName("http-redirect-logs-*.txt")
+    if err == nil {
+        file.Save(redirectFile, str.Join(redirectLogs, "\n"))
+        yakit.Info("%d redirects recorded, saved to %v", len(redirectLogs), redirectFile)
+    }
+}
+
+// print response body inline if small enough
+if len(rsp) > 0 && len(rsp) < 30000 {
+    yakit.Info("response packet:\n%v", string(rsp))
+}
+
+// keyword and regex matching
+if keyword != "" || regexpMatch != "" {
+    edt := memeditor.New(string(rsp))
+    if keyword != "" {
+        edt.FindStringRange(keyword, rg => {
+            matchContent := rg.GetTextContextWithPrompt(3)
+            if len(matchContent) > 30000 {
+                yakit.Info("keyword match [size:%v]:\n%v\n... (truncated)", len(matchContent), matchContent[:30000])
+            } else {
+                yakit.Info("keyword match:\n%v", matchContent)
+            }
+        })
+    }
+    if regexpMatch != "" {
+        edt.FindRegexpRange(regexpMatch, rg => {
+            matchContent := rg.GetTextContextWithPrompt(3)
+            if len(matchContent) > 30000 {
+                yakit.Info("regexp match [size:%v]:\n%v\n... (truncated)", len(matchContent), matchContent[:30000])
+            } else {
+                yakit.Info("regexp match:\n%v", matchContent)
+            }
+        })
+    }
+}

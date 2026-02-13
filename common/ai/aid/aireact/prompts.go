@@ -93,6 +93,7 @@ type LoopPromptData struct {
 	WorkingDir         string
 	WorkingDirGlance   string
 	AIForgeList        string
+	ShowForgeList      bool
 	Tools              []*aitool.Tool
 	ToolsCount         int
 	TopTools           []*aitool.Tool
@@ -313,6 +314,9 @@ func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[s
 	if allowPlanAndExec {
 		result["AIForgeList"] = pm.GetAvailableAIForgeBlueprints()
 	}
+	// ShowForgeList controls whether forge list is rendered in base prompt
+	// Default false: forges are discoverable via search_capabilities instead of being listed in prompt
+	result["ShowForgeList"] = pm.react.config.GetShowForgeListInPrompt()
 	result["AllowAskForClarification"] = pm.react.config.GetEnableUserInteract()
 	result["AllowKnowledgeEnhanceAnswer"] = pm.react.config.GetEnhanceKnowledgeManager() == nil || !pm.react.config.GetDisableEnhanceDirectlyAnswer()
 	result["AskForClarificationCurrentTime"] = pm.react.currentUserInteractiveCount

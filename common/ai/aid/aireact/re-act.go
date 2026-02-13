@@ -17,6 +17,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/searchtools"
 	"github.com/yaklang/yaklang/common/ai/rag/rag_search_tool"
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/consts"
@@ -589,12 +590,76 @@ func WithBuiltinTools() aicommon.ConfigOption {
 		// Create keyword searcher
 		aiToolSearcher := rag_search_tool.NewComprehensiveSearcher[*aitool.Tool](rag_search_tool.AIToolVectorIndexName, aiChatFunc)
 		forgeSearcher := rag_search_tool.NewComprehensiveSearcher[*schema.AIForge](rag_search_tool.ForgeVectorIndexName, aiChatFunc)
-		// Enable tool search functionality
-		log.Infof("Added %d builtin AI tools with search capability", len(allTools))
+
+		// Build unified search_capabilities config with skill search support
+		searchCapCfg := &searchtools.SearchCapabilitiesConfig{
+			ToolSearcher:  aiToolSearcher,
+			ToolsGetter: func() []*aitool.Tool {
+				return buildinaitools.GetAllTools()
+			},
+			ForgeSearcher: forgeSearcher,
+			ForgesGetter: func() []*schema.AIForge {
+				forgeList, err := yakit.GetAllAIForge(consts.GetGormProfileDatabase())
+				if err != nil {
+					log.Errorf("get all ai forge error: %v", err)
+				}
+				return forgeList
+			},
+		}
+
+		// Inject skill search function if skill loader is available
+		// Note: SkillLoader interface only exposes AllSkillMetas(), so we do manual substring search.
+		// The closure captures cfg and will resolve skill loader at call time (after skills are fully loaded).
+		searchCapCfg.SkillSearchFn = func(query string, limit int) ([]map[string]string, error) {
+			skillLoader := cfg.GetSkillLoader()
+			if skillLoader == nil || !skillLoader.HasSkills() {
+				return nil, nil
+			}
+			queryLower := strings.ToLower(query)
+			queryTokens := strings.Fields(queryLower)
+			var results []map[string]string
+			for _, meta := range skillLoader.AllSkillMetas() {
+				if len(results) >= limit {
+					break
+				}
+				searchText := strings.ToLower(meta.Name + " " + meta.Description)
+				matched := false
+				// Full query match
+				if strings.Contains(searchText, queryLower) {
+					matched = true
+				}
+				// Token-level match for multi-word queries
+				if !matched && len(queryTokens) > 1 {
+					meaningfulTokens, matchCount := 0, 0
+					for _, token := range queryTokens {
+						if len(token) < 2 {
+							continue
+						}
+						meaningfulTokens++
+						if strings.Contains(searchText, token) {
+							matchCount++
+						}
+					}
+					if meaningfulTokens > 0 && matchCount >= (meaningfulTokens+1)/2 {
+						matched = true
+					}
+				}
+				if matched {
+					results = append(results, map[string]string{
+						"Name":        meta.Name,
+						"Description": meta.Description,
+					})
+				}
+			}
+			return results, nil
+		}
+
+		// Enable unified search_capabilities (replaces tools_search + aiforge_search)
+		log.Infof("Added %d builtin AI tools with unified search_capabilities", len(allTools))
 		return aicommon.WithAiToolManagerOptions(
 			buildinaitools.WithExtendTools(allTools, true),
-			buildinaitools.WithSearchToolEnabled(true),
-			buildinaitools.WithForgeSearchToolEnabled(true),
+			buildinaitools.WithSearchCapabilitiesEnabled(true),
+			buildinaitools.WithSearchCapabilitiesConfig(searchCapCfg),
 			buildinaitools.WithAIToolsSearcher(aiToolSearcher),
 			buildinaitools.WithAiForgeSearcher(forgeSearcher))(cfg)
 	}
