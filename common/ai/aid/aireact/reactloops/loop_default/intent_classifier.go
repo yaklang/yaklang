@@ -7,6 +7,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -332,7 +333,8 @@ func truncateString(s string, maxLen int) string {
 	return string(runes[:maxLen]) + "..."
 }
 
-// applyFastMatchResult injects fast match results into the loop context.
+// applyFastMatchResult injects fast match results into the loop context
+// and populates ExtraCapabilities with matched tools, forges, and focus modes.
 func applyFastMatchResult(r aicommon.AIInvokeRuntime, loop *reactloops.ReActLoop, result *FastMatchResult) {
 	if result == nil {
 		return
@@ -352,6 +354,60 @@ func applyFastMatchResult(r aicommon.AIInvokeRuntime, loop *reactloops.ReActLoop
 		loop.Set("intent_matched_capabilities", result.ContextSummary)
 		r.AddToTimeline("intent_context", result.ContextSummary)
 		log.Infof("intent classification: capabilities matched via fast BM25 search")
+
+		// Populate ExtraCapabilities from fast match results
+		populateExtraCapabilitiesFromFastMatch(r, loop, result)
+	}
+}
+
+// populateExtraCapabilitiesFromFastMatch adds fast match results to the loop's ExtraCapabilitiesManager.
+// Fast match already has resolved objects (schema.AIYakTool, schema.AIForge, LoopMetadata),
+// so no name-to-object resolution is needed.
+func populateExtraCapabilitiesFromFastMatch(r aicommon.AIInvokeRuntime, loop *reactloops.ReActLoop, result *FastMatchResult) {
+	ecm := loop.GetExtraCapabilities()
+	if ecm == nil {
+		return
+	}
+
+	// Convert schema.AIYakTool to aitool.Tool and add
+	if len(result.MatchedTools) > 0 {
+		toolMgr := r.GetConfig().GetAiToolManager()
+		if toolMgr != nil {
+			for _, schTool := range result.MatchedTools {
+				tool, err := toolMgr.GetToolByName(schTool.Name)
+				if err != nil {
+					log.Debugf("extra capabilities (fast): skip tool %q: %v", schTool.Name, err)
+					continue
+				}
+				ecm.AddTools(tool)
+			}
+		}
+	}
+
+	// Add matched forges
+	if len(result.MatchedForges) > 0 {
+		for _, forge := range result.MatchedForges {
+			ecm.AddForges(reactloops.ExtraForgeInfo{
+				Name:        forge.ForgeName,
+				VerboseName: forge.ForgeVerboseName,
+				Description: forge.Description,
+			})
+		}
+	}
+
+	// Add matched focus modes (loops)
+	if len(result.MatchedLoops) > 0 {
+		for _, meta := range result.MatchedLoops {
+			ecm.AddFocusModes(reactloops.ExtraFocusModeInfo{
+				Name:        meta.Name,
+				Description: meta.Description,
+			})
+		}
+	}
+
+	if ecm.HasCapabilities() {
+		log.Infof("extra capabilities populated from fast match: %d tools, %d forges, %d focus modes",
+			ecm.ToolCount(), len(ecm.ListForges()), len(ecm.ListFocusModes()))
 	}
 }
 
@@ -361,6 +417,11 @@ type DeepIntentResult struct {
 	RecommendedTools  string
 	RecommendedForges string
 	ContextEnrichment string
+
+	// Raw comma-separated name lists for populating ExtraCapabilities
+	MatchedToolNames  string // e.g. "tool1,tool2,tool3"
+	MatchedForgeNames string // e.g. "forge1,forge2"
+	MatchedSkillNames string // e.g. "skill1,skill2"
 }
 
 // executeDeepIntentRecognition invokes the hidden loop_intent loop
@@ -409,6 +470,9 @@ func executeDeepIntentRecognition(r aicommon.AIInvokeRuntime, loop *reactloops.R
 		RecommendedTools:  intentLoop.Get("recommended_tools"),
 		RecommendedForges: intentLoop.Get("recommended_forges"),
 		ContextEnrichment: intentLoop.Get("context_enrichment"),
+		MatchedToolNames:  intentLoop.Get("matched_tool_names"),
+		MatchedForgeNames: intentLoop.Get("matched_forge_names"),
+		MatchedSkillNames: intentLoop.Get("matched_skill_names"),
 	}
 
 	log.Infof("deep intent recognition completed: analysis=%d bytes, tools=%d bytes, forges=%d bytes, enrichment=%d bytes",
@@ -418,7 +482,8 @@ func executeDeepIntentRecognition(r aicommon.AIInvokeRuntime, loop *reactloops.R
 	return result
 }
 
-// applyDeepIntentResult injects deep intent recognition results into the loop context.
+// applyDeepIntentResult injects deep intent recognition results into the loop context
+// and populates the ExtraCapabilitiesManager with resolved tools, forges, skills, and focus modes.
 func applyDeepIntentResult(r aicommon.AIInvokeRuntime, loop *reactloops.ReActLoop, result *DeepIntentResult) {
 	if result == nil {
 		return
@@ -447,5 +512,104 @@ func applyDeepIntentResult(r aicommon.AIInvokeRuntime, loop *reactloops.ReActLoo
 		r.AddToTimeline("intent_context_enrichment", result.ContextEnrichment)
 	}
 
+	// Populate ExtraCapabilities with resolved objects
+	populateExtraCapabilitiesFromDeepIntent(r, loop, result)
+
 	log.Infof("deep intent results applied to loop context")
+}
+
+// populateExtraCapabilitiesFromDeepIntent resolves matched names to actual objects
+// and adds them to the loop's ExtraCapabilitiesManager.
+func populateExtraCapabilitiesFromDeepIntent(r aicommon.AIInvokeRuntime, loop *reactloops.ReActLoop, result *DeepIntentResult) {
+	ecm := loop.GetExtraCapabilities()
+	if ecm == nil {
+		return
+	}
+
+	cfg := r.GetConfig()
+
+	// 1. Resolve and add tools
+	if result.MatchedToolNames != "" {
+		toolNames := splitAndTrimNames(result.MatchedToolNames)
+		toolMgr := cfg.GetAiToolManager()
+		if toolMgr != nil {
+			for _, name := range toolNames {
+				tool, err := toolMgr.GetToolByName(name)
+				if err != nil {
+					log.Debugf("extra capabilities: skip tool %q: %v", name, err)
+					continue
+				}
+				ecm.AddTools(tool)
+			}
+		}
+	}
+
+	// 2. Resolve and add forges
+	if result.MatchedForgeNames != "" {
+		forgeNames := splitAndTrimNames(result.MatchedForgeNames)
+		type forgeManagerProvider interface {
+			GetAIForgeManager() aicommon.AIForgeFactory
+		}
+		if provider, ok := cfg.(forgeManagerProvider); ok {
+			forgeMgr := provider.GetAIForgeManager()
+			if forgeMgr != nil {
+				for _, name := range forgeNames {
+					forge, err := forgeMgr.GetAIForge(name)
+					if err != nil {
+						log.Debugf("extra capabilities: skip forge %q: %v", name, err)
+						continue
+					}
+					ecm.AddForges(reactloops.ExtraForgeInfo{
+						Name:        forge.ForgeName,
+						VerboseName: forge.ForgeVerboseName,
+						Description: forge.Description,
+					})
+				}
+			}
+		}
+	}
+
+	// 3. Resolve and add skills
+	if result.MatchedSkillNames != "" {
+		skillNames := splitAndTrimNames(result.MatchedSkillNames)
+		type skillLoaderProvider interface {
+			GetSkillLoader() aiskillloader.SkillLoader
+		}
+		if provider, ok := cfg.(skillLoaderProvider); ok {
+			skillLoader := provider.GetSkillLoader()
+			if skillLoader != nil && skillLoader.HasSkills() {
+				allMetas := skillLoader.AllSkillMetas()
+				nameSet := make(map[string]bool, len(skillNames))
+				for _, n := range skillNames {
+					nameSet[strings.ToLower(n)] = true
+				}
+				for _, meta := range allMetas {
+					if nameSet[strings.ToLower(meta.Name)] {
+						ecm.AddSkills(reactloops.ExtraSkillInfo{
+							Name:        meta.Name,
+							Description: meta.Description,
+						})
+					}
+				}
+			}
+		}
+	}
+
+	if ecm.HasCapabilities() {
+		log.Infof("extra capabilities populated from deep intent: %d tools, %d forges, %d skills",
+			ecm.ToolCount(), len(ecm.ListForges()), len(ecm.ListSkills()))
+	}
+}
+
+// splitAndTrimNames splits a comma-separated string into trimmed non-empty names.
+func splitAndTrimNames(s string) []string {
+	parts := strings.Split(s, ",")
+	var result []string
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			result = append(result, p)
+		}
+	}
+	return result
 }

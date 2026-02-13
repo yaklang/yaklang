@@ -4,6 +4,11 @@
 {{ .UserQuery }}
 <|USER_QUERY_END_{{ .Nonce }}|>
 
+{{/*----------------------------------------  额外能力（ExtraCapabilities - from intent recognition）------------------*/}}
+{{ if .ExtraCapabilities }}<|EXTRA_CAPABILITIES_{{ .Nonce }}|>
+{{ .ExtraCapabilities }}
+<|EXTRA_CAPABILITIES_END_{{ .Nonce }}|>{{ end }}
+
 {{/*----------------------------------------------------------------------------------------------------------------*/}}
 {{ if .PersistentContext }}<|PERSISTENT_{{ .Nonce }}|>
 {{ .PersistentContext }}

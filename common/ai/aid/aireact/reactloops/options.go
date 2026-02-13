@@ -403,3 +403,13 @@ func WithSkillsContextManager(mgr *aiskillloader.SkillsContextManager) ReActLoop
 	}
 }
 
+// WithExtraCapabilities sets a custom ExtraCapabilitiesManager.
+// If not set, NewReActLoop creates a default one with MaxExtraTools=50.
+func WithExtraCapabilities(ecm *ExtraCapabilitiesManager) ReActLoopOption {
+	return func(r *ReActLoop) {
+		if ecm != nil {
+			r.extraCapabilities = ecm
+		}
+	}
+}
+

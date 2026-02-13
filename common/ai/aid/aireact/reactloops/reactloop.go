@@ -124,6 +124,10 @@ type ReActLoop struct {
 
 	// Skills context manager for on-demand skill loading
 	skillsContextManager *aiskillloader.SkillsContextManager
+
+	// Extra capabilities discovered via intent recognition
+	// Rendered as a dedicated prompt section, separate from core tools
+	extraCapabilities *ExtraCapabilitiesManager
 }
 
 func (r *ReActLoop) PushSatisfactionRecord(satisfactory bool, reason string) {
@@ -257,6 +261,11 @@ func (r *ReActLoop) GetSkillsContextManager() *aiskillloader.SkillsContextManage
 	return r.skillsContextManager
 }
 
+// GetExtraCapabilities returns the extra capabilities manager for dynamically discovered capabilities.
+func (r *ReActLoop) GetExtraCapabilities() *ExtraCapabilitiesManager {
+	return r.extraCapabilities
+}
+
 func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReActLoopOption) (*ReActLoop, error) {
 	if utils.IsNil(invoker) {
 		return nil, utils.Error("invoker is nil in ReActLoop")
@@ -285,6 +294,7 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		currentIterationIndex:       0,
 		sameActionTypeSpinThreshold: 3, // 默认连续 3 次相同 Action 触发检测
 		sameLogicSpinThreshold:      3, // 默认连续 3 次相同逻辑触发 AI 检测
+		extraCapabilities:           NewExtraCapabilitiesManager(),
 	}
 
 	for _, action := range []*LoopAction{
