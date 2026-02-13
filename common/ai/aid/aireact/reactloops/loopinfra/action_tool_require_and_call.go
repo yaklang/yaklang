@@ -44,14 +44,25 @@ var loopAction_toolRequireAndCall = &reactloops.LoopAction{
 		}
 		result, directly, err := invoker.ExecuteToolRequiredAndCall(ctx, toolPayload)
 		if err != nil {
-			// FIX: Instead of terminating the loop with operator.Fail(), we record the error
-			// in timeline and allow AI to retry with a different tool or approach
-			errMsg := fmt.Sprintf("Tool '%s' execution failed: %v. Please try a different tool or approach.", toolPayload, err)
+			// Record the error in timeline and allow AI to retry with a different tool or approach
+			errMsg := fmt.Sprintf("Tool '%s' execution failed: %v.", toolPayload, err)
 			invoker.AddToTimeline("[TOOL_EXECUTION_ERROR]", errMsg)
+
+			// Try to resolve the identifier - it might be a forge or skill, not a tool
+			resolved := loop.ResolveIdentifier(toolPayload)
+			if !resolved.IsUnknown() && resolved.IdentityType != aicommon.ResolvedAs_Tool {
+				// The identifier exists as a different type - provide clear guidance
+				invoker.AddToTimeline("identifier_resolved", resolved.Suggestion)
+				operator.Feedback(errMsg + "\n\n" + resolved.Suggestion)
+			} else {
+				operator.Feedback(errMsg + " Please try a different tool or approach.")
+			}
+
 			// Set reflection level to help AI understand the failure
 			operator.SetReflectionLevel(reactloops.ReflectionLevel_Critical)
 			operator.SetReflectionData("tool_error", err.Error())
 			operator.SetReflectionData("tool_name", toolPayload)
+			operator.SetReflectionData("resolved_type", string(resolved.IdentityType))
 			// Continue the loop to give AI a chance to retry
 			operator.Continue()
 			return

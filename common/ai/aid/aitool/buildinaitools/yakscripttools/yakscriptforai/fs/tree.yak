@@ -1,6 +1,6 @@
-__DESC__ = "一个用于查看目录树形结构的工具，支持显示目录下的文件和子目录层级关系。适用于目录结构分析、项目概览等场景。"
+__DESC__ = "一个用于查看目录树形结构的工具，支持显示目录下的文件和子目录层级关系，默认排除 .git/node_modules 等噪声目录。适用于目录结构分析、项目概览等场景。"
 __VERBOSE_NAME__ = "目录树形结构查看工具"
-__KEYWORDS__ = "directory tree,目录结构,树形结构,文件系统浏览,directory listing,文件夹结构,文件树,file hierarchy,目录浏览,directory navigation"
+__KEYWORDS__ = "directory tree,目录结构,树形结构,文件系统浏览,directory listing,文件夹结构,文件树,file hierarchy,目录浏览,directory navigation,exclude"
 
 /*
 目录树形结构查看工具
@@ -13,29 +13,35 @@ __KEYWORDS__ = "directory tree,目录结构,树形结构,文件系统浏览,dire
 
 2. 参数说明：
    --path: 要查看的目录路径 (必需)
+   --exclude: 排除的目录/文件名 (逗号分隔，默认排除 .git,node_modules 等)
+   --max-depth: 最大递归深度 (默认 6)
+   --max-lines: 最大输出行数 (默认 200)
 
 使用示例：
 1. 查看当前目录结构：
    yak tree.yak --path .
 
-2. 查看指定目录结构：
-   yak tree.yak --path /tmp
+2. 查看指定目录结构(带自定义排除)：
+   yak tree.yak --path /tmp --exclude ".git,node_modules,vendor"
 
-3. 查看项目根目录结构：
-   yak tree.yak --path /path/to/project
+3. 不排除任何目录：
+   yak tree.yak --path /path/to/project --exclude ""
 
 注意事项：
 - 支持绝对路径和相对路径
 - 自动限制深度和输出行数以提高性能
 - 显示文件数量和目录数量统计
 - 如果目录不存在会报错
-- 使用 Yak 内置的 filesys.Glance 函数进行高效的文件系统浏览
+- 默认排除 .git, node_modules 等噪声目录以减少输出干扰
 */
 
 yakit.AutoInitYakit()
 
 // 解析命令行参数
 path := cli.String("path", cli.setRequired(true), cli.setHelp("directory path to display tree structure"))
+excludeRaw := cli.String("exclude", cli.setHelp("comma-separated list of directory/file names to exclude from tree view"), cli.setDefault(".git,.svn,.hg,node_modules,__pycache__,.DS_Store,.idea,.vscode,.next,.nuxt,.cache"))
+maxDepth := cli.Int("max-depth", cli.setHelp("maximum directory depth to display"), cli.setDefault(6))
+maxLines := cli.Int("max-lines", cli.setHelp("maximum number of lines to display"), cli.setDefault(200))
 
 cli.check()
 
@@ -53,10 +59,83 @@ if !file.IsDir(path) {
     return
 }
 
-// 使用 filesys.Glance 获取目录结构信息
-treeInfo := filesys.Glance(path)
+// 解析 exclude 列表
+excludeNames = {}
+for item in str.Split(excludeRaw, ",") {
+    item = str.TrimSpace(item)
+    if item != "" {
+        excludeNames[item] = true
+    }
+}
 
+if len(excludeNames) > 0 {
+    yakit.Info("exclude: %v", excludeRaw)
+}
+
+// shouldExcludePath checks if any path component matches the exclude list
+shouldExcludePath = (filePath) => {
+    normalized = str.ReplaceAll(filePath, "\\", "/")
+    parts = str.Split(normalized, "/")
+    for part in parts {
+        if excludeNames[part] {
+            return true
+        }
+    }
+    return false
+}
+
+// Collect paths using filesys.Recursive with filtering
+// Each entry: {relPath: string, isDir: bool}
+entries = []
+lineCount = 0
+dirCount = 0
+fileCount = 0
+
+filesys.Recursive(path, filesys.onStat((isDir, pathname, info) => {
+    if lineCount >= maxLines { return }
+
+    // Get relative path
+    relPath = str.TrimPrefix(pathname, path)
+    relPath = str.TrimLeft(relPath, "/\\")
+    if relPath == "" { return } // skip root itself
+
+    // Normalize path separators
+    relPath = str.ReplaceAll(relPath, "\\", "/")
+
+    // Check exclude
+    if shouldExcludePath(relPath) { return }
+
+    // Check depth
+    parts = str.Split(relPath, "/")
+    if len(parts) > maxDepth { return }
+
+    lineCount++
+    if isDir {
+        dirCount++
+    } else {
+        fileCount++
+    }
+
+    // Build indented tree line
+    depth = len(parts) - 1
+    indent = str.Repeat("  ", depth)
+    name = parts[len(parts) - 1]
+    if isDir {
+        name = name + "/"
+    }
+    entries = append(entries, indent + name)
+}))
+
+// Output tree
 yakit.Info("Directory Tree Structure:")
 yakit.Info("========================")
-yakit.Info(treeInfo)
+yakit.Info("%v", path)
+for entry in entries {
+    yakit.Info("%v", entry)
+}
+yakit.Info("========================")
+yakit.Info("%v directories, %v files", dirCount, fileCount)
+if lineCount >= maxLines {
+    yakit.Info("(output truncated at %v lines, use --max-lines to increase)", maxLines)
+}
 yakit.Info("Directory tree view completed")
