@@ -1,20 +1,161 @@
-__DESC__ = "一个用于在指定目录下递归搜索文件的工具，支持通过模式（子串、正则、Glob）匹配文件路径，并可根据文件类型（文件/目录）、文件扩展名和文件大小进行过滤，限制返回结果数量。"
+__DESC__ = "一个用于在指定目录下递归搜索文件的工具，支持通过模式（子串、正则、Glob）匹配文件路径，并可根据文件类型（文件/目录）进行过滤。支持名称黑白名单和扩展名黑白名单过滤，限制返回结果数量。"
 __VERBOSE_NAME__ = "文件搜索工具"
-__KEYWORDS__ = "file size,file type,recursive search,模式匹配,正则表达式,文件大小,文件类型,file filtering,glob pattern,file search,directory search,file extension,文件搜索,文件过滤,递归搜索,regular expression,目录搜索,glob模式,文件扩展名,pattern matching"
+__KEYWORDS__ = "file size,file type,recursive search,模式匹配,正则表达式,文件大小,文件类型,file filtering,glob pattern,file search,directory search,file extension,文件搜索,文件过滤,递归搜索,regular expression,目录搜索,glob模式,文件扩展名,pattern matching,include,exclude"
 
-dirname = cli.String("dir", cli.setRequired(true), cli.setHelp("which dir you want to find file?"))
-// filename = `/Users/v1ll4n/Projects/yaklang/README.md`
-// dirname = `/Users/v1ll4n/Projects/yaklang/`
-pattern = cli.String("pattern", cli.setRequired(true), cli.setHelp("use pattern to match path, pattern is work in full abspath. default is substr, check 'pattern-type'"))
-// pattern = "syntaxflow"
-patternMode = cli.String("pattern-type", cli.setHelp("make pattern compile as regexp / glob or keywork, match abs file path, one of regexp/substr/glob, like 'regexp', 'text' ..."))
+__USAGE__ = <<<USAGE_BLOCK
+File Search Tool - Parameter Description for JSON Tool Calls
 
-limit = cli.Int("max", cli.setDefault(10), cli.setRequired(true), cli.setHelp("how many files you want to find, default 10"))
-findType = cli.String("type", cli.setDefault(""), cli.setHelp("set 'f' for ordinary file, 'd' for directory only, default emtpy is all"))
-findExt = cli.String("exts", cli.setHelp("use ext for filter files, like '.txt,.js,.jso' or '.txt'"))
-minSize = cli.Int("min-size", cli.setHelp("limit show file size min, unit: byte"))
-maxSize = cli.Int("max-size", cli.setHelp("limit show file size max, unit: byte"))
+Required Parameters:
+  dir             (string)  The root directory to search recursively.
+                            Must be an absolute path or a valid relative path.
+  pattern         (string)  The pattern to match against the FULL ABSOLUTE PATH of each file/directory.
+                            The pattern is applied to the complete path string, not just the filename.
+
+Optional Parameters:
+  pattern-type    (string)  How the pattern is interpreted. Accepted values:
+                            - "" or "substr" (default): case-sensitive substring match against the full path.
+                            - "regexp" / "re" / "regex": Golang-style regular expression match against the full path.
+                            - "glob" / "g": glob-style wildcard match against the full path.
+  max             (int)     Maximum number of results to return. Default: 10.
+                            The search stops early once this limit is reached.
+  type            (string)  Filter by entry type:
+                            - "" (default): match both files and directories.
+                            - "f" or "file": only match regular files.
+                            - "d" or "dir": only match directories.
+  exclude         (string)  Comma-separated list of directory/file names to exclude.
+                            Each name is checked against EVERY component of the path.
+                            For example, "node_modules,.git" will skip any path that contains
+                            a directory or file named "node_modules" or ".git".
+                            Default: ".git,.svn,.hg,node_modules,__pycache__,.DS_Store,.idea,.vscode,.next,.nuxt,.cache"
+  include         (string)  Comma-separated list of name substrings for whitelist filtering.
+                            When set, only files whose filename contains at least one of these
+                            substrings will be included. Directories always pass this filter
+                            (so their children can still be explored).
+                            Default: "" (disabled, all names pass).
+  exclude-ext     (string)  Comma-separated list of file extensions to exclude.
+                            Example: ".pyc,.o,.so,.class" will skip files with those extensions.
+                            The dot prefix is optional (both "pyc" and ".pyc" work).
+                            Directories are never affected by extension filters.
+                            Default: "" (disabled).
+  include-ext     (string)  Comma-separated list of file extensions to include (whitelist).
+                            When set, only files whose extension matches one of these values are returned.
+                            Example: ".go,.js,.py" will only return Go, JavaScript, and Python files.
+                            Directories always pass this filter.
+                            Default: "" (disabled, all extensions pass).
+  min-size        (int)     Minimum file size in bytes. Files smaller than this are skipped. Default: 0 (disabled).
+  max-size        (int)     Maximum file size in bytes. Files larger than this are skipped. Default: 0 (disabled).
+
+Filter Evaluation Order:
+  1. type filter (file/dir)
+  2. exclude name blacklist (path component match)
+  3. include name whitelist (filename substring match, directories pass)
+  4. exclude-ext blacklist (file extension match, directories pass)
+  5. include-ext whitelist (file extension match, directories pass)
+  6. size filters (min-size, max-size)
+  7. pattern match (substr/regexp/glob against full absolute path)
+USAGE_BLOCK
+
+yakit.AutoInitYakit()
+
+dirname = cli.String("dir", cli.setRequired(true), cli.setHelp("root directory to search recursively"))
+pattern = cli.String("pattern", cli.setRequired(true), cli.setHelp("pattern to match against the full absolute path, default is substr match"))
+patternMode = cli.String("pattern-type", cli.setHelp("one of [substr/regexp/glob], controls how 'pattern' is interpreted"))
+
+limit = cli.Int("max", cli.setDefault(10), cli.setRequired(true), cli.setHelp("maximum number of results to return"))
+findType = cli.String("type", cli.setDefault(""), cli.setHelp("'f' for files only, 'd' for directories only, '' for all"))
+excludeRaw = cli.String("exclude", cli.setHelp("comma-separated names to exclude (matched against path components)"), cli.setDefault(".git,.svn,.hg,node_modules,__pycache__,.DS_Store,.idea,.vscode,.next,.nuxt,.cache"))
+includeRaw = cli.String("include", cli.setHelp("comma-separated name substrings whitelist (only matching filenames pass)"), cli.setDefault(""))
+excludeExtRaw = cli.String("exclude-ext", cli.setHelp("comma-separated file extensions to exclude (e.g. '.pyc,.o,.so')"), cli.setDefault(""))
+includeExtRaw = cli.String("include-ext", cli.setHelp("comma-separated file extensions whitelist (e.g. '.go,.js,.py')"), cli.setDefault(""))
+minSize = cli.Int("min-size", cli.setHelp("minimum file size in bytes"))
+maxSize = cli.Int("max-size", cli.setHelp("maximum file size in bytes"))
 cli.check()
+
+yakit.Info("Find files in: %v, pattern: %v, pattern-type: %v", dirname, pattern, patternMode)
+
+// Parse exclude name list
+excludeNames = {}
+for item in str.Split(excludeRaw, ",") {
+    item = str.TrimSpace(item)
+    if item != "" {
+        excludeNames[item] = true
+    }
+}
+
+// Parse include name list (whitelist)
+includeNames = {}
+for item in str.Split(includeRaw, ",") {
+    item = str.TrimSpace(item)
+    if item != "" {
+        includeNames[item] = true
+    }
+}
+hasIncludeFilter = len(includeNames) > 0
+
+// Parse exclude-ext list
+excludeExts = {}
+for item in str.Split(excludeExtRaw, ",") {
+    item = str.TrimSpace(item)
+    if item != "" {
+        if !str.HasPrefix(item, ".") { item = "." + item }
+        excludeExts[str.ToLower(item)] = true
+    }
+}
+
+// Parse include-ext list (whitelist)
+includeExts = {}
+for item in str.Split(includeExtRaw, ",") {
+    item = str.TrimSpace(item)
+    if item != "" {
+        if !str.HasPrefix(item, ".") { item = "." + item }
+        includeExts[str.ToLower(item)] = true
+    }
+}
+hasIncludeExtFilter = len(includeExts) > 0
+
+// shouldFilterPath returns true if the entry should be EXCLUDED.
+// isDir: whether the entry is a directory (directories bypass extension and include-name filters)
+shouldFilterPath = (filePath, isDir) => {
+    normalized = str.ReplaceAll(filePath, "\\", "/")
+    parts = str.Split(normalized, "/")
+
+    // 1. Check exclude name blacklist (any path component)
+    for part in parts {
+        if excludeNames[part] {
+            return true
+        }
+    }
+
+    // 2. Check include name whitelist (filename must contain a substring; directories pass)
+    if hasIncludeFilter && !isDir {
+        fileName = parts[len(parts) - 1]
+        matched = false
+        for incName in includeNames {
+            if str.Contains(fileName, incName) {
+                matched = true
+                break
+            }
+        }
+        if !matched { return true }
+    }
+
+    // 3. Extension filters (only apply to files)
+    if !isDir {
+        ext = str.ToLower(file.GetExt(filePath))
+        // 3a. exclude-ext blacklist
+        if ext != "" && excludeExts[ext] {
+            return true
+        }
+        // 3b. include-ext whitelist
+        if hasIncludeExtFilter {
+            if ext == "" || !includeExts[ext] {
+                return true
+            }
+        }
+    }
+
+    return false
+}
 
 findRes = []
 count = 0
@@ -22,11 +163,12 @@ total = 0
 end = false
 buf = bufio.NewBuffer()
 filesys.Recursive(dirname, filesys.onStat((isDir, name, info) => {
-    // yakit.File(name, yakit.fileStatusAction(info))
     total ++
     if end {
         return
     }
+
+    // Type filter
     switch findType.Lower() {
     case "f", "file":
         if isDir { return }
@@ -35,19 +177,18 @@ filesys.Recursive(dirname, filesys.onStat((isDir, name, info) => {
     default:
     }
 
-    ext := file.GetExt(name)
-    if findExt != "" && str.Contains(findExt, ext) {
-        return
-    }
+    // Unified name + extension filter
+    if shouldFilterPath(name, isDir) { return }
 
+    // Size filters
     if minSize > 0 && info.Size() < minSize {
         return
     }
-
     if maxSize > 0 && info.Size() > maxSize {
         return
     }
 
+    // Pattern match against full absolute path
     output = () => {
         meta = ""
         if isDir {
@@ -64,7 +205,7 @@ filesys.Recursive(dirname, filesys.onStat((isDir, name, info) => {
         if str.MatchAllOfRegexp(name, pattern) {
             count++
             output()
-            if count > limit {
+            if count >= limit {
                 end = true
             }
             return
@@ -73,7 +214,7 @@ filesys.Recursive(dirname, filesys.onStat((isDir, name, info) => {
         if str.MatchAllOfGlob(name, pattern) {
             count++
             output()
-            if count > limit {
+            if count >= limit {
                 end = true
             }
         }
@@ -81,7 +222,7 @@ filesys.Recursive(dirname, filesys.onStat((isDir, name, info) => {
         if str.MatchAllOfSubString(name, pattern) {
             count++
             output()
-            if count > limit {
+            if count >= limit {
                 end = true
             }
         }
@@ -89,6 +230,6 @@ filesys.Recursive(dirname, filesys.onStat((isDir, name, info) => {
 }))
 println(buf.String())
 yakit.Info(buf.String())
-yakit.Info("total: %v", total)
+yakit.Info("total scanned: %v, matched: %v", total, count)
 
 yakit.File(dirname, yakit.fileFindAction("find-name", sprintf("patternmode:[%s] | pattern:[%s]", patternMode,pattern), findRes...))

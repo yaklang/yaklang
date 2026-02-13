@@ -1,6 +1,64 @@
-__DESC__ = "一个文本查找工具，用于在指定文件或目录下查找匹配特定模式的文本。支持子串（区分大小写和不区分大小写）和正则表达式模式。可指定查找的路径、模式、最大结果数量、跳过的匹配次数以及显示匹配文本周围的上下文。"
+__DESC__ = "一个文本查找工具，用于在指定文件或目录下查找匹配特定模式的文本。支持子串（区分大小写和不区分大小写）和正则表达式模式。支持名称和扩展名黑白名单过滤。可指定查找的路径、模式、最大结果数量、跳过的匹配次数以及显示匹配文本周围的上下文。"
 __VERBOSE_NAME__ = "文本查找工具"
-__KEYWORDS__ = "pattern matching,regexp,file path,模式匹配,查找替换,文件路径,context text,文本查找,文本工具,directory search,text tool,文件搜索,正则表达式,目录搜索,grep,text finder,file search"
+__KEYWORDS__ = "pattern matching,regexp,file path,模式匹配,查找替换,文件路径,context text,文本查找,文本工具,directory search,text tool,文件搜索,正则表达式,目录搜索,grep,text finder,file search,include,exclude,extension filter"
+
+__USAGE__ = <<<USAGE_BLOCK
+Text Grep Tool - Parameter Description for JSON Tool Calls
+
+Required Parameters:
+  path            (string)  The file or directory path(s) to search. Multiple paths can be specified
+                            separated by comma ",". Each path is validated before scanning.
+                            If a path is a directory, all files within it are searched recursively.
+                            If a path is a file, only that file is searched.
+  pattern         (string)  The text pattern(s) to search for. Multiple patterns can be specified
+                            separated by comma ",". Each pattern is searched independently.
+                            How patterns are matched depends on the "pattern-mode" parameter.
+
+Optional Parameters:
+  pattern-mode    (string)  Controls how the pattern string is interpreted. Accepted values:
+                            - "" or "substr" (default): case-sensitive substring matching.
+                              The pattern is treated as a literal string.
+                            - "isubstr" or "isubstring": case-insensitive substring matching.
+                              Both the file content and the pattern are lowercased before comparison.
+                            - "regexp" / "re" / "regex": Golang-style regular expression.
+                              The pattern is compiled as a regex and matched against file content.
+  limit           (int)     Maximum number of matched results to return. Default: 10.
+                            The search stops early once this many results (after offset) are collected.
+  offset          (int)     Skip the first N matches before collecting results. Default: 0.
+                            Useful for paginating through large result sets.
+  file-size-max   (int)     Maximum file size in bytes. Files larger than this are skipped entirely.
+                            Default: 2000000000 (2GB). Set to a smaller value for faster scans.
+  context-buffer  (int)     Number of bytes of surrounding context to show around each match.
+                            Default: 0 (only match position is reported, no surrounding text).
+                            When > 0, the tool extracts [match_start - context_buffer, match_end + context_buffer]
+                            bytes from the file content and includes it in the result.
+  exclude         (string)  Comma-separated list of directory/file names to exclude.
+                            Each name is checked against EVERY component of the file path.
+                            For example, "node_modules,.git" will skip any file whose path contains
+                            a directory or file named exactly "node_modules" or ".git".
+                            Default: ".git,.svn,.hg,node_modules,__pycache__,.DS_Store,.idea,.vscode,.next,.nuxt,.cache"
+                            Set to "" to disable all name exclusions.
+  include         (string)  Comma-separated list of filename substrings for whitelist filtering.
+                            When set (non-empty), only files whose filename (last path component)
+                            contains at least one of these substrings are searched.
+                            Default: "" (disabled, all files are searched).
+  exclude-ext     (string)  Comma-separated list of file extensions to exclude (blacklist).
+                            The dot prefix is optional: both "pyc" and ".pyc" are accepted.
+                            Matching is case-insensitive.
+                            Default: "" (disabled).
+  include-ext     (string)  Comma-separated list of file extensions to include (whitelist).
+                            When set, only files whose extension matches one of these values are searched.
+                            The dot prefix is optional: both "go" and ".go" are accepted.
+                            Default: "" (disabled, all extensions pass).
+
+Filter Evaluation Order (for each file during recursive scan):
+  1. exclude name blacklist (path component exact match)
+  2. include name whitelist (filename substring match)
+  3. exclude-ext extension blacklist (file extension match)
+  4. include-ext extension whitelist (file extension match)
+  5. file-size-max check
+  6. pattern matching (substr/isubstr/regexp)
+USAGE_BLOCK
 
 yakit.AutoInitYakit()
 
@@ -12,6 +70,9 @@ offsetResultCount := cli.Int("offset", cli.setHelp("skip how many first match"),
 fileSizeLimit = cli.Int("file-size-max", cli.setHelp("limit for file size, if the file is too large, stop it auto"), cli.setDefault(1000 * 1000 * 1000 * 2)) // 2G
 contextBuffer := cli.Int("context-buffer", cli.setHelp("Show (or display) a certain number of bytes of context around the matching text, default 0 is for not show"), cli.setDefault(0))
 excludeRaw := cli.String("exclude", cli.setHelp("comma-separated list of directory/file names to exclude from scanning"), cli.setDefault(".git,.svn,.hg,node_modules,__pycache__,.DS_Store,.idea,.vscode,.next,.nuxt,.cache"))
+includeRaw := cli.String("include", cli.setHelp("comma-separated list of file name substrings to include (whitelist)"), cli.setDefault(""))
+excludeExtRaw := cli.String("exclude-ext", cli.setHelp("comma-separated list of file extensions to exclude (e.g. '.pyc,.o,.so')"), cli.setDefault(""))
+includeExtRaw := cli.String("include-ext", cli.setHelp("comma-separated list of file extensions to include (whitelist, e.g. '.go,.js,.py')"), cli.setDefault(""))
 cli.check()
 
 // Fallback: if fileSizeLimit is 0 or negative (e.g., due to scientific notation parsing issue), set to 2GB
@@ -20,7 +81,7 @@ if fileSizeLimit <= 0 {
     yakit.Info("file-size-max was invalid (%v), reset to default 2GB", fileSizeLimit)
 }
 
-// 解析 exclude 列表
+// Parse exclude name list
 excludeNames = {}
 for item in str.Split(excludeRaw, ",") {
     item = str.TrimSpace(item)
@@ -29,15 +90,76 @@ for item in str.Split(excludeRaw, ",") {
     }
 }
 
-// shouldExcludePath checks if any path component matches the exclude list
-shouldExcludePath = (filePath) => {
+// Parse include name list (whitelist)
+includeNames = {}
+for item in str.Split(includeRaw, ",") {
+    item = str.TrimSpace(item)
+    if item != "" {
+        includeNames[item] = true
+    }
+}
+hasIncludeFilter = len(includeNames) > 0
+
+// Parse exclude-ext list
+excludeExts = {}
+for item in str.Split(excludeExtRaw, ",") {
+    item = str.TrimSpace(item)
+    if item != "" {
+        if !str.HasPrefix(item, ".") { item = "." + item }
+        excludeExts[str.ToLower(item)] = true
+    }
+}
+
+// Parse include-ext list (whitelist)
+includeExts = {}
+for item in str.Split(includeExtRaw, ",") {
+    item = str.TrimSpace(item)
+    if item != "" {
+        if !str.HasPrefix(item, ".") { item = "." + item }
+        includeExts[str.ToLower(item)] = true
+    }
+}
+hasIncludeExtFilter = len(includeExts) > 0
+
+// shouldFilterPath returns true if the file should be EXCLUDED from searching.
+shouldFilterPath = (filePath) => {
     normalized = str.ReplaceAll(filePath, "\\", "/")
     parts = str.Split(normalized, "/")
+
+    // 1. Check exclude name blacklist (any path component)
     for part in parts {
         if excludeNames[part] {
             return true
         }
     }
+
+    // 2. Check include name whitelist (file name must contain a substring)
+    if hasIncludeFilter {
+        fileName = parts[len(parts) - 1]
+        matched = false
+        for incName in includeNames {
+            if str.Contains(fileName, incName) {
+                matched = true
+                break
+            }
+        }
+        if !matched { return true }
+    }
+
+    // 3. Check extension filters
+    fileName = parts[len(parts) - 1]
+    ext = str.ToLower(file.GetExt(fileName))
+    // 3a. exclude-ext blacklist
+    if ext != "" && excludeExts[ext] {
+        return true
+    }
+    // 3b. include-ext whitelist
+    if hasIncludeExtFilter {
+        if ext == "" || !includeExts[ext] {
+            return true
+        }
+    }
+
     return false
 }
 
@@ -76,6 +198,15 @@ yakit.Info("pattern-mode: %v", matchMode)
 yakit.Info("limit: %v, offset: %v, context-buffer: %v", maxResult, offsetResultCount, contextBuffer)
 if len(excludeNames) > 0 {
     yakit.Info("exclude: %v", excludeRaw)
+}
+if hasIncludeFilter {
+    yakit.Info("include: %v", includeRaw)
+}
+if len(excludeExts) > 0 {
+    yakit.Info("exclude-ext: %v", excludeExtRaw)
+}
+if hasIncludeExtFilter {
+    yakit.Info("include-ext: %v", includeExtRaw)
 }
 
 count := 0
@@ -195,8 +326,8 @@ processPath = (singlePath) => {
             defer recover()
             if end { return }
 
-            // Skip excluded paths (e.g. .git, node_modules)
-            if shouldExcludePath(fileToCheck) { return }
+            // Skip filtered paths (exclude/include name + extension filters)
+            if shouldFilterPath(fileToCheck) { return }
 
             if fileSizeLimit > 0 && info.Size() > fileSizeLimit {
                 // overlarge
