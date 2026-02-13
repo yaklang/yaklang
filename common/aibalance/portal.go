@@ -651,6 +651,26 @@ func (c *ServerConfig) HandlePortalRequest(conn net.Conn, request *http.Request,
 	case uriIns.Path == "/portal/api/web-search-config" && request.Method == "POST":
 		c.handleSetWebSearchConfig(conn, request)
 
+	// ========== Amap API Key Routes ==========
+	case uriIns.Path == "/portal/api/amap-keys" && request.Method == "GET":
+		c.handleGetAmapApiKeys(conn, request)
+	case uriIns.Path == "/portal/api/amap-keys" && request.Method == "POST":
+		c.handleCreateAmapApiKey(conn, request)
+	case strings.HasPrefix(uriIns.Path, "/portal/api/amap-keys/") && request.Method == "DELETE":
+		c.handleDeleteAmapApiKey(conn, request, uriIns.Path)
+	case strings.HasPrefix(uriIns.Path, "/portal/toggle-amap-key/") && request.Method == "POST":
+		c.handleToggleAmapApiKeyStatus(conn, request, uriIns.Path)
+	case strings.HasPrefix(uriIns.Path, "/portal/reset-amap-key-health/") && request.Method == "POST":
+		c.handleResetAmapApiKeyHealth(conn, request, uriIns.Path)
+	case strings.HasPrefix(uriIns.Path, "/portal/test-amap-key/") && request.Method == "POST":
+		c.handleTestAmapApiKey(conn, request, uriIns.Path)
+	case uriIns.Path == "/portal/api/amap-keys/check-all" && request.Method == "POST":
+		c.handleCheckAllAmapApiKeys(conn, request)
+	case uriIns.Path == "/portal/api/amap-config" && request.Method == "GET":
+		c.handleGetAmapConfig(conn, request)
+	case uriIns.Path == "/portal/api/amap-config" && request.Method == "POST":
+		c.handleSetAmapConfig(conn, request)
+
 	// ========== Model Metadata Routes ==========
 	case uriIns.Path == "/portal/update-model-meta" && request.Method == "POST":
 		c.handleUpdateModelMeta(conn, request)

@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/aiengine"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/aiengine"
 
 	"github.com/yaklang/yaklang/common/netstack_exports"
 	"github.com/yaklang/yaklang/common/tcpmitm"
@@ -40,7 +41,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aispec"
-	"github.com/yaklang/yaklang/common/aibalance"
 	"github.com/yaklang/yaklang/common/utils/fileparser"
 
 	"github.com/yaklang/yaklang/common/utils/fileparser/excelparser"
@@ -413,7 +413,7 @@ func initYaklangLib() {
 	yaklang.Import("tcpmitm", tcpmitm.Exports)
 
 	// aibalance - AI traffic forwarding and load balancing
-	yaklang.Import("aibalance", aibalance.Exports)
+	// yaklang.Import("aibalance", aibalance.Exports)
 }
 
 type ScriptEngine struct {

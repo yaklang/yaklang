@@ -2,13 +2,16 @@ package aibalanceclient
 
 import (
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/twofa"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
@@ -176,6 +179,50 @@ func GetTraceID() string {
 
 	log.Infof("generated new persistent Trace-ID: %s", newID)
 	return newID
+}
+
+// FetchTOTPSecretFromAIBalance fetches the TOTP secret from the standard aibalance server.
+// This is a standalone function that does not depend on the AI GatewayClient,
+// and can be used by any client that needs TOTP authentication with aibalance.
+func FetchTOTPSecretFromAIBalance() string {
+	totpURL := "https://aibalance.yaklang.com/v1/memfit-totp-uuid"
+
+	rawReq := []byte("GET /v1/memfit-totp-uuid HTTP/1.1\r\nHost: aibalance.yaklang.com\r\nAccept: application/json\r\nUser-Agent: yaklang-amap-client\r\n\r\n")
+
+	rspIns, err := lowhttp.HTTPWithoutRedirect(
+		lowhttp.WithHttps(true),
+		lowhttp.WithRequest(rawReq),
+		lowhttp.WithHost("aibalance.yaklang.com"),
+		lowhttp.WithTimeout(10*time.Second),
+	)
+	if err != nil {
+		log.Errorf("failed to fetch TOTP UUID from %s: %v", totpURL, err)
+		return ""
+	}
+
+	body := lowhttp.GetHTTPPacketBody(rspIns.RawPacket)
+
+	var result struct {
+		UUID   string `json:"uuid"`
+		Format string `json:"format"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		log.Errorf("failed to parse TOTP UUID response: %v", err)
+		return ""
+	}
+
+	uuid := result.UUID
+	if uuid == "" {
+		log.Errorf("empty TOTP UUID in response from aibalance")
+		return ""
+	}
+
+	// Remove MEMFIT-AI prefix and suffix
+	secret := strings.TrimPrefix(uuid, "MEMFIT-AI")
+	secret = strings.TrimSuffix(secret, "MEMFIT-AI")
+
+	log.Debugf("successfully fetched TOTP secret from aibalance for amap proxy")
+	return secret
 }
 
 // generateUUID creates a new UUID v4 string without importing uuid package

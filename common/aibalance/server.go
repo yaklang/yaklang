@@ -441,9 +441,14 @@ type ServerConfig struct {
 	concurrentChatRequests      int64 // current number of in-flight chat/completions requests
 	concurrentEmbeddingRequests int64 // current number of in-flight embedding requests
 	totalWebSearchCount         int64 // cumulative web-search request count (process lifetime)
+	totalAmapCount              int64 // cumulative amap request count (process lifetime)
 
 	// Rate limiter for free web-search users (Trace-ID based)
 	webSearchRateLimiter *WebSearchRateLimiter
+
+	// Rate limiter for free amap proxy users (Trace-ID based, sleep/wait mode)
+	amapRateLimiter        *AmapRateLimiter
+	amapHealthCheckStopCh  chan struct{}
 }
 
 // NewServerConfig creates a new server configuration
@@ -467,6 +472,9 @@ func NewServerConfig() *ServerConfig {
 	config.AuthMiddleware = NewAuthMiddleware(config, DefaultAuthConfig())
 	// Initialize web search rate limiter for free users
 	config.webSearchRateLimiter = NewWebSearchRateLimiter()
+	// Initialize amap rate limiter and health check stop channel
+	config.amapRateLimiter = NewAmapRateLimiter()
+	config.amapHealthCheckStopCh = make(chan struct{})
 	return config
 }
 
@@ -1786,6 +1794,9 @@ func (c *ServerConfig) serveRequest(conn net.Conn, request *http.Request, should
 		return
 	case strings.HasPrefix(uriIns.Path, "/v1/web-search"):
 		c.serveWebSearch(conn, requestRaw)
+		return
+	case strings.HasPrefix(uriIns.Path, "/amap/"):
+		c.serveAmap(conn, requestRaw)
 		return
 	case strings.HasPrefix(uriIns.Path, "/v1/models"): // 新增：处理 /v1/models 请求
 		c.logInfo("Processing models list request")

@@ -56,6 +56,22 @@ func NewConfig(opts ...AmapConfigOption) *Config {
 			cfg.ApiKey = key
 		}
 	}
+
+	// Fallback: if no API key is configured, use the aibalance proxy
+	if cfg.ApiKey == "" {
+		log.Infof("no amap api key configured, falling back to aibalance proxy")
+		cfg.BaseURL = "https://aibalance.yaklang.com/amap"
+		cfg.ApiKey = "aibalance-proxy" // placeholder key, server will inject real key
+
+		// Load TOTP header for authentication
+		totpHeader, err := LoadAmapTOTPHeader()
+		if err != nil {
+			log.Warnf("failed to load TOTP header for amap proxy: %v", err)
+		} else if totpHeader != "" {
+			cfg.lowhttpOptions = append(cfg.lowhttpOptions, poc.WithReplaceHttpPacketHeader("X-Memfit-OTP-Auth", totpHeader))
+		}
+	}
+
 	return cfg
 }
 

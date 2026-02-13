@@ -178,6 +178,14 @@ func LoadProvidersFromDatabase(config *ServerConfig) error {
 		log.Infof("Loaded global web search proxy: %s", wsConfig.Proxy)
 	}
 
+	// Ensure amap API key and config tables exist
+	if err := EnsureAmapApiKeyTable(); err != nil {
+		log.Warnf("Failed to ensure Amap API key table exists: %v", err)
+	}
+
+	// Start amap health check scheduler (checks every 1 hour)
+	StartAmapHealthCheckScheduler(config.amapHealthCheckStopCh)
+
 	// Get all providers from the database
 	dbProviders, err := GetAllAiProviders()
 	if err != nil {

@@ -237,6 +237,43 @@ type WebSearchApiKey struct {
 	IsHealthy            bool      `json:"is_healthy" gorm:"default:true"`
 }
 
+// AmapConfig stores global configuration for Amap API proxy (singleton row, ID=1)
+type AmapConfig struct {
+	gorm.Model
+
+	AllowFreeUserAmap  bool  `json:"allow_free_user_amap"`  // Allow free users (TOTP only) to use amap proxy
+	TotalAmapRequests  int64 `json:"total_amap_requests"`   // Persistent cumulative amap request count (survives restarts)
+}
+
+func (a *AmapConfig) TableName() string {
+	return "amap_configs"
+}
+
+// AmapApiKey stores API keys for Amap (Gaode Maps) API proxy
+type AmapApiKey struct {
+	gorm.Model
+
+	APIKey string `json:"api_key"`
+	Active bool   `json:"active" gorm:"default:true"` // Whether the key is active
+
+	// Health check
+	IsHealthy       bool      `json:"is_healthy" gorm:"default:true"`
+	HealthCheckTime time.Time `json:"health_check_time"` // Last health check time
+	LastCheckError  string    `json:"last_check_error"`  // Last check error message, empty means success
+
+	// Statistics
+	SuccessCount        int64     `json:"success_count"`
+	FailureCount        int64     `json:"failure_count"`
+	ConsecutiveFailures int64     `json:"consecutive_failures"` // Reset to 0 on success, incremented on failure
+	TotalRequests       int64     `json:"total_requests"`
+	LastUsedTime        time.Time `json:"last_used_time"`
+	LastLatency         int64     `json:"last_latency"` // Milliseconds
+}
+
+func (a *AmapApiKey) TableName() string {
+	return "amap_api_keys"
+}
+
 // AIMemoryEntity 存储AI记忆条目
 type AIMemoryEntity struct {
 	gorm.Model
