@@ -5538,90 +5538,90 @@ curl '${metaApiUrl}?name=${modelName}'`;
         }
 
         async function testAmapKey(id) {
-            showToast('Testing key #' + id + '...', 'info');
+            showToast('正在测试密钥 #' + id + '...', 'info');
             try {
                 const response = await fetch('/portal/test-amap-key/keys/' + id, {
-                    method: 'POST',
-                    headers: { 'Authorization': 'Bearer ' + getSessionToken() }
+                    method: 'POST'
                 });
                 const data = await response.json();
+                if (isAuthError(data)) { handleAuthError(); return; }
                 if (data.success) {
-                    showToast('Test passed! Latency: ' + data.latency_ms + 'ms', 'success');
+                    showToast('测试通过! 延迟: ' + data.latency_ms + 'ms', 'success');
                 } else {
-                    showToast('Test failed: ' + (data.message || 'unknown error'), 'error');
+                    showToast('测试失败: ' + (data.message || '未知错误'), 'error');
                 }
                 setTimeout(function() { refreshAmapKeys(); }, 500);
             } catch (error) {
                 console.error('Error testing amap key:', error);
-                showToast('Failed to test key', 'error');
+                showToast('测试密钥失败', 'error');
             }
         }
 
         async function resetAmapKeyHealth(id) {
             try {
                 const response = await fetch('/portal/reset-amap-key-health/keys/' + id, {
-                    method: 'POST',
-                    headers: { 'Authorization': 'Bearer ' + getSessionToken() }
+                    method: 'POST'
                 });
                 const data = await response.json();
+                if (isAuthError(data)) { handleAuthError(); return; }
                 if (data.success) {
-                    showToast('Health status reset', 'success');
+                    showToast('健康状态已重置', 'success');
                     refreshAmapKeys();
                 } else {
-                    showToast(data.message || 'Failed to reset', 'error');
+                    showToast(data.message || '重置失败', 'error');
                 }
             } catch (error) {
                 console.error('Error resetting amap key health:', error);
-                showToast('Failed to reset health', 'error');
+                showToast('重置健康状态失败', 'error');
             }
         }
 
         async function deleteAmapKey(id) {
-            if (!confirm('Delete this Amap API key?')) return;
+            if (!confirm('确定删除此高德 API 密钥?')) return;
             try {
                 const response = await fetch('/portal/api/amap-keys/keys/' + id, {
-                    method: 'DELETE',
-                    headers: { 'Authorization': 'Bearer ' + getSessionToken() }
+                    method: 'DELETE'
                 });
                 const data = await response.json();
+                if (isAuthError(data)) { handleAuthError(); return; }
                 if (data.success) {
-                    showToast('Key deleted', 'success');
+                    showToast('密钥已删除', 'success');
                     refreshAmapKeys();
                 } else {
-                    showToast(data.message || 'Failed to delete', 'error');
+                    showToast(data.message || '删除失败', 'error');
                 }
             } catch (error) {
                 console.error('Error deleting amap key:', error);
-                showToast('Failed to delete key', 'error');
+                showToast('删除密钥失败', 'error');
             }
         }
 
         async function checkAllAmapKeys() {
-            showToast('Checking all Amap keys...', 'info');
+            showToast('正在检查所有高德密钥...', 'info');
             try {
                 const response = await fetch('/portal/api/amap-keys/check-all', {
-                    method: 'POST',
-                    headers: { 'Authorization': 'Bearer ' + getSessionToken() }
+                    method: 'POST'
                 });
                 const data = await response.json();
+                if (isAuthError(data)) { handleAuthError(); return; }
                 if (data.success) {
-                    showToast('Check complete: ' + data.healthy_count + '/' + data.total + ' healthy', 'success');
+                    showToast('检查完成: ' + data.healthy_count + '/' + data.total + ' 个健康', 'success');
                     refreshAmapKeys();
                 } else {
-                    showToast(data.message || 'Check failed', 'error');
+                    showToast(data.message || '检查失败', 'error');
                 }
             } catch (error) {
                 console.error('Error checking all amap keys:', error);
-                showToast('Failed to check keys', 'error');
+                showToast('检查密钥失败', 'error');
             }
         }
 
         async function loadAmapConfig() {
             try {
-                const response = await fetch('/portal/api/amap-config', {
-                    headers: { 'Authorization': 'Bearer ' + getSessionToken() }
-                });
+                const response = await fetch('/portal/api/amap-config');
+                if (!response.ok) throw new Error('Failed to fetch amap config');
                 const data = await response.json();
+                if (isAuthError(data)) { handleAuthError(); return; }
                 if (data.success) {
                     const checkbox = document.getElementById('amap-allow-free-user');
                     if (checkbox) {
@@ -5639,20 +5639,20 @@ curl '${metaApiUrl}?name=${modelName}'`;
                 const response = await fetch('/portal/api/amap-config', {
                     method: 'POST',
                     headers: {
-                        'Authorization': 'Bearer ' + getSessionToken(),
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({ allow_free_user_amap: allowFreeUser })
                 });
                 const data = await response.json();
+                if (isAuthError(data)) { handleAuthError(); return; }
                 if (data.success) {
-                    showToast('Config saved', 'success');
+                    showToast('配置已保存', 'success');
                 } else {
-                    showToast(data.message || 'Failed to save config', 'error');
+                    showToast(data.message || '保存配置失败', 'error');
                 }
             } catch (error) {
                 console.error('Error saving amap config:', error);
-                showToast('Failed to save config', 'error');
+                showToast('保存配置失败', 'error');
             }
         }
 

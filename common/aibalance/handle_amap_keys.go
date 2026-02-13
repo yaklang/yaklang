@@ -362,6 +362,11 @@ func (c *ServerConfig) handleTestAmapApiKey(conn net.Conn, request *http.Request
 		c.logError("failed to update amap key stats: %v", dbErr)
 	}
 
+	// Increment global amap request counter
+	if incErr := IncrementAmapConfigTotalRequests(); incErr != nil {
+		c.logError("failed to increment amap counter during test: %v", incErr)
+	}
+
 	if !healthy {
 		c.logError("amap api key test failed ID=%d: %v", id, checkErr)
 		errMsg := "unknown error"

@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 )
@@ -39,6 +40,14 @@ func NewClient(options ...func(*Config)) (*Client, error) {
 	return NewClientByConfig(config)
 }
 
+// isAmapTOTPAuthError checks if an HTTP response body indicates a TOTP authentication failure.
+// This follows the same pattern as isTOTPAuthError in the web search client.
+func isAmapTOTPAuthError(body []byte) bool {
+	s := string(body)
+	return strings.Contains(s, "memfit_totp_auth_failed") ||
+		strings.Contains(s, "memfit_totp_auth_required")
+}
+
 // doRequest performs an HTTP request and decodes the response.
 func (c *Client) doRequest(ctx context.Context, path string, params url.Values, v interface{}) error {
 	// Add API key to parameters
@@ -53,7 +62,19 @@ func (c *Client) doRequest(ctx context.Context, path string, params url.Values, 
 	if err != nil {
 		return err
 	}
-	req = lowhttp.ReplaceHTTPPacketPath(req, path)
+
+	// Extract base path from BaseURL so that proxy URLs like
+	// "http://127.0.0.1:8223/amap" work correctly.
+	// e.g. BaseURL="/amap" + path="/v3/ip" => fullPath="/amap/v3/ip"
+	basePath := ""
+	if u, parseErr := url.Parse(c.config.BaseURL); parseErr == nil {
+		basePath = strings.TrimRight(u.Path, "/")
+	}
+	fullPath := basePath + path
+	log.Infof("amap client doRequest: baseURL=%s, basePath=%s, apiPath=%s, fullPath=%s",
+		c.config.BaseURL, basePath, path, fullPath)
+
+	req = lowhttp.ReplaceHTTPPacketPath(req, fullPath)
 	req = lowhttp.ReplaceAllHTTPPacketQueryParams(req, paramsMap)
 
 	opts := slices.Clone(c.config.lowhttpOptions)
@@ -66,6 +87,25 @@ func (c *Client) doRequest(ctx context.Context, path string, params url.Values, 
 	}
 	statusCode := lowhttp.GetStatusCodeFromResponse(rsp)
 	body := lowhttp.GetHTTPPacketBody(rsp)
+
+	// TOTP retry: if using aibalance proxy and TOTP auth failed,
+	// refresh the secret and retry once (same pattern as AI Gateway and Web Search clients)
+	if statusCode == http.StatusUnauthorized && c.config.isAIBalanceProxy && isAmapTOTPAuthError(body) {
+		log.Infof("amap TOTP authentication failed, refreshing secret and retrying...")
+		newTOTPHeader := RefreshAmapTOTPHeader(c.config.proxyServerBase)
+		if newTOTPHeader != "" {
+			retryOpts := append(slices.Clone(opts),
+				poc.WithReplaceHttpPacketHeader("X-Memfit-OTP-Auth", newTOTPHeader),
+			)
+			rsp, _, err = poc.HTTP(req, retryOpts...)
+			if err != nil {
+				return err
+			}
+			statusCode = lowhttp.GetStatusCodeFromResponse(rsp)
+			body = lowhttp.GetHTTPPacketBody(rsp)
+		}
+	}
+
 	// Check status code
 	if statusCode != http.StatusOK {
 		return fmt.Errorf("amap API request failed with status %d: %s", statusCode, string(body))

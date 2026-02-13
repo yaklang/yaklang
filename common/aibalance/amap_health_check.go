@@ -106,9 +106,9 @@ func CheckAllAmapApiKeys() ([]AmapKeyHealthResult, error) {
 				checkErrorStr = checkErr.Error()
 			}
 
-			// Update health status in DB
+			// Update health status and statistics in DB
 			if healthy {
-				// Reset consecutive failures on success
+				// Reset consecutive failures on success, increment stats
 				if dbErr := GetDB().Model(&schema.AmapApiKey{}).Where("id = ?", k.ID).
 					Updates(map[string]interface{}{
 						"is_healthy":           true,
@@ -116,11 +116,14 @@ func CheckAllAmapApiKeys() ([]AmapKeyHealthResult, error) {
 						"last_check_error":     "",
 						"last_latency":         latencyMs,
 						"consecutive_failures": 0,
+						"total_requests":       k.TotalRequests + 1,
+						"success_count":        k.SuccessCount + 1,
+						"last_used_time":       time.Now(),
 					}).Error; dbErr != nil {
 					log.Errorf("failed to update amap key health (ID: %d): %v", k.ID, dbErr)
 				}
 			} else {
-				// Increment consecutive failures
+				// Increment consecutive failures and failure stats
 				newConsecutiveFailures := k.ConsecutiveFailures + 1
 				isHealthy := newConsecutiveFailures < 3
 
@@ -131,6 +134,9 @@ func CheckAllAmapApiKeys() ([]AmapKeyHealthResult, error) {
 						"last_check_error":     checkErrorStr,
 						"last_latency":         latencyMs,
 						"consecutive_failures": newConsecutiveFailures,
+						"total_requests":       k.TotalRequests + 1,
+						"failure_count":        k.FailureCount + 1,
+						"last_used_time":       time.Now(),
 					}).Error; dbErr != nil {
 					log.Errorf("failed to update amap key health (ID: %d): %v", k.ID, dbErr)
 				}
@@ -140,6 +146,11 @@ func CheckAllAmapApiKeys() ([]AmapKeyHealthResult, error) {
 				}
 
 				healthy = isHealthy
+			}
+
+			// Increment global amap request counter
+			if incErr := IncrementAmapConfigTotalRequests(); incErr != nil {
+				log.Errorf("failed to increment amap counter during health check: %v", incErr)
 			}
 
 			result := AmapKeyHealthResult{

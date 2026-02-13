@@ -11,7 +11,6 @@ import (
 // amapTraceIDState tracks the rate limiting state for a single Trace-ID in amap proxy.
 type amapTraceIDState struct {
 	lastRequestTime time.Time
-	lastSuccessTime time.Time
 	mu              sync.Mutex
 }
 
@@ -20,8 +19,7 @@ type amapTraceIDState struct {
 // making rate limiting transparent to the client (they only see increased latency).
 //
 // Rules:
-//   - Minimum 2 seconds between any two requests from the same Trace-ID
-//   - After a successful request, 5 second cooldown before next request is allowed
+//   - Minimum 1 second between any two requests from the same Trace-ID
 type AmapRateLimiter struct {
 	states sync.Map // map[string]*amapTraceIDState
 	stopCh chan struct{}
@@ -74,19 +72,10 @@ func (rl *AmapRateLimiter) checkAndGetWait(traceID string) (bool, time.Duration)
 	state.mu.Lock()
 	defer state.mu.Unlock()
 
-	// Check: after a successful request, 5 second cooldown
-	if !state.lastSuccessTime.IsZero() {
-		sinceSuccess := now.Sub(state.lastSuccessTime)
-		if sinceSuccess < 5*time.Second {
-			waitTime := 5*time.Second - sinceSuccess
-			return false, waitTime
-		}
-	}
-
-	// Check: minimum 2 seconds between any two requests
+	// Check: minimum 1 second between any two requests
 	sinceLastRequest := now.Sub(state.lastRequestTime)
-	if sinceLastRequest < 2*time.Second {
-		waitTime := 2*time.Second - sinceLastRequest
+	if sinceLastRequest < 1*time.Second {
+		waitTime := 1*time.Second - sinceLastRequest
 		return false, waitTime
 	}
 
@@ -95,24 +84,10 @@ func (rl *AmapRateLimiter) checkAndGetWait(traceID string) (bool, time.Duration)
 	return true, 0
 }
 
-// RecordSuccess records that a request from the given Trace-ID was successful.
-// This triggers the 5-second cooldown for subsequent requests.
+// RecordSuccess is a no-op kept for interface compatibility.
+// With the simplified 1s rate limit, no special success handling is needed.
 func (rl *AmapRateLimiter) RecordSuccess(traceID string) {
-	now := time.Now()
-
-	val, loaded := rl.states.Load(traceID)
-	if !loaded {
-		rl.states.Store(traceID, &amapTraceIDState{
-			lastRequestTime: now,
-			lastSuccessTime: now,
-		})
-		return
-	}
-
-	state := val.(*amapTraceIDState)
-	state.mu.Lock()
-	state.lastSuccessTime = now
-	state.mu.Unlock()
+	// no-op: the 1-second interval between requests is enforced in checkAndGetWait
 }
 
 // cleanupLoop periodically removes stale Trace-ID entries (inactive for > 5 minutes)
@@ -129,9 +104,6 @@ func (rl *AmapRateLimiter) cleanupLoop() {
 				state := value.(*amapTraceIDState)
 				state.mu.Lock()
 				latest := state.lastRequestTime
-				if state.lastSuccessTime.After(latest) {
-					latest = state.lastSuccessTime
-				}
 				state.mu.Unlock()
 				if latest.Before(cutoff) {
 					rl.states.Delete(key)
