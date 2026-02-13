@@ -133,7 +133,8 @@ type Config struct {
 	/*
 		Prompt Manager
 	*/
-	TopToolsCount          int // Number of top tools to display in prompt
+	TopToolsCount          int  // Number of top tools to display in prompt
+	ShowForgeListInPrompt  bool // Whether to show forge list in base prompt (default false, forges discoverable via search_capabilities)
 	AiForgeManager         AIForgeFactory
 	ContextProviderManager *ContextProviderManager
 
@@ -390,7 +391,7 @@ func newConfig(ctx context.Context) *Config {
 		AiAgreeRiskControl:                 DefaultAIAssistantRiskControl,
 		MaxIterationCount:                  100,
 		Language:                           "zh", // Default to Chinese
-		TopToolsCount:                      100,
+		TopToolsCount:                      15,
 		ContextProviderManager:             NewContextProviderManager(),
 		InputConsumption:                   new(int64),
 		OutputConsumption:                  new(int64),
@@ -976,6 +977,21 @@ func WithTopToolsCount(n int) ConfigOption {
 		}
 		c.m.Lock()
 		c.TopToolsCount = n
+		c.m.Unlock()
+		return nil
+	}
+}
+
+// WithShowForgeListInPrompt controls whether the AI Forge list is rendered in the base prompt.
+// Default is false: forges are hidden from prompt and discoverable via search_capabilities tool.
+// Set to true to restore the original behavior of showing forge list directly in the prompt.
+func WithShowForgeListInPrompt(show bool) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		c.ShowForgeListInPrompt = show
 		c.m.Unlock()
 		return nil
 	}

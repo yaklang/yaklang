@@ -12,24 +12,23 @@ func (r *ReAct) getPrioritizedTools(tools []*aitool.Tool, maxCount int) []*aitoo
 		return tools
 	}
 
-	// Priority tool names (tools_search should be first)
+	// Priority tool names - the 14 core tools displayed in prompt
+	// search_capabilities should be first as it's the discovery mechanism for all other tools/forges/skills
 	priorityNames := []string{
-		"tools_search",
-		"aiforge_search",
-		"now",
-		"bash",
-		"read_file",
+		"search_capabilities",
 		"grep",
+		"read_file",
+		"write_file",
 		"find_file",
-		"send_http_request_by_url",
-		"whois",
-		"dig",
-		"scan_tcp_port",
+		"tree",
+		"bash",
+		"cmd",
 		"encode",
 		"decode",
 		"auto_decode",
-		"current_time",
-		"echo",
+		"scan_port",
+		"git-clone",
+		"do_http_request",
 	}
 
 	// Create map for quick lookup

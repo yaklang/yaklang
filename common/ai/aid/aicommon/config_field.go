@@ -65,6 +65,10 @@ func (c *Config) GetTopToolsCount() int {
 	return c.TopToolsCount
 }
 
+func (c *Config) GetShowForgeListInPrompt() bool {
+	return c.ShowForgeListInPrompt
+}
+
 func (c *Config) GetMaxIterations() int64 {
 	return c.MaxIterationCount
 }

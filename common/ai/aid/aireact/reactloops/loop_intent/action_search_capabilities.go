@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/consts"
@@ -124,7 +125,10 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 				results.WriteString("### Tools & Forges\nDatabase not available.\n\n")
 			}
 
-			// 3. Search registered loop metadata
+			// 3. Search Skills via SkillLoader (if available)
+			searchSkillsFromLoader(r, query, &results, loop)
+
+			// 4. Search registered loop metadata
 			matchedLoops := searchLoopMetadata(query)
 			if len(matchedLoops) > 0 {
 				results.WriteString("### Matched Focus Modes\n")
@@ -160,6 +164,82 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 			op.Continue()
 		},
 	)
+}
+
+// searchSkillsFromLoader searches skills via the SkillLoader if available in the runtime config.
+// Uses type assertion to access GetSkillLoader() from the concrete Config type.
+func searchSkillsFromLoader(r aicommon.AIInvokeRuntime, query string, results *strings.Builder, loop *reactloops.ReActLoop) {
+	// Try to get skill loader via type assertion on the config
+	type skillLoaderProvider interface {
+		GetSkillLoader() aiskillloader.SkillLoader
+	}
+	cfg := r.GetConfig()
+	provider, ok := cfg.(skillLoaderProvider)
+	if !ok {
+		return
+	}
+	skillLoader := provider.GetSkillLoader()
+	if skillLoader == nil || !skillLoader.HasSkills() {
+		return
+	}
+
+	// Use AllSkillMetas and do manual substring matching (same as AutoSkillLoader.SearchSkills)
+	allMetas := skillLoader.AllSkillMetas()
+	queryLower := strings.ToLower(query)
+	queryTokens := strings.Fields(queryLower)
+
+	var matchedSkills []*aiskillloader.SkillMeta
+	for _, meta := range allMetas {
+		searchText := strings.ToLower(meta.Name + " " + meta.Description)
+
+		// Full query match
+		if strings.Contains(searchText, queryLower) {
+			matchedSkills = append(matchedSkills, meta)
+			continue
+		}
+
+		// Token-level match
+		if len(queryTokens) > 1 {
+			meaningfulTokens := 0
+			matchCount := 0
+			for _, token := range queryTokens {
+				if len(token) < 2 {
+					continue
+				}
+				meaningfulTokens++
+				if strings.Contains(searchText, token) {
+					matchCount++
+				}
+			}
+			if meaningfulTokens > 0 && matchCount > 0 && matchCount >= (meaningfulTokens+1)/2 {
+				matchedSkills = append(matchedSkills, meta)
+			}
+		}
+	}
+
+	if len(matchedSkills) > 0 {
+		results.WriteString("### Matched Skills\n")
+		limit := 5
+		for i, skill := range matchedSkills {
+			if i >= limit {
+				results.WriteString(fmt.Sprintf("... and %d more skills\n", len(matchedSkills)-limit))
+				break
+			}
+			desc := skill.Description
+			if len(desc) > 200 {
+				desc = desc[:200] + "..."
+			}
+			results.WriteString(fmt.Sprintf("- **%s**: %s\n", skill.Name, desc))
+		}
+		results.WriteString("\n")
+		log.Infof("intent loop: found %d matching skills", len(matchedSkills))
+
+		var skillNames []string
+		for _, s := range matchedSkills {
+			skillNames = append(skillNames, s.Name)
+		}
+		loop.Set("matched_skill_names", strings.Join(skillNames, ","))
+	}
 }
 
 // searchLoopMetadata searches registered loop metadata for keyword matches.

@@ -80,6 +80,15 @@ func makeFinalizeEnrichmentAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 				forgeRecommendations.WriteString("匹配蓝图 / Matched forges: " + matchedForgeNames)
 			}
 
+			// Build skill recommendations
+			matchedSkillNames := loop.Get("matched_skill_names")
+			if matchedSkillNames != "" {
+				if toolRecommendations.Len() > 0 {
+					toolRecommendations.WriteString("\n")
+				}
+				toolRecommendations.WriteString("匹配技能 / Matched skills: " + matchedSkillNames)
+			}
+
 			// Build enrichment context
 			var enrichment strings.Builder
 			searchResults := loop.Get("search_results")
@@ -102,10 +111,11 @@ func makeFinalizeEnrichmentAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 
 			// Add to timeline
 			r.AddToTimeline("intent_finalized", fmt.Sprintf(
-				"Intent analysis completed: %s | Tools: %s | Forges: %s",
+				"Intent analysis completed: %s | Tools: %s | Forges: %s | Skills: %s",
 				utils.ShrinkString(intentSummary, 100),
 				matchedToolNames,
 				matchedForgeNames,
+				matchedSkillNames,
 			))
 
 			log.Infof("intent loop: enrichment finalized, exiting loop")

@@ -32,7 +32,7 @@ func init() {
 				reactloops.WithAllowToolCall(false),
 				reactloops.WithAllowUserInteract(false),
 				reactloops.WithInitTask(buildInitTask(r)),
-				reactloops.WithMaxIterations(2), // search -> finalize
+				reactloops.WithMaxIterations(4), // supports up to 3 rounds of search + 1 finalize
 				reactloops.WithPersistentInstruction(instruction),
 				reactloops.WithReflectionOutputExample(outputExample),
 				reactloops.WithActionFilter(func(action *reactloops.LoopAction) bool {
