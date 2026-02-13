@@ -388,6 +388,10 @@ func (c *ServerConfig) handleTestWebSearchApiKey(conn net.Conn, request *http.Re
 		c.logError("web search api key test failed ID=%d: %v", id, searchErr)
 		// Update stats: failure
 		UpdateWebSearchApiKeyStats(sk.ID, false, latencyMs)
+		// Increment global web search counter
+		if incErr := IncrementWebSearchConfigTotalRequests(); incErr != nil {
+			c.logError("failed to increment web search counter during test: %v", incErr)
+		}
 		c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
 			"success":    false,
 			"message":    fmt.Sprintf("test failed: %v", searchErr),
@@ -398,6 +402,10 @@ func (c *ServerConfig) handleTestWebSearchApiKey(conn net.Conn, request *http.Re
 
 	// Update stats: success
 	UpdateWebSearchApiKeyStats(sk.ID, true, latencyMs)
+	// Increment global web search counter
+	if incErr := IncrementWebSearchConfigTotalRequests(); incErr != nil {
+		c.logError("failed to increment web search counter during test: %v", incErr)
+	}
 
 	c.logInfo("web search api key test passed ID=%d, returned %d results, latency=%dms", id, len(results), latencyMs)
 	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{

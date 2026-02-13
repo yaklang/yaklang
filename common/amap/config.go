@@ -1,11 +1,23 @@
 package amap
 
 import (
+	"strings"
 	"time"
 
+	"github.com/yaklang/yaklang/common/aibalanceclient"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 )
+
+// deriveServerBase extracts the aibalance server base URL from an amap BaseURL.
+// e.g. "http://127.0.0.1:8223/amap" -> "http://127.0.0.1:8223"
+// e.g. "https://aibalance.yaklang.com/amap" -> "https://aibalance.yaklang.com"
+func deriveServerBase(amapBaseURL string) string {
+	s := strings.TrimSuffix(amapBaseURL, "/")
+	s = strings.TrimSuffix(s, "/amap")
+	s = strings.TrimSuffix(s, "/")
+	return s
+}
 
 type AmapConfigOption func(*Config)
 
@@ -25,6 +37,10 @@ type Config struct {
 	lowhttpOptions []poc.PocConfigOption
 
 	EnableWeatherForecast bool
+
+	// aibalance proxy fields (internal)
+	isAIBalanceProxy bool   // true when using aibalance proxy, enables TOTP retry
+	proxyServerBase  string // aibalance server base URL without /amap, for TOTP refresh
 }
 
 // NewConfig returns a default config for the Amap API client.
@@ -60,15 +76,26 @@ func NewConfig(opts ...AmapConfigOption) *Config {
 	// Fallback: if no API key is configured, use the aibalance proxy
 	if cfg.ApiKey == "" {
 		log.Infof("no amap api key configured, falling back to aibalance proxy")
-		cfg.BaseURL = "https://aibalance.yaklang.com/amap"
+		// Only set fallback BaseURL if user hasn't explicitly set a custom one
+		if cfg.BaseURL == "https://restapi.amap.com" {
+			cfg.BaseURL = "https://aibalance.yaklang.com/amap"
+		}
 		cfg.ApiKey = "aibalance-proxy" // placeholder key, server will inject real key
+		cfg.isAIBalanceProxy = true
+		cfg.proxyServerBase = deriveServerBase(cfg.BaseURL)
 
-		// Load TOTP header for authentication
-		totpHeader, err := LoadAmapTOTPHeader()
+		// Load TOTP header for authentication from the actual target server
+		totpHeader, err := LoadAmapTOTPHeader(cfg.BaseURL)
 		if err != nil {
 			log.Warnf("failed to load TOTP header for amap proxy: %v", err)
 		} else if totpHeader != "" {
 			cfg.lowhttpOptions = append(cfg.lowhttpOptions, poc.WithReplaceHttpPacketHeader("X-Memfit-OTP-Auth", totpHeader))
+		}
+
+		// Add Trace-ID header for rate limiting identification
+		traceID := aibalanceclient.GetTraceID()
+		if traceID != "" {
+			cfg.lowhttpOptions = append(cfg.lowhttpOptions, poc.WithReplaceHttpPacketHeader("Trace-ID", traceID))
 		}
 	}
 
