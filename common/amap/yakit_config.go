@@ -3,6 +3,7 @@ package amap
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/twofa"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
 
@@ -87,15 +89,13 @@ func RefreshAmapTOTPHeader(serverBase string) string {
 	if isProductionAIBalance(serverBase) {
 		// Production: clear shared cache and re-fetch
 		log.Infof("amap TOTP refresh: clearing shared cache and re-fetching from production")
-		newCode := aibalanceclient.RefreshTOTPSecret(func() string {
+		newSecret := aibalanceclient.RefreshTOTPSecret(func() string {
 			return fetchTOTPSecretFromURL(totpURL)
 		})
-		if newCode == "" {
+		if newSecret == "" {
 			return ""
 		}
-		// RefreshTOTPSecret returns the new secret, not the TOTP code.
-		// Generate a fresh code from it.
-		code := twofa.GetUTCCode(newCode)
+		code := twofa.GetUTCCode(newSecret)
 		if code == "" {
 			return ""
 		}
@@ -116,23 +116,37 @@ func RefreshAmapTOTPHeader(serverBase string) string {
 }
 
 // fetchTOTPSecretFromURL fetches the TOTP UUID from the given URL.
-// This follows the same protocol as aibalanceclient.FetchTOTPSecretFromAIBalance
-// and AiBalanceSearchClient.fetchTOTPSecretFromServer, but targets an arbitrary server.
+// Uses utils.ParseStringToHostPort to correctly handle all URL formats:
+//   - http://127.0.0.1:8223/... (IP + non-standard port)
+//   - https://aibalance.yaklang.com/... (domain + default port 443)
+//   - http://[::1]:8223/... (IPv6 + port)
+//   - http://example.com/... (domain + default port 80)
 func fetchTOTPSecretFromURL(totpURL string) string {
 	log.Infof("fetching TOTP secret from: %s", totpURL)
 
 	isHTTPS := strings.HasPrefix(totpURL, "https://")
-	host := strings.TrimPrefix(strings.TrimPrefix(totpURL, "https://"), "http://")
-	if idx := strings.Index(host, "/"); idx >= 0 {
-		host = host[:idx]
+
+	// Use utils.ParseStringToHostPort to correctly parse host and port
+	// from any URL format (handles IPv4, IPv6, default ports, custom ports, etc.)
+	host, port, err := utils.ParseStringToHostPort(totpURL)
+	if err != nil {
+		log.Errorf("failed to parse TOTP URL %s: %v", totpURL, err)
+		return ""
 	}
 
-	rawReq := []byte("GET /v1/memfit-totp-uuid HTTP/1.1\r\nHost: " + host + "\r\nAccept: application/json\r\nUser-Agent: yaklang-amap-client\r\n\r\n")
+	// Build host:port for Host header and WithHost target
+	addr := utils.HostPort(host, port)
+
+	rawReq := fmt.Appendf(nil,
+		"GET /v1/memfit-totp-uuid HTTP/1.1\r\nHost: %s\r\nAccept: application/json\r\nUser-Agent: yaklang-amap-client\r\n\r\n",
+		addr,
+	)
 
 	rspIns, err := lowhttp.HTTPWithoutRedirect(
 		lowhttp.WithHttps(isHTTPS),
 		lowhttp.WithRequest(rawReq),
 		lowhttp.WithHost(host),
+		lowhttp.WithPort(port),
 		lowhttp.WithTimeout(10*time.Second),
 	)
 	if err != nil {
