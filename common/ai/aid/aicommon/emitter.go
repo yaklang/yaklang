@@ -463,8 +463,27 @@ const (
 )
 
 func (r *Emitter) EmitToolCallStd(toolName string, stdOut, stdErr io.Reader, taskIndex string) {
-	_, _ = r.EmitStreamEventWithContentType(fmt.Sprintf("tool-%v-stdout", toolName), stdOut, taskIndex, TypeLogTool)
-	_, _ = r.EmitStreamEventWithContentType(fmt.Sprintf("tool-%v-stderr", toolName), stdErr, taskIndex, TypeLogToolErrorOutput)
+	// Tool stdout/stderr uses throttled streaming to avoid overwhelming the gRPC stream.
+	// Instead of sending every small chunk immediately, data is accumulated and flushed
+	// at DefaultToolStdThrottleInterval intervals, producing larger but less frequent events.
+	_, _ = r.emitStreamEvent(&streamEvent{
+		disableMarkdown:  true,
+		startTime:        time.Now(),
+		reader:           stdOut,
+		nodeId:           fmt.Sprintf("tool-%v-stdout", toolName),
+		contentType:      TypeLogTool,
+		taskIndex:        taskIndex,
+		throttleInterval: DefaultToolStdThrottleInterval,
+	})
+	_, _ = r.emitStreamEvent(&streamEvent{
+		disableMarkdown:  true,
+		startTime:        time.Now(),
+		reader:           stdErr,
+		nodeId:           fmt.Sprintf("tool-%v-stderr", toolName),
+		contentType:      TypeLogToolErrorOutput,
+		taskIndex:        taskIndex,
+		throttleInterval: DefaultToolStdThrottleInterval,
+	})
 }
 
 func (r *Emitter) EmitStreamEvent(nodeId string, startTime time.Time, reader io.Reader, taskIndex string, finishCallback ...func()) (*schema.AiOutputEvent, error) {
@@ -633,7 +652,15 @@ func (r *Emitter) emitStreamEvent(e *streamEvent) (*schema.AiOutputEvent, error)
 				f()
 			}
 		}()
-		n, _ := io.Copy(producer, e.reader)
+		var n int64
+		if e.throttleInterval > 0 {
+			// Use ThrottledCopy for rate-limited streams (e.g., tool stdout/stderr).
+			// This accumulates data and flushes at controlled intervals, producing
+			// larger but less frequent gRPC events.
+			n, _ = ThrottledCopy(producer, e.reader, e.throttleInterval)
+		} else {
+			n, _ = io.Copy(producer, e.reader)
+		}
 		if n > 0 {
 			du := time.Since(e.startTime)
 			r.EmitStructured("stream-finished", map[string]any{

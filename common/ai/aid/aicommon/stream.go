@@ -4,12 +4,19 @@ import (
 	"bytes"
 	"io"
 	"math/rand"
+	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+// DefaultToolStdThrottleInterval is the default flush interval for tool stdout/stderr streams.
+// Instead of forwarding every small chunk immediately to gRPC, tool output is accumulated
+// and flushed at this interval. This produces larger but less frequent events, reducing
+// gRPC stream congestion and frontend rendering pressure.
+const DefaultToolStdThrottleInterval = 200 * time.Millisecond
 
 type streamEvent struct {
 	startTime          time.Time
@@ -21,6 +28,11 @@ type streamEvent struct {
 	disableMarkdown    bool
 	contentType        string
 	emitFinishCallback []func()
+
+	// throttleInterval controls the flush interval for rate-limiting high-frequency streams.
+	// When > 0, ThrottledCopy is used instead of io.Copy, accumulating data and flushing
+	// at this interval. This is used for tool stdout/stderr to avoid overwhelming gRPC.
+	throttleInterval time.Duration
 }
 
 func newStreamAIOutputEventWriter(
@@ -88,6 +100,91 @@ func (e *streamAIOutputEventWriter) Write(b []byte) (int, error) {
 	}
 	e.handler(event)
 	return len(b), nil
+}
+
+// ThrottledCopy reads from src continuously and writes to dst at a controlled frequency.
+// Instead of forwarding every small read immediately (which can produce hundreds of tiny
+// gRPC events per second), it accumulates data in an internal buffer and flushes to dst
+// at the specified interval. This results in larger but less frequent write calls to dst.
+//
+// This is designed for rate-limiting high-frequency tool stdout/stderr streams to avoid
+// overwhelming the shared gRPC stream and causing backpressure that delays other events.
+//
+// When flushInterval <= 0, it falls back to standard io.Copy behavior.
+func ThrottledCopy(dst io.Writer, src io.Reader, flushInterval time.Duration) (int64, error) {
+	if flushInterval <= 0 {
+		return io.Copy(dst, src)
+	}
+
+	var (
+		written int64
+		mu      sync.Mutex
+		buf     bytes.Buffer
+		srcErr  error
+		srcDone = make(chan struct{})
+	)
+
+	// Background reader: reads from src as fast as possible into the shared buffer.
+	// This ensures the pipe writer (tool execution side) is never blocked by slow gRPC consumption.
+	go func() {
+		defer close(srcDone)
+		readBuf := make([]byte, 4096)
+		for {
+			n, err := src.Read(readBuf)
+			if n > 0 {
+				mu.Lock()
+				buf.Write(readBuf[:n])
+				mu.Unlock()
+			}
+			if err != nil {
+				mu.Lock()
+				srcErr = err
+				mu.Unlock()
+				return
+			}
+		}
+	}()
+
+	// flush writes accumulated buffer data to dst as a single chunk.
+	flush := func() error {
+		mu.Lock()
+		if buf.Len() == 0 {
+			mu.Unlock()
+			return nil
+		}
+		data := make([]byte, buf.Len())
+		copy(data, buf.Bytes())
+		buf.Reset()
+		mu.Unlock()
+
+		n, err := dst.Write(data)
+		written += int64(n)
+		return err
+	}
+
+	ticker := time.NewTicker(flushInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			if err := flush(); err != nil {
+				return written, err
+			}
+		case <-srcDone:
+			// Source finished reading, do final flush to ensure no data is lost.
+			if err := flush(); err != nil {
+				return written, err
+			}
+			mu.Lock()
+			finalErr := srcErr
+			mu.Unlock()
+			if finalErr == io.EOF {
+				return written, nil
+			}
+			return written, finalErr
+		}
+	}
 }
 
 func TypeWriterWrite(dst io.Writer, src string, bps int) (written int64, err error) {
