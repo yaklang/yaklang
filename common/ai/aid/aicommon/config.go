@@ -862,6 +862,22 @@ func (c *Config) LoadBuiltinSkillsFS(fsys fi.FileSystem) error {
 	return err
 }
 
+// LoadBuiltinSkillsFromDir loads skills from a local directory on disk.
+// It respects disableAutoSkills: if auto-skills are disabled, this is a no-op.
+// This is the preferred way to load skills: built-in skills are first extracted
+// to the directory, then loaded from there, allowing users to view and modify them.
+func (c *Config) LoadBuiltinSkillsFromDir(dirPath string) error {
+	if c.disableAutoSkills {
+		return nil
+	}
+	loader := c.ensureSkillLoader()
+	if loader == nil {
+		return utils.Error("failed to ensure skill loader")
+	}
+	_, err := loader.AddLocalDir(dirPath)
+	return err
+}
+
 // Consumption pointers
 func WithAIConsumptionPointers(input *int64, output *int64) ConfigOption {
 	return func(c *Config) error {

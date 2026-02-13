@@ -55,15 +55,15 @@ func TestBuiltinSkillsFS_CodeReviewMetaValid(t *testing.T) {
 		t.Error("body must not be empty for production skill")
 	}
 
-	// Validate body contains expected production content sections (Chinese)
+	// Validate body contains expected production content sections
 	expectedSections := []string{
-		"SyntaxFlow",
+		"grep",
 		"CWE-89",
 		"CWE-77",
 		"CWE-79",
-		"SSA",
-		"ssa.Parse",
-		"syntaxflow.ExecRule",
+		"CWE-918",
+		"CWE-502",
+		"CWE-22",
 	}
 	for _, section := range expectedSections {
 		if !strings.Contains(meta.Body, section) {
