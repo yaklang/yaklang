@@ -1,6 +1,8 @@
 package loopinfra
 
 import (
+	"fmt"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -52,7 +54,27 @@ var loopAction_LoadingSkills = &reactloops.LoopAction{
 		err := mgr.LoadSkill(skillName)
 		if err != nil {
 			log.Warnf("failed to load skill %q: %v", skillName, err)
-			op.Feedback("Failed to load skill '" + skillName + "': " + err.Error())
+
+			// Write error to timeline for persistent record (prevents AI from retrying blindly)
+			invoker := loop.GetInvoker()
+			errMsg := fmt.Sprintf("Failed to load skill '%s': %v", skillName, err)
+			invoker.AddToTimeline("skill_load_failed", errMsg)
+
+			// Try to resolve the identifier to suggest the correct action
+			resolved := loop.ResolveIdentifier(skillName)
+			if !resolved.IsUnknown() {
+				// The identifier exists as a different type (tool/forge) - provide clear guidance
+				invoker.AddToTimeline("identifier_resolved", resolved.Suggestion)
+				op.Feedback(errMsg + "\n\n" + resolved.Suggestion)
+			} else {
+				// The identifier doesn't exist anywhere
+				op.Feedback(errMsg + "\n\n" + resolved.Suggestion)
+			}
+
+			op.SetReflectionLevel(reactloops.ReflectionLevel_Critical)
+			op.SetReflectionData("skill_load_error", err.Error())
+			op.SetReflectionData("skill_name", skillName)
+			op.SetReflectionData("resolved_type", string(resolved.IdentityType))
 			op.Continue()
 			return
 		}

@@ -1,6 +1,8 @@
 package loopinfra
 
 import (
+	"fmt"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -27,6 +29,16 @@ var loopAction_RequireAIBlueprintForge = &reactloops.LoopAction{
 			loop.GetInvoker().AddToTimeline("[BLUEPRINT_MISSING_NAME]", "require_ai_blueprint action is missing 'blueprint_payload' field")
 			loop.GetInvoker().AddToTimeline("[ACTION_VERIFIER]", "Failed to verify require_ai_blueprint action due to missing blueprint_payload")
 			return utils.Error("require_ai_blueprint action must have 'blueprint_payload' field")
+		}
+
+		// Pre-check: try to resolve the identifier to detect misuse early
+		// This prevents the async forge call from failing deep inside invoke_blueprint.go
+		resolved := loop.ResolveIdentifier(forgeName)
+		if resolved.IdentityType != aicommon.ResolvedAs_Unknown && resolved.IdentityType != aicommon.ResolvedAs_Forge {
+			// The identifier exists but is NOT a forge - provide clear guidance
+			loop.GetInvoker().AddToTimeline("[BLUEPRINT_WRONG_TYPE]",
+				fmt.Sprintf("'%s' is not an AI Blueprint. %s", forgeName, resolved.Suggestion))
+			return utils.Errorf("'%s' is not an AI Blueprint: %s", forgeName, resolved.Suggestion)
 		}
 
 		// 记录准备调用的 Blueprint

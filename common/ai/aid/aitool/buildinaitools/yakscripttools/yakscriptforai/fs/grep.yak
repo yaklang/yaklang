@@ -11,12 +11,34 @@ maxResult := cli.Int("limit", cli.setHelp("max times (limit) grep for results"),
 offsetResultCount := cli.Int("offset", cli.setHelp("skip how many first match"), cli.setDefault(0))
 fileSizeLimit = cli.Int("file-size-max", cli.setHelp("limit for file size, if the file is too large, stop it auto"), cli.setDefault(1000 * 1000 * 1000 * 2)) // 2G
 contextBuffer := cli.Int("context-buffer", cli.setHelp("Show (or display) a certain number of bytes of context around the matching text, default 0 is for not show"), cli.setDefault(0))
+excludeRaw := cli.String("exclude", cli.setHelp("comma-separated list of directory/file names to exclude from scanning"), cli.setDefault(".git,.svn,.hg,node_modules,__pycache__,.DS_Store,.idea,.vscode,.next,.nuxt,.cache"))
 cli.check()
 
 // Fallback: if fileSizeLimit is 0 or negative (e.g., due to scientific notation parsing issue), set to 2GB
 if fileSizeLimit <= 0 {
     fileSizeLimit = 1000 * 1000 * 1000 * 2 // 2GB
     yakit.Info("file-size-max was invalid (%v), reset to default 2GB", fileSizeLimit)
+}
+
+// 解析 exclude 列表
+excludeNames = {}
+for item in str.Split(excludeRaw, ",") {
+    item = str.TrimSpace(item)
+    if item != "" {
+        excludeNames[item] = true
+    }
+}
+
+// shouldExcludePath checks if any path component matches the exclude list
+shouldExcludePath = (filePath) => {
+    normalized = str.ReplaceAll(filePath, "\\", "/")
+    parts = str.Split(normalized, "/")
+    for part in parts {
+        if excludeNames[part] {
+            return true
+        }
+    }
+    return false
 }
 
 // 解析多个路径（以逗号分隔）
@@ -52,6 +74,9 @@ yakit.Info("target path(s): %v", pathName)
 yakit.Info("pattern: %v", pattern)
 yakit.Info("pattern-mode: %v", matchMode)
 yakit.Info("limit: %v, offset: %v, context-buffer: %v", maxResult, offsetResultCount, contextBuffer)
+if len(excludeNames) > 0 {
+    yakit.Info("exclude: %v", excludeRaw)
+}
 
 count := 0
 m := sync.NewMutex()
@@ -154,6 +179,9 @@ processPath = (singlePath) => {
             // yakit.File(fileToCheck, yakit.fileStatusAction(info))
             defer recover()
             if end { return }
+
+            // Skip excluded paths (e.g. .git, node_modules)
+            if shouldExcludePath(fileToCheck) { return }
 
             if fileSizeLimit > 0 && info.Size() > fileSizeLimit {
                 // overlarge
