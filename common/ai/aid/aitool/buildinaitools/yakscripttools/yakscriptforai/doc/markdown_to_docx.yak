@@ -2,6 +2,19 @@ __DESC__ = "一个用于将Markdown文件转换为Word文档(.docx)的工具，�
 __VERBOSE_NAME__ = "Markdown转DOCX工具"
 __KEYWORDS__ = "markdown转换,docx文档,文档转换,pandoc,word文档,document conversion,markdown to docx,file conversion,报告生成,文档处理,格式转换,文档导出"
 
+__USAGE__ = <<<USAGE_BLOCK
+Markdown to DOCX Tool - Parameter Description for JSON Tool Calls
+
+Required Parameters:
+  input           (string)  Input Markdown file path (.md).
+
+Optional Parameters:
+  output-dir      (string)  Output directory for the converted .docx file.
+                            If omitted, uses the input file directory.
+  output-name     (string)  Custom output filename without extension.
+                            If omitted, uses input filename.
+USAGE_BLOCK
+
 yakit.AutoInitYakit()
 
 // 解析命令行参数：输入文件路径和输出设置

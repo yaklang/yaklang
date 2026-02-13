@@ -2,6 +2,19 @@ __DESC__ = "一个子域名扫描工具，支持递归爆破和泛解析检测�
 __VERBOSE_NAME__ = "子域名扫描工具"
 __KEYWORDS__ = "子域名扫描,域名爆破,递归扫描,泛解析检测,DNS解析,网络侦察,信息收集,subdomain scan,domain brute force,recursive scan,wildcard detection,DNS resolution,network reconnaissance,information gathering"
 
+__USAGE__ = <<<USAGE_BLOCK
+Subdomain Scan Tool - Parameter Description for JSON Tool Calls
+
+Required Parameters:
+  target          (string)  Target domain for subdomain scanning.
+
+Optional Parameters:
+  not-recursive   (bool)    Disable recursive brute-force scanning.
+                            Default: false (recursive enabled).
+  wildcard-to-stop (bool)   Stop on wildcard DNS detection.
+                            Default: false.
+USAGE_BLOCK
+
 target = cli.String("target",cli.setVerboseName("目标域名"),cli.setHelp("扫描目标"), cli.setRequired(true))
 
 notRecursive = cli.Bool("not-recursive",cli.setVerboseName("关闭递归爆破"), cli.setHelp("设置是否递归爆破？"))

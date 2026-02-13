@@ -2,6 +2,13 @@ __DESC__ = "一个获取当前网络公网IP地址并查询其地理位置信息
 __VERBOSE_NAME__ = "高德：获取公网IP及地理位置"
 __KEYWORDS__ = "公网ip,ip地址,地理位置,网络信息,地址查询"
 
+__USAGE__ = <<<USAGE_BLOCK
+Amap Public IP Location Tool - Parameter Description for JSON Tool Calls
+
+This tool takes no parameters.
+It fetches current public IP and queries its geolocation.
+USAGE_BLOCK
+
 isHttps,req,err = poc.ParseUrlToHTTPRequestRaw("GET","https://ifconfig.me/")
 if err != nil{
     yakit.Error("get public ip error: %v", err)

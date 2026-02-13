@@ -2,6 +2,18 @@ __DESC__ = "一个数据包指纹匹配工具，可以对输入的网络数据�
 __VERBOSE_NAME__ = "数据包指纹匹配"
 __KEYWORDS__ = "数据包分析,指纹匹配,网络分析,协议识别,服务识别,流量分析,安全检测,packet analysis,fingerprint matching,network analysis,protocol identification,service identification,traffic analysis,security detection,response matching,文件读取,file reading"
 
+__USAGE__ = <<<USAGE_BLOCK
+Packet Fingerprint Match Tool - Parameter Description for JSON Tool Calls
+
+Input Parameters (exactly one is required):
+  packet          (string)  Raw packet content for fingerprint matching.
+  file_path       (string)  File path to read packet content from.
+
+Rules:
+  - Provide either "packet" or "file_path".
+  - Do not provide both at the same time.
+USAGE_BLOCK
+
 packet = cli.Text("packet", cli.setVerboseName("数据包"), cli.setHelp("需要指纹匹配的数据包原文(packet 和 file_path 必须二选一)"))
 file_path = cli.String("file_path", cli.setVerboseName("文件路径"), cli.setHelp("指定文件路径，读取文件内容进行指纹匹配(packet 和 file_path 必须二选一)"))
 cli.check()

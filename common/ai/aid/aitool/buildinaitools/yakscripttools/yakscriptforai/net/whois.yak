@@ -2,6 +2,14 @@ __DESC__ = "一个通过向IANA网站发送HTTP请求来查询指定域名的WHO
 __VERBOSE_NAME__ = "IANA WHOIS域名信息查询"
 __KEYWORDS__ = "whois查询,域名信息,域名管理,网络侦察,信息收集,iana,域名注册信息"
 
+__USAGE__ = <<<USAGE_BLOCK
+IANA WHOIS Query Tool - Parameter Description for JSON Tool Calls
+
+Required Parameters:
+  domain          (string)  Target domain name for WHOIS query.
+                            Example: "example.com".
+USAGE_BLOCK
+
 domainString = cli.String("domain", cli.setRequired(true), cli.setHelp("whois target domain"))
 // domainString = "example.com"
 cli.check()

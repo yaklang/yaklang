@@ -2,6 +2,14 @@ __DESC__ = "根据指定的地理位置名称和关键词，搜索该位置附�
 __VERBOSE_NAME__ = "高德：周边地点搜索"
 __KEYWORDS__ = "地理位置,周边搜索,地点信息,高德地图,poi搜索,位置服务,信息查询"
 
+__USAGE__ = <<<USAGE_BLOCK
+Amap Nearby POI Search Tool - Parameter Description for JSON Tool Calls
+
+Required Parameters:
+  location        (string)  Base location name for nearby search.
+  keyword         (string)  Nearby POI keyword, such as "food", "hotel", "hospital".
+USAGE_BLOCK
+
 location = cli.String("location", cli.setHelp("Location Name."),cli.setRequired(true))
 keyword = cli.String("keyword", cli.setHelp("Search nearby keywords, such as food, hotels, etc."),cli.setRequired(true))
 cli.check()

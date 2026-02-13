@@ -2,6 +2,17 @@ __DESC__ = "一个用于获取骑行导航路径规划的工具，根据起始�
 __VERBOSE_NAME__ = "高德：骑行导航路径规划"
 __KEYWORDS__ = "骑行导航,路径规划,高德地图,位置服务,出行规划,导航信息"
 
+__USAGE__ = <<<USAGE_BLOCK
+Amap Bicycling Plan Tool - Parameter Description for JSON Tool Calls
+
+Required Parameters:
+  origin          (string)  Start location for route planning.
+  destination     (string)  Destination location for route planning.
+
+Optional Parameters:
+  city            (string)  City context for route planning.
+USAGE_BLOCK
+
 ori = cli.String("origin",cli.setHelp("Starting point of the route planning"), cli.setRequired(true))
 dst = cli.String("destination",cli.setHelp("Ending point of the route planning"), cli.setRequired(true))
 city = cli.String("city",cli.setHelp("City where the route is located"))

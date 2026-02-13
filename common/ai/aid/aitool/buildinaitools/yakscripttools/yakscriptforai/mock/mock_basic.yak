@@ -2,6 +2,13 @@ __DESC__ = "mock"
 
 __KEYWORDS__ = "mock"
 
+__USAGE__ = <<<USAGE_BLOCK
+Mock Basic Tool - Parameter Description for JSON Tool Calls
+
+This tool takes no parameters.
+It generates mock yakit outputs, mock HTTP traffic, and mock risk records.
+USAGE_BLOCK
+
 yakit.StatusCard("statue","mock basic yakit")
 yakit.Info("mock info")
 yakit.Error("mokc error")

@@ -1,27 +1,148 @@
-__DESC__ = `一个跨平台的Shell命令执行工具，支持bash、cmd、powershell等多种shell类型，允许用户在受控环境中执行任意shell命令，支持超时控制和输出捕获，适用于系统管理、自动化脚本执行和运维操作。
-
-【超时控制】为避免命令卡住，请确保生成的命令能在合理时间内完成。对于可能长时间运行的命令（如 tail -f、watch、ping 无限循环等），请使用 timeout 上下文控制或添加适当的限制参数（如 ping -c 5）。默认超时时间为60秒。
-
-【权限与安全警告 - 非常重要】
-1. 【避免敏感目录扫描】不要对根目录 / 或系统目录执行递归操作（如 find / -xxx、ls -R /）。这会触发操作系统安全警告，且在非root权限下大量报错。
-2. 【禁止访问敏感文件】非root用户禁止尝试访问：/etc/shadow、/root/.ssh/*、/etc/sudoers 等敏感配置文件。
-3. 【限制搜索范围】使用 find 命令时，必须指定具体目录（如 find /home/user -name xxx），禁止使用 find / 全盘搜索。可添加 -maxdepth 限制深度。
-4. 【避免权限升级尝试】不要执行 sudo、su、chmod 777 等可能被视为恶意的操作。
-5. 【安全的替代方案】
-   - 查看系统信息: uname -a, hostnamectl, cat /etc/os-release
-   - 检查磁盘: df -h（当前用户可读的分区）
-   - 检查进程: ps aux, top -l 1（macOS）, top -bn1（Linux）
-   - 检查网络: netstat -tuln, ss -tuln, lsof -i（限制端口）
-   - 检查端口: lsof -i:端口号
-
-【Windows注意】当使用cmd类型时，路径中的反斜杠(\)需要转义，例如应使用 C:\\Users 而不是 C:\Users。
-
-【Bash执行特性】
-- 脚本以 set -e 模式执行，遇到错误立即退出，避免灾难性后果
-- 脚本以 set -x 模式执行（trace），输出每条执行的命令，便于调试和错误定位
-- 错误输出包含行号信息，便于识别问题位置`
+__DESC__ = "跨平台Shell命令执行工具，支持bash/cmd/powershell，具备超时控制和输出捕获。bash脚本以set -e（遇错退出）和set -x（命令追踪）模式执行，适用于系统管理、自动化脚本和运维操作。"
 __VERBOSE_NAME__ = "跨平台Shell命令执行工具"
 __KEYWORDS__ = "shell command,bash,cmd,powershell,命令行工具,系统管理,自动化脚本,运维工具,shell script,command execution,系统操作,终端命令,system administration,automation tools,操作系统,跨平台命令,timeout,超时控制"
+
+__USAGE__ = <<<USAGE_BLOCK
+Cross-Platform Shell Command Execution Tool - Usage Guide for AI Parameter Generation
+
+## Parameters
+
+Required:
+  command   (string)  The shell command or script to execute.
+                      Single-line commands: put directly in JSON params.command
+                      Multi-line scripts: MUST use AITAG format for the command parameter
+
+Optional:
+  timeout   (int)     *** CRITICAL: YOU MUST ALWAYS SET THIS PARAMETER ***
+                      Max execution time in seconds. Process is KILLED when timeout is reached.
+                      Default: 60 (but DO NOT rely on the default -- always set explicitly!)
+                      If the command hangs or runs forever, the entire tool call blocks.
+                      Recommended values:
+                        - Quick queries (ls, cat, echo, uname, whoami): 10-15
+                        - File operations (find, grep, du): 15-30
+                        - Network commands (curl, wget, ping -c N): 30-60
+                        - Build/compile/install (make, go build, pip install): 120-300
+  shell     (string)  Shell type: "bash" | "cmd" | "powershell"
+                      Default: auto-detect (linux/mac -> bash, windows -> cmd)
+
+## Execution Characteristics
+
+bash:  set -e (exit on error) + set -x (trace mode, shows each command with '+' prefix)
+cmd:   executes via "cmd /c", backslashes MUST be escaped: "C:\\Users"
+powershell: $ErrorActionPreference="Stop" + Set-PSDebug -Trace 1
+
+## Safety Rules
+
+FORBIDDEN: find / , ls -R / , sudo, su, chmod 777, rm -rf /, access to /etc/shadow
+MUST have limits: ping -c N, find ... -maxdepth N, tail -n N (never -f), pipe | head -N
+
+## Few-Shot Examples
+
+Replace {NONCE} with the actual nonce from the response format section.
+
+### Example 1: Simple one-line command (JSON params, explicit timeout)
+
+User intent: "Check disk space"
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "bash",
+  "identifier": "check_disk_space",
+  "params": {
+    "command": "df -h",
+    "timeout": 10
+  }
+}
+```
+
+### Example 2: Multi-line diagnostic script (AITAG for command)
+
+User intent: "Show system status: OS, memory, and top processes"
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "bash",
+  "identifier": "system_status_check",
+  "params": {
+    "timeout": 20
+  }
+}
+```
+
+<|TOOL_PARAM_command_{NONCE}|>
+echo "=== OS Info ==="
+uname -a
+echo ""
+echo "=== Memory ==="
+free -h 2>/dev/null || vm_stat 2>/dev/null || echo "Memory info not available"
+echo ""
+echo "=== Top 5 CPU Processes ==="
+ps aux --sort=-%cpu 2>/dev/null | head -6 || ps aux | head -6
+<|TOOL_PARAM_command_END_{NONCE}|>
+
+### Example 3: File search with safety limits (AITAG for command)
+
+User intent: "Find large log files in /var/log"
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "bash",
+  "identifier": "find_large_logs",
+  "params": {
+    "timeout": 20
+  }
+}
+```
+
+<|TOOL_PARAM_command_{NONCE}|>
+echo "Searching for .log files > 10MB (max depth 3)..."
+find /var/log -name "*.log" -size +10M -maxdepth 3 -type f -exec ls -lh {} \; 2>/dev/null | head -20
+echo ""
+du -sh /var/log 2>/dev/null || echo "Cannot access /var/log"
+<|TOOL_PARAM_command_END_{NONCE}|>
+
+### Example 4: Complex script with conditional logic (AITAG for command)
+
+User intent: "Check if Python3 is installed, show version and packages"
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "bash",
+  "identifier": "check_python_env",
+  "params": {
+    "timeout": 25
+  }
+}
+```
+
+<|TOOL_PARAM_command_{NONCE}|>
+if command -v python3 &> /dev/null; then
+    echo "Python3 found: $(python3 --version)"
+    echo "Path: $(which python3)"
+    echo ""
+    echo "Installed packages (first 20):"
+    python3 -m pip list 2>/dev/null | head -20 || echo "pip not available"
+else
+    echo "Python3 not found"
+    which python 2>/dev/null && python --version 2>/dev/null || echo "No python found"
+fi
+<|TOOL_PARAM_command_END_{NONCE}|>
+
+## Key Rules
+
+1. ** TIMEOUT IS MANDATORY ** -- Always set timeout explicitly. Do NOT rely on the default 60s.
+   Estimate how long the command should take, and set timeout to ~1.5x that estimate.
+   A command that hangs without timeout will block the entire agent workflow.
+2. Multi-line commands -> ALWAYS use AITAG for the command parameter
+3. Single-line commands -> Use JSON params.command directly
+4. Limit output: pipe through | head -N; limit search: add -maxdepth to find
+5. Use fallback chains for cross-platform: cmd1 2>/dev/null || cmd2 || echo "not available"
+6. NEVER generate indefinite commands (no tail -f, no watch, no ping without -c)
+USAGE_BLOCK
 
 yakit.AutoInitYakit()
 

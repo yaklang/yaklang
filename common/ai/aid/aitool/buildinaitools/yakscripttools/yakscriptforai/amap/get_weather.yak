@@ -2,6 +2,13 @@ __DESC__ = "一个通过指定地点名称查询该地点实时天气信息的�
 __VERBOSE_NAME__ = "高德：实时天气查询"
 __KEYWORDS__ = "天气查询,实时天气,天气信息,天气工具,地点天气,地理信息,天气数据"
 
+__USAGE__ = <<<USAGE_BLOCK
+Amap Weather Query Tool - Parameter Description for JSON Tool Calls
+
+Required Parameters:
+  location        (string)  Location name to query real-time weather for.
+USAGE_BLOCK
+
 location = cli.String("location", cli.setHelp("Location Name"),cli.setRequired(true))
 cli.check()
 res,err = amap.GetWeather(location)

@@ -2,6 +2,19 @@ __DESC__ = "一个用于查看ZIP压缩包内部文件列表的工具，支持�
 __VERBOSE_NAME__ = "ZIP文件列表查看器"
 __KEYWORDS__ = "file management,限制数量,zip,pagination,data retrieval,view files,文件列表,分页查询,file list,limit,archive,文件阅览,offset,files,zip解压,压缩文件管理,偏移量"
 
+__USAGE__ = <<<USAGE_BLOCK
+ZIP File Viewer Tool - Parameter Description for JSON Tool Calls
+
+Required Parameters:
+  filepath        (string)  ZIP file path to inspect.
+
+Optional Parameters:
+  limit           (int)     Maximum number of entries to display in one page.
+                            Default: 100.
+  offset          (int)     Start offset (entry index) for pagination.
+                            Default: 0.
+USAGE_BLOCK
+
 yakit.AutoInitYakit()
 zipfile = cli.String("filepath", cli.setRequired(true), cli.setDefault("zip filepath u want to check"))
 // zipfile = "/tmp/aaa.zip"

@@ -2,6 +2,14 @@ __DESC__ = "根据提供的起点和终点，使用高德地图API计算并显�
 __VERBOSE_NAME__ = "高德：路径距离和耗时计算"
 __KEYWORDS__ = "路径规划,高德地图,距离计算,耗时计算,地理信息,交通工具,导航工具"
 
+__USAGE__ = <<<USAGE_BLOCK
+Amap Distance Tool - Parameter Description for JSON Tool Calls
+
+Required Parameters:
+  origin          (string)  Start location.
+  destination     (string)  Destination location.
+USAGE_BLOCK
+
 ori = cli.String("origin",cli.setHelp("Starting point of the route planning"), cli.setRequired(true))
 dst = cli.String("destination",cli.setHelp("Ending point of the route planning"), cli.setRequired(true))
 cli.check()

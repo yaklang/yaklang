@@ -4,6 +4,17 @@ EOF
 __VERBOSE_NAME__ = "URL内容摘要提取工具"
 __KEYWORDS__ = "url retrieval,page title,http,web page,content extraction,web crawling,html parsing,text extraction,get request,内容提取,web scraper,网页抓取,url获取,页面标题,get请求,html解析,网页信息"
 
+__USAGE__ = <<<USAGE_BLOCK
+URL Content Summary Tool - Parameter Description for JSON Tool Calls
+
+Required Parameters:
+  url             (string)  The target URL to fetch and summarize.
+
+Optional Parameters:
+  method          (string)  HTTP method used for the request.
+                            Default: "GET".
+USAGE_BLOCK
+
 yakit.AutoInitYakit()
 method = cli.String("method", cli.setRequired(false), cli.setDefault("GET"))
 urlStr = cli.String("url", cli.setRequired(true), cli.setHelp("the target url you want to glance"))//"https://www.example.com"
