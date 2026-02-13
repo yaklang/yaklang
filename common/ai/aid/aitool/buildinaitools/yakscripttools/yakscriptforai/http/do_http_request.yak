@@ -12,6 +12,73 @@ This tool supports two modes of operation:
 If "packet" is provided, the tool uses Packet Mode. Otherwise, "url" is required
 for URL Mode. Both modes share the common parameters below.
 
+##############################################################################
+# CRITICAL RULE: AITAG IS MANDATORY FOR "packet", "body", AND "headers"     #
+##############################################################################
+
+*** YOU MUST USE AITAG FOR THESE PARAMETERS - NEVER PUT THEM IN JSON params ***
+
+The "packet", "body", and "headers" parameters contain multi-line text, raw HTTP
+protocol content, or structured payloads (JSON, XML, form data, etc.).
+
+Putting them directly in JSON params causes BROKEN requests because:
+  - Line breaks become literal "\n" strings instead of real CRLF
+  - Quotes and backslashes need double-escaping which is error-prone
+  - HTTP packet structure (request line + headers + blank line + body) is destroyed
+  - Binary or special characters get corrupted
+
+RULE: If a parameter value contains ANY newline, OR is a raw HTTP packet,
+      OR is a structured payload (JSON/XML/HTML body), you MUST use AITAG.
+      Do NOT put it in the JSON "params" object. Instead, omit it from "params"
+      and attach it after the JSON block using AITAG tags.
+
+WRONG (packet in JSON - WILL PRODUCE MALFORMED REQUEST):
+```json
+{
+  "params": {
+    "packet": "GET / HTTP/1.1\nHost: example.com\nUser-Agent: Mozilla/5.0\n\n"
+  }
+}
+```
+
+CORRECT (packet via AITAG - preserves exact HTTP format):
+```json
+{
+  "params": { "https": "auto", "timeout": 10 }
+}
+```
+<|TOOL_PARAM_packet_{NONCE}|>
+GET / HTTP/1.1
+Host: example.com
+User-Agent: Mozilla/5.0
+
+<|TOOL_PARAM_packet_END_{NONCE}|>
+
+Similarly for "body":
+
+WRONG (body in JSON - escaping issues):
+```json
+{
+  "params": {
+    "url": "https://api.example.com",
+    "method": "POST",
+    "body": "{\"key\":\"value\",\"nested\":{\"a\":1}}"
+  }
+}
+```
+
+CORRECT (body via AITAG):
+```json
+{
+  "params": { "url": "https://api.example.com", "method": "POST", "content-type": "application/json", "timeout": 10 }
+}
+```
+<|TOOL_PARAM_body_{NONCE}|>
+{"key": "value", "nested": {"a": 1}}
+<|TOOL_PARAM_body_END_{NONCE}|>
+
+##############################################################################
+
 ## Parameters
 
 --- URL Mode Parameters ---
@@ -21,19 +88,24 @@ Required (when packet is empty):
 Optional:
   method          (string)  HTTP method. Default: "GET".
   headers         (string)  Custom headers, one per line: "Key: Value\nKey2: Value2".
+                            *** MUST use AITAG if multiple headers ***
   body            (string)  Request body content (for POST/PUT/PATCH).
+                            *** MUST use AITAG - NEVER put body in JSON params ***
   content-type    (string)  Content-Type header value. Example: "application/json".
+                            (This is a simple single-line value, OK in JSON params)
   query-params    (string)  URL query parameters: "k1=v1&k2=v2".
+                            (Simple single-line value, OK in JSON params)
   post-params     (string)  POST form parameters (application/x-www-form-urlencoded): "k1=v1&k2=v2".
+                            (Simple single-line value, OK in JSON params)
 
 --- Packet Mode Parameters ---
 Required (when url is empty):
-  packet          (string)  Raw HTTP request packet to send directly.
-                            IMPORTANT: Raw HTTP packets are multi-line text. You MUST use
-                            AITAG format for the packet parameter to preserve line breaks
-                            and special characters. See examples below.
+  packet          (string)  Complete raw HTTP request packet to send.
+                            *** MUST use AITAG - NEVER put packet in JSON params ***
+                            The packet includes request line, headers, blank line, and body.
+                            AITAG preserves the exact HTTP wire format.
 
---- Common Parameters ---
+--- Common Parameters (all OK in JSON params - single-line values) ---
 Optional:
   https           (string)  Force HTTPS transport: "yes"/"no"/"auto". Default: "auto"
                             (auto-detect from URL scheme or packet Host header).
@@ -44,11 +116,22 @@ Optional:
   show-request    (string)  Display the full request packet: "yes"/"no". Default: "no".
   proxy           (string)  Proxy URL. Example: "http://127.0.0.1:8080" or "socks5://127.0.0.1:1080".
 
+## Quick Reference: Which params go where?
+
+  In JSON params (single-line values):
+    url, method, content-type, query-params, post-params,
+    https, timeout, redirect-times, keyword, regexp-match, show-request, proxy
+
+  Via AITAG (multi-line / structured content):
+    packet  -> <|TOOL_PARAM_packet_{NONCE}|> ... <|TOOL_PARAM_packet_END_{NONCE}|>
+    body    -> <|TOOL_PARAM_body_{NONCE}|> ... <|TOOL_PARAM_body_END_{NONCE}|>
+    headers -> <|TOOL_PARAM_headers_{NONCE}|> ... <|TOOL_PARAM_headers_END_{NONCE}|>
+
 ## Few-Shot Examples
 
 Replace {NONCE} with the actual nonce from the response format section.
 
-### Example 1: Simple GET request (URL mode, JSON params)
+### Example 1: Simple GET request (URL mode, no multi-line params needed)
 
 User intent: "Fetch the homepage of example.com"
 
@@ -64,7 +147,7 @@ User intent: "Fetch the homepage of example.com"
 }
 ```
 
-### Example 2: POST JSON data (URL mode, AITAG for body)
+### Example 2: POST JSON data (URL mode, body via AITAG)
 
 User intent: "Send a JSON POST to an API endpoint"
 
@@ -90,12 +173,12 @@ User intent: "Send a JSON POST to an API endpoint"
 }
 <|TOOL_PARAM_body_END_{NONCE}|>
 
-### Example 3: Send raw HTTP packet (Packet mode, AITAG for packet) - RECOMMENDED for complex requests
+### Example 3: Send complete raw HTTP packet (Packet mode, AITAG for packet)
 
 User intent: "Send a crafted HTTP request with custom headers and body"
 
-This is the most powerful mode. Use AITAG to pass the complete raw HTTP packet,
-preserving exact formatting, headers, and body content.
+This is the most powerful mode. The entire HTTP request (request line + headers +
+blank line + body) is written naturally in AITAG, exactly as it appears on the wire.
 
 ```json
 {
@@ -121,9 +204,9 @@ Accept: application/json
 {"username":"admin","password":"P@ssw0rd"}
 <|TOOL_PARAM_packet_END_{NONCE}|>
 
-### Example 4: Replay a captured request with modifications (Packet mode, AITAG)
+### Example 4: Replay a captured proxy request (Packet mode, AITAG)
 
-User intent: "Replay this HTTP request I captured from the proxy"
+User intent: "Replay this HTTP request I captured"
 
 ```json
 {
