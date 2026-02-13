@@ -2,6 +2,26 @@ __DESC__ = "一个用于修改现有文件内容的工具，支持在指定行�
 __VERBOSE_NAME__ = "文件内容修改工具"
 __KEYWORDS__ = "file modify,文件修改,文件编辑,file editing,content modification,行编辑,line editing,字符串替换,string replacement,文件处理,text processing,insert content,replace content"
 
+__USAGE__ = <<<USAGE_BLOCK
+File Content Modification Tool - Parameter Description for JSON Tool Calls
+
+Required Parameters:
+  file            (string)  The target file path you want to modify.
+                            Must be an existing writable file.
+  line-number     (int)     The line number to modify, starting from 1.
+                            If the line number exceeds the total number of lines,
+                            content will be appended at the end of the file.
+  content         (string)  The content string to insert or use as replacement.
+                            Supports multi-line content.
+
+Optional Parameters:
+  mode            (string)  The modification mode. Controls how the content is applied:
+                            - "replace" (default): replaces the entire line at the specified
+                              line number with the provided content.
+                            - "insert": inserts the content as a new line after the specified
+                              line number. The original line is preserved.
+USAGE_BLOCK
+
 /*
 文件内容修改工具
 

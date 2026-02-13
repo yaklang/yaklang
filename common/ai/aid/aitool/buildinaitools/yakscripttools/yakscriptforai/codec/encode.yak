@@ -2,6 +2,24 @@ __DESC__ = "一个支持多种编码方式的文本编码工具，包括 Base64�
 __VERBOSE_NAME__ = "多格式文本编码"
 __KEYWORDS__ = "representation,transformation,数据转换,url编码,双重url编码,unicode编码,hex,url encoding,base32,cipher,编码工具,文本处理,base64,double url encoding,conversion,格式转换,encoding,data format"
 
+__USAGE__ = <<<USAGE_BLOCK
+Multi-Format Text Encoder - Parameter Description for JSON Tool Calls
+
+Required Parameters:
+  type            (string)  The encoding method to use. Available options:
+                            - "base64" or "b64": Base64 encoding.
+                            - "base64url": Base64 URL-safe encoding.
+                            - "base32": Base32 encoding.
+                            - "hex": Bytes to hexadecimal string.
+                            - "doubleurl": Double URL encoding (encode URL encoding twice).
+                            - "quote" or "ascii": ASCII quoted-printable encoding.
+                            - "html" or "htmlentity": HTML entity encoding.
+                            - "htmlhex": HTML hex entity encoding.
+                            - "url": URL percent-encoding.
+                            - "unicode": Unicode escape sequence encoding.
+  text            (string)  The plain text to encode.
+USAGE_BLOCK
+
 tn := cli.String("type", cli.setRequired(true), cli.setHelp("encode method, available options: base64/b64, base64url, base32, hex, doubleurl, quote/ascii, html/htmlentity, htmlhex, url, unicode"))
 txt := cli.String("text", cli.setRequired(true), cli.setHelp("the origin text u want to encode"))
 cli.check()

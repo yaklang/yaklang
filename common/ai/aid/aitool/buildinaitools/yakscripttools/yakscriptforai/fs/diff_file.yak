@@ -1,6 +1,17 @@
-__DESC__ = "一个用于比较两个文件内容差异的工具，支持生成详细的差异报告。适用于文件版本对比、代码审查等场景。"
+__DESC__ = "一个用于比较两个文件内容差异的工具，参数是两个文件名，所以你需要准备好文件之后才使用这个工具，支持生成详细的差异报告。适用于文件版本对比、代码审查等场景。"
 __VERBOSE_NAME__ = "文件差异比较工具"
 __KEYWORDS__ = "file diff,文件差异,文件比较,diff comparison,文件对比,text comparison,差异分析,版本对比,代码审查"
+
+__USAGE__ = <<<USAGE_BLOCK
+File Diff Comparison Tool - Parameter Description for JSON Tool Calls
+
+Required Parameters:
+  file1           (string)  The path to the first file to compare.
+                            Must be an existing readable file.
+  file2           (string)  The path to the second file to compare.
+                            Must be an existing readable file.
+                            The diff output shows changes needed to transform file1 into file2.
+USAGE_BLOCK
 
 /*
 文件差异比较工具

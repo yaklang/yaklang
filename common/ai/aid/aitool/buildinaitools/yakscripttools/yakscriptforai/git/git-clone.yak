@@ -2,6 +2,23 @@ __DESC__ = "一个用于克隆Git远程仓库的工具，支持指定本地路�
 __VERBOSE_NAME__ = "Git克隆工具"
 __KEYWORDS__ = "git clone,仓库克隆,代码下载,版本控制,git工具,仓库管理,代码同步,分支克隆,深度克隆"
 
+__USAGE__ = <<<USAGE_BLOCK
+Git Clone Tool - Parameter Description for JSON Tool Calls
+
+Required Parameters:
+  url             (string)  The remote Git repository URL to clone (HTTPS or SSH).
+  local-path      (string)  The local directory path where the repository will be cloned to.
+
+Optional Parameters:
+  branch          (string)  The branch name to clone. If not specified, the repository 's'
+                            default branch will be used.
+  depth           (int)     Clone depth, limiting the number of history commits fetched.
+                            0 means full clone with complete history. Default: 0.
+  recursive       (bool)    Recursively clone submodules. Default: false.
+  verify          (bool)    Verify TLS certificates when cloning over HTTPS.
+                            Set to false to skip TLS verification. Default: true.
+USAGE_BLOCK
+
 /*
 Git克隆工具
 

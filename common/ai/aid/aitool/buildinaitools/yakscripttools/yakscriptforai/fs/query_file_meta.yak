@@ -2,6 +2,15 @@ __DESC__ = "获取指定文件的基本元信息，包括判断是否为目录�
 __VERBOSE_NAME__ = "文件元信息查询"
 __KEYWORDS__ = "修改时间,directory,file size,file metadata,文件大小,文件权限,文件元数据,文件属性,file information,file permissions,modified time,文件信息,目录检查"
 
+__USAGE__ = <<<USAGE_BLOCK
+File Metadata Query Tool - Parameter Description for JSON Tool Calls
+
+Required Parameters:
+  filename        (string)  The path to the file whose metadata you want to query.
+                            Returns: is-directory (bool), file size (bytes),
+                            permission mode, and last modified time.
+USAGE_BLOCK
+
 yakit.AutoInitYakit()
 filename = cli.String("filename", cli.setRequired(true), cli.setHelp("the meta info from filename u want to check"))// "/Users/v1ll4n/Projects/yaklang/README.md"
 cli.check()

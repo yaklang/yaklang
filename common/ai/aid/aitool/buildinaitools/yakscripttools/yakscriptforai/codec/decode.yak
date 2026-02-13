@@ -2,6 +2,24 @@ __DESC__ = "一个多功能的解码工具，支持对多种编码格式（如ba
 __VERBOSE_NAME__ = "多格式文本解码"
 __KEYWORDS__ = "数据处理,格式转换,base64解码,数据解码,解码工具,base32解码,decode,double url,encoding schemes,data transformation,text processing,hex解码,编码转换,文本解码,url解码,base64,url encoding,base32,format conversion,decoding tools"
 
+__USAGE__ = <<<USAGE_BLOCK
+Multi-Format Text Decoder - Parameter Description for JSON Tool Calls
+
+Required Parameters:
+  type            (string)  The decoding method to use. Available options:
+                            - "base64" or "b64": Base64 decoding.
+                            - "base64url": Base64 URL-safe decoding.
+                            - "base32": Base32 decoding.
+                            - "hex": Hexadecimal string to bytes.
+                            - "doubleurl": Double URL decoding (decode URL encoding twice).
+                            - "quote" or "ascii": ASCII quoted-printable decoding.
+                            - "html" or "htmlentity": HTML entity decoding.
+                            - "htmlhex": HTML hex entity decoding.
+                            - "url": URL percent-encoding decoding.
+                            - "unicode": Unicode escape sequence decoding.
+  text            (string)  The encoded text to decode.
+USAGE_BLOCK
+
 tn := cli.String("type", cli.setRequired(true), cli.setHelp("decode method, available options: base64/b64, base64url, base32, hex, doubleurl, quote/ascii, html/htmlentity, htmlhex, url, unicode"))
 txt := cli.String("text", cli.setRequired(true), cli.setHelp("the original text you want to decode"))
 cli.check()

@@ -2,6 +2,28 @@ __DESC__ = "一个用于显示指定文件头部内容的工具。支持按字�
 __VERBOSE_NAME__ = "文件头部内容查看"
 __KEYWORDS__ = "file,head,bytes,lines,文件读取,文本处理,十六进制转储,行号显示,内容预览,first bytes,first lines"
 
+__USAGE__ = <<<USAGE_BLOCK
+File Head Viewer Tool - Parameter Description for JSON Tool Calls
+
+Required Parameters:
+  filename        (string)  The path to the file whose head content you want to view.
+
+Optional Parameters:
+  mode            (string)  Read mode that controls the unit of reading.
+                            - "lines" (default): read the first N lines of the file.
+                            - "bytes": read the first N bytes of the file.
+  limit           (int)     How many units (lines or bytes) to read from the head.
+                            In "lines" mode, default is 20 lines.
+                            In "bytes" mode, default is 30000 bytes (max 30000).
+  no-linenumber   (bool)    When set to true, disables line number display in "lines" mode.
+                            Default: false (line numbers are shown).
+  line-length     (int)     Maximum character length per line in "lines" mode. Lines longer
+                            than this value will be truncated. Default: 190.
+                            Only effective when mode is "lines".
+  hexdump         (bool)    When set to true, displays the result as a hex dump.
+                            Only effective when mode is "bytes". Default: false.
+USAGE_BLOCK
+
 /*
 文件头部内容查看工具
 

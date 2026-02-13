@@ -2,6 +2,21 @@ __DESC__ = "一个专门用于按行读取文件的工具，支持指定起始�
 __VERBOSE_NAME__ = "按行读取文件工具"
 __KEYWORDS__ = "文件读取,按行读取,line reading,日志分析,文本处理,大文件处理,file reading,text processing,log analysis,line by line,分段读取,行号显示,文件处理,streaming read"
 
+__USAGE__ = <<<USAGE_BLOCK
+Line-Based File Reader Tool - Parameter Description for JSON Tool Calls
+
+Required Parameters:
+  file            (string)  The target file path you want to read line by line.
+
+Optional Parameters:
+  offset          (int)     The starting line number (1-based). Reading begins from this line.
+                            Default: 1 (start from the first line).
+  lines           (int)     Number of lines to read from the offset position.
+                            Default: 50.
+  line-size       (int)     Maximum number of characters per line. Lines longer than this
+                            value will be truncated with a notice. Default: 512.
+USAGE_BLOCK
+
 /*
 按行读取文件工具
 

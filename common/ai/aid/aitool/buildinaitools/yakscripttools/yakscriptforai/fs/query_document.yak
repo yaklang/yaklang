@@ -2,6 +2,21 @@ __DESC__ = "智能文档阅读和理解工具，支持多种文档格式的深�
 __VERBOSE_NAME__ = "文件内容分析器"
 __KEYWORDS__ = "file analysis, document qa, question answering, query, ask, find, search, retrieve, extract, RAG, retrieval augmented generation, contextual analysis, text chunking, semantic search, information extraction, document analysis, local file QA, content comprehension"
 
+__USAGE__ = <<<USAGE_BLOCK
+Document Content Analyzer Tool - Parameter Description for JSON Tool Calls
+
+Required Parameters:
+  filename        (string)  The path to the local document to be analyzed.
+                            Supports text-based files of various formats.
+
+Optional Parameters:
+  question        (string)  The specific question to ask about the document's content.
+                            The tool will analyze the document and provide a targeted answer.
+                            If omitted, the tool defaults to generating a concise summary
+                            of the document's key points.
+                            Default: "Provide a concise summary of the key points in this document."
+USAGE_BLOCK
+
 filename := cli.String("filename", cli.setHelp("The path to the local document to be analyzed. This argument is required."), cli.setRequired(true))
 query := cli.String("question", cli.setHelp("The specific question to ask about the document's content. If omitted, the tool will default to generating a summary of the document."), cli.setDefault(`Provide a concise summary of the key points in this document.`))
 cli.check()
