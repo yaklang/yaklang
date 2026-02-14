@@ -222,6 +222,43 @@ func getProgram(ctx context.Context, config *ssaCliConfig) ([]*ssaapi.Program, e
 		if config.GetCompileFilePerformanceLog() {
 			para["filePerformanceLog"] = true
 		}
+		if memory {
+			log.Infof("memory mode enabled, compile in-process to keep program in memory")
+			res, err := ssa_compile.ParseProjectWithAutoDetective(ctx, &ssa_compile.SSADetectConfig{
+				Target:             targetPath,
+				Language:           language,
+				CompileImmediately: false,
+				Params:             para,
+			})
+			if err != nil {
+				return nil, err
+			}
+			if res == nil || res.Info == nil || res.Info.Config == nil {
+				return nil, utils.Errorf("auto detective config is nil in memory mode")
+			}
+			cfg := res.Info.Config
+			cfg.SetCompileMemory(true)
+			if programName != "" {
+				cfg.SetProgramName(programName)
+			}
+			if len(config.GetCompileExcludeFiles()) > 0 {
+				cfg.SetCompileExcludeFiles(config.GetCompileExcludeFiles())
+			}
+			if config.GetCompileFilePerformanceLog() {
+				cfg.SetCompileFilePerformanceLog(true)
+			}
+			progs, err := ssaapi.ParseProject(
+				ssaconfig.WithConfigJson(cfg.JSON()),
+				ssaconfig.WithContext(ctx),
+			)
+			if err != nil {
+				return nil, err
+			}
+			if len(progs) == 0 {
+				return nil, utils.Errorf("compile project returned no programs (memory mode)")
+			}
+			return progs, nil
+		}
 		res, err := ssa_compile.ParseProjectWithAutoDetective(ctx, &ssa_compile.SSADetectConfig{
 			Target:             targetPath,
 			Language:           language,

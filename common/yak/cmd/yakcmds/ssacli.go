@@ -1334,6 +1334,9 @@ var ssaCodeScan = &cli.Command{
 			}
 			log.SetLevel(level)
 		}
+		if diagnostics.Enabled(diagnostics.LevelLow) {
+			defer diagnostics.DefaultRecorder().Log("code-scan")
+		}
 
 		// 检查是否指定了 config 文件，如果是则走 config-scan 模式
 		configFilePath := c.String("config")
@@ -1445,6 +1448,11 @@ var ssaCodeScan = &cli.Command{
 				ssaconfig.WithRuleFilterLibRuleKind("noLib"), // 不包含辅助规则
 				ssaconfig.WithSyntaxFlowMemory(config.GetSyntaxFlowMemory()),
 			)
+			if config != nil && config.Config != nil {
+				if ruleFilter := config.Config.GetRuleFilter(); ruleFilter != nil {
+					scanOpt = append(scanOpt, ssaconfig.WithRuleFilter(ruleFilter))
+				}
+			}
 		} else {
 			// 普通模式：使用命令行参数的规则过滤
 			ruleFilter := &ypb.SyntaxFlowRuleFilter{
@@ -1460,6 +1468,10 @@ var ssaCodeScan = &cli.Command{
 				ssaconfig.WithSyntaxFlowMemory(c.Bool("memory")),
 				syntaxflow_scan.WithRulePerformanceLog(c.Bool("rule-perf-log")),
 			)
+		}
+
+		if c.Bool("rule-perf-log") {
+			scanOpt = append(scanOpt, syntaxflow_scan.WithRulePerformanceLog(true))
 		}
 
 		scanOpt = append(scanOpt,
@@ -1479,14 +1491,48 @@ var ssaCodeScan = &cli.Command{
 				if len(info.Rules) == 0 {
 					return
 				}
+
+				var runningRules []*syntaxflow_scan.RuleProcessInfo
+				for _, rule := range info.Rules {
+					if !rule.Finished {
+						runningRules = append(runningRules, rule)
+					}
+				}
+
 				var b bytes.Buffer
 				b.WriteString("\tRules:\n")
 				for _, rule := range info.Rules {
-					b.WriteString(fmt.Sprintf("  - [%6.2f%%]: [%s] [%s] status=%s\n",
-						rule.Progress*100, rule.ProgramName, rule.RuleName, rule.Info,
+					var duration string
+					if rule.StartTime > 0 {
+						durationSec := time.Since(time.Unix(rule.StartTime, 0)).Seconds()
+						duration = fmt.Sprintf("duration=%.1fs", durationSec)
+					} else {
+						duration = "duration=unknown"
+					}
+
+					statusIndicator := "RUNNING"
+					if rule.Finished {
+						statusIndicator = "DONE"
+					}
+
+					b.WriteString(fmt.Sprintf("  - [%s] [%6.2f%%]: [%s/%s] %s status=%s\n",
+						statusIndicator, rule.Progress*100, rule.ProgramName, rule.RuleName,
+						duration, rule.Info,
 					))
 				}
 				log.Info(b.String())
+
+				if len(runningRules) > 0 {
+					log.Infof("\t=== DEBUG: %d rule(s) still running ===", len(runningRules))
+					for _, rule := range runningRules {
+						var durationSec float64
+						if rule.StartTime > 0 {
+							durationSec = time.Since(time.Unix(rule.StartTime, 0)).Seconds()
+						}
+						log.Infof("\t  -> RUNNING: %s/%s (progress=%.2f%%, running for %.1fs, info: %s)",
+							rule.ProgramName, rule.RuleName, rule.Progress*100, durationSec, rule.Info)
+					}
+				}
 			}),
 		)
 

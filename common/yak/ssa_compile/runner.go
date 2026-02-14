@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -123,6 +124,21 @@ func compileProject(ctx context.Context, info *AutoDetectInfo) (*ssaapi.Program,
 	projectConfig, err := createResp.GetConfig()
 	if err != nil {
 		return nil, cleanup, err
+	}
+	// In memory mode, compile in-process to avoid DB load in another process.
+	if projectConfig.GetCompileMemory() {
+		configJSON, _ := projectConfig.ToJSONString()
+		progs, err := ssaapi.ParseProject(
+			ssaconfig.WithConfigJson(configJSON),
+			ssaconfig.WithContext(ctx),
+		)
+		if err != nil {
+			return nil, cleanup, utils.Errorf("failed to compile project (memory): %s", err)
+		}
+		if len(progs) == 0 {
+			return nil, cleanup, utils.Errorf("compile project (memory) returned no programs")
+		}
+		return progs[0], cleanup, nil
 	}
 	compilePluginName := "SSA 项目编译"
 	compileParam := make(map[string]string)

@@ -87,7 +87,16 @@ if err != nil {
 
 yakit.Info("编译完成")
 
+actualProgramName = programName
+if progs != nil && len(progs) > 0 && progs[0] != nil {
+    actualProgramName = progs[0].GetProgramName()
+}
+if actualProgramName == "" {
+    actualProgramName = programName
+}
+yakit.Info("实际程序名称: %s", actualProgramName)
+
 // 注意：不再需要更新 LastProgramName，因为现在直接通过 projectName 查询最新的 program
 // 编译完成后，最新的 program 会自动成为下次查询的结果
 
-yakit.Code(json.dumps({"program_name": programName}))
+yakit.Code(json.dumps({"program_name": actualProgramName}))
