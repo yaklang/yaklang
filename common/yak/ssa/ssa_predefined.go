@@ -23,6 +23,11 @@ type anInstruction struct {
 	verboseName string // verbose name for output or debug or tag
 	id          int64
 
+	// funcId and blockId are stored separately for lazy loading
+	// to avoid expensive DB queries during instruction reconstruction
+	funcId  int64
+	blockId int64
+
 	isAnnotation bool
 	isExtern     bool
 	isFromDB     bool
@@ -151,13 +156,31 @@ func NewInstruction() *anInstruction {
 // ssa function and block
 func (a *anInstruction) SetFunc(f *Function) {
 	a.fun = f
-	a.prog = f.GetProgram()
+	if f != nil {
+		a.prog = f.GetProgram()
+	}
+}
+
+func (a *anInstruction) SetFuncId(id int64) {
+	a.funcId = id
 }
 
 func (a *anInstruction) GetFunc() *Function {
-	f, ok := ToFunction(a.fun)
-	if ok {
-		return f
+	// Fast path: if we already have the function pointer, return it
+	if a.fun != nil {
+		f, ok := ToFunction(a.fun)
+		if ok {
+			return f
+		}
+	}
+	// Lazy path: resolve from ID if available but pointer is nil
+	if a.funcId > 0 && a.prog != nil && a.prog.Cache != nil && a.prog.Cache.InstructionCache != nil {
+		if cachedFunc, ok := a.prog.Cache.InstructionCache.Get(a.funcId); ok {
+			if f, ok := ToFunction(cachedFunc); ok {
+				a.fun = f
+				return f
+			}
+		}
 	}
 	return nil
 }
@@ -192,15 +215,35 @@ func (a *anInstruction) IsAnnotation() bool {
 	return a.isAnnotation
 }
 
-func (a *anInstruction) SetBlock(block *BasicBlock) { a.block = block }
+func (a *anInstruction) SetBlock(block *BasicBlock) {
+	a.block = block
+	if block != nil {
+		a.blockId = block.GetId()
+	}
+}
+
+func (a *anInstruction) SetBlockId(id int64) {
+	a.blockId = id
+}
+
 func (a *anInstruction) GetBlock() *BasicBlock {
-	if a.block == nil {
+	// Fast path: if we already have the block pointer, return it
+	if a.block != nil {
+		if block, ok := ToBasicBlock(a.block); ok {
+			return block
+		}
+		log.Warnf("GetBlock: block is not a BasicBlock but: %v", a.block)
 		return nil
 	}
-	if block, ok := ToBasicBlock(a.block); ok {
-		return block
+	// Lazy path: resolve from ID if available but pointer is nil
+	if a.blockId > 0 && a.prog != nil && a.prog.Cache != nil && a.prog.Cache.InstructionCache != nil {
+		if cachedBlock, ok := a.prog.Cache.InstructionCache.Get(a.blockId); ok {
+			if block, ok := ToBasicBlock(cachedBlock); ok {
+				a.block = block
+				return block
+			}
+		}
 	}
-	log.Warnf("GetBlock: block is not a BasicBlock but: %v", a.block)
 	return nil
 }
 

@@ -174,32 +174,15 @@ func instructionFromIrCode(inst Instruction, ir *ssadb.IrCode) {
 	inst.SetName(ir.Name)
 	inst.SetVerboseName(ir.VerboseName)
 
-	// not function
-	if !ir.IsFunction {
-		if currentFunc, ok := inst.GetInstructionById(ir.CurrentFunction); ok && currentFunc != nil {
-			if fun, ok := ToFunction(currentFunc); ok {
-				inst.SetFunc(fun)
-			} else {
-				log.Warnf("BUG: set CurrentFunction[%d] failed: instruction type is %T, not Function. Instruction: %s (id: %d)",
-					ir.CurrentFunction, currentFunc, inst.GetName(), inst.GetId())
-			}
-		}
-		if !ir.IsBlock {
-			if currentBlock, ok := inst.GetInstructionById(ir.CurrentBlock); ok && currentBlock != nil {
-				if block, ok := ToBasicBlock(currentBlock); ok {
-					inst.SetBlock(block)
-				} else {
-					log.Warnf("BUG: set CurrentBlock[%d] failed: instruction type is %T, not BasicBlock. Instruction: %s (id: %d)",
-						ir.CurrentBlock, currentBlock, inst.GetName(), inst.GetId())
-				}
-			}
-		} else {
-			if block, ok := ToBasicBlock(inst); ok {
-				inst.SetBlock(block)
-			} else {
-				log.Warnf("BUG: set currentblock for block failed: instruction type is %T, not BasicBlock. Instruction: %s (id: %d)",
-					inst, inst.GetName(), inst.GetId())
-			}
+	// Set function and block IDs directly - lazy loading will resolve them on demand
+	// This avoids expensive DB queries during instruction reconstruction
+	inst.SetFuncId(ir.CurrentFunction)
+	inst.SetBlockId(ir.CurrentBlock)
+
+	// Special case: if this is a BasicBlock instruction, it is its own block
+	if !ir.IsFunction && !ir.IsBlock {
+		if block, ok := ToBasicBlock(inst); ok {
+			inst.SetBlock(block)
 		}
 	}
 	editor, start, end, err := ir.GetStartAndEndPositions()

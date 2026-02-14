@@ -2,17 +2,24 @@ package ssa
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"strings"
 
 	"github.com/gobwas/glob"
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"golang.org/x/exp/slices"
 )
 
 func MatchInstructionByOpcodes(ctx context.Context, prog *Program, opcodes ...Opcode) []Instruction {
-	return matchInstructionByOpcodes(ctx, prog, opcodes...)
+	var insts []Instruction
+	_ = diagnostics.TrackLow("ssa.MatchInstructionByOpcodes", func() error {
+		insts = matchInstructionByOpcodes(ctx, prog, opcodes...)
+		return nil
+	})
+	return insts
 }
 
 func matchInstructionByOpcodes(ctx context.Context, prog *Program, opcodes ...Opcode) []Instruction {
@@ -47,7 +54,8 @@ func matchInstructionByOpcodes(ctx context.Context, prog *Program, opcodes ...Op
 func MatchInstructionsByVariable(
 	ctx context.Context,
 	prog *Program,
-	compareMode, matchMode int,
+	compareMode ssadb.CompareMode,
+	matchMode ssadb.MatchMode,
 	name string,
 ) (res []Instruction) {
 	return MatchInstructionsByVariableWithExcludeFiles(ctx, prog, compareMode, matchMode, name, nil)
@@ -58,7 +66,8 @@ func MatchInstructionsByVariable(
 func MatchInstructionsByVariableWithExcludeFiles(
 	ctx context.Context,
 	prog *Program,
-	compareMode, matchMode int,
+	compareMode ssadb.CompareMode,
+	matchMode ssadb.MatchMode,
 	name string,
 	excludeFiles []string,
 ) (res []Instruction) {
@@ -130,7 +139,7 @@ func MatchInstructionsByVariableWithExcludeFiles(
 			addRes(insts...)
 		}
 	case ProgramCacheDBRead, ProgramCacheDBWrite:
-		ch := ssadb.SearchVariableWithExcludeFiles(ssadb.GetDBInProgram(prog.Name), ctx, prog.Name, compareMode, matchMode, name, excludeFiles)
+		ch := ssadb.SearchVariableWithExcludeFiles(ssadb.GetDBInProgram(prog.Name), ctx, prog.Name, prog.NameCache, compareMode, matchMode, name, excludeFiles)
 		for ir := range ch {
 			var inst Instruction
 			var err error
@@ -172,7 +181,7 @@ func getInstructionFilePath(inst Instruction) string {
 }
 
 func (c *ProgramCache) _getByVariableEx(
-	mod int,
+	mod ssadb.MatchMode,
 	checkValue func(string) bool,
 ) []Instruction {
 	var ins []Instruction

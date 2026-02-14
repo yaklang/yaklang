@@ -52,6 +52,7 @@ func NewProgram(
 		Template:                make(map[string]tl.TemplateGeneratedInfo),
 		CurrentIncludingStack:   utils.NewStack[string](),
 		config:                  NewLanguageConfig(),
+		NameCache:               ssadb.NewNameCache(),
 	}
 
 	prog.GlobalVariablesBlueprint = NewBlueprint("__GlobalVariables__")
@@ -100,6 +101,7 @@ func NewTmpProgram(ProgramName string) *Program {
 		Template:                make(map[string]tl.TemplateGeneratedInfo),
 		CurrentIncludingStack:   utils.NewStack[string](),
 		config:                  NewLanguageConfig(),
+		NameCache:               ssadb.NewNameCache(),
 	}
 	prog.Application = prog
 	prog.DatabaseKind = ProgramCacheMemory

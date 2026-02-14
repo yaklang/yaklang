@@ -4,15 +4,15 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
-func SaveVariableIndexByName(name string, inst Instruction) *ssadb.IrIndex {
-	return SaveVariableIndex(inst, name, "")
+func CreateVariableIndexByName(name string, inst Instruction) *ssadb.IrIndex {
+	return CreateVariableIndex(inst, name, "")
 }
 
-func SaveVariableIndexByMember(member string, inst Instruction) *ssadb.IrIndex {
-	return SaveVariableIndex(inst, "", member)
+func CreateVariableIndexByMember(member string, inst Instruction) *ssadb.IrIndex {
+	return CreateVariableIndex(inst, "", member)
 }
 
-func SaveVariableIndex(inst Instruction, name, member string) *ssadb.IrIndex {
+func CreateVariableIndex(inst Instruction, name, member string) *ssadb.IrIndex {
 	if inst.GetId() == -1 {
 		return nil
 	}
@@ -24,7 +24,8 @@ func SaveVariableIndex(inst Instruction, name, member string) *ssadb.IrIndex {
 	// index
 	index.ProgramName = prog.GetApplication().Name
 	index.ValueID = inst.GetId()
-	index.VariableName = name
+	id := prog.NameCache.GetID(progName, name)
+	index.VariableID = &id
 
 	{
 		// variable and scope
@@ -37,19 +38,19 @@ func SaveVariableIndex(inst Instruction, name, member string) *ssadb.IrIndex {
 			index.VersionID = variable.GetVersion()
 			// TODO : scope ID
 			scope := variable.GetScope()
-			index.ScopeName = scope.GetScopeName()
+			scopeID := prog.NameCache.GetID(progName, scope.GetScopeName())
+			index.ScopeID = &scopeID
 		}
 
 		// field
-		if member != "" {
-			index.FieldName = member
-		}
+		fieldID := prog.NameCache.GetID(progName, member)
+		index.FieldID = &fieldID
 
 	}
 	return index
 }
 
-func SaveClassIndex(name string, inst Instruction) *ssadb.IrIndex {
+func CreateClassIndex(name string, inst Instruction) *ssadb.IrIndex {
 	if inst.GetId() == -1 {
 		return nil
 	}
@@ -61,6 +62,7 @@ func SaveClassIndex(name string, inst Instruction) *ssadb.IrIndex {
 	// index
 	index.ProgramName = prog.GetApplication().Name
 	index.ValueID = inst.GetId()
-	index.ClassName = name
+	classID := prog.NameCache.GetID(progName, name)
+	index.ClassID = &classID
 	return index
 }
