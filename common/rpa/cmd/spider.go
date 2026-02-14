@@ -8,7 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"os"
 
-	"github.com/urfave/cli"
+	"github.com/yaklang/yaklang/common/urfavecli"
 )
 
 func main() {

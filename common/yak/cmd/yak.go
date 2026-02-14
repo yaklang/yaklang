@@ -37,7 +37,7 @@ import (
 	systemLog "log"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/urfave/cli"
+	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/consts"
 	_ "github.com/yaklang/yaklang/common/coreplugin"
 	"github.com/yaklang/yaklang/common/cybertunnel"
@@ -1124,6 +1124,7 @@ func main() {
 	app := cli.NewApp()
 	app.Usage = "yaklang core engine"
 	app.Version = yakVersion
+	app.IgnoreUnknownFlags = true
 	consts.SetPalmVersion(yakVersion)
 	consts.SetYakVersion(yakVersion)
 
