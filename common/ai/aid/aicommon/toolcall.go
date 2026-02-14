@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -387,6 +388,43 @@ func sanitizeIdentifier(identifier string) string {
 		return ""
 	}
 	return result
+}
+
+// sanitizeTaskName sanitizes a task name for use in directory names.
+// Unlike sanitizeIdentifier, this function preserves Unicode characters (including CJK)
+// to keep task names human-readable across different languages.
+func sanitizeTaskName(name string) string {
+	if name == "" {
+		return ""
+	}
+	var result []rune
+	for _, r := range name {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			if r >= 'A' && r <= 'Z' {
+				r = r - 'A' + 'a' // Convert ASCII uppercase to lowercase
+			}
+			result = append(result, r)
+		} else if r == ' ' || r == '-' || r == '\t' || r == '_' {
+			result = append(result, '_')
+		}
+		// Skip filesystem-unsafe and other special characters (/, \, :, *, ?, ", <, >, | etc.)
+	}
+	// Collapse consecutive underscores
+	collapsed := make([]rune, 0, len(result))
+	for i, r := range result {
+		if r == '_' && i > 0 && result[i-1] == '_' {
+			continue
+		}
+		collapsed = append(collapsed, r)
+	}
+	str := strings.Trim(string(collapsed), "_")
+	// Limit rune count (not byte count) to 40 characters for filesystem friendliness
+	runes := []rune(str)
+	if len(runes) > 40 {
+		str = string(runes[:40])
+		str = strings.TrimRight(str, "_") // Don't end with underscore after truncation
+	}
+	return str
 }
 
 func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams bool, presetInvokeParams aitool.InvokeParams) (result *aitool.ToolResult, directlyAnswer bool, err error) {
@@ -858,7 +896,9 @@ func sanitizeFilename(name string) string {
 
 // BuildTaskDirName builds a task directory name with optional semantic identifier.
 // Format: task_{index}_{sanitized_name} or task_{index} when name is empty.
-// Example: task_1-1_detect_os_type
+// This function uses sanitizeTaskName which preserves Unicode characters (including CJK)
+// for human-readable directory names across different languages.
+// Example: task_1-1_detect_os_type, task_1-2_扫描目标端口
 func BuildTaskDirName(index, name string) string {
 	if index == "" {
 		index = "0"
@@ -866,13 +906,9 @@ func BuildTaskDirName(index, name string) string {
 	if name == "" {
 		return fmt.Sprintf("task_%s", index)
 	}
-	sanitized := sanitizeIdentifier(name)
+	sanitized := sanitizeTaskName(name)
 	if sanitized == "" {
 		return fmt.Sprintf("task_%s", index)
-	}
-	// Limit the sanitized name to 40 characters for filesystem friendliness
-	if len(sanitized) > 40 {
-		sanitized = sanitized[:40]
 	}
 	return fmt.Sprintf("task_%s_%s", index, sanitized)
 }

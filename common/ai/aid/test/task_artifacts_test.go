@@ -230,6 +230,38 @@ func TestTaskArtifacts_TaskDirectoryStructure(t *testing.T) {
 	t.Log("TestTaskArtifacts_TaskDirectoryStructure passed")
 }
 
+// TestBuildTaskDirName tests the BuildTaskDirName helper function
+func TestBuildTaskDirName(t *testing.T) {
+	testCases := []struct {
+		index    string
+		name     string
+		expected string
+	}{
+		{"1", "", "task_1"},
+		{"1-1", "", "task_1-1"},
+		{"1-1", "detect_os_type", "task_1-1_detect_os_type"},
+		{"1-2", "Scan Ports", "task_1-2_scan_ports"},
+		{"1", "A Very Long Task Name That Should Be Truncated At Some Point", "task_1_a_very_long_task_name_that_should_be_tru"},
+		{"", "test", "task_0_test"},
+		{"1-1", "special!@#chars", "task_1-1_specialchars"},
+		// CJK / Unicode test cases
+		{"1-1", "扫描目标端口", "task_1-1_扫描目标端口"},
+		{"1-2", "web渗透扫描", "task_1-2_web渗透扫描"},
+		{"1-3", "扫描 目标 端口", "task_1-3_扫描_目标_端口"},
+		{"1-4", "扫描:目标/端口", "task_1-4_扫描目标端口"},
+		{"1-5", "检测操作系统类型并获取版本信息以便后续分析使用的超长中文任务名称需要被截断处理确保不会过长", "task_1-5_检测操作系统类型并获取版本信息以便后续分析使用的超长中文任务名称需要被截断处理确"},
+		// Mixed language
+		{"2-1", "Search web渗透 capabilities", "task_2-1_search_web渗透_capabilities"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(fmt.Sprintf("index=%s_name=%s", tc.index, tc.name), func(t *testing.T) {
+			result := aicommon.BuildTaskDirName(tc.index, tc.name)
+			require.Equal(t, tc.expected, result)
+		})
+	}
+}
+
 // TestTaskArtifacts_TimelineDifferIntegration tests the timeline differ integration with task
 func TestTaskArtifacts_TimelineDifferIntegration(t *testing.T) {
 	// Create a timeline
