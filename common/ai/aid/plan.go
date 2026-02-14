@@ -209,6 +209,10 @@ func (c *Coordinator) generateAITaskWithName(name, goal string) *AiTask {
 	task.AIStatefulTaskBase = taskBase
 	taskBase.SetName(name)
 
+	// Generate semantic identifier for directory naming
+	semanticId := c.generateSemanticIdentifier(name)
+	task.SetSemanticIdentifier(semanticId)
+
 	nonce := utils.RandStringBytes(4)
 	taskInput := task.GetUserInput()
 	i := utils.MustRenderTemplate(`
@@ -226,6 +230,73 @@ func (c *Coordinator) generateAITaskWithName(name, goal string) *AiTask {
 	task.SetUserInput(i)
 
 	return task
+}
+
+// generateSemanticIdentifier generates a short semantic identifier from a task name.
+// Logic:
+//  1. If name is empty, return empty.
+//  2. Sanitize the name; if short enough (≤20 runes), use it directly.
+//  3. If too long, use SpeedPriority AI to generate a shorter identifier.
+//  4. If AI is unavailable or fails, fall back to truncation.
+func (c *Coordinator) generateSemanticIdentifier(name string) string {
+	if name == "" {
+		return ""
+	}
+
+	sanitized := aicommon.SanitizeTaskName(name)
+	if sanitized == "" {
+		return ""
+	}
+
+	const maxIdentifierRuneLen = 20
+	runes := []rune(sanitized)
+	if len(runes) <= maxIdentifierRuneLen {
+		return sanitized
+	}
+
+	// Name is too long, use LiteForge to generate a shorter identifier via speed-priority AI
+	truncateFallback := func() string {
+		truncated := string(runes[:maxIdentifierRuneLen])
+		return strings.TrimRight(truncated, "_")
+	}
+
+	aiCallback := c.SpeedPriorityAICallback
+	if aiCallback == nil {
+		aiCallback = c.OriginalAICallback
+	}
+	if aiCallback == nil {
+		return truncateFallback()
+	}
+
+	prompt := fmt.Sprintf(`Generate a very short identifier (2-6 words, max 20 characters total) for the following task name.
+The identifier should capture the core meaning. Chinese or English are both acceptable.
+Reply with ONLY the JSON: {"@action":"object","identifier":"YOUR_IDENTIFIER"}
+
+Task name: %s`, name)
+
+	forgeResult, err := aicommon.InvokeLiteForge(prompt, aicommon.WithAICallback(aiCallback))
+	if err != nil {
+		log.Debugf("liteforge failed to generate semantic identifier for %q: %v, falling back to truncation", name, err)
+		return truncateFallback()
+	}
+	if forgeResult == nil || forgeResult.Action == nil {
+		log.Debugf("liteforge returned nil result for %q, falling back to truncation", name)
+		return truncateFallback()
+	}
+
+	result := strings.TrimSpace(forgeResult.Action.GetString("identifier"))
+	result = aicommon.SanitizeTaskName(result)
+	if result == "" {
+		return truncateFallback()
+	}
+
+	// Ensure the AI-generated identifier is within limits
+	resultRunes := []rune(result)
+	if len(resultRunes) > maxIdentifierRuneLen {
+		result = string(resultRunes[:maxIdentifierRuneLen])
+		result = strings.TrimRight(result, "_")
+	}
+	return result
 }
 
 func (c *Coordinator) createPlanRequest(rawUserInput string) (*planRequest, error) {

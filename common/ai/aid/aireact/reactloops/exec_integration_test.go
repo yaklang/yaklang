@@ -335,6 +335,13 @@ func (m *mockSimpleTask) GetName() string {
 	return "mock-task"
 }
 
+func (m *mockSimpleTask) GetSemanticIdentifier() string {
+	return "mock_task"
+}
+
+func (m *mockSimpleTask) SetSemanticIdentifier(id string) {
+}
+
 func (m *mockSimpleTask) GetInput() string {
 	return "test input"
 }

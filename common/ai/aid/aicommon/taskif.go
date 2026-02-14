@@ -22,6 +22,8 @@ import (
 type AITask interface {
 	GetIndex() string
 	GetName() string
+	GetSemanticIdentifier() string
+	SetSemanticIdentifier(string)
 	PushToolCallResult(result *aitool.ToolResult)
 	GetAllToolCallResults() []*aitool.ToolResult
 	GetSummary() string
@@ -112,6 +114,26 @@ func (s *AIStatefulTaskBase) GetSemanticLabel() string {
 
 func (s *AIStatefulTaskBase) SetSemanticLabel(label string) {
 	s.semanticLabel = label
+}
+
+// GetSemanticIdentifier returns the semantic identifier for directory naming.
+// Falls back to semanticLabel if set, otherwise returns the task name.
+func (s *AIStatefulTaskBase) GetSemanticIdentifier() string {
+	if s == nil {
+		return ""
+	}
+	if s.semanticLabel != "" {
+		return s.semanticLabel
+	}
+	return s.name
+}
+
+// SetSemanticIdentifier sets the semantic identifier used for directory naming.
+func (s *AIStatefulTaskBase) SetSemanticIdentifier(id string) {
+	if s == nil {
+		return
+	}
+	s.semanticLabel = id
 }
 
 func (s *AIStatefulTaskBase) SetFocusMode(mode string) {
