@@ -416,6 +416,12 @@ func newConfig(ctx context.Context) *Config {
 		buildinaitools.WithEnableAllTools(),
 	)
 
+	// Register the session artifacts context provider.
+	// This provider scans the session's working directory on every prompt build
+	// and injects a file listing (paths, sizes, modification times) into DynamicContext,
+	// so that all subsequent AI turns can see artifacts produced by async plan/forge tasks.
+	config.ContextProviderManager.Register("session_artifacts", ArtifactsContextProvider)
+
 	// Initialize emitter
 	config.Emitter = NewEmitter(id, func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
 		if config.Guardian != nil {

@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
@@ -411,6 +412,145 @@ func KnowledgeBaseSystemFlagContextProvider(flag string, userPrompt ...string) C
 		default:
 			return baseInfo + fmt.Sprintf("[Error: unknown system flag: %s]", flag), utils.Errorf("unknown knowledge base system flag: %s", flag)
 		}
+	}
+}
+
+// ArtifactsContextMaxBytes is the maximum size (in bytes) for the artifacts context output.
+// This limits the artifacts summary injected into every prompt to 8KB.
+const ArtifactsContextMaxBytes = 8 * 1024
+
+// artifactFileEntry holds metadata for a single file in the artifacts directory.
+type artifactFileEntry struct {
+	RelPath string
+	Size    int64
+	ModTime time.Time
+}
+
+// ArtifactsContextProvider scans the session's working directory (artifacts dir) and generates
+// a structured summary of all task output files. This provider is registered once and executed
+// on every prompt build, ensuring all subsequent AI turns can see the artifacts filesystem.
+//
+// The output is limited to ArtifactsContextMaxBytes (8KB) using utils.ShrinkTextBlock.
+func ArtifactsContextProvider(config AICallerConfigIf, emitter *Emitter, key string) (string, error) {
+	workDir := config.GetOrCreateWorkDir()
+	if workDir == "" {
+		return "", nil
+	}
+
+	// Check if the directory exists
+	info, err := os.Stat(workDir)
+	if err != nil || !info.IsDir() {
+		return "", nil
+	}
+
+	var entries []artifactFileEntry
+	walkErr := filepath.Walk(workDir, func(path string, fi os.FileInfo, err error) error {
+		if err != nil {
+			return nil // skip errors
+		}
+		if fi.IsDir() {
+			return nil
+		}
+		relPath, err := filepath.Rel(workDir, path)
+		if err != nil {
+			relPath = path
+		}
+		entries = append(entries, artifactFileEntry{
+			RelPath: relPath,
+			Size:    fi.Size(),
+			ModTime: fi.ModTime(),
+		})
+		return nil
+	})
+	if walkErr != nil {
+		log.Warnf("artifacts context provider: walk error: %v", walkErr)
+	}
+
+	if len(entries) == 0 {
+		return "", nil
+	}
+
+	// Sort entries by modification time (newest first)
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].ModTime.After(entries[j].ModTime)
+	})
+
+	// Group entries by top-level task directory
+	taskGroups := omap.NewOrderedMap(make(map[string][]artifactFileEntry))
+	var rootFiles []artifactFileEntry
+
+	for _, e := range entries {
+		parts := strings.SplitN(e.RelPath, string(filepath.Separator), 2)
+		if len(parts) == 1 {
+			// File directly in workDir (not in a task subfolder)
+			rootFiles = append(rootFiles, e)
+		} else {
+			taskDir := parts[0]
+			existing, _ := taskGroups.Get(taskDir)
+			taskGroups.Set(taskDir, append(existing, e))
+		}
+	}
+
+	var sb strings.Builder
+	sb.WriteString("# Session Artifacts\n")
+	sb.WriteString(fmt.Sprintf("artifacts_dir: %s\n", workDir))
+	sb.WriteString(fmt.Sprintf("total_files: %d\n\n", len(entries)))
+
+	// Write task directory groups
+	taskGroups.ForEach(func(taskDir string, files []artifactFileEntry) bool {
+		// Find the latest modification time for the group
+		var latestMod time.Time
+		for _, f := range files {
+			if f.ModTime.After(latestMod) {
+				latestMod = f.ModTime
+			}
+		}
+		sb.WriteString(fmt.Sprintf("## %s (modified: %s)\n",
+			taskDir,
+			latestMod.Format("2006-01-02 15:04:05"),
+		))
+		for _, f := range files {
+			// Show only the part after the task directory
+			innerPath := strings.TrimPrefix(f.RelPath, taskDir+string(filepath.Separator))
+			sb.WriteString(fmt.Sprintf("- %s (%s, %s)\n",
+				innerPath,
+				formatFileSize(f.Size),
+				f.ModTime.Format("15:04:05"),
+			))
+		}
+		sb.WriteString("\n")
+		return true
+	})
+
+	// Write root-level files (if any)
+	if len(rootFiles) > 0 {
+		sb.WriteString("## [root files]\n")
+		for _, f := range rootFiles {
+			sb.WriteString(fmt.Sprintf("- %s (%s, %s)\n",
+				f.RelPath,
+				formatFileSize(f.Size),
+				f.ModTime.Format("15:04:05"),
+			))
+		}
+		sb.WriteString("\n")
+	}
+
+	result := sb.String()
+	if len(result) > ArtifactsContextMaxBytes {
+		result = utils.ShrinkTextBlock(result, ArtifactsContextMaxBytes)
+	}
+	return result, nil
+}
+
+// formatFileSize formats a file size in human-readable form.
+func formatFileSize(size int64) string {
+	switch {
+	case size >= 1024*1024:
+		return fmt.Sprintf("%.1fMB", float64(size)/(1024*1024))
+	case size >= 1024:
+		return fmt.Sprintf("%.1fKB", float64(size)/1024)
+	default:
+		return fmt.Sprintf("%dB", size)
 	}
 }
 

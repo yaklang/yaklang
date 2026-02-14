@@ -675,3 +675,34 @@ func WithBuiltinTools() aicommon.ConfigOption {
 			buildinaitools.WithAiForgeSearcher(forgeSearcher))(cfg)
 	}
 }
+
+// emitArtifactsSummaryToTimeline pushes a summary of the artifacts directory into the
+// timeline after plan/forge completion, and ensures EmitPinDirectory is called for UI visibility.
+// This provides an immediate notification layer; the persistent layer is ArtifactsContextProvider
+// which runs on every prompt build.
+func (r *ReAct) emitArtifactsSummaryToTimeline() {
+	artifactsDir := r.config.GetOrCreateWorkDir()
+	if artifactsDir == "" {
+		return
+	}
+
+	glance := filesys.Glance(artifactsDir)
+	if glance == "" {
+		return
+	}
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("Artifacts directory: %s\n", artifactsDir))
+	sb.WriteString("Directory structure:\n")
+	sb.WriteString(glance)
+	r.AddToTimeline("artifacts_summary", sb.String())
+	log.Infof("emitted artifacts summary to timeline for dir: %s", artifactsDir)
+
+	// Ensure the artifacts directory is pinned for UI visibility
+	if !r.config.IsArtifactsPinned() {
+		if r.Emitter != nil {
+			r.Emitter.EmitPinDirectory(artifactsDir)
+		}
+		r.config.SetArtifactsPinned()
+	}
+}

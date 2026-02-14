@@ -80,6 +80,7 @@ func (r *ReAct) RequireAIForgeAndAsyncExecute(
 				log.Warnf("start up failed: %v", err)
 			}
 			r.AddToTimeline("plan_executeion", fmt.Sprintf("plan/forge: %v is finished", utils.ShrinkString(forgeName, 128)))
+			r.emitArtifactsSummaryToTimeline()
 			done(finalError)
 		}()
 		finalError = r.invokePlanAndExecute(taskDone, ctx, "", forgeName, forgeParams)
@@ -106,6 +107,7 @@ func (r *ReAct) AsyncPlanAndExecute(ctx context.Context, planPayload string, onF
 				log.Warnf("start up failed: %v", err)
 			}
 			r.AddToTimeline("plan_executeion", fmt.Sprintf("plan: %v is finished", utils.ShrinkString(planPayload, 128)))
+			r.emitArtifactsSummaryToTimeline()
 			if onFinished != nil {
 				onFinished(finalError)
 			}
