@@ -509,6 +509,24 @@ func WithAICallback(cb AICallbackType) ConfigOption {
 	}
 }
 
+// WithPreWrappedAICallback sets the AI callback directly without additional wrapping.
+// Use this when the callback has already been wrapped by another Config's wrapper
+// (e.g., when passing a callback from an outer Config to an inner Config like LiteForge).
+// This avoids double-wrapping which would cause double retry logic, double checkpoint saving, etc.
+func WithPreWrappedAICallback(cb AICallbackType) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		c.OriginalAICallback = cb
+		c.QualityPriorityAICallback = cb
+		c.SpeedPriorityAICallback = cb
+		c.m.Unlock()
+		return nil
+	}
+}
+
 func WithWrapperedAICallback(cb AICallbackType) ConfigOption {
 	return func(c *Config) error {
 		if c.m == nil {
