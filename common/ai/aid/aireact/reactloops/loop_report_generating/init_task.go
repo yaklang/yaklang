@@ -45,7 +45,7 @@ func analyzeUserIntent(ctx context.Context, r aicommon.AIInvokeRuntime, userInpu
 		"attachedFiles": attachedFiles,
 	})
 
-	result, err := r.InvokeLiteForgeSpeedPriority(
+	result, err := r.InvokeLiteForge(
 		ctx,
 		"analyze-report-intent",
 		renderedPrompt,

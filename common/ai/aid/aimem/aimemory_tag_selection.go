@@ -31,7 +31,7 @@ func (r *AIMemoryTriage) SelectTags(ctx context.Context, i any) ([]string, error
 		return nil, utils.Errorf("RenderTemplate failed: %v", err)
 	}
 
-	action, err := r.invoker.InvokeLiteForgeSpeedPriority(ctx, "tag-selection", prompt, []aitool.ToolOption{
+	action, err := r.invoker.InvokeLiteForge(ctx, "tag-selection", prompt, []aitool.ToolOption{
 		aitool.WithStringArrayParam("tags", aitool.WithParam_Description("从上面的输入中提取出相关的标签（领域），如果上面的标签已经足够了，就不需要再创建新的标签了")), // tags
 	})
 	if err != nil {

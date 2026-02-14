@@ -110,7 +110,7 @@ func compressSearchResults(resultStr string, searchInfo string, userContext stri
 		context = op.GetTask().GetContext()
 	}
 
-	forgeResult, err := invoker.InvokeLiteForgeSpeedPriority(
+	forgeResult, err := invoker.InvokeLiteForge(
 		context,
 		"extract-ranked-lines",
 		materials,

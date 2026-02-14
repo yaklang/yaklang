@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiconfig"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
@@ -167,12 +166,6 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 	}
 	configOptions = append(configOptions, optsFromStartParams...)
 
-	// enable new version
-	if aiconfig.IsTieredAIConfig() {
-		log.Infof("tiered ai config is loaded. but got %v(%v)", startParams.GetAIService(), startParams.GetAIModelName())
-	} else {
-		log.Infof("tiered ai config is not loaded. using default ai callback. but got %v(%v)", startParams.GetAIService(), startParams.GetAIModelName())
-	}
 
 	reAct, err := aireact.NewReAct(configOptions...)
 	if err != nil {

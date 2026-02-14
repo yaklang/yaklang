@@ -48,7 +48,7 @@ func (r *AIMemoryTriage) AddRawText(i string) ([]*aicommon.MemoryEntity, error) 
 		return nil, err
 	}
 
-	ac, err := r.invoker.InvokeLiteForgeSpeedPriority(r.ctx, "memory-triage", promptResult, []aitool.ToolOption{
+	ac, err := r.invoker.InvokeLiteForge(r.ctx, "memory-triage", promptResult, []aitool.ToolOption{
 		aitool.WithStructArrayParam(
 			"memory_entities",
 			[]aitool.PropertyOption{
