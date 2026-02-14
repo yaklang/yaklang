@@ -548,7 +548,7 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 	stdoutMultiWriter := io.MultiWriter(stdoutWriter, stdoutBuffer)
 	stderrMultiWriter := io.MultiWriter(stderrWriter, stderrBuffer)
 
-	t.emitter.EmitToolCallStd(tool.Name, stdoutReader, stderrReader, t.task.GetIndex())
+	waitToolStdFlush := t.emitter.EmitToolCallStd(tool.Name, stdoutReader, stderrReader, t.task.GetIndex())
 	t.emitter.EmitInfo("start to invoke tool: %v", tool.Name)
 
 	toolResult, err = t.invoke(
@@ -568,6 +568,17 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 		toolResult.Error = fmt.Sprintf("error invoking tool[%v]: %v", tool.Name, err)
 		toolResult.Success = false
 	}
+
+	// Close pipe writers to signal end of tool output. This triggers ThrottledCopy's
+	// final flush of any remaining buffered data. The deferred Close calls are still
+	// safe (bufpipe Close is idempotent).
+	stdoutWriter.Close()
+	stderrWriter.Close()
+
+	// Wait for ThrottledCopy goroutines to finish flushing all remaining buffered data.
+	// This ensures all tool stdout/stderr stream events have been sent via gRPC before
+	// we emit the tool result event, preserving correct event ordering.
+	waitToolStdFlush()
 
 	// Save tool call files (params, stdout, stderr, result)
 	t.saveToolCallFiles(tool, callToolId, destinationIdentifier, invokeParams, stdoutBuffer, stderrBuffer, toolResult)
