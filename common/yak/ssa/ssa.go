@@ -31,9 +31,11 @@ type Instruction interface {
 	// function
 	GetFunc() *Function
 	SetFunc(*Function)
+	SetFuncId(int64)
 	// block
 	GetBlock() *BasicBlock
 	SetBlock(*BasicBlock)
+	SetBlockId(int64)
 	// program
 	GetProgram() *Program
 	GetProgramName() string
@@ -346,6 +348,8 @@ type Program struct {
 
 	config *LanguageConfig
 	ctx    context.Context
+
+	NameCache *ssadb.NameCache
 }
 
 // implement Value

@@ -52,6 +52,7 @@ func NewProgram(
 		Template:                make(map[string]tl.TemplateGeneratedInfo),
 		CurrentIncludingStack:   utils.NewStack[string](),
 		config:                  NewLanguageConfig(),
+		NameCache:               ssadb.NewNameCache(ProgramName),
 	}
 
 	prog.GlobalVariablesBlueprint = NewBlueprint("__GlobalVariables__")
@@ -100,6 +101,7 @@ func NewTmpProgram(ProgramName string) *Program {
 		Template:                make(map[string]tl.TemplateGeneratedInfo),
 		CurrentIncludingStack:   utils.NewStack[string](),
 		config:                  NewLanguageConfig(),
+		NameCache:               ssadb.NewNameCache(ProgramName),
 	}
 	prog.Application = prog
 	prog.DatabaseKind = ProgramCacheMemory
@@ -136,6 +138,7 @@ func (prog *Program) createSubProgram(name string, kind ssadb.ProgramKind, path 
 	prog.Application.AddUpStream(subProg)
 	subProg.Application = prog.Application
 	subProg.Cache = prog.Cache
+	subProg.NameCache = prog.NameCache
 	subProg.fixImportCallback = make([]func(), 0)
 	return subProg
 }

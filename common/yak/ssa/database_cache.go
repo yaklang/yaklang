@@ -122,6 +122,31 @@ func (c *ProgramCache) GetInstruction(id int64) Instruction {
 
 }
 
+// PreloadInstructionsByIDsFast fills instruction cache with lazy instructions without neighbor prefetch.
+func (c *ProgramCache) PreloadInstructionsByIDsFast(ids []int64) {
+	if c == nil || c.ProgramCacheKind != ProgramCacheDBRead || c.program == nil {
+		return
+	}
+	if len(ids) == 0 {
+		return
+	}
+	ssadb.PreloadIrCodesByIdsFast(ssadb.GetDB(), c.program.Name, ids)
+	cache := ssadb.GetIrCodeCache(c.program.Name)
+	for _, id := range ids {
+		if id <= 0 {
+			continue
+		}
+		if _, ok := c.InstructionCache.Get(id); ok {
+			continue
+		}
+		if ir, ok := cache.Get(id); ok {
+			if inst, err := NewLazyInstructionFromIrCode(ir, c.program); err == nil {
+				c.InstructionCache.Set(inst)
+			}
+		}
+	}
+}
+
 // =============================================== Variable =======================================================
 
 func (c *ProgramCache) AddConst(inst Instruction) {

@@ -11,6 +11,7 @@ var SSAProjectTables = []any{
 	// instruction
 	&IrCode{},
 	&IrIndex{},
+	&IrNamePool{},
 	// source code
 	&IrSource{},
 	// type
@@ -93,6 +94,11 @@ func patchIrCodeIndex(db *gorm.DB) {
 			"idx_ir_codes_program_code",
 			`CREATE INDEX IF NOT EXISTS "idx_ir_codes_program_code" ON "ir_codes" ("program_name", "code_id");`,
 		},
+		{
+			"idx_ir_codes_program_opcode",
+			// composite index for program+opcode lookups
+			`CREATE INDEX IF NOT EXISTS "idx_ir_codes_program_opcode" ON "ir_codes" ("program_name", "opcode");`,
+		},
 		// 为 ir_types 表添加复合索引
 		{
 			"idx_ir_types_program_type",
@@ -106,6 +112,10 @@ func patchIrCodeIndex(db *gorm.DB) {
 		{
 			"idx_ir_indices_program_field",
 			`CREATE INDEX IF NOT EXISTS "idx_ir_indices_program_field" ON "ir_indices" ("program_name", "field_name");`,
+		},
+		{
+			"idx_ir_name_pool_program_name_name",
+			`CREATE INDEX IF NOT EXISTS "idx_ir_name_pool_program_name_name" ON "ir_name_pool" ("program_name", "name");`,
 		},
 	}
 
