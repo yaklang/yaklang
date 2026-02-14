@@ -207,6 +207,7 @@ func (c *Coordinator) generateAITaskWithName(name, goal string) *AiTask {
 		true,
 	)
 	task.AIStatefulTaskBase = taskBase
+	taskBase.SetName(name)
 
 	nonce := utils.RandStringBytes(4)
 	taskInput := task.GetUserInput()

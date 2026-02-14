@@ -19,6 +19,7 @@ import (
 
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"gopkg.in/yaml.v3"
 )
 
 type ToolCaller struct {
@@ -221,8 +222,10 @@ func (t *ToolCaller) CallTool(tool *aitool.Tool) (result *aitool.ToolResult, dir
 
 // GenerateParamsResult contains the result of generateParams including params and identifier
 type GenerateParamsResult struct {
-	Params     aitool.InvokeParams
-	Identifier string // destination identifier, e.g. "query_large_file", "find_process"
+	Params        aitool.InvokeParams
+	Identifier    string        // destination identifier, e.g. "query_large_file", "find_process"
+	Duration      time.Duration // time spent generating params via AI
+	RawAIResponse string        // raw AI stream output for param generation
 }
 
 func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) (*GenerateParamsResult, error) {
@@ -252,6 +255,8 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 
 	invokeParams := aitool.InvokeParams{}
 	var identifier string
+	var paramDuration time.Duration
+	var rawAIResponse string
 	err = CallAITransaction(t.config, paramsPrompt, func(request *AIRequest) (*AIResponse, error) {
 		request.SetTaskIndex(t.task.GetIndex())
 		return t.ai.CallAI(request)
@@ -294,8 +299,10 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 			actionOpts,
 			WithActionOnReaderFinished(func() {
 				cost := time.Since(start)
+				paramDuration = cost
+				rawAIResponse = response.String()
 				pw.WriteString(" [done] 耗时(Cost): " + fmt.Sprintf("%.2f", cost.Seconds()) + "s")
-				emitter.EmitTextReferenceMaterial(event.GetContentJSONPath(`$.event_writer_id`), response.String())
+				emitter.EmitTextReferenceMaterial(event.GetContentJSONPath(`$.event_writer_id`), rawAIResponse)
 				pw.Close()
 			}),
 			WithActionFieldStreamHandler(paramNames, func(key string, r io.Reader) {
@@ -347,8 +354,10 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 		return nil, err
 	}
 	return &GenerateParamsResult{
-		Params:     invokeParams,
-		Identifier: identifier,
+		Params:        invokeParams,
+		Identifier:    identifier,
+		Duration:      paramDuration,
+		RawAIResponse: rawAIResponse,
 	}, nil
 }
 
@@ -456,6 +465,8 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 	// generate params
 	var invokeParams = make(aitool.InvokeParams)
 	var destinationIdentifier string // identifier describing the purpose of this tool call
+	var paramGenDuration time.Duration
+	var rawAIParamResponse string
 	if presetParams {
 		invokeParams = presetInvokeParams
 		t.emitter.EmitInfo("use preset params for tool[%v]: %v", tool.Name, invokeParams)
@@ -466,6 +477,8 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 		}
 		invokeParams = generateResult.Params
 		destinationIdentifier = generateResult.Identifier
+		paramGenDuration = generateResult.Duration
+		rawAIParamResponse = generateResult.RawAIResponse
 		if destinationIdentifier != "" {
 			t.emitter.EmitInfo("tool[%v] destination identifier: %v", tool.Name, destinationIdentifier)
 		}
@@ -580,8 +593,8 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 	// we emit the tool result event, preserving correct event ordering.
 	waitToolStdFlush()
 
-	// Save tool call files (params, stdout, stderr, result)
-	t.saveToolCallFiles(tool, callToolId, destinationIdentifier, invokeParams, stdoutBuffer, stderrBuffer, toolResult)
+	// Save tool call report markdown (params, stdout, stderr, result merged into one file)
+	t.saveToolCallFiles(tool, callToolId, destinationIdentifier, invokeParams, stdoutBuffer, stderrBuffer, toolResult, paramGenDuration, rawAIParamResponse)
 
 	t.emitter.EmitInfo("start to generate and feedback tool[%v] result in task: %#v", tool.Name, t.task.GetName())
 	if toolResult.Data != nil {
@@ -595,6 +608,9 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 	return toolResult, false, nil
 }
 
+// markdownCodeFence is 10 backticks used as code fence in markdown to safely nest any content
+const markdownCodeFence = "``````````"
+
 func (t *ToolCaller) saveToolCallFiles(
 	tool *aitool.Tool,
 	callToolId string,
@@ -603,6 +619,8 @@ func (t *ToolCaller) saveToolCallFiles(
 	stdoutBuffer *bytes.Buffer,
 	stderrBuffer *bytes.Buffer,
 	toolResult *aitool.ToolResult,
+	paramGenDuration time.Duration,
+	rawAIParamResponse string,
 ) {
 	// Get workdir - try to get from config if it's a Config type
 	workdir := ""
@@ -616,10 +634,12 @@ func (t *ToolCaller) saveToolCallFiles(
 		workdir = consts.GetDefaultBaseHomeDir()
 	}
 
-	// Get task index for file naming
+	// Get task index and name for file naming
 	taskIndex := ""
+	taskName := ""
 	if t.task != nil {
 		taskIndex = t.task.GetIndex()
+		taskName = t.task.GetName()
 	}
 	if taskIndex == "" {
 		taskIndex = "0"
@@ -628,126 +648,196 @@ func (t *ToolCaller) saveToolCallFiles(
 	// Get tool call count for this task (number of previous tool calls + 1)
 	toolCallNumber := 1
 	if t.task != nil {
-		// Get count of existing tool call results, then add 1 for current call
 		existingResults := t.task.GetAllToolCallResults()
 		toolCallNumber = len(existingResults) + 1
 	}
 
-	// Generate tool name (sanitized for directory name)
+	// Generate tool name (sanitized for filename)
 	toolName := sanitizeFilename(tool.Name)
 	if toolName == "" {
 		toolName = "unknown_tool"
 	}
 
-	// Build directory name: {{index}}_{{tool-name}}_{{destination_identifier}}
-	// Example: 1_grep_query_large_file
-	var dirName string
+	// Build markdown filename: {n}_{toolName}_{identifier}.md
+	var mdFileName string
 	if destinationIdentifier != "" {
-		dirName = fmt.Sprintf("%d_%s_%s", toolCallNumber, toolName, destinationIdentifier)
+		mdFileName = fmt.Sprintf("%d_%s_%s.md", toolCallNumber, toolName, destinationIdentifier)
 	} else {
-		dirName = fmt.Sprintf("%d_%s", toolCallNumber, toolName)
+		mdFileName = fmt.Sprintf("%d_%s.md", toolCallNumber, toolName)
 	}
 
-	// Build full directory path: task_{{task_index}}/tool_calls/{{dirName}}
-	// Example: task_1_1/tool_calls/1_grep_query_large_file
-	toolCallDir := filepath.Join(workdir, fmt.Sprintf("task_%s", taskIndex), "tool_calls", dirName)
-	t.emitter.EmitToolCallLogDir(callToolId, toolCallDir)
+	// Build full file path: task_{index}_{name}/tool_calls/{n}_{tool}_{id}.md
+	taskDirName := BuildTaskDirName(taskIndex, taskName)
+	toolCallsDir := filepath.Join(workdir, taskDirName, "tool_calls")
+	toolCallFilePath := filepath.Join(toolCallsDir, mdFileName)
+	t.emitter.EmitToolCallLogDir(callToolId, toolCallFilePath)
 
-	// Ensure directory exists
-	if err := os.MkdirAll(toolCallDir, 0755); err != nil {
-		log.Errorf("failed to create tool call directory %s: %v", toolCallDir, err)
+	// Ensure tool_calls directory exists
+	if err := os.MkdirAll(toolCallsDir, 0755); err != nil {
+		log.Errorf("failed to create tool_calls directory %s: %v", toolCallsDir, err)
 		return
 	}
 
-	// Generate file names in the directory
-	paramsFilename := filepath.Join(toolCallDir, "params.txt")
-	stdoutFilename := filepath.Join(toolCallDir, "stdout.txt")
-	stderrFilename := filepath.Join(toolCallDir, "stderr.txt")
-	resultFilename := filepath.Join(toolCallDir, "result.txt")
+	// Build the markdown report content
+	var md strings.Builder
 
-	// Save params file
-	paramsJSON := utils.Jsonify(params)
-	if err := os.WriteFile(paramsFilename, []byte(paramsJSON), 0644); err != nil {
-		log.Errorf("failed to save tool call params file: %v", err)
-	} else {
-		t.emitter.EmitPinFilename(paramsFilename)
-		log.Infof("saved tool call params to file: %s", paramsFilename)
+	// --- Header ---
+	md.WriteString(fmt.Sprintf("# Tool Call Report: %s\n\n", tool.Name))
+
+	// --- Basic Info ---
+	md.WriteString("## Basic Info\n\n")
+	md.WriteString(fmt.Sprintf("- **Tool**: %s\n", tool.Name))
+	md.WriteString(fmt.Sprintf("- **Task**: %s\n", taskIndex))
+	if destinationIdentifier != "" {
+		md.WriteString(fmt.Sprintf("- **Identifier**: %s\n", destinationIdentifier))
+	}
+	md.WriteString(fmt.Sprintf("- **Call ID**: %s\n", callToolId))
+	md.WriteString("\n")
+
+	// --- Parameters ---
+	md.WriteString("## Parameters\n\n")
+	if paramGenDuration > 0 {
+		md.WriteString(fmt.Sprintf("Parameter generation took **%.2fs**\n\n", paramGenDuration.Seconds()))
 	}
 
-	// Save stdout file
-	// Filter out framework message "invoking tool[xxx] ...\n" - only save tool callback's actual output
+	// Raw AI Response
+	md.WriteString("### Raw AI Response\n\n")
+	if rawAIParamResponse != "" {
+		md.WriteString(markdownCodeFence + "\n")
+		md.WriteString(rawAIParamResponse)
+		if !strings.HasSuffix(rawAIParamResponse, "\n") {
+			md.WriteString("\n")
+		}
+		md.WriteString(markdownCodeFence + "\n\n")
+	} else {
+		md.WriteString("(not available - preset params mode)\n\n")
+	}
+
+	// Parsed Parameters (YAML)
+	md.WriteString("### Parsed Parameters (YAML)\n\n")
+	md.WriteString(markdownCodeFence + "yaml\n")
+	md.WriteString(renderParamsAsYAML(params))
+	md.WriteString(markdownCodeFence + "\n\n")
+
+	// --- Execution Result ---
+	md.WriteString("## Execution Result\n\n")
+	resultText := extractResultHumanReadable(toolResult, t.emitter)
+	if len(resultText) > 100 {
+		md.WriteString(markdownCodeFence + "\n")
+		md.WriteString(resultText)
+		if !strings.HasSuffix(resultText, "\n") {
+			md.WriteString("\n")
+		}
+		md.WriteString(markdownCodeFence + "\n\n")
+	} else if resultText != "" {
+		md.WriteString(resultText + "\n\n")
+	} else {
+		md.WriteString("(empty)\n\n")
+	}
+
+	// --- STDOUT ---
+	md.WriteString("## STDOUT\n\n")
 	stdoutContent := stdoutBuffer.Bytes()
 	frameworkMsgPrefix := fmt.Sprintf("invoking tool[%s] ...\n", tool.Name)
 	if bytes.HasPrefix(stdoutContent, []byte(frameworkMsgPrefix)) {
 		stdoutContent = stdoutContent[len(frameworkMsgPrefix):]
 	}
 	if len(stdoutContent) > 0 {
-		if err := os.WriteFile(stdoutFilename, stdoutContent, 0644); err != nil {
-			log.Errorf("failed to save tool call stdout file: %v", err)
-		} else {
-			t.emitter.EmitPinFilename(stdoutFilename)
-			log.Infof("saved tool call stdout to file: %s", stdoutFilename)
+		md.WriteString(markdownCodeFence + "\n")
+		md.Write(stdoutContent)
+		if !bytes.HasSuffix(stdoutContent, []byte("\n")) {
+			md.WriteString("\n")
 		}
-	}
-
-	// Save stderr file
-	if stderrBuffer.Len() > 0 {
-		if err := os.WriteFile(stderrFilename, stderrBuffer.Bytes(), 0644); err != nil {
-			log.Errorf("failed to save tool call stderr file: %v", err)
-		} else {
-			t.emitter.EmitPinFilename(stderrFilename)
-			log.Infof("saved tool call stderr to file: %s", stderrFilename)
-		}
-	}
-
-	// Save result file
-	// Always save the full result to file, even if it's large
-	var resultContent []byte
-	if toolResult != nil {
-		// Try to get the original result from ToolExecutionResult
-		if toolResult.Data != nil {
-			toolExecutionResult, ok := toolResult.Data.(*aitool.ToolExecutionResult)
-			if ok && toolExecutionResult.Result != nil {
-				// Get the original result before it was truncated
-				// If result was saved to a file in tool_invoke.go, we need to read it
-				resultStr := utils.InterfaceToString(toolExecutionResult.Result)
-				// Check if result contains a file path (from handleLargeContent)
-				filePathRegex := regexp.MustCompile(`saved in file\[([^\]]+)\]`)
-				matches := filePathRegex.FindStringSubmatch(resultStr)
-				if len(matches) > 1 {
-					// Extract file path and read it
-					filePath := matches[1]
-					if fileContent, err := os.ReadFile(filePath); err == nil {
-						resultContent = fileContent
-						// Also emit the original file
-						t.emitter.EmitPinFilename(filePath)
-						log.Infof("found large result file from tool_invoke.go: %s, also emitting it", filePath)
-					} else {
-						// Fallback to JSON
-						resultContent = []byte(utils.Jsonify(toolExecutionResult.Result))
-						log.Warnf("failed to read large result file %s: %v, using JSON fallback", filePath, err)
-					}
-				} else {
-					// Result is not truncated, save as JSON
-					resultContent = []byte(utils.Jsonify(toolExecutionResult.Result))
-				}
-			} else {
-				// Fallback to full tool result
-				resultContent = []byte(utils.Jsonify(toolResult))
-			}
-		} else {
-			// Save full tool result
-			resultContent = []byte(utils.Jsonify(toolResult))
-		}
-	}
-
-	// Always save result file, even if empty
-	if err := os.WriteFile(resultFilename, resultContent, 0644); err != nil {
-		log.Errorf("failed to save tool call result file: %v", err)
+		md.WriteString(markdownCodeFence + "\n\n")
 	} else {
-		t.emitter.EmitPinFilename(resultFilename)
-		log.Infof("saved tool call result to file: %s", resultFilename)
+		md.WriteString("(empty)\n\n")
 	}
+
+	// --- STDERR ---
+	md.WriteString("## STDERR\n\n")
+	if stderrBuffer.Len() > 0 {
+		md.WriteString(markdownCodeFence + "\n")
+		md.Write(stderrBuffer.Bytes())
+		if !bytes.HasSuffix(stderrBuffer.Bytes(), []byte("\n")) {
+			md.WriteString("\n")
+		}
+		md.WriteString(markdownCodeFence + "\n")
+	} else {
+		md.WriteString("(empty)\n")
+	}
+
+	// Write the single markdown file
+	if err := os.WriteFile(toolCallFilePath, []byte(md.String()), 0644); err != nil {
+		log.Errorf("failed to save tool call report file: %v", err)
+	} else {
+		t.emitter.EmitPinFilename(toolCallFilePath)
+		log.Infof("saved tool call report to file: %s", toolCallFilePath)
+	}
+}
+
+// renderParamsAsYAML renders InvokeParams as YAML for human-readable output.
+func renderParamsAsYAML(params aitool.InvokeParams) string {
+	if len(params) == 0 {
+		return "(no parameters)\n"
+	}
+	yamlBytes, err := yaml.Marshal(map[string]any(params))
+	if err != nil {
+		log.Warnf("failed to marshal params as YAML: %v, falling back to JSON", err)
+		return string(utils.Jsonify(params)) + "\n"
+	}
+	return string(yamlBytes)
+}
+
+// extractResultHumanReadable extracts tool result as human-readable text.
+// It handles large content saved in files and avoids raw JSON output.
+func extractResultHumanReadable(toolResult *aitool.ToolResult, emitter *Emitter) string {
+	if toolResult == nil {
+		return ""
+	}
+
+	// Try to get the original result from ToolExecutionResult
+	if toolResult.Data != nil {
+		toolExecutionResult, ok := toolResult.Data.(*aitool.ToolExecutionResult)
+		if ok && toolExecutionResult.Result != nil {
+			resultStr := utils.InterfaceToString(toolExecutionResult.Result)
+			// Check if result contains a file path (from handleLargeContent)
+			filePathRegex := regexp.MustCompile(`saved in file\[([^\]]+)\]`)
+			matches := filePathRegex.FindStringSubmatch(resultStr)
+			if len(matches) > 1 {
+				filePath := matches[1]
+				if fileContent, err := os.ReadFile(filePath); err == nil {
+					if emitter != nil {
+						emitter.EmitPinFilename(filePath)
+					}
+					log.Infof("found large result file from tool_invoke.go: %s, also emitting it", filePath)
+					return string(fileContent)
+				}
+				log.Warnf("failed to read large result file %s, using raw string", filePath)
+			}
+			return resultStr
+		}
+	}
+
+	// Fallback: build a readable summary from ToolResult fields
+	var buf strings.Builder
+	if toolResult.Name != "" {
+		buf.WriteString(fmt.Sprintf("Tool: %s\n", toolResult.Name))
+	}
+	if toolResult.Success {
+		buf.WriteString("Status: Success\n")
+	} else {
+		buf.WriteString("Status: Failed\n")
+	}
+	if toolResult.Error != "" {
+		buf.WriteString(fmt.Sprintf("Error: %s\n", toolResult.Error))
+	}
+	if toolResult.Data != nil {
+		dataStr := utils.InterfaceToString(toolResult.Data)
+		if dataStr != "" {
+			buf.WriteString(fmt.Sprintf("Data: %s\n", dataStr))
+		}
+	}
+	return buf.String()
 }
 
 func sanitizeFilename(name string) string {
@@ -764,6 +854,27 @@ func sanitizeFilename(name string) string {
 		return "unknown"
 	}
 	return result
+}
+
+// BuildTaskDirName builds a task directory name with optional semantic identifier.
+// Format: task_{index}_{sanitized_name} or task_{index} when name is empty.
+// Example: task_1-1_detect_os_type
+func BuildTaskDirName(index, name string) string {
+	if index == "" {
+		index = "0"
+	}
+	if name == "" {
+		return fmt.Sprintf("task_%s", index)
+	}
+	sanitized := sanitizeIdentifier(name)
+	if sanitized == "" {
+		return fmt.Sprintf("task_%s", index)
+	}
+	// Limit the sanitized name to 40 characters for filesystem friendliness
+	if len(sanitized) > 40 {
+		sanitized = sanitized[:40]
+	}
+	return fmt.Sprintf("task_%s_%s", index, sanitized)
 }
 
 func SummaryRank(task AITask, callResult *aitool.ToolResult) string {

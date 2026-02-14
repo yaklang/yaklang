@@ -383,12 +383,12 @@ func (t *AiTask) saveTaskArtifacts(summary, nextMovements, statusSummary, taskSu
 		workdir = consts.GetDefaultBaseHomeDir()
 	}
 
-	// Build task directory path: task_{{task_index}}
+	// Build task directory path: task_{index}_{name}
 	taskIndex := t.Index
 	if taskIndex == "" {
 		taskIndex = "0"
 	}
-	taskDir := filepath.Join(workdir, fmt.Sprintf("task_%s", taskIndex))
+	taskDir := filepath.Join(workdir, aicommon.BuildTaskDirName(taskIndex, t.Name))
 
 	// Ensure task directory exists
 	if err := os.MkdirAll(taskDir, 0755); err != nil {
