@@ -104,6 +104,14 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 		if utils.IsNil(planRes) {
 			return nil, utils.Error("planMocker returns nil, unknown error")
 		}
+		// Ensure all tasks from PlanMocker have proper initialization:
+		// AIStatefulTaskBase, Coordinator reference, and SemanticIdentifier.
+		// This handles cases where PlanMocker constructs AiTask objects manually
+		// without going through generateAITaskWithName.
+		if planRes.RootTask != nil {
+			pr.cod.ensureTaskTreeInitialized(planRes.RootTask)
+			planRes.RootTask.GenerateIndex()
+		}
 		return planRes, nil
 	}
 
@@ -297,6 +305,44 @@ Task name: %s`, name)
 		result = strings.TrimRight(result, "_")
 	}
 	return result
+}
+
+// ensureTaskTreeInitialized recursively walks the task tree and ensures each task
+// has proper AIStatefulTaskBase, Coordinator reference, SemanticIdentifier, and parent pointers.
+// This is critical for tasks created via PlanMocker (preset tasks) which may bypass
+// generateAITaskWithName and lack proper initialization.
+func (c *Coordinator) ensureTaskTreeInitialized(task *AiTask) {
+	if task == nil {
+		return
+	}
+
+	// Ensure Coordinator is set
+	task.Coordinator = c
+
+	// Ensure AIStatefulTaskBase is initialized
+	if task.AIStatefulTaskBase == nil {
+		taskBase := aicommon.NewStatefulTaskBase(
+			"plan-task"+uuid.NewString(),
+			fmt.Sprintf("任务名称: %s\n任务目标: %s", task.Name, task.Goal),
+			c.Ctx,
+			c.Emitter,
+			true,
+		)
+		task.AIStatefulTaskBase = taskBase
+		taskBase.SetName(task.Name)
+	}
+
+	// Ensure SemanticIdentifier is set
+	if task.SemanticIdentifier == "" && task.Name != "" {
+		semanticId := c.generateSemanticIdentifier(task.Name)
+		task.SetSemanticIdentifier(semanticId)
+	}
+
+	// Recursively process subtasks
+	for _, sub := range task.Subtasks {
+		sub.ParentTask = task
+		c.ensureTaskTreeInitialized(sub)
+	}
 }
 
 func (c *Coordinator) createPlanRequest(rawUserInput string) (*planRequest, error) {

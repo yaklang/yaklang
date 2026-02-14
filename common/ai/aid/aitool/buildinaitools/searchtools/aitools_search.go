@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 
 	_ "embed"
 
@@ -83,18 +84,30 @@ type SearchCapabilitiesConfig struct {
 	ForgeSearcher AISearcher[*schema.AIForge]
 	ForgesGetter  func() []*schema.AIForge
 	SkillSearchFn SkillSearchFunc
+
+	// OnSearchCompleted is called after each successful search.
+	// It can be used to add timeline entries (e.g., via AddToTimeline) to inform the AI
+	// that search_capabilities has already been called and should not be called again.
+	// Parameters: query string, resultSummary string
+	OnSearchCompleted func(query string, resultSummary string)
 }
 
 // CreateSearchCapabilitiesTool creates the unified search_capabilities tool
 // that searches tools, forges, AND skills simultaneously.
+// It tracks previous searches and prevents infinite loops by refusing duplicate queries
+// and notifying the AI via OnSearchCompleted callback (used for AddToTimeline).
 func CreateSearchCapabilitiesTool(cfg *SearchCapabilitiesConfig) ([]*aitool.Tool, error) {
+	// Track searched queries to prevent repeated calls forming a loop
+	var searchedQueries sync.Map
+
 	factory := aitool.NewFactory()
 	err := factory.RegisterTool(
 		SearchCapabilitiesName,
 		aitool.WithDescription(
 			"Search all available capabilities: tools, AI forges (blueprints), and skills. "+
 				"Use this to discover tools not shown in the core list, find AI blueprints for complex tasks, "+
-				"or locate skills for specialized knowledge. Returns categorized results.",
+				"or locate skills for specialized knowledge. Returns categorized results. "+
+				"IMPORTANT: Each query should only be searched ONCE. Do NOT call this tool repeatedly with the same or similar query.",
 		),
 		aitool.WithStringParam("query",
 			aitool.WithParam_Required(true),
@@ -111,9 +124,27 @@ func CreateSearchCapabilitiesTool(cfg *SearchCapabilitiesConfig) ([]*aitool.Tool
 				category = "all"
 			}
 
+			// Check if this query (or similar) has been searched before
+			normalizedQuery := strings.ToLower(strings.TrimSpace(query))
+			if prevResult, loaded := searchedQueries.Load(normalizedQuery); loaded {
+				// Already searched this query - refuse and return previous summary
+				refusalMsg := fmt.Sprintf(
+					"## search_capabilities: DUPLICATE QUERY REJECTED\n\n"+
+						"The query %q has already been searched. Results were provided previously.\n"+
+						"**DO NOT call search_capabilities again.** Use the previously returned results to proceed with your task.\n\n"+
+						"Previous result summary:\n%s", query, prevResult.(string))
+				log.Infof("search_capabilities: rejected duplicate query %q", query)
+				return refusalMsg, nil
+			}
+
 			var results strings.Builder
 			results.WriteString(fmt.Sprintf("## Search Results for: %s\n\n", query))
 			hasResults := false
+
+			// Collect matched names for timeline summary
+			var matchedToolNames []string
+			var matchedForgeNames []string
+			var matchedSkillNames []string
 
 			// 1. Search Tools
 			if category == "all" || category == "tools" {
@@ -121,6 +152,7 @@ func CreateSearchCapabilitiesTool(cfg *SearchCapabilitiesConfig) ([]*aitool.Tool
 				if toolResults != "" {
 					results.WriteString(toolResults)
 					hasResults = true
+					matchedToolNames = extractMatchedNames(toolResults)
 				}
 			}
 
@@ -130,6 +162,7 @@ func CreateSearchCapabilitiesTool(cfg *SearchCapabilitiesConfig) ([]*aitool.Tool
 				if forgeResults != "" {
 					results.WriteString(forgeResults)
 					hasResults = true
+					matchedForgeNames = extractMatchedNames(forgeResults)
 				}
 			}
 
@@ -139,6 +172,7 @@ func CreateSearchCapabilitiesTool(cfg *SearchCapabilitiesConfig) ([]*aitool.Tool
 				if skillResults != "" {
 					results.WriteString(skillResults)
 					hasResults = true
+					matchedSkillNames = extractMatchedNames(skillResults)
 				}
 			}
 
@@ -146,7 +180,24 @@ func CreateSearchCapabilitiesTool(cfg *SearchCapabilitiesConfig) ([]*aitool.Tool
 				results.WriteString("No matching capabilities found. Try different keywords or broaden your search.\n")
 			}
 
-			return results.String(), nil
+			// Append anti-loop directive to the result
+			results.WriteString("\n---\n")
+			results.WriteString("**IMPORTANT**: search_capabilities has completed for this query. " +
+				"Do NOT call search_capabilities again with the same or similar query. " +
+				"Use the results above to proceed with your actual task.\n")
+
+			resultStr := results.String()
+
+			// Store the query and a brief summary to detect duplicates
+			searchedQueries.Store(normalizedQuery, utils.ShrinkString(resultStr, 500))
+
+			// Notify via callback (used for AddToTimeline in plan mode)
+			// Pass structured matched names so the timeline entry can contain concrete results
+			if cfg != nil && cfg.OnSearchCompleted != nil {
+				cfg.OnSearchCompleted(query, buildTimelineSummary(query, matchedToolNames, matchedForgeNames, matchedSkillNames))
+			}
+
+			return resultStr, nil
 		}),
 	)
 	if err != nil {
@@ -284,4 +335,61 @@ func searchSkills(cfg *SearchCapabilitiesConfig, query string) string {
 	}
 	buf.WriteString("\n")
 	return buf.String()
+}
+
+// extractMatchedNames parses "- **name**: description" lines from search result sections
+// and returns a list of matched names for timeline summary.
+func extractMatchedNames(sectionResult string) []string {
+	var names []string
+	for _, line := range strings.Split(sectionResult, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "- **") {
+			continue
+		}
+		// Extract name from "- **name**: description"
+		start := strings.Index(line, "**")
+		if start < 0 {
+			continue
+		}
+		end := strings.Index(line[start+2:], "**")
+		if end < 0 {
+			continue
+		}
+		name := line[start+2 : start+2+end]
+		if name != "" {
+			names = append(names, name)
+		}
+	}
+	return names
+}
+
+// buildTimelineSummary constructs a structured timeline message that includes
+// the actual search results, so the AI has concrete context and won't re-search.
+func buildTimelineSummary(query string, toolNames, forgeNames, skillNames []string) string {
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("search_capabilities has been called for query: %q\n", query))
+
+	hasAny := false
+
+	if len(toolNames) > 0 {
+		hasAny = true
+		sb.WriteString(fmt.Sprintf("  Matched Tools: %s\n", strings.Join(toolNames, ", ")))
+	}
+	if len(forgeNames) > 0 {
+		hasAny = true
+		sb.WriteString(fmt.Sprintf("  Matched AI Forges: %s\n", strings.Join(forgeNames, ", ")))
+	}
+	if len(skillNames) > 0 {
+		hasAny = true
+		sb.WriteString(fmt.Sprintf("  Matched Skills: %s\n", strings.Join(skillNames, ", ")))
+	}
+
+	if !hasAny {
+		sb.WriteString("  No matching capabilities were found for this query.\n")
+	}
+
+	sb.WriteString("  The search is complete. Do NOT call search_capabilities again for this task.\n")
+	sb.WriteString("  Proceed with the matched capabilities above to accomplish your task goals.")
+
+	return sb.String()
 }
