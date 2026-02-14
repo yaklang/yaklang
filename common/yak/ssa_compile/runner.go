@@ -3,12 +3,14 @@ package ssa_compile
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -27,7 +29,7 @@ func ParseProjectWithAutoDetective(ctx context.Context, conf *SSADetectConfig) (
 		return &SSADetectResult{Info: info}, nil
 	}
 
-	prog, cleanup, err := compileProject(ctx, info)
+	prog, cleanup, err := compileProject(ctx, info, conf)
 	if err != nil {
 		return &SSADetectResult{Info: info}, err
 	}
@@ -89,7 +91,7 @@ func detectProject(ctx context.Context, conf *SSADetectConfig) (*AutoDetectInfo,
 	return info, nil
 }
 
-func compileProject(ctx context.Context, info *AutoDetectInfo) (*ssaapi.Program, func(), error) {
+func compileProject(ctx context.Context, info *AutoDetectInfo, conf *SSADetectConfig) (*ssaapi.Program, func(), error) {
 	config := info.Config
 	if config == nil {
 		return nil, nil, utils.Errorf("config is nil")
@@ -123,6 +125,24 @@ func compileProject(ctx context.Context, info *AutoDetectInfo) (*ssaapi.Program,
 	projectConfig, err := createResp.GetConfig()
 	if err != nil {
 		return nil, cleanup, err
+	}
+	if shouldCompileInMemory(conf) {
+		projectConfig.SetCompileMemory(true)
+	}
+	// In memory mode, compile in-process to avoid DB load in another process.
+	if projectConfig.GetCompileMemory() {
+		configJSON, _ := projectConfig.ToJSONString()
+		progs, err := ssaapi.ParseProject(
+			ssaconfig.WithConfigJson(configJSON),
+			ssaconfig.WithContext(ctx),
+		)
+		if err != nil {
+			return nil, cleanup, utils.Errorf("failed to compile project (memory): %s", err)
+		}
+		if len(progs) == 0 {
+			return nil, cleanup, utils.Errorf("compile project (memory) returned no programs")
+		}
+		return progs[0], cleanup, nil
 	}
 	compilePluginName := "SSA 项目编译"
 	compileParam := make(map[string]string)
@@ -179,6 +199,17 @@ func compileProject(ctx context.Context, info *AutoDetectInfo) (*ssaapi.Program,
 	}
 
 	return prog, cleanup, nil
+}
+
+func shouldCompileInMemory(conf *SSADetectConfig) bool {
+	if conf == nil || conf.Params == nil {
+		return false
+	}
+	raw, ok := conf.Params["memory"]
+	if !ok || raw == nil {
+		return false
+	}
+	return strings.EqualFold(codec.AnyToString(raw), "true")
 }
 
 type execMsg struct {
