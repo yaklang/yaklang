@@ -894,7 +894,8 @@ func (r *ReActLoop) ensureLoopDirectory(task aicommon.AIStatefulTask) string {
 		loopName = "unknown_loop"
 	}
 
-	taskDir := filepath.Join(workdir, fmt.Sprintf("task_%s", taskIndex))
+	taskName := task.GetName()
+	taskDir := filepath.Join(workdir, aicommon.BuildTaskDirName(taskIndex, taskName))
 	if err := os.MkdirAll(taskDir, 0755); err != nil {
 		log.Errorf("failed to create task directory %s: %v", taskDir, err)
 		return ""
