@@ -16,6 +16,8 @@ import (
 type Measurement struct {
 	Name       string
 	Total      time.Duration
+	Min        time.Duration
+	Max        time.Duration
 	Count      uint64
 	ErrorCount uint64
 	Steps      []time.Duration
@@ -38,6 +40,9 @@ func (m Measurement) String() string {
 
 	builder.WriteString(fmt.Sprintf("%s--all\tTime: %v\tCount: %v\tAvg: %v\n",
 		m.Name, m.Total, m.Count, m.Average(),
+	))
+	builder.WriteString(fmt.Sprintf("%s--range\tMin: %v\tMax: %v\n",
+		m.Name, m.Min, m.Max,
 	))
 
 	if m.Count > 1 {
@@ -66,6 +71,8 @@ func newMeasurementData(name string, stepCapacity int) *measurementData {
 			Name:       name,
 			Steps:      steps,
 			Total:      0,
+			Min:        0,
+			Max:        0,
 			Count:      0,
 			ErrorCount: 0,
 		},
@@ -96,6 +103,17 @@ func (m *measurementData) record(total time.Duration, stepDurations []time.Durat
 		m.measurement.Steps[i] += dur
 	}
 
+	if m.measurement.Count == 0 {
+		m.measurement.Min = total
+		m.measurement.Max = total
+	} else {
+		if total < m.measurement.Min {
+			m.measurement.Min = total
+		}
+		if total > m.measurement.Max {
+			m.measurement.Max = total
+		}
+	}
 	m.measurement.Total += total
 	m.measurement.Count++
 }
@@ -115,6 +133,8 @@ func (m *measurementData) snapshot() Measurement {
 	return Measurement{
 		Name:       m.measurement.Name,
 		Total:      m.measurement.Total,
+		Min:        m.measurement.Min,
+		Max:        m.measurement.Max,
 		Count:      m.measurement.Count,
 		ErrorCount: m.measurement.ErrorCount,
 		Steps:      steps,
