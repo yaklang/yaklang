@@ -3,9 +3,8 @@ package aimem
 import (
 	"context"
 	"fmt"
-	"strings"
-
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/consts"
@@ -155,7 +154,7 @@ func (t *AIMemoryTriage) BatchIsRepeatedMemoryEntitiesByAI(ctx context.Context, 
 	}
 
 	// 调用AI进行批量高级判别
-	action, err := t.invoker.InvokeLiteForgeSpeedPriority(ctx, "batch-memory-deduplication", prompt, []aitool.ToolOption{
+	action, err := t.invoker.InvokeLiteForge(ctx, "batch-memory-deduplication", prompt, []aitool.ToolOption{
 		aitool.WithStringArrayParam("non_duplicate_indices", aitool.WithParam_Description("不重复的记忆索引列表，例如: [\"1\", \"3\", \"5\"]。只返回确实不重复且值得保存的记忆索引")),
 		aitool.WithStringParam("analysis", aitool.WithParam_Description("详细分析每个记忆的重复情况和保留理由")),
 	})
