@@ -462,28 +462,42 @@ const (
 	TypeCodeHTTPRequest    = "code/http-request"
 )
 
-func (r *Emitter) EmitToolCallStd(toolName string, stdOut, stdErr io.Reader, taskIndex string) {
+// EmitToolCallStd emits throttled stream events for tool stdout and stderr.
+// It returns a wait function that blocks until both streams have finished flushing
+// all buffered data. The caller MUST close the pipe writers before calling the
+// returned wait function, so that ThrottledCopy receives EOF and triggers its final flush.
+func (r *Emitter) EmitToolCallStd(toolName string, stdOut, stdErr io.Reader, taskIndex string) (waitFlush func()) {
 	// Tool stdout/stderr uses throttled streaming to avoid overwhelming the gRPC stream.
 	// Instead of sending every small chunk immediately, data is accumulated and flushed
 	// at DefaultToolStdThrottleInterval intervals, producing larger but less frequent events.
+	stdoutDone := make(chan struct{})
+	stderrDone := make(chan struct{})
+
 	_, _ = r.emitStreamEvent(&streamEvent{
-		disableMarkdown:  true,
-		startTime:        time.Now(),
-		reader:           stdOut,
-		nodeId:           fmt.Sprintf("tool-%v-stdout", toolName),
-		contentType:      TypeLogTool,
-		taskIndex:        taskIndex,
-		throttleInterval: DefaultToolStdThrottleInterval,
+		disableMarkdown:    true,
+		startTime:          time.Now(),
+		reader:             stdOut,
+		nodeId:             fmt.Sprintf("tool-%v-stdout", toolName),
+		contentType:        TypeLogTool,
+		taskIndex:          taskIndex,
+		throttleInterval:   DefaultToolStdThrottleInterval,
+		emitFinishCallback: []func(){func() { close(stdoutDone) }},
 	})
 	_, _ = r.emitStreamEvent(&streamEvent{
-		disableMarkdown:  true,
-		startTime:        time.Now(),
-		reader:           stdErr,
-		nodeId:           fmt.Sprintf("tool-%v-stderr", toolName),
-		contentType:      TypeLogToolErrorOutput,
-		taskIndex:        taskIndex,
-		throttleInterval: DefaultToolStdThrottleInterval,
+		disableMarkdown:    true,
+		startTime:          time.Now(),
+		reader:             stdErr,
+		nodeId:             fmt.Sprintf("tool-%v-stderr", toolName),
+		contentType:        TypeLogToolErrorOutput,
+		taskIndex:          taskIndex,
+		throttleInterval:   DefaultToolStdThrottleInterval,
+		emitFinishCallback: []func(){func() { close(stderrDone) }},
 	})
+
+	return func() {
+		<-stdoutDone
+		<-stderrDone
+	}
 }
 
 func (r *Emitter) EmitStreamEvent(nodeId string, startTime time.Time, reader io.Reader, taskIndex string, finishCallback ...func()) (*schema.AiOutputEvent, error) {
