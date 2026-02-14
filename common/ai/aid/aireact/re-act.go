@@ -607,6 +607,17 @@ func WithBuiltinTools() aicommon.ConfigOption {
 			},
 		}
 
+		// Set OnSearchCompleted callback to push anti-loop timeline entry with actual results.
+		// The resultSummary contains structured matched names (tools/forges/skills),
+		// so the AI sees concrete results in the timeline and won't re-search.
+		searchCapCfg.OnSearchCompleted = func(query string, resultSummary string) {
+			if cfg.Timeline != nil {
+				msg := fmt.Sprintf("[search_capabilities_completed]:\n  %s", resultSummary)
+				cfg.Timeline.PushText(cfg.AcquireId(), msg)
+				log.Infof("search_capabilities: added timeline entry for query: %s", query)
+			}
+		}
+
 		// Inject skill search function if skill loader is available
 		// Note: SkillLoader interface only exposes AllSkillMetas(), so we do manual substring search.
 		// The closure captures cfg and will resolve skill loader at call time (after skills are fully loaded).
