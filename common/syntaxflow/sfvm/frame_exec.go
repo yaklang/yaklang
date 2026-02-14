@@ -23,11 +23,14 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"time"
 
 	"github.com/gobwas/glob"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
 func recursiveDeepChain(element ValueOperator, handle func(operator ValueOperator) bool, visited map[int64]struct{}) error {
@@ -477,9 +480,9 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		if value == nil {
 			return true, utils.Errorf("search exact failed: stack top is empty")
 		}
-		mod := i.UnaryInt
+		mod := ssadb.MatchMode(i.UnaryInt)
 		if !s.config.StrictMatch {
-			mod |= KeyMatch
+			mod |= ssadb.KeyMatch
 		}
 
 		// diagnostics: track value operation timing
@@ -521,7 +524,7 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		err := recursiveDeepChain(value, func(operator ValueOperator) bool {
 			done := s.startValueOpTiming("RecursiveExactMatch")
 			defer done()
-			ok, results, _ := operator.ExactMatch(s.GetContext(), BothMatch, i.UnaryStr)
+			ok, results, _ := operator.ExactMatch(s.GetContext(), ssadb.BothMatch, i.UnaryStr)
 			if ok {
 				have := false
 				// log.Infof("recursive search exact: %v from: %v", results.String(), operator.String())
@@ -557,7 +560,7 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 			return true, utils.Wrap(CriticalError, "recursive search glob failed: stack top is empty")
 		}
 
-		mod := i.UnaryInt
+		mod := ssadb.MatchMode(i.UnaryInt)
 
 		globIns, err := glob.Compile(i.UnaryStr)
 		if err != nil {
@@ -569,7 +572,7 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		err = recursiveDeepChain(value, func(operator ValueOperator) bool {
 			done := s.startValueOpTiming("RecursiveGlobMatch")
 			defer done()
-			ok, results, _ := operator.GlobMatch(s.GetContext(), mod|NameMatch, i.UnaryStr)
+			ok, results, _ := operator.GlobMatch(s.GetContext(), mod|ssadb.NameMatch, i.UnaryStr)
 			if ok {
 				have := false
 				_ = results.Recursive(func(operator ValueOperator) error {
@@ -603,7 +606,7 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		if value == nil {
 			return true, utils.Wrap(CriticalError, "recursive search regexp failed: stack top is empty")
 		}
-		mod := i.UnaryInt
+		mod := ssadb.MatchMode(i.UnaryInt)
 
 		regexpIns, err := regexp.Compile(i.UnaryStr)
 		if err != nil {
@@ -619,7 +622,7 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 			//if strings.Contains(operator.String(), "aaa") {
 			//	spew.Dump(1)
 			//}
-			ok, results, _ := operator.RegexpMatch(s.GetContext(), mod|NameMatch, i.UnaryStr)
+			ok, results, _ := operator.RegexpMatch(s.GetContext(), mod|ssadb.NameMatch, i.UnaryStr)
 			if ok {
 				have := false
 				_ = results.Recursive(func(operator ValueOperator) error {
@@ -659,9 +662,9 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		}
 		_ = globIns
 
-		mod := i.UnaryInt
+		mod := ssadb.MatchMode(i.UnaryInt)
 		if !s.config.StrictMatch {
-			mod |= KeyMatch
+			mod |= ssadb.KeyMatch
 		}
 		var result bool
 		var next ValueOperator
@@ -698,9 +701,9 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		if err != nil {
 			err = utils.Wrapf(CriticalError, "compile regexp[%v] failed: %v", i.UnaryStr, err)
 		}
-		mod := i.UnaryInt
+		mod := ssadb.MatchMode(i.UnaryInt)
 		if !s.config.StrictMatch {
-			mod |= KeyMatch
+			mod |= ssadb.KeyMatch
 		}
 		var result bool
 		var next ValueOperator
@@ -1137,29 +1140,51 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 		}
 		return true, nil
 	case OpNativeCall:
-		s.debugSubLog(">> pop")
-		value := s.stack.Pop()
-		if value == nil {
-			return true, utils.Wrap(CriticalError, "native call failed: stack top is empty")
-		}
-
-		s.debugSubLog("native call: [%v]", i.UnaryStr)
-		call, err := GetNativeCall(i.UnaryStr)
-		if err != nil {
-			s.debugSubLog("Err: %v", err)
-			log.Errorf("native call failed, not an existed native call[%v]: %v", i.UnaryStr, err)
-			s.stack.Push(NewEmptyValues())
-			return true, utils.Errorf("get native call failed: %v", err)
-		}
-
-		ok, ret, err := call(value, s, NewNativeCallActualParams(i.SyntaxFlowConfig...))
-		if err != nil || !ok {
-			s.debugSubLog("No Result in [%v]", i.UnaryStr)
-			s.stack.Push(NewEmptyValues())
-			if errors.Is(err, CriticalError) {
-				return true, err
+		ruleLabel := ""
+		if s.rule != nil {
+			if s.rule.Title != "" {
+				ruleLabel = s.rule.Title
+			} else if s.rule.RuleName != "" {
+				ruleLabel = s.rule.RuleName
 			}
-			return true, utils.Errorf("get native call failed: %v", err)
+		}
+		name := "sfvm.nativecall:" + i.UnaryStr
+		if ruleLabel != "" {
+			name += ":" + ruleLabel
+		}
+		var (
+			ret ValueOperator
+			ok  bool
+			err error
+		)
+		if trackErr := diagnostics.TrackLow(name, func() error {
+			s.debugSubLog(">> pop")
+			value := s.stack.Pop()
+			if value == nil {
+				return utils.Wrap(CriticalError, "native call failed: stack top is empty")
+			}
+
+			s.debugSubLog("native call: [%v]", i.UnaryStr)
+			call, err := GetNativeCall(i.UnaryStr)
+			if err != nil {
+				s.debugSubLog("Err: %v", err)
+				log.Errorf("native call failed, not an existed native call[%v]: %v", i.UnaryStr, err)
+				s.stack.Push(NewEmptyValues())
+				return utils.Errorf("get native call failed: %v", err)
+			}
+
+			ok, ret, err = call(value, s, NewNativeCallActualParams(i.SyntaxFlowConfig...))
+			if err != nil || !ok {
+				s.debugSubLog("No Result in [%v]", i.UnaryStr)
+				s.stack.Push(NewEmptyValues())
+				if errors.Is(err, CriticalError) {
+					return err
+				}
+				return utils.Errorf("get native call failed: %v", err)
+			}
+			return nil
+		}); trackErr != nil {
+			return true, trackErr
 		}
 		s.debugSubLog("<< push: %v", ValuesLen(ret))
 		s.stack.Push(ret)

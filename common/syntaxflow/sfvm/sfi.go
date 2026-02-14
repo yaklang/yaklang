@@ -6,10 +6,9 @@ import (
 	"strconv"
 
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-
-	"github.com/yaklang/yaklang/common/log"
 )
 
 type OpCodes struct {
@@ -241,6 +240,13 @@ var Opcode2String = map[SFVMOpCode]string{
 	OpCheckEmpty:            "OpCheckEmpty",
 	OpPopDuplicate:          "OpPopDuplicate",
 	OpEmptyCompare:          "OpEmptyCompare",
+}
+
+func (op SFVMOpCode) String() string {
+	if opcodeName, ok := Opcode2String[op]; ok && opcodeName != "" {
+		return opcodeName
+	}
+	return fmt.Sprintf("opcode-%d", op)
 }
 
 type SFI struct {
