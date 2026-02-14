@@ -36,11 +36,12 @@ type AiTask struct {
 	*Coordinator
 
 	*aicommon.AIStatefulTaskBase
-	Index      string    `json:"index"`
-	Name       string    `json:"name"`
-	Goal       string    `json:"goal"`
-	ParentTask *AiTask   `json:"parent_task"`
-	Subtasks   []*AiTask `json:"subtasks"`
+	Index              string    `json:"index"`
+	Name               string    `json:"name"`
+	Goal               string    `json:"goal"`
+	SemanticIdentifier string    `json:"semantic_identifier"` // short identifier for directory naming, generated from Name or AI
+	ParentTask         *AiTask   `json:"parent_task"`
+	Subtasks           []*AiTask `json:"subtasks"`
 
 	StatusSummary string `json:"status_summary"`
 	TaskSummary   string `json:"task_summary"`
@@ -50,6 +51,28 @@ type AiTask struct {
 	toolCallResultIds  *omap.OrderedMap[int64, *aitool.ToolResult]
 	taskTimelineDiffer *aicommon.TimelineDiffer // Timeline differ for tracking task execution timeline changes
 	taskStartTime      time.Time                // Task execution start time for duration calculation
+}
+
+// GetSemanticIdentifier returns the semantic identifier for directory naming.
+// Priority: SemanticIdentifier field > base semanticLabel > Name
+func (t *AiTask) GetSemanticIdentifier() string {
+	if t.SemanticIdentifier != "" {
+		return t.SemanticIdentifier
+	}
+	if t.AIStatefulTaskBase != nil {
+		if label := t.AIStatefulTaskBase.GetSemanticLabel(); label != "" {
+			return label
+		}
+	}
+	return t.Name
+}
+
+// SetSemanticIdentifier sets the semantic identifier for directory naming.
+func (t *AiTask) SetSemanticIdentifier(id string) {
+	t.SemanticIdentifier = id
+	if t.AIStatefulTaskBase != nil {
+		t.AIStatefulTaskBase.SetSemanticLabel(id)
+	}
 }
 
 func (t *AiTask) GetUserInput() string {

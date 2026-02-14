@@ -388,7 +388,7 @@ func (t *AiTask) saveTaskArtifacts(summary, nextMovements, statusSummary, taskSu
 	if taskIndex == "" {
 		taskIndex = "0"
 	}
-	taskDir := filepath.Join(workdir, aicommon.BuildTaskDirName(taskIndex, t.Name))
+	taskDir := filepath.Join(workdir, aicommon.BuildTaskDirName(taskIndex, t.GetSemanticIdentifier()))
 
 	// Ensure task directory exists
 	if err := os.MkdirAll(taskDir, 0755); err != nil {

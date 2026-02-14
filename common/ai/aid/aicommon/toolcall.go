@@ -390,10 +390,10 @@ func sanitizeIdentifier(identifier string) string {
 	return result
 }
 
-// sanitizeTaskName sanitizes a task name for use in directory names.
+// SanitizeTaskName sanitizes a task name for use in directory names.
 // Unlike sanitizeIdentifier, this function preserves Unicode characters (including CJK)
 // to keep task names human-readable across different languages.
-func sanitizeTaskName(name string) string {
+func SanitizeTaskName(name string) string {
 	if name == "" {
 		return ""
 	}
@@ -677,7 +677,7 @@ func (t *ToolCaller) saveToolCallFiles(
 	taskName := ""
 	if t.task != nil {
 		taskIndex = t.task.GetIndex()
-		taskName = t.task.GetName()
+		taskName = t.task.GetSemanticIdentifier()
 	}
 	if taskIndex == "" {
 		taskIndex = "0"
@@ -906,7 +906,7 @@ func BuildTaskDirName(index, name string) string {
 	if name == "" {
 		return fmt.Sprintf("task_%s", index)
 	}
-	sanitized := sanitizeTaskName(name)
+	sanitized := SanitizeTaskName(name)
 	if sanitized == "" {
 		return fmt.Sprintf("task_%s", index)
 	}

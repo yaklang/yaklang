@@ -262,6 +262,66 @@ func TestBuildTaskDirName(t *testing.T) {
 	}
 }
 
+// TestAiTask_SemanticIdentifier tests the SemanticIdentifier field and GetSemanticIdentifier method
+func TestAiTask_SemanticIdentifier(t *testing.T) {
+	t.Run("ExplicitSemanticIdentifier", func(t *testing.T) {
+		task := &aid.AiTask{
+			Index:              "1-1",
+			Name:               "使用Nmap扫描目标主机的所有端口并检测服务版本",
+			SemanticIdentifier: "nmap端口扫描",
+		}
+		require.Equal(t, "nmap端口扫描", task.GetSemanticIdentifier())
+		// BuildTaskDirName should use the semantic identifier
+		result := aicommon.BuildTaskDirName(task.Index, task.GetSemanticIdentifier())
+		require.Equal(t, "task_1-1_nmap端口扫描", result)
+	})
+
+	t.Run("FallbackToNameWhenNoIdentifier", func(t *testing.T) {
+		task := &aid.AiTask{
+			Index: "1-2",
+			Name:  "扫描端口",
+		}
+		// No SemanticIdentifier set, should fall back to Name
+		require.Equal(t, "扫描端口", task.GetSemanticIdentifier())
+		result := aicommon.BuildTaskDirName(task.Index, task.GetSemanticIdentifier())
+		require.Equal(t, "task_1-2_扫描端口", result)
+	})
+
+	t.Run("FallbackToBaseSemanticLabel", func(t *testing.T) {
+		taskBase := aicommon.NewStatefulTaskBase("test", "test input", nil, nil, false)
+		taskBase.SetSemanticLabel("base_label")
+		task := &aid.AiTask{
+			AIStatefulTaskBase: taskBase,
+			Index:              "1-3",
+			Name:               "Some Long Task Name",
+		}
+		// SemanticIdentifier is empty, should fall back to base semanticLabel
+		require.Equal(t, "base_label", task.GetSemanticIdentifier())
+	})
+
+	t.Run("SetSemanticIdentifierSyncsBoth", func(t *testing.T) {
+		taskBase := aicommon.NewStatefulTaskBase("test", "test input", nil, nil, false)
+		task := &aid.AiTask{
+			AIStatefulTaskBase: taskBase,
+			Index:              "1-4",
+			Name:               "Test Task",
+		}
+		task.SetSemanticIdentifier("custom_id")
+		require.Equal(t, "custom_id", task.SemanticIdentifier)
+		require.Equal(t, "custom_id", taskBase.GetSemanticLabel())
+		require.Equal(t, "custom_id", task.GetSemanticIdentifier())
+	})
+
+	t.Run("SanitizeTaskName_Exported", func(t *testing.T) {
+		// Verify the exported SanitizeTaskName works the same as before
+		require.Equal(t, "扫描目标端口", aicommon.SanitizeTaskName("扫描目标端口"))
+		require.Equal(t, "detect_os_type", aicommon.SanitizeTaskName("Detect OS Type"))
+		require.Equal(t, "web渗透扫描", aicommon.SanitizeTaskName("web渗透扫描"))
+		require.Equal(t, "", aicommon.SanitizeTaskName(""))
+		require.Equal(t, "specialchars", aicommon.SanitizeTaskName("special!@#chars"))
+	})
+}
+
 // TestTaskArtifacts_TimelineDifferIntegration tests the timeline differ integration with task
 func TestTaskArtifacts_TimelineDifferIntegration(t *testing.T) {
 	// Create a timeline
