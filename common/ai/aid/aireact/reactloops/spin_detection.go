@@ -153,7 +153,7 @@ func (r *ReActLoop) IsInSameLogicSpinWithAI() (*SpinDetectionResult, error) {
 		),
 	}
 
-	action, err := r.invoker.InvokeLiteForge(ctx, "spin_detection", prompt, outputSchema)
+	action, err := r.invoker.InvokeLiteForgeSpeedPriority(ctx, "spin_detection", prompt, outputSchema)
 	if err != nil {
 		return nil, utils.Wrap(err, "invoke liteforge for spin detection failed")
 	}

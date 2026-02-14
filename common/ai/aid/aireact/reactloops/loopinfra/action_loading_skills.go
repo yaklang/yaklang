@@ -184,7 +184,7 @@ var loopAction_LoadingSkills = &reactloops.LoopAction{
 				)
 
 				ctx := op.GetContext()
-				decision, liteForgeErr := invoker.InvokeLiteForge(ctx, "skill-conflict-resolver",
+				decision, liteForgeErr := invoker.InvokeLiteForgeSpeedPriority(ctx, "skill-conflict-resolver",
 					conflictPrompt, []aitool.ToolOption{
 						aitool.WithStringParam("action",
 							aitool.WithParam_Description("One of: proceed_with_loaded, skip, use_alternative"),

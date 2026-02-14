@@ -133,7 +133,7 @@ func BuildIndexQuestions(rawInput []string, aiService aicommon.AICallbackType) (
 		aicommon.WithLiteForgeOutputSchema(indexBuildSchema),
 	}
 
-	result, err := aicommon.InvokeLiteForge(query, forgeOpts...)
+	result, err := aicommon.InvokeLiteForgeSpeedPriority(query, forgeOpts...)
 	if err != nil {
 		return nil, err
 	}
