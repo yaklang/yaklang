@@ -161,6 +161,75 @@ func GetIrCodeById(db *gorm.DB, progName string, id int64) *IrCode {
 	return result.(*IrCode)
 }
 
+// GetIrCodeByIdFast loads ir code without neighbor prefetch, useful for hot paths that only need extra info.
+func GetIrCodeByIdFast(db *gorm.DB, progName string, id int64) *IrCode {
+	if id == -1 {
+		return nil
+	}
+
+	cache := GetIrCodeCache(progName)
+	if ir, ok := cache.Get(id); ok {
+		return ir
+	}
+
+	key := dbKey(progName, id)
+	result, _, _ := irCodeSingleFlight.Do(key, func() (interface{}, error) {
+		if ir, ok := cache.Get(id); ok {
+			return ir, nil
+		}
+		ret := GetIrCodeItemById(db, progName, id)
+		if ret == nil {
+			return nil, nil
+		}
+		cache.Set(id, ret)
+		return ret, nil
+	})
+	if result == nil {
+		return nil
+	}
+	return result.(*IrCode)
+}
+
+// PreloadIrCodesByIdsFast loads ir codes by ids without neighbor prefetch.
+// It only fills the cache and returns nothing.
+func PreloadIrCodesByIdsFast(db *gorm.DB, progName string, ids []int64) {
+	if len(ids) == 0 {
+		return
+	}
+	cache := GetIrCodeCache(progName)
+	if cache == nil {
+		return
+	}
+	missing := make([]int64, 0, len(ids))
+	seen := make(map[int64]struct{}, len(ids))
+	for _, id := range ids {
+		if id <= 0 {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		if _, ok := cache.Get(id); ok {
+			continue
+		}
+		missing = append(missing, id)
+	}
+	if len(missing) == 0 {
+		return
+	}
+	var irs []*IrCode
+	if err := db.Model(&IrCode{}).
+		Where("program_name = ?", progName).
+		Where("code_id in (?)", missing).
+		Find(&irs).Error; err != nil {
+		return
+	}
+	for _, ir := range irs {
+		cache.Set(ir.CodeID, ir)
+	}
+}
+
 func GetIrTypeById(db *gorm.DB, progName string, id int64) *IrType {
 	if id < 0 {
 		return nil

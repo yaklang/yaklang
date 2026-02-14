@@ -129,9 +129,13 @@ func (c *ProgramCache) initIndex(databaseKind ProgramCacheKind, saveSize int) {
 			func(iii []simpleCacheItem[*ssadb.IrIndex]) {
 				saveStep := func() error {
 					return utils.GormTransaction(c.DB, func(tx *gorm.DB) error {
+						var indices []*ssadb.IrIndex
 						for _, item := range iii {
-							ssadb.SaveIrIndex(tx, item.Value)
+							if item.Value != nil {
+								indices = append(indices, item.Value)
+							}
 						}
+						ssadb.SaveIrIndexBatch(tx, indices)
 						return nil
 					})
 				}
@@ -147,7 +151,7 @@ func (c *ProgramCache) initIndex(databaseKind ProgramCacheKind, saveSize int) {
 		c.VariableIndex.SetSaver(
 			func(items []simpleCacheItem[Instruction]) {
 				for _, item := range items {
-					ret := SaveVariableIndexByName(item.Name, item.Value)
+					ret := CreateVariableIndexByName(item.Name, item.Value)
 					c.indexCache.Add("", ret)
 
 					// save to offset
@@ -169,7 +173,7 @@ func (c *ProgramCache) initIndex(databaseKind ProgramCacheKind, saveSize int) {
 		c.MemberIndex.SetSaver(
 			func(items []simpleCacheItem[Instruction]) {
 				for _, item := range items {
-					item := SaveVariableIndexByMember(item.Name, item.Value)
+					item := CreateVariableIndexByMember(item.Name, item.Value)
 					c.indexCache.Add("", item)
 				}
 			},
@@ -182,7 +186,7 @@ func (c *ProgramCache) initIndex(databaseKind ProgramCacheKind, saveSize int) {
 		c.ClassIndex.SetSaver(
 			func(items []simpleCacheItem[Instruction]) {
 				for _, item := range items {
-					item := SaveClassIndex(item.Name, item.Value)
+					item := CreateClassIndex(item.Name, item.Value)
 					c.indexCache.Add("", item)
 				}
 			},

@@ -226,6 +226,19 @@ func (lz *LazyInstruction) GetOpcode() Opcode {
 	return Opcode(lz.ir.Opcode)
 }
 
+// GetReturnResultIDs returns return result IDs without materializing the instruction.
+// It is only valid for SSAOpcodeReturn.
+func (lz *LazyInstruction) GetReturnResultIDs() []int64 {
+	if lz == nil || lz.ir == nil {
+		return nil
+	}
+	if Opcode(lz.ir.Opcode) != SSAOpcodeReturn {
+		return nil
+	}
+	params := lz.ir.GetExtraInfo()
+	return utils.MapGetInt64Slice(params, "return_results")
+}
+
 func (lz *LazyInstruction) RefreshString() {
 	lz.check()
 	if utils.IsNil(lz.Instruction) {
@@ -340,6 +353,14 @@ func (lz *LazyInstruction) SetFunc(f *Function) {
 	lz.Instruction.SetFunc(f)
 }
 
+func (lz *LazyInstruction) SetFuncId(id int64) {
+	lz.check()
+	if utils.IsNil(lz.Instruction) {
+		return
+	}
+	lz.Instruction.SetFuncId(id)
+}
+
 func (lz *LazyInstruction) GetBlock() *BasicBlock {
 	lz.check()
 	if utils.IsNil(lz.Instruction) {
@@ -354,6 +375,14 @@ func (lz *LazyInstruction) SetBlock(b *BasicBlock) {
 		return
 	}
 	lz.Instruction.SetBlock(b)
+}
+
+func (lz *LazyInstruction) SetBlockId(id int64) {
+	lz.check()
+	if utils.IsNil(lz.Instruction) {
+		return
+	}
+	lz.Instruction.SetBlockId(id)
 }
 
 func (lz *LazyInstruction) GetProgram() *Program {
@@ -678,7 +707,6 @@ func (lz *LazyInstruction) GetStringMember(n string) (Value, bool) {
 func (lz *LazyInstruction) GetType() Type {
 	lz.check()
 	if utils.IsNil(lz.Value) {
-		log.Errorf("[BUG]: lazyInstruction value is nil,get type fail: %d", lz.id)
 		return nil
 	}
 	return lz.Value.GetType()
