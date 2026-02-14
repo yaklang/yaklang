@@ -427,14 +427,6 @@ func (r *testRuntime) InvokeLiteForge(ctx context.Context, actionName string, pr
 	return nil, nil
 }
 
-func (r *testRuntime) InvokeLiteForgeSpeedPriority(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
-	return nil, nil
-}
-
-func (r *testRuntime) InvokeLiteForgeQualityPriority(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
-	return nil, nil
-}
-
 func (r *testRuntime) EmitFileArtifactWithExt(name, ext string, data any) string {
 	return ""
 }

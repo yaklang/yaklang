@@ -341,7 +341,7 @@ func Query(db *gorm.DB, query string, opts ...QueryOption) (chan *SearchKnowledg
 			}
 
 			//answer, err := Simpleliteforge.SimpleExecute(config.Ctx, prompt, []aitool.ToolOption{aitool.WithStringParam("answer")})
-			answer, err := aicommon.InvokeLiteForgeSpeedPriority(prompt, aiCommonOptions...)
+			answer, err := aicommon.InvokeLiteForge(prompt, aiCommonOptions...)
 			if err != nil {
 				knowledgeBaseMsgCallback(&SearchKnowledgebaseResult{
 					Message: err.Error(),

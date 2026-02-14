@@ -161,14 +161,6 @@ func (m *MockInvoker) ExecuteLoopTaskIF(taskTypeName string, task aicommon.AISta
 	return false, nil
 }
 
-func (m *MockInvoker) InvokeLiteForgeSpeedPriority(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
-	return m.InvokeLiteForge(ctx, actionName, prompt, outputs, opts...)
-}
-
-func (m *MockInvoker) InvokeLiteForgeQualityPriority(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
-	return m.InvokeLiteForge(ctx, actionName, prompt, outputs, opts...)
-}
-
 func (m *MockInvoker) InvokeLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
 	log.Infof("mock InvokeLiteForge called with action: %s", actionName)
 

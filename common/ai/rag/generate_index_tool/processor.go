@@ -46,7 +46,7 @@ func (p *DefaultAIContentProcessor) ProcessContent(ctx context.Context, rawConte
 	inputPrompt := fmt.Sprintf("%s\n\n内容: %s", p.prompt, rawContent)
 
 	// 使用 aicommon.InvokeLiteForge 执行，参考 enhancesearch/enhance.go 的用法
-	result, err := aicommon.InvokeLiteForgeSpeedPriority(
+	result, err := aicommon.InvokeLiteForge(
 		inputPrompt,
 		aicommon.WithContext(ctx),
 		aicommon.WithLiteForgeOutputSchemaFromAIToolOptions(

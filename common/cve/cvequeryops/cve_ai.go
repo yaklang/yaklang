@@ -272,7 +272,7 @@ func invokeCVETranslationLiteForge(ctx context.Context, prompt string, opts ...a
 	liteforgeOpts = append(liteforgeOpts, opts...)
 
 	// Execute LiteForge
-	result, err := aicommon.InvokeLiteForgeSpeedPriority(prompt, liteforgeOpts...)
+	result, err := aicommon.InvokeLiteForge(prompt, liteforgeOpts...)
 	if err != nil {
 		return nil, utils.Errorf("invoke liteforge failed: %v", err)
 	}
