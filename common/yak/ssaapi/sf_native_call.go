@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/java/template2java"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 
 	_ "github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
@@ -1086,27 +1088,78 @@ func init() {
 	registerNativeCall(
 		NativeCall_GetReturns,
 		nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, actualParams *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+			var ruleName string
+			if frame != nil && frame.GetRule() != nil {
+				ruleName = frame.GetRule().RuleName
+			}
+			name := "sf.nativecall.getReturns"
+			if ruleName != "" {
+				name += ":" + ruleName
+			}
 			var vals []sfvm.ValueOperator
-			v.Recursive(func(operator sfvm.ValueOperator) error {
-				val, ok := operator.(*Value)
-				if !ok {
-					return nil
-				}
-				originIns := val.getValue()
-				funcIns, ok := ssa.ToFunction(originIns)
-				if !ok {
-					return nil
-				}
-				for _, ret := range funcIns.Return {
-					ret, ok := funcIns.GetValueById(ret)
-					if !ok || ret == nil {
-						continue
-					}
-					retVal, ok := ssa.ToReturn(ret)
+			if err := diagnostics.TrackLow(name, func() error {
+				v.Recursive(func(operator sfvm.ValueOperator) error {
+					val, ok := operator.(*Value)
 					if !ok {
-						continue
+						return nil
 					}
-					for _, retIns := range retVal.Results {
+					originIns := val.getValue()
+					funcIns, ok := ssa.ToFunction(originIns)
+					if !ok {
+						return nil
+					}
+					funcID := funcIns.GetId()
+					var returnIDs []int64
+					if val.ParentProgram != nil && val.ParentProgram.funcReturnsCache != nil {
+						if cached, ok := val.ParentProgram.funcReturnsCache.Get(funcID); ok {
+							returnIDs = cached
+						}
+					}
+					useFastIR := funcIns.GetProgram() != nil && funcIns.GetProgram().DatabaseKind != ssa.ProgramCacheMemory
+					if returnIDs == nil {
+						buildName := "sf.nativecall.getReturns.buildIDs"
+						if ruleName != "" {
+							buildName += ":" + ruleName
+						}
+						_ = diagnostics.TrackLow(buildName, func() error {
+							returnIDs = make([]int64, 0)
+							for _, ret := range funcIns.Return {
+								if useFastIR {
+									if ir := ssadb.GetIrCodeByIdFast(ssadb.GetDB(), funcIns.GetProgramName(), ret); ir != nil {
+										ids := utils.MapGetInt64Slice(ir.GetExtraInfo(), "return_results")
+										if len(ids) > 0 {
+											returnIDs = append(returnIDs, ids...)
+											continue
+										}
+									}
+								}
+								ret, ok := funcIns.GetValueById(ret)
+								if !ok || ret == nil {
+									continue
+								}
+								if lz, ok := ssa.ToLazyInstruction(ret); ok {
+									if ids := lz.GetReturnResultIDs(); len(ids) > 0 {
+										returnIDs = append(returnIDs, ids...)
+										continue
+									}
+								}
+								retVal, ok := ssa.ToReturn(ret)
+								if ok {
+									for _, retIns := range retVal.Results {
+										returnIDs = append(returnIDs, retIns)
+									}
+								}
+							}
+							return nil
+						})
+						if val.ParentProgram != nil && val.ParentProgram.funcReturnsCache != nil {
+							val.ParentProgram.funcReturnsCache.Set(funcID, returnIDs)
+						}
+					}
+					if useFastIR && funcIns.GetProgram() != nil && funcIns.GetProgram().Cache != nil && len(returnIDs) > 0 {
+						funcIns.GetProgram().Cache.PreloadInstructionsByIDsFast(returnIDs)
+					}
+					for _, retIns := range returnIDs {
 						retIns, ok := funcIns.GetValueById(retIns)
 						if !ok || retIns == nil {
 							continue
@@ -1117,9 +1170,12 @@ func init() {
 							vals = append(vals, new)
 						}
 					}
-				}
+					return nil
+				})
 				return nil
-			})
+			}); err != nil {
+				return false, nil, err
+			}
 			if len(vals) > 0 {
 				return true, sfvm.NewValues(vals), nil
 			}
@@ -1328,7 +1384,7 @@ func init() {
 							if val.ParentProgram == nil {
 								return utils.Error("ParentProgram is nil")
 							}
-							ok, next, _ := val.ParentProgram.ExactMatch(frame.GetContext(), sfvm.BothMatch, funcName)
+							ok, next, _ := val.ParentProgram.ExactMatch(frame.GetContext(), ssadb.BothMatch, funcName)
 							if ok {
 								vals = append(vals, next)
 							}
@@ -1344,7 +1400,7 @@ func init() {
 							if val.ParentProgram == nil {
 								return utils.Error("ParentProgram is nil")
 							}
-							ok, next, _ := val.ParentProgram.ExactMatch(frame.GetContext(), sfvm.BothMatch, funcName)
+							ok, next, _ := val.ParentProgram.ExactMatch(frame.GetContext(), ssadb.BothMatch, funcName)
 							if ok {
 								next.AppendPredecessor(val, frame.WithPredecessorContext("searchCall: "+funcName))
 								vals = append(vals, next)
@@ -1367,7 +1423,7 @@ func init() {
 						if prog == nil {
 							return utils.Error("ParentProgram is nil")
 						}
-						haveNext, next, _ := prog.ExactMatch(frame.GetContext(), sfvm.BothMatch, methodName)
+						haveNext, next, _ := prog.ExactMatch(frame.GetContext(), ssadb.BothMatch, methodName)
 						if haveNext && next != nil {
 							next.Recursive(func(operator sfvm.ValueOperator) error {
 								callee, ok := operator.(*Value)
@@ -1384,7 +1440,7 @@ func init() {
 						if str, err := strconv.Unquote(funcName); err == nil {
 							funcName = str
 						}
-						ok, next, _ := val.ParentProgram.ExactMatch(frame.GetContext(), sfvm.BothMatch, funcName)
+						ok, next, _ := val.ParentProgram.ExactMatch(frame.GetContext(), ssadb.BothMatch, funcName)
 						if ok {
 							next.AppendPredecessor(val, frame.WithPredecessorContext("searchCall: "+funcName))
 							vals = append(vals, next)

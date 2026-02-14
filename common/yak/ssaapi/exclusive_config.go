@@ -18,6 +18,7 @@ type OperationConfig struct {
 	lastValue *Value
 
 	programOverLay *ProgramOverLay // for program overlay analysis
+	RuleName       string
 }
 
 type OperationOption func(*OperationConfig)
@@ -49,6 +50,12 @@ func WithMinDepth(minDepth int) OperationOption {
 func WithAllowCallStack(allowCallStack bool) OperationOption {
 	return func(operationConfig *OperationConfig) {
 		operationConfig.AllowIgnoreCallStack = allowCallStack
+	}
+}
+
+func WithRuleName(ruleName string) OperationOption {
+	return func(operationConfig *OperationConfig) {
+		operationConfig.RuleName = ruleName
 	}
 }
 

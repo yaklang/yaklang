@@ -15,7 +15,7 @@ type userNodeItems struct {
 	values ssa.Values
 }
 
-func SearchWithCFG(value *Value, mod int, compare func(string) bool, opt ...sfvm.AnalysisContextOption) Values {
+func SearchWithCFG(value *Value, mod ssadb.MatchMode, compare func(string) bool, opt ...sfvm.AnalysisContextOption) Values {
 	var newValue Values
 	inst := value.getUser()
 	if utils.IsNil(inst) {
@@ -73,7 +73,7 @@ func SearchWithCFG(value *Value, mod int, compare func(string) bool, opt ...sfvm
 
 }
 
-func SearchWithValue(value *Value, mod int, compare func(string) bool, opt ...sfvm.AnalysisContextOption) Values {
+func SearchWithValue(value *Value, mod ssadb.MatchMode, compare func(string) bool, opt ...sfvm.AnalysisContextOption) Values {
 	var newValue Values
 
 	inst := value.getValue()

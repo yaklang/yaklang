@@ -1116,8 +1116,8 @@ func (p *ProgramOverLay) Recursive(f func(sfvm.ValueOperator) error) error {
 // queryMatch 通用的查询匹配方法，应用上层优先策略
 func (p *ProgramOverLay) queryMatch(
 	ctx context.Context,
-	mod int,
-	queryFunc func(*Program, context.Context, int, string, []string) (bool, sfvm.ValueOperator, error),
+	mod ssadb.MatchMode,
+	queryFunc func(*Program, context.Context, ssadb.MatchMode, string, []string) (bool, sfvm.ValueOperator, error),
 	query string,
 ) (bool, sfvm.ValueOperator, error) {
 	if p == nil {
@@ -1187,20 +1187,20 @@ func (p *ProgramOverLay) queryMatch(
 	return len(results) > 0, ValuesToSFValueList(results), nil
 }
 
-func (p *ProgramOverLay) ExactMatch(ctx context.Context, mod int, want string) (bool, sfvm.ValueOperator, error) {
-	return p.queryMatch(ctx, mod, func(prog *Program, ctx context.Context, mod int, query string, excludeFiles []string) (bool, sfvm.ValueOperator, error) {
+func (p *ProgramOverLay) ExactMatch(ctx context.Context, mod ssadb.MatchMode, want string) (bool, sfvm.ValueOperator, error) {
+	return p.queryMatch(ctx, mod, func(prog *Program, ctx context.Context, mod ssadb.MatchMode, query string, excludeFiles []string) (bool, sfvm.ValueOperator, error) {
 		return prog.matchVariableWithExcludeFiles(ctx, ssadb.ExactCompare, mod, query, excludeFiles)
 	}, want)
 }
 
-func (p *ProgramOverLay) GlobMatch(ctx context.Context, mod int, g string) (bool, sfvm.ValueOperator, error) {
-	return p.queryMatch(ctx, mod, func(prog *Program, ctx context.Context, mod int, query string, excludeFiles []string) (bool, sfvm.ValueOperator, error) {
+func (p *ProgramOverLay) GlobMatch(ctx context.Context, mod ssadb.MatchMode, g string) (bool, sfvm.ValueOperator, error) {
+	return p.queryMatch(ctx, mod, func(prog *Program, ctx context.Context, mod ssadb.MatchMode, query string, excludeFiles []string) (bool, sfvm.ValueOperator, error) {
 		return prog.matchVariableWithExcludeFiles(ctx, ssadb.GlobCompare, mod, query, excludeFiles)
 	}, g)
 }
 
-func (p *ProgramOverLay) RegexpMatch(ctx context.Context, mod int, re string) (bool, sfvm.ValueOperator, error) {
-	return p.queryMatch(ctx, mod, func(prog *Program, ctx context.Context, mod int, query string, excludeFiles []string) (bool, sfvm.ValueOperator, error) {
+func (p *ProgramOverLay) RegexpMatch(ctx context.Context, mod ssadb.MatchMode, re string) (bool, sfvm.ValueOperator, error) {
+	return p.queryMatch(ctx, mod, func(prog *Program, ctx context.Context, mod ssadb.MatchMode, query string, excludeFiles []string) (bool, sfvm.ValueOperator, error) {
 		return prog.matchVariableWithExcludeFiles(ctx, ssadb.RegexpCompare, mod, query, excludeFiles)
 	}, re)
 }

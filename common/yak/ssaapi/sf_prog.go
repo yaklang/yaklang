@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"sort"
+	"time"
 
 	"github.com/yaklang/yaklang/common/jsonpath"
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -32,6 +35,43 @@ func (p *Program) NewConst(i any, rng ...*memedit.Range) sfvm.ValueOperator {
 func (p *Program) CompareOpcode(opcodeItems *sfvm.OpcodeComparator) (sfvm.ValueOperator, []bool) {
 	var boolRes []bool
 	ctx := opcodeItems.Context
+
+	if p != nil && p.opcode2ValuesCache != nil && len(opcodeItems.Opcodes) > 0 {
+		var (
+			cached   Values
+			cacheErr error
+			cacheHit bool
+		)
+		sorted := append([]ssa.Opcode(nil), opcodeItems.Opcodes...)
+		sort.Slice(sorted, func(i, j int) bool { return sorted[i] < sorted[j] })
+		cacheKey := utils.CalcSha256(sorted)
+		_ = diagnostics.TrackLow("sf.CompareOpcode.cache", func() error {
+			cached, cacheErr = p.opcode2ValuesCache.GetOrLoad(cacheKey, func() (Values, error) {
+				var values Values
+				for _, inst := range ssa.MatchInstructionByOpcodes(ctx, p.Program, sorted...) {
+					v, err := p.NewValue(inst)
+					if err != nil {
+						log.Errorf("CompareOpcode: new value failed: %v", err)
+						continue
+					}
+					values = append(values, v)
+				}
+				return values, nil
+			})
+			if cacheErr == nil {
+				cacheHit = true
+			}
+			return cacheErr
+		})
+		if cacheHit {
+			boolRes = make([]bool, len(cached))
+			for i := range boolRes {
+				boolRes[i] = true
+			}
+			return ValuesToSFValueList(cached), boolRes
+		}
+	}
+
 	var res Values = lo.FilterMap(
 		ssa.MatchInstructionByOpcodes(ctx, p.Program, opcodeItems.Opcodes...),
 		func(i ssa.Instruction, _ int) (*Value, bool) {
@@ -147,36 +187,40 @@ func (p *Program) Recursive(f func(operator sfvm.ValueOperator) error) error {
 	return f(p)
 }
 
-func (p *Program) ExactMatch(ctx context.Context, mod int, s string) (bool, sfvm.ValueOperator, error) {
+func (p *Program) ExactMatch(ctx context.Context, mod ssadb.MatchMode, s string) (bool, sfvm.ValueOperator, error) {
 	return p.matchVariable(ctx, ssadb.ExactCompare, mod, s)
 }
 
-func (p *Program) GlobMatch(ctx context.Context, mod int, g string) (bool, sfvm.ValueOperator, error) {
+func (p *Program) GlobMatch(ctx context.Context, mod ssadb.MatchMode, g string) (bool, sfvm.ValueOperator, error) {
 	return p.matchVariable(ctx, ssadb.GlobCompare, mod, g)
 }
 
-func (p *Program) RegexpMatch(ctx context.Context, mod int, re string) (bool, sfvm.ValueOperator, error) {
+func (p *Program) RegexpMatch(ctx context.Context, mod ssadb.MatchMode, re string) (bool, sfvm.ValueOperator, error) {
 	return p.matchVariable(ctx, ssadb.RegexpCompare, mod, re)
 }
 
-func (p *Program) matchVariable(ctx context.Context, compareMode, mod int, pattern string) (bool, sfvm.ValueOperator, error) {
+func (p *Program) matchVariable(ctx context.Context, compareMode ssadb.CompareMode, mod ssadb.MatchMode, pattern string) (bool, sfvm.ValueOperator, error) {
 	return p.matchVariableWithExcludeFiles(ctx, compareMode, mod, pattern, nil)
 }
 
 // matchVariableWithExcludeFiles 搜索变量，支持排除指定文件
 // excludeFiles: 要排除的文件路径列表（规范化后的路径，如 "/test.go"）
-func (p *Program) matchVariableWithExcludeFiles(ctx context.Context, compareMode, mod int, pattern string, excludeFiles []string) (bool, sfvm.ValueOperator, error) {
-	var values Values = lo.FilterMap(
-		ssa.MatchInstructionsByVariableWithExcludeFiles(ctx, p.Program, compareMode, mod, pattern, excludeFiles),
-		func(i ssa.Instruction, _ int) (*Value, bool) {
-			if v, err := p.NewValue(i); err != nil {
-				log.Errorf("matchVariable: new value failed: %v", err)
-				return nil, false
-			} else {
+func (p *Program) matchVariableWithExcludeFiles(ctx context.Context, compareMode ssadb.CompareMode, mod ssadb.MatchMode, pattern string, excludeFiles []string) (bool, sfvm.ValueOperator, error) {
+	var values Values
+	name := fmt.Sprintf("sf.matchVariable:%s", pattern)
+	_ = diagnostics.TrackLow(name, func() error {
+		values = lo.FilterMap(
+			ssa.MatchInstructionsByVariableWithExcludeFiles(ctx, p.Program, compareMode, mod, pattern, excludeFiles),
+			func(i ssa.Instruction, _ int) (*Value, bool) {
+				if v, err := p.NewValue(i); err != nil {
+					log.Errorf("matchVariable: new value failed: %v", err)
+					return nil, false
+				}
 				return v, true
-			}
-		},
-	)
+			},
+		)
+		return nil
+	})
 	// 将 Values 转换为 sfvm.ValueOperator
 	return len(values) > 0, ValuesToSFValueList(values), nil
 }
@@ -409,6 +453,12 @@ func (p *Program) FileFilter(path string, match string, rule map[string]string, 
 	}
 
 	var res []sfvm.ValueOperator
+	var (
+		filesScanned int
+		filesMatched int
+		matchCount   int
+		bytesScanned int
+	)
 	addRes := func(index Index, editor *memedit.MemEditor, offsetMap *memedit.RuneOffsetMap) {
 		// get range of match string
 		if startRune, ok := offsetMap.ByteOffsetToRuneIndex(index.Start); ok {
@@ -423,22 +473,36 @@ func (p *Program) FileFilter(path string, match string, rule map[string]string, 
 	}
 
 	matchFile := false
-	p.ForEachAllFile(func(s string, me *memedit.MemEditor) bool {
-		if me == nil {
-			return true
-		}
-		offsetMap := memedit.NewRuneOffsetMap(me.GetSourceCode())
-		if filter.matchFile(s) {
-			matchFile = true
-			if filter.matchContent != nil {
-				matches := filter.matchContent(me.GetSourceCode())
-				for _, match := range matches {
-					addRes(match, me, offsetMap)
+	_ = diagnostics.TrackLow("sf.filefilter.total", func() error {
+		p.ForEachAllFile(func(s string, me *memedit.MemEditor) bool {
+			if me == nil {
+				return true
+			}
+			var offsetMap *memedit.RuneOffsetMap
+			if filter.matchFile(s) {
+				matchFile = true
+				filesMatched++
+				if filter.matchContent != nil {
+					content := me.GetSourceCode()
+					bytesScanned += len(content)
+					matches := filter.matchContent(content)
+					for _, match := range matches {
+						if offsetMap == nil {
+							offsetMap = memedit.NewRuneOffsetMap(content)
+						}
+						addRes(match, me, offsetMap)
+						matchCount++
+					}
 				}
 			}
-		}
-		return true
+			filesScanned++
+			return true
+		})
+		return nil
 	})
+	if diagnostics.Enabled(diagnostics.LevelLow) {
+		log.Infof("FileFilter[%s]: files=%d matched=%d matches=%d bytes=%d mode=%s", path, filesScanned, filesMatched, matchCount, bytesScanned, match)
+	}
 	if len(res) == 0 {
 		if matchFile {
 			return nil, utils.Errorf("no file contains data matching rule %v %v", rule, rule2)
