@@ -69,14 +69,6 @@ func (m *AdvancedMockInvoker) GetBasicPromptInfo(tools []*aitool.Tool) (string, 
 	}, nil
 }
 
-func (m *AdvancedMockInvoker) InvokeLiteForgeSpeedPriority(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
-	return m.InvokeLiteForge(ctx, actionName, prompt, outputs, opts...)
-}
-
-func (m *AdvancedMockInvoker) InvokeLiteForgeQualityPriority(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
-	return m.InvokeLiteForge(ctx, actionName, prompt, outputs, opts...)
-}
-
 func (m *AdvancedMockInvoker) InvokeLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
 	// 记录调用
 	m.capturedActions = append(m.capturedActions, actionName)

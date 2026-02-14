@@ -2,7 +2,6 @@ package aireact
 
 import (
 	"context"
-
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/aiforge"
@@ -10,7 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func (r *ReAct) invokeLiteForgeWithCallback(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, aiCallback aicommon.AICallbackType, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
+func (r *ReAct) InvokeLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
 	var rawOutputs []any
 	for _, output := range outputs {
 		var rawOpt any = output
@@ -41,33 +40,9 @@ func (r *ReAct) invokeLiteForgeWithCallback(ctx context.Context, actionName stri
 	}
 	forgeResult, err := f.Execute(ctx, []*ypb.ExecParamItem{
 		{Key: "query", Value: prompt},
-	}, aicommon.WithAgreeYOLO(), aicommon.WithAICallback(aiCallback))
+	}, aicommon.WithAgreeYOLO(), aicommon.WithAICallback(r.config.OriginalAICallback))
 	if err != nil {
 		return nil, utils.Wrap(err, "invoke liteforge failed")
 	}
 	return forgeResult.Action, nil
-}
-
-func (r *ReAct) InvokeLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
-	return r.invokeLiteForgeWithCallback(ctx, actionName, prompt, outputs, r.config.OriginalAICallback, opts...)
-}
-
-// InvokeLiteForgeSpeedPriority invokes LiteForge with speed-priority (lightweight) AI model.
-// It prefers SpeedPriorityAICallback, falling back to OriginalAICallback if not available.
-func (r *ReAct) InvokeLiteForgeSpeedPriority(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
-	cb := r.config.SpeedPriorityAICallback
-	if cb == nil {
-		cb = r.config.OriginalAICallback
-	}
-	return r.invokeLiteForgeWithCallback(ctx, actionName, prompt, outputs, cb, opts...)
-}
-
-// InvokeLiteForgeQualityPriority invokes LiteForge with quality-priority (intelligent) AI model.
-// It prefers QualityPriorityAICallback, falling back to OriginalAICallback if not available.
-func (r *ReAct) InvokeLiteForgeQualityPriority(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
-	cb := r.config.QualityPriorityAICallback
-	if cb == nil {
-		cb = r.config.OriginalAICallback
-	}
-	return r.invokeLiteForgeWithCallback(ctx, actionName, prompt, outputs, cb, opts...)
 }

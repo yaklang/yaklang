@@ -53,8 +53,7 @@ if err != nil {
 toUtf8 = (s)=>{
     res,err = codec.GBKSafe(s)
     if err {
-        // GBK conversion failed, fix invalid UTF-8 bytes instead of returning raw
-        return codec.FixUTF8(s)
+        return s
     }
     return res
 }

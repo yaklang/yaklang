@@ -70,12 +70,6 @@ type AIInvokeRuntime interface {
 	RequireAIForgeAndAsyncExecute(ctx context.Context, forgeName string, onFinish func(error))
 	AsyncPlanAndExecute(ctx context.Context, planPayload string, onFinish func(error))
 	InvokeLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...GeneralKVConfigOption) (*Action, error)
-	// InvokeLiteForgeSpeedPriority invokes LiteForge with speed-priority (lightweight) AI model.
-	// It delegates to InvokeLiteForge but uses the speed/lightweight AI callback when tiered AI config is available.
-	InvokeLiteForgeSpeedPriority(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...GeneralKVConfigOption) (*Action, error)
-	// InvokeLiteForgeQualityPriority invokes LiteForge with quality-priority (intelligent) AI model.
-	// It delegates to InvokeLiteForge but uses the quality/intelligent AI callback when tiered AI config is available.
-	InvokeLiteForgeQualityPriority(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...GeneralKVConfigOption) (*Action, error)
 	// SelectKnowledgeBase selects appropriate knowledge bases based on the user query
 	// It uses AI to analyze the query and match it with available knowledge bases
 	SelectKnowledgeBase(ctx context.Context, originQuery string) (*SelectedKnowledgeBaseResult, error)
