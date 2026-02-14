@@ -102,8 +102,34 @@ func (m *MockAIMemoryInvoker) InvokeLiteForge(ctx context.Context, actionName st
 		return action, nil
 	}
 
+	if actionName == "tag-selection" {
+		mockResponseJSON := `{"@action": "tag-selection", "tags": ["用户交互", "工具拒绝", "测试场景"]}`
+		action, err := aicommon.ExtractAction(mockResponseJSON, "tag-selection")
+		if err != nil {
+			return nil, utils.Errorf("failed to extract tag-selection action: %v", err)
+		}
+		return action, nil
+	}
+
+	if actionName == "batch-memory-deduplication" {
+		mockResponseJSON := `{"@action": "batch-memory-deduplication", "non_duplicate_indices": ["1", "2"], "analysis": "no duplicates found in mock"}`
+		action, err := aicommon.ExtractAction(mockResponseJSON, "batch-memory-deduplication")
+		if err != nil {
+			return nil, utils.Errorf("failed to extract batch-memory-deduplication action: %v", err)
+		}
+		return action, nil
+	}
+
 	// Fall back to original implementation
 	return m.ReAct.InvokeLiteForge(ctx, actionName, prompt, outputs)
+}
+
+func (m *MockAIMemoryInvoker) InvokeLiteForgeSpeedPriority(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
+	return m.InvokeLiteForge(ctx, actionName, prompt, outputs, opts...)
+}
+
+func (m *MockAIMemoryInvoker) InvokeLiteForgeQualityPriority(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
+	return m.InvokeLiteForge(ctx, actionName, prompt, outputs, opts...)
 }
 
 func mockedToolCallingWithAIMemory2(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string) (*aicommon.AIResponse, error) {
