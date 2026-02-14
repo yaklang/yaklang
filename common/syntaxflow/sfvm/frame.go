@@ -20,6 +20,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 
@@ -288,6 +289,14 @@ func (s *SFFrame) exec(feedValue ValueOperator) (ret error) {
 }
 
 func (s *SFFrame) execRule(feedValue ValueOperator) error {
+	ruleLabel := "unknown-rule"
+	if s.rule != nil {
+		if s.rule.Title != "" {
+			ruleLabel = s.rule.Title
+		} else if s.rule.RuleName != "" {
+			ruleLabel = s.rule.RuleName
+		}
+	}
 	for {
 		var msg string
 		if s.idx < len(s.Codes) {
@@ -307,93 +316,117 @@ func (s *SFFrame) execRule(feedValue ValueOperator) error {
 
 		i := s.Codes[s.idx]
 		s.idx++
-
-		// special handler this exist opcode, because this shuold pop then debugLog it
-		if i.OpCode == OpExitStatement {
-			checkLen := s.errorSkipStack.Pop().stackDepth
-			s.debugLog("%s\t|stack %d", i.String(), s.stack.Len())
-			if s.stack.Len() != checkLen {
-				err := utils.Errorf("filter statement stack unbalanced: %v vs want(%v)", s.stack.Len(), checkLen)
-				s.debugSubLog("exit statement error:%v", err)
-				if s.config.debug {
-					return err
-				}
-				s.stack.PopN(s.stack.Len() - checkLen)
-			}
-			continue
+		opcodeName := Opcode2String[i.OpCode]
+		if opcodeName == "" {
+			opcodeName = fmt.Sprintf("opcode-%d", i.OpCode)
+		}
+		name := "sfvm.op:" + opcodeName
+		if ruleLabel != "" {
+			name += ":" + ruleLabel
 		}
 
-		s.debugLog("%s\t|stack %d", i.String(), s.stack.Len())
+		type opFlow int
+		const (
+			opContinue opFlow = iota
+			opReturn
+		)
+		flow := opContinue
 
-		switch i.OpCode {
-		case OpCheckStackTop:
-			if s.stack.Len() == 0 {
-				s.debugSubLog(">> stack top is nil (push input)")
-				s.stack.Push(feedValue)
-			}
-		case OpEnterStatement:
-			s.errorSkipStack.Push(&errorSkipContext{
-				start:      s.idx,
-				end:        i.UnaryInt,
-				stackDepth: s.stack.Len(),
-			})
-
-		case OpCreateIter:
-			s.debugSubLog(">> peek")
-			vs := s.stack.Peek()
-			if vs == nil {
-				return utils.Wrapf(CriticalError, "BUG: iterCreate: stack top is empty")
-			}
-			s.IterStart(vs)
-		case OpIterNext:
-			vs, next, err := s.IterNext()
-			if err != nil {
-				return err
-			}
-			if !next {
-				// jump to end
-				end := i.Iter.End
-				s.debugSubLog("no next data, to %v", end)
-				s.idx = end
-				continue
-			}
-			s.debugLog("next value: %v", ValuesLen(vs))
-			s.stack.Push(vs)
-		case OpIterLatch:
-			if s.stack.IsEmpty() {
-				return utils.Wrapf(CriticalError, "BUG: iterLatch: stack top is empty")
-			}
-			if err := s.IterLatch(s.stack.Pop()); err != nil {
-				return err
-			}
-			// jump to next
-			next := i.Iter.Next
-			i.Iter.currentIndex++
-			s.debugSubLog("jump to next code: %v", next)
-			s.idx = next
-			continue
-		case OpIterEnd:
-			i.Iter.currentIndex = 0
-			// end iter, pop and collect results to conditionStack
-			if err := s.IterEnd(); err != nil {
-				return err
-			}
-		default:
-			if err := s.execStatement(i); err != nil {
-				s.debugSubLog("execStatement error: %v", err)
-				if errors.Is(err, AbortError) {
-					return nil
+		err := diagnostics.TrackLow(name, func() error {
+			// special handler this exist opcode, because this shuold pop then debugLog it
+			if i.OpCode == OpExitStatement {
+				checkLen := s.errorSkipStack.Pop().stackDepth
+				s.debugLog("%s\t|stack %d", i.String(), s.stack.Len())
+				if s.stack.Len() != checkLen {
+					err := utils.Errorf("filter statement stack unbalanced: %v vs want(%v)", s.stack.Len(), checkLen)
+					s.debugSubLog("exit statement error:%v", err)
+					if s.config.debug {
+						return err
+					}
+					s.stack.PopN(s.stack.Len() - checkLen)
 				}
-				if errors.Is(err, CriticalError) {
+				return nil
+			}
+
+			s.debugLog("%s\t|stack %d", i.String(), s.stack.Len())
+
+			switch i.OpCode {
+			case OpCheckStackTop:
+				if s.stack.Len() == 0 {
+					s.debugSubLog(">> stack top is nil (push input)")
+					s.stack.Push(feedValue)
+				}
+			case OpEnterStatement:
+				s.errorSkipStack.Push(&errorSkipContext{
+					start:      s.idx,
+					end:        i.UnaryInt,
+					stackDepth: s.stack.Len(),
+				})
+
+			case OpCreateIter:
+				s.debugSubLog(">> peek")
+				vs := s.stack.Peek()
+				if vs == nil {
+					return utils.Wrapf(CriticalError, "BUG: iterCreate: stack top is empty")
+				}
+				s.IterStart(vs)
+			case OpIterNext:
+				vs, next, err := s.IterNext()
+				if err != nil {
 					return err
 				}
-				// go to expression end
-				if result := s.errorSkipStack.Peek(); result != nil {
-					s.idx = result.end
-					continue
+				if !next {
+					// jump to end
+					end := i.Iter.End
+					s.debugSubLog("no next data, to %v", end)
+					s.idx = end
+					return nil
 				}
-				return err
+				s.debugLog("next value: %v", ValuesLen(vs))
+				s.stack.Push(vs)
+			case OpIterLatch:
+				if s.stack.IsEmpty() {
+					return utils.Wrapf(CriticalError, "BUG: iterLatch: stack top is empty")
+				}
+				if err := s.IterLatch(s.stack.Pop()); err != nil {
+					return err
+				}
+				// jump to next
+				next := i.Iter.Next
+				i.Iter.currentIndex++
+				s.debugSubLog("jump to next code: %v", next)
+				s.idx = next
+			case OpIterEnd:
+				i.Iter.currentIndex = 0
+				// end iter, pop and collect results to conditionStack
+				if err := s.IterEnd(); err != nil {
+					return err
+				}
+			default:
+				if err := s.execStatement(i); err != nil {
+					s.debugSubLog("execStatement error: %v", err)
+					if errors.Is(err, AbortError) {
+						flow = opReturn
+						return nil
+					}
+					if errors.Is(err, CriticalError) {
+						return err
+					}
+					// go to expression end
+					if result := s.errorSkipStack.Peek(); result != nil {
+						s.idx = result.end
+						return nil
+					}
+					return err
+				}
 			}
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+		if flow == opReturn {
+			return nil
 		}
 	}
 	return nil

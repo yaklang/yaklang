@@ -4,9 +4,9 @@ import (
 	"context"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/utils/memedit"
-
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/memedit"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
 type RecursiveConfigKey string
@@ -84,21 +84,16 @@ func WithAnalysisContext_Label(label string) AnalysisContextOption {
 	}
 }
 
-// type MatchMode int
-const (
-	NameMatch int = 1
-	KeyMatch      = 1 << 1
-	BothMatch     = NameMatch | KeyMatch
-)
-
-func MatchModeString(mode int) string {
+func MatchModeString(mode ssadb.MatchMode) string {
 	switch mode {
-	case NameMatch:
+	case ssadb.NameMatch:
 		return "name"
-	case KeyMatch:
+	case ssadb.KeyMatch:
 		return "key"
-	case BothMatch:
+	case ssadb.BothMatch:
 		return "name+key"
+	case ssadb.ConstType:
+		return "const"
 	}
 	return "Unknown"
 }
@@ -117,11 +112,11 @@ type ValueOperator interface {
 	Recursive(func(ValueOperator) error) error
 
 	// ExactMatch return ops, for OpPushSearchExact
-	ExactMatch(context.Context, int, string) (bool, ValueOperator, error)
+	ExactMatch(context.Context, ssadb.MatchMode, string) (bool, ValueOperator, error)
 	// GlobMatch return opts, for OpPushSearchGlob
-	GlobMatch(context.Context, int, string) (bool, ValueOperator, error)
+	GlobMatch(context.Context, ssadb.MatchMode, string) (bool, ValueOperator, error)
 	// RegexpMatch for OpPushSearchRegexp
-	RegexpMatch(context.Context, int, string) (bool, ValueOperator, error)
+	RegexpMatch(context.Context, ssadb.MatchMode, string) (bool, ValueOperator, error)
 
 	GetCalled() (ValueOperator, error)
 	GetCallActualParams(int, bool) (ValueOperator, error)
