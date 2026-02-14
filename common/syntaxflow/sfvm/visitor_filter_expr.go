@@ -5,11 +5,11 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/utils/yakunquote"
-
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sf"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
@@ -193,9 +193,9 @@ func (y *SyntaxFlowVisitor) VisitRecursiveNameFilter(recursive bool, isMember bo
 		return err
 	}
 
-	mod := NameMatch
+	mod := ssadb.NameMatch
 	if isMember {
-		mod = KeyMatch
+		mod = ssadb.KeyMatch
 	}
 
 	if s := ret.Star(); s != nil {
@@ -264,9 +264,9 @@ func (y *SyntaxFlowVisitor) VisitNameFilter(isMember bool, i sf.INameFilterConte
 		return err
 	}
 
-	mod := NameMatch
+	mod := ssadb.NameMatch
 	if isMember {
-		mod = KeyMatch
+		mod = ssadb.KeyMatch
 	}
 
 	if s := ret.Star(); s != nil {

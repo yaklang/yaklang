@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
 func (y *SyntaxFlowVisitor) EmitEnterStatement() *SFI {
@@ -264,61 +265,61 @@ func (y *SyntaxFlowVisitor) EmitVersionIn(results ...*RecursiveConfigItem) {
 	})
 }
 
-func (v *SyntaxFlowVisitor) EmitSearchExact(mod int, i string) *SFI {
+func (v *SyntaxFlowVisitor) EmitSearchExact(mod ssadb.MatchMode, i string) *SFI {
 	sfi := &SFI{
 		OpCode:   OpPushSearchExact,
 		UnaryStr: i,
-		UnaryInt: mod,
+		UnaryInt: int(mod),
 	}
 	v.codes = append(v.codes, sfi)
 	return sfi
 }
 
-func (v *SyntaxFlowVisitor) EmitRecursiveSearchExact(mod int, i string) *SFI {
+func (v *SyntaxFlowVisitor) EmitRecursiveSearchExact(mod ssadb.MatchMode, i string) *SFI {
 	sfi := &SFI{
 		OpCode:   OpRecursiveSearchExact,
 		UnaryStr: i,
-		UnaryInt: mod,
+		UnaryInt: int(mod),
 	}
 	v.codes = append(v.codes, sfi)
 	return sfi
 }
 
-func (v *SyntaxFlowVisitor) EmitSearchGlob(mod int, i string) *SFI {
+func (v *SyntaxFlowVisitor) EmitSearchGlob(mod ssadb.MatchMode, i string) *SFI {
 	sfi := &SFI{
 		OpCode:   OpPushSearchGlob,
 		UnaryStr: i,
-		UnaryInt: mod,
+		UnaryInt: int(mod),
 	}
 	v.codes = append(v.codes, sfi)
 	return sfi
 }
 
-func (v *SyntaxFlowVisitor) EmitRecursiveSearchGlob(mod int, i string) *SFI {
+func (v *SyntaxFlowVisitor) EmitRecursiveSearchGlob(mod ssadb.MatchMode, i string) *SFI {
 	sfi := &SFI{
 		OpCode:   OpRecursiveSearchGlob,
 		UnaryStr: i,
-		UnaryInt: mod,
+		UnaryInt: int(mod),
 	}
 	v.codes = append(v.codes, sfi)
 	return sfi
 }
 
-func (v *SyntaxFlowVisitor) EmitSearchRegexp(mod int, i string) *SFI {
+func (v *SyntaxFlowVisitor) EmitSearchRegexp(mod ssadb.MatchMode, i string) *SFI {
 	sfi := &SFI{
 		OpCode:   OpPushSearchRegexp,
 		UnaryStr: i,
-		UnaryInt: mod,
+		UnaryInt: int(mod),
 	}
 	v.codes = append(v.codes, sfi)
 	return sfi
 }
 
-func (v *SyntaxFlowVisitor) EmitRecursiveSearchRegexp(mod int, i string) *SFI {
+func (v *SyntaxFlowVisitor) EmitRecursiveSearchRegexp(mod ssadb.MatchMode, i string) *SFI {
 	sfi := &SFI{
 		OpCode:   OpRecursiveSearchRegexp,
 		UnaryStr: i,
-		UnaryInt: mod,
+		UnaryInt: int(mod),
 	}
 	v.codes = append(v.codes, sfi)
 	return sfi

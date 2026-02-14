@@ -10,6 +10,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
 var _ ValueOperator = (*ValueList)(nil)
@@ -250,7 +251,7 @@ func (v *ValueList) IsList() bool {
 	return true
 }
 
-func (v *ValueList) ExactMatch(ctx context.Context, mod int, s string) (bool, ValueOperator, error) {
+func (v *ValueList) ExactMatch(ctx context.Context, mod ssadb.MatchMode, s string) (bool, ValueOperator, error) {
 	ret, err := v.pipeLineRun(func(vo ValueOperator) (ValueOperator, error) {
 		match, nextValue, err := vo.ExactMatch(ctx, mod, s)
 		_ = match
@@ -259,7 +260,7 @@ func (v *ValueList) ExactMatch(ctx context.Context, mod int, s string) (bool, Va
 	return ValuesLen(ret) > 0, ret, err
 }
 
-func (v *ValueList) GlobMatch(ctx context.Context, mod int, s string) (bool, ValueOperator, error) {
+func (v *ValueList) GlobMatch(ctx context.Context, mod ssadb.MatchMode, s string) (bool, ValueOperator, error) {
 	ret, err := v.pipeLineRun(func(vo ValueOperator) (ValueOperator, error) {
 		match, nextValue, err := vo.GlobMatch(ctx, mod, s)
 		_ = match
@@ -268,7 +269,7 @@ func (v *ValueList) GlobMatch(ctx context.Context, mod int, s string) (bool, Val
 	return ValuesLen(ret) > 0, ret, err
 }
 
-func (v *ValueList) RegexpMatch(ctx context.Context, mod int, regexp string) (bool, ValueOperator, error) {
+func (v *ValueList) RegexpMatch(ctx context.Context, mod ssadb.MatchMode, regexp string) (bool, ValueOperator, error) {
 	ret, err := v.pipeLineRun(func(vo ValueOperator) (ValueOperator, error) {
 		match, nextValue, err := vo.RegexpMatch(ctx, mod, regexp)
 		_ = match
