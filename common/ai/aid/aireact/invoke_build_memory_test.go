@@ -471,6 +471,14 @@ func (m *mockInvokerForMemoryTest) GetBasicPromptInfo(tools []*aitool.Tool) (str
 	return "Basic system prompt for testing", map[string]any{}, nil
 }
 
+func (m *mockInvokerForMemoryTest) InvokeLiteForgeSpeedPriority(ctx context.Context, name string, prompt string, params []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
+	return m.InvokeLiteForge(ctx, name, prompt, params, opts...)
+}
+
+func (m *mockInvokerForMemoryTest) InvokeLiteForgeQualityPriority(ctx context.Context, name string, prompt string, params []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
+	return m.InvokeLiteForge(ctx, name, prompt, params, opts...)
+}
+
 func (m *mockInvokerForMemoryTest) InvokeLiteForge(ctx context.Context, name string, prompt string, params []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
 	// 返回一个模拟的 action 响应，模拟 memory triage 的输出
 	mockResponseJSON := `{

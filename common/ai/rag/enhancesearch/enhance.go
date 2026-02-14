@@ -97,7 +97,7 @@ func (h *LiteForgeSearchHandler) ExtractKeywords(ctx context.Context, query stri
 		return nil, err
 	}
 	inputPrompt := prompt
-	result, err := aicommon.InvokeLiteForge(
+	result, err := aicommon.InvokeLiteForgeSpeedPriority(
 		inputPrompt,
 		aicommon.WithContext(ctx),
 		aicommon.WithLiteForgeOutputSchemaFromAIToolOptions(
@@ -140,7 +140,7 @@ func (h *LiteForgeSearchHandler) HypotheticalAnswer(ctx context.Context, query s
 	}
 
 	inputPrompt := prompt
-	result, err := aicommon.InvokeLiteForge(
+	result, err := aicommon.InvokeLiteForgeSpeedPriority(
 		inputPrompt,
 		aicommon.WithContext(ctx),
 		aicommon.WithLiteForgeOutputSchemaFromAIToolOptions(
@@ -195,7 +195,7 @@ func (h *LiteForgeSearchHandler) SplitQuery(ctx context.Context, query string) (
 	})
 
 	inputPrompt := prompt
-	result, err := aicommon.InvokeLiteForge(
+	result, err := aicommon.InvokeLiteForgeSpeedPriority(
 		inputPrompt,
 		aicommon.WithContext(ctx),
 		aicommon.WithLiteForgeOutputSchemaFromAIToolOptions(
@@ -242,7 +242,7 @@ func (h *LiteForgeSearchHandler) GeneralizeQuery(ctx context.Context, query stri
 		"query": query,
 	})
 	inputPrompt := prompt
-	result, err := aicommon.InvokeLiteForge(
+	result, err := aicommon.InvokeLiteForgeSpeedPriority(
 		inputPrompt,
 		aicommon.WithLiteForgeOutputSchemaFromAIToolOptions(
 			aitool.WithStringArrayParam(
