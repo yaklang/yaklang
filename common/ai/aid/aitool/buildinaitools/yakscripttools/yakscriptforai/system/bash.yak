@@ -331,12 +331,27 @@ if err != nil {
     }
 }
 
+// Platform-aware output encoding conversion:
+// - Windows: cmd.exe/powershell may output GBK-encoded text, use codec.GBKSafe to convert
+// - macOS/Linux: bash outputs UTF-8 natively, use codec.FixUTF8 to preserve valid UTF-8
+//   and only escape truly invalid bytes (e.g. binary data mixed into output)
+//
+// Why not use codec.GBKSafe on macOS/Linux?
+//   GBKSafe checks utf8.Valid() on the ENTIRE buffer. If even one invalid byte exists
+//   (e.g. from httpd -V or other commands mixing binary into stderr), it converts the
+//   ENTIRE buffer from GBK to UTF-8, which corrupts all Chinese UTF-8 characters
+//   (e.g. "服务配置检查" becomes "鑸嗛姊烯闁磅曞夊€鑺6").
 toUtf8 = (s)=>{
-    res,err = codec.GBKSafe(s)
-    if err {
-        return s
+    if osType == "windows" {
+        res, err = codec.GBKSafe(s)
+        if err {
+            // GBK conversion failed, fall back to fixing invalid bytes
+            return codec.FixUTF8(s)
+        }
+        return res
     }
-    return res
+    // macOS/Linux: output is UTF-8, preserve valid characters and escape bad bytes
+    return codec.FixUTF8(s)
 }
 
 // 输出执行结果
