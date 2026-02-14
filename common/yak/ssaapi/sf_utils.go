@@ -1,9 +1,13 @@
 package ssaapi
 
 import (
+	"strings"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
@@ -19,10 +23,62 @@ func _SearchValues(values Values, mod ssadb.MatchMode, handler func(string) bool
 }
 
 func _SearchValue(value *Value, mod ssadb.MatchMode, compare func(string) bool, opt ...sfvm.AnalysisContextOption) Values {
+	ctx := sfvm.NewDefaultAnalysisContext()
+	for _, apply := range opt {
+		apply(ctx)
+	}
+	label := ctx.Label
+	skipValueSearch := false
+	skipCFGSearch := false
+	if label != "" && strings.HasPrefix(label, "search-exact:") {
+		if shouldUseCFGSearch(value) {
+			skipValueSearch = true
+		} else {
+			skipCFGSearch = true
+		}
+	}
 	newValue := make([]*Value, 0)
-	newValue = append(newValue, SearchWithValue(value, mod, compare, opt...)...)
-	newValue = append(newValue, SearchWithCFG(value, mod, compare, opt...)...)
+	if !skipValueSearch {
+		name := "sf.SearchWithValue"
+		if label != "" {
+			name += ":" + label
+		}
+		_ = diagnostics.TrackLow(name, func() error {
+			newValue = append(newValue, SearchWithValue(value, mod, compare, opt...)...)
+			return nil
+		})
+	}
+
+	if !skipCFGSearch {
+		name := "sf.SearchWithCFG"
+		if label != "" {
+			name += ":" + label
+		}
+		_ = diagnostics.TrackLow(name, func() error {
+			newValue = append(newValue, SearchWithCFG(value, mod, compare, opt...)...)
+			return nil
+		})
+	}
 	return newValue
+}
+
+func shouldUseCFGSearch(value *Value) bool {
+	if value == nil {
+		return false
+	}
+	inst := value.getInstruction()
+	if inst == nil {
+		return false
+	}
+	if ssa.IsControlInstruction(inst) {
+		return true
+	}
+	switch inst.GetOpcode() {
+	case ssa.SSAOpcodeFunction, ssa.SSAOpcodeErrorCatch:
+		return true
+	default:
+		return false
+	}
 }
 
 func _SearchValuesByOpcode(values Values, opcode string, opt ...sfvm.AnalysisContextOption) Values {

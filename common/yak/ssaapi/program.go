@@ -3,6 +3,7 @@ package ssaapi
 import (
 	"context"
 	"fmt"
+	"os"
 	"sort"
 	"time"
 
@@ -30,9 +31,11 @@ type Program struct {
 	// come from database will affect search operation
 	comeFromDatabase bool
 	//value cache
-	nodeId2ValueCache *utils.CacheWithKey[string, *Value]
-	id                *atomic.Int64
-	overlay           *ProgramOverLay
+	nodeId2ValueCache  *utils.CacheWithKey[string, *Value]
+	opcode2ValuesCache *utils.CacheWithKey[string, Values]
+	funcReturnsCache   *utils.CacheWithKey[int64, []int64]
+	id                 *atomic.Int64
+	overlay            *ProgramOverLay
 }
 
 type Programs []*Program
@@ -139,9 +142,11 @@ func (p *Program) GetConfig() *Config {
 
 func NewProgram(prog *ssa.Program, config *Config) *Program {
 	p := &Program{
-		Program:           prog,
-		nodeId2ValueCache: utils.NewTTLCacheWithKey[string, *Value](8 * time.Second),
-		id:                atomic.NewInt64(0),
+		Program:            prog,
+		nodeId2ValueCache:  utils.NewTTLCacheWithKey[string, *Value](8 * time.Second),
+		opcode2ValuesCache: utils.NewLRUCacheWithKey[string, Values](16),
+		funcReturnsCache:   utils.NewLRUCacheWithKey[int64, []int64](256),
+		id:                 atomic.NewInt64(0),
 	}
 	if config != nil {
 		p.config = config
@@ -166,11 +171,13 @@ func NewProgram(prog *ssa.Program, config *Config) *Program {
 
 func NewTmpProgram(name string) *Program {
 	p := &Program{
-		Program:           ssa.NewTmpProgram(name),
-		config:            &Config{},
-		enableDatabase:    false,
-		nodeId2ValueCache: utils.NewTTLCacheWithKey[string, *Value](8 * time.Second),
-		id:                atomic.NewInt64(0),
+		Program:            ssa.NewTmpProgram(name),
+		config:             &Config{},
+		enableDatabase:     false,
+		nodeId2ValueCache:  utils.NewTTLCacheWithKey[string, *Value](8 * time.Second),
+		opcode2ValuesCache: utils.NewLRUCacheWithKey[string, Values](16),
+		funcReturnsCache:   utils.NewLRUCacheWithKey[int64, []int64](256),
+		id:                 atomic.NewInt64(0),
 	}
 	return p
 }
@@ -269,9 +276,6 @@ func (v *Value) NewValue(value ssa.Instruction) *Value {
 
 func (p *Program) NewValue(inst ssa.Instruction) (*Value, error) {
 	if utils.IsNil(inst) {
-		// var raw = make([]byte, 2048)
-		// runtime.Stack(raw, false)
-		// return nil, utils.Errorf("instruction is nil: %s", string(raw))
 		return nil, utils.Errorf("instruction is nil")
 	}
 	var v *Value
@@ -296,8 +300,9 @@ func (p *Program) NewValue(inst ssa.Instruction) (*Value, error) {
 	if n, ok := checkInst.(ssa.User); ok {
 		v.innerUser = n
 	}
-	if v.getValue() == nil && v.innerUser == nil {
-		return nil, utils.Errorf("instruction is not a value or user: %s", inst.String())
+	if v.innerValue == nil && v.innerUser == nil {
+		str := inst.String()
+		return nil, utils.Errorf("instruction is not a value or user: %s", str)
 	}
 	return v, nil
 }

@@ -59,7 +59,7 @@ func (v *Value) getInstruction() ssa.Instruction {
 	}
 	return nil
 }
-func (v Value) getUser() ssa.User {
+func (v *Value) getUser() ssa.User {
 	if utils.IsNil(v) {
 		log.Errorf("ssaapi.Value: getUser on nil value")
 		return nil
@@ -73,7 +73,7 @@ func (v Value) getUser() ssa.User {
 	return nil
 }
 
-func (v Value) getValue() ssa.Value {
+func (v *Value) getValue() ssa.Value {
 	if utils.IsNil(v) {
 		log.Errorf("ssaapi.Value: getValue on nil value")
 		return nil

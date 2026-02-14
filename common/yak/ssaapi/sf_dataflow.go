@@ -87,6 +87,11 @@ func DataFlowWithSFConfig(
 	}
 
 	options = append(options, WithExclusiveContext(config.GetContext()))
+	if sfResult != nil {
+		if rule := sfResult.GetRule(); rule != nil {
+			options = append(options, WithRuleName(rule.RuleName))
+		}
+	}
 	var dataflowRecursiveFunc func(options ...OperationOption) Values
 	if analysisType == TopDefAnalysis {
 		dataflowRecursiveFunc = value.GetTopDefs

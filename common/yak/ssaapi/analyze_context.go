@@ -51,6 +51,9 @@ type AnalyzeContext struct {
 
 	// savedPath map[*Value]struct{}
 	recursiveStatusIsLeaf *utils.Stack[node]
+
+	traceEnabled bool
+	traceStats   *topDefTraceStats
 }
 
 type node struct {
@@ -68,6 +71,53 @@ func NewAnalyzeContext(opt ...OperationOption) *AnalyzeContext {
 		recursiveStatusIsLeaf:  utils.NewStack[node](),
 	}
 	return actx
+}
+
+type topDefTraceStats struct {
+	callCount           uint64
+	maxDepth            int
+	maxObjectStack      int
+	maxCallStack        int
+	depthLimitCount     uint64
+	recursiveLimitCount uint64
+	untilMatchCount     uint64
+	opCounts            map[string]uint64
+}
+
+func newTopDefTraceStats() *topDefTraceStats {
+	return &topDefTraceStats{
+		opCounts: make(map[string]uint64),
+	}
+}
+
+func (a *AnalyzeContext) enableTopDefTrace() {
+	a.traceEnabled = true
+	if a.traceStats == nil {
+		a.traceStats = newTopDefTraceStats()
+	}
+}
+
+func (s *topDefTraceStats) observe(a *AnalyzeContext) {
+	if s == nil || a == nil {
+		return
+	}
+	s.callCount++
+	if depth := a.recursiveStatusIsLeaf.Len(); depth > s.maxDepth {
+		s.maxDepth = depth
+	}
+	if size := a._objectStack.Len(); size > s.maxObjectStack {
+		s.maxObjectStack = size
+	}
+	if size := a.callStack.Len(); size > s.maxCallStack {
+		s.maxCallStack = size
+	}
+}
+
+func (s *topDefTraceStats) incOpcode(name string) {
+	if s == nil || name == "" {
+		return
+	}
+	s.opCounts[name]++
 }
 func (a *AnalyzeContext) pushCall(call *ssa.Call) {
 	a.callStack.Push(call)
@@ -154,6 +204,9 @@ func (a *AnalyzeContext) check(v *Value) (needExit bool, recoverStack func()) {
 	prev.leaf = false
 	a.recursiveStatusIsLeaf.Push(prev)          // prev status is false, because it have next recursive
 	a.recursiveStatusIsLeaf.Push(node{true, v}) // current status is true
+	if a.traceEnabled && a.traceStats != nil {
+		a.traceStats.observe(a)
+	}
 
 	needVisited, recoverIntraProcess := a.valueShould(v)
 	recoverStack = func() {
@@ -176,17 +229,26 @@ func (a *AnalyzeContext) check(v *Value) (needExit bool, recoverStack func()) {
 	// if !utils.InGithubActions() {
 	if a.IsRecursiveLimit() {
 		log.Warnf("recursive call is over 10000, stop it")
+		if a.traceEnabled && a.traceStats != nil {
+			a.traceStats.recursiveLimitCount++
+		}
 		a.reachedDepthLimited = true
 		return
 	}
 	// }
 	if a.depth > 0 && a.config.MaxDepth > 0 && a.depth > a.config.MaxDepth {
 		log.Warnf("reached depth limit,stop it")
+		if a.traceEnabled && a.traceStats != nil {
+			a.traceStats.depthLimitCount++
+		}
 		a.reachedDepthLimited = true
 		return
 	}
 	if a.depth < 0 && a.config.MinDepth < 0 && a.depth < a.config.MinDepth {
 		log.Warnf("reached depth limit,stop it")
+		if a.traceEnabled && a.traceStats != nil {
+			a.traceStats.depthLimitCount++
+		}
 		a.reachedDepthLimited = true
 		return
 	}
@@ -241,6 +303,9 @@ func (a *AnalyzeContext) isUntilNode(v *Value) bool {
 	if a.config.UntilNode != nil {
 		if a.config.UntilNode(v) {
 			a.untilMatch = append(a.untilMatch, v)
+			if a.traceEnabled && a.traceStats != nil {
+				a.traceStats.untilMatchCount++
+			}
 			return true
 		} else {
 			return false

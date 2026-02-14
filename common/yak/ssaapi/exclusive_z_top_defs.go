@@ -3,9 +3,13 @@ package ssaapi
 import (
 	"context"
 	"fmt"
+	"sort"
+	"time"
 
 	"github.com/samber/lo"
+	baselog "github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
@@ -14,6 +18,8 @@ const objectAnalyzeLevel = 50
 
 // GetTopDefs desc all of 'Defs' is not used by any other value
 func (i *Value) GetTopDefs(opt ...OperationOption) (ret Values) {
+	var actx *AnalyzeContext
+	var traceStart time.Time
 	defer func() {
 		if r := recover(); r != nil {
 			if r == errRecursiveDepth {
@@ -30,11 +36,32 @@ func (i *Value) GetTopDefs(opt ...OperationOption) (ret Values) {
 			utils.PrintCurrentGoroutineRuntimeStack()
 			ret = nil
 		}
+		if diagnostics.Enabled(diagnostics.LevelLow) && traceStart != (time.Time{}) {
+			elapsed := time.Since(traceStart)
+			ruleName := ""
+			if actx != nil && actx.config != nil {
+				ruleName = actx.config.RuleName
+			}
+			if actx != nil && actx.traceStats != nil {
+				logTopDefTraceStats(actx.traceStats, ruleName, elapsed, len(ret), actx.reachedDepthLimited)
+			}
+		}
 	}()
-	actx := NewAnalyzeContext(opt...)
+	actx = NewAnalyzeContext(opt...)
 	actx.Self = i
 	actx.direct = TopDefAnalysis
-	ret = i.getTopDefs(actx, opt...)
+	if diagnostics.Enabled(diagnostics.LevelLow) {
+		actx.enableTopDefTrace()
+		traceStart = time.Now()
+	}
+	name := "ssa.topdef.total"
+	if actx.config != nil && actx.config.RuleName != "" {
+		name += ":" + actx.config.RuleName
+	}
+	_ = diagnostics.TrackLow(name, func() error {
+		ret = i.getTopDefs(actx, opt...)
+		return nil
+	})
 	if actx.HasUntilNode() {
 		ret = actx.untilMatch
 	}
@@ -52,6 +79,55 @@ func (v Values) GetTopDefs(opts ...OperationOption) Values {
 		ret = append(ret, sub.GetTopDefs(opts...)...)
 	}
 	return MergeValues(ret)
+}
+
+type opCount struct {
+	name  string
+	count uint64
+}
+
+func logTopDefTraceStats(stats *topDefTraceStats, ruleName string, elapsed time.Duration, resultCount int, reachedDepthLimit bool) {
+	if stats == nil {
+		return
+	}
+	label := "ssa.topdef.trace"
+	if ruleName != "" {
+		label = label + ":" + ruleName
+	}
+	baselog.Infof(
+		"%s total=%s calls=%d results=%d maxDepth=%d maxObjectStack=%d maxCallStack=%d depthLimit=%d recursiveLimit=%d untilMatch=%d reachedDepthLimit=%v",
+		label,
+		elapsed,
+		stats.callCount,
+		resultCount,
+		stats.maxDepth,
+		stats.maxObjectStack,
+		stats.maxCallStack,
+		stats.depthLimitCount,
+		stats.recursiveLimitCount,
+		stats.untilMatchCount,
+		reachedDepthLimit,
+	)
+	if len(stats.opCounts) == 0 {
+		return
+	}
+	ops := make([]opCount, 0, len(stats.opCounts))
+	for name, count := range stats.opCounts {
+		ops = append(ops, opCount{name: name, count: count})
+	}
+	sort.Slice(ops, func(i, j int) bool {
+		if ops[i].count == ops[j].count {
+			return ops[i].name < ops[j].name
+		}
+		return ops[i].count > ops[j].count
+	})
+	top := 12
+	if len(ops) < top {
+		top = len(ops)
+	}
+	for i := 0; i < top; i++ {
+		baselog.Infof("%s op[%d] %s=%d", label, i+1, ops[i].name, ops[i].count)
+	}
 }
 
 func (i *Value) visitedDefs(actx *AnalyzeContext, opt ...OperationOption) (result Values) {
@@ -189,7 +265,11 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		}
 		return i.visitedDefs(actx, opt...)
 	}
-	switch inst := i.getValue().(type) {
+	instRaw := i.getValue()
+	if actx.traceEnabled && actx.traceStats != nil {
+		actx.traceStats.incOpcode(fmt.Sprintf("%T", instRaw))
+	}
+	switch inst := instRaw.(type) {
 	case *ssa.Undefined:
 		if inst.Kind == ssa.UndefinedValueReturn {
 			return Values{}
