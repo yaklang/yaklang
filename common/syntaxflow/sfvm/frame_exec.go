@@ -23,7 +23,6 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
-	"time"
 
 	"github.com/gobwas/glob"
 	"github.com/yaklang/yaklang/common/log"
@@ -1152,28 +1151,27 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 		if ruleLabel != "" {
 			name += ":" + ruleLabel
 		}
-		var (
-			ret ValueOperator
-			ok  bool
-			err error
-		)
-		if trackErr := diagnostics.TrackLow(name, func() error {
-			s.debugSubLog(">> pop")
-			value := s.stack.Pop()
+			var (
+				ret ValueOperator
+				ok  bool
+			)
+			if trackErr := diagnostics.TrackLow(name, func() error {
+				s.debugSubLog(">> pop")
+				value := s.stack.Pop()
 			if value == nil {
 				return utils.Wrap(CriticalError, "native call failed: stack top is empty")
 			}
 
-			s.debugSubLog("native call: [%v]", i.UnaryStr)
-			call, err := GetNativeCall(i.UnaryStr)
-			if err != nil {
-				s.debugSubLog("Err: %v", err)
-				log.Errorf("native call failed, not an existed native call[%v]: %v", i.UnaryStr, err)
-				s.stack.Push(NewEmptyValues())
-				return utils.Errorf("get native call failed: %v", err)
-			}
+				s.debugSubLog("native call: [%v]", i.UnaryStr)
+				call, err := GetNativeCall(i.UnaryStr)
+				if err != nil {
+					s.debugSubLog("Err: %v", err)
+					log.Errorf("native call failed, not an existed native call[%v]: %v", i.UnaryStr, err)
+					s.stack.Push(NewEmptyValues())
+					return utils.Errorf("get native call failed: %v", err)
+				}
 
-			ok, ret, err = call(value, s, NewNativeCallActualParams(i.SyntaxFlowConfig...))
+				ok, ret, err = call(value, s, NewNativeCallActualParams(i.SyntaxFlowConfig...))
 			if err != nil || !ok {
 				s.debugSubLog("No Result in [%v]", i.UnaryStr)
 				s.stack.Push(NewEmptyValues())
