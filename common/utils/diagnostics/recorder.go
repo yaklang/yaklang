@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -61,12 +62,14 @@ func (m Measurement) String() string {
 
 type measurementData struct {
 	mu          sync.Mutex
+	stepCap     uint32
 	measurement Measurement
 }
 
 func newMeasurementData(name string, stepCapacity int) *measurementData {
 	steps := make([]time.Duration, stepCapacity)
 	return &measurementData{
+		stepCap: uint32(stepCapacity),
 		measurement: Measurement{
 			Name:       name,
 			Steps:      steps,
@@ -80,14 +83,22 @@ func newMeasurementData(name string, stepCapacity int) *measurementData {
 }
 
 func (m *measurementData) ensureStepCapacity(count int) {
+	if count <= 0 {
+		return
+	}
+	if count <= int(atomic.LoadUint32(&m.stepCap)) {
+		return
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if count <= len(m.measurement.Steps) {
+		atomic.StoreUint32(&m.stepCap, uint32(len(m.measurement.Steps)))
 		return
 	}
 	newSteps := make([]time.Duration, count)
 	copy(newSteps, m.measurement.Steps)
 	m.measurement.Steps = newSteps
+	atomic.StoreUint32(&m.stepCap, uint32(count))
 }
 
 func (m *measurementData) record(total time.Duration, stepDurations []time.Duration) {
@@ -98,6 +109,7 @@ func (m *measurementData) record(total time.Duration, stepDurations []time.Durat
 		newSteps := make([]time.Duration, len(stepDurations))
 		copy(newSteps, m.measurement.Steps)
 		m.measurement.Steps = newSteps
+		atomic.StoreUint32(&m.stepCap, uint32(len(newSteps)))
 	}
 	for i, dur := range stepDurations {
 		m.measurement.Steps[i] += dur

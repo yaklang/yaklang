@@ -328,7 +328,7 @@ func (s *SFFrame) execRule(feedValue ValueOperator) error {
 		)
 		flow := opContinue
 
-		err := diagnostics.TrackLow(name, func() error {
+		execOpcode := func() error {
 			// special handler this exist opcode, because this shuold pop then debugLog it
 			if i.OpCode == OpExitStatement {
 				checkLen := s.errorSkipStack.Pop().stackDepth

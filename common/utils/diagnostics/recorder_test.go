@@ -2,6 +2,7 @@ package diagnostics
 
 import (
 	"errors"
+	"sync"
 	"testing"
 )
 
@@ -53,6 +54,10 @@ func TestRecorderSnapshotAndReset(t *testing.T) {
 }
 
 func TestRecorderTrackDisabledRunsSteps(t *testing.T) {
+	origLevel := GetLevel()
+	defer SetLevel(origLevel)
+	SetLevel(LevelHigh)
+
 	rec := NewRecorder()
 	run := false
 	if err := rec.Track("noop", func() error {
@@ -66,5 +71,72 @@ func TestRecorderTrackDisabledRunsSteps(t *testing.T) {
 	}
 	if len(rec.Snapshot()) != 0 {
 		t.Fatalf("expected no recorded measurements when disabled")
+	}
+}
+
+func TestRecorderConcurrentTrackCount(t *testing.T) {
+	origLevel := GetLevel()
+	defer SetLevel(origLevel)
+	SetLevel(LevelLow)
+
+	rec := NewRecorder()
+	const workers = 200
+	var wg sync.WaitGroup
+	wg.Add(workers)
+	for i := 0; i < workers; i++ {
+		go func() {
+			defer wg.Done()
+			if err := rec.Track("parallel",
+				func() error { return nil },
+				func() error { return nil },
+			); err != nil {
+				t.Errorf("track failed: %v", err)
+			}
+		}()
+	}
+	wg.Wait()
+
+	snaps := rec.Snapshot()
+	if len(snaps) != 1 {
+		t.Fatalf("expected one measurement, got %d", len(snaps))
+	}
+	if got := snaps[0].Count; got != workers {
+		t.Fatalf("expected count %d, got %d", workers, got)
+	}
+	if got := len(snaps[0].Steps); got < 2 {
+		t.Fatalf("expected at least 2 steps, got %d", got)
+	}
+}
+
+func TestRecorderConcurrentStepExpansion(t *testing.T) {
+	rec := NewRecorder()
+	const workers = 120
+
+	var wg sync.WaitGroup
+	wg.Add(workers)
+	for i := 0; i < workers; i++ {
+		go func(i int) {
+			defer wg.Done()
+			stepCount := 1 + (i % 8)
+			steps := make([]func() error, stepCount)
+			for j := range steps {
+				steps[j] = func() error { return nil }
+			}
+			if err := rec.track(true, "expand", steps...); err != nil {
+				t.Errorf("track failed: %v", err)
+			}
+		}(i)
+	}
+	wg.Wait()
+
+	snaps := rec.Snapshot()
+	if len(snaps) != 1 {
+		t.Fatalf("expected one measurement, got %d", len(snaps))
+	}
+	if got := snaps[0].Count; got != workers {
+		t.Fatalf("expected count %d, got %d", workers, got)
+	}
+	if got := len(snaps[0].Steps); got != 8 {
+		t.Fatalf("expected expanded steps len 8, got %d", got)
 	}
 }
