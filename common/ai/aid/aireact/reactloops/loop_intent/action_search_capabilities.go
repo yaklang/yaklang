@@ -32,10 +32,13 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 		),
 	}
 
-	return reactloops.WithRegisterLoopAction(
+	return reactloops.WithRegisterLoopActionWithStreamField(
 		"search_capabilities",
 		desc,
 		toolOpts,
+		[]*reactloops.LoopStreamField{
+			{FieldName: "search_query", AINodeId: "intent"},
+		},
 		// Verifier
 		func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
 			query := strings.TrimSpace(action.GetString("search_query"))
@@ -55,6 +58,7 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 			// 1. Search AIYakTool via BM25 trigram
 			db := consts.GetGormProfileDatabase()
 			if db != nil {
+				loop.LoadingStatus("Start to load bm25+keyword search results for tools and AI forges... / 开始加载工具和AI蓝图的BM25+关键词搜索结果...")
 				tools, err := yakit.SearchAIYakToolBM25(db, &yakit.AIYakToolFilter{
 					Keywords: query,
 				}, 10, 0)
@@ -67,10 +71,7 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 						if tool.VerboseName != "" {
 							name = tool.VerboseName + " (" + tool.Name + ")"
 						}
-						desc := tool.Description
-						if len(desc) > 200 {
-							desc = desc[:200] + "..."
-						}
+						desc := utils.ShrinkString(tool.Description, 200)
 						results.WriteString(fmt.Sprintf("- **%s**: %s", name, desc))
 						if tool.Keywords != "" {
 							results.WriteString(fmt.Sprintf(" [keywords: %s]", tool.Keywords))
@@ -90,24 +91,21 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 					results.WriteString("### Tools\nNo matching tools found.\n\n")
 				}
 
-			// 2. Search AI Forges via BM25 trigram (with LIKE fallback for short queries)
-			forges, err := yakit.SearchAIForgeBM25(db, &yakit.AIForgeSearchFilter{
-				Keywords: query,
-			}, 10, 0)
-			if err != nil {
-				log.Warnf("intent loop: BM25 forge search failed: %v", err)
-			}
-			if len(forges) > 0 {
+				// 2. Search AI Forges via BM25 trigram (with LIKE fallback for short queries)
+				forges, err := yakit.SearchAIForgeBM25(db, &yakit.AIForgeSearchFilter{
+					Keywords: query,
+				}, 10, 0)
+				if err != nil {
+					log.Warnf("intent loop: BM25 forge search failed: %v", err)
+				}
+				if len(forges) > 0 {
 					results.WriteString("### Matched AI Forges (Blueprints)\n")
 					for _, forge := range forges {
 						name := forge.ForgeName
 						if forge.ForgeVerboseName != "" {
 							name = forge.ForgeVerboseName + " (" + forge.ForgeName + ")"
 						}
-						desc := forge.Description
-						if len(desc) > 200 {
-							desc = desc[:200] + "..."
-						}
+						desc := utils.ShrinkString(forge.Description, 200)
 						results.WriteString(fmt.Sprintf("- **%s**: %s\n", name, desc))
 					}
 					results.WriteString("\n")

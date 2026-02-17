@@ -429,14 +429,15 @@ type DeepIntentResult struct {
 func executeDeepIntentRecognition(r aicommon.AIInvokeRuntime, loop *reactloops.ReActLoop, task aicommon.AIStatefulTask) *DeepIntentResult {
 	userInput := task.GetUserInput()
 
-	// Create a sub-task for intent recognition
-	intentTask := aicommon.NewStatefulTaskBase(
-		task.GetId()+"_intent",
-		userInput,
-		r.GetConfig().GetContext(),
-		r.GetConfig().GetEmitter(),
-	)
-
+	//// Create a sub-task for intent recognition
+	//intentTask := aicommon.NewStatefulTaskBase(
+	//	task.GetId()+"_intent",
+	//	userInput,
+	//	r.GetConfig().GetContext(),
+	//	r.GetConfig().GetEmitter(),
+	//)
+	_ = userInput
+	intentTask := task
 	originOptions := r.GetConfig().OriginOptions()
 	var opts []any
 	for _, option := range originOptions {

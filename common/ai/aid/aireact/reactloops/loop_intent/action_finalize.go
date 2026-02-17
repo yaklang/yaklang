@@ -34,10 +34,15 @@ func makeFinalizeEnrichmentAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 		),
 	}
 
-	return reactloops.WithRegisterLoopAction(
+	return reactloops.WithRegisterLoopActionWithStreamField(
 		"finalize_enrichment",
 		desc,
 		toolOpts,
+		[]*reactloops.LoopStreamField{
+			{AINodeId: "intent", FieldName: "intent_summary"},
+			{AINodeId: "intent", FieldName: "recommended_capabilities"},
+			{AINodeId: "intent", FieldName: "context_notes"},
+		},
 		// Verifier
 		func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
 			summary := strings.TrimSpace(action.GetString("intent_summary"))

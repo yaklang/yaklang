@@ -32,16 +32,16 @@ func init() {
 				reactloops.WithAllowToolCall(false),
 				reactloops.WithAllowUserInteract(false),
 				reactloops.WithInitTask(buildInitTask(r)),
-				reactloops.WithMaxIterations(4), // supports up to 3 rounds of search + 1 finalize
+				reactloops.WithMaxIterations(3),
 				reactloops.WithPersistentInstruction(instruction),
 				reactloops.WithReflectionOutputExample(outputExample),
 				reactloops.WithActionFilter(func(action *reactloops.LoopAction) bool {
-					allowedActions := []string{
+					allowActionNames := []string{
 						"search_capabilities",
 						"finalize_enrichment",
 					}
-					for _, name := range allowedActions {
-						if action.ActionType == name {
+					for _, actionName := range allowActionNames {
+						if action.ActionType == actionName {
 							return true
 						}
 					}
@@ -68,8 +68,9 @@ func init() {
 				// Register custom actions
 				searchCapabilitiesAction(r),
 				finalizeEnrichmentAction(r),
-				// Post-iteration hook for extracting final results
-				buildOnPostIterationHook(r),
+				// Post-iteration hook: ensures finalization always runs on loop exit
+				// (mirrors loop_knowledge_enhance pattern)
+				BuildOnPostIterationHook(r),
 			}
 			preset = append(opts, preset...)
 			return reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_INTENT, r, preset...)
@@ -138,16 +139,4 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		log.Infof("intent recognition loop initialized for query: %s", utils.ShrinkString(userQuery, 200))
 		operator.Continue()
 	}
-}
-
-// buildOnPostIterationHook creates the post-iteration hook for extracting final results.
-func buildOnPostIterationHook(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
-	return reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, operator *reactloops.OnPostIterationOperator) {
-		operator.IgnoreError()
-		
-		if isDone {
-			log.Infof("intent recognition loop completed at iteration %d", iteration)
-			// Results are already stored in loop variables by the finalize action
-		}
-	})
 }
