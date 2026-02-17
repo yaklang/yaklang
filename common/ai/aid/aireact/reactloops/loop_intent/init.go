@@ -32,7 +32,7 @@ func init() {
 				reactloops.WithAllowToolCall(false),
 				reactloops.WithAllowUserInteract(false),
 				reactloops.WithInitTask(buildInitTask(r)),
-				reactloops.WithMaxIterations(2),
+				reactloops.WithMaxIterations(1),
 				reactloops.WithPersistentInstruction(instruction),
 				reactloops.WithReflectionOutputExample(outputExample),
 				reactloops.WithActionFilter(func(action *reactloops.LoopAction) bool {
