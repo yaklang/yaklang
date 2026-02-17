@@ -53,10 +53,19 @@ func (f *SingleFileModificationSuiteFactory) buildWriteAction() reactloops.ReAct
 			}
 			err := os.WriteFile(filename, []byte(code), 0644)
 			if err != nil {
-				runtime.AddToTimeline("error", "Failed to write code to file: "+err.Error())
+				runtime.AddToTimeline("write_failed", fmt.Sprintf("FAILED to write file: %s, error: %s", filename, err.Error()))
 				operator.Fail(err)
 				return
 			}
+
+			// Verify file was written correctly
+			writtenBytes, verifyErr := os.ReadFile(filename)
+			if verifyErr != nil {
+				runtime.AddToTimeline("write_verify_failed", fmt.Sprintf("FAILED to verify written file: %s, error: %s", filename, verifyErr.Error()))
+				operator.Fail(fmt.Sprintf("file write verification failed: %v", verifyErr))
+				return
+			}
+			runtime.AddToTimeline("write_success", fmt.Sprintf("SUCCESS: wrote %d bytes to file: %s (verified: %d bytes on disk)", len(code), filename, len(writtenBytes)))
 
 			// Call file changed callback
 			errMsg, blocking := f.OnFileChanged(code, operator)
@@ -74,14 +83,6 @@ func (f *SingleFileModificationSuiteFactory) buildWriteAction() reactloops.ReAct
 				msg += "\n\n--[linter]--\nNo issues found in the code."
 			}
 			runtime.AddToTimeline("lint-message", msg)
-
-			//fmt.Println("**********************CODE***************************")
-			//fmt.Println(code)
-			//fmt.Println("***********************LINT MSG****************************")
-			//fmt.Println(msg)
-			//fmt.Println("***********************BLOCKED???****************************")
-			//fmt.Println("msg", errMsg, blocking)
-			//os.Exit(1)
 
 			log.Infof("write_code done: hasBlockingErrors=%v", blocking)
 			loop.GetEmitter().EmitPinFilename(filename)
@@ -177,7 +178,13 @@ func (f *SingleFileModificationSuiteFactory) buildModifyAction() reactloops.ReAc
 			fullCode = editor.GetSourceCode()
 			loop.Set(fullCodeVar, fullCode)
 			os.RemoveAll(filename)
-			os.WriteFile(filename, []byte(fullCode), 0644)
+			writeErr := os.WriteFile(filename, []byte(fullCode), 0644)
+			if writeErr != nil {
+				runtime.AddToTimeline("modify_write_failed", fmt.Sprintf("FAILED to write modified file: %s, error: %s", filename, writeErr.Error()))
+				op.Fail(fmt.Sprintf("failed to write modified content to file: %v", writeErr))
+				return
+			}
+			runtime.AddToTimeline("modify_success", fmt.Sprintf("SUCCESS: modified lines[%d-%d], wrote %d bytes to file: %s", modifyStartLine, modifyEndLine, len(fullCode), filename))
 
 			// Call file changed callback
 			errMsg, hasBlockingErrors := f.OnFileChanged(fullCode, op)
@@ -292,7 +299,13 @@ func (f *SingleFileModificationSuiteFactory) buildInsertAction() reactloops.ReAc
 			fullCode = editor.GetSourceCode()
 			loop.Set(fullCodeVar, fullCode)
 			os.RemoveAll(filename)
-			os.WriteFile(filename, []byte(fullCode), 0644)
+			writeErr := os.WriteFile(filename, []byte(fullCode), 0644)
+			if writeErr != nil {
+				runtime.AddToTimeline("insert_write_failed", fmt.Sprintf("FAILED to write file after insert: %s, error: %s", filename, writeErr.Error()))
+				op.Fail(fmt.Sprintf("failed to write content after insert: %v", writeErr))
+				return
+			}
+			runtime.AddToTimeline("insert_success", fmt.Sprintf("SUCCESS: inserted at line[%d], wrote %d bytes to file: %s", insertLine, len(fullCode), filename))
 
 			// Call file changed callback
 			errMsg, hasBlockingErrors := f.OnFileChanged(fullCode, op)
@@ -405,7 +418,23 @@ func (f *SingleFileModificationSuiteFactory) buildDeleteAction() reactloops.ReAc
 			fullCode = editor.GetSourceCode()
 			loop.Set(fullCodeVar, fullCode)
 			os.RemoveAll(filename)
-			os.WriteFile(filename, []byte(fullCode), 0644)
+			writeErr := os.WriteFile(filename, []byte(fullCode), 0644)
+			if writeErr != nil {
+				var deleteDesc string
+				if deleteEndLine > 0 {
+					deleteDesc = fmt.Sprintf("lines[%d-%d]", deleteStartLine, deleteEndLine)
+				} else {
+					deleteDesc = fmt.Sprintf("line[%d]", deleteStartLine)
+				}
+				runtime.AddToTimeline("delete_write_failed", fmt.Sprintf("FAILED to write file after deleting %s: %s, error: %s", deleteDesc, filename, writeErr.Error()))
+				op.Fail(fmt.Sprintf("failed to write content after delete: %v", writeErr))
+				return
+			}
+			if deleteEndLine > 0 {
+				runtime.AddToTimeline("delete_success", fmt.Sprintf("SUCCESS: deleted lines[%d-%d], wrote %d bytes to file: %s", deleteStartLine, deleteEndLine, len(fullCode), filename))
+			} else {
+				runtime.AddToTimeline("delete_success", fmt.Sprintf("SUCCESS: deleted line[%d], wrote %d bytes to file: %s", deleteStartLine, len(fullCode), filename))
+			}
 
 			// Call file changed callback
 			errMsg, hasBlockingErrors := f.OnFileChanged(fullCode, op)
