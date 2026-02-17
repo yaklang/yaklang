@@ -391,6 +391,12 @@ func (r *ReAct) ensureWorkDirectory(userInput string) {
 	}
 
 	if cfg.IsWorkDirReady() {
+		// WorkDir was restored from persistent session or set by parent config.
+		// Still need to: update the new runtime's DB record with the restored WorkDir,
+		// and initialize the artifacts filesystem for this ReAct instance.
+		dirPath := cfg.GetOrCreateWorkDir()
+		r.artifacts = filesys.NewRelLocalFs(dirPath)
+		yakit.UpdateAIAgentRuntimeWorkDir(cfg.GetDB(), cfg.GetRuntimeId(), dirPath, "")
 		return
 	}
 

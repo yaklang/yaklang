@@ -2302,6 +2302,18 @@ func (c *Config) restorePersistentSession() {
 
 	c.Timeline = timelineInstance
 	c.TimelineDiffer = NewTimelineDiffer(timelineInstance)
+
+	// Restore WorkDir from previous runtime so that Session Artifacts persist across restarts
+	if runtime.WorkDir != "" {
+		if utils.GetFirstExistedPath(runtime.WorkDir) != "" {
+			c.SetWorkDir(runtime.WorkDir)
+			c.Workdir = runtime.WorkDir
+			log.Infof("restored work directory from persistent session [%s]: %s", c.PersistentSessionId, runtime.WorkDir)
+		} else {
+			log.Warnf("previous work directory no longer exists for session [%s]: %s, will create new one", c.PersistentSessionId, runtime.WorkDir)
+		}
+	}
+
 	c.InitStatus.SetPersistentSessionRestored(true)
 	log.Infof("successfully restored timeline instance from persistent session [%s] with %d items",
 		c.PersistentSessionId, timelineInstance.GetIdToTimelineItem().Len())
