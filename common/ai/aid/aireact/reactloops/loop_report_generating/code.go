@@ -8,6 +8,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loopinfra"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -35,6 +36,16 @@ func init() {
 		func(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {
 			log.Infof("initializing report_generating loop")
 
+			// 创建单文件修改工厂（复用 loopinfra 基础设施）
+			modSuite := loopinfra.NewSingleFileModificationSuiteFactory(
+				r,
+				loopinfra.WithLoopVarsPrefix("report"),
+				loopinfra.WithActionSuffix("section"),
+				loopinfra.WithAITagConfig("GEN_REPORT", "report_content", "report-content", "text/markdown"),
+				loopinfra.WithFileExtension(".md"),
+				loopinfra.WithExitAfterWrite(false),
+			)
+
 			// 创建预设选项
 			preset := []reactloops.ReActLoopOption{
 				reactloops.WithAllowRAG(true),
@@ -44,9 +55,9 @@ func init() {
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 				reactloops.WithPersistentInstruction(instruction),
 				reactloops.WithReflectionOutputExample(outputExample),
-				reactloops.WithAITagFieldWithAINodeId("GEN_REPORT", "report_content", "report-content", "text/markdown"),
+				modSuite.GetAITagOption(),
 				reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
-					reportContent := loop.Get("full_report")
+					reportContent := loop.Get(modSuite.GetFullCodeVariableName())
 
 					// 获取分页参数
 					offsetLine, _ := strconv.Atoi(loop.Get("offset_line"))
@@ -109,7 +120,7 @@ func init() {
 
 					renderMap := map[string]any{
 						"UserRequirements":            userRequirements,
-						"Filename":                    loop.Get("filename"),
+						"Filename":                    loop.Get(modSuite.GetFilenameVariableName()),
 						"CurrentReportWithLineNumber": reportWithLine,
 						"CollectedReferences":         collectedReferences,
 						"AvailableFiles":              availableFiles,
@@ -132,14 +143,11 @@ func init() {
 				readReferenceFileAction(r),
 				grepReferenceAction(r),
 				searchKnowledgeAction(r),
-				// 注册写作 actions
-				writeReportAction(r),
-				modifySectionAction(r),
-				insertSectionAction(r),
-				deleteSectionAction(r),
 				// 注册视图控制 actions
 				changeOffsetLineAction(r),
 			}
+			// 添加工厂生成的文件修改 actions (write_section, modify_section, insert_section, delete_section)
+			preset = append(preset, modSuite.GetActions()...)
 			preset = append(preset, opts...)
 			return reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_REPORT_GENERATING, r, preset...)
 		},

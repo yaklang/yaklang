@@ -18,7 +18,7 @@
 │  └─────────────┘     └─────────────┘     └─────────────┘   │
 │        │                   │                   │           │
 │        ▼                   ▼                   ▼           │
-│  • read_reference    • write_report     • modify_section   │
+│  • read_reference    • write_section     • modify_section   │
 │  • grep_reference    • insert_section   • delete_section   │
 │  • search_knowledge  • modify_section                      │
 │                                                             │
@@ -41,9 +41,9 @@
 
 | Action | 描述 | 使用场景 |
 |--------|------|----------|
-| `write_report` | 创建报告初稿 | 报告为空时使用 |
+| `write_section` | 创建报告初稿 | 报告为空时使用 |
 | `modify_section` | 修改指定行范围 | 更新/替换现有内容 |
-| `insert_section` | 在指定行后插入 | 添加新章节 |
+| `insert_section` | 在指定行位置插入 | 添加新章节 |
 | `delete_section` | 删除指定行范围 | 移除冗余内容 |
 | `change_view_offset` | 切换视图偏移 | 导航大型报告 |
 
@@ -72,10 +72,10 @@
 
 **⚠️ 关键规则：写作类 Action 必须使用 AITAG！**
 
-当使用 `write_report`、`modify_section`、`insert_section` 时，必须在 JSON 后输出 AITAG 包裹的内容：
+当使用 `write_section`、`modify_section`、`insert_section` 时，必须在 JSON 后输出 AITAG 包裹的内容：
 
 ```
-{"@action": "write_report", "human_readable_thought": "创建报告初稿"}
+{"@action": "write_section", "human_readable_thought": "创建报告初稿"}
 
 <|GEN_REPORT_xxx|>
 # 报告标题
@@ -100,11 +100,10 @@ loop_report_generating/
 ├── action_read_reference.go     # 读取参考文件
 ├── action_grep_reference.go     # 搜索参考资料
 ├── action_search_knowledge.go   # 知识库搜索
-├── action_write_report.go       # 创建报告
-├── action_modify_section.go     # 修改章节
-├── action_insert_section.go     # 插入内容
-├── action_delete_section.go     # 删除内容
 ├── action_change_offset.go      # 切换视图偏移（分页导航）
+├── init_task.go                 # 初始化任务（意图分析、文件准备）
+│   # write_section, modify_section, insert_section, delete_section
+│   # 由 loopinfra.SingleFileModificationSuiteFactory 统一提供
 ├── prompts/
 │   ├── persistent_instruction.txt   # AI 角色定义
 │   ├── reactive_data.txt            # 响应数据模板
@@ -173,7 +172,7 @@ err = aim.InvokeReAct(
 ## 测试脚本说明
 
 ### test_basic_report.yak
-测试基础报告生成功能，只使用 `write_report` action。
+测试基础报告生成功能，只使用 `write_section` action。
 
 ### test_grep_reference.yak
 测试 `grep_reference` 功能，先搜索再生成报告。
@@ -182,7 +181,7 @@ err = aim.InvokeReAct(
 测试多文件分析功能，阅读多个参考文件后生成综合报告。
 
 ### test_iterative_writing.yak
-测试迭代写作流程，使用 `write_report` → `insert_section` → `modify_section` 的完整流程。
+测试迭代写作流程，使用 `write_section` → `insert_section` → `modify_section` 的完整流程。
 
 ### test_code_analysis_report.yak
 测试代码分析能力，分析 Go 代码文件并生成技术报告。
@@ -224,12 +223,12 @@ done
 
 | 测试脚本 | 状态 | 使用的 Actions | 耗时 |
 |---------|------|---------------|------|
-| test_basic_report.yak | ✅ PASSED | `write_report` | ~15s |
-| test_grep_reference.yak | ✅ PASSED | `grep_reference`, `write_report` | ~20s |
-| test_multi_file_analysis.yak | ✅ PASSED | `read_reference_file`(多次), `write_report` | ~25s |
-| test_iterative_writing.yak | ✅ PASSED | `write_report`, `insert_section` | ~30s |
-| test_code_analysis_report.yak | ✅ PASSED | `read_reference_file`, `grep_reference`, `write_report` | ~20s |
-| test_change_view_offset.yak | ✅ PASSED | `write_report`, `insert_section` | ~60s |
+| test_basic_report.yak | ✅ PASSED | `write_section` | ~15s |
+| test_grep_reference.yak | ✅ PASSED | `grep_reference`, `write_section` | ~20s |
+| test_multi_file_analysis.yak | ✅ PASSED | `read_reference_file`(多次), `write_section` | ~25s |
+| test_iterative_writing.yak | ✅ PASSED | `write_section`, `insert_section` | ~30s |
+| test_code_analysis_report.yak | ✅ PASSED | `read_reference_file`, `grep_reference`, `write_section` | ~20s |
+| test_change_view_offset.yak | ✅ PASSED | `write_section`, `insert_section` | ~60s |
 | test_modify_existing_file.yak | ✅ PASSED | `modify_section`(多次) | ~30s |
 
 ### 生成报告示例
@@ -298,7 +297,7 @@ SSA作为Yaklang语言核心技术架构的关键组成部分，通过与YakVM�
 ```
 请帮我撰写一份 Yaklang 项目的技术白皮书（简化版）。
 分步骤执行：
-1. 使用 write_report 创建初始结构
+1. 使用 write_section 创建初始结构
 2. 使用 insert_section 添加新章节
 3. 使用 modify_section 完善内容
 ```

@@ -2,7 +2,7 @@
 
 ## ⚠️ 关键规则：使用写作工具时必须同时输出 <|GEN_REPORT_{{ .Nonce }}|> 标签！
 
-当使用 write_report、modify_section、insert_section 时，必须在 JSON 后紧接着输出 `<|GEN_REPORT_{{ .Nonce }}|>` 开始标签和 `<|GEN_REPORT_END_{{ .Nonce }}|>` 结束标签包裹的内容。
+当使用 write_section、modify_section、insert_section 时，必须在 JSON 后紧接着输出 `<|GEN_REPORT_{{ .Nonce }}|>` 开始标签和 `<|GEN_REPORT_END_{{ .Nonce }}|>` 结束标签包裹的内容。
 
 **标签格式说明：**
 - 开始标签：`<|GEN_REPORT_xxx|>` 其中 xxx 是系统提供的 Nonce
@@ -45,7 +45,7 @@
 当资料收集完成，报告为空时：
 ```json
 {
-  "@action": "write_report",
+  "@action": "write_section",
   "human_readable_thought": "已收集足够的资料，现在创建报告初稿"
 }
 ```
@@ -79,7 +79,7 @@
   "human_readable_thought": "根据新收集的资料，需要完善第2章的内容，补充更多漏洞类型的说明",
   "modify_start_line": 10,
   "modify_end_line": 15,
-  "modify_reason": "补充漏洞类型的详细说明"
+  "modify_code_reason": "补充漏洞类型的详细说明"
 }
 ```
 **必须紧接着输出替换内容：**
@@ -99,8 +99,8 @@
 {
   "@action": "insert_section",
   "human_readable_thought": "需要在第2章后添加一个新的分析章节",
-  "after_line": 20,
-  "insert_reason": "添加详细的技术分析章节"
+  "insert_line": 21,
+  "insert_lines_reason": "添加详细的技术分析章节"
 }
 ```
 **必须紧接着输出新增内容：**
@@ -117,7 +117,8 @@
   "@action": "delete_section",
   "human_readable_thought": "发现第15-18行的内容与前文重复，需要删除",
   "delete_start_line": 15,
-  "delete_end_line": 18
+  "delete_end_line": 18,
+  "delete_lines_reason": "第15-18行内容与前文重复"
 }
 ```
 
@@ -135,7 +136,7 @@
 ## 📋 Action 类型总结
 
 ### 需要 `<|GEN_REPORT_...|>` 标签对的 Actions：
-- ✅ `write_report` - 创建报告初稿
+- ✅ `write_section` - 创建报告初稿
 - ✅ `modify_section` - 修改现有内容片段
 - ✅ `insert_section` - 插入新内容
 

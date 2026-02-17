@@ -1,6 +1,6 @@
 // test_change_view_offset.yak
 // 测试 loop_report_generating 的 change_view_offset 分页导航功能
-// 使用 actions: write_report, change_view_offset, insert_section
+// 使用 actions: write_section, change_view_offset, insert_section
 //
 // 测试断言：
 // 1. 必须成功获取报告文件路径
@@ -17,7 +17,7 @@ testPrompt = `请帮我生成一份详细的 Yaklang 网络安全工具分析报
 任务要求：
 
 **第一步：创建初始报告**
-请首先使用 write_report 创建一份包含以下章节的详细报告：
+请首先使用 write_section 创建一份包含以下章节的详细报告：
 
 1. 引言（介绍 Yaklang 的背景和目标）
 2. 核心功能分析

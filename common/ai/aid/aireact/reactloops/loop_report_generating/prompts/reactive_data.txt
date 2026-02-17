@@ -1,8 +1,8 @@
 ## ⚠️ 写报告时必须使用以下格式
 
-当你使用 `write_report` 时，必须这样输出：
+当你使用 `write_section` 时，必须这样输出：
 ```
-{"@action": "write_report", "human_readable_thought": "..."}
+{"@action": "write_section", "human_readable_thought": "..."}
 
 <|GEN_REPORT_{{ .Nonce }}|>
 你的报告内容...
@@ -79,7 +79,7 @@
    - `read_reference_file` 阅读参考文件
    - `grep_reference` 搜索关键词
    - `search_knowledge` 知识库搜索
-2. 收集足够资料后使用 `write_report` 创建初稿
+2. 收集足够资料后使用 `write_section` 创建初稿
 
 ### 如果报告已有内容
 1. 检查是否需要补充更多资料
@@ -95,7 +95,7 @@
 
 ### 修改操作说明
 - 行号从 1 开始计数
-- 修改范围必须指定 start_line 和 end_line
-- 插入时指定 after_line（在该行之后插入）
+- 修改范围必须指定 modify_start_line 和 modify_end_line
+- 插入时指定 insert_line（在该行位置插入，原内容向下推移）
 - 每次操作后会自动更新行号
 

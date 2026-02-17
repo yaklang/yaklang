@@ -28,9 +28,9 @@ Common operations:
 			aitool.WithIntegerParam("show_size", aitool.WithParam_Description("Maximum characters to display (default: 30000)")),
 		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
-			reportContent := loop.Get("full_report")
+			reportContent := loop.Get("full_report_code")
 			if reportContent == "" {
-				return utils.Error("no report content to view. Please create a report first using write_report")
+				return utils.Error("no report content to view. Please create a report first using write_section")
 			}
 
 			offsetLine := action.GetInt("offset_line")
@@ -57,7 +57,7 @@ Common operations:
 			loop.Set("offset_line", strconv.Itoa(offsetLine))
 			loop.Set("report_show_size", strconv.Itoa(showSize))
 
-			reportContent := loop.Get("full_report")
+			reportContent := loop.Get("full_report_code")
 			lines := strings.Split(reportContent, "\n")
 			totalLines := len(lines)
 

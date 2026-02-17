@@ -1,6 +1,6 @@
 // test_multi_file_analysis.yak
 // 测试 loop_report_generating 的多文件分析功能
-// 使用 actions: read_reference_file（多个文件）, write_report, modify_section
+// 使用 actions: read_reference_file（多个文件）, write_section, modify_section
 //
 // 测试断言：
 // 1. 必须成功获取报告文件路径

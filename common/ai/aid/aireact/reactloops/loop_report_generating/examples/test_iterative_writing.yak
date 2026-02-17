@@ -1,6 +1,6 @@
 // test_iterative_writing.yak
 // 测试 loop_report_generating 的迭代写作功能
-// 使用 actions: read_reference_file, write_report, insert_section, modify_section
+// 使用 actions: read_reference_file, write_section, insert_section, modify_section
 //
 // 测试断言：
 // 1. 必须成功获取报告文件路径
@@ -18,7 +18,7 @@ testPrompt = `请帮我撰写一份 Yaklang 项目的技术白皮书（简化版
 
 第一步：阅读 /Users/v1ll4n/Projects/yaklang/README.md 获取基础信息
 
-第二步：使用 write_report 创建初始报告，包含以下结构：
+第二步：使用 write_section 创建初始报告，包含以下结构：
 - 标题：Yaklang 技术白皮书（简化版）
 - 第一章：项目背景（占位符内容）
 - 第二章：核心技术（占位符内容）

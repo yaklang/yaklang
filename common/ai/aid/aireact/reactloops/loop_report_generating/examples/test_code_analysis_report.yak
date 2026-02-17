@@ -1,6 +1,6 @@
 // test_code_analysis_report.yak
 // 测试 loop_report_generating 对代码进行分析并生成报告
-// 使用 actions: grep_reference, read_reference_file, write_report
+// 使用 actions: grep_reference, read_reference_file, write_section
 //
 // 测试断言：
 // 1. 必须成功获取报告文件路径

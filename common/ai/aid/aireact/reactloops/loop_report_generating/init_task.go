@@ -54,7 +54,7 @@ func analyzeUserIntent(ctx context.Context, r aicommon.AIInvokeRuntime, userInpu
 			aitool.WithStringParam("target_file", aitool.WithParam_Description("如果用户指定了目标文件路径，返回该路径；否则返回空字符串")),
 			aitool.WithStringParam("analysis_reason", aitool.WithParam_Description("简要说明判断理由")),
 		},
-		aicommon.WithGeneralConfigStreamableFieldWithNodeId("init-analyze-intent", "analysis_reason"),
+		aicommon.WithGeneralConfigStreamableFieldWithNodeId("intent", "analysis_reason"),
 	)
 
 	if err != nil {
@@ -198,9 +198,9 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 			modeDescription = "创建模式：目标文件为空，将创建新内容"
 		}
 
-		// 初始化 loop 上下文
-		loop.Set("filename", outputFilename)
-		loop.Set("full_report", existingContent)
+		// 初始化 loop 上下文（变量名与 loopinfra.SingleFileModificationSuiteFactory 对齐）
+		loop.Set("report_filename", outputFilename)
+		loop.Set("full_report_code", existingContent)
 		loop.Set("user_requirements", userInput)
 		loop.Set("reference_files", strings.Join(referenceFiles, ","))
 		loop.Set("knowledge_bases", strings.Join(knowledgeBases, ","))

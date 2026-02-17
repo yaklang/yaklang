@@ -43,6 +43,9 @@ type SingleFileModificationSuiteFactory struct {
 
 	// Event type for emitting JSON events
 	eventType string
+
+	// Behavior flags
+	exitAfterWrite bool // whether to call operator.Exit() after successful write (default: true)
 }
 
 // SingleFileModificationOption is an option for configuring the factory
@@ -58,8 +61,9 @@ func NewSingleFileModificationSuiteFactory(runtime aicommon.AIInvokeRuntime, opt
 		aiTagVariable: "content",
 		aiNodeId:      "content",
 		contentType:   "text/plain",
-		eventType:     "yaklang_code_editor",
-		runtime:       runtime,
+		eventType:      "yaklang_code_editor",
+		exitAfterWrite: true,
+		runtime:        runtime,
 		codePrettifyCb: func(code string) (int, int, string, bool) {
 			return defaultPrettifyAITagCode(code)
 		},
@@ -139,6 +143,20 @@ func WithEventType(eventType string) SingleFileModificationOption {
 	return func(f *SingleFileModificationSuiteFactory) {
 		f.eventType = eventType
 	}
+}
+
+// WithExitAfterWrite controls whether the loop should exit after a successful write action.
+// Default is true (exit after write). Set to false for scenarios like report generation
+// where the AI needs to continue modifying content after the initial write.
+func WithExitAfterWrite(exit bool) SingleFileModificationOption {
+	return func(f *SingleFileModificationSuiteFactory) {
+		f.exitAfterWrite = exit
+	}
+}
+
+// ShouldExitAfterWrite returns whether the loop should exit after a successful write action
+func (f *SingleFileModificationSuiteFactory) ShouldExitAfterWrite() bool {
+	return f.exitAfterWrite
 }
 
 // GetAITagOption returns the ReActLoopOption for configuring AI tag extraction

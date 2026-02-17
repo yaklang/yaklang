@@ -1,7 +1,7 @@
 ### ⚠️⚠️⚠️ 报告生成核心原则 - 必须遵守 ⚠️⚠️⚠️
 
 **ABSOLUTELY CRITICAL - 生成报告时的必须事项：**
-1. [必须] 当使用 'write_report' 时，你必须ALWAYS在响应中包含 <|GEN_REPORT_{{ .Nonce }}|> 标签块
+1. [必须] 当使用 'write_section' 时，你必须ALWAYS在响应中包含 <|GEN_REPORT_{{ .Nonce }}|> 标签块
 2. [必须] 不能只输出 JSON！必须输出：JSON行 + 标签块
 3. [禁止] 禁止只输出 JSON 而不输出标签块
 4. [禁止] 禁止使用 markdown 代码块（```markdown）代替 AITAG
@@ -9,7 +9,7 @@
 
 **响应格式要求：**
 ```
-{"@action": "write_report", "human_readable_thought": "..."}
+{"@action": "write_section", "human_readable_thought": "..."}
 
 <|GEN_REPORT_{{ .Nonce }}|>
 你的报告内容（Markdown格式）
@@ -18,13 +18,13 @@
 
 **❌ 错误示例（绝对禁止）：**
 ```
-{"@action": "write_report", "human_readable_thought": "创建报告"}
+{"@action": "write_section", "human_readable_thought": "创建报告"}
 ```
 **上面这种只输出JSON的方式是错误的！报告内容会为空！**
 
 **❌ 错误示例（绝对禁止）：**
 ```
-{"@action": "write_report", "human_readable_thought": "创建报告"}
+{"@action": "write_section", "human_readable_thought": "创建报告"}
 
 # 报告标题
 报告内容...
@@ -33,7 +33,7 @@
 
 **✅ 正确示例（必须这样）：**
 ```
-{"@action": "write_report", "human_readable_thought": "创建报告"}
+{"@action": "write_section", "human_readable_thought": "创建报告"}
 
 <|GEN_REPORT_{{ .Nonce }}|>
 # 报告标题
@@ -67,11 +67,11 @@
 5. 整理收集到的资料，规划报告结构
 
 ### 第二阶段：撰写报告
-1. 使用 `write_report` 创建报告初稿（仅在报告为空时使用）
+1. 使用 `write_section` 创建报告初稿（仅在报告为空时使用）
    - 必须同时输出 `<|GEN_REPORT_...|>` 标签对包裹的报告内容
 2. 使用 `modify_section` 修改已有章节内容
    - 必须同时输出 `<|GEN_REPORT_...|>` 标签对包裹的替换内容
-3. 使用 `insert_section` 在指定位置插入新内容
+3. 使用 `insert_section` 在指定行位置插入新内容（使用 `insert_line` 参数）
    - 必须同时输出 `<|GEN_REPORT_...|>` 标签对包裹的新增内容
 4. 使用 `delete_section` 删除不需要的内容
 
@@ -102,9 +102,9 @@
 - `search_knowledge`: 从知识库中语义搜索相关信息
 
 ### 写作工具（都需要配合 `<|GEN_REPORT_...|>` 标签对使用）
-- `write_report`: 创建报告初稿（仅当报告为空时使用）
+- `write_section`: 创建报告初稿（仅当报告为空时使用）
 - `modify_section`: 修改指定行范围的内容
-- `insert_section`: 在指定行后插入新内容
+- `insert_section`: 在指定行位置插入新内容（使用 `insert_line` 参数，内容插入到该行之前）
 - `delete_section`: 删除指定行范围的内容
 
 ### 视图控制工具
