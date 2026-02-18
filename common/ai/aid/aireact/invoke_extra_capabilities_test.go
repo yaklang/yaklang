@@ -21,17 +21,22 @@ import (
 )
 
 // TestReAct_ExtraCapabilities_DeepIntent tests that deep intent recognition
-// correctly runs the full pipeline: search_capabilities -> finalize_enrichment -> main loop.
+// correctly runs the pipeline: search_capabilities -> auto-finalize -> main loop.
+//
+// With MaxIterations(1), the intent loop runs exactly 1 iteration. The AI executes
+// search_capabilities to discover relevant forges/tools/skills, then the loop exits.
+// The BuildOnPostIterationHook auto-generates intent analysis via LiteForge when
+// finalize_enrichment was not called by the AI. The main loop then proceeds.
 //
 // Flow:
 //  1. Create a test forge in DB
 //  2. Enable intent recognition (override NewTestReAct default)
 //  3. Use a medium-length user input (>100 runes) to trigger deep intent recognition
-//  4. Mock AI callback handles three phases (detected via prompt keywords):
+//  4. Mock AI callback handles two phases (detected via prompt keywords):
 //     - Intent loop iteration 1: return search_capabilities action
-//     - Intent loop iteration 2: return finalize_enrichment action
 //     - Main loop iteration:     capture prompt, return directly_answer
-//  5. Assert: all phases executed, prompt captured, timeline contains intent analysis
+//  5. Finalization runs automatically in post-iteration hook (not via AI callback)
+//  6. Assert: search + main loop executed, timeline contains intent analysis
 func TestReAct_ExtraCapabilities_DeepIntent(t *testing.T) {
 	testNonce := utils.RandStringBytes(16)
 	testForgeName := "test_forge_extracap_" + testNonce
@@ -57,7 +62,6 @@ func TestReAct_ExtraCapabilities_DeepIntent(t *testing.T) {
 
 	// Tracking variables (set inside AI callback, checked after event loop)
 	var intentSearchCalled int32
-	var intentFinalizeCalled int32
 	var mainLoopCalled int32
 	var extraCapFoundInPrompt int32
 	// Capture the main loop prompt for post-run assertion
@@ -72,30 +76,18 @@ func TestReAct_ExtraCapabilities_DeepIntent(t *testing.T) {
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := r.GetPrompt()
 
-			// ---- Phase 1 & 2: Intent loop ----
+			// ---- Phase 1: Intent loop (single iteration with MaxIterations=1) ----
 			// The intent loop prompt contains "finalize_enrichment" and "search_capabilities"
 			// (from schema/output examples) but NOT "directly_answer" (filtered out).
+			// With MaxIterations(1), only 1 iteration runs. After that, the post-iteration
+			// hook auto-generates the intent summary via LiteForge.
 			if utils.MatchAllOfSubString(prompt, "finalize_enrichment", "search_capabilities") &&
 				!utils.MatchAllOfSubString(prompt, "directly_answer") {
-
-				// Phase 1: No search results yet -> search for capabilities
-				if !utils.MatchAllOfSubString(prompt, "Capability Search Results") {
-					atomic.AddInt32(&intentSearchCalled, 1)
-					log.Infof("intent loop phase 1: returning search_capabilities action")
-					rsp := i.NewAIResponse()
-					rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "search_capabilities", "human_readable_thought": "searching for capabilities matching the user request", "search_query": "` + testForgeName + `"}
-`))
-					rsp.Close()
-					return rsp, nil
-				}
-
-				// Phase 2: Search results present -> finalize intent analysis
-				atomic.AddInt32(&intentFinalizeCalled, 1)
-				log.Infof("intent loop phase 2: returning finalize_enrichment action")
+				atomic.AddInt32(&intentSearchCalled, 1)
+				log.Infof("intent loop: returning search_capabilities action (single iteration)")
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "finalize_enrichment", "human_readable_thought": "search completed, finalizing intent analysis", "intent_summary": "User wants to perform security assessment. Found relevant blueprint ` + testForgeName + `.", "recommended_capabilities": "` + testForgeName + `", "context_notes": "The blueprint should be used for comprehensive scanning."}
+{"@action": "search_capabilities", "human_readable_thought": "searching for capabilities matching the user request", "search_query": "` + testForgeName + `"}
 `))
 				rsp.Close()
 				return rsp, nil
@@ -206,19 +198,16 @@ LOOP:
 
 	// 1. Verify intent recognition phases executed
 	searchCount := atomic.LoadInt32(&intentSearchCalled)
-	finalizeCount := atomic.LoadInt32(&intentFinalizeCalled)
 	mainCount := atomic.LoadInt32(&mainLoopCalled)
 
 	t.Logf("intent search_capabilities called %d time(s)", searchCount)
-	t.Logf("intent finalize_enrichment called %d time(s)", finalizeCount)
 	t.Logf("main loop called %d time(s)", mainCount)
 
 	if searchCount == 0 {
-		t.Fatal("intent loop phase 1 (search_capabilities) was never called - deep intent recognition did not trigger")
+		t.Fatal("intent loop (search_capabilities) was never called - deep intent recognition did not trigger")
 	}
-	if finalizeCount == 0 {
-		t.Fatal("intent loop phase 2 (finalize_enrichment) was never called - intent loop did not reach finalization")
-	}
+	// Note: finalize_enrichment is NOT called via AI callback with MaxIterations(1).
+	// Instead, BuildOnPostIterationHook auto-generates the intent summary via LiteForge.
 	if mainCount == 0 {
 		t.Fatal("main loop AI callback was never called - main loop did not execute after intent recognition")
 	}
