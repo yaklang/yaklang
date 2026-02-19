@@ -11,6 +11,27 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+func buildPlanInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
+	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
+		config := r.GetConfig()
+
+		if config.GetConfigBool("DisableIntentRecognition") {
+			log.Infof("plan: intent recognition disabled via config, skipping")
+			return
+		}
+
+		loop.LoadingStatus("深度意图识别 / Deep intent recognition")
+		log.Infof("plan: invoking deep intent recognition directly")
+
+		deepResult := reactloops.ExecuteDeepIntentRecognition(r, loop, task)
+		if deepResult != nil {
+			reactloops.ApplyDeepIntentResult(r, loop, deepResult)
+		} else {
+			log.Infof("plan: deep intent recognition returned no result, proceeding normally")
+		}
+	}
+}
+
 var PLAN_DATA_KEY = "plan_data"
 var PLAN_HELP_KEY = "plan_help"
 var PLAN_ENHANCE_KEY = "plan_enhance"
@@ -32,12 +53,13 @@ func init() {
 		func(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {
 			help := r.GetConfig().GetConfigString(PLAN_HELP_KEY)
 			planPrompt := r.GetConfig().GetConfigString(PLAN_PROMPT_KEY)
-			preset := []reactloops.ReActLoopOption{
-				reactloops.WithAllowRAG(false),
-				reactloops.WithAllowToolCall(false),
-				reactloops.WithAllowAIForge(false),
-				reactloops.WithAllowPlanAndExec(false),
-				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
+		preset := []reactloops.ReActLoopOption{
+			reactloops.WithAllowRAG(false),
+			reactloops.WithAllowToolCall(false),
+			reactloops.WithAllowAIForge(false),
+			reactloops.WithAllowPlanAndExec(false),
+			reactloops.WithInitTask(buildPlanInitTask(r)),
+			reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 				reactloops.WithPersistentContextProvider(func(loop *reactloops.ReActLoop, nonce string) (string, error) {
 					return utils.RenderTemplate(persistentInstruction, map[string]any{

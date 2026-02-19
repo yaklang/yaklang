@@ -23,9 +23,9 @@ func buildPETaskInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReAct
 		loop.LoadingStatus("深度意图识别 / Deep intent recognition")
 		log.Infof("pe_task: invoking deep intent recognition directly")
 
-		deepResult := executeDeepIntentRecognition(r, loop, task)
+		deepResult := reactloops.ExecuteDeepIntentRecognition(r, loop, task)
 		if deepResult != nil {
-			applyDeepIntentResult(r, loop, deepResult)
+			reactloops.ApplyDeepIntentResult(r, loop, deepResult)
 		} else {
 			log.Infof("pe_task: deep intent recognition returned no result, proceeding normally")
 		}
