@@ -431,29 +431,13 @@ func (c *Coordinator) Run() error {
 	if c.ResultHandler != nil {
 		c.ResultHandler(c)
 	} else if c.GenerateReport {
-		c.planLoadingStatus("生成报告中 / Generating Report...")
-		c.EmitInfo("start to generate report or result")
-		prompt, err := c.generateReport()
-		if err != nil {
+		c.planLoadingStatus("进入报告生成专注模式 / Entering Report Generation Focus Mode...")
+		c.EmitInfo("start report generation via focus mode loop")
+		if err := c.generateReportViaFocusMode(); err != nil {
 			c.planLoadingStatus("报告生成失败 / Report Generation Failed")
-			c.EmitError("generate report failed: %v", err)
-			return utils.Error("coordinator: generate report failed")
+			c.EmitError("report generation via focus mode failed: %v", err)
+			return utils.Errorf("coordinator: report generation failed: %v", err)
 		}
-		aiRsp, err := c.CallAI(aicommon.NewAIRequest(prompt))
-		if err != nil {
-			c.planLoadingStatus("AI 响应失败 / AI Response Failed")
-			c.EmitError("AICallback failed: %v", err)
-			return utils.Errorf("coordinator: AICallback failed: %v", err)
-		}
-		output, err := io.ReadAll(aiRsp.GetOutputStreamReader("result", false, c.GetEmitter()))
-		if err != nil {
-			c.planLoadingStatus("读取结果失败 / Reading Result Failed")
-			c.EmitError("read AICallback response failed: %v", err)
-			return utils.Errorf("coordinator: read AICallback response failed: %v", err)
-		}
-		c.EmitStructured("result", map[string]any{
-			"data": string(output),
-		})
 	}
 
 	// Phase 8: Completed

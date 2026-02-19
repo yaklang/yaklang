@@ -178,9 +178,9 @@ func buildAIDOption(startParams *ypb.AIStartParams) []aicommon.ConfigOption {
 		aidOption = append(aidOption, aicommon.WithPlanUserInteractMaxCount(startParams.GetPlanUserInteractMaxCount()))
 	}
 
-	if startParams.GetAllowGenerateReport() {
-		aidOption = append(aidOption, aicommon.WithGenerateReport(startParams.GetAllowGenerateReport()))
-	}
+	//if startParams.GetAllowGenerateReport() {
+	//	aidOption = append(aidOption, aicommon.WithGenerateReport(startParams.GetAllowGenerateReport()))
+	//}
 
 	if startParams.GetUseDefaultAIConfig() {
 		wrapperChat := aicommon.AIChatToAICallbackType(ai.Chat)

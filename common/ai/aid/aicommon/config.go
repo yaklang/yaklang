@@ -406,6 +406,7 @@ func newConfig(ctx context.Context) *Config {
 		MemoryPoolSize:                     10 * 1024,
 		MemoryPool:                         omap.NewOrderedMap(make(map[string]*MemoryEntity)),
 		MaxTaskContinue:                    3,
+		GenerateReport:                     true,
 		DisallowMCPServers:                 false, // 默认启用 MCP Servers
 		MemoryTriageId:                     "default",
 		m:                                  new(sync.Mutex),
