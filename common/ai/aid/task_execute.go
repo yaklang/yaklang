@@ -116,16 +116,49 @@ func (t *AiTask) execute() error {
 
 				// Signal the loop to end - this ensures the loop terminates after this iteration
 				operator.EndIteration("task completed via completed_task_index or isDone")
-			} else {
-				// Emit continuing status
-				t.planLoadingStatus(fmt.Sprintf("任务 [%s] 继续执行 (迭代 %d) / Task [%s] Continuing (Iteration %d)", t.Index, iteration+1, t.Index, iteration+1))
+		} else {
+			// Emit continuing status
+			t.planLoadingStatus(fmt.Sprintf("任务 [%s] 继续执行 (迭代 %d) / Task [%s] Continuing (Iteration %d)", t.Index, iteration+1, t.Index, iteration+1))
 
-				// Combine summary (reasoning) and next_movements as Processing status
-				// This ensures both are captured in StatusSummary to avoid context loss
-				t.updateProcessingStatus(summary, nextMovements)
+			// Combine summary (reasoning) and next_movements as Processing status
+			// This ensures both are captured in StatusSummary to avoid context loss
+			t.updateProcessingStatus(summary, nextMovements)
+
+			if t.Coordinator != nil && summary != "" {
+				timelineMsg := fmt.Sprintf(
+					"[task-verification] Task %s iteration %d verification: not yet complete. Reason: %s",
+					t.Index, iteration, summary,
+				)
+				if nextMovements != "" {
+					timelineMsg += fmt.Sprintf(" | Suggested next steps: %s", nextMovements)
+				}
+				t.Coordinator.Timeline.PushText(
+					t.Coordinator.AcquireId(),
+					timelineMsg,
+				)
 			}
+		}
 		}),
 		reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedback *bytes.Buffer, nonce string) (string, error) {
+			currentIteration := loop.GetCurrentIterationIndex()
+
+			var lastVerificationInfo string
+			if lastRecord := loop.GetLastSatisfactionRecordFull(); lastRecord != nil {
+				lastVerificationInfo = fmt.Sprintf("satisfied=%v, reasoning=%s", lastRecord.Satisfactory, lastRecord.Reason)
+				if lastRecord.NextMovements != "" {
+					lastVerificationInfo += fmt.Sprintf(", next_movements=%s", lastRecord.NextMovements)
+				}
+			}
+
+			var recentActionsSummary string
+			if recentActions := loop.GetLastNAction(3); len(recentActions) > 0 {
+				var parts []string
+				for _, a := range recentActions {
+					parts = append(parts, fmt.Sprintf("iter%d: %s(%s)", a.IterationIndex, a.ActionType, a.ActionName))
+				}
+				recentActionsSummary = strings.Join(parts, " -> ")
+			}
+
 			reactiveData := utils.MustRenderTemplate(`
 当前 Plan-Execution 模式进度信息：
 
@@ -137,6 +170,23 @@ func (t *AiTask) execute() error {
 --- CURRENT_TASK_END ---
 
 <|PROGRESS_TASK_END_{{ .Nonce }}|>
+
+--- TASK_ITERATION_INFO ---
+当前子任务迭代次数: {{ .CurrentIteration }}
+{{ if .StatusSummary }}当前状态分析: {{ .StatusSummary }}{{ end }}
+{{ if .LastVerificationInfo }}上次验证结果: {{ .LastVerificationInfo }}{{ end }}
+{{ if .FeedbackMessages }}
+最近反馈信息:
+{{ .FeedbackMessages }}
+{{ end }}
+{{ if .RecentActions }}最近执行动作: {{ .RecentActions }}{{ end }}
+{{ if gt .CurrentIteration 5 }}
+** 警告: 当前子任务已执行 {{ .CurrentIteration }} 次迭代，请认真评估：
+  1. 任务目标是否实际上已经完成？如果工具已返回足够结果，请允许任务完成。
+  2. 当前策略是否有效？如果反复失败，请更换工具或方法。
+  3. 不要重复执行相同的操作，这会浪费迭代次数。**
+{{ end }}
+--- TASK_ITERATION_INFO_END ---
 
 - 进度信息语义约定：
   1) 任务树状态约定
@@ -162,9 +212,14 @@ func (t *AiTask) execute() error {
      - 用于计划：仅对“当前任务”制定可执行的下一步子步骤清单与完成判据（Done Criteria）。
 
 `, map[string]interface{}{
-				"Progress":        t.rootTask.Progress(),
-				"CurrentProgress": t.Progress(),
-				"Nonce":           nonce,
+				"Progress":             t.rootTask.Progress(),
+				"CurrentProgress":      t.Progress(),
+				"Nonce":                nonce,
+				"CurrentIteration":     currentIteration,
+				"FeedbackMessages":     feedback.String(),
+				"StatusSummary":        t.StatusSummary,
+				"LastVerificationInfo": lastVerificationInfo,
+				"RecentActions":        recentActionsSummary,
 			})
 
 			return reactiveData, nil

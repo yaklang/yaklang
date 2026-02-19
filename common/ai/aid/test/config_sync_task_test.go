@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -252,6 +253,7 @@ func TestCoordinator_SyncTask_Upgrade(t *testing.T) {
 	ins, err := aid.NewCoordinator(
 		"test-upgrade",
 		aicommon.WithTools(aid.EchoTool(), aid.ErrorTool()),
+		aicommon.WithMemoryTriage(aimem.NewMockMemoryTriage()),
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
@@ -344,6 +346,17 @@ func TestCoordinator_SyncTask_Upgrade(t *testing.T) {
 					firstSummary = false
 				} else {
 					rsp.EmitOutputStream(strings.NewReader(fmt.Sprintf(`{"@action": "summary","task_short_summary":"%s"}`, task2Summary)))
+				}
+				return rsp, nil
+			}
+
+			if strings.Contains(prompt, "数据处理和总结提示小助手") {
+				if strings.Contains(prompt, "tag-selection") {
+					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "tag-selection", "tags": ["test"]}`))
+				} else if strings.Contains(prompt, "memory-triage") {
+					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "memory-triage", "memory_entities": []}`))
+				} else {
+					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object"}`))
 				}
 				return rsp, nil
 			}

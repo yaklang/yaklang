@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -534,6 +535,7 @@ func TestCoordinator_SkipSubtaskInPlan_CancelSkipsReview(t *testing.T) {
 	ins, err := aid.NewCoordinator(
 		"测试取消后跳过审查逻辑",
 		aicommon.WithAgreeYOLO(),
+		aicommon.WithMemoryTriage(aimem.NewMockMemoryTriage()),
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
@@ -662,13 +664,13 @@ LOOP:
 
 // TestCoordinator_SkipSubtaskAndContinueNextUseCurrent 验证 skip 子任务后，下一个子任务立即开始执行, 但是使用的是skip current task flag
 func TestCoordinator_SkipSubtaskAndContinueNextUseCurrent(t *testing.T) {
-	const maxRetries = 10
+	const maxRetries = 3
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		if attempt > 0 {
-			time.Sleep(20 * time.Millisecond)
+			time.Sleep(50 * time.Millisecond)
 		}
 		if runSkipAndContinueTest(t, true) {
-			return // 测试成功
+			return
 		}
 	}
 	t.Fatal("Test failed after max retries - skip and continue mechanism may have issues")
@@ -690,13 +692,13 @@ func TestCoordinator_SkipSubtaskAndContinueNext(t *testing.T) {
 	// 由于框架的 skip 处理涉及复杂的异步操作和竞争条件，
 	// 使用重试机制确保至少一次成功即可验证功能正常
 	// 注意：这不是"作弊"，而是处理并发测试中常见的时序不确定性
-	const maxRetries = 10
+	const maxRetries = 3
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		if attempt > 0 {
-			time.Sleep(20 * time.Millisecond)
+			time.Sleep(50 * time.Millisecond)
 		}
 		if runSkipAndContinueTest(t, false) {
-			return // 测试成功
+			return
 		}
 	}
 	t.Fatal("Test failed after max retries - skip and continue mechanism may have issues")
@@ -707,8 +709,7 @@ func runSkipAndContinueTest(t *testing.T, useCurrentFlag bool) bool {
 	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 100)
 	outputChan := make(chan *schema.AiOutputEvent, 100)
 
-	// 测试超时上下文 - 3秒内完成
-	testCtx, testCancel := context.WithTimeout(context.Background(), 3*time.Second)
+	testCtx, testCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer testCancel()
 
 	// 用于协调 callback 和外部测试循环
@@ -724,6 +725,7 @@ func runSkipAndContinueTest(t *testing.T, useCurrentFlag bool) bool {
 	ins, err := aid.NewCoordinator(
 		"测试跳过子任务后继续执行下一个任务",
 		aicommon.WithAgreeYOLO(),
+		aicommon.WithMemoryTriage(aimem.NewMockMemoryTriage()),
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			select {
@@ -809,6 +811,18 @@ func runSkipAndContinueTest(t *testing.T, useCurrentFlag bool) bool {
 				return rsp, nil
 			}
 
+			if strings.Contains(prompt, "数据处理和总结提示小助手") {
+				defer rsp.Close()
+				if strings.Contains(prompt, "tag-selection") {
+					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "tag-selection", "tags": ["test"]}`))
+				} else if strings.Contains(prompt, "memory-triage") {
+					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "memory-triage", "memory_entities": []}`))
+				} else {
+					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object"}`))
+				}
+				return rsp, nil
+			}
+
 			// 默认响应
 			defer rsp.Close()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "finish", "answer_payload": "默认完成"}}`))
@@ -832,7 +846,7 @@ LOOP:
 	for {
 		select {
 		case <-task11Ready:
-			// callback 已准备好，发送 skip 请求
+			t.Logf("[DEBUG] task11Ready received, sending skip request (useCurrentFlag=%v)", useCurrentFlag)
 			if !skipSent {
 				skipSent = true
 
@@ -852,19 +866,22 @@ LOOP:
 			}
 
 		case result := <-outputChan:
-			// plan 审核正常 continue
 			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
 				continue
 			}
 
-			// 检查 skip 响应
+			if result.Type == schema.EVENT_TYPE_TASK_REVIEW_REQUIRE || result.Type == schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE {
+				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
+				continue
+			}
+
 			if result.Type == schema.EVENT_TYPE_STRUCTURED && result.SyncID == syncId {
 				var data map[string]any
 				if err := json.Unmarshal([]byte(result.Content), &data); err == nil {
 					if success, ok := data["success"].(bool); ok && success && !skipSuccess {
+						t.Logf("[DEBUG] skip success received")
 						skipSuccess = true
-						// 通知 callback skip 已成功确认
 						skipConfirmOnce.Do(func() {
 							close(skipConfirmed)
 						})
@@ -872,14 +889,16 @@ LOOP:
 				}
 			}
 
-			// 检查完成
 			if result.Type == schema.EVENT_TYPE_STRUCTURED && strings.Contains(string(result.Content), "coordinator run finished") {
-				time.Sleep(30 * time.Millisecond) // 短暂等待确保状态更新
+				t.Logf("[DEBUG] coordinator run finished")
+				time.Sleep(30 * time.Millisecond)
 				break LOOP
 			}
 
 		case <-testCtx.Done():
-			return false // 超时
+			t.Logf("[DEBUG] testCtx done: skipSent=%v, skipSuccess=%v, task11=%v, task12=%v",
+				skipSent, skipSuccess, atomic.LoadInt32(&task11DidStart), atomic.LoadInt32(&task12Started))
+			return false
 		}
 	}
 

@@ -101,5 +101,12 @@ var loopAction_toolRequireAndCall = &reactloops.LoopAction{
 			operator.Exit()
 			return
 		}
+
+		feedbackMsg := fmt.Sprintf("[Verification] Task not yet satisfied.\nReasoning: %s", verifyResult.Reasoning)
+		if verifyResult.NextMovements != "" {
+			feedbackMsg += fmt.Sprintf("\nNext Steps: %s", verifyResult.NextMovements)
+		}
+		operator.Feedback(feedbackMsg)
+		operator.Continue()
 	},
 }
