@@ -2537,6 +2537,12 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 		opts = append(opts, WithSeqIdProvider(i.SeqIdProvider))
 	}
 
+	// Propagate intent recognition disable flag so sub-loops (PE task, plan)
+	// do not accidentally run deep intent recognition in test environments.
+	if i.DisableIntentRecognition {
+		opts = append(opts, WithDisableIntentRecognition(true))
+	}
+
 	// once init config flag
 	opts = append(opts, WithInitConfigStatus(i.InitStatus))
 
