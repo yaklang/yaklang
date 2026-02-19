@@ -21,10 +21,10 @@ import (
 )
 
 // TestReAct_ExtraCapabilities_DeepIntent tests that deep intent recognition
-// correctly runs the pipeline: search_capabilities -> auto-finalize -> main loop.
+// correctly runs the pipeline: query_capabilities -> auto-finalize -> main loop.
 //
 // With MaxIterations(1), the intent loop runs exactly 1 iteration. The AI executes
-// search_capabilities to discover relevant forges/tools/skills, then the loop exits.
+// query_capabilities to discover relevant forges/tools/skills, then the loop exits.
 // The BuildOnPostIterationHook auto-generates intent analysis via LiteForge when
 // finalize_enrichment was not called by the AI. The main loop then proceeds.
 //
@@ -33,16 +33,16 @@ import (
 //  2. Enable intent recognition (override NewTestReAct default)
 //  3. Use a medium-length user input (>100 runes) to trigger deep intent recognition
 //  4. Mock AI callback handles two phases (detected via prompt keywords):
-//     - Intent loop iteration 1: return search_capabilities action
+//     - Intent loop iteration 1: return query_capabilities action
 //     - Main loop iteration:     capture prompt, return directly_answer
 //  5. Finalization runs automatically in post-iteration hook (not via AI callback)
-//  6. Assert: search + main loop executed, timeline contains intent analysis
+//  6. Assert: query_capabilities + main loop executed, timeline contains intent analysis
 func TestReAct_ExtraCapabilities_DeepIntent(t *testing.T) {
 	testNonce := utils.RandStringBytes(16)
 	testForgeName := "test_forge_extracap_" + testNonce
 	forgeVerboseName := "Extra Capabilities Test Blueprint " + testNonce
 
-	// Create test forge in DB so search_capabilities can find it via BM25
+	// Create test forge in DB so query_capabilities can find it via BM25
 	forge := &schema.AIForge{
 		ForgeName:        testForgeName,
 		ForgeVerboseName: forgeVerboseName,
@@ -77,17 +77,17 @@ func TestReAct_ExtraCapabilities_DeepIntent(t *testing.T) {
 			prompt := r.GetPrompt()
 
 			// ---- Phase 1: Intent loop (single iteration with MaxIterations=1) ----
-			// The intent loop prompt contains "finalize_enrichment" and "search_capabilities"
+			// The intent loop prompt contains "finalize_enrichment" and "query_capabilities"
 			// (from schema/output examples) but NOT "directly_answer" (filtered out).
 			// With MaxIterations(1), only 1 iteration runs. After that, the post-iteration
 			// hook auto-generates the intent summary via LiteForge.
-			if utils.MatchAllOfSubString(prompt, "finalize_enrichment", "search_capabilities") &&
+			if utils.MatchAllOfSubString(prompt, "finalize_enrichment", "query_capabilities") &&
 				!utils.MatchAllOfSubString(prompt, "directly_answer") {
 				atomic.AddInt32(&intentSearchCalled, 1)
-				log.Infof("intent loop: returning search_capabilities action (single iteration)")
+				log.Infof("intent loop: returning query_capabilities action (single iteration)")
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "search_capabilities", "human_readable_thought": "searching for capabilities matching the user request", "search_query": "` + testForgeName + `"}
+{"@action": "query_capabilities", "human_readable_thought": "searching for capabilities matching the user request", "search_query": "` + testForgeName + `"}
 `))
 				rsp.Close()
 				return rsp, nil
@@ -200,11 +200,11 @@ LOOP:
 	searchCount := atomic.LoadInt32(&intentSearchCalled)
 	mainCount := atomic.LoadInt32(&mainLoopCalled)
 
-	t.Logf("intent search_capabilities called %d time(s)", searchCount)
+	t.Logf("intent query_capabilities called %d time(s)", searchCount)
 	t.Logf("main loop called %d time(s)", mainCount)
 
 	if searchCount == 0 {
-		t.Fatal("intent loop (search_capabilities) was never called - deep intent recognition did not trigger")
+		t.Fatal("intent loop (query_capabilities) was never called - deep intent recognition did not trigger")
 	}
 	// Note: finalize_enrichment is NOT called via AI callback with MaxIterations(1).
 	// Instead, BuildOnPostIterationHook auto-generates the intent summary via LiteForge.

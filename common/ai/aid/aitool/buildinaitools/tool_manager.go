@@ -28,11 +28,6 @@ type AiToolManager struct {
 	forgeSearchTool       []*aitool.Tool
 	noCacheTools          bool // 是否不缓存工具
 	enableAllTools        bool // 是否开启所有工具
-
-	// Unified search_capabilities replaces tools_search + aiforge_search
-	enableSearchCapabilities bool
-	searchCapabilitiesCfg    *searchtools.SearchCapabilitiesConfig
-	searchCapabilitiesTool   []*aitool.Tool
 }
 
 // ToolManagerOption 定义工具管理器的配置选项
@@ -69,27 +64,6 @@ func WithAiForgeSearcher(searcher searchtools.AISearcher[*schema.AIForge]) ToolM
 func WithForgeSearchToolEnabled(enabled bool) ToolManagerOption {
 	return func(m *AiToolManager) {
 		m.enableForgeSearchTool = enabled
-	}
-}
-
-// WithSearchCapabilitiesEnabled enables the unified search_capabilities tool
-// which replaces both tools_search and aiforge_search with a single tool
-// that searches tools, forges, AND skills simultaneously.
-func WithSearchCapabilitiesEnabled(enabled bool) ToolManagerOption {
-	return func(m *AiToolManager) {
-		m.enableSearchCapabilities = enabled
-		if enabled {
-			// Disable legacy search tools when unified search is enabled
-			m.enableSearchTool = false
-			m.enableForgeSearchTool = false
-		}
-	}
-}
-
-// WithSearchCapabilitiesConfig sets the configuration for the unified search_capabilities tool.
-func WithSearchCapabilitiesConfig(cfg *searchtools.SearchCapabilitiesConfig) ToolManagerOption {
-	return func(m *AiToolManager) {
-		m.searchCapabilitiesCfg = cfg
 	}
 }
 
@@ -216,34 +190,22 @@ func (m *AiToolManager) GetEnableTools() ([]*aitool.Tool, error) {
 		}
 	}
 
-	// Unified search_capabilities replaces legacy tools_search + aiforge_search
-	if m.enableSearchCapabilities {
-		tool, err := m.getSearchCapabilitiesTools()
+	if m.enableSearchTool {
+		tool, err := m.getSearchTools()
 		if err != nil {
-			log.Errorf("getSearchCapabilitiesTools err: %v", err)
+			log.Errorf("getSearchTools err: %v", err)
 		}
 		if !utils.IsNil(tool) {
 			enabledTools = append(enabledTools, tool...)
 		}
-	} else {
-		// Legacy search tools (backward compatible)
-		if m.enableSearchTool {
-			tool, err := m.getSearchTools()
-			if err != nil {
-				log.Errorf("getSearchTools err: %v", err)
-			}
-			if !utils.IsNil(tool) {
-				enabledTools = append(enabledTools, tool...)
-			}
+	}
+	if m.enableForgeSearchTool {
+		tool, err := m.getForgeSearchTools()
+		if err != nil {
+			log.Errorf("getForgeSearchTools err: %v", err)
 		}
-		if m.enableForgeSearchTool {
-			tool, err := m.getForgeSearchTools()
-			if err != nil {
-				log.Errorf("getForgeSearchTools err: %v", err)
-			}
-			if !utils.IsNil(tool) {
-				enabledTools = append(enabledTools, tool...)
-			}
+		if !utils.IsNil(tool) {
+			enabledTools = append(enabledTools, tool...)
 		}
 	}
 	return enabledTools, nil
@@ -278,32 +240,6 @@ func (m *AiToolManager) getSearchTools() ([]*aitool.Tool, error) {
 		m.searchTool = aiToolSearchTools
 	}
 	return m.searchTool, nil
-}
-
-func (m *AiToolManager) getSearchCapabilitiesTools() ([]*aitool.Tool, error) {
-	if m.searchCapabilitiesTool == nil {
-		if m.searchCapabilitiesCfg == nil {
-			// Build default config from available searchers
-			m.searchCapabilitiesCfg = &searchtools.SearchCapabilitiesConfig{
-				ToolSearcher:  m.aiToolsSearcher,
-				ToolsGetter:   m.safeToolsGetter,
-				ForgeSearcher: m.aiForgeSearcher,
-				ForgesGetter: func() []*schema.AIForge {
-					forgeList, err := yakit.GetAllAIForge(consts.GetGormProfileDatabase())
-					if err != nil {
-						log.Errorf("get all ai forge error: %v", err)
-					}
-					return forgeList
-				},
-			}
-		}
-		tools, err := searchtools.CreateSearchCapabilitiesTool(m.searchCapabilitiesCfg)
-		if err != nil {
-			return nil, utils.Errorf("create search_capabilities tool: %v", err)
-		}
-		m.searchCapabilitiesTool = tools
-	}
-	return m.searchCapabilitiesTool, nil
 }
 
 // GetToolByName 通过工具名获取特定工具

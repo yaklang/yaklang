@@ -1,10 +1,10 @@
 ## Action 输出示例
 
 * 当需要搜索可用能力（工具、蓝图、专注模式）时：
-  {"@action": "search_capabilities", "search_query": "渗透测试 端口扫描 漏洞检测 penetration test"}
+  {"@action": "query_capabilities", "search_query": "渗透测试 端口扫描 漏洞检测 penetration test"}
 
 * 当需要对综合性任务进行多维度搜索时（可多次调用）：
-  {"@action": "search_capabilities", "search_query": "信息收集 子域名扫描 报告生成 reconnaissance"}
+  {"@action": "query_capabilities", "search_query": "信息收集 子域名扫描 报告生成 reconnaissance"}
 
 * 当已收集到足够的搜索结果，需要输出最终分析时：
   {"@action": "finalize_enrichment", "intent_summary": "用户希望进行完整的渗透测试流程，包括：1) 信息收集与资产发现 2) 端口扫描与服务识别 3) 漏洞检测与验证 4) 报告生成", "recommended_capabilities": "synscan, servicescan, poc, subdomain, report_generating"}

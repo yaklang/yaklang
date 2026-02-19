@@ -14,8 +14,10 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
-// searchCapabilitiesAction creates the search_capabilities action
+// searchCapabilitiesAction creates the query_capabilities action
 // that searches for tools, forges, and focus modes matching the user's intent.
+// Renamed from "search_capabilities" to "query_capabilities" to avoid conflict
+// with the global built-in @action "search_capabilities".
 var searchCapabilitiesAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 	return makeSearchCapabilitiesAction(r)
 }
@@ -33,7 +35,7 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 	}
 
 	return reactloops.WithRegisterLoopActionWithStreamField(
-		"search_capabilities",
+		"query_capabilities",
 		desc,
 		toolOpts,
 		[]*reactloops.LoopStreamField{

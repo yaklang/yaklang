@@ -28,6 +28,7 @@ type EventType string
 
 const (
 	AI_REACT_LOOP_ACTION_REQUIRE_TOOL              = "require_tool"
+	AI_REACT_LOOP_ACTION_SEARCH_CAPABILITIES       = "search_capabilities"
 	AI_REACT_LOOP_ACTION_ASK_FOR_CLARIFICATION     = "ask_for_clarification"
 	AI_REACT_LOOP_ACTION_DIRECTLY_ANSWER           = "directly_answer"
 	AI_REACT_LOOP_ACTION_KNOWLEDGE_ENHANCE         = "knowledge_enhance_answer"

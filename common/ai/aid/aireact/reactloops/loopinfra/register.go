@@ -13,4 +13,5 @@ func init() {
 	reactloops.RegisterAction(loopAction_toolCompose)
 	reactloops.RegisterAction(loopAction_LoadingSkills)
 	reactloops.RegisterAction(loopAction_ChangeSkillViewOffset)
+	reactloops.RegisterAction(loopAction_SearchCapabilities)
 }

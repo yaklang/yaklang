@@ -37,7 +37,7 @@ func init() {
 				reactloops.WithReflectionOutputExample(outputExample),
 				reactloops.WithActionFilter(func(action *reactloops.LoopAction) bool {
 					allowActionNames := []string{
-						"search_capabilities",
+						"query_capabilities",
 						"finalize_enrichment",
 					}
 					for _, actionName := range allowActionNames {
