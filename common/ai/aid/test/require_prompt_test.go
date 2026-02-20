@@ -21,6 +21,27 @@ func mockedClarification(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, f
 	prompt := req.GetPrompt()
 
 	fmt.Println("===========" + "request:" + "===========\n" + req.GetPrompt())
+
+	if strings.Contains(prompt, "意图识别与上下文增强系统") {
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finalize_enrichment", "intent_summary": "mocked intent analysis", "recommended_capabilities": "", "context_notes": ""}`))
+		rsp.Close()
+		return rsp, nil
+	}
+
+	if strings.Contains(prompt, "数据处理和总结提示小助手") {
+		rsp := i.NewAIResponse()
+		if strings.Contains(prompt, "tag-selection") {
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "tag-selection", "tags": ["test"]}`))
+		} else if strings.Contains(prompt, "memory-triage") {
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "memory-triage", "memory_entities": []}`))
+		} else {
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object"}`))
+		}
+		rsp.Close()
+		return rsp, nil
+	}
+
 	if utils.MatchAllOfSubString(prompt, "plan: when user needs to create or refine a plan for a specific task, if need to search") {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(strings.NewReader(`
@@ -51,6 +72,13 @@ func mockedClarification(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, f
 {"@action": "object", "next_action": { "type": "ask_for_clarification", "ask_for_clarification_payload": {"question": "...mocked question...", "options": ["` + flag + `", "option2", "option3"]} },
 "human_readable_thought": "mocked thought for tool calling", "cumulative_summary": "..cumulative-mocked for tool calling.."}
 `))
+		rsp.Close()
+		return rsp, nil
+	}
+
+	if utils.MatchAllOfSubString(prompt, "short_summary") {
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "summary","task_short_summary":"mock"}`))
 		rsp.Close()
 		return rsp, nil
 	}

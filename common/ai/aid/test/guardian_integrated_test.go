@@ -25,6 +25,23 @@ func mockedToolCalling(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, too
 	rsp := i.NewAIResponse()
 	defer rsp.Close()
 	fmt.Println("===========" + "request:" + "===========\n" + req.GetPrompt())
+
+	if strings.Contains(prompt, "意图识别与上下文增强系统") {
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finalize_enrichment", "intent_summary": "mocked intent analysis", "recommended_capabilities": "", "context_notes": ""}`))
+		return rsp, nil
+	}
+
+	if strings.Contains(prompt, "数据处理和总结提示小助手") {
+		if strings.Contains(prompt, "tag-selection") {
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "tag-selection", "tags": ["test"]}`))
+		} else if strings.Contains(prompt, "memory-triage") {
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "memory-triage", "memory_entities": []}`))
+		} else {
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object"}`))
+		}
+		return rsp, nil
+	}
+
 	if utils.MatchAllOfSubString(prompt, "plan: when user needs to create or refine a plan for a specific task, if need to search") {
 
 		rsp.EmitOutputStream(strings.NewReader(`
@@ -69,7 +86,6 @@ func mockedToolCalling(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, too
 
 	if utils.MatchAllOfSubString(prompt, "short_summary") {
 		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "summary","task_short_summary":"mock"}`))
-		time.Sleep(2 * time.Second)
 		return rsp, nil
 	}
 
