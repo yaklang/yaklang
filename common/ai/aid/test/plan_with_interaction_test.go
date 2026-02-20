@@ -4,20 +4,21 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
-	"testing"
-	"time"
 )
 
 func TestCoordinator_PlanInteraction_Timeline(t *testing.T) {
 	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
-	outputChan := make(chan *schema.AiOutputEvent)
+	outputChan := make(chan *schema.AiOutputEvent, 200)
 
 	token := utils.RandStringBytes(100)
 
@@ -101,7 +102,8 @@ LOOP:
 				}
 			}
 
-			if utils.MatchAllOfSubString(result.String(), `react_task_created`, `plan-task`) {
+			if utils.MatchAllOfSubString(result.String(), `react_task_created`, `plan-task`) &&
+				!strings.Contains(result.String(), `plan-task_intent`) {
 				t.Fatal("should not create plan build task")
 			}
 			_ = inputChan

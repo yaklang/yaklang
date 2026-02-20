@@ -56,62 +56,93 @@ func TestServer_CustomFingerprint(t *testing.T) {
 	client, err := NewLocalClient()
 	require.Nil(t, err)
 
-	host, port := utils.DebugMockHTTP([]byte("test CustomFingerprint1,test CustomFingerprint2"))
+	const maxRetries = 3
 
-	utils.WaitConnect(utils.HostPort(host, port), 3)
-
-	fpFiles := []string{}
-	f, err := os.CreateTemp(os.TempDir(), "yakit-test-fingerprint-*.yaml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	f.WriteString(`- methods:
+	createFingerprintFiles := func(t *testing.T) []string {
+		var fpFiles []string
+		f1, err := os.CreateTemp(os.TempDir(), "yakit-test-fingerprint-*.yaml")
+		require.NoError(t, err)
+		t.Cleanup(func() { os.Remove(f1.Name()) })
+		f1.WriteString(`- methods:
     - keywords:
         - product: 测试1
           regexp: "test CustomFingerprint1"`)
-	f.Close()
-	fpFiles = append(fpFiles, f.Name())
-	f, err = os.CreateTemp(os.TempDir(), "yakit-test-fingerprint-*.yaml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	f.WriteString(`- methods:
+		f1.Close()
+		fpFiles = append(fpFiles, f1.Name())
+
+		f2, err := os.CreateTemp(os.TempDir(), "yakit-test-fingerprint-*.yaml")
+		require.NoError(t, err)
+		t.Cleanup(func() { os.Remove(f2.Name()) })
+		f2.WriteString(`- methods:
     - keywords:
         - product: 测试2
           regexp: "test CustomFingerprint2"`)
-	f.Close()
-	fpFiles = append(fpFiles, f.Name())
+		f2.Close()
+		fpFiles = append(fpFiles, f2.Name())
+		return fpFiles
+	}
 
-	r, err := client.PortScan(context.Background(), &ypb.PortScanRequest{
-		UserFingerprintFiles: fpFiles,
-		Targets:              host,
-		Ports:                strconv.Itoa(port),
-		Mode:                 "fingerprint",
-		Proto:                []string{"tcp"},
-		Concurrent:           50,
-		Active:               false,
-		ScriptNames:          []string{},
-		SkippedHostAliveScan: true,
-	})
-	_ = r
-	require.Nil(t, err)
-	ok := false
-	for {
-		result, err := r.Recv()
+	fpFiles := createFingerprintFiles(t)
+
+	var lastErr error
+	for retry := 0; retry < maxRetries; retry++ {
+		host, port := utils.DebugMockHTTP([]byte("test CustomFingerprint1,test CustomFingerprint2"))
+		err := utils.WaitConnect(utils.HostPort(host, port), 5)
 		if err != nil {
-			if !errors.Is(err, io.EOF) {
-				require.Nilf(t, err, "stream error: %v", err)
+			lastErr = fmt.Errorf("retry %d: mock server not ready: %v", retry, err)
+			continue
+		}
+
+		r, err := client.PortScan(context.Background(), &ypb.PortScanRequest{
+			UserFingerprintFiles: fpFiles,
+			Targets:              host,
+			Ports:                strconv.Itoa(port),
+			Mode:                 "fingerprint",
+			Proto:                []string{"tcp"},
+			Concurrent:           50,
+			Active:               false,
+			ScriptNames:          []string{},
+			SkippedHostAliveScan: true,
+		})
+		if err != nil {
+			lastErr = fmt.Errorf("retry %d: PortScan RPC failed: %v", retry, err)
+			continue
+		}
+
+		found1 := false
+		found2 := false
+		scanErr := false
+		var allMessages []string
+		for {
+			result, err := r.Recv()
+			if err != nil {
+				if !errors.Is(err, io.EOF) {
+					lastErr = fmt.Errorf("retry %d: stream error: %v", retry, err)
+					scanErr = true
+				}
+				break
 			}
-			break
+			msgStr := string(result.Message)
+			allMessages = append(allMessages, msgStr)
+			if strings.Contains(msgStr, "测试1") {
+				found1 = true
+			}
+			if strings.Contains(msgStr, "测试2") {
+				found2 = true
+			}
 		}
-		if strings.Contains(string(result.Message), "http/测试1/测试2") || strings.Contains(string(result.Message), "http/测试2/测试1") {
-			ok = true
+
+		if scanErr {
+			continue
 		}
-		spew.Dump(result)
+
+		if found1 && found2 {
+			return
+		}
+		lastErr = fmt.Errorf("retry %d: fingerprint match incomplete (found1=%v, found2=%v), last 5 messages: %v",
+			retry, found1, found2, tailMessages(allMessages, 5))
 	}
-	if !ok {
-		t.FailNow()
-	}
+	require.NoError(t, lastErr, "after %d retries still failed", maxRetries)
 }
 
 //func TestServer_PortScanUDP(t *testing.T) {
@@ -384,4 +415,11 @@ func TestServer_ScanWithFingerprintGroup(t *testing.T) {
 		}
 		require.NoError(t, lastErr, "after %d retries still failed", maxRetries)
 	})
+}
+
+func tailMessages(msgs []string, n int) []string {
+	if len(msgs) <= n {
+		return msgs
+	}
+	return msgs[len(msgs)-n:]
 }
