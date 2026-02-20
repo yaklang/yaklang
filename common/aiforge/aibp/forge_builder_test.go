@@ -59,6 +59,17 @@ func MockAICallback(t *testing.T, initFlag, persistentFlag, planFlag string) aic
 			return rsp, nil
 		}
 
+		if strings.Contains(prompt, "数据处理和总结提示小助手") {
+			if strings.Contains(prompt, "tag-selection") {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "tag-selection", "tags": ["test"]}`))
+			} else if strings.Contains(prompt, "memory-triage") {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "memory-triage", "memory_entities": []}`))
+			} else {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object"}`))
+			}
+			return rsp, nil
+		}
+
 		if utils.MatchAllOfSubString(prompt, "plan: when user needs to create or refine a plan for a specific task, if need to search") {
 			if initFlag != "" && !strings.Contains(req.GetPrompt(), initFlag) {
 				t.Fatalf("init flag not found in prompt: %s", req.GetPrompt())
