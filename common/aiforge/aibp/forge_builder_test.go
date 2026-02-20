@@ -53,6 +53,12 @@ func MockAICallback(t *testing.T, initFlag, persistentFlag, planFlag string) aic
 		prompt := req.GetPrompt()
 		rsp := i.NewAIResponse()
 		defer rsp.Close()
+
+		if strings.Contains(prompt, "意图识别与上下文增强系统") {
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finalize_enrichment", "intent_summary": "mocked intent analysis", "recommended_capabilities": "", "context_notes": ""}`))
+			return rsp, nil
+		}
+
 		if utils.MatchAllOfSubString(prompt, "plan: when user needs to create or refine a plan for a specific task, if need to search") {
 			if initFlag != "" && !strings.Contains(req.GetPrompt(), initFlag) {
 				t.Fatalf("init flag not found in prompt: %s", req.GetPrompt())
