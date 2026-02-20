@@ -260,6 +260,10 @@ func (s *AIStatefulTaskBase) GetIndex() string {
 }
 
 func (s *AIStatefulTaskBase) Finish(i error) {
+	if s.IsFinished() {
+		return
+	}
+
 	if utils.IsNil(i) {
 		s.SetStatus(AITaskState_Completed)
 		return

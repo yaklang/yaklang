@@ -63,7 +63,13 @@ func TestCoordinator_SkipSubtaskInPlan(t *testing.T) {
 
 	ins, err := aid.NewCoordinator(
 		"测试跳过子任务功能",
-		aicommon.WithAgreeYOLO(), // 自动同意所有审核，加快测试
+		aicommon.WithAgreeYOLO(),
+		aicommon.WithMemoryTriage(aimem.NewMockMemoryTriage()),
+		aicommon.WithDisableIntentRecognition(true),
+		aicommon.WithEnableSelfReflection(false),
+		aicommon.WithDisableAutoSkills(true),
+		aicommon.WithDisableSessionTitleGeneration(true),
+		aicommon.WithGenerateReport(false),
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
@@ -185,6 +191,12 @@ func TestCoordinator_SkipSubtaskInPlan_NotFound(t *testing.T) {
 	ins, err := aid.NewCoordinator(
 		"测试跳过不存在的子任务",
 		aicommon.WithAgreeYOLO(),
+		aicommon.WithMemoryTriage(aimem.NewMockMemoryTriage()),
+		aicommon.WithDisableIntentRecognition(true),
+		aicommon.WithEnableSelfReflection(false),
+		aicommon.WithDisableAutoSkills(true),
+		aicommon.WithDisableSessionTitleGeneration(true),
+		aicommon.WithGenerateReport(false),
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
@@ -298,6 +310,12 @@ func TestCoordinator_FindSubtaskByIndex(t *testing.T) {
 	ins, err := aid.NewCoordinator(
 		"测试查找子任务",
 		aicommon.WithAgreeYOLO(),
+		aicommon.WithMemoryTriage(aimem.NewMockMemoryTriage()),
+		aicommon.WithDisableIntentRecognition(true),
+		aicommon.WithEnableSelfReflection(false),
+		aicommon.WithDisableAutoSkills(true),
+		aicommon.WithDisableSessionTitleGeneration(true),
+		aicommon.WithGenerateReport(false),
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
@@ -419,6 +437,12 @@ func TestCoordinator_SkipSubtaskInPlan_WithReason(t *testing.T) {
 	ins, err := aid.NewCoordinator(
 		"测试跳过子任务并提供理由",
 		aicommon.WithAgreeYOLO(),
+		aicommon.WithMemoryTriage(aimem.NewMockMemoryTriage()),
+		aicommon.WithDisableIntentRecognition(true),
+		aicommon.WithEnableSelfReflection(false),
+		aicommon.WithDisableAutoSkills(true),
+		aicommon.WithDisableSessionTitleGeneration(true),
+		aicommon.WithGenerateReport(false),
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
@@ -536,6 +560,11 @@ func TestCoordinator_SkipSubtaskInPlan_CancelSkipsReview(t *testing.T) {
 		"测试取消后跳过审查逻辑",
 		aicommon.WithAgreeYOLO(),
 		aicommon.WithMemoryTriage(aimem.NewMockMemoryTriage()),
+		aicommon.WithDisableIntentRecognition(true),
+		aicommon.WithEnableSelfReflection(false),
+		aicommon.WithDisableAutoSkills(true),
+		aicommon.WithDisableSessionTitleGeneration(true),
+		aicommon.WithGenerateReport(false),
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
@@ -726,6 +755,11 @@ func runSkipAndContinueTest(t *testing.T, useCurrentFlag bool) bool {
 		"测试跳过子任务后继续执行下一个任务",
 		aicommon.WithAgreeYOLO(),
 		aicommon.WithMemoryTriage(aimem.NewMockMemoryTriage()),
+		aicommon.WithDisableIntentRecognition(true),
+		aicommon.WithEnableSelfReflection(false),
+		aicommon.WithDisableAutoSkills(true),
+		aicommon.WithDisableSessionTitleGeneration(true),
+		aicommon.WithGenerateReport(false),
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			select {

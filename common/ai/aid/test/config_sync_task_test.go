@@ -27,6 +27,12 @@ func TestCoordinator_SyncTask(t *testing.T) {
 	outputChan := make(chan *schema.AiOutputEvent)
 	ins, err := aid.NewCoordinator(
 		uuid.New().String(),
+		aicommon.WithMemoryTriage(aimem.NewMockMemoryTriage()),
+		aicommon.WithDisableIntentRecognition(true),
+		aicommon.WithEnableSelfReflection(false),
+		aicommon.WithDisableAutoSkills(true),
+		aicommon.WithDisableSessionTitleGeneration(true),
+		aicommon.WithGenerateReport(false),
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
@@ -254,6 +260,11 @@ func TestCoordinator_SyncTask_Upgrade(t *testing.T) {
 		"test-upgrade",
 		aicommon.WithTools(aid.EchoTool(), aid.ErrorTool()),
 		aicommon.WithMemoryTriage(aimem.NewMockMemoryTriage()),
+		aicommon.WithDisableIntentRecognition(true),
+		aicommon.WithEnableSelfReflection(false),
+		aicommon.WithDisableAutoSkills(true),
+		aicommon.WithDisableSessionTitleGeneration(true),
+		aicommon.WithGenerateReport(false),
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
