@@ -210,6 +210,11 @@ func (r *ReActLoop) getRenderInfo() (string, map[string]any, error) {
 		info["AllowToolCall"] = true
 	}
 
+	if r.actions != nil {
+		_, hasLoadCap := r.actions.Get(schema.AI_REACT_LOOP_ACTION_LOAD_CAPABILITY)
+		info["HasLoadCapability"] = hasLoadCap
+	}
+
 	result, err := utils.RenderTemplate(temp, info)
 	if err != nil {
 		return "", nil, err
