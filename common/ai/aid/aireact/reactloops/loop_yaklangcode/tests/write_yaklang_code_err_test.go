@@ -1,4 +1,4 @@
-package aireact
+package yaklangcodetests
 
 import (
 	"bytes"
@@ -11,6 +11,7 @@ import (
 
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -20,13 +21,9 @@ import (
 func mockedYaklangWritingAndModifyCauseError(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, code string, stat *mockStats_forWriteAndModify) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
 
-	// Handle init task: analyze-requirement-and-search
-	// 支持两种情况：有搜索器（包含 search_patterns）和无搜索器（只有 create_new_file）
 	if utils.MatchAllOfSubString(prompt, "analyze-requirement-and-search", "create_new_file") {
 		rsp := i.NewAIResponse()
-		// 检查是否有搜索器（通过检查 prompt 中是否包含搜索相关的任务描述）
 		if utils.MatchAllOfSubString(prompt, "search_patterns", "Grep模式") {
-			// 有搜索器的情况
 			rsp.EmitOutputStream(bytes.NewBufferString(`{
   "@action": "analyze-requirement-and-search",
   "create_new_file": true,
@@ -34,7 +31,6 @@ func mockedYaklangWritingAndModifyCauseError(i aicommon.AICallerConfigIf, req *a
   "reason": "Simple test code"
 }`))
 		} else {
-			// 无搜索器的情况，只返回 create_new_file
 			rsp.EmitOutputStream(bytes.NewBufferString(`{
   "@action": "analyze-requirement-and-search",
   "create_new_file": true
@@ -44,7 +40,6 @@ func mockedYaklangWritingAndModifyCauseError(i aicommon.AICallerConfigIf, req *a
 		return rsp, nil
 	}
 
-	// Handle compress search results: extract-ranked-lines
 	if utils.MatchAllOfSubString(prompt, "extract-ranked-lines", "ranges", "rank", "reason") {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`{
@@ -57,7 +52,6 @@ func mockedYaklangWritingAndModifyCauseError(i aicommon.AICallerConfigIf, req *a
 		return rsp, nil
 	}
 
-	// Handle knowledge-compress (for compressing long search results)
 	if utils.MatchAllOfSubString(prompt, "KNOWLEDGE_CHUNK", "ranges", "score") {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`{
@@ -70,32 +64,7 @@ func mockedYaklangWritingAndModifyCauseError(i aicommon.AICallerConfigIf, req *a
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool", `"write_yaklang_code"`) {
-		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "object", "next_action": { "type": "write_yaklang_code", "write_yaklang_code_approach": "` + code + `" },
-"human_readable_thought": "mocked thought for write-yaklang", "cumulative_summary": "..cumulative-mocked for write-yaklang calling.."}
-`))
-		rsp.Close()
-		return rsp, nil
-	}
-
-	if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
-		rsp := i.NewAIResponse()
-		// First verify-satisfaction after write_code should return false to continue modifying
-		// Second verify-satisfaction after modify_code should return true to complete
-		if !stat.verifyCalled {
-			stat.verifyCalled = true
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": false, "reasoning": "need to modify code"}`))
-		} else {
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "abc-mocked-reason"}`))
-		}
-		rsp.Close()
-		return rsp, nil
-	}
-
 	if utils.MatchAllOfSubString(prompt, `"grep_yaklang_samples"`, `"require_tool"`, `"write_code"`, `"@action"`) {
-		// extract nonce from <|GEN_CODE_{{.Nonce}}|>
 		re := regexp.MustCompile(`<\|GEN_CODE_([^|]+)\|>`)
 		matches := re.FindStringSubmatch(prompt)
 		var nonceStr string
@@ -137,11 +106,10 @@ println("modifiedcodecodecode")
 	}
 
 	fmt.Println("Unexpected prompt:", prompt)
-
 	return nil, utils.Errorf("unexpected prompt: %s", prompt)
 }
 
-func TestReAct_WriteYaklangCodeCauseErrorAndThenModify(t *testing.T) {
+func TestFocusMode_WriteYaklangCodeCauseErrorAndThenModify(t *testing.T) {
 	flag := ksuid.New().String()
 	_ = flag
 	in := make(chan *ypb.AIInputEvent, 10)
@@ -152,7 +120,7 @@ func TestReAct_WriteYaklangCodeCauseErrorAndThenModify(t *testing.T) {
 	stat := &mockStats_forWriteAndModify{
 		writeDone: false,
 	}
-	ins, err := NewTestReAct(
+	ins, err := aireact.NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			sample := `[Error]: 基础语法错误（Syntax Error）`
 			if strings.Contains(r.GetPrompt(), sample) {
@@ -172,15 +140,13 @@ func TestReAct_WriteYaklangCodeCauseErrorAndThenModify(t *testing.T) {
 	}
 	_ = ins
 	go func() {
-		for i := 0; i < 1; i++ {
-			in <- &ypb.AIInputEvent{
-				IsFreeInput: true,
-				FreeInput:   "abc",
-			}
+		in <- &ypb.AIInputEvent{
+			IsFreeInput:   true,
+			FreeInput:     "abc",
+			FocusModeLoop: schema.AI_REACT_LOOP_NAME_WRITE_YAKLANG,
 		}
 	}()
 
-	// 优化：缩短超时时间，测试应该快速完成
 	du := time.Duration(3)
 	if utils.InGithubActions() {
 		du = time.Duration(2)
@@ -221,9 +187,6 @@ LOOP:
 	fmt.Println("--------------------------------------")
 	tl := ins.DumpTimeline()
 	fmt.Println(tl)
-	if !utils.MatchAllOfSubString(tl, "mocked thought for write-yaklang") {
-		t.Fatal("timeline not match")
-	}
 	fmt.Println("--------------------------------------")
 
 	result, err := os.ReadFile(filename)
