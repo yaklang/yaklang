@@ -22,6 +22,9 @@ type LoopActionHandlerOperator struct {
 
 	task aicommon.AIStatefulTask
 
+	// dynamic async mode: handler can request async mode at runtime
+	requestedAsyncMode bool
+
 	// 自我反思相关
 	reflectionLevel      ReflectionLevel
 	customReflectionData map[string]interface{}
@@ -40,6 +43,11 @@ func newLoopActionHandlerOperator(task aicommon.AIStatefulTask) *LoopActionHandl
 		reflectionLevel:      ReflectionLevel_None, // 默认不反思，由策略决定
 		customReflectionData: make(map[string]interface{}),
 	}
+}
+
+// NewActionHandlerOperator creates a LoopActionHandlerOperator for external use (e.g. action unit tests).
+func NewActionHandlerOperator(task aicommon.AIStatefulTask) *LoopActionHandlerOperator {
+	return newLoopActionHandlerOperator(task)
 }
 
 func (l *LoopActionHandlerOperator) GetTask() aicommon.AIStatefulTask {
@@ -98,6 +106,18 @@ func (l *LoopActionHandlerOperator) MarkSilence(i ...bool) {
 		return
 	}
 	l.isSilence = i[0]
+}
+
+// RequestAsyncMode allows a handler to dynamically request async mode at runtime.
+// This is used by actions like load_capability that need async behavior conditionally
+// (e.g. only when the resolved identifier is a blueprint/forge).
+func (l *LoopActionHandlerOperator) RequestAsyncMode() {
+	l.requestedAsyncMode = true
+}
+
+// IsAsyncModeRequested returns whether the handler has dynamically requested async mode.
+func (l *LoopActionHandlerOperator) IsAsyncModeRequested() bool {
+	return l.requestedAsyncMode
 }
 
 // SetReflectionLevel 设置该 action 执行后的反思级别

@@ -782,9 +782,22 @@ LOOP:
 			return nil
 		}
 
-		if handler.AsyncMode {
+		effectiveAsyncMode := handler.AsyncMode || operator.IsAsyncModeRequested()
+		if effectiveAsyncMode {
+			if !handler.AsyncMode {
+				// dynamic async mode requested by handler at runtime
+				task.SetAsyncMode(true)
+				emitter.EmitJSON(schema.EVENT_TYPE_AI_TASK_SWITCHED_TO_ASYNC, `react_task_mode_changed`, map[string]any{
+					"task_id":         task.GetId(),
+					"loop_name":       r.loopName,
+					"task_index":      task.GetIndex(),
+					"task_user_input": task.GetUserInput(),
+				})
+				if r.onAsyncTaskTrigger != nil {
+					r.onAsyncTaskTrigger(handler, task)
+				}
+			}
 			r.loadingStatus("当前任务进入异步模式 / Async mode, ending loop")
-			// 异步模式直接退出循环
 			finalError = nil
 			utils.Debug(func() {
 				fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")

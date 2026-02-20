@@ -266,6 +266,18 @@ func (r *ReActLoop) GetExtraCapabilities() *ExtraCapabilitiesManager {
 	return r.extraCapabilities
 }
 
+// NewMinimalReActLoop creates a lightweight ReActLoop for unit testing action handlers.
+// It sets up config, invoker, and emitter but skips full action registration.
+func NewMinimalReActLoop(cfg aicommon.AICallerConfigIf, invoker aicommon.AIInvokeRuntime) *ReActLoop {
+	return &ReActLoop{
+		config:    cfg,
+		invoker:   invoker,
+		emitter:   cfg.GetEmitter(),
+		vars:      omap.NewEmptyOrderedMap[string, any](),
+		taskMutex: new(sync.Mutex),
+	}
+}
+
 func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReActLoopOption) (*ReActLoop, error) {
 	if utils.IsNil(invoker) {
 		return nil, utils.Error("invoker is nil in ReActLoop")
@@ -347,6 +359,12 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 			log.Warn("loop action 'tool_compose' not found")
 		} else {
 			r.actions.Set(toolCompose.ActionType, toolCompose)
+		}
+	}
+
+	if _, ok := r.actions.Get(schema.AI_REACT_LOOP_ACTION_LOAD_CAPABILITY); !ok {
+		if loadCap, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_LOAD_CAPABILITY); ok {
+			r.actions.Set(loadCap.ActionType, loadCap)
 		}
 	}
 
