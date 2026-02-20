@@ -28,7 +28,6 @@ func BuildOnPostIterationHook(invoker aicommon.AIInvokeRuntime) reactloops.ReAct
 			// Check whether finalize_enrichment already set intent_analysis
 			existingAnalysis := loop.Get("intent_analysis")
 			if existingAnalysis == "" {
-				// finalize_enrichment was NOT called (likely max iterations reached)
 				if reasonErr, ok := reason.(error); ok && strings.Contains(reasonErr.Error(), "max iterations") {
 					log.Infof("intent recognition loop ended due to max iterations, force generating summary via LiteForge")
 				} else {
@@ -37,7 +36,6 @@ func BuildOnPostIterationHook(invoker aicommon.AIInvokeRuntime) reactloops.ReAct
 				generateIntentSummaryViaLiteForge(loop, invoker)
 			}
 
-			// Always log the final summary
 			logFinalIntentSummary(loop, invoker)
 		}
 	})
@@ -45,7 +43,6 @@ func BuildOnPostIterationHook(invoker aicommon.AIInvokeRuntime) reactloops.ReAct
 
 // generateIntentSummaryViaLiteForge uses InvokeLiteForge to generate a final intent
 // analysis from collected search results when the loop exits without finalize_enrichment.
-// This mirrors how loop_knowledge_enhance generates reports on abnormal exits.
 func generateIntentSummaryViaLiteForge(loop *reactloops.ReActLoop, invoker aicommon.AIInvokeRuntime) {
 	userQuery := loop.Get("user_query")
 	searchResults := loop.Get("search_results")
@@ -53,7 +50,6 @@ func generateIntentSummaryViaLiteForge(loop *reactloops.ReActLoop, invoker aicom
 	matchedForgeNames := loop.Get("matched_forge_names")
 	matchedSkillNames := loop.Get("matched_skill_names")
 
-	// If absolutely no data was collected, set a minimal analysis
 	if searchResults == "" && matchedToolNames == "" && matchedForgeNames == "" && matchedSkillNames == "" {
 		loop.Set("intent_analysis", "## Intent Analysis\n\nNo capabilities found for the given query.")
 		log.Infof("intent finalize: no search results available, setting default analysis")
@@ -72,7 +68,12 @@ Requirements:
 1. Summarize what the user wants to accomplish
 2. List the matched capabilities (tools, forges, skills) and briefly explain why they are relevant
 3. Provide recommended capabilities for the main loop to use
-4. Output should be concise and actionable
+4. intent_summary must follow this template:
+   "The user said [summary], the purpose is: [intent]. Based on searching [keywords],
+   recommend using tools [tool names], Forge/Blueprint [forge names], loading skills [skill names].
+   Enter focus mode: [focus mode names] to achieve the goal."
+   Omit capability types with no matches.
+5. Output should be concise and actionable
 <|INSTRUCTION_END_{{ .Nonce }}|>
 
 <|USER_QUERY_{{ .Nonce }}|>
@@ -109,16 +110,16 @@ Skills: {{ .MatchedSkillNames }}
 		materials,
 		[]aitool.ToolOption{
 			aitool.WithStringParam("intent_summary",
-				aitool.WithParam_Description("Concise summary of user intent with sub-goals"),
+				aitool.WithParam_Description("Concise structured summary of user intent following the template"),
 				aitool.WithParam_Required(true)),
-			aitool.WithStringParam("recommended_capabilities",
-				aitool.WithParam_Description("Comma-separated recommended tool/forge/skill names")),
-			aitool.WithStringParam("context_notes",
-				aitool.WithParam_Description("Additional context notes for the main loop")),
+			aitool.WithStringArrayParamEx("recommended_capabilities",
+				[]aitool.PropertyOption{
+					aitool.WithParam_Description("List of recommended capability names"),
+				},
+			),
 		},
 		aicommon.WithGeneralConfigStreamableFieldWithNodeId("intent", "intent_summary"),
 		aicommon.WithGeneralConfigStreamableFieldWithNodeId("intent", "recommended_capabilities"),
-		aicommon.WithGeneralConfigStreamableFieldWithNodeId("intent", "context_notes"),
 	)
 	if err != nil {
 		log.Errorf("intent finalize: LiteForge invocation failed: %v", err)
@@ -132,8 +133,7 @@ Skills: {{ .MatchedSkillNames }}
 	}
 
 	intentSummary := strings.TrimSpace(forgeResult.GetString("intent_summary"))
-	recommendedCapabilities := strings.TrimSpace(forgeResult.GetString("recommended_capabilities"))
-	contextNotes := strings.TrimSpace(forgeResult.GetString("context_notes"))
+	recommendedCaps := forgeResult.GetStringSlice("recommended_capabilities")
 
 	// Build and set intent_analysis
 	var analysis strings.Builder
@@ -151,29 +151,34 @@ Skills: {{ .MatchedSkillNames }}
 	if matchedToolNames != "" {
 		toolRecommendations.WriteString("Matched tools: " + matchedToolNames)
 	}
-	if recommendedCapabilities != "" {
+	if len(recommendedCaps) > 0 {
 		if toolRecommendations.Len() > 0 {
 			toolRecommendations.WriteString("\n")
 		}
-		toolRecommendations.WriteString("AI recommended: " + recommendedCapabilities)
+		toolRecommendations.WriteString("AI recommended: " + strings.Join(recommendedCaps, ", "))
 	}
 	loop.Set("recommended_tools", toolRecommendations.String())
 
-	// Build forge recommendations
 	if matchedForgeNames != "" {
 		loop.Set("recommended_forges", "Matched forges: "+matchedForgeNames)
 	}
 
-	// Build context enrichment
+	// Build structured capability enrichment Markdown
+	recSet := make(map[string]bool, len(recommendedCaps))
+	for _, name := range recommendedCaps {
+		recSet[strings.TrimSpace(name)] = true
+	}
+	capDetailsJSON := loop.Get("matched_capabilities_details")
+	capDetails := parseCapabilityDetails(capDetailsJSON)
+
 	var enrichment strings.Builder
+	capMd := buildCapabilityEnrichmentMarkdown(capDetails, recSet)
+	if capMd != "" {
+		enrichment.WriteString(capMd)
+	}
 	if searchResults != "" {
 		enrichment.WriteString("### Capability Search Results\n\n")
 		enrichment.WriteString(searchResults)
-		enrichment.WriteString("\n")
-	}
-	if contextNotes != "" {
-		enrichment.WriteString("### Additional Context\n\n")
-		enrichment.WriteString(contextNotes)
 		enrichment.WriteString("\n")
 	}
 	loop.Set("context_enrichment", enrichment.String())
@@ -205,22 +210,33 @@ func buildFallbackIntentAnalysis(loop *reactloops.ReActLoop) {
 
 	loop.Set("intent_analysis", analysis.String())
 
-	// Set recommendations based on raw matched names
 	if matchedToolNames != "" {
 		loop.Set("recommended_tools", "Matched tools: "+matchedToolNames)
 	}
 	if matchedForgeNames != "" {
 		loop.Set("recommended_forges", "Matched forges: "+matchedForgeNames)
 	}
+
+	// Build structured capability enrichment from details if available
+	capDetailsJSON := loop.Get("matched_capabilities_details")
+	capDetails := parseCapabilityDetails(capDetailsJSON)
+	var enrichment strings.Builder
+	capMd := buildCapabilityEnrichmentMarkdown(capDetails, nil)
+	if capMd != "" {
+		enrichment.WriteString(capMd)
+	}
 	if searchResults != "" {
-		loop.Set("context_enrichment", "### Capability Search Results\n\n"+searchResults)
+		enrichment.WriteString("### Capability Search Results\n\n")
+		enrichment.WriteString(searchResults)
+	}
+	if enrichment.Len() > 0 {
+		loop.Set("context_enrichment", enrichment.String())
 	}
 
 	log.Infof("intent finalize: using fallback analysis from raw search results")
 }
 
 // logFinalIntentSummary logs the final intent recognition summary.
-// This is always called when the loop exits, ensuring the summary is visible in logs.
 func logFinalIntentSummary(loop *reactloops.ReActLoop, invoker aicommon.AIInvokeRuntime) {
 	intentAnalysis := loop.Get("intent_analysis")
 	recommendedTools := loop.Get("recommended_tools")

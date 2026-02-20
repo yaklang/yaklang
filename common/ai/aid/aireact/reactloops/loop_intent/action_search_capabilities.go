@@ -14,6 +14,15 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
+// appendCapDetail is a helper to collect structured capability details during search.
+func appendCapDetail(details *[]capabilityDetail, name, capType, desc string) {
+	*details = append(*details, capabilityDetail{
+		CapabilityName: name,
+		CapabilityType: capType,
+		Description:    desc,
+	})
+}
+
 // searchCapabilitiesAction creates the query_capabilities action
 // that searches for tools, forges, and focus modes matching the user's intent.
 // Renamed from "search_capabilities" to "query_capabilities" to avoid conflict
@@ -57,6 +66,8 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 			var results strings.Builder
 			results.WriteString(fmt.Sprintf("## Capability Search Results for: %s\n\n", query))
 
+			var capDetails []capabilityDetail
+
 			// 1. Search AIYakTool via BM25 trigram
 			db := consts.GetGormProfileDatabase()
 			if db != nil {
@@ -79,11 +90,11 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 							results.WriteString(fmt.Sprintf(" [keywords: %s]", tool.Keywords))
 						}
 						results.WriteString("\n")
+						appendCapDetail(&capDetails, tool.Name, "tool", utils.ShrinkString(tool.Description, 200))
 					}
 					results.WriteString("\n")
 					log.Infof("intent loop: found %d tools via BM25", len(tools))
 
-					// Store matched tool names for later reference
 					var toolNames []string
 					for _, t := range tools {
 						toolNames = append(toolNames, t.Name)
@@ -109,6 +120,7 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 						}
 						desc := utils.ShrinkString(forge.Description, 200)
 						results.WriteString(fmt.Sprintf("- **%s**: %s\n", name, desc))
+						appendCapDetail(&capDetails, forge.ForgeName, "forge", utils.ShrinkString(forge.Description, 200))
 					}
 					results.WriteString("\n")
 					log.Infof("intent loop: found %d forges", len(forges))
@@ -126,7 +138,7 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 			}
 
 			// 3. Search Skills via SkillLoader (if available)
-			searchSkillsFromLoader(r, query, &results, loop)
+			searchSkillsFromLoader(r, query, &results, loop, &capDetails)
 
 			// 4. Search registered loop metadata
 			matchedLoops := searchLoopMetadata(query)
@@ -134,6 +146,7 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 				results.WriteString("### Matched Focus Modes\n")
 				for _, meta := range matchedLoops {
 					results.WriteString(fmt.Sprintf("- **%s**: %s\n", meta.Name, meta.Description))
+					appendCapDetail(&capDetails, meta.Name, "focus_mode", meta.Description)
 				}
 				results.WriteString("\n")
 				log.Infof("intent loop: found %d matching focus modes", len(matchedLoops))
@@ -144,13 +157,23 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 				}
 				loop.Set("matched_loop_names", strings.Join(loopNames, ","))
 			} else {
-				// Also include available focus modes for reference
 				availableModes := loop.Get("available_focus_modes")
 				if availableModes != "" {
 					results.WriteString("### Available Focus Modes (no direct match)\n")
 					results.WriteString(availableModes)
 					results.WriteString("\n")
 				}
+			}
+
+			// Store structured capability details for finalize_enrichment to use
+			if jsonStr := marshalCapabilityDetails(capDetails); jsonStr != "" {
+				existingJSON := loop.Get("matched_capabilities_details")
+				if existingJSON != "" {
+					existing := parseCapabilityDetails(existingJSON)
+					capDetails = append(existing, capDetails...)
+					jsonStr = marshalCapabilityDetails(capDetails)
+				}
+				loop.Set("matched_capabilities_details", jsonStr)
 			}
 
 			// Store search results
@@ -168,7 +191,7 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 
 // searchSkillsFromLoader searches skills via the SkillLoader if available in the runtime config.
 // Uses type assertion to access GetSkillLoader() from the concrete Config type.
-func searchSkillsFromLoader(r aicommon.AIInvokeRuntime, query string, results *strings.Builder, loop *reactloops.ReActLoop) {
+func searchSkillsFromLoader(r aicommon.AIInvokeRuntime, query string, results *strings.Builder, loop *reactloops.ReActLoop, capDetails *[]capabilityDetail) {
 	// Try to get skill loader via type assertion on the config
 	type skillLoaderProvider interface {
 		GetSkillLoader() aiskillloader.SkillLoader
@@ -230,6 +253,7 @@ func searchSkillsFromLoader(r aicommon.AIInvokeRuntime, query string, results *s
 				desc = desc[:200] + "..."
 			}
 			results.WriteString(fmt.Sprintf("- **%s**: %s\n", skill.Name, desc))
+			appendCapDetail(capDetails, skill.Name, "skill", desc)
 		}
 		results.WriteString("\n")
 		log.Infof("intent loop: found %d matching skills", len(matchedSkills))

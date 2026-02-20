@@ -23,14 +23,17 @@ func makeFinalizeEnrichmentAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 
 	toolOpts := []aitool.ToolOption{
 		aitool.WithStringParam("intent_summary",
-			aitool.WithParam_Description("用户意图的简洁摘要，如有多个子目标请逐一列出。/ Concise summary of the user's intent, with sub-goals if applicable."),
+			aitool.WithParam_Description(
+				"结构化意图摘要，大致遵循模板，表达含义即可：「用户说「{摘要}」，目的是：{意图}。通过搜索「{关键词}」得到的结果，"+
+					"可以推荐接下来的步骤使用工具 {tools}，蓝图（Forge）{forges}，加载技能 {skills}。"+
+					"启动专注模式：{focus_modes} 来实现目标。」无匹配的类型可省略。/ "+
+					"Structured intent summary following the template. Omit capability types with no matches."),
 			aitool.WithParam_Required(true),
 		),
-		aitool.WithStringParam("recommended_capabilities",
-			aitool.WithParam_Description("推荐的工具名、蓝图名或专注模式，逗号分隔。/ Comma-separated recommended tool/forge/focus mode names."),
-		),
-		aitool.WithStringParam("context_notes",
-			aitool.WithParam_Description("帮助主循环更好处理用户请求的补充上下文或备注。/ Additional context to help the main loop handle the request."),
+		aitool.WithStringArrayParamEx("recommended_capabilities",
+			[]aitool.PropertyOption{
+				aitool.WithParam_Description("推荐的能力名称列表（工具、蓝图、技能、专注模式的名称）。/ List of recommended capability names (tools, forges, skills, focus modes)."),
+			},
 		),
 	}
 
@@ -41,7 +44,6 @@ func makeFinalizeEnrichmentAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 		[]*reactloops.LoopStreamField{
 			{AINodeId: "intent", FieldName: "intent_summary"},
 			{AINodeId: "intent", FieldName: "recommended_capabilities"},
-			{AINodeId: "intent", FieldName: "context_notes"},
 		},
 		// Verifier
 		func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
@@ -54,8 +56,7 @@ func makeFinalizeEnrichmentAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 		// Handler
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
 			intentSummary := strings.TrimSpace(action.GetString("intent_summary"))
-			recommendedCapabilities := strings.TrimSpace(action.GetString("recommended_capabilities"))
-			contextNotes := strings.TrimSpace(action.GetString("context_notes"))
+			recommendedCaps := action.GetStringSlice("recommended_capabilities")
 
 			log.Infof("intent loop: finalizing enrichment - summary: %s", utils.ShrinkString(intentSummary, 200))
 
@@ -65,28 +66,27 @@ func makeFinalizeEnrichmentAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 			analysis.WriteString(intentSummary)
 			analysis.WriteString("\n\n")
 
-			// Build recommended tools section from search results + AI recommendations
-			var toolRecommendations strings.Builder
+			// Build recommended tools/forges from search + AI recommendations
 			matchedToolNames := loop.Get("matched_tool_names")
+			matchedForgeNames := loop.Get("matched_forge_names")
+			matchedSkillNames := loop.Get("matched_skill_names")
+
+			var toolRecommendations strings.Builder
 			if matchedToolNames != "" {
 				toolRecommendations.WriteString("匹配工具 / Matched tools: " + matchedToolNames)
 			}
-			if recommendedCapabilities != "" {
+			if len(recommendedCaps) > 0 {
 				if toolRecommendations.Len() > 0 {
 					toolRecommendations.WriteString("\n")
 				}
-				toolRecommendations.WriteString("AI 推荐 / AI recommended: " + recommendedCapabilities)
+				toolRecommendations.WriteString("AI 推荐 / AI recommended: " + strings.Join(recommendedCaps, ", "))
 			}
 
-			// Build forge recommendations
 			var forgeRecommendations strings.Builder
-			matchedForgeNames := loop.Get("matched_forge_names")
 			if matchedForgeNames != "" {
 				forgeRecommendations.WriteString("匹配蓝图 / Matched forges: " + matchedForgeNames)
 			}
 
-			// Build skill recommendations
-			matchedSkillNames := loop.Get("matched_skill_names")
 			if matchedSkillNames != "" {
 				if toolRecommendations.Len() > 0 {
 					toolRecommendations.WriteString("\n")
@@ -94,17 +94,24 @@ func makeFinalizeEnrichmentAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 				toolRecommendations.WriteString("匹配技能 / Matched skills: " + matchedSkillNames)
 			}
 
-			// Build enrichment context
+			// Build structured capability enrichment Markdown
+			recSet := make(map[string]bool, len(recommendedCaps))
+			for _, name := range recommendedCaps {
+				recSet[strings.TrimSpace(name)] = true
+			}
+
+			capDetailsJSON := loop.Get("matched_capabilities_details")
+			capDetails := parseCapabilityDetails(capDetailsJSON)
+
 			var enrichment strings.Builder
+			capMd := buildCapabilityEnrichmentMarkdown(capDetails, recSet)
+			if capMd != "" {
+				enrichment.WriteString(capMd)
+			}
 			searchResults := loop.Get("search_results")
 			if searchResults != "" {
 				enrichment.WriteString("### 能力搜索结果 / Capability Search Results\n\n")
 				enrichment.WriteString(searchResults)
-				enrichment.WriteString("\n")
-			}
-			if contextNotes != "" {
-				enrichment.WriteString("### 补充上下文 / Additional Context\n\n")
-				enrichment.WriteString(contextNotes)
 				enrichment.WriteString("\n")
 			}
 
@@ -114,7 +121,6 @@ func makeFinalizeEnrichmentAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 			loop.Set("recommended_forges", forgeRecommendations.String())
 			loop.Set("context_enrichment", enrichment.String())
 
-			// Add to timeline
 			r.AddToTimeline("intent_finalized", fmt.Sprintf(
 				"Intent analysis completed: %s | Tools: %s | Forges: %s | Skills: %s",
 				utils.ShrinkString(intentSummary, 100),

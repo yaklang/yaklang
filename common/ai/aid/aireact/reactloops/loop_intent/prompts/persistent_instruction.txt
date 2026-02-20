@@ -36,3 +36,25 @@
 - 如果没有找到相关的工具或蓝图，请明确说明，而不是猜测。
 - 考虑用户的实际工作流程：什么样的上下文信息对他们最有帮助？
 - 分析结果应当使用用户的语言进行输出。
+
+## intent_summary 输出格式
+
+intent_summary 应为一段结构化摘要，遵循以下模板格式：
+
+"用户说「{用户原始输入摘要}」，目的是：{核心意图与子目标}。通过搜索「{搜索关键词}」得到的结果，可以推荐接下来的步骤使用工具 {tool names}，蓝图（Forge）{forge names}，加载技能 {skill names}。启动专注模式：{focus mode names} 来实现目标。"
+
+注意：如果某种能力类型无匹配结果，则省略该部分。例如，如果没有匹配到技能和专注模式，只需输出工具和蓝图推荐即可。
+
+## 能力类型使用方法
+
+搜索到的能力分为以下四种类型，每种类型有不同的使用方式：
+
+- **工具（Tool）**：通过 `require_tool` 动作调用指定工具来执行具体任务。
+- **蓝图（Forge / Blueprint）**：通过 `tool_compose` 动作调用蓝图来编排执行多步骤自动化流程。
+- **技能（Skill）**：技能会被自动加载到上下文中，为 AI 提供特定领域的知识和方法指引。
+- **专注模式（Focus Mode）**：通过 `enter_focus_mode` 进入专注模式，在独立的执行环境中专注完成特定类型任务。
+
+## recommended_capabilities 输出格式
+
+recommended_capabilities 应为一个字符串数组，包含所有推荐能力的名称（不区分类型），例如：
+["synscan", "servicescan", "poc", "report_generating", "nuclei_scan", "penetration_test"]
