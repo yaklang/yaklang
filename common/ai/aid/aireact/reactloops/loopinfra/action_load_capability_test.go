@@ -37,6 +37,7 @@ type testInvoker struct {
 	executeLoopCallback      func(string, aicommon.AIStatefulTask) (bool, error)
 	verifySatisfactionResult *aicommon.VerifySatisfactionResult
 	currentTask              aicommon.AIStatefulTask
+	timelineEntries          []string
 }
 
 func newTestInvoker(ctx context.Context) *testInvoker {
@@ -85,6 +86,22 @@ func (t *testInvoker) GetCurrentTask() aicommon.AIStatefulTask {
 
 func (t *testInvoker) GetCurrentTaskId() string {
 	return "test-task-id"
+}
+
+func (t *testInvoker) AddToTimeline(entry, content string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.timelineEntries = append(t.timelineEntries, entry+": "+content)
+}
+
+func (t *testInvoker) getTimelineString() string {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	var result string
+	for _, e := range t.timelineEntries {
+		result += e + "\n"
+	}
+	return result
 }
 
 // mockForgeFactory implements aicommon.AIForgeFactory for testing.
@@ -349,7 +366,7 @@ func TestLoadCapability_Handler_FocusMode_Success(t *testing.T) {
 	assert.True(t, invoker.executeLoopCalled, "ExecuteLoopTaskIF should be called")
 	assert.Equal(t, "vuln_verify", invoker.executeLoopName)
 	assert.True(t, op.IsContinued(), "should continue after focus mode completes")
-	assert.Contains(t, op.GetFeedback().String(), "completed successfully")
+	assert.Contains(t, op.GetFeedback().String(), "SUCCESSFULLY")
 }
 
 func TestLoadCapability_Handler_FocusMode_Error(t *testing.T) {
@@ -371,7 +388,7 @@ func TestLoadCapability_Handler_FocusMode_Error(t *testing.T) {
 
 	assert.True(t, invoker.executeLoopCalled)
 	assert.True(t, op.IsContinued(), "should continue on focus mode error")
-	assert.Contains(t, op.GetFeedback().String(), "execution failed")
+	assert.Contains(t, op.GetFeedback().String(), "FAILED")
 }
 
 func TestLoadCapability_Handler_FocusMode_NotOk(t *testing.T) {
@@ -394,7 +411,7 @@ func TestLoadCapability_Handler_FocusMode_NotOk(t *testing.T) {
 
 	assert.True(t, invoker.executeLoopCalled)
 	assert.True(t, op.IsContinued(), "should continue when focus mode returns not-ok")
-	assert.Contains(t, op.GetFeedback().String(), "returned unsuccessful")
+	assert.Contains(t, op.GetFeedback().String(), "UNSUCCESSFUL")
 }
 
 // --- Handler Tests: Unknown -> Intent Fallback ---
@@ -425,7 +442,7 @@ func TestLoadCapability_Handler_Unknown_IntentFallback(t *testing.T) {
 	assert.True(t, op.IsContinued(), "should continue after intent fallback")
 	feedback := op.GetFeedback().String()
 	assert.Contains(t, feedback, "totally-unknown-thing")
-	assert.Contains(t, feedback, "was not found")
+	assert.Contains(t, feedback, "was NOT found")
 }
 
 func TestLoadCapability_Handler_Unknown_IntentFallback_Error(t *testing.T) {
@@ -447,7 +464,7 @@ func TestLoadCapability_Handler_Unknown_IntentFallback_Error(t *testing.T) {
 
 	assert.True(t, invoker.executeLoopCalled)
 	assert.True(t, op.IsContinued(), "should continue on intent fallback failure")
-	assert.Contains(t, op.GetFeedback().String(), "intent recognition failed")
+	assert.Contains(t, op.GetFeedback().String(), "intent recognition FAILED")
 }
 
 func TestLoadCapability_Handler_Unknown_IntentFallback_NotOk(t *testing.T) {
@@ -470,7 +487,7 @@ func TestLoadCapability_Handler_Unknown_IntentFallback_NotOk(t *testing.T) {
 
 	assert.True(t, invoker.executeLoopCalled)
 	assert.True(t, op.IsContinued(), "should continue when intent loop returns not-ok")
-	assert.Contains(t, op.GetFeedback().String(), "produced no results")
+	assert.Contains(t, op.GetFeedback().String(), "produced NO useful results")
 }
 
 // --- Handler Tests: Empty Identifier ---
@@ -653,4 +670,239 @@ func TestLoadCapability_Verifier_WhitespaceIdentifier(t *testing.T) {
 
 	assert.Equal(t, "trimmed-tool", loop.Get("_load_cap_identifier"),
 		"verifier should trim whitespace from identifier")
+}
+
+// --- Verifier: Repeated Attempt Detection ---
+
+func TestLoadCapability_Verifier_RepeatedAttemptTracking(t *testing.T) {
+	ctx := context.Background()
+	cfg := &aicommon.Config{}
+	invoker := newTestInvoker(ctx)
+	loop := reactloops.NewMinimalReActLoop(cfg, invoker)
+
+	action := buildAction("repeated-id")
+
+	err := loopAction_LoadCapability.ActionVerifier(loop, action)
+	require.NoError(t, err)
+	assert.Equal(t, "1", loop.Get("_load_cap_attempt_repeated-id"),
+		"first attempt should record count=1")
+
+	err = loopAction_LoadCapability.ActionVerifier(loop, action)
+	require.NoError(t, err)
+	assert.Equal(t, "2", loop.Get("_load_cap_attempt_repeated-id"),
+		"second attempt should increment count to 2")
+
+	assert.Contains(t, invoker.getTimelineString(),
+		"REPEATED_ATTEMPT",
+		"timeline should warn about repeated attempt")
+}
+
+// --- Handler Tests: Forge Rejected When Already Async ---
+
+func TestLoadCapability_Handler_Forge_RejectedWhenTaskAlreadyAsync(t *testing.T) {
+	ctx := context.Background()
+	forgeMgr := &mockForgeFactory{
+		forges: map[string]*schema.AIForge{
+			"my-forge": {ForgeName: "my-forge"},
+		},
+	}
+	cfg := &aicommon.Config{AiForgeManager: forgeMgr}
+	invoker := newTestInvoker(ctx)
+	task := newTestTask(ctx)
+	task.SetAsyncMode(true)
+	invoker.currentTask = task
+
+	loop := reactloops.NewMinimalReActLoop(cfg, invoker)
+	loop.SetCurrentTask(task)
+	loop.Set("_load_cap_identifier", "my-forge")
+	loop.Set("_load_cap_resolved_type", string(aicommon.ResolvedAs_Forge))
+
+	op := reactloops.NewActionHandlerOperator(task)
+	action := buildAction("my-forge")
+	loopAction_LoadCapability.ActionHandler(loop, action, op)
+
+	assert.False(t, invoker.forgeCalled, "forge should NOT be called when task is already async")
+	assert.False(t, op.IsAsyncModeRequested(), "should NOT request async mode")
+	assert.True(t, op.IsContinued(), "should continue with rejection")
+	feedback := op.GetFeedback().String()
+	assert.Contains(t, feedback, "REJECTED")
+	assert.Contains(t, feedback, "already running in async mode")
+	assert.Contains(t, invoker.getTimelineString(),
+		"FORGE_REJECTED",
+		"timeline should record forge rejection")
+}
+
+func TestLoadCapability_Handler_Forge_AllowedWhenTaskNotAsync(t *testing.T) {
+	ctx := context.Background()
+	forgeMgr := &mockForgeFactory{
+		forges: map[string]*schema.AIForge{
+			"my-forge": {ForgeName: "my-forge"},
+		},
+	}
+	cfg := &aicommon.Config{AiForgeManager: forgeMgr}
+	invoker := newTestInvoker(ctx)
+	task := newTestTask(ctx)
+	invoker.currentTask = task
+
+	loop := reactloops.NewMinimalReActLoop(cfg, invoker)
+	loop.SetCurrentTask(task)
+	loop.Set("_load_cap_identifier", "my-forge")
+	loop.Set("_load_cap_resolved_type", string(aicommon.ResolvedAs_Forge))
+
+	op := reactloops.NewActionHandlerOperator(task)
+	action := buildAction("my-forge")
+	loopAction_LoadCapability.ActionHandler(loop, action, op)
+
+	assert.True(t, invoker.forgeCalled, "forge should be called when task is NOT async")
+	assert.True(t, op.IsAsyncModeRequested(), "should request async mode")
+}
+
+// --- Handler Tests: Focus Mode Timeline Feedback ---
+
+func TestLoadCapability_Handler_FocusMode_SuccessTimelineFeedback(t *testing.T) {
+	ctx := context.Background()
+	cfg := &aicommon.Config{}
+	invoker := newTestInvoker(ctx)
+	invoker.executeLoopResult = true
+	task := newTestTask(ctx)
+	invoker.currentTask = task
+
+	loop := reactloops.NewMinimalReActLoop(cfg, invoker)
+	loop.SetCurrentTask(task)
+	loop.Set("_load_cap_identifier", "success-mode")
+	loop.Set("_load_cap_resolved_type", string(aicommon.ResolvedAs_FocusedMode))
+
+	op := reactloops.NewActionHandlerOperator(task)
+	action := buildAction("success-mode")
+	loopAction_LoadCapability.ActionHandler(loop, action, op)
+
+	feedback := op.GetFeedback().String()
+	assert.Contains(t, feedback, "SUCCESSFULLY")
+	assert.Contains(t, invoker.getTimelineString(),
+		"FOCUS_MODE_DONE",
+		"timeline should record success")
+}
+
+func TestLoadCapability_Handler_FocusMode_ErrorTimelineFeedback(t *testing.T) {
+	ctx := context.Background()
+	cfg := &aicommon.Config{}
+	invoker := newTestInvoker(ctx)
+	invoker.executeLoopErr = fmt.Errorf("loop crashed")
+	task := newTestTask(ctx)
+	invoker.currentTask = task
+
+	loop := reactloops.NewMinimalReActLoop(cfg, invoker)
+	loop.SetCurrentTask(task)
+	loop.Set("_load_cap_identifier", "crash-mode")
+	loop.Set("_load_cap_resolved_type", string(aicommon.ResolvedAs_FocusedMode))
+
+	op := reactloops.NewActionHandlerOperator(task)
+	action := buildAction("crash-mode")
+	loopAction_LoadCapability.ActionHandler(loop, action, op)
+
+	feedback := op.GetFeedback().String()
+	assert.Contains(t, feedback, "FAILED")
+	assert.Contains(t, feedback, "Do NOT retry")
+	assert.Contains(t, invoker.getTimelineString(),
+		"FOCUS_MODE_FAILED",
+		"timeline should record failure with details")
+}
+
+func TestLoadCapability_Handler_FocusMode_UnsuccessfulTimelineFeedback(t *testing.T) {
+	ctx := context.Background()
+	cfg := &aicommon.Config{}
+	invoker := newTestInvoker(ctx)
+	invoker.executeLoopResult = false
+	invoker.executeLoopErr = nil
+	task := newTestTask(ctx)
+	invoker.currentTask = task
+
+	loop := reactloops.NewMinimalReActLoop(cfg, invoker)
+	loop.SetCurrentTask(task)
+	loop.Set("_load_cap_identifier", "unsat-mode")
+	loop.Set("_load_cap_resolved_type", string(aicommon.ResolvedAs_FocusedMode))
+
+	op := reactloops.NewActionHandlerOperator(task)
+	action := buildAction("unsat-mode")
+	loopAction_LoadCapability.ActionHandler(loop, action, op)
+
+	feedback := op.GetFeedback().String()
+	assert.Contains(t, feedback, "UNSUCCESSFUL")
+	assert.Contains(t, feedback, "Do NOT retry")
+	assert.Contains(t, invoker.getTimelineString(),
+		"FOCUS_MODE_UNSUCCESSFUL",
+		"timeline should record unsuccessful outcome")
+}
+
+// --- Handler Tests: Unknown Blocked on Repeat ---
+
+func TestLoadCapability_Handler_Unknown_BlockedOnRepeat(t *testing.T) {
+	ctx := context.Background()
+	cfg := &aicommon.Config{}
+	invoker := newTestInvoker(ctx)
+	invoker.executeLoopResult = true
+	task := newTestTask(ctx)
+	invoker.currentTask = task
+
+	loop := reactloops.NewMinimalReActLoop(cfg, invoker)
+	loop.SetCurrentTask(task)
+	loop.Set("_load_cap_identifier", "repeat-unknown")
+	loop.Set("_load_cap_resolved_type", string(aicommon.ResolvedAs_Unknown))
+
+	op1 := reactloops.NewActionHandlerOperator(task)
+	action := buildAction("repeat-unknown")
+	loopAction_LoadCapability.ActionHandler(loop, action, op1)
+
+	assert.True(t, invoker.executeLoopCalled,
+		"first attempt should trigger intent recognition")
+
+	invoker.mu.Lock()
+	invoker.executeLoopCalled = false
+	invoker.mu.Unlock()
+
+	loop.Set("_load_cap_identifier", "repeat-unknown")
+	loop.Set("_load_cap_resolved_type", string(aicommon.ResolvedAs_Unknown))
+	op2 := reactloops.NewActionHandlerOperator(task)
+	loopAction_LoadCapability.ActionHandler(loop, action, op2)
+
+	assert.False(t, invoker.executeLoopCalled,
+		"second attempt with same identifier should be BLOCKED without intent recognition")
+	feedback := op2.GetFeedback().String()
+	assert.Contains(t, feedback, "BLOCKED")
+	assert.Contains(t, feedback, "already been tried")
+	assert.Contains(t, feedback, "Do NOT call load_capability")
+	assert.Contains(t, invoker.getTimelineString(),
+		"UNKNOWN_BLOCKED",
+		"timeline should record blocked attempt")
+}
+
+// --- Handler Tests: Unknown Timeline Pressure ---
+
+func TestLoadCapability_Handler_Unknown_TimelinePressure(t *testing.T) {
+	ctx := context.Background()
+	cfg := &aicommon.Config{}
+	invoker := newTestInvoker(ctx)
+	invoker.executeLoopResult = true
+	task := newTestTask(ctx)
+	invoker.currentTask = task
+
+	loop := reactloops.NewMinimalReActLoop(cfg, invoker)
+	loop.SetCurrentTask(task)
+	loop.Set("_load_cap_identifier", "some-unknown")
+	loop.Set("_load_cap_resolved_type", string(aicommon.ResolvedAs_Unknown))
+
+	op := reactloops.NewActionHandlerOperator(task)
+	action := buildAction("some-unknown")
+	loopAction_LoadCapability.ActionHandler(loop, action, op)
+
+	timeline := invoker.getTimelineString()
+	assert.Contains(t, timeline, "Do NOT call load_capability",
+		"timeline should explicitly warn against retrying")
+	assert.Contains(t, timeline, "some-unknown",
+		"timeline should reference the identifier by name")
+	feedback := op.GetFeedback().String()
+	assert.Contains(t, feedback, "was NOT found",
+		"feedback should clearly state the identifier was not found")
+	assert.Contains(t, feedback, "Do NOT retry",
+		"feedback should discourage retrying")
 }

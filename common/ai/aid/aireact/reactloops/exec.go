@@ -660,6 +660,26 @@ LOOP:
 		r.GetInvoker().AddToTimeline("iteration", msg)
 
 		if handler.AsyncMode {
+			if task.IsAsyncMode() {
+				log.Warnf("ReactLoop[%v] rejecting static async action '%v' because the current task is already in async mode", r.loopName, actionName)
+				rejectMsg := fmt.Sprintf(
+					"REJECTED: action '%s' requires async mode, but the current task is already running asynchronously. "+
+						"You MUST NOT start another async operation while one is in progress. "+
+						"Wait for the current async task to complete, or choose a synchronous action instead.",
+					actionName)
+				r.GetInvoker().AddToTimeline("[ASYNC_ACTION_REJECTED]", rejectMsg)
+				operator = newLoopActionHandlerOperator(task)
+				operator.Feedback(rejectMsg)
+				operator.SetReflectionLevel(ReflectionLevel_Critical)
+				operator.SetReflectionData("rejected_action", actionName)
+				operator.SetReflectionData("rejected_reason", "task_already_async")
+				operator.Continue()
+				continueIter := func() {
+					r.GetInvoker().AddToTimeline("iteration", fmt.Sprintf("[%v]ReAct Iteration Done[%v] max:%v continue to next iteration", loopName, iterationCount, maxIterations))
+				}
+				continueIter()
+				continue
+			}
 			task.SetAsyncMode(true)
 			emitter.EmitJSON(schema.EVENT_TYPE_AI_TASK_SWITCHED_TO_ASYNC, `react_task_mode_changed`, map[string]any{
 				"task_id":         task.GetId(),
@@ -668,9 +688,6 @@ LOOP:
 				"task_user_input": task.GetUserInput(),
 			})
 
-			// 异步模式不在主循环更新状态
-			// 只能在异步回调中更新状态
-			// 否则会出现状态被覆盖的问题
 			if r.onAsyncTaskTrigger != nil {
 				r.onAsyncTaskTrigger(handler, task)
 			}

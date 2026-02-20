@@ -51,8 +51,28 @@ func loadCapabilityVerifier(loop *reactloops.ReActLoop, action *aicommon.Action)
 	loop.Set("_load_cap_suggestion", resolved.Suggestion)
 
 	invoker := loop.GetInvoker()
+
+	// Track repeated attempts for the same identifier to detect loops
+	attemptKey := "_load_cap_attempt_" + identifier
+	prevAttempts := loop.Get(attemptKey)
+	attemptCount := 1
+	if prevAttempts != "" {
+		fmt.Sscanf(prevAttempts, "%d", &attemptCount)
+		attemptCount++
+	}
+	loop.Set(attemptKey, fmt.Sprintf("%d", attemptCount))
+
+	if attemptCount > 1 {
+		invoker.AddToTimeline("[LOAD_CAPABILITY_REPEATED_ATTEMPT]",
+			fmt.Sprintf("WARNING: identifier='%s' has been attempted %d times. "+
+				"DO NOT call load_capability with '%s' again. "+
+				"You MUST try a completely different approach or identifier. "+
+				"Repeating the same load_capability call is wasteful and will not produce different results.",
+				identifier, attemptCount, identifier))
+	}
+
 	invoker.AddToTimeline("[LOAD_CAPABILITY_VERIFIED]",
-		fmt.Sprintf("identifier='%s' resolved as '%s'", identifier, resolved.IdentityType))
+		fmt.Sprintf("identifier='%s' resolved as '%s' (attempt #%d)", identifier, resolved.IdentityType, attemptCount))
 	return nil
 }
 
@@ -160,6 +180,8 @@ func handleLoadTool(
 }
 
 // handleLoadForge starts an async blueprint/forge execution.
+// If the current task is already in async mode (e.g. a PE_TASK is already running),
+// the request is rejected to prevent nested async execution.
 func handleLoadForge(
 	loop *reactloops.ReActLoop,
 	invoker aicommon.AIInvokeRuntime,
@@ -167,13 +189,30 @@ func handleLoadForge(
 	identifier string,
 	op *reactloops.LoopActionHandlerOperator,
 ) {
+	task := loop.GetCurrentTask()
+	if task != nil && task.IsAsyncMode() {
+		log.Warnf("load_capability: rejecting forge '%s' because current task is already in async mode", identifier)
+		rejectMsg := fmt.Sprintf(
+			"REJECTED: Cannot start AI Blueprint '%s' — the current task is already running in async mode. "+
+				"You MUST NOT start another async operation while one is in progress. "+
+				"Wait for the current async task to complete, or take a different synchronous action.",
+			identifier)
+		invoker.AddToTimeline("[LOAD_CAPABILITY_FORGE_REJECTED]", rejectMsg)
+		op.Feedback(rejectMsg)
+		op.SetReflectionLevel(reactloops.ReflectionLevel_Critical)
+		op.SetReflectionData("forge_rejected_reason", "task_already_async")
+		op.SetReflectionData("forge_name", identifier)
+		op.Continue()
+		return
+	}
+
 	log.Infof("load_capability: dispatching '%s' as blueprint/forge", identifier)
 	invoker.AddToTimeline("[LOAD_CAPABILITY_FORGE]",
 		fmt.Sprintf("Starting AI Blueprint '%s' in async mode", identifier))
 
 	op.RequestAsyncMode()
 
-	task := op.GetTask()
+	task = op.GetTask()
 	taskCtx := task.GetContext()
 	invoker.RequireAIForgeAndAsyncExecute(taskCtx, identifier, func(err error) {
 		loop.FinishAsyncTask(task, err)
@@ -244,6 +283,7 @@ func handleLoadSkill(
 }
 
 // handleLoadFocusMode synchronously executes a focus mode loop.
+// Provides detailed timeline feedback for both success and failure outcomes.
 func handleLoadFocusMode(
 	loop *reactloops.ReActLoop,
 	invoker aicommon.AIInvokeRuntime,
@@ -283,26 +323,48 @@ func handleLoadFocusMode(
 	ok, err := invoker.ExecuteLoopTaskIF(identifier, subTask, opts...)
 	if err != nil {
 		log.Warnf("load_capability: focus mode '%s' execution failed: %v", identifier, err)
-		invoker.AddToTimeline("[LOAD_CAPABILITY_FOCUS_MODE_ERROR]",
-			fmt.Sprintf("Focus mode '%s' failed: %v", identifier, err))
-		op.Feedback(fmt.Sprintf("Focus mode '%s' execution failed: %v. Proceeding with current context.", identifier, err))
+		failMsg := fmt.Sprintf(
+			"Focus mode '%s' FAILED. Reason: %v. "+
+				"The focus mode could not be executed. Do NOT retry the same focus mode. "+
+				"Proceed with a different approach using your current context and available tools.",
+			identifier, err)
+		invoker.AddToTimeline("[LOAD_CAPABILITY_FOCUS_MODE_FAILED]", failMsg)
+		op.Feedback(failMsg)
+		op.SetReflectionLevel(reactloops.ReflectionLevel_Critical)
+		op.SetReflectionData("focus_mode_error", err.Error())
+		op.SetReflectionData("focus_mode_name", identifier)
 		op.Continue()
 		return
 	}
 	if !ok {
 		log.Warnf("load_capability: focus mode '%s' returned not ok", identifier)
-		op.Feedback(fmt.Sprintf("Focus mode '%s' completed but returned unsuccessful. Proceeding with current context.", identifier))
+		failMsg := fmt.Sprintf(
+			"Focus mode '%s' completed but returned UNSUCCESSFUL. "+
+				"The sub-loop did not produce a satisfactory outcome. "+
+				"Do NOT retry the same focus mode with the same input. "+
+				"Proceed with a different strategy.",
+			identifier)
+		invoker.AddToTimeline("[LOAD_CAPABILITY_FOCUS_MODE_UNSUCCESSFUL]", failMsg)
+		op.Feedback(failMsg)
+		op.SetReflectionLevel(reactloops.ReflectionLevel_Deep)
+		op.SetReflectionData("focus_mode_status", "unsuccessful")
+		op.SetReflectionData("focus_mode_name", identifier)
 		op.Continue()
 		return
 	}
 
-	invoker.AddToTimeline("[LOAD_CAPABILITY_FOCUS_MODE_DONE]",
-		fmt.Sprintf("Focus mode '%s' completed successfully", identifier))
-	op.Feedback(fmt.Sprintf("Focus mode '%s' has completed successfully. Proceeding with your task.", identifier))
+	successMsg := fmt.Sprintf(
+		"Focus mode '%s' completed SUCCESSFULLY. "+
+			"The focused sub-loop has finished its work. "+
+			"Its results are now part of your context. Proceed with your main task.",
+		identifier)
+	invoker.AddToTimeline("[LOAD_CAPABILITY_FOCUS_MODE_DONE]", successMsg)
+	op.Feedback(successMsg)
 	op.Continue()
 }
 
 // handleLoadUnknown falls back to a 1-iteration intent recognition loop.
+// Adds strong timeline pressure to prevent the AI from repeating the same unknown identifier.
 func handleLoadUnknown(
 	loop *reactloops.ReActLoop,
 	invoker aicommon.AIInvokeRuntime,
@@ -311,8 +373,32 @@ func handleLoadUnknown(
 	op *reactloops.LoopActionHandlerOperator,
 ) {
 	log.Infof("load_capability: identifier '%s' is unknown, falling back to intent recognition", identifier)
+
+	// Mark this identifier as "failed unknown" to detect loops
+	failedKey := "_load_cap_failed_unknown_" + identifier
+	prevFailed := loop.Get(failedKey)
+	if prevFailed != "" {
+		blockMsg := fmt.Sprintf(
+			"BLOCKED: identifier '%s' has already been tried and resolved as UNKNOWN in a previous attempt. "+
+				"Do NOT call load_capability with '%s' again — it will never resolve. "+
+				"You MUST choose a completely different approach: use search_capabilities to discover valid names, "+
+				"or use a known tool/action directly. Repeating this call wastes iterations.",
+			identifier, identifier)
+		invoker.AddToTimeline("[LOAD_CAPABILITY_UNKNOWN_BLOCKED]", blockMsg)
+		op.Feedback(blockMsg)
+		op.SetReflectionLevel(reactloops.ReflectionLevel_Critical)
+		op.SetReflectionData("blocked_identifier", identifier)
+		op.SetReflectionData("blocked_reason", "repeated_unknown_identifier")
+		op.Continue()
+		return
+	}
+	loop.Set(failedKey, "true")
+
 	invoker.AddToTimeline("[LOAD_CAPABILITY_UNKNOWN]",
-		fmt.Sprintf("Identifier '%s' not found in any registry. Running 1-iteration intent recognition loop.", identifier))
+		fmt.Sprintf("Identifier '%s' not found in any registry. "+
+			"Running 1-iteration intent recognition fallback. "+
+			"Do NOT call load_capability('%s') again after this — use the discovered capabilities instead.",
+			identifier, identifier))
 
 	cfg := invoker.GetConfig()
 	taskCtx := cfg.GetContext()
@@ -342,27 +428,41 @@ func handleLoadUnknown(
 	ok, err := invoker.ExecuteLoopTaskIF(schema.AI_REACT_LOOP_NAME_INTENT, intentTask, opts...)
 	if err != nil {
 		log.Warnf("load_capability: intent loop fallback failed: %v", err)
-		op.Feedback(fmt.Sprintf(
-			"Identifier '%s' was not found and intent recognition failed: %v. "+
-				"Please verify the name or try search_capabilities with a descriptive query.",
-			identifier, err))
+		failMsg := fmt.Sprintf(
+			"Identifier '%s' was NOT found, and intent recognition FAILED (reason: %v). "+
+				"Do NOT retry load_capability with '%s'. "+
+				"Use search_capabilities with a descriptive query, or proceed with already-available tools.",
+			identifier, err, identifier)
+		invoker.AddToTimeline("[LOAD_CAPABILITY_INTENT_FAILED]", failMsg)
+		op.Feedback(failMsg)
+		op.SetReflectionLevel(reactloops.ReflectionLevel_Critical)
+		op.SetReflectionData("intent_error", err.Error())
+		op.SetReflectionData("failed_identifier", identifier)
 		op.Continue()
 		return
 	}
 	if !ok {
 		log.Warnf("load_capability: intent loop fallback returned not ok")
-		op.Feedback(fmt.Sprintf(
-			"Identifier '%s' was not found and intent recognition produced no results. "+
-				"Try search_capabilities with a more descriptive query.",
-			identifier))
+		failMsg := fmt.Sprintf(
+			"Identifier '%s' was NOT found, and intent recognition produced NO useful results. "+
+				"Do NOT retry load_capability with '%s'. "+
+				"Use search_capabilities with a different, more descriptive query instead.",
+			identifier, identifier)
+		invoker.AddToTimeline("[LOAD_CAPABILITY_INTENT_NO_RESULT]", failMsg)
+		op.Feedback(failMsg)
+		op.SetReflectionLevel(reactloops.ReflectionLevel_Deep)
+		op.SetReflectionData("failed_identifier", identifier)
 		op.Continue()
 		return
 	}
 	if intentLoop == nil {
 		log.Warnf("load_capability: intent loop reference is nil")
-		op.Feedback(fmt.Sprintf(
-			"Identifier '%s' was not found. Intent recognition completed but results could not be extracted.",
-			identifier))
+		failMsg := fmt.Sprintf(
+			"Identifier '%s' was NOT found. Intent recognition completed but results could not be extracted. "+
+				"Do NOT retry. Use search_capabilities instead.",
+			identifier)
+		invoker.AddToTimeline("[LOAD_CAPABILITY_INTENT_NIL]", failMsg)
+		op.Feedback(failMsg)
 		op.Continue()
 		return
 	}
@@ -396,8 +496,8 @@ func handleLoadUnknown(
 
 	var summary strings.Builder
 	summary.WriteString(fmt.Sprintf("## Capability Search Results for: %s\n\n", identifier))
-	summary.WriteString(fmt.Sprintf("'%s' was not found as a direct match. "+
-		"The system ran intent recognition and discovered the following:\n\n", identifier))
+	summary.WriteString(fmt.Sprintf("'%s' was NOT found as a direct match. "+
+		"Intent recognition discovered the following alternatives:\n\n", identifier))
 	if intentAnalysis != "" {
 		summary.WriteString(intentAnalysis)
 		summary.WriteString("\n\n")
@@ -415,11 +515,16 @@ func handleLoadUnknown(
 		summary.WriteString("\n" + contextEnrichment)
 	}
 	summary.WriteString("\n---\n")
-	summary.WriteString("Discovered capabilities are now available in your context. Use the appropriate action to proceed.\n")
+	summary.WriteString(fmt.Sprintf(
+		"IMPORTANT: '%s' is confirmed as NOT a valid capability name. "+
+			"Do NOT call load_capability('%s') again. "+
+			"Use the discovered capabilities above with their correct names, or choose a different approach.\n",
+		identifier, identifier))
 
 	invoker.AddToTimeline("[LOAD_CAPABILITY_INTENT_DONE]",
-		fmt.Sprintf("Intent fallback completed: tools=[%s], forges=[%s], skills=[%s]",
-			matchedToolNames, matchedForgeNames, matchedSkillNames))
+		fmt.Sprintf("Intent fallback completed for '%s': tools=[%s], forges=[%s], skills=[%s]. "+
+			"Do NOT retry load_capability('%s').",
+			identifier, matchedToolNames, matchedForgeNames, matchedSkillNames, identifier))
 
 	op.Feedback(summary.String())
 	op.Continue()

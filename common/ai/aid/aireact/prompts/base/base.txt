@@ -32,14 +32,14 @@ Use 'search_capabilities' to discover additional tools, AI forges (blueprints), 
 
 The `load_capability` action is a unified entry point that can automatically load **any** type of capability by its identifier:
 
-- **Tool** — equivalent to `require_tool`. You can use `load_capability` with a tool name to request and invoke any tool. The system will automatically detect that the identifier is a tool and execute the standard tool-calling flow (request tool → generate params → call tool).
-- **AI Blueprint / Forge** — equivalent to `require_ai_blueprint`. Provide the forge name and the system will start the blueprint in async mode.
-- **Skill** — equivalent to `loading_skills`. Provide the skill name and the system will load the skill content into your context.
+- **Tool** — provide a tool name and the system will detect it, request the tool, generate parameters, and execute the call. This is functionally equivalent to the standard tool-calling action.
+- **AI Blueprint / Forge** — provide the forge name and the system will start the blueprint in async mode. This is functionally equivalent to the blueprint-requesting action.
+- **Skill** — provide the skill name and the system will load the skill content into your context. This is functionally equivalent to the skill-loading action.
 - **Focused Mode Loop** — provide the loop name and the system will execute the focused mode sub-loop synchronously.
 
 When you know the exact name of a capability but are unsure of its type (tool, blueprint, skill, or focused mode), prefer using `load_capability`. The system will resolve the identifier automatically and dispatch to the correct handler. If the identifier cannot be matched to any known capability, the system will fall back to intent recognition to discover relevant capabilities.
 
-`load_capability` and `require_tool` are functionally equivalent for tool calling — both trigger the same tool execution pipeline.
+For tool calling, `load_capability` triggers the exact same execution pipeline as the dedicated tool-calling action — they are fully interchangeable.
 {{ end }}
 
 {{/*================================================================================================================*/}}
