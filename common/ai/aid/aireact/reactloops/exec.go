@@ -796,6 +796,12 @@ LOOP:
 				if r.onAsyncTaskTrigger != nil {
 					r.onAsyncTaskTrigger(handler, task)
 				}
+				// Consume the done guard to prevent the deferred complete() from
+				// prematurely marking the task as Completed while the async forge
+				// is still running. This mirrors the static AsyncMode path (line 677).
+				done.Do(func() {
+					log.Infof("dynamic async mode, not update task status in mainloop")
+				})
 			}
 			r.loadingStatus("当前任务进入异步模式 / Async mode, ending loop")
 			finalError = nil
