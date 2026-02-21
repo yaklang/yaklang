@@ -13,6 +13,10 @@ type I18n struct {
 }
 
 var nodeIdMapper = map[string]*I18n{
+	"internet-research": {
+		Zh: "互联网调研",
+		En: "Internet Research",
+	},
 	"load_capability": {
 		Zh: "加载能力",
 		En: "Loading Capabilities",
