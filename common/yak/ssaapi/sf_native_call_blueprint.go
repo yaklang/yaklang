@@ -33,7 +33,7 @@ func getCurrentBlueprint(v sfvm.ValueOperator) []*ssa.Blueprint {
 				rets = append(rets, bp)
 			}
 		case *sfvm.ValueList:
-			// 直接使用 ValueList 的 Recursive 方法遍历其中的 Value
+			// 直接使用 Values 的 Recursive 方法遍历其中的 Value
 			ret.Recursive(func(vo sfvm.ValueOperator) error {
 				if val, ok := vo.(*Value); ok {
 					if bp := getBlueprint(val); bp != nil {

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
-	"time"
 
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/utils/diagnostics"
@@ -187,36 +186,64 @@ func (p *Program) Recursive(f func(operator sfvm.ValueOperator) error) error {
 	return f(p)
 }
 
-func (p *Program) ExactMatch(ctx context.Context, mod ssadb.MatchMode, s string) (bool, sfvm.ValueOperator, error) {
+func (p *Program) ExactMatch(ctx context.Context, mod int, s string) (bool, sfvm.ValueOperator, error) {
 	return p.matchVariable(ctx, ssadb.ExactCompare, mod, s)
 }
 
-func (p *Program) GlobMatch(ctx context.Context, mod ssadb.MatchMode, g string) (bool, sfvm.ValueOperator, error) {
+func (p *Program) GlobMatch(ctx context.Context, mod int, g string) (bool, sfvm.ValueOperator, error) {
 	return p.matchVariable(ctx, ssadb.GlobCompare, mod, g)
 }
 
-func (p *Program) RegexpMatch(ctx context.Context, mod ssadb.MatchMode, re string) (bool, sfvm.ValueOperator, error) {
+func (p *Program) RegexpMatch(ctx context.Context, mod int, re string) (bool, sfvm.ValueOperator, error) {
 	return p.matchVariable(ctx, ssadb.RegexpCompare, mod, re)
 }
 
-func (p *Program) matchVariable(ctx context.Context, compareMode ssadb.CompareMode, mod ssadb.MatchMode, pattern string) (bool, sfvm.ValueOperator, error) {
+func (p *Program) matchVariable(ctx context.Context, compareMode int, mod int, pattern string) (bool, sfvm.ValueOperator, error) {
 	return p.matchVariableWithExcludeFiles(ctx, compareMode, mod, pattern, nil)
 }
 
 // matchVariableWithExcludeFiles 搜索变量，支持排除指定文件
 // excludeFiles: 要排除的文件路径列表（规范化后的路径，如 "/test.go"）
-func (p *Program) matchVariableWithExcludeFiles(ctx context.Context, compareMode ssadb.CompareMode, mod ssadb.MatchMode, pattern string, excludeFiles []string) (bool, sfvm.ValueOperator, error) {
+func (p *Program) matchVariableWithExcludeFiles(ctx context.Context, compareMode int, mod int, pattern string, excludeFiles []string) (bool, sfvm.ValueOperator, error) {
 	var values Values
 	name := fmt.Sprintf("sf.matchVariable:%s", pattern)
+	cacheKey := ""
+	if p != nil && p.matchValuesCache != nil {
+		excluded := append([]string(nil), excludeFiles...)
+		sort.Strings(excluded)
+		cacheKey = utils.CalcSha256(compareMode, mod, pattern, excluded)
+	}
 	_ = diagnostics.TrackLow(name, func() error {
+		if p != nil && p.matchValuesCache != nil && cacheKey != "" {
+			cached, err := p.matchValuesCache.GetOrLoad(cacheKey, func() (Values, error) {
+				values := lo.FilterMap(
+					ssa.MatchInstructionsByVariableWithExcludeFiles(ctx, p.Program, compareMode, mod, pattern, excludeFiles),
+					func(i ssa.Instruction, _ int) (*Value, bool) {
+						if v, err := p.NewValue(i); err != nil {
+							log.Errorf("matchVariable: new value failed: %v", err)
+							return nil, false
+						} else {
+							return v, true
+						}
+					},
+				)
+				return values, nil
+			})
+			if err != nil {
+				return err
+			}
+			values = cached
+			return nil
+		}
 		values = lo.FilterMap(
 			ssa.MatchInstructionsByVariableWithExcludeFiles(ctx, p.Program, compareMode, mod, pattern, excludeFiles),
 			func(i ssa.Instruction, _ int) (*Value, bool) {
 				if v, err := p.NewValue(i); err != nil {
 					log.Errorf("matchVariable: new value failed: %v", err)
 					return nil, false
+				} else {
+					return v, true
 				}
-				return v, true
 			},
 		)
 		return nil

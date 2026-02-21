@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/samber/lo"
@@ -43,7 +45,7 @@ func (i *Value) GetTopDefs(opt ...OperationOption) (ret Values) {
 				ruleName = actx.config.RuleName
 			}
 			if actx != nil && actx.traceStats != nil {
-				logTopDefTraceStats(actx.traceStats, ruleName, elapsed, len(ret), actx.reachedDepthLimited)
+				logTopDefTraceStats(actx.traceStats, actx.relationCacheStats(), ruleName, elapsed, len(ret), actx.reachedDepthLimited)
 			}
 		}
 	}()
@@ -86,7 +88,7 @@ type opCount struct {
 	count uint64
 }
 
-func logTopDefTraceStats(stats *topDefTraceStats, ruleName string, elapsed time.Duration, resultCount int, reachedDepthLimit bool) {
+func logTopDefTraceStats(stats *topDefTraceStats, relationStats analyzeRelationCacheStats, ruleName string, elapsed time.Duration, resultCount int, reachedDepthLimit bool) {
 	if stats == nil {
 		return
 	}
@@ -95,7 +97,7 @@ func logTopDefTraceStats(stats *topDefTraceStats, ruleName string, elapsed time.
 		label = label + ":" + ruleName
 	}
 	baselog.Infof(
-		"%s total=%s calls=%d results=%d maxDepth=%d maxObjectStack=%d maxCallStack=%d depthLimit=%d recursiveLimit=%d untilMatch=%d reachedDepthLimit=%v",
+		"%s total=%s calls=%d results=%d maxDepth=%d maxObjectStack=%d maxCallStack=%d depthLimit=%d recursiveLimit=%d undefinedPrune=%d untilMatch=%d cache(users:%d/%d values:%d/%d userValues:%d/%d mask:%d/%d) reachedDepthLimit=%v",
 		label,
 		elapsed,
 		stats.callCount,
@@ -105,7 +107,16 @@ func logTopDefTraceStats(stats *topDefTraceStats, ruleName string, elapsed time.
 		stats.maxCallStack,
 		stats.depthLimitCount,
 		stats.recursiveLimitCount,
+		stats.undefinedPruneCount,
 		stats.untilMatchCount,
+		relationStats.UsersHit,
+		relationStats.UsersMiss,
+		relationStats.ValueValsHit,
+		relationStats.ValueValsMiss,
+		relationStats.UserValsHit,
+		relationStats.UserValsMiss,
+		relationStats.MaskHit,
+		relationStats.MaskMiss,
 		reachedDepthLimit,
 	)
 	if len(stats.opCounts) == 0 {
@@ -135,7 +146,7 @@ func (i *Value) visitedDefs(actx *AnalyzeContext, opt ...OperationOption) (resul
 	if i.getValue() == nil {
 		return vals
 	}
-	for _, def := range i.getValue().GetValues() {
+	for _, def := range actx.cachedValueValues(i) {
 		if utils.IsNil(def) {
 			continue
 		}
@@ -148,7 +159,7 @@ func (i *Value) visitedDefs(actx *AnalyzeContext, opt ...OperationOption) (resul
 	}
 
 	if maskable, ok := i.getValue().(ssa.Maskable); ok {
-		if len(maskable.GetMask()) == 0 {
+		if len(actx.cachedMaskValues(i.getValue().GetId(), maskable)) == 0 {
 			return vals
 		}
 		// 拿到上次递归的节点
@@ -162,7 +173,7 @@ func (i *Value) visitedDefs(actx *AnalyzeContext, opt ...OperationOption) (resul
 		} else {
 			shadow = i.NewValue(i.getValue())
 		}
-		for _, def := range maskable.GetMask() {
+		for _, def := range actx.cachedMaskValues(i.getValue().GetId(), maskable) {
 			if ret := shadow.NewValue(def).getTopDefs(actx, opt...); len(ret) > 0 {
 				vals = append(vals, ret...)
 			}
@@ -234,6 +245,72 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		}
 		return ret
 	}
+	getMembersByKeyWithFallback := func(object *Value, key *Value, all map[ssa.Value]ssa.Value) Values {
+		if object == nil || key == nil {
+			return nil
+		}
+		seen := make(map[int64]struct{})
+		matched := make(Values, 0)
+		appendMember := func(v *Value) {
+			if v == nil {
+				return
+			}
+			id := v.GetId()
+			if _, ok := seen[id]; ok {
+				return
+			}
+			seen[id] = struct{}{}
+			matched = append(matched, v)
+		}
+		for _, m := range object.GetMember(key) {
+			appendMember(m)
+		}
+		if len(matched) > 0 {
+			return matched
+		}
+		candidates := make(map[string]struct{})
+		addCandidate := func(s string) {
+			s = strings.TrimSpace(s)
+			if s == "" {
+				return
+			}
+			candidates[s] = struct{}{}
+			candidates[strings.Trim(s, `"'`)] = struct{}{}
+			if unquoted, err := strconv.Unquote(s); err == nil {
+				candidates[unquoted] = struct{}{}
+			}
+		}
+		if key.getValue() != nil {
+			addCandidate(key.getValue().String())
+		}
+		addCandidate(fmt.Sprint(key.GetConstValue()))
+		addCandidate(key.GetName())
+		for rawKey, member := range all {
+			if rawKey == nil || member == nil {
+				continue
+			}
+			keyForms := []string{
+				rawKey.String(),
+				rawKey.GetName(),
+				strings.Trim(rawKey.String(), `"'`),
+			}
+			hit := false
+			for _, form := range keyForms {
+				form = strings.TrimSpace(form)
+				if form == "" {
+					continue
+				}
+				if _, ok := candidates[form]; ok {
+					hit = true
+					break
+				}
+			}
+			if hit {
+				appendMember(object.NewValue(member))
+			}
+		}
+		return matched
+	}
 	vals := checkObject()
 	if vals != nil {
 		return vals
@@ -272,6 +349,9 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 	switch inst := instRaw.(type) {
 	case *ssa.Undefined:
 		if inst.Kind == ssa.UndefinedValueReturn {
+			return Values{}
+		}
+		if actx.shouldPruneUndefined(inst.GetId()) {
 			return Values{}
 		}
 		return getMemberCall(i, inst, actx)
@@ -448,14 +528,42 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 			if !ok {
 				return
 			}
+			firstSeen := int64(-1)
+			var seen map[int64]struct{}
+			visitReturnVal := func(subVal ssa.Value) {
+				if subVal == nil {
+					return
+				}
+				id := subVal.GetId()
+				if firstSeen == -1 {
+					firstSeen = id
+				} else if id == firstSeen {
+					return
+				} else {
+					if seen == nil {
+						seen = map[int64]struct{}{firstSeen: {}}
+					}
+					if _, existed := seen[id]; existed {
+						return
+					}
+					seen[id] = struct{}{}
+				}
+				if ret := value.NewValue(subVal).getTopDefs(actx, opt...); len(ret) > 0 {
+					vals = append(vals, ret...)
+				}
+			}
 			for _, retId := range fun.Return {
 				retInst, ok := fun.GetValueById(retId)
 				if !ok {
 					continue
 				}
-				for _, subVal := range retInst.GetValues() {
-					if ret := value.NewValue(subVal).getTopDefs(actx, opt...); len(ret) > 0 {
-						vals = append(vals, ret...)
+				if u, ok := ssa.ToUser(retInst); ok {
+					for _, subVal := range actx.cachedUserValues(u) {
+						visitReturnVal(subVal)
+					}
+				} else {
+					for _, subVal := range retInst.GetValues() {
+						visitReturnVal(subVal)
 					}
 				}
 			}
@@ -650,6 +758,16 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		values = append(values, i)
 		var allmember map[ssa.Value]ssa.Value
 		allmember = inst.GetAllMember()
+		if ctxObj := actx.CurrentObjectStack(); ctxObj != nil && ValueCompare(ctxObj.object, i) && ctxObj.key != nil {
+			for _, member := range getMembersByKeyWithFallback(i, ctxObj.key, allmember) {
+				if err := actx.pushObject(i, ctxObj.key, member); err != nil {
+					continue
+				}
+				values = append(values, member.getTopDefs(actx, opt...)...)
+				actx.popObject()
+			}
+			return values
+		}
 		for key, member := range allmember {
 			value := i.NewValue(member)
 			if err := actx.pushObject(i, i.NewValue(key), value); err != nil {

@@ -54,6 +54,14 @@ type AnalyzeContext struct {
 
 	traceEnabled bool
 	traceStats   *topDefTraceStats
+
+	// relationCache memoizes expensive SSA relationship lookups (users/values/masks) by instruction id.
+	// This avoids re-querying (and re-allocating) the same adjacency lists across many transient *Value wrappers.
+	relationCache *analyzeRelationCache
+
+	// undefinedVisitCounts guards against pathological loops in topdef traversals.
+	// Key: SSA value id of *ssa.Undefined node.
+	undefinedVisitCounts map[int64]uint16
 }
 
 type node struct {
@@ -69,6 +77,8 @@ func NewAnalyzeContext(opt ...OperationOption) *AnalyzeContext {
 		depth:                  -1,
 		callStack:              utils.NewStack[*ssa.Call](),
 		recursiveStatusIsLeaf:  utils.NewStack[node](),
+		relationCache:          newAnalyzeRelationCache(),
+		undefinedVisitCounts:   make(map[int64]uint16),
 	}
 	return actx
 }
@@ -80,6 +90,7 @@ type topDefTraceStats struct {
 	maxCallStack        int
 	depthLimitCount     uint64
 	recursiveLimitCount uint64
+	undefinedPruneCount uint64
 	untilMatchCount     uint64
 	opCounts            map[string]uint64
 }
@@ -118,6 +129,22 @@ func (s *topDefTraceStats) incOpcode(name string) {
 		return
 	}
 	s.opCounts[name]++
+}
+
+const undefinedVisitLimitPerTraversal = 256
+
+func (a *AnalyzeContext) shouldPruneUndefined(valueID int64) bool {
+	if a == nil || valueID == 0 {
+		return false
+	}
+	a.undefinedVisitCounts[valueID]++
+	if a.undefinedVisitCounts[valueID] > undefinedVisitLimitPerTraversal {
+		if a.traceEnabled && a.traceStats != nil {
+			a.traceStats.undefinedPruneCount++
+		}
+		return true
+	}
+	return false
 }
 func (a *AnalyzeContext) pushCall(call *ssa.Call) {
 	a.callStack.Push(call)

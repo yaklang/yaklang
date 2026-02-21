@@ -2,12 +2,17 @@ package ssaapi
 
 import (
 	"context"
+	"time"
 
+	baselog "github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 func (v *Value) GetBottomUses(opt ...OperationOption) (ret Values) {
+	var actx *AnalyzeContext
+	var traceStart time.Time
 	defer func() {
 		if r := recover(); r != nil {
 			if r == errRecursiveDepth {
@@ -24,10 +29,40 @@ func (v *Value) GetBottomUses(opt ...OperationOption) (ret Values) {
 			utils.PrintCurrentGoroutineRuntimeStack()
 			ret = nil
 		}
+		if diagnostics.Enabled(diagnostics.LevelLow) && traceStart != (time.Time{}) && actx != nil {
+			elapsed := time.Since(traceStart)
+			ruleName := ""
+			if actx.config != nil {
+				ruleName = actx.config.RuleName
+			}
+			stats := actx.relationCacheStats()
+			label := "ssa.bottomuse.trace"
+			if ruleName != "" {
+				label = label + ":" + ruleName
+			}
+			baselog.Infof(
+				"%s total=%s results=%d depthLimit=%v cache(users:%d/%d values:%d/%d userValues:%d/%d mask:%d/%d)",
+				label,
+				elapsed,
+				len(ret),
+				actx.reachedDepthLimited,
+				stats.UsersHit,
+				stats.UsersMiss,
+				stats.ValueValsHit,
+				stats.ValueValsMiss,
+				stats.UserValsHit,
+				stats.UserValsMiss,
+				stats.MaskHit,
+				stats.MaskMiss,
+			)
+		}
 	}()
-	actx := NewAnalyzeContext(opt...)
+	actx = NewAnalyzeContext(opt...)
 	actx.Self = v
 	actx.direct = BottomUseAnalysis
+	if diagnostics.Enabled(diagnostics.LevelLow) {
+		traceStart = time.Now()
+	}
 	ret = v.getBottomUses(actx, opt...)
 	if actx.HasUntilNode() {
 		ret = actx.untilMatch
@@ -52,14 +87,32 @@ func (v *Value) visitUserFallback(actx *AnalyzeContext, opt ...OperationOption) 
 	var vals Values
 	if v.IsObject() {
 		exist := false
+		var scopedKeys Values
 		actx.foreachObjectStack(func(obj *Value, key *Value, val *Value) bool {
 			if obj.GetId() == v.GetId() {
 				exist = true
+				if key != nil {
+					scopedKeys = append(scopedKeys, key)
+				}
 				return false
 			}
 			return true
 		})
-		if !exist {
+		if exist && len(scopedKeys) > 0 {
+			for _, key := range MergeValues(scopedKeys) {
+				if key == nil {
+					continue
+				}
+				for _, member := range v.GetMember(key) {
+					if member == nil {
+						continue
+					}
+					_ = actx.pushObject(v, key, member)
+					vals = append(vals, member.getBottomUses(actx, opt...)...)
+					actx.popObject()
+				}
+			}
+		} else if !exist {
 			v.GetAllMember().ForEach(func(value *Value) {
 				_ = actx.pushObject(v, value.GetKey(), value)
 				vals = append(vals, value.getBottomUses(actx, opt...)...)
@@ -85,7 +138,7 @@ func (v *Value) visitUserFallback(actx *AnalyzeContext, opt ...OperationOption) 
 		}
 	}
 	// log.Infof("current Value: %s", v)
-	v.GetUsers().ForEach(func(value *Value) {
+	actx.usersAsValues(v).ForEach(func(value *Value) {
 		// log.Infof("value %s", value)
 		if ret := value.getBottomUses(actx, opt...); len(ret) > 0 {
 			vals = append(vals, ret...)

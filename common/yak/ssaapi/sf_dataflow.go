@@ -103,7 +103,7 @@ func DataFlowWithSFConfig(
 	ret := dataflowRecursiveFunc(options...)
 	// filter the result
 	ret = dataFlowFilter(ret, sfResult, config, nil, filterCondition...)
-	// set predecessor label - 将 Values 转换为 sfvm.ValueList 才能调用 AppendPredecessor
+	// set predecessor label - 将 Values 转换为 sfvm.Values 才能调用 AppendPredecessor
 	retValue := ValuesToSFValueList(ret)
 	retValue.AppendPredecessor(value, sf.WithAnalysisContext_Label(DataFlowLabel(analysisType)))
 	return retValue
@@ -209,7 +209,7 @@ func dataFlowFilter(
 	//foreach every path,A-> B-> C-> D-> E
 	//if E start dataflow. include: A && exclude:D this path is not match
 	checkMatch := func(path Values) bool {
-		// CheckMatch 需要 sfvm.ValueOperator，将 Values 转换为 sfvm.ValueList
+		// CheckMatch 需要 sfvm.ValueOperator，将 Values 转换为 sfvm.Values
 		return pathCheck.CheckMatch(ValuesToSFValueList(path))
 	}
 	var ret []*Value
@@ -223,7 +223,7 @@ func dataFlowFilter(
 		case *Value:
 			endValues = Values{i}
 		case *sf.ValueList:
-			// 直接使用 ValueList 的 Recursive 方法提取其中的 Value
+			// 直接使用 Values 的 Recursive 方法提取其中的 Value
 			i.Recursive(func(operator sf.ValueOperator) error {
 				if val, ok := operator.(*Value); ok {
 					endValues = append(endValues, val)

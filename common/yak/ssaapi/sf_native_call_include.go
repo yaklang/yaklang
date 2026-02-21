@@ -81,7 +81,7 @@ func nativeCallInclude(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.N
 	if len(inputs) == 0 {
 		queryValue = parent
 	} else {
-		// 将 Values 转换为 sfvm.ValueList
+		// 将 Values 转换为 sfvm.Values
 		queryValue = ValuesToSFValueList(inputs)
 	}
 

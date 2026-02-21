@@ -5,7 +5,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/java/template2java"
@@ -423,7 +422,7 @@ func init() {
 				case *Value:
 					// GetUsers() 返回 Values，需要转换为 sfvm.ValueOperator
 					temp = append(temp, ValuesToSFValueList(ret.GetUsers()))
-				case *sfvm.Values:
+				case *sfvm.ValueList:
 					// 直接使用 Values 的 Recursive 方法遍历其中的 Value
 					ret.Recursive(func(vo sfvm.ValueOperator) error {
 						if val, ok := vo.(*Value); ok {
@@ -657,7 +656,7 @@ func init() {
 		case *Value:
 			vals := getCalledAndCheck(i)
 			res = append(res, vals...)
-		case *sfvm.Values:
+		case *sfvm.ValueList:
 			// 直接使用 Values 的 Recursive 方法遍历其中的 Value
 			i.Recursive(func(operator sfvm.ValueOperator) error {
 				value, ok := operator.(*Value)
@@ -1148,7 +1147,6 @@ func init() {
 							returnIDs = cached
 						}
 					}
-					useFastIR := funcIns.GetProgram() != nil && funcIns.GetProgram().DatabaseKind != ssa.ProgramCacheMemory
 					if returnIDs == nil {
 						buildName := "sf.nativecall.getReturns.buildIDs"
 						if ruleName != "" {
@@ -1157,24 +1155,9 @@ func init() {
 						_ = diagnostics.TrackLow(buildName, func() error {
 							returnIDs = make([]int64, 0)
 							for _, ret := range funcIns.Return {
-								if useFastIR {
-									if ir := ssadb.GetIrCodeByIdFast(ssadb.GetDB(), funcIns.GetProgramName(), ret); ir != nil {
-										ids := utils.MapGetInt64Slice(ir.GetExtraInfo(), "return_results")
-										if len(ids) > 0 {
-											returnIDs = append(returnIDs, ids...)
-											continue
-										}
-									}
-								}
 								ret, ok := funcIns.GetValueById(ret)
 								if !ok || ret == nil {
 									continue
-								}
-								if lz, ok := ssa.ToLazyInstruction(ret); ok {
-									if ids := lz.GetReturnResultIDs(); len(ids) > 0 {
-										returnIDs = append(returnIDs, ids...)
-										continue
-									}
 								}
 								retVal, ok := ssa.ToReturn(ret)
 								if ok {
@@ -1189,9 +1172,6 @@ func init() {
 						if val.ParentProgram != nil && val.ParentProgram.funcReturnsCache != nil {
 							val.ParentProgram.funcReturnsCache.Set(funcID, returnIDs)
 						}
-					}
-					if useFastIR && funcIns.GetProgram() != nil && funcIns.GetProgram().Cache != nil && len(returnIDs) > 0 {
-						funcIns.GetProgram().Cache.PreloadInstructionsByIDsFast(returnIDs)
 					}
 					var retVals ssa.Values
 					if val.ParentProgram != nil && val.ParentProgram.funcReturnValsCache != nil {
