@@ -1,0 +1,236 @@
+__DESC__ = "互联网搜索与内容精炼工具。根据关键词搜索互联网，自动获取搜索结果页面内容并提取文本，将精炼后的结果输出给AI，同时可保存到指定文件。适用于信息收集、话题调研、实时信息获取等场景。"
+__VERBOSE_NAME__ = "互联网搜索与内容精炼工具"
+__KEYWORDS__ = "web search,internet search,omnisearch,content extraction,web research,网页搜索,互联网搜索,内容提取,信息收集,话题调研,search engine,搜索引擎,web scraping,网页抓取,information gathering,实时信息"
+
+__USAGE__ = <<<USAGE_BLOCK
+Web Search Tool - Parameter Description for JSON Tool Calls
+
+Required Parameters:
+  query           (string)  The search query / keywords to search for on the internet.
+
+Optional Parameters:
+  output_file     (string)  File path to save the search results. If not specified,
+                            results are only output to AI and stdout.
+                            Parent directories will be created automatically.
+  max_results     (int)     Maximum number of search results to process. Default: 5.
+                            Higher values provide more comprehensive results but take longer.
+  timeout         (int)     Timeout in seconds for each HTTP request when fetching page content.
+                            Default: 10. Set higher for slow websites.
+  fetch_content   (bool)    Whether to fetch and extract text content from result URLs.
+                            Default: true. Set to false for a quick search without page fetching.
+
+## Few-Shot Examples
+
+Replace {NONCE} with the actual nonce from the response format section.
+
+### Example 1: Basic search with default settings
+
+User intent: "Search for information about Yaklang security tool"
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "web_search",
+  "identifier": "search_yaklang_info",
+  "params": {
+    "query": "Yaklang security tool features"
+  }
+}
+```
+
+### Example 2: Search and save results to file
+
+User intent: "Research CVE-2024-1234 and save the findings"
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "web_search",
+  "identifier": "research_cve",
+  "params": {
+    "query": "CVE-2024-1234 vulnerability details exploit",
+    "output_file": "/tmp/cve_2024_1234_research.md",
+    "max_results": 8
+  }
+}
+```
+
+### Example 3: Quick search without fetching page content
+
+User intent: "Quickly check what results come up for a topic"
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "web_search",
+  "identifier": "quick_search",
+  "params": {
+    "query": "golang concurrency patterns 2024",
+    "fetch_content": false,
+    "max_results": 10
+  }
+}
+```
+
+## Key Rules
+
+1. Always provide a clear, specific search query for best results.
+2. Use fetch_content=false for quick overviews, true for deep research.
+3. Set output_file when you need to persist results for later reference.
+4. Adjust max_results based on how comprehensive the search needs to be.
+USAGE_BLOCK
+
+yakit.AutoInitYakit()
+
+query = cli.String("query", cli.setRequired(true), cli.setHelp("search query keywords"))
+outputFile = cli.String("output_file", cli.setRequired(false), cli.setDefault(""), cli.setHelp("file path to save search results"))
+maxResults = cli.Int("max_results", cli.setRequired(false), cli.setDefault(5), cli.setHelp("maximum number of search results to process"))
+timeoutSec = cli.Int("timeout", cli.setRequired(false), cli.setDefault(10), cli.setHelp("timeout in seconds for each HTTP request"))
+fetchContent = cli.Bool("fetch_content", cli.setRequired(false), cli.setDefault(true), cli.setHelp("whether to fetch and extract text from result URLs"))
+
+cli.check()
+
+if maxResults <= 0 {
+    maxResults = 5
+}
+if timeoutSec <= 0 {
+    timeoutSec = 10
+}
+
+yakit.Info("=== Web Search Start ===")
+yakit.Info("Query: %v", query)
+yakit.Info("Max Results: %v, Fetch Content: %v, Timeout: %vs", maxResults, fetchContent, timeoutSec)
+
+results, err = omnisearch.Search(query, omnisearch.pagesize(maxResults))
+if err != nil {
+    yakit.Error("Search failed: %v", err)
+    yakit.AIOutput("Search failed: %v" % [err])
+    return
+}
+
+if len(results) == 0 {
+    yakit.Info("No search results found for query: %v", query)
+    yakit.AIOutput("No search results found for query: %v" % [query])
+    return
+}
+
+yakit.Info("Found %d search results", len(results))
+
+extractTextFromHTML = (body) => {
+    txt = make([]string)
+    title = str.ExtractTitle(string(body))
+    xhtml.Walker(body, node => {
+        if string(node.Type) != "1" {
+            return
+        }
+        text = str.TrimSpace(node.Data)
+        if text != "" {
+            txt = append(txt, text)
+        }
+    })
+    textContent = str.Join(txt, " ")
+    return title, textContent
+}
+
+fetchPageContent = (url) => {
+    defer fn{
+        err = recover()
+        if err != nil {
+            return "", "", err
+        }
+    }
+    rsp, req, err = poc.Get(url, poc.timeout(timeoutSec))
+    if err != nil {
+        return "", "", err
+    }
+    header, body = poc.Split(rsp.RawPacket)
+    if len(body) == 0 {
+        return "", "", nil
+    }
+    ct = rsp.GetContentType().Lower()
+    if str.Contains(ct, "html") {
+        title, textContent = extractTextFromHTML(body)
+        return title, textContent, nil
+    }
+    if len(body) <= 4096 {
+        return "", string(body), nil
+    }
+    return "", string(body[:4096]), nil
+}
+
+maxContentPerPage = 4096
+
+var fullOutput
+fullOutput = sprintf("# Web Search Results: %s\n\n", query)
+fullOutput += sprintf("**Query**: %s\n", query)
+fullOutput += sprintf("**Results Count**: %d\n\n---\n\n", len(results))
+
+for i, result = range results {
+    idx = i + 1
+    yakit.Info("[%d/%d] Processing: %v", idx, len(results), result.Title)
+
+    entryHeader = sprintf("## %d. %s\n\n", idx, result.Title)
+    entryHeader += sprintf("**URL**: %s\n", result.URL)
+    if result.Source != "" {
+        entryHeader += sprintf("**Source**: %s\n", result.Source)
+    }
+    entryHeader += "\n"
+
+    snippet = result.Content
+    if snippet != "" {
+        entryHeader += sprintf("**Snippet**: %s\n\n", snippet)
+    }
+
+    pageContent = ""
+    if fetchContent && result.URL != "" {
+        yakit.Info("[%d/%d] Fetching page content from: %v", idx, len(results), result.URL)
+        pageTitle, textContent, fetchErr = fetchPageContent(result.URL)
+        if fetchErr != nil {
+            yakit.Info("[%d/%d] Failed to fetch page: %v", idx, len(results), fetchErr)
+            entryHeader += sprintf("*Page fetch failed: %v*\n\n", fetchErr)
+        } else if textContent != "" {
+            if len(textContent) > maxContentPerPage {
+                textContent = textContent[:maxContentPerPage] + "\n...(content truncated)"
+            }
+            if pageTitle != "" && pageTitle != result.Title {
+                entryHeader += sprintf("**Page Title**: %s\n\n", pageTitle)
+            }
+            pageContent = sprintf("### Extracted Content\n\n%s\n\n", textContent)
+        } else {
+            entryHeader += "*No extractable text content*\n\n"
+        }
+    }
+
+    fullOutput += entryHeader + pageContent + "---\n\n"
+}
+
+yakit.AIOutput(fullOutput)
+
+println(fullOutput)
+
+if outputFile != "" {
+    dir = file.GetDirPath(outputFile)
+    if dir != "" && !file.IsExisted(dir) {
+        yakit.Info("Creating directory: %v", dir)
+        err = file.MkdirAll(dir)
+        if err != nil {
+            yakit.Error("Failed to create directory %v: %v", dir, err)
+        }
+    }
+
+    err = file.Save(outputFile, fullOutput)
+    if err != nil {
+        yakit.Error("Failed to save results to file %v: %v", outputFile, err)
+    } else {
+        info, statErr = file.Stat(outputFile)
+        if statErr == nil {
+            yakit.Info("Results saved to %v (%v bytes)", outputFile, info.Size())
+            yakit.File(outputFile, yakit.fileWriteAction(len(fullOutput), "cover", fullOutput))
+        } else {
+            yakit.Info("Results saved to %v", outputFile)
+        }
+    }
+}
+
+yakit.Info("=== Web Search Complete ===")
+yakit.Info("Processed %d results for query: %v", len(results), query)

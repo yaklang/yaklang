@@ -1,0 +1,116 @@
+## 输出示例
+
+**任务目标**：通过互联网搜索收集信息并生成调研报告
+
+---
+
+### 场景一：基础互联网搜索
+
+#### 1. 首次搜索 - 核心关键词
+用户问题："Qwen3 模型的主要特性和发布时间"
+
+```json
+{
+  "@action": "web_search",
+  "search_query": "Qwen3 model features release date 2025",
+  "human_readable_thought": "用户想了解 Qwen3 模型的特性和发布时间，先搜索核心关键词获取基本信息"
+}
+```
+
+#### 2. 补充搜索 - 换角度搜索
+发现需要了解更多技术细节：
+
+```json
+{
+  "@action": "web_search",
+  "search_query": "Qwen3 benchmark performance comparison",
+  "human_readable_thought": "已获取基本信息，现在搜索 Qwen3 的性能基准测试结果，补充技术细节"
+}
+```
+
+#### 3. 深入阅读 - 阅读重要页面
+从搜索结果中发现一篇详细的技术文章：
+
+```json
+{
+  "@action": "read_url",
+  "url": "https://qwenlm.github.io/blog/qwen3/",
+  "human_readable_thought": "搜索结果中发现 Qwen 官方博客有详细的 Qwen3 介绍文章，需要深入阅读获取详细信息"
+}
+```
+
+#### 4. 提交最终报告
+
+```json
+{
+  "@action": "final_summary",
+  "summary": "# Qwen3 模型调研报告\n\n## 发布时间\nQwen3 于 2025 年 4 月 29 日由阿里巴巴开源发布。\n\n## 主要特性\n1. 支持混合推理模式（思考模式和非思考模式无缝切换）\n2. 覆盖 0.6B 到 235B 的 8 个密集模型和 3 个 MoE 模型\n3. 全面支持 119 种语言和方言\n4. 增强的 Agent 和工具调用能力\n\n## 性能表现\n在多个基准测试中超越同级别模型...\n\n## 信息来源\n1. Qwen 官方博客\n2. GitHub 发布页面\n3. 多家技术媒体报道",
+  "human_readable_thought": "已收集到关于 Qwen3 的发布时间、主要特性、性能表现等全面信息，提交调研报告"
+}
+```
+
+---
+
+### 场景二：需要多轮搜索的复杂调研
+
+#### 1. 初始搜索
+
+```json
+{
+  "@action": "web_search",
+  "search_query": "CVE-2024-3400 PAN-OS vulnerability details",
+  "human_readable_thought": "搜索 CVE-2024-3400 漏洞的详细信息，这是一个 PAN-OS 的高危漏洞"
+}
+```
+
+#### 2. 补充搜索 - 利用信息
+
+```json
+{
+  "@action": "web_search",
+  "search_query": "CVE-2024-3400 exploit POC analysis",
+  "human_readable_thought": "已获取漏洞基本信息，现在搜索该漏洞的利用方式和 POC 分析"
+}
+```
+
+#### 3. 补充搜索 - 修复方案
+
+```json
+{
+  "@action": "web_search",
+  "search_query": "CVE-2024-3400 patch mitigation Palo Alto",
+  "human_readable_thought": "搜索官方修复方案和缓解措施"
+}
+```
+
+#### 4. 深入阅读权威来源
+
+```json
+{
+  "@action": "read_url",
+  "url": "https://security.paloaltonetworks.com/CVE-2024-3400",
+  "human_readable_thought": "阅读 Palo Alto Networks 官方安全公告，获取权威的漏洞描述和修复方案"
+}
+```
+
+#### 5. 提交最终报告
+
+```json
+{
+  "@action": "final_summary",
+  "summary": "# CVE-2024-3400 漏洞调研报告\n\n## 漏洞概述\n...\n\n## 影响范围\n...\n\n## 技术分析\n...\n\n## 修复方案\n...\n\n## 信息来源\n...",
+  "human_readable_thought": "已从多个角度收集了 CVE-2024-3400 的完整信息，包括漏洞详情、利用方式和修复方案，提交调研报告"
+}
+```
+
+---
+
+### 场景三：搜索结果不足
+
+```json
+{
+  "@action": "final_summary",
+  "summary": "# 调研报告\n\n## 用户问题\n[用户的问题]\n\n## 搜索情况\n已尝试以下搜索：\n- 搜索 1: [关键词] - 未找到直接相关信息\n- 搜索 2: [关键词] - 仅找到少量间接信息\n\n## 已收集的信息\n[有限的信息内容]\n\n## 说明\n当前互联网搜索未能找到充分的相关信息，可能原因：\n1. 该主题较为小众\n2. 相关信息可能需要特定数据库访问\n\n## 建议\n建议通过其他渠道获取更多信息。",
+  "human_readable_thought": "多次搜索后未能找到充分信息，提交包含已有信息和说明的报告"
+}
+```
