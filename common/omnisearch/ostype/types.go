@@ -8,6 +8,7 @@ const (
 	SearcherTypeAiBalance SearcherType = "aibalance"
 	SearcherTypeChatGLM   SearcherType = "chatglm"
 	SearcherTypeBocha     SearcherType = "bocha"
+	SearcherTypeUnifuncs  SearcherType = "unifuncs"
 )
 
 func (s SearcherType) String() string {

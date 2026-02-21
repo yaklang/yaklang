@@ -1,0 +1,32 @@
+/*
+UniFuncs Search Integration Test
+Tests the omnisearch library with unifuncs search type
+*/
+
+log.info("start unifuncs search integration test")
+
+// Read API key from file
+keyBytes = file.ReadFile("/tmp/unifuncs.txt")~
+key = str.TrimSpace(string(keyBytes))
+assert key != "", "api key should not be empty"
+log.info("api key loaded successfully")
+
+// Test 1: basic search via omnisearch with unifuncs type
+log.info("test 1: basic unifuncs search")
+results = omnisearch.Search(
+    "yaklang",
+    omnisearch.type("unifuncs"),
+    omnisearch.apikey(key),
+    omnisearch.pagesize(5),
+    omnisearch.timeout(15),
+)~
+assert len(results) > 0, "unifuncs search should return results"
+for _, r := range results {
+    log.info("  title: %s, url: %s, source: %s", r.Title, r.URL, r.Source)
+    assert r.Title != "", "result title should not be empty"
+    assert r.URL != "", "result url should not be empty"
+    assert r.Source == "unifuncs", "result source should be unifuncs"
+}
+log.info("test 1 passed: got %d results", len(results))
+
+log.info("all unifuncs search tests passed")

@@ -105,10 +105,10 @@ func (c *ServerConfig) handleCreateWebSearchApiKey(conn net.Conn, request *http.
 		})
 		return
 	}
-	validTypes := map[string]bool{"brave": true, "tavily": true, "chatglm": true, "bocha": true}
+	validTypes := map[string]bool{"brave": true, "tavily": true, "chatglm": true, "bocha": true, "unifuncs": true}
 	if !validTypes[reqBody.SearcherType] {
 		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]string{
-			"error": "searcher_type must be 'brave', 'tavily', 'chatglm' or 'bocha'",
+			"error": "searcher_type must be 'brave', 'tavily', 'chatglm', 'bocha' or 'unifuncs'",
 		})
 		return
 	}

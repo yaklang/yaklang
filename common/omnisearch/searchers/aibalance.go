@@ -18,7 +18,7 @@ type AiBalanceSearchConfig struct {
 	BaseURL string
 	// APIKey is the Bearer token for AiBalance authentication
 	APIKey string
-	// BackendSearcherType specifies which backend searcher to use via AiBalance ("brave", "tavily" or "chatglm")
+	// BackendSearcherType specifies which backend searcher to use via AiBalance ("brave", "tavily", "chatglm", "bocha" or "unifuncs")
 	BackendSearcherType string
 	// Proxy is an optional proxy for connecting to AiBalance
 	Proxy string

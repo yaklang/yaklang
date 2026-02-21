@@ -217,11 +217,11 @@ func (w *WebSearchConfig) TableName() string {
 	return "web_search_configs"
 }
 
-// WebSearchApiKey stores API keys for web search providers (Brave, Tavily)
+// WebSearchApiKey stores API keys for web search providers (Brave, Tavily, ChatGLM, Bocha, Unifuncs)
 type WebSearchApiKey struct {
 	gorm.Model
 
-	SearcherType string `json:"searcher_type" gorm:"index"` // "brave" or "tavily"
+	SearcherType string `json:"searcher_type" gorm:"index"` // "brave", "tavily", "chatglm", "bocha" or "unifuncs"
 	APIKey       string `json:"api_key"`
 	BaseURL      string `json:"base_url"`                     // Optional custom base URL
 	Proxy        string `json:"proxy"`                        // Optional proxy

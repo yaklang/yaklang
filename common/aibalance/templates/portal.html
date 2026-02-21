@@ -351,7 +351,7 @@
   -d '{"query": "Yaklang", "max_results": 10}'</pre>
                     <p style="color: #868e96; margin: 8px 0 0 0; font-size: 12px;">
                         <strong>说明:</strong> 付费用户使用 API Key 认证并计费；免费用户通过 Trace-ID 使用（需开启免费用户开关）。
-                        searcher_type 支持: <code>brave</code>, <code>tavily</code>, <code>chatglm</code>, <code>bocha</code>（留空自动选择）
+                        searcher_type 支持: <code>brave</code>, <code>tavily</code>, <code>chatglm</code>, <code>bocha</code>, <code>unifuncs</code>（留空自动选择）
                     </p>
                 </div>
                 <div style="display: flex; gap: 15px; align-items: center; margin-bottom: 15px; padding: 12px; background: #f0f7ff; border: 1px solid #d0e3ff; border-radius: 6px;">
@@ -405,6 +405,7 @@
                             <option value="tavily">Tavily</option>
                             <option value="chatglm">ChatGLM</option>
                             <option value="bocha">Bocha</option>
+                            <option value="unifuncs">Unifuncs</option>
                         </select>
                     </div>
                 </div>
@@ -504,6 +505,30 @@
                         </tbody>
                     </table>
                 </div>
+
+                <!-- Unifuncs Keys Section -->
+                <h4 style="margin-top: 30px; margin-bottom: 10px; color: #e91e63;">Unifuncs Search Keys</h4>
+                <div class="table-container">
+                    <table cellspacing="0" cellpadding="0" id="ws-unifuncs-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>API Key</th>
+                                <th>Base URL</th>
+                                <th>状态</th>
+                                <th>健康</th>
+                                <th>成功/失败</th>
+                                <th>总请求</th>
+                                <th>延迟(ms)</th>
+                                <th>最后使用</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ws-unifuncs-tbody">
+                            <tr><td colspan="10" style="text-align: center; color: #888; padding: 20px;">加载中...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
@@ -519,6 +544,7 @@
                         <option value="tavily">Tavily</option>
                         <option value="chatglm">ChatGLM</option>
                         <option value="bocha">Bocha</option>
+                        <option value="unifuncs">Unifuncs</option>
                     </select>
                 </div>
                 <div class="form-group">

@@ -21,7 +21,7 @@ import (
 // WebSearchRequest represents the request body for /v1/web-search
 type WebSearchRequest struct {
 	Query        string `json:"query"`
-	SearcherType string `json:"searcher_type"` // "brave", "tavily", "chatglm" or "" (auto-select), default ""
+	SearcherType string `json:"searcher_type"` // "brave", "tavily", "chatglm", "bocha", "unifuncs" or "" (auto-select), default ""
 	MaxResults   int    `json:"max_results"`   // default 10
 	Page         int    `json:"page"`          // default 1
 	PageSize     int    `json:"page_size"`     // default 10
@@ -116,12 +116,12 @@ func (c *ServerConfig) serveWebSearch(conn net.Conn, rawPacket []byte) {
 	}
 
 	// Validate searcher type (empty string means "auto-select")
-	validTypes := map[string]bool{"brave": true, "tavily": true, "chatglm": true, "bocha": true, "": true}
+	validTypes := map[string]bool{"brave": true, "tavily": true, "chatglm": true, "bocha": true, "unifuncs": true, "": true}
 	if !validTypes[reqBody.SearcherType] {
 		c.logError("invalid searcher type: %s", reqBody.SearcherType)
 		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]interface{}{
 			"error": map[string]string{
-				"message": "searcher_type must be 'brave', 'tavily', 'chatglm', 'bocha' or empty (auto-select)",
+				"message": "searcher_type must be 'brave', 'tavily', 'chatglm', 'bocha', 'unifuncs' or empty (auto-select)",
 				"type":    "invalid_request_error",
 			},
 		})
@@ -447,6 +447,9 @@ func (c *ServerConfig) doWebSearch(sk *schema.WebSearchApiKey, req *WebSearchReq
 		return client.Search(req.Query, config)
 	case "bocha":
 		client := searchers.NewOmniBochaSearchClient()
+		return client.Search(req.Query, config)
+	case "unifuncs":
+		client := searchers.NewOmniUnifuncsSearchClient()
 		return client.Search(req.Query, config)
 	default:
 		return nil, utils.Errorf("unsupported searcher type: %s", req.SearcherType)

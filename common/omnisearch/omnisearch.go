@@ -53,6 +53,7 @@ func (s *OmniSearchClient) InitDefaultSearchers() {
 	s.searcherList[ostype.SearcherTypeAiBalance] = searchers.NewOmniAiBalanceSearchClient()
 	s.searcherList[ostype.SearcherTypeChatGLM] = searchers.NewOmniChatGLMSearchClient()
 	s.searcherList[ostype.SearcherTypeBocha] = searchers.NewOmniBochaSearchClient()
+	s.searcherList[ostype.SearcherTypeUnifuncs] = searchers.NewOmniUnifuncsSearchClient()
 	for _, searcher := range searcherList {
 		s.searcherList[searcher.GetType()] = searcher
 	}
