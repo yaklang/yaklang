@@ -11,6 +11,19 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
+func isCFGExactLabel(label string) bool {
+	if !strings.HasPrefix(label, "search-exact:") {
+		return false
+	}
+	target := strings.TrimPrefix(label, "search-exact:")
+	switch target {
+	case "throws":
+		return true
+	default:
+		return false
+	}
+}
+
 func _SearchValues(values Values, mod ssadb.MatchMode, handler func(string) bool, opt ...sfvm.AnalysisContextOption) Values {
 	var newValue Values
 	for _, value := range values {
@@ -31,7 +44,10 @@ func _SearchValue(value *Value, mod ssadb.MatchMode, compare func(string) bool, 
 	skipValueSearch := false
 	skipCFGSearch := false
 	if label != "" && strings.HasPrefix(label, "search-exact:") {
-		if shouldUseCFGSearch(value) {
+		if isCFGExactLabel(label) {
+			// CFG keywords should be resolved by CFG edges directly.
+			skipValueSearch = true
+		} else if shouldUseCFGSearch(value) {
 			skipValueSearch = true
 		} else {
 			skipCFGSearch = true
@@ -59,6 +75,7 @@ func _SearchValue(value *Value, mod ssadb.MatchMode, compare func(string) bool, 
 			return nil
 		})
 	}
+
 	return newValue
 }
 
@@ -108,8 +125,8 @@ func SyntaxFlowVariableToValues(vs ...sfvm.ValueOperator) Values {
 			switch ret := operator.(type) {
 			case *Value:
 				rets = append(rets, ret)
-			case *sfvm.ValueList:
-				// ValueList 内部可能包含 *Value，递归提取
+			case *sfvm.Values:
+				// Values 内部可能包含 *Value，递归提取
 				ret.Recursive(func(vo sfvm.ValueOperator) error {
 					if val, ok := vo.(*Value); ok {
 						rets = append(rets, val)
@@ -128,17 +145,17 @@ func SyntaxFlowVariableToValues(vs ...sfvm.ValueOperator) Values {
 	return rets
 }
 
-// ValuesToSFValueList 将 ssaapi.Values 转换为 sfvm.ValueList
-// 这是从 ssaapi 层创建 sfvm.ValueList 的标准方法
-func ValuesToSFValueList(values Values) *sfvm.ValueList {
-	var list []sfvm.ValueOperator
+// ValuesToSFValueList 将 ssaapi.Values 转换为 sfvm.Values
+// 这是从 ssaapi 层创建 sfvm.Values 的标准方法
+func ValuesToSFValueList(values Values) *sfvm.Values {
+	out := make(sfvm.Values, 0, len(values))
 	for _, value := range values {
-		list = append(list, value)
+		out = append(out, value)
 	}
-	return &sfvm.ValueList{Values: list}
+	return &out
 }
 
-// MergeSFValueOperator 合并多个 sfvm.ValueOperator 为一个 sfvm.ValueList
+// MergeSFValueOperator 合并多个 sfvm.ValueOperator 为一个 sfvm.Values
 // 这是合并 ValueOperator 的标准方法
 func MergeSFValueOperator(sfv ...sfvm.ValueOperator) sfvm.ValueOperator {
 	ret := []sfvm.ValueOperator{}
@@ -158,5 +175,6 @@ func MergeSFValueOperator(sfv ...sfvm.ValueOperator) sfvm.ValueOperator {
 	for _, v := range MergeValues(values) {
 		ret = append(ret, v)
 	}
-	return &sfvm.ValueList{Values: ret}
+	out := sfvm.Values(ret)
+	return &out
 }

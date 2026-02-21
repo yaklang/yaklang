@@ -79,8 +79,9 @@ func (v *Value) ExactMatch(ctx context.Context, mod ssadb.MatchMode, want string
 }
 
 func (v *Value) GlobMatch(ctx context.Context, mod ssadb.MatchMode, g string) (bool, sfvm.ValueOperator, error) {
+	gMatcher := glob.MustCompile(g)
 	value := _SearchValue(v, mod, func(s string) bool {
-		return glob.MustCompile(g).Match(s)
+		return gMatcher.Match(s)
 	}, sfvm.WithAnalysisContext_Label("search-glob:"+g))
 	return len(value) > 0, ValuesToSFValueList(value), nil
 }
@@ -92,8 +93,9 @@ func (v *Value) Merge(sf ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
 }
 
 func (v *Value) RegexpMatch(ctx context.Context, mod ssadb.MatchMode, re string) (bool, sfvm.ValueOperator, error) {
+	regMatcher := regexp.MustCompile(re)
 	value := _SearchValue(v, mod, func(s string) bool {
-		return regexp.MustCompile(re).MatchString(s)
+		return regMatcher.MatchString(s)
 	}, sfvm.WithAnalysisContext_Label("search-regexp:"+re))
 	return len(value) > 0, ValuesToSFValueList(value), nil
 }
@@ -185,10 +187,10 @@ func (v *Value) GetCallActualParams(start int, contain bool) (sfvm.ValueOperator
 
 func (v *Value) GetCalled() (sfvm.ValueOperator, error) {
 	ret := v.GetCalledBy()
-	// 将 Values 转换为 sfvm.ValueList 才能调用 AppendPredecessor
-	retValueList := ValuesToSFValueList(ret)
-	retValueList.AppendPredecessor(v, sfvm.WithAnalysisContext_Label("call"))
-	return retValueList, nil
+	// 将 Values 转换为 sfvm.Values 才能调用 AppendPredecessor
+	retValues := ValuesToSFValueList(ret)
+	retValues.AppendPredecessor(v, sfvm.WithAnalysisContext_Label("call"))
+	return retValues, nil
 }
 
 func (v *Value) GetFields() (sfvm.ValueOperator, error) {

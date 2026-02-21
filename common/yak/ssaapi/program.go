@@ -31,11 +31,14 @@ type Program struct {
 	// come from database will affect search operation
 	comeFromDatabase bool
 	//value cache
-	nodeId2ValueCache  *utils.CacheWithKey[string, *Value]
-	opcode2ValuesCache *utils.CacheWithKey[string, Values]
-	funcReturnsCache   *utils.CacheWithKey[int64, []int64]
-	id                 *atomic.Int64
-	overlay            *ProgramOverLay
+	nodeId2ValueCache   *utils.CacheWithKey[string, *Value]
+	opcode2ValuesCache  *utils.CacheWithKey[string, Values]
+	matchValuesCache    *utils.CacheWithKey[string, Values]
+	funcParamsCache     *utils.CacheWithKey[int64, []int64]
+	funcReturnsCache    *utils.CacheWithKey[int64, []int64]
+	funcReturnValsCache *utils.CacheWithKey[int64, ssa.Values]
+	id                  *atomic.Int64
+	overlay             *ProgramOverLay
 }
 
 type Programs []*Program
@@ -142,11 +145,14 @@ func (p *Program) GetConfig() *Config {
 
 func NewProgram(prog *ssa.Program, config *Config) *Program {
 	p := &Program{
-		Program:            prog,
-		nodeId2ValueCache:  utils.NewTTLCacheWithKey[string, *Value](8 * time.Second),
-		opcode2ValuesCache: utils.NewLRUCacheWithKey[string, Values](16),
-		funcReturnsCache:   utils.NewLRUCacheWithKey[int64, []int64](256),
-		id:                 atomic.NewInt64(0),
+		Program:             prog,
+		nodeId2ValueCache:   utils.NewTTLCacheWithKey[string, *Value](8 * time.Second),
+		opcode2ValuesCache:  utils.NewLRUCacheWithKey[string, Values](16),
+		matchValuesCache:    utils.NewLRUCacheWithKey[string, Values](256),
+		funcParamsCache:     utils.NewLRUCacheWithKey[int64, []int64](256),
+		funcReturnsCache:    utils.NewLRUCacheWithKey[int64, []int64](256),
+		funcReturnValsCache: utils.NewLRUCacheWithKey[int64, ssa.Values](256),
+		id:                  atomic.NewInt64(0),
 	}
 	if config != nil {
 		p.config = config
@@ -171,13 +177,16 @@ func NewProgram(prog *ssa.Program, config *Config) *Program {
 
 func NewTmpProgram(name string) *Program {
 	p := &Program{
-		Program:            ssa.NewTmpProgram(name),
-		config:             &Config{},
-		enableDatabase:     false,
-		nodeId2ValueCache:  utils.NewTTLCacheWithKey[string, *Value](8 * time.Second),
-		opcode2ValuesCache: utils.NewLRUCacheWithKey[string, Values](16),
-		funcReturnsCache:   utils.NewLRUCacheWithKey[int64, []int64](256),
-		id:                 atomic.NewInt64(0),
+		Program:             ssa.NewTmpProgram(name),
+		config:              &Config{},
+		enableDatabase:      false,
+		nodeId2ValueCache:   utils.NewTTLCacheWithKey[string, *Value](8 * time.Second),
+		opcode2ValuesCache:  utils.NewLRUCacheWithKey[string, Values](16),
+		matchValuesCache:    utils.NewLRUCacheWithKey[string, Values](256),
+		funcParamsCache:     utils.NewLRUCacheWithKey[int64, []int64](256),
+		funcReturnsCache:    utils.NewLRUCacheWithKey[int64, []int64](256),
+		funcReturnValsCache: utils.NewLRUCacheWithKey[int64, ssa.Values](256),
+		id:                  atomic.NewInt64(0),
 	}
 	return p
 }

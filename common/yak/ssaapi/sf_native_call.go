@@ -182,6 +182,22 @@ const (
 	NativeCall_GetRoot = "root"
 )
 
+func dedupeInt64KeepOrder(ids []int64) []int64 {
+	if len(ids) <= 1 {
+		return ids
+	}
+	seen := make(map[int64]struct{}, len(ids))
+	out := make([]int64, 0, len(ids))
+	for _, id := range ids {
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
+	}
+	return out
+}
+
 func init() {
 	registerNativeCall(NativeCall_GetRoot, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		var result []sfvm.ValueOperator
@@ -407,8 +423,8 @@ func init() {
 				case *Value:
 					// GetUsers() 返回 Values，需要转换为 sfvm.ValueOperator
 					temp = append(temp, ValuesToSFValueList(ret.GetUsers()))
-				case *sfvm.ValueList:
-					// 直接使用 ValueList 的 Recursive 方法遍历其中的 Value
+				case *sfvm.Values:
+					// 直接使用 Values 的 Recursive 方法遍历其中的 Value
 					ret.Recursive(func(vo sfvm.ValueOperator) error {
 						if val, ok := vo.(*Value); ok {
 							// GetUsers() 返回 Values，需要转换为 sfvm.ValueOperator
@@ -641,8 +657,8 @@ func init() {
 		case *Value:
 			vals := getCalledAndCheck(i)
 			res = append(res, vals...)
-		case *sfvm.ValueList:
-			// 直接使用 ValueList 的 Recursive 方法遍历其中的 Value
+		case *sfvm.Values:
+			// 直接使用 Values 的 Recursive 方法遍历其中的 Value
 			i.Recursive(func(operator sfvm.ValueOperator) error {
 				value, ok := operator.(*Value)
 				if !ok {
@@ -1052,6 +1068,7 @@ func init() {
 		NativeCall_GetFormalParams,
 		nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, actualParams *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 			var vals []sfvm.ValueOperator
+			seenFunc := make(map[int64]struct{})
 			v.Recursive(func(operator sfvm.ValueOperator) error {
 				val, ok := operator.(*Value)
 				if !ok {
@@ -1062,8 +1079,23 @@ func init() {
 					if !ok {
 						return nil
 					}
-					for _, param := range rets.Params {
-						param, ok := rets.GetValueById(param)
+					funcID := rets.GetId()
+					if _, ok := seenFunc[funcID]; ok {
+						return nil
+					}
+					seenFunc[funcID] = struct{}{}
+					paramIDs := rets.Params
+					if val.ParentProgram != nil && val.ParentProgram.funcParamsCache != nil {
+						if cached, ok := val.ParentProgram.funcParamsCache.Get(funcID); ok {
+							paramIDs = cached
+						} else {
+							cached = dedupeInt64KeepOrder(rets.Params)
+							val.ParentProgram.funcParamsCache.Set(funcID, cached)
+							paramIDs = cached
+						}
+					}
+					for _, paramID := range paramIDs {
+						param, ok := rets.GetValueById(paramID)
 						if !ok || param == nil {
 							continue
 						}
@@ -1098,17 +1130,18 @@ func init() {
 			}
 			var vals []sfvm.ValueOperator
 			if err := diagnostics.TrackLow(name, func() error {
-				v.Recursive(func(operator sfvm.ValueOperator) error {
-					val, ok := operator.(*Value)
-					if !ok {
-						return nil
-					}
+				seenFunc := make(map[int64]struct{})
+				processValue := func(val *Value) {
 					originIns := val.getValue()
 					funcIns, ok := ssa.ToFunction(originIns)
 					if !ok {
-						return nil
+						return
 					}
 					funcID := funcIns.GetId()
+					if _, ok := seenFunc[funcID]; ok {
+						return
+					}
+					seenFunc[funcID] = struct{}{}
 					var returnIDs []int64
 					if val.ParentProgram != nil && val.ParentProgram.funcReturnsCache != nil {
 						if cached, ok := val.ParentProgram.funcReturnsCache.Get(funcID); ok {
@@ -1150,6 +1183,7 @@ func init() {
 									}
 								}
 							}
+							returnIDs = dedupeInt64KeepOrder(returnIDs)
 							return nil
 						})
 						if val.ParentProgram != nil && val.ParentProgram.funcReturnsCache != nil {
@@ -1159,17 +1193,41 @@ func init() {
 					if useFastIR && funcIns.GetProgram() != nil && funcIns.GetProgram().Cache != nil && len(returnIDs) > 0 {
 						funcIns.GetProgram().Cache.PreloadInstructionsByIDsFast(returnIDs)
 					}
-					for _, retIns := range returnIDs {
-						retIns, ok := funcIns.GetValueById(retIns)
-						if !ok || retIns == nil {
+					var retVals ssa.Values
+					if val.ParentProgram != nil && val.ParentProgram.funcReturnValsCache != nil {
+						if cached, ok := val.ParentProgram.funcReturnValsCache.Get(funcID); ok {
+							retVals = cached
+						}
+					}
+					if retVals == nil {
+						retVals = funcIns.GetValuesByIDs(returnIDs)
+						if val.ParentProgram != nil && val.ParentProgram.funcReturnValsCache != nil {
+							val.ParentProgram.funcReturnValsCache.Set(funcID, retVals)
+						}
+					}
+					for _, retVal := range retVals {
+						if retVal == nil {
 							continue
 						}
-						new := val.NewValue(retIns)
+						new := val.NewValue(retVal)
 						if new != nil {
 							new.AppendPredecessor(val, frame.WithPredecessorContext("getReturns"))
 							vals = append(vals, new)
 						}
 					}
+				}
+
+				// hot path: most invocations pass a single *Value.
+				if val, ok := v.(*Value); ok {
+					processValue(val)
+					return nil
+				}
+				_ = v.Recursive(func(operator sfvm.ValueOperator) error {
+					val, ok := operator.(*Value)
+					if !ok {
+						return nil
+					}
+					processValue(val)
 					return nil
 				})
 				return nil
