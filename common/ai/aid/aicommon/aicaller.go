@@ -57,7 +57,19 @@ func AIChatToAICallbackType(cb func(prompt string, opts ...aispec.AIConfigOption
 				aispec.WithReasonStreamHandler(func(reader io.Reader) {
 					isStream = true
 					resp.EmitReasonStream(reader)
-				})}
+				}),
+				aispec.WithModelInfoCallback(func(provider, model string) {
+					resp.SetModelInfo(provider, model)
+					if cfg, ok := aicf.(interface{ UpdateAIModelInfo(string, string) }); ok {
+						cfg.UpdateAIModelInfo(provider, model)
+					}
+					log.Infof("ai request %v:%v is sent with request body: %v bytes",
+						provider, model, len(req.GetPrompt()))
+				}),
+				aispec.WithModelInfoConfirmCallback(func(provider, model string) {
+					resp.SetModelInfo(provider, model)
+				}),
+			}
 			for _, data := range req.GetImageList() {
 				if data.IsBase64 {
 					optList = append(optList, aispec.WithImageBase64(string(data.Data)))

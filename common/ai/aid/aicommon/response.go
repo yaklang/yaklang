@@ -6,12 +6,27 @@ import (
 	"io"
 	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 )
+
+type byteCountingReader struct {
+	reader  io.Reader
+	counter *atomic.Int64
+}
+
+func (r *byteCountingReader) Read(p []byte) (int, error) {
+	n, err := r.reader.Read(p)
+	if n > 0 {
+		r.counter.Add(int64(n))
+	}
+	return n, err
+}
 
 type AIResponseOutputStream struct {
 	NodeType string
@@ -28,6 +43,13 @@ type AIResponse struct {
 
 	respStartTime time.Time
 	reqStartTime  time.Time
+
+	providerName     string
+	modelName        string
+	modelVerboseName string
+
+	firstOutputByteTime time.Time
+	totalOutputBytes    atomic.Int64
 }
 
 func (a *AIResponse) SetResponseStartTime(t time.Time) {
@@ -56,6 +78,57 @@ func (a *AIResponse) GetRequestStartTime() time.Time {
 		return time.Time{}
 	}
 	return a.reqStartTime
+}
+
+func (a *AIResponse) SetModelInfo(provider, model string) {
+	if a == nil {
+		return
+	}
+	a.providerName = provider
+	a.modelName = model
+	a.modelVerboseName = aispec.ModelVerboseName(model)
+}
+
+func (a *AIResponse) GetProviderName() string {
+	if a == nil {
+		return ""
+	}
+	return a.providerName
+}
+
+func (a *AIResponse) GetModelName() string {
+	if a == nil {
+		return ""
+	}
+	return a.modelName
+}
+
+func (a *AIResponse) GetModelVerboseName() string {
+	if a == nil {
+		return ""
+	}
+	return a.modelVerboseName
+}
+
+func (a *AIResponse) SetFirstOutputByteTime(t time.Time) {
+	if a == nil {
+		return
+	}
+	a.firstOutputByteTime = t
+}
+
+func (a *AIResponse) GetFirstOutputByteTime() time.Time {
+	if a == nil {
+		return time.Time{}
+	}
+	return a.firstOutputByteTime
+}
+
+func (a *AIResponse) GetTotalOutputBytes() int64 {
+	if a == nil {
+		return 0
+	}
+	return a.totalOutputBytes.Load()
 }
 
 func (a *AIResponse) GetTaskIndex() string {
@@ -226,15 +299,17 @@ func (a *AIResponse) GetOutputStreamReader(nodeId string, system bool, emitter *
 }
 
 func (r *AIResponse) EmitOutputStream(reader io.Reader) {
+	counted := &byteCountingReader{reader: reader, counter: &r.totalOutputBytes}
 	r.ch.SafeFeed(&AIResponseOutputStream{
-		out: CreateConsumptionReader(reader, r.consumptionCallback),
+		out: CreateConsumptionReader(counted, r.consumptionCallback),
 	})
 }
 
 func (r *AIResponse) EmitReasonStream(reader io.Reader) {
+	counted := &byteCountingReader{reader: reader, counter: &r.totalOutputBytes}
 	r.ch.SafeFeed(&AIResponseOutputStream{
 		IsReason: true,
-		out:      CreateConsumptionReader(reader, r.consumptionCallback),
+		out:      CreateConsumptionReader(counted, r.consumptionCallback),
 	})
 }
 
@@ -296,12 +371,14 @@ func TeeAIResponse(
 ) *AIResponse {
 	first := NewAIResponse(aiCaller)
 	first.SetTaskIndex(src.GetTaskIndex())
+	first.SetModelInfo(src.GetProviderName(), src.GetModelName())
 	first.consumptionCallback = nil
 	firstReasonReader, firstReasonWriter := utils.NewPipe()
 	firstOutputReader, firstOutputWriter := utils.NewPipe()
 
 	second := NewAIResponse(aiCaller)
 	second.SetTaskIndex(src.GetTaskIndex())
+	second.SetModelInfo(src.GetProviderName(), src.GetModelName())
 	secondReasonReader, secondReasonWriter := utils.NewPipe()
 	secondOutputReader, secondOutputWriter := utils.NewPipe()
 

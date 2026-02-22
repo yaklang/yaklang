@@ -181,10 +181,11 @@ type AiOutputEvent struct {
 
 	ProcessesId []string `gorm:"-"`
 
-	ContentType string
-	AIService   string
-	AIModelName string
-	SessionId   string `gorm:"index"`
+	ContentType        string
+	AIService          string
+	AIModelName        string
+	AIModelVerboseName string
+	SessionId          string `gorm:"index"`
 
 	// semantic label for the task associated with this event
 	TaskSemanticLabel string `json:"task_semantic_label"`
@@ -379,9 +380,10 @@ func (e *AiOutputEvent) ToGRPC() *ypb.AIOutputEvent {
 		EventUUID:       e.EventUUID,
 		CallToolID:      e.CallToolID,
 		NodeIdVerbose:   NodeIdAndTypeToI18n(e.NodeId, e.Type, e.IsStream).I18nToYPB_I18n(),
-		ContentType:     e.ContentType,
-		AIService:       e.AIService,
-		TaskUUID:        e.TaskUUID,
-		AIModelName:     e.AIModelName,
+		ContentType:        e.ContentType,
+		AIService:          e.AIService,
+		TaskUUID:           e.TaskUUID,
+		AIModelName:        e.AIModelName,
+		AIModelVerboseName: e.AIModelVerboseName,
 	}
 }

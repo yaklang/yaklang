@@ -107,22 +107,19 @@ func ProcessHotPatchMessage(e *ypb.AIInputEvent) []ConfigOption {
 
 	if e.HotpatchType == HotPatchType_AIService {
 		serviceName := hotPatchParams.GetAIService()
-		aiConfig, err := ai.LoadAiGatewayConfig(serviceName)
+		chat, err := ai.LoadChater(serviceName)
 		if err != nil {
-			log.Errorf("ai service %s not found", serviceName)
+			log.Errorf("load ai service failed: %v", err)
 		} else {
-			chat, err := ai.LoadChater(hotPatchParams.GetAIService())
-			if err != nil {
-				log.Errorf("load ai service failed: %v", err)
-			} else {
-				aiOption = append(aiOption, WithAICallback(AIChatToAICallbackType(chat)))
-				aiOption = append(aiOption, WithAIChatInfo(hotPatchParams.GetAIService(), aiConfig.Model))
-			}
+			aiOption = append(aiOption, WithAICallback(AIChatToAICallbackType(chat)))
 		}
+		log.Warnf("HotPatch AIService WithAIChatInfo is deprecated, " +
+			"model info is now auto-detected from the actual AI gateway call")
 	}
 
 	if e.HotpatchType == HotPatchType_ModelName {
-		aiOption = append(aiOption, WithAIModelName(hotPatchParams.GetAIModelName()))
+		log.Warnf("HotPatch ModelName is deprecated, " +
+			"model info is now auto-detected from the actual AI gateway call")
 	}
 
 	return aiOption

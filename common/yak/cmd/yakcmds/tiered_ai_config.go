@@ -545,6 +545,68 @@ var TieredAIConfigCommands = []*cli.Command{
 		},
 	},
 	{
+		Name:  "dump-tiered-ai-config",
+		Usage: "Dump a tiered AI config template file for user customization",
+		Flags: []cli.Flag{
+			cli.StringFlag{
+				Name:  "output,o",
+				Usage: "Output file path (default: stdout). Format is inferred from extension (.yaml/.json)",
+			},
+			cli.StringFlag{
+				Name:  "format,f",
+				Value: "yaml",
+				Usage: "Output format when writing to stdout: yaml or json",
+			},
+			configFileFlag,
+		},
+		Action: func(c *cli.Context) error {
+			var cfg *TieredAIConfigFile
+			specifiedPath := c.String("config-file")
+			if specifiedPath != "" && utils.GetFirstExistedFile(specifiedPath) != "" {
+				var err error
+				cfg, err = loadTieredAIConfigFile(specifiedPath)
+				if err != nil {
+					return err
+				}
+			} else {
+				existingPath := resolveConfigFilePath("")
+				if utils.GetFirstExistedFile(existingPath) != "" {
+					var err error
+					cfg, err = loadTieredAIConfigFile(existingPath)
+					if err != nil {
+						cfg = getDefaultTieredAIConfigFile()
+					}
+				} else {
+					cfg = getDefaultTieredAIConfigFile()
+				}
+			}
+
+			outputPath := c.String("output")
+			if outputPath != "" {
+				if err := saveTieredAIConfigFile(outputPath, cfg); err != nil {
+					return err
+				}
+				fmt.Printf("Tiered AI config dumped to: %s\n", outputPath)
+				return nil
+			}
+
+			format := strings.ToLower(c.String("format"))
+			var data []byte
+			var err error
+			switch format {
+			case "json":
+				data, err = json.MarshalIndent(cfg, "", "  ")
+			default:
+				data, err = yaml.Marshal(cfg)
+			}
+			if err != nil {
+				return utils.Errorf("failed to marshal config: %v", err)
+			}
+			fmt.Println(string(data))
+			return nil
+		},
+	},
+	{
 		Name:  "reset-tiered-ai-config",
 		Usage: "Reset tiered AI configuration to default (aibalance)",
 		Action: func(c *cli.Context) error {

@@ -62,6 +62,13 @@ type AIConfig struct {
 	Tools []Tool
 	// ToolChoice controls which (if any) tool is called by the model
 	ToolChoice any
+
+	// ModelInfoCallback is invoked after gateway CheckValid succeeds but before Chat,
+	// providing the resolved provider type and model name as early as possible.
+	ModelInfoCallback func(provider, model string)
+	// ModelInfoConfirmCallback is invoked after Chat returns successfully,
+	// confirming the provider and model that actually produced the response.
+	ModelInfoConfirmCallback func(provider, model string)
 }
 
 func WithExtraHeader(headers ...*ypb.HTTPHeader) AIConfigOption {
@@ -821,5 +828,17 @@ func WithTools(tools []Tool) AIConfigOption {
 func WithToolChoice(choice any) AIConfigOption {
 	return func(c *AIConfig) {
 		c.ToolChoice = choice
+	}
+}
+
+func WithModelInfoCallback(cb func(provider, model string)) AIConfigOption {
+	return func(c *AIConfig) {
+		c.ModelInfoCallback = cb
+	}
+}
+
+func WithModelInfoConfirmCallback(cb func(provider, model string)) AIConfigOption {
+	return func(c *AIConfig) {
+		c.ModelInfoConfirmCallback = cb
 	}
 }
