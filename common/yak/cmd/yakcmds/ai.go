@@ -31,7 +31,7 @@ var AICommands = []*cli.Command{
 	},
 }
 
-// 合并本地模型命令到AI命令组
 func init() {
 	AICommands = append(AICommands, LocalModelCommands...)
+	AICommands = append(AICommands, TieredAIConfigCommands...)
 }
