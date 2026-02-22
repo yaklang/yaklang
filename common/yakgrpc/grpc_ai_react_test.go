@@ -61,5 +61,6 @@ func TestConvertYPBAIStartParamsToReActConfig(t *testing.T) {
 	require.Equal(t, int64(start.UserInteractLimit), cfg.PlanUserInteractMaxCount)
 	require.Equal(t, start.DisableToolUse, cfg.DisableToolUse)
 	require.ElementsMatch(t, start.IncludeSuggestedToolKeywords, cfg.Keywords)
-	require.Equal(t, start.AIService, cfg.AiServerName)
+	// AiServerName is no longer set from frontend params (WithAIChatInfo deprecated),
+	// it is now auto-detected via ModelInfoCallback during actual AI gateway calls.
 }
