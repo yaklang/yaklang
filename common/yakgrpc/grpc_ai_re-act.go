@@ -71,23 +71,14 @@ func ConvertYPBAIStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.Confi
 	}
 	if i.GetAIService() != "" {
 		serviceName := i.GetAIService()
-		modelName := ""
-		aiConfig, err := ai.LoadAiGatewayConfig(serviceName)
+		chat, err := ai.LoadChater(serviceName)
 		if err != nil {
-			log.Errorf("ai service %s not found", serviceName)
+			log.Errorf("load ai service failed: %v", err)
 		} else {
-			chat, err := ai.LoadChater(i.GetAIService())
-			if err != nil {
-				log.Errorf("load ai service failed: %v", err)
-			} else {
-				opts = append(opts, aicommon.WithAICallback(aicommon.AIChatToAICallbackType(chat)))
-				modelName = aiConfig.Model
-				if i.GetAIModelName() != "" {
-					modelName = i.GetAIModelName()
-				}
-			}
+			opts = append(opts, aicommon.WithAICallback(aicommon.AIChatToAICallbackType(chat)))
 		}
-		opts = append(opts, aicommon.WithAIChatInfo(serviceName, modelName))
+		log.Warnf("AIStartParams.AIService/AIModelName for WithAIChatInfo is deprecated, " +
+			"model info is now auto-detected from the actual AI gateway call")
 	}
 
 	if !i.GetDisableAISearchForge() {

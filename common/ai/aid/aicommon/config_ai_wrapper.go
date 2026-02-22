@@ -126,11 +126,14 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 
 			}
 
+		origRsp := rsp
 			rsp = TeeAIResponse(config, rsp, func(teeResp *AIResponse) {
-				du := time.Since(start)
-				c.EmitInfo("ai response first byte cost: %v", du.String())
+				now := time.Now()
+				du := now.Sub(start)
+				origRsp.SetFirstOutputByteTime(now)
+				c.EmitInfo("ai response from %v:%v first byte cost: %v",
+					origRsp.GetProviderName(), origRsp.GetModelName(), du.String())
 
-				// save response to checkpoint
 				outConfig.Add(1)
 				go func() {
 					defer outConfig.Done()
@@ -144,7 +147,17 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 				})
 			}, func() {
 				du := time.Since(start)
-				c.EmitInfo("ai response close cost: %v", du)
+				provider := origRsp.GetProviderName()
+				model := origRsp.GetModelName()
+				outputBytes := origRsp.GetTotalOutputBytes()
+				firstByteTime := origRsp.GetFirstOutputByteTime()
+				outputDuration := time.Since(firstByteTime)
+				tokenRate := float64(0)
+				if outputDuration.Seconds() > 0 {
+					tokenRate = float64(outputBytes/4) / outputDuration.Seconds()
+				}
+				c.EmitInfo("ai response from %v:%v cost: %v, output duration: %v, estimated %.1f token/s",
+					provider, model, du, outputDuration, tokenRate)
 				c.EmitJSON(schema.EVENT_TYPE_AI_TOTAL_COST_MS, "system", map[string]any{
 					"ms":     du.Milliseconds(),
 					"second": du.Seconds(),

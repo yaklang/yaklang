@@ -7769,31 +7769,32 @@ func (x *GetAIToolListRequest) GetOnlyFavorites() bool {
 }
 
 type AIOutputEvent struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	CoordinatorId   string                 `protobuf:"bytes,1,opt,name=CoordinatorId,proto3" json:"CoordinatorId,omitempty"`
-	Type            string                 `protobuf:"bytes,2,opt,name=Type,proto3" json:"Type,omitempty"`
-	NodeId          string                 `protobuf:"bytes,3,opt,name=NodeId,proto3" json:"NodeId,omitempty"`
-	IsSystem        bool                   `protobuf:"varint,4,opt,name=IsSystem,proto3" json:"IsSystem,omitempty"`
-	IsStream        bool                   `protobuf:"varint,5,opt,name=IsStream,proto3" json:"IsStream,omitempty"`
-	IsReason        bool                   `protobuf:"varint,6,opt,name=IsReason,proto3" json:"IsReason,omitempty"`
-	StreamDelta     []byte                 `protobuf:"bytes,7,opt,name=StreamDelta,proto3" json:"StreamDelta,omitempty"`
-	IsJson          bool                   `protobuf:"varint,8,opt,name=IsJson,proto3" json:"IsJson,omitempty"`
-	IsResult        bool                   `protobuf:"varint,15,opt,name=IsResult,proto3" json:"IsResult,omitempty"`
-	Content         []byte                 `protobuf:"bytes,9,opt,name=Content,proto3" json:"Content,omitempty"`
-	Timestamp       int64                  `protobuf:"varint,10,opt,name=Timestamp,proto3" json:"Timestamp,omitempty"`
-	TaskIndex       string                 `protobuf:"bytes,11,opt,name=TaskIndex,proto3" json:"TaskIndex,omitempty"`
-	DisableMarkdown bool                   `protobuf:"varint,13,opt,name=DisableMarkdown,proto3" json:"DisableMarkdown,omitempty"`
-	IsSync          bool                   `protobuf:"varint,12,opt,name=IsSync,proto3" json:"IsSync,omitempty"`              // 是否是同步消息
-	SyncID          string                 `protobuf:"bytes,14,opt,name=SyncID,proto3" json:"SyncID,omitempty"`               // 用于同步消息的 ID
-	EventUUID       string                 `protobuf:"bytes,16,opt,name=EventUUID,proto3" json:"EventUUID,omitempty"`         // 事件的唯一ID, used via stream stream-finished
-	NodeIdVerbose   *I18N                  `protobuf:"bytes,17,opt,name=NodeIdVerbose,proto3" json:"NodeIdVerbose,omitempty"` // 用于展示的节点ID，可能是节点名称
-	ContentType     string                 `protobuf:"bytes,18,opt,name=ContentType,proto3" json:"ContentType,omitempty"`     // markdown / yaklang_code / plain_code
-	CallToolID      string                 `protobuf:"bytes,19,opt,name=CallToolID,proto3" json:"CallToolID,omitempty"`       // 如果是调用工具相关的事件，那么这里是调用的ID
-	AIService       string                 `protobuf:"bytes,20,opt,name=AIService,proto3" json:"AIService,omitempty"`         // 如果是 AI 服务相关的事件，那么这里是 AI 服务的名称
-	AIModelName     string                 `protobuf:"bytes,22,opt,name=AIModelName,proto3" json:"AIModelName,omitempty"`     // AI 模型名称
-	TaskUUID        string                 `protobuf:"bytes,21,opt,name=TaskUUID,proto3" json:"TaskUUID,omitempty"`           // 任务的唯一ID
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	CoordinatorId      string                 `protobuf:"bytes,1,opt,name=CoordinatorId,proto3" json:"CoordinatorId,omitempty"`
+	Type               string                 `protobuf:"bytes,2,opt,name=Type,proto3" json:"Type,omitempty"`
+	NodeId             string                 `protobuf:"bytes,3,opt,name=NodeId,proto3" json:"NodeId,omitempty"`
+	IsSystem           bool                   `protobuf:"varint,4,opt,name=IsSystem,proto3" json:"IsSystem,omitempty"`
+	IsStream           bool                   `protobuf:"varint,5,opt,name=IsStream,proto3" json:"IsStream,omitempty"`
+	IsReason           bool                   `protobuf:"varint,6,opt,name=IsReason,proto3" json:"IsReason,omitempty"`
+	StreamDelta        []byte                 `protobuf:"bytes,7,opt,name=StreamDelta,proto3" json:"StreamDelta,omitempty"`
+	IsJson             bool                   `protobuf:"varint,8,opt,name=IsJson,proto3" json:"IsJson,omitempty"`
+	IsResult           bool                   `protobuf:"varint,15,opt,name=IsResult,proto3" json:"IsResult,omitempty"`
+	Content            []byte                 `protobuf:"bytes,9,opt,name=Content,proto3" json:"Content,omitempty"`
+	Timestamp          int64                  `protobuf:"varint,10,opt,name=Timestamp,proto3" json:"Timestamp,omitempty"`
+	TaskIndex          string                 `protobuf:"bytes,11,opt,name=TaskIndex,proto3" json:"TaskIndex,omitempty"`
+	DisableMarkdown    bool                   `protobuf:"varint,13,opt,name=DisableMarkdown,proto3" json:"DisableMarkdown,omitempty"`
+	IsSync             bool                   `protobuf:"varint,12,opt,name=IsSync,proto3" json:"IsSync,omitempty"`                        // 是否是同步消息
+	SyncID             string                 `protobuf:"bytes,14,opt,name=SyncID,proto3" json:"SyncID,omitempty"`                         // 用于同步消息的 ID
+	EventUUID          string                 `protobuf:"bytes,16,opt,name=EventUUID,proto3" json:"EventUUID,omitempty"`                   // 事件的唯一ID, used via stream stream-finished
+	NodeIdVerbose      *I18N                  `protobuf:"bytes,17,opt,name=NodeIdVerbose,proto3" json:"NodeIdVerbose,omitempty"`           // 用于展示的节点ID，可能是节点名称
+	ContentType        string                 `protobuf:"bytes,18,opt,name=ContentType,proto3" json:"ContentType,omitempty"`               // markdown / yaklang_code / plain_code
+	CallToolID         string                 `protobuf:"bytes,19,opt,name=CallToolID,proto3" json:"CallToolID,omitempty"`                 // 如果是调用工具相关的事件，那么这里是调用的ID
+	AIService          string                 `protobuf:"bytes,20,opt,name=AIService,proto3" json:"AIService,omitempty"`                   // 如果是 AI 服务相关的事件，那么这里是 AI 服务的名称
+	AIModelName        string                 `protobuf:"bytes,22,opt,name=AIModelName,proto3" json:"AIModelName,omitempty"`               // AI 模型名称
+	AIModelVerboseName string                 `protobuf:"bytes,23,opt,name=AIModelVerboseName,proto3" json:"AIModelVerboseName,omitempty"` // AI 模型展示名称（美化后的模型名）
+	TaskUUID           string                 `protobuf:"bytes,21,opt,name=TaskUUID,proto3" json:"TaskUUID,omitempty"`                     // 任务的唯一ID
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *AIOutputEvent) Reset() {
@@ -7969,6 +7970,13 @@ func (x *AIOutputEvent) GetAIService() string {
 func (x *AIOutputEvent) GetAIModelName() string {
 	if x != nil {
 		return x.AIModelName
+	}
+	return ""
+}
+
+func (x *AIOutputEvent) GetAIModelVerboseName() string {
+	if x != nil {
+		return x.AIModelVerboseName
 	}
 	return ""
 }
@@ -66967,7 +66975,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\n" +
 	"Pagination\x18\x03 \x01(\v2\v.ypb.PagingR\n" +
 	"Pagination\x12$\n" +
-	"\rOnlyFavorites\x18\x04 \x01(\bR\rOnlyFavorites\"\xa8\x05\n" +
+	"\rOnlyFavorites\x18\x04 \x01(\bR\rOnlyFavorites\"\xd8\x05\n" +
 	"\rAIOutputEvent\x12$\n" +
 	"\rCoordinatorId\x18\x01 \x01(\tR\rCoordinatorId\x12\x12\n" +
 	"\x04Type\x18\x02 \x01(\tR\x04Type\x12\x16\n" +
@@ -66992,7 +67000,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"CallToolID\x18\x13 \x01(\tR\n" +
 	"CallToolID\x12\x1c\n" +
 	"\tAIService\x18\x14 \x01(\tR\tAIService\x12 \n" +
-	"\vAIModelName\x18\x16 \x01(\tR\vAIModelName\x12\x1a\n" +
+	"\vAIModelName\x18\x16 \x01(\tR\vAIModelName\x12.\n" +
+	"\x12AIModelVerboseName\x18\x17 \x01(\tR\x12AIModelVerboseName\x12\x1a\n" +
 	"\bTaskUUID\x18\x15 \x01(\tR\bTaskUUID\"&\n" +
 	"\x04I18n\x12\x0e\n" +
 	"\x02Zh\x18\x01 \x01(\tR\x02Zh\x12\x0e\n" +

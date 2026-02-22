@@ -2206,12 +2206,19 @@ func (c *Config) CallAIResponseOutputFinishedCallback(s string) {
 	_ = s
 }
 
+func (c *Config) UpdateAIModelInfo(provider, model string) {
+	c.m.Lock()
+	defer c.m.Unlock()
+	c.AiServerName = provider
+	c.AiModelName = model
+}
+
 // EventFormat fills in common fields for AI output events
 func (c *Config) EventFormat(e *schema.AiOutputEvent) *schema.AiOutputEvent {
-	// set ai service
 	if c.AiServerName != "" {
-		e.AIService = c.AiServerName  // set ai service name
-		e.AIModelName = c.AiModelName // set ai model name
+		e.AIService = c.AiServerName
+		e.AIModelName = c.AiModelName
+		e.AIModelVerboseName = aispec.ModelVerboseName(c.AiModelName)
 	}
 
 	if c.PersistentSessionId != "" {

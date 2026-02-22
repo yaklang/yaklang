@@ -195,6 +195,20 @@ func tryCreateAIGateway(t string, cb func(string, aispec.AIClient) bool) error {
 	return errors.New("not found valid ai agent")
 }
 
+func invokeModelInfoCallback(gateway aispec.AIClient, provider string) {
+	cfg := gateway.GetConfig()
+	if cfg != nil && cfg.ModelInfoCallback != nil {
+		cfg.ModelInfoCallback(provider, cfg.Model)
+	}
+}
+
+func invokeModelInfoConfirmCallback(gateway aispec.AIClient, provider string) {
+	cfg := gateway.GetConfig()
+	if cfg != nil && cfg.ModelInfoConfirmCallback != nil {
+		cfg.ModelInfoConfirmCallback(provider, cfg.Model)
+	}
+}
+
 func createAIGateway(t string) aispec.AIClient {
 	gw, ok := aispec.Lookup(t)
 	if !ok {
@@ -407,12 +421,14 @@ func legacyChat(msg string, opts ...aispec.AIConfigOption) (string, error) {
 			log.Debugf("check valid by %s failed: %s", typ, err)
 			return false
 		}
+		invokeModelInfoCallback(gateway, typ)
 		log.Infof("start to chat completions by %v", typ)
 		responseRsp, err = gateway.Chat(msg)
 		if err != nil {
 			log.Warnf("chat by %s failed: %s", typ, err)
 			return false
 		}
+		invokeModelInfoConfirmCallback(gateway, typ)
 		return true
 	})
 	if err != nil {
@@ -492,8 +508,14 @@ func chatWithThirdPartyConfig(msg string, cfg *ypb.ThirdPartyApplicationConfig, 
 		return "", err
 	}
 
+	invokeModelInfoCallback(agent, cfg.Type)
 	log.Debugf("Start tiered chat with type=%s", cfg.Type)
-	return agent.Chat(msg)
+	result, err := agent.Chat(msg)
+	if err != nil {
+		return "", err
+	}
+	invokeModelInfoConfirmCallback(agent, cfg.Type)
+	return result, nil
 }
 
 // buildOptionsFromThirdPartyConfig builds AIConfigOption slice from ThirdPartyApplicationConfig
@@ -768,7 +790,13 @@ func LoadChater(name string, defaultOpts ...aispec.AIConfigOption) (aispec.Gener
 			log.Warnf("check valid by %s failed: %s", name, err)
 			return "", err
 		}
-		return gateway.Chat(msg)
+		invokeModelInfoCallback(gateway, name)
+		result, err := gateway.Chat(msg)
+		if err != nil {
+			return "", err
+		}
+		invokeModelInfoConfirmCallback(gateway, name)
+		return result, nil
 	}, nil
 }
 
@@ -808,5 +836,7 @@ var Exports = map[string]any{
 	"imageFile":          aispec.WithImageFile,
 	"imageBase64":        aispec.WithImageBase64,
 	"imageRaw":           aispec.WithImageRaw,
-	"toolCallCallback":   aispec.WithToolCallCallback,
+	"toolCallCallback":        aispec.WithToolCallCallback,
+	"modelInfoCallback":       aispec.WithModelInfoCallback,
+	"modelInfoConfirmCallback": aispec.WithModelInfoConfirmCallback,
 }

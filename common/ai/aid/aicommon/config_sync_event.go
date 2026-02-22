@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -88,6 +89,8 @@ func (c *Config) HandleSyncUpdataConfigEvent(event *ypb.AIInputEvent) error {
 		if err != nil {
 			c.EmitError("load ai service failed: %v", err)
 		}
+		log.Warnf("AIInputEvent.Params.AIService WithAIChatInfo is deprecated, " +
+			"model info is now auto-detected from the actual AI gateway call")
 	}
 	if event.Params.GetReviewPolicy() != "" {
 		c.AgreePolicy = AgreePolicyType(event.Params.GetReviewPolicy())
