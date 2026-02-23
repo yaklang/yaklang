@@ -349,6 +349,10 @@ var TieredAIConfigCommands = []*cli.Command{
 				Name:  "disabled",
 				Usage: "Disable the tiered AI configuration",
 			},
+			cli.BoolFlag{
+				Name:  "enable",
+				Usage: "Enable the tiered AI configuration (use existing DB config or defaults)",
+			},
 			configFileFlag,
 		},
 		Action: func(c *cli.Context) error {
@@ -362,6 +366,26 @@ var TieredAIConfigCommands = []*cli.Command{
 					return err
 				}
 				fmt.Println("Tiered AI configuration disabled and saved to database.")
+				return nil
+			}
+
+			if c.Bool("enable") {
+				cfg := getDefaultTieredAIConfigFile()
+				if specifiedPath != "" && utils.GetFirstExistedFile(specifiedPath) != "" {
+					var err error
+					cfg, err = loadTieredAIConfigFile(specifiedPath)
+					if err != nil {
+						return err
+					}
+					fmt.Printf("Loading configuration from file: %s\n", specifiedPath)
+				} else {
+					fmt.Println("Using default (aibalance) configuration")
+				}
+				cfg.Enabled = true
+				if err := saveConfigToDB(cfg); err != nil {
+					return err
+				}
+				fmt.Println("Tiered AI configuration enabled and saved to database.")
 				return nil
 			}
 
