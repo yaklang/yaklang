@@ -57,7 +57,7 @@ func EnsureConfigLoaded() {
 		return
 	}
 
-	if consts.GetTieredAIConfig() != nil {
+	if cfg := consts.GetTieredAIConfig(); cfg != nil && cfg.Enabled {
 		configLoaded = true
 		return
 	}
