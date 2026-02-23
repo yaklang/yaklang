@@ -111,9 +111,9 @@ func ProcessHotPatchMessage(e *ypb.AIInputEvent) []ConfigOption {
 		if err != nil {
 			log.Errorf("load ai service failed: %v", err)
 		} else {
-			aiOption = append(aiOption, WithAICallback(AIChatToAICallbackType(chat)))
+			aiOption = append(aiOption, WithQualityPriorityAICallback(AIChatToAICallbackType(chat)))
 		}
-		log.Warnf("HotPatch AIService WithAIChatInfo is deprecated, " +
+		log.Warnf("HotPatch AIService only overrides QualityPriority callback, " +
 			"model info is now auto-detected from the actual AI gateway call")
 	}
 

@@ -198,6 +198,8 @@ func buildAIDOption(startParams *ypb.AIStartParams) []aicommon.ConfigOption {
 		} else {
 			aidOption = append(aidOption, aicommon.WithAICallback(callback))
 		}
+		log.Warnf("AIStartParams.AIService for WithAIChatInfo is deprecated, " +
+			"model info is now auto-detected from the actual AI gateway call")
 	}
 
 	if mockedAIChat != nil {
