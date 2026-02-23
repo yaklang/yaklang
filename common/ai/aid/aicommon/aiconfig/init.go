@@ -13,6 +13,8 @@ import (
 var (
 	configLoadedOnce sync.Once
 	configLoaded     bool
+
+	getNetworkConfig = yakit.GetNetworkConfig
 )
 
 func init() {
@@ -26,61 +28,60 @@ func init() {
 // ensureConfigLoadedFromDB ensures that the tiered AI configuration is loaded from the database
 func ensureConfigLoadedFromDB() error {
 	configLoadedOnce.Do(func() {
-		// The config should already be loaded by ConfigureNetWork in sync-global-config-from-db
-		// We just verify that it's available
 		tieredConfig := consts.GetTieredAIConfig()
-		if tieredConfig != nil && tieredConfig.Enabled {
-			log.Debugf("Tiered AI config loaded: policy=%s, intelligent=%d, lightweight=%d, vision=%d",
+		if tieredConfig != nil {
+			log.Debugf("tiered AI config loaded from DB: enabled=%v, policy=%s, intelligent=%d, lightweight=%d, vision=%d",
+				tieredConfig.Enabled,
 				tieredConfig.RoutingPolicy,
 				len(tieredConfig.IntelligentConfigs),
 				len(tieredConfig.LightweightConfigs),
 				len(tieredConfig.VisionConfigs))
 			configLoaded = true
 		} else {
-			log.Debugf("Tiered AI config not enabled or not available")
+			log.Debugf("tiered AI config not available from DB yet")
 		}
 	})
 	return nil
 }
 
 // EnsureConfigLoaded ensures the tiered AI configuration is loaded.
-// Priority: 1) database GlobalNetworkConfig  2) config file on disk  3) built-in defaults
+// The ONLY authoritative source is the database (GlobalNetworkConfig).
+// If the database has no config yet, built-in defaults are applied.
+// Config files on disk are NOT loaded -- they are a legacy mechanism;
+// use `yak tiered-ai-config` to write config into the database.
 func EnsureConfigLoaded() {
 	if configLoaded {
 		return
 	}
 
-	config := yakit.GetNetworkConfig()
-	if config != nil && config.GetEnableTieredAIModelConfig() && consts.GetTieredAIConfig() == nil {
-		log.Debugf("tiered AI config enabled in DB but not loaded, loading from network config")
+	config := getNetworkConfig()
+	if config != nil {
 		loadTieredConfigFromNetworkConfig(config)
+		warnIfLegacyConfigFileExists()
 		return
 	}
 
-	if cfg := consts.GetTieredAIConfig(); cfg != nil && cfg.Enabled {
+	if cfg := consts.GetTieredAIConfig(); cfg != nil {
 		configLoaded = true
+		warnIfLegacyConfigFileExists()
 		return
-	}
-
-	configPath := ResolveConfigFilePath("")
-	if utils.GetFirstExistedFile(configPath) != "" {
-		cfg, err := LoadTieredAIConfigFile(configPath)
-		if err != nil {
-			log.Debugf("failed to load tiered AI config file %s: %v", configPath, err)
-		} else if cfg.Enabled {
-			tiered := ConfigFileToTieredAIConfig(cfg)
-			consts.SetTieredAIConfig(tiered)
-			configLoaded = true
-			log.Infof("tiered AI config loaded from file: %s", configPath)
-			return
-		}
 	}
 
 	defaultCfg := GetDefaultTieredAIConfigFile()
 	tiered := ConfigFileToTieredAIConfig(defaultCfg)
 	consts.SetTieredAIConfig(tiered)
 	configLoaded = true
-	log.Infof("tiered AI config loaded from built-in defaults (no DB config or config file found)")
+	log.Infof("tiered AI config loaded from built-in defaults (no DB config found)")
+	warnIfLegacyConfigFileExists()
+}
+
+func warnIfLegacyConfigFileExists() {
+	configPath := ResolveConfigFilePath("")
+	if utils.GetFirstExistedFile(configPath) != "" {
+		log.Warnf("legacy tiered AI config file found at %s, "+
+			"this file is no longer used. The authoritative source is the database. "+
+			"Use `yak tiered-ai-config` to update the database configuration.", configPath)
+	}
 }
 
 // loadTieredConfigFromNetworkConfig loads tiered config from a GlobalNetworkConfig
@@ -131,4 +132,15 @@ func IsConfigLoaded() bool {
 func ResetConfigLoaded() {
 	configLoadedOnce = sync.Once{}
 	configLoaded = false
+}
+
+// SetNetworkConfigGetter overrides the function used to fetch
+// GlobalNetworkConfig. For testing only.
+func SetNetworkConfigGetter(fn func() *ypb.GlobalNetworkConfig) {
+	getNetworkConfig = fn
+}
+
+// ResetNetworkConfigGetter restores the default getter. For testing only.
+func ResetNetworkConfigGetter() {
+	getNetworkConfig = yakit.GetNetworkConfig
 }
