@@ -5,6 +5,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -42,27 +43,44 @@ func ensureConfigLoadedFromDB() error {
 	return nil
 }
 
-// EnsureConfigLoaded ensures the tiered AI configuration is loaded
-// This is useful for cases where you need to ensure config is loaded before use
-// It will try to load from database if not already loaded
+// EnsureConfigLoaded ensures the tiered AI configuration is loaded.
+// Priority: 1) database GlobalNetworkConfig  2) config file on disk  3) built-in defaults
 func EnsureConfigLoaded() {
-	// If already loaded, return immediately
 	if configLoaded {
 		return
 	}
 
-	// Try to load from database
 	config := yakit.GetNetworkConfig()
-	if config == nil {
-		log.Debugf("No network config available in database")
+	if config != nil && config.GetEnableTieredAIModelConfig() && consts.GetTieredAIConfig() == nil {
+		log.Debugf("tiered AI config enabled in DB but not loaded, loading from network config")
+		loadTieredConfigFromNetworkConfig(config)
 		return
 	}
 
-	// Check if tiered config is enabled but not loaded
-	if config.GetEnableTieredAIModelConfig() && consts.GetTieredAIConfig() == nil {
-		log.Debugf("Tiered AI config enabled but not loaded, loading from network config")
-		loadTieredConfigFromNetworkConfig(config)
+	if consts.GetTieredAIConfig() != nil {
+		configLoaded = true
+		return
 	}
+
+	configPath := ResolveConfigFilePath("")
+	if utils.GetFirstExistedFile(configPath) != "" {
+		cfg, err := LoadTieredAIConfigFile(configPath)
+		if err != nil {
+			log.Debugf("failed to load tiered AI config file %s: %v", configPath, err)
+		} else if cfg.Enabled {
+			tiered := ConfigFileToTieredAIConfig(cfg)
+			consts.SetTieredAIConfig(tiered)
+			configLoaded = true
+			log.Infof("tiered AI config loaded from file: %s", configPath)
+			return
+		}
+	}
+
+	defaultCfg := GetDefaultTieredAIConfigFile()
+	tiered := ConfigFileToTieredAIConfig(defaultCfg)
+	consts.SetTieredAIConfig(tiered)
+	configLoaded = true
+	log.Infof("tiered AI config loaded from built-in defaults (no DB config or config file found)")
 }
 
 // loadTieredConfigFromNetworkConfig loads tiered config from a GlobalNetworkConfig

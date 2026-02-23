@@ -7,14 +7,15 @@ import (
 	"time"
 
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiconfig"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
+	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 
 	"github.com/yaklang/yaklang/common/ai/rag"
 
-	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"github.com/yaklang/yaklang/common/log"
@@ -141,6 +142,27 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 		persistentSession = "default"
 	}
 	var hotpatchChan = chanx.NewUnlimitedChan[aicommon.ConfigOption](baseCtx, 10)
+
+	if aiconfig.IsTieredAIConfig() {
+		log.Info("tiered ai config is enabled. the old-styled ai config is override")
+	}
+
+	lightAI, err := aiconfig.GetLightweightAIModelCallback()
+	if err != nil {
+		lightAI, _ = aiconfig.GetDefaultAIModelCallback()
+		log.Warnf("get lightweight AI model callback failed: %v", err)
+	}
+	intelligentAI, err := aiconfig.GetIntelligentAIModelCallback()
+	if err != nil {
+		intelligentAI, _ = aiconfig.GetDefaultAIModelCallback()
+		log.Warnf("get intelligent AI model callback failed: %v", err)
+	}
+	defaultAI, err := aiconfig.GetDefaultAIModelCallback()
+	if err != nil {
+		defaultAI, _ = aiconfig.GetDefaultAIModelCallback()
+		log.Warnf("get default AI model callback failed: %v", err)
+	}
+
 	var configOptions = []aicommon.ConfigOption{
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			feedback(e)
@@ -148,15 +170,16 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 		aicommon.WithEventInputChanx(inputEvent),
 		aicommon.WithContext(baseCtx),
 		aireact.WithBuiltinTools(),
-		aicommon.WithAICallback(aicommon.AIChatToAICallbackType(ai.Chat)),
 		aicommon.WithEnhanceKnowledgeManager(rag.NewRagEnhanceKnowledgeManager()),
 		aicommon.WithPersistentSessionId(persistentSession),
 		aicommon.WithEnableSelfReflection(true),
 		aicommon.WithHotPatchOptionChan(hotpatchChan),
 		aicommon.WithEnablePETaskAnalyze(true),
+		aicommon.WithSpeedPriorityAICallback(lightAI),
+		aicommon.WithQualityPriorityAICallback(intelligentAI),
+		aicommon.WithAutoTieredAICallback(defaultAI),
 	}
 	configOptions = append(configOptions, optsFromStartParams...)
-
 
 	reAct, err := aireact.NewReAct(configOptions...)
 	if err != nil {

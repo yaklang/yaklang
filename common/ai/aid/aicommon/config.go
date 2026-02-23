@@ -2568,17 +2568,21 @@ func (c *Config) LoadAIServiceByName(name string, modelName string) error {
 	if err != nil {
 		return err
 	}
-	// update react config
-	c.SetAICallback(AIChatToAICallbackType(chat))
+
+	cb := AIChatToAICallbackType(chat)
+	wCb := c.wrapper(cb)
+	c.m.Lock()
+	c.OriginalAICallback = cb
+	c.QualityPriorityAICallback = wCb
+	c.m.Unlock()
+
 	c.AiServerName = name
 	c.AiModelName = aiConfig.Model
 	if modelName != "" {
 		c.AiModelName = modelName
 	}
 
-	// submit hotpatch options
-	c.HotPatchBroadcaster.Submit(WithAIChatInfo(c.AiServerName, c.AiModelName))
-	c.HotPatchBroadcaster.Submit(WithAICallback(c.OriginalAICallback))
+	c.HotPatchBroadcaster.Submit(WithQualityPriorityAICallback(cb))
 	return nil
 }
 
