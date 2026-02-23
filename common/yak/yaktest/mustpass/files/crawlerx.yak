@@ -126,10 +126,10 @@ MM_reloadPage(true);
 
 host, port = tcp.MockServe("HTTP/1.1 200 OK\r\n\r\n" + CrawlerTestHtml)
 
-time.sleep(1)
+time.sleep(0.3)
 
 targetUrl = "http://"+host+":"+string(port)
-fullTimeout = 10
+fullTimeout = 5
 formFill = "username:admin;password:admin"
 fileUpload = "default:/opt/defaultFile.txt;"
 scanRange = ["AllDomainScan"]

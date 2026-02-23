@@ -1,7 +1,7 @@
 
 host,port = tcp.MockTCPProtocol("mysql")
 checked = false
-for result in servicescan.Scan(host, string(port), servicescan.service(),servicescan.active(true))~{
+for result in servicescan.Scan(host, string(port), servicescan.service(),servicescan.active(true),servicescan.probeTimeout(2))~{
     //dump(result)
     if result.Fingerprint.ServiceName == "mysql" {
         checked = true
@@ -10,7 +10,7 @@ for result in servicescan.Scan(host, string(port), servicescan.service(),service
 
 
 checked2 = false
-for result in servicescan.Scan(host, string(port), servicescan.web(),servicescan.active(true))~{
+for result in servicescan.Scan(host, string(port), servicescan.web(),servicescan.active(true),servicescan.probeTimeout(2))~{
     //dump(result)
     if result.Fingerprint.ServiceName == "" {
         checked2 = true
@@ -18,7 +18,7 @@ for result in servicescan.Scan(host, string(port), servicescan.web(),servicescan
 }
 
 checked3 = false
-for result in servicescan.Scan(host, string(port), servicescan.all(),servicescan.active(true))~{
+for result in servicescan.Scan(host, string(port), servicescan.all(),servicescan.active(true),servicescan.probeTimeout(2))~{
     //dump(result)
     if result.Fingerprint.ServiceName == "mysql" {
         checked3 = true

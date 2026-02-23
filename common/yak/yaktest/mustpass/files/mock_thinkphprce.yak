@@ -1,7 +1,7 @@
 host, port = tcp.MockServe("HTTP/1.1 200 OK\r\nContent-Type: aaaa \r\n\r\nPHP Extension PHP Version ThinkPHP")
 
 checked = false
-for result in nuclei.Scan("http://vulinbox.aws-4c16.yaklang.io:8004", poc.host(host), poc.port(port), nuclei.rawTemplate(`
+for result in nuclei.Scan(f"http://${host}:${port}", nuclei.rawTemplate(`
 id: thinkphp-5023-rce
 
 info:
@@ -38,7 +38,7 @@ http:
           - 200
 
 # Enhanced by md on 2022/10/05
-`), nuclei.debug(true), nuclei.debugRequest(true), nuclei.debugResponse(true))~ {
+`))~ {
     dump(result)
     checked = true
 }

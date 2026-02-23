@@ -11,6 +11,8 @@ bruter, err := brute.New(
     "ssh",
     brute.concurrentTarget(256),
     brute.debug(true),
+    brute.minDelay(0),
+    brute.maxDelay(0),
     brute.userList("root", "root123"),
     brute.passList("admin123", "password"),
     brute.okToStop(true),
