@@ -2,7 +2,7 @@ host , port = udp.MockUDPProtocol("snmp")
 
 checked = false
 
-for result in servicescan.Scan(host, string(port), servicescan.proto(["udp"]...))~{
+for result in servicescan.Scan(host, string(port), servicescan.proto(["udp"]...), servicescan.probeTimeout(1))~{
     dump(result)
     if result.Fingerprint.ServiceName == "snmp" {
         checked = true
@@ -11,7 +11,7 @@ for result in servicescan.Scan(host, string(port), servicescan.proto(["udp"]...)
 
 checked2 = false
 // U:port 的优先级比 servicescan.proto("tcp") 高
-for result in servicescan.Scan(host, "U:"+string(port), servicescan.proto(["tcp"]...))~{
+for result in servicescan.Scan(host, "U:"+string(port), servicescan.proto(["tcp"]...), servicescan.probeTimeout(1))~{
     dump(result)
     if result.Fingerprint.ServiceName == "snmp" {
         checked2 = true
@@ -21,7 +21,9 @@ for result in servicescan.Scan(host, "U:"+string(port), servicescan.proto(["tcp"
 checked3 = false
 for result in servicescan.Scan(host, string(port),
     servicescan.proto(["tcp","udp"]...),
-    servicescan.maxProbes(100),
+    servicescan.maxProbes(30),
+    servicescan.probeTimeout(1),
+    servicescan.maxProbesConcurrent(15),
 )~{
     dump(result)
     if result.Fingerprint.ServiceName == "snmp" {

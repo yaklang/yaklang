@@ -1,7 +1,7 @@
 host, port = tcp.MockServe("asdfadxv\\$Proxy51hfawqwexv")
 
 checked = false
-for result in nuclei.Scan("http://vulinbox.aws-4c16.yaklang.io:8004", poc.host(host), poc.port(port), nuclei.rawTemplate(`
+for result in nuclei.Scan(f"http://${host}:${port}", nuclei.rawTemplate(`
 id: CVE-2018-2628
 
 info:

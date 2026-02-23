@@ -1,6 +1,6 @@
 host, port = tcp.MockTCPProtocol("rdp")
 
-maxRetries := 5
+maxRetries := 2
 
 checked = false
 
@@ -9,6 +9,7 @@ for in maxRetries {
     for result in servicescan.Scan(host, string(port),
         servicescan.proto(["tcp"]...),
         servicescan.maxProbes(5),
+        servicescan.probeTimeout(1),
         servicescan.all(),
      )~ {
         println("tcp")
@@ -31,6 +32,7 @@ for in maxRetries {
     for result in servicescan.Scan(host, string(port),
         servicescan.proto(["udp"]...),
         servicescan.maxProbes(5),
+        servicescan.probeTimeout(1),
     )~ {
         if !result.IsOpen() {
             continue
