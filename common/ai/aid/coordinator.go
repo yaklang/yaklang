@@ -322,7 +322,7 @@ func (c *Coordinator) loadToolsViaOptions() error {
 }
 
 func (c *Coordinator) CallAITransaction(prompt string, postHandler func(response *aicommon.AIResponse) error, requestOpts ...aicommon.AIRequestOption) error {
-	return c.CallAiTransaction(prompt, c.CallAI, func(rsp *aicommon.AIResponse) error {
+	return aicommon.CallAITransaction(c, prompt, c.CallAI, func(rsp *aicommon.AIResponse) error {
 		if postHandler == nil {
 			return nil
 		}

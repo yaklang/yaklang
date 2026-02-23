@@ -35,12 +35,12 @@ func BuildOnPostIterationHook(invoker aicommon.AIInvokeRuntime) reactloops.ReAct
 }
 
 type smartEvaluation struct {
-	Specific  string
+	Specific   string
 	Measurable string
 	Achievable string
-	Relevant  string
-	TimeBound string
-	Overall   string
+	Relevant   string
+	TimeBound  string
+	Overall    string
 }
 
 func evaluateSMART(ctx context.Context, invoker aicommon.AIInvokeRuntime, userQuery, searchResults, searchHistory string) *smartEvaluation {
@@ -84,7 +84,7 @@ For each S.M.A.R.T dimension, provide a brief evaluation (1-2 sentences) of the 
 		return nil
 	}
 
-	forgeResult, err := invoker.InvokeLiteForge(
+	forgeResult, err := invoker.InvokeSpeedPriorityLiteForge(
 		ctx,
 		"smart-evaluation",
 		materials,
@@ -154,7 +154,7 @@ Provide a concise analysis (3-5 sentences) explaining why the collected informat
 		return ""
 	}
 
-	forgeResult, err := invoker.InvokeLiteForge(
+	forgeResult, err := invoker.InvokeSpeedPriorityLiteForge(
 		ctx,
 		"insufficient-reason-analysis",
 		materials,

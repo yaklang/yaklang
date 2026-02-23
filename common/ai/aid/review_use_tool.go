@@ -152,7 +152,7 @@ func (t *AiTask) toolReviewPolicy_wrongTool(ctx context.Context, oldTool *aitool
 
 	var selecteddTool *aitool.Tool
 	var directlyAnswer bool
-	transErr := t.CallAiTransaction(prompt, func(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+	transErr := aicommon.CallAITransaction(t, prompt, func(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		// Check context before AI call
 		select {
 		case <-ctx.Done():
@@ -211,7 +211,7 @@ func (t *AiTask) toolReviewPolicy_wrongParam(ctx context.Context, tool *aitool.T
 	}
 
 	var invokeParams = aitool.InvokeParams{}
-	transErr := t.CallAiTransaction(prompt, func(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+	transErr := aicommon.CallAITransaction(t, prompt, func(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		// Check context before AI call
 		select {
 		case <-ctx.Done():

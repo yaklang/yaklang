@@ -55,6 +55,32 @@ func (pr *planRequest) CallAI(request *aicommon.AIRequest) (*aicommon.AIResponse
 	return nil, utils.Error("no any ai callback is set, cannot found ai config")
 }
 
+func (pr *planRequest) CallSpeedPriorityAI(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+	for _, cb := range []aicommon.AICallbackType{
+		pr.cod.SpeedPriorityAICallback,
+		pr.cod.OriginalAICallback,
+	} {
+		if cb == nil {
+			continue
+		}
+		return cb(pr.cod, request)
+	}
+	return nil, utils.Error("no speed priority ai callback is set")
+}
+
+func (pr *planRequest) CallQualityPriorityAI(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+	for _, cb := range []aicommon.AICallbackType{
+		pr.cod.QualityPriorityAICallback,
+		pr.cod.OriginalAICallback,
+	} {
+		if cb == nil {
+			continue
+		}
+		return cb(pr.cod, request)
+	}
+	return nil, utils.Error("no quality priority ai callback is set")
+}
+
 type PlanResponse struct {
 	RootTask *AiTask `json:"root_task"`
 }

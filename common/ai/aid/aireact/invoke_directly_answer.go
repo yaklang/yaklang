@@ -97,7 +97,7 @@ func (r *ReAct) DirectlyAnswer(ctx context.Context, query string, tools []*aitoo
 	err = aicommon.CallAITransaction(
 		r.config,
 		prompt,
-		r.config.CallAI,
+		r.config.CallQualityPriorityAI,
 		func(rsp *aicommon.AIResponse) error {
 			stream := rsp.GetOutputStreamReader("directly_answer", true, r.Emitter)
 			action, err := aicommon.ExtractActionFromStream(
@@ -106,28 +106,28 @@ func (r *ReAct) DirectlyAnswer(ctx context.Context, query string, tools []*aitoo
 				aicommon.WithActionNonce(nonceStr),
 				aicommon.WithActionTagToKey("FINAL_ANSWER", "answer_payload"),
 				aicommon.WithActionAlias("directly_answer"),
-			aicommon.WithActionFieldStreamHandler(
-				[]string{"answer_payload"},
-				func(key string, reader io.Reader) {
-					var out bytes.Buffer
-					reader = utils.JSONStringReader(reader)
-					reader = io.TeeReader(reader, &out)
-					var event *schema.AiOutputEvent
-					event, _ = r.Emitter.EmitTextMarkdownStreamEvent(
-						"re-act-loop-answer-payload",
-						reader,
-						rsp.GetTaskIndex(),
-						func() {
-							// Only emit result if not skipped (caller will handle it)
-							if !config.skipEmitResultAfterDone {
-								r.EmitResultAfterStream(out.String())
-							}
-							if event != nil {
-								emitReferenceMaterial(event)
-							}
-						},
-					)
-				}),
+				aicommon.WithActionFieldStreamHandler(
+					[]string{"answer_payload"},
+					func(key string, reader io.Reader) {
+						var out bytes.Buffer
+						reader = utils.JSONStringReader(reader)
+						reader = io.TeeReader(reader, &out)
+						var event *schema.AiOutputEvent
+						event, _ = r.Emitter.EmitTextMarkdownStreamEvent(
+							"re-act-loop-answer-payload",
+							reader,
+							rsp.GetTaskIndex(),
+							func() {
+								// Only emit result if not skipped (caller will handle it)
+								if !config.skipEmitResultAfterDone {
+									r.EmitResultAfterStream(out.String())
+								}
+								if event != nil {
+									emitReferenceMaterial(event)
+								}
+							},
+						)
+					}),
 			)
 			if err != nil {
 				return err

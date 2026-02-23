@@ -104,7 +104,7 @@ Skills: {{ .MatchedSkillNames }}
 		return
 	}
 
-	forgeResult, err := invoker.InvokeLiteForge(
+	forgeResult, err := invoker.InvokeSpeedPriorityLiteForge(
 		ctx,
 		"intent-finalize-summary",
 		materials,

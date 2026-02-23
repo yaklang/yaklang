@@ -97,7 +97,7 @@ func (t *AiTask) toolResultDecision(result *aitool.ToolResult, targetTool *aitoo
 	}
 
 	var action *aicommon.Action
-	err = t.CallAiTransaction(decisionPrompt, func(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+	err = aicommon.CallAITransaction(t, decisionPrompt, func(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		request.SetTaskIndex(t.Index)
 		return t.CallAI(request)
 	}, func(continueResult *aicommon.AIResponse) error {

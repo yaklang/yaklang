@@ -273,7 +273,7 @@ ALREADY_EXTRACTED 部分包含了之前已经提取过的内容。请注意：
 
 	// Get task index for emit
 	var taskIndex string
-	forgeResult, err := invoker.InvokeLiteForge(
+	forgeResult, err := invoker.InvokeSpeedPriorityLiteForge(
 		ctx,
 		"knowledge-compress",
 		materials,

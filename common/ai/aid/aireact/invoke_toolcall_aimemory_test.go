@@ -106,6 +106,14 @@ func (m *MockAIMemoryInvoker) InvokeLiteForge(ctx context.Context, actionName st
 	return m.ReAct.InvokeLiteForge(ctx, actionName, prompt, outputs)
 }
 
+func (m *MockAIMemoryInvoker) InvokeSpeedPriorityLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
+	return m.InvokeLiteForge(ctx, actionName, prompt, outputs, opts...)
+}
+
+func (m *MockAIMemoryInvoker) InvokeQualityPriorityLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
+	return m.InvokeLiteForge(ctx, actionName, prompt, outputs, opts...)
+}
+
 func mockedToolCallingWithAIMemory2(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
 	if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {

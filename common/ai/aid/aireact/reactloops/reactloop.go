@@ -98,6 +98,9 @@ type ReActLoop struct {
 	// operator 用于控制 init 后的行为：Done/Failed/Continue/NextAction/RemoveNextAction
 	initHandler func(loop *ReActLoop, task aicommon.AIStatefulTask, operator *InitTaskOperator)
 
+	// use speed priority AI callback for main AI calls in the loop
+	useSpeedPriorityAI bool
+
 	// 自我反思功能开关
 	enableSelfReflection bool
 

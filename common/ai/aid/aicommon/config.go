@@ -2025,6 +2025,32 @@ func (c *Config) CallOriginalAI(request *AIRequest) (*AIResponse, error) {
 	return nil, utils.Error("no any ai callback is set, cannot found ai config")
 }
 
+func (c *Config) CallQualityPriorityAI(request *AIRequest) (*AIResponse, error) {
+	for _, cb := range []AICallbackType{
+		c.QualityPriorityAICallback,
+		c.OriginalAICallback,
+	} {
+		if cb == nil {
+			continue
+		}
+		return cb(c, request)
+	}
+	return nil, utils.Error("no quality priority ai callback is set")
+}
+
+func (c *Config) CallSpeedPriorityAI(request *AIRequest) (*AIResponse, error) {
+	for _, cb := range []AICallbackType{
+		c.SpeedPriorityAICallback,
+		c.OriginalAICallback,
+	} {
+		if cb == nil {
+			continue
+		}
+		return cb(c, request)
+	}
+	return nil, utils.Error("no quality priority ai callback is set")
+}
+
 func (c *Config) Feed(endpointId string, params aitool.InvokeParams) {
 	if c.Epm != nil {
 		c.Epm.Feed(endpointId, params)
@@ -2373,7 +2399,7 @@ func (c *Config) SetContext(ctx context.Context) {
 	c.cancel = cancel
 }
 
-func (c *Config) CallAiTransaction(
+func (c *Config) CallAITransaction(
 	prompt string,
 	callAi func(*AIRequest) (*AIResponse, error),
 	postHandler func(rsp *AIResponse) error,

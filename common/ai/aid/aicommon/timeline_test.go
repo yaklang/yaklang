@@ -53,6 +53,14 @@ func (m *mockedAI) CallAI(req *AIRequest) (*AIResponse, error) {
 	return rsp, nil
 }
 
+func (m *mockedAI) CallSpeedPriorityAI(req *AIRequest) (*AIResponse, error) {
+	return m.CallAI(req)
+}
+
+func (m *mockedAI) CallQualityPriorityAI(req *AIRequest) (*AIResponse, error) {
+	return m.CallAI(req)
+}
+
 type mockedToolResult struct {
 	ID int64
 }

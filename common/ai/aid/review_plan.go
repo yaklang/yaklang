@@ -261,7 +261,7 @@ func (pr *planRequest) generateCreateSubtaskPlan(extraPrompt string, rsp *PlanRe
 	if err != nil {
 		return nil, err
 	}
-	err = pr.cod.CallAiTransaction(buf.String(), pr.CallAI, func(response *aicommon.AIResponse) error {
+	err = pr.cod.CallAITransaction(buf.String(), func(response *aicommon.AIResponse) error {
 		reader := response.GetOutputStreamReader("create-subtasks", false, pr.cod.GetEmitter())
 		if reader == nil {
 			return utils.Error("get output stream failed")
@@ -319,7 +319,7 @@ func (pr *planRequest) freedomReviewGenerateNewPlan(extraPrompt string, rsp *Pla
 	prompt := planPrompt.String()
 
 	var task *AiTask
-	err = pr.cod.CallAiTransaction(prompt, pr.CallAI, func(response *aicommon.AIResponse) error {
+	err = pr.cod.CallAITransaction(prompt, func(response *aicommon.AIResponse) error {
 		responseReader := response.GetOutputStreamReader("freedom-plan-review", false, pr.cod.Emitter)
 		taskResponse, err := io.ReadAll(responseReader)
 		if err != nil {
@@ -365,7 +365,7 @@ func (pr *planRequest) generateNewPlan(suggestion string, extraPrompt string, rs
 	prompt := planPrompt.String()
 
 	var task *AiTask
-	err = pr.cod.CallAiTransaction(prompt, pr.CallAI, func(response *aicommon.AIResponse) error {
+	err = pr.cod.CallAITransaction(prompt, func(response *aicommon.AIResponse) error {
 		// 读取 AI 的响应
 		responseReader := response.GetOutputStreamReader("dynamic-plan", false, pr.cod.Emitter)
 		taskResponse, err := io.ReadAll(responseReader)

@@ -64,7 +64,7 @@ func (r *ReAct) SelectKnowledgeBase(ctx context.Context, originQuery string) (*a
 	defer pw.Close()
 	firstExec := utils.NewOnce()
 	// Use liteforge to select knowledge bases
-	action, err := r.InvokeLiteForge(ctx, "select_knowledge_base", prompt, []aitool.ToolOption{
+	action, err := r.InvokeSpeedPriorityLiteForge(ctx, "select_knowledge_base", prompt, []aitool.ToolOption{
 		aitool.WithStringArrayParam("knowledge_bases",
 			aitool.WithParam_Description("要搜索的知识库名称列表，必须指定至少一个知识库"),
 			aitool.WithParam_Required(true),

@@ -394,14 +394,7 @@ func (m *Timeline) batchCompressByTargetSize(targetSize int) {
 	// 调用 AI 进行批量压缩
 	var action *Action
 	var cumulativeSummary string
-	err = CallAITransaction(m.config, prompt, m.ai.CallAI, func(response *AIResponse) error {
-		var callErr error
-		response, callErr = m.ai.CallAI(NewAIRequest(prompt))
-		if callErr != nil {
-			log.Errorf("batch compress call ai failed: %v", callErr)
-			return utils.Errorf("context-shrink call ai failed: %v", callErr)
-		}
-
+	err = CallAITransaction(m.config, prompt, m.ai.CallSpeedPriorityAI, func(response *AIResponse) error {
 		var r io.Reader
 		if m.config == nil {
 			r = response.GetUnboundStreamReader(false)

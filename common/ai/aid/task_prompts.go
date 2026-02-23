@@ -102,8 +102,8 @@ func (t *AiTask) DeepThink(suggestion string) error {
 		t.GenerateIndex()
 	}()
 
-	err = t.CallAiTransaction(
-		prompt, t.CallAI,
+	err = t.CallAITransaction(
+		prompt,
 		func(rsp *aicommon.AIResponse) error {
 			action, err := aicommon.ExtractValidActionFromStream(
 				t.Ctx,
@@ -164,9 +164,8 @@ func (t *AiTask) AdjustPlan(suggestion string) error {
 		t.GenerateIndex()
 	}()
 
-	err = t.CallAiTransaction(
+	err = t.CallAITransaction(
 		planPrompt,
-		t.CallAI,
 		func(response *aicommon.AIResponse) error {
 			// 读取 AI 的响应
 			responseReader := response.GetOutputStreamReader("dynamic-plan", false, t.GetEmitter())

@@ -70,6 +70,8 @@ type AIInvokeRuntime interface {
 	RequireAIForgeAndAsyncExecute(ctx context.Context, forgeName string, onFinish func(error))
 	AsyncPlanAndExecute(ctx context.Context, planPayload string, onFinish func(error))
 	InvokeLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...GeneralKVConfigOption) (*Action, error)
+	InvokeSpeedPriorityLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...GeneralKVConfigOption) (*Action, error)
+	InvokeQualityPriorityLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...GeneralKVConfigOption) (*Action, error)
 	// SelectKnowledgeBase selects appropriate knowledge bases based on the user query
 	// It uses AI to analyze the query and match it with available knowledge bases
 	SelectKnowledgeBase(ctx context.Context, originQuery string) (*SelectedKnowledgeBaseResult, error)

@@ -116,28 +116,28 @@ func (t *AiTask) execute() error {
 
 				// Signal the loop to end - this ensures the loop terminates after this iteration
 				operator.EndIteration("task completed via completed_task_index or isDone")
-		} else {
-			// Emit continuing status
-			t.planLoadingStatus(fmt.Sprintf("任务 [%s] 继续执行 (迭代 %d) / Task [%s] Continuing (Iteration %d)", t.Index, iteration+1, t.Index, iteration+1))
+			} else {
+				// Emit continuing status
+				t.planLoadingStatus(fmt.Sprintf("任务 [%s] 继续执行 (迭代 %d) / Task [%s] Continuing (Iteration %d)", t.Index, iteration+1, t.Index, iteration+1))
 
-			// Combine summary (reasoning) and next_movements as Processing status
-			// This ensures both are captured in StatusSummary to avoid context loss
-			t.updateProcessingStatus(summary, nextMovements)
+				// Combine summary (reasoning) and next_movements as Processing status
+				// This ensures both are captured in StatusSummary to avoid context loss
+				t.updateProcessingStatus(summary, nextMovements)
 
-			if t.Coordinator != nil && summary != "" {
-				timelineMsg := fmt.Sprintf(
-					"[task-verification] Task %s iteration %d verification: not yet complete. Reason: %s",
-					t.Index, iteration, summary,
-				)
-				if nextMovements != "" {
-					timelineMsg += fmt.Sprintf(" | Suggested next steps: %s", nextMovements)
+				if t.Coordinator != nil && summary != "" {
+					timelineMsg := fmt.Sprintf(
+						"[task-verification] Task %s iteration %d verification: not yet complete. Reason: %s",
+						t.Index, iteration, summary,
+					)
+					if nextMovements != "" {
+						timelineMsg += fmt.Sprintf(" | Suggested next steps: %s", nextMovements)
+					}
+					t.Coordinator.Timeline.PushText(
+						t.Coordinator.AcquireId(),
+						timelineMsg,
+					)
 				}
-				t.Coordinator.Timeline.PushText(
-					t.Coordinator.AcquireId(),
-					timelineMsg,
-				)
 			}
-		}
 		}),
 		reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedback *bytes.Buffer, nonce string) (string, error) {
 			currentIteration := loop.GetCurrentIterationIndex()
@@ -318,7 +318,7 @@ func (t *AiTask) generateTaskSummary(summary, nextMovements string) error {
 
 	t.planLoadingStatus(fmt.Sprintf("任务 [%s] 等待 AI 生成总结 / Task [%s] Waiting AI Summary...", t.Index, t.Index))
 	extractStart := time.Now()
-	err = t.CallAiTransaction(summaryPromptWellFormed, t.CallOriginalAI, func(summaryReader *aicommon.AIResponse) error { // 异步过程 使用无 id的 原始ai callback
+	err = t.CallAITransaction(summaryPromptWellFormed, func(summaryReader *aicommon.AIResponse) error { // 异步过程 使用无 id的 原始ai callback
 		action, err := aicommon.ExtractValidActionFromStream(t.Ctx, summaryReader.GetUnboundStreamReader(false), "summary",
 			aicommon.WithActionFieldStreamHandler(
 				[]string{"status_summary", "task_short_summary", "task_long_summary"},

@@ -39,6 +39,14 @@ func (m *mockedAI) CallAI(req *aicommon.AIRequest) (*aicommon.AIResponse, error)
 	return rsp, nil
 }
 
+func (m *mockedAI) CallSpeedPriorityAI(req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+	return m.CallAI(req)
+}
+
+func (m *mockedAI) CallQualityPriorityAI(req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+	return m.CallAI(req)
+}
+
 type mockedAI2 struct {
 	hCompressTime *int64
 }
@@ -63,6 +71,14 @@ func (m *mockedAI2) CallAI(req *aicommon.AIRequest) (*aicommon.AIResponse, error
 	}
 
 	return rsp, nil
+}
+
+func (m *mockedAI2) CallSpeedPriorityAI(req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+	return m.CallAI(req)
+}
+
+func (m *mockedAI2) CallQualityPriorityAI(req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+	return m.CallAI(req)
 }
 
 func TestMemoryTimelineWithBatchCompression(t *testing.T) {
