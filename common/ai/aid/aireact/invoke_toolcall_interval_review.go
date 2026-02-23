@@ -47,7 +47,7 @@ func (r *ReAct) _invokeToolCall_IntervalReviewWithContext(
 	var shouldContinue = true
 	var reviewReason string
 
-	transErr := aicommon.CallAITransaction(r.config, prompt, r.config.CallAI,
+	transErr := aicommon.CallAITransaction(r.config, prompt, r.config.CallSpeedPriorityAI,
 		func(rsp *aicommon.AIResponse) error {
 			action, err := aicommon.ExtractActionFromStream(
 				ctx,

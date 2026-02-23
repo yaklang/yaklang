@@ -323,6 +323,18 @@ func WithMemorySizeLimit(sizeLimit int) ReActLoopOption {
 	}
 }
 
+// WithUseSpeedPriorityAICallback makes the ReAct loop use config.CallSpeedPriorityAI
+// instead of config.CallAI for its main AI calls in CallAITransaction.
+func WithUseSpeedPriorityAICallback(b ...bool) ReActLoopOption {
+	return func(r *ReActLoop) {
+		if len(b) > 0 {
+			r.useSpeedPriorityAI = b[0]
+		} else {
+			r.useSpeedPriorityAI = true
+		}
+	}
+}
+
 // WithEnableSelfReflection 启用自我反思功能
 // 启用后，每次 action 执行后会根据策略进行自我反思分析
 // action 可以通过 operator.SetReflectionLevel() 自定义反思级别

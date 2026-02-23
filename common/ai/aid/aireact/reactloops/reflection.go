@@ -262,7 +262,7 @@ func (r *ReActLoop) performAIReflection(ctx context.Context, reflection *ActionR
 	err = aicommon.CallAITransaction(
 		config,
 		prompt,
-		config.CallAI,
+		config.CallSpeedPriorityAI,
 		func(rsp *aicommon.AIResponse) error {
 			// 获取流式输出
 			stream := rsp.GetOutputStreamReader(

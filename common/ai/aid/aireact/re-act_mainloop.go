@@ -436,7 +436,7 @@ func (r *ReAct) ensureWorkDirectory(userInput string) {
 				return
 			}
 
-			action, err := r.InvokeLiteForge(liteForgeCtx, "session-init-generator", prompt, []aitool.ToolOption{
+			action, err := r.InvokeSpeedPriorityLiteForge(liteForgeCtx, "session-init-generator", prompt, []aitool.ToolOption{
 				aitool.WithStringParam("session_title", aitool.WithParam_Description("Concise session title for display"), aitool.WithParam_MaxLength(50), aitool.WithParam_Required(true)),
 				aitool.WithStringParam("folder_name", aitool.WithParam_Description("Short filesystem-safe folder name in snake_case English, describing the task purpose, e.g. sql_injection_scan, http_flow_analysis"), aitool.WithParam_MaxLength(30), aitool.WithParam_Required(true)),
 			})
@@ -527,7 +527,7 @@ func (r *ReAct) ensureSessionTitle(userInput string) {
 			return
 		}
 
-		action, err := r.InvokeLiteForge(cfg.GetContext(), "session-title-generator", prompt, []aitool.ToolOption{
+		action, err := r.InvokeSpeedPriorityLiteForge(cfg.GetContext(), "session-title-generator", prompt, []aitool.ToolOption{
 			aitool.WithStringParam("session_title", aitool.WithParam_Description("Concise session title"), aitool.WithParam_MaxLength(50), aitool.WithParam_Required(true)),
 		})
 		if err != nil {

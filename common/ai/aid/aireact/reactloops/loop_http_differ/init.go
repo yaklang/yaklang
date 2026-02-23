@@ -145,7 +145,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 			"userInput": task.GetUserInput(),
 		})
 
-		result, err := r.InvokeLiteForge(
+		result, err := r.InvokeSpeedPriorityLiteForge(
 			task.GetContext(),
 			"analyze-user-requirements",
 			renderedPrompt,

@@ -175,11 +175,18 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 		aicommon.WithEnableSelfReflection(true),
 		aicommon.WithHotPatchOptionChan(hotpatchChan),
 		aicommon.WithEnablePETaskAnalyze(true),
-		aicommon.WithSpeedPriorityAICallback(lightAI),
-		aicommon.WithQualityPriorityAICallback(intelligentAI),
 		aicommon.WithAutoTieredAICallback(defaultAI),
 	}
+	// optsFromStartParams (containing WithAICallback) must be applied BEFORE
+	// tiered overrides, otherwise WithAICallback overwrites all three callbacks
+	// (Original, Quality, Speed) to the same frontend-selected model.
 	configOptions = append(configOptions, optsFromStartParams...)
+	if aiconfig.IsTieredAIConfig() {
+		configOptions = append(configOptions,
+			aicommon.WithSpeedPriorityAICallback(lightAI),
+			aicommon.WithQualityPriorityAICallback(intelligentAI),
+		)
+	}
 
 	reAct, err := aireact.NewReAct(configOptions...)
 	if err != nil {

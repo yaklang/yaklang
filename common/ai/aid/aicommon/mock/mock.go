@@ -35,6 +35,14 @@ func (m *MockedAIConfig) CallAI(request *aicommon.AIRequest) (*aicommon.AIRespon
 	panic("implement me")
 }
 
+func (m *MockedAIConfig) CallSpeedPriorityAI(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+	return m.CallAI(request)
+}
+
+func (m *MockedAIConfig) CallQualityPriorityAI(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+	return m.CallAI(request)
+}
+
 var _ aicommon.AICallerConfigIf = (*MockedAIConfig)(nil)
 
 func NewMockedAIConfig(ctx context.Context) aicommon.AICallerConfigIf {
@@ -159,6 +167,14 @@ func (m *MockInvoker) EnhanceKnowledgeGetRandomN(ctx context.Context, n int, col
 
 func (m *MockInvoker) ExecuteLoopTaskIF(taskTypeName string, task aicommon.AIStatefulTask, options ...any) (bool, error) {
 	return false, nil
+}
+
+func (m *MockInvoker) InvokeSpeedPriorityLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
+	return m.InvokeLiteForge(ctx, actionName, prompt, outputs, opts...)
+}
+
+func (m *MockInvoker) InvokeQualityPriorityLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
+	return m.InvokeLiteForge(ctx, actionName, prompt, outputs, opts...)
 }
 
 func (m *MockInvoker) InvokeLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {

@@ -144,11 +144,15 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 
 	log.Infof("start to call aicommon.CallAITransaction in ReActLoop[%v]", r.loopName)
 	r.loadingStatus("等待 AI 回应 / Waiting AI Respond...")
+	aiCallback := r.config.CallAI
+	if r.useSpeedPriorityAI {
+		aiCallback = r.config.CallSpeedPriorityAI
+	}
 	var promptRefOnce sync.Once
 	transactionErr := aicommon.CallAITransaction(
 		r.config,
 		prompt,
-		r.config.CallAI,
+		aiCallback,
 		func(resp *aicommon.AIResponse) error {
 			if ctxCanceled.IsSet() {
 				return nil

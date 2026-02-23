@@ -99,6 +99,8 @@ type ProxyAICaller struct {
 
 type AICaller interface {
 	CallAI(request *AIRequest) (*AIResponse, error)
+	CallSpeedPriorityAI(request *AIRequest) (*AIResponse, error)
+	CallQualityPriorityAI(request *AIRequest) (*AIResponse, error)
 }
 
 func CreateProxyAICaller(
@@ -122,6 +124,14 @@ func (p ProxyAICaller) CallAI(request *AIRequest) (*AIResponse, error) {
 		return p.callFunc(request)
 	}
 	return nil, utils.Error("proxy function returned nil request")
+}
+
+func (p ProxyAICaller) CallSpeedPriorityAI(request *AIRequest) (*AIResponse, error) {
+	return p.CallAI(request)
+}
+
+func (p ProxyAICaller) CallQualityPriorityAI(request *AIRequest) (*AIResponse, error) {
+	return p.CallAI(request)
 }
 
 func LoadAIService(typeName string, opts ...aispec.AIConfigOption) (AICallbackType, error) {

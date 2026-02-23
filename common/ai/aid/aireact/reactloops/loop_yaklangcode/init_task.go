@@ -116,7 +116,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 		}
 
 		loop.LoadingStatus("开始分析用户需求... / Analyzing user requirements...")
-		step1Result, err := r.InvokeLiteForge(
+		step1Result, err := r.InvokeSpeedPriorityLiteForge(
 			task.GetContext(),
 			"analyze-requirement-and-search",
 			renderedPrompt,
