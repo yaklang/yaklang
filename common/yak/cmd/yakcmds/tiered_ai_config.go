@@ -276,6 +276,10 @@ func applyConfigToMemory(cfg *TieredAIConfigFile) {
 	log.Infof("tiered AI config applied to memory: enabled=%v, policy=%s", tiered.Enabled, tiered.RoutingPolicy)
 }
 
+func saveConfigToDB(cfg *TieredAIConfigFile) error {
+	return aiconfig.SaveTieredAIConfigToDB(cfg)
+}
+
 var configFileFlag = cli.StringFlag{
 	Name:  "config-file",
 	Usage: "Path to the tiered AI config file (YAML or JSON)",
@@ -348,57 +352,30 @@ var TieredAIConfigCommands = []*cli.Command{
 			configFileFlag,
 		},
 		Action: func(c *cli.Context) error {
-			defaultSavePath := resolveConfigFilePath("")
 			specifiedPath := c.String("config-file")
 
 			if c.Bool("disabled") {
-				savePath := defaultSavePath
-				if specifiedPath != "" {
-					savePath = specifiedPath
-				}
-
-				var cfg *TieredAIConfigFile
-				if utils.GetFirstExistedFile(savePath) != "" {
-					var err error
-					cfg, err = loadTieredAIConfigFile(savePath)
-					if err != nil {
-						return err
-					}
-				} else {
-					cfg = getDefaultTieredAIConfigFile()
-				}
+				cfg := getDefaultTieredAIConfigFile()
 				cfg.Enabled = false
-				if err := saveTieredAIConfigFile(savePath, cfg); err != nil {
+
+				if err := saveConfigToDB(cfg); err != nil {
 					return err
 				}
-				applyConfigToMemory(cfg)
-				fmt.Printf("Tiered AI configuration disabled and saved to: %s\n", savePath)
+				fmt.Println("Tiered AI configuration disabled and saved to database.")
 				return nil
 			}
 
 			var cfg *TieredAIConfigFile
-			sourcePath := specifiedPath
-			if sourcePath == "" {
-				sourcePath = defaultSavePath
-			}
-
 			if specifiedPath != "" && utils.GetFirstExistedFile(specifiedPath) != "" {
 				var err error
 				cfg, err = loadTieredAIConfigFile(specifiedPath)
 				if err != nil {
 					return err
 				}
-				fmt.Printf("Loading configuration from: %s\n", specifiedPath)
-			} else if utils.GetFirstExistedFile(defaultSavePath) != "" {
-				var err error
-				cfg, err = loadTieredAIConfigFile(defaultSavePath)
-				if err != nil {
-					return err
-				}
-				fmt.Printf("Loading configuration from: %s\n", defaultSavePath)
+				fmt.Printf("Loading configuration from file: %s\n", specifiedPath)
 			} else {
 				cfg = getDefaultTieredAIConfigFile()
-				fmt.Println("No config file found, using default (aibalance) configuration")
+				fmt.Println("No config file specified, using default (aibalance) configuration")
 			}
 
 			cfg.Enabled = true
@@ -413,14 +390,10 @@ var TieredAIConfigCommands = []*cli.Command{
 				return utils.Error("configuration check failed, tiered AI config not enabled")
 			}
 
-			savePath := defaultSavePath
-			if specifiedPath != "" {
-				savePath = specifiedPath
-			}
-			if err := saveTieredAIConfigFile(savePath, cfg); err != nil {
+			if err := saveConfigToDB(cfg); err != nil {
 				return err
 			}
-			fmt.Printf("\nTiered AI configuration enabled and saved to: %s\n", savePath)
+			fmt.Println("\nTiered AI configuration enabled and saved to database.")
 			return nil
 		},
 	},
@@ -491,16 +464,15 @@ var TieredAIConfigCommands = []*cli.Command{
 		Usage: "Reset tiered AI configuration to default (aibalance)",
 		Action: func(c *cli.Context) error {
 			cfg := getDefaultTieredAIConfigFile()
-			savePath := filepath.Join(getDefaultConfigDir(), "tiered-ai-config.yaml")
 
-			if err := saveTieredAIConfigFile(savePath, cfg); err != nil {
+			if err := saveConfigToDB(cfg); err != nil {
 				return err
 			}
-			applyConfigToMemory(cfg)
 
 			fmt.Println("Tiered AI configuration reset to default (aibalance)")
-			fmt.Printf("Config saved to: %s\n\n", savePath)
-			printTieredAIConfigStatus(cfg, savePath)
+			fmt.Println("Config saved to database.")
+			fmt.Println()
+			printTieredAIConfigStatus(cfg, "(database)")
 			return nil
 		},
 	},

@@ -1,85 +1,60 @@
 package aiconfig
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func TestEnsureConfigLoaded(t *testing.T) {
-	// Save original state
-	originalConfig := consts.GetTieredAIConfig()
-	defer func() {
-		consts.SetTieredAIConfig(originalConfig)
+func saveAndRestore(t *testing.T) {
+	t.Helper()
+	orig := consts.GetTieredAIConfig()
+	t.Cleanup(func() {
+		consts.SetTieredAIConfig(orig)
 		ResetConfigLoaded()
-	}()
+		ResetNetworkConfigGetter()
+	})
+}
 
-	// Reset state
-	consts.SetTieredAIConfig(nil)
-	ResetConfigLoaded()
+func setupTempYakitHome(t *testing.T) string {
+	t.Helper()
+	tmpDir := t.TempDir()
+	t.Setenv("YAKIT_HOME", tmpDir)
+	baseDir := filepath.Join(tmpDir, "base")
+	require.NoError(t, os.MkdirAll(baseDir, 0o755))
+	return tmpDir
+}
 
-	// Before loading, config should be nil
-	assert.Nil(t, consts.GetTieredAIConfig())
-	assert.False(t, IsConfigLoaded())
-
-	// Set up a config
-	testConfig := &consts.TieredAIConfig{
-		Enabled:       true,
-		RoutingPolicy: consts.PolicyBalance,
-		IntelligentConfigs: []*ypb.ThirdPartyApplicationConfig{
-			{Type: "aibalance", APIKey: "test"},
-		},
-	}
-	consts.SetTieredAIConfig(testConfig)
-
-	// Call EnsureConfigLoaded - it should detect config is already loaded
-	EnsureConfigLoaded()
+func writeConfigFile(t *testing.T, yakitHome string, content string) string {
+	t.Helper()
+	configPath := filepath.Join(yakitHome, "base", "tiered-ai-config.yaml")
+	require.NoError(t, os.WriteFile(configPath, []byte(content), 0o644))
+	return configPath
 }
 
 func TestIsConfigLoaded(t *testing.T) {
-	// Save original state
-	originalConfig := consts.GetTieredAIConfig()
-	defer func() {
-		consts.SetTieredAIConfig(originalConfig)
-		ResetConfigLoaded()
-	}()
-
-	// Reset state
+	saveAndRestore(t)
 	ResetConfigLoaded()
 	assert.False(t, IsConfigLoaded())
 }
 
 func TestResetConfigLoaded(t *testing.T) {
-	// Save original state
-	originalConfig := consts.GetTieredAIConfig()
-	defer func() {
-		consts.SetTieredAIConfig(originalConfig)
-		ResetConfigLoaded()
-	}()
-
-	// Set config loaded state
+	saveAndRestore(t)
 	consts.SetTieredAIConfig(&consts.TieredAIConfig{Enabled: true})
-
-	// Reset
 	ResetConfigLoaded()
 	assert.False(t, IsConfigLoaded())
 }
 
-func TestLoadTieredConfigFromNetworkConfig(t *testing.T) {
-	// Save original state
-	originalConfig := consts.GetTieredAIConfig()
-	defer func() {
-		consts.SetTieredAIConfig(originalConfig)
-		ResetConfigLoaded()
-	}()
-
-	// Reset state
+func TestLoadTieredConfigFromNetworkConfig_Enabled(t *testing.T) {
+	saveAndRestore(t)
 	consts.SetTieredAIConfig(nil)
 	ResetConfigLoaded()
 
-	// Create a network config
 	networkConfig := &ypb.GlobalNetworkConfig{
 		EnableTieredAIModelConfig: true,
 		TieredAIModelConfig: &ypb.TieredAIModelConfigDescriptor{
@@ -97,34 +72,45 @@ func TestLoadTieredConfigFromNetworkConfig(t *testing.T) {
 		},
 	}
 
-	// Load config
 	loadTieredConfigFromNetworkConfig(networkConfig)
 
-	// Verify config was loaded
-	tieredConfig := consts.GetTieredAIConfig()
-	assert.NotNil(t, tieredConfig)
-	assert.True(t, tieredConfig.Enabled)
-	assert.Equal(t, consts.PolicyPerformance, tieredConfig.RoutingPolicy)
-	assert.True(t, tieredConfig.DisableFallback)
-	assert.Len(t, tieredConfig.IntelligentConfigs, 1)
-	assert.Len(t, tieredConfig.LightweightConfigs, 1)
-	assert.Len(t, tieredConfig.VisionConfigs, 1)
+	cfg := consts.GetTieredAIConfig()
+	require.NotNil(t, cfg)
+	assert.True(t, cfg.Enabled)
+	assert.Equal(t, consts.PolicyPerformance, cfg.RoutingPolicy)
+	assert.True(t, cfg.DisableFallback)
+	assert.Len(t, cfg.IntelligentConfigs, 1)
+	assert.Len(t, cfg.LightweightConfigs, 1)
+	assert.Len(t, cfg.VisionConfigs, 1)
 	assert.True(t, IsConfigLoaded())
 }
 
-func TestLoadTieredConfigFromNetworkConfig_EmptyPolicy(t *testing.T) {
-	// Save original state
-	originalConfig := consts.GetTieredAIConfig()
-	defer func() {
-		consts.SetTieredAIConfig(originalConfig)
-		ResetConfigLoaded()
-	}()
-
-	// Reset state
+func TestLoadTieredConfigFromNetworkConfig_Disabled(t *testing.T) {
+	saveAndRestore(t)
 	consts.SetTieredAIConfig(nil)
 	ResetConfigLoaded()
 
-	// Create a network config with no TieredAIModelConfig
+	networkConfig := &ypb.GlobalNetworkConfig{
+		EnableTieredAIModelConfig: false,
+		TieredAIModelConfig: &ypb.TieredAIModelConfigDescriptor{
+			ModelRoutingPolicy: "balance",
+		},
+	}
+
+	loadTieredConfigFromNetworkConfig(networkConfig)
+
+	cfg := consts.GetTieredAIConfig()
+	require.NotNil(t, cfg)
+	assert.False(t, cfg.Enabled, "DB says disabled, must be respected")
+	assert.True(t, IsConfigLoaded())
+	assert.False(t, consts.IsTieredAIModelConfigEnabled())
+}
+
+func TestLoadTieredConfigFromNetworkConfig_EmptyPolicy(t *testing.T) {
+	saveAndRestore(t)
+	consts.SetTieredAIConfig(nil)
+	ResetConfigLoaded()
+
 	networkConfig := &ypb.GlobalNetworkConfig{
 		EnableTieredAIModelConfig: true,
 		IntelligentAIModelConfig: []*ypb.ThirdPartyApplicationConfig{
@@ -132,30 +118,149 @@ func TestLoadTieredConfigFromNetworkConfig_EmptyPolicy(t *testing.T) {
 		},
 	}
 
-	// Load config
 	loadTieredConfigFromNetworkConfig(networkConfig)
 
-	// Verify default policy is balance
-	tieredConfig := consts.GetTieredAIConfig()
-	assert.NotNil(t, tieredConfig)
-	assert.Equal(t, consts.PolicyBalance, tieredConfig.RoutingPolicy)
+	cfg := consts.GetTieredAIConfig()
+	require.NotNil(t, cfg)
+	assert.Equal(t, consts.PolicyBalance, cfg.RoutingPolicy)
 }
 
 func TestLoadTieredConfigFromNetworkConfig_NilConfig(t *testing.T) {
-	// Save original state
-	originalConfig := consts.GetTieredAIConfig()
-	defer func() {
-		consts.SetTieredAIConfig(originalConfig)
-		ResetConfigLoaded()
-	}()
-
-	// Reset state
+	saveAndRestore(t)
 	consts.SetTieredAIConfig(nil)
 	ResetConfigLoaded()
 
-	// Load nil config should not panic
 	loadTieredConfigFromNetworkConfig(nil)
-
-	// Config should still be nil
 	assert.Nil(t, consts.GetTieredAIConfig())
+}
+
+// DB returns enabled config with performance policy.
+func TestEnsureConfigLoaded_DBEnabled(t *testing.T) {
+	saveAndRestore(t)
+	setupTempYakitHome(t)
+
+	SetNetworkConfigGetter(func() *ypb.GlobalNetworkConfig {
+		return &ypb.GlobalNetworkConfig{
+			EnableTieredAIModelConfig: true,
+			TieredAIModelConfig: &ypb.TieredAIModelConfigDescriptor{
+				ModelRoutingPolicy: "performance",
+			},
+			IntelligentAIModelConfig: []*ypb.ThirdPartyApplicationConfig{
+				{Type: "aibalance", APIKey: "db-key"},
+			},
+		}
+	})
+	consts.SetTieredAIConfig(nil)
+	ResetConfigLoaded()
+
+	EnsureConfigLoaded()
+
+	cfg := consts.GetTieredAIConfig()
+	require.NotNil(t, cfg)
+	assert.True(t, cfg.Enabled)
+	assert.Equal(t, consts.PolicyPerformance, cfg.RoutingPolicy)
+	assert.True(t, IsConfigLoaded())
+	assert.True(t, consts.IsTieredAIModelConfigEnabled())
+}
+
+// DB returns disabled config. Must be respected -- defaults must NOT override.
+func TestEnsureConfigLoaded_DBDisabled(t *testing.T) {
+	saveAndRestore(t)
+	setupTempYakitHome(t)
+
+	SetNetworkConfigGetter(func() *ypb.GlobalNetworkConfig {
+		return &ypb.GlobalNetworkConfig{
+			EnableTieredAIModelConfig: false,
+			TieredAIModelConfig: &ypb.TieredAIModelConfigDescriptor{
+				ModelRoutingPolicy: "balance",
+			},
+		}
+	})
+	consts.SetTieredAIConfig(nil)
+	ResetConfigLoaded()
+
+	EnsureConfigLoaded()
+
+	cfg := consts.GetTieredAIConfig()
+	require.NotNil(t, cfg)
+	assert.False(t, cfg.Enabled, "DB disabled config must NOT be overridden by defaults")
+	assert.True(t, IsConfigLoaded())
+	assert.False(t, consts.IsTieredAIModelConfigEnabled())
+}
+
+// No DB config, no in-memory config -> built-in defaults should be loaded.
+func TestEnsureConfigLoaded_NoConfig_LoadsDefaults(t *testing.T) {
+	saveAndRestore(t)
+	setupTempYakitHome(t)
+
+	SetNetworkConfigGetter(func() *ypb.GlobalNetworkConfig { return nil })
+	consts.SetTieredAIConfig(nil)
+	ResetConfigLoaded()
+
+	EnsureConfigLoaded()
+
+	cfg := consts.GetTieredAIConfig()
+	require.NotNil(t, cfg)
+	assert.True(t, cfg.Enabled, "built-in defaults should have enabled: true")
+	assert.True(t, IsConfigLoaded())
+	assert.True(t, consts.IsTieredAIModelConfigEnabled())
+	assert.NotEmpty(t, cfg.IntelligentConfigs)
+	assert.NotEmpty(t, cfg.LightweightConfigs)
+	assert.NotEmpty(t, cfg.VisionConfigs)
+}
+
+// Config file on disk must be IGNORED by EnsureConfigLoaded.
+// Even when DB says disabled, a file saying enabled must not take effect.
+func TestEnsureConfigLoaded_ConfigFileIgnored(t *testing.T) {
+	saveAndRestore(t)
+	yakitHome := setupTempYakitHome(t)
+	writeConfigFile(t, yakitHome, `
+enabled: true
+routing_policy: performance
+intelligent_configs:
+  - type: aibalance
+    api_key: file-key
+    domain: file.example.com
+    model: file-model
+`)
+
+	SetNetworkConfigGetter(func() *ypb.GlobalNetworkConfig {
+		return &ypb.GlobalNetworkConfig{
+			EnableTieredAIModelConfig: false,
+			TieredAIModelConfig: &ypb.TieredAIModelConfigDescriptor{
+				ModelRoutingPolicy: "balance",
+			},
+		}
+	})
+	consts.SetTieredAIConfig(nil)
+	ResetConfigLoaded()
+
+	EnsureConfigLoaded()
+
+	cfg := consts.GetTieredAIConfig()
+	require.NotNil(t, cfg)
+	assert.False(t, cfg.Enabled, "config file must NOT override DB config")
+	assert.Equal(t, consts.PolicyBalance, cfg.RoutingPolicy, "policy from DB, not from file")
+	assert.True(t, IsConfigLoaded())
+}
+
+// In-memory config already loaded (e.g. by ConfigureNetWork during DB init).
+// EnsureConfigLoaded must not clobber it.
+func TestEnsureConfigLoaded_AlreadyLoaded(t *testing.T) {
+	saveAndRestore(t)
+
+	SetNetworkConfigGetter(func() *ypb.GlobalNetworkConfig { return nil })
+	consts.SetTieredAIConfig(&consts.TieredAIConfig{
+		Enabled:       true,
+		RoutingPolicy: consts.PolicyPerformance,
+	})
+	ResetConfigLoaded()
+
+	EnsureConfigLoaded()
+
+	cfg := consts.GetTieredAIConfig()
+	require.NotNil(t, cfg)
+	assert.True(t, cfg.Enabled)
+	assert.Equal(t, consts.PolicyPerformance, cfg.RoutingPolicy)
+	assert.True(t, IsConfigLoaded())
 }

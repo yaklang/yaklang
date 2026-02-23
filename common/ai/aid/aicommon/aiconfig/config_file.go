@@ -7,7 +7,9 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"gopkg.in/yaml.v3"
 )
@@ -138,6 +140,41 @@ func ResolveConfigFilePath(specified string) string {
 		}
 	}
 	return filepath.Join(GetDefaultConfigDir(), "tiered-ai-config.yaml")
+}
+
+// SaveTieredAIConfigToDB merges the given TieredAIConfigFile into the database
+// GlobalNetworkConfig and persists it. This is the authoritative way to update
+// tiered AI configuration -- all runtime reads should come from the database.
+func SaveTieredAIConfigToDB(cfg *TieredAIConfigFile) error {
+	networkConfig := yakit.GetNetworkConfig()
+	if networkConfig == nil {
+		networkConfig = yakit.GetDefaultNetworkConfig()
+	}
+
+	networkConfig.EnableTieredAIModelConfig = cfg.Enabled
+
+	if networkConfig.TieredAIModelConfig == nil {
+		networkConfig.TieredAIModelConfig = &ypb.TieredAIModelConfigDescriptor{}
+	}
+	networkConfig.TieredAIModelConfig.ModelRoutingPolicy = cfg.RoutingPolicy
+	networkConfig.TieredAIModelConfig.DisableFallbackToLightweightModel = cfg.DisableFallback
+
+	networkConfig.IntelligentAIModelConfig = nil
+	for _, e := range cfg.IntelligentConfigs {
+		networkConfig.IntelligentAIModelConfig = append(networkConfig.IntelligentAIModelConfig, ConfigEntryToThirdPartyConfig(e))
+	}
+	networkConfig.LightweightAIModelConfig = nil
+	for _, e := range cfg.LightweightConfigs {
+		networkConfig.LightweightAIModelConfig = append(networkConfig.LightweightAIModelConfig, ConfigEntryToThirdPartyConfig(e))
+	}
+	networkConfig.VisionAIModelConfig = nil
+	for _, e := range cfg.VisionConfigs {
+		networkConfig.VisionAIModelConfig = append(networkConfig.VisionAIModelConfig, ConfigEntryToThirdPartyConfig(e))
+	}
+
+	yakit.ConfigureNetWork(networkConfig)
+	log.Infof("tiered AI config saved to database: enabled=%v, policy=%s", cfg.Enabled, cfg.RoutingPolicy)
+	return nil
 }
 
 func LoadTieredAIConfigFile(path string) (*TieredAIConfigFile, error) {
