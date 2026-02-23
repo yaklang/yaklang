@@ -2571,6 +2571,17 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 		opts = append(opts, WithSeqIdProvider(i.SeqIdProvider))
 	}
 
+	// Propagate tiered AI callbacks so child configs (coordinator, P&E sub-invokers)
+	// inherit the speed/quality priority distinction from the parent config.
+	if i.SpeedPriorityAICallback != nil {
+		speedCb := i.SpeedPriorityAICallback
+		opts = append(opts, WithSpeedPriorityAICallback(speedCb))
+	}
+	if i.QualityPriorityAICallback != nil {
+		qualityCb := i.QualityPriorityAICallback
+		opts = append(opts, WithQualityPriorityAICallback(qualityCb))
+	}
+
 	// Propagate intent recognition disable flag so sub-loops (PE task, plan)
 	// do not accidentally run deep intent recognition in test environments.
 	if i.DisableIntentRecognition {

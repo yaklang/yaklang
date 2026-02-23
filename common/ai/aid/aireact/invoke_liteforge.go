@@ -43,9 +43,13 @@ func (r *ReAct) invokeLiteForgeWithCallback(cb aicommon.AICallbackType, ctx cont
 	if err != nil {
 		return nil, utils.Wrap(err, "create liteforge failed")
 	}
+	execCb := cb
+	if utils.IsNil(execCb) {
+		execCb = r.config.OriginalAICallback
+	}
 	forgeResult, err := f.Execute(ctx, []*ypb.ExecParamItem{
 		{Key: "query", Value: prompt},
-	}, aicommon.WithAgreeYOLO(), aicommon.WithAICallback(r.config.OriginalAICallback))
+	}, aicommon.WithAgreeYOLO(), aicommon.WithAICallback(execCb))
 	if err != nil {
 		return nil, utils.Wrap(err, "invoke liteforge failed")
 	}
