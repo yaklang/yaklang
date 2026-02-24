@@ -252,6 +252,24 @@ func (v *SyntaxFlowVisitor) EmitCondition() {
 	})
 }
 
+func (v *SyntaxFlowVisitor) EmitFilterCondition() {
+	v.codes = append(v.codes, &SFI{
+		OpCode: OpFilterCondition,
+	})
+}
+
+func (v *SyntaxFlowVisitor) EmitConditionScopeStart() {
+	v.codes = append(v.codes, &SFI{
+		OpCode: OpConditionScopeStart,
+	})
+}
+
+func (v *SyntaxFlowVisitor) EmitConditionScopeEnd() {
+	v.codes = append(v.codes, &SFI{
+		OpCode: OpConditionScopeEnd,
+	})
+}
+
 func (v *SyntaxFlowVisitor) EmitEqual(i any) {
 	switch i.(type) {
 	case string:

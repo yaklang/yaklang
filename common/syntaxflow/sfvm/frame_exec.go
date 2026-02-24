@@ -32,6 +32,45 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
+func flattenValues(value ValueOperator) Values {
+	if utils.IsNil(value) {
+		return nil
+	}
+	var result Values
+	_ = value.Recursive(func(operator ValueOperator) error {
+		result = append(result, operator)
+		return nil
+	})
+	return result
+}
+
+func ensureSequentialIndex(values Values) {
+	length := len(values)
+	if length == 0 {
+		return
+	}
+	for i, value := range values {
+		if utils.IsNil(value) {
+			continue
+		}
+		idx := value.GetIndex()
+		if idx != nil && idx.Len() > 0 {
+			continue
+		}
+		mask := NewBitVector(length)
+		mask.SetBit(i, true)
+		value.SetIndex(mask)
+	}
+}
+
+func ensureIndexOnValueOperator(value ValueOperator) {
+	if utils.IsNil(value) {
+		return
+	}
+	values := flattenValues(value)
+	ensureSequentialIndex(values)
+}
+
 func recursiveDeepChain(element ValueOperator, handle func(operator ValueOperator) bool, visited map[int64]struct{}) error {
 	if visited == nil {
 		visited = make(map[int64]struct{})
@@ -405,11 +444,11 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 		conds1 := s.conditionStack.Pop()
 		conds2 := s.conditionStack.Pop()
 		if len(conds1) != len(conds2) {
-			return true, utils.Errorf("condition failed: stack top(%v) vs conds(%v)", len(conds1), len(conds2))
+			return true, utils.Wrapf(CriticalError, "condition failed: conds1(%v) vs conds2(%v)", len(conds1), len(conds2))
 		}
-		res := make([]bool, 0, len(conds1))
+		res := make([]bool, len(conds1))
 		for i := 0; i < len(conds1); i++ {
-			res = append(res, conds1[i] && conds2[i])
+			res[i] = conds1[i] && conds2[i]
 		}
 		s.conditionStack.Push(res)
 		return true, nil
@@ -417,11 +456,11 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 		conds1 := s.conditionStack.Pop()
 		conds2 := s.conditionStack.Pop()
 		if len(conds1) != len(conds2) {
-			return true, utils.Errorf("condition failed: stack top(%v) vs conds(%v)", len(conds1), len(conds2))
+			return true, utils.Wrapf(CriticalError, "condition failed: conds1(%v) vs conds2(%v)", len(conds1), len(conds2))
 		}
-		res := make([]bool, 0, len(conds1))
+		res := make([]bool, len(conds1))
 		for i := 0; i < len(conds1); i++ {
-			res = append(res, conds1[i] || conds2[i])
+			res[i] = conds1[i] || conds2[i]
 		}
 		s.conditionStack.Push(res)
 		return true, nil
@@ -429,41 +468,106 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 		s.debugSubLog(">> pop")
 		vs := s.stack.Pop()
 		if vs == nil {
-			return true, utils.Wrap(CriticalError, "BUG: get stack top failed, empty stack")
+			return true, utils.Wrap(CriticalError, "condition failed: stack top is empty")
 		}
 		conds := s.conditionStack.Pop()
 		if len(conds) != ValuesLen(vs) {
 			return true, utils.Wrapf(CriticalError, "condition failed: stack top(%v) vs conds(%v)", ValuesLen(vs), len(conds))
 		}
-		//log.Infof("condition: %v", conds)
-		res := make([]ValueOperator, 0, ValuesLen(vs))
-		for i := 0; i < len(conds); i++ {
-			if conds[i] {
-				if v, err := vs.ListIndex(i); err == nil {
+		var res Values
+		if vals, ok := vs.(Values); ok {
+			for i, v := range vals {
+				if conds[i] {
 					res = append(res, v)
 				}
 			}
+		} else {
+			if len(conds) != 1 {
+				return true, utils.Wrapf(CriticalError, "condition failed: stack top should be only one value: [%v]", ValuesLen(vs))
+			}
+			if conds[0] {
+				res = append(res, vs)
+			}
 		}
-		s.stack.Push(NewValues(res))
+		s.stack.Push(res)
+		return true, nil
+	case OpFilterCondition:
+		s.debugSubLog(">> pop condition values")
+		cond := s.stack.Pop()
+		if cond == nil {
+			return true, utils.Wrap(CriticalError, "filter condition failed: empty condition")
+		}
+		s.debugSubLog(">> pop source values")
+		source := s.stack.Pop()
+		if source == nil {
+			return true, utils.Wrap(CriticalError, "filter condition failed: empty source")
+		}
+
+		srcValues := flattenValues(source)
+		ensureSequentialIndex(srcValues)
+		sourceByID := make(map[int64][]int, len(srcValues))
+		for i, src := range srcValues {
+			if utils.IsNil(src) {
+				continue
+			}
+			if idGetter, ok := src.(ssa.GetIdIF); ok {
+				sourceByID[idGetter.GetId()] = append(sourceByID[idGetter.GetId()], i)
+			}
+		}
+
+		mask := make([]bool, len(srcValues))
+		_ = cond.Recursive(func(operator ValueOperator) error {
+			if utils.IsNil(operator) {
+				return nil
+			}
+			bools, err := operator.ToBool()
+			if err != nil {
+				return err
+			}
+			truthy := len(bools) > 0 && bools[0]
+			if !truthy {
+				return nil
+			}
+			if idGetter, ok := operator.(ssa.GetIdIF); ok {
+				if positions, existed := sourceByID[idGetter.GetId()]; existed {
+					for _, pos := range positions {
+						if pos >= 0 && pos < len(mask) {
+							mask[pos] = true
+						}
+					}
+					return nil
+				}
+			}
+			idx := operator.GetIndex()
+			if idx == nil || idx.Len() == 0 {
+				if len(mask) == 1 {
+					mask[0] = true
+				}
+				return nil
+			}
+			for i := 0; i < len(mask) && i < idx.Len(); i++ {
+				if idx.GetBit(i) {
+					mask[i] = true
+				}
+			}
+			return nil
+		})
+
+		var filtered Values
+		for i, val := range srcValues {
+			if i < len(mask) && mask[i] {
+				filtered = append(filtered, val)
+			}
+		}
+		s.conditionStack.Push(mask)
+		s.stack.Push(filtered)
 		return true, nil
 	case OpCheckEmpty:
-		if i.Iter == nil {
-			return true, utils.Wrap(CriticalError, "check empty failed: stack top is empty")
-		}
-		index := i.Iter.currentIndex
-		conditions := s.conditionStack.Peek()
-		//如果是null
-		val := s.stack.Pop()
-		if len(conditions) == index+1 && !conditions[index] {
+		if s.stack.Len() == 0 {
 			return true, nil
 		}
-		conditions = s.conditionStack.Pop()
-		if len(conditions) < index+1 {
-			return true, utils.Errorf("check empty failed: stack top is empty")
-		}
-		conditions[index] = !val.IsEmpty()
-		s.conditionStack.Push(conditions)
-		s.popStack.Free()
+		val := s.stack.Peek()
+		s.conditionStack.Push([]bool{!val.IsEmpty()})
 		return true, nil
 	default:
 		return false, nil
@@ -904,6 +1008,7 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 		}
 		s.debugSubLog(">> duplicate (stack grow)")
 		v := s.stack.Peek()
+		ensureIndexOnValueOperator(v)
 		s.stack.Push(v)
 		return true, nil
 	case OpPopDuplicate:
@@ -1002,7 +1107,7 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 		//	}
 		//	m[item.Key] = item.Value
 		//})
-		s.result.AlertSymbolTable.Set(i.UnaryStr, value)
+		s.result.AlertSymbolTable.Set(i.UnaryStr, NewValues([]ValueOperator{value}))
 		//alStr := i.ValueByIndex(0)
 		//if alStr != "" {
 		//	m["__extra__"] = alStr
@@ -1151,27 +1256,27 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 		if ruleLabel != "" {
 			name += ":" + ruleLabel
 		}
-			var (
-				ret ValueOperator
-				ok  bool
-			)
-			if trackErr := diagnostics.TrackLow(name, func() error {
-				s.debugSubLog(">> pop")
-				value := s.stack.Pop()
+		var (
+			ret ValueOperator
+			ok  bool
+		)
+		if trackErr := diagnostics.TrackLow(name, func() error {
+			s.debugSubLog(">> pop")
+			value := s.stack.Pop()
 			if value == nil {
 				return utils.Wrap(CriticalError, "native call failed: stack top is empty")
 			}
 
-				s.debugSubLog("native call: [%v]", i.UnaryStr)
-				call, err := GetNativeCall(i.UnaryStr)
-				if err != nil {
-					s.debugSubLog("Err: %v", err)
-					log.Errorf("native call failed, not an existed native call[%v]: %v", i.UnaryStr, err)
-					s.stack.Push(NewEmptyValues())
-					return utils.Errorf("get native call failed: %v", err)
-				}
+			s.debugSubLog("native call: [%v]", i.UnaryStr)
+			call, err := GetNativeCall(i.UnaryStr)
+			if err != nil {
+				s.debugSubLog("Err: %v", err)
+				log.Errorf("native call failed, not an existed native call[%v]: %v", i.UnaryStr, err)
+				s.stack.Push(NewEmptyValues())
+				return utils.Errorf("get native call failed: %v", err)
+			}
 
-				ok, ret, err = call(value, s, NewNativeCallActualParams(i.SyntaxFlowConfig...))
+			ok, ret, err = call(value, s, NewNativeCallActualParams(i.SyntaxFlowConfig...))
 			if err != nil || !ok {
 				s.debugSubLog("No Result in [%v]", i.UnaryStr)
 				s.stack.Push(NewEmptyValues())
