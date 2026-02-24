@@ -234,7 +234,7 @@ func (s *ScanNode) handleSSAStream(reporter *ScannerAgentReporter, info string) 
 		if r == nil || strings.TrimSpace(r.RiskHash) == "" || len(r.RiskJSON) == 0 {
 			continue
 		}
-		ev := &spec.StreamRiskEvent{
+		ev := &spec.SSAStreamRiskEvent{
 			RiskHash:       r.RiskHash,
 			ProgramName:    parts.ProgramName,
 			ReportType:     parts.ReportType,
