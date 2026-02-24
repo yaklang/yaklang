@@ -1348,6 +1348,10 @@ func WithMemoryTriage(mt MemoryTriage) ConfigOption {
 	}
 }
 
+func WithNoOpMemoryTriage() ConfigOption {
+	return WithMemoryTriage(NewNoOpMemoryTriage())
+}
+
 func WithMemoryPoolSize(sz int64) ConfigOption {
 	return func(c *Config) error {
 		if sz < 0 {

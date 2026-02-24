@@ -27,6 +27,7 @@ func TestPlanRetry(t *testing.T) {
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			outputChan <- e
 		}),
+		aicommon.WithNoOpMemoryTriage(),
 		aicommon.WithAIAutoRetry(2),
 		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			count++
@@ -128,22 +129,20 @@ func testRecoverPlanRetry(t *testing.T, uid string) {
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			outputChan <- e
 		}),
+		aicommon.WithNoOpMemoryTriage(),
 		aicommon.WithAIAutoRetry(2),
 		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			count++
-			// 修复：让恢复测试能够成功，而不是总是失败
 			rsp := config.NewAIResponse()
 			prompt := req.GetPrompt()
 
 			if strings.Contains(prompt, "角色设定") && strings.Contains(prompt, "任务执行助手") {
-				// 任务执行请求
 				rsp.EmitOutputStream(strings.NewReader(`{
     "@action": "direct-answer",
     "direct_answer": "测试任务已完成，已成功扫描指定目录并找到最大文件",
     "direct_answer_long": "这是一个用于测试AI基础设施恢复功能的模拟响应。任务执行过程：1) 已递归扫描目录；2) 已获取所有文件信息；3) 已成功识别出最大的文件。测试任务已成功完成。"
 }`))
 			} else {
-				// 计划请求或其他请求
 				rsp.EmitOutputStream(strings.NewReader(`{
     "@action": "plan",
     "query": "找出 /Users/v1ll4n/Projects/yaklang 目录中最大的文件",

@@ -34,6 +34,26 @@ type MemoryTriage interface {
 	GetSessionID() string
 }
 
+// noOpMemoryTriage is a MemoryTriage implementation that does nothing.
+// Used in tests and scenarios where memory processing is not needed.
+type noOpMemoryTriage struct{}
+
+func NewNoOpMemoryTriage() MemoryTriage                                           { return &noOpMemoryTriage{} }
+func (n *noOpMemoryTriage) SetInvoker(AIInvokeRuntime)                            {}
+func (n *noOpMemoryTriage) AddRawText(string) ([]*MemoryEntity, error)            { return nil, nil }
+func (n *noOpMemoryTriage) SaveMemoryEntities(...*MemoryEntity) error             { return nil }
+func (n *noOpMemoryTriage) SearchBySemantics(string, int) ([]*SearchResult, error) { return nil, nil }
+func (n *noOpMemoryTriage) SearchByTags([]string, bool, int) ([]*MemoryEntity, error) {
+	return nil, nil
+}
+func (n *noOpMemoryTriage) HandleMemory(any) error                                 { return nil }
+func (n *noOpMemoryTriage) SearchMemory(any, int) (*SearchMemoryResult, error)     { return &SearchMemoryResult{}, nil }
+func (n *noOpMemoryTriage) SearchMemoryWithoutAI(any, int) (*SearchMemoryResult, error) {
+	return &SearchMemoryResult{}, nil
+}
+func (n *noOpMemoryTriage) Close() error      { return nil }
+func (n *noOpMemoryTriage) GetSessionID() string { return "noop" }
+
 type ForgeQueryConfig struct {
 	Filter *ypb.AIForgeFilter
 	Paging *ypb.Paging
