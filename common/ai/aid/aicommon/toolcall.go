@@ -44,14 +44,24 @@ type ToolCaller struct {
 	onCallToolStart func(callToolId string)
 	onCallToolEnd   func(callToolId string)
 
-	intervalReviewHandler  func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdoutSnapshot, stderrSnapshot []byte) (bool, error)
+	intervalReviewHandler  func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdoutSnapshot, stderrSnapshot []byte, callExpectations string) (bool, error)
 	intervalReviewDuration time.Duration // interval duration for review, default is 20 seconds
 
 	reviewWrongToolHandler  func(ctx context.Context, tool *aitool.Tool, newToolName, keyword string) (*aitool.Tool, bool, error)
 	reviewWrongParamHandler func(ctx context.Context, tool *aitool.Tool, oldParam aitool.InvokeParams, suggestion string) (aitool.InvokeParams, error)
+
+	callExpectations string
 }
 
+const ReservedKeyCallExpectations = "__call_expectations__"
+
 type ToolCallerOption func(tc *ToolCaller)
+
+func WithToolCaller_CallExpectations(expectations string) ToolCallerOption {
+	return func(tc *ToolCaller) {
+		tc.callExpectations = expectations
+	}
+}
 
 func WithToolCaller_ReviewWrongTool(
 	handler func(ctx context.Context, tool *aitool.Tool, newToolName, keyword string) (*aitool.Tool, bool, error),
@@ -73,7 +83,7 @@ func WithToolCaller_ReviewWrongParam(
 // The handler is called periodically during tool execution to review the progress.
 // If the handler returns false, the tool execution will be cancelled.
 func WithToolCaller_IntervalReviewHandler(
-	handler func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdoutSnapshot, stderrSnapshot []byte) (bool, error),
+	handler func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdoutSnapshot, stderrSnapshot []byte, callExpectations string) (bool, error),
 ) ToolCallerOption {
 	return func(tc *ToolCaller) {
 		tc.intervalReviewHandler = handler
@@ -223,10 +233,11 @@ func (t *ToolCaller) CallTool(tool *aitool.Tool) (result *aitool.ToolResult, dir
 
 // GenerateParamsResult contains the result of generateParams including params and identifier
 type GenerateParamsResult struct {
-	Params        aitool.InvokeParams
-	Identifier    string        // destination identifier, e.g. "query_large_file", "find_process"
-	Duration      time.Duration // time spent generating params via AI
-	RawAIResponse string        // raw AI stream output for param generation
+	Params           aitool.InvokeParams
+	Identifier       string        // destination identifier, e.g. "query_large_file", "find_process"
+	Duration         time.Duration // time spent generating params via AI
+	RawAIResponse    string        // raw AI stream output for param generation
+	CallExpectations string        // AI-generated expectations for this tool call (timing, success criteria, etc.)
 }
 
 func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) (*GenerateParamsResult, error) {
@@ -256,6 +267,7 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 
 	invokeParams := aitool.InvokeParams{}
 	var identifier string
+	var callExpectations string
 	var paramDuration time.Duration
 	var rawAIResponse string
 	err = CallAITransaction(t.config, paramsPrompt, func(request *AIRequest) (*AIResponse, error) {
@@ -331,6 +343,11 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 			log.Debugf("extracted identifier[%s] for tool[%s]", identifier, tool.Name)
 		}
 
+		callExpectations = callToolAction.GetString("call_expectations")
+		if callExpectations != "" {
+			log.Debugf("extracted call_expectations for tool[%s]: %s", tool.Name, callExpectations)
+		}
+
 		// First, get params from JSON
 		for k, v := range callToolAction.GetInvokeParams("params") {
 			invokeParams.Set(k, v)
@@ -355,10 +372,11 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 		return nil, err
 	}
 	return &GenerateParamsResult{
-		Params:        invokeParams,
-		Identifier:    identifier,
-		Duration:      paramDuration,
-		RawAIResponse: rawAIResponse,
+		Params:           invokeParams,
+		Identifier:       identifier,
+		Duration:         paramDuration,
+		RawAIResponse:    rawAIResponse,
+		CallExpectations: callExpectations,
 	}, nil
 }
 
@@ -507,6 +525,10 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 	var rawAIParamResponse string
 	if presetParams {
 		invokeParams = presetInvokeParams
+		if ce, ok := invokeParams[ReservedKeyCallExpectations]; ok {
+			t.callExpectations = utils.InterfaceToString(ce)
+			delete(invokeParams, ReservedKeyCallExpectations)
+		}
 		t.emitter.EmitInfo("use preset params for tool[%v]: %v", tool.Name, invokeParams)
 	} else {
 		generateResult, err := t.generateParams(tool, handleError)
@@ -517,6 +539,7 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 		destinationIdentifier = generateResult.Identifier
 		paramGenDuration = generateResult.Duration
 		rawAIParamResponse = generateResult.RawAIResponse
+		t.callExpectations = generateResult.CallExpectations
 		if destinationIdentifier != "" {
 			t.emitter.EmitInfo("tool[%v] destination identifier: %v", tool.Name, destinationIdentifier)
 		}

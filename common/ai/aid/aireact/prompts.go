@@ -756,6 +756,8 @@ type IntervalReviewPromptData struct {
 
 	// Schema
 	Schema string
+
+	CallExpectations string
 }
 
 // GenerateIntervalReviewPrompt generates interval review prompt for long-running tool execution
@@ -764,7 +766,7 @@ func (pm *PromptManager) GenerateIntervalReviewPrompt(
 	params aitool.InvokeParams,
 	stdoutSnapshot, stderrSnapshot []byte,
 ) (string, error) {
-	return pm.GenerateIntervalReviewPromptWithContext(tool, params, stdoutSnapshot, stderrSnapshot, time.Time{}, 0)
+	return pm.GenerateIntervalReviewPromptWithContext(tool, params, stdoutSnapshot, stderrSnapshot, time.Time{}, 0, "")
 }
 
 // GenerateIntervalReviewPromptWithContext generates interval review prompt with additional context
@@ -774,16 +776,18 @@ func (pm *PromptManager) GenerateIntervalReviewPromptWithContext(
 	stdoutSnapshot, stderrSnapshot []byte,
 	startTime time.Time,
 	reviewCount int,
+	callExpectations string,
 ) (string, error) {
 	data := &IntervalReviewPromptData{
-		ToolName:        tool.Name,
-		ToolDescription: tool.Description,
-		ToolParams:      params.Dump(),
-		CurrentTime:     time.Now().Format("2006-01-02 15:04:05"),
-		StdoutSnapshot:  utils.ShrinkString(string(stdoutSnapshot), 3000),
-		StderrSnapshot:  utils.ShrinkString(string(stderrSnapshot), 1500),
-		Schema:          intervalReviewSchemaJSON,
-		ReviewCount:     reviewCount,
+		ToolName:         tool.Name,
+		ToolDescription:  tool.Description,
+		ToolParams:       params.Dump(),
+		CurrentTime:      time.Now().Format("2006-01-02 15:04:05"),
+		StdoutSnapshot:   utils.ShrinkString(string(stdoutSnapshot), 3000),
+		StderrSnapshot:   utils.ShrinkString(string(stderrSnapshot), 1500),
+		Schema:           intervalReviewSchemaJSON,
+		ReviewCount:      reviewCount,
+		CallExpectations: callExpectations,
 	}
 
 	// Calculate elapsed duration

@@ -38,12 +38,14 @@ func ConvertAIToolToLoopAction(tool *aitool.Tool) *LoopAction {
 		}
 
 		// Case 4 & 5: No "params" field, extract all non-metadata fields
-		// Filter out metadata fields (@action, tool, params)
+		// Filter out metadata fields (@action, tool, params, call_expectations, identifier)
 		cleanParams := make(map[string]any)
 		metadataFields := map[string]bool{
-			"@action": true,
-			"tool":    true,
-			"params":  true,
+			"@action":           true,
+			"tool":              true,
+			"params":            true,
+			"call_expectations": true,
+			"identifier":        true,
 		}
 
 		for key, value := range allParams {
@@ -125,6 +127,11 @@ func ConvertAIToolToLoopAction(tool *aitool.Tool) *LoopAction {
 						invokeParams[paramName] = boolVal
 					}
 				}
+			}
+
+			callExpectations := action.GetString("call_expectations")
+			if callExpectations != "" {
+				invokeParams[aicommon.ReservedKeyCallExpectations] = callExpectations
 			}
 
 			// Get context

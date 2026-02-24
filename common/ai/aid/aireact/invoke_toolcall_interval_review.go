@@ -23,6 +23,7 @@ func (r *ReAct) _invokeToolCall_IntervalReviewWithContext(
 	stdoutSnapshot, stderrSnapshot []byte,
 	startTime time.Time,
 	reviewCount int,
+	callExpectations string,
 ) (bool, error) {
 	// Check context at the beginning
 	select {
@@ -36,7 +37,7 @@ func (r *ReAct) _invokeToolCall_IntervalReviewWithContext(
 
 	// Generate the interval review prompt with full context
 	prompt, err := r.promptManager.GenerateIntervalReviewPromptWithContext(
-		tool, params, stdoutSnapshot, stderrSnapshot, startTime, reviewCount,
+		tool, params, stdoutSnapshot, stderrSnapshot, startTime, reviewCount, callExpectations,
 	)
 	if err != nil {
 		log.Errorf("failed to generate interval review prompt: %v", err)
@@ -122,7 +123,7 @@ func (r *ReAct) _invokeToolCall_IntervalReviewWithContext(
 // This handler will be called periodically during tool execution to check if it should continue.
 // Returns nil if interval review is disabled.
 // The handler maintains its own state (start time and review count) in a closure.
-func (r *ReAct) CreateIntervalReviewHandler() func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdoutSnapshot, stderrSnapshot []byte) (bool, error) {
+func (r *ReAct) CreateIntervalReviewHandler() func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdoutSnapshot, stderrSnapshot []byte, callExpectations string) (bool, error) {
 	if r.config.DisableIntervalReview {
 		return nil
 	}
@@ -131,7 +132,7 @@ func (r *ReAct) CreateIntervalReviewHandler() func(ctx context.Context, tool *ai
 	var startTime time.Time
 	var reviewCount int32
 
-	return func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdoutSnapshot, stderrSnapshot []byte) (bool, error) {
+	return func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdoutSnapshot, stderrSnapshot []byte, callExpectations string) (bool, error) {
 		// Initialize start time on first call
 		if startTime.IsZero() {
 			startTime = time.Now()
@@ -140,7 +141,7 @@ func (r *ReAct) CreateIntervalReviewHandler() func(ctx context.Context, tool *ai
 		// Increment review count
 		count := int(atomic.AddInt32(&reviewCount, 1))
 
-		return r._invokeToolCall_IntervalReviewWithContext(ctx, tool, params, stdoutSnapshot, stderrSnapshot, startTime, count)
+		return r._invokeToolCall_IntervalReviewWithContext(ctx, tool, params, stdoutSnapshot, stderrSnapshot, startTime, count, callExpectations)
 	}
 }
 

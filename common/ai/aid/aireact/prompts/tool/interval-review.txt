@@ -29,6 +29,10 @@ User query not available.
 ```json
 {{ .ToolParams }}
 ```
+{{ if .CallExpectations }}
+### Call Expectations (AI-generated pre-execution predictions)
+{{ .CallExpectations }}
+{{ end }}
 
 ## Current Output Snapshot
 

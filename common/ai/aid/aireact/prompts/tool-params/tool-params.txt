@@ -82,11 +82,18 @@ RESPONSE FORMAT: Respond with a JSON object following the @action pattern(Exampl
   "params": {
     "param1": "value1",
     "param2": "value2"
-  }
+  },
+  "call_expectations": "Estimated ~5s. If timeout, force stop and retry with adjusted params. Success: returns valid data matching the query. Failure: adjust strategy and try alternative params."
 }
 ```
 
 **IMPORTANT: The `identifier` field is REQUIRED**
+
+**OPTIONAL: The `call_expectations` field**
+- Describe estimated execution time (e.g. "~3 seconds", "may take 30+ seconds")
+- What to do if timeout occurs (force stop? wait longer? retry with different params?)
+- Success criteria (what constitutes a successful execution result)
+- Failure handling (what to do if execution fails or returns unexpected results)
 - The `identifier` should be a short, lowercase, underscore-separated string that describes the PURPOSE/INTENT of this tool call
 - Examples: `query_large_file`, `find_process`, `list_directory`, `search_log_error`, `check_disk_usage`
 - Format: use lowercase letters and underscores only (snake_case), keep it under 30 characters
@@ -102,7 +109,8 @@ For your current tool '{{ .ToolName }}':
   "params": {
     "param1": "simple_value",
     "param2": 123
-  }
+  },
+  "call_expectations": "(optional) describe expected timing, success criteria, and fallback strategy"
 }
 ```
 
