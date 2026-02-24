@@ -1,7 +1,6 @@
 package sfreport
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
@@ -15,6 +14,14 @@ var Exports = map[string]interface{}{
 	"withDataflowPath": WithDataflowPath,
 	"withFileContent":  WithFileContent,
 
+	"withStreamKey":              WithStreamKey,
+	"withStreamReportType":       WithStreamReportType,
+	"withStreamShowDataflowPath": WithStreamShowDataflowPath,
+	"withStreamShowFileContent":  WithStreamShowFileContent,
+	"withStreamWithFile":         WithStreamWithFile,
+	"withStreamDedupFileContent": WithStreamDedupFileContent,
+	"withStreamDedupDataflow":    WithStreamDedupDataflow,
+
 	// Legacy JSON export helpers (not used by the current IRify streaming path),
 	// keep for backward compatibility of external yak scripts/tools.
 	"ConvertSingleResultToJSON": func(result *ssaapi.SyntaxFlowResult, showDataflow bool) (string, error) {
@@ -24,19 +31,8 @@ var Exports = map[string]interface{}{
 		return ConvertSingleResultToJSONWithOptions(result, reportType, showDataflow, showFileContent, withFile)
 	},
 
-	"ConvertSingleResultToStreamPartsJSONPayload": func(result *ssaapi.SyntaxFlowResult, opts map[string]any) (map[string]any, error) {
-		o := StreamPartsOptions{
-			StreamKey:        utils.InterfaceToString(utils.MapGetFirstRaw(opts, "stream_key", "streamKey")),
-			ReportType:       ReportType(utils.InterfaceToString(utils.MapGetFirstRaw(opts, "report_type", "reportType"))),
-			ShowDataflowPath: utils.InterfaceToBoolean(utils.MapGetFirstRaw(opts, "show_dataflow_path", "showDataflowPath", "show_dataflow")),
-			ShowFileContent:  utils.InterfaceToBoolean(utils.MapGetFirstRaw(opts, "show_file_content", "showFileContent")),
-			WithFile:         utils.InterfaceToBoolean(utils.MapGetFirstRaw(opts, "with_file", "withFile")),
-			DedupFileContent: utils.InterfaceToBoolean(utils.MapGetFirstRaw(opts, "dedup_file_content", "dedupFileContent", "dedup_file")),
-			DedupDataflow:    utils.InterfaceToBoolean(utils.MapGetFirstRaw(opts, "dedup_dataflow", "dedupDataflow")),
-		}
-		if o.ReportType == "" {
-			o.ReportType = IRifyFullReportType
-		}
+	"ConvertSingleResultToStreamPartsJSONPayload": func(result *ssaapi.SyntaxFlowResult, opts ...StreamPartsOption) (map[string]any, error) {
+		o := NewStreamPartsOptions(opts...)
 		j, stats, err := ConvertSingleResultToStreamPartsJSON(result, o)
 		if err != nil {
 			return nil, err
