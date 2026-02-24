@@ -7,7 +7,12 @@ import (
 	"fmt"
 )
 
-// CheckJournalAvailable 检查 journalctl 是否可用
+// CheckJournalAvailable 检查 journalctl 是否可用且当前用户有权读取系统级 sshd 日志
+//
+// sshd 日志属于 system journal，非 root 用户需要加入 systemd-journal（或 adm）组才能读取。
+// 如果权限不足，journalctl 会静默返回空结果而不报错，导致监控无法捕获任何事件。
+// 本函数通过不带 -q 执行 journalctl，捕获其向 stderr 输出的权限提示来判断。
+//
 // Example:
 // ```
 // err = hids.CheckJournalAvailable()

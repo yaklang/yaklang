@@ -92,8 +92,8 @@ var Exports = map[string]interface{}{
 	"NewAuditMonitor":       NewAuditMonitor,           // 创建Audit监控器
 	"auditMonitorLogin":     WithAuditMonitorLogin,     // 设置是否监控登录事件
 	"auditMonitorCommand":   WithAuditMonitorCommand,   // 设置是否监控命令执行事件
-	"onLoginEvent":          WithOnLoginEvent,          // 设置登录事件回调
-	"onCommandEvent":        WithOnCommandEvent,        // 设置命令执行事件回调
+	"auditOnLoginEvent":     WithOnLoginEvent,          // 设置登录事件回调
+	"auditOnCommandEvent":   WithOnCommandEvent,        // 设置命令执行事件回调
 	"auditFilterUsers":      WithAuditFilterUsers,      // 按当前用户(Username)过滤
 	"auditFilterLoginUsers": WithAuditFilterLoginUsers, // 按原始登录用户(LoginUser)过滤
 	"auditFilterCommands":   WithAuditFilterCommands,   // 设置命令过滤器
