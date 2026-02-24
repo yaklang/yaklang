@@ -208,7 +208,7 @@ func buildDataflowsAndRisks(
 
 		// Collect dataflow hashes for this risk.
 		for _, p := range r.DataFlowPaths {
-			raw, err := MarshalStreamMinimalDataFlowPath(p)
+			raw, err := MarshalMinimalDataFlowPath(p)
 			if err != nil || len(raw) == 0 {
 				continue
 			}
