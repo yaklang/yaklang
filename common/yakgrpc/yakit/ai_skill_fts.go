@@ -105,7 +105,7 @@ func SearchAISkillBM25(db *gorm.DB, filter *AISkillSearchFilter, limit, offset i
 		filter.Keywords = ""
 	}
 
-	return bizhelper.SQLiteFTS5BM25Match[*schema.AISkill](FilterAISkillForSearch(db, filter), defaultAISkillFTS5, match, limit, offset)
+	return bizhelper.SQLiteFTS5BM25Match[*schema.AISkill](FilterAISkillForSearch(db, filter), defaultAISkillFTS5, []string{match}, limit, offset)
 }
 
 // CreateOrUpdateAISkill creates or updates an AISkill by name.
