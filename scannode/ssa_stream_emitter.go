@@ -67,7 +67,7 @@ func (e *StreamEmitter) EmitSSADataflow(taskId, runtimeId, subTaskId string, flo
 }
 
 // EmitSSARisk emits one risk payload. It should carry references to file/dataflow hashes.
-func (e *StreamEmitter) EmitSSARisk(taskId, runtimeId, subTaskId string, ev *spec.StreamRiskEvent) error {
+func (e *StreamEmitter) EmitSSARisk(taskId, runtimeId, subTaskId string, ev *spec.SSAStreamRiskEvent) error {
 	if !e.Enabled() {
 		return nil
 	}
@@ -112,7 +112,7 @@ func (e *StreamEmitter) EmitSSARisk(taskId, runtimeId, subTaskId string, ev *spe
 	state.lastActivity = time.Now()
 	state.emitStartOnce(e, taskId, runtimeId, subTaskId, programName, reportType)
 
-	out := &spec.StreamRiskEvent{
+	out := &spec.SSAStreamRiskEvent{
 		RiskHash:       riskHash,
 		ProgramName:    programName,
 		ReportType:     reportType,
@@ -120,7 +120,7 @@ func (e *StreamEmitter) EmitSSARisk(taskId, runtimeId, subTaskId string, ev *spe
 		FileHashes:     ev.FileHashes,
 		DataflowHashes: ev.DataflowHashes,
 	}
-	e.emitEnvelope(taskId, runtimeId, subTaskId, spec.StreamEventRisk, out)
+	e.emitEnvelope(taskId, runtimeId, subTaskId, spec.SSAStreamEventRisk, out)
 	return nil
 }
 
@@ -146,19 +146,19 @@ func (s *taskStreamState) emitStartOnce(e *StreamEmitter, taskId, runtimeId, sub
 	s.started = true
 	s.mu.Unlock()
 
-	ev := &spec.StreamTaskStartEvent{
+	ev := &spec.SSAStreamTaskStartEvent{
 		TaskId:     taskId,
 		Program:    programName,
 		ReportType: reportType,
 	}
 	// Force seq for task_start to preserve ordering relative to risk/file/flow events.
-	e.emitEnvelopeForceSeq(taskId, runtimeId, subTaskId, spec.StreamEventTaskStart, ev)
+	e.emitEnvelopeForceSeq(taskId, runtimeId, subTaskId, spec.SSAStreamEventTaskStart, ev)
 }
 
 func (e *StreamEmitter) emitFile(fileHash string, file *sfreport.File, taskId, runtimeId, subTaskId string) {
 	rawContent := []byte(file.Content)
 	content, encoding := e.maybeCompress(rawContent)
-	meta := &spec.StreamFileMetaEvent{
+	meta := &spec.SSAStreamFileMetaEvent{
 		FileHash:    fileHash,
 		Path:        file.Path,
 		Length:      file.Length,
@@ -169,26 +169,26 @@ func (e *StreamEmitter) emitFile(fileHash string, file *sfreport.File, taskId, r
 	}
 	if e.inlineMax > 0 && len(content) > 0 && len(content) <= e.inlineMax {
 		meta.InlineContent = content
-		e.emitEnvelope(taskId, runtimeId, subTaskId, spec.StreamEventFileMeta, meta)
+		e.emitEnvelope(taskId, runtimeId, subTaskId, spec.SSAStreamEventFileMeta, meta)
 		return
 	}
-	e.emitEnvelope(taskId, runtimeId, subTaskId, spec.StreamEventFileMeta, meta)
-	e.emitChunks(taskId, runtimeId, subTaskId, spec.StreamEventFileChunk, fileHash, content)
+	e.emitEnvelope(taskId, runtimeId, subTaskId, spec.SSAStreamEventFileMeta, meta)
+	e.emitChunks(taskId, runtimeId, subTaskId, spec.SSAStreamEventFileChunk, fileHash, content)
 }
 
 func (e *StreamEmitter) emitDataflow(flowHash string, payload []byte, taskId, runtimeId, subTaskId string) {
 	rawPayload := payload
 	payload, encoding := e.maybeCompress(rawPayload)
-	meta := &spec.StreamDataflowMetaEvent{
+	meta := &spec.SSAStreamDataflowMetaEvent{
 		DataflowHash: flowHash,
 		Size:         int64(len(rawPayload)),
 		Encoding:     encoding,
 	}
 	if e.inlineMax > 0 && len(payload) > 0 && len(payload) <= e.inlineMax {
 		meta.InlineContent = payload
-		e.emitEnvelope(taskId, runtimeId, subTaskId, spec.StreamEventDataflowMeta, meta)
+		e.emitEnvelope(taskId, runtimeId, subTaskId, spec.SSAStreamEventDataflowMeta, meta)
 		return
 	}
-	e.emitEnvelope(taskId, runtimeId, subTaskId, spec.StreamEventDataflowMeta, meta)
-	e.emitChunks(taskId, runtimeId, subTaskId, spec.StreamEventDataflowChunk, flowHash, payload)
+	e.emitEnvelope(taskId, runtimeId, subTaskId, spec.SSAStreamEventDataflowMeta, meta)
+	e.emitChunks(taskId, runtimeId, subTaskId, spec.SSAStreamEventDataflowChunk, flowHash, payload)
 }

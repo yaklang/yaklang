@@ -81,15 +81,15 @@ func TestEmitSSARisk(t *testing.T) {
 		wantStarted bool
 	}{
 		{
-			name:     "drop_info_severity",
-			dropInfo: true,
-			riskJSON: []byte(`{"severity":"info","title":"x","program_name":"demo","risk_type":"demo","code_source_url":"a.java","code_range":"1:1"}`),
+			name:        "drop_info_severity",
+			dropInfo:    true,
+			riskJSON:    []byte(`{"severity":"info","title":"x","program_name":"demo","risk_type":"demo","code_source_url":"a.java","code_range":"1:1"}`),
 			wantStarted: false,
 		},
 		{
-			name:     "high_severity_emitted",
-			dropInfo: false,
-			riskJSON: []byte(`{"severity":"high","title":"Possible SQL Injection","program_name":"demo","risk_type":"sql","code_source_url":"src/A.java","code_range":"10:20"}`),
+			name:        "high_severity_emitted",
+			dropInfo:    false,
+			riskJSON:    []byte(`{"severity":"high","title":"Possible SQL Injection","program_name":"demo","risk_type":"sql","code_source_url":"src/A.java","code_range":"10:20"}`),
 			wantStarted: true,
 		},
 	}
@@ -98,7 +98,7 @@ func TestEmitSSARisk(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			e := &StreamEmitter{enabled: true, dropInfo: tt.dropInfo}
 			taskId := "task-risk-" + tt.name
-			err := e.EmitSSARisk(taskId, "rt-1", "sub-1", &spec.StreamRiskEvent{RiskJSON: tt.riskJSON})
+			err := e.EmitSSARisk(taskId, "rt-1", "sub-1", &spec.SSAStreamRiskEvent{RiskJSON: tt.riskJSON})
 			if err != nil {
 				t.Fatalf("emit risk failed: %v", err)
 			}
