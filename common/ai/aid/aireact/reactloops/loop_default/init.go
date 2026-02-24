@@ -26,7 +26,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 
 		// exit early
 		if failed, reason := operator.IsFailed(); operator.IsDone() || failed {
-			if reason.Error() != "" {
+			if reason != nil && reason.Error() != "" {
 				r.AddToTimeline("attached_materials_handler", reason.Error())
 			}
 			r.AddToTimeline("end", "Attached Materials Handler Decide to exit.")
