@@ -19,7 +19,7 @@ type IrIndex struct {
 	FieldID    *int64 `json:"field_id" gorm:"index"`
 
 	// scope
-	ScopeID *int64 `json:"scope_id" gorm:"index"`
+	ScopeName string `json:"scope_name" gorm:"index"`
 
 	// for object-key-member search
 	// owner id + field id -> member
@@ -78,9 +78,7 @@ func GetScope(programName, scopeName string, cache *NameCache) ([]IrVariable, er
 	if db == nil {
 		return nil, fmt.Errorf("database not initialized")
 	}
-
-	scopeID := cache.GetID(scopeName)
-	if scopeID == 0 {
+	if scopeName == "" {
 		return []IrVariable{}, nil
 	}
 
@@ -94,11 +92,11 @@ func GetScope(programName, scopeName string, cache *NameCache) ([]IrVariable, er
 
 	err := db.Table("ir_indices").
 		Select("variable_id, value_id, version_id").
-		Where("program_name = ? AND scope_id = ? AND deleted_at IS NULL", programName, scopeID).
+		Where("program_name = ? AND scope_name = ? AND deleted_at IS NULL", programName, scopeName).
 		Where(`version_id = (
 			SELECT max(sub.version_id) FROM ir_indices AS sub
 			WHERE sub.variable_id = ir_indices.variable_id 
-			  AND sub.scope_id = ir_indices.scope_id 
+			  AND sub.scope_name = ir_indices.scope_name 
 			  AND sub.program_name = ir_indices.program_name
 		)`).Scan(&results).Error
 
