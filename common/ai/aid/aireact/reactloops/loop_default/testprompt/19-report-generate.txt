@@ -1,0 +1,8 @@
+任务说明:
+请进入 report_generating 焦点模式，基于以下内容输出简要报告: "Target service has login, upload and admin modules."
+
+期望行为:
+触发报告生成 loop，返回结构化报告（摘要、关键点、风险提示）。
+
+通过标准:
+结果为结构化报告，不是单句回答。

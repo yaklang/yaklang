@@ -1,0 +1,11 @@
+任务说明:
+请使用 tool_compose 设计复杂 DAG:
+step1 读取 /etc/hosts;
+step2 读取 /etc/resolv.conf;
+step3 依赖 step1+step2，写入 /tmp/yaklang_compose_merge.txt 做合并摘要。
+
+期望行为:
+给出包含 depends_on 的 DAG 定义并执行。
+
+通过标准:
+最终汇总文件生成，内容体现两个输入文件信息。

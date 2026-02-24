@@ -1,0 +1,8 @@
+任务说明:
+请把字符串 key=value&foo=bar baz 做 URL 编码。
+
+期望行为:
+调用 encode 工具，type=url，并返回编码结果。
+
+通过标准:
+结果中包含 key%3Dvalue%26foo%3Dbar+baz 或等价 URL 编码表示。
