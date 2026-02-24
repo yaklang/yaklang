@@ -53,6 +53,7 @@ type SFFrame struct {
 
 	stack          *utils.Stack[ValueOperator] // for filter
 	conditionStack *utils.Stack[[]bool]        // for condition
+	conditionScope *utils.Stack[int]           // for condition scope
 	iterStack      *utils.Stack[*IterContext]  // for loop
 	popStack       *utils.Stack[ValueOperator] //pop stack,for sf
 
@@ -214,6 +215,7 @@ func (s *SFFrame) Flush() {
 	s.stack = utils.NewStack[ValueOperator]()
 	s.errorSkipStack = utils.NewStack[*errorSkipContext]()
 	s.conditionStack = utils.NewStack[[]bool]()
+	s.conditionScope = utils.NewStack[int]()
 	s.iterStack = utils.NewStack[*IterContext]()
 	s.popStack = utils.NewStack[ValueOperator]()
 	s.idx = 0
@@ -352,6 +354,21 @@ func (s *SFFrame) execRule(feedValue ValueOperator) error {
 					s.debugSubLog(">> stack top is nil (push input)")
 					s.stack.Push(feedValue)
 				}
+			case OpConditionScopeStart:
+				s.conditionScope.Push(s.conditionStack.Len())
+			case OpConditionScopeEnd:
+				if s.conditionScope.Len() == 0 {
+					break
+				}
+				scopeLen := s.conditionScope.Pop()
+				if s.conditionStack.Len() <= scopeLen {
+					break
+				}
+				latest := s.conditionStack.Pop()
+				for s.conditionStack.Len() > scopeLen {
+					s.conditionStack.Pop()
+				}
+				s.conditionStack.Push(latest)
 			case OpEnterStatement:
 				s.errorSkipStack.Push(&errorSkipContext{
 					start:      s.idx,

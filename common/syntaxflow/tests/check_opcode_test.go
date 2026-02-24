@@ -173,6 +173,14 @@ func TestOpcode(t *testing.T) {
 	t.Run("logical condition", func(t *testing.T) {
 		check(t, `a?{(have: const) || (opcode: const)} as $target`, sfvm.OpLogicOr)
 	})
+	t.Run("filter condition without iter loop", func(t *testing.T) {
+		code := `a?{.b} as $target`
+		check(t, code, sfvm.OpFilterCondition)
+		checkNo(t, code, sfvm.OpCreateIter)
+		checkNo(t, code, sfvm.OpIterNext)
+		checkNo(t, code, sfvm.OpIterLatch)
+		checkNo(t, code, sfvm.OpIterEnd)
+	})
 
 	// use def
 	t.Run("get users", func(t *testing.T) {

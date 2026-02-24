@@ -140,6 +140,8 @@ const (
 	OpLogicAnd
 	OpLogicOr
 	OpLogicBang
+	OpConditionScopeStart
+	OpConditionScopeEnd
 
 	/*
 		Unary Operator: Fetch ONE in STACK, calc result, push result into stack
@@ -219,6 +221,8 @@ var Opcode2String = map[SFVMOpCode]string{
 	OpLogicAnd:              "OpLogicAnd",
 	OpLogicOr:               "OpLogicOr",
 	OpLogicBang:             "OpLogicBang",
+	OpConditionScopeStart:   "OpConditionScopeStart",
+	OpConditionScopeEnd:     "OpConditionScopeEnd",
 	OpReMatch:               "OpReMatch",
 	OpGlobMatch:             "OpGlobMatch",
 	OpNot:                   "OpNot",
@@ -368,6 +372,10 @@ func (s *SFI) String() string {
 		return fmt.Sprintf(verboseLen+" %v", "(operator) ||", s.UnaryStr)
 	case OpLogicBang:
 		return fmt.Sprintf(verboseLen+" %v", "(operator) !", s.UnaryStr)
+	case OpConditionScopeStart:
+		return fmt.Sprintf(verboseLen+" %v", "condition-scope-start", s.UnaryStr)
+	case OpConditionScopeEnd:
+		return fmt.Sprintf(verboseLen+" %v", "condition-scope-end", s.UnaryStr)
 	case OpPop:
 		return fmt.Sprintf(verboseLen+" %v", "pop", s.UnaryStr)
 	case OpCheckParams:
