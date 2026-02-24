@@ -4,9 +4,10 @@ import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
-func _SearchValues(values Values, mod int, handler func(string) bool, opt ...sfvm.AnalysisContextOption) Values {
+func _SearchValues(values Values, mod ssadb.MatchMode, handler func(string) bool, opt ...sfvm.AnalysisContextOption) Values {
 	var newValue Values
 	for _, value := range values {
 		result := _SearchValue(value, mod, handler, opt...)
@@ -17,7 +18,7 @@ func _SearchValues(values Values, mod int, handler func(string) bool, opt ...sfv
 	// return newValue
 }
 
-func _SearchValue(value *Value, mod int, compare func(string) bool, opt ...sfvm.AnalysisContextOption) Values {
+func _SearchValue(value *Value, mod ssadb.MatchMode, compare func(string) bool, opt ...sfvm.AnalysisContextOption) Values {
 	newValue := make([]*Value, 0)
 	newValue = append(newValue, SearchWithValue(value, mod, compare, opt...)...)
 	newValue = append(newValue, SearchWithCFG(value, mod, compare, opt...)...)

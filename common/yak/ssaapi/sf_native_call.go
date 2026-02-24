@@ -1328,7 +1328,7 @@ func init() {
 							if val.ParentProgram == nil {
 								return utils.Error("ParentProgram is nil")
 							}
-							ok, next, _ := val.ParentProgram.ExactMatch(frame.GetContext(), sfvm.BothMatch, funcName)
+							ok, next, _ := val.ParentProgram.ExactMatch(frame.GetContext(), ssadb.BothMatch, funcName)
 							if ok {
 								vals = append(vals, next)
 							}
@@ -1344,7 +1344,7 @@ func init() {
 							if val.ParentProgram == nil {
 								return utils.Error("ParentProgram is nil")
 							}
-							ok, next, _ := val.ParentProgram.ExactMatch(frame.GetContext(), sfvm.BothMatch, funcName)
+							ok, next, _ := val.ParentProgram.ExactMatch(frame.GetContext(), ssadb.BothMatch, funcName)
 							if ok {
 								next.AppendPredecessor(val, frame.WithPredecessorContext("searchCall: "+funcName))
 								vals = append(vals, next)
@@ -1367,7 +1367,7 @@ func init() {
 						if prog == nil {
 							return utils.Error("ParentProgram is nil")
 						}
-						haveNext, next, _ := prog.ExactMatch(frame.GetContext(), sfvm.BothMatch, methodName)
+						haveNext, next, _ := prog.ExactMatch(frame.GetContext(), ssadb.BothMatch, methodName)
 						if haveNext && next != nil {
 							next.Recursive(func(operator sfvm.ValueOperator) error {
 								callee, ok := operator.(*Value)
@@ -1384,7 +1384,7 @@ func init() {
 						if str, err := strconv.Unquote(funcName); err == nil {
 							funcName = str
 						}
-						ok, next, _ := val.ParentProgram.ExactMatch(frame.GetContext(), sfvm.BothMatch, funcName)
+						ok, next, _ := val.ParentProgram.ExactMatch(frame.GetContext(), ssadb.BothMatch, funcName)
 						if ok {
 							next.AppendPredecessor(val, frame.WithPredecessorContext("searchCall: "+funcName))
 							vals = append(vals, next)
