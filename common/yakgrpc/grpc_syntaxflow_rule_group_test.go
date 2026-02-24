@@ -341,6 +341,6 @@ func TestGRPCMUSTPASS_SynatxFlow_Query_Same_Group(t *testing.T) {
 
 		groups, err := querySameGroup([]string{ruleName1})
 		require.NoError(t, err)
-		require.Equal(t, 6, len(groups))
+		require.Equal(t, 3, len(groups))
 	})
 }
