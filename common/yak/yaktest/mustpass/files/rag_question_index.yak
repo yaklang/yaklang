@@ -31,6 +31,8 @@ mockAIService = ai.MockAIService((req)=>{
 
 // 创建 RAG 集合
 collectionName = "KnowledgeBase-" + randstr(10)
+// 先清理同名历史集合，避免重复运行时加载脏数据
+rag.DeleteRAG(collectionName)
 // 使用 defer 确保测试结束后清理资源
 defer rag.DeleteRAG(collectionName)
 
@@ -43,7 +45,7 @@ collection = rag.GetCollection(collectionName,
 // 添加 knowledge1，并启用 enableQuestionIndex
 // 这会触发 AI 服务（我们 mock 的）为这条知识生成问题索引
 // 预期生成的 Question Index 内容为 knowledge1_question
-collection.AddKnowledge(knowledge1, rag.enableQuestionIndex(true))~
+collection.AddKnowledge(knowledge1, rag.enableQuestionIndex(true), rag.aiService(mockAIService))~
 
 // 添加 knowledge2，不启用 enableQuestionIndex
 collection.AddKnowledge(knowledge2)~
