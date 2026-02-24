@@ -25,6 +25,9 @@ type LoopActionHandlerOperator struct {
 	// dynamic async mode: handler can request async mode at runtime
 	requestedAsyncMode bool
 
+	// open task plan and execution
+	openTaskPlanAndExecution bool
+
 	// 自我反思相关
 	reflectionLevel      ReflectionLevel
 	customReflectionData map[string]interface{}
@@ -115,6 +118,17 @@ func (l *LoopActionHandlerOperator) RequestAsyncMode() {
 	l.requestedAsyncMode = true
 }
 
+// RequestOpenTaskPlanAndExecution allows a handler to dynamically request open task plan and execution at runtime.
+// This is used by actions like request_plan_and_execution that need to open task plan and execution conditionally.
+func (l *LoopActionHandlerOperator) RequestOpenTaskPlanAndExecution() {
+	l.openTaskPlanAndExecution = true
+}
+
+// IsOpenTaskPlanAndExecutionRequested returns whether the handler has dynamically requested open task plan and execution.
+func (l *LoopActionHandlerOperator) IsOpenTaskPlanAndExecutionRequested() bool {
+	return l.openTaskPlanAndExecution
+}
+
 // IsAsyncModeRequested returns whether the handler has dynamically requested async mode.
 func (l *LoopActionHandlerOperator) IsAsyncModeRequested() bool {
 	return l.requestedAsyncMode
@@ -155,7 +169,7 @@ func (l *LoopActionHandlerOperator) GetReflectionData() map[string]interface{} {
 type OnPostIterationOperator struct {
 	shouldEndIteration bool
 	endReason          any
-	ignoreError        bool   // 忽略错误，静默退出
+	ignoreError        bool     // 忽略错误，静默退出
 	deferredFuncs      []func() // 在所有回调完成后执行的延迟函数
 }
 
