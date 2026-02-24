@@ -1,3 +1,4 @@
+// TODO: MQ 不适合批量数据传输，当前流式协议是过渡方案，后续改为对象存储 + MQ 通知。
 package scannode
 
 import (
@@ -13,7 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/spec"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 type StreamEmitter struct {
@@ -118,7 +118,7 @@ func (e *StreamEmitter) EmitTaskEnd(taskId, runtimeId, subTaskId string, totalRi
 		return
 	}
 
-	ev := &spec.StreamTaskEndEvent{
+	ev := &spec.SSAStreamTaskEndEvent{
 		TaskId:      taskId,
 		TotalRisks:  totalRisks,
 		TotalFiles:  totalFiles,
@@ -127,24 +127,24 @@ func (e *StreamEmitter) EmitTaskEnd(taskId, runtimeId, subTaskId string, totalRi
 		FinalStatus: "done",
 	}
 	// Force seq for task_end to preserve ordering even when disableSeq is enabled.
-	e.emitEnvelopeForceSeq(taskId, runtimeId, subTaskId, spec.StreamEventTaskEnd, ev)
+	e.emitEnvelopeForceSeq(taskId, runtimeId, subTaskId, spec.SSAStreamEventTaskEnd, ev)
 
 	// Best-effort cleanup to avoid per-task state leaking forever.
 	time.AfterFunc(2*time.Minute, func() { e.perTask.Delete(taskId) })
 }
 
-func (e *StreamEmitter) emitChunks(taskId, runtimeId, subTaskId string, eventType spec.StreamEventType, key string, payload []byte) {
+func (e *StreamEmitter) emitChunks(taskId, runtimeId, subTaskId string, eventType spec.SSAStreamEventType, key string, payload []byte) {
 	if len(payload) == 0 {
 		switch eventType {
-		case spec.StreamEventFileChunk:
-			e.emitEnvelope(taskId, runtimeId, subTaskId, eventType, &spec.StreamFileChunkEvent{
+		case spec.SSAStreamEventFileChunk:
+			e.emitEnvelope(taskId, runtimeId, subTaskId, eventType, &spec.SSAStreamFileChunkEvent{
 				FileHash:   key,
 				ChunkIndex: 0,
 				Data:       nil,
 				IsLast:     true,
 			})
-		case spec.StreamEventDataflowChunk:
-			e.emitEnvelope(taskId, runtimeId, subTaskId, eventType, &spec.StreamDataflowChunkEvent{
+		case spec.SSAStreamEventDataflowChunk:
+			e.emitEnvelope(taskId, runtimeId, subTaskId, eventType, &spec.SSAStreamDataflowChunkEvent{
 				DataflowHash: key,
 				ChunkIndex:   0,
 				Data:         nil,
@@ -163,15 +163,15 @@ func (e *StreamEmitter) emitChunks(taskId, runtimeId, subTaskId string, eventTyp
 		isLast := end >= len(payload)
 
 		switch eventType {
-		case spec.StreamEventFileChunk:
-			e.emitEnvelope(taskId, runtimeId, subTaskId, eventType, &spec.StreamFileChunkEvent{
+		case spec.SSAStreamEventFileChunk:
+			e.emitEnvelope(taskId, runtimeId, subTaskId, eventType, &spec.SSAStreamFileChunkEvent{
 				FileHash:   key,
 				ChunkIndex: i,
 				Data:       data,
 				IsLast:     isLast,
 			})
-		case spec.StreamEventDataflowChunk:
-			e.emitEnvelope(taskId, runtimeId, subTaskId, eventType, &spec.StreamDataflowChunkEvent{
+		case spec.SSAStreamEventDataflowChunk:
+			e.emitEnvelope(taskId, runtimeId, subTaskId, eventType, &spec.SSAStreamDataflowChunkEvent{
 				DataflowHash: key,
 				ChunkIndex:   i,
 				Data:         data,
@@ -181,46 +181,47 @@ func (e *StreamEmitter) emitChunks(taskId, runtimeId, subTaskId string, eventTyp
 	}
 }
 
-func (e *StreamEmitter) emitEnvelope(taskId, runtimeId, subTaskId string, eventType spec.StreamEventType, payload any) {
+func (e *StreamEmitter) emitEnvelope(taskId, runtimeId, subTaskId string, eventType spec.SSAStreamEventType, payload any) {
 	// Only batch risk events. Meta events may carry inline file/dataflow payloads and can become
 	// large enough to regress latency or hit message size limits.
-	allowBatch := eventType == spec.StreamEventRisk
+	allowBatch := eventType == spec.SSAStreamEventRisk
 	e.emitEnvelopeInternal(taskId, runtimeId, subTaskId, eventType, payload, allowBatch, false)
 }
 
-func (e *StreamEmitter) emitEnvelopeForceSeq(taskId, runtimeId, subTaskId string, eventType spec.StreamEventType, payload any) {
+func (e *StreamEmitter) emitEnvelopeForceSeq(taskId, runtimeId, subTaskId string, eventType spec.SSAStreamEventType, payload any) {
 	// Force-send control envelopes (never batch).
 	e.emitEnvelopeInternal(taskId, runtimeId, subTaskId, eventType, payload, false, true)
 }
 
 func (e *StreamEmitter) emitEnvelopeInternal(
 	taskId, runtimeId, subTaskId string,
-	eventType spec.StreamEventType,
+	eventType spec.SSAStreamEventType,
 	payload any,
 	allowBatch bool,
 	forceSeq bool,
 ) {
-	raw, err := json.Marshal(payload)
-	if err != nil {
-		log.Errorf("stream marshal payload failed: %v", err)
-		return
+	env := &spec.SSAStreamEnvelope{
+		TaskId:    taskId,
+		RuntimeId: runtimeId,
+		SubTaskId: subTaskId,
+		EventId:   utils.RandStringBytes(20),
+		Seq:       e.nextSeq(taskId),
+		Timestamp: time.Now().Unix(),
+		Type:      eventType,
 	}
-	env := &spec.StreamEnvelope{
-		TaskId:      taskId,
-		RuntimeId:   runtimeId,
-		SubTaskId:   subTaskId,
-		EventId:     utils.RandStringBytes(20),
-		Seq:         e.nextSeq(taskId),
-		Timestamp:   time.Now().Unix(),
-		Type:        eventType,
-		Payload:     raw,
-		PayloadHash: codec.Md5(raw),
-		PayloadSize: int64(len(raw)),
+	// Single-marshal path: payload is encoded together with envelope.
+	// Receiver decodes into SSAStreamEnvelope.Payload(raw JSON) by event type.
+	wire := struct {
+		*spec.SSAStreamEnvelope
+		Payload any `json:"payload"`
+	}{
+		SSAStreamEnvelope: env,
+		Payload:           payload,
 	}
 	if !forceSeq && e.disableSeq {
-		env.Seq = 0
+		wire.Seq = 0
 	}
-	envRaw, err := json.Marshal(env)
+	envRaw, err := json.Marshal(&wire)
 	if err != nil {
 		log.Errorf("stream marshal envelope failed: %v", err)
 		return
