@@ -140,11 +140,13 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 					saveHandler(teeResp)
 				}()
 
-				haveFirstByte.SetTo(true)
-				c.EmitJSON(schema.EVENT_TYPE_AI_FIRST_BYTE_COST_MS, "system", map[string]any{
-					"ms":     du.Milliseconds(),
-					"second": du.Seconds(),
-				})
+			haveFirstByte.SetTo(true)
+			c.EmitJSON(schema.EVENT_TYPE_AI_FIRST_BYTE_COST_MS, "system", map[string]any{
+				"ms":            du.Milliseconds(),
+				"second":        du.Seconds(),
+				"model_name":    origRsp.GetModelName(),
+				"provider_name": origRsp.GetProviderName(),
+			})
 			}, func() {
 				du := time.Since(start)
 				provider := origRsp.GetProviderName()
@@ -156,12 +158,32 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 				if outputDuration.Seconds() > 0 {
 					tokenRate = float64(outputBytes/4) / outputDuration.Seconds()
 				}
-				c.EmitInfo("ai response from %v:%v cost: %v, output duration: %v, estimated %.1f token/s",
-					provider, model, du, outputDuration, tokenRate)
-				c.EmitJSON(schema.EVENT_TYPE_AI_TOTAL_COST_MS, "system", map[string]any{
-					"ms":     du.Milliseconds(),
-					"second": du.Seconds(),
-				})
+			c.EmitInfo("ai response from %v:%v cost: %v, output duration: %v, estimated %.1f token/s",
+				provider, model, du, outputDuration, tokenRate)
+			c.EmitJSON(schema.EVENT_TYPE_AI_TOTAL_COST_MS, "system", map[string]any{
+				"ms":                 du.Milliseconds(),
+				"second":             du.Seconds(),
+				"model_name":         model,
+				"provider_name":      provider,
+				"token_rate":         tokenRate,
+				"output_bytes":       outputBytes,
+				"output_duration_ms": outputDuration.Milliseconds(),
+			})
+			firstByteCostMs := int64(0)
+			if !firstByteTime.IsZero() {
+				firstByteCostMs = firstByteTime.Sub(start).Milliseconds()
+			}
+			c.EmitJSON(schema.EVENT_TYPE_AI_CALL_SUMMARY, "system", map[string]any{
+				"model_name":              model,
+				"provider_name":           provider,
+				"first_byte_cost_ms":      firstByteCostMs,
+				"total_cost_ms":           du.Milliseconds(),
+				"output_bytes":            outputBytes,
+				"estimated_output_tokens": outputBytes / 4,
+				"token_rate":              tokenRate,
+				"output_duration_ms":      outputDuration.Milliseconds(),
+				"input_token_size":        tokenSize,
+			})
 			})
 			if c.DebugPrompt {
 				rsp.Debug(true)
