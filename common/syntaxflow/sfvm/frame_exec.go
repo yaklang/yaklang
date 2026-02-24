@@ -6,7 +6,7 @@ package sfvm
 // 1. execFilterAndCondition: Handles condition/logic/comparison operations
 //    - OpEmptyCompare, OpCompare*, OpVersionIn
 //    - OpEq/Ne/Gt/GtEq/Lt/LtEq
-//    - OpLogic*, OpCondition, OpCheckEmpty
+//    - OpLogic*, OpCondition
 // 2. execValueFilter: Handles ValueOperator navigation/search operations
 //    - OpPush/RecursiveSearch* (Exact/Glob/Regexp)
 //    - OpGetCall/CallArgs
@@ -22,6 +22,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"reflect"
 	"regexp"
 
 	"github.com/gobwas/glob"
@@ -32,11 +33,11 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
-func flattenValues(value ValueOperator) Values {
+func flattenValues(value ValueOperator) []ValueOperator {
 	if utils.IsNil(value) {
 		return nil
 	}
-	var result Values
+	var result []ValueOperator
 	_ = value.Recursive(func(operator ValueOperator) error {
 		result = append(result, operator)
 		return nil
@@ -44,31 +45,54 @@ func flattenValues(value ValueOperator) Values {
 	return result
 }
 
-func ensureSequentialIndex(values Values) {
-	length := len(values)
-	if length == 0 {
-		return
-	}
-	for i, value := range values {
-		if utils.IsNil(value) {
-			continue
-		}
-		idx := value.GetIndex()
-		if idx != nil && idx.Len() > 0 {
-			continue
-		}
-		mask := NewBitVector(length)
-		mask.SetBit(i, true)
-		value.SetIndex(mask)
-	}
-}
-
-func ensureIndexOnValueOperator(value ValueOperator) {
+func collectPredecessorSourceIDs(value ValueOperator) []int64 {
 	if utils.IsNil(value) {
-		return
+		return nil
 	}
-	values := flattenValues(value)
-	ensureSequentialIndex(values)
+	rawVal := reflect.ValueOf(value)
+	if !rawVal.IsValid() {
+		return nil
+	}
+	method := rawVal.MethodByName("GetPredecessors")
+	if !method.IsValid() || method.Type().NumIn() != 0 || method.Type().NumOut() != 1 {
+		return nil
+	}
+	outs := method.Call(nil)
+	if len(outs) != 1 {
+		return nil
+	}
+	preds := outs[0]
+	if !preds.IsValid() || preds.Kind() != reflect.Slice {
+		return nil
+	}
+	ids := make([]int64, 0, preds.Len())
+	for i := 0; i < preds.Len(); i++ {
+		pred := preds.Index(i)
+		if !pred.IsValid() {
+			continue
+		}
+		if pred.Kind() == reflect.Ptr && pred.IsNil() {
+			continue
+		}
+		if pred.Kind() == reflect.Ptr {
+			pred = pred.Elem()
+		}
+		if !pred.IsValid() || pred.Kind() != reflect.Struct {
+			continue
+		}
+		nodeField := pred.FieldByName("Node")
+		if !nodeField.IsValid() {
+			continue
+		}
+		if nodeField.Kind() == reflect.Ptr && nodeField.IsNil() {
+			continue
+		}
+		node := nodeField.Interface()
+		if idGetter, ok := node.(ssa.GetIdIF); ok {
+			ids = append(ids, idGetter.GetId())
+		}
+	}
+	return ids
 }
 
 func recursiveDeepChain(element ValueOperator, handle func(operator ValueOperator) bool, visited map[int64]struct{}) error {
@@ -474,22 +498,18 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 		if len(conds) != ValuesLen(vs) {
 			return true, utils.Wrapf(CriticalError, "condition failed: stack top(%v) vs conds(%v)", ValuesLen(vs), len(conds))
 		}
-		var res Values
-		if vals, ok := vs.(Values); ok {
-			for i, v := range vals {
-				if conds[i] {
-					res = append(res, v)
-				}
-			}
-		} else {
-			if len(conds) != 1 {
-				return true, utils.Wrapf(CriticalError, "condition failed: stack top should be only one value: [%v]", ValuesLen(vs))
-			}
-			if conds[0] {
-				res = append(res, vs)
+		values := flattenValues(vs)
+		var filtered []ValueOperator
+		for i, value := range values {
+			if i < len(conds) && conds[i] {
+				filtered = append(filtered, value)
 			}
 		}
-		s.stack.Push(res)
+		s.stack.Push(NewValues(filtered))
+		// In condition scope, logic operators still need this condition vector.
+		if s.conditionScope.Len() > 0 {
+			s.conditionStack.Push(conds)
+		}
 		return true, nil
 	case OpFilterCondition:
 		s.debugSubLog(">> pop condition values")
@@ -504,7 +524,6 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 		}
 
 		srcValues := flattenValues(source)
-		ensureSequentialIndex(srcValues)
 		sourceByID := make(map[int64][]int, len(srcValues))
 		for i, src := range srcValues {
 			if utils.IsNil(src) {
@@ -520,12 +539,7 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 			if utils.IsNil(operator) {
 				return nil
 			}
-			bools, err := operator.ToBool()
-			if err != nil {
-				return err
-			}
-			truthy := len(bools) > 0 && bools[0]
-			if !truthy {
+			if operator.IsEmpty() {
 				return nil
 			}
 			if idGetter, ok := operator.(ssa.GetIdIF); ok {
@@ -538,36 +552,23 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 					return nil
 				}
 			}
-			idx := operator.GetIndex()
-			if idx == nil || idx.Len() == 0 {
-				if len(mask) == 1 {
-					mask[0] = true
+			for _, predID := range collectPredecessorSourceIDs(operator) {
+				if positions, existed := sourceByID[predID]; existed {
+					for _, pos := range positions {
+						if pos >= 0 && pos < len(mask) {
+							mask[pos] = true
+						}
+					}
 				}
-				return nil
 			}
-			for i := 0; i < len(mask) && i < idx.Len(); i++ {
-				if idx.GetBit(i) {
-					mask[i] = true
-				}
+			if len(mask) == 1 {
+				mask[0] = true
 			}
 			return nil
 		})
 
-		var filtered Values
-		for i, val := range srcValues {
-			if i < len(mask) && mask[i] {
-				filtered = append(filtered, val)
-			}
-		}
 		s.conditionStack.Push(mask)
-		s.stack.Push(filtered)
-		return true, nil
-	case OpCheckEmpty:
-		if s.stack.Len() == 0 {
-			return true, nil
-		}
-		val := s.stack.Peek()
-		s.conditionStack.Push([]bool{!val.IsEmpty()})
+		s.stack.Push(source)
 		return true, nil
 	default:
 		return false, nil
@@ -866,7 +867,6 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 
 	case OpGetCallArgs:
 		s.debugSubLog("-- getCallArgs pop call args")
-		//in iterStack
 		value := s.stack.Peek()
 		if value == nil {
 			return true, utils.Wrap(CriticalError, "get call args failed: stack top is empty")
@@ -1008,7 +1008,6 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 		}
 		s.debugSubLog(">> duplicate (stack grow)")
 		v := s.stack.Peek()
-		ensureIndexOnValueOperator(v)
 		s.stack.Push(v)
 		return true, nil
 	case OpPopDuplicate:

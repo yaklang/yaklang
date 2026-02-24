@@ -205,18 +205,14 @@ func (y *SyntaxFlowVisitor) VisitConditionExpression(raw sf.IConditionExpression
 
 	switch i := raw.(type) {
 	case *sf.FilterConditionContext:
-		y.EmitOpEmptyCompare()
-		ctx := y.EmitCreateIterator()
-		y.EmitNextIterator(ctx)
+		y.EmitDuplicate()
 		err := y.VisitFilterExpr(i.FilterExpr())
 		if err != nil {
 			log.Warnf("compile filter-expr in condition expression failed: %v", err)
 			return err
 		}
-		y.EmitDuplicate()
-		y.EmitOpCheckEmpty(ctx)
-		y.EmitLatchIterator(ctx)
-		y.EmitIterEnd(ctx)
+		y.EmitFilterCondition()
+		return true
 	case *sf.OpcodeTypeConditionContext:
 		opcodes := i.AllOpcodesCondition()
 		ops := make([]string, 0, len(opcodes))

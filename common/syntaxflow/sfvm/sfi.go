@@ -7,7 +7,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
@@ -27,33 +26,6 @@ func ToOpCodes(code string) (*OpCodes, bool) {
 		return nil, false
 	}
 
-	existHash := make(map[string]*IterIndex)
-	for _, opcode := range opcodes.Opcode {
-		switch opcode.OpCode {
-		case OpCreateIter:
-			iter := opcode.Iter
-			if iter == nil {
-				return nil, false
-			}
-			hash := iter.CalcHash()
-			if _, exist := existHash[hash]; exist {
-				log.Errorf("duplicate iter hash: %s", hash)
-				return nil, false
-			}
-			existHash[hash] = iter
-		case OpIterNext, OpIterEnd, OpIterLatch, OpCheckEmpty:
-			if opcode.Iter == nil {
-				return nil, false
-			}
-			calcHash := opcode.Iter.CalcHash()
-			index, ok := existHash[calcHash]
-			if !ok {
-				log.Errorf("iter not exist: %s", calcHash)
-				return nil, false
-			}
-			opcode.Iter = index
-		}
-	}
 	return opcodes, true
 }
 func (y *SyntaxFlowVisitor) ToString() string {
@@ -121,6 +93,7 @@ const (
 	// use the []bool  && []Value of stack top, push result into stack
 
 	OpCondition
+	OpFilterCondition
 	OpCompareOpcode
 	OpCompareString
 	OpEmptyCompare
@@ -128,8 +101,6 @@ const (
 	OpVersionIn
 	//OpPopDuplicate is copy popStack to stack
 	OpPopDuplicate
-	//OpCheckEmpty check the stack top, if empty, push false
-	OpCheckEmpty
 
 	OpEq
 	OpNotEq
@@ -159,16 +130,6 @@ const (
 
 	// OpAddDescription add description to current context
 	OpAddDescription
-
-	// OpCreateIter will create iterator for current context
-	// the context contains origin values(list) and channel for elements
-	OpCreateIter
-	// OpIterNext will get next value from iterator
-	// if the channel from iter context has a next element, push into stack and execute filter
-	// if not, exit
-	OpIterNext  // check next to end or end
-	OpIterLatch // jump to next
-	OpIterEnd   // end
 
 	OpCheckStackTop // check the top of stack, if empty, push input into stack
 
@@ -209,6 +170,7 @@ var Opcode2String = map[SFVMOpCode]string{
 	OpPushBool:              "OpPushBool",
 	OpPop:                   "OpPop",
 	OpCondition:             "OpCondition",
+	OpFilterCondition:       "OpFilterCondition",
 	OpCompareOpcode:         "OpCompareOpcode",
 	OpCompareString:         "OpCompareString",
 	OpVersionIn:             "OpVersionIn",
@@ -229,10 +191,6 @@ var Opcode2String = map[SFVMOpCode]string{
 	OpAlert:                 "OpAlert",
 	OpCheckParams:           "OpCheckParams",
 	OpAddDescription:        "OpAddDescription",
-	OpCreateIter:            "OpCreateIter",
-	OpIterNext:              "OpIterNext",
-	OpIterLatch:             "OpIterLatch",
-	OpIterEnd:               "OpIterEnd",
 	OpCheckStackTop:         "OpCheckStackTop",
 	OpMergeRef:              "OpMergeRef",
 	OpRemoveRef:             "OpRemoveRef",
@@ -241,7 +199,6 @@ var Opcode2String = map[SFVMOpCode]string{
 	OpFileFilterReg:         "OpFileFilterReg",
 	OpFileFilterXpath:       "OpFileFilterXpath",
 	OpFileFilterJsonPath:    "OpFileFilterJsonPath",
-	OpCheckEmpty:            "OpCheckEmpty",
 	OpPopDuplicate:          "OpPopDuplicate",
 	OpEmptyCompare:          "OpEmptyCompare",
 }
@@ -262,31 +219,10 @@ type SFI struct {
 	MultiOperator        []int                  `json:"multi_operator"`
 	SyntaxFlowConfig     []*RecursiveConfigItem `json:"syntax_flow_config"`
 	FileFilterMethodItem map[string]string      `json:"file_filter_method_item"`
-	Iter                 *IterIndex             `json:"iter"`
 }
 
 func (s *SFI) IsIterOpcode() bool {
-	switch s.OpCode {
-	case OpCreateIter, OpIterLatch, OpIterNext, OpIterEnd:
-		return true
-	default:
-		return false
-	}
-}
-
-type IterIndex struct {
-	// static
-	Start int `json:"start"`
-	Next  int `json:"next"`
-	Latch int `json:"latch"`
-	End   int `json:"end"`
-
-	//记录当前的索引位置
-	currentIndex int
-}
-
-func (i *IterIndex) CalcHash() string {
-	return utils.CalcMd5(i.Start, i.Next, i.Latch, i.End)
+	return false
 }
 
 func (s *SFI) ValueByIndex(i int) string {
@@ -348,6 +284,8 @@ func (s *SFI) String() string {
 		return fmt.Sprintf(verboseLen+" %v [%d] mul:%v", "compare string", s.Values, s.UnaryInt, s.MultiOperator)
 	case OpCondition:
 		return fmt.Sprintf(verboseLen+" %v", "condition", s.UnaryStr)
+	case OpFilterCondition:
+		return fmt.Sprintf(verboseLen+" %v", "filter-condition", s.UnaryStr)
 	case OpEq:
 		return fmt.Sprintf(verboseLen+" %v", "(operator) ==", s.UnaryStr)
 	case OpNotEq:
@@ -397,14 +335,6 @@ func (s *SFI) String() string {
 		return fmt.Sprintf(verboseLen+" %v"+suffix, "desc", s.UnaryStr)
 	case OpAlert:
 		return fmt.Sprintf(verboseLen+" %v", "alert", s.UnaryStr)
-	case OpCreateIter:
-		return fmt.Sprintf(verboseLen+" %v", "iter-start", s.UnaryStr)
-	case OpIterEnd:
-		return fmt.Sprintf(verboseLen+" %v", "iter-end", s.UnaryStr)
-	case OpIterLatch:
-		return fmt.Sprintf(verboseLen+" iter-latch to: %d", s.UnaryStr, s.Iter.Next)
-	case OpIterNext:
-		return fmt.Sprintf(verboseLen+" start: %v  latch:%v end: %v", "iter-next", s.Iter.Start, s.Iter.Latch, s.Iter.End)
 	case OpCheckStackTop:
 		return fmt.Sprintf(verboseLen+" %v", "check top", s.UnaryStr)
 	case OpMergeRef:
@@ -432,8 +362,6 @@ func (s *SFI) String() string {
 		return fmt.Sprintf(verboseLen+" %v", "fileFilter$jsonpath", s.UnaryStr)
 	case OpVersionIn:
 		return fmt.Sprintf(verboseLen+" ", "version$in")
-	case OpCheckEmpty:
-		return fmt.Sprintf(verboseLen+" ", "check empty")
 	case OpPopDuplicate:
 		return fmt.Sprintf(verboseLen+" ", "pop-duplicate")
 	case OpEmptyCompare:

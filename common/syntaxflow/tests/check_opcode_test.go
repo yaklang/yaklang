@@ -176,10 +176,7 @@ func TestOpcode(t *testing.T) {
 	t.Run("filter condition without iter loop", func(t *testing.T) {
 		code := `a?{.b} as $target`
 		check(t, code, sfvm.OpFilterCondition)
-		checkNo(t, code, sfvm.OpCreateIter)
-		checkNo(t, code, sfvm.OpIterNext)
-		checkNo(t, code, sfvm.OpIterLatch)
-		checkNo(t, code, sfvm.OpIterEnd)
+		checkNo(t, code, sfvm.OpEmptyCompare)
 	})
 
 	// use def
