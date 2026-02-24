@@ -56,7 +56,6 @@ type MockAIMemoryInvoker struct {
 func (m *MockAIMemoryInvoker) InvokeLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
 	if actionName == "memory-triage" {
 		m.memoryTriageCallCount++
-		// 构造mock的返回数据
 		mockResponseJSON := `{
 			"@action": "memory-triage",
 			"memory_entities": [
@@ -102,8 +101,24 @@ func (m *MockAIMemoryInvoker) InvokeLiteForge(ctx context.Context, actionName st
 		return action, nil
 	}
 
-	// Fall back to original implementation
-	return m.ReAct.InvokeLiteForge(ctx, actionName, prompt, outputs)
+	if actionName == "batch-memory-deduplication" {
+		mockResponseJSON := `{
+			"@action": "batch-memory-deduplication",
+			"non_duplicate_indices": ["0", "1"],
+			"analysis": "mock: all memories are unique"
+		}`
+		action, err := aicommon.ExtractAction(mockResponseJSON, "batch-memory-deduplication")
+		if err != nil {
+			return nil, utils.Errorf("failed to extract action: %v", err)
+		}
+		return action, nil
+	}
+
+	// For any other LiteForge action (e.g. tag-selection, session naming),
+	// return a generic empty action to avoid falling through to the real
+	// implementation which spawns coordinator goroutines that can hang in tests.
+	action, _ := aicommon.ExtractAction(`{"@action": "`+actionName+`"}`, actionName)
+	return action, nil
 }
 
 func (m *MockAIMemoryInvoker) InvokeSpeedPriorityLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
