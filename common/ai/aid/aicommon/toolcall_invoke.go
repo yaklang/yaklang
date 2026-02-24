@@ -54,7 +54,7 @@ func (a *ToolCaller) intervalReviewContext(
 			case <-ctx.Done():
 				return
 			default:
-				shouldContinue, err := a.intervalReviewHandler(ctx, tool, params, stdoutSnapshot, stderrSnapshot)
+				shouldContinue, err := a.intervalReviewHandler(ctx, tool, params, stdoutSnapshot, stderrSnapshot, a.callExpectations)
 				if err != nil {
 					log.Errorf("interval review handler failed: %v", err)
 					continue
@@ -81,6 +81,10 @@ func (a *ToolCaller) IntervalReviewContext(
 	onAICanceled func(any),
 ) {
 	a.intervalReviewContext(ctx, reviewCancel, tool, params, stdoutSnapshot, stderrSnapshot, onAICanceled)
+}
+
+func (a *ToolCaller) GetCallExpectations() string {
+	return a.callExpectations
 }
 
 func (a *ToolCaller) invoke(
@@ -130,10 +134,11 @@ func (a *ToolCaller) invoke(
 
 	newToolCallRes := func() *aitool.ToolResult {
 		return &aitool.ToolResult{
-			Param:       params,
-			Name:        tool.Name,
-			Description: tool.Description,
-			ToolCallID:  a.callToolId,
+			Param:            params,
+			Name:             tool.Name,
+			Description:      tool.Description,
+			ToolCallID:       a.callToolId,
+			CallExpectations: a.callExpectations,
 		}
 	}
 

@@ -27,6 +27,8 @@ type ToolResult struct {
 
 	// shrink_similar_result 表示缩略信息，是由于时间线内容过多引发的压缩。
 	ShrinkResult string `json:"shrink_result,omitempty"`
+
+	CallExpectations string `json:"call_expectations,omitempty"`
 }
 
 func (t *ToolResult) DumpTimelineItem(buf io.Writer) {
@@ -57,6 +59,10 @@ func (t *ToolResult) String() string {
 		buf.WriteString(fmt.Sprintf("id: %v; ", t.ID))
 	}
 	buf.WriteString(fmt.Sprintf("tool_name: %#v\n", t.Name))
+
+	if t.CallExpectations != "" {
+		buf.WriteString(fmt.Sprintf("call_expectations: %s\n", t.CallExpectations))
+	}
 
 	paramParsed := utils.InterfaceToGeneralMap(t.Param)
 	if len(paramParsed) > 0 {

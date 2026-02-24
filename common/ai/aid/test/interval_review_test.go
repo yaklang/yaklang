@@ -54,7 +54,7 @@ func TestToolCallerIntervalReviewHandler(t *testing.T) {
 		expectedStdout := []byte("test stdout")
 		expectedStderr := []byte("test stderr")
 
-		handler := func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdout, stderr []byte) (bool, error) {
+		handler := func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdout, stderr []byte, callExpectations string) (bool, error) {
 			handlerCalled = true
 			receivedTool = tool
 			receivedParams = params
@@ -88,7 +88,7 @@ func TestToolCallerIntervalReviewHandler(t *testing.T) {
 	t.Run("handler respects configured duration", func(t *testing.T) {
 		var callCount int32
 
-		handler := func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdout, stderr []byte) (bool, error) {
+		handler := func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdout, stderr []byte, callExpectations string) (bool, error) {
 			atomic.AddInt32(&callCount, 1)
 			return true, nil
 		}
@@ -122,7 +122,7 @@ func TestIntervalReviewIntegration_MockedHandler(t *testing.T) {
 		var handlerCallCount int32
 
 		// Create handler that always returns continue
-		handler := func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdout, stderr []byte) (bool, error) {
+		handler := func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdout, stderr []byte, callExpectations string) (bool, error) {
 			atomic.AddInt32(&handlerCallCount, 1)
 			return true, nil // continue
 		}
@@ -156,7 +156,7 @@ func TestIntervalReviewIntegration_MockedHandler(t *testing.T) {
 		var cancelCalled bool
 
 		// Create handler that cancels after 2 calls
-		handler := func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdout, stderr []byte) (bool, error) {
+		handler := func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdout, stderr []byte, callExpectations string) (bool, error) {
 			count := atomic.AddInt32(&handlerCallCount, 1)
 			if count >= 2 {
 				return false, nil // cancel
@@ -200,7 +200,7 @@ func TestIntervalReviewIntegration_MockedHandler(t *testing.T) {
 		expectedStdout := []byte("stdout content here")
 		expectedStderr := []byte("stderr content here")
 
-		handler := func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdout, stderr []byte) (bool, error) {
+		handler := func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdout, stderr []byte, callExpectations string) (bool, error) {
 			receivedTool = tool
 			receivedParams = params
 			receivedStdout = stdout
@@ -249,7 +249,7 @@ func TestIntervalReviewIntegration_MockedHandler(t *testing.T) {
 		var handlerCallCount int32
 
 		// Create handler that returns error
-		handler := func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdout, stderr []byte) (bool, error) {
+		handler := func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdout, stderr []byte, callExpectations string) (bool, error) {
 			atomic.AddInt32(&handlerCallCount, 1)
 			return true, context.DeadlineExceeded // return error but continue
 		}

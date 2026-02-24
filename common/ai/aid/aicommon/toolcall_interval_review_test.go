@@ -89,7 +89,7 @@ func TestWithToolCallerIntervalReviewDuration(t *testing.T) {
 func TestWithToolCallerIntervalReviewHandler(t *testing.T) {
 	t.Run("set handler", func(t *testing.T) {
 		tc := &ToolCaller{}
-		handler := func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdout, stderr []byte) (bool, error) {
+		handler := func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdout, stderr []byte, callExpectations string) (bool, error) {
 			return true, nil
 		}
 		opt := WithToolCaller_IntervalReviewHandler(handler)
@@ -100,7 +100,7 @@ func TestWithToolCallerIntervalReviewHandler(t *testing.T) {
 	t.Run("handler is callable", func(t *testing.T) {
 		tc := &ToolCaller{}
 		called := false
-		handler := func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdout, stderr []byte) (bool, error) {
+		handler := func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdout, stderr []byte, callExpectations string) (bool, error) {
 			called = true
 			return true, nil
 		}
@@ -108,7 +108,7 @@ func TestWithToolCallerIntervalReviewHandler(t *testing.T) {
 		opt(tc)
 
 		// Call the handler
-		result, err := tc.intervalReviewHandler(context.Background(), nil, nil, nil, nil)
+		result, err := tc.intervalReviewHandler(context.Background(), nil, nil, nil, nil, "")
 		require.NoError(t, err)
 		require.True(t, result)
 		require.True(t, called)
@@ -140,7 +140,7 @@ func TestIntervalReviewContext(t *testing.T) {
 	t.Run("exits when context is cancelled", func(t *testing.T) {
 		tc := &ToolCaller{
 			intervalReviewDuration: testMediumInterval,
-			intervalReviewHandler: func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdout, stderr []byte) (bool, error) {
+			intervalReviewHandler: func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdout, stderr []byte, callExpectations string) (bool, error) {
 				return true, nil
 			},
 		}
@@ -170,7 +170,7 @@ func TestIntervalReviewContext(t *testing.T) {
 
 		tc := &ToolCaller{
 			intervalReviewDuration: testShortInterval,
-			intervalReviewHandler: func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdout, stderr []byte) (bool, error) {
+			intervalReviewHandler: func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdout, stderr []byte, callExpectations string) (bool, error) {
 				atomic.AddInt32(&callCount, 1)
 				return true, nil
 			},
@@ -206,7 +206,7 @@ func TestIntervalReviewContext(t *testing.T) {
 
 		tc := &ToolCaller{
 			intervalReviewDuration: testShortInterval,
-			intervalReviewHandler: func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdout, stderr []byte) (bool, error) {
+			intervalReviewHandler: func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdout, stderr []byte, callExpectations string) (bool, error) {
 				count := atomic.AddInt32(&callCount, 1)
 				if count >= 2 {
 					return false, nil // Stop after 2 calls
@@ -250,7 +250,7 @@ func TestIntervalReviewContext(t *testing.T) {
 
 		tc := &ToolCaller{
 			intervalReviewDuration: testShortInterval,
-			intervalReviewHandler: func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdout, stderr []byte) (bool, error) {
+			intervalReviewHandler: func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdout, stderr []byte, callExpectations string) (bool, error) {
 				count := atomic.AddInt32(&callCount, 1)
 				if count == 1 {
 					return false, context.DeadlineExceeded // Return error on first call
@@ -295,7 +295,7 @@ func TestIntervalReviewContext(t *testing.T) {
 
 		tc := &ToolCaller{
 			intervalReviewDuration: testShortInterval,
-			intervalReviewHandler: func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdout, stderr []byte) (bool, error) {
+			intervalReviewHandler: func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdout, stderr []byte, callExpectations string) (bool, error) {
 				mu.Lock()
 				receivedTool = tool
 				receivedParams = params
@@ -337,7 +337,7 @@ func TestIntervalReviewDurationIntegration(t *testing.T) {
 		// Test with short duration (20ms)
 		tcShort := &ToolCaller{
 			intervalReviewDuration: testShortInterval,
-			intervalReviewHandler: func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdout, stderr []byte) (bool, error) {
+			intervalReviewHandler: func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdout, stderr []byte, callExpectations string) (bool, error) {
 				atomic.AddInt32(&shortDurationCalls, 1)
 				return true, nil
 			},
@@ -346,7 +346,7 @@ func TestIntervalReviewDurationIntegration(t *testing.T) {
 		// Test with long duration (100ms)
 		tcLong := &ToolCaller{
 			intervalReviewDuration: testLongInterval,
-			intervalReviewHandler: func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdout, stderr []byte) (bool, error) {
+			intervalReviewHandler: func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdout, stderr []byte, callExpectations string) (bool, error) {
 				atomic.AddInt32(&longDurationCalls, 1)
 				return true, nil
 			},
@@ -387,7 +387,7 @@ func TestIntervalReviewDurationIntegration(t *testing.T) {
 func TestToolCallerOptionsChaining(t *testing.T) {
 	t.Run("chain handler and duration options", func(t *testing.T) {
 		handlerCalled := false
-		handler := func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdout, stderr []byte) (bool, error) {
+		handler := func(ctx context.Context, tool *aitool.Tool, params aitool.InvokeParams, stdout, stderr []byte, callExpectations string) (bool, error) {
 			handlerCalled = true
 			return true, nil
 		}
@@ -400,7 +400,7 @@ func TestToolCallerOptionsChaining(t *testing.T) {
 		require.Equal(t, time.Second*5, tc.intervalReviewDuration)
 
 		// Call the handler to verify it works
-		_, err := tc.intervalReviewHandler(context.Background(), nil, nil, nil, nil)
+		_, err := tc.intervalReviewHandler(context.Background(), nil, nil, nil, nil, "")
 		require.NoError(t, err)
 		require.True(t, handlerCalled)
 	})
