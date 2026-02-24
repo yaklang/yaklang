@@ -21,7 +21,7 @@ func Scan(ctx context.Context, option ...ssaconfig.Option) error {
 
 	runningID := uuid.NewString()
 	defer func() {
-		if success && m != nil {
+		if success && m != nil && m.status != schema.SYNTAXFLOWSCAN_PAUSED {
 			m.SetFinishedQuery(m.GetTotalQuery())
 		}
 		m.SaveTask()
