@@ -105,10 +105,10 @@ func WithAuditMonitorCommand(enable bool) AuditMonitorOption {
 	}
 }
 
-// onLoginEvent 设置登录事件回调
+// auditOnLoginEvent 设置登录事件回调
 // Example:
 // ```
-// monitor = hids.NewAuditMonitor(hids.onLoginEvent(fn(event) {
+// monitor = hids.NewAuditMonitor(hids.auditOnLoginEvent(fn(event) {
 //
 //	println("Login:", event.Username, "from", event.RemoteIP)
 //
@@ -120,10 +120,10 @@ func WithOnLoginEvent(callback func(*LoginEvent)) AuditMonitorOption {
 	}
 }
 
-// onCommandEvent 设置命令执行事件回调
+// auditOnCommandEvent 设置命令执行事件回调
 // Example:
 // ```
-// monitor = hids.NewAuditMonitor(hids.onCommandEvent(fn(event) {
+// monitor = hids.NewAuditMonitor(hids.auditOnCommandEvent(fn(event) {
 //
 //	println("Command:", event.Command, "by", event.Username)
 //

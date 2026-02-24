@@ -32,12 +32,32 @@ var (
 )
 
 // journalEntry journalctl --output=json 的单条记录结构
+// MESSAGE 字段在 journald 中可能是字符串或字节数组（当内容含非 UTF-8 时），
+// 用 json.RawMessage 接收后再按需解析。
 type journalEntry struct {
-	Message           string `json:"MESSAGE"`
-	RealtimeTimestamp string `json:"__REALTIME_TIMESTAMP"` // 微秒时间戳
-	PID               string `json:"_PID"`
-	Hostname          string `json:"_HOSTNAME"`
-	SyslogIdentifier  string `json:"SYSLOG_IDENTIFIER"`
+	RawMessage        json.RawMessage `json:"MESSAGE"`
+	RealtimeTimestamp string          `json:"__REALTIME_TIMESTAMP"` // 微秒时间戳
+	PID               string          `json:"_PID"`
+	Hostname          string          `json:"_HOSTNAME"`
+	SyslogIdentifier  string          `json:"SYSLOG_IDENTIFIER"`
+}
+
+// getMessage 解析 MESSAGE 字段，兼容字符串和字节数组两种 journald 编码格式
+func (e *journalEntry) getMessage() string {
+	if len(e.RawMessage) == 0 {
+		return ""
+	}
+	// 优先尝试字符串格式
+	var s string
+	if err := json.Unmarshal(e.RawMessage, &s); err == nil {
+		return s
+	}
+	// journald 对含二进制内容的消息会编码为 []uint8 数组
+	var raw []byte
+	if err := json.Unmarshal(e.RawMessage, &raw); err == nil {
+		return string(raw)
+	}
+	return ""
 }
 
 // parseJournalTimestamp 解析 journal 时间戳（微秒）
@@ -52,24 +72,36 @@ func parseJournalTimestamp(ts string) time.Time {
 	return time.Unix(us/1e6, (us%1e6)*1000)
 }
 
-// detectSSHUnits 自动检测系统中可用的 sshd 服务 unit 名称
-func detectSSHUnits() []string {
-	candidates := []string{"sshd.service", "ssh.service", "openssh.service", "openssh-server.service"}
-	var available []string
-	for _, unit := range candidates {
-		cmd := exec.Command("systemctl", "cat", unit)
-		if err := cmd.Run(); err == nil {
-			available = append(available, unit)
+// buildJournalArgs 构建 journalctl 参数
+// 默认使用 -t sshd（SYSLOG_IDENTIFIER），比 -u unit 更可靠：
+//   - sshd 无论以什么 unit 名称运行，写日志时 SYSLOG_IDENTIFIER 始终为 "sshd"
+//   - 避免因发行版 service 名不同（ssh/sshd/openssh-server）导致漏监
+//
+// 只有用户通过 journalSSHUnits 显式指定 unit 时才使用 -u 过滤。
+func buildJournalArgs(m *JournalSSHMonitor) []string {
+	args := []string{"--no-pager", "--output=json", "--follow"}
+
+	if len(m.journalUnits) > 0 {
+		for _, unit := range m.journalUnits {
+			args = append(args, "-u", unit)
 		}
+	} else {
+		// 用 syslog 标识符过滤，兼容所有发行版
+		args = append(args, "-t", "sshd")
 	}
-	if len(available) == 0 {
-		// 无法检测时退回到常用名称
-		return []string{"sshd.service", "ssh.service"}
+
+	if m.sinceTime != "" {
+		args = append(args, "--since", m.sinceTime)
 	}
-	return available
+	return args
 }
 
-// CheckJournalAvailable 检查 journalctl 是否可用
+// CheckJournalAvailable 检查 journalctl 是否可用且当前用户有权读取系统级 sshd 日志
+//
+// sshd 日志属于 system journal，非 root 用户需要加入 systemd-journal（或 adm）组才能读取。
+// 如果权限不足，journalctl 会静默返回空结果而不报错，导致监控无法捕获任何事件。
+// 本函数通过不带 -q 执行 journalctl，捕获其向 stderr 输出的权限提示来判断。
+//
 // Example:
 // ```
 // err = hids.CheckJournalAvailable()
@@ -80,11 +112,31 @@ func CheckJournalAvailable() error {
 	if err != nil {
 		return fmt.Errorf("journalctl not found in PATH, systemd may not be running: %v", err)
 	}
-	// 尝试执行一次确认权限
-	cmd := exec.Command(path, "--no-pager", "-n", "0", "--output=json")
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("journalctl execution failed: %v, output: %s", err, string(out))
+
+	// 不加 -q，让 journalctl 将权限不足的提示输出到 stderr
+	// 同时用 -t sshd 定向查询 sshd 相关条目，以触发系统日志的权限检查
+	cmd := exec.Command(path, "--no-pager", "-n", "0", "-t", "sshd")
+	out, _ := cmd.CombinedOutput()
+	output := string(out)
+
+	// 硬性权限错误：journal 文件无法打开
+	if strings.Contains(output, "Permission denied") ||
+		strings.Contains(output, "Failed to open journal") ||
+		strings.Contains(output, "No journal files were opened") {
+		return fmt.Errorf(
+			"cannot access system journal: permission denied\n" +
+				"sshd logs are stored in the system journal and require elevated access.\n")
 	}
+
+	// 软性权限提示：journalctl 运行成功但隐藏了其他用户和系统的日志
+	// 此时监控能启动但捕获不到任何 sshd 事件
+	if strings.Contains(output, "not seeing messages from other users") ||
+		strings.Contains(output, "not seeing messages from the system") ||
+		strings.Contains(output, "Cannot access system journal") {
+		return fmt.Errorf(
+			"current user cannot read system-level journal entries (sshd runs as a system service)\n")
+	}
+
 	return nil
 }
 
@@ -142,20 +194,7 @@ func (m *JournalSSHMonitor) Start() error {
 		return err
 	}
 
-	units := m.journalUnits
-	if len(units) == 0 {
-		units = detectSSHUnits()
-	}
-
-	// 构建 journalctl 参数
-	args := []string{"--no-pager", "--output=json", "--follow"}
-	for _, unit := range units {
-		args = append(args, "-u", unit)
-	}
-	if m.sinceTime != "" {
-		args = append(args, "--since", m.sinceTime)
-	}
-
+	args := buildJournalArgs(m)
 	cmd := exec.Command("journalctl", args...)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -245,7 +284,7 @@ func (m *JournalSSHMonitor) IsRunning() bool {
 
 // parseSSHEvent 从 journal 条目中解析 SSH 事件
 func (m *JournalSSHMonitor) parseSSHEvent(entry *journalEntry) *JournalSSHEvent {
-	msg := entry.Message
+	msg := entry.getMessage()
 	if msg == "" {
 		return nil
 	}
