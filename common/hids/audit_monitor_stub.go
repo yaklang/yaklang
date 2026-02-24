@@ -7,15 +7,32 @@ import (
 	"fmt"
 )
 
-// CheckAuditSystem 检查 audit 子系统状态 (非Linux平台不支持)
+// CheckAuditSystem 检查 audit 子系统状态
+// Example:
+// ```
+// status, err = hids.CheckAuditSystem()
+// if err != nil { println("Audit not available:", err) }
+// println("Audit enabled:", status.Enabled)
+// ```
 func CheckAuditSystem() (*AuditStatus, error) {
 	return nil, fmt.Errorf("audit subsystem is only supported on Linux")
 }
 
-// NewAuditMonitor 创建Audit监控器 (非Linux平台不支持)
+// NewAuditMonitor 创建Audit监控器
 // Example:
 // ```
-// monitor, err = hids.NewAuditMonitor()
+// monitor = hids.NewAuditMonitor(
+//
+//	hids.WithAuditMonitorLogin(true),
+//	hids.WithAuditMonitorCommand(true),
+//	hids.WithOnLoginEvent(func(event) {
+//	    println("Login:", event.Username, "from", event.RemoteIP)
+//	}),
+//	hids.WithOnCommandEvent(func(event) {
+//	    println("Command:", event.Command)
+//	}),
+//
+// )
 // ```
 func NewAuditMonitor(opts ...AuditMonitorOption) (*AuditMonitor, error) {
 	return nil, fmt.Errorf("audit monitor is only supported on Linux")

@@ -1,0 +1,69 @@
+status, err = hids.CheckAuditSystem()
+if err != nil{
+    println("AuditLog not available on current environment! skip tests...")
+    println(err)
+    return
+}else{
+    dump(status)
+}
+monitor, err = hids.NewAuditMonitor(
+    hids.WithAuditMonitorLogin(true),
+    hids.WithAuditMonitorCommand(true),
+    hids.WithOnLoginEvent(fn(event) {
+        println("========== Login Event ==========")
+        printf("  Timestamp:   %v\n", event.Timestamp)
+        printf("  AuditID:     %s\n", event.AuditID)
+        printf("  Username:    %s\n", event.Username)
+        printf("  UID:         %s\n", event.UID)
+        printf("  LoginUser:   %s\n", event.LoginUser)
+        printf("  AUID:        %s\n", event.AUID)
+        printf("  RemoteIP:    %s\n", event.RemoteIP)
+        printf("  RemoteHost:  %s\n", event.RemoteHost)
+        printf("  LoginMethod: %s\n", event.LoginMethod)
+        printf("  Terminal:    %s\n", event.Terminal)
+        printf("  SessionID:   %s\n", event.SessionID)
+        printf("  Result:      %s\n", event.Result)
+        printf("  ExtraData:   %v\n", event.ExtraData)
+        println("=================================")
+    }),
+    hids.WithOnCommandEvent(fn(event) {
+        println("========== Command Event ==========")
+        printf("  Timestamp:   %v\n", event.Timestamp)
+        printf("  AuditID:     %s\n", event.AuditID)
+        printf("  Username:    %s\n", event.Username)
+        printf("  UID:         %s\n", event.UID)
+        printf("  LoginUser:   %s\n", event.LoginUser)
+        printf("  AUID:        %s\n", event.AUID)
+        printf("  PID:         %d\n", event.PID)
+        printf("  PPID:        %d\n", event.PPID)
+        printf("  Command:     %s\n", event.Command)
+        printf("  CommandLine: %s\n", event.CommandLine)
+        printf("  Arguments:   %v\n", event.Arguments)
+        printf("  Executable:  %s\n", event.Executable)
+        printf("  WorkingDir:  %s\n", event.WorkingDir)
+        printf("  Terminal:    %s\n", event.Terminal)
+        printf("  SessionID:   %s\n", event.SessionID)
+        printf("  Result:      %s\n", event.Result)
+        printf("  ExitCode:    %d\n", event.ExitCode)
+        println("===================================")
+    }),
+    hids.WithAuditBufferSize(8192),
+)
+
+if err != nil {
+    printf("Error: %v\n", err)
+    return
+}
+
+err = monitor.Start()
+if err != nil {
+    printf("Start Error: %v\n", err)
+    return
+}
+
+println("Audit monitor started, listening for events...")
+println("Press Ctrl+C to stop")
+exec.System("time")~
+time.Sleep(5)
+monitor.Stop()
+println("Monitor stopped")
