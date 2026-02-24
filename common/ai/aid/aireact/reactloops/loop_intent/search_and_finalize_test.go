@@ -405,7 +405,7 @@ func TestSearchBM25_ToolAndForge(t *testing.T) {
 
 	// Search tools via BM25
 	tools, err := yakit.SearchAIYakToolBM25(db, &yakit.AIYakToolFilter{
-		Keywords: nonce,
+		Keywords: []string{nonce},
 	}, 10, 0)
 	if err != nil {
 		t.Fatalf("BM25 tool search failed: %v", err)
@@ -424,7 +424,7 @@ func TestSearchBM25_ToolAndForge(t *testing.T) {
 
 	// Search forges via BM25
 	forges, err := yakit.SearchAIForgeBM25(db, &yakit.AIForgeSearchFilter{
-		Keywords: nonce,
+		Keywords: []string{nonce},
 	}, 10, 0)
 	if err != nil {
 		t.Fatalf("BM25 forge search failed: %v", err)
