@@ -2573,13 +2573,31 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 
 	// Propagate tiered AI callbacks so child configs (coordinator, P&E sub-invokers)
 	// inherit the speed/quality priority distinction from the parent config.
+	// Set directly to avoid double-wrapping: the callbacks are already wrapped
+	// by the parent's c.wrapper(); using WithSpeedPriorityAICallback would wrap again.
 	if i.SpeedPriorityAICallback != nil {
 		speedCb := i.SpeedPriorityAICallback
-		opts = append(opts, WithSpeedPriorityAICallback(speedCb))
+		opts = append(opts, func(c *Config) error {
+			if c.m == nil {
+				c.m = &sync.Mutex{}
+			}
+			c.m.Lock()
+			c.SpeedPriorityAICallback = speedCb
+			c.m.Unlock()
+			return nil
+		})
 	}
 	if i.QualityPriorityAICallback != nil {
 		qualityCb := i.QualityPriorityAICallback
-		opts = append(opts, WithQualityPriorityAICallback(qualityCb))
+		opts = append(opts, func(c *Config) error {
+			if c.m == nil {
+				c.m = &sync.Mutex{}
+			}
+			c.m.Lock()
+			c.QualityPriorityAICallback = qualityCb
+			c.m.Unlock()
+			return nil
+		})
 	}
 
 	// Propagate intent recognition disable flag so sub-loops (PE task, plan)
