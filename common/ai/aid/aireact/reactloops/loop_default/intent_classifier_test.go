@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
@@ -350,7 +352,7 @@ func TestNeedsDeepAnalysis(t *testing.T) {
 		// BM25 found relevant tools → fast path with context
 		// Example: "扫描端口" where BM25 finds port scanner tool
 		result := &FastMatchResult{
-			MatchedTools: []*schema.AIYakTool{{Name: "port-scanner"}},
+			MatchedTools: []*aitool.Tool{{Tool: &mcp.Tool{Name: "port-scanner"}}},
 		}
 		if result.NeedsDeepAnalysis() {
 			t.Error("result with matched tools should not need deep analysis")
@@ -466,7 +468,7 @@ func TestEscalationScenarios(t *testing.T) {
 				IsSimpleQuery: sc.isSimpleQuery,
 			}
 			if sc.hasMatches {
-				result.MatchedTools = []*schema.AIYakTool{{Name: "dummy-tool"}}
+				result.MatchedTools = []*aitool.Tool{{Tool: &mcp.Tool{Name: "dummy-tool"}}}
 			}
 
 			// Verify escalation decision
@@ -525,9 +527,9 @@ func TestBuildFastMatchSummary_Empty(t *testing.T) {
 
 func TestBuildFastMatchSummary_WithTools(t *testing.T) {
 	result := &FastMatchResult{
-		MatchedTools: []*schema.AIYakTool{
-			{Name: "port-scanner", VerboseName: "Port Scanner", Description: "Scan TCP/UDP ports on target hosts"},
-			{Name: "http-fuzzer", Description: "Fuzz HTTP requests with various payloads"},
+		MatchedTools: []*aitool.Tool{
+			{Tool: &mcp.Tool{Name: "port-scanner", Description: "Scan TCP/UDP ports on target hosts"}, VerboseName: "Port Scanner"},
+			{Tool: &mcp.Tool{Name: "http-fuzzer", Description: "Fuzz HTTP requests with various payloads"}},
 		},
 	}
 	summary := buildFastMatchSummary(result)
@@ -727,15 +729,16 @@ func TestIntentSearchDualChannel(t *testing.T) {
 	})
 
 	t.Run("search covers tools forges and loops", func(t *testing.T) {
-		// Verify that FastIntentMatch searches all three capability types:
-		// 1. AIYakTool via yakit.SearchAIYakToolBM25 (BM25 + LIKE fallback)
-		// 2. AIForge via yakit.SearchAIForgeBM25 (BM25 + LIKE fallback)
-		// 3. LoopMetadata via matchLoopMetadata (in-memory token matching)
+		// Verify that FastIntentMatch searches all three capability types
+		// via ToolRecommender.QuickSearch:
+		// 1. aitool.Tool via BM25 search (BM25 + LIKE fallback)
+		// 2. AIForge via BM25 search (BM25 + LIKE fallback)
+		// 3. LoopMetadata via keyword matching (in-memory token matching)
 
 		// This is a structural test - the actual search requires a DB
 		// We verify the result struct can hold all three types
 		result := &FastMatchResult{
-			MatchedTools:  []*schema.AIYakTool{{Name: "tool1"}},
+			MatchedTools:  []*aitool.Tool{{Tool: &mcp.Tool{Name: "tool1"}}},
 			MatchedForges: []*schema.AIForge{{ForgeName: "forge1"}},
 			MatchedLoops:  []*reactloops.LoopMetadata{{Name: "loop1"}},
 		}

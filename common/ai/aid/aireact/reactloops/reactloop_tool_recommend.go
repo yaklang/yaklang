@@ -39,11 +39,9 @@ type ToolRecommender struct {
 }
 
 // NewToolRecommender 创建新的工具推荐管理器
+// 初始化时会使用 limit 查询填充缓存默认值
 func NewToolRecommender(invoker aicommon.AIInvokeRuntime) *ToolRecommender {
-	return &ToolRecommender{
-		cachedToolsList:            make([]*aitool.Tool, 0),
-		cachedForgesList:           make([]*schema.AIForge, 0),
-		cachedLoopsList:            make([]*LoopMetadata, 0),
+	tr := &ToolRecommender{
 		cachedToolsListMutex:       new(sync.Mutex),
 		cachedForgesListMutex:      new(sync.Mutex),
 		cachedLoopsListMutex:       new(sync.Mutex),
@@ -53,6 +51,27 @@ func NewToolRecommender(invoker aicommon.AIInvokeRuntime) *ToolRecommender {
 		maxForgesLimit:             200, // 默认限制 forge 数量为 200 个
 		maxLoopsLimit:              10,  // 默认限制 loop 数量为 10 个
 	}
+
+	// 使用 limit 查询初始化缓存默认值
+	if tools := tr.getAllAvailableTools(); len(tools) > 0 {
+		tr.cachedToolsList = tr.prioritizeAndLimitTools(tools, tr.maxToolsLimit)
+	} else {
+		tr.cachedToolsList = make([]*aitool.Tool, 0)
+	}
+
+	if forges := tr.getAllAvailableForges(); len(forges) > 0 {
+		tr.cachedForgesList = tr.limitForges(forges, tr.maxForgesLimit)
+	} else {
+		tr.cachedForgesList = make([]*schema.AIForge, 0)
+	}
+
+	if loops := tr.getAllAvailableLoops(); len(loops) > 0 {
+		tr.cachedLoopsList = loops
+	} else {
+		tr.cachedLoopsList = make([]*LoopMetadata, 0)
+	}
+
+	return tr
 }
 
 // GetRecommendedToolsAndForges 根据用户输入通过关键词匹配获取推荐的 tools 和 forges
@@ -64,8 +83,6 @@ func (tr *ToolRecommender) GetRecommendedToolsAndForges(userInput string, config
 // GetRecommendedToolsAndForgesWithLimits 根据用户输入通过关键词匹配获取推荐的 tools 和 forges
 // 支持自定义限制值
 func (tr *ToolRecommender) GetRecommendedToolsAndForgesWithLimits(userInput string, config aicommon.AICallerConfigIf, maxToolsLimit, maxForgesLimit int) ([]*aitool.Tool, []*schema.AIForge) {
-	// 使用传入的限制值
-
 	tr.cachedToolsListMutex.Lock()
 	defer tr.cachedToolsListMutex.Unlock()
 
@@ -74,22 +91,16 @@ func (tr *ToolRecommender) GetRecommendedToolsAndForgesWithLimits(userInput stri
 
 	// 获取所有可用工具
 	var allTools []*aitool.Tool
-	toolMgr := config.GetAiToolManager()
-	if toolMgr != nil {
-		allTools, _ = toolMgr.GetEnableTools()
+	if mgr := config.GetAiToolManager(); mgr != nil {
+		allTools, _ = mgr.GetEnableTools()
 	}
 
 	// 获取所有可用 forges
 	var allForges []*schema.AIForge
 	if cfg, ok := config.(*aicommon.Config); ok {
-		// 首先添加扩展 forges（通过 WithForges 添加的）
 		allForges = append(allForges, cfg.ExtendedForge...)
-
-		// 然后查询数据库中的 forges
-		mgr := cfg.GetAIForgeManager()
-		if mgr != nil {
-			forges, err := mgr.Query(config.GetContext())
-			if err == nil {
+		if mgr := cfg.GetAIForgeManager(); mgr != nil {
+			if forges, err := mgr.Query(config.GetContext()); err == nil {
 				allForges = append(allForges, forges...)
 			} else {
 				log.Warnf("failed to query forges: %v", err)
@@ -102,7 +113,7 @@ func (tr *ToolRecommender) GetRecommendedToolsAndForgesWithLimits(userInput stri
 		tr.cachedToolsList = tr.prioritizeAndLimitTools(allTools, maxToolsLimit)
 	}
 
-	// 如果缓存的 forges 列表为空，使用全部 forges 初始化（限制数量）
+	// 如果缓存的 forges 列表为空，使用全部 forges 初始化
 	if len(tr.cachedForgesList) == 0 {
 		tr.cachedForgesList = tr.limitForges(allForges, maxForgesLimit)
 	}
@@ -112,114 +123,54 @@ func (tr *ToolRecommender) GetRecommendedToolsAndForgesWithLimits(userInput stri
 		return tr.prioritizeAndLimitTools(allTools, maxToolsLimit), tr.limitForges(allForges, maxForgesLimit)
 	}
 
-	// 将用户输入转为小写用于匹配
-	userInputLower := strings.ToLower(userInput)
+	queryLower := strings.ToLower(userInput)
 
-	// ============ 处理工具匹配 ============
-	var matchedTools []*aitool.Tool
-	matchedToolsMap := make(map[string]bool)
+	// ============ 使用关键词匹配工具 ============
+	matchedTools := keywordMatchTools(allTools, queryLower, maxToolsLimit)
 
-	for _, tool := range allTools {
-		// 检查工具名称是否匹配
-		if utils.MatchAnyOfSubString(userInputLower, strings.ToLower(tool.Name)) {
-			matchedTools = append(matchedTools, tool)
-			matchedToolsMap[tool.Name] = true
-			continue
-		}
-
-		// 检查 VerboseName 是否匹配
-		if tool.VerboseName != "" && utils.MatchAnyOfSubString(userInputLower, strings.ToLower(tool.VerboseName)) {
-			matchedTools = append(matchedTools, tool)
-			matchedToolsMap[tool.Name] = true
-			continue
-		}
-
-		// 检查关键词是否匹配
-		for _, keyword := range tool.Keywords {
-			if keyword != "" && utils.MatchAnyOfSubString(userInputLower, strings.ToLower(keyword)) {
-				matchedTools = append(matchedTools, tool)
-				matchedToolsMap[tool.Name] = true
-				break
-			}
-		}
-	}
-
-	// 如果有匹配成功的工具，把匹配的放在前面
 	var recommendedTools []*aitool.Tool
 	if len(matchedTools) > 0 {
-		// 首先添加匹配的工具（应用优先级排序）
 		matchedPrioritized := tr.prioritizeAndLimitTools(matchedTools, maxToolsLimit)
 		recommendedTools = append(recommendedTools, matchedPrioritized...)
 
-		// 然后从缓存列表中添加未匹配的工具，直到达到限制
+		matchedToolsMap := make(map[string]bool)
+		for _, t := range matchedTools {
+			matchedToolsMap[t.Name] = true
+		}
 		for _, cachedTool := range tr.cachedToolsList {
 			if len(recommendedTools) >= maxToolsLimit {
 				break
 			}
-			// 如果这个工具不在匹配列表中，添加它
 			if !matchedToolsMap[cachedTool.Name] {
 				recommendedTools = append(recommendedTools, cachedTool)
 			}
 		}
-
-		// 更新缓存列表
 		tr.cachedToolsList = recommendedTools
 	} else {
-		// 没有匹配到任何工具，返回缓存的工具列表
 		recommendedTools = tr.cachedToolsList
 	}
 
-	// ============ 处理 forges 匹配 ============
-	var matchedForges []*schema.AIForge
-	matchedForgesMap := make(map[string]bool)
+	// ============ 使用关键词匹配 forges ============
+	matchedForges := keywordMatchForges(allForges, queryLower, maxForgesLimit)
 
-	for _, forge := range allForges {
-		// 检查 forge 名称是否匹配
-		if utils.MatchAnyOfSubString(userInputLower, strings.ToLower(forge.ForgeName)) {
-			matchedForges = append(matchedForges, forge)
-			matchedForgesMap[forge.ForgeName] = true
-			continue
-		}
-
-		// 检查 VerboseName 是否匹配
-		if forge.ForgeVerboseName != "" && utils.MatchAnyOfSubString(userInputLower, strings.ToLower(forge.ForgeVerboseName)) {
-			matchedForges = append(matchedForges, forge)
-			matchedForgesMap[forge.ForgeName] = true
-			continue
-		}
-
-		// 检查标签是否匹配
-		keywords := forge.GetKeywords()
-		for _, keyword := range keywords {
-			if keyword != "" && utils.MatchAnyOfSubString(userInputLower, strings.ToLower(keyword)) {
-				matchedForges = append(matchedForges, forge)
-				matchedForgesMap[forge.ForgeName] = true
-				break
-			}
-		}
-	}
-
-	// 如果有匹配成功的 forges，把匹配的放在前面
 	var recommendedForges []*schema.AIForge
 	if len(matchedForges) > 0 {
-		// 首先添加匹配的 forges（限制数量）
 		recommendedForges = append(recommendedForges, tr.limitForges(matchedForges, maxForgesLimit)...)
 
-		// 然后从缓存列表中添加未匹配的 forges，直到达到限制
+		matchedForgesMap := make(map[string]bool)
+		for _, f := range matchedForges {
+			matchedForgesMap[f.ForgeName] = true
+		}
 		for _, cachedForge := range tr.cachedForgesList {
 			if len(recommendedForges) >= maxForgesLimit {
 				break
 			}
-			// 如果这个 forge 不在匹配列表中，添加它
 			if !matchedForgesMap[cachedForge.ForgeName] {
 				recommendedForges = append(recommendedForges, cachedForge)
 			}
 		}
-
-		// 更新缓存列表
 		tr.cachedForgesList = recommendedForges
 	} else {
-		// 没有匹配到任何 forge，返回缓存的 forges 列表
 		recommendedForges = tr.cachedForgesList
 	}
 
@@ -276,7 +227,7 @@ func (tr *ToolRecommender) GetRecommendedToolsAndForgesAsync(userInput string, c
 
 		// ============ 更新缓存 ============
 		if len(searchedTools) > 0 {
-			tr.updateCacheWithMatchedItems(searchedTools, nil)
+			tr.updateCacheWithMatchedItems(searchedTools, nil, nil)
 		}
 	}()
 }
@@ -286,8 +237,8 @@ func (tr *ToolRecommender) WaitRecommendTask() {
 	tr.recommendTaskSizeWaitGroup.Wait()
 }
 
-// GetCachedToolsAndForges 获取缓存的工具和 forges（需要加锁）
-func (tr *ToolRecommender) GetCachedToolsAndForges() ([]*aitool.Tool, []*schema.AIForge) {
+// GetCachedToolsAndForges 获取缓存的工具、forges 和 loops（需要加锁）
+func (tr *ToolRecommender) GetCachedToolsAndForges() ([]*aitool.Tool, []*schema.AIForge, []*LoopMetadata) {
 	tr.cachedToolsListMutex.Lock()
 	tools := tr.cachedToolsList
 	tr.cachedToolsListMutex.Unlock()
@@ -296,7 +247,11 @@ func (tr *ToolRecommender) GetCachedToolsAndForges() ([]*aitool.Tool, []*schema.
 	forges := tr.cachedForgesList
 	tr.cachedForgesListMutex.Unlock()
 
-	return tools, forges
+	tr.cachedLoopsListMutex.Lock()
+	loops := tr.cachedLoopsList
+	tr.cachedLoopsListMutex.Unlock()
+
+	return tools, forges, loops
 }
 
 // WaitForAsyncSearchWithTimeout 等待异步搜索完成，最多等待指定时间
@@ -331,6 +286,7 @@ func (tr *ToolRecommender) prioritizeAndLimitTools(tools []*aitool.Tool, maxCoun
 		"now",
 		"bash",
 		"read_file",
+		"ls",
 		"grep",
 		"find_file",
 		"send_http_request_by_url",
@@ -386,79 +342,194 @@ func (tr *ToolRecommender) limitForges(forges []*schema.AIForge, maxCount int) [
 	return forges[:maxCount]
 }
 
+// keywordMatchTools 使用关键词匹配工具（name、verboseName、keywords 子串匹配）
+func keywordMatchTools(allTools []*aitool.Tool, queryLower string, limit int) []*aitool.Tool {
+	var matched []*aitool.Tool
+	for _, tool := range allTools {
+		if utils.MatchAnyOfSubString(queryLower, strings.ToLower(tool.Name)) {
+			matched = append(matched, tool)
+		} else if tool.VerboseName != "" && utils.MatchAnyOfSubString(queryLower, strings.ToLower(tool.VerboseName)) {
+			matched = append(matched, tool)
+		} else {
+			for _, keyword := range tool.Keywords {
+				if keyword != "" && utils.MatchAnyOfSubString(queryLower, strings.ToLower(keyword)) {
+					matched = append(matched, tool)
+					break
+				}
+			}
+		}
+		if limit > 0 && len(matched) >= limit {
+			break
+		}
+	}
+	return matched
+}
+
+// keywordMatchForges 使用关键词匹配 forges（forgeName、verboseName、keywords 子串匹配）
+func keywordMatchForges(allForges []*schema.AIForge, queryLower string, limit int) []*schema.AIForge {
+	var matched []*schema.AIForge
+	for _, forge := range allForges {
+		if utils.MatchAnyOfSubString(queryLower, strings.ToLower(forge.ForgeName)) {
+			matched = append(matched, forge)
+		} else if forge.ForgeVerboseName != "" && utils.MatchAnyOfSubString(queryLower, strings.ToLower(forge.ForgeVerboseName)) {
+			matched = append(matched, forge)
+		} else {
+			for _, keyword := range forge.GetKeywords() {
+				if keyword != "" && utils.MatchAnyOfSubString(queryLower, strings.ToLower(keyword)) {
+					matched = append(matched, forge)
+					break
+				}
+			}
+		}
+		if limit > 0 && len(matched) >= limit {
+			break
+		}
+	}
+	return matched
+}
+
+// mergeAndDeduplicateTools 合并并去重工具列表，primary 优先
+func mergeAndDeduplicateTools(primary, secondary []*aitool.Tool, limit int) []*aitool.Tool {
+	seen := make(map[string]bool)
+	var result []*aitool.Tool
+	for _, t := range primary {
+		if !seen[t.Name] {
+			seen[t.Name] = true
+			result = append(result, t)
+		}
+	}
+	for _, t := range secondary {
+		if limit > 0 && len(result) >= limit {
+			break
+		}
+		if !seen[t.Name] {
+			seen[t.Name] = true
+			result = append(result, t)
+		}
+	}
+	return result
+}
+
+// mergeAndDeduplicateForges 合并并去重 forge 列表，primary 优先
+func mergeAndDeduplicateForges(primary, secondary []*schema.AIForge, limit int) []*schema.AIForge {
+	seen := make(map[string]bool)
+	var result []*schema.AIForge
+	for _, f := range primary {
+		if !seen[f.ForgeName] {
+			seen[f.ForgeName] = true
+			result = append(result, f)
+		}
+	}
+	for _, f := range secondary {
+		if limit > 0 && len(result) >= limit {
+			break
+		}
+		if !seen[f.ForgeName] {
+			seen[f.ForgeName] = true
+			result = append(result, f)
+		}
+	}
+	return result
+}
+
+// mergeAndDeduplicateLoops 合并并去重 loop 列表，primary 优先
+func mergeAndDeduplicateLoops(primary, secondary []*LoopMetadata, limit int) []*LoopMetadata {
+	seen := make(map[string]bool)
+	var result []*LoopMetadata
+	for _, l := range primary {
+		if !seen[l.Name] {
+			seen[l.Name] = true
+			result = append(result, l)
+		}
+	}
+	for _, l := range secondary {
+		if limit > 0 && len(result) >= limit {
+			break
+		}
+		if !seen[l.Name] {
+			seen[l.Name] = true
+			result = append(result, l)
+		}
+	}
+	return result
+}
+
 // updateCacheWithMatchedItems 更新缓存，包括优先级处理和限制处理
-// matchedTools: 新匹配到的工具列表
-// matchedForges: 新匹配到的 forge 列表
-func (tr *ToolRecommender) updateCacheWithMatchedItems(matchedTools []*aitool.Tool, matchedForges []*schema.AIForge) {
-	// 使用配置的限制值
+// 新匹配的结果会排在前面，原缓存中未重复的条目补充到后面，直到达到限制
+func (tr *ToolRecommender) updateCacheWithMatchedItems(matchedTools []*aitool.Tool, matchedForges []*schema.AIForge, matchedLoops []*LoopMetadata) {
 	maxToolsLimit := tr.maxToolsLimit
 	maxForgesLimit := tr.maxForgesLimit
-
-	tr.cachedToolsListMutex.Lock()
-	defer tr.cachedToolsListMutex.Unlock()
-
-	tr.cachedForgesListMutex.Lock()
-	defer tr.cachedForgesListMutex.Unlock()
+	maxLoopsLimit := tr.maxLoopsLimit
 
 	// ============ 更新工具缓存 ============
 	if len(matchedTools) > 0 {
-		// 创建工具名称映射，用于去重
-		toolMap := make(map[string]*aitool.Tool)
-		var newToolsList []*aitool.Tool
+		tr.cachedToolsListMutex.Lock()
 
-		// 首先添加新匹配的工具（应用优先级排序）
-		prioritizedMatched := tr.prioritizeAndLimitTools(matchedTools, maxToolsLimit)
-		for _, tool := range prioritizedMatched {
-			toolMap[tool.Name] = tool
-			newToolsList = append(newToolsList, tool)
-		}
+		// 先合并 matchedTools（优先）和缓存中的工具，去重
+		merged := mergeAndDeduplicateTools(matchedTools, tr.cachedToolsList, 0)
+		// 再整体按 priorityNames 排序并限制数量
+		tr.cachedToolsList = tr.prioritizeAndLimitTools(merged, maxToolsLimit)
 
-		// 然后从原缓存中添加未匹配的工具，直到达到限制
-		for _, cachedTool := range tr.cachedToolsList {
-			if len(newToolsList) >= maxToolsLimit {
-				break
-			}
-			// 如果这个工具不在新匹配列表中，添加它
-			if _, exists := toolMap[cachedTool.Name]; !exists {
-				newToolsList = append(newToolsList, cachedTool)
-				toolMap[cachedTool.Name] = cachedTool
-			}
-		}
-
-		// 更新缓存
-		tr.cachedToolsList = newToolsList
+		tr.cachedToolsListMutex.Unlock()
 		log.Infof("updated tools cache: matched %d tools, total cache size %d", len(matchedTools), len(tr.cachedToolsList))
 	}
 
 	// ============ 更新 forge 缓存 ============
 	if len(matchedForges) > 0 {
-		// 创建 forge 名称映射，用于去重
+		tr.cachedForgesListMutex.Lock()
+		limitedMatched := tr.limitForges(matchedForges, maxForgesLimit)
+
 		forgeMap := make(map[string]*schema.AIForge)
 		var newForgesList []*schema.AIForge
-
-		// 首先添加新匹配的 forges（限制数量）
-		limitedMatched := tr.limitForges(matchedForges, maxForgesLimit)
 		for _, forge := range limitedMatched {
 			forgeMap[forge.ForgeName] = forge
 			newForgesList = append(newForgesList, forge)
 		}
-
-		// 然后从原缓存中添加未匹配的 forges，直到达到限制
 		for _, cachedForge := range tr.cachedForgesList {
 			if len(newForgesList) >= maxForgesLimit {
 				break
 			}
-			// 如果这个 forge 不在新匹配列表中，添加它
 			if _, exists := forgeMap[cachedForge.ForgeName]; !exists {
 				newForgesList = append(newForgesList, cachedForge)
 				forgeMap[cachedForge.ForgeName] = cachedForge
 			}
 		}
 
-		// 更新缓存
 		tr.cachedForgesList = newForgesList
+		tr.cachedForgesListMutex.Unlock()
 		log.Infof("updated forge cache: matched %d forges, total cache size %d", len(matchedForges), len(tr.cachedForgesList))
 	}
+
+	// ============ 更新 loops 缓存 ============
+	if len(matchedLoops) > 0 {
+		tr.cachedLoopsListMutex.Lock()
+
+		loopMap := make(map[string]*LoopMetadata)
+		var newLoopsList []*LoopMetadata
+		for _, loop := range matchedLoops {
+			loopMap[loop.Name] = loop
+			newLoopsList = append(newLoopsList, loop)
+		}
+		for _, cachedLoop := range tr.cachedLoopsList {
+			if maxLoopsLimit > 0 && len(newLoopsList) >= maxLoopsLimit {
+				break
+			}
+			if _, exists := loopMap[cachedLoop.Name]; !exists {
+				newLoopsList = append(newLoopsList, cachedLoop)
+				loopMap[cachedLoop.Name] = cachedLoop
+			}
+		}
+
+		tr.cachedLoopsList = newLoopsList
+		tr.cachedLoopsListMutex.Unlock()
+		log.Infof("updated loops cache: matched %d loops, total cache size %d", len(matchedLoops), len(tr.cachedLoopsList))
+	}
+}
+
+// QuickSearch 执行快速双通道搜索（BM25 + 关键词匹配），适用于 FastIntentMatch 等快速意图识别场景。
+// 使用较小的默认限制（各 5 条），搜索后自动更新缓存并返回合并去重后的结果。
+func (tr *ToolRecommender) QuickSearch(query string) ([]*aitool.Tool, []*schema.AIForge, []*LoopMetadata, error) {
+	return tr.SearchAndUpdateCache(query, 5, 5, 5)
 }
 
 // SearchCapabilitiesBM25 使用 BM25 搜索工具、forge 和 loops
@@ -514,6 +585,101 @@ func (tr *ToolRecommender) SearchCapabilitiesBM25(query string, toolLimit, forge
 	loops = tr.searchLoopMetadata(query, loopLimit)
 	if len(loops) > 0 {
 		log.Infof("Found %d matching loops", len(loops))
+	}
+
+	return tools, forges, loops, nil
+}
+
+// getAllAvailableTools 从 invoker 配置中获取所有可用工具
+func (tr *ToolRecommender) getAllAvailableTools() []*aitool.Tool {
+	if tr.invoker == nil {
+		return nil
+	}
+	config := tr.invoker.GetConfig()
+	if config == nil {
+		return nil
+	}
+	if mgr := config.GetAiToolManager(); mgr != nil {
+		tools, _ := mgr.GetEnableTools()
+		return tools
+	}
+	return nil
+}
+
+// getAllAvailableForges 从 invoker 配置中获取所有可用 forges
+func (tr *ToolRecommender) getAllAvailableForges() []*schema.AIForge {
+	if tr.invoker == nil {
+		return nil
+	}
+	config := tr.invoker.GetConfig()
+	if config == nil {
+		return nil
+	}
+	cfg, ok := config.(*aicommon.Config)
+	if !ok {
+		return nil
+	}
+	var allForges []*schema.AIForge
+	allForges = append(allForges, cfg.ExtendedForge...)
+	if mgr := cfg.GetAIForgeManager(); mgr != nil {
+		if forges, err := mgr.Query(config.GetContext()); err == nil {
+			allForges = append(allForges, forges...)
+		} else {
+			log.Warnf("failed to query forges: %v", err)
+		}
+	}
+	return allForges
+}
+
+// getAllAvailableLoops 获取所有非隐藏的 loop metadata，按 maxLoopsLimit 限制数量
+func (tr *ToolRecommender) getAllAvailableLoops() []*LoopMetadata {
+	allMeta := GetAllLoopMetadata()
+	var visible []*LoopMetadata
+	for _, meta := range allMeta {
+		if meta.IsHidden {
+			continue
+		}
+		visible = append(visible, meta)
+		if tr.maxLoopsLimit > 0 && len(visible) >= tr.maxLoopsLimit {
+			break
+		}
+	}
+	return visible
+}
+
+// SearchCapabilitiesKeyword 使用关键词匹配搜索工具、forge 和 loops
+// 与 SearchCapabilitiesBM25 签名一致，但使用 name/verboseName/keywords 子串匹配
+func (tr *ToolRecommender) SearchCapabilitiesKeyword(query string, toolLimit, forgeLimit, loopLimit int) (
+	tools []*aitool.Tool,
+	forges []*schema.AIForge,
+	loops []*LoopMetadata,
+	err error,
+) {
+	query = strings.TrimSpace(query)
+	if query == "" {
+		return nil, nil, nil, utils.Error("search query is empty")
+	}
+
+	queryLower := strings.ToLower(query)
+
+	// 1. 关键词匹配工具
+	allTools := tr.getAllAvailableTools()
+	tools = keywordMatchTools(allTools, queryLower, toolLimit)
+	if len(tools) > 0 {
+		log.Infof("keyword search found %d tools", len(tools))
+	}
+
+	// 2. 关键词匹配 forges
+	allForges := tr.getAllAvailableForges()
+	forges = keywordMatchForges(allForges, queryLower, forgeLimit)
+	if len(forges) > 0 {
+		log.Infof("keyword search found %d forges", len(forges))
+	}
+
+	// 3. 搜索 loops（使用关键词匹配）
+	loops = tr.searchLoopMetadata(query, loopLimit)
+	if len(loops) > 0 {
+		log.Infof("keyword search found %d matching loops", len(loops))
 	}
 
 	return tools, forges, loops, nil
@@ -580,84 +746,29 @@ func (tr *ToolRecommender) UpdateCachedLoops(loops []*LoopMetadata) {
 	tr.cachedLoopsList = loops
 }
 
-// SearchAndUpdateCache 统一的搜索方法，使用 BM25 搜索工具和 forges，关键词搜索 loops
-// 搜索完成后更新缓存
-func (tr *ToolRecommender) SearchAndUpdateCache(query string, toolLimit, forgeLimit, loopLimit int) error {
+// SearchAndUpdateCache 统一的搜索方法，同时使用 BM25 和关键词双通道搜索工具、forges 和 loops，
+// 搜索完成后去重合并并更新缓存，返回合并后的结果。
+func (tr *ToolRecommender) SearchAndUpdateCache(query string, toolLimit, forgeLimit, loopLimit int) (
+	[]*aitool.Tool, []*schema.AIForge, []*LoopMetadata, error,
+) {
 	// 执行 BM25 搜索
-	tools, forges, loops, err := tr.SearchCapabilitiesBM25(query, toolLimit, forgeLimit, loopLimit)
+	bm25Tools, bm25Forges, bm25Loops, err := tr.SearchCapabilitiesBM25(query, toolLimit, forgeLimit, loopLimit)
 	if err != nil {
-		return err
+		return nil, nil, nil, err
 	}
 
-	// 更新工具缓存（应用优先级排序）
-	if len(tools) > 0 {
-		tr.cachedToolsListMutex.Lock()
-		prioritizedTools := tr.prioritizeAndLimitTools(tools, toolLimit)
+	// 执行关键词搜索
+	kwTools, kwForges, kwLoops, _ := tr.SearchCapabilitiesKeyword(query, toolLimit, forgeLimit, loopLimit)
 
-		// 创建工具映射用于去重
-		toolMap := make(map[string]*aitool.Tool)
-		var newToolsList []*aitool.Tool
+	// 合并去重（BM25 结果优先）
+	tools := mergeAndDeduplicateTools(bm25Tools, kwTools, toolLimit)
+	forges := mergeAndDeduplicateForges(bm25Forges, kwForges, forgeLimit)
+	loops := mergeAndDeduplicateLoops(bm25Loops, kwLoops, loopLimit)
 
-		// 首先添加新搜索到的工具
-		for _, tool := range prioritizedTools {
-			toolMap[tool.Name] = tool
-			newToolsList = append(newToolsList, tool)
-		}
+	// 使用统一的缓存更新方法
+	tr.updateCacheWithMatchedItems(tools, forges, loops)
 
-		// 然后从原缓存中添加未匹配的工具，直到达到限制
-		for _, cachedTool := range tr.cachedToolsList {
-			if len(newToolsList) >= toolLimit {
-				break
-			}
-			if _, exists := toolMap[cachedTool.Name]; !exists {
-				newToolsList = append(newToolsList, cachedTool)
-				toolMap[cachedTool.Name] = cachedTool
-			}
-		}
-
-		tr.cachedToolsList = newToolsList
-		tr.cachedToolsListMutex.Unlock()
-		log.Infof("updated tools cache via BM25: found %d tools, total cache size %d", len(tools), len(tr.cachedToolsList))
-	}
-
-	// 更新 forge 缓存
-	if len(forges) > 0 {
-		tr.cachedForgesListMutex.Lock()
-		limitedForges := tr.limitForges(forges, forgeLimit)
-
-		// 创建 forge 映射用于去重
-		forgeMap := make(map[string]*schema.AIForge)
-		var newForgesList []*schema.AIForge
-
-		// 首先添加新搜索到的 forges
-		for _, forge := range limitedForges {
-			forgeMap[forge.ForgeName] = forge
-			newForgesList = append(newForgesList, forge)
-		}
-
-		// 然后从原缓存中添加未匹配的 forges，直到达到限制
-		for _, cachedForge := range tr.cachedForgesList {
-			if len(newForgesList) >= forgeLimit {
-				break
-			}
-			if _, exists := forgeMap[cachedForge.ForgeName]; !exists {
-				newForgesList = append(newForgesList, cachedForge)
-				forgeMap[cachedForge.ForgeName] = cachedForge
-			}
-		}
-
-		tr.cachedForgesList = newForgesList
-		tr.cachedForgesListMutex.Unlock()
-		log.Infof("updated forges cache via BM25: found %d forges, total cache size %d", len(forges), len(tr.cachedForgesList))
-	}
-
-	// 更新 loops 缓存
-	if len(loops) > 0 {
-		tr.UpdateCachedLoops(loops)
-		log.Infof("updated loops cache: found %d loops", len(loops))
-	}
-
-	return nil
+	return tools, forges, loops, nil
 }
 
 // SearchAndUpdateCacheAsync 异步执行搜索并更新缓存
@@ -679,7 +790,7 @@ func (tr *ToolRecommender) SearchAndUpdateCacheAsync(query string, toolLimit, fo
 			}
 		}()
 
-		if err := tr.SearchAndUpdateCache(query, toolLimit, forgeLimit, loopLimit); err != nil {
+		if _, _, _, err := tr.SearchAndUpdateCache(query, toolLimit, forgeLimit, loopLimit); err != nil {
 			log.Errorf("async capability search failed: %v", err)
 		}
 	}()

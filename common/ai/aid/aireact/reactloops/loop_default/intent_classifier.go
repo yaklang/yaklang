@@ -8,10 +8,9 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
-	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 // InputScale represents the complexity level of user input.
@@ -142,8 +141,8 @@ type FastMatchResult struct {
 	// or other trivial query that can be answered directly.
 	IsSimpleQuery bool
 
-	// MatchedTools contains tools found via BM25 search
-	MatchedTools []*schema.AIYakTool
+	// MatchedTools contains tools found via BM25 search (through ToolRecommender)
+	MatchedTools []*aitool.Tool
 
 	// MatchedForges contains forges found via keyword matching
 	MatchedForges []*schema.AIForge
@@ -194,37 +193,34 @@ func FastIntentMatch(r aicommon.AIInvokeRuntime, input string) *FastMatchResult 
 		return result
 	}
 
-	// Step 2: BM25 Trigram + keyword dual-channel search for tools, forges, and loops
-	db := consts.GetGormProfileDatabase()
-	if db != nil {
-		// Search AIYakTool via BM25 (FTS5 trigram with LIKE fallback for short queries)
-		tools, err := yakit.SearchAIYakToolBM25(db, &yakit.AIYakToolFilter{
-			Keywords: trimmed,
-		}, 5, 0)
-		if err != nil {
-			log.Warnf("fast intent match: BM25 tool search failed: %v", err)
-		} else if len(tools) > 0 {
-			result.MatchedTools = tools
-			log.Infof("fast intent match: found %d tools via BM25 for: %s", len(tools), trimmed)
-		}
-
-		// Search AIForge via BM25 (FTS5 trigram with LIKE fallback for short queries)
-		forges, err := yakit.SearchAIForgeBM25(db, &yakit.AIForgeSearchFilter{
-			Keywords: trimmed,
-		}, 5, 0)
-		if err != nil {
-			log.Warnf("fast intent match: BM25 forge search failed: %v", err)
-		} else if len(forges) > 0 {
-			result.MatchedForges = forges
-			log.Infof("fast intent match: found %d forges via BM25 for: %s", len(forges), trimmed)
-		}
+	// Step 2: BM25 Trigram + keyword search via ToolRecommender (tools, forges, loops)
+	type toolRecommenderGetter interface {
+		GetToolRecommender() *reactloops.ToolRecommender
 	}
 
-	// Search registered loop metadata (in-memory, not DB-backed)
-	matchedLoops := matchLoopMetadata(trimmed)
-	if len(matchedLoops) > 0 {
-		result.MatchedLoops = matchedLoops
-		log.Infof("fast intent match: found %d matching loops for: %s", len(matchedLoops), trimmed)
+	getter, ok := r.(toolRecommenderGetter)
+	if !ok {
+		log.Warnf("fast intent match: runtime does not support GetToolRecommender, skipping capability search")
+	} else if recommender := getter.GetToolRecommender(); recommender == nil {
+		log.Warnf("fast intent match: ToolRecommender is nil, skipping capability search")
+	} else {
+		tools, forges, loops, err := recommender.QuickSearch(trimmed)
+		if err != nil {
+			log.Warnf("fast intent match: QuickSearch failed: %v", err)
+		} else {
+			if len(tools) > 0 {
+				result.MatchedTools = tools
+				log.Infof("fast intent match: found %d tools via QuickSearch for: %s", len(tools), trimmed)
+			}
+			if len(forges) > 0 {
+				result.MatchedForges = forges
+				log.Infof("fast intent match: found %d forges via QuickSearch for: %s", len(forges), trimmed)
+			}
+			if len(loops) > 0 {
+				result.MatchedLoops = loops
+				log.Infof("fast intent match: found %d matching loops via QuickSearch for: %s", len(loops), trimmed)
+			}
+		}
 	}
 
 	// Build context summary

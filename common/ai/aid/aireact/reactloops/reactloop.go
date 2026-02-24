@@ -189,17 +189,6 @@ func (r *ReActLoop) GetRecommendedToolsAndForges() ([]*aitool.Tool, []*schema.AI
 	return r.getToolRecommender().GetRecommendedToolsAndForgesWithLimits(userInput, r.config, maxToolsLimit, maxForgesLimit)
 }
 
-// GetRecommendedToolsAndForgesAsync 异步搜索推荐的 tools 和 forges
-// 使用 AiToolManager 进行异步搜索，搜索成功后更新缓存
-// onFinished: 可选的回调函数，在搜索完成后调用
-func (r *ReActLoop) GetRecommendedToolsAndForgesAsync(onFinished ...func()) {
-	var userInput string
-	if task := r.GetCurrentTask(); task != nil {
-		userInput = task.GetUserInput()
-	}
-	r.getToolRecommender().GetRecommendedToolsAndForgesAsync(userInput, r.config, onFinished...)
-}
-
 // WaitRecommendTask 等待所有推荐任务完成
 func (r *ReActLoop) WaitRecommendTask() {
 	r.getToolRecommender().WaitRecommendTask()
@@ -208,7 +197,7 @@ func (r *ReActLoop) WaitRecommendTask() {
 func (r *ReActLoop) getRenderInfo() (string, map[string]any, error) {
 	// 直接获取缓存的工具和 forges
 	// 缓存应该在任务开始前或搜索操作中已经更新
-	tools, forges := r.getToolRecommender().GetCachedToolsAndForges()
+	tools, forges, _ := r.getToolRecommender().GetCachedToolsAndForges()
 
 	temp, info, err := r.invoker.GetBasicPromptInfo(tools, forges)
 	if err != nil {

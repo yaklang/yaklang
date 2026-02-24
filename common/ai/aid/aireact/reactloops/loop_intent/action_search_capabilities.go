@@ -78,17 +78,14 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 			forgeLimit := 10
 			loopLimit := 10
 
-			if err := recommender.SearchAndUpdateCache(query, toolLimit, forgeLimit, loopLimit); err != nil {
+			tools, forges, loops, err := recommender.SearchAndUpdateCache(query, toolLimit, forgeLimit, loopLimit)
+			if err != nil {
 				log.Warnf("intent loop: capability search failed: %v", err)
 				results.WriteString(fmt.Sprintf("### Error\nSearch failed: %v\n\n", err))
 				op.Feedback(results.String())
 				op.Continue()
 				return
 			}
-
-			// 获取搜索结果
-			tools, forges := recommender.GetCachedToolsAndForges()
-			loops := recommender.GetCachedLoops()
 
 			// 1. 显示匹配的工具
 			if len(tools) > 0 {
