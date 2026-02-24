@@ -106,7 +106,7 @@ SOLUTION
 *.Get(<slice(index=0)>* as $client)
 *.Post(<slice(index=0)>* as $client)
 
-$client?{* #{until: `*<fullTypeName()>?{have: "net/http/Client"}`}->} as $func
+$client?{* #{until: `*<fullTypeName()>?{have: "net/http"}`}->} as $func
 
 $func.Get(* #-> as $param);
 
