@@ -2568,4 +2568,6 @@ var PoCExports = map[string]interface{}{
 	"CurlToHTTPRequest": curlToHTTPRequest,
 	"HTTPRequestToCurl": httpRequestToCurl,
 	"IsResponse":        lowhttp.IsResp,
+
+	"AutoUnzipPacketEncoding": lowhttp.AutoUnzipPacketEncoding,
 }
