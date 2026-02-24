@@ -110,10 +110,6 @@ func patchIrCodeIndex(db *gorm.DB) {
 			`CREATE INDEX IF NOT EXISTS "idx_ir_indices_program_value" ON "ir_indices" ("program_name", "value_id");`,
 		},
 		{
-			"idx_ir_indices_program_field",
-			`CREATE INDEX IF NOT EXISTS "idx_ir_indices_program_field" ON "ir_indices" ("program_name", "field_name");`,
-		},
-		{
 			"idx_ir_name_pool_program_name_name",
 			`CREATE INDEX IF NOT EXISTS "idx_ir_name_pool_program_name_name" ON "ir_name_pool" ("program_name", "name");`,
 		},

@@ -36,10 +36,8 @@ func CreateVariableIndex(inst Instruction, name, member string) *ssadb.IrIndex {
 		variable := value.GetVariable(name)
 		if variable != nil {
 			index.VersionID = variable.GetVersion()
-			// TODO : scope ID
 			scope := variable.GetScope()
-			scopeID := prog.NameCache.GetID(scope.GetScopeName())
-			index.ScopeID = &scopeID
+			index.ScopeName = scope.GetScopeName()
 		}
 
 		// field
