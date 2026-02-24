@@ -11,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -125,6 +126,15 @@ func sfRuleCompletionExecutor(ctx context.Context, items []*ypb.ExecParamItem, o
 	)
 	if err != nil {
 		return nil, utils.Wrapf(err, "format rule failed")
+	}
+
+	writeBack := strings.EqualFold(aiforge.GetCliValueByKey("write_back", items), "true")
+	if writeBack {
+		if rule.IsBuildInRule {
+			log.Warnf("skip write_back for built-in rule: %s", rule.RuleName)
+		} else if err := sfdb.UpdateRuleContent(rule.RuleName, merged); err != nil {
+			return nil, utils.Wrapf(err, "write rule content back to database failed")
+		}
 	}
 
 	action := aicommon.NewSimpleAction("sf_rule_completion", aitool.InvokeParams{
