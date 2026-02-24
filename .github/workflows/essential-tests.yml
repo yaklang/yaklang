@@ -12,6 +12,7 @@ on:
     types: [opened, synchronize, reopened, labeled, unlabeled]
     paths:
       - "common/**"
+      - "scannode/**"
       - ".github/workflows/essential-tests.yml"
       - "go.mod"
 
@@ -330,7 +331,9 @@ jobs:
                 {"package": "./common/yak/ssaapi", "timeout": "1m"},
                 {"package": "./common/yak/ssaapi/ssareducer", "timeout": "1m"},
                 {"package": "./common/yak/ssaapi/test/ssatest", "timeout": "1m"},
-                {"package": "./common/yak/syntaxflow_scan/...", "timeout": "1m"}
+                {"package": "./common/yak/syntaxflow_scan/...", "timeout": "1m"},
+                {"package": "./common/yak/ssaapi/sfreport/...", "timeout": "1m"},
+                {"package": "./scannode/...", "timeout": "30s"}
               ]          
 
           - name: "Test gRPC SSA Frontend Yak  / JS(TS|ES) | PHP | Python | Golang | C | Java"

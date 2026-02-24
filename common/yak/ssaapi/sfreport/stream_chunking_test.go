@@ -525,13 +525,13 @@ func TestFileStreaming_ChunksOutOfOrder(t *testing.T) {
 }
 
 func TestDataflowStreaming(t *testing.T) {
-	flow := &StreamMinimalDataFlowPath{
+	flow := &DataFlowPath{
 		Description: "sql injection data flow",
-		Nodes: []*StreamMinimalNodeInfo{
+		Nodes: []*NodeInfo{
 			{NodeID: "n1", IRCode: "call sql.Query", IRSourceHash: "src1", StartOffset: 10, EndOffset: 50},
 			{NodeID: "n2", IRCode: "param input", IRSourceHash: "src2", StartOffset: 20, EndOffset: 60},
 		},
-		Edges: []*StreamMinimalEdgeInfo{
+		Edges: []*EdgeInfo{
 			{EdgeID: "e1", FromNodeID: "n1", ToNodeID: "n2", EdgeType: "taint"},
 		},
 	}
@@ -554,7 +554,7 @@ func TestDataflowStreaming(t *testing.T) {
 			if err != nil {
 				t.Fatalf("decode: %v", err)
 			}
-			var result StreamMinimalDataFlowPath
+			var result DataFlowPath
 			if err := json.Unmarshal(bytes.TrimRight(decoded, " "), &result); err != nil {
 				t.Fatalf("unmarshal: %v", err)
 			}
