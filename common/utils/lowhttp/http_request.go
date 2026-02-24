@@ -263,46 +263,14 @@ func FixHTTPRequest(raw []byte) []byte {
 }
 
 func DeletePacketEncoding(raw []byte) []byte {
-	var encoding string
-	var isChunked bool
-	var buf bytes.Buffer
-	_, body := SplitHTTPPacket(raw, func(method string, requestUri string, proto string) error {
-		buf.WriteString(method + " " + requestUri + " " + proto + CRLF)
-		return nil
-	}, func(proto string, code int, codeMsg string) error {
-		buf.WriteString(proto + " " + strconv.Itoa(code) + " " + codeMsg + CRLF)
-		return nil
-	}, func(line string) string {
-		k, v := SplitHTTPHeader(line)
-		ret := strings.ToLower(k)
-		if ret == "content-encoding" {
-			encoding = v
-			return ""
-		} else if ret == "transfer-encoding" && utils.IContains(v, "chunked") {
-			isChunked = true
-			return ""
-		}
-		buf.WriteString(line + CRLF)
-		return line
-	})
-	buf.WriteString(CRLF)
-
-	if isChunked {
-		unchunked, chunkErr := codec.HTTPChunkedDecode(body)
-		if unchunked != nil {
-			body = unchunked
-		} else {
-			if chunkErr == nil {
-				body = []byte{}
-			}
-		}
-	}
-
-	decResult, fixed := ContentEncodingDecode(encoding, body)
-	if fixed && len(decResult) > 0 {
-		body = decResult
-	}
-	return ReplaceHTTPPacketBody(buf.Bytes(), body, false)
+	plain, _, _ := _unzipPacketEncodingInternal(
+		raw,
+		_defaultUnzipPacketEncodingConfig(),
+		_withUnzipPacketEncodingEnableMagic(false),
+		_withUnzipPacketEncodingConservative(false),
+		_withUnzipPacketEncodingMaxDecodedBytes(0),
+	)
+	return plain
 }
 
 func ConvertHTTPRequestToFuzzTag(i []byte) []byte {
