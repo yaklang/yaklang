@@ -122,23 +122,13 @@ func TestAITaskCallToolStdOut_VerifyTimelineAndUserQuery(t *testing.T) {
 		aicommon.WithTools(aid.PrintTool()),
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithSystemFileOperator(),
+		aicommon.WithNoOpMemoryTriage(),
 		aicommon.WithPersistentSessionId(timelineId),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := r.GetPrompt()
-
-			// LiteForge/memory-triage calls (tag-selection, session naming, etc.)
-			// use a "Preset" prompt that differs from the main ReAct loop prompt.
-			// Return a valid default response for these auxiliary calls.
-			if strings.Contains(prompt, "输出JSON的数据处理和总结提示小助手") ||
-				strings.Contains(prompt, "tag-selection") {
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(strings.NewReader(`{"@action":"tag-selection","memory_entities":[]}`))
-				rsp.Close()
-				return rsp, nil
-			}
 
 			if !strings.Contains(prompt, userRawInput) {
 				fmt.Println(prompt)
