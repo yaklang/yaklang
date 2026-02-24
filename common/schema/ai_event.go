@@ -27,33 +27,34 @@ const (
 type EventType string
 
 const (
-	AI_REACT_LOOP_ACTION_REQUIRE_TOOL              = "require_tool"
-	AI_REACT_LOOP_ACTION_SEARCH_CAPABILITIES       = "search_capabilities"
-	AI_REACT_LOOP_ACTION_ASK_FOR_CLARIFICATION     = "ask_for_clarification"
-	AI_REACT_LOOP_ACTION_DIRECTLY_ANSWER           = "directly_answer"
-	AI_REACT_LOOP_ACTION_KNOWLEDGE_ENHANCE         = "knowledge_enhance_answer"
-	AI_REACT_LOOP_ACTION_REQUIRE_AI_BLUEPRINT      = "require_ai_blueprint"
-	AI_REACT_LOOP_ACTION_REQUEST_PLAN_EXECUTION    = "request_plan_and_execution"
-	AI_REACT_LOOP_ACTION_HTTP_FLOW_ANALYZE         = "http_flow_analyze"
-	AI_REACT_LOOP_ACTION_TOOL_COMPOSE              = "tool_compose"
-	AI_REACT_LOOP_ACTION_LOADING_SKILLS            = "loading_skills"
-	AI_REACT_LOOP_ACTION_CHANGE_SKILL_VIEW_OFFSET  = "change_skill_view_offset"
-	AI_REACT_LOOP_ACTION_LOAD_CAPABILITY           = "load_capability"
+	AI_REACT_LOOP_ACTION_REQUIRE_TOOL             = "require_tool"
+	AI_REACT_LOOP_ACTION_SEARCH_CAPABILITIES      = "search_capabilities"
+	AI_REACT_LOOP_ACTION_ASK_FOR_CLARIFICATION    = "ask_for_clarification"
+	AI_REACT_LOOP_ACTION_DIRECTLY_ANSWER          = "directly_answer"
+	AI_REACT_LOOP_ACTION_KNOWLEDGE_ENHANCE        = "knowledge_enhance_answer"
+	AI_REACT_LOOP_ACTION_REQUIRE_AI_BLUEPRINT     = "require_ai_blueprint"
+	AI_REACT_LOOP_ACTION_REQUEST_PLAN_EXECUTION   = "request_plan_and_execution"
+	AI_REACT_LOOP_ACTION_HTTP_FLOW_ANALYZE        = "http_flow_analyze"
+	AI_REACT_LOOP_ACTION_TOOL_COMPOSE             = "tool_compose"
+	AI_REACT_LOOP_ACTION_LOADING_SKILLS           = "loading_skills"
+	AI_REACT_LOOP_ACTION_CHANGE_SKILL_VIEW_OFFSET = "change_skill_view_offset"
+	AI_REACT_LOOP_ACTION_LOAD_CAPABILITY          = "load_capability"
 )
 
 const (
-	AI_REACT_LOOP_NAME_DEFAULT           = "default"
-	AI_REACT_LOOP_NAME_WRITE_YAKLANG     = "write_yaklang_code"
-	AI_REACT_LOOP_NAME_JAVA_DECOMPILER   = "java_decompiler"
-	AI_REACT_LOOP_NAME_HTTP_DIFFER       = "http_differ"
-	AI_REACT_LOOP_NAME_PE_TASK           = "pe_task"
-	AI_REACT_LOOP_NAME_PLAN              = "plan"
-	AI_REACT_LOOP_NAME_KNOWLEDGE_ENHANCE = "knowledge_enhance"
-	AI_REACT_LOOP_NAME_REPORT_GENERATING = "report_generating"
-	AI_REACT_LOOP_NAME_PYTHON_POC        = "python_poc"
-	AI_REACT_LOOP_NAME_VULN_VERIFY       = "vuln_verify"
-	AI_REACT_LOOP_NAME_INTENT             = "intent"
-	AI_REACT_LOOP_NAME_INTERNET_RESEARCH  = "internet_research"
+	AI_REACT_LOOP_NAME_DEFAULT             = "default"
+	AI_REACT_LOOP_NAME_WRITE_YAKLANG       = "write_yaklang_code"
+	AI_REACT_LOOP_NAME_JAVA_DECOMPILER     = "java_decompiler"
+	AI_REACT_LOOP_NAME_HTTP_DIFFER         = "http_differ"
+	AI_REACT_LOOP_NAME_PE_TASK             = "pe_task"
+	AI_REACT_LOOP_NAME_PLAN                = "plan"
+	AI_REACT_LOOP_NAME_KNOWLEDGE_ENHANCE   = "knowledge_enhance"
+	AI_REACT_LOOP_NAME_REPORT_GENERATING   = "report_generating"
+	AI_REACT_LOOP_NAME_PYTHON_POC          = "python_poc"
+	AI_REACT_LOOP_NAME_VULN_VERIFY         = "vuln_verify"
+	AI_REACT_LOOP_NAME_INTENT              = "intent"
+	AI_REACT_LOOP_NAME_INTERNET_RESEARCH   = "internet_research"
+	AI_REACT_LOOP_NAME_WRITE_PYTHON_SCRIPT = "write_python_script"
 )
 
 const (
@@ -363,23 +364,23 @@ func (e *AiOutputEvent) ToExecResult() *ypb.ExecResult {
 
 func (e *AiOutputEvent) ToGRPC() *ypb.AIOutputEvent {
 	return &ypb.AIOutputEvent{
-		CoordinatorId:   e.CoordinatorId,
-		Type:            string(e.Type),
-		NodeId:          utils.EscapeInvalidUTF8Byte([]byte(e.NodeId)),
-		IsSystem:        e.IsSystem,
-		IsStream:        e.IsStream,
-		IsReason:        e.IsReason,
-		IsSync:          e.IsSync,
-		StreamDelta:     e.StreamDelta,
-		IsJson:          e.IsJson,
-		Content:         e.Content,
-		Timestamp:       e.Timestamp,
-		TaskIndex:       e.TaskIndex,
-		DisableMarkdown: e.DisableMarkdown,
-		SyncID:          e.SyncID,
-		EventUUID:       e.EventUUID,
-		CallToolID:      e.CallToolID,
-		NodeIdVerbose:   NodeIdAndTypeToI18n(e.NodeId, e.Type, e.IsStream).I18nToYPB_I18n(),
+		CoordinatorId:      e.CoordinatorId,
+		Type:               string(e.Type),
+		NodeId:             utils.EscapeInvalidUTF8Byte([]byte(e.NodeId)),
+		IsSystem:           e.IsSystem,
+		IsStream:           e.IsStream,
+		IsReason:           e.IsReason,
+		IsSync:             e.IsSync,
+		StreamDelta:        e.StreamDelta,
+		IsJson:             e.IsJson,
+		Content:            e.Content,
+		Timestamp:          e.Timestamp,
+		TaskIndex:          e.TaskIndex,
+		DisableMarkdown:    e.DisableMarkdown,
+		SyncID:             e.SyncID,
+		EventUUID:          e.EventUUID,
+		CallToolID:         e.CallToolID,
+		NodeIdVerbose:      NodeIdAndTypeToI18n(e.NodeId, e.Type, e.IsStream).I18nToYPB_I18n(),
 		ContentType:        e.ContentType,
 		AIService:          e.AIService,
 		TaskUUID:           e.TaskUUID,

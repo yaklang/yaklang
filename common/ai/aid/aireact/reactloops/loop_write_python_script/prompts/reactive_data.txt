@@ -1,0 +1,92 @@
+## Environment Status
+
+{{ if .PythonCommand }}
+- Python: `{{ .PythonCommand }}` ({{ .PythonVersion }})
+{{ else }}
+- Python: NOT AVAILABLE
+{{ end }}
+{{ if .PkgManager }}
+- Package Manager: `{{ .PkgManager }}`
+{{ else }}
+- Package Manager: NOT AVAILABLE
+{{ end }}
+
+---
+
+{{ if .Code }}## Current Script
+
+**Script file**: `{{ .Filename }}`
+
+**IMPORTANT**: The script file already exists at the path above. Do NOT use `write_script` again. Use `modify_script` only if you need to fix errors.
+
+When you need to execute or test the script, use `require_tool` with `tool_require_payload: "bash"`, then run:
+`{{ .PythonCommand }} {{ .Filename }} --help`
+
+**Code below includes line numbers for reference. Do NOT include line number prefixes when generating code.**
+
+<|CURRENT_PYTHON_SCRIPT_{{ .Nonce }}|>
+{{ .CurrentCodeWithLineNumber }}
+<|CURRENT_PYTHON_SCRIPT_END_{{ .Nonce }}|>
+
+### Status
+
+{{ if .LintOk }}
+- Syntax/Lint: PASS
+{{ else }}
+{{ if .FeedbackMessages }}
+- Syntax/Lint: Has issues (see feedback below)
+{{ else }}
+- Syntax/Lint: Not yet checked
+{{ end }}
+{{ end }}
+{{ if .DepsChecked }}
+{{ if .DepsInstalled }}
+- Dependencies: All installed
+{{ else }}
+- Dependencies: Some missing (use bash to install, see feedback)
+{{ end }}
+{{ else }}
+- Dependencies: Not yet checked
+{{ end }}
+
+### Next Steps
+
+{{ if not .LintOk }}
+{{ if .FeedbackMessages }}
+1. Check feedback below for syntax errors and fix them with `modify_script`
+{{ else }}
+1. Wait for automatic syntax check results
+{{ end }}
+{{ else if not .DepsChecked }}
+1. Run `check_and_install_dependencies` to detect missing packages
+{{ else if not .DepsInstalled }}
+1. Use `require_tool` with `tool_require_payload: "bash"` to install missing packages, then `check_and_install_dependencies` to verify
+{{ else }}
+1. Use `require_tool` with `tool_require_payload: "bash"` to run: `{{ .PythonCommand }} {{ .Filename }} --help` to verify the script works
+2. If execution succeeds, use `directly_answer` to complete the task
+{{ end }}
+
+{{ else }}## No Script Yet
+
+{{ if .Filename }}File path: `{{ .Filename }}`{{ end }}
+
+Use `write_script` to create the Python script. Include:
+- `#!/usr/bin/env python3` shebang
+- `argparse` CLI entry point
+- `if __name__ == "__main__": main()`
+
+{{ end }}
+
+{{ if .FeedbackMessages }}
+## Feedback
+
+<|FEEDBACK_{{ .Nonce }}|>
+{{ .FeedbackMessages }}
+<|FEEDBACK_END_{{ .Nonce }}|>
+
+Take action based on the feedback:
+- **Syntax errors**: Fix with `modify_script`
+- **Missing dependencies**: Use `require_tool` with `tool_require_payload: "bash"` to install
+- **Style warnings**: Non-blocking, may ignore
+
+{{ end }}

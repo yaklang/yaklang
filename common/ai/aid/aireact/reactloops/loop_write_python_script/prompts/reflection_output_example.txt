@@ -1,0 +1,78 @@
+## Output Examples
+
+### Example 1: Write a new script (only when NO code exists)
+
+{"@action": "write_script", "human_readable_thought": "Creating a Python HTTP request script with CLI entry point"}
+
+<|GEN_PYTHON_SCRIPT_EXAMPLE1|>
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""HTTP GET Request Tool"""
+import argparse
+import urllib.request
+import json
+
+def make_request(url, timeout=30):
+    req = urllib.request.Request(url)
+    with urllib.request.urlopen(req, timeout=timeout) as response:
+        return response.read().decode('utf-8')
+
+def main():
+    parser = argparse.ArgumentParser(description="Make HTTP GET requests")
+    parser.add_argument("url", help="Target URL")
+    parser.add_argument("--timeout", type=int, default=30, help="Request timeout")
+    args = parser.parse_args()
+    result = make_request(args.url, args.timeout)
+    print(result)
+
+if __name__ == "__main__":
+    main()
+<|GEN_PYTHON_SCRIPT_END_EXAMPLE1|>
+
+### Example 2: Fix syntax error (use modify_script, NOT write_script)
+
+{"@action": "modify_script", "start_line": 15, "end_line": 18, "human_readable_thought": "Fixing indentation error in main function"}
+
+<|GEN_PYTHON_SCRIPT_EXAMPLE2|>
+def main():
+    parser = argparse.ArgumentParser(description="Tool")
+    args = parser.parse_args()
+    process(args)
+<|GEN_PYTHON_SCRIPT_END_EXAMPLE2|>
+
+### Example 3: Check and install dependencies
+
+Step 1 - Check what's missing:
+{"@action": "check_and_install_dependencies", "human_readable_thought": "Checking if all dependencies are installed"}
+
+Step 2 - Install via bash (after check reports missing packages):
+{"@action": "require_tool", "tool_require_payload": "bash", "human_readable_thought": "Installing missing package: requests"}
+
+Then run: pip3 install --user requests
+
+Step 3 - Verify installation:
+{"@action": "check_and_install_dependencies", "human_readable_thought": "Verifying packages installed successfully"}
+
+### Example 4: Execute the script via bash
+
+{"@action": "require_tool", "tool_require_payload": "bash", "human_readable_thought": "Running script to test --help flag"}
+
+Then run: python3 /path/to/script.py --help
+
+### Example 5: Complete the task
+
+{"@action": "directly_answer", "human_readable_thought": "Script is complete, tested, and working"}
+
+## Common Errors to Avoid
+
+Error 1: Calling write_script when code already exists
+WRONG: {"@action": "write_script", ...}  // Code already exists!
+RIGHT: {"@action": "modify_script", ...}  // Fix specific lines
+
+Error 2: Replacing third-party imports to avoid dependencies
+WRONG: Replace `import requests` with `import urllib.request` to avoid installing
+RIGHT: Use bash to install: `pip3 install --user requests`
+
+Error 3: Repeating the same action without new information
+WRONG: Call check_and_install_dependencies 3 times without installing anything
+RIGHT: Check once -> install via bash -> check again to verify

@@ -1,8 +1,9 @@
-package loop_python_poc
+package loop_write_python_script
 
 import (
 	"bytes"
 	_ "embed"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -23,17 +24,17 @@ var reactiveData string
 
 func init() {
 	err := reactloops.RegisterLoopFactory(
-		schema.AI_REACT_LOOP_NAME_PYTHON_POC,
+		schema.AI_REACT_LOOP_NAME_WRITE_PYTHON_SCRIPT,
 		func(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {
 			modSuite := loopinfra.NewSingleFileModificationSuiteFactory(
 				r,
 				loopinfra.WithLoopVarsPrefix("python"),
-				loopinfra.WithActionSuffix("python_poc"),
-				loopinfra.WithAITagConfig("GEN_PYTHON_POC", "python_poc_code", "python-poc", aicommon.TypeCodePython),
+				loopinfra.WithActionSuffix("script"),
+				loopinfra.WithAITagConfig("GEN_PYTHON_SCRIPT", "python_script_code", "python-script", aicommon.TypeTextPlain),
 				loopinfra.WithFileExtension(".py"),
 				loopinfra.WithExitAfterWrite(false),
-				loopinfra.WithFileChanged(pythonSyntaxCheck),
-				loopinfra.WithEventType("python_poc_editor"),
+				loopinfra.WithFileChanged(pythonLintCheck),
+				loopinfra.WithEventType("python_script_editor"),
 			)
 
 			preset := []reactloops.ReActLoopOption{
@@ -49,47 +50,44 @@ func init() {
 					pythonCode := loop.Get(modSuite.GetFullCodeVariableName())
 					codeWithLine := utils.PrefixLinesWithLineNumbers(pythonCode)
 					filename := loop.Get(modSuite.GetFilenameVariableName())
-					envChecked := loop.Get("env_checked") == "true"
-					pythonAvailable := loop.Get("python_available") == "true"
 					pythonCommand := loop.Get("python_command")
 					pythonVersion := loop.Get("python_version")
+					pkgManager := loop.Get("pkg_manager")
+					depsChecked := loop.Get("deps_checked") == "true"
+					depsInstalled := loop.Get("deps_installed") == "true"
+					lintOk := loop.Get(modSuite.GetLintStatusVariableName()) == "true"
 
 					feedbacks := feedbacker.String()
+					feedbacks = strings.TrimSpace(feedbacks)
 					renderMap := map[string]any{
 						"Code":                      pythonCode,
 						"CurrentCodeWithLineNumber": codeWithLine,
 						"Nonce":                     nonce,
 						"FeedbackMessages":          feedbacks,
 						"Filename":                  filename,
-						"EnvChecked":                envChecked,
-						"PythonAvailable":           pythonAvailable,
 						"PythonCommand":             pythonCommand,
 						"PythonVersion":             pythonVersion,
+						"PkgManager":                pkgManager,
+						"DepsChecked":               depsChecked,
+						"DepsInstalled":             depsInstalled,
+						"LintOk":                    lintOk,
 					}
 					return utils.RenderTemplate(reactiveData, renderMap)
 				}),
-				checkPythonEnv(r),
-				verifySyntax(r),
+				checkAndInstallDependencies(r),
 			}
 			preset = append(preset, modSuite.GetActions()...)
 			preset = append(preset, opts...)
-			return reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_PYTHON_POC, r, preset...)
+			return reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_WRITE_PYTHON_SCRIPT, r, preset...)
 		},
-		reactloops.WithLoopDescription("Enter focused mode for Python POC code generation. Used to create security vulnerability proof-of-concept scripts. AI should use bash tool to check Python environment and syntax."),
-		reactloops.WithLoopUsagePrompt("Use when user requests to generate Python POC code for security vulnerabilities. Provides specialized tools: write_python_poc, modify_python_poc, insert_python_poc, delete_python_poc. AI should use bash tool to verify Python syntax after code generation."),
+		reactloops.WithLoopDescription("Enter focused mode for Python script generation. Creates production-quality Python scripts with CLI entry points, dependency management, and syntax validation."),
+		reactloops.WithLoopUsagePrompt("Use when user requests to write or modify Python scripts. Provides specialized tools: write_script, modify_script, insert_script, delete_script, check_and_install_dependencies. Use bash tool to execute scripts and install dependencies."),
 		reactloops.WithLoopOutputExample(`
-* When user requests to generate Python POC code:
-  {"@action": "python_poc", "human_readable_thought": "I need to generate Python POC code with proper syntax and security testing logic"}
+* When user requests to write a Python script:
+  {"@action": "write_python_script", "human_readable_thought": "I need to write a Python script with CLI entry point and proper dependency management"}
 `),
 	)
 	if err != nil {
-		log.Errorf("register reactloop: %v failed", schema.AI_REACT_LOOP_NAME_PYTHON_POC)
-	}
-}
-
-func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
-	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
-		log.Infof("[*] React: Python PoC loop initialized, waiting for AI to generate code")
-		operator.Continue()
+		log.Errorf("register reactloop: %v failed", schema.AI_REACT_LOOP_NAME_WRITE_PYTHON_SCRIPT)
 	}
 }

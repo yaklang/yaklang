@@ -1,0 +1,99 @@
+// test_basic_script.yak
+// Test loop_write_python_script basic script generation
+// Verifies: write_script action, CLI entry point, syntax check
+//
+// Assertions:
+// 1. Must successfully get script file path
+// 2. Script content length must be > 50 bytes
+// 3. Script must contain argparse
+// 4. Script must contain if __name__ == "__main__"
+//
+// Run: go run common/yak/cmd/yak.go common/ai/aid/aireact/reactloops/loop_write_python_script/examples/test_basic_script.yak
+
+var scriptFilename = ""
+var scriptContent = ""
+var executionError = nil
+
+testPrompt = `Please write a Python script to perform HTTP GET request to www.example.com.
+
+Requirements:
+1. Use argparse for CLI entry point
+2. Accept a URL as command-line argument with default value www.example.com
+3. Print the response status code and content length
+4. Keep it simple, use only standard library (urllib)
+5. This is just a test, keep it minimal.`
+
+log.Info("========================================")
+log.Info("Testing loop_write_python_script - Basic Script")
+log.Info("========================================")
+
+err = aim.InvokeReAct(
+    testPrompt,
+    aim.focus("write_python_script"),
+    aim.aiConfig("aibalance", ai.model("deepseek-v3.2")),
+    aim.timeout(300),
+    aim.maxIteration(15),
+    aim.onEvent(func(react, event) {
+        eventType = string(event.Type)
+
+        if eventType == "filesystem_pin_filename" {
+            contentStr = string(event.Content)
+            if len(contentStr) > 0 {
+                try {
+                    jsonData = json.loads(contentStr)
+                    if jsonData != nil && jsonData["path"] != nil {
+                        path = string(jsonData["path"])
+                        if str.HasSuffix(path, ".py") {
+                            scriptFilename = path
+                        }
+                    }
+                } catch e {
+                    // ignore
+                }
+            }
+        }
+    }),
+    aim.onFinished(func(react) {
+        if scriptFilename != "" {
+            content, readErr = file.ReadFile(scriptFilename)
+            if readErr == nil {
+                scriptContent = string(content)
+            }
+        }
+    }),
+)
+
+if err != nil {
+    executionError = err
+}
+
+// ========================================
+// Assertions
+// ========================================
+
+log.Info("========================================")
+log.Info("RUNNING ASSERTIONS")
+log.Info("========================================")
+
+assert executionError == nil, sprintf("ReAct execution failed: %v", executionError)
+
+assert scriptFilename != "", "Failed to capture script filename from events. scriptFilename is empty."
+
+fileExists = file.IsExisted(scriptFilename)
+assert fileExists, sprintf("Script file does not exist: %s", scriptFilename)
+
+contentLen = len(scriptContent)
+assert contentLen > 50, sprintf("Script content too short. Expected > 50 bytes, got %d bytes. Content: %s", contentLen, scriptContent)
+
+hasArgparse = str.Contains(scriptContent, "argparse")
+assert hasArgparse, sprintf("Script must use argparse for CLI entry point. Content preview: %s", scriptContent[:min(len(scriptContent), 300)])
+
+hasMainGuard = str.Contains(scriptContent, "__main__")
+assert hasMainGuard, sprintf("Script must have if __name__ == '__main__' guard. Content preview: %s", scriptContent[:min(len(scriptContent), 300)])
+
+log.Info("========================================")
+log.Info("ALL ASSERTIONS PASSED!")
+log.Info("========================================")
+log.Info("Script Filename: %s", scriptFilename)
+log.Info("Script Content Length: %d bytes", contentLen)
+log.Info("Script Preview: %s", scriptContent[:min(len(scriptContent), 500)])
