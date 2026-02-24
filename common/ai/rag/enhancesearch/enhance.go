@@ -2,6 +2,7 @@ package enhancesearch
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiconfig"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -106,6 +107,7 @@ func (h *LiteForgeSearchHandler) ExtractKeywords(ctx context.Context, query stri
 				aitool.WithParam_Description("从问题中提取的核心搜索关键词列表，用于精确的词条检索"),
 			),
 		),
+		aicommon.WithAICallback(aiconfig.MustGetSpeedPriorityAIModelCallback()),
 	)
 	if err != nil {
 		return nil, err
@@ -149,6 +151,7 @@ func (h *LiteForgeSearchHandler) HypotheticalAnswer(ctx context.Context, query s
 				aitool.WithParam_Description("假设文档内容，搜索会使用假设文档作为 rag 搜索的查询内容"),
 			),
 		),
+		aicommon.WithAICallback(aiconfig.MustGetSpeedPriorityAIModelCallback()),
 	)
 	if err != nil {
 		return "", err
@@ -204,6 +207,7 @@ func (h *LiteForgeSearchHandler) SplitQuery(ctx context.Context, query string) (
 				aitool.WithParam_Description("拆分后的子问题列表，若无法拆分则返回原问题作为唯一子问题"),
 			),
 		),
+		aicommon.WithAICallback(aiconfig.MustGetSpeedPriorityAIModelCallback()),
 	)
 	if err != nil {
 		return nil, err
@@ -251,6 +255,7 @@ func (h *LiteForgeSearchHandler) GeneralizeQuery(ctx context.Context, query stri
 			),
 		),
 		aicommon.WithContext(ctx),
+		aicommon.WithAICallback(aiconfig.MustGetSpeedPriorityAIModelCallback()),
 	)
 	if err != nil {
 		return nil, err

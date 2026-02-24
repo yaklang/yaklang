@@ -8,6 +8,50 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+func MustGetIntelligentAIModelCallback() aicommon.AICallbackType {
+	callback, err := GetIntelligentAIModelCallback()
+	if err != nil {
+		log.Warnf("you are using aiconfig to get intelligent model callback, but got error: %v, fallback to legacy chat", err)
+		return aicommon.AIChatToAICallbackType(ai.Chat)
+	}
+	return callback
+}
+
+func MustGetLightweightAIModelCallback() aicommon.AICallbackType {
+	callback, err := GetLightweightAIModelCallback()
+	if err != nil {
+		log.Warnf("you are using aiconfig to get lightweight model callback, but got error: %v, fallback to legacy chat", err)
+		return aicommon.AIChatToAICallbackType(ai.Chat)
+	}
+	return callback
+}
+
+func MustGetQualityPriorityAIModelCallback() aicommon.AICallbackType {
+	return MustGetIntelligentAIModelCallback()
+}
+
+func MustGetSpeedPriorityAIModelCallback() aicommon.AICallbackType {
+	return MustGetLightweightAIModelCallback()
+}
+
+func MustGetVisionAIModelCallback() aicommon.AICallbackType {
+	callback, err := GetVisionAIModelCallback()
+	if err != nil {
+		log.Warnf("you are using aiconfig to get vision model callback, but got error: %v, fallback to legacy chat", err)
+		return aicommon.AIChatToAICallbackType(ai.Chat)
+	}
+	return callback
+}
+
+func MustGetDefaultAIModelCallback() aicommon.AICallbackType {
+	callback, err := GetDefaultAIModelCallback()
+	if err != nil {
+		log.Warnf("you are using aiconfig to get default model callback, but got error: %v, fallback to legacy chat", err)
+		return aicommon.AIChatToAICallbackType(ai.Chat)
+	}
+	return callback
+}
+
 // GetIntelligentAIModelCallback returns the AI callback for intelligent (high-quality) models
 // Suitable for complex reasoning, code generation, and other high-quality tasks
 func GetIntelligentAIModelCallback() (aicommon.AICallbackType, error) {
