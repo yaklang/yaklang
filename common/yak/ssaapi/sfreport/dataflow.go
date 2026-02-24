@@ -1,6 +1,7 @@
 package sfreport
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
@@ -26,15 +27,13 @@ type DataFlowPath struct {
 type NodeInfo struct {
 	NodeID          string            `json:"node_id"`
 	IRCode          string            `json:"ir_code"`
-	SourceCode      string            `json:"source_code"`
-	SourceCodeStart int               `json:"source_code_start"`
-	CodeRange       *ssaapi.CodeRange `json:"code_range"`
-
-	// for audit
-	IRSourceHash string `json:"ir_source_hash"`
-	StartOffset  int    `json:"start_offset"`
-	EndOffset    int    `json:"end_offset"`
-	IsEntryNode  bool   `json:"is_entry_node"`
+	SourceCode      string            `json:"source_code,omitempty"`
+	SourceCodeStart int               `json:"source_code_start,omitempty"`
+	CodeRange       *ssaapi.CodeRange `json:"code_range,omitempty"`
+	IRSourceHash    string            `json:"ir_source_hash"`
+	StartOffset     int               `json:"start_offset"`
+	EndOffset       int               `json:"end_offset"`
+	IsEntryNode     bool              `json:"is_entry_node"`
 }
 
 type EdgeInfo struct {
@@ -46,7 +45,55 @@ type EdgeInfo struct {
 	AnalysisLabel string `json:"analysis_label"`
 }
 
-func GenerateDataFlowAnalysis(risk *schema.SSARisk, values ...*ssaapi.Value) (*DataFlowPath, []string, error) {
+// MarshalMinimalDataFlowPath converts a full DataFlowPath to a minimal
+// JSON representation for streaming by stripping heavy fields (DotGraph,
+// SourceCode, CodeRange). Returns nil for nil or empty paths.
+func MarshalMinimalDataFlowPath(p *DataFlowPath) ([]byte, error) {
+	if p == nil {
+		return nil, nil
+	}
+
+	nodes := make([]*NodeInfo, 0, len(p.Nodes))
+	for _, n := range p.Nodes {
+		if n == nil {
+			continue
+		}
+		nodes = append(nodes, &NodeInfo{
+			NodeID:       n.NodeID,
+			IRCode:       n.IRCode,
+			IRSourceHash: n.IRSourceHash,
+			StartOffset:  n.StartOffset,
+			EndOffset:    n.EndOffset,
+			IsEntryNode:  n.IsEntryNode,
+		})
+	}
+	edges := make([]*EdgeInfo, 0, len(p.Edges))
+	for _, e := range p.Edges {
+		if e == nil {
+			continue
+		}
+		edges = append(edges, &EdgeInfo{
+			EdgeID:        e.EdgeID,
+			FromNodeID:    e.FromNodeID,
+			ToNodeID:      e.ToNodeID,
+			EdgeType:      e.EdgeType,
+			AnalysisStep:  e.AnalysisStep,
+			AnalysisLabel: e.AnalysisLabel,
+		})
+	}
+
+	if len(nodes) == 0 && len(edges) == 0 {
+		return nil, nil
+	}
+
+	return json.Marshal(&DataFlowPath{
+		Description: p.Description,
+		Nodes:       nodes,
+		Edges:       edges,
+	})
+}
+
+func GenerateDataFlowAnalysis(risk *schema.SSARisk, minimal bool, values ...*ssaapi.Value) (*DataFlowPath, []string, error) {
 	if risk.ResultID == 0 || risk.Variable == "" {
 		return nil, nil, utils.Errorf("risk has no valid result ID or variable")
 	}
@@ -66,10 +113,6 @@ func GenerateDataFlowAnalysis(risk *schema.SSARisk, values ...*ssaapi.Value) (*D
 	// 这儿行为图的产生是GraphKindShow而不是GraphKindDump
 	// 因此产生的图数据而直接存数据库的行为是不一致的
 	// 但是好像又不影响最后查看结果
-	minimal := false
-	if raw := strings.TrimSpace(os.Getenv("SSA_DATAFLOW_MINIMAL")); raw != "" {
-		minimal = raw == "1" || strings.EqualFold(raw, "true")
-	}
 	dotGraph := ssaapi.NewDotGraph()
 	value.GenerateGraph(dotGraph)
 	nodes, edges, irSourceHashes := coverNodeAndEdgeInfos(dotGraph, value, minimal)
@@ -165,6 +208,9 @@ func nodeId(i int) string {
 }
 
 func (n *NodeInfo) ToAuditNode(riskHash string) *ssadb.AuditNode {
+	if n == nil {
+		return nil
+	}
 	an := ssadb.NewAuditNode()
 	an.AuditNodeStatus = ssadb.AuditNodeStatus{
 		RiskHash: riskHash,
@@ -179,11 +225,20 @@ func (n *NodeInfo) ToAuditNode(riskHash string) *ssadb.AuditNode {
 }
 
 func (e *EdgeInfo) ToAuditEdge(m map[string]string) *ssadb.AuditEdge {
+	if e == nil || m == nil {
+		return nil
+	}
+	from, ok1 := m[e.FromNodeID]
+	to, ok2 := m[e.ToNodeID]
+	if !ok1 || !ok2 {
+		return nil
+	}
 	return &ssadb.AuditEdge{
-		FromNode:      m[e.FromNodeID],
-		ToNode:        m[e.ToNodeID],
+		FromNode:      from,
+		ToNode:        to,
 		EdgeType:      ssadb.ValidEdgeType(e.EdgeType),
 		AnalysisLabel: e.AnalysisLabel,
+		AnalysisStep:  e.AnalysisStep,
 	}
 }
 
@@ -201,65 +256,32 @@ func NewSaveDataFlowCtx(db *gorm.DB, riskHash string) *SaveDataFlowCtx {
 	}
 }
 
-func (sc *SaveDataFlowCtx) SaveDataFlow(dp *DataFlowPath) {
-	if sc == nil || dp == nil || len(dp.Nodes) == 0 {
-		return
-	}
-	// Dataflow audit nodes/edges insertion can be extremely write-heavy. Use one transaction
-	// and multi-values INSERTs. (gorm v1 slice Create panics in this codebase.)
+// tryBeginTx attempts to start a transaction; returns (tx, true) on success,
+// or (sc.db, false) if the transaction cannot be started.
+func (sc *SaveDataFlowCtx) tryBeginTx() (*gorm.DB, bool) {
 	tx := sc.db.Begin()
 	if tx == nil || tx.Error != nil {
-		// Fallback to the original behavior if transaction cannot be started.
-		sc.saveAuditNodes(sc.db, dp.Nodes, defaultDataflowBatchSize())
-		sc.saveAuditEdges(sc.db, dp.Edges, defaultDataflowBatchSize())
-		return
+		return sc.db, false
 	}
-	if err := sc.saveAuditNodes(tx, dp.Nodes, defaultDataflowBatchSize()); err != nil {
-		_ = tx.Rollback().Error
-		log.Errorf("save dataflow nodes failed: %v", err)
-		// Best-effort fallback without tx.
-		_ = sc.saveAuditNodes(sc.db, dp.Nodes, defaultDataflowBatchSize())
-		_ = sc.saveAuditEdges(sc.db, dp.Edges, defaultDataflowBatchSize())
-		return
-	}
-	if err := sc.saveAuditEdges(tx, dp.Edges, defaultDataflowBatchSize()); err != nil {
-		_ = tx.Rollback().Error
-		log.Errorf("save dataflow edges failed: %v", err)
-		_ = sc.saveAuditEdges(sc.db, dp.Edges, defaultDataflowBatchSize())
-		return
-	}
+	return tx, true
+}
+
+func (sc *SaveDataFlowCtx) commitOrRollback(tx *gorm.DB) {
 	if err := tx.Commit().Error; err != nil {
 		_ = tx.Rollback().Error
 		log.Errorf("save dataflow commit failed: %v", err)
 	}
 }
 
-func (sc *SaveDataFlowCtx) SaveMinimalDataFlow(dp *StreamMinimalDataFlowPath) {
+func (sc *SaveDataFlowCtx) SaveDataFlow(dp *DataFlowPath) {
 	if sc == nil || dp == nil || len(dp.Nodes) == 0 {
 		return
 	}
-	tx := sc.db.Begin()
-	if tx == nil || tx.Error != nil {
-		_ = sc.saveAuditNodesMinimal(sc.db, dp.Nodes, defaultDataflowBatchSize())
-		_ = sc.saveAuditEdgesMinimal(sc.db, dp.Edges, defaultDataflowBatchSize())
-		return
-	}
-	if err := sc.saveAuditNodesMinimal(tx, dp.Nodes, defaultDataflowBatchSize()); err != nil {
-		_ = tx.Rollback().Error
-		log.Errorf("save minimal dataflow nodes failed: %v", err)
-		_ = sc.saveAuditNodesMinimal(sc.db, dp.Nodes, defaultDataflowBatchSize())
-		_ = sc.saveAuditEdgesMinimal(sc.db, dp.Edges, defaultDataflowBatchSize())
-		return
-	}
-	if err := sc.saveAuditEdgesMinimal(tx, dp.Edges, defaultDataflowBatchSize()); err != nil {
-		_ = tx.Rollback().Error
-		log.Errorf("save minimal dataflow edges failed: %v", err)
-		_ = sc.saveAuditEdgesMinimal(sc.db, dp.Edges, defaultDataflowBatchSize())
-		return
-	}
-	if err := tx.Commit().Error; err != nil {
-		_ = tx.Rollback().Error
-		log.Errorf("save minimal dataflow commit failed: %v", err)
+	tx, isTx := sc.tryBeginTx()
+	sc.saveAuditNodes(tx, dp.Nodes, defaultDataflowBatchSize())
+	sc.saveAuditEdges(tx, dp.Edges, defaultDataflowBatchSize())
+	if isTx {
+		sc.commitOrRollback(tx)
 	}
 }
 
@@ -287,12 +309,13 @@ func (sc *SaveDataFlowCtx) saveAuditNodes(db *gorm.DB, nodes []*NodeInfo, batchS
 		if n == nil {
 			continue
 		}
-		// 存储过的不重复存储
 		if sc.nodeMap[n.NodeID] != "" {
 			continue
 		}
 		auditNode := n.ToAuditNode(sc.riskHash)
-		// NodeID is generated in memory (ULID), so we can map before insert.
+		if auditNode == nil {
+			continue
+		}
 		sc.nodeMap[n.NodeID] = auditNode.NodeID
 		toInsert = append(toInsert, auditNode)
 	}
@@ -353,74 +376,6 @@ func (sc *SaveDataFlowCtx) saveAuditEdges(db *gorm.DB, edges []*EdgeInfo, batchS
 	return nil
 }
 
-func (sc *SaveDataFlowCtx) saveAuditNodesMinimal(db *gorm.DB, nodes []*StreamMinimalNodeInfo, batchSize int) error {
-	if len(nodes) == 0 {
-		return nil
-	}
-	toInsert := make([]*ssadb.AuditNode, 0, len(nodes))
-	for _, n := range nodes {
-		if n == nil {
-			continue
-		}
-		if sc.nodeMap[n.NodeID] != "" {
-			continue
-		}
-		auditNode := n.ToAuditNode(sc.riskHash)
-		if auditNode == nil {
-			continue
-		}
-		sc.nodeMap[n.NodeID] = auditNode.NodeID
-		toInsert = append(toInsert, auditNode)
-	}
-	if len(toInsert) == 0 {
-		return nil
-	}
-	if err := insertAuditNodesMultiValues(db, toInsert, batchSize); err == nil {
-		return nil
-	}
-	for _, an := range toInsert {
-		if an == nil {
-			continue
-		}
-		if e := db.Create(an).Error; e != nil {
-			log.Errorf("save audit node failed: %v", e)
-		}
-	}
-	return nil
-}
-
-func (sc *SaveDataFlowCtx) saveAuditEdgesMinimal(db *gorm.DB, edges []*StreamMinimalEdgeInfo, batchSize int) error {
-	if len(edges) == 0 {
-		return nil
-	}
-	toInsert := make([]*ssadb.AuditEdge, 0, len(edges))
-	for _, e := range edges {
-		if e == nil {
-			continue
-		}
-		auditEdge := e.ToAuditEdge(sc.nodeMap)
-		if auditEdge == nil || auditEdge.FromNode == "" || auditEdge.ToNode == "" {
-			continue
-		}
-		toInsert = append(toInsert, auditEdge)
-	}
-	if len(toInsert) == 0 {
-		return nil
-	}
-	if err := insertAuditEdgesMultiValues(db, toInsert, batchSize); err == nil {
-		return nil
-	}
-	for _, ae := range toInsert {
-		if ae == nil {
-			continue
-		}
-		if e := db.Create(ae).Error; e != nil {
-			log.Errorf("save audit edge failed: %v", e)
-		}
-	}
-	return nil
-}
-
 func insertAuditNodesMultiValues(db *gorm.DB, items []*ssadb.AuditNode, batchSize int) error {
 	if db == nil || len(items) == 0 {
 		return nil
@@ -461,6 +416,7 @@ func insertAuditNodesMultiValues(db *gorm.DB, items []*ssadb.AuditNode, batchSiz
 		}
 	}
 
+	now := time.Now()
 	for i := 0; i < len(items); i += batchSize {
 		j := i + batchSize
 		if j > len(items) {
@@ -475,14 +431,15 @@ func insertAuditNodesMultiValues(db *gorm.DB, items []*ssadb.AuditNode, batchSiz
 		sb.WriteString(strings.Join(cols, ","))
 		sb.WriteString(") VALUES ")
 
-		args := make([]any, 0, len(batch)*16)
+		args := make([]any, 0, len(batch)*18)
 		for idx, n := range batch {
 			if idx > 0 {
 				sb.WriteByte(',')
 			}
-			// created_at, updated_at use NOW() for the batch.
-			sb.WriteString("(NOW(),NOW(),?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+			sb.WriteString("(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
 			args = append(args,
+				now,
+				now,
 				n.TaskId,
 				n.ResultId,
 				n.ResultVariable,
@@ -540,6 +497,7 @@ func insertAuditEdgesMultiValues(db *gorm.DB, items []*ssadb.AuditEdge, batchSiz
 		}
 	}
 
+	now := time.Now()
 	for i := 0; i < len(items); i += batchSize {
 		j := i + batchSize
 		if j > len(items) {
@@ -554,13 +512,15 @@ func insertAuditEdgesMultiValues(db *gorm.DB, items []*ssadb.AuditEdge, batchSiz
 		sb.WriteString(strings.Join(cols, ","))
 		sb.WriteString(") VALUES ")
 
-		args := make([]any, 0, len(batch)*8)
+		args := make([]any, 0, len(batch)*10)
 		for idx, e := range batch {
 			if idx > 0 {
 				sb.WriteByte(',')
 			}
-			sb.WriteString("(NOW(),NOW(),?,?,?,?,?,?,?,?)")
+			sb.WriteString("(?,?,?,?,?,?,?,?,?,?)")
 			args = append(args,
+				now,
+				now,
 				e.TaskId,
 				e.ResultId,
 				e.FromNode,
