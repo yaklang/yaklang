@@ -72,17 +72,31 @@ var Exports = map[string]interface{}{
 	"WithConnectionHistory":         WithConnectionHistory,         // 启用历史记录
 	"WatchConnections":              WatchConnections,              // 简单连接监控函数
 
+	// ==================== SSH Journal 监控模块 ====================
+	// 基于 systemd journal 监控 SSH 登录事件，无需 root 权限，无需安装 audit 模块
+	"CheckJournalAvailable":     CheckJournalAvailable,         // 检查 journalctl 是否可用
+	"NewJournalSSHMonitor":      NewJournalSSHMonitor,          // 创建 SSH journal 监控器
+	"WatchJournalSSHEvents":     WatchJournalSSHEvents,         // 简化的 SSH 监控函数
+	"journalSSHOnLoginSuccess":  WithJournalSSHOnLoginSuccess,  // 设置登录成功回调
+	"journalSSHOnLoginFailed":   WithJournalSSHOnLoginFailed,   // 设置登录失败回调
+	"journalSSHOnDisconnected":  WithJournalSSHOnDisconnected,  // 设置断开连接回调
+	"journalSSHOnAnyEvent":      WithJournalSSHOnAnyEvent,      // 设置任意事件回调
+	"journalSSHFilterUsers":     WithJournalSSHFilterUsers,     // 按用户名过滤
+	"journalSSHFilterRemoteIPs": WithJournalSSHFilterRemoteIPs, // 按来源 IP 过滤
+	"journalSSHUnits":           WithJournalSSHUnits,           // 设置监听的 systemd unit
+	"journalSSHSince":           WithJournalSSHSince,           // 设置日志起始时间
+
 	// ==================== Linux Audit 监控模块 ====================
 	// Audit监控器 - 基于Linux audit子系统进行用户行为审计
-	"CheckAuditSystem":          CheckAuditSystem,          // 检查audit子系统状态
-	"NewAuditMonitor":           NewAuditMonitor,           // 创建Audit监控器
-	"WithAuditMonitorLogin":     WithAuditMonitorLogin,     // 设置是否监控登录事件
-	"WithAuditMonitorCommand":   WithAuditMonitorCommand,   // 设置是否监控命令执行事件
-	"WithOnLoginEvent":          WithOnLoginEvent,          // 设置登录事件回调
-	"WithOnCommandEvent":        WithOnCommandEvent,        // 设置命令执行事件回调
-	"WithAuditFilterUsers":      WithAuditFilterUsers,      // 按当前用户(Username)过滤
-	"WithAuditFilterLoginUsers": WithAuditFilterLoginUsers, // 按原始登录用户(LoginUser)过滤
-	"WithAuditFilterCommands":   WithAuditFilterCommands,   // 设置命令过滤器
-	"WithAuditBufferSize":       WithAuditBufferSize,       // 设置缓冲区大小
-	"WatchAuditEvents":          WatchAuditEvents,          // 简化的audit监控函数
+	"CheckAuditSystem":      CheckAuditSystem,          // 检查audit子系统状态
+	"NewAuditMonitor":       NewAuditMonitor,           // 创建Audit监控器
+	"auditMonitorLogin":     WithAuditMonitorLogin,     // 设置是否监控登录事件
+	"auditMonitorCommand":   WithAuditMonitorCommand,   // 设置是否监控命令执行事件
+	"onLoginEvent":          WithOnLoginEvent,          // 设置登录事件回调
+	"onCommandEvent":        WithOnCommandEvent,        // 设置命令执行事件回调
+	"auditFilterUsers":      WithAuditFilterUsers,      // 按当前用户(Username)过滤
+	"auditFilterLoginUsers": WithAuditFilterLoginUsers, // 按原始登录用户(LoginUser)过滤
+	"auditFilterCommands":   WithAuditFilterCommands,   // 设置命令过滤器
+	"auditBufferSize":       WithAuditBufferSize,       // 设置缓冲区大小
+	"WatchAuditEvents":      WatchAuditEvents,          // 简化的audit监控函数
 }
