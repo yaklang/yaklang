@@ -64151,8 +64151,13 @@ type MITMV2Request struct {
 	SetPluginMode   bool     `protobuf:"varint,38,opt,name=SetPluginMode,proto3" json:"SetPluginMode,omitempty"`
 	InitPluginNames []string `protobuf:"bytes,39,rep,name=InitPluginNames,proto3" json:"InitPluginNames,omitempty"`
 	// mitm manual hijack message
-	SetAutoForward        bool                              `protobuf:"varint,40,opt,name=SetAutoForward,proto3" json:"SetAutoForward,omitempty"`
-	AutoForwardValue      bool                              `protobuf:"varint,41,opt,name=AutoForwardValue,proto3" json:"AutoForwardValue,omitempty"`
+	SetAutoForward   bool `protobuf:"varint,40,opt,name=SetAutoForward,proto3" json:"SetAutoForward,omitempty"`
+	AutoForwardValue bool `protobuf:"varint,41,opt,name=AutoForwardValue,proto3" json:"AutoForwardValue,omitempty"`
+	// auto unzip / zip packet encoding for manual hijack (hot reload)
+	// If enabled, engine will try to decode Content-Encoding/Transfer-Encoding (chunked) before
+	// sending packets to frontend for editing, and re-encode them when frontend sends back.
+	AutoUnzipValue        bool                              `protobuf:"varint,54,opt,name=AutoUnzipValue,proto3" json:"AutoUnzipValue,omitempty"`
+	SetAutoUnzip          bool                              `protobuf:"varint,55,opt,name=SetAutoUnzip,proto3" json:"SetAutoUnzip,omitempty"`
 	RecoverManualHijack   bool                              `protobuf:"varint,42,opt,name=RecoverManualHijack,proto3" json:"RecoverManualHijack,omitempty"`
 	ManualHijackControl   bool                              `protobuf:"varint,43,opt,name=ManualHijackControl,proto3" json:"ManualHijackControl,omitempty"`
 	ManualHijackMessage   *SingleManualHijackControlMessage `protobuf:"bytes,44,opt,name=ManualHijackMessage,proto3" json:"ManualHijackMessage,omitempty"`
@@ -64495,6 +64500,20 @@ func (x *MITMV2Request) GetSetAutoForward() bool {
 func (x *MITMV2Request) GetAutoForwardValue() bool {
 	if x != nil {
 		return x.AutoForwardValue
+	}
+	return false
+}
+
+func (x *MITMV2Request) GetAutoUnzipValue() bool {
+	if x != nil {
+		return x.AutoUnzipValue
+	}
+	return false
+}
+
+func (x *MITMV2Request) GetSetAutoUnzip() bool {
+	if x != nil {
+		return x.SetAutoUnzip
 	}
 	return false
 }
@@ -72012,7 +72031,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x14WatchProcessResponse\x12\x16\n" +
 	"\x06Action\x18\x01 \x01(\tR\x06Action\x12*\n" +
 	"\aProcess\x18\x02 \x01(\v2\x10.ypb.ProcessInfoR\aProcess\x125\n" +
-	"\vConnections\x18\x03 \x03(\v2\x13.ypb.ConnectionInfoR\vConnections\"\xc0\x12\n" +
+	"\vConnections\x18\x03 \x03(\v2\x13.ypb.ConnectionInfoR\vConnections\"\x8c\x13\n" +
 	"\rMITMV2Request\x12\x12\n" +
 	"\x04Host\x18\x01 \x01(\tR\x04Host\x12\x12\n" +
 	"\x04Port\x18\x02 \x01(\rR\x04Port\x12(\n" +
@@ -72062,7 +72081,9 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\rSetPluginMode\x18& \x01(\bR\rSetPluginMode\x12(\n" +
 	"\x0fInitPluginNames\x18' \x03(\tR\x0fInitPluginNames\x12&\n" +
 	"\x0eSetAutoForward\x18( \x01(\bR\x0eSetAutoForward\x12*\n" +
-	"\x10AutoForwardValue\x18) \x01(\bR\x10AutoForwardValue\x120\n" +
+	"\x10AutoForwardValue\x18) \x01(\bR\x10AutoForwardValue\x12&\n" +
+	"\x0eAutoUnzipValue\x186 \x01(\bR\x0eAutoUnzipValue\x12\"\n" +
+	"\fSetAutoUnzip\x187 \x01(\bR\fSetAutoUnzip\x120\n" +
 	"\x13RecoverManualHijack\x18* \x01(\bR\x13RecoverManualHijack\x120\n" +
 	"\x13ManualHijackControl\x18+ \x01(\bR\x13ManualHijackControl\x12W\n" +
 	"\x13ManualHijackMessage\x18, \x01(\v2%.ypb.SingleManualHijackControlMessageR\x13ManualHijackMessage\x12&\n" +

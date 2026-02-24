@@ -452,6 +452,9 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		}
 	}
 
+	// 手动劫持：是否启用自动解压/自动压缩（需要热加载）
+	autoUnzip := utils.NewBool(firstReq.GetAutoUnzipValue())
+
 	go func() {
 		for {
 			reqInstance, err := stream.Recv()
@@ -673,6 +676,11 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 				continue
 			}
 
+			if reqInstance.GetSetAutoUnzip() {
+				autoUnzip.SetTo(reqInstance.GetAutoUnzipValue())
+				continue
+			}
+
 			if reqInstance.GetRecoverManualHijack() {
 				hijackListReload()
 				continue
@@ -832,21 +840,13 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		// use handled request
 		plainRequest := getPlainRequestBytes(req)
 
-		plainResponseHash := codec.Sha256(plainResponse)
-		handleResponseModified := func(r []byte) bool {
-			if codec.Sha256(r) != plainResponseHash {
-				return true
-			}
-			return false
-		}
-
 		dropped := utils.NewBool(false)
 		mitmPluginCaller.CallHijackResponseExWithCtx(pluginCtx, isHttps, urlStr, func() interface{} {
 			return plainRequest
 		}, func() interface{} {
 			return plainResponse
 		}, constClujore(func(i interface{}) {
-			if ret := codec.AnyToBytes(i); handleResponseModified(ret) {
+			if ret := codec.AnyToBytes(i); packetModified(plainRequest, ret) {
 				httpctx.SetResponseModified(req, "yaklang.hook(ex)")
 				httpctx.SetHijackedResponseBytes(req, ret)
 			}
@@ -864,7 +864,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 					return plainResponse
 				}
 			}, constClujore(func(i interface{}) {
-				if ret := codec.AnyToBytes(i); handleResponseModified(ret) {
+				if ret := codec.AnyToBytes(i); packetModified(ret, plainResponse) {
 					httpctx.SetResponseModified(req, "yaklang.hook")
 					httpctx.SetHijackedResponseBytes(req, ret)
 				}
@@ -920,7 +920,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 				return nil
 			}
 			httpctx.AppendMatchedRule(req, rules...)
-			if handleResponseModified(rspHooked) {
+			if packetModified(rsp, rspHooked) {
 				httpctx.SetResponseModified(req, "yakit.rule.hook")
 				httpctx.SetHijackedResponseBytes(req, rspHooked)
 				rsp = rspHooked
@@ -950,9 +950,19 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		taskInfo.Status = Hijack_Status_Response
 		taskInfo.Request = httpctx.GetRequestBytes(req)
 		taskInfo.Response = rsp
+		if autoUnzip.IsSet() {
+			if viewReq, _, ok := lowhttp.AutoUnzipPacketEncoding(taskInfo.Request); ok {
+				taskInfo.Request = viewReq
+			}
+			if viewRsp, st, ok := lowhttp.AutoUnzipPacketEncoding(taskInfo.Response); ok && st != nil {
+				taskInfo.Response = viewRsp
+				hijackManger.autoUnzipResponse.Set(taskInfo.TaskID, st)
+			}
+		}
 		taskInfo.TraceInfo = model.ToLowhttpTraceInfoGRPCModel(traceInfo)
 		httpctx.SetResponseViewedByUser(req)
 
+		sendPacket := taskInfo.Response
 		for {
 			hijackListFeedback(Hijack_List_Update, taskInfo)
 			select {
@@ -997,10 +1007,22 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 						}
 					}
 
-					if handleResponseModified(response) {
-						httpctx.SetResponseModified(req, "manual")
-						httpctx.SetHijackedResponseBytes(req, response)
+					// 没改动的话，保持 forward 行为（避免因重新压缩导致“被修改”误判）
+					if !packetModified(sendPacket, response) {
+						return rsp
 					}
+
+					if autoUnzip.IsSet() {
+						if st, ok := hijackManger.autoUnzipResponse.Get(taskInfo.TaskID); ok && st != nil {
+							if encoded, ok := lowhttp.AutoZipPacketEncoding(response, st); ok {
+								response = encoded
+							}
+						}
+					}
+
+					httpctx.SetResponseModified(req, "manual")
+					httpctx.SetHijackedResponseBytes(req, response)
+					httpctx.SetPlainResponseBytes(req, lowhttp.DeletePacketEncoding(response))
 
 					rspModified, _, err := lowhttp.FixHTTPResponse(response)
 					if err != nil {
@@ -1138,16 +1160,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		fixReqIns, _ := lowhttp.ParseBytesToHttpRequest(fixReq)
 		method := originReqIns.Method
 
-		// make it plain
-		plainRequest := getPlainRequestBytes(originReqIns)
-
 		// handle rules
-		originRequestHash := codec.Sha256(plainRequest)
-
-		// modified ?
-		handleRequestModified := func(newReqBytes []byte) bool {
-			return codec.Sha256(newReqBytes) != originRequestHash
-		}
 
 		defer func() {
 			if err := recover(); err != nil {
@@ -1189,7 +1202,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 
 		defer func() {
 			newHijackReq := mitmPluginCaller.CallBeforeRequestWithCtx(pluginCtx, isHttps, urlStr, httpctx.GetBareRequestBytes(originReqIns), hijackReq)
-			if len(newHijackReq) > 0 && handleRequestModified(newHijackReq) {
+			if len(newHijackReq) > 0 && packetModified(req, newHijackReq) {
 				hijackReq = newHijackReq
 				setModifiedRequest("yaklang.hook beforeRequest", hijackReq)
 			}
@@ -1227,7 +1240,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		httpctx.AppendMatchedRule(originReqIns, rules...)
 
 		modifiedByRule := false
-		if handleRequestModified(req1) {
+		if packetModified(req, req1) {
 			req = req1
 			modifiedByRule = true
 			setModifiedRequest("yakit.mitm.replacer", req1)
@@ -1261,7 +1274,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 					return
 				}
 				if replaced != nil {
-					if ret := codec.AnyToBytes(replaced); handleRequestModified(ret) {
+					if ret := codec.AnyToBytes(replaced); packetModified(getPlainRequestBytes(originReqIns), ret) {
 						setModifiedRequest("yaklang.hook", lowhttp.FixHTTPRequest(ret))
 					}
 				}
@@ -1303,6 +1316,13 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 
 		taskInfo := task.infoMessage
 
+		if autoUnzip.IsSet() {
+			if viewReq, st, ok := lowhttp.AutoUnzipPacketEncoding(taskInfo.Request); ok && st != nil {
+				taskInfo.Request = viewReq
+				hijackManger.autoUnzipRequest.Set(taskInfo.TaskID, st)
+			}
+		}
+
 		httpctx.SetResponseContentTypeFiltered(originReqIns, func(t string) bool { // update callback set resp filter feedback
 			ret := !filterManager.IsMIMEPassed(t)
 			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.RESPONSE_CONTEXT_KEY_ResponseIsFiltered, ret)
@@ -1325,6 +1345,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 				hijackListFeedback(Hijack_List_Update, taskInfo)
 			}
 		}()
+		sendPacket := taskInfo.Request
 		for {
 			hijackListFeedback(Hijack_List_Update, taskInfo)
 			select {
@@ -1401,9 +1422,21 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 							current = []byte(result[0])
 						}
 					}
-					if handleRequestModified(current) {
-						setModifiedRequest("user", current)
+
+					// 没改动的话，保持 forward 行为（避免因重新压缩导致“被修改”误判）
+					if !packetModified(sendPacket, current) {
+						return req
 					}
+
+					if autoUnzip.IsSet() {
+						if st, ok := hijackManger.autoUnzipRequest.Get(taskInfo.TaskID); ok && st != nil {
+							if encoded, ok := lowhttp.AutoZipPacketEncoding(current, st); ok {
+								current = encoded
+							}
+						}
+					}
+
+					setModifiedRequest("user", current)
 					return current
 				}
 			}
@@ -1752,6 +1785,10 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	return nil
 }
 
+func packetModified(sendPacket, recvPacket []byte) bool {
+	return codec.Sha256(sendPacket) != codec.Sha256(recvPacket)
+}
+
 type manualHijackTask struct {
 	taskID      string
 	messageChan <-chan *ypb.SingleManualHijackControlMessage
@@ -1764,6 +1801,8 @@ type manualHijackManager struct {
 	manualHijacking      bool
 	hijackLock           sync.Mutex
 	fuzztagConvertedTask *utils.SafeMap[bool] // Track which tasks had binary response converted to fuzztag
+	autoUnzipRequest     *utils.SafeMap[*lowhttp.PacketEncodingState]
+	autoUnzipResponse    *utils.SafeMap[*lowhttp.PacketEncodingState]
 }
 
 func newManualHijackManager() *manualHijackManager {
@@ -1772,6 +1811,8 @@ func newManualHijackManager() *manualHijackManager {
 		messageChan:          make(map[string]chan<- *ypb.SingleManualHijackControlMessage),
 		manualHijacking:      false,
 		fuzztagConvertedTask: utils.NewSafeMap[bool](),
+		autoUnzipRequest:     utils.NewSafeMap[*lowhttp.PacketEncodingState](),
+		autoUnzipResponse:    utils.NewSafeMap[*lowhttp.PacketEncodingState](),
 	}
 }
 
@@ -1787,6 +1828,8 @@ func (m *manualHijackManager) setCanRegister(b bool) {
 			}
 			// Clean up fuzztag tracking to prevent memory leak
 			m.fuzztagConvertedTask.Delete(id)
+			m.autoUnzipRequest.Delete(id)
+			m.autoUnzipResponse.Delete(id)
 		}
 	}
 	m.manualHijacking = b
@@ -1843,6 +1886,8 @@ func (m *manualHijackManager) unRegister(id string) {
 	}
 	// Clean up fuzztag tracking to prevent memory leak
 	m.fuzztagConvertedTask.Delete(id)
+	m.autoUnzipRequest.Delete(id)
+	m.autoUnzipResponse.Delete(id)
 }
 
 func (m *manualHijackManager) unicast(req *ypb.SingleManualHijackControlMessage) {
