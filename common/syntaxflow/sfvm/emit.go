@@ -92,14 +92,6 @@ func (y *SyntaxFlowVisitor) EmitOpEmptyCompare() {
 		OpCode: OpEmptyCompare,
 	})
 }
-func (y *SyntaxFlowVisitor) EmitOpCheckEmpty(index *IterIndex) {
-	//索引
-	y.codes = append(y.codes, &SFI{
-		OpCode: OpCheckEmpty,
-		Iter:   index,
-	})
-}
-
 func (y *SyntaxFlowVisitor) EmitAddDescription(key string, value string) {
 	y.codes = append(y.codes, &SFI{
 		OpCode:   OpAddDescription,
@@ -427,30 +419,6 @@ func (v *SyntaxFlowVisitor) EmitPass() {
 	v.codes = append(v.codes, &SFI{
 		OpCode: OpPass,
 	})
-}
-
-func (v *SyntaxFlowVisitor) EmitCreateIterator() *IterIndex {
-	idx := len(v.codes)
-	it := &IterIndex{Start: idx, currentIndex: 0}
-	v.codes = append(v.codes, &SFI{OpCode: OpCreateIter, Iter: it})
-	return it
-}
-
-func (v *SyntaxFlowVisitor) EmitNextIterator(i *IterIndex) {
-	i.Next = len(v.codes)
-	v.codes = append(v.codes, &SFI{OpCode: OpIterNext, Iter: i})
-}
-
-func (v *SyntaxFlowVisitor) EmitLatchIterator(i *IterIndex) {
-	i.Latch = len(v.codes)
-	v.codes = append(v.codes, &SFI{OpCode: OpIterLatch, Iter: i})
-}
-
-func (v *SyntaxFlowVisitor) EmitIterEnd(i *IterIndex) {
-	idx := len(v.codes)
-	code := &SFI{OpCode: OpIterEnd, Iter: i}
-	i.End = idx
-	v.codes = append(v.codes, code)
 }
 
 func (y *SyntaxFlowVisitor) EmitCheckStackTop() {

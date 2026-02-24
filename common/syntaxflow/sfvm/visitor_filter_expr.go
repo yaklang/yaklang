@@ -48,9 +48,10 @@ func (y *SyntaxFlowVisitor) VisitFilterItem(raw sf.IFilterItemContext) error {
 		y.EmitOpEmptyCompare()
 		if filter.ActualParam() != nil {
 			y.VisitActualParam(filter.ActualParam(), filter.Question() != nil)
+		} else {
+			// no actual-param filter: keep original call filtering behavior
+			y.EmitCondition()
 		}
-		//拿到符合要求的call
-		y.EmitCondition()
 		//检查栈顶，应该可以被里面的值影响到
 		y.EmitCheckStackTop()
 	case *sf.DeepChainFilterContext:
@@ -319,21 +320,15 @@ func (y *SyntaxFlowVisitor) VisitActualParam(i sf.IActualParamContext, haveQuest
 	}
 	switch ret := i.(type) {
 	case *sf.AllParamContext:
-		iteratorCtx := y.EmitCreateIterator()
-		y.EmitNextIterator(iteratorCtx)
 		statement := y.EmitEnterStatement()
+		y.EmitDuplicate()
 		y.EmitPushCallArgs(0, true)
 		handlerStatement(ret.SingleParam())
+		y.EmitFilterCondition()
+		y.EmitCondition()
 		y.EmitExitStatement(statement)
-		if haveQuestion {
-			y.EmitOpPopDuplicate()
-			y.EmitOpCheckEmpty(iteratorCtx)
-		}
-		y.EmitLatchIterator(iteratorCtx)
-		y.EmitIterEnd(iteratorCtx)
+		_ = haveQuestion
 	case *sf.EveryParamContext:
-		iterator := y.EmitCreateIterator()
-		y.EmitNextIterator(iterator)
 		for i, paraI := range ret.AllActualParamFilter() {
 			para, ok := paraI.(*sf.ActualParamFilterContext)
 			if !ok {
@@ -344,26 +339,23 @@ func (y *SyntaxFlowVisitor) VisitActualParam(i sf.IActualParamContext, haveQuest
 				continue
 			}
 			statement := y.EmitEnterStatement()
+			y.EmitDuplicate()
 			y.EmitPushCallArgs(i, false)
 			handlerStatement(single)
+			_ = haveQuestion
+			y.EmitFilterCondition()
+			y.EmitCondition()
 			y.EmitExitStatement(statement)
-			if haveQuestion {
-				y.EmitOpPopDuplicate()
-				y.EmitOpCheckEmpty(iterator)
-			}
 		}
 		if ret.SingleParam() != nil { // the last one get continue other value
 			statement := y.EmitEnterStatement()
+			y.EmitDuplicate()
 			y.EmitPushCallArgs(len(ret.AllActualParamFilter()), true)
 			handlerStatement(ret.SingleParam())
+			y.EmitFilterCondition()
+			y.EmitCondition()
 			y.EmitExitStatement(statement)
-			if haveQuestion {
-				y.EmitOpPopDuplicate()
-				y.EmitOpCheckEmpty(iterator)
-			}
 		}
-		y.EmitLatchIterator(iterator)
-		y.EmitIterEnd(iterator)
 	default:
 		return utils.Errorf("BUG: ActualParamFilter type error: %s", reflect.TypeOf(ret))
 	}
