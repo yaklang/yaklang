@@ -29,6 +29,19 @@ func QuerySyntaxFlowRules(name string, opts ...QueryRulesOption) chan *schema.Sy
 	return sfdb.YieldSyntaxFlowRules(db, context.Background())
 }
 
+// QuerySyntaxFlowRulesByKeyword 按规则名称、英文标题、中文标题模糊查询，支持中文/英文输入
+func QuerySyntaxFlowRulesByKeyword(keyword string, opts ...QueryRulesOption) chan *schema.SyntaxFlowRule {
+	db := consts.GetGormProfileDatabase().Model(&schema.SyntaxFlowRule{})
+	if keyword != "" {
+		like := "%" + keyword + "%"
+		db = db.Where("rule_name LIKE ? OR title LIKE ? OR title_zh LIKE ?", like, like, like)
+	}
+	for _, opt := range opts {
+		db = opt(db)
+	}
+	return sfdb.YieldSyntaxFlowRules(db, context.Background())
+}
+
 var Exports = map[string]any{
 	"ExecRule":       ExecRule,
 	"withExecTaskID": ssaapi.QueryWithTaskID,
@@ -42,5 +55,6 @@ var Exports = map[string]any{
 	"withSearch": func() ssaapi.QueryOption {
 		return ssaapi.QueryWithSave(schema.SFResultKindSearch)
 	},
-	"QuerySyntaxFlowRules": QuerySyntaxFlowRules,
+	"QuerySyntaxFlowRules":       QuerySyntaxFlowRules,
+	"QuerySyntaxFlowRulesByKeyword": QuerySyntaxFlowRulesByKeyword,
 }

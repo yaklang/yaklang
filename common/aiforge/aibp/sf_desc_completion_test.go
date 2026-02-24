@@ -2,21 +2,25 @@ package aibp
 
 import (
 	"context"
+	"os"
+	"path/filepath"
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"os"
-	"testing"
 )
 
 func TestSFDescCompletion(t *testing.T) {
 	if utils.InGithubActions() {
 		return
 	}
-	fileName := `D:\GoProject\yaklang\common\syntaxflow\sfbuildin\buildin\php\cwe-89-sql-injection\php-mysql-inject.sf`
+	cwd, _ := os.Getwd()
+	root := filepath.Clean(filepath.Join(cwd, "..", "..", ".."))
+	fileName := filepath.Join(root, "common", "syntaxflow", "sfbuildin", "buildin", "php", "cwe-89-sql-injection", "php-mysql-inject.sf")
 	content, err := os.ReadFile(fileName)
 	require.NoError(t, err)
 	results, err := aiforge.ExecuteForge(
