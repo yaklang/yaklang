@@ -234,7 +234,7 @@ func searchTools(cfg *SearchCapabilitiesConfig, query string) string {
 	// Fallback to BM25 DB search
 	db := consts.GetGormProfileDatabase()
 	if db != nil {
-		tools, err := yakit.SearchAIYakToolBM25(db, &yakit.AIYakToolFilter{Keywords: query}, 10, 0)
+		tools, err := yakit.SearchAIYakToolBM25(db, &yakit.AIYakToolFilter{Keywords: []string{query}}, 10, 0)
 		if err != nil {
 			log.Warnf("search_capabilities: BM25 tool search failed: %v", err)
 		} else if len(tools) > 0 {
@@ -285,7 +285,7 @@ func searchForges(cfg *SearchCapabilitiesConfig, query string) string {
 	// Fallback to BM25 DB search
 	db := consts.GetGormProfileDatabase()
 	if db != nil {
-		forges, err := yakit.SearchAIForgeBM25(db, &yakit.AIForgeSearchFilter{Keywords: query}, 10, 0)
+		forges, err := yakit.SearchAIForgeBM25(db, &yakit.AIForgeSearchFilter{Keywords: []string{query}}, 10, 0)
 		if err != nil {
 			log.Warnf("search_capabilities: BM25 forge search failed: %v", err)
 		} else if len(forges) > 0 {
