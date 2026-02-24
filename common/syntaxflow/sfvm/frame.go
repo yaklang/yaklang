@@ -54,7 +54,6 @@ type SFFrame struct {
 	stack          *utils.Stack[ValueOperator] // for filter
 	conditionStack *utils.Stack[[]bool]        // for condition
 	conditionScope *utils.Stack[int]           // for condition scope
-	iterStack      *utils.Stack[*IterContext]  // for loop
 	popStack       *utils.Stack[ValueOperator] //pop stack,for sf
 
 	// when cache err skip  statement/expr
@@ -216,7 +215,6 @@ func (s *SFFrame) Flush() {
 	s.errorSkipStack = utils.NewStack[*errorSkipContext]()
 	s.conditionStack = utils.NewStack[[]bool]()
 	s.conditionScope = utils.NewStack[int]()
-	s.iterStack = utils.NewStack[*IterContext]()
 	s.popStack = utils.NewStack[ValueOperator]()
 	s.idx = 0
 }
@@ -376,45 +374,6 @@ func (s *SFFrame) execRule(feedValue ValueOperator) error {
 					stackDepth: s.stack.Len(),
 				})
 
-			case OpCreateIter:
-				s.debugSubLog(">> peek")
-				vs := s.stack.Peek()
-				if vs == nil {
-					return utils.Wrapf(CriticalError, "BUG: iterCreate: stack top is empty")
-				}
-				s.IterStart(vs)
-			case OpIterNext:
-				vs, next, err := s.IterNext()
-				if err != nil {
-					return err
-				}
-				if !next {
-					// jump to end
-					end := i.Iter.End
-					s.debugSubLog("no next data, to %v", end)
-					s.idx = end
-					return nil
-				}
-				s.debugLog("next value: %v", ValuesLen(vs))
-				s.stack.Push(vs)
-			case OpIterLatch:
-				if s.stack.IsEmpty() {
-					return utils.Wrapf(CriticalError, "BUG: iterLatch: stack top is empty")
-				}
-				if err := s.IterLatch(s.stack.Pop()); err != nil {
-					return err
-				}
-				// jump to next
-				next := i.Iter.Next
-				i.Iter.currentIndex++
-				s.debugSubLog("jump to next code: %v", next)
-				s.idx = next
-			case OpIterEnd:
-				i.Iter.currentIndex = 0
-				// end iter, pop and collect results to conditionStack
-				if err := s.IterEnd(); err != nil {
-					return err
-				}
 			default:
 				if err := s.execStatement(i); err != nil {
 					s.debugSubLog("execStatement error: %v", err)
