@@ -1,0 +1,11 @@
+__DESC__ = "补全 SyntaxFlow 静态代码审计规则的 desc 与 alert 信息，包括 title、title_zh、desc、solution 等字段，由 LiteForge 执行。"
+__VERBOSE_NAME__ = "SyntaxFlow 规则补全"
+__KEYWORDS__ = "SyntaxFlow,规则补全,静态分析,代码审计"
+
+rule_name = cli.String("rule_name", cli.setHelp("SF规则名称或关键字"), cli.setVerboseName("规则名称"))
+query = cli.String("query", cli.setHelp("查询关键字"), cli.setVerboseName("查询"))
+cli.check()
+
+forgeHandle = func(params) {
+    return aiagent.ExecuteForge("sf_rule_completion", params)
+}

@@ -117,6 +117,7 @@ func syncBuildInForgeInternal() error {
 	registerBuildInForge("mock_forge")
 	registerBuildInForge("alert_denoising")
 	registerBuildInForge("code_audit")
+	registerBuildInForge("sf_rule_completion")
 	return nil
 }
 
