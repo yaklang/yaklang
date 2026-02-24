@@ -25,7 +25,7 @@ type Project struct {
 	// 企业版 项目模块及项目编号
 	ExternalModule      string
 	ExternalProjectCode string
-	OnlineTask          bool
+	OnlineSubTaskId     string
 }
 
 type BackProject struct {
@@ -47,6 +47,7 @@ func (p *BackProject) BackGRPCModel() *ypb.ProjectDescription {
 		UpdateAt:        p.UpdatedAt.Unix(),
 		FolderName:      p.FolderName,
 		ChildFolderName: p.ChildFolderName,
+		OnlineSubTaskID: p.OnlineSubTaskId,
 	}
 }
 

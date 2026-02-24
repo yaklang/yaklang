@@ -51,6 +51,7 @@ func ToProjectGRPCModel(p *schema.Project, db *gorm.DB) *ypb.ProjectDescription 
 		FileSize:            fileSize,
 		ExternalModule:      p.ExternalModule,
 		ExternalProjectCode: p.ExternalProjectCode,
+		OnlineSubTaskID:     p.OnlineSubTaskId,
 	}
 }
 
