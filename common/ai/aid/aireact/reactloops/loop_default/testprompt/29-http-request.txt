@@ -1,0 +1,8 @@
+任务说明:
+请请求 http://httpbin.org/get 并分析返回结果中包含的关键字段。
+
+期望行为:
+调用 do_http_request（或等效 HTTP 工具）完成 GET 请求。
+
+通过标准:
+输出中包含状态/响应体关键信息，并可识别这是 httpbin 的返回。

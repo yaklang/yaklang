@@ -1,0 +1,8 @@
+任务说明:
+请把字符串 YAKLANG_TEST_OK 写入 /tmp/yaklang_ai_test.txt，然后再读取该文件确认内容。
+
+期望行为:
+先调用 write_file，再调用 read_file 做校验。
+
+通过标准:
+最终输出明确显示文件内容为 YAKLANG_TEST_OK。

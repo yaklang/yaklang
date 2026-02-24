@@ -1,0 +1,8 @@
+任务说明:
+请把字符串 hello-yaklang 做 base64 编码。
+
+期望行为:
+调用 encode 工具，type=base64，text=hello-yaklang。
+
+通过标准:
+输出结果为 aGVsbG8teWFrbGFuZw==。

@@ -1,0 +1,8 @@
+任务说明:
+请通过 load_capability 动态加载 ostype 能力并执行，返回当前操作系统类型。
+
+期望行为:
+先执行 load_capability(identifier=ostype 或 system/ostype 对应能力)，再完成工具调用。
+
+通过标准:
+最终输出包含系统类型（如 darwin/linux/windows）且流程成功。

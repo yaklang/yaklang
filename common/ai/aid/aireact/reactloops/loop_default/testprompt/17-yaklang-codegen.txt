@@ -1,0 +1,8 @@
+任务说明:
+请进入 write_yaklang_code 焦点模式，生成一个最小 Yaklang 脚本，脚本执行时打印 Hello from Yaklang AI Test。
+
+期望行为:
+触发对应 focus loop，给出完整脚本内容。
+
+通过标准:
+输出中包含可运行的 Yaklang 脚本，且打印目标字符串。

@@ -1,0 +1,10 @@
+任务说明:
+请使用 tool_compose 设计顺序 DAG:
+step1 获取当前时间;
+step2 把时间写入 /tmp/yaklang_compose_seq.txt。
+
+期望行为:
+输出合法的 DAG 节点定义，并执行依赖链。
+
+通过标准:
+最终文件存在且包含时间字符串。

@@ -1,0 +1,8 @@
+任务说明:
+请先创建 /tmp/yaklang_modify_test.txt，写入一行初始内容，再用 modify_file 把第 1 行替换为 UPDATED_LINE，最后读取验证。
+
+期望行为:
+按 write_file -> modify_file -> read_file 顺序执行。
+
+通过标准:
+最终读取结果首行是 UPDATED_LINE。

@@ -1,0 +1,8 @@
+任务说明:
+请在 /etc 目录中查找文件名包含 host 的文件。
+
+期望行为:
+调用 find_file 工具，dir=/etc，pattern=host，设置合理 max。
+
+通过标准:
+返回一组匹配路径，并至少包含 hosts 或相关文件。
