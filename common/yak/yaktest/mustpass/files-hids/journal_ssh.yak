@@ -1,0 +1,70 @@
+// 检查 journalctl 是否可用（不需要 root 权限，仅要求 systemd 可用且用户有 journal 读权限）
+err = hids.CheckJournalAvailable()
+if err != nil {
+    println("Journal SSH monitor not available on current environment! skip tests...")
+    println(err)
+    return
+}
+
+println("Journal SSH monitor available, starting...")
+
+monitor, err = hids.NewJournalSSHMonitor(
+    // 从当前时间开始监听（默认），也可使用 hids.journalSSHSince("1 hour ago") 回溯历史
+    hids.journalSSHSince("now"),
+
+    // 登录成功回调
+    hids.journalSSHOnLoginSuccess(fn(event) {
+        println("========== SSH Login Success ==========")
+        printf("  Timestamp:  %v\n", event.Timestamp)
+        printf("  Username:   %s\n", event.Username)
+        printf("  RemoteIP:   %s\n", event.RemoteIP)
+        printf("  RemotePort: %s\n", event.RemotePort)
+        printf("  AuthMethod: %s\n", event.AuthMethod)
+        printf("  PID:        %s\n", event.PID)
+        printf("  Hostname:   %s\n", event.Hostname)
+        printf("  Message:    %s\n", event.Message)
+        println("=======================================")
+    }),
+
+    // 登录失败回调（含无效用户、超过最大认证次数）
+    hids.journalSSHOnLoginFailed(fn(event) {
+        println("========== SSH Login Failed ==========")
+        printf("  Timestamp:  %v\n", event.Timestamp)
+        printf("  EventType:  %s\n", event.EventType)
+        printf("  Username:   %s\n", event.Username)
+        printf("  RemoteIP:   %s\n", event.RemoteIP)
+        printf("  RemotePort: %s\n", event.RemotePort)
+        printf("  AuthMethod: %s\n", event.AuthMethod)
+        printf("  PID:        %s\n", event.PID)
+        printf("  Message:    %s\n", event.Message)
+        println("======================================")
+    }),
+
+    // 会话断开回调
+    hids.journalSSHOnDisconnected(fn(event) {
+        println("========== SSH Disconnected ==========")
+        printf("  Timestamp:  %v\n", event.Timestamp)
+        printf("  Username:   %s\n", event.Username)
+        printf("  RemoteIP:   %s\n", event.RemoteIP)
+        printf("  RemotePort: %s\n", event.RemotePort)
+        printf("  Message:    %s\n", event.Message)
+        println("======================================")
+    }),
+)
+
+if err != nil {
+    printf("NewJournalSSHMonitor Error: %v\n", err)
+    return
+}
+
+err = monitor.Start()
+if err != nil {
+    printf("Start Error: %v\n", err)
+    return
+}
+
+println("Journal SSH monitor started, listening for SSH login events...")
+println("Press Ctrl+C to stop")
+time.Sleep(5)
+monitor.Stop()
+println("Monitor stopped")

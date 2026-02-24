@@ -83,10 +83,10 @@ type AuditMonitor struct {
 // AuditMonitorOption Audit监控器配置选项
 type AuditMonitorOption func(*AuditMonitor)
 
-// WithAuditMonitorLogin 设置是否监控登录事件
+// auditMonitorLogin 设置是否监控登录事件
 // Example:
 // ```
-// monitor = hids.NewAuditMonitor(hids.WithAuditMonitorLogin(true))
+// monitor = hids.NewAuditMonitor(hids.auditMonitorLogin(true))
 // ```
 func WithAuditMonitorLogin(enable bool) AuditMonitorOption {
 	return func(m *AuditMonitor) {
@@ -94,10 +94,10 @@ func WithAuditMonitorLogin(enable bool) AuditMonitorOption {
 	}
 }
 
-// WithAuditMonitorCommand 设置是否监控命令执行事件
+// auditMonitorCommand 设置是否监控命令执行事件
 // Example:
 // ```
-// monitor = hids.NewAuditMonitor(hids.WithAuditMonitorCommand(true))
+// monitor = hids.NewAuditMonitor(hids.auditMonitorCommand(true))
 // ```
 func WithAuditMonitorCommand(enable bool) AuditMonitorOption {
 	return func(m *AuditMonitor) {
@@ -105,10 +105,10 @@ func WithAuditMonitorCommand(enable bool) AuditMonitorOption {
 	}
 }
 
-// WithOnLoginEvent 设置登录事件回调
+// onLoginEvent 设置登录事件回调
 // Example:
 // ```
-// monitor = hids.NewAuditMonitor(hids.WithOnLoginEvent(func(event) {
+// monitor = hids.NewAuditMonitor(hids.onLoginEvent(fn(event) {
 //
 //	println("Login:", event.Username, "from", event.RemoteIP)
 //
@@ -120,10 +120,10 @@ func WithOnLoginEvent(callback func(*LoginEvent)) AuditMonitorOption {
 	}
 }
 
-// WithOnCommandEvent 设置命令执行事件回调
+// onCommandEvent 设置命令执行事件回调
 // Example:
 // ```
-// monitor = hids.NewAuditMonitor(hids.WithOnCommandEvent(func(event) {
+// monitor = hids.NewAuditMonitor(hids.onCommandEvent(fn(event) {
 //
 //	println("Command:", event.Command, "by", event.Username)
 //
@@ -135,12 +135,12 @@ func WithOnCommandEvent(callback func(*CommandEvent)) AuditMonitorOption {
 	}
 }
 
-// WithAuditFilterUsers 设置当前用户过滤器（按 Username 过滤）
+// auditFilterUsers 设置当前用户过滤器（按 Username 过滤）
 // 过滤当前执行操作的用户（例如 su 后的用户）
 // Example:
 // ```
 // // 只监控 matrix 用户执行的命令
-// monitor = hids.NewAuditMonitor(hids.WithAuditFilterUsers("matrix", "admin"))
+// monitor = hids.NewAuditMonitor(hids.auditFilterUsers("root", "www"))
 // ```
 func WithAuditFilterUsers(users ...string) AuditMonitorOption {
 	return func(m *AuditMonitor) {
@@ -148,12 +148,12 @@ func WithAuditFilterUsers(users ...string) AuditMonitorOption {
 	}
 }
 
-// WithAuditFilterLoginUsers 设置原始登录用户过滤器（按 LoginUser 过滤）
+// auditFilterLoginUsers 设置原始登录用户过滤器（按 LoginUser 过滤）
 // 过滤原始登录的用户（例如 SSH 登录的用户，即使后来 su 到其他用户）
 // Example:
 // ```
 // // 只监控原始登录用户为 root 的会话中的操作
-// monitor = hids.NewAuditMonitor(hids.WithAuditFilterLoginUsers("root"))
+// monitor = hids.NewAuditMonitor(hids.auditFilterLoginUsers("root"))
 // ```
 func WithAuditFilterLoginUsers(users ...string) AuditMonitorOption {
 	return func(m *AuditMonitor) {
@@ -161,10 +161,10 @@ func WithAuditFilterLoginUsers(users ...string) AuditMonitorOption {
 	}
 }
 
-// WithAuditFilterCommands 设置命令过滤器（支持正则）
+// auditFilterCommands 设置命令过滤器（支持正则）
 // Example:
 // ```
-// monitor = hids.NewAuditMonitor(hids.WithAuditFilterCommands(".*ssh.*", "sudo"))
+// monitor = hids.NewAuditMonitor(hids.auditFilterCommands(".*ssh.*", "sudo"))
 // ```
 func WithAuditFilterCommands(commands ...string) AuditMonitorOption {
 	return func(m *AuditMonitor) {
@@ -172,10 +172,10 @@ func WithAuditFilterCommands(commands ...string) AuditMonitorOption {
 	}
 }
 
-// WithAuditBufferSize 设置缓冲区大小
+// auditBufferSize 设置缓冲区大小
 // Example:
 // ```
-// monitor = hids.NewAuditMonitor(hids.WithAuditBufferSize(16384))
+// monitor = hids.NewAuditMonitor(hids.auditBufferSize(16384))
 // ```
 func WithAuditBufferSize(size int) AuditMonitorOption {
 	return func(m *AuditMonitor) {

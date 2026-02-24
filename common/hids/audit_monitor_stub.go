@@ -23,12 +23,12 @@ func CheckAuditSystem() (*AuditStatus, error) {
 // ```
 // monitor = hids.NewAuditMonitor(
 //
-//	hids.WithAuditMonitorLogin(true),
-//	hids.WithAuditMonitorCommand(true),
-//	hids.WithOnLoginEvent(func(event) {
+//	hids.auditMonitorLogin(true),
+//	hids.auditMonitorCommand(true),
+//	hids.onLoginEvent(fn(event) {
 //	    println("Login:", event.Username, "from", event.RemoteIP)
 //	}),
-//	hids.WithOnCommandEvent(func(event) {
+//	hids.onCommandEvent(fn(event) {
 //	    println("Command:", event.Command)
 //	}),
 //
@@ -38,12 +38,23 @@ func NewAuditMonitor(opts ...AuditMonitorOption) (*AuditMonitor, error) {
 	return nil, fmt.Errorf("audit monitor is only supported on Linux")
 }
 
-// Start 启动监控 (非Linux平台不支持)
+// Start 启动监控
+// Example:
+// ```
+// monitor = hids.NewAuditMonitor()
+// err = monitor.Start()
+// time.Sleep(10)
+// monitor.Stop()
+// ```
 func (m *AuditMonitor) Start() error {
 	return fmt.Errorf("audit monitor is only supported on Linux")
 }
 
 // Stop 停止监控
+// Example:
+// ```
+// monitor.Stop()
+// ```
 func (m *AuditMonitor) Stop() {
 	// no-op on non-Linux
 }
@@ -53,7 +64,18 @@ func (m *AuditMonitor) IsRunning() bool {
 	return false
 }
 
-// WatchAuditEvents 简化的监控函数 (非Linux平台不支持)
+// WatchAuditEvents 简化的audit监控函数
+// Example:
+// ```
+// ctx, cancel = context.WithTimeout(context.Background(), 10)
+// defer cancel()
+// err = hids.WatchAuditEvents(ctx,
+//
+//	fn(event) { println("Login:", event.Username) },
+//	fn(event) { println("Command:", event.Command) },
+//
+// )
+// ```
 func WatchAuditEvents(ctx context.Context, onLogin func(*LoginEvent), onCommand func(*CommandEvent)) error {
 	return fmt.Errorf("audit monitor is only supported on Linux")
 }

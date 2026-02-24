@@ -96,12 +96,12 @@ func checkAuditAvailable() error {
 // ```
 // monitor = hids.NewAuditMonitor(
 //
-//	hids.WithAuditMonitorLogin(true),
-//	hids.WithAuditMonitorCommand(true),
-//	hids.WithOnLoginEvent(func(event) {
+//	hids.auditMonitorLogin(true),
+//	hids.auditMonitorCommand(true),
+//	hids.onLoginEvent(fn(event) {
 //	    println("Login:", event.Username, "from", event.RemoteIP)
 //	}),
-//	hids.WithOnCommandEvent(func(event) {
+//	hids.onCommandEvent(fn(event) {
 //	    println("Command:", event.Command)
 //	}),
 //
@@ -631,20 +631,17 @@ func (s *auditStream) shouldProcessCommand(event *CommandEvent) bool {
 	return true
 }
 
-// WatchAuditEvents 简化的监控函数 - 监控audit事件
+// WatchAuditEvents 简化的audit监控函数
 // Example:
 // ```
 // ctx, cancel = context.WithTimeout(context.Background(), 10)
 // defer cancel()
-// err = hids.WatchAuditEvents(ctx, func(event) {
+// err = hids.WatchAuditEvents(ctx,
 //
-//	println("Login:", event.Username)
+//	fn(event) { println("Login:", event.Username) },
+//	fn(event) { println("Command:", event.Command) },
 //
-// }, func(event) {
-//
-//	println("Command:", event.Command)
-//
-// })
+// )
 // ```
 func WatchAuditEvents(ctx context.Context, onLogin func(*LoginEvent), onCommand func(*CommandEvent)) error {
 	opts := []AuditMonitorOption{
