@@ -559,6 +559,18 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "Python PoC 生成",
 		En: "Python PoC Generation",
 	},
+	"python-poc": {
+		Zh: "Python PoC 代码",
+		En: "Python PoC Code",
+	},
+	"python-script": {
+		Zh: "Python 脚本",
+		En: "Python Script",
+	},
+	"write_python_script": {
+		Zh: "编写 Python 脚本",
+		En: "Write Python Script",
+	},
 	"plan_exec_fail": {
 		Zh: "任务规划执行失败",
 		En: "plan and execute failed",

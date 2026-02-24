@@ -121,19 +121,11 @@ func init() {
 			modSuite := loopinfra.NewSingleFileModificationSuiteFactory(
 				r,
 				loopinfra.WithLoopVarsPrefix("yak"),
-				loopinfra.WithActionSuffix("code"), // 生成 write_code, modify_code, insert_code, delete_code
+				loopinfra.WithActionSuffix("code"),
 				loopinfra.WithAITagConfig("GEN_CODE", "yak_code", "yaklang-code", "code/yaklang"),
 				loopinfra.WithFileExtension(".yak"),
 				loopinfra.WithFileChanged(func(content string, op *reactloops.LoopActionHandlerOperator) (string, bool) {
 					return checkCodeAndFormatErrors(content)
-				}),
-				loopinfra.WithSpinDetection(func(loop *reactloops.ReActLoop, startLine, endLine int) (bool, string) {
-					record := ModifyRecord{StartLine: startLine, EndLine: endLine}
-					return detectSpinning(loop, record)
-				}),
-				loopinfra.WithReflectionPrompt(func(startLine, endLine int, reason string) string {
-					record := ModifyRecord{StartLine: startLine, EndLine: endLine}
-					return generateReflectionPrompt(record, reason)
 				}),
 			)
 

@@ -22,6 +22,12 @@ func (f *SingleFileModificationSuiteFactory) buildWriteAction() reactloops.ReAct
 		"If there is NO CODE, you need to create a new file, then use this. If there is already code, it is forbidden to use this action as it will forcibly overwrite the previous code. You must use 'modify_...' to modify the content.",
 		nil,
 		func(l *reactloops.ReActLoop, action *aicommon.Action) error {
+			fullCodeVar := f.GetFullCodeVariableName()
+			existing := l.Get(fullCodeVar)
+			if existing != "" {
+				return fmt.Errorf("code already exists (%d bytes). Use 'modify_%s' to make changes instead of 'write_%s'",
+					len(existing), f.actionSuffix, f.actionSuffix)
+			}
 			return nil
 		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
@@ -69,10 +75,15 @@ func (f *SingleFileModificationSuiteFactory) buildWriteAction() reactloops.ReAct
 
 			// Call file changed callback
 			errMsg, blocking := f.OnFileChanged(code, operator)
+			lintStatusVar := f.GetLintStatusVariableName()
 			if blocking {
+				loop.Set(lintStatusVar, "false")
 				operator.DisallowNextLoopExit()
-			} else if f.ShouldExitAfterWrite() {
-				operator.Exit()
+			} else {
+				loop.Set(lintStatusVar, "true")
+				if f.ShouldExitAfterWrite() {
+					operator.Exit()
+				}
 			}
 
 			msg := utils.ShrinkTextBlock(code, 256)
@@ -188,8 +199,12 @@ func (f *SingleFileModificationSuiteFactory) buildModifyAction() reactloops.ReAc
 
 			// Call file changed callback
 			errMsg, hasBlockingErrors := f.OnFileChanged(fullCode, op)
+			lintStatusVar := f.GetLintStatusVariableName()
 			if hasBlockingErrors {
+				loop.Set(lintStatusVar, "false")
 				op.DisallowNextLoopExit()
+			} else {
+				loop.Set(lintStatusVar, "true")
 			}
 
 			// Check for spinning behavior
@@ -309,8 +324,12 @@ func (f *SingleFileModificationSuiteFactory) buildInsertAction() reactloops.ReAc
 
 			// Call file changed callback
 			errMsg, hasBlockingErrors := f.OnFileChanged(fullCode, op)
+			lintStatusVar := f.GetLintStatusVariableName()
 			if hasBlockingErrors {
+				loop.Set(lintStatusVar, "false")
 				op.DisallowNextLoopExit()
+			} else {
+				loop.Set(lintStatusVar, "true")
 			}
 			msg = utils.ShrinkTextBlock(fmt.Sprintf("inserted at line[%v]:\n", insertLine)+partialCode, 256)
 			if errMsg != "" {
@@ -438,8 +457,12 @@ func (f *SingleFileModificationSuiteFactory) buildDeleteAction() reactloops.ReAc
 
 			// Call file changed callback
 			errMsg, hasBlockingErrors := f.OnFileChanged(fullCode, op)
+			lintStatusVar := f.GetLintStatusVariableName()
 			if hasBlockingErrors {
+				loop.Set(lintStatusVar, "false")
 				op.DisallowNextLoopExit()
+			} else {
+				loop.Set(lintStatusVar, "true")
 			}
 
 			if deleteEndLine > 0 {

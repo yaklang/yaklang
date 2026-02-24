@@ -213,6 +213,12 @@ func (f *SingleFileModificationSuiteFactory) GetActionName(baseName string) stri
 	return baseName + "_" + f.actionSuffix
 }
 
+// GetLintStatusVariableName returns the variable name for lint/syntax check status
+// e.g., "yak" prefix returns "yak_lint_ok", "python" prefix returns "python_lint_ok"
+func (f *SingleFileModificationSuiteFactory) GetLintStatusVariableName() string {
+	return f.prefix + "_lint_ok"
+}
+
 // GetEventType returns the event type for emitting JSON events
 func (f *SingleFileModificationSuiteFactory) GetEventType() string {
 	return f.eventType
