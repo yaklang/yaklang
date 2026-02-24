@@ -45,6 +45,69 @@ type StreamPartsOptions struct {
 	DedupDataflow    bool
 }
 
+type StreamPartsOption func(*StreamPartsOptions)
+
+func NewStreamPartsOptions(opts ...StreamPartsOption) StreamPartsOptions {
+	o := StreamPartsOptions{
+		ReportType:       IRifyFullReportType,
+		ShowDataflowPath: true,
+		ShowFileContent:  true,
+		WithFile:         true,
+		DedupDataflow:    true,
+	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&o)
+		}
+	}
+	if o.ReportType == "" {
+		o.ReportType = IRifyFullReportType
+	}
+	return o
+}
+
+func WithStreamKey(v string) StreamPartsOption {
+	return func(o *StreamPartsOptions) {
+		o.StreamKey = strings.TrimSpace(v)
+	}
+}
+
+func WithStreamReportType(v ReportType) StreamPartsOption {
+	return func(o *StreamPartsOptions) {
+		o.ReportType = v
+	}
+}
+
+func WithStreamShowDataflowPath(v bool) StreamPartsOption {
+	return func(o *StreamPartsOptions) {
+		o.ShowDataflowPath = v
+	}
+}
+
+func WithStreamShowFileContent(v bool) StreamPartsOption {
+	return func(o *StreamPartsOptions) {
+		o.ShowFileContent = v
+	}
+}
+
+func WithStreamWithFile(v bool) StreamPartsOption {
+	return func(o *StreamPartsOptions) {
+		o.WithFile = v
+	}
+}
+
+func WithStreamDedupFileContent(v bool) StreamPartsOption {
+	return func(o *StreamPartsOptions) {
+		o.DedupFileContent = v
+	}
+}
+
+func WithStreamDedupDataflow(v bool) StreamPartsOption {
+	return func(o *StreamPartsOptions) {
+		o.DedupDataflow = v
+	}
+}
+
 // ConvertSingleResultToStreamPartsJSON returns raw JSON of StreamSingleResultParts and basic stats.
 func ConvertSingleResultToStreamPartsJSON(result *ssaapi.SyntaxFlowResult, opts StreamPartsOptions) (string, map[string]any, error) {
 	parts, err := ConvertSingleResultToStreamParts(result, opts)
