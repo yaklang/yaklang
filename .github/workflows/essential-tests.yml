@@ -379,46 +379,47 @@ jobs:
             test_configs: |
               [
               {"package": "./common/yakgrpc/yakit", "timeout": "1m", "run": "TestMUSTPASS"},
-              {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_MITM_"},
-              {"package": "./common/yakgrpc/...", "timeout": "6m", "run": "TestGRPCMUSTPASS_MITMV2_"},
-              {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_MITM.*SlowRuleHook"},
-              {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS.*SlowSQL"}
+              {"package": "./common/yakgrpc", "timeout": "5m", "run": "TestGRPCMUSTPASS_MITM_"},
+              {"package": "./common/yakgrpc", "timeout": "6m", "run": "TestGRPCMUSTPASS_MITMV2_"},
+              {"package": "./common/yakgrpc", "timeout": "5m", "run": "TestGRPCMUSTPASS_MITM.*SlowRuleHook"},
+              {"package": "./common/yakgrpc", "timeout": "5m", "run": "TestGRPCMUSTPASS.*SlowSQL"}
               ]
 
           - name: "Test gRPC MUSTPASS Fuzzer"
             test_configs: |
               [
-                {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_HTTPFuzzer"},
-                {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_HTTP_"},
-                {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_PluginTrace"}
+                {"package": "./common/yakgrpc", "timeout": "5m", "run": "TestGRPCMUSTPASS_HTTPFuzzer"},
+                {"package": "./common/yakgrpc", "timeout": "5m", "run": "TestGRPCMUSTPASS_HTTP_"},
+                {"package": "./common/yakgrpc", "timeout": "5m", "run": "TestGRPCMUSTPASS_PluginTrace"}
               ]
 
           - name: "Test gRPC MUSTPASS Language"
             test_configs: |
               [
-                {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_LANGUAGE"}
+                {"package": "./common/yakgrpc", "timeout": "5m", "run": "TestGRPCMUSTPASS_LANGUAGE"}
               ]
 
           - name: "Test gRPC MUSTPASS SyntaxFlow | SSA"
             sync_rule: "1"
             test_configs: |
               [
-              {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_SyntaxFlow"},
-              {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_SSA"},
+              {"package": "./common/yakgrpc", "timeout": "5m", "run": "TestGRPCMUSTPASS_SyntaxFlow"},
+              {"package": "./common/yakgrpc", "timeout": "5m", "run": "TestGRPCMUSTPASS_SSA"},
               {"package": "./common/sfweb/...", "timeout": "4m"}
               ]
 
           - name: "Test gRPC In 2m"
             test_configs: |
               [
-                {"package": "./common/yakgrpc/...", "timeout": "2m", "run": "TestGRPCMUSTPASS_AnalyzeHTTPFlow"},
-                {"package": "./common/yakgrpc/...", "timeout": "2m", "run": "TestGRPCMUSTPASS_Fingerprint"},
-                {"package": "./common/yakgrpc/...", "timeout": "2m", "run": "TestGRPCMUSTPASS_HybridScan"},
-                {"package": "./common/yakgrpc/...", "timeout": "2m", "run": "TestLARGEGRPCMUSTPASS"},
-                {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_COMMON"},
-                {"package": "./common/yakgrpc/...", "timeout": "1m", "run": "TestAITaskWith", "parallel": 1}
+                {"package": "./common/yakgrpc", "timeout": "2m", "run": "TestGRPCMUSTPASS_AnalyzeHTTPFlow"},
+                {"package": "./common/yakgrpc", "timeout": "2m", "run": "TestGRPCMUSTPASS_Fingerprint"},
+                {"package": "./common/yakgrpc", "timeout": "2m", "run": "TestGRPCMUSTPASS_HybridScan"},
+                {"package": "./common/yakgrpc", "timeout": "2m", "run": "TestLARGEGRPCMUSTPASS"},
+                {"package": "./common/yakgrpc", "timeout": "5m", "run": "TestGRPCMUSTPASS_COMMON"},
+                {"package": "./common/yakgrpc", "timeout": "1m", "run": "TestAITaskWith", "parallel": 1}
               ]
 
+          # 使用 ... 以覆盖 main+yakit 的「其他」测试；带 run 的规则已改为 ./common/yakgrpc 避免重复
           - name: "Test gRPC Other"
             test_configs: |
               [
