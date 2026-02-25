@@ -370,6 +370,15 @@ func WithSameLogicSpinThreshold(threshold int) ReActLoopOption {
 	}
 }
 
+// WithMaxConsecutiveSpinWarnings sets the max number of consecutive spin warnings
+// before the loop is forcibly terminated. Default is 3.
+// Set to 0 to disable force-exit on spin.
+func WithMaxConsecutiveSpinWarnings(max int) ReActLoopOption {
+	return func(r *ReActLoop) {
+		r.maxConsecutiveSpinWarnings = max
+	}
+}
+
 func WithVar(key string, value any) ReActLoopOption {
 	return func(r *ReActLoop) {
 		r.vars.Set(key, value)

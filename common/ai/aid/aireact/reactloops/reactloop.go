@@ -119,6 +119,10 @@ type ReActLoop struct {
 	sameActionTypeSpinThreshold int // 相同任务自旋阈值
 	sameLogicSpinThreshold      int // 相同逻辑自旋阈值
 
+	// SPIN force-exit: consecutive spin warnings counter and threshold
+	consecutiveSpinWarnings    int
+	maxConsecutiveSpinWarnings int
+
 	// Init handler action constraints
 	// These are set by the init handler and cleared after first iteration
 	initActionMustUse  []string // Actions that MUST be used (set by init)
@@ -131,6 +135,22 @@ type ReActLoop struct {
 	// Extra capabilities discovered via intent recognition
 	// Rendered as a dedicated prompt section, separate from core tools
 	extraCapabilities *ExtraCapabilitiesManager
+}
+
+func (r *ReActLoop) IncrementSpinWarning() {
+	r.consecutiveSpinWarnings++
+	log.Infof("consecutive spin warnings incremented to %d (max: %d)", r.consecutiveSpinWarnings, r.maxConsecutiveSpinWarnings)
+}
+
+func (r *ReActLoop) ResetSpinWarning() {
+	if r.consecutiveSpinWarnings > 0 {
+		log.Infof("consecutive spin warnings reset from %d to 0", r.consecutiveSpinWarnings)
+	}
+	r.consecutiveSpinWarnings = 0
+}
+
+func (r *ReActLoop) ShouldForceExitDueToSpin() bool {
+	return r.maxConsecutiveSpinWarnings > 0 && r.consecutiveSpinWarnings >= r.maxConsecutiveSpinWarnings
 }
 
 func (r *ReActLoop) PushSatisfactionRecord(satisfactory bool, reason string) {
@@ -314,6 +334,7 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		currentIterationIndex:       0,
 		sameActionTypeSpinThreshold: 3, // 默认连续 3 次相同 Action 触发检测
 		sameLogicSpinThreshold:      3, // 默认连续 3 次相同逻辑触发 AI 检测
+		maxConsecutiveSpinWarnings:  3, // 默认连续 3 次 SPIN 警告后强制退出
 		extraCapabilities:           NewExtraCapabilitiesManager(),
 	}
 

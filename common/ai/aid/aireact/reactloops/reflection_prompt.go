@@ -127,11 +127,18 @@ func (r *ReActLoop) getSpinDetectionData() map[string]interface{} {
 		actionsText.WriteString("\n")
 	}
 
+	escalationLevel := r.consecutiveSpinWarnings + 1 // next level after this detection
+	if escalationLevel < 1 {
+		escalationLevel = 1
+	}
+
 	return map[string]interface{}{
 		"RecentActionsText": actionsText.String(),
 		"TimelineContent":   timelineContent,
 		"ActionType":        firstActionType,
 		"ConsecutiveCount":  len(recentActions),
+		"SpinWarningCount":  r.consecutiveSpinWarnings,
+		"EscalationLevel":   escalationLevel,
 	}
 }
 

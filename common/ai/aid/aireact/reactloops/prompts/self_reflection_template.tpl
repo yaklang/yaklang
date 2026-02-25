@@ -35,36 +35,82 @@
 <|PREVIOUS_REFLECTIONS_END_{{.Nonce}}|>{{end}}
 
 {{if .SpinDetection}}<|SPIN_DETECTION_{{.Nonce}}|>
-## SPIN 检测分析
+## SPIN Detection Analysis (Warning #{{.SpinDetection.SpinWarningCount}} — Escalation Level {{.SpinDetection.EscalationLevel}})
 
-检测到连续 {{.SpinDetection.ConsecutiveCount}} 次执行相同的 Action 类型（{{.SpinDetection.ActionType}}）。请分析是否发生了 SPIN 情况。
+Detected {{.SpinDetection.ConsecutiveCount}} consecutive executions of the same action type '{{.SpinDetection.ActionType}}'.
+This is spin warning #{{.SpinDetection.SpinWarningCount}}. Previous warnings have been IGNORED by the agent.
 
-**SPIN 定义**：AI Agent 反复做出相同或相似的决策，没有推进任务。
+**SPIN definition**: The AI Agent repeatedly makes the same or similar decisions without advancing the task.
 
-### 最近的 Action 执行历史
+### Recent Action History
 
 {{.SpinDetection.RecentActionsText}}
 
-{{if .SpinDetection.TimelineContent}}### Timeline 上下文
+{{if .SpinDetection.TimelineContent}}### Timeline Context
 
 {{.SpinDetection.TimelineContent}}{{end}}
 
-**请分析**：
-1. 这些 Action 是否在重复执行相同的逻辑，没有推进任务？
-2. 如果发生了 SPIN，请说明原因
-3. 如果发生了 SPIN，请提供打破循环的具体建议（这些建议应整合到 `suggestions` 中）
+### Required Analysis
+
+1. Are these actions repeating the same logic without progress? (Almost certainly YES at this escalation level)
+2. If SPIN is confirmed, identify the ROOT CAUSE — why is the agent unable to choose a different action?
+3. Your suggestions MUST include CONCRETE alternative action types (not vague advice).
+4. Your suggestions MUST name specific tool/action that DIFFERS from '{{.SpinDetection.ActionType}}'.
+
+{{if ge .SpinDetection.EscalationLevel 3}}### ⛔ CRITICAL: SWOT-Based Suggestion Generation
+
+This is escalation level {{.SpinDetection.EscalationLevel}}. The loop will be FORCE-TERMINATED soon.
+Generate suggestions using SWOT analysis:
+- **Strengths**: What does the agent already know that it keeps re-discovering?
+- **Weaknesses**: What misconception causes the agent to repeat '{{.SpinDetection.ActionType}}'?
+- **Opportunities**: List ALL alternative actions the agent has NOT tried.
+- **Threats**: State clearly that repeating '{{.SpinDetection.ActionType}}' will cause task failure.
+
+Your suggestions MUST include: "IMMEDIATELY use action [X] instead of '{{.SpinDetection.ActionType}}'" where [X] is a concrete alternative.
+{{else if ge .SpinDetection.EscalationLevel 2}}### ⚠️ ESCALATED: S.M.A.R.T Suggestion Generation
+
+This is escalation level {{.SpinDetection.EscalationLevel}}. Previous suggestions were IGNORED.
+Generate suggestions using S.M.A.R.T framework:
+- **Specific**: Name the exact alternative action type and its parameters
+- **Measurable**: Define what success looks like for the alternative action
+- **Achievable**: Confirm the alternative action is available in the tool set
+- **Relevant**: Explain how the alternative directly advances the task
+- **Time-bound**: The alternative must complete in a single iteration
+
+Your suggestions MUST be action-oriented, not advisory. Say "DO X" not "consider X".
+{{else}}### Analysis Required
+
+Answer these questions in your suggestions:
+1. Why is '{{.SpinDetection.ActionType}}' being repeated?
+2. What SPECIFIC different action should be used instead?
+3. What information does the agent already have that makes repeating '{{.SpinDetection.ActionType}}' unnecessary?
+{{end}}
 
 <|SPIN_DETECTION_END_{{.Nonce}}|>{{end}}
 
 <|ANALYSIS_REQUIREMENTS_{{.Nonce}}|>
-## 分析要求
+## Analysis Requirements
 
-请对本次操作进行简要反思，**按需提供以下内容**（所有字段均为可选）：
+{{if .SpinDetection}}**⚠ SPIN DETECTED — Escalation Level {{.SpinDetection.EscalationLevel}}**
 
-1. **建议**：针对类似情况的改进建议（如有）。{{if .SpinDetection}}**如果检测到 SPIN，请将打破循环的建议整合到此字段。**{{end}}
-{{if .SpinDetection}}2. **SPIN 检测**：如果提供了 SPIN 检测数据，请判断是否发生 SPIN，并说明原因{{end}}
+This is NOT a routine reflection. The agent is in a confirmed SPIN state.
 
-**注意**：如果是常规操作且无特殊情况，可以只返回最基本的信息。保持简洁，避免冗余。{{if .SpinDetection}}**如果同时进行了 SPIN 检测，请将 SPIN 相关建议整合到 `suggestions` 中。**{{end}}
+MANDATORY output:
+1. Set `is_spinning` to `true`
+2. Provide `spin_reason` with the root cause
+3. Provide `suggestions` with CONCRETE, ACTIONABLE break-out steps:
+   - Each suggestion MUST name a specific action type different from '{{.SpinDetection.ActionType}}'
+   - Each suggestion MUST be imperative ("DO X", "USE Y", "SWITCH TO Z")
+   - Do NOT suggest "consider" or "try" — use direct commands
+{{if ge .SpinDetection.EscalationLevel 3}}
+4. **CRITICAL**: This is the FINAL escalation. If your suggestions do not break the loop, the task will be force-terminated as UNSUCCESSFUL.
+{{end}}
+{{else}}Perform a brief reflection on this action. All fields are optional — provide only what's relevant.
+
+1. **Suggestions**: Improvement advice for similar situations (if any).
+
+**Note**: For routine operations, return minimal information. Keep it concise.
+{{end}}
 <|ANALYSIS_REQUIREMENTS_END_{{.Nonce}}|>
 
 <|OUTPUT_SCHEMA_{{.Nonce}}|>
