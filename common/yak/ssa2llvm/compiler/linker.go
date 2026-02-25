@@ -40,6 +40,7 @@ func CompileLLVMToBinary(llFile, binFile string) error {
 		"-o", binFile,
 		"-L" + absRuntimeDir,
 		"-lyak",
+		"-lgc",
 		"-lpthread",
 		"-ldl",
 		// "-v", // Debug linking
