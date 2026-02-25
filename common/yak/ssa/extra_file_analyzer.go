@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
@@ -127,12 +128,18 @@ func (d *PreHandlerBase) PreHandlerProject(fi.FileSystem, FrontAST, *FunctionBui
 }
 
 func (d *PreHandlerBase) Clearup() {
+	if diagnostics.Enabled(diagnostics.LevelLow) {
+		diagnostics.LogHeapSnapshot("antlr_clearup_before_release", false)
+	}
+
 	d.antlrMutex.Lock()
-	defer d.antlrMutex.Unlock()
 	// Clear DFA cache explicitly
 	d.Caches = nil
-	// Force garbage collection
-	// runtime.GC() // in multiple goroutines environment, this run long time
+	d.antlrMutex.Unlock()
+
+	if diagnostics.Enabled(diagnostics.LevelLow) {
+		diagnostics.LogHeapSnapshot("antlr_clearup_after_release", true)
+	}
 }
 
 func (a *AntlrCache) Empty() bool {

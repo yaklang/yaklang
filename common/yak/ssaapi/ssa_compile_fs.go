@@ -386,5 +386,9 @@ func (c *Config) parseProjectWithFS(
 		}
 	}
 
+	if diagnostics.Enabled(diagnostics.LevelLow) {
+		diagnostics.LogHeapSnapshot("ssa_compile_project_end", true)
+	}
+
 	return NewProgram(prog, c), nil
 }
