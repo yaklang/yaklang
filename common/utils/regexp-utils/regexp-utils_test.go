@@ -143,3 +143,23 @@ jsc.accessKey.secret=bbbbbbbbbbbbbbbbb
 		})
 	})
 }
+
+func TestBearerRegexCompatibility(t *testing.T) {
+	src := `Authorization: Bearer AbCdEf1234567890+/=`
+
+	t.Run("legacy_inline_flag_position_not_usable", func(t *testing.T) {
+		legacy := `(\b(?i)Bearer [A-Za-z0-9-._~+/]{8,}={0,2})|((?i)Authorization:\s*[` + "`'\"" + `]?Bearer [A-Za-z0-9-._~+/]+={0,2}[` + "`'\"" + `]?))`
+		reUtils := NewYakRegexpUtils(legacy)
+		_, err := reUtils.FindAllSubmatchIndex(src)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "no usable regexp")
+	})
+
+	t.Run("fixed_inline_flag_position_works", func(t *testing.T) {
+		fixed := `(?i)(\bBearer [A-Za-z0-9-._~+/]{8,}={0,2}|Authorization:\s*[` + "`'\"" + `]?Bearer [A-Za-z0-9-._~+/]+={0,2}[` + "`'\"" + `]?)`
+		reUtils := NewYakRegexpUtils(fixed)
+		indices, err := reUtils.FindAllSubmatchIndex(src)
+		require.NoError(t, err)
+		require.NotEmpty(t, indices)
+	})
+}
