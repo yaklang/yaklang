@@ -18,7 +18,6 @@ import (
 	"github.com/yaklang/yaklang/common/spec"
 	"github.com/yaklang/yaklang/common/synscan"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -26,6 +25,80 @@ import (
 )
 
 var riskDebugCount int32
+
+const defaultSSASTSRenewBeforeSec int64 = 600
+
+func readSSASTSRenewBeforeSec() int64 {
+	v := strings.TrimSpace(os.Getenv("SCANNODE_SSA_STS_RENEW_BEFORE_SEC"))
+	if v == "" {
+		return defaultSSASTSRenewBeforeSec
+	}
+	n, err := strconv.ParseInt(v, 10, 64)
+	if err != nil || n <= 0 {
+		return defaultSSASTSRenewBeforeSec
+	}
+	return n
+}
+
+func (s *ScanNode) ensureSSAUploadTicket(ctx context.Context, reporter *ScannerAgentReporter, force bool) error {
+	if s == nil || reporter == nil {
+		return utils.Errorf("invalid upload context")
+	}
+	cfg := reporter.ssaUploadCfg
+	if cfg == nil {
+		return utils.Errorf("ssa artifact upload config missing")
+	}
+	renewBeforeSec := readSSASTSRenewBeforeSec()
+	if !force && !cfg.NeedSTSRefresh(renewBeforeSec) {
+		return nil
+	}
+
+	fresh, err := s.fetchSSAArtifactUploadTicket(ctx, reporter.TaskId, cfg.ObjectKey)
+	if err != nil {
+		return err
+	}
+	if cfg.Codec != "" && fresh.Codec == "" {
+		fresh.Codec = cfg.Codec
+	}
+	if cfg.ObjectKey != "" && fresh.ObjectKey == "" {
+		fresh.ObjectKey = cfg.ObjectKey
+	}
+	if cfg.Endpoint != "" && fresh.Endpoint == "" {
+		fresh.Endpoint = cfg.Endpoint
+	}
+	if cfg.Bucket != "" && fresh.Bucket == "" {
+		fresh.Bucket = cfg.Bucket
+	}
+	if cfg.Region != "" && fresh.Region == "" {
+		fresh.Region = cfg.Region
+	}
+	if !fresh.UseSSL && cfg.UseSSL {
+		fresh.UseSSL = true
+	}
+	if fresh.STSAccessKey == "" {
+		fresh.STSAccessKey = cfg.STSAccessKey
+	}
+	if fresh.STSSecretKey == "" {
+		fresh.STSSecretKey = cfg.STSSecretKey
+	}
+	if fresh.STSSessionToken == "" {
+		fresh.STSSessionToken = cfg.STSSessionToken
+	}
+	if fresh.STSExpiresAt <= 0 {
+		fresh.STSExpiresAt = cfg.STSExpiresAt
+	}
+	if fresh.ObjectKey != "" && cfg.ObjectKey != "" && fresh.ObjectKey != cfg.ObjectKey {
+		return utils.Errorf("upload object key mismatch old=%s new=%s", cfg.ObjectKey, fresh.ObjectKey)
+	}
+	if strings.TrimSpace(fresh.Endpoint) == "" || strings.TrimSpace(fresh.Bucket) == "" || strings.TrimSpace(fresh.ObjectKey) == "" {
+		return utils.Errorf("invalid upload ticket: missing object storage fields")
+	}
+	if strings.TrimSpace(fresh.STSAccessKey) == "" || strings.TrimSpace(fresh.STSSecretKey) == "" {
+		return utils.Errorf("invalid upload ticket: missing sts credentials")
+	}
+	reporter.ssaUploadCfg = fresh
+	return nil
+}
 
 func (s *ScanNode) rpc_startScript(ctx context.Context, node string, req *scanrpc.SCAN_StartScriptRequest, broker *mq.Broker) (*scanrpc.SCAN_StartScriptResponse, error) {
 	if req.Content == "" {
@@ -84,6 +157,16 @@ func (s *ScanNode) rpc_invokeScript(ctx context.Context, node string, req *scanr
 
 	// Parse and convert user-provided JSON parameters to command-line arguments
 	paramsKeyValue := s.parseScriptParams(req.ScriptJsonParam)
+	reporter.ssaUploadCfg = extractSSAArtifactUploadConfig(paramsKeyValue)
+	reporter.ssaCollector = NewSSAArtifactCollector(req.TaskId, req.RuntimeId, req.SubTaskId)
+	if reporter.ssaCollector != nil && reporter.ssaUploadCfg != nil {
+		_ = reporter.ssaCollector.EnableContinuousUpload(reporter.ssaUploadCfg.Codec, func(force bool) (*SSAArtifactUploadConfig, error) {
+			if refreshErr := s.ensureSSAUploadTicket(context.Background(), reporter, force); refreshErr != nil {
+				return nil, refreshErr
+			}
+			return reporter.ssaUploadCfg, nil
+		})
+	}
 
 	// Automatic rule synchronization before script execution
 	s.syncRulesIfNeeded(paramsKeyValue)
@@ -111,16 +194,8 @@ func (s *ScanNode) rpc_invokeScript(ctx context.Context, node string, req *scanr
 		return nil, utils.Errorf("exec yakScript %v failed: %s", scriptFile, err)
 	}
 
-	// If stream-layered SSA events were emitted, send a final task_end marker after the script truly finishes.
-	// This allows the server to finalize without relying on idle timeouts, while preserving audit completeness.
-	if s.streamer != nil && s.streamer.Enabled() {
-		var totalRisks, totalFiles, totalFlows int64
-		if m, ok := res.Data.(map[string]interface{}); ok && m != nil {
-			totalRisks = int64(utils.InterfaceToFloat64(utils.MapGetFirstRaw(m, "risk_count", "riskCount", "RiskCount")))
-			totalFiles = int64(utils.InterfaceToFloat64(utils.MapGetFirstRaw(m, "file_count", "fileCount", "FileCount")))
-			totalFlows = int64(utils.InterfaceToFloat64(utils.MapGetFirstRaw(m, "flow_count", "flowCount", "FlowCount")))
-		}
-		s.streamer.EmitTaskEnd(req.TaskId, req.RuntimeId, req.SubTaskId, totalRisks, totalFiles, totalFlows)
+	if err := s.finalizeSSAArtifactUpload(reporter, res); err != nil {
+		return nil, err
 	}
 
 	return res, nil
@@ -143,6 +218,88 @@ func extractErrorFromResponse(res *scanrpc.SCAN_InvokeScriptResponse) string {
 	}
 
 	return errMsg
+}
+
+func (s *ScanNode) finalizeSSAArtifactUpload(reporter *ScannerAgentReporter, res *scanrpc.SCAN_InvokeScriptResponse) error {
+	if reporter == nil || reporter.agent == nil {
+		return nil
+	}
+	if reporter.ssaCollector == nil {
+		return nil
+	}
+	defer reporter.ssaCollector.Cleanup()
+	meta := parseSSAResultMeta(res)
+	cfg := reporter.ssaUploadCfg
+	if cfg == nil {
+		if reporter.ssaCollector.HasData() {
+			return utils.Errorf("ssa artifact upload config missing")
+		}
+		// No SSA payload generated.
+		return nil
+	}
+	if err := s.ensureSSAUploadTicket(context.Background(), reporter, false); err != nil {
+		return err
+	}
+	cfg = reporter.ssaUploadCfg
+
+	build, err := reporter.ssaCollector.FinalizeUploadWithProvider(cfg.Codec, func(force bool) (*SSAArtifactUploadConfig, error) {
+		if refreshErr := s.ensureSSAUploadTicket(context.Background(), reporter, force); refreshErr != nil {
+			return nil, refreshErr
+		}
+		return reporter.ssaUploadCfg, nil
+	})
+	if err != nil {
+		return err
+	}
+	if build == nil {
+		return nil
+	}
+	if build.ProgramName == "" {
+		build.ProgramName = meta.ProgramName
+	}
+	if strings.TrimSpace(build.ObjectKey) == "" && cfg != nil {
+		build.ObjectKey = cfg.ObjectKey
+	}
+	if strings.TrimSpace(build.Codec) == "" && cfg != nil {
+		build.Codec = cfg.Codec
+	}
+	event := reporter.ssaCollector.BuildReadyEvent(build, meta.TotalLines, meta.RiskCount)
+	raw, err := json.Marshal(event)
+	if err != nil {
+		return err
+	}
+	reporter.agent.feedback(&spec.ScanResult{
+		Type:      spec.ScanResult_SSAArtifactReady,
+		Content:   raw,
+		TaskId:    reporter.TaskId,
+		RuntimeId: reporter.RuntimeId,
+		SubTaskId: reporter.SubTaskId,
+	})
+	log.Infof("ssa artifact uploaded task=%s key=%s codec=%s raw=%d compressed=%d risks=%d files=%d flows=%d",
+		reporter.TaskId, build.ObjectKey, build.Codec,
+		build.UncompressedSize, build.CompressedSize, event.RiskCount, event.FileCount, event.FlowCount)
+	return nil
+}
+
+type ssaResultMeta struct {
+	ProgramName string
+	TotalLines  int64
+	RiskCount   int64
+}
+
+func parseSSAResultMeta(res *scanrpc.SCAN_InvokeScriptResponse) ssaResultMeta {
+	meta := ssaResultMeta{}
+	if res == nil {
+		return meta
+	}
+	m, ok := res.Data.(map[string]interface{})
+	if !ok || m == nil {
+		return meta
+	}
+	meta.ProgramName = strings.TrimSpace(utils.InterfaceToString(utils.MapGetFirstRaw(m, "program_name", "programName", "ProgramName")))
+	meta.TotalLines = int64(utils.InterfaceToFloat64(utils.MapGetFirstRaw(m, "total_lines", "totalLines", "TotalLines")))
+	meta.RiskCount = int64(utils.InterfaceToFloat64(utils.MapGetFirstRaw(m, "risk_count", "riskCount", "RiskCount")))
+	return meta
 }
 
 // createYakitServer initializes a Yakit server with progress and log handlers
@@ -203,46 +360,11 @@ func (s *ScanNode) createLogHandler(reporter *ScannerAgentReporter, res *scanrpc
 }
 
 func (s *ScanNode) handleSSAStream(reporter *ScannerAgentReporter, info string) {
-	if reporter == nil || reporter.agent == nil || reporter.agent.streamer == nil || !reporter.agent.streamer.Enabled() {
+	if reporter == nil || reporter.ssaCollector == nil {
 		return
 	}
-	// info is expected to be a raw JSON string of StreamSingleResultParts.
-	raw := strings.TrimSpace(info)
-	if raw == "" {
-		return
-	}
-	var parts sfreport.StreamSingleResultParts
-	if err := json.Unmarshal([]byte(raw), &parts); err != nil {
-		log.Errorf("unmarshal ssa-stream failed: %v", err)
-		return
-	}
-	reporter.agent.streamer.EmitSSATaskStart(reporter.TaskId, reporter.RuntimeId, reporter.SubTaskId, parts.ProgramName, parts.ReportType)
-
-	for _, f := range parts.Files {
-		if f == nil {
-			continue
-		}
-		_ = reporter.agent.streamer.EmitSSAFile(reporter.TaskId, reporter.RuntimeId, reporter.SubTaskId, f)
-	}
-	for _, df := range parts.Dataflows {
-		if df == nil || strings.TrimSpace(df.DataflowHash) == "" || len(df.Payload) == 0 {
-			continue
-		}
-		_ = reporter.agent.streamer.EmitSSADataflow(reporter.TaskId, reporter.RuntimeId, reporter.SubTaskId, df.DataflowHash, []byte(df.Payload))
-	}
-	for _, r := range parts.Risks {
-		if r == nil || strings.TrimSpace(r.RiskHash) == "" || len(r.RiskJSON) == 0 {
-			continue
-		}
-		ev := &spec.SSAStreamRiskEvent{
-			RiskHash:       r.RiskHash,
-			ProgramName:    parts.ProgramName,
-			ReportType:     parts.ReportType,
-			RiskJSON:       r.RiskJSON,
-			FileHashes:     r.FileHashes,
-			DataflowHashes: r.DataflowHashes,
-		}
-		_ = reporter.agent.streamer.EmitSSARisk(reporter.TaskId, reporter.RuntimeId, reporter.SubTaskId, ev)
+	if err := reporter.ssaCollector.AddStreamPayload(info); err != nil {
+		log.Errorf("collect ssa stream payload failed: %v", err)
 	}
 }
 
@@ -408,6 +530,9 @@ func (s *ScanNode) syncRulesIfNeeded(params map[string]interface{}) {
 // appendKeyValueParams converts key-value parameters to command-line format
 func (s *ScanNode) appendKeyValueParams(params []string, keyValues map[string]interface{}) []string {
 	for k, v := range keyValues {
+		if strings.HasPrefix(k, scannodeInternalParamPrefix) {
+			continue
+		}
 		k = strings.TrimLeft(k, "-")
 		params = append(params, "--"+k)
 		params = append(params, utils.InterfaceToString(v))

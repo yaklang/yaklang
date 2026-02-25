@@ -43,8 +43,8 @@ const (
 
 	ScanResult_StatusCard ScanResultType = "status"
 
-	// 分层流式传输事件
-	ScanResult_StreamEvent ScanResultType = "stream-event"
+	// SSA 对象已上传，等待服务端异步导入
+	ScanResult_SSAArtifactReady ScanResultType = "ssa-artifact-ready"
 )
 
 type ScanResult struct {
