@@ -170,6 +170,10 @@ func (c *Config) parseSimple(r *memedit.MemEditor) (ret *ssa.Program, err error)
 	if c.diagnosticsRecorder != nil {
 		c.diagnosticsRecorder.RecordDuration("SSA Build", buildDuration)
 	}
+
+	if diagnostics.Enabled(diagnostics.LevelLow) {
+		diagnostics.LogHeapSnapshot("ssa_compile_simple_end", true)
+	}
 	return prog, nil
 }
 

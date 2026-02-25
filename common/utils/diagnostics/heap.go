@@ -10,11 +10,15 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/pprof"
+	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"github.com/yaklang/yaklang/common/log"
 )
+
+const envHeapDumpDir = "YAK_DIAGNOSTICS_HEAP_DUMP_DIR"
 
 type heapDumpConfig struct {
 	memThreshold uint64
@@ -53,7 +57,7 @@ func WithDumpCount(count int) HeapDumpOption {
 
 func WithHeapFile(name string) HeapDumpOption {
 	return func(cfg *heapDumpConfig) {
-		if filepath.Ext(name) != ".pb.gz" {
+		if !strings.HasSuffix(name, ".pb.gz") {
 			name += ".pb.gz"
 		}
 		cfg.fileName = name
@@ -156,40 +160,34 @@ func runHeapMonitor(ctx context.Context, interval time.Duration, cfg heapDumpCon
 
 func performHeapDump(cfg heapDumpConfig, saveFile bool) bool {
 	saved := false
-	save := func() {
+	save := func(phase string) {
 		var stats runtime.MemStats
 		runtime.ReadMemStats(&stats)
 		if cfg.memThreshold > 0 && stats.Alloc < cfg.memThreshold {
 			return
 		}
-		log.Infof("Memory usage exceeds threshold (%d MB) | %s", bytesToMB(stats.Alloc), cfg.name)
+		logHeapStats(withPhaseName(cfg.name, phase), stats)
 		if cfg.disable || !saveFile {
 			saved = true
 			return
 		}
-		if err := writeHeapProfile(cfg, stats.Alloc); err != nil {
+		if err := writeHeapProfile(cfg, stats.Alloc, phase); err != nil {
 			log.Errorf("could not write heap profile: %v", err)
 			return
 		}
 		saved = true
 	}
 
-	save()
+	save("before_gc")
 	if cfg.runtimeGC {
 		runtime.GC()
-		save()
+		save("after_gc")
 	}
 	return saved
 }
 
-func writeHeapProfile(cfg heapDumpConfig, alloc uint64) error {
-	target := cfg.fileName
-	if target == "" {
-		target = fmt.Sprintf("heap_profile_%s_%d_%s.pb.gz", time.Now().Format("2006-01-02-15:04:05"), bytesToMB(alloc), cfg.name)
-	}
-	if filepath.Ext(target) != ".pb.gz" {
-		target += ".pb.gz"
-	}
+func writeHeapProfile(cfg heapDumpConfig, alloc uint64, phase string) error {
+	target := resolveHeapProfileTarget(cfg, alloc, phase)
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil && !errors.Is(err, os.ErrExist) {
 		return err
 	}
@@ -213,9 +211,84 @@ func writeHeapProfile(cfg heapDumpConfig, alloc uint64) error {
 	if err := os.Rename(tmp, target); err != nil {
 		return err
 	}
+	log.Infof("[heap] snapshot profile saved: %s", target)
 	return nil
 }
 
 func bytesToMB(b uint64) uint64 {
 	return b / 1024 / 1024
+}
+
+func normalizeHeapName(name string) string {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return "heap"
+	}
+	var b strings.Builder
+	for _, r := range name {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' || r == '-' {
+			b.WriteRune(r)
+			continue
+		}
+		b.WriteByte('_')
+	}
+	return b.String()
+}
+
+func withPhaseName(name string, phase string) string {
+	base := strings.TrimSpace(name)
+	if base == "" {
+		base = "heap"
+	}
+	if phase == "" {
+		return base
+	}
+	return base + " " + phase
+}
+
+func logHeapStats(name string, stats runtime.MemStats) {
+	log.Infof(
+		"[heap] %s alloc=%dMB heap_alloc=%dMB heap_inuse=%dMB heap_idle=%dMB heap_objects=%d num_gc=%d",
+		name,
+		bytesToMB(stats.Alloc),
+		bytesToMB(stats.HeapAlloc),
+		bytesToMB(stats.HeapInuse),
+		bytesToMB(stats.HeapIdle),
+		stats.HeapObjects,
+		stats.NumGC,
+	)
+}
+
+func resolveHeapProfileTarget(cfg heapDumpConfig, alloc uint64, phase string) string {
+	target := strings.TrimSpace(cfg.fileName)
+	if target == "" {
+		name := fmt.Sprintf(
+			"heap_profile_%s_%d_%s",
+			time.Now().Format("2006-01-02-15:04:05.000000000"),
+			bytesToMB(alloc),
+			normalizeHeapName(cfg.name),
+		)
+		if phase != "" {
+			name += "_" + phase
+		}
+		name += ".pb.gz"
+		if dir := strings.TrimSpace(os.Getenv(envHeapDumpDir)); dir != "" {
+			return filepath.Join(dir, name)
+		}
+		return name
+	}
+
+	trimmed := strings.TrimSuffix(target, ".pb.gz")
+	if phase != "" {
+		trimmed += "_" + phase
+	}
+	return trimmed + ".pb.gz"
+}
+
+// LogHeapSnapshot logs heap memory usage, and optionally logs the GC-before/after delta.
+func LogHeapSnapshot(name string, withRuntimeGC bool) {
+	DumpHeap(
+		WithName(name),
+		WithRuntimeGC(withRuntimeGC),
+	)
 }

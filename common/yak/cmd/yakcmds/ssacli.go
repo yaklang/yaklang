@@ -1336,6 +1336,7 @@ var ssaCodeScan = &cli.Command{
 		}
 		if diagnostics.Enabled(diagnostics.LevelLow) {
 			defer diagnostics.DefaultRecorder().Log("code-scan")
+			defer diagnostics.LogHeapSnapshot("code_scan_end", true)
 		}
 
 		// 检查是否指定了 config 文件，如果是则走 config-scan 模式
