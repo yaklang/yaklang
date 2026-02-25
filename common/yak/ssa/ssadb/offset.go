@@ -1,6 +1,8 @@
 package ssadb
 
 import (
+	"strings"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -61,6 +63,15 @@ func GetValueBeforeEndOffset(DB *gorm.DB, rng *memedit.Range) (int64, error) {
 }
 
 func (r *IrOffset) GetStartAndEndPositions() (*memedit.MemEditor, *memedit.Position, *memedit.Position, error) {
+	if r == nil {
+		return nil, nil, nil, nil
+	}
+	if strings.TrimSpace(r.FileHash) == "" {
+		// Some synthetic variables (for example dependency/config placeholders)
+		// intentionally have no backing source file.
+		return nil, nil, nil, nil
+	}
+
 	editor, err := GetEditorByHash(r.FileHash)
 	if err != nil {
 		return nil, nil, nil, utils.Errorf("GetStartAndEndPositions failed: %v", err)

@@ -13,6 +13,9 @@ func GetVariableFromDB(id int64, name string) *Variable {
 			log.Errorf("GetStartAndEndPositions failed: %v", err)
 			continue
 		}
+		if editor == nil || start == nil || end == nil {
+			continue
+		}
 		rng := editor.GetRangeByPosition(start, end)
 		v.AddRange(rng, true)
 	}
