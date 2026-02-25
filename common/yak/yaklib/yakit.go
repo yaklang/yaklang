@@ -26,6 +26,8 @@ import (
 	"github.com/yaklang/yaklang/common/utils/cli"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/http_struct"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
 	"github.com/yaklang/yaklang/common/yak/yaklib/yakhttp"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -196,10 +198,41 @@ func GetExtYakitLibByClient(client *YakitClient) map[string]interface{} {
 		// SSA stream events: a dedicated channel that ScanNode can hook to, avoiding
 		// "risk.NewRisk(type=ssa-risk)" as a transport hack.
 		//
-		// Expect raw JSON string of sfreport.StreamSingleResultParts.
+		// Expect raw JSON string of sfreport.SSAResultParts.
 		// Keep it as "raw JSON" to avoid extra marshal/unmarshal cycles in yak runtime.
 		"SSAStream": func(partsJSON string) {
-			_ = client.YakitLog("ssa-stream", partsJSON)
+			_ = client.YakitLog("ssa-stream", string(partsJSON))
+		},
+		// EmitSSAResult converts one SyntaxFlowResult to SSA stream payload
+		// and sends it through the internal "ssa-stream" channel.
+		//
+		// Returns (riskCount, fileCount, flowCount, error).
+		// Dedup state is kept in current yak process memory (not global package state).
+		"EmitSSAResult": func(result *ssaapi.SyntaxFlowResult) (int, int, int, error) {
+			opts := sfreport.NewStreamPartsOptions(
+				sfreport.WithStreamReportType(sfreport.IRifyFullReportType),
+				sfreport.WithStreamShowDataflowPath(true),
+				sfreport.WithStreamShowFileContent(true),
+				sfreport.WithStreamWithFile(true),
+				sfreport.WithStreamDedupFileContent(false),
+				sfreport.WithStreamDedupDataflow(false),
+			)
+			parts, err := sfreport.ConvertSingleResultToSSAResultParts(result, opts)
+			if err != nil {
+				return 0, 0, 0, err
+			}
+			if parts == nil {
+				return 0, 0, 0, nil
+			}
+			if len(parts.Risks) == 0 && len(parts.Files) == 0 && len(parts.Dataflows) == 0 {
+				return 0, 0, 0, nil
+			}
+			partsJSON, err := json.Marshal(parts)
+			if err != nil {
+				return 0, 0, 0, err
+			}
+			_ = client.YakitLog("ssa-stream", string(partsJSON))
+			return len(parts.Risks), len(parts.Files), len(parts.Dataflows), nil
 		},
 	}
 	if os.Getenv("YAK_DISABLE") == "output" {

@@ -33,7 +33,7 @@ var Exports = map[string]interface{}{
 
 	"ConvertSingleResultToStreamPartsJSONPayload": func(result *ssaapi.SyntaxFlowResult, opts ...StreamPartsOption) (map[string]any, error) {
 		o := NewStreamPartsOptions(opts...)
-		j, stats, err := ConvertSingleResultToStreamPartsJSON(result, o)
+		j, stats, err := ConvertSingleResultToSSAResultPartsJSON(result, o)
 		if err != nil {
 			return nil, err
 		}
@@ -44,7 +44,18 @@ var Exports = map[string]interface{}{
 			"has_payload": stats != nil && stats["has_payload"] == true,
 		}, nil
 	},
-	"ResetStreamFileDedup": ResetStreamFileDedup,
-
+	"ConvertSingleResultToSSAResultPartsJSONPayload": func(result *ssaapi.SyntaxFlowResult, opts ...StreamPartsOption) (map[string]any, error) {
+		o := NewStreamPartsOptions(opts...)
+		j, stats, err := ConvertSingleResultToSSAResultPartsJSON(result, o)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{
+			"json":        j,
+			"stats":       stats,
+			"ok":          err == nil,
+			"has_payload": stats != nil && stats["has_payload"] == true,
+		}, nil
+	},
 	"ImportSSARiskFromJSON": ImportSSARiskFromJSON,
 }

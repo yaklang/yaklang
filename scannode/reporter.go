@@ -23,6 +23,9 @@ type ScannerAgentReporter struct {
 	RuntimeId string
 
 	agent *ScanNode
+
+	ssaCollector *SSAArtifactCollector
+	ssaUploadCfg *SSAArtifactUploadConfig
 }
 
 var streamDebugCount int32
