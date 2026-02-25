@@ -8,12 +8,13 @@ File Search Tool - Parameter Description for JSON Tool Calls
 Required Parameters:
   dir             (string)  The root directory to search recursively.
                             Must be an absolute path or a valid relative path.
-  pattern         (string)  The pattern to match against the FULL ABSOLUTE PATH of each file/directory.
+  pattern         (string)  A SINGLE pattern string to match against the FULL ABSOLUTE PATH of each file/directory.
                             The pattern is applied to the complete path string, not just the filename.
+                            IMPORTANT: This is ONE pattern, NOT multiple patterns. Do NOT use "|" as a separator.
 
 Optional Parameters:
   pattern-type    (string)  How the pattern is interpreted. Accepted values:
-                            - "" or "substr" (default): case-sensitive substring match against the full path.
+                            - "" or "substr" (default): case-insensitive substring match against the full path.
                             - "regexp" / "re" / "regex": Golang-style regular expression match against the full path.
                             - "glob" / "g": glob-style wildcard match against the full path.
   max             (int)     Maximum number of results to return. Default: 10.
@@ -44,6 +45,69 @@ Optional Parameters:
                             Default: "" (disabled, all extensions pass).
   min-size        (int)     Minimum file size in bytes. Files smaller than this are skipped. Default: 0 (disabled).
   max-size        (int)     Maximum file size in bytes. Files larger than this are skipped. Default: 0 (disabled).
+
+=== Pattern Rules (IMPORTANT - Read Carefully) ===
+
+The "pattern" field accepts EXACTLY ONE pattern string. It does NOT support multiple
+patterns separated by "|", "," or any other delimiter within the pattern itself.
+
+1. substr mode (default):
+   - The pattern is a plain literal substring, matched case-insensitively.
+   - No wildcards, no regex syntax, no special characters.
+   - The entire pattern string must appear somewhere in the full absolute path.
+   - CORRECT:   {"pattern": "result_summary", "pattern-type": "substr"}
+   - CORRECT:   {"pattern": ".md", "pattern-type": "substr"}
+   - WRONG:     {"pattern": "foo|bar", "pattern-type": "substr"}
+                 ("|" is treated as a literal character, will match nothing)
+   - WRONG:     {"pattern": "*.md", "pattern-type": "substr"}
+                 ("*" is treated as a literal character, will match nothing)
+
+2. glob mode:
+   - Standard glob wildcards: "*" matches any chars (except "/"), "?" matches one char,
+     "[abc]" matches character class.
+   - The glob is matched against the FULL absolute path, so use "**" or leading "*"
+     to match across directory levels.
+   - CORRECT:   {"pattern": "**/result_summary.txt", "pattern-type": "glob"}
+   - CORRECT:   {"pattern": "*/tool_calls/*.md", "pattern-type": "glob"}
+   - WRONG:     {"pattern": "*.md|*.txt", "pattern-type": "glob"}
+                 ("|" is not glob syntax; this is a single invalid glob)
+
+3. regexp mode:
+   - Golang-style regular expression (re2 syntax).
+   - This is the ONLY mode where "|" has special meaning (regex alternation).
+   - Use this mode when you need to match multiple different patterns in one call.
+   - CORRECT:   {"pattern": "(result_summary\\.txt|directly_answer.*\\.md)", "pattern-type": "regexp"}
+   - CORRECT:   {"pattern": "\\.(md|txt|yaml)$", "pattern-type": "regexp"}
+   - CORRECT:   {"pattern": "tool_calls/.*\\.md", "pattern-type": "regexp"}
+
+=== How to Search for Multiple File Types/Names ===
+
+If you need to find files matching several different names or patterns, choose ONE of these strategies:
+
+Strategy A - Use regexp with alternation (recommended for complex OR matching):
+  {"pattern": "(config\\.yaml|README\\.md|setup\\.py)", "pattern-type": "regexp"}
+
+Strategy B - Use include/include-ext for simple filename or extension filtering:
+  {"pattern": "src/", "pattern-type": "substr", "include-ext": ".go,.js,.py"}
+  {"pattern": "config", "pattern-type": "substr", "include": "config,setting"}
+
+Strategy C - Call the tool multiple times, once per pattern (if patterns are very different):
+  Call 1: {"pattern": "result_summary.txt", "pattern-type": "substr"}
+  Call 2: {"pattern": "directly_answer", "pattern-type": "substr", "include-ext": ".md"}
+
+=== Common Mistakes to Avoid ===
+
+  WRONG: {"pattern": "foo|bar|baz", "pattern-type": "substr"}
+         "|" is a literal character in substr mode, not a separator.
+         FIX: Use pattern-type "regexp" instead: {"pattern": "foo|bar|baz", "pattern-type": "regexp"}
+
+  WRONG: {"pattern": "*.md", "pattern-type": "substr"}
+         "*" is a literal character in substr mode, not a wildcard.
+         FIX: Use pattern ".md" in substr mode, or use glob/regexp mode.
+
+  WRONG: {"pattern": "result_summary.txt|directly_answer_*.md", "pattern-type": "substr"}
+         Mixes "|" separator (not supported) and "*" wildcard (not supported in substr).
+         FIX: {"pattern": "(result_summary\\.txt|directly_answer_.*\\.md)", "pattern-type": "regexp"}
 
 Filter Evaluation Order:
   1. type filter (file/dir)
