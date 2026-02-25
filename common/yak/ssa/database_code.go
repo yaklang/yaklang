@@ -174,10 +174,8 @@ func instructionFromIrCode(inst Instruction, ir *ssadb.IrCode) {
 	inst.SetName(ir.Name)
 	inst.SetVerboseName(ir.VerboseName)
 
-	// Set function and block IDs directly - lazy loading will resolve them on demand
-	// This avoids expensive DB queries during instruction reconstruction
-	inst.SetFuncId(ir.CurrentFunction)
-	inst.SetBlockId(ir.CurrentBlock)
+	// Set function/block ids without eagerly loading function/block objects.
+	setInstructionLocationIDs(inst, ir.CurrentFunction, ir.CurrentBlock)
 
 	// Special case: if this is a BasicBlock instruction, it is its own block
 	if !ir.IsFunction && !ir.IsBlock {
@@ -191,6 +189,10 @@ func instructionFromIrCode(inst Instruction, ir *ssadb.IrCode) {
 	}
 
 	inst.SetExtern(ir.IsExternal)
+}
+
+func setInstructionLocationIDs(inst Instruction, funcID, blockID int64) {
+	inst.getAnInstruction().setLocationIDs(funcID, blockID)
 }
 
 func value2IrCode(inst Instruction, ir *ssadb.IrCode) {

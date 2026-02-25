@@ -31,11 +31,9 @@ type Instruction interface {
 	// function
 	GetFunc() *Function
 	SetFunc(*Function)
-	SetFuncId(int64)
 	// block
 	GetBlock() *BasicBlock
 	SetBlock(*BasicBlock)
-	SetBlockId(int64)
 	// program
 	GetProgram() *Program
 	GetProgramName() string
