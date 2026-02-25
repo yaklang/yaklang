@@ -245,6 +245,8 @@ run_test() {
 
 rc=0
 declare -a processed_indices=()
+# 已执行 (bin, run, skip) 组合，避免重复跑
+declare -A run_tests_done=()
 
 # 配置驱动模式：如果有配置文件，按配置执行
 if [[ -n "$TEST_CONFIG" && -f "$TEST_CONFIG" ]]; then
@@ -294,12 +296,17 @@ if [[ -n "$TEST_CONFIG" && -f "$TEST_CONFIG" ]]; then
     fi
     
     matched_array=($matched)
-    echo "  Found ${#matched_array[@]} matching test(s)"
-    
-    # 执行匹配的测试
+    # 去重：同一 (bin,run,skip) 组合只执行一次，避免 manifest 或 pattern 导致重复
     for test_idx in "${matched_array[@]}"; do
+      bin="${ALL_TEST_BINS[$test_idx]}"
+      run_key="${bin}|${run_pattern}|${skip_pattern}"
+      if [[ -n "${run_tests_done[$run_key]:-}" ]]; then
+        echo "  ⏭️  Skip duplicate: $(basename "$bin") (already ran with run=$run_pattern)"
+        continue
+      fi
+      run_tests_done[$run_key]=1
       processed_indices+=("$test_idx")
-      run_test "${ALL_TEST_BINS[$test_idx]}" "${ALL_TEST_PKGS[$test_idx]}" \
+      run_test "${bin}" "${ALL_TEST_PKGS[$test_idx]}" \
                "$timeout" "$run_pattern" "$skip_pattern" "$parallel" \
                "$retry" "$retry_delay" "config:$pattern" || rc=1
     done
