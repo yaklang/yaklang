@@ -85,7 +85,7 @@ func TestReAct_FocusModeLoop_EndToEnd(t *testing.T) {
 		}
 	}
 
-	require.Contains(t, prompt, "## Python 环境状态")
+	require.Contains(t, prompt, "## Python Environment Status")
 	require.Equal(t, schema.AI_REACT_LOOP_NAME_PYTHON_POC, focusMode)
 }
 
