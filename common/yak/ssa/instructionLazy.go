@@ -346,19 +346,17 @@ func (lz *LazyInstruction) GetFunc() *Function {
 }
 
 func (lz *LazyInstruction) SetFunc(f *Function) {
-	lz.check()
-	if utils.IsNil(lz.Instruction) {
+	if lz.ir != nil {
+		if f != nil {
+			lz.ir.CurrentFunction = f.GetId()
+		} else {
+			lz.ir.CurrentFunction = 0
+		}
+	}
+	if !utils.IsNil(lz.Instruction) {
+		lz.Instruction.SetFunc(f)
 		return
 	}
-	lz.Instruction.SetFunc(f)
-}
-
-func (lz *LazyInstruction) SetFuncId(id int64) {
-	lz.check()
-	if utils.IsNil(lz.Instruction) {
-		return
-	}
-	lz.Instruction.SetFuncId(id)
 }
 
 func (lz *LazyInstruction) GetBlock() *BasicBlock {
@@ -370,19 +368,17 @@ func (lz *LazyInstruction) GetBlock() *BasicBlock {
 }
 
 func (lz *LazyInstruction) SetBlock(b *BasicBlock) {
-	lz.check()
-	if utils.IsNil(lz.Instruction) {
+	if lz.ir != nil {
+		if b != nil {
+			lz.ir.CurrentBlock = b.GetId()
+		} else {
+			lz.ir.CurrentBlock = 0
+		}
+	}
+	if !utils.IsNil(lz.Instruction) {
+		lz.Instruction.SetBlock(b)
 		return
 	}
-	lz.Instruction.SetBlock(b)
-}
-
-func (lz *LazyInstruction) SetBlockId(id int64) {
-	lz.check()
-	if utils.IsNil(lz.Instruction) {
-		return
-	}
-	lz.Instruction.SetBlockId(id)
 }
 
 func (lz *LazyInstruction) GetProgram() *Program {

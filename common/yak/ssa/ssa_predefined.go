@@ -158,11 +158,39 @@ func (a *anInstruction) SetFunc(f *Function) {
 	a.fun = f
 	if f != nil {
 		a.prog = f.GetProgram()
+		a.setLocationIDs(f.GetId(), a.blockId)
+	} else {
+		a.setLocationIDs(0, a.blockId)
 	}
 }
 
-func (a *anInstruction) SetFuncId(id int64) {
-	a.funcId = id
+func (a *anInstruction) setLocationIDs(funcID, blockID int64) {
+	a.funcId = funcID
+	if a.fun != nil && a.fun.GetId() != funcID {
+		a.fun = nil
+	}
+	a.blockId = blockID
+	if a.block != nil && a.block.GetId() != blockID {
+		a.block = nil
+	}
+}
+
+func (a *anInstruction) resolveFunctionByID() *Function {
+	if a.funcId <= 0 || a.prog == nil || a.prog.Cache == nil || a.prog.Cache.InstructionCache == nil {
+		return nil
+	}
+	if cachedFunc, ok := a.prog.Cache.InstructionCache.Get(a.funcId); ok {
+		if f, ok := ToFunction(cachedFunc); ok {
+			return f
+		}
+	}
+	// DB-read mode may not have the function in InstructionCache yet.
+	if loaded := a.prog.Cache.GetInstruction(a.funcId); loaded != nil {
+		if f, ok := ToFunction(loaded); ok {
+			return f
+		}
+	}
+	return nil
 }
 
 func (a *anInstruction) GetFunc() *Function {
@@ -173,14 +201,9 @@ func (a *anInstruction) GetFunc() *Function {
 			return f
 		}
 	}
-	// Lazy path: resolve from ID if available but pointer is nil
-	if a.funcId > 0 && a.prog != nil && a.prog.Cache != nil && a.prog.Cache.InstructionCache != nil {
-		if cachedFunc, ok := a.prog.Cache.InstructionCache.Get(a.funcId); ok {
-			if f, ok := ToFunction(cachedFunc); ok {
-				a.fun = f
-				return f
-			}
-		}
+	if f := a.resolveFunctionByID(); f != nil {
+		a.fun = f
+		return f
 	}
 	return nil
 }
@@ -218,12 +241,28 @@ func (a *anInstruction) IsAnnotation() bool {
 func (a *anInstruction) SetBlock(block *BasicBlock) {
 	a.block = block
 	if block != nil {
-		a.blockId = block.GetId()
+		a.setLocationIDs(a.funcId, block.GetId())
+	} else {
+		a.setLocationIDs(a.funcId, 0)
 	}
 }
 
-func (a *anInstruction) SetBlockId(id int64) {
-	a.blockId = id
+func (a *anInstruction) resolveBlockByID() *BasicBlock {
+	if a.blockId <= 0 || a.prog == nil || a.prog.Cache == nil || a.prog.Cache.InstructionCache == nil {
+		return nil
+	}
+	if cachedBlock, ok := a.prog.Cache.InstructionCache.Get(a.blockId); ok {
+		if block, ok := ToBasicBlock(cachedBlock); ok {
+			return block
+		}
+	}
+	// DB-read mode may not have the block in InstructionCache yet.
+	if loaded := a.prog.Cache.GetInstruction(a.blockId); loaded != nil {
+		if block, ok := ToBasicBlock(loaded); ok {
+			return block
+		}
+	}
+	return nil
 }
 
 func (a *anInstruction) GetBlock() *BasicBlock {
@@ -235,14 +274,9 @@ func (a *anInstruction) GetBlock() *BasicBlock {
 		log.Warnf("GetBlock: block is not a BasicBlock but: %v", a.block)
 		return nil
 	}
-	// Lazy path: resolve from ID if available but pointer is nil
-	if a.blockId > 0 && a.prog != nil && a.prog.Cache != nil && a.prog.Cache.InstructionCache != nil {
-		if cachedBlock, ok := a.prog.Cache.InstructionCache.Get(a.blockId); ok {
-			if block, ok := ToBasicBlock(cachedBlock); ok {
-				a.block = block
-				return block
-			}
-		}
+	if block := a.resolveBlockByID(); block != nil {
+		a.block = block
+		return block
 	}
 	return nil
 }
