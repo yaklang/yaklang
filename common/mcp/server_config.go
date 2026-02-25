@@ -266,6 +266,14 @@ func WithDisableYakScriptToolSet() McpServerOption {
 	return WithDisableToolSet("yak_script")
 }
 
+func WithEnableSSAToolSet() McpServerOption {
+	return WithEnableToolSet("ssa")
+}
+
+func WithDisableSSAToolSet() McpServerOption {
+	return WithDisableToolSet("ssa")
+}
+
 func WithYakScriptTools(tools ...*mcp.Tool) McpServerOption {
 	return func(cfg *MCPServerConfig) error {
 		for _, tool := range tools {
