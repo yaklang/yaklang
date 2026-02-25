@@ -1,0 +1,62 @@
+# files-hids MustPass 功能清单
+
+本表用于描述 `common/yak/yaktest/mustpass/files-hids/*.yak` 的测试脚本与对应功能点。
+
+| 模块 | 功能点 | 说明 | 关联实现 | 对应脚本 |
+|---|---|---|---|---|
+| 文件格式模块 | ELF文件头解析 | 解析ELF文件头信息，包括魔数、架构类型和入口地址。 | `common/yak/yaklib/elf.go` | `common/yak/yaktest/mustpass/files-hids/elf_header.yak` |
+| 文件格式模块 | ELF段信息提取 | 提取ELF文件的段（Segment）信息，包括代码段和数据段。 | - | `common/yak/yaktest/mustpass/files-hids/elf_segments.yak` |
+| 文件格式模块 | ELF节信息提取 | 提取ELF文件的节（Section）信息，包括符号表和字符串表。 | - | `common/yak/yaktest/mustpass/files-hids/elf_sections.yak` |
+| 工具模块 | MD5哈希计算 | 使用MD5算法计算文件哈希值。 | `common/yak/yaklib/file.go` | `common/yak/yaktest/mustpass/files-hids/file_md5.yak` |
+| 工具模块 | 文件类型识别 | 通过文件头魔数识别文件类型。 | - | `common/yak/yaktest/mustpass/files-hids/file_type_magic.yak` |
+| 工具模块 | 文件扩展名匹配 | 通过文件扩展名匹配文件类型。 | - | `common/yak/yaktest/mustpass/files-hids/file_type_extension.yak` |
+| 模块扩展 | 模块接口定义 | 定义标准化的模块接口规范。 | `common/yak/script_engine.go` | - |
+| 进程信息收集 | 进程列表获取 | 获取当前系统中所有运行进程的列表。 | `common/hids/process_info.go` | `common/yak/yaktest/mustpass/files-hids/process_list.yak` |
+| 进程信息收集 | 进程列表过滤 | 支持按用户、状态等条件过滤进程列表。 | - | `common/yak/yaktest/mustpass/files-hids/process_filter.yak` |
+| 进程信息收集 | 进程基本信息查看 | 查看进程的基本信息，包括PID、PPID、用户等。 | - | `common/yak/yaktest/mustpass/files-hids/process_basic_info.yak` |
+| 进程信息收集 | 进程父子关系识别 | 识别进程之间的父子关系。 | - | `common/yak/yaktest/mustpass/files-hids/process_parent_child.yak` |
+| 进程信息收集 | 进程依赖关系识别 | 识别进程之间的依赖关系，构建进程依赖图。 | - | `common/yak/yaktest/mustpass/files-hids/process_tree.yak` |
+| 进程行为监控 | 进程启动事件捕获 | 捕获新进程的启动事件。 | `common/hids/process_monitor.go` | `common/yak/yaktest/mustpass/files-hids/process_create_event.yak` |
+| 进程行为监控 | 进程启动信息记录 | 记录进程启动的执行文件路径和启动用户信息。 | - | `common/yak/yaktest/mustpass/files-hids/process_create_info.yak` |
+| 进程行为监控 | 进程退出事件捕获 | 捕获进程的退出事件。 | - | `common/yak/yaktest/mustpass/files-hids/process_exit_event.yak` |
+| 进程行为监控 | 白名单规则配置 | 配置进程白名单规则，支持路径、哈希值等多种匹配方式。 | - | `common/yak/yaktest/mustpass/files-hids/process_whitelist.yak` |
+| 连接状态监控 | 连接列表获取 | 获取当前系统的网络连接列表。 | `common/hids/connection_monitor.go` | `common/yak/yaktest/mustpass/files-hids/connection_list.yak` |
+| 连接状态监控 | 连接列表过滤 | 支持按协议、端口、状态等条件过滤连接列表。 | - | `common/yak/yaktest/mustpass/files-hids/connection_filter.yak` |
+| 连接状态监控 | 连接状态历史记录 | 记录连接状态变化的历史信息。 | - | `common/yak/yaktest/mustpass/files-hids/connection_history.yak` |
+| 网络行为识别 | 通信协议识别 | 识别网络通信使用的协议类型。 | `common/suricata/` | `common/yak/yaktest/mustpass/files-hids/hids_match.yak` |
+| 网络行为识别 | 数据泄露告警 | 对检测到的数据泄露行为进行告警处理。 | - | `common/yak/yaktest/mustpass/files-hids/hids_basic.yak` |
+| 网络行为识别 | 攻击特征库 | 维护网络攻击流量特征库。 | - | `common/yak/yaktest/mustpass/files-hids/hids_match.yak` |
+| 网络行为识别 | 攻击流量识别 | 识别网络攻击流量特征并告警。 | - | `common/yak/yaktest/mustpass/files-hids/hids_match.yak` |
+| 网络行为识别 | 流量分类规则 | 定义网络流量的分类规则。 | - | `common/yak/yaktest/mustpass/files-hids/hids_match.yak` |
+| 网络行为识别 | 流量自动分类 | 基于规则对网络流量进行自动分类。 | - | `common/yak/yaktest/mustpass/files-hids/hids_match.yak` |
+| 用户行为审计 | 登录事件捕获 | 捕获用户登录事件。 | `common/hids/audit_monitor.go` | - |
+| 用户行为审计 | 登录信息记录 | 记录登录时间、IP地址和登录方式等信息。 | `common/hids/audit_monitor.go` | - |
+| 用户行为审计 | 命令执行记录 | 记录用户执行的命令及其参数。 | `common/hids/audit_monitor.go` | - |
+| 文件变化监控 | 文件访问记录 | 记录用户对文件的访问操作，包括读取、写入等。 | `common/yak/yaklib/filemonitor.go` | `common/yak/yaktest/mustpass/files-hids/filemonitor_access_log.yak` |
+| 文件变化监控 | 权限变更事件捕获 | 捕获用户权限变更操作事件。 | `common/yak/yaklib/filemonitor.go` | `common/yak/yaktest/mustpass/files-hids/filemonitor_permission_check.yak` |
+| 文件变化监控 | 权限变更日志 | 记录权限变更的详细信息，包括变更前后权限对比。 | `common/yak/yaklib/filemonitor.go` | `common/yak/yaktest/mustpass/files-hids/filemonitor_permission_check.yak` |
+| 系统配置审计 | 配置文件监控 | 监控系统关键配置文件的变更。 | `common/yak/yaklib/filemonitor.go` | `common/yak/yaktest/mustpass/files-hids/filemonitor_config.yak`<br>`common/yak/yaktest/mustpass/files-hids/filemonitor_config_change_detail.yak` |
+| 系统配置审计 | 配置变更详情记录 | 记录修改内容、时间和操作用户等详细信息。 | `common/yak/yaklib/filemonitor.go` | `common/yak/yaktest/mustpass/files-hids/filemonitor_config_change_detail.yak` |
+| 文件变化监控 | 文件监控规则配置 | 配置需要监控的重要文件列表和监控规则。 | `common/yak/yaklib/filemonitor.go` | `common/yak/yaktest/mustpass/files-hids/filemonitor_config.yak` |
+| 文件变化监控 | 文件操作事件捕获 | 捕获指定重要文件的读取、修改或删除操作。 | - | `common/yak/yaktest/mustpass/files-hids/filemonitor_access_log.yak` |
+| 文件变化监控 | 文件哈希计算 | 计算文件的哈希值用于完整性校验。 | `common/yak/yaklib/file.go` | `common/yak/yaktest/mustpass/files-hids/file_hash.yak` |
+| 文件变化监控 | 文件访问日志记录 | 记录访问时间、用户和操作类型等详细信息。 | `common/yak/yaklib/filemonitor.go` | `common/yak/yaktest/mustpass/files-hids/filemonitor_access_log.yak` |
+| 文件变化监控 | 权限变更事件捕获 | 监测文件权限或属主的变更事件。 | - | `common/yak/yaktest/mustpass/files-hids/filemonitor_permission_check.yak` |
+| 文件变化监控 | 内容特征匹配 | 基于特征库匹配文件内容特征。 | `common/yak/yaklib/file_malicious_signatures.go` | `common/yak/yaktest/mustpass/files-hids/file_malicious_match.yak` |
+| 规则配置 | 条件表达式定义 | 定义规则触发条件的表达式语法。 | `common/yak/sandbox.go` | `common/yak/yaktest/mustpass/files-hids/rule_engine_basic.yak` |
+| 规则配置 | 条件规则配置 | 配置具体的规则触发条件。 | `common/yak/sandbox.go` | `common/yak/yaktest/mustpass/files-hids/rule_engine_basic.yak` |
+| 规则配置 | 动作参数配置 | 配置规则动作的具体参数和执行方式。 | `common/yak/sandbox.go` | `common/yak/yaktest/mustpass/files-hids/rule_engine_basic.yak` |
+| 规则配置 | 规则启用执行 | 启用指定规则，使其开始监控事件并触发相应动作。 | `common/yak/sandbox.go` | `common/yak/yaktest/mustpass/files-hids/rule_engine_basic.yak` |
+| 规则配置 | 规则禁用执行 | 禁用指定规则，暂停其监控和触发动作。 | `common/yak/sandbox.go` | `common/yak/yaktest/mustpass/files-hids/rule_engine_basic.yak` |
+| 规则执行 | 事件匹配引擎 | 实时检测系统事件是否满足规则条件。 | `common/yak/sandbox.go` | `common/yak/yaktest/mustpass/files-hids/rule_engine_basic.yak` |
+| 规则执行 | 日志记录功能 | 记录规则触发的时间、条件和执行结果。 | `common/yak/sandbox.go` | `common/yak/yaktest/mustpass/files-hids/rule_engine_basic.yak` |
+| 规则编写 | 规则语法定义 | 定义使用类C语法编写规则的语法规范。 | `common/yak/sandbox.go` | `common/yak/yaktest/mustpass/files-hids/rule_engine_basic.yak` |
+| 规则编写 | 规则结构定义 | 定义规则的结构，包括规则标识符、元数据、字符串和条件部分。 | `common/yak/sandbox.go` | `common/yak/yaktest/mustpass/files-hids/rule_engine_basic.yak` |
+| 规则编写 | 文本字符串匹配 | 支持文本字符串的匹配功能。 | - | `common/yak/yaktest/mustpass/files-hids/rule_engine_basic.yak` |
+| 规则编写 | 正则表达式匹配 | 支持正则表达式的匹配功能。 | - | `common/yak/yaktest/mustpass/files-hids/rule_engine_basic.yak` |
+| 规则编写 | 元数据定义 | 定义元数据的结构和格式规范。 | - | `common/yak/yaktest/mustpass/files-hids/rule_engine_basic.yak` |
+| 规则编写 | 元数据解析 | 解析规则中的描述性元数据信息。 | - | `common/yak/yaktest/mustpass/files-hids/rule_engine_basic.yak` |
+| 文件扫描 | 单文件扫描 | 支持扫描单个文件，提取文件特征进行匹配。 | `common/yak/yaklib/filescanner.go` | `common/yak/yaktest/mustpass/files-hids/file_scanner.yak` |
+| 文件扫描 | 扫描结果处理 | 处理文件扫描结果，包括匹配规则和告警生成。 | `common/yak/yaklib/filescanner.go` | `common/yak/yaktest/mustpass/files-hids/file_scanner.yak` |
+| 文件扫描 | 批量文件扫描 | 对目录中的文件进行批量扫描处理。 | `common/yak/yaklib/filescanner.go` | `common/yak/yaktest/mustpass/files-hids/file_scanner.yak` |
+| 进程信息收集 | 进程内存获取 | 获取进程的内存空间信息。 | - | - |

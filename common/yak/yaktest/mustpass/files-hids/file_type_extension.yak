@@ -88,15 +88,32 @@ for extInfo in knownExts {
     assert expectedPrefix in extMime, sprintf("Extension '%s' should map to MIME type starting with '%s', got: %s", ext, expectedPrefix, extMime)
 }
 
-// 6. 测试 file.DetectFileType() 使用扩展名作为回退
-// 创建一个没有魔数的文件（纯文本，但扩展名是 .json）
-jsonFile,err = file.TempFileName("test_extension_*.json")
-file.Save(jsonFile, "{}")
-detectedType, err = file.DetectFileType(jsonFile)
-assert err == nil, sprintf("DetectFileType failed: %v", err)
-assert detectedType != "", sprintf("DetectFileType should return non-empty MIME type, got: %s", detectedType)
-// 应该识别为 JSON 类型（通过扩展名或魔数）
-assert "json" in detectedType || "application" in detectedType, sprintf("JSON file should be detected as JSON or application type, got: %s", detectedType)
+ // 6. 测试 file.DetectFileType() 使用扩展名作为回退
+ // 创建一个没有魔数的文件（纯文本，但扩展名是 .json）
+ jsonFile,err = file.TempFileName("test_extension_*.json")
+ file.Save(jsonFile, "{}")
+ detectedType, err = file.DetectFileType(jsonFile)
+ assert err == nil, sprintf("DetectFileType failed: %v", err)
+ assert detectedType != "", sprintf("DetectFileType should return non-empty MIME type, got: %s", detectedType)
+ // 应该识别为 JSON 类型（通过扩展名或魔数）
+ assert "json" in detectedType || "application" in detectedType, sprintf("JSON file should be detected as JSON or application type, got: %s", detectedType)
 
-println("All file extension matching tests passed!")
+ // 输出一些更“可读”的结果，方便报告展示
+ println("=== Extension -> MIME (sample) ===")
+ println(sprintf(".txt -> %s", txtMime))
+ println(sprintf("jpg -> %s", jpgMime))
+ println(sprintf(".jpg -> %s", jpgMimeWithDot))
+ println(sprintf(".png -> %s", pngMime))
+ println(sprintf(".pdf -> %s", pdfMime))
+ println(sprintf(".html -> %s", htmlMime))
+ println(sprintf(".css -> %s", cssMime))
+ println(sprintf(".js -> %s", jsMime))
+ println(sprintf(".json -> %s", jsonMime))
+ println(sprintf(".xml -> %s", xmlMime))
+ println(sprintf(".zip -> %s", zipMime))
+ println(sprintf("unknown -> %s", unknownMime))
+ println(sprintf("empty ext -> %s", emptyExtMime))
+ println(sprintf(".TXT -> %s", txtMime3))
+println(sprintf("DetectFileType(%s) -> %s", file.GetBase(jsonFile), detectedType))
 
+ println("All file extension matching tests passed!")

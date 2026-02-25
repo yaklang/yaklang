@@ -43,6 +43,8 @@ for sect in sections {
     }
 }
 
+println(sprintf("ELF sections: total=%d symtabs=%d strtabs=%d", len(sections), len(symTabs), len(strTabs)))
+
 // 3. 测试 ParseELF - 验证Sections部分的一致性
 info, err = elf.ParseELF(elfFile)
 assert err == nil, sprintf("ParseELF failed: %v", err)

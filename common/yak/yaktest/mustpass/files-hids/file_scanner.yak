@@ -39,9 +39,16 @@ assert len(result.Matches) > 0, "Matches should not be empty"
 assert result.MimeType != "", "Mime type should not be empty"
 assert result.Md5 != "", "MD5 should not be empty"
 
+println("=== ScanFile (malicious sample) ===")
+println(sprintf("name=%s ext=%s size=%d mime=%s matched=%v", result.Name, result.Extension, result.Size, result.MimeType, result.Matched))
+println(sprintf("md5=%s match_names=%v", result.Md5, result.MatchNames))
+
 result2, err = scanner.ScanFile(normalFile)
 assert err == nil, sprintf("ScanFile failed: %v", err)
 assert result2.Skipped == false, "Normal file should not be skipped"
+
+println("=== ScanFile (normal sample) ===")
+println(sprintf("name=%s ext=%s size=%d mime=%s skipped=%v matched=%v", result2.Name, result2.Extension, result2.Size, result2.MimeType, result2.Skipped, result2.Matched))
 
 results, err = scanner.ScanDir(testDir)
 assert err == nil, sprintf("ScanDir failed: %v", err)
@@ -55,6 +62,32 @@ for r in results {
 }
 assert matchedCount >= 1, sprintf("Expected at least one matched file, got: %d", matchedCount)
 
+skippedCount = 0
+for r in results {
+    if r.Skipped {
+        skippedCount = skippedCount + 1
+    }
+}
+
+println("=== ScanDir summary ===")
+println(sprintf("total=%d matched=%d skipped=%d", len(results), matchedCount, skippedCount))
+
+// 输出固定顺序的样例，避免报告/CI 输出过于随机
+targets = ["webshell.php", "normal.php", "note.txt"]
+for target in targets {
+    found = false
+    for r in results {
+        if r.Name == target {
+            println(sprintf("%s: matched=%v skipped=%v mime=%s md5=%s", r.Name, r.Matched, r.Skipped, r.MimeType, r.Md5))
+            found = true
+            break
+        }
+    }
+    if !found {
+        println(sprintf("%s: (no result)", target))
+    }
+}
+
 config2 = {
     "enable_risk": false,
     "include_patterns": ["*.php"],
@@ -67,5 +100,8 @@ result3, err = scanner2.ScanFile(normalFile)
 assert err == nil, sprintf("ScanFile failed: %v", err)
 assert result3.Skipped == true, "Excluded file should be skipped"
 assert result3.SkipReason == "excluded", sprintf("Unexpected skip reason: %s", result3.SkipReason)
+
+println("=== Exclude pattern sample ===")
+println(sprintf("name=%s skipped=%v reason=%s", result3.Name, result3.Skipped, result3.SkipReason))
 
 println("File scanner tests passed!")

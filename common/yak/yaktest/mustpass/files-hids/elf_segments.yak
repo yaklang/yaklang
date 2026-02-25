@@ -29,6 +29,8 @@ assert len(segments) > 0, sprintf("Should have at least one segment, got: %d", l
 hasLoadSegment = false
 hasCodeSegment = false
 hasDataSegment = false
+codeCount = 0
+dataCount = 0
 
 for seg in segments {
     assert seg.Type != "", sprintf("Segment type should not be empty, got: %s", seg.Type)
@@ -41,13 +43,17 @@ for seg in segments {
     
     if seg.IsCode {
         hasCodeSegment = true
+        codeCount = codeCount + 1
         assert "X" in seg.Flags, sprintf("Code segment should have execute flag, flags: %s", seg.Flags)
     }
     
     if seg.IsData {
         hasDataSegment = true
+        dataCount = dataCount + 1
     }
 }
+
+println(sprintf("ELF segments: total=%d PT_LOAD=%v code=%d data=%d", len(segments), hasLoadSegment, codeCount, dataCount))
 
 assert hasLoadSegment, "Should have at least one PT_LOAD segment"
 
