@@ -362,8 +362,10 @@ func (r *ReActLoop) fillReflectionFromAction(action *aicommon.Action, reflection
 	if reflection.IsSpinning {
 		reflection.SpinReason = params.GetString("spin_reason")
 
-		// 如果检测到 SPIN，添加到 Timeline
 		r.addSpinWarningToTimeline(reflection)
+		r.IncrementSpinWarning()
+	} else {
+		r.ResetSpinWarning()
 	}
 
 	log.Infof("filled reflection from action: suggestions[%d], spinning[%v]",
@@ -371,34 +373,104 @@ func (r *ReActLoop) fillReflectionFromAction(action *aicommon.Action, reflection
 }
 
 // addSpinWarningToTimeline 将 SPIN 警告添加到 Timeline
+// 根据 consecutiveSpinWarnings 计数逐级引入结构化方法论施加认知压力
 func (r *ReActLoop) addSpinWarningToTimeline(reflection *ActionReflection) {
 	if !reflection.IsSpinning {
 		return
 	}
 
-	log.Warnf("SPIN detected: %s", reflection.SpinReason)
+	spinCount := r.consecutiveSpinWarnings + 1 // +1 because IncrementSpinWarning is called after this
+	log.Warnf("SPIN detected (consecutive #%d): %s", spinCount, reflection.SpinReason)
 
-	// 构建 Timeline 消息
 	var msg strings.Builder
-	msg.WriteString("⚠️ [SPIN DETECTED] 检测到 AI Agent 陷入循环\n\n")
-	msg.WriteString(fmt.Sprintf("**Action 类型**: %s\n", reflection.ActionType))
-	msg.WriteString(fmt.Sprintf("**原因**: %s\n\n", reflection.SpinReason))
+	msg.WriteString(fmt.Sprintf("⚠️ [SPIN DETECTED #%d] AI Agent is stuck in a loop\n\n", spinCount))
+	msg.WriteString(fmt.Sprintf("**Action type**: %s\n", reflection.ActionType))
+	msg.WriteString(fmt.Sprintf("**Reason**: %s\n\n", reflection.SpinReason))
 
-	// 如果 suggestions 中有内容，添加进去（可能已经整合了 SPIN 建议）
 	if len(reflection.Suggestions) > 0 {
-		msg.WriteString("**建议**:\n")
+		msg.WriteString("**Suggestions**:\n")
 		for i, suggestion := range reflection.Suggestions {
 			msg.WriteString(fmt.Sprintf("%d. %s\n", i+1, suggestion))
 		}
 		msg.WriteString("\n")
 	}
 
-	// 添加到 Timeline，使用 logic_spin_warning 作为 entry type
+	// Escalating methodological pressure based on consecutive spin count
+	switch {
+	case spinCount >= 3:
+		msg.WriteString(buildSWOTFramework(reflection.ActionType))
+	case spinCount >= 2:
+		msg.WriteString(buildSMARTFramework(reflection.ActionType))
+	default:
+		msg.WriteString(buildFiveWhysFramework(reflection.ActionType))
+	}
+
+	if r.maxConsecutiveSpinWarnings > 0 {
+		remaining := r.maxConsecutiveSpinWarnings - spinCount
+		if remaining <= 1 {
+			msg.WriteString(fmt.Sprintf(
+				"\n---\n⛔ **FINAL WARNING**: This loop will be FORCE-TERMINATED after %d more spin(s). "+
+					"You MUST select a DIFFERENT action type NOW.\n", remaining))
+		}
+	}
+
 	invoker := r.GetInvoker()
 	if invoker != nil {
 		invoker.AddToTimeline("logic_spin_warning", msg.String())
-		log.Infof("SPIN warning added to timeline")
+		log.Infof("SPIN warning #%d added to timeline with escalation framework", spinCount)
 	}
+}
+
+// buildFiveWhysFramework returns a "5 Whys" root-cause analysis prompt
+// Used at spin escalation level 1 to force basic causal reasoning.
+func buildFiveWhysFramework(actionType string) string {
+	return fmt.Sprintf(`**[MANDATORY] Root-Cause Analysis — 5 Whys**
+
+Before choosing your next action, answer each question in order:
+1. **Why** am I repeating '%s'? → identify the immediate trigger
+2. **Why** didn't the previous execution advance the task? → identify what's missing
+3. **Why** haven't I tried a different action type? → identify the constraint
+4. **Why** does this constraint exist? → identify the real blocker
+5. **What is the minimum viable DIFFERENT action** that bypasses this blocker?
+
+⚠ You MUST pick an action that is NOT '%s' in the next iteration.
+`, actionType, actionType)
+}
+
+// buildSMARTFramework returns a S.M.A.R.T goal-setting prompt
+// Used at spin escalation level 2 to force concrete next-step planning.
+func buildSMARTFramework(actionType string) string {
+	return fmt.Sprintf(`**[MANDATORY] S.M.A.R.T Next-Step Planning**
+
+You have been spinning on '%s' for 2 consecutive reflections. Define your next action using S.M.A.R.T:
+
+- **S**pecific: What EXACT action (different from '%s') will you take? Name the action type and its parameters.
+- **M**easurable: What concrete output proves it succeeded? (e.g. "file content retrieved", "HTTP response received")
+- **A**chievable: Is this action available in your tool set? If not, pick one that IS.
+- **R**elevant: How does this action DIRECTLY advance the original task goal?
+- **T**ime-bound: This must complete in a SINGLE iteration — no multi-step plans.
+
+⚠ CONSTRAINT: Action type '%s' is STRONGLY DISCOURAGED. Justify if you must use it again.
+`, actionType, actionType, actionType)
+}
+
+// buildSWOTFramework returns a SWOT analysis prompt
+// Used at spin escalation level 3 (final pressure before force-exit).
+func buildSWOTFramework(actionType string) string {
+	return fmt.Sprintf(`**[CRITICAL — FINAL ESCALATION] SWOT Analysis of Current Approach**
+
+You have been spinning on '%s' for 3+ consecutive reflections. Perform a SWOT analysis NOW:
+
+**Strengths** — What information/context do you ALREADY possess that doesn't require re-collection?
+**Weaknesses** — What specific gap in your reasoning causes the repeat of '%s'? (Be brutally honest)
+**Opportunities** — List ALL alternative action types you have NOT tried. Pick one.
+**Threats** — If you repeat '%s' one more time, the loop will be force-terminated with UNSUCCESSFUL status.
+
+⚠ HARD CONSTRAINT: Action type '%s' is now BANNED.
+  → If you select '%s' again, the system will terminate this loop.
+  → You MUST select a fundamentally different action type.
+  → If no other action applies, use 'finish' or 'directly_answer' to exit gracefully.
+`, actionType, actionType, actionType, actionType, actionType)
 }
 
 // GetReflectionHistory 获取历史反思记录

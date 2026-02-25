@@ -139,7 +139,7 @@ func concludeAction(r aicommon.AIInvokeRuntime, state *VerifyState) reactloops.R
 
 			// 完成验证
 			operator.Feedback(report + "\n\n---\n验证完成。")
-			// 默认允许退出，无需调用 AllowNextLoopExit
+			operator.Exit()
 		},
 	)
 }

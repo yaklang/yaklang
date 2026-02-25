@@ -777,6 +777,16 @@ LOOP:
 			r.executeReflection(handler, actionParams, operator, reflectionLevel, iterationCount, actionExecutionDuration)
 		}
 
+		if r.ShouldForceExitDueToSpin() {
+			log.Warnf("ReactLoop[%v] force exiting due to %d consecutive spin warnings (threshold: %d)",
+				r.loopName, r.consecutiveSpinWarnings, r.maxConsecutiveSpinWarnings)
+			r.GetInvoker().AddToTimeline("force_spin_exit",
+				fmt.Sprintf("loop force-exited after %d consecutive spin detections", r.consecutiveSpinWarnings))
+			r.ResetSpinWarning()
+			needSummary.SetTo(true)
+			break LOOP
+		}
+
 		// 检查 operator 状态
 		if isTerminated, err := operator.IsTerminated(); isTerminated {
 			log.Infof("ReactLoop[%v] terminated", r.loopName)
