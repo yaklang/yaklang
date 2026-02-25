@@ -139,6 +139,19 @@ func WithProgramNames(programName ...string) Option {
 	}
 }
 
+// WithSetProgramName 设置主 program 名称（替换而非追加）
+// 用于新编译场景：当 config 从项目 JSON 加载时可能包含旧的 program_names，
+// 调用此选项可强制使用新生成的 program 名称，避免复用数据库中的旧 program
+func WithSetProgramName(name string) Option {
+	return func(c *Config) error {
+		if err := c.ensureBase("Program Name"); err != nil {
+			return err
+		}
+		c.BaseInfo.ProgramNames = []string{name}
+		return nil
+	}
+}
+
 func WithProgramDescription(description string) Option {
 	return func(c *Config) error {
 		if err := c.ensureBase("Program Description"); err != nil {

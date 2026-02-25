@@ -62,6 +62,9 @@ func PeepholeCompile(fs fi.FileSystem, size int, opts ...ssaconfig.Option) (Prog
 	return ParseProject(opts...)
 }
 
+// DiffProgressReporter 用于上报 diff 与编译阶段的进度，进度范围：diff 0.1-0.3，编译 0.3-0.8
+type DiffProgressReporter func(progress float64, msg string)
+
 // CompileDiffProgramAndSaveToDB 编译差量程序并保存到数据库
 // 注意：这个函数不应该通过选项触发增量编译，因为它已经在增量编译的上下文中被调用了
 // 它只负责编译差量文件系统，并在编译后手动设置增量编译元数据
@@ -76,6 +79,7 @@ func CompileDiffProgramAndSaveToDB(
 	baseFS, newFS fi.FileSystem,
 	baseProgramName, diffProgramName string,
 	language ssaconfig.Language,
+	progressReporter DiffProgressReporter,
 	opts ...ssaconfig.Option,
 ) (*Program, error) {
 	var err error
@@ -97,11 +101,17 @@ func CompileDiffProgramAndSaveToDB(
 		}
 	}
 
-	// Step 2: 计算文件系统差异
+	// Step 2: 计算文件系统差异（进度 0.1-0.3）
+	if progressReporter != nil {
+		progressReporter(0.1, "calculating file system diff...")
+	}
 	// 传入 diffProgramName，确保 diff 文件系统中的路径包含 program name 前缀
 	diffFS, fileHashMap, err := calculateFileSystemDiff(baseFS, newFS)
 	if err != nil {
 		return nil, utils.Wrap(err, "failed to calculate file system diff")
+	}
+	if progressReporter != nil {
+		progressReporter(0.3, "file system diff calculated")
 	}
 
 	// Step 3: 准备编译选项
@@ -126,10 +136,15 @@ func CompileDiffProgramAndSaveToDB(
 	if len(fileHashMap) > 0 {
 		diffOpts = append(diffOpts, WithFileHashMap(fileHashMap))
 	}
-	// 合并用户提供的选项
+	// 合并用户提供的选项；若有 progressReporter，注入 WithProcess 将编译进度 0-1 映射到 0.3-0.8
+	if progressReporter != nil {
+		diffOpts = append(diffOpts, WithProcess(func(msg string, p float64) {
+			progressReporter(0.3+p*0.5, msg)
+		}))
+	}
 	diffOpts = append(diffOpts, opts...)
 
-	// Step 3: 创建 Config 并直接调用 parseProjectWithFS（底层 API）
+	// Step 3: 创建 Config 并直接调用 parseProjectWithFS（底层 API，编译阶段 0.3-0.8）
 	// 这样可以避免触发增量编译检测，直接编译差量文件系统
 	config, err := DefaultConfig(diffOpts...)
 	if err != nil {
@@ -238,8 +253,8 @@ func (c *Config) parseProject() (progs Programs, err error) {
 	if isIncrementalCompile {
 		var prog *Program
 		if isDiffCompile {
-			c.Processf(0.1, "incremental compile detected, base program: %s", c.GetBaseProgramName())
-			// 差量编译：编译差量程序并创建 overlay
+			c.Processf(0.02, "incremental compile detected, base program: %s", c.GetBaseProgramName())
+			// 差量编译：4 段进度条 0-0.1 base，0.1-0.3 diff，0.3-0.8 编译，0.8-1 overlay 保存
 			prog, err = c.parseProjectWithIncrementalCompile()
 		} else {
 			c.Processf(0.1, "first incremental compile (base program), performing full compilation")
@@ -456,15 +471,16 @@ func buildFileSystemFromProgramName(programName string) (fi.FileSystem, error) {
 }
 
 // parseProjectWithIncrementalCompile 执行增量编译：编译差量程序并创建 ProgramOverLay
+// 进度条设计：0-0.1 base 加载；0.1-0.3 diff 阶段；0.3-0.8 编译阶段（含内部进度）；0.8-1 overlay 与保存
 func (c *Config) parseProjectWithIncrementalCompile() (*Program, error) {
-	// Step 1: 从数据库加载基础程序
+	// Step 1: 从数据库加载基础程序（压缩到 0-0.1）
 	baseProgramName := c.GetBaseProgramName()
-	c.Processf(0.1, "loading base program from database: %s", baseProgramName)
+	c.Processf(0.03, "loading base program from database: %s", baseProgramName)
 	baseProgram, err := FromDatabase(baseProgramName)
 	if err != nil {
 		return nil, utils.Wrapf(err, "failed to load base program from database: %s", baseProgramName)
 	}
-	c.Processf(0.2, "base program loaded: %s", baseProgram.GetProgramName())
+	c.Processf(0.06, "base program loaded: %s", baseProgram.GetProgramName())
 
 	// Step 2: 处理 base program 的情况
 	// 问题2：当一个差量的 program 要继续进行增量编译时，需要先将这个差量 program 聚合生成 ProgramOverLay
@@ -484,7 +500,7 @@ func (c *Config) parseProjectWithIncrementalCompile() (*Program, error) {
 		if err != nil {
 			return nil, utils.Wrapf(err, "failed to remove program name prefix from aggregated file system")
 		}
-		c.Processf(0.3, "base program is an overlay with %d layers", len(baseOverlay.Layers))
+		c.Processf(0.08, "base program is an overlay with %d layers", len(baseOverlay.Layers))
 	} else if baseProgram.IsIncrementalCompile() && !baseProgram.IsBaseProgram() {
 		// base program 是一个差量 program，需要先聚合生成 ProgramOverLay
 		// 从数据库加载 base program 的 base program
@@ -507,14 +523,14 @@ func (c *Config) parseProjectWithIncrementalCompile() (*Program, error) {
 		if err != nil {
 			return nil, utils.Wrapf(err, "failed to remove program name prefix from aggregated file system")
 		}
-		c.Processf(0.3, "base program is a diff program, created overlay with 2 layers")
+		c.Processf(0.08, "base program is a diff program, created overlay with 2 layers")
 	} else {
 		// base program 是全量编译的 program
 		// 优先从 program name 构建文件系统，如果失败则回退到配置重建
 		var err error
 		baseFSForDiff, err = buildFileSystemFromProgramName(baseProgramName)
 		if err == nil && baseFSForDiff != nil {
-			c.Processf(0.3, "base program is a full compilation program, rebuilt file system from program name")
+			c.Processf(0.08, "base program is a full compilation program, rebuilt file system from program name")
 		} else {
 			// 回退：从基础程序的配置重新构建文件系统
 			baseConfig := baseProgram.GetConfig()
@@ -539,26 +555,26 @@ func (c *Config) parseProjectWithIncrementalCompile() (*Program, error) {
 			if baseFSForDiff == nil {
 				return nil, utils.Errorf("failed to rebuild file system from base program: %s", baseProgramName)
 			}
-			c.Processf(0.3, "base program is a full compilation program, rebuilt file system from config")
+			c.Processf(0.08, "base program is a full compilation program, rebuilt file system from config")
 		}
 	}
 
-	// Step 3: 编译差量程序并保存到数据库
-	c.Processf(0.4, "compiling diff program...")
+	// Step 3: diff 阶段 (0.1-0.3) + 编译阶段 (0.3-0.8)
 	diffProgram, err := CompileDiffProgramAndSaveToDB(
 		c.ctx,
 		baseFSForDiff, c.fs, // 新文件系统
 		baseProgramName,          // 基础程序名称（系统会从数据库构建基础文件系统）
 		c.GetLatestProgramName(), // 差量程序名称
 		c.GetLanguage(),          // 语言
+		func(p float64, msg string) { c.Processf(p, "%s", msg) },
 	)
 	if err != nil {
 		return nil, utils.Wrap(err, "failed to compile diff program")
 	}
-	c.Processf(0.7, "diff program compiled: %s", diffProgram.GetProgramName())
+	c.Processf(0.8, "diff program compiled: %s", diffProgram.GetProgramName())
 
-	// Step 4: 创建 ProgramOverLay
-	c.Processf(0.8, "creating program overlay...")
+	// Step 4: 创建 ProgramOverLay（进度 0.8-1）
+	c.Processf(0.85, "creating program overlay...")
 	var overlay *ProgramOverLay
 
 	if baseOverlay != nil && len(baseOverlay.Layers) > 0 {
@@ -579,14 +595,14 @@ func (c *Config) parseProjectWithIncrementalCompile() (*Program, error) {
 	diffProgram.overlay = overlay
 
 	// Step 5: 确保 diffProgram 本身已保存到数据库（在保存 overlay 之前）
-	c.Processf(0.94, "saving diff program to database...")
+	c.Processf(0.9, "saving diff program to database...")
 	if diffProgram.Program != nil {
 		wait := diffProgram.Program.UpdateToDatabase()
 		if wait != nil {
 			wait() // 等待保存完成
 		}
 	}
-	c.Processf(0.95, "diff program saved to database")
+	c.Processf(0.92, "diff program saved to database")
 
 	// Step 6: 保存 overlay 信息到数据库（只更新当前 program，不更新 layer）
 	c.Processf(0.96, "saving overlay metadata to database...")

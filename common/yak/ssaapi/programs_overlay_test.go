@@ -103,6 +103,7 @@ func checkOverlayTest(t *testing.T, config OverlayTestConfig) {
 			nil, diffFS,
 			programNames[i-1], programNames[i],
 			language,
+			nil,
 		)
 		require.NoError(t, err)
 		require.NotNil(t, diffProgram)
@@ -290,6 +291,7 @@ func checkOverlayTestWithSyntaxFlowRule(t *testing.T, config OverlayTestConfig) 
 			nil, diffFS,
 			programNames[i-1], programNames[i],
 			language,
+			nil,
 		)
 		require.NoError(t, err)
 		require.NotNil(t, diffProgram)
@@ -525,6 +527,7 @@ func InitProgram(t *testing.T) (progBase *ssaapi.Program, progExtend *ssaapi.Pro
 		nil, newFS,
 		progNameBaseUUID, progNameExtendUUID,
 		ssaconfig.JAVA,
+		nil,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, progExtend)
@@ -802,6 +805,7 @@ func InitProgramWithFileChanges(t *testing.T) (progBase *ssaapi.Program, progExt
 		nil, vf2,
 		progNameBaseUUID, progNameExtendUUID,
 		ssaconfig.JAVA,
+		nil,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, progExtend)
