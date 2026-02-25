@@ -50,10 +50,11 @@ if projectName != "" {
     yakit.Warn("项目名称为空，跳过查询最新程序名称")
 }
 
+// 使用 withSetProgramName 覆盖 config 中可能存在的旧 program_names（同 project 多次编译时避免复用数据库中的旧 program）
 opts = [ssa.withProcess((msg, process) => {
     yakit.SetProgressEx("compile", process)
     yakit.Info("%s: %f", msg, process)
-}), ssa.withContext(context.Background()), ssa.withJsonRawConfig(configJSON), ssa.withProgramName(programName)]
+}), ssa.withContext(context.Background()), ssa.withJsonRawConfig(configJSON), ssa.withSetProgramName(programName)]
 
 if enableIncrementalCompile {
     opts = append(opts, ssa.withEnableIncrementalCompile(true))

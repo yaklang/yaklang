@@ -302,6 +302,8 @@ var WithProgramDescription = ssaconfig.WithProgramDescription
 
 var WithProgramName = ssaconfig.WithProgramNames
 
+var WithSetProgramName = ssaconfig.WithSetProgramName
+
 var WithMemory = ssaconfig.WithCompileMemoryCompile
 
 var WithConcurrency = ssaconfig.WithCompileConcurrency
