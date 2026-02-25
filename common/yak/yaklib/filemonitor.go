@@ -188,7 +188,6 @@ func (fm *FileMonitor) Stop() {
 	unregisterActiveFileMonitor(fm)
 	fm.performFinalCheck()
 	fm.cancel()
-	close(fm.eventChan)
 	fm.wg.Wait()
 
 	for _, monitor := range fm.monitors {

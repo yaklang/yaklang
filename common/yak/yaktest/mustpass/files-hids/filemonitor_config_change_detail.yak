@@ -28,8 +28,8 @@ events = []
 monitor.SetEventCallback(func(event) {
     if event.Type == filemonitor.OP_WRITE && event.Path == configFile {
         events = append(events, event)
-        println(sprintf("[CONFIG_WRITE] Path: %s, User: %s, OldLen: %d, NewLen: %d, Time: %v",
-            event.Path, event.User, len(event.OldContent), len(event.NewContent), event.Timestamp))
+        println(sprintf("[CONFIG_WRITE] Path: %s, OldLen: %d, NewLen: %d, Time: %v",
+            event.Path, len(event.OldContent), len(event.NewContent), event.Timestamp))
     }
 })
 
@@ -52,5 +52,7 @@ assert configEvent.OldContent != "", "Old content should not be empty"
 assert configEvent.NewContent != "", "New content should not be empty"
 assert configEvent.OldContent != configEvent.NewContent, "Old/New content should differ"
 assert configEvent.User != "", "User should not be empty"
+
+println(sprintf("Captured %d config write events (oldLen=%d newLen=%d)", len(events), len(configEvent.OldContent), len(configEvent.NewContent)))
 
 println("Config change detail tests passed!")

@@ -35,6 +35,8 @@ assert header.Machine != "", sprintf("Machine should not be empty, got: %s", hea
 assert header.Type != "", sprintf("Type should not be empty, got: %s", header.Type)
 assert header.Entry > 0, sprintf("Entry point should be > 0, got: 0x%016x", header.Entry)
 
+println(sprintf("ELF header: class=%s machine=%s entry=0x%016x", header.Class, header.Machine, header.Entry))
+
 // 3. 测试 GetELFArchitecture - 获取架构类型
 arch, err = elf.GetELFArchitecture(elfFile)
 assert err == nil, sprintf("GetELFArchitecture failed: %v", err)

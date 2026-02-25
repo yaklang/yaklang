@@ -121,6 +121,10 @@ assert len(monitorConfig6.IncludePatterns) == 2, "Should have 2 include patterns
 assert len(monitorConfig6.ExcludePatterns) == 1, "Should have 1 exclude pattern"
 assert len(monitorConfig6.MonitorOps) == 5, "Should have 5 monitor ops"
 
+println("=== File monitor config (sample) ===")
+println(sprintf("watch_paths=%d recursive=%v max_file_size=%d include=%d exclude=%d ops=%d", len(monitorConfig6.WatchPaths), monitorConfig6.Recursive, monitorConfig6.MaxFileSize, len(monitorConfig6.IncludePatterns), len(monitorConfig6.ExcludePatterns), len(monitorConfig6.MonitorOps)))
+println(sprintf("monitor_ops=%v", monitorConfig6.MonitorOps))
+
 monitor6.Stop()
 
 // 7. 测试无效配置（空监控路径）
@@ -133,4 +137,3 @@ monitor8, err = filemonitor.NewMonitor(config8)
 assert err != nil, "Should return error for empty watch paths"
 
 println("File monitor config tests passed!")
-

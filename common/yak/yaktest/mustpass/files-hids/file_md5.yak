@@ -36,6 +36,10 @@ fileContent = file.ReadFile(testFile)
 codecMd5 = codec.Md5(fileContent)
 assert codecMd5 == md5Hash, sprintf("file.Md5() and codec.Md5() should produce same hash: %s vs %s", md5Hash, codecMd5)
 
+println("=== MD5 sample ===")
+println(sprintf("file=%s", file.GetBase(testFile)))
+println(sprintf("md5(file)=%s md5(codec)=%s", md5Hash, codecMd5))
+
 // 3. 测试空文件的 MD5
 emptyFile,err = file.TempFileName("test_empty_*.txt")
 file.Save(emptyFile, string(""))
@@ -45,6 +49,8 @@ assert len(emptyMd5) == 32, sprintf("Empty file MD5 should be 32 characters, got
 // 空文件的 MD5 应该是 "d41d8cd98f00b204e9800998ecf8427e"
 expectedEmptyMd5 = "d41d8cd98f00b204e9800998ecf8427e"
 assert emptyMd5 == expectedEmptyMd5, sprintf("Empty file MD5 should be %s, got: %s", expectedEmptyMd5, emptyMd5)
+
+println(sprintf("md5(empty)=%s", emptyMd5))
 
 // 4. 测试相同内容的文件产生相同的 MD5
 testContent = "Test content for MD5 consistency check"
@@ -56,11 +62,14 @@ md5_1 = file.Md5(file1)
 md5_2 = file.Md5(file2)
 assert md5_1 == md5_2, sprintf("Same content should produce same MD5: %s vs %s", md5_1, md5_2)
 
+println(sprintf("md5(same content)=%s", md5_1))
+
 // 5. 测试不同内容的文件产生不同的 MD5
 file3,err = file.TempFileName("test_md5_3_*.txt")
 file.Save(file3, "Different content")
 md5_3 = file.Md5(file3)
 assert md5_3 != md5_1, sprintf("Different content should produce different MD5: %s vs %s", md5_3, md5_1)
 
-println("All MD5 hash calculation tests passed!")
+println(sprintf("md5(different content)=%s", md5_3))
 
+println("All MD5 hash calculation tests passed!")

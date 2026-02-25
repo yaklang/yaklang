@@ -45,6 +45,11 @@ assert rawMime != nil, "DetectMIMETypeFromRaw should return non-nil MIME type"
 rawMimeStr = rawMime.String()
 assert rawMimeStr != "", sprintf("Raw MIME type string should not be empty, got: %s", rawMimeStr)
 
+println("=== MIME detection sample ===")
+println(sprintf("file=%s", file.GetBase(testFile)))
+println(sprintf("mime(from file)=%s", mimeTypeStr))
+println(sprintf("mime(from raw)=%s", rawMimeStr))
+
 // 验证从文件和从原始字节识别的结果应该一致
 assert rawMimeStr == mimeTypeStr, sprintf("DetectMIMETypeFromRaw and DetectMIMETypeFromFile should produce same result: %s vs %s", rawMimeStr, mimeTypeStr)
 
@@ -58,6 +63,8 @@ assert textMime != nil, "Text file MIME type should not be nil"
 textMimeStr = textMime.String()
 // 文本文件应该被识别为 text/plain（可能带 charset 等参数）
 assert str.HasPrefix(textMimeStr, "text/plain"), sprintf("Text file should be identified as text/plain, got: %s", textMimeStr)
+
+println(sprintf("mime(text/plain)=%s", textMimeStr))
 
 // 4. 测试 ELF 文件类型识别（如果测试文件是 ELF）
 if file.GetExt(testFile) == ".elf" || (testDir != nil && testDir != "" && file.IsExisted(file.Join(testDir, "hello.elf"))) {
@@ -78,6 +85,8 @@ if file.GetExt(testFile) == ".elf" || (testDir != nil && testDir != "" && file.I
         // ELF 文件可能被识别为多种类型：application/x-elf, application/x-executable, application/x-sharedlib, application/x-object, application/x-coredump, 或 application/octet-stream（可能带参数）
         assert elfMimeStr != "", sprintf("ELF file MIME type should not be empty, got: %s", elfMimeStr)
         assert str.HasPrefix(elfMimeStr, "application/x-elf") || str.HasPrefix(elfMimeStr, "application/x-executable") || str.HasPrefix(elfMimeStr, "application/x-sharedlib") || str.HasPrefix(elfMimeStr, "application/x-object") || str.HasPrefix(elfMimeStr, "application/x-coredump") || str.HasPrefix(elfMimeStr, "application/octet-stream"), sprintf("ELF file MIME type should be one of: application/x-elf, application/x-executable, application/x-sharedlib, application/x-object, application/x-coredump, or application/octet-stream, got: %s", elfMimeStr)
+
+        println(sprintf("mime(elf)=%s", elfMimeStr))
     }
 }
 
@@ -99,7 +108,8 @@ if binaryMime != nil {
     binaryMimeStr = binaryMime.String()
     // PNG 文件应该被识别为 image/png（可能带参数）
     assert str.HasPrefix(binaryMimeStr, "image/png"), sprintf("PNG magic number should be identified as image/png, got: %s", binaryMimeStr)
+
+    println(sprintf("mime(png raw)=%s", binaryMimeStr))
 }
 
 println("All file type detection (magic number) tests passed!")
-
