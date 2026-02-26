@@ -97,6 +97,5 @@ var Exports = map[string]interface{}{
 	"auditFilterUsers":      WithAuditFilterUsers,      // 按当前用户(Username)过滤
 	"auditFilterLoginUsers": WithAuditFilterLoginUsers, // 按原始登录用户(LoginUser)过滤
 	"auditFilterCommands":   WithAuditFilterCommands,   // 设置命令过滤器
-	"auditBufferSize":       WithAuditBufferSize,       // 设置缓冲区大小
 	"WatchAuditEvents":      WatchAuditEvents,          // 简化的audit监控函数
 }
