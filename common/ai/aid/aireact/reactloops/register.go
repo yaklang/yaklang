@@ -18,6 +18,8 @@ type LoopMetadata struct {
 	OutputExamplePrompt string // example output for reflection_output_example.txt
 	UsagePrompt         string // usage description for x-@action-rules in schema
 	IsHidden            bool   // whether to hide this loop from the user
+	VerboseName         string // display name in English for the frontend
+	VerboseNameZh       string // display name in Chinese for the frontend
 }
 
 // LoopMetadataOption configures LoopMetadata
@@ -48,6 +50,20 @@ func WithLoopOutputExample(example string) LoopMetadataOption {
 func WithLoopUsagePrompt(usage string) LoopMetadataOption {
 	return func(m *LoopMetadata) {
 		m.UsagePrompt = usage
+	}
+}
+
+// WithVerboseName sets the English display name for the frontend
+func WithVerboseName(name string) LoopMetadataOption {
+	return func(m *LoopMetadata) {
+		m.VerboseName = name
+	}
+}
+
+// WithVerboseNameZh sets the Chinese display name for the frontend
+func WithVerboseNameZh(name string) LoopMetadataOption {
+	return func(m *LoopMetadata) {
+		m.VerboseNameZh = name
 	}
 }
 

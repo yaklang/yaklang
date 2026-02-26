@@ -1,4 +1,4 @@
-package loop_vuln_verify
+package loop_code_audit_verify
 
 import (
 	"fmt"
@@ -128,7 +128,7 @@ func concludeAction(r aicommon.AIInvokeRuntime, state *VerifyState) reactloops.R
 			log.Infof("[VulnVerify] Conclusion: %s (%s confidence)", result, confidence)
 
 			// 发送结构化事件
-			loop.GetEmitter().EmitJSON(schema.EVENT_TYPE_STRUCTURED, "vuln_verify_conclusion", map[string]any{
+			loop.GetEmitter().EmitJSON(schema.EVENT_TYPE_STRUCTURED, "code_audit_verify_conclusion", map[string]any{
 				"vuln_context": ctx,
 				"result":       result,
 				"confidence":   confidence,

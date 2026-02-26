@@ -24,6 +24,8 @@ func (s *Server) QueryAIFocus(ctx context.Context, _ *ypb.QueryAIFocusRequest) (
 			Description:         meta.Description,
 			OutputExamplePrompt: meta.OutputExamplePrompt,
 			UsagePrompt:         meta.UsagePrompt,
+			VerboseName:         meta.VerboseName,
+			VerboseNameZh:       meta.VerboseNameZh,
 		})
 	}
 

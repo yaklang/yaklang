@@ -17,7 +17,7 @@ const (
 	// ResolvedAs_Skill means the identifier is a registered AI skill.
 	ResolvedAs_Skill ResolvedIdentifierType = "skill"
 	// ResolvedAs_FocusedMode means the identifier is a registered focused mode loop
-	// (e.g. vuln_verify, python_poc, write_yaklang_code).
+	// (e.g. code_audit_verify, python_poc, write_yaklang_code).
 	// Focused modes are specialized ReAct loops that are entered via task.SetFocusMode(),
 	// not through AI actions like loading_skills or require_tool.
 	ResolvedAs_FocusedMode ResolvedIdentifierType = "focused_mode"

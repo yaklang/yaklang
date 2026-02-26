@@ -1,4 +1,4 @@
-package loop_http_differ
+package loop_http_fuzztest
 
 import (
 	"bytes"
@@ -26,12 +26,11 @@ var reactiveData string
 //go:embed prompts/reflection_output_example.txt
 var outputExample string
 
-// LoopHTTPDifferName is the name of the HTTP differ loop
-const LoopHTTPDifferName = "http_differ"
+const LoopHTTPFuzztestName = "http_fuzztest"
 
 func init() {
 	err := reactloops.RegisterLoopFactory(
-		LoopHTTPDifferName,
+		LoopHTTPFuzztestName,
 		func(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {
 			// 创建预设选项
 			preset := []reactloops.ReActLoopOption{
@@ -71,17 +70,19 @@ func init() {
 				fuzzCookieAction(r),
 			}
 			preset = append(preset, opts...)
-			return reactloops.NewReActLoop(LoopHTTPDifferName, r, preset...)
+			return reactloops.NewReActLoop(LoopHTTPFuzztestName, r, preset...)
 		},
 		reactloops.WithLoopDescription("HTTP request fuzzing and response diff analysis for security testing"),
+		reactloops.WithVerboseName("HTTP Fuzz Test"),
+		reactloops.WithVerboseNameZh("HTTP 安全模糊测试"),
 		reactloops.WithLoopUsagePrompt("Use when user wants to fuzz HTTP requests and analyze response differences. First use 'set_http_request' to set the target request, then use fuzz actions (fuzz_method, fuzz_path, fuzz_header, fuzz_get_params, fuzz_body, fuzz_cookie) to test"),
 		reactloops.WithLoopOutputExample(`
 * When user requests to fuzz HTTP request:
-  {"@action": "http_differ", "human_readable_thought": "I need to fuzz HTTP request parameters to find vulnerabilities"}
+  {"@action": "http_fuzztest", "human_readable_thought": "I need to fuzz HTTP request parameters to find vulnerabilities"}
 `),
 	)
 	if err != nil {
-		log.Errorf("register reactloop: %v failed: %v", LoopHTTPDifferName, err)
+		log.Errorf("register reactloop: %v failed: %v", LoopHTTPFuzztestName, err)
 	}
 }
 
@@ -217,7 +218,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 			emitter.EmitThoughtStream(task.GetIndex(), "Found relevant security knowledge:\n"+utils.ShrinkTextBlock(searchResultsStr, 500))
 		}
 
-		log.Infof("http_differ loop initialized successfully")
+		log.Infof("http_fuzztest loop initialized successfully")
 		// Default: Continue with normal loop execution
 		operator.Continue()
 	}

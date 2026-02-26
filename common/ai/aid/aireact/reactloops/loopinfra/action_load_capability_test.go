@@ -356,15 +356,15 @@ func TestLoadCapability_Handler_FocusMode_Success(t *testing.T) {
 
 	loop := reactloops.NewMinimalReActLoop(cfg, invoker)
 	loop.SetCurrentTask(task)
-	loop.Set("_load_cap_identifier", "vuln_verify")
+	loop.Set("_load_cap_identifier", "code_audit_verify")
 	loop.Set("_load_cap_resolved_type", string(aicommon.ResolvedAs_FocusedMode))
 
 	op := reactloops.NewActionHandlerOperator(task)
-	action := buildAction("vuln_verify")
+	action := buildAction("code_audit_verify")
 	loopAction_LoadCapability.ActionHandler(loop, action, op)
 
 	assert.True(t, invoker.executeLoopCalled, "ExecuteLoopTaskIF should be called")
-	assert.Equal(t, "vuln_verify", invoker.executeLoopName)
+	assert.Equal(t, "code_audit_verify", invoker.executeLoopName)
 	assert.True(t, op.IsContinued(), "should continue after focus mode completes")
 	assert.Contains(t, op.GetFeedback().String(), "SUCCESSFULLY")
 }
