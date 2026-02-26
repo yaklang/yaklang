@@ -3,11 +3,18 @@ package mcp
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
+	"time"
 
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/server"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
@@ -81,10 +88,40 @@ Requires a program_name from a prior ssa_compile call.`),
 	),
 )
 
+var ssaListIncludesTool = mcp.NewTool("ssa_list_includes",
+	mcp.WithDescription(`List all available SyntaxFlow include (lib) rules that can be used with <include('name')> in SyntaxFlow queries.
+These are reusable source/sink/filter building blocks. Use the language parameter to filter by programming language.`),
+	mcp.WithString("language",
+		mcp.Description("Filter by language. If empty, returns all languages"),
+		mcp.EnumString("java", "php", "js", "golang", "yak", "c", "python", ""),
+	),
+	mcp.WithString("keyword",
+		mcp.Description("Search keyword to filter rules by name or title"),
+	),
+)
+
+var ssaListRulesTool = mcp.NewTool("ssa_list_rules",
+	mcp.WithDescription(`List all available built-in SyntaxFlow vulnerability detection rules (non-lib rules).
+These are complete rules that can be executed directly via ssa_query, or used as reference to write custom rules.`),
+	mcp.WithString("language",
+		mcp.Description("Filter by language. If empty, returns all languages"),
+		mcp.EnumString("java", "php", "js", "golang", "yak", "c", "python", ""),
+	),
+	mcp.WithString("keyword",
+		mcp.Description("Search keyword to filter rules by name, title, or risk type"),
+	),
+	mcp.WithString("severity",
+		mcp.Description("Filter by severity level"),
+		mcp.EnumString("info", "low", "mid", "middle", "high", "critical", ""),
+	),
+)
+
 func init() {
 	AddGlobalToolSet("ssa",
 		WithTool(ssaCompileTool, handleSSACompile),
 		WithTool(ssaQueryTool, handleSSAQuery),
+		WithTool(ssaListIncludesTool, handleSSAListIncludes),
+		WithTool(ssaListRulesTool, handleSSAListRules),
 	)
 }
 
@@ -106,18 +143,28 @@ func handleSSACompile(_ *MCPServer) server.ToolHandlerFunc {
 			return nil, utils.Wrapf(err, "invalid language: %s", language)
 		}
 
+		programName, _ := args["program_name"].(string)
+		reCompile, _ := args["re_compile"].(bool)
+		baseProgramName, _ := args["base_program_name"].(string)
+
+		// Cache-hit detection: skip compilation if the program already exists and source files haven't changed
+		if !reCompile && baseProgramName == "" && programName != "" {
+			if result, ok := tryCompileCache(target, programName, lang); ok {
+				return result, nil
+			}
+		}
+
 		opts := []ssaconfig.Option{
 			ssaapi.WithLanguage(lang),
 			ssaapi.WithContext(ctx),
 		}
-
-		if programName, ok := args["program_name"].(string); ok && programName != "" {
+		if programName != "" {
 			opts = append(opts, ssaapi.WithProgramName(programName))
 		}
-		if reCompile, ok := args["re_compile"].(bool); ok && reCompile {
+		if reCompile {
 			opts = append(opts, ssaapi.WithReCompile(reCompile))
 		}
-		if baseProgramName, ok := args["base_program_name"].(string); ok && baseProgramName != "" {
+		if baseProgramName != "" {
 			opts = append(opts,
 				ssaapi.WithBaseProgramName(baseProgramName),
 				ssaapi.WithEnableIncrementalCompile(true),
@@ -154,6 +201,74 @@ func handleSSACompile(_ *MCPServer) server.ToolHandlerFunc {
 			},
 		}, nil
 	}
+}
+
+// tryCompileCache checks if a compiled program already exists and source files haven't been modified.
+// Returns (result, true) on cache hit, (nil, false) on miss.
+func tryCompileCache(target, programName string, lang ssaconfig.Language) (*mcp.CallToolResult, bool) {
+	irProg, err := ssadb.GetProgram(programName, ssadb.Application)
+	if err != nil || irProg == nil {
+		return nil, false
+	}
+
+	if string(irProg.Language) != string(lang) {
+		return nil, false
+	}
+
+	compiledAt := irProg.UpdatedAt
+	if compiledAt.IsZero() {
+		return nil, false
+	}
+
+	changed, err := hasSourceChanged(target, compiledAt)
+	if err != nil || changed {
+		return nil, false
+	}
+
+	log.Infof("[Cache Hit] Program %q already compiled, no source changes detected", programName)
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("[Cache Hit] Program already compiled — no source files changed since last compilation.\n"))
+	sb.WriteString(fmt.Sprintf("Program Name: %s\nLanguage: %s\nCompiled Files: %d\nLast Compiled: %s\n",
+		irProg.ProgramName, irProg.Language, len(irProg.FileList), compiledAt.Format(time.RFC3339)))
+	sb.WriteString("\nUse this program_name in ssa_query to perform data flow analysis.")
+
+	return &mcp.CallToolResult{
+		Content: []any{mcp.TextContent{Type: "text", Text: sb.String()}},
+	}, true
+}
+
+// hasSourceChanged walks the target directory and checks if any file was modified after compiledAt.
+func hasSourceChanged(target string, compiledAt time.Time) (bool, error) {
+	info, err := os.Stat(target)
+	if err != nil {
+		return true, err
+	}
+	if !info.IsDir() {
+		return info.ModTime().After(compiledAt), nil
+	}
+
+	changed := false
+	err = filepath.Walk(target, func(path string, fi os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		if fi.IsDir() {
+			base := filepath.Base(path)
+			for _, skip := range []string{"vendor", "Vendor", "node_modules", ".git", "target", "classes", "build", ".idea"} {
+				if base == skip {
+					return filepath.SkipDir
+				}
+			}
+			return nil
+		}
+		if fi.ModTime().After(compiledAt) {
+			changed = true
+			return filepath.SkipAll
+		}
+		return nil
+	})
+	return changed, err
 }
 
 func handleSSAQuery(_ *MCPServer) server.ToolHandlerFunc {
@@ -277,5 +392,103 @@ func writeSSAValues(sb *strings.Builder, values ssaapi.Values) {
 				}
 			}
 		}
+	}
+}
+
+func handleSSAListIncludes(_ *MCPServer) server.ToolHandlerFunc {
+	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := request.Params.Arguments
+		language, _ := args["language"].(string)
+		keyword, _ := args["keyword"].(string)
+
+		db := consts.GetGormProfileDatabase().Model(&schema.SyntaxFlowRule{}).Where("allow_included = ?", true)
+		if language != "" {
+			db = db.Where("language = ?", language)
+		}
+		if keyword != "" {
+			like := "%" + keyword + "%"
+			db = db.Where("included_name LIKE ? OR title LIKE ? OR title_zh LIKE ?", like, like, like)
+		}
+		db = db.Order("language, included_name")
+
+		var rules []schema.SyntaxFlowRule
+		if err := db.Find(&rules).Error; err != nil {
+			return nil, utils.Wrapf(err, "query include rules failed")
+		}
+
+		var sb strings.Builder
+		sb.WriteString(fmt.Sprintf("Available <include('name')> rules: %d\n\n", len(rules)))
+		sb.WriteString("Usage: <include('name')> as $variable;\n\n")
+
+		currentLang := ssaconfig.Language("")
+		for _, rule := range rules {
+			if rule.Language != currentLang {
+				currentLang = rule.Language
+				sb.WriteString(fmt.Sprintf("--- %s ---\n", strings.ToUpper(string(currentLang))))
+			}
+			title := rule.TitleZh
+			if title == "" {
+				title = rule.Title
+			}
+			sb.WriteString(fmt.Sprintf("  %-45s  %s\n", rule.IncludedName, title))
+		}
+
+		return &mcp.CallToolResult{
+			Content: []any{mcp.TextContent{Type: "text", Text: sb.String()}},
+		}, nil
+	}
+}
+
+func handleSSAListRules(_ *MCPServer) server.ToolHandlerFunc {
+	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		args := request.Params.Arguments
+		language, _ := args["language"].(string)
+		keyword, _ := args["keyword"].(string)
+		severity, _ := args["severity"].(string)
+
+		db := consts.GetGormProfileDatabase().Model(&schema.SyntaxFlowRule{}).Where("allow_included = ?", false)
+		if language != "" {
+			db = db.Where("language = ?", language)
+		}
+		if keyword != "" {
+			like := "%" + keyword + "%"
+			db = db.Where("rule_name LIKE ? OR title LIKE ? OR title_zh LIKE ? OR risk LIKE ?", like, like, like, like)
+		}
+		if severity != "" {
+			db = db.Where("severity = ?", severity)
+		}
+		db = db.Order("language, severity DESC, rule_name")
+
+		var rules []schema.SyntaxFlowRule
+		if err := db.Find(&rules).Error; err != nil {
+			return nil, utils.Wrapf(err, "query rules failed")
+		}
+
+		var sb strings.Builder
+		sb.WriteString(fmt.Sprintf("Built-in vulnerability detection rules: %d\n\n", len(rules)))
+
+		currentLang := ssaconfig.Language("")
+		for _, rule := range rules {
+			if rule.Language != currentLang {
+				currentLang = rule.Language
+				sb.WriteString(fmt.Sprintf("\n--- %s ---\n", strings.ToUpper(string(currentLang))))
+			}
+			title := rule.TitleZh
+			if title == "" {
+				title = rule.Title
+			}
+			if title == "" {
+				title = rule.RuleName
+			}
+			severity := rule.Severity
+			if severity == "" {
+				severity = "info"
+			}
+			sb.WriteString(fmt.Sprintf("  [%-8s] %s\n", severity, title))
+		}
+
+		return &mcp.CallToolResult{
+			Content: []any{mcp.TextContent{Type: "text", Text: sb.String()}},
+		}, nil
 	}
 }
