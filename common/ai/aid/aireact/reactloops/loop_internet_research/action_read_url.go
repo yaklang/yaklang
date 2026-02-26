@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/searchtools"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -55,7 +56,7 @@ func makeReadURLAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 			loop.LoadingStatus(fmt.Sprintf("fetching page: %s", url))
 			log.Infof("internet research: reading URL '%s'", url)
 
-			pageText := fetchAndExtractText(url, 15*time.Second)
+			pageText := searchtools.FetchPageContent(url, 15*time.Second)
 			if pageText == "" {
 				op.Feedback(fmt.Sprintf("failed to extract text content from %s. the page may be unavailable or contain non-text content.", url))
 				op.Continue()

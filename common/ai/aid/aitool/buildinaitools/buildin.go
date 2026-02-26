@@ -82,6 +82,7 @@ func GetAllToolsDynamically(db *gorm.DB) []*aitool.Tool {
 		tools = append(tools, ssaToolsList...)
 	}
 
+
 	// Add generated tools (added by code-gen when run)
 	// These functions will be generated based on aitools.tools by the code generator
 	// Example:

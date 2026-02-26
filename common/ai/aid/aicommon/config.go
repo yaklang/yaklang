@@ -148,6 +148,7 @@ type Config struct {
 	DisableToolUse      bool
 	AiToolManagerOption []buildinaitools.ToolManagerOption
 	EnableAISearch      bool
+	DisableWebSearch    bool // disable enhanced web search tool, default false (enabled)
 	DisallowMCPServers  bool // 禁用 MCP Servers，默认为 false（即默认启用）
 
 	// Interactive(review/require_user/sync) features
@@ -1094,6 +1095,18 @@ func WithDisallowMCPServers(disallow bool) ConfigOption {
 		c.m.Lock()
 		defer c.m.Unlock()
 		c.DisallowMCPServers = disallow
+		return nil
+	}
+}
+
+func WithDisableWebSearch(disable bool) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		defer c.m.Unlock()
+		c.DisableWebSearch = disable
 		return nil
 	}
 }

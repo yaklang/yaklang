@@ -356,6 +356,17 @@ func applyFastMatchResult(r aicommon.AIInvokeRuntime, loop *reactloops.ReActLoop
 
 		// Populate ExtraCapabilities from fast match results
 		populateExtraCapabilitiesFromFastMatch(r, loop, result)
+
+		for _, schTool := range result.MatchedTools {
+			if schTool.Name == "web_search" {
+				r.AddToTimeline("web_search_recommended",
+					"web_search tool was identified as relevant for this query. "+
+						"If knowledge_enhance_answer or knowledge base search cannot provide sufficient results, "+
+						"you MUST call web_search to find the answer from the internet. "+
+						"Do NOT repeatedly retry knowledge_enhance_answer if it already failed.")
+				break
+			}
+		}
 	}
 }
 

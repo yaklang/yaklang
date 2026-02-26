@@ -318,6 +318,31 @@ func (m *AiToolManager) AppendTools(tools ...*aitool.Tool) error {
 	return nil
 }
 
+// OverrideToolByName replaces all tools with the given name, keeping only the new one.
+// If no tool with that name exists, the new tool is appended.
+func (m *AiToolManager) OverrideToolByName(newTool *aitool.Tool) {
+	originGetter := m.toolsGetter
+	m.toolsGetter = func() []*aitool.Tool {
+		var result []*aitool.Tool
+		found := false
+		for _, t := range originGetter() {
+			if t.Name == newTool.Name {
+				if !found {
+					result = append(result, newTool)
+					found = true
+				}
+			} else {
+				result = append(result, t)
+			}
+		}
+		if !found {
+			result = append(result, newTool)
+		}
+		return result
+	}
+	m.EnableTool(newTool.Name)
+}
+
 func (m *AiToolManager) EnableAIToolSearch(searcher searchtools.AISearcher[*aitool.Tool]) error {
 	m.enableSearchTool = true
 	m.aiToolsSearcher = searcher

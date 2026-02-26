@@ -106,6 +106,14 @@ func ApplyDeepIntentResult(r aicommon.AIInvokeRuntime, loop *ReActLoop, result *
 
 	PopulateExtraCapabilitiesFromDeepIntent(r, loop, result)
 
+	if result.MatchedToolNames != "" && strings.Contains(result.MatchedToolNames, "web_search") {
+		r.AddToTimeline("web_search_recommended",
+			"web_search tool was identified as relevant for this query. "+
+				"If knowledge_enhance_answer or knowledge base search cannot provide sufficient results, "+
+				"you MUST call web_search to find the answer from the internet. "+
+				"Do NOT repeatedly retry knowledge_enhance_answer if it already failed.")
+	}
+
 	log.Infof("deep intent results applied to loop context")
 }
 
