@@ -140,18 +140,24 @@ func makeSearchAction(r aicommon.AIInvokeRuntime, mode string) reactloops.ReActL
 			log.Infof("prepared for queryToUse: %s", queryToUse)
 			log.Infof("start to call invoker.EnhanceKnowledgeGetterEx with enhancePlans: %v, knowledgeBases: %v", enhancePlans, knowledgeBases)
 			// 执行搜索，使用 EnhanceKnowledgeGetterEx 支持指定 EnhancePlan
-			enhanceData, err := invoker.EnhanceKnowledgeGetterEx(ctx, queryToUse, enhancePlans, knowledgeBases...)
-			if err != nil {
-				log.Warnf("enhance getter error for query '%s': %v", queryToUse, err)
-				op.Feedback(fmt.Sprintf("搜索失败：%v\n请尝试其他查询条件。", err))
-				op.Continue()
-				return
-			}
-			if enhanceData == "" {
-				op.Feedback(fmt.Sprintf("搜索 '%s' 未找到相关结果。请尝试其他查询条件。", queryToUse))
-				op.Continue()
-				return
-			}
+		enhanceData, err := invoker.EnhanceKnowledgeGetterEx(ctx, queryToUse, enhancePlans, knowledgeBases...)
+		if err != nil {
+			log.Warnf("enhance getter error for query '%s': %v", queryToUse, err)
+			failMsg := fmt.Sprintf("Knowledge search FAILED for '%s': %v. "+
+				"The knowledge base could not return results for this query.", queryToUse, err)
+			r.AddToTimeline("knowledge_search_error", failMsg)
+			op.Feedback(fmt.Sprintf("搜索失败：%v\n请尝试其他查询条件。", err))
+			op.Continue()
+			return
+		}
+		if enhanceData == "" {
+			emptyMsg := fmt.Sprintf("Knowledge search for '%s' returned NO results. "+
+				"The knowledge base does not contain information matching this query.", queryToUse)
+			r.AddToTimeline("knowledge_search_empty", emptyMsg)
+			op.Feedback(fmt.Sprintf("搜索 '%s' 未找到相关结果。请尝试其他查询条件。", queryToUse))
+			op.Continue()
+			return
+		}
 
 			loop.LoadingStatus("已获取结果，准备压缩 - result fetched, preparing to compress")
 

@@ -12,6 +12,7 @@ import (
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_plan"
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_python_poc"
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_report_generating"
+	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_smart_qa"
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_write_python_script"
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_yaklangcode"
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loopinfra"

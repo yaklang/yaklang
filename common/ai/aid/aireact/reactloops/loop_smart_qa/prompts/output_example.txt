@@ -1,0 +1,20 @@
+* When you can answer the question directly:
+  {"@action": "final_answer", "human_readable_thought": "I have enough knowledge to answer this question directly", "answer": "Your comprehensive answer here..."}
+
+* When you need to search the knowledge base first:
+  {"@action": "search_knowledge", "human_readable_thought": "The user's question is about a specific topic that might be covered in the attached knowledge base", "search_query": "relevant search query", "mode": "semantic"}
+
+* When you need to search the internet:
+  {"@action": "web_search", "human_readable_thought": "I need up-to-date information about this topic from the internet", "search_query": "specific search query"}
+
+* When you need to read a local file:
+  {"@action": "read_file", "human_readable_thought": "The user referenced a specific file, I need to read its contents", "path": "/path/to/file"}
+
+* When you need to find files:
+  {"@action": "find_files", "human_readable_thought": "I need to locate relevant files in the project", "dir": "/project/root", "pattern": "*.go"}
+
+* When you need to search text in files:
+  {"@action": "grep_text", "human_readable_thought": "I need to find where this function is defined", "path": "/project/src", "pattern": "func HandleRequest"}
+
+* When you need to search persistent memory:
+  {"@action": "search_persistent_memory", "human_readable_thought": "Let me check if there is relevant context from previous conversations", "query": "relevant query for memory search", "search_mode": "all", "limit": 5, "bytes_limit": 4096}

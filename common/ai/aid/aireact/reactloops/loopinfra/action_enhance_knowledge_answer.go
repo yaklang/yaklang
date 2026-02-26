@@ -73,36 +73,47 @@ var loopAction_EnhanceKnowledgeAnswer = &reactloops.LoopAction{
 			ctx = task.GetContext()
 		}
 
-		// Step 1: Get enhanced knowledge data
 		enhancedAnswer, err := invoker.EnhanceKnowledgeGetterEx(ctx, rewriteQuery, nil, selectKBResults.KnowledgeBases...)
 		if err != nil {
+			invoker.AddToTimeline("knowledge_enhance_insufficient",
+				"Knowledge enhancement FAILED for query '"+rewriteQuery+"': "+err.Error()+". "+
+					"The knowledge base could not provide results. "+
+					"You MUST use web_search or internet_research to find the answer from the internet. "+
+					"Do NOT retry knowledge_enhance_answer for the same query.")
 			op.Fail(err.Error())
 			return
 		}
 
-		// Step 2: Compress if needed
-		result, err := invoker.CompressLongTextWithDestination(ctx, enhancedAnswer, rewriteQuery, 10*1024) // Compress to 10KB
+		if enhancedAnswer == "" {
+			invoker.AddToTimeline("knowledge_enhance_insufficient",
+				"Knowledge enhancement for '"+rewriteQuery+"' returned EMPTY results. "+
+					"The knowledge base does not contain relevant information for this topic. "+
+					"You MUST use web_search or internet_research to find the answer from the internet. "+
+					"Do NOT retry knowledge_enhance_answer for the same query.")
+			op.Fail("knowledge enhancement returned empty results for: " + rewriteQuery)
+			return
+		}
+
+		result, err := invoker.CompressLongTextWithDestination(ctx, enhancedAnswer, rewriteQuery, 10*1024)
 		if err != nil {
+			invoker.AddToTimeline("knowledge_enhance_insufficient",
+				"Knowledge enhancement compression FAILED for query '"+rewriteQuery+"': "+err.Error()+". "+
+					"Consider using web_search or internet_research as alternative information sources.")
 			op.Fail(err.Error())
 			return
 		}
 		enhancedAnswer = result
 
-		// Step 3: Add enhanced knowledge to timeline for DirectlyAnswer prompt
 		invoker.AddToTimeline("enhanced_knowledge_content", enhancedAnswer)
 
-		// Step 4: Call DirectlyAnswer to emit result BEFORE verify (like the old EnhanceKnowledgeAnswer did)
-		// This is the key difference: DirectlyAnswer is called first, then verify checks if satisfied
 		directlyAnswerResult, err := invoker.DirectlyAnswer(ctx, rewriteQuery, nil)
 		if err != nil {
 			log.Warnf("DirectlyAnswer failed after knowledge enhancement: %v", err)
-			// Fallback: emit the enhanced answer directly
 			invoker.EmitFileArtifactWithExt("directly_answer", ".md", enhancedAnswer)
 			invoker.EmitResultAfterStream(enhancedAnswer)
 			directlyAnswerResult = enhancedAnswer
 		}
 
-		// Step 5: Verify user satisfaction with the directly answer result
 		verifyResult, err := invoker.VerifyUserSatisfaction(
 			ctx,
 			rewriteQuery,
@@ -120,6 +131,14 @@ var loopAction_EnhanceKnowledgeAnswer = &reactloops.LoopAction{
 			op.Exit()
 			return
 		}
+
+		invoker.AddToTimeline("knowledge_enhance_not_satisfied",
+			"Knowledge enhancement did NOT satisfy the query '"+rewriteQuery+"'. "+
+				"Reasoning: "+verifyResult.Reasoning+". "+
+				"Suggested next steps: "+verifyResult.NextMovements+". "+
+				"If the knowledge base lacks relevant information, "+
+				"you MUST try web_search or internet_research to search the internet. "+
+				"Do NOT retry knowledge_enhance_answer with the same approach.")
 		op.Continue()
 	},
 }

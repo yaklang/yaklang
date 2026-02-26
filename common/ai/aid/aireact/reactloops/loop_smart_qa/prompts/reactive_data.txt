@@ -1,0 +1,27 @@
+<|USER_QUERY_{{ .Nonce }}|>
+{{ .UserQuery }}
+<|USER_QUERY_END_{{ .Nonce }}|>
+
+{{ if .SearchResults }}
+<|SEARCH_RESULTS_{{ .Nonce }}|>
+{{ .SearchResults }}
+<|SEARCH_RESULTS_END_{{ .Nonce }}|>
+{{ end }}
+
+{{ if .SearchHistory }}
+<|SEARCH_HISTORY_{{ .Nonce }}|>
+{{ .SearchHistory }}
+<|SEARCH_HISTORY_END_{{ .Nonce }}|>
+{{ end }}
+
+{{ if .MemoryResults }}
+<|MEMORY_RESULTS_{{ .Nonce }}|>
+{{ .MemoryResults }}
+<|MEMORY_RESULTS_END_{{ .Nonce }}|>
+{{ end }}
+
+{{ if .FileResults }}
+<|FILE_RESULTS_{{ .Nonce }}|>
+{{ .FileResults }}
+<|FILE_RESULTS_END_{{ .Nonce }}|>
+{{ end }}

@@ -301,8 +301,13 @@ func generateInsufficientDataReport(loop *reactloops.ReActLoop, invoker aicommon
 			finalFilename, len(finalContent))
 	}
 
-	// Record to timeline
-	invoker.AddToTimeline("knowledge_search_insufficient", fmt.Sprintf("Insufficient data report saved to: %s", finalFilename))
+	// Record to timeline with strong guidance for the parent loop
+	invoker.AddToTimeline("knowledge_search_insufficient",
+		fmt.Sprintf("Knowledge base search was INSUFFICIENT for the user query. "+
+			"Report saved to: %s. "+
+			"The knowledge base does not contain enough information to answer the question. "+
+			"You MUST use web_search or internet_research to find the answer from the internet. "+
+			"Do NOT retry knowledge_enhance_answer for the same topic.", finalFilename))
 
 	// Store report path in loop context
 	loop.Set("final_knowledge_document", finalFilename)

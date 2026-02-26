@@ -12,6 +12,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/searchtools"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -594,6 +595,16 @@ func BuildReActInvoker(ctx context.Context, options ...aicommon.ConfigOption) (a
 
 	// Register pending context providers
 	invoker.promptManager.cpm = cfg.ContextProviderManager
+
+	// Register enhanced web_search tool with AI compression capability
+	if !cfg.DisableWebSearch {
+		enhancedTool, err := searchtools.CreateEnhancedWebSearchTool(invoker.CompressLongTextWithDestination)
+		if err != nil {
+			log.Warnf("create enhanced web_search tool failed: %v", err)
+		} else {
+			cfg.GetAiToolManager().OverrideToolByName(enhancedTool)
+		}
+	}
 
 	// EmitPinDirectory is deferred to ensureWorkDirectory when user input arrives
 
