@@ -40,7 +40,7 @@ func init() {
 				reactloops.WithActionFilter(func(action *reactloops.LoopAction) bool {
 					allowActionNames := []string{
 						"web_search",
-						"read_url",
+						"read_file",
 						"final_summary",
 					}
 					for _, actionName := range allowActionNames {
@@ -68,7 +68,7 @@ func init() {
 					return utils.RenderTemplate(reactiveData, renderMap)
 				}),
 				webSearchAction(r),
-				readURLAction(r),
+				buildReadFileAction(r),
 				finalSummaryAction(r),
 				BuildOnPostIterationHook(r),
 			}
@@ -115,6 +115,20 @@ func buildArtifactsSummary(loop *reactloops.ReActLoop) string {
 		summary.WriteString(fmt.Sprintf("  %d. %s\n", i+1, filename))
 	}
 	return summary.String()
+}
+
+func buildReadFileAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
+	toolMgr := r.GetConfig().GetAiToolManager()
+	if toolMgr == nil {
+		log.Warnf("internet research: tool manager not available, skip read_file action")
+		return func(r *reactloops.ReActLoop) {}
+	}
+	tool, err := toolMgr.GetToolByName("read_file")
+	if err != nil {
+		log.Warnf("internet research: read_file tool not found: %v", err)
+		return func(r *reactloops.ReActLoop) {}
+	}
+	return reactloops.WithRegisterLoopActionFromTool(tool)
 }
 
 func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {

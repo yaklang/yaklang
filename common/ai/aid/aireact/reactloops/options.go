@@ -122,6 +122,23 @@ func WithRegisterLoopAction(actionName string, desc string, opts []aitool.ToolOp
 	return WithRegisterLoopActionWithStreamField(actionName, desc, opts, nil, verifier, handler)
 }
 
+// WithRegisterLoopActionFromTool converts an aitool.Tool to a LoopAction and registers it.
+// This is a convenience wrapper around ConvertAIToolToLoopAction.
+func WithRegisterLoopActionFromTool(tool *aitool.Tool) ReActLoopOption {
+	return func(r *ReActLoop) {
+		if tool == nil {
+			return
+		}
+		name := tool.GetName()
+		if r.actions.Have(name) {
+			log.Errorf("loop action %s already registered", name)
+			return
+		}
+		action := ConvertAIToolToLoopAction(tool)
+		r.actions.Set(name, action)
+	}
+}
+
 func WithRegisterLoopActionWithStreamField(actionName string, desc string, opts []aitool.ToolOption, fields []*LoopStreamField, verifier LoopActionVerifierFunc, handler LoopActionHandlerFunc) ReActLoopOption {
 	return func(r *ReActLoop) {
 		if r.actions.Have(actionName) {

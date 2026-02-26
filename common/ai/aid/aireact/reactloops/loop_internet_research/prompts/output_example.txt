@@ -28,18 +28,7 @@
 }
 ```
 
-#### 3. 深入阅读 - 阅读重要页面
-从搜索结果中发现一篇详细的技术文章：
-
-```json
-{
-  "@action": "read_url",
-  "url": "https://qwenlm.github.io/blog/qwen3/",
-  "human_readable_thought": "搜索结果中发现 Qwen 官方博客有详细的 Qwen3 介绍文章，需要深入阅读获取详细信息"
-}
-```
-
-#### 4. 提交最终报告
+#### 3. 提交最终报告
 
 ```json
 {
@@ -83,17 +72,7 @@
 }
 ```
 
-#### 4. 深入阅读权威来源
-
-```json
-{
-  "@action": "read_url",
-  "url": "https://security.paloaltonetworks.com/CVE-2024-3400",
-  "human_readable_thought": "阅读 Palo Alto Networks 官方安全公告，获取权威的漏洞描述和修复方案"
-}
-```
-
-#### 5. 提交最终报告
+#### 4. 提交最终报告
 
 ```json
 {

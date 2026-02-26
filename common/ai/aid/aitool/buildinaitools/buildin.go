@@ -9,7 +9,6 @@ import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/fstools"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/searchtools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/ssatools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
 	"github.com/yaklang/yaklang/common/consts"
@@ -60,14 +59,6 @@ func GetAllToolsDynamically(db *gorm.DB) []*aitool.Tool {
 		log.Errorf("create fs tools: %v", err)
 	} else {
 		tools = append(tools, fsTools...)
-	}
-
-	// Add search tools from searchtools package
-	searchTools, err := searchtools.CreateOmniSearchTools()
-	if err != nil {
-		log.Errorf("create search tools: %v", err)
-	} else {
-		tools = append(tools, searchTools...)
 	}
 
 	// Add yakscripttools from yakscripttools package

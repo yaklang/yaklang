@@ -1,6 +1,6 @@
-__DESC__ = "互联网搜索与内容精炼工具。根据关键词搜索互联网，自动获取搜索结果页面内容并提取文本，将精炼后的结果输出给AI，同时可保存到指定文件。适用于信息收集、话题调研、实时信息获取等场景。"
+__DESC__ = "互联网搜索与内容精炼工具。搜索互联网获取信息，并发抓取页面内容，通过 AI 蒸馏压缩提取精华，交付高质量结果。Internet search and content refinement tool. Searches the internet, concurrently fetches page content, and uses AI distillation to extract key information."
 __VERBOSE_NAME__ = "互联网搜索与内容精炼工具"
-__KEYWORDS__ = "web search,internet search,omnisearch,content extraction,web research,网页搜索,互联网搜索,内容提取,信息收集,话题调研,search engine,搜索引擎,web scraping,网页抓取,information gathering,实时信息"
+__KEYWORDS__ = "web search,internet search,omnisearch,搜索互联网,互联网搜索,网页搜索,搜索引擎,网上搜索,在线搜索,上网搜索,search engine,web research,网页抓取,信息收集,话题调研,实时信息,content extraction,information gathering,百度搜索,谷歌搜索,search online,搜一下,帮我搜,帮我查"
 
 __USAGE__ = <<<USAGE_BLOCK
 Web Search Tool - Parameter Description for JSON Tool Calls
@@ -12,16 +12,10 @@ Optional Parameters:
   output_file     (string)  File path to save the search results. If not specified,
                             results are only output to AI and stdout.
                             Parent directories will be created automatically.
-  max_results     (int)     Maximum number of search results to process. Default: 5.
+  max_results     (int)     Maximum number of search results to process. Default: 30.
                             Higher values provide more comprehensive results but take longer.
-  timeout         (int)     Timeout in seconds for each HTTP request when fetching page content.
-                            Default: 10. Set higher for slow websites.
-  fetch_content   (bool)    Whether to fetch and extract text content from result URLs.
-                            Default: true. Set to false for a quick search without page fetching.
 
 ## Few-Shot Examples
-
-Replace {NONCE} with the actual nonce from the response format section.
 
 ### Example 1: Basic search with default settings
 
@@ -50,12 +44,12 @@ User intent: "Research CVE-2024-1234 and save the findings"
   "params": {
     "query": "CVE-2024-1234 vulnerability details exploit",
     "output_file": "/tmp/cve_2024_1234_research.md",
-    "max_results": 8
+    "max_results": 10
   }
 }
 ```
 
-### Example 3: Quick search without fetching page content
+### Example 3: Quick search with fewer results
 
 User intent: "Quickly check what results come up for a topic"
 
@@ -66,8 +60,7 @@ User intent: "Quickly check what results come up for a topic"
   "identifier": "quick_search",
   "params": {
     "query": "golang concurrency patterns 2024",
-    "fetch_content": false,
-    "max_results": 10
+    "max_results": 5
   }
 }
 ```
@@ -75,138 +68,412 @@ User intent: "Quickly check what results come up for a topic"
 ## Key Rules
 
 1. Always provide a clear, specific search query for best results.
-2. Use fetch_content=false for quick overviews, true for deep research.
-3. Set output_file when you need to persist results for later reference.
-4. Adjust max_results based on how comprehensive the search needs to be.
+2. Set output_file when you need to persist results for later reference.
+3. Adjust max_results based on how comprehensive the search needs to be.
 USAGE_BLOCK
 
 yakit.AutoInitYakit()
 
 query = cli.String("query", cli.setRequired(true), cli.setHelp("search query keywords"))
 outputFile = cli.String("output_file", cli.setRequired(false), cli.setDefault(""), cli.setHelp("file path to save search results"))
-maxResults = cli.Int("max_results", cli.setRequired(false), cli.setDefault(5), cli.setHelp("maximum number of search results to process"))
-timeoutSec = cli.Int("timeout", cli.setRequired(false), cli.setDefault(10), cli.setHelp("timeout in seconds for each HTTP request"))
-fetchContent = cli.Bool("fetch_content", cli.setRequired(false), cli.setDefault(true), cli.setHelp("whether to fetch and extract text from result URLs"))
+maxResults = cli.Int("max_results", cli.setRequired(false), cli.setDefault(30), cli.setHelp("maximum number of search results to process"))
 
 cli.check()
 
 if maxResults <= 0 {
-    maxResults = 5
-}
-if timeoutSec <= 0 {
-    timeoutSec = 10
+    maxResults = 30
 }
 
+timeoutSec = 10
+maxContentPerPage = 4096
+concurrencyLimit = 5
+maxChunkSize = 30 * 1024
+maxRanges = 8
+minLines = 3
+maxLines = 20
+targetByteSize = 10 * 1024
+
+outputToAI = fn(content) {
+    yakit.AIOutput(content)
+    ts = time.Now().Format("2006-01-02 15:04:05")
+    println(sprintf("[ai-output] %s: %s", ts, content))
+}
+
+// ==================== Phase 1: Internet Search ====================
 yakit.Info("=== Web Search Start ===")
-yakit.Info("Query: %v", query)
-yakit.Info("Max Results: %v, Fetch Content: %v, Timeout: %vs", maxResults, fetchContent, timeoutSec)
+yakit.Info("Query: %v, Max Results: %v", query, maxResults)
 
 results, err = omnisearch.Search(query, omnisearch.pagesize(maxResults))
 if err != nil {
     yakit.Error("Search failed: %v", err)
-    yakit.AIOutput("Search failed: %v" % [err])
+    outputToAI("Search failed: " + sprint(err))
     return
 }
 
 if len(results) == 0 {
     yakit.Info("No search results found for query: %v", query)
-    yakit.AIOutput("No search results found for query: %v" % [query])
+    outputToAI("No search results found for query: " + query)
     return
 }
 
-yakit.Info("Found %d search results", len(results))
+outputToAI(sprintf("## Web Search: %s\n\nSearch completed, found **%d** results.\n", query, len(results)))
 
-extractTextFromHTML = (body) => {
-    txt = make([]string)
+// Build snippet summary for all search results (preserved even if fetch fails)
+snippetOutput = sprintf("## Search Result Snippets (%d results)\n\n", len(results))
+for i, result = range results {
+    title = result.Title
+    content = result.Content
+    url = result.URL
+    yakit.Info("Result #%d - Title: [%s], Content length: %d, URL: %s", i+1, title, len(content), url)
+    snippetOutput += sprintf("%d. **%s**\n   URL: %s\n", i+1, title, url)
+    if content != "" {
+        snippetOutput += sprintf("   Snippet: %s\n", content)
+    }
+    snippetOutput += "\n"
+}
+
+outputToAI(snippetOutput)
+
+// ==================== Phase 2: Concurrent Page Fetching ====================
+yakit.Info("Starting concurrent page content fetching (concurrency=%d, timeout=%ds)...", concurrencyLimit, timeoutSec)
+outputToAI(sprintf("Fetching page content from **%d** URLs (concurrency=%d, timeout=%ds)...\n", len(results), concurrencyLimit, timeoutSec))
+
+cleanHtmlContent = fn(htmlStr) {
+    cleaned = re.ReplaceAll(htmlStr, `(?is)<script[^>]*>.*?</script>`, "")
+    cleaned = re.ReplaceAll(cleaned, `(?is)<style[^>]*>.*?</style>`, "")
+    cleaned = re.ReplaceAll(cleaned, `(?is)<noscript[^>]*>.*?</noscript>`, "")
+    cleaned = re.ReplaceAll(cleaned, `(?is)<iframe[^>]*>.*?</iframe>`, "")
+    cleaned = re.ReplaceAll(cleaned, `(?is)<svg[^>]*>.*?</svg>`, "")
+    cleaned = re.ReplaceAll(cleaned, `(?is)<!--.*?-->`, "")
+    return cleaned
+}
+
+extractTextFromHTML = fn(body) {
     title = str.ExtractTitle(string(body))
-    xhtml.Walker(body, node => {
-        if string(node.Type) != "1" {
-            return
+    cleaned = cleanHtmlContent(string(body))
+    textParts = make([]string)
+    try {
+        xhtml.Walker(cleaned, node => {
+            if sprint(node.Type) == "1" {
+                text = str.TrimSpace(node.Data)
+                if text != "" {
+                    textParts = append(textParts, text)
+                }
+            }
+        })
+    } catch err {
+        log.Warn("HTML walker failed, falling back to regex extraction: %v", err)
+        fallback = re.ReplaceAll(cleaned, `<[^>]+>`, " ")
+        fallback = re.ReplaceAll(fallback, `\s+`, " ")
+        fallback = str.TrimSpace(fallback)
+        if fallback != "" {
+            textParts = append(textParts, fallback)
         }
-        text = str.TrimSpace(node.Data)
-        if text != "" {
-            txt = append(txt, text)
-        }
-    })
-    textContent = str.Join(txt, " ")
+    }
+    textContent = str.Join(textParts, " ")
     return title, textContent
 }
 
-fetchPageContent = (url) => {
-    defer fn{
-        err = recover()
-        if err != nil {
-            return "", "", err
-        }
-    }
-    rsp, req, err = poc.Get(url, poc.timeout(timeoutSec))
-    if err != nil {
-        return "", "", err
-    }
-    header, body = poc.Split(rsp.RawPacket)
-    if len(body) == 0 {
-        return "", "", nil
-    }
-    ct = rsp.GetContentType().Lower()
-    if str.Contains(ct, "html") {
-        title, textContent = extractTextFromHTML(body)
-        return title, textContent, nil
-    }
-    if len(body) <= 4096 {
-        return "", string(body), nil
-    }
-    return "", string(body[:4096]), nil
-}
+// pageResults: list of maps with keys: index, title, url, snippet, content, fetchErr
+pageResults = make([]map[string]any)
+swg = sync.NewSizedWaitGroup(concurrencyLimit)
+resultLock = sync.NewLock()
 
-maxContentPerPage = 4096
-
-var fullOutput
-fullOutput = sprintf("# Web Search Results: %s\n\n", query)
-fullOutput += sprintf("**Query**: %s\n", query)
-fullOutput += sprintf("**Results Count**: %d\n\n---\n\n", len(results))
+fetchedCount = 0
+failedCount = 0
 
 for i, result = range results {
-    idx = i + 1
-    yakit.Info("[%d/%d] Processing: %v", idx, len(results), result.Title)
-
-    entryHeader = sprintf("## %d. %s\n\n", idx, result.Title)
-    entryHeader += sprintf("**URL**: %s\n", result.URL)
-    if result.Source != "" {
-        entryHeader += sprintf("**Source**: %s\n", result.Source)
-    }
-    entryHeader += "\n"
-
-    snippet = result.Content
-    if snippet != "" {
-        entryHeader += sprintf("**Snippet**: %s\n\n", snippet)
-    }
-
-    pageContent = ""
-    if fetchContent && result.URL != "" {
-        yakit.Info("[%d/%d] Fetching page content from: %v", idx, len(results), result.URL)
-        pageTitle, textContent, fetchErr = fetchPageContent(result.URL)
-        if fetchErr != nil {
-            yakit.Info("[%d/%d] Failed to fetch page: %v", idx, len(results), fetchErr)
-            entryHeader += sprintf("*Page fetch failed: %v*\n\n", fetchErr)
-        } else if textContent != "" {
-            if len(textContent) > maxContentPerPage {
-                textContent = textContent[:maxContentPerPage] + "\n...(content truncated)"
+    swg.Add()
+    go fn(idx, url, title, snippet) {
+        defer swg.Done()
+        pr = {"index": idx, "title": title, "url": url, "snippet": snippet, "content": "", "fetchErr": ""}
+        try {
+            rsp, req, err = poc.Get(url, poc.timeout(timeoutSec))
+            if err != nil {
+                pr["fetchErr"] = sprint(err)
+            } else {
+                body = rsp.GetBody()
+                if len(body) > 0 {
+                    ct = str.ToLower(rsp.GetContentType())
+                    if str.Contains(ct, "html") || ct == "" {
+                        pageTitle, textContent = extractTextFromHTML(body)
+                        if len(textContent) > maxContentPerPage {
+                            textContent = textContent[:maxContentPerPage]
+                        }
+                        if pageTitle != "" && pageTitle != title {
+                            pr["content"] = sprintf("[Page: %s]\n%s", pageTitle, textContent)
+                        } else {
+                            pr["content"] = textContent
+                        }
+                    } else {
+                        bodyStr = string(body)
+                        if len(bodyStr) > maxContentPerPage {
+                            bodyStr = bodyStr[:maxContentPerPage]
+                        }
+                        pr["content"] = bodyStr
+                    }
+                }
             }
-            if pageTitle != "" && pageTitle != result.Title {
-                entryHeader += sprintf("**Page Title**: %s\n\n", pageTitle)
-            }
-            pageContent = sprintf("### Extracted Content\n\n%s\n\n", textContent)
-        } else {
-            entryHeader += "*No extractable text content*\n\n"
+        } catch e {
+            pr["fetchErr"] = sprint(e)
         }
-    }
-
-    fullOutput += entryHeader + pageContent + "---\n\n"
+        resultLock.Lock()
+        pageResults = append(pageResults, pr)
+        if pr["content"] != "" {
+            fetchedCount++
+        } else {
+            failedCount++
+        }
+        resultLock.Unlock()
+    }(i+1, result.URL, result.Title, result.Content)
 }
 
-yakit.AIOutput(fullOutput)
+swg.Wait()
 
-println(fullOutput)
+yakit.Info("Page fetching complete: %d succeeded, %d failed/empty out of %d total", fetchedCount, failedCount, len(results))
+outputToAI(sprintf("Page fetching complete: **%d** succeeded, **%d** failed/empty.\nStarting AI content refinement...\n", fetchedCount, failedCount))
+
+// ==================== Phase 3: aireducer + liteforge Distillation ====================
+
+// Assemble all text with structured markers for line-based extraction
+allTextParts = make([]string)
+for _, pr = range pageResults {
+    entry = sprintf("=== [%d] %s ===\nURL: %s\n", pr["index"], pr["title"], pr["url"])
+    if pr["snippet"] != "" {
+        entry += sprintf("Snippet: %s\n", pr["snippet"])
+    }
+    if pr["content"] != "" {
+        entry += sprintf("Content:\n%s\n", pr["content"])
+    } else if pr["fetchErr"] != "" {
+        entry += sprintf("(fetch failed: %s)\n", pr["fetchErr"])
+    } else {
+        entry += "(no content available)\n"
+    }
+    allTextParts = append(allTextParts, entry)
+}
+allText = str.Join(allTextParts, "\n---\n\n")
+
+// If content is short enough, skip distillation
+if len(allText) < targetByteSize / 2 {
+    finalOutput = sprintf("# Web Search Results for: %s\n\n%s\n\n%s", query, allText, snippetOutput)
+    outputToAI(finalOutput)
+    if outputFile != "" {
+        dir = file.GetDirPath(outputFile)
+        if dir != "" && !file.IsExisted(dir) {
+            file.MkdirAll(dir)
+        }
+        file.Save(outputFile, finalOutput)
+        yakit.Info("Results saved to %v", outputFile)
+    }
+    yakit.Info("=== Web Search Complete (content short enough, no distillation needed) ===")
+    return
+}
+
+buildCompressPrompt = fn(chunkData, userQuery, alreadyExtracted) {
+    nonce = randstr(4)
+    alreadyExtractedSection = ""
+    hasAlready = false
+    if alreadyExtracted != "" {
+        hasAlready = true
+        alreadyExtractedSection = sprintf("<|ALREADY_EXTRACTED_%s|>\n%s\n<|ALREADY_EXTRACTED_END_%s|>\n\n", nonce, alreadyExtracted, nonce)
+    }
+
+    return str.RenderTemplate(<<<PROMPT
+<|USER_QUERY_{{ .nonce }}|>
+{{ .userQuery }}
+<|USER_QUERY_END_{{ .nonce }}|>
+
+{{ .alreadyExtractedSection }}<|KNOWLEDGE_CHUNK_{{ .nonce }}|>
+{{ .samples }}
+<|KNOWLEDGE_CHUNK_END_{{ .nonce }}|>
+
+<|INSTRUCT_{{ .nonce }}|>
+Extract the most relevant knowledge fragments from the current chunk that relate to the user's query.
+
+From the line-numbered content above, extract fragments directly relevant to the user's question.
+{{ if .hasAlready }}
+IMPORTANT: ALREADY_EXTRACTED contains previously extracted content. Rules:
+- If content is identical or highly repetitive with already extracted content, lower score significantly or skip
+- If content partially overlaps but adds new information, extract with reduced score
+- Prioritize new, non-duplicate information
+{{ end }}
+Output requirements:
+1. Extract at most {{ .maxRanges }} fragments
+2. Each fragment {{ .minLines }}-{{ .maxLines }} lines
+3. Use original line numbers (first column digits)
+4. Score each 0.00-1.00 (higher = more relevant)
+
+Scoring criteria:
+- 0.80-1.00: Directly answers the user's core question (not previously extracted)
+- 0.60-0.80: Related background/technical details (not previously extracted)
+- 0.40-0.60: Supplementary info (or partially overlapping with new details)
+- 0.00-0.40: Weakly related, irrelevant, or fully duplicated (do not output)
+
+Output the ranges array.
+<|INSTRUCT_END_{{ .nonce }}|>
+PROMPT, {
+        "nonce": nonce,
+        "samples": chunkData,
+        "userQuery": userQuery,
+        "alreadyExtractedSection": alreadyExtractedSection,
+        "hasAlready": hasAlready,
+        "maxRanges": sprint(maxRanges),
+        "minLines": sprint(minLines),
+        "maxLines": sprint(maxLines),
+    })
+}
+
+schema = jsonschema.ActionObject(
+    jsonschema.paramObjectArray("ranges", nil,
+        jsonschema.paramString("range", jsonschema.description("line range, format: start-end")),
+        jsonschema.paramNumber("score", jsonschema.description("relevance score 0.0-1.0")),
+    ),
+)
+
+// allScoredRanges: list of maps with keys: rangeStr, startLine, endLine, score
+allScoredRanges = make([]map[string]any)
+alreadyExtracted = ""
+chunkIndex = 0
+allLines = str.Split(allText, "\n")
+
+extractTextByLineRange = fn(lines, startLine, endLine) {
+    if startLine < 1 { startLine = 1 }
+    if endLine > len(lines) { endLine = len(lines) }
+    if startLine > endLine { return "" }
+    selected = lines[startLine-1:endLine]
+    return str.Join(selected, "\n")
+}
+
+aireducer.String(allText, chunk => {
+    chunkIndex++
+    if chunkIndex > 20 {
+        return
+    }
+    data = chunk.DumpWithOverlap(128)
+    prompt = buildCompressPrompt(data, query, alreadyExtracted)
+    if prompt == "" {
+        log.Warn("build compress prompt returned empty for chunk %d", chunkIndex)
+        return
+    }
+    try {
+        forgeResult, err = liteforge.Execute(prompt, liteforge.output(schema), liteforge.speedPriority())
+        if err != nil {
+            log.Warn("liteforge execute failed for chunk %d: %v", chunkIndex, err)
+            return
+        }
+        forgeParams = forgeResult.GetParams()
+        rangesRaw = forgeParams["ranges"]
+        if rangesRaw == nil || rangesRaw == undefined {
+            yakit.Info("Chunk %d: no ranges returned from liteforge", chunkIndex)
+            return
+        }
+
+        extractedInChunk = 0
+        for idx = 0; idx < len(rangesRaw); idx++ {
+            itemRaw = rangesRaw[idx]
+
+            scoreRaw = itemRaw["score"]
+            if scoreRaw == nil || scoreRaw == undefined {
+                continue
+            }
+            score = parseFloat(sprint(scoreRaw))
+            if score < 0.4 {
+                continue
+            }
+
+            rangeStr = sprint(itemRaw["range"])
+            if rangeStr == "" || rangeStr == "<nil>" {
+                continue
+            }
+            parts = str.SplitN(rangeStr, "-", 2)
+            if len(parts) != 2 {
+                continue
+            }
+            sl, _ = atoi(str.TrimSpace(sprint(parts[0])))
+            el, _ = atoi(str.TrimSpace(sprint(parts[1])))
+            if sl <= 0 || el < sl {
+                continue
+            }
+            sr = {"rangeStr": rangeStr, "startLine": sl, "endLine": el, "score": score}
+            allScoredRanges = append(allScoredRanges, sr)
+            extractedInChunk++
+
+            text = extractTextByLineRange(allLines, sl, el)
+            if text != "" && len(alreadyExtracted) < 8192 {
+                remaining = 8192 - len(alreadyExtracted)
+                if len(text) > remaining {
+                    text = text[:remaining]
+                }
+                alreadyExtracted += sprintf("--- [Score: %.2f, Line %d-%d] ---\n%s\n", score, sl, el, text)
+            }
+        }
+        yakit.Info("Chunk %d processed: extracted %d relevant ranges", chunkIndex, extractedInChunk)
+    } catch e {
+        log.Warn("liteforge processing failed for chunk %d: %v", chunkIndex, e)
+    }
+}, aireducer.lineNumber(true), aireducer.chunkSize(maxChunkSize))
+
+outputToAI(sprintf("AI refinement complete. Extracted **%d** relevant fragments from %d chunks.\n", len(allScoredRanges), chunkIndex))
+
+// ==================== Phase 4: Sort, Deduplicate, Assemble Final Result ====================
+
+sortByScore = fn(ranges) {
+    n = len(ranges)
+    for i = 0; i < n-1; i++ {
+        for j = 0; j < n-1-i; j++ {
+            if ranges[j]["score"] < ranges[j+1]["score"] {
+                ranges[j], ranges[j+1] = ranges[j+1], ranges[j]
+            }
+        }
+    }
+    return ranges
+}
+
+deduplicateRanges = fn(ranges) {
+    deduped = make([]map[string]any)
+    for _, r = range ranges {
+        overlaps = false
+        for _, existing = range deduped {
+            if r["startLine"] <= existing["endLine"] && r["endLine"] >= existing["startLine"] {
+                overlaps = true
+                break
+            }
+        }
+        if !overlaps {
+            deduped = append(deduped, r)
+        }
+    }
+    return deduped
+}
+
+allScoredRanges = sortByScore(allScoredRanges)
+allScoredRanges = deduplicateRanges(allScoredRanges)
+
+finalResult = sprintf("# Web Search Results for: %s\n\n", query)
+
+if len(allScoredRanges) > 0 {
+    finalResult += sprintf("## Distilled Content (%d fragments from %d search results)\n\n", len(allScoredRanges), len(results))
+    totalBytes = 0
+    for i, sr = range allScoredRanges {
+        text = extractTextByLineRange(allLines, sr["startLine"], sr["endLine"])
+        if text == "" {
+            continue
+        }
+        textBytes = len(text)
+        if totalBytes + textBytes > targetByteSize {
+            finalResult += sprintf("\n[... reached %d byte limit, %d fragments remaining ...]\n", targetByteSize, len(allScoredRanges)-i)
+            break
+        }
+        finalResult += sprintf("### Fragment %d (Score: %.2f, Lines %d-%d)\n\n%s\n\n", i+1, sr["score"], sr["startLine"], sr["endLine"], text)
+        totalBytes += textBytes
+    }
+} else {
+    finalResult += "## No relevant fragments could be distilled. Showing raw snippets below.\n\n"
+}
+
+finalResult += "\n" + snippetOutput
+
+outputToAI(finalResult)
 
 if outputFile != "" {
     dir = file.GetDirPath(outputFile)
@@ -217,20 +484,13 @@ if outputFile != "" {
             yakit.Error("Failed to create directory %v: %v", dir, err)
         }
     }
-
-    err = file.Save(outputFile, fullOutput)
+    err = file.Save(outputFile, finalResult)
     if err != nil {
         yakit.Error("Failed to save results to file %v: %v", outputFile, err)
     } else {
-        info, statErr = file.Stat(outputFile)
-        if statErr == nil {
-            yakit.Info("Results saved to %v (%v bytes)", outputFile, info.Size())
-            yakit.File(outputFile, yakit.fileWriteAction(len(fullOutput), "cover", fullOutput))
-        } else {
-            yakit.Info("Results saved to %v", outputFile)
-        }
+        yakit.Info("Results saved to %v", outputFile)
     }
 }
 
 yakit.Info("=== Web Search Complete ===")
-yakit.Info("Processed %d results for query: %v", len(results), query)
+yakit.Info("Processed %d results, distilled %d fragments for query: %v", len(results), len(allScoredRanges), query)

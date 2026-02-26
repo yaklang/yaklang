@@ -16,7 +16,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/fstools"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/searchtools"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -1123,11 +1122,7 @@ func WithJarOperator() ConfigOption {
 
 func WithOmniSearchTool() ConfigOption {
 	return func(c *Config) error {
-		tools, err := searchtools.CreateOmniSearchTools()
-		if err != nil {
-			return utils.Errorf("create omnisearch tools: %v", err)
-		}
-		return WithTools(tools...)(c)
+		return nil
 	}
 }
 
