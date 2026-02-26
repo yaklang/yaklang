@@ -71,9 +71,6 @@ type AuditMonitor struct {
 	filterLoginUsers []string // 按原始登录用户(LoginUser)过滤
 	filterCommands   []string // 按命令过滤
 
-	// 性能配置
-	bufferSize int
-
 	// 运行状态
 	running bool
 	stopCh  chan struct{}
