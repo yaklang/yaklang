@@ -423,6 +423,11 @@ const (
 	Yak_GetThirdPartyAppConfigTemplate_FullMethodName             = "/ypb.Yak/GetThirdPartyAppConfigTemplate"
 	Yak_CheckHahValidAiConfig_FullMethodName                      = "/ypb.Yak/CheckHahValidAiConfig"
 	Yak_ListAiModel_FullMethodName                                = "/ypb.Yak/ListAiModel"
+	Yak_GetAIGlobalConfig_FullMethodName                          = "/ypb.Yak/GetAIGlobalConfig"
+	Yak_SetAIGlobalConfig_FullMethodName                          = "/ypb.Yak/SetAIGlobalConfig"
+	Yak_ListAIProviders_FullMethodName                            = "/ypb.Yak/ListAIProviders"
+	Yak_UpsertAIProvider_FullMethodName                           = "/ypb.Yak/UpsertAIProvider"
+	Yak_DeleteAIProvider_FullMethodName                           = "/ypb.Yak/DeleteAIProvider"
 	Yak_GetFingerprint_FullMethodName                             = "/ypb.Yak/GetFingerprint"
 	Yak_AddFingerprint_FullMethodName                             = "/ypb.Yak/AddFingerprint"
 	Yak_ModifyFingerprint_FullMethodName                          = "/ypb.Yak/ModifyFingerprint"
@@ -1138,6 +1143,11 @@ type YakClient interface {
 	// AI相关
 	CheckHahValidAiConfig(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GeneralResponse, error)
 	ListAiModel(ctx context.Context, in *ListAiModelRequest, opts ...grpc.CallOption) (*ListAiModelResponse, error)
+	GetAIGlobalConfig(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*AIGlobalConfig, error)
+	SetAIGlobalConfig(ctx context.Context, in *AIGlobalConfig, opts ...grpc.CallOption) (*Empty, error)
+	ListAIProviders(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ListAIProvidersResponse, error)
+	UpsertAIProvider(ctx context.Context, in *UpsertAIProviderRequest, opts ...grpc.CallOption) (*UpsertAIProviderResponse, error)
+	DeleteAIProvider(ctx context.Context, in *DeleteAIProviderRequest, opts ...grpc.CallOption) (*Empty, error)
 	// 指纹库
 	GetFingerprint(ctx context.Context, in *GetFingerprintRequest, opts ...grpc.CallOption) (*GetFingerprintResponse, error)
 	AddFingerprint(ctx context.Context, in *AddFingerprintRequest, opts ...grpc.CallOption) (*AddFingerprintResponse, error)
@@ -6031,6 +6041,56 @@ func (c *yakClient) ListAiModel(ctx context.Context, in *ListAiModelRequest, opt
 	return out, nil
 }
 
+func (c *yakClient) GetAIGlobalConfig(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*AIGlobalConfig, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AIGlobalConfig)
+	err := c.cc.Invoke(ctx, Yak_GetAIGlobalConfig_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) SetAIGlobalConfig(ctx context.Context, in *AIGlobalConfig, opts ...grpc.CallOption) (*Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, Yak_SetAIGlobalConfig_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) ListAIProviders(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ListAIProvidersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListAIProvidersResponse)
+	err := c.cc.Invoke(ctx, Yak_ListAIProviders_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) UpsertAIProvider(ctx context.Context, in *UpsertAIProviderRequest, opts ...grpc.CallOption) (*UpsertAIProviderResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpsertAIProviderResponse)
+	err := c.cc.Invoke(ctx, Yak_UpsertAIProvider_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) DeleteAIProvider(ctx context.Context, in *DeleteAIProviderRequest, opts ...grpc.CallOption) (*Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, Yak_DeleteAIProvider_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) GetFingerprint(ctx context.Context, in *GetFingerprintRequest, opts ...grpc.CallOption) (*GetFingerprintResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetFingerprintResponse)
@@ -8703,6 +8763,11 @@ type YakServer interface {
 	// AI相关
 	CheckHahValidAiConfig(context.Context, *Empty) (*GeneralResponse, error)
 	ListAiModel(context.Context, *ListAiModelRequest) (*ListAiModelResponse, error)
+	GetAIGlobalConfig(context.Context, *Empty) (*AIGlobalConfig, error)
+	SetAIGlobalConfig(context.Context, *AIGlobalConfig) (*Empty, error)
+	ListAIProviders(context.Context, *Empty) (*ListAIProvidersResponse, error)
+	UpsertAIProvider(context.Context, *UpsertAIProviderRequest) (*UpsertAIProviderResponse, error)
+	DeleteAIProvider(context.Context, *DeleteAIProviderRequest) (*Empty, error)
 	// 指纹库
 	GetFingerprint(context.Context, *GetFingerprintRequest) (*GetFingerprintResponse, error)
 	AddFingerprint(context.Context, *AddFingerprintRequest) (*AddFingerprintResponse, error)
@@ -10146,6 +10211,21 @@ func (UnimplementedYakServer) CheckHahValidAiConfig(context.Context, *Empty) (*G
 }
 func (UnimplementedYakServer) ListAiModel(context.Context, *ListAiModelRequest) (*ListAiModelResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListAiModel not implemented")
+}
+func (UnimplementedYakServer) GetAIGlobalConfig(context.Context, *Empty) (*AIGlobalConfig, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetAIGlobalConfig not implemented")
+}
+func (UnimplementedYakServer) SetAIGlobalConfig(context.Context, *AIGlobalConfig) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SetAIGlobalConfig not implemented")
+}
+func (UnimplementedYakServer) ListAIProviders(context.Context, *Empty) (*ListAIProvidersResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListAIProviders not implemented")
+}
+func (UnimplementedYakServer) UpsertAIProvider(context.Context, *UpsertAIProviderRequest) (*UpsertAIProviderResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpsertAIProvider not implemented")
+}
+func (UnimplementedYakServer) DeleteAIProvider(context.Context, *DeleteAIProviderRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteAIProvider not implemented")
 }
 func (UnimplementedYakServer) GetFingerprint(context.Context, *GetFingerprintRequest) (*GetFingerprintResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetFingerprint not implemented")
@@ -17411,6 +17491,96 @@ func _Yak_ListAiModel_Handler(srv interface{}, ctx context.Context, dec func(int
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_GetAIGlobalConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetAIGlobalConfig(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_GetAIGlobalConfig_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetAIGlobalConfig(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_SetAIGlobalConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AIGlobalConfig)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).SetAIGlobalConfig(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_SetAIGlobalConfig_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).SetAIGlobalConfig(ctx, req.(*AIGlobalConfig))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_ListAIProviders_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).ListAIProviders(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_ListAIProviders_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).ListAIProviders(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_UpsertAIProvider_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpsertAIProviderRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).UpsertAIProvider(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_UpsertAIProvider_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).UpsertAIProvider(ctx, req.(*UpsertAIProviderRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_DeleteAIProvider_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteAIProviderRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).DeleteAIProvider(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_DeleteAIProvider_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).DeleteAIProvider(ctx, req.(*DeleteAIProviderRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_GetFingerprint_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetFingerprintRequest)
 	if err := dec(in); err != nil {
@@ -21808,6 +21978,26 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListAiModel",
 			Handler:    _Yak_ListAiModel_Handler,
+		},
+		{
+			MethodName: "GetAIGlobalConfig",
+			Handler:    _Yak_GetAIGlobalConfig_Handler,
+		},
+		{
+			MethodName: "SetAIGlobalConfig",
+			Handler:    _Yak_SetAIGlobalConfig_Handler,
+		},
+		{
+			MethodName: "ListAIProviders",
+			Handler:    _Yak_ListAIProviders_Handler,
+		},
+		{
+			MethodName: "UpsertAIProvider",
+			Handler:    _Yak_UpsertAIProvider_Handler,
+		},
+		{
+			MethodName: "DeleteAIProvider",
+			Handler:    _Yak_DeleteAIProvider_Handler,
 		},
 		{
 			MethodName: "GetFingerprint",
