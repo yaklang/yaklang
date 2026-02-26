@@ -8,18 +8,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/server"
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 var ssaCompileTool = mcp.NewTool("ssa_compile",
@@ -61,12 +56,12 @@ re_compile=true is a FULL recompile that discards all previous data.`),
 
 var ssaQueryTool = mcp.NewTool("ssa_query",
 	mcp.WithDescription(`Execute a SyntaxFlow data flow query on a compiled SSA program.
+SyntaxFlow is a DSL for querying data flow paths in code. It can answer questions like:
+- "Which user inputs flow into dangerous functions (SQL injection, command execution)?"
+- "What are the callers of a specific method?"
+- "Trace the data flow from source to sink"
 
-Two ways to run a query:
-1. By rule_id: provide a built-in rule's ID (from ssa_list_rules) — executes the rule directly, no need to write SyntaxFlow
-2. By rule text: provide custom SyntaxFlow DSL code
-
-SyntaxFlow DSL key operators:
+Key operators:
 - Dot chain: Runtime.getRuntime().exec() — matches call chains
 - #-> (TopDef): traces where a value comes from (Use-Def chain)
 - --> (BottomUse): traces where a value flows to (Def-Use chain)
@@ -75,39 +70,19 @@ SyntaxFlow DSL key operators:
 - check $var then "msg" : assert variable is non-empty
 - alert $var : mark variable as an alert/finding
 
+Example rules:
+1. Find command injection:  Runtime.getRuntime().exec(* #-> * as $source) as $sink;
+2. Find SQL injection:      *sql*.append(*<slice(start=1)> as $params);
+3. Find all calls to eval:  eval(*) as $dangerous;
+
 Requires a program_name from a prior ssa_compile call.`),
 	mcp.WithString("program_name",
 		mcp.Description("Name of the compiled program (from ssa_compile result)"),
 		mcp.Required(),
 	),
-	mcp.WithString("rule_id",
-		mcp.Description("ID of a built-in rule (from ssa_list_rules). If provided, the rule content is loaded from database and 'rule' parameter is ignored"),
-	),
 	mcp.WithString("rule",
-		mcp.Description("Custom SyntaxFlow rule text. Used when rule_id is not provided"),
-	),
-)
-
-var ssaListRulesTool = mcp.NewTool("ssa_list_rules",
-	mcp.WithDescription(`List available SyntaxFlow rules. Returns rule_id that can be used directly with ssa_query(rule_id=...).
-
-Filter by group to find different kinds of rules:
-- group="java" / "golang" / "php" etc. → rules for that language
-- lib="lib" → only include (lib) rules, reusable building blocks for <include('name')>
-- lib="noLib" → only detection rules (default if omitted)
-- lib="" → all rules (both lib and detection)
-- group="high" / "critical" → rules by severity level
-
-Use keyword to search by name, title, or description.`),
-	mcp.WithString("group",
-		mcp.Description("Filter by rule group name (language, severity, purpose, or custom group). Examples: 'java', 'golang', 'high', 'critical', 'audit'"),
-	),
-	mcp.WithString("keyword",
-		mcp.Description("Search keyword to filter rules by name, title, description, or content"),
-	),
-	mcp.WithString("lib",
-		mcp.Description("Filter lib rule kind: 'lib' = only include/lib rules, 'noLib' = only detection rules (default), '' = all"),
-		mcp.EnumString("lib", "noLib", ""),
+		mcp.Description("SyntaxFlow rule text to execute"),
+		mcp.Required(),
 	),
 )
 
@@ -115,7 +90,6 @@ func init() {
 	AddGlobalToolSet("ssa",
 		WithTool(ssaCompileTool, handleSSACompile),
 		WithTool(ssaQueryTool, handleSSAQuery),
-		WithTool(ssaListRulesTool, handleSSAListRules),
 	)
 }
 
@@ -273,20 +247,9 @@ func handleSSAQuery(_ *MCPServer) server.ToolHandlerFunc {
 		if !ok || programName == "" {
 			return nil, utils.Error("missing required argument: program_name")
 		}
-
-		rule, _ := args["rule"].(string)
-		ruleID, _ := args["rule_id"].(string)
-
-		if ruleID != "" {
-			dbRule, err := sfdb.QueryRuleByRuleId(consts.GetGormProfileDatabase(), ruleID)
-			if err != nil {
-				return nil, utils.Wrapf(err, "built-in rule %q not found", ruleID)
-			}
-			rule = dbRule.Content
-		}
-
-		if rule == "" {
-			return nil, utils.Error("either rule_id or rule text is required")
+		rule, ok := args["rule"].(string)
+		if !ok || rule == "" {
+			return nil, utils.Error("missing required argument: rule")
 		}
 
 		prog, err := ssaapi.FromDatabase(programName)
@@ -400,71 +363,3 @@ func writeSSAValues(sb *strings.Builder, values ssaapi.Values) {
 	}
 }
 
-func handleSSAListRules(_ *MCPServer) server.ToolHandlerFunc {
-	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		args := request.Params.Arguments
-		groupName, _ := args["group"].(string)
-		keyword, _ := args["keyword"].(string)
-		libKind, _ := args["lib"].(string)
-
-		filter := &ypb.SyntaxFlowRuleFilter{}
-		if groupName != "" {
-			filter.GroupNames = []string{groupName}
-		}
-		if keyword != "" {
-			filter.Keyword = keyword
-		}
-		if libKind == "" {
-			libKind = "noLib"
-		}
-		filter.FilterLibRuleKind = libKind
-
-		db := consts.GetGormProfileDatabase()
-		db = yakit.FilterSyntaxFlowRule(db, filter)
-		db = db.Order("language, severity DESC, rule_name")
-
-		var rules []schema.SyntaxFlowRule
-		if err := db.Find(&rules).Error; err != nil {
-			return nil, utils.Wrapf(err, "query rules failed")
-		}
-
-		isLib := libKind == "lib"
-
-		var sb strings.Builder
-		sb.WriteString(fmt.Sprintf("Rules found: %d\n", len(rules)))
-		if isLib {
-			sb.WriteString("These are lib rules. Usage: <include('included_name')> as $variable;\n\n")
-		} else {
-			sb.WriteString("Use rule_id with ssa_query(rule_id=...) to execute directly.\n\n")
-		}
-
-		currentLang := ssaconfig.Language("")
-		for _, rule := range rules {
-			if rule.Language != currentLang {
-				currentLang = rule.Language
-				sb.WriteString(fmt.Sprintf("\n--- %s ---\n", strings.ToUpper(string(currentLang))))
-			}
-			title := rule.TitleZh
-			if title == "" {
-				title = rule.Title
-			}
-			if title == "" {
-				title = rule.RuleName
-			}
-
-			if isLib {
-				sb.WriteString(fmt.Sprintf("  %-45s  %s\n", rule.IncludedName, title))
-			} else {
-				severity := rule.Severity
-				if severity == "" {
-					severity = "info"
-				}
-				sb.WriteString(fmt.Sprintf("  [%-8s] %-36s  %s\n", severity, rule.RuleId, title))
-			}
-		}
-
-		return &mcp.CallToolResult{
-			Content: []any{mcp.TextContent{Type: "text", Text: sb.String()}},
-		}, nil
-	}
-}
