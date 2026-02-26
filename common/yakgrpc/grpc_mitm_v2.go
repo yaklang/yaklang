@@ -834,7 +834,6 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		plainResponse := getPlainResponseBytes(req)
 		if len(plainResponse) > 0 {
 			httpctx.SetPlainResponseBytes(req, plainResponse)
-			rsp = plainResponse
 		}
 
 		// use handled request
@@ -929,12 +928,6 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 
 		ptr := fmt.Sprintf("%p", req)
 		if !httpctx.GetContextBoolInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest) {
-			return rsp
-		}
-
-		rsp, _, err := lowhttp.FixHTTPResponse(rsp)
-		if err != nil {
-			log.Errorf("fix http response packet failed: %s", err)
 			return rsp
 		}
 
