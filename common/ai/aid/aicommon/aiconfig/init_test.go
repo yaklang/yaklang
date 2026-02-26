@@ -1,6 +1,7 @@
 package aiconfig
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -18,6 +19,7 @@ func saveAndRestore(t *testing.T) {
 		consts.SetTieredAIConfig(orig)
 		ResetConfigLoaded()
 		ResetNetworkConfigGetter()
+		ResetAIGlobalConfigGetter()
 	})
 }
 
@@ -254,6 +256,73 @@ func TestEnsureConfigLoaded_AlreadyLoaded(t *testing.T) {
 		Enabled:       true,
 		RoutingPolicy: consts.PolicyPerformance,
 	})
+	ResetConfigLoaded()
+
+	EnsureConfigLoaded()
+
+	cfg := consts.GetTieredAIConfig()
+	require.NotNil(t, cfg)
+	assert.True(t, cfg.Enabled)
+	assert.Equal(t, consts.PolicyPerformance, cfg.RoutingPolicy)
+	assert.True(t, IsConfigLoaded())
+}
+
+// AIGlobalConfig should take priority over GlobalNetworkConfig when present.
+func TestEnsureConfigLoaded_AIGlobalConfigPriority(t *testing.T) {
+	saveAndRestore(t)
+	setupTempYakitHome(t)
+
+	SetAIGlobalConfigGetter(func() (*ypb.AIGlobalConfig, error) {
+		return &ypb.AIGlobalConfig{
+			Enabled:         true,
+			RoutingPolicy:   "cost",
+			DisableFallback: true,
+			DefaultModelId:  "default-model",
+			GlobalWeight:    0.33,
+		}, nil
+	})
+	SetNetworkConfigGetter(func() *ypb.GlobalNetworkConfig {
+		return &ypb.GlobalNetworkConfig{
+			EnableTieredAIModelConfig: false,
+			TieredAIModelConfig: &ypb.TieredAIModelConfigDescriptor{
+				ModelRoutingPolicy: "balance",
+			},
+		}
+	})
+
+	consts.SetTieredAIConfig(nil)
+	ResetConfigLoaded()
+
+	EnsureConfigLoaded()
+
+	cfg := consts.GetTieredAIConfig()
+	require.NotNil(t, cfg)
+	assert.True(t, cfg.Enabled)
+	assert.True(t, cfg.DisableFallback)
+	assert.Equal(t, consts.PolicyCost, cfg.RoutingPolicy)
+	assert.Equal(t, "default-model", cfg.DefaultModelID)
+	assert.Equal(t, 0.33, cfg.GlobalWeight)
+	assert.True(t, IsConfigLoaded())
+}
+
+// If AIGlobalConfig getter errors, fallback to GlobalNetworkConfig.
+func TestEnsureConfigLoaded_AIGlobalConfigErrorFallback(t *testing.T) {
+	saveAndRestore(t)
+	setupTempYakitHome(t)
+
+	SetAIGlobalConfigGetter(func() (*ypb.AIGlobalConfig, error) {
+		return nil, errors.New("boom")
+	})
+	SetNetworkConfigGetter(func() *ypb.GlobalNetworkConfig {
+		return &ypb.GlobalNetworkConfig{
+			EnableTieredAIModelConfig: true,
+			TieredAIModelConfig: &ypb.TieredAIModelConfigDescriptor{
+				ModelRoutingPolicy: "performance",
+			},
+		}
+	})
+
+	consts.SetTieredAIConfig(nil)
 	ResetConfigLoaded()
 
 	EnsureConfigLoaded()
