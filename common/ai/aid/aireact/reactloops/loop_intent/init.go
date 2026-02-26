@@ -119,6 +119,24 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		loop.Set("recommended_forges", "")
 		loop.Set("context_enrichment", "")
 
+		// Build full capability catalog for anti-hallucination matching
+		catalog := BuildCapabilityCatalog(r)
+		if catalog != "" {
+			loop.Set("capability_catalog", catalog)
+			log.Infof("intent init: built capability catalog (%d bytes)", len(catalog))
+
+			// Run AI catalog matching concurrently to pre-identify relevant identifiers
+			preMatched := MatchIdentifiersFromCatalog(r, catalog, userQuery)
+			if len(preMatched) > 0 {
+				verified := VerifyIdentifiers(loop, preMatched)
+				if len(verified) > 0 {
+					loop.Set("catalog_matched_identifiers", strings.Join(verified, ","))
+					log.Infof("intent init: catalog pre-matched %d identifiers (verified %d): %v",
+						len(preMatched), len(verified), verified)
+				}
+			}
+		}
+
 		// Build a summary of available loop metadata for the AI to reference
 		allMeta := reactloops.GetAllLoopMetadata()
 		var loopSummary strings.Builder

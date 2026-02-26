@@ -133,7 +133,23 @@ Skills: {{ .MatchedSkillNames }}
 	}
 
 	intentSummary := strings.TrimSpace(forgeResult.GetString("intent_summary"))
-	recommendedCaps := forgeResult.GetStringSlice("recommended_capabilities")
+	recommendedCaps := VerifyIdentifiers(loop, forgeResult.GetStringSlice("recommended_capabilities"))
+
+	// Merge catalog pre-matched identifiers
+	catalogMatched := loop.Get("catalog_matched_identifiers")
+	if catalogMatched != "" {
+		seen := make(map[string]bool)
+		for _, c := range recommendedCaps {
+			seen[c] = true
+		}
+		for _, id := range strings.Split(catalogMatched, ",") {
+			id = strings.TrimSpace(id)
+			if id != "" && !seen[id] {
+				recommendedCaps = append(recommendedCaps, id)
+				seen[id] = true
+			}
+		}
+	}
 
 	// Build and set intent_analysis
 	var analysis strings.Builder

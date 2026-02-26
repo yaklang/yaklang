@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
@@ -68,18 +69,59 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 
 			var capDetails []capabilityDetail
 
-			// 1. Search AIYakTool via BM25 trigram
+			// Include catalog pre-matched identifiers as supplementary context
+			catalogMatched := loop.Get("catalog_matched_identifiers")
+			if catalogMatched != "" {
+				results.WriteString(fmt.Sprintf("### Pre-matched from Capability Catalog\n%s\n\n", catalogMatched))
+			}
+
+			// 1. Search AIYakTool via BM25 trigram - dual mode: AND + OR
 			db := consts.GetGormProfileDatabase()
 			if db != nil {
 				loop.LoadingStatus("Start to load bm25+keyword search results for tools and AI forges... / 开始加载工具和AI蓝图的BM25+关键词搜索结果...")
+
+				toolSeen := make(map[string]bool)
+				var allTools []*schema.AIYakTool
+
+				// AND search: all keywords together
 				tools, err := yakit.SearchAIYakToolBM25(db, &yakit.AIYakToolFilter{
 					Keywords: keywords,
 				}, 10, 0)
 				if err != nil {
-					log.Warnf("intent loop: BM25 tool search failed: %v", err)
-				} else if len(tools) > 0 {
+					log.Warnf("intent loop: BM25 tool AND-search failed: %v", err)
+				}
+				for _, t := range tools {
+					if !toolSeen[t.Name] {
+						toolSeen[t.Name] = true
+						allTools = append(allTools, t)
+					}
+				}
+
+				// OR search: each keyword individually (for broader coverage)
+				if len(keywords) > 1 {
+					for _, kw := range keywords {
+						kw = strings.TrimSpace(kw)
+						if kw == "" {
+							continue
+						}
+						orTools, orErr := yakit.SearchAIYakToolBM25(db, &yakit.AIYakToolFilter{
+							Keywords: []string{kw},
+						}, 5, 0)
+						if orErr != nil {
+							continue
+						}
+						for _, t := range orTools {
+							if !toolSeen[t.Name] {
+								toolSeen[t.Name] = true
+								allTools = append(allTools, t)
+							}
+						}
+					}
+				}
+
+				if len(allTools) > 0 {
 					results.WriteString("### Matched Tools\n")
-					for _, tool := range tools {
+					for _, tool := range allTools {
 						name := tool.Name
 						if tool.VerboseName != "" {
 							name = tool.VerboseName + " (" + tool.Name + ")"
@@ -93,10 +135,10 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 						appendCapDetail(&capDetails, tool.Name, "tool", utils.ShrinkString(tool.Description, 200))
 					}
 					results.WriteString("\n")
-					log.Infof("intent loop: found %d tools via BM25", len(tools))
+					log.Infof("intent loop: found %d tools via BM25 (AND+OR)", len(allTools))
 
 					var toolNames []string
-					for _, t := range tools {
+					for _, t := range allTools {
 						toolNames = append(toolNames, t.Name)
 					}
 					loop.Set("matched_tool_names", strings.Join(toolNames, ","))
@@ -104,16 +146,47 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 					results.WriteString("### Tools\nNo matching tools found.\n\n")
 				}
 
-				// 2. Search AI Forges via BM25 trigram (with LIKE fallback for short queries)
+				// 2. Search AI Forges via BM25 trigram - dual mode: AND + OR
+				forgeSeen := make(map[string]bool)
+				var allForges []*schema.AIForge
+
 				forges, err := yakit.SearchAIForgeBM25(db, &yakit.AIForgeSearchFilter{
 					Keywords: keywords,
 				}, 10, 0)
 				if err != nil {
-					log.Warnf("intent loop: BM25 forge search failed: %v", err)
+					log.Warnf("intent loop: BM25 forge AND-search failed: %v", err)
 				}
-				if len(forges) > 0 {
+				for _, f := range forges {
+					if !forgeSeen[f.ForgeName] {
+						forgeSeen[f.ForgeName] = true
+						allForges = append(allForges, f)
+					}
+				}
+
+				if len(keywords) > 1 {
+					for _, kw := range keywords {
+						kw = strings.TrimSpace(kw)
+						if kw == "" {
+							continue
+						}
+						orForges, orErr := yakit.SearchAIForgeBM25(db, &yakit.AIForgeSearchFilter{
+							Keywords: []string{kw},
+						}, 5, 0)
+						if orErr != nil {
+							continue
+						}
+						for _, f := range orForges {
+							if !forgeSeen[f.ForgeName] {
+								forgeSeen[f.ForgeName] = true
+								allForges = append(allForges, f)
+							}
+						}
+					}
+				}
+
+				if len(allForges) > 0 {
 					results.WriteString("### Matched AI Forges (Blueprints)\n")
-					for _, forge := range forges {
+					for _, forge := range allForges {
 						name := forge.ForgeName
 						if forge.ForgeVerboseName != "" {
 							name = forge.ForgeVerboseName + " (" + forge.ForgeName + ")"
@@ -123,10 +196,10 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 						appendCapDetail(&capDetails, forge.ForgeName, "forge", utils.ShrinkString(forge.Description, 200))
 					}
 					results.WriteString("\n")
-					log.Infof("intent loop: found %d forges", len(forges))
+					log.Infof("intent loop: found %d forges (AND+OR)", len(allForges))
 
 					var forgeNames []string
-					for _, f := range forges {
+					for _, f := range allForges {
 						forgeNames = append(forgeNames, f.ForgeName)
 					}
 					loop.Set("matched_forge_names", strings.Join(forgeNames, ","))

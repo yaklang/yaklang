@@ -6,14 +6,13 @@ __USAGE__ = <<<USAGE_BLOCK
 Web Search Tool - Parameter Description for JSON Tool Calls
 
 Required Parameters:
-  query           (string)  The search query / keywords to search for on the internet.
+  query             (string)  The search query / keywords to search for on the internet.
 
 Optional Parameters:
-  output_file     (string)  File path to save the search results. If not specified,
-                            results are only output to AI and stdout.
-                            Parent directories will be created automatically.
-  max_results     (int)     Maximum number of search results to process. Default: 30.
-                            Higher values provide more comprehensive results but take longer.
+  max_results       (int)     Maximum number of search results to process. Default: 30.
+                              Higher values provide more comprehensive results but take longer.
+  max_refined_size  (int)     Maximum byte size of the AI-refined output. Default: 10240 (10KB).
+                              Range: 1024 ~ 20480 (1KB ~ 20KB). Controls the final distilled content size.
 
 ## Few-Shot Examples
 
@@ -32,9 +31,9 @@ User intent: "Search for information about Yaklang security tool"
 }
 ```
 
-### Example 2: Search and save results to file
+### Example 2: Search with limited results
 
-User intent: "Research CVE-2024-1234 and save the findings"
+User intent: "Research CVE-2024-1234 vulnerability"
 
 ```json
 {
@@ -43,7 +42,6 @@ User intent: "Research CVE-2024-1234 and save the findings"
   "identifier": "research_cve",
   "params": {
     "query": "CVE-2024-1234 vulnerability details exploit",
-    "output_file": "/tmp/cve_2024_1234_research.md",
     "max_results": 10
   }
 }
@@ -68,20 +66,26 @@ User intent: "Quickly check what results come up for a topic"
 ## Key Rules
 
 1. Always provide a clear, specific search query for best results.
-2. Set output_file when you need to persist results for later reference.
-3. Adjust max_results based on how comprehensive the search needs to be.
+2. Adjust max_results based on how comprehensive the search needs to be.
+3. Use max_refined_size to control output verbosity when needed.
 USAGE_BLOCK
 
 yakit.AutoInitYakit()
 
 query = cli.String("query", cli.setRequired(true), cli.setHelp("search query keywords"))
-outputFile = cli.String("output_file", cli.setRequired(false), cli.setDefault(""), cli.setHelp("file path to save search results"))
 maxResults = cli.Int("max_results", cli.setRequired(false), cli.setDefault(30), cli.setHelp("maximum number of search results to process"))
+maxRefinedSize = cli.Int("max_refined_size", cli.setRequired(false), cli.setDefault(10240), cli.setHelp("maximum byte size of AI-refined output (1024~20480)"))
 
 cli.check()
 
 if maxResults <= 0 {
     maxResults = 30
+}
+if maxRefinedSize < 1024 {
+    maxRefinedSize = 1024
+}
+if maxRefinedSize > 20480 {
+    maxRefinedSize = 20480
 }
 
 timeoutSec = 10
@@ -91,7 +95,7 @@ maxChunkSize = 30 * 1024
 maxRanges = 8
 minLines = 3
 maxLines = 20
-targetByteSize = 10 * 1024
+targetByteSize = maxRefinedSize
 
 outputToAI = fn(content) {
     yakit.AIOutput(content)
@@ -144,8 +148,61 @@ cleanHtmlContent = fn(htmlStr) {
     cleaned = re.ReplaceAll(cleaned, `(?is)<noscript[^>]*>.*?</noscript>`, "")
     cleaned = re.ReplaceAll(cleaned, `(?is)<iframe[^>]*>.*?</iframe>`, "")
     cleaned = re.ReplaceAll(cleaned, `(?is)<svg[^>]*>.*?</svg>`, "")
+    cleaned = re.ReplaceAll(cleaned, `(?is)<link[^>]*>`, "")
+    cleaned = re.ReplaceAll(cleaned, `(?is)<meta[^>]*>`, "")
+    cleaned = re.ReplaceAll(cleaned, `(?is)<nav[^>]*>.*?</nav>`, "")
+    cleaned = re.ReplaceAll(cleaned, `(?is)<header[^>]*>.*?</header>`, "")
+    cleaned = re.ReplaceAll(cleaned, `(?is)<footer[^>]*>.*?</footer>`, "")
     cleaned = re.ReplaceAll(cleaned, `(?is)<!--.*?-->`, "")
     return cleaned
+}
+
+isCodeOrJunkLine = fn(line) {
+    trimmed = str.TrimSpace(line)
+    if len(trimmed) < 2 {
+        return true
+    }
+    if re.Match(`^[\s{}\[\]();,.<>/*#=+\-|\\^~!@$%&_]+$`, trimmed) {
+        return true
+    }
+    braceCount = str.Count(trimmed, "{") + str.Count(trimmed, "}") + str.Count(trimmed, ";")
+    if braceCount >= 3 && len(trimmed) < 200 {
+        return true
+    }
+    codePatterns = [
+        `^\s*(function\s|var\s|let\s|const\s|import\s|export\s|return\s|class\s)`,
+        `^\s*\.\w+[\s]*\{`,
+        `^\s*@(media|keyframes|import|charset|font-face)\s`,
+        `^\s*(if\s*\(|for\s*\(|while\s*\(|switch\s*\()`,
+        `^\s*\}\s*(else|catch|finally)`,
+        `^\s*(require|module\.exports|window\.|document\.)`,
+        `^\s*#(include|define|pragma|ifdef|endif)`,
+        `[{;]\s*$`,
+    ]
+    for _, pattern = range codePatterns {
+        if re.Match(pattern, trimmed) {
+            return true
+        }
+    }
+    return false
+}
+
+filterCodeLines = fn(textContent) {
+    lines = str.Split(textContent, "\n")
+    filtered = make([]string)
+    prevLine = ""
+    for _, line = range lines {
+        trimmed = str.TrimSpace(line)
+        if isCodeOrJunkLine(trimmed) {
+            continue
+        }
+        if trimmed == prevLine {
+            continue
+        }
+        prevLine = trimmed
+        filtered = append(filtered, trimmed)
+    }
+    return str.Join(filtered, " ")
 }
 
 extractTextFromHTML = fn(body) {
@@ -170,7 +227,8 @@ extractTextFromHTML = fn(body) {
             textParts = append(textParts, fallback)
         }
     }
-    textContent = str.Join(textParts, " ")
+    rawText = str.Join(textParts, "\n")
+    textContent = filterCodeLines(rawText)
     return title, textContent
 }
 
@@ -257,14 +315,6 @@ allText = str.Join(allTextParts, "\n---\n\n")
 if len(allText) < targetByteSize / 2 {
     finalOutput = sprintf("# Web Search Results for: %s\n\n%s\n\n%s", query, allText, snippetOutput)
     outputToAI(finalOutput)
-    if outputFile != "" {
-        dir = file.GetDirPath(outputFile)
-        if dir != "" && !file.IsExisted(dir) {
-            file.MkdirAll(dir)
-        }
-        file.Save(outputFile, finalOutput)
-        yakit.Info("Results saved to %v", outputFile)
-    }
     yakit.Info("=== Web Search Complete (content short enough, no distillation needed) ===")
     return
 }
@@ -291,8 +341,14 @@ buildCompressPrompt = fn(chunkData, userQuery, alreadyExtracted) {
 Extract the most relevant knowledge fragments from the current chunk that relate to the user's query.
 
 From the line-numbered content above, extract fragments directly relevant to the user's question.
+
+CRITICAL FILTERING RULES:
+- SKIP lines containing code (JavaScript, CSS, programming syntax: braces, semicolons, function/var/const/import declarations, CSS selectors).
+- SKIP lines that are navigation menus, breadcrumbs, footer links, sidebar widgets, or website UI chrome.
+- SKIP lines that are cookie notices, login prompts, subscription popups, or advertising text.
+- ONLY extract natural language text content: articles, documentation, explanations, descriptions, factual information.
 {{ if .hasAlready }}
-IMPORTANT: ALREADY_EXTRACTED contains previously extracted content. Rules:
+DEDUPLICATION RULES (ALREADY_EXTRACTED contains previously extracted content):
 - If content is identical or highly repetitive with already extracted content, lower score significantly or skip
 - If content partially overlaps but adds new information, extract with reduced score
 - Prioritize new, non-duplicate information
@@ -304,10 +360,10 @@ Output requirements:
 4. Score each 0.00-1.00 (higher = more relevant)
 
 Scoring criteria:
-- 0.80-1.00: Directly answers the user's core question (not previously extracted)
-- 0.60-0.80: Related background/technical details (not previously extracted)
+- 0.80-1.00: Directly answers the user's core question with natural language content
+- 0.60-0.80: Related background/technical details in natural language
 - 0.40-0.60: Supplementary info (or partially overlapping with new details)
-- 0.00-0.40: Weakly related, irrelevant, or fully duplicated (do not output)
+- 0.00-0.40: Weakly related, irrelevant, code/markup, or fully duplicated (do not output)
 
 Output the ranges array.
 <|INSTRUCT_END_{{ .nonce }}|>
@@ -474,23 +530,6 @@ if len(allScoredRanges) > 0 {
 finalResult += "\n" + snippetOutput
 
 outputToAI(finalResult)
-
-if outputFile != "" {
-    dir = file.GetDirPath(outputFile)
-    if dir != "" && !file.IsExisted(dir) {
-        yakit.Info("Creating directory: %v", dir)
-        err = file.MkdirAll(dir)
-        if err != nil {
-            yakit.Error("Failed to create directory %v: %v", dir, err)
-        }
-    }
-    err = file.Save(outputFile, finalResult)
-    if err != nil {
-        yakit.Error("Failed to save results to file %v: %v", outputFile, err)
-    } else {
-        yakit.Info("Results saved to %v", outputFile)
-    }
-}
 
 yakit.Info("=== Web Search Complete ===")
 yakit.Info("Processed %d results, distilled %d fragments for query: %v", len(results), len(allScoredRanges), query)

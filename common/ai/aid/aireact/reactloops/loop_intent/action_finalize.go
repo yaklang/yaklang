@@ -58,7 +58,26 @@ func makeFinalizeEnrichmentAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 			intentSummary := strings.TrimSpace(action.GetString("intent_summary"))
 			recommendedCaps := action.GetStringSlice("recommended_capabilities")
 
-			log.Infof("intent loop: finalizing enrichment - summary: %s", utils.ShrinkString(intentSummary, 200))
+			// Verify AI-recommended identifiers and merge with catalog pre-matched ones
+			recommendedCaps = VerifyIdentifiers(loop, recommendedCaps)
+
+			catalogMatched := loop.Get("catalog_matched_identifiers")
+			if catalogMatched != "" {
+				seen := make(map[string]bool)
+				for _, c := range recommendedCaps {
+					seen[c] = true
+				}
+				for _, id := range strings.Split(catalogMatched, ",") {
+					id = strings.TrimSpace(id)
+					if id != "" && !seen[id] {
+						recommendedCaps = append(recommendedCaps, id)
+						seen[id] = true
+					}
+				}
+			}
+
+			log.Infof("intent loop: finalizing enrichment - summary: %s, verified caps: %v",
+				utils.ShrinkString(intentSummary, 200), recommendedCaps)
 
 			// Build the structured intent analysis
 			var analysis strings.Builder

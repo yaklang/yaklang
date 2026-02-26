@@ -1,13 +1,16 @@
 ## Action 输出示例
 
-* 当需要搜索可用能力（工具、蓝图、专注模式）时：
-  {"@action": "query_capabilities", "search_query": "渗透测试 端口扫描 漏洞检测 penetration test"}
+* 当需要搜索可用能力（工具、蓝图、专注模式）时，同时使用中英文关键词：
+  {"@action": "query_capabilities", "search_query": "渗透测试 端口扫描 penetration test port scan"}
 
 * 当需要对综合性任务进行多维度搜索时（可多次调用）：
-  {"@action": "query_capabilities", "search_query": "信息收集 子域名扫描 报告生成 reconnaissance"}
+  {"@action": "query_capabilities", "search_query": "信息收集 子域名扫描 reconnaissance subdomain"}
 
-* 当已收集到足够的搜索结果，需要输出最终分析时：
-  {"@action": "finalize_enrichment", "intent_summary": "用户说「对目标 192.168.1.0/24 做渗透测试」，目的是：对目标网段进行完整渗透测试流程，包括信息收集、端口扫描、漏洞检测与验证。通过搜索「渗透测试 端口扫描 漏洞检测」得到的结果，可以推荐接下来的步骤使用工具 synscan, servicescan, poc，蓝图（Forge）report_generating，加载技能 nuclei_scan。启动专注模式：penetration_test 来实现目标。", "recommended_capabilities": ["synscan", "servicescan", "poc", "report_generating", "nuclei_scan", "penetration_test"]}
+* 当用户明确指定了某个能力名称（如"执行 hostscan"），搜索确认后直接输出：
+  {"@action": "finalize_enrichment", "intent_summary": "用户说「执行 hostscan」，目的是：执行主机健康状态扫描。推荐使用蓝图 hostscan。", "recommended_capabilities": ["hostscan"]}
 
-* 当搜索结果中只有工具匹配，没有蓝图或专注模式时（省略无匹配的类型）：
-  {"@action": "finalize_enrichment", "intent_summary": "用户说「扫描 example.com 的开放端口」，目的是：对目标域名进行端口扫描以发现开放服务。通过搜索「端口扫描 port scan」得到的结果，可以推荐接下来的步骤使用工具 synscan, servicescan。", "recommended_capabilities": ["synscan", "servicescan"]}
+* 当搜索结果匹配到多种能力时，只列出有结果的类型：
+  {"@action": "finalize_enrichment", "intent_summary": "用户说「对目标 192.168.1.0/24 做渗透测试」，目的是：对目标网段进行完整渗透测试流程。推荐使用工具 synscan, servicescan，蓝图 report_generating。", "recommended_capabilities": ["synscan", "servicescan", "report_generating"]}
+
+* 当搜索结果中只有工具匹配时（省略无匹配的类型）：
+  {"@action": "finalize_enrichment", "intent_summary": "用户说「扫描 example.com 的开放端口」，目的是：对目标域名进行端口扫描。推荐使用工具 synscan, servicescan。", "recommended_capabilities": ["synscan", "servicescan"]}
