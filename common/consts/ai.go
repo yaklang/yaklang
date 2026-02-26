@@ -50,6 +50,10 @@ type TieredAIConfig struct {
 	RoutingPolicy RoutingPolicy
 	// DisableFallback disables fallback to lightweight model when intelligent model fails
 	DisableFallback bool
+	// DefaultModelID is the default model identifier for AI calls
+	DefaultModelID string
+	// GlobalWeight is a global weight used by AI routing strategies
+	GlobalWeight float64
 	// IntelligentConfigs contains configurations for high-intelligence models
 	IntelligentConfigs []*ypb.ThirdPartyApplicationConfig
 	// LightweightConfigs contains configurations for lightweight models
