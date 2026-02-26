@@ -19,6 +19,22 @@ binaries:
       "*":
         url: "/ai-knowledge-base/yaklang-aikb.zip"
         bin_path: "yaklang-aikb.zip"
+  - name: "syntaxflow-aikb-rag"
+    description: "SyntaxFlow AIKB RAG - SyntaxFlow rules knowledge base for semantic search"
+    version: "latest"
+    install_type: "bin"
+    download_info_map:
+      "*":
+        url: "/ai-knowledge-base/rag/syntaxflow-aikb.rag"
+        bin_path: "syntaxflow-aikb.rag"
+  - name: "syntaxflow-aikb"
+    description: "SyntaxFlow AIKB - SyntaxFlow rules knowledge base for grep search"
+    version: "latest"
+    install_type: "bin"
+    download_info_map:
+      "*":
+        url: "/ai-knowledge-base/syntaxflow-aikb.zip"
+        bin_path: "syntaxflow-aikb.zip"
   - name: "vulinbox"
     description: "Yaklang Vulnerability Testing Box - A comprehensive vulnerability testing platform"
     version: "latest"
