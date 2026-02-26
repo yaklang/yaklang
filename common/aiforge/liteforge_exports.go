@@ -40,6 +40,7 @@ var LiteForgeExport = map[string]interface{}{
 	"context":           LiteForgeExecWithContext,
 	"verboseName":       _withVerboseName,
 	"forceImage":        _withForceImage,
+	"speedPriority":     _withSpeedPriority,
 
 	"knowledgeBaseName":    RefineWithKnowledgeBaseName,
 	"knowledgeBaseDesc":    RefineWithKnowledgeBaseDesc,
@@ -57,6 +58,7 @@ type liteforgeConfig struct {
 	ctx        context.Context
 	images     []*aicommon.ImageData
 	forceImage bool
+	speedPriority bool
 
 	aidOptions []aicommon.ConfigOption
 
@@ -255,6 +257,9 @@ func _executeLiteForgeTemp(query string, opts ...any) (*ForgeResult, error) {
 	if cfg.output != "" {
 		liteForgeOpts = append(liteForgeOpts, WithLiteForge_OutputSchemaRaw(cfg.action, cfg.output))
 	}
+	if cfg.speedPriority {
+		liteForgeOpts = append(liteForgeOpts, WithLiteForge_SpeedPriority(true))
+	}
 	liteforgeIns, err := NewLiteForge(cfg.id, liteForgeOpts...)
 	if err != nil {
 		return nil, utils.Errorf("new liteforge failed: %s", err)
@@ -318,5 +323,14 @@ func LiteForgeExecWithContext(ctx context.Context) LiteForgeExecOption {
 func _withVerboseName(opts ...aicommon.ConfigOption) LiteForgeExecOption {
 	return func(cfg *liteforgeConfig) {
 		cfg.aidOptions = append(cfg.aidOptions, opts...)
+	}
+}
+
+// liteforge.speedPriority uses a faster/cheaper AI model for distillation tasks
+func _withSpeedPriority(b ...bool) LiteForgeExecOption {
+	return func(cfg *liteforgeConfig) {
+		if len(b) == 0 || b[0] {
+			cfg.speedPriority = true
+		}
 	}
 }

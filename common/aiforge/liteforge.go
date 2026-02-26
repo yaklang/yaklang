@@ -48,12 +48,13 @@ type streamableField struct {
 
 // LiteForge 被设计只允许提取数据，生成结构化（单步），如果需要多步拆解，不能使用 LiteForge
 type LiteForge struct {
-	ForgeName        string
-	Prompt           string
-	RequireSchema    string
-	OutputSchema     string
-	OutputActionName string
-	ExtendAIDOptions []aicommon.ConfigOption
+	ForgeName            string
+	Prompt               string
+	RequireSchema        string
+	OutputSchema         string
+	OutputActionName     string
+	PreferSpeedPriority  bool
+	ExtendAIDOptions     []aicommon.ConfigOption
 
 	streamFields         *omap.OrderedMap[string, *streamableField]
 	fieldStreamCallbacks []*fieldStreamCallbackItem // user-defined callbacks for streaming fields
@@ -108,6 +109,15 @@ func WithLiteForge_FieldStreamCallback(fieldKeys []string, callback FieldStreamC
 }
 
 type LiteForgeOption func(*LiteForge) error
+
+func WithLiteForge_SpeedPriority(b ...bool) LiteForgeOption {
+	return func(l *LiteForge) error {
+		if len(b) == 0 || b[0] {
+			l.PreferSpeedPriority = true
+		}
+		return nil
+	}
+}
 
 func WithLiteForge_RequireParams(params ...aitool.ToolOption) LiteForgeOption {
 	return func(l *LiteForge) error {
@@ -274,7 +284,11 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 		return nil, utils.Errorf("template execute failed: %v", err)
 	}
 	var action *aicommon.Action
-	transactionErr := cod.CallAITransaction(buf.String(),
+	aiCallback := cod.CallAI
+	if l.PreferSpeedPriority {
+		aiCallback = cod.CallSpeedPriorityAI
+	}
+	transactionErr := aicommon.CallAITransaction(cod, buf.String(), aiCallback,
 		func(response *aicommon.AIResponse) error {
 			if l.ForgeName == "" {
 				l.ForgeName = "LiteForge"

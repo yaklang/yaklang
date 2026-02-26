@@ -117,6 +117,12 @@ var (
 		// Simple thanks
 		`谢谢|感谢|thanks|thank\s+you|thx` +
 		`)[\s?!。！？,.]*$`)
+	// webSearchPatterns matches explicit internet search intent keywords
+	webSearchPatterns = regexp.MustCompile(`(?i)(` +
+		`搜索互联网|互联网搜索|网页搜索|网上搜索|在线搜索|上网搜索|上网查|` +
+		`搜索引擎|百度搜索|谷歌搜索|搜一下|搜一搜|帮我搜|帮我查一下|` +
+		`search\s*(the\s*)?(internet|web|online)|web\s*search|internet\s*search|google\s*search` +
+		`)`)
 )
 
 // countSentences counts the approximate number of sentences in the input.
@@ -141,6 +147,9 @@ type FastMatchResult struct {
 	// IsSimpleQuery indicates the input is a greeting, status check,
 	// or other trivial query that can be answered directly.
 	IsSimpleQuery bool
+
+	// WebSearchKeywordDetected indicates explicit web search keywords were found in input
+	WebSearchKeywordDetected bool
 
 	// MatchedTools contains tools found via BM25 search
 	MatchedTools []*schema.AIYakTool
@@ -194,10 +203,15 @@ func FastIntentMatch(r aicommon.AIInvokeRuntime, input string) *FastMatchResult 
 		return result
 	}
 
-	// Step 2: BM25 Trigram + keyword dual-channel search for tools, forges, and loops
+	// Step 2a: Web search keyword shortcut — bypass BM25 ranking issues
+	webSearchKeywordDetected := webSearchPatterns.MatchString(trimmed)
+	if webSearchKeywordDetected {
+		log.Infof("fast intent match: web search keyword detected in input: %s", trimmed)
+	}
+
+	// Step 2b: BM25 Trigram + keyword dual-channel search for tools, forges, and loops
 	db := consts.GetGormProfileDatabase()
 	if db != nil {
-		// Search AIYakTool via BM25 (FTS5 trigram with LIKE fallback for short queries)
 		tools, err := yakit.SearchAIYakToolBM25(db, &yakit.AIYakToolFilter{
 			Keywords: []string{trimmed},
 		}, 5, 0)
@@ -208,7 +222,26 @@ func FastIntentMatch(r aicommon.AIInvokeRuntime, input string) *FastMatchResult 
 			log.Infof("fast intent match: found %d tools via BM25 for: %s", len(tools), trimmed)
 		}
 
-		// Search AIForge via BM25 (FTS5 trigram with LIKE fallback for short queries)
+		// When web search keywords detected, ensure web_search tool is in results
+		if webSearchKeywordDetected {
+			hasWebSearch := false
+			for _, t := range result.MatchedTools {
+				if t.Name == "web_search" {
+					hasWebSearch = true
+					break
+				}
+			}
+			if !hasWebSearch {
+				webSearchTools, wsErr := yakit.SearchAIYakToolBM25(db, &yakit.AIYakToolFilter{
+					Keywords: []string{"web_search"},
+				}, 1, 0)
+				if wsErr == nil && len(webSearchTools) > 0 {
+					result.MatchedTools = append(result.MatchedTools, webSearchTools[0])
+					log.Infof("fast intent match: forcibly added web_search tool via keyword shortcut")
+				}
+			}
+		}
+
 		forges, err := yakit.SearchAIForgeBM25(db, &yakit.AIForgeSearchFilter{
 			Keywords: []string{trimmed},
 		}, 5, 0)
@@ -226,6 +259,28 @@ func FastIntentMatch(r aicommon.AIInvokeRuntime, input string) *FastMatchResult 
 		result.MatchedLoops = matchedLoops
 		log.Infof("fast intent match: found %d matching loops for: %s", len(matchedLoops), trimmed)
 	}
+
+	// When web search keywords detected, ensure internet_research loop is in results
+	if webSearchKeywordDetected {
+		hasInternetResearch := false
+		for _, m := range result.MatchedLoops {
+			if m.Name == "internet_research" {
+				hasInternetResearch = true
+				break
+			}
+		}
+		if !hasInternetResearch {
+			for _, meta := range reactloops.GetAllLoopMetadata() {
+				if meta.Name == "internet_research" {
+					result.MatchedLoops = append(result.MatchedLoops, meta)
+					log.Infof("fast intent match: forcibly added internet_research loop via keyword shortcut")
+					break
+				}
+			}
+		}
+	}
+
+	result.WebSearchKeywordDetected = webSearchKeywordDetected
 
 	// Build context summary
 	if result.HasMatches() {
@@ -356,6 +411,15 @@ func applyFastMatchResult(r aicommon.AIInvokeRuntime, loop *reactloops.ReActLoop
 
 		// Populate ExtraCapabilities from fast match results
 		populateExtraCapabilitiesFromFastMatch(r, loop, result)
+
+		if result.WebSearchKeywordDetected {
+			r.AddToTimeline("web_search_keyword_detected",
+				"[CRITICAL] User's input explicitly contains internet search keywords. "+
+					"You MUST use web_search tool or switch to internet_research focus mode to satisfy this request. "+
+					"Do NOT use do_http_request with placeholder URLs. "+
+					"Do NOT rely solely on knowledge_enhance_answer. "+
+					"The user is requesting real-time internet search results.")
+		}
 
 		for _, schTool := range result.MatchedTools {
 			if schTool.Name == "web_search" {
