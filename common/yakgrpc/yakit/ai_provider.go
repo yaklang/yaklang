@@ -2,6 +2,7 @@ package yakit
 
 import (
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -98,4 +99,31 @@ func LoadAIProviderMap(db *gorm.DB) (map[int64]*schema.AIThirdPartyConfig, error
 		result[int64(p.ID)] = p
 	}
 	return result, nil
+}
+
+// EnsureAIBalanceProviderConfig ensures the default aibalance provider exists.
+// This keeps fresh installs usable with free AI services.
+func EnsureAIBalanceProviderConfig(db *gorm.DB) {
+	if db == nil {
+		return
+	}
+	var count int
+	if err := db.Model(&schema.AIThirdPartyConfig{}).Where("type = ?", "aibalance").Count(&count).Error; err != nil {
+		log.Warnf("query aibalance provider failed: %v", err)
+		return
+	}
+	if count > 0 {
+		return
+	}
+
+	provider := &schema.AIThirdPartyConfig{
+		Type:   "aibalance",
+		APIKey: "free-user",
+		Domain: "aibalance.yaklang.com",
+	}
+	if err := db.Create(provider).Error; err != nil {
+		log.Warnf("create default aibalance provider failed: %v", err)
+		return
+	}
+	log.Infof("Added default AIBalance provider config (key: free-user)")
 }
