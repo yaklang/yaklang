@@ -7,9 +7,9 @@ if err != nil{
     dump(status)
 }
 monitor, err = hids.NewAuditMonitor(
-    hids.WithAuditMonitorLogin(true),
-    hids.WithAuditMonitorCommand(true),
-    hids.WithOnLoginEvent(fn(event) {
+    hids.auditMonitorLogin(true),
+    hids.auditMonitorCommand(true),
+    hids.auditOnLoginEvent(fn(event) {
         println("========== Login Event ==========")
         printf("  Timestamp:   %v\n", event.Timestamp)
         printf("  AuditID:     %s\n", event.AuditID)
@@ -26,7 +26,7 @@ monitor, err = hids.NewAuditMonitor(
         printf("  ExtraData:   %v\n", event.ExtraData)
         println("=================================")
     }),
-    hids.WithOnCommandEvent(fn(event) {
+    hids.auditOnCommandEvent(fn(event) {
         println("========== Command Event ==========")
         printf("  Timestamp:   %v\n", event.Timestamp)
         printf("  AuditID:     %s\n", event.AuditID)
@@ -47,7 +47,6 @@ monitor, err = hids.NewAuditMonitor(
         printf("  ExitCode:    %d\n", event.ExitCode)
         println("===================================")
     }),
-    hids.WithAuditBufferSize(8192),
 )
 
 if err != nil {

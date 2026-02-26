@@ -98,10 +98,10 @@ func checkAuditAvailable() error {
 //
 //	hids.auditMonitorLogin(true),
 //	hids.auditMonitorCommand(true),
-//	hids.onLoginEvent(fn(event) {
+//	hids.auditOnLoginEvent(fn(event) {
 //	    println("Login:", event.Username, "from", event.RemoteIP)
 //	}),
-//	hids.onCommandEvent(fn(event) {
+//	hids.auditOnCommandEvent(fn(event) {
 //	    println("Command:", event.Command)
 //	}),
 //

@@ -171,14 +171,3 @@ func WithAuditFilterCommands(commands ...string) AuditMonitorOption {
 		m.filterCommands = commands
 	}
 }
-
-// auditBufferSize 设置缓冲区大小
-// Example:
-// ```
-// monitor = hids.NewAuditMonitor(hids.auditBufferSize(16384))
-// ```
-func WithAuditBufferSize(size int) AuditMonitorOption {
-	return func(m *AuditMonitor) {
-		m.bufferSize = size
-	}
-}
