@@ -69,6 +69,7 @@ var ProfileTables = []interface{}{
 	&LoginSession{},  // for aibalance
 	&OpsUser{},       // for aibalance - operations users
 	&OpsActionLog{},  // for aibalance - operations action logs
+	&AIThirdPartyConfig{},
 	&AIYakTool{},
 	&AISkill{}, // AI Skills for aiskillloader BM25 search
 
