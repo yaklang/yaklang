@@ -1,4 +1,4 @@
-package loop_vuln_verify
+package loop_code_audit_verify
 
 import (
 	"encoding/json"

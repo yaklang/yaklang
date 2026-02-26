@@ -49,4 +49,4 @@ SQL: query, execute, raw, whereRaw
 
 ## 验证漏洞
 
-发现潜在漏洞后，使用 `vuln_verify` action 进入验证模式，追踪完整数据流后给出结论。
+发现潜在漏洞后，使用 `code_audit_verify` action 进入验证模式，追踪完整数据流后给出结论。

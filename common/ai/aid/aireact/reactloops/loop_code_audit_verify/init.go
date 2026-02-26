@@ -1,4 +1,4 @@
-package loop_vuln_verify
+package loop_code_audit_verify
 
 import (
 	"bytes"
@@ -22,7 +22,7 @@ var outputExample string
 
 func init() {
 	err := reactloops.RegisterLoopFactory(
-		schema.AI_REACT_LOOP_NAME_VULN_VERIFY,
+		schema.AI_REACT_LOOP_NAME_CODE_AUDIT_VERIFY,
 		func(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {
 			// 创建验证状态
 			state := NewVerifyState()
@@ -58,19 +58,21 @@ func init() {
 			}
 
 			preset = append(preset, opts...)
-			return reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_VULN_VERIFY, r, preset...)
+			return reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_CODE_AUDIT_VERIFY, r, preset...)
 		},
 		// 注册元数据
 		reactloops.WithLoopDescription("漏洞验证模式：验证潜在漏洞点是否真实可利用，追踪 Source→Sink 数据流，分析过滤有效性。"),
+		reactloops.WithVerboseName("Code Audit Verify"),
+		reactloops.WithVerboseNameZh("代码审计漏洞验证"),
 		reactloops.WithLoopUsagePrompt(`当需要验证一个潜在漏洞是否真实存在时使用此流程。
 AI 会追踪数据流、分析过滤函数、判断可利用性，最终给出确认/安全/需人工确认的结论。`),
 		reactloops.WithLoopOutputExample(`
 * 当需要验证潜在漏洞时:
-  {"@action": "vuln_verify", "human_readable_thought": "需要验证这个SQL注入点是否真实可利用"}
+  {"@action": "code_audit_verify", "human_readable_thought": "需要验证这个SQL注入点是否真实可利用"}
 `),
 	)
 	if err != nil {
-		log.Errorf("register reactloop: %v failed: %v", schema.AI_REACT_LOOP_NAME_VULN_VERIFY, err)
+		log.Errorf("register reactloop: %v failed: %v", schema.AI_REACT_LOOP_NAME_CODE_AUDIT_VERIFY, err)
 	}
 }
 

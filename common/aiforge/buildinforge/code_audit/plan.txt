@@ -14,7 +14,7 @@
     },
     {
       "subtask_name": "漏洞验证",
-      "subtask_goal": "对每个发现的 Sink 点，使用 vuln_verify action 进入验证模式。在验证模式中: 1) 读取 Sink 点上下文代码; 2) 追踪参数来源直到 Source; 3) 检查中间过滤函数有效性; 4) 输出验证结论(confirmed/safe/uncertain)。只有经过验证的漏洞才记录到最终报告。"
+      "subtask_goal": "对每个发现的 Sink 点，使用 code_audit_verify action 进入验证模式。在验证模式中: 1) 读取 Sink 点上下文代码; 2) 追踪参数来源直到 Source; 3) 检查中间过滤函数有效性; 4) 输出验证结论(confirmed/safe/uncertain)。只有经过验证的漏洞才记录到最终报告。"
     },
     {
       "subtask_name": "生成审计报告",

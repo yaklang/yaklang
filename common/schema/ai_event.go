@@ -42,19 +42,19 @@ const (
 )
 
 const (
+	AI_REACT_LOOP_NAME_WRITE_PYTHON_SCRIPT = "write_python_script"
 	AI_REACT_LOOP_NAME_DEFAULT             = "default"
 	AI_REACT_LOOP_NAME_WRITE_YAKLANG       = "write_yaklang_code"
 	AI_REACT_LOOP_NAME_JAVA_DECOMPILER     = "java_decompiler"
-	AI_REACT_LOOP_NAME_HTTP_DIFFER         = "http_differ"
+	AI_REACT_LOOP_NAME_HTTP_FUZZTEST       = "http_fuzztest"
 	AI_REACT_LOOP_NAME_PE_TASK             = "pe_task"
 	AI_REACT_LOOP_NAME_PLAN                = "plan"
 	AI_REACT_LOOP_NAME_KNOWLEDGE_ENHANCE   = "knowledge_enhance"
 	AI_REACT_LOOP_NAME_REPORT_GENERATING   = "report_generating"
 	AI_REACT_LOOP_NAME_PYTHON_POC          = "python_poc"
-	AI_REACT_LOOP_NAME_VULN_VERIFY         = "vuln_verify"
+	AI_REACT_LOOP_NAME_CODE_AUDIT_VERIFY   = "code_audit_verify"
 	AI_REACT_LOOP_NAME_INTENT              = "intent"
 	AI_REACT_LOOP_NAME_INTERNET_RESEARCH   = "internet_research"
-	AI_REACT_LOOP_NAME_WRITE_PYTHON_SCRIPT = "write_python_script"
 )
 
 const (

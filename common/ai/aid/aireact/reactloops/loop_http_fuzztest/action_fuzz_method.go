@@ -1,4 +1,4 @@
-package loop_http_differ
+package loop_http_fuzztest
 
 import (
 	"fmt"
