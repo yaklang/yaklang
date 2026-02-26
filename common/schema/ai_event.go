@@ -55,6 +55,7 @@ const (
 	AI_REACT_LOOP_NAME_CODE_AUDIT_VERIFY   = "code_audit_verify"
 	AI_REACT_LOOP_NAME_INTENT              = "intent"
 	AI_REACT_LOOP_NAME_INTERNET_RESEARCH   = "internet_research"
+	AI_REACT_LOOP_NAME_SMART_QA            = "smart_qa"
 )
 
 const (
