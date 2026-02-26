@@ -15,6 +15,9 @@ var (
 	configLoaded     bool
 
 	getNetworkConfig = yakit.GetNetworkConfig
+	getAIGlobalConfig = func() (*ypb.AIGlobalConfig, error) {
+		return yakit.GetAIGlobalConfig(consts.GetGormProfileDatabase())
+	}
 )
 
 func init() {
@@ -51,6 +54,13 @@ func ensureConfigLoadedFromDB() error {
 // use `yak tiered-ai-config` to write config into the database.
 func EnsureConfigLoaded() {
 	if configLoaded {
+		return
+	}
+
+	if cfg, err := getAIGlobalConfig(); err == nil && cfg != nil {
+		_ = yakit.ApplyAIGlobalConfig(consts.GetGormProfileDatabase(), cfg)
+		configLoaded = true
+		warnIfLegacyConfigFileExists()
 		return
 	}
 
@@ -143,4 +153,17 @@ func SetNetworkConfigGetter(fn func() *ypb.GlobalNetworkConfig) {
 // ResetNetworkConfigGetter restores the default getter. For testing only.
 func ResetNetworkConfigGetter() {
 	getNetworkConfig = yakit.GetNetworkConfig
+}
+
+// SetAIGlobalConfigGetter overrides the function used to fetch
+// AIGlobalConfig. For testing only.
+func SetAIGlobalConfigGetter(fn func() (*ypb.AIGlobalConfig, error)) {
+	getAIGlobalConfig = fn
+}
+
+// ResetAIGlobalConfigGetter restores the default getter. For testing only.
+func ResetAIGlobalConfigGetter() {
+	getAIGlobalConfig = func() (*ypb.AIGlobalConfig, error) {
+		return yakit.GetAIGlobalConfig(consts.GetGormProfileDatabase())
+	}
 }

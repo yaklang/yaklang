@@ -537,34 +537,37 @@ func ConfigureNetWork(c *ypb.GlobalNetworkConfig) {
 	}
 
 	// ==================== Tiered AI Model Configuration ====================
-	// Store tiered AI model configuration in memory
-	tieredConfig := &consts.TieredAIConfig{
-		Enabled:            c.GetEnableTieredAIModelConfig(),
-		DisableFallback:    false,
-		IntelligentConfigs: c.GetIntelligentAIModelConfig(),
-		LightweightConfigs: c.GetLightweightAIModelConfig(),
-		VisionConfigs:      c.GetVisionAIModelConfig(),
-	}
+	// Skip legacy network config if AI global config is already present.
+	if !HasAIGlobalConfig(consts.GetGormProfileDatabase()) {
+		// Store tiered AI model configuration in memory
+		tieredConfig := &consts.TieredAIConfig{
+			Enabled:            c.GetEnableTieredAIModelConfig(),
+			DisableFallback:    false,
+			IntelligentConfigs: c.GetIntelligentAIModelConfig(),
+			LightweightConfigs: c.GetLightweightAIModelConfig(),
+			VisionConfigs:      c.GetVisionAIModelConfig(),
+		}
 
-	// Parse routing policy from TieredAIModelConfig
-	if c.GetTieredAIModelConfig() != nil {
-		policy := c.GetTieredAIModelConfig().GetModelRoutingPolicy()
-		switch policy {
-		case "auto":
-			tieredConfig.RoutingPolicy = consts.PolicyAuto
-		case "performance":
-			tieredConfig.RoutingPolicy = consts.PolicyPerformance
-		case "cost":
-			tieredConfig.RoutingPolicy = consts.PolicyCost
-		case "balance":
-			tieredConfig.RoutingPolicy = consts.PolicyBalance
-		default:
+		// Parse routing policy from TieredAIModelConfig
+		if c.GetTieredAIModelConfig() != nil {
+			policy := c.GetTieredAIModelConfig().GetModelRoutingPolicy()
+			switch policy {
+			case "auto":
+				tieredConfig.RoutingPolicy = consts.PolicyAuto
+			case "performance":
+				tieredConfig.RoutingPolicy = consts.PolicyPerformance
+			case "cost":
+				tieredConfig.RoutingPolicy = consts.PolicyCost
+			case "balance":
+				tieredConfig.RoutingPolicy = consts.PolicyBalance
+			default:
+				tieredConfig.RoutingPolicy = consts.PolicyBalance
+			}
+			tieredConfig.DisableFallback = c.GetTieredAIModelConfig().GetDisableFallbackToLightweightModel()
+		} else {
 			tieredConfig.RoutingPolicy = consts.PolicyBalance
 		}
-		tieredConfig.DisableFallback = c.GetTieredAIModelConfig().GetDisableFallbackToLightweightModel()
-	} else {
-		tieredConfig.RoutingPolicy = consts.PolicyBalance
-	}
 
-	consts.SetTieredAIConfig(tieredConfig)
+		consts.SetTieredAIConfig(tieredConfig)
+	}
 }

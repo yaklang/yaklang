@@ -142,37 +142,39 @@ func ResolveConfigFilePath(specified string) string {
 	return filepath.Join(GetDefaultConfigDir(), "tiered-ai-config.yaml")
 }
 
-// SaveTieredAIConfigToDB merges the given TieredAIConfigFile into the database
-// GlobalNetworkConfig and persists it. This is the authoritative way to update
+// SaveTieredAIConfigToDB persists the given TieredAIConfigFile into the database
+// via the AI global config storage. This is the authoritative way to update
 // tiered AI configuration -- all runtime reads should come from the database.
 func SaveTieredAIConfigToDB(cfg *TieredAIConfigFile) error {
-	networkConfig := yakit.GetNetworkConfig()
-	if networkConfig == nil {
-		networkConfig = yakit.GetDefaultNetworkConfig()
+	aiConfig := &ypb.AIGlobalConfig{
+		Enabled:         cfg.Enabled,
+		RoutingPolicy:   cfg.RoutingPolicy,
+		DisableFallback: cfg.DisableFallback,
 	}
 
-	networkConfig.EnableTieredAIModelConfig = cfg.Enabled
-
-	if networkConfig.TieredAIModelConfig == nil {
-		networkConfig.TieredAIModelConfig = &ypb.TieredAIModelConfigDescriptor{}
-	}
-	networkConfig.TieredAIModelConfig.ModelRoutingPolicy = cfg.RoutingPolicy
-	networkConfig.TieredAIModelConfig.DisableFallbackToLightweightModel = cfg.DisableFallback
-
-	networkConfig.IntelligentAIModelConfig = nil
 	for _, e := range cfg.IntelligentConfigs {
-		networkConfig.IntelligentAIModelConfig = append(networkConfig.IntelligentAIModelConfig, ConfigEntryToThirdPartyConfig(e))
+		aiConfig.IntelligentModels = append(aiConfig.IntelligentModels, &ypb.AIModelConfig{
+			Provider:  ConfigEntryToThirdPartyConfig(e),
+			ModelName: e.Model,
+		})
 	}
-	networkConfig.LightweightAIModelConfig = nil
 	for _, e := range cfg.LightweightConfigs {
-		networkConfig.LightweightAIModelConfig = append(networkConfig.LightweightAIModelConfig, ConfigEntryToThirdPartyConfig(e))
+		aiConfig.LightweightModels = append(aiConfig.LightweightModels, &ypb.AIModelConfig{
+			Provider:  ConfigEntryToThirdPartyConfig(e),
+			ModelName: e.Model,
+		})
 	}
-	networkConfig.VisionAIModelConfig = nil
 	for _, e := range cfg.VisionConfigs {
-		networkConfig.VisionAIModelConfig = append(networkConfig.VisionAIModelConfig, ConfigEntryToThirdPartyConfig(e))
+		aiConfig.VisionModels = append(aiConfig.VisionModels, &ypb.AIModelConfig{
+			Provider:  ConfigEntryToThirdPartyConfig(e),
+			ModelName: e.Model,
+		})
 	}
 
-	yakit.ConfigureNetWork(networkConfig)
+	if _, err := yakit.SetAIGlobalConfig(consts.GetGormProfileDatabase(), aiConfig); err != nil {
+		return err
+	}
+	_ = yakit.ApplyAIGlobalConfig(consts.GetGormProfileDatabase(), aiConfig)
 	log.Infof("tiered AI config saved to database: enabled=%v, policy=%s", cfg.Enabled, cfg.RoutingPolicy)
 	return nil
 }
