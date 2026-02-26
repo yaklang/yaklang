@@ -93,6 +93,14 @@ func AutoUnzipPacketEncoding(raw []byte) (plain []byte, state *PacketEncodingSta
 	return _unzipPacketEncodingInternal(raw, _defaultUnzipPacketEncodingConfig())
 }
 
+func FastAutoUnzipPacketEncoding(raw []byte) (plain []byte) {
+	result, _, ok := _unzipPacketEncodingInternal(raw, _defaultUnzipPacketEncodingConfig())
+	if ok {
+		return result
+	}
+	return raw
+}
+
 func _unzipPacketEncodingInternal(raw []byte, cfg _unzipPacketEncodingConfig, opt ..._unzipPacketEncodingOption) (plain []byte, state *PacketEncodingState, ok bool) {
 	for _, o := range opt {
 		if o != nil {
