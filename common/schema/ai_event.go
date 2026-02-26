@@ -46,6 +46,7 @@ const (
 	AI_REACT_LOOP_NAME_WRITE_PYTHON_SCRIPT = "write_python_script"
 	AI_REACT_LOOP_NAME_DEFAULT             = "default"
 	AI_REACT_LOOP_NAME_WRITE_YAKLANG       = "write_yaklang_code"
+	AI_REACT_LOOP_NAME_WRITE_SYNTAXFLOW    = "write_syntaxflow_rule"
 	AI_REACT_LOOP_NAME_JAVA_DECOMPILER     = "java_decompiler"
 	AI_REACT_LOOP_NAME_HTTP_FUZZTEST       = "http_fuzztest"
 	AI_REACT_LOOP_NAME_PE_TASK             = "pe_task"

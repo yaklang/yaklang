@@ -1,0 +1,16 @@
+## 当前 SyntaxFlow 规则
+
+{{ if .Code }}
+<|CURRENT_SF_RULE_{{ .Nonce }}|>
+{{ .CurrentCodeWithLineNumber }}
+<|CURRENT_SF_RULE_END_{{ .Nonce }}|>
+
+{{ if .FeedbackMessages }}
+
+## 反馈/错误信息
+
+{{ .FeedbackMessages }}
+{{ end }}
+{{ else }}
+等待生成规则。使用 write_rule 创建新规则。
+{{ end }}
