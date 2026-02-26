@@ -111,18 +111,12 @@ func NewAuditMonitor(opts ...AuditMonitorOption) (*AuditMonitor, error) {
 	m := &AuditMonitor{
 		monitorLogin:   true,
 		monitorCommand: true,
-		bufferSize:     8192,
 		running:        false,
 		stopCh:         make(chan struct{}),
 	}
 
 	for _, opt := range opts {
 		opt(m)
-	}
-
-	// 设置默认缓冲区大小
-	if m.bufferSize == 0 {
-		m.bufferSize = 8192
 	}
 
 	return m, nil
