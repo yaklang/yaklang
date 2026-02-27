@@ -508,6 +508,9 @@ const (
 	Yak_UpdateHotPatchTemplate_FullMethodName                     = "/ypb.Yak/UpdateHotPatchTemplate"
 	Yak_QueryHotPatchTemplate_FullMethodName                      = "/ypb.Yak/QueryHotPatchTemplate"
 	Yak_QueryHotPatchTemplateList_FullMethodName                  = "/ypb.Yak/QueryHotPatchTemplateList"
+	Yak_GetGlobalHotPatchConfig_FullMethodName                    = "/ypb.Yak/GetGlobalHotPatchConfig"
+	Yak_SetGlobalHotPatchConfig_FullMethodName                    = "/ypb.Yak/SetGlobalHotPatchConfig"
+	Yak_ResetGlobalHotPatchConfig_FullMethodName                  = "/ypb.Yak/ResetGlobalHotPatchConfig"
 	Yak_GroupTableColumn_FullMethodName                           = "/ypb.Yak/GroupTableColumn"
 	Yak_UploadHotPatchTemplateToOnline_FullMethodName             = "/ypb.Yak/UploadHotPatchTemplateToOnline"
 	Yak_DownloadHotPatchTemplate_FullMethodName                   = "/ypb.Yak/DownloadHotPatchTemplate"
@@ -1250,6 +1253,10 @@ type YakClient interface {
 	UpdateHotPatchTemplate(ctx context.Context, in *UpdateHotPatchTemplateRequest, opts ...grpc.CallOption) (*UpdateHotPatchTemplateResponse, error)
 	QueryHotPatchTemplate(ctx context.Context, in *HotPatchTemplateRequest, opts ...grpc.CallOption) (*QueryHotPatchTemplateResponse, error)
 	QueryHotPatchTemplateList(ctx context.Context, in *QueryHotPatchTemplateListRequest, opts ...grpc.CallOption) (*QueryHotPatchTemplateListResponse, error)
+	// global hot-patch config (Global HotPatch)
+	GetGlobalHotPatchConfig(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GlobalHotPatchConfig, error)
+	SetGlobalHotPatchConfig(ctx context.Context, in *SetGlobalHotPatchConfigRequest, opts ...grpc.CallOption) (*GlobalHotPatchConfig, error)
+	ResetGlobalHotPatchConfig(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GlobalHotPatchConfig, error)
 	// db common rpc
 	GroupTableColumn(ctx context.Context, in *GroupTableColumnRequest, opts ...grpc.CallOption) (*GroupTableColumnResponse, error)
 	UploadHotPatchTemplateToOnline(ctx context.Context, in *UploadHotPatchTemplateToOnlineRequest, opts ...grpc.CallOption) (*Empty, error)
@@ -7003,6 +7010,36 @@ func (c *yakClient) QueryHotPatchTemplateList(ctx context.Context, in *QueryHotP
 	return out, nil
 }
 
+func (c *yakClient) GetGlobalHotPatchConfig(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GlobalHotPatchConfig, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GlobalHotPatchConfig)
+	err := c.cc.Invoke(ctx, Yak_GetGlobalHotPatchConfig_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) SetGlobalHotPatchConfig(ctx context.Context, in *SetGlobalHotPatchConfigRequest, opts ...grpc.CallOption) (*GlobalHotPatchConfig, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GlobalHotPatchConfig)
+	err := c.cc.Invoke(ctx, Yak_SetGlobalHotPatchConfig_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) ResetGlobalHotPatchConfig(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GlobalHotPatchConfig, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GlobalHotPatchConfig)
+	err := c.cc.Invoke(ctx, Yak_ResetGlobalHotPatchConfig_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) GroupTableColumn(ctx context.Context, in *GroupTableColumnRequest, opts ...grpc.CallOption) (*GroupTableColumnResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GroupTableColumnResponse)
@@ -8925,6 +8962,10 @@ type YakServer interface {
 	UpdateHotPatchTemplate(context.Context, *UpdateHotPatchTemplateRequest) (*UpdateHotPatchTemplateResponse, error)
 	QueryHotPatchTemplate(context.Context, *HotPatchTemplateRequest) (*QueryHotPatchTemplateResponse, error)
 	QueryHotPatchTemplateList(context.Context, *QueryHotPatchTemplateListRequest) (*QueryHotPatchTemplateListResponse, error)
+	// global hot-patch config (Global HotPatch)
+	GetGlobalHotPatchConfig(context.Context, *Empty) (*GlobalHotPatchConfig, error)
+	SetGlobalHotPatchConfig(context.Context, *SetGlobalHotPatchConfigRequest) (*GlobalHotPatchConfig, error)
+	ResetGlobalHotPatchConfig(context.Context, *Empty) (*GlobalHotPatchConfig, error)
 	// db common rpc
 	GroupTableColumn(context.Context, *GroupTableColumnRequest) (*GroupTableColumnResponse, error)
 	UploadHotPatchTemplateToOnline(context.Context, *UploadHotPatchTemplateToOnlineRequest) (*Empty, error)
@@ -10531,6 +10572,15 @@ func (UnimplementedYakServer) QueryHotPatchTemplate(context.Context, *HotPatchTe
 }
 func (UnimplementedYakServer) QueryHotPatchTemplateList(context.Context, *QueryHotPatchTemplateListRequest) (*QueryHotPatchTemplateListResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryHotPatchTemplateList not implemented")
+}
+func (UnimplementedYakServer) GetGlobalHotPatchConfig(context.Context, *Empty) (*GlobalHotPatchConfig, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetGlobalHotPatchConfig not implemented")
+}
+func (UnimplementedYakServer) SetGlobalHotPatchConfig(context.Context, *SetGlobalHotPatchConfigRequest) (*GlobalHotPatchConfig, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SetGlobalHotPatchConfig not implemented")
+}
+func (UnimplementedYakServer) ResetGlobalHotPatchConfig(context.Context, *Empty) (*GlobalHotPatchConfig, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ResetGlobalHotPatchConfig not implemented")
 }
 func (UnimplementedYakServer) GroupTableColumn(context.Context, *GroupTableColumnRequest) (*GroupTableColumnResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GroupTableColumn not implemented")
@@ -19013,6 +19063,60 @@ func _Yak_QueryHotPatchTemplateList_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_GetGlobalHotPatchConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetGlobalHotPatchConfig(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_GetGlobalHotPatchConfig_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetGlobalHotPatchConfig(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_SetGlobalHotPatchConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetGlobalHotPatchConfigRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).SetGlobalHotPatchConfig(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_SetGlobalHotPatchConfig_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).SetGlobalHotPatchConfig(ctx, req.(*SetGlobalHotPatchConfigRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_ResetGlobalHotPatchConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).ResetGlobalHotPatchConfig(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_ResetGlobalHotPatchConfig_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).ResetGlobalHotPatchConfig(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_GroupTableColumn_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GroupTableColumnRequest)
 	if err := dec(in); err != nil {
@@ -22440,6 +22544,18 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "QueryHotPatchTemplateList",
 			Handler:    _Yak_QueryHotPatchTemplateList_Handler,
+		},
+		{
+			MethodName: "GetGlobalHotPatchConfig",
+			Handler:    _Yak_GetGlobalHotPatchConfig_Handler,
+		},
+		{
+			MethodName: "SetGlobalHotPatchConfig",
+			Handler:    _Yak_SetGlobalHotPatchConfig_Handler,
+		},
+		{
+			MethodName: "ResetGlobalHotPatchConfig",
+			Handler:    _Yak_ResetGlobalHotPatchConfig_Handler,
 		},
 		{
 			MethodName: "GroupTableColumn",
