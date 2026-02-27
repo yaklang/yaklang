@@ -37,19 +37,11 @@ type SSARiskPart struct {
 	DataflowHashes []string        `json:"dataflow_hashes,omitempty"`
 }
 
-// Compatibility aliases for existing callers.
-type StreamSingleResultParts = SSAResultParts
-type StreamDataflowPart = SSADataflowPart
-type StreamRiskPart = SSARiskPart
-
 type StreamPartsOptions struct {
-	StreamKey        string
 	ReportType       ReportType
 	ShowDataflowPath bool
 	ShowFileContent  bool
 	WithFile         bool
-	DedupFileContent bool
-	DedupDataflow    bool
 }
 
 type StreamPartsOption func(*StreamPartsOptions)
@@ -60,7 +52,6 @@ func NewStreamPartsOptions(opts ...StreamPartsOption) StreamPartsOptions {
 		ShowDataflowPath: true,
 		ShowFileContent:  true,
 		WithFile:         true,
-		DedupDataflow:    true,
 	}
 	for _, opt := range opts {
 		if opt != nil {
@@ -71,12 +62,6 @@ func NewStreamPartsOptions(opts ...StreamPartsOption) StreamPartsOptions {
 		o.ReportType = IRifyFullReportType
 	}
 	return o
-}
-
-func WithStreamKey(v string) StreamPartsOption {
-	return func(o *StreamPartsOptions) {
-		o.StreamKey = strings.TrimSpace(v)
-	}
 }
 
 func WithStreamReportType(v ReportType) StreamPartsOption {
@@ -100,18 +85,6 @@ func WithStreamShowFileContent(v bool) StreamPartsOption {
 func WithStreamWithFile(v bool) StreamPartsOption {
 	return func(o *StreamPartsOptions) {
 		o.WithFile = v
-	}
-}
-
-func WithStreamDedupFileContent(v bool) StreamPartsOption {
-	return func(o *StreamPartsOptions) {
-		o.DedupFileContent = v
-	}
-}
-
-func WithStreamDedupDataflow(v bool) StreamPartsOption {
-	return func(o *StreamPartsOptions) {
-		o.DedupDataflow = v
 	}
 }
 
@@ -142,7 +115,6 @@ func ConvertSingleResultToSSAResultParts(result *ssaapi.SyntaxFlowResult, opts S
 	if result == nil {
 		return nil, nil
 	}
-	_ = opts.StreamKey
 	if opts.ReportType == "" {
 		opts.ReportType = IRifyFullReportType
 	}
@@ -317,14 +289,6 @@ func ConvertSingleResultToSSAResultParts(result *ssaapi.SyntaxFlowResult, opts S
 	return out, nil
 }
 
-func ConvertSingleResultToStreamPartsJSON(result *ssaapi.SyntaxFlowResult, opts StreamPartsOptions) (string, map[string]any, error) {
-	return ConvertSingleResultToSSAResultPartsJSON(result, opts)
-}
-
-func ConvertSingleResultToStreamParts(result *ssaapi.SyntaxFlowResult, opts StreamPartsOptions) (*StreamSingleResultParts, error) {
-	return ConvertSingleResultToSSAResultParts(result, opts)
-}
-
 func upsertStreamFileByEditor(fileByHash map[string]*File, editor *memedit.MemEditor, reportCtx *Report) *File {
 	if editor == nil {
 		return nil
@@ -356,140 +320,6 @@ func upsertStreamFileByHash(fileByHash map[string]*File, irSourceHash string, re
 	f := NewFile(editor, reportCtx)
 	fileByHash[irSourceHash] = f
 	return f, nil
-}
-
-// buildFiles extracts unique files from the report and returns risk→fileHashes mapping.
-func buildFiles(out *StreamSingleResultParts, report *Report, withFile bool, dedup *streamDedupState, dedupFile bool) map[string][]string {
-	riskFiles := make(map[string][]string)
-	if !withFile || len(report.File) == 0 {
-		return riskFiles
-	}
-
-	// Build unique file index, preferring fileByHash if available.
-	unique := make(map[string]*File, len(report.File))
-	if len(report.fileByHash) > 0 {
-		for h, f := range report.fileByHash {
-			if h != "" && f != nil {
-				unique[h] = f
-			}
-		}
-	} else {
-		for _, f := range report.File {
-			if f == nil || f.IrSourceHash == "" {
-				continue
-			}
-			if _, ok := unique[f.IrSourceHash]; !ok {
-				unique[f.IrSourceHash] = f
-			}
-		}
-	}
-
-	out.Files = make([]*File, 0, len(unique))
-	var fileDedup *streamDedupState
-	if dedupFile {
-		fileDedup = dedup
-	}
-
-	for h, f := range unique {
-		// Always track risk→file associations, even for deduped files.
-		for _, rh := range f.Risks {
-			if rh = strings.TrimSpace(rh); rh != "" {
-				riskFiles[rh] = append(riskFiles[rh], h)
-			}
-		}
-
-		if !fileDedup.markSeen("file:", h) {
-			continue
-		}
-
-		ff := *f
-		if ff.Content != "" && !utf8.ValidString(ff.Content) {
-			ff.Content = utils.EscapeInvalidUTF8Byte([]byte(ff.Content))
-		}
-		out.Files = append(out.Files, &ff)
-	}
-
-	sort.Slice(out.Files, func(i, j int) bool {
-		return out.Files[i].IrSourceHash < out.Files[j].IrSourceHash
-	})
-	return riskFiles
-}
-
-// buildDataflowsAndRisks builds dataflow parts and risk parts in a single pass over report.Risks.
-func buildDataflowsAndRisks(
-	out *StreamSingleResultParts,
-	report *Report,
-	dedup *streamDedupState,
-	dedupDataflow bool,
-	riskFiles map[string][]string,
-) {
-	flowPayloads := make(map[string]json.RawMessage)
-	riskFlows := make(map[string][]string)
-
-	var flowDedup *streamDedupState
-	if dedupDataflow {
-		flowDedup = dedup
-	}
-
-	out.Risks = make([]*StreamRiskPart, 0, len(report.Risks))
-	out.Dataflows = make([]*StreamDataflowPart, 0)
-
-	for rh, r := range report.Risks {
-		if r == nil {
-			continue
-		}
-		riskHash := strings.TrimSpace(rh)
-		if riskHash == "" {
-			riskHash = strings.TrimSpace(r.Hash)
-		}
-		if riskHash == "" {
-			continue
-		}
-		if out.ProgramName == "" && r.ProgramName != "" {
-			out.ProgramName = r.ProgramName
-		}
-
-		// Collect dataflow hashes for this risk.
-		for _, p := range r.DataFlowPaths {
-			raw, err := MarshalMinimalDataFlowPath(p)
-			if err != nil || len(raw) == 0 {
-				continue
-			}
-			flowHash := codec.Sha256(raw)
-			if flowHash == "" {
-				continue
-			}
-			if _, exists := flowPayloads[flowHash]; !exists {
-				flowPayloads[flowHash] = raw
-				if flowDedup.markSeen("flow:", flowHash) {
-					out.Dataflows = append(out.Dataflows, &StreamDataflowPart{
-						DataflowHash: flowHash,
-						Payload:      raw,
-					})
-				}
-			}
-			riskFlows[riskHash] = append(riskFlows[riskHash], flowHash)
-		}
-
-		// Build risk part (strip heavy DataFlowPaths).
-		rc := *r
-		rc.Hash = riskHash
-		rc.DataFlowPaths = nil
-		riskJSON, err := json.Marshal(&rc)
-		if err != nil {
-			continue
-		}
-		out.Risks = append(out.Risks, &StreamRiskPart{
-			RiskHash:       riskHash,
-			RiskJSON:       riskJSON,
-			FileHashes:     dedupStrings(riskFiles[riskHash]),
-			DataflowHashes: dedupStrings(riskFlows[riskHash]),
-		})
-	}
-
-	sort.Slice(out.Dataflows, func(i, j int) bool {
-		return out.Dataflows[i].DataflowHash < out.Dataflows[j].DataflowHash
-	})
 }
 
 func dedupStrings(in []string) []string {
