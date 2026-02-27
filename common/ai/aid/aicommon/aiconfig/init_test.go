@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -27,6 +28,7 @@ func setupTempYakitHome(t *testing.T) string {
 	t.Helper()
 	tmpDir := t.TempDir()
 	t.Setenv("YAKIT_HOME", tmpDir)
+	consts.ResetYakitHomeOnce()
 	baseDir := filepath.Join(tmpDir, "base")
 	require.NoError(t, os.MkdirAll(baseDir, 0o755))
 	return tmpDir
@@ -56,6 +58,7 @@ func TestLoadTieredConfigFromNetworkConfig_Enabled(t *testing.T) {
 	saveAndRestore(t)
 	consts.SetTieredAIConfig(nil)
 	ResetConfigLoaded()
+	SetAIGlobalConfigGetter(func() (*ypb.AIGlobalConfig, error) { return nil, nil })
 
 	networkConfig := &ypb.GlobalNetworkConfig{
 		EnableTieredAIModelConfig: true,
@@ -91,6 +94,7 @@ func TestLoadTieredConfigFromNetworkConfig_Disabled(t *testing.T) {
 	saveAndRestore(t)
 	consts.SetTieredAIConfig(nil)
 	ResetConfigLoaded()
+	SetAIGlobalConfigGetter(func() (*ypb.AIGlobalConfig, error) { return nil, nil })
 
 	networkConfig := &ypb.GlobalNetworkConfig{
 		EnableTieredAIModelConfig: false,
@@ -112,6 +116,7 @@ func TestLoadTieredConfigFromNetworkConfig_EmptyPolicy(t *testing.T) {
 	saveAndRestore(t)
 	consts.SetTieredAIConfig(nil)
 	ResetConfigLoaded()
+	SetAIGlobalConfigGetter(func() (*ypb.AIGlobalConfig, error) { return nil, nil })
 
 	networkConfig := &ypb.GlobalNetworkConfig{
 		EnableTieredAIModelConfig: true,
@@ -141,6 +146,7 @@ func TestEnsureConfigLoaded_DBEnabled(t *testing.T) {
 	saveAndRestore(t)
 	setupTempYakitHome(t)
 
+	SetAIGlobalConfigGetter(func() (*ypb.AIGlobalConfig, error) { return nil, nil })
 	SetNetworkConfigGetter(func() *ypb.GlobalNetworkConfig {
 		return &ypb.GlobalNetworkConfig{
 			EnableTieredAIModelConfig: true,
@@ -170,6 +176,7 @@ func TestEnsureConfigLoaded_DBDisabled(t *testing.T) {
 	saveAndRestore(t)
 	setupTempYakitHome(t)
 
+	SetAIGlobalConfigGetter(func() (*ypb.AIGlobalConfig, error) { return nil, nil })
 	SetNetworkConfigGetter(func() *ypb.GlobalNetworkConfig {
 		return &ypb.GlobalNetworkConfig{
 			EnableTieredAIModelConfig: false,
@@ -195,6 +202,7 @@ func TestEnsureConfigLoaded_NoConfig_LoadsDefaults(t *testing.T) {
 	saveAndRestore(t)
 	setupTempYakitHome(t)
 
+	SetAIGlobalConfigGetter(func() (*ypb.AIGlobalConfig, error) { return nil, nil })
 	SetNetworkConfigGetter(func() *ypb.GlobalNetworkConfig { return nil })
 	consts.SetTieredAIConfig(nil)
 	ResetConfigLoaded()
@@ -209,6 +217,16 @@ func TestEnsureConfigLoaded_NoConfig_LoadsDefaults(t *testing.T) {
 	assert.NotEmpty(t, cfg.IntelligentConfigs)
 	assert.NotEmpty(t, cfg.LightweightConfigs)
 	assert.NotEmpty(t, cfg.VisionConfigs)
+
+	dbCfg, err := yakit.GetAIGlobalConfig(consts.GetGormProfileDatabase())
+	require.NoError(t, err)
+	require.NotNil(t, dbCfg)
+	assert.True(t, dbCfg.Enabled)
+
+	providers, err := yakit.ListAIProviders(consts.GetGormProfileDatabase())
+	require.NoError(t, err)
+	assert.NotEmpty(t, providers)
+	assert.Equal(t, "aibalance", providers[0].Type)
 }
 
 // Config file on disk must be IGNORED by EnsureConfigLoaded.
@@ -234,6 +252,7 @@ intelligent_configs:
 			},
 		}
 	})
+	SetAIGlobalConfigGetter(func() (*ypb.AIGlobalConfig, error) { return nil, nil })
 	consts.SetTieredAIConfig(nil)
 	ResetConfigLoaded()
 
@@ -251,6 +270,7 @@ intelligent_configs:
 func TestEnsureConfigLoaded_AlreadyLoaded(t *testing.T) {
 	saveAndRestore(t)
 
+	SetAIGlobalConfigGetter(func() (*ypb.AIGlobalConfig, error) { return nil, nil })
 	SetNetworkConfigGetter(func() *ypb.GlobalNetworkConfig { return nil })
 	consts.SetTieredAIConfig(&consts.TieredAIConfig{
 		Enabled:       true,
@@ -332,4 +352,34 @@ func TestEnsureConfigLoaded_AIGlobalConfigErrorFallback(t *testing.T) {
 	assert.True(t, cfg.Enabled)
 	assert.Equal(t, consts.PolicyPerformance, cfg.RoutingPolicy)
 	assert.True(t, IsConfigLoaded())
+}
+
+func TestEnsureConfigLoaded_NetworkConfigPersistsToDB(t *testing.T) {
+	saveAndRestore(t)
+	setupTempYakitHome(t)
+
+	SetAIGlobalConfigGetter(func() (*ypb.AIGlobalConfig, error) { return nil, nil })
+	SetNetworkConfigGetter(func() *ypb.GlobalNetworkConfig {
+		return &ypb.GlobalNetworkConfig{
+			EnableTieredAIModelConfig: true,
+			TieredAIModelConfig: &ypb.TieredAIModelConfigDescriptor{
+				ModelRoutingPolicy:                "performance",
+				DisableFallbackToLightweightModel: true,
+			},
+			IntelligentAIModelConfig: []*ypb.ThirdPartyApplicationConfig{
+				{Type: "aibalance", APIKey: "test"},
+			},
+		}
+	})
+	consts.SetTieredAIConfig(nil)
+	ResetConfigLoaded()
+
+	EnsureConfigLoaded()
+
+	dbCfg, err := yakit.GetAIGlobalConfig(consts.GetGormProfileDatabase())
+	require.NoError(t, err)
+	require.NotNil(t, dbCfg)
+	assert.Equal(t, "performance", dbCfg.RoutingPolicy)
+	assert.True(t, dbCfg.DisableFallback)
+	assert.Len(t, dbCfg.IntelligentModels, 1)
 }
