@@ -104,19 +104,23 @@ func doVerifyAIConfig() error {
 	return nil
 }
 
-// verifyThirdPartyConfig verifies a single ThirdPartyApplicationConfig
-func verifyThirdPartyConfig(cfg *ypb.ThirdPartyApplicationConfig, tier string, index int) error {
+// verifyThirdPartyConfig verifies a single AIModelConfig.
+func verifyThirdPartyConfig(cfg *ypb.AIModelConfig, tier string, index int) error {
 	if cfg == nil {
 		return utils.Errorf("%s config[%d] is nil", tier, index)
 	}
+	provider := cfg.GetProvider()
+	if provider == nil {
+		return utils.Errorf("%s config[%d] has nil provider", tier, index)
+	}
 
-	if cfg.Type == "" {
+	if provider.GetType() == "" {
 		return utils.Errorf("%s config[%d] has empty type", tier, index)
 	}
 
 	// APIKey is optional for some providers (e.g., local ollama)
 	// So we only warn if it's empty
-	if cfg.APIKey == "" {
+	if provider.GetAPIKey() == "" {
 		log.Debugf("%s config[%d] has empty API key, this may be intentional for local providers", tier, index)
 	}
 

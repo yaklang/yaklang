@@ -49,6 +49,26 @@ func ConfigEntryToThirdPartyConfig(entry AIModelConfigEntry) *ypb.ThirdPartyAppl
 	return cfg
 }
 
+func ConfigEntryToModelConfig(entry AIModelConfigEntry) *ypb.AIModelConfig {
+	provider := &ypb.ThirdPartyApplicationConfig{
+		Type:   entry.Type,
+		APIKey: entry.APIKey,
+		Domain: entry.Domain,
+	}
+	extras := make([]*ypb.KVPair, 0, len(entry.ExtraParams))
+	for k, v := range entry.ExtraParams {
+		if k == modelExtraParamKey {
+			continue
+		}
+		extras = append(extras, &ypb.KVPair{Key: k, Value: v})
+	}
+	return &ypb.AIModelConfig{
+		Provider:    provider,
+		ModelName:   entry.Model,
+		ExtraParams: extras,
+	}
+}
+
 func ThirdPartyConfigToEntry(cfg *ypb.ThirdPartyApplicationConfig) AIModelConfigEntry {
 	entry := AIModelConfigEntry{
 		Type:   cfg.GetType(),
@@ -90,13 +110,13 @@ func ConfigFileToTieredAIConfig(cfg *TieredAIConfigFile) *consts.TieredAIConfig 
 		tiered.RoutingPolicy = consts.PolicyBalance
 	}
 	for _, e := range cfg.IntelligentConfigs {
-		tiered.IntelligentConfigs = append(tiered.IntelligentConfigs, ConfigEntryToThirdPartyConfig(e))
+		tiered.IntelligentConfigs = append(tiered.IntelligentConfigs, ConfigEntryToModelConfig(e))
 	}
 	for _, e := range cfg.LightweightConfigs {
-		tiered.LightweightConfigs = append(tiered.LightweightConfigs, ConfigEntryToThirdPartyConfig(e))
+		tiered.LightweightConfigs = append(tiered.LightweightConfigs, ConfigEntryToModelConfig(e))
 	}
 	for _, e := range cfg.VisionConfigs {
-		tiered.VisionConfigs = append(tiered.VisionConfigs, ConfigEntryToThirdPartyConfig(e))
+		tiered.VisionConfigs = append(tiered.VisionConfigs, ConfigEntryToModelConfig(e))
 	}
 	return tiered
 }
@@ -153,22 +173,13 @@ func SaveTieredAIConfigToDB(cfg *TieredAIConfigFile) error {
 	}
 
 	for _, e := range cfg.IntelligentConfigs {
-		aiConfig.IntelligentModels = append(aiConfig.IntelligentModels, &ypb.AIModelConfig{
-			Provider:  ConfigEntryToThirdPartyConfig(e),
-			ModelName: e.Model,
-		})
+		aiConfig.IntelligentModels = append(aiConfig.IntelligentModels, ConfigEntryToModelConfig(e))
 	}
 	for _, e := range cfg.LightweightConfigs {
-		aiConfig.LightweightModels = append(aiConfig.LightweightModels, &ypb.AIModelConfig{
-			Provider:  ConfigEntryToThirdPartyConfig(e),
-			ModelName: e.Model,
-		})
+		aiConfig.LightweightModels = append(aiConfig.LightweightModels, ConfigEntryToModelConfig(e))
 	}
 	for _, e := range cfg.VisionConfigs {
-		aiConfig.VisionModels = append(aiConfig.VisionModels, &ypb.AIModelConfig{
-			Provider:  ConfigEntryToThirdPartyConfig(e),
-			ModelName: e.Model,
-		})
+		aiConfig.VisionModels = append(aiConfig.VisionModels, ConfigEntryToModelConfig(e))
 	}
 
 	if _, err := yakit.SetAIGlobalConfig(consts.GetGormProfileDatabase(), aiConfig); err != nil {

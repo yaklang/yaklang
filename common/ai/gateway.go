@@ -444,7 +444,7 @@ func tieredChat(msg string, opts ...aispec.AIConfigOption) (string, error) {
 	policy := consts.GetTieredAIRoutingPolicy()
 
 	// Select the appropriate tier based on policy
-	var configs []*ypb.ThirdPartyApplicationConfig
+	var configs []*ypb.AIModelConfig
 	switch policy {
 	case consts.PolicyPerformance:
 		configs = consts.GetIntelligentAIConfigs()
@@ -463,20 +463,24 @@ func tieredChat(msg string, opts ...aispec.AIConfigOption) (string, error) {
 	}
 
 	// Try each config in order
-	for _, cfg := range configs {
-		result, err := chatWithThirdPartyConfig(msg, cfg, opts...)
+	for _, model := range configs {
+		result, err := chatWithModelConfig(msg, model, opts...)
 		if err == nil {
 			return result, nil
 		}
-		log.Debugf("Chat with config type=%s failed: %v, trying next", cfg.Type, err)
+		if model == nil || model.GetProvider() == nil {
+			log.Debugf("Chat with model config failed: provider is nil, trying next")
+			continue
+		}
+		log.Debugf("Chat with config type=%s failed: %v, trying next", model.GetProvider().GetType(), err)
 	}
 
 	// Fallback to lightweight if not already using it
 	if policy != consts.PolicyCost && !consts.IsTieredAIFallbackDisabled() {
 		log.Debugf("Falling back to lightweight model")
 		lightweightConfigs := consts.GetLightweightAIConfigs()
-		for _, cfg := range lightweightConfigs {
-			result, err := chatWithThirdPartyConfig(msg, cfg, opts...)
+		for _, model := range lightweightConfigs {
+			result, err := chatWithModelConfig(msg, model, opts...)
 			if err == nil {
 				return result, nil
 			}
@@ -488,20 +492,28 @@ func tieredChat(msg string, opts ...aispec.AIConfigOption) (string, error) {
 	return legacyChat(msg, opts...)
 }
 
-// chatWithThirdPartyConfig performs chat using a specific ThirdPartyApplicationConfig
-func chatWithThirdPartyConfig(msg string, cfg *ypb.ThirdPartyApplicationConfig, opts ...aispec.AIConfigOption) (string, error) {
+// chatWithModelConfig performs chat using a specific AIModelConfig.
+func chatWithModelConfig(msg string, cfg *ypb.AIModelConfig, opts ...aispec.AIConfigOption) (string, error) {
 	if cfg == nil {
 		return "", errors.New("config is nil")
 	}
+	provider := cfg.GetProvider()
+	if provider == nil {
+		return "", errors.New("provider config is nil")
+	}
+	providerType := provider.GetType()
+	if providerType == "" {
+		return "", errors.New("provider type is empty")
+	}
 
 	// Build options from config
-	configOpts := buildOptionsFromThirdPartyConfig(cfg)
+	configOpts := aispec.BuildOptionsFromConfig(cfg)
 	allOpts := append(configOpts, opts...)
 
 	// Create gateway and chat
-	agent := createAIGateway(cfg.Type)
+	agent := createAIGateway(providerType)
 	if agent == nil {
-		return "", errors.New("failed to create AI gateway for type: " + cfg.Type)
+		return "", errors.New("failed to create AI gateway for type: " + providerType)
 	}
 
 	agent.LoadOption(allOpts...)
@@ -509,39 +521,14 @@ func chatWithThirdPartyConfig(msg string, cfg *ypb.ThirdPartyApplicationConfig, 
 		return "", err
 	}
 
-	invokeModelInfoCallback(agent, cfg.Type)
-	log.Debugf("Start tiered chat with type=%s", cfg.Type)
+	invokeModelInfoCallback(agent, providerType)
+	log.Debugf("Start tiered chat with type=%s", providerType)
 	result, err := agent.Chat(msg)
 	if err != nil {
 		return "", err
 	}
-	invokeModelInfoConfirmCallback(agent, cfg.Type)
+	invokeModelInfoConfirmCallback(agent, providerType)
 	return result, nil
-}
-
-// buildOptionsFromThirdPartyConfig builds AIConfigOption slice from ThirdPartyApplicationConfig
-func buildOptionsFromThirdPartyConfig(cfg *ypb.ThirdPartyApplicationConfig) []aispec.AIConfigOption {
-	var opts []aispec.AIConfigOption
-
-	if cfg.Type != "" {
-		opts = append(opts, aispec.WithType(cfg.Type))
-	}
-	if cfg.APIKey != "" {
-		opts = append(opts, aispec.WithAPIKey(cfg.APIKey))
-	}
-	if cfg.Domain != "" {
-		opts = append(opts, aispec.WithDomain(cfg.Domain))
-	}
-
-	// Extract model from ExtraParams
-	for _, param := range cfg.ExtraParams {
-		if param.Key == "model" {
-			opts = append(opts, aispec.WithModel(param.Value))
-			break
-		}
-	}
-
-	return opts
 }
 
 // TieredChat allows explicit selection of a model tier for chat
@@ -560,7 +547,7 @@ func TieredChatWithTier(tier ModelTier, msg string, opts ...aispec.AIConfigOptio
 		return legacyChat(msg, opts...)
 	}
 
-	var configs []*ypb.ThirdPartyApplicationConfig
+	var configs []*ypb.AIModelConfig
 	switch tier {
 	case TierIntelligent:
 		configs = consts.GetIntelligentAIConfigs()
@@ -578,7 +565,7 @@ func TieredChatWithTier(tier ModelTier, msg string, opts ...aispec.AIConfigOptio
 	}
 
 	// Try the first config
-	return chatWithThirdPartyConfig(msg, configs[0], opts...)
+	return chatWithModelConfig(msg, configs[0], opts...)
 }
 
 // IntelligentChat uses the intelligent (high-quality) model
@@ -842,12 +829,15 @@ var Exports = map[string]any{
 	"modelInfoConfirmCallback": aispec.WithModelInfoConfirmCallback,
 }
 
-// CreateChatterFromConfig creates a chat function from ThirdPartyApplicationConfig
-func CreateChatterFromConfig(config *ypb.ThirdPartyApplicationConfig) (func(string, ...aispec.AIConfigOption) (string, error), error) {
+// CreateChatterFromConfig creates a chat function from AIModelConfig.
+func CreateChatterFromConfig(config *ypb.AIModelConfig) (func(string, ...aispec.AIConfigOption) (string, error), error) {
 	if config == nil {
-		return nil, fmt.Errorf("ThirdPartyApplicationConfig is nil")
+		return nil, fmt.Errorf("AIModelConfig is nil")
+	}
+	if config.GetProvider() == nil {
+		return nil, fmt.Errorf("AIModelConfig provider is nil")
 	}
 
 	opts := aispec.BuildOptionsFromConfig(config)
-	return LoadChater(config.Type, opts...)
+	return LoadChater(config.GetProvider().GetType(), opts...)
 }

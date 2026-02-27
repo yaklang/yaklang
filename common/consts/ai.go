@@ -55,11 +55,11 @@ type TieredAIConfig struct {
 	// GlobalWeight is a global weight used by AI routing strategies
 	GlobalWeight float64
 	// IntelligentConfigs contains configurations for high-intelligence models
-	IntelligentConfigs []*ypb.ThirdPartyApplicationConfig
+	IntelligentConfigs []*ypb.AIModelConfig
 	// LightweightConfigs contains configurations for lightweight models
-	LightweightConfigs []*ypb.ThirdPartyApplicationConfig
+	LightweightConfigs []*ypb.AIModelConfig
 	// VisionConfigs contains configurations for vision models
-	VisionConfigs []*ypb.ThirdPartyApplicationConfig
+	VisionConfigs []*ypb.AIModelConfig
 }
 
 // tieredAIConfig stores the global tiered AI configuration
@@ -111,7 +111,7 @@ func GetTieredAIRoutingPolicy() RoutingPolicy {
 }
 
 // GetIntelligentAIConfigs returns the intelligent model configurations
-func GetIntelligentAIConfigs() []*ypb.ThirdPartyApplicationConfig {
+func GetIntelligentAIConfigs() []*ypb.AIModelConfig {
 	tieredAIConfigLock.RLock()
 	defer tieredAIConfigLock.RUnlock()
 	if tieredAIConfig == nil {
@@ -121,7 +121,7 @@ func GetIntelligentAIConfigs() []*ypb.ThirdPartyApplicationConfig {
 }
 
 // GetLightweightAIConfigs returns the lightweight model configurations
-func GetLightweightAIConfigs() []*ypb.ThirdPartyApplicationConfig {
+func GetLightweightAIConfigs() []*ypb.AIModelConfig {
 	tieredAIConfigLock.RLock()
 	defer tieredAIConfigLock.RUnlock()
 	if tieredAIConfig == nil {
@@ -131,7 +131,7 @@ func GetLightweightAIConfigs() []*ypb.ThirdPartyApplicationConfig {
 }
 
 // GetVisionAIConfigs returns the vision model configurations
-func GetVisionAIConfigs() []*ypb.ThirdPartyApplicationConfig {
+func GetVisionAIConfigs() []*ypb.AIModelConfig {
 	tieredAIConfigLock.RLock()
 	defer tieredAIConfigLock.RUnlock()
 	if tieredAIConfig == nil {

@@ -86,11 +86,25 @@ func ApplyAIGlobalConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig) error {
 	}
 	providerMap, _ := LoadAIProviderMap(db)
 
-	buildConfigs := func(models []*ypb.AIModelConfig) []*ypb.ThirdPartyApplicationConfig {
+	cloneExtraParams := func(extra []*ypb.KVPair) []*ypb.KVPair {
+		if len(extra) == 0 {
+			return nil
+		}
+		cloned := make([]*ypb.KVPair, 0, len(extra))
+		for _, kv := range extra {
+			if kv == nil {
+				continue
+			}
+			cloned = append(cloned, &ypb.KVPair{Key: kv.GetKey(), Value: kv.GetValue()})
+		}
+		return cloned
+	}
+
+	buildModels := func(models []*ypb.AIModelConfig) []*ypb.AIModelConfig {
 		if len(models) == 0 {
 			return nil
 		}
-		result := make([]*ypb.ThirdPartyApplicationConfig, 0, len(models))
+		result := make([]*ypb.AIModelConfig, 0, len(models))
 		for _, model := range models {
 			if model == nil {
 				continue
@@ -99,8 +113,12 @@ func ApplyAIGlobalConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig) error {
 			if providerCfg == nil {
 				continue
 			}
-			merged := mergeProviderAndModel(providerCfg, model)
-			result = append(result, merged)
+			result = append(result, &ypb.AIModelConfig{
+				ProviderId:  model.GetProviderId(),
+				Provider:    providerCfg,
+				ModelName:   model.GetModelName(),
+				ExtraParams: cloneExtraParams(model.GetExtraParams()),
+			})
 		}
 		return result
 	}
@@ -125,9 +143,9 @@ func ApplyAIGlobalConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig) error {
 		GlobalWeight:    cfg.GetGlobalWeight(),
 	}
 
-	tiered.IntelligentConfigs = buildConfigs(cfg.IntelligentModels)
-	tiered.LightweightConfigs = buildConfigs(cfg.LightweightModels)
-	tiered.VisionConfigs = buildConfigs(cfg.VisionModels)
+	tiered.IntelligentConfigs = buildModels(cfg.IntelligentModels)
+	tiered.LightweightConfigs = buildModels(cfg.LightweightModels)
+	tiered.VisionConfigs = buildModels(cfg.VisionModels)
 
 	consts.SetTieredAIConfig(tiered)
 	return nil

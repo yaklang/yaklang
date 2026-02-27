@@ -33,8 +33,8 @@ func TestVerifyAIConfig(t *testing.T) {
 	consts.SetTieredAIConfig(&consts.TieredAIConfig{
 		Enabled:       true,
 		RoutingPolicy: consts.PolicyBalance,
-		IntelligentConfigs: []*ypb.ThirdPartyApplicationConfig{
-			{Type: "aibalance", APIKey: "test-key"},
+		IntelligentConfigs: []*ypb.AIModelConfig{
+			{Provider: &ypb.ThirdPartyApplicationConfig{Type: "aibalance", APIKey: "test-key"}, ModelName: "test-model"},
 		},
 	})
 	err = VerifyAIConfig()
@@ -78,8 +78,8 @@ func TestVerifyOnce(t *testing.T) {
 	// Set up a valid config
 	consts.SetTieredAIConfig(&consts.TieredAIConfig{
 		Enabled: true,
-		IntelligentConfigs: []*ypb.ThirdPartyApplicationConfig{
-			{Type: "aibalance", APIKey: "test-key"},
+		IntelligentConfigs: []*ypb.AIModelConfig{
+			{Provider: &ypb.ThirdPartyApplicationConfig{Type: "aibalance", APIKey: "test-key"}, ModelName: "test-model"},
 		},
 	})
 
@@ -107,22 +107,20 @@ func TestVerifyThirdPartyConfig(t *testing.T) {
 	assert.Error(t, err)
 
 	// Test empty type
-	err = verifyThirdPartyConfig(&ypb.ThirdPartyApplicationConfig{
-		Type: "",
+	err = verifyThirdPartyConfig(&ypb.AIModelConfig{
+		Provider: &ypb.ThirdPartyApplicationConfig{Type: ""},
 	}, "test", 0)
 	assert.Error(t, err)
 
 	// Test valid config
-	err = verifyThirdPartyConfig(&ypb.ThirdPartyApplicationConfig{
-		Type:   "aibalance",
-		APIKey: "test-key",
+	err = verifyThirdPartyConfig(&ypb.AIModelConfig{
+		Provider: &ypb.ThirdPartyApplicationConfig{Type: "aibalance", APIKey: "test-key"},
 	}, "test", 0)
 	assert.NoError(t, err)
 
 	// Test config without API key (should still pass with warning)
-	err = verifyThirdPartyConfig(&ypb.ThirdPartyApplicationConfig{
-		Type:   "ollama",
-		APIKey: "",
+	err = verifyThirdPartyConfig(&ypb.AIModelConfig{
+		Provider: &ypb.ThirdPartyApplicationConfig{Type: "ollama", APIKey: ""},
 	}, "test", 0)
 	assert.NoError(t, err)
 }

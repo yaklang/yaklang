@@ -173,9 +173,9 @@ func buildAIGlobalConfigFromTiered(tiered *consts.TieredAIConfig) *ypb.AIGlobalC
 		cfg.RoutingPolicy = defaultRoutingPolicy
 	}
 
-	cfg.IntelligentModels = buildAIModelConfigs(tiered.IntelligentConfigs)
-	cfg.LightweightModels = buildAIModelConfigs(tiered.LightweightConfigs)
-	cfg.VisionModels = buildAIModelConfigs(tiered.VisionConfigs)
+	cfg.IntelligentModels = cloneAIModelConfigs(tiered.IntelligentConfigs)
+	cfg.LightweightModels = cloneAIModelConfigs(tiered.LightweightConfigs)
+	cfg.VisionModels = cloneAIModelConfigs(tiered.VisionConfigs)
 
 	return cfg
 }
@@ -192,6 +192,15 @@ func buildAIModelConfigs(configs []*ypb.ThirdPartyApplicationConfig) []*ypb.AIMo
 		}
 		models = append(models, model)
 	}
+	return models
+}
+
+func cloneAIModelConfigs(configs []*ypb.AIModelConfig) []*ypb.AIModelConfig {
+	if len(configs) == 0 {
+		return nil
+	}
+	models := make([]*ypb.AIModelConfig, 0, len(configs))
+	models = append(models, configs...)
 	return models
 }
 
@@ -245,9 +254,9 @@ func loadTieredConfigFromNetworkConfig(c *ypb.GlobalNetworkConfig) {
 	tieredConfig := &consts.TieredAIConfig{
 		Enabled:            c.GetEnableTieredAIModelConfig(),
 		DisableFallback:    false,
-		IntelligentConfigs: c.GetIntelligentAIModelConfig(),
-		LightweightConfigs: c.GetLightweightAIModelConfig(),
-		VisionConfigs:      c.GetVisionAIModelConfig(),
+		IntelligentConfigs: buildAIModelConfigs(c.GetIntelligentAIModelConfig()),
+		LightweightConfigs: buildAIModelConfigs(c.GetLightweightAIModelConfig()),
+		VisionConfigs:      buildAIModelConfigs(c.GetVisionAIModelConfig()),
 	}
 
 	// Parse routing policy from TieredAIModelConfig

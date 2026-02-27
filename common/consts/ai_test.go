@@ -29,8 +29,11 @@ func TestTieredAIConfig(t *testing.T) {
 	config := &TieredAIConfig{
 		Enabled:       true,
 		RoutingPolicy: PolicyPerformance,
-		IntelligentConfigs: []*ypb.ThirdPartyApplicationConfig{
-			{Type: "aibalance", APIKey: "test"},
+		IntelligentConfigs: []*ypb.AIModelConfig{
+			{
+				Provider:  &ypb.ThirdPartyApplicationConfig{Type: "aibalance", APIKey: "test"},
+				ModelName: "test-model",
+			},
 		},
 	}
 	SetTieredAIConfig(config)
@@ -49,39 +52,39 @@ func TestGetTieredAIConfigs(t *testing.T) {
 	original := GetTieredAIConfig()
 	defer SetTieredAIConfig(original)
 
-	intelligentCfg := &ypb.ThirdPartyApplicationConfig{
-		Type:   "aibalance",
-		APIKey: "intelligent-key",
+	intelligentCfg := &ypb.AIModelConfig{
+		Provider:  &ypb.ThirdPartyApplicationConfig{Type: "aibalance", APIKey: "intelligent-key"},
+		ModelName: "intelligent-model",
 	}
-	lightweightCfg := &ypb.ThirdPartyApplicationConfig{
-		Type:   "aibalance",
-		APIKey: "lightweight-key",
+	lightweightCfg := &ypb.AIModelConfig{
+		Provider:  &ypb.ThirdPartyApplicationConfig{Type: "aibalance", APIKey: "lightweight-key"},
+		ModelName: "lightweight-model",
 	}
-	visionCfg := &ypb.ThirdPartyApplicationConfig{
-		Type:   "aibalance",
-		APIKey: "vision-key",
+	visionCfg := &ypb.AIModelConfig{
+		Provider:  &ypb.ThirdPartyApplicationConfig{Type: "aibalance", APIKey: "vision-key"},
+		ModelName: "vision-model",
 	}
 
 	config := &TieredAIConfig{
 		Enabled:            true,
-		IntelligentConfigs: []*ypb.ThirdPartyApplicationConfig{intelligentCfg},
-		LightweightConfigs: []*ypb.ThirdPartyApplicationConfig{lightweightCfg},
-		VisionConfigs:      []*ypb.ThirdPartyApplicationConfig{visionCfg},
+		IntelligentConfigs: []*ypb.AIModelConfig{intelligentCfg},
+		LightweightConfigs: []*ypb.AIModelConfig{lightweightCfg},
+		VisionConfigs:      []*ypb.AIModelConfig{visionCfg},
 	}
 	SetTieredAIConfig(config)
 
 	// Test getting configs
 	intelligentConfigs := GetIntelligentAIConfigs()
 	assert.Len(t, intelligentConfigs, 1)
-	assert.Equal(t, "intelligent-key", intelligentConfigs[0].APIKey)
+	assert.Equal(t, "intelligent-key", intelligentConfigs[0].GetProvider().GetAPIKey())
 
 	lightweightConfigs := GetLightweightAIConfigs()
 	assert.Len(t, lightweightConfigs, 1)
-	assert.Equal(t, "lightweight-key", lightweightConfigs[0].APIKey)
+	assert.Equal(t, "lightweight-key", lightweightConfigs[0].GetProvider().GetAPIKey())
 
 	visionConfigs := GetVisionAIConfigs()
 	assert.Len(t, visionConfigs, 1)
-	assert.Equal(t, "vision-key", visionConfigs[0].APIKey)
+	assert.Equal(t, "vision-key", visionConfigs[0].GetProvider().GetAPIKey())
 
 	// Test with nil config
 	SetTieredAIConfig(nil)
