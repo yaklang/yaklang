@@ -33854,13 +33854,13 @@ type StartBruteParams struct {
 	Concurrent int64 `protobuf:"varint,8,opt,name=Concurrent,proto3" json:"Concurrent,omitempty"`
 	Retry      int64 `protobuf:"varint,9,opt,name=Retry,proto3" json:"Retry,omitempty"`
 	// 目标任务内并发
-	TargetTaskConcurrent int64 `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
-	OkToStop         bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
-	DelayMin         int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
-	DelayMax         int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
-	PluginScriptName string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	TargetTaskConcurrent int64  `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
+	OkToStop             bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
+	DelayMin             int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
+	DelayMax             int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
+	PluginScriptName     string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *StartBruteParams) Reset() {
@@ -43409,8 +43409,8 @@ type ExecHistoryRecord struct {
 	// Uid
 	Id string `protobuf:"bytes,9,opt,name=Id,proto3" json:"Id,omitempty"`
 	// 展示界面内容
-	Stdout []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
-	Stderr []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
+	Stdout        []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
+	Stderr        []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
 	RuntimeId     string `protobuf:"bytes,12,opt,name=RuntimeId,proto3" json:"RuntimeId,omitempty"`
 	FromYakModule string `protobuf:"bytes,13,opt,name=FromYakModule,proto3" json:"FromYakModule,omitempty"`
 	StdoutLen     int64  `protobuf:"varint,14,opt,name=StdoutLen,proto3" json:"StdoutLen,omitempty"`
@@ -51521,6 +51521,7 @@ type ExecResult struct {
 	Id            int64   `protobuf:"varint,6,opt,name=Id,proto3" json:"Id,omitempty"`
 	RuntimeID     string  `protobuf:"bytes,7,opt,name=RuntimeID,proto3" json:"RuntimeID,omitempty"`
 	Progress      float32 `protobuf:"fixed32,8,opt,name=Progress,proto3" json:"Progress,omitempty"`
+	PluginName    string  `protobuf:"bytes,9,opt,name=PluginName,proto3" json:"PluginName,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -51609,6 +51610,13 @@ func (x *ExecResult) GetProgress() float32 {
 		return x.Progress
 	}
 	return 0
+}
+
+func (x *ExecResult) GetPluginName() string {
+	if x != nil {
+		return x.PluginName
+	}
+	return ""
 }
 
 type GetLicenseResponse struct {
@@ -70931,7 +70939,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\aWorkDir\x18\b \x01(\tR\aWorkDir\x12\x1e\n" +
 	"\n" +
 	"ScriptPath\x18\t \x01(\tR\n" +
-	"ScriptPath\"\xd4\x01\n" +
+	"ScriptPath\"\xf4\x01\n" +
 	"\n" +
 	"ExecResult\x12\x12\n" +
 	"\x04Hash\x18\x01 \x01(\tR\x04Hash\x12\x1e\n" +
@@ -70943,7 +70951,10 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\aMessage\x18\x05 \x01(\fR\aMessage\x12\x0e\n" +
 	"\x02Id\x18\x06 \x01(\x03R\x02Id\x12\x1c\n" +
 	"\tRuntimeID\x18\a \x01(\tR\tRuntimeID\x12\x1a\n" +
-	"\bProgress\x18\b \x01(\x02R\bProgress\".\n" +
+	"\bProgress\x18\b \x01(\x02R\bProgress\x12\x1e\n" +
+	"\n" +
+	"PluginName\x18\t \x01(\tR\n" +
+	"PluginName\".\n" +
 	"\x12GetLicenseResponse\x12\x18\n" +
 	"\aLicense\x18\x01 \x01(\tR\aLicense\"k\n" +
 	"\x13CheckLicenseRequest\x12,\n" +
