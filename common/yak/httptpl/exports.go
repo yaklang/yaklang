@@ -347,6 +347,25 @@ func WithOnRisk(target string, onRisk func(i *schema.Risk)) ConfigOption {
 	}
 }
 
+func buildRiskTargetAndPacketPairs(resp []*lowhttp.LowhttpResponse) (string, []byte, []byte, []tools.RawPacketPair) {
+	if len(resp) == 0 {
+		return "", nil, nil, nil
+	}
+
+	// Risk.Target keeps a single URL. For multi-packet cases, extra URLs are
+	// carried by PacketPairs instead of being merged into one comma-separated URL.
+	target := resp[0].Url
+	if len(resp) == 1 {
+		return target, resp[0].RawRequest, resp[0].RawPacket, nil
+	}
+
+	rawPacketPairs := make([]tools.RawPacketPair, 0, len(resp))
+	for _, r := range resp {
+		rawPacketPairs = append(rawPacketPairs, tools.RawPacketPair{Req: r.RawRequest, Rsp: r.RawPacket})
+	}
+	return target, nil, nil, rawPacketPairs
+}
+
 func processVulnerability(target any, filterVul filter.Filterable, vCh chan *tools.PocVul, handlers ...func(i *schema.Risk)) func(i map[string]interface{}) {
 	return func(i map[string]interface{}) {
 		if i["match"].(bool) {
@@ -360,7 +379,6 @@ func processVulnerability(target any, filterVul filter.Filterable, vCh chan *too
 			details := make(map[string]interface{}, 2)
 			runtimeId := utils.MapGetString(i, "runtimeId")
 			var rawPacketPairs []tools.RawPacketPair
-			var urls []string
 			var singleReq, singleRsp []byte
 			if len(tpl.HTTPRequestSequences) > 0 {
 				resp := i["responses"].([]*lowhttp.LowhttpResponse)
@@ -369,16 +387,7 @@ func processVulnerability(target any, filterVul filter.Filterable, vCh chan *too
 					runtimeId = resp[0].RuntimeId
 				}
 				calcSha1 = utils.CalcSha1(tpl.Name, resp[0].RemoteAddr, target)
-				if len(resp) == 1 {
-					urls = append(urls, resp[0].Url)
-					singleReq, singleRsp = resp[0].RawRequest, resp[0].RawPacket
-				} else {
-					for _, r := range resp {
-						urls = append(urls, r.Url)
-						rawPacketPairs = append(rawPacketPairs, tools.RawPacketPair{Req: r.RawRequest, Rsp: r.RawPacket})
-					}
-				}
-				currTarget = strings.Join(urls, ",")
+				currTarget, singleReq, singleRsp, rawPacketPairs = buildRiskTargetAndPacketPairs(resp)
 				payloads, err = httpPayloadsToString(reqBulk.Payloads)
 				if err != nil {
 					log.Errorf("httpPayloadsToString failed: %v", err)
