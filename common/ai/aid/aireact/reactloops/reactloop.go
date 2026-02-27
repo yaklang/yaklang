@@ -436,6 +436,9 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 			if loadSkill, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_LOADING_SKILLS); ok {
 				r.actions.Set(loadSkill.ActionType, loadSkill)
 			}
+			if loadRes, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_LOAD_SKILL_RESOURCES); ok {
+				r.actions.Set(loadRes.ActionType, loadRes)
+			}
 		}
 		if r.allowSkillViewOffset == nil || r.allowSkillViewOffset() {
 			if changeOffset, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_CHANGE_SKILL_VIEW_OFFSET); ok {

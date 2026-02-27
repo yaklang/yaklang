@@ -614,3 +614,259 @@ func TestSkillsContextManager_HasTruncatedViews_NoSkillsLoaded(t *testing.T) {
 		t.Fatal("HasTruncatedViews should be false when no skills are loaded")
 	}
 }
+
+// --- ResolveIncludes tests ---
+
+func TestResolveIncludes_Basic(t *testing.T) {
+	vfs := filesys.NewVirtualFs()
+	vfs.AddFile("extra.md", "# Extra Content\nSome included text.")
+
+	content := "Before\n<!-- include: extra.md -->\nAfter"
+	resolved := ResolveIncludes(content, vfs)
+
+	if !strings.Contains(resolved, "# Extra Content") {
+		t.Errorf("resolved content should contain included file, got %q", resolved)
+	}
+	if !strings.Contains(resolved, "Before") || !strings.Contains(resolved, "After") {
+		t.Error("surrounding content should be preserved")
+	}
+	if strings.Contains(resolved, "<!-- include:") {
+		t.Error("include directive should be replaced")
+	}
+}
+
+func TestResolveIncludes_MultipleIncludes(t *testing.T) {
+	vfs := filesys.NewVirtualFs()
+	vfs.AddFile("a.md", "Content A")
+	vfs.AddFile("b.md", "Content B")
+
+	content := "Start\n<!-- include: a.md -->\nMiddle\n<!-- include: b.md -->\nEnd"
+	resolved := ResolveIncludes(content, vfs)
+
+	if !strings.Contains(resolved, "Content A") {
+		t.Error("should contain Content A")
+	}
+	if !strings.Contains(resolved, "Content B") {
+		t.Error("should contain Content B")
+	}
+	if !strings.Contains(resolved, "Middle") {
+		t.Error("surrounding text should be preserved")
+	}
+}
+
+func TestResolveIncludes_MissingFile(t *testing.T) {
+	vfs := filesys.NewVirtualFs()
+
+	content := "Before\n<!-- include: nonexistent.md -->\nAfter"
+	resolved := ResolveIncludes(content, vfs)
+
+	if !strings.Contains(resolved, "include error") {
+		t.Errorf("should contain error marker for missing file, got %q", resolved)
+	}
+	if !strings.Contains(resolved, "nonexistent.md") {
+		t.Error("error should mention the missing file name")
+	}
+}
+
+func TestResolveIncludes_NilFS(t *testing.T) {
+	content := "Before\n<!-- include: file.md -->\nAfter"
+	resolved := ResolveIncludes(content, nil)
+
+	if resolved != content {
+		t.Error("nil filesystem should return content unchanged")
+	}
+}
+
+func TestResolveIncludes_NoDirectives(t *testing.T) {
+	vfs := filesys.NewVirtualFs()
+	content := "Just regular markdown content."
+	resolved := ResolveIncludes(content, vfs)
+
+	if resolved != content {
+		t.Error("content without directives should be unchanged")
+	}
+}
+
+func TestResolveIncludes_SpacingVariants(t *testing.T) {
+	vfs := filesys.NewVirtualFs()
+	vfs.AddFile("file.md", "included")
+
+	tests := []string{
+		"<!-- include: file.md -->",
+		"<!--include: file.md-->",
+		"<!--  include:  file.md  -->",
+		"<!-- include:file.md -->",
+	}
+
+	for _, directive := range tests {
+		resolved := ResolveIncludes(directive, vfs)
+		if !strings.Contains(resolved, "included") {
+			t.Errorf("directive %q should resolve, got %q", directive, resolved)
+		}
+	}
+}
+
+func TestResolveIncludes_LargeFile(t *testing.T) {
+	vfs := filesys.NewVirtualFs()
+	largeContent := strings.Repeat("x", ViewWindowMaxBytes+1000)
+	vfs.AddFile("large.md", largeContent)
+
+	content := "<!-- include: large.md -->"
+	resolved := ResolveIncludes(content, vfs)
+
+	if len(resolved) > ViewWindowMaxBytes+200 {
+		t.Errorf("included content should be truncated, got size %d", len(resolved))
+	}
+	if !strings.Contains(resolved, "truncated") {
+		t.Error("truncated include should have truncation note")
+	}
+}
+
+func TestResolveIncludes_SkillMDWithIncludes(t *testing.T) {
+	vfs := filesys.NewVirtualFs()
+	vfs.AddFile("inc-skill/SKILL.md", buildTestSkillMD("inc-skill", "Skill with includes",
+		"# Main\n\n<!-- include: guide.md -->\n\nEnd"))
+	vfs.AddFile("inc-skill/guide.md", "# Guide\nStep 1\nStep 2")
+
+	loader, err := NewFSSkillLoader(vfs)
+	if err != nil {
+		t.Fatalf("NewFSSkillLoader failed: %v", err)
+	}
+
+	mgr := NewSkillsContextManager(loader)
+	if err := mgr.LoadSkill("inc-skill"); err != nil {
+		t.Fatalf("LoadSkill failed: %v", err)
+	}
+
+	rendered := mgr.Render("n")
+	if !strings.Contains(rendered, "# Guide") {
+		t.Error("rendered context should contain included guide content")
+	}
+	if !strings.Contains(rendered, "Step 1") {
+		t.Error("rendered context should contain included guide steps")
+	}
+}
+
+// --- DetectCrossSkillReferences tests ---
+
+func TestDetectCrossSkillReferences_Basic(t *testing.T) {
+	content := "See ../recon/SKILL.md and ../exploitation/guide.md for details."
+	refs := DetectCrossSkillReferences(content, "pentest-master")
+
+	if len(refs) != 2 {
+		t.Fatalf("expected 2 references, got %d: %v", len(refs), refs)
+	}
+	if refs[0] != "exploitation" || refs[1] != "recon" {
+		t.Errorf("expected [exploitation, recon], got %v", refs)
+	}
+}
+
+func TestDetectCrossSkillReferences_ExcludesSelf(t *testing.T) {
+	content := "See ../recon/SKILL.md and ../recon/other.md for more."
+	refs := DetectCrossSkillReferences(content, "recon")
+
+	if len(refs) != 0 {
+		t.Errorf("self-references should be excluded, got %v", refs)
+	}
+}
+
+func TestDetectCrossSkillReferences_Deduplicate(t *testing.T) {
+	content := "Use ../toolbox/a.md and ../toolbox/b.md and ../recon/c.md"
+	refs := DetectCrossSkillReferences(content, "test")
+
+	if len(refs) != 2 {
+		t.Fatalf("expected 2 unique references, got %d: %v", len(refs), refs)
+	}
+}
+
+func TestDetectCrossSkillReferences_NoRefs(t *testing.T) {
+	content := "This skill has no cross-references."
+	refs := DetectCrossSkillReferences(content, "test")
+
+	if len(refs) != 0 {
+		t.Errorf("expected 0 references, got %v", refs)
+	}
+}
+
+func TestDetectCrossSkillReferences_InRenderedOutput(t *testing.T) {
+	vfs := filesys.NewVirtualFs()
+	vfs.AddFile("xref-skill/SKILL.md", buildTestSkillMD("xref-skill", "Cross-ref test",
+		"# XRef\n\nSee ../recon/SKILL.md and ../exploitation/guide.md\n"))
+
+	loader, err := NewFSSkillLoader(vfs)
+	if err != nil {
+		t.Fatalf("NewFSSkillLoader failed: %v", err)
+	}
+
+	mgr := NewSkillsContextManager(loader)
+	if err := mgr.LoadSkill("xref-skill"); err != nil {
+		t.Fatalf("LoadSkill failed: %v", err)
+	}
+
+	rendered := mgr.Render("n")
+	if !strings.Contains(rendered, "Related Skills") {
+		t.Error("rendered output should contain Related Skills hint")
+	}
+	if !strings.Contains(rendered, "recon") {
+		t.Error("rendered output should mention recon as related skill")
+	}
+	if !strings.Contains(rendered, "exploitation") {
+		t.Error("rendered output should mention exploitation as related skill")
+	}
+}
+
+// --- LoadSkills batch tests ---
+
+func TestSkillsContextManager_LoadSkills(t *testing.T) {
+	vfs := buildTestVFS()
+	loader, _ := NewFSSkillLoader(vfs)
+	mgr := NewSkillsContextManager(loader)
+
+	results := mgr.LoadSkills([]string{"deploy-app", "code-review"})
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+	if results["deploy-app"] != nil {
+		t.Errorf("deploy-app should load successfully: %v", results["deploy-app"])
+	}
+	if results["code-review"] != nil {
+		t.Errorf("code-review should load successfully: %v", results["code-review"])
+	}
+
+	skills := mgr.GetCurrentSelectedSkills()
+	if len(skills) != 2 {
+		t.Errorf("expected 2 loaded skills, got %d", len(skills))
+	}
+}
+
+func TestSkillsContextManager_LoadSkills_PartialFailure(t *testing.T) {
+	vfs := buildTestVFS()
+	loader, _ := NewFSSkillLoader(vfs)
+	mgr := NewSkillsContextManager(loader)
+
+	results := mgr.LoadSkills([]string{"deploy-app", "nonexistent"})
+	if results["deploy-app"] != nil {
+		t.Errorf("deploy-app should succeed: %v", results["deploy-app"])
+	}
+	if results["nonexistent"] == nil {
+		t.Error("nonexistent should fail")
+	}
+
+	if !mgr.IsSkillLoaded("deploy-app") {
+		t.Error("deploy-app should be loaded despite other failures")
+	}
+}
+
+func TestSkillsContextManager_LoadSkills_EmptyNames(t *testing.T) {
+	vfs := buildTestVFS()
+	loader, _ := NewFSSkillLoader(vfs)
+	mgr := NewSkillsContextManager(loader)
+
+	results := mgr.LoadSkills([]string{"", "  ", "deploy-app"})
+	if len(results) != 1 {
+		t.Errorf("expected 1 result (empty names skipped), got %d", len(results))
+	}
+	if results["deploy-app"] != nil {
+		t.Errorf("deploy-app should succeed: %v", results["deploy-app"])
+	}
+}

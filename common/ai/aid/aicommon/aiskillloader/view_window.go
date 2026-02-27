@@ -11,7 +11,7 @@ import (
 
 const (
 	// ViewWindowMaxBytes is the maximum bytes for a single file view window.
-	ViewWindowMaxBytes = 15 * 1024 // 15KB
+	ViewWindowMaxBytes = 32 * 1024 // 32KB
 )
 
 // ViewWindow represents a scrollable view into a file's content.
