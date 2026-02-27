@@ -17,7 +17,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
-type CompileOptions struct {
+type CompileConfig struct {
 	SourceFile        string
 	SourceCode        string
 	Language          string
@@ -27,34 +27,213 @@ type CompileOptions struct {
 	EmitAsm           bool
 	CompileOnly       bool
 	PrintIR           bool
+	ExternBindings    map[string]ExternBinding
+	ExtraLinkArgs     []string
+	SkipRuntimeLink   bool
+	PrintEntryResult  bool
 }
 
-type RunOptions struct {
-	SourceFile    string
-	SourceCode    string
-	Language      string
-	FunctionName  string
-	Args          []uint64
-	PrintIR       bool
-	ExternalHooks map[string]unsafe.Pointer
+type CompileOption func(*CompileConfig)
+
+type RunConfig struct {
+	SourceFile     string
+	SourceCode     string
+	Language       string
+	FunctionName   string
+	Args           []uint64
+	PrintIR        bool
+	ExternalHooks  map[string]unsafe.Pointer
+	ExternBindings map[string]ExternBinding
+}
+
+type RunOption func(*RunConfig)
+
+func defaultRunConfig() *RunConfig {
+	return &RunConfig{
+		FunctionName:  "check",
+		ExternalHooks: make(map[string]unsafe.Pointer),
+	}
+}
+
+func defaultCompileConfig() *CompileConfig {
+	return &CompileConfig{}
+}
+
+func WithCompileSourceFile(path string) CompileOption {
+	return func(c *CompileConfig) { c.SourceFile = path }
+}
+
+func WithCompileSourceCode(code string) CompileOption {
+	return func(c *CompileConfig) { c.SourceCode = code }
+}
+
+func WithCompileLanguage(language string) CompileOption {
+	return func(c *CompileConfig) { c.Language = language }
+}
+
+func WithCompileOutputFile(path string) CompileOption {
+	return func(c *CompileConfig) { c.OutputFile = path }
+}
+
+func WithCompileEntryFunction(name string) CompileOption {
+	return func(c *CompileConfig) { c.EntryFunctionName = name }
+}
+
+func WithCompileEmitLLVM(enabled bool) CompileOption {
+	return func(c *CompileConfig) { c.EmitLLVM = enabled }
+}
+
+func WithCompileEmitAsm(enabled bool) CompileOption {
+	return func(c *CompileConfig) { c.EmitAsm = enabled }
+}
+
+func WithCompileOnly(enabled bool) CompileOption {
+	return func(c *CompileConfig) { c.CompileOnly = enabled }
+}
+
+func WithCompilePrintIR(enabled bool) CompileOption {
+	return func(c *CompileConfig) { c.PrintIR = enabled }
+}
+
+func WithCompileExternBindings(bindings map[string]ExternBinding) CompileOption {
+	return func(c *CompileConfig) {
+		if len(bindings) == 0 {
+			return
+		}
+		if c.ExternBindings == nil {
+			c.ExternBindings = make(map[string]ExternBinding, len(bindings))
+		}
+		for name, binding := range bindings {
+			c.ExternBindings[name] = binding
+		}
+	}
+}
+
+func WithCompileExtraLinkArgs(args ...string) CompileOption {
+	return func(c *CompileConfig) {
+		c.ExtraLinkArgs = append(c.ExtraLinkArgs, args...)
+	}
+}
+
+func WithCompileSkipRuntimeLink(enabled bool) CompileOption {
+	return func(c *CompileConfig) { c.SkipRuntimeLink = enabled }
+}
+
+func WithCompilePrintEntryResult(enabled bool) CompileOption {
+	return func(c *CompileConfig) { c.PrintEntryResult = enabled }
+}
+
+func WithCompileConfig(cfg CompileConfig) CompileOption {
+	return func(c *CompileConfig) {
+		c.SourceFile = cfg.SourceFile
+		c.SourceCode = cfg.SourceCode
+		c.Language = cfg.Language
+		c.OutputFile = cfg.OutputFile
+		c.EntryFunctionName = cfg.EntryFunctionName
+		c.EmitLLVM = cfg.EmitLLVM
+		c.EmitAsm = cfg.EmitAsm
+		c.CompileOnly = cfg.CompileOnly
+		c.PrintIR = cfg.PrintIR
+		c.SkipRuntimeLink = cfg.SkipRuntimeLink
+		c.PrintEntryResult = cfg.PrintEntryResult
+		if len(cfg.ExtraLinkArgs) > 0 {
+			c.ExtraLinkArgs = append(c.ExtraLinkArgs, cfg.ExtraLinkArgs...)
+		}
+		if len(cfg.ExternBindings) > 0 {
+			if c.ExternBindings == nil {
+				c.ExternBindings = make(map[string]ExternBinding, len(cfg.ExternBindings))
+			}
+			for name, binding := range cfg.ExternBindings {
+				c.ExternBindings[name] = binding
+			}
+		}
+	}
+}
+
+func WithRunSourceFile(path string) RunOption {
+	return func(c *RunConfig) { c.SourceFile = path }
+}
+
+func WithRunSourceCode(code string) RunOption {
+	return func(c *RunConfig) { c.SourceCode = code }
+}
+
+func WithRunLanguage(language string) RunOption {
+	return func(c *RunConfig) { c.Language = language }
+}
+
+func WithRunFunction(name string) RunOption {
+	return func(c *RunConfig) { c.FunctionName = name }
+}
+
+func WithRunArgs(args ...uint64) RunOption {
+	return func(c *RunConfig) {
+		c.Args = append(c.Args[:0], args...)
+	}
+}
+
+func WithRunPrintIR(enabled bool) RunOption {
+	return func(c *RunConfig) { c.PrintIR = enabled }
+}
+
+func WithRunExternalHooks(hooks map[string]unsafe.Pointer) RunOption {
+	return func(c *RunConfig) {
+		if c.ExternalHooks == nil {
+			c.ExternalHooks = make(map[string]unsafe.Pointer, len(hooks))
+		}
+		for name, addr := range hooks {
+			c.ExternalHooks[name] = addr
+		}
+	}
+}
+
+func WithRunExternBindings(bindings map[string]ExternBinding) RunOption {
+	return func(c *RunConfig) { c.ExternBindings = bindings }
+}
+
+func WithRunConfig(cfg RunConfig) RunOption {
+	return func(c *RunConfig) {
+		c.SourceFile = cfg.SourceFile
+		c.SourceCode = cfg.SourceCode
+		c.Language = cfg.Language
+		if cfg.FunctionName != "" {
+			c.FunctionName = cfg.FunctionName
+		}
+		c.Args = append(c.Args[:0], cfg.Args...)
+		c.PrintIR = cfg.PrintIR
+		c.ExternBindings = cfg.ExternBindings
+		if c.ExternalHooks == nil {
+			c.ExternalHooks = make(map[string]unsafe.Pointer, len(cfg.ExternalHooks))
+		}
+		for name, addr := range cfg.ExternalHooks {
+			c.ExternalHooks[name] = addr
+		}
+	}
 }
 
 // RunViaJIT compiles and executes the code using LLVM JIT.
-func RunViaJIT(opts RunOptions) (int64, error) {
+func RunViaJIT(opts ...RunOption) (int64, error) {
+	cfg := defaultRunConfig()
+	for _, opt := range opts {
+		if opt != nil {
+			opt(cfg)
+		}
+	}
+
 	var comp *Compiler
 	var err error
 
-	if opts.SourceCode != "" {
-		_, comp, _, err = compileToIRFromCode(opts.SourceCode, opts.Language)
+	if cfg.SourceCode != "" {
+		_, comp, _, err = compileToIRFromCodeWithExternBindings(cfg.SourceCode, cfg.Language, cfg.ExternBindings)
 	} else {
-		_, comp, _, err = compileToIR(opts.SourceFile, opts.Language)
+		_, comp, _, err = compileToIRWithExternBindings(cfg.SourceFile, cfg.Language, cfg.ExternBindings)
 	}
 
 	if err != nil {
 		return 0, err
 	}
 
-	if opts.PrintIR {
+	if cfg.PrintIR {
 		fmt.Println("\n=== Generated LLVM IR ===")
 		fmt.Println(comp.Mod.String())
 		fmt.Println()
@@ -67,7 +246,7 @@ func RunViaJIT(opts RunOptions) (int64, error) {
 	}
 
 	// Register external hooks (mappings)
-	for name, addr := range opts.ExternalHooks {
+	for name, addr := range cfg.ExternalHooks {
 		fnVal := comp.Mod.NamedFunction(name)
 		if !fnVal.IsNil() {
 			engine.AddGlobalMapping(fnVal, addr)
@@ -82,7 +261,7 @@ func RunViaJIT(opts RunOptions) (int64, error) {
 	defer comp.Builder.Dispose()
 	defer engine.Dispose()
 
-	functionName := opts.FunctionName
+	functionName := cfg.FunctionName
 	if functionName == "" {
 		functionName = "check"
 	}
@@ -114,8 +293,8 @@ func RunViaJIT(opts RunOptions) (int64, error) {
 	}
 
 	// Prepare arguments
-	llvmArgs := make([]llvm.GenericValue, len(opts.Args))
-	for i, arg := range opts.Args {
+	llvmArgs := make([]llvm.GenericValue, len(cfg.Args))
+	for i, arg := range cfg.Args {
 		llvmArgs[i] = llvm.NewGenericValueFromInt(comp.LLVMCtx.Int64Type(), arg, false)
 	}
 
@@ -126,6 +305,10 @@ func RunViaJIT(opts RunOptions) (int64, error) {
 }
 
 func compileToIRFromCode(code, language string) (*ssaapi.Program, *Compiler, string, error) {
+	return compileToIRFromCodeWithExternBindings(code, language, nil)
+}
+
+func compileToIRFromCodeWithExternBindings(code, language string, externBindings map[string]ExternBinding) (*ssaapi.Program, *Compiler, string, error) {
 	ctx := context.Background()
 
 	opts := buildSSAOptions(language)
@@ -139,7 +322,7 @@ func compileToIRFromCode(code, language string) (*ssaapi.Program, *Compiler, str
 	llvm.InitializeNativeTarget()
 	llvm.InitializeNativeAsmPrinter()
 
-	comp := NewCompiler(ctx, ssaProg)
+	comp := NewCompiler(ctx, ssaProg, WithExternBindings(externBindings))
 	if err := comp.Compile(); err != nil {
 		comp.Dispose()
 		return nil, nil, "", utils.Errorf("LLVM compilation failed: %v", err)
@@ -157,6 +340,10 @@ func compileToIRFromCode(code, language string) (*ssaapi.Program, *Compiler, str
 }
 
 func compileToIR(sourceFile, language string) (*ssaapi.Program, *Compiler, string, error) {
+	return compileToIRWithExternBindings(sourceFile, language, nil)
+}
+
+func compileToIRWithExternBindings(sourceFile, language string, externBindings map[string]ExternBinding) (*ssaapi.Program, *Compiler, string, error) {
 	code, err := os.ReadFile(sourceFile)
 	if err != nil {
 		return nil, nil, "", utils.Errorf("failed to read source file: %v", err)
@@ -168,7 +355,7 @@ func compileToIR(sourceFile, language string) (*ssaapi.Program, *Compiler, strin
 
 	log.Infof("compiling %s (%s)", sourceFile, language)
 
-	prog, comp, ir, err := compileToIRFromCode(string(code), language)
+	prog, comp, ir, err := compileToIRFromCodeWithExternBindings(string(code), language, externBindings)
 	if err != nil {
 		return nil, nil, "", err
 	}
@@ -176,15 +363,22 @@ func compileToIR(sourceFile, language string) (*ssaapi.Program, *Compiler, strin
 	return prog, comp, ir, nil
 }
 
-func CompileToExecutable(opts CompileOptions) error {
+func CompileToExecutable(opts ...CompileOption) error {
+	cfg := defaultCompileConfig()
+	for _, opt := range opts {
+		if opt != nil {
+			opt(cfg)
+		}
+	}
+
 	var comp *Compiler
 	var ir string
 	var err error
 
-	if opts.SourceCode != "" {
-		_, comp, ir, err = compileToIRFromCode(opts.SourceCode, opts.Language)
+	if cfg.SourceCode != "" {
+		_, comp, ir, err = compileToIRFromCodeWithExternBindings(cfg.SourceCode, cfg.Language, cfg.ExternBindings)
 	} else {
-		_, comp, ir, err = compileToIR(opts.SourceFile, opts.Language)
+		_, comp, ir, err = compileToIRWithExternBindings(cfg.SourceFile, cfg.Language, cfg.ExternBindings)
 	}
 
 	if err != nil {
@@ -194,7 +388,7 @@ func CompileToExecutable(opts CompileOptions) error {
 
 	// Add main wrapper for executable generation
 	// Use configured entry function or default to "@main" (standard Yak SSA entry)
-	entryFunc := opts.EntryFunctionName
+	entryFunc := cfg.EntryFunctionName
 	if entryFunc == "" {
 		entryFunc = "check"
 	}
@@ -243,13 +437,13 @@ func CompileToExecutable(opts CompileOptions) error {
 	// Regenerate IR because we modified the module (renamed function)
 	ir = comp.Mod.String()
 
-	ir = addMainWrapper(ir, entryFunc)
+	ir = addMainWrapper(ir, entryFunc, cfg.PrintEntryResult)
 
-	if opts.PrintIR {
+	if cfg.PrintIR {
 		fmt.Println(ir)
 	}
 
-	outputFile := opts.OutputFile
+	outputFile := cfg.OutputFile
 	if outputFile == "" {
 		if runtime.GOOS == "windows" {
 			outputFile = "a.exe"
@@ -258,10 +452,10 @@ func CompileToExecutable(opts CompileOptions) error {
 		}
 	}
 
-	if opts.EmitLLVM {
-		if outputFile == opts.OutputFile && outputFile != "" {
+	if cfg.EmitLLVM {
+		if outputFile == cfg.OutputFile && outputFile != "" {
 		} else {
-			outputFile = replaceExt(opts.SourceFile, ".ll")
+			outputFile = replaceExt(cfg.SourceFile, ".ll")
 		}
 		if err := os.WriteFile(outputFile, []byte(ir), 0644); err != nil {
 			return utils.Errorf("failed to write LLVM IR: %v", err)
@@ -281,10 +475,10 @@ func CompileToExecutable(opts CompileOptions) error {
 	}
 	tmpLL.Close()
 
-	if opts.EmitAsm {
-		if outputFile == opts.OutputFile && outputFile != "" {
+	if cfg.EmitAsm {
+		if outputFile == cfg.OutputFile && outputFile != "" {
 		} else {
-			outputFile = replaceExt(opts.SourceFile, ".s")
+			outputFile = replaceExt(cfg.SourceFile, ".s")
 		}
 		if err := CompileLLVMToAsm(tmpLL.Name(), outputFile); err != nil {
 			return err
@@ -293,10 +487,10 @@ func CompileToExecutable(opts CompileOptions) error {
 		return nil
 	}
 
-	if opts.CompileOnly {
-		if outputFile == opts.OutputFile && outputFile != "" {
+	if cfg.CompileOnly {
+		if outputFile == cfg.OutputFile && outputFile != "" {
 		} else {
-			outputFile = replaceExt(opts.SourceFile, ".o")
+			outputFile = replaceExt(cfg.SourceFile, ".o")
 		}
 		if err := CompileLLVMToObject(tmpLL.Name(), outputFile); err != nil {
 			return err
@@ -305,7 +499,7 @@ func CompileToExecutable(opts CompileOptions) error {
 		return nil
 	}
 
-	if err := CompileLLVMToBinary(tmpLL.Name(), outputFile); err != nil {
+	if err := CompileLLVMToBinary(tmpLL.Name(), outputFile, !cfg.SkipRuntimeLink, cfg.ExtraLinkArgs...); err != nil {
 		return err
 	}
 
@@ -313,7 +507,7 @@ func CompileToExecutable(opts CompileOptions) error {
 	return nil
 }
 
-func addMainWrapper(ir, entryFunc string) string {
+func addMainWrapper(ir, entryFunc string, printEntryResult bool) string {
 	// Construct call target name
 	// If entryFunc is "check", target is "@check"
 	// If entryFunc is "@main", target is @"@main" (quoted because of @)
@@ -326,16 +520,24 @@ func addMainWrapper(ir, entryFunc string) string {
 	if !strings.Contains(ir, "@yak_runtime_gc") {
 		gcDecl = "\ndeclare void @yak_runtime_gc()\n"
 	}
+	printDecl := ""
+	printCall := ""
+	if printEntryResult {
+		if !strings.Contains(ir, "@yak_internal_print_int") {
+			printDecl = "declare void @yak_internal_print_int(i64)\n"
+		}
+		printCall = "  call void @yak_internal_print_int(i64 %result)\n"
+	}
 
-	mainWrapper := fmt.Sprintf(`%s
+	mainWrapper := fmt.Sprintf(`%s%s
 define i32 @main() {
 entry:
   %%result = call i64 %s()
-  call void @yak_runtime_gc()
+%s  call void @yak_runtime_gc()
   %%exit_code = trunc i64 %%result to i32
   ret i32 %%exit_code
 }
-`, gcDecl, callTarget)
+`, gcDecl, printDecl, callTarget, printCall)
 	return ir + mainWrapper
 }
 

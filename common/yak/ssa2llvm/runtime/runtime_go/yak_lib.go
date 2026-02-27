@@ -22,13 +22,23 @@ import (
 
 func main() {}
 
+func recoverRuntimePanic() {
+	if r := recover(); r != nil {
+		if gcLogEnabled() {
+			fmt.Printf("[Yak Runtime] recovered panic: %v\n", r)
+		}
+	}
+}
+
 //export yak_internal_print_int
 func yak_internal_print_int(n int64) {
+	defer recoverRuntimePanic()
 	fmt.Println(n)
 }
 
 //export yak_internal_malloc
-func yak_internal_malloc(size int64) uintptr {
+func yak_internal_malloc(size int64) (ret uintptr) {
+	defer recoverRuntimePanic()
 	// Use Boehm GC for internal allocations too
 	return uintptr(C.GC_malloc(C.size_t(size)))
 }
@@ -37,70 +47,19 @@ func yak_internal_malloc(size int64) uintptr {
 
 //export yak_host_release_handle
 func yak_host_release_handle(id C.uintptr_t) {
+	defer recoverRuntimePanic()
 	h := cgo.Handle(id)
-	// Verification log for tests
 	if gcLogEnabled() {
 		fmt.Printf("[Go] Releasing handle %d\n", id)
 	}
 	h.Delete()
 }
 
-// --- Test Helper: Object Factory ---
-
-type MockObject struct {
-	Number int64
-	Name   string
-}
-
-//export yak_host_get_object
-func yak_host_get_object(initVal int64) C.uintptr_t {
-	obj := &MockObject{Number: initVal, Name: "YakTest"}
-	h := cgo.NewHandle(obj)
-	fmt.Printf("[Go] Created object %d with handle %d\n", initVal, h)
-	return C.uintptr_t(h)
-}
-
-// --- Test Helper: Reflection Access ---
-
-//export yak_host_get_member
-func yak_host_get_member(handleID C.uintptr_t, memberName *C.char) int64 {
-	h := cgo.Handle(handleID)
-	obj := h.Value()
-	name := C.GoString(memberName)
-
-	val := reflect.ValueOf(obj).Elem()
-	field := val.FieldByName(name)
-	if !field.IsValid() {
-		fmt.Printf("[Go] Field %s not found\n", name)
-		return 0
-	}
-	return field.Int()
-}
-
-//export yak_host_set_member
-func yak_host_set_member(handleID C.uintptr_t, memberName *C.char, val int64) {
-	h := cgo.Handle(handleID)
-	obj := h.Value()
-	name := C.GoString(memberName)
-
-	v := reflect.ValueOf(obj).Elem()
-	f := v.FieldByName(name)
-	if f.IsValid() && f.CanSet() {
-		f.SetInt(val)
-		fmt.Printf("[Go] Set %s = %d\n", name, val)
-	}
-}
-
-//export yak_host_dump
-func yak_host_dump(handleID C.uintptr_t) {
-	h := cgo.Handle(handleID)
-	fmt.Printf("[Go] Dump: %+v\n", h.Value())
-}
-
 // --- Yak Runtime (Boehm GC Integrated) ---
 
 //export yak_internal_release_shadow
 func yak_internal_release_shadow(ptr unsafe.Pointer) {
+	defer recoverRuntimePanic()
 	// Reconstruct the handle ID from the C memory
 	handleID := *(*C.uintptr_t)(ptr)
 
@@ -114,7 +73,8 @@ func yak_internal_release_shadow(ptr unsafe.Pointer) {
 }
 
 //export yak_runtime_new_shadow
-func yak_runtime_new_shadow(handleID C.uintptr_t) unsafe.Pointer {
+func yak_runtime_new_shadow(handleID C.uintptr_t) (ret unsafe.Pointer) {
+	defer recoverRuntimePanic()
 	// 1. Allocate memory managed by Boehm GC
 	// We allocate 8 bytes to store the handleID (sizeof(uintptr_t))
 	ptr := C.GC_malloc(C.size_t(8))
@@ -137,51 +97,109 @@ func yak_runtime_new_shadow(handleID C.uintptr_t) unsafe.Pointer {
 	return ptr
 }
 
+func handleFromShadow(objPtr unsafe.Pointer) (cgo.Handle, bool) {
+	defer recoverRuntimePanic()
+	if objPtr == nil {
+		return 0, false
+	}
+	handleID := *(*C.uintptr_t)(objPtr)
+	return cgo.Handle(handleID), true
+}
+
+func resolveField(obj any, name string) (reflect.Value, bool) {
+	v := reflect.ValueOf(obj)
+	if !v.IsValid() {
+		return reflect.Value{}, false
+	}
+	if v.Kind() == reflect.Interface {
+		v = v.Elem()
+	}
+	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return reflect.Value{}, false
+		}
+		v = v.Elem()
+	}
+	if v.Kind() != reflect.Struct {
+		return reflect.Value{}, false
+	}
+	f := v.FieldByName(name)
+	if !f.IsValid() {
+		return reflect.Value{}, false
+	}
+	return f, true
+}
+
 //export yak_runtime_get_field
 func yak_runtime_get_field(objPtr unsafe.Pointer, name *C.char) int64 {
-	if objPtr == nil {
+	defer recoverRuntimePanic()
+	h, ok := handleFromShadow(objPtr)
+	if !ok || name == nil {
 		return 0
 	}
-	// Retrieve HandleID from the C pointer
-	handleID := *(*C.uintptr_t)(objPtr)
-	return yak_host_get_member(handleID, name)
+	f, ok := resolveField(h.Value(), C.GoString(name))
+	if !ok {
+		return 0
+	}
+	switch f.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return f.Int()
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		return int64(f.Uint())
+	case reflect.Bool:
+		if f.Bool() {
+			return 1
+		}
+		return 0
+	case reflect.Float32, reflect.Float64:
+		return int64(f.Float())
+	default:
+		return 0
+	}
 }
 
 //export yak_runtime_set_field
 func yak_runtime_set_field(objPtr unsafe.Pointer, name *C.char, val int64) {
-	if objPtr == nil {
+	defer recoverRuntimePanic()
+	h, ok := handleFromShadow(objPtr)
+	if !ok || name == nil {
 		return
 	}
-	// Retrieve HandleID from the C pointer
-	handleID := *(*C.uintptr_t)(objPtr)
-	yak_host_set_member(handleID, name, val)
+	f, ok := resolveField(h.Value(), C.GoString(name))
+	if !ok || !f.CanSet() {
+		return
+	}
+	switch f.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		f.SetInt(val)
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		f.SetUint(uint64(val))
+	case reflect.Bool:
+		f.SetBool(val != 0)
+	case reflect.Float32, reflect.Float64:
+		f.SetFloat(float64(val))
+	}
 }
 
 //export yak_runtime_dump
 func yak_runtime_dump(objPtr unsafe.Pointer) {
-	if objPtr == nil {
+	defer recoverRuntimePanic()
+	h, ok := handleFromShadow(objPtr)
+	if !ok {
 		return
 	}
-	// Retrieve HandleID from the C pointer
-	handleID := *(*C.uintptr_t)(objPtr)
-	yak_host_dump(handleID)
-}
-
-//export yak_runtime_get_object
-func yak_runtime_get_object(initVal int64) unsafe.Pointer {
-	handleID := yak_host_get_object(initVal)
-	// Return the pointer to the shadow object
-	return yak_runtime_new_shadow(handleID)
+	fmt.Printf("[Go] Dump: %+v\n", h.Value())
 }
 
 //export yak_runtime_dump_handle
 func yak_runtime_dump_handle(objPtr unsafe.Pointer) {
-	// objPtr is the pointer to the shadow object
+	defer recoverRuntimePanic()
 	yak_runtime_dump(objPtr)
 }
 
 //export yak_runtime_gc
 func yak_runtime_gc() {
+	defer recoverRuntimePanic()
 	// Manual GC trigger if needed
 	C.GC_gcollect()
 	runtime.GC()

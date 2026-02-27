@@ -35,7 +35,7 @@ func main() {
 		"[Go] Created object 100",
 		"[Yak GC] Finalizer triggered",
 		"[Go] Releasing handle",
-	})
+	}, withInteropRuntimeCode())
 	require.NotEmpty(t, output)
 }
 
@@ -52,7 +52,7 @@ func main() {
     println(v2)
 }
 `
-	output := checkRunBinary(t, code, "main", nil, []string{"10\n", "20\n"})
+	output := checkRunBinary(t, code, "main", nil, []string{"10\n", "20\n"}, withInteropRuntimeCode())
 	nums := extractIntLines(output)
 	require.Len(t, nums, 2)
 	require.Equal(t, int64(10), nums[0])
@@ -71,5 +71,5 @@ func main() {
 		"[Go] Dump:",
 		"Number:99",
 		"Name:YakTest",
-	})
+	}, withInteropRuntimeCode())
 }

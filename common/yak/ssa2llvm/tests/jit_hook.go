@@ -9,12 +9,13 @@ import (
 
 // buffer stores the captured output values
 var (
-	buffer     []int64
-	jitLock    sync.Mutex
-	bufferLock sync.Mutex
-	cbOnce     sync.Once
-	printCB    uintptr
-	mallocCB   uintptr
+	buffer      []int64
+	jitLock     sync.Mutex
+	bufferLock  sync.Mutex
+	cbOnce      sync.Once
+	printCB     uintptr
+	mallocCB    uintptr
+	testAllocCB uintptr
 )
 
 // yakInternalPrintInt is the Go function we want to expose.
@@ -29,11 +30,16 @@ func yakInternalMalloc(size int64) unsafe.Pointer {
 	return unsafe.Pointer(&data[0])
 }
 
+func yakTestAlloc(size int64) int64 {
+	return size + 1000
+}
+
 func getHookAddr() unsafe.Pointer {
 	cbOnce.Do(func() {
 		// Create C-callable function pointers once to avoid callback churn.
 		printCB = purego.NewCallback(yakInternalPrintInt)
 		mallocCB = purego.NewCallback(yakInternalMalloc)
+		testAllocCB = purego.NewCallback(yakTestAlloc)
 	})
 	return unsafe.Pointer(printCB)
 }
@@ -42,8 +48,18 @@ func getMallocHookAddr() unsafe.Pointer {
 	cbOnce.Do(func() {
 		printCB = purego.NewCallback(yakInternalPrintInt)
 		mallocCB = purego.NewCallback(yakInternalMalloc)
+		testAllocCB = purego.NewCallback(yakTestAlloc)
 	})
 	return unsafe.Pointer(mallocCB)
+}
+
+func getTestAllocHookAddr() unsafe.Pointer {
+	cbOnce.Do(func() {
+		printCB = purego.NewCallback(yakInternalPrintInt)
+		mallocCB = purego.NewCallback(yakInternalMalloc)
+		testAllocCB = purego.NewCallback(yakTestAlloc)
+	})
+	return unsafe.Pointer(testAllocCB)
 }
 
 // SetupJITHook locks the JIT hook, resets the buffer, and returns a function

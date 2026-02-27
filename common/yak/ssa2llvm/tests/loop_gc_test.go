@@ -35,5 +35,5 @@ func TestInterop_LoopGC(t *testing.T) {
 	}
 
 	// We expect "Releasing handle" logs to verify finalizers ran during the loop.
-	checkRunBinary(t, code, "main", env, []string{"999", "Releasing handle"})
+	checkRunBinary(t, code, "main", env, []string{"999", "Releasing handle"}, withInteropRuntimeCode())
 }
