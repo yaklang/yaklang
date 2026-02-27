@@ -86,22 +86,74 @@ func (v *ValueList) NewConst(i any, rng ...*memedit.Range) ValueOperator {
 
 func (v *ValueList) CompareOpcode(comparator *OpcodeComparator) (ValueOperator, []bool) {
 	var res []bool
+	var candidates []ValueOperator
 	v.Recursive(func(operator ValueOperator) error {
-		_, result := operator.CompareOpcode(comparator)
+		matched, result := operator.CompareOpcode(comparator)
 		res = append(res, result...)
+		filtered := pickCandidateByMask(matched, result)
+		if !utils.IsNil(filtered) && !filtered.IsEmpty() {
+			candidates = append(candidates, filtered)
+		}
 		return nil
 	})
-	return v, res
+	if len(candidates) == 0 {
+		return NewEmptyValues(), res
+	}
+	return NewValues(candidates), res
 }
 
 func (v *ValueList) CompareString(comparator *StringComparator) (ValueOperator, []bool) {
 	var res []bool
+	var candidates []ValueOperator
 	v.Recursive(func(operator ValueOperator) error {
-		_, result := operator.CompareString(comparator)
+		matched, result := operator.CompareString(comparator)
 		res = append(res, result...)
+		filtered := pickCandidateByMask(matched, result)
+		if !utils.IsNil(filtered) && !filtered.IsEmpty() {
+			candidates = append(candidates, filtered)
+		}
 		return nil
 	})
-	return v, res
+	if len(candidates) == 0 {
+		return NewEmptyValues(), res
+	}
+	return NewValues(candidates), res
+}
+
+func pickCandidateByMask(candidate ValueOperator, cond []bool) ValueOperator {
+	if utils.IsNil(candidate) || candidate.IsEmpty() {
+		return NewEmptyValues()
+	}
+	if len(cond) == 0 {
+		return candidate
+	}
+
+	// If condition width cannot align with candidate width, keep the candidate
+	// only when there is at least one true condition.
+	if ValuesLen(candidate) != len(cond) {
+		for _, ok := range cond {
+			if ok {
+				return candidate
+			}
+		}
+		return NewEmptyValues()
+	}
+
+	filtered := make([]ValueOperator, 0, len(cond))
+	for idx, ok := range cond {
+		if !ok {
+			continue
+		}
+		sub, err := candidate.ListIndex(idx)
+		if err != nil || utils.IsNil(sub) {
+			continue
+		}
+		filtered = append(filtered, sub)
+	}
+	if len(filtered) == 0 {
+		return NewEmptyValues()
+	}
+	return NewValues(filtered)
 }
 
 func (v *ValueList) AppendPredecessor(value ValueOperator, opts ...AnalysisContextOption) error {
