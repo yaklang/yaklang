@@ -178,10 +178,10 @@ func makeRandomData(size int) []byte {
 }
 
 func makeJSONData(riskCount int) []byte {
-	parts := &StreamSingleResultParts{
+	parts := &SSAResultParts{
 		ProgramName: "test-program",
 		ReportType:  "security",
-		Risks:       make([]*StreamRiskPart, 0, riskCount),
+		Risks:       make([]*SSARiskPart, 0, riskCount),
 		Files: []*File{
 			{Path: "/src/main.go", IrSourceHash: "abc123", Content: strings.Repeat("package main\n", 200)},
 			{Path: "/src/util.go", IrSourceHash: "def456", Content: strings.Repeat("func helper() {}\n", 300)},
@@ -193,7 +193,7 @@ func makeJSONData(riskCount int) []byte {
 			"severity":    "high",
 			"description": strings.Repeat("risk detail ", 50),
 		})
-		parts.Risks = append(parts.Risks, &StreamRiskPart{
+		parts.Risks = append(parts.Risks, &SSARiskPart{
 			RiskHash:       fmt.Sprintf("riskhash_%04d", i),
 			RiskJSON:       riskJSON,
 			FileHashes:     []string{"abc123"},
@@ -455,7 +455,7 @@ func TestRoundtripJSONIntegrity(t *testing.T) {
 			if err != nil {
 				t.Fatalf("decode: %v", err)
 			}
-			var parts StreamSingleResultParts
+			var parts SSAResultParts
 			if err := json.Unmarshal(decoded, &parts); err != nil {
 				t.Fatalf("unmarshal: %v", err)
 			}
@@ -569,16 +569,16 @@ func TestDataflowStreaming(t *testing.T) {
 }
 
 func TestFullPipeline_PartsToEnvelopesAndBack(t *testing.T) {
-	parts := &StreamSingleResultParts{
+	parts := &SSAResultParts{
 		ProgramName: "test-proj",
 		ReportType:  "security",
 		Files: []*File{
 			{Path: "/a.go", IrSourceHash: "fh1", Content: strings.Repeat("line\n", 500)},
 		},
-		Dataflows: []*StreamDataflowPart{
+		Dataflows: []*SSADataflowPart{
 			{DataflowHash: "dh1", Payload: json.RawMessage(`{"nodes":[],"edges":[]}`)},
 		},
-		Risks: []*StreamRiskPart{
+		Risks: []*SSARiskPart{
 			{
 				RiskHash:       "rh1",
 				RiskJSON:       json.RawMessage(`{"title":"xss","severity":"high"}`),

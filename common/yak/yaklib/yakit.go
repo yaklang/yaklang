@@ -214,8 +214,6 @@ func GetExtYakitLibByClient(client *YakitClient) map[string]interface{} {
 				sfreport.WithStreamShowDataflowPath(true),
 				sfreport.WithStreamShowFileContent(true),
 				sfreport.WithStreamWithFile(true),
-				sfreport.WithStreamDedupFileContent(false),
-				sfreport.WithStreamDedupDataflow(false),
 			)
 			parts, err := sfreport.ConvertSingleResultToSSAResultParts(result, opts)
 			if err != nil {
