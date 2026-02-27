@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiconfig"
 	"io"
 	"io/ioutil"
 	"os"
@@ -429,7 +428,7 @@ func invokeCWETranslationLiteForge(ctx context.Context, prompt string, opts ...a
 		aitool.WithStringParam("solution",
 			aitool.WithParam_Description("Brief solution or mitigation for this weakness in Chinese"),
 		),
-	), aicommon.WithAICallback(aiconfig.MustGetSpeedPriorityAIModelCallback()))
+	), aicommon.WithAICallback(aicommon.MustGetSpeedPriorityAIModelCallback()))
 
 	// Add user-provided options (like ai.type, ai.model, etc.)
 	liteforgeOpts = append(liteforgeOpts, opts...)

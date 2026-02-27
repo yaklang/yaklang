@@ -2,10 +2,8 @@ package generate_index_tool
 
 import (
 	"context"
-	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiconfig"
-
 	_ "embed"
+	"fmt"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -55,7 +53,7 @@ func (p *DefaultAIContentProcessor) ProcessContent(ctx context.Context, rawConte
 			aitool.WithStringParam("description", aitool.WithParam_Required(true), aitool.WithParam_Description("内容功能描述")),
 			aitool.WithStringArrayParam("keywords", aitool.WithParam_Required(true), aitool.WithParam_Description("关键词数组")),
 		),
-		aicommon.WithAICallback(aiconfig.MustGetSpeedPriorityAIModelCallback()),
+		aicommon.WithAICallback(aicommon.MustGetSpeedPriorityAIModelCallback()),
 	)
 	if err != nil {
 		return "", fmt.Errorf("invoke liteforge failed: %w", err)

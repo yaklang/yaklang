@@ -2,7 +2,6 @@ package enhancesearch
 
 import (
 	"bytes"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiconfig"
 	"strings"
 	"text/template"
 
@@ -135,7 +134,7 @@ func BuildIndexQuestions(rawInput []string, aiService aicommon.AICallbackType) (
 	if aiService != nil {
 		forgeOpts = append(forgeOpts, aicommon.WithAICallback(aiService))
 	} else {
-		forgeOpts = append(forgeOpts, aicommon.WithAICallback(aiconfig.MustGetSpeedPriorityAIModelCallback()))
+		forgeOpts = append(forgeOpts, aicommon.WithAICallback(aicommon.MustGetSpeedPriorityAIModelCallback()))
 	}
 
 	result, err := aicommon.InvokeLiteForge(query, forgeOpts...)

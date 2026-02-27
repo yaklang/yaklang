@@ -2,6 +2,7 @@ package aicommon
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io"
 	"strings"
 
@@ -140,4 +141,14 @@ func LoadAIService(typeName string, opts ...aispec.AIConfigOption) (AICallbackTy
 		return nil, err
 	}
 	return AIChatToAICallbackType(chatter), nil
+}
+
+// CreateCallbackFromConfig creates an AICallbackType from a ThirdPartyApplicationConfig
+func CreateCallbackFromConfig(config *ypb.ThirdPartyApplicationConfig) (AICallbackType, error) {
+	if config == nil {
+		return nil, utils.Error("config is nil")
+	}
+
+	opts := aispec.BuildOptionsFromConfig(config)
+	return LoadAIService(config.Type, opts...)
 }

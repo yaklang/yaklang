@@ -147,19 +147,19 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 		log.Info("tiered ai config is enabled. the old-styled ai config is override")
 	}
 
-	lightAI, err := aiconfig.GetLightweightAIModelCallback()
+	lightAI, err := aicommon.GetLightweightAIModelCallback()
 	if err != nil {
-		lightAI, _ = aiconfig.GetDefaultAIModelCallback()
+		lightAI, _ = aicommon.GetDefaultAIModelCallback()
 		log.Warnf("get lightweight AI model callback failed: %v", err)
 	}
-	intelligentAI, err := aiconfig.GetIntelligentAIModelCallback()
+	intelligentAI, err := aicommon.GetIntelligentAIModelCallback()
 	if err != nil {
-		intelligentAI, _ = aiconfig.GetDefaultAIModelCallback()
+		intelligentAI, _ = aicommon.GetDefaultAIModelCallback()
 		log.Warnf("get intelligent AI model callback failed: %v", err)
 	}
-	defaultAI, err := aiconfig.GetDefaultAIModelCallback()
+	defaultAI, err := aicommon.GetDefaultAIModelCallback()
 	if err != nil {
-		defaultAI, _ = aiconfig.GetDefaultAIModelCallback()
+		defaultAI, _ = aicommon.GetDefaultAIModelCallback()
 		log.Warnf("get default AI model callback failed: %v", err)
 	}
 
