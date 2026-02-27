@@ -5,6 +5,8 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+const aiThirdPartyConfigTableName = "ai_third_party_configs"
+
 // AIThirdPartyConfig stores AI provider configuration synced with ypb.ThirdPartyApplicationConfig.
 type AIThirdPartyConfig struct {
 	gorm.Model
@@ -21,7 +23,7 @@ type AIThirdPartyConfig struct {
 }
 
 func (c *AIThirdPartyConfig) TableName() string {
-	return "ai_third_party_configs"
+	return aiThirdPartyConfigTableName
 }
 
 func (c *AIThirdPartyConfig) ToThirdPartyConfig() *ypb.ThirdPartyApplicationConfig {
