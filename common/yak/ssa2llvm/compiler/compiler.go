@@ -30,21 +30,42 @@ type Compiler struct {
 
 	// CurrentFunction being compiled
 	CurrentFunction *ssa.Function
+
+	// ExternBindings maps source-level function names to runtime symbols/signatures.
+	ExternBindings map[string]ExternBinding
+}
+
+type CompilerOption func(*Compiler)
+
+func WithExternBindings(custom map[string]ExternBinding) CompilerOption {
+	return func(c *Compiler) {
+		if len(custom) == 0 {
+			return
+		}
+		c.ExternBindings = mergeExternBindings(c.ExternBindings, custom)
+	}
 }
 
 // NewCompiler initializes a new Compiler instance.
-func NewCompiler(ctx context.Context, prog *ssa.Program) *Compiler {
+func NewCompiler(ctx context.Context, prog *ssa.Program, opts ...CompilerOption) *Compiler {
 	c := llvm.NewContext()
-	return &Compiler{
-		Ctx:           ctx,
-		LLVMCtx:       c,
-		Mod:           c.NewModule(prog.Name),
-		Builder:       c.NewBuilder(),
-		Values:        make(map[int64]llvm.Value),
-		Blocks:        make(map[int64]llvm.BasicBlock),
-		Program:       prog,
-		TypeConverter: types.NewTypeConverter(c),
+	comp := &Compiler{
+		Ctx:            ctx,
+		LLVMCtx:        c,
+		Mod:            c.NewModule(prog.Name),
+		Builder:        c.NewBuilder(),
+		Values:         make(map[int64]llvm.Value),
+		Blocks:         make(map[int64]llvm.BasicBlock),
+		Program:        prog,
+		TypeConverter:  types.NewTypeConverter(c),
+		ExternBindings: cloneExternBindings(defaultExternBindings),
 	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(comp)
+		}
+	}
+	return comp
 }
 
 // Dispose releases LLVM resources.

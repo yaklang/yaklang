@@ -87,17 +87,15 @@ func compileAction(c *cli.Context) error {
 		return fmt.Errorf("missing source file argument")
 	}
 
-	opts := compiler.CompileOptions{
-		SourceFile:  c.Args().First(),
-		Language:    c.String("language"),
-		OutputFile:  c.String("output"),
-		EmitLLVM:    c.Bool("emit-llvm"),
-		EmitAsm:     c.Bool("emit-asm"),
-		CompileOnly: c.Bool("c"),
-		PrintIR:     c.Bool("print-ir"),
-	}
-
-	return compiler.CompileToExecutable(opts)
+	return compiler.CompileToExecutable(
+		compiler.WithCompileSourceFile(c.Args().First()),
+		compiler.WithCompileLanguage(c.String("language")),
+		compiler.WithCompileOutputFile(c.String("output")),
+		compiler.WithCompileEmitLLVM(c.Bool("emit-llvm")),
+		compiler.WithCompileEmitAsm(c.Bool("emit-asm")),
+		compiler.WithCompileOnly(c.Bool("c")),
+		compiler.WithCompilePrintIR(c.Bool("print-ir")),
+	)
 }
 
 func runAction(c *cli.Context) error {
@@ -105,20 +103,19 @@ func runAction(c *cli.Context) error {
 		return fmt.Errorf("missing source file argument")
 	}
 
-	opts := compiler.RunOptions{
-		SourceFile:   c.Args().First(),
-		Language:     c.String("language"),
-		FunctionName: c.String("function"),
-		PrintIR:      c.Bool("print-ir"),
-	}
-
-	result, err := compiler.RunViaJIT(opts)
+	functionName := c.String("function")
+	result, err := compiler.RunViaJIT(
+		compiler.WithRunSourceFile(c.Args().First()),
+		compiler.WithRunLanguage(c.String("language")),
+		compiler.WithRunFunction(functionName),
+		compiler.WithRunPrintIR(c.Bool("print-ir")),
+	)
 	if err != nil {
 		return err
 	}
 
 	fmt.Printf("\n=== Execution Result ===\n")
-	fmt.Printf("Function '%s' returned: %d\n", opts.FunctionName, result)
+	fmt.Printf("Function '%s' returned: %d\n", functionName, result)
 
 	return nil
 }

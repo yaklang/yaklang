@@ -9,42 +9,48 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// CompileLLVMToBinary compiles an LLVM IR file to a native executable, linking with the Yak runtime.
-func CompileLLVMToBinary(llFile, binFile string) error {
+// CompileLLVMToBinary compiles an LLVM IR file to a native executable.
+// When linkRuntime is true, it links against the default yak runtime archive.
+func CompileLLVMToBinary(llFile, binFile string, linkRuntime bool, extraArgs ...string) error {
 	// Find clang
 	clangPath, err := findLLVMTool("clang")
 	if err != nil {
 		return err
 	}
 
-	// Determine runtime path
-	// We check standard locations relative to the project root
-	runtimeDir := "common/yak/ssa2llvm/runtime"
-	if _, err := os.Stat(runtimeDir); os.IsNotExist(err) {
-		// Try finding it relative to current working directory
-		if _, err := os.Stat("runtime/libyak.a"); err == nil {
-			runtimeDir = "runtime"
-		} else if _, err := os.Stat("../runtime/libyak.a"); err == nil {
-			runtimeDir = "../runtime"
-		} else {
-			cwd, _ := os.Getwd()
-			return utils.Errorf("runtime library not found in %s/common/yak/ssa2llvm/runtime or runtime", cwd)
+	args := []string{llFile}
+	if len(extraArgs) > 0 {
+		args = append(args, extraArgs...)
+	}
+
+	if linkRuntime {
+		// Determine runtime path
+		// We check standard locations relative to the project root
+		runtimeDir := "common/yak/ssa2llvm/runtime"
+		if _, err := os.Stat(runtimeDir); os.IsNotExist(err) {
+			// Try finding it relative to current working directory
+			if _, err := os.Stat("runtime/libyak.a"); err == nil {
+				runtimeDir = "runtime"
+			} else if _, err := os.Stat("../runtime/libyak.a"); err == nil {
+				runtimeDir = "../runtime"
+			} else {
+				cwd, _ := os.Getwd()
+				return utils.Errorf("runtime library not found in %s/common/yak/ssa2llvm/runtime or runtime", cwd)
+			}
 		}
+		absRuntimeDir, _ := filepath.Abs(runtimeDir)
+		args = append(args,
+			"-L"+absRuntimeDir,
+			"-lyak",
+			"-lgc",
+			"-lpthread",
+			"-ldl",
+		)
 	}
-
-	absRuntimeDir, _ := filepath.Abs(runtimeDir)
-
-	// Build command: clang <llFile> -o <binFile> -L<runtimeDir> -lyak
-	args := []string{
-		llFile,
+	args = append(args,
 		"-o", binFile,
-		"-L" + absRuntimeDir,
-		"-lyak",
-		"-lgc",
-		"-lpthread",
-		"-ldl",
 		// "-v", // Debug linking
-	}
+	)
 
 	cmd := exec.Command(clangPath, args...)
 	output, err := cmd.CombinedOutput()

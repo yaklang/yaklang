@@ -3,8 +3,8 @@ package compiler
 import (
 	"fmt"
 
-	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/go-llvm"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 // compileJump creates an unconditional branch to the target block.
@@ -163,8 +163,17 @@ func (c *Compiler) callReturnsPointer(call *ssa.Call, fn *ssa.Function) bool {
 		calleeName = fmt.Sprintf("func_%d", call.Method)
 	}
 
+	if binding, ok := c.getExternBinding(calleeName); ok {
+		switch binding.Return {
+		case ExternTypePtr:
+			return true
+		default:
+			return false
+		}
+	}
+
 	switch calleeName {
-	case "getObject":
+	case "malloc":
 		return true
 	default:
 		return false

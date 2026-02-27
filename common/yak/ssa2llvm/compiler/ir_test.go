@@ -7,6 +7,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func testInteropExternBindings() map[string]ExternBinding {
+	return map[string]ExternBinding{
+		"getObject": {
+			Symbol: "yak_runtime_get_object",
+			Params: []LLVMExternType{ExternTypeI64},
+			Return: ExternTypePtr,
+		},
+	}
+}
+
 func requireIRContainsInOrder(t *testing.T, ir string, parts ...string) {
 	t.Helper()
 	last := -1
@@ -26,7 +36,7 @@ func TestIR_ObjectInteropCalls(t *testing.T) {
 		println(v)
 	}
 	`
-	_, _, ir, err := compileToIRFromCode(code, "yak")
+	_, _, ir, err := compileToIRFromCodeWithExternBindings(code, "yak", testInteropExternBindings())
 	require.NoError(t, err)
 	requireIRContainsInOrder(t, ir,
 		"call ptr @yak_runtime_get_object",
@@ -47,11 +57,57 @@ func TestIR_LoopEmitsBranchesAndCalls(t *testing.T) {
 		println(999)
 	}
 	`
-	_, _, ir, err := compileToIRFromCode(code, "yak")
+	_, _, ir, err := compileToIRFromCodeWithExternBindings(code, "yak", testInteropExternBindings())
 	require.NoError(t, err)
 	requireIRContainsInOrder(t, ir,
 		"br i1",
 		"call ptr @yak_runtime_get_object",
+		"call void @yak_internal_print_int",
+	)
+}
+
+func TestIR_CustomExternBindingPointerReturn(t *testing.T) {
+	code := `
+	func main() {
+		a = newObject(10)
+		v = a.Number
+		println(v)
+	}
+	`
+	bindings := map[string]ExternBinding{
+		"newObject": {
+			Symbol: "yak_runtime_get_object",
+			Params: []LLVMExternType{ExternTypeI64},
+			Return: ExternTypePtr,
+		},
+	}
+	_, _, ir, err := compileToIRFromCodeWithExternBindings(code, "yak", bindings)
+	require.NoError(t, err)
+	requireIRContainsInOrder(t, ir,
+		"call ptr @yak_runtime_get_object",
+		"call i64 @yak_runtime_get_field",
+		"call void @yak_internal_print_int",
+	)
+}
+
+func TestIR_CustomExternBindingOverrideGetObject(t *testing.T) {
+	code := `
+	func main() {
+		v = getObject(16)
+		println(v)
+	}
+	`
+	bindings := map[string]ExternBinding{
+		"getObject": {
+			Symbol: "yak_internal_malloc",
+			Params: []LLVMExternType{ExternTypeI64},
+			Return: ExternTypeI64,
+		},
+	}
+	_, _, ir, err := compileToIRFromCodeWithExternBindings(code, "yak", bindings)
+	require.NoError(t, err)
+	requireIRContainsInOrder(t, ir,
+		"call i64 @yak_internal_malloc",
 		"call void @yak_internal_print_int",
 	)
 }

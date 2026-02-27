@@ -3,9 +3,20 @@ package compiler
 import (
 	"fmt"
 
-	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/go-llvm"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 )
+
+func (c *Compiler) coerceToExternArgType(val llvm.Value, typ LLVMExternType) llvm.Value {
+	switch typ {
+	case ExternTypePtr:
+		return c.coerceToI8Ptr(val)
+	case ExternTypeI64:
+		return c.coerceToInt64(val)
+	default:
+		return val
+	}
+}
 
 // compileCall compiles a ssa.Call instruction to LLVM IR.
 func (c *Compiler) compileCall(inst *ssa.Call) error {
@@ -32,6 +43,7 @@ func (c *Compiler) compileCall(inst *ssa.Call) error {
 	// 2. Get or declare LLVM function
 	// Check externs first
 	llvmFn := c.ensureExternDeclaration(calleeName)
+	externBinding, hasExternBinding := c.getExternBinding(calleeName)
 
 	if llvmFn.IsNil() {
 		llvmFn = c.Mod.NamedFunction(calleeName)
@@ -49,10 +61,13 @@ func (c *Compiler) compileCall(inst *ssa.Call) error {
 
 	// 3. Prepare arguments
 	args := make([]llvm.Value, 0, len(inst.Args))
-	for _, argID := range inst.Args {
+	for i, argID := range inst.Args {
 		argVal, err := c.getValue(inst, argID)
 		if err != nil {
 			return fmt.Errorf("compileCall: failed to resolve argument %d: %w", argID, err)
+		}
+		if hasExternBinding && i < len(externBinding.Params) {
+			argVal = c.coerceToExternArgType(argVal, externBinding.Params[i])
 		}
 		args = append(args, argVal)
 	}
