@@ -31,6 +31,10 @@ func (v *ValueList) IsEmpty() bool {
 	return false
 }
 
+func (v *ValueList) ShouldUseConditionCandidate() bool {
+	return false
+}
+
 func NewEmptyValues() ValueOperator {
 	return &ValueList{Values: nil}
 }

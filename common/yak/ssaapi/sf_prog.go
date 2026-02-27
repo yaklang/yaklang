@@ -25,45 +25,101 @@ func (p *Program) CompareConst(comparator *sfvm.ConstComparator) []bool {
 	return []bool{false}
 }
 
+func (p *Program) ShouldUseConditionCandidate() bool {
+	return true
+}
+
 func (p *Program) NewConst(i any, rng ...*memedit.Range) sfvm.ValueOperator {
 	return p.NewConstValue(i, rng...)
 }
 
 func (p *Program) CompareOpcode(opcodeItems *sfvm.OpcodeComparator) (sfvm.ValueOperator, []bool) {
-	var boolRes []bool
 	ctx := opcodeItems.Context
 	var res Values = lo.FilterMap(
 		ssa.MatchInstructionByOpcodes(ctx, p.Program, opcodeItems.Opcodes...),
 		func(i ssa.Instruction, _ int) (*Value, bool) {
-			if v, err := p.NewValue(i); err != nil {
+			val, err := p.NewValue(i)
+			if err != nil {
 				log.Errorf("CompareOpcode: new value failed: %v", err)
-				return v, false
-			} else {
-				boolRes = append(boolRes, true)
-				return v, true
+				return val, false
 			}
+			return val, true
 		},
 	)
-	// 将 Values 转换为 sfvm.ValueOperator
-	return ValuesToSFValueList(res), boolRes
+	// Return matched values; VM will normalize bool mask against source width.
+	return ValuesToSFValueList(res), nil
 }
 
 func (p *Program) CompareString(comparator *sfvm.StringComparator) (sfvm.ValueOperator, []bool) {
 	var res []sfvm.ValueOperator
-	var boolRes []bool
 	ctx := comparator.Context
+
+	matchCallByString := func(condition *sfvm.StringCondition) sfvm.ValueOperator {
+		callMatcher := sfvm.NewStringComparator(sfvm.MatchHave, ctx)
+		callMatcher.Conditions = []*sfvm.StringCondition{condition}
+		var out []sfvm.ValueOperator
+		for _, inst := range ssa.MatchInstructionByOpcodes(ctx, p.Program, ssa.SSAOpcodeCall) {
+			val, err := p.NewValue(inst)
+			if err != nil || val == nil {
+				continue
+			}
+			names := getValueNames(val)
+			names = append(names, codec.AnyToString(val.String()))
+			if callMatcher.Matches(names...) {
+				out = append(out, val)
+			}
+		}
+		return sfvm.NewValues(out)
+	}
+	matchConstByString := func(condition *sfvm.StringCondition) sfvm.ValueOperator {
+		constMatcher := sfvm.NewStringComparator(sfvm.MatchHave, ctx)
+		constMatcher.Conditions = []*sfvm.StringCondition{condition}
+		var out []sfvm.ValueOperator
+		for _, inst := range ssa.MatchInstructionByOpcodes(ctx, p.Program, ssa.SSAOpcodeConstInst) {
+			val, err := p.NewValue(inst)
+			if err != nil || val == nil {
+				continue
+			}
+			names := getValueNames(val)
+			names = append(names, codec.AnyToString(val.String()))
+			if constMatcher.Matches(names...) {
+				out = append(out, val)
+			}
+		}
+		return sfvm.NewValues(out)
+	}
 
 	matchValue := func(condition *sfvm.StringCondition) sfvm.ValueOperator {
 		var v sfvm.ValueOperator
 		switch condition.FilterMode {
 		case sfvm.GlobalConditionFilter:
-			_, v, _ = p.GlobMatch(ctx, ssadb.NameMatch, condition.Pattern)
+			_, v, _ = p.GlobMatch(ctx, ssadb.BothMatch, condition.Pattern)
 		case sfvm.RegexpConditionFilter:
-			_, v, _ = p.RegexpMatch(ctx, ssadb.NameMatch, condition.Pattern)
+			_, v, _ = p.RegexpMatch(ctx, ssadb.BothMatch, condition.Pattern)
 		case sfvm.ExactConditionFilter:
-			_, v, _ = p.RegexpMatch(ctx, ssadb.NameMatch, fmt.Sprintf(".*%s.*", condition.Pattern))
+			_, v, _ = p.RegexpMatch(ctx, ssadb.BothMatch, fmt.Sprintf(".*%s.*", condition.Pattern))
 		}
-		return v
+		callMatches := matchCallByString(condition)
+		constMatches := matchConstByString(condition)
+		if utils.IsNil(v) {
+			if utils.IsNil(callMatches) {
+				return constMatches
+			}
+			merged, err := callMatches.Merge(constMatches)
+			if err != nil {
+				return callMatches
+			}
+			return merged
+		}
+		merged, err := v.Merge(callMatches)
+		if err != nil {
+			merged = v
+		}
+		merged2, err := merged.Merge(constMatches)
+		if err != nil {
+			return merged
+		}
+		return merged2
 	}
 
 	switch comparator.MatchMode {
@@ -99,12 +155,8 @@ func (p *Program) CompareString(comparator *sfvm.StringComparator) (sfvm.ValueOp
 			}
 		}
 	}
-	result := sfvm.NewValues(res)
-	result.Recursive(func(operator sfvm.ValueOperator) error {
-		boolRes = append(boolRes, true)
-		return nil
-	})
-	return result, boolRes
+	// Return matched values; VM will normalize bool mask against source width.
+	return sfvm.NewValues(res), nil
 }
 
 func (p *Program) String() string {
