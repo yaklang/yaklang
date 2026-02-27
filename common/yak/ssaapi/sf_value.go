@@ -31,6 +31,10 @@ func (v *Value) IsEmpty() bool {
 	return v == nil
 }
 
+func (v *Value) ShouldUseConditionCandidate() bool {
+	return false
+}
+
 func (v *Value) GetOpcode() string {
 	return v.getOpcode().String()
 }

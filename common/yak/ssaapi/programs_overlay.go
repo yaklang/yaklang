@@ -1091,6 +1091,10 @@ func (p *ProgramOverLay) IsEmpty() bool {
 	return true
 }
 
+func (p *ProgramOverLay) ShouldUseConditionCandidate() bool {
+	return true
+}
+
 func (p *ProgramOverLay) GetOpcode() string {
 	return ""
 }
@@ -1258,11 +1262,25 @@ func (p *ProgramOverLay) FileFilter(path string, match string, rule map[string]s
 }
 
 func (p *ProgramOverLay) CompareString(comparator *sfvm.StringComparator) (sfvm.ValueOperator, []bool) {
-	return p, nil
+	if p == nil || len(p.Layers) == 0 {
+		return sfvm.NewEmptyValues(), nil
+	}
+	top := p.Layers[len(p.Layers)-1]
+	if top == nil || top.Program == nil {
+		return sfvm.NewEmptyValues(), nil
+	}
+	return top.Program.CompareString(comparator)
 }
 
 func (p *ProgramOverLay) CompareOpcode(comparator *sfvm.OpcodeComparator) (sfvm.ValueOperator, []bool) {
-	return p, nil
+	if p == nil || len(p.Layers) == 0 {
+		return sfvm.NewEmptyValues(), nil
+	}
+	top := p.Layers[len(p.Layers)-1]
+	if top == nil || top.Program == nil {
+		return sfvm.NewEmptyValues(), nil
+	}
+	return top.Program.CompareOpcode(comparator)
 }
 
 func (p *ProgramOverLay) CompareConst(comparator *sfvm.ConstComparator) []bool {

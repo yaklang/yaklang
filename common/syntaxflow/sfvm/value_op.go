@@ -103,6 +103,7 @@ type ValueOperator interface {
 	IsMap() bool
 	IsList() bool
 	IsEmpty() bool
+	ShouldUseConditionCandidate() bool
 	GetOpcode() string
 	GetBinaryOperator() string
 	GetUnaryOperator() string
