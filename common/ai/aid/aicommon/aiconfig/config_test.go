@@ -84,24 +84,24 @@ func TestGetConfigsByTier(t *testing.T) {
 	originalConfig := consts.GetTieredAIConfig()
 	defer consts.SetTieredAIConfig(originalConfig)
 
-	intelligentConfig := &ypb.ThirdPartyApplicationConfig{
-		Type:   "aibalance",
-		APIKey: "test-key",
+	intelligentConfig := &ypb.AIModelConfig{
+		Provider:  &ypb.ThirdPartyApplicationConfig{Type: "aibalance", APIKey: "test-key"},
+		ModelName: "intelligent-model",
 	}
-	lightweightConfig := &ypb.ThirdPartyApplicationConfig{
-		Type:   "aibalance",
-		APIKey: "light-key",
+	lightweightConfig := &ypb.AIModelConfig{
+		Provider:  &ypb.ThirdPartyApplicationConfig{Type: "aibalance", APIKey: "light-key"},
+		ModelName: "lightweight-model",
 	}
-	visionConfig := &ypb.ThirdPartyApplicationConfig{
-		Type:   "aibalance",
-		APIKey: "vision-key",
+	visionConfig := &ypb.AIModelConfig{
+		Provider:  &ypb.ThirdPartyApplicationConfig{Type: "aibalance", APIKey: "vision-key"},
+		ModelName: "vision-model",
 	}
 
 	consts.SetTieredAIConfig(&consts.TieredAIConfig{
 		Enabled:            true,
-		IntelligentConfigs: []*ypb.ThirdPartyApplicationConfig{intelligentConfig},
-		LightweightConfigs: []*ypb.ThirdPartyApplicationConfig{lightweightConfig},
-		VisionConfigs:      []*ypb.ThirdPartyApplicationConfig{visionConfig},
+		IntelligentConfigs: []*ypb.AIModelConfig{intelligentConfig},
+		LightweightConfigs: []*ypb.AIModelConfig{lightweightConfig},
+		VisionConfigs:      []*ypb.AIModelConfig{visionConfig},
 	})
 
 	mgr := &AIConfigManager{}
@@ -109,15 +109,15 @@ func TestGetConfigsByTier(t *testing.T) {
 	// Test getting configs by tier
 	intelligentConfigs := mgr.GetConfigsByTier(TierIntelligent)
 	assert.Len(t, intelligentConfigs, 1)
-	assert.Equal(t, "test-key", intelligentConfigs[0].APIKey)
+	assert.Equal(t, "test-key", intelligentConfigs[0].GetProvider().GetAPIKey())
 
 	lightweightConfigs := mgr.GetConfigsByTier(TierLightweight)
 	assert.Len(t, lightweightConfigs, 1)
-	assert.Equal(t, "light-key", lightweightConfigs[0].APIKey)
+	assert.Equal(t, "light-key", lightweightConfigs[0].GetProvider().GetAPIKey())
 
 	visionConfigs := mgr.GetConfigsByTier(TierVision)
 	assert.Len(t, visionConfigs, 1)
-	assert.Equal(t, "vision-key", visionConfigs[0].APIKey)
+	assert.Equal(t, "vision-key", visionConfigs[0].GetProvider().GetAPIKey())
 }
 
 func TestGetFirstConfig(t *testing.T) {
@@ -127,16 +127,16 @@ func TestGetFirstConfig(t *testing.T) {
 
 	consts.SetTieredAIConfig(&consts.TieredAIConfig{
 		Enabled: true,
-		IntelligentConfigs: []*ypb.ThirdPartyApplicationConfig{
-			{Type: "aibalance", APIKey: "first"},
-			{Type: "aibalance", APIKey: "second"},
+		IntelligentConfigs: []*ypb.AIModelConfig{
+			{Provider: &ypb.ThirdPartyApplicationConfig{Type: "aibalance", APIKey: "first"}, ModelName: "first-model"},
+			{Provider: &ypb.ThirdPartyApplicationConfig{Type: "aibalance", APIKey: "second"}, ModelName: "second-model"},
 		},
 	})
 
 	mgr := GetGlobalManager()
 	config := mgr.GetFirstConfig(TierIntelligent)
 	assert.NotNil(t, config)
-	assert.Equal(t, "first", config.APIKey)
+	assert.Equal(t, "first", config.GetProvider().GetAPIKey())
 
 	// Test with empty configs
 	consts.SetTieredAIConfig(&consts.TieredAIConfig{
@@ -153,27 +153,18 @@ func TestGetFirstConfigByTierAndProviderAndModel(t *testing.T) {
 
 	consts.SetTieredAIConfig(&consts.TieredAIConfig{
 		Enabled: true,
-		IntelligentConfigs: []*ypb.ThirdPartyApplicationConfig{
+		IntelligentConfigs: []*ypb.AIModelConfig{
 			{
-				Type:   "openai",
-				APIKey: "first",
-				ExtraParams: []*ypb.KVPair{
-					{Key: "model", Value: "gpt-4o"},
-				},
+				Provider:  &ypb.ThirdPartyApplicationConfig{Type: "openai", APIKey: "first"},
+				ModelName: "gpt-4o",
 			},
 			{
-				Type:   "openai",
-				APIKey: "second",
-				ExtraParams: []*ypb.KVPair{
-					{Key: "model", Value: "gpt-4.1"},
-				},
+				Provider:  &ypb.ThirdPartyApplicationConfig{Type: "openai", APIKey: "second"},
+				ModelName: "gpt-4.1",
 			},
 			{
-				Type:   "aibalance",
-				APIKey: "third",
-				ExtraParams: []*ypb.KVPair{
-					{Key: "model", Value: "memfit-standard-free"},
-				},
+				Provider:  &ypb.ThirdPartyApplicationConfig{Type: "aibalance", APIKey: "third"},
+				ModelName: "memfit-standard-free",
 			},
 		},
 	})
@@ -182,19 +173,19 @@ func TestGetFirstConfigByTierAndProviderAndModel(t *testing.T) {
 
 	config := mgr.GetFirstConfigByTierAndProviderAndModel(TierIntelligent, "openai", "gpt-4.1")
 	assert.NotNil(t, config)
-	assert.Equal(t, "second", config.GetAPIKey())
+	assert.Equal(t, "second", config.GetProvider().GetAPIKey())
 
 	config = mgr.GetFirstConfigByTierAndProviderAndModel(TierIntelligent, "OPENAI", "GPT-4O")
 	assert.NotNil(t, config)
-	assert.Equal(t, "first", config.GetAPIKey())
+	assert.Equal(t, "first", config.GetProvider().GetAPIKey())
 
 	config = mgr.GetFirstConfigByTierAndProviderAndModel(TierIntelligent, "", "gpt-4o")
 	assert.NotNil(t, config)
-	assert.Equal(t, "first", config.GetAPIKey())
+	assert.Equal(t, "first", config.GetProvider().GetAPIKey())
 
 	config = mgr.GetFirstConfigByTierAndProviderAndModel(TierIntelligent, "aibalance", "")
 	assert.NotNil(t, config)
-	assert.Equal(t, "third", config.GetAPIKey())
+	assert.Equal(t, "third", config.GetProvider().GetAPIKey())
 
 	config = mgr.GetFirstConfigByTierAndProviderAndModel(TierIntelligent, "openai", "not-exist")
 	assert.Nil(t, config)
@@ -205,40 +196,40 @@ func TestGetModelByPolicy(t *testing.T) {
 	originalConfig := consts.GetTieredAIConfig()
 	defer consts.SetTieredAIConfig(originalConfig)
 
-	intelligentConfig := &ypb.ThirdPartyApplicationConfig{
-		Type:   "aibalance",
-		APIKey: "intelligent-key",
+	intelligentConfig := &ypb.AIModelConfig{
+		Provider:  &ypb.ThirdPartyApplicationConfig{Type: "aibalance", APIKey: "intelligent-key"},
+		ModelName: "intelligent-model",
 	}
-	lightweightConfig := &ypb.ThirdPartyApplicationConfig{
-		Type:   "aibalance",
-		APIKey: "lightweight-key",
+	lightweightConfig := &ypb.AIModelConfig{
+		Provider:  &ypb.ThirdPartyApplicationConfig{Type: "aibalance", APIKey: "lightweight-key"},
+		ModelName: "lightweight-model",
 	}
 
 	consts.SetTieredAIConfig(&consts.TieredAIConfig{
 		Enabled:            true,
-		IntelligentConfigs: []*ypb.ThirdPartyApplicationConfig{intelligentConfig},
-		LightweightConfigs: []*ypb.ThirdPartyApplicationConfig{lightweightConfig},
+		IntelligentConfigs: []*ypb.AIModelConfig{intelligentConfig},
+		LightweightConfigs: []*ypb.AIModelConfig{lightweightConfig},
 	})
 
 	// Test performance policy
 	config, err := GetModelByPolicy(PolicyPerformance)
 	assert.NoError(t, err)
-	assert.Equal(t, "intelligent-key", config.APIKey)
+	assert.Equal(t, "intelligent-key", config.GetProvider().GetAPIKey())
 
 	// Test cost policy
 	config, err = GetModelByPolicy(PolicyCost)
 	assert.NoError(t, err)
-	assert.Equal(t, "lightweight-key", config.APIKey)
+	assert.Equal(t, "lightweight-key", config.GetProvider().GetAPIKey())
 
 	// Test balance policy
 	config, err = GetModelByPolicy(PolicyBalance)
 	assert.NoError(t, err)
-	assert.Equal(t, "lightweight-key", config.APIKey)
+	assert.Equal(t, "lightweight-key", config.GetProvider().GetAPIKey())
 
 	// Test auto policy
 	config, err = GetModelByPolicy(PolicyAuto)
 	assert.NoError(t, err)
-	assert.Equal(t, "lightweight-key", config.APIKey)
+	assert.Equal(t, "lightweight-key", config.GetProvider().GetAPIKey())
 }
 
 func TestSelectTierByPolicy(t *testing.T) {

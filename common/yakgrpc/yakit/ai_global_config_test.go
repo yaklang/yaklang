@@ -150,11 +150,19 @@ func TestSetAIGlobalConfigRequiresProvider(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func lookupExtraParam(cfg *ypb.ThirdPartyApplicationConfig, key string) string {
+func lookupExtraParam(cfg *ypb.AIModelConfig, key string) string {
 	if cfg == nil {
 		return ""
 	}
+	if key == modelExtraParamKey && cfg.GetModelName() != "" {
+		return cfg.GetModelName()
+	}
 	for _, kv := range cfg.GetExtraParams() {
+		if kv.GetKey() == key {
+			return kv.GetValue()
+		}
+	}
+	for _, kv := range cfg.GetProvider().GetExtraParams() {
 		if kv.GetKey() == key {
 			return kv.GetValue()
 		}

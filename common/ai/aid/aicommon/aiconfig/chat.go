@@ -88,7 +88,7 @@ func chatWithTier(msg string, tier ModelTier, opts ...aispec.AIConfigOption) (st
 }
 
 // chatWithConfig performs a conversation using a specific configuration
-func chatWithConfig(msg string, config *ypb.ThirdPartyApplicationConfig, opts ...aispec.AIConfigOption) (string, error) {
+func chatWithConfig(msg string, config *ypb.AIModelConfig, opts ...aispec.AIConfigOption) (string, error) {
 	chatter, err := ai.CreateChatterFromConfig(config)
 	if err != nil {
 		log.Warnf("Failed to create chatter from config: %v, falling back to legacy chat", err)

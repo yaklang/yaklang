@@ -136,31 +136,57 @@ func fixDomain(c *AIConfig) {
 	}
 }
 
-// BuildOptionsFromConfig builds aispec.AIConfigOption slice from ThirdPartyApplicationConfig
-func BuildOptionsFromConfig(config *ypb.ThirdPartyApplicationConfig) []AIConfigOption {
+// BuildOptionsFromConfig builds aispec.AIConfigOption slice from AIModelConfig.
+func BuildOptionsFromConfig(config *ypb.AIModelConfig) []AIConfigOption {
+	if config == nil {
+		return nil
+	}
+	return buildOptionsFromProviderAndModel(config.GetProvider(), config.GetModelName(), config.GetExtraParams())
+}
+
+func buildOptionsFromProviderAndModel(provider *ypb.ThirdPartyApplicationConfig, modelName string, modelExtra []*ypb.KVPair) []AIConfigOption {
 	var opts []AIConfigOption
 
+	if provider == nil {
+		return opts
+	}
+
 	// Set API key
-	if config.APIKey != "" {
-		opts = append(opts, WithAPIKey(config.APIKey))
+	if provider.APIKey != "" {
+		opts = append(opts, WithAPIKey(provider.APIKey))
 	}
 
 	// Set domain
-	if config.Domain != "" {
-		opts = append(opts, WithDomain(config.Domain))
+	if provider.Domain != "" {
+		opts = append(opts, WithDomain(provider.Domain))
 	}
 
 	// Set type
-	if config.Type != "" {
-		opts = append(opts, WithType(config.Type))
+	if provider.Type != "" {
+		opts = append(opts, WithType(provider.Type))
 	}
 
-	// Extract model from ExtraParams
-	if len(config.ExtraParams) > 0 {
-		for _, param := range config.ExtraParams {
+	if modelName != "" {
+		opts = append(opts, WithModel(modelName))
+		return opts
+	}
+
+	// Extract model from model extra params first.
+	if len(modelExtra) > 0 {
+		for _, param := range modelExtra {
 			if param.Key == "model" {
 				opts = append(opts, WithModel(param.Value))
-				break
+				return opts
+			}
+		}
+	}
+
+	// Fall back to provider extra params.
+	if len(provider.ExtraParams) > 0 {
+		for _, param := range provider.ExtraParams {
+			if param.Key == "model" {
+				opts = append(opts, WithModel(param.Value))
+				return opts
 			}
 		}
 	}

@@ -143,12 +143,15 @@ func LoadAIService(typeName string, opts ...aispec.AIConfigOption) (AICallbackTy
 	return AIChatToAICallbackType(chatter), nil
 }
 
-// CreateCallbackFromConfig creates an AICallbackType from a ThirdPartyApplicationConfig
-func CreateCallbackFromConfig(config *ypb.ThirdPartyApplicationConfig) (AICallbackType, error) {
+// CreateCallbackFromConfig creates an AICallbackType from an AIModelConfig.
+func CreateCallbackFromConfig(config *ypb.AIModelConfig) (AICallbackType, error) {
 	if config == nil {
 		return nil, utils.Error("config is nil")
 	}
+	if config.GetProvider() == nil {
+		return nil, utils.Error("provider config is nil")
+	}
 
 	opts := aispec.BuildOptionsFromConfig(config)
-	return LoadAIService(config.Type, opts...)
+	return LoadAIService(config.GetProvider().GetType(), opts...)
 }

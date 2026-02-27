@@ -589,7 +589,7 @@ func WithTieredAICallback() ConfigOption {
 		// Configure quality priority callback (uses intelligent model)
 		intelligentConfigs := consts.GetIntelligentAIConfigs()
 		if len(intelligentConfigs) > 0 {
-			intelligentCB, err := loadCallbackFromThirdPartyConfig(intelligentConfigs[0])
+			intelligentCB, err := CreateCallbackFromConfig(intelligentConfigs[0])
 			if err == nil {
 				intelligentCB = c.wrapper(intelligentCB)
 				c.m.Lock()
@@ -604,7 +604,7 @@ func WithTieredAICallback() ConfigOption {
 		// Configure speed priority callback (uses lightweight model)
 		lightweightConfigs := consts.GetLightweightAIConfigs()
 		if len(lightweightConfigs) > 0 {
-			lightweightCB, err := loadCallbackFromThirdPartyConfig(lightweightConfigs[0])
+			lightweightCB, err := CreateCallbackFromConfig(lightweightConfigs[0])
 			if err == nil {
 				lightweightCB = c.wrapper(lightweightCB)
 				c.m.Lock()
@@ -653,32 +653,6 @@ func WithAutoTieredAICallback(defaultCallback AICallbackType) ConfigOption {
 		}
 		return nil
 	}
-}
-
-// loadCallbackFromThirdPartyConfig creates an AICallbackType from ThirdPartyApplicationConfig
-func loadCallbackFromThirdPartyConfig(cfg *ypb.ThirdPartyApplicationConfig) (AICallbackType, error) {
-	if cfg == nil {
-		return nil, utils.Error("config is nil")
-	}
-
-	var opts []aispec.AIConfigOption
-	if cfg.Type != "" {
-		opts = append(opts, aispec.WithType(cfg.Type))
-	}
-	if cfg.APIKey != "" {
-		opts = append(opts, aispec.WithAPIKey(cfg.APIKey))
-	}
-	if cfg.Domain != "" {
-		opts = append(opts, aispec.WithDomain(cfg.Domain))
-	}
-	for _, param := range cfg.ExtraParams {
-		if param.Key == "model" {
-			opts = append(opts, aispec.WithModel(param.Value))
-			break
-		}
-	}
-
-	return LoadAIService(cfg.Type, opts...)
 }
 
 // AI retry / limits

@@ -42,22 +42,22 @@ func GetCurrentPolicy() RoutingPolicy {
 }
 
 // GetIntelligentConfigs returns the intelligent model configurations
-func (m *AIConfigManager) GetIntelligentConfigs() []*ypb.ThirdPartyApplicationConfig {
+func (m *AIConfigManager) GetIntelligentConfigs() []*ypb.AIModelConfig {
 	return consts.GetIntelligentAIConfigs()
 }
 
 // GetLightweightConfigs returns the lightweight model configurations
-func (m *AIConfigManager) GetLightweightConfigs() []*ypb.ThirdPartyApplicationConfig {
+func (m *AIConfigManager) GetLightweightConfigs() []*ypb.AIModelConfig {
 	return consts.GetLightweightAIConfigs()
 }
 
 // GetVisionConfigs returns the vision model configurations
-func (m *AIConfigManager) GetVisionConfigs() []*ypb.ThirdPartyApplicationConfig {
+func (m *AIConfigManager) GetVisionConfigs() []*ypb.AIModelConfig {
 	return consts.GetVisionAIConfigs()
 }
 
 // GetConfigsByTier returns configurations for a specific model tier
-func (m *AIConfigManager) GetConfigsByTier(tier ModelTier) []*ypb.ThirdPartyApplicationConfig {
+func (m *AIConfigManager) GetConfigsByTier(tier ModelTier) []*ypb.AIModelConfig {
 	switch tier {
 	case TierIntelligent:
 		return m.GetIntelligentConfigs()
@@ -73,7 +73,7 @@ func (m *AIConfigManager) GetConfigsByTier(tier ModelTier) []*ypb.ThirdPartyAppl
 
 // GetFirstConfig returns the first configuration for a specific tier
 // Returns nil if no configuration is available
-func (m *AIConfigManager) GetFirstConfig(tier ModelTier) *ypb.ThirdPartyApplicationConfig {
+func (m *AIConfigManager) GetFirstConfig(tier ModelTier) *ypb.AIModelConfig {
 	configs := m.GetConfigsByTier(tier)
 	if len(configs) == 0 {
 		return nil
@@ -82,10 +82,10 @@ func (m *AIConfigManager) GetFirstConfig(tier ModelTier) *ypb.ThirdPartyApplicat
 }
 
 // GetFirstConfigByTierAndProviderAndModel returns the first matched config by tier, provider and model.
-// providerName maps to ThirdPartyApplicationConfig.Type.
-// modelName maps to the `model` key in ThirdPartyApplicationConfig.ExtraParams.
+// providerName maps to AIModelConfig.Provider.Type.
+// modelName maps to AIModelConfig.ModelName or the `model` key in ExtraParams.
 // Empty providerName or modelName means no filtering on that dimension.
-func (m *AIConfigManager) GetFirstConfigByTierAndProviderAndModel(tier ModelTier, providerName, modelName string) *ypb.ThirdPartyApplicationConfig {
+func (m *AIConfigManager) GetFirstConfigByTierAndProviderAndModel(tier ModelTier, providerName, modelName string) *ypb.AIModelConfig {
 	configs := m.GetConfigsByTier(tier)
 	if len(configs) == 0 {
 		return nil
@@ -99,7 +99,7 @@ func (m *AIConfigManager) GetFirstConfigByTierAndProviderAndModel(tier ModelTier
 			continue
 		}
 
-		if providerName != "" && !strings.EqualFold(strings.TrimSpace(cfg.GetType()), providerName) {
+		if providerName != "" && !strings.EqualFold(strings.TrimSpace(cfg.GetProvider().GetType()), providerName) {
 			continue
 		}
 
@@ -113,12 +113,23 @@ func (m *AIConfigManager) GetFirstConfigByTierAndProviderAndModel(tier ModelTier
 	return nil
 }
 
-func getModelFromConfig(config *ypb.ThirdPartyApplicationConfig) string {
+func getModelFromConfig(config *ypb.AIModelConfig) string {
 	if config == nil {
 		return ""
 	}
+	if strings.TrimSpace(config.GetModelName()) != "" {
+		return config.GetModelName()
+	}
 
 	for _, param := range config.GetExtraParams() {
+		if param == nil {
+			continue
+		}
+		if strings.EqualFold(strings.TrimSpace(param.GetKey()), modelExtraParamKey) {
+			return param.GetValue()
+		}
+	}
+	for _, param := range config.GetProvider().GetExtraParams() {
 		if param == nil {
 			continue
 		}
@@ -135,10 +146,10 @@ func getModelFromConfig(config *ypb.ThirdPartyApplicationConfig) string {
 // - performance: uses intelligent model
 // - cost: uses lightweight model
 // - balance: uses lightweight model by default
-func GetModelByPolicy(policy RoutingPolicy) (*ypb.ThirdPartyApplicationConfig, error) {
+func GetModelByPolicy(policy RoutingPolicy) (*ypb.AIModelConfig, error) {
 	mgr := GetGlobalManager()
 
-	var config *ypb.ThirdPartyApplicationConfig
+	var config *ypb.AIModelConfig
 	switch policy {
 	case PolicyPerformance:
 		config = mgr.GetFirstConfig(TierIntelligent)
