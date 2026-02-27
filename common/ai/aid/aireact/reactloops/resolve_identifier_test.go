@@ -32,23 +32,6 @@ func TestReActLoop_ResolveIdentifier_FocusedModeLoop(t *testing.T) {
 	assert.False(t, result.IsUnknown())
 }
 
-func TestReActLoop_ResolveIdentifier_FocusedMode_PythonPoc(t *testing.T) {
-	loopName := schema.AI_REACT_LOOP_NAME_PYTHON_POC
-
-	_, ok := GetLoopFactory(loopName)
-	if !ok {
-		t.Skipf("loop %q is not registered, skipping", loopName)
-	}
-
-	cfg := &aicommon.Config{}
-	loop := &ReActLoop{config: cfg}
-
-	result := loop.ResolveIdentifier(loopName)
-	assert.Equal(t, aicommon.ResolvedAs_FocusedMode, result.IdentityType)
-	assert.False(t, result.IsUnknown())
-	assert.Contains(t, result.Suggestion, "CANNOT enter this mode via loading_skills")
-}
-
 func TestReActLoop_ResolveIdentifier_TrulyUnknown(t *testing.T) {
 	cfg := &aicommon.Config{}
 	loop := &ReActLoop{config: cfg}

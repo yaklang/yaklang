@@ -18,7 +18,7 @@
     },
     {
       "subtask_name": "探索项目结构获取更多上下文（可选）",
-      "subtask_goal": "如果项目源码可访问(非内存模式)且需要更多上下文信息，使用ssa-list-files列出项目文件结构，使用ssa-grep搜索相关代码（如路由定义、配置文件、相关类等），使用ssa-read-file读取关键文件内容。这一步可以帮助理解完整的数据流和API结构。"
+      "subtask_goal": "如果项目源码可访问(非内存模式)且你认为需要更多上下文信息，则应该使用ssa相关工具探索项目结构和漏洞文件。使用ssa-list-files列出项目文件结构，使用ssa-grep搜索相关代码（如路由定义、配置文件、相关类等），使用ssa-read-file读取关键文件内容。这一步可以帮助理解完整的数据流和API结构。"
     },
     {
       "subtask_name": "漏洞类型分类与攻击向量分析",
@@ -34,7 +34,7 @@
     },
     {
       "subtask_name": "使用专注模式生成Python POC代码",
-      "subtask_goal": "根据前面收集的漏洞信息、API端点、攻击向量等信息，生成完整的Python POC代码。你需要输出 `{\"@action\": \"python_poc\", \"human_readable_thought\": \"根据漏洞分析结果生成Python POC代码\"}` 进入python_poc专注模式。在专注模式中使用write_python_poc创建POC文件，如有语法错误使用modify_python_poc修复。POC代码必须：1）语法正确，可以通过Python解释器验证；2）包含完整的漏洞检测和利用逻辑；3）使用规范的代码结构（类封装、异常处理、文档字符串）；4）包含使用说明和免责声明。"
+      "subtask_goal": "根据前面收集的漏洞信息、API端点、攻击向量等信息，生成完整的Python POC代码。你需要进入write_python_script专注模式。当用户输入URL目标不可达时你只需要尽量确保Python脚本逻辑正确，忽略网络连接错误"
     },
     {
       "subtask_name": "根据已有信息输出包含Python POC的MarkDown报告",

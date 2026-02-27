@@ -68,8 +68,8 @@ func TestReAct_FocusModeLoop_EndToEnd(t *testing.T) {
 	go func() {
 		in <- &ypb.AIInputEvent{
 			IsFreeInput:   true,
-			FreeInput:     "@__FOCUS__java_decompiler please generate a Python PoC",
-			FocusModeLoop: schema.AI_REACT_LOOP_NAME_PYTHON_POC,
+			FreeInput:     "@__FOCUS__java_decompiler please generate a Python Script that can print `Hello World`",
+			FocusModeLoop: schema.AI_REACT_LOOP_NAME_WRITE_PYTHON_SCRIPT,
 		}
 		close(in)
 	}()
@@ -85,8 +85,8 @@ func TestReAct_FocusModeLoop_EndToEnd(t *testing.T) {
 		}
 	}
 
-	require.Contains(t, prompt, "## Python Environment Status")
-	require.Equal(t, schema.AI_REACT_LOOP_NAME_PYTHON_POC, focusMode)
+	require.Contains(t, prompt, "## Python Script Generation")
+	require.Equal(t, schema.AI_REACT_LOOP_NAME_WRITE_PYTHON_SCRIPT, focusMode)
 }
 
 func TestReAct_SelectLoopForTask_FocusModeOverridesDirective(t *testing.T) {
