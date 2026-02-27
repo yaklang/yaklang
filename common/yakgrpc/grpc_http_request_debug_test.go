@@ -590,6 +590,48 @@ return codec.EncodeBase64(a)
 	}
 }
 
+func TestGRPCMUSTPASS_HTTP_CodecCliDebug(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	codecString := utils.RandStringBytes(10)
+	expected := codec.EncodeBase64(codecString)
+	stream, err := client.DebugPlugin(context.Background(), &ypb.DebugPluginRequest{
+		Code: `
+ok = cli.Bool("ok")
+cli.check()
+handle = func(a){
+if !ok {
+	return ""
+}
+return codec.EncodeBase64(a)
+}
+`,
+		PluginType: "codec",
+		Input:      codecString,
+		ExecParams: []*ypb.KVPair{{Key: "ok", Value: "true"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	checked := false
+	for {
+		exec, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		if string(exec.Message) != "" {
+			if strings.Contains(string(exec.Message), expected) {
+				checked = true
+			}
+		}
+	}
+	if !checked {
+		t.Fatal("plugin is not executed")
+	}
+}
+
 func TestGRPCMUSTPASS_HTTP_YakDebug(t *testing.T) {
 	client, err := NewLocalClient()
 	host, port := utils.DebugMockHTTP([]byte(`HTTP/1.1 200 OK

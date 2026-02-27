@@ -105,10 +105,8 @@ func execScriptWithExecParam(script *schema.YakScript, input string, stream send
 		})
 		app := cli.DefaultCliApp
 		// 额外处理 cli，新建 cli app
-		if strings.ToLower(scriptType) == "yak" {
-			tempArgs := makeArgs(streamCtx, params)
-			app = yak.GetHookCliApp(tempArgs)
-		}
+		tempArgs := makeArgs(streamCtx, params)
+		app = yak.GetHookCliApp(tempArgs)
 		yak.BindYakitPluginContextToEngine(engine, yak.CreateYakitPluginContext(
 			runtimeId,
 		).WithPluginName(

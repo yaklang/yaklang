@@ -4,17 +4,16 @@ import (
 	"fmt"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"github.com/yaklang/yaklang/common/yak/static_analyzer/plugin_type"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/result"
 )
 
-func init() {
-	//plugin_type.RegisterCheckRuler(plugin_type.PluginTypeMitm, DisableCli)
-	plugin_type.RegisterCheckRuler(plugin_type.PluginTypePortScan, DisableCli)
-	plugin_type.RegisterCheckRuler(plugin_type.PluginTypeCodec, DisableCli)
-
-	//plugin_type.RegisterCheckRuler(plugin_type.PluginTypeMitm, DisableMitmExternLib)
-}
+//func init() {
+//	//plugin_type.RegisterCheckRuler(plugin_type.PluginTypeMitm, DisableCli)
+//	plugin_type.RegisterCheckRuler(plugin_type.PluginTypePortScan, DisableCli)
+//	plugin_type.RegisterCheckRuler(plugin_type.PluginTypeCodec, DisableCli)
+//
+//	//plugin_type.RegisterCheckRuler(plugin_type.PluginTypeMitm, DisableMitmExternLib)
+//}
 
 func DisableCli(prog *ssaapi.Program) *result.StaticAnalyzeResults {
 	ret := result.NewStaticAnalyzeResults("disable cli")
