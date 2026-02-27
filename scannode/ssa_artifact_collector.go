@@ -461,9 +461,11 @@ func runContinuousSegmentedUpload(codec string, provider ssaUploadConfigProvider
 			return err
 		}
 		segmentKey := ppath.Join(segmentPrefix, fmt.Sprintf("segment-%06d.ndjson.%s", seq, codecExt(uploadCodec)))
+		uploadStart := time.Now()
 		if err := uploadSSAArtifactFileWithObjectKey(compPath, compressedSize, segmentKey, provider); err != nil {
 			return err
 		}
+		uploadMS := time.Since(uploadStart).Milliseconds()
 		log.Infof("ssa artifact segment uploaded task=%s seq=%d key=%s codec=%s raw=%d compressed=%d",
 			taskID, seq, segmentKey, uploadCodec, rawBytes, compressedSize)
 		segments = append(segments, spec.SSAArtifactSegment{
@@ -472,6 +474,7 @@ func runContinuousSegmentedUpload(codec string, provider ssaUploadConfigProvider
 			Codec:            uploadCodec,
 			CompressedSize:   compressedSize,
 			UncompressedSize: rawBytes,
+			UploadMS:         uploadMS,
 			SHA256:           compressedSHA,
 		})
 		totalRawBytes += rawBytes

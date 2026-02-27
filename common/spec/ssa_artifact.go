@@ -15,6 +15,7 @@ type SSAArtifactSegment struct {
 	Codec            string `json:"codec"`
 	CompressedSize   int64  `json:"compressed_size"`
 	UncompressedSize int64  `json:"uncompressed_size"`
+	UploadMS         int64  `json:"upload_ms,omitempty"`
 	SHA256           string `json:"sha256,omitempty"`
 }
 
