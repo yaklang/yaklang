@@ -7,6 +7,12 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+const (
+	aiProviderTypeAIBalance = "aibalance"
+	aiProviderDefaultAPIKey = "free-user"
+	aiProviderDefaultDomain = "aibalance.yaklang.com"
+)
+
 func CreateAIProvider(db *gorm.DB, provider *schema.AIThirdPartyConfig) error {
 	if db == nil {
 		return utils.Error("no set database")
@@ -108,7 +114,7 @@ func EnsureAIBalanceProviderConfig(db *gorm.DB) {
 		return
 	}
 	var count int
-	if err := db.Model(&schema.AIThirdPartyConfig{}).Where("type = ?", "aibalance").Count(&count).Error; err != nil {
+	if err := db.Model(&schema.AIThirdPartyConfig{}).Where("type = ?", aiProviderTypeAIBalance).Count(&count).Error; err != nil {
 		log.Warnf("query aibalance provider failed: %v", err)
 		return
 	}
@@ -117,13 +123,13 @@ func EnsureAIBalanceProviderConfig(db *gorm.DB) {
 	}
 
 	provider := &schema.AIThirdPartyConfig{
-		Type:   "aibalance",
-		APIKey: "free-user",
-		Domain: "aibalance.yaklang.com",
+		Type:   aiProviderTypeAIBalance,
+		APIKey: aiProviderDefaultAPIKey,
+		Domain: aiProviderDefaultDomain,
 	}
 	if err := db.Create(provider).Error; err != nil {
 		log.Warnf("create default aibalance provider failed: %v", err)
 		return
 	}
-	log.Infof("Added default AIBalance provider config (key: free-user)")
+	log.Infof("Added default AIBalance provider config (key: %s)", aiProviderDefaultAPIKey)
 }

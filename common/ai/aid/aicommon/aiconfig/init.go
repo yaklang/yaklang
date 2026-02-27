@@ -10,6 +10,15 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+const (
+	routingPolicyAuto        = string(consts.PolicyAuto)
+	routingPolicyPerformance = string(consts.PolicyPerformance)
+	routingPolicyCost        = string(consts.PolicyCost)
+	routingPolicyBalance     = string(consts.PolicyBalance)
+	defaultRoutingPolicy     = routingPolicyBalance
+	modelExtraParamKey       = "model"
+)
+
 var (
 	configLoadedOnce sync.Once
 	configLoaded     bool
@@ -116,10 +125,10 @@ func buildAIGlobalConfigFromNetworkConfig(c *ypb.GlobalNetworkConfig) *ypb.AIGlo
 		cfg.RoutingPolicy = c.GetTieredAIModelConfig().GetModelRoutingPolicy()
 		cfg.DisableFallback = c.GetTieredAIModelConfig().GetDisableFallbackToLightweightModel()
 	} else {
-		cfg.RoutingPolicy = "balance"
+		cfg.RoutingPolicy = defaultRoutingPolicy
 	}
 	if cfg.RoutingPolicy == "" {
-		cfg.RoutingPolicy = "balance"
+		cfg.RoutingPolicy = defaultRoutingPolicy
 	}
 
 	cfg.IntelligentModels = buildAIModelConfigs(c.GetIntelligentAIModelConfig())
@@ -141,7 +150,7 @@ func buildAIGlobalConfigFromTiered(tiered *consts.TieredAIConfig) *ypb.AIGlobalC
 		GlobalWeight:    tiered.GlobalWeight,
 	}
 	if cfg.RoutingPolicy == "" {
-		cfg.RoutingPolicy = "balance"
+		cfg.RoutingPolicy = defaultRoutingPolicy
 	}
 
 	cfg.IntelligentModels = buildAIModelConfigs(tiered.IntelligentConfigs)
@@ -173,7 +182,7 @@ func thirdPartyConfigToModelConfig(cfg *ypb.ThirdPartyApplicationConfig) *ypb.AI
 	modelName := ""
 	extras := make([]*ypb.KVPair, 0)
 	for _, kv := range cfg.GetExtraParams() {
-		if kv.GetKey() == "model" {
+		if kv.GetKey() == modelExtraParamKey {
 			modelName = kv.GetValue()
 			continue
 		}
@@ -225,13 +234,13 @@ func loadTieredConfigFromNetworkConfig(c *ypb.GlobalNetworkConfig) {
 	if c.GetTieredAIModelConfig() != nil {
 		policy := c.GetTieredAIModelConfig().GetModelRoutingPolicy()
 		switch policy {
-		case "auto":
+		case routingPolicyAuto:
 			tieredConfig.RoutingPolicy = consts.PolicyAuto
-		case "performance":
+		case routingPolicyPerformance:
 			tieredConfig.RoutingPolicy = consts.PolicyPerformance
-		case "cost":
+		case routingPolicyCost:
 			tieredConfig.RoutingPolicy = consts.PolicyCost
-		case "balance":
+		case routingPolicyBalance:
 			tieredConfig.RoutingPolicy = consts.PolicyBalance
 		default:
 			tieredConfig.RoutingPolicy = consts.PolicyBalance

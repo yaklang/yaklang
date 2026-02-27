@@ -10,6 +10,15 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+const (
+	routingPolicyAuto        = string(consts.PolicyAuto)
+	routingPolicyPerformance = string(consts.PolicyPerformance)
+	routingPolicyCost        = string(consts.PolicyCost)
+	routingPolicyBalance     = string(consts.PolicyBalance)
+	defaultRoutingPolicy     = routingPolicyBalance
+	modelExtraParamKey       = "model"
+)
+
 func HasAIGlobalConfig(db *gorm.DB) bool {
 	if db == nil {
 		return false
@@ -33,7 +42,7 @@ func GetAIGlobalConfig(db *gorm.DB) (*ypb.AIGlobalConfig, error) {
 		return nil, err
 	}
 	if cfg.RoutingPolicy == "" {
-		cfg.RoutingPolicy = "balance"
+		cfg.RoutingPolicy = defaultRoutingPolicy
 	}
 	providerMap, _ := LoadAIProviderMap(db)
 	fillProviders(cfg.IntelligentModels, providerMap)
@@ -98,13 +107,13 @@ func ApplyAIGlobalConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig) error {
 
 	routing := consts.PolicyBalance
 	switch cfg.GetRoutingPolicy() {
-	case "auto":
+	case routingPolicyAuto:
 		routing = consts.PolicyAuto
-	case "performance":
+	case routingPolicyPerformance:
 		routing = consts.PolicyPerformance
-	case "cost":
+	case routingPolicyCost:
 		routing = consts.PolicyCost
-	case "balance":
+	case routingPolicyBalance:
 		routing = consts.PolicyBalance
 	}
 
@@ -187,7 +196,7 @@ func mergeProviderAndModel(provider *ypb.ThirdPartyApplicationConfig, model *ypb
 	extra := mapFromKVPairs(provider.GetExtraParams())
 	if model != nil {
 		if model.GetModelName() != "" {
-			extra["model"] = model.GetModelName()
+			extra[modelExtraParamKey] = model.GetModelName()
 		}
 		for _, kv := range model.GetExtraParams() {
 			extra[kv.GetKey()] = kv.GetValue()
