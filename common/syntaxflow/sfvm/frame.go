@@ -37,6 +37,11 @@ type errorSkipContext struct {
 	stackDepth int
 }
 
+type conditionScopeState struct {
+	conditionDepth int
+	stackDepth     int
+}
+
 type SFFrame struct {
 	vm *SyntaxFlowVirtualMachine
 
@@ -53,8 +58,11 @@ type SFFrame struct {
 
 	stack          *utils.Stack[ValueOperator] // for filter
 	conditionStack *utils.Stack[[]bool]        // for condition
-	conditionScope *utils.Stack[int]           // for condition scope
-	popStack       *utils.Stack[ValueOperator] //pop stack,for sf
+	// conditionValueStack keeps candidate value sets aligned with conditionStack.
+	// It is used by program-like condition filtering where boolean mask alone is insufficient.
+	conditionValueStack *utils.Stack[ValueOperator]
+	conditionScope      *utils.Stack[conditionScopeState] // for condition scope
+	popStack            *utils.Stack[ValueOperator]       //pop stack,for sf
 
 	// when cache err skip  statement/expr
 	errorSkipStack *utils.Stack[*errorSkipContext]
@@ -214,7 +222,8 @@ func (s *SFFrame) Flush() {
 	s.stack = utils.NewStack[ValueOperator]()
 	s.errorSkipStack = utils.NewStack[*errorSkipContext]()
 	s.conditionStack = utils.NewStack[[]bool]()
-	s.conditionScope = utils.NewStack[int]()
+	s.conditionValueStack = utils.NewStack[ValueOperator]()
+	s.conditionScope = utils.NewStack[conditionScopeState]()
 	s.popStack = utils.NewStack[ValueOperator]()
 	s.idx = 0
 }
@@ -353,12 +362,27 @@ func (s *SFFrame) execRule(feedValue ValueOperator) error {
 					s.stack.Push(feedValue)
 				}
 			case OpConditionScopeStart:
-				s.conditionScope.Push(s.conditionStack.Len())
+				if s.stack.Len() == 0 {
+					return utils.Wrap(CriticalError, "condition scope start failed: stack top is empty")
+				}
+				s.conditionScope.Push(conditionScopeState{
+					conditionDepth: s.conditionStack.Len(),
+					stackDepth:     s.stack.Len(),
+				})
 			case OpConditionScopeEnd:
 				if s.conditionScope.Len() == 0 {
 					break
 				}
-				scopeLen := s.conditionScope.Pop()
+				scopeState := s.conditionScope.Pop()
+				if s.stack.Len() != scopeState.stackDepth {
+					return utils.Wrapf(
+						CriticalError,
+						"condition scope stack unbalanced: %d vs want(%d)",
+						s.stack.Len(),
+						scopeState.stackDepth,
+					)
+				}
+				scopeLen := scopeState.conditionDepth
 				if s.conditionStack.Len() <= scopeLen {
 					break
 				}
@@ -367,6 +391,13 @@ func (s *SFFrame) execRule(feedValue ValueOperator) error {
 					s.conditionStack.Pop()
 				}
 				s.conditionStack.Push(latest)
+				if s.conditionValueStack != nil && s.conditionValueStack.Len() > scopeLen {
+					latestValue := s.conditionValueStack.Pop()
+					for s.conditionValueStack.Len() > scopeLen {
+						s.conditionValueStack.Pop()
+					}
+					s.conditionValueStack.Push(latestValue)
+				}
 			case OpEnterStatement:
 				s.errorSkipStack.Push(&errorSkipContext{
 					start:      s.idx,

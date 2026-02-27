@@ -324,7 +324,7 @@ func (y *SyntaxFlowVisitor) VisitActualParam(i sf.IActualParamContext, haveQuest
 		y.EmitDuplicate()
 		y.EmitPushCallArgs(0, true)
 		handlerStatement(ret.SingleParam())
-		y.EmitFilterCondition()
+		y.EmitFilter()
 		y.EmitCondition()
 		y.EmitExitStatement(statement)
 		_ = haveQuestion
@@ -343,7 +343,7 @@ func (y *SyntaxFlowVisitor) VisitActualParam(i sf.IActualParamContext, haveQuest
 			y.EmitPushCallArgs(i, false)
 			handlerStatement(single)
 			_ = haveQuestion
-			y.EmitFilterCondition()
+			y.EmitFilter()
 			y.EmitCondition()
 			y.EmitExitStatement(statement)
 		}
@@ -352,7 +352,7 @@ func (y *SyntaxFlowVisitor) VisitActualParam(i sf.IActualParamContext, haveQuest
 			y.EmitDuplicate()
 			y.EmitPushCallArgs(len(ret.AllActualParamFilter()), true)
 			handlerStatement(ret.SingleParam())
-			y.EmitFilterCondition()
+			y.EmitFilter()
 			y.EmitCondition()
 			y.EmitExitStatement(statement)
 		}
