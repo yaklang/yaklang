@@ -87,18 +87,16 @@ func (g *GatewayClient) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
 }
 
 func TestAiApiPriority(t *testing.T) {
-	client, err := NewLocalClient(true)
+	client, err := NewLocalClientWithTempDatabase(t)
 	if err != nil {
 		t.Fatal(err)
 	}
-	config_bak, _ := client.GetGlobalNetworkConfig(context.Background(), &ypb.GetGlobalNetworkConfigRequest{})
-	defer func() {
-		client.SetGlobalNetworkConfig(context.Background(), config_bak)
-	}()
 	client.ResetGlobalNetworkConfig(context.Background(), &ypb.ResetGlobalNetworkConfigRequest{})
 	config, err := client.GetGlobalNetworkConfig(context.Background(), &ypb.GetGlobalNetworkConfigRequest{})
 	// Disable tiered AI config to test legacy AiApiPriority functionality
-	config.EnableTieredAIModelConfig = false
+	client.SetAIGlobalConfig(context.Background(), &ypb.AIGlobalConfig{
+		Enabled: false,
+	})
 	config.AiApiPriority = []string{"test", "test1", "test2"}
 	var ok, test1, test2 bool
 	aispec.Register("test", func() aispec.AIClient {
