@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand/v2"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -273,6 +274,10 @@ type Config struct {
 	// (~/.yakit-projects/ai-skills). Default is false (auto-load enabled).
 	// Use WithDisableAutoSkills(true) to disable this behavior (e.g., in tests).
 	disableAutoSkills bool
+
+	// restoredSkillNames holds skill names restored from a previous persistent session.
+	// These are loaded back into SkillsContextManager when a new ReActLoop starts.
+	restoredSkillNames []string
 
 	/*
 		Lazy WorkDir for semantic artifact directory naming
@@ -834,6 +839,26 @@ func (c *Config) GetSkillLoader() aiskillloader.SkillLoader {
 		return nil
 	}
 	return c.skillLoader
+}
+
+// GetRestoredSkillNames returns skill names restored from a previous persistent session.
+func (c *Config) GetRestoredSkillNames() []string {
+	return c.restoredSkillNames
+}
+
+// SaveLoadedSkillNames persists the given skill names to the DB for the current persistent session.
+func (c *Config) SaveLoadedSkillNames(skillNames []string) {
+	if c.PersistentSessionId == "" {
+		return
+	}
+	db := c.GetDB()
+	if db == nil {
+		return
+	}
+	joined := strings.Join(skillNames, ",")
+	if err := yakit.UpdateAIAgentRuntimeLoadedSkillNames(db, c.PersistentSessionId, joined); err != nil {
+		log.Warnf("failed to save loaded skill names for session [%s]: %v", c.PersistentSessionId, err)
+	}
 }
 
 // WithDisableAutoSkills controls automatic loading of skills from the default directory
@@ -2357,6 +2382,22 @@ func (c *Config) restorePersistentSession() {
 			log.Infof("restored work directory from persistent session [%s]: %s", c.PersistentSessionId, runtime.WorkDir)
 		} else {
 			log.Warnf("previous work directory no longer exists for session [%s]: %s, will create new one", c.PersistentSessionId, runtime.WorkDir)
+		}
+	}
+
+	// Restore loaded skill names from previous session
+	if runtime.LoadedSkillNames != "" {
+		names := strings.Split(runtime.LoadedSkillNames, ",")
+		var trimmed []string
+		for _, n := range names {
+			n = strings.TrimSpace(n)
+			if n != "" {
+				trimmed = append(trimmed, n)
+			}
+		}
+		if len(trimmed) > 0 {
+			c.restoredSkillNames = trimmed
+			log.Infof("restored %d loaded skill names from persistent session [%s]: %v", len(trimmed), c.PersistentSessionId, trimmed)
 		}
 	}
 

@@ -50,6 +50,13 @@ func loadCapabilityVerifier(loop *reactloops.ReActLoop, action *aicommon.Action)
 	loop.Set("_load_cap_resolved_type", string(resolved.IdentityType))
 	loop.Set("_load_cap_suggestion", resolved.Suggestion)
 
+	// Store alternative types for fallback in handler
+	var altTypes []string
+	for _, alt := range resolved.Alternatives {
+		altTypes = append(altTypes, string(alt.IdentityType))
+	}
+	loop.Set("_load_cap_alt_types", strings.Join(altTypes, ","))
+
 	invoker := loop.GetInvoker()
 
 	// Track repeated attempts for the same identifier to detect loops
@@ -92,11 +99,14 @@ func loadCapabilityHandler(loop *reactloops.ReActLoop, action *aicommon.Action, 
 		ctx = task.GetContext()
 	}
 
+	altTypesStr := loop.Get("_load_cap_alt_types")
+	hasSkillAlt := strings.Contains(altTypesStr, string(aicommon.ResolvedAs_Skill))
+
 	switch resolvedType {
 	case aicommon.ResolvedAs_Tool:
 		handleLoadTool(loop, invoker, ctx, identifier, op)
 	case aicommon.ResolvedAs_Forge:
-		handleLoadForge(loop, invoker, ctx, identifier, op)
+		handleLoadForgeWithSkillFallback(loop, invoker, ctx, identifier, op, hasSkillAlt)
 	case aicommon.ResolvedAs_Skill:
 		handleLoadSkill(loop, invoker, identifier, op)
 	case aicommon.ResolvedAs_FocusedMode:
@@ -177,6 +187,27 @@ func handleLoadTool(
 	}
 	op.Feedback(feedbackMsg)
 	op.Continue()
+}
+
+// handleLoadForgeWithSkillFallback tries loading as forge first. If forge is rejected
+// (e.g. async mode conflict) and a skill with the same name exists, falls back to skill.
+func handleLoadForgeWithSkillFallback(
+	loop *reactloops.ReActLoop,
+	invoker aicommon.AIInvokeRuntime,
+	ctx interface{ Done() <-chan struct{} },
+	identifier string,
+	op *reactloops.LoopActionHandlerOperator,
+	hasSkillAlt bool,
+) {
+	task := loop.GetCurrentTask()
+	if task != nil && task.IsAsyncMode() && hasSkillAlt {
+		log.Infof("load_capability: forge '%s' rejected (async mode), falling back to skill alternative", identifier)
+		invoker.AddToTimeline("[LOAD_CAPABILITY_FORGE_TO_SKILL_FALLBACK]",
+			fmt.Sprintf("'%s' exists as both forge and skill. Forge rejected (async conflict), falling back to skill.", identifier))
+		handleLoadSkill(loop, invoker, identifier, op)
+		return
+	}
+	handleLoadForge(loop, invoker, ctx, identifier, op)
 }
 
 // handleLoadForge starts an async blueprint/forge execution.
@@ -273,6 +304,10 @@ func handleLoadSkill(
 	invoker.AddToTimeline("skill_loaded",
 		fmt.Sprintf("Successfully loaded skill '%s' into context. %s", identifier, viewSummary))
 	log.Infof("load_capability: skill %q loaded into context successfully", identifier)
+
+	persistLoadedSkillNames(loop, invoker)
+	emitSkillReferenceMaterial(invoker, identifier, mgr)
+
 	op.Feedback(fmt.Sprintf(
 		"Skill '%s' has been loaded into the context. "+
 			"The SKILL.md content and file tree are now displayed in the SKILLS_CONTEXT section of your prompt. "+

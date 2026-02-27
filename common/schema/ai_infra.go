@@ -40,6 +40,10 @@ type AIAgentRuntime struct {
 	SemanticLabel string `json:"semantic_label" gorm:"index"`
 	// final working directory absolute path for artifacts
 	WorkDir string `json:"work_dir"`
+
+	// LoadedSkillNames stores comma-separated skill names that were loaded in this session.
+	// Used to restore skills across conversations within the same persistent session.
+	LoadedSkillNames string `json:"loaded_skill_names"`
 }
 
 func (a *AIAgentRuntime) GetTimeline() string {
