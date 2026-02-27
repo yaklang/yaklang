@@ -2,29 +2,49 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+func isCI() bool {
+	ciEnvVars := []string{
+		"CI",
+		"GITHUB_ACTIONS",
+		"GITLAB_CI",
+		"CIRCLECI",
+		"TRAVIS",
+		"JENKINS_HOME",
+		"BUILDKITE",
+	}
+	for _, envVar := range ciEnvVars {
+		if os.Getenv(envVar) != "" {
+			return true
+		}
+	}
+	return false
+}
+
 func TestAIGlobalConfig_GRPC_Local(t *testing.T) {
-	if utils.InGithubActions() {
+	if isCI() {
 		t.Skip("skip grpc ai config local test in CI environment")
 	}
 
-	origTiered, _ := yakit.GetAIGlobalConfig(consts.GetGormProfileDatabase())
-	t.Cleanup(func() {
-		yakit.SetAIGlobalConfig(consts.GetGormProfileDatabase(), origTiered)
-	})
-
-	client, err := newLocalClientEx(true)
+	client, server, err := NewLocalClientAndServerWithTempDatabase(t)
 	require.NoError(t, err)
 	require.NotNil(t, client)
+	require.NotNil(t, server)
+	t.Cleanup(func() {
+		if server.profileDatabase != nil {
+			_ = server.profileDatabase.Close()
+		}
+		if server.projectDatabase != nil {
+			_ = server.projectDatabase.Close()
+		}
+	})
 	ctx := context.Background()
 
 	cfg := &ypb.AIGlobalConfig{

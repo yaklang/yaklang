@@ -14,7 +14,7 @@ var (
 	configLoadedOnce sync.Once
 	configLoaded     bool
 
-	getNetworkConfig = yakit.GetNetworkConfig
+	getNetworkConfig  = yakit.GetNetworkConfig
 	getAIGlobalConfig = func() (*ypb.AIGlobalConfig, error) {
 		return yakit.GetAIGlobalConfig(consts.GetGormProfileDatabase())
 	}
@@ -48,8 +48,9 @@ func ensureConfigLoadedFromDB() error {
 }
 
 // EnsureConfigLoaded ensures the tiered AI configuration is loaded.
-// The ONLY authoritative source is the database (GlobalNetworkConfig).
-// If the database has no config yet, built-in defaults are applied.
+// The ONLY authoritative source is the database (AIGlobalConfig).
+// If the database has no config yet, built-in defaults are applied
+// and written back to the database.
 // Config files on disk are NOT loaded -- they are a legacy mechanism;
 // use `yak tiered-ai-config` to write config into the database.
 func EnsureConfigLoaded() {
@@ -57,32 +58,144 @@ func EnsureConfigLoaded() {
 		return
 	}
 
+	db := consts.GetGormProfileDatabase()
 	if cfg, err := getAIGlobalConfig(); err == nil && cfg != nil {
-		_ = yakit.ApplyAIGlobalConfig(consts.GetGormProfileDatabase(), cfg)
+		_ = yakit.ApplyAIGlobalConfig(db, cfg)
 		configLoaded = true
 		warnIfLegacyConfigFileExists()
 		return
 	}
+
+	var cfg *ypb.AIGlobalConfig
+	source := "unknown"
 
 	config := getNetworkConfig()
 	if config != nil {
-		loadTieredConfigFromNetworkConfig(config)
-		warnIfLegacyConfigFileExists()
-		return
+		cfg = buildAIGlobalConfigFromNetworkConfig(config)
+		source = "network-config"
+	} else if tiered := consts.GetTieredAIConfig(); tiered != nil {
+		cfg = buildAIGlobalConfigFromTiered(tiered)
+		source = "memory-config"
+	} else {
+		cfg = buildDefaultAIGlobalConfig()
+		source = "built-in defaults"
 	}
 
-	if cfg := consts.GetTieredAIConfig(); cfg != nil {
-		configLoaded = true
-		warnIfLegacyConfigFileExists()
-		return
+	if cfg != nil {
+		yakit.EnsureAIBalanceProviderConfig(db)
+		if _, err := yakit.SetAIGlobalConfig(db, cfg); err != nil {
+			log.Warnf("failed to persist ai global config from %s: %v", source, err)
+		}
+		if err := yakit.ApplyAIGlobalConfig(db, cfg); err != nil {
+			log.Warnf("failed to apply ai global config from %s: %v", source, err)
+		}
 	}
 
+	configLoaded = true
+	if source == "built-in defaults" {
+		log.Infof("tiered AI config loaded from built-in defaults (no DB config found)")
+	}
+	warnIfLegacyConfigFileExists()
+}
+
+func buildDefaultAIGlobalConfig() *ypb.AIGlobalConfig {
 	defaultCfg := GetDefaultTieredAIConfigFile()
 	tiered := ConfigFileToTieredAIConfig(defaultCfg)
-	consts.SetTieredAIConfig(tiered)
-	configLoaded = true
-	log.Infof("tiered AI config loaded from built-in defaults (no DB config found)")
-	warnIfLegacyConfigFileExists()
+	return buildAIGlobalConfigFromTiered(tiered)
+}
+
+func buildAIGlobalConfigFromNetworkConfig(c *ypb.GlobalNetworkConfig) *ypb.AIGlobalConfig {
+	if c == nil {
+		return nil
+	}
+	cfg := &ypb.AIGlobalConfig{
+		Enabled: c.GetEnableTieredAIModelConfig(),
+	}
+
+	if c.GetTieredAIModelConfig() != nil {
+		cfg.RoutingPolicy = c.GetTieredAIModelConfig().GetModelRoutingPolicy()
+		cfg.DisableFallback = c.GetTieredAIModelConfig().GetDisableFallbackToLightweightModel()
+	} else {
+		cfg.RoutingPolicy = "balance"
+	}
+	if cfg.RoutingPolicy == "" {
+		cfg.RoutingPolicy = "balance"
+	}
+
+	cfg.IntelligentModels = buildAIModelConfigs(c.GetIntelligentAIModelConfig())
+	cfg.LightweightModels = buildAIModelConfigs(c.GetLightweightAIModelConfig())
+	cfg.VisionModels = buildAIModelConfigs(c.GetVisionAIModelConfig())
+
+	return cfg
+}
+
+func buildAIGlobalConfigFromTiered(tiered *consts.TieredAIConfig) *ypb.AIGlobalConfig {
+	if tiered == nil {
+		return nil
+	}
+	cfg := &ypb.AIGlobalConfig{
+		Enabled:         tiered.Enabled,
+		RoutingPolicy:   string(tiered.RoutingPolicy),
+		DisableFallback: tiered.DisableFallback,
+		DefaultModelId:  tiered.DefaultModelID,
+		GlobalWeight:    tiered.GlobalWeight,
+	}
+	if cfg.RoutingPolicy == "" {
+		cfg.RoutingPolicy = "balance"
+	}
+
+	cfg.IntelligentModels = buildAIModelConfigs(tiered.IntelligentConfigs)
+	cfg.LightweightModels = buildAIModelConfigs(tiered.LightweightConfigs)
+	cfg.VisionModels = buildAIModelConfigs(tiered.VisionConfigs)
+
+	return cfg
+}
+
+func buildAIModelConfigs(configs []*ypb.ThirdPartyApplicationConfig) []*ypb.AIModelConfig {
+	if len(configs) == 0 {
+		return nil
+	}
+	models := make([]*ypb.AIModelConfig, 0, len(configs))
+	for _, cfg := range configs {
+		model := thirdPartyConfigToModelConfig(cfg)
+		if model == nil {
+			continue
+		}
+		models = append(models, model)
+	}
+	return models
+}
+
+func thirdPartyConfigToModelConfig(cfg *ypb.ThirdPartyApplicationConfig) *ypb.AIModelConfig {
+	if cfg == nil {
+		return nil
+	}
+	modelName := ""
+	extras := make([]*ypb.KVPair, 0)
+	for _, kv := range cfg.GetExtraParams() {
+		if kv.GetKey() == "model" {
+			modelName = kv.GetValue()
+			continue
+		}
+		extras = append(extras, &ypb.KVPair{Key: kv.GetKey(), Value: kv.GetValue()})
+	}
+
+	provider := &ypb.ThirdPartyApplicationConfig{
+		Type:           cfg.GetType(),
+		APIKey:         cfg.GetAPIKey(),
+		UserIdentifier: cfg.GetUserIdentifier(),
+		UserSecret:     cfg.GetUserSecret(),
+		Namespace:      cfg.GetNamespace(),
+		Domain:         cfg.GetDomain(),
+		WebhookURL:     cfg.GetWebhookURL(),
+		Disabled:       cfg.GetDisabled(),
+	}
+
+	return &ypb.AIModelConfig{
+		Provider:    provider,
+		ModelName:   modelName,
+		ExtraParams: extras,
+	}
 }
 
 func warnIfLegacyConfigFileExists() {
