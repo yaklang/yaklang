@@ -41,6 +41,9 @@ var (
 	GLOBAL_NETWORK_CONFIG      = "GLOBAL_NETWORK_CONFIG"
 	GLOBAL_NETWORK_CONFIG_INIT = "GLOBAL_NETWORK_CONFIG_INIT"
 
+	// 全局 HotPatch 配置（Profile DB KV）
+	GLOBAL_HOTPATCH_CONFIG = "GLOBAL_HOTPATCH_CONFIG"
+
 	// default  http flow save config
 	GLOBAL_HTTP_FLOW_SAVE = utils.NewBool(true)
 

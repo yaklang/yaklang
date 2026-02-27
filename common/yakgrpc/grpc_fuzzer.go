@@ -250,7 +250,14 @@ func (s *Server) StringFuzzer(rootCtx context.Context, req *ypb.StringFuzzerRequ
 
 	var res [][]byte
 	var counter int64
-	opts := yak.Fuzz_WithAllHotPatch(rootCtx, req.GetHotPatchCode())
+	enabled, _, globalCode := yakit.GetGlobalHotPatchVersionAndCode()
+	if !enabled {
+		globalCode = ""
+	}
+	opts := yak.Fuzz_WithAllHotPatchChained(rootCtx, yak.HotPatchChain{
+		GlobalCode: globalCode,
+		ModuleCode: req.GetHotPatchCode(),
+	})
 	opts = append(opts, mutate.Fuzz_WithResultHandler(func(origin string, payloads []string) bool {
 		select {
 		case <-ctx.Done():
@@ -505,8 +512,16 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 
 	// hot code
 	var extraOpt []mutate.FuzzConfigOpt
-	if strings.TrimSpace(req.GetHotPatchCode()) != "" {
-		extraOpt = append(extraOpt, yak.Fuzz_WithAllHotPatch(stream.Context(), req.GetHotPatchCode())...)
+	enabled, _, globalCode := yakit.GetGlobalHotPatchVersionAndCode()
+	if !enabled || req.GetDisableHotPatch() {
+		globalCode = ""
+	}
+	hotPatchChain := yak.HotPatchChain{
+		GlobalCode: globalCode,
+		ModuleCode: req.GetHotPatchCode(),
+	}
+	if strings.TrimSpace(hotPatchChain.GlobalCode) != "" || strings.TrimSpace(hotPatchChain.ModuleCode) != "" {
+		extraOpt = append(extraOpt, yak.Fuzz_WithAllHotPatchChained(stream.Context(), hotPatchChain)...)
 		extraOpt = append(extraOpt, mutate.Fuzz_WithExtraFuzzTagHandler("request", func(s string) []string {
 			return []string{utils.UnsafeBytesToString(rawRequest)}
 		}))
@@ -655,7 +670,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				if len(oldIDs) == 0 { // 尝试修复
 					oldIDs = []uint{uint(historyID)}
 				}
-				_, _, getMirrorHTTPFlowParams, _, _, _ := yak.MutateHookCaller(stream.Context(), req.GetHotPatchCode(), nil)
+				_, _, getMirrorHTTPFlowParams, _, _, _ := yak.MutateHookCallerChained(stream.Context(), hotPatchChain, nil)
 				for resp := range yakit.YieldWebFuzzerResponseByTaskIDs(s.GetProjectDatabase(), stream.Context(), oldIDs, true) {
 					var extractorResults []*ypb.KVPair
 					respModel, err := resp.ToGRPCModel()
@@ -950,7 +965,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		}
 
 		if !req.GetDisableHotPatch() {
-			beforeRequest, afterRequest, mirrorHTTPFlow, retryHandler, customFailureChecker, mockHTTPRequest := yak.MutateHookCaller(stream.Context(), req.GetHotPatchCode(), nil)
+			beforeRequest, afterRequest, mirrorHTTPFlow, retryHandler, customFailureChecker, mockHTTPRequest := yak.MutateHookCallerChained(stream.Context(), hotPatchChain, nil)
 			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_HookCodeCaller(beforeRequest, afterRequest, mirrorHTTPFlow, retryHandler, customFailureChecker, mockHTTPRequest))
 		}
 

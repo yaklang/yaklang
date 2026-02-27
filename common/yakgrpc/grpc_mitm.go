@@ -360,6 +360,27 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		mitmPluginCaller.SetProxy(downstreamProxy...)
 	}
 
+	buildGlobalHotPatchCaller := func() (*yak.MixPluginCaller, error) {
+		caller, err := yak.NewMixPluginCaller()
+		if err != nil {
+			return nil, err
+		}
+		caller.SetFeedback(execFeedback)
+		caller.SetDividedContext(true)
+		caller.SetConcurrent(20)
+		caller.SetLoadPluginTimeout(consts.GetGlobalCallerLoadPluginTimeout())
+		caller.SetCallPluginTimeout(consts.GetGlobalCallerCallPluginTimeout())
+		if downstreamProxy != nil {
+			caller.SetProxy(downstreamProxy...)
+		}
+		return caller, nil
+	}
+	globalHotPatchCaller, err := buildGlobalHotPatchCaller()
+	if err != nil {
+		return utils.Errorf("create global hotpatch caller failed: %s", err)
+	}
+	hotPatchPipeline := newMitmGlobalHotPatchPipeline(mitmPluginCaller, globalHotPatchCaller, buildGlobalHotPatchCaller)
+
 	cacheDebounce, _ := lo.NewDebounce(1*time.Second, func() {
 		err := mitmSendResp(&ypb.MITMResponse{
 			HaveNotification:    true,
@@ -650,6 +671,9 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 						log.Errorf("set downstream proxy failed: %s", err)
 					}
 					mitmPluginCaller.SetProxy(downstreamProxy...)
+					if global := hotPatchPipeline.getGlobalCaller(); global != nil {
+						global.SetProxy(downstreamProxy...)
+					}
 					feedbackToUser(fmt.Sprintf("设置下游代理成功 / set downstream proxy successful: %v", downstreamProxy))
 				}
 			}
@@ -809,7 +833,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				utils.PrintCurrentGoroutineRuntimeStack()
 			}
 
-			newHijackRsp := mitmPluginCaller.CallAfterRequestWithCtx(pluginCtx, isHttps, urlStr, httpctx.GetBareRequestBytes(req), httpctx.GetRequestBytes(req), httpctx.GetBareResponseBytes(req), hijackRsp)
+			newHijackRsp := hotPatchPipeline.CallAfterRequestWithCtx(pluginCtx, isHttps, urlStr, httpctx.GetBareRequestBytes(req), httpctx.GetRequestBytes(req), httpctx.GetBareResponseBytes(req), hijackRsp)
 			if len(newHijackRsp) > 0 {
 				httpctx.SetResponseModified(req, "yaklang.hook(ex) afterRequest")
 				httpctx.SetHijackedResponseBytes(req, newHijackRsp)
@@ -835,7 +859,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 
 		dropped := utils.NewBool(false)
-		mitmPluginCaller.CallHijackResponseExWithCtx(pluginCtx, isHttps, urlStr, func() interface{} {
+		hotPatchPipeline.CallHijackResponseExWithCtx(pluginCtx, isHttps, urlStr, func() interface{} {
 			return plainRequest
 		}, func() interface{} {
 			return plainResponse
@@ -851,7 +875,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		// dropped.
 		if !dropped.IsSet() {
 			// legacy code
-			mitmPluginCaller.CallHijackResponseWithCtx(pluginCtx, isHttps, urlStr, func() interface{} {
+			hotPatchPipeline.CallHijackResponseWithCtx(pluginCtx, isHttps, urlStr, func() interface{} {
 				if httpctx.GetResponseIsModified(req) {
 					return httpctx.GetHijackedResponseBytes(req)
 				} else {
@@ -1283,7 +1307,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		pluginCtx := httpctx.GetPluginContext(originReqIns)
 
 		defer func() {
-			newHijackReq := mitmPluginCaller.CallBeforeRequestWithCtx(pluginCtx, isHttps, urlStr, httpctx.GetBareRequestBytes(originReqIns), hijackReq)
+			newHijackReq := hotPatchPipeline.CallBeforeRequestWithCtx(pluginCtx, isHttps, urlStr, httpctx.GetBareRequestBytes(originReqIns), hijackReq)
 			if len(newHijackReq) > 0 && handleRequestModified(newHijackReq) {
 				hijackReq = newHijackReq
 				setModifiedRequest("yaklang.hook beforeRequest", hijackReq)
@@ -1329,7 +1353,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 
 		// Handle mockHTTPRequest hook
-		mitmPluginCaller.CallMockHTTPRequestWithCtx(pluginCtx, isHttps, urlStr,
+		hotPatchPipeline.CallMockHTTPRequestWithCtx(pluginCtx, isHttps, urlStr,
 			func() interface{} {
 				if modifiedByRule {
 					return httpctx.GetHijackedRequestBytes(originReqIns)
@@ -1346,7 +1370,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				httpctx.SetShouldMockResponse(originReqIns, true)
 			})
 
-		mitmPluginCaller.CallHijackRequestWithCtx(pluginCtx, isHttps, urlStr,
+		hotPatchPipeline.CallHijackRequestWithCtx(pluginCtx, isHttps, urlStr,
 			func() interface{} {
 				if modifiedByRule {
 					return httpctx.GetHijackedRequestBytes(originReqIns)
@@ -1603,7 +1627,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 		pluginCtx := httpctx.GetPluginContext(req)
 		go func() {
-			mitmPluginCaller.MirrorHTTPFlowWithCtx(pluginCtx, isHttps, reqUrl, plainRequest, plainResponse, body, shouldBeHijacked)
+			hotPatchPipeline.MirrorHTTPFlowWithCtx(pluginCtx, isHttps, reqUrl, plainRequest, plainResponse, body, shouldBeHijacked)
 		}()
 		// 劫持过滤
 		if isFiltered {
@@ -1699,7 +1723,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		isDroppedSaveFlow := utils.NewBool(false)
 
 		pluginCh := make(chan struct{})
-		mitmPluginCaller.HijackSaveHTTPFlowEx(
+		hotPatchPipeline.HijackSaveHTTPFlowEx(
 			pluginCtx,
 			flow,
 			func() {
