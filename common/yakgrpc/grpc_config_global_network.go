@@ -30,8 +30,6 @@ func init() {
 			yakit.Set(consts.GLOBAL_NETWORK_CONFIG, string(raw))
 			yakit.ConfigureNetWork(defaultConfig)
 			yakit.Set(consts.GLOBAL_NETWORK_CONFIG_INIT, "1")
-			// 确保 aibalance provider 存在（用于新的 AI 提供商列表）
-			yakit.EnsureAIBalanceProviderConfig(consts.GetGormProfileDatabase())
 			return nil
 		} else {
 			config := yakit.GetNetworkConfig()
@@ -49,8 +47,6 @@ func init() {
 			log.Debugf("disallow domain: %v", config.DisallowDomain)
 			log.Debugf("global proxy: %v", config.GlobalProxy)
 			yakit.ConfigureNetWork(config)
-			// 确保 aibalance provider 存在（用于新的 AI 提供商列表）
-			yakit.EnsureAIBalanceProviderConfig(consts.GetGormProfileDatabase())
 			return nil
 		}
 	}, "sync-global-config-from-db")

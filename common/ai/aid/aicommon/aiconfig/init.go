@@ -30,30 +30,18 @@ var (
 )
 
 func init() {
+	// ensure AIBalanceProviderConfig is loaded after database initialization
+	yakit.RegisterPostInitDatabaseFunction(func() error {
+		yakit.EnsureAIBalanceProviderConfig(consts.GetGormProfileDatabase())
+		return nil
+	})
+
 	// Register a post-init database function to ensure TieredAIConfig is loaded
 	// This will be called after the database is initialized
 	yakit.RegisterPostInitDatabaseFunction(func() error {
-		return ensureConfigLoadedFromDB()
-	}, "load-tiered-ai-config")
-}
-
-// ensureConfigLoadedFromDB ensures that the tiered AI configuration is loaded from the database
-func ensureConfigLoadedFromDB() error {
-	configLoadedOnce.Do(func() {
-		tieredConfig := consts.GetTieredAIConfig()
-		if tieredConfig != nil {
-			log.Debugf("tiered AI config loaded from DB: enabled=%v, policy=%s, intelligent=%d, lightweight=%d, vision=%d",
-				tieredConfig.Enabled,
-				tieredConfig.RoutingPolicy,
-				len(tieredConfig.IntelligentConfigs),
-				len(tieredConfig.LightweightConfigs),
-				len(tieredConfig.VisionConfigs))
-			configLoaded = true
-		} else {
-			log.Debugf("tiered AI config not available from DB yet")
-		}
-	})
-	return nil
+		EnsureConfigLoaded()
+		return nil
+	}, "tiered-ai-config-loader")
 }
 
 // EnsureConfigLoaded ensures the tiered AI configuration is loaded.
@@ -85,13 +73,14 @@ func EnsureConfigLoaded() {
 	} else if tiered := consts.GetTieredAIConfig(); tiered != nil {
 		cfg = buildAIGlobalConfigFromTiered(tiered)
 		source = "memory-config"
-	} else {
+	}
+
+	if cfg == nil { // use default config if no config found from DB, network, or memory
 		cfg = buildDefaultAIGlobalConfig()
 		source = "built-in defaults"
 	}
 
 	if cfg != nil {
-		yakit.EnsureAIBalanceProviderConfig(db)
 		if _, err := yakit.SetAIGlobalConfig(db, cfg); err != nil {
 			log.Warnf("failed to persist ai global config from %s: %v", source, err)
 		}
@@ -108,9 +97,39 @@ func EnsureConfigLoaded() {
 }
 
 func buildDefaultAIGlobalConfig() *ypb.AIGlobalConfig {
-	defaultCfg := GetDefaultTieredAIConfigFile()
-	tiered := ConfigFileToTieredAIConfig(defaultCfg)
-	return buildAIGlobalConfigFromTiered(tiered)
+	aibalanceId := yakit.EnsureAIBalanceProviderConfig(consts.GetGormProfileDatabase())
+	return &ypb.AIGlobalConfig{
+		Enabled:         true,
+		RoutingPolicy:   "balance",
+		DisableFallback: false,
+		IntelligentModels: []*ypb.AIModelConfig{
+			{
+				ProviderId: aibalanceId,
+				ModelName:  "memfit-standard-free",
+				ExtraParams: []*ypb.KVPair{
+					{Key: modelExtraParamKey, Value: "memfit-standard-free"},
+				},
+			},
+		},
+		LightweightModels: []*ypb.AIModelConfig{
+			{
+				ProviderId: aibalanceId,
+				ModelName:  "memfit-light-free",
+				ExtraParams: []*ypb.KVPair{
+					{Key: modelExtraParamKey, Value: "memfit-light-free"},
+				},
+			},
+		},
+		VisionModels: []*ypb.AIModelConfig{
+			{
+				ProviderId: aibalanceId,
+				ModelName:  "memfit-vision-free",
+				ExtraParams: []*ypb.KVPair{
+					{Key: modelExtraParamKey, Value: "memfit-vision-free"},
+				},
+			},
+		},
+	}
 }
 
 func buildAIGlobalConfigFromNetworkConfig(c *ypb.GlobalNetworkConfig) *ypb.AIGlobalConfig {
@@ -125,8 +144,9 @@ func buildAIGlobalConfigFromNetworkConfig(c *ypb.GlobalNetworkConfig) *ypb.AIGlo
 		cfg.RoutingPolicy = c.GetTieredAIModelConfig().GetModelRoutingPolicy()
 		cfg.DisableFallback = c.GetTieredAIModelConfig().GetDisableFallbackToLightweightModel()
 	} else {
-		cfg.RoutingPolicy = defaultRoutingPolicy
+		return nil
 	}
+
 	if cfg.RoutingPolicy == "" {
 		cfg.RoutingPolicy = defaultRoutingPolicy
 	}
