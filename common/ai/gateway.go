@@ -2,6 +2,7 @@ package ai
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"time"
 
@@ -820,23 +821,33 @@ var Exports = map[string]any{
 	"ListModels":              ListModels,
 	"ListModelByProviderType": ListModelByProviderType,
 
-	"thinking":           aispec.WithEnableThinking,
-	"timeout":            aispec.WithTimeout,
-	"proxy":              aispec.WithProxy,
-	"model":              aispec.WithModel,
-	"apiKey":             aispec.WithAPIKey,
-	"noHttps":            aispec.WithNoHttps,
-	"funcCallRetryTimes": aispec.WithFunctionCallRetryTimes,
-	"domain":             aispec.WithDomain,
-	"baseURL":            aispec.WithBaseURL,
-	"onStream":           aispec.WithStreamHandler,
-	"onReasonStream":     aispec.WithReasonStreamHandler,
-	"debugStream":        aispec.WithDebugStream,
-	"type":               aispec.WithType,
-	"imageFile":          aispec.WithImageFile,
-	"imageBase64":        aispec.WithImageBase64,
-	"imageRaw":           aispec.WithImageRaw,
-	"toolCallCallback":        aispec.WithToolCallCallback,
-	"modelInfoCallback":       aispec.WithModelInfoCallback,
+	"thinking":                 aispec.WithEnableThinking,
+	"timeout":                  aispec.WithTimeout,
+	"proxy":                    aispec.WithProxy,
+	"model":                    aispec.WithModel,
+	"apiKey":                   aispec.WithAPIKey,
+	"noHttps":                  aispec.WithNoHttps,
+	"funcCallRetryTimes":       aispec.WithFunctionCallRetryTimes,
+	"domain":                   aispec.WithDomain,
+	"baseURL":                  aispec.WithBaseURL,
+	"onStream":                 aispec.WithStreamHandler,
+	"onReasonStream":           aispec.WithReasonStreamHandler,
+	"debugStream":              aispec.WithDebugStream,
+	"type":                     aispec.WithType,
+	"imageFile":                aispec.WithImageFile,
+	"imageBase64":              aispec.WithImageBase64,
+	"imageRaw":                 aispec.WithImageRaw,
+	"toolCallCallback":         aispec.WithToolCallCallback,
+	"modelInfoCallback":        aispec.WithModelInfoCallback,
 	"modelInfoConfirmCallback": aispec.WithModelInfoConfirmCallback,
+}
+
+// CreateChatterFromConfig creates a chat function from ThirdPartyApplicationConfig
+func CreateChatterFromConfig(config *ypb.ThirdPartyApplicationConfig) (func(string, ...aispec.AIConfigOption) (string, error), error) {
+	if config == nil {
+		return nil, fmt.Errorf("ThirdPartyApplicationConfig is nil")
+	}
+
+	opts := aispec.BuildOptionsFromConfig(config)
+	return LoadChater(config.Type, opts...)
 }

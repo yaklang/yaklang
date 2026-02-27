@@ -3,6 +3,7 @@ package aispec
 import (
 	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/url"
 	"strings"
 
@@ -133,4 +134,36 @@ func fixDomain(c *AIConfig) {
 			c.Domain = fixedDomain
 		}
 	}
+}
+
+// BuildOptionsFromConfig builds aispec.AIConfigOption slice from ThirdPartyApplicationConfig
+func BuildOptionsFromConfig(config *ypb.ThirdPartyApplicationConfig) []AIConfigOption {
+	var opts []AIConfigOption
+
+	// Set API key
+	if config.APIKey != "" {
+		opts = append(opts, WithAPIKey(config.APIKey))
+	}
+
+	// Set domain
+	if config.Domain != "" {
+		opts = append(opts, WithDomain(config.Domain))
+	}
+
+	// Set type
+	if config.Type != "" {
+		opts = append(opts, WithType(config.Type))
+	}
+
+	// Extract model from ExtraParams
+	if len(config.ExtraParams) > 0 {
+		for _, param := range config.ExtraParams {
+			if param.Key == "model" {
+				opts = append(opts, WithModel(param.Value))
+				break
+			}
+		}
+	}
+
+	return opts
 }

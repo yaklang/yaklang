@@ -1,6 +1,7 @@
 package aiconfig
 
 import (
+	"strings"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -78,6 +79,55 @@ func (m *AIConfigManager) GetFirstConfig(tier ModelTier) *ypb.ThirdPartyApplicat
 		return nil
 	}
 	return configs[0]
+}
+
+// GetFirstConfigByTierAndProviderAndModel returns the first matched config by tier, provider and model.
+// providerName maps to ThirdPartyApplicationConfig.Type.
+// modelName maps to the `model` key in ThirdPartyApplicationConfig.ExtraParams.
+// Empty providerName or modelName means no filtering on that dimension.
+func (m *AIConfigManager) GetFirstConfigByTierAndProviderAndModel(tier ModelTier, providerName, modelName string) *ypb.ThirdPartyApplicationConfig {
+	configs := m.GetConfigsByTier(tier)
+	if len(configs) == 0 {
+		return nil
+	}
+
+	providerName = strings.TrimSpace(providerName)
+	modelName = strings.TrimSpace(modelName)
+
+	for _, cfg := range configs {
+		if cfg == nil {
+			continue
+		}
+
+		if providerName != "" && !strings.EqualFold(strings.TrimSpace(cfg.GetType()), providerName) {
+			continue
+		}
+
+		if modelName != "" && !strings.EqualFold(strings.TrimSpace(getModelFromConfig(cfg)), modelName) {
+			continue
+		}
+
+		return cfg
+	}
+
+	return nil
+}
+
+func getModelFromConfig(config *ypb.ThirdPartyApplicationConfig) string {
+	if config == nil {
+		return ""
+	}
+
+	for _, param := range config.GetExtraParams() {
+		if param == nil {
+			continue
+		}
+		if strings.EqualFold(strings.TrimSpace(param.GetKey()), modelExtraParamKey) {
+			return param.GetValue()
+		}
+	}
+
+	return ""
 }
 
 // GetModelByPolicy returns the appropriate model configuration based on the routing policy

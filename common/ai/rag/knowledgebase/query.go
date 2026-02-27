@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiconfig"
 	"strings"
 
 	"github.com/jinzhu/gorm"
@@ -338,7 +337,7 @@ func Query(db *gorm.DB, query string, opts ...QueryOption) (chan *SearchKnowledg
 			if config.AICallback != nil {
 				aiCommonOptions = append(aiCommonOptions, aicommon.WithAICallback(config.AICallback))
 			} else {
-				aiCommonOptions = append(aiCommonOptions, aicommon.WithAICallback(aiconfig.MustGetSpeedPriorityAIModelCallback()))
+				aiCommonOptions = append(aiCommonOptions, aicommon.WithAICallback(aicommon.MustGetSpeedPriorityAIModelCallback()))
 			}
 
 			if config.AIService != "" {

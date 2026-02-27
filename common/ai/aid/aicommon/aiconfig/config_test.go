@@ -71,7 +71,7 @@ func TestGetCurrentPolicy(t *testing.T) {
 }
 
 func TestAIConfigManager(t *testing.T) {
-	mgr := GetGlobalManager()
+	mgr := &AIConfigManager{}
 	assert.NotNil(t, mgr)
 
 	// Test singleton
@@ -104,7 +104,7 @@ func TestGetConfigsByTier(t *testing.T) {
 		VisionConfigs:      []*ypb.ThirdPartyApplicationConfig{visionConfig},
 	})
 
-	mgr := GetGlobalManager()
+	mgr := &AIConfigManager{}
 
 	// Test getting configs by tier
 	intelligentConfigs := mgr.GetConfigsByTier(TierIntelligent)
@@ -144,6 +144,59 @@ func TestGetFirstConfig(t *testing.T) {
 		IntelligentConfigs: nil,
 	})
 	config = mgr.GetFirstConfig(TierIntelligent)
+	assert.Nil(t, config)
+}
+
+func TestGetFirstConfigByTierAndProviderAndModel(t *testing.T) {
+	originalConfig := consts.GetTieredAIConfig()
+	defer consts.SetTieredAIConfig(originalConfig)
+
+	consts.SetTieredAIConfig(&consts.TieredAIConfig{
+		Enabled: true,
+		IntelligentConfigs: []*ypb.ThirdPartyApplicationConfig{
+			{
+				Type:   "openai",
+				APIKey: "first",
+				ExtraParams: []*ypb.KVPair{
+					{Key: "model", Value: "gpt-4o"},
+				},
+			},
+			{
+				Type:   "openai",
+				APIKey: "second",
+				ExtraParams: []*ypb.KVPair{
+					{Key: "model", Value: "gpt-4.1"},
+				},
+			},
+			{
+				Type:   "aibalance",
+				APIKey: "third",
+				ExtraParams: []*ypb.KVPair{
+					{Key: "model", Value: "memfit-standard-free"},
+				},
+			},
+		},
+	})
+
+	mgr := &AIConfigManager{}
+
+	config := mgr.GetFirstConfigByTierAndProviderAndModel(TierIntelligent, "openai", "gpt-4.1")
+	assert.NotNil(t, config)
+	assert.Equal(t, "second", config.GetAPIKey())
+
+	config = mgr.GetFirstConfigByTierAndProviderAndModel(TierIntelligent, "OPENAI", "GPT-4O")
+	assert.NotNil(t, config)
+	assert.Equal(t, "first", config.GetAPIKey())
+
+	config = mgr.GetFirstConfigByTierAndProviderAndModel(TierIntelligent, "", "gpt-4o")
+	assert.NotNil(t, config)
+	assert.Equal(t, "first", config.GetAPIKey())
+
+	config = mgr.GetFirstConfigByTierAndProviderAndModel(TierIntelligent, "aibalance", "")
+	assert.NotNil(t, config)
+	assert.Equal(t, "third", config.GetAPIKey())
+
+	config = mgr.GetFirstConfigByTierAndProviderAndModel(TierIntelligent, "openai", "not-exist")
 	assert.Nil(t, config)
 }
 
