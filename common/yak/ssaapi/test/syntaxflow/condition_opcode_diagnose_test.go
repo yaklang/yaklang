@@ -55,9 +55,9 @@ f2(f1(11))
 	})
 
 	t.Run("filter_then_topdef_contains_param_context", func(t *testing.T) {
-		// This case is used to isolate whether `?{opcode:param}` is correct before `#->` traversal.
+		// After top-def actual-param resolution, traversing from a filtered param reaches call-site argument values.
 		ssatest.CheckSyntaxFlowContain(t, code, `a1?{opcode: param} #-> * as $target`, map[string][]string{
-			"target": {"Parameter-a1"},
+			"target": {"1"},
 		})
 	})
 }

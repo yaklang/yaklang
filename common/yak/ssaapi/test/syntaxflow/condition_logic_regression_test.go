@@ -47,7 +47,7 @@ b2 = f2(2)
 
 	t.Run("include_and_match_single_path", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code, `b* #{include:`+"`"+`* ?{have:f1 && opcode:call}`+"`"+`}-> as $result`, map[string][]string{
-			"result": {"Undefined-f1"},
+			"result": {"Undefined-f1", "1"},
 		})
 	})
 

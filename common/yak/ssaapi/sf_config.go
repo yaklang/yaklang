@@ -1,6 +1,8 @@
 package ssaapi
 
 import (
+	"strings"
+
 	sf "github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -206,23 +208,32 @@ func (r *sfCheck) clearup(sfres *sf.SFFrameResult) {
 }
 
 func isMatch(result *SyntaxFlowResult) bool {
-	if result.GetVariableNum() == 0 {
+	if result == nil {
+		return false
+	}
+
+	effectiveVarNum := 0
+	matchedSingle := false
+	if vars := result.GetAllVariable(); vars != nil {
+		vars.ForEach(func(key string, value any) {
+			// Ignore VM internal temporary symbols when deciding include/exclude/until match.
+			if strings.HasPrefix(key, "__") && key != sf.RecursiveMagicVariable {
+				return
+			}
+			effectiveVarNum++
+			if num, ok := value.(int); ok && num != 0 {
+				matchedSingle = true
+			}
+		})
+	}
+
+	if effectiveVarNum == 0 {
 		// check un-name value
 		if len(result.GetUnNameValues()) != 0 {
 			return true
 		}
-	} else if result.GetVariableNum() == 1 {
-		match := false
-		// if only one variable, check its value
-		if ret := result.GetAllVariable(); ret.Len() == 1 {
-			ret.ForEach(func(key string, value any) {
-				num := value.(int)
-				if num != 0 {
-					match = true
-				}
-			})
-		}
-		return match
+	} else if effectiveVarNum == 1 {
+		return matchedSingle
 	} else {
 		// multiple variable, check magic variable
 		if len(result.GetValues(sf.RecursiveMagicVariable)) != 0 {

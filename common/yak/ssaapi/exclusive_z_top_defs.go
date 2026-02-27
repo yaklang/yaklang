@@ -506,9 +506,15 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 					log.Debugf("formal parameter index: %d is out of range", inst.FormalParameterIndex)
 					return getMemberCall(i, i.getValue(), actx)
 				}
-				actualParam, ok = inst.GetValueById(calledInstance.Args[inst.FormalParameterIndex])
+				argID := calledInstance.Args[inst.FormalParameterIndex]
+				// Prefer resolving actual argument in the call-site scope first.
+				actualParam, ok = calledInstance.GetValueById(argID)
 				if !ok {
-					actualParam = nil
+					// Fallback to current instruction scope for compatibility.
+					actualParam, ok = inst.GetValueById(argID)
+					if !ok {
+						actualParam = nil
+					}
 				}
 			}
 			traced := i.NewValue(actualParam)
