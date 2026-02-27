@@ -405,9 +405,9 @@ func TestSkillsContextManager_PromptContextCompleteness(t *testing.T) {
 // --- Integration: ViewWindow large file rendering in context ---
 
 func TestSkillsContextManager_LargeSkillMD(t *testing.T) {
-	// Create a skill with a large SKILL.md that exceeds 15KB view window
+	// Create a skill with a large SKILL.md that exceeds 32KB view window
 	vfs := filesys.NewVirtualFs()
-	largeBody := strings.Repeat("This is a long line of skill documentation content.\n", 400)
+	largeBody := strings.Repeat("This is a long line of skill documentation content.\n", 700)
 	vfs.AddFile("large-skill/SKILL.md", buildSkillMD(
 		"large-skill",
 		"A skill with very large SKILL.md content.",
