@@ -42,7 +42,8 @@ func yieldFromIrIndexWithExcludeFiles(DB *gorm.DB, ctx context.Context, progName
 
 	// Step 1: Get matched value_ids from DB (DB already contains match conditions and program_name)
 	var matchedIds []int64
-	if err := DB.Select("DISTINCT ir_indices.value_id").Pluck("DISTINCT ir_indices.value_id", &matchedIds).Error; err != nil {
+	distinctIrIndicesValueID := "DISTINCT " + TableIrIndices + ".value_id"
+	if err := DB.Pluck(distinctIrIndicesValueID, &matchedIds).Error; err != nil {
 		log.Errorf("failed to get matched ids: %v", err)
 		return emptyIrCodeChan()
 	}
@@ -53,14 +54,14 @@ func yieldFromIrIndexWithExcludeFiles(DB *gorm.DB, ctx context.Context, progName
 
 	// Step 2: Join to exclude files based on matched value_ids
 	baseDB := GetDB()
-	query := baseDB.Table("ir_indices").
-		Select("DISTINCT ir_indices.value_id").
-		Joins("INNER JOIN ir_codes ON ir_indices.value_id = ir_codes.code_id").
-		Joins("INNER JOIN ir_sources ON ir_codes.source_code_hash = ir_sources.source_code_hash").
-		Where("ir_indices.program_name = ?", progName).
-		Where("ir_codes.program_name = ?", progName).
-		Where("ir_sources.program_name = ?", progName).
-		Where("ir_indices.value_id IN (?)", matchedIds)
+	query := baseDB.Model(&IrIndex{}).
+		Select(distinctIrIndicesValueID).
+		Joins("INNER JOIN "+TableIrCodes+" ON "+TableIrIndices+".value_id = "+TableIrCodes+".code_id").
+		Joins("INNER JOIN "+TableIrSources+" ON "+TableIrCodes+".source_code_hash = "+TableIrSources+".source_code_hash").
+		Where(TableIrIndices+".program_name = ?", progName).
+		Where(TableIrCodes+".program_name = ?", progName).
+		Where(TableIrSources+".program_name = ?", progName).
+		Where(TableIrIndices+".value_id IN (?)", matchedIds)
 
 	// Add exclusion conditions if needed
 	if len(excludeFiles) > 0 {
@@ -77,7 +78,7 @@ func yieldFromIrIndexWithExcludeFiles(DB *gorm.DB, ctx context.Context, progName
 		}
 	}
 
-	if err := query.Pluck("DISTINCT ir_indices.value_id", &ids).Error; err != nil {
+	if err := query.Pluck(distinctIrIndicesValueID, &ids).Error; err != nil {
 		log.Errorf("failed to get ids from index with exclude files: %v", err)
 		return emptyIrCodeChan()
 	}
@@ -151,8 +152,8 @@ func searchVariableWithExcludeFiles(db *gorm.DB, ctx context.Context, progName s
 		}
 		// ConstType query also needs file exclusion
 		if len(excludeFiles) > 0 {
-			query = query.Joins("INNER JOIN ir_sources ON ir_codes.source_code_hash = ir_sources.source_code_hash").
-				Where("ir_sources.program_name = ?", progName)
+			query = query.Joins("INNER JOIN "+TableIrSources+" ON "+TableIrCodes+".source_code_hash = "+TableIrSources+".source_code_hash").
+				Where(TableIrSources+".program_name = ?", progName)
 			concatExpr := getConcatExpression(db)
 			excludeConditions := make([]string, 0, len(excludeFiles))
 			excludeArgs := make([]interface{}, 0, len(excludeFiles))
@@ -258,10 +259,10 @@ func getConcatExpression(db *gorm.DB) string {
 	switch dialect {
 	case "sqlite3", "sqlite":
 		// SQLite uses || operator
-		return "(ir_sources.folder_path || ir_sources.file_name)"
+		return "(" + TableIrSources + ".folder_path || " + TableIrSources + ".file_name)"
 	default:
 		// MySQL, PostgreSQL use CONCAT function
-		return "CONCAT(ir_sources.folder_path, ir_sources.file_name)"
+		return "CONCAT(" + TableIrSources + ".folder_path, " + TableIrSources + ".file_name)"
 	}
 }
 

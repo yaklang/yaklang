@@ -17,6 +17,10 @@ type SSARiskDisposals struct {
 	Comment         string `json:"comment" gorm:"type:text"`
 }
 
+func (*SSARiskDisposals) TableName() string {
+	return TableSSARiskDisposals
+}
+
 func (s *SSARiskDisposals) BeforeCreate() {
 	s.Status = string(ValidSSARiskDisposalStatus(s.Status))
 }

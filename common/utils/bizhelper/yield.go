@@ -3,6 +3,7 @@ package bizhelper
 import (
 	"context"
 	"database/sql"
+	"reflect"
 	"strings"
 
 	"github.com/jinzhu/gorm"
@@ -66,6 +67,11 @@ func WithYieldModel_Limit(l int) YieldModelOpts {
 
 func YieldModel[T any](ctx context.Context, db *gorm.DB, opts ...YieldModelOpts) chan T {
 	var t T
+	// db.NewScope(t).TableName() cannot work with a nil pointer receiver.
+	// When T is *Model, instantiate it so GORM can resolve table metadata safely.
+	if rv := reflect.ValueOf(t); rv.IsValid() && rv.Kind() == reflect.Ptr && rv.IsNil() {
+		t = reflect.New(rv.Type().Elem()).Interface().(T)
+	}
 	db = db.Table(db.NewScope(t).TableName())
 
 	cfg := NewYieldModelConfig()

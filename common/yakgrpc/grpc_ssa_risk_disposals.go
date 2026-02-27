@@ -53,7 +53,7 @@ func (s *Server) DeleteSSARiskDisposals(ctx context.Context, req *ypb.DeleteSSAR
 	}
 	return &ypb.DeleteSSARiskDisposalsResponse{
 		Message: &ypb.DbOperateMessage{
-			TableName:  "ssa_risk_disposals",
+			TableName:  schema.TableSSARiskDisposals,
 			Operation:  DbOperationDelete,
 			EffectRows: count,
 		},

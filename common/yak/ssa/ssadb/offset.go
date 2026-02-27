@@ -20,6 +20,10 @@ type IrOffset struct {
 	ValueID int64 `json:"value_id" gorm:"index"` // this id will set
 }
 
+func (*IrOffset) TableName() string {
+	return TableIrOffsets
+}
+
 func CreateOffset(rng *memedit.Range, projectName string) *IrOffset {
 	ret := &IrOffset{}
 	ret.FileHash = rng.GetEditor().GetIrSourceHash()

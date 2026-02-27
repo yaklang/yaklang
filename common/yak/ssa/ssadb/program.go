@@ -68,6 +68,10 @@ type IrProgram struct {
 	OverlayLayers StringSlice `json:"overlay_layers" gorm:"type:text"`
 }
 
+func (*IrProgram) TableName() string {
+	return TableIrPrograms
+}
+
 func CreateProgram(name, version string, kind ProgramKind) *IrProgram {
 	db := GetDB().Model(&IrProgram{})
 	out := &IrProgram{

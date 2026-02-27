@@ -51,7 +51,7 @@ func init() {
 // PostgreSQL: use TEXT (unlimited length)
 // SQLite: use TEXT (supports up to 2GB, no modification needed)
 func patchIrSourceQuotedCode(db *gorm.DB) {
-	if !db.HasTable("ir_sources") {
+	if !db.HasTable(TableIrSources) {
 		return
 	}
 
@@ -60,27 +60,27 @@ func patchIrSourceQuotedCode(db *gorm.DB) {
 	case "mysql":
 		// For MySQL, change TEXT to LONGTEXT to support larger source files
 		// TEXT in MySQL is limited to ~64KB, but LONGTEXT can store up to 4GB
-		err := db.Exec("ALTER TABLE ir_sources MODIFY COLUMN quoted_code LONGTEXT").Error
+		err := db.Exec("ALTER TABLE " + TableIrSources + " MODIFY COLUMN quoted_code LONGTEXT").Error
 		if err != nil {
-			log.Warnf("failed to modify ir_sources.quoted_code to LONGTEXT for MySQL: %v", err)
+			log.Warnf("failed to modify %s.quoted_code to LONGTEXT for MySQL: %v", TableIrSources, err)
 		} else {
-			log.Infof("MySQL: ir_sources.quoted_code column type changed to LONGTEXT")
+			log.Infof("MySQL: %s.quoted_code column type changed to LONGTEXT", TableIrSources)
 		}
 	case "postgres", "postgresql":
 		// PostgreSQL TEXT type already supports unlimited length, no modification needed
-		log.Debugf("PostgreSQL: ir_sources.quoted_code uses TEXT type (unlimited length)")
+		log.Debugf("PostgreSQL: %s.quoted_code uses TEXT type (unlimited length)", TableIrSources)
 	case "sqlite3", "sqlite":
 		// SQLite TEXT type supports up to 2GB (SQLITE_MAX_LENGTH), no modification needed
-		log.Debugf("SQLite: ir_sources.quoted_code uses TEXT type (up to 2GB)")
+		log.Debugf("SQLite: %s.quoted_code uses TEXT type (up to 2GB)", TableIrSources)
 	default:
 		// For other databases, use default TEXT type
-		log.Debugf("Database dialect %s: using default TEXT type for ir_sources.quoted_code", dialect)
+		log.Debugf("Database dialect %s: using default TEXT type for %s.quoted_code", dialect, TableIrSources)
 	}
 }
 
 // doSSAPatch 添加数据库索引以优化查询性能
 func patchIrCodeIndex(db *gorm.DB) {
-	if !db.HasTable("ir_codes") {
+	if !db.HasTable(TableIrCodes) {
 		return
 	}
 
@@ -92,26 +92,26 @@ func patchIrCodeIndex(db *gorm.DB) {
 	}{
 		{
 			"idx_ir_codes_program_code",
-			`CREATE INDEX IF NOT EXISTS "idx_ir_codes_program_code" ON "ir_codes" ("program_name", "code_id");`,
+			`CREATE INDEX IF NOT EXISTS "idx_ir_codes_program_code" ON "` + TableIrCodes + `" ("program_name", "code_id");`,
 		},
 		{
 			"idx_ir_codes_program_opcode",
 			// composite index for program+opcode lookups
-			`CREATE INDEX IF NOT EXISTS "idx_ir_codes_program_opcode" ON "ir_codes" ("program_name", "opcode");`,
+			`CREATE INDEX IF NOT EXISTS "idx_ir_codes_program_opcode" ON "` + TableIrCodes + `" ("program_name", "opcode");`,
 		},
 		// 为 ir_types 表添加复合索引
 		{
 			"idx_ir_types_program_type",
-			`CREATE INDEX IF NOT EXISTS "idx_ir_types_program_type" ON "ir_types" ("program_name", "type_id");`,
+			`CREATE INDEX IF NOT EXISTS "idx_ir_types_program_type" ON "` + TableIrTypes + `" ("program_name", "type_id");`,
 		},
 		// 为 ir_indices 表添加复合索引以优化常见查询
 		{
 			"idx_ir_indices_program_value",
-			`CREATE INDEX IF NOT EXISTS "idx_ir_indices_program_value" ON "ir_indices" ("program_name", "value_id");`,
+			`CREATE INDEX IF NOT EXISTS "idx_ir_indices_program_value" ON "` + TableIrIndices + `" ("program_name", "value_id");`,
 		},
 		{
 			"idx_ir_name_pool_program_name_name",
-			`CREATE INDEX IF NOT EXISTS "idx_ir_name_pool_program_name_name" ON "ir_name_pool" ("program_name", "name");`,
+			`CREATE INDEX IF NOT EXISTS "idx_ir_name_pool_program_name_name" ON "` + TableIrNamePool + `" ("program_name", "name");`,
 		},
 	}
 
@@ -154,6 +154,7 @@ func deleteProgramCodeOnly(db *gorm.DB, program string) {
 	deleteCache(program)
 	db.Model(&IrCode{}).Where("program_name = ?", program).Unscoped().Delete(&IrCode{})
 	db.Model(&IrIndex{}).Where("program_name = ?", program).Unscoped().Delete(&IrIndex{})
+	db.Model(&IrNamePool{}).Where("program_name = ?", program).Unscoped().Delete(&IrNamePool{})
 	db.Model(&IrSource{}).Where("program_name = ?", program).Unscoped().Delete(&IrSource{})
 	db.Model(&IrSource{}).Where("folder_path = ? AND file_name = ?", "/", program).Unscoped().Delete(&IrSource{})
 	db.Model(&IrType{}).Where("program_name = ?", program).Unscoped().Delete(&IrType{})

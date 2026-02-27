@@ -143,6 +143,9 @@ func NewSSARiskFilter(opts ...SSARiskFilterOption) *ypb.SSARisksFilter {
 }
 
 func filterSSARiskByIncremental(db *gorm.DB, runtimeId ...string) *gorm.DB {
+	riskTable := schema.TableSSARisks
+	disposalTable := schema.TableSSARiskDisposals
+	taskTable := schema.TableSyntaxFlowScanTask
 	if len(runtimeId) == 0 {
 		// 查询所有未处置的漏洞
 		var disposedFeatureHashes []string
@@ -163,17 +166,17 @@ func filterSSARiskByIncremental(db *gorm.DB, runtimeId ...string) *gorm.DB {
 		subWhere := `
 		NOT EXISTS (
 			SELECT 1
-			FROM ssa_risk_disposals
-			JOIN syntax_flow_scan_tasks base_task ON ssa_risk_disposals.task_id = base_task.task_id
-			WHERE ssa_risk_disposals.risk_feature_hash = ssa_risks.risk_feature_hash
+			FROM ` + disposalTable + `
+			JOIN ` + taskTable + ` base_task ON ` + disposalTable + `.task_id = base_task.task_id
+			WHERE ` + disposalTable + `.risk_feature_hash = ` + riskTable + `.risk_feature_hash
 			  AND base_task.scan_batch <= ?
 		)
 	`
 		err := db.New().
 			Model(&schema.SSARisk{}).
-			Where("ssa_risks.runtime_id = ? AND ssa_risks.risk_feature_hash != ''", runtimeId).
+			Where(riskTable+".runtime_id = ? AND "+riskTable+".risk_feature_hash != ''", runtimeId).
 			Where(subWhere, baseTask.ScanBatch).
-			Pluck("DISTINCT ssa_risks.risk_feature_hash", &validFeatureHashes).Error
+			Pluck("DISTINCT "+riskTable+".risk_feature_hash", &validFeatureHashes).Error
 		if err != nil {
 			log.Errorf("Failed to query valid feature hashes: %v", err)
 			return db
@@ -290,7 +293,7 @@ func UpdateSSARiskTags(DB *gorm.DB, id int64, tags []string) error {
 }
 
 func SSARiskColumnGroupCount(db *gorm.DB, column string) []*ypb.FieldGroup {
-	return bizhelper.GroupCount(db, "ssa_risks", column)
+	return bizhelper.GroupCount(db, schema.TableSSARisks, column)
 }
 
 func NewSSARiskReadRequest(db *gorm.DB, filter *ypb.SSARisksFilter) error {

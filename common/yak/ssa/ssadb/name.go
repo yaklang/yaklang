@@ -7,5 +7,5 @@ type IrNamePool struct {
 }
 
 func (i *IrNamePool) TableName() string {
-	return "ir_name_pool"
+	return TableIrNamePool
 }

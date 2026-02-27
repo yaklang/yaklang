@@ -42,6 +42,10 @@ type AuditResult struct {
 	UnValueVariable StringSlice `json:"un_value_variable" gorm:"type:text"`
 }
 
+func (*AuditResult) TableName() string {
+	return TableAuditResults
+}
+
 func GetResultByID(resultID uint) (*AuditResult, error) {
 	var result AuditResult
 	if err := GetDB().Where("id = ?", resultID).First(&result).Error; err != nil {

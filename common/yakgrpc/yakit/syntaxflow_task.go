@@ -48,7 +48,8 @@ func FilterSyntaxFlowScanTask(DB *gorm.DB, filter *ypb.SyntaxFlowScanTaskFilter)
 		}, []string{filter.GetKeyword()}, false)
 	}
 	if filter.GetHaveRisk() {
-		db = db.Where("EXISTS (SELECT 1 FROM ssa_risks WHERE ssa_risks.runtime_id = syntax_flow_scan_tasks.task_id)")
+		db = db.Where("EXISTS (SELECT 1 FROM " + schema.TableSSARisks +
+			" WHERE " + schema.TableSSARisks + ".runtime_id = " + schema.TableSyntaxFlowScanTask + ".task_id)")
 	}
 	return db
 }

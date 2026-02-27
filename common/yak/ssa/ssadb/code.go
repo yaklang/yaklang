@@ -100,6 +100,10 @@ type IrCode struct {
 	ConstType string `json:"const_type" gorm:"index"`
 }
 
+func (*IrCode) TableName() string {
+	return TableIrCodes
+}
+
 func EmptyIrCode(progName string, id int64) *IrCode {
 	return &IrCode{
 		ProgramName: progName,
