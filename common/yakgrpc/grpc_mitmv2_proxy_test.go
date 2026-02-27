@@ -379,6 +379,7 @@ yakit.StatusCard("mitmId", "StatusCard")
 		pluginStartLoading    bool
 		pluginStatusCardFound bool
 		hotStatusCardFound    bool
+		pluginNameFound       bool
 	)
 	for {
 		data, err := stream.Recv()
@@ -426,6 +427,9 @@ go func{
 		}
 
 		if strings.Contains(spew.Sdump(data), "StatusCard") && strings.Contains(spew.Sdump(data), "mitmId") {
+			if data.GetMessage().GetPluginName() == name {
+				pluginNameFound = true
+			}
 			pluginStatusCardFound = true
 		}
 	}
@@ -434,4 +438,5 @@ go func{
 
 	require.True(t, pluginStatusCardFound, "plugin status card not found")
 	require.True(t, hotStatusCardFound, "hot status card not found")
+	require.True(t, pluginNameFound, "plugin name not found")
 }

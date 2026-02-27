@@ -183,8 +183,9 @@ func FeedbackFactory(db *gorm.DB, caller func(result *ypb.ExecResult) error, sav
 		}
 
 		result := &ypb.ExecResult{
-			IsMessage: true,
-			Message:   raw,
+			IsMessage:  true,
+			Message:    raw,
+			PluginName: yakScriptName,
 		}
 		if saveToDb {
 			// mitmSaveToDBLock.Lock()
@@ -645,6 +646,7 @@ func (y *YakToCallerManager) AddForYakit(
 	hooks ...string,
 ) error {
 	caller := func(result *ypb.ExecResult) error {
+		result.PluginName = script.ScriptName
 		return callerIf.Send(result)
 	}
 	db := consts.GetGormProjectDatabase()

@@ -7129,6 +7129,7 @@ message ExecResult {
 
   string RuntimeID = 7;
   float Progress = 8;
+  string PluginName = 9;
 }
 
 message GetLicenseResponse {
