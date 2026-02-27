@@ -112,7 +112,9 @@ func GetEditorByHash(hash string) (*memedit.MemEditor, error) {
 	}
 
 	log.Debugf("GetEditorByHash: loaded from database, hash=%s, program=%s, path=%s", hash, source.ProgramName, source.FolderPath+source.FileName)
-	return irSource2Editor(&source), nil
+	editor := irSource2Editor(&source)
+	irSourceCache.Set(hash, editor)
+	return editor, nil
 }
 
 func GetEditorCountByProgramName(programName string) (int, error) {
