@@ -2,8 +2,6 @@ package test
 
 import (
 	"testing"
-
-	"github.com/yaklang/yaklang/common/yak/static_analyzer/rules"
 )
 
 func TestSSARuleMustPassCliDisable(t *testing.T) {
@@ -31,15 +29,27 @@ func TestSSARuleMustPassCliDisable(t *testing.T) {
 		)
 	})
 
-	t.Run("cli disable in codec", func(t *testing.T) {
+	t.Run("cli enable in codec", func(t *testing.T) {
 		check(t, `
 handle = func(s) {
 	cli.String("domains")
 	cli.check()
 }
 			`,
-			[]string{rules.ErrorDisableCLi(), rules.ErrorDisableCLi()},
+			[]string{},
 			"codec",
+		)
+	})
+
+	t.Run("cli enable in portscan", func(t *testing.T) {
+		check(t, `
+handle = func(result) {
+	cli.String("domains")
+	cli.check()
+}
+			`,
+			[]string{},
+			"portscan",
 		)
 	})
 }
