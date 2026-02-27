@@ -66,6 +66,10 @@ type SSARisk struct {
 	SSAProjectID uint64 `json:"ssa_project_id" gorm:"index"`
 }
 
+func (*SSARisk) TableName() string {
+	return TableSSARisks
+}
+
 func (s *SSARisk) CalcHash() string {
 	return utils.CalcSha1(
 		s.CodeSourceUrl, s.CodeRange, // source code range

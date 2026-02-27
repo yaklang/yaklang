@@ -29,7 +29,7 @@ type IrIndex struct {
 }
 
 func (i *IrIndex) TableName() string {
-	return "ir_indices"
+	return TableIrIndices
 }
 
 func CreateIndex(progName string) *IrIndex {
@@ -90,14 +90,14 @@ func GetScope(programName, scopeName string, cache *NameCache) ([]IrVariable, er
 	}
 	var results []result
 
-	err := db.Table("ir_indices").
+	err := db.Model(&IrIndex{}).
 		Select("variable_id, value_id, version_id").
 		Where("program_name = ? AND scope_name = ? AND deleted_at IS NULL", programName, scopeName).
 		Where(`version_id = (
-			SELECT max(sub.version_id) FROM ir_indices AS sub
-			WHERE sub.variable_id = ir_indices.variable_id 
-			  AND sub.scope_name = ir_indices.scope_name 
-			  AND sub.program_name = ir_indices.program_name
+			SELECT max(sub.version_id) FROM ` + TableIrIndices + ` AS sub
+			WHERE sub.variable_id = ` + TableIrIndices + `.variable_id
+			  AND sub.scope_name = ` + TableIrIndices + `.scope_name
+			  AND sub.program_name = ` + TableIrIndices + `.program_name
 		)`).Scan(&results).Error
 
 	if err != nil {

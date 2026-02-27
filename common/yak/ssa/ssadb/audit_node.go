@@ -46,6 +46,10 @@ type AuditNode struct {
 	VerboseName string `json:"verbose_name"`
 }
 
+func (*AuditNode) TableName() string {
+	return TableAuditNodes
+}
+
 // 你需要一个熵源 (entropy source)
 // 在你的应用启动时初始化一次即可
 var ulidEntropy = ulid.Monotonic(rand.New(rand.NewSource(time.Now().UnixNano())), 0)
@@ -251,6 +255,10 @@ type AuditEdge struct {
 	// for predecessor
 	AnalysisStep  int64
 	AnalysisLabel string
+}
+
+func (*AuditEdge) TableName() string {
+	return TableAuditEdges
 }
 
 func (n *AuditNode) CreateDependsOnEdge(progName string, to *AuditNode) *AuditEdge {

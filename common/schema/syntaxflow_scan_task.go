@@ -60,6 +60,10 @@ type SyntaxFlowScanTask struct {
 	Config []byte `gorm:"type:text"` // new data
 }
 
+func (*SyntaxFlowScanTask) TableName() string {
+	return TableSyntaxFlowScanTask
+}
+
 func (s *SyntaxFlowScanTask) ToGRPCModel() *ypb.SyntaxFlowScanTask {
 	res := &ypb.SyntaxFlowScanTask{
 		Id:            uint64(s.ID),

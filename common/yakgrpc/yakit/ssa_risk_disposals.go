@@ -111,6 +111,8 @@ func GetSSARiskDisposalsOnly(db *gorm.DB, riskId int64) ([]schema.SSARiskDisposa
 // GetSSARiskDisposalsWithInheritance 获取特定 Risk 的处置信息，包括通过 RiskFeatureHash 继承的历史处置信息
 // 通过 TaskId 关联扫描任务，获取扫描批次信息
 func GetSSARiskDisposalsWithInheritance(db *gorm.DB, riskId int64) ([]schema.SSARiskDisposals, error) {
+	disposalTable := schema.TableSSARiskDisposals
+	taskTable := schema.TableSyntaxFlowScanTask
 	var risk schema.SSARisk
 	if err := db.Where("id = ?", riskId).First(&risk).Error; err != nil {
 		return nil, utils.Errorf("GetSSARiskDisposalsWithInheritance failed to query risk: %v", err)
@@ -131,10 +133,10 @@ func GetSSARiskDisposalsWithInheritance(db *gorm.DB, riskId int64) ([]schema.SSA
 	// 查询所有相同 RiskFeatureHash 的处置信息，但只包括早于或等于当前扫描批次号的记录
 	var disposals []schema.SSARiskDisposals
 	if err := db.Model(&schema.SSARiskDisposals{}).
-		Joins("JOIN syntax_flow_scan_tasks ON ssa_risk_disposals.task_id = syntax_flow_scan_tasks.task_id").
-		Where("ssa_risk_disposals.risk_feature_hash = ? AND syntax_flow_scan_tasks.scan_batch <= ?",
+		Joins("JOIN "+taskTable+" ON "+disposalTable+".task_id = "+taskTable+".task_id").
+		Where(disposalTable+".risk_feature_hash = ? AND "+taskTable+".scan_batch <= ?",
 			risk.RiskFeatureHash, currentTask.ScanBatch).
-		Order("syntax_flow_scan_tasks.scan_batch DESC, ssa_risk_disposals.updated_at DESC").
+		Order(taskTable + ".scan_batch DESC, " + disposalTable + ".updated_at DESC").
 		Find(&disposals).Error; err != nil {
 		return nil, utils.Errorf("GetSSARiskDisposalsWithInheritance failed: %v", err)
 	}
@@ -163,6 +165,8 @@ func DeleteSSARiskDisposals(db *gorm.DB, req *ypb.DeleteSSARiskDisposalsRequest)
 
 // GetSSARiskDisposalsWithTaskInfo 获取包含扫描任务信息的处置数据，携带审计信息
 func GetSSARiskDisposalsWithTaskInfo(db *gorm.DB, request *ypb.GetSSARiskDisposalRequest) ([]*ypb.SSARiskDisposalData, error) {
+	disposalTable := schema.TableSSARiskDisposals
+	taskTable := schema.TableSyntaxFlowScanTask
 	if request == nil {
 		return nil, utils.Error("GetSSARiskDisposalsWithTaskInfo failed: GetSSARiskDisposalRequest is nil")
 	}
@@ -196,10 +200,10 @@ func GetSSARiskDisposalsWithTaskInfo(db *gorm.DB, request *ypb.GetSSARiskDisposa
 	// 审计携带
 	var disposals []schema.SSARiskDisposals
 	if err := db.Model(&schema.SSARiskDisposals{}).
-		Joins("JOIN syntax_flow_scan_tasks ON ssa_risk_disposals.task_id = syntax_flow_scan_tasks.task_id").
-		Where("ssa_risk_disposals.risk_feature_hash = ? AND syntax_flow_scan_tasks.scan_batch <= ?",
+		Joins("JOIN "+taskTable+" ON "+disposalTable+".task_id = "+taskTable+".task_id").
+		Where(disposalTable+".risk_feature_hash = ? AND "+taskTable+".scan_batch <= ?",
 			risk.RiskFeatureHash, currentTask.ScanBatch).
-		Order("syntax_flow_scan_tasks.scan_batch DESC, ssa_risk_disposals.updated_at DESC").
+		Order(taskTable + ".scan_batch DESC, " + disposalTable + ".updated_at DESC").
 		Find(&disposals).Error; err != nil {
 		return nil, utils.Errorf("GetSSARiskDisposalsWithTaskInfo failed: %v", err)
 	}

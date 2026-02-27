@@ -82,6 +82,6 @@ func (d *SSADiffResult) BeforeSave() {
 }
 
 // TableName ensures GORM uses the correct table name
-func (SSADiffResult) TableName() string {
-	return "ssa_diff_results"
+func (*SSADiffResult) TableName() string {
+	return TableSSADiffResults
 }

@@ -26,6 +26,10 @@ type IrSource struct {
 
 }
 
+func (*IrSource) TableName() string {
+	return TableIrSources
+}
+
 func GetIrSourceByPath(path string) ([]*IrSource, error) {
 	db := GetDB()
 	var sources []*IrSource

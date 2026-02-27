@@ -16,6 +16,10 @@ type IrType struct {
 	// Hash             string `json:"hash" gorm:"unique_index"`
 }
 
+func (*IrType) TableName() string {
+	return TableIrTypes
+}
+
 func (t *IrType) SetId(id int64) {
 	t.TypeId = uint64(id)
 }
