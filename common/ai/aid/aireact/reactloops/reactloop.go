@@ -371,6 +371,28 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 				r.allowSkillViewOffset = func() bool {
 					return mgr.HasTruncatedViews()
 				}
+
+				// Restore previously loaded skills from persistent session
+				if realConfig.InitStatus.IsPersistentSessionRestored() {
+					if names := realConfig.GetRestoredSkillNames(); len(names) > 0 {
+						results := mgr.LoadSkills(names)
+						var restored, failed []string
+						for name, err := range results {
+							if err != nil {
+								failed = append(failed, name)
+								log.Warnf("failed to restore skill %q from persistent session: %v", name, err)
+							} else {
+								restored = append(restored, name)
+							}
+						}
+						if len(restored) > 0 {
+							log.Infof("restored %d skills from persistent session: %v", len(restored), restored)
+						}
+						if len(failed) > 0 {
+							log.Warnf("failed to restore %d skills from persistent session: %v", len(failed), failed)
+						}
+					}
+				}
 			}
 		}
 	}

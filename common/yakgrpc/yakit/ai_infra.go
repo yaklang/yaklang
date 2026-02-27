@@ -109,6 +109,10 @@ func UpdateAIAgentRuntimeTimelineWithPersistentId(db *gorm.DB, persistentId stri
 	return db.Model(&schema.AIAgentRuntime{}).Where("persistent_session = ?", persistentId).Update("quoted_timeline", timeline).Error
 }
 
+func UpdateAIAgentRuntimeLoadedSkillNames(db *gorm.DB, persistentId string, skillNames string) error {
+	return db.Model(&schema.AIAgentRuntime{}).Where("persistent_session = ?", persistentId).Update("loaded_skill_names", skillNames).Error
+}
+
 // GetLatestAIAgentRuntimeByPersistentSession 获取某个持久化会话的最新运行时
 func GetLatestAIAgentRuntimeByPersistentSession(db *gorm.DB, sessionId string) (*schema.AIAgentRuntime, error) {
 	start := time.Now()

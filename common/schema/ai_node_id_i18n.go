@@ -13,6 +13,10 @@ type I18n struct {
 }
 
 var nodeIdMapper = map[string]*I18n{
+	"load_skill_resources_path": {
+		Zh: "额外加载技能资源",
+		En: "Load Extra SKILL Resource",
+	},
 	"internet_research": {
 		Zh: "互联网调研",
 		En: "Internet Research",

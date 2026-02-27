@@ -2,6 +2,7 @@ package aicommon
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/schema"
 )
@@ -39,6 +40,10 @@ type ResolvedIdentifier struct {
 	// Suggestion is a human-readable message for the AI explaining the resolution result
 	// and what action to take instead. Designed to be strongly worded to prevent loops.
 	Suggestion string
+	// Alternatives holds other registries where this identifier also exists.
+	// For example, if "recon" is both a forge and a skill, the primary match is forge
+	// and the skill entry appears in Alternatives.
+	Alternatives []*ResolvedIdentifier
 }
 
 // IsUnknown returns true if the identifier was not found in any registry.
@@ -46,12 +51,32 @@ func (r *ResolvedIdentifier) IsUnknown() bool {
 	return r.IdentityType == ResolvedAs_Unknown
 }
 
+// HasAlternative returns true if an alternative of the given type exists.
+func (r *ResolvedIdentifier) HasAlternative(t ResolvedIdentifierType) bool {
+	for _, alt := range r.Alternatives {
+		if alt.IdentityType == t {
+			return true
+		}
+	}
+	return false
+}
+
+// GetAlternative returns the alternative with the given type, or nil.
+func (r *ResolvedIdentifier) GetAlternative(t ResolvedIdentifierType) *ResolvedIdentifier {
+	for _, alt := range r.Alternatives {
+		if alt.IdentityType == t {
+			return alt
+		}
+	}
+	return nil
+}
+
 // ResolveIdentifier checks whether the given name exists as a tool, forge, or skill
 // and returns a ResolvedIdentifier with the correct action type and a suggestion message.
-// This is used as a fallback mechanism when an action fails because the AI used the wrong
-// action type for a given identifier (e.g. trying to load a tool as a skill).
+// When the same name exists in multiple registries (e.g. both forge and skill),
+// the primary result follows the priority order (tools -> forges -> skills) and
+// other matches are stored in the Alternatives field.
 //
-// Check order: tools -> forges -> skills.
 // Note: Focused mode loops are NOT checked here because the loop registry lives in
 // the reactloops package. Use ReActLoop.ResolveIdentifier() for full resolution
 // including focused mode loops.
@@ -65,37 +90,27 @@ func (c *Config) ResolveIdentifier(name string) *ResolvedIdentifier {
 		}
 	}
 
+	var matches []*ResolvedIdentifier
+
 	// 1. Check tools
 	if c.AiToolManager != nil {
 		if _, err := c.AiToolManager.GetToolByName(name); err == nil {
-			return &ResolvedIdentifier{
+			matches = append(matches, &ResolvedIdentifier{
 				Name:         name,
 				IdentityType: ResolvedAs_Tool,
 				ActionType:   schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL,
-				Suggestion: fmt.Sprintf(
-					"IMPORTANT: '%s' is NOT a skill or blueprint. It is a TOOL. "+
-						"Use @action '%s' with tool_require_payload '%s' instead. "+
-						"Do NOT retry the current action.",
-					name, schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL, name,
-				),
-			}
+			})
 		}
 	}
 
 	// 2. Check forges (AI Blueprints)
 	if c.AiForgeManager != nil {
 		if _, err := c.AiForgeManager.GetAIForge(name); err == nil {
-			return &ResolvedIdentifier{
+			matches = append(matches, &ResolvedIdentifier{
 				Name:         name,
 				IdentityType: ResolvedAs_Forge,
 				ActionType:   schema.AI_REACT_LOOP_ACTION_REQUIRE_AI_BLUEPRINT,
-				Suggestion: fmt.Sprintf(
-					"IMPORTANT: '%s' is NOT a tool or skill. It is an AI Blueprint (forge). "+
-						"Use @action '%s' with blueprint_payload '%s' instead. "+
-						"Do NOT retry the current action.",
-					name, schema.AI_REACT_LOOP_ACTION_REQUIRE_AI_BLUEPRINT, name,
-				),
-			}
+			})
 		}
 	}
 
@@ -103,31 +118,104 @@ func (c *Config) ResolveIdentifier(name string) *ResolvedIdentifier {
 	if sl := c.GetSkillLoader(); sl != nil {
 		for _, meta := range sl.AllSkillMetas() {
 			if meta.Name == name {
-				return &ResolvedIdentifier{
+				matches = append(matches, &ResolvedIdentifier{
 					Name:         name,
 					IdentityType: ResolvedAs_Skill,
 					ActionType:   schema.AI_REACT_LOOP_ACTION_LOADING_SKILLS,
-					Suggestion: fmt.Sprintf(
-						"IMPORTANT: '%s' is NOT a tool or blueprint. It is a SKILL. "+
-							"Use @action '%s' with skill_name '%s' instead. "+
-							"Do NOT retry the current action.",
-						name, schema.AI_REACT_LOOP_ACTION_LOADING_SKILLS, name,
-					),
-				}
+				})
+				break
 			}
 		}
 	}
 
-	// 4. Unknown - not found in tool/forge/skill registries
-	// Note: focused mode loops are checked at the ReActLoop level.
-	return &ResolvedIdentifier{
-		Name:         name,
-		IdentityType: ResolvedAs_Unknown,
-		Suggestion: fmt.Sprintf(
-			"'%s' does not exist as a tool, AI blueprint, skill, or focused mode. "+
-				"Please verify the name is correct. Do NOT retry with the same name. "+
-				"Try a different approach or ask for clarification.",
-			name,
-		),
+	if len(matches) == 0 {
+		return &ResolvedIdentifier{
+			Name:         name,
+			IdentityType: ResolvedAs_Unknown,
+			Suggestion: fmt.Sprintf(
+				"'%s' does not exist as a tool, AI blueprint, skill, or focused mode. "+
+					"Please verify the name is correct. Do NOT retry with the same name. "+
+					"Try a different approach or ask for clarification.",
+				name,
+			),
+		}
+	}
+
+	primary := matches[0]
+	if len(matches) > 1 {
+		primary.Alternatives = matches[1:]
+	}
+
+	primary.Suggestion = buildResolveSuggestion(name, primary, matches)
+	return primary
+}
+
+func buildResolveSuggestion(name string, primary *ResolvedIdentifier, allMatches []*ResolvedIdentifier) string {
+	if len(allMatches) == 1 {
+		return buildSingleSuggestion(name, primary)
+	}
+
+	var typeNames []string
+	for _, m := range allMatches {
+		typeNames = append(typeNames, describeType(m.IdentityType))
+	}
+
+	var actionHints []string
+	for _, m := range allMatches {
+		if m.ActionType != "" {
+			actionHints = append(actionHints, fmt.Sprintf("  - %s: use @action '%s'", describeType(m.IdentityType), m.ActionType))
+		}
+	}
+
+	return fmt.Sprintf(
+		"'%s' exists as MULTIPLE types: %s. "+
+			"The system resolved it as '%s' by default. "+
+			"If this is not the intended type, use the correct action:\n%s",
+		name, strings.Join(typeNames, ", "),
+		describeType(primary.IdentityType),
+		strings.Join(actionHints, "\n"),
+	)
+}
+
+func buildSingleSuggestion(name string, resolved *ResolvedIdentifier) string {
+	switch resolved.IdentityType {
+	case ResolvedAs_Tool:
+		return fmt.Sprintf(
+			"IMPORTANT: '%s' is NOT a skill or blueprint. It is a TOOL. "+
+				"Use @action '%s' with tool_require_payload '%s' instead. "+
+				"Do NOT retry the current action.",
+			name, schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL, name,
+		)
+	case ResolvedAs_Forge:
+		return fmt.Sprintf(
+			"IMPORTANT: '%s' is NOT a tool or skill. It is an AI Blueprint (forge). "+
+				"Use @action '%s' with blueprint_payload '%s' instead. "+
+				"Do NOT retry the current action.",
+			name, schema.AI_REACT_LOOP_ACTION_REQUIRE_AI_BLUEPRINT, name,
+		)
+	case ResolvedAs_Skill:
+		return fmt.Sprintf(
+			"IMPORTANT: '%s' is NOT a tool or blueprint. It is a SKILL. "+
+				"Use @action '%s' with skill_name '%s' instead. "+
+				"Do NOT retry the current action.",
+			name, schema.AI_REACT_LOOP_ACTION_LOADING_SKILLS, name,
+		)
+	default:
+		return ""
+	}
+}
+
+func describeType(t ResolvedIdentifierType) string {
+	switch t {
+	case ResolvedAs_Tool:
+		return "Tool"
+	case ResolvedAs_Forge:
+		return "AI Blueprint (forge)"
+	case ResolvedAs_Skill:
+		return "Skill"
+	case ResolvedAs_FocusedMode:
+		return "Focus Mode"
+	default:
+		return "Unknown"
 	}
 }

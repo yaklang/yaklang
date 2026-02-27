@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
@@ -25,6 +26,46 @@ func skillLoadedNamesFromMgr(loop *reactloops.ReActLoop) []string {
 		names = append(names, s.Name)
 	}
 	return names
+}
+
+// persistLoadedSkillNames saves current loaded skill names to the persistent session DB.
+func persistLoadedSkillNames(loop *reactloops.ReActLoop, invoker aicommon.AIInvokeRuntime) {
+	names := skillLoadedNamesFromMgr(loop)
+	if len(names) == 0 {
+		return
+	}
+	cfg := invoker.GetConfig()
+	if cfg == nil {
+		return
+	}
+	if realConfig, ok := cfg.(*aicommon.Config); ok {
+		realConfig.SaveLoadedSkillNames(names)
+	}
+}
+
+// emitSkillReferenceMaterial emits SKILL.md content as reference material for the frontend.
+func emitSkillReferenceMaterial(invoker aicommon.AIInvokeRuntime, skillName string, mgr *aiskillloader.SkillsContextManager) {
+	cfg := invoker.GetConfig()
+	if cfg == nil {
+		return
+	}
+	emitter := cfg.GetEmitter()
+	if emitter == nil {
+		return
+	}
+	loader := mgr.GetLoader()
+	if loader == nil {
+		return
+	}
+	fsys, err := loader.GetFileSystem(skillName)
+	if err != nil {
+		return
+	}
+	content, err := fsys.ReadFile("SKILL.md")
+	if err != nil {
+		return
+	}
+	emitter.EmitReferenceMaterial("skill", skillName, string(content))
 }
 
 var loopAction_LoadingSkills = &reactloops.LoopAction{
@@ -164,6 +205,11 @@ var loopAction_LoadingSkills = &reactloops.LoopAction{
 				"Do NOT reload already loaded skills.", summary)
 			invoker.AddToTimeline("skills_batch_loaded", timelineMsg)
 			log.Infof("batch skill loading: %s", summary)
+
+			persistLoadedSkillNames(loop, invoker)
+			for _, name := range loaded {
+				emitSkillReferenceMaterial(invoker, name, mgr)
+			}
 
 			op.Feedback(fmt.Sprintf("Batch loading complete. %s", summary))
 			op.Continue()
@@ -362,6 +408,9 @@ var loopAction_LoadingSkills = &reactloops.LoopAction{
 
 		log.Infof("skill %q loaded into context successfully (SKILL.md: %.1fKB, %d files)", skillName, contextExpansionKB, fileCount)
 		_ = contextSizeAfter
+
+		persistLoadedSkillNames(loop, invoker)
+		emitSkillReferenceMaterial(invoker, skillName, mgr)
 
 		feedbackMsg := fmt.Sprintf(
 			"Skill '%s' loaded. SKILL.md: %.1fKB | %d files available. "+
