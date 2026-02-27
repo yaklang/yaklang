@@ -191,6 +191,93 @@ func TestGetFirstConfigByTierAndProviderAndModel(t *testing.T) {
 	assert.Nil(t, config)
 }
 
+func TestPromoteFirstConfigByTierAndProviderAndModel(t *testing.T) {
+	originalLoaded := configLoaded
+	originalGetAIGlobalConfig := getAIGlobalConfig
+	originalSaveAIGlobalConfigForManager := saveAIGlobalConfigForManager
+	originalApplyAIGlobalConfigForManager := applyAIGlobalConfigForManager
+	defer func() {
+		configLoaded = originalLoaded
+		getAIGlobalConfig = originalGetAIGlobalConfig
+		saveAIGlobalConfigForManager = originalSaveAIGlobalConfigForManager
+		applyAIGlobalConfigForManager = originalApplyAIGlobalConfigForManager
+	}()
+
+	// Bypass EnsureConfigLoaded side effects in this unit test.
+	configLoaded = true
+
+	cfg := &ypb.AIGlobalConfig{
+		Enabled: true,
+		IntelligentModels: []*ypb.AIModelConfig{
+			{Provider: &ypb.ThirdPartyApplicationConfig{Type: "openai", APIKey: "first"}, ModelName: "gpt-4o"},
+			{Provider: &ypb.ThirdPartyApplicationConfig{Type: "openai", APIKey: "second"}, ModelName: "gpt-4.1"},
+			{Provider: &ypb.ThirdPartyApplicationConfig{Type: "aibalance", APIKey: "third"}, ModelName: "memfit-standard-free"},
+		},
+	}
+
+	getAIGlobalConfig = func() (*ypb.AIGlobalConfig, error) { return cfg, nil }
+
+	saveCalled := false
+	applyCalled := false
+	saveAIGlobalConfigForManager = func(saved *ypb.AIGlobalConfig) (*ypb.AIGlobalConfig, error) {
+		saveCalled = true
+		assert.Equal(t, "second", saved.GetIntelligentModels()[0].GetProvider().GetAPIKey())
+		return saved, nil
+	}
+	applyAIGlobalConfigForManager = func(applied *ypb.AIGlobalConfig) error {
+		applyCalled = true
+		assert.Equal(t, "second", applied.GetIntelligentModels()[0].GetProvider().GetAPIKey())
+		return nil
+	}
+
+	mgr := &AIConfigManager{}
+	err := mgr.PromoteFirstConfigByTierAndProviderAndModel(TierIntelligent, "openai", "gpt-4.1")
+	assert.NoError(t, err)
+	assert.True(t, saveCalled)
+	assert.True(t, applyCalled)
+	assert.Equal(t, "second", cfg.GetIntelligentModels()[0].GetProvider().GetAPIKey())
+}
+
+func TestPromoteFirstConfigByTierAndProviderAndModel_NotFound(t *testing.T) {
+	originalLoaded := configLoaded
+	originalGetAIGlobalConfig := getAIGlobalConfig
+	originalSaveAIGlobalConfigForManager := saveAIGlobalConfigForManager
+	originalApplyAIGlobalConfigForManager := applyAIGlobalConfigForManager
+	defer func() {
+		configLoaded = originalLoaded
+		getAIGlobalConfig = originalGetAIGlobalConfig
+		saveAIGlobalConfigForManager = originalSaveAIGlobalConfigForManager
+		applyAIGlobalConfigForManager = originalApplyAIGlobalConfigForManager
+	}()
+
+	configLoaded = true
+	cfg := &ypb.AIGlobalConfig{
+		Enabled: true,
+		IntelligentModels: []*ypb.AIModelConfig{
+			{Provider: &ypb.ThirdPartyApplicationConfig{Type: "openai", APIKey: "first"}, ModelName: "gpt-4o"},
+		},
+	}
+	getAIGlobalConfig = func() (*ypb.AIGlobalConfig, error) { return cfg, nil }
+
+	saveCalled := false
+	applyCalled := false
+	saveAIGlobalConfigForManager = func(saved *ypb.AIGlobalConfig) (*ypb.AIGlobalConfig, error) {
+		saveCalled = true
+		return saved, nil
+	}
+	applyAIGlobalConfigForManager = func(applied *ypb.AIGlobalConfig) error {
+		applyCalled = true
+		return nil
+	}
+
+	mgr := &AIConfigManager{}
+	err := mgr.PromoteFirstConfigByTierAndProviderAndModel(TierIntelligent, "openai", "gpt-4.1")
+	assert.Error(t, err)
+	assert.False(t, saveCalled)
+	assert.False(t, applyCalled)
+	assert.Equal(t, "first", cfg.GetIntelligentModels()[0].GetProvider().GetAPIKey())
+}
+
 func TestGetModelByPolicy(t *testing.T) {
 	// Save original state
 	originalConfig := consts.GetTieredAIConfig()
