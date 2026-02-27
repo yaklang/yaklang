@@ -28,6 +28,7 @@ func TestPlanRetry(t *testing.T) {
 			outputChan <- e
 		}),
 		aicommon.WithNoOpMemoryTriage(),
+		aicommon.WithDisableIntentRecognition(true),
 		aicommon.WithAIAutoRetry(2),
 		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			count++
@@ -130,6 +131,7 @@ func testRecoverPlanRetry(t *testing.T, uid string) {
 			outputChan <- e
 		}),
 		aicommon.WithNoOpMemoryTriage(),
+		aicommon.WithDisableIntentRecognition(true),
 		aicommon.WithAIAutoRetry(2),
 		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			count++
