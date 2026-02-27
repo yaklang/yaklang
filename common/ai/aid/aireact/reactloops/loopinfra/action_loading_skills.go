@@ -3,6 +3,7 @@ package loopinfra
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -27,28 +28,45 @@ func skillLoadedNamesFromMgr(loop *reactloops.ReActLoop) []string {
 }
 
 var loopAction_LoadingSkills = &reactloops.LoopAction{
-	ActionType:  schema.AI_REACT_LOOP_ACTION_LOADING_SKILLS,
-	Description: `Load a skill into the context window. Use this when you need specialized knowledge or instructions from an available skill. The skill's SKILL.md content and file tree will be displayed in the context.`,
+	ActionType: schema.AI_REACT_LOOP_ACTION_LOADING_SKILLS,
+	Description: `Load one or more skills into the context window. Use this when you need specialized knowledge or instructions from available skills. ` +
+		`Provide either 'skill_name' for a single skill, or 'skill_names' (comma-separated) for batch loading. ` +
+		`The skill's SKILL.md content and file tree will be displayed in the context.`,
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
 			"skill_name",
-			aitool.WithParam_Description(`The name of the skill to load. Must match one of the available skill names shown in the skills context.`),
-			aitool.WithParam_Required(true),
+			aitool.WithParam_Description(`The name of a single skill to load. Must match one of the available skill names shown in the skills context.`),
+		),
+		aitool.WithStringParam(
+			"skill_names",
+			aitool.WithParam_Description(`Comma-separated list of skill names to load in batch. Example: "recon,toolbox,exploitation". Use this to load multiple skills at once.`),
 		),
 	},
 	StreamFields: []*reactloops.LoopStreamField{
 		{FieldName: "skill_name", AINodeId: "loading_skills_name"},
+		{FieldName: "skill_names", AINodeId: "loading_skills_names"},
 	},
 	ActionVerifier: func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
 		skillName := action.GetString("skill_name")
-		if skillName == "" {
-			return utils.Error("loading_skills action requires 'skill_name' parameter")
-		}
+		skillNames := action.GetString("skill_names")
 
 		mgr := loop.GetSkillsContextManager()
 		if mgr == nil {
 			return utils.Error("skills context manager is not available")
 		}
+
+		if skillNames != "" {
+			loop.Set("_batch_mode", "true")
+			loop.Set("_batch_skill_names", skillNames)
+			loop.Set("_skill_load_skip", "")
+			return nil
+		}
+
+		if skillName == "" {
+			return utils.Error("loading_skills action requires either 'skill_name' or 'skill_names' parameter")
+		}
+
+		loop.Set("_batch_mode", "")
 
 		invoker := loop.GetInvoker()
 
@@ -89,12 +107,6 @@ var loopAction_LoadingSkills = &reactloops.LoopAction{
 		return nil
 	},
 	ActionHandler: func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
-		skillName := loop.Get("loading_skill_name")
-		if skillName == "" {
-			op.Fail("loading_skills action: skill_name is empty")
-			return
-		}
-
 		mgr := loop.GetSkillsContextManager()
 		if mgr == nil {
 			op.Fail("skills context manager is not available")
@@ -102,6 +114,67 @@ var loopAction_LoadingSkills = &reactloops.LoopAction{
 		}
 
 		invoker := loop.GetInvoker()
+
+		// Batch mode: load multiple skills at once
+		if loop.Get("_batch_mode") == "true" {
+			loop.Set("_batch_mode", "")
+			batchNames := loop.Get("_batch_skill_names")
+			loop.Set("_batch_skill_names", "")
+
+			names := strings.Split(batchNames, ",")
+			results := mgr.LoadSkills(names)
+
+			var loaded, skipped, failed []string
+			for name, err := range results {
+				if err != nil {
+					failed = append(failed, fmt.Sprintf("%s(%v)", name, err))
+					log.Warnf("batch load skill %q failed: %v", name, err)
+				} else {
+					loaded = append(loaded, name)
+				}
+			}
+
+			for _, name := range names {
+				name = strings.TrimSpace(name)
+				if name == "" {
+					continue
+				}
+				if mgr.IsSkillLoadedAndUnfolded(name) {
+					if _, inResults := results[name]; !inResults {
+						skipped = append(skipped, name)
+					}
+				}
+			}
+
+			var msgParts []string
+			if len(loaded) > 0 {
+				msgParts = append(msgParts, fmt.Sprintf("Loaded: %s", strings.Join(loaded, ", ")))
+			}
+			if len(skipped) > 0 {
+				msgParts = append(msgParts, fmt.Sprintf("Already loaded: %s", strings.Join(skipped, ", ")))
+			}
+			if len(failed) > 0 {
+				msgParts = append(msgParts, fmt.Sprintf("Failed: %s", strings.Join(failed, ", ")))
+			}
+
+			summary := strings.Join(msgParts, ". ")
+			timelineMsg := fmt.Sprintf("Batch skill loading completed. %s. "+
+				"Skills are now visible in SKILLS_CONTEXT. "+
+				"Use load_skill_resources to access sub-files. "+
+				"Do NOT reload already loaded skills.", summary)
+			invoker.AddToTimeline("skills_batch_loaded", timelineMsg)
+			log.Infof("batch skill loading: %s", summary)
+
+			op.Feedback(fmt.Sprintf("Batch loading complete. %s", summary))
+			op.Continue()
+			return
+		}
+
+		skillName := loop.Get("loading_skill_name")
+		if skillName == "" {
+			op.Fail("loading_skills action: skill_name is empty")
+			return
+		}
 
 		// Check skip flag set by ActionVerifier — handle silently without error
 		skipReason := loop.Get("_skill_load_skip")
@@ -248,23 +321,54 @@ var loopAction_LoadingSkills = &reactloops.LoopAction{
 
 		// Load succeeded
 		viewSummary := mgr.GetSkillViewSummary(skillName)
+
+		contextSizeAfter := 0
+		selected := mgr.GetCurrentSelectedSkills()
+		for _, s := range selected {
+			if s.Name == skillName {
+				contextSizeAfter = len(viewSummary)
+				break
+			}
+		}
+
+		skillMDSize := 0
+		fileCount := 0
+		if loader := mgr.GetLoader(); loader != nil {
+			if fsys, err := loader.GetFileSystem(skillName); err == nil {
+				if content, err := fsys.ReadFile("SKILL.md"); err == nil {
+					skillMDSize = len(content)
+				}
+				if entries, err := fsys.ReadDir("."); err == nil {
+					for _, e := range entries {
+						if !e.IsDir() {
+							fileCount++
+						}
+					}
+				}
+			}
+		}
+
+		contextExpansionKB := float64(skillMDSize) / 1024
 		timelineMsg := fmt.Sprintf(
 			"Successfully loaded skill '%s' into context. "+
-				"The skill content is now visible in the SKILLS_CONTEXT section of your prompt "+
-				"(look for '<|SKILLS_CONTEXT_' tags). %s "+
-				"IMPORTANT: Do NOT load this skill again - it is already active. "+
-				"Read the View Window content in your prompt and proceed with your task.",
-			skillName, viewSummary,
+				"SKILL.md: %.1fKB, %d files in skill directory. %s "+
+				"Context expanded by ~%.1fKB. "+
+				"Use load_skill_resources to load additional files (e.g. @%s/filename.md). "+
+				"IMPORTANT: Do NOT load this skill again - it is already active.",
+			skillName, contextExpansionKB, fileCount, viewSummary,
+			contextExpansionKB, skillName,
 		)
 		invoker.AddToTimeline("skill_loaded", timelineMsg)
 
-		log.Infof("skill %q loaded into context successfully", skillName)
+		log.Infof("skill %q loaded into context successfully (SKILL.md: %.1fKB, %d files)", skillName, contextExpansionKB, fileCount)
+		_ = contextSizeAfter
+
 		feedbackMsg := fmt.Sprintf(
-			"Skill '%s' has been loaded into the context. "+
-				"The SKILL.md content and file tree are now displayed in the SKILLS_CONTEXT section of your prompt. "+
-				"Read the skill content from your prompt's View Window and proceed with the task. "+
+			"Skill '%s' loaded. SKILL.md: %.1fKB | %d files available. "+
+				"Content is now in SKILLS_CONTEXT. "+
+				"Use load_skill_resources with '@%s/filename' to load additional files. "+
 				"Do NOT load this skill again.",
-			skillName,
+			skillName, contextExpansionKB, fileCount, skillName,
 		)
 		op.Feedback(feedbackMsg)
 		op.Continue()

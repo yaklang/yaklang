@@ -3,10 +3,12 @@ package aiskillloader
 import (
 	"bytes"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"gopkg.in/yaml.v3"
 )
 
@@ -94,4 +96,46 @@ func ParseSkillMeta(content string) (*SkillMeta, error) {
 	}
 
 	return meta, nil
+}
+
+var includeDirectiveRegexp = regexp.MustCompile(`<!--\s*include:\s*(.+?)\s*-->`)
+
+// ResolveIncludes processes include directives in SKILL.md content.
+// Directives in the form <!-- include: path/to/file.md --> are replaced
+// with the actual file content read from the provided filesystem.
+// Each included file is capped at ViewWindowMaxBytes to prevent excessive expansion.
+// Only one level of includes is resolved (no recursive nesting).
+func ResolveIncludes(content string, fsys fi.FileSystem) string {
+	if fsys == nil {
+		return content
+	}
+
+	if !includeDirectiveRegexp.MatchString(content) {
+		return content
+	}
+
+	return includeDirectiveRegexp.ReplaceAllStringFunc(content, func(match string) string {
+		submatches := includeDirectiveRegexp.FindStringSubmatch(match)
+		if len(submatches) < 2 {
+			return match
+		}
+
+		filePath := strings.TrimSpace(submatches[1])
+		if filePath == "" {
+			return match
+		}
+
+		data, err := fsys.ReadFile(filePath)
+		if err != nil {
+			log.Warnf("include directive: failed to read %q: %v", filePath, err)
+			return fmt.Sprintf("<!-- include error: %s not found -->", filePath)
+		}
+
+		if len(data) > ViewWindowMaxBytes {
+			data = data[:ViewWindowMaxBytes]
+			return string(data) + fmt.Sprintf("\n<!-- included '%s' truncated at %dKB -->", filePath, ViewWindowMaxBytes/1024)
+		}
+
+		return string(data)
+	})
 }

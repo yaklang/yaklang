@@ -3,6 +3,8 @@ package aiskillloader
 import (
 	"bytes"
 	"fmt"
+	"regexp"
+	"sort"
 	"strings"
 	"sync"
 
@@ -16,7 +18,7 @@ import (
 
 const (
 	// SkillsContextMaxBytes is the total size limit for all skills context.
-	SkillsContextMaxBytes = 20 * 1024 // 20KB
+	SkillsContextMaxBytes = 64 * 1024 // 64KB
 )
 
 // skillContextState tracks the display state of a loaded skill.
@@ -326,6 +328,8 @@ func (m *SkillsContextManager) LoadSkill(skillName string) error {
 		return utils.Wrapf(err, "failed to load skill %q", skillName)
 	}
 
+	loaded.SkillMDContent = ResolveIncludes(loaded.SkillMDContent, loaded.FileSystem)
+
 	nonce := GenerateNonce(skillName, skillMDFilename)
 	skillMDWindow := NewViewWindow(skillName, skillMDFilename, loaded.SkillMDContent, nonce)
 
@@ -343,6 +347,20 @@ func (m *SkillsContextManager) LoadSkill(skillName string) error {
 	// Ensure total context fits within the limit
 	m.ensureContextFits()
 	return nil
+}
+
+// LoadSkills loads multiple skills into the context manager in batch.
+// Returns a map of skill name to error (nil error means success).
+func (m *SkillsContextManager) LoadSkills(names []string) map[string]error {
+	results := make(map[string]error, len(names))
+	for _, name := range names {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		results[name] = m.LoadSkill(name)
+	}
+	return results
 }
 
 // ChangeViewOffset changes the view offset for a file in a loaded skill.
@@ -488,6 +506,13 @@ func (m *SkillsContextManager) renderFull(state *skillContextState) string {
 	var buf bytes.Buffer
 	buf.WriteString(fmt.Sprintf("=== Skill: %s ===\n", state.Skill.Meta.Name))
 	buf.WriteString(state.Skill.Meta.BriefString())
+
+	relatedSkills := DetectCrossSkillReferences(state.Skill.SkillMDContent, state.Skill.Meta.Name)
+	if len(relatedSkills) > 0 {
+		buf.WriteString(fmt.Sprintf("\nRelated Skills (referenced in SKILL.md): %s\n", strings.Join(relatedSkills, ", ")))
+		buf.WriteString("Use loading_skills to load these related skills if needed.\n")
+	}
+
 	buf.WriteString("\nFile Tree:\n")
 	buf.WriteString(RenderFileSystemTreeFull(state.Skill.FileSystem))
 
@@ -498,6 +523,32 @@ func (m *SkillsContextManager) renderFull(state *skillContextState) string {
 	}
 
 	return buf.String()
+}
+
+var crossSkillRefRegexp = regexp.MustCompile(`\.\.\/([a-zA-Z0-9][a-zA-Z0-9_-]*)\/`)
+
+// DetectCrossSkillReferences scans SKILL.md content for cross-skill
+// references (e.g. ../other-skill/file.md) and returns deduplicated,
+// sorted skill names, excluding the current skill itself.
+func DetectCrossSkillReferences(content string, currentSkillName string) []string {
+	matches := crossSkillRefRegexp.FindAllStringSubmatch(content, -1)
+	if len(matches) == 0 {
+		return nil
+	}
+
+	seen := make(map[string]bool)
+	var skills []string
+	for _, match := range matches {
+		skillName := match[1]
+		if skillName == currentSkillName || seen[skillName] {
+			continue
+		}
+		seen[skillName] = true
+		skills = append(skills, skillName)
+	}
+
+	sort.Strings(skills)
+	return skills
 }
 
 // ensureContextFits folds oldest skills if the total context exceeds the limit.
