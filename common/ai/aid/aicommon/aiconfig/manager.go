@@ -6,6 +6,8 @@ import (
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -17,6 +19,13 @@ type AIConfigManager struct {
 var (
 	globalManager     *AIConfigManager
 	globalManagerOnce sync.Once
+
+	saveAIGlobalConfigForManager = func(cfg *ypb.AIGlobalConfig) (*ypb.AIGlobalConfig, error) {
+		return yakit.SetAIGlobalConfig(consts.GetGormProfileDatabase(), cfg)
+	}
+	applyAIGlobalConfigForManager = func(cfg *ypb.AIGlobalConfig) error {
+		return yakit.ApplyAIGlobalConfig(consts.GetGormProfileDatabase(), cfg)
+	}
 )
 
 // GetGlobalManager returns the global AIConfigManager singleton
@@ -95,22 +104,108 @@ func (m *AIConfigManager) GetFirstConfigByTierAndProviderAndModel(tier ModelTier
 	modelName = strings.TrimSpace(modelName)
 
 	for _, cfg := range configs {
-		if cfg == nil {
-			continue
+		if isConfigMatchedByProviderAndModel(cfg, providerName, modelName) {
+			return cfg
 		}
-
-		if providerName != "" && !strings.EqualFold(strings.TrimSpace(cfg.GetProvider().GetType()), providerName) {
-			continue
-		}
-
-		if modelName != "" && !strings.EqualFold(strings.TrimSpace(getModelFromConfig(cfg)), modelName) {
-			continue
-		}
-
-		return cfg
 	}
 
 	return nil
+}
+
+// PromoteFirstConfigByTierAndProviderAndModel moves the first matched model config
+// to the top of the specified tier and persists the change to database.
+func (m *AIConfigManager) PromoteFirstConfigByTierAndProviderAndModel(tier ModelTier, providerName, modelName string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	EnsureConfigLoaded()
+
+	cfg, err := getAIGlobalConfig()
+	if err != nil {
+		return utils.Errorf("failed to load ai global config: %v", err)
+	}
+	if cfg == nil {
+		return ErrNoConfigAvailable
+	}
+
+	models, err := getModelsByTierFromGlobalConfig(cfg, tier)
+	if err != nil {
+		return err
+	}
+	if len(models) == 0 {
+		return ErrNoConfigAvailable
+	}
+
+	providerName = strings.TrimSpace(providerName)
+	modelName = strings.TrimSpace(modelName)
+
+	matchedIndex := -1
+	for i, modelCfg := range models {
+		if isConfigMatchedByProviderAndModel(modelCfg, providerName, modelName) {
+			matchedIndex = i
+			break
+		}
+	}
+	if matchedIndex < 0 {
+		return utils.Errorf("no matched model config found for tier=%s provider=%s model=%s", tier, providerName, modelName)
+	}
+
+	if matchedIndex > 0 {
+		matched := models[matchedIndex]
+		copy(models[1:matchedIndex+1], models[:matchedIndex])
+		models[0] = matched
+		setModelsByTierInGlobalConfig(cfg, tier, models)
+	}
+
+	normalized, err := saveAIGlobalConfigForManager(cfg)
+	if err != nil {
+		return utils.Errorf("failed to save ai global config: %v", err)
+	}
+	if err := applyAIGlobalConfigForManager(normalized); err != nil {
+		return utils.Errorf("failed to apply ai global config: %v", err)
+	}
+
+	return nil
+}
+
+func isConfigMatchedByProviderAndModel(cfg *ypb.AIModelConfig, providerName, modelName string) bool {
+	if cfg == nil {
+		return false
+	}
+
+	if providerName != "" && !strings.EqualFold(strings.TrimSpace(cfg.GetProvider().GetType()), providerName) {
+		return false
+	}
+
+	if modelName != "" && !strings.EqualFold(strings.TrimSpace(getModelFromConfig(cfg)), modelName) {
+		return false
+	}
+
+	return true
+}
+
+func getModelsByTierFromGlobalConfig(cfg *ypb.AIGlobalConfig, tier ModelTier) ([]*ypb.AIModelConfig, error) {
+	switch tier {
+	case TierIntelligent:
+		return cfg.GetIntelligentModels(), nil
+	case TierLightweight:
+		return cfg.GetLightweightModels(), nil
+	case TierVision:
+		return cfg.GetVisionModels(), nil
+	default:
+		return nil, utils.Errorf("invalid model tier: %s", tier)
+	}
+}
+
+func setModelsByTierInGlobalConfig(cfg *ypb.AIGlobalConfig, tier ModelTier, models []*ypb.AIModelConfig) {
+	switch tier {
+	case TierIntelligent:
+		cfg.IntelligentModels = models
+	case TierLightweight:
+		cfg.LightweightModels = models
+	case TierVision:
+		cfg.VisionModels = models
+	}
 }
 
 func getModelFromConfig(config *ypb.AIModelConfig) string {
