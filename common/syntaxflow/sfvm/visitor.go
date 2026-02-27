@@ -211,7 +211,7 @@ func (y *SyntaxFlowVisitor) VisitConditionExpression(raw sf.IConditionExpression
 			log.Warnf("compile filter-expr in condition expression failed: %v", err)
 			return err
 		}
-		y.EmitFilterCondition()
+		y.EmitFilter()
 		return true
 	case *sf.OpcodeTypeConditionContext:
 		opcodes := i.AllOpcodesCondition()
@@ -279,19 +279,10 @@ func (y *SyntaxFlowVisitor) VisitConditionExpression(raw sf.IConditionExpression
 		if len(conds) == 0 {
 			return nil
 		}
-		sourceRef := fmt.Sprintf("__cond_src_%d", len(y.codes))
-		tmpRef := fmt.Sprintf("__cond_tmp_%d", len(y.codes))
-		y.EmitDuplicate()
-		y.EmitUpdate(sourceRef)
 		for idx, exp := range conds {
-			y.EmitNewRef(sourceRef)
 			y.EmitConditionScopeStart()
-			alreadyFiltered, _ := y.VisitConditionExpression(exp).(bool)
-			if !alreadyFiltered {
-				y.EmitCondition()
-			}
+			y.VisitConditionExpression(exp)
 			y.EmitConditionScopeEnd()
-			y.EmitUpdate(tmpRef)
 			if idx > 0 {
 				y.EmitOperator("&&")
 			}
@@ -301,36 +292,18 @@ func (y *SyntaxFlowVisitor) VisitConditionExpression(raw sf.IConditionExpression
 		if len(conds) == 0 {
 			return nil
 		}
-		sourceRef := fmt.Sprintf("__cond_src_%d", len(y.codes))
-		tmpRef := fmt.Sprintf("__cond_tmp_%d", len(y.codes))
-		y.EmitDuplicate()
-		y.EmitUpdate(sourceRef)
 		for idx, exp := range conds {
-			y.EmitNewRef(sourceRef)
 			y.EmitConditionScopeStart()
-			alreadyFiltered, _ := y.VisitConditionExpression(exp).(bool)
-			if !alreadyFiltered {
-				y.EmitCondition()
-			}
+			y.VisitConditionExpression(exp)
 			y.EmitConditionScopeEnd()
-			y.EmitUpdate(tmpRef)
 			if idx > 0 {
 				y.EmitOperator("||")
 			}
 		}
 	case *sf.NotConditionContext:
-		sourceRef := fmt.Sprintf("__cond_src_%d", len(y.codes))
-		tmpRef := fmt.Sprintf("__cond_tmp_%d", len(y.codes))
-		y.EmitDuplicate()
-		y.EmitUpdate(sourceRef)
-		y.EmitNewRef(sourceRef)
 		y.EmitConditionScopeStart()
-		alreadyFiltered, _ := y.VisitConditionExpression(i.ConditionExpression()).(bool)
-		if !alreadyFiltered {
-			y.EmitCondition()
-		}
+		y.VisitConditionExpression(i.ConditionExpression())
 		y.EmitConditionScopeEnd()
-		y.EmitUpdate(tmpRef)
 		y.EmitOperator("!")
 	case *sf.ParenConditionContext:
 		y.VisitConditionExpression(i.ConditionExpression())

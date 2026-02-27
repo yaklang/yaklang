@@ -244,9 +244,9 @@ func (v *SyntaxFlowVisitor) EmitCondition() {
 	})
 }
 
-func (v *SyntaxFlowVisitor) EmitFilterCondition() {
+func (v *SyntaxFlowVisitor) EmitFilter() {
 	v.codes = append(v.codes, &SFI{
-		OpCode: OpFilterCondition,
+		OpCode: OpFilter,
 	})
 }
 

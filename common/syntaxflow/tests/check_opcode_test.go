@@ -12,6 +12,39 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 )
 
+func compileFrame(t *testing.T, code string) *sfvm.SFFrame {
+	vm := sfvm.NewSyntaxFlowVirtualMachine()
+	frame, err := vm.Compile(code)
+	require.NoError(t, err)
+	return frame
+}
+
+func checkOpcodeSequence(t *testing.T, code string, expected ...sfvm.SFVMOpCode) {
+	frame := compileFrame(t, code)
+	actual := make([]sfvm.SFVMOpCode, 0, len(frame.Codes))
+	for _, c := range frame.Codes {
+		actual = append(actual, c.OpCode)
+	}
+	if len(expected) == 0 {
+		return
+	}
+
+	for i := 0; i+len(expected) <= len(actual); i++ {
+		matched := true
+		for j, op := range expected {
+			if actual[i+j] != op {
+				matched = false
+				break
+			}
+		}
+		if matched {
+			return
+		}
+	}
+
+	t.Fatalf("opcode sequence not found.\ncode: %s\nexpected: %v\nactual: %v", code, expected, actual)
+}
+
 func checkNo(t *testing.T, code string, op sfvm.SFVMOpCode) {
 	if checkContain(t, code, op) {
 		t.Fatalf("found %v", op)
@@ -175,8 +208,53 @@ func TestOpcode(t *testing.T) {
 	})
 	t.Run("filter condition without iter loop", func(t *testing.T) {
 		code := `a?{.b} as $target`
-		check(t, code, sfvm.OpFilterCondition)
+		checkOpcodeSequence(t, code,
+			sfvm.OpDuplicate,
+			sfvm.OpEnterStatement,
+			sfvm.OpPushSearchExact,
+			sfvm.OpExitStatement,
+			sfvm.OpFilter,
+			sfvm.OpCondition,
+		)
 		checkNo(t, code, sfvm.OpEmptyCompare)
+	})
+	t.Run("logical filter should build mask then condition", func(t *testing.T) {
+		code := `a?{.b && .c} as $target`
+		checkOpcodeSequence(t, code,
+			sfvm.OpConditionScopeStart,
+			sfvm.OpDuplicate,
+			sfvm.OpEnterStatement,
+			sfvm.OpPushSearchExact,
+			sfvm.OpExitStatement,
+			sfvm.OpFilter,
+			sfvm.OpConditionScopeEnd,
+			sfvm.OpConditionScopeStart,
+			sfvm.OpDuplicate,
+			sfvm.OpEnterStatement,
+			sfvm.OpPushSearchExact,
+			sfvm.OpExitStatement,
+			sfvm.OpFilter,
+			sfvm.OpConditionScopeEnd,
+			sfvm.OpLogicAnd,
+			sfvm.OpCondition,
+		)
+	})
+	t.Run("mixed opcode-and-filter should keep stack balance", func(t *testing.T) {
+		code := `a?{opcode:param && .b} as $target`
+		checkOpcodeSequence(t, code,
+			sfvm.OpConditionScopeStart,
+			sfvm.OpCompareOpcode,
+			sfvm.OpConditionScopeEnd,
+			sfvm.OpConditionScopeStart,
+			sfvm.OpDuplicate,
+			sfvm.OpEnterStatement,
+			sfvm.OpPushSearchExact,
+			sfvm.OpExitStatement,
+			sfvm.OpFilter,
+			sfvm.OpConditionScopeEnd,
+			sfvm.OpLogicAnd,
+			sfvm.OpCondition,
+		)
 	})
 
 	// use def

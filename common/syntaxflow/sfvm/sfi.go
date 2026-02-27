@@ -93,7 +93,7 @@ const (
 	// use the []bool  && []Value of stack top, push result into stack
 
 	OpCondition
-	OpFilterCondition
+	OpFilter
 	OpCompareOpcode
 	OpCompareString
 	OpEmptyCompare
@@ -170,7 +170,7 @@ var Opcode2String = map[SFVMOpCode]string{
 	OpPushBool:              "OpPushBool",
 	OpPop:                   "OpPop",
 	OpCondition:             "OpCondition",
-	OpFilterCondition:       "OpFilterCondition",
+	OpFilter:                "OpFilter",
 	OpCompareOpcode:         "OpCompareOpcode",
 	OpCompareString:         "OpCompareString",
 	OpVersionIn:             "OpVersionIn",
@@ -284,8 +284,8 @@ func (s *SFI) String() string {
 		return fmt.Sprintf(verboseLen+" %v [%d] mul:%v", "compare string", s.Values, s.UnaryInt, s.MultiOperator)
 	case OpCondition:
 		return fmt.Sprintf(verboseLen+" %v", "condition", s.UnaryStr)
-	case OpFilterCondition:
-		return fmt.Sprintf(verboseLen+" %v", "filter-condition", s.UnaryStr)
+	case OpFilter:
+		return fmt.Sprintf(verboseLen+" %v", "filter", s.UnaryStr)
 	case OpEq:
 		return fmt.Sprintf(verboseLen+" %v", "(operator) ==", s.UnaryStr)
 	case OpNotEq:
