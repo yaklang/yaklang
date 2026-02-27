@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	changeLogURL            = "https://github.com/urfave/cli/blob/master/CHANGELOG.md"
+	changeLogURL            = "https://github.com/yaklang/yaklang/common/urfavecli/blob/master/CHANGELOG.md"
 	appActionDeprecationURL = fmt.Sprintf("%s#deprecated-cli-app-action-signature", changeLogURL)
 	// unused variable. commented for now. will remove in future if agreed upon by everyone
 	//runAndExitOnErrorDeprecationURL = fmt.Sprintf("%s#deprecated-cli-app-runandexitonerror", changeLogURL)

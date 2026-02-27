@@ -8,12 +8,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiconfig"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	cli "github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"gopkg.in/yaml.v3"
@@ -330,7 +330,7 @@ var TieredAIConfigCommands = []*cli.Command{
 			} else {
 				cfg = getDefaultTieredAIConfigFile()
 				fmt.Println("Config file not found, checking default (aibalance) configuration...")
-			fmt.Println()
+				fmt.Println()
 			}
 
 			applyConfigToMemory(cfg)
