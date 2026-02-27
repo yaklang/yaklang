@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"github.com/yaklang/yaklang/common/ai"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiconfig"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -76,6 +78,17 @@ var (
 	HotPatchType_AIService                   = "AIService"
 	HotPatchType_ModelName                   = "ModelName"
 	HotPatchType_RiskControlScore            = "RiskControlScore"
+
+	hotPatchPromoteIntelligentConfig = func(serviceName, modelName string) error {
+		mgr := aiconfig.GetGlobalManager()
+		return mgr.PromoteFirstConfigByTierAndProviderAndModel(aiconfig.TierIntelligent, serviceName, modelName)
+	}
+	hotPatchGetIntelligentCallback = func(serviceName, modelName string) (AICallbackType, error) {
+		return GetAIModelCallbackByTierAndProviderAndModel(aiconfig.TierIntelligent, serviceName, modelName)
+	}
+	hotPatchLoadChater = func(serviceName string, defaultOpts ...aispec.AIConfigOption) (aispec.GeneralChatter, error) {
+		return ai.LoadChater(serviceName, defaultOpts...)
+	}
 )
 
 func ProcessHotPatchMessage(e *ypb.AIInputEvent) []ConfigOption {
@@ -107,14 +120,34 @@ func ProcessHotPatchMessage(e *ypb.AIInputEvent) []ConfigOption {
 
 	if e.HotpatchType == HotPatchType_AIService {
 		serviceName := hotPatchParams.GetAIService()
-		chat, err := ai.LoadChater(serviceName)
-		if err != nil {
-			log.Errorf("load ai service failed: %v", err)
-		} else {
-			aiOption = append(aiOption, WithQualityPriorityAICallback(AIChatToAICallbackType(chat)))
+		modelName := hotPatchParams.GetAIModelName()
+
+		if serviceName == "" {
+			log.Errorf("hotpatch AIService is empty")
+			return aiOption
 		}
-		log.Warnf("HotPatch AIService only overrides QualityPriority callback, " +
-			"model info is now auto-detected from the actual AI gateway call")
+
+		if err := hotPatchPromoteIntelligentConfig(serviceName, modelName); err != nil {
+			log.Warnf("failed to promote intelligent tier model by service=%s model=%s: %v", serviceName, modelName, err)
+		}
+
+		if cb, err := hotPatchGetIntelligentCallback(serviceName, modelName); err == nil {
+			aiOption = append(aiOption, WithQualityPriorityAICallback(cb))
+		} else {
+			log.Warnf("load callback from tiered config failed by service=%s model=%s: %v", serviceName, modelName, err)
+
+			defaultOpts := make([]aispec.AIConfigOption, 0, 1)
+			if modelName != "" {
+				defaultOpts = append(defaultOpts, aispec.WithModel(modelName))
+			}
+			chat, loadErr := hotPatchLoadChater(serviceName, defaultOpts...)
+			if loadErr != nil {
+				log.Errorf("load ai service failed: %v", loadErr)
+			} else {
+				aiOption = append(aiOption, WithQualityPriorityAICallback(AIChatToAICallbackType(chat)))
+			}
+		}
+		aiOption = append(aiOption, WithAIChatInfo(serviceName, modelName))
 	}
 
 	if e.HotpatchType == HotPatchType_ModelName {

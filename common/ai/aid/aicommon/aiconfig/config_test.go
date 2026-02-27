@@ -71,7 +71,7 @@ func TestGetCurrentPolicy(t *testing.T) {
 }
 
 func TestAIConfigManager(t *testing.T) {
-	mgr := &AIConfigManager{}
+	mgr := GetGlobalManager()
 	assert.NotNil(t, mgr)
 
 	// Test singleton
