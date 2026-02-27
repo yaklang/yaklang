@@ -559,14 +559,6 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "报告内容",
 		En: "Report Content",
 	},
-	"python_poc": {
-		Zh: "Python PoC 生成",
-		En: "Python PoC Generation",
-	},
-	"python-poc": {
-		Zh: "Python PoC 代码",
-		En: "Python PoC Code",
-	},
 	"python-script": {
 		Zh: "Python 脚本",
 		En: "Python Script",

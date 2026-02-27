@@ -6,7 +6,7 @@
 {{ .ContextProvider.PersistentMemory }}
 
 ## 重要提醒
-在生成最终报告时，必须包含通过python_poc专注模式生成的Python POC代码。
+在生成最终报告时，必须包含通过write_python_script专注模式生成的Python POC代码。
 POC代码应该作为报告的核心内容之一，完整嵌入到MarkDown文档中。
 
 ## 输出格式规范
@@ -15,8 +15,7 @@ POC代码应该作为报告的核心内容之一，完整嵌入到MarkDown文档
 
 **必须确保**：
 1. 如果这个Risk被认为是可生成POC的，那你要确保在生成的MarkDown文档中包含完整的Python POC代码
-2. POC代码必须是通过python_poc专注模式生成并验证过语法的代码
-3. 报告中的POC代码应该使用Python代码块格式（```python）包裹
+2. 报告中的POC代码应该使用Python代码块格式（```python）包裹
 
 根据上面的算法和具体任务内容，按照下面Schema给出具体案例建议，一定要结合当前任务信息。
 ```schema

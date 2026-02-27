@@ -60,7 +60,7 @@ Then run: `python3 <script_path> --help`
 
 ### Step 5: Complete
 
-Use `directly_answer` to report results.
+Use `directly_answer` to report results. Make sure you include generated Python script path in your output.
 
 ## Available Actions
 
