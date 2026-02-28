@@ -357,6 +357,7 @@ func DefaultAuthConfig() *AuthConfig {
 		"/portal/static/*",
 		"/ops/login",
 		"/ops/static/*",
+		"/public/*",
 	}
 
 	// ========== Route Permissions ==========

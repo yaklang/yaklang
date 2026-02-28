@@ -165,6 +165,11 @@ func LoadProvidersFromDatabase(config *ServerConfig) error {
 		log.Warnf("Failed to ensure AiModelMeta table exists: %v", err)
 	}
 
+	// Ensure health record table exists (for uptime tracking)
+	if err := EnsureHealthRecordTable(); err != nil {
+		log.Warnf("Failed to ensure HealthRecord table exists: %v", err)
+	}
+
 	// Ensure web search API key table exists
 	if err := EnsureWebSearchApiKeyTable(); err != nil {
 		log.Warnf("Failed to ensure WebSearchApiKey table exists: %v", err)

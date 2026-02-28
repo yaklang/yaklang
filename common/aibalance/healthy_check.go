@@ -264,8 +264,10 @@ func CheckProviderHealth(provider *Provider) (*HealthCheckResult, error) {
 			log.Errorf("Health Check Failed (CheckProviderHealth): %s (ID: %d), ERR: %s, Delay: %dms",
 				providerLogName, providerLogID, errMsg, result.ResponseTime)
 		}
+
+		// Save health check record for uptime history tracking
+		saveHealthCheckRecord(provider.DbProvider, result)
 	}
-	// For temporary providers, ExecuteHealthCheckLogic already logged details.
 
 	return result, nil // error from ExecuteHealthCheckLogic is in result.Error
 }
@@ -512,6 +514,7 @@ func StartHealthCheckScheduler(balancer *Balancer, interval time.Duration) {
 
 	// 后台持续健康检查
 	go func() {
+		cleanupCounter := 0
 		for {
 			select {
 			case <-ticker.C:
@@ -521,6 +524,18 @@ func StartHealthCheckScheduler(balancer *Balancer, interval time.Duration) {
 					log.Infof("Health check completed successfully, checked %d providers", len(results))
 				} else {
 					log.Warnf("No providers found for health check")
+				}
+
+				// Cleanup old health records every ~50 checks (~4h at 5min interval)
+				cleanupCounter++
+				if cleanupCounter >= 50 {
+					cleanupCounter = 0
+					cutoff := time.Now().Add(-30 * 24 * time.Hour)
+					if deleted, err := CleanupOldHealthRecords(cutoff); err != nil {
+						log.Warnf("failed to cleanup old health records: %v", err)
+					} else if deleted > 0 {
+						log.Infof("cleaned up %d old health records (older than 30 days)", deleted)
+					}
 				}
 			case <-manager.stopChan:
 				ticker.Stop()
@@ -621,6 +636,37 @@ func (m *HealthCheckManager) GetAllHealthCheckResults() []*HealthCheckResult {
 // StopScheduler 停止健康检查调度器
 func (m *HealthCheckManager) StopScheduler() {
 	close(m.stopChan)
+}
+
+// saveHealthCheckRecord persists a health check result for uptime history
+func saveHealthCheckRecord(dbProvider *schema.AiProvider, result *HealthCheckResult) {
+	if dbProvider == nil || result == nil {
+		return
+	}
+
+	wrapperName := dbProvider.WrapperName
+	if wrapperName == "" {
+		wrapperName = dbProvider.ModelName
+	}
+
+	var errMsg string
+	if result.Error != nil {
+		errMsg = result.Error.Error()
+	}
+
+	record := &schema.AiProviderHealthRecord{
+		ProviderID:   dbProvider.ID,
+		WrapperName:  wrapperName,
+		IsHealthy:    result.IsHealthy,
+		LatencyMs:    result.ResponseTime,
+		CheckTime:    time.Now(),
+		ErrorMessage: errMsg,
+	}
+
+	if err := SaveHealthRecord(record); err != nil {
+		log.Errorf("failed to save health check record for provider %s (ID: %d): %v",
+			wrapperName, dbProvider.ID, err)
+	}
 }
 
 // RunSingleProviderHealthCheck 执行单个提供者的健康检查

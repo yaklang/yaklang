@@ -216,6 +216,8 @@ func (c *ServerConfig) serveStaticFile(conn net.Conn, path string) {
 		fileName = strings.TrimPrefix(path, "/portal/static/")
 	} else if strings.HasPrefix(path, "/ops/static/") {
 		fileName = strings.TrimPrefix(path, "/ops/static/")
+	} else if strings.HasPrefix(path, "/public/static/") {
+		fileName = strings.TrimPrefix(path, "/public/static/")
 	} else {
 		c.logError("Invalid static file path: %s", path)
 		conn.Write([]byte("HTTP/1.1 400 Bad Request\r\n\r\nInvalid path"))

@@ -1813,6 +1813,9 @@ func (c *ServerConfig) serveRequest(conn net.Conn, request *http.Request, should
 		c.logInfo("Processing Memfit TOTP UUID request")
 		c.serveMemfitTOTPUUID(conn)
 		return
+	case strings.HasPrefix(uriIns.Path, "/public/"):
+		c.servePublicAPI(conn, request, uriIns)
+		return
 	case strings.HasPrefix(uriIns.Path, "/ops"):
 		c.HandleOpsPortalRequest(conn, request, uriIns)
 		return
