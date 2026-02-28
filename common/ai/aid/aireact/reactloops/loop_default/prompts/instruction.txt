@@ -62,6 +62,14 @@
 
 **注意：** 工具调用适用于需要执行具体操作或获取外部信息的场景。如果用户的需求可以通过简单的对话或已知信息直接回答，则无需调用工具，以避免不必要的复杂性。请根据任务的性质灵活判断是否需要工具支持。
 
+{{ if .HasLoadCapability }}
+## SyntaxFlow 规则生成（必须遵守）
+当用户要求「根据代码生成 SyntaxFlow 规则」、「根据上述代码生成规则」、「为漏洞代码编写 .sf 规则」、「generate syntaxflow rule from code」等类似话术时：
+1. **必须**优先调用 `load_capability(identifier="write_syntaxflow_rule")` 进入专注模式，**禁止**直接回答或先调用 `check_syntaxflow_syntax`。
+2. 正确流程：先进入 write_syntaxflow_rule 专注模式生成规则 → 生成完成后才可用 check_syntaxflow_syntax 验证。
+3. 在未生成规则前调用 check_syntaxflow_syntax 会因参数为空而报错，切勿如此操作。
+{{ end }}
+
 {{/*================================================================================================================*/}}
 {{ if .AIForgeList }}{{ if .AllowPlan}}
 ## AI 蓝图（应用体/Forge）使用指南

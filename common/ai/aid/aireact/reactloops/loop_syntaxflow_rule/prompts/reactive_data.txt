@@ -1,6 +1,9 @@
 ## 当前 SyntaxFlow 规则
 
 {{ if .Code }}
+{{ if .SfFilename }}
+**规则文件路径**（用于 check-syntaxflow-syntax 的 path 参数）: `{{ .SfFilename }}`
+{{ end }}
 <|CURRENT_SF_RULE_{{ .Nonce }}|>
 {{ .CurrentCodeWithLineNumber }}
 <|CURRENT_SF_RULE_END_{{ .Nonce }}|>
@@ -10,6 +13,10 @@
 ## 反馈/错误信息
 
 {{ .FeedbackMessages }}
+
+**若反馈涉及 desc 或元数据语法错误**：请根据任务开始时已提供的规则样例及 golang-template-ssti.sf、golang-reflected-xss-gin-context.sf 中的 desc 格式，确认正确结构后再 modify_rule。禁止盲目继续修改。
+{{ else }}
+**下一步**：必须调用 `check-syntaxflow-syntax` 显式验证{{ if .SfFilename }}，传入 path=`{{ .SfFilename }}`{{ else }}（可传 syntaxflow-code 为上方规则内容）{{ end }}，通过后方可 directly_answer。
 {{ end }}
 {{ else }}
 等待生成规则。使用 write_rule 创建新规则。

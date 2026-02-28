@@ -391,6 +391,29 @@ func TestLoadCapability_Handler_FocusMode_Error(t *testing.T) {
 	assert.Contains(t, op.GetFeedback().String(), "FAILED")
 }
 
+func TestLoadCapability_Handler_FocusMode_NotOk(t *testing.T) {
+	ctx := context.Background()
+	cfg := &aicommon.Config{}
+	invoker := newTestInvoker(ctx)
+	invoker.executeLoopResult = false
+	invoker.executeLoopErr = nil
+	task := newTestTask(ctx)
+	invoker.currentTask = task
+
+	loop := reactloops.NewMinimalReActLoop(cfg, invoker)
+	loop.SetCurrentTask(task)
+	loop.Set("_load_cap_identifier", "partial-mode")
+	loop.Set("_load_cap_resolved_type", string(aicommon.ResolvedAs_FocusedMode))
+
+	op := reactloops.NewActionHandlerOperator(task)
+	action := buildAction("partial-mode")
+	loopAction_LoadCapability.ActionHandler(loop, action, op)
+
+	assert.True(t, invoker.executeLoopCalled)
+	assert.True(t, op.IsContinued(), "should continue when focus mode completes")
+	assert.Contains(t, op.GetFeedback().String(), "SUCCESSFULLY", "err==nil means sync focus completed; ok=false (IsAsyncMode) is not failure")
+}
+
 // --- Handler Tests: Unknown -> Intent Fallback ---
 
 func TestLoadCapability_Handler_Unknown_IntentFallback(t *testing.T) {
