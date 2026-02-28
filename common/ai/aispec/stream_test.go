@@ -19,7 +19,7 @@ func TestProcessNonStreamResponse(t *testing.T) {
 	outBuffer := &bytes.Buffer{}
 	reasonBuffer := &bytes.Buffer{}
 
-	processAIResponse(mockResponse, mockCloser, outBuffer, reasonBuffer, nil)
+	processAIResponse(mockResponse, mockCloser, outBuffer, reasonBuffer, nil, nil)
 
 	expectedContent := "Hello World"
 	expectedReason := "This is my reasoning process"
@@ -49,7 +49,7 @@ data: [DONE]`
 	outBuffer := &bytes.Buffer{}
 	reasonBuffer := &bytes.Buffer{}
 
-	processAIResponse(mockResponse, mockCloser, outBuffer, reasonBuffer, nil)
+	processAIResponse(mockResponse, mockCloser, outBuffer, reasonBuffer, nil, nil)
 
 	t.Logf("流式内容输出: %s", outBuffer.String())
 	t.Logf("流式推理输出: %s", reasonBuffer.String())
@@ -57,7 +57,7 @@ data: [DONE]`
 
 func TestAppendStreamHandlerPoCOptionEx(t *testing.T) {
 	// 测试流式和非流式选项创建
-	outReader, reasonReader, opts, cancel := appendStreamHandlerPoCOptionEx(true, []poc.PocConfigOption{}, nil)
+	outReader, reasonReader, opts, cancel := appendStreamHandlerPoCOptionEx(true, []poc.PocConfigOption{}, nil, nil)
 	defer cancel()
 
 	if outReader == nil || reasonReader == nil {
@@ -69,7 +69,7 @@ func TestAppendStreamHandlerPoCOptionEx(t *testing.T) {
 	}
 
 	// 测试非流式
-	outReader2, reasonReader2, opts2, cancel2 := appendStreamHandlerPoCOptionEx(false, []poc.PocConfigOption{}, nil)
+	outReader2, reasonReader2, opts2, cancel2 := appendStreamHandlerPoCOptionEx(false, []poc.PocConfigOption{}, nil, nil)
 	defer cancel2()
 
 	if outReader2 == nil || reasonReader2 == nil {

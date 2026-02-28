@@ -1,6 +1,8 @@
 package aicommon
 
 import (
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -23,7 +25,8 @@ func CallAITransaction(
 		trcRetry = 3
 	}
 	var postHandlerErr error
-	var lastErr error // 记录最后一次重试的错误
+	var lastErr error
+	var lastRsp *AIResponse
 
 	emitter := c.GetEmitter()
 
@@ -42,7 +45,6 @@ func CallAITransaction(
 		finalPrompt := c.RetryPromptBuilder(prompt, postHandlerErr)
 
 		utils.Debug(func() {
-			// 调试打印：输出完整的 prompt（仅在测试环境或调试模式下）
 			if i == 0 {
 				emitter.EmitInfo("[DEBUG] AI Transaction Prompt (seq=%d, attempt=%d):\n%s", seq, i+1, finalPrompt)
 			} else {
@@ -57,27 +59,29 @@ func CallAITransaction(
 			))
 		if err != nil {
 			lastErr = err
-			emitter.EmitError("call ai api error: %v, retry and block it", err)
+			lastRsp = rsp
+			emitter.EmitError("call ai api error (attempt %d/%d): %v", i+1, trcRetry, err)
 			select {
 			case <-c.GetContext().Done():
 				return err
 			case <-time.After(100 * time.Millisecond):
-				emitter.EmitWarning("call ai transaction retry")
+				emitter.EmitWarning("call ai transaction retry (attempt %d/%d)", i+1, trcRetry)
 				continue
 			}
 		}
 		if c.IsCtxDone() {
 			return utils.Errorf("context is done, cannot continue transaction")
 		}
+		lastRsp = rsp
 		postHandlerErr = postHandler(rsp)
 		if postHandlerErr != nil {
 			lastErr = postHandlerErr
-			emitter.EmitError("ai transaction in postHandler error: %v, retry and block it, prompts: %v", postHandlerErr, utils.ShrinkString(finalPrompt, 512))
+			emitter.EmitError("ai transaction postHandler error (attempt %d/%d): %v", i+1, trcRetry, postHandlerErr)
 			select {
 			case <-c.GetContext().Done():
 				return postHandlerErr
 			case <-time.After(100 * time.Millisecond):
-				emitter.EmitWarning("call ai transaction retry")
+				emitter.EmitWarning("call ai transaction retry (attempt %d/%d)", i+1, trcRetry)
 				continue
 			}
 		}
@@ -92,6 +96,25 @@ func CallAITransaction(
 		}
 		return nil
 	}
+
+	finalErrMsg := fmt.Sprintf(
+		"[AI Transaction Failed] After %d attempts, the AI interaction could not complete. "+
+			"Last error: %v\n\n"+
+			"Suggested actions:\n"+
+			"1. Check if the current AI model is working properly\n"+
+			"2. Try switching to a different AI model\n"+
+			"3. Simplify the task or reduce the prompt complexity\n"+
+			"4. Check network connectivity and API rate limits",
+		trcRetry, lastErr,
+	)
+	if lastRsp != nil {
+		rawDump := lastRsp.GetRawHTTPResponseDump()
+		if rawDump != "" {
+			finalErrMsg += "\n\n--- Last Raw HTTP Response ---\n" + utils.ShrinkString(rawDump, 4096)
+		}
+	}
+	emitter.EmitDefaultStreamEvent("ai-error", strings.NewReader(finalErrMsg), "")
+
 	if lastErr != nil {
 		return utils.Errorf("max retry count[%v] reached in transaction, last error: %v", trcRetry, lastErr)
 	}

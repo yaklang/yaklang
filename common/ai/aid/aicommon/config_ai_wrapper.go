@@ -2,6 +2,7 @@ package aicommon
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"strings"
 	"time"
@@ -147,44 +148,71 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 				"model_name":    origRsp.GetModelName(),
 				"provider_name": origRsp.GetProviderName(),
 			})
-			}, func() {
-				du := time.Since(start)
-				provider := origRsp.GetProviderName()
-				model := origRsp.GetModelName()
-				outputBytes := origRsp.GetTotalOutputBytes()
-				firstByteTime := origRsp.GetFirstOutputByteTime()
-				outputDuration := time.Since(firstByteTime)
-				tokenRate := float64(0)
-				if outputDuration.Seconds() > 0 {
-					tokenRate = float64(outputBytes/4) / outputDuration.Seconds()
-				}
-			c.EmitInfo("ai response from %v:%v cost: %v, output duration: %v, estimated %.1f token/s",
-				provider, model, du, outputDuration, tokenRate)
-			c.EmitJSON(schema.EVENT_TYPE_AI_TOTAL_COST_MS, "system", map[string]any{
-				"ms":                 du.Milliseconds(),
-				"second":             du.Seconds(),
-				"model_name":         model,
-				"provider_name":      provider,
-				"token_rate":         tokenRate,
-				"output_bytes":       outputBytes,
-				"output_duration_ms": outputDuration.Milliseconds(),
-			})
-			firstByteCostMs := int64(0)
-			if !firstByteTime.IsZero() {
-				firstByteCostMs = firstByteTime.Sub(start).Milliseconds()
+		}, func() {
+			du := time.Since(start)
+			provider := origRsp.GetProviderName()
+			model := origRsp.GetModelName()
+			outputBytes := origRsp.GetTotalOutputBytes()
+			firstByteTime := origRsp.GetFirstOutputByteTime()
+			outputDuration := time.Since(firstByteTime)
+			tokenRate := float64(0)
+			if outputDuration.Seconds() > 0 {
+				tokenRate = float64(outputBytes/4) / outputDuration.Seconds()
 			}
-			c.EmitJSON(schema.EVENT_TYPE_AI_CALL_SUMMARY, "system", map[string]any{
-				"model_name":              model,
-				"provider_name":           provider,
-				"first_byte_cost_ms":      firstByteCostMs,
-				"total_cost_ms":           du.Milliseconds(),
-				"output_bytes":            outputBytes,
-				"estimated_output_tokens": outputBytes / 4,
-				"token_rate":              tokenRate,
-				"output_duration_ms":      outputDuration.Milliseconds(),
-				"input_token_size":        tokenSize,
-			})
-			})
+		c.EmitInfo("ai response from %v:%v cost: %v, output duration: %v, estimated %.1f token/s",
+			provider, model, du, outputDuration, tokenRate)
+		c.EmitJSON(schema.EVENT_TYPE_AI_TOTAL_COST_MS, "system", map[string]any{
+			"ms":                 du.Milliseconds(),
+			"second":             du.Seconds(),
+			"model_name":         model,
+			"provider_name":      provider,
+			"token_rate":         tokenRate,
+			"output_bytes":       outputBytes,
+			"output_duration_ms": outputDuration.Milliseconds(),
+		})
+		firstByteCostMs := int64(0)
+		if !firstByteTime.IsZero() {
+			firstByteCostMs = firstByteTime.Sub(start).Milliseconds()
+		}
+		c.EmitJSON(schema.EVENT_TYPE_AI_CALL_SUMMARY, "system", map[string]any{
+			"model_name":              model,
+			"provider_name":           provider,
+			"first_byte_cost_ms":      firstByteCostMs,
+			"total_cost_ms":           du.Milliseconds(),
+			"output_bytes":            outputBytes,
+			"estimated_output_tokens": outputBytes / 4,
+			"token_rate":              tokenRate,
+			"output_duration_ms":      outputDuration.Milliseconds(),
+			"input_token_size":        tokenSize,
+		})
+
+		if outputBytes == 0 {
+			warnMsg := fmt.Sprintf(
+				"[AI Empty Response] model=%v:%v, cost=%v, input_tokens~%d. "+
+					"The AI model returned an empty response. "+
+					"Possible causes: 1) Model overloaded or rate-limited; "+
+					"2) Prompt too long for this model; "+
+					"3) Model does not support the required output format. "+
+					"Consider switching to a different AI model or retrying later.",
+				provider, model, du, tokenSize,
+			)
+			c.EmitError("%s", warnMsg)
+			rawDump := origRsp.GetRawHTTPResponseDump()
+			if rawDump != "" {
+				c.EmitDefaultStreamEvent(
+					"ai-error",
+					strings.NewReader(warnMsg+"\n\n--- Raw HTTP Response ---\n"+rawDump),
+					request.GetTaskIndex(),
+				)
+			} else {
+				c.EmitDefaultStreamEvent(
+					"ai-error",
+					strings.NewReader(warnMsg),
+					request.GetTaskIndex(),
+				)
+			}
+		}
+		})
 			if c.DebugPrompt {
 				rsp.Debug(true)
 			}
