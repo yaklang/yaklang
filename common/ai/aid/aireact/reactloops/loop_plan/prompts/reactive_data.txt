@@ -22,10 +22,30 @@
 {{ .Enhance }}
 <|ENHANCE_KNOWLEDGE_END_{{ .Nonce }}|>{{end}}{{/*
 
+*/}}{{if .FileResults }}
+## 文件与代码信息
+
+以下是通过 read_file / find_files / grep_text 等工具收集到的项目文件和代码信息，请基于这些事实数据来辅助任务规划（白帽思维）。
+
+<|FILE_RESULTS_{{ .Nonce }}|>
+{{ .FileResults }}
+<|FILE_RESULTS_END_{{ .Nonce }}|>{{end}}{{/*
+
+*/}}{{if .WebResults }}
+## 互联网搜索结果
+
+以下是通过 web_search 工具从互联网获取到的外部信息，包含最佳实践、技术文档或行业知识，请结合这些信息来优化任务规划。
+
+<|WEB_RESULTS_{{ .Nonce }}|>
+{{ .WebResults }}
+<|WEB_RESULTS_END_{{ .Nonce }}|>{{end}}{{/*
+
 */}}{{ if .IsLastIteration }}
 ## **重要：最后一轮迭代**
 
-这是规划循环的最后一轮迭代。你**必须**在本轮输出一个完整的 plan，不可以再执行 search_knowledge。
-请基于当前已有的所有信息（包括用户诉求、已有计划、增强补充知识等）直接输出最终的任务计划。
+这是规划循环的最后一轮迭代。你**必须**在本轮输出一个完整的 plan，不可以再执行任何信息收集操作（search_knowledge、read_file、find_files、grep_text、web_search、loading_skills 均已移除）。
+请基于当前已有的所有信息（包括用户诉求、已有计划、增强补充知识、文件信息、互联网搜索结果等）直接输出最终的任务计划。
 即使信息不够完整，也要尽最大努力生成一个可执行的计划。
+
+运用 SWOT 分析总结当前态势：在 Strengths 中列出已收集到的有价值信息，在 Weaknesses 中标注信息缺口，在规划中通过子任务来弥补不足。
 {{ end }}

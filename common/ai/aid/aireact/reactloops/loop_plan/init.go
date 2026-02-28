@@ -36,9 +36,16 @@ var PLAN_DATA_KEY = "plan_data"
 var PLAN_HELP_KEY = "plan_help"
 var PLAN_ENHANCE_KEY = "plan_enhance"
 var PLAN_ENHANCE_COUNT = "plan_enhance_count"
-var PLAN_PROMPT_KEY = "plan_prompt" // Additional context for plan phase only
+var PLAN_PROMPT_KEY = "plan_prompt"
+var PLAN_FILE_RESULTS_KEY = "plan_file_results"
+var PLAN_WEB_RESULTS_KEY = "plan_web_results"
 
-const PlanMaxIterations = 3
+const PlanMaxIterations = 5
+
+var infoGatheringActions = []string{
+	"search_knowledge", "read_file", "find_files", "grep_text",
+	"web_search", schema.AI_REACT_LOOP_ACTION_LOADING_SKILLS,
+}
 
 //go:embed prompts/output_example.txt
 var outputExample string
@@ -55,6 +62,12 @@ func init() {
 		func(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {
 			help := r.GetConfig().GetConfigString(PLAN_HELP_KEY)
 			planPrompt := r.GetConfig().GetConfigString(PLAN_PROMPT_KEY)
+			allowedActions := []string{
+				"plan", "search_knowledge",
+				"read_file", "find_files", "grep_text",
+				"web_search",
+				schema.AI_REACT_LOOP_ACTION_LOADING_SKILLS,
+			}
 			preset := []reactloops.ReActLoopOption{
 				reactloops.WithAllowRAG(false),
 				reactloops.WithAllowToolCall(false),
@@ -64,6 +77,14 @@ func init() {
 				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
 				reactloops.WithMaxIterations(PlanMaxIterations),
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
+				reactloops.WithActionFilter(func(action *reactloops.LoopAction) bool {
+					for _, name := range allowedActions {
+						if action.ActionType == name {
+							return true
+						}
+					}
+					return false
+				}),
 				reactloops.WithPersistentContextProvider(func(loop *reactloops.ReActLoop, nonce string) (string, error) {
 					return utils.RenderTemplate(persistentInstruction, map[string]any{
 						"Nonce":      nonce,
@@ -75,34 +96,47 @@ func init() {
 				reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
 					currentPlan := loop.Get(PLAN_DATA_KEY)
 					enhance := loop.Get(PLAN_ENHANCE_KEY)
+					fileResults := loop.Get(PLAN_FILE_RESULTS_KEY)
+					webResults := loop.Get(PLAN_WEB_RESULTS_KEY)
 					currentIter := loop.GetCurrentIterationIndex()
 					maxIter := loop.GetMaxIterations()
 					isLastIteration := currentIter+1 >= maxIter
 					if isLastIteration {
-						loop.RemoveAction("search_knowledge")
-						log.Infof("plan loop: last iteration (%d/%d), removed search_knowledge action, forcing plan output", currentIter+1, maxIter)
+						for _, name := range infoGatheringActions {
+							loop.RemoveAction(name)
+						}
+						log.Infof("plan loop: last iteration (%d/%d), removed all info-gathering actions, forcing plan output", currentIter+1, maxIter)
 					}
 					renderMap := map[string]any{
 						"Plan":            currentPlan,
 						"Help":            help,
 						"Nonce":           nonce,
 						"Enhance":         enhance,
+						"FileResults":     fileResults,
+						"WebResults":      webResults,
 						"IsLastIteration": isLastIteration,
 					}
 					return utils.RenderTemplate(reactiveData, renderMap)
 				}),
 				generate(r),
 				searchKnowledge(r),
+				readFileAction(r),
+				findFilesAction(r),
+				grepTextAction(r),
+				webSearchAction(r),
 			}
 			preset = append(opts, preset...)
 			return reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_PLAN, r, preset...)
 		},
-		// Register metadata for better AI understanding
-		reactloops.WithLoopDescription("Loop for generating and refining plans based on user requirements, with knowledge enhancement."),
-		reactloops.WithLoopUsagePrompt("when user needs to create or refine a plan for a specific task, if need to search knowledge to enhance the plan, use search_knowledge action to get relevant information."),
+		reactloops.WithLoopDescription("Loop for generating and refining plans based on user requirements, with multi-source information gathering (knowledge base, file system, internet) and structured thinking frameworks (SMART, Six Thinking Hats, SWOT)."),
+		reactloops.WithLoopUsagePrompt("when user needs to create or refine a plan for a specific task. Supports searching knowledge, reading local files, grepping code, internet search, and loading skills to produce comprehensive plans."),
 		reactloops.WithLoopOutputExample(`
 * When the user asks for a clear executable plan:
   {"@action": "plan", "human_readable_thought": "I should break down the goal into actionable subtasks and refine the plan with supporting knowledge"}
+* When needing to understand project structure before planning:
+  {"@action": "find_files", "dir": "/project/root", "pattern": "*.go"}
+* When needing external best practices:
+  {"@action": "web_search", "query": "best practices for microservice architecture"}
 `),
 
 		reactloops.WithVerboseName("Plan Builder"),
