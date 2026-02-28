@@ -275,17 +275,6 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 				if action != nil && action.GetParams() != nil {
 					paramsDump = utils.ShrinkString(action.GetParams().Dump(), 300)
 				}
-				diagMsg := fmt.Sprintf(
-					"AI response did not contain a valid action type (@action field is empty). "+
-						"parsed_params=[%s], available_actions=%v. "+
-						"This usually means the AI model returned an empty or malformed response.",
-					paramsDump, actionNames,
-				)
-				rawDump := resp.GetRawHTTPResponseDump()
-				if rawDump != "" {
-					diagMsg += "\n\n--- Raw HTTP Response ---\n" + utils.ShrinkString(rawDump, 4096)
-				}
-				emitter.EmitDefaultStreamEvent("ai-error", strings.NewReader(diagMsg), resp.GetTaskIndex())
 				return utils.Errorf("action type is empty (parsed_params=%s, available_actions=%v)",
 					paramsDump, actionNames)
 			}

@@ -2,7 +2,6 @@ package aicommon
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"strings"
 	"time"
@@ -187,30 +186,10 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 		})
 
 		if outputBytes == 0 {
-			warnMsg := fmt.Sprintf(
-				"[AI Empty Response] model=%v:%v, cost=%v, input_tokens~%d. "+
-					"The AI model returned an empty response. "+
-					"Possible causes: 1) Model overloaded or rate-limited; "+
-					"2) Prompt too long for this model; "+
-					"3) Model does not support the required output format. "+
-					"Consider switching to a different AI model or retrying later.",
+			c.EmitError("[AI Empty Response] model=%v:%v, cost=%v, input_tokens~%d. "+
+				"The AI model returned an empty response.",
 				provider, model, du, tokenSize,
 			)
-			c.EmitError("%s", warnMsg)
-			rawDump := origRsp.GetRawHTTPResponseDump()
-			if rawDump != "" {
-				c.EmitDefaultStreamEvent(
-					"ai-error",
-					strings.NewReader(warnMsg+"\n\n--- Raw HTTP Response ---\n"+rawDump),
-					request.GetTaskIndex(),
-				)
-			} else {
-				c.EmitDefaultStreamEvent(
-					"ai-error",
-					strings.NewReader(warnMsg),
-					request.GetTaskIndex(),
-				)
-			}
 		}
 		})
 			if c.DebugPrompt {

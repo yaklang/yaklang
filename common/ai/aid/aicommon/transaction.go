@@ -97,15 +97,23 @@ func CallAITransaction(
 		return nil
 	}
 
+	var modelInfo string
+	if lastRsp != nil {
+		provider := lastRsp.GetProviderName()
+		model := lastRsp.GetModelName()
+		if provider != "" || model != "" {
+			modelInfo = fmt.Sprintf(" (model: %s:%s)", provider, model)
+		}
+	}
 	finalErrMsg := fmt.Sprintf(
-		"[AI Transaction Failed] After %d attempts, the AI interaction could not complete. "+
+		"[AI Transaction Failed] After %d attempts%s, the AI interaction could not complete.\n"+
 			"Last error: %v\n\n"+
 			"Suggested actions:\n"+
 			"1. Check if the current AI model is working properly\n"+
 			"2. Try switching to a different AI model\n"+
 			"3. Simplify the task or reduce the prompt complexity\n"+
 			"4. Check network connectivity and API rate limits",
-		trcRetry, lastErr,
+		trcRetry, modelInfo, lastErr,
 	)
 	if lastRsp != nil {
 		rawDump := lastRsp.GetRawHTTPResponseDump()
