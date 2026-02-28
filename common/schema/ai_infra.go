@@ -278,6 +278,22 @@ func (a *AmapApiKey) TableName() string {
 	return "amap_api_keys"
 }
 
+// AiProviderHealthRecord stores historical health check results for uptime tracking
+type AiProviderHealthRecord struct {
+	gorm.Model
+
+	ProviderID  uint      `json:"provider_id" gorm:"index"`
+	WrapperName string    `json:"wrapper_name" gorm:"index"`
+	IsHealthy   bool      `json:"is_healthy"`
+	LatencyMs   int64     `json:"latency_ms"`
+	CheckTime   time.Time `json:"check_time" gorm:"index"`
+	ErrorMessage string   `json:"error_message" gorm:"type:text"`
+}
+
+func (a *AiProviderHealthRecord) TableName() string {
+	return "ai_provider_health_records"
+}
+
 // AIMemoryEntity 存储AI记忆条目
 type AIMemoryEntity struct {
 	gorm.Model

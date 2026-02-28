@@ -601,3 +601,109 @@ func GetAiApiKeysPaginated(page, pageSize int, sortBy, sortOrder string) ([]*sch
 	
 	return keys, total, nil
 }
+
+// ==================== Health Record Functions ====================
+
+// EnsureHealthRecordTable ensures the AiProviderHealthRecord table exists
+func EnsureHealthRecordTable() error {
+	return GetDB().AutoMigrate(&schema.AiProviderHealthRecord{}).Error
+}
+
+// SaveHealthRecord saves a single health check record
+func SaveHealthRecord(record *schema.AiProviderHealthRecord) error {
+	return GetDB().Create(record).Error
+}
+
+// GetHealthRecordsByModel retrieves health records for a specific model since a given time
+func GetHealthRecordsByModel(wrapperName string, since time.Time) ([]*schema.AiProviderHealthRecord, error) {
+	var records []*schema.AiProviderHealthRecord
+	err := GetDB().Where("wrapper_name = ? AND check_time >= ?", wrapperName, since).
+		Order("check_time ASC").Find(&records).Error
+	if err != nil {
+		return nil, err
+	}
+	return records, nil
+}
+
+// HealthSummary holds aggregated health data for a model
+type HealthSummary struct {
+	WrapperName  string
+	TotalChecks  int64
+	HealthyCount int64
+	UptimeRate   float64
+}
+
+// GetAllHealthSummary returns uptime summaries for all models since a given time
+func GetAllHealthSummary(since time.Time) ([]HealthSummary, error) {
+	var results []HealthSummary
+	rows, err := GetDB().Model(&schema.AiProviderHealthRecord{}).
+		Select("wrapper_name, COUNT(*) as total_checks, SUM(CASE WHEN is_healthy THEN 1 ELSE 0 END) as healthy_count").
+		Where("check_time >= ?", since).
+		Group("wrapper_name").Rows()
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var s HealthSummary
+		if err := rows.Scan(&s.WrapperName, &s.TotalChecks, &s.HealthyCount); err != nil {
+			continue
+		}
+		if s.TotalChecks > 0 {
+			s.UptimeRate = float64(s.HealthyCount) / float64(s.TotalChecks) * 100
+		}
+		results = append(results, s)
+	}
+	return results, nil
+}
+
+// LatencyPoint is a single latency data point for charting
+type LatencyPoint struct {
+	CheckTime string `json:"check_time"`
+	LatencyMs int64  `json:"latency_ms"`
+	IsHealthy bool   `json:"is_healthy"`
+}
+
+// GetRecentLatencyByModel returns the most recent N latency points per model for charting
+func GetRecentLatencyByModel(limit int) (map[string][]LatencyPoint, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+
+	// Get distinct wrapper names
+	var names []string
+	if err := GetDB().Model(&schema.AiProviderHealthRecord{}).
+		Select("DISTINCT wrapper_name").Pluck("wrapper_name", &names).Error; err != nil {
+		return nil, err
+	}
+
+	result := make(map[string][]LatencyPoint)
+	for _, name := range names {
+		var records []schema.AiProviderHealthRecord
+		if err := GetDB().Where("wrapper_name = ?", name).
+			Order("check_time DESC").Limit(limit).Find(&records).Error; err != nil {
+			continue
+		}
+		// Reverse to chronological order
+		points := make([]LatencyPoint, len(records))
+		for i, r := range records {
+			points[len(records)-1-i] = LatencyPoint{
+				CheckTime: r.CheckTime.Format("15:04"),
+				LatencyMs: r.LatencyMs,
+				IsHealthy: r.IsHealthy,
+			}
+		}
+		result[name] = points
+	}
+	return result, nil
+}
+
+// CleanupOldHealthRecords removes health records older than the given time
+func CleanupOldHealthRecords(before time.Time) (int64, error) {
+	result := GetDB().Where("check_time < ?", before).Delete(&schema.AiProviderHealthRecord{})
+	if result.Error != nil {
+		return 0, result.Error
+	}
+	return result.RowsAffected, nil
+}
