@@ -179,7 +179,7 @@ func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *
 Host: %v
 User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:68.0) Gecko/20100101 Firefox/68.0
 Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
-`, target, webPath))
+`,webPath, target))
 			f.log("sending request to path: %s", webPath)
 			var ok bool
 			var flow []*lowhttp.RedirectFlow
