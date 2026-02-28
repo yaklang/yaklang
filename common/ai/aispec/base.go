@@ -193,6 +193,9 @@ type ChatBaseContext struct {
 	Tools []Tool
 	// ToolChoice controls which (if any) tool is called by the model
 	ToolChoice any
+	// RawHTTPResponseCallback is called after the AI HTTP response is fully consumed,
+	// providing the raw HTTP response header and a body preview for debugging.
+	RawHTTPResponseCallback func(headerBytes []byte, bodyPreview []byte)
 }
 
 type ChatBaseOption func(c *ChatBaseContext)
@@ -284,6 +287,12 @@ func WithChatBase_ToolCallCallback(cb func([]*ToolCall)) ChatBaseOption {
 	}
 }
 
+func WithChatBase_RawHTTPResponseCallback(cb func(headerBytes []byte, bodyPreview []byte)) ChatBaseOption {
+	return func(c *ChatBaseContext) {
+		c.RawHTTPResponseCallback = cb
+	}
+}
+
 func NewChatBaseContext(opts ...ChatBaseOption) *ChatBaseContext {
 	ctx := &ChatBaseContext{
 		EnableThinking: false,
@@ -365,7 +374,7 @@ func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) 
 
 	var pr, reasonPr io.Reader
 	var cancel context.CancelFunc
-	pr, reasonPr, opts, cancel = appendStreamHandlerPoCOptionEx(handleStream, opts, ctx.ToolCallCallback)
+	pr, reasonPr, opts, cancel = appendStreamHandlerPoCOptionEx(handleStream, opts, ctx.ToolCallCallback, ctx.RawHTTPResponseCallback)
 	wg := new(sync.WaitGroup)
 
 	// 统一处理reasoning stream handler

@@ -50,6 +50,10 @@ type AIResponse struct {
 
 	firstOutputByteTime time.Time
 	totalOutputBytes    atomic.Int64
+
+	rawHTTPResponseHeaderMu sync.Mutex
+	rawHTTPResponseHeader   []byte
+	rawHTTPResponseBody     []byte
 }
 
 func (a *AIResponse) SetResponseStartTime(t time.Time) {
@@ -108,6 +112,35 @@ func (a *AIResponse) GetModelVerboseName() string {
 		return ""
 	}
 	return a.modelVerboseName
+}
+
+func (a *AIResponse) SetRawHTTPResponseData(header []byte, body []byte) {
+	if a == nil {
+		return
+	}
+	a.rawHTTPResponseHeaderMu.Lock()
+	defer a.rawHTTPResponseHeaderMu.Unlock()
+	a.rawHTTPResponseHeader = header
+	a.rawHTTPResponseBody = body
+}
+
+func (a *AIResponse) GetRawHTTPResponseDump() string {
+	if a == nil {
+		return ""
+	}
+	a.rawHTTPResponseHeaderMu.Lock()
+	defer a.rawHTTPResponseHeaderMu.Unlock()
+	if len(a.rawHTTPResponseHeader) == 0 && len(a.rawHTTPResponseBody) == 0 {
+		return ""
+	}
+	var buf bytes.Buffer
+	if len(a.rawHTTPResponseHeader) > 0 {
+		buf.Write(a.rawHTTPResponseHeader)
+	}
+	if len(a.rawHTTPResponseBody) > 0 {
+		buf.Write(a.rawHTTPResponseBody)
+	}
+	return buf.String()
 }
 
 func (a *AIResponse) SetFirstOutputByteTime(t time.Time) {

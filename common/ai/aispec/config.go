@@ -69,6 +69,10 @@ type AIConfig struct {
 	// ModelInfoConfirmCallback is invoked after Chat returns successfully,
 	// confirming the provider and model that actually produced the response.
 	ModelInfoConfirmCallback func(provider, model string)
+
+	// RawHTTPResponseCallback is called with the raw HTTP response header and body preview
+	// when an AI response completes. Used for debugging AI call failures.
+	RawHTTPResponseCallback func(headerBytes []byte, bodyPreview []byte)
 }
 
 func WithExtraHeader(headers ...*ypb.HTTPHeader) AIConfigOption {
@@ -840,5 +844,11 @@ func WithModelInfoCallback(cb func(provider, model string)) AIConfigOption {
 func WithModelInfoConfirmCallback(cb func(provider, model string)) AIConfigOption {
 	return func(c *AIConfig) {
 		c.ModelInfoConfirmCallback = cb
+	}
+}
+
+func WithRawHTTPResponseCallback(cb func(headerBytes []byte, bodyPreview []byte)) AIConfigOption {
+	return func(c *AIConfig) {
+		c.RawHTTPResponseCallback = cb
 	}
 }

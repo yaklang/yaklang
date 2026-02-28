@@ -70,6 +70,9 @@ func AIChatToAICallbackType(cb func(prompt string, opts ...aispec.AIConfigOption
 				aispec.WithModelInfoConfirmCallback(func(provider, model string) {
 					resp.SetModelInfo(provider, model)
 				}),
+				aispec.WithRawHTTPResponseCallback(func(headerBytes []byte, bodyPreview []byte) {
+					resp.SetRawHTTPResponseData(headerBytes, bodyPreview)
+				}),
 			}
 			for _, data := range req.GetImageList() {
 				if data.IsBase64 {

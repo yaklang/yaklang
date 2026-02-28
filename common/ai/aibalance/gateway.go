@@ -140,6 +140,7 @@ func (g *GatewayClient) Chat(s string, function ...any) (string, error) {
 		aispec.WithChatBase_Tools(g.config.Tools),
 		aispec.WithChatBase_ToolChoice(g.config.ToolChoice),
 		aispec.WithChatBase_ToolCallCallback(g.config.ToolCallCallback),
+		aispec.WithChatBase_RawHTTPResponseCallback(g.config.RawHTTPResponseCallback),
 	)
 
 	// 检查是否是 TOTP 认证失败（需要刷新密钥并重试）
@@ -164,6 +165,7 @@ func (g *GatewayClient) Chat(s string, function ...any) (string, error) {
 			aispec.WithChatBase_Tools(g.config.Tools),
 			aispec.WithChatBase_ToolChoice(g.config.ToolChoice),
 			aispec.WithChatBase_ToolCallCallback(g.config.ToolCallCallback),
+			aispec.WithChatBase_RawHTTPResponseCallback(g.config.RawHTTPResponseCallback),
 		)
 	}
 

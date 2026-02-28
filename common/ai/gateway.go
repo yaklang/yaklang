@@ -121,6 +121,7 @@ func (g *Gateway) Chat(s string, f ...any) (string, error) {
 		aispec.WithChatBase_ToolCallCallback(g.Config.ToolCallCallback),
 		aispec.WithChatBase_Tools(g.Config.Tools),
 		aispec.WithChatBase_ToolChoice(g.Config.ToolChoice),
+		aispec.WithChatBase_RawHTTPResponseCallback(g.Config.RawHTTPResponseCallback),
 	)
 }
 

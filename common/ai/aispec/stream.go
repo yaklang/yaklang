@@ -48,7 +48,7 @@ func mergeReasonIntoOutputStream(reason io.Reader, out io.Reader) io.Reader {
 // processAIResponse 处理流式响应
 // If toolCallCallback is not nil, tool_calls will be passed to the callback instead of being
 // converted to <|TOOL_CALL...|> format in the output stream.
-func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reasonWriter io.Writer, toolCallCallback func([]*ToolCall)) {
+func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reasonWriter io.Writer, toolCallCallback func([]*ToolCall), rawResponseCallback func([]byte, []byte)) {
 	defer func() {
 		utils.CallGeneralClose(reasonWriter)
 		utils.CallGeneralClose(outWriter)
@@ -60,14 +60,26 @@ func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reas
 	}
 
 	var mirrorResponse bytes.Buffer
-	if lowhttp.GetStatusCodeFromResponse(r) > 299 {
-		log.Warnf("response status code: %v", lowhttp.GetStatusCodeFromResponse(r))
+	statusCode := lowhttp.GetStatusCodeFromResponse(r)
+	if statusCode > 299 {
+		log.Warnf("response status code: %v", statusCode)
 		defer func() {
 			if mirrorResponse.Len() > 0 {
 				log.Infof("response body: %v", utils.ShrinkString(mirrorResponse.String(), 400))
 			}
 		}()
 	}
+
+	defer func() {
+		if rawResponseCallback != nil {
+			bodyPreview := mirrorResponse.Bytes()
+			const maxBodyPreview = 4096
+			if len(bodyPreview) > maxBodyPreview {
+				bodyPreview = bodyPreview[:maxBodyPreview]
+			}
+			rawResponseCallback(r, bodyPreview)
+		}
+	}()
 
 	var reader io.Reader = closer
 	ioReader := reader
@@ -336,7 +348,7 @@ func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reas
 	}
 }
 
-func appendStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfigOption, toolCallCallback func([]*ToolCall)) (io.Reader, io.Reader, []poc.PocConfigOption, func()) {
+func appendStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfigOption, toolCallCallback func([]*ToolCall), rawResponseCallback func([]byte, []byte)) (io.Reader, io.Reader, []poc.PocConfigOption, func()) {
 	outReader, outWriter := utils.NewBufPipe(nil)
 	reasonReader, reasonWriter := utils.NewBufPipe(nil)
 
@@ -346,12 +358,7 @@ func appendStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfigOption, t
 	}
 
 	opts = append(opts, poc.WithBodyStreamReaderHandler(func(r []byte, closer io.ReadCloser) {
-		processAIResponse(r, closer, outWriter, reasonWriter, toolCallCallback)
-
-		//if isStream {
-		//} else {
-		//	processNonStreamResponse(r, closer, outWriter, reasonWriter)
-		//}
+		processAIResponse(r, closer, outWriter, reasonWriter, toolCallCallback, rawResponseCallback)
 	}))
 
 	return outReader, reasonReader, opts, cancelFunc
