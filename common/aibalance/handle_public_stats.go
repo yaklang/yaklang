@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"runtime"
+	"sort"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -198,6 +199,21 @@ func (c *ServerConfig) servePublicStats(conn net.Conn, request *http.Request) {
 		}
 		data.Models = append(data.Models, info)
 	}
+
+	// Stable sort: Memfit first, then non-free before free, then by provider count desc, then by name
+	sort.SliceStable(data.Models, func(i, j int) bool {
+		a, b := data.Models[i], data.Models[j]
+		if a.IsMemfit != b.IsMemfit {
+			return a.IsMemfit
+		}
+		if a.IsFree != b.IsFree {
+			return !a.IsFree
+		}
+		if a.ProviderCount != b.ProviderCount {
+			return a.ProviderCount > b.ProviderCount
+		}
+		return a.DisplayName < b.DisplayName
+	})
 
 	log.Infof("public stats: core data ready in %v, fetching health/latency async", time.Since(start))
 
