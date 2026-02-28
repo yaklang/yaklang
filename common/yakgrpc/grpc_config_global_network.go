@@ -30,6 +30,7 @@ func init() {
 			yakit.Set(consts.GLOBAL_NETWORK_CONFIG, string(raw))
 			yakit.ConfigureNetWork(defaultConfig)
 			yakit.Set(consts.GLOBAL_NETWORK_CONFIG_INIT, "1")
+			yakit.EnsureAIBalanceConfig()
 			return nil
 		} else {
 			config := yakit.GetNetworkConfig()
@@ -47,6 +48,7 @@ func init() {
 			log.Debugf("disallow domain: %v", config.DisallowDomain)
 			log.Debugf("global proxy: %v", config.GlobalProxy)
 			yakit.ConfigureNetWork(config)
+			yakit.EnsureAIBalanceConfig()
 			return nil
 		}
 	}, "sync-global-config-from-db")
