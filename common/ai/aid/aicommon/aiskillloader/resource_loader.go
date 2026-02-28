@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -55,25 +56,31 @@ func (m *SkillsContextManager) LoadSkillResource(skillName, filePath string) (*S
 		return nil, utils.Error("skills context manager: no loader configured")
 	}
 
+	now := time.Now()
+
 	state, ok := m.loadedSkills.Get(skillName)
 	if !ok {
 		loaded, err := m.loader.LoadSkill(skillName)
 		if err != nil {
 			return nil, utils.Wrapf(err, "skill %q is not loaded and cannot be loaded on demand", skillName)
 		}
-		loaded.SkillMDContent = ResolveIncludes(loaded.SkillMDContent, loaded.FileSystem)
+		transformedContent := TransformIncludesToResourceHints(loaded.SkillMDContent, skillName)
 		nonce := GenerateNonce(skillName, skillMDFilename)
-		skillMDWindow := NewViewWindow(skillName, skillMDFilename, loaded.SkillMDContent, nonce)
+		skillMDWindow := NewViewWindow(skillName, skillMDFilename, transformedContent, nonce)
 		state = &skillContextState{
 			Skill:    loaded,
 			IsFolded: false,
 			ViewWindows: map[string]*ViewWindow{
 				skillMDFilename: skillMDWindow,
 			},
+			LastAccessedAt: now,
 		}
 		m.loadedSkills.Set(skillName, state)
+		m.contextSizeDirty = true
 		log.Infof("auto-loaded skill %q for resource access", skillName)
 	}
+
+	state.LastAccessedAt = now
 
 	if state.IsFolded {
 		state.IsFolded = false
@@ -139,6 +146,7 @@ func (m *SkillsContextManager) LoadSkillResource(skillName, filePath string) (*S
 		return nil, utils.Errorf("no files found for path %q in skill %q", filePath, skillName)
 	}
 
+	m.contextSizeDirty = true
 	m.ensureContextFits()
 	return result, nil
 }

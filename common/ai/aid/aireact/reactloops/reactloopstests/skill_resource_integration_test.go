@@ -231,8 +231,11 @@ func TestReActLoop_BatchLoadSkills(t *testing.T) {
 	t.Logf("Batch loading test passed: %d skills loaded, %d main prompts", len(skills), len(mainPrompts))
 }
 
-// TestReActLoop_IncludeDirective tests that include directives in SKILL.md are resolved.
-func TestReActLoop_IncludeDirective(t *testing.T) {
+// TestReActLoop_IncludeDirective_LazyLoading tests that include directives in SKILL.md
+// are NOT eagerly resolved but instead replaced with load_skill_resources hints.
+// This verifies the progressive disclosure principle: SKILL.md stays lightweight,
+// and included content is only loaded when the AI explicitly requests it.
+func TestReActLoop_IncludeDirective_LazyLoading(t *testing.T) {
 	vfs := filesys.NewVirtualFs()
 	vfs.AddFile("inc-skill/SKILL.md", `---
 name: inc-skill
@@ -274,17 +277,108 @@ description: Skill with include directives
 	}
 	_ = loop.Execute("test", context.Background(), "load inc-skill")
 
-	if len(mainPrompts) >= 2 {
-		postLoadPrompt := mainPrompts[len(mainPrompts)-1]
-		if !strings.Contains(postLoadPrompt, "Guide Content") {
-			t.Error("included guide content should appear in prompt after skill loading")
-		}
-		if !strings.Contains(postLoadPrompt, "Step 1") {
-			t.Error("included guide steps should appear in prompt")
-		}
+	if len(mainPrompts) < 2 {
+		t.Fatalf("expected at least 2 main prompts, got %d", len(mainPrompts))
 	}
 
-	t.Logf("Include directive test passed with %d main prompts", len(mainPrompts))
+	postLoadPrompt := mainPrompts[len(mainPrompts)-1]
+
+	// Include directives should NOT be eagerly expanded
+	if strings.Contains(postLoadPrompt, "Guide Content") {
+		t.Error("included guide content should NOT be eagerly expanded into prompt")
+	}
+	if strings.Contains(postLoadPrompt, "Step 1: Do something") {
+		t.Error("included guide steps should NOT be eagerly expanded into prompt")
+	}
+
+	// Instead, a resource loading hint should appear
+	if !strings.Contains(postLoadPrompt, "load_skill_resources") {
+		t.Error("prompt should contain load_skill_resources hint for included file")
+	}
+	if !strings.Contains(postLoadPrompt, "@inc-skill/guide.md") {
+		t.Error("prompt should contain resource path @inc-skill/guide.md")
+	}
+
+	t.Logf("Lazy include test passed with %d main prompts", len(mainPrompts))
+}
+
+// TestReActLoop_IncludeDirective_LazyLoadEndToEnd tests the full lazy loading cycle:
+// 1. Load skill with include directives -> hint appears (NOT eagerly expanded)
+// 2. Use load_skill_resources to load the included file -> content appears in next prompt
+// This verifies that the progressive disclosure of include directives works end-to-end.
+func TestReActLoop_IncludeDirective_LazyLoadEndToEnd(t *testing.T) {
+	vfs := filesys.NewVirtualFs()
+	vfs.AddFile("inc-skill/SKILL.md", `---
+name: inc-skill
+description: Skill with include directives
+---
+# Include Test
+
+<!-- include: guide.md -->
+
+## End
+`)
+	vfs.AddFile("inc-skill/guide.md", "# Guide Content\n\nStep 1: Do something\nStep 2: Do more\n")
+
+	skillLoaded := false
+	resourceLoaded := false
+	var mainPrompts []string
+
+	reactIns := NewSkillTestReAct(t, vfs,
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			prompt := req.GetPrompt()
+
+			if rsp, err, handled := handleNonMainPrompt(prompt, i); handled {
+				return rsp, err
+			}
+
+			mainPrompts = append(mainPrompts, prompt)
+
+			// Step 1: load the skill
+			if !skillLoaded && strings.Contains(prompt, "loading_skills") {
+				skillLoaded = true
+				return makeLoadSkillResponse(i, "inc-skill")
+			}
+
+			// Step 2: after skill loaded, load the included resource via load_skill_resources
+			if !resourceLoaded && skillLoaded && strings.Contains(prompt, "@inc-skill/guide.md") {
+				resourceLoaded = true
+				return makeLoadSkillResourceResponse(i, "@inc-skill/guide.md")
+			}
+
+			return makeFinishResponse(i)
+		}),
+	)
+
+	loop, err := reactloops.NewReActLoop("include-e2e-test", reactIns)
+	if err != nil {
+		t.Fatalf("failed to create loop: %v", err)
+	}
+	_ = loop.Execute("test", context.Background(), "load inc-skill and read guide")
+
+	if len(mainPrompts) < 3 {
+		t.Fatalf("expected at least 3 main prompts (before load, after skill load, after resource load), got %d", len(mainPrompts))
+	}
+
+	// Phase 1: after skill load - hint should be present, content should NOT
+	afterSkillLoad := mainPrompts[1]
+	if strings.Contains(afterSkillLoad, "Guide Content") {
+		t.Error("after skill load: guide content should NOT be eagerly expanded")
+	}
+	if !strings.Contains(afterSkillLoad, "@inc-skill/guide.md") {
+		t.Error("after skill load: resource hint @inc-skill/guide.md should be present")
+	}
+
+	// Phase 2: after resource load - actual content should now be visible
+	afterResourceLoad := mainPrompts[len(mainPrompts)-1]
+	if !strings.Contains(afterResourceLoad, "Guide Content") {
+		t.Error("after resource load: guide content should appear via load_skill_resources")
+	}
+	if !strings.Contains(afterResourceLoad, "Step 1") {
+		t.Error("after resource load: guide steps should appear via load_skill_resources")
+	}
+
+	t.Logf("Lazy include E2E test passed: %d prompts, skill=%v resource=%v", len(mainPrompts), skillLoaded, resourceLoaded)
 }
 
 // TestReActLoop_CrossSkillHints tests that cross-skill references appear as hints.
@@ -399,4 +493,159 @@ func TestReActLoop_LoadingSkills_EnhancedFeedback(t *testing.T) {
 	}
 
 	t.Logf("Enhanced feedback test passed with %d main prompts", len(mainPrompts))
+}
+
+// TestReActLoop_SkillsContext_VisibleInAllSubsequentCallbacks verifies that once a skill
+// is loaded, EVERY subsequent AICallback invocation receives a prompt containing the
+// SKILLS_CONTEXT section with the loaded skill content. This is the core contract:
+// skills must participate in all subsequent AI interactions via GetPrompt().
+func TestReActLoop_SkillsContext_VisibleInAllSubsequentCallbacks(t *testing.T) {
+	vfs := BuildResourceTestVFS()
+
+	skillLoaded := false
+	totalMainCalls := 0
+	mainCallsWithSkillsContext := 0
+	mainCallsWithSkillHeader := 0
+	var postLoadPrompts []string
+
+	reactIns := NewSkillTestReAct(t, vfs,
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			prompt := req.GetPrompt()
+
+			if rsp, err, handled := handleNonMainPrompt(prompt, i); handled {
+				return rsp, err
+			}
+
+			totalMainCalls++
+
+			// Step 1: first main call -> load skill
+			if !skillLoaded && strings.Contains(prompt, "loading_skills") {
+				skillLoaded = true
+				return makeLoadSkillResponse(i, "recon")
+			}
+
+			// After skill is loaded, every main prompt must contain SKILLS_CONTEXT
+			if skillLoaded {
+				postLoadPrompts = append(postLoadPrompts, prompt)
+				if strings.Contains(prompt, "SKILLS_CONTEXT") {
+					mainCallsWithSkillsContext++
+				}
+				if strings.Contains(prompt, "=== Skill: recon ===") {
+					mainCallsWithSkillHeader++
+				}
+			}
+
+			return makeFinishResponse(i)
+		}),
+	)
+
+	loop, err := reactloops.NewReActLoop("visibility-test", reactIns)
+	if err != nil {
+		t.Fatalf("failed to create loop: %v", err)
+	}
+	_ = loop.Execute("test", context.Background(), "load recon skill")
+
+	// Verify that the skill was actually loaded
+	mgr := loop.GetSkillsContextManager()
+	if mgr == nil {
+		t.Fatal("SkillsContextManager should not be nil")
+	}
+	if !mgr.IsSkillLoaded("recon") {
+		t.Fatal("recon skill should be loaded")
+	}
+
+	// There must be at least 1 post-load main prompt
+	if len(postLoadPrompts) == 0 {
+		t.Fatal("expected at least 1 main prompt after skill loading, got 0")
+	}
+
+	// ALL post-load main prompts must contain SKILLS_CONTEXT
+	if mainCallsWithSkillsContext != len(postLoadPrompts) {
+		t.Errorf("SKILLS_CONTEXT should appear in ALL %d post-load main prompts, but only appeared in %d",
+			len(postLoadPrompts), mainCallsWithSkillsContext)
+	}
+
+	// ALL post-load main prompts must contain the loaded skill header
+	if mainCallsWithSkillHeader != len(postLoadPrompts) {
+		t.Errorf("'=== Skill: recon ===' should appear in ALL %d post-load main prompts, but only appeared in %d",
+			len(postLoadPrompts), mainCallsWithSkillHeader)
+	}
+
+	t.Logf("Visibility test passed: %d total main calls, %d post-load prompts, all contain SKILLS_CONTEXT",
+		totalMainCalls, len(postLoadPrompts))
+}
+
+// TestReActLoop_SkillsContext_ContentPersistsAcrossMultipleIterations verifies that
+// loaded skill content persists across multiple ReAct loop iterations. The AI should
+// see the skill content in every iteration, not just the one immediately after loading.
+func TestReActLoop_SkillsContext_ContentPersistsAcrossMultipleIterations(t *testing.T) {
+	vfs := BuildResourceTestVFS()
+
+	skillLoaded := false
+	resourceLoaded := false
+	iterationCount := 0
+	maxExtraIterations := 3
+	var allPostLoadPrompts []string
+
+	reactIns := NewSkillTestReAct(t, vfs,
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			prompt := req.GetPrompt()
+
+			if rsp, err, handled := handleNonMainPrompt(prompt, i); handled {
+				return rsp, err
+			}
+
+			// Step 1: load skill
+			if !skillLoaded && strings.Contains(prompt, "loading_skills") {
+				skillLoaded = true
+				return makeLoadSkillResponse(i, "recon")
+			}
+
+			// Step 2: after skill is loaded, load a resource
+			if skillLoaded && !resourceLoaded && strings.Contains(prompt, "load_skill_resources") {
+				resourceLoaded = true
+				return makeLoadSkillResourceResponse(i, "@recon/osint.md")
+			}
+
+			// Step 3: after resource loaded, do a few more iterations before finishing
+			if resourceLoaded {
+				allPostLoadPrompts = append(allPostLoadPrompts, prompt)
+				iterationCount++
+				if iterationCount < maxExtraIterations {
+					rsp := i.NewAIResponse()
+					rsp.EmitOutputStream(bytes.NewBufferString(
+						`{"@action": "directly_answer", "answer_payload": "continuing iteration"}`))
+					rsp.Close()
+					return rsp, nil
+				}
+			}
+
+			return makeFinishResponse(i)
+		}),
+	)
+
+	loop, err := reactloops.NewReActLoop("persistence-test", reactIns)
+	if err != nil {
+		t.Fatalf("failed to create loop: %v", err)
+	}
+	_ = loop.Execute("test", context.Background(), "load recon and osint then continue")
+
+	if len(allPostLoadPrompts) == 0 {
+		t.Fatal("expected at least 1 post-resource-load main prompt")
+	}
+
+	for idx, prompt := range allPostLoadPrompts {
+		if !strings.Contains(prompt, "SKILLS_CONTEXT") {
+			t.Errorf("iteration %d: SKILLS_CONTEXT missing from prompt", idx+1)
+		}
+		if !strings.Contains(prompt, "=== Skill: recon ===") {
+			t.Errorf("iteration %d: loaded skill header missing from prompt", idx+1)
+		}
+		if !strings.Contains(prompt, "osint.md") {
+			t.Errorf("iteration %d: loaded resource osint.md missing from prompt", idx+1)
+		}
+	}
+
+	t.Logf("Persistence test passed: skill+resource content persisted across %d post-load iterations",
+		len(allPostLoadPrompts))
 }

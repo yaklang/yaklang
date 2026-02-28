@@ -722,7 +722,7 @@ func TestResolveIncludes_LargeFile(t *testing.T) {
 	}
 }
 
-func TestResolveIncludes_SkillMDWithIncludes(t *testing.T) {
+func TestResolveIncludes_SkillMDWithIncludes_LazyLoading(t *testing.T) {
 	vfs := filesys.NewVirtualFs()
 	vfs.AddFile("inc-skill/SKILL.md", buildTestSkillMD("inc-skill", "Skill with includes",
 		"# Main\n\n<!-- include: guide.md -->\n\nEnd"))
@@ -739,11 +739,96 @@ func TestResolveIncludes_SkillMDWithIncludes(t *testing.T) {
 	}
 
 	rendered := mgr.Render("n")
-	if !strings.Contains(rendered, "# Guide") {
-		t.Error("rendered context should contain included guide content")
+
+	// Include directives should NOT be eagerly expanded
+	if strings.Contains(rendered, "# Guide") {
+		t.Error("rendered context should NOT contain eagerly expanded guide content")
 	}
-	if !strings.Contains(rendered, "Step 1") {
-		t.Error("rendered context should contain included guide steps")
+	if strings.Contains(rendered, "Step 1") {
+		t.Error("rendered context should NOT contain eagerly expanded guide steps")
+	}
+
+	// Instead, should contain a resource loading hint
+	if !strings.Contains(rendered, "load_skill_resources") {
+		t.Error("rendered context should contain load_skill_resources hint for included file")
+	}
+	if !strings.Contains(rendered, "@inc-skill/guide.md") {
+		t.Error("rendered context should contain the resource path @inc-skill/guide.md")
+	}
+}
+
+// --- TransformIncludesToResourceHints tests ---
+
+func TestTransformIncludesToResourceHints_Basic(t *testing.T) {
+	content := "Before\n<!-- include: guide.md -->\nAfter"
+	result := TransformIncludesToResourceHints(content, "my-skill")
+
+	if strings.Contains(result, "<!-- include:") {
+		t.Error("include directive should be replaced")
+	}
+	if !strings.Contains(result, "load_skill_resources") {
+		t.Error("result should contain load_skill_resources hint")
+	}
+	if !strings.Contains(result, "@my-skill/guide.md") {
+		t.Error("result should contain the resource path @my-skill/guide.md")
+	}
+	if !strings.Contains(result, "Before") || !strings.Contains(result, "After") {
+		t.Error("surrounding content should be preserved")
+	}
+}
+
+func TestTransformIncludesToResourceHints_MultipleIncludes(t *testing.T) {
+	content := "Start\n<!-- include: a.md -->\nMiddle\n<!-- include: b.md -->\nEnd"
+	result := TransformIncludesToResourceHints(content, "test-skill")
+
+	if !strings.Contains(result, "@test-skill/a.md") {
+		t.Error("should contain hint for a.md")
+	}
+	if !strings.Contains(result, "@test-skill/b.md") {
+		t.Error("should contain hint for b.md")
+	}
+	if !strings.Contains(result, "Middle") {
+		t.Error("surrounding text should be preserved")
+	}
+	if strings.Contains(result, "<!-- include:") {
+		t.Error("no include directives should remain")
+	}
+}
+
+func TestTransformIncludesToResourceHints_NoDirectives(t *testing.T) {
+	content := "Just regular markdown content."
+	result := TransformIncludesToResourceHints(content, "my-skill")
+
+	if result != content {
+		t.Error("content without directives should be unchanged")
+	}
+}
+
+func TestTransformIncludesToResourceHints_SubdirectoryPath(t *testing.T) {
+	content := "<!-- include: references/detailed-guide.md -->"
+	result := TransformIncludesToResourceHints(content, "deploy-app")
+
+	if !strings.Contains(result, "@deploy-app/references/detailed-guide.md") {
+		t.Errorf("should contain full resource path, got %q", result)
+	}
+}
+
+func TestTransformIncludesToResourceHints_SpacingVariants(t *testing.T) {
+	tests := []string{
+		"<!-- include: file.md -->",
+		"<!--include: file.md-->",
+		"<!--  include:  file.md  -->",
+		"<!-- include:file.md -->",
+	}
+
+	for _, directive := range tests {
+		result := TransformIncludesToResourceHints(directive, "s")
+		if !strings.Contains(result, "load_skill_resources") {
+			t.Errorf("directive %q should be transformed, got %q", directive, result)
+		}
+		if !strings.Contains(result, "@s/file.md") {
+			t.Errorf("directive %q should produce @s/file.md hint, got %q", directive, result)
+		}
 	}
 }
 
