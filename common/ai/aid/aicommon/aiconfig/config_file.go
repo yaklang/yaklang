@@ -57,7 +57,7 @@ func ConfigEntryToModelConfig(entry AIModelConfigEntry) *ypb.AIModelConfig {
 	}
 	extras := make([]*ypb.KVPair, 0, len(entry.ExtraParams))
 	for k, v := range entry.ExtraParams {
-		if k == modelExtraParamKey {
+		if k == consts.ModelExtraParamKey {
 			continue
 		}
 		extras = append(extras, &ypb.KVPair{Key: k, Value: v})

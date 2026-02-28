@@ -91,7 +91,7 @@ var (
 	}
 )
 
-func ProcessHotPatchMessage(e *ypb.AIInputEvent) []ConfigOption {
+func (c *Config) ProcessHotPatchMessage(e *ypb.AIInputEvent) []ConfigOption {
 	if !e.IsConfigHotpatch {
 		return nil
 	}
@@ -151,6 +151,19 @@ func ProcessHotPatchMessage(e *ypb.AIInputEvent) []ConfigOption {
 	}
 
 	if e.HotpatchType == HotPatchType_ModelName {
+		serviceName := c.AiServerName
+		modelName := hotPatchParams.GetAIModelName()
+		defaultOpts := make([]aispec.AIConfigOption, 0, 1)
+		if modelName != "" {
+			defaultOpts = append(defaultOpts, aispec.WithModel(modelName))
+		}
+		chat, loadErr := hotPatchLoadChater(serviceName, defaultOpts...)
+		if loadErr != nil {
+			log.Errorf("load ai service failed: %v", loadErr)
+		} else {
+			aiOption = append(aiOption, WithQualityPriorityAICallback(AIChatToAICallbackType(chat)))
+			aiOption = append(aiOption, WithAIModelName(hotPatchParams.GetAIModelName()))
+		}
 		log.Warnf("HotPatch ModelName is deprecated, " +
 			"model info is now auto-detected from the actual AI gateway call")
 	}

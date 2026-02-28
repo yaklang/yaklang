@@ -10,15 +10,6 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-const (
-	routingPolicyAuto        = string(consts.PolicyAuto)
-	routingPolicyPerformance = string(consts.PolicyPerformance)
-	routingPolicyCost        = string(consts.PolicyCost)
-	routingPolicyBalance     = string(consts.PolicyBalance)
-	defaultRoutingPolicy     = routingPolicyBalance
-	modelExtraParamKey       = "model"
-)
-
 var (
 	configLoadedOnce sync.Once
 	configLoaded     bool
@@ -107,7 +98,7 @@ func buildDefaultAIGlobalConfig() *ypb.AIGlobalConfig {
 				ProviderId: aibalanceId,
 				ModelName:  "memfit-standard-free",
 				ExtraParams: []*ypb.KVPair{
-					{Key: modelExtraParamKey, Value: "memfit-standard-free"},
+					{Key: consts.ModelExtraParamKey, Value: "memfit-standard-free"},
 				},
 			},
 		},
@@ -116,7 +107,7 @@ func buildDefaultAIGlobalConfig() *ypb.AIGlobalConfig {
 				ProviderId: aibalanceId,
 				ModelName:  "memfit-light-free",
 				ExtraParams: []*ypb.KVPair{
-					{Key: modelExtraParamKey, Value: "memfit-light-free"},
+					{Key: consts.ModelExtraParamKey, Value: "memfit-light-free"},
 				},
 			},
 		},
@@ -125,7 +116,7 @@ func buildDefaultAIGlobalConfig() *ypb.AIGlobalConfig {
 				ProviderId: aibalanceId,
 				ModelName:  "memfit-vision-free",
 				ExtraParams: []*ypb.KVPair{
-					{Key: modelExtraParamKey, Value: "memfit-vision-free"},
+					{Key: consts.ModelExtraParamKey, Value: "memfit-vision-free"},
 				},
 			},
 		},
@@ -148,12 +139,12 @@ func buildAIGlobalConfigFromNetworkConfig(c *ypb.GlobalNetworkConfig) *ypb.AIGlo
 	}
 
 	if cfg.RoutingPolicy == "" {
-		cfg.RoutingPolicy = defaultRoutingPolicy
+		cfg.RoutingPolicy = consts.DefaultRoutingPolicy
 	}
 
-	cfg.IntelligentModels = buildAIModelConfigs(c.GetIntelligentAIModelConfig())
-	cfg.LightweightModels = buildAIModelConfigs(c.GetLightweightAIModelConfig())
-	cfg.VisionModels = buildAIModelConfigs(c.GetVisionAIModelConfig())
+	cfg.IntelligentModels = consts.BuildAIModelConfigs(c.GetIntelligentAIModelConfig())
+	cfg.LightweightModels = consts.BuildAIModelConfigs(c.GetLightweightAIModelConfig())
+	cfg.VisionModels = consts.BuildAIModelConfigs(c.GetVisionAIModelConfig())
 
 	return cfg
 }
@@ -170,7 +161,7 @@ func buildAIGlobalConfigFromTiered(tiered *consts.TieredAIConfig) *ypb.AIGlobalC
 		GlobalWeight:    tiered.GlobalWeight,
 	}
 	if cfg.RoutingPolicy == "" {
-		cfg.RoutingPolicy = defaultRoutingPolicy
+		cfg.RoutingPolicy = consts.DefaultRoutingPolicy
 	}
 
 	cfg.IntelligentModels = cloneAIModelConfigs(tiered.IntelligentConfigs)
@@ -180,21 +171,6 @@ func buildAIGlobalConfigFromTiered(tiered *consts.TieredAIConfig) *ypb.AIGlobalC
 	return cfg
 }
 
-func buildAIModelConfigs(configs []*ypb.ThirdPartyApplicationConfig) []*ypb.AIModelConfig {
-	if len(configs) == 0 {
-		return nil
-	}
-	models := make([]*ypb.AIModelConfig, 0, len(configs))
-	for _, cfg := range configs {
-		model := thirdPartyConfigToModelConfig(cfg)
-		if model == nil {
-			continue
-		}
-		models = append(models, model)
-	}
-	return models
-}
-
 func cloneAIModelConfigs(configs []*ypb.AIModelConfig) []*ypb.AIModelConfig {
 	if len(configs) == 0 {
 		return nil
@@ -202,38 +178,6 @@ func cloneAIModelConfigs(configs []*ypb.AIModelConfig) []*ypb.AIModelConfig {
 	models := make([]*ypb.AIModelConfig, 0, len(configs))
 	models = append(models, configs...)
 	return models
-}
-
-func thirdPartyConfigToModelConfig(cfg *ypb.ThirdPartyApplicationConfig) *ypb.AIModelConfig {
-	if cfg == nil {
-		return nil
-	}
-	modelName := ""
-	extras := make([]*ypb.KVPair, 0)
-	for _, kv := range cfg.GetExtraParams() {
-		if kv.GetKey() == modelExtraParamKey {
-			modelName = kv.GetValue()
-			continue
-		}
-		extras = append(extras, &ypb.KVPair{Key: kv.GetKey(), Value: kv.GetValue()})
-	}
-
-	provider := &ypb.ThirdPartyApplicationConfig{
-		Type:           cfg.GetType(),
-		APIKey:         cfg.GetAPIKey(),
-		UserIdentifier: cfg.GetUserIdentifier(),
-		UserSecret:     cfg.GetUserSecret(),
-		Namespace:      cfg.GetNamespace(),
-		Domain:         cfg.GetDomain(),
-		WebhookURL:     cfg.GetWebhookURL(),
-		Disabled:       cfg.GetDisabled(),
-	}
-
-	return &ypb.AIModelConfig{
-		Provider:    provider,
-		ModelName:   modelName,
-		ExtraParams: extras,
-	}
 }
 
 func warnIfLegacyConfigFileExists() {
@@ -254,22 +198,22 @@ func loadTieredConfigFromNetworkConfig(c *ypb.GlobalNetworkConfig) {
 	tieredConfig := &consts.TieredAIConfig{
 		Enabled:            c.GetEnableTieredAIModelConfig(),
 		DisableFallback:    false,
-		IntelligentConfigs: buildAIModelConfigs(c.GetIntelligentAIModelConfig()),
-		LightweightConfigs: buildAIModelConfigs(c.GetLightweightAIModelConfig()),
-		VisionConfigs:      buildAIModelConfigs(c.GetVisionAIModelConfig()),
+		IntelligentConfigs: consts.BuildAIModelConfigs(c.GetIntelligentAIModelConfig()),
+		LightweightConfigs: consts.BuildAIModelConfigs(c.GetLightweightAIModelConfig()),
+		VisionConfigs:      consts.BuildAIModelConfigs(c.GetVisionAIModelConfig()),
 	}
 
 	// Parse routing policy from TieredAIModelConfig
 	if c.GetTieredAIModelConfig() != nil {
 		policy := c.GetTieredAIModelConfig().GetModelRoutingPolicy()
 		switch policy {
-		case routingPolicyAuto:
+		case consts.RoutingPolicyAuto:
 			tieredConfig.RoutingPolicy = consts.PolicyAuto
-		case routingPolicyPerformance:
+		case consts.RoutingPolicyPerformance:
 			tieredConfig.RoutingPolicy = consts.PolicyPerformance
-		case routingPolicyCost:
+		case consts.RoutingPolicyCost:
 			tieredConfig.RoutingPolicy = consts.PolicyCost
-		case routingPolicyBalance:
+		case consts.RoutingPolicyBalance:
 			tieredConfig.RoutingPolicy = consts.PolicyBalance
 		default:
 			tieredConfig.RoutingPolicy = consts.PolicyBalance

@@ -149,3 +149,59 @@ func IsTieredAIFallbackDisabled() bool {
 	}
 	return tieredAIConfig.DisableFallback
 }
+
+func BuildAIModelConfigs(configs []*ypb.ThirdPartyApplicationConfig) []*ypb.AIModelConfig {
+	if len(configs) == 0 {
+		return nil
+	}
+	models := make([]*ypb.AIModelConfig, 0, len(configs))
+	for _, cfg := range configs {
+		model := thirdPartyConfigToModelConfig(cfg)
+		if model == nil {
+			continue
+		}
+		models = append(models, model)
+	}
+	return models
+}
+
+func thirdPartyConfigToModelConfig(cfg *ypb.ThirdPartyApplicationConfig) *ypb.AIModelConfig {
+	if cfg == nil {
+		return nil
+	}
+	modelName := ""
+	extras := make([]*ypb.KVPair, 0)
+	for _, kv := range cfg.GetExtraParams() {
+		if kv.GetKey() == ModelExtraParamKey {
+			modelName = kv.GetValue()
+			continue
+		}
+		extras = append(extras, &ypb.KVPair{Key: kv.GetKey(), Value: kv.GetValue()})
+	}
+
+	provider := &ypb.ThirdPartyApplicationConfig{
+		Type:           cfg.GetType(),
+		APIKey:         cfg.GetAPIKey(),
+		UserIdentifier: cfg.GetUserIdentifier(),
+		UserSecret:     cfg.GetUserSecret(),
+		Namespace:      cfg.GetNamespace(),
+		Domain:         cfg.GetDomain(),
+		WebhookURL:     cfg.GetWebhookURL(),
+		Disabled:       cfg.GetDisabled(),
+	}
+
+	return &ypb.AIModelConfig{
+		Provider:    provider,
+		ModelName:   modelName,
+		ExtraParams: extras,
+	}
+}
+
+const (
+	RoutingPolicyAuto        = string(PolicyAuto)
+	RoutingPolicyPerformance = string(PolicyPerformance)
+	RoutingPolicyCost        = string(PolicyCost)
+	RoutingPolicyBalance     = string(PolicyBalance)
+	DefaultRoutingPolicy     = RoutingPolicyBalance
+	ModelExtraParamKey       = "model"
+)

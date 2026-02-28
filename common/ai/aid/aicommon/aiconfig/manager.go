@@ -220,7 +220,7 @@ func getModelFromConfig(config *ypb.AIModelConfig) string {
 		if param == nil {
 			continue
 		}
-		if strings.EqualFold(strings.TrimSpace(param.GetKey()), modelExtraParamKey) {
+		if strings.EqualFold(strings.TrimSpace(param.GetKey()), consts.ModelExtraParamKey) {
 			return param.GetValue()
 		}
 	}
@@ -228,7 +228,7 @@ func getModelFromConfig(config *ypb.AIModelConfig) string {
 		if param == nil {
 			continue
 		}
-		if strings.EqualFold(strings.TrimSpace(param.GetKey()), modelExtraParamKey) {
+		if strings.EqualFold(strings.TrimSpace(param.GetKey()), consts.ModelExtraParamKey) {
 			return param.GetValue()
 		}
 	}
