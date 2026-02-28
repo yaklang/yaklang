@@ -131,6 +131,9 @@ func (y *builder) VisitFormalParameter(raw phpparser.IFormalParameterContext, in
 	_, _, _ = typeHint, isRef, isVariadic
 	formalParams, defaultValue := y.VisitVariableInitializer(i.VariableInitializer())
 	param := y.NewParam(formalParams)
+	if isVariadic != nil {
+		y.HandlerEllipsis()
+	}
 	if defaultValue != nil {
 		param.SetDefault(defaultValue)
 		if t := defaultValue.GetType(); t != nil {

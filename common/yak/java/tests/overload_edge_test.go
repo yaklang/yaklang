@@ -176,4 +176,72 @@ class Main {
 			ssaapi.WithLanguage(ssaconfig.JAVA),
 		)
 	})
+
+	t.Run("complex direct calls with alias select different overload candidates", func(t *testing.T) {
+		code := `
+class A {
+	int value;
+	void set(int num) {
+		this.value = 81;
+	}
+	void set(String raw) {
+		this.value = 82;
+	}
+	int get() {
+		return this.value;
+	}
+}
+class Main {
+	void main() {
+		A a = new A();
+		A alias = a;
+		alias.set(1);
+		print(a.get());
+		a.set("x");
+		print(alias.get());
+	}
+}
+`
+		ssatest.CheckSyntaxFlow(t, code,
+			`print(* #-> * as $target)`,
+			map[string][]string{
+				"target": {"81", "82"},
+			},
+			ssaapi.WithLanguage(ssaconfig.JAVA),
+		)
+	})
+
+	t.Run("constructor overload through direct creation and alias chain", func(t *testing.T) {
+		code := `
+class Box {
+	int value;
+	Box(int num) {
+		this.value = 91;
+	}
+	Box(String raw) {
+		this.value = 92;
+	}
+	int get() {
+		return this.value;
+	}
+}
+class Main {
+	void main() {
+		Box first = new Box(1);
+		Box alias1 = first;
+		print(alias1.get());
+		Box second = new Box("x");
+		Box alias2 = second;
+		print(alias2.get());
+	}
+}
+`
+		ssatest.CheckSyntaxFlow(t, code,
+			`print(* #-> * as $target)`,
+			map[string][]string{
+				"target": {"91", "92"},
+			},
+			ssaapi.WithLanguage(ssaconfig.JAVA),
+		)
+	})
 }

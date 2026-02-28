@@ -138,6 +138,7 @@ func (s *SSABuilder) BuildFromAST(raw ssa.FrontAST, b *ssa.FunctionBuilder) erro
 				return id
 			},
 			currentInclude: make(map[string]struct{}),
+			refAlias:       make(map[string]string),
 		}
 		build.callback = func(str string, filename string) {
 			files, ok := b.GetProgram().GetApplication().LibraryFile[str]
@@ -193,11 +194,48 @@ type builder struct {
 	callback       func(str string, filename string)
 	fetchDollarId  func() int
 	currentInclude map[string]struct{}
+	refAlias       map[string]string
 	stableNameSeq  int
 }
 
 func (y *builder) nextPHPStableName(prefix string) string {
 	return ssa.NextStableName(prefix, &y.stableNameSeq, "tmp")
+}
+
+func (y *builder) bindReferenceAlias(alias, target string) {
+	if y == nil || alias == "" || target == "" || alias == target {
+		return
+	}
+	if y.refAlias == nil {
+		y.refAlias = make(map[string]string)
+	}
+	y.refAlias[alias] = y.resolveReferenceAlias(target)
+}
+
+func (y *builder) clearReferenceAlias(alias string) {
+	if y == nil || y.refAlias == nil || alias == "" {
+		return
+	}
+	delete(y.refAlias, alias)
+}
+
+func (y *builder) resolveReferenceAlias(name string) string {
+	if y == nil || y.refAlias == nil || name == "" {
+		return name
+	}
+	current := name
+	visited := map[string]struct{}{current: {}}
+	for {
+		next, ok := y.refAlias[current]
+		if !ok || next == "" || next == current {
+			return current
+		}
+		if _, seen := visited[next]; seen {
+			return current
+		}
+		visited[next] = struct{}{}
+		current = next
+	}
 }
 
 func Frontend(src string, caches ...*ssa.AntlrCache) (phpparser.IHtmlDocumentContext, error) {

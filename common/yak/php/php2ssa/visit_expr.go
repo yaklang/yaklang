@@ -396,6 +396,28 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) (v ssa.Value
 		rightValue = y.reduceAssignCalcExpression(ret.AssignmentOperator().GetText(), variable, rightValue)
 		y.AssignVariable(variable, rightValue)
 		return rightValue
+	case *phpparser.ReferenceAssignmentExpressionContext:
+		rightValue := y.VisitExpression(ret.Expression())
+		leftName, hasLeft := y.getSimpleFlexiVariableRawName(ret.FlexiVariable())
+		if hasLeft {
+			if rhsExpr, ok := ret.Expression().(*phpparser.VariableExpressionContext); ok {
+				if rightName, hasRight := y.getSimpleFlexiVariableRawName(rhsExpr.FlexiVariable()); hasRight {
+					y.bindReferenceAlias(leftName, rightName)
+				}
+			} else {
+				y.clearReferenceAlias(leftName)
+			}
+			target := y.resolveReferenceAlias(leftName)
+			variable := y.CreateVariable(target)
+			if rhsCurrent := y.ReadValue(target); !utils.IsNil(rhsCurrent) {
+				rightValue = rhsCurrent
+			}
+			y.AssignVariable(variable, rightValue)
+			return rightValue
+		}
+		variable := y.VisitLeftVariable(ret.FlexiVariable())
+		y.AssignVariable(variable, rightValue)
+		return rightValue
 
 	case *phpparser.LogicalExpressionContext:
 		id := y.nextPHPStableName("logical")
@@ -1245,6 +1267,33 @@ func (y *builder) VisitRightValue(raw phpparser.IFlexiVariableContext) ssa.Value
 	}
 }
 
+func (y *builder) getSimpleFlexiVariableRawName(raw phpparser.IFlexiVariableContext) (string, bool) {
+	if y == nil || raw == nil {
+		return "", false
+	}
+	custom, ok := raw.(*phpparser.CustomVariableContext)
+	if !ok || custom.Variable() == nil {
+		return "", false
+	}
+	name := y.VisitVariableRaw(custom.Variable())
+	if name == "" {
+		return "", false
+	}
+	return name, true
+}
+
+func (y *builder) VisitVariableRaw(raw phpparser.IVariableContext) string {
+	if y == nil || raw == nil {
+		return ""
+	}
+	switch ret := raw.(type) {
+	case *phpparser.NormalVariableContext:
+		return ret.VarName().GetText()
+	default:
+		return y.VisitVariable(raw)
+	}
+}
+
 func (y *builder) VisitVariable(raw phpparser.IVariableContext) string {
 	if y == nil || raw == nil || y.IsStop() {
 		return ""
@@ -1253,7 +1302,7 @@ func (y *builder) VisitVariable(raw phpparser.IVariableContext) string {
 	defer recoverRange()
 	switch ret := raw.(type) {
 	case *phpparser.NormalVariableContext:
-		return ret.VarName().GetText()
+		return y.resolveReferenceAlias(ret.VarName().GetText())
 
 	case *phpparser.DynamicVariableContext:
 		id := ret.VarName().GetText()

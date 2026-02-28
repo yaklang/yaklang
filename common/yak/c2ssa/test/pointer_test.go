@@ -725,4 +725,30 @@ void vulnerable_file_list(const char *directory) {
 		`, []string{"side-effect(Parameter-directory, command)"}, t)
 	})
 
+	t.Run("nested pointer side-effect chain", func(t *testing.T) {
+		test.CheckPrintlnValueContain(`#include <stdio.h>
+
+void modify(int* left, int* right, int cond) {
+	if (cond > 0) {
+		*left = 11;
+		*right = 22;
+	} else {
+		*left = 33;
+		*right = 44;
+	}
+}
+
+int main() {
+	int x = 1;
+	int y = 2;
+	modify(&x, &y, flag);
+	println(x);
+	println(y);
+}
+	`, []string{
+			"side-effect(phi(x)[11,33], x)",
+			"side-effect(phi(y)[22,44], y)",
+		}, t)
+	})
+
 }

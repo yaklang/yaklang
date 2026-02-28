@@ -242,6 +242,15 @@ func handleSideEffect(c *Call, funcTyp *FunctionType, buildPointer bool) {
 				}
 			}
 		}
+		if pm, ok := ToParameterMember(modify); ok && se.Kind == PointerSideEffect {
+			if v, ok := pm.GetActualCallParam(c); ok && !utils.IsNil(v) {
+				modify = v
+				if modify.GetBlock() == nil || modify.GetBlock().ScopeTable == nil {
+					log.Warnf("[ssa.handleSideEffect] skip pointer member side effect %s: resolved modify value missing block", se.Name)
+					continue
+				}
+			}
+		}
 
 		var variable *Variable
 		if _, ok := ToFunction(modify); ok {

@@ -327,3 +327,36 @@ var a = x
 		fmt.Println("  5. TopDef 处理 SideEffect 时只追踪 SideEffect.Value = 222222")
 	})
 }
+
+func TestTopDef_ClassCallbackSideEffectChain(t *testing.T) {
+	code := `
+var listeners = {}
+var seed = 1
+var on = (event, handler) => {
+	listeners[event] = handler
+}
+var emit = (event, data) => {
+	var h = listeners[event]
+	if (h) {
+		h(data)
+	}
+}
+
+on("update", (v) => {
+	if (v > 0) {
+		seed = 222222
+	} else {
+		seed = 333333
+	}
+})
+emit("update", 1)
+var a = seed
+`
+	ssatest.CheckSyntaxFlow(t, code, `a #-> as $res`, map[string][]string{
+		"res": {
+			"1",
+			"222222",
+			"333333",
+		},
+	}, ssaapi.WithLanguage(ssaconfig.TS))
+}
