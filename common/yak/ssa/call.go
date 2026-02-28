@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
@@ -383,6 +384,15 @@ func (c *Call) handleCalleeFunction() {
 			break
 		}
 		for _, p := range funcTyp.ParameterMember {
+			wantFunction := false
+			if typ := p.GetType(); typ != nil {
+				if typ.GetTypeKind() == FunctionTypeKind {
+					wantFunction = true
+				}
+				if _, ok := ToFunctionType(typ); ok {
+					wantFunction = true
+				}
+			}
 
 			objectName := p.ObjectName
 			key, ok := p.GetValueById(p.MemberCallKey)
@@ -410,7 +420,31 @@ func (c *Call) handleCalleeFunction() {
 				continue
 			}
 
-			if res := checkCanMemberCallExist(object, actualKey); !res.exist {
+			// Variadic parameter member access:
+			// for `fn(a, ...vals)` and `vals[0]`, map directly to the first variadic
+			// call argument when key is a constant index.
+			if funcTyp.IsVariadic && p.MemberCallKind == ParameterMemberCall {
+				memberOffset := -1
+				if keyConst, ok := ToConstInst(actualKey); ok {
+					if keyConst.IsNumber() {
+						memberOffset = int(keyConst.Number())
+					} else if parsed, err := strconv.Atoi(strings.TrimSpace(keyConst.String())); err == nil {
+						memberOffset = parsed
+					}
+				}
+				if memberOffset >= 0 {
+					argIndex := p.MemberCallObjectIndex + memberOffset
+					if argIndex < len(c.Args) {
+						if variadicArg, ok := c.GetValueById(c.Args[argIndex]); ok && !utils.IsNil(variadicArg) {
+							variadicArg.AddUser(c)
+							c.ArgMember = append(c.ArgMember, variadicArg.GetId())
+							continue
+						}
+					}
+				}
+			}
+
+			if res := checkCanMemberCallExist(object, actualKey, wantFunction); !res.exist {
 				builder.NewErrorWithPos(Error, SSATAG,
 					p.GetRange(),
 					ValueNotMember(
@@ -450,7 +484,18 @@ func (c *Call) handleCalleeFunction() {
 			}
 
 			if utils.IsNil(val) {
+				if wantFunction {
+					val = builder.ReadMemberCallMethod(object, actualKey)
+				} else {
+					val = builder.ReadMemberCallValue(object, actualKey)
+				}
+			}
+			if utils.IsNil(val) && wantFunction {
+				// Fallback for weakly typed objects where method/value boundaries are blurred.
 				val = builder.ReadMemberCallValue(object, actualKey)
+			}
+			if utils.IsNil(val) {
+				continue
 			}
 			val.AddUser(c)
 			c.ArgMember = append(c.ArgMember, val.GetId())
@@ -582,6 +627,14 @@ func (c *Call) tryGetFunctionTypeFromCallReturn(method Value) *FunctionType {
 		}
 	}
 
+	// Handle identity-like wrappers, e.g.:
+	//   const register = (cb) => cb
+	//   const f = register(update)
+	// where return value is a formal parameter that should map to call args.
+	if retFuncTyp := c.extractFunctionTypeFromReturnedArgument(innerFunc, callMethod); retFuncTyp != nil {
+		return retFuncTyp
+	}
+
 	// Fallback: check the Return statements directly
 	// This handles cases where the function type hasn't been fully resolved like a function return is a closure function
 	return c.extractFunctionTypeFromReturns(innerFunc)
@@ -615,6 +668,55 @@ func (c *Call) extractFunctionTypeFromReturns(fn *Function) *FunctionType {
 
 			if len(retFuncTyp.SideEffects) > 0 {
 				return retFuncTyp
+			}
+		}
+	}
+	return nil
+}
+
+// extractFunctionTypeFromReturnedArgument resolves function type when callee returns
+// one of its formal parameters and the actual argument is a function value.
+func (c *Call) extractFunctionTypeFromReturnedArgument(fn *Function, call *Call) *FunctionType {
+	for _, retID := range fn.Return {
+		retInst, ok := fn.GetValueById(retID)
+		if !ok || utils.IsNil(retInst) {
+			continue
+		}
+		ret, ok := ToReturn(retInst)
+		if !ok {
+			continue
+		}
+		for _, resultID := range ret.Results {
+			result, ok := fn.GetValueById(resultID)
+			if !ok || utils.IsNil(result) {
+				continue
+			}
+			param, isParam := ToParameter(result)
+			if !isParam || param.IsFreeValue {
+				continue
+			}
+			idx := param.FormalParameterIndex
+			if idx < 0 || idx >= len(call.Args) {
+				continue
+			}
+			arg, ok := c.GetValueById(call.Args[idx])
+			if !ok || utils.IsNil(arg) {
+				continue
+			}
+			if fnType, ok := ToFunctionType(arg.GetType()); ok {
+				return fnType
+			}
+			if fnValue, ok := ToFunction(arg); ok {
+				if fnValue.Type == nil {
+					fnValue.Build()
+				}
+				if fnType, ok := ToFunctionType(fnValue.GetType()); ok {
+					return fnType
+				}
+			}
+			// Support one more level, e.g. return param that itself is a call returning a function.
+			if fnType := c.tryGetFunctionTypeFromCallReturn(arg); fnType != nil {
+				return fnType
 			}
 		}
 	}

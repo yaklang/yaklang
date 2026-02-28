@@ -1,8 +1,12 @@
 package test
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	test "github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -738,4 +742,87 @@ func Test_SideEffect_MutiReturn(t *testing.T) {
 		}
 		`, []string{"side-effect(2, a)"}, t)
 	})
+}
+
+func Test_SideEffect_InterfaceDispatchAndClosureChain(t *testing.T) {
+	test.CheckPrintlnValue(`package main
+
+type Counter struct {
+	n int
+}
+
+func (c *Counter) Set(v int) {
+	c.n = v
+}
+
+func apply(c *Counter, next func() int) {
+	c.Set(next())
+}
+
+func main() {
+	c := &Counter{n: 0}
+	x := 1
+	next := func() int {
+		x = x + 2
+		return x
+	}
+	apply(c, next)
+	println(c.n)
+	println(x)
+}
+`, []string{
+		"side-effect(side-effect(Parameter-next(), c.n), c.n)",
+		"side-effect(add(FreeValue-x, 2), x)",
+	}, t)
+}
+
+func Test_InterfaceMethodArgumentTypeCheckRegression(t *testing.T) {
+	code := `package main
+
+type Counter struct {
+	n int
+}
+
+func (c *Counter) Set(v int) {
+	c.n = v
+}
+
+func (c *Counter) Bump(delta int) {
+	c.n = c.n + delta
+}
+
+type Setter interface {
+	Set(int)
+	Bump(int)
+}
+
+func apply(s Setter, next func() int) {
+	s.Set(next())
+	s.Bump(4)
+}
+
+func main() {
+	c := &Counter{n: 0}
+	x := 1
+	next := func() int {
+		x = x + 2
+		return x
+	}
+	apply(c, next)
+	println(c.n)
+	println(x)
+}
+`
+	test.Check(t, code, func(prog *ssaapi.Program) error {
+		for _, err := range prog.GetErrors() {
+			if strings.Contains(err.Message, "Not enough arguments in call") {
+				return fmt.Errorf("unexpected interface call type-check error: %s", err.Message)
+			}
+		}
+		return nil
+	}, ssaapi.WithLanguage(ssaconfig.GO))
+	test.CheckPrintlnValue(code, []string{
+		"0",
+		"side-effect(add(FreeValue-x, 2), x)",
+	}, t)
 }

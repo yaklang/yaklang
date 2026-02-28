@@ -110,6 +110,26 @@ println($c);
 		}, t)
 	})
 
+	t.Run("reference callback chain with branch", func(t *testing.T) {
+		test.CheckPrintlnValue(`<?php
+function step2(&$x){
+	if ($flag) {
+		$x = 40;
+	} else {
+		$x = 50;
+	}
+}
+
+function step1(&$x){
+	step2($x);
+}
+
+$state = 1;
+step1($state);
+println($state);
+`, []string{"side-effect(side-effect(phi($x)[40,50], $x), $state)"}, t)
+	})
+
 }
 
 func TestParseSSA_FuncCall_DefaultParameter(t *testing.T) {

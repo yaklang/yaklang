@@ -134,6 +134,26 @@ func TestResolveJavaMethodOverloadFromParentBlueprint(t *testing.T) {
 	require.Equal(t, parentMethod, y.resolveJavaMethodOverload(child, "pick", []ssa.Value{argString}))
 }
 
+func TestResolveJavaMethodOverloadTieBreakByDeclarationOrder(t *testing.T) {
+	y := newJavaBuilderForUnitTest()
+	prog := ssa.NewProgram(context.Background(), "java-overload-order-test", ssa.ProgramCacheMemory, ssa.Application, nil, "", 0)
+	class := ssa.NewBlueprint("DemoOrder")
+
+	first := prog.NewFunction("pick_first")
+	second := prog.NewFunction("pick_second")
+
+	y.registerJavaMethodOverload(class, "pick", first, []javaParamSignature{
+		{key: "number", typ: ssa.CreateNumberType()},
+	}, false)
+	y.registerJavaMethodOverload(class, "pick", second, []javaParamSignature{
+		{key: "number", typ: ssa.CreateNumberType()},
+	}, false)
+
+	fb := newJavaFunctionBuilderForUnitTest()
+	arg := fb.EmitConstInst(3)
+	require.Equal(t, first, y.resolveJavaMethodOverload(class, "pick", []ssa.Value{arg}))
+}
+
 func newJavaBuilderForUnitTest() *singleFileBuilder {
 	return &singleFileBuilder{
 		methodOverloads:      make(map[*ssa.Blueprint]map[string][]*javaCallableCandidate),
