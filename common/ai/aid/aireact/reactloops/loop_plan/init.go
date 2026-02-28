@@ -38,6 +38,8 @@ var PLAN_ENHANCE_KEY = "plan_enhance"
 var PLAN_ENHANCE_COUNT = "plan_enhance_count"
 var PLAN_PROMPT_KEY = "plan_prompt" // Additional context for plan phase only
 
+const PlanMaxIterations = 3
+
 //go:embed prompts/output_example.txt
 var outputExample string
 
@@ -60,6 +62,7 @@ func init() {
 				reactloops.WithAllowPlanAndExec(false),
 				reactloops.WithInitTask(buildPlanInitTask(r)),
 				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
+				reactloops.WithMaxIterations(PlanMaxIterations),
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 				reactloops.WithPersistentContextProvider(func(loop *reactloops.ReActLoop, nonce string) (string, error) {
 					return utils.RenderTemplate(persistentInstruction, map[string]any{
@@ -72,11 +75,19 @@ func init() {
 				reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
 					currentPlan := loop.Get(PLAN_DATA_KEY)
 					enhance := loop.Get(PLAN_ENHANCE_KEY)
+					currentIter := loop.GetCurrentIterationIndex()
+					maxIter := loop.GetMaxIterations()
+					isLastIteration := currentIter+1 >= maxIter
+					if isLastIteration {
+						loop.RemoveAction("search_knowledge")
+						log.Infof("plan loop: last iteration (%d/%d), removed search_knowledge action, forcing plan output", currentIter+1, maxIter)
+					}
 					renderMap := map[string]any{
-						"Plan":    currentPlan,
-						"Help":    help,
-						"Nonce":   nonce,
-						"Enhance": enhance,
+						"Plan":            currentPlan,
+						"Help":            help,
+						"Nonce":           nonce,
+						"Enhance":         enhance,
+						"IsLastIteration": isLastIteration,
 					}
 					return utils.RenderTemplate(reactiveData, renderMap)
 				}),
