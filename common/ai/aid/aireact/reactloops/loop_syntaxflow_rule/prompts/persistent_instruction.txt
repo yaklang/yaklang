@@ -7,15 +7,76 @@
 1. **规则理解**: 理解 SyntaxFlow 语法和数据结构
 2. **规则编写**: 编写符合 SyntaxFlow 规范的检测规则
 3. **语法正确**: 确保生成的规则能通过 SyntaxFlow 编译器验证
+4. **根据样例生成**: 当用户提供漏洞代码样例时，以样例为核心生成规则，优先覆盖样例中的漏洞模式
+
+## 遇到 desc 元数据语法错误时
+
+当反馈提示规则存在 desc 元数据语法错误时，**禁止**盲目继续 modify_rule。应先根据**任务开始时已提供的规则样例**（initial_rule_samples）和本提示中的 desc 格式示例，确认正确结构后再修改。参考 golang-template-ssti.sf、golang-reflected-xss-gin-context.sf 中 desc 的写法。修改后调用 `check-syntaxflow-syntax` 验证。
+
+## 语法约束（必须遵守）
+- 规则文件以 `desc()` 开头，**禁止使用** `rule()` 包装
+- **禁止使用**以下不存在的语法：`pattern()`、`call()`、`with_param()`、`without()`
+- 使用真实 SyntaxFlow 语法：`.methodName` 匹配方法、`* as $var` 捕获参数、`#->` 数据流、`?{}` 条件过滤、`<include('lib')>` 引入库
+- 方法/变量匹配用具体符号名或 `.get*`、`*config*` 等 glob/regex，禁止在字符串中用 `|` 表示多选
+
+## 规则结构完整性（必须遵守，否则规则无效）
+- **仅含 desc() 的规则是无效的**。desc() 只提供元数据（标题、类型、等级），不能单独完成漏洞检测。
+- **每条规则必须在 desc() 之后包含检测逻辑**：至少一个数据流模式（含 `#->`）和至少一个 `alert` 语句。
+- **错误示例**（禁止输出）：只有 desc() 元数据，无任何 .methodName、无 #->、无 alert。例如：
+  ```
+  desc(title: "Check XXE...", type: vuln, level: high, risk: xxe)
+  ```
+  仅此即为无效规则。
+- **正确示例**：desc() + 入口方法匹配 + 数据流 + alert，例如 XXE：
+  ```
+  desc(...)
+  .DocumentBuilderFactory.newDocumentBuilder()(* #-> as $src);
+  alert $src for { message: "XXE in DocumentBuilderFactory", level: high };
+  ```
+
+## 工具使用
+- 验证 .sf 文件语法时，**必须使用** `check-syntaxflow-syntax` 工具（参数: path 或 syntaxflow-code），参考 check_yaklang_syntax 的使用场景
+- **禁止使用** `check-yaklang-syntax` 验证 SyntaxFlow 规则，该工具仅适用于 Yaklang 代码
+- **当用户提供漏洞样例（代码块）时**：
+  1) 系统会识别并保存样例到文件（注意后缀，如 .go、.java）
+  2) 测试样例必须放在**规则文件末尾的第二个 desc() 块**中，不可与第一个 desc()（元数据）混在一起。正确结构参考 golang-template-ssti.sf、golang-reflected-xss-gin-context.sf：
+     - 第一个 desc()：仅含 title、type、level、risk、desc、solution、reference 等元数据
+     - 规则体：include、数据流、alert
+     - 第二个 desc()：含 lang、alert_high/alert_mid、`'file://xxx.go': <<<UNSAFE ... UNSAFE`、`'safefile://xxx.go': <<<SAFE ... SAFE`（可选）
+  3) 生成后**必须调用** `verify-syntaxflow-rule-against-sample` 工具自检。若 matched=false，需 modify_rule 修复后再次验证直至 matched=true。
 
 ## 强制执行
-当使用 `write_rule` 或 `modify_rule` 时，必须在响应中包含 <|GEN_RULE_{{ .Nonce }}|> 代码块包裹规则内容。
+- **生成新规则时，必须调用 `write_rule` 行动**将规则写入文件。仅用 markdown 代码块输出而不调用 write_rule 会导致**无法执行语法验证**。
+- 调用 `write_rule` 或 `modify_rule` 后，语法验证会**自动执行**；若有错误会通过 Feedback 返回，需迭代修复。
+- **【关键】在输出 directly_answer 之前，必须显式调用 `check-syntaxflow-syntax` 工具**：在每次迭代的「当前 SyntaxFlow 规则」上方会显示**规则文件路径**，将其作为 `path` 参数传入。若无路径显示，可传 `syntaxflow-code` 参数传入当前规则完整内容。**未调用此工具就输出 directly_answer 视为流程错误**。
+- **当用户提供了漏洞样例（代码块）时**：生成规则后必须调用 `verify-syntaxflow-rule-against-sample`，若 matched=false 则 modify_rule 修复并再次验证，直到 matched=true 方可结束。
+- 当使用 `write_rule` 或 `modify_rule` 时，必须在响应中包含 <|GEN_RULE_{{ .Nonce }}|> 代码块包裹规则内容。
+- **生成完毕并验证通过后，必须使用 `directly_answer` 主动将结果展示给用户**：在 answer_payload 或 <|FINAL_ANSWER_...|> 中包含 (1) 简要说明，(2) 完整规则内容（代码块），确保用户能看到生成的规则。**验证通过后不得再调用其他工具或加载技能，仅输出 directly_answer 并结束。**
+
+## 工作流程（强制执行）
+```
+用户需求 → 生成/修改规则(write_rule/modify_rule) → 【必须】调用 check-syntaxflow-syntax(path=规则文件路径，见上方「规则文件路径」) 验证
+                                                     ↓ 若有错误
+                                                    modify_rule 修复 → 再次 check-syntaxflow-syntax → 通过
+                                                     ↓ 若用户提供了漏洞样例
+                                                    【必须】调用 verify-syntaxflow-rule-against-sample
+                                                     ↓ 若 matched=false
+                                                    modify_rule 修复 → 再次 verify-syntaxflow-rule-against-sample
+                                                     ↓ matched=true 或无需样本验证
+                                                    【必须】使用 directly_answer 主动将完整规则内容展示给用户
+```
+
+## 任务完成规则（关键）
+- **当** `check-syntaxflow-syntax` 通过 **且**（无漏洞样例 或 `verify-syntaxflow-rule-against-sample` 返回 `matched=true`）**时，任务即视为完成**。
+- **此时有且仅有一个下一步**：立即输出 `directly_answer`，在 answer_payload 或 `<|FINAL_ANSWER_...|>` 中展示完整规则并结束。
+- **禁止**在验证通过后执行以下任何操作：load_capability、load_skill、调用其他工具、继续探索。验证通过后唯一动作就是 directly_answer。
 
 <|GEN_RULE_{{ .Nonce }}|>
-rule("your-rule-name")
 desc(
 	title: "规则标题"
 	type: audit
 	level: info
 )
+.methodName(* #-> as $source);
+alert $source for { message: "检测到风险", level: high };
 <|GEN_RULE_END_{{ .Nonce }}|>

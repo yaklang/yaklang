@@ -20,6 +20,27 @@ import (
 
 func mockedSyntaxFlowWritingCauseError(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, stat *mockStats_forWriteAndModify) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
+
+	// Match analyze-requirement-and-search init step
+	if utils.MatchAllOfSubString(prompt, "analyze-requirement-and-search", "create_new_file") {
+		rsp := i.NewAIResponse()
+		if utils.MatchAnyOfSubString(prompt, "search_patterns", "Grep模式", "semantic_questions") {
+			rsp.EmitOutputStream(bytes.NewBufferString(`{
+  "@action": "analyze-requirement-and-search",
+  "create_new_file": true,
+  "search_patterns": ["rule("],
+  "reason": "Simple test rule"
+}`))
+		} else {
+			rsp.EmitOutputStream(bytes.NewBufferString(`{
+  "@action": "analyze-requirement-and-search",
+  "create_new_file": true
+}`))
+		}
+		rsp.Close()
+		return rsp, nil
+	}
+
 	hasRulePrompt := utils.MatchAnyOfSubString(prompt, "write_rule", "modify_rule", "GEN_RULE", "sf_rule")
 	if hasRulePrompt {
 		re := regexp.MustCompile(`<\|GEN_RULE_([^|]+)\|>`)

@@ -22,7 +22,7 @@ var loopAction_LoadCapability = &reactloops.LoopAction{
 			"identifier",
 			aitool.WithParam_Description(
 				"The exact name of the capability to load. "+
-					"This can be a tool name (e.g. 'check-yaklang-syntax'), "+
+					"This can be a tool name (e.g. 'check-yaklang-syntax' for .yak, 'check-syntaxflow-syntax' for .sf), "+
 					"an AI blueprint/forge name (e.g. 'code_generator'), "+
 					"a skill name, or a focus mode loop name. "+
 					"The system will automatically detect the type and handle it."),
@@ -317,6 +317,68 @@ func handleLoadSkill(
 	op.Continue()
 }
 
+// shouldAugmentUserInputForSyntaxFlow returns true when userInput looks like a short
+// reference (e.g. "根据上述代码生成syntaxflow规则") that likely lacks the actual code.
+func shouldAugmentUserInputForSyntaxFlow(userInput string) bool {
+	if userInput == "" || len([]rune(userInput)) > 500 {
+		return false
+	}
+	lower := strings.ToLower(strings.TrimSpace(userInput))
+	refPhrases := []string{
+		"根据上述", "根据以上", "根据代码", "根据上述代码", "根据以上代码",
+		"from the above", "from the code", "based on the code",
+		"生成syntaxflow", "生成规则", "syntaxflow rule", "write .sf",
+	}
+	for _, p := range refPhrases {
+		if strings.Contains(lower, p) {
+			return true
+		}
+	}
+	return false
+}
+
+// tryAugmentUserInputFromTimeline extracts "current task user input" entries from
+// timeline. When PE or UI creates a subtask with only the goal, the root task's
+// full user input (including code) is in the timeline.
+func tryAugmentUserInputFromTimeline(cfg aicommon.AICallerConfigIf, currentInput string) string {
+	config, ok := cfg.(*aicommon.Config)
+	if !ok || config == nil || config.Timeline == nil {
+		return ""
+	}
+	outputs := config.Timeline.GetTimelineOutput()
+	if outputs == nil {
+		return ""
+	}
+	marker := "[current task user input]"
+	var best string
+	for _, out := range outputs {
+		if out == nil || out.Type != "text" {
+			continue
+		}
+		raw := out.Content
+		if !strings.Contains(raw, marker) {
+			continue
+		}
+		idx := strings.Index(raw, marker)
+		after := raw[idx:]
+		colonIdx := strings.Index(after, ":\n")
+		if colonIdx == -1 {
+			colonIdx = strings.Index(after, ":")
+		}
+		if colonIdx < 0 {
+			continue
+		}
+		content := strings.TrimSpace(after[colonIdx+2:])
+		// Remove "  " line prefix from utils.PrefixLines
+		content = strings.ReplaceAll(content, "\n  ", "\n")
+		content = strings.TrimSpace(content)
+		if len(content) > len(best) && len(content) > len(currentInput) {
+			best = content
+		}
+	}
+	return best
+}
+
 // handleLoadFocusMode synchronously executes a focus mode loop.
 // Provides detailed timeline feedback for both success and failure outcomes.
 func handleLoadFocusMode(
@@ -340,6 +402,15 @@ func handleLoadFocusMode(
 	userInput := ""
 	if task != nil {
 		userInput = task.GetUserInput()
+	}
+
+	// For write_syntaxflow_rule: when userInput looks like a short reference (e.g. "根据上述代码生成syntaxflow规则")
+	// without the actual code, try to augment from timeline's root user input (parent/PE may have split the task).
+	if identifier == schema.AI_REACT_LOOP_NAME_WRITE_SYNTAXFLOW && shouldAugmentUserInputForSyntaxFlow(userInput) {
+		if augmented := tryAugmentUserInputFromTimeline(cfg, userInput); augmented != "" {
+			log.Infof("load_capability: augmented write_syntaxflow_rule userInput from %d to %d chars", len(userInput), len(augmented))
+			userInput = augmented
+		}
 	}
 
 	subTask := aicommon.NewStatefulTaskBase(
@@ -372,6 +443,8 @@ func handleLoadFocusMode(
 		return
 	}
 
+	// Focus mode runs synchronously. ExecuteLoopTask returns (task.IsAsyncMode(), nil);
+	// for sync focus like write_syntaxflow_rule, IsAsyncMode is false. Do NOT treat ok=false as UNSUCCESSFUL.
 	successMsg := fmt.Sprintf(
 		"Focus mode '%s' completed SUCCESSFULLY. "+
 			"The focused sub-loop has finished its work. "+

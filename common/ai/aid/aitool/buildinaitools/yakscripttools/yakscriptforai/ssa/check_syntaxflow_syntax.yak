@@ -1,0 +1,72 @@
+__DESC__ = "Performs a syntax check on SyntaxFlow rule. The rule can be provided directly as a string ('syntaxflow-code') or by specifying a file path ('path')."
+__VERBOSE_NAME__ = "SyntaxFlow 语法检测"
+__KEYWORDS__ = "syntaxflow, sf, syntax check, rule validation, static analysis, code audit, SyntaxFlow, 语法检测, 规则验证, 静态分析"
+
+__USAGE__ = <<<USAGE_BLOCK
+SyntaxFlow Syntax Check Tool - Parameter Description for JSON Tool Calls
+
+Parameters (one of them is required):
+  syntaxflow-code  (string)  SyntaxFlow rule content string to check.
+  path             (string)  Local file path of .sf SyntaxFlow rule file to check.
+
+Rules:
+  - At least one of "syntaxflow-code" or "path" must be provided.
+  - If "syntaxflow-code" is provided, it is checked directly.
+  - If "path" is provided, tool reads file content and then checks syntax.
+  - Use this for .sf files; do NOT use check-yaklang-syntax for SyntaxFlow rules.
+USAGE_BLOCK
+
+code = cli.String(
+    "syntaxflow-code",
+    cli.setHelp(`A string containing the SyntaxFlow rule for syntax validation. If this parameter is provided, the 'path' parameter will be ignored.`),
+)
+filepath = cli.String(
+    "path",
+    cli.setHelp(`The local file path to a .sf SyntaxFlow rule file for syntax validation. This parameter is only used if the 'syntaxflow-code' parameter is empty.`),
+)
+cli.check()
+
+if code == "" && filepath == "" {
+    yakit.Error("Empty syntaxflow-code and path")
+    return
+}
+
+if code != "" {
+    yakit.Info("===========start to check syntaxflow-code for string===========")
+    results := ssa.SyntaxFlowRuleChecking(code)
+    yakit.Info("origin rule fetch %v checking results", len(results))
+    for result in results {
+        yakit.Warn(result.String())
+        println(result.String())
+    }
+    if len(results) == 0 {
+        println("SyntaxFlow 语法检查通过")
+    }
+    yakit.Info("============end checking syntaxflow-code for string============")
+}
+
+if filepath != "" {
+    yakit.Info("============ start to check .sf file: %v=========", filepath)
+    code, err := file.ReadFile(filepath)
+    if err != nil {
+        yakit.Error("failed to read: %v, reason: %v", filepath, err)
+        println("SyntaxFlow 语法检查失败: 无法读取文件 " + filepath + ", " + err.Error())
+        return
+    }
+    if code == "" {
+        yakit.Warn("file is empty: %v", filepath)
+        println("SyntaxFlow 语法检查失败: 文件为空")
+        yakit.Info("============end checking .sf file============")
+        return
+    }
+    results := ssa.SyntaxFlowRuleChecking(code)
+    yakit.Info("origin rule fetch %v checking results", len(results))
+    for result in results {
+        yakit.Warn(result.String())
+        println(result.String())
+    }
+    if len(results) == 0 {
+        println("SyntaxFlow 语法检查通过")
+    }
+    yakit.Info("============end checking .sf file============")
+}

@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/fstools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/ssatools"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/syntaxflowtools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -73,6 +74,13 @@ func GetAllToolsDynamically(db *gorm.DB) []*aitool.Tool {
 		tools = append(tools, ssaToolsList...)
 	}
 
+	// Add SyntaxFlow tools
+	sfTools, err := syntaxflowtools.CreateSyntaxFlowTools()
+	if err != nil {
+		log.Errorf("create syntaxflow tools: %v", err)
+	} else {
+		tools = append(tools, sfTools...)
+	}
 
 	// Add generated tools (added by code-gen when run)
 	// These functions will be generated based on aitools.tools by the code generator

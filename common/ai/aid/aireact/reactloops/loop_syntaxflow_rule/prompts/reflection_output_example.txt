@@ -3,18 +3,27 @@
 * 使用 `write_rule` 创建新规则
 * 使用 `modify_rule` 修改已有规则（指定 modify_start_line 和 modify_end_line）
 * 每次生成或修改后，系统会进行 SyntaxFlow 编译验证
+* 验证通过后必须使用 `directly_answer` 将完整规则展示给用户
 
-### 正确示例: write_rule
+### 正确示例: write_rule（必须包含 desc + 数据流 + alert）
 
 ```json
 {"@action": "write_rule", "human_readable_thought": "创建漏洞检测规则"}
 ```
 
 <|GEN_RULE_{{ .Nonce }}|>
-rule("test-rule")
 desc(
 	title: "Test"
 	type: audit
 	level: info
 )
+.methodName(* #-> as $source);
+alert $source for { message: "检测到风险", level: high };
 <|GEN_RULE_END_{{ .Nonce }}|>
+
+### 完成时: directly_answer 展示结果（验证通过后立即执行，禁止再做其他操作）
+
+```json
+{"@action": "directly_answer", "human_readable_thought": "规则已生成并通过 check-syntaxflow-syntax 与 verify-syntaxflow-rule-against-sample 验证，展示完整内容"}
+```
+（answer_payload 或 <|FINAL_ANSWER_...|> 中包含完整规则代码块。验证通过后必须立即 directly_answer，不得 load_capability、load_skill 或调用其他工具。）

@@ -19,10 +19,28 @@ import (
 )
 
 // mockedSyntaxFlowWriting mocks AI responses for Write SyntaxFlow ReAct loop.
-// The SyntaxFlow loop has a simple init (no analyze-requirement-and-search),
-// so the first prompt will be the main loop asking for write_rule/modify_rule.
 func mockedSyntaxFlowWriting(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
+
+	// Match analyze-requirement-and-search init step
+	if utils.MatchAllOfSubString(prompt, "analyze-requirement-and-search", "create_new_file") {
+		rsp := i.NewAIResponse()
+		if utils.MatchAnyOfSubString(prompt, "search_patterns", "Grep模式", "semantic_questions") {
+			rsp.EmitOutputStream(bytes.NewBufferString(`{
+  "@action": "analyze-requirement-and-search",
+  "create_new_file": true,
+  "search_patterns": ["rule("],
+  "reason": "Simple test rule"
+}`))
+		} else {
+			rsp.EmitOutputStream(bytes.NewBufferString(`{
+  "@action": "analyze-requirement-and-search",
+  "create_new_file": true
+}`))
+		}
+		rsp.Close()
+		return rsp, nil
+	}
 
 	// Match main loop prompt asking for write_rule with GEN_RULE tag
 	if utils.MatchAnyOfSubString(prompt, "write_rule", "GEN_RULE", "sf_rule") {
@@ -111,6 +129,26 @@ type mockStats_forWriteAndModify struct {
 
 func mockedSyntaxFlowWritingAndModify(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, stat *mockStats_forWriteAndModify) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
+
+	// Match analyze-requirement-and-search init step
+	if utils.MatchAllOfSubString(prompt, "analyze-requirement-and-search", "create_new_file") {
+		rsp := i.NewAIResponse()
+		if utils.MatchAnyOfSubString(prompt, "search_patterns", "Grep模式", "semantic_questions") {
+			rsp.EmitOutputStream(bytes.NewBufferString(`{
+  "@action": "analyze-requirement-and-search",
+  "create_new_file": true,
+  "search_patterns": ["rule("],
+  "reason": "Simple test rule"
+}`))
+		} else {
+			rsp.EmitOutputStream(bytes.NewBufferString(`{
+  "@action": "analyze-requirement-and-search",
+  "create_new_file": true
+}`))
+		}
+		rsp.Close()
+		return rsp, nil
+	}
 
 	// Match prompts that ask for rule generation (write or modify)
 	hasRulePrompt := utils.MatchAnyOfSubString(prompt, "write_rule", "modify_rule", "GEN_RULE", "sf_rule")
