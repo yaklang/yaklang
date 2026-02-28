@@ -82,7 +82,9 @@ AI会通过多轮搜索和页面阅读，从互联网收集相关信息并生成
 * 当需要从互联网搜索信息时：
   {"@action": "internet_research", "human_readable_thought": "需要从互联网搜索和收集与用户问题相关的最新信息"}
 `),
-		reactloops.WithLoopIsHidden(false),
+
+		reactloops.WithVerboseName("Internet Research"),
+		reactloops.WithVerboseNameZh("互联网调研"),
 	)
 	if err != nil {
 		log.Errorf("register reactloop: %v failed: %v", schema.AI_REACT_LOOP_NAME_INTERNET_RESEARCH, err)

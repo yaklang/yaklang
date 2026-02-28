@@ -159,6 +159,9 @@ AI会先收集资料（读取文件、搜索知识库），然后分批撰写报
 * 当需要生成报告或分析文章时：
   {"@action": "report_generating", "human_readable_thought": "用户需要生成一份调查报告，我将收集资料并分批撰写"}
 `),
+
+		reactloops.WithVerboseName("Report Generating"),
+		reactloops.WithVerboseNameZh("报告生成"),
 	)
 	if err != nil {
 		log.Errorf("register reactloop: %v failed: %v", schema.AI_REACT_LOOP_NAME_REPORT_GENERATING, err)

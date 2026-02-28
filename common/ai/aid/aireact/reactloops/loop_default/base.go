@@ -41,6 +41,15 @@ func init() {
 			loop, err := reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_DEFAULT, r, preset...)
 			return loop, err
 		},
+		reactloops.WithLoopDescription("General-purpose assistant mode for mixed tasks, combining reasoning, tools, RAG, and AI forges."),
+		reactloops.WithLoopUsagePrompt("Use as the primary fallback mode when the request does not require a specialized focused mode. Suitable for broad problem solving, multi-step coordination, and direct responses."),
+		reactloops.WithLoopOutputExample(`
+* When the task is general and no specialized focused mode is needed:
+  {"@action": "default", "human_readable_thought": "The request is broad, so I will continue in the default assistant mode and solve it step by step"}
+`),
+		reactloops.WithLoopIsHidden(true),
+		reactloops.WithVerboseName("Default Assistant"),
+		reactloops.WithVerboseNameZh("默认助手模式"),
 	)
 	if err != nil {
 		log.Errorf("build default react loop failed: %v", err)
@@ -69,6 +78,15 @@ func init() {
 			loop, err := reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_DEFAULT, r, preset...)
 			return loop, err
 		},
+		reactloops.WithLoopDescription("Plan-execution task mode for structured PE workflows with predefined objectives and execution context."),
+		reactloops.WithLoopUsagePrompt("Used internally for PE task orchestration when the system has already prepared execution-oriented initialization context and constraints."),
+		reactloops.WithLoopOutputExample(`
+* When entering a structured PE execution task:
+  {"@action": "pe_task", "human_readable_thought": "I will execute the prepared PE task flow with the provided constraints and goals"}
+`),
+		reactloops.WithLoopIsHidden(true),
+		reactloops.WithVerboseName("PE Task Executor"),
+		reactloops.WithVerboseNameZh("渗透任务执行模式"),
 	)
 	if err != nil {
 		log.Errorf("build default react loop failed: %v", err)

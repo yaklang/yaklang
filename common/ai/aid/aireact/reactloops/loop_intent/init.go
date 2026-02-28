@@ -78,7 +78,13 @@ func init() {
 		},
 		reactloops.WithLoopDescription("Intent recognition and context enrichment mode: analyzes user input to identify intent, search for relevant tools/forges/skills, and produce context enrichment for the main loop."),
 		reactloops.WithLoopUsagePrompt("Used internally when user input is medium-to-large scale and requires deep intent decomposition and capability matching before the main loop can proceed effectively."),
+		reactloops.WithLoopOutputExample(`
+* When internal pre-routing needs deep intent decomposition:
+  {"@action": "intent", "human_readable_thought": "I should analyze user intent deeply and return structured capability recommendations for the main loop"}
+`),
 		reactloops.WithLoopIsHidden(true),
+		reactloops.WithVerboseName("Intent Recognition"),
+		reactloops.WithVerboseNameZh("意图识别（内部）"),
 	)
 	if err != nil {
 		log.Errorf("register reactloop %s failed: %v", schema.AI_REACT_LOOP_NAME_INTENT, err)

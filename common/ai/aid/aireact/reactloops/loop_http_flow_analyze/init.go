@@ -55,6 +55,13 @@ func init() {
 		},
 		reactloops.WithLoopDescription("Analyze captured HTTP flows from Yakit by querying, inspecting details, and applying matchers to highlight interesting traffic."),
 		reactloops.WithLoopUsagePrompt("Use when you need to investigate HTTP traffic. Start with filter_and_match_http_flows to narrow data, use get_http_flow_detail for specific packets."),
+		reactloops.WithLoopOutputExample(`
+* When the user asks to investigate captured HTTP traffic:
+  {"@action": "http_flow_analyze", "human_readable_thought": "I should inspect and filter captured HTTP flows to identify suspicious traffic patterns"}
+`),
+
+		reactloops.WithVerboseName("HTTP Flow Analysis"),
+		reactloops.WithVerboseNameZh("HTTP 流量分析"),
 	)
 	if err != nil {
 		log.Errorf("register reactloop: %v failed: %v", schema.AI_REACT_LOOP_ACTION_HTTP_FLOW_ANALYZE, err)

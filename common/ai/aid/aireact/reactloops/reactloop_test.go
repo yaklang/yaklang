@@ -210,7 +210,12 @@ func TestLoopAction_ReflectionOutputExampleProvider(t *testing.T) {
 		func(r aicommon.AIInvokeRuntime, opts ...ReActLoopOption) (*ReActLoop, error) {
 			return nil, nil // mock factory
 		},
+		WithLoopDescription("Test loop metadata for output example fallback behavior"),
+		WithLoopUsagePrompt("Used in tests to verify reflection output falls back to LoopMetadata when action output examples are absent."),
 		WithLoopOutputExample(testMetadataOutputExample),
+		WithLoopIsHidden(true),
+		WithVerboseName("Metadata Fallback Test Loop"),
+		WithVerboseNameZh("元数据回退测试流程"),
 	)
 	// Ignore error if already registered
 	_ = err
@@ -276,7 +281,12 @@ func TestLoopMetadata_OutputExamplePromptFallback(t *testing.T) {
 		func(r aicommon.AIInvokeRuntime, opts ...ReActLoopOption) (*ReActLoop, error) {
 			return nil, nil
 		},
+		WithLoopDescription("Test loop for LoopMetadata output example fallback"),
+		WithLoopUsagePrompt("Used in tests to validate fallback from LoopAction output examples to LoopMetadata output examples."),
 		WithLoopOutputExample(outputExamplePrompt),
+		WithLoopIsHidden(true),
+		WithVerboseName("Loop Metadata Fallback"),
+		WithVerboseNameZh("流程元数据回退"),
 	)
 
 	// Verify GetLoopMetadata returns the metadata

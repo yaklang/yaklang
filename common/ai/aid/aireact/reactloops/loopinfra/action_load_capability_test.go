@@ -632,6 +632,11 @@ func TestLoadCapability_E2E_FocusModeFlow(t *testing.T) {
 			return nil, nil
 		},
 		reactloops.WithLoopDescription("Test focus mode for load_capability"),
+		reactloops.WithLoopUsagePrompt("Used in tests to validate that load_capability correctly resolves and executes focused mode loops."),
+		reactloops.WithLoopOutputExample(`{"@action":"focus_mode_test","human_readable_thought":"Test-only focused mode execution path"}`),
+
+		reactloops.WithVerboseName("Load Capability Test Mode"),
+		reactloops.WithVerboseNameZh("能力加载测试模式"),
 	)
 
 	loop := reactloops.NewMinimalReActLoop(cfg, invoker)

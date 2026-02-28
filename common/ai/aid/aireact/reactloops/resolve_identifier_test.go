@@ -52,6 +52,11 @@ func TestReActLoop_ResolveIdentifier_FocusedMode_WithMetadata(t *testing.T) {
 			return nil, nil
 		},
 		WithLoopDescription("Test focused mode for vulnerability verification"),
+		WithLoopUsagePrompt("Used by resolver tests to ensure focused-mode metadata is returned in identifier suggestions."),
+		WithLoopOutputExample(`{"@action":"focused_mode_test","human_readable_thought":"resolver metadata test"}`),
+		WithLoopIsHidden(false),
+		WithVerboseName("Resolver Test Focus Mode"),
+		WithVerboseNameZh("解析器测试专注模式"),
 	)
 	if err != nil {
 		t.Skipf("could not register test loop (already registered): %v", err)
