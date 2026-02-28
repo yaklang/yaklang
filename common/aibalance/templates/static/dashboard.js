@@ -196,7 +196,9 @@
 
         models.sort(function (a, b) {
             if (a.is_memfit !== b.is_memfit) return a.is_memfit ? -1 : 1;
-            return b.provider_count - a.provider_count;
+            if (a.is_free !== b.is_free) return a.is_free ? 1 : -1;
+            if (b.provider_count !== a.provider_count) return b.provider_count - a.provider_count;
+            return a.display_name.localeCompare(b.display_name);
         });
 
         var html = '';
@@ -249,7 +251,10 @@
             return;
         }
 
-        uptimeSummary.sort(function (a, b) { return b.uptime_rate - a.uptime_rate; });
+        uptimeSummary.sort(function (a, b) {
+            if (b.uptime_rate !== a.uptime_rate) return b.uptime_rate - a.uptime_rate;
+            return a.model_name.localeCompare(b.model_name);
+        });
 
         var seen = {}, deduped = [];
         for (var i = 0; i < uptimeSummary.length; i++) {
