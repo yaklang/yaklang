@@ -33,12 +33,18 @@ func YaklangScriptChecking(code, pluginType string) []*result.StaticAnalyzeResul
 	return StaticAnalyzeWithContext(context.Background(), code, pluginType, Analyze)
 }
 
+// SyntaxFlowRuleChecking performs syntax check on SyntaxFlow rule content
+func SyntaxFlowRuleChecking(code string) []*result.StaticAnalyzeResult {
+	return StaticAnalyzeWithContext(context.Background(), code, "syntaxflow", Analyze)
+}
+
 func StaticAnalyze(code, codeTyp string, kind StaticAnalyzeKind) []*result.StaticAnalyzeResult {
 	return StaticAnalyzeWithContext(context.Background(), code, codeTyp, kind)
 }
 
 func init() {
 	ssaapi.RegisterExport("YaklangScriptChecking", YaklangScriptChecking)
+	ssaapi.RegisterExport("SyntaxFlowRuleChecking", SyntaxFlowRuleChecking)
 }
 
 // plugin type : "yak" "mitm" "port-scan" "codec" "syntaxflow"
