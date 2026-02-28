@@ -84,7 +84,7 @@ The AI assistant will search knowledge bases, the internet, local files, and per
 * When the user asks a question that can be answered with research:
   {"@action": "smart_qa", "human_readable_thought": "The user wants to understand a topic, I'll search relevant sources and provide a comprehensive answer"}
 `),
-		reactloops.WithLoopIsHidden(false),
+
 		reactloops.WithVerboseName("Smart Q&A"),
 		reactloops.WithVerboseNameZh("智能问答"),
 	)

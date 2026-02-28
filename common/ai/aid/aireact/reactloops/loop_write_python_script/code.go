@@ -86,6 +86,9 @@ func init() {
 * When user requests to write a Python script:
   {"@action": "write_python_script", "human_readable_thought": "I need to write a Python script with CLI entry point and proper dependency management"}
 `),
+
+		reactloops.WithVerboseName("Python Script Builder"),
+		reactloops.WithVerboseNameZh("Python 脚本生成"),
 	)
 	if err != nil {
 		log.Errorf("register reactloop: %v failed", schema.AI_REACT_LOOP_NAME_WRITE_PYTHON_SCRIPT)

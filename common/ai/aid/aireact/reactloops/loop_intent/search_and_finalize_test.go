@@ -236,7 +236,11 @@ func TestSearchLoopMetadata_MatchesNonHiddenLoops(t *testing.T) {
 			return nil, nil
 		},
 		reactloops.WithLoopDescription(testDesc),
-		reactloops.WithLoopIsHidden(false),
+		reactloops.WithLoopUsagePrompt("Test-only focus mode used to verify non-hidden loop metadata can be discovered by search."),
+		reactloops.WithLoopOutputExample(`{"@action":"test_focus_mode","human_readable_thought":"search metadata match test"}`),
+
+		reactloops.WithVerboseName("Searchable Test Focus Mode"),
+		reactloops.WithVerboseNameZh("可搜索测试专注模式"),
 	)
 	if err != nil {
 		t.Fatalf("failed to register test loop: %v", err)
@@ -267,7 +271,11 @@ func TestSearchLoopMetadata_ExcludesHiddenLoops(t *testing.T) {
 			return nil, nil
 		},
 		reactloops.WithLoopDescription("hidden loop "+testName),
+		reactloops.WithLoopUsagePrompt("Test-only hidden focus mode used to verify hidden metadata is excluded from search results."),
+		reactloops.WithLoopOutputExample(`{"@action":"hidden_test_focus_mode","human_readable_thought":"hidden loop exclusion test"}`),
 		reactloops.WithLoopIsHidden(true),
+		reactloops.WithVerboseName("Hidden Test Focus Mode"),
+		reactloops.WithVerboseNameZh("隐藏测试专注模式"),
 	)
 	if err != nil {
 		t.Fatalf("failed to register test loop: %v", err)
@@ -291,7 +299,11 @@ func TestSearchLoopMetadata_TokenLevelMatch(t *testing.T) {
 			return nil, nil
 		},
 		reactloops.WithLoopDescription(testDesc),
-		reactloops.WithLoopIsHidden(false),
+		reactloops.WithLoopUsagePrompt("Test-only focus mode used to verify token-level loop metadata matching behavior."),
+		reactloops.WithLoopOutputExample(`{"@action":"token_match_focus_mode","human_readable_thought":"token-level metadata matching test"}`),
+
+		reactloops.WithVerboseName("Token Match Test Focus Mode"),
+		reactloops.WithVerboseNameZh("分词匹配测试专注模式"),
 	)
 	if err != nil {
 		t.Fatalf("failed to register test loop: %v", err)

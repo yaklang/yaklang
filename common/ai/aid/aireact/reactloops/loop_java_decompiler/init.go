@@ -82,6 +82,9 @@ func init() {
 * 用户请求反编译 jar 并自动修复导出的 Java 代码。例如：
   {"@action": "java_decompiler", "human_readable_thought": "请将 /tmp/xxx.jar 反编译输出到 ./xxx，并修复所有导出的 Java 文件中的语法和常见反编译问题"}
 `),
+
+		reactloops.WithVerboseName("Java Decompiler"),
+		reactloops.WithVerboseNameZh("Java 反编译修复"),
 	)
 	if err != nil {
 		log.Errorf("register reactloop: %v failed: %v", schema.AI_REACT_LOOP_NAME_JAVA_DECOMPILER, err)

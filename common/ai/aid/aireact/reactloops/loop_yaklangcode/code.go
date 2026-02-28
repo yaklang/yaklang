@@ -169,6 +169,9 @@ func init() {
 * When user requests to write Yaklang code:
   {"@action": "write_yaklang_code", "human_readable_thought": "I need to write Yaklang code with proper syntax and access to code examples"}
 `),
+
+		reactloops.WithVerboseName("Yaklang Code Builder"),
+		reactloops.WithVerboseNameZh("Yaklang 代码生成"),
 	)
 	if err != nil {
 		log.Errorf("register reactloop: %v failed", schema.AI_REACT_LOOP_NAME_WRITE_YAKLANG)
