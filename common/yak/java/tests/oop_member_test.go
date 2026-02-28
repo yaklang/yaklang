@@ -389,6 +389,78 @@ class Main {
 	})
 }
 
+func TestMethodOverloadDispatchComplex(t *testing.T) {
+	t.Run("dispatch by arity then by type", func(t *testing.T) {
+		code := `
+class A {
+	int value;
+	void set(int num) {
+		this.value = 11;
+	}
+	void set(int left, int right) {
+		this.value = 22;
+	}
+	void set(String raw) {
+		this.value = 33;
+	}
+	int get() {
+		return this.value;
+	}
+}
+class Main {
+	void main() {
+		A a = new A();
+		a.set(1, 2);
+		print(a.get());
+		a.set(10);
+		print(a.get());
+		a.set("yak");
+		print(a.get());
+	}
+}
+`
+		ssatest.CheckSyntaxFlow(t, code,
+			`print(* #-> * as $target)`,
+			map[string][]string{
+				"target": {"11", "22", "33"},
+			},
+			ssaapi.WithLanguage(ssaconfig.JAVA),
+		)
+	})
+
+	t.Run("constructor overload keeps separated state", func(t *testing.T) {
+		code := `
+class Box {
+	int value;
+	Box(int num) {
+		this.value = 44;
+	}
+	Box(String text) {
+		this.value = 55;
+	}
+	int get() {
+		return this.value;
+	}
+}
+class Main {
+	void main() {
+		Box n = new Box(1);
+		Box s = new Box("x");
+		print(n.get());
+		print(s.get());
+	}
+}
+`
+		ssatest.CheckSyntaxFlow(t, code,
+			`print(* #-> * as $target)`,
+			map[string][]string{
+				"target": {"44", "55"},
+			},
+			ssaapi.WithLanguage(ssaconfig.JAVA),
+		)
+	})
+}
+
 func Test_Inner_Class(t *testing.T) {
 	t.Run("test outerclass.this ", func(t *testing.T) {
 		code := `
