@@ -20,4 +20,12 @@
 
 <|ENHANCE_KNOWLEDGE_{{ .Nonce }}|>
 {{ .Enhance }}
-<|ENHANCE_KNOWLEDGE_END_{{ .Nonce }}|>{{end}}
+<|ENHANCE_KNOWLEDGE_END_{{ .Nonce }}|>{{end}}{{/*
+
+*/}}{{ if .IsLastIteration }}
+## **重要：最后一轮迭代**
+
+这是规划循环的最后一轮迭代。你**必须**在本轮输出一个完整的 plan，不可以再执行 search_knowledge。
+请基于当前已有的所有信息（包括用户诉求、已有计划、增强补充知识等）直接输出最终的任务计划。
+即使信息不够完整，也要尽最大努力生成一个可执行的计划。
+{{ end }}

@@ -42,6 +42,7 @@ type AiTask struct {
 	SemanticIdentifier string    `json:"semantic_identifier"` // short identifier for directory naming, generated from Name or AI
 	ParentTask         *AiTask   `json:"parent_task"`
 	Subtasks           []*AiTask `json:"subtasks"`
+	DependsOn          []string  `json:"depends_on,omitempty"`
 
 	StatusSummary string `json:"status_summary"`
 	TaskSummary   string `json:"task_summary"`

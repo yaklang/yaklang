@@ -179,6 +179,19 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 		reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, _ *reactloops.OnPostIterationOperator) {
 			if isDone {
 				planData := loop.Get(loop_plan.PLAN_DATA_KEY)
+
+				if planData == "" {
+					log.Warnf("plan loop finished without producing plan data (iteration=%d), attempting fallback plan generation", iteration)
+					fallbackPlan := pr.generateFallbackPlan(loop)
+					if fallbackPlan != "" {
+						planData = fallbackPlan
+						loop.Set(loop_plan.PLAN_DATA_KEY, planData)
+					} else {
+						log.Errorf("fallback plan generation also failed, plan will be incomplete")
+						return
+					}
+				}
+
 				action, err := aicommon.ExtractAction(planData, "plan", "plan")
 				if err != nil {
 					log.Errorf("extract action from plan data failed: %v", err)
@@ -186,8 +199,14 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 				}
 				rootTask = pr.cod.generateAITaskWithName(action.GetAnyToString("main_task"), action.GetAnyToString("main_task_goal"))
 
+				if identifier := action.GetAnyToString("main_task_identifier"); identifier != "" {
+					sanitized := aicommon.SanitizeTaskName(identifier)
+					if sanitized != "" {
+						rootTask.SetSemanticIdentifier(sanitized)
+					}
+				}
+
 				if !strings.Contains(rootTask.GetUserInput(), pr.rawInput) {
-					// keep raw user input context
 					nonce := utils.RandStringBytes(4)
 					taskInput := rootTask.GetUserInput()
 					i := utils.MustRenderTemplate(`
@@ -222,8 +241,50 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 	return pr.cod.newPlanResponse(rootTask), nil
 }
 
+func (pr *planRequest) generateFallbackPlan(loop *reactloops.ReActLoop) string {
+	enhance := loop.Get(loop_plan.PLAN_ENHANCE_KEY)
+	prompt := fmt.Sprintf(`You must generate a task plan based on the user's original request. 
+Reply with ONLY valid JSON in this exact format:
+{"@action":"plan","main_task":"<task name>","main_task_goal":"<goal>","tasks":[{"subtask_name":"<name>","subtask_goal":"<goal>","depends_on":[]}]}
+
+User request: %s`, pr.rawInput)
+	if enhance != "" {
+		prompt += fmt.Sprintf("\n\nAdditional context gathered:\n%s", enhance)
+	}
+
+	aiCallback := pr.cod.SpeedPriorityAICallback
+	if aiCallback == nil {
+		aiCallback = pr.cod.OriginalAICallback
+	}
+	if aiCallback == nil {
+		log.Errorf("no AI callback available for fallback plan generation")
+		return ""
+	}
+
+	forgeResult, err := aicommon.InvokeLiteForge(prompt, aicommon.WithAICallback(aiCallback))
+	if err != nil {
+		log.Errorf("fallback plan LiteForge invocation failed: %v", err)
+		return ""
+	}
+	if forgeResult == nil || forgeResult.Action == nil {
+		log.Errorf("fallback plan LiteForge returned nil result")
+		return ""
+	}
+
+	result := string(utils.Jsonify(forgeResult.Action.GetParams()))
+	log.Infof("fallback plan generated successfully via LiteForge")
+	return result
+}
+
 func (c *Coordinator) generateAITask(params aitool.InvokeParams) *AiTask {
-	return c.generateAITaskWithName(params.GetAnyToString("subtask_name"), params.GetAnyToString("subtask_goal"))
+	task := c.generateAITaskWithName(params.GetAnyToString("subtask_name"), params.GetAnyToString("subtask_goal"))
+	if deps := params.GetStringSlice("depends_on"); len(deps) > 0 {
+		task.DependsOn = deps
+	}
+	if identifier := params.GetAnyToString("subtask_identifier"); identifier != "" {
+		task.SemanticIdentifier = identifier
+	}
+	return task
 }
 
 func (c *Coordinator) generateAITaskWithName(name, goal string) *AiTask {

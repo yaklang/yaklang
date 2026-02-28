@@ -210,6 +210,10 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 								pw.Close()
 								log.Debugf("stream copy goroutine for field [%s] completed, took %v", key, time.Since(copyStartTime))
 							}()
+							if field.StreamHandler != nil {
+								field.StreamHandler(reader, pw)
+								return
+							}
 							if field.Prefix != "" {
 								pw.WriteString(field.Prefix + ": ")
 							}
