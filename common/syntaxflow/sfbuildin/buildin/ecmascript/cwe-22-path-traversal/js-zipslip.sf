@@ -1,0 +1,464 @@
+desc(
+	title: "Arbitrary File Access During Archive Extraction (Zip Slip)"
+	title_zh: "压缩包解压时未验证文件路径导致目录穿越（Zip Slip）"
+	type: vuln
+	level: high
+	risk: "path-traversal"
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+
+Zip Slip（CWE-22）是一种针对文件压缩包解压操作的路径穿越漏洞。攻击者可以精心构造含有恶意文件路径（如 `../../evil.sh`）的 ZIP、TAR 等格式的压缩包。当 Node.js 应用程序在未对压缩包内文件路径进行充分验证的情况下直接将其用于文件系统写操作时，解压后的文件可能被写入目标解压目录之外的任意位置，覆盖系统关键文件甚至执行任意代码。
+
+2. **触发场景**
+
+```javascript
+// unzip / unzipper 场景
+const unzip = require('unzip');
+const fs = require('fs');
+const path = require('path');
+
+fs.createReadStream('upload.zip')
+    .pipe(unzip.Parse())
+    .on('entry', function(entry) {
+        const fileName = entry.path;  // 直接使用压缩包内的路径
+        const destPath = path.join('/var/www/app/', fileName);
+        // 若 fileName 为 '../../etc/cron.d/evil'，则 destPath 跳出目标目录
+        entry.pipe(fs.createWriteStream(destPath));  // 危险：任意文件写入
+    });
+```
+
+```javascript
+// adm-zip 场景
+const AdmZip = require('adm-zip');
+const fs = require('fs');
+
+const zip = new AdmZip('archive.zip');
+zip.getEntries().forEach(function(entry) {
+    const entryName = entry.entryName;  // 来自压缩包的路径
+    fs.writeFile('/extract/' + entryName, entry.getData());  // 危险
+});
+```
+
+3. **潜在影响**
+
+- **任意文件写入**：攻击者可将恶意文件写入服务器任意可写目录，如覆盖配置文件、cron 任务、可执行文件等
+- **远程代码执行（RCE）**：若能将 webshell 或启动脚本写入可执行目录，可导致服务器被完全控制
+- **文件覆盖与服务中断**：覆盖关键应用文件，导致拒绝服务或业务逻辑被篡改
+DESC
+	rule_id: "d8f4a22b-9c1e-4b37-8e5d-7f3a901c2e84"
+	solution: <<<SOLUTION
+### 修复建议
+
+1. **验证解压路径是否在目标目录内（推荐方法）**
+
+在解压每个文件之前，使用 `path.resolve()` 规范化路径后，检查结果是否以安全目标目录为前缀：
+
+```javascript
+const path = require('path');
+const fs = require('fs');
+const unzip = require('unzip');
+
+const TARGET_DIR = path.resolve('/var/www/safe_extract/');
+
+fs.createReadStream('upload.zip')
+    .pipe(unzip.Parse())
+    .on('entry', function(entry) {
+        const fileName = entry.path;
+        // 关键安全检查：规范化后验证路径是否在目标目录内
+        const destPath = path.resolve(TARGET_DIR, fileName);
+        if (!destPath.startsWith(TARGET_DIR + path.sep)) {
+            entry.autodrain();  // 跳过危险条目
+            return;
+        }
+        entry.pipe(fs.createWriteStream(destPath));
+    });
+```
+
+2. **拒绝包含路径穿越字符的条目**
+
+```javascript
+// 拒绝任何包含 '..' 或绝对路径的条目
+if (fileName.includes('..') || path.isAbsolute(fileName)) {
+    // 跳过或报错
+    return;
+}
+```
+
+3. **使用 path.basename() 仅保留文件名**
+
+```javascript
+// 仅保留文件名部分，丢弃所有目录信息
+const safeFileName = path.basename(entry.path);
+fs.createWriteStream(path.join(TARGET_DIR, safeFileName));
+```
+
+4. **使用内置安全检查的库**
+
+考虑使用已内置 Zip Slip 防护的库，如较新版本的 `extract-zip`（`>= 2.0.0`）。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-22: Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal')](https://cwe.mitre.org/data/definitions/22.html)
+[Snyk - Zip Slip Vulnerability](https://security.snyk.io/research/zip-slip-vulnerability)
+[OWASP - Path Traversal](https://owasp.org/www-community/attacks/Path_Traversal)
+[GitHub Security Lab - Zip Slip](https://github.com/snyk/zip-slip-vulnerability)
+REFERENCE
+)
+
+// =====================================================================
+// Sources: Archive entry filenames from common Node.js archive libraries
+// =====================================================================
+
+// Pattern 1: unzip / unzipper / tar-stream
+// Example:
+//   stream.pipe(unzip.Parse()).on('entry', (entry) => { entry.path ... })
+//   tarExtract.on('entry', (header, stream) => { header.name ... })
+.on('entry', * as $onEntryCallback)
+$onEntryCallback<getFormalParams> as $entryParam
+$entryParam.path as $source
+$entryParam.name as $source
+$entryParam.linkname as $source
+
+// Pattern 2: adm-zip - zip.getEntries() / zip.getEntry()
+// Example:
+//   zip.getEntries().forEach(entry => { entry.entryName ... })
+//   zip.getEntry('file').entryName
+*.getEntries() as $admZipEntries
+$admZipEntries.forEach(* as $admForEachCb)
+$admForEachCb<getFormalParams> as $admEntryParam
+$admEntryParam.entryName as $source
+
+*.getEntry() as $admSingleEntry
+$admSingleEntry.entryName as $source
+
+// Pattern 3: jszip
+//
+// JSZip has two main usage patterns:
+//
+// 3a. new JSZip() constructor style:
+//   const zip = new JSZip();
+//   zip.forEach((relativePath, zipEntry) => { fs.writeFile(relativePath ...) })
+//
+// 3b. JSZip.loadAsync() promise style (more common in practice):
+//   JSZip.loadAsync(data).then((zip) => {
+//     zip.forEach((relativePath, zipEntry) => { fs.writeFile(relativePath ...) })
+//   })
+//
+// We anchor on the JSZip class name to avoid matching generic Array.forEach.
+// Note: The second parameter `file` (JSZip.JSZipObject) is also collected here,
+// but it won't reach a string-type sink directly, so no false positives occur.
+
+// 3a: new JSZip() → zip.forEach(...)
+JSZip() as $jszipInstance
+$jszipInstance.forEach(* as $jszipForEachCb)
+$jszipForEachCb<getFormalParams> as $jszipEntryParam
+$jszipEntryParam as $source
+
+// 3b: JSZip.loadAsync(data).then((zip) => zip.forEach(...))
+JSZip.loadAsync(*) as $loadAsyncResult
+$loadAsyncResult.then(* as $loadAsyncThenCb)
+$loadAsyncThenCb<getFormalParams> as $loadAsyncZipParam
+$loadAsyncZipParam.forEach(* as $loadAsyncForEachCb)
+$loadAsyncForEachCb<getFormalParams> as $loadAsyncEntryParam
+$loadAsyncEntryParam as $source
+
+// =====================================================================
+// Sinks: File system write operations where path argument may be tainted
+// =====================================================================
+
+// fs.createWriteStream(path) - path is first argument
+fs.createWriteStream(* as $fsSink,)
+
+// fs.writeFile(path, data, ...) - capture the path argument (first arg)
+fs.writeFile(* as $fsSink,)
+fs.writeFileSync(* as $fsSink,)
+
+// fs.appendFile(path, data, ...) - capture the path argument (first arg)
+fs.appendFile(* as $fsSink,)
+fs.appendFileSync(* as $fsSink,)
+
+// fs.open(path, flags, ...) / fs.openSync - capture the path argument
+fs.open(* as $fsSink,)
+fs.openSync(* as $fsSink,)
+
+// =====================================================================
+// Sanitizer functions: ONLY path.basename is a true sanitizer for Zip Slip.
+// path.basename() strips all directory components, leaving just the filename.
+// Note: path.resolve() and path.normalize() alone do NOT prevent Zip Slip;
+//       they must be combined with startsWith() validation (detected via phi exclusion below).
+// =====================================================================
+path.basename(*) as $filter
+
+// =====================================================================
+// String guard check detection (Barrier Guard simulation)
+//
+// CodeQL handles indexOf/includes/startsWith guards via CFG-based BarrierGuard.
+// SyntaxFlow cannot perform CFG analysis, so we approximate:
+//   Use ?{<self>.method(*)} condition filter to detect source values that
+//   have string check methods called on them. These are likely protected
+//   by if-condition barrier guards (e.g. "if (fileName.indexOf('..') == -1)").
+// =====================================================================
+
+// Filter source values that are the receiver of string guard check calls.
+// e.g. "if (fileName.indexOf('..') == -1)" → fileName is in $guardedSources
+$source?{<self>.indexOf(*)} as $guardedSources
+$source?{<self>.includes(*)} as $guardedSources
+$source?{<self>.startsWith(*)} as $guardedSources
+$source?{<self>.endsWith(*)} as $guardedSources
+
+// =====================================================================
+// Dataflow Analysis: Source (archive entry path) -> Sink (file write)
+// =====================================================================
+
+// Filter sinks: reachable from archive entry source, excluding phi nodes.
+// PHI node exclusion: patterns like "path.resolve() + startsWith() + early return"
+// produce a phi(destPath) at the merge point. Excluding phi from the backward
+// search correctly handles these early-return guard patterns without false positives.
+$fsSink?{<self> #{include: <<<CODE
+* & $source
+CODE, exclude: <<<CODE
+*?{opcode: phi} as $__next__
+CODE}->} as $sink
+
+// =====================================================================
+// HIGH vs MID classification using set intersection/difference:
+//
+//   $sink & $source  → HIGH: the sink argument IS the source node itself,
+//                      meaning no intermediate function call transformed it.
+//                      e.g. fs.writeFile(entry.path, ...)
+//                           fs.writeFile(entryName, ...)  [where entryName = zipEntry.entryName]
+//
+//   $sink - $source  → MID: the sink argument is a *derived* value (e.g. path.join result),
+//                      meaning source flowed through at least one intermediate call.
+//                      e.g. fs.writeFile(path.join('/base/', entry.path), ...)
+//
+// This approach correctly handles both ParameterMember nodes (unzip/tar-stream) and
+// Undefined nodes (adm-zip getEntry().entryName), avoiding the GetDataflowPath issues
+// that plagued the previous exclude=*?{opcode:call} approach.
+// =====================================================================
+
+// HIGH candidates: two approaches combined via union assignment.
+//
+// Approach 1 ($highFromIntersect): sink node IS in $source (set intersection).
+//   Works for ParameterMember patterns (unzip/tar-stream) where the sink argument
+//   is literally the same SSA value as the source (e.g. entry.path used directly).
+//
+// Approach 2 ($highFromDirect): sink's dataflow path to source contains no call nodes.
+//   Works for FreeValue alias patterns (jszip) where the sink argument is a const/let
+//   variable that aliases the source (e.g. const sanitizedName = relativePath).
+//   A FreeValue's default points directly to the source Parameter, with no Call
+//   instruction in between, so exclude:opcode=call correctly captures this.
+//   Also covers adm-zip's entryName = zipEntry.entryName (member access, no call).
+//
+// Note: only one `exclude` clause is used to avoid the NativeCallActualParams map-key
+// overwrite bug where multiple `exclude` entries silently drop all but the last one.
+$sink & $source as $highCandidates
+$fsSink?{<self> #{include: <<<CODE
+* & $source as $__next__
+CODE, exclude: <<<CODE
+*?{opcode: call} as $__next__
+CODE}->} as $highCandidates
+
+// Remove string-guarded sources from HIGH (barrier guard approximation)
+$highCandidates?{<self> #{include: <<<CODE
+* & $guardedSources
+CODE}->} as $guardedHigh
+
+$highCandidates - $guardedHigh as $high
+
+alert $high for {
+	level: "high"
+	title: "Zip Slip: Archive Entry Path Flows Directly to File Write (No Guard)"
+	title_zh: "Zip Slip：压缩包条目路径未经任何守卫直接用于文件写入"
+	desc: <<<DESC
+检测到压缩包解压时存在高风险的 Zip Slip 漏洞。压缩包内文件路径（`entry.path`、`entry.name`、`entry.linkname`、`entry.entryName` 等）未经任何路径规范化和目录合法性检查（如 `indexOf('..')` 守卫、`path.resolve` + `startsWith` 验证等），直接传递到文件系统写操作（如 `fs.createWriteStream`、`fs.writeFile` 等）。攻击者可以通过精心构造包含路径穿越序列（`../../`）的压缩包，将恶意文件写入服务器任意可写目录，可能导致任意文件写入、配置文件覆盖甚至远程代码执行。
+DESC
+	message: "检测到 Zip Slip 高风险漏洞：压缩包条目路径未经守卫直接流向文件写操作。"
+	solution: <<<SOLUTION
+使用 `path.resolve()` 规范化路径后验证是否以安全目录为前缀：
+```javascript
+const TARGET_DIR = path.resolve('/var/www/safe_extract/');
+const destPath = path.resolve(TARGET_DIR, entry.path);
+if (!destPath.startsWith(TARGET_DIR + path.sep)) {
+    entry.autodrain();
+    return;
+}
+entry.pipe(fs.createWriteStream(destPath));
+```
+或者使用 `path.basename()` 仅保留文件名（丢弃所有目录部分）：
+```javascript
+const safeFileName = path.basename(entry.path);
+fs.createWriteStream(path.join(TARGET_DIR, safeFileName));
+```
+SOLUTION
+	risk: "任意文件写入/目录穿越"
+	name: "high"
+}
+
+// MID: sink is a derived value (went through intermediate calls like path.join/path.resolve),
+// but NOT through $filter (path.basename), and NOT guarded by string checks.
+// Exclude sinks already classified as HIGH to avoid duplicate alerts.
+// Reference: same pattern as java-mybatis rule: collect all flows, subtract safe ones.
+$sink - $source as $midAll
+$midAll - $high as $midCandidates
+
+// Remove flows where path.basename sanitizer is in the upstream call chain
+$midCandidates<dataflow(include=<<<CODE
+* & $filter as $__next__
+CODE)> as $filteredMid
+
+$midCandidates - $filteredMid as $mid
+
+alert $mid for {
+	level: "mid"
+	title: "Audit: Zip Slip Risk with Intermediate Path Processing"
+	title_zh: "审计：存在 Zip Slip 风险，路径经过了中间函数处理"
+	desc: <<<DESC
+检测到压缩包条目路径经过若干中间函数处理后流向文件系统写操作，可能存在 Zip Slip 风险，需人工审计确认。常见不安全场景：
+
+1. **路径拼接函数**（如 `path.join`）：`path.join('/base/', entry.path)` 本身不能防御 Zip Slip。`path.join` 不会阻止路径穿越到基础目录之外，例如 `path.join('/base/', '../etc/passwd')` 返回 `/base/../etc/passwd`（规范化后为 `/etc/passwd`）。
+
+2. **`path.resolve()` 但未做 `startsWith()` 验证**：仅 `path.resolve(base, entry.path)` 不足以防御 Zip Slip，必须结合 `startsWith(TARGET_DIR)` 检查解压目标是否在安全目录内。
+
+推荐修复：使用 `path.resolve(TARGET_DIR, fileName)` + `startsWith(TARGET_DIR + path.sep)` 双重验证。
+DESC
+	message: "审计：压缩包条目路径经中间函数处理后流向文件写操作，需确认是否有效防御 Zip Slip（建议使用 path.resolve + startsWith 双重验证）。"
+	risk: "疑似目录穿越"
+	name: "mid"
+}
+
+// =====================================================================
+// Test cases for rule verification
+// =====================================================================
+
+// Test 1: unzip library - direct path traversal (should alert)
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///zipslip_unzip_direct.js': <<<CODE
+const unzip = require('unzip');
+const fs = require('fs');
+const path = require('path');
+
+fs.createReadStream('upload.zip')
+    .pipe(unzip.Parse())
+    .on('entry', function(entry) {
+        const fileName = entry.path;
+        const destPath = path.join('/var/www/app/', fileName);
+        entry.pipe(fs.createWriteStream(destPath));
+    });
+CODE
+	"safefile://safe_unzip_resolve_check.js": <<<CODE
+const unzip = require('unzip');
+const fs = require('fs');
+const path = require('path');
+
+const TARGET_DIR = path.resolve('/var/www/safe_extract/');
+
+fs.createReadStream('upload.zip')
+    .pipe(unzip.Parse())
+    .on('entry', function(entry) {
+        const fileName = entry.path;
+        const destPath = path.resolve(TARGET_DIR, fileName);
+        if (!destPath.startsWith(TARGET_DIR + path.sep)) {
+            entry.autodrain();
+            return;
+        }
+        entry.pipe(fs.createWriteStream(destPath));
+    });
+CODE
+	"safefile://safe_unzip_indexof_guard.js": <<<CODE
+const fs = require('fs');
+const unzip = require('unzip');
+
+fs.createReadStream('archive.zip')
+  .pipe(unzip.Parse())
+  .on('entry', entry => {
+    const fileName = entry.path;
+    if (fileName.indexOf('..') == -1) {
+      entry.pipe(fs.createWriteStream(fileName));
+    } else {
+      console.log('skipping bad path', fileName);
+    }
+  });
+CODE
+)
+
+// Test 2: adm-zip library - getEntries().forEach (should alert mid: path string concat)
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///zipslip_admzip.js': <<<CODE
+const AdmZip = require('adm-zip');
+const fs = require('fs');
+
+const zip = new AdmZip('archive.zip');
+zip.getEntries().forEach(function(entry) {
+    const entryName = entry.entryName;
+    fs.writeFile('/tmp/extract/' + entryName, entry.getData(), function(err) {});
+});
+CODE
+)
+
+// Test 4: adm-zip getEntry() single entry - direct writeFile (should alert high)
+desc(
+	lang: "js"
+	alert_high: 1
+	'file:///zipslip_admzip_single.js': <<<CODE
+const fs = require('fs');
+const AdmZip = require('adm-zip');
+
+const zip = new AdmZip('test.zip');
+const zipEntry = zip.getEntry('file');
+if (zipEntry) {
+  const entryName = zipEntry.entryName;
+  fs.writeFile(entryName, entryName, (err) => {
+    if (err) {
+      console.error('Error writing to file:', err);
+    }
+  });
+}
+CODE
+)
+
+// Test 3: tar-stream library - header.name used in createWriteStream (should alert)
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///zipslip_tarstream.js': <<<CODE
+const tar = require('tar-stream');
+const fs = require('fs');
+const path = require('path');
+
+const extract = tar.extract();
+extract.on('entry', function(header, stream, next) {
+    const filePath = path.join('/extract/', header.name);
+    stream.pipe(fs.createWriteStream(filePath));
+    stream.on('end', function() { next(); });
+});
+CODE
+)
+
+// Test 5: jszip loadAsync - relativePath flows directly to writeFile (should alert high)
+// Note: fs.writeFile is called within the forEach callback itself (not in a further
+// nested .then()), so relativePath is directly the sink argument.
+desc(
+	lang: "js"
+	alert_high: 1
+	'file:///zipslip_jszip_loadasync.js': <<<CODE
+const JSZip = require('jszip');
+const fs = require('fs');
+
+fs.readFile('test.zip', (err, data) => {
+  JSZip.loadAsync(data)
+    .then((zip) => {
+      zip.forEach((relativePath, zipEntry) => {
+        if (!zipEntry.dir) {
+          fs.writeFile(relativePath, 'content', (err) => {});
+        }
+      });
+    });
+});
+CODE
+)

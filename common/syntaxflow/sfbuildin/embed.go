@@ -33,6 +33,18 @@ func init() {
 	InitEmbedFS()
 }
 
+// GetEmbedRuleContent 从内置 embed FS 中按相对路径读取规则文件内容。
+// path 为相对于 buildin/ 目录的路径
+func GetEmbedRuleContent(path string) (string, bool) {
+	// embed FS 内文件路径格式为 "buildin/<path>"
+	fullPath := "buildin/" + path
+	raw, err := ruleFSWithHash.ReadFile(fullPath)
+	if err != nil {
+		return "", false
+	}
+	return string(raw), true
+}
+
 // InitEmbedFSWithNotify 带进度通知的初始化（非 gzip 版本不需要，但保持接口一致）
 // 在这里自动执行重复标题检查
 func InitEmbedFSWithNotify(notify func(process float64, ruleName string)) {

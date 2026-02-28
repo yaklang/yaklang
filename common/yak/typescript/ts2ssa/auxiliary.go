@@ -104,6 +104,14 @@ func (b *builder) IsObjectLike(val ssa.Value) bool {
 func (b *builder) SwitchFunctionBuilder(s *ssa.StoredFunctionBuilder) func() {
 	t := b.StoreFunctionBuilder()
 	b.LoadBuilder(s)
+	// store.Current 是活指针，其 CurrentBlock 可能被外层函数的 lazy build 流程改写（例如
+	// BuildSyntaxBlock 结束后切换到 EndBlock）。store.Store.CurrentBlock 是注册时的值快照，
+	// 始终保存着正确的 Block（包含内层 closure 需要继承的 local 变量 ScopeTable）。
+	// 在切入新 builder 时用快照覆盖活指针上已失效的 CurrentBlock，确保后续 PushFunction
+	// 构造的 parentScope 能正确包含父函数体内定义的 const/let 变量。
+	if s.Store.CurrentBlock != nil {
+		b.FunctionBuilder.CurrentBlock = s.Store.CurrentBlock
+	}
 	return func() {
 		b.LoadBuilder(t)
 	}
