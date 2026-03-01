@@ -70,7 +70,7 @@ func MockAICallback(t *testing.T, initFlag, persistentFlag, planFlag string) aic
 			return rsp, nil
 		}
 
-		if utils.MatchAllOfSubString(prompt, "plan: when user needs to create or refine a plan for a specific task, if need to search") {
+		if utils.MatchAllOfSubString(prompt, "plan: when user needs to create or refine a plan for a specific task") {
 			if initFlag != "" && !strings.Contains(req.GetPrompt(), initFlag) {
 				t.Fatalf("init flag not found in prompt: %s", req.GetPrompt())
 			}

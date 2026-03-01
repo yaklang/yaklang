@@ -58,7 +58,7 @@ func TestCoordinator_ToolUseReview_WrongTool_SuggestionTools(t *testing.T) {
 				return rsp, nil
 			}
 
-			if utils.MatchAllOfSubString(prompt, "plan: when user needs to create or refine a plan for a specific task, if need to search") {
+			if utils.MatchAllOfSubString(prompt, "plan: when user needs to create or refine a plan for a specific task") {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(strings.NewReader(`
 {

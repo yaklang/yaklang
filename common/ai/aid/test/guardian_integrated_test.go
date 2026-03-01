@@ -42,7 +42,7 @@ func mockedToolCalling(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, too
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(prompt, "plan: when user needs to create or refine a plan for a specific task, if need to search") {
+	if utils.MatchAllOfSubString(prompt, "plan: when user needs to create or refine a plan for a specific task") {
 
 		rsp.EmitOutputStream(strings.NewReader(`
 {
