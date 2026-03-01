@@ -42,7 +42,7 @@ func mockedClarification(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, f
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(prompt, "plan: when user needs to create or refine a plan for a specific task, if need to search") {
+	if utils.MatchAllOfSubString(prompt, "plan: when user needs to create or refine a plan for a specific task") {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(strings.NewReader(`
 {

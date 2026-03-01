@@ -68,6 +68,9 @@ func init() {
 				"web_search",
 				schema.AI_REACT_LOOP_ACTION_LOADING_SKILLS,
 			}
+			if r.GetConfig().GetAllowUserInteraction() {
+				allowedActions = append(allowedActions, schema.AI_REACT_LOOP_ACTION_ASK_FOR_CLARIFICATION)
+			}
 			preset := []reactloops.ReActLoopOption{
 				reactloops.WithAllowRAG(false),
 				reactloops.WithAllowToolCall(false),
