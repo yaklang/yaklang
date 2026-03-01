@@ -15,6 +15,39 @@ Optional Parameters:
                             When false (default), the tool will refuse to overwrite
                             an existing file and return an error.
                             Set to true to allow overwriting. Default: false.
+
+IMPORTANT - Use AITAG for the `content` parameter:
+  The `content` parameter often contains multi-line text, code, scripts, JSON,
+  or other structured content with special characters (quotes, backslashes,
+  newlines, tabs, etc.). Using standard JSON string encoding for such content
+  is error-prone and frequently causes JSON parse failures.
+
+  You MUST use AITAG format to wrap the `content` parameter for safe delivery:
+
+  Example:
+  ```json
+  {
+    "@action": "call-tool",
+    "tool": "write_file",
+    "identifier": "create_config_file",
+    "params": {
+      "file": "/path/to/target/file.txt",
+      "force": true
+    }
+  }
+  ```
+
+  <|TOOL_PARAM_content_{nonce}|>
+  Your file content here - raw text, no escaping needed.
+  Supports multi-line content, "quotes", \backslashes\,
+  code blocks, JSON, YAML, scripts, etc.
+  <|TOOL_PARAM_content_END_{nonce}|>
+
+  Where {nonce} is the current session nonce provided in the tool-params prompt.
+
+  DO NOT put large or multi-line content directly in the JSON "params.content" field.
+  AITAG values automatically override the same-named JSON parameter, so you can
+  safely omit "content" from the JSON params object when using AITAG.
 USAGE_BLOCK
 
 yakit.AutoInitYakit()
