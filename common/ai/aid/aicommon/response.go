@@ -404,22 +404,29 @@ func TeeAIResponse(
 ) *AIResponse {
 	first := NewAIResponse(aiCaller)
 	first.SetTaskIndex(src.GetTaskIndex())
-	first.SetModelInfo(src.GetProviderName(), src.GetModelName())
 	first.consumptionCallback = nil
 	firstReasonReader, firstReasonWriter := utils.NewPipe()
 	firstOutputReader, firstOutputWriter := utils.NewPipe()
 
 	second := NewAIResponse(aiCaller)
 	second.SetTaskIndex(src.GetTaskIndex())
-	second.SetModelInfo(src.GetProviderName(), src.GetModelName())
 	secondReasonReader, secondReasonWriter := utils.NewPipe()
 	secondOutputReader, secondOutputWriter := utils.NewPipe()
 
 	reasonReader, outputReader := src.GetUnboundStreamReaderEx(func() {
+		first.SetModelInfo(src.GetProviderName(), src.GetModelName())
+		second.SetModelInfo(src.GetProviderName(), src.GetModelName())
 		if onFirstByte != nil {
 			onFirstByte(second)
 		}
-	}, onClose, nil)
+	}, func() {
+		first.SetModelInfo(src.GetProviderName(), src.GetModelName())
+		first.totalOutputBytes.Store(src.GetTotalOutputBytes())
+		second.SetModelInfo(src.GetProviderName(), src.GetModelName())
+		if onClose != nil {
+			onClose()
+		}
+	}, nil)
 
 	wg := new(sync.WaitGroup)
 	wg.Add(2)

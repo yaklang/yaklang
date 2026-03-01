@@ -294,9 +294,24 @@ func (m *Manager) StartService(address string, options ...Option) error {
 	done := make(chan error, 3)
 	go m.startServiceInternal(service, config.LlamaServerPath, done)
 
-	// 等待启动完成或超时
-	if err := m.waitForService(service); err != nil {
-		return err
+	// 并发等待：服务就绪 OR 启动失败（快速失败）
+	waitResult := make(chan error, 1)
+	go func() {
+		waitResult <- m.waitForService(service)
+	}()
+
+	select {
+	case startErr := <-done:
+		if startErr != nil {
+			return startErr
+		}
+		if err := <-waitResult; err != nil {
+			return err
+		}
+	case err := <-waitResult:
+		if err != nil {
+			return err
+		}
 	}
 
 	log.Infof("Starting %s service: %s", serviceType, serviceName)

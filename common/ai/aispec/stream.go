@@ -63,6 +63,9 @@ func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reas
 	statusCode := lowhttp.GetStatusCodeFromResponse(r)
 	if statusCode > 299 {
 		log.Warnf("response status code: %v", statusCode)
+		if len(r) > 0 {
+			log.Warnf("response headers:\n%v", utils.ShrinkString(string(r), 1024))
+		}
 		defer func() {
 			if mirrorResponse.Len() > 0 {
 				log.Infof("response body: %v", utils.ShrinkString(mirrorResponse.String(), 400))
