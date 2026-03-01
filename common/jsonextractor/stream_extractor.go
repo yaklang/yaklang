@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"unicode"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -81,6 +82,8 @@ type callbackManager struct {
 	// 字段流处理相关
 	activeWriters         []io.WriteCloser    // 当前活跃的写入器列表，支持多字段同时写入
 	fieldStreamFrameStack []*fieldStreamFrame // 字段流写入栈，用于支持嵌套结构
+	allCreatedWriters     []io.WriteCloser    // 所有创建的写入器，用于最终清理
+	fieldStreamWg         sync.WaitGroup      // 等待所有字段流处理 goroutine 完成
 
 	// stream finish callback
 	streamFinishedCallback func()
@@ -304,7 +307,9 @@ func (c *callbackManager) createFieldStream(fieldName string, handler *FieldStre
 	}
 
 	// 在新的 goroutine 中调用处理函数
+	c.fieldStreamWg.Add(1)
 	go func(h *FieldStreamHandler, r io.Reader, key string, parentPath []string) {
+		defer c.fieldStreamWg.Done()
 		defer func() {
 			if err := recover(); err != nil {
 				log.Errorf("field stream handler panic: %v", err)
@@ -317,6 +322,7 @@ func (c *callbackManager) createFieldStream(fieldName string, handler *FieldStre
 		}
 	}(handler, reader, fieldName, parents)
 
+	c.allCreatedWriters = append(c.allCreatedWriters, writer)
 	log.Infof("started field stream for: %s", fieldName)
 	return &fieldStreamContext{
 		key:    fieldName,
@@ -402,6 +408,15 @@ func (c *callbackManager) resetFieldStreamFrames() {
 	}
 }
 
+func (c *callbackManager) closeAllCreatedWriters() {
+	for _, w := range c.allCreatedWriters {
+		if w != nil {
+			w.Close()
+		}
+	}
+	c.allCreatedWriters = nil
+}
+
 // setCurrentFieldWriter 设置当前字段写入器（已废弃，保留兼容性）
 func (c *callbackManager) setCurrentFieldWriter(fieldName string) {
 	// 在新的多写入器架构中，此方法不再需要
@@ -435,7 +450,11 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 			callbackManager.streamFinishedCallback()
 		}
 	}()
-	defer callbackManager.resetFieldStreamFrames()
+	defer func() {
+		callbackManager.resetFieldStreamFrames()
+		callbackManager.closeAllCreatedWriters()
+		callbackManager.fieldStreamWg.Wait()
+	}()
 
 	var mirror = new(bytes.Buffer)
 	reader := newAutoPeekReader(io.TeeReader(jsonReader, mirror))
