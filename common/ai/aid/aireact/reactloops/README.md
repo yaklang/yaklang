@@ -202,16 +202,16 @@ loop.streamFields.Set("thought", &LoopStreamField{
 
 主要测试场景：
 
-1. ✅ 基本执行流程
-2. ✅ 最大迭代次数限制
-3. ✅ 异步/同步模式
-4. ✅ ActionVerifier 和 ActionHandler
-5. ✅ 状态转换（Processing, Completed, Aborted）
-6. ✅ 错误处理和 Panic 恢复
-7. ✅ 反馈机制
-8. ✅ Prompt 生成
-9. ✅ Stream 处理和 Mirror
-10. ✅ 禁止退出循环
+1. 基本执行流程
+2. 最大迭代次数限制
+3. 异步/同步模式
+4. ActionVerifier 和 ActionHandler
+5. 状态转换（Processing, Completed, Aborted）
+6. 错误处理和 Panic 恢复
+7. 反馈机制
+8. Prompt 生成
+9. Stream 处理和 Mirror
+10. 禁止退出循环
 
 ### 运行测试
 

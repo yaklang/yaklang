@@ -137,6 +137,7 @@ type Config struct {
 	ShowForgeListInPrompt  bool // Whether to show forge list in base prompt (default false, forges discoverable via search_capabilities)
 	AiForgeManager         AIForgeFactory
 	ContextProviderManager *ContextProviderManager
+	UserPresetPrompt       string // max 4000 chars, appended to every AI request via AITAG, affects preferences only
 
 	/*
 		AI Tool
@@ -694,6 +695,18 @@ func WithPromptHook(hook func(string) string) ConfigOption {
 		c.m.Lock()
 		c.PromptHook = hook
 		c.m.Unlock()
+		return nil
+	}
+}
+
+const UserPresetPromptMaxLength = 4000
+
+func WithUserPresetPrompt(prompt string) ConfigOption {
+	return func(c *Config) error {
+		if len(prompt) > UserPresetPromptMaxLength {
+			prompt = prompt[:UserPresetPromptMaxLength]
+		}
+		c.UserPresetPrompt = prompt
 		return nil
 	}
 }
@@ -2584,6 +2597,10 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	// PlanPrompt - additional context for plan phase only
 	if i.PlanPrompt != "" {
 		opts = append(opts, WithPlanPrompt(i.PlanPrompt))
+	}
+
+	if i.UserPresetPrompt != "" {
+		opts = append(opts, WithUserPresetPrompt(i.UserPresetPrompt))
 	}
 
 	if i.PersistentSessionId != "" {

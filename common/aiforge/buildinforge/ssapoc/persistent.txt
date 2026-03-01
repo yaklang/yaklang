@@ -71,8 +71,8 @@
 - 实际文件路径: `vulnerabilities/brute/source/low.php`
 
 在使用 ssa-read-file、ssa-list-files 等工具时，**file_path 和 path_prefix 参数应使用相对路径**（不包含 ProgramName 前缀）：
-- ✅ 正确: `file_path: "vulnerabilities/brute/source/low.php"`
-- ❌ 错误: `file_path: "/DVWA(2025-12-16 11:27:47)/vulnerabilities/brute/source/low.php"`
+- 正确: `file_path: "vulnerabilities/brute/source/low.php"`
+- 错误: `file_path: "/DVWA(2025-12-16 11:27:47)/vulnerabilities/brute/source/low.php"`
 
 ### 使用流程
 1. 首先使用 ssa-risk 获取 Risk 信息，从中获取 ProgramName 和 code_source_url

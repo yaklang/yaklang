@@ -312,8 +312,8 @@ if err != nil {
     // 检查是否是超时导致的错误（通过错误信息判断）
     if str.Contains(errStr, "killed") || str.Contains(errStr, "signal: killed") || str.Contains(errStr, "context deadline exceeded") {
         isTimeout = true
-        yakit.Info("⚠️ COMMAND TIMEOUT: The command was killed after %d seconds timeout. The command may be running too long or hanging indefinitely.", timeoutSeconds)
-        yakit.Info("💡 SUGGESTION: For long-running commands, consider using 'timeout' command wrapper (e.g., 'timeout 30 your_command'), or add limits to your command (e.g., 'ping -c 5' instead of 'ping').")
+        yakit.Info("COMMAND TIMEOUT: The command was killed after %d seconds timeout. The command may be running too long or hanging indefinitely.", timeoutSeconds)
+        yakit.Info("SUGGESTION: For long-running commands, consider using 'timeout' command wrapper (e.g., 'timeout 30 your_command'), or add limits to your command (e.g., 'ping -c 5' instead of 'ping').")
     } else {
         // Extract exit code if available
         if str.Contains(errStr, "exit status") {
@@ -325,8 +325,8 @@ if err != nil {
         }
         yakit.Error("%v command execution failed (exit code %d): %v", shellType, exitCode, err)
         if shellType == "bash" {
-            yakit.Info("💡 TIP: With 'set -e' enabled, the script exits on the first error. Check the trace output (lines starting with '+') to identify which command failed.")
-            yakit.Info("💡 TIP: Line numbers in error messages are offset by 7 from the original command (due to script header). Subtract 7 to get the actual line in your command.")
+            yakit.Info("TIP: With 'set -e' enabled, the script exits on the first error. Check the trace output (lines starting with '+') to identify which command failed.")
+            yakit.Info("TIP: Line numbers in error messages are offset by 7 from the original command (due to script header). Subtract 7 to get the actual line in your command.")
         }
     }
 }

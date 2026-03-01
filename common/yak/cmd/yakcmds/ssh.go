@@ -99,7 +99,7 @@ var SSHCommands = []*cli.Command{
 
 			// Display banner if using root
 			if user == "root" {
-				log.Warn("⚠️  WARNING: Connecting as root user. Please be careful with your operations!")
+				log.Warn("WARNING: Connecting as root user. Please be careful with your operations!")
 			}
 
 			log.Infof("Connecting to %s as user '%s'...", addr, user)
@@ -157,7 +157,7 @@ var SSHCommands = []*cli.Command{
 			}
 			defer client.Close()
 
-			log.Info("✓ SSH connection established successfully")
+			log.Info("SSH connection established successfully")
 
 			// Upload file if specified
 			if uploadFile != "" {
@@ -222,7 +222,7 @@ var SSHCommands = []*cli.Command{
 					os.Exit(-1)
 				}
 
-				log.Infof("✓ file uploaded successfully to %s", remotePath)
+				log.Infof("file uploaded successfully to %s", remotePath)
 				os.Exit(0)
 			}
 
@@ -235,7 +235,7 @@ var SSHCommands = []*cli.Command{
 				if err != nil {
 					return utils.Errorf("failed to execute command: %s", err)
 				}
-				log.Info("✓ Command execution completed")
+				log.Info("Command execution completed")
 				return nil
 			}
 
@@ -254,7 +254,7 @@ var SSHCommands = []*cli.Command{
 				if err != nil {
 					return utils.Errorf("failed to execute bash script: %s", err)
 				}
-				log.Info("✓ Bash script execution completed")
+				log.Info("Bash script execution completed")
 				return nil
 			}
 
@@ -295,7 +295,7 @@ var SSHCommands = []*cli.Command{
 			}
 
 			log.Info("═══════════════════════════════════════════════════════════════")
-			log.Info("✓ Interactive shell session ended")
+			log.Info("Interactive shell session ended")
 			return nil
 		},
 	},

@@ -124,24 +124,24 @@ defer reader.Close()
 
 ---
 
-## 📋 Action 类型总结
+## Action 类型总结
 
 ### 需要 `<|GEN_CODE...|>` 标签的 Actions：
-- ✅ `write_code` - 创建新代码文件
-- ✅ `modify_code` - 修改现有代码片段
-- ✅ `insert_lines` - 插入新代码行
+- `write_code` - 创建新代码文件
+- `modify_code` - 修改现有代码片段
+- `insert_lines` - 插入新代码行
 
 ### 不需要禁止 `<|GEN_CODE...|>` 标签的 Actions：
-- ❌ `delete_lines` - 删除代码行（无需生成代码）
-- ❌ `grep_yaklang_samples` - 搜索代码样例（查询类操作）
-- ❌ `query_document` - 查询文档（查询类操作）
-- ❌ `rag_search_payload` - RAG搜索（查询类操作）
+- `delete_lines` - 删除代码行（无需生成代码）
+- `grep_yaklang_samples` - 搜索代码样例（查询类操作）
+- `query_document` - 查询文档（查询类操作）
+- `rag_search_payload` - RAG搜索（查询类操作）
 
 **记忆口诀**: 只有需要你"生成或提供代码片段"的 actions 才需要 `<|GEN_CODE...|>` 标签！
 
 ---
 
-## ❌ 常见错误示例
+## 常见错误示例
 
 ### 错误示例 1：包含行号前缀（绝对禁止！）
 ```json
@@ -153,9 +153,9 @@ defer reader.Close()
 19 | reader, err := zip.OpenReader(zipFilePath)
 <|GEN_CODE_END_{{ .Nonce }}|>
 
-⚠️ **这种格式是错误的！包含行号会导致语法解析失败！**
+**这种格式是错误的！包含行号会导致语法解析失败！**
 
-## ✅ 完整工作流示例
+## 完整工作流示例
 
 ### 示例 7: grep_yaklang_samples 完整工作流
 
@@ -232,7 +232,7 @@ for result in results {
 
 ---
 
-## ✅ 正确做法对比
+## 正确做法对比
 
 ### 示例 8: 第一次错误后立即 grep
 

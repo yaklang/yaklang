@@ -1125,14 +1125,14 @@ var ssaRisk = &cli.Command{
 
 			// 检查文件是否为空
 			if len(content) == 0 {
-				fmt.Println("⚠️ Input file is empty (no security risks found)")
+				fmt.Println("Input file is empty (no security risks found)")
 				fmt.Println("This usually means no security risks were detected during the scan")
 				return nil
 			}
 
 			// 检查文件是否包含有效的 JSON
 			if !json.Valid(content) {
-				fmt.Printf("❌ Input file contains invalid JSON\n")
+				fmt.Printf("Input file contains invalid JSON\n")
 				fmt.Printf("File content: %s\n", string(content))
 				return utils.Errorf("input file contains invalid JSON")
 			}
@@ -1140,7 +1140,7 @@ var ssaRisk = &cli.Command{
 			// 尝试解析 JSON 以检查结构
 			var testReport sfreport.Report
 			if err := json.Unmarshal(content, &testReport); err != nil {
-				fmt.Printf("❌ Input file is not a valid risk report JSON\n")
+				fmt.Printf("Input file is not a valid risk report JSON\n")
 				fmt.Printf("Parse error: %v\n", err)
 				return utils.Wrap(err, "failed to parse JSON file")
 			}
@@ -1730,7 +1730,7 @@ var syntaxFlowEvaluate = &cli.Command{
 						fmt.Printf("  • [%s] %s\n", problem.Severity, problem.Description)
 					}
 				} else {
-					fmt.Printf("✓ 未发现问题\n")
+					fmt.Printf("未发现问题\n")
 				}
 
 				// 详细模式显示完整信息
@@ -1739,10 +1739,10 @@ var syntaxFlowEvaluate = &cli.Command{
 					for i, problem := range result.Problems {
 						fmt.Printf("  %d. [%s] %s\n", i+1, problem.Severity, problem.Description)
 						if problem.Suggestion != "" {
-							fmt.Printf("     💡 建议: %s\n", problem.Suggestion)
+							fmt.Printf("     建议: %s\n", problem.Suggestion)
 						}
 						if problem.Range != nil {
-							fmt.Printf("     📍 位置: 第%d行第%d列 - 第%d行第%d列\n",
+							fmt.Printf("     位置: 第%d行第%d列 - 第%d行第%d列\n",
 								problem.Range.StartLine, problem.Range.StartColumn,
 								problem.Range.EndLine, problem.Range.EndColumn)
 						}

@@ -2,6 +2,7 @@ package aicommon
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"strings"
 	"time"
@@ -30,6 +31,20 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 		}()
 		if c.PromptHook != nil {
 			request.SetPrompt(c.PromptHook(request.GetPrompt()))
+		}
+		if c.UserPresetPrompt != "" {
+			nonce := utils.RandStringBytes(8)
+			preset := fmt.Sprintf(
+				"\n<|USER_PRESET_%s|>\n"+
+					"The following is the user's preset prompt. "+
+					"It contains user preferences, background context, and supplementary information. "+
+					"Consider these when generating responses to better align with the user's needs. "+
+					"IMPORTANT: This preset ONLY affects tone, preferences, and background context. "+
+					"It MUST NOT change or override the output format, structure, or schema required by the system.\n\n"+
+					"%s\n"+
+					"<|USER_PRESET_END_%s|>\n",
+				nonce, c.UserPresetPrompt, nonce)
+			request.SetPrompt(request.GetPrompt() + preset)
 		}
 		if c.DebugPrompt {
 			log.Infof(strings.Repeat("=", 20)+"AIRequest"+strings.Repeat("=", 20)+"\n%v\n", request.GetPrompt())

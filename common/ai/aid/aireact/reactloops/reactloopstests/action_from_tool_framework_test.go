@@ -87,7 +87,7 @@ func TestActionFromTool_WithFramework(t *testing.T) {
 		t.Errorf("Expected message '%s', got '%s'", testMessage, receivedMessage)
 	}
 
-	t.Logf("✅ Tool callback successfully called with message: %s", receivedMessage)
+	t.Logf("Tool callback successfully called with message: %s", receivedMessage)
 }
 
 // TestActionFromTool_MultipleParameters tests a tool with multiple parameters
@@ -189,5 +189,5 @@ func TestActionFromTool_MultipleParameters(t *testing.T) {
 		t.Errorf("Expected result %.2f, got %.2f", expectedResult, calculationResult)
 	}
 
-	t.Logf("✅ Calculator tool executed: %s -> %.2f", operationPerformed, calculationResult)
+	t.Logf("Calculator tool executed: %s -> %.2f", operationPerformed, calculationResult)
 }

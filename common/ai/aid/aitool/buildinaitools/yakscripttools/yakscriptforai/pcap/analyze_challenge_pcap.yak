@@ -213,7 +213,7 @@ analyzeChallengePacket = func(packet) {
                             "packet": challengeResults["packets_analyzed"],
                             "context": packetStr,
                         })
-                        yakit.Info("🚩 FLAG FOUND: %v", flag)
+                        yakit.Info("FLAG FOUND: %v", flag)
                         suspicious = true
                     }
                 }
@@ -240,7 +240,7 @@ analyzeChallengePacket = func(packet) {
                                     "packet": challengeResults["packets_analyzed"],
                                     "context": decodedStr,
                                 })
-                                yakit.Info("🚩 FLAG FOUND (base64 decoded): %v", flag)
+                                yakit.Info("FLAG FOUND (base64 decoded): %v", flag)
                                 suspicious = true
                             }
                         }
@@ -266,7 +266,7 @@ analyzeChallengePacket = func(packet) {
             //                         "packet": challengeResults["packets_analyzed"],
             //                         "context": hexStr,
             //                     })
-            //                     yakit.Info("🚩 FLAG FOUND (hex decoded): %v", flag)
+            //                     yakit.Info("FLAG FOUND (hex decoded): %v", flag)
             //                     suspicious = true
             //                 }
             //             }
@@ -499,7 +499,7 @@ yakit.Info("Extracted data packets: %v", len(challengeResults["extracted_data"])
 if len(challengeResults["flags_found"]) > 0 {
     yakit.Info("=== FLAGS FOUND ===")
     for flag in challengeResults["flags_found"] {
-        yakit.Info("🚩 %v (packet %v)", flag["flag"], flag["packet"])
+        yakit.Info("%v (packet %v)", flag["flag"], flag["packet"])
         if flag["encoding"] != nil {
             yakit.Info("   Encoding: %v", flag["encoding"])
         }
@@ -508,9 +508,9 @@ if len(challengeResults["flags_found"]) > 0 {
 
 // 总结
 if len(challengeResults["flags_found"]) > 0 {
-    yakit.Info("🎉 Analysis completed! Found %v potential flags.", len(challengeResults["flags_found"]))
+    yakit.Info("Analysis completed! Found %v potential flags.", len(challengeResults["flags_found"]))
 } else {
-    yakit.Info("🤔 Analysis completed. No obvious flags found, but check the extracted data for hidden information.")
+    yakit.Info("Analysis completed. No obvious flags found, but check the extracted data for hidden information.")
 }
 
 yakit.Info("Challenge PCAP analysis completed successfully!")

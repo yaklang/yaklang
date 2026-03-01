@@ -86,7 +86,7 @@ func checkCodeAndFormatErrors(code string) (string, bool) {
 		// Add intelligent error hints for common Yaklang DSL issues
 		intelligentHint := getIntelligentErrorHint(msg, me)
 		if intelligentHint != "" {
-			buf.WriteString("\n🤖 AI助手提示: " + intelligentHint + "\n\n")
+			buf.WriteString("\nAI助手提示: " + intelligentHint + "\n\n")
 		}
 
 		if msg.StartLineNumber >= 0 && msg.EndLineNumber >= 0 && msg.EndLineNumber >= msg.StartLineNumber {
@@ -310,8 +310,8 @@ func formatErrorHint(pattern ErrorPattern) string {
 	hint := pattern.Hint
 
 	if len(pattern.Examples) >= 2 {
-		hint += "\n❌ 错误: " + pattern.Examples[0]
-		hint += "\n✅ 正确: " + pattern.Examples[1]
+		hint += "\n错误: " + pattern.Examples[0]
+		hint += "\n正确: " + pattern.Examples[1]
 	}
 
 	return hint

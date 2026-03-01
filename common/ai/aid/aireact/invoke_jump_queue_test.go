@@ -296,5 +296,5 @@ LOOP:
 		t.Fatal("Expected task 2 to be completed, but it wasn't")
 	}
 
-	fmt.Println("✅ Jump queue test passed successfully!")
+	fmt.Println("Jump queue test passed successfully!")
 }

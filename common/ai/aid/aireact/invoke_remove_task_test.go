@@ -427,5 +427,5 @@ LOOP:
 		t.Fatal("Expected queue info to be received, but it wasn't")
 	}
 
-	fmt.Println("✅ clear queue test passed successfully!")
+	fmt.Println("clear queue test passed successfully!")
 }

@@ -41,10 +41,10 @@ alert $thread for { ... }
 ```
 
 那么安全用例应该：
-- ❌ 避免直接使用 `new Thread()`
-- ✅ 使用线程池 `ExecutorService`
-- ✅ 使用容器管理的 `@Async` 注解
-- ✅ 使用 `CompletableFuture` 等现代并发工具
+- 避免直接使用 `new Thread()`
+- 使用线程池 `ExecutorService`
+- 使用容器管理的 `@Async` 注解
+- 使用 `CompletableFuture` 等现代并发工具
 
 ## 输出格式要求
 

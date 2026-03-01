@@ -1,6 +1,6 @@
 ## 报告生成模式输出示例
 
-## ⚠️ 关键规则：使用写作工具时必须同时输出 <|GEN_REPORT_{{ .Nonce }}|> 标签！
+## 关键规则：使用写作工具时必须同时输出 <|GEN_REPORT_{{ .Nonce }}|> 标签！
 
 当使用 write_section、modify_section、insert_section 时，必须在 JSON 后紧接着输出 `<|GEN_REPORT_{{ .Nonce }}|>` 开始标签和 `<|GEN_REPORT_END_{{ .Nonce }}|>` 结束标签包裹的内容。
 
@@ -133,18 +133,18 @@
 
 ---
 
-## 📋 Action 类型总结
+## Action 类型总结
 
 ### 需要 `<|GEN_REPORT_...|>` 标签对的 Actions：
-- ✅ `write_section` - 创建报告初稿
-- ✅ `modify_section` - 修改现有内容片段
-- ✅ `insert_section` - 插入新内容
+- `write_section` - 创建报告初稿
+- `modify_section` - 修改现有内容片段
+- `insert_section` - 插入新内容
 
 ### 不需要 `<|GEN_REPORT_...|>` 标签对的 Actions：
-- ❌ `delete_section` - 删除内容（无需生成内容）
-- ❌ `read_reference_file` - 读取参考文件（查询类操作）
-- ❌ `grep_reference` - 搜索参考资料（查询类操作）
-- ❌ `search_knowledge` - 知识库搜索（查询类操作）
-- ❌ `finish` - 完成报告
+- `delete_section` - 删除内容（无需生成内容）
+- `read_reference_file` - 读取参考文件（查询类操作）
+- `grep_reference` - 搜索参考资料（查询类操作）
+- `search_knowledge` - 知识库搜索（查询类操作）
+- `finish` - 完成报告
 
 **记忆口诀**: 只有需要你"生成或提供报告内容片段"的 actions 才需要 `<|GEN_REPORT_...|>` 标签对！

@@ -220,7 +220,7 @@ func generateInsufficientDataReport(loop *reactloops.ReActLoop, invoker aicommon
 
 	// Search status section
 	report.WriteString("## 搜索情况\n\n")
-	report.WriteString("⚠️ **注意**：已尝试多次搜索，但未能找到足够的相关资料来完整回答问题。\n\n")
+	report.WriteString("**注意**：已尝试多次搜索，但未能找到足够的相关资料来完整回答问题。\n\n")
 
 	// Metadata
 	report.WriteString("### 搜索概况\n\n")
