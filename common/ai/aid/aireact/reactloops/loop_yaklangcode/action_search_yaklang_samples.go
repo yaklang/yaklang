@@ -43,12 +43,12 @@ var semanticSearchYaklangSamplesAction = func(r aicommon.AIInvokeRuntime, ragSys
   * 每个问题必须是完整的主谓宾句式
   * 禁止使用代词（它、这个、那个等）
   * 问题风格示例：
-    ✅ Good: "Yaklang中如何获取数组长度？"
-    ✅ Good: "Yaklang中append函数如何使用？"
-    ✅ Good: "Yaklang中如何配置默认的嵌入处理函数？"
-    ❌ Bad: "如何获取长度？"（缺少主语）
-    ❌ Bad: "它如何使用？"（使用代词）
-    ❌ Bad: "配置嵌入"（不完整句式）
+    Good: "Yaklang中如何获取数组长度？"
+    Good: "Yaklang中append函数如何使用？"
+    Good: "Yaklang中如何配置默认的嵌入处理函数？"
+    Bad: "如何获取长度？"（缺少主语）
+    Bad: "它如何使用？"（使用代词）
+    Bad: "配置嵌入"（不完整句式）
   * 复杂问题可拆解为多个问题：
     例如："Yaklang数组操作" 拆解为：
     - "Yaklang中如何创建数组？"
@@ -87,18 +87,18 @@ semantic_search_yaklang_samples(questions=["Yaklang中如何处理错误？", "Y
 3. 明确指明 Yaklang 语言
 
 【Good Cases - 正确示例】：
-✅ "Yaklang中如何获取数组长度？"
-✅ "Yaklang中append函数如何使用？"
-✅ "Yaklang中如何配置默认的嵌入处理函数？"
-✅ "Yaklang中生产环境嵌入请求如何添加TOTP验证头？"
-✅ "Yaklang中如何递归读取ZIP文件内容？"
-✅ "Yaklang中如何处理嵌入响应的JSON解析错误？"
+- "Yaklang中如何获取数组长度？"
+- "Yaklang中append函数如何使用？"
+- "Yaklang中如何配置默认的嵌入处理函数？"
+- "Yaklang中生产环境嵌入请求如何添加TOTP验证头？"
+- "Yaklang中如何递归读取ZIP文件内容？"
+- "Yaklang中如何处理嵌入响应的JSON解析错误？"
 
 【Bad Cases - 错误示例】：
-❌ "如何获取长度？" - 缺少主语（Yaklang）
-❌ "它如何使用？" - 使用代词
-❌ "配置嵌入" - 不完整句式
-❌ "数组操作" - 过于宽泛，应拆解为多个具体问题
+- "如何获取长度？" - 缺少主语（Yaklang）
+- "它如何使用？" - 使用代词
+- "配置嵌入" - 不完整句式
+- "数组操作" - 过于宽泛，应拆解为多个具体问题
 
 【拆解复杂问题】：
 复杂需求应拆解为多个具体问题：
@@ -317,9 +317,9 @@ semantic_search_yaklang_samples(questions=["Yaklang中如何处理错误？", "Y
 【严重警告】：无法找到相关代码样例！
 
 【禁止行为】：
-❌ 禁止臆造任何 Yaklang API
-❌ 禁止参考其他语言的语法
-❌ 禁止假设函数存在或用法
+- 禁止臆造任何 Yaklang API
+- 禁止参考其他语言的语法
+- 禁止假设函数存在或用法
 
 【必须立即执行】：
 1. 重新表述问题 - 使用更通用或更具体的描述

@@ -125,16 +125,16 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 4. 问题要具体，涉及具体的漏洞类型和测试技术
 
 问题示例：
-✅ Good: "如何检测GET参数中的字符型SQL注入漏洞？"
-✅ Good: "img标签的onerror属性如何触发XSS攻击？"
-✅ Good: "Cookie参数中的SQL注入有哪些常见payload？"
-✅ Good: "如何绕过WAF进行SQL注入测试？"
-✅ Good: "JSON请求体中如何检测命令注入漏洞？"
-✅ Good: "时间盲注的payload有哪些？"
-✅ Good: "反射型XSS和存储型XSS有什么区别？"
-❌ Bad: "如何注入？" - 太笼统
-❌ Bad: "它怎么绕过？" - 使用代词
-❌ Bad: "XSS" - 不完整句式
+Good: "如何检测GET参数中的字符型SQL注入漏洞？"
+Good: "img标签的onerror属性如何触发XSS攻击？"
+Good: "Cookie参数中的SQL注入有哪些常见payload？"
+Good: "如何绕过WAF进行SQL注入测试？"
+Good: "JSON请求体中如何检测命令注入漏洞？"
+Good: "时间盲注的payload有哪些？"
+Good: "反射型XSS和存储型XSS有什么区别？"
+Bad: "如何注入？" - 太笼统
+Bad: "它怎么绕过？" - 使用代词
+Bad: "XSS" - 不完整句式
 
 <|USER_INPUT_{{ .nonce }}|>
 {{ .userInput }}

@@ -383,7 +383,7 @@ func (r *ReActLoop) addSpinWarningToTimeline(reflection *ActionReflection) {
 	log.Warnf("SPIN detected (consecutive #%d): %s", spinCount, reflection.SpinReason)
 
 	var msg strings.Builder
-	msg.WriteString(fmt.Sprintf("⚠️ [SPIN DETECTED #%d] AI Agent is stuck in a loop\n\n", spinCount))
+	msg.WriteString(fmt.Sprintf("[SPIN DETECTED #%d] AI Agent is stuck in a loop\n\n", spinCount))
 	msg.WriteString(fmt.Sprintf("**Action type**: %s\n", reflection.ActionType))
 	msg.WriteString(fmt.Sprintf("**Reason**: %s\n\n", reflection.SpinReason))
 
@@ -409,7 +409,7 @@ func (r *ReActLoop) addSpinWarningToTimeline(reflection *ActionReflection) {
 		remaining := r.maxConsecutiveSpinWarnings - spinCount
 		if remaining <= 1 {
 			msg.WriteString(fmt.Sprintf(
-				"\n---\n⛔ **FINAL WARNING**: This loop will be FORCE-TERMINATED after %d more spin(s). "+
+				"\n---\n**FINAL WARNING**: This loop will be FORCE-TERMINATED after %d more spin(s). "+
 					"You MUST select a DIFFERENT action type NOW.\n", remaining))
 		}
 	}
@@ -433,7 +433,7 @@ Before choosing your next action, answer each question in order:
 4. **Why** does this constraint exist? → identify the real blocker
 5. **What is the minimum viable DIFFERENT action** that bypasses this blocker?
 
-⚠ You MUST pick an action that is NOT '%s' in the next iteration.
+You MUST pick an action that is NOT '%s' in the next iteration.
 `, actionType, actionType)
 }
 
@@ -450,7 +450,7 @@ You have been spinning on '%s' for 2 consecutive reflections. Define your next a
 - **R**elevant: How does this action DIRECTLY advance the original task goal?
 - **T**ime-bound: This must complete in a SINGLE iteration — no multi-step plans.
 
-⚠ CONSTRAINT: Action type '%s' is STRONGLY DISCOURAGED. Justify if you must use it again.
+CONSTRAINT: Action type '%s' is STRONGLY DISCOURAGED. Justify if you must use it again.
 `, actionType, actionType, actionType)
 }
 
@@ -466,7 +466,7 @@ You have been spinning on '%s' for 3+ consecutive reflections. Perform a SWOT an
 **Opportunities** — List ALL alternative action types you have NOT tried. Pick one.
 **Threats** — If you repeat '%s' one more time, the loop will be force-terminated with UNSUCCESSFUL status.
 
-⚠ HARD CONSTRAINT: Action type '%s' is now BANNED.
+HARD CONSTRAINT: Action type '%s' is now BANNED.
   → If you select '%s' again, the system will terminate this loop.
   → You MUST select a fundamentally different action type.
   → If no other action applies, use 'finish' or 'directly_answer' to exit gracefully.

@@ -1,4 +1,4 @@
-### ⚠️⚠️⚠️ Yaklang 代码生成核心原则 - 必须遵守 ⚠️⚠️⚠️
+### Yaklang 代码生成核心原则 - 必须遵守
 
 ## 八荣八耻 - Yaklang DSL 开发准则
 
@@ -75,7 +75,7 @@ if err != nil {
 **注意：** 工具调用适用于需要执行具体操作或获取外部信息的场景。如果用户的需求可以通过简单的对话或已知信息直接回答，则无需调用工具，以避免不必要的复杂性。请根据任务的性质灵活判断是否需要工具支持。
 
 
-## 🔍 grep_yaklang_samples - 你的首要工具！
+## grep_yaklang_samples - 你的首要工具！
 
 ### 为什么必须使用 grep_yaklang_samples？
 
@@ -166,7 +166,7 @@ if err != nil {
 
 ---
 
-## 🔍 semantic_search_yaklang_samples - 语义搜索工具
+## semantic_search_yaklang_samples - 语义搜索工具
 
 ### 什么时候使用 semantic_search_yaklang_samples？
 
@@ -203,13 +203,13 @@ semantic_search_yaklang_samples:
 - `score_threshold` - 相似度阈值（默认 0.3，范围 -1.0 到 1.0）
 
 **问题格式要求：**
-✅ Good Cases（正确示例）：
+Good Cases（正确示例）：
 - "Yaklang中如何获取数组长度？"
 - "Yaklang中append函数如何使用？"
 - "Yaklang中如何配置默认的嵌入处理函数？"
 - "Yaklang中生产环境嵌入请求如何添加TOTP验证头？"
 
-❌ Bad Cases（错误示例）：
+Bad Cases（错误示例）：
 - "如何获取长度？" - 缺少主语（Yaklang）
 - "它如何使用？" - 使用代词
 - "配置嵌入" - 不完整句式

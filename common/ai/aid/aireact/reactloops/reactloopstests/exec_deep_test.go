@@ -92,7 +92,7 @@ func testFunc() {
 				}
 
 				codeExtracted = true
-				t.Logf("✅ AITag extracted code in action handler: %s", strings.TrimSpace(code))
+				t.Logf("AITag extracted code in action handler: %s", strings.TrimSpace(code))
 				operator.Continue()
 			},
 		),
@@ -167,12 +167,12 @@ const jsCode = "test js code";
 	hasJs := strings.Contains(jsCode, "jsCode") || strings.Contains(jsCode, "js")
 
 	if !hasYak && !hasPy && !hasJs {
-		t.Logf("⚠️ Multiple AITag extraction may be timing-sensitive")
+		t.Logf("Multiple AITag extraction may be timing-sensitive")
 		t.Logf("  - Yak (%d bytes): %s", len(yakCode), yakCode)
 		t.Logf("  - Python (%d bytes): %s", len(pyCode), pyCode)
 		t.Logf("  - JS (%d bytes): %s", len(jsCode), jsCode)
 	} else {
-		t.Logf("✅ Multiple AITags extracted successfully")
+		t.Logf("Multiple AITags extracted successfully")
 		t.Logf("  - Yak: %s", yakCode)
 		t.Logf("  - Python: %s", pyCode)
 		t.Logf("  - JS: %s", jsCode)
@@ -215,7 +215,7 @@ func TestExec_CreateMirrors_EmptyTag(t *testing.T) {
 		t.Logf("Empty tag resulted in: '%s'", code)
 	}
 
-	t.Logf("✅ Empty tag handled correctly")
+	t.Logf("Empty tag handled correctly")
 }
 
 // TestExec_CreateMirrors_NoAITags 测试没有AITag的情况
@@ -243,7 +243,7 @@ func TestExec_CreateMirrors_NoAITags(t *testing.T) {
 		t.Fatalf("Execute failed: %v", err)
 	}
 
-	t.Logf("✅ No AITag case handled correctly")
+	t.Logf("No AITag case handled correctly")
 }
 
 // TestExec_CreateMirrors_TagWithNewlines 测试带换行符的标签
@@ -305,9 +305,9 @@ func multiLineFunc() {
 			t.Errorf("Code should contain 'multiLineFunc', got: %s", code)
 		}
 
-		t.Logf("✅ Newlines trimmed correctly: %q", code)
+		t.Logf("Newlines trimmed correctly: %q", code)
 	} else {
-		t.Logf("⚠️ AITag with newlines extraction may be timing-sensitive")
+		t.Logf("AITag with newlines extraction may be timing-sensitive")
 	}
 }
 
@@ -448,14 +448,14 @@ func TestExec_TaskStatusTransitions(t *testing.T) {
 
 	// Processing状态可能很短暂，如果没有捕获到，给出警告而不是失败
 	if !hasProcessing {
-		t.Logf("⚠️ Processing status not captured (may be too brief)")
+		t.Logf("Processing status not captured (may be too brief)")
 		// 检查是否至少有状态变化
 		if len(statusHistory) < 2 {
 			t.Error("Should have at least 2 status changes (created -> completed)")
 		}
 	}
 
-	t.Logf("✅ Status transitions verified: Processing=%v, Completed=%v", hasProcessing, hasCompleted)
+	t.Logf("Status transitions verified: Processing=%v, Completed=%v", hasProcessing, hasCompleted)
 }
 
 // TestExec_TaskStatusAborted 测试任务中止状态
@@ -502,9 +502,9 @@ func TestExec_TaskStatusAborted(t *testing.T) {
 		finalStatus = capturedTask.GetStatus()
 		// Panic被recover后，defer中的complete可能执行，状态可能是Completed或Aborted
 		if finalStatus == aicommon.AITaskState_Aborted {
-			t.Logf("✅ Task aborted after panic: %v", finalStatus)
+			t.Logf("Task aborted after panic: %v", finalStatus)
 		} else if finalStatus == aicommon.AITaskState_Completed {
-			t.Logf("✅ Task completed after panic recovery: %v", finalStatus)
+			t.Logf("Task completed after panic recovery: %v", finalStatus)
 		} else {
 			t.Errorf("Unexpected task status after panic: %v", finalStatus)
 		}
@@ -551,7 +551,7 @@ func TestExec_AITransaction_RetryMechanism(t *testing.T) {
 		t.Errorf("Should have at least 2 attempts due to retry, got: %d", attemptCount)
 	}
 
-	t.Logf("✅ Retry mechanism tested: %d attempts", attemptCount)
+	t.Logf("Retry mechanism tested: %d attempts", attemptCount)
 }
 
 // TestExec_EdgeCase_VeryLongResponse 测试超长AI响应
@@ -618,13 +618,13 @@ func TestExec_EdgeCase_VeryLongResponse(t *testing.T) {
 
 				if codeLength > 5000 {
 					codeExtracted = true
-					t.Logf("✅ Long response handled: %d bytes", codeLength)
+					t.Logf("Long response handled: %d bytes", codeLength)
 				} else {
-					t.Logf("⚠️ Code length: %d bytes (expected >5KB)", codeLength)
+					t.Logf("Code length: %d bytes (expected >5KB)", codeLength)
 				}
 
 				if strings.Contains(code, "generatedFunc") {
-					t.Logf("✅ Code contains expected function definitions")
+					t.Logf("Code contains expected function definitions")
 				}
 
 				operator.Exit()
@@ -684,7 +684,7 @@ func TestExec_EdgeCase_RapidIterations(t *testing.T) {
 		t.Errorf("Expected 1 iteration (directly_answer should exit), got: %d", iterCount)
 	}
 
-	t.Logf("✅ Rapid iterations completed: %d iterations in %v", iterCount, duration)
+	t.Logf("Rapid iterations completed: %d iterations in %v", iterCount, duration)
 }
 
 // TestExec_BoundaryCondition_MaxIterationsZero 测试最大迭代为0的边界条件
@@ -737,7 +737,7 @@ func TestExec_BoundaryCondition_MaxIterationsZero(t *testing.T) {
 		t.Errorf("Should allow multiple iterations with default maxIterations, got: %d", iterCount)
 	}
 
-	t.Logf("✅ Zero maxIterations uses default, completed in %d iterations", iterCount)
+	t.Logf("Zero maxIterations uses default, completed in %d iterations", iterCount)
 }
 
 // TestExec_BoundaryCondition_MaxIterationsOne 测试最大迭代为1
@@ -770,7 +770,7 @@ func TestExec_BoundaryCondition_MaxIterationsOne(t *testing.T) {
 		t.Errorf("Expected exactly 1 iteration, got: %d", iterCount)
 	}
 
-	t.Logf("✅ Single iteration limit enforced: %d iteration", iterCount)
+	t.Logf("Single iteration limit enforced: %d iteration", iterCount)
 }
 
 // TestExec_StreamProcessing_ComplexJSON 测试复杂JSON流处理
@@ -813,7 +813,7 @@ func TestExec_StreamProcessing_ComplexJSON(t *testing.T) {
 		t.Fatalf("Execute failed: %v", err)
 	}
 
-	t.Logf("✅ Complex JSON stream processed successfully")
+	t.Logf("Complex JSON stream processed successfully")
 }
 
 // TestExec_Feedback_MultipleRounds 测试多轮反馈
@@ -872,7 +872,7 @@ func TestExec_Feedback_MultipleRounds(t *testing.T) {
 		t.Errorf("Expected at least 2 feedback rounds, got: %d", len(feedbackHistory))
 	}
 
-	t.Logf("✅ Multiple feedback rounds: %v", feedbackHistory)
+	t.Logf("Multiple feedback rounds: %v", feedbackHistory)
 }
 
 // TestExec_DisallowNextLoopExit_Enforcement 测试禁止退出的强制执行
@@ -932,5 +932,5 @@ func TestExec_DisallowNextLoopExit_Enforcement(t *testing.T) {
 		t.Errorf("Expected at least 2 attempts, got: %d", attemptCount)
 	}
 
-	t.Logf("✅ DisallowNextLoopExit enforced: %d attempts needed", attemptCount)
+	t.Logf("DisallowNextLoopExit enforced: %d attempts needed", attemptCount)
 }

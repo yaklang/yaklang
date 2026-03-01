@@ -215,5 +215,5 @@ LOOP:
 		t.Fatal("Expected task to be aborted, but it wasn't")
 	}
 
-	fmt.Printf("✅ Cancel current task test passed successfully! (toolCalled: %v)\n", toolCalled)
+	fmt.Printf("Cancel current task test passed successfully! (toolCalled: %v)\n", toolCalled)
 }

@@ -13,7 +13,7 @@ Your response should be in JSON format with the following structure:
 
 ---
 
-### ⚠️⚠️⚠️ CRITICAL - Java Code Generation Rules ⚠️⚠️⚠️
+### CRITICAL - Java Code Generation Rules
 
 **ABSOLUTELY CRITICAL when using `rewrite_java_file`:**
 

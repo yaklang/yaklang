@@ -26,10 +26,10 @@ bruteTask.SetResultHandler(func(result map[string]interface{}) {
 	assert.True(t, hasBlockingErrors, "Should have blocking errors for function parameter types")
 
 	// Should contain intelligent hint about function parameter types
-	assert.Contains(t, errorMsg, "🤖 AI助手提示:", "Should contain AI assistant hint")
+	assert.Contains(t, errorMsg, "AI助手提示:", "Should contain AI assistant hint")
 	assert.Contains(t, errorMsg, "Yaklang DSL 中函数参数不允许有类型声明", "Should contain specific hint about parameter types")
-	assert.Contains(t, errorMsg, "❌ 错误: func(result map[string]interface{})", "Should show incorrect syntax")
-	assert.Contains(t, errorMsg, "✅ 正确: func(result)", "Should show correct syntax")
+	assert.Contains(t, errorMsg, "错误: func(result map[string]interface{})", "Should show incorrect syntax")
+	assert.Contains(t, errorMsg, "正确: func(result)", "Should show correct syntax")
 }
 
 func TestCheckCodeAndFormatErrors_VariableTypeDeclarations(t *testing.T) {
@@ -70,7 +70,7 @@ result := []string{"a", "b"}
 		t.Run(tt.name, func(t *testing.T) {
 			errorMsg, hasBlockingErrors := checkCodeAndFormatErrors(tt.code)
 
-			if hasBlockingErrors && strings.Contains(errorMsg, "🤖 AI助手提示:") {
+			if hasBlockingErrors && strings.Contains(errorMsg, "AI助手提示:") {
 				assert.Contains(t, errorMsg, "变量声明不需要显式类型", "Should contain hint about variable declarations")
 			}
 		})
@@ -89,7 +89,7 @@ func main() {
 
 	errorMsg, hasBlockingErrors := checkCodeAndFormatErrors(code)
 
-	if hasBlockingErrors && strings.Contains(errorMsg, "🤖 AI助手提示:") {
+	if hasBlockingErrors && strings.Contains(errorMsg, "AI助手提示:") {
 		assert.Contains(t, errorMsg, "不需要 import 语句", "Should contain hint about import statements")
 	}
 }
@@ -105,7 +105,7 @@ func hello() {
 
 	errorMsg, hasBlockingErrors := checkCodeAndFormatErrors(code)
 
-	if hasBlockingErrors && strings.Contains(errorMsg, "🤖 AI助手提示:") {
+	if hasBlockingErrors && strings.Contains(errorMsg, "AI助手提示:") {
 		assert.Contains(t, errorMsg, "不需要 package 声明", "Should contain hint about package declarations")
 	}
 }
@@ -117,7 +117,7 @@ arr := []string{"a", "b", "c"}
 
 	errorMsg, hasBlockingErrors := checkCodeAndFormatErrors(code)
 
-	if hasBlockingErrors && strings.Contains(errorMsg, "🤖 AI助手提示:") {
+	if hasBlockingErrors && strings.Contains(errorMsg, "AI助手提示:") {
 		assert.Contains(t, errorMsg, "数组/切片语法", "Should contain hint about array/slice syntax")
 	}
 }
@@ -153,7 +153,7 @@ func TestGetIntelligentErrorHint_FunctionParameterTypes(t *testing.T) {
 	if hasBlockingErrors {
 		// Should contain the specific hint we're looking for
 		expectedHints := []string{
-			"🤖 AI助手提示:",
+			"AI助手提示:",
 			"函数参数不允许有类型声明",
 			"func(result map[string]interface{})",
 			"func(result)",
@@ -187,7 +187,7 @@ func test(param string) {
 
 	if hasBlockingErrors {
 		// Should contain AI hints
-		assert.Contains(t, errorMsg, "🤖 AI助手提示:", "Should contain AI assistant hints")
+		assert.Contains(t, errorMsg, "AI助手提示:", "Should contain AI assistant hints")
 
 		// May contain hints about package, import, or parameter types
 		// depending on which error is processed first

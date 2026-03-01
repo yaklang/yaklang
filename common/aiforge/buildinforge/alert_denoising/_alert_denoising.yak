@@ -26,11 +26,11 @@ func generateSeverityStatsTable(bySeverity) {
     
     severityLevels = ["critical", "high", "medium", "low", "info"]
     severityNames = {
-        "critical": "🔴 严重",
-        "high": "🟠 高危",
-        "medium": "🟡 中等",
-        "low": "🟢 低危",
-        "info": "🔵 信息"
+        "critical": "严重",
+        "high": "高危",
+        "medium": "中等",
+        "low": "低危",
+        "info": "信息"
     }
     
     for _, level := range severityLevels {
@@ -62,7 +62,7 @@ func generateTypeStatsTable(byType) {
         percentage = safeVar(typeData, "percentage")
         isNoise = safeVar(typeData, "is_noise")
         
-        noiseLabel = isNoise ? "✅ 噪声" : "⚠️ 威胁"
+        noiseLabel = isNoise ? "噪声" : "威胁"
         lines = append(lines, sprintf("| %v | %v | %.1f%% | %s |", typeName, count, percentage, noiseLabel))
     }
     
@@ -94,7 +94,7 @@ func generateSourceStatsTable(bySource) {
 // generateNoiseCategoriesText 生成噪声类别分析文本
 func generateNoiseCategoriesText(noiseCategories) {
     if len(noiseCategories) == 0 {
-        return "✅ 未识别到噪声类别"
+        return "未识别到噪声类别"
     }
     
     lines = []
@@ -123,7 +123,7 @@ func generateNoiseCategoriesText(noiseCategories) {
 // generateNoisePatternsList 生成噪声模式列表
 func generateNoisePatternsList(topNoisePatterns) {
     if len(topNoisePatterns) == 0 {
-        return "✅ 未发现重复噪声模式"
+        return "未发现重复噪声模式"
     }
     
     lines = []
@@ -146,7 +146,7 @@ func generateNoisePatternsList(topNoisePatterns) {
 // generateThreatsList 生成威胁列表
 func generateThreatsList(threats, level) {
     if len(threats) == 0 {
-        return sprintf("✅ 未发现%s威胁", level)
+        return sprintf("未发现%s威胁", level)
     }
     
     lines = []
@@ -160,7 +160,7 @@ func generateThreatsList(threats, level) {
         impact = safeVar(threat, "impact")
         riskScore = safeVar(threat, "risk_score")
         
-        lines = append(lines, sprintf("#### 🚨 %s", threatType))
+        lines = append(lines, sprintf("#### %s", threatType))
         lines = append(lines, sprintf("- **ID**: %v", threatId))
         lines = append(lines, sprintf("- **来源**: %v", source))
         if target != "" {
@@ -183,7 +183,7 @@ func generateThreatsList(threats, level) {
 // generateAttackChainsList 生成攻击链列表
 func generateAttackChainsList(attackChains) {
     if len(attackChains) == 0 {
-        return "✅ 未发现关联攻击链"
+        return "未发现关联攻击链"
     }
     
     lines = []
@@ -221,7 +221,7 @@ func generateAttackChainsList(attackChains) {
 // generatePriorityAlertsList 生成优先级告警列表
 func generatePriorityAlertsList(alerts, priority) {
     if len(alerts) == 0 {
-        return sprintf("✅ 无%s优先级告警", priority)
+        return sprintf("无%s优先级告警", priority)
     }
     
     lines = []
@@ -250,7 +250,7 @@ func generatePriorityAlertsList(alerts, priority) {
 // generateRecommendationsList 生成建议列表
 func generateRecommendationsList(recommendations, recType) {
     if len(recommendations) == 0 {
-        return sprintf("✅ 暂无%s建议", recType)
+        return sprintf("暂无%s建议", recType)
     }
     
     lines = []
@@ -338,17 +338,17 @@ func generateSummaryMessage(executiveSummary) {
     noiseRatio = safeVar(executiveSummary, "noise_ratio")
     
     if criticalThreats > 0 {
-        messages = append(messages, sprintf("🚨 **紧急关注**: 发现 %v 个严重威胁，需要立即处理", criticalThreats))
+        messages = append(messages, sprintf("**紧急关注**: 发现 %v 个严重威胁，需要立即处理", criticalThreats))
     }
     
     if threatCount > 0 {
-        messages = append(messages, sprintf("⚠️ **威胁总数**: 共识别出 %v 个真实威胁", threatCount))
+        messages = append(messages, sprintf("**威胁总数**: 共识别出 %v 个真实威胁", threatCount))
     }
     
     if noiseRatio >= 50 {
-        messages = append(messages, sprintf("📊 **降噪效果**: 噪声比例为 %.1f%%，建议优化告警规则以减少误报", noiseRatio))
+        messages = append(messages, sprintf("**降噪效果**: 噪声比例为 %.1f%%，建议优化告警规则以减少误报", noiseRatio))
     } else {
-        messages = append(messages, sprintf("✅ **告警质量**: 噪声比例为 %.1f%%，告警质量较好", noiseRatio))
+        messages = append(messages, sprintf("**告警质量**: 噪声比例为 %.1f%%，告警质量较好", noiseRatio))
     }
     
     return str.Join(messages, "\n\n")
@@ -426,9 +426,9 @@ forgeHandle = func(params, opts...) {
     }
     
     // 生成报告模板
-    reportTemplate = f`# 🔍 安全告警降噪分析报告
+    reportTemplate = f`# 安全告警降噪分析报告
 
-## 📊 执行摘要
+## 执行摘要
 
 | 项目 | 值 |
 |------|-----|
@@ -442,11 +442,11 @@ forgeHandle = func(params, opts...) {
 | **真实威胁** | ${safeVar(executiveSummary, "threat_count")} |
 | **严重威胁** | ${safeVar(executiveSummary, "critical_threats")} |
 
-### 🎯 关键发现
+### 关键发现
 
 ${keyFindingsText}
 
-## 📈 统计分析
+## 统计分析
 
 ### 按严重程度统计
 
@@ -460,7 +460,7 @@ ${typeStatsTable}
 
 ${sourceStatsTable}
 
-## 🔇 噪声分析
+## 噪声分析
 
 ### 噪声类别分布
 
@@ -470,7 +470,7 @@ ${noiseCategoriesText}
 
 ${noisePatternsText}
 
-## 🚨 威胁分析
+## 威胁分析
 
 ### 威胁概览
 
@@ -478,55 +478,55 @@ ${noisePatternsText}
 - **独立来源**: ${safeVar(threatAnalysis, "threat_summary.unique_sources")}
 - **受影响目标**: ${safeVar(threatAnalysis, "threat_summary.unique_targets")}
 
-### 🔴 严重威胁详情
+### 严重威胁详情
 
 ${criticalThreatsText}
 
-### 🟠 高危威胁详情
+### 高危威胁详情
 
 ${highThreatsText}
 
-### 🔗 攻击链分析
+### 攻击链分析
 
 ${attackChainsText}
 
-## ⚡ 优先级告警
+## 优先级告警
 
-### 🔴 P0 - 紧急（立即处理）
+### P0 - 紧急（立即处理）
 
 ${p0AlertsText}
 
-### 🟠 P1 - 高优先级（24小时内）
+### P1 - 高优先级（24小时内）
 
 ${p1AlertsText}
 
-### 🟡 P2 - 中优先级（本周内）
+### P2 - 中优先级（本周内）
 
 ${p2AlertsText}
 
-## 💡 优化建议
+## 优化建议
 
-### 🚀 立即执行措施
+### 立即执行措施
 
 ${immediateActionsText}
 
-### 📋 规则优化建议
+### 规则优化建议
 
 ${ruleOptimizationText}
 
-### 🔄 告警聚合建议
+### 告警聚合建议
 
 ${alertAggregationText}
 
-### 🤖 自动化处理建议
+### 自动化处理建议
 
 ${automationText}
 
-### 📊 监控改进建议
+### 监控改进建议
 
 ${monitoringText}
 
-## 📝 结论
+## 结论
 
 ### 整体评估
 
@@ -542,7 +542,7 @@ ${nextStepsText}
 
 ---
 
-## 📋 总结
+## 总结
 
 ${summaryMessage}
 

@@ -52,7 +52,7 @@ func generateNetworkInterfacesText(resourceStatus)  {
 // generateOpenPortsTable 生成开放端口表格
 func generateOpenPortsTable(openPorts) {
 	if len(openPorts) == 0 {
-		return "✅ 未发现开放端口"
+		return "未发现开放端口"
 	}
 
 	lines = []
@@ -79,7 +79,7 @@ func generateOpenPortsTable(openPorts) {
 // generateProcessesTable 生成进程表格
 func generateProcessesTable(processes) {
 	if len(processes) == 0 {
-		return "✅ 未发现关键进程信息"
+		return "未发现关键进程信息"
 	}
 
 	lines = []
@@ -102,7 +102,7 @@ func generateProcessesTable(processes) {
 // generateSecurityIssuesText 生成安全问题文本
 func generateSecurityIssuesText(issues, level) {
 	if len(issues) == 0 {
-		return sprintf("✅ 未发现%s安全问题", level)
+		return sprintf("未发现%s安全问题", level)
 	}
 
 	lines = []
@@ -127,7 +127,7 @@ func generateSecurityIssuesText(issues, level) {
 // generateRecommendationsText 生成修复建议文本
 func generateRecommendationsText(recommendations, level) {
 	if len(recommendations) == 0 {
-		return sprintf("✅ 暂无%s优化建议", level)
+		return sprintf("暂无%s优化建议", level)
 	}
 
 	lines = []
@@ -155,15 +155,15 @@ func generateSummaryMessage(security_issues) {
 	highCount := len(security_issues["high"])
 
 	if criticalCount > 0 {
-		messages = append(messages, sprintf("⚠️ **重点关注**: 发现 %d 个严重问题，建议立即处理", criticalCount))
+		messages = append(messages, sprintf("**重点关注**: 发现 %d 个严重问题，建议立即处理", criticalCount))
 	}
 
 	if highCount > 0 {
-		messages = append(messages, sprintf("⚠️ **需要关注**: 发现 %d 个高危问题，建议尽快处理", highCount))
+		messages = append(messages, sprintf("**需要关注**: 发现 %d 个高危问题，建议尽快处理", highCount))
 	}
 
 	if criticalCount == 0 && highCount == 0 {
-		messages = append(messages, "✅ **安全状况良好**: 未发现严重或高危安全问题")
+		messages = append(messages, "**安全状况良好**: 未发现严重或高危安全问题")
 	}
 
 	return str.Join(messages, "\n")
@@ -215,7 +215,7 @@ forgeHandle = func(params,opts...) {
 	summary_message = generateSummaryMessage(security_issues)
     reportTemplate = f`# 主机体检报告
 
-## 📊 扫描摘要
+## 扫描摘要
 
 | 项目 | 值 |
 |------|-----|
@@ -225,7 +225,7 @@ forgeHandle = func(params,opts...) {
 | **整体健康度** | ${safeVar(scan_summary,"overall_health")} |
 | **问题总数** | ${safeVar(scan_summary,"total_issues")} |
 
-## 💻 系统信息
+## 系统信息
 
 | 项目 | 值 |
 |------|-----|
@@ -235,7 +235,7 @@ forgeHandle = func(params,opts...) {
 | **主机名** | ${safeVar(system_info,"hostname")} |
 | **运行时间** | ${safeVar(system_info,"uptime")} |
 
-## 📈 资源状态
+## 资源状态
 
 ### CPU使用情况
 - **使用率**: ${safeVar(resource_status,"cpu.usage_percent")}%
@@ -260,40 +260,40 @@ forgeHandle = func(params,opts...) {
 #### 网络接口
 ${network_interfaces_text}
 
-## 🔌 开放端口
+## 开放端口
 
 ${open_ports_table}
 
-## 🔄 关键进程
+## 关键进程
 
 ${processes_table}
 
-## 🚨 安全问题
+## 安全问题
 
-### 🔴 严重问题
+### 严重问题
 ${critical_issues_text}
 
-### 🟠 高危问题
+### 高危问题
 ${high_issues_text}
 
-### 🟡 中等问题
+### 中等问题
 ${medium_issues_text}
 
-### 🟢 轻微问题
+### 轻微问题
 ${low_issues_text}
 
-## 💡 修复建议
+## 修复建议
 
-### 🔴 需要立即执行的修复措施
+### 需要立即执行的修复措施
 ${immediate_recommendations_text}
 
-### 🟠 短期优化建议
+### 短期优化建议
 ${short_term_recommendations_text}
 
-### 🔵 长期改进建议
+### 长期改进建议
 ${long_term_recommendations_text}
 
-## 📋 总结
+## 总结
 
 本次体检共发现 **${safeVar(scan_summary,"total_issues")}** 个问题，系统整体健康度为 **${safeVar(scan_summary,"overall_health")}**。
 

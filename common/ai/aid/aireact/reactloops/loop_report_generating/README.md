@@ -47,7 +47,7 @@
 | `delete_section` | 删除指定行范围 | 移除冗余内容 |
 | `change_view_offset` | 切换视图偏移 | 导航大型报告 |
 
-### 📖 大报告分页功能
+### 大报告分页功能
 
 当报告内容很大（超过约 30KB）时，系统会自动分页显示。使用 `change_view_offset` action 导航：
 
@@ -70,7 +70,7 @@
 
 ## AITAG 输出规则
 
-**⚠️ 关键规则：写作类 Action 必须使用 AITAG！**
+**关键规则：写作类 Action 必须使用 AITAG！**
 
 当使用 `write_section`、`modify_section`、`insert_section` 时，必须在 JSON 后输出 AITAG 包裹的内容：
 
@@ -223,13 +223,13 @@ done
 
 | 测试脚本 | 状态 | 使用的 Actions | 耗时 |
 |---------|------|---------------|------|
-| test_basic_report.yak | ✅ PASSED | `write_section` | ~15s |
-| test_grep_reference.yak | ✅ PASSED | `grep_reference`, `write_section` | ~20s |
-| test_multi_file_analysis.yak | ✅ PASSED | `read_reference_file`(多次), `write_section` | ~25s |
-| test_iterative_writing.yak | ✅ PASSED | `write_section`, `insert_section` | ~30s |
-| test_code_analysis_report.yak | ✅ PASSED | `read_reference_file`, `grep_reference`, `write_section` | ~20s |
-| test_change_view_offset.yak | ✅ PASSED | `write_section`, `insert_section` | ~60s |
-| test_modify_existing_file.yak | ✅ PASSED | `modify_section`(多次) | ~30s |
+| test_basic_report.yak | PASSED | `write_section` | ~15s |
+| test_grep_reference.yak | PASSED | `grep_reference`, `write_section` | ~20s |
+| test_multi_file_analysis.yak | PASSED | `read_reference_file`(多次), `write_section` | ~25s |
+| test_iterative_writing.yak | PASSED | `write_section`, `insert_section` | ~30s |
+| test_code_analysis_report.yak | PASSED | `read_reference_file`, `grep_reference`, `write_section` | ~20s |
+| test_change_view_offset.yak | PASSED | `write_section`, `insert_section` | ~60s |
+| test_modify_existing_file.yak | PASSED | `modify_section`(多次) | ~30s |
 
 ### 生成报告示例
 

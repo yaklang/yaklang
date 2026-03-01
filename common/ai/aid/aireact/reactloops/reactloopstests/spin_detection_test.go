@@ -215,7 +215,7 @@ func TestIsInSameLogicSpinWithAI(t *testing.T) {
 		t.Logf("Timeline entries: %v", timelineEntries)
 		t.Error("Expected to find logic_spin_warning in timeline, but not found")
 	} else {
-		t.Log("✅ Successfully found logic_spin_warning in timeline")
+		t.Log("Successfully found logic_spin_warning in timeline")
 	}
 
 	// 验证 IsInSpin 方法
@@ -223,10 +223,10 @@ func TestIsInSameLogicSpinWithAI(t *testing.T) {
 	// 因为最后几次 action 不全是相同的类型。但我们已经通过 Timeline 验证了 SPIN 检测成功
 	isSpinning, result := loop.IsInSpin()
 	if isSpinning {
-		t.Log("✅ IsInSpin returned true (SPIN still detected)")
+		t.Log("IsInSpin returned true (SPIN still detected)")
 		if result != nil {
 			if result.IsSpinning {
-				t.Logf("✅ SPIN result: reason=%s, suggestions=%d", result.Reason, len(result.Suggestions))
+				t.Logf("SPIN result: reason=%s, suggestions=%d", result.Reason, len(result.Suggestions))
 			}
 		}
 	} else {
@@ -464,7 +464,7 @@ func TestSelfReflectionInvoked(t *testing.T) {
 		// 但我们已经通过反思历史验证了 SPIN 检测
 		t.Log("Note: IsInSameActionTypeSpin returned false (this may be expected if finish action was executed)")
 	} else {
-		t.Log("✅ SPIN detected successfully")
+		t.Log("SPIN detected successfully")
 	}
 
 	// 验证自我反思被调用
@@ -472,7 +472,7 @@ func TestSelfReflectionInvoked(t *testing.T) {
 	if len(reflectionHistory) == 0 {
 		t.Error("Expected reflection history to contain entries, but it is empty")
 	} else {
-		t.Logf("✅ Reflection history contains %d entry(ies)", len(reflectionHistory))
+		t.Logf("Reflection history contains %d entry(ies)", len(reflectionHistory))
 		// 验证至少有一个反思记录
 		for _, reflection := range reflectionHistory {
 			t.Logf("  - Reflection at iteration %d, level: %s, action: %s",
@@ -482,7 +482,7 @@ func TestSelfReflectionInvoked(t *testing.T) {
 
 	// 验证 AI 回调中的自我反思调用计数
 	if reflectionCallCount > 0 {
-		t.Logf("✅ Self-reflection AI call was invoked %d time(s)", reflectionCallCount)
+		t.Logf("Self-reflection AI call was invoked %d time(s)", reflectionCallCount)
 	} else {
 		t.Error("Expected self-reflection AI call to be invoked, but it was not called")
 	}
@@ -650,14 +650,14 @@ func TestSelfReflectionThenSpin(t *testing.T) {
 	if reflectionCallCount == 0 {
 		t.Error("Expected self-reflection to be invoked, but it was not called")
 	} else {
-		t.Logf("✅ Self-reflection was invoked %d time(s)", reflectionCallCount)
+		t.Logf("Self-reflection was invoked %d time(s)", reflectionCallCount)
 	}
 
 	// 验证 SPIN 触发的自我反思被调用了
 	if spinReflectionCallCount == 0 {
 		t.Error("Expected SPIN-triggered self-reflection to be invoked, but it was not called")
 	} else {
-		t.Logf("✅ SPIN-triggered self-reflection was invoked %d time(s)", spinReflectionCallCount)
+		t.Logf("SPIN-triggered self-reflection was invoked %d time(s)", spinReflectionCallCount)
 	}
 
 	// 验证反思历史中有记录
@@ -665,7 +665,7 @@ func TestSelfReflectionThenSpin(t *testing.T) {
 	if len(reflectionHistory) == 0 {
 		t.Error("Expected reflection history to contain entries, but it is empty")
 	} else {
-		t.Logf("✅ Reflection history contains %d entry(ies)", len(reflectionHistory))
+		t.Logf("Reflection history contains %d entry(ies)", len(reflectionHistory))
 	}
 
 	// 验证 Timeline 中新增了 logic_spin_warning 条目
@@ -679,7 +679,7 @@ func TestSelfReflectionThenSpin(t *testing.T) {
 			if len(content) < previewLen {
 				previewLen = len(content)
 			}
-			t.Logf("✅ Found SPIN warning in timeline: %s", content[:previewLen])
+			t.Logf("Found SPIN warning in timeline: %s", content[:previewLen])
 			break
 		}
 	}
@@ -718,7 +718,7 @@ func TestSelfReflectionThenSpin(t *testing.T) {
 	for _, reflection := range reflectionHistory {
 		if reflection.IsSpinning {
 			hasSpinReflection = true
-			t.Logf("✅ Found SPIN reflection at iteration %d: %s", reflection.IterationNum, reflection.SpinReason)
+			t.Logf("Found SPIN reflection at iteration %d: %s", reflection.IterationNum, reflection.SpinReason)
 			if reflection.SpinReason == "" {
 				t.Error("Expected SpinReason to be non-empty in SPIN reflection")
 			}

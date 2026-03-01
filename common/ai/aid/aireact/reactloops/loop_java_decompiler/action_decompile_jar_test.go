@@ -104,7 +104,7 @@ func TestDecompileJar_BasicFunctionality(t *testing.T) {
 		t.Errorf("Working directory not set correctly")
 	}
 
-	t.Logf("✅ Basic decompile test passed")
+	t.Logf("Basic decompile test passed")
 }
 
 // TestDecompileJar_RealDecompilation tests actual JAR decompilation
@@ -213,7 +213,7 @@ func TestDecompileJar_RealDecompilation(t *testing.T) {
 		t.Errorf("Total files in context (%d) doesn't match actual files (%d)", totalFiles, javaFiles)
 	}
 
-	t.Logf("✅ Real decompilation test passed: %d files decompiled", javaFiles)
+	t.Logf("Real decompilation test passed: %d files decompiled", javaFiles)
 }
 
 // TestDecompileJar_MissingJarFile tests error handling for missing JAR
@@ -244,7 +244,7 @@ func TestDecompileJar_MissingJarFile(t *testing.T) {
 		}
 	}
 
-	t.Logf("✅ Missing JAR error handling test passed")
+	t.Logf("Missing JAR error handling test passed")
 }
 
 // TestDecompileJar_AutoOutputDirectory tests automatic output directory naming
@@ -277,7 +277,7 @@ func TestDecompileJar_AutoOutputDirectory(t *testing.T) {
 	if _, err := os.Stat(expectedDir); os.IsNotExist(err) {
 		t.Errorf("Auto-created output directory not found: %s", expectedDir)
 	} else {
-		t.Logf("✅ Auto-created output directory: %s", expectedDir)
+		t.Logf("Auto-created output directory: %s", expectedDir)
 	}
 }
 
@@ -308,7 +308,7 @@ func TestGenerateDecompilationReport(t *testing.T) {
 				"Another.java: unbalanced braces",
 			},
 			filesList:    []string{"Test.java", "Another.java"},
-			wantContains: []string{"⚠️ Compilation Issues Detected", "Found 2 potential issues", "Decompiler limitations"},
+			wantContains: []string{"Compilation Issues Detected", "Found 2 potential issues", "Decompiler limitations"},
 		},
 		{
 			name:            "Many errors (truncation)",

@@ -87,7 +87,7 @@ func concludeAction(r aicommon.AIInvokeRuntime, state *VerifyState) reactloops.R
 			var report string
 			switch result {
 			case "confirmed":
-				report = fmt.Sprintf("## 🔴 漏洞确认\n\n**位置**: %s:%d\n**类型**: %s\n**Sink**: %s\n**置信度**: %s\n\n### 验证理由\n%s",
+				report = fmt.Sprintf("## 漏洞确认\n\n**位置**: %s:%d\n**类型**: %s\n**Sink**: %s\n**置信度**: %s\n\n### 验证理由\n%s",
 					ctx.FilePath, ctx.Line, ctx.VulnType, ctx.SinkFunction, confidence, reason)
 				if exploitCondition != "" {
 					report += fmt.Sprintf("\n\n### 利用条件\n%s", exploitCondition)
@@ -96,7 +96,7 @@ func concludeAction(r aicommon.AIInvokeRuntime, state *VerifyState) reactloops.R
 					report += fmt.Sprintf("\n\n### 修复建议\n%s", fixSuggestion)
 				}
 			case "safe":
-				report = fmt.Sprintf("## 🟢 安全确认\n\n**位置**: %s:%d\n**类型**: %s\n**置信度**: %s\n\n### 验证理由\n%s",
+				report = fmt.Sprintf("## 安全确认\n\n**位置**: %s:%d\n**类型**: %s\n**置信度**: %s\n\n### 验证理由\n%s",
 					ctx.FilePath, ctx.Line, ctx.VulnType, confidence, reason)
 			case "uncertain":
 				report = fmt.Sprintf("## 🟡 需人工确认\n\n**位置**: %s:%d\n**类型**: %s\n**置信度**: %s\n\n### 不确定原因\n%s",

@@ -57,7 +57,7 @@ This is spin warning #{{.SpinDetection.SpinWarningCount}}. Previous warnings hav
 3. Your suggestions MUST include CONCRETE alternative action types (not vague advice).
 4. Your suggestions MUST name specific tool/action that DIFFERS from '{{.SpinDetection.ActionType}}'.
 
-{{if ge .SpinDetection.EscalationLevel 3}}### ⛔ CRITICAL: SWOT-Based Suggestion Generation
+{{if ge .SpinDetection.EscalationLevel 3}}### CRITICAL: SWOT-Based Suggestion Generation
 
 This is escalation level {{.SpinDetection.EscalationLevel}}. The loop will be FORCE-TERMINATED soon.
 Generate suggestions using SWOT analysis:
@@ -67,7 +67,7 @@ Generate suggestions using SWOT analysis:
 - **Threats**: State clearly that repeating '{{.SpinDetection.ActionType}}' will cause task failure.
 
 Your suggestions MUST include: "IMMEDIATELY use action [X] instead of '{{.SpinDetection.ActionType}}'" where [X] is a concrete alternative.
-{{else if ge .SpinDetection.EscalationLevel 2}}### ⚠️ ESCALATED: S.M.A.R.T Suggestion Generation
+{{else if ge .SpinDetection.EscalationLevel 2}}### ESCALATED: S.M.A.R.T Suggestion Generation
 
 This is escalation level {{.SpinDetection.EscalationLevel}}. Previous suggestions were IGNORED.
 Generate suggestions using S.M.A.R.T framework:
@@ -91,7 +91,7 @@ Answer these questions in your suggestions:
 <|ANALYSIS_REQUIREMENTS_{{.Nonce}}|>
 ## Analysis Requirements
 
-{{if .SpinDetection}}**⚠ SPIN DETECTED — Escalation Level {{.SpinDetection.EscalationLevel}}**
+{{if .SpinDetection}}**SPIN DETECTED — Escalation Level {{.SpinDetection.EscalationLevel}}**
 
 This is NOT a routine reflection. The agent is in a confirmed SPIN state.
 

@@ -168,7 +168,7 @@ func buildAIToolIndex(c *cli.Context) error {
 		return fmt.Errorf("索引失败: %v", err)
 	}
 
-	fmt.Printf("\n✅ AITool索引完成！\n")
+	fmt.Printf("\nAITool索引完成\n")
 	fmt.Printf("成功: %d, 失败: %d, 跳过: %d, 耗时: %s\n",
 		result.SuccessCount, len(result.FailedItems), result.SkippedCount, result.Duration)
 
@@ -256,7 +256,7 @@ func buildForgeIndex(c *cli.Context) error {
 		return fmt.Errorf("索引失败: %v", err)
 	}
 
-	fmt.Printf("\n✅ Forge索引完成！\n")
+	fmt.Printf("\nForge索引完成\n")
 	fmt.Printf("成功: %d, 失败: %d, 跳过: %d, 耗时: %s\n",
 		result.SuccessCount, len(result.FailedItems), result.SkippedCount, result.Duration)
 

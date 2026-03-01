@@ -162,7 +162,7 @@ func generateDefaultSummary(loop *reactloops.ReActLoop, invoker aicommon.AIInvok
 	var defaultSummary strings.Builder
 	defaultSummary.WriteString("# HTTP 流量分析报告\n\n")
 	defaultSummary.WriteString("## 分析状态\n\n")
-	defaultSummary.WriteString("⚠️ 已达到最大迭代次数限制。以下是已收集的信息：\n\n")
+	defaultSummary.WriteString("已达到最大迭代次数限制。以下是已收集的信息：\n\n")
 	defaultSummary.WriteString(contextInfo)
 	defaultSummary.WriteString("\n\n## 建议\n\n")
 	defaultSummary.WriteString("1. 可以尝试使用更精确的过滤条件重新分析\n")

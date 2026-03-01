@@ -32,7 +32,7 @@ func (h *LiteForgeSearchHandler) ExtractKeywords(ctx context.Context, query stri
 # 任务
 你的任务是分析用户的【问题】，并从中提炼出一组约10个**高价值、高信噪比**的核心搜索关键词。这组关键词将用于精准的、基于词条的检索引擎，目的是快速定位到最相关的专业文档。
 
-# ⚠️ 核心原则：聚焦主体，禁止扩散
+# 核心原则：聚焦主体，禁止扩散
 
 **关键词必须始终围绕问题中的【核心搜索目标】，提取该目标的不同形式、变体、别名和子类型。绝对禁止扩展到通用分类或上层概念。**
 
@@ -42,8 +42,8 @@ func (h *LiteForgeSearchHandler) ExtractKeywords(ctx context.Context, query stri
 
 **2. 同主体变体扩展 (Same-Subject Variant Expansion):**
     -   扩展方向必须是核心目标的**子类型、变体形式、别名、同义词**，而非关联概念。
-    -   ✅ 正确扩展：围绕同一主体的不同表现形式
-    -   ❌ 错误扩展：扩展到上层分类、通用框架、关联技术
+    -   正确扩展：围绕同一主体的不同表现形式
+    -   错误扩展：扩展到上层分类、通用框架、关联技术
 
 **3. 标准化与规范 (Normalization & Canonization):**
     -   提取概念时，应同时包含其**常用缩写和完整全称**，因为两者都可能作为索引词。
@@ -53,7 +53,7 @@ func (h *LiteForgeSearchHandler) ExtractKeywords(ctx context.Context, query stri
         -   疑问词：如何、什么、为什么、哪里
         -   停用词：的、和、一个、关于、在
         -   模糊描述：最佳实践、优缺点、性能差异
-        -   ⚠️ **通用分类词**：如 MITRE、ATT&CK、CVE、OWASP（除非这些本身就是搜索目标）
+        -   **通用分类词**：如 MITRE、ATT&CK、CVE、OWASP（除非这些本身就是搜索目标）
 
 **5. 质量与数量 (Quality & Quantity):**
     -   生成 **8-12个** 最具代表性的关键词。
@@ -64,22 +64,22 @@ func (h *LiteForgeSearchHandler) ExtractKeywords(ctx context.Context, query stri
 ## 示例1：搜索 XSS 的 ATT&CK 编号
 **问题：** "XSS 漏洞的 ATT&CK 编号是什么？"
 **核心搜索目标：** XSS（跨站脚本攻击）
-✅ **正确关键词：** XSS, Cross-Site Scripting, DOM-XSS, Reflected XSS, Stored XSS, Self-XSS, 跨站脚本, DOM型XSS, 反射型XSS, 存储型XSS
-❌ **错误关键词：** MITRE, ATT&CK, 攻击框架, 威胁情报, 安全标准
+**正确关键词：** XSS, Cross-Site Scripting, DOM-XSS, Reflected XSS, Stored XSS, Self-XSS, 跨站脚本, DOM型XSS, 反射型XSS, 存储型XSS
+**错误关键词：** MITRE, ATT&CK, 攻击框架, 威胁情报, 安全标准
 **原因：** 用户想搜索的是 XSS 相关的文档，而非 ATT&CK 框架本身。关键词应聚焦于 XSS 的各种形式和别名。
 
 ## 示例2：搜索 SQL 注入的防御方法
 **问题：** "如何防御 SQL 注入攻击？"
 **核心搜索目标：** SQL 注入
-✅ **正确关键词：** SQL注入, SQL Injection, SQLi, 盲注, Blind SQL Injection, 报错注入, 联合查询注入, 堆叠查询, 时间盲注, 布尔盲注
-❌ **错误关键词：** Web安全, 数据库安全, 输入验证, 安全编码, OWASP
+**正确关键词：** SQL注入, SQL Injection, SQLi, 盲注, Blind SQL Injection, 报错注入, 联合查询注入, 堆叠查询, 时间盲注, 布尔盲注
+**错误关键词：** Web安全, 数据库安全, 输入验证, 安全编码, OWASP
 **原因：** 虽然这些通用概念相关，但会导致搜索结果过于分散，无法精准定位 SQL 注入的文档。
 
 ## 示例3：搜索 Redis 未授权访问
 **问题：** "Redis 未授权访问漏洞如何利用？"
 **核心搜索目标：** Redis 未授权访问
-✅ **正确关键词：** Redis未授权访问, Redis unauthorized access, Redis RCE, Redis写SSH公钥, Redis写Webshell, Redis主从复制RCE, Redis SSRF
-❌ **错误关键词：** NoSQL, 数据库安全, 中间件漏洞, 配置不当
+**正确关键词：** Redis未授权访问, Redis unauthorized access, Redis RCE, Redis写SSH公钥, Redis写Webshell, Redis主从复制RCE, Redis SSRF
+**错误关键词：** NoSQL, 数据库安全, 中间件漏洞, 配置不当
 **原因：** 关键词应聚焦于 Redis 漏洞的具体利用方式，而非泛化到中间件或数据库安全。
 
 ---

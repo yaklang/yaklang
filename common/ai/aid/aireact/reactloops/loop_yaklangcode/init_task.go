@@ -59,13 +59,13 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 4. 每个问题要从不同角度描述需求
 
 问题示例：
-✅ Good: "Yaklang中如何发送HTTP请求？"
-✅ Good: "Yaklang中如何进行端口扫描？"
-✅ Good: "Yaklang中如何处理JSON数据？"
-✅ Good: "Yaklang中如何调用爬虫功能？"
-❌ Bad: "如何发送请求？" - 缺少主语
-❌ Bad: "它如何使用？" - 使用代词
-❌ Bad: "端口扫描" - 不完整句式
+Good: "Yaklang中如何发送HTTP请求？"
+Good: "Yaklang中如何进行端口扫描？"
+Good: "Yaklang中如何处理JSON数据？"
+Good: "Yaklang中如何调用爬虫功能？"
+Bad: "如何发送请求？" - 缺少主语
+Bad: "它如何使用？" - 使用代词
+Bad: "端口扫描" - 不完整句式
 {{ end }}
 <|USER_INPUT_{{ .nonce }}|>
 {{ .data }}
