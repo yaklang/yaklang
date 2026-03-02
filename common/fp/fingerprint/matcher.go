@@ -5,6 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"regexp"
+	"sync"
 
 	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
 	"github.com/yaklang/yaklang/common/log"
@@ -29,25 +30,31 @@ func NewMatcher() *Matcher {
 }
 
 func (m *Matcher) MatchResource(ctx context.Context, concurrency int, rules []*rule.FingerPrintRule, getter func(path string) (*rule.MatchResource, error)) []*schema.CPE {
-	var result []*schema.CPE
+	var (
+		result []*schema.CPE
+		mu     sync.Mutex
+	)
 	swg := utils.NewSizedWaitGroup(concurrency)
 	for _, r := range rules {
+		r := r
 		err := swg.AddWithContext(ctx)
 		if err != nil {
 			log.Errorf("failed to run rule %v: %v", r, err)
 			return result
 		}
-		go func() {
+		go func(r *rule.FingerPrintRule) {
 			defer swg.Done()
-			r := r
 			info, err := rule.Execute(getter, r)
 			if err != nil {
 				log.Errorf("execute rule failed: %v", err)
+				return
 			}
 			if info != nil {
+				mu.Lock()
 				result = append(result, info)
+				mu.Unlock()
 			}
-		}()
+		}(r)
 	}
 	swg.Wait()
 	return result
