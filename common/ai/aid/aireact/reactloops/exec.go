@@ -673,7 +673,9 @@ LOOP:
 		r.GetInvoker().AddToTimeline("iteration", msg)
 
 		if handler.AsyncMode {
+			r.loadingStatus("当前任务进入异步模式 / Async mode, ending loop")
 			if task.IsAsyncMode() {
+				r.loadingStatus("当前任务已进入异步模式 / Async mode, ending loop")
 				log.Warnf("ReactLoop[%v] rejecting static async action '%v' because the current task is already in async mode", r.loopName, actionName)
 				rejectMsg := fmt.Sprintf(
 					"REJECTED: action '%s' requires async mode, but the current task is already running asynchronously. "+
@@ -733,6 +735,7 @@ LOOP:
 		// 记录 action 执行开始时间
 		actionStartTime := time.Now()
 
+		r.loadingStatus("执行动作 " + actionName + " 中 / Executing action " + actionName + "...")
 		handler.ActionHandler(
 			r,
 			actionParams,

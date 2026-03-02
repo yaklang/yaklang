@@ -15,11 +15,11 @@ var loopAction_RequestPlanAndExecution = &reactloops.LoopAction{
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
 			"plan_request_payload",
-			aitool.WithParam_Description("USE THIS FIELD ONLY IF @action is 'request_plan_and_execution'. Provide a one-sentence summary of the complex task that needs a multi-step plan. This summary will trigger a more advanced planning system. Example: 'Create a marketing plan for a new product launch.'"),
+			aitool.WithParam_Description("USE THIS FIELD ONLY IF @action is 'request_plan_and_execution'. Provide a one-sentence summary of the complex task that needs a multi-step plan. This summary will trigger a more advanced planning system. Example: '用户需求是:...; 执行过程中需要考虑:...; 可能用到的工具方向有:...; 这个任务交付标准为:....'"),
 		),
 	},
 	StreamFields: []*reactloops.LoopStreamField{
-		{FieldName: `plan_request_payload`},
+		{FieldName: `plan_request_payload`, AINodeId: "plan"},
 	},
 	ActionVerifier: func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
 		// Check if there's already a plan execution task running
