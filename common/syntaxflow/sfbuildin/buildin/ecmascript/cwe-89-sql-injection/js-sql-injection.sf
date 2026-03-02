@@ -1,0 +1,377 @@
+desc(
+	title: "Database Query Built From User-Controlled Sources"
+	title_zh: "用户可控输入构建的数据库查询（SQL/NoSQL 注入）"
+	type: vuln
+	level: high
+	risk: "SQL注入"
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+
+如果数据库查询（SQL 或 NoSQL）直接使用用户可控数据构建，而未经充分净化，恶意用户可能执行恶意数据库查询。
+
+**SQL 注入**：通过构造特殊字符串改变原有 SQL 语义，实现绕过认证、读取敏感数据、修改或删除数据，甚至执行操作系统命令（如 MySQL 的 `INTO OUTFILE`、SQL Server 的 `xp_cmdshell`）。
+
+**NoSQL 注入**：通过向查询过滤器中注入对象（如 `{ $gt: "" }`），操控 MongoDB 等 NoSQL 数据库的查询逻辑，绕过认证或读取不应访问的数据。
+
+2. **触发场景**
+
+**场景一：SQL 字符串拼接（pg 库）**
+```javascript
+const app = require("express")();
+const { Pool } = require("pg");
+const pool = new Pool(config);
+
+app.get("/search", (req, res) => {
+    // 危险：直接拼接用户输入到 SQL 字符串
+    const query = "SELECT * FROM products WHERE category='" + req.params.category + "'";
+    pool.query(query, [], (err, results) => { /* ... */ });
+});
+```
+
+**场景二：NoSQL 注入（Mongoose）**
+```javascript
+const express = require("express");
+const mongoose = require("mongoose");
+const Todo = mongoose.model("Todo", new mongoose.Schema({ text: String }));
+
+app.delete("/api/delete", async (req, res) => {
+    let id = req.body.id; // 用户输入，可能是对象 { $gt: "" }
+    await Todo.deleteOne({ _id: id }); // 危险：直接使用用户输入作为过滤条件
+});
+```
+
+3. **潜在影响**
+- 数据库敏感信息（用户凭证、个人隐私数据）泄露
+- 任意 SQL/NoSQL 操作：绕过认证、篡改/删除数据
+- 部分数据库场景下可进一步提权至操作系统（如通过 `xp_cmdshell`）
+DESC
+	rule_id: "c7d8e9f0-a1b2-3456-cdef-789012345678"
+	title_zh: "用户可控输入构建的数据库查询（SQL/NoSQL 注入）"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. SQL 注入修复：使用参数化查询（Prepared Statements）
+
+**pg（node-postgres）**：
+```javascript
+// GOOD: 使用参数化查询，$1 为占位符，用户输入作为第二个参数传入
+const query = "SELECT * FROM products WHERE category=$1 ORDER BY price";
+pool.query(query, [req.params.category], (err, results) => { /* ... */ });
+```
+
+**mysql2**：
+```javascript
+// GOOD: 使用 ? 占位符
+connection.query("SELECT * FROM users WHERE id = ?", [req.params.id], (err, results) => { /* ... */ });
+```
+
+**sqlite3**：
+```javascript
+// GOOD: 使用 ? 占位符
+db.run("INSERT INTO users (name) VALUES (?)", [req.body.name], (err) => { /* ... */ });
+```
+
+#### 2. SQL 注入修复：使用 sqlstring 库转义
+
+```javascript
+const SqlString = require('sqlstring');
+// GOOD: 使用 SqlString.escape() 对用户输入进行转义
+const safeCategory = SqlString.escape(req.params.category);
+const query = "SELECT * FROM products WHERE category=" + safeCategory;
+pool.query(query, [], (err, results) => { /* ... */ });
+```
+
+#### 3. NoSQL 注入修复（MongoDB）：使用 `$eq` 运算符
+
+```javascript
+// GOOD: 使用 $eq 确保用户输入被解释为字面值而非查询对象
+await Todo.deleteOne({ _id: { $eq: req.body.id } });
+```
+
+#### 4. NoSQL 注入修复：类型检查
+
+```javascript
+// GOOD: 确保 id 是字符串类型，而非对象
+if (typeof req.body.id !== "string") {
+    return res.status(400).json({ status: "error" });
+}
+await Todo.deleteOne({ _id: req.body.id });
+```
+
+#### 5. 使用 ORM/查询构建器的安全 API
+
+优先使用 ORM 框架（如 Sequelize、TypeORM、Prisma）提供的安全查询 API，而非原始查询字符串。它们默认使用参数化查询。
+SOLUTION
+	reference: <<<REFERENCE
+[Wikipedia: SQL Injection](https://en.wikipedia.org/wiki/SQL_injection)
+[OWASP: SQL Injection Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html)
+[OWASP: NoSQL Injection](https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/05.6-Testing_for_NoSQL_Injection)
+[MongoDB: $eq operator](https://www.mongodb.com/docs/manual/reference/operator/query/eq/)
+[CWE-89: SQL Injection](https://cwe.mitre.org/data/definitions/89.html)
+[CWE-90: NoSQL Injection](https://cwe.mitre.org/data/definitions/90.html)
+[CWE-943: Improper Neutralization of Special Elements in Data Query Logic](https://cwe.mitre.org/data/definitions/943.html)
+REFERENCE
+)
+
+<include('js-param')> as $params;
+<include('js-sql-injection-sink')> as $sinks;
+
+// ============================================================
+// HIGH - SQL 注入检测
+// 策略：只检测 SQL 查询函数的第一个参数（SQL 字符串本身）是否包含用户输入
+// 这样可以天然排除参数化查询（第一参数是纯字面常量 SQL 字符串）
+// ============================================================
+
+// 分离出 SQL 查询类 sink（需要精确控制第一参数）
+*.query(*<slice(index=0)> as $sqlFirstArg)
+*.run(*<slice(index=0)> as $sqlFirstArg)
+*.all(*<slice(index=0)> as $sqlFirstArg)
+*.exec(*<slice(index=0)> as $sqlFirstArg)
+*.execute(*<slice(index=0)> as $sqlFirstArg)
+*.raw(*<slice(index=0)> as $sqlFirstArg)
+
+// Case A：SQL 字符串第一参数直接就是用户输入（最危险，无任何处理）
+// 例如：db.query(req.query.sql, ...)
+$sqlFirstArg?{<self> #{
+    include: <<<CODE
+* & $params as $__next__
+CODE,
+    exclude: <<<CODE
+*?{opcode: call} as $__next__
+CODE
+}->} as $high
+
+// Case B：SQL 字符串第一参数经过字符串拼接（add/BinOp）包含用户输入
+// 例如：db.query("SELECT * FROM t WHERE id='" + req.query.id + "'", ...)
+$sqlFirstArg #{
+    until: <<<UNTIL
+*?{opcode: add} as $__next__
+UNTIL
+}-> as $concatChain
+
+$concatChain?{<self> #{
+    include: <<<CODE
+* & $params as $__next__
+CODE,
+    exclude: <<<CODE
+*?{opcode: call} as $__next__
+CODE
+}->} as $concatHigh
+
+$high + $concatHigh as $high
+
+// ============================================================
+// HIGH - NoSQL 注入检测
+// 策略：检测 NoSQL 查询函数（find/deleteOne 等）的参数是否包含用户输入
+// 直接传入用户输入对象（而非 $eq 包装）会导致 NoSQL 注入
+//
+// 两类安全模式（排除）：
+//   1. $eq/$ne/$gt/$lt 等操作符包装：{ _id: { $eq: id } }
+//      检测方式：nosqlArg 的两层 members 中存在 MongoDB 查询操作符 key
+//   2. 运行时类型检查守卫（typeof id !== "string"）：
+//      typeof 检查会产生条件分支，导致 nosqlArg 的成员出现 phi 节点
+//      检测方式：nosqlArg 的 members 中存在 phi 节点则说明有条件守卫
+// ============================================================
+*.find(* as $nosqlArg)
+*.findOne(* as $nosqlArg)
+*.findById(* as $nosqlArg)
+*.deleteOne(* as $nosqlArg)
+*.deleteMany(* as $nosqlArg)
+*.updateOne(* as $nosqlArg)
+*.updateMany(* as $nosqlArg)
+*.findOneAndUpdate(* as $nosqlArg)
+*.findByIdAndUpdate(* as $nosqlArg)
+*.findByIdAndDelete(* as $nosqlArg)
+*.findOneAndDelete(* as $nosqlArg)
+*.aggregate(* as $nosqlArg)
+*.countDocuments(* as $nosqlArg)
+
+// 安全：使用 $eq/$ne/$gt 等操作符包装的查询对象
+$nosqlArg?{<self><getMembers><getMembers>?{have: /^\$(eq|ne|gt|gte|lt|lte|in|nin|exists|type|not|and|or|nor|all|size|elemMatch)$/}} as $nosqlSafeByOperator
+
+$nosqlArg?{<self> #{
+    include: <<<CODE
+* & $params as $__next__
+CODE,
+    exclude: <<<CODE
+*?{opcode: call} as $__next__
+CODE
+}->}?{!(<self> & $nosqlSafeByOperator)}?{!<self><getMembers>?{opcode:phi}} as $nosqlHigh
+
+$high + $nosqlHigh as $high
+
+alert $high for {
+	level: "high"
+	title: "Database Query Built From User-Controlled Sources"
+	title_zh: "用户可控输入构建数据库查询（高风险 SQL/NoSQL 注入）"
+	message: "检测到用户可控输入（如 req.query.*、req.body.*）直接流入数据库查询函数，或通过字符串拼接构建 SQL 语句，存在严重的 SQL/NoSQL 注入风险。请使用参数化查询或 $eq 操作符防御。"
+	risk: "SQL注入"
+	cwe: "CWE-89,CWE-90,CWE-943"
+}
+
+// ============================================================
+// MID: 用户输入经过中间处理（含函数调用）后流入查询
+// 排除已知的安全转义函数（sanitize / escape / validate 等）
+// ============================================================
+/(?i)(escape|sanitize|encode|validate|clean|purify|filter|strip|htmlspecialchars|addslashes|quote|mysqlRealEscape|sqlstring)/ as $sanitizerNames
+
+$sinks<dataflow(
+    include: <<<CODE
+* & $params as $__next__
+CODE,
+    exclude: <<<CODE
+*?{opcode: call && (<self><getCallee> & $sanitizerNames)} as $__next__
+CODE
+)> as $midInjection
+
+alert $midInjection for {
+	level: "mid"
+	title: "Database Query Potentially Built From User-Controlled Sources (Indirect)"
+	title_zh: "用户可控输入可能经间接路径流入数据库查询（中等风险 SQL/NoSQL 注入）"
+	message: "用户可控输入经过某些中间处理后流入数据库查询函数，处理过程中未检测到明显的转义/净化函数。请人工确认是否存在有效过滤，如无则存在 SQL/NoSQL 注入风险。"
+	risk: "SQL注入"
+	cwe: "CWE-89,CWE-90,CWE-943"
+}
+
+// ============================================================
+// Embedded test cases
+// ============================================================
+
+desc(
+	lang: "js"
+	alert_high: 1
+	'file://unsafe_sql_direct.js': <<<CODE
+const express = require("express");
+const { Pool } = require("pg");
+const app = express();
+const pool = new Pool();
+
+app.get("/search", (req, res) => {
+    // BAD: 直接拼接用户输入到 SQL 字符串
+    const query = "SELECT ITEM, PRICE FROM PRODUCT WHERE ITEM_CATEGORY='" +
+        req.params.category +
+        "' ORDER BY PRICE";
+    pool.query(query, [], (err, results) => {
+        res.json(results.rows);
+    });
+});
+CODE
+)
+
+desc(
+	lang: "js"
+	alert_high: 1
+	'file://unsafe_mysql_direct.js': <<<CODE
+const express = require("express");
+const mysql = require("mysql2");
+const app = express();
+const connection = mysql.createConnection({});
+
+app.get("/user", (req, res) => {
+    // BAD: req.query.id 直接进入查询
+    const id = req.query.id;
+    const sql = "SELECT * FROM users WHERE id = " + id;
+    connection.query(sql, (err, results) => {
+        res.json(results);
+    });
+});
+CODE
+)
+
+desc(
+	lang: "js"
+	alert_high: 1
+	'file://unsafe_nosql_mongoose.js': <<<CODE
+const express = require("express");
+const mongoose = require("mongoose");
+const app = express();
+app.use(express.json());
+
+const Todo = mongoose.model("Todo", new mongoose.Schema({ text: String }));
+
+app.delete("/api/delete", async (req, res) => {
+    let id = req.body.id; // BAD: id 可能是 { $gt: "" }
+    await Todo.deleteOne({ _id: id });
+    res.json({ status: "ok" });
+});
+CODE
+)
+
+desc(
+	lang: "js"
+	'safefile://safe_pg_parameterized.js': <<<CODE
+const express = require("express");
+const { Pool } = require("pg");
+const app = express();
+const pool = new Pool();
+
+app.get("/search", (req, res) => {
+    // GOOD: 使用参数化查询
+    const query = "SELECT ITEM, PRICE FROM PRODUCT WHERE ITEM_CATEGORY=$1 ORDER BY PRICE";
+    pool.query(query, [req.params.category], (err, results) => {
+        res.json(results.rows);
+    });
+});
+CODE
+)
+
+desc(
+	lang: "js"
+	'safefile://safe_mysql_parameterized.js': <<<CODE
+const express = require("express");
+const mysql = require("mysql2");
+const app = express();
+const connection = mysql.createConnection({});
+
+app.get("/user", (req, res) => {
+    // GOOD: 使用参数化查询
+    connection.query("SELECT * FROM users WHERE id = ?", [req.query.id], (err, results) => {
+        res.json(results);
+    });
+});
+CODE
+)
+
+desc(
+	lang: "js"
+	'safefile://safe_nosql_eq_operator.js': <<<CODE
+const express = require("express");
+const mongoose = require("mongoose");
+const app = express();
+app.use(express.json());
+
+const Todo = mongoose.model("Todo", new mongoose.Schema({ text: String }));
+
+app.delete("/api/delete", async (req, res) => {
+    let id = req.body.id;
+    // GOOD: 使用 $eq 操作符，确保 id 被解释为字面值
+    await Todo.deleteOne({ _id: { $eq: id } });
+    res.json({ status: "ok" });
+});
+CODE
+)
+
+desc(
+	lang: "js"
+	'safefile://safe_nosql_typeof_guard.js': <<<CODE
+const express = require("express");
+const mongoose = require("mongoose");
+const app = express();
+app.use(express.json());
+
+const Todo = mongoose.model("Todo", new mongoose.Schema({ text: String }));
+
+app.delete("/api/delete", async (req, res) => {
+    let id = req.body.id;
+    // GOOD: typeof 类型检查确保 id 是字符串而非查询对象
+    if (typeof id !== "string") {
+        res.status(400).json({ status: "error" });
+        return;
+    }
+    await Todo.deleteOne({ _id: id });
+    res.json({ status: "ok" });
+});
+CODE
+)

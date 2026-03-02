@@ -1,0 +1,342 @@
+desc(
+	title: "JavaScript Code Injection via User-Controlled Input"
+	title_zh: "用户可控输入流入代码执行函数导致代码注入"
+	type: vuln
+	level: high
+	risk: "code-injection"
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+
+代码注入（Code Injection，CWE-94/CWE-95）是指应用程序将未经净化的用户输入传递给可以动态执行代码的函数（如 `eval()`、`new Function()`、模板引擎的 `compile()`/`render()` 等）。攻击者可以通过精心构造的输入控制所执行的代码逻辑，从而：
+
+- **服务端（Node.js）**：实现任意代码执行（RCE），读写文件、执行系统命令、泄露敏感数据、完全接管服务器
+- **客户端（Browser）**：实现跨站脚本攻击（XSS），窃取 Cookie/Session、重定向用户、篡改页面内容
+
+2. **常见触发模式**
+
+**直接 eval 注入：**
+```javascript
+// eval(document.location.href) — 浏览器端 URL 注入
+eval(document.location.href.substring(document.location.href.indexOf("default=")+8));
+```
+
+**服务端模板注入（SSTI）：**
+```javascript
+const express = require('express');
+const pug = require('pug');
+const app = express();
+
+app.post('/', (req, res) => {
+    var input = req.query.username;  // 用户可控
+    var template = `
+doctype html
+html
+  body
+    p Hello ` + input;              // 模板字符串拼接用户输入
+    var fn = pug.compile(template); // 危险：用户输入作为模板的一部分
+    res.send(fn());
+});
+// 攻击者可注入: username=#{global.process.mainModule.require('child_process').execSync('id')}
+```
+
+**vm 模块沙箱逃逸：**
+```javascript
+const vm = require('vm');
+app.get('/run', (req, res) => {
+    const result = vm.runInNewContext(req.query.code);  // 危险
+    res.json({ result });
+});
+```
+
+3. **潜在影响**
+
+- **远程代码执行（RCE）**：攻击者在服务器上执行任意系统命令，完全控制服务器
+- **数据泄露**：读取配置文件、环境变量、数据库凭据等敏感信息
+- **服务器被植入后门**：在服务器上部署 webshell 或持久化恶意程序
+- **供应链污染**：修改部署的应用代码
+- **XSS**：客户端代码注入导致会话劫持、钓鱼攻击
+DESC
+	rule_id: "c3d4e5f6-a7b8-9012-cdef-345678901234"
+	solution: <<<SOLUTION
+### 修复建议
+
+**1. 避免将用户输入传递给代码执行函数**
+
+最根本的修复是不要将不可信数据传递给 `eval()`、`new Function()`、模板引擎的 `compile()`/`render()` 等。
+
+```javascript
+// 危险
+eval(req.query.expression);
+
+// 安全替代：预定义允许的操作
+const ALLOWED_OPS = {
+    add: (a, b) => a + b,
+    multiply: (a, b) => a * b
+};
+const op = ALLOWED_OPS[req.query.op];
+if (op) result = op(a, b);
+```
+
+**2. 模板引擎：将用户输入作为模板变量而非模板本身**
+
+```javascript
+// 危险：用户输入拼接到模板字符串中
+const template = `p Hello ` + req.query.username;
+pug.compile(template)();
+
+// 安全：用户输入通过变量传递，不作为模板的一部分
+const template = `p Hello #{username}`;
+pug.compile(template)({ username: req.query.username });
+```
+
+**3. 如必须动态执行代码，使用严格沙箱并限制能力**
+
+即使使用 `vm` 模块，也要设置严格的超时和资源限制，并避免将 Node.js 内置模块暴露给沙箱：
+
+```javascript
+const vm = require('vm');
+const sandbox = Object.create(null);  // 空原型，不继承任何属性
+try {
+    const result = vm.runInNewContext(code, sandbox, {
+        timeout: 100,           // 防止无限循环
+        displayErrors: false
+    });
+} catch (e) {
+    // 处理错误
+}
+```
+注意：`vm` 模块本身不是安全沙箱，建议使用专门的安全沙箱库（如 `isolated-vm`）。
+
+**4. 输入验证和白名单**
+
+对用户输入进行严格的类型检查、格式验证和白名单过滤，在进入任何处理逻辑前拒绝不合法输入。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-94: Improper Control of Generation of Code ('Code Injection')](https://cwe.mitre.org/data/definitions/94.html)
+[CWE-95: Improper Neutralization of Directives in Dynamically Evaluated Code ('Eval Injection')](https://cwe.mitre.org/data/definitions/95.html)
+[CWE-79: Cross-site Scripting](https://cwe.mitre.org/data/definitions/79.html)
+[OWASP: Code Injection](https://owasp.org/www-community/attacks/Code_Injection)
+[OWASP: Server Side Template Injection](https://owasp.org/www-community/attacks/Server_Side_Template_Injection)
+[PortSwigger: Server-Side Template Injection](https://portswigger.net/research/server-side-template-injection)
+REFERENCE
+)
+
+// =====================================================================
+// Pull in source and sink libraries
+// =====================================================================
+<include('js-param')> as $params;
+<include('js-code-exec-sink')> as $sinks;
+
+// =====================================================================
+// Known sanitizer/escape functions — their presence in the call chain
+// indicates the data has been sanitized, reducing risk.
+// =====================================================================
+/^(escape|sanitize|encode|encodeURIComponent|encodeURI|DOMPurify|purify|stripTags|xss|validator)$/ as $sanitizerNames
+
+// =====================================================================
+// HIGH: User input flows DIRECTLY into a code execution sink
+//       with no intermediate function call in the data flow path.
+//
+// Pattern: $source --> $sink without any intermediate call
+//   - Direct: eval(req.query.code)
+//   - Member access only (not a call): eval(req.query.code)
+//
+// Uses #{include:..., exclude:...}-> taint-flow query:
+//   include: * & $params  → any node that is also a param source
+//   exclude: *?{opcode: call} → stop at any intermediate function call
+// =====================================================================
+$sinks?{<self> #{
+    include: <<<CODE
+* & $params as $__next__
+CODE,
+    exclude: <<<CODE
+*?{opcode: call} as $__next__
+CODE
+}->} as $directInjection
+
+// =====================================================================
+// MID: User input flows into a code execution sink through intermediate
+//      operations (string concatenation, template construction, etc.)
+//      but NOT through a sanitizer function.
+//
+// Captures patterns like:
+//   const template = `prefix` + req.query.input;  // BinOp
+//   pug.compile(template);                         // sink
+// =====================================================================
+$sinks<dataflow(
+    include: <<<CODE
+* & $params as $__next__
+CODE,
+    exclude: <<<CODE
+*?{opcode: call && (<self><getCallee> & $sanitizerNames)} as $__next__
+CODE
+)> as $midInjection
+
+// Remove direct flows already classified as HIGH
+$midInjection - $directInjection as $mid
+
+// =====================================================================
+// Alert HIGH: direct source → sink
+// =====================================================================
+alert $directInjection for {
+	level: "high"
+	type: "vuln"
+	title: "Direct Code Injection: User Input Directly Passed to Code Execution Function"
+	title_zh: "直接代码注入：用户输入直接传入代码执行函数"
+	message: "检测到用户可控输入（如 req.query、req.body、document.location 等）**直接**传入了代码执行函数（如 eval、pug.compile、vm.runInNewContext 等），中间无任何函数调用拦截。攻击者可以通过构造恶意输入执行任意代码，导致服务器被完全控制（RCE）。"
+	solution: <<<SOLUTION
+立即修复：绝对不要将用户可控输入直接传递给 eval()、new Function()、pug.compile()、vm.runInNewContext() 等代码执行函数。
+
+```javascript
+// 危险
+eval(req.query.code);
+pug.compile(req.query.template);
+
+// 安全：模板引擎中将用户输入作为变量而非模板
+const safeTemplate = `p Hello #{username}`;
+pug.compile(safeTemplate)({ username: req.query.username });
+```
+SOLUTION
+	risk: "remote-code-execution"
+	name: "directInjection"
+}
+
+// =====================================================================
+// Alert MID: indirect source → sink (through intermediate ops)
+// =====================================================================
+alert $mid for {
+	level: "mid"
+	type: "vuln"
+	title: "Indirect Code Injection: User Input Flows into Code Execution via Intermediate Operations"
+	title_zh: "间接代码注入：用户输入经中间操作后流入代码执行函数"
+	message: "检测到用户可控输入经过中间操作（如字符串拼接、模板构造）后流入了代码执行函数。攻击者可以通过注入特殊字符或模板语法（如 Pug 的 `#{global.process.mainModule.require('child_process').execSync('id')}`）执行任意代码。"
+	solution: <<<SOLUTION
+将用户输入作为模板变量（而非模板本身的一部分）传递：
+
+```javascript
+// 危险：用户输入拼接进模板字符串
+const template = `p Hello ` + req.query.username;
+pug.compile(template)();
+
+// 安全：用户输入通过选项对象传递
+const template = `p Hello #{username}`;
+pug.compile(template)({ username: req.query.username });
+```
+SOLUTION
+	risk: "server-side-template-injection"
+	name: "mid"
+}
+
+// =====================================================================
+// Embedded test cases
+// =====================================================================
+
+// Test 1: HIGH — direct eval of URL fragment (browser-side)
+desc(
+	lang: "js"
+	alert_high: 1
+	'file:///unsafe_eval_location.js': <<<CODE
+// Browser-side: attacker controls the URL fragment
+var href = document.location.href;
+var code = href.substring(href.indexOf("default=") + 8);
+eval(code);
+CODE
+)
+
+// Test 2: HIGH — direct eval of request query param (server-side)
+desc(
+	lang: "js"
+	alert_high: 1
+	'file:///unsafe_eval_req_query.js': <<<CODE
+const express = require('express');
+const app = express();
+
+app.get('/run', (req, res) => {
+    const result = eval(req.query.code);
+    res.json({ result });
+});
+CODE
+)
+
+// Test 3: HIGH — pug template injection via string concatenation
+// pug.compile receives a BinOp that directly contains req.query.username (ParameterMember),
+// with no intermediate function call, so it's classified as HIGH (directInjection).
+desc(
+	lang: "js"
+	alert_high: 1
+	'file:///unsafe_pug_ssti.js': <<<CODE
+const express = require('express');
+const pug = require('pug');
+const app = express();
+
+app.post('/', (req, res) => {
+    var input = req.query.username;
+    var template = `
+doctype html
+html
+  body
+    p Hello ` + input;
+    var fn = pug.compile(template);
+    var html = fn();
+    res.send(html);
+});
+CODE
+)
+
+// Test 4: HIGH — vm.runInNewContext with direct req.query
+desc(
+	lang: "js"
+	alert_high: 1
+	'file:///unsafe_vm_run.js': <<<CODE
+const vm = require('vm');
+const express = require('express');
+const app = express();
+
+app.get('/eval', (req, res) => {
+    const code = req.query.code;
+    const result = vm.runInNewContext(code, {});
+    res.json({ result });
+});
+CODE
+)
+
+// Test 5: SAFE — pug with user input as variable (not template)
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///safe_pug_variable.js': <<<CODE
+const express = require('express');
+const pug = require('pug');
+const app = express();
+
+app.post('/', (req, res) => {
+    var input = req.query.username;
+    var template = `
+doctype html
+html
+  body
+    p Hello #{username}`;
+    var fn = pug.compile(template);
+    var html = fn({ username: input });
+    res.send(html);
+});
+CODE
+)
+
+// Test 6: HIGH — new Function with req.body
+desc(
+	lang: "js"
+	alert_high: 1
+	'file:///unsafe_new_function.js': <<<CODE
+const express = require('express');
+const app = express();
+app.use(require('express').json());
+
+app.post('/compute', (req, res) => {
+    const fn = new Function('x', req.body.expression);
+    res.json({ result: fn(42) });
+});
+CODE
+)

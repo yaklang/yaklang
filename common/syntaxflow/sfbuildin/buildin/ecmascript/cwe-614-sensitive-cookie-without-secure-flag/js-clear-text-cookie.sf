@@ -1,0 +1,338 @@
+desc(
+	title: "Clear Text Transmission of Sensitive Cookie"
+	title_zh: "Cookie 未设置 Secure 标志，可能被明文传输"
+	type: vuln
+	level: warning
+	risk: "sensitive-cookie-cleartext"
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+
+Cookie 的 `Secure` 属性用于指示浏览器仅在 HTTPS 加密连接下才发送该 Cookie。若设置 Cookie 时未包含 `Secure` 属性，浏览器会在 HTTP 和 HTTPS 连接中均发送该 Cookie，导致：
+
+- 会话令牌、认证 Token 等敏感 Cookie 以明文形式在 HTTP 链路上传输
+- 攻击者通过网络监听（中间人攻击、ARP 欺骗、公共 WiFi 嗅探）即可截获 Cookie
+- 截获的 Cookie 可用于会话劫持，冒充合法用户执行任意操作
+
+在 Node.js/JavaScript 环境中，以下几种方式均可设置 Cookie：
+- `res.setHeader("Set-Cookie", "name=value")` — 原生 Node.js HTTP
+- `res.writeHead(200, {"Set-Cookie": "name=value"})` — 原生 Node.js HTTP
+- `res.cookie("name", "value", options)` — Express.js
+
+2. **触发场景**
+
+```javascript
+// 场景1：原生 Node.js — 缺少 ; Secure
+const http = require('http');
+http.createServer((req, res) => {
+    res.setHeader("Set-Cookie", `authKey=${makeAuthkey()}`);  // 危险：无 Secure 属性
+    res.end('<h2>Hello world</h2>');
+});
+
+// 场景2：Express.js — 明确设置 secure: false
+app.get('/login', (req, res) => {
+    res.cookie('sessionId', token, { secure: false }); // 危险：明确禁用 secure
+    res.redirect('/');
+});
+```
+
+3. **潜在影响**
+
+- **会话劫持**：攻击者截获 Session Cookie，冒充用户身份执行任意操作
+- **认证绕过**：认证 Token 被窃取，攻击者直接获得 API 访问权限
+- **敏感信息泄露**：Cookie 中存储的用户数据被暴露
+- **违反合规要求**：PCI DSS、HIPAA 等标准要求敏感凭证必须加密传输
+DESC
+	rule_id: "f3c8b2a1-7e4d-4f92-a5b6-0c1d9e3f7a28"
+	solution: <<<SOLUTION
+### 修复建议
+
+**1. 原生 Node.js — 在 Set-Cookie 字符串中添加 `; Secure`**
+
+```javascript
+// 修复前（危险）
+res.setHeader("Set-Cookie", `authKey=${makeAuthkey()}`);
+
+// 修复后（安全）
+res.setHeader("Set-Cookie", `authKey=${makeAuthkey()}; Secure; HttpOnly`);
+```
+
+**2. Express.js — 在 `res.cookie()` 选项中设置 `secure: true`**
+
+```javascript
+// 修复前（危险）
+res.cookie('sessionId', token, { secure: false });
+
+// 修复后（安全）
+res.cookie('sessionId', token, { secure: true, httpOnly: true, sameSite: 'Strict' });
+```
+
+**3. Express.js — 全局配置 session 安全选项**
+
+```javascript
+app.use(session({
+    secret: 'your-secret',
+    cookie: { secure: true, httpOnly: true, sameSite: 'Strict' }
+}));
+```
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-614: Sensitive Cookie Without 'Secure' Attribute](https://cwe.mitre.org/data/definitions/614.html)
+[CWE-311: Missing Encryption of Sensitive Data](https://cwe.mitre.org/data/definitions/311.html)
+[CWE-312: Cleartext Storage of Sensitive Information](https://cwe.mitre.org/data/definitions/312.html)
+[CWE-319: Cleartext Transmission of Sensitive Information](https://cwe.mitre.org/data/definitions/319.html)
+[OWASP: Set Cookie Flags Appropriately](https://owasp.org/www-community/controls/SecureFlag)
+[Mozilla MDN: Set-Cookie](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Set-Cookie)
+[Express.js: Use Cookies Securely](https://expressjs.com/en/advanced/best-practice-security.html#use-cookies-securely)
+REFERENCE
+)
+
+// =====================================================================
+// Detection Pattern A:
+//   res.setHeader("Set-Cookie", cookieString)
+//
+// In JS SSA:
+//   - Static strings like "name=val; HttpOnly" → ConstInst
+//   - Template literals like `authKey=${fn()}; HttpOnly` → BinOp(add, ...)
+//
+// Strategy (verified via SSA exploration):
+//   1. Capture all setHeader() second args as $hVal
+//   2. For STATIC values: filter ConstInst that look like cookies (contain '=')
+//      and do NOT contain the 'Secure' attribute → alert
+//   3. For DYNAMIC values (BinOp from template literals): use <string> native call
+//      to get the SSA string representation which includes all literal parts.
+//      e.g. `key=${fn()}; Secure; HttpOnly` →
+//           add(add("key=", castType(string, fn())), "; Secure; HttpOnly")
+//      The literal "; Secure; HttpOnly" appears in this repr, so ?{!have: /secure/}
+//      correctly identifies templates without the Secure attribute.
+//   4. The two sub-patterns are completely INDEPENDENT — safe/unsafe for each type.
+// =====================================================================
+
+*.setHeader(* as $hName, * as $hVal)
+
+// --- Sub-pattern A1: Static const cookie strings without Secure ---
+// ?{have: /\w+=\w+/} ensures it's a cookie "name=value" pair (not "text/html" etc.)
+$hVal?{opcode: const}?{have: /\w+=\w+/}?{!have: /(?i)(^|;)\s*secure(\s|;|$)/} as $unsafeConstCookie
+
+alert $unsafeConstCookie for {
+	level: "warning"
+	type: "vuln"
+	title: "Cookie Set via setHeader Without 'Secure' Attribute"
+	title_zh: "通过 setHeader 设置的静态 Cookie 字符串缺少 Secure 属性，可能被明文传输"
+	message: "检测到通过 res.setHeader('Set-Cookie', '...') 设置的静态 Cookie 字符串中未包含 'Secure' 属性。该 Cookie 将在 HTTP 和 HTTPS 连接中均被发送，攻击者可通过网络嗅探截获敏感 Cookie。请在 Cookie 字符串末尾添加 '; Secure; HttpOnly'。"
+	solution: <<<SOLUTION
+在 Cookie 字符串中添加 Secure 和 HttpOnly 属性：
+
+```javascript
+// 修复前
+res.setHeader("Set-Cookie", "sessionToken=abc123; HttpOnly");
+
+// 修复后
+res.setHeader("Set-Cookie", "sessionToken=abc123; Secure; HttpOnly");
+```
+SOLUTION
+	risk: "会话劫持/敏感信息明文传输"
+	name: "setHeader-static-missing-secure"
+}
+
+// --- Sub-pattern A2: Dynamic (template literal) cookie values without Secure ---
+// Template literals compile to BinOp(add, ...) in SSA.
+// <string> converts the BinOp to its SSA string representation, which contains
+// all string literal parts. E.g.:
+//   `key=${fn()}; Secure; HttpOnly` → "add(add(\"key=\", ...), \"; Secure; HttpOnly\")"
+// We can then check if the representation contains "secure" (case-insensitive).
+//
+// Key insight: template literals with "; Secure" as a SUFFIX are SAFE, because
+// the suffix becomes the rightmost operand of the outermost add() and thus
+// appears in the SSA repr. Template literals WITHOUT "; Secure" will not contain
+// the word "secure" anywhere in the SSA repr.
+$hVal?{!opcode: const} as $dynamicCookieVals
+$dynamicCookieVals<string> as $dynamicSSARepr
+$dynamicSSARepr?{!have: /(?i)secure/} as $unsafeDynamicSSARepr
+
+alert $unsafeDynamicSSARepr for {
+	level: "warning"
+	type: "vuln"
+	title: "Template Literal Cookie via setHeader Without 'Secure' Attribute"
+	title_zh: "通过 setHeader 设置的模板字符串 Cookie 缺少 Secure 属性，可能被明文传输"
+	message: "检测到通过 res.setHeader('Set-Cookie', `动态模板`) 设置的 Cookie，通过分析模板字符串的字面量部分，确认其中不包含 'Secure' 属性。该 Cookie 将在 HTTP 明文连接中被发送。请在模板字符串末尾添加 '; Secure; HttpOnly'。"
+	solution: <<<SOLUTION
+在动态 Cookie 模板字符串末尾添加 Secure 和 HttpOnly 属性：
+
+```javascript
+// 修复前
+res.setHeader("Set-Cookie", `authKey=${makeAuthkey()}`);
+res.setHeader("Set-Cookie", `authKey=${makeAuthkey()}; HttpOnly`);
+
+// 修复后
+res.setHeader("Set-Cookie", `authKey=${makeAuthkey()}; Secure; HttpOnly`);
+```
+SOLUTION
+	risk: "会话劫持/敏感信息明文传输"
+	name: "setHeader-template-missing-secure"
+}
+
+// =====================================================================
+// Detection Pattern B:
+//   Express res.cookie(name, value, { secure: false })
+//
+// When secure is explicitly set to false in the options object,
+// the SSA captures options.secure as a ConstInst with value false.
+// =====================================================================
+
+*.cookie(* as $cookieName, * as $cookieVal, * as $cookieOpts)
+$cookieOpts.secure as $secureAttr
+$secureAttr?{have: false} as $explicitSecureFalse
+
+alert $explicitSecureFalse for {
+	level: "warning"
+	type: "vuln"
+	title: "Express Cookie Set with 'secure: false'"
+	title_zh: "Express res.cookie() 明确将 secure 设置为 false，Cookie 将被明文传输"
+	message: "检测到 Express res.cookie() 调用中明确设置了 secure: false，导致该 Cookie 在 HTTP 非加密连接中也会被发送。Cookie 中可能包含会话令牌等敏感信息，一旦被中间人攻击者截获，将导致会话劫持。请将 secure 选项改为 true。"
+	solution: <<<SOLUTION
+将 res.cookie() 中的 secure 选项改为 true：
+
+```javascript
+// 修复前
+res.cookie('sessionId', token, { httpOnly: true, secure: false });
+
+// 修复后
+res.cookie('sessionId', token, { httpOnly: true, secure: true });
+```
+SOLUTION
+	risk: "会话劫持/敏感信息明文传输"
+	name: "express-cookie-secure-false"
+}
+
+// =====================================================================
+// Test cases embedded in the rule file
+// =====================================================================
+
+// Test 1: VULNERABLE — setHeader with static string, HttpOnly but no Secure
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///unsafe_setheader_static.js': <<<CODE
+const http = require('http');
+
+const server = http.createServer((req, res) => {
+    res.setHeader("Set-Cookie", "sessionToken=abc123; HttpOnly");
+    res.end('OK');
+});
+CODE
+)
+
+// Test 2: VULNERABLE — setHeader with template literal, no secure suffix
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///unsafe_setheader_template_no_secure.js': <<<CODE
+const http = require('http');
+function makeAuthkey() { return "key123"; }
+
+const server = http.createServer((req, res) => {
+    res.setHeader("Set-Cookie", `authKey=${makeAuthkey()}`);
+    res.end('<h2>Hello world</h2>');
+});
+CODE
+)
+
+// Test 3: VULNERABLE — setHeader with template literal, has httpOnly but NO Secure
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///unsafe_setheader_template_httponly_no_secure.js': <<<CODE
+const http = require('http');
+function makeAuthkey() { return "key123"; }
+
+const server = http.createServer((req, res) => {
+    res.setHeader("Set-Cookie", `authKey=${makeAuthkey()}; httpOnly`);
+    res.end('OK');
+});
+CODE
+)
+
+// Test 4: VULNERABLE — Express res.cookie() with secure: false
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///unsafe_express_secure_false.js': <<<CODE
+const express = require('express');
+const app = express();
+
+app.post('/login', (req, res) => {
+    const token = generateToken(req.body.username);
+    res.cookie('authToken', token, {
+        httpOnly: true,
+        secure: false
+    });
+    res.json({ success: true });
+});
+CODE
+)
+
+// Test 5: SAFE — setHeader with Secure attribute in static string
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///safe_setheader_static_secure.js': <<<CODE
+const http = require('http');
+
+const server = http.createServer((req, res) => {
+    res.setHeader("Set-Cookie", "sessionToken=abc123; Secure; HttpOnly");
+    res.end('OK');
+});
+CODE
+)
+
+// Test 6: SAFE — setHeader with template literal that has Secure suffix (lowercase)
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///safe_setheader_template_secure_lowercase.js': <<<CODE
+const http = require('http');
+function makeAuthkey() { return "key123"; }
+
+const server = http.createServer((req, res) => {
+    res.setHeader("Set-Cookie", `authKey=${makeAuthkey()}; secure; httpOnly`);
+    res.end('OK');
+});
+CODE
+)
+
+// Test 7: SAFE — setHeader with template literal that has Secure suffix (mixed case)
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///safe_setheader_template_secure_mixedcase.js': <<<CODE
+const http = require('http');
+function makeAuthkey() { return "key123"; }
+
+const server = http.createServer((req, res) => {
+    res.setHeader("Set-Cookie", `token=${makeAuthkey()}; Secure; HttpOnly`);
+    res.end('OK');
+});
+CODE
+)
+
+// Test 8: SAFE — Express res.cookie() with secure: true
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///safe_express_secure_true.js': <<<CODE
+const express = require('express');
+const app = express();
+
+app.post('/login', (req, res) => {
+    const token = generateToken(req.body.username);
+    res.cookie('authToken', token, {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'Strict'
+    });
+    res.json({ success: true });
+});
+CODE
+)

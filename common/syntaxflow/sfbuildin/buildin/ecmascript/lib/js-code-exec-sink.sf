@@ -1,0 +1,175 @@
+desc(
+	title: "JavaScript Code Execution Sink Functions"
+	title_zh: "JavaScript 代码执行 Sink 函数"
+	type: audit
+	lib: 'js-code-exec-sink'
+	desc: <<<DESC
+### 规则目的
+
+该规则是 `js-code-exec-sink` 库规则（`lib` 类型），识别 JavaScript/Node.js 中所有可能导致**代码注入（Code Injection）**的危险 Sink 函数。
+
+当用户可控输入（来自 `js-param` 等 source lib）流入这些函数时，攻击者可能执行任意代码（RCE）或客户端脚本（XSS）。
+
+#### 覆盖的 Sink 分类
+
+**1. JavaScript 直接执行**
+- `eval(code)` — 最直接的代码执行
+- `new Function(args, body)` — 动态创建函数
+- `Function(code)` — 同上
+
+**2. 定时器/异步代码执行**
+- `setTimeout(code, delay)` — 第一个参数为字符串时执行代码
+- `setInterval(code, delay)` — 同上
+- `setImmediate(code)` — Node.js 专属
+
+**3. 模板引擎 Sink（服务端模板注入 SSTI）**
+- `pug.compile(template)` — Pug（原 Jade）
+- `pug.render(template)` — Pug
+- `ejs.render(template)` — EJS
+- `ejs.renderFile(file, data)` — EJS
+- `jade.compile(template)` — Jade（旧版 Pug）
+- `jade.render(template)` — Jade
+- `Handlebars.compile(template)` — Handlebars
+- `nunjucks.renderString(template)` — Nunjucks
+- `swig.render(template)` — Swig
+- `_.template(template)` — Lodash/Underscore template
+- `dot.template(template)` — doT.js
+- `mustache.render(template)` — Mustache（当模板本身可控时）
+- `vm.runInNewContext(code)` — Node.js vm 模块
+- `vm.runInContext(code)` — Node.js vm 模块
+- `vm.runInThisContext(code)` — Node.js vm 模块
+- `vm2.run(code)` — vm2 沙箱（绕过研究已证明不安全）
+
+**4. 脚本/进程执行（间接代码执行）**
+- `child_process.exec(cmd)` — Shell 命令执行（代码注入转命令注入）
+- `child_process.execSync(cmd)` — 同步版本
+- `child_process.spawn(cmd, args)` — 进程启动
+
+**5. 动态脚本加载（客户端）**
+- `document.write(html)` — 向文档写入 HTML（包含 `<script>` 时执行代码）
+- `element.innerHTML = *` — 设置 innerHTML（XSS/代码注入）
+- `element.outerHTML = *` — 设置 outerHTML
+
+**6. Worker/沙箱（可绕过的代码执行上下文）**
+- `new Worker(scriptURL)` — Web Worker
+DESC
+	rule_id: "b2c3d4e5-f6a7-8901-bcde-f23456789012"
+	title_zh: "JavaScript 代码执行 Sink 函数"
+	solution: <<<SOLUTION
+此规则为 lib 库规则，不直接报告漏洞。请结合具体的漏洞检测规则使用。
+SOLUTION
+	reference: <<<REFERENCE
+[OWASP: Code Injection](https://owasp.org/www-community/attacks/Code_Injection)
+[CWE-94: Improper Control of Generation of Code ('Code Injection')](https://cwe.mitre.org/data/definitions/94.html)
+[CWE-95: Improper Neutralization of Directives in Dynamically Evaluated Code ('Eval Injection')](https://cwe.mitre.org/data/definitions/95.html)
+REFERENCE
+)
+
+// ============================================================
+// 1. Direct JS code execution
+// ============================================================
+eval(* as $sink)
+new Function(* as $sink)
+Function(* as $sink)
+
+// ============================================================
+// 2. Timer-based code execution (string first arg = code)
+// ============================================================
+setTimeout(* as $sink)
+setInterval(* as $sink)
+setImmediate(* as $sink)
+
+// ============================================================
+// 3. Template engine sinks (Server-Side Template Injection)
+// ============================================================
+
+// Pug (formerly Jade)
+pug.compile(* as $sink)
+pug.render(* as $sink)
+pug.renderFile(* as $sink)
+
+// Jade (legacy)
+jade.compile(* as $sink)
+jade.render(* as $sink)
+jade.renderFile(* as $sink)
+
+// EJS
+ejs.render(* as $sink)
+ejs.renderFile(* as $sink)
+
+// Handlebars - compile(template) is dangerous when template is user-controlled
+Handlebars.compile(* as $sink)
+Handlebars.precompile(* as $sink)
+
+// Nunjucks
+nunjucks.renderString(* as $sink)
+
+// Swig
+swig.render(* as $sink)
+swig.renderFile(* as $sink)
+
+// Lodash / Underscore template
+_.template(* as $sink)
+
+// doT.js
+dot.template(* as $sink)
+
+// Mustache - render(template, view) when template is user-controlled
+mustache.render(* as $sink)
+
+// ============================================================
+// 4. Node.js vm module (sandboxed but still code execution)
+// ============================================================
+vm.runInNewContext(* as $sink)
+vm.runInContext(* as $sink)
+vm.runInThisContext(* as $sink)
+vm.compileFunction(* as $sink)
+new vm.Script(* as $sink)
+
+// vm2 (commonly used as sandbox, but proven bypassable)
+// Note: *.run() is too broad; target specific vm2 patterns via dataflow in rules
+
+// ============================================================
+// 5. Child process / shell execution (leads to RCE via code→cmd injection)
+// ============================================================
+exec(* as $sink)
+execSync(* as $sink)
+spawn(* as $sink)
+spawnSync(* as $sink)
+execFile(* as $sink)
+execFileSync(* as $sink)
+
+// ============================================================
+// 6. DOM-based sinks (client-side code injection / XSS)
+// ============================================================
+document.write(* as $sink)
+document.writeln(* as $sink)
+
+$sink as $output
+
+alert $output for {
+	level: "info"
+	title: "JavaScript Code Execution Sink"
+	title_zh: "JavaScript 代码执行 Sink 函数"
+	message: "识别到可能执行代码的危险函数，请结合污点传播链路判断是否存在代码注入风险。"
+	name: "output"
+}
+
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///js_code_exec_sinks.js': <<<CODE
+const vm = require('vm');
+const pug = require('pug');
+const ejs = require('ejs');
+
+function runUntrusted(userInput) {
+    eval(userInput);
+    new Function(userInput)();
+    setTimeout(userInput, 0);
+    vm.runInNewContext(userInput);
+    pug.compile(userInput);
+    ejs.render(userInput);
+}
+CODE
+)
