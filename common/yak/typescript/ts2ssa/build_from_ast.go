@@ -1093,13 +1093,16 @@ func (b *builder) VisitVariableDeclaration(decl *ast.VariableDeclaration, declTy
 	}
 
 	// 考虑js声明关键词let const var
-	if declType != ast.NodeFlagsLet && declType != ast.NodeFlagsConst && declType != ast.NodeFlagsNone {
+	// 注意：在 async 函数体内，节点的 Flags 会包含 NodeFlagsAwaitContext（0x2000）等上下文标志位，
+	// 因此不能用精确匹配，需要用位掩码只提取 let/const/using 声明类型相关的位。
+	declKind := declType & (ast.NodeFlagsLet | ast.NodeFlagsConst | ast.NodeFlagsUsing)
+	if declKind != ast.NodeFlagsLet && declKind != ast.NodeFlagsConst && declKind != ast.NodeFlagsNone {
 		b.NewError(ssa.Error, TAG, UnexpectedVariableDeclarationModifierError(strconv.Itoa(int(declType))))
 		return nil
 	}
 
 	// const修饰的变量必须在声明时提供initializer
-	if declType == ast.NodeFlagsConst && decl.Initializer == nil {
+	if declKind == ast.NodeFlagsConst && decl.Initializer == nil {
 		b.NewError(ssa.Error, TAG, ConstDeclarationWithoutInitializer())
 		return nil
 	}
@@ -1128,7 +1131,7 @@ func (b *builder) VisitVariableDeclaration(decl *ast.VariableDeclaration, declTy
 	name := decl.Name()
 
 	var isLocal bool
-	if declType == ast.NodeFlagsLet || declType == ast.NodeFlagsConst {
+	if declKind == ast.NodeFlagsLet || declKind == ast.NodeFlagsConst {
 		isLocal = true
 	} else {
 		isLocal = false

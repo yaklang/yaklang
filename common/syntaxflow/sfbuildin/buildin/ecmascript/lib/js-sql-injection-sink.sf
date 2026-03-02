@@ -1,0 +1,128 @@
+desc(
+	title: "JavaScript SQL / NoSQL Query Execution Sinks"
+	title_zh: "JavaScript SQL/NoSQL 查询执行 Sink 函数"
+	type: audit
+	lib: 'js-sql-injection-sink'
+	desc: <<<DESC
+### 规则目的
+
+该规则是 `js-sql-injection-sink` 库规则（`lib` 类型），识别 JavaScript/Node.js 中所有可能导致 **SQL 注入（CWE-89）** 或 **NoSQL 注入（CWE-943）** 的数据库查询执行 Sink 函数。
+
+当用户可控输入（来自 `js-param` 等 source lib）流入这些函数时，攻击者可能操纵数据库查询，导致数据泄露、数据篡改或权限绕过。
+
+#### 覆盖的数据库客户端库
+
+**1. SQL 数据库**
+- **`pg`（node-postgres）**：`pool.query()`、`client.query()`、`db.query()`
+- **`mysql` / `mysql2`**：`connection.query()`、`pool.query()`
+- **`sqlite3`**：`db.run()`、`db.all()`、`db.get()`、`db.each()`、`db.exec()`
+- **`better-sqlite3`**：`db.prepare().run()`、`db.exec()`
+- **`mssql`（node-mssql）**：`request.query()`、`request.execute()`
+- **`oracle`（oracledb）**：`connection.execute()`
+- **`knex.js`**：`knex.raw()`（其他 knex 方法自动参数化，不在此）
+- **`sequelize`**：`sequelize.query()`（仅原始查询接口，非模型方法）
+- **`typeorm`**：`manager.query()`、`repository.query()`、`connection.query()`
+
+**2. NoSQL 数据库**
+- **`mongoose`（MongoDB）**：`Model.find()`、`Model.findOne()`、`Model.findById()`、`Model.deleteOne()`、`Model.deleteMany()`、`Model.updateOne()`、`Model.updateMany()`、`Model.findOneAndUpdate()`、`Model.findOneAndDelete()`、`Model.aggregate()`
+- **`mongodb`（官方驱动）**：`collection.find()`、`collection.findOne()`、`collection.deleteOne()`、`collection.updateOne()`、`collection.aggregate()`
+- **`redis`（ioredis/node_redis）**：通常安全，但原始命令执行可注入
+
+#### 检测重点
+- 第一个参数为查询字符串（SQL 文本）的调用
+- 使用字符串拼接构造查询（BinOp）时特别危险
+- NoSQL 中对象参数直接包含用户输入时危险（NoSQL 注入）
+DESC
+	rule_id: "d4e5f6a7-b8c9-0123-def0-456789012345"
+	title_zh: "JavaScript SQL/NoSQL 查询执行 Sink 函数"
+	solution: <<<SOLUTION
+此规则为 lib 库规则，不直接报告漏洞。请结合具体的漏洞检测规则使用。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-89: SQL Injection](https://cwe.mitre.org/data/definitions/89.html)
+[CWE-943: NoSQL Injection](https://cwe.mitre.org/data/definitions/943.html)
+[OWASP: SQL Injection Prevention](https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html)
+REFERENCE
+)
+
+// ============================================================
+// SQL Database Sinks
+// ============================================================
+
+// node-postgres (pg): pool.query(sql, params?), client.query(sql, params?)
+*.query(* as $sink)
+
+// mysql / mysql2: connection.query(sql, ...), pool.query(sql, ...)
+// (*.query already covers this)
+
+// sqlite3: db.run(sql, ...), db.all(sql, ...), db.get(sql, ...), db.each(sql, ...), db.exec(sql)
+*.run(* as $sink)
+*.all(* as $sink)
+*.get(* as $sink)
+*.each(* as $sink)
+*.exec(* as $sink)
+
+// mssql: request.query(sql), request.execute(proc)
+*.execute(* as $sink)
+
+// oracledb: connection.execute(sql, ...)
+// (*.execute already covers this)
+
+// knex.js: knex.raw(sql, bindings?) — the raw escape hatch for knex
+*.raw(* as $sink)
+
+// sequelize: sequelize.query(sql, options)
+// (*.query already covers this)
+
+// typeorm: manager.query(sql, ...), repository.query(sql, ...)
+// (*.query already covers this)
+
+// ============================================================
+// NoSQL Database Sinks (MongoDB)
+// ============================================================
+// Mongoose model methods that accept a query filter as first arg
+*.find(* as $sink)
+*.findOne(* as $sink)
+*.findById(* as $sink)
+*.deleteOne(* as $sink)
+*.deleteMany(* as $sink)
+*.updateOne(* as $sink)
+*.updateMany(* as $sink)
+*.findOneAndUpdate(* as $sink)
+*.findOneAndDelete(* as $sink)
+*.findByIdAndUpdate(* as $sink)
+*.findByIdAndDelete(* as $sink)
+*.aggregate(* as $sink)
+*.countDocuments(* as $sink)
+*.estimatedDocumentCount(* as $sink)
+
+$sink as $output
+
+alert $output for {
+	level: "info"
+	title: "JavaScript SQL/NoSQL Query Sink"
+	title_zh: "JavaScript SQL/NoSQL 查询执行 Sink 函数"
+	message: "识别到数据库查询执行函数，请结合污点传播链路判断是否存在注入风险。"
+	name: "output"
+}
+
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///js_sql_sinks.js': <<<CODE
+const { Pool } = require('pg');
+const mysql = require('mysql2');
+const mongoose = require('mongoose');
+
+const pgPool = new Pool();
+const mysqlConn = mysql.createConnection({});
+const Todo = mongoose.model('Todo', {});
+
+async function runQueries(input) {
+    pgPool.query("SELECT 1");
+    mysqlConn.query("SELECT 1");
+    Todo.find({ name: input });
+    Todo.deleteOne({ _id: input });
+}
+CODE
+)

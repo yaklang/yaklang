@@ -1,0 +1,161 @@
+desc(
+	title: "JavaScript/Node.js User-Controlled Input Sources"
+	title_zh: "JavaScript/Node.js 用户可控输入源"
+	type: audit
+	lib: 'js-param'
+	desc: <<<DESC
+### 规则目的
+
+该规则是 `js-param` 库规则（`lib` 类型），作为 JavaScript/Node.js 应用程序中污点分析的**起点（Source）**。
+
+它识别以下几类用户可控输入：
+
+#### 1. Express / Koa 等 Web 框架的请求参数
+- `req.query.*` — URL 查询字符串参数（GET 参数）
+- `req.body.*` — POST 请求体参数
+- `req.params.*` — URL 路径参数（如 `/user/:id`）
+- `req.headers.*` — HTTP 请求头
+- `req.cookies.*` — Cookie 数据
+- `req.query` / `req.body` / `req.params`（整体对象）
+- `ctx.query.*` / `ctx.request.body.*`（Koa 框架）
+
+#### 2. 浏览器端用户输入
+- `document.location.*` — URL 相关属性（`href`, `search`, `hash`, `pathname`）
+- `location.search` / `location.hash` / `location.href`
+- `document.referrer` — HTTP Referer 头
+- `document.cookie` — Cookie 读取
+- `window.name` — 窗口名（可被跨页面控制）
+- `document.URL` — 当前页面 URL
+- DOM 元素值：`document.getElementById(*).value` 等
+
+#### 3. URL/环境参数
+- `process.argv.*` — 命令行参数
+- `process.env.*` — 环境变量（部分场景下可被外部控制）
+- `new URL(*).searchParams.*` — URL 查询参数解析
+
+#### 4. HTTP 服务原生请求
+- Node.js 原生 HTTP：`req.url`, `request.url`
+DESC
+	rule_id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+	title_zh: "JavaScript/Node.js 用户可控输入源"
+	solution: <<<SOLUTION
+此规则为 lib 库规则，不直接报告漏洞。请结合具体的漏洞检测规则使用。
+SOLUTION
+	reference: <<<REFERENCE
+[OWASP: Input Validation Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html)
+[CWE-20: Improper Input Validation](https://cwe.mitre.org/data/definitions/20.html)
+REFERENCE
+)
+
+// ============================================================
+// Server-side: Express / Koa / raw Node.js HTTP request sources
+//
+// Key insight for SyntaxFlow SSA:
+//   req.query.* captures specific named members like req.query.username
+//   req.query   captures the whole object (for cases like const q = req.query)
+//   Using both ensures coverage of all access patterns.
+// ============================================================
+
+// Express: req.query (GET params), req.body (POST params), req.params (URL path params)
+req.query as $source
+req.query.* as $source
+req.body as $source
+req.body.* as $source
+req.params as $source
+req.params.* as $source
+req.headers as $source
+req.headers.* as $source
+req.cookies as $source
+req.cookies.* as $source
+
+// Koa: ctx.query, ctx.request.body
+ctx.query as $source
+ctx.query.* as $source
+ctx.request.body as $source
+ctx.request.body.* as $source
+ctx.params as $source
+ctx.params.* as $source
+ctx.headers as $source
+ctx.headers.* as $source
+
+// Raw Node.js HTTP: req.url is user-controlled
+request.url as $source
+req.url as $source
+
+// ============================================================
+// Browser-side: DOM/Location sources
+// ============================================================
+
+// document.location and window.location
+document.location.href as $source
+document.location.search as $source
+document.location.hash as $source
+document.location.pathname as $source
+document.location as $source
+
+location.href as $source
+location.search as $source
+location.hash as $source
+location.pathname as $source
+
+// document.referrer
+document.referrer as $source
+
+// document.cookie
+document.cookie as $source
+
+// window.name
+window.name as $source
+
+// document.URL
+document.URL as $source
+
+// ============================================================
+// URL parameter parsing (both server and browser)
+// ============================================================
+
+*.searchParams.get(*) as $source
+*.searchParams.getAll(*) as $source
+
+// ============================================================
+// Node.js process / environment
+// ============================================================
+
+process.argv as $source
+
+$source as $output
+
+alert $output for {
+	level: "info"
+	title: "JavaScript User-Controlled Input Source"
+	title_zh: "JavaScript 用户可控输入源"
+	message: "识别到用户可控输入点，请结合污点传播链路判断是否存在安全风险。"
+	name: "output"
+}
+
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///js_param_express.js': <<<CODE
+const express = require('express');
+const app = express();
+
+app.post('/search', (req, res) => {
+    const keyword = req.query.q;
+    const userId = req.params.id;
+    const token = req.headers.authorization;
+    const data = req.body.content;
+    res.send('ok');
+});
+CODE
+)
+
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///js_param_browser.js': <<<CODE
+const query = location.search;
+const fragment = document.location.hash;
+const referer = document.referrer;
+CODE
+)

@@ -1,0 +1,321 @@
+desc(
+	title: "Case-Sensitive Middleware Path in Express.js"
+	title_zh: "Express.js 中间件使用区分大小写的正则表达式路径"
+	type: vuln
+	level: warning
+	risk: "authorization-bypass"
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+
+在 Express.js 等 Node.js Web 框架中，路由和中间件的路径匹配存在不一致的大小写处理行为：
+
+- **字符串路径**（如 `'/admin'`）是**大小写不敏感**的——Express 内部会对路径做规范化处理
+- **正则表达式路径**（如 `/\/admin\/.*/`）**默认区分大小写**，除非添加 `i`（ignore case）标志
+
+当开发者使用不带 `i` 标志的正则表达式作为安全中间件（权限验证、身份认证、CSRF 防护等）的路径匹配规则时，攻击者可以通过改变 URL 的大小写来绕过该中间件，同时仍然能够访问使用字符串路径定义的端点。
+
+2. **触发场景**
+
+```javascript
+const app = require('express')();
+
+// 危险：正则表达式没有 i 标志 → 区分大小写
+app.use(/\/admin\/.*/, (req, res, next) => {
+    if (!req.user.isAdmin) {
+        res.status(401).send('Unauthorized');
+    } else {
+        next();
+    }
+});
+
+// 该端点使用字符串路径（大小写不敏感）
+app.get('/admin/users/:id', (req, res) => {
+    res.send(app.database.users[req.params.id]);
+});
+```
+
+访问 `/ADMIN/users/45`：
+- `/admin/users/:id` 路由**命中**（字符串路径，大小写不敏感）  
+- `app.use(/\/admin\/.*/)` 中间件**未命中**（正则无 `i` 标志，大小写敏感）  
+- 攻击者**绕过了管理员权限检查**，直接访问了受保护端点
+
+3. **检测逻辑说明**
+
+本规则分两步检测：
+- **Step 1**：找到所有 `*.use(regex, handler)` 调用，其中 `regex` 是正则字面量且不含 `i` 标志（即 opcode 为 const，值形如 `/pattern/` 或 `/pattern/g` 等，末尾 `/` 后不含 `i`）
+- **Step 2**：检查同一程序中是否存在 `*.get/post/put/delete/all/patch(stringPath, handler)` 形式的路由端点，其中 `stringPath` 是普通字符串（非正则）
+
+两个条件同时满足时告警，接近于 CodeQL 规则中"中间件保护了一个字符串路径端点"的语义。
+
+4. **潜在影响**
+
+- **权限绕过**：攻击者绕过基于路径的访问控制中间件
+- **身份验证绕过**：通过大小写变换绕过需要认证的路径保护
+- **安全策略失效**：CSRF 保护、速率限制、日志记录、WAF 规则等中间件可能被绕过
+DESC
+	rule_id: "a7e3f21b-5c8d-4e9a-b6f2-1d4c7e0a3f95"
+	solution: <<<SOLUTION
+### 修复建议
+
+**1. 添加 `i` 标志使正则表达式大小写不敏感（推荐）**
+
+```javascript
+// 修复前（存在漏洞）
+app.use(/\/admin\/.*/, authMiddleware);
+
+// 修复后（安全）
+app.use(/\/admin\/.*/i, authMiddleware);
+```
+
+**2. 在应用入口处统一规范化路径大小写**
+
+```javascript
+// 将所有请求路径统一转为小写，消除大小写不一致的根源
+app.use((req, res, next) => {
+    req.url = req.url.toLowerCase();
+    next();
+});
+```
+
+**3. 改用字符串路径（天然大小写不敏感）**
+
+如果不需要正则的特殊匹配能力，优先使用字符串路径：
+```javascript
+app.use('/admin', authMiddleware);  // 字符串路径，大小写不敏感
+```
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-178: Improper Handling of Case Sensitivity](https://cwe.mitre.org/data/definitions/178.html)
+[MDN Regular Expression Flags](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_expressions#advanced_searching_with_flags)
+[Express.js Routing Guide](https://expressjs.com/en/guide/routing.html)
+[CodeQL: js/case-sensitive-middleware-path](https://codeql.github.com/codeql-query-help/javascript/js-case-sensitive-middleware-path/)
+REFERENCE
+)
+
+// =====================================================================
+// Detection Logic
+//
+// CodeQL's original rule detects the "guard" relationship:
+//   - middleware with case-sensitive regex path guards an endpoint with
+//     a case-insensitive string path → the string path can be reached
+//     by upper-casing the URL, bypassing the regex middleware.
+//
+// In SyntaxFlow, we approximate this by detecting that BOTH conditions
+// coexist in the same program:
+//
+// Condition A (vulnerable middleware):
+//   *.use(regex_without_i_flag, handler)
+//   where regex is a regex literal (const starting and ending with '/')
+//   that does NOT have the 'i' flag after the last '/'.
+//
+// Condition B (guarded string-path endpoint):
+//   *.get/post/put/delete/patch/all(string_path, handler)
+//   where string_path is a plain string (starts with '/', does NOT
+//   match the regex pattern /^\/.*\/$/ which would indicate a regex literal).
+//
+// When both A and B are found in the same program, we alert on A
+// (the vulnerable middleware regex), cross-referencing B (the endpoint).
+//
+// Note on regex const representation:
+//   In the TS/JS SSA frontend, regex literals /pattern/flags are compiled
+//   as ConstInst with string value "/pattern/flags".
+//   - /admin/.*/     → const value "/\/admin\/.*/"  (no 'i' flag)
+//   - /admin/.*/i    → const value "/\/admin\/.*/i" (has 'i' flag)
+//   - /admin/.*/gi   → const value "/\/admin\/.*/gi" (has 'i' flag)
+//   Plain string paths like '/admin' do NOT match the /^\/.*\/$/ pattern
+//   because they have no closing '/' after the content.
+// =====================================================================
+
+// ------------------------------------------------------------------
+// Step 1: Find vulnerable middleware — *.use(regex_without_i, handler)
+// ------------------------------------------------------------------
+// Capture the first argument of *.use() calls
+*.use(* as $middlewareArg,)
+
+// Filter: only regex literal constants WITHOUT the 'i' flag
+// Pattern /^\/.*\/[^i]*$/ matches:
+//   - starts with '/'
+//   - has any content
+//   - ends with '/' optionally followed by non-'i' chars (flags like g, m, etc.)
+// This correctly excludes:
+//   - plain strings like '/admin' (no trailing '/' after path chars within regex)
+//   - safe regex like /pattern/i or /pattern/gi
+$middlewareArg?{opcode: const}?{have: /^\/.*\/[^i]*$/} as $caseSensitiveRegex
+
+// ------------------------------------------------------------------
+// Step 2: Find string-path endpoints — *.get/post/put/delete/patch/all(path, handler)
+// ------------------------------------------------------------------
+// Capture first argument of common HTTP method route registrations
+*.get(* as $endpointArg,)
+*.post(* as $endpointArg,)
+*.put(* as $endpointArg,)
+*.delete(* as $endpointArg,)
+*.patch(* as $endpointArg,)
+*.all(* as $endpointArg,)
+
+// Filter: only plain string paths (NOT regex literals)
+// A plain string path like '/admin/users/:id' starts with '/' but does NOT
+// match the regex literal pattern (which requires a closing '/' after content).
+// We use: opcode is const AND value starts with '/' AND is NOT a regex literal
+$endpointArg?{opcode: const}?{have: /^\//}?{!have: /^\/.*\/[gimsuy]*$/} as $stringEndpoint
+
+// ------------------------------------------------------------------
+// Step 3: Report — both A and B must coexist in the same program.
+// We alert on $caseSensitiveRegex (the vulnerable middleware arg),
+// noting that $stringEndpoint provides the bypass target.
+//
+// SyntaxFlow does not have a native "coexist in same program" operator,
+// so we rely on the fact that both variables are populated in the same
+// rule execution context (same program compilation unit).
+// The check below alerts ONLY if caseSensitiveRegex is non-empty AND
+// stringEndpoint is non-empty (implicit: both must have found matches).
+// ------------------------------------------------------------------
+check $caseSensitiveRegex
+check $stringEndpoint
+
+alert $caseSensitiveRegex for {
+	level: "warning"
+	type: "vuln"
+	title: "Case-Sensitive Middleware Path Guards a Case-Insensitive Endpoint"
+	title_zh: "区分大小写的中间件正则路径保护了大小写不敏感的端点，可被绕过"
+	message: "检测到 app.use() 中使用了不带 'i' 标志的正则表达式路径作为中间件，同时程序中存在使用字符串路径（大小写不敏感）的路由端点。攻击者可以通过修改 URL 的大小写（如将 /admin/users 改为 /ADMIN/USERS）来绕过该中间件的保护，从而直接访问受保护的端点。请在正则表达式末尾添加 'i' 标志使其大小写不敏感。"
+	solution: <<<SOLUTION
+将正则表达式修改为大小写不敏感模式，在末尾添加 `i` 标志：
+
+```javascript
+// 修复前（存在漏洞）
+app.use(/\/admin\/.*/, authMiddleware);
+
+// 修复后（安全）
+app.use(/\/admin\/.*/i, authMiddleware);
+```
+SOLUTION
+	risk: "权限绕过"
+	name: "case-sensitive-middleware"
+}
+
+// =====================================================================
+// Test cases embedded in the rule file
+// =====================================================================
+
+// Test 1: VULNERABLE — regex without 'i' flag + string-path endpoint (MUST alert)
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///unsafe_with_endpoint.js': <<<CODE
+const express = require('express');
+const app = express();
+
+// Case-sensitive regex middleware (no 'i' flag) — vulnerable
+app.use(/\/admin\/.*/, (req, res, next) => {
+    if (!req.user.isAdmin) {
+        res.status(401).send('Unauthorized');
+    } else {
+        next();
+    }
+});
+
+// String-path endpoint (case-insensitive by default) — bypass target
+app.get('/admin/users/:id', (req, res) => {
+    res.send('user data');
+});
+CODE
+)
+
+// Test 2: VULNERABLE — multiple HTTP methods with string paths (MUST alert)
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///unsafe_multi_method.js': <<<CODE
+const express = require('express');
+const app = express();
+const router = express.Router();
+
+// Vulnerable middleware on router
+router.use(/\/api\/v1\/.*/, (req, res, next) => {
+    if (!req.headers.authorization) {
+        return res.status(401).send('No auth token');
+    }
+    next();
+});
+
+router.post('/api/v1/data', (req, res) => {
+    res.json({ data: 'secret' });
+});
+
+app.use(router);
+CODE
+)
+
+// Test 3: SAFE — regex WITH 'i' flag + string endpoint (should NOT alert on middleware)
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///safe_with_i_flag.js': <<<CODE
+const express = require('express');
+const app = express();
+
+// Safe: regex has 'i' flag — case-insensitive, matches both /admin and /ADMIN
+app.use(/\/admin\/.*/i, (req, res, next) => {
+    if (!req.user.isAdmin) {
+        res.status(401).send('Unauthorized');
+    } else {
+        next();
+    }
+});
+
+app.get('/admin/users/:id', (req, res) => {
+    res.send('user data');
+});
+CODE
+)
+
+// Test 4: SAFE — string-only middleware (no regex at all)
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///safe_string_middleware.js': <<<CODE
+const express = require('express');
+const app = express();
+
+// Safe: string path is case-insensitive in Express
+app.use('/admin', (req, res, next) => {
+    if (!req.user.isAdmin) {
+        res.status(401).send('Unauthorized');
+    } else {
+        next();
+    }
+});
+
+app.get('/admin/users/:id', (req, res) => {
+    res.send('user data');
+});
+CODE
+)
+
+// Test 5: SAFE — regex without 'i' flag but NO string-path endpoint exists
+// (middleware exists but there's no string-path route that could be bypassed)
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///regex_middleware_no_string_endpoint.js': <<<CODE
+const express = require('express');
+const app = express();
+
+// Regex middleware without 'i' flag
+app.use(/\/admin\/.*/, (req, res, next) => {
+    if (!req.user.isAdmin) {
+        res.status(401).send('Unauthorized');
+    } else {
+        next();
+    }
+});
+
+// Only regex-path endpoints (no string-path endpoints to bypass)
+app.get(/\/admin\/users\/\d+/i, (req, res) => {
+    res.send('user data');
+});
+CODE
+)
