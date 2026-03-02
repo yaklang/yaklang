@@ -23,7 +23,9 @@ alert $source for { message: "检测到风险", level: high };
 
 ### 完成时: directly_answer 展示结果（验证通过后立即执行，禁止再做其他操作）
 
+**有正例（用户提供的漏洞样例=file://、UNSAFE）时**：必须先 require_tool check-syntaxflow-syntax 并传入 path、sample_code、filename、language 进行正例自检，matched=true 后才能 directly_answer。
+
 ```json
-{"@action": "directly_answer", "human_readable_thought": "规则已生成并通过 check-syntaxflow-syntax 与 verify-syntaxflow-rule-against-sample 验证，展示完整内容"}
+{"@action": "directly_answer", "human_readable_thought": "规则已生成并通过 check-syntaxflow-syntax（含样例自检）验证，展示完整内容"}
 ```
-（answer_payload 或 <|FINAL_ANSWER_...|> 中包含完整规则代码块。验证通过后必须立即 directly_answer，不得 load_capability、load_skill 或调用其他工具。）
+（directly_answer 时禁止输出规则代码。系统自动从规则文件读取并展示。你只需输出 1-3 句话的简要总结。验证通过后必须立即 directly_answer。）

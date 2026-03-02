@@ -426,7 +426,7 @@ func handleLoadFocusMode(
 		opts = append(opts, option)
 	}
 
-	_, err := invoker.ExecuteLoopTaskIF(identifier, subTask, opts...)
+	ok, err := invoker.ExecuteLoopTaskIF(identifier, subTask, opts...)
 	if err != nil {
 		log.Warnf("load_capability: focus mode '%s' execution failed: %v", identifier, err)
 		failMsg := fmt.Sprintf(
@@ -443,8 +443,21 @@ func handleLoadFocusMode(
 		return
 	}
 
-	// Focus mode runs synchronously. ExecuteLoopTask returns (task.IsAsyncMode(), nil);
-	// for sync focus like write_syntaxflow_rule, IsAsyncMode is false. Do NOT treat ok=false as UNSUCCESSFUL.
+	if !ok {
+		log.Warnf("load_capability: focus mode '%s' completed UNSUCCESSFULLY", identifier)
+		unsuccessfulMsg := fmt.Sprintf(
+			"Focus mode '%s' completed UNSUCCESSFULLY. "+
+				"The focused sub-loop finished but did not produce usable results. "+
+				"Do NOT retry the same focus mode. Proceed with a different approach.",
+			identifier)
+		invoker.AddToTimeline("[LOAD_CAPABILITY_FOCUS_MODE_UNSUCCESSFUL]", unsuccessfulMsg)
+		op.Feedback(unsuccessfulMsg)
+		op.SetReflectionLevel(reactloops.ReflectionLevel_Deep)
+		op.SetReflectionData("focus_mode_name", identifier)
+		op.Continue()
+		return
+	}
+
 	successMsg := fmt.Sprintf(
 		"Focus mode '%s' completed SUCCESSFULLY. "+
 			"The focused sub-loop has finished its work. "+
