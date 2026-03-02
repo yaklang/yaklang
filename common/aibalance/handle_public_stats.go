@@ -280,9 +280,13 @@ func (c *ServerConfig) computePublicStats() *PublicStatsResponse {
 		log.Warnf("public stats: GetAllHealthSummary failed in %v: %v", time.Since(healthStart), err)
 	}
 
-	// Step 8: Latency history
+	// Step 8: Latency history (only for current active models, not stale health_records entries)
 	latencyStart := time.Now()
-	latencyMap, err := GetRecentLatencyByModel(20)
+	var currentModelNames []string
+	for name := range modelMap {
+		currentModelNames = append(currentModelNames, name)
+	}
+	latencyMap, err := GetRecentLatencyByModel(20, currentModelNames)
 	if err == nil && len(latencyMap) > 0 {
 		displayLatency := make(map[string][]LatencyPoint)
 		totalPoints := 0
