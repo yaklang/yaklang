@@ -94,18 +94,51 @@ type ToolInputSchema struct {
 	Required   []string                      `json:"required,omitempty"`
 }
 
-func (t *ToolInputSchema) MarshalJSON() ([]byte, error) {
+func normalizeSchemaValue(v any) any {
+	switch value := v.(type) {
+	case *omap.OrderedMap[string, any]:
+		result := make(map[string]any)
+		if value == nil {
+			return result
+		}
+		value.ForEach(func(k string, v any) bool {
+			result[k] = normalizeSchemaValue(v)
+			return true
+		})
+		return result
+	case map[string]any:
+		result := make(map[string]any, len(value))
+		for k, v := range value {
+			result[k] = normalizeSchemaValue(v)
+		}
+		return result
+	case []any:
+		result := make([]any, len(value))
+		for i, item := range value {
+			result[i] = normalizeSchemaValue(item)
+		}
+		return result
+	default:
+		return v
+	}
+}
+
+func (t ToolInputSchema) MarshalJSON() ([]byte, error) {
 	temp := struct {
 		Type       string         `json:"type"`
-		Properties map[string]any `json:"properties,omitempty"`
+		Properties map[string]any `json:"properties"`
 		Required   []string       `json:"required,omitempty"`
 	}{
-		Type:     t.Type,
-		Required: t.Required,
+		Type:       t.Type,
+		Properties: make(map[string]any),
+		Required:   t.Required,
 	}
 
 	if t.Properties != nil {
-		temp.Properties = t.Properties.GetMap()
+		t.Properties.ForEach(func(k string, v any) bool {
+			temp.Properties[k] = normalizeSchemaValue(v)
+			return true
+		})
 	}
 
 	return json.Marshal(temp)
@@ -473,21 +506,22 @@ func (s *ToolInputSchema) ToMap() *omap.OrderedMap[string, any] {
 	result := omap.NewEmptyOrderedMap[string, any]()
 	result.Set("type", s.Type)
 
-	if s.Properties != nil && s.Properties.Len() > 0 {
-		// Create an ordered copy of properties with required field processing
-		orderedProps := omap.NewEmptyOrderedMap[string, any]()
+	properties := make(map[string]any)
+	if s.Properties != nil {
 		s.Properties.ForEach(func(k string, v any) bool {
-			m := utils.InterfaceToGeneralMap(v)
-			if _, ok := m["required"]; ok {
-				delete(m, "required")
-				orderedProps.Set(k, m)
+			normalized := normalizeSchemaValue(v)
+			if m, ok := normalized.(map[string]any); ok {
+				if _, ok := m["required"]; ok {
+					delete(m, "required")
+				}
+				properties[k] = m
 			} else {
-				orderedProps.Set(k, v)
+				properties[k] = normalized
 			}
 			return true
 		})
-		result.Set("properties", orderedProps)
 	}
+	result.Set("properties", properties)
 
 	if len(s.Required) > 0 {
 		required := lo.Map(s.Required, func(item string, _ int) any { return item })
@@ -506,14 +540,16 @@ func (s *ToolInputSchema) FromMap(m map[string]any) error {
 	s.Type = typeStr
 
 	// properties
-	properties, ok := m["properties"].(map[string]any)
-	if !ok {
-		return fmt.Errorf("properties is not a map[string]any")
-	}
 	// Convert regular map to OrderedMap
 	s.Properties = omap.NewEmptyOrderedMap[string, any]()
-	for k, v := range properties {
-		s.Properties.Set(k, v)
+	if rawProperties, exists := m["properties"]; exists {
+		properties, ok := rawProperties.(map[string]any)
+		if !ok {
+			return fmt.Errorf("properties is not a map[string]any")
+		}
+		for k, v := range properties {
+			s.Properties.Set(k, v)
+		}
 	}
 
 	// required
