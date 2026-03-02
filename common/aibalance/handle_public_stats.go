@@ -8,10 +8,12 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 // PublicStatsResponse is the public (unauthenticated) stats response.
@@ -54,9 +56,22 @@ type PublicUptimeEntry struct {
 	TotalChecks int64   `json:"total_checks"`
 }
 
-// servePublicStats handles GET /public/stats
+var (
+	publicStatsCache    *PublicStatsResponse
+	publicStatsCacheMu  sync.RWMutex
+	publicStatsCoolDown *utils.CoolDown
+	publicStatsCDOnce   sync.Once
+)
+
+func getPublicStatsCoolDown() *utils.CoolDown {
+	publicStatsCDOnce.Do(func() {
+		publicStatsCoolDown = utils.NewCoolDown(30 * time.Second)
+	})
+	return publicStatsCoolDown
+}
+
+// servePublicStats handles GET /public/stats with 30s CoolDown caching
 func (c *ServerConfig) servePublicStats(conn net.Conn, request *http.Request) {
-	// Panic recovery: ensure we always send a response
 	defer func() {
 		if r := recover(); r != nil {
 			log.Errorf("panic in servePublicStats: %v", r)
@@ -64,10 +79,43 @@ func (c *ServerConfig) servePublicStats(conn net.Conn, request *http.Request) {
 		}
 	}()
 
-	log.Infof("serving public stats API")
+	cd := getPublicStatsCoolDown()
+	cd.DoOr(
+		func() {
+			start := time.Now()
+			log.Infof("public stats: cooldown elapsed, refreshing cache...")
+			data := c.computePublicStats()
+			publicStatsCacheMu.Lock()
+			publicStatsCache = data
+			publicStatsCacheMu.Unlock()
+			log.Infof("public stats: cache refreshed in %v", time.Since(start))
+		},
+		func() {},
+	)
+
+	publicStatsCacheMu.RLock()
+	cached := publicStatsCache
+	publicStatsCacheMu.RUnlock()
+
+	if cached == nil {
+		log.Infof("public stats: cache not yet populated, computing initial data...")
+		data := c.computePublicStats()
+		publicStatsCacheMu.Lock()
+		if publicStatsCache == nil {
+			publicStatsCache = data
+		}
+		cached = publicStatsCache
+		publicStatsCacheMu.Unlock()
+	}
+
+	c.writeJSONResponse(conn, 200, cached)
+}
+
+// computePublicStats does the actual data collection (called at most once per 30s)
+func (c *ServerConfig) computePublicStats() *PublicStatsResponse {
 	start := time.Now()
 
-	data := PublicStatsResponse{
+	data := &PublicStatsResponse{
 		CurrentTime: time.Now().Format("2006-01-02 15:04:05"),
 		Models:      make([]PublicModelInfo, 0),
 	}
@@ -76,12 +124,10 @@ func (c *ServerConfig) servePublicStats(conn net.Conn, request *http.Request) {
 	providers, err := GetAllAiProviders()
 	if err != nil {
 		log.Warnf("public stats: GetAllAiProviders failed in %v: %v", time.Since(start), err)
-		c.writeJSONResponse(conn, 200, data)
-		return
+		return data
 	}
 	log.Infof("public stats: got %d providers in %v", len(providers), time.Since(start))
 
-	// Aggregate per-model stats
 	type modelAgg struct {
 		providerCount   int
 		totalRequests   int64
@@ -132,13 +178,14 @@ func (c *ServerConfig) servePublicStats(conn net.Conn, request *http.Request) {
 		data.SuccessRate = float64(totalSuccess) / float64(data.TotalRequests) * 100
 	}
 
-	// Step 2: Traffic from API keys (non-critical, skip on error)
+	// Step 2: Traffic from API keys
 	dbApiKeys, err := GetAllAiApiKeys()
 	var totalTraffic int64
 	if err == nil {
 		for _, apiKey := range dbApiKeys {
 			totalTraffic += apiKey.InputBytes + apiKey.OutputBytes
 		}
+		log.Infof("public stats: traffic from %d API keys, total %s in %v", len(dbApiKeys), formatBytes(totalTraffic), time.Since(start))
 	} else {
 		log.Warnf("public stats: GetAllAiApiKeys failed: %v", err)
 	}
@@ -151,7 +198,7 @@ func (c *ServerConfig) servePublicStats(conn net.Conn, request *http.Request) {
 	embeddingReqs := atomic.LoadInt64(&c.concurrentEmbeddingRequests)
 	data.ConcurrentRequests = chatReqs + embeddingReqs
 
-	// Step 4: Web search / Amap counts (non-critical)
+	// Step 4: Web search / Amap counts
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -167,7 +214,7 @@ func (c *ServerConfig) servePublicStats(conn net.Conn, request *http.Request) {
 	runtime.ReadMemStats(&memStats)
 	data.MemoryMB = memStats.Alloc / 1024 / 1024
 
-	// Step 6: Model metadata (non-critical)
+	// Step 6: Model metadata
 	allMetas, _ := GetAllModelMetas()
 
 	for name, agg := range modelMap {
@@ -200,7 +247,6 @@ func (c *ServerConfig) servePublicStats(conn net.Conn, request *http.Request) {
 		data.Models = append(data.Models, info)
 	}
 
-	// Stable sort: Memfit first, then non-free before free, then by provider count desc, then by name
 	sort.SliceStable(data.Models, func(i, j int) bool {
 		a, b := data.Models[i], data.Models[j]
 		if a.IsMemfit != b.IsMemfit {
@@ -215,67 +261,46 @@ func (c *ServerConfig) servePublicStats(conn net.Conn, request *http.Request) {
 		return a.DisplayName < b.DisplayName
 	})
 
-	log.Infof("public stats: core data ready in %v, fetching health/latency async", time.Since(start))
+	log.Infof("public stats: core data ready in %v, fetching health/latency...", time.Since(start))
 
-	// Step 7: Uptime & Latency (run with timeout, non-critical)
-	// Use a channel to enforce a 3-second deadline for these optional queries
-	type asyncResult struct {
-		uptime  []PublicUptimeEntry
-		latency map[string][]LatencyPoint
-	}
-	asyncCh := make(chan asyncResult, 1)
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				log.Warnf("public stats: async health query panic: %v", r)
-				asyncCh <- asyncResult{}
-			}
-		}()
-
-		var result asyncResult
-
-		// Uptime summary (last 24h)
-		summaries, err := GetAllHealthSummary(time.Now().Add(-24 * time.Hour))
-		if err == nil {
-			for _, s := range summaries {
-				displayName, _, _ := processModelName(s.WrapperName)
-				result.uptime = append(result.uptime, PublicUptimeEntry{
-					ModelName:   displayName,
-					UptimeRate:  s.UptimeRate,
-					TotalChecks: s.TotalChecks,
-				})
-			}
-		} else {
-			log.Warnf("public stats: GetAllHealthSummary failed: %v", err)
+	// Step 7: Uptime summary (synchronous, CoolDown protects from frequent calls)
+	healthStart := time.Now()
+	summaries, err := GetAllHealthSummary(time.Now().Add(-24 * time.Hour))
+	if err == nil {
+		for _, s := range summaries {
+			displayName, _, _ := processModelName(s.WrapperName)
+			data.UptimeSummary = append(data.UptimeSummary, PublicUptimeEntry{
+				ModelName:   displayName,
+				UptimeRate:  s.UptimeRate,
+				TotalChecks: s.TotalChecks,
+			})
 		}
-
-		// Latency history
-		latencyMap, err := GetRecentLatencyByModel(20)
-		if err == nil && len(latencyMap) > 0 {
-			displayLatency := make(map[string][]LatencyPoint)
-			for name, points := range latencyMap {
-				displayName, _, _ := processModelName(name)
-				displayLatency[displayName] = points
-			}
-			result.latency = displayLatency
-		} else if err != nil {
-			log.Warnf("public stats: GetRecentLatencyByModel failed: %v", err)
-		}
-
-		asyncCh <- result
-	}()
-
-	// Wait up to 3 seconds for health/latency data
-	select {
-	case result := <-asyncCh:
-		data.UptimeSummary = result.uptime
-		data.LatencyHistory = result.latency
-	case <-time.After(3 * time.Second):
-		log.Warnf("public stats: health/latency queries timed out after 3s, returning partial data")
+		log.Infof("public stats: GetAllHealthSummary returned %d entries in %v", len(summaries), time.Since(healthStart))
+	} else {
+		log.Warnf("public stats: GetAllHealthSummary failed in %v: %v", time.Since(healthStart), err)
 	}
 
-	log.Infof("public stats: response ready in %v", time.Since(start))
-	c.writeJSONResponse(conn, 200, data)
+	// Step 8: Latency history
+	latencyStart := time.Now()
+	latencyMap, err := GetRecentLatencyByModel(20)
+	if err == nil && len(latencyMap) > 0 {
+		displayLatency := make(map[string][]LatencyPoint)
+		totalPoints := 0
+		for name, points := range latencyMap {
+			displayName, _, _ := processModelName(name)
+			displayLatency[displayName] = points
+			totalPoints += len(points)
+		}
+		data.LatencyHistory = displayLatency
+		log.Infof("public stats: GetRecentLatencyByModel returned %d models, %d total points in %v",
+			len(latencyMap), totalPoints, time.Since(latencyStart))
+	} else if err != nil {
+		log.Warnf("public stats: GetRecentLatencyByModel failed in %v: %v", time.Since(latencyStart), err)
+	}
+
+	log.Infof("public stats: full computation completed in %v (providers=%d, models=%d)",
+		time.Since(start), len(providers), len(data.Models))
+	return data
 }
 
 // servePublicAPI dispatches /public/* routes
