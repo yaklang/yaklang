@@ -154,7 +154,14 @@ func (f *FingerPrintRule) preToOpCodes() []*OpCode {
 	case "regexp":
 		pushCode(&OpCode{Op: OpData, data: []any{f.WebPath}})
 		pushCode(&OpCode{Op: OpPush, data: []any{f.MatchParam.RegexpPattern}})
-		extGroup := []any{f.MatchParam.Keyword.VersionIndex, f.MatchParam.Keyword.ProductIndex, f.MatchParam.Keyword.VersionIndex, f.MatchParam.Keyword.UpdateIndex, f.MatchParam.Keyword.EditionIndex, f.MatchParam.Keyword.LanguageIndex}
+		extGroup := []any{
+			f.MatchParam.Keyword.VendorIndex,
+			f.MatchParam.Keyword.ProductIndex,
+			f.MatchParam.Keyword.VersionIndex,
+			f.MatchParam.Keyword.UpdateIndex,
+			f.MatchParam.Keyword.EditionIndex,
+			f.MatchParam.Keyword.LanguageIndex,
+		}
 		if !funk.Any(extGroup...) {
 			extGroup = nil
 		}
@@ -167,7 +174,14 @@ func (f *FingerPrintRule) preToOpCodes() []*OpCode {
 		pushCode(&OpCode{Op: OpExtractData, data: []any{f.WebPath, "header_item", f.MatchParam.HeaderKey}})
 		subParam := f.MatchParam.HeaderMatchRule.MatchParam
 		pushCode(&OpCode{Op: OpPush, data: []any{subParam.RegexpPattern}})
-		extGroup := []any{subParam.Keyword.VersionIndex, subParam.Keyword.ProductIndex, subParam.Keyword.VersionIndex, subParam.Keyword.UpdateIndex, subParam.Keyword.EditionIndex, subParam.Keyword.LanguageIndex}
+		extGroup := []any{
+			subParam.Keyword.VendorIndex,
+			subParam.Keyword.ProductIndex,
+			subParam.Keyword.VersionIndex,
+			subParam.Keyword.UpdateIndex,
+			subParam.Keyword.EditionIndex,
+			subParam.Keyword.LanguageIndex,
+		}
 		if !funk.Any(extGroup...) {
 			extGroup = nil
 		}

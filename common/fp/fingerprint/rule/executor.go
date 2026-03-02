@@ -77,7 +77,14 @@ func Execute(getter func(path string) (*MatchResource, error), rule *FingerPrint
 		switch code.Op {
 		case OpInfo:
 			if v := stack.Pop().(*matchedResult); v.ok {
-				info := code.data[0].(*schema.CPE)
+				baseInfo := code.data[0].(*schema.CPE)
+				if baseInfo == nil {
+					return nil, fmt.Errorf("empty cpe info")
+				}
+
+				// Clone per match to avoid cross-rule/cross-target mutation and data races.
+				infoCopy := *baseInfo
+				info := &infoCopy
 				if v.RebuildCPE != nil {
 					v.RebuildCPE(info)
 				}
