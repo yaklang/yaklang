@@ -24,6 +24,7 @@ func CreateAIProvider(db *gorm.DB, provider *schema.AIThirdPartyConfig) error {
 	if provider == nil {
 		return utils.Error("provider is nil")
 	}
+	provider.Hash = provider.CalcHash()
 	return db.Create(provider).Error
 }
 
@@ -34,7 +35,9 @@ func UpdateAIProvider(db *gorm.DB, id int64, provider *schema.AIThirdPartyConfig
 	if provider == nil {
 		return utils.Error("provider is nil")
 	}
+	provider.Hash = provider.CalcHash()
 	updates := map[string]interface{}{
+		"hash":            provider.Hash,
 		"type":            provider.Type,
 		"api_key":         provider.APIKey,
 		"user_identifier": provider.UserIdentifier,
@@ -55,12 +58,27 @@ func UpsertAIProvider(db *gorm.DB, provider *schema.AIThirdPartyConfig) (*schema
 	if provider == nil {
 		return nil, utils.Error("provider is nil")
 	}
+	provider.Hash = provider.CalcHash()
+
+	var existProvider schema.AIThirdPartyConfig
+	err := db.Model(&schema.AIThirdPartyConfig{}).Where("hash = ?", provider.Hash).First(&existProvider).Error
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+	if err == nil {
+		if err := UpdateAIProvider(db, int64(existProvider.ID), provider); err != nil {
+			return nil, err
+		}
+		return GetAIProvider(db, int64(existProvider.ID))
+	}
+
 	if provider.ID > 0 {
 		if err := UpdateAIProvider(db, int64(provider.ID), provider); err != nil {
 			return nil, err
 		}
 		return GetAIProvider(db, int64(provider.ID))
 	}
+
 	if err := CreateAIProvider(db, provider); err != nil {
 		return nil, err
 	}
