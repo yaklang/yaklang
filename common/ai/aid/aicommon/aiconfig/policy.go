@@ -1,33 +1,34 @@
 package aiconfig
 
 import (
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 )
 
 // SelectTierByPolicy determines which model tier to use based on the routing policy and context
-func SelectTierByPolicy(policy RoutingPolicy, isComplex bool) ModelTier {
+func SelectTierByPolicy(policy consts.RoutingPolicy, isComplex bool) consts.ModelTier {
 	switch policy {
-	case PolicyPerformance:
+	case consts.PolicyPerformance:
 		// Always use intelligent model for performance
-		return TierIntelligent
-	case PolicyCost:
+		return consts.TierIntelligent
+	case consts.PolicyCost:
 		// Always use lightweight model for cost efficiency
-		return TierLightweight
-	case PolicyBalance:
+		return consts.TierLightweight
+	case consts.PolicyBalance:
 		// Use lightweight by default, intelligent for complex tasks
 		if isComplex {
-			return TierIntelligent
+			return consts.TierIntelligent
 		}
-		return TierLightweight
-	case PolicyAuto:
+		return consts.TierLightweight
+	case consts.PolicyAuto:
 		// Auto mode: same as balance for now
 		if isComplex {
-			return TierIntelligent
+			return consts.TierIntelligent
 		}
-		return TierLightweight
+		return consts.TierLightweight
 	default:
 		log.Warnf("Unknown routing policy: %s, defaulting to lightweight", policy)
-		return TierLightweight
+		return consts.TierLightweight
 	}
 }
 
@@ -86,7 +87,7 @@ func toLower(s string) string {
 }
 
 // AutoSelectTier automatically selects the appropriate tier based on the prompt
-func AutoSelectTier(prompt string) ModelTier {
+func AutoSelectTier(prompt string) consts.ModelTier {
 	policy := GetCurrentPolicy()
 	isComplex := IsComplexTask(prompt)
 	return SelectTierByPolicy(policy, isComplex)

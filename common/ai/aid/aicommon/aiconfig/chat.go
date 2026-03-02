@@ -3,6 +3,7 @@ package aiconfig
 import (
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -29,7 +30,7 @@ func IntelligentChat(msg string, opts ...aispec.AIConfigOption) (string, error) 
 		return ai.Chat(msg, opts...)
 	}
 
-	return chatWithTier(msg, TierIntelligent, opts...)
+	return chatWithTier(msg, consts.TierIntelligent, opts...)
 }
 
 // LightweightChat performs a conversation using the lightweight model
@@ -41,7 +42,7 @@ func LightweightChat(msg string, opts ...aispec.AIConfigOption) (string, error) 
 		return ai.Chat(msg, opts...)
 	}
 
-	return chatWithTier(msg, TierLightweight, opts...)
+	return chatWithTier(msg, consts.TierLightweight, opts...)
 }
 
 // VisionChat performs a conversation using the vision model
@@ -53,11 +54,11 @@ func VisionChat(msg string, opts ...aispec.AIConfigOption) (string, error) {
 		return ai.Chat(msg, opts...)
 	}
 
-	return chatWithTier(msg, TierVision, opts...)
+	return chatWithTier(msg, consts.TierVision, opts...)
 }
 
 // chatWithPolicy performs a conversation based on the routing policy
-func chatWithPolicy(msg string, policy RoutingPolicy, opts ...aispec.AIConfigOption) (string, error) {
+func chatWithPolicy(msg string, policy consts.RoutingPolicy, opts ...aispec.AIConfigOption) (string, error) {
 	config, err := GetModelByPolicy(policy)
 	if err != nil {
 		log.Warnf("Failed to get model by policy %s: %v, falling back to legacy chat", policy, err)
@@ -68,14 +69,14 @@ func chatWithPolicy(msg string, policy RoutingPolicy, opts ...aispec.AIConfigOpt
 }
 
 // chatWithTier performs a conversation using a specific model tier
-func chatWithTier(msg string, tier ModelTier, opts ...aispec.AIConfigOption) (string, error) {
+func chatWithTier(msg string, tier consts.ModelTier, opts ...aispec.AIConfigOption) (string, error) {
 	mgr := GetGlobalManager()
 	config := mgr.GetFirstConfig(tier)
 	if config == nil {
 		// Try fallback if enabled
-		if !IsFallbackDisabled() && tier != TierLightweight {
+		if !IsFallbackDisabled() && tier != consts.TierLightweight {
 			log.Debugf("No config for tier %s, trying fallback to lightweight", tier)
-			config = mgr.GetFirstConfig(TierLightweight)
+			config = mgr.GetFirstConfig(consts.TierLightweight)
 		}
 
 		if config == nil {
