@@ -48,6 +48,21 @@ func (p *Program) GetProgramName() string {
 	return p.Program.Name
 }
 
+// TotalLines returns source total lines for the compiled program.
+// Exposed for Yak scripts to read task-level code line metrics.
+func (p *Program) TotalLines() int {
+	if p == nil {
+		return 0
+	}
+	if p.Program != nil && p.Program.LineCount > 0 {
+		return p.Program.LineCount
+	}
+	if p.irProgram != nil && p.irProgram.LineCount > 0 {
+		return p.irProgram.LineCount
+	}
+	return 0
+}
+
 func (p *Program) GetProgramKind() ssadb.ProgramKind {
 	return p.Program.ProgramKind
 }
