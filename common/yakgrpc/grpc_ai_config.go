@@ -49,6 +49,53 @@ func (s *Server) ListAIProviders(ctx context.Context, _ *ypb.Empty) (*ypb.ListAI
 	return resp, nil
 }
 
+func (s *Server) QueryAIProvider(ctx context.Context, req *ypb.QueryAIProvidersRequest) (*ypb.QueryAIProvidersResponse, error) {
+	if req == nil {
+		req = &ypb.QueryAIProvidersRequest{}
+	}
+
+	paging := req.GetPagination()
+	if paging == nil {
+		paging = &ypb.Paging{Page: 1, Limit: 10, OrderBy: "id", Order: "asc"}
+	}
+	if paging.GetPage() <= 0 {
+		paging.Page = 1
+	}
+	if paging.GetLimit() == 0 {
+		paging.Limit = 10
+	}
+	if paging.GetRawOrder() == "" && paging.GetOrderBy() == "" {
+		paging.OrderBy = "id"
+	}
+	if paging.GetRawOrder() == "" && paging.GetOrder() == "" {
+		paging.Order = "asc"
+	}
+
+	pag, providers, err := yakit.QueryAIProviders(s.GetProfileDatabase(), req.GetFilter(), paging)
+	if err != nil {
+		return nil, err
+	}
+
+	resp := &ypb.QueryAIProvidersResponse{
+		Pagination: &ypb.Paging{
+			Page:    int64(pag.Page),
+			Limit:   int64(pag.Limit),
+			OrderBy: paging.GetOrderBy(),
+			Order:   paging.GetOrder(),
+		},
+		Total: int64(pag.TotalRecord),
+	}
+
+	for _, provider := range providers {
+		if provider == nil {
+			continue
+		}
+		resp.Providers = append(resp.Providers, provider.ToAIProvider())
+	}
+
+	return resp, nil
+}
+
 func (s *Server) UpsertAIProvider(ctx context.Context, req *ypb.UpsertAIProviderRequest) (*ypb.UpsertAIProviderResponse, error) {
 	if req == nil || req.Provider == nil || req.Provider.Config == nil {
 		return nil, utils.Error("provider config is required")
