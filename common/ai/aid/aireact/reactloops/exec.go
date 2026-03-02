@@ -377,7 +377,9 @@ func (r *ReActLoop) LoadingStatus(i string) {
 
 func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) error {
 	r.loadingStatus("初始化 / initializing...")
-	defer r.loadingStatus("end")
+	if !r.noEndLoadingStatus {
+		defer r.loadingStatus("end")
+	}
 
 	if utils.IsNil(task) {
 		return errors.New("re-act loop task is nil")

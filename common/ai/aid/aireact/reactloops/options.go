@@ -441,6 +441,16 @@ func WithSkillsContextManager(mgr *aiskillloader.SkillsContextManager) ReActLoop
 	}
 }
 
+func WithNoEndLoadingStatus(b ...bool) ReActLoopOption {
+	return func(r *ReActLoop) {
+		if len(b) > 0 {
+			r.noEndLoadingStatus = b[0]
+		} else {
+			r.noEndLoadingStatus = true
+		}
+	}
+}
+
 // WithExtraCapabilities sets a custom ExtraCapabilitiesManager.
 // If not set, NewReActLoop creates a default one with MaxExtraTools=50.
 func WithExtraCapabilities(ecm *ExtraCapabilitiesManager) ReActLoopOption {
