@@ -672,7 +672,9 @@ LOOP:
 		}
 		r.GetInvoker().AddToTimeline("iteration", msg)
 
-		if handler.AsyncMode {
+		needOpenTaskPlanAndExecution := handler.AsyncMode || operator.IsOpenTaskPlanAndExecutionRequested()
+
+		if needOpenTaskPlanAndExecution {
 			if task.IsAsyncMode() {
 				log.Warnf("ReactLoop[%v] rejecting static async action '%v' because the current task is already in async mode", r.loopName, actionName)
 				rejectMsg := fmt.Sprintf(
@@ -822,7 +824,8 @@ LOOP:
 			return nil
 		}
 
-		effectiveAsyncMode := handler.AsyncMode || operator.IsAsyncModeRequested()
+		effectiveAsyncMode := needOpenTaskPlanAndExecution || operator.IsAsyncModeRequested()
+
 		if effectiveAsyncMode {
 			if !handler.AsyncMode {
 				// dynamic async mode requested by handler at runtime

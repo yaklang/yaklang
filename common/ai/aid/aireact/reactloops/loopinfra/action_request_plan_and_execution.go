@@ -9,7 +9,7 @@ import (
 )
 
 var loopAction_RequestPlanAndExecution = &reactloops.LoopAction{
-	AsyncMode:   true,
+	AsyncMode:   false,
 	ActionType:  schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN_EXECUTION,
 	Description: `Request a detailed plan and execute it step-by-step to achieve the user's goal.`,
 	Options: []aitool.ToolOption{
@@ -47,8 +47,18 @@ var loopAction_RequestPlanAndExecution = &reactloops.LoopAction{
 
 		rewriteQuery := loop.Get("plan_request_payload")
 		invoker := loop.GetInvoker()
+		var planErr error
 		invoker.AsyncPlanAndExecute(task.GetContext(), rewriteQuery, func(err error) {
+			planErr = err
 			loop.FinishAsyncTask(task, err)
 		})
+		if planErr != nil {
+			operator.Feedback(planErr.Error())
+			operator.SetReflectionLevel(reactloops.ReflectionLevel_Critical)
+			operator.SetReflectionData("plan_error", planErr.Error())
+			operator.Continue()
+			return
+		}
+		operator.RequestOpenTaskPlanAndExecution()
 	},
 }
