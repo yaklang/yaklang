@@ -635,6 +635,13 @@ type HealthSummary struct {
 
 // GetAllHealthSummary returns uptime summaries for all models since a given time
 func GetAllHealthSummary(since time.Time) ([]HealthSummary, error) {
+	start := time.Now()
+
+	var totalRecords int64
+	GetDB().Model(&schema.AiProviderHealthRecord{}).Where("check_time >= ?", since).Count(&totalRecords)
+	log.Infof("GetAllHealthSummary: querying records since %v, total records in range: %d, count query took %v",
+		since.Format("2006-01-02 15:04:05"), totalRecords, time.Since(start))
+
 	var results []HealthSummary
 	rows, err := GetDB().Model(&schema.AiProviderHealthRecord{}).
 		Select("wrapper_name, COUNT(*) as total_checks, SUM(CASE WHEN is_healthy THEN 1 ELSE 0 END) as healthy_count").
@@ -655,6 +662,9 @@ func GetAllHealthSummary(since time.Time) ([]HealthSummary, error) {
 		}
 		results = append(results, s)
 	}
+
+	log.Infof("GetAllHealthSummary: completed in %v, returned %d model summaries from %d records",
+		time.Since(start), len(results), totalRecords)
 	return results, nil
 }
 
@@ -665,27 +675,48 @@ type LatencyPoint struct {
 	IsHealthy bool   `json:"is_healthy"`
 }
 
-// GetRecentLatencyByModel returns the most recent N latency points per model for charting
+// GetRecentLatencyByModel returns the most recent N latency points per model for charting.
+// Total records are capped at ~200 to prevent slow queries when there are many models.
 func GetRecentLatencyByModel(limit int) (map[string][]LatencyPoint, error) {
 	if limit <= 0 {
 		limit = 20
 	}
+	if limit > 50 {
+		limit = 50
+	}
 
-	// Get distinct wrapper names
+	start := time.Now()
+
 	var names []string
 	if err := GetDB().Model(&schema.AiProviderHealthRecord{}).
 		Select("DISTINCT wrapper_name").Pluck("wrapper_name", &names).Error; err != nil {
 		return nil, err
 	}
 
+	log.Infof("GetRecentLatencyByModel: found %d distinct models, limit=%d per model, distinct query took %v",
+		len(names), limit, time.Since(start))
+
+	maxModels := 200 / limit
+	if maxModels < 5 {
+		maxModels = 5
+	}
+	if len(names) > maxModels {
+		log.Warnf("GetRecentLatencyByModel: too many models (%d), truncating to %d to stay within ~200 total records",
+			len(names), maxModels)
+		names = names[:maxModels]
+	}
+
 	result := make(map[string][]LatencyPoint)
+	totalPoints := 0
 	for _, name := range names {
+		queryStart := time.Now()
 		var records []schema.AiProviderHealthRecord
 		if err := GetDB().Where("wrapper_name = ?", name).
 			Order("check_time DESC").Limit(limit).Find(&records).Error; err != nil {
+			log.Warnf("GetRecentLatencyByModel: query for model %s failed in %v: %v",
+				name, time.Since(queryStart), err)
 			continue
 		}
-		// Reverse to chronological order
 		points := make([]LatencyPoint, len(records))
 		for i, r := range records {
 			points[len(records)-1-i] = LatencyPoint{
@@ -695,7 +726,11 @@ func GetRecentLatencyByModel(limit int) (map[string][]LatencyPoint, error) {
 			}
 		}
 		result[name] = points
+		totalPoints += len(points)
 	}
+
+	log.Infof("GetRecentLatencyByModel: completed in %v, queried %d models, %d total points",
+		time.Since(start), len(result), totalPoints)
 	return result, nil
 }
 
