@@ -108,6 +108,24 @@ func TestAIGlobalConfig_GRPC_Local(t *testing.T) {
 	require.NotNil(t, upsert.GetProvider())
 	assert.NotZero(t, upsert.Provider.Id)
 
+	queryResp, err := client.QueryAIProvider(ctx, &ypb.QueryAIProvidersRequest{
+		Filter: &ypb.AIProviderFilter{
+			Ids:    []int64{upsert.Provider.Id},
+			AIType: []string{"custom"},
+		},
+		Pagination: &ypb.Paging{
+			Page:    1,
+			Limit:   10,
+			OrderBy: "id",
+			Order:   "asc",
+		},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, queryResp)
+	assert.Equal(t, int64(1), queryResp.Total)
+	require.Len(t, queryResp.Providers, 1)
+	assert.Equal(t, upsert.Provider.Id, queryResp.Providers[0].Id)
+
 	_, err = client.DeleteAIProvider(ctx, &ypb.DeleteAIProviderRequest{Id: upsert.Provider.Id})
 	require.NoError(t, err)
 }

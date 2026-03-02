@@ -2,10 +2,13 @@ package yakit
 
 import (
 	"errors"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 const (
@@ -84,6 +87,48 @@ func ListAIProviders(db *gorm.DB) ([]*schema.AIThirdPartyConfig, error) {
 		return nil, err
 	}
 	return providers, nil
+}
+
+func FilterAIProvider(db *gorm.DB, filter *ypb.AIProviderFilter) *gorm.DB {
+	db = db.Model(&schema.AIThirdPartyConfig{})
+	if filter == nil {
+		return db
+	}
+
+	db = bizhelper.ExactQueryInt64ArrayOr(db, "id", filter.GetIds())
+	db = bizhelper.ExactQueryStringArrayOr(db, "type", filter.GetAIType())
+	return db
+}
+
+func QueryAIProviders(db *gorm.DB, filter *ypb.AIProviderFilter, paging *ypb.Paging) (*bizhelper.Paginator, []*schema.AIThirdPartyConfig, error) {
+	if db == nil {
+		return nil, nil, utils.Error("no set database")
+	}
+
+	db = FilterAIProvider(db, filter)
+
+	if paging == nil {
+		paging = &ypb.Paging{Page: 1, Limit: 10, OrderBy: "id", Order: "asc"}
+	}
+	if paging.GetPage() <= 0 {
+		paging.Page = 1
+	}
+	if paging.GetLimit() == 0 {
+		paging.Limit = 10
+	}
+	if paging.GetRawOrder() == "" && paging.GetOrderBy() == "" {
+		paging.OrderBy = "id"
+	}
+	if paging.GetRawOrder() == "" && paging.GetOrder() == "" {
+		paging.Order = "asc"
+	}
+
+	var providers []*schema.AIThirdPartyConfig
+	pag, db := bizhelper.YakitPagingQuery(db, paging, &providers)
+	if db.Error != nil {
+		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
+	}
+	return pag, providers, nil
 }
 
 func DeleteAIProvider(db *gorm.DB, id int64) error {

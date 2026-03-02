@@ -426,6 +426,7 @@ const (
 	Yak_GetAIGlobalConfig_FullMethodName                          = "/ypb.Yak/GetAIGlobalConfig"
 	Yak_SetAIGlobalConfig_FullMethodName                          = "/ypb.Yak/SetAIGlobalConfig"
 	Yak_ListAIProviders_FullMethodName                            = "/ypb.Yak/ListAIProviders"
+	Yak_QueryAIProvider_FullMethodName                            = "/ypb.Yak/QueryAIProvider"
 	Yak_UpsertAIProvider_FullMethodName                           = "/ypb.Yak/UpsertAIProvider"
 	Yak_DeleteAIProvider_FullMethodName                           = "/ypb.Yak/DeleteAIProvider"
 	Yak_GetFingerprint_FullMethodName                             = "/ypb.Yak/GetFingerprint"
@@ -1146,6 +1147,7 @@ type YakClient interface {
 	GetAIGlobalConfig(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*AIGlobalConfig, error)
 	SetAIGlobalConfig(ctx context.Context, in *AIGlobalConfig, opts ...grpc.CallOption) (*Empty, error)
 	ListAIProviders(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ListAIProvidersResponse, error)
+	QueryAIProvider(ctx context.Context, in *QueryAIProvidersRequest, opts ...grpc.CallOption) (*QueryAIProvidersResponse, error)
 	UpsertAIProvider(ctx context.Context, in *UpsertAIProviderRequest, opts ...grpc.CallOption) (*UpsertAIProviderResponse, error)
 	DeleteAIProvider(ctx context.Context, in *DeleteAIProviderRequest, opts ...grpc.CallOption) (*Empty, error)
 	// 指纹库
@@ -6071,6 +6073,16 @@ func (c *yakClient) ListAIProviders(ctx context.Context, in *Empty, opts ...grpc
 	return out, nil
 }
 
+func (c *yakClient) QueryAIProvider(ctx context.Context, in *QueryAIProvidersRequest, opts ...grpc.CallOption) (*QueryAIProvidersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QueryAIProvidersResponse)
+	err := c.cc.Invoke(ctx, Yak_QueryAIProvider_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) UpsertAIProvider(ctx context.Context, in *UpsertAIProviderRequest, opts ...grpc.CallOption) (*UpsertAIProviderResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(UpsertAIProviderResponse)
@@ -8766,6 +8778,7 @@ type YakServer interface {
 	GetAIGlobalConfig(context.Context, *Empty) (*AIGlobalConfig, error)
 	SetAIGlobalConfig(context.Context, *AIGlobalConfig) (*Empty, error)
 	ListAIProviders(context.Context, *Empty) (*ListAIProvidersResponse, error)
+	QueryAIProvider(context.Context, *QueryAIProvidersRequest) (*QueryAIProvidersResponse, error)
 	UpsertAIProvider(context.Context, *UpsertAIProviderRequest) (*UpsertAIProviderResponse, error)
 	DeleteAIProvider(context.Context, *DeleteAIProviderRequest) (*Empty, error)
 	// 指纹库
@@ -10220,6 +10233,9 @@ func (UnimplementedYakServer) SetAIGlobalConfig(context.Context, *AIGlobalConfig
 }
 func (UnimplementedYakServer) ListAIProviders(context.Context, *Empty) (*ListAIProvidersResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListAIProviders not implemented")
+}
+func (UnimplementedYakServer) QueryAIProvider(context.Context, *QueryAIProvidersRequest) (*QueryAIProvidersResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryAIProvider not implemented")
 }
 func (UnimplementedYakServer) UpsertAIProvider(context.Context, *UpsertAIProviderRequest) (*UpsertAIProviderResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpsertAIProvider not implemented")
@@ -17545,6 +17561,24 @@ func _Yak_ListAIProviders_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_QueryAIProvider_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryAIProvidersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QueryAIProvider(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_QueryAIProvider_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QueryAIProvider(ctx, req.(*QueryAIProvidersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_UpsertAIProvider_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(UpsertAIProviderRequest)
 	if err := dec(in); err != nil {
@@ -21990,6 +22024,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListAIProviders",
 			Handler:    _Yak_ListAIProviders_Handler,
+		},
+		{
+			MethodName: "QueryAIProvider",
+			Handler:    _Yak_QueryAIProvider_Handler,
 		},
 		{
 			MethodName: "UpsertAIProvider",
