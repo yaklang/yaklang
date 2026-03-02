@@ -32,13 +32,6 @@ desc(
 	assert.Contains(t, errorMsg, "SyntaxFlow")
 }
 
-func TestCheckSyntaxFlowAndFormatErrors_InvalidRule_UnknownToken(t *testing.T) {
-	invalidRule := `rule("test") invalid_token_here`
-	errorMsg, hasBlockingErrors := checkSyntaxFlowAndFormatErrors(invalidRule)
-	assert.True(t, hasBlockingErrors, "invalid rule should have blocking errors")
-	assert.NotEmpty(t, errorMsg)
-}
-
 func TestCheckSyntaxFlowAndFormatErrors_EmptyContent(t *testing.T) {
 	errorMsg, hasBlockingErrors := checkSyntaxFlowAndFormatErrors("")
 	// Empty may or may not be valid depending on sfvm

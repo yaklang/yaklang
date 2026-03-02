@@ -70,6 +70,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 ✅ Good: "SyntaxFlow中如何编写dataflow数据流追踪规则？"
 ✅ Good: "如何用SyntaxFlow检测XSS跨站脚本？"
 ✅ Good: "SyntaxFlow规则如何定义source和sink？"
+✅ Good: "SyntaxFlow运算符#->和alert的用法是什么？"
 ❌ Bad: "如何检测？" - 缺少主语
 ❌ Bad: "它怎么写？" - 使用代词
 ❌ Bad: "SQL注入" - 不完整句式
@@ -82,7 +83,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 		toolOptions := []aitool.ToolOption{
 			aitool.WithBoolParam("create_new_file", aitool.WithParam_Description("Is this task to create a new rule file or modify an existing file? If user mentions specific file path, set to false."), aitool.WithParam_Required(true)),
 			aitool.WithStringParam("existed_filepath", aitool.WithParam_Description("Only when create_new_file is false. The .sf file path to modify.")),
-			aitool.WithBoolParam("has_code_sample", aitool.WithParam_Description("True if user provided vulnerability code sample (e.g. markdown code block). When true, must extract sample, save to file, embed in rule, and call verify-syntaxflow-rule-against-sample.")),
+			aitool.WithBoolParam("has_code_sample", aitool.WithParam_Description("True if user provided vulnerability code sample (e.g. markdown code block). When true, must extract sample, save to file, embed in rule, and call check-syntaxflow-syntax with sample_code/filename/language for sample verification.")),
 			aitool.WithStringParam("extracted_sample_code", aitool.WithParam_Description("When has_code_sample=true. The raw vulnerability code extracted from user's markdown code block, without the ``` wrapper.")),
 			aitool.WithStringParam("sample_language", aitool.WithParam_Description("When has_code_sample=true. Language: golang, java, php, c, javascript, yak, python.")),
 			aitool.WithStringParam("sample_filename", aitool.WithParam_Description("When has_code_sample=true. Virtual filename for the sample, e.g. vuln.go, handler.go, Main.java. Should have correct extension for the language.")),
@@ -141,6 +142,43 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 		searchPatterns := step1Result.GetStringSlice("search_patterns")
 		semanticQuestions := step1Result.GetStringSlice("semantic_questions")
 
+		// 兜底：LLM 可能漏识别代码块，若用户输入明显含 Go 代码则强制 has_code_sample
+		userInput := task.GetUserInput()
+		if !hasCodeSample && extractedSampleCode == "" && strings.Contains(userInput, "package main") && (strings.Contains(userInput, "func ") || strings.Contains(userInput, "import ")) {
+			// 尝试提取代码：优先找 ```go ... ``` 或 ``` ... ```
+			if idx := strings.Index(userInput, "```go"); idx >= 0 {
+				start := idx + 5
+				if end := strings.Index(userInput[start:], "```"); end >= 0 {
+					extractedSampleCode = strings.TrimSpace(userInput[start : start+end])
+				}
+			}
+			if extractedSampleCode == "" && strings.Contains(userInput, "```") {
+				start := strings.Index(userInput, "```") + 3
+				if end := strings.Index(userInput[start:], "```"); end >= 0 {
+					extractedSampleCode = strings.TrimSpace(userInput[start : start+end])
+				}
+			}
+			if extractedSampleCode == "" {
+				// 无代码块标记时，从 package 开始取到合理结束
+				if pkgIdx := strings.Index(userInput, "package main"); pkgIdx >= 0 {
+					extractedSampleCode = strings.TrimSpace(userInput[pkgIdx:])
+					if idx := strings.Index(extractedSampleCode, "\n\n分析"); idx > 0 {
+						extractedSampleCode = strings.TrimSpace(extractedSampleCode[:idx])
+					}
+				}
+			}
+			if extractedSampleCode != "" {
+				hasCodeSample = true
+				if sampleLanguage == "" {
+					sampleLanguage = "golang"
+				}
+				if sampleFilename == "" || !strings.Contains(sampleFilename, ".") {
+					sampleFilename = "vuln.go"
+				}
+				log.Infof("fallback: detected Go code in user input, set has_code_sample=true")
+			}
+		}
+
 		// 当用户提供漏洞样例时：保存到文件，供规则嵌入和 verify 工具使用
 		if hasCodeSample && extractedSampleCode != "" {
 			lang, _ := ssaconfig.ValidateLanguage(sampleLanguage)
@@ -176,10 +214,10 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 			if embedLang == "" {
 				embedLang = "golang"
 			}
-			sampleHint = "\n【重要】用户提供了漏洞代码样例，已保存到 sf_sample_filepath。生成规则时务必：\n" +
-				"1) 测试样例必须放在**规则末尾的第二个 desc() 块**中（第一个 desc 仅含 title/type/level 等元数据，不含 file://）。参考 golang-template-ssti.sf、golang-reflected-xss-gin-context.sf 的结构：\n" +
-				"   desc(lang: " + embedLang + ", alert_high: 1, 'file://" + embedFilename + "': <<<UNSAFE\n<样例代码完整内容>\nUNSAFE)\n" +
-				"2) 生成后必须调用 verify-syntaxflow-rule-against-sample 工具（path=sf_filename, sample_code=sf_sample_code, filename=sf_sample_filename, language=sf_sample_language）验证。若 matched=false，需 modify_rule 修复后再次验证直至 matched=true。"
+			sampleHint = "\n【重要】用户提供的漏洞样例为正例（file://、UNSAFE），已保存到 sf_sample_filepath。生成规则时务必：\n" +
+				"1) 正例必须放在**规则末尾的第二个 desc() 块**中，格式为 'file://" + embedFilename + "': <<<UNSAFE ... UNSAFE。参考 golang-template-ssti.sf、golang-reflected-xss-gin-context.sf：\n" +
+				"   desc(lang: " + embedLang + ", alert_high: 1, 'file://" + embedFilename + "': <<<UNSAFE\n<用户样例完整内容>\nUNSAFE)\n" +
+				"2) 生成后必须调用 check-syntaxflow-syntax 并传入 path、sample_code=sf_sample_code、filename=sf_sample_filename、language=sf_sample_language 进行正例自检。若 matched=false，根据 result_vars_diagnostic 修改规则，修改后先通过语法验证再重新调用直至 matched=true。"
 		}
 		var userRequirements = utils.MustRenderTemplate(`<|USER_REQUIREMENTS_{{.nonce}}|>
 {{.data}}
@@ -198,7 +236,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearc
 
 		if hasCodeSample {
 			loop.Set("sf_has_code_sample", true)
-			emitter.EmitDefaultStreamEvent("thought", bytes.NewBufferString("用户提供了漏洞代码样例，生成规则后需调用 verify-syntaxflow-rule-against-sample 验证匹配。"), task.GetIndex())
+			emitter.EmitDefaultStreamEvent("thought", bytes.NewBufferString("用户提供的漏洞样例为正例（file://、UNSAFE），生成规则后需调用 check-syntaxflow-syntax 并传入 path、sample_code、filename、language 进行正例自检。"), task.GetIndex())
 		}
 
 		// Step 2: 执行规则样例搜索（Grep + RAG 语义搜索）

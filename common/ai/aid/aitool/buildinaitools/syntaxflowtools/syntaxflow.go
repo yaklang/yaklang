@@ -18,9 +18,6 @@ import (
 
 const SyntaxFlowToolName_SyntaxCheck = "check-syntaxflow-syntax"
 
-// VerifySFRuleAgainstSample 工具名：静态检测生成的规则是否能正确匹配用户提供的漏洞样例
-const SyntaxFlowToolName_VerifyAgainstSample = "verify-syntaxflow-rule-against-sample"
-
 // checkSyntaxFlowRule performs SyntaxFlow rule syntax validation via sfvm.Compile
 // Returns: errorMessages string, hasErrors bool
 func checkSyntaxFlowRule(content string) (string, bool) {
@@ -65,6 +62,18 @@ func checkSyntaxFlowRule(content string) (string, bool) {
 		return colI < colJ
 	})
 
+	// 识别 heredoc 结束符错误，输出明确错误类型（避免空洞的 mismatched input ':' expecting <EOF>）
+	errTextPreview := ""
+	if len(errs) > 0 && errs[0] != nil {
+		errTextPreview = errs[0].Error()
+	}
+	if strings.Contains(content, "<<<") && strings.Contains(errTextPreview, "mismatched input ':'") && strings.Contains(errTextPreview, "expecting <EOF>") {
+		buf.WriteString("【错误类型】heredoc 结束符格式错误\n")
+		buf.WriteString("【原因】heredoc（如 <<<TEXT ... TEXT）的结束标识符有前导空格，未被识别，导致解析异常。\n")
+		buf.WriteString("【修复】结束标识符必须单独占一行且行首无空格。错误：`    TEXT`。正确：换行后紧跟 `TEXT`。\n")
+		buf.WriteString("------------------------\n")
+	}
+
 	maxShow := 3
 	if len(errs) < maxShow {
 		maxShow = len(errs)
@@ -101,6 +110,18 @@ func checkSyntaxFlowRule(content string) (string, bool) {
 		buf.WriteString(fmt.Sprintf("还有 %d 个错误，建议先修复以上关键问题\n", len(errs)-maxShow))
 	}
 
+	// 当错误疑似特定格式问题时，附加可操作建议
+	errText := buf.String()
+	if strings.Contains(content, "desc(") && (strings.Contains(errText, "missing ')'") || strings.Contains(errText, "mismatched input ','")) {
+		buf.WriteString("------------------------\n")
+		buf.WriteString("【desc 格式提示】若错误位于 desc 块内：字段必须为 fieldName: value（冒号不可省略），字段间用换行分隔、禁止用逗号。参考 golang-template-ssti.sf 的 desc 写法。\n")
+	}
+	// heredoc 结束符错误：mismatched input ':' expecting <EOF> 常因 heredoc 未正确闭合导致
+	if strings.Contains(content, "<<<") && strings.Contains(errText, "mismatched input ':'") && strings.Contains(errText, "expecting <EOF>") {
+		buf.WriteString("------------------------\n")
+		buf.WriteString("【heredoc 结束符错误】heredoc（如 desc: <<<TEXT ... TEXT）的结束标识符必须**单独占一行且行首无空格**。错误：`    TEXT`（有前导空格，不会被识别）。正确：换行后紧跟 `TEXT` 或 `DESC`，无任何前导空格或制表符。参考 golang-reflected-xss-gin-context.sf。\n")
+	}
+
 	return strings.TrimSpace(buf.String()), true
 }
 
@@ -108,85 +129,97 @@ func checkSyntaxFlowRule(content string) (string, bool) {
 func CreateSyntaxFlowTools() ([]*aitool.Tool, error) {
 	factory := aitool.NewFactory()
 	err := factory.RegisterTool(SyntaxFlowToolName_SyntaxCheck,
-		aitool.WithDescription("Performs a syntax check on SyntaxFlow rule. The rule can be provided directly as a string ('syntaxflow-code') or by specifying a .sf file path ('path'). Use this for .sf files; do NOT use check-yaklang-syntax for SyntaxFlow rules."),
-		aitool.WithStringParam("syntaxflow-code", aitool.WithParam_Description("SyntaxFlow rule content string to check")),
-		aitool.WithStringParam("path", aitool.WithParam_Description("Local file path of .sf SyntaxFlow rule file to check")),
+		aitool.WithDescription("SyntaxFlow 规则语法检查与正例自检（合并）。1) 语法检查：验证 .sf 规则是否符合 SyntaxFlow 语法。2) 正例自检（可选）：当提供 sample_code+language 时，将用户提供的漏洞样例作为正例（file://、UNSAFE）执行规则，若产生告警则 matched=true。有漏洞样例时必须传入 path、sample_code、filename、language 完成正例自检；无样例时仅传 path 或 syntaxflow-code 做语法检查。"),
+		aitool.WithKeywords([]string{
+			"include 必须 as $gin", "正确 include as $gin",
+			"<include('golang-gin-context')> as $gin", "include 漏写 as",
+			"$gin 未定义", "$source 没有查到", "include 未匹配",
+		}),
+		aitool.WithStringParam("syntaxflow-code", aitool.WithParam_Description("SyntaxFlow 规则内容字符串，与 path 二选一")),
+		aitool.WithStringParam("path", aitool.WithParam_Description(".sf 规则文件路径，与 syntaxflow-code 二选一。有样例自检时推荐传 path。")),
+		aitool.WithStringParam("sample_code", aitool.WithParam_Description("【有正例时必传】正例（file://、UNSAFE）漏洞样例完整源代码，即用户提供的漏洞代码，用于自检规则能否正确匹配")),
+		aitool.WithStringParam("filename", aitool.WithParam_Description("【有正例时推荐】正例虚拟文件名，如 vuln.go、Main.java，对应规则中 file:// 的文件名。为空则按 language 推断")),
+		aitool.WithStringParam("language", aitool.WithParam_Description("【有正例时必传】语言：golang、java、php、c、javascript、yak、python")),
 		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
 			codeContent := params.GetString("syntaxflow-code")
 			if codeContent == "" {
 				path := params.GetString("path")
 				if path == "" {
-					return nil, utils.Error("syntaxflow-code content or path is required")
+					return nil, utils.Error("【参数错误】syntaxflow-code 或 path 必须提供其一")
 				}
 				content, err := os.ReadFile(path)
 				if err != nil {
-					return nil, utils.Errorf("read file %s failed: %s", path, err)
+					return nil, utils.Errorf("【读取失败】无法读取规则文件 %s: %s", path, err)
 				}
 				codeContent = string(content)
 			}
-			errMsg, hasErrors := checkSyntaxFlowRule(codeContent)
-			if !hasErrors {
-				return map[string]any{
-					"passed":  true,
-					"message": "SyntaxFlow 规则语法检查通过",
-				}, nil
-			}
-			return map[string]any{
-				"passed":  false,
-				"errors":  errMsg,
-				"message": "SyntaxFlow 规则存在语法错误",
-			}, nil
-		}),
-	)
-	if err != nil {
-		log.Errorf("register check-syntaxflow-syntax tool: %v", err)
-	}
 
-	err = factory.RegisterTool(SyntaxFlowToolName_VerifyAgainstSample,
-		aitool.WithDescription("静态检测 SyntaxFlow 规则能否正确匹配漏洞样例。将 sample_code 作为虚拟项目解析并执行规则扫描；若产生告警则 matched=true，表示规则已覆盖样例中的漏洞。生成规则后必须调用此工具验证，matched=false 时需根据 suggestion 修改规则后再次验证。"),
-		aitool.WithStringParam("syntaxflow-code", aitool.WithParam_Description("SyntaxFlow 规则完整内容，与 path 二选一")),
-		aitool.WithStringParam("path", aitool.WithParam_Description("规则 .sf 文件路径，与 syntaxflow-code 二选一")),
-		aitool.WithStringParam("sample_code", aitool.WithParam_Description("漏洞样例代码（需为完整可解析的源代码）"), aitool.WithParam_Required(true)),
-		aitool.WithStringParam("filename", aitool.WithParam_Description("样例虚拟文件名，如 vuln.go、Main.java。可选，为空则按 language 自动推断")),
-		aitool.WithStringParam("language", aitool.WithParam_Description("语言：golang/go、java、php、c、javascript、yak、python"), aitool.WithParam_Required(true)),
-		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
-			ruleContent := params.GetString("syntaxflow-code")
-			if ruleContent == "" {
-				path := params.GetString("path")
-				if path != "" {
-					content, err := os.ReadFile(path)
-					if err != nil {
-						return nil, utils.Errorf("read rule file %s failed: %s", path, err)
-					}
-					ruleContent = string(content)
-				}
-			}
-			if ruleContent == "" {
-				return nil, utils.Error("syntaxflow-code 或 path 必须提供其一")
-			}
-			sampleCode := params.GetString("sample_code")
+			sampleCode := strings.TrimSpace(params.GetString("sample_code"))
 			filename := params.GetString("filename")
 			language := params.GetString("language")
-			res := sfverify.VerifySFRuleMatchesSample(ruleContent, sampleCode, filename, language)
+			hasSample := sampleCode != "" && language != ""
+
+			// Step 1: 语法检查
+			errMsg, hasErrors := checkSyntaxFlowRule(codeContent)
+			if hasErrors {
+				return map[string]any{
+					"passed":       false,
+					"errors":       errMsg,
+					"message":      "【语法错误】SyntaxFlow 规则存在语法错误，请根据下方 errors 逐行修复后再验证。禁止在语法未通过时进行正例自检。",
+					"syntax_error": true,
+				}, nil
+			}
+
 			out := map[string]any{
-				"matched": res.Matched,
-				"message": res.Message,
+				"passed":  true,
+				"message": "【语法检查通过】SyntaxFlow 规则语法正确。",
 			}
+
+			// Step 2: 若有正例（用户提供的漏洞样例，对应 file://、UNSAFE）则进行正例自检
+			if !hasSample {
+				return out, nil
+			}
+
+			res := sfverify.VerifySFRuleMatchesSample(codeContent, sampleCode, filename, language)
+			out["sample_verified"] = true
+			out["matched"] = res.Matched
+
+			if res.Matched {
+				out["message"] = "【语法检查通过】【正例自检通过】规则已正确匹配正例（file://、UNSAFE）中的漏洞，可进行 directly_answer。"
+				if res.AlertCount > 0 {
+					out["alert_count"] = res.AlertCount
+					out["alert_details"] = res.AlertDetails
+				}
+				if res.QueryResultsFull != "" {
+					out["query_results_full"] = res.QueryResultsFull
+				}
+				return out, nil
+			}
+
+			// 正例自检未通过
 			if res.Error != "" {
+				out["message"] = fmt.Sprintf("【语法检查通过】【正例自检失败】%s", res.Message)
 				out["error"] = res.Error
-			}
-			if res.AlertCount > 0 {
-				out["alert_count"] = res.AlertCount
-				out["alert_details"] = res.AlertDetails
+			} else {
+				out["message"] = fmt.Sprintf("【语法检查通过】【正例自检未通过】%s", res.Message)
 			}
 			if res.Suggestion != "" {
 				out["suggestion"] = res.Suggestion
+			}
+			if len(res.ResultVarsDiagnostic) > 0 {
+				out["result_vars_diagnostic"] = res.ResultVarsDiagnostic
+				if res.Suggestion == "" {
+					out["suggestion"] = "根据 result_vars_diagnostic 中各变量匹配数量（0 表示数据流未贯通）修改规则，修改后再次调用本工具验证。"
+				}
+			}
+			if res.DiagnosticHint != "" {
+				out["diagnostic_hint"] = res.DiagnosticHint
 			}
 			return out, nil
 		}),
 	)
 	if err != nil {
-		log.Errorf("register verify-syntaxflow-rule-against-sample tool: %v", err)
+		log.Errorf("register check-syntaxflow-syntax tool: %v", err)
 	}
 
 	return factory.Tools(), nil

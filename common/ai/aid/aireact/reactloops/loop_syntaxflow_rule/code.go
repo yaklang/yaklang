@@ -112,12 +112,19 @@ func init() {
 				loopinfra.WithAITagConfig("GEN_RULE", "sf_rule", "syntaxflow-rule", "text/syntaxflow"),
 				loopinfra.WithFileExtension(".sf"),
 				loopinfra.WithFileChanged(func(content string, op *reactloops.LoopActionHandlerOperator) (string, bool) {
-					return checkSyntaxFlowAndFormatErrors(content)
+					errMsg, blocking := checkSyntaxFlowAndFormatErrors(content)
+					if blocking && errMsg != "" {
+						errMsg += "\n\n【必须验证】修改后请立即调用 check-syntaxflow-syntax 验证（传入 path 或 syntaxflow-code），禁止在未验证的情况下再次 modify_rule。"
+					}
+					return errMsg, blocking
 				}),
 				loopinfra.WithEventType("syntaxflow_rule_editor"),
+				// loopinfra.WithSkipReflectionWhenValidationPasses(true), // 验证通过后跳过反思，避免建议 tool_compose 等导致 AI 继续生成错误规则
+				loopinfra.WithExitAfterWrite(false), // 验证通过后不立即退出，保留迭代以便 AI 调用 check-syntaxflow-syntax 进行样例自检
 			)
 
 			preset := []reactloops.ReActLoopOption{
+				reactloops.WithOverrideLoopAction(loopAction_DirectlyAnswerSyntaxFlow),
 				reactloops.WithAllowRAG(true),
 				reactloops.WithAllowToolCall(true),
 				reactloops.WithInitTask(buildInitTask(r, docSearcher, docSearcherByRag)),
@@ -132,12 +139,17 @@ func init() {
 					feedbacks := feedbacker.String()
 					feedbacks = strings.TrimSpace(feedbacks)
 					sfFilename := loop.Get("sf_filename")
+					sfHasCodeSample := utils.InterfaceToBoolean(loop.Get("sf_has_code_sample"))
+					iteration := loop.GetCurrentIterationIndex()
 					renderMap := map[string]any{
 						"Code":                      sfCode,
 						"CurrentCodeWithLineNumber": codeWithLine,
 						"Nonce":                     nonce,
 						"FeedbackMessages":          feedbacks,
 						"SfFilename":                sfFilename,
+						"SfHasCodeSample":           sfHasCodeSample,
+						"IterationCount":            iteration,
+						"IterationHigh":             iteration >= 10,
 					}
 					return utils.RenderTemplate(reactiveData, renderMap)
 				}),
@@ -147,7 +159,7 @@ func init() {
 			return reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_WRITE_SYNTAXFLOW, r, preset...)
 		},
 		reactloops.WithLoopDescription("Enter focused mode for SyntaxFlow rule generation and modification with real-time syntax validation"),
-		reactloops.WithLoopUsagePrompt("Use when user requests to write, modify, or debug SyntaxFlow vulnerability detection rules. Provides tools: write_rule, modify_rule, insert_rule, delete_rule, check-syntaxflow-syntax (for .sf syntax validation; do NOT use check-yaklang-syntax) with real-time SyntaxFlow compile validation"),
+		reactloops.WithLoopUsagePrompt("Use when user requests to write, modify, or debug SyntaxFlow vulnerability detection rules. Provides tools: write_rule, modify_rule, insert_rule, delete_rule, check-syntaxflow-syntax (for .sf syntax validation; do NOT use check-yaklang-syntax) with real-time SyntaxFlow compile validation. Keywords: include 必须 as $gin, 正确 <include('golang-gin-context')> as $gin, include 漏写 as, $gin 未定义"),
 		reactloops.WithLoopOutputExample(`
 * When user requests to write SyntaxFlow rule:
   {"@action": "write_syntaxflow_rule", "human_readable_thought": "I need to write a SyntaxFlow rule for vulnerability detection"}
