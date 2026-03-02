@@ -165,6 +165,7 @@ func normalizeModelConfigs(db *gorm.DB, models []*ypb.AIModelConfig) error {
 			if providerId > 0 {
 				provider.ID = uint(providerId)
 			}
+			provider.CalcHash()
 			saved, err := UpsertAIProvider(db, provider)
 			if err != nil {
 				return err

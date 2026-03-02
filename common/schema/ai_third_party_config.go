@@ -1,7 +1,11 @@
 package schema
 
 import (
+	"sort"
+	"strings"
+
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -11,6 +15,7 @@ const aiThirdPartyConfigTableName = "ai_third_party_configs"
 type AIThirdPartyConfig struct {
 	gorm.Model
 
+	Hash           string          `json:"hash" gorm:"unique_index"`
 	Type           string          `json:"type" gorm:"index"`
 	APIKey         string          `json:"api_key"`
 	UserIdentifier string          `json:"user_identifier"`
@@ -20,6 +25,39 @@ type AIThirdPartyConfig struct {
 	WebhookURL     string          `json:"webhook_url"`
 	ExtraParams    MapStringString `json:"extra_params" gorm:"type:text"`
 	Disabled       bool            `json:"disabled" gorm:"default:false"`
+}
+
+func (c *AIThirdPartyConfig) CalcHash() string {
+	if c == nil {
+		return ""
+	}
+	keys := make([]string, 0, len(c.ExtraParams))
+	for k := range c.ExtraParams {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	var builder strings.Builder
+	for _, k := range keys {
+		builder.WriteString(k)
+		builder.WriteString("=")
+		builder.WriteString(c.ExtraParams[k])
+		builder.WriteString(";")
+	}
+	return utils.CalcSha256(
+		c.Type,
+		c.APIKey,
+		c.UserIdentifier,
+		c.UserSecret,
+		c.Namespace,
+		c.Domain,
+		c.WebhookURL,
+		builder.String(),
+	)
+}
+
+func (c *AIThirdPartyConfig) BeforeSave() error {
+	c.Hash = c.CalcHash()
+	return nil
 }
 
 func (c *AIThirdPartyConfig) TableName() string {

@@ -74,3 +74,43 @@ func TestQueryAIProviders(t *testing.T) {
 	require.Len(t, providers, 1)
 	assert.Equal(t, p2.ID, providers[0].ID)
 }
+
+func TestUpsertAIProvider_ByHash(t *testing.T) {
+	db := setupAIProviderTestDB(t)
+	defer db.Close()
+
+	first, err := UpsertAIProvider(db, &schema.AIThirdPartyConfig{
+		Type:   "openai",
+		APIKey: "key-1",
+		Domain: "api.openai.com",
+	})
+	require.NoError(t, err)
+	require.NotZero(t, first.ID)
+	require.NotEmpty(t, first.Hash)
+
+	same, err := UpsertAIProvider(db, &schema.AIThirdPartyConfig{
+		Type:   "openai",
+		APIKey: "key-1",
+		Domain: "api.openai.com",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, first.ID, same.ID)
+	assert.Equal(t, first.Hash, same.Hash)
+
+	providers, err := ListAIProviders(db)
+	require.NoError(t, err)
+	assert.Len(t, providers, 1)
+
+	changed, err := UpsertAIProvider(db, &schema.AIThirdPartyConfig{
+		Type:   "openai",
+		APIKey: "key-2",
+		Domain: "api.openai.com",
+	})
+	require.NoError(t, err)
+	assert.NotEqual(t, first.ID, changed.ID)
+	assert.NotEqual(t, first.Hash, changed.Hash)
+
+	providers, err = ListAIProviders(db)
+	require.NoError(t, err)
+	assert.Len(t, providers, 2)
+}
