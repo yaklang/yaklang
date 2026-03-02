@@ -90,8 +90,13 @@
 **depends_on 使用说明:**
 每个子任务可以通过 `depends_on` 字段声明它依赖哪些其他子任务。`depends_on` 是一个字符串数组，内容为被依赖子任务的 `subtask_name`。
 - 无依赖的子任务：`depends_on` 留空 `[]`，这些任务可以并行执行
-- 有依赖的子任务：填入被依赖任务的名称，如 `["配置静态代码分析工具"]`
+- 有依赖的子任务：填入被依赖任务的名称，如 `["分析项目构建工具和语言"]`
 - 多个依赖：一个任务可以依赖多个前置任务，如 `["任务A", "任务B"]`，表示 A 和 B 都完成后才能开始本任务
+
+**任务粒度要求（关键）:**
+每个子任务必须足够小，确保执行 agent 在 3-5 步（3-5 次工具调用）内可以完成。判断标准：
+- 如果描述一个子任务时出现"并且"、"然后"、"同时还要"等连接词串联多个独立操作，说明它需要进一步拆分
+- 一个子任务应该对应一个明确的操作阶段（探索/分析/实施/验证），而非多个阶段的组合
 
 假设用户的任务是："为项目添加自动化代码质量检查工具。"
 
@@ -103,32 +108,150 @@
     "main_task_goal": "在CI/CD流程中集成代码质量检查工具，确保每次代码提交都自动执行静态分析和代码规范检查。交付物为配置好的检查工具、CI配置文件以及检查报告示例。",
     "tasks": [
         {
-            "subtask_name": "配置静态代码分析工具",
-            "subtask_identifier": "setup_static_analysis",
-            "subtask_goal": "在项目中安装并配置静态代码分析工具（如SonarQube或ESLint），设置代码质量规则和阈值。完成工具配置并生成初始检查报告。",
+            "subtask_name": "分析项目构建工具和语言",
+            "subtask_identifier": "analyze_project_stack",
+            "subtask_goal": "确认项目使用的编程语言、构建工具和包管理器，确定适用的代码检查工具类型。产出：项目技术栈摘要和推荐的检查工具名称。",
             "depends_on": []
         },
         {
-            "subtask_name": "集成到CI/CD流程",
-            "subtask_identifier": "integrate_cicd",
-            "subtask_goal": "修改CI/CD配置文件，添加代码质量检查步骤。确保每次代码提交或合并请求时自动触发检查，检查失败时阻止代码合并。",
-            "depends_on": ["配置静态代码分析工具"]
+            "subtask_name": "查看现有CI/CD配置",
+            "subtask_identifier": "inspect_cicd_config",
+            "subtask_goal": "读取项目中已有的CI/CD配置文件（如 .github/workflows、.gitlab-ci.yml、Jenkinsfile 等），了解现有流水线结构和阶段划分。产出：现有CI/CD配置的结构摘要和可插入检查步骤的位置。",
+            "depends_on": []
         },
         {
-            "subtask_name": "编写检查结果处理文档",
-            "subtask_identifier": "write_check_docs",
-            "subtask_goal": "编写代码质量检查工具的使用文档，包括如何查看检查报告、如何修复常见问题以及如何更新检查规则。文档需包含示例和最佳实践。",
-            "depends_on": ["集成到CI/CD流程"]
+            "subtask_name": "安装并配置代码检查工具",
+            "subtask_identifier": "setup_linter",
+            "subtask_goal": "根据项目技术栈安装对应的代码检查工具，创建工具配置文件并设置检查规则。产出：工具依赖已添加到项目配置中，检查规则配置文件已创建。",
+            "depends_on": ["分析项目构建工具和语言"]
+        },
+        {
+            "subtask_name": "添加CI流水线检查步骤",
+            "subtask_identifier": "add_ci_check_step",
+            "subtask_goal": "在现有CI/CD配置文件中添加代码质量检查步骤，配置触发条件（代码提交或合并请求）和失败阻断策略。产出：CI配置文件已更新，包含代码检查步骤。",
+            "depends_on": ["查看现有CI/CD配置", "安装并配置代码检查工具"]
+        },
+        {
+            "subtask_name": "本地运行检查并验证",
+            "subtask_identifier": "verify_check_locally",
+            "subtask_goal": "在本地执行代码检查工具，确认规则配置正确、检查结果输出格式符合预期、无误报或配置错误。产出：本地检查通过，输出检查报告示例。",
+            "depends_on": ["安装并配置代码检查工具"]
+        },
+        {
+            "subtask_name": "编写使用说明文档",
+            "subtask_identifier": "write_usage_docs",
+            "subtask_goal": "编写代码质量检查工具的使用文档，包含查看报告方法、常见问题修复指南和规则更新方式。产出：README 或文档文件已创建。",
+            "depends_on": ["本地运行检查并验证"]
         }
     ]
 }
 ```
+
+注意上面示例中每个子任务的粒度——每个子任务都聚焦于一个具体操作阶段，agent 用 3-5 步就能完成：
+- "分析项目构建工具和语言"：find_files 查看项目结构 -> read_file 读取构建配置 -> 分析并总结（3 步）
+- "安装并配置代码检查工具"：确定工具 -> 修改依赖配置 -> 创建规则配置文件 -> 验证配置语法（4 步）
+- "添加CI流水线检查步骤"：读取现有CI配置 -> 编写检查步骤 -> 写入配置文件（3 步）
+
+---
+
+#### **8. 按类别拆分示例——安全测试任务**
+
+以下示例展示：当同一种操作（漏洞验证）需要针对多个独立类别（不同漏洞类型）执行时，必须按类别拆分为独立子任务。
+
+**错误示范——把多个漏洞类别塞进一个任务：**
+
+```json
+{
+    "@action": "plan",
+    "main_task": "对目标Web应用进行漏洞验证",
+    "main_task_goal": "...",
+    "tasks": [
+        {
+            "subtask_name": "Web漏洞手工验证",
+            "subtask_goal": "针对Web应用逐项验证：SQL注入、XSS、命令注入、SSRF、文件上传、认证绕过。产出：漏洞详情清单。",
+            "depends_on": []
+        }
+    ]
+}
+```
+上面的任务包含 6 种独立漏洞类别，每种至少 3-5 步，合计 20+ 步，严重违反粒度要求。
+
+**正确示范——按漏洞类别拆分为独立子任务：**
+
+假设前序探索任务已确认目标运行 Web 服务，发现了参数入口和表单页面。
+
+```json
+{
+    "@action": "plan",
+    "main_task": "对目标Web应用进行漏洞验证",
+    "main_task_identifier": "web_vuln_verification",
+    "main_task_goal": "针对已发现的 Web 应用攻击面，按漏洞类型逐一验证，产出经过确认的漏洞清单（含 PoC 和风险评级）。",
+    "tasks": [
+        {
+            "subtask_name": "识别Web应用攻击面",
+            "subtask_identifier": "identify_attack_surface",
+            "subtask_goal": "通过爬虫或手动浏览收集目标 Web 应用的所有入口点（URL路径、表单、API端点、参数名）。产出：攻击面清单，列出所有可测试的参数和端点。",
+            "depends_on": []
+        },
+        {
+            "subtask_name": "验证SQL注入漏洞",
+            "subtask_identifier": "test_sqli",
+            "subtask_goal": "针对攻击面清单中的参数入口，构造SQL注入测试payload进行验证。产出：SQL注入测试结果，包含是否存在注入、注入类型和PoC。",
+            "depends_on": ["识别Web应用攻击面"]
+        },
+        {
+            "subtask_name": "验证XSS漏洞",
+            "subtask_identifier": "test_xss",
+            "subtask_goal": "针对攻击面清单中的输入点，构造反射型和存储型XSS测试payload进行验证。产出：XSS测试结果，包含是否存在XSS、触发位置和PoC。",
+            "depends_on": ["识别Web应用攻击面"]
+        },
+        {
+            "subtask_name": "验证SSRF漏洞",
+            "subtask_identifier": "test_ssrf",
+            "subtask_goal": "针对接受URL或IP参数的端点，构造SSRF测试payload（如内网地址探测、协议探测）进行验证。产出：SSRF测试结果，包含是否存在SSRF和可达范围。",
+            "depends_on": ["识别Web应用攻击面"]
+        },
+        {
+            "subtask_name": "验证命令注入漏洞",
+            "subtask_identifier": "test_cmdi",
+            "subtask_goal": "针对可能与系统命令交互的参数，构造命令注入测试payload进行验证。产出：命令注入测试结果，包含是否存在注入和PoC。",
+            "depends_on": ["识别Web应用攻击面"]
+        },
+        {
+            "subtask_name": "汇总漏洞验证结果",
+            "subtask_identifier": "summarize_findings",
+            "subtask_goal": "汇总所有漏洞验证结果，按风险等级排序，生成结构化的漏洞清单。产出：漏洞报告文件，包含每个漏洞的类型、位置、PoC和风险评级。",
+            "depends_on": ["验证SQL注入漏洞", "验证XSS漏洞", "验证SSRF漏洞", "验证命令注入漏洞"]
+        }
+    ]
+}
+```
+
+注意上面示例的关键设计：
+- 每种漏洞类型是一个独立子任务，各自 3-5 步可完成
+- 不同漏洞类型的验证任务之间没有依赖关系，可以并行执行
+- 先有"识别攻击面"这个探索任务提供事实数据，后续验证任务才有明确的测试目标，而非凭空猜测
+
+---
+
+#### **9. 列举式任务的拆分判断**
+
+**判断规则：** 如果 subtask_goal 中出现了枚举/列举多个独立项（A、B、C...），且去掉其中任何一项后，剩余部分仍然是完整、可独立执行的，那么每一项都应拆分为独立子任务。
+
+**需要拆分的情况：**
+- "为 auth 模块、payment 模块、notification 模块编写单元测试" -> 拆为 3 个子任务，因为每个模块的测试互不影响
+- "配置 Redis 缓存、MySQL 数据库、Nginx 反向代理" -> 拆为 3 个子任务，因为每个服务配置独立
+- "验证 SQL注入、XSS、SSRF、命令注入" -> 拆为 4 个子任务，因为每种漏洞验证独立
+
+**不需要拆分的情况：**
+- "读取 package.json 确认项目依赖和构建脚本" -> 虽然涉及依赖和构建脚本两个方面，但都来自同一个文件的同一次读取操作
+- "安装 ESLint 并创建 .eslintrc 配置文件" -> 安装和配置是同一个工具的连续操作，总共 3-4 步，无需拆分
 
 # 任务设计输出要求：
 *. 根据后续任务计划的schema构造JSON
 *. 任务规划只能输出JSON，禁止输出非JSON的内容，注意JSON的格式，避免出现语法错误
 *. **易错点**：时刻记住输出JSON时注意string使用"闭合，string内的内容合理转义，不转义会造成解析结构数据失败
 *. 在任务输出时，任务目标或者详情中只允许出现工具名和简要说明，不允许出现特殊符号，尤其是"避免破坏JSON结构
-*. 为了减少用户理解成本，子任务尽量不超过5个
+*. 子任务数量不设硬性上限，以合理粒度为准（每个子任务 3-5 步可完成）
 *. 每个子任务都应包含 depends_on 字段，即使为空数组 []
 *. 每个子任务建议提供 subtask_identifier 字段（英文蛇形命名），用于语义标识和目录命名

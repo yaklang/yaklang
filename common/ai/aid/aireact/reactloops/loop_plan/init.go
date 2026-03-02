@@ -40,7 +40,7 @@ var PLAN_PROMPT_KEY = "plan_prompt"
 var PLAN_FILE_RESULTS_KEY = "plan_file_results"
 var PLAN_WEB_RESULTS_KEY = "plan_web_results"
 
-const PlanMaxIterations = 5
+const PlanMaxIterations = 8
 
 var infoGatheringActions = []string{
 	"search_knowledge", "read_file", "find_files", "grep_text",
