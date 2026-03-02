@@ -8,13 +8,14 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aiddb"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
-func (c *Config) wrapper(i AICallbackType) AICallbackType {
+func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType {
 	outConfig := c
 	return func(config AICallerConfigIf, request *AIRequest) (rsp *AIResponse, err error) {
 		// check if callback is nil before calling
@@ -106,6 +107,7 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 		c.EmitJSON(schema.EVENT_TYPE_PRESSURE, "system", map[string]any{
 			"current_cost_token_size": tokenSize,
 			"pressure_token_size":     c.AiCallTokenLimit,
+			"model_tier":              string(tier),
 		})
 
 		start := time.Now()
@@ -144,7 +146,7 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 
 			}
 
-		origRsp := rsp
+			origRsp := rsp
 			rsp = TeeAIResponse(config, rsp, func(teeResp *AIResponse) {
 				now := time.Now()
 				du := now.Sub(start)
@@ -164,6 +166,7 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 				"second":        du.Seconds(),
 				"model_name":    origRsp.GetModelName(),
 				"provider_name": origRsp.GetProviderName(),
+				"model_tier":    string(tier),
 			})
 		}, func() {
 			du := time.Since(start)
@@ -186,6 +189,7 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 			"second":             du.Seconds(),
 			"model_name":         model,
 			"provider_name":      provider,
+			"model_tier":         string(tier),
 			"token_rate":         tokenRate,
 			"output_bytes":       outputBytes,
 			"output_duration_ms": outputDuration.Milliseconds(),
@@ -197,6 +201,7 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 		c.EmitJSON(schema.EVENT_TYPE_AI_CALL_SUMMARY, "system", map[string]any{
 			"model_name":              model,
 			"provider_name":           provider,
+			"model_tier":              string(tier),
 			"first_byte_cost_ms":      firstByteCostMs,
 			"total_cost_ms":           du.Milliseconds(),
 			"output_bytes":            outputBytes,

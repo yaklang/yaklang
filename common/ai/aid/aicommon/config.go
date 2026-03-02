@@ -506,11 +506,12 @@ func WithAICallback(cb AICallbackType) ConfigOption {
 		}
 
 		oCb := cb
-		cb = c.wrapper(cb)
+		qualityCb := c.wrapper(cb, consts.TierIntelligent)
+		speedCb := c.wrapper(cb, consts.TierLightweight)
 		c.m.Lock()
 		c.OriginalAICallback = oCb
-		c.QualityPriorityAICallback = cb
-		c.SpeedPriorityAICallback = cb
+		c.QualityPriorityAICallback = qualityCb
+		c.SpeedPriorityAICallback = speedCb
 		c.m.Unlock()
 		return nil
 	}
@@ -522,15 +523,21 @@ func WithWrapperedAICallback(cb AICallbackType) ConfigOption {
 			c.m = &sync.Mutex{}
 		}
 
-		// if callback is nil, use default ai.Chat with wrapper
+		var qualityCb AICallbackType
+		var speedCb AICallbackType
 		if cb == nil {
-			cb = c.wrapper(AIChatToAICallbackType(ai.Chat))
+			defaultCb := AIChatToAICallbackType(ai.Chat)
+			qualityCb = c.wrapper(defaultCb, consts.TierIntelligent)
+			speedCb = c.wrapper(defaultCb, consts.TierLightweight)
+		} else {
+			qualityCb = cb
+			speedCb = cb
 		}
 
 		c.m.Lock()
 		defer c.m.Unlock()
-		c.QualityPriorityAICallback = cb
-		c.SpeedPriorityAICallback = cb
+		c.QualityPriorityAICallback = qualityCb
+		c.SpeedPriorityAICallback = speedCb
 		return nil
 	}
 }
@@ -552,7 +559,7 @@ func WithQualityPriorityAICallback(cb AICallbackType) ConfigOption {
 		if c.m == nil {
 			c.m = &sync.Mutex{}
 		}
-		cb = c.wrapper(cb)
+		cb = c.wrapper(cb, consts.TierIntelligent)
 		c.m.Lock()
 		c.QualityPriorityAICallback = cb
 		c.m.Unlock()
@@ -565,7 +572,7 @@ func WithSpeedPriorityAICallback(cb AICallbackType) ConfigOption {
 		if c.m == nil {
 			c.m = &sync.Mutex{}
 		}
-		cb = c.wrapper(cb)
+		cb = c.wrapper(cb, consts.TierLightweight)
 		c.m.Lock()
 		c.SpeedPriorityAICallback = cb
 		c.m.Unlock()
@@ -592,7 +599,7 @@ func WithTieredAICallback() ConfigOption {
 		if len(intelligentConfigs) > 0 {
 			intelligentCB, err := CreateCallbackFromConfig(intelligentConfigs[0])
 			if err == nil {
-				intelligentCB = c.wrapper(intelligentCB)
+				intelligentCB = c.wrapper(intelligentCB, consts.TierIntelligent)
 				c.m.Lock()
 				c.QualityPriorityAICallback = intelligentCB
 				c.m.Unlock()
@@ -607,7 +614,7 @@ func WithTieredAICallback() ConfigOption {
 		if len(lightweightConfigs) > 0 {
 			lightweightCB, err := CreateCallbackFromConfig(lightweightConfigs[0])
 			if err == nil {
-				lightweightCB = c.wrapper(lightweightCB)
+				lightweightCB = c.wrapper(lightweightCB, consts.TierLightweight)
 				c.m.Lock()
 				c.SpeedPriorityAICallback = lightweightCB
 				c.m.Unlock()
@@ -636,7 +643,7 @@ func WithAutoTieredAICallback(defaultCallback AICallbackType) ConfigOption {
 				// Also set the original callback if not already set
 				if c.OriginalAICallback == nil && defaultCallback != nil {
 					c.m.Lock()
-					c.OriginalAICallback = c.wrapper(defaultCallback)
+					c.OriginalAICallback = c.wrapper(defaultCallback, consts.TierIntelligent)
 					c.m.Unlock()
 				}
 				return nil
@@ -645,11 +652,13 @@ func WithAutoTieredAICallback(defaultCallback AICallbackType) ConfigOption {
 
 		// Fall back to default callback for all priorities
 		if defaultCallback != nil {
-			defaultCallback = c.wrapper(defaultCallback)
+			originalCb := c.wrapper(defaultCallback, consts.TierIntelligent)
+			qualityCb := c.wrapper(defaultCallback, consts.TierIntelligent)
+			speedCb := c.wrapper(defaultCallback, consts.TierLightweight)
 			c.m.Lock()
-			c.OriginalAICallback = defaultCallback
-			c.QualityPriorityAICallback = defaultCallback
-			c.SpeedPriorityAICallback = defaultCallback
+			c.OriginalAICallback = originalCb
+			c.QualityPriorityAICallback = qualityCb
+			c.SpeedPriorityAICallback = speedCb
 			c.m.Unlock()
 		}
 		return nil
@@ -2415,12 +2424,13 @@ func (c *Config) SetAICallback(callback AICallbackType) {
 		callback = AIChatToAICallbackType(ai.Chat)
 	}
 
-	wCb := c.wrapper(callback)
+	qualityCb := c.wrapper(callback, consts.TierIntelligent)
+	speedCb := c.wrapper(callback, consts.TierLightweight)
 	c.m.Lock()
 	defer c.m.Unlock()
 	c.OriginalAICallback = callback
-	c.QualityPriorityAICallback = wCb
-	c.SpeedPriorityAICallback = wCb
+	c.QualityPriorityAICallback = qualityCb
+	c.SpeedPriorityAICallback = speedCb
 }
 
 func (c *Config) SetContext(ctx context.Context) {
@@ -2669,7 +2679,7 @@ func (c *Config) LoadAIServiceByName(name string, modelName string) error {
 	}
 
 	cb := AIChatToAICallbackType(chat)
-	wCb := c.wrapper(cb)
+	wCb := c.wrapper(cb, consts.TierIntelligent)
 	c.m.Lock()
 	c.OriginalAICallback = cb
 	c.QualityPriorityAICallback = wCb
