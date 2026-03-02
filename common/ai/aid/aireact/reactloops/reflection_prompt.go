@@ -20,23 +20,26 @@ func (r *ReActLoop) buildReflectionPrompt(
 	relevantMemories string,
 	previousReflections string,
 ) (string, error) {
-	// 构建 JSON Schema
-	schema := buildReflectionSchema()
+	// 构建 JSON Schema（传入当前 loop 的合法 action 列表以约束 suggestions）
+	availableActions := r.GetAllActionNames()
+	schema := buildReflectionSchema(availableActions)
 
 	// 准备模板数据
 	data := map[string]interface{}{
-		"Nonce":         nonce,
-		"ActionType":    reflection.ActionType,
-		"IterationNum":  reflection.IterationNum,
-		"ExecutionTime": reflection.ExecutionTime.String(),
+		"Nonce":             nonce,
+		"ActionType":        reflection.ActionType,
+		"IterationNum":      reflection.IterationNum,
+		"ExecutionTime":     reflection.ExecutionTime.String(),
 		"ResultStatus": func() string {
 			if reflection.Success {
 				return "✓ SUCCESS"
 			}
 			return "✗ FAILED"
 		}(),
-		"ErrorMessage": reflection.ErrorMessage,
-		"Schema":       schema,
+		"ErrorMessage":      reflection.ErrorMessage,
+		"Schema":            schema,
+		"AvailableActions":  strings.Join(availableActions, ", "),
+		"LoopName":          r.loopName,
 	}
 
 	// 添加环境影响
@@ -143,7 +146,13 @@ func (r *ReActLoop) getSpinDetectionData() map[string]interface{} {
 }
 
 // buildReflectionSchema 构建反思结果的 JSON Schema
-func buildReflectionSchema() string {
+// availableActions 为当前 loop 的合法 action 列表，用于约束 suggestions 只能引用真实存在的操作
+func buildReflectionSchema(availableActions []string) string {
+	suggestionsDesc := "建议（可选）：针对类似情况的改进建议，按需提供。如果检测到 SPIN，请将打破循环的建议整合到此字段中。"
+	if len(availableActions) > 0 {
+		suggestionsDesc += " 【action 选取范围】建议中若提及具体操作，必须且只能从以下列表中选择: [" + strings.Join(availableActions, ", ") + "]。不得引用此列表之外的任何操作。"
+	}
+
 	schema := aitool.NewObjectSchemaWithAction(
 		aitool.WithStringParam(
 			"@action",
@@ -164,7 +173,7 @@ func buildReflectionSchema() string {
 		),
 		aitool.WithStringArrayParam(
 			"suggestions",
-			aitool.WithParam_Description("建议（可选）：针对类似情况的改进建议，按需提供。如果检测到 SPIN，请将打破循环的建议整合到此字段中"),
+			aitool.WithParam_Description(suggestionsDesc),
 			aitool.WithParam_Required(false),
 		),
 	)

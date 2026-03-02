@@ -23,11 +23,15 @@ func checkSyntaxFlowAndFormatErrors(content string) (string, bool) {
 	var buf bytes.Buffer
 	hasBlockingErrors := true // Syntax errors are always blocking for SF rules
 
+	// 所有错误输出必须以 SyntaxFlow 标识开头，便于识别错误来源
+	const syntaxFlowPrefix = "SyntaxFlow 编译错误: "
+
 	errs := vm.GetCompileErrors()
 	if len(errs) == 0 {
 		// Fallback: no structured errors, use raw error message
-		buf.WriteString(fmt.Sprintf("SyntaxFlow 编译错误: %s\n", err.Error()))
-		buf.WriteString("------------------------")
+		buf.WriteString(syntaxFlowPrefix)
+		buf.WriteString(err.Error())
+		buf.WriteString("\n------------------------")
 		return buf.String(), hasBlockingErrors
 	}
 
@@ -62,6 +66,16 @@ func checkSyntaxFlowAndFormatErrors(content string) (string, bool) {
 	if len(errs) < maxShow {
 		maxShow = len(errs)
 	}
+	buf.WriteString(syntaxFlowPrefix)
+	buf.WriteString("\n")
+	// heredoc 结束符错误时输出明确错误类型
+	errTextPreview := ""
+	if len(errs) > 0 && errs[0] != nil {
+		errTextPreview = errs[0].Error()
+	}
+	if strings.Contains(content, "<<<") && strings.Contains(errTextPreview, "mismatched input ':'") && strings.Contains(errTextPreview, "expecting <EOF>") {
+		buf.WriteString("【错误类型】heredoc 结束符格式错误\n【原因】结束标识符有前导空格。【修复】结束符须行首无空格。\n------------------------\n")
+	}
 	for i := 0; i < maxShow; i++ {
 		e := errs[i]
 		if e == nil {
@@ -93,6 +107,18 @@ func checkSyntaxFlowAndFormatErrors(content string) (string, bool) {
 	if len(errs) > maxShow {
 		buf.WriteString("------------------------\n")
 		buf.WriteString(fmt.Sprintf("还有 %d 个错误，建议先修复以上关键问题\n", len(errs)-maxShow))
+	}
+
+	// 当错误疑似特定格式问题时，附加可操作建议
+	errText := buf.String()
+	if strings.Contains(content, "desc(") && (strings.Contains(errText, "missing ')'") || strings.Contains(errText, "mismatched input ','")) {
+		buf.WriteString("------------------------\n")
+		buf.WriteString("【desc 格式提示】若错误位于 desc 块内：字段必须为 fieldName: value（冒号不可省略），字段间用换行分隔、禁止用逗号。参考 golang-template-ssti.sf 的 desc 写法。\n")
+	}
+	// heredoc 结束符错误
+	if strings.Contains(content, "<<<") && strings.Contains(errText, "mismatched input ':'") && strings.Contains(errText, "expecting <EOF>") {
+		buf.WriteString("------------------------\n")
+		buf.WriteString("【heredoc 结束符错误】heredoc 结束标识符必须**行首无空格**。错误：`    TEXT`。正确：换行后紧跟 `TEXT` 无空格。参考 golang-reflected-xss-gin-context.sf。\n")
 	}
 
 	return strings.TrimSpace(buf.String()), hasBlockingErrors

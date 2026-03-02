@@ -56,6 +56,9 @@ This is spin warning #{{.SpinDetection.SpinWarningCount}}. Previous warnings hav
 2. If SPIN is confirmed, identify the ROOT CAUSE — why is the agent unable to choose a different action?
 3. Your suggestions MUST include CONCRETE alternative action types (not vague advice).
 4. Your suggestions MUST name specific tool/action that DIFFERS from '{{.SpinDetection.ActionType}}'.
+{{if .AvailableActions}}
+5. **Action scope**: Alternative actions MUST be chosen ONLY from: {{.AvailableActions}}.
+{{end}}
 
 {{if ge .SpinDetection.EscalationLevel 3}}### CRITICAL: SWOT-Based Suggestion Generation
 
@@ -102,12 +105,19 @@ MANDATORY output:
    - Each suggestion MUST name a specific action type different from '{{.SpinDetection.ActionType}}'
    - Each suggestion MUST be imperative ("DO X", "USE Y", "SWITCH TO Z")
    - Do NOT suggest "consider" or "try" — use direct commands
+{{if .AvailableActions}}
+   - Alternative actions MUST be chosen ONLY from: {{.AvailableActions}}
+{{end}}
 {{if ge .SpinDetection.EscalationLevel 3}}
 4. **CRITICAL**: This is the FINAL escalation. If your suggestions do not break the loop, the task will be force-terminated as UNSUCCESSFUL.
 {{end}}
 {{else}}Perform a brief reflection on this action. All fields are optional — provide only what's relevant.
 
 1. **Suggestions**: Improvement advice for similar situations (if any).
+{{if .AvailableActions}}
+
+**Action scope (mandatory)**: When suggesting specific actions, you MUST choose ONLY from this list: {{.AvailableActions}}. No other action names are valid in this loop.
+{{end}}
 
 **Note**: For routine operations, return minimal information. Keep it concise.
 {{end}}

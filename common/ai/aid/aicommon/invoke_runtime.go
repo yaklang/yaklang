@@ -48,6 +48,12 @@ func NewSelectedKnowledgeBaseResult(reason string, knowledgeBases []string) *Sel
 	}
 }
 
+// ToolParamAugmentInvoker is an optional extension: invoker can merge extra params into AI-generated params.
+// Used when infra must inject params (e.g. sf_sample_* for check-syntaxflow-syntax) instead of relying on AI.
+type ToolParamAugmentInvoker interface {
+	ExecuteToolRequiredAndCallWithExtraParams(ctx context.Context, toolName string, extraParams aitool.InvokeParams) (*aitool.ToolResult, bool, error)
+}
+
 type AIInvokeRuntime interface {
 	GetBasicPromptInfo(tools []*aitool.Tool) (string, map[string]any, error)
 	SetCurrentTask(task AIStatefulTask)
