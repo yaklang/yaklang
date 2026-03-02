@@ -47,6 +47,7 @@ func (c *Config) StartHotPatchLoop(ctx context.Context) {
 }
 
 func (c *Config) SimpleInfoMap() map[string]interface{} {
+	input, output, _ := c.GetConsumptionConfig()
 	return map[string]interface{}{
 		"ID":                          c.Id,
 		"AllowPlanUserInteract":       c.AllowPlanUserInteract,
@@ -63,8 +64,8 @@ func (c *Config) SimpleInfoMap() map[string]interface{} {
 		"AgreeInterval":               c.AgreeInterval,
 		"AgreeAIScoreLow":             c.AgreeAIScoreLow,
 		"AgreeAIScoreMiddle":          c.AgreeAIScoreMiddle,
-		"InputConsumption":            c.InputConsumption,
-		"OutputConsumption":           c.OutputConsumption,
+		"InputConsumption":            input,
+		"OutputConsumption":           output,
 		"AICallTokenLimit":            c.AiCallTokenLimit,
 		"AIAutoRetry":                 c.AiAutoRetry,
 		"AIAutoTransactionRetry":      c.AiTransactionAutoRetry,

@@ -15,6 +15,39 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
+type tierAwareConsumptionCaller struct {
+	AICallerConfigIf
+	config *Config
+	tier   consts.ModelTier
+}
+
+func (c *tierAwareConsumptionCaller) NewAIResponse() *AIResponse {
+	return NewAIResponse(c)
+}
+
+func (c *tierAwareConsumptionCaller) CallAIResponseConsumptionCallback(current int) {
+	if c == nil {
+		return
+	}
+	if c.AICallerConfigIf != nil {
+		c.AICallerConfigIf.CallAIResponseConsumptionCallback(current)
+	}
+	if c.config != nil {
+		c.config.AddTierConsumption(c.tier, 0, int64(current))
+	}
+}
+
+func wrapCallerWithTierConsumption(base AICallerConfigIf, owner *Config, tier consts.ModelTier) AICallerConfigIf {
+	if base == nil {
+		base = owner
+	}
+	return &tierAwareConsumptionCaller{
+		AICallerConfigIf: base,
+		config:           owner,
+		tier:             tier,
+	}
+}
+
 func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType {
 	outConfig := c
 	return func(config AICallerConfigIf, request *AIRequest) (rsp *AIResponse, err error) {
@@ -56,8 +89,9 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 			if c.AiAutoRetry <= 0 {
 				c.AiAutoRetry = 1
 			}
+			callConfig := wrapCallerWithTierConsumption(config, outConfig, tier)
 			for _idx := 0; _idx < int(c.AiAutoRetry); _idx++ {
-				rsp, err = i(config, request)
+				rsp, err = i(callConfig, request)
 				if err != nil || rsp == nil {
 					c.EmitWarning("ai request err: %v, retry auto time: [%v]", err, _idx+1)
 					time.Sleep(500 * time.Millisecond)
@@ -111,9 +145,11 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 		})
 
 		start := time.Now()
+		callConfig := wrapCallerWithTierConsumption(config, outConfig, tier)
 		for _idx := 0; _idx < int(c.AiAutoRetry); _idx++ {
 			c.InputConsumptionCallback(tokenSize)
-			rsp, err = i(config, request)
+			c.AddTierConsumption(tier, int64(tokenSize), 0)
+			rsp, err = i(callConfig, request)
 			if err != nil || rsp == nil {
 				c.EmitWarning("ai request err: %v, retry auto time: [%v]", err, _idx+1)
 				time.Sleep(500 * time.Millisecond)

@@ -19,8 +19,8 @@ func (c *Config) StartEventLoop(ctx context.Context) {
 func (c *Config) StartEventLoopEx(ctx context.Context, startCall func(), doneCall func()) {
 	c.RegisterBasicSyncHandlers()
 	c.StartInputEventOnce.Do(func() {
-		if c.consumptionUUID == "" {
-			c.consumptionUUID = ksuid.New().String()
+		if c.GetConsumptionUUID() == "" {
+			c.SetConsumptionUUID(ksuid.New().String())
 		}
 		validator := make(chan struct{})
 		go func() {
@@ -48,7 +48,8 @@ func (c *Config) StartEventLoopEx(ctx context.Context, startCall func(), doneCal
 						map[string]any{
 							"input_consumption":  c.GetInputConsumption(),
 							"output_consumption": c.GetOutputConsumption(),
-							"consumption_uuid":   c.consumptionUUID,
+							"consumption_uuid":   c.GetConsumptionUUID(),
+							"tier_consumption":   c.GetTierConsumptionSnapshot(),
 						},
 					)
 				}

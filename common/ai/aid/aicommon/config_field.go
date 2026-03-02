@@ -18,15 +18,39 @@ func (c *Config) GetForgeName() string {
 }
 
 func (c *Config) GetInputConsumption() int64 {
-	return atomic.LoadInt64(c.InputConsumption)
+	state := c.ensureConsumptionState()
+	if state == nil {
+		return 0
+	}
+	input, _ := state.GetConsumptionPointers()
+	if input == nil {
+		return 0
+	}
+	return atomic.LoadInt64(input)
 }
 
 func (c *Config) GetOutputConsumption() int64 {
-	return atomic.LoadInt64(c.OutputConsumption)
+	state := c.ensureConsumptionState()
+	if state == nil {
+		return 0
+	}
+	_, output := state.GetConsumptionPointers()
+	if output == nil {
+		return 0
+	}
+	return atomic.LoadInt64(output)
 }
 
 func (c *Config) InputConsumptionCallback(current int) {
-	atomic.AddInt64(c.InputConsumption, int64(current))
+	state := c.ensureConsumptionState()
+	if state == nil {
+		return
+	}
+	input, _ := state.GetConsumptionPointers()
+	if input == nil {
+		return
+	}
+	atomic.AddInt64(input, int64(current))
 }
 
 func (c *Config) GetSequenceStart() int64 {

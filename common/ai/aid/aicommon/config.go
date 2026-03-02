@@ -32,16 +32,24 @@ type ConfigOption func(*Config) error
 
 type ConfigInitStatus struct {
 	PersistentSessionRestored *utils.AtomicBool
+	ConsumptionState          *ConfigConsumptionState
+	m                         *sync.Mutex
 }
 
 func NewConfigInitStatus() *ConfigInitStatus {
 	return &ConfigInitStatus{
 		PersistentSessionRestored: utils.NewAtomicBool(),
+		ConsumptionState:          NewConfigConsumptionState(),
+		m:                         &sync.Mutex{},
 	}
 }
 
 func (cis *ConfigInitStatus) String() string {
-	return fmt.Sprintf("PersistentSessionRestored: %v", cis.PersistentSessionRestored.IsSet())
+	return fmt.Sprintf(
+		"PersistentSessionRestored: %v, ConsumptionTracked: %v",
+		cis.PersistentSessionRestored.IsSet(),
+		cis.GetOrCreateConsumptionState() != nil,
+	)
 }
 
 func (cis *ConfigInitStatus) SetPersistentSessionRestored(value bool) {
@@ -50,6 +58,21 @@ func (cis *ConfigInitStatus) SetPersistentSessionRestored(value bool) {
 
 func (cis *ConfigInitStatus) IsPersistentSessionRestored() bool {
 	return cis.PersistentSessionRestored.IsSet()
+}
+
+func (cis *ConfigInitStatus) GetOrCreateConsumptionState() *ConfigConsumptionState {
+	if cis == nil {
+		return nil
+	}
+	if cis.m == nil {
+		cis.m = &sync.Mutex{}
+	}
+	cis.m.Lock()
+	defer cis.m.Unlock()
+	if cis.ConsumptionState == nil {
+		cis.ConsumptionState = NewConfigConsumptionState()
+	}
+	return cis.ConsumptionState
 }
 
 type Config struct {
@@ -124,11 +147,6 @@ type Config struct {
 	AiAutoRetry            int64
 	AiTransactionAutoRetry int64
 	PromptHook             func(string) string
-
-	// ai consumption index
-	InputConsumption  *int64
-	OutputConsumption *int64
-	consumptionUUID   string
 
 	/*
 		Prompt Manager
@@ -300,7 +318,6 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 	for _, opt := range opts {
 		opt(config)
 	}
-
 	config.originOptions = opts
 
 	// Initialize checkpoint storage
@@ -378,6 +395,7 @@ func newConfig(ctx context.Context) *Config {
 	// Initialize ID generator
 	seq := rand.Int64N(300) + 200 // avoid zero seq number
 	var provider = utils.NewAtomicInt64IDProvider(seq)
+	initStatus := NewConfigInitStatus()
 
 	config := &Config{
 		HotPatchBroadcaster:                chanx.NewBroadcastChannel[ConfigOption](ctx, 10),
@@ -399,8 +417,6 @@ func newConfig(ctx context.Context) *Config {
 		Language:                           "zh", // Default to Chinese
 		TopToolsCount:                      15,
 		ContextProviderManager:             NewContextProviderManager(),
-		InputConsumption:                   new(int64),
-		OutputConsumption:                  new(int64),
 		AiAutoRetry:                        5,
 		AiTransactionAutoRetry:             5,
 		TimelineContentSizeLimit:           50 * 1024, // Default limit for 50k
@@ -416,7 +432,7 @@ func newConfig(ctx context.Context) *Config {
 		DisallowMCPServers:                 false, // 默认启用 MCP Servers
 		MemoryTriageId:                     "default",
 		m:                                  new(sync.Mutex),
-		InitStatus:                         NewConfigInitStatus(),
+		InitStatus:                         initStatus,
 	}
 	config.AiToolManagerOption = append(config.AiToolManagerOption,
 		buildinaitools.WithNoToolsCache(),
@@ -908,15 +924,16 @@ func (c *Config) LoadBuiltinSkillsFromDir(dirPath string) error {
 }
 
 // Consumption pointers
-func WithAIConsumptionPointers(input *int64, output *int64) ConfigOption {
+func WithAIConsumptionPointers(input *int64, output *int64, tierStats ...*omap.OrderedMap[consts.ModelTier, *ConsumptionStats]) ConfigOption {
 	return func(c *Config) error {
-		if c.m == nil {
-			c.m = &sync.Mutex{}
+		state := c.ensureConsumptionState()
+		if state == nil {
+			return nil
 		}
-		c.m.Lock()
-		c.InputConsumption = input
-		c.OutputConsumption = output
-		c.m.Unlock()
+		state.SetConsumptionPointers(input, output)
+		if len(tierStats) > 0 && tierStats[0] != nil {
+			state.SetTierConsumptionStats(tierStats[0])
+		}
 		return nil
 	}
 }
@@ -1715,9 +1732,12 @@ func WithInitConfigStatus(status *ConfigInitStatus) ConfigOption {
 		if c.m == nil {
 			c.m = &sync.Mutex{}
 		}
+		if status == nil {
+			status = NewConfigInitStatus()
+		}
 		c.m.Lock()
-		defer c.m.Unlock()
 		c.InitStatus = status
+		c.m.Unlock()
 		return nil
 	}
 }
@@ -1758,16 +1778,19 @@ func WithTool(tool *aitool.Tool) ConfigOption {
 	}
 }
 
-func WithConsumption(input, output *int64, logUUID string) ConfigOption {
+func WithConsumption(input, output *int64, logUUID string, tierStats ...*omap.OrderedMap[consts.ModelTier, *ConsumptionStats]) ConfigOption {
 	return func(c *Config) error {
-		if c.m == nil {
-			c.m = &sync.Mutex{}
+		state := c.ensureConsumptionState()
+		if state == nil {
+			return nil
 		}
-		c.m.Lock()
-		defer c.m.Unlock()
-		c.InputConsumption = input
-		c.OutputConsumption = output
-		c.consumptionUUID = logUUID
+		state.SetConsumptionPointers(input, output)
+		if logUUID != "" {
+			state.SetConsumptionUUID(logUUID)
+		}
+		if len(tierStats) > 0 && tierStats[0] != nil {
+			state.SetTierConsumptionStats(tierStats[0])
+		}
 		return nil
 	}
 }
@@ -2216,10 +2239,15 @@ func (c *Config) GetContext() context.Context {
 }
 
 func (c *Config) CallAIResponseConsumptionCallback(i int) {
-	if c.OutputConsumption == nil {
+	state := c.ensureConsumptionState()
+	if state == nil {
 		return
 	}
-	atomic.AddInt64(c.OutputConsumption, int64(i))
+	_, output := state.GetConsumptionPointers()
+	if output == nil {
+		return
+	}
+	atomic.AddInt64(output, int64(i))
 }
 
 func (c *Config) GetAITransactionAutoRetryCount() int64 {
@@ -2696,7 +2724,17 @@ func (c *Config) LoadAIServiceByName(name string, modelName string) error {
 }
 
 func (c *Config) GetConsumptionConfig() (*int64, *int64, string) {
-	return c.InputConsumption, c.OutputConsumption, c.consumptionUUID
+	state := c.ensureConsumptionState()
+	if state == nil {
+		return nil, nil, ""
+	}
+	input, output := state.GetConsumptionPointers()
+	return input, output, state.GetConsumptionUUID()
+}
+
+func (c *Config) GetConsumptionConfigEx() (*int64, *int64, string, *omap.OrderedMap[consts.ModelTier, *ConsumptionStats]) {
+	input, output, uuid := c.GetConsumptionConfig()
+	return input, output, uuid, c.ensureTierConsumptionStats()
 }
 
 func (c *Config) OriginOptions() []ConfigOption {
