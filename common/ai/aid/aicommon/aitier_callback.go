@@ -3,6 +3,7 @@ package aicommon
 import (
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiconfig"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 )
 
@@ -50,7 +51,7 @@ func MustGetDefaultAIModelCallback() AICallbackType {
 	return callback
 }
 
-func MustGetAIModelCallbackByTierAndProviderAndModel(tier aiconfig.ModelTier, providerName, modelName string) AICallbackType {
+func MustGetAIModelCallbackByTierAndProviderAndModel(tier consts.ModelTier, providerName, modelName string) AICallbackType {
 	callback, err := GetAIModelCallbackByTierAndProviderAndModel(tier, providerName, modelName)
 	if err != nil {
 		log.Warnf("you are using aiconfig to get model callback by tier/provider/model, but got error: %v, fallback to legacy chat", err)
@@ -67,7 +68,7 @@ func GetIntelligentAIModelCallback() (AICallbackType, error) {
 	}
 
 	mgr := aiconfig.GetGlobalManager()
-	config := mgr.GetFirstConfig(aiconfig.TierIntelligent)
+	config := mgr.GetFirstConfig(consts.TierIntelligent)
 	if config == nil {
 		return nil, aiconfig.ErrNoConfigAvailable
 	}
@@ -83,7 +84,7 @@ func GetLightweightAIModelCallback() (AICallbackType, error) {
 	}
 
 	mgr := aiconfig.GetGlobalManager()
-	config := mgr.GetFirstConfig(aiconfig.TierLightweight)
+	config := mgr.GetFirstConfig(consts.TierLightweight)
 	if config == nil {
 		return nil, aiconfig.ErrNoConfigAvailable
 	}
@@ -99,7 +100,7 @@ func GetVisionAIModelCallback() (AICallbackType, error) {
 	}
 
 	mgr := aiconfig.GetGlobalManager()
-	config := mgr.GetFirstConfig(aiconfig.TierVision)
+	config := mgr.GetFirstConfig(consts.TierVision)
 	if config == nil {
 		return nil, aiconfig.ErrNoConfigAvailable
 	}
@@ -128,7 +129,7 @@ func GetDefaultAIModelCallback() (AICallbackType, error) {
 
 // GetAIModelCallbackByTierAndProviderAndModel returns the AI callback for the first config
 // matching tier + provider name + model name.
-func GetAIModelCallbackByTierAndProviderAndModel(tier aiconfig.ModelTier, providerName, modelName string) (AICallbackType, error) {
+func GetAIModelCallbackByTierAndProviderAndModel(tier consts.ModelTier, providerName, modelName string) (AICallbackType, error) {
 	if !aiconfig.IsTieredAIConfig() {
 		return nil, aiconfig.ErrTieredConfigDisabled
 	}
@@ -143,13 +144,13 @@ func GetAIModelCallbackByTierAndProviderAndModel(tier aiconfig.ModelTier, provid
 }
 
 // GetCallbackByTier returns the AI callback for a specific model tier
-func GetCallbackByTier(tier aiconfig.ModelTier) (AICallbackType, error) {
+func GetCallbackByTier(tier consts.ModelTier) (AICallbackType, error) {
 	switch tier {
-	case aiconfig.TierIntelligent:
+	case consts.TierIntelligent:
 		return GetIntelligentAIModelCallback()
-	case aiconfig.TierLightweight:
+	case consts.TierLightweight:
 		return GetLightweightAIModelCallback()
-	case aiconfig.TierVision:
+	case consts.TierVision:
 		return GetVisionAIModelCallback()
 	default:
 		log.Warnf("Unknown model tier: %s, using intelligent model", tier)
@@ -159,7 +160,7 @@ func GetCallbackByTier(tier aiconfig.ModelTier) (AICallbackType, error) {
 
 // TryGetCallbackWithFallback tries to get a callback for the specified tier
 // If the tier is not available and fallback is enabled, it falls back to lightweight model
-func TryGetCallbackWithFallback(tier aiconfig.ModelTier) (AICallbackType, error) {
+func TryGetCallbackWithFallback(tier consts.ModelTier) (AICallbackType, error) {
 	callback, err := GetCallbackByTier(tier)
 	if err == nil {
 		return callback, nil
@@ -171,7 +172,7 @@ func TryGetCallbackWithFallback(tier aiconfig.ModelTier) (AICallbackType, error)
 	}
 
 	// Try fallback to lightweight model
-	if tier != aiconfig.TierLightweight {
+	if tier != consts.TierLightweight {
 		log.Debugf("Falling back from %s to lightweight model", tier)
 		fallbackCallback, fallbackErr := GetLightweightAIModelCallback()
 		if fallbackErr == nil {

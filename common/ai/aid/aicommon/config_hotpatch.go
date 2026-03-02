@@ -2,6 +2,7 @@ package aicommon
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/consts"
 
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiconfig"
@@ -81,10 +82,10 @@ var (
 
 	hotPatchPromoteIntelligentConfig = func(serviceName, modelName string) error {
 		mgr := aiconfig.GetGlobalManager()
-		return mgr.PromoteFirstConfigByTierAndProviderAndModel(aiconfig.TierIntelligent, serviceName, modelName)
+		return mgr.PromoteFirstConfigByTierAndProviderAndModel(consts.TierIntelligent, serviceName, modelName)
 	}
 	hotPatchGetIntelligentCallback = func(serviceName, modelName string) (AICallbackType, error) {
-		return GetAIModelCallbackByTierAndProviderAndModel(aiconfig.TierIntelligent, serviceName, modelName)
+		return GetAIModelCallbackByTierAndProviderAndModel(consts.TierIntelligent, serviceName, modelName)
 	}
 	hotPatchLoadChater = func(serviceName string, defaultOpts ...aispec.AIConfigOption) (aispec.GeneralChatter, error) {
 		return ai.LoadChater(serviceName, defaultOpts...)

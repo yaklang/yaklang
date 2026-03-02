@@ -9,16 +9,16 @@ import (
 )
 
 func TestModelTierConstants(t *testing.T) {
-	assert.Equal(t, ModelTier("intelligent"), TierIntelligent)
-	assert.Equal(t, ModelTier("lightweight"), TierLightweight)
-	assert.Equal(t, ModelTier("vision"), TierVision)
+	assert.Equal(t, consts.ModelTier("intelligent"), consts.TierIntelligent)
+	assert.Equal(t, consts.ModelTier("lightweight"), consts.TierLightweight)
+	assert.Equal(t, consts.ModelTier("vision"), consts.TierVision)
 }
 
 func TestRoutingPolicyConstants(t *testing.T) {
-	assert.Equal(t, consts.PolicyAuto, PolicyAuto)
-	assert.Equal(t, consts.PolicyPerformance, PolicyPerformance)
-	assert.Equal(t, consts.PolicyCost, PolicyCost)
-	assert.Equal(t, consts.PolicyBalance, PolicyBalance)
+	assert.Equal(t, consts.PolicyAuto, consts.PolicyAuto)
+	assert.Equal(t, consts.PolicyPerformance, consts.PolicyPerformance)
+	assert.Equal(t, consts.PolicyCost, consts.PolicyCost)
+	assert.Equal(t, consts.PolicyBalance, consts.PolicyBalance)
 }
 
 func TestIsTieredAIConfig(t *testing.T) {
@@ -60,14 +60,14 @@ func TestGetCurrentPolicy(t *testing.T) {
 
 	// Test default policy
 	consts.SetTieredAIConfig(nil)
-	assert.Equal(t, PolicyBalance, GetCurrentPolicy())
+	assert.Equal(t, consts.PolicyBalance, GetCurrentPolicy())
 
 	// Test with explicit policy
 	consts.SetTieredAIConfig(&consts.TieredAIConfig{
 		Enabled:       true,
 		RoutingPolicy: consts.PolicyPerformance,
 	})
-	assert.Equal(t, PolicyPerformance, GetCurrentPolicy())
+	assert.Equal(t, consts.PolicyPerformance, GetCurrentPolicy())
 }
 
 func TestAIConfigManager(t *testing.T) {
@@ -107,15 +107,15 @@ func TestGetConfigsByTier(t *testing.T) {
 	mgr := &AIConfigManager{}
 
 	// Test getting configs by tier
-	intelligentConfigs := mgr.GetConfigsByTier(TierIntelligent)
+	intelligentConfigs := mgr.GetConfigsByTier(consts.TierIntelligent)
 	assert.Len(t, intelligentConfigs, 1)
 	assert.Equal(t, "test-key", intelligentConfigs[0].GetProvider().GetAPIKey())
 
-	lightweightConfigs := mgr.GetConfigsByTier(TierLightweight)
+	lightweightConfigs := mgr.GetConfigsByTier(consts.TierLightweight)
 	assert.Len(t, lightweightConfigs, 1)
 	assert.Equal(t, "light-key", lightweightConfigs[0].GetProvider().GetAPIKey())
 
-	visionConfigs := mgr.GetConfigsByTier(TierVision)
+	visionConfigs := mgr.GetConfigsByTier(consts.TierVision)
 	assert.Len(t, visionConfigs, 1)
 	assert.Equal(t, "vision-key", visionConfigs[0].GetProvider().GetAPIKey())
 }
@@ -134,7 +134,7 @@ func TestGetFirstConfig(t *testing.T) {
 	})
 
 	mgr := GetGlobalManager()
-	config := mgr.GetFirstConfig(TierIntelligent)
+	config := mgr.GetFirstConfig(consts.TierIntelligent)
 	assert.NotNil(t, config)
 	assert.Equal(t, "first", config.GetProvider().GetAPIKey())
 
@@ -143,7 +143,7 @@ func TestGetFirstConfig(t *testing.T) {
 		Enabled:            true,
 		IntelligentConfigs: nil,
 	})
-	config = mgr.GetFirstConfig(TierIntelligent)
+	config = mgr.GetFirstConfig(consts.TierIntelligent)
 	assert.Nil(t, config)
 }
 
@@ -171,23 +171,23 @@ func TestGetFirstConfigByTierAndProviderAndModel(t *testing.T) {
 
 	mgr := &AIConfigManager{}
 
-	config := mgr.GetFirstConfigByTierAndProviderAndModel(TierIntelligent, "openai", "gpt-4.1")
+	config := mgr.GetFirstConfigByTierAndProviderAndModel(consts.TierIntelligent, "openai", "gpt-4.1")
 	assert.NotNil(t, config)
 	assert.Equal(t, "second", config.GetProvider().GetAPIKey())
 
-	config = mgr.GetFirstConfigByTierAndProviderAndModel(TierIntelligent, "OPENAI", "GPT-4O")
+	config = mgr.GetFirstConfigByTierAndProviderAndModel(consts.TierIntelligent, "OPENAI", "GPT-4O")
 	assert.NotNil(t, config)
 	assert.Equal(t, "first", config.GetProvider().GetAPIKey())
 
-	config = mgr.GetFirstConfigByTierAndProviderAndModel(TierIntelligent, "", "gpt-4o")
+	config = mgr.GetFirstConfigByTierAndProviderAndModel(consts.TierIntelligent, "", "gpt-4o")
 	assert.NotNil(t, config)
 	assert.Equal(t, "first", config.GetProvider().GetAPIKey())
 
-	config = mgr.GetFirstConfigByTierAndProviderAndModel(TierIntelligent, "aibalance", "")
+	config = mgr.GetFirstConfigByTierAndProviderAndModel(consts.TierIntelligent, "aibalance", "")
 	assert.NotNil(t, config)
 	assert.Equal(t, "third", config.GetProvider().GetAPIKey())
 
-	config = mgr.GetFirstConfigByTierAndProviderAndModel(TierIntelligent, "openai", "not-exist")
+	config = mgr.GetFirstConfigByTierAndProviderAndModel(consts.TierIntelligent, "openai", "not-exist")
 	assert.Nil(t, config)
 }
 
@@ -231,7 +231,7 @@ func TestPromoteFirstConfigByTierAndProviderAndModel(t *testing.T) {
 	}
 
 	mgr := &AIConfigManager{}
-	err := mgr.PromoteFirstConfigByTierAndProviderAndModel(TierIntelligent, "openai", "gpt-4.1")
+	err := mgr.PromoteFirstConfigByTierAndProviderAndModel(consts.TierIntelligent, "openai", "gpt-4.1")
 	assert.NoError(t, err)
 	assert.True(t, saveCalled)
 	assert.True(t, applyCalled)
@@ -271,7 +271,7 @@ func TestPromoteFirstConfigByTierAndProviderAndModel_NotFound(t *testing.T) {
 	}
 
 	mgr := &AIConfigManager{}
-	err := mgr.PromoteFirstConfigByTierAndProviderAndModel(TierIntelligent, "openai", "gpt-4.1")
+	err := mgr.PromoteFirstConfigByTierAndProviderAndModel(consts.TierIntelligent, "openai", "gpt-4.1")
 	assert.Error(t, err)
 	assert.False(t, saveCalled)
 	assert.False(t, applyCalled)
@@ -299,42 +299,42 @@ func TestGetModelByPolicy(t *testing.T) {
 	})
 
 	// Test performance policy
-	config, err := GetModelByPolicy(PolicyPerformance)
+	config, err := GetModelByPolicy(consts.PolicyPerformance)
 	assert.NoError(t, err)
 	assert.Equal(t, "intelligent-key", config.GetProvider().GetAPIKey())
 
 	// Test cost policy
-	config, err = GetModelByPolicy(PolicyCost)
+	config, err = GetModelByPolicy(consts.PolicyCost)
 	assert.NoError(t, err)
 	assert.Equal(t, "lightweight-key", config.GetProvider().GetAPIKey())
 
 	// Test balance policy
-	config, err = GetModelByPolicy(PolicyBalance)
+	config, err = GetModelByPolicy(consts.PolicyBalance)
 	assert.NoError(t, err)
 	assert.Equal(t, "lightweight-key", config.GetProvider().GetAPIKey())
 
 	// Test auto policy
-	config, err = GetModelByPolicy(PolicyAuto)
+	config, err = GetModelByPolicy(consts.PolicyAuto)
 	assert.NoError(t, err)
 	assert.Equal(t, "lightweight-key", config.GetProvider().GetAPIKey())
 }
 
 func TestSelectTierByPolicy(t *testing.T) {
 	// Test performance policy (always intelligent)
-	assert.Equal(t, TierIntelligent, SelectTierByPolicy(PolicyPerformance, false))
-	assert.Equal(t, TierIntelligent, SelectTierByPolicy(PolicyPerformance, true))
+	assert.Equal(t, consts.TierIntelligent, SelectTierByPolicy(consts.PolicyPerformance, false))
+	assert.Equal(t, consts.TierIntelligent, SelectTierByPolicy(consts.PolicyPerformance, true))
 
 	// Test cost policy (always lightweight)
-	assert.Equal(t, TierLightweight, SelectTierByPolicy(PolicyCost, false))
-	assert.Equal(t, TierLightweight, SelectTierByPolicy(PolicyCost, true))
+	assert.Equal(t, consts.TierLightweight, SelectTierByPolicy(consts.PolicyCost, false))
+	assert.Equal(t, consts.TierLightweight, SelectTierByPolicy(consts.PolicyCost, true))
 
 	// Test balance policy
-	assert.Equal(t, TierLightweight, SelectTierByPolicy(PolicyBalance, false))
-	assert.Equal(t, TierIntelligent, SelectTierByPolicy(PolicyBalance, true))
+	assert.Equal(t, consts.TierLightweight, SelectTierByPolicy(consts.PolicyBalance, false))
+	assert.Equal(t, consts.TierIntelligent, SelectTierByPolicy(consts.PolicyBalance, true))
 
 	// Test auto policy
-	assert.Equal(t, TierLightweight, SelectTierByPolicy(PolicyAuto, false))
-	assert.Equal(t, TierIntelligent, SelectTierByPolicy(PolicyAuto, true))
+	assert.Equal(t, consts.TierLightweight, SelectTierByPolicy(consts.PolicyAuto, false))
+	assert.Equal(t, consts.TierIntelligent, SelectTierByPolicy(consts.PolicyAuto, true))
 }
 
 func TestIsComplexTask(t *testing.T) {

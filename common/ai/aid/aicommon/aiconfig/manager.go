@@ -45,7 +45,7 @@ func IsTieredAIConfig() bool {
 }
 
 // GetCurrentPolicy returns the current user-configured routing policy
-func GetCurrentPolicy() RoutingPolicy {
+func GetCurrentPolicy() consts.RoutingPolicy {
 	EnsureConfigLoaded()
 	return consts.GetTieredAIRoutingPolicy()
 }
@@ -66,13 +66,13 @@ func (m *AIConfigManager) GetVisionConfigs() []*ypb.AIModelConfig {
 }
 
 // GetConfigsByTier returns configurations for a specific model tier
-func (m *AIConfigManager) GetConfigsByTier(tier ModelTier) []*ypb.AIModelConfig {
+func (m *AIConfigManager) GetConfigsByTier(tier consts.ModelTier) []*ypb.AIModelConfig {
 	switch tier {
-	case TierIntelligent:
+	case consts.TierIntelligent:
 		return m.GetIntelligentConfigs()
-	case TierLightweight:
+	case consts.TierLightweight:
 		return m.GetLightweightConfigs()
-	case TierVision:
+	case consts.TierVision:
 		return m.GetVisionConfigs()
 	default:
 		log.Warnf("Unknown model tier: %s, falling back to intelligent", tier)
@@ -82,7 +82,7 @@ func (m *AIConfigManager) GetConfigsByTier(tier ModelTier) []*ypb.AIModelConfig 
 
 // GetFirstConfig returns the first configuration for a specific tier
 // Returns nil if no configuration is available
-func (m *AIConfigManager) GetFirstConfig(tier ModelTier) *ypb.AIModelConfig {
+func (m *AIConfigManager) GetFirstConfig(tier consts.ModelTier) *ypb.AIModelConfig {
 	configs := m.GetConfigsByTier(tier)
 	if len(configs) == 0 {
 		return nil
@@ -94,7 +94,7 @@ func (m *AIConfigManager) GetFirstConfig(tier ModelTier) *ypb.AIModelConfig {
 // providerName maps to AIModelConfig.Provider.Type.
 // modelName maps to AIModelConfig.ModelName or the `model` key in ExtraParams.
 // Empty providerName or modelName means no filtering on that dimension.
-func (m *AIConfigManager) GetFirstConfigByTierAndProviderAndModel(tier ModelTier, providerName, modelName string) *ypb.AIModelConfig {
+func (m *AIConfigManager) GetFirstConfigByTierAndProviderAndModel(tier consts.ModelTier, providerName, modelName string) *ypb.AIModelConfig {
 	configs := m.GetConfigsByTier(tier)
 	if len(configs) == 0 {
 		return nil
@@ -114,7 +114,7 @@ func (m *AIConfigManager) GetFirstConfigByTierAndProviderAndModel(tier ModelTier
 
 // PromoteFirstConfigByTierAndProviderAndModel moves the first matched model config
 // to the top of the specified tier and persists the change to database.
-func (m *AIConfigManager) PromoteFirstConfigByTierAndProviderAndModel(tier ModelTier, providerName, modelName string) error {
+func (m *AIConfigManager) PromoteFirstConfigByTierAndProviderAndModel(tier consts.ModelTier, providerName, modelName string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -184,26 +184,26 @@ func isConfigMatchedByProviderAndModel(cfg *ypb.AIModelConfig, providerName, mod
 	return true
 }
 
-func getModelsByTierFromGlobalConfig(cfg *ypb.AIGlobalConfig, tier ModelTier) ([]*ypb.AIModelConfig, error) {
+func getModelsByTierFromGlobalConfig(cfg *ypb.AIGlobalConfig, tier consts.ModelTier) ([]*ypb.AIModelConfig, error) {
 	switch tier {
-	case TierIntelligent:
+	case consts.TierIntelligent:
 		return cfg.GetIntelligentModels(), nil
-	case TierLightweight:
+	case consts.TierLightweight:
 		return cfg.GetLightweightModels(), nil
-	case TierVision:
+	case consts.TierVision:
 		return cfg.GetVisionModels(), nil
 	default:
 		return nil, utils.Errorf("invalid model tier: %s", tier)
 	}
 }
 
-func setModelsByTierInGlobalConfig(cfg *ypb.AIGlobalConfig, tier ModelTier, models []*ypb.AIModelConfig) {
+func setModelsByTierInGlobalConfig(cfg *ypb.AIGlobalConfig, tier consts.ModelTier, models []*ypb.AIModelConfig) {
 	switch tier {
-	case TierIntelligent:
+	case consts.TierIntelligent:
 		cfg.IntelligentModels = models
-	case TierLightweight:
+	case consts.TierLightweight:
 		cfg.LightweightModels = models
-	case TierVision:
+	case consts.TierVision:
 		cfg.VisionModels = models
 	}
 }
@@ -241,21 +241,21 @@ func getModelFromConfig(config *ypb.AIModelConfig) string {
 // - performance: uses intelligent model
 // - cost: uses lightweight model
 // - balance: uses lightweight model by default
-func GetModelByPolicy(policy RoutingPolicy) (*ypb.AIModelConfig, error) {
+func GetModelByPolicy(policy consts.RoutingPolicy) (*ypb.AIModelConfig, error) {
 	mgr := GetGlobalManager()
 
 	var config *ypb.AIModelConfig
 	switch policy {
-	case PolicyPerformance:
-		config = mgr.GetFirstConfig(TierIntelligent)
-	case PolicyCost:
-		config = mgr.GetFirstConfig(TierLightweight)
-	case PolicyBalance, PolicyAuto:
+	case consts.PolicyPerformance:
+		config = mgr.GetFirstConfig(consts.TierIntelligent)
+	case consts.PolicyCost:
+		config = mgr.GetFirstConfig(consts.TierLightweight)
+	case consts.PolicyBalance, consts.PolicyAuto:
 		// Balance mode: default to lightweight
-		config = mgr.GetFirstConfig(TierLightweight)
+		config = mgr.GetFirstConfig(consts.TierLightweight)
 	default:
 		// Default to lightweight
-		config = mgr.GetFirstConfig(TierLightweight)
+		config = mgr.GetFirstConfig(consts.TierLightweight)
 	}
 
 	if config == nil {

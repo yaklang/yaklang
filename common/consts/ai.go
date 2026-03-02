@@ -31,6 +31,17 @@ func SetAIPrimaryType(t string) {
 // RoutingPolicy defines the model routing strategy
 type RoutingPolicy string
 
+type ModelTier string
+
+const (
+	// TierIntelligent represents high-intelligence models for complex tasks
+	TierIntelligent ModelTier = "intelligent"
+	// TierLightweight represents lightweight models for simple and fast tasks
+	TierLightweight ModelTier = "lightweight"
+	// TierVision represents vision models for image understanding tasks
+	TierVision ModelTier = "vision"
+)
+
 const (
 	// PolicyAuto automatically selects the appropriate model based on the request
 	PolicyAuto RoutingPolicy = "auto"
