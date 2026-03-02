@@ -190,7 +190,9 @@ func hasLoopConfigFlag(token string, flag string) bool {
 }
 
 func (r *ReAct) ExecuteLoopTaskIF(taskTypeName string, task aicommon.AIStatefulTask, options ...any) (bool, error) {
-	var loopOptions []reactloops.ReActLoopOption
+	loopOptions := []reactloops.ReActLoopOption{
+		reactloops.WithNoEndLoadingStatus(true),
+	}
 	for _, option := range options {
 		opt, ok := option.(reactloops.ReActLoopOption)
 		if ok {

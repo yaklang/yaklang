@@ -135,6 +135,8 @@ type ReActLoop struct {
 	// Extra capabilities discovered via intent recognition
 	// Rendered as a dedicated prompt section, separate from core tools
 	extraCapabilities *ExtraCapabilitiesManager
+
+	noEndLoadingStatus bool
 }
 
 func (r *ReActLoop) IncrementSpinWarning() {
