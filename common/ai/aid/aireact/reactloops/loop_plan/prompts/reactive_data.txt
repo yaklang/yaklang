@@ -1,4 +1,19 @@
-{{ if .Plan }}## 现有计划区块
+{{ if not .Plan }}{{ if not .FileResults }}{{ if not .WebResults }}{{ if not .Enhance }}## 探索优先提示
+
+当前尚未收集到任何事实数据（无文件信息、无搜索结果、无补充知识）。在此阶段直接输出计划很可能产生泛化、模板化的内容。
+
+**强烈建议先使用信息收集工具进行探索**，例如：
+- 用 `find_files` 了解项目结构或目标环境
+- 用 `grep_text` 搜索关键代码或配置
+- 用 `read_file` 阅读核心文件内容
+- 用 `web_search` 获取领域最佳实践
+- 用 `search_knowledge` 搜索知识库补充背景知识
+- 用 `loading_skills` 加载专业技能获取操作指南
+
+基于真实数据规划出的任务才会具体、可执行，而非空泛的通用步骤。
+{{ end }}{{ end }}{{ end }}{{ end }}{{/*
+
+*/}}{{ if .Plan }}## 现有计划区块
 * 现有的计划会在下面做展示，你在生成计划的时候可以参考
 <|CURRENT_PLAN_{{ .Nonce }}|>
 {{ .Plan }}
