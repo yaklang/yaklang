@@ -77,6 +77,24 @@ func (v *Value) IsList() bool {
 	return v.GetTypeKind() == ssa.SliceTypeKind
 }
 
+func (v *Value) GetSourceBitVector() *utils.BitVector {
+	if v == nil || v.sourceBits == nil {
+		return nil
+	}
+	return v.sourceBits
+}
+
+func (v *Value) SetSourceBitVector(bits *utils.BitVector) {
+	if v == nil {
+		return
+	}
+	if bits == nil {
+		v.sourceBits = nil
+		return
+	}
+	v.sourceBits = bits.Clone()
+}
+
 func (v *Value) ExactMatch(ctx context.Context, mod ssadb.MatchMode, want string) (bool, sfvm.ValueOperator, error) {
 	value := _SearchValue(v, mod, func(s string) bool { return s == want }, sfvm.WithAnalysisContext_Label("search-exact:"+want))
 	return len(value) > 0, ValuesToSFValueList(value), nil

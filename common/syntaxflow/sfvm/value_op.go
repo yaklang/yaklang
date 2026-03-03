@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
@@ -99,51 +100,61 @@ func MatchModeString(mode int) string {
 }
 
 type ValueOperator interface {
+	// Basic shape and debug text.
 	String() string
 	IsMap() bool
 	IsList() bool
 	IsEmpty() bool
+
+	// Candidate-mode condition optimization switch.
 	ShouldUseConditionCandidate() bool
+
+	// IR/operator metadata for comparator opcodes.
 	GetOpcode() string
 	GetBinaryOperator() string
 	GetUnaryOperator() string
 	// Len() int
 
-	// Recursive will execute with handler for every list or map
+	// Recursive visits each leaf value in a list/map carrier.
 	Recursive(func(ValueOperator) error) error
 
-	// ExactMatch return ops, for OpPushSearchExact
+	// Search and name/key matching.
 	ExactMatch(context.Context, ssadb.MatchMode, string) (bool, ValueOperator, error)
-	// GlobMatch return opts, for OpPushSearchGlob
 	GlobMatch(context.Context, ssadb.MatchMode, string) (bool, ValueOperator, error)
-	// RegexpMatch for OpPushSearchRegexp
 	RegexpMatch(context.Context, ssadb.MatchMode, string) (bool, ValueOperator, error)
 
+	// Graph navigation.
 	GetCalled() (ValueOperator, error)
 	GetCallActualParams(int, bool) (ValueOperator, error)
 	GetFields() (ValueOperator, error)
 
-	// GetTopDef and GetBottomUse is for OpBottomUse
-	// use and def
+	// Def-use queries.
 	GetSyntaxFlowUse() (ValueOperator, error)
 	GetSyntaxFlowDef() (ValueOperator, error)
-	// top and bottom
 	GetSyntaxFlowTopDef(*SFFrameResult, *Config, ...*RecursiveConfigItem) (ValueOperator, error)
 	GetSyntaxFlowBottomUse(*SFFrameResult, *Config, ...*RecursiveConfigItem) (ValueOperator, error)
 
-	// ListIndex for OpListIndex, like a[1] a must be list...
+	// List projection for OpListIndex.
 	ListIndex(i int) (ValueOperator, error)
 
+	// Set-like collection operations.
 	Merge(...ValueOperator) (ValueOperator, error)
 	Remove(...ValueOperator) (ValueOperator, error)
 
+	// Optional provenance edge tracking used by some traversals.
 	AppendPredecessor(ValueOperator, ...AnalysisContextOption) error
 
-	// fileFilter
+	// File content filtering.
 	FileFilter(string, string, map[string]string, []string) (ValueOperator, error)
 
+	// Condition comparators.
 	CompareString(*StringComparator) (ValueOperator, []bool)
 	CompareOpcode(*OpcodeComparator) (ValueOperator, []bool)
 	CompareConst(*ConstComparator) []bool
 	NewConst(any, ...*memedit.Range) ValueOperator
+
+	// Source bitvector provenance for condition mask alignment.
+	// The vector records which source slots this value can map back to.
+	GetSourceBitVector() *utils.BitVector
+	SetSourceBitVector(*utils.BitVector)
 }

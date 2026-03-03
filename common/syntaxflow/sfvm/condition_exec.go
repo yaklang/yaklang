@@ -1,8 +1,6 @@
 package sfvm
 
 import (
-	"reflect"
-
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -87,92 +85,63 @@ func flattenValues(value ValueOperator) []ValueOperator {
 	return result
 }
 
-func collectPredecessorNodes(value any) []any {
-	if value == nil {
-		return nil
-	}
-	rawVal := reflect.ValueOf(value)
-	if !rawVal.IsValid() {
-		return nil
-	}
-	method := rawVal.MethodByName("GetPredecessors")
-	if !method.IsValid() || method.Type().NumIn() != 0 || method.Type().NumOut() != 1 {
-		return nil
-	}
-	outs := method.Call(nil)
-	if len(outs) != 1 {
-		return nil
-	}
-	preds := outs[0]
-	if !preds.IsValid() || preds.Kind() != reflect.Slice {
-		return nil
-	}
-	nodes := make([]any, 0, preds.Len())
-	for i := 0; i < preds.Len(); i++ {
-		pred := preds.Index(i)
-		if !pred.IsValid() {
-			continue
-		}
-		if pred.Kind() == reflect.Ptr && pred.IsNil() {
-			continue
-		}
-		if pred.Kind() == reflect.Ptr {
-			pred = pred.Elem()
-		}
-		if !pred.IsValid() || pred.Kind() != reflect.Struct {
-			continue
-		}
-		nodeField := pred.FieldByName("Node")
-		if !nodeField.IsValid() {
-			continue
-		}
-		if nodeField.Kind() == reflect.Ptr && nodeField.IsNil() {
-			continue
-		}
-		nodes = append(nodes, nodeField.Interface())
-	}
-	return nodes
-}
-
-func collectReachableSourceIDs(value ValueOperator) []int64 {
-	if utils.IsNil(value) {
-		return nil
-	}
-	var ids []int64
-	queue := []any{value}
-	visited := make(map[int64]struct{})
-	for len(queue) > 0 {
-		current := queue[0]
-		queue = queue[1:]
-		if current == nil {
-			continue
-		}
-		idGetter, ok := current.(ssa.GetIdIF)
-		if !ok {
-			continue
-		}
-		id := idGetter.GetId()
-		if _, existed := visited[id]; existed {
-			continue
-		}
-		visited[id] = struct{}{}
-		ids = append(ids, id)
-		queue = append(queue, collectPredecessorNodes(current)...)
-	}
-	return ids
-}
-
-func buildSourceIDIndex(source []ValueOperator) map[int64][]int {
-	index := make(map[int64][]int, len(source))
-	for i, src := range source {
+func ensureSourceBitVector(source []ValueOperator) {
+	for idx, src := range source {
 		if utils.IsNil(src) {
 			continue
 		}
-		if idGetter, ok := src.(ssa.GetIdIF); ok {
-			index[idGetter.GetId()] = append(index[idGetter.GetId()], i)
+		bits := src.GetSourceBitVector()
+		if bits == nil {
+			bits = utils.NewBitVector()
+		}
+		bits.Set(idx)
+		src.SetSourceBitVector(bits)
+	}
+}
+
+func markMaskByBitVector(mask []bool, bits *utils.BitVector) bool {
+	if bits == nil || bits.IsEmpty() {
+		return false
+	}
+	matched := false
+	bits.ForEach(func(index int) {
+		if index >= 0 && index < len(mask) {
+			mask[index] = true
+			matched = true
+		}
+	})
+	return matched
+}
+
+func mergeSourceBitVector(dst ValueOperator, src ValueOperator) {
+	if utils.IsNil(dst) || utils.IsNil(src) {
+		return
+	}
+	srcBits := src.GetSourceBitVector()
+	if srcBits == nil || srcBits.IsEmpty() {
+		return
+	}
+	dstBits := dst.GetSourceBitVector()
+	if dstBits == nil {
+		dst.SetSourceBitVector(srcBits)
+		return
+	}
+	merged := dstBits.Clone()
+	merged.Or(srcBits)
+	dst.SetSourceBitVector(merged)
+}
+
+func buildValueByID(values []ValueOperator) map[int64]ValueOperator {
+	res := make(map[int64]ValueOperator, len(values))
+	for _, value := range values {
+		if utils.IsNil(value) {
+			continue
+		}
+		if idGetter, ok := value.(ssa.GetIdIF); ok {
+			res[idGetter.GetId()] = value
 		}
 	}
-	return index
+	return res
 }
 
 func normalizeConditionAgainstSource(source ValueOperator, result ValueOperator, cond []bool) ([]bool, error) {
@@ -181,6 +150,7 @@ func normalizeConditionAgainstSource(source ValueOperator, result ValueOperator,
 	if width == 0 {
 		return nil, nil
 	}
+	ensureSourceBitVector(sourceVals)
 	if len(cond) == width {
 		return cond, nil
 	}
@@ -200,10 +170,8 @@ func normalizeConditionAgainstSource(source ValueOperator, result ValueOperator,
 		return []bool{matched}, nil
 	}
 
-	// General case: map result values back to source only by direct ID.
-	// Compare operators should not expand via predecessor chain here.
+	// General case: map result values back to source by bitvector only.
 	mask := make([]bool, width)
-	sourceByID := buildSourceIDIndex(sourceVals)
 	hasTruthCondition := len(cond) == 0
 	resIndex := 0
 	if !utils.IsNil(result) {
@@ -221,16 +189,7 @@ func normalizeConditionAgainstSource(source ValueOperator, result ValueOperator,
 				return nil
 			}
 			hasTruthCondition = true
-			if idGetter, ok := operator.(ssa.GetIdIF); ok {
-				if positions, existed := sourceByID[idGetter.GetId()]; existed {
-					for _, pos := range positions {
-						if pos >= 0 && pos < len(mask) {
-							mask[pos] = true
-						}
-					}
-					return nil
-				}
-			}
+			markMaskByBitVector(mask, operator.GetSourceBitVector())
 			return nil
 		}); err != nil {
 			return nil, err
@@ -288,6 +247,8 @@ func mergeValuesByID(left ValueOperator, right ValueOperator, andMode bool) Valu
 	rightVals := flattenValues(right)
 	leftSet := valueSetFromValues(leftVals)
 	rightSet := valueSetFromValues(rightVals)
+	leftByIDMap := buildValueByID(leftVals)
+	rightByIDMap := buildValueByID(rightVals)
 	leftByID := leftSet.List()
 	rightByID := rightSet.List()
 
@@ -334,58 +295,19 @@ func mergeValuesByID(left ValueOperator, right ValueOperator, andMode bool) Valu
 			out = orSet.List()
 		}
 	}
+	for _, value := range out {
+		idGetter, ok := value.(ssa.GetIdIF)
+		if !ok {
+			continue
+		}
+		if leftValue, ok := leftByIDMap[idGetter.GetId()]; ok {
+			mergeSourceBitVector(value, leftValue)
+		}
+		if rightValue, ok := rightByIDMap[idGetter.GetId()]; ok {
+			mergeSourceBitVector(value, rightValue)
+		}
+	}
 	return NewValues(out)
-}
-
-func normalizeConditionEntryAgainstSource(source ValueOperator, entry ConditionEntry) (ConditionEntry, error) {
-	switch entry.Mode {
-	case ConditionModeMask:
-		mask, err := normalizeConditionAgainstSource(source, entry.Candidate, entry.Mask)
-		if err != nil {
-			return ConditionEntry{}, err
-		}
-		return newMaskCondition(mask, entry.Candidate), nil
-	case ConditionModeCandidate:
-		width := len(flattenValues(source))
-		if width == 0 {
-			return newMaskCondition(nil, entry.Candidate), nil
-		}
-		if !utils.IsNil(entry.Candidate) && !entry.Candidate.IsEmpty() {
-			mask, err := normalizeConditionAgainstSource(source, entry.Candidate, nil)
-			if err != nil {
-				return ConditionEntry{}, err
-			}
-			if entry.Matched && len(mask) == 1 {
-				mask[0] = true
-			}
-			return newMaskCondition(mask, entry.Candidate), nil
-		}
-		mask := make([]bool, width)
-		if entry.Matched && width == 1 {
-			mask[0] = true
-		}
-		return newMaskCondition(mask, entry.Candidate), nil
-	default:
-		return newMaskCondition(nil, nil), nil
-	}
-}
-
-func coerceConditionEntryToMode(source ValueOperator, entry ConditionEntry, targetMode ConditionMode) (ConditionEntry, error) {
-	if entry.Mode == targetMode {
-		if targetMode == ConditionModeMask {
-			return normalizeConditionEntryAgainstSource(source, entry)
-		}
-		return entry, nil
-	}
-
-	switch targetMode {
-	case ConditionModeMask:
-		return normalizeConditionEntryAgainstSource(source, entry)
-	case ConditionModeCandidate:
-		return newCandidateCondition(anyTrue(entry.Mask), entry.Candidate), nil
-	default:
-		return entry, nil
-	}
 }
 
 func buildConditionEntry(source ValueOperator, cond []bool, candidate ValueOperator, fromCompare bool) (ConditionEntry, error) {
@@ -409,30 +331,16 @@ func buildConditionEntry(source ValueOperator, cond []bool, candidate ValueOpera
 }
 
 func (s *SFFrame) pushCondition(source ValueOperator, cond []bool, candidate ValueOperator, fromCompare bool) error {
-	if fromCompare {
-		entry, err := buildConditionEntry(source, cond, candidate, true)
-		if err != nil {
-			return err
-		}
-		s.conditionStack.Push(entry)
-		return nil
-	} else {
-		entry, err := buildConditionEntry(source, cond, candidate, false)
-		if err != nil {
-			return err
-		}
-		s.conditionStack.Push(entry)
-		return nil
+	entry, err := buildConditionEntry(source, cond, candidate, fromCompare)
+	if err != nil {
+		return err
 	}
+	s.conditionStack.Push(entry)
+	return nil
 }
 
 func (s *SFFrame) popCondition() ConditionEntry {
 	return s.conditionStack.Pop()
-}
-
-func (s *SFFrame) popConditionForSourceMode(source ValueOperator, mode ConditionMode) (ConditionEntry, error) {
-	entry := s.popCondition()
-	return coerceConditionEntryToMode(source, entry, mode)
 }
 
 func invertMask(mask []bool) []bool {
@@ -443,39 +351,38 @@ func invertMask(mask []bool) []bool {
 	return out
 }
 
-func (s *SFFrame) applyLogicBangCondition(source ValueOperator) error {
-	mode := conditionModeFromSource(source)
-	normalized, err := s.popConditionForSourceMode(source, mode)
-	if err != nil {
-		return err
-	}
-	if mode == ConditionModeCandidate {
+func (s *SFFrame) applyLogicBangCondition() error {
+	entry := s.popCondition()
+	switch entry.Mode {
+	case ConditionModeCandidate:
 		// Candidate-mode "!" stays conservative and only flips truthiness.
-		return s.pushCondition(source, []bool{!normalized.Matched}, nil, false)
-	} else {
-		return s.pushCondition(source, invertMask(normalized.Mask), nil, false)
+		s.conditionStack.Push(newCandidateCondition(!entry.Matched, nil))
+		return nil
+	case ConditionModeMask:
+		s.conditionStack.Push(newMaskCondition(invertMask(entry.Mask), nil))
+		return nil
+	default:
+		return utils.Wrapf(CriticalError, "condition failed: invalid mode %v", entry.Mode)
 	}
 }
 
-func (s *SFFrame) applyLogicBinaryCondition(source ValueOperator, andMode bool) error {
-	mode := conditionModeFromSource(source)
-	left, err := s.popConditionForSourceMode(source, mode)
-	if err != nil {
-		return err
-	}
-	right, err := s.popConditionForSourceMode(source, mode)
-	if err != nil {
-		return err
+func (s *SFFrame) applyLogicBinaryCondition(andMode bool) error {
+	left := s.popCondition()
+	right := s.popCondition()
+	if left.Mode != right.Mode {
+		return utils.Wrapf(CriticalError, "condition failed: mode mismatch (%v vs %v)", left.Mode, right.Mode)
 	}
 
 	mergedCandidate := mergeValuesByID(right.Candidate, left.Candidate, andMode)
-	if mode == ConditionModeCandidate {
+	switch left.Mode {
+	case ConditionModeCandidate:
 		matched := left.Matched && right.Matched
 		if !andMode {
 			matched = left.Matched || right.Matched
 		}
-		return s.pushCondition(source, []bool{matched}, mergedCandidate, false)
-	} else {
+		s.conditionStack.Push(newCandidateCondition(matched, mergedCandidate))
+		return nil
+	case ConditionModeMask:
 		if len(left.Mask) != len(right.Mask) {
 			return utils.Wrapf(CriticalError, "condition failed: conds1(%v) vs conds2(%v)", len(left.Mask), len(right.Mask))
 		}
@@ -488,15 +395,17 @@ func (s *SFFrame) applyLogicBinaryCondition(source ValueOperator, andMode bool) 
 				res[idx] = left.Mask[idx] || right.Mask[idx]
 			}
 		}
-		return s.pushCondition(source, res, mergedCandidate, false)
+		s.conditionStack.Push(newMaskCondition(res, mergedCandidate))
+		return nil
+	default:
+		return utils.Wrapf(CriticalError, "condition failed: invalid mode %v", left.Mode)
 	}
 }
 
 func buildFilterMask(source ValueOperator, cond ValueOperator) ([]bool, error) {
 	srcValues := flattenValues(source)
-	sourceByID := buildSourceIDIndex(srcValues)
+	ensureSourceBitVector(srcValues)
 	mask := make([]bool, len(srcValues))
-	usedAnyCondition := false
 
 	if err := cond.Recursive(func(operator ValueOperator) error {
 		if utils.IsNil(operator) {
@@ -505,48 +414,12 @@ func buildFilterMask(source ValueOperator, cond ValueOperator) ([]bool, error) {
 		if operator.IsEmpty() {
 			return nil
 		}
-		usedAnyCondition = true
-
-		// Fallback 1: direct ID mapping.
-		if idGetter, ok := operator.(ssa.GetIdIF); ok {
-			if positions, existed := sourceByID[idGetter.GetId()]; existed {
-				for _, pos := range positions {
-					if pos >= 0 && pos < len(mask) {
-						mask[pos] = true
-					}
-				}
-				return nil
-			}
-		}
-
-		// Fallback 2: bounded predecessor traversal.
-		// To avoid accidental match amplification, only accept unique source position.
-		reachableIDs := collectReachableSourceIDs(operator)
-		if len(reachableIDs) == 0 {
-			return nil
-		}
-		posSet := make(map[int]struct{})
-		for _, id := range reachableIDs {
-			for _, pos := range sourceByID[id] {
-				if pos >= 0 && pos < len(mask) {
-					posSet[pos] = struct{}{}
-				}
-			}
-		}
-		if len(posSet) == 1 {
-			for pos := range posSet {
-				mask[pos] = true
-			}
-		}
+		markMaskByBitVector(mask, operator.GetSourceBitVector())
 		return nil
 	}); err != nil {
 		return nil, err
 	}
 
-	// Program-like source (single entry without source IDs): any condition hit means true.
-	if len(mask) == 1 && len(sourceByID) == 0 && usedAnyCondition {
-		mask[0] = true
-	}
 	return mask, nil
 }
 
@@ -579,19 +452,21 @@ func filterValueByMask(value ValueOperator, cond []bool) (ValueOperator, error) 
 }
 
 func (s *SFFrame) applyCondition(value ValueOperator) (ValueOperator, error) {
-	mode := conditionModeFromSource(value)
-	normalized, err := s.popConditionForSourceMode(value, mode)
-	if err != nil {
-		return nil, err
+	entry := s.popCondition()
+	expectedMode := conditionModeFromSource(value)
+	if entry.Mode != expectedMode {
+		return nil, utils.Wrapf(CriticalError, "condition failed: mode mismatch (%v vs %v)", entry.Mode, expectedMode)
 	}
 
-	if mode == ConditionModeCandidate {
-		if normalized.Matched && !utils.IsNil(normalized.Candidate) && !normalized.Candidate.IsEmpty() {
-			return normalized.Candidate, nil
-		} else {
-			return NewEmptyValues(), nil
+	switch entry.Mode {
+	case ConditionModeCandidate:
+		if entry.Matched && !utils.IsNil(entry.Candidate) && !entry.Candidate.IsEmpty() {
+			return entry.Candidate, nil
 		}
-	} else {
-		return filterValueByMask(value, normalized.Mask)
+		return NewEmptyValues(), nil
+	case ConditionModeMask:
+		return filterValueByMask(value, entry.Mask)
+	default:
+		return nil, utils.Wrapf(CriticalError, "condition failed: invalid mode %v", entry.Mode)
 	}
 }
