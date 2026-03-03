@@ -14,13 +14,6 @@ func TestModelTierConstants(t *testing.T) {
 	assert.Equal(t, consts.ModelTier("vision"), consts.TierVision)
 }
 
-func TestRoutingPolicyConstants(t *testing.T) {
-	assert.Equal(t, consts.PolicyAuto, consts.PolicyAuto)
-	assert.Equal(t, consts.PolicyPerformance, consts.PolicyPerformance)
-	assert.Equal(t, consts.PolicyCost, consts.PolicyCost)
-	assert.Equal(t, consts.PolicyBalance, consts.PolicyBalance)
-}
-
 func TestIsTieredAIConfig(t *testing.T) {
 	// Save original state
 	originalConfig := consts.GetTieredAIConfig()
