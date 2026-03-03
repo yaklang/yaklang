@@ -630,8 +630,8 @@ if authConfig != nil && authConfig != undefined {
 
 // 添加增量编译配置
 if enableIncrementalCompile {
-    // 启用增量编译
-    options = append(options, ssa.withEnableIncrementalCompile(true))
+    // 启用增量编译时，JSON 中勾选重新编译（与 SSA 项目编译 逻辑一致）
+    options = append(options, ssa.withEnableIncrementalCompile(true), ssa.withReCompile(true))
     // 如果提供了基础程序名称，设置基础程序名称
     if baseProgramName != "" {
         options = append(options, ssa.withBaseProgramName(baseProgramName))
