@@ -1,0 +1,201 @@
+desc(
+	title: "Enabling Electron allowRunningInsecureContent"
+	title_zh: "Electron allowRunningInsecureContent 被启用"
+	type: vuln
+	level: error
+	risk: "insecure-content"
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+
+Electron 默认禁止在 HTTPS 页面中执行或加载通过 HTTP 传输的内容（混合内容策略）。将 `webPreferences` 对象的 `allowRunningInsecureContent` 属性设置为 `true` 会禁用此策略，允许：
+
+- 在 HTTPS 页面中加载并执行来自 HTTP 源的 JavaScript 脚本
+- 加载来自 HTTP 源的 CSS 样式表、字体、图片等资源
+- 向 HTTP 端点发起请求（绕过混合内容拦截）
+
+由于 HTTP 流量未加密，处于同一网络的攻击者可通过中间人攻击（MITM）篡改 HTTP 响应，注入任意 JavaScript 代码并在 Electron 渲染进程中执行。
+
+2. **触发场景**
+
+```javascript
+// 危险：允许在 HTTPS 页面中执行 HTTP 加载的不安全内容
+const mainWindow = new BrowserWindow({
+    webPreferences: {
+        allowRunningInsecureContent: true
+    }
+});
+```
+
+3. **潜在影响**
+
+- **代码注入（CWE-494）**：攻击者通过 MITM 劫持 HTTP 请求，在响应中注入恶意脚本，在 Electron 渲染进程中执行任意代码
+- **远程代码执行（RCE）**：配合 `nodeIntegration: true` 时，攻击者可通过注入的脚本调用 Node.js API，完全控制操作系统
+- **数据窃取**：注入的脚本可读取页面内容、Cookie、LocalStorage 等敏感数据
+- **供应链污染**：若应用依赖的第三方脚本通过 HTTP 加载，攻击者可替换这些脚本
+DESC
+	rule_id: "b2c3d4e5-f6a7-8901-bcde-f12345678902"
+	solution: <<<SOLUTION
+### 修复建议
+
+**1. 不要启用 allowRunningInsecureContent**
+
+```javascript
+// 危险
+const mainWindow = new BrowserWindow({
+    webPreferences: {
+        allowRunningInsecureContent: true
+    }
+});
+
+// 安全：删除该配置或显式设置为 false（默认值）
+const mainWindow = new BrowserWindow({
+    webPreferences: {
+        allowRunningInsecureContent: false  // 默认值，保持混合内容策略
+    }
+});
+```
+
+**2. 确保所有资源通过 HTTPS 加载**
+
+将应用中所有外部资源引用从 `http://` 升级为 `https://`，从根本上消除混合内容问题。
+
+**3. 使用 CSP 限制可加载的内容源**
+
+```javascript
+session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+        responseHeaders: {
+            ...details.responseHeaders,
+            'Content-Security-Policy': ["default-src 'self' https:"]
+        }
+    });
+});
+```
+
+这样即使攻击者尝试注入 HTTP 资源，CSP 也会阻止其执行。
+SOLUTION
+	reference: <<<REFERENCE
+[Electron Documentation: Security, Native Capabilities, and Your Responsibility](https://www.electronjs.org/docs/latest/tutorial/security)
+[Electron Security: allowRunningInsecureContent](https://www.electronjs.org/docs/latest/tutorial/security#7-do-not-enable-allowrunninginsecurecontent)
+[CWE-494: Download of Code Without Integrity Check](https://cwe.mitre.org/data/definitions/494.html)
+[CodeQL: js/enabling-electron-insecure-content](https://codeql.github.com/codeql-query-help/javascript/js-enabling-electron-insecure-content/)
+REFERENCE
+)
+
+// =====================================================================
+// Detection Pattern:
+//   new BrowserWindow({ webPreferences: { allowRunningInsecureContent: true } })
+//
+// SSA traversal:
+//   BrowserWindow options object  →  .webPreferences member
+//                                →  .allowRunningInsecureContent member
+//                                →  filter for ConstInst(true)
+//
+// Also covers variable indirection:
+//   const prefs = { allowRunningInsecureContent: true };
+//   new BrowserWindow({ webPreferences: prefs });
+// =====================================================================
+
+BrowserWindow(* as $browserWindowOpts)
+$browserWindowOpts.webPreferences as $webPrefs
+$webPrefs.allowRunningInsecureContent as $insecureContentVal
+$insecureContentVal?{have: true} as $enabledInsecureContent
+
+alert $enabledInsecureContent for {
+	level: "error"
+	type: "vuln"
+	title: "Electron allowRunningInsecureContent Enabled"
+	title_zh: "Electron allowRunningInsecureContent 被设置为 true，允许执行不安全内容"
+	message: "检测到 Electron BrowserWindow 的 webPreferences.allowRunningInsecureContent 被显式设置为 true，这将允许在 HTTPS 页面中执行通过 HTTP 加载的不安全脚本。处于同一网络的攻击者可通过中间人攻击（MITM）篡改 HTTP 响应，注入并执行任意 JavaScript 代码。若同时开启 nodeIntegration，可实现完整的远程代码执行（RCE）。强烈建议不要启用 allowRunningInsecureContent。"
+	solution: <<<SOLUTION
+删除 allowRunningInsecureContent: true 配置，或显式设置为 false（Electron 默认值）：
+
+```javascript
+// 修复前（危险）
+new BrowserWindow({ webPreferences: { allowRunningInsecureContent: true } });
+
+// 修复后（安全）
+new BrowserWindow({ webPreferences: { allowRunningInsecureContent: false } });
+// 或者直接省略该配置（默认为 false）
+new BrowserWindow({ webPreferences: {} });
+```
+SOLUTION
+	risk: "code-injection"
+	name: "enabledInsecureContent"
+}
+
+// =====================================================================
+// Embedded test cases
+// =====================================================================
+
+// Test 1: VULNERABLE — allowRunningInsecureContent: true
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///unsafe_insecure_content.js': <<<CODE
+const { BrowserWindow } = require('electron');
+
+const mainWindow = new BrowserWindow({
+    webPreferences: {
+        allowRunningInsecureContent: true
+    }
+});
+mainWindow.loadURL('https://example.com');
+CODE
+)
+
+// Test 2: VULNERABLE — combined with nodeIntegration (high-risk combination)
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///unsafe_insecure_content_node.js': <<<CODE
+const { BrowserWindow } = require('electron');
+
+const win = new BrowserWindow({
+    width: 1024,
+    height: 768,
+    webPreferences: {
+        nodeIntegration: true,
+        contextIsolation: false,
+        allowRunningInsecureContent: true
+    }
+});
+CODE
+)
+
+// Test 3: SAFE — allowRunningInsecureContent: false (explicit)
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///safe_insecure_content_false.js': <<<CODE
+const { BrowserWindow } = require('electron');
+
+const mainWindow = new BrowserWindow({
+    webPreferences: {
+        allowRunningInsecureContent: false,
+        contextIsolation: true
+    }
+});
+CODE
+)
+
+// Test 4: SAFE — allowRunningInsecureContent not set (defaults to false)
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///safe_insecure_content_default.js': <<<CODE
+const { BrowserWindow } = require('electron');
+
+// GOOD: allowRunningInsecureContent defaults to false when not specified
+const mainWindow = new BrowserWindow({
+    width: 800,
+    height: 600,
+    webPreferences: {
+        contextIsolation: true,
+        nodeIntegration: false
+    }
+});
+CODE
+)

@@ -1,0 +1,343 @@
+desc(
+	title: "Deserialization of User-Controlled Data"
+	title_zh: "用户可控数据流入不安全反序列化函数"
+	type: vuln
+	level: high
+	risk: "unsafe-deserialization"
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+
+不安全反序列化（CWE-502）是指应用程序将来自不可信来源（如 HTTP 请求参数）的数据直接传递给支持**任意函数/对象还原**的反序列化库。攻击者可以构造特殊的序列化载荷，在反序列化过程中触发任意代码执行（RCE）。
+
+在 JavaScript/Node.js 生态中，以下库因支持函数类型的序列化而特别危险：
+
+- **js-yaml `load()`**：支持 `!!js/function`、`!!js/regexp` 等 YAML 类型标签，可直接执行 JavaScript 函数
+- **node-serialize `unserialize()`**：支持 IIFE（立即执行函数），存在公开的 RCE PoC
+- **funcster `deepDeserialize()`**：通过 `new Function()` 还原序列化函数
+- **cryo `Cryo.parse()`**：支持函数和 RegExp 的反序列化
+
+2. **常见触发模式**
+
+**js-yaml 危险用法（YAML 函数注入）：**
+```javascript
+const jsyaml = require("js-yaml");
+const app = require("express")();
+
+app.get("/load", (req, res) => {
+    // 危险：load() 支持 !!js/function 标签，攻击者可注入：
+    // "data: !!js/function 'function(){require(\"child_process\").exec(\"id\")}'"
+    let data = jsyaml.load(req.params.data);
+    res.json(data);
+});
+```
+
+**node-serialize IIFE 注入：**
+```javascript
+const serialize = require("node-serialize");
+const app = require("express")();
+
+app.post("/restore", (req, res) => {
+    // 危险：攻击者可发送：
+    // {"rce":"_$$ND_FUNC$$_function(){require('child_process').exec('id')}()"}
+    const obj = serialize.unserialize(req.body.data);
+    res.json(obj);
+});
+```
+
+3. **潜在影响**
+
+- **远程代码执行（RCE）**：攻击者在服务器上执行任意系统命令，完全控制服务器
+- **数据泄露**：读取配置文件、环境变量、数据库凭据等敏感信息
+- **服务器被植入后门**：在服务器上部署 webshell 或持久化恶意程序
+- **供应链污染**：修改部署的应用代码
+DESC
+	rule_id: "f6a7b8c9-d0e1-2345-f012-345678901234"
+	solution: <<<SOLUTION
+### 修复建议
+
+**1. js-yaml：使用安全的解析模式**
+
+```javascript
+// 危险：load() 支持任意 JS 类型（包括函数）
+let data = jsyaml.load(req.params.data);
+
+// 安全方案一：使用 safeLoad()（js-yaml v3.x）
+let data = jsyaml.safeLoad(req.params.data);
+
+// 安全方案二：使用 CORE_SCHEMA（js-yaml v4.x，禁用 JS 特定类型）
+let data = jsyaml.load(req.params.data, { schema: jsyaml.CORE_SCHEMA });
+
+// 安全方案三：使用 FAILSAFE_SCHEMA（最严格，只支持字符串/数组/对象）
+let data = jsyaml.load(req.params.data, { schema: jsyaml.FAILSAFE_SCHEMA });
+```
+
+**2. node-serialize：弃用该库**
+
+`node-serialize` 已不再维护，且设计上不安全。改用 JSON 或其他安全的序列化格式：
+
+```javascript
+// 危险
+const obj = serialize.unserialize(req.body.data);
+
+// 安全替代：使用 JSON（不支持函数类型）
+const obj = JSON.parse(req.body.data);
+```
+
+**3. funcster：避免使用**
+
+```javascript
+// 危险
+funcster.deepDeserialize(req.body.data);
+
+// 安全替代：重新设计不依赖函数序列化的架构
+```
+
+**4. 通用原则**
+
+- 尽量使用 JSON 等不支持函数类型的格式进行数据交换
+- 如必须使用 YAML，确保配置了安全的 Schema（禁止 JS 特定类型）
+- 对反序列化的数据进行严格的输入验证和类型检查
+- 在高安全要求场景下，不要反序列化来自不可信来源的数据
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-502: Deserialization of Untrusted Data](https://cwe.mitre.org/data/definitions/502.html)
+[OWASP: Deserialization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Deserialization_Cheat_Sheet.html)
+[CodeQL: js/unsafe-deserialization](https://codeql.github.com/codeql-query-help/javascript/js-unsafe-deserialization/)
+[Neal Poole: Code Execution via js-yaml](https://nealan.io/code-execution-via-yaml-in-js-yaml-nodejs-module)
+[node-serialize RCE PoC](https://opsecx.com/index.php/2017/02/08/exploiting-node-js-deserialization-bug-for-remote-code-execution/)
+REFERENCE
+)
+
+// =====================================================================
+// Pull in source library (user-controlled input)
+// =====================================================================
+<include('js-param')> as $params;
+
+// =====================================================================
+// Known SAFE deserialization functions — these are explicitly safe
+// alternatives that should NOT trigger alerts.
+//
+// js-yaml v3: safeLoad / safeLoadAll
+// js-yaml v4: load(..., {schema: CORE_SCHEMA}) — handled via schema check
+// =====================================================================
+/^(safeLoad|safeLoadAll)$/ as $safeDeserializers
+
+// =====================================================================
+// HIGH: User input flows DIRECTLY into a dangerous deserialization sink.
+//
+// Covers:
+//   - jsyaml.load(req.params.data)                   — direct param
+//   - serialize.unserialize(req.body.data)            — direct param
+//   - funcster.deepDeserialize(req.body.payload)      — direct param
+//
+// Strategy:
+//   1. Capture dangerous deserialization calls:
+//      - *.load() / *.loadAll()  — js-yaml
+//      - *.unserialize()         — node-serialize
+//      - *.deepDeserialize()     — funcster
+//   2. Filter out calls to known SAFE functions (safeLoad, safeLoadAll)
+//   3. Use #{include: $params, exclude: call}-> to require direct data flow
+//      from user-controlled source with NO intermediate function call
+// =====================================================================
+
+// --- Step A: Capture all potentially dangerous deserialization calls ---
+*.load(* as $loadArgs)
+*.loadAll(* as $loadAllArgs)
+*.unserialize(* as $unserializeArgs)
+*.deepDeserialize(* as $deepDeserializeArgs)
+
+// Merge into one candidate set
+$loadArgs     as $candidateArgs
+$loadAllArgs  as $candidateArgs
+$unserializeArgs  as $candidateArgs
+$deepDeserializeArgs as $candidateArgs
+
+// --- Step B: Filter out safe callee variants (safeLoad, safeLoadAll) ---
+// Keep only args whose owning call's callee name does NOT match safe functions.
+// The ?{!...} filter removes args where callee is in $safeDeserializers.
+// Note: filter condition must be on a single line (no newlines inside ?{...}).
+$candidateArgs?{!<self><getCall><getCallee><name> & $safeDeserializers} as $dangerousArgs
+
+// --- Step C: HIGH — direct data flow from source to dangerous sink ---
+// No intermediate function call allowed (exclude: call)
+$dangerousArgs?{<self> #{
+    include: <<<CODE
+* & $params as $__next__
+CODE,
+    exclude: <<<CODE
+*?{opcode: call} as $__next__
+CODE
+}->} as $directDeserialization
+
+// =====================================================================
+// MID: User input flows through intermediate operations but still reaches
+//      a dangerous deserialization sink without passing through a known
+//      safe sanitizer.
+//
+// Captures patterns like:
+//   const buf = req.body.data.toString();   // intermediate call
+//   jsyaml.load(buf);                       // sink
+// =====================================================================
+$dangerousArgs<dataflow(
+    include: <<<CODE
+* & $params as $__next__
+CODE,
+    exclude: <<<CODE
+*?{opcode: call && (<self><getCallee><name> & $safeDeserializers)} as $__next__
+CODE
+)> as $midDeserialization
+
+// Remove flows already classified as HIGH to avoid duplicate alerts
+$midDeserialization - $directDeserialization as $mid
+
+// =====================================================================
+// Alert HIGH: direct source → dangerous deserialization sink
+// =====================================================================
+alert $directDeserialization for {
+	level: "high"
+	type: "vuln"
+	title: "Direct Deserialization of User-Controlled Data"
+	title_zh: "用户可控数据直接传入不安全反序列化函数"
+	message: "检测到用户可控输入（如 req.params、req.body、req.query 等）**直接**传入了支持任意函数执行的反序列化函数（如 jsyaml.load()、serialize.unserialize()、funcster.deepDeserialize() 等），中间无任何函数调用拦截。攻击者可以构造特殊的序列化载荷（如 YAML !!js/function 标签或 node-serialize IIFE）在服务器上执行任意代码（RCE）。"
+	solution: <<<SOLUTION
+立即修复：使用安全的反序列化替代方案。
+
+对于 js-yaml：
+```javascript
+// 危险
+jsyaml.load(req.params.data);
+
+// 安全（v3.x）
+jsyaml.safeLoad(req.params.data);
+
+// 安全（v4.x）
+jsyaml.load(req.params.data, { schema: jsyaml.CORE_SCHEMA });
+```
+
+对于 node-serialize：弃用该库，改用 JSON.parse()。
+SOLUTION
+	risk: "remote-code-execution"
+	name: "directDeserialization"
+}
+
+// =====================================================================
+// Alert MID: indirect source → deserialization sink
+// =====================================================================
+alert $mid for {
+	level: "mid"
+	type: "vuln"
+	title: "Indirect Deserialization of User-Controlled Data"
+	title_zh: "用户可控数据经中间操作后流入不安全反序列化函数"
+	message: "检测到用户可控输入经过中间操作后流入了支持任意函数执行的反序列化函数。虽然存在中间处理步骤，但最终数据仍可能包含攻击者构造的恶意序列化载荷，导致远程代码执行（RCE）。"
+	solution: <<<SOLUTION
+检查中间处理逻辑是否真正过滤了危险内容，或改用安全的反序列化方案（如 jsyaml.safeLoad() 或 JSON.parse()）。
+SOLUTION
+	risk: "remote-code-execution"
+	name: "mid"
+}
+
+// =====================================================================
+// Embedded test cases
+// =====================================================================
+
+// Test 1: HIGH — jsyaml.load() with direct req.params
+desc(
+	lang: "js"
+	alert_high: 1
+	'file:///unsafe_jsyaml_load_param.js': <<<CODE
+const app = require("express")(),
+      jsyaml = require("js-yaml");
+
+app.get("load", function(req, res) {
+    let data = jsyaml.load(req.params.data);
+    res.json({ result: data });
+});
+CODE
+)
+
+// Test 2: HIGH — jsyaml.loadAll() with req.body
+desc(
+	lang: "js"
+	alert_high: 1
+	'file:///unsafe_jsyaml_loadall.js': <<<CODE
+const express = require("express");
+const jsyaml = require("js-yaml");
+const app = express();
+app.use(express.json());
+
+app.post("/loadall", (req, res) => {
+    const docs = jsyaml.loadAll(req.body.content);
+    res.json({ docs });
+});
+CODE
+)
+
+// Test 3: HIGH — node-serialize.unserialize() with direct req.body
+desc(
+	lang: "js"
+	alert_high: 1
+	'file:///unsafe_node_serialize.js': <<<CODE
+const express = require("express");
+const serialize = require("node-serialize");
+const app = express();
+app.use(express.json());
+
+app.post("/restore", (req, res) => {
+    // BAD: IIFE payload can execute arbitrary code
+    const obj = serialize.unserialize(req.body.data);
+    res.json(obj);
+});
+CODE
+)
+
+// Test 4: HIGH — funcster.deepDeserialize() with req.body
+desc(
+	lang: "js"
+	alert_high: 1
+	'file:///unsafe_funcster.js': <<<CODE
+const express = require("express");
+const funcster = require("funcster");
+const app = express();
+app.use(express.json());
+
+app.post("/deserialize", (req, res) => {
+    const result = funcster.deepDeserialize(req.body.payload);
+    res.json({ result });
+});
+CODE
+)
+
+// Test 5: SAFE — jsyaml.safeLoad() (v3.x safe API)
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///safe_jsyaml_safeload.js': <<<CODE
+const app = require("express")(),
+      jsyaml = require("js-yaml");
+
+app.get("load", function(req, res) {
+    // GOOD: safeLoad() only supports basic YAML types, no JS functions
+    let data = jsyaml.safeLoad(req.params.data);
+    res.json({ result: data });
+});
+CODE
+)
+
+// Test 6: SAFE — jsyaml.load() without user input (static YAML string)
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///safe_jsyaml_static.js': <<<CODE
+const jsyaml = require("js-yaml");
+
+// GOOD: loading a hard-coded config string — no user input
+const config = jsyaml.load(`
+server:
+  host: localhost
+  port: 8080
+`);
+console.log(config);
+CODE
+)
