@@ -191,13 +191,13 @@ func (c *Config) parseProjectWithFS(
 					}
 				}()
 			}
-			// 记录文件级别的 AST 解析时间
+			// 记录文件级别的 AST 解析时间（含文件大小用于 ms/KB）
 			if enableFilePerfLog {
 				fileASTTime := time.Since(fileASTStart)
-				// 收集到 recorder（记录所有文件，不设阈值）
 				if filePerfRecorder != nil {
-					filePerfRecorder.RecordDuration(fmt.Sprintf("AST[%s]", fileContent.Path), fileASTTime)
-					if fileASTTime > 100*time.Millisecond { // 只记录超过 100ms 的文件到日志
+					fileSize := int64(len(fileContent.Content))
+					filePerfRecorder.RecordDurationWithSize(fmt.Sprintf("AST[%s]", fileContent.Path), fileASTTime, fileSize)
+					if fileASTTime > 100*time.Millisecond {
 						log.Infof("[File Performance] AST parse: %s, time: %v", fileContent.Path, fileASTTime)
 					}
 				}
@@ -287,13 +287,13 @@ func (c *Config) parseProjectWithFS(
 						log.Errorf("parse [%s] error %v  ", path, r)
 						utils.PrintCurrentGoroutineRuntimeStack()
 					}
-					// 记录文件级别的 Build 时间
+					// 记录文件级别的 Build 时间（含文件大小用于 ms/KB）
 					if enableFilePerfLog {
 						fileBuildTime := time.Since(fileBuildStart)
-						// 收集到 recorder（记录所有文件，不设阈值）
 						if filePerfRecorder != nil {
-							filePerfRecorder.RecordDuration(fmt.Sprintf("Build[%s]", path), fileBuildTime)
-							if fileBuildTime > 100*time.Millisecond { // 只记录超过 100ms 的文件到日志
+							fileSize := int64(len(fileContent.Content))
+							filePerfRecorder.RecordDurationWithSize(fmt.Sprintf("Build[%s]", path), fileBuildTime, fileSize)
+							if fileBuildTime > 100*time.Millisecond {
 								log.Infof("[File Performance] Build: %s, time: %v", path, fileBuildTime)
 							}
 						}
