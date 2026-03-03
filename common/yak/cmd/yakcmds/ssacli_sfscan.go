@@ -9,7 +9,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
-	"github.com/yaklang/yaklang/common/urfavecli"
+	cli "github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa_compile"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -125,6 +125,11 @@ func parseSFScanConfigFromCli(c *cli.Context) (res *ssaCliConfig, err error) {
 	// file-perf-log: 启用文件级别性能日志
 	if c.Bool("file-perf-log") {
 		opts = append(opts, ssaconfig.WithCompileFilePerformanceLog(true))
+	}
+
+	// 编译并发数（code-scan 与 ssa-compile 共用）
+	if concurrency := c.Int("concurrency"); concurrency > 0 {
+		opts = append(opts, ssaconfig.WithCompileConcurrency(concurrency))
 	}
 
 	// 创建统一配置
@@ -259,6 +264,10 @@ func getProgram(ctx context.Context, config *ssaCliConfig) ([]*ssaapi.Program, e
 			req.Options = buildCompileOptionsForDetect(config.Config)
 		}
 
+		// 传递编译并发数（用于 SSA 项目探测/编译）
+		// if c := config.GetCompileConcurrency(); c > 0 {
+		// 	para["concurrency"] = c
+		// }
 		res, err := ssa_compile.ParseProjectWithAutoDetective(ctx, req)
 		if err != nil {
 			return nil, err
@@ -340,6 +349,12 @@ func parseConfigFileWithCliFlagOverride(cliCtx *cli.Context) (res *ssaCliConfig,
 		outputFormat = "sarif" // 默认格式
 	}
 	config.Format = sfreport.ReportTypeFromString(outputFormat)
+
+	// CLI 参数覆盖：并发数
+	if concurrency := cliCtx.Int("concurrency"); concurrency > 0 {
+		_ = cfg.Update(ssaconfig.WithCompileConcurrency(concurrency))
+		log.Infof("Using CLI concurrency (overrides config): %d", concurrency)
+	}
 
 	// 处理输出文件：CLI 参数优先于配置文件
 	outputFile := cfg.GetOutputFile()
