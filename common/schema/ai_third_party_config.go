@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	"sort"
 	"strings"
 
@@ -25,6 +26,8 @@ type AIThirdPartyConfig struct {
 	WebhookURL     string          `json:"webhook_url"`
 	ExtraParams    MapStringString `json:"extra_params" gorm:"type:text"`
 	Disabled       bool            `json:"disabled" gorm:"default:false"`
+	Proxy          string          `json:"proxy"`
+	NoHttps        bool            `json:"no_https" gorm:"default:false"`
 }
 
 func (c *AIThirdPartyConfig) CalcHash() string {
@@ -52,6 +55,8 @@ func (c *AIThirdPartyConfig) CalcHash() string {
 		c.Domain,
 		c.WebhookURL,
 		builder.String(),
+		c.Proxy,
+		c.NoHttps,
 	)
 }
 
@@ -105,6 +110,12 @@ func AIThirdPartyConfigFromGRPC(cfg *ypb.ThirdPartyApplicationConfig) *AIThirdPa
 	for _, kv := range cfg.GetExtraParams() {
 		extra[kv.GetKey()] = kv.GetValue()
 	}
+
+	err := utils.ImportAppConfigToStruct(cfg, extra)
+	if err != nil {
+		log.Errorf("ImportAppConfigToStruct failed: %v", err)
+	}
+
 	return &AIThirdPartyConfig{
 		Type:           cfg.GetType(),
 		APIKey:         cfg.GetAPIKey(),

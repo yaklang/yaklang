@@ -159,6 +159,7 @@ func normalizeModelConfigs(db *gorm.DB, models []*ypb.AIModelConfig) error {
 		if model == nil {
 			continue
 		}
+
 		providerId := model.GetProviderId()
 		if model.GetProvider() != nil {
 			provider := schema.AIThirdPartyConfigFromGRPC(model.GetProvider())

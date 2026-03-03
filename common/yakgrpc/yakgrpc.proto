@@ -2756,6 +2756,8 @@ message ThirdPartyApplicationConfig {
   string WebhookURL = 7;
   repeated KVPair ExtraParams = 8;
   bool Disabled = 9;
+  string Proxy = 10;
+  bool NoHttps = 11;
 }
 
 message DiagnoseNetworkRequest {
