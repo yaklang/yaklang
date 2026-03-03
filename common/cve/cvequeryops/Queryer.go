@@ -16,20 +16,21 @@ import (
 type CVEOption func(info *CVEQueryInfo)
 
 type CVEQueryInfo struct {
-	CVE          string
-	CPE          []cveresources.CPE
-	CWE          []string
-	Vendors      []string
-	Products     []string
-	Severity     []string
-	ExploitScore float64
-	After        time.Time
-	Before       time.Time
-	Start        int
-	Quantity     int
-	OrderBy      string
-	Desc         bool
-	Strict       bool
+	CVE                   string
+	CPE                   []cveresources.CPE
+	CWE                   []string
+	Vendors               []string
+	Products              []string
+	Severity              []string
+	ExploitScore          float64
+	After                 time.Time
+	Before                time.Time
+	Start                 int
+	Quantity              int
+	OrderBy               string
+	Desc                  bool
+	Strict                bool
+	SkipUnboundedWildcard bool
 }
 
 func QueryCVEYields(db *gorm.DB, opts ...CVEOption) chan *cveresources.CVE {
@@ -48,14 +49,21 @@ func QueryCVEYields(db *gorm.DB, opts ...CVEOption) chan *cveresources.CVE {
 				}
 
 				for _, node := range config.Nodes {
-					if level < node.Result(queryConfig.CPE) {
-						level = node.Result(queryConfig.CPE)
+					nodeLevel := node.Result(queryConfig.CPE)
+					if level < nodeLevel {
+						level = nodeLevel
 					}
 				}
 
-				if level > 0 {
-					ch <- c
+				if level <= 0 {
+					continue
 				}
+
+				if queryConfig.SkipUnboundedWildcard && shouldSkipUnboundedWildcardOnly(config, queryConfig.CPE) {
+					continue
+				}
+
+				ch <- c
 			}
 		}()
 		return ch
@@ -359,6 +367,12 @@ func Desc(flag bool) CVEOption {
 func Strict(flag bool) CVEOption {
 	return func(info *CVEQueryInfo) {
 		info.Strict = flag
+	}
+}
+
+func SkipUnboundedWildcard(flag bool) CVEOption {
+	return func(info *CVEQueryInfo) {
+		info.SkipUnboundedWildcard = flag
 	}
 }
 
