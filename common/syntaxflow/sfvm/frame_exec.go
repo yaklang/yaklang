@@ -22,7 +22,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"reflect"
 	"regexp"
 
 	"github.com/gobwas/glob"
@@ -32,340 +31,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
-
-func flattenValues(value ValueOperator) []ValueOperator {
-	if utils.IsNil(value) {
-		return nil
-	}
-	var result []ValueOperator
-	_ = value.Recursive(func(operator ValueOperator) error {
-		result = append(result, operator)
-		return nil
-	})
-	return result
-}
-
-func collectPredecessorNodes(value any) []any {
-	if value == nil {
-		return nil
-	}
-	rawVal := reflect.ValueOf(value)
-	if !rawVal.IsValid() {
-		return nil
-	}
-	method := rawVal.MethodByName("GetPredecessors")
-	if !method.IsValid() || method.Type().NumIn() != 0 || method.Type().NumOut() != 1 {
-		return nil
-	}
-	outs := method.Call(nil)
-	if len(outs) != 1 {
-		return nil
-	}
-	preds := outs[0]
-	if !preds.IsValid() || preds.Kind() != reflect.Slice {
-		return nil
-	}
-	nodes := make([]any, 0, preds.Len())
-	for i := 0; i < preds.Len(); i++ {
-		pred := preds.Index(i)
-		if !pred.IsValid() {
-			continue
-		}
-		if pred.Kind() == reflect.Ptr && pred.IsNil() {
-			continue
-		}
-		if pred.Kind() == reflect.Ptr {
-			pred = pred.Elem()
-		}
-		if !pred.IsValid() || pred.Kind() != reflect.Struct {
-			continue
-		}
-		nodeField := pred.FieldByName("Node")
-		if !nodeField.IsValid() {
-			continue
-		}
-		if nodeField.Kind() == reflect.Ptr && nodeField.IsNil() {
-			continue
-		}
-		nodes = append(nodes, nodeField.Interface())
-	}
-	return nodes
-}
-
-func collectReachableSourceIDs(value ValueOperator) []int64 {
-	if utils.IsNil(value) {
-		return nil
-	}
-	var ids []int64
-	queue := []any{value}
-	visited := make(map[int64]struct{})
-	for len(queue) > 0 {
-		current := queue[0]
-		queue = queue[1:]
-		if current == nil {
-			continue
-		}
-		idGetter, ok := current.(ssa.GetIdIF)
-		if !ok {
-			continue
-		}
-		id := idGetter.GetId()
-		if _, existed := visited[id]; existed {
-			continue
-		}
-		visited[id] = struct{}{}
-		ids = append(ids, id)
-		queue = append(queue, collectPredecessorNodes(current)...)
-	}
-	return ids
-}
-
-func buildSourceIDIndex(source []ValueOperator) map[int64][]int {
-	index := make(map[int64][]int, len(source))
-	for i, src := range source {
-		if utils.IsNil(src) {
-			continue
-		}
-		if idGetter, ok := src.(ssa.GetIdIF); ok {
-			index[idGetter.GetId()] = append(index[idGetter.GetId()], i)
-		}
-	}
-	return index
-}
-
-func normalizeConditionAgainstSource(source ValueOperator, result ValueOperator, cond []bool) ([]bool, error) {
-	sourceVals := flattenValues(source)
-	width := len(sourceVals)
-	if width == 0 {
-		return nil, nil
-	}
-	if len(cond) == width {
-		return cond, nil
-	}
-
-	// Program/overlay-like singleton source: cond can be omitted and derived from result existence.
-	if width == 1 {
-		matched := false
-		for _, ok := range cond {
-			if ok {
-				matched = true
-				break
-			}
-		}
-		if !matched && !utils.IsNil(result) && !result.IsEmpty() {
-			matched = ValuesLen(result) > 0
-		}
-		return []bool{matched}, nil
-	}
-
-	// General case: map result values back to source only by direct ID.
-	// Compare operators should not expand via predecessor chain here.
-	mask := make([]bool, width)
-	sourceByID := buildSourceIDIndex(sourceVals)
-	hasTruthCondition := len(cond) == 0
-	resIndex := 0
-	if !utils.IsNil(result) {
-		if err := result.Recursive(func(operator ValueOperator) error {
-			if utils.IsNil(operator) {
-				resIndex++
-				return nil
-			}
-			truthy := len(cond) == 0
-			if len(cond) > 0 {
-				truthy = resIndex < len(cond) && cond[resIndex]
-			}
-			resIndex++
-			if !truthy {
-				return nil
-			}
-			hasTruthCondition = true
-			if idGetter, ok := operator.(ssa.GetIdIF); ok {
-				if positions, existed := sourceByID[idGetter.GetId()]; existed {
-					for _, pos := range positions {
-						if pos >= 0 && pos < len(mask) {
-							mask[pos] = true
-						}
-					}
-					return nil
-				}
-			}
-			return nil
-		}); err != nil {
-			return nil, err
-		}
-	}
-	if !hasTruthCondition {
-		return mask, nil
-	}
-	return mask, nil
-}
-
-func markSourceByReachableID(sourceByID map[int64][]int, mask []bool, value ValueOperator) bool {
-	if utils.IsNil(value) {
-		return false
-	}
-	matched := false
-	queue := []any{value}
-	visited := make(map[int64]struct{})
-	for len(queue) > 0 {
-		current := queue[0]
-		queue = queue[1:]
-		if current == nil {
-			continue
-		}
-		idGetter, ok := current.(ssa.GetIdIF)
-		if !ok {
-			continue
-		}
-		id := idGetter.GetId()
-		if _, existed := visited[id]; existed {
-			continue
-		}
-		visited[id] = struct{}{}
-		if positions, existed := sourceByID[id]; existed {
-			for _, pos := range positions {
-				if pos >= 0 && pos < len(mask) {
-					mask[pos] = true
-					matched = true
-				}
-			}
-			// Stop expanding from a source-root node to avoid over-expansion.
-			continue
-		}
-		queue = append(queue, collectPredecessorNodes(current)...)
-	}
-	return matched
-}
-
-func mergeValuesByID(left ValueOperator, right ValueOperator, andMode bool) ValueOperator {
-	leftEmpty := utils.IsNil(left) || left.IsEmpty()
-	rightEmpty := utils.IsNil(right) || right.IsEmpty()
-	if utils.IsNil(left) && utils.IsNil(right) {
-		return nil
-	}
-	if andMode {
-		if leftEmpty && rightEmpty {
-			return NewEmptyValues()
-		}
-		if leftEmpty {
-			return right
-		}
-		if rightEmpty {
-			return left
-		}
-	}
-
-	leftVals := flattenValues(left)
-	rightVals := flattenValues(right)
-	leftByID := make(map[int64]ValueOperator, len(leftVals))
-	rightByID := make(map[int64]ValueOperator, len(rightVals))
-
-	for _, v := range leftVals {
-		if idGetter, ok := v.(ssa.GetIdIF); ok {
-			leftByID[idGetter.GetId()] = v
-		}
-	}
-	for _, v := range rightVals {
-		if idGetter, ok := v.(ssa.GetIdIF); ok {
-			rightByID[idGetter.GetId()] = v
-		}
-	}
-
-	// Fallback for non-id values: keep existing side in OR mode.
-	if len(leftByID) == 0 || len(rightByID) == 0 {
-		if andMode {
-			rightByString := make(map[string]struct{}, len(rightVals))
-			for _, rv := range rightVals {
-				rightByString[rv.String()] = struct{}{}
-			}
-			var out []ValueOperator
-			for _, lv := range leftVals {
-				if _, ok := rightByString[lv.String()]; ok {
-					out = append(out, lv)
-				}
-			}
-			return NewValues(out)
-		}
-		if utils.IsNil(left) {
-			return right
-		}
-		if utils.IsNil(right) {
-			return left
-		}
-		merged, err := left.Merge(right)
-		if err != nil {
-			return left
-		}
-		return merged
-	}
-
-	var out []ValueOperator
-	if andMode {
-		for id, lv := range leftByID {
-			if _, ok := rightByID[id]; ok {
-				out = append(out, lv)
-			}
-		}
-		if len(out) == 0 {
-			rightByString := make(map[string]struct{}, len(rightVals))
-			for _, rv := range rightVals {
-				rightByString[rv.String()] = struct{}{}
-			}
-			for _, lv := range leftVals {
-				if _, ok := rightByString[lv.String()]; ok {
-					out = append(out, lv)
-				}
-			}
-		}
-		if len(out) == 0 {
-			// Program-like compare candidates may not share stable IDs/strings.
-			// Keep non-empty side instead of dropping everything.
-			if len(rightVals) > 0 {
-				return right
-			}
-			if len(leftVals) > 0 {
-				return left
-			}
-		}
-	} else {
-		for _, lv := range leftByID {
-			out = append(out, lv)
-		}
-		for id, rv := range rightByID {
-			if _, ok := leftByID[id]; !ok {
-				out = append(out, rv)
-			}
-		}
-	}
-	return NewValues(out)
-}
-
-func (s *SFFrame) pushCondition(conds []bool, candidate ValueOperator) {
-	s.conditionStack.Push(conds)
-	if s.conditionValueStack != nil {
-		s.conditionValueStack.Push(candidate)
-	}
-}
-
-func (s *SFFrame) popCondition() ([]bool, ValueOperator) {
-	conds := s.conditionStack.Pop()
-	var candidate ValueOperator
-	if s.conditionValueStack != nil {
-		candidate = s.conditionValueStack.Pop()
-	}
-	return conds, candidate
-}
-
-func shouldUseConditionCandidate(source ValueOperator) bool {
-	sourceVals := flattenValues(source)
-	if len(sourceVals) != 1 {
-		return false
-	}
-	if utils.IsNil(sourceVals[0]) {
-		return false
-	}
-	return sourceVals[0].ShouldUseConditionCandidate()
-}
 
 func recursiveDeepChain(element ValueOperator, handle func(operator ValueOperator) bool, visited map[int64]struct{}) error {
 	if visited == nil {
@@ -481,7 +146,9 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 			flag = append(flag, true)
 			return nil
 		})
-		s.pushCondition(flag, nil)
+		if err := s.pushCondition(vals, flag, nil, false); err != nil {
+			return true, err
+		}
 		return true, nil
 	case OpCompareOpcode:
 		s.debugSubLog(">> pop")
@@ -515,13 +182,11 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 		}); trackErr != nil {
 			return true, trackErr
 		}
-		condition, normalizeErr := normalizeConditionAgainstSource(values, newVal, condition)
-		if normalizeErr != nil {
-			return true, normalizeErr
-		}
 		// Compare only produces condition mask; keep source value stack unchanged in shape.
 		s.stack.Push(values)
-		s.pushCondition(condition, newVal)
+		if err := s.pushCondition(values, condition, newVal, true); err != nil {
+			return true, err
+		}
 		return true, nil
 	case OpCompareString:
 		s.debugSubLog(">> pop")
@@ -538,7 +203,9 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 
 		comparator := NewStringComparator(mode, s.GetContext())
 		if len(i.Values) != len(i.MultiOperator) {
-			s.pushCondition([]bool{false}, nil)
+			if err := s.pushCondition(values, []bool{false}, nil, false); err != nil {
+				return true, err
+			}
 			return true, utils.Wrapf(CriticalError, "sfi values or mutiOperator out size %v", len(i.Values))
 		}
 		for index, v := range i.Values {
@@ -554,13 +221,11 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 		}); trackErr != nil {
 			return true, trackErr
 		}
-		condition, normalizeErr := normalizeConditionAgainstSource(values, newVal, condition)
-		if normalizeErr != nil {
-			return true, normalizeErr
-		}
 		// Compare only produces condition mask; keep source value stack unchanged in shape.
 		s.stack.Push(values)
-		s.pushCondition(condition, newVal)
+		if err := s.pushCondition(values, condition, newVal, true); err != nil {
+			return true, err
+		}
 		return true, nil
 	case OpVersionIn:
 		value := s.stack.Peek()
@@ -599,7 +264,9 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 			res = append(res, ok)
 			return nil
 		})
-		s.pushCondition(res, nil)
+		if err := s.pushCondition(value, res, nil, false); err != nil {
+			return true, err
+		}
 		return true, nil
 	case OpEq:
 		s.debugSubLog(">> pop")
@@ -622,7 +289,9 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 		}); trackErr != nil {
 			return true, trackErr
 		}
-		s.pushCondition(conds, nil)
+		if err := s.pushCondition(vs2, conds, nil, false); err != nil {
+			return true, err
+		}
 		return true, nil
 	case OpNotEq:
 		s.debugSubLog(">> pop")
@@ -645,7 +314,9 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 		}); trackErr != nil {
 			return true, trackErr
 		}
-		s.pushCondition(conds, nil)
+		if err := s.pushCondition(vs2, conds, nil, false); err != nil {
+			return true, err
+		}
 		return true, nil
 	case OpGt:
 		s.debugSubLog(">> pop")
@@ -668,7 +339,9 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 		}); trackErr != nil {
 			return true, trackErr
 		}
-		s.pushCondition(conds, nil)
+		if err := s.pushCondition(vs2, conds, nil, false); err != nil {
+			return true, err
+		}
 		return true, nil
 	case OpGtEq:
 		s.debugSubLog(">> pop")
@@ -691,7 +364,9 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 		}); trackErr != nil {
 			return true, trackErr
 		}
-		s.pushCondition(conds, nil)
+		if err := s.pushCondition(vs2, conds, nil, false); err != nil {
+			return true, err
+		}
 		return true, nil
 	case OpLt:
 		s.debugSubLog(">> pop")
@@ -714,7 +389,9 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 		}); trackErr != nil {
 			return true, trackErr
 		}
-		s.pushCondition(conds, nil)
+		if err := s.pushCondition(vs2, conds, nil, false); err != nil {
+			return true, err
+		}
 		return true, nil
 	case OpLtEq:
 		s.debugSubLog(">> pop")
@@ -737,38 +414,36 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 		}); trackErr != nil {
 			return true, trackErr
 		}
-		s.pushCondition(conds, nil)
+		if err := s.pushCondition(vs2, conds, nil, false); err != nil {
+			return true, err
+		}
 		return true, nil
 	case OpLogicBang:
-		conds, _ := s.popCondition()
-		for i := 0; i < len(conds); i++ {
-			conds[i] = !conds[i]
+		source := s.stack.Peek()
+		if source == nil {
+			return true, utils.Wrap(CriticalError, "condition failed: stack top is empty")
 		}
-		s.pushCondition(conds, nil)
+		if err := s.applyLogicBangCondition(source); err != nil {
+			return true, err
+		}
 		return true, nil
 	case OpLogicAnd:
-		conds1, cand1 := s.popCondition()
-		conds2, cand2 := s.popCondition()
-		if len(conds1) != len(conds2) {
-			return true, utils.Wrapf(CriticalError, "condition failed: conds1(%v) vs conds2(%v)", len(conds1), len(conds2))
+		source := s.stack.Peek()
+		if source == nil {
+			return true, utils.Wrap(CriticalError, "condition failed: stack top is empty")
 		}
-		res := make([]bool, len(conds1))
-		for i := 0; i < len(conds1); i++ {
-			res[i] = conds1[i] && conds2[i]
+		if err := s.applyLogicBinaryCondition(source, true); err != nil {
+			return true, err
 		}
-		s.pushCondition(res, mergeValuesByID(cand2, cand1, true))
 		return true, nil
 	case OpLogicOr:
-		conds1, cand1 := s.popCondition()
-		conds2, cand2 := s.popCondition()
-		if len(conds1) != len(conds2) {
-			return true, utils.Wrapf(CriticalError, "condition failed: conds1(%v) vs conds2(%v)", len(conds1), len(conds2))
+		source := s.stack.Peek()
+		if source == nil {
+			return true, utils.Wrap(CriticalError, "condition failed: stack top is empty")
 		}
-		res := make([]bool, len(conds1))
-		for i := 0; i < len(conds1); i++ {
-			res[i] = conds1[i] || conds2[i]
+		if err := s.applyLogicBinaryCondition(source, false); err != nil {
+			return true, err
 		}
-		s.pushCondition(res, mergeValuesByID(cand2, cand1, false))
 		return true, nil
 	case OpCondition:
 		s.debugSubLog(">> pop")
@@ -776,28 +451,11 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 		if vs == nil {
 			return true, utils.Wrap(CriticalError, "condition failed: stack top is empty")
 		}
-		conds, candidate := s.popCondition()
-		if len(conds) != ValuesLen(vs) {
-			return true, utils.Wrapf(CriticalError, "condition failed: stack top(%v) vs conds(%v)", ValuesLen(vs), len(conds))
+		filtered, err := s.applyCondition(vs)
+		if err != nil {
+			return true, err
 		}
-		filtered := make([]ValueOperator, 0, ValuesLen(vs))
-		for i := 0; i < len(conds); i++ {
-			if !conds[i] {
-				continue
-			}
-			if v, err := vs.ListIndex(i); err == nil {
-				filtered = append(filtered, v)
-			}
-		}
-		if shouldUseConditionCandidate(vs) {
-			if len(conds) == 1 && conds[0] && !utils.IsNil(candidate) {
-				s.stack.Push(candidate)
-			} else {
-				s.stack.Push(NewEmptyValues())
-			}
-			return true, nil
-		}
-		s.stack.Push(NewValues(filtered))
+		s.stack.Push(filtered)
 		return true, nil
 	case OpFilter:
 		s.debugSubLog(">> pop condition values")
@@ -810,69 +468,9 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 		if source == nil {
 			return true, utils.Wrap(CriticalError, "filter condition failed: empty source")
 		}
-
-		srcValues := flattenValues(source)
-		sourceByID := make(map[int64][]int, len(srcValues))
-		for i, src := range srcValues {
-			if utils.IsNil(src) {
-				continue
-			}
-			if idGetter, ok := src.(ssa.GetIdIF); ok {
-				sourceByID[idGetter.GetId()] = append(sourceByID[idGetter.GetId()], i)
-			}
-		}
-
-		mask := make([]bool, len(srcValues))
-		usedAnyCondition := false
-		if err := cond.Recursive(func(operator ValueOperator) error {
-			if utils.IsNil(operator) {
-				return nil
-			}
-			if operator.IsEmpty() {
-				return nil
-			}
-			usedAnyCondition = true
-			// Fallback 1: direct ID mapping.
-			if idGetter, ok := operator.(ssa.GetIdIF); ok {
-				if positions, existed := sourceByID[idGetter.GetId()]; existed {
-					for _, pos := range positions {
-						if pos >= 0 && pos < len(mask) {
-							mask[pos] = true
-						}
-					}
-					return nil
-				}
-			}
-
-			// Fallback 2: bounded predecessor traversal.
-			// To avoid accidental match amplification, only accept unique source position.
-			reachableIDs := collectReachableSourceIDs(operator)
-			if len(reachableIDs) == 0 {
-				return nil
-			}
-			posSet := make(map[int]struct{})
-			for _, id := range reachableIDs {
-				for _, pos := range sourceByID[id] {
-					if pos >= 0 && pos < len(mask) {
-						posSet[pos] = struct{}{}
-					}
-				}
-			}
-			if len(posSet) == 1 {
-				for pos := range posSet {
-					mask[pos] = true
-				}
-			}
-			return nil
-		}); err != nil {
+		if err := s.pushFilterCondition(source, cond); err != nil {
 			return true, err
 		}
-
-		// Program-like source (single entry without source IDs): any condition hit means true.
-		if len(mask) == 1 && len(sourceByID) == 0 && usedAnyCondition {
-			mask[0] = true
-		}
-		s.pushCondition(mask, cond)
 		return true, nil
 	default:
 		return false, nil
