@@ -120,3 +120,11 @@ func (s *Server) DeleteAIProvider(ctx context.Context, req *ypb.DeleteAIProvider
 	}
 	return &ypb.Empty{}, nil
 }
+
+func (s *Server) GetAIThirdPartyAppConfigTemplate(ctx context.Context, _ *ypb.Empty) (*ypb.GetThirdPartyAppConfigTemplateResponse, error) {
+	templates, err := buildAIGatewayTemplates()
+	if err != nil {
+		return nil, err
+	}
+	return &ypb.GetThirdPartyAppConfigTemplateResponse{Templates: templates}, nil
+}

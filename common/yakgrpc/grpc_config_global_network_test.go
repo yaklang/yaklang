@@ -715,6 +715,41 @@ func TestGetThirdPartyAppConfigTemplate(t *testing.T) {
 	assert.Equal(t, comateTmp.Items[0].GetRequired(), false)
 }
 
+func TestGetAIThirdPartyAppConfigTemplateIsSubset(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	allRes, err := client.GetThirdPartyAppConfigTemplate(context.Background(), &ypb.Empty{})
+	require.NoError(t, err)
+
+	aiRes, err := client.GetAIThirdPartyAppConfigTemplate(context.Background(), &ypb.Empty{})
+	require.NoError(t, err)
+	require.NotEmpty(t, aiRes.GetTemplates())
+
+	allByName := make(map[string]*ypb.GetThirdPartyAppConfigTemplate)
+	allAI := make([]string, 0)
+	for _, template := range allRes.GetTemplates() {
+		allByName[template.GetName()] = template
+		if template.GetType() == thirdPartyTemplateTypeAI {
+			allAI = append(allAI, template.GetName())
+		}
+	}
+
+	aiNames := make([]string, 0, len(aiRes.GetTemplates()))
+	for _, template := range aiRes.GetTemplates() {
+		assert.Equal(t, thirdPartyTemplateTypeAI, template.GetType())
+		aiNames = append(aiNames, template.GetName())
+
+		allTemplate, ok := allByName[template.GetName()]
+		require.True(t, ok, "ai template should exist in third-party template list: %s", template.GetName())
+		assert.Equal(t, allTemplate.GetType(), template.GetType())
+		assert.Equal(t, allTemplate.GetVerbose(), template.GetVerbose())
+		assert.Equal(t, len(allTemplate.GetItems()), len(template.GetItems()))
+	}
+
+	assert.ElementsMatch(t, allAI, aiNames)
+}
+
 func TestGenThirdPartyConfigOption(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
@@ -901,5 +936,13 @@ func TestInitNetworkConfig(t *testing.T) {
 			}
 		}
 
+	}
+}
+
+func TestAAcc(t *testing.T) {
+	templates, err := buildAIGatewayTemplates()
+	require.NoError(t, err)
+	for _, template := range templates {
+		fmt.Println(template)
 	}
 }

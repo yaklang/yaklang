@@ -752,6 +752,7 @@ service Yak {
   rpc QueryAIProvider(QueryAIProvidersRequest) returns (QueryAIProvidersResponse);
   rpc UpsertAIProvider(UpsertAIProviderRequest) returns (UpsertAIProviderResponse);
   rpc DeleteAIProvider(DeleteAIProviderRequest) returns (Empty);
+  rpc GetAIThirdPartyAppConfigTemplate(Empty) returns (GetThirdPartyAppConfigTemplateResponse);
 
   // 指纹库
   rpc GetFingerprint(GetFingerprintRequest) returns (GetFingerprintResponse);
