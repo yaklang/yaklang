@@ -419,29 +419,17 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 		}
 		return true, nil
 	case OpLogicBang:
-		source := s.stack.Peek()
-		if source == nil {
-			return true, utils.Wrap(CriticalError, "condition failed: stack top is empty")
-		}
-		if err := s.applyLogicBangCondition(source); err != nil {
+		if err := s.applyLogicBangCondition(); err != nil {
 			return true, err
 		}
 		return true, nil
 	case OpLogicAnd:
-		source := s.stack.Peek()
-		if source == nil {
-			return true, utils.Wrap(CriticalError, "condition failed: stack top is empty")
-		}
-		if err := s.applyLogicBinaryCondition(source, true); err != nil {
+		if err := s.applyLogicBinaryCondition(true); err != nil {
 			return true, err
 		}
 		return true, nil
 	case OpLogicOr:
-		source := s.stack.Peek()
-		if source == nil {
-			return true, utils.Wrap(CriticalError, "condition failed: stack top is empty")
-		}
-		if err := s.applyLogicBinaryCondition(source, false); err != nil {
+		if err := s.applyLogicBinaryCondition(false); err != nil {
 			return true, err
 		}
 		return true, nil

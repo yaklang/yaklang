@@ -1091,6 +1091,12 @@ func (p *ProgramOverLay) IsEmpty() bool {
 	return true
 }
 
+func (p *ProgramOverLay) GetSourceBitVector() *utils.BitVector {
+	return nil
+}
+
+func (p *ProgramOverLay) SetSourceBitVector(*utils.BitVector) {}
+
 func (p *ProgramOverLay) ShouldUseConditionCandidate() bool {
 	return true
 }

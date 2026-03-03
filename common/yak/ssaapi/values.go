@@ -37,6 +37,7 @@ type Value struct {
 	// for syntaxflow vm
 	Predecessors []*PredecessorValue
 	DescInfo     map[string]string
+	sourceBits   *utils.BitVector
 	// value from database
 	auditNode *ssadb.AuditNode
 }
