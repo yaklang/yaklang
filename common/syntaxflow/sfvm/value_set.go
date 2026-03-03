@@ -42,3 +42,21 @@ func (v *ValueSet) And(other *ValueSet) *ValueSet {
 	}
 	return res
 }
+
+func (v *ValueSet) Or(other *ValueSet) *ValueSet {
+	if v == nil && other == nil {
+		return nil
+	}
+	res := NewValueSet()
+	if v != nil {
+		for id, vo := range v.m {
+			res.Add(id, vo)
+		}
+	}
+	if other != nil {
+		for id, vo := range other.m {
+			res.Add(id, vo)
+		}
+	}
+	return res
+}

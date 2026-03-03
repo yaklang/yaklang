@@ -56,13 +56,10 @@ type SFFrame struct {
 	idx            int     // current opcode index
 	currentProcess float64 // current process
 
-	stack          *utils.Stack[ValueOperator] // for filter
-	conditionStack *utils.Stack[[]bool]        // for condition
-	// conditionValueStack keeps candidate value sets aligned with conditionStack.
-	// It is used by program-like condition filtering where boolean mask alone is insufficient.
-	conditionValueStack *utils.Stack[ValueOperator]
-	conditionScope      *utils.Stack[conditionScopeState] // for condition scope
-	popStack            *utils.Stack[ValueOperator]       //pop stack,for sf
+	stack          *utils.Stack[ValueOperator]       // for filter
+	conditionStack *utils.Stack[ConditionEntry]      // for condition
+	conditionScope *utils.Stack[conditionScopeState] // for condition scope
+	popStack       *utils.Stack[ValueOperator]       //pop stack,for sf
 
 	// when cache err skip  statement/expr
 	errorSkipStack *utils.Stack[*errorSkipContext]
@@ -221,8 +218,7 @@ func (s *SFFrame) Flush() {
 	s.result = NewSFResult(s.rule, s.config)
 	s.stack = utils.NewStack[ValueOperator]()
 	s.errorSkipStack = utils.NewStack[*errorSkipContext]()
-	s.conditionStack = utils.NewStack[[]bool]()
-	s.conditionValueStack = utils.NewStack[ValueOperator]()
+	s.conditionStack = utils.NewStack[ConditionEntry]()
 	s.conditionScope = utils.NewStack[conditionScopeState]()
 	s.popStack = utils.NewStack[ValueOperator]()
 	s.idx = 0
@@ -391,13 +387,6 @@ func (s *SFFrame) execRule(feedValue ValueOperator) error {
 					s.conditionStack.Pop()
 				}
 				s.conditionStack.Push(latest)
-				if s.conditionValueStack != nil && s.conditionValueStack.Len() > scopeLen {
-					latestValue := s.conditionValueStack.Pop()
-					for s.conditionValueStack.Len() > scopeLen {
-						s.conditionValueStack.Pop()
-					}
-					s.conditionValueStack.Push(latestValue)
-				}
 			case OpEnterStatement:
 				s.errorSkipStack.Push(&errorSkipContext{
 					start:      s.idx,
