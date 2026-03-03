@@ -286,10 +286,6 @@ func WithJsonRawConfig(raw []byte) Option {
 		if err != nil {
 			return err
 		}
-		// 增量编译勾选时，重新编译默认应为 true
-		if c.SSACompile != nil && c.SSACompile.EnableIncrementalCompile {
-			c.SSACompile.ReCompile = true
-		}
 		return nil
 	}
 }
