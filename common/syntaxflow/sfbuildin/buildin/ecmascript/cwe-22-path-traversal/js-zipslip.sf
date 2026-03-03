@@ -114,7 +114,14 @@ REFERENCE
 // Example:
 //   stream.pipe(unzip.Parse()).on('entry', (entry) => { entry.path ... })
 //   tarExtract.on('entry', (header, stream) => { header.name ... })
-.on('entry', * as $onEntryCallback)
+//
+// Scope restriction: only match .on('entry') calls whose receiver object's SSA
+// string representation contains 'unzip', 'unzipper', or 'tar'.
+// This filters out EventEmitter, DB stream, and other non-archive .on('entry') usage.
+// (e.g. "Undefined-.pipe(valid)(Undefined-unzip.Parse(valid)())" → contains 'unzip')
+// (e.g. "Undefined-tar.extract(valid)()"                        → contains 'tar')
+.on('entry', * as $onEntryCallbackAll)
+$onEntryCallbackAll?{<self><getCall><getCallee><getObject>?{have: /(?i)(unzip|unzipper|tar)/}} as $onEntryCallback
 $onEntryCallback<getFormalParams> as $entryParam
 $entryParam.path as $source
 $entryParam.name as $source
@@ -124,12 +131,20 @@ $entryParam.linkname as $source
 // Example:
 //   zip.getEntries().forEach(entry => { entry.entryName ... })
 //   zip.getEntry('file').entryName
-*.getEntries() as $admZipEntries
+//
+// Scope restriction: only match calls whose callee object is an AdmZip instance.
+// The callee of zip.getEntries() is an Undefined member-access node; its object
+// points back to the `new AdmZip(...)` Call node (string: "Function-AdmZip.AdmZip(...)").
+// Using ?{<self><getCallee><getObject>?{have: /AdmZip/}} correctly filters out
+// arbitrary objects with a getEntries() method (e.g. { getEntries: () => [] }).
+*.getEntries() as $admZipEntriesAll
+$admZipEntriesAll?{<self><getCallee><getObject>?{have: /AdmZip/}} as $admZipEntries
 $admZipEntries.forEach(* as $admForEachCb)
 $admForEachCb<getFormalParams> as $admEntryParam
 $admEntryParam.entryName as $source
 
-*.getEntry() as $admSingleEntry
+*.getEntry() as $admSingleEntryAll
+$admSingleEntryAll?{<self><getCallee><getObject>?{have: /AdmZip/}} as $admSingleEntry
 $admSingleEntry.entryName as $source
 
 // Pattern 3: jszip
