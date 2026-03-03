@@ -429,6 +429,7 @@ const (
 	Yak_QueryAIProvider_FullMethodName                            = "/ypb.Yak/QueryAIProvider"
 	Yak_UpsertAIProvider_FullMethodName                           = "/ypb.Yak/UpsertAIProvider"
 	Yak_DeleteAIProvider_FullMethodName                           = "/ypb.Yak/DeleteAIProvider"
+	Yak_GetAIThirdPartyAppConfigTemplate_FullMethodName           = "/ypb.Yak/GetAIThirdPartyAppConfigTemplate"
 	Yak_GetFingerprint_FullMethodName                             = "/ypb.Yak/GetFingerprint"
 	Yak_AddFingerprint_FullMethodName                             = "/ypb.Yak/AddFingerprint"
 	Yak_ModifyFingerprint_FullMethodName                          = "/ypb.Yak/ModifyFingerprint"
@@ -1150,6 +1151,7 @@ type YakClient interface {
 	QueryAIProvider(ctx context.Context, in *QueryAIProvidersRequest, opts ...grpc.CallOption) (*QueryAIProvidersResponse, error)
 	UpsertAIProvider(ctx context.Context, in *UpsertAIProviderRequest, opts ...grpc.CallOption) (*UpsertAIProviderResponse, error)
 	DeleteAIProvider(ctx context.Context, in *DeleteAIProviderRequest, opts ...grpc.CallOption) (*Empty, error)
+	GetAIThirdPartyAppConfigTemplate(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetThirdPartyAppConfigTemplateResponse, error)
 	// 指纹库
 	GetFingerprint(ctx context.Context, in *GetFingerprintRequest, opts ...grpc.CallOption) (*GetFingerprintResponse, error)
 	AddFingerprint(ctx context.Context, in *AddFingerprintRequest, opts ...grpc.CallOption) (*AddFingerprintResponse, error)
@@ -6103,6 +6105,16 @@ func (c *yakClient) DeleteAIProvider(ctx context.Context, in *DeleteAIProviderRe
 	return out, nil
 }
 
+func (c *yakClient) GetAIThirdPartyAppConfigTemplate(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetThirdPartyAppConfigTemplateResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetThirdPartyAppConfigTemplateResponse)
+	err := c.cc.Invoke(ctx, Yak_GetAIThirdPartyAppConfigTemplate_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) GetFingerprint(ctx context.Context, in *GetFingerprintRequest, opts ...grpc.CallOption) (*GetFingerprintResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetFingerprintResponse)
@@ -8781,6 +8793,7 @@ type YakServer interface {
 	QueryAIProvider(context.Context, *QueryAIProvidersRequest) (*QueryAIProvidersResponse, error)
 	UpsertAIProvider(context.Context, *UpsertAIProviderRequest) (*UpsertAIProviderResponse, error)
 	DeleteAIProvider(context.Context, *DeleteAIProviderRequest) (*Empty, error)
+	GetAIThirdPartyAppConfigTemplate(context.Context, *Empty) (*GetThirdPartyAppConfigTemplateResponse, error)
 	// 指纹库
 	GetFingerprint(context.Context, *GetFingerprintRequest) (*GetFingerprintResponse, error)
 	AddFingerprint(context.Context, *AddFingerprintRequest) (*AddFingerprintResponse, error)
@@ -10242,6 +10255,9 @@ func (UnimplementedYakServer) UpsertAIProvider(context.Context, *UpsertAIProvide
 }
 func (UnimplementedYakServer) DeleteAIProvider(context.Context, *DeleteAIProviderRequest) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteAIProvider not implemented")
+}
+func (UnimplementedYakServer) GetAIThirdPartyAppConfigTemplate(context.Context, *Empty) (*GetThirdPartyAppConfigTemplateResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetAIThirdPartyAppConfigTemplate not implemented")
 }
 func (UnimplementedYakServer) GetFingerprint(context.Context, *GetFingerprintRequest) (*GetFingerprintResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetFingerprint not implemented")
@@ -17615,6 +17631,24 @@ func _Yak_DeleteAIProvider_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_GetAIThirdPartyAppConfigTemplate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetAIThirdPartyAppConfigTemplate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_GetAIThirdPartyAppConfigTemplate_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetAIThirdPartyAppConfigTemplate(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_GetFingerprint_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetFingerprintRequest)
 	if err := dec(in); err != nil {
@@ -22036,6 +22070,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteAIProvider",
 			Handler:    _Yak_DeleteAIProvider_Handler,
+		},
+		{
+			MethodName: "GetAIThirdPartyAppConfigTemplate",
+			Handler:    _Yak_GetAIThirdPartyAppConfigTemplate_Handler,
 		},
 		{
 			MethodName: "GetFingerprint",

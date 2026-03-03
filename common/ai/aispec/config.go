@@ -32,7 +32,7 @@ type AIConfig struct {
 	Timeout  float64 // `app:"name:请求超时时长"`
 	Deadline time.Time
 
-	APIKey string `json:"api_key" app:"name:api_key,verbose:ApiKey,desc:APIKey / Token,required:true,id:1"`
+	APIKey string `json:"api_key" app:"name:api_key,verbose:ApiKey,desc:APIKey / Token,required:true,id:1,type:string"`
 	Proxy  string `json:"proxy" app:"name:proxy,verbose:代理地址,id:5"`
 	Host   string
 	Port   int
