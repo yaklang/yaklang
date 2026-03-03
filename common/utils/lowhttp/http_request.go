@@ -266,8 +266,6 @@ func DeletePacketEncoding(raw []byte) []byte {
 	plain, _, _ := _unzipPacketEncodingInternal(
 		raw,
 		_defaultUnzipPacketEncodingConfig(),
-		_withUnzipPacketEncodingEnableMagic(false),
-		_withUnzipPacketEncodingConservative(false),
 		_withUnzipPacketEncodingMaxDecodedBytes(0),
 	)
 	return plain

@@ -311,7 +311,11 @@ func toHTTPFlowGRPCModel(f *schema.HTTPFlow, full bool) (*ypb.HTTPFlow, error) {
 			flow.RawRequestBodyBase64 = codec.EncodeBase64(requestBody)
 			// 这里需要修复请求，这是为了解决Content-Type与body中boundary不一致的问题
 			fixReq := lowhttp.FixHTTPRequest(flow.Request)
-			flow.SafeHTTPRequest = utils.EscapeInvalidUTF8Byte(lowhttp.ConvertHTTPRequestToFuzzTag(lowhttp.FastAutoUnzipPacketEncoding(fixReq)))
+			// first step try auto unzip
+			fixReq = lowhttp.FastAutoUnzipPacketEncoding(fixReq)
+			// second step try to fix invalid UTF-8
+			fixReq = lowhttp.ConvertHTTPRequestToFuzzTag(fixReq)
+			flow.SafeHTTPRequest = utils.EscapeInvalidUTF8Byte(fixReq)
 		}
 	}
 

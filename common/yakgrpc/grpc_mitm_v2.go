@@ -453,8 +453,6 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	}
 
 	// 手动劫持：是否启用自动解压/自动压缩（需要热加载）
-	autoUnzip := utils.NewBool(firstReq.GetAutoUnzipValue())
-
 	go func() {
 		for {
 			reqInstance, err := stream.Recv()
@@ -673,11 +671,6 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			if reqInstance.GetSetAutoForward() {
 				autoForwardValue := reqInstance.GetAutoForwardValue()
 				hijackManger.setCanRegister(!autoForwardValue)
-				continue
-			}
-
-			if reqInstance.GetSetAutoUnzip() {
-				autoUnzip.SetTo(reqInstance.GetAutoUnzipValue())
 				continue
 			}
 
@@ -943,14 +936,12 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		taskInfo.Status = Hijack_Status_Response
 		taskInfo.Request = httpctx.GetRequestBytes(req)
 		taskInfo.Response = rsp
-		if autoUnzip.IsSet() {
-			if viewReq, _, ok := lowhttp.AutoUnzipPacketEncoding(taskInfo.Request); ok {
-				taskInfo.Request = viewReq
-			}
-			if viewRsp, st, ok := lowhttp.AutoUnzipPacketEncoding(taskInfo.Response); ok && st != nil {
-				taskInfo.Response = viewRsp
-				hijackManger.autoUnzipResponse.Set(taskInfo.TaskID, st)
-			}
+		if viewReq, _, ok := lowhttp.AutoUnzipPacketEncoding(taskInfo.Request); ok {
+			taskInfo.Request = viewReq
+		}
+		if viewRsp, st, ok := lowhttp.AutoUnzipPacketEncoding(taskInfo.Response); ok && st != nil {
+			taskInfo.Response = viewRsp
+			hijackManger.autoUnzipResponse.Set(taskInfo.TaskID, st)
 		}
 		taskInfo.TraceInfo = model.ToLowhttpTraceInfoGRPCModel(traceInfo)
 		httpctx.SetResponseViewedByUser(req)
@@ -1005,14 +996,6 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 						return rsp
 					}
 
-					if autoUnzip.IsSet() {
-						if st, ok := hijackManger.autoUnzipResponse.Get(taskInfo.TaskID); ok && st != nil {
-							if encoded, ok := lowhttp.AutoZipPacketEncoding(response, st); ok {
-								response = encoded
-							}
-						}
-					}
-
 					httpctx.SetResponseModified(req, "manual")
 					httpctx.SetHijackedResponseBytes(req, response)
 					httpctx.SetPlainResponseBytes(req, lowhttp.DeletePacketEncoding(response))
@@ -1025,6 +1008,12 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 					if rspModified == nil {
 						log.Error("BUG: http response is empty... use origin")
 						return rsp
+					}
+
+					if st, ok := hijackManger.autoUnzipResponse.Get(taskInfo.TaskID); ok && st != nil {
+						if encoded, ok := lowhttp.AutoZipPacketEncoding(rspModified, st); ok {
+							response = encoded
+						}
 					}
 
 					return rspModified
@@ -1309,11 +1298,9 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 
 		taskInfo := task.infoMessage
 
-		if autoUnzip.IsSet() {
-			if viewReq, st, ok := lowhttp.AutoUnzipPacketEncoding(taskInfo.Request); ok && st != nil {
-				taskInfo.Request = viewReq
-				hijackManger.autoUnzipRequest.Set(taskInfo.TaskID, st)
-			}
+		if viewReq, st, ok := lowhttp.AutoUnzipPacketEncoding(taskInfo.Request); ok && st != nil {
+			taskInfo.Request = viewReq
+			hijackManger.autoUnzipRequest.Set(taskInfo.TaskID, st)
 		}
 
 		httpctx.SetResponseContentTypeFiltered(originReqIns, func(t string) bool { // update callback set resp filter feedback
@@ -1421,11 +1408,9 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 						return req
 					}
 
-					if autoUnzip.IsSet() {
-						if st, ok := hijackManger.autoUnzipRequest.Get(taskInfo.TaskID); ok && st != nil {
-							if encoded, ok := lowhttp.AutoZipPacketEncoding(current, st); ok {
-								current = encoded
-							}
+					if st, ok := hijackManger.autoUnzipRequest.Get(taskInfo.TaskID); ok && st != nil {
+						if encoded, ok := lowhttp.AutoZipPacketEncoding(current, st); ok {
+							current = encoded
 						}
 					}
 
@@ -1506,10 +1491,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		saveBarePacketHandler := func(id uint) {
 			// 存储KV，将flow ID作为key，bare request和bare response作为value
 			if httpctx.GetRequestIsModified(req) {
-				bareReq := httpctx.GetPlainRequestBytes(req)
-				if len(bareReq) == 0 {
-					bareReq = httpctx.GetBareRequestBytes(req)
-				}
+				bareReq := httpctx.GetBareRequestBytes(req)
 				log.Debugf("[KV] save bare Request(%d)", id)
 
 				if len(bareReq) > 0 && id > 0 {
@@ -1519,10 +1501,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			}
 
 			if httpctx.GetResponseIsModified(req) || isResponseDropped {
-				bareRsp := httpctx.GetPlainResponseBytes(req)
-				if len(bareRsp) == 0 {
-					bareRsp = httpctx.GetBareResponseBytes(req)
-				}
+				bareRsp := httpctx.GetBareResponseBytes(req)
 				log.Debugf("[KV] save bare Response(%d)", id)
 
 				if len(bareRsp) > 0 && id > 0 {

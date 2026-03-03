@@ -76,10 +76,6 @@ func TestGRPCMUSTPASS_MITMV2_ManualHijack_AutoUnzip_ViewPlainRequestAndResponse(
 		SetAutoForward:   true,
 		AutoForwardValue: false, // enable manual hijack
 	}))
-	require.NoError(t, stream.Send(&ypb.MITMV2Request{
-		SetAutoUnzip:   true,
-		AutoUnzipValue: true, // enable auto unzip/zip for manual hijack view
-	}))
 
 	clientErrCh := make(chan error, 1)
 	started := false

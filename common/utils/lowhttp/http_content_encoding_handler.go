@@ -13,6 +13,6 @@ func ContentEncodingDecode(contentEncoding string, bodyRaw []byte) (finalResult 
 		}
 	}()
 
-	result, _, ok := _decodeByHeaderOrMagic(contentEncoding, bodyRaw, false, _autoUnzipMaxDecodedBodyBytes)
+	result, _, ok := _decodeByHeaderOrMagic(contentEncoding, bodyRaw, true, _autoUnzipMaxDecodedBodyBytes)
 	return result, ok
 }
