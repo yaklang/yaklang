@@ -1,6 +1,7 @@
 package ssaconfig
 
 import (
+	"runtime"
 	"testing"
 
 	"github.com/google/uuid"
@@ -304,7 +305,8 @@ func TestDefaultFactoryFunctions(t *testing.T) {
 		require.Empty(t, config.ExcludeFiles)
 		require.False(t, config.ReCompile)
 		require.False(t, config.MemoryCompile)
-		require.Equal(t, 1, config.Concurrency)
+		require.GreaterOrEqual(t, config.Concurrency, 1)
+		require.LessOrEqual(t, config.Concurrency, runtime.NumCPU())
 	})
 
 	t.Run("defaultSyntaxFlowConfig", func(t *testing.T) {

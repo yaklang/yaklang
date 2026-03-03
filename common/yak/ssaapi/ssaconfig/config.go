@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"runtime"
 )
 
 type Config struct {
@@ -115,6 +116,14 @@ func defaultCodeSourceConfig() *CodeSourceInfo {
 	}
 }
 
+func defaultCompileConcurrency() int {
+	n := runtime.NumCPU() / 2
+	if n < 1 {
+		return 1
+	}
+	return n
+}
+
 func defaultSSACompileConfig() *SSACompileConfig {
 	return &SSACompileConfig{
 		StrictMode:               false,
@@ -123,7 +132,7 @@ func defaultSSACompileConfig() *SSACompileConfig {
 		EntryFiles:               []string{},
 		ReCompile:                false,
 		MemoryCompile:            false,
-		Concurrency:              1,
+		Concurrency:              defaultCompileConcurrency(),
 		FilePerformanceLog:       false,
 		StopOnCliCheck:           false,
 		EnableIncrementalCompile: false,
