@@ -230,3 +230,36 @@ fs.readFile('test.zip', (err, data) => {
 `)
 	assert.Equal(t, total, 0, "不应触发告警（误报）")
 }
+
+// TestZipSlip_NoFalsePositive_NonAdmZipGetEntries ensures that a non-adm-zip object
+// with a getEntries() method does NOT trigger a Zip Slip alert.
+func TestZipSlip_NoFalsePositive_NonAdmZipGetEntries(t *testing.T) {
+	rule := loadZipSlipRule(t)
+	total, _ := runOnFile(t, rule, "fp_test.js", `
+const fs = require('fs');
+
+// Arbitrary object with getEntries() — not adm-zip, should NOT alert
+const api = { getEntries: function() { return [{ entryName: 'file.txt' }]; } };
+api.getEntries().forEach(function(e) {
+    fs.writeFile('/output/' + e.entryName, 'data', function(err) {});
+});
+`)
+	assert.Equal(t, 0, total, "non-adm-zip getEntries should NOT trigger Zip Slip alert (false positive)")
+}
+
+// TestZipSlip_NoFalsePositive_NonArchiveOnEntry ensures that EventEmitter .on('entry')
+// does NOT trigger a Zip Slip alert.
+func TestZipSlip_NoFalsePositive_EventEmitterOnEntry(t *testing.T) {
+	rule := loadZipSlipRule(t)
+	total, _ := runOnFile(t, rule, "fp_emitter_test.js", `
+const EventEmitter = require('events');
+const fs = require('fs');
+
+// EventEmitter .on('entry') — not a zip stream, should NOT alert
+const emitter = new EventEmitter();
+emitter.on('entry', function(entry) {
+    fs.writeFile('/logs/' + entry.path, 'log', function(err) {});
+});
+`)
+	assert.Equal(t, 0, total, "EventEmitter .on('entry') should NOT trigger Zip Slip alert (false positive)")
+}

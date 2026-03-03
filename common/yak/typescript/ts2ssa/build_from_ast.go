@@ -2783,6 +2783,14 @@ func (b *builder) VisitNewExpression(node *ast.NewExpression) ssa.Value {
 		defaultCtorFunc := b.NewFunc(fmt.Sprintf("%s_%s", className, "default_ctor_func"))
 		class.RegisterMagicMethod(ssa.Constructor, defaultCtorFunc)
 		store := b.StoreFunctionBuilder()
+		// externalSource holds the require() call value (if any) so the LazyBuilder
+		// closure can capture it and embed it into the constructed object. This preserves
+		// the def-use chain: require('pkg') → new Cls() → instance methods, enabling
+		// topdef analysis to trace all the way back to the original require() call.
+		var externalSource ssa.Value
+		if !utils.IsNil(classVal) {
+			externalSource = classVal
+		}
 		defaultCtorFunc.AddLazyBuilder(func() {
 			switchHandler := b.SwitchFunctionBuilder(store)
 			defer switchHandler()
@@ -2793,6 +2801,16 @@ func (b *builder) VisitNewExpression(node *ast.NewExpression) ssa.Value {
 				variable := b.CreateVariable("this")
 				b.AssignVariable(variable, container)
 				container.SetType(class)
+				// Embed the external source (e.g. require('adm-zip')) as a hidden member
+				// of the constructed object. topdef on Make nodes traverses all members,
+				// so this creates a traceable path from instances back to require().
+				if !utils.IsNil(externalSource) {
+					requireKey := b.EmitConstInst("__require__")
+					memberVar := b.CreateMemberCallVariable(container, requireKey)
+					if memberVar != nil {
+						b.AssignVariable(memberVar, externalSource)
+					}
+				}
 
 				b.EmitReturn([]ssa.Value{container})
 				b.Finish()

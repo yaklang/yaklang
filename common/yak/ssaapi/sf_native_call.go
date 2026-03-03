@@ -178,6 +178,12 @@ const (
 	NativeCall_Length = "len"
 
 	NativeCall_GetRoot = "root"
+
+	// NativeCall_MatchRegexpPath checks whether a regex literal (e.g. from app.use())
+	// can be bypassed by uppercasing a string route path (e.g. from app.get()).
+	// Usage: $regexVar<matchRegexpPath(target="$routeVar")>
+	// Returns the regex values that have a bypass risk against the target string paths.
+	NativeCall_MatchRegexpPath = "matchRegexpPath"
 )
 
 func init() {
@@ -890,6 +896,10 @@ func init() {
 		frame.GetSymbolTable().Set(varName, sfvm.NewValues(vals))
 		return true, v, nil
 	}), nc_desc(`put vars to variables`))
+	registerNativeCall(NativeCall_MatchRegexpPath, nc_func(nativeCallMatchRegexpPath), nc_desc(`检查正则表达式路径（如 app.use() 中的 /\/admin\/.*/）是否能被大小写绕过。
+用法: $regexVar<matchRegexpPath(target="$routeVar")>
+输入是正则字面量值集合，target 参数是目标字符串路径变量名。
+如果存在字符串路径（大小写不敏感）能被大写攻击URL命中，但中间件正则（大小写敏感）无法拦截，则输出该正则值（bypass风险）。`))
 	registerNativeCall(NativeCall_StrLower, nc_func(nativeCallStrLower), nc_desc(`convert a string to lower case`))
 	registerNativeCall(NativeCall_StrUpper, nc_func(nativeCallStrUpper), nc_desc(`convert a string to upper case`))
 	registerNativeCall(NativeCall_Regexp, nc_func(nativeCallRegexp), nc_desc(`regexp a string, group is available`))
