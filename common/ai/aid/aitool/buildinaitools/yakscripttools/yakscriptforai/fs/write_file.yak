@@ -59,39 +59,53 @@ overwrite := cli.Bool("force", cli.setRequired(false), cli.setDefault(false), cl
 
 cli.check()
 
-yakit.Info("Writing to file: %v", filename)
+println(sprintf("[write_file] start writing file: %s", filename))
 
 // 检查文件是否已存在
 if file.IsExisted(filename) && !overwrite {
-    yakit.Warn("File %v already exists. Use --force to overwrite", filename)
+    println(sprintf("[write_file] file already exists and force=false: %s", filename))
     return
 }
 
 // 获取文件目录，如果目录不存在则尝试创建
 dir := file.GetDirPath(filename)
+createdDir := false
 if dir != "" && !file.IsExisted(dir) {
-    yakit.Info("Creating directory: %v", dir)
+    println(sprintf("[write_file] parent directory does not exist, creating: %s", dir))
     err := file.MkdirAll(dir)
     if err != nil {
-        yakit.Error("Failed to create directory %v: %v", dir, err)
+        println(sprintf("[write_file] failed to create parent directory: %s, reason: %v", dir, err))
         return
     }
+    createdDir = true
+    println(sprintf("[write_file] parent directory created successfully: %s", dir))
 }
 
 // 写入文件内容
 err := file.Save(filename, content)
 if err != nil {
-    yakit.Error("Failed to write file %v: %v", filename, err)
+    println(sprintf("[write_file] failed to write file: %s, reason: %v", filename, err))
+    if createdDir {
+        println(sprintf("[write_file] attempting rollback by removing created directory: %s", dir))
+        rollbackErr := file.Remove(dir)
+        if rollbackErr != nil {
+            println(sprintf("[write_file] rollback failed, could not remove directory: %s, reason: %v", dir, rollbackErr))
+        } else {
+            println(sprintf("[write_file] rollback success, removed directory: %s", dir))
+        }
+    }
     return
 }
+
+println(sprintf("[write_file] write success. file: %s", filename))
+println(sprintf("[write_file] content length: %d bytes", len(content)))
+println(sprintf("[write_file] parent directory: %s", dir))
 
 // 获取写入后的文件信息
 info, err := file.Stat(filename)
 if err != nil {
-    yakit.Warn("File written successfully but failed to get file info: %v", err)
+    println(sprintf("[write_file] file written but failed to stat file: %v", err))
 } else {
-    yakit.Info("File written successfully. Size: %v bytes, ModTime: %v", info.Size(), info.ModTime())
+    println(sprintf("[write_file] file stat size: %d, mod_time: %v", info.Size(), info.ModTime()))
     yakit.File(filename, yakit.fileWriteAction(len(content), "cover", content))
 }
-
-yakit.Info("Content written to %v successfully", filename)
