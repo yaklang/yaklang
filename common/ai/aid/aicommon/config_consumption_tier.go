@@ -191,13 +191,7 @@ func (c *Config) GetOrCreateTierConsumptionStats(tier consts.ModelTier) *Consump
 		return nil
 	}
 	normalizedTier := normalizeConsumptionTier(tier)
-	stats := statsByTier.GetOrSet(normalizedTier, newConsumptionStats())
-	if stats != nil {
-		return stats
-	}
-	stats = newConsumptionStats()
-	statsByTier.Set(normalizedTier, stats)
-	return stats
+	return statsByTier.GetOrSet(normalizedTier, newConsumptionStats())
 }
 
 func (c *Config) AddTierConsumption(tier consts.ModelTier, inputDelta, outputDelta int64) {
