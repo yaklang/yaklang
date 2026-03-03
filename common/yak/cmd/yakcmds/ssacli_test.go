@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/google/pprof/profile"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/log"
@@ -199,4 +200,41 @@ alert $result`
 			require.NoError(t, err)
 		})
 	}
+}
+
+// TestSSACompileCPUProfile 验证 --cpuprofile 能正确生成 pprof 文件
+func TestSSACompileCPUProfile(t *testing.T) {
+	tmpDir := t.TempDir()
+	log.Infof("tmpDir: %s", tmpDir)
+
+	// 创建简单 yak 文件用于快速编译
+	err := os.WriteFile(filepath.Join(tmpDir, "test.yak"), []byte("a = 1\n"), 0644)
+	require.NoError(t, err)
+
+	cpuprofilePath := filepath.Join(tmpDir, "cpu.pprof")
+	programName := uuid.NewString()
+
+	app := cli.NewApp()
+	addCommands(app, yakcmds.SSACompilerCommands...)
+
+	err = app.Run([]string{
+		"yak", "ssa-compile",
+		"-t", tmpDir,
+		"-p", programName,
+		"--cpuprofile", cpuprofilePath,
+	})
+	require.NoError(t, err)
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
+
+	// 验证 pprof 文件已生成
+	info, err := os.Stat(cpuprofilePath)
+	require.NoError(t, err, "cpuprofile file should exist")
+	require.Greater(t, info.Size(), int64(0), "cpuprofile file should not be empty")
+
+	// 读入内存后解析，避免持有文件句柄影响 TempDir 清理（Windows）
+	data, err := os.ReadFile(cpuprofilePath)
+	require.NoError(t, err)
+	prof, err := profile.ParseData(data)
+	require.NoError(t, err, "cpuprofile should be valid pprof format")
+	require.NotNil(t, prof, "parsed profile should not be nil")
 }
