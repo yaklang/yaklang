@@ -236,6 +236,12 @@ func (c *Config) parseProjectWithFS(
 		prog.SetPreHandler(false)
 		start = time.Now()
 
+		// O(1) lookup: handlerFilesSet for needsCompile check
+		handlerFilesSet := make(map[string]struct{}, len(handlerFiles))
+		for _, hf := range handlerFiles {
+			handlerFilesSet[hf] = struct{}{}
+		}
+
 		// ssareducer.FilesHandler(
 		// 	c.ctx, filesystem, handlerFiles,
 		// 	func(path string, content []byte) {
@@ -251,16 +257,7 @@ func (c *Config) parseProjectWithFS(
 			}
 			// Check if this file needs to be compiled (is in handlerFiles)
 			// If not, it's an extra file (like XML) that should be kept in filesystem but not compiled
-			needsCompile := false
-			for _, hf := range handlerFiles {
-				if hf == fileContent.Path {
-					needsCompile = true
-					break
-				}
-			}
-			// If file doesn't need compilation (extra file), ensure it's added to FileList
-			// and skip the build step but keep it in filesystem
-			if !needsCompile {
+			if _, needsCompile := handlerFilesSet[fileContent.Path]; !needsCompile {
 				// Ensure extra files (like XML) are added to FileList even if they don't need compilation
 				if fileContent.Editor != nil {
 					prog.PushEditor(fileContent.Editor)
