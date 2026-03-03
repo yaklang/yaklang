@@ -1,0 +1,229 @@
+desc(
+	title: "Disabling Electron webSecurity"
+	title_zh: "Electron webSecurity 被禁用"
+	type: vuln
+	level: warning
+	risk: "xss"
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+
+Electron 默认通过同源策略（Same-Origin Policy）保护应用安全，要求所有 JavaScript 和 CSS 代码均来自运行 Electron 应用的本地机器。
+
+将 `webPreferences` 对象的 `webSecurity` 属性设置为 `false` 会禁用同源策略，允许：
+- 加载并执行来自任意域的外部脚本和样式表
+- 跨域发起 HTTP 请求（绕过 CORS 限制）
+- 加载本地文件（`file://`协议）访问本地文件系统
+
+攻击者若能控制 Electron 应用加载的内容（如通过 XSS、中间人攻击或恶意链接），可在禁用 `webSecurity` 的应用中：
+- 注入并执行任意 JavaScript 代码
+- 访问 Node.js API（若同时开启 `nodeIntegration`），实现完整的 RCE
+- 读取用户本地文件系统上的敏感文件
+
+2. **触发场景**
+
+```javascript
+// 危险：禁用同源策略
+const mainWindow = new BrowserWindow({
+    webPreferences: {
+        webSecurity: false  // 允许跨域加载任意内容
+    }
+});
+```
+
+3. **潜在影响**
+
+- **跨站脚本（XSS）**：攻击者注入恶意脚本，在 Electron 渲染进程中执行
+- **远程代码执行（RCE）**：配合 `nodeIntegration: true` 可完全控制操作系统
+- **本地文件读取**：渲染进程可通过 `file://` 协议读取用户本地文件
+- **会话劫持**：攻击者窃取认证 Token、Cookie 等敏感凭据
+DESC
+	rule_id: "a1b2c3d4-e5f6-7890-abcd-ef1234567891"
+	solution: <<<SOLUTION
+### 修复建议
+
+**1. 不要禁用 webSecurity**
+
+```javascript
+// 危险
+const mainWindow = new BrowserWindow({
+    webPreferences: {
+        webSecurity: false
+    }
+});
+
+// 安全：删除该配置或显式设置为 true（默认值）
+const mainWindow = new BrowserWindow({
+    webPreferences: {
+        webSecurity: true  // 默认值，保持同源策略
+    }
+});
+```
+
+**2. 如果需要加载外部资源，使用 CSP（内容安全策略）白名单**
+
+```javascript
+// 在主进程中为特定来源配置 CSP
+session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+        responseHeaders: {
+            ...details.responseHeaders,
+            'Content-Security-Policy': ["default-src 'self' https://trusted-domain.com"]
+        }
+    });
+});
+```
+
+**3. 如需跨域请求，通过主进程代理**
+
+通过 IPC 将网络请求代理到主进程，由主进程处理跨域请求，而不是在渲染进程中禁用安全策略。
+SOLUTION
+	reference: <<<REFERENCE
+[Electron Documentation: Security, Native Capabilities, and Your Responsibility](https://www.electronjs.org/docs/latest/tutorial/security)
+[Electron Security: webSecurity](https://www.electronjs.org/docs/latest/tutorial/security#5-do-not-disable-websecurity)
+[CWE-79: Cross-site Scripting](https://cwe.mitre.org/data/definitions/79.html)
+[CodeQL: js/disabling-electron-websecurity](https://codeql.github.com/codeql-query-help/javascript/js-disabling-electron-websecurity/)
+REFERENCE
+)
+
+// =====================================================================
+// Detection Pattern:
+//   new BrowserWindow({ webPreferences: { webSecurity: false } })
+//
+// In SSA:
+//   - The options object is a Make node with members
+//   - webPreferences is a member of the outer options object
+//   - webSecurity is a member of the webPreferences object
+//   - false is a ConstInst with bool value false
+//
+// Strategy:
+//   1. Find all BrowserWindow construction calls
+//   2. Navigate into webPreferences member
+//   3. Navigate into webSecurity member
+//   4. Filter for explicit false value
+//
+// Note: This also covers dynamic assignment patterns:
+//   const prefs = { webSecurity: false };
+//   new BrowserWindow({ webPreferences: prefs });
+// =====================================================================
+
+BrowserWindow(* as $browserWindowOpts)
+$browserWindowOpts.webPreferences as $webPrefs
+$webPrefs.webSecurity as $webSecurityVal
+$webSecurityVal?{have: false} as $disabledWebSecurity
+
+alert $disabledWebSecurity for {
+	level: "warning"
+	type: "vuln"
+	title: "Electron webSecurity Disabled"
+	title_zh: "Electron webSecurity 被设置为 false，同源策略被禁用"
+	message: "检测到 Electron BrowserWindow 的 webPreferences.webSecurity 被显式设置为 false，这将禁用 Chromium 的同源策略。攻击者若能控制渲染进程加载的内容，可利用此配置加载并执行来自任意域的恶意脚本，在配合 nodeIntegration 开启时可实现完整的远程代码执行（RCE）。强烈建议不要禁用 webSecurity。"
+	solution: <<<SOLUTION
+删除 webSecurity: false 配置，或显式设置为 true（Electron 默认值）：
+
+```javascript
+// 修复前（危险）
+new BrowserWindow({ webPreferences: { webSecurity: false } });
+
+// 修复后（安全）
+new BrowserWindow({ webPreferences: { webSecurity: true } });
+// 或者直接省略该配置（默认为 true）
+new BrowserWindow({ webPreferences: {} });
+```
+SOLUTION
+	risk: "xss"
+	name: "disabledWebSecurity"
+}
+
+// =====================================================================
+// Embedded test cases
+// =====================================================================
+
+// Test 1: VULNERABLE — webSecurity: false in BrowserWindow constructor
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///unsafe_websecurity_false.js': <<<CODE
+const { BrowserWindow } = require('electron');
+
+const mainWindow = new BrowserWindow({
+    webPreferences: {
+        webSecurity: false
+    }
+});
+mainWindow.loadURL('https://example.com');
+CODE
+)
+
+// Test 2: VULNERABLE — webSecurity: false with additional options
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///unsafe_websecurity_false_multi.js': <<<CODE
+const { BrowserWindow } = require('electron');
+
+const win = new BrowserWindow({
+    width: 800,
+    height: 600,
+    webPreferences: {
+        nodeIntegration: true,
+        webSecurity: false,
+        contextIsolation: false
+    }
+});
+CODE
+)
+
+// Test 3: SAFE — webSecurity: true (explicit)
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///safe_websecurity_true.js': <<<CODE
+const { BrowserWindow } = require('electron');
+
+const mainWindow = new BrowserWindow({
+    webPreferences: {
+        webSecurity: true,
+        contextIsolation: true,
+        nodeIntegration: false
+    }
+});
+CODE
+)
+
+// Test 4: SAFE — webSecurity not set (defaults to true)
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///safe_websecurity_default.js': <<<CODE
+const { BrowserWindow } = require('electron');
+
+// GOOD: webSecurity defaults to true when not specified
+const mainWindow = new BrowserWindow({
+    width: 1200,
+    height: 800,
+    webPreferences: {
+        contextIsolation: true,
+        nodeIntegration: false
+    }
+});
+CODE
+)
+
+// Test 5: VULNERABLE — webSecurity: false via variable
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///unsafe_websecurity_var.js': <<<CODE
+const { BrowserWindow } = require('electron');
+
+const webPrefs = {
+    webSecurity: false
+};
+
+const win = new BrowserWindow({
+    webPreferences: webPrefs
+});
+CODE
+)

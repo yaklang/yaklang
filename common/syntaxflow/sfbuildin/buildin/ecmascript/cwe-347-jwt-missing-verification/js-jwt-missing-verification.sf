@@ -1,0 +1,278 @@
+desc(
+	title: "JWT missing secret or public key verification"
+	title_zh: "JWT 验证未使用加密密钥（None 算法绕过）"
+	type: vuln
+	level: warning
+	risk: "authentication-bypass"
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+
+JSON Web Token（JWT）的完整性依赖于签名验证。`jsonwebtoken` 库的 `verify()` 函数第二个参数为密钥（secret 或 public key），用于验证 JWT 签名的合法性。
+
+当该参数为 **falsy 值**（`false`、`null`、`undefined`、`""`、`0`）时，JWT 库会切换到 **None 算法模式**，完全跳过签名验证：
+- 攻击者可以任意篡改 JWT payload（如将 `role: "user"` 改为 `role: "admin"`）
+- 重新用 `algorithm: "none"` 签名后，服务器会直接接受伪造的 Token
+- 导致权限提升、身份伪造等严重安全问题
+
+2. **触发场景**
+
+```javascript
+const jwt = require("jsonwebtoken");
+
+// 危险：使用 false 作为密钥，禁用签名验证
+jwt.verify(token, false, { algorithms: ["HS256", "none"] });
+
+// 危险：使用 null 作为密钥
+jwt.verify(token, null, { algorithms: ["none"] });
+
+// 危险：使用空字符串作为密钥
+jwt.verify(token, "", {});
+```
+
+3. **潜在影响**
+
+- **权限提升**：攻击者伪造包含管理员权限的 JWT，绕过授权检查
+- **身份伪造**：攻击者篡改 JWT 中的用户 ID，冒充任意用户
+- **认证绕过**：完全跳过 Token 合法性验证，任意构造的 Token 均被接受
+- **会话劫持**：攻击者通过伪造 Token 接管任意用户的会话
+DESC
+	rule_id: "c3d4e5f6-a7b8-9012-cdef-456789012345"
+	solution: <<<SOLUTION
+### 修复建议
+
+**1. 始终使用有效的加密密钥**
+
+```javascript
+const jwt = require("jsonwebtoken");
+const secret = process.env.JWT_SECRET;  // 从环境变量读取，不要硬编码
+
+// 危险：falsy 值禁用签名验证
+jwt.verify(token, false);    // 错误
+jwt.verify(token, null);     // 错误
+jwt.verify(token, "");       // 错误
+
+// 安全：使用真实密钥
+jwt.verify(token, secret, { algorithms: ["HS256"] });
+```
+
+**2. 明确指定允许的算法，禁止 "none"**
+
+```javascript
+// 危险：允许 "none" 算法
+jwt.verify(token, secret, { algorithms: ["HS256", "none"] });
+
+// 安全：仅允许强加密算法
+jwt.verify(token, secret, { algorithms: ["HS256"] });
+// 或使用非对称算法
+jwt.verify(token, publicKey, { algorithms: ["RS256"] });
+```
+
+**3. 使用环境变量管理密钥，确保密钥足够复杂**
+
+```javascript
+const secret = process.env.JWT_SECRET;
+if (!secret) {
+    throw new Error("JWT_SECRET environment variable is required");
+}
+jwt.verify(token, secret, { algorithms: ["HS256"] });
+```
+SOLUTION
+	reference: <<<REFERENCE
+[Auth0 Blog: Meet the "None" Algorithm](https://auth0.com/blog/critical-vulnerabilities-in-json-web-token-libraries/)
+[JWT Security Best Practices](https://datatracker.ietf.org/doc/html/rfc8725)
+[CWE-347: Improper Verification of Cryptographic Signature](https://cwe.mitre.org/data/definitions/347.html)
+[CodeQL: js/jwt-missing-verification](https://codeql.github.com/codeql-query-help/javascript/js-jwt-missing-verification/)
+REFERENCE
+)
+
+// =====================================================================
+// Detection Strategy:
+//
+// The jsonwebtoken library's verify(token, secretOrPublicKey, options, callback)
+// call is vulnerable when the second argument (secretOrPublicKey) is a falsy
+// value. The SSA frontend represents falsy values as:
+//
+//   false       → ConstInst <boolean> false
+//   null        → ConstInst <null> nil   (string representation "nil")
+//   undefined   → Undefined node (opcode: undefined)
+//   ""          → ConstInst <string> ""  (empty string)
+//   0           → ConstInst <number> 0
+//
+// SyntaxFlow filter syntax notes:
+//   - ?{have: false}         matches <boolean> false  (BoolLiteral is a keyword)
+//   - ?{have: /^nil$/}       matches <null> nil via regex on string representation
+//   - ?{opcode: undefined}   matches the Undefined SSA node
+//   - ?{== ""}               matches <string> "" exactly (have:"" is substring match
+//                              and would match ANY string — must use == for exact match)
+//   - ?{== 0}                matches <number> 0 via numeric comparison
+//
+// "have: nil" is NOT valid SyntaxFlow syntax (nil is not a BoolLiteral/keyword);
+// "have: 0" is NOT valid either (numeric literals not accepted by have:);
+// "have: """ matches all strings (substring match) — use "== """ for exact empty string.
+// We use the correct alternatives above instead.
+// =====================================================================
+
+// Capture the second argument of all *.verify() calls
+*.verify(,* as $secretArg,)
+
+// Filter: boolean false
+$secretArg?{have: false} as $falsySecret
+
+// Filter: null  (SSA represents null as <null> nil; match via regex on string repr)
+$secretArg?{have: /^nil$/} as $nullSecret
+
+// Filter: undefined (Undefined SSA node)
+$secretArg?{opcode: undefined} as $undefinedSecret
+
+// Filter: empty string "" — must use == for exact match;
+// "have: """ is substring match and would incorrectly match all non-empty strings too.
+$secretArg?{== ""} as $emptyStringSecret
+
+// Filter: numeric 0 (use == comparison, not "have:" which only accepts string/bool/regex)
+$secretArg?{== 0} as $zeroSecret
+
+alert $falsySecret for {
+	level: "warning"
+	type: "vuln"
+	title: "JWT verify() called with false as secret key"
+	title_zh: "JWT verify() 使用 false 作为密钥，签名验证被禁用"
+	message: "检测到 JWT verify() 调用使用 false 作为密钥参数，这将触发 None 算法模式，完全跳过 JWT 签名验证。攻击者可任意篡改 JWT payload 并伪造合法 Token，导致权限提升或身份伪造。请使用有效的加密密钥替换 false。"
+	risk: "authentication-bypass"
+	name: "jwtFalseSecret"
+}
+
+alert $nullSecret for {
+	level: "warning"
+	type: "vuln"
+	title: "JWT verify() called with null as secret key"
+	title_zh: "JWT verify() 使用 null 作为密钥，签名验证被禁用"
+	message: "检测到 JWT verify() 调用使用 null 作为密钥参数，这将触发 None 算法模式，完全跳过 JWT 签名验证。攻击者可任意篡改 JWT payload 并伪造合法 Token，导致权限提升或身份伪造。请使用有效的加密密钥替换 null。"
+	risk: "authentication-bypass"
+	name: "jwtNullSecret"
+}
+
+alert $undefinedSecret for {
+	level: "warning"
+	type: "vuln"
+	title: "JWT verify() called with undefined as secret key"
+	title_zh: "JWT verify() 使用 undefined 作为密钥，签名验证被禁用"
+	message: "检测到 JWT verify() 调用使用 undefined 作为密钥参数，这将触发 None 算法模式，完全跳过 JWT 签名验证。攻击者可任意篡改 JWT payload 并伪造合法 Token。请使用有效的加密密钥替换 undefined。"
+	risk: "authentication-bypass"
+	name: "jwtUndefinedSecret"
+}
+
+alert $emptyStringSecret for {
+	level: "warning"
+	type: "vuln"
+	title: "JWT verify() called with empty string as secret key"
+	title_zh: "JWT verify() 使用空字符串作为密钥，签名验证实际无效"
+	message: "检测到 JWT verify() 调用使用空字符串 \"\" 作为密钥参数。空字符串属于 falsy 值，jsonwebtoken 库将视其为禁用签名验证，导致任意 JWT 均可通过验证。请使用足够复杂的加密密钥。"
+	risk: "authentication-bypass"
+	name: "jwtEmptySecret"
+}
+
+alert $zeroSecret for {
+	level: "warning"
+	type: "vuln"
+	title: "JWT verify() called with 0 as secret key"
+	title_zh: "JWT verify() 使用数字 0 作为密钥，签名验证实际无效"
+	message: "检测到 JWT verify() 调用使用数字 0 作为密钥参数。0 属于 falsy 值，jsonwebtoken 库将视其为禁用签名验证，导致任意 JWT 均可通过验证。请使用有效的加密密钥替换 0。"
+	risk: "authentication-bypass"
+	name: "jwtZeroSecret"
+}
+
+// =====================================================================
+// Embedded test cases
+// =====================================================================
+
+// Test 1: VULNERABLE — false as secret key (CodeQL canonical example)
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///unsafe_jwt_false.js': <<<CODE
+const jwt = require("jsonwebtoken");
+
+const secret = "my-secret-key";
+var token = jwt.sign({ foo: 'bar' }, secret, { algorithm: "none" });
+jwt.verify(token, false, { algorithms: ["HS256", "none"] });
+CODE
+)
+
+// Test 2: VULNERABLE — null as secret key
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///unsafe_jwt_null.js': <<<CODE
+const jwt = require("jsonwebtoken");
+
+var token = jwt.sign({ userId: 1, role: "user" }, "secret");
+jwt.verify(token, null, { algorithms: ["none"] });
+CODE
+)
+
+// Test 3: VULNERABLE — undefined as secret key
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///unsafe_jwt_undefined.js': <<<CODE
+const jwt = require("jsonwebtoken");
+
+var token = jwt.sign({ userId: 1 }, "secret");
+jwt.verify(token, undefined, {});
+CODE
+)
+
+// Test 4: VULNERABLE — empty string as secret key
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///unsafe_jwt_empty_string.js': <<<CODE
+const jwt = require("jsonwebtoken");
+
+var token = jwt.sign({ userId: 1 }, "secret");
+jwt.verify(token, "", { algorithms: ["HS256"] });
+CODE
+)
+
+// Test 5: VULNERABLE — numeric 0 as secret key
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///unsafe_jwt_zero.js': <<<CODE
+const jwt = require("jsonwebtoken");
+
+var token = jwt.sign({ userId: 1 }, "secret");
+jwt.verify(token, 0, { algorithms: ["HS256"] });
+CODE
+)
+
+// Test 6: SAFE — valid string secret
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///safe_jwt_string_secret.js': <<<CODE
+const jwt = require("jsonwebtoken");
+
+const secret = "my-secret-key";
+var token = jwt.sign({ foo: 'bar' }, secret, { algorithm: "HS256" });
+jwt.verify(token, secret, { algorithms: ["HS256"] });
+CODE
+)
+
+// Test 7: SAFE — valid public key (asymmetric)
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///safe_jwt_pubkey.js': <<<CODE
+const jwt = require("jsonwebtoken");
+const fs = require("fs");
+
+const privateKey = fs.readFileSync("private.key");
+const publicKey = fs.readFileSync("public.key");
+
+var token = jwt.sign({ userId: 123 }, privateKey, { algorithm: "RS256" });
+jwt.verify(token, publicKey, { algorithms: ["RS256"] });
+CODE
+)

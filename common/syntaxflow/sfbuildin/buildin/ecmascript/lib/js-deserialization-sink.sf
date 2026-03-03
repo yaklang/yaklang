@@ -1,0 +1,120 @@
+desc(
+	title: "JavaScript Unsafe Deserialization Sink Functions"
+	title_zh: "JavaScript 不安全反序列化 Sink 函数"
+	type: audit
+	lib: 'js-deserialization-sink'
+	desc: <<<DESC
+### 规则目的
+
+该规则是 `js-deserialization-sink` 库规则（`lib` 类型），识别 JavaScript/Node.js 中所有可能导致**不安全反序列化（CWE-502）**的危险 Sink 函数。
+
+当用户可控输入流入这些函数时，攻击者可以通过构造特殊的序列化数据控制反序列化过程，执行任意代码（RCE）。
+
+#### 覆盖的库和危险函数
+
+**1. js-yaml**
+- `jsyaml.load(data)` — 危险：支持 YAML `!!js/function` 等可执行函数类型标签
+- `jsyaml.loadAll(data)` — 危险：同上，处理多文档 YAML
+- `yaml.load(data)` — 同上（别名导入形式）
+
+**2. node-serialize**
+- `serialize.unserialize(data)` — 极度危险：直接支持 IIFE（立即执行函数表达式）的反序列化，历史上有公开 RCE PoC
+
+**3. funcster**
+- `funcster.deepDeserialize(data)` — 危险：通过 `new Function()` 还原序列化的函数，允许任意代码执行
+
+**4. serialize-javascript（反序列化端）**
+- `eval(serialized)` — 通常与 serialize-javascript 配合使用，直接 eval 反序列化数据
+
+**5. cryo**
+- `Cryo.parse(data)` — 危险：支持函数和复杂对象的反序列化
+
+**6. notevil / safer-eval**
+- `notevil(code)` — 危险：沙箱逃逸历史漏洞
+- `saferEval(code)` — 危险：同上
+
+**7. 原生 JSON（部分危险场景）**
+- `JSON.parse(data)` — 通常安全，但结合 `reviver` 参数且 reviver 使用 eval 时危险
+  注意：纯 JSON.parse 不列入此处，由具体规则根据数据流上下文判断
+
+#### 安全替代方案
+- `jsyaml.safeLoad(data)` / `jsyaml.load(data, {schema: jsyaml.CORE_SCHEMA})` — 只解析基本类型，禁用函数
+- 使用 JSON 格式代替 YAML 进行数据交换
+DESC
+	rule_id: "e5f6a7b8-c9d0-1234-ef01-234567890123"
+	title_zh: "JavaScript 不安全反序列化 Sink 函数"
+	solution: <<<SOLUTION
+此规则为 lib 库规则，不直接报告漏洞。请结合具体的漏洞检测规则使用。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-502: Deserialization of Untrusted Data](https://cwe.mitre.org/data/definitions/502.html)
+[OWASP: Deserialization Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Deserialization_Cheat_Sheet.html)
+[NodeJS Security: Unsafe Deserialization](https://nodejs-security.com/blog/deserialization)
+REFERENCE
+)
+
+// ============================================================
+// 1. js-yaml: load / loadAll
+//    The load() function supports all YAML types including !!js/function,
+//    !!js/regexp, !!js/undefined which allow arbitrary code execution.
+//    safeLoad() (deprecated in v4, replaced by load with CORE_SCHEMA) is safe.
+// ============================================================
+*.load(* as $sink)
+*.loadAll(* as $sink)
+
+// ============================================================
+// 2. node-serialize: unserialize
+//    Deserializes a string produced by serialize(), supports IIFE patterns
+//    like {"rce":"_$$ND_FUNC$$_function(){require('child_process').exec('id')}()"}
+// ============================================================
+*.unserialize(* as $sink)
+
+// ============================================================
+// 3. funcster: deepDeserialize
+//    Uses new Function() to restore serialized function objects,
+//    enabling arbitrary code execution through crafted input.
+// ============================================================
+*.deepDeserialize(* as $sink)
+
+// ============================================================
+// 4. cryo: Cryo.parse
+//    Supports functions and RegExp in serialized data, more powerful
+//    (and more dangerous) than JSON.parse.
+// ============================================================
+*.parse(* as $sink)
+
+// ============================================================
+// 5. notevil / safer-eval
+//    Sandboxed eval alternatives with known sandbox escape vulnerabilities.
+// ============================================================
+notevil(* as $sink)
+saferEval(* as $sink)
+
+$sink as $output
+
+alert $output for {
+	level: "info"
+	title: "JavaScript Unsafe Deserialization Sink"
+	title_zh: "JavaScript 不安全反序列化 Sink 函数"
+	message: "识别到可能执行不安全反序列化的危险函数，请结合污点传播链路判断是否存在反序列化注入风险。"
+	name: "output"
+}
+
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///js_deserialization_sinks.js': <<<CODE
+const jsyaml = require('js-yaml');
+const serialize = require('node-serialize');
+const funcster = require('funcster');
+const Cryo = require('cryo');
+
+function processInput(userInput) {
+    jsyaml.load(userInput);
+    jsyaml.loadAll(userInput);
+    serialize.unserialize(userInput);
+    funcster.deepDeserialize(userInput);
+    Cryo.parse(userInput);
+}
+CODE
+)
