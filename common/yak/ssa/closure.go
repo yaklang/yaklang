@@ -205,6 +205,9 @@ func computeActualVerboseName(c *Call, se *FunctionSideEffect) string {
 }
 
 func handleSideEffect(c *Call, funcTyp *FunctionType, buildPointer bool) {
+	if funcTyp == nil || len(funcTyp.SideEffects) == 0 {
+		return
+	}
 	currentScope := c.GetBlock().ScopeTable
 	function := c.GetFunc()
 	builder := function.builder
@@ -392,6 +395,9 @@ func handleSideEffect(c *Call, funcTyp *FunctionType, buildPointer bool) {
 }
 
 func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
+	if funcTyp == nil || len(funcTyp.SideEffects) == 0 {
+		return
+	}
 	currentScope := c.GetBlock().ScopeTable
 	function := c.GetFunc()
 	builder := function.builder
@@ -596,8 +602,18 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 				}
 			}
 
+			// Cache GetScope results to avoid repeated scope traversal for same (scope, name)
+			type scopeLookupKey struct {
+				s ScopeIF
+				n string
+			}
+			getScopeCache := make(map[scopeLookupKey]*Variable)
 			var GetScope func(ScopeIF, string, *FunctionBuilder) *Variable
-			GetScope = func(scope ScopeIF, name string, builder *FunctionBuilder) *Variable {
+			GetScope = func(scope ScopeIF, name string, b *FunctionBuilder) *Variable {
+				key := scopeLookupKey{scope, name}
+				if cached, ok := getScopeCache[key]; ok {
+					return cached
+				}
 				var ret *Variable
 				if vairable := GetFristLocalVariableFromScopeAndParent(scope, name); vairable != nil {
 					ret = vairable
@@ -605,16 +621,17 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 					ret = vairable
 				}
 				if ret == nil {
+					getScopeCache[key] = nil
 					return nil
 				}
 				if _, ok := ToParameter(ret.GetValue()); ok {
-					parentBuilder := builder.parentBuilder
+					parentBuilder := b.parentBuilder
 					if parentBuilder != nil {
 						parentScope := parentBuilder.CurrentBlock.ScopeTable
-						return GetScope(parentScope, name, parentBuilder)
+						ret = GetScope(parentScope, name, parentBuilder)
 					}
 				}
-
+				getScopeCache[key] = ret
 				return ret
 			}
 
@@ -752,7 +769,7 @@ func isParameterCalledInFunction(calleeFunc *Function, paramIndex int) bool {
 // 2. If the corresponding parameter is actually called inside the callee
 // 3. If both conditions are met, create SideEffect instructions at the call site
 func handleArgumentFunctionSideEffect(c *Call, calleeFuncTyp *FunctionType) {
-	if calleeFuncTyp == nil {
+	if calleeFuncTyp == nil || len(c.Args) == 0 {
 		return
 	}
 
