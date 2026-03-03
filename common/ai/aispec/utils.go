@@ -166,6 +166,14 @@ func buildOptionsFromProviderAndModel(provider *ypb.ThirdPartyApplicationConfig,
 		opts = append(opts, WithType(provider.Type))
 	}
 
+	if provider.NoHttps {
+		opts = append(opts, WithNoHttps(provider.NoHttps))
+	}
+
+	if provider.Proxy != "" {
+		opts = append(opts, WithProxy(provider.Proxy))
+	}
+
 	if modelName != "" {
 		opts = append(opts, WithModel(modelName))
 		return opts

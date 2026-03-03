@@ -15421,6 +15421,8 @@ type ThirdPartyApplicationConfig struct {
 	WebhookURL     string    `protobuf:"bytes,7,opt,name=WebhookURL,proto3" json:"WebhookURL,omitempty"`
 	ExtraParams    []*KVPair `protobuf:"bytes,8,rep,name=ExtraParams,proto3" json:"ExtraParams,omitempty"`
 	Disabled       bool      `protobuf:"varint,9,opt,name=Disabled,proto3" json:"Disabled,omitempty"`
+	Proxy          string    `protobuf:"bytes,10,opt,name=Proxy,proto3" json:"Proxy,omitempty"`
+	NoHttps        bool      `protobuf:"varint,11,opt,name=NoHttps,proto3" json:"NoHttps,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -15514,6 +15516,20 @@ func (x *ThirdPartyApplicationConfig) GetExtraParams() []*KVPair {
 func (x *ThirdPartyApplicationConfig) GetDisabled() bool {
 	if x != nil {
 		return x.Disabled
+	}
+	return false
+}
+
+func (x *ThirdPartyApplicationConfig) GetProxy() string {
+	if x != nil {
+		return x.Proxy
+	}
+	return ""
+}
+
+func (x *ThirdPartyApplicationConfig) GetNoHttps() bool {
+	if x != nil {
+		return x.NoHttps
 	}
 	return false
 }
@@ -68413,7 +68429,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\fAuthPassword\x18\x02 \x01(\tR\fAuthPassword\x12\x1a\n" +
 	"\bAuthType\x18\x03 \x01(\tR\bAuthType\x12\x12\n" +
 	"\x04Host\x18\x04 \x01(\tR\x04Host\x12\x1c\n" +
-	"\tForbidden\x18\x05 \x01(\bR\tForbidden\"\xb2\x02\n" +
+	"\tForbidden\x18\x05 \x01(\bR\tForbidden\"\xe2\x02\n" +
 	"\x1bThirdPartyApplicationConfig\x12\x12\n" +
 	"\x04Type\x18\x01 \x01(\tR\x04Type\x12\x16\n" +
 	"\x06APIKey\x18\x02 \x01(\tR\x06APIKey\x12&\n" +
@@ -68427,7 +68443,10 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"WebhookURL\x18\a \x01(\tR\n" +
 	"WebhookURL\x12-\n" +
 	"\vExtraParams\x18\b \x03(\v2\v.ypb.KVPairR\vExtraParams\x12\x1a\n" +
-	"\bDisabled\x18\t \x01(\bR\bDisabled\"\xb2\x02\n" +
+	"\bDisabled\x18\t \x01(\bR\bDisabled\x12\x14\n" +
+	"\x05Proxy\x18\n" +
+	" \x01(\tR\x05Proxy\x12\x18\n" +
+	"\aNoHttps\x18\v \x01(\bR\aNoHttps\"\xb2\x02\n" +
 	"\x16DiagnoseNetworkRequest\x12&\n" +
 	"\x0eNetworkTimeout\x18\x01 \x01(\x01R\x0eNetworkTimeout\x12$\n" +
 	"\rConnectTarget\x18\x02 \x01(\tR\rConnectTarget\x12\x14\n" +
