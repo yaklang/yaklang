@@ -81,6 +81,28 @@ func GetAllToolsDynamically(db *gorm.DB) []*aitool.Tool {
 	// tools = append(tools, GetFilesystemTools()...)  // From filesystem_tools.go
 	// tools = append(tools, GetExampleTools()...)  // From example_tools.go
 
+	// Deduplicate tools by name: later entries (yakscript) override earlier ones (go builtin).
+	seen := make(map[string]int) // name -> index of last occurrence
+	for i, t := range tools {
+		if utils.IsNil(t) {
+			continue
+		}
+		if prevIdx, exists := seen[t.Name]; exists {
+			log.Warnf("tool %q has duplicate registration (index %d and %d), later version will be used, earlier version is dropped", t.Name, prevIdx, i)
+		}
+		seen[t.Name] = i
+	}
+	var deduped []*aitool.Tool
+	for i, t := range tools {
+		if utils.IsNil(t) {
+			continue
+		}
+		if seen[t.Name] == i {
+			deduped = append(deduped, t)
+		}
+	}
+	tools = deduped
+
 	allAiTools = lo.Filter(tools, func(item *aitool.Tool, index int) bool {
 		if utils.IsNil(item) {
 			log.Errorf("tool is nil")

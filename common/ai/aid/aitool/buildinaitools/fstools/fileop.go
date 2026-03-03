@@ -106,87 +106,87 @@ func CreateFSOperator(fsys filesys_interface.FileSystem) ([]*aitool.Tool, error)
 	if err != nil {
 		log.Errorf("register ls tool: %v", err)
 	}
-	err = factory.RegisterTool(
-		"read_file",
-		aitool.WithDescription("read file content, considering the context size, adjust chunk and offset size"),
-		aitool.WithStringParam("path",
-			aitool.WithParam_Required(true),
-			aitool.WithParam_Description("file path"),
-		),
-		aitool.WithIntegerParam("offset",
-			aitool.WithParam_Default(0),
-			aitool.WithParam_Description("offset to start reading"),
-		),
-		aitool.WithIntegerParam("chunk_size",
-			aitool.WithParam_Default(20480),
-			aitool.WithParam_Description("chunk size to read"),
-		),
-		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
-			pathName := params.GetString("path")
-			offset := params.GetInt("offset")
-			chunkSize := params.GetInt("chunk_size")
-			f, err := fsys.OpenFile(pathName, os.O_RDONLY, 0444)
-			if err != nil {
-				stderr.Write([]byte("failed to open file: " + pathName + "\n"))
-				return nil, err
-			}
-			defer f.Close()
+	// err = factory.RegisterTool(
+	// 	"read_file",
+	// 	aitool.WithDescription("read file content, considering the context size, adjust chunk and offset size"),
+	// 	aitool.WithStringParam("path",
+	// 		aitool.WithParam_Required(true),
+	// 		aitool.WithParam_Description("file path"),
+	// 	),
+	// 	aitool.WithIntegerParam("offset",
+	// 		aitool.WithParam_Default(0),
+	// 		aitool.WithParam_Description("offset to start reading"),
+	// 	),
+	// 	aitool.WithIntegerParam("chunk_size",
+	// 		aitool.WithParam_Default(20480),
+	// 		aitool.WithParam_Description("chunk size to read"),
+	// 	),
+	// 	aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+	// 		pathName := params.GetString("path")
+	// 		offset := params.GetInt("offset")
+	// 		chunkSize := params.GetInt("chunk_size")
+	// 		f, err := fsys.OpenFile(pathName, os.O_RDONLY, 0444)
+	// 		if err != nil {
+	// 			stderr.Write([]byte("failed to open file: " + pathName + "\n"))
+	// 			return nil, err
+	// 		}
+	// 		defer f.Close()
 
-			// use seek
-			if seeker, ok := f.(interface {
-				Seek(offset int64, whence int) (int64, error)
-			}); ok {
-				_, err := seeker.Seek(int64(offset), io.SeekStart)
-				if err != nil {
-					stderr.Write([]byte("seek failed: " + err.Error() + "\n"))
-				} else {
-					// read chunk
-					buf := make([]byte, chunkSize)
-					raw, err := f.Read(buf)
-					if err != nil && err != io.EOF {
-						stderr.Write([]byte("read failed: " + err.Error() + "\n"))
-					} else {
-						content := string(buf[:raw])
-						stdout.Write([]byte("read " + utils.InterfaceToString(raw) + " bytes from file: " + pathName + " (offset: " + utils.InterfaceToString(offset) + ")\n"))
-						return content, nil
-					}
-				}
-			}
+	// 		// use seek
+	// 		if seeker, ok := f.(interface {
+	// 			Seek(offset int64, whence int) (int64, error)
+	// 		}); ok {
+	// 			_, err := seeker.Seek(int64(offset), io.SeekStart)
+	// 			if err != nil {
+	// 				stderr.Write([]byte("seek failed: " + err.Error() + "\n"))
+	// 			} else {
+	// 				// read chunk
+	// 				buf := make([]byte, chunkSize)
+	// 				raw, err := f.Read(buf)
+	// 				if err != nil && err != io.EOF {
+	// 					stderr.Write([]byte("read failed: " + err.Error() + "\n"))
+	// 				} else {
+	// 					content := string(buf[:raw])
+	// 					stdout.Write([]byte("read " + utils.InterfaceToString(raw) + " bytes from file: " + pathName + " (offset: " + utils.InterfaceToString(offset) + ")\n"))
+	// 					return content, nil
+	// 				}
+	// 			}
+	// 		}
 
-			// if offset > 0
-			if offset > 0 {
-				_, err := io.CopyN(io.Discard, f, int64(offset))
-				if err != nil {
-					stderr.Write([]byte("discard failed: " + err.Error() + "\n"))
-				} else {
-					buf := make([]byte, chunkSize)
-					raw, err := io.ReadFull(f, buf)
-					if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
-						stderr.Write([]byte("read failed: " + err.Error() + "\n"))
-					} else {
-						content := string(buf[:raw])
-						stdout.Write([]byte("read " + utils.InterfaceToString(raw) + " bytes from file: " + pathName + " (offset: " + utils.InterfaceToString(offset) + ")\n"))
-						return content, nil
-					}
-				}
-			}
+	// 		// if offset > 0
+	// 		if offset > 0 {
+	// 			_, err := io.CopyN(io.Discard, f, int64(offset))
+	// 			if err != nil {
+	// 				stderr.Write([]byte("discard failed: " + err.Error() + "\n"))
+	// 			} else {
+	// 				buf := make([]byte, chunkSize)
+	// 				raw, err := io.ReadFull(f, buf)
+	// 				if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+	// 					stderr.Write([]byte("read failed: " + err.Error() + "\n"))
+	// 				} else {
+	// 					content := string(buf[:raw])
+	// 					stdout.Write([]byte("read " + utils.InterfaceToString(raw) + " bytes from file: " + pathName + " (offset: " + utils.InterfaceToString(offset) + ")\n"))
+	// 					return content, nil
+	// 				}
+	// 			}
+	// 		}
 
-			// read chunk
-			buf := make([]byte, chunkSize)
-			raw, err := f.Read(buf)
-			if err != nil && err != io.EOF {
-				stderr.Write([]byte("read failed: " + err.Error() + "\n"))
-			} else {
-				content := string(buf[:raw])
-				stdout.Write([]byte("read " + utils.InterfaceToString(raw) + " bytes from file: " + pathName + "\n"))
-				return content, nil
-			}
-			return nil, nil
-		}),
-	)
-	if err != nil {
-		log.Errorf("register read_file tool: %v", err)
-	}
+	// 		// read chunk
+	// 		buf := make([]byte, chunkSize)
+	// 		raw, err := f.Read(buf)
+	// 		if err != nil && err != io.EOF {
+	// 			stderr.Write([]byte("read failed: " + err.Error() + "\n"))
+	// 		} else {
+	// 			content := string(buf[:raw])
+	// 			stdout.Write([]byte("read " + utils.InterfaceToString(raw) + " bytes from file: " + pathName + "\n"))
+	// 			return content, nil
+	// 		}
+	// 		return nil, nil
+	// 	}),
+	// )
+	// if err != nil {
+	// 	log.Errorf("register read_file tool: %v", err)
+	// }
 
 	err = factory.RegisterTool(
 		"remove_file",
@@ -210,32 +210,33 @@ func CreateFSOperator(fsys filesys_interface.FileSystem) ([]*aitool.Tool, error)
 		log.Errorf("register remove_file tool: %v", err)
 	}
 
-	err = factory.RegisterTool(
-		"write_file",
-		aitool.WithDescription("write file content"),
-		aitool.WithStringParam("path",
-			aitool.WithParam_Required(true),
-			aitool.WithParam_Description("file path"),
-		),
-		aitool.WithStringParam("content",
-			aitool.WithParam_Required(true),
-			aitool.WithParam_Description("file content"),
-		),
-		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
-			pathName := params.GetString("path")
-			content := params.GetString("content")
-			err := fsys.WriteFile(pathName, []byte(content), 0644)
-			if err != nil {
-				stderr.Write([]byte("failed to write file: " + pathName + "\n"))
-				return nil, err
-			}
-			stdout.Write([]byte("successfully wrote " + utils.InterfaceToString(len(content)) + " bytes to file: " + pathName + "\n"))
-			return "success", nil
-		}),
-	)
-	if err != nil {
-		log.Errorf("register write_file tool: %v", err)
-	}
+	// err = factory.RegisterTool(
+	// 	"write_file",
+	// 	aitool.WithDescription("write file content"),
+	// 	aitool.WithStringParam("path",
+	// 		aitool.WithParam_Required(true),
+	// 		aitool.WithParam_Description("file path"),
+	// 	),
+	// 	aitool.WithStringParam("content",
+	// 		aitool.WithParam_Required(true),
+	// 		aitool.WithParam_Description("file content"),
+	// 	),
+	// 	aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+	// 		pathName := params.GetString("path")
+	// 		content := params.GetString("content")
+	// 		err := fsys.WriteFile(pathName, []byte(content), 0644)
+	// 		if err != nil {
+	// 			stderr.Write([]byte("failed to write file: " + pathName + "\n"))
+	// 			return nil, err
+	// 		}
+	// 		stdout.Write([]byte("successfully wrote " + utils.InterfaceToString(len(content)) + " bytes to file: " + pathName + "\n"))
+	// 		return "success", nil
+	// 	}),
+	// )
+	// if err != nil {
+	// 	log.Errorf("register write_file tool: %v", err)
+	// }
+
 	err = factory.RegisterTool(
 		"copy_file",
 		aitool.WithDescription("copy file"),
