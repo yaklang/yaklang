@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"context"
+	"sync"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
@@ -348,6 +349,10 @@ type Program struct {
 	ctx    context.Context
 
 	NameCache *ssadb.NameCache
+
+	// isParameterCalledCache 缓存 (calleeFunc, paramIndex)->是否被调用，每个 Program 独立，随 Program GC 释放
+	isParameterCalledCache   map[struct{ f *Function; i int }]bool
+	isParameterCalledCacheMu sync.RWMutex
 }
 
 // implement Value
