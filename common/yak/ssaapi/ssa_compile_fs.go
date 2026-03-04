@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"fmt"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -281,21 +282,34 @@ func (c *Config) parseProjectWithFS(
 			ast := fileContent.AST
 			fileContent.AST = nil // clear AST
 			func() {
+				var lazyBuildTotal time.Duration
+				var lazyBuildTriggerPath string
+				if enableFilePerfLog && filePerfRecorder != nil {
+					prog.OnLazyBuildCompleteByFile = func(byFile map[string]time.Duration) {
+						for file, d := range byFile {
+							filePerfRecorder.RecordDuration(fmt.Sprintf("LazyBuild[%s]", file), d)
+							lazyBuildTotal += d
+						}
+						lazyBuildTriggerPath = path
+					}
+				}
 				fileBuildStart := time.Now()
 				defer func() {
 					if r := recover(); r != nil {
 						log.Errorf("parse [%s] error %v  ", path, r)
 						utils.PrintCurrentGoroutineRuntimeStack()
 					}
-					// 记录文件级别的 Build 时间（含文件大小用于 ms/KB）
-					if enableFilePerfLog {
+					if enableFilePerfLog && filePerfRecorder != nil {
 						fileBuildTime := time.Since(fileBuildStart)
-						if filePerfRecorder != nil {
-							fileSize := int64(len(fileContent.Content))
-							filePerfRecorder.RecordDurationWithSize(fmt.Sprintf("Build[%s]", path), fileBuildTime, fileSize)
-							if fileBuildTime > 100*time.Millisecond {
-								log.Infof("[File Performance] Build: %s, time: %v", path, fileBuildTime)
-							}
+						fileSize := int64(len(fileContent.Content))
+						// 若当前文件触发了 LazyBuild，则从 Build 时间中扣除 LazyBuild 耗时，避免错误归属
+						buildRecord := fileBuildTime
+						if filepath.Base(lazyBuildTriggerPath) == filepath.Base(path) && lazyBuildTotal > 0 {
+							buildRecord = fileBuildTime - lazyBuildTotal
+						}
+						filePerfRecorder.RecordDurationWithSize(fmt.Sprintf("Build[%s]", path), buildRecord, fileSize)
+						if fileBuildTime > 100*time.Millisecond {
+							log.Infof("[File Performance] Build: %s, time: %v", path, fileBuildTime)
 						}
 					}
 				}()
@@ -372,11 +386,12 @@ func (c *Config) parseProjectWithFS(
 		return nil, err
 	}
 
-	// 输出文件性能汇总表格
+	// 输出文件性能汇总表格（Build 与 LazyBuild 按文件合并展示）
 	if enableFilePerfLog && filePerfRecorder != nil {
 		snapshots := filePerfRecorder.Snapshot()
 		if len(snapshots) > 0 {
-			table := diagnostics.FormatPerformanceTable("File Compilation Performance Summary", snapshots)
+			merged := diagnostics.MergeBuildAndLazyBuildForDisplay(snapshots)
+			table := diagnostics.FormatPerformanceTable("File Compilation Performance Summary", merged)
 			fmt.Println(table)
 		} else {
 			fmt.Println("File Performance: no data recorded")

@@ -1,12 +1,16 @@
 package ssa
 
 import (
+	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/utils"
 	"go.uber.org/atomic"
 )
+
+const lazyBuildOtherFile = "__Other__" // 无法按文件归类的 LazyBuild 耗时（如 fixImportCallback）
 
 // lazyTask 将任务逻辑和任务数据分离开
 type lazyTask func()
@@ -115,11 +119,62 @@ func (p *Program) VisitAst(ast ASTIF) {
 	}
 }
 
+// getFuncFilename 从 Function 的 Range/Editor 获取文件名，用于 LazyBuild 按文件计时
+func getFuncFilename(fun *Function) string {
+	if fun == nil {
+		return ""
+	}
+	rng := fun.GetRange()
+	if rng == nil || rng.GetEditor() == nil {
+		return ""
+	}
+	return filepath.Base(rng.GetEditor().GetFilename())
+}
+
+// getBlueprintFilename 从 Blueprint 的方法中获取代表文件名
+func getBlueprintFilename(c *Blueprint) string {
+	if c == nil {
+		return ""
+	}
+	for _, m := range c.NormalMethod {
+		if f := getFuncFilename(m); f != "" {
+			return f
+		}
+	}
+	for _, m := range c.StaticMethod {
+		if f := getFuncFilename(m); f != "" {
+			return f
+		}
+	}
+	for _, v := range c.MagicMethod {
+		if m, ok := ToFunction(v); ok {
+			if f := getFuncFilename(m); f != "" {
+				return f
+			}
+		}
+	}
+	return ""
+}
+
 func (p *Program) LazyBuild() {
+	trackByFile := p.OnLazyBuildCompleteByFile != nil || (p.Application != nil && p.Application.OnLazyBuildCompleteByFile != nil)
+	byFile := make(map[string]time.Duration)
+
+	addDuration := func(file string, d time.Duration) {
+		if file == "" {
+			file = lazyBuildOtherFile
+		}
+		byFile[file] += d
+	}
+
 	for _, key := range p.Blueprint.Keys() {
 		blueprint, ok := p.Blueprint.Get(key)
 		_ = ok
+		start := time.Now()
 		blueprint.Build()
+		if trackByFile {
+			addDuration(getBlueprintFilename(blueprint), time.Since(start))
+		}
 	}
 	visited := make(map[*Function]struct{})
 	var stack []*Function
@@ -132,7 +187,6 @@ func (p *Program) LazyBuild() {
 	}
 
 	for len(stack) > 0 {
-		// 深度优先遍历函数与其子函数，确保所有 LazyBuilder 均被执行
 		fun := stack[len(stack)-1]
 		stack = stack[:len(stack)-1]
 		if fun == nil {
@@ -142,7 +196,11 @@ func (p *Program) LazyBuild() {
 			continue
 		}
 		visited[fun] = struct{}{}
+		start := time.Now()
 		fun.Build()
+		if trackByFile {
+			addDuration(getFuncFilename(fun), time.Since(start))
+		}
 		for _, childID := range fun.ChildFuncs {
 			childValue, ok := fun.GetValueById(childID)
 			if !ok || childValue == nil {
@@ -153,25 +211,49 @@ func (p *Program) LazyBuild() {
 			}
 		}
 	}
+	start := time.Now()
 	for _, f := range p.fixImportCallback {
 		f()
+	}
+	if trackByFile {
+		addDuration(lazyBuildOtherFile, time.Since(start))
 	}
 	for _, key := range p.Blueprint.Keys() {
 		blueprint, ok := p.Blueprint.Get(key)
 		_ = ok
+		start := time.Now()
 		blueprint.BuildConstructorAndDestructor()
+		if trackByFile {
+			addDuration(getBlueprintFilename(blueprint), time.Since(start))
+		}
 	}
 	function := p.GetFunction(string(MainFunctionName), "")
 	if function != nil {
+		start := time.Now()
 		function.Finish()
+		if trackByFile {
+			addDuration(getFuncFilename(function), time.Since(start))
+		}
 	}
 	virtualFunction := p.GetFunction(string(VirtualFunctionName), "")
 	if virtualFunction != nil {
+		start := time.Now()
 		virtualFunction.Finish()
+		if trackByFile {
+			addDuration(getFuncFilename(virtualFunction), time.Since(start))
+		}
 	}
 	if function == nil && virtualFunction == nil {
 		log.Errorf("main function is not found and virtual function is not found")
 		return
+	}
+
+	cbByFile := p.OnLazyBuildCompleteByFile
+	if cbByFile == nil && p.Application != nil {
+		cbByFile = p.Application.OnLazyBuildCompleteByFile
+	}
+	if cbByFile != nil && len(byFile) > 0 {
+		cbByFile(byFile)
 	}
 }
 

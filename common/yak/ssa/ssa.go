@@ -3,6 +3,7 @@ package ssa
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
@@ -327,6 +328,9 @@ type Program struct {
 
 	// process
 	ProcessInfof func(string, ...any)
+
+	// OnLazyBuildCompleteByFile 按文件名拆分的 LazyBuild 耗时，key 为文件名（如 builder_ast.go），value 为该文件相关的 Build 耗时
+	OnLazyBuildCompleteByFile func(byFile map[string]time.Duration)
 
 	// extern lib
 	cacheExternInstance     map[string]Value // lib and value
