@@ -1638,7 +1638,8 @@ and exports structured report (sarif/irify).`,
 				if filePerfRecorder != nil {
 					snapshots := filePerfRecorder.Snapshot()
 					if len(snapshots) > 0 {
-						table := diagnostics.FormatPerformanceTable("File Compilation Performance Summary", snapshots)
+						merged := diagnostics.MergeBuildAndLazyBuildForDisplay(snapshots)
+						table := diagnostics.FormatPerformanceTable("File Compilation Performance Summary", merged)
 						log.Info("\n" + table)
 					}
 				}

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -152,7 +153,72 @@ func TestDebugBuildPerformance(t *testing.T) {
 
 	snapshots := recorder.Snapshot()
 	t.Logf("compiled %s: %d measurements", absDir, len(snapshots))
-	for _, m := range snapshots {
+
+	// 按 Total 降序排序，便于定位性能瓶颈
+	sorted := make([]struct {
+		Name  string
+		Total time.Duration
+		Size  int64
+		Count uint64
+		Steps []time.Duration
+	}, len(snapshots))
+	for i, m := range snapshots {
+		sorted[i] = struct {
+			Name  string
+			Total time.Duration
+			Size  int64
+			Count uint64
+			Steps []time.Duration
+		}{m.Name, m.Total, m.Size, m.Count, m.Steps}
+	}
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Total > sorted[j].Total })
+
+	// 写入性能分析日志文件（优先项目根目录，便于分析）
+	_, testFile, _, _ := runtime.Caller(0)
+	projectRoot, _ := filepath.Abs(filepath.Join(filepath.Dir(testFile), "..", "..", "..", "..", ".."))
+	if projectRoot == "" {
+		projectRoot = os.TempDir()
+	} else if _, err := os.Stat(filepath.Join(projectRoot, "go.mod")); err != nil {
+		projectRoot = os.TempDir()
+	}
+	logPath := filepath.Join(projectRoot, fmt.Sprintf("golang_perf_test_%d.log", time.Now().Unix()))
+	f, err := os.Create(logPath)
+	if err != nil {
+		t.Logf("create perf log file failed: %v", err)
+	} else {
+		defer f.Close()
+		start := time.Now()
+		fmt.Fprintf(f, "=== TestDebugBuildPerformance 性能日志 ===\n")
+		fmt.Fprintf(f, "时间: %s\n", start.Format(time.RFC3339))
+		fmt.Fprintf(f, "目标目录: %s\n", absDir)
+		fmt.Fprintf(f, "Measurement 数量: %d\n\n", len(snapshots))
+
+		fmt.Fprintf(f, "--- 按 Total 降序排序（最慢的在前） ---\n")
+		for i, m := range sorted {
+			line := fmt.Sprintf("[%d] %s: %v (Count:%d)", i+1, m.Name, m.Total, m.Count)
+			if m.Size > 0 && m.Total > 0 {
+				ratio := float64(m.Total.Milliseconds()) / (float64(m.Size) / 1024)
+				line += fmt.Sprintf(" | %.2f ms/KB", ratio)
+			}
+			fmt.Fprintln(f, line)
+			if len(m.Steps) > 0 {
+				for si, step := range m.Steps {
+					if step > 0 {
+						fmt.Fprintf(f, "    Step[%d]: %v\n", si+1, step)
+					}
+				}
+			}
+		}
+		fmt.Fprintf(f, "\n--- 完整 Measurement 详情 ---\n")
+		for _, m := range snapshots {
+			fmt.Fprint(f, m.String())
+		}
+		elapsed := time.Since(start)
+		fmt.Fprintf(f, "\n日志写入耗时: %v\n", elapsed)
+		t.Logf("性能日志已写入: %s", logPath)
+	}
+
+	for _, m := range sorted {
 		line := fmt.Sprintf("  %s: %v", m.Name, m.Total)
 		if m.Size > 0 && m.Total > 0 {
 			ratio := float64(m.Total.Milliseconds()) / (float64(m.Size) / 1024)

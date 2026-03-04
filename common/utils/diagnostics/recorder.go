@@ -426,6 +426,69 @@ func formatDuration(d time.Duration) string {
 	return d.String()
 }
 
+const (
+	perfPrefixBuild     = "Build["
+	perfPrefixLazyBuild = "LazyBuild["
+	perfSuffixBracket   = "]"
+)
+
+// extractFileFromPerfName 从 "Build[filename]" 或 "LazyBuild[filename]" 提取 filename
+func extractFileFromPerfName(name, prefix string) string {
+	if !strings.HasPrefix(name, prefix) || !strings.HasSuffix(name, perfSuffixBracket) {
+		return ""
+	}
+	return name[len(prefix) : len(name)-1]
+}
+
+// MergeBuildAndLazyBuildForDisplay 将 Build[filename] 与 LazyBuild[filename] 合并为一行，Total 相加，用于文件编译性能展示
+func MergeBuildAndLazyBuildForDisplay(measurements []Measurement) []Measurement {
+	buildByFile := make(map[string]Measurement)
+	lazyByFile := make(map[string]Measurement)
+	var other []Measurement
+
+	for _, m := range measurements {
+		if f := extractFileFromPerfName(m.Name, perfPrefixBuild); f != "" {
+			buildByFile[f] = m
+			continue
+		}
+		if f := extractFileFromPerfName(m.Name, perfPrefixLazyBuild); f != "" {
+			lazyByFile[f] = m
+			continue
+		}
+		other = append(other, m)
+	}
+
+	out := make([]Measurement, 0, len(other)+len(buildByFile)+len(lazyByFile))
+	out = append(out, other...)
+	for f, b := range buildByFile {
+		if l, ok := lazyByFile[f]; ok {
+			b.Total += l.Total
+			delete(lazyByFile, f)
+		}
+		out = append(out, b)
+	}
+	for _, l := range lazyByFile {
+		out = append(out, l)
+	}
+	// 按 ms/KB 降序排序（Size=0 的条目排在最后）
+	sort.Slice(out, func(i, j int) bool {
+		ri := 0.0
+		if out[i].Size > 0 && out[i].Total > 0 {
+			ri = float64(out[i].Total.Milliseconds()) / (float64(out[i].Size) / 1024)
+		}
+		rj := 0.0
+		if out[j].Size > 0 && out[j].Total > 0 {
+			rj = float64(out[j].Total.Milliseconds()) / (float64(out[j].Size) / 1024)
+		}
+		if ri != rj {
+			return ri > rj
+		}
+		// ms/KB 相同时按 Duration 降序
+		return out[i].Total > out[j].Total
+	})
+	return out
+}
+
 // FormatPerformanceTable 格式化性能数据为表格；若有 Size 则显示文件大小和 ms/KB 比例
 func FormatPerformanceTable(title string, measurements []Measurement) string {
 	if len(measurements) == 0 {
