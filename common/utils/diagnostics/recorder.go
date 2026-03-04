@@ -246,12 +246,27 @@ func (r *Recorder) Snapshot() []Measurement {
 		result = append(result, entry.snapshot())
 	}
 	slices.SortFunc(result, func(a, b Measurement) int {
+		ratioA := 0.0
+		if a.Size > 0 && a.Total > 0 {
+			ratioA = float64(a.Total.Milliseconds()) / (float64(a.Size) / 1024)
+		}
+		ratioB := 0.0
+		if b.Size > 0 && b.Total > 0 {
+			ratioB = float64(b.Total.Milliseconds()) / (float64(b.Size) / 1024)
+		}
 		switch {
-		case a.Total < b.Total:
+		case ratioA > ratioB:
+			return -1 // a 在前（ms/KB 高到低）
+		case ratioA < ratioB:
 			return 1
-		case a.Total > b.Total:
-			return -1
 		default:
+			// ratio 相同，按 Total 降序，再按 Name
+			if a.Total != b.Total {
+				if a.Total > b.Total {
+					return -1
+				}
+				return 1
+			}
 			return strings.Compare(a.Name, b.Name)
 		}
 	})
@@ -400,6 +415,17 @@ func formatSize(bytes int64) string {
 	return fmt.Sprintf("%.1f%cB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }
 
+// formatDuration 格式化耗时：0 显示 "0s"，< 1ms 显示 "xxxµs"，否则使用默认 String()
+func formatDuration(d time.Duration) string {
+	if d == 0 {
+		return "0s"
+	}
+	if d < time.Millisecond {
+		return fmt.Sprintf("%dµs", d.Microseconds())
+	}
+	return d.String()
+}
+
 // FormatPerformanceTable 格式化性能数据为表格；若有 Size 则显示文件大小和 ms/KB 比例
 func FormatPerformanceTable(title string, measurements []Measurement) string {
 	if len(measurements) == 0 {
@@ -428,8 +454,8 @@ func FormatPerformanceTable(title string, measurements []Measurement) string {
 		if nameLen > maxNameLen {
 			maxNameLen = nameLen
 		}
-		if len(m.Total.String()) > maxTimeLen {
-			maxTimeLen = len(m.Total.String())
+		if len(formatDuration(m.Total)) > maxTimeLen {
+			maxTimeLen = len(formatDuration(m.Total))
 		}
 		if hasSize {
 			sz := formatSize(m.Size)
@@ -437,7 +463,7 @@ func FormatPerformanceTable(title string, measurements []Measurement) string {
 				maxSizeLen = len(sz)
 			}
 			if m.Size > 0 && m.Total > 0 {
-				ratio := float64(m.Total.Microseconds()) / (float64(m.Size) / 1024)
+				ratio := float64(m.Total.Milliseconds()) / (float64(m.Size) / 1024)
 				ratioStr := fmt.Sprintf("%.2f", ratio)
 				if len(ratioStr) > maxRatioLen {
 					maxRatioLen = len(ratioStr)
@@ -494,12 +520,12 @@ func FormatPerformanceTable(title string, measurements []Measurement) string {
 			sz := formatSize(m.Size)
 			ratioStr := "-"
 			if m.Size > 0 && m.Total > 0 {
-				ratio := float64(m.Total.Microseconds()) / (float64(m.Size) / 1024)
+				ratio := float64(m.Total.Milliseconds()) / (float64(m.Size) / 1024)
 				ratioStr = fmt.Sprintf("%.2f", ratio)
 			}
 			builder.WriteString(fmt.Sprintf("| %-*s | %*s | %*s | %*s |\n",
 				maxNameLen, displayName,
-				maxTimeLen, m.Total.String(),
+				maxTimeLen, formatDuration(m.Total),
 				maxSizeLen, sz,
 				maxRatioLen, ratioStr,
 			))
@@ -524,7 +550,7 @@ func FormatPerformanceTable(title string, measurements []Measurement) string {
 			}
 			builder.WriteString(fmt.Sprintf("| %-*s | %*s |\n",
 				maxNameLen, displayName,
-				maxTimeLen, m.Total.String(),
+				maxTimeLen, formatDuration(m.Total),
 			))
 		}
 		builder.WriteString(headerBorder)

@@ -460,10 +460,11 @@ func (c *Call) handleCalleeFunction() {
 
 	if builder.isBindLanguage() {
 		handleSideEffectBind(c, funcTyp)
+		handleSideEffect(c, funcTyp, true)
 	} else {
-		handleSideEffect(c, funcTyp, false)
+		// 单次遍历处理 NormalSideEffect 和 PointerSideEffect，避免重复循环
+		handleSideEffects(c, funcTyp)
 	}
-	handleSideEffect(c, funcTyp, true)
 
 	// Handle side effects from function arguments
 	// When a function with side effects is passed as an argument and will be called
