@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"io"
 	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -293,96 +291,96 @@ func CreateFSOperator(fsys filesys_interface.FileSystem) ([]*aitool.Tool, error)
 		log.Errorf("register copy_file tool: %v", err)
 	}
 
-	defaultExclude := ".git,.svn,.hg,node_modules,__pycache__,.DS_Store,.idea,.vscode,.next,.nuxt,.cache,vendor,.gradle,build,dist,.egg-info"
-	err = factory.RegisterTool(
-		"tree",
-		aitool.WithDescription("list files in directory recursively, with exclude filter to skip noisy directories and save tokens"),
-		aitool.WithStringParam("path", aitool.WithParam_Required(true)),
-		aitool.WithIntegerParam("limit", aitool.WithParam_Required(true), aitool.WithParam_Default(20)),
-		aitool.WithIntegerParam("offset", aitool.WithParam_Default(0)),
-		aitool.WithStringParam("exclude",
-			aitool.WithParam_Description("Comma-separated list of directory/file names to exclude. Each name is matched against every path component. Default: "+defaultExclude),
-			aitool.WithParam_Default(defaultExclude),
-		),
-		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
-			path := params.GetString("path")
-			limit := params.GetInt("limit")
-			offset := params.GetInt("offset")
-			excludeRaw := params.GetString("exclude")
+	// defaultExclude := ".git,.svn,.hg,node_modules,__pycache__,.DS_Store,.idea,.vscode,.next,.nuxt,.cache,vendor,.gradle,build,dist,.egg-info"
+	// err = factory.RegisterTool(
+	// 	"tree",
+	// 	aitool.WithDescription("list files in directory recursively, with exclude filter to skip noisy directories and save tokens"),
+	// 	aitool.WithStringParam("path", aitool.WithParam_Required(true)),
+	// 	aitool.WithIntegerParam("limit", aitool.WithParam_Required(true), aitool.WithParam_Default(20)),
+	// 	aitool.WithIntegerParam("offset", aitool.WithParam_Default(0)),
+	// 	aitool.WithStringParam("exclude",
+	// 		aitool.WithParam_Description("Comma-separated list of directory/file names to exclude. Each name is matched against every path component. Default: "+defaultExclude),
+	// 		aitool.WithParam_Default(defaultExclude),
+	// 	),
+	// 	aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+	// 		path := params.GetString("path")
+	// 		limit := params.GetInt("limit")
+	// 		offset := params.GetInt("offset")
+	// 		excludeRaw := params.GetString("exclude")
 
-			excludeSet := make(map[string]bool)
-			for _, name := range strings.Split(excludeRaw, ",") {
-				name = strings.TrimSpace(name)
-				if name != "" {
-					excludeSet[name] = true
-				}
-			}
+	// 		excludeSet := make(map[string]bool)
+	// 		for _, name := range strings.Split(excludeRaw, ",") {
+	// 			name = strings.TrimSpace(name)
+	// 			if name != "" {
+	// 				excludeSet[name] = true
+	// 			}
+	// 		}
 
-			shouldExclude := func(pathname string) bool {
-				if len(excludeSet) == 0 {
-					return false
-				}
-				normalized := strings.ReplaceAll(pathname, "\\", "/")
-				for _, part := range strings.Split(normalized, "/") {
-					if excludeSet[part] {
-						return true
-					}
-				}
-				return false
-			}
+	// 		shouldExclude := func(pathname string) bool {
+	// 			if len(excludeSet) == 0 {
+	// 				return false
+	// 			}
+	// 			normalized := strings.ReplaceAll(pathname, "\\", "/")
+	// 			for _, part := range strings.Split(normalized, "/") {
+	// 				if excludeSet[part] {
+	// 					return true
+	// 				}
+	// 			}
+	// 			return false
+	// 		}
 
-			counter := int64(0)
-			resultCount := int64(0)
-			var buf bytes.Buffer
-			err := filesys.Recursive(
-				path,
-				filesys.WithFileSystem(fsys),
-				filesys.WithStat(func(isDir bool, pathname string, info os.FileInfo) error {
-					relPath, _ := filepath.Rel(path, pathname)
-					if relPath == "" {
-						relPath = pathname
-					}
-					if shouldExclude(relPath) {
-						return nil
-					}
+	// 		counter := int64(0)
+	// 		resultCount := int64(0)
+	// 		var buf bytes.Buffer
+	// 		err := filesys.Recursive(
+	// 			path,
+	// 			filesys.WithFileSystem(fsys),
+	// 			filesys.WithStat(func(isDir bool, pathname string, info os.FileInfo) error {
+	// 				relPath, _ := filepath.Rel(path, pathname)
+	// 				if relPath == "" {
+	// 					relPath = pathname
+	// 				}
+	// 				if shouldExclude(relPath) {
+	// 					return nil
+	// 				}
 
-					if counter >= offset {
-						if counter >= offset+limit {
-							return utils.Error("more than limit")
-						}
-						raw := map[string]any{
-							"path":  pathname,
-							"isDir": isDir,
-							"type":  info.Mode().String(),
-						}
-						infoMap := make(map[string]any)
-						raw["info"] = infoMap
-						infoMap["name"] = info.Name()
-						infoMap["size"] = info.Size()
-						infoMap["mode"] = info.Mode()
-						infoMap["modTime"] = info.ModTime()
-						rawJSON, _ := json.Marshal(raw)
-						buf.WriteString(string(rawJSON))
-						if len(rawJSON) > 0 {
-							buf.WriteString("\n")
-						}
-						resultCount++
-					}
-					counter++
-					return nil
-				}),
-			)
-			if err != nil {
-				stderr.Write([]byte("failed to traverse directory: " + path + "\n"))
-				return nil, err
-			}
-			stdout.Write([]byte("listed " + utils.InterfaceToString(resultCount) + " items recursively from: " + path + " (offset: " + utils.InterfaceToString(offset) + ", limit: " + utils.InterfaceToString(limit) + ")\n"))
-			return buf.String(), nil
-		}),
-	)
-	if err != nil {
-		log.Errorf("register tree tool: %v", err)
-	}
+	// 				if counter >= offset {
+	// 					if counter >= offset+limit {
+	// 						return utils.Error("more than limit")
+	// 					}
+	// 					raw := map[string]any{
+	// 						"path":  pathname,
+	// 						"isDir": isDir,
+	// 						"type":  info.Mode().String(),
+	// 					}
+	// 					infoMap := make(map[string]any)
+	// 					raw["info"] = infoMap
+	// 					infoMap["name"] = info.Name()
+	// 					infoMap["size"] = info.Size()
+	// 					infoMap["mode"] = info.Mode()
+	// 					infoMap["modTime"] = info.ModTime()
+	// 					rawJSON, _ := json.Marshal(raw)
+	// 					buf.WriteString(string(rawJSON))
+	// 					if len(rawJSON) > 0 {
+	// 						buf.WriteString("\n")
+	// 					}
+	// 					resultCount++
+	// 				}
+	// 				counter++
+	// 				return nil
+	// 			}),
+	// 		)
+	// 		if err != nil {
+	// 			stderr.Write([]byte("failed to traverse directory: " + path + "\n"))
+	// 			return nil, err
+	// 		}
+	// 		stdout.Write([]byte("listed " + utils.InterfaceToString(resultCount) + " items recursively from: " + path + " (offset: " + utils.InterfaceToString(offset) + ", limit: " + utils.InterfaceToString(limit) + ")\n"))
+	// 		return buf.String(), nil
+	// 	}),
+	// )
+	// if err != nil {
+	// 	log.Errorf("register tree tool: %v", err)
+	// }
 
 	return factory.Tools(), nil
 }

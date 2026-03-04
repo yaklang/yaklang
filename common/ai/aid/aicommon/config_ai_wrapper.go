@@ -168,7 +168,10 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 			model := origRsp.GetModelName()
 			outputBytes := origRsp.GetTotalOutputBytes()
 			firstByteTime := origRsp.GetFirstOutputByteTime()
-			outputDuration := time.Since(firstByteTime)
+			var outputDuration time.Duration
+			if !firstByteTime.IsZero() {
+				outputDuration = time.Since(firstByteTime)
+			}
 			tokenRate := float64(0)
 			if outputDuration.Seconds() > 0 {
 				tokenRate = float64(outputBytes/4) / outputDuration.Seconds()
