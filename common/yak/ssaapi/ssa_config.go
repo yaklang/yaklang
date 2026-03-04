@@ -33,7 +33,6 @@ type Config struct {
 	originEditor *memedit.MemEditor
 	// file system
 	fs          fi.FileSystem
-	entryFile   []string
 	programPath string
 	includePath []string
 
@@ -210,12 +209,8 @@ var WithFileSystem = ssaconfig.SetOption("ssa_compile/file_system", func(c *Conf
 var WithRawLanguage = ssaconfig.WithProjectRawLanguage
 var WithLanguage = ssaconfig.WithProjectLanguage
 
-var withFileSystemEntry = ssaconfig.SetOption("ssa_compile/file_system_entry", func(c *Config, v []string) {
-	c.entryFile = append(c.entryFile, v...)
-})
-
 func WithFileSystemEntry(v ...string) ssaconfig.Option {
-	return withFileSystemEntry(v)
+	return ssaconfig.WithCompileEntryFiles(v...)
 }
 
 var WithProgramPath = ssaconfig.SetOption("ssa_compile/program_path", func(c *Config, v string) {
@@ -349,7 +344,6 @@ func DefaultConfig(opts ...ssaconfig.Option) (*Config, error) {
 	c := &Config{
 		LanguageBuilder:            nil,
 		programPath:                ".",
-		entryFile:                  make([]string, 0),
 		cacheTTL:                   make([]time.Duration, 0),
 		externLib:                  make(map[string]map[string]any),
 		externValue:                make(map[string]any),

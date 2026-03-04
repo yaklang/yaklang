@@ -1,6 +1,8 @@
 yakit.AutoInitYakit()
 
 configJSON := cli.Text("config", cli.setRequired(true), cli.setVerboseName("SSA 配置"), cli.setHelp("SSA 项目的配置 JSON 字符串"))
+programNameFromParam := cli.Text("program_name", cli.setVerboseName("程序名称（可选）"), cli.setHelp("显式指定程序名称；不填则自动生成时间戳程序名"))
+disableTimestampProgramName := cli.Bool("disable_timestamp_program_name", cli.setVerboseName("禁用程序名称时间戳（可选）"), cli.setHelp("默认 false；为 true 时不附加时间戳"))
 
 cli.check()
 
@@ -26,9 +28,20 @@ yakit.Info("项目语言: %s", config.GetLanguage())
 
 reCompile = config.GetCompileReCompile()
 
-// 生成新的 programName（带时间戳）
-currentTime = time.Now().Format("2006-01-02 15:04:05")
-programName = sprintf("%s(%s)", projectName, currentTime)
+baseProgramName = programNameFromParam
+if baseProgramName == "" {
+    baseProgramName = projectName
+}
+if baseProgramName == "" {
+    baseProgramName = "default"
+}
+
+programName = baseProgramName
+if !disableTimestampProgramName {
+    // 按需附加时间戳，program_name 与时间戳开关解耦
+    currentTime = time.Now().Format("2006-01-02 15:04:05")
+    programName = sprintf("%s(%s)", baseProgramName, currentTime)
+}
 yakit.Info("程序名称: %s", programName)
 
 // 从配置中读取增量编译设置

@@ -120,6 +120,7 @@ func defaultSSACompileConfig() *SSACompileConfig {
 		StrictMode:               false,
 		PeepholeSize:             0,
 		ExcludeFiles:             []string{},
+		EntryFiles:               []string{},
 		ReCompile:                false,
 		MemoryCompile:            false,
 		Concurrency:              1,

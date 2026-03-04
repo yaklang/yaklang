@@ -33,12 +33,11 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"golang.org/x/exp/slices"
 
-	"github.com/segmentio/ksuid"
-	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfanalyzer"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
+	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -69,21 +68,29 @@ var ssaRemove = &cli.Command{
 var staticCheck = &cli.Command{
 	Name:    "static-check",
 	Aliases: []string{"check"},
-	Usage:   "Check Code",
+	Usage:   "Legacy local SyntaxFlow rule assertion check",
+	UsageText: "yak static-check --input-file <target> --rules <rule-dir> " +
+		"[--language <lang>] [--exclude-file <glob>]",
+	Description: `Compile local target and execute all .sf rules under --rules.
+This command is mainly for rule author testing. It returns non-zero when any rule reports alerts.`,
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:     "input-file,file",
+			Usage:    "target source path/archive to compile",
 			Required: true,
 		},
 		cli.StringFlag{
 			Name:     "rules",
+			Usage:    "directory containing .sf rules",
 			Required: true,
 		},
 		cli.StringFlag{
-			Name: "language",
+			Name:  "language",
+			Usage: "source language (auto-detect when omitted)",
 		},
 		cli.StringFlag{
-			Name: "exclude-file",
+			Name:  "exclude-file",
+			Usage: "exclude files by glob, e.g. vendor/*, test/*",
 		},
 	},
 	Action: func(c *cli.Context) error {
@@ -151,13 +158,16 @@ type Program interface {
 }
 
 var ssaProgram = &cli.Command{
-	Name:    "ssa-program",
-	Aliases: []string{"ssa-prog"},
-	Usage:   "Get SSA OpCodes program info from database",
+	Name:      "ssa-program",
+	Aliases:   []string{"ssa-prog"},
+	Usage:     "List or query SSA programs in database",
+	UsageText: `yak ssa-program [program-regexp...] [--database <db>]`,
+	Description: `Without arguments, list all programs in current database.
+With one or more arguments, treat them as regexp patterns and print matched program names.`,
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "database",
-			Usage: "",
+			Usage: "SSA database path",
 		},
 	},
 	Action: func(c *cli.Context) error {
@@ -200,17 +210,26 @@ var ssaProgram = &cli.Command{
 }
 
 var ssaCompile = &cli.Command{
-	Name:    "ssa-compile",
-	Aliases: []string{"ssa"},
-	Usage:   "Compile to SSA OpCodes from source code",
+	Name:      "ssa-compile",
+	Aliases:   []string{"ssa"},
+	Usage:     "Compile project to SSA and save program",
+	UsageText: `yak ssa-compile (--target <path> | --config <json>) [--program <name>] [options]`,
+	Description: `Compile source code into SSA program and save it to database.
+Compile stage is shared with code-scan (same auto-detect + script compile pipeline).
+When --syntaxflow is provided, a follow-up SyntaxFlowQuery is executed for quick manual verification.`,
 	Flags: []cli.Flag{
-		cli.StringFlag{Name: "log", Usage: "log level"},
+		cli.StringFlag{Name: "log", Usage: "log level: debug, info, warn, error"},
 		cli.StringFlag{
-			Name: "language,l",
+			Name:  "config,c",
+			Usage: "JSON configuration file path (compile options)",
+		},
+		cli.StringFlag{
+			Name:  "language,l",
+			Usage: "source language (auto-detect when omitted)",
 		},
 		cli.StringFlag{
 			Name:  "target,t",
-			Usage: `target file or directory`,
+			Usage: `target source file/directory`,
 		},
 		cli.StringFlag{
 			Name:  "program,p",
@@ -218,15 +237,15 @@ var ssaCompile = &cli.Command{
 		},
 		cli.StringFlag{
 			Name:  "entry",
-			Usage: "Program Entry",
+			Usage: "entry file(s), comma-separated",
 		},
 		cli.StringFlag{
 			Name:  "syntaxflow,sf",
-			Usage: "syntax flow query language",
+			Usage: "run SyntaxFlow after compile: inline code, .sf/.syntaxflow file, or directory",
 		},
 		cli.StringFlag{
 			Name:  "database,db",
-			Usage: "database path",
+			Usage: "SSA database path",
 		},
 		cli.StringFlag{
 			Name:  "database-dialect,db-dialect",
@@ -241,26 +260,28 @@ var ssaCompile = &cli.Command{
 			Usage: "enable syntax flow debug mode",
 		},
 		cli.BoolFlag{
-			Name: "no-override", Usage: "no override existed database program(no delete)",
+			Name: "no-override", Usage: "do not delete existing program before compile",
 		},
 		cli.BoolFlag{
-			Name: "re-compile", Usage: "re-compile existed database program",
+			Name: "re-compile", Usage: "allow recompiling an existing program name",
 		},
 		cli.BoolFlag{
-			Name: "dot", Usage: "dot graph text for result",
+			Name: "dot", Usage: "print dot graph in syntaxflow query result",
 		},
 		cli.BoolFlag{
-			Name: "with-code,code", Usage: "show code context",
+			Name: "with-code,code", Usage: "show code context in syntaxflow query result",
 		},
 		cli.BoolFlag{
-			Name: "no-frontend",
-			Usage: `in default, you can see program that compiled by ssa-cli in Yakit Frontend.
-				you can use --no-frontend to disable this function`,
+			Name:  "no-frontend",
+			Usage: `disable frontend metadata integration`,
 		},
 		cli.StringFlag{
-			Name: "exclude-file",
-			Usage: `exclude default file,only support glob mode. eg.
-					targets/*, vendor/*`,
+			Name:  "exclude-file",
+			Usage: `exclude files by glob, e.g. targets/*, vendor/*`,
+		},
+		cli.BoolFlag{
+			Name:  "file-perf-log",
+			Usage: "enable file-level compile performance log output",
 		},
 	},
 	Action: func(c *cli.Context) error {
@@ -268,17 +289,7 @@ var ssaCompile = &cli.Command{
 			log.SetLevel(ret)
 		}
 
-		programName := c.String("program")
-		reCompile := c.Bool("re-compile")
-		if programName != "" {
-			defer func() {
-				diagnostics.LogRecorder("compile")
-			}()
-		}
-		entry := c.String("entry")
-		input_language := c.String("language")
-		rawFile := c.String("target")
-		target := utils.GetFirstExistedPath(rawFile)
+		configFilePath := c.String("config")
 		databaseFileRaw := c.String("database")
 		databaseDialect := c.String("database-dialect")
 		noOverride := c.Bool("no-override")
@@ -287,18 +298,7 @@ var ssaCompile = &cli.Command{
 		sfDebug := c.Bool("syntaxflow-debug")
 		showDot := c.Bool("dot")
 		withCode := c.Bool("with-code")
-		excludeFileStr := c.String("exclude-file")
-		// check program name duplicate
-		if prog, err := ssadb.GetProgram(programName, ssa.Application); prog != nil && err == nil {
-			if !reCompile {
-				return utils.Errorf(
-					"program name %v existed in this database, please use `re-compile` flag to re-compile or change program name",
-					programName,
-				)
-			}
-		}
 
-		opt := make([]ssaconfig.Option, 0, 3)
 		// set database
 		if databaseDialect != "" {
 			// if set dialect, open gorm and set db
@@ -314,70 +314,153 @@ var ssaCompile = &cli.Command{
 		// if not set dialect, use existed db
 		if databaseDialect == "" && databaseFileRaw != "" {
 			// set database path
-			// if target == "" &&
-			// 	utils.GetFirstExistedFile(databaseFileRaw) == "" {
-			// 	// no compile ,database not existed
-			// 	return utils.Errorf("database file not found: %v", databaseFileRaw)
-			// }
 			consts.SetSSADatabaseInfo(databaseFileRaw)
 		}
 
-		if slices.Contains(ssadb.AllProgramNames(ssadb.GetDB()), programName) {
-			if !reCompile {
-				return utils.Errorf(
-					"program name %v existed in other database, please use `re-compile` flag to re-compile or change program name",
-					programName,
-				)
+		var (
+			compileConfig *ssaCliConfig
+			err           error
+		)
+		if configFilePath != "" {
+			compileConfig, err = parseConfigFileWithCliFlagOverride(c)
+		} else {
+			compileConfig, err = parseCompileConfigFromCli(c)
+		}
+		if err != nil {
+			return err
+		}
+		defer compileConfig.DeferFunc()
+		if compileConfig.GetCompileMemory() || compileConfig.GetSyntaxFlowMemory() {
+			log.Warn("ssa-compile does not support memory mode, ignore memory-related settings")
+			if err := compileConfig.Config.Update(
+				ssaconfig.WithCompileMemoryCompile(false),
+				ssaconfig.WithSyntaxFlowMemory(false),
+			); err != nil {
+				return utils.Errorf("normalize compile config failed: %v", err)
+			}
+		}
+		log.Infof("[ssa-compile] mode: compile only; optional --syntaxflow runs SyntaxFlowQuery for manual rule verification")
+		logCompileStageMessage("ssa-compile", compileConfig)
+
+		programName := compileConfig.GetProgramName()
+		reCompile := compileConfig.GetCompileReCompile()
+		targetPath := compileConfig.GetCodeSourceLocalFileOrURL()
+
+		if programName != "" {
+			defer func() {
+				diagnostics.LogRecorder("compile")
+			}()
+		}
+
+		// check program name duplicate
+		if programName != "" {
+			if prog, err := ssadb.GetProgram(programName, ssa.Application); prog != nil && err == nil {
+				if !reCompile {
+					return utils.Errorf(
+						"program name %v existed in this database, please use `re-compile` flag to re-compile or change program name",
+						programName,
+					)
+				}
+			}
+			if slices.Contains(ssadb.AllProgramNames(ssadb.GetDB()), programName) {
+				if !reCompile {
+					return utils.Errorf(
+						"program name %v existed in other database, please use `re-compile` flag to re-compile or change program name",
+						programName,
+					)
+				}
 			}
 		}
 
-		// compile
-		if target == "" {
-			return utils.Errorf("target file not found: %v", rawFile)
-		}
-		log.Infof("start to compile file: %v ", target)
-		opt = append(opt, ssaapi.WithRawLanguage(input_language))
-		opt = append(opt, ssaapi.WithReCompile(reCompile))
-		opt = append(opt, ssaapi.WithExcludeFunc(excludeFileStr))
-
-		if entry != "" {
-			log.Infof("start to use entry file: %v", entry)
-			opt = append(opt, ssaapi.WithFileSystemEntry(entry))
-		}
-
-		if programName == "" {
-			programName = "default-" + ksuid.New().String()
-		}
-		log.Infof("compile save to database with program name: %v", programName)
-		opt = append(opt, ssaapi.WithProgramName(programName))
-
-		if !noOverride {
+		if !noOverride && programName != "" {
 			ssadb.DeleteProgram(ssadb.GetDB(), programName)
-		} else {
+		} else if noOverride && programName != "" {
 			log.Warnf("no-override flag is set, will not delete existed program: %v", programName)
 		}
 
-		var proj ssaapi.Programs
-		zipfs, err := filesys.NewZipFSFromLocal(target)
-		if err == nil {
-			proj, err = ssaapi.ParseProjectWithFS(zipfs, opt...)
-			if err != nil {
-				return utils.Errorf("parse project [%v] failed: %v", target, err)
-			}
-		} else {
-			proj, err = ssaapi.ParseProjectFromPath(target, opt...)
-			if err != nil {
-				return utils.Errorf("parse project [%v] failed: %v", target, err)
-			}
+		if targetPath != "" {
+			log.Infof("start to compile file: %v", targetPath)
 		}
-
-		log.Infof("finished compiling..., results: %v", len(proj))
+		if programName != "" {
+			log.Infof("compile save to database with program name: %v", programName)
+		}
+		progs, err := getProgram(context.Background(), compileConfig)
+		if err != nil {
+			if targetPath != "" {
+				return utils.Errorf("parse project [%v] failed: %v", targetPath, err)
+			}
+			return err
+		}
+		if len(progs) <= 0 {
+			if targetPath != "" {
+				return utils.Errorf("parse project [%v] failed: no program compiled", targetPath)
+			}
+			return utils.Errorf("parse project failed: no program compiled")
+		}
+		programName = progs[0].GetProgramName()
+		log.Infof("finished compiling..., results: %v", len(progs))
 		if syntaxFlow != "" {
+			log.Infof("[ssa-compile] syntaxflow stage: execute via SyntaxFlowQuery (single program, interactive output)")
+			syntaxFlows, isPath, err := loadSyntaxFlowInputs(syntaxFlow)
+			if err != nil {
+				return err
+			}
+			if isPath {
+				if len(syntaxFlows) == 0 {
+					return utils.Errorf("no .sf/.syntaxflow rule found in path: %s", syntaxFlow)
+				}
+				for _, sf := range syntaxFlows {
+					if err := SyntaxFlowQuery(programName, sf, dbDebug, sfDebug, showDot, withCode); err != nil {
+						return err
+					}
+				}
+				return nil
+			}
 			log.Warn("Deprecated: syntax flow query language will be removed in ssa sub-command, please use `ssa-query(in short: sf/syntaxFlow)` instead")
 			return SyntaxFlowQuery(programName, syntaxFlow, dbDebug, sfDebug, showDot, withCode)
 		}
 		return nil
 	},
+}
+
+func loadSyntaxFlowInputs(input string) ([]string, bool, error) {
+	if input == "" {
+		return nil, false, nil
+	}
+
+	if utils.IsFile(input) {
+		raw, err := os.ReadFile(input)
+		if err != nil {
+			return nil, true, utils.Wrapf(err, "read syntaxflow file %s failed", input)
+		}
+		return []string{string(raw)}, true, nil
+	}
+
+	if utils.IsDir(input) {
+		entries, err := utils.ReadDir(input)
+		if err != nil {
+			return nil, true, utils.Wrapf(err, "read syntaxflow dir %s failed", input)
+		}
+		var flows []string
+		for _, entry := range entries {
+			ext := strings.ToLower(filepath.Ext(entry.Path))
+			if ext != ".sf" && ext != ".syntaxflow" {
+				continue
+			}
+			contentRaw, err := os.ReadFile(entry.Path)
+			if err != nil {
+				return nil, true, utils.Wrapf(err, "read syntaxflow file %s failed", entry.Path)
+			}
+			if len(contentRaw) <= 0 {
+				continue
+			}
+			flows = append(flows, string(contentRaw))
+		}
+		return flows, true, nil
+	}
+
+	// 不是现有路径，按内联语法流代码处理。
+	return nil, false, nil
 }
 
 var syntaxFlowCreate = &cli.Command{
@@ -1061,17 +1144,20 @@ var syntaxFlowSave = &cli.Command{
 }
 
 var ssaRisk = &cli.Command{
-	Name:    "ssa-risk",
-	Aliases: []string{"ssa-risk", "sr"},
-	Usage:   "visualize and format risk report from JSON file",
+	Name:      "ssa-risk",
+	Aliases:   []string{"ssa-risk", "sr"},
+	Usage:     "View and filter risk report",
+	UsageText: `yak ssa-risk --input <report.json> [--severity <level>] [--rule <keyword>] [--with-code]`,
+	Description: `Read risk report JSON (typically generated by code-scan) and print a readable summary.
+Use --severity and --rule to filter output.`,
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "input,i",
-			Usage: "risk report JSON file to be imported",
+			Usage: "risk report JSON file path",
 		},
 		cli.StringFlag{
 			Name:  "program,p",
-			Usage: "program name for ssa compiler in db",
+			Usage: "program name in database (reserved for future online export mode)",
 		},
 		// 	cli.StringFlag{
 		// 		Name: "format",
@@ -1107,8 +1193,8 @@ var ssaRisk = &cli.Command{
 			}
 
 			// format := sfreport.ReportTypeFromString(c.String("format"))
-			severityFilter := c.String("severity-filter")
-			ruleFilter := c.String("rule-filter")
+			severityFilter := c.String("severity")
+			ruleFilter := c.String("rule")
 			withCode := c.Bool("with-code")
 			return outputConsole(os.Stdout, &report, severityFilter, ruleFilter, withCode)
 		}
@@ -1195,39 +1281,43 @@ var ssaRisk = &cli.Command{
 }
 
 var ssaCodeScan = &cli.Command{
-	Name:    "code-scan",
-	Aliases: []string{"codescan,sfscan"},
-	Usage:   "Compile and scan code using command line arguments (use config-scan for JSON config file)",
+	Name:      "code-scan",
+	Aliases:   []string{"codescan,sfscan"},
+	Usage:     "Compile and batch-scan code with SyntaxFlow rules",
+	UsageText: `yak code-scan (--target <path> | --program <name> | --config <json>) [options]`,
+	Description: `Recommended scanning command for CI and batch jobs.
+It compiles code (same compile pipeline as ssa-compile), executes SyntaxFlow rules,
+and exports structured report (sarif/irify).`,
 	Flags: []cli.Flag{
 		// Input {{{
 		// config file (when specified, use config-scan mode)
 		cli.StringFlag{
 			Name:  "config,c",
-			Usage: "JSON configuration file path (when specified, uses config-scan mode without coreplugin detection)",
+			Usage: "JSON configuration file path (recommended for CI and complex scans)",
 		},
 		// program name
 		cli.StringFlag{
 			Name:  "program,p",
-			Usage: "program name for ssa compiler in db",
+			Usage: "existing program name in SSA database",
 		},
 		// target path
 		cli.StringFlag{
 			Name:  "target,t",
-			Usage: "target path for ssa compiler",
+			Usage: "target source path to compile before scan",
 		},
 
 		cli.StringFlag{
 			Name:  "language,l",
-			Usage: "language for ssa compiler",
+			Usage: "source language (auto-detect when omitted)",
 		},
 
 		cli.BoolFlag{
 			Name:  "memory,mem",
-			Usage: "enable memory mode",
+			Usage: "run scan in memory mode (results not persisted)",
 		},
 		cli.StringFlag{
 			Name:  "database,db",
-			Usage: "database path",
+			Usage: "SSA database path",
 		},
 		// }}}
 
@@ -1242,21 +1332,20 @@ var ssaCodeScan = &cli.Command{
 		// rule filter
 		cli.StringFlag{
 			Name:  "rule-keyword,rk,kw",
-			Usage: `set rule keyword for filter`,
+			Usage: `filter rules by keyword`,
 		},
 
 		// rule group filter
 		cli.StringSliceFlag{
 			Name:  "rule-group,rg",
-			Usage: `set rule group names for filter (can be used multiple times)`,
+			Usage: `filter rules by group name (can be used multiple times)`,
 		},
 		// }}}
 
 		// output {{{
 		cli.StringFlag{
-			Name: "output,o",
-			// Usage: "output file, use --format set output file format, default is sarif",
-			Usage: "output file, default format is sarif",
+			Name:  "output,o",
+			Usage: "output file path (extension auto-appended by --format)",
 		},
 		cli.StringFlag{
 			Name: "format",
@@ -1291,23 +1380,22 @@ var ssaCodeScan = &cli.Command{
 
 		cli.BoolFlag{
 			Name:  "rule-perf-log",
-			Usage: "enable per-rule performance profiling log output",
+			Usage: "enable per-rule performance profiling log",
 		},
 
 		cli.BoolFlag{
 			Name:  "file-perf-log",
-			Usage: "enable file-level performance profiling log output (separate AST and Build by file)",
+			Usage: "enable file-level compile performance profiling log",
 		},
 
 		cli.StringFlag{
-			Name: "exclude-file",
-			Usage: `exclude default file,only support glob mode. eg.
-					targets/*, vendor/*`,
+			Name:  "exclude-file",
+			Usage: `exclude files by glob, e.g. targets/*, vendor/*`,
 		},
 
 		cli.StringFlag{
 			Name:  "syntaxflow,sf",
-			Usage: "SyntaxFlow Rule Path/File",
+			Usage: "custom rules: inline syntaxflow, .sf/.syntaxflow file, or directory",
 		},
 	},
 	Action: func(c *cli.Context) (e error) {
@@ -1348,6 +1436,7 @@ var ssaCodeScan = &cli.Command{
 		} else {
 			log.Infof("============= start to scan code ==============")
 		}
+		log.Infof("[code-scan] mode: compile + scan via syntaxflow_scan.StartScan (batch/CI report path)")
 
 		ruleTimeStart := time.Now()
 		SyncEmbedRule()
@@ -1375,15 +1464,13 @@ var ssaCodeScan = &cli.Command{
 		}
 		// Ensure the file is closed after we're done
 		defer config.DeferFunc()
+		logCompileStageMessage("code-scan", config)
+		log.Infof("[code-scan] scan stage: config-mode=%v report-format=%v output=%q",
+			useConfigMode, config.Format, config.GetOutputFile(),
+		)
 
 		var progs []*ssaapi.Program
-		if useConfigMode {
-			// config-scan 模式：使用独立的编译逻辑，不经过 coreplugin 探测流程
-			progs, err = getProgramForConfigScan(ctx, config)
-		} else {
-			// 普通模式：经过 coreplugin 探测流程
-			progs, err = getProgram(ctx, config)
-		}
+		progs, err = getProgram(ctx, config)
 		if err != nil {
 			log.Errorf("get program failed: %s", err)
 			return err
@@ -1406,33 +1493,26 @@ var ssaCodeScan = &cli.Command{
 		reportInstance.SetWriter(config.OutputWriter)
 
 		scanOpt := make([]ssaconfig.Option, 0)
+		ruleSource := "database builtin rules (with filter)"
+		customRuleCount := 0
 		if path := c.String("syntaxflow"); path != "" {
-			if utils.IsFile(path) {
-				data, err := os.ReadFile(path)
-				if err != nil {
-					log.Errorf("failed to read file %s: %v", path, err)
-				} else {
-					scanOpt = append(scanOpt, ssaconfig.WithRuleInputRaw(string(data)))
+			syntaxFlows, isPath, err := loadSyntaxFlowInputs(path)
+			if err != nil {
+				return err
+			}
+			if isPath {
+				for _, sf := range syntaxFlows {
+					scanOpt = append(scanOpt, ssaconfig.WithRuleInputRaw(sf))
 				}
+				ruleSource = fmt.Sprintf("custom rules from path: %s", path)
+				customRuleCount = len(syntaxFlows)
 			} else {
-				// folder
-				local := filesys.NewLocalFs()
-				entrys, err := utils.ReadDir(path)
-				if err != nil {
-					return err
-				}
-				for _, entry := range entrys {
-					if filepath.Ext(entry.Path) != ".sf" {
-						continue
-					}
-					contentRaw, _ := local.ReadFile(entry.Path)
-					if len(contentRaw) <= 0 {
-						continue
-					}
-					scanOpt = append(scanOpt, ssaconfig.WithRuleInputRaw(string(contentRaw)))
-				}
+				scanOpt = append(scanOpt, ssaconfig.WithRuleInputRaw(path))
+				ruleSource = "inline syntaxflow expression"
+				customRuleCount = 1
 			}
 		}
+		log.Infof("[code-scan] rule source: %s (custom-rule-count=%d)", ruleSource, customRuleCount)
 
 		scanOpt = append(scanOpt,
 			syntaxflow_scan.WithPrograms(progs...),
@@ -1769,22 +1849,25 @@ var syntaxFlowEvaluate = &cli.Command{
 }
 
 var ssaQuery = &cli.Command{
-	Name:    "ssa-query",
-	Aliases: []string{"sf", "syntaxFlow"},
-	Usage:   "Use SyntaxFlow query SSA OpCodes from database",
+	Name:      "ssa-query",
+	Aliases:   []string{"sf", "syntaxFlow"},
+	Usage:     "Run SyntaxFlow query against existing SSA program",
+	UsageText: `yak ssa-query --program <name> --syntaxflow <rule|file|dir> [options]`,
+	Description: `Use this command for manual rule verification and interactive debugging.
+Unlike code-scan, this command runs query-style output rather than batch report pipeline.`,
 	Flags: []cli.Flag{
-		cli.StringFlag{Name: "log", Usage: "log level"},
+		cli.StringFlag{Name: "log", Usage: "log level: debug, info, warn, error"},
 		cli.StringFlag{
 			Name:  "program,p",
-			Usage: `program name to save in database`,
+			Usage: `program name in SSA database`,
 		},
 		cli.StringFlag{
 			Name:  "syntaxflow,sf",
-			Usage: "syntax flow query language code",
+			Usage: "syntaxflow input: inline code, .sf/.syntaxflow file, or directory",
 		},
 		cli.StringFlag{
 			Name:  "database,db",
-			Usage: "database path",
+			Usage: "SSA database path",
 		},
 		cli.StringFlag{
 			Name:  "database-dialect,db-dialect",
@@ -1799,13 +1882,13 @@ var ssaQuery = &cli.Command{
 			Usage: "enable syntax flow debug mode",
 		},
 		cli.BoolFlag{
-			Name: "dot", Usage: "dot graph text for result",
+			Name: "dot", Usage: "print dot graph in query result",
 		},
 		cli.BoolFlag{
-			Name: "with-code,code", Usage: "show code context",
+			Name: "with-code,code", Usage: "show code context in query result",
 		},
 		cli.StringFlag{
-			Name: "sarif,sarif-export,o", Usage: "export SARIF format to files",
+			Name: "sarif,sarif-export,o", Usage: "export matched results to SARIF file",
 		},
 		cli.BoolFlag{
 			Name: "save,s", Usage: "save the risk to the database",
@@ -1815,6 +1898,7 @@ var ssaQuery = &cli.Command{
 		if ret, err := log.ParseLevel(c.String("log")); err == nil {
 			log.SetLevel(ret)
 		}
+		log.Infof("[ssa-query] mode: query existing program(s) via SyntaxFlowQuery (manual testing and rule debugging)")
 		programName := c.String("program")
 		databaseFileRaw := c.String("database")
 		databaseDialect := c.String("database-dialect")
@@ -1889,6 +1973,21 @@ var ssaQuery = &cli.Command{
 		}()
 
 		if syntaxFlow != "" {
+			syntaxFlows, isPath, err := loadSyntaxFlowInputs(syntaxFlow)
+			if err != nil {
+				return err
+			}
+			if isPath {
+				if len(syntaxFlows) == 0 {
+					return utils.Errorf("no .sf/.syntaxflow rule found in path: %s", syntaxFlow)
+				}
+				for _, sf := range syntaxFlows {
+					if err := SyntaxFlowQuery(programName, sf, dbDebug, sfDebug, showDot, withCode, sarifCallback); err != nil {
+						return err
+					}
+				}
+				return nil
+			}
 			return SyntaxFlowQuery(programName, syntaxFlow, dbDebug, sfDebug, showDot, withCode, sarifCallback)
 		}
 

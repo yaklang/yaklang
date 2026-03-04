@@ -1,41 +1,43 @@
 package ssa_compile
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
+)
 
 func TestShouldCompileInMemory(t *testing.T) {
 	tests := []struct {
 		name string
-		conf *SSADetectConfig
+		cfg  *ssaconfig.Config
 		want bool
 	}{
 		{
-			name: "nil config",
-			conf: nil,
+			name: "nil",
+			cfg:  nil,
 			want: false,
 		},
 		{
-			name: "nil params",
-			conf: &SSADetectConfig{},
+			name: "empty config",
+			cfg:  &ssaconfig.Config{},
 			want: false,
 		},
 		{
-			name: "missing memory param",
-			conf: &SSADetectConfig{Params: map[string]any{"foo": "bar"}},
-			want: false,
-		},
-		{
-			name: "memory true bool",
-			conf: &SSADetectConfig{Params: map[string]any{"memory": true}},
-			want: true,
-		},
-		{
-			name: "memory true string",
-			conf: &SSADetectConfig{Params: map[string]any{"memory": "TRUE"}},
+			name: "memory true",
+			cfg: &ssaconfig.Config{
+				SSACompile: &ssaconfig.SSACompileConfig{
+					MemoryCompile: true,
+				},
+			},
 			want: true,
 		},
 		{
 			name: "memory false",
-			conf: &SSADetectConfig{Params: map[string]any{"memory": false}},
+			cfg: &ssaconfig.Config{
+				SSACompile: &ssaconfig.SSACompileConfig{
+					MemoryCompile: false,
+				},
+			},
 			want: false,
 		},
 	}
@@ -43,7 +45,7 @@ func TestShouldCompileInMemory(t *testing.T) {
 	for _, tc := range tests {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			got := shouldCompileInMemory(tc.conf)
+			got := shouldCompileInMemory(tc.cfg)
 			if got != tc.want {
 				t.Fatalf("shouldCompileInMemory() = %v, want %v", got, tc.want)
 			}

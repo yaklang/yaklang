@@ -7,11 +7,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/yak/ssa_compile"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
+	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssa_compile"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
@@ -39,6 +39,11 @@ func SyncEmbedRule(force ...bool) {
 type ssaCliConfig struct {
 	// 统一配置
 	*ssaconfig.Config
+	// preferConfigCompile 为 true 时，编译阶段直接使用 Config 走 script 编译链路。
+	// 为 false 时，优先走 target + detect + script 链路。
+	preferConfigCompile bool
+	// forceProgramName 为 true 时，编译阶段显式固定 program_name（例如 CLI 指定 --program）。
+	forceProgramName bool
 
 	// {{ should result
 	// OutputWriter is the file to save the result
@@ -79,18 +84,17 @@ func parseSFScanConfigFromCli(c *cli.Context) (res *ssaCliConfig, err error) {
 
 	// Parse program configuration
 	if programName := c.String("program"); programName != "" {
-		opts = append(opts, ssaconfig.WithProgramNames(programName))
+		opts = append(opts, ssaconfig.WithSetProgramName(programName))
 	}
 
 	// target path -> code source
 	if targetPath := c.String("target"); targetPath != "" {
+		opts = append(opts, ssaconfig.WithCodeSourceKind(ssaconfig.CodeSourceLocal))
 		opts = append(opts, ssaconfig.WithCodeSourceLocalFile(targetPath))
 	}
 
 	// Language
-	if language := c.String("language"); language != "" {
-		opts = append(opts, ssaconfig.WithProjectRawLanguage(language))
-	}
+	opts = append(opts, ssaconfig.WithProjectRawLanguage(c.String("language")))
 
 	// Memory mode
 	if c.Bool("memory") {
@@ -143,7 +147,9 @@ func parseSFScanConfigFromCli(c *cli.Context) (res *ssaCliConfig, err error) {
 	}
 
 	config := &ssaCliConfig{
-		Config: cfg,
+		Config:              cfg,
+		preferConfigCompile: false,
+		forceProgramName:    c.IsSet("program") && strings.TrimSpace(c.String("program")) != "",
 	}
 
 	// 设置输出格式
@@ -190,6 +196,37 @@ func parseSFScanConfigFromCli(c *cli.Context) (res *ssaCliConfig, err error) {
 	return config, nil
 }
 
+func logCompileStageMessage(command string, config *ssaCliConfig) {
+	if config == nil || config.Config == nil {
+		return
+	}
+	targetPath := config.GetCodeSourceLocalFileOrURL()
+	programName := config.GetProgramName()
+	language := config.GetLanguage()
+
+	if targetPath != "" {
+		pipeline := "ParseProjectWithAutoDetective(target + detect)"
+		if config.preferConfigCompile {
+			pipeline = "ParseProjectWithAutoDetective(config direct)"
+		}
+		log.Infof("[%s] compile stage: target=%q program=%q language=%q pipeline=%s",
+			command, targetPath, programName, language, pipeline)
+	} else {
+		log.Infof("[%s] compile stage: load existing program from database by pattern=%q", command, programName)
+	}
+
+	log.Infof(
+		"[%s] compile options: re-compile=%v entry-files=%d exclude-files=%d file-perf-log=%v compile-memory=%v scan-memory=%v",
+		command,
+		config.GetCompileReCompile(),
+		len(config.GetCompileEntryFiles()),
+		len(config.GetCompileExcludeFiles()),
+		config.GetCompileFilePerformanceLog(),
+		config.GetCompileMemory(),
+		config.GetSyntaxFlowMemory(),
+	)
+}
+
 // getProgram gets the program using the provided configuration
 func getProgram(ctx context.Context, config *ssaCliConfig) ([]*ssaapi.Program, error) {
 	log.Infof("================= get or parse program ================")
@@ -202,34 +239,32 @@ func getProgram(ctx context.Context, config *ssaCliConfig) ([]*ssaapi.Program, e
 	}()
 	targetPath := config.GetCodeSourceLocalFileOrURL()
 	programName := config.GetProgramName()
-	language := string(config.GetLanguage())
-	memory := config.GetCompileMemory() || config.GetSyntaxFlowMemory()
-	excludeFiles := strings.Join(config.GetCompileExcludeFiles(), ",")
 
 	if targetPath != "" {
-		log.Infof("get program from target path: %s", targetPath)
-		para := make(map[string]any)
-		if memory {
-			para["memory"] = true
+		if config.preferConfigCompile {
+			log.Infof("get program from target path: %s (config-direct compile mode)", targetPath)
+		} else {
+			log.Infof("get program from target path: %s (target-detect compile mode)", targetPath)
 		}
-		if len(excludeFiles) > 0 {
-			para["excludeFile"] = excludeFiles
+		req := &ssa_compile.SSADetectConfig{
+			CompileImmediately:          true,
+			ForceProgramName:            config.forceProgramName,
+			DisableTimestampProgramName: true,
 		}
-		if programName != "" {
-			para["program_name"] = programName
+		if config.preferConfigCompile {
+			req.Config = config.Config
+		} else {
+			req.Target = targetPath
+			req.Language = string(config.GetLanguage())
+			req.Options = buildCompileOptionsForDetect(config.Config)
 		}
-		// 传递文件性能日志配置
-		if config.GetCompileFilePerformanceLog() {
-			para["filePerformanceLog"] = true
-		}
-		res, err := ssa_compile.ParseProjectWithAutoDetective(ctx, &ssa_compile.SSADetectConfig{
-			Target:             targetPath,
-			Language:           language,
-			CompileImmediately: true,
-			Params:             para,
-		})
+
+		res, err := ssa_compile.ParseProjectWithAutoDetective(ctx, req)
 		if err != nil {
 			return nil, err
+		}
+		if res == nil || res.Program == nil {
+			return nil, utils.Errorf("compile result is empty")
 		}
 		return []*ssaapi.Program{res.Program}, nil
 	}
@@ -250,7 +285,6 @@ func getProgram(ctx context.Context, config *ssaCliConfig) ([]*ssaapi.Program, e
 // cliOutputFile 为空时使用配置文件中的设置，非空时优先使用 CLI 参数
 func parseConfigFileWithCliFlagOverride(cliCtx *cli.Context) (res *ssaCliConfig, err error) {
 	configFilePath := cliCtx.String("config")
-	cliOutputFile := cliCtx.String("output")
 
 	log.Infof("================= parse config file ================")
 	defer func() {
@@ -277,6 +311,9 @@ func parseConfigFileWithCliFlagOverride(cliCtx *cli.Context) (res *ssaCliConfig,
 	if err != nil {
 		return nil, utils.Errorf("failed to create config from JSON: %v", err)
 	}
+	if err := applyCompileCliOverrides(cfg, cliCtx); err != nil {
+		return nil, err
+	}
 
 	// 调试日志
 	log.Infof("Config loaded: programName=%s, language=%s, targetPath=%s, outputFile=%s, outputFormat=%s",
@@ -292,7 +329,9 @@ func parseConfigFileWithCliFlagOverride(cliCtx *cli.Context) (res *ssaCliConfig,
 	}
 
 	config := &ssaCliConfig{
-		Config: cfg,
+		Config:              cfg,
+		preferConfigCompile: true,
+		forceProgramName:    strings.TrimSpace(cfg.GetProgramName()) != "",
 	}
 
 	// 设置输出格式
@@ -303,12 +342,7 @@ func parseConfigFileWithCliFlagOverride(cliCtx *cli.Context) (res *ssaCliConfig,
 	config.Format = sfreport.ReportTypeFromString(outputFormat)
 
 	// 处理输出文件：CLI 参数优先于配置文件
-	outputFile := cliOutputFile
-	if outputFile != "" {
-		log.Infof("Using CLI output file (overrides config): %s", outputFile)
-	} else {
-		outputFile = cfg.GetOutputFile()
-	}
+	outputFile := cfg.GetOutputFile()
 
 	if outputFile == "" {
 		log.Infof("output file is not specified, use stdout")
@@ -345,125 +379,160 @@ func parseConfigFileWithCliFlagOverride(cliCtx *cli.Context) (res *ssaCliConfig,
 	return config, nil
 }
 
-// getProgramForConfigScan 直接使用 ssaapi.ParseProject 编译程序 (for config-scan command)
-// 不经过 coreplugin 的项目探测流程，减少与 code-scan 的链路耦合
-func getProgramForConfigScan(ctx context.Context, config *ssaCliConfig) ([]*ssaapi.Program, error) {
-	log.Infof("================= get or parse program (config-scan) ================")
+func parseCompileConfigFromCli(c *cli.Context) (res *ssaCliConfig, err error) {
+	log.Infof("================= parse compile config ================")
 	defer func() {
-		log.Infof("get program done")
-		if err := recover(); err != nil {
-			log.Errorf("get program failed: %s", err)
+		log.Infof("parse compile config done")
+		if panicErr := recover(); panicErr != nil {
+			log.Errorf("parse compile config failed: %s", panicErr)
 			utils.PrintCurrentGoroutineRuntimeStack()
+			err = utils.Errorf("parse compile config failed: %s", panicErr)
 		}
 	}()
 
-	programName := config.GetProgramName()
-	targetPath := config.GetCodeSourceLocalFileOrURL()
-
-	// 逻辑说明：
-	// 1. 如果指定了 CodeSource（targetPath 非空），则始终重新编译，不从数据库加载
-	//    这意味着用户明确希望编译新的代码，无论数据库中是否存在同名程序
-	// 2. 只有当 CodeSource 未指定（targetPath 为空）且指定了 programName 时，
-	//    才尝试从数据库加载已有程序
-
-	// 有 CodeSource → 始终编译
-	if targetPath != "" {
-		log.Infof("compiling program from target path: %s", targetPath)
-
-		// 构建编译选项
-		opts := []ssaconfig.Option{
-			ssaconfig.WithContext(ctx),
-		}
-
-		// 设置程序名
-		if programName != "" {
-			opts = append(opts, ssaconfig.WithProgramNames(programName))
-		}
-
-		// 设置语言
-		if lang := config.GetLanguage(); lang != "" {
-			opts = append(opts, ssaconfig.WithProjectLanguage(lang))
-		}
-
-		// 设置 memory 模式（仅编译时的 memory）
-		if config.GetCompileMemory() {
-			opts = append(opts, ssaconfig.WithCompileMemoryCompile(true))
-		}
-
-		// 设置排除文件
-		if excludeFiles := config.GetCompileExcludeFiles(); len(excludeFiles) > 0 {
-			opts = append(opts, ssaconfig.WithCompileExcludeFiles(excludeFiles...))
-		}
-
-		// 设置重编译选项
-		if config.GetCompileReCompile() {
-			opts = append(opts, ssaconfig.WithCompileReCompile(true))
-		}
-
-		// 设置文件性能日志
-		if config.GetCompileFilePerformanceLog() {
-			opts = append(opts, ssaconfig.WithCompileFilePerformanceLog(true))
-		}
-
-		// 设置编译并发数
-		if concurrency := config.GetCompileConcurrency(); concurrency > 0 {
-			opts = append(opts, ssaconfig.WithCompileConcurrency(concurrency))
-		}
-
-		// 根据 CodeSource 类型设置文件系统
-		codeSourceKind := config.GetCodeSourceKind()
-		log.Infof("code source kind: %s, target path: %s", codeSourceKind, targetPath)
-
-		switch codeSourceKind {
-		case ssaconfig.CodeSourceLocal:
-			opts = append(opts, ssaconfig.WithCodeSourceMap(map[string]any{
-				"kind":       "local",
-				"local_file": targetPath,
-			}))
-		case ssaconfig.CodeSourceGit:
-			opts = append(opts, ssaconfig.WithCodeSourceMap(map[string]any{
-				"kind":   "git",
-				"url":    config.GetCodeSourceURL(),
-				"branch": config.GetCodeSourceBranch(),
-			}))
-		case ssaconfig.CodeSourceCompression:
-			opts = append(opts, ssaconfig.WithCodeSourceMap(map[string]any{
-				"kind":       "compression",
-				"local_file": targetPath,
-			}))
-		default:
-			// 默认当作本地路径处理
-			opts = append(opts, ssaconfig.WithCodeSourceMap(map[string]any{
-				"kind":       "local",
-				"local_file": targetPath,
-			}))
-		}
-
-		// 调用 ssaapi.ParseProject 进行编译
-		progs, err := ssaapi.ParseProject(opts...)
-		if err != nil {
-			return nil, utils.Errorf("compile project failed: %v", err)
-		}
-		if len(progs) == 0 {
-			return nil, utils.Errorf("compile project returned no programs")
-		}
-		// 转换为 []*ssaapi.Program
-		result := make([]*ssaapi.Program, 0, len(progs))
-		for _, prog := range progs {
-			result = append(result, prog)
-		}
-		return result, nil
+	opts := []ssaconfig.Option{
+		ssaconfig.WithProjectRawLanguage(c.String("language")),
+	}
+	if programName := c.String("program"); programName != "" {
+		opts = append(opts, ssaconfig.WithSetProgramName(programName))
+	}
+	if targetPath := c.String("target"); targetPath != "" {
+		opts = append(opts,
+			ssaconfig.WithCodeSourceKind(ssaconfig.CodeSourceLocal),
+			ssaconfig.WithCodeSourceLocalFile(targetPath),
+		)
+	}
+	if c.Bool("re-compile") {
+		opts = append(opts, ssaconfig.WithCompileReCompile(true))
+	}
+	if excludeFileStr := c.String("exclude-file"); excludeFileStr != "" {
+		opts = append(opts, ssaconfig.WithCompileExcludeFiles(excludeFileStr))
+	}
+	if entry := c.String("entry"); entry != "" {
+		opts = append(opts, ssaconfig.WithCompileEntryFiles(entry))
+	}
+	if c.Bool("file-perf-log") {
+		opts = append(opts, ssaconfig.WithCompileFilePerformanceLog(true))
 	}
 
-	// 没有 CodeSource，只有 programName → 从数据库加载已有程序
-	if programName != "" {
-		log.Infof("loading program from database: %s", programName)
-		ret := ssaapi.LoadProgramRegexp(programName)
-		if len(ret) == 0 {
-			return nil, utils.Errorf("program %s not found in database", programName)
-		}
-		return ret, nil
+	cfg, err := ssaconfig.NewCLIScanConfig(opts...)
+	if err != nil {
+		return nil, utils.Errorf("failed to create compile config: %v", err)
+	}
+	if cfg.GetProgramName() == "" && cfg.GetCodeSourceLocalFileOrURL() == "" {
+		return nil, utils.Errorf("either --program, --target, or --config must be specified")
 	}
 
-	return nil, utils.Errorf("config must specify either CodeSource (with local_file/url) or program_names in BaseInfo")
+	return &ssaCliConfig{
+		Config:              cfg,
+		preferConfigCompile: false,
+		forceProgramName:    c.IsSet("program") && strings.TrimSpace(c.String("program")) != "",
+	}, nil
+}
+
+func buildCompileOptionsForDetect(cfg *ssaconfig.Config) []ssaconfig.Option {
+	if cfg == nil {
+		return nil
+	}
+	opts := make([]ssaconfig.Option, 0, 10)
+	if programName := cfg.GetProgramName(); programName != "" {
+		opts = append(opts, ssaconfig.WithSetProgramName(programName))
+	}
+	opts = append(opts, ssaconfig.WithProjectRawLanguage(string(cfg.GetLanguage())))
+	if cfg.GetCompileMemory() || cfg.GetSyntaxFlowMemory() {
+		opts = append(opts, ssaconfig.WithCompileMemoryCompile(true))
+	}
+	if excludes := cfg.GetCompileExcludeFiles(); len(excludes) > 0 {
+		opts = append(opts, ssaconfig.WithCompileExcludeFiles(excludes...))
+	}
+	if entries := cfg.GetCompileEntryFiles(); len(entries) > 0 {
+		opts = append(opts, ssaconfig.WithCompileEntryFiles(entries...))
+	}
+	if cfg.GetCompileReCompile() {
+		opts = append(opts, ssaconfig.WithCompileReCompile(true))
+	}
+	if cfg.GetCompileFilePerformanceLog() {
+		opts = append(opts, ssaconfig.WithCompileFilePerformanceLog(true))
+	}
+	if cfg.GetCompileStrictMode() {
+		opts = append(opts, ssaconfig.WithCompileStrictMode(true))
+	}
+	if concurrency := cfg.GetCompileConcurrency(); concurrency > 0 {
+		opts = append(opts, ssaconfig.WithCompileConcurrency(concurrency))
+	}
+	return opts
+}
+
+func applyCompileCliOverrides(cfg *ssaconfig.Config, cliCtx *cli.Context) error {
+	if cfg == nil {
+		return utils.Errorf("config is nil")
+	}
+	if cliCtx == nil {
+		return nil
+	}
+
+	opts := make([]ssaconfig.Option, 0, 16)
+	if cliCtx.IsSet("program") {
+		if programName := strings.TrimSpace(cliCtx.String("program")); programName != "" {
+			opts = append(opts, ssaconfig.WithSetProgramName(programName))
+		}
+	}
+	if cliCtx.IsSet("target") {
+		if targetPath := strings.TrimSpace(cliCtx.String("target")); targetPath != "" {
+			opts = append(opts,
+				ssaconfig.WithCodeSourceKind(ssaconfig.CodeSourceLocal),
+				ssaconfig.WithCodeSourceLocalFile(targetPath),
+				ssaconfig.WithCodeSourceURL(""),
+			)
+		}
+	}
+	if cliCtx.IsSet("language") {
+		opts = append(opts, ssaconfig.WithProjectRawLanguage(cliCtx.String("language")))
+	}
+	if cliCtx.IsSet("memory") {
+		enable := cliCtx.Bool("memory")
+		opts = append(opts,
+			ssaconfig.WithCompileMemoryCompile(enable),
+			ssaconfig.WithSyntaxFlowMemory(enable),
+		)
+	}
+	if cliCtx.IsSet("file-perf-log") {
+		opts = append(opts, ssaconfig.WithCompileFilePerformanceLog(cliCtx.Bool("file-perf-log")))
+	}
+	if cliCtx.IsSet("re-compile") {
+		opts = append(opts, ssaconfig.WithCompileReCompile(cliCtx.Bool("re-compile")))
+	}
+	if cliCtx.IsSet("format") {
+		opts = append(opts, ssaconfig.WithOutputFormat(cliCtx.String("format")))
+	}
+	if cliCtx.IsSet("output") {
+		opts = append(opts, ssaconfig.WithOutputFile(cliCtx.String("output")))
+	}
+	if cliCtx.IsSet("with-file-content") {
+		opts = append(opts, ssaconfig.WithOutputFileContent(cliCtx.Bool("with-file-content")))
+	}
+	if cliCtx.IsSet("with-dataflow-path") {
+		opts = append(opts, ssaconfig.WithOutputDataflowPath(cliCtx.Bool("with-dataflow-path")))
+	}
+	if err := cfg.Update(opts...); err != nil {
+		return utils.Errorf("apply cli overrides failed: %v", err)
+	}
+
+	if cliCtx.IsSet("exclude-file") {
+		excludeFileStr := strings.TrimSpace(cliCtx.String("exclude-file"))
+		if excludeFileStr == "" {
+			cfg.SetCompileExcludeFiles(nil)
+		} else {
+			cfg.SetCompileExcludeFiles([]string{excludeFileStr})
+		}
+	}
+	if cliCtx.IsSet("entry") {
+		entry := strings.TrimSpace(cliCtx.String("entry"))
+		if entry == "" {
+			cfg.SetCompileEntryFiles(nil)
+		} else {
+			cfg.SetCompileEntryFiles([]string{entry})
+		}
+	}
+	return nil
 }

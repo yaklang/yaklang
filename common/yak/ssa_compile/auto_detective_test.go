@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -16,6 +17,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssa_compile"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"github.com/yaklang/yaklang/common/yakgrpc"
@@ -208,9 +210,6 @@ func TestSSAProjectComprehensive(t *testing.T) {
 		require.NoError(t, err)
 		info := res.Info
 		prog := res.Program
-		cleanup := res.Cleanup
-		require.NotNil(t, cleanup, "cleanup function should be returned")
-		defer cleanup()
 
 		require.NotNil(t, prog, "compile_immediately=true 时应该返回编译后的程序")
 		require.NotEmpty(t, info.GetProgramName(), "Program name should not be empty")
@@ -233,22 +232,16 @@ func TestSSAProjectComprehensive(t *testing.T) {
 				ProjectNames: []string{info.GetProjectName()},
 			},
 		}
-
 		queryResp, err := client.QuerySSAProject(context.Background(), queryReq)
 		require.NoError(t, err)
 		require.NotNil(t, queryResp)
-		require.Equal(t, 1, len(queryResp.Projects), "Should find exactly one project")
+		require.Len(t, queryResp.Projects, 0, "compile_immediately should not auto create SSAProject record")
 
-		project := queryResp.Projects[0]
-		log.Infof("Found SSA Project:")
-		log.Infof("  ID: %d", project.ID)
-		log.Infof("  ProjectName: %s", project.ProjectName)
-		log.Infof("  Language: %s", project.Language)
-		log.Infof("  CompileTimes: %d", project.CompileTimes)
+		programs := ssaapi.LoadProgramRegexp("^" + regexp.QuoteMeta(info.GetProjectName()) + "(\\(|$)")
+		require.NotEmpty(t, programs, "compile_immediately should compile program to database")
+		require.Equal(t, uint64(0), programs[0].Program.ProjectID, "compile_immediately without existing SSA project should keep project_id=0")
 
-		require.Equal(t, int64(1), project.CompileTimes, "CompileTimes should be 1 after immediate compilation")
-
-		log.Infof("✅ Test passed: compile_immediately flag works correctly with automatic compilation")
+		log.Infof("✅ Test passed: compile_immediately flag works correctly and program is compiled without SSAProject record")
 	})
 
 	t.Run("check project exists and use existing config", func(t *testing.T) {
@@ -379,7 +372,7 @@ public class ExistsTest {
 		log.Infof("Final CompileTimes: %d", finalCompileTimes)
 		require.Equal(t, int64(3), finalCompileTimes, "CompileTimes should be 3 after three compilations")
 
-		log.Infof("✅ Test passed: SSA project compiled successfully 3 times with CompileTimes = 3")
+		log.Infof("✅ Test passed: SSA project compiled successfully 3 times")
 	})
 }
 
@@ -411,8 +404,8 @@ func TestExcludeFile(t *testing.T) {
 		res, err := ssa_compile.ParseProjectWithAutoDetective(context.Background(), &ssa_compile.SSADetectConfig{
 			Target:   tempDir,
 			Language: "java",
-			Params: map[string]any{
-				"excludeFile": "a.java",
+			Options: []ssaconfig.Option{
+				ssaconfig.WithCompileExcludeFiles("a.java"),
 			},
 			CompileImmediately: true,
 		})
@@ -449,8 +442,8 @@ func TestExcludeFile(t *testing.T) {
 		res, err := ssa_compile.ParseProjectWithAutoDetective(context.Background(), &ssa_compile.SSADetectConfig{
 			Target:   tempDir,
 			Language: "java",
-			Params: map[string]any{
-				"excludeFile": "a,a/",
+			Options: []ssaconfig.Option{
+				ssaconfig.WithCompileExcludeFiles("a,a/"),
 			},
 			CompileImmediately: true,
 		})
