@@ -16,7 +16,7 @@ type capabilityDetail struct {
 
 var capabilityTypeUsageGuides = map[string]string{
 	"tool":       "通过 `require_tool` 调用指定工具执行任务。/ Use `require_tool` to invoke the tool.",
-	"forge":      "通过 `tool_compose` 调用蓝图编排执行多步骤自动化流程。/ Use `tool_compose` to execute the blueprint.",
+	"forge":      "通过 `require_ai_blueprint` 调用蓝图，由蓝图系统负责自动化执行编排。/ Use `require_ai_blueprint` to execute the blueprint workflow.",
 	"skill":      "技能会被自动加载到上下文中，提供特定领域的知识和方法指引。/ Skills are auto-loaded into context.",
 	"focus_mode": "通过 `enter_focus_mode` 进入专注模式，在独立的执行环境中完成特定任务。/ Use `enter_focus_mode` to enter focus mode.",
 }
