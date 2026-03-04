@@ -35,7 +35,7 @@ func mockedRequestPlanAndExecuting_MultiPlans(i aicommon.AICallerConfigIf, req *
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
+	if utils.MatchAllOfSubString(prompt, "directly_answer", "plan_request_payload", "require_tool") {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "request_plan_and_execution", "plan_request_payload": "` + flag + `" },
