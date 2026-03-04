@@ -36,7 +36,7 @@ func (r *ReAct) invokeLiteForgeWithCallback(cb aicommon.AICallbackType, ctx cont
 	fopts = append(fopts, aiforge.WithLiteForge_Emitter(r.config.Emitter))
 
 	if !utils.IsNil(cb) {
-		fopts = append(fopts, aiforge.WithExtendLiteForge_AIOption(aicommon.WithAICallback(cb)))
+		fopts = append(fopts, aiforge.WithExtendLiteForge_AIOption(aicommon.WithWrapperedAICallback(cb)))
 	}
 
 	f, err := aiforge.NewLiteForge(actionName, fopts...)

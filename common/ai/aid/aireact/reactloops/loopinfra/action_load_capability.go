@@ -355,7 +355,7 @@ func handleLoadFocusMode(
 		opts = append(opts, option)
 	}
 
-	ok, err := invoker.ExecuteLoopTaskIF(identifier, subTask, opts...)
+	_, err := invoker.ExecuteLoopTaskIF(identifier, subTask, opts...)
 	if err != nil {
 		log.Warnf("load_capability: focus mode '%s' execution failed: %v", identifier, err)
 		failMsg := fmt.Sprintf(
@@ -367,22 +367,6 @@ func handleLoadFocusMode(
 		op.Feedback(failMsg)
 		op.SetReflectionLevel(reactloops.ReflectionLevel_Critical)
 		op.SetReflectionData("focus_mode_error", err.Error())
-		op.SetReflectionData("focus_mode_name", identifier)
-		op.Continue()
-		return
-	}
-	if !ok {
-		log.Warnf("load_capability: focus mode '%s' returned not ok", identifier)
-		failMsg := fmt.Sprintf(
-			"Focus mode '%s' completed but returned UNSUCCESSFUL. "+
-				"The sub-loop did not produce a satisfactory outcome. "+
-				"Do NOT retry the same focus mode with the same input. "+
-				"Proceed with a different strategy.",
-			identifier)
-		invoker.AddToTimeline("[LOAD_CAPABILITY_FOCUS_MODE_UNSUCCESSFUL]", failMsg)
-		op.Feedback(failMsg)
-		op.SetReflectionLevel(reactloops.ReflectionLevel_Deep)
-		op.SetReflectionData("focus_mode_status", "unsuccessful")
 		op.SetReflectionData("focus_mode_name", identifier)
 		op.Continue()
 		return
@@ -460,7 +444,7 @@ func handleLoadUnknown(
 		intentLoop = l
 	}))
 
-	ok, err := invoker.ExecuteLoopTaskIF(schema.AI_REACT_LOOP_NAME_INTENT, intentTask, opts...)
+	_, err := invoker.ExecuteLoopTaskIF(schema.AI_REACT_LOOP_NAME_INTENT, intentTask, opts...)
 	if err != nil {
 		log.Warnf("load_capability: intent loop fallback failed: %v", err)
 		failMsg := fmt.Sprintf(
@@ -476,20 +460,7 @@ func handleLoadUnknown(
 		op.Continue()
 		return
 	}
-	if !ok {
-		log.Warnf("load_capability: intent loop fallback returned not ok")
-		failMsg := fmt.Sprintf(
-			"Identifier '%s' was NOT found, and intent recognition produced NO useful results. "+
-				"Do NOT retry load_capability with '%s'. "+
-				"Use search_capabilities with a different, more descriptive query instead.",
-			identifier, identifier)
-		invoker.AddToTimeline("[LOAD_CAPABILITY_INTENT_NO_RESULT]", failMsg)
-		op.Feedback(failMsg)
-		op.SetReflectionLevel(reactloops.ReflectionLevel_Deep)
-		op.SetReflectionData("failed_identifier", identifier)
-		op.Continue()
-		return
-	}
+
 	if intentLoop == nil {
 		log.Warnf("load_capability: intent loop reference is nil")
 		failMsg := fmt.Sprintf(

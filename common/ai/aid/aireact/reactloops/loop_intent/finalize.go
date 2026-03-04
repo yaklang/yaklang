@@ -11,6 +11,23 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+const NeedRecommendCapabilitiesCount = 15
+
+func VerifyIntentLoopNeedReAnalysis(loop *reactloops.ReActLoop) bool {
+	existingAnalysis := loop.Get("intent_analysis")
+	if existingAnalysis != "" {
+		return false
+	}
+	existingSummary := loop.Get("intent_summary")
+	if existingSummary != "" {
+		matchedToolCount := len(strings.Split(loop.Get("matched_tool_names"), ","))
+		matchedForgeCount := len(strings.Split(loop.Get("matched_forge_names"), ","))
+		matchedSkillCounts := len(strings.Split(loop.Get("matched_skill_names"), ","))
+		return matchedToolCount+matchedForgeCount+matchedSkillCounts > NeedRecommendCapabilitiesCount
+	}
+	return true
+}
+
 // BuildOnPostIterationHook creates the post-iteration hook that ensures finalization
 // always runs regardless of how the loop exits (normal exit, max iterations, or error).
 //
@@ -26,8 +43,7 @@ func BuildOnPostIterationHook(invoker aicommon.AIInvokeRuntime) reactloops.ReAct
 			log.Infof("intent recognition loop done at iteration %d", iteration)
 
 			// Check whether finalize_enrichment already set intent_analysis
-			existingAnalysis := loop.Get("intent_analysis")
-			if existingAnalysis == "" {
+			if VerifyIntentLoopNeedReAnalysis(loop) {
 				if reasonErr, ok := reason.(error); ok && strings.Contains(reasonErr.Error(), "max iterations") {
 					log.Infof("intent recognition loop ended due to max iterations, force generating summary via LiteForge")
 				} else {
