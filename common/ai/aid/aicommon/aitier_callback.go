@@ -76,6 +76,20 @@ func GetIntelligentAIModelCallback() (AICallbackType, error) {
 	return CreateCallbackFromConfig(config)
 }
 
+func GetIntelligentAIModelInfo() (string, string, error) {
+	if !aiconfig.IsTieredAIConfig() {
+		return "", "", aiconfig.ErrTieredConfigDisabled
+	}
+
+	mgr := aiconfig.GetGlobalManager()
+	config := mgr.GetFirstConfig(consts.TierIntelligent)
+	if config == nil {
+		return "", "", aiconfig.ErrNoConfigAvailable
+	}
+
+	return config.Provider.Type, config.ModelName, nil
+}
+
 // GetLightweightAIModelCallback returns the AI callback for lightweight models
 // Suitable for simple conversations and fast responses
 func GetLightweightAIModelCallback() (AICallbackType, error) {

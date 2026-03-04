@@ -153,16 +153,6 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 		log.Info("tiered ai config is enabled. the old-styled ai config is override")
 	}
 
-	lightAI, err := aicommon.GetLightweightAIModelCallback()
-	if err != nil {
-		lightAI, _ = aicommon.GetDefaultAIModelCallback()
-		log.Warnf("get lightweight AI model callback failed: %v", err)
-	}
-	intelligentAI, err := aicommon.GetIntelligentAIModelCallback()
-	if err != nil {
-		intelligentAI, _ = aicommon.GetDefaultAIModelCallback()
-		log.Warnf("get intelligent AI model callback failed: %v", err)
-	}
 	defaultAI, err := aicommon.GetDefaultAIModelCallback()
 	if err != nil {
 		defaultAI, _ = aicommon.GetDefaultAIModelCallback()
@@ -181,17 +171,13 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 		aicommon.WithEnableSelfReflection(true),
 		aicommon.WithHotPatchOptionChan(hotpatchChan),
 		aicommon.WithEnablePETaskAnalyze(true),
-		aicommon.WithAutoTieredAICallback(defaultAI),
 	}
 	// optsFromStartParams (containing WithAICallback) must be applied BEFORE
 	// tiered overrides, otherwise WithAICallback overwrites all three callbacks
 	// (Original, Quality, Speed) to the same frontend-selected model.
 	configOptions = append(configOptions, optsFromStartParams...)
 	if aiconfig.IsTieredAIConfig() {
-		configOptions = append(configOptions,
-			aicommon.WithSpeedPriorityAICallback(lightAI),
-			aicommon.WithQualityPriorityAICallback(intelligentAI),
-		)
+		configOptions = append(configOptions, aicommon.WithAutoTieredAICallback(defaultAI))
 	}
 
 	reAct, err := aireact.NewReAct(configOptions...)

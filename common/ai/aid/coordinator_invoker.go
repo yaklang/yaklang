@@ -128,7 +128,7 @@ func (c *Coordinator) ExecuteLoopTask(taskTypeName string, task aicommon.AIState
 	baseOpts := aicommon.ConvertConfigToOptions(c.Config)
 	baseOpts = append(baseOpts,
 		aicommon.WithID(c.Config.Id), // pe -> react should use same id
-		aicommon.WithWrapperedAICallback(c.QualityPriorityAICallback),
+		aicommon.WithAutoTieredAICallback(c.OriginalAICallback),
 		aicommon.WithAllowPlanUserInteract(true),
 		aicommon.WithEventInputChanx(inputChannel),
 		aicommon.WithContext(ctx),

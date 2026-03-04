@@ -91,7 +91,7 @@ type LoopPromptData struct {
 	CurrentTime        string
 	OSArch             string
 	WorkingDir         string
-	WorkingDirGlance   string
+	WingDiorkrGlance   string
 	AIForgeList        string
 	ShowForgeList      bool
 	Tools              []*aitool.Tool
@@ -114,7 +114,7 @@ type LoopPromptData struct {
 type ToolParamsPromptData struct {
 	ToolName          string
 	ToolDescription   string
-	ToolUsage         string   // Usage instructions disclosed at param generation stage (2-phase disclosure)
+	ToolUsage         string // Usage instructions disclosed at param generation stage (2-phase disclosure)
 	ToolSchema        string
 	OriginalQuery     string
 	CumulativeSummary string
