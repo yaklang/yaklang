@@ -169,3 +169,24 @@ func TestAutoUnzipAndZipPacketEncoding_DeflateRaw(t *testing.T) {
 	_, rezipBody := SplitHTTPHeadersAndBodyFromPacket(rezip)
 	require.Equal(t, plainBody, unzipDeflateRaw(t, rezipBody))
 }
+
+func TestAutoUnzipAndZipPacketEncoding_ChunkedRaw(t *testing.T) {
+	plainBody := []byte("hello yak chunked")
+	chunked := codec.HTTPChunkedEncode(plainBody)
+
+	orig := []byte("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n" + string(chunked))
+
+	view, st, ok := AutoUnzipPacketEncoding(orig)
+	require.True(t, ok)
+	require.NotNil(t, st)
+	require.True(t, st.WasChunked)
+	require.Contains(t, st.TransferEncoding, "chunked")
+	require.NotContains(t, string(view), "Transfer-Encoding:")
+
+	_, viewBody := SplitHTTPHeadersAndBodyFromPacket(view)
+	require.Equal(t, plainBody, viewBody)
+
+	rezip, ok := AutoZipPacketEncoding(view, st)
+	require.True(t, ok)
+	require.Contains(t, string(rezip), "Transfer-Encoding:")
+}
