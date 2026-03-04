@@ -361,9 +361,14 @@ func (r *Emitter) EmitToolCallStatus(callToolId string, status string) (*schema.
 	})
 }
 
-func (r *Emitter) EmitToolCallDone(callToolId string, endTime time.Time, startTime time.Time) (*schema.AiOutputEvent, error) {
+func (r *Emitter) EmitToolCallDone(callToolId string, endTime time.Time, startTime time.Time, purePluginDuration time.Duration) (*schema.AiOutputEvent, error) {
+	if purePluginDuration < 0 {
+		purePluginDuration = 0
+	}
 	data := map[string]any{
-		"call_tool_id": callToolId,
+		"call_tool_id":     callToolId,
+		"duration_ms":      purePluginDuration.Milliseconds(),
+		"duration_seconds": purePluginDuration.Seconds(),
 	}
 	if !endTime.IsZero() {
 		data["end_time"] = endTime.Unix()
@@ -374,17 +379,22 @@ func (r *Emitter) EmitToolCallDone(callToolId string, endTime time.Time, startTi
 		data["start_time_ms"] = startTime.UnixMilli()
 	}
 	if !startTime.IsZero() && !endTime.IsZero() {
-		duration := endTime.Sub(startTime)
-		data["duration_ms"] = duration.Milliseconds()
-		data["duration_seconds"] = duration.Seconds()
+		totalDuration := endTime.Sub(startTime)
+		data["total_duration_ms"] = totalDuration.Milliseconds()
+		data["total_duration_seconds"] = totalDuration.Seconds()
 	}
 	return r.EmitJSON(schema.EVENT_TOOL_CALL_DONE, callToolId, data)
 }
 
-func (r *Emitter) EmitToolCallError(callToolId string, err any, endTime time.Time, startTime time.Time) (*schema.AiOutputEvent, error) {
+func (r *Emitter) EmitToolCallError(callToolId string, err any, endTime time.Time, startTime time.Time, purePluginDuration time.Duration) (*schema.AiOutputEvent, error) {
+	if purePluginDuration < 0 {
+		purePluginDuration = 0
+	}
 	data := map[string]any{
-		"call_tool_id": callToolId,
-		"error":        fmt.Sprintf("%v", err),
+		"call_tool_id":     callToolId,
+		"error":            fmt.Sprintf("%v", err),
+		"duration_ms":      purePluginDuration.Milliseconds(),
+		"duration_seconds": purePluginDuration.Seconds(),
 	}
 	if !endTime.IsZero() {
 		data["end_time"] = endTime.Unix()
@@ -395,16 +405,21 @@ func (r *Emitter) EmitToolCallError(callToolId string, err any, endTime time.Tim
 		data["start_time_ms"] = startTime.UnixMilli()
 	}
 	if !startTime.IsZero() && !endTime.IsZero() {
-		duration := endTime.Sub(startTime)
-		data["duration_ms"] = duration.Milliseconds()
-		data["duration_seconds"] = duration.Seconds()
+		totalDuration := endTime.Sub(startTime)
+		data["total_duration_ms"] = totalDuration.Milliseconds()
+		data["total_duration_seconds"] = totalDuration.Seconds()
 	}
 	return r.EmitJSON(schema.EVENT_TOOL_CALL_ERROR, callToolId, data)
 }
 
-func (r *Emitter) EmitToolCallUserCancel(callToolId string, endTime time.Time, startTime time.Time) (*schema.AiOutputEvent, error) {
+func (r *Emitter) EmitToolCallUserCancel(callToolId string, endTime time.Time, startTime time.Time, purePluginDuration time.Duration) (*schema.AiOutputEvent, error) {
+	if purePluginDuration < 0 {
+		purePluginDuration = 0
+	}
 	data := map[string]any{
-		"call_tool_id": callToolId,
+		"call_tool_id":     callToolId,
+		"duration_ms":      purePluginDuration.Milliseconds(),
+		"duration_seconds": purePluginDuration.Seconds(),
 	}
 	if !endTime.IsZero() {
 		data["end_time"] = endTime.Unix()
@@ -415,9 +430,9 @@ func (r *Emitter) EmitToolCallUserCancel(callToolId string, endTime time.Time, s
 		data["start_time_ms"] = startTime.UnixMilli()
 	}
 	if !startTime.IsZero() && !endTime.IsZero() {
-		duration := endTime.Sub(startTime)
-		data["duration_ms"] = duration.Milliseconds()
-		data["duration_seconds"] = duration.Seconds()
+		totalDuration := endTime.Sub(startTime)
+		data["total_duration_ms"] = totalDuration.Milliseconds()
+		data["total_duration_seconds"] = totalDuration.Seconds()
 	}
 	return r.EmitJSON(schema.EVENT_TOOL_CALL_USER_CANCEL, callToolId, data)
 }
