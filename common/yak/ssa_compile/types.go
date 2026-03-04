@@ -10,13 +10,21 @@ type SSADetectConfig struct {
 	Target             string
 	Language           string
 	CompileImmediately bool
-	Params             map[string]any
+	// Config 不为空时直接使用该配置编译（不再探测）。
+	Config *ssaconfig.Config
+	// Options 会应用到探测结果或 Config 上，便于复用 ssaconfig.Option。
+	Options []ssaconfig.Option
+	// ForceProgramName 为 true 时，编译插件优先使用 Config 中的 program_name（例如 CLI 显式 -p）。
+	ForceProgramName bool
+	// DisableTimestampProgramName 为 true 时，禁止编译插件自动追加时间戳到 program_name。
+	DisableTimestampProgramName bool
 }
 
 // SSADetectResult ParseProjectWithAutoDetective 的返回
 type SSADetectResult struct {
 	Info    *AutoDetectInfo
 	Program *ssaapi.Program
+	// Cleanup 仅为兼容保留；默认情况下无需项目级清理。
 	Cleanup func()
 }
 

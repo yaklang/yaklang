@@ -164,6 +164,9 @@ func WithProgramDescription(description string) Option {
 
 func WithProjectRawLanguage(language string) Option {
 	return func(c *Config) error {
+		if strings.TrimSpace(language) == "" {
+			return nil
+		}
 		if err := c.ensureBase("Project Raw Language"); err != nil {
 			return err
 		}
@@ -190,6 +193,7 @@ type SSACompileConfig struct {
 	StrictMode               bool          `json:"strict_mode"`
 	PeepholeSize             int           `json:"peephole_size"`
 	ExcludeFiles             []string      `json:"exclude_files"`
+	EntryFiles               []string      `json:"entry_files,omitempty"`
 	ReCompile                bool          `json:"re_compile"`
 	MemoryCompile            bool          `json:"memory_compile"`
 	Concurrency              int           `json:"compile_concurrency"`
@@ -255,6 +259,26 @@ func (c *Config) SetCompileExcludeFiles(excludeFiles []string) {
 		return strings.Split(item, ",")
 	})
 	c.SSACompile.ExcludeFiles = allFiles
+}
+
+func (c *Config) GetCompileEntryFiles() []string {
+	if c == nil || c.SSACompile == nil {
+		return nil
+	}
+	return c.SSACompile.EntryFiles
+}
+
+func (c *Config) SetCompileEntryFiles(entryFiles []string) {
+	if c == nil {
+		return
+	}
+	if c.SSACompile == nil {
+		c.SSACompile = defaultSSACompileConfig()
+	}
+	allFiles := lo.FlatMap(entryFiles, func(item string, index int) []string {
+		return strings.Split(item, ",")
+	})
+	c.SSACompile.EntryFiles = allFiles
 }
 
 func (c *Config) GetCompileReCompile() bool {
@@ -360,6 +384,20 @@ func WithCompileExcludeFiles(excludeFiles ...string) Option {
 			return strings.Split(item, ",")
 		})
 		c.SSACompile.ExcludeFiles = append(c.SSACompile.ExcludeFiles, allFiles...)
+		return nil
+	}
+}
+
+// WithCompileEntryFiles 设置入口文件
+func WithCompileEntryFiles(entryFiles ...string) Option {
+	return func(c *Config) error {
+		if err := c.ensureSSACompile("Compile Entry Files"); err != nil {
+			return err
+		}
+		allFiles := lo.FlatMap(entryFiles, func(item string, index int) []string {
+			return strings.Split(item, ",")
+		})
+		c.SSACompile.EntryFiles = append(c.SSACompile.EntryFiles, allFiles...)
 		return nil
 	}
 }

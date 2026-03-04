@@ -7,9 +7,10 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/yak/cmd/yakcmds"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
@@ -40,11 +41,33 @@ func TestRecompileWarn(t *testing.T) {
 	err = app.Run([]string{"yak", "ssa-compile", "-t", tmpDir, "-p", programName})
 	require.NoError(t, err)
 	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
+	prog, err := ssadb.GetProgram(programName, ssa.Application)
+	require.NoError(t, err)
+	require.NotNil(t, prog, "compiled program should use explicit -p name")
 
 	// recompile
 	err = app.Run([]string{"yak", "ssa-compile", "-t", tmpDir, "-p", programName})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "please use `re-compile` flag to re-compile or change program name")
+}
+
+func TestCompileDefaultProgramNameNoTimestamp(t *testing.T) {
+	root := t.TempDir()
+	programName := uuid.NewString()
+	targetDir := filepath.Join(root, programName)
+	require.NoError(t, os.MkdirAll(targetDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(targetDir, "test.yak"), []byte("a = 1\n"), 0o644))
+
+	app := cli.NewApp()
+	addCommands(app, yakcmds.SSACompilerCommands...)
+
+	err := app.Run([]string{"yak", "ssa-compile", "-t", targetDir})
+	require.NoError(t, err)
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
+
+	prog, err := ssadb.GetProgram(programName, ssa.Application)
+	require.NoError(t, err)
+	require.NotNil(t, prog, "compiled program should default to target directory name when -p is not set")
 }
 
 func TestSyntaxFlowEvaluate(t *testing.T) {

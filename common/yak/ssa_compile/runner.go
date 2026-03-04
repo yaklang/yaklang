@@ -6,21 +6,22 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 // ParseProjectWithAutoDetective 调「SSA 项目探测」再可选调「SSA 项目编译」，返回探测信息与（若编译）Program。
 // 插件由 coreplugin 注册，本包仅负责执行与结果组装。
 func ParseProjectWithAutoDetective(ctx context.Context, conf *SSADetectConfig) (*SSADetectResult, error) {
-	info, err := detectProject(ctx, conf)
+	if conf == nil {
+		conf = &SSADetectConfig{}
+	}
+
+	info, compileConfig, err := resolveCompileConfig(ctx, conf)
 	if err != nil {
 		return nil, err
 	}
@@ -29,7 +30,7 @@ func ParseProjectWithAutoDetective(ctx context.Context, conf *SSADetectConfig) (
 		return &SSADetectResult{Info: info}, nil
 	}
 
-	prog, cleanup, err := compileProject(ctx, info, conf)
+	prog, err := compileProject(ctx, compileConfig, conf.ForceProgramName, conf.DisableTimestampProgramName)
 	if err != nil {
 		return &SSADetectResult{Info: info}, err
 	}
@@ -37,20 +38,67 @@ func ParseProjectWithAutoDetective(ctx context.Context, conf *SSADetectConfig) (
 	return &SSADetectResult{
 		Info:    info,
 		Program: prog,
-		Cleanup: cleanup,
 	}, nil
 }
 
-func detectProject(ctx context.Context, conf *SSADetectConfig) (*AutoDetectInfo, error) {
-	pluginName := "SSA 项目探测"
-	param := make(map[string]string)
-	param["target"] = conf.Target
-	param["language"] = conf.Language
-	if conf.CompileImmediately {
-		param["compile-immediately"] = "true"
+func resolveCompileConfig(ctx context.Context, conf *SSADetectConfig) (*AutoDetectInfo, *ssaconfig.Config, error) {
+	if conf.Config != nil {
+		cfg, err := cloneConfigWithOptions(conf.Config, append(conf.Options, ssaconfig.WithContext(ctx))...)
+		if err != nil {
+			return nil, nil, err
+		}
+		return &AutoDetectInfo{
+			Config:             cfg,
+			CompileImmediately: conf.CompileImmediately,
+		}, cfg, nil
 	}
-	for key, value := range conf.Params {
-		param[key] = codec.AnyToString(value)
+
+	if strings.TrimSpace(conf.Target) == "" {
+		return nil, nil, utils.Errorf("target is required when config is empty")
+	}
+
+	info, err := detectProject(ctx, conf.Target, conf.Language)
+	if err != nil {
+		return nil, nil, err
+	}
+	if info == nil || info.Config == nil {
+		return nil, nil, utils.Errorf("auto detective config is nil")
+	}
+
+	cfg, err := cloneConfigWithOptions(info.Config, append(conf.Options, ssaconfig.WithContext(ctx))...)
+	if err != nil {
+		return nil, nil, err
+	}
+	info.Config = cfg
+	info.CompileImmediately = conf.CompileImmediately
+	return info, cfg, nil
+}
+
+func cloneConfigWithOptions(base *ssaconfig.Config, options ...ssaconfig.Option) (*ssaconfig.Config, error) {
+	if base == nil {
+		return nil, utils.Errorf("base config is nil")
+	}
+	raw, err := base.ToJSONRaw()
+	if err != nil {
+		return nil, utils.Errorf("marshal config failed: %s", err)
+	}
+	cfg, err := ssaconfig.NewCLIScanConfig(ssaconfig.WithJsonRawConfig(raw))
+	if err != nil {
+		return nil, utils.Errorf("clone config failed: %s", err)
+	}
+	if err := cfg.Update(options...); err != nil {
+		return nil, utils.Errorf("apply config options failed: %s", err)
+	}
+	return cfg, nil
+}
+
+func detectProject(ctx context.Context, target, language string) (*AutoDetectInfo, error) {
+	pluginName := "SSA 项目探测"
+	param := map[string]string{
+		"target": target,
+	}
+	if strings.TrimSpace(language) != "" {
+		param["language"] = language
 	}
 
 	var info *AutoDetectInfo
@@ -91,63 +139,66 @@ func detectProject(ctx context.Context, conf *SSADetectConfig) (*AutoDetectInfo,
 	return info, nil
 }
 
-func compileProject(ctx context.Context, info *AutoDetectInfo, conf *SSADetectConfig) (*ssaapi.Program, func(), error) {
-	config := info.Config
+func compileProject(ctx context.Context, config *ssaconfig.Config, forceProgramName, disableTimestampProgramName bool) (*ssaapi.Program, error) {
 	if config == nil {
-		return nil, nil, utils.Errorf("config is nil")
+		return nil, utils.Errorf("config is nil")
 	}
 
-	configJSON, err := config.ToJSONString()
-	if err != nil {
-		return nil, nil, utils.Errorf("failed to convert config to json: %s", err)
-	}
-
-	createReq := &ypb.CreateSSAProjectRequest{
-		JSONStringConfig: configJSON,
-	}
-
-	profileDb := consts.GetGormProfileDatabase()
-	createResp, err := yakit.CreateSSAProject(profileDb, createReq)
-	if err != nil {
-		return nil, nil, utils.Errorf("failed to create ssa project: %s", err)
-	}
-
-	cleanup := func() {
-		deleteReq := &ypb.DeleteSSAProjectRequest{
-			DeleteMode: string(yakit.SSAProjectDeleteAll),
-			Filter: &ypb.SSAProjectFilter{
-				IDs: []int64{int64(createResp.ID)},
-			},
+	if shouldCompileInMemory(config) {
+		configJSON, err := config.ToJSONString()
+		if err != nil {
+			return nil, utils.Errorf("failed to convert config to json: %s", err)
 		}
-		yakit.DeleteSSAProject(profileDb, deleteReq)
-	}
-
-	projectConfig, err := createResp.GetConfig()
-	if err != nil {
-		return nil, cleanup, err
-	}
-	if shouldCompileInMemory(conf) {
-		projectConfig.SetCompileMemory(true)
-	}
-	// In memory mode, compile in-process to avoid DB load in another process.
-	if projectConfig.GetCompileMemory() {
-		configJSON, _ := projectConfig.ToJSONString()
 		progs, err := ssaapi.ParseProject(
 			ssaconfig.WithConfigJson(configJSON),
 			ssaconfig.WithContext(ctx),
 		)
 		if err != nil {
-			return nil, cleanup, utils.Errorf("failed to compile project (memory): %s", err)
+			return nil, utils.Errorf("failed to compile project (memory): %s", err)
 		}
 		if len(progs) == 0 {
-			return nil, cleanup, utils.Errorf("compile project (memory) returned no programs")
+			return nil, utils.Errorf("compile project (memory) returned no programs")
 		}
-		return progs[0], cleanup, nil
+		return progs[0], nil
 	}
+
+	compiledProgramName, err := compileProjectByPlugin(ctx, config, forceProgramName, disableTimestampProgramName)
+	if err != nil {
+		return nil, err
+	}
+
+	if compiledProgramName == "" {
+		compiledProgramName = config.GetProgramName()
+	}
+	if compiledProgramName == "" {
+		return nil, utils.Errorf("compiled program name is empty")
+	}
+
+	return loadProgramWithRetry(compiledProgramName)
+}
+
+func compileProjectByPlugin(ctx context.Context, config *ssaconfig.Config, forceProgramName, disableTimestampProgramName bool) (string, error) {
 	compilePluginName := "SSA 项目编译"
-	compileParam := make(map[string]string)
-	jsonString, _ := projectConfig.ToJSONString()
-	compileParam["config"] = jsonString
+	configJSON, err := config.ToJSONString()
+	if err != nil {
+		return "", utils.Errorf("failed to convert config to json: %s", err)
+	}
+	compileParam := map[string]string{
+		"config": configJSON,
+	}
+	if forceProgramName {
+		if programName := strings.TrimSpace(config.GetProgramName()); programName != "" {
+			compileParam["program_name"] = programName
+		}
+	}
+	if disableTimestampProgramName {
+		compileParam["disable_timestamp_program_name"] = "true"
+		if _, hasProgramName := compileParam["program_name"]; !hasProgramName {
+			if projectName := strings.TrimSpace(config.GetProjectName()); projectName != "" {
+				compileParam["program_name"] = projectName
+			}
+		}
+	}
 
 	var compiledProgramName string
 	err = yakgrpc.ExecScriptWithParam(ctx, compilePluginName, compileParam,
@@ -171,45 +222,38 @@ func compileProject(ctx context.Context, info *AutoDetectInfo, conf *SSADetectCo
 		},
 	)
 	if err != nil {
-		return nil, cleanup, utils.Errorf("failed to compile project: %s", err)
+		return "", utils.Errorf("failed to compile project: %s", err)
 	}
+	return compiledProgramName, nil
+}
 
-	if compiledProgramName == "" {
-		return nil, cleanup, utils.Errorf("compiled program name is empty")
-	}
-
-	var prog *ssaapi.Program
+func loadProgramWithRetry(programName string) (*ssaapi.Program, error) {
+	var (
+		prog *ssaapi.Program
+		err  error
+	)
 	maxRetries := 10
 	retryDelay := 100 * time.Millisecond
 
 	for i := 0; i < maxRetries; i++ {
-		prog, err = ssaapi.FromDatabase(compiledProgramName)
+		prog, err = ssaapi.FromDatabase(programName)
 		if err == nil {
-			break
+			return prog, nil
 		}
 		if i < maxRetries-1 {
-			log.Debugf("program %s not found in database, retrying... (attempt %d/%d)", compiledProgramName, i+1, maxRetries)
+			log.Debugf("program %s not found in database, retrying... (attempt %d/%d)", programName, i+1, maxRetries)
 			time.Sleep(retryDelay)
 			retryDelay *= 2
 		}
 	}
-
-	if err != nil {
-		return nil, cleanup, utils.Errorf("failed to load program after %d retries: %s", maxRetries, err)
-	}
-
-	return prog, cleanup, nil
+	return nil, utils.Errorf("failed to load program after %d retries: %s", maxRetries, err)
 }
 
-func shouldCompileInMemory(conf *SSADetectConfig) bool {
-	if conf == nil || conf.Params == nil {
+func shouldCompileInMemory(config *ssaconfig.Config) bool {
+	if config == nil {
 		return false
 	}
-	raw, ok := conf.Params["memory"]
-	if !ok || raw == nil {
-		return false
-	}
-	return strings.EqualFold(codec.AnyToString(raw), "true")
+	return config.GetCompileMemory()
 }
 
 type execMsg struct {
