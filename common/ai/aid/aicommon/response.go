@@ -404,22 +404,40 @@ func TeeAIResponse(
 ) *AIResponse {
 	first := NewAIResponse(aiCaller)
 	first.SetTaskIndex(src.GetTaskIndex())
-	first.SetModelInfo(src.GetProviderName(), src.GetModelName())
 	first.consumptionCallback = nil
 	firstReasonReader, firstReasonWriter := utils.NewPipe()
 	firstOutputReader, firstOutputWriter := utils.NewPipe()
 
 	second := NewAIResponse(aiCaller)
 	second.SetTaskIndex(src.GetTaskIndex())
-	second.SetModelInfo(src.GetProviderName(), src.GetModelName())
 	secondReasonReader, secondReasonWriter := utils.NewPipe()
 	secondOutputReader, secondOutputWriter := utils.NewPipe()
 
+	refreshFromSrc := func() {
+		first.SetModelInfo(src.GetProviderName(), src.GetModelName())
+		second.SetModelInfo(src.GetProviderName(), src.GetModelName())
+		src.rawHTTPResponseHeaderMu.Lock()
+		headerCopy := src.rawHTTPResponseHeader
+		bodyCopy := src.rawHTTPResponseBody
+		src.rawHTTPResponseHeaderMu.Unlock()
+		first.SetRawHTTPResponseData(headerCopy, bodyCopy)
+		second.SetRawHTTPResponseData(headerCopy, bodyCopy)
+		srcBytes := src.totalOutputBytes.Load()
+		first.totalOutputBytes.Store(srcBytes)
+		second.totalOutputBytes.Store(srcBytes)
+	}
+
 	reasonReader, outputReader := src.GetUnboundStreamReaderEx(func() {
+		refreshFromSrc()
 		if onFirstByte != nil {
 			onFirstByte(second)
 		}
-	}, onClose, nil)
+	}, func() {
+		refreshFromSrc()
+		if onClose != nil {
+			onClose()
+		}
+	}, nil)
 
 	wg := new(sync.WaitGroup)
 	wg.Add(2)
