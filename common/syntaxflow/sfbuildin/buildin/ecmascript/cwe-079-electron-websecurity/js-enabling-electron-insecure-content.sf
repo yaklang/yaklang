@@ -104,11 +104,11 @@ $webPrefs.allowRunningInsecureContent as $insecureContentVal
 $insecureContentVal?{have: true} as $enabledInsecureContent
 
 alert $enabledInsecureContent for {
-	level: "error"
-	type: "vuln"
-	title: "Electron allowRunningInsecureContent Enabled"
-	title_zh: "Electron allowRunningInsecureContent 被设置为 true，允许执行不安全内容"
-	message: "检测到 Electron BrowserWindow 的 webPreferences.allowRunningInsecureContent 被显式设置为 true，这将允许在 HTTPS 页面中执行通过 HTTP 加载的不安全脚本。处于同一网络的攻击者可通过中间人攻击（MITM）篡改 HTTP 响应，注入并执行任意 JavaScript 代码。若同时开启 nodeIntegration，可实现完整的远程代码执行（RCE）。强烈建议不要启用 allowRunningInsecureContent。"
+	level: "error",
+	type: "vuln",
+	title: "Electron allowRunningInsecureContent Enabled",
+	title_zh: "Electron allowRunningInsecureContent 被设置为 true，允许执行不安全内容",
+	message: "检测到 Electron BrowserWindow 的 webPreferences.allowRunningInsecureContent 被显式设置为 true，这将允许在 HTTPS 页面中执行通过 HTTP 加载的不安全脚本。处于同一网络的攻击者可通过中间人攻击（MITM）篡改 HTTP 响应，注入并执行任意 JavaScript 代码。若同时开启 nodeIntegration，可实现完整的远程代码执行（RCE）。强烈建议不要启用 allowRunningInsecureContent。",
 	solution: <<<SOLUTION
 删除 allowRunningInsecureContent: true 配置，或显式设置为 false（Electron 默认值）：
 
@@ -122,8 +122,8 @@ new BrowserWindow({ webPreferences: { allowRunningInsecureContent: false } });
 new BrowserWindow({ webPreferences: {} });
 ```
 SOLUTION
-	risk: "code-injection"
-	name: "enabledInsecureContent"
+	risk: "code-injection",
+	name: "enabledInsecureContent",
 }
 
 // =====================================================================

@@ -181,11 +181,11 @@ $midInjection - $directInjection as $mid
 // Alert HIGH: direct source → sink
 // =====================================================================
 alert $directInjection for {
-	level: "high"
-	type: "vuln"
-	title: "Direct Code Injection: User Input Directly Passed to Code Execution Function"
-	title_zh: "直接代码注入：用户输入直接传入代码执行函数"
-	message: "检测到用户可控输入（如 req.query、req.body、document.location 等）**直接**传入了代码执行函数（如 eval、pug.compile、vm.runInNewContext 等），中间无任何函数调用拦截。攻击者可以通过构造恶意输入执行任意代码，导致服务器被完全控制（RCE）。"
+	level: "high",
+	type: "vuln",
+	title: "Direct Code Injection: User Input Directly Passed to Code Execution Function",
+	title_zh: "直接代码注入：用户输入直接传入代码执行函数",
+	message: "检测到用户可控输入（如 req.query、req.body、document.location 等）**直接**传入了代码执行函数（如 eval、pug.compile、vm.runInNewContext 等），中间无任何函数调用拦截。攻击者可以通过构造恶意输入执行任意代码，导致服务器被完全控制（RCE）。",
 	solution: <<<SOLUTION
 立即修复：绝对不要将用户可控输入直接传递给 eval()、new Function()、pug.compile()、vm.runInNewContext() 等代码执行函数。
 
@@ -199,19 +199,19 @@ const safeTemplate = `p Hello #{username}`;
 pug.compile(safeTemplate)({ username: req.query.username });
 ```
 SOLUTION
-	risk: "remote-code-execution"
-	name: "directInjection"
+	risk: "remote-code-execution",
+	name: "directInjection",
 }
 
 // =====================================================================
 // Alert MID: indirect source → sink (through intermediate ops)
 // =====================================================================
 alert $mid for {
-	level: "mid"
-	type: "vuln"
-	title: "Indirect Code Injection: User Input Flows into Code Execution via Intermediate Operations"
-	title_zh: "间接代码注入：用户输入经中间操作后流入代码执行函数"
-	message: "检测到用户可控输入经过中间操作（如字符串拼接、模板构造）后流入了代码执行函数。攻击者可以通过注入特殊字符或模板语法（如 Pug 的 `#{global.process.mainModule.require('child_process').execSync('id')}`）执行任意代码。"
+	level: "mid",
+	type: "vuln",
+	title: "Indirect Code Injection: User Input Flows into Code Execution via Intermediate Operations",
+	title_zh: "间接代码注入：用户输入经中间操作后流入代码执行函数",
+	message: "检测到用户可控输入经过中间操作（如字符串拼接、模板构造）后流入了代码执行函数。攻击者可以通过注入特殊字符或模板语法（如 Pug 的 `#{global.process.mainModule.require('child_process').execSync('id')}`）执行任意代码。",
 	solution: <<<SOLUTION
 将用户输入作为模板变量（而非模板本身的一部分）传递：
 
@@ -225,8 +225,8 @@ const template = `p Hello #{username}`;
 pug.compile(template)({ username: req.query.username });
 ```
 SOLUTION
-	risk: "server-side-template-injection"
-	name: "mid"
+	risk: "server-side-template-injection",
+	name: "mid",
 }
 
 // =====================================================================

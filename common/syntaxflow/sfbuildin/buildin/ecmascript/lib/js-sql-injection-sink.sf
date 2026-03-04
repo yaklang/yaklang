@@ -99,11 +99,11 @@ REFERENCE
 $sink as $output
 
 alert $output for {
-	level: "info"
-	title: "JavaScript SQL/NoSQL Query Sink"
-	title_zh: "JavaScript SQL/NoSQL 查询执行 Sink 函数"
-	message: "识别到数据库查询执行函数，请结合污点传播链路判断是否存在注入风险。"
-	name: "output"
+	level: "info",
+	title: "JavaScript SQL/NoSQL Query Sink",
+	title_zh: "JavaScript SQL/NoSQL 查询执行 Sink 函数",
+	message: "识别到数据库查询执行函数，请结合污点传播链路判断是否存在注入风险。",
+	name: "output",
 }
 
 desc(
