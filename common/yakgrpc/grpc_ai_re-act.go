@@ -113,6 +113,7 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 	var currentCoordinatorId = startParams.CoordinatorId
 	_ = currentCoordinatorId
 	var coordinatorIdOnce = new(sync.Once)
+	var sendMu sync.Mutex
 	feedback := func(e *schema.AiOutputEvent) {
 		if e.Timestamp <= 0 {
 			e.Timestamp = time.Now().Unix() // fallback
@@ -131,6 +132,11 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 			}
 		})
 
+		if stream.Context().Err() != nil {
+			return
+		}
+		sendMu.Lock()
+		defer sendMu.Unlock()
 		err := stream.Send(e.ToGRPC())
 		if err != nil {
 			log.Errorf("send re-act event to stream failed: %v", err)
