@@ -54,8 +54,12 @@ const toolComposeSchema = `
 `
 
 var loopAction_toolCompose = &reactloops.LoopAction{
-	ActionType:  schema.AI_REACT_LOOP_ACTION_TOOL_COMPOSE,
-	Description: "Compose multiple tool calls into a workflow DAG for complex multi-step operations",
+	ActionType: schema.AI_REACT_LOOP_ACTION_TOOL_COMPOSE,
+	Description: "Compose multiple KNOWN tool calls into a workflow DAG with explicit dependencies or parallelism. " +
+		"ONLY use this when you already know exactly which tools to call and their dependency/parallel relationships. " +
+		"Do NOT use tool_compose as a planning mechanism — for complex/uncertain tasks use request_plan_and_execution instead. " +
+		"Do NOT use tool_compose to invoke AI Blueprints (use require_ai_blueprint). " +
+		"Minimum requirement: at least 2 tool nodes with meaningful dependency or parallel structure.",
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
 			"tool_compose_payload",
@@ -64,7 +68,16 @@ var loopAction_toolCompose = &reactloops.LoopAction{
 	},
 	OutputExamples: `
 # tool-compose description
-在命名是工具调用节点时，call_id 需要以 _ 结尾，例如 "step1_search"，"step2_write"，"step3_combine" 等，如无法确定第几步，可以使用直接使用 "search_material" 等简明扼要的 identifier 来命名。
+
+## 使用前提（必须满足）
+- 你已经明确知道要调用哪些具体工具（至少 2 个）
+- 这些工具之间存在明确的依赖关系（串行）或可以并行执行
+- 不要把 tool_compose 当成规划器使用 — 如果任务目标不明确或需要探索，请使用 request_plan_and_execution
+- 不要用 tool_compose 调用 AI Blueprint — 请使用 require_ai_blueprint
+- 如果只有单个工具调用，请使用 require_tool
+
+## 节点命名规范
+在命名工具调用节点时，call_id 需要以 _ 结尾，例如 "step1_search"，"step2_write"，"step3_combine" 等，如无法确定第几步，可以使用直接使用 "search_material" 等简明扼要的 identifier 来命名。
 注意，工具之间如果有依赖关系，一定要通过 depends_on 来指定。
 
 ` + toolComposeSchema + `
@@ -121,6 +134,33 @@ Example - Sequential file operations(With AI-Tag tags):
 				}
 			}
 		}
+
+		// Lightweight strategy gate: guide the AI toward more appropriate actions
+		// when tool_compose is being misused as a planning mechanism.
+		invoker := loop.GetInvoker()
+		if len(nodes) == 1 {
+			invoker.AddToTimeline("[TOOL_COMPOSE_HINT]",
+				"WARNING: tool_compose was called with only 1 node. "+
+					"For single-tool calls, use require_tool instead — it is simpler and more efficient. "+
+					"tool_compose is designed for multi-tool DAGs with dependencies or parallelism.")
+		}
+		if len(nodes) >= 2 {
+			hasDep := false
+			for _, n := range nodes {
+				if len(n.RawDependsOn) > 0 {
+					hasDep = true
+					break
+				}
+			}
+			if !hasDep {
+				invoker.AddToTimeline("[TOOL_COMPOSE_HINT]",
+					"NOTE: tool_compose DAG has multiple nodes but NO depends_on relationships. "+
+						"All nodes will execute sequentially. If these are independent operations, "+
+						"consider calling them individually via require_tool. "+
+						"If the task is exploratory or uncertain, consider request_plan_and_execution.")
+			}
+		}
+
 		loop.Set("tool_compose_payload", payload)
 		return nil
 	},

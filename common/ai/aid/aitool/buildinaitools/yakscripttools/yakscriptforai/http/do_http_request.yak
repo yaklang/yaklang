@@ -425,6 +425,16 @@ if err != nil {
 rsp = rspIns.RawPacket
 req = rspIns.RawRequest
 
+// --- print request packet ---
+reqSize = len(req)
+if reqSize > 0 {
+    if reqSize <= 5120 {
+        yakit.Info("request packet (%v bytes):\n%v", reqSize, string(req))
+    } else {
+        yakit.Info("request packet (%v bytes, truncated to 5KB):\n%v\n... (truncated, full request saved to file)", reqSize, string(req[:5120]))
+    }
+}
+
 // --- report results ---
 // connection info
 if rspIns.PortIsOpen {
@@ -479,15 +489,29 @@ if len(redirectLogs) > 0 {
     }
 }
 
-// print response body inline if small enough
-if len(rsp) > 0 && len(rsp) < 30000 {
-    yakit.Info("response packet:\n%v", string(rsp))
+// print response packet inline with size/pattern-aware logic
+hasPattern = (keyword != "" || regexpMatch != "")
+if len(rsp) > 0 {
+    if hasPattern {
+        if len(rsp) <= 5120 {
+            yakit.Info("response packet (%v bytes):\n%v", len(rsp), string(rsp))
+        } else {
+            yakit.Info("response packet too large (%v bytes), skip inline printing, see pattern match results below and saved file", len(rsp))
+        }
+    } else {
+        if len(rsp) <= 10240 {
+            yakit.Info("response packet (%v bytes):\n%v", len(rsp), string(rsp))
+        } else {
+            yakit.Info("response packet (%v bytes, truncated to 10KB):\n%v\n... (truncated, full response saved to file)", len(rsp), string(rsp[:10240]))
+        }
+    }
 }
 
 // keyword and regex matching
-if keyword != "" || regexpMatch != "" {
+if hasPattern {
     edt := memeditor.New(string(rsp))
     if keyword != "" {
+        yakit.Info("searching keyword pattern: %v", keyword)
         edt.FindStringRange(keyword, rg => {
             matchContent := rg.GetTextContextWithPrompt(3)
             if len(matchContent) > 30000 {
@@ -498,6 +522,7 @@ if keyword != "" || regexpMatch != "" {
         })
     }
     if regexpMatch != "" {
+        yakit.Info("searching regexp pattern: %v", regexpMatch)
         edt.FindRegexpRange(regexpMatch, rg => {
             matchContent := rg.GetTextContextWithPrompt(3)
             if len(matchContent) > 30000 {

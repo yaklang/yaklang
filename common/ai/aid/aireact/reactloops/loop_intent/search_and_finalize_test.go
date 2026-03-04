@@ -51,9 +51,9 @@ func TestBuildCapabilityEnrichmentMarkdown_AllFourTypes(t *testing.T) {
 	if !strings.Contains(md, "require_tool") {
 		t.Fatal("tool section should mention require_tool")
 	}
-	// Verify forge usage guide mentions tool_compose
-	if !strings.Contains(md, "tool_compose") {
-		t.Fatal("forge section should mention tool_compose")
+	// Verify forge usage guide mentions require_ai_blueprint
+	if !strings.Contains(md, "require_ai_blueprint") {
+		t.Fatal("forge section should mention require_ai_blueprint")
 	}
 	// Verify focus_mode usage guide mentions enter_focus_mode
 	if !strings.Contains(md, "enter_focus_mode") {
@@ -488,8 +488,8 @@ func TestSearchBM25_ToolAndForge(t *testing.T) {
 	if !strings.Contains(md, "require_tool") {
 		t.Fatal("Markdown should contain require_tool usage guide for tool type")
 	}
-	if !strings.Contains(md, "tool_compose") {
-		t.Fatal("Markdown should contain tool_compose usage guide for forge type")
+	if !strings.Contains(md, "require_ai_blueprint") {
+		t.Fatal("Markdown should contain require_ai_blueprint usage guide for forge type")
 	}
 
 	t.Logf("BM25 search test passed: tool=%s, forge=%s", toolName, forgeName)

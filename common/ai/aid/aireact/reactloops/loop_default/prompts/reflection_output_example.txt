@@ -18,5 +18,14 @@
     * 如果你发现有对应的 AI Blueprint(Forge) 可以使用，请你输出: `{"@action": "require_ai_blueprint", "blueprint_payload": "[your-blueprint-name]", ...}` 可以启动一个已经存在 AI 预设应用执行这个任务。
     * 如果你觉得任务复杂，且没有现有任务模版（Blueprint）需要使用任务规划能力，输出：`{"@action": "request_plan_and_execution", "plan_request_payload": "..[something-helpful-for-design-plan]..", ""human_readable_thought": "..."}
 
-同时你需要注意 '@action' 中的其他 @action 优先级为 '@action > tool_call > require_ai_blueprint > request_plan_and_execution'。
+同时你必须遵循动作选择优先级：
+1. 复杂/不确定任务：优先 `request_plan_and_execution`
+2. 需要领域指导：优先加载技能（`loading_skills` / `load_skill_resources`）
+3. 仅在“已知多工具且存在明确依赖图”时使用 `tool_compose`
+4. AI Blueprint 必须使用 `require_ai_blueprint`，禁止通过 `tool_compose` 代替
+
+反例（禁止）：
+* 任务还没拆清楚就直接 `tool_compose`
+* 只有一个工具调用却使用 `tool_compose`
+* 把 Blueprint 当普通工具节点塞进 `tool_compose`
 {{end}}
