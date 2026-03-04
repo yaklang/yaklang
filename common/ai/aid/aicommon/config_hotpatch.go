@@ -155,17 +155,27 @@ func (c *Config) ProcessHotPatchMessage(e *ypb.AIInputEvent) []ConfigOption {
 	if e.HotpatchType == HotPatchType_ModelName {
 		serviceName := c.AiServerName
 		modelName := hotPatchParams.GetAIModelName()
-		defaultOpts := make([]aispec.AIConfigOption, 0, 1)
-		if modelName != "" {
-			defaultOpts = append(defaultOpts, aispec.WithModel(modelName))
+		if err := hotPatchPromoteIntelligentConfig(serviceName, modelName); err != nil {
+			log.Warnf("failed to promote intelligent tier model by service=%s model=%s: %v", serviceName, modelName, err)
 		}
-		chat, loadErr := hotPatchLoadChater(serviceName, defaultOpts...)
-		if loadErr != nil {
-			log.Errorf("load ai service failed: %v", loadErr)
+
+		if cb, err := hotPatchGetIntelligentCallback(serviceName, modelName); err == nil {
+			aiOption = append(aiOption, WithQualityPriorityAICallback(cb))
 		} else {
-			aiOption = append(aiOption, WithQualityPriorityAICallback(AIChatToAICallbackType(chat)))
-			aiOption = append(aiOption, WithAIModelName(hotPatchParams.GetAIModelName()))
+			log.Warnf("load callback from tiered config failed by service=%s model=%s: %v", serviceName, modelName, err)
+
+			defaultOpts := make([]aispec.AIConfigOption, 0, 1)
+			if modelName != "" {
+				defaultOpts = append(defaultOpts, aispec.WithModel(modelName))
+			}
+			chat, loadErr := hotPatchLoadChater(serviceName, defaultOpts...)
+			if loadErr != nil {
+				log.Errorf("load ai service failed: %v", loadErr)
+			} else {
+				aiOption = append(aiOption, WithQualityPriorityAICallback(AIChatToAICallbackType(chat)))
+			}
 		}
+		aiOption = append(aiOption, WithAIChatInfo(serviceName, modelName))
 		log.Warnf("HotPatch ModelName is deprecated, " +
 			"model info is now auto-detected from the actual AI gateway call")
 	}

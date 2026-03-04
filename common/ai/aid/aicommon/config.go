@@ -380,6 +380,11 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 		}
 	}
 
+	// Auto Set up work dir
+	if config.Workdir == "" {
+		config.Workdir = config.GetOrCreateWorkDir()
+	}
+
 	return config
 }
 
@@ -542,9 +547,19 @@ func WithWrapperedAICallback(cb AICallbackType) ConfigOption {
 		var qualityCb AICallbackType
 		var speedCb AICallbackType
 		if cb == nil {
-			defaultCb := AIChatToAICallbackType(ai.Chat)
-			qualityCb = c.wrapper(defaultCb, consts.TierIntelligent)
-			speedCb = c.wrapper(defaultCb, consts.TierLightweight)
+			qualityCb, err := GetIntelligentAIModelCallback()
+			if err != nil {
+				log.Errorf("failed to get intelligent AI model callback: %v, using default chat callback", err)
+			} else {
+				qualityCb = c.wrapper(qualityCb, consts.TierIntelligent)
+			}
+
+			speedCb, err = GetLightweightAIModelCallback()
+			if err != nil {
+				log.Errorf("failed to get lightweight AI model callback: %v, using default chat callback", err)
+			} else {
+				speedCb = c.wrapper(speedCb, consts.TierLightweight)
+			}
 		} else {
 			qualityCb = cb
 			speedCb = cb
@@ -610,34 +625,36 @@ func WithTieredAICallback() ConfigOption {
 			return nil
 		}
 
-		// Configure quality priority callback (uses intelligent model)
-		intelligentConfigs := consts.GetIntelligentAIConfigs()
-		if len(intelligentConfigs) > 0 {
-			intelligentCB, err := CreateCallbackFromConfig(intelligentConfigs[0])
-			if err == nil {
-				intelligentCB = c.wrapper(intelligentCB, consts.TierIntelligent)
-				c.m.Lock()
-				c.QualityPriorityAICallback = intelligentCB
-				c.m.Unlock()
-				log.Debugf("Configured quality priority callback from intelligent model")
-			} else {
-				log.Warnf("Failed to load intelligent model callback: %v", err)
-			}
+		serviceName, modelName, err := GetIntelligentAIModelInfo()
+		if err != nil {
+			log.Warnf("Failed to get service and model name from tiered config: %v", err)
+		} else {
+			log.Debugf("Configuring tiered AI callbacks with service=%s model=%s", serviceName, modelName)
+			c.AiModelName = modelName
+			c.AiServerName = serviceName
 		}
 
-		// Configure speed priority callback (uses lightweight model)
-		lightweightConfigs := consts.GetLightweightAIConfigs()
-		if len(lightweightConfigs) > 0 {
-			lightweightCB, err := CreateCallbackFromConfig(lightweightConfigs[0])
-			if err == nil {
-				lightweightCB = c.wrapper(lightweightCB, consts.TierLightweight)
-				c.m.Lock()
-				c.SpeedPriorityAICallback = lightweightCB
-				c.m.Unlock()
-				log.Debugf("Configured speed priority callback from lightweight model")
-			} else {
-				log.Warnf("Failed to load lightweight model callback: %v", err)
-			}
+		// Configure quality priority callback (uses intelligent model)
+		intelligentCB, err := GetIntelligentAIModelCallback()
+		if err == nil {
+			intelligentCB = c.wrapper(intelligentCB, consts.TierIntelligent)
+			c.m.Lock()
+			c.QualityPriorityAICallback = intelligentCB
+			c.m.Unlock()
+			log.Debugf("Configured quality priority callback from intelligent model")
+		} else {
+			log.Warnf("Failed to load intelligent model callback: %v", err)
+		}
+
+		lightweightCB, err := GetLightweightAIModelCallback()
+		if err == nil {
+			lightweightCB = c.wrapper(lightweightCB, consts.TierLightweight)
+			c.m.Lock()
+			c.SpeedPriorityAICallback = lightweightCB
+			c.m.Unlock()
+			log.Debugf("Configured speed priority callback from lightweight model")
+		} else {
+			log.Warnf("Failed to load lightweight model callback: %v", err)
 		}
 
 		return nil
@@ -659,7 +676,7 @@ func WithAutoTieredAICallback(defaultCallback AICallbackType) ConfigOption {
 				// Also set the original callback if not already set
 				if c.OriginalAICallback == nil && defaultCallback != nil {
 					c.m.Lock()
-					c.OriginalAICallback = c.wrapper(defaultCallback, consts.TierIntelligent)
+					c.OriginalAICallback = defaultCallback
 					c.m.Unlock()
 				}
 				return nil
@@ -668,7 +685,7 @@ func WithAutoTieredAICallback(defaultCallback AICallbackType) ConfigOption {
 
 		// Fall back to default callback for all priorities
 		if defaultCallback != nil {
-			originalCb := c.wrapper(defaultCallback, consts.TierIntelligent)
+			originalCb := defaultCallback
 			qualityCb := c.wrapper(defaultCallback, consts.TierIntelligent)
 			speedCb := c.wrapper(defaultCallback, consts.TierLightweight)
 			c.m.Lock()
@@ -2653,35 +2670,6 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 		opts = append(opts, WithSeqIdProvider(i.SeqIdProvider))
 	}
 
-	// Propagate tiered AI callbacks so child configs (coordinator, P&E sub-invokers)
-	// inherit the speed/quality priority distinction from the parent config.
-	// Set directly to avoid double-wrapping: the callbacks are already wrapped
-	// by the parent's c.wrapper(); using WithSpeedPriorityAICallback would wrap again.
-	if i.SpeedPriorityAICallback != nil {
-		speedCb := i.SpeedPriorityAICallback
-		opts = append(opts, func(c *Config) error {
-			if c.m == nil {
-				c.m = &sync.Mutex{}
-			}
-			c.m.Lock()
-			c.SpeedPriorityAICallback = speedCb
-			c.m.Unlock()
-			return nil
-		})
-	}
-	if i.QualityPriorityAICallback != nil {
-		qualityCb := i.QualityPriorityAICallback
-		opts = append(opts, func(c *Config) error {
-			if c.m == nil {
-				c.m = &sync.Mutex{}
-			}
-			c.m.Lock()
-			c.QualityPriorityAICallback = qualityCb
-			c.m.Unlock()
-			return nil
-		})
-	}
-
 	// Propagate intent recognition disable flag so sub-loops (PE task, plan)
 	// do not accidentally run deep intent recognition in test environments.
 	if i.DisableIntentRecognition {
@@ -2708,17 +2696,13 @@ func (c *Config) LoadAIServiceByName(name string, modelName string) error {
 
 	cb := AIChatToAICallbackType(chat)
 	wCb := c.wrapper(cb, consts.TierIntelligent)
+	if modelName == "" {
+		modelName = aiConfig.Model
+	}
 	c.m.Lock()
 	c.OriginalAICallback = cb
-	c.QualityPriorityAICallback = wCb
+	c.SetQualityPriorityAICallbackInLock(wCb, name, modelName)
 	c.m.Unlock()
-
-	c.AiServerName = name
-	c.AiModelName = aiConfig.Model
-	if modelName != "" {
-		c.AiModelName = modelName
-	}
-
 	c.HotPatchBroadcaster.Submit(WithQualityPriorityAICallback(cb))
 	return nil
 }
@@ -2739,4 +2723,10 @@ func (c *Config) GetConsumptionConfigEx() (*int64, *int64, string, *omap.Ordered
 
 func (c *Config) OriginOptions() []ConfigOption {
 	return c.originOptions
+}
+
+func (c *Config) SetQualityPriorityAICallbackInLock(callback AICallbackType, service, model string) {
+	c.QualityPriorityAICallback = callback
+	c.AiServerName = service
+	c.AiModelName = model
 }
