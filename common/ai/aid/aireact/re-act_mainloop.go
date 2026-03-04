@@ -587,7 +587,7 @@ func BuildReActInvoker(ctx context.Context, options ...aicommon.ConfigOption) (a
 	// Initialize prompt manager (workdir does not depend on artifacts, which is lazy)
 	workdir := cfg.Workdir
 	if workdir == "" {
-		workdir = filepath.Join(consts.GetDefaultBaseHomeDir(), "code")
+		workdir = filepath.Join(consts.GetDefaultYakitBaseDir(), "code")
 		if utils.GetFirstExistedFile(workdir) == "" {
 			os.MkdirAll(workdir, os.ModePerm)
 		}
