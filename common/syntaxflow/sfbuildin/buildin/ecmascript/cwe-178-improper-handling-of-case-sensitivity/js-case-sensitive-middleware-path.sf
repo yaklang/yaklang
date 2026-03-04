@@ -181,11 +181,11 @@ $endpointArg?{opcode: const}?{have: /^\//}?{!have: /^\/.*\/[gimsuy]*$/} as $stri
 $caseSensitiveRegex<matchRegexpPath(target="$stringEndpoint")> as $bypassRisk
 
 alert $bypassRisk for {
-	level: "warning"
-	type: "vuln"
-	title: "Case-Sensitive Middleware Path Guards a Case-Insensitive Endpoint"
-	title_zh: "区分大小写的中间件正则路径保护了大小写不敏感的端点，可被绕过"
-	message: "检测到 app.use() 中使用了不带 'i' 标志的正则表达式路径作为中间件，同时程序中存在使用字符串路径（大小写不敏感）的路由端点。攻击者可以通过修改 URL 的大小写（如将 /admin/users 改为 /ADMIN/USERS）来绕过该中间件的保护，从而直接访问受保护的端点。请在正则表达式末尾添加 'i' 标志使其大小写不敏感。"
+	level: "warning",
+	type: "vuln",
+	title: "Case-Sensitive Middleware Path Guards a Case-Insensitive Endpoint",
+	title_zh: "区分大小写的中间件正则路径保护了大小写不敏感的端点，可被绕过",
+	message: "检测到 app.use() 中使用了不带 'i' 标志的正则表达式路径作为中间件，同时程序中存在使用字符串路径（大小写不敏感）的路由端点。攻击者可以通过修改 URL 的大小写（如将 /admin/users 改为 /ADMIN/USERS）来绕过该中间件的保护，从而直接访问受保护的端点。请在正则表达式末尾添加 'i' 标志使其大小写不敏感。",
 	solution: <<<SOLUTION
 将正则表达式修改为大小写不敏感模式，在末尾添加 `i` 标志：
 
@@ -197,8 +197,8 @@ app.use(/\/admin\/.*/, authMiddleware);
 app.use(/\/admin\/.*/i, authMiddleware);
 ```
 SOLUTION
-	risk: "权限绕过"
-	name: "case-sensitive-middleware"
+	risk: "权限绕过",
+	name: "case-sensitive-middleware",
 }
 
 // =====================================================================

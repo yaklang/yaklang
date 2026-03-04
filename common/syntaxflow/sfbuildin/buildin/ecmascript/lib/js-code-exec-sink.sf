@@ -148,11 +148,11 @@ document.writeln(* as $sink)
 $sink as $output
 
 alert $output for {
-	level: "info"
-	title: "JavaScript Code Execution Sink"
-	title_zh: "JavaScript 代码执行 Sink 函数"
-	message: "识别到可能执行代码的危险函数，请结合污点传播链路判断是否存在代码注入风险。"
-	name: "output"
+	level: "info",
+	title: "JavaScript Code Execution Sink",
+	title_zh: "JavaScript 代码执行 Sink 函数",
+	message: "识别到可能执行代码的危险函数，请结合污点传播链路判断是否存在代码注入风险。",
+	name: "output",
 }
 
 desc(

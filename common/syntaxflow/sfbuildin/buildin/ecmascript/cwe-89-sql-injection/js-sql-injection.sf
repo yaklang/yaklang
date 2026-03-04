@@ -203,12 +203,12 @@ CODE
 $high + $nosqlHigh as $high
 
 alert $high for {
-	level: "high"
-	title: "Database Query Built From User-Controlled Sources"
-	title_zh: "用户可控输入构建数据库查询（高风险 SQL/NoSQL 注入）"
-	message: "检测到用户可控输入（如 req.query.*、req.body.*）直接流入数据库查询函数，或通过字符串拼接构建 SQL 语句，存在严重的 SQL/NoSQL 注入风险。请使用参数化查询或 $eq 操作符防御。"
-	risk: "SQL注入"
-	cwe: "CWE-89,CWE-90,CWE-943"
+	level: "high",
+	title: "Database Query Built From User-Controlled Sources",
+	title_zh: "用户可控输入构建数据库查询（高风险 SQL/NoSQL 注入）",
+	message: "检测到用户可控输入（如 req.query.*、req.body.*）直接流入数据库查询函数，或通过字符串拼接构建 SQL 语句，存在严重的 SQL/NoSQL 注入风险。请使用参数化查询或 $eq 操作符防御。",
+	risk: "SQL注入",
+	cwe: "CWE-89,CWE-90,CWE-943",
 }
 
 // ============================================================
@@ -227,12 +227,12 @@ CODE
 )> as $midInjection
 
 alert $midInjection for {
-	level: "mid"
-	title: "Database Query Potentially Built From User-Controlled Sources (Indirect)"
-	title_zh: "用户可控输入可能经间接路径流入数据库查询（中等风险 SQL/NoSQL 注入）"
-	message: "用户可控输入经过某些中间处理后流入数据库查询函数，处理过程中未检测到明显的转义/净化函数。请人工确认是否存在有效过滤，如无则存在 SQL/NoSQL 注入风险。"
-	risk: "SQL注入"
-	cwe: "CWE-89,CWE-90,CWE-943"
+	level: "mid",
+	title: "Database Query Potentially Built From User-Controlled Sources (Indirect)",
+	title_zh: "用户可控输入可能经间接路径流入数据库查询（中等风险 SQL/NoSQL 注入）",
+	message: "用户可控输入经过某些中间处理后流入数据库查询函数，处理过程中未检测到明显的转义/净化函数。请人工确认是否存在有效过滤，如无则存在 SQL/NoSQL 注入风险。",
+	risk: "SQL注入",
+	cwe: "CWE-89,CWE-90,CWE-943",
 }
 
 // ============================================================

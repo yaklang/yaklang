@@ -114,11 +114,11 @@ $webPrefs.webSecurity as $webSecurityVal
 $webSecurityVal?{have: false} as $disabledWebSecurity
 
 alert $disabledWebSecurity for {
-	level: "warning"
-	type: "vuln"
-	title: "Electron webSecurity Disabled"
-	title_zh: "Electron webSecurity 被设置为 false，同源策略被禁用"
-	message: "检测到 Electron BrowserWindow 的 webPreferences.webSecurity 被显式设置为 false，这将禁用 Chromium 的同源策略。攻击者若能控制渲染进程加载的内容，可利用此配置加载并执行来自任意域的恶意脚本，在配合 nodeIntegration 开启时可实现完整的远程代码执行（RCE）。强烈建议不要禁用 webSecurity。"
+	level: "warning",
+	type: "vuln",
+	title: "Electron webSecurity Disabled",
+	title_zh: "Electron webSecurity 被设置为 false，同源策略被禁用",
+	message: "检测到 Electron BrowserWindow 的 webPreferences.webSecurity 被显式设置为 false，这将禁用 Chromium 的同源策略。攻击者若能控制渲染进程加载的内容，可利用此配置加载并执行来自任意域的恶意脚本，在配合 nodeIntegration 开启时可实现完整的远程代码执行（RCE）。强烈建议不要禁用 webSecurity。",
 	solution: <<<SOLUTION
 删除 webSecurity: false 配置，或显式设置为 true（Electron 默认值）：
 
@@ -132,8 +132,8 @@ new BrowserWindow({ webPreferences: { webSecurity: true } });
 new BrowserWindow({ webPreferences: {} });
 ```
 SOLUTION
-	risk: "xss"
-	name: "disabledWebSecurity"
+	risk: "xss",
+	name: "disabledWebSecurity",
 }
 
 // =====================================================================

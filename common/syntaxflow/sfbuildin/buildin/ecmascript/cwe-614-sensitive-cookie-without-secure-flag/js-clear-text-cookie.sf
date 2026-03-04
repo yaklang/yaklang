@@ -116,11 +116,11 @@ REFERENCE
 $hVal?{opcode: const}?{have: /\w+=\w+/}?{!have: /(?i)(^|;)\s*secure(\s|;|$)/} as $unsafeConstCookie
 
 alert $unsafeConstCookie for {
-	level: "warning"
-	type: "vuln"
-	title: "Cookie Set via setHeader Without 'Secure' Attribute"
-	title_zh: "通过 setHeader 设置的静态 Cookie 字符串缺少 Secure 属性，可能被明文传输"
-	message: "检测到通过 res.setHeader('Set-Cookie', '...') 设置的静态 Cookie 字符串中未包含 'Secure' 属性。该 Cookie 将在 HTTP 和 HTTPS 连接中均被发送，攻击者可通过网络嗅探截获敏感 Cookie。请在 Cookie 字符串末尾添加 '; Secure; HttpOnly'。"
+	level: "warning",
+	type: "vuln",
+	title: "Cookie Set via setHeader Without 'Secure' Attribute",
+	title_zh: "通过 setHeader 设置的静态 Cookie 字符串缺少 Secure 属性，可能被明文传输",
+	message: "检测到通过 res.setHeader('Set-Cookie', '...') 设置的静态 Cookie 字符串中未包含 'Secure' 属性。该 Cookie 将在 HTTP 和 HTTPS 连接中均被发送，攻击者可通过网络嗅探截获敏感 Cookie。请在 Cookie 字符串末尾添加 '; Secure; HttpOnly'。",
 	solution: <<<SOLUTION
 在 Cookie 字符串中添加 Secure 和 HttpOnly 属性：
 
@@ -132,8 +132,8 @@ res.setHeader("Set-Cookie", "sessionToken=abc123; HttpOnly");
 res.setHeader("Set-Cookie", "sessionToken=abc123; Secure; HttpOnly");
 ```
 SOLUTION
-	risk: "会话劫持/敏感信息明文传输"
-	name: "setHeader-static-missing-secure"
+	risk: "会话劫持/敏感信息明文传输",
+	name: "setHeader-static-missing-secure",
 }
 
 // --- Sub-pattern A2: Dynamic (template literal) cookie values without Secure ---
@@ -152,11 +152,11 @@ $dynamicCookieVals<string> as $dynamicSSARepr
 $dynamicSSARepr?{!have: /(?i)secure/} as $unsafeDynamicSSARepr
 
 alert $unsafeDynamicSSARepr for {
-	level: "warning"
-	type: "vuln"
-	title: "Template Literal Cookie via setHeader Without 'Secure' Attribute"
-	title_zh: "通过 setHeader 设置的模板字符串 Cookie 缺少 Secure 属性，可能被明文传输"
-	message: "检测到通过 res.setHeader('Set-Cookie', `动态模板`) 设置的 Cookie，通过分析模板字符串的字面量部分，确认其中不包含 'Secure' 属性。该 Cookie 将在 HTTP 明文连接中被发送。请在模板字符串末尾添加 '; Secure; HttpOnly'。"
+	level: "warning",
+	type: "vuln",
+	title: "Template Literal Cookie via setHeader Without 'Secure' Attribute",
+	title_zh: "通过 setHeader 设置的模板字符串 Cookie 缺少 Secure 属性，可能被明文传输",
+	message: "检测到通过 res.setHeader('Set-Cookie', `动态模板`) 设置的 Cookie，通过分析模板字符串的字面量部分，确认其中不包含 'Secure' 属性。该 Cookie 将在 HTTP 明文连接中被发送。请在模板字符串末尾添加 '; Secure; HttpOnly'。",
 	solution: <<<SOLUTION
 在动态 Cookie 模板字符串末尾添加 Secure 和 HttpOnly 属性：
 
@@ -169,8 +169,8 @@ res.setHeader("Set-Cookie", `authKey=${makeAuthkey()}; HttpOnly`);
 res.setHeader("Set-Cookie", `authKey=${makeAuthkey()}; Secure; HttpOnly`);
 ```
 SOLUTION
-	risk: "会话劫持/敏感信息明文传输"
-	name: "setHeader-template-missing-secure"
+	risk: "会话劫持/敏感信息明文传输",
+	name: "setHeader-template-missing-secure",
 }
 
 // =====================================================================
@@ -186,11 +186,11 @@ $cookieOpts.secure as $secureAttr
 $secureAttr?{have: false} as $explicitSecureFalse
 
 alert $explicitSecureFalse for {
-	level: "warning"
-	type: "vuln"
-	title: "Express Cookie Set with 'secure: false'"
-	title_zh: "Express res.cookie() 明确将 secure 设置为 false，Cookie 将被明文传输"
-	message: "检测到 Express res.cookie() 调用中明确设置了 secure: false，导致该 Cookie 在 HTTP 非加密连接中也会被发送。Cookie 中可能包含会话令牌等敏感信息，一旦被中间人攻击者截获，将导致会话劫持。请将 secure 选项改为 true。"
+	level: "warning",
+	type: "vuln",
+	title: "Express Cookie Set with 'secure: false'",
+	title_zh: "Express res.cookie() 明确将 secure 设置为 false，Cookie 将被明文传输",
+	message: "检测到 Express res.cookie() 调用中明确设置了 secure: false，导致该 Cookie 在 HTTP 非加密连接中也会被发送。Cookie 中可能包含会话令牌等敏感信息，一旦被中间人攻击者截获，将导致会话劫持。请将 secure 选项改为 true。",
 	solution: <<<SOLUTION
 将 res.cookie() 中的 secure 选项改为 true：
 
@@ -202,8 +202,8 @@ res.cookie('sessionId', token, { httpOnly: true, secure: false });
 res.cookie('sessionId', token, { httpOnly: true, secure: true });
 ```
 SOLUTION
-	risk: "会话劫持/敏感信息明文传输"
-	name: "express-cookie-secure-false"
+	risk: "会话劫持/敏感信息明文传输",
+	name: "express-cookie-secure-false",
 }
 
 // =====================================================================

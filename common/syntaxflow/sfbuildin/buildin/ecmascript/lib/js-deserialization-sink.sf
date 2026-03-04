@@ -93,11 +93,11 @@ saferEval(* as $sink)
 $sink as $output
 
 alert $output for {
-	level: "info"
-	title: "JavaScript Unsafe Deserialization Sink"
-	title_zh: "JavaScript 不安全反序列化 Sink 函数"
-	message: "识别到可能执行不安全反序列化的危险函数，请结合污点传播链路判断是否存在反序列化注入风险。"
-	name: "output"
+	level: "info",
+	title: "JavaScript Unsafe Deserialization Sink",
+	title_zh: "JavaScript 不安全反序列化 Sink 函数",
+	message: "识别到可能执行不安全反序列化的危险函数，请结合污点传播链路判断是否存在反序列化注入风险。",
+	name: "output",
 }
 
 desc(

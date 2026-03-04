@@ -126,11 +126,11 @@ process.argv as $source
 $source as $output
 
 alert $output for {
-	level: "info"
-	title: "JavaScript User-Controlled Input Source"
-	title_zh: "JavaScript 用户可控输入源"
-	message: "识别到用户可控输入点，请结合污点传播链路判断是否存在安全风险。"
-	name: "output"
+	level: "info",
+	title: "JavaScript User-Controlled Input Source",
+	title_zh: "JavaScript 用户可控输入源",
+	message: "识别到用户可控输入点，请结合污点传播链路判断是否存在安全风险。",
+	name: "output",
 }
 
 desc(

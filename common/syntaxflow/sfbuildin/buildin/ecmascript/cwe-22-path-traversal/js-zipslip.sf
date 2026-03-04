@@ -283,13 +283,13 @@ CODE}->} as $guardedHigh
 $highCandidates - $guardedHigh as $high
 
 alert $high for {
-	level: "high"
-	title: "Zip Slip: Archive Entry Path Flows Directly to File Write (No Guard)"
-	title_zh: "Zip Slip：压缩包条目路径未经任何守卫直接用于文件写入"
+	level: "high",
+	title: "Zip Slip: Archive Entry Path Flows Directly to File Write (No Guard)",
+	title_zh: "Zip Slip：压缩包条目路径未经任何守卫直接用于文件写入",
 	desc: <<<DESC
 检测到压缩包解压时存在高风险的 Zip Slip 漏洞。压缩包内文件路径（`entry.path`、`entry.name`、`entry.linkname`、`entry.entryName` 等）未经任何路径规范化和目录合法性检查（如 `indexOf('..')` 守卫、`path.resolve` + `startsWith` 验证等），直接传递到文件系统写操作（如 `fs.createWriteStream`、`fs.writeFile` 等）。攻击者可以通过精心构造包含路径穿越序列（`../../`）的压缩包，将恶意文件写入服务器任意可写目录，可能导致任意文件写入、配置文件覆盖甚至远程代码执行。
 DESC
-	message: "检测到 Zip Slip 高风险漏洞：压缩包条目路径未经守卫直接流向文件写操作。"
+	message: "检测到 Zip Slip 高风险漏洞：压缩包条目路径未经守卫直接流向文件写操作。",
 	solution: <<<SOLUTION
 使用 `path.resolve()` 规范化路径后验证是否以安全目录为前缀：
 ```javascript
@@ -307,8 +307,8 @@ const safeFileName = path.basename(entry.path);
 fs.createWriteStream(path.join(TARGET_DIR, safeFileName));
 ```
 SOLUTION
-	risk: "任意文件写入/目录穿越"
-	name: "high"
+	risk: "任意文件写入/目录穿越",
+	name: "high",
 }
 
 // MID: sink is a derived value (went through intermediate calls like path.join/path.resolve),
@@ -326,9 +326,9 @@ CODE)> as $filteredMid
 $midCandidates - $filteredMid as $mid
 
 alert $mid for {
-	level: "mid"
-	title: "Audit: Zip Slip Risk with Intermediate Path Processing"
-	title_zh: "审计：存在 Zip Slip 风险，路径经过了中间函数处理"
+	level: "mid",
+	title: "Audit: Zip Slip Risk with Intermediate Path Processing",
+	title_zh: "审计：存在 Zip Slip 风险，路径经过了中间函数处理",
 	desc: <<<DESC
 检测到压缩包条目路径经过若干中间函数处理后流向文件系统写操作，可能存在 Zip Slip 风险，需人工审计确认。常见不安全场景：
 
@@ -338,9 +338,9 @@ alert $mid for {
 
 推荐修复：使用 `path.resolve(TARGET_DIR, fileName)` + `startsWith(TARGET_DIR + path.sep)` 双重验证。
 DESC
-	message: "审计：压缩包条目路径经中间函数处理后流向文件写操作，需确认是否有效防御 Zip Slip（建议使用 path.resolve + startsWith 双重验证）。"
-	risk: "疑似目录穿越"
-	name: "mid"
+	message: "审计：压缩包条目路径经中间函数处理后流向文件写操作，需确认是否有效防御 Zip Slip（建议使用 path.resolve + startsWith 双重验证）。",
+	risk: "疑似目录穿越",
+	name: "mid",
 }
 
 // =====================================================================
