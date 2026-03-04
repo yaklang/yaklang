@@ -21,6 +21,16 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+func safeSend(ch chan *ypb.AIInputEvent, event *ypb.AIInputEvent) (sent bool) {
+	defer func() {
+		if r := recover(); r != nil {
+			sent = false
+		}
+	}()
+	ch <- event
+	return true
+}
+
 // TestReAct_PlanAndExecute_SkipAfterCancel reproduces the original deadlock:
 //
 //	react_cancel_task kills planCtx -> coordinator event loop dies
@@ -79,23 +89,23 @@ func TestReAct_PlanAndExecute_SkipAfterCancel(t *testing.T) {
 
 			// Simulate the exact bug scenario:
 			// 1. Send cancel to kill the planCtx (and coordinator event loop)
-			in <- &ypb.AIInputEvent{
+			safeSend(in, &ypb.AIInputEvent{
 				IsSyncMessage: true,
 				SyncType:      SYNC_TYPE_REACT_CANCEL_TASK,
 				SyncJsonInput: `{"task_id":"` + currentTaskID + `"}`,
 				SyncID:        utils.RandStringBytes(8),
-			}
+			})
 
 			// Small delay to let cancel propagate
 			time.Sleep(200 * time.Millisecond)
 
 			// 2. Send skip_subtask_in_plan after coordinator event loop is dead
-			in <- &ypb.AIInputEvent{
+			safeSend(in, &ypb.AIInputEvent{
 				IsSyncMessage: true,
 				SyncType:      aicommon.SYNC_TYPE_SKIP_SUBTASK_IN_PLAN,
 				SyncJsonInput: `{"reason":"skip after cancel","skip_current_task":true}`,
 				SyncID:        utils.RandStringBytes(8),
-			}
+			})
 
 			time.Sleep(100 * time.Millisecond)
 			return "", nil
@@ -210,6 +220,9 @@ LOOP:
 			t.Fatal("DEADLOCK DETECTED: P&E did not terminate within 15s after cancel+skip sequence")
 		}
 	}
+
+	// Wait for tool callback goroutine to finish before cleanup
+	time.Sleep(500 * time.Millisecond)
 	close(in)
 
 	if atomic.LoadInt32(&toolCalled) == 0 {
