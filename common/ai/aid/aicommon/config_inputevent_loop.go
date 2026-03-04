@@ -105,20 +105,46 @@ func (c *Config) StartEventLoopEx(ctx context.Context, startCall func(), doneCal
 							log.Errorf("ReAct event processing failed: %v", err)
 						}
 					}(event)
-				case <-ticker.C:
-					tickerCallback()
-					continue
-				case <-ctx.Done():
-					return
-				}
+			case <-ticker.C:
+				tickerCallback()
+				continue
+			case <-ctx.Done():
+				log.Infof("event loop context cancelled for config %s, draining pending events", c.id)
+				c.drainPendingEvents()
+				return
 			}
-		}()
+		}
+	}()
 		select {
 		case validator <- struct{}{}:
 		case <-ctx.Done():
 		}
 	})
 	c.StartHotPatchLoop(ctx)
+}
+
+// drainPendingEvents processes remaining events in EventInputChan after context cancellation.
+// Sync events like skip_subtask_in_plan that arrived concurrently with cancellation
+// must still be handled so upstream callers don't block indefinitely.
+func (c *Config) drainPendingEvents() {
+	if c.EventInputChan == nil {
+		return
+	}
+	for {
+		select {
+		case event, ok := <-c.EventInputChan.OutputChannel():
+			if !ok || event == nil {
+				return
+			}
+			if event.IsSyncMessage && c.InputEventManager != nil {
+				if err := c.InputEventManager.processEvent(event); err != nil {
+					log.Errorf("drain pending sync event (%s) failed: %v", event.SyncType, err)
+				}
+			}
+		default:
+			return
+		}
+	}
 }
 
 // processInputEvent processes a single input event and triggers ReAct loop

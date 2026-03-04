@@ -662,6 +662,11 @@ func (c *Coordinator) HandleSkipSubtaskInPlan(event *ypb.AIInputEvent) error {
 		return nil
 	}
 
+	// 幂等检查：如果任务已经是 Skipped 状态，不重复处理
+	if task.GetStatus() == aicommon.AITaskState_Skipped {
+		return nil
+	}
+
 	// 取消任务并设置为 Skipped 状态（区别于 Aborted，Skipped 专门表示用户主动跳过）
 	task.SetStatus(aicommon.AITaskState_Skipped)
 	task.Cancel()

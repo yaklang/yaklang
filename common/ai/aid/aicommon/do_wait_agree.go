@@ -38,8 +38,7 @@ func (c *Config) DoWaitAgreeWithPolicy(ctx context.Context, policy AgreePolicyTy
 		return
 	case AgreePolicyAI, AgreePolicyAIAuto:
 		if skipAIReview {
-			// Default behavior: wait for user interaction
-			endpoint.Wait()
+			endpoint.WaitContext(ctx)
 			return
 		}
 		go func() {
@@ -66,6 +65,8 @@ func (c *Config) DoWaitAgreeWithPolicy(ctx context.Context, policy AgreePolicyTy
 				if err != nil {
 					endNormally(1, "high", "review failed: "+err.Error())
 					log.Errorf("error during auto-review: %v", err)
+					endpoint.SetParams(aitool.InvokeParams{"suggestion": "continue"})
+					endpoint.Release()
 					return
 				}
 				score := riskResult.GetFloat("risk_score")
@@ -78,9 +79,8 @@ func (c *Config) DoWaitAgreeWithPolicy(ctx context.Context, policy AgreePolicyTy
 						"level":          "low",
 					})
 					c.Emitter.EmitInfo("Auto-review score is low, suggesting to continue in " + fmt.Sprint(int(duSec)) + " seconds...")
-					// reason := action.WaitString("reason")
 					endNormally(score, "low", "")
-					time.Sleep(duSec * time.Second) // Simulate a delay for user to read the message
+					time.Sleep(duSec * time.Second)
 					endpoint.SetParams(aitool.InvokeParams{"suggestion": "continue"})
 					endpoint.Release()
 				} else if score > c.AgreeAIScoreLow && score <= c.AgreeAIScoreMiddle {
@@ -91,10 +91,9 @@ func (c *Config) DoWaitAgreeWithPolicy(ctx context.Context, policy AgreePolicyTy
 						"score":          score,
 						"level":          "middle",
 					})
-					// reason := action.WaitString("reason")
 					endNormally(score, "middle", "")
 					c.Emitter.EmitInfo("Auto-review score is middle, suggesting to continue in " + fmt.Sprint(int(duSec)) + " seconds...")
-					time.Sleep(duSec * time.Second) // Simulate a delay for user to read the message
+					time.Sleep(duSec * time.Second)
 					endpoint.SetParams(aitool.InvokeParams{"suggestion": "continue"})
 					endpoint.Release()
 				} else {
@@ -104,7 +103,7 @@ func (c *Config) DoWaitAgreeWithPolicy(ctx context.Context, policy AgreePolicyTy
 				}
 			}()
 		}()
-		endpoint.Wait()
+		endpoint.WaitContext(ctx)
 	case AgreePolicyManual:
 		fallthrough
 	default:
