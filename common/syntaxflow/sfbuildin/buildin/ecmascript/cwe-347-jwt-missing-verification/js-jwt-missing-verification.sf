@@ -90,48 +90,64 @@ REFERENCE
 // =====================================================================
 // Detection Strategy:
 //
-// The jsonwebtoken library's verify(token, secretOrPublicKey, options, callback)
-// call is vulnerable when the second argument (secretOrPublicKey) is a falsy
-// value. The SSA frontend represents falsy values as:
+// Step 1 — Scope to jsonwebtoken library:
+//   The rule captures the second argument of *.verify() calls, then filters
+//   only those where the callee object originates from require('jsonwebtoken').
+//   This prevents false positives from unrelated libraries (tls.verify,
+//   crypto.verify, etc.) that also have a .verify() method.
 //
-//   false       → ConstInst <boolean> false
-//   null        → ConstInst <null> nil   (string representation "nil")
-//   undefined   → Undefined node (opcode: undefined)
-//   ""          → ConstInst <string> ""  (empty string)
-//   0           → ConstInst <number> 0
+//   Filter chain:
+//     $secretArg
+//       <self>          — the second arg node itself
+//       <getCall>       — the verify() call that uses this arg
+//       <getCallee>     — the callee (jwt.verify method reference)
+//       <getObject>     — the receiver object (jwt variable)
+//       ?{have: /jsonwebtoken/}  — must originate from require('jsonwebtoken')
 //
-// SyntaxFlow filter syntax notes:
-//   - ?{have: false}         matches <boolean> false  (BoolLiteral is a keyword)
-//   - ?{have: /^nil$/}       matches <null> nil via regex on string representation
-//   - ?{opcode: undefined}   matches the Undefined SSA node
-//   - ?{== ""}               matches <string> "" exactly (have:"" is substring match
-//                              and would match ANY string — must use == for exact match)
-//   - ?{== 0}                matches <number> 0 via numeric comparison
+// Step 2 — Identify falsy secret values:
+//   The SSA frontend represents falsy values as:
+//     false     → ConstInst, String() = "false"
+//     null      → ConstInst, String() = "nil"
+//     undefined → Undefined node (opcode: undefined, NOT a ConstInst)
+//     ""        → ConstInst, String() = "\"\""  (with surrounding quotes)
+//     0         → ConstInst, String() = "0"
 //
-// "have: nil" is NOT valid SyntaxFlow syntax (nil is not a BoolLiteral/keyword);
-// "have: 0" is NOT valid either (numeric literals not accepted by have:);
-// "have: """ matches all strings (substring match) — use "== """ for exact empty string.
-// We use the correct alternatives above instead.
+// SyntaxFlow filter syntax — following the pattern from golang-insecure-skip-verify.sf:
+//   Always use ?{opcode: const} as a guard before any string/value comparison.
+//   This prevents CriticalError when the value set is empty or contains non-ConstInst
+//   nodes (e.g. FreeValue, Call), which would otherwise cause the VM to panic or
+//   return a "BUG: get stack top failed, empty stack" error.
+//
+// SSA string representations of falsy values (used by have:/regex/):
+//   false     → "false"     → ?{opcode: const}?{have: /^false$/}
+//   null      → "nil"       → ?{opcode: const}?{have: /^nil$/}
+//   undefined → "Undefined-"→ ?{opcode: undefined}   (NOT const, handle separately)
+//   ""        → "\"\""      → ?{opcode: const}?{have: /^""$/}
+//   0         → "0"         → ?{opcode: const}?{have: /^0$/}
 // =====================================================================
 
-// Capture the second argument of all *.verify() calls
+// Step 1: Capture second arg of all *.verify() calls, then scope to jsonwebtoken
 *.verify(,* as $secretArg,)
+$secretArg?{<self><getCall><getCallee><getObject>?{have: /jsonwebtoken/}} as $jwtSecretArg
+
+// Step 2: Filter for each falsy representation
+// Use ?{opcode: const} guard (same pattern as golang-insecure-skip-verify.sf)
+// to ensure only ConstInst nodes reach the string comparison.
 
 // Filter: boolean false
-$secretArg?{have: false} as $falsySecret
+$jwtSecretArg?{opcode: const}?{have: /^false$/} as $falsySecret
 
-// Filter: null  (SSA represents null as <null> nil; match via regex on string repr)
-$secretArg?{have: /^nil$/} as $nullSecret
+// Filter: null  (SSA represents <null> nil as string "nil")
+$jwtSecretArg?{opcode: const}?{have: /^nil$/} as $nullSecret
 
-// Filter: undefined (Undefined SSA node)
-$secretArg?{opcode: undefined} as $undefinedSecret
+// Filter: undefined (Undefined SSA node — not a ConstInst, must use opcode filter)
+$jwtSecretArg?{opcode: undefined} as $undefinedSecret
 
-// Filter: empty string "" — must use == for exact match;
-// "have: """ is substring match and would incorrectly match all non-empty strings too.
-$secretArg?{== ""} as $emptyStringSecret
+// Filter: empty string "" (SSA represents "" as string "\"\"")
+$jwtSecretArg?{opcode: const}?{have: /^""$/} as $emptyStringSecret
 
-// Filter: numeric 0 (use == comparison, not "have:" which only accepts string/bool/regex)
-$secretArg?{== 0} as $zeroSecret
+// Filter: numeric 0 (SSA represents 0 as string "0")
+$jwtSecretArg?{opcode: const}?{have: /^0$/} as $zeroSecret
 
 alert $falsySecret for {
 	level: "warning"
