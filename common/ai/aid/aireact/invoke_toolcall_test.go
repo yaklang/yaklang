@@ -103,7 +103,8 @@ func TestReAct_ToolUse_Timing(t *testing.T) {
 	after := time.After(10 * time.Second)
 
 	var startTime, endTime int64
-	var durationMs int64
+	var durationMs int64 = -1
+	var totalDurationMs int64 = -1
 	toolStartReceived := false
 	toolDoneReceived := false
 	reviewed := false
@@ -149,6 +150,15 @@ LOOP:
 					require.GreaterOrEqual(t, durationSeconds, 0.0, "duration_seconds should be >= 0")
 					fmt.Printf("Tool call duration: %d ms (%.3f seconds)\n", durationMs, durationSeconds)
 				}
+				if tdm := jsonpath.FindFirst(string(e.Content), "$.total_duration_ms"); tdm != nil {
+					totalDurationMs = int64(utils.InterfaceToInt(tdm))
+					require.GreaterOrEqual(t, totalDurationMs, int64(0), "total_duration_ms should be >= 0")
+					require.GreaterOrEqual(t, totalDurationMs, durationMs, "total_duration_ms should be >= duration_ms")
+				}
+				if tds := jsonpath.FindFirst(string(e.Content), "$.total_duration_seconds"); tds != nil {
+					totalDurationSeconds := utils.InterfaceToFloat64(tds)
+					require.GreaterOrEqual(t, totalDurationSeconds, 0.0, "total_duration_seconds should be >= 0")
+				}
 
 				if endTime > 0 {
 					require.Greater(t, endTime, int64(0), "end_time should be greater than 0")
@@ -190,6 +200,8 @@ LOOP:
 	require.Greater(t, startTime, int64(0), "start_time should have been set")
 	require.Greater(t, endTime, int64(0), "end_time should have been set")
 	require.GreaterOrEqual(t, durationMs, int64(0), "duration_ms should have been set")
+	require.GreaterOrEqual(t, totalDurationMs, int64(0), "total_duration_ms should have been set")
+	require.GreaterOrEqual(t, totalDurationMs, durationMs, "total_duration_ms should be >= duration_ms")
 }
 
 func TestReAct_ToolUse(t *testing.T) {
@@ -954,7 +966,8 @@ func TestReAct_ToolCallError_Timing(t *testing.T) {
 	after := time.After(10 * time.Second)
 
 	var startTime, endTime int64
-	var durationMs int64
+	var durationMs int64 = -1
+	var totalDurationMs int64 = -1
 	toolStartReceived := false
 	toolErrorReceived := false
 	reviewed := false
@@ -990,6 +1003,15 @@ LOOP:
 				if ds := jsonpath.FindFirst(string(e.Content), "$.duration_seconds"); ds != nil {
 					durationSeconds := utils.InterfaceToFloat64(ds)
 					require.GreaterOrEqual(t, durationSeconds, 0.0, "duration_seconds should be >= 0 in error event")
+				}
+				if tdm := jsonpath.FindFirst(string(e.Content), "$.total_duration_ms"); tdm != nil {
+					totalDurationMs = int64(utils.InterfaceToInt(tdm))
+					require.GreaterOrEqual(t, totalDurationMs, int64(0), "total_duration_ms should be >= 0 in error event")
+					require.GreaterOrEqual(t, totalDurationMs, durationMs, "total_duration_ms should be >= duration_ms in error event")
+				}
+				if tds := jsonpath.FindFirst(string(e.Content), "$.total_duration_seconds"); tds != nil {
+					totalDurationSeconds := utils.InterfaceToFloat64(tds)
+					require.GreaterOrEqual(t, totalDurationSeconds, 0.0, "total_duration_seconds should be >= 0 in error event")
 				}
 
 				if endTime > 0 {
@@ -1031,6 +1053,8 @@ LOOP:
 	require.Greater(t, startTime, int64(0), "start_time should have been set in error case")
 	require.Greater(t, endTime, int64(0), "end_time should have been set in error case")
 	require.GreaterOrEqual(t, durationMs, int64(0), "duration_ms should have been set in error case")
+	require.GreaterOrEqual(t, totalDurationMs, int64(0), "total_duration_ms should have been set in error case")
+	require.GreaterOrEqual(t, totalDurationMs, durationMs, "total_duration_ms should be >= duration_ms in error case")
 }
 
 func TestReAct_ToolCallUserCancel_Timing(t *testing.T) {
@@ -1073,7 +1097,8 @@ func TestReAct_ToolCallUserCancel_Timing(t *testing.T) {
 	after := time.After(10 * time.Second)
 
 	var startTime, endTime int64
-	var durationMs int64
+	var durationMs int64 = -1
+	var totalDurationMs int64 = -1
 	toolStartReceived := false
 	toolCancelReceived := false
 	var iid string
@@ -1108,6 +1133,15 @@ LOOP:
 				if ds := jsonpath.FindFirst(string(e.Content), "$.duration_seconds"); ds != nil {
 					durationSeconds := utils.InterfaceToFloat64(ds)
 					require.GreaterOrEqual(t, durationSeconds, 0.0, "duration_seconds should be >= 0 in cancel event")
+				}
+				if tdm := jsonpath.FindFirst(string(e.Content), "$.total_duration_ms"); tdm != nil {
+					totalDurationMs = int64(utils.InterfaceToInt(tdm))
+					require.GreaterOrEqual(t, totalDurationMs, int64(0), "total_duration_ms should be >= 0 in cancel event")
+					require.GreaterOrEqual(t, totalDurationMs, durationMs, "total_duration_ms should be >= duration_ms in cancel event")
+				}
+				if tds := jsonpath.FindFirst(string(e.Content), "$.total_duration_seconds"); tds != nil {
+					totalDurationSeconds := utils.InterfaceToFloat64(tds)
+					require.GreaterOrEqual(t, totalDurationSeconds, 0.0, "total_duration_seconds should be >= 0 in cancel event")
 				}
 
 				if endTime > 0 {
@@ -1144,6 +1178,8 @@ LOOP:
 	require.Greater(t, startTime, int64(0), "start_time should have been set in cancel case")
 	require.Greater(t, endTime, int64(0), "end_time should have been set in cancel case")
 	require.GreaterOrEqual(t, durationMs, int64(0), "duration_ms should have been set in cancel case")
+	require.GreaterOrEqual(t, totalDurationMs, int64(0), "total_duration_ms should have been set in cancel case")
+	require.GreaterOrEqual(t, totalDurationMs, durationMs, "total_duration_ms should be >= duration_ms in cancel case")
 }
 
 func TestReAct_ToolUse_WithToolCallResult_WithBoolParam(t *testing.T) {

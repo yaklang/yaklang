@@ -470,13 +470,35 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 	})
 
 	t.emitter.EmitInfo("start to generate tool[%v] params in task: %v", tool.Name, t.task.GetName())
+	// pluginInvokeStartTime: 纯插件执行起点（从真正进入 t.invoke 前开始计时）。
+	// 该时间不会包含 AI 生成参数、人工 review 等前置阶段。
+	var pluginInvokeStartTime time.Time
+	// pluginInvokeDuration: 纯插件执行耗时缓存。
+	// 由 t.invoke 返回后写入，done/cancel/error 的 once 回调仅读取；访问时统一受 t.m 保护。
+	var pluginInvokeDuration time.Duration
+	getPurePluginDuration := func(endTime time.Time) time.Duration {
+		if pluginInvokeStartTime.IsZero() {
+			return 0
+		}
+		if pluginInvokeDuration > 0 {
+			return pluginInvokeDuration
+		}
+		if endTime.IsZero() {
+			endTime = time.Now()
+		}
+		if endTime.Before(pluginInvokeStartTime) {
+			return 0
+		}
+		return endTime.Sub(pluginInvokeStartTime)
+	}
+
 	handleDone := func() {
 		t.done.Do(func() {
 			t.m.Lock()
 			defer t.m.Unlock()
 			endTime := time.Now() // Record end time
 			t.emitter.EmitToolCallStatus(t.callToolId, "done")
-			t.emitter.EmitToolCallDone(callToolId, endTime, t.startTime)
+			t.emitter.EmitToolCallDone(callToolId, endTime, t.startTime, getPurePluginDuration(endTime))
 			if t.onCallToolEnd != nil {
 				t.onCallToolEnd(callToolId)
 			}
@@ -489,7 +511,7 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 			defer t.m.Unlock()
 			endTime := time.Now() // Record end time
 			t.emitter.EmitToolCallStatus(t.callToolId, fmt.Sprintf("cancelled by reason: %v", reason))
-			t.emitter.EmitToolCallUserCancel(callToolId, endTime, t.startTime)
+			t.emitter.EmitToolCallUserCancel(callToolId, endTime, t.startTime, getPurePluginDuration(endTime))
 
 			if t.onCallToolEnd != nil {
 				t.onCallToolEnd(callToolId)
@@ -502,7 +524,7 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 			t.m.Lock()
 			defer t.m.Unlock()
 			endTime := time.Now() // Record end time
-			t.emitter.EmitToolCallError(callToolId, err, endTime, t.startTime)
+			t.emitter.EmitToolCallError(callToolId, err, endTime, t.startTime, getPurePluginDuration(endTime))
 
 			if t.onCallToolEnd != nil {
 				t.onCallToolEnd(callToolId)
@@ -624,12 +646,22 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 
 	waitToolStdFlush := t.emitter.EmitToolCallStd(tool.Name, stdoutReader, stderrReader, t.task.GetIndex())
 	t.emitter.EmitInfo("start to invoke tool: %v", tool.Name)
+	t.m.Lock()
+	// Measure pure plugin execution time from real invoke start to invoke return.
+	pluginInvokeStartTime = time.Now()
+	pluginInvokeDuration = 0
+	t.m.Unlock()
 
 	toolResult, err = t.invoke(
 		tool, invokeParams, handleUserCancel, handleError,
 		stdoutMultiWriter, stderrMultiWriter,
 		stdoutBuffer, stderrBuffer,
 	)
+	t.m.Lock()
+	if !pluginInvokeStartTime.IsZero() && pluginInvokeDuration <= 0 {
+		pluginInvokeDuration = time.Since(pluginInvokeStartTime)
+	}
+	t.m.Unlock()
 	if err != nil {
 		if toolResult == nil {
 			toolResult = &aitool.ToolResult{
