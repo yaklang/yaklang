@@ -76,19 +76,14 @@ var loopAction_SearchCapabilities = &reactloops.LoopAction{
 			intentLoop = l
 		}))
 
-		ok, err := invoker.ExecuteLoopTaskIF(schema.AI_REACT_LOOP_NAME_INTENT, intentTask, opts...)
+		_, err := invoker.ExecuteLoopTaskIF(schema.AI_REACT_LOOP_NAME_INTENT, intentTask, opts...)
 		if err != nil {
 			log.Warnf("search_capabilities action: intent loop failed: %v", err)
 			operator.Feedback(fmt.Sprintf("Capability search failed: %v. Try a different query or proceed with currently available tools.", err))
 			operator.Continue()
 			return
 		}
-		if !ok {
-			log.Warnf("search_capabilities action: intent loop returned not ok")
-			operator.Feedback("Capability search did not produce results. Try rephrasing the query.")
-			operator.Continue()
-			return
-		}
+
 		if intentLoop == nil {
 			log.Warnf("search_capabilities action: intent loop reference is nil")
 			operator.Feedback("Capability search completed but no results could be extracted.")

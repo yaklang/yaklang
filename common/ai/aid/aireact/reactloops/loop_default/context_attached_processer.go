@@ -43,9 +43,9 @@ func ProcessAttachedData(r aicommon.AIInvokeRuntime, loop *reactloops.ReActLoop,
 			knowledgeEnhanceLoop = loop
 		}))
 
-		ok, err := r.ExecuteLoopTaskIF(schema.AI_REACT_LOOP_NAME_KNOWLEDGE_ENHANCE, newTask, opts...)
+		_, err := r.ExecuteLoopTaskIF(schema.AI_REACT_LOOP_NAME_KNOWLEDGE_ENHANCE, newTask, opts...)
 
-		log.Infof("knowledge enhance loop completed: ok=%v, err=%v, exit next loop", ok, err)
+		log.Infof("knowledge enhance loop completed: err=%v, exit next loop", err)
 		operator.Done()
 
 		var searchResultsSummary string
@@ -64,9 +64,7 @@ func ProcessAttachedData(r aicommon.AIInvokeRuntime, loop *reactloops.ReActLoop,
 		if err != nil {
 			return utils.Wrap(err, "failed to execute loop task")
 		}
-		if !ok {
-			return utils.Errorf("failed to execute loop task")
-		}
+
 		return nil
 	}
 

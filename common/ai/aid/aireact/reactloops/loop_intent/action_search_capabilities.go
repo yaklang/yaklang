@@ -61,6 +61,10 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 		},
 		// Handler
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
+			// if the intent_summary is provided by the intent analysis step, store it for context , can reduce the step of intent analysis in finalize_enrichment
+			if summary := action.GetString("intent_summary"); summary != "" {
+				loop.Set("intent_summary", summary)
+			}
 			query := strings.TrimSpace(action.GetString("search_query"))
 			log.Infof("intent loop: searching capabilities with query: %s", query)
 			keywords := strings.Split(query, " ")
@@ -83,7 +87,7 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 				toolSeen := make(map[string]bool)
 				var allTools []*schema.AIYakTool
 
-				// AND search: all keywords together
+				// just use OR search, bm25 will rank result
 				tools, err := yakit.SearchAIYakToolBM25(db, &yakit.AIYakToolFilter{
 					Keywords: keywords,
 				}, 10, 0)
@@ -94,28 +98,6 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 					if !toolSeen[t.Name] {
 						toolSeen[t.Name] = true
 						allTools = append(allTools, t)
-					}
-				}
-
-				// OR search: each keyword individually (for broader coverage)
-				if len(keywords) > 1 {
-					for _, kw := range keywords {
-						kw = strings.TrimSpace(kw)
-						if kw == "" {
-							continue
-						}
-						orTools, orErr := yakit.SearchAIYakToolBM25(db, &yakit.AIYakToolFilter{
-							Keywords: []string{kw},
-						}, 5, 0)
-						if orErr != nil {
-							continue
-						}
-						for _, t := range orTools {
-							if !toolSeen[t.Name] {
-								toolSeen[t.Name] = true
-								allTools = append(allTools, t)
-							}
-						}
 					}
 				}
 
@@ -146,7 +128,7 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 					results.WriteString("### Tools\nNo matching tools found.\n\n")
 				}
 
-				// 2. Search AI Forges via BM25 trigram - dual mode: AND + OR
+				// 2. Search AI Forges via BM25 trigram
 				forgeSeen := make(map[string]bool)
 				var allForges []*schema.AIForge
 
@@ -160,27 +142,6 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 					if !forgeSeen[f.ForgeName] {
 						forgeSeen[f.ForgeName] = true
 						allForges = append(allForges, f)
-					}
-				}
-
-				if len(keywords) > 1 {
-					for _, kw := range keywords {
-						kw = strings.TrimSpace(kw)
-						if kw == "" {
-							continue
-						}
-						orForges, orErr := yakit.SearchAIForgeBM25(db, &yakit.AIForgeSearchFilter{
-							Keywords: []string{kw},
-						}, 5, 0)
-						if orErr != nil {
-							continue
-						}
-						for _, f := range orForges {
-							if !forgeSeen[f.ForgeName] {
-								forgeSeen[f.ForgeName] = true
-								allForges = append(allForges, f)
-							}
-						}
 					}
 				}
 

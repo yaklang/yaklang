@@ -45,13 +45,9 @@ func ExecuteDeepIntentRecognition(r aicommon.AIInvokeRuntime, loop *ReActLoop, t
 		intentLoop = l
 	}), WithNoEndLoadingStatus(true))
 
-	ok, err := r.ExecuteLoopTaskIF(schema.AI_REACT_LOOP_NAME_INTENT, intentTask, opts...)
+	_, err := r.ExecuteLoopTaskIF(schema.AI_REACT_LOOP_NAME_INTENT, intentTask, opts...)
 	if err != nil {
 		log.Warnf("deep intent recognition failed: %v", err)
-		return nil
-	}
-	if !ok {
-		log.Warnf("deep intent recognition returned not ok")
 		return nil
 	}
 	if intentLoop == nil {
