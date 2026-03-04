@@ -363,11 +363,6 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 		}
 	}
 
-	// Auto Set up work dir
-	if config.Workdir == "" {
-		config.Workdir = config.GetOrCreateWorkDir()
-	}
-
 	return config
 }
 
