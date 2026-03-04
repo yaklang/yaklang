@@ -3,8 +3,6 @@ package yakgrpc
 import (
 	"bytes"
 	"context"
-	"io"
-	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -14,10 +12,58 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+type autoUnzipCaseConfig struct {
+	pathSuffix      string
+	requestChunked  bool
+	requestGzip     bool
+	responseChunked bool
+	responseGzip    bool
+}
+
+type serverSeen struct {
+	contentEncoding  string
+	transferEncoding string
+	rawBody          []byte
+	decodedBody      []byte
+}
+
 func TestGRPCMUSTPASS_MITMV2_ManualHijack_AutoUnzip_ViewPlainRequestAndResponse(t *testing.T) {
+	runMITMV2ManualHijackAutoUnzipCase(t, autoUnzipCaseConfig{
+		pathSuffix:      "/plain-gzip",
+		requestChunked:  false,
+		requestGzip:     true,
+		responseChunked: false,
+		responseGzip:    true,
+	})
+}
+
+func TestGRPCMUSTPASS_MITMV2_ManualHijack_AutoUnzip_ViewPlainRequestAndResponse_ChunkGzip(t *testing.T) {
+	runMITMV2ManualHijackAutoUnzipCase(t, autoUnzipCaseConfig{
+		pathSuffix:      "/chunk-gzip",
+		requestChunked:  true,
+		requestGzip:     true,
+		responseChunked: true,
+		responseGzip:    true,
+	})
+}
+
+func TestGRPCMUSTPASS_MITMV2_ManualHijack_AutoUnzip_ViewPlainRequestAndResponse_ChunkRaw(t *testing.T) {
+	runMITMV2ManualHijackAutoUnzipCase(t, autoUnzipCaseConfig{
+		pathSuffix:      "/chunk-raw",
+		requestChunked:  true,
+		requestGzip:     false,
+		responseChunked: true,
+		responseGzip:    false,
+	})
+}
+
+func runMITMV2ManualHijackAutoUnzipCase(t *testing.T, cfg autoUnzipCaseConfig) {
+	t.Helper()
+
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 
@@ -28,39 +74,51 @@ func TestGRPCMUSTPASS_MITMV2_ManualHijack_AutoUnzip_ViewPlainRequestAndResponse(
 	reqPlainModified := "req-mod-" + uuid.NewString()
 	respPlain := "resp-" + uuid.NewString()
 
-	type serverSeen struct {
-		contentEncoding string
-		rawBody         []byte
-		decodedBody     []byte
-	}
 	seenCh := make(chan serverSeen, 1)
 
-	mockHost, mockPort := utils.DebugMockHTTPHandlerFuncContext(ctx, func(w http.ResponseWriter, r *http.Request) {
-		raw, _ := io.ReadAll(r.Body)
-		_ = r.Body.Close()
+	mockHost, mockPort := utils.DebugMockHTTPExContext(ctx, func(req []byte) []byte {
+		ce := strings.TrimSpace(lowhttp.GetHTTPPacketHeader(req, "Content-Encoding"))
+		te := strings.TrimSpace(lowhttp.GetHTTPPacketHeader(req, "Transfer-Encoding"))
+		rawBody := lowhttp.GetHTTPPacketBody(req)
 
-		ce := strings.TrimSpace(r.Header.Get("Content-Encoding"))
-		decoded := raw
+		decoded := rawBody
+		if strings.Contains(strings.ToLower(te), "chunked") {
+			if out, err := codec.HTTPChunkedDecode(decoded); err == nil {
+				decoded = out
+			}
+		}
 		if strings.Contains(strings.ToLower(ce), "gzip") {
-			if out, err := utils.GzipDeCompress(raw); err == nil {
+			if out, err := utils.GzipDeCompress(decoded); err == nil {
 				decoded = out
 			}
 		}
 
 		select {
-		case seenCh <- serverSeen{contentEncoding: ce, rawBody: raw, decodedBody: decoded}:
+		case seenCh <- serverSeen{
+			contentEncoding:  ce,
+			transferEncoding: te,
+			rawBody:          rawBody,
+			decodedBody:      decoded,
+		}:
 		default:
 		}
 
-		respBody, _ := utils.GzipCompress([]byte(respPlain))
-		w.Header().Set("Content-Type", "text/plain")
-		w.Header().Set("Content-Encoding", "gzip")
-		_, _ = w.Write(respBody)
+		respBody := []byte(respPlain)
+		if cfg.responseGzip {
+			respBody, _ = utils.GzipCompress(respBody)
+		}
+
+		rsp := []byte("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n")
+		if cfg.responseGzip {
+			rsp = lowhttp.ReplaceHTTPPacketHeader(rsp, "Content-Encoding", "gzip")
+		}
+		rsp = lowhttp.ReplaceHTTPPacketBody(rsp, respBody, cfg.responseChunked)
+		return rsp
 	})
 
 	mitmPort := utils.GetRandomAvailableTCPPort()
 	proxy := "http://" + utils.HostPort("127.0.0.1", mitmPort)
-	target := "http://" + utils.HostPort(mockHost, mockPort) + "/autounzip"
+	target := "http://" + utils.HostPort(mockHost, mockPort) + "/autounzip" + cfg.pathSuffix
 
 	stream, err := client.MITMV2(ctx)
 	require.NoError(t, err)
@@ -96,14 +154,26 @@ func TestGRPCMUSTPASS_MITMV2_ManualHijack_AutoUnzip_ViewPlainRequestAndResponse(
 				started = true
 				go func() {
 					time.Sleep(200 * time.Millisecond)
-					bodyGzip, _ := utils.GzipCompress([]byte(reqPlainOriginal))
-					_, _, err := poc.DoPOST(target,
+					bodyRaw := []byte(reqPlainOriginal)
+					if cfg.requestGzip {
+						bodyRaw, _ = utils.GzipCompress(bodyRaw)
+					}
+
+					opts := []poc.PocConfigOption{
 						poc.WithProxy(proxy),
 						poc.WithTimeout(10),
 						poc.WithNoRedirect(true),
-						poc.WithBody(bodyGzip),
-						poc.WithReplaceHttpPacketHeader("Content-Encoding", "gzip"),
-					)
+					}
+					if cfg.requestChunked {
+						opts = append(opts, poc.WithReplaceHttpPacketBody(bodyRaw, true))
+					} else {
+						opts = append(opts, poc.WithBody(bodyRaw))
+					}
+					if cfg.requestGzip {
+						opts = append(opts, poc.WithReplaceHttpPacketHeader("Content-Encoding", "gzip"))
+					}
+
+					_, _, err := poc.DoPOST(target, opts...)
 					if err != nil {
 						clientErrCh <- err
 					}
@@ -131,9 +201,11 @@ func TestGRPCMUSTPASS_MITMV2_ManualHijack_AutoUnzip_ViewPlainRequestAndResponse(
 				taskID = item.GetTaskID()
 				require.NotEmpty(t, taskID)
 
-				// Auto-unzip should make the "view" packet plain for the user (no Content-Encoding, no binary fuzztag).
+				// Auto-unzip should make the "view" packet plain for the user (no Content-Encoding/Transfer-Encoding, no binary fuzztag).
 				ce := strings.TrimSpace(lowhttp.GetHTTPPacketHeader(item.GetRequest(), "Content-Encoding"))
 				require.Equal(t, "", ce)
+				te := strings.TrimSpace(lowhttp.GetHTTPPacketHeader(item.GetRequest(), "Transfer-Encoding"))
+				require.Equal(t, "", te)
 				require.False(t, bytes.Contains(item.GetRequest(), []byte("{{unquote")), "request view should not be converted to {{unquote}} when auto-unzip is enabled")
 
 				_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(item.GetRequest())
@@ -169,6 +241,8 @@ func TestGRPCMUSTPASS_MITMV2_ManualHijack_AutoUnzip_ViewPlainRequestAndResponse(
 
 				ce := strings.TrimSpace(lowhttp.GetHTTPPacketHeader(item.GetResponse(), "Content-Encoding"))
 				require.Equal(t, "", ce)
+				te := strings.TrimSpace(lowhttp.GetHTTPPacketHeader(item.GetResponse(), "Transfer-Encoding"))
+				require.Equal(t, "", te)
 				require.False(t, bytes.Contains(item.GetResponse(), []byte("{{unquote")), "response view should not be converted to {{unquote}} when auto-unzip is enabled")
 
 				_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(item.GetResponse())
@@ -194,8 +268,19 @@ func TestGRPCMUSTPASS_MITMV2_ManualHijack_AutoUnzip_ViewPlainRequestAndResponse(
 
 	select {
 	case seen := <-seenCh:
-		require.True(t, strings.Contains(strings.ToLower(seen.contentEncoding), "gzip"), "server should receive re-zipped request, got Content-Encoding=%q", seen.contentEncoding)
-		require.Equal(t, []byte(reqPlainModified), seen.decodedBody, "server should receive gzip body that decodes to the user-edited plain request")
+		if cfg.requestChunked {
+			require.True(t, strings.Contains(strings.ToLower(seen.transferEncoding), "chunked"), "server should receive chunked request, got Transfer-Encoding=%q", seen.transferEncoding)
+		} else {
+			require.False(t, strings.Contains(strings.ToLower(seen.transferEncoding), "chunked"), "server should not receive chunked request, got Transfer-Encoding=%q", seen.transferEncoding)
+		}
+
+		if cfg.requestGzip {
+			require.True(t, strings.Contains(strings.ToLower(seen.contentEncoding), "gzip"), "server should receive gzip request, got Content-Encoding=%q", seen.contentEncoding)
+		} else {
+			require.Equal(t, "", strings.TrimSpace(seen.contentEncoding), "server should receive plain request body without Content-Encoding")
+		}
+
+		require.Equal(t, []byte(reqPlainModified), seen.decodedBody, "server should receive request body that decodes to the user-edited plain request")
 	case <-time.After(3 * time.Second):
 		t.Fatal("timeout waiting for mock server to receive forwarded request")
 	}
