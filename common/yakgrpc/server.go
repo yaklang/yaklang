@@ -109,6 +109,10 @@ func NewTestServer() (*Server, error) {
 	)
 }
 
+func NewYakGRPCServerForHTTPGateway() (*Server, error) {
+	return newServerEx(WithInitFacadeServer(false))
+}
+
 func NewServerWithLogCache(opts ...ServerOpts) (*Server, error) {
 	// return newServerEx(true, startCacheLog)
 	return newServerEx(opts...)

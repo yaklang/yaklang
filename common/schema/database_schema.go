@@ -129,6 +129,7 @@ var ProjectTables = []interface{}{
 	&Note{},
 
 	// AI
+	&AISession{},
 	&AIAgentRuntime{},
 	&AiCheckpoint{},
 	&AiOutputEvent{},

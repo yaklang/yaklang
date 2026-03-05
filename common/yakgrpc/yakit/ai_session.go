@@ -3,6 +3,7 @@ package yakit
 import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 // DeleteAISession deletes all persistent-session scoped data:
@@ -19,7 +20,14 @@ func DeleteAISession(profileDB, projectDB *gorm.DB, sessionId string) (deletedRu
 		return 0, 0, utils.Errorf("projectDB is nil")
 	}
 
-	deletedRuntimes, err = DeleteAgentRuntimeByPersistentSession(profileDB, sessionId)
+	_, err = DeleteAISessionMetaBySessionID(projectDB, sessionId)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	deletedRuntimes, err = DeleteAgentRuntime(profileDB, &ypb.AITaskFilter{
+		SessionID: []string{sessionId},
+	})
 	if err != nil {
 		return 0, 0, err
 	}

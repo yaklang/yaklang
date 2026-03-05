@@ -529,6 +529,9 @@ const (
 	Yak_DeleteAITask_FullMethodName                               = "/ypb.Yak/DeleteAITask"
 	Yak_QueryAIEvent_FullMethodName                               = "/ypb.Yak/QueryAIEvent"
 	Yak_DeleteAIEvent_FullMethodName                              = "/ypb.Yak/DeleteAIEvent"
+	Yak_QueryAISession_FullMethodName                             = "/ypb.Yak/QueryAISession"
+	Yak_UpdateAISessionTitle_FullMethodName                       = "/ypb.Yak/UpdateAISessionTitle"
+	Yak_DeleteAISession_FullMethodName                            = "/ypb.Yak/DeleteAISession"
 	Yak_GetRandomAIMaterials_FullMethodName                       = "/ypb.Yak/GetRandomAIMaterials"
 	Yak_ExportAILogs_FullMethodName                               = "/ypb.Yak/ExportAILogs"
 	Yak_CreateAIMemoryEntity_FullMethodName                       = "/ypb.Yak/CreateAIMemoryEntity"
@@ -1273,6 +1276,9 @@ type YakClient interface {
 	DeleteAITask(ctx context.Context, in *AITaskDeleteRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	QueryAIEvent(ctx context.Context, in *AIEventQueryRequest, opts ...grpc.CallOption) (*AIEventQueryResponse, error)
 	DeleteAIEvent(ctx context.Context, in *AIEventDeleteRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
+	QueryAISession(ctx context.Context, in *QueryAISessionRequest, opts ...grpc.CallOption) (*QueryAISessionResponse, error)
+	UpdateAISessionTitle(ctx context.Context, in *UpdateAISessionTitleRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
+	DeleteAISession(ctx context.Context, in *DeleteAISessionRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	GetRandomAIMaterials(ctx context.Context, in *GetRandomAIMaterialsRequest, opts ...grpc.CallOption) (*GetRandomAIMaterialsResponse, error)
 	ExportAILogs(ctx context.Context, in *ExportAILogsRequest, opts ...grpc.CallOption) (*ExportAILogsResponse, error)
 	// AI Memory CRUD
@@ -7249,6 +7255,36 @@ func (c *yakClient) DeleteAIEvent(ctx context.Context, in *AIEventDeleteRequest,
 	return out, nil
 }
 
+func (c *yakClient) QueryAISession(ctx context.Context, in *QueryAISessionRequest, opts ...grpc.CallOption) (*QueryAISessionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QueryAISessionResponse)
+	err := c.cc.Invoke(ctx, Yak_QueryAISession_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) UpdateAISessionTitle(ctx context.Context, in *UpdateAISessionTitleRequest, opts ...grpc.CallOption) (*DbOperateMessage, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DbOperateMessage)
+	err := c.cc.Invoke(ctx, Yak_UpdateAISessionTitle_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) DeleteAISession(ctx context.Context, in *DeleteAISessionRequest, opts ...grpc.CallOption) (*DbOperateMessage, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DbOperateMessage)
+	err := c.cc.Invoke(ctx, Yak_DeleteAISession_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) GetRandomAIMaterials(ctx context.Context, in *GetRandomAIMaterialsRequest, opts ...grpc.CallOption) (*GetRandomAIMaterialsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetRandomAIMaterialsResponse)
@@ -8915,6 +8951,9 @@ type YakServer interface {
 	DeleteAITask(context.Context, *AITaskDeleteRequest) (*DbOperateMessage, error)
 	QueryAIEvent(context.Context, *AIEventQueryRequest) (*AIEventQueryResponse, error)
 	DeleteAIEvent(context.Context, *AIEventDeleteRequest) (*DbOperateMessage, error)
+	QueryAISession(context.Context, *QueryAISessionRequest) (*QueryAISessionResponse, error)
+	UpdateAISessionTitle(context.Context, *UpdateAISessionTitleRequest) (*DbOperateMessage, error)
+	DeleteAISession(context.Context, *DeleteAISessionRequest) (*DbOperateMessage, error)
 	GetRandomAIMaterials(context.Context, *GetRandomAIMaterialsRequest) (*GetRandomAIMaterialsResponse, error)
 	ExportAILogs(context.Context, *ExportAILogsRequest) (*ExportAILogsResponse, error)
 	// AI Memory CRUD
@@ -10555,6 +10594,15 @@ func (UnimplementedYakServer) QueryAIEvent(context.Context, *AIEventQueryRequest
 }
 func (UnimplementedYakServer) DeleteAIEvent(context.Context, *AIEventDeleteRequest) (*DbOperateMessage, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteAIEvent not implemented")
+}
+func (UnimplementedYakServer) QueryAISession(context.Context, *QueryAISessionRequest) (*QueryAISessionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryAISession not implemented")
+}
+func (UnimplementedYakServer) UpdateAISessionTitle(context.Context, *UpdateAISessionTitleRequest) (*DbOperateMessage, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateAISessionTitle not implemented")
+}
+func (UnimplementedYakServer) DeleteAISession(context.Context, *DeleteAISessionRequest) (*DbOperateMessage, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteAISession not implemented")
 }
 func (UnimplementedYakServer) GetRandomAIMaterials(context.Context, *GetRandomAIMaterialsRequest) (*GetRandomAIMaterialsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetRandomAIMaterials not implemented")
@@ -19293,6 +19341,60 @@ func _Yak_DeleteAIEvent_Handler(srv interface{}, ctx context.Context, dec func(i
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_QueryAISession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryAISessionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QueryAISession(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_QueryAISession_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QueryAISession(ctx, req.(*QueryAISessionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_UpdateAISessionTitle_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateAISessionTitleRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).UpdateAISessionTitle(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_UpdateAISessionTitle_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).UpdateAISessionTitle(ctx, req.(*UpdateAISessionTitleRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_DeleteAISession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteAISessionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).DeleteAISession(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_DeleteAISession_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).DeleteAISession(ctx, req.(*DeleteAISessionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_GetRandomAIMaterials_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetRandomAIMaterialsRequest)
 	if err := dec(in); err != nil {
@@ -22398,6 +22500,18 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteAIEvent",
 			Handler:    _Yak_DeleteAIEvent_Handler,
+		},
+		{
+			MethodName: "QueryAISession",
+			Handler:    _Yak_QueryAISession_Handler,
+		},
+		{
+			MethodName: "UpdateAISessionTitle",
+			Handler:    _Yak_UpdateAISessionTitle_Handler,
+		},
+		{
+			MethodName: "DeleteAISession",
+			Handler:    _Yak_DeleteAISession_Handler,
 		},
 		{
 			MethodName: "GetRandomAIMaterials",

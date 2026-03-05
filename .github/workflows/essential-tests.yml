@@ -315,6 +315,7 @@ jobs:
                 {"package": "./common/ai/rag/plugins_rag/...", "timeout": "1m", "run": "TestMUSTPASS", "parallel": 1},
                 {"package": "./common/ai/rag/ragtests/...", "timeout": "1m", "run": "TestMUSTPASS"},
                 {"package": "./common/ai/tests/...", "timeout": "1m"}
+                {"package": "./common/yakgrpc/aihttp/tests/...", "timeout": "1m"}
               ]          
 
           - name: "Test gRPC StaticAnalyze / BuildIn SyntaxFlow Rule / SSA / SSA-API / SF Scan"
