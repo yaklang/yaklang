@@ -783,6 +783,7 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 			imageContent,
 			bodyIns.Tools,      // Forward tools from client request
 			bodyIns.ToolChoice, // Forward tool_choice from client request
+			bodyIns.EnableThinking,
 			func(reader io.Reader) {
 				defer func() {
 					pw.Close()

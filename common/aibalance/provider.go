@@ -151,7 +151,7 @@ func (cp *ConfigProvider) GetAllKeys() []string {
 }
 
 // GetAIClientWithImagesAndTools is the full-featured version that supports images and tools
-func (p *Provider) GetAIClientWithImagesAndTools(imageContents []*aispec.ChatContent, tools []aispec.Tool, toolChoice any, onStream, onReasonStream func(reader io.Reader), onToolCall func([]*aispec.ToolCall)) (aispec.AIClient, error) {
+func (p *Provider) GetAIClientWithImagesAndTools(imageContents []*aispec.ChatContent, tools []aispec.Tool, toolChoice any, enableThinking bool, onStream, onReasonStream func(reader io.Reader), onToolCall func([]*aispec.ToolCall)) (aispec.AIClient, error) {
 	log.Infof("GetAIClient: type: %s, domain: %s, key: %s, model: %s, no_https: %v, tools: %d", p.TypeName, p.DomainOrURL, utils.ShrinkString(p.APIKey, 8), p.ModelName, p.NoHTTPS, len(tools))
 
 	var images []any
@@ -188,6 +188,17 @@ func (p *Provider) GetAIClientWithImagesAndTools(imageContents []*aispec.ChatCon
 		}),
 	)
 
+	shouldEnableThinking := enableThinking
+	if !shouldEnableThinking && p.OptionalAllowReason != "" {
+		switch strings.ToLower(strings.TrimSpace(p.OptionalAllowReason)) {
+		case "true", "yes", "1", "enable", "on":
+			shouldEnableThinking = true
+		}
+	}
+	if shouldEnableThinking {
+		opts = append(opts, aispec.WithEnableThinking(true))
+	}
+
 	// Add tool call callback if provided
 	// This enables forwarding tool_calls from AI provider to the client
 	if onToolCall != nil {
@@ -217,13 +228,13 @@ func (p *Provider) GetAIClientWithImagesAndTools(imageContents []*aispec.ChatCon
 }
 
 // GetAIClientWithImages is kept for backward compatibility
-func (p *Provider) GetAIClientWithImages(imageContents []*aispec.ChatContent, onStream, onReasonStream func(reader io.Reader), onToolCall func([]*aispec.ToolCall)) (aispec.AIClient, error) {
-	return p.GetAIClientWithImagesAndTools(imageContents, nil, nil, onStream, onReasonStream, onToolCall)
+func (p *Provider) GetAIClientWithImages(imageContents []*aispec.ChatContent, enableThinking bool, onStream, onReasonStream func(reader io.Reader), onToolCall func([]*aispec.ToolCall)) (aispec.AIClient, error) {
+	return p.GetAIClientWithImagesAndTools(imageContents, nil, nil, enableThinking, onStream, onReasonStream, onToolCall)
 }
 
 // GetAIClient gets the AI client
-func (p *Provider) GetAIClient(onStream, onReasonStream func(reader io.Reader)) (aispec.AIClient, error) {
-	return p.GetAIClientWithImages(nil, onStream, onReasonStream, nil)
+func (p *Provider) GetAIClient(enableThinking bool, onStream, onReasonStream func(reader io.Reader)) (aispec.AIClient, error) {
+	return p.GetAIClientWithImages(nil, enableThinking, onStream, onReasonStream, nil)
 }
 
 // GetEmbeddingClient gets an embedding client for the provider

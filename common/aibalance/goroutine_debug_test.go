@@ -193,6 +193,7 @@ func TestGoroutineTracing(t *testing.T) {
 
 	client, err := provider.GetAIClientWithImages(
 		nil,
+		false,
 		func(reader io.Reader) {
 			defer pw.Close()
 			io.Copy(pw, reader)
@@ -497,6 +498,7 @@ func TestGoroutineLeakWithSlowAIProvider(t *testing.T) {
 
 			client, err := provider.GetAIClientWithImages(
 				nil,
+				false,
 				func(reader io.Reader) {
 					defer pw.Close()
 					io.Copy(pw, reader)
@@ -713,6 +715,7 @@ func TestGoroutineLeakWithHangingAIProvider(t *testing.T) {
 
 			client, err := provider.GetAIClientWithImages(
 				nil,
+				false,
 				func(reader io.Reader) {
 					defer pw.Close()
 					io.Copy(pw, reader)

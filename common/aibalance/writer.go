@@ -64,7 +64,7 @@ func NewChatJSONChunkWriter(writer io.WriteCloser, uid string, model string) *ch
 func (w *chatJSONChunkWriter) buildDelta(reason bool, content string) ([]byte, error) {
 	outputField := "content"
 	if reason {
-		outputField = "reason_content"
+		outputField = "reasoning_content"
 	}
 	result := map[string]any{
 		"id":      "chat-ai-balance-" + w.uid,
@@ -90,7 +90,7 @@ func (w *chatJSONChunkWriter) buildMessage(reasonContent string, content string)
 		"role": "assistant",
 	}
 	if reasonContent != "" {
-		r["reason_content"] = reasonContent
+		r["reasoning_content"] = reasonContent
 	}
 	r["content"] = content
 	result := map[string]any{

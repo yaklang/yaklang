@@ -69,7 +69,7 @@ func TestProvider_GetAIClient(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client, err := tt.provider.GetAIClient(nil, nil)
+			client, err := tt.provider.GetAIClient(false, nil, nil)
 			if tt.expectError {
 				assert.Error(t, err)
 				assert.Nil(t, client)
@@ -106,7 +106,7 @@ func TestProvider_GetAIClient_Performance(t *testing.T) {
 	for _, provider := range providers {
 		t.Run(provider.TypeName, func(t *testing.T) {
 			start := time.Now()
-			_, err := provider.GetAIClient(nil, nil)
+			_, err := provider.GetAIClient(false, nil, nil)
 			assert.NoError(t, err)
 			duration := time.Since(start)
 
