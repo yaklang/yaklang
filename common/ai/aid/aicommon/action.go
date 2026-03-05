@@ -166,6 +166,15 @@ func (a *Action) GetParams() aitool.InvokeParams {
 	return a.GetInvokeParams(a.generalParamKey)
 }
 
+func (a *Action) DumpRawParams() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.params == nil {
+		return "<nil>"
+	}
+	return a.params.Dump()
+}
+
 type ActionMaker struct {
 	actionName       string
 	alias            []string

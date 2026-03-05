@@ -275,12 +275,13 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 			actionType := getNextActionType(action)
 			if actionType == "" {
 				r.loadingStatus("动作类型为空 / Action Type Empty")
-				paramsDump := ""
-				if action != nil && action.GetParams() != nil {
-					paramsDump = utils.ShrinkString(action.GetParams().Dump(), 300)
+				if action != nil {
+					println("=== [DEBUG] action type is empty, raw params dump ===")
+					println(action.DumpRawParams())
+					println("=== [DEBUG] end raw params dump ===")
 				}
-				return utils.Errorf("action type is empty (parsed_params=%s, available_actions=%v)",
-					paramsDump, actionNames)
+				return utils.Errorf("action type is empty (available_actions=%v)",
+					actionNames)
 			}
 
 			r.loadingStatus(fmt.Sprintf("处理动作 [%s] / Processing Action [%s]", actionType, actionType))

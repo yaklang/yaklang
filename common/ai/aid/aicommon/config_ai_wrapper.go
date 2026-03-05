@@ -209,12 +209,15 @@ func (c *Config) wrapper(i AICallbackType) AICallbackType {
 		if outputBytes == 0 {
 			rawDump := origRsp.GetRawHTTPResponseDump()
 			if rawDump != "" {
-				c.EmitError("[AI Empty Response] model=%v:%v, cost=%v, input_tokens~%d. "+
-					"The AI model returned an empty response. Raw HTTP Response:\n%v",
-					provider, model, du, tokenSize, utils.ShrinkString(rawDump, 2048),
+				println(rawDump)
+				c.EmitWarning("[AI Empty Response] model=%v:%v, cost=%v, input_tokens~%d. "+
+					"The AI model returned HTTP 200 but generated 0 output tokens "+
+					"(finish_reason: stop without delta.content). "+
+					"This is typically a transient model-side issue and will be retried automatically.",
+					provider, model, du, tokenSize,
 				)
 			} else {
-				c.EmitError("[AI Empty Response] model=%v:%v, cost=%v, input_tokens~%d. "+
+				c.EmitWarning("[AI Empty Response] model=%v:%v, cost=%v, input_tokens~%d. "+
 					"The AI model returned an empty response. (no raw HTTP response available)",
 					provider, model, du, tokenSize,
 				)
