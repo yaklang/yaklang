@@ -68,7 +68,7 @@ func (prog *Program) GetFunctionEx(name, pkg string) *Function {
 	getFunc := func() (Value, bool) {
 		if fun, ok := prog.Funcs.Get(name); ok {
 			if !prog.PreHandler() {
-				fun.Build()
+				buildFunctionWithPerfTracking(fun)
 			}
 			return fun, true
 		}
@@ -83,7 +83,7 @@ func (prog *Program) GetFunctionEx(name, pkg string) *Function {
 		if fun, ok := ToFunction(val); ok {
 			//todo: fix se
 			if !prog.PreHandler() {
-				fun.Build()
+				buildFunctionWithPerfTracking(fun)
 			}
 			return fun
 		}

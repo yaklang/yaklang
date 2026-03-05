@@ -1,16 +1,16 @@
 package ssa
 
 import (
+	"fmt"
 	"path/filepath"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"go.uber.org/atomic"
 )
-
-const lazyBuildOtherFile = "__Other__" // 无法按文件归类的 LazyBuild 耗时（如 fixImportCallback）
 
 // lazyTask 将任务逻辑和任务数据分离开
 type lazyTask func()
@@ -45,26 +45,33 @@ func (l *LazyBuilder) AddLazyBuilder(work func(), async ...bool) {
 	l.tasks = append(l.tasks, lazyTask(work))
 }
 
-// Build 执行所有已添加的任务，该方法在整个生命周期中只会有效执行一次。
-func (l *LazyBuilder) Build() {
+// HasBeenBuilt 返回是否已完成构建（用于跳过重复追踪）
+func (l *LazyBuilder) HasBeenBuilt() bool {
 	if l == nil {
-		// log.Errorf("LazyBuilder is nil")
-		return
+		return true
+	}
+	return l.build.Load()
+}
+
+// Build 执行所有已添加的任务，该方法在整个生命周期中只会有效执行一次。
+// 返回值 hadTasks：是否曾通过 AddLazyBuilder 添加过任务（用于诊断从未添加任务的 case）
+func (l *LazyBuilder) Build() (hadTasks bool) {
+	if l == nil {
+		return false
 	}
 
 	if l.build.Load() {
-		// log.Errorf("LazyBuilder is nil or already built")
-		return // 已经构建过，直接返回
+		return false // 已经构建过，直接返回，不计入 hadTasks
 	}
 
 	l.build.Store(true)
 
 	l.mu.Lock()
-	defer l.mu.Unlock()
-
 	tasksToRun := l.tasks
 	l.tasks = nil // 【关键】立即清空，释放对闭包和上下文的引用
-	_ = tasksToRun
+	l.mu.Unlock()
+
+	hadTasks = len(tasksToRun) > 0
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -72,12 +79,12 @@ func (l *LazyBuilder) Build() {
 		}
 	}()
 
-	// // 依次执行所有任务
 	for _, task := range tasksToRun {
 		if task != nil {
 			task()
 		}
 	}
+	return hadTasks
 }
 
 type ASTIF interface {
@@ -119,62 +126,93 @@ func (p *Program) VisitAst(ast ASTIF) {
 	}
 }
 
-// getFuncFilename 从 Function 的 Range/Editor 获取文件名，用于 LazyBuild 按文件计时
-func getFuncFilename(fun *Function) string {
-	if fun == nil {
-		return ""
-	}
-	rng := fun.GetRange()
-	if rng == nil || rng.GetEditor() == nil {
-		return ""
-	}
-	return filepath.Base(rng.GetEditor().GetFilename())
+// makeLazyBuildID 生成程序级 LazyBuild 的 ID：package:file:funcName
+// @main 是程序入口，不绑定到具体文件，用 "-" 表示程序作用域
+func makeLazyBuildID(p *Program) string {
+	return makeBuildIDWithFile(p, "-", string(MainFunctionName))
 }
 
-// getBlueprintFilename 从 Blueprint 的方法中获取代表文件名
-func getBlueprintFilename(c *Blueprint) string {
-	if c == nil {
-		return ""
+// makeFunctionBuildID 生成 Function Build 的 ID：package:file:funcName
+// 优先从 fun.GetRange() 获取定义文件，避免 LazyBuild 时 GetCurrentEditor 指向最后一个文件
+func makeFunctionBuildID(p *Program, fun *Function) string {
+	funcName := fun.GetName()
+	if funcName == "" {
+		funcName = string(MainFunctionName)
 	}
-	for _, m := range c.NormalMethod {
-		if f := getFuncFilename(m); f != "" {
-			return f
+	file := ""
+	if r := fun.GetRange(); r != nil {
+		if e := r.GetEditor(); e != nil {
+			file = filepath.Base(e.GetFilename())
 		}
 	}
-	for _, m := range c.StaticMethod {
-		if f := getFuncFilename(m); f != "" {
-			return f
+	return makeBuildIDWithFile(p, file, funcName)
+}
+
+func makeBuildID(p *Program, funcName string) string {
+	return makeBuildIDWithFile(p, "", funcName)
+}
+
+func makeBuildIDWithFile(p *Program, file string, funcName string) string {
+	pkg := p.PkgName
+	if pkg == "" {
+		pkg = p.Name
+	}
+	if file == "" {
+		if e := p.GetCurrentEditor(); e != nil {
+			file = filepath.Base(e.GetFilename())
 		}
 	}
-	for _, v := range c.MagicMethod {
-		if m, ok := ToFunction(v); ok {
-			if f := getFuncFilename(m); f != "" {
-				return f
-			}
-		}
+	if file == "" {
+		file = p.Name
 	}
-	return ""
+	return fmt.Sprintf("%s:%s:%s", pkg, file, funcName)
+}
+
+func getBuildTreeTracker(p *Program) diagnostics.BuildTreeTracker {
+	if p == nil {
+		return nil
+	}
+	app := p.Application
+	if app == nil {
+		app = p
+	}
+	return app.BuildTreeTracker
+}
+
+// buildFunctionWithPerfTracking 构建函数并在 BuildTreeTracker 中记录（若启用）。
+// 用于 LazyBuild 主循环及按需构建（如 call 时构建 callee），确保所有函数都出现在性能树中。
+func buildFunctionWithPerfTracking(fun *Function) (hadTasks bool) {
+	if fun == nil {
+		return false
+	}
+	p := fun.GetProgram()
+	tracker := getBuildTreeTracker(p)
+	start := time.Now()
+	if tracker != nil {
+		tracker.PushLazyBuild(makeFunctionBuildID(p, fun))
+		defer func() {
+			tracker.PopLazyBuild(time.Since(start), hadTasks)
+		}()
+	}
+	hadTasks = fun.Build()
+	return hadTasks
 }
 
 func (p *Program) LazyBuild() {
-	trackByFile := p.OnLazyBuildCompleteByFile != nil || (p.Application != nil && p.Application.OnLazyBuildCompleteByFile != nil)
-	byFile := make(map[string]time.Duration)
-
-	addDuration := func(file string, d time.Duration) {
-		if file == "" {
-			file = lazyBuildOtherFile
-		}
-		byFile[file] += d
+	start := time.Now()
+	tracker := getBuildTreeTracker(p)
+	if tracker != nil {
+		id := makeLazyBuildID(p)
+		tracker.PushLazyBuild(id)
+		defer func() {
+			tracker.PopLazyBuildProgramLevel(time.Since(start), true)
+		}()
 	}
 
 	for _, key := range p.Blueprint.Keys() {
 		blueprint, ok := p.Blueprint.Get(key)
 		_ = ok
-		start := time.Now()
 		blueprint.Build()
-		if trackByFile {
-			addDuration(getBlueprintFilename(blueprint), time.Since(start))
-		}
 	}
 	visited := make(map[*Function]struct{})
 	var stack []*Function
@@ -196,11 +234,21 @@ func (p *Program) LazyBuild() {
 			continue
 		}
 		visited[fun] = struct{}{}
-		start := time.Now()
-		fun.Build()
-		if trackByFile {
-			addDuration(getFuncFilename(fun), time.Since(start))
+		// 已构建过：正常情况，不重复显示（不加入性能树）
+		if tracker != nil && fun.LazyBuilder != nil && fun.LazyBuilder.HasBeenBuilt() {
+			fun.Build()
+			for _, childID := range fun.ChildFuncs {
+				childValue, ok := fun.GetValueById(childID)
+				if !ok || childValue == nil {
+					continue
+				}
+				if childFunc, ok := ToFunction(childValue); ok && childFunc != nil {
+					stack = append(stack, childFunc)
+				}
+			}
+			continue
 		}
+		_ = buildFunctionWithPerfTracking(fun)
 		for _, childID := range fun.ChildFuncs {
 			childValue, ok := fun.GetValueById(childID)
 			if !ok || childValue == nil {
@@ -211,49 +259,25 @@ func (p *Program) LazyBuild() {
 			}
 		}
 	}
-	start := time.Now()
 	for _, f := range p.fixImportCallback {
 		f()
-	}
-	if trackByFile {
-		addDuration(lazyBuildOtherFile, time.Since(start))
 	}
 	for _, key := range p.Blueprint.Keys() {
 		blueprint, ok := p.Blueprint.Get(key)
 		_ = ok
-		start := time.Now()
 		blueprint.BuildConstructorAndDestructor()
-		if trackByFile {
-			addDuration(getBlueprintFilename(blueprint), time.Since(start))
-		}
 	}
 	function := p.GetFunction(string(MainFunctionName), "")
 	if function != nil {
-		start := time.Now()
 		function.Finish()
-		if trackByFile {
-			addDuration(getFuncFilename(function), time.Since(start))
-		}
 	}
 	virtualFunction := p.GetFunction(string(VirtualFunctionName), "")
 	if virtualFunction != nil {
-		start := time.Now()
 		virtualFunction.Finish()
-		if trackByFile {
-			addDuration(getFuncFilename(virtualFunction), time.Since(start))
-		}
 	}
 	if function == nil && virtualFunction == nil {
 		log.Errorf("main function is not found and virtual function is not found")
 		return
-	}
-
-	cbByFile := p.OnLazyBuildCompleteByFile
-	if cbByFile == nil && p.Application != nil {
-		cbByFile = p.Application.OnLazyBuildCompleteByFile
-	}
-	if cbByFile != nil && len(byFile) > 0 {
-		cbByFile(byFile)
 	}
 }
 

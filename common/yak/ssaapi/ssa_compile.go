@@ -149,8 +149,8 @@ func (c *Config) parseSimple(r *memedit.MemEditor) (ret *ssa.Program, err error)
 	astStart := time.Now()
 	ast, err := c.LanguageBuilder.ParseAST(r.GetSourceCode(), nil)
 	astDuration := time.Since(astStart)
-	if c.diagnosticsRecorder != nil {
-		c.diagnosticsRecorder.RecordDuration("SSA AST Parse", astDuration)
+	if c.DiagnosticsEnabled() {
+		c.DiagnosticsRecorder().RecordDuration("SSA AST Parse", astDuration)
 	}
 	defer c.LanguageBuilder.Clearup()
 	if !c.ignoreSyntaxErr && err != nil {
@@ -167,8 +167,8 @@ func (c *Config) parseSimple(r *memedit.MemEditor) (ret *ssa.Program, err error)
 	builder.Finish()
 	ssa4analyze.RunAnalyzer(prog)
 	buildDuration := time.Since(buildStart)
-	if c.diagnosticsRecorder != nil {
-		c.diagnosticsRecorder.RecordDuration("SSA Build", buildDuration)
+	if c.DiagnosticsEnabled() {
+		c.DiagnosticsRecorder().RecordDuration("SSA Build", buildDuration)
 	}
 
 	if diagnostics.Enabled(diagnostics.LevelLow) {

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -18,6 +19,9 @@ func (c *Config) init(filesystem filesys_interface.FileSystem, fileSize int) (*s
 	application.ProcessInfof = func(s string, v ...any) {
 		msg := fmt.Sprintf(s, v...)
 		log.Info(msg)
+	}
+	if c.GetFilePerformanceRecorderIfEnabled() != nil {
+		application.BuildTreeTracker = diagnostics.NewBuildTreeTracker()
 	}
 
 	application.Build = func(
