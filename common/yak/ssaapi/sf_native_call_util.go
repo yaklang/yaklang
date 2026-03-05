@@ -9,6 +9,10 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
+func mergeAnchorBitVectorToResult(result sfvm.ValueOperator, source sfvm.ValueOperator) {
+	sfvm.MergeAnchorBitVectorToResult(result, source)
+}
+
 var nativeCallString = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 	if isProgram(v) {
 		return false, nil, utils.Error("string is not supported in program")
@@ -28,6 +32,7 @@ var nativeCallString = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *s
 
 		results := val.NewConstValue(val.String(), val.GetRange())
 		results.AppendPredecessor(val, frame.WithPredecessorContext("string"))
+		mergeAnchorBitVectorToResult(results, val)
 		vals = append(vals, results)
 		return nil
 	})
@@ -48,6 +53,7 @@ var nativeCallStrLower = sfvm.NativeCallFunc(func(v sfvm.ValueOperator, frame *s
 			ss := codec.AnyToString(val.GetConstValue())
 			results := val.NewConstValue(strings.ToLower(ss), val.GetRange())
 			results.AppendPredecessor(val, frame.WithPredecessorContext("str-lower"))
+			mergeAnchorBitVectorToResult(results, val)
 			vals = append(vals, results)
 			return nil
 		}
@@ -70,6 +76,7 @@ var nativeCallStrUpper = sfvm.NativeCallFunc(func(v sfvm.ValueOperator, frame *s
 			ss := codec.AnyToString(val.GetConstValue())
 			results := val.NewConstValue(strings.ToUpper(ss), val.GetRange())
 			results.AppendPredecessor(val, frame.WithPredecessorContext("str-upper"))
+			mergeAnchorBitVectorToResult(results, val)
 			vals = append(vals, results)
 			return nil
 		}
@@ -98,59 +105,60 @@ var nativeCallRegexp = sfvm.NativeCallFunc(func(v sfvm.ValueOperator, frame *sfv
 		return false, nil, err
 	}
 
-	var vals []string
-	_ = v.Recursive(func(operator sfvm.ValueOperator) error {
-		val, ok := operator.(*Value)
-		if !ok {
-			return nil
-		}
-
-		if val.IsConstInst() {
-			vals = append(vals, codec.AnyToString(val.GetConstValue()))
-			return nil
-		}
-
-		next, calls, _ := nativeCallString(val, frame, nil)
-		if next {
-			_ = calls.Recursive(func(operator sfvm.ValueOperator) error {
-				val, ok := operator.(*Value)
-				if !ok {
-					return nil
-				}
-				if val.IsConstInst() {
-					vals = append(vals, codec.AnyToString(val.GetConstValue()))
-				}
-				return nil
-			})
-		}
-		return nil
-	})
-
 	prog, err := fetchProgram(v)
 	if err != nil {
 		return false, nil, err
 	}
 
 	var results []sfvm.ValueOperator
-	for _, raw := range vals {
-		for _, i := range re.FindAllStringSubmatch(raw, -1) {
-			if len(groupInt) > 0 {
-				for _, j := range groupInt {
-					if j >= 0 && j < len(i) {
-						ret := prog.NewConstValue(i[j])
-						_ = ret.AppendPredecessor(v, frame.WithPredecessorContext("regexp group"))
-						results = append(results, ret)
+	_ = v.Recursive(func(operator sfvm.ValueOperator) error {
+		val, ok := operator.(*Value)
+		if !ok {
+			return nil
+		}
+
+		var raws []string
+		if val.IsConstInst() {
+			raws = append(raws, codec.AnyToString(val.GetConstValue()))
+		} else {
+			next, calls, _ := nativeCallString(val, frame, nil)
+			if next {
+				_ = calls.Recursive(func(op sfvm.ValueOperator) error {
+					rawVal, ok := op.(*Value)
+					if !ok || !rawVal.IsConstInst() {
+						return nil
 					}
-				}
-			} else {
-				if len(i) > 0 {
-					ret := prog.NewConstValue(i[0])
-					_ = ret.AppendPredecessor(v, frame.WithPredecessorContext("regexp"))
-					results = append(results, ret)
-				}
+					raws = append(raws, codec.AnyToString(rawVal.GetConstValue()))
+					return nil
+				})
 			}
 		}
-	}
+
+		for _, raw := range raws {
+			for _, matched := range re.FindAllStringSubmatch(raw, -1) {
+				if len(groupInt) > 0 {
+					for _, group := range groupInt {
+						if group < 0 || group >= len(matched) {
+							continue
+						}
+						ret := prog.NewConstValue(matched[group])
+						_ = ret.AppendPredecessor(val, frame.WithPredecessorContext("regexp group"))
+						mergeAnchorBitVectorToResult(ret, val)
+						results = append(results, ret)
+					}
+					continue
+				}
+				if len(matched) == 0 {
+					continue
+				}
+				ret := prog.NewConstValue(matched[0])
+				_ = ret.AppendPredecessor(val, frame.WithPredecessorContext("regexp"))
+				mergeAnchorBitVectorToResult(ret, val)
+				results = append(results, ret)
+			}
+		}
+		return nil
+	})
 	if len(results) > 0 {
 		return true, sfvm.NewValues(results), nil
 	}

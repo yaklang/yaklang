@@ -135,6 +135,10 @@ func (y *singleFileBuilder) VisitAnnotation(annotationContext javaparser.IAnnota
 				variable := y.CreateMemberCallVariable(thisAnnotation, y.EmitConstInstPlaceholder(name))
 				y.AssignVariable(variable, v)
 			}
+			// Keep per-instance annotation container usable for forward traversal:
+			// `obj.annotation.<Anno>.__ref__` should point back to the annotated def/instance.
+			ref := y.CreateMemberCallVariable(thisAnnotation, y.EmitConstInstPlaceholder("__ref__"))
+			y.AssignVariable(ref, v)
 		}, func(value ssa.Value) {
 			/*
 				@RequestParam(value = "xml_str") String xmlStr

@@ -1091,11 +1091,11 @@ func (p *ProgramOverLay) IsEmpty() bool {
 	return true
 }
 
-func (p *ProgramOverLay) GetSourceBitVector() *utils.BitVector {
+func (p *ProgramOverLay) GetAnchorBitVector() *utils.BitVector {
 	return nil
 }
 
-func (p *ProgramOverLay) SetSourceBitVector(*utils.BitVector) {}
+func (p *ProgramOverLay) SetAnchorBitVector(*utils.BitVector) {}
 
 func (p *ProgramOverLay) ShouldUseConditionCandidate() bool {
 	return true

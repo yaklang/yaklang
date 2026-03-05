@@ -16,7 +16,7 @@ type OpCodes struct {
 	Opcode        []*SFI `json:"opcode"`
 }
 
-const CurrentOpcodeSchemaVersion = 1
+const CurrentOpcodeSchemaVersion = 2
 
 func ToOpCodes(code string) (*OpCodes, bool) {
 	var opcodes *OpCodes
@@ -329,9 +329,9 @@ func (s *SFI) String() string {
 	case OpLogicBang:
 		return fmt.Sprintf(verboseLen+" %v", "(operator) !", s.UnaryStr)
 	case OpConditionScopeStart:
-		return fmt.Sprintf(verboseLen+" %v", "condition-scope-start", s.UnaryStr)
+		return fmt.Sprintf(verboseLen+" anchor(%v)", "condition-scope-start", s.UnaryBool)
 	case OpConditionScopeEnd:
-		return fmt.Sprintf(verboseLen+" %v", "condition-scope-end", s.UnaryStr)
+		return fmt.Sprintf(verboseLen+" anchor(%v)", "condition-scope-end", s.UnaryBool)
 	case OpPop:
 		return fmt.Sprintf(verboseLen+" %v", "pop", s.UnaryStr)
 	case OpCheckParams:

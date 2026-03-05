@@ -153,8 +153,12 @@ type ValueOperator interface {
 	CompareConst(*ConstComparator) []bool
 	NewConst(any, ...*memedit.Range) ValueOperator
 
-	// Source bitvector provenance for condition mask alignment.
-	// The vector records which source slots this value can map back to.
-	GetSourceBitVector() *utils.BitVector
-	SetSourceBitVector(*utils.BitVector)
+	// Anchor bitvector provenance for condition mask alignment and scoped grouping.
+	//
+	// When a value is derived from a source list inside a condition scope, its
+	// AnchorBitVector records which source slot(s) it can map back to.
+	// Outside of condition scope, anchors are ignored and most operations behave
+	// as flat lists.
+	GetAnchorBitVector() *utils.BitVector
+	SetAnchorBitVector(*utils.BitVector)
 }

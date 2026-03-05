@@ -146,11 +146,22 @@ func MergeValues(allVs ...Values) Values {
 			return
 		}
 		// template value will not merge, this value create in query Runtime
-		if v.GetId() == -1 {
-			templateValue = append(templateValue, v)
-			return
-		}
-		if existValue, exist := tmp.Get(v.GetId()); exist {
+			if v.GetId() == -1 {
+				templateValue = append(templateValue, v)
+				return
+			}
+			if existValue, exist := tmp.Get(v.GetId()); exist {
+				if anchorBits := v.GetAnchorBitVector(); anchorBits != nil && !anchorBits.IsEmpty() {
+					existingBits := existValue.GetAnchorBitVector()
+					if existingBits == nil || existingBits.IsEmpty() {
+						existValue.SetAnchorBitVector(anchorBits)
+					} else {
+						merged := existingBits.Clone()
+						merged.Or(anchorBits)
+						existValue.SetAnchorBitVector(merged)
+					}
+				}
+
 			// merge v to exist value
 			if v.EffectOn != nil {
 				v.EffectOn.ForEach(func(key string, effect *Value) bool {

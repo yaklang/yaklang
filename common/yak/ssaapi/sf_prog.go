@@ -168,11 +168,11 @@ func (p *Program) IsEmpty() bool {
 	return p == nil || p.Program == nil
 }
 
-func (p *Program) GetSourceBitVector() *utils.BitVector {
+func (p *Program) GetAnchorBitVector() *utils.BitVector {
 	return nil
 }
 
-func (p *Program) SetSourceBitVector(*utils.BitVector) {}
+func (p *Program) SetAnchorBitVector(*utils.BitVector) {}
 
 func (p *Program) AppendPredecessor(sfvm.ValueOperator, ...sfvm.AnalysisContextOption) error {
 	// return nil will not change the predecessor

@@ -76,7 +76,6 @@ func nativeCallInclude(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.N
 		log.Warnf("get syntaxflow rule library %v error: %v", ruleName, err)
 		return false, nil, err
 	}
-
 	var queryValue sfvm.ValueOperator
 	if len(inputs) == 0 {
 		queryValue = parent

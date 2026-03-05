@@ -205,6 +205,12 @@ func (y *SyntaxFlowVisitor) VisitConditionExpression(raw sf.IConditionExpression
 
 	switch i := raw.(type) {
 	case *sf.FilterConditionContext:
+		// Compatibility shortcut:
+		// in expressions like `have:'A' || 'B'`, parser can produce the right branch
+		// as a plain const filter condition; normalize it to compare-string semantics.
+		if y.tryEmitConstStringShortcutCondition(i) {
+			return true
+		}
 		y.EmitDuplicate()
 		err := y.VisitFilterExpr(i.FilterExpr())
 		if err != nil {
@@ -213,6 +219,36 @@ func (y *SyntaxFlowVisitor) VisitConditionExpression(raw sf.IConditionExpression
 		}
 		y.EmitFilter()
 		return true
+	case *sf.FilterExpressionBinaryCompareContext:
+		// Binary compare against the result of a filterExpr, e.g. `*<len>==2` or `.*<len>!=0`.
+		//
+		// Implementation strategy:
+		// 1) Evaluate filterExpr on a duplicated source list -> derived values.
+		// 2) Compare derived values with a literal -> condition entry (derived mask).
+		// 3) Apply that condition to derived values -> filtered derived values.
+		// 4) Map filtered derived values back to the original source via OpFilter.
+		y.EmitDuplicate()
+		if err := y.VisitFilterExpr(i.FilterExpr()); err != nil {
+			log.Warnf("compile filter-expr in binary compare failed: %v", err)
+			return err
+		}
+		if i.NumberLiteral() != nil {
+			n := y.VisitNumberLiteral(i.NumberLiteral())
+			y.EmitPushLiteral(n)
+		} else if i.Identifier() != nil {
+			y.EmitPushLiteral(yakunquote.TryUnquote(i.Identifier().GetText()))
+		} else if i.BoolLiteral() != nil {
+			if yakunquote.TryUnquote(i.BoolLiteral().GetText()) == "true" {
+				y.EmitPushLiteral(true)
+			} else {
+				y.EmitPushLiteral(false)
+			}
+		}
+		y.EmitOperator(i.GetOp().GetText())
+		// Filter derived values by the comparison result.
+		y.EmitCondition()
+		// Map back to the original source list.
+		y.EmitFilter()
 	case *sf.OpcodeTypeConditionContext:
 		opcodes := i.AllOpcodesCondition()
 		ops := make([]string, 0, len(opcodes))
@@ -314,6 +350,54 @@ func (y *SyntaxFlowVisitor) VisitConditionExpression(raw sf.IConditionExpression
 	}
 
 	return nil
+}
+
+func (y *SyntaxFlowVisitor) tryEmitConstStringShortcutCondition(i *sf.FilterConditionContext) bool {
+	if y == nil || i == nil {
+		return false
+	}
+	expr, ok := i.FilterExpr().(*sf.FilterExprContext)
+	if !ok || expr == nil {
+		return false
+	}
+	if len(expr.AllFilterItem()) != 0 {
+		return false
+	}
+	first, ok := expr.FilterItemFirst().(*sf.ConstFilterContext)
+	if !ok || first == nil {
+		return false
+	}
+
+	pattern := ""
+	mode := ExactConditionFilter
+	if first.QuotedStringLiteral() != nil {
+		pattern = yakunquote.TryUnquote(first.QuotedStringLiteral().GetText())
+	} else if first.HereDoc() != nil {
+		pattern = y.VisitHereDoc(first.HereDoc())
+	} else {
+		return false
+	}
+
+	if prefix, ok := first.ConstSearchPrefix().(*sf.ConstSearchPrefixContext); ok && prefix != nil {
+		switch {
+		case prefix.ConstSearchModePrefixGlob() != nil:
+			mode = GlobalConditionFilter
+		case prefix.ConstSearchModePrefixRegexp() != nil:
+			mode = RegexpConditionFilter
+		case prefix.ConstSearchModePrefixExact() != nil:
+			mode = ExactConditionFilter
+		}
+	} else if glob, isGlob := y.FormatStringOrGlob(pattern); isGlob {
+		mode = GlobalConditionFilter
+		pattern = glob
+	}
+
+	y.EmitCompareString([]func() (string, ConditionFilterMode){
+		func() (string, ConditionFilterMode) {
+			return pattern, mode
+		},
+	}, MatchHave)
+	return true
 }
 
 const tmpPH = "__[[PLACEHOLDER]]__"

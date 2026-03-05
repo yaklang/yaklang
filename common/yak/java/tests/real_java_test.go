@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/trace"
+	"strings"
 	"testing"
 	"time"
 
@@ -361,11 +362,14 @@ func TestRuleRun(t *testing.T) {
 	require.NoError(t, err)
 	_ = rule
 
-	diagnostics.SetLevel(diagnostics.LevelLow)
 
 	progName := "RuoYi-Cloud-Plus(2025-12-03 15:22:29)"
 	prog, err := ssaapi.FromDatabase(progName)
+	if err != nil && strings.Contains(err.Error(), "record not found") {
+		t.Skipf("skip TestRuleRun: program %q is not in local ssa database", progName)
+	}
 	require.NoError(t, err)
+	diagnostics.SetLevel(diagnostics.LevelLow)
 
 	content := `
 

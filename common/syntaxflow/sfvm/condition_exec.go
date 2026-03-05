@@ -73,64 +73,6 @@ func conditionModeFromSource(source ValueOperator) ConditionMode {
 	return ConditionModeMask
 }
 
-func flattenValues(value ValueOperator) []ValueOperator {
-	if utils.IsNil(value) {
-		return nil
-	}
-	var result []ValueOperator
-	_ = value.Recursive(func(operator ValueOperator) error {
-		result = append(result, operator)
-		return nil
-	})
-	return result
-}
-
-func ensureSourceBitVector(source []ValueOperator) {
-	for idx, src := range source {
-		if utils.IsNil(src) {
-			continue
-		}
-		bits := src.GetSourceBitVector()
-		if bits == nil {
-			bits = utils.NewBitVector()
-		}
-		bits.Set(idx)
-		src.SetSourceBitVector(bits)
-	}
-}
-
-func markMaskByBitVector(mask []bool, bits *utils.BitVector) bool {
-	if bits == nil || bits.IsEmpty() {
-		return false
-	}
-	matched := false
-	bits.ForEach(func(index int) {
-		if index >= 0 && index < len(mask) {
-			mask[index] = true
-			matched = true
-		}
-	})
-	return matched
-}
-
-func mergeSourceBitVector(dst ValueOperator, src ValueOperator) {
-	if utils.IsNil(dst) || utils.IsNil(src) {
-		return
-	}
-	srcBits := src.GetSourceBitVector()
-	if srcBits == nil || srcBits.IsEmpty() {
-		return
-	}
-	dstBits := dst.GetSourceBitVector()
-	if dstBits == nil {
-		dst.SetSourceBitVector(srcBits)
-		return
-	}
-	merged := dstBits.Clone()
-	merged.Or(srcBits)
-	dst.SetSourceBitVector(merged)
-}
-
 func buildValueByID(values []ValueOperator) map[int64]ValueOperator {
 	res := make(map[int64]ValueOperator, len(values))
 	for _, value := range values {
@@ -150,10 +92,10 @@ func normalizeConditionAgainstSource(source ValueOperator, result ValueOperator,
 	if width == 0 {
 		return nil, nil
 	}
-	ensureSourceBitVector(sourceVals)
 	if len(cond) == width {
 		return cond, nil
 	}
+	sourceIdentityIndex := buildValueIdentityIndex(sourceVals)
 
 	// Program/overlay-like singleton source: cond can be omitted and derived from result existence.
 	if width == 1 {
@@ -170,33 +112,22 @@ func normalizeConditionAgainstSource(source ValueOperator, result ValueOperator,
 		return []bool{matched}, nil
 	}
 
-	// General case: map result values back to source by bitvector only.
+	// General case: map result values back to source by anchor bits (with identity fallback).
 	mask := make([]bool, width)
-	hasTruthCondition := len(cond) == 0
-	resIndex := 0
-	if !utils.IsNil(result) {
+	resultPresent := !utils.IsNil(result) && !result.IsEmpty()
+	if resultPresent {
 		if err := result.Recursive(func(operator ValueOperator) error {
-			if utils.IsNil(operator) {
-				resIndex++
+			if utils.IsNil(operator) || operator.IsEmpty() {
 				return nil
 			}
-			truthy := len(cond) == 0
-			if len(cond) > 0 {
-				truthy = resIndex < len(cond) && cond[resIndex]
+			matched := markMaskByBitVector(mask, operator.GetAnchorBitVector())
+			if !matched {
+				markMaskByValueIdentity(mask, sourceIdentityIndex, operator)
 			}
-			resIndex++
-			if !truthy {
-				return nil
-			}
-			hasTruthCondition = true
-			markMaskByBitVector(mask, operator.GetSourceBitVector())
 			return nil
 		}); err != nil {
 			return nil, err
 		}
-	}
-	if !hasTruthCondition {
-		return mask, nil
 	}
 	return mask, nil
 }
@@ -301,10 +232,10 @@ func mergeValuesByID(left ValueOperator, right ValueOperator, andMode bool) Valu
 			continue
 		}
 		if leftValue, ok := leftByIDMap[idGetter.GetId()]; ok {
-			mergeSourceBitVector(value, leftValue)
+			mergeAnchorBitVector(value, leftValue)
 		}
 		if rightValue, ok := rightByIDMap[idGetter.GetId()]; ok {
-			mergeSourceBitVector(value, rightValue)
+			mergeAnchorBitVector(value, rightValue)
 		}
 	}
 	return NewValues(out)
@@ -404,17 +335,17 @@ func (s *SFFrame) applyLogicBinaryCondition(andMode bool) error {
 
 func buildFilterMask(source ValueOperator, cond ValueOperator) ([]bool, error) {
 	srcValues := flattenValues(source)
-	ensureSourceBitVector(srcValues)
 	mask := make([]bool, len(srcValues))
+	sourceIdentityIndex := buildValueIdentityIndex(srcValues)
 
 	if err := cond.Recursive(func(operator ValueOperator) error {
-		if utils.IsNil(operator) {
+		if utils.IsNil(operator) || operator.IsEmpty() {
 			return nil
 		}
-		if operator.IsEmpty() {
-			return nil
+		matched := markMaskByBitVector(mask, operator.GetAnchorBitVector())
+		if !matched {
+			markMaskByValueIdentity(mask, sourceIdentityIndex, operator)
 		}
-		markMaskByBitVector(mask, operator.GetSourceBitVector())
 		return nil
 	}); err != nil {
 		return nil, err

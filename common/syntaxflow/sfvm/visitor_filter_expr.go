@@ -45,6 +45,9 @@ func (y *SyntaxFlowVisitor) VisitFilterItem(raw sf.IFilterItemContext) error {
 	case *sf.FunctionCallFilterContext:
 		//先拿到所有的call，然后再去拿callArgs
 		y.EmitGetCall()
+		// Call-arg filtering relies on grouping by the parent call; anchor the call list
+		// so args can map back to their originating call via AnchorBitVector.
+		y.EmitAnchorScopeStart()
 		y.EmitOpEmptyCompare()
 		if filter.ActualParam() != nil {
 			y.VisitActualParam(filter.ActualParam(), filter.Question() != nil)
@@ -52,6 +55,7 @@ func (y *SyntaxFlowVisitor) VisitFilterItem(raw sf.IFilterItemContext) error {
 			// no actual-param filter: keep original call filtering behavior
 			y.EmitCondition()
 		}
+		y.EmitAnchorScopeEnd()
 		//检查栈顶，应该可以被里面的值影响到
 		y.EmitCheckStackTop()
 	case *sf.DeepChainFilterContext:
@@ -73,8 +77,10 @@ func (y *SyntaxFlowVisitor) VisitFilterItem(raw sf.IFilterItemContext) error {
 			y.VisitNameFilter(true, member.NameFilter())
 		}
 	case *sf.OptionalFilterContext:
+		y.EmitAnchorScopeStart()
 		y.VisitConditionExpression(filter.ConditionExpression())
 		y.EmitCondition()
+		y.EmitAnchorScopeEnd()
 	case *sf.NextFilterContext:
 		y.EmitGetUsers()
 	case *sf.DefFilterContext:
@@ -308,22 +314,65 @@ func (y *SyntaxFlowVisitor) VisitNameFilter(isMember bool, i sf.INameFilterConte
 }
 
 func (y *SyntaxFlowVisitor) VisitActualParam(i sf.IActualParamContext, haveQuestion bool) error {
-	handlerStatement := func(i sf.ISingleParamContext) {
-		ret, ok := (i).(*sf.SingleParamContext)
-		if !ok {
-			return
+	handleFilterStatement := func(single sf.ISingleParamContext) bool {
+		ret, ok := single.(*sf.SingleParamContext)
+		if !ok || ret == nil || ret.FilterStatement() == nil {
+			return false
 		}
-		if ret.FilterStatement() != nil {
-			y.VisitFilterStatement(ret.FilterStatement())
+
+		// VisitFilterStatement always consumes stack top via update/pop.
+		// Actual-param filtering needs that consumed value again for OpFilter.
+		y.VisitFilterStatement(ret.FilterStatement())
+		return true
+	}
+
+	handleConditionExpression := func(single sf.ISingleParamContext) bool {
+		ret, ok := single.(*sf.SingleParamContext)
+		if !ok || ret == nil || ret.ConditionExpression() == nil {
+			return false
 		}
-		// TODO: handler recursive config
+
+		cond := ret.ConditionExpression()
+		// Special-case binary compare like `*<len>==2`:
+		// keep call-level grouping (call anchor) and return the derived values
+		// that satisfy the compare so OpFilter can map them back to the call list.
+		if binary, ok := cond.(*sf.FilterExpressionBinaryCompareContext); ok {
+			if err := y.VisitFilterExpr(binary.FilterExpr()); err != nil {
+				return true
+			}
+			if binary.NumberLiteral() != nil {
+				n := y.VisitNumberLiteral(binary.NumberLiteral())
+				y.EmitPushLiteral(n)
+			} else if binary.Identifier() != nil {
+				y.EmitPushLiteral(yakunquote.TryUnquote(binary.Identifier().GetText()))
+			} else if binary.BoolLiteral() != nil {
+				if yakunquote.TryUnquote(binary.BoolLiteral().GetText()) == "true" {
+					y.EmitPushLiteral(true)
+				} else {
+					y.EmitPushLiteral(false)
+				}
+			}
+			y.EmitOperator(binary.GetOp().GetText())
+			y.EmitCondition()
+			return true
+		}
+
+		// General case: interpret `?(condExpr)` as `*?{condExpr}` (filter call args),
+		// i.e. produce a filtered arg list that still maps back to the parent call.
+		y.EmitAnchorScopeStart()
+		y.VisitConditionExpression(cond)
+		y.EmitCondition()
+		y.EmitAnchorScopeEnd()
+		return true
 	}
 	switch ret := i.(type) {
 	case *sf.AllParamContext:
 		statement := y.EmitEnterStatement()
-		y.EmitDuplicate()
 		y.EmitPushCallArgs(0, true)
-		handlerStatement(ret.SingleParam())
+		if handleFilterStatement(ret.SingleParam()) {
+			y.EmitOpPopDuplicate()
+		} else if handleConditionExpression(ret.SingleParam()) {
+		}
 		y.EmitFilter()
 		y.EmitCondition()
 		y.EmitExitStatement(statement)
@@ -339,9 +388,11 @@ func (y *SyntaxFlowVisitor) VisitActualParam(i sf.IActualParamContext, haveQuest
 				continue
 			}
 			statement := y.EmitEnterStatement()
-			y.EmitDuplicate()
 			y.EmitPushCallArgs(i, false)
-			handlerStatement(single)
+			if handleFilterStatement(single) {
+				y.EmitOpPopDuplicate()
+			} else if handleConditionExpression(single) {
+			}
 			_ = haveQuestion
 			y.EmitFilter()
 			y.EmitCondition()
@@ -349,9 +400,11 @@ func (y *SyntaxFlowVisitor) VisitActualParam(i sf.IActualParamContext, haveQuest
 		}
 		if ret.SingleParam() != nil { // the last one get continue other value
 			statement := y.EmitEnterStatement()
-			y.EmitDuplicate()
 			y.EmitPushCallArgs(len(ret.AllActualParamFilter()), true)
-			handlerStatement(ret.SingleParam())
+			if handleFilterStatement(ret.SingleParam()) {
+				y.EmitOpPopDuplicate()
+			} else if handleConditionExpression(ret.SingleParam()) {
+			}
 			y.EmitFilter()
 			y.EmitCondition()
 			y.EmitExitStatement(statement)

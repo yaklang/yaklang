@@ -77,34 +77,38 @@ func (v *Value) IsList() bool {
 	return v.GetTypeKind() == ssa.SliceTypeKind
 }
 
-func (v *Value) GetSourceBitVector() *utils.BitVector {
-	if v == nil || v.sourceBits == nil {
+func (v *Value) GetAnchorBitVector() *utils.BitVector {
+	if v == nil || v.anchorBits == nil {
 		return nil
 	}
-	return v.sourceBits
+	return v.anchorBits
 }
 
-func (v *Value) SetSourceBitVector(bits *utils.BitVector) {
+func (v *Value) SetAnchorBitVector(bits *utils.BitVector) {
 	if v == nil {
 		return
 	}
 	if bits == nil {
-		v.sourceBits = nil
+		v.anchorBits = nil
 		return
 	}
-	v.sourceBits = bits.Clone()
+	v.anchorBits = bits.Clone()
 }
 
 func (v *Value) ExactMatch(ctx context.Context, mod ssadb.MatchMode, want string) (bool, sfvm.ValueOperator, error) {
 	value := _SearchValue(v, mod, func(s string) bool { return s == want }, sfvm.WithAnalysisContext_Label("search-exact:"+want))
-	return len(value) > 0, ValuesToSFValueList(value), nil
+	results := ValuesToSFValueList(value)
+	mergeAnchorBitVectorToResult(results, v)
+	return len(value) > 0, results, nil
 }
 
 func (v *Value) GlobMatch(ctx context.Context, mod ssadb.MatchMode, g string) (bool, sfvm.ValueOperator, error) {
 	value := _SearchValue(v, mod, func(s string) bool {
 		return glob.MustCompile(g).Match(s)
 	}, sfvm.WithAnalysisContext_Label("search-glob:"+g))
-	return len(value) > 0, ValuesToSFValueList(value), nil
+	results := ValuesToSFValueList(value)
+	mergeAnchorBitVectorToResult(results, v)
+	return len(value) > 0, results, nil
 }
 
 func (v *Value) Merge(sf ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
@@ -117,7 +121,9 @@ func (v *Value) RegexpMatch(ctx context.Context, mod ssadb.MatchMode, re string)
 	value := _SearchValue(v, mod, func(s string) bool {
 		return regexp.MustCompile(re).MatchString(s)
 	}, sfvm.WithAnalysisContext_Label("search-regexp:"+re))
-	return len(value) > 0, ValuesToSFValueList(value), nil
+	results := ValuesToSFValueList(value)
+	mergeAnchorBitVectorToResult(results, v)
+	return len(value) > 0, results, nil
 }
 
 func (v *Value) CompareString(items *sfvm.StringComparator) (sfvm.ValueOperator, []bool) {
@@ -179,6 +185,7 @@ func (v *Value) GetCallActualParams(start int, contain bool) (sfvm.ValueOperator
 			return
 		}
 		ret := v.NewValue(value)
+		ret.SetAnchorBitVector(v.GetAnchorBitVector())
 		ret.AppendPredecessor(v, sfvm.WithAnalysisContext_Label(
 			fmt.Sprintf("actual-args[%d](containRest:%v)", start, contain),
 		))
@@ -210,6 +217,7 @@ func (v *Value) GetCalled() (sfvm.ValueOperator, error) {
 	// 将 Values 转换为 sfvm.ValueList 才能调用 AppendPredecessor
 	retValueList := ValuesToSFValueList(ret)
 	retValueList.AppendPredecessor(v, sfvm.WithAnalysisContext_Label("call"))
+	mergeAnchorBitVectorToResult(retValueList, v)
 	return retValueList, nil
 }
 

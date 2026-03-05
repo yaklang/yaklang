@@ -10,7 +10,7 @@ import (
 type bitVectorValue struct {
 	*ValueList
 	name       string
-	sourceBits *utils.BitVector
+	anchorBits *utils.BitVector
 }
 
 func newBitVectorValue(name string) *bitVectorValue {
@@ -35,22 +35,22 @@ func (v *bitVectorValue) Merge(...ValueOperator) (ValueOperator, error) {
 	return nil, utils.Error("merge unsupported")
 }
 
-func (v *bitVectorValue) GetSourceBitVector() *utils.BitVector {
-	if v == nil || v.sourceBits == nil {
+func (v *bitVectorValue) GetAnchorBitVector() *utils.BitVector {
+	if v == nil || v.anchorBits == nil {
 		return nil
 	}
-	return v.sourceBits
+	return v.anchorBits
 }
 
-func (v *bitVectorValue) SetSourceBitVector(bits *utils.BitVector) {
+func (v *bitVectorValue) SetAnchorBitVector(bits *utils.BitVector) {
 	if v == nil {
 		return
 	}
 	if bits == nil {
-		v.sourceBits = nil
+		v.anchorBits = nil
 		return
 	}
-	v.sourceBits = bits.Clone()
+	v.anchorBits = bits.Clone()
 }
 
 func TestNormalizeConditionAgainstSource_UsesBitVectorForDuplicateSource(t *testing.T) {
@@ -63,6 +63,28 @@ func TestNormalizeConditionAgainstSource_UsesBitVectorForDuplicateSource(t *test
 	require.Equal(t, []bool{true, true}, mask)
 }
 
+func TestNormalizeConditionAgainstSource_AlignedConditionShouldNotRewriteSourceBitVector(t *testing.T) {
+	a := newBitVectorValue("a")
+	aBits := utils.NewBitVector()
+	aBits.Set(3)
+	a.SetAnchorBitVector(aBits)
+
+	b := newBitVectorValue("b")
+	bBits := utils.NewBitVector()
+	bBits.Set(5)
+	b.SetAnchorBitVector(bBits)
+
+	source := &ValueList{Values: []ValueOperator{a, b}}
+	mask, err := normalizeConditionAgainstSource(source, nil, []bool{true, false})
+	require.NoError(t, err)
+	require.Equal(t, []bool{true, false}, mask)
+
+	require.True(t, a.GetAnchorBitVector().Has(3))
+	require.False(t, a.GetAnchorBitVector().Has(0))
+	require.True(t, b.GetAnchorBitVector().Has(5))
+	require.False(t, b.GetAnchorBitVector().Has(1))
+}
+
 func TestBuildFilterMask_UsesBitVector(t *testing.T) {
 	a := newBitVectorValue("a")
 	b := newBitVectorValue("b")
@@ -73,7 +95,7 @@ func TestBuildFilterMask_UsesBitVector(t *testing.T) {
 	condBits := utils.NewBitVector()
 	condBits.Set(0)
 	condBits.Set(2)
-	condVal.SetSourceBitVector(condBits)
+	condVal.SetAnchorBitVector(condBits)
 
 	mask, err := buildFilterMask(source, &ValueList{Values: []ValueOperator{condVal}})
 	require.NoError(t, err)
@@ -117,4 +139,21 @@ func TestFilterValueByMask_LengthMismatch(t *testing.T) {
 
 	_, err := filterValueByMask(source, []bool{true})
 	require.Error(t, err)
+}
+
+func TestNormalizeConditionAgainstSource_DerivesMaskFromAnchorBitVector(t *testing.T) {
+	a := newBitVectorValue("a")
+	b := newBitVectorValue("b")
+	c := newBitVectorValue("c")
+	source := &ValueList{Values: []ValueOperator{a, b, c}}
+
+	cond := newBitVectorValue("cond")
+	condBits := utils.NewBitVector()
+	condBits.Set(0)
+	condBits.Set(2)
+	cond.SetAnchorBitVector(condBits)
+
+	mask, err := normalizeConditionAgainstSource(source, &ValueList{Values: []ValueOperator{cond}}, nil)
+	require.NoError(t, err)
+	require.Equal(t, []bool{true, false, true}, mask)
 }
