@@ -221,9 +221,10 @@ func logCompileStageMessage(command string, config *ssaCliConfig) {
 	}
 
 	log.Infof(
-		"[%s] compile options: re-compile=%v entry-files=%d exclude-files=%d file-perf-log=%v compile-memory=%v scan-memory=%v",
+		"[%s] compile options: re-compile=%v concurrency=%d entry-files=%d exclude-files=%d file-perf-log=%v compile-memory=%v scan-memory=%v",
 		command,
 		config.GetCompileReCompile(),
+		config.GetCompileConcurrency(),
 		len(config.GetCompileEntryFiles()),
 		len(config.GetCompileExcludeFiles()),
 		config.GetCompileFilePerformanceLog(),
@@ -428,6 +429,9 @@ func parseCompileConfigFromCli(c *cli.Context) (res *ssaCliConfig, err error) {
 	}
 	if c.Bool("file-perf-log") {
 		opts = append(opts, ssaconfig.WithCompileFilePerformanceLog(true))
+	}
+	if concurrency := c.Int("concurrency"); concurrency > 0 {
+		opts = append(opts, ssaconfig.WithCompileConcurrency(concurrency))
 	}
 
 	cfg, err := ssaconfig.NewCLIScanConfig(opts...)

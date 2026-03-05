@@ -205,7 +205,8 @@ configData = cli.Json("config_data",
         "compile_concurrency": {
           "title": "编译并发数",
           "type": "integer",
-          "default": 10
+          "default": 10,
+          "description": "同时解析源文件的 worker 数量。未显式设置或设为 0 时，默认使用 核心数量/2（runtime.NumCPU()/2，至少为 1）。与 CPU 核心数相关但不是同一概念：核心数是硬件限制，此配置为业务并发度。"
         },
         "enable_incremental_compile": {
           "title": "启用增量编译",

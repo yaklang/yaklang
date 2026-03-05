@@ -116,6 +116,8 @@ func defaultCodeSourceConfig() *CodeSourceInfo {
 	}
 }
 
+// defaultCompileConcurrency 返回默认编译并发数：未显式设置时为 核心数量/2。
+// 与 runtime.NumCPU() 相关：用于限制并行解析源文件的 worker 数，留出部分 CPU 给其他任务。
 func defaultCompileConcurrency() int {
 	n := runtime.NumCPU() / 2
 	if n < 1 {
