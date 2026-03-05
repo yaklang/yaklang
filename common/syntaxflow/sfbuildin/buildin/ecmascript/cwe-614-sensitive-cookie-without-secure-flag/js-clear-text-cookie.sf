@@ -3,7 +3,7 @@ desc(
 	title_zh: "Cookie 未设置 Secure 标志，可能被明文传输"
 	type: vuln
 	level: warning
-	risk: "sensitive-cookie-cleartext"
+	risk_type: "sensitive-cookie-cleartext"
 	desc: <<<DESC
 ### 漏洞描述
 

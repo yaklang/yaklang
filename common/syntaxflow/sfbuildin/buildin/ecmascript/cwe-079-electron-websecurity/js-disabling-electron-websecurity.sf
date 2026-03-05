@@ -3,7 +3,7 @@ desc(
 	title_zh: "Electron webSecurity 被禁用"
 	type: vuln
 	level: warning
-	risk: "xss"
+	risk_type: "xss"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -132,7 +132,7 @@ new BrowserWindow({ webPreferences: { webSecurity: true } });
 new BrowserWindow({ webPreferences: {} });
 ```
 SOLUTION
-	risk: "xss",
+	risk: "跨站脚本（XSS）",
 	name: "disabledWebSecurity",
 }
 

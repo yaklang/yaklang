@@ -3,7 +3,7 @@ desc(
 	title_zh: "Express.js 中间件使用区分大小写的正则表达式路径"
 	type: vuln
 	level: warning
-	risk: "authorization-bypass"
+	risk_type: "authorization-bypass"
 	desc: <<<DESC
 ### 漏洞描述
 

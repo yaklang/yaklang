@@ -52,7 +52,6 @@ func runOnFile(t *testing.T, ruleContent, filename, code string) (total, warning
 // ============================================================
 
 // TestClearTextCookie_Positive_SetHeaderTemplate 验证 setHeader 使用不含 Secure 的模板字符串应触发告警。
-// 对应 irify/ts-sf-rules/cwe-614/clear-text-transmission-of-sensitive-cookie/positive.js
 func TestClearTextCookie_Positive_SetHeaderTemplate(t *testing.T) {
 	rule := loadClearTextCookieRule(t)
 	total, _ := runOnFile(t, rule, "positive.js", `
@@ -68,7 +67,6 @@ const server = http.createServer((req, res) => {
 }
 
 // TestClearTextCookie_Negative_SetHeaderTemplateWithSecure 验证 setHeader 含 secure; httpOnly 的模板字符串不触发告警。
-// 对应 irify/ts-sf-rules/cwe-614/clear-text-transmission-of-sensitive-cookie/negative.js
 func TestClearTextCookie_Negative_SetHeaderTemplateWithSecure(t *testing.T) {
 	rule := loadClearTextCookieRule(t)
 	total, _ := runOnFile(t, rule, "negative.js", `
