@@ -11,9 +11,12 @@ import (
 )
 
 type OpCodes struct {
-	Version string `json:"version"`
-	Opcode  []*SFI `json:"opcode"`
+	Version       string `json:"version"`
+	SchemaVersion int    `json:"schema_version,omitempty"`
+	Opcode        []*SFI `json:"opcode"`
 }
+
+const CurrentOpcodeSchemaVersion = 1
 
 func ToOpCodes(code string) (*OpCodes, bool) {
 	var opcodes *OpCodes
@@ -21,8 +24,22 @@ func ToOpCodes(code string) (*OpCodes, bool) {
 		log.Errorf("to opcode fail: %s", err)
 		return nil, false
 	}
-	// check version
-	if consts.GetYakVersion() != "dev" && opcodes.Version != "dev" && opcodes.Version != consts.GetYakVersion() {
+	if opcodes.SchemaVersion != CurrentOpcodeSchemaVersion {
+		return nil, false
+	}
+
+	// OpCode payload is cache-only optimization:
+	// - runtime dev build: always ignore payload
+	// - payload marked dev: always ignore payload
+	// - version mismatch: ignore payload
+	runtimeVersion := consts.GetYakVersion()
+	if runtimeVersion == "" || runtimeVersion == "dev" {
+		return nil, false
+	}
+	if opcodes.Version == "" || opcodes.Version == "dev" {
+		return nil, false
+	}
+	if opcodes.Version != runtimeVersion {
 		return nil, false
 	}
 
@@ -30,8 +47,9 @@ func ToOpCodes(code string) (*OpCodes, bool) {
 }
 func (y *SyntaxFlowVisitor) ToString() string {
 	p := &OpCodes{
-		Version: consts.GetYakVersion(),
-		Opcode:  y.codes,
+		Version:       consts.GetYakVersion(),
+		SchemaVersion: CurrentOpcodeSchemaVersion,
+		Opcode:        y.codes,
 	}
 
 	var result string
