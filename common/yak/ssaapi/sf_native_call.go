@@ -3,6 +3,7 @@ package ssaapi
 import (
 	"fmt"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -248,15 +249,44 @@ func init() {
 		return true, sfvm.NewValues(result), nil
 	}))
 	registerNativeCall(NativeCall_Length, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
-		count := 0
-		v.Recursive(func(operator sfvm.ValueOperator) error {
-			switch operator.(type) {
-			case *Value, *Program:
-				count++
+		if width, ok := frame.ActiveAnchorWidth(); ok && width > 0 {
+			counts := make([]int, width)
+			_ = v.Recursive(func(operator sfvm.ValueOperator) error {
+				if utils.IsNil(operator) || operator.IsEmpty() {
+					return nil
+				}
+				bits := operator.GetAnchorBitVector()
+				if bits == nil || bits.IsEmpty() {
+					return nil
+				}
+				bits.ForEach(func(index int) {
+					if index >= 0 && index < width {
+						counts[index]++
+					}
+				})
+				return nil
+			})
+
+			results := make([]sfvm.ValueOperator, 0, width)
+			for index, count := range counts {
+				ret := v.NewConst(count)
+				bits := utils.NewBitVector()
+				bits.Set(index)
+				ret.SetAnchorBitVector(bits)
+				results = append(results, ret)
 			}
+			return true, sfvm.NewValues(results), nil
+		}
+
+		flatCount := 0
+		_ = v.Recursive(func(operator sfvm.ValueOperator) error {
+			if utils.IsNil(operator) || operator.IsEmpty() {
+				return nil
+			}
+			flatCount++
 			return nil
 		})
-		return true, v.NewConst(count), nil
+		return true, v.NewConst(flatCount), nil
 	}))
 
 	registerNativeCall(NativeCall_GetInterfaceBlueprint, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
@@ -382,13 +412,13 @@ func init() {
 		return true, sfvm.NewValues(result), nil
 	}))
 
-	registerNativeCall(NativeCall_GetActualParams, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
-		result, err := v.GetCallActualParams(0, true)
-		if err != nil {
-			return false, nil, err
-		}
-		return true, result, nil
-	}), nc_desc("获取实际参数"))
+		registerNativeCall(NativeCall_GetActualParams, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+			result, err := v.GetCallActualParams(0, true)
+			if err != nil {
+				return false, nil, err
+			}
+			return true, result, nil
+		}), nc_desc("获取实际参数"))
 	registerNativeCall(NativeCall_GetUsers, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		depth := params.GetInt(0, "depth")
 		var result []sfvm.ValueOperator
@@ -741,19 +771,27 @@ func init() {
 			mode, rule string
 		)
 
+			appendResult := func(source sfvm.ValueOperator, matched sfvm.ValueOperator) {
+				if utils.IsNil(matched) || matched.IsEmpty() {
+					return
+				}
+				mergeAnchorBitVectorToResult(matched, source)
+				results = append(results, matched)
+			}
+
 		constHandler := func(operator sfvm.ValueOperator) {
 			switch mode {
 			case "e":
 				if match, valueOperator, err := operator.ExactMatch(frame.GetContext(), ssadb.ConstType, rule); match && err == nil {
-					results = append(results, valueOperator)
+					appendResult(operator, valueOperator)
 				}
 			case "g":
 				if match, valueOperator, err := operator.GlobMatch(frame.GetContext(), ssadb.ConstType, rule); match && err == nil {
-					results = append(results, valueOperator)
+					appendResult(operator, valueOperator)
 				}
 			case "r":
 				if match, valueOperator, err := operator.RegexpMatch(frame.GetContext(), ssadb.ConstType, rule); match && err == nil {
-					results = append(results, valueOperator)
+					appendResult(operator, valueOperator)
 				}
 			}
 		}
@@ -851,23 +889,67 @@ func init() {
 		if index == -1 && start == -1 {
 			return false, nil, utils.Errorf("start or index is required")
 		}
-		idx := 0
-		var vals []sfvm.ValueOperator
-		_ = v.Recursive(func(operator sfvm.ValueOperator) error {
-			if idx >= start && start != -1 {
-				vals = append(vals, operator)
+
+		collectByRange := func(values []sfvm.ValueOperator) []sfvm.ValueOperator {
+			if index != -1 {
+				if index >= 0 && index < len(values) {
+					return []sfvm.ValueOperator{values[index]}
+				}
+				return nil
 			}
-			if idx == index && index != -1 {
-				vals = append(vals, operator)
-				return utils.Error("abort")
+			if start != -1 {
+				if start < 0 || start >= len(values) {
+					return nil
+				}
+				return values[start:]
 			}
-			idx++
 			return nil
-		})
-		if len(vals) > 0 {
-			return true, sfvm.NewValues(vals), nil
 		}
-		return false, nil, utils.Error("no value found")
+
+			grouped := make(map[int][]sfvm.ValueOperator)
+			groupOrderMap := make(map[int]struct{})
+			var groupedOrder []int
+			var flat []sfvm.ValueOperator
+			_, anchorScope := frame.ActiveAnchorWidth()
+			hasGroup := false
+
+			_ = v.Recursive(func(operator sfvm.ValueOperator) error {
+				if utils.IsNil(operator) {
+					return nil
+				}
+				flat = append(flat, operator)
+				if !anchorScope {
+					return nil
+				}
+				bits := operator.GetAnchorBitVector()
+				if bits == nil || bits.IsEmpty() {
+					return nil
+				}
+				hasGroup = true
+				bits.ForEach(func(bitIndex int) {
+					if _, ok := groupOrderMap[bitIndex]; !ok {
+						groupOrderMap[bitIndex] = struct{}{}
+						groupedOrder = append(groupedOrder, bitIndex)
+					}
+					grouped[bitIndex] = append(grouped[bitIndex], operator)
+				})
+				return nil
+			})
+
+		var vals []sfvm.ValueOperator
+		if hasGroup {
+			sort.Ints(groupedOrder)
+			for _, bitIndex := range groupedOrder {
+				vals = append(vals, collectByRange(grouped[bitIndex])...)
+			}
+		} else {
+			vals = collectByRange(flat)
+		}
+
+		if len(vals) == 0 {
+			return false, nil, utils.Error("no value found")
+		}
+		return true, sfvm.NewValues(vals), nil
 	}))
 	registerNativeCall(NativeCall_MyBatisSink, nc_func(nativeCallMybatisXML), nc_desc("Fins MyBatis Sink for default searching"))
 	registerNativeCall(NativeCall_FreeMarkerSink, nc_func(nativeCallFreeMarker))
@@ -954,15 +1036,20 @@ func init() {
 				java.io.File #-> File
 			*/
 			var vals []sfvm.ValueOperator
-			var tmpMap = make(map[string]struct{})
+			var tmpMap = make(map[string]sfvm.ValueOperator)
 			addVals := func(val *Value, typ string) {
-				_, ok := tmpMap[typ]
-				if ok {
+				if typ == "" {
 					return
 				}
-				tmpMap[typ] = struct{}{}
+				if existed, ok := tmpMap[typ]; ok {
+					_ = existed.AppendPredecessor(val, frame.WithPredecessorContext("typeName"))
+					mergeAnchorBitVectorToResult(existed, val)
+					return
+				}
 				vx := val.NewConstValue(typ, val.GetRange())
 				vx.AppendPredecessor(val, frame.WithPredecessorContext("typeName"))
+				mergeAnchorBitVectorToResult(vx, val)
+				tmpMap[typ] = vx
 				vals = append(vals, vx)
 			}
 			v.Recursive(func(operator sfvm.ValueOperator) error {
@@ -1008,18 +1095,20 @@ func init() {
 		NativeCall_FullTypeName,
 		nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, actualParams *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 			var vals []sfvm.ValueOperator
-			var tmpMap = make(map[string]struct{})
+			var tmpMap = make(map[string]sfvm.ValueOperator)
 			addVals := func(val *Value, typ string, rangeIf *memedit.Range) {
 				if typ == "" {
 					return
 				}
-				_, exist := tmpMap[typ]
-				if exist {
+				if existed, ok := tmpMap[typ]; ok {
+					_ = existed.AppendPredecessor(val, frame.WithPredecessorContext("fullTypeName"))
+					mergeAnchorBitVectorToResult(existed, val)
 					return
 				}
-				tmpMap[typ] = struct{}{}
 				results := val.NewConstValue(typ, rangeIf)
 				results.AppendPredecessor(val, frame.WithPredecessorContext("fullTypeName"))
+				mergeAnchorBitVectorToResult(results, val)
+				tmpMap[typ] = results
 				vals = append(vals, results)
 			}
 			err := v.Recursive(func(operator sfvm.ValueOperator) error {
@@ -1078,6 +1167,7 @@ func init() {
 						newVal := val.NewValue(param)
 						if newVal != nil {
 							newVal.AppendPredecessor(val, frame.WithPredecessorContext("getFormalParams"))
+							mergeAnchorBitVectorToResult(newVal, val)
 							vals = append(vals, newVal)
 						}
 					}
@@ -1124,6 +1214,7 @@ func init() {
 						new := val.NewValue(retIns)
 						if new != nil {
 							new.AppendPredecessor(val, frame.WithPredecessorContext("getReturns"))
+							mergeAnchorBitVectorToResult(new, val)
 							vals = append(vals, new)
 						}
 					}
@@ -1152,6 +1243,7 @@ func init() {
 					call := val.GetCallee()
 					if call != nil {
 						call.AppendPredecessor(val, frame.WithPredecessorContext("getCallee"))
+						mergeAnchorBitVectorToResult(call, val)
 						vals = append(vals, call)
 					}
 				}
@@ -1177,6 +1269,7 @@ func init() {
 				f := val.GetFunction()
 				if f != nil {
 					f.AppendPredecessor(val, frame.WithPredecessorContext("getFunc"))
+					mergeAnchorBitVectorToResult(f, val)
 					vals = append(vals, f)
 				}
 				return nil
@@ -1208,6 +1301,7 @@ func init() {
 							continue
 						}
 						newVal.AppendPredecessor(val, frame.WithPredecessorContext("getSiblings"))
+						mergeAnchorBitVectorToResult(newVal, val)
 						vals = append(vals, newVal)
 					}
 				}
@@ -1236,6 +1330,7 @@ func init() {
 							continue
 						}
 						member.AppendPredecessor(val, frame.WithPredecessorContext("getMembers"))
+						mergeAnchorBitVectorToResult(member, val)
 						rets = append(rets, member)
 					}
 				}
@@ -1261,10 +1356,11 @@ func init() {
 					return nil
 				}
 
-				if ret, ok := val.GetMembersByString(key); ok {
-					ret.AppendPredecessor(val, frame.WithPredecessorContext("getMemberByKey"))
-					rets = append(rets, ret)
-				}
+					if ret, ok := val.GetMembersByString(key); ok {
+						ret.AppendPredecessor(val, frame.WithPredecessorContext("getMemberByKey"))
+						mergeAnchorBitVectorToResult(ret, val)
+						rets = append(rets, ret)
+					}
 
 				return nil
 			})
@@ -1285,12 +1381,13 @@ func init() {
 				if !ok {
 					return nil
 				}
-				obj := val.GetObject()
-				if obj != nil {
-					obj.AppendPredecessor(val, frame.WithPredecessorContext("getObject"))
-					ret = append(ret, obj)
-					return nil
-				}
+					obj := val.GetObject()
+					if obj != nil {
+						obj.AppendPredecessor(val, frame.WithPredecessorContext("getObject"))
+						mergeAnchorBitVectorToResult(obj, val)
+						ret = append(ret, obj)
+						return nil
+					}
 				return nil
 			})
 			if len(ret) > 0 {
@@ -1309,21 +1406,22 @@ func init() {
 				if !ok {
 					return nil
 				}
-				for _, u := range val.GetUsers() {
-					if u.getOpcode() == ssa.SSAOpcodeCall {
-						u.AppendPredecessor(val, frame.WithPredecessorContext("getCall"))
-						vals = append(vals, u)
+					for _, u := range val.GetUsers() {
+						if u.getOpcode() == ssa.SSAOpcodeCall {
+							u.AppendPredecessor(val, frame.WithPredecessorContext("getCall"))
+							mergeAnchorBitVectorToResult(u, val)
+							vals = append(vals, u)
+						}
 					}
+					return nil
+				})
+				if len(vals) > 0 {
+					return true, sfvm.NewValues(vals), nil
 				}
-				return nil
-			})
-			if len(vals) > 0 {
-				return true, sfvm.NewValues(vals), nil
-			}
-			return false, nil, utils.Error("no value(call) found")
-		}),
-		nc_desc(`获取输入指令的调用指令，输入必须是一个函数指令`),
-	)
+				return false, nil, utils.Error("no value(call) found")
+			}),
+			nc_desc(`获取输入指令的调用指令，输入必须是一个函数指令`),
+		)
 	registerNativeCall(
 		NativeCall_SearchFunc,
 		nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, actualParams *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {

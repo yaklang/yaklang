@@ -112,6 +112,7 @@ func (s *SFFrame) opPop(unName bool) (ValueOperator, error) {
 	}
 	return i, nil
 }
+
 func (s *SFFrame) execStatement(i *SFI) error {
 	// Try filter and condition operations first
 	if handled, err := s.execFilterAndCondition(i); handled || err != nil {
@@ -183,7 +184,7 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 			return true, trackErr
 		}
 		// Compare only produces condition mask; keep source value stack unchanged in shape.
-		s.stack.Push(values)
+		s.pushStack(values)
 		if err := s.pushCondition(values, condition, newVal, true); err != nil {
 			return true, err
 		}
@@ -222,7 +223,7 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 			return true, trackErr
 		}
 		// Compare only produces condition mask; keep source value stack unchanged in shape.
-		s.stack.Push(values)
+		s.pushStack(values)
 		if err := s.pushCondition(values, condition, newVal, true); err != nil {
 			return true, err
 		}
@@ -443,6 +444,7 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 		if err != nil {
 			return true, err
 		}
+		// Keep condition output bitvector unchanged; it will be consumed by filter.
 		s.stack.Push(filtered)
 		return true, nil
 	case OpFilter:
@@ -501,7 +503,7 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 
 		s.debugSubLog("result next: %v", ValuesLen(next))
 		// _ = next.AppendPredecessor(value, s.WithPredecessorContext("search "+i.UnaryStr))
-		s.stack.Push(next)
+		s.pushStack(next)
 		s.debugSubLog("<< push next")
 		if next == nil || err != nil {
 			s.debugSubLog("error: %v", err)
@@ -544,7 +546,7 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 
 		results := NewValues(next)
 		s.debugSubLog("result next: %v", ValuesLen(results))
-		s.stack.Push(results)
+		s.pushStack(results)
 		s.debugSubLog("<< push next")
 		return true, nil
 	case OpRecursiveSearchGlob:
@@ -591,7 +593,7 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		results := NewValues(next)
 		s.debugSubLog("result next: %v", ValuesLen(results))
 		_ = results.AppendPredecessor(value, s.WithPredecessorContext("recursive search "+i.UnaryStr))
-		s.stack.Push(results)
+		s.pushStack(results)
 		s.debugSubLog("<< push next")
 		return true, nil
 	case OpRecursiveSearchRegexp:
@@ -641,7 +643,7 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		results := NewValues(next)
 		s.debugSubLog("result next: %v", ValuesLen(results))
 		_ = results.AppendPredecessor(value, s.WithPredecessorContext("recursive search "+i.UnaryStr))
-		s.stack.Push(results)
+		s.pushStack(results)
 		s.debugSubLog("<< push next")
 		return true, nil
 	case OpPushSearchGlob:
@@ -678,7 +680,7 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		}
 		s.debugSubLog("result next: %v", ValuesLen(next))
 		// _ = next.AppendPredecessor(value, s.WithPredecessorContext("search: "+i.UnaryStr))
-		s.stack.Push(next)
+		s.pushStack(next)
 		s.debugSubLog("<< push next")
 		if next == nil || err != nil {
 			s.debugSubLog("error: %v", err)
@@ -717,7 +719,7 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		}
 		s.debugSubLog("result next: %v", ValuesLen(next))
 		// _ = next.AppendPredecessor(value, s.WithPredecessorContext("search: "+i.UnaryStr))
-		s.stack.Push(next)
+		s.pushStack(next)
 		s.debugSubLog("<< push next")
 		if next == nil || err != nil {
 			s.debugSubLog("error: %v", err)
@@ -742,17 +744,15 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		}
 		if err != nil {
 			err = utils.Errorf("get calling instruction failed: %s", err)
-		}
-		if err != nil {
 			s.debugSubLog("error: %v", err)
 			s.debugSubLog("recover origin value")
-			s.stack.Push(NewEmptyValues())
+			s.pushStack(NewEmptyValues())
 			s.debugSubLog("<< push")
 			return true, err
 		}
 		callLen := ValuesLen(results)
 		s.debugSubLog("<< push len: %v", callLen)
-		s.stack.Push(results)
+		s.pushStack(results)
 		return true, nil
 
 	case OpGetCallArgs:
@@ -778,7 +778,7 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		s.debugSubLog("<< push arg len: %v", callLen)
 		s.debugSubLog("<< stack grow")
 
-		s.stack.Push(results)
+		s.pushStack(results)
 		return true, nil
 
 	case OpGetUsers:
@@ -806,7 +806,7 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		}
 		vals.AppendPredecessor(value, s.WithPredecessorContext("getUser"))
 		s.debugSubLog("<< push users")
-		s.stack.Push(vals)
+		s.pushStack(vals)
 		return true, nil
 	case OpGetBottomUsers:
 		s.debugSubLog(">> pop")
@@ -832,7 +832,7 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 			return true, utils.Errorf("Call .GetSyntaxFlowBottomUse() failed: %v", err)
 		}
 		s.debugSubLog("<< push bottom uses %v", ValuesLen(vals))
-		s.stack.Push(vals)
+		s.pushStack(vals)
 		return true, nil
 	case OpGetDefs:
 		s.debugSubLog(">> pop")
@@ -855,7 +855,7 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 			return true, utils.Errorf("Call .GetSyntaxFlowDef() failed: %v", err)
 		}
 		s.debugSubLog("<< push users %v", ValuesLen(vals))
-		s.stack.Push(vals)
+		s.pushStack(vals)
 		return true, nil
 	case OpGetTopDefs:
 		s.debugSubLog(">> pop")
@@ -882,7 +882,7 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 			return true, utils.Errorf("Call .GetSyntaxFlowTopDef() failed: %v", err)
 		}
 		s.debugSubLog("<< push top defs %v", ValuesLen(vals))
-		s.stack.Push(vals)
+		s.pushStack(vals)
 		return true, nil
 	default:
 		return false, nil
@@ -898,7 +898,7 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 		}
 		s.debugSubLog(">> duplicate (stack grow)")
 		v := s.stack.Peek()
-		s.stack.Push(v)
+		s.pushStack(v)
 		return true, nil
 	case OpPopDuplicate:
 		val := s.popStack.Peek()
@@ -935,11 +935,11 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 			})
 			_ = operator0
 			s.debugSubLog(">> get value: %v ", vs)
-			s.stack.Push(vs)
+			s.pushStack(vs)
 		} else {
 			values := NewEmptyValues()
 			s.result.SymbolTable.Set(i.UnaryStr, values)
-			s.stack.Push(values)
+			s.pushStack(values)
 			return true, nil
 			//return utils.Errorf("new ref failed: not found: %v", i.UnaryStr)
 		}
@@ -1061,7 +1061,7 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 		if err != nil {
 			return true, utils.Wrapf(CriticalError, "merge failed: %v", err)
 		}
-		s.stack.Push(val)
+		s.pushStack(val)
 		s.debugSubLog("<< push")
 		return true, nil
 	case OpRemoveRef:
@@ -1080,7 +1080,7 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 		if err != nil {
 			return true, utils.Wrapf(CriticalError, "remove failed: %v", err)
 		}
-		s.stack.Push(newVal)
+		s.pushStack(newVal)
 		s.debugSubLog("<< push")
 		return true, nil
 	case OpIntersectionRef:
@@ -1093,7 +1093,7 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 			if value == nil {
 				return true, utils.Wrap(CriticalError, "BUG: get top defs failed, empty stack")
 			}
-			s.stack.Push(NewEmptyValues())
+			s.pushStack(NewEmptyValues())
 			return true, nil
 		}
 		s.debugLog(">> pop")
@@ -1126,13 +1126,13 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 		})
 		if len(vals) == 0 {
 			s.debugSubLog("no intersection")
-			s.stack.Push(NewEmptyValues())
+			s.pushStack(NewEmptyValues())
 		} else {
 			s.debugSubLog("intersection:%v", buf.String())
-			s.stack.Push(NewValues(vals))
+			s.pushStack(NewValues(vals))
 		}
 		return true, nil
-	case OpNativeCall:
+		case OpNativeCall:
 		ruleLabel := ""
 		if s.rule != nil {
 			if s.rule.Title != "" {
@@ -1145,13 +1145,14 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 		if ruleLabel != "" {
 			name += ":" + ruleLabel
 		}
-		var (
-			ret ValueOperator
-			ok  bool
-		)
-		if trackErr := diagnostics.TrackLow(name, func() error {
+			var (
+				value ValueOperator
+				ret   ValueOperator
+				ok    bool
+			)
+			if trackErr := diagnostics.TrackLow(name, func() error {
 			s.debugSubLog(">> pop")
-			value := s.stack.Pop()
+			value = s.stack.Pop()
 			if value == nil {
 				return utils.Wrap(CriticalError, "native call failed: stack top is empty")
 			}
@@ -1161,26 +1162,26 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 			if err != nil {
 				s.debugSubLog("Err: %v", err)
 				log.Errorf("native call failed, not an existed native call[%v]: %v", i.UnaryStr, err)
-				s.stack.Push(NewEmptyValues())
+				s.pushStack(NewEmptyValues())
 				return utils.Errorf("get native call failed: %v", err)
 			}
 
 			ok, ret, err = call(value, s, NewNativeCallActualParams(i.SyntaxFlowConfig...))
 			if err != nil || !ok {
 				s.debugSubLog("No Result in [%v]", i.UnaryStr)
-				s.stack.Push(NewEmptyValues())
+				s.pushStack(NewEmptyValues())
 				if errors.Is(err, CriticalError) {
 					return err
 				}
 				return utils.Errorf("get native call failed: %v", err)
+				}
+				return nil
+			}); trackErr != nil {
+				return true, trackErr
 			}
-			return nil
-		}); trackErr != nil {
-			return true, trackErr
-		}
-		s.debugSubLog("<< push: %v", ValuesLen(ret))
-		s.stack.Push(ret)
-		return true, nil
+			s.debugSubLog("<< push: %v", ValuesLen(ret))
+			s.pushStack(ret)
+			return true, nil
 	case OpFileFilterJsonPath, OpFileFilterReg, OpFileFilterXpath:
 		opcode2strMap := map[SFVMOpCode]string{
 			OpFileFilterJsonPath: "jsonpath",
@@ -1213,7 +1214,7 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 		if err != nil {
 			return true, utils.Errorf("file filter failed: %v", err)
 		}
-		s.stack.Push(res)
+		s.pushStack(res)
 		return true, nil
 	case OpPushNumber:
 		s.debugSubLog(">> peek")
@@ -1230,10 +1231,11 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 		}); trackErr != nil {
 			return true, trackErr
 		}
-		if !val.IsEmpty() {
-			s.debugSubLog(">> push: %v", ValuesLen(val))
-			s.stack.Push(val)
+		if utils.IsNil(val) {
+			val = NewEmptyValues()
 		}
+		s.debugSubLog(">> push: %v", ValuesLen(val))
+		s.pushStack(val)
 		return true, nil
 	case OpPushBool:
 		s.debugSubLog(">> peek")
@@ -1250,10 +1252,11 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 		}); trackErr != nil {
 			return true, trackErr
 		}
-		if !val.IsEmpty() {
-			s.debugSubLog(">> push: %v", ValuesLen(val))
-			s.stack.Push(val)
+		if utils.IsNil(val) {
+			val = NewEmptyValues()
 		}
+		s.debugSubLog(">> push: %v", ValuesLen(val))
+		s.pushStack(val)
 		return true, nil
 	case OpPushString:
 		s.debugSubLog(">> peek")
@@ -1270,10 +1273,11 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 		}); trackErr != nil {
 			return true, trackErr
 		}
-		if !val.IsEmpty() {
-			s.debugSubLog(">> push: %v", ValuesLen(val))
-			s.stack.Push(val)
+		if utils.IsNil(val) {
+			val = NewEmptyValues()
 		}
+		s.debugSubLog(">> push: %v", ValuesLen(val))
+		s.pushStack(val)
 		return true, nil
 	default:
 		return false, nil

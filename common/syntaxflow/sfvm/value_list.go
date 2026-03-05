@@ -35,11 +35,11 @@ func (v *ValueList) ShouldUseConditionCandidate() bool {
 	return false
 }
 
-func (v *ValueList) GetSourceBitVector() *utils.BitVector {
+func (v *ValueList) GetAnchorBitVector() *utils.BitVector {
 	return nil
 }
 
-func (v *ValueList) SetSourceBitVector(*utils.BitVector) {}
+func (v *ValueList) SetAnchorBitVector(*utils.BitVector) {}
 
 func NewEmptyValues() ValueOperator {
 	return &ValueList{Values: nil}
@@ -53,50 +53,15 @@ func (v *ValueList) Count() int {
 	return len(v.Values)
 }
 
-func (v *ValueList) ensureSourceBitVector() {
-	for idx, operator := range v.Values {
-		if utils.IsNil(operator) {
-			continue
-		}
-		bits := operator.GetSourceBitVector()
-		if bits == nil {
-			bits = utils.NewBitVector()
-		}
-		bits.Set(idx)
-		operator.SetSourceBitVector(bits)
-	}
-}
-
-func mergeSourceBitVectorForValue(value ValueOperator, sourceBits *utils.BitVector) {
-	if utils.IsNil(value) || sourceBits == nil || sourceBits.IsEmpty() {
-		return
-	}
-	_ = value.Recursive(func(operator ValueOperator) error {
-		if utils.IsNil(operator) {
-			return nil
-		}
-		bits := operator.GetSourceBitVector()
-		if bits == nil {
-			operator.SetSourceBitVector(sourceBits)
-			return nil
-		}
-		merged := bits.Clone()
-		merged.Or(sourceBits)
-		operator.SetSourceBitVector(merged)
-		return nil
-	})
-}
-
 func (v *ValueList) pipeLineRun(f func(ValueOperator) (ValueOperator, error)) (ValueOperator, error) {
 	ctx := context.Background()
-	v.ensureSourceBitVector()
 	size := v.Count()
 	pipe := pipeline.NewPipe(ctx, size, func(v ValueOperator) (ValueOperator, error) {
 		var err error
 		var value ValueOperator
 		value, err = f(v)
 		if err == nil {
-			mergeSourceBitVectorForValue(value, v.GetSourceBitVector())
+			mergeAnchorBitVectorToResult(value, v)
 		}
 		return value, err
 	})
@@ -129,14 +94,13 @@ func (v *ValueList) NewConst(i any, rng ...*memedit.Range) ValueOperator {
 }
 
 func (v *ValueList) CompareOpcode(comparator *OpcodeComparator) (ValueOperator, []bool) {
-	v.ensureSourceBitVector()
 	var res []bool
 	var candidates []ValueOperator
 	v.Recursive(func(operator ValueOperator) error {
 		matched, result := operator.CompareOpcode(comparator)
 		res = append(res, result...)
 		filtered := pickCandidateByMask(matched, result)
-		mergeSourceBitVectorForValue(filtered, operator.GetSourceBitVector())
+		mergeAnchorBitVectorToResult(filtered, operator)
 		if !utils.IsNil(filtered) && !filtered.IsEmpty() {
 			candidates = append(candidates, filtered)
 		}
@@ -145,18 +109,17 @@ func (v *ValueList) CompareOpcode(comparator *OpcodeComparator) (ValueOperator, 
 	if len(candidates) == 0 {
 		return NewEmptyValues(), res
 	}
-	return NewValues(candidates), res
+	return &ValueList{Values: candidates}, res
 }
 
 func (v *ValueList) CompareString(comparator *StringComparator) (ValueOperator, []bool) {
-	v.ensureSourceBitVector()
 	var res []bool
 	var candidates []ValueOperator
 	v.Recursive(func(operator ValueOperator) error {
 		matched, result := operator.CompareString(comparator)
 		res = append(res, result...)
 		filtered := pickCandidateByMask(matched, result)
-		mergeSourceBitVectorForValue(filtered, operator.GetSourceBitVector())
+		mergeAnchorBitVectorToResult(filtered, operator)
 		if !utils.IsNil(filtered) && !filtered.IsEmpty() {
 			candidates = append(candidates, filtered)
 		}
@@ -165,7 +128,7 @@ func (v *ValueList) CompareString(comparator *StringComparator) (ValueOperator, 
 	if len(candidates) == 0 {
 		return NewEmptyValues(), res
 	}
-	return NewValues(candidates), res
+	return &ValueList{Values: candidates}, res
 }
 
 func pickCandidateByMask(candidate ValueOperator, cond []bool) ValueOperator {
