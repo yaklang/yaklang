@@ -128,7 +128,8 @@ type AiProvider struct {
 	DomainOrURL  string `json:"domain_or_url" gorm:"index"`
 	APIKey       string `json:"api_key" gorm:"index"`
 	NoHTTPS      bool   `json:"no_https"`
-	ProviderMode string `json:"provider_mode" gorm:"default:'chat'"` // Provider 模式: "chat" 或 "embedding"
+	ProviderMode        string `json:"provider_mode" gorm:"default:'chat'"` // Provider 模式: "chat" 或 "embedding"
+	OptionalAllowReason string `json:"optional_allow_reason" gorm:"default:''"`
 
 	// 可用性指标
 	SuccessCount  int64 `json:"success_count"`  // 成功请求总数

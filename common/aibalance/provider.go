@@ -163,6 +163,7 @@ func (p *Provider) GetAIClientWithImagesAndTools(imageContents []*aispec.ChatCon
 	var opts []aispec.AIConfigOption
 	opts = append(
 		opts,
+		aispec.WithType(p.TypeName),
 		aispec.WithChatImageContent(images...),
 		aispec.WithTimeout(10),
 		aispec.WithNoHTTPS(p.NoHTTPS),
@@ -189,14 +190,22 @@ func (p *Provider) GetAIClientWithImagesAndTools(imageContents []*aispec.ChatCon
 	)
 
 	shouldEnableThinking := enableThinking
-	if !shouldEnableThinking && p.OptionalAllowReason != "" {
+	forceDisableThinking := false
+	if p.OptionalAllowReason != "" {
 		switch strings.ToLower(strings.TrimSpace(p.OptionalAllowReason)) {
 		case "true", "yes", "1", "enable", "on":
 			shouldEnableThinking = true
+		case "false", "no", "0", "disable", "off":
+			shouldEnableThinking = false
+			forceDisableThinking = true
 		}
 	}
 	if shouldEnableThinking {
+		log.Infof("GetAIClient: enable_thinking=true for type=%s (OptionalAllowReason=%q, clientRequest=%v)", p.TypeName, p.OptionalAllowReason, enableThinking)
 		opts = append(opts, aispec.WithEnableThinking(true))
+	} else if forceDisableThinking {
+		log.Infof("GetAIClient: enable_thinking=false (force disabled) for type=%s (OptionalAllowReason=%q)", p.TypeName, p.OptionalAllowReason)
+		opts = append(opts, aispec.WithEnableThinking(false))
 	}
 
 	// Add tool call callback if provided

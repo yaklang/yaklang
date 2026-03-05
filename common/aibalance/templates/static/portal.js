@@ -878,6 +878,17 @@
                         </div>
                         <div class="form-row">
                             <div class="form-group">
+                                <label for="optionalAllowReason">思考配置</label>
+                                <select id="optionalAllowReason" name="optionalAllowReason" class="form-control">
+                                    <option value="" selected>默认 (跟随客户端请求)</option>
+                                    <option value="true">启用思考</option>
+                                    <option value="false">禁用思考</option>
+                                </select>
+                                <small class="form-text text-muted">控制模型是否使用深度思考模式</small>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
                                 <label for="domainOrURL">域名/URL</label> <!-- 移除 * -->
                                 <input type="text" id="domainOrURL" name="domainOrURL" class="form-control autocomplete" 
                                        placeholder="例如：api.openai.com" 
@@ -941,7 +952,8 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
             wrapper_names: [],
             model_names: [],
             model_types: [],
-            domain_or_urls: [] // 添加 domain_or_urls
+            domain_or_urls: [],
+            domain_suggestions: {}
         };
 
         // 加载自动补全数据
@@ -959,8 +971,9 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                 autoCompleteData.wrapper_names = data.wrapper_names || [];
                 autoCompleteData.model_names = data.model_names || [];
                 autoCompleteData.model_types = data.model_types || [];
-                autoCompleteData.domain_or_urls = data.domain_or_urls || []; // 获取 domain_or_urls
-                console.log("Processed domain_or_urls:", autoCompleteData.domain_or_urls); // Debug log
+                autoCompleteData.domain_or_urls = data.domain_or_urls || [];
+                autoCompleteData.domain_suggestions = data.domain_suggestions || {};
+                console.log("Processed domain_or_urls:", autoCompleteData.domain_or_urls);
 
                 // 填充当前打开的表单（如果有）
                 if (document.querySelector('.tab.active[data-tab="add"]')) {
@@ -1033,20 +1046,25 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                     const selectedType = this.value.toLowerCase();
                     let suggestedDomain = '';
                     
-                    // 根据类型提供默认域名建议
-                    const domainSuggestions = {
+                    // 优先使用后端返回的域名建议，硬编码作为 fallback
+                    const fallbackDomainSuggestions = {
                         'openai': 'api.openai.com',
                         'siliconflow': 'api.siliconflow.cn',
-                        'tongyi': '', // 通义不需要域名
+                        'tongyi': 'dashscope.aliyuncs.com',
                         'moonshot': 'api.moonshot.cn',
                         'deepseek': 'api.deepseek.com',
-                        'gemini': '', // Gemini 使用 Google API
-                        'ollama': 'localhost:11434',
-                        'chatglm': 'open.bigmodel.cn'
+                        'gemini': 'generativelanguage.googleapis.com',
+                        'ollama': '127.0.0.1:11434',
+                        'chatglm': 'open.bigmodel.cn',
+                        'volcengine': 'ark.cn-beijing.volces.com',
+                        'openrouter': 'openrouter.ai',
+                        'comate': 'comate.baidu.com'
                     };
                     
-                    if (domainSuggestions[selectedType] !== undefined) {
-                        suggestedDomain = domainSuggestions[selectedType];
+                    if (autoCompleteData.domain_suggestions && autoCompleteData.domain_suggestions[selectedType] !== undefined) {
+                        suggestedDomain = autoCompleteData.domain_suggestions[selectedType];
+                    } else if (fallbackDomainSuggestions[selectedType] !== undefined) {
+                        suggestedDomain = fallbackDomainSuggestions[selectedType];
                     }
                     
                     // 如果域名输入框为空，则填充默认值
@@ -1160,16 +1178,18 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
             const domainOrURL = document.getElementById('domainOrURL').value.trim();
             const apiKeys = document.getElementById('apiKeys').value;
             const noHTTPS = document.getElementById('noHTTPS').checked;
+            const optionalAllowReason = document.getElementById('optionalAllowReason').value;
             
             // 日志输出表单数据（方便调试）
-            console.log('Submitting data:', { // Use common/log - Debug log
+            console.log('Submitting data:', {
                 wrapper_name: wrapperName,
                 model_name: modelName,
                 model_type: typeName,
                 provider_mode: providerMode,
-                domain_or_url: domainOrURL, // Now can be empty
+                domain_or_url: domainOrURL,
                 api_keys: apiKeys,
-                no_https: noHTTPS ? 'on' : ''
+                no_https: noHTTPS ? 'on' : '',
+                optional_allow_reason: optionalAllowReason
             });
             
             // 验证必填字段 (移除对 domainOrURL 的检查)
@@ -1202,6 +1222,9 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                 params.append('api_keys', apiKeys);
                 if (noHTTPS) {
                     params.append('no_https', 'on');
+                }
+                if (optionalAllowReason) {
+                    params.append('optional_allow_reason', optionalAllowReason);
                 }
                 
                 // 发送请求
@@ -2791,20 +2814,25 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                     const selectedType = this.value.toLowerCase();
                     let suggestedDomain = '';
                     
-                    // 根据类型提供默认域名建议
-                    const domainSuggestions = {
+                    // 优先使用后端返回的域名建议，硬编码作为 fallback
+                    const fallbackDomainSuggestions = {
                         'openai': 'api.openai.com',
                         'siliconflow': 'api.siliconflow.cn',
-                        'tongyi': '', // 通义不需要域名
+                        'tongyi': 'dashscope.aliyuncs.com',
                         'moonshot': 'api.moonshot.cn',
                         'deepseek': 'api.deepseek.com',
-                        'gemini': '', // Gemini 使用 Google API
-                        'ollama': 'localhost:11434',
-                        'chatglm': 'open.bigmodel.cn'
+                        'gemini': 'generativelanguage.googleapis.com',
+                        'ollama': '127.0.0.1:11434',
+                        'chatglm': 'open.bigmodel.cn',
+                        'volcengine': 'ark.cn-beijing.volces.com',
+                        'openrouter': 'openrouter.ai',
+                        'comate': 'comate.baidu.com'
                     };
                     
-                    if (domainSuggestions[selectedType] !== undefined) {
-                        suggestedDomain = domainSuggestions[selectedType];
+                    if (autoCompleteData.domain_suggestions && autoCompleteData.domain_suggestions[selectedType] !== undefined) {
+                        suggestedDomain = autoCompleteData.domain_suggestions[selectedType];
+                    } else if (fallbackDomainSuggestions[selectedType] !== undefined) {
+                        suggestedDomain = fallbackDomainSuggestions[selectedType];
                     }
                     
                     // 如果域名输入框为空，则填充默认值
@@ -2934,7 +2962,11 @@ sk-abcdef1234567890abcdef1234567890"></textarea>
                 params.append('model_type', typeName);
                 params.append('domain_or_url', domainOrURL);
                 params.append('api_key_to_validate', firstApiKey);
-                params.append('provider_mode', providerMode); // 添加 provider_mode
+                params.append('provider_mode', providerMode);
+                const optAllowReason = document.getElementById('optionalAllowReason');
+                if (optAllowReason && optAllowReason.value) {
+                    params.append('optional_allow_reason', optAllowReason.value);
+                }
                 if (noHTTPSCheckbox.checked) {
                     params.append('no_https', 'on');
                 }
