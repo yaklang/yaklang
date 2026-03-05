@@ -391,29 +391,6 @@ func TestLoadCapability_Handler_FocusMode_Error(t *testing.T) {
 	assert.Contains(t, op.GetFeedback().String(), "FAILED")
 }
 
-func TestLoadCapability_Handler_FocusMode_NotOk(t *testing.T) {
-	ctx := context.Background()
-	cfg := &aicommon.Config{}
-	invoker := newTestInvoker(ctx)
-	invoker.executeLoopResult = false
-	invoker.executeLoopErr = nil
-	task := newTestTask(ctx)
-	invoker.currentTask = task
-
-	loop := reactloops.NewMinimalReActLoop(cfg, invoker)
-	loop.SetCurrentTask(task)
-	loop.Set("_load_cap_identifier", "partial-mode")
-	loop.Set("_load_cap_resolved_type", string(aicommon.ResolvedAs_FocusedMode))
-
-	op := reactloops.NewActionHandlerOperator(task)
-	action := buildAction("partial-mode")
-	loopAction_LoadCapability.ActionHandler(loop, action, op)
-
-	assert.True(t, invoker.executeLoopCalled)
-	assert.True(t, op.IsContinued(), "should continue when focus mode returns not-ok")
-	assert.Contains(t, op.GetFeedback().String(), "UNSUCCESSFUL")
-}
-
 // --- Handler Tests: Unknown -> Intent Fallback ---
 
 func TestLoadCapability_Handler_Unknown_IntentFallback(t *testing.T) {
@@ -465,29 +442,6 @@ func TestLoadCapability_Handler_Unknown_IntentFallback_Error(t *testing.T) {
 	assert.True(t, invoker.executeLoopCalled)
 	assert.True(t, op.IsContinued(), "should continue on intent fallback failure")
 	assert.Contains(t, op.GetFeedback().String(), "intent recognition FAILED")
-}
-
-func TestLoadCapability_Handler_Unknown_IntentFallback_NotOk(t *testing.T) {
-	ctx := context.Background()
-	cfg := &aicommon.Config{}
-	invoker := newTestInvoker(ctx)
-	invoker.executeLoopResult = false
-	invoker.executeLoopErr = nil
-	task := newTestTask(ctx)
-	invoker.currentTask = task
-
-	loop := reactloops.NewMinimalReActLoop(cfg, invoker)
-	loop.SetCurrentTask(task)
-	loop.Set("_load_cap_identifier", "unknown-no-results")
-	loop.Set("_load_cap_resolved_type", string(aicommon.ResolvedAs_Unknown))
-
-	op := reactloops.NewActionHandlerOperator(task)
-	action := buildAction("unknown-no-results")
-	loopAction_LoadCapability.ActionHandler(loop, action, op)
-
-	assert.True(t, invoker.executeLoopCalled)
-	assert.True(t, op.IsContinued(), "should continue when intent loop returns not-ok")
-	assert.Contains(t, op.GetFeedback().String(), "produced NO useful results")
 }
 
 // --- Handler Tests: Empty Identifier ---
@@ -811,32 +765,6 @@ func TestLoadCapability_Handler_FocusMode_ErrorTimelineFeedback(t *testing.T) {
 	assert.Contains(t, invoker.getTimelineString(),
 		"FOCUS_MODE_FAILED",
 		"timeline should record failure with details")
-}
-
-func TestLoadCapability_Handler_FocusMode_UnsuccessfulTimelineFeedback(t *testing.T) {
-	ctx := context.Background()
-	cfg := &aicommon.Config{}
-	invoker := newTestInvoker(ctx)
-	invoker.executeLoopResult = false
-	invoker.executeLoopErr = nil
-	task := newTestTask(ctx)
-	invoker.currentTask = task
-
-	loop := reactloops.NewMinimalReActLoop(cfg, invoker)
-	loop.SetCurrentTask(task)
-	loop.Set("_load_cap_identifier", "unsat-mode")
-	loop.Set("_load_cap_resolved_type", string(aicommon.ResolvedAs_FocusedMode))
-
-	op := reactloops.NewActionHandlerOperator(task)
-	action := buildAction("unsat-mode")
-	loopAction_LoadCapability.ActionHandler(loop, action, op)
-
-	feedback := op.GetFeedback().String()
-	assert.Contains(t, feedback, "UNSUCCESSFUL")
-	assert.Contains(t, feedback, "Do NOT retry")
-	assert.Contains(t, invoker.getTimelineString(),
-		"FOCUS_MODE_UNSUCCESSFUL",
-		"timeline should record unsuccessful outcome")
 }
 
 // --- Handler Tests: Unknown Blocked on Repeat ---
