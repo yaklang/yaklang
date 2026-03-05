@@ -91,7 +91,7 @@ type LoopPromptData struct {
 	CurrentTime        string
 	OSArch             string
 	WorkingDir         string
-	WingDiorkrGlance   string
+	WorkingDirGlance   string
 	AIForgeList        string
 	ShowForgeList      bool
 	Tools              []*aitool.Tool
