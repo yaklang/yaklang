@@ -137,6 +137,7 @@ func (g *GatewayClient) Chat(s string, function ...any) (string, error) {
 		aispec.WithChatBase_ReasonStreamHandler(g.config.ReasonStreamHandler),
 		aispec.WithChatBase_ErrHandler(wrappedErrorHandler),
 		aispec.WithChatBase_ImageRawInstance(g.config.Images...),
+		aispec.WithChatBase_EnableThinkingEx(g.config.EnableThinking, g.config.EnableThinkingField, g.config.EnableThinkingValue),
 		aispec.WithChatBase_Tools(g.config.Tools),
 		aispec.WithChatBase_ToolChoice(g.config.ToolChoice),
 		aispec.WithChatBase_ToolCallCallback(g.config.ToolCallCallback),
@@ -162,6 +163,7 @@ func (g *GatewayClient) Chat(s string, function ...any) (string, error) {
 			aispec.WithChatBase_ReasonStreamHandler(g.config.ReasonStreamHandler),
 			aispec.WithChatBase_ErrHandler(wrappedErrorHandler),
 			aispec.WithChatBase_ImageRawInstance(g.config.Images...),
+			aispec.WithChatBase_EnableThinkingEx(g.config.EnableThinking, g.config.EnableThinkingField, g.config.EnableThinkingValue),
 			aispec.WithChatBase_Tools(g.config.Tools),
 			aispec.WithChatBase_ToolChoice(g.config.ToolChoice),
 			aispec.WithChatBase_ToolCallCallback(g.config.ToolCallCallback),
@@ -249,6 +251,7 @@ func (g *GatewayClient) ChatStream(s string) (io.Reader, error) {
 	reader, err := aispec.ChatWithStream(
 		g.targetUrl, g.config.Model, s, wrappedErrorHandler, g.config.ReasonStreamHandler,
 		g.BuildHTTPOptions,
+		aispec.WithChatBase_EnableThinkingEx(g.config.EnableThinking, g.config.EnableThinkingField, g.config.EnableThinkingValue),
 	)
 
 	// 检查是否是 TOTP 认证失败
@@ -262,6 +265,7 @@ func (g *GatewayClient) ChatStream(s string) (io.Reader, error) {
 		return aispec.ChatWithStream(
 			g.targetUrl, g.config.Model, s, wrappedErrorHandler, g.config.ReasonStreamHandler,
 			g.BuildHTTPOptions,
+			aispec.WithChatBase_EnableThinkingEx(g.config.EnableThinking, g.config.EnableThinkingField, g.config.EnableThinkingValue),
 		)
 	}
 

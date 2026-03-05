@@ -299,17 +299,10 @@ func (a *AIResponse) GetOutputStreamReader(nodeId string, system bool, emitter *
 				targetStream = io.TeeReader(targetStream, os.Stdout)
 			}
 			if i.IsReason {
-				if system {
-					wg.Add(1)
-					emitter.EmitSystemReasonStreamEvent(nodeId, a.respStartTime, targetStream, a.GetTaskIndex(), func() {
-						wg.Done()
-					})
-				} else {
-					wg.Add(1)
-					emitter.EmitReasonStreamEvent(nodeId, a.respStartTime, targetStream, a.GetTaskIndex(), func() {
-						wg.Done()
-					})
-				}
+				wg.Add(1)
+				emitter.EmitDefaultStreamEvent("thought", targetStream, a.GetTaskIndex(), func() {
+					wg.Done()
+				})
 				continue
 			}
 

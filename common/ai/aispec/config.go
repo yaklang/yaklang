@@ -133,17 +133,16 @@ func WithEnableThinking(t any) AIConfigOption {
 		if utils.IsNil(t) {
 			return
 		}
-		switch t.(type) {
+		switch ret := t.(type) {
 		case bool:
-			config.EnableThinking = t.(bool)
-			return
-		}
-
-		switch utils.InterfaceToString(t) {
-		case "yes", "y", "true", "1", "enable", "on", "auto", "a", "enabled":
-			config.EnableThinking = true
+			config.EnableThinking = ret
 		default:
-			config.EnableThinking = false
+			switch utils.InterfaceToString(t) {
+			case "yes", "y", "true", "1", "enable", "on", "auto", "a", "enabled":
+				config.EnableThinking = true
+			default:
+				config.EnableThinking = false
+			}
 		}
 
 		switch config.Type {
@@ -158,6 +157,9 @@ func WithEnableThinking(t any) AIConfigOption {
 					"type": "disabled",
 				}
 			}
+		case "tongyi", "aibalance":
+			config.EnableThinkingField = "enable_thinking"
+			config.EnableThinkingValue = config.EnableThinking
 		}
 	}
 }
