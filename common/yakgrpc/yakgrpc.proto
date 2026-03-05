@@ -1023,6 +1023,7 @@ service Yak {
 
 message DownloadRAGsRequest {
   string RagName = 1;
+  bool All = 2;
   bool Force = 3;
 }
 
