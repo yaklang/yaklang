@@ -87,13 +87,14 @@ func (c *ServerConfig) processAddProviders(conn net.Conn, request *http.Request)
 	}
 
 	type ProviderData struct {
-		WrapperName  string
-		ModelName    string
-		TypeName     string
-		DomainOrURL  string
-		APIKey       string
-		NoHTTPS      bool
-		ProviderMode string
+		WrapperName         string
+		ModelName           string
+		TypeName            string
+		DomainOrURL         string
+		APIKey              string
+		NoHTTPS             bool
+		ProviderMode        string
+		OptionalAllowReason string
 	}
 
 	var providers []ProviderData
@@ -117,6 +118,7 @@ func (c *ServerConfig) processAddProviders(conn net.Conn, request *http.Request)
 		providerMode := request.FormValue("provider_mode")
 		noHTTPS := request.FormValue("no_https") == "on"
 		apiKeysStr := request.FormValue("api_keys")
+		optionalAllowReason := request.FormValue("optional_allow_reason")
 
 		// If model_name is empty, use wrapper_name
 		if modelName == "" {
@@ -131,13 +133,14 @@ func (c *ServerConfig) processAddProviders(conn net.Conn, request *http.Request)
 				continue
 			}
 			providers = append(providers, ProviderData{
-				WrapperName:  wrapperName,
-				ModelName:    modelName,
-				TypeName:     typeName,
-				DomainOrURL:  domainOrURL,
-				APIKey:       apiKey,
-				NoHTTPS:      noHTTPS,
-				ProviderMode: providerMode,
+				WrapperName:         wrapperName,
+				ModelName:           modelName,
+				TypeName:            typeName,
+				DomainOrURL:         domainOrURL,
+				APIKey:              apiKey,
+				NoHTTPS:             noHTTPS,
+				ProviderMode:        providerMode,
+				OptionalAllowReason: optionalAllowReason,
 			})
 		}
 	} else {
@@ -152,13 +155,14 @@ func (c *ServerConfig) processAddProviders(conn net.Conn, request *http.Request)
 
 		var reqBody struct {
 			Providers []struct {
-				WrapperName  string `json:"wrapper_name"`
-				ModelName    string `json:"model_name"`
-				TypeName     string `json:"type_name"`
-				DomainOrURL  string `json:"domain_or_url"`
-				APIKey       string `json:"api_key"`
-				NoHTTPS      bool   `json:"no_https"`
-				ProviderMode string `json:"provider_mode"`
+				WrapperName         string `json:"wrapper_name"`
+				ModelName           string `json:"model_name"`
+				TypeName            string `json:"type_name"`
+				DomainOrURL         string `json:"domain_or_url"`
+				APIKey              string `json:"api_key"`
+				NoHTTPS             bool   `json:"no_https"`
+				ProviderMode        string `json:"provider_mode"`
+				OptionalAllowReason string `json:"optional_allow_reason"`
 			} `json:"providers"`
 		}
 
@@ -174,13 +178,14 @@ func (c *ServerConfig) processAddProviders(conn net.Conn, request *http.Request)
 				modelName = p.WrapperName
 			}
 			providers = append(providers, ProviderData{
-				WrapperName:  p.WrapperName,
-				ModelName:    modelName,
-				TypeName:     p.TypeName,
-				DomainOrURL:  p.DomainOrURL,
-				APIKey:       p.APIKey,
-				NoHTTPS:      p.NoHTTPS,
-				ProviderMode: p.ProviderMode,
+				WrapperName:         p.WrapperName,
+				ModelName:           modelName,
+				TypeName:            p.TypeName,
+				DomainOrURL:         p.DomainOrURL,
+				APIKey:              p.APIKey,
+				NoHTTPS:             p.NoHTTPS,
+				ProviderMode:        p.ProviderMode,
+				OptionalAllowReason: p.OptionalAllowReason,
 			})
 		}
 	}
@@ -203,14 +208,15 @@ func (c *ServerConfig) processAddProviders(conn net.Conn, request *http.Request)
 
 		// Create provider record
 		provider := &schema.AiProvider{
-			WrapperName:  p.WrapperName,
-			ModelName:    p.ModelName,
-			TypeName:     p.TypeName,
-			DomainOrURL:  p.DomainOrURL,
-			APIKey:       p.APIKey,
-			NoHTTPS:      p.NoHTTPS,
-			ProviderMode: p.ProviderMode,
-			IsHealthy:    true, // Default to healthy
+			WrapperName:         p.WrapperName,
+			ModelName:           p.ModelName,
+			TypeName:            p.TypeName,
+			DomainOrURL:         p.DomainOrURL,
+			APIKey:              p.APIKey,
+			NoHTTPS:             p.NoHTTPS,
+			ProviderMode:        p.ProviderMode,
+			OptionalAllowReason: p.OptionalAllowReason,
+			IsHealthy:           true, // Default to healthy
 		}
 
 		if err := SaveAiProvider(provider); err != nil {
@@ -277,11 +283,26 @@ func (c *ServerConfig) serveAutoCompleteData(conn net.Conn, request *http.Reques
 	// Get AI types from aispec (registered gateway types)
 	aiTypes := aispec.RegisteredAIGateways()
 
+	domainSuggestions := map[string]string{
+		"openai":      "api.openai.com",
+		"tongyi":      "dashscope.aliyuncs.com",
+		"volcengine":  "ark.cn-beijing.volces.com",
+		"chatglm":     "open.bigmodel.cn",
+		"moonshot":    "api.moonshot.cn",
+		"deepseek":    "api.deepseek.com",
+		"siliconflow": "api.siliconflow.cn",
+		"openrouter":  "openrouter.ai",
+		"ollama":      "127.0.0.1:11434",
+		"gemini":      "generativelanguage.googleapis.com",
+		"comate":      "comate.baidu.com",
+	}
+
 	c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{
-		"wrapper_names":  wrapperNames,
-		"model_names":    modelNames,
-		"model_types":    aiTypes, // Use model_types for frontend compatibility
-		"domain_or_urls": domainOrURLs,
+		"wrapper_names":      wrapperNames,
+		"model_names":        modelNames,
+		"model_types":        aiTypes,
+		"domain_or_urls":     domainOrURLs,
+		"domain_suggestions": domainSuggestions,
 	})
 }
 
@@ -419,7 +440,7 @@ func (c *ServerConfig) handleValidateProvider(conn net.Conn, request *http.Reque
 	}
 
 	// Parse request - support both form data and JSON
-	var typeName, domainOrURL, apiKey, modelName, providerMode string
+	var typeName, domainOrURL, apiKey, modelName, providerMode, optionalAllowReason string
 	var noHTTPS bool
 
 	contentType := request.Header.Get("Content-Type")
@@ -440,16 +461,18 @@ func (c *ServerConfig) handleValidateProvider(conn net.Conn, request *http.Reque
 		modelName = request.FormValue("model_name")
 		noHTTPS = request.FormValue("no_https") == "on"
 		providerMode = request.FormValue("provider_mode")
+		optionalAllowReason = request.FormValue("optional_allow_reason")
 	} else {
 		// Parse JSON body
 		var reqBody struct {
-			TypeName     string `json:"type_name"`
-			ModelType    string `json:"model_type"`
-			DomainOrURL  string `json:"domain_or_url"`
-			APIKey       string `json:"api_key"`
-			ModelName    string `json:"model_name"`
-			NoHTTPS      bool   `json:"no_https"`
-			ProviderMode string `json:"provider_mode"`
+			TypeName            string `json:"type_name"`
+			ModelType           string `json:"model_type"`
+			DomainOrURL         string `json:"domain_or_url"`
+			APIKey              string `json:"api_key"`
+			ModelName           string `json:"model_name"`
+			NoHTTPS             bool   `json:"no_https"`
+			ProviderMode        string `json:"provider_mode"`
+			OptionalAllowReason string `json:"optional_allow_reason"`
 		}
 
 		bodyBytes, err := io.ReadAll(request.Body)
@@ -475,6 +498,7 @@ func (c *ServerConfig) handleValidateProvider(conn net.Conn, request *http.Reque
 		modelName = reqBody.ModelName
 		noHTTPS = reqBody.NoHTTPS
 		providerMode = reqBody.ProviderMode
+		optionalAllowReason = reqBody.OptionalAllowReason
 	}
 
 	// Validate required fields
@@ -496,12 +520,13 @@ func (c *ServerConfig) handleValidateProvider(conn net.Conn, request *http.Reque
 
 	// Create a temporary provider for validation
 	provider := &Provider{
-		TypeName:     typeName,
-		DomainOrURL:  domainOrURL,
-		APIKey:       apiKey,
-		ModelName:    modelName,
-		NoHTTPS:      noHTTPS,
-		ProviderMode: providerMode,
+		TypeName:            typeName,
+		DomainOrURL:         domainOrURL,
+		APIKey:              apiKey,
+		ModelName:           modelName,
+		NoHTTPS:             noHTTPS,
+		ProviderMode:        providerMode,
+		OptionalAllowReason: optionalAllowReason,
 	}
 
 	// Validate by actually calling the AI and checking for valid response content

@@ -211,13 +211,14 @@ func LoadProvidersFromDatabase(config *ServerConfig) error {
 
 		// Create Provider instance
 		provider := &Provider{
-			ModelName:    dbProvider.ModelName,
-			TypeName:     dbProvider.TypeName,
-			ProviderMode: dbProvider.ProviderMode,
-			DomainOrURL:  dbProvider.DomainOrURL,
-			APIKey:       dbProvider.APIKey,
-			NoHTTPS:      dbProvider.NoHTTPS,
-			DbProvider:   dbProvider, // Set database object directly
+			ModelName:           dbProvider.ModelName,
+			TypeName:            dbProvider.TypeName,
+			ProviderMode:        dbProvider.ProviderMode,
+			DomainOrURL:         dbProvider.DomainOrURL,
+			APIKey:              dbProvider.APIKey,
+			NoHTTPS:             dbProvider.NoHTTPS,
+			OptionalAllowReason: dbProvider.OptionalAllowReason,
+			DbProvider:          dbProvider,
 		}
 
 		// Use WrapperName as model name for grouping
