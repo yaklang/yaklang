@@ -1,6 +1,6 @@
-{{ if not .Plan }}{{ if not .FileResults }}{{ if not .WebResults }}{{ if not .Enhance }}## 探索优先提示
+{{ if not .Plan }}{{ if not .FileResults }}{{ if not .WebResults }}{{ if not .Enhance }}{{ if not .ReconResults }}## 探索优先提示
 
-当前尚未收集到任何事实数据（无文件信息、无搜索结果、无补充知识）。在此阶段直接输出计划很可能产生泛化、模板化的内容。
+当前尚未收集到任何事实数据（无文件信息、无搜索结果、无补充知识、无网络侦查结果）。在此阶段直接输出计划很可能产生泛化、模板化的内容。
 
 **强烈建议先使用信息收集工具进行探索**，例如：
 - 用 `find_files` 了解项目结构或目标环境
@@ -9,9 +9,11 @@
 - 用 `web_search` 获取领域最佳实践
 - 用 `search_knowledge` 搜索知识库补充背景知识
 - 用 `loading_skills` 加载专业技能获取操作指南
+- 用 `scan_port` 扫描目标主机端口，发现开放服务和指纹信息
+- 用 `simple_crawler` 爬取目标 Web 应用，发现 URL 结构和入口点
 
 基于真实数据规划出的任务才会具体、可执行，而非空泛的通用步骤。
-{{ end }}{{ end }}{{ end }}{{ end }}{{/*
+{{ end }}{{ end }}{{ end }}{{ end }}{{ end }}{{/*
 
 */}}{{ if .Plan }}## 现有计划区块
 * 现有的计划会在下面做展示，你在生成计划的时候可以参考
@@ -55,11 +57,20 @@
 {{ .WebResults }}
 <|WEB_RESULTS_END_{{ .Nonce }}|>{{end}}{{/*
 
+*/}}{{if .ReconResults }}
+## 网络侦查结果
+
+以下是通过 scan_port / simple_crawler 等侦查工具收集到的目标网络和 Web 应用信息，包含开放端口、服务指纹、URL 结构和入口点等，请基于这些真实的侦查数据来设计更具针对性的任务规划。
+
+<|RECON_RESULTS_{{ .Nonce }}|>
+{{ .ReconResults }}
+<|RECON_RESULTS_END_{{ .Nonce }}|>{{end}}{{/*
+
 */}}{{ if .IsLastIteration }}
 ## **重要：最后一轮迭代**
 
-这是规划循环的最后一轮迭代。你**必须**在本轮输出一个完整的 plan，不可以再执行任何信息收集操作（search_knowledge、read_file、find_files、grep_text、web_search、loading_skills 均已移除）。
-请基于当前已有的所有信息（包括用户诉求、已有计划、增强补充知识、文件信息、互联网搜索结果等）直接输出最终的任务计划。
+这是规划循环的最后一轮迭代。你**必须**在本轮输出一个完整的 plan，不可以再执行任何信息收集操作（search_knowledge、read_file、find_files、grep_text、web_search、scan_port、simple_crawler、loading_skills 均已移除）。
+请基于当前已有的所有信息（包括用户诉求、已有计划、增强补充知识、文件信息、互联网搜索结果、网络侦查结果等）直接输出最终的任务计划。
 即使信息不够完整，也要尽最大努力生成一个可执行的计划。
 
 运用 SWOT 分析总结当前态势：在 Strengths 中列出已收集到的有价值信息，在 Weaknesses 中标注信息缺口，在规划中通过子任务来弥补不足。
