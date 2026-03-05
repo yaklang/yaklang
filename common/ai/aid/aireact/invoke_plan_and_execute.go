@@ -79,7 +79,11 @@ func (r *ReAct) RequireAIForgeAndAsyncExecute(
 			if err := cb.Wait("startup"); err != nil {
 				log.Warnf("start up failed: %v", err)
 			}
-			r.AddToTimeline("plan_executeion", fmt.Sprintf("plan/forge: %v is finished", utils.ShrinkString(forgeName, 128)))
+			if finalError != nil {
+				r.AddToTimeline("plan_executeion", fmt.Sprintf("plan/forge: %v finished with FAILURE: %v", utils.ShrinkString(forgeName, 128), finalError))
+			} else {
+				r.AddToTimeline("plan_executeion", fmt.Sprintf("plan/forge: %v is finished", utils.ShrinkString(forgeName, 128)))
+			}
 			r.emitArtifactsSummaryToTimeline()
 			done(finalError)
 		}()
@@ -151,6 +155,14 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 	defer func() {
 		if finalErr != nil {
 			r.EmitPlanExecFail(finalErr.Error())
+			if forgeName != "" {
+				msg := fmt.Sprintf(
+					"AI 智能应用 '%s' 执行失败: %v。请检查参数是否正确（如 rule_name 是否存在于数据库），或使用 search_capabilities 查询可用规则后重试。",
+					forgeName, finalErr)
+				r.AddToTimeline("[BLUEPRINT_RESULT]", msg)
+				// 显式告知用户，便于 AI 在下一轮迭代中根据 timeline 向用户提示
+				r.EmitResult(msg)
+			}
 		}
 		r.EmitJSON(schema.EVENT_TYPE_END_PLAN_AND_EXECUTION, r.config.Id, params)
 	}()

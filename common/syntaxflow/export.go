@@ -2,10 +2,14 @@ package syntaxflow
 
 import (
 	"context"
+
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
@@ -42,6 +46,13 @@ func QuerySyntaxFlowRulesByKeyword(keyword string, opts ...QueryRulesOption) cha
 	return sfdb.YieldSyntaxFlowRules(db, context.Background())
 }
 
+// MergeCompletionResultsForYak 供 Yak 调用，将 desc/alert forge 输出合并到规则内容。descMap/alertMap 为 map[string]any。
+func MergeCompletionResultsForYak(descMap, alertMap any, ruleContent string) (string, error) {
+	descParams := aitool.InvokeParams(utils.InterfaceToGeneralMap(descMap))
+	alertParams := aitool.InvokeParams(utils.InterfaceToGeneralMap(alertMap))
+	return MergeCompletionResults(descParams, alertParams, ruleContent)
+}
+
 var Exports = map[string]any{
 	"ExecRule":       ExecRule,
 	"withExecTaskID": ssaapi.QueryWithTaskID,
@@ -55,6 +66,9 @@ var Exports = map[string]any{
 	"withSearch": func() ssaapi.QueryOption {
 		return ssaapi.QueryWithSave(schema.SFResultKindSearch)
 	},
-	"QuerySyntaxFlowRules":       QuerySyntaxFlowRules,
+	"QuerySyntaxFlowRules":        QuerySyntaxFlowRules,
 	"QuerySyntaxFlowRulesByKeyword": QuerySyntaxFlowRulesByKeyword,
+	"MergeCompletionResults":     MergeCompletionResultsForYak,
+	"UpdateRuleContent":          sfdb.UpdateRuleContent,
+	"CompileRule":                sfvm.CompileRule,
 }
