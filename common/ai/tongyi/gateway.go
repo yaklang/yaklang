@@ -42,6 +42,7 @@ func (g *GatewayClient) Chat(s string, function ...any) (string, error) {
 		aispec.WithChatBase_ReasonStreamHandler(g.config.ReasonStreamHandler),
 		aispec.WithChatBase_ErrHandler(g.config.HTTPErrorHandler),
 		aispec.WithChatBase_ImageRawInstance(g.config.Images...),
+		aispec.WithChatBase_EnableThinkingEx(g.config.EnableThinking, g.config.EnableThinkingField, g.config.EnableThinkingValue),
 		aispec.WithChatBase_Tools(g.config.Tools),
 		aispec.WithChatBase_ToolChoice(g.config.ToolChoice),
 		aispec.WithChatBase_ToolCallCallback(g.config.ToolCallCallback),
@@ -49,7 +50,9 @@ func (g *GatewayClient) Chat(s string, function ...any) (string, error) {
 }
 
 func (g *GatewayClient) ChatStream(s string) (io.Reader, error) {
-	return aispec.ChatWithStream(g.targetUrl, g.config.Model, s, g.config.HTTPErrorHandler, g.config.StreamHandler, g.BuildHTTPOptions)
+	return aispec.ChatWithStream(g.targetUrl, g.config.Model, s, g.config.HTTPErrorHandler, g.config.StreamHandler, g.BuildHTTPOptions,
+		aispec.WithChatBase_EnableThinkingEx(g.config.EnableThinking, g.config.EnableThinkingField, g.config.EnableThinkingValue),
+	)
 }
 
 func (g *GatewayClient) ExtractData(data string, desc string, fields map[string]any) (map[string]any, error) {
