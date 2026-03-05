@@ -691,18 +691,26 @@ func TestGetThirdPartyAppConfigTemplate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	apiTmp := res.GetTemplates()[0]
-	for _, template := range apiTmp.GetItems() {
-		fmt.Printf("name: %s, required: %v\n", template.GetName(), template.GetRequired())
+	var openAITmp *ypb.GetThirdPartyAppConfigTemplate
+	for _, template := range res.GetTemplates() {
+		if template.GetName() == "openai" {
+			openAITmp = template
+			break
+		}
 	}
-	assert.Equal(t, apiTmp.Name, aispec.RegisteredAIGateways()[0])
-	assert.Equal(t, "api_key", apiTmp.Items[0].Name)
-	assert.Equal(t, true, apiTmp.Items[0].Required)
-	assert.Equal(t, "proxy", apiTmp.Items[4].Name)
-	assert.Equal(t, "代理地址", apiTmp.Items[4].Verbose)
+	for _, template := range openAITmp.GetItems() {
+		fmt.Printf("name: %s, required: %v\n", template.GetName(), template.GetRequired())
 
-	assert.Equal(t, "model", apiTmp.Items[1].Name)
-	assert.Equal(t, "模型名称", apiTmp.Items[1].Verbose)
+	}
+
+	assert.Equal(t, openAITmp.Name, "openai") // openai
+	assert.Equal(t, "api_key", openAITmp.Items[0].Name)
+	assert.Equal(t, true, openAITmp.Items[0].Required)
+	assert.Equal(t, "proxy", openAITmp.Items[4].Name)
+	assert.Equal(t, "代理地址", openAITmp.Items[4].Verbose)
+
+	assert.Equal(t, "model", openAITmp.Items[1].Name)
+	assert.Equal(t, "模型名称", openAITmp.Items[1].Verbose)
 
 	var comateTmp *ypb.GetThirdPartyAppConfigTemplate
 	for _, t := range res.GetTemplates() {
