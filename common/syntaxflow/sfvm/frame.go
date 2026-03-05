@@ -355,7 +355,7 @@ func (s *SFFrame) execRule(feedValue ValueOperator) error {
 			case OpCheckStackTop:
 				if s.stack.Len() == 0 {
 					s.debugSubLog(">> stack top is nil (push input)")
-					s.stack.Push(feedValue)
+					s.pushStack(feedValue)
 				}
 			case OpConditionScopeStart:
 				if s.stack.Len() == 0 {
@@ -427,6 +427,10 @@ func (s *SFFrame) execRule(feedValue ValueOperator) error {
 
 var CriticalError = utils.Error("CriticalError(Immediately Abort)")
 var AbortError = utils.Error("AbortError(Normal Abort)")
+
+func (s *SFFrame) pushStack(value ValueOperator) {
+	s.stack.Push(value)
+}
 
 func (s *SFFrame) output(resultName string, operator ValueOperator) error {
 	var values = []ValueOperator{operator}
