@@ -48,3 +48,21 @@ func (gw *AIAgentHTTPGateway) handleUpdateGlobalSetting(w http.ResponseWriter, r
 
 	writeJSON(w, http.StatusOK, req)
 }
+
+func (gw *AIAgentHTTPGateway) handleGetThirdPartyAppConfigTemplate(w http.ResponseWriter, r *http.Request) {
+	if gw.yakClient == nil {
+		writeError(w, http.StatusServiceUnavailable, "grpc client is unavailable")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+
+	resp, err := gw.yakClient.GetThirdPartyAppConfigTemplate(ctx, &ypb.Empty{})
+	if err != nil {
+		writeError(w, http.StatusBadGateway, "get third party app config template failed: "+err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, resp)
+}

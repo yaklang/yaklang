@@ -247,6 +247,24 @@ Response: full saved setting (PascalCase keys).
 
 ---
 
+### `POST /setting/appconfigs/template/get`
+
+- Purpose: fetch third-party application config form templates (passthrough gRPC `GetThirdPartyAppConfigTemplate`)
+- Request body: `{}` (or empty JSON object)
+- Response: `GetThirdPartyAppConfigTemplateResponse`
+
+Template item fields:
+
+- `Name`: config key name
+- `Verbose`: display label
+- `Type`: input type (`string` / `number` / `bool` / `list`)
+- `Required`: whether this key is mandatory
+- `DefaultValue`: default field value
+- `Desc`: description text
+- `Extra`: extra metadata
+
+---
+
 ### `POST /setting/providers/get`
 
 - Purpose: fetch AI providers list
@@ -523,4 +541,3 @@ await fetch(`/agent/run/${runID}/events/push`, {
   body: JSON.stringify({ type: "free_input", free_input: "继续" })
 });
 ```
-
