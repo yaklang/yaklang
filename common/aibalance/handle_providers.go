@@ -525,7 +525,7 @@ func (c *ServerConfig) handleValidateProvider(conn net.Conn, request *http.Reque
 		_, validationErr = embClient.Embedding("validation test")
 	} else {
 		// Chat mode validation - wait for actual AI response content
-		client, err := provider.GetAIClient(nil, nil)
+		client, err := provider.GetAIClient(false, nil, nil)
 		if err != nil {
 			c.logError("Failed to create client for validation: %v", err)
 			c.writeJSONResponse(conn, http.StatusOK, map[string]interface{}{

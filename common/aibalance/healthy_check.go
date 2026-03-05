@@ -129,6 +129,7 @@ func ExecuteHealthCheckLogic(p *Provider, providerIdentifierForLog string) (isHe
 		// Create AI client using the provider's GetAIClient method
 		// GetAIClient is assumed to handle its own HTTP client requirements.
 		client, err := p.GetAIClient(
+			false,
 			func(reader io.Reader) {
 				io.Copy(utils.FirstWriter(func(b []byte) {
 					rspOnce.Do(func() {
