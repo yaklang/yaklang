@@ -1,16 +1,13 @@
 package thirdparty_bin
 
 import (
-	"sync"
-
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 var (
-	// 确保只初始化一次
-	initOnce sync.Once
 	// 初始化是否成功
 	initSuccess bool
 	// 初始化错误
@@ -23,7 +20,7 @@ var (
 
 // init 包初始化函数，自动注册内置的二进制工具
 func init() {
-	initOnce.Do(func() {
+	yakit.RegisterPostInitDatabaseFunction(func() error {
 		installDir := consts.GetDefaultLibsDir()
 		downloadDir := consts.GetDefaultDownloadTempDir()
 		var err error
@@ -42,6 +39,7 @@ func init() {
 			log.Debugf("Package thirdparty_bin initialized successfully")
 			initSuccess = true
 		}
+		return nil
 	})
 }
 

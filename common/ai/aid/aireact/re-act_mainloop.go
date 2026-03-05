@@ -418,6 +418,14 @@ func (r *ReAct) ensureWorkDirectory(userInput string) {
 	var folderName string
 	var sessionTitle string
 
+	shouldTrySessionTitle := true
+	if r.config.PersistentSessionId != "" && cfg.GetDB() != nil {
+		initialized, err := yakit.IsAISessionTitleInitialized(cfg.GetDB(), r.config.PersistentSessionId)
+		if err == nil && initialized {
+			shouldTrySessionTitle = false
+		}
+	}
+
 	// try LiteForge to generate both folder_name and session_title
 	// use a tight timeout to avoid blocking the main flow
 	if trimmedInput != "" && !cfg.GetConfigBool(sessionTitleDisableKey) && cfg.OriginalAICallback != nil {
@@ -438,10 +446,13 @@ func (r *ReAct) ensureWorkDirectory(userInput string) {
 				return
 			}
 
-			action, err := r.InvokeSpeedPriorityLiteForge(liteForgeCtx, "session-init-generator", prompt, []aitool.ToolOption{
-				aitool.WithStringParam("session_title", aitool.WithParam_Description("Concise session title for display"), aitool.WithParam_MaxLength(50), aitool.WithParam_Required(true)),
+			toolOptions := []aitool.ToolOption{
 				aitool.WithStringParam("folder_name", aitool.WithParam_Description("Short filesystem-safe folder name in snake_case English, describing the task purpose, e.g. sql_injection_scan, http_flow_analysis"), aitool.WithParam_MaxLength(30), aitool.WithParam_Required(true)),
-			})
+			}
+			if shouldTrySessionTitle {
+				toolOptions = append(toolOptions, aitool.WithStringParam("session_title", aitool.WithParam_Description("Concise session title for display"), aitool.WithParam_MaxLength(50), aitool.WithParam_Required(true)))
+			}
+			action, err := r.InvokeSpeedPriorityLiteForge(liteForgeCtx, "session-init-generator", prompt, toolOptions)
 			if err != nil {
 				log.Warnf("generate semantic folder name failed: %v", err)
 				return
@@ -450,10 +461,23 @@ func (r *ReAct) ensureWorkDirectory(userInput string) {
 			if fn := strings.TrimSpace(action.GetString("folder_name")); fn != "" {
 				folderName = sanitizeFolderName(fn, 30)
 			}
-			if st := strings.TrimSpace(action.GetString("session_title")); st != "" {
-				sessionTitle = st
+			if shouldTrySessionTitle {
+				if st := strings.TrimSpace(action.GetString("session_title")); st != "" {
+					sessionTitle = st
+				}
 			}
 		}()
+	}
+
+	// load existing title for restored session so UI gets it even when generation is skipped.
+	if cfg.GetConfigString("session_title", "") == "" && r.config.PersistentSessionId != "" && cfg.GetDB() != nil {
+		if meta, err := yakit.GetAISessionMetaBySessionID(cfg.GetDB(), r.config.PersistentSessionId); err == nil {
+			if existing := strings.TrimSpace(meta.Title); existing != "" {
+				cfg.SetConfig("session_title", existing)
+				cfg.SetConfig(sessionTitleGeneratedKey, true)
+				r.Emitter.EmitSessionTitle(existing)
+			}
+		}
 	}
 
 	// build the final directory name: {dbId}_{semanticOrSession}_{date}_{shortUuid}
@@ -485,8 +509,18 @@ func (r *ReAct) ensureWorkDirectory(userInput string) {
 	// update DB record with work dir and semantic label
 	yakit.UpdateAIAgentRuntimeWorkDir(cfg.GetDB(), cfg.GetRuntimeId(), dirPath, folderName)
 
-	// if we got a session title from the merged LiteForge call, emit it
-	if sessionTitle != "" {
+	// if we got a session title from LiteForge, persist title only when not initialized.
+	if sessionTitle != "" && r.config.PersistentSessionId != "" && cfg.GetDB() != nil {
+		updated, err := yakit.InitAISessionTitleIfNeeded(cfg.GetDB(), r.config.PersistentSessionId, sessionTitle)
+		if err != nil {
+			log.Warnf("init ai session title failed: %v", err)
+		}
+		if updated {
+			cfg.SetConfig("session_title", sessionTitle)
+			cfg.SetConfig(sessionTitleGeneratedKey, true)
+			r.Emitter.EmitSessionTitle(sessionTitle)
+		}
+	} else if sessionTitle != "" {
 		cfg.SetConfig("session_title", sessionTitle)
 		cfg.SetConfig(sessionTitleGeneratedKey, true)
 		r.Emitter.EmitSessionTitle(sessionTitle)
@@ -503,6 +537,13 @@ func (r *ReAct) ensureSessionTitle(userInput string) {
 
 	if cfg.GetConfigBool(sessionTitleDisableKey) {
 		return
+	}
+
+	if r.config.PersistentSessionId != "" && cfg.GetDB() != nil {
+		initialized, err := yakit.IsAISessionTitleInitialized(cfg.GetDB(), r.config.PersistentSessionId)
+		if err == nil && initialized {
+			return
+		}
 	}
 
 	if cfg.GetConfigString("session_title", "") != "" || cfg.GetConfigBool(sessionTitleGeneratedKey) {
@@ -542,6 +583,16 @@ func (r *ReAct) ensureSessionTitle(userInput string) {
 			return
 		}
 
+		if r.config.PersistentSessionId != "" && cfg.GetDB() != nil {
+			updated, err := yakit.InitAISessionTitleIfNeeded(cfg.GetDB(), r.config.PersistentSessionId, sessionTitle)
+			if err != nil {
+				log.Warnf("init ai session title failed: %v", err)
+				return
+			}
+			if !updated {
+				return
+			}
+		}
 		cfg.SetConfig("session_title", sessionTitle)
 		r.Emitter.EmitSessionTitle(sessionTitle)
 	}()

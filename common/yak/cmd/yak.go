@@ -37,11 +37,11 @@ import (
 	systemLog "log"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/consts"
 	_ "github.com/yaklang/yaklang/common/coreplugin"
 	"github.com/yaklang/yaklang/common/cybertunnel"
 	"github.com/yaklang/yaklang/common/log"
+	cli "github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/grpc_auth"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
@@ -153,7 +153,7 @@ func init() {
 	}
 
 	/* 初始化数据库: 在 grpc 模式下，数据库应该不在 init 中使用 */
-	ignoreInitDatabase := []string{"grpc", "check-secret-local-grpc", "fixup-database"}
+	ignoreInitDatabase := []string{"grpc", "check-secret-local-grpc", "fixup-database", "ai-http-gateway"}
 	switch {
 	case len(os.Args) > 1 && slices.Contains(ignoreInitDatabase, os.Args[1]):
 		log.Debug("grpc should not initialize database in func:init")
@@ -1141,6 +1141,7 @@ func main() {
 
 	mainCommands := []*cli.Command{
 		yakcmds.LSPCommand,
+		yakcmds.AIHTTPGatewayCommand,
 		{
 			Name: "version",
 			Flags: []cli.Flag{

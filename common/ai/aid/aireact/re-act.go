@@ -226,6 +226,17 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 		wg:                   new(sync.WaitGroup),
 	}
 
+	if cfg.PersistentSessionId != "" && cfg.GetDB() != nil {
+		meta, err := yakit.EnsureAISessionMeta(cfg.GetDB(), cfg.PersistentSessionId)
+		if err != nil {
+			log.Warnf("ensure ai session meta failed for %s: %v", cfg.PersistentSessionId, err)
+		} else if meta != nil && strings.TrimSpace(meta.Title) != "" {
+			cfg.SetConfig("session_title", meta.Title)
+			cfg.SetConfig(sessionTitleGeneratedKey, true)
+			react.Emitter.EmitSessionTitle(meta.Title)
+		}
+	}
+
 	memoryLoadStart := time.Now()
 	if cfg.MemoryTriage != nil {
 		react.memoryTriage = cfg.MemoryTriage

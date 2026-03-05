@@ -44,7 +44,7 @@ func (s *Server) DeleteAITask(ctx context.Context, req *ypb.AITaskDeleteRequest)
 	db := s.GetProjectDatabase()
 
 	// Fast clear (drop+recreate) for the "clear all" case.
-	if filter == nil || (len(filter.GetName()) == 0 && len(filter.GetKeyword()) == 0 && len(filter.GetForgeName()) == 0 && len(filter.GetCoordinatorId()) == 0) {
+	if filter == nil || (len(filter.GetName()) == 0 && len(filter.GetKeyword()) == 0 && len(filter.GetForgeName()) == 0 && len(filter.GetSessionID()) == 0 && len(filter.GetCoordinatorId()) == 0) {
 		if err := yakit.DropAIAgentRuntimeTable(db); err != nil {
 			return nil, err
 		}

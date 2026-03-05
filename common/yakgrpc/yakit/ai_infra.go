@@ -140,6 +140,7 @@ func GetAgentRuntime(db *gorm.DB, uuid string) (*schema.AIAgentRuntime, error) {
 func FilterAgentRuntime(db *gorm.DB, filter *ypb.AITaskFilter) *gorm.DB {
 	db = db.Model(&schema.AIAgentRuntime{})
 	db = bizhelper.ExactQueryStringArrayOr(db, "forge_name", filter.GetForgeName())
+	db = bizhelper.ExactQueryStringArrayOr(db, "persistent_session", filter.GetSessionID())
 	db = bizhelper.ExactQueryStringArrayOr(db, "uuid", filter.GetCoordinatorId())
 	db = bizhelper.ExactQueryStringArrayOr(db, "name", filter.GetName())
 	db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{
