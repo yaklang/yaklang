@@ -1,12 +1,194 @@
-__DESC__ = "补全 SyntaxFlow 静态代码审计规则的 desc 与 alert 信息，包括 title、title_zh、desc、solution 等字段，由 LiteForge 执行。"
+__DESC__ = "根据 rule_name 查找 SyntaxFlow 规则，独立完成 desc 与 alert 块的美化补全，合并后返回；可选写回数据库。"
 __VERBOSE_NAME__ = "SyntaxFlow 规则补全"
-__KEYWORDS__ = "SyntaxFlow,规则补全,静态分析,代码审计"
+__KEYWORDS__ = "语法流,规则补全,desc补全,alert补全,代码审计规则,SyntaxFlow"
 
-rule_name = cli.String("rule_name", cli.setHelp("SF规则名称或关键字"), cli.setVerboseName("规则名称"))
-query = cli.String("query", cli.setHelp("查询关键字"), cli.setVerboseName("查询"))
-write_back = cli.Bool("write_back", cli.setDefault(false), cli.setHelp("是否将补全后的规则写回数据库"), cli.setVerboseName("写回数据库"))
+rule_name = cli.String("rule_name", cli.setRequired(true), cli.setHelp("规则名称，用于查询"))
+write_back = cli.StringSlice("write_back",
+    cli.setMultipleSelect(false),
+    cli.setSelectOption("否", "false"),
+    cli.setSelectOption("是", "true"),
+    cli.setDefault("false"),
+    cli.setHelp("是否将补全结果写回数据库"),
+    cli.setVerboseName("写回数据库"))
 cli.check()
 
+descPrompt = <<<DESC_PROMPT
+# 指令
+你是一个专业的网络安全技术人员，你能够通过我给你的静态代码审计规则，规则中可能描述信息不完全或者不符合标准，因此需要你审查并补全描述信息。
+
+## 处理步骤
+1. 阅读理解静态代码审计文件名、规则内容、文件相对路径。
+2. 文件内容的第一个desc用来描述该静态代码审计规则的信息；里面的描述信息可能不完整或者不符合标准。
+3. 你需要根据**描述信息标准**，来决定是否修改或新增描述信息。
+
+## 描述信息标准
+### title：规则英文标题，动词+语言+目的，如 Check Java LDAP Injection Vulnerability
+### title_zh：规则中文标题，如 检测Java LDAP注入漏洞
+### cwe：CWE编号，纯数字；非漏洞规则可无
+### desc：规则目的和作用，不少于300字，markdown格式描述漏洞原理、触发场景和潜在影响
+### solution：修复建议，不少于300字，markdown格式；非漏洞规则返回none
+### reference：参考资料链接；无则返回none
+
+## 输入
+文件名: %s
+规则内容:
+%s
+DESC_PROMPT
+
+alertPrompt = <<<ALERT_PROMPT
+# 指令
+你是一个专业的网络安全技术人员。根据静态代码审计规则补全所有 alert 块的信息。
+
+## 处理步骤
+1. 阅读理解文件名、规则内容。
+2. 记录 alert 数量，输出前后数量必须相等。
+3. 每个 alert 需补全：name、title、title_zh、desc、level、message、risk、solution。
+4. level 枚举：critical/high/middle/low/info
+
+## 输入
+文件名: %s
+规则内容:
+%s
+ALERT_PROMPT
+
+descSchema = jsonschema.ActionObject(
+    jsonschema.paramString("title", jsonschema.description("规则英文标题")),
+    jsonschema.paramString("title_zh", jsonschema.description("规则中文标题")),
+    jsonschema.paramString("desc", jsonschema.description("规则描述")),
+    jsonschema.paramString("solution", jsonschema.description("漏洞修复方式或安全建议")),
+    jsonschema.paramString("reference", jsonschema.description("参考链接或文档")),
+    jsonschema.paramNumber("cwe", jsonschema.description("CWE编号"))
+)
+
+alertSchema = jsonschema.ActionObject(
+    jsonschema.paramObjectArray("alert",
+        jsonschema.paramString("name", jsonschema.description("alert变量名")),
+        jsonschema.paramString("title", jsonschema.description("英文标题")),
+        jsonschema.paramString("title_zh", jsonschema.description("中文标题")),
+        jsonschema.paramString("desc", jsonschema.description("漏洞描述")),
+        jsonschema.paramString("level", jsonschema.description("风险等级")),
+        jsonschema.paramString("message", jsonschema.description("简短提示")),
+        jsonschema.paramString("risk", jsonschema.description("风险类型")),
+        jsonschema.paramString("solution", jsonschema.description("修复建议")),
+    )
+)
+
 forgeHandle = func(params) {
-    return aiagent.ExecuteForge("sf_rule_completion", params)
+    cod, err := aiagent.NewExecutor("sf_rule_completion", nil)
+    if err != nil {
+        log.Error("sf_rule_completion NewExecutor failed: %v", err)
+        return nil, err
+    }
+    aidConfig = cod.GetAIConfig()
+    makeReader = func(format, args ...) {
+        return str.NewReader(sprintf(format, args...))
+    }
+
+    aidConfig.EmitDefaultStreamEvent("查询 SyntaxFlow 规则", makeReader("正在根据 rule_name=%s 查询规则", rule_name), "")
+    rule = nil
+    for r := range syntaxflow.QuerySyntaxFlowRules(rule_name) {
+        rule = r
+        break
+    }
+    if rule == nil {
+        msg = sprintf("no rule found for keyword: %s", rule_name)
+        log.Error("[sf_rule_completion] %s", msg)
+        aidConfig.EmitDefaultStreamEvent("规则未找到", makeReader(msg), "")
+        return nil, msg
+    }
+    aidConfig.EmitDefaultStreamEvent("已找到规则", makeReader("规则: %s", rule.RuleName), "")
+
+    fileName = rule.RuleName
+    fileContent = rule.Content
+    if fileContent == "" {
+        msg = sprintf("rule %s has empty content", fileName)
+        log.Error("[sf_rule_completion] %s", msg)
+        aidConfig.EmitDefaultStreamEvent("规则内容为空", makeReader(msg), "")
+        return nil, msg
+    }
+
+    aidConfig.EmitDefaultStreamEvent("开始 desc 补全", makeReader("正在补全规则 %s 的 desc 块", fileName), "")
+    descQuery = sprintf(descPrompt, fileName, fileContent)
+    descRes, err = liteforge.Execute(descQuery, liteforge.output(descSchema))
+    if err != nil {
+        msg = sprintf("desc completion failed: %v", err)
+        log.Error("[sf_rule_completion] desc 补全失败: %v", err)
+        aidConfig.EmitDefaultStreamEvent("desc 补全失败", makeReader(msg), "")
+        return nil, msg
+    }
+    aidConfig.EmitDefaultStreamEvent("desc 补全完成", makeReader("已补全 title、title_zh、desc、solution、reference、cwe"), "")
+    descParams = {
+        "title": descRes.GetString("title"),
+        "title_zh": descRes.GetString("title_zh"),
+        "desc": descRes.GetString("desc"),
+        "solution": descRes.GetString("solution"),
+        "reference": descRes.GetString("reference"),
+        "cwe": descRes.GetInt("cwe"),
+    }
+
+    aidConfig.EmitDefaultStreamEvent("开始 alert 补全", makeReader("正在补全规则 %s 的 alert 块", fileName), "")
+    alertQuery = sprintf(alertPrompt, fileName, fileContent)
+    alertRes, err = liteforge.Execute(alertQuery, liteforge.output(alertSchema))
+    if err != nil {
+        msg = sprintf("alert completion failed: %v", err)
+        log.Error("[sf_rule_completion] alert 补全失败: %v", err)
+        aidConfig.EmitDefaultStreamEvent("alert 补全失败", makeReader(msg), "")
+        return nil, msg
+    }
+    alertParams = {"alert": alertRes.GetInvokeParamsArray("alert")}
+    aidConfig.EmitDefaultStreamEvent("alert 补全完成", makeReader("已补全 %d 个 alert", len(alertRes.GetInvokeParamsArray("alert"))), "")
+
+    aidConfig.EmitDefaultStreamEvent("合并与校验", makeReader("正在合并 desc 与 alert 结果并校验语法"), "")
+    merged, err = syntaxflow.MergeCompletionResults(descParams, alertParams, fileContent)
+    if err != nil {
+        msg = sprintf("format rule failed: %v", err)
+        log.Error("[sf_rule_completion] 合并失败: %v", err)
+        aidConfig.EmitDefaultStreamEvent("合并失败", makeReader(msg), "")
+        return nil, msg
+    }
+    _, err = syntaxflow.CompileRule(merged)
+    if err != nil {
+        msg = sprintf("format rule syntax validation failed: %v", err)
+        mergedPreview = len(merged) > 200 ? merged[0:200] + "..." : merged
+        log.Error("[sf_rule_completion] 语法校验失败: %v, merged 前 200 字符: %s", err, mergedPreview)
+        aidConfig.EmitDefaultStreamEvent("语法校验失败", makeReader(msg), "")
+        return nil, msg
+    }
+
+    writeBackVal = "false"
+    if len(write_back) > 0 {
+        writeBackVal = write_back[0]
+    }
+    if rule != nil && str.ToLower(writeBackVal) == "true" {
+        if rule.IsBuildInRule {
+            aidConfig.EmitDefaultStreamEvent("跳过写回", makeReader("内置规则 %s 不执行写回", rule.RuleName), "")
+            log.Warn("skip write_back for built-in rule: %s", rule.RuleName)
+        } else {
+            aidConfig.EmitDefaultStreamEvent("写回数据库", makeReader("正在将补全结果写回规则 %s", rule.RuleName), "")
+            err = syntaxflow.UpdateRuleContent(rule.RuleName, merged)
+            if err != nil {
+                msg = sprintf("write rule content back to database failed: %v", err)
+                log.Error("[sf_rule_completion] 写回失败: %v", err)
+                aidConfig.EmitDefaultStreamEvent("写回失败", makeReader(msg), "")
+                return nil, msg
+            }
+            aidConfig.EmitDefaultStreamEvent("写回成功", makeReader("规则 %s 已更新到数据库", rule.RuleName), "")
+        }
+    }
+
+    log.Info("[sf_rule_completion] 规则 %s 补全完成，merged 长度: %d", rule.RuleName, len(merged))
+    aidConfig.EmitDefaultStreamEvent("规则补全完成", makeReader("规则 %s 补全完成，共 %d 字符。下方可查看、复制和下载完整规则", rule.RuleName, len(merged)), "")
+    aidConfig.EmitStreamEventWithContentType("补全后的规则", str.NewReader(merged), "", "code/yaklang")
+    workDir = aidConfig.GetOrCreateWorkDir()
+    if workDir != "" {
+        artifactName = sprintf("sf_rule_%s_%s.sf", rule.RuleName, str.RandStr(8))
+        artifactPath = file.Join(workDir, artifactName)
+        err = file.Save(artifactPath, merged)
+        if err == nil {
+            aidConfig.EmitPinFilename(artifactPath)
+            aidConfig.EmitDefaultStreamEvent("可下载的规则文件", makeReader("规则已保存至 %s，支持下载和复制", artifactPath), "")
+        }
+    }
+    aidConfig.EmitResultAfterStream("补全后的规则", merged, true)
+    return {"params": {"rule_content": merged}}
 }

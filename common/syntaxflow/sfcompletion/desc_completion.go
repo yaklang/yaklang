@@ -3,22 +3,22 @@ package sfcompletion
 import (
 	"context"
 	_ "embed"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"strconv"
-
 	"io"
 
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/aiforge"
 	_ "github.com/yaklang/yaklang/common/aiforge/aibp"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
+	"github.com/yaklang/yaklang/common/syntaxflow"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-// CompleteRuleDesc 用于给sf rule文件的desc中信息项内容补全，包括title、title_zh、desc、solution等
+// CompleteRuleDesc 用于给 sf rule 文件的 desc 中信息项内容补全，包括 title、title_zh、desc、solution 等。
+// 委托 sf_desc_completion 执行，将 AI 输出合并到规则内容后返回，不写回。
 func CompleteRuleDesc(
 	fileName, ruleContent string,
 	aiConfig ...aispec.AIConfigOption,
@@ -38,16 +38,18 @@ func CompleteRuleDesc(
 		return rsp, nil
 	}
 
+	if fileName == "" {
+		return "", utils.Errorf("complete rule failed: fileName is required")
+	}
+	if ruleContent == "" {
+		return "", utils.Errorf("complete rule failed: ruleContent is required")
+	}
 	forgeResult, err := aiforge.ExecuteForge(
 		"sf_desc_completion",
 		context.Background(),
 		[]*ypb.ExecParamItem{
-			{
-				Key: "file_name", Value: fileName,
-			},
-			{
-				Key: "file_content", Value: ruleContent,
-			},
+			{Key: "file_name", Value: fileName},
+			{Key: "file_content", Value: ruleContent},
 		},
 		aicommon.WithAgreeYOLO(),
 		aicommon.WithAICallback(aiCallback),
@@ -55,63 +57,17 @@ func CompleteRuleDesc(
 	if err != nil {
 		return "", utils.Errorf("complete rule failed: %v", err)
 	}
-	alertResult, err := aiforge.ExecuteForge("sf_alert_completion", context.Background(), []*ypb.ExecParamItem{
-		{
-			Key: "file_name", Value: fileName,
-		},
-		{
-			Key: "file_content", Value: ruleContent,
-		},
-	},
-		aicommon.WithAgreeYOLO(),
-		aicommon.WithAICallback(aiCallback))
+	descParams := aitool.InvokeParams{
+		"title":     forgeResult.GetString("title"),
+		"title_zh":  forgeResult.GetString("title_zh"),
+		"desc":      forgeResult.GetString("desc"),
+		"solution":  forgeResult.GetString("solution"),
+		"reference": forgeResult.GetString("reference"),
+		"cwe":       forgeResult.GetInt("cwe"),
+	}
+	merged, err := syntaxflow.MergeCompletionResults(descParams, nil, ruleContent)
 	if err != nil {
-		return "", err
+		return "", utils.Errorf("merge completion results failed: %v", err)
 	}
-	descParams := forgeResult.GetInvokeParams("params")
-	alertParams := alertResult.GetInvokeParams("params")
-	if descParams == nil {
-		return "", utils.Errorf("complete rule failed: ai response have  no params")
-	}
-
-	handler := func(key, value string) string {
-		if typ := sfvm.ValidDescItemKeyType(key); typ == sfvm.SFDescKeyType_Unknown {
-			return value
-		}
-		if got := descParams.GetString(key); got != "" {
-			return got
-		}
-		if got := descParams.GetInt(key); got != 0 {
-			return strconv.FormatInt(got, 10)
-		}
-		return value
-	}
-	var opts []sfvm.RuleFormatOption
-	opts = append(opts,
-		sfvm.RuleFormatWithRequireInfoDescKeyType(sfvm.GetSupplyInfoDescKeyType()...),
-		sfvm.RuleFormatWithDescHandler(handler),
-		sfvm.RuleFormatWithAlertHandler(func(name, key, value string) string {
-			array := alertParams.GetObjectArray("alert")
-			if len(array) == 0 {
-				return value
-			}
-			for _, invokeParams := range array {
-				if name != invokeParams.GetString("name") {
-					continue
-				}
-				aiVal := invokeParams.GetString(key)
-				if aiVal == "" {
-					return value
-				}
-				return aiVal
-			}
-			return value
-		}),
-		sfvm.RuleFormatWithRequireAlertDescKeyType(sfvm.GetAlertDescKeyType()...),
-	)
-	content, err := sfvm.FormatRule(ruleContent, opts...)
-	if err != nil {
-		return "", err
-	}
-	return content, nil
+	return merged, nil
 }
