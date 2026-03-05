@@ -279,6 +279,10 @@ When --syntaxflow is provided, a follow-up SyntaxFlowQuery is executed for quick
 			Name:  "exclude-file",
 			Usage: `exclude files by glob, e.g. targets/*, vendor/*`,
 		},
+		cli.IntFlag{
+			Name:  "concurrency",
+			Usage: "compile concurrency: worker count for parallel file parsing. 0 or unset = NumCPU/2 (default). >0 to override.",
+		},
 		cli.BoolFlag{
 			Name:  "file-perf-log",
 			Usage: "enable file-level compile performance log output",
@@ -1392,7 +1396,10 @@ and exports structured report (sarif/irify).`,
 			Name:  "exclude-file",
 			Usage: `exclude files by glob, e.g. targets/*, vendor/*`,
 		},
-
+		cli.IntFlag{
+			Name:  "concurrency",
+			Usage: "compile concurrency: worker count for parallel file parsing. 0 or unset = NumCPU/2 (default). >0 to override.",
+		},
 		cli.StringFlag{
 			Name:  "syntaxflow,sf",
 			Usage: "custom rules: inline syntaxflow, .sf/.syntaxflow file, or directory",
