@@ -2,7 +2,7 @@ package ssaapi
 
 import (
 	"fmt"
-	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -124,12 +124,7 @@ func (c *Config) parseProjectWithFS(
 
 	var AstErr error
 	fileContents := make([]*ssareducer.FileContent, 0, preHandlerTotal)
-	enableFilePerfLog := c.Config != nil && c.Config.GetCompileFilePerformanceLog()
-	// 创建文件性能 recorder
-	if enableFilePerfLog && c.filePerformanceRecorder == nil {
-		c.filePerformanceRecorder = diagnostics.NewRecorder()
-	}
-	filePerfRecorder := c.filePerformanceRecorder
+	filePerfRecorder := c.GetFilePerformanceRecorderIfEnabled()
 	// pre handler  0-40%
 	f1 := func() error {
 		preHandlerNum := 0
@@ -193,14 +188,12 @@ func (c *Config) parseProjectWithFS(
 				}()
 			}
 			// 记录文件级别的 AST 解析时间（含文件大小用于 ms/KB）
-			if enableFilePerfLog {
+			if filePerfRecorder != nil {
 				fileASTTime := time.Since(fileASTStart)
-				if filePerfRecorder != nil {
-					fileSize := int64(len(fileContent.Content))
-					filePerfRecorder.RecordDurationWithSize(fmt.Sprintf("AST[%s]", fileContent.Path), fileASTTime, fileSize)
-					if fileASTTime > 100*time.Millisecond {
-						log.Infof("[File Performance] AST parse: %s, time: %v", fileContent.Path, fileASTTime)
-					}
+				fileSize := int64(len(fileContent.Content))
+				filePerfRecorder.RecordDurationWithSize(fmt.Sprintf("AST[%s]", fileContent.Path), fileASTTime, fileSize)
+				if fileASTTime > 100*time.Millisecond {
+					log.Infof("[File Performance] AST parse: %s, time: %v", fileContent.Path, fileASTTime)
 				}
 			}
 		}
@@ -282,38 +275,21 @@ func (c *Config) parseProjectWithFS(
 			ast := fileContent.AST
 			fileContent.AST = nil // clear AST
 			func() {
-				var lazyBuildTotal time.Duration
-				var lazyBuildTriggerPath string
-				if enableFilePerfLog && filePerfRecorder != nil {
-					prog.OnLazyBuildCompleteByFile = func(byFile map[string]time.Duration) {
-						for file, d := range byFile {
-							filePerfRecorder.RecordDuration(fmt.Sprintf("LazyBuild[%s]", file), d)
-							lazyBuildTotal += d
-						}
-						lazyBuildTriggerPath = path
-					}
-				}
 				fileBuildStart := time.Now()
 				defer func() {
 					if r := recover(); r != nil {
 						log.Errorf("parse [%s] error %v  ", path, r)
 						utils.PrintCurrentGoroutineRuntimeStack()
 					}
-					if enableFilePerfLog && filePerfRecorder != nil {
+					if filePerfRecorder != nil {
 						fileBuildTime := time.Since(fileBuildStart)
 						fileSize := int64(len(fileContent.Content))
-						// 若当前文件触发了 LazyBuild，则从 Build 时间中扣除 LazyBuild 耗时，避免错误归属
-						buildRecord := fileBuildTime
-						if filepath.Base(lazyBuildTriggerPath) == filepath.Base(path) && lazyBuildTotal > 0 {
-							buildRecord = fileBuildTime - lazyBuildTotal
-						}
-						filePerfRecorder.RecordDurationWithSize(fmt.Sprintf("Build[%s]", path), buildRecord, fileSize)
+						filePerfRecorder.RecordDurationWithSize(fmt.Sprintf("Build[%s]", path), fileBuildTime, fileSize)
 						if fileBuildTime > 100*time.Millisecond {
 							log.Infof("[File Performance] Build: %s, time: %v", path, fileBuildTime)
 						}
 					}
 				}()
-				// build
 				if err := prog.Build(ast, fileContent.Editor, builder); err != nil {
 					log.Errorf("parse %#v failed: %v", path, err)
 				}
@@ -386,16 +362,24 @@ func (c *Config) parseProjectWithFS(
 		return nil, err
 	}
 
-	// 输出文件性能汇总表格（Build 与 LazyBuild 按文件合并展示）
-	if enableFilePerfLog && filePerfRecorder != nil {
+	// 输出 AST 阶段表格
+	if filePerfRecorder != nil {
 		snapshots := filePerfRecorder.Snapshot()
-		if len(snapshots) > 0 {
-			merged := diagnostics.MergeBuildAndLazyBuildForDisplay(snapshots)
-			table := diagnostics.FormatPerformanceTable("File Compilation Performance Summary", merged)
-			fmt.Println(table)
-		} else {
-			fmt.Println("File Performance: no data recorded")
+		astOnly := make([]diagnostics.Measurement, 0, len(snapshots))
+		for _, m := range snapshots {
+			if strings.HasPrefix(m.Name, "AST[") {
+				astOnly = append(astOnly, m)
+			}
 		}
+		if len(astOnly) > 0 {
+			table := diagnostics.FormatPerformanceTable("AST Phase Performance Summary", astOnly)
+			fmt.Println(table)
+		}
+	}
+
+	// 输出 Build 阶段树形结构（AST 表格之后）
+	if prog.BuildTreeTracker != nil {
+		prog.BuildTreeTracker.PrintTree("")
 	}
 
 	if diagnostics.Enabled(diagnostics.LevelLow) {

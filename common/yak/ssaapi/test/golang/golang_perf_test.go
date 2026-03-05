@@ -12,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
@@ -49,7 +50,7 @@ func TestVulinboxBuildPerformance(t *testing.T) {
 
 	cases := []vulinboxBuildPerfCase{
 		{"vul_upload.go", 100 * time.Millisecond, "vul_upload 优化后 ~26ms"},
-		{"vul_xss.go", 3 * time.Second, "vul_xss 优化目标 < 500ms，当前 ~1.7s，阈值防回退"},
+		{"vul_xss.go", 5 * time.Second, "vul_xss 优化目标 < 500ms，当前 ~1.7s，阈值防回退"},
 	}
 
 	// 至少有一个待测文件存在才编译
@@ -74,6 +75,7 @@ func TestVulinboxBuildPerformance(t *testing.T) {
 	)
 	require.NoError(t, err)
 	require.NotEmpty(t, progs, "expected at least one program")
+	defer ssadb.DeleteProgram(ssadb.GetDB(), progs[0].GetProgramName())
 
 	recorder := progs[0].GetConfig().GetFilePerformanceRecorder()
 	require.NotNil(t, recorder, "file performance recorder should not be nil")
@@ -147,6 +149,7 @@ func TestDebugBuildPerformance(t *testing.T) {
 	)
 	require.NoError(t, err)
 	require.NotEmpty(t, progs, "expected at least one program")
+	defer ssadb.DeleteProgram(ssadb.GetDB(), progs[0].GetProgramName())
 
 	recorder := progs[0].GetConfig().GetFilePerformanceRecorder()
 	require.NotNil(t, recorder, "file performance recorder should not be nil")

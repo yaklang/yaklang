@@ -299,6 +299,10 @@ jobs:
           echo "$SCAN_OUTPUT"
           echo "::endgroup::"
           
+          echo "::group::Performance Logs (SSA_PERF)"
+          echo "$SCAN_OUTPUT" | grep -F '[SSA_PERF]' || true
+          echo "::endgroup::"
+          
           echo "::group::Processing scan results"
           if [ ! -f "./risk.json" ]; then
             echo "::error::risk.json was not generated"
