@@ -47,27 +47,17 @@ func EnsureConfigLoaded() {
 	}
 
 	db := consts.GetGormProfileDatabase()
-	if cfg, err := getAIGlobalConfig(); err == nil && cfg != nil {
-		if ensureTierModelConfigsAvailable(cfg) {
-			if _, setErr := yakit.SetAIGlobalConfig(db, cfg); setErr != nil {
-				log.Warnf("failed to persist ai global config after filling default tier models: %v", setErr)
-			}
-		}
-		configLoaded = true
-		warnIfLegacyConfigFileExists()
-		return
-	}
-
-	var cfg *ypb.AIGlobalConfig
+	cfg, err := getAIGlobalConfig() // from db ai global config
 	source := "unknown"
-
-	config := getNetworkConfig()
-	if config != nil {
-		cfg = buildAIGlobalConfigFromNetworkConfig(config)
-		source = "network-config"
-	} else if tiered := consts.GetTieredAIConfig(); tiered != nil {
-		cfg = buildAIGlobalConfigFromTiered(tiered)
-		source = "memory-config"
+	if err != nil || cfg == nil {
+		config := getNetworkConfig()
+		if config != nil { // from network config
+			cfg = buildAIGlobalConfigFromNetworkConfig(config)
+			source = "network-config"
+		} else if tiered := consts.GetTieredAIConfig(); tiered != nil { // from consts
+			cfg = buildAIGlobalConfigFromTiered(tiered)
+			source = "memory-config"
+		}
 	}
 
 	if cfg == nil { // use default config if no config found from DB, network, or memory
@@ -75,11 +65,11 @@ func EnsureConfigLoaded() {
 		source = "built-in defaults"
 	}
 
-	ensureTierModelConfigsAvailable(cfg)
-	if _, err := yakit.SetAIGlobalConfig(db, cfg); err != nil {
+	ensureTierModelConfigsAvailable(cfg)                        // ensure config base avail model
+	if _, err := yakit.SetAIGlobalConfig(db, cfg); err != nil { // set it to database
 		log.Warnf("failed to persist ai global config from %s: %v", source, err)
 	}
-	if err := yakit.ApplyAIGlobalConfig(db, cfg); err != nil {
+	if err := yakit.ApplyAIGlobalConfig(db, cfg); err != nil { // set to consts
 		log.Warnf("failed to apply ai global config from %s: %v", source, err)
 	}
 
