@@ -244,6 +244,9 @@ type SyntaxFlowParserVisitor interface {
 	// Visit a parse tree produced by SyntaxFlowParser#negativeCondition.
 	VisitNegativeCondition(ctx *NegativeConditionContext) interface{}
 
+	// Visit a parse tree produced by SyntaxFlowParser#FilterExpressionBinaryCompare.
+	VisitFilterExpressionBinaryCompare(ctx *FilterExpressionBinaryCompareContext) interface{}
+
 	// Visit a parse tree produced by SyntaxFlowParser#NotCondition.
 	VisitNotCondition(ctx *NotConditionContext) interface{}
 

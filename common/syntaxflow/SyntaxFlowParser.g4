@@ -145,7 +145,7 @@ actualParam
 
 actualParamFilter: singleParam ',' | ',';
 
-singleParam: ( '#>' | '#{' (config)? '}' )? filterStatement ;
+singleParam: ( '#>' | '#{' (config)? '}' )? (filterStatement | conditionExpression) ;
 
 config: recursiveConfigItem (',' recursiveConfigItem)* ','? lines? ;
 recursiveConfigItem: lines? identifier ':' recursiveConfigItemValue lines?;
@@ -169,6 +169,12 @@ negativeCondition: (Not | '!');
 
 conditionExpression
     : '(' conditionExpression ')'                                                # ParenCondition
+    | filterExpr op = (
+        '>' | '<' | '=' | '==' | '>='
+         | '<=' | '!='
+        ) (
+            numberLiteral | identifier | boolLiteral
+        ) # FilterExpressionBinaryCompare
     | filterExpr                                                                 # FilterCondition        // filter dot(.)Member and fields
     |  Opcode ':' opcodesCondition (',' opcodesCondition) * ','?                      # OpcodeTypeCondition    // something like .(call, phi)
     |  Have  ':' stringLiteralWithoutStarGroup       # StringContainHaveCondition // something like .(have: 'a', 'b')

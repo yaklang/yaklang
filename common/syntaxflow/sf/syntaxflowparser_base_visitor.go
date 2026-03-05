@@ -323,6 +323,10 @@ func (v *BaseSyntaxFlowParserVisitor) VisitNegativeCondition(ctx *NegativeCondit
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseSyntaxFlowParserVisitor) VisitFilterExpressionBinaryCompare(ctx *FilterExpressionBinaryCompareContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseSyntaxFlowParserVisitor) VisitNotCondition(ctx *NotConditionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
