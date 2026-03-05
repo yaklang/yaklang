@@ -10,8 +10,11 @@ Deep: '...';
 
 Percent: '%%';
 DeepDot: '..';
-LtEq: '<=';
-GtEq: '>=';
+// Prevent `>==` / `<==` from being tokenized as `>=` / `<=` + `=`.
+// This is important for shorthand expressions like `<len>==2` where the `>` is
+// a standalone token (native call terminator) followed by `==`.
+LtEq: '<=' { this.GetInputStream().LA(1) != '=' }?;
+GtEq: '>=' { this.GetInputStream().LA(1) != '=' }?;
 DoubleGt: '>>';
 Filter: '=>';
 EqEq: '==';
