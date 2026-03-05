@@ -1,0 +1,369 @@
+desc(
+	title: "Server-Side URL Redirect"
+	title_zh: "服务端未验证的 URL 重定向（开放重定向）"
+	type: vuln
+	level: mid
+	risk_type: "open-redirect"
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+
+开放重定向（Open Redirect / CWE-601）是指 Web 应用程序接受用户可控的 URL 参数，并直接将用户重定向到该 URL，而不对目标 URL 进行充分验证。
+
+攻击者可以构造形如以下的恶意链接并分发给受害者：
+```
+https://trusted-site.com/redirect?target=https://evil.com/phishing
+```
+由于链接域名是受信任站点（`trusted-site.com`），用户不容易察觉，点击后被自动跳转到攻击者控制的恶意页面（`evil.com`），导致：
+
+- **网络钓鱼**：伪装成合法站点的登录页面骗取凭证
+- **OAuth 令牌劫持**：滥用开放重定向绕过 OAuth 的 `redirect_uri` 校验窃取访问令牌
+- **跨站脚本辅助**：通过 `javascript:` 协议触发 XSS（如 `res.redirect("javascript:alert(1)")`）
+
+2. **触发场景**
+
+```javascript
+// 危险：直接将请求参数作为重定向目标
+app.get("/redirect", (req, res) => {
+    res.redirect(req.query["target"]);
+});
+
+// 危险：字符串拼接后重定向
+app.get("/redirect", (req, res) => {
+    res.redirect("https://example.com/" + req.query.path);
+});
+```
+
+3. **潜在影响**
+
+- **钓鱼攻击**：受信任域名引导用户到恶意站点，窃取凭证或敏感信息
+- **OAuth 令牌劫持**：利用开放重定向绕过 OAuth 授权服务器的 `redirect_uri` 白名单校验
+- **XSS 扩大面**：部分框架/浏览器允许 `javascript:` 协议被重定向执行
+- **品牌信誉损失**：受信任的企业域名被用于欺诈活动
+DESC
+	rule_id: "e5f6a7b8-c9d0-1234-efab-601000000001"
+	solution: <<<SOLUTION
+### 修复建议
+
+**1. 使用服务端白名单（最推荐）**
+
+```javascript
+const ALLOWED_REDIRECTS = {
+    "home":    "/home",
+    "profile": "/profile",
+    "docs":    "https://docs.example.com",
+};
+
+app.get("/redirect", (req, res) => {
+    const key = req.query.dest;
+    const target = ALLOWED_REDIRECTS[key];
+    if (target) {
+        res.redirect(target);
+    } else {
+        res.redirect("/");  // 默认回退到安全 URL
+    }
+});
+```
+
+**2. 验证目标 URL 必须为同源**
+
+```javascript
+function isSameOrigin(urlStr, baseOrigin) {
+    try {
+        const parsed = new URL(urlStr, baseOrigin);
+        return parsed.origin === baseOrigin;
+    } catch {
+        return false;
+    }
+}
+
+app.get("/redirect", (req, res) => {
+    const target = req.query.target;
+    if (isSameOrigin(target, "https://example.com")) {
+        res.redirect(target);
+    } else {
+        res.redirect("/");
+    }
+});
+```
+
+**3. 仅允许相对路径**
+
+```javascript
+app.get("/redirect", (req, res) => {
+    const target = req.query.target;
+    // 只允许以 / 开头的相对路径，防止协议跳转
+    if (target && target.startsWith("/") && !target.startsWith("//")) {
+        res.redirect(target);
+    } else {
+        res.redirect("/");
+    }
+});
+```
+SOLUTION
+	reference: <<<REFERENCE
+[OWASP: Unvalidated Redirects and Forwards Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Unvalidated_Redirects_and_Forwards_Cheat_Sheet.html)
+[CWE-601: URL Redirection to Untrusted Site ('Open Redirect')](https://cwe.mitre.org/data/definitions/601.html)
+[CodeQL: js/server-side-unvalidated-url-redirection](https://codeql.github.com/codeql-query-help/javascript/js-server-side-unvalidated-url-redirection/)
+[PortSwigger: Open redirect vulnerabilities](https://portswigger.net/kb/issues/00500100_open-redirection-reflected)
+REFERENCE
+)
+
+// =====================================================================
+// Detection Strategy
+//
+// This rule detects open redirect vulnerabilities where user-controlled input
+// flows directly into a server-side HTTP redirect response.
+//
+// Architecture:
+//   Sources → <include('js-param')>  — HTTP request parameters, body, headers
+//   Sinks   → res.redirect() / ctx.redirect() / response.redirect()
+//
+// Detection Patterns:
+//
+//   Case A (Direct, unguarded, no phi):
+//     Redirect arg directly contains an UNGUARDED $params value.
+//     "Guarded" params are those whose direct users include an eq-comparison
+//     node (BinOp eq), indicating a strict equality check before use.
+//     → Catches: res.redirect(req.query.target)   [no if check]
+//     → Excludes: if (CONST === target) { res.redirect(target) }  [has eq guard]
+//
+//   Case B (Any tainted phi):
+//     Redirect arg contains a phi node where at least one operand is ANY $params
+//     value (guarded or not). The phi itself means the guard does NOT fully
+//     protect the redirect: the eq-guard only protected a direct assignment
+//     path, but the phi merges it back with another branch. Even if one phi
+//     branch has a guard, the redirect still sees the phi output—not the
+//     guarded value directly.
+//     → Catches: phi["/safe", target]; res.redirect(phi)  [partial guard]
+//     → Excludes: phi["/home", "/default"]  [all-const phi, no param operand]
+//
+//   Case C/D (String concat variants):
+//     Same logic applied after extracting the concat chain (#{until: add}->).
+//     → Catches: res.redirect("https://example.com/" + req.query.path)
+//
+// Two-tier false positive prevention:
+//   1. Eq-guard exclusion (Case A only):
+//      $params?{<self> -> *?{opcode: BinOp}?{have: /^eq\(/}} = $guardedParams
+//      These are excluded from direct (no-phi) detection only.
+//      Rationale: if (CONST === x) { redirect(x) } is a safe pattern because
+//      redirect is only reached when x equals a known constant.
+//
+//   2. Clean phi exclusion (Cases B/D):
+//      $params -> * → phi nodes = $anyTaintedPhi (only phi with param operand).
+//      All-constant phi nodes have NO param operand so they are excluded.
+//      Rationale: if (x === "a") { url = "/a" } else { url = "/b" } produces
+//      phi["/a", "/b"] with no $params operand — this is a safe allowlist.
+// =====================================================================
+
+<include('js-param')> as $params
+
+// Redirect sinks: Express/Node.js res.redirect, Koa ctx.redirect
+res.redirect(* as $sinks,)
+response.redirect(* as $sinks,)
+ctx.redirect(* as $sinks,)
+
+// =====================================================================
+// Pre-step A: Find params guarded by strict equality check (eq BinOp).
+// These are params whose direct users include an eq-comparison node,
+// meaning code does if (CONST === param) before using the param.
+// Such params are excluded from direct-use detection (Case A only).
+// =====================================================================
+$params?{<self> -> *?{opcode: BinOp}?{have: /^eq\(/}} as $guardedParams
+$params?{!(<self> & $guardedParams)} as $unguardedParams
+
+// =====================================================================
+// Pre-step B: Find phi nodes that have ANY $params value as an operand.
+// These represent partial allowlists or variables that merge a user-input
+// branch — the redirect is still tainted even if one branch is guarded.
+// =====================================================================
+$params -> * as $paramsDirectUsers
+$paramsDirectUsers?{opcode: phi} as $anyTaintedPhi
+
+// =====================================================================
+// Case A: Redirect sink directly contains UNGUARDED user input (no phi)
+// =====================================================================
+$sinks?{<self> #{
+	include: <<<CODE
+* & $unguardedParams as $__next__
+CODE,
+	exclude: <<<CODE
+*?{opcode: phi} as $__next__
+CODE
+}->} as $directRedirect
+
+// =====================================================================
+// Case B: Redirect sink contains a tainted phi (any param as operand)
+// =====================================================================
+$sinks?{<self> #{
+	include: <<<CODE
+* & $anyTaintedPhi as $__next__
+CODE
+}->} as $phiRedirect
+
+// =====================================================================
+// Case C/D: Redirect URL built via string concatenation (BinOp add)
+// =====================================================================
+$sinks#{
+	until: <<<UNTIL
+*?{opcode: add} as $__next__
+UNTIL
+}-> as $concatChain
+
+$concatChain?{<self> #{
+	include: <<<CODE
+* & $unguardedParams as $__next__
+CODE,
+	exclude: <<<CODE
+*?{opcode: phi} as $__next__
+CODE
+}->} as $concatDirectRedirect
+
+$concatChain?{<self> #{
+	include: <<<CODE
+* & $anyTaintedPhi as $__next__
+CODE
+}->} as $concatPhiRedirect
+
+$directRedirect as $openRedirect
+$phiRedirect as $openRedirect
+$concatDirectRedirect as $openRedirect
+$concatPhiRedirect as $openRedirect
+
+alert $openRedirect for {
+	level: "mid",
+	type: "vuln",
+	title: "Server-Side URL Redirect",
+	title_zh: "服务端未验证的 URL 重定向（开放重定向）",
+	message: "检测到用户可控输入直接流入服务端 HTTP 重定向函数（res.redirect / ctx.redirect），可能导致开放重定向漏洞。攻击者可构造恶意链接将用户重定向至钓鱼站点，或滥用此漏洞绕过 OAuth redirect_uri 校验窃取令牌。请使用服务端白名单映射或校验目标 URL 为同源。",
+	risk: "开放重定向",
+	name: "openRedirect",
+}
+
+// =====================================================================
+// Embedded Test Cases
+// =====================================================================
+
+// Test 1: VULNERABLE — direct user input (CodeQL canonical example)
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///redirect_bad_direct.js': <<<CODE
+const app = require("express")();
+
+app.get("/redirect", function(req, res) {
+    // BAD: a request parameter is incorporated without validation into a URL redirect
+    res.redirect(req.query["target"]);
+});
+CODE
+)
+
+// Test 2: VULNERABLE — string concatenation
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///redirect_bad_concat.js': <<<CODE
+const express = require("express");
+const app = express();
+
+app.get("/go", (req, res) => {
+    const dest = req.query.url;
+    // BAD: user input appended to base URL
+    res.redirect("https://example.com/" + dest);
+});
+CODE
+)
+
+// Test 3: VULNERABLE — POST body param
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///redirect_bad_body.js': <<<CODE
+const express = require("express");
+const app = express();
+
+app.post("/login", (req, res) => {
+    // BAD: redirect target from POST body
+    res.redirect(req.body.next);
+});
+CODE
+)
+
+// Test 4: VULNERABLE — partial allowlist (phi with user-input branch)
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///redirect_bad_partial_allowlist.js': <<<CODE
+const express = require("express");
+const app = express();
+
+app.get("/redirect", (req, res) => {
+    const target = req.query.target;
+    let url;
+    if (target === "safe") {
+        url = "/safe";
+    } else {
+        // BAD: else branch still returns attacker-controlled value
+        url = target;
+    }
+    res.redirect(url);
+});
+CODE
+)
+
+// Test 5: SAFE — validated against exact known constant (CodeQL canonical safe example)
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///redirect_safe_constant_check.js': <<<CODE
+const app = require("express")();
+
+const VALID_REDIRECT = "http://cwe.mitre.org/data/definitions/601.html";
+
+app.get("/redirect", function(req, res) {
+    // GOOD: validated against known fixed string using strict equality
+    let target = req.query["target"];
+    if (VALID_REDIRECT === target) {
+        res.redirect(target);
+    } else {
+        res.redirect("/");
+    }
+});
+CODE
+)
+
+// Test 6: SAFE — allowlist mapping (phi of constants only)
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///redirect_safe_allowlist.js': <<<CODE
+const app = require("express")();
+
+app.get("/redirect", function(req, res) {
+    const dest = req.query.dest;
+    // GOOD: dest only selects between server-controlled constant paths
+    let url;
+    if (dest === "home") {
+        url = "/home";
+    } else {
+        url = "/default";
+    }
+    res.redirect(url);
+});
+CODE
+)
+
+// Test 7: SAFE — hardcoded redirect target
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///redirect_safe_hardcoded.js': <<<CODE
+const app = require("express")();
+
+app.get("/logout", (req, res) => {
+    // GOOD: redirect target is hardcoded
+    res.redirect("/login");
+});
+CODE
+)

@@ -1,0 +1,369 @@
+desc(
+	title: "Use of a weak cryptographic key"
+	title_zh: "使用密钥长度不足的加密密钥"
+	type: vuln
+	level: low
+	risk_type: "insufficient-key-size"
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+
+现代加密依赖于在没有密钥的情况下破解密文在计算上不可行。随着计算能力的不断提升，破解密钥的能力也在增长，因此密钥需要足够长才能保证安全性。
+
+使用过短的密钥会使加密保护失效：
+
+- **RSA / DSA**：密钥长度低于 2048 位时，现代硬件可在合理时间内分解大整数，导致私钥泄露
+- **椭圆曲线（EC / ECDH）**：使用低安全级别的曲线（如 P-192、secp160r1），安全位数不足 112 位，不满足 NIST 最低要求
+- **DH（Diffie-Hellman）**：素数长度低于 2048 位时，离散对数问题可在合理时间内被解决
+
+2. **触发场景**
+
+```javascript
+const crypto = require('crypto');
+
+// 危险：RSA-1024 密钥长度不足
+crypto.generateKeyPair('rsa', { modulusLength: 1024 });
+
+// 危险：使用弱 EC 曲线 P-192（安全性约 96 位）
+crypto.generateKeyPair('ec', { namedCurve: 'P-192' });
+
+// 危险：DH 素数长度 1024 位
+crypto.createDiffieHellman(1024);
+```
+
+3. **潜在影响**
+
+- **密钥恢复**：攻击者利用现代算法（如 GNFS）分解短 RSA 密钥，获取私钥
+- **通信解密**：破解密钥后可解密历史及未来所有通信内容
+- **签名伪造**：获取签名私钥后可伪造任意数字签名，冒充合法身份
+- **合规违规**：PCI DSS、FIPS 140、NIST SP 800-131A 等标准明确要求最低密钥长度
+DESC
+	rule_id: "c3d4e5f6-a7b8-9012-cdef-326000000001"
+	solution: <<<SOLUTION
+### 修复建议
+
+**1. RSA / DSA：使用至少 2048 位密钥（推荐 3072 或 4096 位）**
+
+```javascript
+const crypto = require('crypto');
+
+// GOOD: RSA-2048（当前最低安全要求）
+crypto.generateKeyPair('rsa', {
+    modulusLength: 2048,
+    publicKeyEncoding: { type: 'pkcs1', format: 'pem' },
+    privateKeyEncoding: { type: 'pkcs1', format: 'pem' }
+}, callback);
+
+// BETTER: RSA-4096（长期安全）
+crypto.generateKeyPair('rsa', { modulusLength: 4096 }, callback);
+```
+
+**2. 椭圆曲线：使用 P-256 及以上的强曲线**
+
+```javascript
+// GOOD: P-256（128-bit 安全级别，NIST 推荐）
+crypto.generateKeyPair('ec', { namedCurve: 'P-256' }, callback);
+
+// GOOD: P-384（192-bit 安全级别）
+crypto.generateKeyPair('ec', { namedCurve: 'P-384' }, callback);
+
+// GOOD: X25519（现代高性能椭圆曲线，推荐用于密钥交换）
+crypto.generateKeyPair('x25519', {}, callback);
+
+// GOOD: Ed25519（推荐用于数字签名）
+crypto.generateKeyPair('ed25519', {}, callback);
+```
+
+**3. DH：使用至少 2048 位素数**
+
+```javascript
+// GOOD: DH-2048
+const dh = crypto.createDiffieHellman(2048);
+
+// BETTER: 使用 X25519 替代传统 DH（更安全、更高效）
+crypto.generateKeyPair('x25519', {}, callback);
+```
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-326: Inadequate Encryption Strength](https://cwe.mitre.org/data/definitions/326.html)
+[NIST SP 800-131A: Transitioning the Use of Cryptographic Algorithms and Key Lengths](https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-131Ar2.pdf)
+[NIST SP 800-57: Recommendation for Key Management](https://csrc.nist.gov/publications/detail/sp/800-57-part-1/rev-5/final)
+[CodeQL: js/insufficient-key-size](https://codeql.github.com/codeql-query-help/javascript/js-insufficient-key-size/)
+[Wikipedia: Key size](https://en.wikipedia.org/wiki/Key_size)
+[Node.js Crypto: generateKeyPair](https://nodejs.org/api/crypto.html#cryptogeneratekeypairtype-options-callback)
+REFERENCE
+)
+
+// =====================================================================
+// Detection Strategy:
+//
+// Target APIs (Node.js built-in crypto module):
+//   1. crypto.generateKeyPair(type, { modulusLength: N })   — RSA / DSA
+//      crypto.generateKeyPairSync(type, { modulusLength: N })
+//      Weak condition: modulusLength < 2048
+//      Affected types: 'rsa', 'rsa-pss', 'dsa'
+//
+//   2. crypto.generateKeyPair(type, { namedCurve: 'X' })    — EC
+//      crypto.generateKeyPairSync(type, { namedCurve: 'X' })
+//      crypto.createECDH(curveName)
+//      Weak condition: curve provides < 112-bit security
+//      Weak curves: P-192/prime192v1/secp192r1, secp160*, sect160*, secp128*, etc.
+//
+//   3. crypto.createDiffieHellman(primeLength)               — DH
+//      Weak condition: primeLength < 2048
+//
+// Approach:
+//   - For modulusLength / DH prime: collect all values from option objects,
+//     filter by known weak sizes (explicit list of multiples of 128 below 2048)
+//   - For EC curves: collect namedCurve / ECDH curve name, filter by weak curve regex
+//
+// Note on numeric comparison: SyntaxFlow's `have:` operates on string representation.
+// Numbers like 512, 1024 are represented without quotes: "512", "1024".
+// We enumerate known weak sizes rather than using numeric comparison.
+// =====================================================================
+
+// === Part 1: RSA/DSA/RSA-PSS — weak modulusLength ===
+
+*.generateKeyPair(* as $kpKeyType, * as $kpOpts)
+*.generateKeyPairSync(* as $kpKeyType, * as $kpOpts)
+
+// Get modulusLength from the options object
+$kpOpts.modulusLength as $modLen
+
+// Weak: any modulusLength below 2048
+// Enumerating common weak sizes (multiples of common key size increments < 2048)
+$modLen?{opcode: const}?{have: /^(512|640|768|896|1024|1152|1280|1408|1536|1664|1792|1920)$/} as $weakModLen
+
+// === Part 2: EC — weak named curves ===
+
+$kpOpts.namedCurve as $ecCurveFromKP
+*.createECDH(* as $ecCurveFromECDH)
+
+$ecCurveFromKP   as $allEcCurves
+$ecCurveFromECDH as $allEcCurves
+
+// Weak EC curves: providing less than 112-bit security level
+//   P-192 / prime192v1 / secp192r1: ~96-bit security
+//   secp160* / sect160*: ~80-bit security
+//   secp128* / sect131* / sect113*: < 80-bit security
+//   prime192: alias for P-192
+//   c2tnb/c2pnb: binary field curves with < 112-bit security
+//   brainpoolP160/P192: low-security brainpool curves
+//   wap-wsg: WAP/wireless curves (obsolete, < 112-bit)
+$allEcCurves?{opcode: const}?{have: /(?i)(p-?192|prime192|secp192|secp160|sect160|secp128|sect131|sect113|c2pnb|c2tnb|wap-wsg|brainpoolp160|brainpoolp192)/} as $weakEcCurve
+
+// === Part 3: DH — weak prime length ===
+
+*.createDiffieHellman(* as $dhLen,)
+
+$dhLen?{opcode: const}?{have: /^(512|640|768|896|1024|1152|1280|1408|1536|1664|1792|1920)$/} as $weakDhLen
+
+// =====================================================================
+// Alerts
+// =====================================================================
+
+alert $weakModLen for {
+	level: "low",
+	type: "vuln",
+	title: "Insufficient RSA/DSA key size: modulusLength is below 2048 bits",
+	title_zh: "RSA/DSA 密钥长度不足：modulusLength 低于 2048 位",
+	message: "检测到 RSA 或 DSA 密钥生成时使用了低于 2048 位的模数长度。根据 NIST SP 800-131A，2048 位是 RSA/DSA 密钥的当前最低安全要求。低于此长度的密钥可在合理时间内被现代硬件破解。请将 modulusLength 设置为至少 2048（推荐 3072 或 4096）。",
+	risk: "密钥长度不足",
+	name: "weakModLen",
+}
+
+alert $weakEcCurve for {
+	level: "low",
+	type: "vuln",
+	title: "Weak elliptic curve: named curve provides insufficient security",
+	title_zh: "弱椭圆曲线：所选曲线安全位数不足",
+	message: "检测到椭圆曲线密钥生成或 ECDH 使用了安全级别低于 112 位的弱曲线（如 P-192、secp160r1 等）。NIST 要求椭圆曲线至少提供 112 位安全性。请改用 P-256（secp256r1）、P-384、X25519 或 Ed25519 等强曲线。",
+	risk: "密钥长度不足",
+	name: "weakEcCurve",
+}
+
+alert $weakDhLen for {
+	level: "low",
+	type: "vuln",
+	title: "Insufficient DH prime length: below 2048 bits",
+	title_zh: "DH 素数长度不足：低于 2048 位",
+	message: "检测到 Diffie-Hellman 密钥交换使用了低于 2048 位的素数长度。根据 NIST SP 800-131A，DH 素数长度至少需要 2048 位才能保证安全性。强烈建议改用 X25519（通过 crypto.generateKeyPair('x25519')）以获得更好的安全性和性能。",
+	risk: "密钥长度不足",
+	name: "weakDhLen",
+}
+
+// =====================================================================
+// Embedded test cases
+// =====================================================================
+
+// Test 1: VULNERABLE — RSA-512
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///unsafe_rsa_512.js': <<<CODE
+const crypto = require('crypto');
+
+// BAD: RSA-512 is far too short
+crypto.generateKeyPair('rsa', { modulusLength: 512 }, (err, publicKey, privateKey) => {});
+CODE
+)
+
+// Test 2: VULNERABLE — RSA-1024
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///unsafe_rsa_1024.js': <<<CODE
+const crypto = require('crypto');
+
+// BAD: RSA-1024 no longer meets NIST minimum requirements
+crypto.generateKeyPair('rsa', { modulusLength: 1024 }, (err, pub, priv) => {});
+CODE
+)
+
+// Test 3: VULNERABLE — DSA-1024
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///unsafe_dsa_1024.js': <<<CODE
+const crypto = require('crypto');
+
+// BAD: DSA-1024 is insufficient
+crypto.generateKeyPairSync('dsa', {
+    modulusLength: 1024,
+    divisorLength: 160
+});
+CODE
+)
+
+// Test 4: VULNERABLE — EC P-192
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///unsafe_ec_p192.js': <<<CODE
+const crypto = require('crypto');
+
+// BAD: P-192 provides only ~96-bit security, below NIST minimum of 112 bits
+crypto.generateKeyPair('ec', { namedCurve: 'P-192' }, (err, pub, priv) => {});
+CODE
+)
+
+// Test 5: VULNERABLE — EC secp160r1
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///unsafe_ec_secp160.js': <<<CODE
+const crypto = require('crypto');
+
+// BAD: secp160r1 provides only ~80-bit security
+crypto.generateKeyPair('ec', { namedCurve: 'secp160r1' }, (err, pub, priv) => {});
+CODE
+)
+
+// Test 6: VULNERABLE — ECDH with weak curve
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///unsafe_ecdh_p192.js': <<<CODE
+const crypto = require('crypto');
+
+// BAD: prime192v1 is an alias for P-192 (weak)
+const ecdh = crypto.createECDH('prime192v1');
+CODE
+)
+
+// Test 7: VULNERABLE — DH-512
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///unsafe_dh_512.js': <<<CODE
+const crypto = require('crypto');
+
+// BAD: DH with 512-bit prime is trivially breakable
+const dh = crypto.createDiffieHellman(512);
+CODE
+)
+
+// Test 8: VULNERABLE — DH-1024
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///unsafe_dh_1024.js': <<<CODE
+const crypto = require('crypto');
+
+// BAD: DH-1024 no longer meets NIST minimum requirements
+const dh = crypto.createDiffieHellman(1024);
+CODE
+)
+
+// Test 9: SAFE — RSA-2048
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///safe_rsa_2048.js': <<<CODE
+const crypto = require('crypto');
+
+// GOOD: RSA-2048 meets current NIST requirements
+crypto.generateKeyPair('rsa', { modulusLength: 2048 }, (err, pub, priv) => {});
+CODE
+)
+
+// Test 10: SAFE — RSA-4096
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///safe_rsa_4096.js': <<<CODE
+const crypto = require('crypto');
+
+// GOOD: RSA-4096 provides strong long-term security
+crypto.generateKeyPairSync('rsa', { modulusLength: 4096 });
+CODE
+)
+
+// Test 11: SAFE — EC P-256
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///safe_ec_p256.js': <<<CODE
+const crypto = require('crypto');
+
+// GOOD: P-256 provides 128-bit security, meets NIST requirements
+crypto.generateKeyPair('ec', { namedCurve: 'P-256' }, (err, pub, priv) => {});
+CODE
+)
+
+// Test 12: SAFE — X25519
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///safe_x25519.js': <<<CODE
+const crypto = require('crypto');
+
+// GOOD: X25519 is a modern, high-performance curve for key exchange
+crypto.generateKeyPair('x25519', {}, (err, pub, priv) => {});
+CODE
+)
+
+// Test 13: SAFE — DH-2048
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///safe_dh_2048.js': <<<CODE
+const crypto = require('crypto');
+
+// GOOD: DH-2048 meets NIST minimum requirements
+const dh = crypto.createDiffieHellman(2048);
+CODE
+)
+
+// Test 14: SAFE — ECDH P-384
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///safe_ecdh_p384.js': <<<CODE
+const crypto = require('crypto');
+
+// GOOD: P-384 provides 192-bit security
+const ecdh = crypto.createECDH('prime256v1');
+CODE
+)

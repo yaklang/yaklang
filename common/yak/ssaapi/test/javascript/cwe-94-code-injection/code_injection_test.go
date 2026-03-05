@@ -52,7 +52,6 @@ func runOnFile(t *testing.T, ruleContent, filename, code string) (total, high in
 // ============================================================
 
 // TestCodeInject_Positive_EvalDocumentLocation 验证 eval(document.location...) 浏览器端 URL 注入触发告警。
-// 对应 irify/ts-sf-rules/cwe-94/code-inject/positive.js
 // 注意：document.location.href.substring(...) 经过了 .substring() 调用，规则分类为 mid（间接注入）而非 high。
 func TestCodeInject_Positive_EvalDocumentLocation(t *testing.T) {
 	rule := loadCodeInjectionRule(t)
@@ -63,7 +62,6 @@ eval(document.location.href.substring(document.location.href.indexOf("default=")
 }
 
 // TestCodeInject_Positive_PugSSTI 验证 Pug 模板注入（字符串拼接用户输入到模板）触发 high 告警。
-// 对应 irify/ts-sf-rules/cwe-94/code-inject/positive-1.js
 func TestCodeInject_Positive_PugSSTI(t *testing.T) {
 	rule := loadCodeInjectionRule(t)
 	total, high := runOnFile(t, rule, "positive-1.js", `
@@ -148,7 +146,6 @@ app.post('/compute', (req, res) => {
 // ============================================================
 
 // TestCodeInject_Negative_PugInputAsVariable 验证 Pug 模板中用户输入作为变量（非模板一部分）时不触发告警。
-// 对应 irify/ts-sf-rules/cwe-94/code-inject/negative.js
 func TestCodeInject_Negative_PugInputAsVariable(t *testing.T) {
 	rule := loadCodeInjectionRule(t)
 	total, _ := runOnFile(t, rule, "negative.js", `

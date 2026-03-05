@@ -3,7 +3,7 @@ desc(
 	title_zh: "用户可控数据流入不安全反序列化函数"
 	type: vuln
 	level: high
-	risk: "unsafe-deserialization"
+	risk_type: "unsafe-deserialization"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -218,7 +218,7 @@ jsyaml.load(req.params.data, { schema: jsyaml.CORE_SCHEMA });
 
 对于 node-serialize：弃用该库，改用 JSON.parse()。
 SOLUTION
-	risk: "remote-code-execution",
+	risk: "远程代码执行",
 	name: "directDeserialization",
 }
 
@@ -234,7 +234,7 @@ alert $mid for {
 	solution: <<<SOLUTION
 检查中间处理逻辑是否真正过滤了危险内容，或改用安全的反序列化方案（如 jsyaml.safeLoad() 或 JSON.parse()）。
 SOLUTION
-	risk: "remote-code-execution",
+	risk: "远程代码执行",
 	name: "mid",
 }
 

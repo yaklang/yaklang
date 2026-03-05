@@ -1,0 +1,295 @@
+desc(
+	title: "Insecure randomness used in security-sensitive context"
+	title_zh: "安全敏感场景中使用了不安全的伪随机数生成器"
+	type: vuln
+	level: low
+	risk_type: "insecure-randomness"
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+
+`Math.random()` 是一个密码学上不安全的伪随机数生成器（PRNG）。它的输出序列由一个较小的初始种子完全决定，攻击者通过观察或预测种子，可以重现整个随机数序列。
+
+当 `Math.random()` 的输出被用于安全敏感场景（如生成密码、会话 Token、API 密钥、CSRF Token 等）时，攻击者可以：
+- 预测生成的密码，直接登录受害者账户
+- 伪造会话 Token，劫持用户会话
+- 绕过基于随机 Token 的 CSRF 防护
+- 重现密钥，解密受保护的数据
+
+2. **触发场景**
+
+```javascript
+// 危险：使用 Math.random() 生成密码
+function insecurePassword() {
+    var suffix = Math.random();
+    var password = "myPassword" + suffix;
+    return password;
+}
+
+// 危险：使用 Math.random() 生成 session token
+const token = Math.random().toString(36).substring(2);
+
+// 危险：使用 Math.random() 生成 API 密钥
+const apiKey = Math.random().toString(16).slice(2);
+```
+
+3. **潜在影响**
+
+- **账户接管**：攻击者预测密码，直接登录受害者账户
+- **会话劫持**：攻击者伪造 Token，接管用户会话
+- **认证绕过**：可预测的 Token 导致安全验证形同虚设
+- **数据泄露**：可预测的密钥导致加密数据被破解
+DESC
+	rule_id: "a1b2c3d4-e5f6-7890-abcd-338000000001"
+	solution: <<<SOLUTION
+### 修复建议
+
+**Node.js 环境：使用 `crypto.randomBytes()`**
+
+```javascript
+const crypto = require('crypto');
+
+// 生成安全随机 token（hex 格式）
+const token = crypto.randomBytes(32).toString('hex');
+
+// 生成安全随机密码
+const password = crypto.randomBytes(16).toString('base64');
+```
+
+**浏览器环境：使用 `window.crypto.getRandomValues()`**
+
+```javascript
+// 生成安全随机整数
+const randomInt = window.crypto.getRandomValues(new Uint32Array(1))[0];
+
+// 生成 0 到 1 之间的安全随机浮点数
+const randomFloat = window.crypto.getRandomValues(new Uint32Array(1))[0] * Math.pow(2, -32);
+```
+
+**使用专门的安全随机数库（如 `uuid`）**
+
+```javascript
+const { v4: uuidv4 } = require('uuid');
+const sessionId = uuidv4();  // 使用密码学安全的 UUID
+```
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-338: Use of Cryptographically Weak Pseudo-Random Number Generator](https://cwe.mitre.org/data/definitions/338.html)
+[MDN: Crypto.getRandomValues()](https://developer.mozilla.org/en-US/docs/Web/API/Crypto/getRandomValues)
+[Node.js: crypto.randomBytes](https://nodejs.org/api/crypto.html#cryptorandombytessize-callback)
+[CodeQL: js/insecure-randomness](https://codeql.github.com/codeql-query-help/javascript/js-insecure-randomness/)
+[Wikipedia: Pseudorandom number generator](https://en.wikipedia.org/wiki/Pseudorandom_number_generator)
+REFERENCE
+)
+
+// =====================================================================
+// Detection Strategy:
+//
+// Source: Math.random() — cryptographically weak PRNG
+//
+// Sink: variables/values whose names match security-sensitive patterns,
+//       such as password, token, apiKey, secret, sessionId, csrf, nonce,
+//       salt, otp, hmac, signature, etc.
+//
+// Detection:
+//   Step 1 — Capture Math.random() calls as $rand.
+//
+//   Step 2 — Find variables with security-sensitive names by regex match:
+//             /(?i)(password|token|apikey|...)/ as $sensitiveSinks
+//             These are SSA nodes whose variable name matches the regex.
+//
+//   Step 3 — Exclude nodes with non-security names (RGB, animation, etc.)
+//             to reduce false positives for common non-security uses.
+//
+//   Step 4 — Check if each sensitive sink has Math.random() in its value:
+//     a) Direct: $filteredSinks?{<self> & $rand}
+//        — the sink value IS part of the Math.random() result set
+//          (e.g. `var password = "myPassword" + Math.random()` where
+//           the add() node is directly captured by the password variable name)
+//     b) Taint: $filteredSinks?{<self> #{include: * & $rand}->}
+//        — Math.random() flows through intermediate calls into the sink
+//          (e.g. `const token = Math.random().toString(36).substring(2)`)
+//
+// False positives avoided:
+//   - RGB color values: r, g, b, red, green, blue, etc.
+//   - Animation/layout: delay, duration, x, y, width, height, etc.
+//   - Game values: dice, score, damage, etc.
+//   - Crypto-safe alternatives (crypto.randomBytes, crypto.getRandomValues)
+//     are not captured by Math.random() source, so they won't match.
+// =====================================================================
+
+// Step 1: Source — Math.random() calls
+Math.random() as $rand
+
+// Step 2: Security-sensitive sink names (regex match on SSA variable names)
+/(?i)(password|passwd|pwd|secret|token|apikey|api_key|sessionid|session_id|session|csrf|nonce|salt|otp|pin|authcode|auth_code|credential|privatekey|private_key|accesskey|access_key|signkey|sign_key|hmac|signature)/ as $sensitiveSinks
+
+// Step 3: Exclude well-known non-security context names
+/(?i)^(r|g|b|red|green|blue|alpha|color|colour|rgb|rgba|hsl|hsv|hue|saturation|brightness|lightness|x|y|z|width|height|left|top|right|bottom|position|offset|angle|rotation|scale|delay|duration|speed|fps|frame|tick|dice|score|damage|hp|spawn|chance|probability|noise|jitter|fuzz|sample|index|row|col)$/ as $safeContextNames
+
+// Exclude function definitions — a function named "generatePassword" should not
+// be flagged itself; only the variable values inside it matter.
+$sensitiveSinks?{!opcode: function} as $nonFuncSinks
+
+// Filter out sink nodes that match safe (non-security) context names
+$nonFuncSinks?{!<self> & $safeContextNames} as $filteredSinks
+
+// Step 4a: Direct — sink value is directly part of Math.random() result
+$filteredSinks?{<self> & $rand} as $directInsecure
+
+// Step 4b: Taint — Math.random() flows through intermediate calls to sink
+$filteredSinks?{<self> #{
+    include: <<<CODE
+* & $rand as $__next__
+CODE
+}->} as $taintedInsecure
+
+// Merge both patterns
+$directInsecure as $insecureRandom
+$taintedInsecure as $insecureRandom
+
+alert $insecureRandom for {
+	level: "low",
+	type: "vuln",
+	title: "Insecure randomness: Math.random() used in security-sensitive context",
+	title_zh: "不安全随机数：Math.random() 用于安全敏感场景（密码/Token/密钥等）",
+	message: "检测到 Math.random() 的输出流入了安全敏感场景（如密码、Session Token、API Key、密钥等）。Math.random() 是密码学不安全的伪随机数生成器，攻击者可以通过预测其输出值伪造 Token 或直接登录账户。请改用 crypto.randomBytes()（Node.js）或 window.crypto.getRandomValues()（浏览器）生成密码学安全的随机数。",
+	risk: "不安全的随机数",
+	name: "insecureRandom",
+}
+
+// =====================================================================
+// Embedded test cases
+// =====================================================================
+
+// Test 1: VULNERABLE — password generation with Math.random() (CodeQL canonical)
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///unsafe_random_password.js': <<<CODE
+function insecurePassword() {
+    // BAD: the random suffix is not cryptographically secure
+    var suffix = Math.random();
+    var password = "myPassword" + suffix;
+    return password;
+}
+CODE
+)
+
+// Test 2: VULNERABLE — session token with Math.random()
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///unsafe_random_token.js': <<<CODE
+function generateSessionToken() {
+    // BAD: Math.random() is not cryptographically secure
+    const token = Math.random().toString(36).substring(2);
+    return token;
+}
+CODE
+)
+
+// Test 3: VULNERABLE — API key generation
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///unsafe_random_apikey.js': <<<CODE
+function createApiKey() {
+    const apiKey = Math.random().toString(16).slice(2) +
+                   Math.random().toString(16).slice(2);
+    return apiKey;
+}
+CODE
+)
+
+// Test 4: VULNERABLE — secret
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///unsafe_random_secret.js': <<<CODE
+const secret = Math.random().toString(36).repeat(3);
+CODE
+)
+
+// Test 5: VULNERABLE — CSRF nonce
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///unsafe_random_csrf.js': <<<CODE
+function generateCsrfToken() {
+    const nonce = Math.random().toString(36).slice(2);
+    return nonce;
+}
+CODE
+)
+
+// Test 6: SAFE — Math.random() used for RGB color (non-security)
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///safe_random_color.js': <<<CODE
+function randomColor() {
+    // GOOD: Math.random() is fine for non-security UI randomness
+    const r = Math.floor(Math.random() * 256);
+    const g = Math.floor(Math.random() * 256);
+    const b = Math.floor(Math.random() * 256);
+    return `rgb(${r}, ${g}, ${b})`;
+}
+CODE
+)
+
+// Test 7: SAFE — Math.random() for animation delay (non-security)
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///safe_random_animation.js': <<<CODE
+function randomDelay() {
+    // GOOD: animation delay does not need crypto randomness
+    const delay = Math.random() * 1000;
+    return delay;
+}
+CODE
+)
+
+// Test 8: SAFE — using crypto.randomBytes() for password (secure alternative)
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///safe_crypto_password.js': <<<CODE
+const crypto = require('crypto');
+
+function securePassword() {
+    // GOOD: crypto.randomBytes() is cryptographically secure
+    const password = crypto.randomBytes(16).toString('base64');
+    return password;
+}
+CODE
+)
+
+// Test 9: SAFE — using window.crypto.getRandomValues() in browser
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///safe_browser_crypto.js': <<<CODE
+function secureToken() {
+    // GOOD: window.crypto.getRandomValues() is cryptographically secure
+    const token = window.crypto.getRandomValues(new Uint32Array(4))
+        .reduce((acc, val) => acc + val.toString(16).padStart(8, '0'), '');
+    return token;
+}
+CODE
+)
+
+// Test 10: SAFE — Math.random() for game dice (non-security)
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///safe_random_game.js': <<<CODE
+function rollDice() {
+    // GOOD: dice rolls in a game do not need crypto-secure randomness
+    const dice = Math.floor(Math.random() * 6) + 1;
+    return dice;
+}
+CODE
+)

@@ -1,0 +1,145 @@
+desc(
+	title: "JavaScript HTTP Request Sink Functions"
+	title_zh: "JavaScript HTTP 请求 Sink 函数"
+	type: audit
+	lib: 'js-http-request-sink'
+	desc: <<<DESC
+### 规则目的
+
+该规则是 `js-http-request-sink` 库规则（`lib` 类型），用于识别 JavaScript/Node.js 中发起 HTTP 请求的函数调用，作为 SSRF 污点分析的 **Sink（汇聚点）**。
+
+#### 覆盖的库和 API
+
+**Node.js 内置 HTTP/HTTPS 模块：**
+- `http.get(url, ...)` / `http.request(url/options, ...)`
+- `https.get(url, ...)` / `https.request(url/options, ...)`
+
+**第三方 HTTP 客户端库：**
+- `axios(url)` / `axios.get/post/put/delete/patch/request(url, ...)`
+- `fetch(url, ...)` / `node-fetch(url, ...)`
+- `request(url/options, ...)` / `request.get/post/put/delete(url, ...)`
+- `got(url, ...)` / `got.get/post/put/delete/stream(url, ...)`
+- `needle(method, url, ...)` / `needle.get/post/put/delete(url, ...)`
+- `superagent.get/post/put/delete/patch(url)`
+- `urllib.request(url, ...)` / `urllib.fetch(url, ...)`
+
+#### Sink 位置
+
+对于接受 URL 字符串作为第一参数的函数（如 `axios.get(url)`），Sink 是第一个参数。
+对于接受 options 对象的函数（如 `http.request({ host, path })`），Sink 是整个 options 对象（可进一步追踪 `.host`、`.url`、`.path` 属性）。
+DESC
+	rule_id: "d4e5f6a7-b8c9-0123-defa-918000000001"
+	solution: <<<SOLUTION
+此规则为 lib 库规则，不直接报告漏洞。请结合具体的 SSRF 漏洞检测规则（js-request-forgery.sf）使用。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-918: Server-Side Request Forgery](https://cwe.mitre.org/data/definitions/918.html)
+[OWASP: Server-Side Request Forgery Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html)
+REFERENCE
+)
+
+// ===================================================================
+// Node.js built-in http / https
+// ===================================================================
+
+// http.get(url, callback) — url is the first arg
+http.get(* as $output,)
+// http.request(url_or_options, callback)
+http.request(* as $output,)
+// https counterparts
+https.get(* as $output,)
+https.request(* as $output,)
+
+// ===================================================================
+// axios — promise-based HTTP client
+// ===================================================================
+
+axios.get(* as $output,)
+axios.post(* as $output,)
+axios.put(* as $output,)
+axios.delete(* as $output,)
+axios.patch(* as $output,)
+axios.head(* as $output,)
+axios.options(* as $output,)
+axios.request(* as $output,)
+// axios(config) — direct call with options object
+axios(* as $output,)
+
+// ===================================================================
+// fetch / node-fetch
+// ===================================================================
+
+fetch(* as $output,)
+
+// ===================================================================
+// request / request-promise
+// ===================================================================
+
+request(* as $output,)
+request.get(* as $output,)
+request.post(* as $output,)
+request.put(* as $output,)
+request.delete(* as $output,)
+request.patch(* as $output,)
+
+// ===================================================================
+// got
+// ===================================================================
+
+got(* as $output,)
+got.get(* as $output,)
+got.post(* as $output,)
+got.put(* as $output,)
+got.delete(* as $output,)
+got.patch(* as $output,)
+got.stream(* as $output,)
+
+// ===================================================================
+// needle
+// ===================================================================
+
+// needle(method, url, ...) — url is the second arg
+needle(,* as $output,)
+needle.get(* as $output,)
+needle.post(* as $output,)
+needle.put(* as $output,)
+needle.delete(* as $output,)
+
+// ===================================================================
+// superagent
+// ===================================================================
+
+superagent.get(* as $output,)
+superagent.post(* as $output,)
+superagent.put(* as $output,)
+superagent.delete(* as $output,)
+superagent.patch(* as $output,)
+
+// ===================================================================
+// urllib (node-urllib)
+// ===================================================================
+
+urllib.request(* as $output,)
+urllib.fetch(* as $output,)
+
+$output as $output
+
+alert $output for {
+	level: "info",
+	title: "JavaScript HTTP Request Sink",
+	title_zh: "JavaScript HTTP 请求 Sink",
+	message: "识别到 HTTP 请求调用点，请结合污点传播链路判断是否存在 SSRF 风险。",
+	name: "output",
+}
+
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///js_http_sink_test.js': <<<CODE
+const http = require('http');
+const axios = require('axios');
+
+http.get('https://example.com/api', res => {});
+axios.get('https://example.com/data');
+CODE
+)

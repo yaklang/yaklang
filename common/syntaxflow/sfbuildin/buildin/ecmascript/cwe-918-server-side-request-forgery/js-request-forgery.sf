@@ -1,0 +1,413 @@
+desc(
+	title: "Server-Side Request Forgery"
+	title_zh: "服务端请求伪造（SSRF）"
+	type: vuln
+	level: high
+	risk_type: "ssrf"
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+
+服务端请求伪造（SSRF，Server-Side Request Forgery）是一类允许攻击者诱导服务端应用程序向攻击者指定的目标发起请求的漏洞。
+
+当应用程序直接将用户可控输入（如 URL 参数、表单字段、HTTP Header）拼接或嵌入到服务端发出的 HTTP 请求 URL 中，攻击者便可控制请求的目标主机、路径或参数，从而实施以下攻击：
+
+- **内网渗透**：绕过防火墙，向内网服务（如 Redis、数据库、云元数据服务 `169.254.169.254`）发起请求
+- **端口扫描**：探测内网主机和端口开放情况
+- **读取云元数据**：在 AWS/GCP/Azure 环境中读取实例元数据获取凭证
+- **拒绝服务**：请求大文件或慢速响应 URL，耗尽服务器资源
+- **信息泄露**：通过 `file://`、`dict://`、`ftp://` 等协议读取本地文件或探测服务
+
+2. **触发场景**
+
+```javascript
+// 危险：用户输入直接拼入 URL 主机名
+const target = req.query.target;
+http.get('https://' + target + '.example.com/data', res => {});
+
+// 危险：用户输入作为完整 URL
+const url = req.query.url;
+axios.get(url);
+
+// 危险：用户输入在路径中（路径遍历+SSRF）
+const path = req.query.path;
+axios.get('https://api.internal.com/' + path);
+```
+
+3. **潜在影响**
+
+- **高危**：攻击者控制 URL 主机名，可访问任意内网服务器（含 `localhost`, `127.0.0.1`, `169.254.169.254`）
+- **中危**：攻击者控制 URL 路径，可访问内部 API 的非预期端点（如 `/admin`, `/debug`）
+- **信息泄露**：攻击者通过响应内容获取内网服务信息或凭证
+DESC
+	rule_id: "d4e5f6a7-b8c9-0123-defa-918000000002"
+	solution: <<<SOLUTION
+### 修复建议
+
+**1. 使用白名单限制请求目标主机**
+
+```javascript
+// BAD: 直接使用用户输入
+http.get('https://' + req.query.target + '.example.com/data', res => {});
+
+// GOOD: 使用服务端维护的白名单映射
+const ALLOWED_TARGETS = {
+    'EU': 'europe.example.com',
+    'US': 'us.example.com',
+};
+const hostname = ALLOWED_TARGETS[req.query.target] || 'default.example.com';
+http.get('https://' + hostname + '/data', res => {});
+```
+
+**2. 解析并校验 URL 的 hostname**
+
+```javascript
+const { URL } = require('url');
+
+function isSafeUrl(urlStr) {
+    try {
+        const parsed = new URL(urlStr);
+        // 只允许特定域名
+        const allowedHosts = ['api.example.com', 'data.example.com'];
+        return allowedHosts.includes(parsed.hostname);
+    } catch {
+        return false;
+    }
+}
+
+const url = req.query.url;
+if (!isSafeUrl(url)) {
+    return res.status(400).send('Invalid URL');
+}
+axios.get(url);
+```
+
+**3. 禁止内网地址访问（黑名单辅助）**
+
+```javascript
+const dns = require('dns');
+const { promisify } = require('util');
+const dnsLookup = promisify(dns.lookup);
+
+async function isPublicHost(hostname) {
+    const { address } = await dnsLookup(hostname);
+    // 禁止访问内网和 loopback 地址
+    const privateRanges = /^(127\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.|169\.254\.)/;
+    return !privateRanges.test(address);
+}
+```
+
+**4. 使用 SSRF 防护库**
+
+- Node.js: `ssrf-agent`、`axios-ssrf-protection`
+- 对所有出站请求使用专用 HTTP 客户端，内置私有地址过滤
+
+**5. 最小化出站网络权限**
+
+- 使用防火墙/安全组限制服务器的出站连接
+- 禁用不必要的协议（`file://`, `dict://`, `ftp://`）
+SOLUTION
+	reference: <<<REFERENCE
+[OWASP: Server-Side Request Forgery Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html)
+[PortSwigger: Server-side request forgery (SSRF)](https://portswigger.net/web-security/ssrf)
+[CWE-918: Server-Side Request Forgery (SSRF)](https://cwe.mitre.org/data/definitions/918.html)
+[CodeQL: js/request-forgery](https://codeql.github.com/codeql-query-help/javascript/js-request-forgery/)
+[NIST NVD: CWE-918](https://nvd.nist.gov/vuln/categories/nvd-cwe-918)
+REFERENCE
+)
+
+// =====================================================================
+// Detection Strategy
+//
+// This rule detects SSRF vulnerabilities by tracing user-controlled input
+// into the URL argument of HTTP request functions.
+//
+// Architecture:
+//   Sources  → <include('js-param')>            — HTTP request parameters, body, headers
+//   Sinks    → <include('js-http-request-sink')> — HTTP client library calls
+//
+// Detection Patterns:
+//
+//   Case A (Direct, unguarded, no phi):
+//     The URL argument directly contains an UNGUARDED $params value.
+//     "Guarded" = the param's direct users include an eq-comparison (BinOp eq),
+//     meaning code does `if (CONST === param) { http.get(param) }`.
+//     → Catches: axios.get(req.query.url)
+//     → Excludes: if (TRUSTED === url) { axios.get(url) }
+//
+//   Case B (Any tainted phi):
+//     The URL contains a phi node where at least one operand is ANY $params
+//     value (guarded or not). The phi merges branches — even if one branch has
+//     a guard, the redirect/request still sees the combined phi output.
+//     → Catches: phi["safe.com", req.query.target]; axios.get(phi)
+//     → Excludes: phi["europe","world"] (all-constant phi, no param operand)
+//
+//   Case C/D (String concat variants):
+//     Same logic applied after extracting the concat chain (#{until: add}->).
+//     → Catches: http.get('https://' + req.query.target + '.example.com')
+//
+// Two-tier false positive prevention:
+//   1. Eq-guard exclusion (Case A/C only):
+//      Params that appear in eq-comparisons (=== / ==) are excluded from
+//      direct-use detection. Safe pattern: if (CONST === url) { http.get(url) }
+//   2. Clean phi exclusion (Cases B/D):
+//      Phi nodes with NO $params operand (all-constant) are naturally excluded
+//      because $params -> * only finds phi nodes with direct param operands.
+// =====================================================================
+
+<include('js-param')> as $params
+<include('js-http-request-sink')> as $sinks
+
+// =====================================================================
+// Pre-step A: Find params guarded by strict equality check (eq BinOp).
+// These params appear in an eq-comparison node as a direct user,
+// indicating the code validates the param's exact value before use.
+//
+// GUARDED:   if (TRUSTED_URL === url) { http.get(url) }
+//            → url's users include eq(TRUSTED_URL, url)
+// UNGUARDED: http.get(req.query.url)
+//            → url's users have no eq node
+// =====================================================================
+$params?{<self> -> *?{opcode: BinOp}?{have: /^eq\(/}} as $guardedParams
+$params?{!(<self> & $guardedParams)} as $unguardedParams
+
+// =====================================================================
+// Pre-step B: Identify phi nodes directly tainted by ANY $params operand.
+// These represent variables where at least one branch is user-controlled.
+//
+// TAINTED: phi(x)["safe.com", req.query.target]  ← target is a $params value
+// CLEAN:   phi(x)["europe", "world"]             ← all const, NOT in $anyTaintedPhi
+// =====================================================================
+$params -> * as $paramsDirectUsers
+$paramsDirectUsers?{opcode: phi} as $anyTaintedPhi
+
+// =====================================================================
+// Case A: Sink URL directly contains UNGUARDED user input (no phi crossing)
+// =====================================================================
+$sinks?{<self> #{
+	include: <<<CODE
+* & $unguardedParams as $__next__
+CODE,
+	exclude: <<<CODE
+*?{opcode: phi} as $__next__
+CODE
+}->} as $directSsrf
+
+// =====================================================================
+// Case B: Sink URL contains a tainted phi (any param as operand)
+// =====================================================================
+$sinks?{<self> #{
+	include: <<<CODE
+* & $anyTaintedPhi as $__next__
+CODE
+}->} as $phiSsrf
+
+// =====================================================================
+// Case C/D: URL built by string concatenation (BinOp add)
+// =====================================================================
+$sinks#{
+	until: <<<UNTIL
+*?{opcode: add} as $__next__
+UNTIL
+}-> as $concatChain
+
+$concatChain?{<self> #{
+	include: <<<CODE
+* & $unguardedParams as $__next__
+CODE,
+	exclude: <<<CODE
+*?{opcode: phi} as $__next__
+CODE
+}->} as $concatDirectSsrf
+
+$concatChain?{<self> #{
+	include: <<<CODE
+* & $anyTaintedPhi as $__next__
+CODE
+}->} as $concatPhiSsrf
+
+$directSsrf as $ssrf
+$phiSsrf as $ssrf
+$concatDirectSsrf as $ssrf
+$concatPhiSsrf as $ssrf
+
+alert $ssrf for {
+	level: "high",
+	type: "vuln",
+	title: "Server-Side Request Forgery",
+	title_zh: "服务端请求伪造（SSRF）",
+	message: "检测到用户可控输入直接流入 HTTP 请求的 URL 参数，可能导致 SSRF 攻击。攻击者可利用此漏洞将服务器作为代理访问内网资源、云元数据服务或其他非预期目标。请使用白名单校验请求目标，禁止将用户输入直接拼入 URL。",
+	risk: "服务端请求伪造（SSRF）",
+	name: "ssrfSink",
+}
+
+// =====================================================================
+// Embedded Test Cases
+// =====================================================================
+
+// Test 1: VULNERABLE — user input directly in URL hostname (CodeQL canonical example)
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///ssrf_concat_hostname.js': <<<CODE
+import http from 'http';
+
+const server = http.createServer(function(req, res) {
+    const target = new URL(req.url, "http://example.com").searchParams.get("target");
+
+    // BAD: target is controlled by the attacker
+    http.get('https://' + target + ".example.com/data/", res => {
+        // process request response ...
+    });
+});
+CODE
+)
+
+// Test 2: VULNERABLE — axios with user-controlled URL
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///ssrf_axios.js': <<<CODE
+const express = require('express');
+const axios = require('axios');
+
+const app = express();
+
+app.get('/proxy', async (req, res) => {
+    const url = req.query.url;
+
+    // BAD: url is fully attacker-controlled
+    const response = await axios.get(url);
+    res.json(response.data);
+});
+CODE
+)
+
+// Test 3: VULNERABLE — fetch with path from user input
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///ssrf_fetch_path.js': <<<CODE
+const express = require('express');
+
+const app = express();
+
+app.get('/api/proxy', async (req, res) => {
+    const path = req.query.path;
+
+    // BAD: path is controlled by attacker, can use ../ to traverse
+    const response = await fetch('https://internal-api.example.com/' + path);
+    const data = await response.json();
+    res.json(data);
+});
+CODE
+)
+
+// Test 4: VULNERABLE — request library with user-controlled URL
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///ssrf_request_lib.js': <<<CODE
+const express = require('express');
+const request = require('request');
+
+const app = express();
+
+app.get('/fetch', (req, res) => {
+    const target = req.body.target;
+
+    // BAD: target is user-controlled
+    request('https://' + target + '/data', (err, response, body) => {
+        res.send(body);
+    });
+});
+CODE
+)
+
+// Test 5: VULNERABLE — phi where one branch is user input (partial allowlist)
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///ssrf_partial_allowlist.js': <<<CODE
+const http = require('http');
+
+const server = http.createServer(function(req, res) {
+    const target = req.query.target;
+
+    let host;
+    if (target === 'safe') {
+        host = "safe.example.com";
+    } else {
+        host = target;
+    }
+
+    // BAD: host can still be attacker-controlled via the else branch
+    http.get('https://' + host + '/api', res2 => {});
+});
+CODE
+)
+
+// Test 6: SAFE — allowlist-based hostname selection (CodeQL canonical safe example)
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///ssrf_safe_allowlist.js': <<<CODE
+import http from 'http';
+
+const server = http.createServer(function(req, res) {
+    const target = new URL(req.url, "http://example.com").searchParams.get("target");
+
+    let subdomain;
+    if (target === 'EU') {
+        subdomain = "europe";
+    } else {
+        subdomain = "world";
+    }
+
+    // GOOD: subdomain is phi of constants, not user-controlled
+    http.get('https://' + subdomain + ".example.com/data/", res => {
+        // process request response ...
+    });
+});
+CODE
+)
+
+// Test 7: SAFE — hardcoded URL, no user input
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///ssrf_safe_hardcoded.js': <<<CODE
+const axios = require('axios');
+
+async function fetchPublicData() {
+    // GOOD: URL is hardcoded, not user-controlled
+    const response = await axios.get('https://api.example.com/public/data');
+    return response.data;
+}
+CODE
+)
+
+// Test 8: SAFE — exact-value equality guard before request
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///ssrf_safe_eq_guard.js': <<<CODE
+const http = require('http');
+
+const TRUSTED_API = "https://trusted-api.example.com/data";
+
+const server = http.createServer(function(req, res) {
+    const url = req.query.url;
+    // GOOD: strict equality check ensures url can only be the trusted constant
+    if (url === TRUSTED_API) {
+        http.get(url, res2 => {
+            res2.pipe(res);
+        });
+    } else {
+        res.writeHead(400);
+        res.end("Invalid URL");
+    }
+});
+CODE
+)

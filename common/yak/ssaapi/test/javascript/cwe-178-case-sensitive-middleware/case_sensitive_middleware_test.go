@@ -47,7 +47,6 @@ func runOnFile(t *testing.T, ruleContent, filename, code string) int {
 // ============================================================
 
 // TestCaseSensitiveMiddleware_Positive_RegexWithoutIFlag 验证不含 'i' 标志的正则中间件 + 同路径字符串端点触发告警。
-// 对应 irify/ts-sf-rules/cwe-178/case-sensitive-middleware-path/positive.js
 func TestCaseSensitiveMiddleware_Positive_RegexWithoutIFlag(t *testing.T) {
 	rule := loadCaseSensitiveRule(t)
 	total := runOnFile(t, rule, "positive.js", `
@@ -73,7 +72,6 @@ app.get('/admin/users/:id', (req, res) => {
 // ============================================================
 
 // TestCaseSensitiveMiddleware_Negative_RegexWithIFlag 验证含 'i' 标志的正则中间件不触发告警。
-// 对应 irify/ts-sf-rules/cwe-178/case-sensitive-middleware-path/negative.js
 func TestCaseSensitiveMiddleware_Negative_RegexWithIFlag(t *testing.T) {
 	rule := loadCaseSensitiveRule(t)
 	total := runOnFile(t, rule, "negative.js", `
@@ -95,7 +93,6 @@ app.get('/admin/users/:id', (req, res) => {
 }
 
 // TestCaseSensitiveMiddleware_Negative_RegexPathNotOverlapping 验证正则路径与端点路径不重叠时不触发告警。
-// 对应 irify/ts-sf-rules/cwe-178/case-sensitive-middleware-path/negative-1.js
 // /\/go0p\/.*/ 不覆盖 /guest/users/:id，无绕过风险。
 func TestCaseSensitiveMiddleware_Negative_RegexPathNotOverlapping(t *testing.T) {
 	rule := loadCaseSensitiveRule(t)

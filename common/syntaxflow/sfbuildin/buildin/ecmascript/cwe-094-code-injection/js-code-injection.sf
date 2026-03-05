@@ -3,7 +3,7 @@ desc(
 	title_zh: "用户可控输入流入代码执行函数导致代码注入"
 	type: vuln
 	level: high
-	risk: "code-injection"
+	risk_type: "code-injection"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -199,7 +199,7 @@ const safeTemplate = `p Hello #{username}`;
 pug.compile(safeTemplate)({ username: req.query.username });
 ```
 SOLUTION
-	risk: "remote-code-execution",
+	risk: "远程代码执行",
 	name: "directInjection",
 }
 
@@ -225,7 +225,7 @@ const template = `p Hello #{username}`;
 pug.compile(template)({ username: req.query.username });
 ```
 SOLUTION
-	risk: "server-side-template-injection",
+	risk: "服务端模板注入",
 	name: "mid",
 }
 

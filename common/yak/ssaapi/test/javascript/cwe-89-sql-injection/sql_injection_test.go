@@ -53,7 +53,6 @@ func runOnFile(t *testing.T, ruleContent, filename, code string) (total, high in
 // ============================================================
 
 // TestSQLInject_Ex1Positive_SQLConcatenation 检测 pg 字符串拼接注入（应报 high 告警）。
-// 对应 irify/ts-sf-rules/cwe-89/sql-inject/ex1-positive-1.js
 func TestSQLInject_Ex1Positive_SQLConcatenation(t *testing.T) {
 	rule := loadSQLInjectionRule(t)
 	total, high := runOnFile(t, rule, "ex1-positive-1.js", `
@@ -77,7 +76,6 @@ app.get("search", function handler(req, res) {
 }
 
 // TestSQLInject_Ex1Negative1_ParameterizedQuery 验证参数化查询不产生告警（应零告警）。
-// 对应 irify/ts-sf-rules/cwe-89/sql-inject/ex1-negative-1.js
 func TestSQLInject_Ex1Negative1_ParameterizedQuery(t *testing.T) {
 	rule := loadSQLInjectionRule(t)
 	total, _ := runOnFile(t, rule, "ex1-negative-1.js", `
@@ -98,7 +96,6 @@ app.get("search", function handler(req, res) {
 }
 
 // TestSQLInject_Ex1Negative2_SqlStringEscape 验证 SqlString.escape() 过滤后不产生高风险告警。
-// 对应 irify/ts-sf-rules/cwe-89/sql-inject/ex1-negative-2.js
 // SqlString.escape() 是已知的安全转义函数，应被排除在 high 告警范围外。
 func TestSQLInject_Ex1Negative2_SqlStringEscape(t *testing.T) {
 	rule := loadSQLInjectionRule(t)
@@ -128,7 +125,6 @@ app.get("search", function handler(req, res) {
 // ============================================================
 
 // TestSQLInject_Ex2Positive_NoSQLDirectInput 检测 Mongoose deleteOne 直接传入用户输入（应报 high 告警）。
-// 对应 irify/ts-sf-rules/cwe-89/sql-inject/ex2-positive-1.js
 func TestSQLInject_Ex2Positive_NoSQLDirectInput(t *testing.T) {
 	rule := loadSQLInjectionRule(t)
 	total, high := runOnFile(t, rule, "ex2-positive-1.js", `
@@ -156,7 +152,6 @@ app.delete("/api/delete", async (req, res) => {
 }
 
 // TestSQLInject_Ex2Negative1_EqOperator 验证使用 $eq 操作符后不产生告警。
-// 对应 irify/ts-sf-rules/cwe-89/sql-inject/ex2-negative-1.js
 func TestSQLInject_Ex2Negative1_EqOperator(t *testing.T) {
 	rule := loadSQLInjectionRule(t)
 	total, _ := runOnFile(t, rule, "ex2-negative-1.js", `
@@ -182,7 +177,6 @@ app.delete("/api/delete", async (req, res) => {
 }
 
 // TestSQLInject_Ex2Negative2_TypeofCheck 验证 typeof 类型检查守卫后不产生高风险告警。
-// 对应 irify/ts-sf-rules/cwe-89/sql-inject/ex2-negative-2.js
 // typeof 运行时类型检查是一种常见的 NoSQL 注入防御手段，规则应降低或消除其告警级别。
 func TestSQLInject_Ex2Negative2_TypeofCheck(t *testing.T) {
 	rule := loadSQLInjectionRule(t)

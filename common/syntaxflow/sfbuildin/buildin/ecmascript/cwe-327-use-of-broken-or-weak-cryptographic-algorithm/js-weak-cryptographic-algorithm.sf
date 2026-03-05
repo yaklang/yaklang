@@ -1,0 +1,376 @@
+desc(
+	title: "Use of a broken or weak cryptographic algorithm"
+	title_zh: "使用已破解或弱加密算法"
+	type: vuln
+	level: low
+	risk_type: "weak-cryptographic-algorithm"
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+
+使用已破解或存在安全缺陷的密码学算法，会导致加密、哈希或签名提供的安全保证（保密性、完整性、真实性）无法得到满足。
+
+**弱对称加密算法（不应再用于新系统）：**
+- **DES**（数据加密标准）：密钥仅 56 位，可在数小时内被暴力破解
+- **3DES/DESede**（三重 DES）：密钥有效强度约 112 位，存在 Sweet32 生日攻击，2023 年已被 NIST 正式弃用
+- **RC2**：密钥长度可变但设计存在缺陷，已被证明不安全
+- **RC4**（ARCFOUR）：流密码，存在多种已知攻击，在 TLS 中已被禁用（RFC 7465）
+- **Blowfish**：块大小仅 64 位，存在 Sweet32 生日攻击风险
+
+**弱哈希算法（不应用于安全场景）：**
+- **MD4 / MD5**：存在碰撞攻击，不应用于完整性校验或数字签名
+- **SHA-1**：2017 年 Google 展示了实际碰撞（SHAttered），不应用于证书或数字签名
+- **SHA-0**：SHA-1 的前身，已被彻底废弃
+
+2. **触发场景**
+
+```javascript
+const crypto = require('crypto');
+
+// 危险：DES 加密（56 位密钥，已不安全）
+const desCipher = crypto.createCipher('des', key);
+
+// 危险：RC4 加密（存在多种实际攻击）
+const rc4Cipher = crypto.createCipher('rc4', key);
+
+// 危险：MD5 哈希（存在碰撞攻击）
+const md5Hash = crypto.createHash('md5');
+
+// 危险：SHA-1 哈希（已被实际碰撞攻击破解）
+const sha1Hash = crypto.createHash('sha1');
+```
+
+3. **潜在影响**
+
+- **数据泄露**：弱加密算法可被攻击者解密，导致敏感数据暴露
+- **完整性破坏**：弱哈希算法存在碰撞，攻击者可伪造相同哈希值的恶意输入
+- **签名伪造**：弱算法用于数字签名时，攻击者可伪造合法签名，冒充合法用户
+- **合规违规**：PCI DSS、FIPS 140 等合规标准明确禁止使用这些算法
+DESC
+	rule_id: "b2c3d4e5-f6a7-8901-bcde-327000000001"
+	solution: <<<SOLUTION
+### 修复建议
+
+**1. 对称加密：使用 AES**
+
+```javascript
+const crypto = require('crypto');
+
+// GOOD: AES-256-GCM（认证加密，推荐）
+const key = crypto.randomBytes(32);   // 256 位密钥
+const iv = crypto.randomBytes(12);    // GCM 推荐 96 位 IV
+const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+
+// GOOD: AES-256-CBC（需要配合 HMAC 使用）
+const cbcCipher = crypto.createCipheriv('aes-256-cbc', key, iv);
+```
+
+**2. 哈希/完整性校验：使用 SHA-2 或 SHA-3**
+
+```javascript
+// GOOD: SHA-256（推荐用于一般完整性校验）
+const hash = crypto.createHash('sha256').update(data).digest('hex');
+
+// GOOD: SHA-512（需要更高安全强度时）
+const hash512 = crypto.createHash('sha512').update(data).digest('hex');
+
+// GOOD: SHA3-256（下一代标准）
+const hash3 = crypto.createHash('sha3-256').update(data).digest('hex');
+
+// GOOD: HMAC-SHA256（带密钥的完整性校验）
+const hmac = crypto.createHmac('sha256', key).update(data).digest('hex');
+```
+
+**3. 密码哈希：使用专用密码哈希函数**
+
+```javascript
+// GOOD: 密码存储应使用 bcrypt/argon2/scrypt，而非通用哈希
+const bcrypt = require('bcrypt');
+const hash = await bcrypt.hash(password, 12);
+```
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-327: Use of a Broken or Risky Cryptographic Algorithm](https://cwe.mitre.org/data/definitions/327.html)
+[CWE-328: Use of Weak Hash](https://cwe.mitre.org/data/definitions/328.html)
+[NIST SP 800-131A: Transitioning the Use of Cryptographic Algorithms](https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-131Ar2.pdf)
+[RFC 7465: Prohibiting RC4 Cipher Suites](https://www.rfc-editor.org/rfc/rfc7465)
+[Node.js Crypto Documentation](https://nodejs.org/api/crypto.html)
+[CodeQL: js/weak-cryptographic-algorithm](https://codeql.github.com/codeql-query-help/javascript/js-weak-cryptographic-algorithm/)
+REFERENCE
+)
+
+// =====================================================================
+// Detection Strategy:
+//
+// Target APIs (Node.js built-in crypto module):
+//   - crypto.createCipher(algorithm, key)     — deprecated but still used
+//   - crypto.createCipheriv(algorithm, key, iv)
+//   - crypto.createDecipher(algorithm, key)
+//   - crypto.createDecipheriv(algorithm, key, iv)
+//   - crypto.createHash(algorithm)
+//   - crypto.createHmac(algorithm, key)
+//   - crypto.createSign(algorithm)            — for digital signatures
+//   - crypto.createVerify(algorithm)
+//
+// Step 1 — Capture the algorithm argument (first param) of each crypto call.
+//
+// Step 2 — Use #{until: const}-> to trace through variable assignments
+//           and reach the actual string constant (like Java rule pattern).
+//           This handles cases like:
+//             const ALGO = 'des';
+//             crypto.createCipher(ALGO, key);
+//
+// Step 3 — Match against weak algorithm patterns:
+//
+//   Weak ciphers (encryption):
+//     des, des-*, des3, 3des, triple-des, des-ede*, bf-*, blowfish, rc2, rc4*
+//
+//   Weak hashes:
+//     md2, md4, md5, sha, sha-1, sha1, ripemd160
+//     NOTE: sha256, sha512, sha384, sha3-* are NOT matched (strong)
+//
+// =====================================================================
+
+// === Part 1: Weak symmetric cipher detection ===
+
+*.createCipher(* as $cipherAlg,)
+*.createCipheriv(* as $cipherAlg,)
+*.createDecipher(* as $cipherAlg,)
+*.createDecipheriv(* as $cipherAlg,)
+
+// Trace through variable assignments to the actual string constant,
+// then check if it matches a known weak cipher algorithm.
+$cipherAlg#{
+	until: <<<CODE
+* ?{opcode: const && have: /(?i)^"?(des(-[a-z0-9]+)?|des3|3des|triple-?des|des-?ede[23]?(-[a-z0-9]+)?|rc[24](-[0-9]+)?|blowfish|bf(-[a-z]+)?)/}
+CODE
+}-> as $weakCipher
+
+// === Part 2: Weak hash algorithm detection ===
+
+*.createHash(* as $hashAlg)
+*.createHmac(* as $hmacAlg,)
+*.createSign(* as $signAlg)
+*.createVerify(* as $verifyAlg)
+
+$hashAlg   as $allHashAlg
+$hmacAlg   as $allHashAlg
+$signAlg   as $allHashAlg
+$verifyAlg as $allHashAlg
+
+// Weak hash: md2, md4, md5, sha (alone), sha1/sha-1, ripemd160
+// Carefully anchored to avoid matching sha256, sha512, sha3-xxx, etc.
+$allHashAlg#{
+	until: <<<CODE
+* ?{opcode: const && have: /(?i)^"?(md[245]|sha-?1"?$|sha"?$|ripemd-?160)/}
+CODE
+}-> as $weakHash
+
+// =====================================================================
+// Alerts
+// =====================================================================
+
+alert $weakCipher for {
+	level: "low",
+	type: "vuln",
+	title: "Weak symmetric cipher: broken or deprecated encryption algorithm used",
+	title_zh: "弱对称加密：使用了已破解或弃用的加密算法",
+	message: "检测到 Node.js crypto 模块使用了弱对称加密算法（如 DES、3DES、RC4、RC2、Blowfish 等）。这些算法存在已知安全缺陷，无法提供足够的保密性保证。请使用 AES-256-GCM 或 AES-256-CBC 替代。",
+	risk: "使用弱加密算法",
+	name: "weakCipher",
+}
+
+alert $weakHash for {
+	level: "low",
+	type: "vuln",
+	title: "Weak hash algorithm: broken or deprecated hash function used",
+	title_zh: "弱哈希算法：使用了已破解或弃用的哈希函数",
+	message: "检测到 Node.js crypto 模块使用了弱哈希算法（如 MD5、SHA-1、MD4 等）。这些算法存在已知碰撞攻击，不应用于安全完整性校验、数字签名或密码存储。请使用 SHA-256、SHA-512 或 SHA3-256 替代。",
+	risk: "使用弱加密算法",
+	name: "weakHash",
+}
+
+// =====================================================================
+// Embedded test cases
+// =====================================================================
+
+// Test 1: VULNERABLE — DES cipher (CodeQL canonical example)
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///unsafe_des_cipher.js': <<<CODE
+const crypto = require('crypto');
+
+var secretText = "someSecret";
+var key = "myDESkey";
+
+// BAD: DES is a broken algorithm
+const desCipher = crypto.createCipher('des', key);
+let desEncrypted = desCipher.write(secretText, 'utf8', 'hex');
+CODE
+)
+
+// Test 2: VULNERABLE — RC4 cipher
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///unsafe_rc4_cipher.js': <<<CODE
+const crypto = require('crypto');
+
+// BAD: RC4 has multiple known attacks, prohibited in TLS (RFC 7465)
+const cipher = crypto.createCipher('rc4', 'mykey');
+CODE
+)
+
+// Test 3: VULNERABLE — 3DES via createCipheriv
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///unsafe_3des_cipher.js': <<<CODE
+const crypto = require('crypto');
+
+const key = Buffer.alloc(24);
+const iv = Buffer.alloc(8);
+
+// BAD: 3DES deprecated by NIST in 2023
+const cipher = crypto.createCipheriv('des-ede3-cbc', key, iv);
+CODE
+)
+
+// Test 4: VULNERABLE — algorithm via const variable
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///unsafe_des_via_variable.js': <<<CODE
+const crypto = require('crypto');
+
+const ALGORITHM = 'des';
+const key = 'mykey';
+
+// BAD: DES via variable
+const cipher = crypto.createCipher(ALGORITHM, key);
+CODE
+)
+
+// Test 5: VULNERABLE — MD5 hash
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///unsafe_md5_hash.js': <<<CODE
+const crypto = require('crypto');
+
+// BAD: MD5 has known collision attacks
+const hash = crypto.createHash('md5');
+hash.update('some data');
+const digest = hash.digest('hex');
+CODE
+)
+
+// Test 6: VULNERABLE — SHA-1 hash
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///unsafe_sha1_hash.js': <<<CODE
+const crypto = require('crypto');
+
+// BAD: SHA-1 broken by SHAttered attack (2017)
+const hash = crypto.createHash('sha1').update('data').digest('hex');
+CODE
+)
+
+// Test 7: VULNERABLE — MD5 HMAC
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///unsafe_md5_hmac.js': <<<CODE
+const crypto = require('crypto');
+
+// BAD: HMAC with MD5 is not recommended for security-critical applications
+const hmac = crypto.createHmac('md5', 'secret-key');
+hmac.update('message');
+const result = hmac.digest('hex');
+CODE
+)
+
+// Test 8: VULNERABLE — Blowfish cipher
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///unsafe_blowfish_cipher.js': <<<CODE
+const crypto = require('crypto');
+
+// BAD: Blowfish has 64-bit block size, vulnerable to Sweet32 birthday attack
+const cipher = crypto.createCipheriv('bf-cbc', Buffer.alloc(16), Buffer.alloc(8));
+CODE
+)
+
+// Test 9: SAFE — AES-128 encryption (CodeQL canonical safe example)
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///safe_aes_cipher.js': <<<CODE
+const crypto = require('crypto');
+
+var secretText = "someSecret";
+var key = crypto.randomBytes(16);  // 128-bit key
+var iv = crypto.randomBytes(16);
+
+// GOOD: AES is a strong modern algorithm
+const aesCipher = crypto.createCipheriv('aes-128-cbc', key, iv);
+let aesEncrypted = aesCipher.update(secretText, 'utf8', 'hex');
+CODE
+)
+
+// Test 10: SAFE — AES-256-GCM encryption
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///safe_aes256gcm_cipher.js': <<<CODE
+const crypto = require('crypto');
+
+const key = crypto.randomBytes(32);  // 256-bit key
+const iv = crypto.randomBytes(12);   // 96-bit IV for GCM
+
+// GOOD: AES-256-GCM is authenticated encryption
+const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+CODE
+)
+
+// Test 11: SAFE — SHA-256 hash
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///safe_sha256_hash.js': <<<CODE
+const crypto = require('crypto');
+
+// GOOD: SHA-256 is a strong hash algorithm
+const hash = crypto.createHash('sha256').update('data').digest('hex');
+CODE
+)
+
+// Test 12: SAFE — SHA-512 HMAC
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///safe_sha512_hmac.js': <<<CODE
+const crypto = require('crypto');
+
+// GOOD: HMAC-SHA512 is secure
+const hmac = crypto.createHmac('sha512', 'secret');
+hmac.update('message');
+const result = hmac.digest('hex');
+CODE
+)
+
+// Test 13: SAFE — SHA3-256 hash
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///safe_sha3_hash.js': <<<CODE
+const crypto = require('crypto');
+
+// GOOD: SHA3-256 is the next-generation standard
+const hash = crypto.createHash('sha3-256').update('data').digest('hex');
+CODE
+)
