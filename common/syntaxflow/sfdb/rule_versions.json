@@ -102,6 +102,84 @@
     "version": "20251230.0001"
   },
   {
+    "rule_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567891",
+    "rule_name": "Electron webSecurity 被禁用",
+    "hash": "90ee8900cc7eb567b618de08bd129a6fa6ef965334e9f407acacaaa953d75f31",
+    "version": "20260305.0001"
+  },
+  {
+    "rule_id": "b2c3d4e5-f6a7-8901-bcde-f12345678902",
+    "rule_name": "Electron allowRunningInsecureContent 被启用",
+    "hash": "de506e3a91bf0aae9a3bfd7154e8b062ae1c69538069544d425ef288c4505729",
+    "version": "20260305.0001"
+  },
+  {
+    "rule_id": "c3d4e5f6-a7b8-9012-cdef-345678901234",
+    "rule_name": "用户可控输入流入代码执行函数导致代码注入",
+    "hash": "6fea3426e983fc3001f6a0392c4ee1363ae0bdbbfea41696a48326b6247f6183",
+    "version": "20260305.0001"
+  },
+  {
+    "rule_id": "a7e3f21b-5c8d-4e9a-b6f2-1d4c7e0a3f95",
+    "rule_name": "Express.js 中间件使用区分大小写的正则表达式路径",
+    "hash": "b0850ae5325f69b28014298ea0527ab35f275b91435376ac8cdb70e25a66ba61",
+    "version": "20260305.0001"
+  },
+  {
+    "rule_id": "d8f4a22b-9c1e-4b37-8e5d-7f3a901c2e84",
+    "rule_name": "压缩包解压时未验证文件路径导致目录穿越（Zip Slip）",
+    "hash": "06d789196217553fe9543cd7962dc6c5a96cbb55eec59e69027edb6ee303e012",
+    "version": "20260305.0001"
+  },
+  {
+    "rule_id": "c3d4e5f6-a7b8-9012-cdef-456789012345",
+    "rule_name": "JWT 验证未使用加密密钥（None 算法绕过）",
+    "hash": "993d268c1e8e5f5695bdc343f46f1e242ca1e4f9c25bbf41da9de4b1f2e02864",
+    "version": "20260305.0001"
+  },
+  {
+    "rule_id": "f6a7b8c9-d0e1-2345-f012-345678901234",
+    "rule_name": "用户可控数据流入不安全反序列化函数",
+    "hash": "6cfa5ea656acfad3b6d2fab32f292a84764c87e9a2335ba089aea8cf4cde3bb0",
+    "version": "20260305.0001"
+  },
+  {
+    "rule_id": "f3c8b2a1-7e4d-4f92-a5b6-0c1d9e3f7a28",
+    "rule_name": "Cookie 未设置 Secure 标志，可能被明文传输",
+    "hash": "82115deccbb8c60fd05cfcd8f2ed1414b0b451204f6dcb32bf1a5bc880f1e748",
+    "version": "20260305.0001"
+  },
+  {
+    "rule_id": "c7d8e9f0-a1b2-3456-cdef-789012345678",
+    "rule_name": "用户可控输入构建的数据库查询（SQL/NoSQL 注入）",
+    "hash": "fde98bb7f2e96b2ee454d1e04b820d1bd78b035d4eaeee8536b76b2388219786",
+    "version": "20260305.0001"
+  },
+  {
+    "rule_id": "b2c3d4e5-f6a7-8901-bcde-f23456789012",
+    "rule_name": "JavaScript 代码执行 Sink 函数",
+    "hash": "e401e39eef8a425af2ea69b9d6623eec97f8fc10ad917f1a57bd3be6056b5afe",
+    "version": "20260305.0001"
+  },
+  {
+    "rule_id": "e5f6a7b8-c9d0-1234-ef01-234567890123",
+    "rule_name": "JavaScript 不安全反序列化 Sink 函数",
+    "hash": "0b4ca694d576ee1f5edbf9a785e6ae12092857b2d325b91075015df2ffbaefd5",
+    "version": "20260305.0001"
+  },
+  {
+    "rule_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "rule_name": "JavaScript/Node.js 用户可控输入源",
+    "hash": "a91cac0a86aa09cc8cddc6bcf67fc7d8067df159060ce62798ad2f4bdb0f690c",
+    "version": "20260305.0001"
+  },
+  {
+    "rule_id": "d4e5f6a7-b8c9-0123-def0-456789012345",
+    "rule_name": "JavaScript SQL/NoSQL 查询执行 Sink 函数",
+    "hash": "dbffb9b2f3fa59ad9d29c440e8d236994465ca36ff2347a18cf48d6bf8f68505",
+    "version": "20260305.0001"
+  },
+  {
     "rule_id": "48c2c107-024f-4abc-a940-ed637847f22c",
     "rule_name": "检测通用硬编码凭据",
     "hash": "34d130c20791d5f4bbafd6fb49401305b842f02334b9fbe952016e1cfd4bd43c",
