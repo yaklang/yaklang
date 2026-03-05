@@ -21,6 +21,13 @@ type aiGatewayTemplateProfile struct {
 }
 
 var aiGatewayTemplateProfiles = map[string]aiGatewayTemplateProfile{
+	"aibalance": {
+		Verbose: "AIBalance",
+		ExtTag: map[string]string{
+			"model":   "default:memfit-light-free",
+			"api_key": "default:free-user,required:false",
+		},
+	},
 	"openai": {
 		Verbose: "OpenAI",
 		ExtTag: map[string]string{
@@ -90,13 +97,6 @@ var aiGatewayTemplateProfiles = map[string]aiGatewayTemplateProfile{
 		ExtTag: map[string]string{
 			"model":  "default:qwen/qwq-32b:free",
 			"domain": "default:openrouter.ai",
-		},
-	},
-	"aibalance": {
-		Verbose: "AIBalance",
-		ExtTag: map[string]string{
-			"model":   "default:memfit-light-free",
-			"api_key": "default:free-user,required:false",
 		},
 	},
 }

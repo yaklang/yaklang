@@ -322,7 +322,17 @@ func TestEnsureConfigLoaded_AIGlobalConfigPriority(t *testing.T) {
 	assert.Equal(t, consts.PolicyCost, cfg.RoutingPolicy)
 	assert.Equal(t, "default-model", cfg.DefaultModelID)
 	assert.Equal(t, 0.33, cfg.GlobalWeight)
+	assert.NotEmpty(t, cfg.IntelligentConfigs)
+	assert.NotEmpty(t, cfg.LightweightConfigs)
+	assert.NotEmpty(t, cfg.VisionConfigs)
 	assert.True(t, IsConfigLoaded())
+
+	dbCfg, err := yakit.GetAIGlobalConfig(consts.GetGormProfileDatabase())
+	require.NoError(t, err)
+	require.NotNil(t, dbCfg)
+	assert.NotEmpty(t, dbCfg.IntelligentModels)
+	assert.NotEmpty(t, dbCfg.LightweightModels)
+	assert.NotEmpty(t, dbCfg.VisionModels)
 }
 
 // If AIGlobalConfig getter errors, fallback to GlobalNetworkConfig.
@@ -382,4 +392,8 @@ func TestEnsureConfigLoaded_NetworkConfigPersistsToDB(t *testing.T) {
 	assert.Equal(t, "performance", dbCfg.RoutingPolicy)
 	assert.True(t, dbCfg.DisableFallback)
 	assert.Len(t, dbCfg.IntelligentModels, 1)
+	assert.Len(t, dbCfg.LightweightModels, 1)
+	assert.Len(t, dbCfg.VisionModels, 1)
+	assert.Equal(t, "memfit-light-free", dbCfg.LightweightModels[0].GetModelName())
+	assert.Equal(t, "memfit-vision-free", dbCfg.VisionModels[0].GetModelName())
 }

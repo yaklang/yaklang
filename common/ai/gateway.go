@@ -3,10 +3,9 @@ package ai
 import (
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aibalance"
 	"io"
 	"time"
-
-	"github.com/yaklang/yaklang/common/ai/aibalance"
 
 	"github.com/yaklang/yaklang/common/ai/dashscopebase"
 	"github.com/yaklang/yaklang/common/ai/deepseek"
@@ -31,6 +30,9 @@ import (
 )
 
 func init() {
+	aispec.Register("aibalance", func() aispec.AIClient {
+		return &aibalance.GatewayClient{}
+	})
 	aispec.Register("openai", func() aispec.AIClient {
 		return &openai.GatewayClient{}
 	})
@@ -84,9 +86,6 @@ func init() {
 	})
 	aispec.Register("yakit-plugin-search", func() aispec.AIClient {
 		return dashscopebase.CreateDashScopeGateway("e8be1ba351dc44568728bcb46e36aac2")
-	})
-	aispec.Register("aibalance", func() aispec.AIClient {
-		return &aibalance.GatewayClient{}
 	})
 }
 

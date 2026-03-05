@@ -48,7 +48,11 @@ func EnsureConfigLoaded() {
 
 	db := consts.GetGormProfileDatabase()
 	if cfg, err := getAIGlobalConfig(); err == nil && cfg != nil {
-		_ = yakit.ApplyAIGlobalConfig(db, cfg)
+		if ensureTierModelConfigsAvailable(cfg) {
+			if _, setErr := yakit.SetAIGlobalConfig(db, cfg); setErr != nil {
+				log.Warnf("failed to persist ai global config after filling default tier models: %v", setErr)
+			}
+		}
 		configLoaded = true
 		warnIfLegacyConfigFileExists()
 		return
@@ -71,13 +75,12 @@ func EnsureConfigLoaded() {
 		source = "built-in defaults"
 	}
 
-	if cfg != nil {
-		if _, err := yakit.SetAIGlobalConfig(db, cfg); err != nil {
-			log.Warnf("failed to persist ai global config from %s: %v", source, err)
-		}
-		if err := yakit.ApplyAIGlobalConfig(db, cfg); err != nil {
-			log.Warnf("failed to apply ai global config from %s: %v", source, err)
-		}
+	ensureTierModelConfigsAvailable(cfg)
+	if _, err := yakit.SetAIGlobalConfig(db, cfg); err != nil {
+		log.Warnf("failed to persist ai global config from %s: %v", source, err)
+	}
+	if err := yakit.ApplyAIGlobalConfig(db, cfg); err != nil {
+		log.Warnf("failed to apply ai global config from %s: %v", source, err)
 	}
 
 	configLoaded = true
@@ -121,6 +124,47 @@ func buildDefaultAIGlobalConfig() *ypb.AIGlobalConfig {
 			},
 		},
 	}
+}
+
+func ensureTierModelConfigsAvailable(cfg *ypb.AIGlobalConfig) bool {
+	if cfg == nil {
+		return false
+	}
+
+	needIntelligent := !hasAvailableModelConfig(cfg.GetIntelligentModels())
+	needLightweight := !hasAvailableModelConfig(cfg.GetLightweightModels())
+	needVision := !hasAvailableModelConfig(cfg.GetVisionModels())
+	if !needIntelligent && !needLightweight && !needVision {
+		return false
+	}
+
+	defaultCfg := buildDefaultAIGlobalConfig()
+	if defaultCfg == nil {
+		return false
+	}
+
+	if needIntelligent {
+		cfg.IntelligentModels = cloneAIModelConfigs(defaultCfg.GetIntelligentModels())
+	}
+	if needLightweight {
+		cfg.LightweightModels = cloneAIModelConfigs(defaultCfg.GetLightweightModels())
+	}
+	if needVision {
+		cfg.VisionModels = cloneAIModelConfigs(defaultCfg.GetVisionModels())
+	}
+	return true
+}
+
+func hasAvailableModelConfig(models []*ypb.AIModelConfig) bool {
+	for _, model := range models {
+		if model == nil {
+			continue
+		}
+		if model.GetProviderId() != 0 || model.GetProvider() != nil {
+			return true
+		}
+	}
+	return false
 }
 
 func buildAIGlobalConfigFromNetworkConfig(c *ypb.GlobalNetworkConfig) *ypb.AIGlobalConfig {
