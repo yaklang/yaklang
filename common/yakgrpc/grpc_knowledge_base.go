@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"path/filepath"
 	"strings"
 
@@ -530,7 +531,38 @@ type RAGInstaller struct {
 	stream          ypb.Yak_DownloadRAGsServer
 	downloadDir     string
 	importProgress  *int
+	batchIndex      int
+	batchTotal      int
 	downloadURLFunc func(name string) (urlStr string, filename string, hash string, err error)
+}
+
+func (ri *RAGInstaller) SetBatchProgress(index int, total int) {
+	ri.batchIndex = index
+	ri.batchTotal = total
+}
+
+func (ri *RAGInstaller) convertProgress(localProgress float64) float32 {
+	if localProgress < 0 {
+		localProgress = 0
+	}
+	if localProgress > 100 {
+		localProgress = 100
+	}
+	if ri.batchTotal <= 1 {
+		return float32(localProgress)
+	}
+	return float32((float64(ri.batchIndex) + localProgress/100) / float64(ri.batchTotal) * 100)
+}
+
+func (ri *RAGInstaller) sendProgress(message string, localProgress float64) {
+	err := ri.stream.Send(&ypb.ExecResult{
+		IsMessage: true,
+		Message:   []byte(message),
+		Progress:  ri.convertProgress(localProgress),
+	})
+	if err != nil {
+		log.Errorf("send DownloadRAGs progress failed: %v", err)
+	}
 }
 
 // Install 实现RAG知识库的安装方法
@@ -546,11 +578,7 @@ func (ri *RAGInstaller) Install(descriptor *thirdparty_bin.BinaryDescriptor, opt
 		Force:   options.Force,
 		Proxy:   options.Proxy,
 		Progress: func(progress float64, downloaded, total int64, message string) {
-			ri.stream.Send(&ypb.ExecResult{
-				IsMessage: true,
-				Message:   []byte(message),
-				Progress:  float32(progress * 100 * 0.8),
-			})
+			ri.sendProgress(message, progress*100*0.8)
 		},
 	})
 	if err != nil {
@@ -563,11 +591,7 @@ func (ri *RAGInstaller) Install(descriptor *thirdparty_bin.BinaryDescriptor, opt
 	}
 
 	// 导入知识库
-	ri.stream.Send(&ypb.ExecResult{
-		IsMessage: true,
-		Message:   []byte("开始导入知识库..."),
-		Progress:  80,
-	})
+	ri.sendProgress("开始导入知识库...", 80)
 
 	// 下载进度和导入进度
 	importProgress := 80
@@ -578,20 +602,12 @@ func (ri *RAGInstaller) Install(descriptor *thirdparty_bin.BinaryDescriptor, opt
 		rag.WithExportOverwriteExisting(options.Force),
 		rag.WithRAGSerialVersionUID(hash),
 		rag.WithProgressHandler(func(percent float64, message string, messageType string) {
-			ri.stream.Send(&ypb.ExecResult{
-				IsMessage: true,
-				Message:   []byte(message),
-				Progress:  float32(importProgress + int(percent*0.2)),
-			})
+			ri.sendProgress(message, float64(importProgress)+percent*0.2)
 		}))
 	if err != nil {
 		return utils.Errorf("导入知识库失败: %v", err)
 	}
-	ri.stream.Send(&ypb.ExecResult{
-		IsMessage: true,
-		Message:   []byte("知识库下载和导入完成"),
-		Progress:  100,
-	})
+	ri.sendProgress("知识库下载和导入完成", 100)
 
 	return nil
 }
@@ -655,17 +671,21 @@ func getBuildInRagInfoByName(ragName string) (urlStr string, filename string, ha
 func (s *Server) DownloadRAGs(req *ypb.DownloadRAGsRequest, stream ypb.Yak_DownloadRAGsServer) error {
 	ctx := stream.Context()
 	ragName := req.GetRagName()
+	downloadAll := req.GetAll()
 
-	if ragName == "" {
+	if !downloadAll && ragName == "" {
 		return utils.Errorf("知识库名称不能为空")
 	}
 
 	// 发送开始消息
-	stream.Send(&ypb.ExecResult{
+	err := stream.Send(&ypb.ExecResult{
 		IsMessage: true,
 		Message:   []byte("开始获取知识库信息..."),
 		Progress:  0,
 	})
+	if err != nil {
+		return err
+	}
 
 	downloadDir := filepath.Join(consts.GetDefaultYakitProjectsDir(), "libs")
 	installDir := downloadDir
@@ -680,6 +700,8 @@ func (s *Server) DownloadRAGs(req *ypb.DownloadRAGsRequest, stream ypb.Yak_Downl
 		BaseInstaller:   baseInstaller,
 		stream:          stream,
 		downloadDir:     downloadDir,
+		batchIndex:      0,
+		batchTotal:      1,
 		downloadURLFunc: getBuildInRagInfoByName, // 获取知识库信息
 	}
 	manager.SetInstaller(ragInstaller)
@@ -694,8 +716,78 @@ func (s *Server) DownloadRAGs(req *ypb.DownloadRAGsRequest, stream ypb.Yak_Downl
 		})
 	}
 
-	return manager.Install(ragName, &thirdparty_bin.InstallOptions{
+	installOptions := &thirdparty_bin.InstallOptions{
 		Context: ctx,
 		Force:   req.GetForce(),
-	})
+	}
+
+	targetRAGs := []string{ragName}
+	if downloadAll {
+		targetRAGs = make([]string, 0, len(ragInfos))
+		for _, info := range ragInfos {
+			targetRAGs = append(targetRAGs, info.Name)
+		}
+		if len(targetRAGs) == 0 {
+			return utils.Errorf("没有可下载的知识库")
+		}
+		err = stream.Send(&ypb.ExecResult{
+			IsMessage: true,
+			Message:   []byte(fmt.Sprintf("开始批量下载知识库，共 %d 个", len(targetRAGs))),
+			Progress:  0,
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	total := len(targetRAGs)
+	successCount := 0
+	for i, name := range targetRAGs {
+		ragInstaller.SetBatchProgress(i, total)
+		if downloadAll {
+			err = stream.Send(&ypb.ExecResult{
+				IsMessage: true,
+				Message:   []byte(fmt.Sprintf("正在下载第 %d/%d 个知识库: %s", i+1, total, name)),
+				Progress:  float32(float64(i) / float64(total) * 100),
+			})
+			if err != nil {
+				return err
+			}
+		}
+
+		err = manager.Install(name, installOptions)
+		if err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			if !downloadAll {
+				return err
+			}
+			log.Errorf("download rag [%s] failed: %v", name, err)
+			sendErr := stream.Send(&ypb.ExecResult{
+				IsMessage: true,
+				Message:   []byte(fmt.Sprintf("下载知识库失败，已跳过: %s", name)),
+				Progress:  float32(float64(i+1) / float64(total) * 100),
+			})
+			if sendErr != nil {
+				return sendErr
+			}
+			continue
+		}
+		successCount++
+	}
+
+	if downloadAll {
+		failCount := total - successCount
+		err = stream.Send(&ypb.ExecResult{
+			IsMessage: true,
+			Message:   []byte(fmt.Sprintf("批量下载完成，成功 %d 个，失败 %d 个", successCount, failCount)),
+			Progress:  100,
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
