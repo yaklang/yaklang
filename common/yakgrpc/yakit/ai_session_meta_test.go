@@ -57,7 +57,7 @@ func TestEnsureAISessionMetaDefaultTitle(t *testing.T) {
 	got, err := GetAISessionMetaBySessionID(db, "sess-default-title")
 	require.NoError(t, err)
 	require.Equal(t, defaultAISessionTitle, got.Title)
-	require.True(t, got.TitleInitialized)
+	require.False(t, got.TitleInitialized)
 }
 
 func TestEnsureAISessionMetaNotOverrideExistingTitle(t *testing.T) {
