@@ -830,18 +830,6 @@ LOOP:
 
 		effectiveAsyncMode := handler.AsyncMode || operator.IsAsyncModeRequested()
 		if effectiveAsyncMode {
-			if operator.ShouldSyncContinuation() {
-				// forge 失败，继续迭代让 AI 根据 timeline 向用户说明错误（如规则未找到）
-				r.loadingStatus("Forge 执行失败，继续迭代以向用户反馈")
-				continueIter()
-				postOp := r.doneCurrentIteration(iterationCount, task)
-				if postOp.ShouldEndIteration() {
-					log.Infof("Loop ending due to post-iteration operator request: %v", postOp.GetEndReason())
-					needSummary.SetTo(true)
-					break LOOP
-				}
-				continue
-			}
 			if !handler.AsyncMode {
 				// dynamic async mode requested by handler at runtime
 				task.SetAsyncMode(true)

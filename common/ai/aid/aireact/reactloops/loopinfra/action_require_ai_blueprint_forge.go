@@ -4,10 +4,10 @@ import (
 	"fmt"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 var loopAction_RequireAIBlueprintForge = &reactloops.LoopAction{
@@ -57,22 +57,8 @@ var loopAction_RequireAIBlueprintForge = &reactloops.LoopAction{
 		invoker := loop.GetInvoker()
 		task := operator.GetTask()
 
-		errChan := make(chan error, 1)
 		invoker.RequireAIForgeAndAsyncExecute(task.GetContext(), forgeName, func(err error) {
-			errChan <- err
+			loop.FinishAsyncTask(task, err)
 		})
-		forgeErr := <-errChan
-		loop.FinishAsyncTask(task, forgeErr)
-
-		if forgeErr != nil {
-			operator.Feedback(forgeErr)
-			operator.Continue()
-			operator.RequestSyncContinuation()
-		} else {
-			// Forge 成功时调用 Exit()，使 exec 将此次执行视为正常终止。
-			// 否则 FinishAsyncTask -> task.Finish -> SetStatus(Completed) -> task.Cancel()
-			// 会取消 context，exec 随后的 context.Done() 检查会误判为错误并返回 "context canceled"。
-			operator.Exit()
-		}
 	},
 }

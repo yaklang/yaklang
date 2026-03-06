@@ -1,15 +1,11 @@
-__DESC__ = "根据 rule_name 查找 SyntaxFlow 规则，独立完成 desc 与 alert 块的美化补全，合并后返回；可选写回数据库。"
+__DESC__ = "根据 规则名/文件路径/文件内容（按优先级依次尝试）获取 SyntaxFlow 规则，独立完成 desc 与 alert 块的美化补全；结果写入 AI Artifacts 文件系统，不写回数据库与真实磁盘。"
 __VERBOSE_NAME__ = "SyntaxFlow 规则补全"
 __KEYWORDS__ = "语法流,规则补全,desc补全,alert补全,代码审计规则,SyntaxFlow"
 
-rule_name = cli.String("rule_name", cli.setRequired(true), cli.setHelp("规则名称，用于查询"))
-write_back = cli.StringSlice("write_back",
-    cli.setMultipleSelect(false),
-    cli.setSelectOption("否", "false"),
-    cli.setSelectOption("是", "true"),
-    cli.setDefault("false"),
-    cli.setHelp("是否将补全结果写回数据库"),
-    cli.setVerboseName("写回数据库"))
+// 三种输入按优先级：规则名 > 文件名 > 文件内容
+rule_name = cli.String("rule_name", cli.setHelp("规则名称，用于从数据库查询规则"))
+file_path = cli.String("file_path", cli.setHelp("规则文件路径，用于读取本地文件"))
+file_content = cli.String("file_content", cli.setHelp("规则文件内容（直接传入文本）"))
 cli.check()
 
 descPrompt = <<<DESC_PROMPT
@@ -25,8 +21,8 @@ descPrompt = <<<DESC_PROMPT
 ### title：规则英文标题，动词+语言+目的，如 Check Java LDAP Injection Vulnerability
 ### title_zh：规则中文标题，如 检测Java LDAP注入漏洞
 ### cwe：CWE编号，纯数字；非漏洞规则可无
-### desc：规则目的和作用，不少于300字，markdown格式描述漏洞原理、触发场景和潜在影响
-### solution：修复建议，不少于300字，markdown格式；非漏洞规则返回none
+### desc：规则目的和作用，不少于100字，markdown格式描述漏洞原理、触发场景和潜在影响
+### solution：修复建议，不少于100字，markdown格式；非漏洞规则返回none
 ### reference：参考资料链接；无则返回none
 
 ## 输入
@@ -84,26 +80,41 @@ forgeHandle = func(params) {
         return str.NewReader(sprintf(format, args...))
     }
 
-    aidConfig.EmitDefaultStreamEvent("查询 SyntaxFlow 规则", makeReader("正在根据 rule_name=%s 查询规则", rule_name), "")
-    rule = nil
-    for r := range syntaxflow.QuerySyntaxFlowRules(rule_name) {
-        rule = r
-        break
+    // 按优先级：规则名 > 文件名 > 文件内容
+    fileName = ""
+    fileContent = ""
+    if rule_name != "" {
+        aidConfig.EmitDefaultStreamEvent("查询 SyntaxFlow 规则", makeReader("正在根据 rule_name=%s 查询规则", rule_name), "")
+        rule = nil
+        for r := range syntaxflow.QuerySyntaxFlowRules(rule_name) {
+            rule = r
+            break
+        }
+        if rule != nil {
+            fileName = rule.RuleName
+            fileContent = rule.Content
+            aidConfig.EmitDefaultStreamEvent("已找到规则", makeReader("规则: %s", fileName), "")
+        }
     }
-    if rule == nil {
-        msg = sprintf("no rule found for keyword: %s", rule_name)
-        log.Error("[sf_rule_completion] %s", msg)
-        aidConfig.EmitDefaultStreamEvent("规则未找到", makeReader(msg), "")
-        return nil, msg
+    if fileName == "" && file_path != "" {
+        if file.IsExisted(file_path) {
+            raw, err = file.ReadFile(file_path)
+            if err == nil {
+                fileName = file_path
+                fileContent = string(raw)
+                aidConfig.EmitDefaultStreamEvent("读取文件", makeReader("已从 %s 读取规则，长度 %d 字符", file_path, len(raw)), "")
+            }
+        }
     }
-    aidConfig.EmitDefaultStreamEvent("已找到规则", makeReader("规则: %s", rule.RuleName), "")
-
-    fileName = rule.RuleName
-    fileContent = rule.Content
-    if fileContent == "" {
-        msg = sprintf("rule %s has empty content", fileName)
+    if fileName == "" && file_content != "" {
+        fileName = "rule.sf"
+        fileContent = file_content
+        aidConfig.EmitDefaultStreamEvent("使用文件内容", makeReader("直接使用传入的 file_content，长度 %d 字符", len(fileContent)), "")
+    }
+    if fileName == "" || fileContent == "" {
+        msg = "必须提供 rule_name、file_path 或 file_content 之一；rule_name 需能查到规则，file_path 需为有效路径，file_content 需为非空"
         log.Error("[sf_rule_completion] %s", msg)
-        aidConfig.EmitDefaultStreamEvent("规则内容为空", makeReader(msg), "")
+        aidConfig.EmitDefaultStreamEvent("输入无效", makeReader(msg), "")
         return nil, msg
     }
 
@@ -138,7 +149,7 @@ forgeHandle = func(params) {
     alertParams = {"alert": alertRes.GetInvokeParamsArray("alert")}
     aidConfig.EmitDefaultStreamEvent("alert 补全完成", makeReader("已补全 %d 个 alert", len(alertRes.GetInvokeParamsArray("alert"))), "")
 
-    aidConfig.EmitDefaultStreamEvent("合并与校验", makeReader("正在合并 desc 与 alert 结果并校验语法"), "")
+    aidConfig.EmitDefaultStreamEvent("合并结果", makeReader("正在合并 desc 与 alert 结果"), "")
     merged, err = syntaxflow.MergeCompletionResults(descParams, alertParams, fileContent)
     if err != nil {
         msg = sprintf("format rule failed: %v", err)
@@ -146,49 +157,10 @@ forgeHandle = func(params) {
         aidConfig.EmitDefaultStreamEvent("合并失败", makeReader(msg), "")
         return nil, msg
     }
-    _, err = syntaxflow.CompileRule(merged)
-    if err != nil {
-        msg = sprintf("format rule syntax validation failed: %v", err)
-        mergedPreview = len(merged) > 200 ? merged[0:200] + "..." : merged
-        log.Error("[sf_rule_completion] 语法校验失败: %v, merged 前 200 字符: %s", err, mergedPreview)
-        aidConfig.EmitDefaultStreamEvent("语法校验失败", makeReader(msg), "")
-        return nil, msg
-    }
 
-    writeBackVal = "false"
-    if len(write_back) > 0 {
-        writeBackVal = write_back[0]
-    }
-    if rule != nil && str.ToLower(writeBackVal) == "true" {
-        if rule.IsBuildInRule {
-            aidConfig.EmitDefaultStreamEvent("跳过写回", makeReader("内置规则 %s 不执行写回", rule.RuleName), "")
-            log.Warn("skip write_back for built-in rule: %s", rule.RuleName)
-        } else {
-            aidConfig.EmitDefaultStreamEvent("写回数据库", makeReader("正在将补全结果写回规则 %s", rule.RuleName), "")
-            err = syntaxflow.UpdateRuleContent(rule.RuleName, merged)
-            if err != nil {
-                msg = sprintf("write rule content back to database failed: %v", err)
-                log.Error("[sf_rule_completion] 写回失败: %v", err)
-                aidConfig.EmitDefaultStreamEvent("写回失败", makeReader(msg), "")
-                return nil, msg
-            }
-            aidConfig.EmitDefaultStreamEvent("写回成功", makeReader("规则 %s 已更新到数据库", rule.RuleName), "")
-        }
-    }
-
-    log.Info("[sf_rule_completion] 规则 %s 补全完成，merged 长度: %d", rule.RuleName, len(merged))
-    aidConfig.EmitDefaultStreamEvent("规则补全完成", makeReader("规则 %s 补全完成，共 %d 字符。下方可查看、复制和下载完整规则", rule.RuleName, len(merged)), "")
+    log.Info("[sf_rule_completion] 规则 %s 补全完成，merged 长度: %d", fileName, len(merged))
+    aidConfig.EmitDefaultStreamEvent("规则补全完成", makeReader("规则 %s 补全完成，共 %d 字符", fileName, len(merged)), "")
     aidConfig.EmitStreamEventWithContentType("补全后的规则", str.NewReader(merged), "", "code/yaklang")
-    workDir = aidConfig.GetOrCreateWorkDir()
-    if workDir != "" {
-        artifactName = sprintf("sf_rule_%s_%s.sf", rule.RuleName, str.RandStr(8))
-        artifactPath = file.Join(workDir, artifactName)
-        err = file.Save(artifactPath, merged)
-        if err == nil {
-            aidConfig.EmitPinFilename(artifactPath)
-            aidConfig.EmitDefaultStreamEvent("可下载的规则文件", makeReader("规则已保存至 %s，支持下载和复制", artifactPath), "")
-        }
-    }
     aidConfig.EmitResultAfterStream("补全后的规则", merged, true)
     return {"params": {"rule_content": merged}}
 }

@@ -25,9 +25,6 @@ type LoopActionHandlerOperator struct {
 	// dynamic async mode: handler can request async mode at runtime
 	requestedAsyncMode bool
 
-	// forge 失败时请求继续迭代，让 AI 有机会根据 timeline 向用户说明错误
-	requestSyncContinuation bool
-
 	// 自我反思相关
 	reflectionLevel      ReflectionLevel
 	customReflectionData map[string]interface{}
@@ -121,16 +118,6 @@ func (l *LoopActionHandlerOperator) RequestAsyncMode() {
 // IsAsyncModeRequested returns whether the handler has dynamically requested async mode.
 func (l *LoopActionHandlerOperator) IsAsyncModeRequested() bool {
 	return l.requestedAsyncMode
-}
-
-// RequestSyncContinuation 在 forge 失败时请求继续迭代，而非按 async 直接退出
-func (l *LoopActionHandlerOperator) RequestSyncContinuation() {
-	l.requestSyncContinuation = true
-}
-
-// ShouldSyncContinuation 是否需要在 forge 失败后继续迭代
-func (l *LoopActionHandlerOperator) ShouldSyncContinuation() bool {
-	return l.requestSyncContinuation
 }
 
 // SetReflectionLevel 设置该 action 执行后的反思级别
