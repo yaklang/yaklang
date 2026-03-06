@@ -1201,7 +1201,6 @@ func TestBasic_variable_logical(t *testing.T) {
 
 	// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Strict_mode
 	t.Run("test closure side-effect which will create global variable implicitly", func(t *testing.T) {
-		t.Skip("目前还不能处理这种函数内部隐式创建全局变量，当前开启TryBuildValue选项后也只能创建函数级全局变量")
 		ssatest.CheckPrintlnValue(`
 		a = () => {
 			t = 1
@@ -1211,12 +1210,11 @@ func TestBasic_variable_logical(t *testing.T) {
 		a()
 		println(t)
 		`, []string{
-			"Undefined-t", "1", "side-effect(phi(t)[1,2], t)",
+			"Undefined-t", "1", "side-effect(1, t)",
 		}, t)
 	})
 
 	t.Run("test function side-effect which will create global variable implicitly", func(t *testing.T) {
-		t.Skip("目前还不能处理这种函数内部隐式创建全局变量，当前开启TryBuildValue选项后也只能创建函数级全局变量")
 		ssatest.CheckPrintlnValue(`
 		function a(){
 			t = 1
@@ -1226,12 +1224,11 @@ func TestBasic_variable_logical(t *testing.T) {
 		a()
 		println(t)
 		`, []string{
-			"Undefined-t", "1", "side-effect(phi(t)[1,2], t)",
+			"Undefined-t", "1", "side-effect(1, t)",
 		}, t)
 	})
 
 	t.Run("test closure side-effect case 1", func(t *testing.T) {
-		t.Skip("目前还不能处理这种函数内部隐式创建全局变量，当前开启TryBuildValue选项后也只能创建函数级全局变量")
 		ssatest.CheckPrintlnValue(`
 		a = () => {
 			t = 1 || 2

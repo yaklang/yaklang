@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/exp/slices"
 )
 
@@ -12,6 +13,57 @@ func filterNilValue(v Value) bool {
 
 func ReplaceAllValue(v Value, to Value) {
 	ReplaceValue(v, to, func(i Instruction) bool { return false })
+}
+
+func replaceBlueprintFieldReference(fields map[string]Value, from Value, to Value) {
+	if len(fields) == 0 {
+		return
+	}
+	for name, current := range fields {
+		if utils.IsNil(current) || current.GetId() != from.GetId() {
+			continue
+		}
+		fields[name] = to
+	}
+}
+
+func replaceProgramBlueprintReference(prog *Program, from Value, to Value) {
+	if prog == nil {
+		return
+	}
+
+	replaceBlueprint := func(blueprint *Blueprint) {
+		if blueprint == nil {
+			return
+		}
+		replaceBlueprintFieldReference(blueprint.NormalMember, from, to)
+		replaceBlueprintFieldReference(blueprint.StaticMember, from, to)
+		replaceBlueprintFieldReference(blueprint.ConstValue, from, to)
+	}
+
+	if prog.Blueprint != nil {
+		for _, name := range prog.Blueprint.Keys() {
+			blueprint, ok := prog.Blueprint.Get(name)
+			if !ok {
+				continue
+			}
+			replaceBlueprint(blueprint)
+		}
+	}
+
+	replaceBlueprint(prog.GlobalVariablesBlueprint)
+}
+
+func replaceStoredMemberReference(variable *Variable, from Value, to Value) {
+	if variable == nil || !variable.IsMemberCall() {
+		return
+	}
+	obj, key := variable.GetMemberCall()
+	if utils.IsNil(obj) || utils.IsNil(key) {
+		return
+	}
+
+	obj.AddMember(key, to)
 }
 
 func ReplaceValue(v Value, to Value, skip func(Instruction) bool) {
@@ -27,10 +79,12 @@ func ReplaceValue(v Value, to Value, skip func(Instruction) bool) {
 	for _, variable := range v.GetAllVariables() {
 		// TODO: handler variable replace value
 		variable.Replace(v, to)
+		replaceStoredMemberReference(variable, v, to)
 		// variable = to
 		to.AddVariable(variable)
 		v.GetProgram().SetInstructionWithName(variable.GetName(), to)
 	}
+	replaceProgramBlueprintReference(v.GetProgram(), v, to)
 
 	deleteInst := make([]User, 0)
 	invalidUsers := make([]User, 0) // 记录不再使用 v 的 users（如 Phi 节点）

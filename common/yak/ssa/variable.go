@@ -1,6 +1,9 @@
 package ssa
 
 import (
+	"strconv"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
@@ -63,12 +66,35 @@ func (variable *Variable) Assign(value Value) error {
 		if objTyp, ok := ToObjectType(obj.GetType()); ok {
 			objTyp.AddField(key, value.GetType())
 		}
+	} else if objID, memberKey, ok := parseMemberCallVariableName(variable.GetName()); ok {
+		if obj, ok := value.GetValueById(objID); ok && !utils.IsNil(obj) {
+			obj.SetStringMember(memberKey, value)
+		}
 	}
 	if err := variable.Versioned.Assign(value); err != nil {
 		return err
 	}
 	variable.persistAllOffsets()
 	return nil
+}
+
+func parseMemberCallVariableName(name string) (objID int64, key string, ok bool) {
+	if len(name) < 3 || name[0] != '#' {
+		return 0, "", false
+	}
+	idx := strings.IndexByte(name, '.')
+	if idx <= 1 || idx >= len(name)-1 {
+		return 0, "", false
+	}
+	// Exclude dynamic member-call name: "#obj.#key".
+	if idx+1 < len(name) && name[idx+1] == '#' {
+		return 0, "", false
+	}
+	id, err := strconv.ParseInt(name[1:idx], 10, 64)
+	if err != nil {
+		return 0, "", false
+	}
+	return id, name[idx+1:], true
 }
 
 func (v *Variable) SetMemberCall(obj, key Value) {
