@@ -6,16 +6,15 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 type mitmGlobalHotPatchPipeline struct {
 	module *yak.MixPluginCaller
+	ctx    context.Context
 
 	buildGlobalCaller func() (*yak.MixPluginCaller, error)
 	globalCaller      atomic.Value // *yak.MixPluginCaller
@@ -25,12 +24,17 @@ type mitmGlobalHotPatchPipeline struct {
 }
 
 func newMitmGlobalHotPatchPipeline(
+	ctx context.Context,
 	module *yak.MixPluginCaller,
 	initialGlobal *yak.MixPluginCaller,
 	buildGlobal func() (*yak.MixPluginCaller, error),
 ) *mitmGlobalHotPatchPipeline {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	p := &mitmGlobalHotPatchPipeline{
 		module:            module,
+		ctx:               ctx,
 		buildGlobalCaller: buildGlobal,
 		loadedVersion:     -1,
 	}
@@ -57,13 +61,11 @@ func (p *mitmGlobalHotPatchPipeline) ensureGlobalHotPatchLoaded() {
 		log.Errorf("build global hotpatch caller failed: %v", err)
 		return
 	}
-	loadCode := ""
 	if enabled {
-		loadCode = code
-	}
-	if err := caller.LoadHotPatch(utils.TimeoutContextSeconds(consts.GetGlobalCallerLoadPluginTimeout()), nil, loadCode); err != nil {
-		log.Errorf("load global hotpatch failed(version=%d enabled=%v): %v", version, enabled, err)
-		return
+		if err := caller.LoadHotPatchSilently(p.ctx, nil, code); err != nil {
+			log.Errorf("load global hotpatch failed(version=%d enabled=%v): %v", version, enabled, err)
+			return
+		}
 	}
 
 	p.globalCaller.Store(caller)

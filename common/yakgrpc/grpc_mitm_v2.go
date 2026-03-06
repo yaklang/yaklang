@@ -425,7 +425,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	if err != nil {
 		return utils.Errorf("create global hotpatch caller failed: %s", err)
 	}
-	hotPatchPipeline := newMitmGlobalHotPatchPipeline(mitmPluginCaller, globalHotPatchCaller, buildGlobalHotPatchCaller)
+	hotPatchPipeline := newMitmGlobalHotPatchPipeline(streamCtx, mitmPluginCaller, globalHotPatchCaller, buildGlobalHotPatchCaller)
 
 	cacheDebounce, _ := lo.NewDebounce(1*time.Second, func() {
 		sendLogged(&ypb.MITMV2Response{

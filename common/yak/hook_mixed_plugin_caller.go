@@ -550,8 +550,18 @@ func (c *MixPluginCaller) FeedbackOrdinary(i interface{}) {
 }
 
 func (c *MixPluginCaller) LoadHotPatch(ctx context.Context, params []*ypb.ExecParamItem, code string) error {
+	return c.loadHotPatch(ctx, params, code, false)
+}
+
+func (c *MixPluginCaller) LoadHotPatchSilently(ctx context.Context, params []*ypb.ExecParamItem, code string) error {
+	return c.loadHotPatch(ctx, params, code, true)
+}
+
+func (c *MixPluginCaller) loadHotPatch(ctx context.Context, params []*ypb.ExecParamItem, code string, silent bool) error {
 	c.ResetFilter()
-	c.FeedbackOrdinary("Initializing HotPatched MITM HOOKS")
+	if !silent {
+		c.FeedbackOrdinary("Initializing HotPatched MITM HOOKS")
+	}
 	paramsMap := make(map[string]any)
 	for _, param := range params {
 		paramsMap[param.GetKey()] = param.GetValue()
@@ -565,7 +575,9 @@ func (c *MixPluginCaller) LoadHotPatch(ctx context.Context, params []*ypb.ExecPa
 		ScriptName: HotPatchScriptName,
 	}, paramsMap, code, YakitCallerIf(c.feedbackHandler), MITMAndPortScanHooks...)
 	if err != nil {
-		c.FeedbackOrdinary(fmt.Sprintf("Initialized HotPatched MITM HOOKS FAILED: %v", err.Error()))
+		if !silent {
+			c.FeedbackOrdinary(fmt.Sprintf("Initialized HotPatched MITM HOOKS FAILED: %v", err.Error()))
+		}
 		return err
 	}
 	return nil
