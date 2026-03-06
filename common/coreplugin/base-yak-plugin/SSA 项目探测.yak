@@ -21,7 +21,7 @@ compile_immediately := cli.Bool(
     cli.setCliGroup("compile"), 
 )
 
-concurrency := cli.Int("concurrency", cli.setVerboseName("并发数"), cli.setCliGroup("compile"), cli.setDefault(10), cli.setHelp("编译时，同时进行编译的文件数量"))
+concurrency := cli.Int("concurrency", cli.setVerboseName("编译并发数"), cli.setCliGroup("compile"), cli.setDefault(10), cli.setHelp("编译时，同时进行编译的文件数量。0 或未设置时默认使用核心数/2"))
 
 proxy = cli.String("proxy", cli.setHelp("remote url proxy"))
 timeout = 3

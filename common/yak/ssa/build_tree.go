@@ -1,12 +1,10 @@
-package diagnostics
+package ssa
 
 import (
 	"fmt"
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/yaklang/yaklang/common/log"
 )
 
 // BuildTreeTracker 追踪 LazyBuild 调用栈，输出树形结构
@@ -107,7 +105,7 @@ func (t *buildTreeTrackerImpl) popLazyBuildInternal(duration time.Duration, hadT
 
 	// LazyBuild 结束时直接输出 SSA_PERF 日志（tracker 仅在 file-perf-log 开启时存在）
 	if duration >= time.Microsecond {
-		LogPerfLineIf(true, "%s  %s", id, formatDurationShort(duration))
+		log.Info("[SSA_PERF] " + fmt.Sprintf("%s  %s", id, formatDurationShort(duration)))
 	}
 }
 

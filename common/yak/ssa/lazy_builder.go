@@ -8,7 +8,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"go.uber.org/atomic"
 )
 
@@ -168,7 +167,7 @@ func makeBuildIDWithFile(p *Program, file string, funcName string) string {
 	return fmt.Sprintf("%s:%s:%s", pkg, file, funcName)
 }
 
-func getBuildTreeTracker(p *Program) diagnostics.BuildTreeTracker {
+func getBuildTreeTracker(p *Program) BuildTreeTracker {
 	if p == nil {
 		return nil
 	}

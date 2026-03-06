@@ -7,6 +7,30 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+// scopeLookupKey (scope, name) 用于缓存 scope 变量查找，避免重复遍历
+type scopeLookupKey struct {
+	s ScopeIF
+	n string
+}
+
+// scopeCacheGet 从 cache 获取或通过 compute 计算并缓存，供 cachedScopeLookup 复用
+func scopeCacheGet(cache map[scopeLookupKey]*Variable, key scopeLookupKey, compute func() *Variable) *Variable {
+	if v, ok := cache[key]; ok {
+		return v
+	}
+	v := compute()
+	cache[key] = v
+	return v
+}
+
+// cachedScopeLookup 带缓存的 scope 变量查找，lookup 为实际查找函数
+func cachedScopeLookup(cache map[scopeLookupKey]*Variable, scope ScopeIF, name string, lookup func(ScopeIF, string) *Variable) *Variable {
+	if utils.IsNil(scope) {
+		return nil
+	}
+	return scopeCacheGet(cache, scopeLookupKey{s: scope, n: name}, func() *Variable { return lookup(scope, name) })
+}
+
 type SideEffectKind string
 
 const (
@@ -231,19 +255,9 @@ func handleSideEffectInner(c *Call, funcTyp *FunctionType, shouldProcess func(*F
 	function := c.GetFunc()
 	builder := function.builder
 
-	type scopeLookupKey struct {
-		s ScopeIF
-		n string
-	}
 	getScopeCache := make(map[scopeLookupKey]*Variable)
 	getFromScope := func(scope ScopeIF, name string) *Variable {
-		key := scopeLookupKey{scope, name}
-		if v, ok := getScopeCache[key]; ok {
-			return v
-		}
-		v := GetFristLocalVariableFromScopeAndParent(scope, name)
-		getScopeCache[key] = v
-		return v
+		return cachedScopeLookup(getScopeCache, scope, name, GetFristLocalVariableFromScopeAndParent)
 	}
 
 	for _, se := range funcTyp.SideEffects {
@@ -436,22 +450,29 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 	function := c.GetFunc()
 	builder := function.builder
 
-	type scopeLookupKey struct {
-		scope ScopeIF
-		name  string
-	}
 	getScopeCache := make(map[scopeLookupKey]*Variable)
 	getFromScope := func(scope ScopeIF, name string) *Variable {
-		if utils.IsNil(scope) {
+		return cachedScopeLookup(getScopeCache, scope, name, GetFristLocalVariableFromScopeAndParent)
+	}
+
+	// GetScope: 递归查找 scope 变量（含 Parameter 的 parent 链）
+	var GetScope func(ScopeIF, string, *FunctionBuilder) *Variable
+	GetScope = func(scope ScopeIF, name string, b *FunctionBuilder) *Variable {
+		var ret *Variable
+		if v := GetFristLocalVariableFromScopeAndParent(scope, name); v != nil {
+			ret = v
+		} else if v := GetFristVariableFromScopeAndParent(scope, name); v != nil {
+			ret = v
+		}
+		if ret == nil {
 			return nil
 		}
-		key := scopeLookupKey{scope: scope, name: name}
-		if v, ok := getScopeCache[key]; ok {
-			return v
+		if _, ok := ToParameter(ret.GetValue()); ok {
+			if parentBuilder := b.parentBuilder; parentBuilder != nil {
+				return GetScope(parentBuilder.CurrentBlock.ScopeTable, name, parentBuilder)
+			}
 		}
-		v := GetFristLocalVariableFromScopeAndParent(scope, name)
-		getScopeCache[key] = v
-		return v
+		return ret
 	}
 
 	for _, se := range funcTyp.SideEffects {
@@ -654,39 +675,6 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 				}
 			}
 
-			// Cache GetScope results to avoid repeated scope traversal for same (scope, name)
-			type scopeLookupKey struct {
-				s ScopeIF
-				n string
-			}
-			getScopeCache := make(map[scopeLookupKey]*Variable)
-			var GetScope func(ScopeIF, string, *FunctionBuilder) *Variable
-			GetScope = func(scope ScopeIF, name string, b *FunctionBuilder) *Variable {
-				key := scopeLookupKey{scope, name}
-				if cached, ok := getScopeCache[key]; ok {
-					return cached
-				}
-				var ret *Variable
-				if vairable := GetFristLocalVariableFromScopeAndParent(scope, name); vairable != nil {
-					ret = vairable
-				} else if vairable := GetFristVariableFromScopeAndParent(scope, name); vairable != nil {
-					ret = vairable
-				}
-				if ret == nil {
-					getScopeCache[key] = nil
-					return nil
-				}
-				if _, ok := ToParameter(ret.GetValue()); ok {
-					parentBuilder := b.parentBuilder
-					if parentBuilder != nil {
-						parentScope := parentBuilder.CurrentBlock.ScopeTable
-						ret = GetScope(parentScope, name, parentBuilder)
-					}
-				}
-				getScopeCache[key] = ret
-				return ret
-			}
-
 			if _, ok := modify.(*Parameter); ok {
 				AddSideEffect()
 				continue
@@ -781,34 +769,7 @@ func isParameterCalledInFunction(calleeFunc *Function, paramIndex int) bool {
 		return false
 	}
 
-	prog := calleeFunc.GetProgram()
-	if prog == nil {
-		return isParameterCalledInFunctionNoCache(calleeFunc, paramIndex)
-	}
-
-	key := struct {
-		f *Function
-		i int
-	}{calleeFunc, paramIndex}
-	prog.isParameterCalledCacheMu.Lock()
-	if prog.isParameterCalledCache == nil {
-		prog.isParameterCalledCache = make(map[struct {
-			f *Function
-			i int
-		}]bool)
-	}
-	if v, ok := prog.isParameterCalledCache[key]; ok {
-		prog.isParameterCalledCacheMu.Unlock()
-		return v
-	}
-	prog.isParameterCalledCacheMu.Unlock()
-
-	result := isParameterCalledInFunctionNoCache(calleeFunc, paramIndex)
-
-	prog.isParameterCalledCacheMu.Lock()
-	prog.isParameterCalledCache[key] = result
-	prog.isParameterCalledCacheMu.Unlock()
-	return result
+	return isParameterCalledInFunctionNoCache(calleeFunc, paramIndex)
 }
 
 func isParameterCalledInFunctionNoCache(calleeFunc *Function, paramIndex int) bool {
@@ -863,22 +824,9 @@ func handleArgumentFunctionSideEffect(c *Call, calleeFuncTyp *FunctionType) {
 		return
 	}
 
-	type scopeLookupKey struct {
-		s ScopeIF
-		n string
-	}
 	getScopeCache := make(map[scopeLookupKey]*Variable)
 	getFromScope := func(scope ScopeIF, name string) *Variable {
-		if utils.IsNil(scope) {
-			return nil
-		}
-		key := scopeLookupKey{s: scope, n: name}
-		if v, ok := getScopeCache[key]; ok {
-			return v
-		}
-		v := ReadVariableFromScopeAndParent(scope, name)
-		getScopeCache[key] = v
-		return v
+		return cachedScopeLookup(getScopeCache, scope, name, ReadVariableFromScopeAndParent)
 	}
 
 	// Get the callee function (not just its type) to analyze parameter usage
