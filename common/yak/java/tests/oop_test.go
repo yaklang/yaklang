@@ -290,95 +290,125 @@ public class Main{
 }
 `
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-a.getNum1(valid)(Function-A.A(Undefined-A,1,2)) member[side-effect(Parameter-num1, this.num1)]",
-			"Undefined-a.getNum2(valid)(Function-A.A(Undefined-A,1,2)) member[side-effect(Parameter-num2, this.num2)]",
+			"Undefined-a.getNum1(valid)(Function-A.A(Undefined-A,1,2)) member[1]",
+			"Undefined-a.getNum2(valid)(Function-A.A(Undefined-A,1,2)) member[2]",
 		}, t)
 	})
 }
 
 func TestJava_OOP_Enum(t *testing.T) {
-	t.Skip()
 	t.Run("test simple top-level enum", func(t *testing.T) {
-		ssatest.CheckPrintlnValue(`
+		code := `
 		public enum A {
-			A,B,C;
+			FIRST,SECOND,THIRD;
+			int num = 1;
 		}
 		public class Main{
 			public static void main(String[] args) {
-			A a = A.B;
-			println(a);
+			A a = A.SECOND;
+			int o = a.num;
 			}
 		}
-		`, []string{
-			"Undefined-a(valid)",
-		}, t)
+		`
+		ssatest.CheckSyntaxFlow(t, code, `
+			o #-> as $o
+		`, map[string][]string{
+			"o": {"1"},
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
-	t.Run("test  top-level enum with constructor", func(t *testing.T) {
-		ssatest.CheckPrintlnValue(`
+	t.Run("test nested enum through outer type", func(t *testing.T) {
+		code := `
+		public class Outer {
+			enum Kind {
+				FIRST,SECOND;
+				int num = 7;
+			}
+		}
+		public class Main {
+			public static void main(String[] args) {
+				Outer.Kind kind = Outer.Kind.SECOND;
+				int o1 = kind.num;
+				int o2 = Outer.Kind.FIRST.num;
+			}
+		}
+		`
+		ssatest.CheckSyntaxFlow(t, code, `
+			o1 #-> as $o1
+			o2 #-> as $o2
+		`, map[string][]string{
+			"o1": {"7"},
+			"o2": {"7"},
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
+	})
+
+	t.Run("test top-level enum with constructor", func(t *testing.T) {
+		code := `
 		public enum A {
-			A(1,2),
-			B(3,4),
-			C(4,5);
-			private final int num1;
-			private final int num2;
-
-			A(int par1,int par2){
-				this.num1=par1;
-				this.num2=par2;
-			}
-
-			public int getNum1(){
-			return this.num1;
-			}
-
-			public int getNum2(){
-			return this.num2;
+			FIRST(1),SECOND(2);
+			int num;
+			A(int num){
+				this.num = num;
 			}
 		}
 		public class Main{
 			public static void main(String[] args) {
-			A a = A.B;
-			println(a.getNum1());
-			println(a.getNum2());
+				int o1 = A.FIRST.num;
+				int o2 = A.SECOND.num;
 			}
 		}
-		`, []string{
-			"Undefined-a.getNum1(valid)(Undefined-a(valid)) member[Undefined-a.num1(valid)]",
-			"Undefined-a.getNum2(valid)(Undefined-a(valid)) member[Undefined-a.num2(valid)]",
-		}, t)
+		`
+		ssatest.CheckSyntaxFlow(t, code, `
+			o1 #-> as $o1
+			o2 #-> as $o2
+		`, map[string][]string{
+			"o1": {"1"},
+			"o2": {"2"},
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
 }
 
 func TestJava_OOP_MemberClass(t *testing.T) {
-	t.Skip()
 	t.Run("test no-static inner class ", func(t *testing.T) {
 		code := `
 public class Outer {
-    public  class Inner{
+    public class Inner {
         int a = 1;
-		// TODO: if this constructor is defined, it will be an error
-        // public Inner(int par){
-        //     this.a=par;
-        // }
-        public int getA(){
-            return this.a;
-        }
     }
 }
 
-public class Main{
+public class Main {
     public static void main(String[] args) {
         Outer outer = new Outer();
-        Outer.Inner inner =outer.new Inner(5);
-        println(inner);
-		println(inner.getA());
+        Outer.Inner inner = outer.new Inner();
+        int o = inner.a;
     }
 }`
-		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-inner",
-		}, t)
+		ssatest.CheckSyntaxFlow(t, code, `
+			o #-> as $o
+		`, map[string][]string{
+			"o": {"1"},
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
+	})
+
+	t.Run("test static inner class static member", func(t *testing.T) {
+		ssatest.CheckPrintlnValue(`
+public class Outer {
+    public static class Inner {
+        static int version = 9;
+        int value = 1;
+    }
+}
+
+public class Main {
+    public static void main(String[] args) {
+        Outer.Inner inner = new Outer.Inner();
+        println(inner.value);
+        println(Outer.Inner.version);
+    }
+}`,
+			[]string{"1", "9"}, t)
 	})
 }
 
@@ -503,7 +533,7 @@ class Main{
 	}
 }
 `
-		ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-num1, this.num1)"}, t)
+		ssatest.CheckPrintlnValue(code, []string{"Parameter-num1"}, t)
 	})
 	t.Run("test no package with constructor and no direct use member", func(t *testing.T) {
 		code := `package com.example.A;
@@ -523,7 +553,7 @@ class Main{
 	}
 }
 `
-		ssatest.CheckPrintlnValue(code, []string{"Undefined-a.getNum(valid)(Function-A.A(Undefined-A)) member[side-effect(Parameter-num1, this.num1)]"}, t)
+		ssatest.CheckPrintlnValue(code, []string{"Undefined-a.getNum(valid)(Function-A.A(Undefined-A)) member[Parameter-num1]"}, t)
 	})
 	t.Run("test package with constructor", func(t *testing.T) {
 		code := `
@@ -553,7 +583,7 @@ class Main{
 	}
 		`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-a.getNum1(valid)(Function-A.A(Undefined-A,1,2)) member[side-effect(Parameter-num1, this.num1)]", "Undefined-a.getNum2(valid)(Function-A.A(Undefined-A,1,2)) member[side-effect(Parameter-num2, this.num2)]",
+			"Undefined-a.getNum1(valid)(Function-A.A(Undefined-A,1,2)) member[1]", "Undefined-a.getNum2(valid)(Function-A.A(Undefined-A,1,2)) member[2]",
 		}, t)
 	})
 }
@@ -574,7 +604,7 @@ class Test{
         println(main.a);
     }
 }`
-	ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-a, this.a)"}, t)
+	ssatest.CheckPrintlnValue(code, []string{"2"}, t)
 	ssatest.CheckSyntaxFlow(t, code, `println(* #-> * as $param)`, map[string][]string{
 		"param": {"2"},
 	}, ssaapi.WithLanguage(ssaconfig.JAVA))
