@@ -42,6 +42,9 @@ const (
 	ScanResult_Process ScanResultType = "process"
 
 	ScanResult_StatusCard ScanResultType = "status"
+
+	// SSA 对象已上传，等待服务端异步导入
+	ScanResult_SSAArtifactReady ScanResultType = "ssa-artifact-ready"
 )
 
 type ScanResult struct {

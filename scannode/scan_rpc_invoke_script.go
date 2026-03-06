@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"sync/atomic"
 
 	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
@@ -22,6 +23,82 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"github.com/yaklang/yaklang/scannode/scanrpc"
 )
+
+var riskDebugCount int32
+
+const defaultSSASTSRenewBeforeSec int64 = 600
+
+func readSSASTSRenewBeforeSec() int64 {
+	v := strings.TrimSpace(os.Getenv("SCANNODE_SSA_STS_RENEW_BEFORE_SEC"))
+	if v == "" {
+		return defaultSSASTSRenewBeforeSec
+	}
+	n, err := strconv.ParseInt(v, 10, 64)
+	if err != nil || n <= 0 {
+		return defaultSSASTSRenewBeforeSec
+	}
+	return n
+}
+
+func (s *ScanNode) ensureSSAUploadTicket(ctx context.Context, reporter *ScannerAgentReporter, force bool) error {
+	if s == nil || reporter == nil {
+		return utils.Errorf("invalid upload context")
+	}
+	cfg := reporter.ssaUploadCfg
+	if cfg == nil {
+		return utils.Errorf("ssa artifact upload config missing")
+	}
+	renewBeforeSec := readSSASTSRenewBeforeSec()
+	if !force && !cfg.NeedSTSRefresh(renewBeforeSec) {
+		return nil
+	}
+
+	fresh, err := s.fetchSSAArtifactUploadTicket(ctx, reporter.TaskId, cfg.ObjectKey)
+	if err != nil {
+		return err
+	}
+	if cfg.Codec != "" && fresh.Codec == "" {
+		fresh.Codec = cfg.Codec
+	}
+	if cfg.ObjectKey != "" && fresh.ObjectKey == "" {
+		fresh.ObjectKey = cfg.ObjectKey
+	}
+	if cfg.Endpoint != "" && fresh.Endpoint == "" {
+		fresh.Endpoint = cfg.Endpoint
+	}
+	if cfg.Bucket != "" && fresh.Bucket == "" {
+		fresh.Bucket = cfg.Bucket
+	}
+	if cfg.Region != "" && fresh.Region == "" {
+		fresh.Region = cfg.Region
+	}
+	if !fresh.UseSSL && cfg.UseSSL {
+		fresh.UseSSL = true
+	}
+	if fresh.STSAccessKey == "" {
+		fresh.STSAccessKey = cfg.STSAccessKey
+	}
+	if fresh.STSSecretKey == "" {
+		fresh.STSSecretKey = cfg.STSSecretKey
+	}
+	if fresh.STSSessionToken == "" {
+		fresh.STSSessionToken = cfg.STSSessionToken
+	}
+	if fresh.STSExpiresAt <= 0 {
+		fresh.STSExpiresAt = cfg.STSExpiresAt
+	}
+	if fresh.ObjectKey != "" && cfg.ObjectKey != "" && fresh.ObjectKey != cfg.ObjectKey {
+		return utils.Errorf("upload object key mismatch old=%s new=%s", cfg.ObjectKey, fresh.ObjectKey)
+	}
+	if strings.TrimSpace(fresh.Endpoint) == "" || strings.TrimSpace(fresh.Bucket) == "" || strings.TrimSpace(fresh.ObjectKey) == "" {
+		return utils.Errorf("invalid upload ticket: missing object storage fields")
+	}
+	if strings.TrimSpace(fresh.STSAccessKey) == "" || strings.TrimSpace(fresh.STSSecretKey) == "" {
+		return utils.Errorf("invalid upload ticket: missing sts credentials")
+	}
+	reporter.ssaUploadCfg = fresh
+	return nil
+}
 
 func (s *ScanNode) rpc_startScript(ctx context.Context, node string, req *scanrpc.SCAN_StartScriptRequest, broker *mq.Broker) (*scanrpc.SCAN_StartScriptResponse, error) {
 	if req.Content == "" {
@@ -80,6 +157,16 @@ func (s *ScanNode) rpc_invokeScript(ctx context.Context, node string, req *scanr
 
 	// Parse and convert user-provided JSON parameters to command-line arguments
 	paramsKeyValue := s.parseScriptParams(req.ScriptJsonParam)
+	reporter.ssaUploadCfg = extractSSAArtifactUploadConfig(paramsKeyValue)
+	reporter.ssaCollector = NewSSAArtifactCollector(req.TaskId, req.RuntimeId, req.SubTaskId)
+	if reporter.ssaCollector != nil && reporter.ssaUploadCfg != nil {
+		_ = reporter.ssaCollector.EnableContinuousUpload(reporter.ssaUploadCfg.Codec, func(force bool) (*SSAArtifactUploadConfig, error) {
+			if refreshErr := s.ensureSSAUploadTicket(context.Background(), reporter, force); refreshErr != nil {
+				return nil, refreshErr
+			}
+			return reporter.ssaUploadCfg, nil
+		})
+	}
 
 	// Automatic rule synchronization before script execution
 	s.syncRulesIfNeeded(paramsKeyValue)
@@ -107,6 +194,10 @@ func (s *ScanNode) rpc_invokeScript(ctx context.Context, node string, req *scanr
 		return nil, utils.Errorf("exec yakScript %v failed: %s", scriptFile, err)
 	}
 
+	if err := s.finalizeSSAArtifactUpload(reporter, res); err != nil {
+		return nil, err
+	}
+
 	return res, nil
 }
 
@@ -129,12 +220,102 @@ func extractErrorFromResponse(res *scanrpc.SCAN_InvokeScriptResponse) string {
 	return errMsg
 }
 
+func (s *ScanNode) finalizeSSAArtifactUpload(reporter *ScannerAgentReporter, res *scanrpc.SCAN_InvokeScriptResponse) error {
+	if reporter == nil || reporter.agent == nil {
+		return nil
+	}
+	if reporter.ssaCollector == nil {
+		return nil
+	}
+	defer reporter.ssaCollector.Cleanup()
+	meta := parseSSAResultMeta(res)
+	cfg := reporter.ssaUploadCfg
+	if cfg == nil {
+		if reporter.ssaCollector.HasData() {
+			return utils.Errorf("ssa artifact upload config missing")
+		}
+		// No SSA payload generated.
+		return nil
+	}
+	if err := s.ensureSSAUploadTicket(context.Background(), reporter, false); err != nil {
+		return err
+	}
+	cfg = reporter.ssaUploadCfg
+
+	build, err := reporter.ssaCollector.FinalizeUploadWithProvider(cfg.Codec, func(force bool) (*SSAArtifactUploadConfig, error) {
+		if refreshErr := s.ensureSSAUploadTicket(context.Background(), reporter, force); refreshErr != nil {
+			return nil, refreshErr
+		}
+		return reporter.ssaUploadCfg, nil
+	})
+	if err != nil {
+		return err
+	}
+	if build == nil {
+		return nil
+	}
+	if build.ProgramName == "" {
+		build.ProgramName = meta.ProgramName
+	}
+	if strings.TrimSpace(build.ObjectKey) == "" && cfg != nil {
+		build.ObjectKey = cfg.ObjectKey
+	}
+	if strings.TrimSpace(build.Codec) == "" && cfg != nil {
+		build.Codec = cfg.Codec
+	}
+	event := reporter.ssaCollector.BuildReadyEvent(build, meta.TotalLines, meta.RiskCount)
+	raw, err := json.Marshal(event)
+	if err != nil {
+		return err
+	}
+	reporter.agent.feedback(&spec.ScanResult{
+		Type:      spec.ScanResult_SSAArtifactReady,
+		Content:   raw,
+		TaskId:    reporter.TaskId,
+		RuntimeId: reporter.RuntimeId,
+		SubTaskId: reporter.SubTaskId,
+	})
+	log.Infof("ssa artifact uploaded task=%s key=%s codec=%s raw=%d compressed=%d risks=%d files=%d flows=%d",
+		reporter.TaskId, build.ObjectKey, build.Codec,
+		build.UncompressedSize, build.CompressedSize, event.RiskCount, event.FileCount, event.FlowCount)
+	return nil
+}
+
+type ssaResultMeta struct {
+	ProgramName string
+	TotalLines  int64
+	RiskCount   int64
+}
+
+func parseSSAResultMeta(res *scanrpc.SCAN_InvokeScriptResponse) ssaResultMeta {
+	meta := ssaResultMeta{}
+	if res == nil {
+		return meta
+	}
+	m, ok := res.Data.(map[string]interface{})
+	if !ok || m == nil {
+		return meta
+	}
+	meta.ProgramName = strings.TrimSpace(utils.InterfaceToString(utils.MapGetFirstRaw(m, "program_name", "programName", "ProgramName")))
+	meta.TotalLines = int64(utils.InterfaceToFloat64(utils.MapGetFirstRaw(m, "total_lines", "totalLines", "TotalLines")))
+	meta.RiskCount = int64(utils.InterfaceToFloat64(utils.MapGetFirstRaw(m, "risk_count", "riskCount", "RiskCount")))
+	return meta
+}
+
 // createYakitServer initializes a Yakit server with progress and log handlers
 func (s *ScanNode) createYakitServer(reporter *ScannerAgentReporter, res *scanrpc.SCAN_InvokeScriptResponse) *yaklib.YakitServer {
 	return yaklib.NewYakitServer(
 		0,
 		yaklib.SetYakitServer_ProgressHandler(func(id string, progress float64) {
-			reporter.ReportProcess(progress)
+			// Scripts and libraries may emit multiple progress streams via SetProgressEx(id, progress).
+			// If we treat all of them as the "main" progress, a non-main stream that restarts from 0
+			// will shrink the frontend progress bar (e.g. around phase transitions).
+			id = strings.TrimSpace(id)
+			if id == "" || id == "main" {
+				_ = reporter.ReportProcess(progress)
+				return
+			}
+			_ = reporter.ReportProcessWithSubTask(id, progress)
 		}),
 		yaklib.SetYakitServer_LogHandler(s.createLogHandler(reporter, res)),
 	)
@@ -143,13 +324,15 @@ func (s *ScanNode) createYakitServer(reporter *ScannerAgentReporter, res *scanrp
 // createLogHandler creates a log handler for processing various types of scan results
 func (s *ScanNode) createLogHandler(reporter *ScannerAgentReporter, res *scanrpc.SCAN_InvokeScriptResponse) func(string, string) {
 	return func(level string, info string) {
+		level = strings.TrimSpace(level)
+		lowerLevel := strings.ToLower(level)
 		shrink := info
 		if len(info) > 256 {
 			shrink = string([]rune(info)[:100]) + "..."
 		}
 		log.Infof("LEVEL: %v INFO: %v", level, shrink)
 
-		switch strings.ToLower(level) {
+		switch lowerLevel {
 		case "fingerprint":
 			s.handleFingerprintLog(reporter, info)
 
@@ -167,7 +350,21 @@ func (s *ScanNode) createLogHandler(reporter *ScannerAgentReporter, res *scanrpc
 
 		case "feature-status-card-data":
 			s.handleStatusCardLog(reporter, info)
+
+		// SSA stream producer path (yak -> scannode -> mq -> legion).
+		// This avoids using risk.NewRisk(type=ssa-risk) as a transport hack.
+		case "ssa-stream":
+			s.handleSSAStream(reporter, info)
 		}
+	}
+}
+
+func (s *ScanNode) handleSSAStream(reporter *ScannerAgentReporter, info string) {
+	if reporter == nil || reporter.ssaCollector == nil {
+		return
+	}
+	if err := reporter.ssaCollector.AddStreamPayload(info); err != nil {
+		log.Errorf("collect ssa stream payload failed: %v", err)
 	}
 }
 
@@ -197,6 +394,14 @@ func (s *ScanNode) handleRiskLog(reporter *ScannerAgentReporter, info string) {
 	if err := json.Unmarshal([]byte(info), &rawData); err != nil {
 		log.Errorf("unmarshal risk failed: %s", err)
 		return
+	}
+	if atomic.AddInt32(&riskDebugCount, 1) <= 1 {
+		keys := make([]string, 0, len(rawData))
+		for k := range rawData {
+			keys = append(keys, k)
+		}
+		detailRaw := utils.MapGetFirstRaw(rawData, "Details", "Detail", "details", "detail")
+		log.Infof("risk_log_debug keys=%v RiskType=%v DetailsType=%T DetailsLen=%d", keys, rawData["RiskType"], detailRaw, len(utils.InterfaceToString(detailRaw)))
 	}
 
 	// Extract risk title with fallback
@@ -325,6 +530,9 @@ func (s *ScanNode) syncRulesIfNeeded(params map[string]interface{}) {
 // appendKeyValueParams converts key-value parameters to command-line format
 func (s *ScanNode) appendKeyValueParams(params []string, keyValues map[string]interface{}) []string {
 	for k, v := range keyValues {
+		if strings.HasPrefix(k, scannodeInternalParamPrefix) {
+			continue
+		}
 		k = strings.TrimLeft(k, "-")
 		params = append(params, "--"+k)
 		params = append(params, utils.InterfaceToString(v))

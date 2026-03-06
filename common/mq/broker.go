@@ -171,6 +171,14 @@ func (b *Broker) serve() (err error) {
 		log.Error("consuming failed for 0 consumers")
 	}
 
+	if prefetchCount, prefetchSize, ok := b.findPrefetch(); ok {
+		if err := c.Qos(prefetchCount, prefetchSize, false); err != nil {
+			log.Errorf("set qos failed: prefetch_count=%d prefetch_size=%d err=%v", prefetchCount, prefetchSize, err)
+			return errors.Errorf("set qos failed: %s", err)
+		}
+		log.Infof("mq qos set: prefetch_count=%d prefetch_size=%d", prefetchCount, prefetchSize)
+	}
+
 	for _, p := range b.consumingParams {
 		b.wg.Add(1)
 		p := p
@@ -185,6 +193,15 @@ func (b *Broker) serve() (err error) {
 	b.wg.Wait()
 
 	return errors.New("normal exit / all consumers down / no consumers")
+}
+
+func (b *Broker) findPrefetch() (count int, size int, ok bool) {
+	for _, p := range b.consumingParams {
+		if p.PrefetchCount > 0 || p.PrefetchSize > 0 {
+			return p.PrefetchCount, p.PrefetchSize, true
+		}
+	}
+	return 0, 0, false
 }
 
 func (b *Broker) initDeclareAndBinding(c *amqp.Channel) (err error) {
@@ -220,6 +237,8 @@ func (b *Broker) initDeclareAndBinding(c *amqp.Channel) (err error) {
 }
 
 func (b *Broker) consume(conn *amqp.Connection, channel *amqp.Channel, p *ConsumingParam) error {
+	log.Infof("mq consume start: queue=%s consumer=%s prefetch_count=%d prefetch_size=%d",
+		p.Queue, p.Consumer, p.PrefetchCount, p.PrefetchSize)
 	ch, err := channel.Consume(p.Queue, p.Consumer, p.AutoACK, p.Exclusive, p.NoLocal, p.NoWait, p.Args)
 	if err != nil {
 		return errors.Errorf("consume failed: %s", err)

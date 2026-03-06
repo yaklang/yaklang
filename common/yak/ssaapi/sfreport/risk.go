@@ -85,7 +85,7 @@ func NewRisk(ssarisk *schema.SSARisk, r *Report, value ...*ssaapi.Value) (*Risk,
 		if ssarisk.ResultID != 0 && ssarisk.Variable != "" {
 			var err error
 			var dataFlowPath *DataFlowPath
-			dataFlowPath, irSourceHashes, err = GenerateDataFlowAnalysis(ssarisk, value...)
+			dataFlowPath, irSourceHashes, err = GenerateDataFlowAnalysis(ssarisk, false, value...)
 			if err != nil {
 				log.Errorf("generate data flow paths failed for risk %d: %v", ssarisk.ID, err)
 			} else {
