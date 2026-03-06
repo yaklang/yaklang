@@ -1698,7 +1698,28 @@ func (y *singleFileBuilder) VisitInnerCreator(raw javaparser.IInnerCreatorContex
 	builder.WriteString(i.Identifier().GetText())
 	className := builder.String()
 
-	class := y.GetBluePrint(className)
+	innerName := i.Identifier().GetText()
+	lookupNames := make([]string, 0, 6)
+	lookupNames = append(lookupNames, className)
+	if outClassBlueprint, ok := ssa.ToClassBluePrintType(outClassType); ok && outClassBlueprint != nil {
+		lookupNames = append(lookupNames, outClassBlueprint.Name+INNER_CLASS_SPLIT+innerName)
+		for _, ft := range outClassBlueprint.GetFullTypeNames() {
+			lookupNames = append(lookupNames, ft+INNER_CLASS_SPLIT+innerName)
+			lookupNames = append(lookupNames, ft+"."+innerName)
+		}
+	}
+	lookupNames = append(lookupNames, outClassName+INNER_CLASS_SPLIT+innerName, outClassName+"."+innerName)
+
+	var class *ssa.Blueprint
+	for _, className := range lookupNames {
+		if className == "" {
+			continue
+		}
+		class = y.GetBluePrint(className)
+		if class != nil {
+			break
+		}
+	}
 	if class == nil {
 		// External nested classes may not have declarations in the project.
 		// Model their constructor just like an unresolved normal new-expression.
@@ -1713,7 +1734,7 @@ func (y *singleFileBuilder) VisitInnerCreator(raw javaparser.IInnerCreatorContex
 	obj.SetType(class)
 
 	args := []ssa.Value{obj}
-	arguments := y.VisitClassCreatorRest(i.ClassCreatorRest(), className)
+	arguments := y.VisitClassCreatorRest(i.ClassCreatorRest(), class.Name)
 	args = append(args, arguments...)
 	// 注册过重载的类走重载解析；其余情况保持 main 的 ClassConstructor 语义。
 	if len(y.constructorOverloads[class]) > 0 {
@@ -1931,9 +1952,33 @@ func (y *singleFileBuilder) VisitCreatedName(raw javaparser.ICreatedNameContext)
 
 	className := createdName[len(createdName)-1]
 	fullClassName := strings.Join(createdName, ".")
-	class := y.GetBluePrint(className)
+
+	var class *ssa.Blueprint
+	for _, candidate := range y.getClassNameCandidates(createdName...) {
+		if bp := y.GetBluePrint(candidate); bp != nil {
+			class = bp
+			break
+		}
+	}
 	if class == nil {
 		class = y.GetBluePrint(fullClassName)
+	}
+	if class == nil {
+		if importType, ok := y.GetProgram().ReadImportType(className); ok {
+			if bp, ok := ssa.ToClassBluePrintType(importType); ok {
+				class = bp
+			}
+		}
+	}
+	if class == nil {
+		if importType, ok := y.GetProgram().ReadImportType(fullClassName); ok {
+			if bp, ok := ssa.ToClassBluePrintType(importType); ok {
+				class = bp
+			}
+		}
+	}
+	if class == nil {
+		class = y.resolveImportedNestedBlueprint(createdName...)
 	}
 	if class == nil {
 		class = y.CreateBlueprint(className, raw)
