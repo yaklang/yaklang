@@ -50,6 +50,8 @@ type ToolCaller struct {
 	reviewWrongToolHandler  func(ctx context.Context, tool *aitool.Tool, newToolName, keyword string) (*aitool.Tool, bool, error)
 	reviewWrongParamHandler func(ctx context.Context, tool *aitool.Tool, oldParam aitool.InvokeParams, suggestion string) (aitool.InvokeParams, error)
 
+	paramAugment func(aitool.InvokeParams) aitool.InvokeParams // optional merge before tool execution
+
 	callExpectations string
 }
 
@@ -76,6 +78,14 @@ func WithToolCaller_ReviewWrongParam(
 ) ToolCallerOption {
 	return func(tc *ToolCaller) {
 		tc.reviewWrongParamHandler = handler
+	}
+}
+
+// WithToolCaller_ParamAugment sets an optional callback to merge extra params into the final invoke params
+// after generation or preset. Used when infra must inject params (e.g. sample code for validation tools).
+func WithToolCaller_ParamAugment(augment func(aitool.InvokeParams) aitool.InvokeParams) ToolCallerOption {
+	return func(tc *ToolCaller) {
+		tc.paramAugment = augment
 	}
 }
 
@@ -568,6 +578,9 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 	}
 	if utils.IsNil(invokeParams) {
 		invokeParams = make(aitool.InvokeParams)
+	}
+	if t.paramAugment != nil {
+		invokeParams = t.paramAugment(invokeParams)
 	}
 
 	t.emitter.EmitInfo("start to invoke callback function for tool:%v", tool.Name)

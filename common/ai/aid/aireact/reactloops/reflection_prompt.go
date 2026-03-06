@@ -20,23 +20,22 @@ func (r *ReActLoop) buildReflectionPrompt(
 	relevantMemories string,
 	previousReflections string,
 ) (string, error) {
-	// 构建 JSON Schema
 	schema := buildReflectionSchema()
 
 	// 准备模板数据
 	data := map[string]interface{}{
-		"Nonce":         nonce,
-		"ActionType":    reflection.ActionType,
-		"IterationNum":  reflection.IterationNum,
-		"ExecutionTime": reflection.ExecutionTime.String(),
+		"Nonce":             nonce,
+		"ActionType":        reflection.ActionType,
+		"IterationNum":      reflection.IterationNum,
+		"ExecutionTime":     reflection.ExecutionTime.String(),
 		"ResultStatus": func() string {
 			if reflection.Success {
 				return "✓ SUCCESS"
 			}
 			return "✗ FAILED"
 		}(),
-		"ErrorMessage": reflection.ErrorMessage,
-		"Schema":       schema,
+		"ErrorMessage":      reflection.ErrorMessage,
+		"Schema":            schema,
 	}
 
 	// 添加环境影响
@@ -144,6 +143,8 @@ func (r *ReActLoop) getSpinDetectionData() map[string]interface{} {
 
 // buildReflectionSchema 构建反思结果的 JSON Schema
 func buildReflectionSchema() string {
+	suggestionsDesc := "建议（可选）：针对类似情况的改进建议，按需提供。如果检测到 SPIN，请将打破循环的建议整合到此字段中。"
+
 	schema := aitool.NewObjectSchemaWithAction(
 		aitool.WithStringParam(
 			"@action",
@@ -164,7 +165,7 @@ func buildReflectionSchema() string {
 		),
 		aitool.WithStringArrayParam(
 			"suggestions",
-			aitool.WithParam_Description("建议（可选）：针对类似情况的改进建议，按需提供。如果检测到 SPIN，请将打破循环的建议整合到此字段中"),
+			aitool.WithParam_Description(suggestionsDesc),
 			aitool.WithParam_Required(false),
 		),
 	)

@@ -22,7 +22,7 @@ var loopAction_LoadCapability = &reactloops.LoopAction{
 			"identifier",
 			aitool.WithParam_Description(
 				"The exact name of the capability to load. "+
-					"This can be a tool name (e.g. 'check-yaklang-syntax'), "+
+					"This can be a tool name (e.g. 'check-yaklang-syntax' for .yak, 'check-syntaxflow-syntax' for .sf), "+
 					"an AI blueprint/forge name (e.g. 'code_generator'), "+
 					"a skill name, or a focus mode loop name. "+
 					"The system will automatically detect the type and handle it."),
@@ -342,6 +342,7 @@ func handleLoadFocusMode(
 		userInput = task.GetUserInput()
 	}
 
+
 	subTask := aicommon.NewStatefulTaskBase(
 		invoker.GetCurrentTaskId()+"_focus_"+identifier,
 		userInput,
@@ -355,7 +356,7 @@ func handleLoadFocusMode(
 		opts = append(opts, option)
 	}
 
-	_, err := invoker.ExecuteLoopTaskIF(identifier, subTask, opts...)
+	ok, err := invoker.ExecuteLoopTaskIF(identifier, subTask, opts...)
 	if err != nil {
 		log.Warnf("load_capability: focus mode '%s' execution failed: %v", identifier, err)
 		failMsg := fmt.Sprintf(
@@ -370,6 +371,26 @@ func handleLoadFocusMode(
 		op.SetReflectionData("focus_mode_name", identifier)
 		op.Continue()
 		return
+	}
+
+	// When err==nil, the focus mode completed successfully. The 'ok' from ExecuteLoopTaskIF
+	// is task.IsAsyncMode() (true=async, false=sync), NOT "usable results". Sync focus modes
+	// (e.g. write_syntaxflow_rule with directly_answer) return ok=false but have produced
+	// usable results. Treating ok=false as UNSUCCESSFUL caused infinite retry loops.
+	if !ok {
+		// log.Warnf("load_capability: focus mode '%s' completed UNSUCCESSFULLY", identifier)
+		// unsuccessfulMsg := fmt.Sprintf(
+		// 	"Focus mode '%s' completed UNSUCCESSFULLY. "+
+		// 		"The focused sub-loop finished but did not produce usable results. "+
+		// 		"Do NOT retry the same focus mode. Proceed with a different approach.",
+		// 	identifier)
+		// invoker.AddToTimeline("[LOAD_CAPABILITY_FOCUS_MODE_UNSUCCESSFUL]", unsuccessfulMsg)
+		// op.Feedback(unsuccessfulMsg)
+		// op.SetReflectionLevel(reactloops.ReflectionLevel_Deep)
+		// op.SetReflectionData("focus_mode_name", identifier)
+		// op.Continue()
+		// return
+		log.Infof("load_capability: focus mode '%s' completed synchronously (ok=IsAsyncMode=false)", identifier)
 	}
 
 	successMsg := fmt.Sprintf(

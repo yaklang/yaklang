@@ -16,7 +16,7 @@ var loopAction_toolRequireAndCall = &reactloops.LoopAction{
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
 			"tool_require_payload",
-			aitool.WithParam_Description("USE THIS FIELD ONLY IF type is 'require_tool'. Provide the exact name of the tool you need to use (e.g., 'check-yaklang-syntax', 'yak-document'). Another system will handle the parameter generation based on this name. Do NOT include tool arguments here."),
+			aitool.WithParam_Description("USE THIS FIELD ONLY IF type is 'require_tool'. Provide the exact name of the tool you need to use (e.g., 'check-yaklang-syntax' for .yak, 'check-syntaxflow-syntax' for .sf, 'yak-document'). Another system will handle the parameter generation based on this name. Do NOT include tool arguments here."),
 		),
 	},
 	ActionVerifier: func(loop *reactloops.ReActLoop, action *aicommon.Action) error {

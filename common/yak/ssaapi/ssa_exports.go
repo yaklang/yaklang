@@ -143,7 +143,7 @@ var Exports = map[string]any{
 	"withExternLib":                WithExternLib,
 	"withExternValue":              WithExternValue,
 	"withProgramName":              WithProgramName,
-	"withSetProgramName":            WithSetProgramName,
+	"withSetProgramName":           WithSetProgramName,
 	"withDescription":              WithProgramDescription,
 	"withProcess":                  WithProcess,
 	"withEntryFile":                WithFileSystemEntry,

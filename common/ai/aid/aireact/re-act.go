@@ -57,7 +57,9 @@ type ReactTaskItem struct {
 	Metadata  map[string]interface{} // 额外元数据
 }
 
-var _ aicommon.AIInvokeRuntime = (*ReAct)(nil)
+var (
+	_ aicommon.AIInvokeRuntime = (*ReAct)(nil)
+)
 
 type ReAct struct {
 	*aicommon.Emitter
@@ -106,8 +108,6 @@ func (r *ReAct) SetCurrentTask(task aicommon.AIStatefulTask) {
 func (r *ReAct) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[string]any, error) {
 	return r.promptManager.GetBasicPromptInfo(tools)
 }
-
-var _ aicommon.AIInvokeRuntime = (*ReAct)(nil)
 
 const SKIP_AI_REVIEW = "skip_ai_review"
 

@@ -65,14 +65,13 @@ func GetAllToolsDynamically(db *gorm.DB) []*aitool.Tool {
 	yakscriptTools := yakscripttools.GetAllYakScriptAiToolsByDB(db)
 	tools = append(tools, yakscriptTools...)
 
-	// Add SSA tools from ssatools package
+	// Add SSA + SyntaxFlow tools from ssatools package
 	ssaToolsList, err := ssatools.CreateSSATools()
 	if err != nil {
 		log.Errorf("create ssa tools: %v", err)
 	} else {
 		tools = append(tools, ssaToolsList...)
 	}
-
 
 	// Add generated tools (added by code-gen when run)
 	// These functions will be generated based on aitools.tools by the code generator

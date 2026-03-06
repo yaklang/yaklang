@@ -185,7 +185,7 @@ func (s *SyntaxFlowAnalyzer) checkTestData(result *SyntaxFlowRuleAnalyzeResult, 
 		result.Score -= MissingNegativeTestPenalty // 缺少反例测试数据扣5分
 	}
 	if (positiveTests != nil && len(positiveTests) > 0) || (negativeTests != nil && len(negativeTests) > 0) {
-		err = evaluateVerifyFilesystemWithRule(frame.GetRule())
+		err = EvaluateVerifyFilesystemWithFrame(frame)
 		log.Info(err)
 		if err != nil {
 			result.Problems = append(result.Problems, SyntaxFlowRuleProblem{
@@ -258,12 +258,22 @@ func BatchAnalyze(rules map[string]string) map[string]*SyntaxFlowRuleAnalyzeResu
 	return results
 }
 
+// EvaluateVerifyFilesystemWithFrame 使用已编译的 frame 验证规则中内嵌的正反例测试，避免重复编译
+func EvaluateVerifyFilesystemWithFrame(frame *sfvm.SFFrame) error {
+	rule := frame.GetRule()
+	return evaluateVerifyFilesystemWithRuleAndFrame(rule, frame)
+}
+
 // evaluateVerifyFilesystemWithRule 用于验证规则中内嵌的正反例测试是否符合预期结果
 func evaluateVerifyFilesystemWithRule(rule *schema.SyntaxFlowRule) error {
 	frame, err := sfvm.NewSyntaxFlowVirtualMachine().Compile(rule.Content)
 	if err != nil {
 		return err
 	}
+	return evaluateVerifyFilesystemWithRuleAndFrame(rule, frame)
+}
+
+func evaluateVerifyFilesystemWithRuleAndFrame(rule *schema.SyntaxFlowRule, frame *sfvm.SFFrame) error {
 	verifyFs, err := frame.ExtractVerifyFilesystemAndLanguage()
 	if err != nil {
 		return err
@@ -275,15 +285,18 @@ func evaluateVerifyFilesystemWithRule(rule *schema.SyntaxFlowRule) error {
 
 	for _, f := range verifyFs {
 		err = checkWithFS(f.GetVirtualFs(), func(p ssaapi.Programs) error {
-			// Use the program as the init input var,so that the lib rule which have `$input` can be tested.
-			result, err := p.SyntaxFlowWithError(rule.Content, ssaapi.QueryWithInitInputVar(p[0]))
+			opts := []ssaapi.QueryOption{
+				ssaapi.QueryWithPrograms(p),
+				ssaapi.QueryWithFrame(frame),
+				ssaapi.QueryWithInitInputVar(p[0]),
+			}
+			result, err := ssaapi.QuerySyntaxflow(opts...)
 			if err != nil {
 				return utils.Errorf("syntax flow content failed: %v", err)
 			}
 			if err := checkResult(f, rule, result); err != nil {
 				return err
 			}
-
 			return nil
 		}, ssaapi.WithLanguage(f.GetLanguage()))
 		if err != nil {
@@ -308,19 +321,18 @@ func evaluateVerifyFilesystemWithRule(rule *schema.SyntaxFlowRule) error {
 	log.Debug("safe filesystem start")
 	for _, f := range verifyFs {
 		err = checkWithFS(f.GetVirtualFs(), func(programs ssaapi.Programs) error {
-			result, err := programs.SyntaxFlowWithError(rule.Content, ssaapi.QueryWithEnableDebug(), ssaapi.QueryWithInitInputVar(programs[0]))
+			opts := []ssaapi.QueryOption{
+				ssaapi.QueryWithPrograms(programs),
+				ssaapi.QueryWithFrame(frame),
+				ssaapi.QueryWithEnableDebug(),
+				ssaapi.QueryWithInitInputVar(programs[0]),
+			}
+			result, err := ssaapi.QuerySyntaxflow(opts...)
 			if err != nil {
 				return utils.Errorf("syntax flow content failed: %v", err)
 			}
 			if err := check(result); err != nil {
 				return utils.Errorf("check content failed: %v", err)
-			}
-			result2, err := programs.SyntaxFlowRule(rule, ssaapi.QueryWithEnableDebug(), ssaapi.QueryWithInitInputVar(programs[0]))
-			if err != nil {
-				return utils.Errorf("syntax flow rule failed: %v", err)
-			}
-			if err := check(result2); err != nil {
-				return utils.Errorf("check rule failed: %v", err)
 			}
 			return nil
 		}, ssaapi.WithLanguage(f.GetLanguage()))

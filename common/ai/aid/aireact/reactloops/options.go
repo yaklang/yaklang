@@ -157,6 +157,16 @@ func WithRegisterLoopActionWithStreamField(actionName string, desc string, opts 
 	}
 }
 
+// WithOverrideLoopAction replaces an existing loop action (e.g. to add custom validation).
+// Use when a loop needs to override a built-in action like directly_answer.
+func WithOverrideLoopAction(action *LoopAction) ReActLoopOption {
+	return func(r *ReActLoop) {
+		if action != nil {
+			r.actions.Set(action.ActionType, action)
+		}
+	}
+}
+
 func WithMaxIterations(maxIterations int) ReActLoopOption {
 	return func(r *ReActLoop) {
 		r.maxIterations = maxIterations
