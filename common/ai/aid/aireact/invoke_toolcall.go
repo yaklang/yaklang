@@ -115,7 +115,7 @@ func (r *ReAct) executeToolCallInternal(ctx context.Context, toolName string, pa
 				return r.generateToolParamsPromptWithMeta(tool, toolName)
 			}),
 		)
-		// Code-enforced param injection: when task has sample (e.g. sf_has_code_sample), merge sample params so tool always gets them
+		// Code-enforced param injection: when task has sample params (e.g. code sample for validation), merge so tool always gets them
 		if extraParamsToMerge != nil && len(extraParamsToMerge) > 0 {
 			toMerge := extraParamsToMerge
 			toolCallerOptions = append(toolCallerOptions, aicommon.WithToolCaller_ParamAugment(func(p aitool.InvokeParams) aitool.InvokeParams {
@@ -175,7 +175,7 @@ func (r *ReAct) ExecuteToolRequiredAndCall(ctx context.Context, toolName string)
 }
 
 // ExecuteToolRequiredAndCallWithExtraParams same as ExecuteToolRequiredAndCall but merges extraParams
-// into AI-generated params before execution. Used when infra must inject params (e.g. sf_sample_* for check-syntaxflow-syntax).
+// into AI-generated params before execution. Used when infra must inject params (e.g. sample code for validation tools).
 func (r *ReAct) ExecuteToolRequiredAndCallWithExtraParams(ctx context.Context, toolName string, extraParams aitool.InvokeParams) (*aitool.ToolResult, bool, error) {
 	return r.executeToolCallInternal(ctx, toolName, nil, false, extraParams)
 }

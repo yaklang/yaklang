@@ -58,8 +58,7 @@ type ReactTaskItem struct {
 }
 
 var (
-	_ aicommon.AIInvokeRuntime        = (*ReAct)(nil)
-	_ aicommon.ToolParamAugmentInvoker = (*ReAct)(nil)
+	_ aicommon.AIInvokeRuntime = (*ReAct)(nil)
 )
 
 type ReAct struct {
