@@ -128,6 +128,33 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 		}
 		return ret
 	}
+
+	// Phi value: merge member existence/types from edges.
+	if phi, ok := ToPhi(value); ok {
+		var mergedTypes []Type
+		var found bool
+		for _, edgeID := range phi.Edge {
+			edgeValue, ok := value.GetValueById(edgeID)
+			if !ok || edgeValue == nil {
+				continue
+			}
+			subRes := checkCanMemberCallExist(edgeValue, key, function...)
+			if subRes.exist {
+				found = true
+			}
+			if !utils.IsNil(subRes.typ) {
+				mergedTypes = append(mergedTypes, subRes.typ)
+			}
+		}
+		ret.exist = found
+		if len(mergedTypes) == 1 {
+			ret.typ = mergedTypes[0]
+		} else if len(mergedTypes) > 1 {
+			ret.typ = NewOrType(mergedTypes...)
+		}
+		return ret
+	}
+
 	switch value.GetType().GetTypeKind() {
 	case ObjectTypeKind:
 		typ, ok := ToObjectType(value.GetType())

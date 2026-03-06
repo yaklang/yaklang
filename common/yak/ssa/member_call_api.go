@@ -52,6 +52,63 @@ func (b *FunctionBuilder) readMemberCallValueEx(object, key Value, wantFunction 
 		}
 	}
 
+	// Phi value: read member from each edge and merge as Phi.
+	if phi, ok := ToPhi(objectt); ok {
+		res := checkCanMemberCallExist(objectt, key, wantFunction)
+		if ret := b.PeekValueInThisFunction(res.name); ret != nil {
+			return ret
+		}
+
+		edgeValues := make(Values, 0, len(phi.Edge))
+		for _, edgeID := range phi.Edge {
+			edgeValue, ok := objectt.GetValueById(edgeID)
+			if !ok || edgeValue == nil {
+				continue
+			}
+			edgeRes := checkCanMemberCallExist(edgeValue, key, wantFunction)
+			if !edgeRes.exist {
+				continue
+			}
+			memberValue := b.readMemberCallValueEx(edgeValue, key, wantFunction)
+			if memberValue != nil {
+				edgeValues = append(edgeValues, memberValue)
+			}
+		}
+		if len(edgeValues) > 1 {
+			dedupeKey := func(v Value) string {
+				if utils.IsNil(v) {
+					return "<nil>"
+				}
+				switch vv := v.(type) {
+				case *ConstInst:
+					return "const:" + vv.String()
+				case *Undefined:
+					return fmt.Sprintf("undef:%d:%s:%s", vv.Kind, vv.GetVerboseName(), vv.GetType())
+				default:
+					return fmt.Sprintf("id:%d", v.GetId())
+				}
+			}
+			seen := make(map[string]struct{}, len(edgeValues))
+			deduped := make(Values, 0, len(edgeValues))
+			for _, edgeValue := range edgeValues {
+				s := dedupeKey(edgeValue)
+				if _, ok := seen[s]; ok {
+					continue
+				}
+				seen[s] = struct{}{}
+				deduped = append(deduped, edgeValue)
+			}
+			edgeValues = deduped
+		}
+		if len(edgeValues) == 0 {
+			return b.getFieldValue(objectt, key, wantFunction)
+		}
+		if len(edgeValues) == 1 {
+			return edgeValues[0]
+		}
+		return b.EmitPhi(res.name, edgeValues)
+	}
+
 	// normal member call
 	return b.getFieldValue(objectt, key, wantFunction)
 }

@@ -108,22 +108,21 @@ func ReplaceMemberCall(old, replacement Value) map[string]Value {
 			if member.IsObject() && !utils.IsNil(toMember) {
 				memberID := member.GetId()
 				toMemberID := toMember.GetId()
-				if memberID != toMemberID {
-					_, memberVisited := visited[memberID]
-					_, toMemberVisited := visited[toMemberID]
-					holderID := holder.GetId()
-					targetID := target.GetId()
-					replacementID := replacement.GetId()
+				_, memberVisited := visited[memberID]
+				_, toMemberVisited := visited[toMemberID]
+				holderID := holder.GetId()
+				targetID := target.GetId()
+				replacementID := replacement.GetId()
 
-					// 检查循环引用和已访问状态
-					if !memberVisited && !toMemberVisited &&
-						memberID != holderID && toMemberID != holderID &&
-						memberID != targetID && toMemberID != targetID &&
-						memberID != replacementID && toMemberID != replacementID {
-						memberForRecursion = member
-						toMemberForRecursion = toMember
-						shouldRecurse = true
-					}
+				// 检查循环引用和已访问状态
+				// 注意：即使 member == toMember，也需要递归处理其嵌套成员（用于补齐/规范化成员关系）
+				if !memberVisited && !toMemberVisited &&
+					memberID != holderID && toMemberID != holderID &&
+					memberID != targetID && toMemberID != targetID &&
+					memberID != replacementID && toMemberID != replacementID {
+					memberForRecursion = member
+					toMemberForRecursion = toMember
+					shouldRecurse = true
 				}
 			}
 
@@ -165,9 +164,11 @@ func ReplaceMemberCall(old, replacement Value) map[string]Value {
 			case SSAOpcodeBinOp, SSAOpcodeUnOp:
 				// 保留原始指令供后续替换
 			default:
-				ReplaceAllValue(member, toMember)
-				DeleteInst(member)
-				memberT = toMember
+				if !utils.IsNil(toMember) && member.GetId() != toMember.GetId() {
+					ReplaceAllValue(member, toMember)
+					DeleteInst(member)
+					memberT = toMember
+				}
 			}
 
 			// 递归处理嵌套成员

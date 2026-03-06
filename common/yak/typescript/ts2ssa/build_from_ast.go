@@ -1733,8 +1733,8 @@ func (b *builder) VisitExpression(node *ast.Expression, isLval bool) (*ssa.Varia
 
 		if isLval {
 			if class == nil {
-				if !utils.IsNil(readValue) {
-					return b.CreateJSVariable(identifierName), nil
+				if utils.IsNil(readValue) {
+					b.ensureImplicitGlobalVariable(identifierName)
 				}
 				return b.CreateJSVariable(identifierName), nil
 			}
@@ -2922,6 +2922,8 @@ func (b *builder) VisitFunctionDeclaration(node *ast.FunctionDeclaration) interf
 				b.VisitStatements(blockNode.Statements)
 			}
 		}
+		// 完成函数构建（包含 side-effect/free-value 等信息）
+		b.Finish()
 		b.FunctionBuilder = b.PopFunction()
 	})
 	if isExport {

@@ -122,3 +122,39 @@ func TestReplaceMemberCallOnExternLib(t *testing.T) {
 	updated := result[name]
 	require.Equal(t, replacement.GetId(), updated.GetObject().GetId())
 }
+
+func TestReplaceAllValueUpdatesContainerMemberReference(t *testing.T) {
+	_, builder := newTestBuilder(t)
+
+	container := emitObject(builder, "container")
+	key := builder.EmitConstInst("PI")
+	placeholder := builder.EmitUndefined("PI")
+	memberVar := builder.CreateMemberCallVariable(container, key)
+	builder.AssignVariable(memberVar, placeholder)
+
+	actual := builder.EmitConstInst(3.14)
+	ReplaceAllValue(placeholder, actual)
+
+	got, ok := container.GetStringMember("PI")
+	require.True(t, ok, "member reference should be rebound to replacement value")
+	require.Equal(t, actual.GetId(), got.GetId())
+}
+
+func TestReplaceAllValueUpdatesBlueprintStaticMember(t *testing.T) {
+	_, builder := newTestBuilder(t)
+
+	blueprint := builder.CreateBlueprint("Color")
+	placeholder := builder.EmitUndefined("PI")
+	blueprint.RegisterStaticMember("Red", placeholder)
+
+	actual := builder.EmitConstInst(3.14)
+	ReplaceAllValue(placeholder, actual)
+
+	member := blueprint.GetStaticMember("Red")
+	require.NotNil(t, member)
+	require.Equal(t, actual.GetId(), member.GetId(), "blueprint static-member table should track replaced value")
+
+	containerMember, ok := blueprint.Container().GetStringMember("Red")
+	require.True(t, ok, "blueprint container should expose updated static member")
+	require.Equal(t, actual.GetId(), containerMember.GetId())
+}

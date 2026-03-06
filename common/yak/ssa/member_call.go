@@ -12,6 +12,25 @@ func (b *FunctionBuilder) getFieldValue(object, key Value, wantFunction bool) Va
 	if ret := b.PeekValueInThisFunction(res.name); ret != nil {
 		return ret
 	}
+	if wantFunction {
+		if member, ok := object.GetMember(key); ok && member != nil {
+			if typ := member.GetType(); typ != nil && typ.GetTypeKind() == FunctionTypeKind {
+				return member
+			}
+		}
+		if member, ok := object.GetStringMember(key.String()); ok && member != nil {
+			if typ := member.GetType(); typ != nil && typ.GetTypeKind() == FunctionTypeKind {
+				return member
+			}
+		}
+	} else {
+		if member, ok := object.GetMember(key); ok && member != nil {
+			return member
+		}
+		if member, ok := object.GetStringMember(key.String()); ok && member != nil {
+			return member
+		}
+	}
 
 	// default member
 	value := b.createDefaultMember(res, object, key, wantFunction)
