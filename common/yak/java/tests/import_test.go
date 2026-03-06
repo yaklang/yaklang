@@ -94,7 +94,7 @@ class A{
 	ssatest.CheckSyntaxFlowWithFS(t, vf,
 		`off #-> * as $param`,
 		map[string][]string{
-			"param": {"1"},
+			"param": {"1", "Parameter-off"},
 		}, false, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 func TestImportClass(t *testing.T) {
@@ -210,6 +210,223 @@ public class A {
 		},
 		true,
 		ssaapi.WithLanguage(ssaconfig.JAVA))
+}
+
+func TestImportNestedTypes(t *testing.T) {
+	t.Run("import static inner class", func(t *testing.T) {
+		fs := filesys.NewVirtualFs()
+		fs.AddFile("com/example/a/Outer.java", `
+package com.example.a;
+public class Outer {
+    public static class Inner {
+        public static int version = 9;
+        public int value = 1;
+    }
+}
+`)
+		fs.AddFile("com/example/b/Main.java", `
+package com.example.b;
+import com.example.a.Outer.Inner;
+public class Main {
+    public static void main(String[] args) {
+        Inner inner = new Inner();
+        println(inner.value);
+        println(Inner.version);
+    }
+}
+`)
+		ssatest.CheckSyntaxFlowWithFS(t, fs, `println(* #-> * as $param)`, map[string][]string{
+			"param": {"1", "9"},
+		}, false, ssaapi.WithLanguage(ssaconfig.JAVA))
+	})
+
+	t.Run("import outer then use inner class", func(t *testing.T) {
+		fs := filesys.NewVirtualFs()
+		fs.AddFile("com/example/a/Outer.java", `
+package com.example.a;
+public class Outer {
+    public static class Inner {
+        public static int version = 9;
+        public int value = 1;
+    }
+}
+`)
+		fs.AddFile("com/example/b/Main.java", `
+package com.example.b;
+import com.example.a.Outer;
+public class Main {
+    public static void main(String[] args) {
+        Outer.Inner inner = new Outer.Inner();
+        println(inner.value);
+        println(Outer.Inner.version);
+    }
+}
+`)
+		ssatest.CheckSyntaxFlowWithFS(t, fs, `println(* #-> * as $param)`, map[string][]string{
+			"param": {"1", "9"},
+		}, false, ssaapi.WithLanguage(ssaconfig.JAVA))
+	})
+
+	t.Run("import nested enum", func(t *testing.T) {
+		fs := filesys.NewVirtualFs()
+		fs.AddFile("com/example/a/Outer.java", `
+package com.example.a;
+public class Outer {
+    public enum Kind {
+        FIRST, SECOND;
+        int num = 7;
+    }
+}
+`)
+		fs.AddFile("com/example/b/Main.java", `
+package com.example.b;
+import com.example.a.Outer.Kind;
+public class Main {
+    public static void main(String[] args) {
+        Kind kind = Kind.SECOND;
+        int o1 = kind.num;
+        int o2 = Kind.FIRST.num;
+    }
+}
+`)
+		ssatest.CheckSyntaxFlowWithFS(t, fs, `o1 #-> as $o1; o2 #-> as $o2`, map[string][]string{
+			"o1": {"7"},
+			"o2": {"7"},
+		}, false, ssaapi.WithLanguage(ssaconfig.JAVA))
+	})
+
+	t.Run("import outer then use nested enum", func(t *testing.T) {
+		fs := filesys.NewVirtualFs()
+		fs.AddFile("com/example/a/Outer.java", `
+package com.example.a;
+public class Outer {
+    public enum Kind {
+        FIRST, SECOND;
+        int num = 7;
+    }
+}
+`)
+		fs.AddFile("com/example/b/Main.java", `
+package com.example.b;
+import com.example.a.Outer;
+public class Main {
+    public static void main(String[] args) {
+        Outer.Kind kind = Outer.Kind.SECOND;
+        int o1 = kind.num;
+        int o2 = Outer.Kind.FIRST.num;
+    }
+}
+`)
+		ssatest.CheckSyntaxFlowWithFS(t, fs, `o1 #-> as $o1; o2 #-> as $o2`, map[string][]string{
+			"o1": {"7"},
+			"o2": {"7"},
+		}, false, ssaapi.WithLanguage(ssaconfig.JAVA))
+	})
+}
+
+func TestImportNestedStaticMembers(t *testing.T) {
+	t.Run("import static nested inner class member", func(t *testing.T) {
+		fs := filesys.NewVirtualFs()
+		fs.AddFile("com/example/a/Outer.java", `
+package com.example.a;
+public class Outer {
+    public static class Inner {
+        public static int version = 9;
+    }
+}
+`)
+		fs.AddFile("com/example/b/Main.java", `
+package com.example.b;
+import static com.example.a.Outer.Inner.version;
+public class Main {
+    public static void main(String[] args) {
+        println(version);
+    }
+}
+`)
+		ssatest.CheckSyntaxFlowWithFS(t, fs, `println(* #-> * as $param)`, map[string][]string{
+			"param": {"9"},
+		}, false, ssaapi.WithLanguage(ssaconfig.JAVA))
+	})
+
+	t.Run("import static nested inner class all", func(t *testing.T) {
+		fs := filesys.NewVirtualFs()
+		fs.AddFile("com/example/a/Outer.java", `
+package com.example.a;
+public class Outer {
+    public static class Inner {
+        public static int version = 9;
+    }
+}
+`)
+		fs.AddFile("com/example/b/Main.java", `
+package com.example.b;
+import static com.example.a.Outer.Inner.*;
+public class Main {
+    public static void main(String[] args) {
+        println(version);
+    }
+}
+`)
+		ssatest.CheckSyntaxFlowWithFS(t, fs, `println(* #-> * as $param)`, map[string][]string{
+			"param": {"9"},
+		}, false, ssaapi.WithLanguage(ssaconfig.JAVA))
+	})
+
+	t.Run("import static nested enum constant members", func(t *testing.T) {
+		fs := filesys.NewVirtualFs()
+		fs.AddFile("com/example/a/Outer.java", `
+package com.example.a;
+public class Outer {
+    public enum Kind {
+        FIRST, SECOND;
+        int num = 7;
+    }
+}
+`)
+		fs.AddFile("com/example/b/Main.java", `
+package com.example.b;
+import static com.example.a.Outer.Kind.FIRST;
+import static com.example.a.Outer.Kind.SECOND;
+public class Main {
+    public static void main(String[] args) {
+        int o1 = SECOND.num;
+        int o2 = FIRST.num;
+    }
+}
+`)
+		ssatest.CheckSyntaxFlowWithFS(t, fs, `o1 #-> as $o1; o2 #-> as $o2`, map[string][]string{
+			"o1": {"7"},
+			"o2": {"7"},
+		}, false, ssaapi.WithLanguage(ssaconfig.JAVA))
+	})
+
+	t.Run("import static nested enum constants all", func(t *testing.T) {
+		fs := filesys.NewVirtualFs()
+		fs.AddFile("com/example/a/Outer.java", `
+package com.example.a;
+public class Outer {
+    public enum Kind {
+        FIRST, SECOND;
+        int num = 7;
+    }
+}
+`)
+		fs.AddFile("com/example/b/Main.java", `
+package com.example.b;
+import static com.example.a.Outer.Kind.*;
+public class Main {
+    public static void main(String[] args) {
+        int o1 = SECOND.num;
+        int o2 = FIRST.num;
+    }
+}
+`)
+		ssatest.CheckSyntaxFlowWithFS(t, fs, `o1 #-> as $o1; o2 #-> as $o2`, map[string][]string{
+			"o1": {"7"},
+			"o2": {"7"},
+		}, false, ssaapi.WithLanguage(ssaconfig.JAVA))
+	})
 }
 
 func TestImportSourceCodeRange(t *testing.T) {
