@@ -12,13 +12,10 @@ import (
 )
 
 func TestDeleteAISession_DeletesRuntimeAndEvents(t *testing.T) {
-	profileDB, err := utils.CreateTempTestDatabaseInMemory()
-	require.NoError(t, err)
 	projectDB, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-
-	require.NoError(t, profileDB.AutoMigrate(&schema.AIAgentRuntime{}).Error)
-	require.NoError(t, projectDB.AutoMigrate(&schema.AISession{}, &schema.AiOutputEvent{}, &schema.AiProcessAndAiEvent{}).Error)
+	profileDB := projectDB
+	require.NoError(t, projectDB.AutoMigrate(&schema.AISession{}, &schema.AIAgentRuntime{}, &schema.AiOutputEvent{}, &schema.AiProcessAndAiEvent{}).Error)
 
 	sessionA := "sess-" + uuid.NewString()
 	sessionB := "sess-" + uuid.NewString()
