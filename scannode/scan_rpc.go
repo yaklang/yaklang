@@ -252,7 +252,7 @@ func (s *ScanNode) feedback(result *spec.ScanResult) {
 	}
 	msg.Content = raw
 
-	log.Infof("scanner feedback data: %v", msg.Type)
+	log.Debugf("scanner feedback data: %v", msg.Type)
 	s.node.Notify(
 		spec.BackendKey_Scanner,
 		msg,
