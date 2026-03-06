@@ -12,7 +12,6 @@ import (
 // CompileLLVMToBinary compiles an LLVM IR file to a native executable.
 // When linkRuntime is true, it links against the default yak runtime archive.
 func CompileLLVMToBinary(llFile, binFile string, linkRuntime bool, extraArgs ...string) error {
-	// Find clang
 	clangPath, err := findLLVMTool("clang")
 	if err != nil {
 		return err
@@ -24,33 +23,18 @@ func CompileLLVMToBinary(llFile, binFile string, linkRuntime bool, extraArgs ...
 	}
 
 	if linkRuntime {
-		// Determine runtime path
-		// We check standard locations relative to the project root
-		runtimeDir := "common/yak/ssa2llvm/runtime"
-		if _, err := os.Stat(runtimeDir); os.IsNotExist(err) {
-			// Try finding it relative to current working directory
-			if _, err := os.Stat("runtime/libyak.a"); err == nil {
-				runtimeDir = "runtime"
-			} else if _, err := os.Stat("../runtime/libyak.a"); err == nil {
-				runtimeDir = "../runtime"
-			} else {
-				cwd, _ := os.Getwd()
-				return utils.Errorf("runtime library not found in %s/common/yak/ssa2llvm/runtime or runtime", cwd)
-			}
+		runtimeArchive, err := findRuntimeArchive()
+		if err != nil {
+			return err
 		}
-		absRuntimeDir, _ := filepath.Abs(runtimeDir)
 		args = append(args,
-			"-L"+absRuntimeDir,
-			"-lyak",
+			runtimeArchive,
 			"-lgc",
 			"-lpthread",
 			"-ldl",
 		)
 	}
-	args = append(args,
-		"-o", binFile,
-		// "-v", // Debug linking
-	)
+	args = append(args, "-o", binFile)
 
 	cmd := exec.Command(clangPath, args...)
 	output, err := cmd.CombinedOutput()
@@ -59,6 +43,27 @@ func CompileLLVMToBinary(llFile, binFile string, linkRuntime bool, extraArgs ...
 	}
 
 	return nil
+}
+
+func findRuntimeArchive() (string, error) {
+	candidates := []string{
+		"common/yak/ssa2llvm/runtime/libyak.a",
+		"runtime/libyak.a",
+		"../runtime/libyak.a",
+	}
+
+	for _, candidate := range candidates {
+		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+			absPath, absErr := filepath.Abs(candidate)
+			if absErr != nil {
+				return candidate, nil
+			}
+			return absPath, nil
+		}
+	}
+
+	cwd, _ := os.Getwd()
+	return "", utils.Errorf("runtime library not found: expected libyak.a under %s/common/yak/ssa2llvm/runtime, runtime, or ../runtime; run ./common/yak/ssa2llvm/scripts/build_runtime_go.sh first", cwd)
 }
 
 func CompileLLVMToAsm(llFile, asmFile string) error {

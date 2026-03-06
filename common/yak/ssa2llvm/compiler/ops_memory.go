@@ -119,20 +119,13 @@ func (c *Compiler) compileParameterMember(inst *ssa.ParameterMember) error {
 		return fmt.Errorf("parent value %d not found for ParameterMember %s", parentID, inst.GetName())
 	}
 
-	// Resolve Key
 	keyID := inst.MemberCallKey
 	keyVal, ok := fn.GetValueById(keyID)
 	if !ok {
 		return fmt.Errorf("key value %d not found", keyID)
 	}
 
-	keyStr := ""
-	if cinst, ok := ssa.ToConstInst(keyVal); ok {
-		keyStr = cinst.String()
-	} else {
-		keyStr = keyVal.GetName()
-	}
-	keyStr = strings.Trim(keyStr, "\"")
+	keyStr := c.resolveMemberKeyString(keyVal)
 
 	val := c.emitRuntimeGetField(parentVal, keyStr, inst.GetId())
 	c.Values[inst.GetId()] = val
@@ -148,32 +141,12 @@ func (c *Compiler) compileMemberCall(val ssa.Value, mc ssa.MemberCall) error {
 		return fmt.Errorf("compileMemberCall: object is nil for value %d", val.GetId())
 	}
 
-	// 1. Get Base Pointer
-	// We need to resolve the object value first.
-	// Since obj is a Value, we can use c.getValue (via Compiler)
-	// We assume getValue in ops.go handles contextInst=nil if we have CurrentFunction
-	// But ops.go implementation might need to be verified or improved to allow nil
-	// Or we use a dummy instruction if needed.
-	// Assuming ops.go getValue signature is (contextInst, id).
-	// We pass nil.
-	// NOTE: ops.go getValue implementation: "fn := contextInst.GetFunc(); if fn == nil { ... }"
-	// It checks contextInst first!
-	// So passing nil WILL CRASH if ops.go is not robust.
-	// I need to fix ops.go to be robust for nil contextInst.
-	// I will fix ops.go in the next step.
 	parentVal, err := c.getValue(nil, obj.GetId())
 	if err != nil {
 		return fmt.Errorf("compileMemberCall: failed to get object value: %w", err)
 	}
 
-	// 2. Resolve Key String
-	keyStr := ""
-	if cinst, ok := ssa.ToConstInst(key); ok {
-		keyStr = cinst.String()
-	} else {
-		keyStr = key.GetName()
-	}
-	keyStr = strings.Trim(keyStr, "\"")
+	keyStr := c.resolveMemberKeyString(key)
 
 	valResult := c.emitRuntimeGetField(parentVal, keyStr, val.GetId())
 	c.Values[val.GetId()] = valResult

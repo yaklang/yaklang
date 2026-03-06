@@ -25,13 +25,7 @@ func (c *Compiler) compileIf(inst *ssa.If) error {
 		return err
 	}
 
-	// Check type of condition. If it's not i1, compare it with 0 to get i1.
-	// We assume values are i64 for now as per Phase 1/2 assumption.
-	if condVal.Type().IntTypeWidth() != 1 {
-		// Create ICmp NE (Not Equal) 0
-		zero := llvm.ConstInt(condVal.Type(), 0, false)
-		condVal = c.Builder.CreateICmp(llvm.IntPredicate(llvm.IntNE), condVal, zero, "if_cond")
-	}
+	condVal = c.coerceToI1(condVal, "if_cond")
 
 	trueBlock, ok := c.Blocks[inst.True]
 	if !ok {
@@ -55,10 +49,7 @@ func (c *Compiler) compileLoop(inst *ssa.Loop) error {
 		return err
 	}
 
-	if condVal.Type().IntTypeWidth() != 1 {
-		zero := llvm.ConstInt(condVal.Type(), 0, false)
-		condVal = c.Builder.CreateICmp(llvm.IntPredicate(llvm.IntNE), condVal, zero, "loop_cond")
-	}
+	condVal = c.coerceToI1(condVal, "loop_cond")
 
 	bodyBlock, ok := c.Blocks[inst.Body]
 	if !ok {
@@ -150,18 +141,7 @@ func (c *Compiler) callReturnsPointer(call *ssa.Call, fn *ssa.Function) bool {
 		return false
 	}
 
-	calleeName := ""
-	if fn != nil {
-		if calleeVal, ok := fn.GetValueById(call.Method); ok && calleeVal != nil {
-			calleeName = calleeVal.GetName()
-			if ssaFn, ok := ssa.ToFunction(calleeVal); ok {
-				calleeName = ssaFn.GetName()
-			}
-		}
-	}
-	if calleeName == "" {
-		calleeName = fmt.Sprintf("func_%d", call.Method)
-	}
+	calleeName := c.resolveCalleeName(fn, call.Method)
 
 	if binding, ok := c.getExternBinding(calleeName); ok {
 		switch binding.Return {

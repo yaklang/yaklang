@@ -20,25 +20,8 @@ func (c *Compiler) coerceToExternArgType(val llvm.Value, typ LLVMExternType) llv
 
 // compileCall compiles a ssa.Call instruction to LLVM IR.
 func (c *Compiler) compileCall(inst *ssa.Call) error {
-	// 1. Resolve callee name
-	calleeName := ""
-
-	// Try to get the callee Value from Function context
 	fn := inst.GetFunc()
-	if fn != nil {
-		if calleeVal, ok := fn.GetValueById(inst.Method); ok && calleeVal != nil {
-			calleeName = calleeVal.GetName()
-			// If it's a function, use its name
-			if ssaFn, ok := ssa.ToFunction(calleeVal); ok {
-				calleeName = ssaFn.GetName()
-			}
-		}
-	}
-
-	// Fallback: generate name from ID if lookup failed
-	if calleeName == "" {
-		calleeName = fmt.Sprintf("func_%d", inst.Method)
-	}
+	calleeName := c.resolveCalleeName(fn, inst.Method)
 
 	// 2. Get or declare LLVM function
 	// Check externs first
