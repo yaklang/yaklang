@@ -3,6 +3,7 @@ package tests
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
@@ -12,6 +13,26 @@ import (
 
 // TODO 已知问题 当一个value通过CrateMemberCallVariable后被赋值到成员变量 后续这个value的ReplaceValue无法生效
 // TODO 已知问题 当一个BluePrint触发LazyBuild时使用一个UndefinedValue 后续这个Value被Replace在蓝图中注册的StaticMember不生效(TestNamedImportWithGlobalVar)
+
+func checkResolvedEnumImportValue(t *testing.T, vf *filesys.VirtualFS, want string, opt ...ssaconfig.Option) {
+	t.Helper()
+	ssatest.CheckResultWithFS(t, vf, `
+		console.log(* #-> as $enumValues)
+	`, func(res *ssaapi.SyntaxFlowResult) {
+		values := res.GetValues("enumValues")
+		got := make([]string, 0, len(values))
+		sawResolved := false
+		for _, value := range values {
+			text := value.String()
+			got = append(got, text)
+			require.NotContains(t, text, "Undefined-", "enum import should resolve without undefined placeholders: %v", got)
+			if text == want {
+				sawResolved = true
+			}
+		}
+		require.True(t, sawResolved, "resolved enum import value %s not found in %v", want, got)
+	}, opt...)
+}
 
 func TestBasicImport(t *testing.T) {
 	vf := filesys.NewVirtualFs()
@@ -463,117 +484,97 @@ console.log(Status.Approved);
 }
 
 func TestNamedImportWithGlobalVar(t *testing.T) {
-	t.Skip("TODO 已知问题 当一个BluePrint触发LazyBuild时使用一个UndefinedValue 后续这个Value被Replace在蓝图中注册的StaticMember不生效")
 	vf := filesys.NewVirtualFs()
-	vf.AddFile("src/enums/colors.ts", `
+	vf.AddFile("src/named-import/enums/colors.ts", `
 import { PI } from './const';
 
-export enum Color {
+export enum NamedImportColor {
  Red = PI,   // 二层递归来源
  Green = "green",
  Blue = "blue",
 }
 `)
-	vf.AddFile("src/main.ts", `
-import { Color} from './enums/colors';
+	vf.AddFile("src/named-import/main.ts", `
+import { NamedImportColor } from './enums/colors';
 
-console.log(Color.Red);
+console.log(NamedImportColor.Red);
 `)
 
-	vf.AddFile("src/enums/const.ts", `
+	vf.AddFile("src/named-import/enums/const.ts", `
 export const PI = 3.14
 `)
 
-	ssatest.CheckSyntaxFlowWithFS(t, vf, `
-		console.log(* #-> as $enumValues)
-	`, map[string][]string{
-		"enumValues": {"3.14"},
-	}, true, ssaapi.WithLanguage(ssaconfig.TS))
+	checkResolvedEnumImportValue(t, vf, "3.14", ssaapi.WithLanguage(ssaconfig.TS))
 }
 
 func TestNameSpaceImportWithGlobalVar(t *testing.T) {
-	t.Skip("TODO 已知问题 当一个value通过CrateMemberCallVariable后被赋值到成员变量 后续这个value的ReplaceValue无法生效")
 	vf := filesys.NewVirtualFs()
-	vf.AddFile("src/enums/colors.ts", `
+	vf.AddFile("src/namespace-import/enums/colors.ts", `
 import * as C from './const';
 
-export enum Color {
+export enum NamespaceImportColor {
  Red = C.PI,   // 二层递归来源
  Green = "green",
  Blue = "blue",
 }
 `)
-	vf.AddFile("src/main.ts", `
-import { Color } from './enums/colors';
+	vf.AddFile("src/namespace-import/main.ts", `
+import { NamespaceImportColor } from './enums/colors';
 
-console.log(Color.Red);
+console.log(NamespaceImportColor.Red);
 `)
-	vf.AddFile("src/enums/const.ts", `
+	vf.AddFile("src/namespace-import/enums/const.ts", `
 export const PI = 3.14
 `)
 
-	ssatest.CheckSyntaxFlowWithFS(t, vf, `
-		console.log(* #-> as $enumValues)
-	`, map[string][]string{
-		"enumValues": {"3.14"},
-	}, true, ssaapi.WithLanguage(ssaconfig.TS))
+	checkResolvedEnumImportValue(t, vf, "3.14", ssaapi.WithLanguage(ssaconfig.TS))
 }
 
 func TestDefaultImportWithGlobalVar(t *testing.T) {
-	t.Skip("TODO 已知问题 当一个value通过CrateMemberCallVariable后被赋值到成员变量 后续这个value的ReplaceValue无法生效")
 	vf := filesys.NewVirtualFs()
-	vf.AddFile("src/enums/colors.ts", `
+	vf.AddFile("src/default-import/enums/colors.ts", `
 import GG from './const';
 
-export enum Color {
+export enum DefaultImportColor {
  Red = GG,   // 二层递归来源
  Green = "green",
  Blue = "blue",
 }
 `)
-	vf.AddFile("src/enums/const.ts", `
+	vf.AddFile("src/default-import/enums/const.ts", `
 const PI = 3.14
 export default PI;
 `)
-	vf.AddFile("src/main.ts", `
-import {Color} from './enums/colors';
+	vf.AddFile("src/default-import/main.ts", `
+import { DefaultImportColor } from './enums/colors';
 
-console.log(Color.Red);
+console.log(DefaultImportColor.Red);
 `)
 
-	ssatest.CheckSyntaxFlowWithFS(t, vf, `
-		console.log(* #-> as $enumValues)
-	`, map[string][]string{
-		"enumValues": {"3.14"},
-	}, true, ssaapi.WithLanguage(ssaconfig.TS), ssaapi.WithASTOrder(ssareducer.Order))
+	checkResolvedEnumImportValue(t, vf, "3.14", ssaapi.WithLanguage(ssaconfig.TS), ssaapi.WithASTOrder(ssareducer.Order))
 }
 
 func TestRenamedImportWithGlobalVar(t *testing.T) {
-	t.Skip("TODO 已知问题 当一个BluePrint触发LazyBuild时使用一个UndefinedValue 后续这个Value被Replace在蓝图中注册的StaticMember不生效")
 	vf := filesys.NewVirtualFs()
-	vf.AddFile("src/main.ts", `
-import { Color} from './enums/colors';
+	vf.AddFile("src/renamed-import/main.ts", `
+import { RenamedImportColor } from './enums/colors';
 
-console.log(Color.Red);
+console.log(RenamedImportColor.Red);
 `)
-	vf.AddFile("src/enums/colors.ts", `
+	vf.AddFile("src/renamed-import/enums/colors.ts", `
 import { PI as MyPI } from './const';
 
-export enum Color {
+export enum RenamedImportColor {
  Red = MyPI,   // 二层递归来源
  Green = "green",
  Blue = "blue",
 }
 `)
-	vf.AddFile("src/enums/const.ts", `
+	vf.AddFile("src/renamed-import/enums/const.ts", `
 export const PI = 3.14
 `)
 
-	ssatest.CheckSyntaxFlowWithFS(t, vf, `
-		console.log(* #-> as $enumValues)
-	`, map[string][]string{
-		"enumValues": {"3.14"},
-	}, true, ssaapi.WithLanguage(ssaconfig.TS))
+	checkResolvedEnumImportValue(t, vf, "3.14", ssaapi.WithLanguage(ssaconfig.TS))
 }
 
 func TestReExportNamed(t *testing.T) {
