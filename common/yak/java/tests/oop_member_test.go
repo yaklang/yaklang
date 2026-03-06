@@ -3,7 +3,6 @@ package tests
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -259,8 +258,7 @@ class A {
 	})
 
 	t.Run("static method read and set member ", func(t *testing.T) {
-		t.Skip()
-		//TODO: wait for oop refractor
+		t.Skip("TODO(wait fix/ssa/field/sensetive): static member topdefs still include class/member noise")
 		code := `
 package foo.bar;
 class A {
@@ -290,8 +288,7 @@ class A {
 }
 
 func Test_Cross_Class_Side_Effect(t *testing.T) {
-	t.Skip()
-	//TODO:类成员的side-effect要有传递性
+	t.Skip("TODO(wait fix/ssa/field/sensetive): cross-class member side effects still depend on field-sensitive topdefs")
 	t.Run("aaa", func(t *testing.T) {
 		vf := filesys.NewVirtualFs()
 		vf.AddFile("a.java", `
@@ -334,17 +331,9 @@ class B {
 	}
 }
 `)
-		ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
-			prog := programs[0]
-			prog.Show()
-			ret, err := prog.SyntaxFlowWithError(`println(* #-> as $a);`)
-			require.NoError(t, err)
-			a := ret.GetValues("a")
-			a.Show()
-			require.Contains(t, a.String(), "22")
-			require.Contains(t, a.String(), "33")
-			return nil
-		})
+		ssatest.CheckSyntaxFlowWithFS(t, vf, `println(* #-> as $a);`, map[string][]string{
+			"a": {"22", "33"},
+		}, false, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 }
 

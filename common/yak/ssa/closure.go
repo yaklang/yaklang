@@ -126,26 +126,36 @@ func (f *FunctionBuilder) CheckMemberSideEffect(variable *Variable, v Value) {
 
 	if variable.IsMemberCall() {
 		// if name is member call, it's modify parameter field
-		para, ok := ToParameter(variable.object)
-		if !ok {
+		if para, ok := ToParameter(variable.object); ok {
+			sideEffect := &FunctionSideEffect{
+				Name:                 variable.GetName(),
+				VerboseName:          getMemberVerboseName(variable.object, variable.key),
+				Modify:               v.GetId(),
+				Variable:             bind,
+				forceCreate:          false,
+				Kind:                 NormalSideEffect,
+				parameterMemberInner: newParameterMember(para, variable.key),
+			}
+			f.SideEffects = append(f.SideEffects, sideEffect)
+
+			if f.MarkedThisObject != nil &&
+				para.GetDefault() != nil &&
+				f.MarkedThisObject.GetId() == para.GetDefault().GetId() {
+				f.SetMethod(true, para.GetType())
+			}
 			return
 		}
 
-		sideEffect := &FunctionSideEffect{
-			Name:                 variable.GetName(),
-			VerboseName:          getMemberVerboseName(variable.object, variable.key),
-			Modify:               v.GetId(),
-			Variable:             bind,
-			forceCreate:          false,
-			Kind:                 NormalSideEffect,
-			parameterMemberInner: newParameterMember(para, variable.key),
-		}
-		f.SideEffects = append(f.SideEffects, sideEffect)
-
-		if f.MarkedThisObject != nil &&
-			para.GetDefault() != nil &&
-			f.MarkedThisObject.GetId() == para.GetDefault().GetId() {
-			f.SetMethod(true, para.GetType())
+		if paramMember, ok := ToParameterMember(variable.object); ok {
+			f.SideEffects = append(f.SideEffects, &FunctionSideEffect{
+				Name:                 variable.GetName(),
+				VerboseName:          getMemberVerboseName(variable.object, variable.key),
+				Modify:               v.GetId(),
+				Variable:             bind,
+				forceCreate:          false,
+				Kind:                 NormalSideEffect,
+				parameterMemberInner: newMoreParameterMember(paramMember, variable.key),
+			})
 		}
 	}
 }
@@ -374,6 +384,10 @@ func handleSideEffect(c *Call, funcTyp *FunctionType, buildPointer bool) {
 		}
 		if variable == nil {
 			log.Warnf("[ssa.handleSideEffectBind] skip side effect %s: variable creation failed", se.Name)
+			continue
+		}
+		if se.Kind == PointerSideEffect && se.MemberCallKind == CallMemberCall {
+			builder.AssignVariable(variable, modify)
 			continue
 		}
 		if sideEffect := builder.EmitSideEffect(se.Name, c, modify); sideEffect != nil {

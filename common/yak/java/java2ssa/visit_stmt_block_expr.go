@@ -2023,6 +2023,14 @@ func (y *singleFileBuilder) VisitIdentifier(raw javaparser.IIdentifierContext, w
 			variable = y.CreateVariable(name)
 			return
 		}
+		if class.GetStaticMember(name) != nil {
+			if container := class.Container(); !utils.IsNil(container) {
+				variable = y.CreateMemberCallVariable(container, y.EmitConstInstPlaceholder(name))
+				return variable, nil
+			}
+			variable = y.GetStaticMember(class, name)
+			return variable, nil
+		}
 		if class.GetNormalMember(name) != nil {
 			obj := y.PeekValue("this")
 			if obj != nil {
@@ -2058,6 +2066,15 @@ func (y *singleFileBuilder) VisitIdentifier(raw javaparser.IIdentifierContext, w
 		if method := class.GetStaticMethod(name); !utils.IsNil(method) {
 			value = method
 			return nil, method
+		}
+		if member := class.GetStaticMember(name); !utils.IsNil(member) {
+			if container := class.Container(); !utils.IsNil(container) {
+				if value = y.ReadMemberCallValue(container, y.EmitConstInstPlaceholder(name)); !utils.IsNil(value) {
+					return nil, value
+				}
+			}
+			value = member
+			return nil, member
 		}
 		if class.GetNormalMember(name) != nil {
 			obj := y.PeekValue("this")
