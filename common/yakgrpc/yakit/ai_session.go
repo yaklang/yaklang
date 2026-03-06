@@ -25,7 +25,7 @@ func DeleteAISession(profileDB, projectDB *gorm.DB, sessionId string) (deletedRu
 		return 0, 0, err
 	}
 
-	deletedRuntimes, err = DeleteAgentRuntime(profileDB, &ypb.AITaskFilter{
+	deletedRuntimes, err = DeleteAgentRuntime(projectDB, &ypb.AITaskFilter{
 		SessionID: []string{sessionId},
 	})
 	if err != nil {
