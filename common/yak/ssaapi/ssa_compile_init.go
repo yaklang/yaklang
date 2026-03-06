@@ -19,6 +19,9 @@ func (c *Config) init(filesystem filesys_interface.FileSystem, fileSize int) (*s
 		msg := fmt.Sprintf(s, v...)
 		log.Info(msg)
 	}
+	if c.GetFilePerformanceRecorderIfEnabled() != nil {
+		application.BuildTreeTracker = ssa.NewBuildTreeTracker()
+	}
 
 	application.Build = func(
 		ast ssa.FrontAST, src *memedit.MemEditor, fb *ssa.FunctionBuilder,

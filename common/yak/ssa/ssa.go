@@ -327,6 +327,9 @@ type Program struct {
 	// process
 	ProcessInfof func(string, ...any)
 
+	// BuildTreeTracker 追踪 LazyBuild 调用栈，在进入/退出时打印树形结构
+	BuildTreeTracker BuildTreeTracker
+
 	// extern lib
 	cacheExternInstance     map[string]Value // lib and value
 	externType              map[string]Type

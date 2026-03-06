@@ -108,7 +108,7 @@ func (c *Blueprint) GetMagicMethod(name BlueprintMagicMethodKind, fb *FunctionBu
 	if !utils.IsNil(_method) {
 		if function, b := ToFunction(_method); b {
 			_ = function
-			function.Build()
+			buildFunctionWithPerfTracking(function)
 		}
 	}
 	return _method
@@ -134,7 +134,7 @@ func (c *Blueprint) GetNormalMethod(key string) Value {
 	c.getFieldWithParent(func(bluePrint *Blueprint) bool {
 		if function, ok := bluePrint.NormalMethod[key]; ok {
 			f = function
-			function.Build()
+			buildFunctionWithPerfTracking(function)
 			return true
 		}
 		return false
@@ -157,7 +157,7 @@ func (c *Blueprint) GetStaticMethod(key string) Value {
 	c.getFieldWithParent(func(bluePrint *Blueprint) bool {
 		if function, ok := bluePrint.StaticMethod[key]; ok {
 			f = function
-			function.Build()
+			buildFunctionWithPerfTracking(function)
 			return true
 		}
 		return false

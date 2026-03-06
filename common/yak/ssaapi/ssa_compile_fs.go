@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -123,12 +124,7 @@ func (c *Config) parseProjectWithFS(
 
 	var AstErr error
 	fileContents := make([]*ssareducer.FileContent, 0, preHandlerTotal)
-	enableFilePerfLog := c.Config != nil && c.Config.GetCompileFilePerformanceLog()
-	// 创建文件性能 recorder
-	if enableFilePerfLog && c.filePerformanceRecorder == nil {
-		c.filePerformanceRecorder = diagnostics.NewRecorder()
-	}
-	filePerfRecorder := c.filePerformanceRecorder
+	filePerfRecorder := c.GetFilePerformanceRecorderIfEnabled()
 	// pre handler  0-40%
 	f1 := func() error {
 		preHandlerNum := 0
@@ -191,15 +187,13 @@ func (c *Config) parseProjectWithFS(
 					}
 				}()
 			}
-			// 记录文件级别的 AST 解析时间
-			if enableFilePerfLog {
+			// 记录文件级别的 AST 解析时间（含文件大小用于 ms/KB）
+			if filePerfRecorder != nil {
 				fileASTTime := time.Since(fileASTStart)
-				// 收集到 recorder（记录所有文件，不设阈值）
-				if filePerfRecorder != nil {
-					filePerfRecorder.RecordDuration(fmt.Sprintf("AST[%s]", fileContent.Path), fileASTTime)
-					if fileASTTime > 100*time.Millisecond { // 只记录超过 100ms 的文件到日志
-						log.Infof("[File Performance] AST parse: %s, time: %v", fileContent.Path, fileASTTime)
-					}
+				fileSize := int64(len(fileContent.Content))
+				filePerfRecorder.RecordDurationWithSize(fmt.Sprintf("AST[%s]", fileContent.Path), fileASTTime, fileSize)
+				if fileASTTime > 100*time.Millisecond {
+					log.Infof("[File Performance] AST parse: %s, time: %v", fileContent.Path, fileASTTime)
 				}
 			}
 		}
@@ -236,6 +230,12 @@ func (c *Config) parseProjectWithFS(
 		prog.SetPreHandler(false)
 		start = time.Now()
 
+		// O(1) lookup: handlerFilesSet for needsCompile check
+		handlerFilesSet := make(map[string]struct{}, len(handlerFiles))
+		for _, hf := range handlerFiles {
+			handlerFilesSet[hf] = struct{}{}
+		}
+
 		// ssareducer.FilesHandler(
 		// 	c.ctx, filesystem, handlerFiles,
 		// 	func(path string, content []byte) {
@@ -251,16 +251,7 @@ func (c *Config) parseProjectWithFS(
 			}
 			// Check if this file needs to be compiled (is in handlerFiles)
 			// If not, it's an extra file (like XML) that should be kept in filesystem but not compiled
-			needsCompile := false
-			for _, hf := range handlerFiles {
-				if hf == fileContent.Path {
-					needsCompile = true
-					break
-				}
-			}
-			// If file doesn't need compilation (extra file), ensure it's added to FileList
-			// and skip the build step but keep it in filesystem
-			if !needsCompile {
+			if _, needsCompile := handlerFilesSet[fileContent.Path]; !needsCompile {
 				// Ensure extra files (like XML) are added to FileList even if they don't need compilation
 				if fileContent.Editor != nil {
 					prog.PushEditor(fileContent.Editor)
@@ -290,19 +281,15 @@ func (c *Config) parseProjectWithFS(
 						log.Errorf("parse [%s] error %v  ", path, r)
 						utils.PrintCurrentGoroutineRuntimeStack()
 					}
-					// 记录文件级别的 Build 时间
-					if enableFilePerfLog {
+					if filePerfRecorder != nil {
 						fileBuildTime := time.Since(fileBuildStart)
-						// 收集到 recorder（记录所有文件，不设阈值）
-						if filePerfRecorder != nil {
-							filePerfRecorder.RecordDuration(fmt.Sprintf("Build[%s]", path), fileBuildTime)
-							if fileBuildTime > 100*time.Millisecond { // 只记录超过 100ms 的文件到日志
-								log.Infof("[File Performance] Build: %s, time: %v", path, fileBuildTime)
-							}
+						fileSize := int64(len(fileContent.Content))
+						filePerfRecorder.RecordDurationWithSize(fmt.Sprintf("Build[%s]", path), fileBuildTime, fileSize)
+						if fileBuildTime > 100*time.Millisecond {
+							log.Infof("[File Performance] Build: %s, time: %v", path, fileBuildTime)
 						}
 					}
 				}()
-				// build
 				if err := prog.Build(ast, fileContent.Editor, builder); err != nil {
 					log.Errorf("parse %#v failed: %v", path, err)
 				}
@@ -375,15 +362,24 @@ func (c *Config) parseProjectWithFS(
 		return nil, err
 	}
 
-	// 输出文件性能汇总表格
-	if enableFilePerfLog && filePerfRecorder != nil {
+	// 输出 AST 阶段表格
+	if filePerfRecorder != nil {
 		snapshots := filePerfRecorder.Snapshot()
-		if len(snapshots) > 0 {
-			table := diagnostics.FormatPerformanceTable("File Compilation Performance Summary", snapshots)
-			fmt.Println(table)
-		} else {
-			fmt.Println("File Performance: no data recorded")
+		astOnly := make([]diagnostics.Measurement, 0, len(snapshots))
+		for _, m := range snapshots {
+			if strings.HasPrefix(m.Name, "AST[") {
+				astOnly = append(astOnly, m)
+			}
 		}
+		if len(astOnly) > 0 {
+			table := diagnostics.FormatPerformanceTable("AST Phase Performance Summary", astOnly)
+			fmt.Println(table)
+		}
+	}
+
+	// 输出 Build 阶段树形结构（AST 表格之后）
+	if prog.BuildTreeTracker != nil {
+		prog.BuildTreeTracker.PrintTree("")
 	}
 
 	if diagnostics.Enabled(diagnostics.LevelLow) {

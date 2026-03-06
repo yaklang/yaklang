@@ -1,7 +1,10 @@
 package ssa
 
 import (
+	"fmt"
+	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/utils"
@@ -41,26 +44,33 @@ func (l *LazyBuilder) AddLazyBuilder(work func(), async ...bool) {
 	l.tasks = append(l.tasks, lazyTask(work))
 }
 
-// Build 执行所有已添加的任务，该方法在整个生命周期中只会有效执行一次。
-func (l *LazyBuilder) Build() {
+// HasBeenBuilt 返回是否已完成构建（用于跳过重复追踪）
+func (l *LazyBuilder) HasBeenBuilt() bool {
 	if l == nil {
-		// log.Errorf("LazyBuilder is nil")
-		return
+		return true
+	}
+	return l.build.Load()
+}
+
+// Build 执行所有已添加的任务，该方法在整个生命周期中只会有效执行一次。
+// 返回值 hadTasks：是否曾通过 AddLazyBuilder 添加过任务（用于诊断从未添加任务的 case）
+func (l *LazyBuilder) Build() (hadTasks bool) {
+	if l == nil {
+		return false
 	}
 
 	if l.build.Load() {
-		// log.Errorf("LazyBuilder is nil or already built")
-		return // 已经构建过，直接返回
+		return false // 已经构建过，直接返回，不计入 hadTasks
 	}
 
 	l.build.Store(true)
 
 	l.mu.Lock()
-	defer l.mu.Unlock()
-
 	tasksToRun := l.tasks
 	l.tasks = nil // 【关键】立即清空，释放对闭包和上下文的引用
-	_ = tasksToRun
+	l.mu.Unlock()
+
+	hadTasks = len(tasksToRun) > 0
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -68,12 +78,12 @@ func (l *LazyBuilder) Build() {
 		}
 	}()
 
-	// // 依次执行所有任务
 	for _, task := range tasksToRun {
 		if task != nil {
 			task()
 		}
 	}
+	return hadTasks
 }
 
 type ASTIF interface {
@@ -115,7 +125,89 @@ func (p *Program) VisitAst(ast ASTIF) {
 	}
 }
 
+// makeLazyBuildID 生成程序级 LazyBuild 的 ID：package:file:funcName
+// @main 是程序入口，不绑定到具体文件，用 "-" 表示程序作用域
+func makeLazyBuildID(p *Program) string {
+	return makeBuildIDWithFile(p, "-", string(MainFunctionName))
+}
+
+// makeFunctionBuildID 生成 Function Build 的 ID：package:file:funcName
+// 优先从 fun.GetRange() 获取定义文件，避免 LazyBuild 时 GetCurrentEditor 指向最后一个文件
+func makeFunctionBuildID(p *Program, fun *Function) string {
+	funcName := fun.GetName()
+	if funcName == "" {
+		funcName = string(MainFunctionName)
+	}
+	file := ""
+	if r := fun.GetRange(); r != nil {
+		if e := r.GetEditor(); e != nil {
+			file = filepath.Base(e.GetFilename())
+		}
+	}
+	return makeBuildIDWithFile(p, file, funcName)
+}
+
+func makeBuildID(p *Program, funcName string) string {
+	return makeBuildIDWithFile(p, "", funcName)
+}
+
+func makeBuildIDWithFile(p *Program, file string, funcName string) string {
+	pkg := p.PkgName
+	if pkg == "" {
+		pkg = p.Name
+	}
+	if file == "" {
+		if e := p.GetCurrentEditor(); e != nil {
+			file = filepath.Base(e.GetFilename())
+		}
+	}
+	if file == "" {
+		file = p.Name
+	}
+	return fmt.Sprintf("%s:%s:%s", pkg, file, funcName)
+}
+
+func getBuildTreeTracker(p *Program) BuildTreeTracker {
+	if p == nil {
+		return nil
+	}
+	app := p.Application
+	if app == nil {
+		app = p
+	}
+	return app.BuildTreeTracker
+}
+
+// buildFunctionWithPerfTracking 构建函数并在 BuildTreeTracker 中记录（若启用）。
+// 用于 LazyBuild 主循环及按需构建（如 call 时构建 callee），确保所有函数都出现在性能树中。
+func buildFunctionWithPerfTracking(fun *Function) (hadTasks bool) {
+	if fun == nil {
+		return false
+	}
+	p := fun.GetProgram()
+	tracker := getBuildTreeTracker(p)
+	start := time.Now()
+	if tracker != nil {
+		tracker.PushLazyBuild(makeFunctionBuildID(p, fun))
+		defer func() {
+			tracker.PopLazyBuild(time.Since(start), hadTasks)
+		}()
+	}
+	hadTasks = fun.Build()
+	return hadTasks
+}
+
 func (p *Program) LazyBuild() {
+	start := time.Now()
+	tracker := getBuildTreeTracker(p)
+	if tracker != nil {
+		id := makeLazyBuildID(p)
+		tracker.PushLazyBuild(id)
+		defer func() {
+			tracker.PopLazyBuildProgramLevel(time.Since(start), true)
+		}()
+	}
+
 	for _, key := range p.Blueprint.Keys() {
 		blueprint, ok := p.Blueprint.Get(key)
 		_ = ok
@@ -132,7 +224,6 @@ func (p *Program) LazyBuild() {
 	}
 
 	for len(stack) > 0 {
-		// 深度优先遍历函数与其子函数，确保所有 LazyBuilder 均被执行
 		fun := stack[len(stack)-1]
 		stack = stack[:len(stack)-1]
 		if fun == nil {
@@ -142,7 +233,21 @@ func (p *Program) LazyBuild() {
 			continue
 		}
 		visited[fun] = struct{}{}
-		fun.Build()
+		// 已构建过：正常情况，不重复显示（不加入性能树）
+		if tracker != nil && fun.LazyBuilder != nil && fun.LazyBuilder.HasBeenBuilt() {
+			fun.Build()
+			for _, childID := range fun.ChildFuncs {
+				childValue, ok := fun.GetValueById(childID)
+				if !ok || childValue == nil {
+					continue
+				}
+				if childFunc, ok := ToFunction(childValue); ok && childFunc != nil {
+					stack = append(stack, childFunc)
+				}
+			}
+			continue
+		}
+		_ = buildFunctionWithPerfTracking(fun)
 		for _, childID := range fun.ChildFuncs {
 			childValue, ok := fun.GetValueById(childID)
 			if !ok || childValue == nil {

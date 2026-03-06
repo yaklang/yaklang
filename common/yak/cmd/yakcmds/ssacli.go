@@ -279,6 +279,10 @@ When --syntaxflow is provided, a follow-up SyntaxFlowQuery is executed for quick
 			Name:  "exclude-file",
 			Usage: `exclude files by glob, e.g. targets/*, vendor/*`,
 		},
+		cli.IntFlag{
+			Name:  "concurrency",
+			Usage: "compile concurrency: worker count for parallel file parsing. 0 or unset = NumCPU/2 (default). >0 to override.",
+		},
 		cli.BoolFlag{
 			Name:  "file-perf-log",
 			Usage: "enable file-level compile performance log output",
@@ -1392,7 +1396,10 @@ and exports structured report (sarif/irify).`,
 			Name:  "exclude-file",
 			Usage: `exclude files by glob, e.g. targets/*, vendor/*`,
 		},
-
+		cli.IntFlag{
+			Name:  "concurrency",
+			Usage: "compile concurrency: worker count for parallel file parsing. 0 or unset = NumCPU/2 (default). >0 to override.",
+		},
 		cli.StringFlag{
 			Name:  "syntaxflow,sf",
 			Usage: "custom rules: inline syntaxflow, .sf/.syntaxflow file, or directory",
@@ -1555,16 +1562,20 @@ and exports structured report (sarif/irify).`,
 			scanOpt = append(scanOpt, syntaxflow_scan.WithRulePerformanceLog(true))
 		}
 
+		perfLogEnabled := config.GetCompileFilePerformanceLog() || c.Bool("rule-perf-log") || c.Bool("file-perf-log")
 		scanOpt = append(scanOpt,
 			syntaxflow_scan.WithProcessCallback(func(taskID, status string, progress float64, info *syntaxflow_scan.RuleProcessInfoList) {
-				// Minimal header always shown
-				log.Infof("[Task %s]", taskID)
-				log.Infof("\tstatus=%s progress=%.2f%%", status, progress*100.0)
+				// 日志统计时输出，仅当 file-perf-log 或 rule-perf-log 至少开启一个时使用 [SSA_PERF] 标记
+				if !perfLogEnabled {
+					return
+				}
+				diagnostics.LogPerfLineIf(perfLogEnabled, "[Task %s]", taskID)
+				diagnostics.LogPerfLineIf(perfLogEnabled, "\tstatus=%s progress=%.2f%%", status, progress*100.0)
 
 				if info == nil {
 					return
 				}
-				log.Infof("\tFailed=%d Skipped=%d Success=%d Finished=%d Total=%d Risk=%d",
+				diagnostics.LogPerfLineIf(perfLogEnabled, "\tFailed=%d Skipped=%d Success=%d Finished=%d Total=%d Risk=%d",
 					info.FailedQuery, info.SkippedQuery, info.SuccessQuery,
 					info.FinishedQuery, info.TotalQuery, info.RiskCount,
 				)
@@ -1601,7 +1612,7 @@ and exports structured report (sarif/irify).`,
 						duration, rule.Info,
 					))
 				}
-				log.Info(b.String())
+				diagnostics.LogPerfIf(perfLogEnabled, b.String())
 
 				if len(runningRules) > 0 {
 					log.Debugf("\t=== DEBUG: %d rule(s) still running ===", len(runningRules))
@@ -1638,7 +1649,8 @@ and exports structured report (sarif/irify).`,
 				if filePerfRecorder != nil {
 					snapshots := filePerfRecorder.Snapshot()
 					if len(snapshots) > 0 {
-						table := diagnostics.FormatPerformanceTable("File Compilation Performance Summary", snapshots)
+						merged := diagnostics.MergeBuildAndLazyBuildForDisplay(snapshots)
+						table := diagnostics.FormatPerformanceTable("File Compilation Performance Summary", merged)
 						log.Info("\n" + table)
 					}
 				}

@@ -284,7 +284,7 @@ func (c *Call) handlerReturnType() {
 	// For lazy-built functions (like TypeScript arrow functions), we need to build them first
 	// to ensure their Type is set before we try to get the return type
 	if fun, isFunc := ToFunction(method); isFunc && fun.Type == nil {
-		fun.Build()
+		buildFunctionWithPerfTracking(fun)
 	}
 	funcTyp, ok := ToFunctionType(method.GetType())
 	if !ok {
@@ -460,10 +460,11 @@ func (c *Call) handleCalleeFunction() {
 
 	if builder.isBindLanguage() {
 		handleSideEffectBind(c, funcTyp)
+		handleSideEffect(c, funcTyp, true)
 	} else {
-		handleSideEffect(c, funcTyp, false)
+		// 单次遍历处理 NormalSideEffect 和 PointerSideEffect，避免重复循环
+		handleSideEffects(c, funcTyp)
 	}
-	handleSideEffect(c, funcTyp, true)
 
 	// Handle side effects from function arguments
 	// When a function with side effects is passed as an argument and will be called
@@ -572,7 +573,7 @@ func (c *Call) tryGetFunctionTypeFromCallReturn(method Value) *FunctionType {
 
 	// Build the function if not yet built (for lazy-built functions like TypeScript arrow functions)
 	if innerFunc.Type == nil {
-		innerFunc.Build()
+		buildFunctionWithPerfTracking(innerFunc)
 	}
 
 	// Try to get return type from innerFunc.Type first

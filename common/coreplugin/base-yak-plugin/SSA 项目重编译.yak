@@ -33,7 +33,7 @@ opts = [
         yakit.Info("%s: %f",msg, process)
     }), 
     ssa.withContext(context.Background()),
-] 
+]
 
 err := prog.Recompile(opts...)
 if err != nil {

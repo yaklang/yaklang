@@ -52,10 +52,21 @@ func OptionSaveValue_Diagnostics(rec *diagnostics.Recorder) SaveValueOption {
 	}
 }
 
-// GetFilePerformanceRecorder 获取文件性能 recorder
+// GetFilePerformanceRecorder 获取文件性能 recorder（可为 nil，不检查是否开启）
 func (c *Config) GetFilePerformanceRecorder() *diagnostics.Recorder {
 	if c == nil {
 		return nil
+	}
+	return c.filePerformanceRecorder
+}
+
+// GetFilePerformanceRecorderIfEnabled 仅在开启文件性能日志时返回 recorder，否则返回 nil
+func (c *Config) GetFilePerformanceRecorderIfEnabled() *diagnostics.Recorder {
+	if c == nil || c.Config == nil || !c.Config.GetCompileFilePerformanceLog() {
+		return nil
+	}
+	if c.filePerformanceRecorder == nil {
+		c.filePerformanceRecorder = diagnostics.NewRecorder()
 	}
 	return c.filePerformanceRecorder
 }

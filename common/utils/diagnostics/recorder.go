@@ -22,6 +22,7 @@ type Measurement struct {
 	Count      uint64
 	ErrorCount uint64
 	Steps      []time.Duration
+	Size       int64 // 文件大小（字节），0 表示未知，用于计算 ms/KB 比例
 }
 
 func (m Measurement) Average() time.Duration {
@@ -102,6 +103,10 @@ func (m *measurementData) ensureStepCapacity(count int) {
 }
 
 func (m *measurementData) record(total time.Duration, stepDurations []time.Duration) {
+	m.recordWithSize(total, stepDurations, 0)
+}
+
+func (m *measurementData) recordWithSize(total time.Duration, stepDurations []time.Duration, size int64) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -128,6 +133,9 @@ func (m *measurementData) record(total time.Duration, stepDurations []time.Durat
 	}
 	m.measurement.Total += total
 	m.measurement.Count++
+	if size > 0 {
+		m.measurement.Size = size
+	}
 }
 
 func (m *measurementData) markError() {
@@ -150,6 +158,7 @@ func (m *measurementData) snapshot() Measurement {
 		Count:      m.measurement.Count,
 		ErrorCount: m.measurement.ErrorCount,
 		Steps:      steps,
+		Size:       m.measurement.Size,
 	}
 }
 
@@ -237,12 +246,27 @@ func (r *Recorder) Snapshot() []Measurement {
 		result = append(result, entry.snapshot())
 	}
 	slices.SortFunc(result, func(a, b Measurement) int {
+		ratioA := 0.0
+		if a.Size > 0 && a.Total > 0 {
+			ratioA = float64(a.Total.Milliseconds()) / (float64(a.Size) / 1024)
+		}
+		ratioB := 0.0
+		if b.Size > 0 && b.Total > 0 {
+			ratioB = float64(b.Total.Milliseconds()) / (float64(b.Size) / 1024)
+		}
 		switch {
-		case a.Total < b.Total:
+		case ratioA > ratioB:
+			return -1 // a 在前（ms/KB 高到低）
+		case ratioA < ratioB:
 			return 1
-		case a.Total > b.Total:
-			return -1
 		default:
+			// ratio 相同，按 Total 降序，再按 Name
+			if a.Total != b.Total {
+				if a.Total > b.Total {
+					return -1
+				}
+				return 1
+			}
 			return strings.Compare(a.Name, b.Name)
 		}
 	})
@@ -258,6 +282,11 @@ func (r *Recorder) Reset() {
 
 // RecordDuration 记录已经测量的时间（用于外部已经测量好的时间）
 func (r *Recorder) RecordDuration(name string, duration time.Duration) {
+	r.RecordDurationWithSize(name, duration, 0)
+}
+
+// RecordDurationWithSize 记录已测量的时间和文件大小（用于文件级性能日志，可计算 ms/KB）
+func (r *Recorder) RecordDurationWithSize(name string, duration time.Duration, fileSize int64) {
 	if r == nil || name == "" {
 		return
 	}
@@ -265,7 +294,7 @@ func (r *Recorder) RecordDuration(name string, duration time.Duration) {
 	if err != nil || entry == nil {
 		return
 	}
-	entry.record(duration, []time.Duration{duration})
+	entry.recordWithSize(duration, []time.Duration{duration}, fileSize)
 }
 
 func LogRecorder(label string, recorders ...*Recorder) {
@@ -291,7 +320,6 @@ func (rec *Recorder) Log(label ...string) {
 		log.Infof("recorder %s is empty", label)
 		return
 	}
-	// 使用 log.Info 而不是 log.Infof，确保性能日志总是输出
 	log.Info("========================================")
 	if len(label) > 0 {
 		log.Infof("Measurement Summary [%s]", label[0])
@@ -369,73 +397,185 @@ func CompareRecorderCosts(database, memory *Recorder) {
 	}
 }
 
-// FormatPerformanceTable 格式化性能数据为表格
+// formatSize 格式化文件大小，如 12.3KB、1.2MB
+func formatSize(bytes int64) string {
+	if bytes <= 0 {
+		return "-"
+	}
+	const unit = 1024
+	if bytes < unit {
+		return fmt.Sprintf("%dB", bytes)
+	}
+	div, exp := int64(unit), 0
+	for n := bytes / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f%cB", float64(bytes)/float64(div), "KMGTPE"[exp])
+}
+
+// formatDuration 格式化耗时：0 显示 "0s"，< 1ms 显示 "xxxµs"，否则使用默认 String()
+func formatDuration(d time.Duration) string {
+	if d == 0 {
+		return "0s"
+	}
+	if d < time.Millisecond {
+		return fmt.Sprintf("%dµs", d.Microseconds())
+	}
+	return d.String()
+}
+
+// MergeBuildAndLazyBuildForDisplay 对测量结果按 ms/KB 降序排序，用于文件编译性能展示。
+// LazyBuild 合并逻辑已移除：Build 阶段现由 BuildTreeTracker 以树形结构单独展示。
+func MergeBuildAndLazyBuildForDisplay(measurements []Measurement) []Measurement {
+	out := make([]Measurement, len(measurements))
+	copy(out, measurements)
+	sort.Slice(out, func(i, j int) bool {
+		ri := 0.0
+		if out[i].Size > 0 && out[i].Total > 0 {
+			ri = float64(out[i].Total.Milliseconds()) / (float64(out[i].Size) / 1024)
+		}
+		rj := 0.0
+		if out[j].Size > 0 && out[j].Total > 0 {
+			rj = float64(out[j].Total.Milliseconds()) / (float64(out[j].Size) / 1024)
+		}
+		if ri != rj {
+			return ri > rj
+		}
+		return out[i].Total > out[j].Total
+	})
+	return out
+}
+
+// FormatPerformanceTable 格式化性能数据为表格；若有 Size 则显示文件大小和 ms/KB 比例
 func FormatPerformanceTable(title string, measurements []Measurement) string {
 	if len(measurements) == 0 {
 		return fmt.Sprintf("No performance data for: %s", title)
 	}
 
+	hasSize := false
+	for _, m := range measurements {
+		if m.Size > 0 {
+			hasSize = true
+			break
+		}
+	}
+
 	// 计算列宽
 	maxNameLen := len("Name")
 	maxTimeLen := len("Duration")
+	maxSizeLen := len("Size")
+	maxRatioLen := len("ms/KB")
 
 	for _, m := range measurements {
 		nameLen := len(m.Name)
-		// 限制名称最大宽度为 80 字符
 		if nameLen > 80 {
 			nameLen = 80
 		}
 		if nameLen > maxNameLen {
 			maxNameLen = nameLen
 		}
-		if len(m.Total.String()) > maxTimeLen {
-			maxTimeLen = len(m.Total.String())
+		if len(formatDuration(m.Total)) > maxTimeLen {
+			maxTimeLen = len(formatDuration(m.Total))
+		}
+		if hasSize {
+			sz := formatSize(m.Size)
+			if len(sz) > maxSizeLen {
+				maxSizeLen = len(sz)
+			}
+			if m.Size > 0 && m.Total > 0 {
+				ratio := float64(m.Total.Milliseconds()) / (float64(m.Size) / 1024)
+				ratioStr := fmt.Sprintf("%.2f", ratio)
+				if len(ratioStr) > maxRatioLen {
+					maxRatioLen = len(ratioStr)
+				}
+			}
 		}
 	}
 
-	// 确保最小宽度
 	if maxNameLen < 30 {
 		maxNameLen = 30
 	}
 	if maxTimeLen < 10 {
 		maxTimeLen = 10
 	}
+	if maxSizeLen < 6 {
+		maxSizeLen = 6
+	}
+	if maxRatioLen < 8 {
+		maxRatioLen = 8
+	}
 
-	// 构建表格
 	var builder strings.Builder
 
-	// 标题边框
-	titleBorder := strings.Repeat("=", maxNameLen+maxTimeLen+7)
+	totalWidth := maxNameLen + maxTimeLen + 7
+	if hasSize {
+		totalWidth += maxSizeLen + maxRatioLen + 6
+	}
+	titleBorder := strings.Repeat("=", totalWidth)
 	builder.WriteString(titleBorder + "\n")
 	builder.WriteString(fmt.Sprintf(" %s\n", title))
 	builder.WriteString(titleBorder + "\n")
 
-	// 表头
-	headerBorder := fmt.Sprintf("+-%s-+-%s-+\n",
-		strings.Repeat("-", maxNameLen),
-		strings.Repeat("-", maxTimeLen),
-	)
-	builder.WriteString(headerBorder)
-	builder.WriteString(fmt.Sprintf("| %-*s | %*s |\n",
-		maxNameLen, "Name",
-		maxTimeLen, "Duration",
-	))
-	builder.WriteString(headerBorder)
-
-	// 数据行
-	for _, m := range measurements {
-		// 截断过长的名称
-		displayName := m.Name
-		if len(displayName) > 80 {
-			displayName = displayName[:77] + "..."
-		}
-		builder.WriteString(fmt.Sprintf("| %-*s | %*s |\n",
-			maxNameLen, displayName,
-			maxTimeLen, m.Total.String(),
+	if hasSize {
+		headerBorder := fmt.Sprintf("+-%s-+-%s-+-%s-+-%s-+\n",
+			strings.Repeat("-", maxNameLen),
+			strings.Repeat("-", maxTimeLen),
+			strings.Repeat("-", maxSizeLen),
+			strings.Repeat("-", maxRatioLen),
+		)
+		builder.WriteString(headerBorder)
+		builder.WriteString(fmt.Sprintf("| %-*s | %*s | %*s | %*s |\n",
+			maxNameLen, "Name",
+			maxTimeLen, "Duration",
+			maxSizeLen, "Size",
+			maxRatioLen, "ms/KB",
 		))
-	}
+		builder.WriteString(headerBorder)
 
-	builder.WriteString(headerBorder)
+		for _, m := range measurements {
+			displayName := m.Name
+			if len(displayName) > 80 {
+				displayName = displayName[:77] + "..."
+			}
+			sz := formatSize(m.Size)
+			ratioStr := "-"
+			if m.Size > 0 && m.Total > 0 {
+				ratio := float64(m.Total.Milliseconds()) / (float64(m.Size) / 1024)
+				ratioStr = fmt.Sprintf("%.2f", ratio)
+			}
+			builder.WriteString(fmt.Sprintf("| %-*s | %*s | %*s | %*s |\n",
+				maxNameLen, displayName,
+				maxTimeLen, formatDuration(m.Total),
+				maxSizeLen, sz,
+				maxRatioLen, ratioStr,
+			))
+		}
+		builder.WriteString(headerBorder)
+	} else {
+		headerBorder := fmt.Sprintf("+-%s-+-%s-+\n",
+			strings.Repeat("-", maxNameLen),
+			strings.Repeat("-", maxTimeLen),
+		)
+		builder.WriteString(headerBorder)
+		builder.WriteString(fmt.Sprintf("| %-*s | %*s |\n",
+			maxNameLen, "Name",
+			maxTimeLen, "Duration",
+		))
+		builder.WriteString(headerBorder)
+
+		for _, m := range measurements {
+			displayName := m.Name
+			if len(displayName) > 80 {
+				displayName = displayName[:77] + "..."
+			}
+			builder.WriteString(fmt.Sprintf("| %-*s | %*s |\n",
+				maxNameLen, displayName,
+				maxTimeLen, formatDuration(m.Total),
+			))
+		}
+		builder.WriteString(headerBorder)
+	}
 	return builder.String()
 }
 

@@ -16,7 +16,7 @@ func (r *Return) calcType() Type {
 		// we need to build them first to ensure their Type is set
 		// before we try to get the return type
 		if fun, ok := ToFunction(v); ok && fun.Type == nil {
-			fun.Build()
+			buildFunctionWithPerfTracking(fun)
 		}
 		t := v.GetType()
 		if objTyp, ok := ToObjectType(t); ok {
