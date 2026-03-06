@@ -28,6 +28,10 @@ var riskDebugCount int32
 
 const defaultSSASTSRenewBeforeSec int64 = 600
 
+const scannodeSSADataBaseRawParamKey = "_scannode_ssa_database_raw"
+const scannodeSSASkipMigrateParamKey = "_scannode_ssa_skip_migrate"
+const scannodeSSADBSkipMigrateEnvKey = "SSA_DB_SKIP_MIGRATE"
+
 func readSSASTSRenewBeforeSec() int64 {
 	v := strings.TrimSpace(os.Getenv("SCANNODE_SSA_STS_RENEW_BEFORE_SEC"))
 	if v == "" {
@@ -144,17 +148,6 @@ func (s *ScanNode) rpc_invokeScript(ctx context.Context, node string, req *scanr
 	reporter := NewScannerAgentReporter(req.TaskId, req.SubTaskId, req.RuntimeId, s)
 	res := &scanrpc.SCAN_InvokeScriptResponse{}
 
-	// Setup Yakit server for receiving callbacks from script execution
-	yakitServer := s.createYakitServer(reporter, res)
-	yakitServer.Start()
-	defer yakitServer.Shutdown()
-
-	// Build base command-line parameters
-	params := []string{"--yakit-webhook", yakitServer.Addr()}
-	if runtimeId != "" {
-		params = append(params, "--runtime-id", runtimeId)
-	}
-
 	// Parse and convert user-provided JSON parameters to command-line arguments
 	paramsKeyValue := s.parseScriptParams(req.ScriptJsonParam)
 	reporter.ssaUploadCfg = extractSSAArtifactUploadConfig(paramsKeyValue)
@@ -166,6 +159,43 @@ func (s *ScanNode) rpc_invokeScript(ctx context.Context, node string, req *scanr
 			}
 			return reporter.ssaUploadCfg, nil
 		})
+	}
+
+	releaseLimiter, err := s.invokeLimiter.acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer releaseLimiter()
+
+	ssaDBRaw := strings.TrimSpace(utils.InterfaceToString(paramsKeyValue[scannodeSSADataBaseRawParamKey]))
+	skipSSAMigrate := utils.InterfaceToBoolean(paramsKeyValue[scannodeSSASkipMigrateParamKey])
+
+	extraEnv := []string{}
+	cleanupDB := func() {}
+	// When running multiple scripts concurrently, isolate the per-task project DB (SQLite) to avoid "database is locked".
+	// SSA DB can be isolated (default) or overridden (e.g. shared SSA-IR DB for compile/scan-from-db mode).
+	if s.needIsolateSSARuntimeDB() && (reporter.ssaUploadCfg != nil || ssaDBRaw != "") {
+		env, cleanup := buildSSARuntimeDBEnv(runtimeId, ssaDBRaw)
+		extraEnv = append(extraEnv, env...)
+		cleanupDB = cleanup
+	} else if ssaDBRaw != "" {
+		// Override SSA DB for this invocation without isolating runtime DB files.
+		extraEnv = append(extraEnv, fmt.Sprintf("%s=%s", consts.ENV_SSA_DATABASE_RAW, ssaDBRaw))
+	}
+	if skipSSAMigrate {
+		extraEnv = append(extraEnv, fmt.Sprintf("%s=1", scannodeSSADBSkipMigrateEnvKey))
+	}
+	defer cleanupDB()
+
+	// Setup Yakit server for receiving callbacks from script execution
+	yakitServer := s.createYakitServer(reporter, res)
+	yakitServer.Start()
+	defer yakitServer.Shutdown()
+
+	// Build base command-line parameters
+	params := []string{"--yakit-webhook", yakitServer.Addr()}
+	if runtimeId != "" {
+		params = append(params, "--runtime-id", runtimeId)
 	}
 
 	// Automatic rule synchronization before script execution
@@ -182,7 +212,7 @@ func (s *ScanNode) rpc_invokeScript(ctx context.Context, node string, req *scanr
 	defer os.RemoveAll(scriptFile)
 
 	// Execute the Yak script
-	if err := s.executeScript(ctx, scanNodePath, scriptFile, params, runtimeId); err != nil {
+	if err := s.executeScript(ctx, scanNodePath, scriptFile, params, runtimeId, extraEnv); err != nil {
 		log.Errorf("exec yakScript %v failed: %s", scriptFile, err)
 
 		// 使用脚本通过 yakit.Output 返回的错误详情
@@ -555,19 +585,22 @@ func (s *ScanNode) createTempScriptFile(content string) (string, error) {
 	return f.Name(), nil
 }
 
-// executeScript executes the Yak script with the specified parameters and environment
-func (s *ScanNode) executeScript(ctx context.Context, scanNodePath, scriptFile string, params []string, runtimeId string) error {
+// executeScript executes the Yak script with the specified parameters and environment.
+// extraEnv should be in "KEY=VALUE" form.
+func (s *ScanNode) executeScript(ctx context.Context, scanNodePath, scriptFile string, params []string, runtimeId string, extraEnv []string) error {
 	// Build command with base arguments
 	baseCmd := []string{"distyak", scriptFile}
 	log.Infof("yak %v %v", scriptFile, params)
 
 	cmd := exec.CommandContext(ctx, scanNodePath, append(baseCmd, params...)...)
 
-	// Setup environment variables
-	cmd.Env = append(os.Environ(),
+	// Setup environment variables: inherit, then override selected keys (avoid duplicate keys).
+	overrides := []string{
 		fmt.Sprintf("YAKIT_HOME=%v", os.Getenv("YAKIT_HOME")),
 		fmt.Sprintf("YAK_RUNTIME_ID=%v", runtimeId),
-	)
+	}
+	overrides = append(overrides, extraEnv...)
+	cmd.Env = mergeEnviron(os.Environ(), overrides)
 
 	// Configure remote bridge settings if needed (currently disabled)
 	// This section is preserved for future use when remote bridge configuration is provided
@@ -588,6 +621,35 @@ func (s *ScanNode) executeScript(ctx context.Context, scanNodePath, scriptFile s
 	cmd.Stderr = os.Stderr
 
 	return cmd.Run()
+}
+
+func mergeEnviron(base []string, overrides []string) []string {
+	if len(overrides) == 0 {
+		return base
+	}
+	keys := make(map[string]struct{}, len(overrides))
+	cleanOverrides := make([]string, 0, len(overrides))
+	for _, kv := range overrides {
+		idx := strings.IndexByte(kv, '=')
+		if idx <= 0 {
+			continue
+		}
+		keys[kv[:idx]] = struct{}{}
+		cleanOverrides = append(cleanOverrides, kv)
+	}
+	out := make([]string, 0, len(base)+len(cleanOverrides))
+	for _, kv := range base {
+		idx := strings.IndexByte(kv, '=')
+		if idx <= 0 {
+			continue
+		}
+		if _, ok := keys[kv[:idx]]; ok {
+			continue
+		}
+		out = append(out, kv)
+	}
+	out = append(out, cleanOverrides...)
+	return out
 }
 
 func (s *ScanNode) rpcQueryYakScript(ctx context.Context, node string, req *ypb.QueryYakScriptRequest, broker *mq.Broker) (*scanrpc.SCAN_QueryYakScriptResponse, error) {
