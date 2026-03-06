@@ -4,6 +4,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"golang.org/x/exp/maps"
+	"strings"
 )
 
 type importDeclareItem struct {
@@ -140,6 +141,9 @@ func (p *Program) ImportTypeFromLib(lib *Program, name string, token CanStartSto
 	}
 	importType := fakeImportType(lib, name, token)
 	pkg.typ[name] = importType
+	if idx := strings.LastIndex(name, "."); idx >= 0 && idx+1 < len(name) {
+		pkg.typ[name[idx+1:]] = importType
+	}
 	return err
 }
 
@@ -154,19 +158,31 @@ func (p *Program) ImportValueFromLib(lib *Program, names ...string) error {
 	}
 	return err
 }
+func getBlueprintForImportType(lib *Program, className string) (*Blueprint, error) {
+	if lib == nil {
+		return nil, utils.Errorf("library is nil")
+	}
+	t := fakeImportType(lib, className, nil)
+	if t == nil {
+		return nil, utils.Errorf("library %s not contain type: %s", lib.Name, className)
+	}
+	blueprint, ok := ToClassBluePrintType(t)
+	if !ok {
+		return nil, utils.Errorf("no support to blueprint")
+	}
+	return blueprint, nil
+}
+
 func (p *Program) ImportTypeStaticAll(lib *Program, classname string) error {
 	pkg, err := p.checkImportRelationship(lib)
 	if err != nil {
 		return err
 	}
-	t, ok := lib.ExportType[classname]
-	if !ok {
-		return utils.Errorf("library %s not contain type: %s", lib.Name, classname)
+	blueprint, err := getBlueprintForImportType(lib, classname)
+	if err != nil {
+		return err
 	}
-	blueprint, b := ToClassBluePrintType(t)
-	if !b {
-		return utils.Errorf("no support to blueprint")
-	}
+	blueprint.Build()
 	p.fixImportCallback = append(p.fixImportCallback, func() {
 		//fix
 		for s, value := range blueprint.StaticMember {
@@ -213,19 +229,13 @@ func (p *Program) ImportTypeStaticMemberFromLib(lib *Program, clsName string, na
 			}
 		}
 	}
-	if v, ok := lib.ExportType[clsName]; !ok {
-		err = utils.JoinErrors(err, utils.Errorf("library %s not contain type %s", lib.Name, clsName))
-		return err
-	} else {
-		blueprint, b := ToClassBluePrintType(v)
-		if !b {
-			errx := utils.Errorf("no support other type")
-			return errx
-		}
-		blueprint.Build()
-		for _, name := range names {
-			build(blueprint, name)
-		}
+	blueprint, err := getBlueprintForImportType(lib, clsName)
+	if err != nil {
+		return utils.JoinErrors(err)
+	}
+	blueprint.Build()
+	for _, name := range names {
+		build(blueprint, name)
 	}
 	return nil
 }

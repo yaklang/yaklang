@@ -257,7 +257,17 @@ func (y *singleFileBuilder) VisitMemberDeclaration(raw javaparser.IMemberDeclara
 	} else if ret := i.AnnotationTypeDeclaration(); ret != nil {
 
 	} else if ret := i.ClassDeclaration(); ret != nil {
+		_, _, isStatic := y.VisitModifiers(modifiers)
 		y.VisitClassDeclaration(ret, class)
+		if isStatic {
+			classDecl, _ := ret.(*javaparser.ClassDeclarationContext)
+			if classDecl != nil {
+				innerName := classDecl.Identifier().GetText()
+				if innerClass := y.GetBluePrint(class.Name + INNER_CLASS_SPLIT + innerName); innerClass != nil {
+					class.RegisterStaticMember(innerName, innerClass.Container(), false)
+				}
+			}
+		}
 	} else if ret := i.EnumDeclaration(); ret != nil {
 		// 声明枚举类型
 		y.VisitEnumDeclaration(ret, class)
@@ -338,14 +348,13 @@ func (y *singleFileBuilder) VisitClassOrInterfaceType(raw javaparser.IClassOrInt
 	var typ ssa.Type
 	typ = ssa.CreateAnyType()
 
-	nameBuilder := strings.Builder{}
+	parts := make([]string, 0, len(i.AllIdentifier())+1)
 	for _, id := range i.AllIdentifier() {
-		nameBuilder.WriteString(id.GetText())
-		nameBuilder.WriteString(".")
+		parts = append(parts, id.GetText())
 	}
 	typeId := i.TypeIdentifier().GetText()
-	nameBuilder.WriteString(typeId)
-	className := nameBuilder.String()
+	parts = append(parts, typeId)
+	className := strings.Join(parts, ".")
 	//wrapper class
 	switch className {
 	case "Boolean":
@@ -361,17 +370,28 @@ func (y *singleFileBuilder) VisitClassOrInterfaceType(raw javaparser.IClassOrInt
 		typ = ssa.CreateStringType()
 		return y.AddFullTypeNameFromMap(className, typ)
 	}
-	if class := y.GetBluePrint(className); class != nil {
+	for _, candidate := range y.getClassNameCandidates(parts...) {
+		if class := y.GetBluePrint(candidate); class != nil {
+			typ = class
+			if len(typ.GetFullTypeNames()) == 0 {
+				typ = y.AddFullTypeNameFromMap(className, typ)
+			}
+			return typ
+		}
+	}
+	if class := y.resolveImportedNestedBlueprint(parts...); class != nil {
 		typ = class
 		if len(typ.GetFullTypeNames()) == 0 {
 			typ = y.AddFullTypeNameFromMap(className, typ)
 		}
 		return typ
-	} else {
-		typ = y.CreateBlueprint(className, raw)
-		typ = y.AddFullTypeNameFromMap(className, typ)
-		return typ
 	}
+	if importType, ok := y.GetProgram().ReadImportType(className); ok && importType != nil {
+		return importType
+	}
+	typ = y.CreateBlueprint(className, raw)
+	typ = y.AddFullTypeNameFromMap(className, typ)
+	return typ
 }
 
 func (y *singleFileBuilder) VisitPrimitiveType(raw javaparser.IPrimitiveTypeContext) ssa.Type {
@@ -403,7 +423,7 @@ func (y *singleFileBuilder) VisitPrimitiveType(raw javaparser.IPrimitiveTypeCont
 	return t
 }
 
-func (y *singleFileBuilder) VisitEnumDeclaration(raw javaparser.IEnumDeclarationContext, class *ssa.Blueprint) interface{} {
+func (y *singleFileBuilder) VisitEnumDeclaration(raw javaparser.IEnumDeclarationContext, outClass *ssa.Blueprint) interface{} {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -417,9 +437,29 @@ func (y *singleFileBuilder) VisitEnumDeclaration(raw javaparser.IEnumDeclaration
 	var mergedTemplate []string
 
 	enumName := i.Identifier().GetText()
-	if class == nil {
-		class = y.CreateBlueprint(enumName)
+	class := outClass
+	if outClass == nil {
+		class = y.CreateBlueprint(enumName, i.Identifier())
+		class.SetKind(ssa.BlueprintClass)
+		y.GetProgram().SetExportType(enumName, class)
+	} else {
+		className := outClass.Name + INNER_CLASS_SPLIT + enumName
+		class = y.CreateBlueprint(className, i.Identifier())
+		class.SetKind(ssa.BlueprintClass)
+		outClass.RegisterStaticMember(enumName, class.Container(), false)
 	}
+
+	if len(y.selfPkgPath) != 0 {
+		ftRaw := fmt.Sprintf("%s.%s", strings.Join(y.selfPkgPath[:len(y.selfPkgPath)-1], "."), class.Name)
+		class = y.AddFullTypeNameRaw(ftRaw, class).(*ssa.Blueprint)
+	}
+
+	y.MarkedThisClassBlueprint = class
+	defer func() {
+		y.MarkedThisClassBlueprint = nil
+	}()
+	y.PushBlueprint(class)
+	defer y.PopBlueprint()
 
 	if i.IMPLEMENTS() != nil {
 		mergedTemplate = append(mergedTemplate, i.TypeList().GetText())
@@ -432,12 +472,6 @@ func (y *singleFileBuilder) VisitEnumDeclaration(raw javaparser.IEnumDeclaration
 	if i.EnumConstants() != nil {
 		y.VisitEnumConstants(i.EnumConstants(), class)
 	}
-	// 将enum实例化并设置为全局变量
-	obj := y.EmitMakeWithoutType(nil, nil)
-	obj.SetType(class)
-	variable := y.CreateVariable(enumName)
-	y.AssignVariable(variable, obj)
-	y.AssignConst(enumName, obj)
 
 	return nil
 }
@@ -457,26 +491,21 @@ func (y *singleFileBuilder) VisitEnumConstants(raw javaparser.IEnumConstantsCont
 		y.VisitEnumConstant(enumConstant, class)
 	}
 
-	// 实例化enum里的常量
-	obj := y.EmitMakeWithoutType(nil, nil)
-	obj.SetType(class)
-	setMember := class.RegisterNormalMember
 	for _, enumConstant := range allEnumConstant {
 		constant := enumConstant.(*javaparser.EnumConstantContext)
 		enumName := constant.Identifier().GetText()
-		arguments := constant.Arguments()
-		if class.Constructor == nil && len(y.constructorOverloads[class]) == 0 {
-			setMember(enumName, obj)
-		} else {
+		obj := y.EmitMakeWithoutType(nil, nil)
+		obj.SetType(class)
+		value := ssa.Value(obj)
+		if class.Constructor != nil || len(y.constructorOverloads[class]) != 0 {
 			args := []ssa.Value{obj}
-			arguments := y.VisitArguments(arguments)
-			args = append(args, arguments...)
-			y.callJavaConstructorWithOverload(class, args, false)
-			setMember(enumName, obj)
+			args = append(args, y.VisitArguments(constant.Arguments())...)
+			if constructed := y.callJavaConstructorWithOverload(class, args, false); !utils.IsNil(constructed) {
+				value = constructed
+			}
 		}
-
+		class.RegisterStaticMember(enumName, value)
 	}
-
 }
 
 func (y *singleFileBuilder) VisitEnumConstant(raw javaparser.IEnumConstantContext, class *ssa.Blueprint) {
@@ -494,11 +523,8 @@ func (y *singleFileBuilder) VisitEnumConstant(raw javaparser.IEnumConstantContex
 		_ = annotation
 	}
 
-	setMember := class.RegisterStaticMember
-
 	name := i.Identifier().GetText()
-	setMember(name, y.EmitValueOnlyDeclare(name))
-	return
+	class.RegisterStaticMember(name, y.EmitValueOnlyDeclare(name))
 }
 
 func (y *singleFileBuilder) VisitEnumBodyDeclarations(raw javaparser.IEnumBodyDeclarationsContext, class *ssa.Blueprint) {

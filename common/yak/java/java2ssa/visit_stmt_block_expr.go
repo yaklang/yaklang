@@ -1641,15 +1641,31 @@ func (y *singleFileBuilder) VisitInnerCreator(raw javaparser.IInnerCreatorContex
 	if nonWildcard := i.NonWildcardTypeArgumentsOrDiamond(); nonWildcard != nil {
 	}
 	outClassObj := y.ReadOrCreateVariable(outClassVariable)
-	outClassType := outClassObj.GetType()
-	outClassName := outClassType.String()
-	var builder strings.Builder
-	builder.WriteString(outClassName)
-	builder.WriteString(".")
-	builder.WriteString(i.Identifier().GetText())
-	className := builder.String()
+	if utils.IsNil(outClassObj) || utils.IsNil(outClassObj.GetType()) {
+		return nil
+	}
 
-	class := y.GetBluePrint(className)
+	innerName := i.Identifier().GetText()
+	lookupNames := make([]string, 0, 4)
+	if outClassBlueprint, ok := ssa.ToClassBluePrintType(outClassObj.GetType()); ok && outClassBlueprint != nil {
+		lookupNames = append(lookupNames, outClassBlueprint.Name+INNER_CLASS_SPLIT+innerName)
+		for _, ft := range outClassBlueprint.GetFullTypeNames() {
+			lookupNames = append(lookupNames, ft+INNER_CLASS_SPLIT+innerName)
+			lookupNames = append(lookupNames, ft+"."+innerName)
+		}
+	}
+	lookupNames = append(lookupNames, outClassVariable+INNER_CLASS_SPLIT+innerName, outClassVariable+"."+innerName)
+
+	var class *ssa.Blueprint
+	for _, className := range lookupNames {
+		if className == "" {
+			continue
+		}
+		class = y.GetBluePrint(className)
+		if class != nil {
+			break
+		}
+	}
 	if class == nil {
 		return nil
 	}
@@ -1662,7 +1678,7 @@ func (y *singleFileBuilder) VisitInnerCreator(raw javaparser.IInnerCreatorContex
 	}
 
 	args := []ssa.Value{obj}
-	arguments := y.VisitClassCreatorRest(i.ClassCreatorRest(), className)
+	arguments := y.VisitClassCreatorRest(i.ClassCreatorRest(), class.Name)
 	args = append(args, arguments...)
 	y.callJavaConstructorWithOverload(class, args, false)
 	return obj
@@ -1875,9 +1891,33 @@ func (y *singleFileBuilder) VisitCreatedName(raw javaparser.ICreatedNameContext)
 
 	className := createdName[len(createdName)-1]
 	fullClassName := strings.Join(createdName, ".")
-	class := y.GetBluePrint(className)
+
+	var class *ssa.Blueprint
+	for _, candidate := range y.getClassNameCandidates(createdName...) {
+		if bp := y.GetBluePrint(candidate); bp != nil {
+			class = bp
+			break
+		}
+	}
 	if class == nil {
 		class = y.GetBluePrint(fullClassName)
+	}
+	if class == nil {
+		if importType, ok := y.GetProgram().ReadImportType(className); ok {
+			if bp, ok := ssa.ToClassBluePrintType(importType); ok {
+				class = bp
+			}
+		}
+	}
+	if class == nil {
+		if importType, ok := y.GetProgram().ReadImportType(fullClassName); ok {
+			if bp, ok := ssa.ToClassBluePrintType(importType); ok {
+				class = bp
+			}
+		}
+	}
+	if class == nil {
+		class = y.resolveImportedNestedBlueprint(createdName...)
 	}
 	if class == nil {
 		class = y.CreateBlueprint(className, raw)
