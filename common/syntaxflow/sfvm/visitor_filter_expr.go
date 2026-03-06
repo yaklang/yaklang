@@ -314,69 +314,142 @@ func (y *SyntaxFlowVisitor) VisitNameFilter(isMember bool, i sf.INameFilterConte
 }
 
 func (y *SyntaxFlowVisitor) VisitActualParam(i sf.IActualParamContext, haveQuestion bool) error {
-	handleFilterStatement := func(single sf.ISingleParamContext) bool {
-		ret, ok := single.(*sf.SingleParamContext)
-		if !ok || ret == nil || ret.FilterStatement() == nil {
-			return false
+	var visitCallArgConditionExpression func(expr sf.IConditionExpressionContext, argStart int, containOther bool) error
+	visitCallArgConditionExpression = func(expr sf.IConditionExpressionContext, argStart int, containOther bool) error {
+		if y == nil || expr == nil {
+			return nil
 		}
-
-		// VisitFilterStatement always consumes stack top via update/pop.
-		// Actual-param filtering needs that consumed value again for OpFilter.
-		y.VisitFilterStatement(ret.FilterStatement())
-		return true
-	}
-
-	handleConditionExpression := func(single sf.ISingleParamContext) bool {
-		ret, ok := single.(*sf.SingleParamContext)
-		if !ok || ret == nil || ret.ConditionExpression() == nil {
-			return false
-		}
-
-		cond := ret.ConditionExpression()
-		// Special-case binary compare like `*<len>==2`:
-		// keep call-level grouping (call anchor) and return the derived values
-		// that satisfy the compare so OpFilter can map them back to the call list.
-		if binary, ok := cond.(*sf.FilterExpressionBinaryCompareContext); ok {
-			if err := y.VisitFilterExpr(binary.FilterExpr()); err != nil {
-				return true
+		switch c := expr.(type) {
+		case *sf.FilterExpressionAndContext:
+			conds := c.AllConditionExpression()
+			for idx, exp := range conds {
+				y.EmitConditionScopeStart()
+				if err := visitCallArgConditionExpression(exp, argStart, containOther); err != nil {
+					return err
+				}
+				y.EmitConditionScopeEnd()
+				if idx > 0 {
+					y.EmitOperator("&&")
+				}
 			}
-			if binary.NumberLiteral() != nil {
-				n := y.VisitNumberLiteral(binary.NumberLiteral())
+			return nil
+		case *sf.FilterExpressionOrContext:
+			conds := c.AllConditionExpression()
+			for idx, exp := range conds {
+				y.EmitConditionScopeStart()
+				if err := visitCallArgConditionExpression(exp, argStart, containOther); err != nil {
+					return err
+				}
+				y.EmitConditionScopeEnd()
+				if idx > 0 {
+					y.EmitOperator("||")
+				}
+			}
+			return nil
+		case *sf.NotConditionContext:
+			y.EmitConditionScopeStart()
+			if err := visitCallArgConditionExpression(c.ConditionExpression(), argStart, containOther); err != nil {
+				return err
+			}
+			y.EmitConditionScopeEnd()
+			y.EmitOperator("!")
+			return nil
+		case *sf.ParenConditionContext:
+			return visitCallArgConditionExpression(c.ConditionExpression(), argStart, containOther)
+
+		// Leaf conditions in call-arg filter context (?(...)):
+		// They are interpreted as "exists an actual-param derived value that satisfies this condition",
+		// then mapped back to the parent call list via OpFilter to produce a call-level ConditionEntry.
+		case *sf.FilterConditionContext:
+			y.EmitPushCallArgs(argStart, containOther)
+			if err := y.VisitFilterExpr(c.FilterExpr()); err != nil {
+				return err
+			}
+			// Map derived values back to the parent call list (call anchor), not to args.
+			y.EmitFilter()
+			return nil
+		case *sf.FilterExpressionBinaryCompareContext:
+			y.EmitPushCallArgs(argStart, containOther)
+			if err := y.VisitFilterExpr(c.FilterExpr()); err != nil {
+				return err
+			}
+			if c.NumberLiteral() != nil {
+				n := y.VisitNumberLiteral(c.NumberLiteral())
 				y.EmitPushLiteral(n)
-			} else if binary.Identifier() != nil {
-				y.EmitPushLiteral(yakunquote.TryUnquote(binary.Identifier().GetText()))
-			} else if binary.BoolLiteral() != nil {
-				if yakunquote.TryUnquote(binary.BoolLiteral().GetText()) == "true" {
+			} else if c.Identifier() != nil {
+				y.EmitPushLiteral(yakunquote.TryUnquote(c.Identifier().GetText()))
+			} else if c.BoolLiteral() != nil {
+				if yakunquote.TryUnquote(c.BoolLiteral().GetText()) == "true" {
 					y.EmitPushLiteral(true)
 				} else {
 					y.EmitPushLiteral(false)
 				}
 			}
-			y.EmitOperator(binary.GetOp().GetText())
+			y.EmitOperator(c.GetOp().GetText())
 			y.EmitCondition()
-			return true
+			y.EmitFilter()
+			return nil
+		case *sf.OpcodeTypeConditionContext:
+			opcodes := c.AllOpcodesCondition()
+			ops := make([]string, 0, len(opcodes))
+			for _, opcode := range opcodes {
+				ops = append(ops, opcode.GetText())
+			}
+			y.EmitPushCallArgs(argStart, containOther)
+			y.EmitCompareOpcode(ops)
+			y.EmitCondition()
+			y.EmitFilter()
+			return nil
+		case *sf.StringContainAnyConditionContext:
+			res := y.VisitStringLiteralWithoutStarGroup(c.StringLiteralWithoutStarGroup())
+			y.EmitPushCallArgs(argStart, containOther)
+			y.EmitCompareString(res, MatchHaveAny)
+			y.EmitCondition()
+			y.EmitFilter()
+			return nil
+		case *sf.StringContainHaveConditionContext:
+			res := y.VisitStringLiteralWithoutStarGroup(c.StringLiteralWithoutStarGroup())
+			y.EmitPushCallArgs(argStart, containOther)
+			y.EmitCompareString(res, MatchHave)
+			y.EmitCondition()
+			y.EmitFilter()
+			return nil
+		default:
+			// Fallback: treat as an arg-level condition expression, then lift to call-level via OpFilter.
+			y.EmitPushCallArgs(argStart, containOther)
+			y.VisitConditionExpression(expr)
+			y.EmitCondition()
+			y.EmitFilter()
+			return nil
 		}
+	}
 
-		// General case: interpret `?(condExpr)` as `*?{condExpr}` (filter call args),
-		// i.e. produce a filtered arg list that still maps back to the parent call.
-		y.EmitAnchorScopeStart()
-		y.VisitConditionExpression(cond)
-		y.EmitCondition()
-		y.EmitAnchorScopeEnd()
+	handleConditionExpression := func(single sf.ISingleParamContext, argStart int, containOther bool) bool {
+		ret, ok := single.(*sf.SingleParamContext)
+		if !ok || ret == nil || ret.ConditionExpression() == nil {
+			return false
+		}
+		_ = haveQuestion
+		// In call-arg filter context, condition expressions are lifted to call-level conditions.
+		// This makes `a?(xx && yy)` composable and allows mixed expressions like `*<len>==2 && opcode:function`.
+		_ = visitCallArgConditionExpression(ret.ConditionExpression(), argStart, containOther)
 		return true
 	}
 	switch ret := i.(type) {
 	case *sf.AllParamContext:
 		statement := y.EmitEnterStatement()
-		y.EmitPushCallArgs(0, true)
-		if handleFilterStatement(ret.SingleParam()) {
-			y.EmitOpPopDuplicate()
-		} else if handleConditionExpression(ret.SingleParam()) {
+		if sp, ok := ret.SingleParam().(*sf.SingleParamContext); ok && sp != nil {
+			if sp.FilterStatement() != nil {
+				y.EmitPushCallArgs(0, true)
+				y.VisitFilterStatement(sp.FilterStatement())
+				y.EmitOpPopDuplicate()
+				y.EmitFilter()
+				y.EmitCondition()
+			} else if handleConditionExpression(sp, 0, true) {
+				y.EmitCondition()
+			}
 		}
-		y.EmitFilter()
-		y.EmitCondition()
 		y.EmitExitStatement(statement)
-		_ = haveQuestion
 	case *sf.EveryParamContext:
 		for i, paraI := range ret.AllActualParamFilter() {
 			para, ok := paraI.(*sf.ActualParamFilterContext)
@@ -388,25 +461,32 @@ func (y *SyntaxFlowVisitor) VisitActualParam(i sf.IActualParamContext, haveQuest
 				continue
 			}
 			statement := y.EmitEnterStatement()
-			y.EmitPushCallArgs(i, false)
-			if handleFilterStatement(single) {
-				y.EmitOpPopDuplicate()
-			} else if handleConditionExpression(single) {
+			if sp, ok := single.(*sf.SingleParamContext); ok && sp != nil {
+				if sp.FilterStatement() != nil {
+					y.EmitPushCallArgs(i, false)
+					y.VisitFilterStatement(sp.FilterStatement())
+					y.EmitOpPopDuplicate()
+					y.EmitFilter()
+					y.EmitCondition()
+				} else if handleConditionExpression(sp, i, false) {
+					y.EmitCondition()
+				}
 			}
-			_ = haveQuestion
-			y.EmitFilter()
-			y.EmitCondition()
 			y.EmitExitStatement(statement)
 		}
 		if ret.SingleParam() != nil { // the last one get continue other value
 			statement := y.EmitEnterStatement()
-			y.EmitPushCallArgs(len(ret.AllActualParamFilter()), true)
-			if handleFilterStatement(ret.SingleParam()) {
-				y.EmitOpPopDuplicate()
-			} else if handleConditionExpression(ret.SingleParam()) {
+			if sp, ok := ret.SingleParam().(*sf.SingleParamContext); ok && sp != nil {
+				if sp.FilterStatement() != nil {
+					y.EmitPushCallArgs(len(ret.AllActualParamFilter()), true)
+					y.VisitFilterStatement(sp.FilterStatement())
+					y.EmitOpPopDuplicate()
+					y.EmitFilter()
+					y.EmitCondition()
+				} else if handleConditionExpression(sp, len(ret.AllActualParamFilter()), true) {
+					y.EmitCondition()
+				}
 			}
-			y.EmitFilter()
-			y.EmitCondition()
 			y.EmitExitStatement(statement)
 		}
 	default:
