@@ -82,7 +82,7 @@ func WithToolCaller_ReviewWrongParam(
 }
 
 // WithToolCaller_ParamAugment sets an optional callback to merge extra params into the final invoke params
-// after generation or preset. Used when infra must inject params (e.g. sf_sample_* for check-syntaxflow-syntax).
+// after generation or preset. Used when infra must inject params (e.g. sample code for validation tools).
 func WithToolCaller_ParamAugment(augment func(aitool.InvokeParams) aitool.InvokeParams) ToolCallerOption {
 	return func(tc *ToolCaller) {
 		tc.paramAugment = augment
