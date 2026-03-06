@@ -21,6 +21,9 @@ type ScanNode struct {
 	manager  *TaskManager
 	serverIp string
 
+	// InvokeScript global concurrency guard. All script tasks share one limiter.
+	invokeLimiter *invokeLimiter
+
 	feedbackCount uint64
 	feedbackBytes uint64
 
@@ -84,6 +87,7 @@ func NewScanNodeWithAMQPUrl(id, serverPort string, amqpUrl string, serverIp stri
 		},
 	)
 	agent.startFeedbackStats()
+	node.initInvokeLimiter()
 	node.initScanRPC()
 	return node, nil
 }
