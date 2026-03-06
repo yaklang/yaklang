@@ -3,7 +3,6 @@ package compiler
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -220,15 +219,7 @@ func RunViaJIT(opts ...RunOption) (int64, error) {
 		}
 	}
 
-	var comp *Compiler
-	var err error
-
-	if cfg.SourceCode != "" {
-		_, comp, _, err = compileToIRFromCodeWithExternBindings(cfg.SourceCode, cfg.Language, cfg.ExternBindings)
-	} else {
-		_, comp, _, err = compileToIRWithExternBindings(cfg.SourceFile, cfg.Language, cfg.ExternBindings)
-	}
-
+	_, comp, _, err := compileInput(cfg.SourceFile, cfg.SourceCode, cfg.Language, cfg.ExternBindings)
 	if err != nil {
 		return 0, err
 	}
@@ -261,35 +252,9 @@ func RunViaJIT(opts ...RunOption) (int64, error) {
 	defer comp.Builder.Dispose()
 	defer engine.Dispose()
 
-	functionName := cfg.FunctionName
-	if functionName == "" {
-		functionName = "check"
-	}
-
-	fn := comp.Mod.NamedFunction(functionName)
-	if fn.IsNil() {
-		// Try fallback to main if check not found
-		if functionName == "check" {
-			fn = comp.Mod.NamedFunction("main")
-			if !fn.IsNil() {
-				functionName = "main"
-			} else {
-				// Try @main
-				fn = comp.Mod.NamedFunction("@main")
-				if !fn.IsNil() {
-					functionName = "@main"
-				}
-			}
-		} else {
-			// Try with @ prefix
-			fn = comp.Mod.NamedFunction("@" + functionName)
-			if !fn.IsNil() {
-				functionName = "@" + functionName
-			}
-		}
-		if fn.IsNil() {
-			return 0, utils.Errorf("function '%s' not found in module", functionName)
-		}
+	functionName, fn, err := resolveEntryFunction(comp.Mod, cfg.FunctionName)
+	if err != nil {
+		return 0, err
 	}
 
 	// Prepare arguments
@@ -304,63 +269,123 @@ func RunViaJIT(opts ...RunOption) (int64, error) {
 	return int64(result.Int(true)), nil
 }
 
-func compileToIRFromCode(code, language string) (*ssaapi.Program, *Compiler, string, error) {
-	return compileToIRFromCodeWithExternBindings(code, language, nil)
-}
+func compileInput(sourceFile, sourceCode, language string, externBindings map[string]ExternBinding) (*ssaapi.Program, *Compiler, string, error) {
+	code, sourceLabel, language, err := resolveCompileInput(sourceFile, sourceCode, language)
+	if err != nil {
+		return nil, nil, "", err
+	}
 
-func compileToIRFromCodeWithExternBindings(code, language string, externBindings map[string]ExternBinding) (*ssaapi.Program, *Compiler, string, error) {
 	ctx := context.Background()
-
 	opts := buildSSAOptions(language)
 	progBundle, err := ssaapi.Parse(code, opts...)
 	if err != nil {
 		return nil, nil, "", utils.Errorf("SSA parse failed: %v", err)
 	}
-	ssaProg := progBundle.Program
 
-	// Initialize LLVM
 	llvm.InitializeNativeTarget()
 	llvm.InitializeNativeAsmPrinter()
 
-	comp := NewCompiler(ctx, ssaProg, WithExternBindings(externBindings))
+	log.Infof("compiling %s (%s)", sourceLabel, language)
+
+	comp := NewCompiler(ctx, progBundle.Program, WithExternBindings(externBindings))
 	if err := comp.Compile(); err != nil {
 		comp.Dispose()
 		return nil, nil, "", utils.Errorf("LLVM compilation failed: %v", err)
 	}
 
-	// Verify module
 	if err := llvm.VerifyModule(comp.Mod, llvm.PrintMessageAction); err != nil {
 		comp.Dispose()
 		return nil, nil, "", utils.Errorf("LLVM verification failed: %v", err)
 	}
 
-	ir := comp.Mod.String()
-
-	return progBundle, comp, ir, nil
+	return progBundle, comp, comp.Mod.String(), nil
 }
 
-func compileToIR(sourceFile, language string) (*ssaapi.Program, *Compiler, string, error) {
-	return compileToIRWithExternBindings(sourceFile, language, nil)
-}
-
-func compileToIRWithExternBindings(sourceFile, language string, externBindings map[string]ExternBinding) (*ssaapi.Program, *Compiler, string, error) {
-	code, err := os.ReadFile(sourceFile)
-	if err != nil {
-		return nil, nil, "", utils.Errorf("failed to read source file: %v", err)
+func resolveCompileInput(sourceFile, sourceCode, language string) (string, string, string, error) {
+	if sourceCode != "" {
+		if language == "" {
+			language = "yak"
+		}
+		return sourceCode, "<memory>", language, nil
+	}
+	if sourceFile == "" {
+		return "", "", "", utils.Errorf("no source file or source code provided")
 	}
 
+	code, err := os.ReadFile(sourceFile)
+	if err != nil {
+		return "", "", "", utils.Errorf("failed to read source file: %v", err)
+	}
 	if language == "" {
 		language = detectLanguageFromExt(sourceFile)
 	}
+	return string(code), sourceFile, language, nil
+}
 
-	log.Infof("compiling %s (%s)", sourceFile, language)
+func resolveEntryFunction(mod llvm.Module, requested string) (string, llvm.Value, error) {
+	candidates := entryFunctionCandidates(requested)
+	for _, candidate := range candidates {
+		fn := mod.NamedFunction(candidate)
+		if !fn.IsNil() {
+			return candidate, fn, nil
+		}
+	}
+	if requested == "" {
+		requested = "check"
+	}
+	return "", llvm.Value{}, utils.Errorf("function %q not found in module", requested)
+}
 
-	prog, comp, ir, err := compileToIRFromCodeWithExternBindings(string(code), language, externBindings)
-	if err != nil {
-		return nil, nil, "", err
+func entryFunctionCandidates(requested string) []string {
+	requested = strings.TrimSpace(requested)
+	if requested == "" {
+		requested = "check"
 	}
 
-	return prog, comp, ir, nil
+	seen := make(map[string]struct{}, 4)
+	add := func(name string, out *[]string) {
+		if name == "" {
+			return
+		}
+		if _, ok := seen[name]; ok {
+			return
+		}
+		seen[name] = struct{}{}
+		*out = append(*out, name)
+	}
+
+	out := make([]string, 0, 4)
+	add(requested, &out)
+	if strings.HasPrefix(requested, "@") {
+		add(strings.TrimPrefix(requested, "@"), &out)
+	} else {
+		add("@"+requested, &out)
+	}
+	if requested == "check" {
+		add("main", &out)
+		add("@main", &out)
+	}
+	return out
+}
+
+func renameConflictingMainFunctions(mod llvm.Module, entryFunc string) string {
+	atMain := mod.NamedFunction("@main")
+	if !atMain.IsNil() {
+		atMain.SetName("yak_internal_atmain")
+		if entryFunc == "@main" {
+			entryFunc = "yak_internal_atmain"
+		}
+	}
+
+	plainMain := mod.NamedFunction("main")
+	if !plainMain.IsNil() {
+		plainMain.SetName("yak_internal_main")
+		if entryFunc == "main" {
+			entryFunc = "yak_internal_main"
+		}
+	}
+
+	return entryFunc
 }
 
 func CompileToExecutable(opts ...CompileOption) error {
@@ -371,68 +396,17 @@ func CompileToExecutable(opts ...CompileOption) error {
 		}
 	}
 
-	var comp *Compiler
-	var ir string
-	var err error
-
-	if cfg.SourceCode != "" {
-		_, comp, ir, err = compileToIRFromCodeWithExternBindings(cfg.SourceCode, cfg.Language, cfg.ExternBindings)
-	} else {
-		_, comp, ir, err = compileToIRWithExternBindings(cfg.SourceFile, cfg.Language, cfg.ExternBindings)
-	}
-
+	_, comp, ir, err := compileInput(cfg.SourceFile, cfg.SourceCode, cfg.Language, cfg.ExternBindings)
 	if err != nil {
 		return err
 	}
 	defer comp.Dispose()
 
-	// Add main wrapper for executable generation
-	// Use configured entry function or default to "@main" (standard Yak SSA entry)
-	entryFunc := cfg.EntryFunctionName
-	if entryFunc == "" {
-		entryFunc = "check"
+	entryFunc, _, err := resolveEntryFunction(comp.Mod, cfg.EntryFunctionName)
+	if err != nil {
+		return err
 	}
-
-	// Logic to resolve entry function and avoid collision with wrapper @main
-	fn := comp.Mod.NamedFunction(entryFunc)
-	if fn.IsNil() {
-		// Fallback logic
-		if entryFunc == "check" {
-			fn = comp.Mod.NamedFunction("main")
-			if !fn.IsNil() {
-				entryFunc = "main"
-			} else {
-				fn = comp.Mod.NamedFunction("@main")
-				if !fn.IsNil() {
-					entryFunc = "@main"
-				}
-			}
-		}
-	}
-	// Try with @ if not found
-	if fn.IsNil() && !strings.HasPrefix(entryFunc, "@") {
-		fn = comp.Mod.NamedFunction("@" + entryFunc)
-		if !fn.IsNil() {
-			entryFunc = "@" + entryFunc
-		}
-	}
-
-	// Rename existing main to avoid collision with C main wrapper
-	atMain := comp.Mod.NamedFunction("@main")
-	if !atMain.IsNil() {
-		atMain.SetName("yak_internal_atmain")
-		if entryFunc == "@main" {
-			entryFunc = "yak_internal_atmain"
-		}
-	}
-
-	plainMain := comp.Mod.NamedFunction("main")
-	if !plainMain.IsNil() {
-		plainMain.SetName("yak_internal_main")
-		if entryFunc == "main" {
-			entryFunc = "yak_internal_main"
-		}
-	}
+	entryFunc = renameConflictingMainFunctions(comp.Mod, entryFunc)
 
 	// Regenerate IR because we modified the module (renamed function)
 	ir = comp.Mod.String()
@@ -464,7 +438,7 @@ func CompileToExecutable(opts ...CompileOption) error {
 		return nil
 	}
 
-	tmpLL, err := ioutil.TempFile("", "ssa2llvm-*.ll")
+	tmpLL, err := os.CreateTemp("", "ssa2llvm-*.ll")
 	if err != nil {
 		return utils.Errorf("failed to create temp file: %v", err)
 	}

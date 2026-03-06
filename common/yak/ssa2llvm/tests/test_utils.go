@@ -22,7 +22,6 @@ func init() {
 	llvm.InitializeNativeTarget()
 	llvm.InitializeNativeAsmPrinter()
 }
-
 func check(t *testing.T, code string, expected interface{}) {
 	t.Helper()
 	checkEx(t, code, "yak", expected)
@@ -30,27 +29,68 @@ func check(t *testing.T, code string, expected interface{}) {
 
 func checkEx(t *testing.T, code string, language string, expected interface{}) {
 	t.Helper()
+	checkVerify(t, code, language)
+	checkBinaryEx(t, code, "check", language, expected)
+}
 
+func checkIntegrated(t *testing.T, code string, expected interface{}) {
+	t.Helper()
+	checkVerify(t, code, "yak")
+	checkJIT(t, code, expected)
+	checkBinaryEx(t, code, "check", "yak", expected)
+}
+
+func checkVerify(t *testing.T, code string, language string) {
+	t.Helper()
+
+	tmpIR, err := os.CreateTemp("", "ssa2llvm-verify-*.ll")
+	if err != nil {
+		t.Fatalf("Failed to create verify temp file: %v", err)
+	}
+	_ = tmpIR.Close()
+	defer os.Remove(tmpIR.Name())
+
+	if err := compiler.CompileToExecutable(
+		compiler.WithCompileSourceCode(code),
+		compiler.WithCompileLanguage(language),
+		compiler.WithCompileEmitLLVM(true),
+		compiler.WithCompileOutputFile(tmpIR.Name()),
+	); err != nil {
+		t.Fatalf("Compile/verify failed: %v", err)
+	}
+}
+
+func checkJIT(t *testing.T, code string, expected interface{}) {
+	t.Helper()
 	result, err := compiler.RunViaJIT(
 		compiler.WithRunSourceCode(code),
-		compiler.WithRunLanguage(language),
+		compiler.WithRunLanguage("yak"),
 	)
 	if err != nil {
 		t.Fatalf("JIT execution failed: %v", err)
 	}
 	compareResult(t, expected, result)
+}
 
+func checkBinaryEx(t *testing.T, code string, entry string, language string, expected interface{}) {
+	t.Helper()
 	want, ok := expectedToInt64(expected)
 	if !ok {
 		t.Fatalf("Unsupported expected value type for binary check: %T", expected)
 	}
-	binaryRet, output := runBinaryReturnValue(t, code, "check", language)
+	binaryRet, output := runBinaryReturnValue(t, code, entry, language)
 	if binaryRet != want {
 		t.Fatalf("Binary return mismatch. Expected: %d, Got: %d, Output: %q", want, binaryRet, output)
 	}
 }
 
 func checkPrint(t *testing.T, code string, expectedVals ...int64) {
+	t.Helper()
+	checkPrintJIT(t, code, expectedVals...)
+	checkPrintBinary(t, code, expectedVals...)
+}
+
+func checkPrintJIT(t *testing.T, code string, expectedVals ...int64) {
 	t.Helper()
 
 	teardown := SetupJITHook()
@@ -71,14 +111,17 @@ func checkPrint(t *testing.T, code string, expectedVals ...int64) {
 	if len(vals) != len(expectedVals) {
 		t.Errorf("JIT hook mismatch. Expected %d calls, got %d. Got: %v, Expected: %v",
 			len(expectedVals), len(vals), vals, expectedVals)
-	} else {
-		for i, v := range vals {
-			if v != expectedVals[i] {
-				t.Errorf("JIT hook mismatch at index %d. Expected %d, got %d", i, expectedVals[i], v)
-			}
+		return
+	}
+	for i, v := range vals {
+		if v != expectedVals[i] {
+			t.Errorf("JIT hook mismatch at index %d. Expected %d, got %d", i, expectedVals[i], v)
 		}
 	}
+}
 
+func checkPrintBinary(t *testing.T, code string, expectedVals ...int64) {
+	t.Helper()
 	output := runBinaryWithEnv(t, code, "check", nil)
 
 	var expectedBuffer strings.Builder

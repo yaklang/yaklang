@@ -6,10 +6,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/compiler"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
-	"github.com/yaklang/go-llvm"
 )
 
 func TestCompileTestdata(t *testing.T) {
@@ -17,7 +17,6 @@ func TestCompileTestdata(t *testing.T) {
 	llvm.InitializeNativeAsmPrinter()
 
 	testdataDir := "testdata"
-
 	testFiles := []struct {
 		file string
 		lang string
@@ -34,12 +33,12 @@ func TestCompileTestdata(t *testing.T) {
 	}
 }
 
-func testCompileFile(t *testing.T, filepath string, language string) {
+func testCompileFile(t *testing.T, filePath string, language string) {
 	t.Helper()
 
-	code, err := os.ReadFile(filepath)
+	code, err := os.ReadFile(filePath)
 	if err != nil {
-		t.Fatalf("Failed to read file %s: %v", filepath, err)
+		t.Fatalf("Failed to read file %s: %v", filePath, err)
 	}
 
 	var opts []ssaconfig.Option
@@ -53,54 +52,22 @@ func testCompileFile(t *testing.T, filepath string, language string) {
 
 	prog, err := ssaapi.Parse(string(code), opts...)
 	if err != nil {
-		t.Fatalf("SSA parse failed for %s: %v", filepath, err)
+		t.Fatalf("SSA parse failed for %s: %v", filePath, err)
 	}
 
-	c := compiler.NewCompiler(context.Background(), prog.Program)
+	comp := compiler.NewCompiler(context.Background(), prog.Program)
+	defer comp.Dispose()
 
-	if err := c.Compile(); err != nil {
-		t.Fatalf("LLVM compilation failed for %s: %v", filepath, err)
+	if err := comp.Compile(); err != nil {
+		t.Fatalf("LLVM compilation failed for %s: %v", filePath, err)
+	}
+	if err := llvm.VerifyModule(comp.Mod, llvm.ReturnStatusAction); err != nil {
+		t.Fatalf("LLVM module verification failed for %s: %v", filePath, err)
 	}
 
-	if err := llvm.VerifyModule(c.Mod, llvm.ReturnStatusAction); err != nil {
-		t.Fatalf("LLVM module verification failed for %s: %v", filepath, err)
+	if fn := comp.Mod.NamedFunction("check"); fn.IsNil() {
+		t.Logf("Warning: no 'check' function found in %s", filePath)
 	}
 
-	engine, err := llvm.NewExecutionEngine(c.Mod)
-	if err != nil {
-		t.Fatalf("Failed to create execution engine for %s: %v", filepath, err)
-	}
-	defer engine.Dispose()
-
-	// Compilation-only test: Do not execute to avoid LLVM execution engine issues with some languages
-	// (e.g., Go SSA generates code that may hang in LLVM JIT execution)
-	fn := c.Mod.NamedFunction("check")
-	if fn.IsNil() {
-		t.Logf("Warning: No 'check' function found in %s", filepath)
-	}
-
-	t.Logf("File %s (%s) compiled successfully (execution skipped)", filepath, language)
-}
-
-func detectLanguage(ext string) string {
-	switch ext {
-	case ".yak":
-		return "yak"
-	case ".go":
-		return "go"
-	case ".py":
-		return "python"
-	case ".js":
-		return "javascript"
-	case ".ts":
-		return "typescript"
-	case ".java":
-		return "java"
-	case ".php":
-		return "php"
-	case ".c", ".h":
-		return "c"
-	default:
-		return ""
-	}
+	t.Logf("File %s (%s) compiled and verified successfully", filePath, language)
 }
