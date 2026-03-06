@@ -43,7 +43,7 @@ app.get('/admin/users/:id', (req, res) => {
 
 3. **检测逻辑说明**
 
-本规则分三步检测，借助 `<matchRegexpPath(target=...)>` NativeCall 精确复现 CodeQL 的 "guard" 关系：
+本规则分三步检测，借助 `<matchRegexpPath(target=...)>` NativeCall 精确复现"guard" 关系：
 
 - **Step 1**：找到所有 `*.use(regex, handler)` 调用，其中 `regex` 是正则字面量且不含 `i` 标志（即 opcode 为 const，值形如 `/pattern/` 或 `/pattern/g` 等，末尾 `/` 后不含 `i`）
 - **Step 2**：检查同一程序中是否存在 `*.get/post/put/delete/all/patch(stringPath, handler)` 形式的路由端点，其中 `stringPath` 是普通字符串（非正则）
@@ -97,7 +97,7 @@ REFERENCE
 // =====================================================================
 // Detection Logic
 //
-// CodeQL's original rule detects the "guard" relationship:
+// rule detects the "guard" relationship:
 //   - middleware with case-sensitive regex path guards an endpoint with
 //     a case-insensitive string path → the string path can be reached
 //     by upper-casing the URL, bypassing the regex middleware.

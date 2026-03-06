@@ -1,0 +1,277 @@
+desc(
+	title: "Sensitive Data Read from GET Request"
+	title_zh: "GET 请求中读取敏感数据"
+	type: vuln
+	risk_type: "sensitive-get-query"
+	level: low
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+
+当应用程序通过 GET 请求的查询字符串（`req.query.*`）传输敏感信息（如密码、令牌、密钥等）时，这些敏感数据会以明文形式出现在 URL 中。URL 中的敏感信息存在多种泄露风险：
+
+- **服务器日志**：Web 服务器、代理服务器、CDN 通常会记录完整的请求 URL，导致敏感数据写入日志文件
+- **浏览器历史**：URL 会被浏览器保存在历史记录和自动补全中
+- **书签/分享**：用户可能无意间将含敏感信息的 URL 发送给他人
+- **Referer 头泄露**：当页面跳转时，浏览器会在 `Referer` 头中携带完整 URL，可能泄露给第三方网站
+- **网络嗅探**：未使用 HTTPS 时，URL 可直接被中间人捕获
+
+2. **触发场景**
+
+```javascript
+// 危险：密码通过 GET 查询字符串传输
+app.get('/login', (req, res) => {
+    const password = req.query.password;  // URL: /login?password=secret123
+    const token = req.query.token;        // URL: /login?token=abc123
+});
+```
+
+3. **潜在影响**
+
+- 敏感凭证（密码、API 密钥、Token）泄露到日志文件
+- 通过 Referer 头将敏感数据暴露给第三方
+- 敏感信息被浏览器历史记录保存，造成本地信息泄露
+- 在共享计算机上可能导致未授权访问
+DESC
+	rule_id: "c5d6e7f8-a9b0-1234-cdef-598000000001"
+	solution: <<<SOLUTION
+### 修复建议
+
+**1. 改用 POST 请求传输敏感数据**
+
+```javascript
+// BAD: 密码通过 GET 查询字符串传输
+app.get('/login', (req, res) => {
+    const password = req.query.password;
+});
+
+// GOOD: 密码通过 POST 请求体传输
+app.post('/login', (req, res) => {
+    const password = req.body.password;
+});
+```
+
+**2. 确保使用 HTTPS**
+
+即使改为 POST，也应确保整个应用使用 HTTPS，防止请求体被中间人捕获。
+
+**3. 避免在 URL 中暴露任何凭证信息**
+
+- 不要在 URL 中包含密码、API 密钥、会话令牌等凭证
+- 使用 HTTP Header（如 `Authorization`）或请求体传输认证信息
+- 对于 API 密钥，使用 `Authorization: Bearer <token>` 头
+
+**4. 配置日志过滤**
+
+如果确实需要在 GET 请求中传输参数，应配置日志系统过滤或脱敏敏感字段。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-598: Use of GET Request Method with Sensitive Query Strings](https://cwe.mitre.org/data/definitions/598.html)
+[OWASP: Information Exposure through Query Strings in URL](https://owasp.org/www-community/vulnerabilities/Information_exposure_through_query_strings_in_url)
+[PortSwigger: Password Submitted using GET Method](https://portswigger.net/kb/issues/00400300_password-submitted-using-get-method)
+[CodeQL: js/sensitive-get-query](https://codeql.github.com/codeql-query-help/javascript/js-sensitive-get-query/)
+REFERENCE
+)
+
+// =====================================================================
+// Detection Strategy
+//
+// Identify GET request query parameters whose field name indicates
+// sensitive data (password, token, secret, API key, etc.).
+//
+// The SSA representation of `req.query.password` is:
+//   ParameterMember-parameterMember[0].password
+//
+// The `have:` filter performs substring/regex match on this full name,
+// which includes the field name (e.g., "password", "api_key").
+//
+// This is a direct pattern match (no dataflow tracing needed), since
+// the vulnerability is in the ACCESS PATTERN itself — reading sensitive
+// fields from GET query params — not in how the value flows downstream.
+//
+// Exclusions:
+//   - "userid" / "user_id" patterns: reading a user ID (not a secret)
+//     via GET is acceptable (e.g., /profile?user_id=123)
+//   - Non-sensitive synonyms: "username" alone is borderline, but
+//     "password" alongside it is the real issue; we focus on fields
+//     that are clearly credential/secret values.
+// =====================================================================
+
+req.query.* as $allGetParams
+ctx.query.* as $allGetParams
+
+// Match GET query parameters whose field name suggests sensitive/secret data.
+// The regex targets common naming conventions for passwords, tokens, keys, etc.
+// It avoids matching plain "user" or "username" since those are identifiers,
+// not secrets. "userid" / "user_id" are also excluded (not secrets).
+$allGetParams?{have: /(?i)(password|passwd|pwd|pass_phrase|passphrase|secret|token|api[_-]?key|apikey|access[_-]?key|accesskey|private[_-]?key|privatekey|auth[_-]?token|authtoken|session[_-]?token|csrf[_-]?token|client[_-]?secret|client_id|app[_-]?secret|sign[_-]?key|signkey|hmac[_-]?key|encryption[_-]?key|enc[_-]?key|salt|otp|pin_code|pincode|cvv|ssn|credit[_-]?card|bank[_-]?account)/} as $sensitiveGetParam
+
+alert $sensitiveGetParam for {
+	level: "low",
+	type: "vuln",
+	title: "Sensitive Data Read from GET Request",
+	title_zh: "GET 请求中读取敏感数据",
+	message: "检测到通过 GET 请求的查询字符串读取敏感数据（如密码、令牌、密钥等）。这些敏感信息会以明文形式出现在 URL 中，可能被记录到服务器日志、浏览器历史或通过 Referer 头泄露给第三方。建议改用 POST 请求，将敏感数据放在请求体中传输。",
+	risk: "敏感数据通过 GET 请求泄露",
+	name: "sensitiveGetParam",
+}
+
+// =====================================================================
+// Embedded Test Cases
+// =====================================================================
+
+// Test 1: VULNERABLE — password read from GET query param (canonical example)
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///sensitive_get_login.js': <<<CODE
+const express = require('express');
+const app = express();
+app.use(require('body-parser').urlencoded({ extended: false }))
+
+// BAD: sensitive information is read from query parameters
+app.get('/login1', (req, res) => {
+    const user = req.query.user;
+    const password = req.query.password;
+    if (checkUser(user, password)) {
+        res.send('Welcome');
+    } else {
+        res.send('Access denied');
+    }
+});
+
+// GOOD: sensitive information is read from post body
+app.post('/login2', (req, res) => {
+    const user = req.body.user;
+    const password = req.body.password;
+    if (checkUser(user, password)) {
+        res.send('Welcome');
+    } else {
+        res.send('Access denied');
+    }
+});
+CODE
+)
+
+// Test 2: VULNERABLE — token read from GET query param
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///sensitive_get_token.js': <<<CODE
+const express = require('express');
+const app = express();
+
+// BAD: API token in GET query string
+app.get('/api/data', (req, res) => {
+    const token = req.query.token;
+    const apiKey = req.query.api_key;
+    if (validateToken(token)) {
+        res.json({ data: 'secret data' });
+    } else {
+        res.status(401).send('Unauthorized');
+    }
+});
+CODE
+)
+
+// Test 3: VULNERABLE — secret and private key in GET params
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///sensitive_get_secret.js': <<<CODE
+const express = require('express');
+const app = express();
+
+// BAD: secret and private key in GET query string
+app.get('/setup', (req, res) => {
+    const secret = req.query.secret;
+    const privateKey = req.query.private_key;
+    configure(secret, privateKey);
+    res.send('configured');
+});
+CODE
+)
+
+// Test 4: VULNERABLE — auth token via GET (Koa style)
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///sensitive_get_koa.js': <<<CODE
+const Koa = require('koa');
+const app = new Koa();
+
+app.use(async (ctx) => {
+    // BAD: auth token in GET query params
+    const authToken = ctx.query.auth_token;
+    const csrfToken = ctx.query.csrf_token;
+    if (validateAuth(authToken)) {
+        ctx.body = 'ok';
+    }
+});
+CODE
+)
+
+// Test 5: SAFE — sensitive data read from POST body
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///safe_post_login.js': <<<CODE
+const express = require('express');
+const app = express();
+app.use(require('body-parser').urlencoded({ extended: false }))
+
+// GOOD: sensitive info in POST request body
+app.post('/login', (req, res) => {
+    const user = req.body.user;
+    const password = req.body.password;
+    const token = req.body.token;
+    if (checkUser(user, password)) {
+        res.send('Welcome');
+    } else {
+        res.send('Access denied');
+    }
+});
+CODE
+)
+
+// Test 6: SAFE — non-sensitive data in GET query params
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///safe_get_nonsensitive.js': <<<CODE
+const express = require('express');
+const app = express();
+
+// GOOD: non-sensitive search/filter params in GET
+app.get('/search', (req, res) => {
+    const keyword = req.query.q;
+    const page = req.query.page;
+    const user = req.query.user;
+    const category = req.query.category;
+    const sortBy = req.query.sort_by;
+    res.json({ results: [] });
+});
+CODE
+)
+
+// Test 7: SAFE — sensitive data in Authorization header
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///safe_auth_header.js': <<<CODE
+const express = require('express');
+const app = express();
+
+// GOOD: token transmitted via Authorization header, not query string
+app.get('/api/data', (req, res) => {
+    const authHeader = req.headers.authorization;
+    const bearerToken = authHeader && authHeader.split(' ')[1];
+    if (validateToken(bearerToken)) {
+        res.json({ data: 'secret' });
+    } else {
+        res.status(401).send('Unauthorized');
+    }
+});
+CODE
+)

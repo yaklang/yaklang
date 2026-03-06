@@ -246,7 +246,7 @@ alert $ssrf for {
 // Embedded Test Cases
 // =====================================================================
 
-// Test 1: VULNERABLE — user input directly in URL hostname (CodeQL canonical example)
+// Test 1: VULNERABLE — user input directly in URL hostname (canonical example)
 desc(
 	lang: "js"
 	alert_min: 1
@@ -348,7 +348,7 @@ const server = http.createServer(function(req, res) {
 CODE
 )
 
-// Test 6: SAFE — allowlist-based hostname selection (CodeQL canonical safe example)
+// Test 6: SAFE — allowlist-based hostname selection (canonical safe example)
 desc(
 	lang: "js"
 	alert_min: 0

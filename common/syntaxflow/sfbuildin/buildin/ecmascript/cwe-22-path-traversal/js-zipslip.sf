@@ -208,7 +208,7 @@ path.basename(*) as $filter
 // =====================================================================
 // String guard check detection (Barrier Guard simulation)
 //
-// CodeQL handles indexOf/includes/startsWith guards via CFG-based BarrierGuard.
+// handles indexOf/includes/startsWith guards via CFG-based BarrierGuard.
 // SyntaxFlow cannot perform CFG analysis, so we approximate:
 //   Use ?{<self>.method(*)} condition filter to detect source values that
 //   have string check methods called on them. These are likely protected

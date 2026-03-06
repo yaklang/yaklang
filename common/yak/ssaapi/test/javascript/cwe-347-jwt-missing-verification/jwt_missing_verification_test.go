@@ -43,7 +43,7 @@ func runOnCode(t *testing.T, ruleContent, filename, code string) int {
 	return total
 }
 
-// TestJWT_Positive_FalseSecret 使用 false 作为密钥（CodeQL 文档标准示例）
+// TestJWT_Positive_FalseSecret 使用 false 作为密钥
 // jwt.verify(token, false, { algorithms: ["HS256", "none"] }) — 最典型的漏洞用法。
 func TestJWT_Positive_FalseSecret(t *testing.T) {
 	rule := loadJWTRule(t)
@@ -111,7 +111,6 @@ jwt.verify(token, 0, { algorithms: ["HS256"] });
 }
 
 // TestJWT_Negative_ValidStringSecret 使用真实字符串密钥（安全）
-// 对应 CodeQL 文档中的修复示例。
 func TestJWT_Negative_ValidStringSecret(t *testing.T) {
 	rule := loadJWTRule(t)
 	code := `
