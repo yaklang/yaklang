@@ -129,6 +129,43 @@ func (b *builder) CreateJSVariable(identifierName string) *ssa.Variable {
 	return b.CreateVariable(identifierName)
 }
 
+// ensureImplicitGlobalVariable creates a placeholder global variable for non-strict
+// assignments in nested functions/closures.
+//
+// In JavaScript non-strict mode, assigning to an undeclared identifier inside a
+// function creates a global variable implicitly (e.g. `t = 1`). Our closure
+// builder snapshots the lexical scope at definition time, so this implicit
+// global may be missing from the parent scope chain when the function body is
+// lazy-built. Creating the placeholder in the root builder makes the assignment
+// observable as a closure side-effect at call sites.
+func (b *builder) ensureImplicitGlobalVariable(identifierName string) {
+	if b.useStrict {
+		return
+	}
+	// Only meaningful inside nested functions/closures.
+	parentBuilder := b.PopFunction()
+	if parentBuilder == nil {
+		return
+	}
+
+	rootBuilder := parentBuilder
+	for next := rootBuilder.PopFunction(); next != nil; next = rootBuilder.PopFunction() {
+		rootBuilder = next
+	}
+	if rootBuilder == nil || rootBuilder.CurrentBlock == nil || rootBuilder.CurrentBlock.ScopeTable == nil {
+		return
+	}
+
+	existing := ssa.ReadVariableFromScopeAndParent(rootBuilder.CurrentBlock.ScopeTable, identifierName)
+	if existing != nil && existing.GetValue() != nil {
+		return
+	}
+
+	undef := rootBuilder.EmitUndefined(identifierName)
+	variable := rootBuilder.CreateVariableHead(identifierName)
+	rootBuilder.AssignVariable(variable, undef)
+}
+
 // resolveImportLibPath 解析导入路径
 func (b *builder) resolveImportLibPath(importPath string) (resolvedPath string, isExternal bool) {
 	if importPath == "" {
