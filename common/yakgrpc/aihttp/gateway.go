@@ -9,7 +9,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiconfig"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -249,7 +248,7 @@ func (gw *AIAgentHTTPGateway) applySettingToRuntime(s aiAgentChatSettingPayload)
 	modelConfigs := consts.BuildAIModelConfigs([]*ypb.ThirdPartyApplicationConfig{aiCfg})
 	consts.SetTieredAIConfig(&consts.TieredAIConfig{
 		Enabled:            true,
-		RoutingPolicy:      aiconfig.RoutingPolicy(s.ReviewPolicy),
+		RoutingPolicy:      consts.RoutingPolicy(s.ReviewPolicy),
 		DisableFallback:    s.DisableToolUse,
 		IntelligentConfigs: modelConfigs,
 		LightweightConfigs: modelConfigs,

@@ -19,6 +19,8 @@ func (gw *AIAgentHTTPGateway) registerRoutes() {
 
 	sub.HandleFunc("/setting/global", gw.handleGetGlobalSetting).Methods("GET", "OPTIONS")
 	sub.HandleFunc("/setting/global", gw.handleUpdateGlobalSetting).Methods("POST", "OPTIONS")
+	sub.HandleFunc("/setting/aiconfig", gw.handleGetAIGlobalConfig).Methods("GET", "OPTIONS")
+	sub.HandleFunc("/setting/aiconfig", gw.handleUpdateAIGlobalConfig).Methods("POST", "OPTIONS")
 	sub.HandleFunc("/setting/appconfigs/template/get", gw.handleGetThirdPartyAppConfigTemplate).Methods("POST", "OPTIONS")
 
 	sub.HandleFunc("/setting/aimodels/get", gw.handleListAIModels).Methods("POST", "OPTIONS")
