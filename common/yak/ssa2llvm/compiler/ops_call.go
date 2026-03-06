@@ -23,6 +23,10 @@ func (c *Compiler) compileCall(inst *ssa.Call) error {
 	fn := inst.GetFunc()
 	calleeName := c.resolveCalleeName(fn, inst.Method)
 
+	if binding, ok := c.getExternBinding(calleeName); ok && binding.DispatchID != 0 {
+		return c.compileStdlibDispatchCall(inst, binding)
+	}
+
 	// 2. Get or declare LLVM function
 	// Check externs first
 	llvmFn := c.ensureExternDeclaration(calleeName)
@@ -44,13 +48,19 @@ func (c *Compiler) compileCall(inst *ssa.Call) error {
 
 	// 3. Prepare arguments
 	args := make([]llvm.Value, 0, len(inst.Args))
+	const yakTaggedPointerMask uint64 = 1 << 62
 	for i, argID := range inst.Args {
 		argVal, err := c.getValue(inst, argID)
 		if err != nil {
 			return fmt.Errorf("compileCall: failed to resolve argument %d: %w", argID, err)
 		}
+		isPointer := argVal.Type().IntTypeWidth() == 0
 		if hasExternBinding && i < len(externBinding.Params) {
 			argVal = c.coerceToExternArgType(argVal, externBinding.Params[i])
+		}
+		if calleeName == "println" && isPointer {
+			tag := llvm.ConstInt(c.LLVMCtx.Int64Type(), yakTaggedPointerMask, false)
+			argVal = buildOr(c.Builder, argVal, tag, "println_tag")
 		}
 		args = append(args, argVal)
 	}

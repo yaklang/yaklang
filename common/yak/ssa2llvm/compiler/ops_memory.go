@@ -180,6 +180,18 @@ func (c *Compiler) getOrInsertRuntimeSetField() (llvm.Value, llvm.Type) {
 	return fn, fnType
 }
 
+func (c *Compiler) getOrInsertRuntimeToCString() (llvm.Value, llvm.Type) {
+	name := "yak_runtime_to_cstring"
+	fn := c.Mod.NamedFunction(name)
+
+	i8Ptr := llvm.PointerType(c.LLVMCtx.Int8Type(), 0)
+	fnType := llvm.FunctionType(i8Ptr, []llvm.Type{i8Ptr}, false)
+	if fn.IsNil() {
+		fn = llvm.AddFunction(c.Mod, name, fnType)
+	}
+	return fn, fnType
+}
+
 func (c *Compiler) resolveMemberKeyString(key ssa.Value) string {
 	if cinst, ok := ssa.ToConstInst(key); ok {
 		return strings.Trim(cinst.String(), "\"")

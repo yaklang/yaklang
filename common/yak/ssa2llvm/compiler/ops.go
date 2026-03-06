@@ -29,6 +29,8 @@ func (c *Compiler) compileInstruction(inst ssa.Instruction) error {
 		return c.compileMake(op)
 	case *ssa.ParameterMember:
 		return c.compileParameterMember(op)
+	case *ssa.TypeCast:
+		return c.compileTypeCast(op)
 	default:
 		// Ignore unimplemented instructions for now
 		return nil
@@ -83,7 +85,18 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 		return llvm.Value{}, fmt.Errorf("getValue: compileParameterMember succeeded but value %d not cached", id)
 	}
 
-	// 5. Generic MemberCall
+	// 5. Lazy compile if TypeCast
+	if tc, ok := valObj.(*ssa.TypeCast); ok {
+		if err := c.compileTypeCast(tc); err != nil {
+			return llvm.Value{}, err
+		}
+		if val, ok := c.Values[id]; ok {
+			return val, nil
+		}
+		return llvm.Value{}, fmt.Errorf("getValue: compileTypeCast succeeded but value %d not cached", id)
+	}
+
+	// 6. Generic MemberCall
 	if mc, ok := valObj.(ssa.MemberCall); ok && mc.IsMember() {
 		if err := c.compileMemberCall(valObj, mc); err != nil {
 			return llvm.Value{}, err
@@ -155,6 +168,14 @@ func (c *Compiler) compileConst(inst *ssa.ConstInst) error {
 
 	// Handle different constant types
 	// For now, assume int64 unless we can detect otherwise
+	if inst.GetRawValue() == nil {
+		llvmVal := llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
+		c.Values[id] = llvmVal
+		if err := c.maybeEmitMemberSet(inst, inst, llvmVal); err != nil {
+			return err
+		}
+		return nil
+	}
 	if inst.IsNumber() {
 		// Use Int64 for simplicity as per Phase 1
 		val := inst.Number()
@@ -181,9 +202,16 @@ func (c *Compiler) compileConst(inst *ssa.ConstInst) error {
 			return err
 		}
 		return nil
+	} else if inst.IsString() {
+		llvmVal := buildGlobalStringPtr(c.Builder, inst.VarString(), fmt.Sprintf("str_%d", id))
+		c.Values[id] = llvmVal
+		if err := c.maybeEmitMemberSet(inst, inst, llvmVal); err != nil {
+			return err
+		}
+		return nil
 	}
 
-	// Fallback/TODO: floats, strings, nil
+	// Fallback/TODO: floats, nil
 	// For now, log warning or create undef?
 	// Return 0 for unknown to prevent crash?
 	fmt.Printf("WARNING: Unsupported constant type for %v (ID: %d)\n", inst.GetRawValue(), id)
@@ -208,5 +236,32 @@ func (c *Compiler) compileReturn(inst *ssa.Return) error {
 		return err
 	}
 	c.Builder.CreateRet(val)
+	return nil
+}
+
+func (c *Compiler) compileTypeCast(inst *ssa.TypeCast) error {
+	val, err := c.getValue(inst, inst.Value)
+	if err != nil {
+		return err
+	}
+
+	if inst.GetType() != nil && inst.GetType().GetTypeKind() == ssa.StringTypeKind {
+		sourceKind := ssa.AnyTypeKind
+		if fn := inst.GetFunc(); fn != nil {
+			if sourceVal, ok := fn.GetValueById(inst.Value); ok && sourceVal != nil && sourceVal.GetType() != nil {
+				sourceKind = sourceVal.GetType().GetTypeKind()
+			}
+		}
+		if sourceKind == ssa.BytesTypeKind || sourceKind == ssa.StringTypeKind {
+			fn, fnType := c.getOrInsertRuntimeToCString()
+			argPtr := c.coerceToI8Ptr(val)
+			val = c.Builder.CreateCall(fnType, fn, []llvm.Value{argPtr}, fmt.Sprintf("to_cstring_%d", inst.GetId()))
+		}
+	}
+
+	c.Values[inst.GetId()] = val
+	if err := c.maybeEmitMemberSet(inst, inst, val); err != nil {
+		return err
+	}
 	return nil
 }

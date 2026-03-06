@@ -2,6 +2,7 @@ package compiler
 
 import (
 	"github.com/yaklang/go-llvm"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/dispatch"
 )
 
 type LLVMExternType uint8
@@ -13,9 +14,17 @@ const (
 )
 
 type ExternBinding struct {
+	// Symbol is the target runtime symbol for a direct extern call.
+	// When DispatchID is non-zero, Symbol/Params are ignored and the call
+	// is routed through the stdlib dispatcher.
 	Symbol string
 	Params []LLVMExternType
 	Return LLVMExternType
+
+	// DispatchID identifies a stdlib function that should be invoked via the
+	// runtime dispatcher entry (yak_std_call). Keep it opaque to reduce the
+	// number of exported symbols in the final binary.
+	DispatchID dispatch.FuncID
 }
 
 var defaultExternBindings = map[string]ExternBinding{
@@ -23,6 +32,22 @@ var defaultExternBindings = map[string]ExternBinding{
 		Symbol: "yak_internal_print_int",
 		Params: []LLVMExternType{ExternTypeI64},
 		Return: ExternTypeVoid,
+	},
+	"poc.timeout": {
+		Return:     ExternTypePtr,
+		DispatchID: dispatch.IDPocTimeout,
+	},
+	"poc.Get": {
+		Return:     ExternTypePtr,
+		DispatchID: dispatch.IDPocGet,
+	},
+	"poc.GetHTTPPacketBody": {
+		Return:     ExternTypePtr,
+		DispatchID: dispatch.IDPocGetHTTPPacketBody,
+	},
+	"os.Getenv": {
+		Return:     ExternTypePtr,
+		DispatchID: dispatch.IDOsGetenv,
 	},
 }
 
@@ -32,9 +57,10 @@ func cloneExternBindings(src map[string]ExternBinding) map[string]ExternBinding 
 		params := make([]LLVMExternType, len(v.Params))
 		copy(params, v.Params)
 		out[k] = ExternBinding{
-			Symbol: v.Symbol,
-			Params: params,
-			Return: v.Return,
+			Symbol:     v.Symbol,
+			Params:     params,
+			Return:     v.Return,
+			DispatchID: v.DispatchID,
 		}
 	}
 	return out
@@ -46,9 +72,10 @@ func mergeExternBindings(base map[string]ExternBinding, custom map[string]Extern
 		params := make([]LLVMExternType, len(v.Params))
 		copy(params, v.Params)
 		out[k] = ExternBinding{
-			Symbol: v.Symbol,
-			Params: params,
-			Return: v.Return,
+			Symbol:     v.Symbol,
+			Params:     params,
+			Return:     v.Return,
+			DispatchID: v.DispatchID,
 		}
 	}
 	return out
