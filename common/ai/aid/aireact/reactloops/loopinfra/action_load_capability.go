@@ -342,13 +342,6 @@ func handleLoadFocusMode(
 		userInput = task.GetUserInput()
 	}
 
-	// Focus modes may register augmenters to enrich short user input (e.g. from timeline) when PE/UI created subtasks with only goal text.
-	if aug := getFocusModeUserInputAugmenter(identifier); aug != nil {
-		if augmented := aug(cfg, userInput); augmented != userInput {
-			log.Infof("load_capability: augmented focus mode '%s' userInput from %d to %d chars", identifier, len(userInput), len(augmented))
-			userInput = augmented
-		}
-	}
 
 	subTask := aicommon.NewStatefulTaskBase(
 		invoker.GetCurrentTaskId()+"_focus_"+identifier,
