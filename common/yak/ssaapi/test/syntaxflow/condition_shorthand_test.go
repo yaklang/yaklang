@@ -81,3 +81,20 @@ a("param1", "param2", "param3")
 	}
 }
 
+func TestCondition_CallArg_LogicalAnd_MixLenAndOpcode(t *testing.T) {
+	code := `
+f = () => { return 1 }
+a("param1", "param2")
+a(f, "param2")
+a(f, "param2", "param3")
+`
+	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+		result, err := prog.SyntaxFlowWithError(`a?(*<len>==2 && opcode:function) as $result`)
+		require.NoError(t, err)
+
+		got := result.GetValues("result")
+		require.Equal(t, 1, got.Len())
+		require.Equal(t, `Undefined-a(Function-f,"param2")`, got[0].String())
+		return nil
+	}, ssaapi.WithLanguage(ssaconfig.Yak))
+}
