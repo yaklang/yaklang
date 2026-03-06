@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/rag"
@@ -19,8 +18,10 @@ import (
 )
 
 func TestSFRuleFromTestCases_ForgeRegistered(t *testing.T) {
+	if utils.InGithubActions() {
+		t.Skip("skip in CI: ExecuteForge may hang without AI config")
+	}
 	// 验证 forge 已注册：调用 ExecuteForge 不应返回 "forge not found"
-	// 使用短超时避免在无 AI 配置时长时间挂起
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -33,34 +34,39 @@ func TestSFRuleFromTestCases_ForgeRegistered(t *testing.T) {
 		},
 		aicommon.WithAgreeYOLO(true),
 	)
-	// forge not found 会立即返回；其他错误（AI 超时/失败）说明 forge 已注册
 	if err != nil && strings.Contains(err.Error(), "forge not found") {
 		t.Fatalf("forge sf_rule_from_test_cases should be registered: %v", err)
 	}
 }
 
-func TestValidateSFRule_CompileSuccess(t *testing.T) {
-	// 使用已知可编译的规则内容
-	ruleContent := `desc(
+func TestValidateSFRule(t *testing.T) {
+	tests := []struct {
+		name        string
+		ruleContent string
+		expectPass  bool
+		expectErr   string
+	}{
+		{"compile_success", `desc(
 	title: "Test"
 	title_zh: "测试"
 )
 a as $x;
 check $x;
 alert $x;
-`
-	result := ValidateSFRule(ruleContent, false)
-	require.True(t, result.Passed, "valid rule should compile: %v", result.Errors)
-}
-
-func TestValidateSFRule_CompileFail(t *testing.T) {
-	ruleContent := `desc(
+`, true, ""},
+		{"compile_fail", `desc(
 invalid syntax here [
-`
-	result := ValidateSFRule(ruleContent, false)
-	require.False(t, result.Passed)
-	require.NotEmpty(t, result.Errors)
-	require.Contains(t, result.Errors[0], "compile failed")
+`, false, "compile failed"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ValidateSFRule(tt.ruleContent, false)
+			require.Equal(t, tt.expectPass, result.Passed, "ValidateSFRule(%s): %v", tt.name, result.Errors)
+			if tt.expectErr != "" && len(result.Errors) > 0 {
+				require.Contains(t, result.Errors[0], tt.expectErr)
+			}
+		})
+	}
 }
 
 func TestValidateSFRule_StrictMode(t *testing.T) {
@@ -89,7 +95,7 @@ alert $output;
 
 func TestSFRuleFromTestCases_ExecuteWithAICallback(t *testing.T) {
 	if utils.InGithubActions() {
-		return
+		t.Skip("skip in CI: requires MockAICallback and no openrouter.txt")
 	}
 	// 使用 Mock 模拟 AI 返回，无需 openrouter.txt
 	// LiteForge 期望 @action/tool/params 包装格式；Mock 按 prompt-response 对返回，需多对以支持 retry
@@ -121,17 +127,13 @@ func TestSFRuleFromTestCases_ExecuteWithAICallback(t *testing.T) {
 		aicommon.WithAgreeYOLO(true),
 		aicommon.WithAICallback(aiforge.MockAICallbackByRecord(mockContent)),
 	)
-	if err != nil {
-		t.Fatal(err)
-		return
-	}
+	require.NoError(t, err)
 	require.NotNil(t, results)
 	require.NotNil(t, results.Action)
 	params := results.Action.GetInvokeParams("params")
 	require.NotNil(t, params)
 	compileResult := ValidateSFRule(params.GetString("rule_content"), false)
 	require.True(t, compileResult.Passed, "generated rule should compile: %v", compileResult.Errors)
-	spew.Dump(results)
 }
 
 // TestSyntaxFlowAIKB_RAGQuery 测试 syntaxflow-aikb.rag 的导入与语义检索

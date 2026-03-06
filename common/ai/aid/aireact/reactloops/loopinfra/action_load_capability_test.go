@@ -392,6 +392,9 @@ func TestLoadCapability_Handler_FocusMode_Error(t *testing.T) {
 }
 
 func TestLoadCapability_Handler_FocusMode_NotOk(t *testing.T) {
+	// When err==nil, focus mode completed successfully. The 'ok' from ExecuteLoopTaskIF
+	// is task.IsAsyncMode() (false for sync completion), NOT "usable results". Sync
+	// focus modes (e.g. write_syntaxflow_rule with directly_answer) return ok=false.
 	ctx := context.Background()
 	cfg := &aicommon.Config{}
 	invoker := newTestInvoker(ctx)
@@ -410,7 +413,7 @@ func TestLoadCapability_Handler_FocusMode_NotOk(t *testing.T) {
 	loopAction_LoadCapability.ActionHandler(loop, action, op)
 
 	assert.True(t, invoker.executeLoopCalled)
-	assert.True(t, op.IsContinued(), "should continue when focus mode completes")
+	assert.True(t, op.IsContinued(), "should continue when focus mode completes (sync)")
 	assert.Contains(t, op.GetFeedback().String(), "SUCCESSFULLY", "err==nil means sync focus completed; ok=false (IsAsyncMode) is not failure")
 }
 
@@ -788,6 +791,34 @@ func TestLoadCapability_Handler_FocusMode_ErrorTimelineFeedback(t *testing.T) {
 	assert.Contains(t, invoker.getTimelineString(),
 		"FOCUS_MODE_FAILED",
 		"timeline should record failure with details")
+}
+
+func TestLoadCapability_Handler_FocusMode_UnsuccessfulTimelineFeedback(t *testing.T) {
+	// Sync focus mode (ok=false, err=nil) is now treated as SUCCESS - see handleLoadFocusMode fix.
+	// This test verifies sync completion produces FOCUS_MODE_DONE (success) in timeline.
+	ctx := context.Background()
+	cfg := &aicommon.Config{}
+	invoker := newTestInvoker(ctx)
+	invoker.executeLoopResult = false
+	invoker.executeLoopErr = nil
+	task := newTestTask(ctx)
+	invoker.currentTask = task
+
+	loop := reactloops.NewMinimalReActLoop(cfg, invoker)
+	loop.SetCurrentTask(task)
+	loop.Set("_load_cap_identifier", "unsat-mode")
+	loop.Set("_load_cap_resolved_type", string(aicommon.ResolvedAs_FocusedMode))
+
+	op := reactloops.NewActionHandlerOperator(task)
+	action := buildAction("unsat-mode")
+	loopAction_LoadCapability.ActionHandler(loop, action, op)
+
+	feedback := op.GetFeedback().String()
+	assert.Contains(t, feedback, "SUCCESSFULLY")
+	assert.Contains(t, feedback, "Proceed with your main task")
+	assert.Contains(t, invoker.getTimelineString(),
+		"FOCUS_MODE_DONE",
+		"timeline should record successful outcome for sync focus completion")
 }
 
 // --- Handler Tests: Unknown Blocked on Repeat ---
