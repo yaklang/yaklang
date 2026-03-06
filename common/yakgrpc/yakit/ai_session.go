@@ -19,7 +19,7 @@ func DeleteAISession(profileDB, projectDB *gorm.DB, sessionId string) (deletedRu
 		return 0, 0, utils.Errorf("projectDB is nil")
 	}
 
-	deletedRuntimes, err = DeleteAgentRuntimeByPersistentSession(profileDB, sessionId)
+	deletedRuntimes, err = DeleteAgentRuntimeByPersistentSession(projectDB, sessionId)
 	if err != nil {
 		return 0, 0, err
 	}
