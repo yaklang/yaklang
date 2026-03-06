@@ -140,9 +140,8 @@ public class C {
 		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
-	// todo: 跨过程会导致指针失效
+	// preserve returned object member aliasing across helper calls
 	t.Run("test class value cross function", func(t *testing.T) {
-		t.Skip()
 		code := `
 		class A {
 			int a;
@@ -198,9 +197,8 @@ public class C {
 		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 
-	// todo
+	// branch-local objects should not pollute the outer alias chain
 	t.Run("test class value if", func(t *testing.T) {
-		t.Skip()
 		code := `
 class A {
 	int a;
@@ -224,27 +222,23 @@ public class C {
 		A a2 = new A(2);
 
         B b = new B(a1);
-        if (a.a == 2) {
-            B b = new B(a2); 
+        if (a1.a == 1) {
+            B b2 = new B(a2);
+            b2.A.a = 4;
         }
 
-		a1.a = 3; 
-        int o1 = a2.a; 	
-        int o2 = b.A.a;	
-        a2.a = 4; 
-        int o3 = a1.a; 	
-        int o4 = b.A.a;	
+        println(a1.a);
+        println(b.A.a);
+        a1.a = 3;
+        println(b.A.a);
     }
 }
 `
-		ssatest.CheckSyntaxFlow(t, code, `
-			o1 #-> as $o1
-			o2 #-> as $o2
-			o3 #-> as $o3
-			o4 #-> as $o4
-		`, map[string][]string{
-			"": {""},
-		}, ssaapi.WithLanguage(ssaconfig.JAVA))
+		ssatest.CheckPrintlnValue(code, []string{
+			"1",
+			"1",
+			"3",
+		}, t)
 	})
 }
 
