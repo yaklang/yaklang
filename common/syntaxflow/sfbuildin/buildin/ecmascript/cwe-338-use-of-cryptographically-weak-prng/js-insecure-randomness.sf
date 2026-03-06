@@ -163,7 +163,7 @@ alert $insecureRandom for {
 // Embedded test cases
 // =====================================================================
 
-// Test 1: VULNERABLE — password generation with Math.random() (CodeQL canonical)
+// Test 1: VULNERABLE — password generation with Math.random() (canonical)
 desc(
 	lang: "js"
 	alert_min: 1

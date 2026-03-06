@@ -52,7 +52,6 @@ func runOnFile(t *testing.T, ruleContent, filename, code string) (total, high in
 // ============================================================
 
 // TestDeser_Positive_JsYamlLoad 验证 jsyaml.load(req.params.data) 直接注入触发 high 告警。
-// 对应 CodeQL 文档示例：jsyaml.load(req.params.data) 是最典型的危险用法。
 func TestDeser_Positive_JsYamlLoad(t *testing.T) {
 	rule := loadDeserRule(t)
 	total, high := runOnFile(t, rule, "jsyaml_load_positive.js", `
@@ -92,7 +91,6 @@ app.post("/loadall", (req, res) => {
 
 // TestDeser_Negative_JsYamlSafeLoad 验证 jsyaml.safeLoad() 不触发任何告警。
 // safeLoad() 是 js-yaml v3.x 的安全 API，不支持 JS 函数类型。
-// 对应 CodeQL 文档中的修复示例。
 func TestDeser_Negative_JsYamlSafeLoad(t *testing.T) {
 	rule := loadDeserRule(t)
 	total, _ := runOnFile(t, rule, "jsyaml_safeload_negative.js", `

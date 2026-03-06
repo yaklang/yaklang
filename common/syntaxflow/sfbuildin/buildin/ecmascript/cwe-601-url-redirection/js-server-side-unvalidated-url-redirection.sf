@@ -245,7 +245,7 @@ alert $openRedirect for {
 // Embedded Test Cases
 // =====================================================================
 
-// Test 1: VULNERABLE — direct user input (CodeQL canonical example)
+// Test 1: VULNERABLE — direct user input (canonical example)
 desc(
 	lang: "js"
 	alert_min: 1
@@ -312,7 +312,7 @@ app.get("/redirect", (req, res) => {
 CODE
 )
 
-// Test 5: SAFE — validated against exact known constant (CodeQL canonical safe example)
+// Test 5: SAFE — validated against exact known constant (canonical safe example)
 desc(
 	lang: "js"
 	alert_min: 0

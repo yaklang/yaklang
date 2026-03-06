@@ -1,0 +1,370 @@
+desc(
+	title: "Template Object Injection via User-Controlled Data"
+	title_zh: "用户可控对象传入模板引擎导致模板对象注入"
+	type: vuln
+	risk_type: "template-object-injection"
+	level: high
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+
+模板对象注入（Template Object Injection）是指应用程序将用户可控的整个对象（如 `req.body`、`req.body.profile`）直接作为第二参数传入模板引擎的 `render()` 方法。
+
+模板引擎（如 `hbs`、`ejs`、`express-handlebars`、`eta`、`squirrelly` 等）在渲染模板时，会读取传入数据对象上的特定属性。攻击者可以通过在请求体中注入特殊的控制属性来操控模板引擎的行为：
+
+- **`layout` 属性**（Handlebars/hbs）：指定一个布局文件路径。攻击者可以将其设置为服务器上的任意文件路径，触发**任意本地文件读取（LFR）**
+- **`settings` / `views` 属性**（EJS）：覆盖模板引擎配置，可能导致模板目录穿越
+- **原型链污染**：通过 `__proto__` 等属性修改对象原型，影响全局行为
+
+2. **触发场景**
+
+```javascript
+var app = require('express')();
+app.set('view engine', 'hbs');
+
+// 危险：将整个用户可控对象传入 render()
+app.post('/', function (req, res, next) {
+    var profile = req.body.profile;
+    res.render('index', profile);
+    // 攻击者发送: { "name": "Alice", "layout": "/etc/passwd" }
+    // → 服务器读取并渲染 /etc/passwd 的内容（LFR）
+});
+```
+
+3. **潜在影响**
+
+- **本地文件读取（LFR）**：通过注入 `layout` 等属性，攻击者可读取服务器任意文件（包括 `/etc/passwd`、应用配置文件、密钥文件等）
+- **远程代码执行（RCE）**：在某些模板引擎配置下，攻击者可执行任意代码
+- **信息泄露**：读取配置文件、数据库凭证、私钥等敏感信息
+- **服务器完全被控**：结合其他漏洞可实现完整的服务器渗透
+DESC
+	rule_id: "a1b2c3d4-e5f6-7890-abcd-094000000003"
+	solution: <<<SOLUTION
+### 修复建议
+
+**1. 显式构造传入模板的数据对象（推荐）**
+
+```javascript
+// BAD: 直接传入用户可控对象
+app.post('/', function (req, res, next) {
+    var profile = req.body.profile;
+    res.render('index', profile);
+});
+
+// GOOD: 显式构造只包含模板需要属性的新对象
+app.post('/', function (req, res, next) {
+    var profile = req.body.profile;
+    res.render('index', {
+        name: profile.name,
+        location: profile.location
+    });
+});
+```
+
+**2. 使用白名单过滤对象属性**
+
+```javascript
+const ALLOWED_KEYS = ['name', 'location', 'bio'];
+
+app.post('/', function (req, res, next) {
+    const profile = req.body.profile;
+    const safeData = {};
+    for (const key of ALLOWED_KEYS) {
+        if (key in profile) {
+            safeData[key] = profile[key];
+        }
+    }
+    res.render('index', safeData);
+});
+```
+
+**3. 使用 JSON Schema 验证输入**
+
+```javascript
+const Ajv = require('ajv');
+const ajv = new Ajv();
+
+const schema = {
+    type: 'object',
+    properties: {
+        name: { type: 'string', maxLength: 100 },
+        location: { type: 'string', maxLength: 200 }
+    },
+    additionalProperties: false  // 拒绝任何额外属性
+};
+
+app.post('/', function (req, res, next) {
+    const profile = req.body.profile;
+    if (!ajv.validate(schema, profile)) {
+        return res.status(400).send('Invalid input');
+    }
+    res.render('index', profile);
+});
+```
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-073: External Control of File Name or Path](https://cwe.mitre.org/data/definitions/73.html)
+[CWE-094: Improper Control of Generation of Code ('Code Injection')](https://cwe.mitre.org/data/definitions/94.html)
+[blog.shoebpatel.com: The Secret Parameter, LFR, and Potential RCE in NodeJS Apps](https://blog.shoebpatel.com/2021/01/23/The-Secret-Parameter-LFR-and-Potential-RCE-in-NodeJS-Apps/)
+[CodeQL: js/template-object-injection](https://codeql.github.com/codeql-query-help/javascript/js-template-object-injection/)
+REFERENCE
+)
+
+// =====================================================================
+// Detection Strategy
+//
+// This rule ONLY fires when ALL three conditions hold simultaneously:
+//
+//   1. GATE: app.set("view engine", <vulnEngine>) is present in the file,
+//      where <vulnEngine> ∈ {hbs, ejs, eta, squirrelly, haml-coffee,
+//      express-hbs, whiskers, express-handlebars}.
+//
+//   2. HANDLER BINDING: The render() call lives in a route handler registered
+//      on the SAME Express app instance that set the vulnerable engine.
+//      Chain: $vulnApp.post/get/put/…(path, handler) → handler's res param
+//      → res.render() receiver ← structural SSA equality (same Parameter node)
+//
+//   3. TAINTED DATA: The render() data argument IS a user-controlled object
+//      (req.body, req.body.x, req.query, req.params, …) matched via SSA node
+//      identity intersection with $params — NOT merely a value derived from
+//      one. When the developer constructs an explicit safe object
+//      { name: profile.name }, the SSA node is make(object{}) which does
+//      NOT intersect with $params → correctly suppressed.
+//
+// This approach successfully distinguishes:
+//   ALERT:    app uses hbs/ejs/eta/… AND res.render receives req.body directly
+//   NO ALERT: app uses pug/mustache → gate fails, $confirmedRes is empty
+//   NO ALERT: custom class renderer → no app.set → gate fails
+//   NO ALERT: { name: req.body.name } → make(object{}) ≠ $params
+//   NO ALERT: two apps in one file: hbs app alerts, pug app's handler is not
+//             in $confirmedRes so its render() is not counted
+// =====================================================================
+
+<include('js-param')> as $params
+
+// Step 1 — GATE: identify the Express app instance using a vulnerable engine.
+// getActualParams + slice(index=1) tightly binds the engine name check to
+// this specific set() call, preventing cross-app contamination.
+*.set(* as $veKey, * as $engineName) as $setCall
+$veKey?{have: /view engine/}
+$engineName?{have: /(?i)^"?(hbs|ejs|eta|squirrelly|haml-coffee|express-hbs|whiskers|express-handlebars)"?$/} as $vulnEngineName
+$setCall?{<self><getActualParams><slice(index=1)> & $vulnEngineName} as $vulnSetCall
+$vulnSetCall<getCallee><getObject> as $vulnApp
+
+// Step 2 — HANDLER BINDING: find route handlers registered on $vulnApp.
+// Two sub-cases:
+//   a) method(path, handler) — get/post/put/patch/delete/all/use with path
+//   b) use(handler)          — use middleware with no path prefix
+*./(get|post|put|patch|delete|all|use)/(*, * as $handlerWithPath) as $routeRegWithPath
+$routeRegWithPath?{<self><getCallee><getObject> & $vulnApp}<getActualParams><slice(index=1)> as $confirmedHandler
+
+*.use(* as $handlerUse)?{<self><getCallee><getObject> & $vulnApp} as $useRegNoPath
+$useRegNoPath<getActualParams><slice(index=0)>?{opcode: function} as $confirmedHandlerUse
+
+$confirmedHandler + $confirmedHandlerUse as $allConfirmedHandlers
+
+// Step 3 — RES PARAM: extract the response parameter (named "res") from
+// each confirmed handler. In Express SSA, the route-handler function's
+// second formal parameter is the `res` object. Its Parameter SSA node is
+// structurally identical to the receiver of res.render() calls inside that
+// function.
+$allConfirmedHandlers<getFormalParams>?{have: /^res/} as $confirmedRes
+
+// Step 4 — SINK: render() data arg where the receiver is $confirmedRes
+// AND the data is directly user-controlled.
+// The filter `?{<self><getCall><getCallee><getObject> & $confirmedRes}` checks
+// that the SSA node of $dataArg was passed as the second arg of a render()
+// call whose callee's object (= the res parameter) is in $confirmedRes.
+*.render(*, * as $dataArg)
+$dataArg?{<self><getCall><getCallee><getObject> & $confirmedRes} as $confirmedDataArg
+$confirmedDataArg & $params as $taintedRender
+
+alert $taintedRender for {
+	level: "high",
+	type: "vuln",
+	title: "Template Object Injection",
+	title_zh: "模板对象注入",
+	message: "检测到用户可控对象直接作为模板引擎 render() 的数据参数传入，且该 Express 应用已配置为使用已知脆弱模板引擎（hbs/ejs/eta/squirrelly 等）。攻击者可以通过在请求体中注入特殊控制属性（如 layout、settings 等）来触发任意本地文件读取（LFR）甚至远程代码执行（RCE）。请显式构造只包含模板所需属性的新对象，而不是直接传入用户可控对象。",
+	risk: "模板对象注入/本地文件读取",
+	name: "taintedRender",
+}
+
+// =====================================================================
+// Embedded Test Cases
+// =====================================================================
+
+// Test 1: VULNERABLE — req.body.profile directly as render data (canonical example)
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///template_inject_hbs.js': <<<CODE
+var app = require('express')();
+app.set('view engine', 'hbs');
+
+app.post('/', function (req, res, next) {
+    var profile = req.body.profile;
+    res.render('index', profile);
+});
+CODE
+)
+
+// Test 2: VULNERABLE — req.body directly as render data (no sub-field)
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///template_inject_ejs_body.js': <<<CODE
+var app = require('express')();
+app.set('view engine', 'ejs');
+
+app.post('/profile', function (req, res) {
+    var data = req.body;
+    res.render('profile', data);
+});
+CODE
+)
+
+// Test 3: VULNERABLE — req.query object passed to render (app.get route)
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///template_inject_query.js': <<<CODE
+var app = require('express')();
+app.set('view engine', 'hbs');
+
+app.get('/greet', function (req, res) {
+    res.render('hello', req.query);
+});
+CODE
+)
+
+// Test 4: VULNERABLE — user object aliased to a local variable then rendered
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///template_inject_alias.js': <<<CODE
+var app = require('express')();
+app.set('view engine', 'hbs');
+
+app.post('/dashboard', function (req, res) {
+    var userData = req.body.user;
+    var opts = userData;
+    res.render('dashboard', opts);
+});
+CODE
+)
+
+// Test 5: VULNERABLE — eta engine (another vulnerable engine in the list)
+desc(
+	lang: "js"
+	alert_min: 1
+	'file:///template_inject_eta.js': <<<CODE
+var app = require('express')();
+app.set('view engine', 'eta');
+
+app.post('/report', function (req, res) {
+    var reportData = req.body.report;
+    res.render('report', reportData);
+});
+CODE
+)
+
+// Test 6: SAFE — explicit object construction with only safe properties
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///template_safe_explicit.js': <<<CODE
+var app = require('express')();
+app.set('view engine', 'hbs');
+
+app.post('/', function (req, res, next) {
+    var profile = req.body.profile;
+    res.render('index', {
+        name: profile.name,
+        location: profile.location
+    });
+});
+CODE
+)
+
+// Test 7: SAFE — hardcoded static data object
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///template_safe_static.js': <<<CODE
+var app = require('express')();
+app.set('view engine', 'hbs');
+
+app.get('/about', function (req, res) {
+    res.render('about', { title: 'About Us', year: 2024 });
+});
+CODE
+)
+
+// Test 8: SAFE — whitelist-filtered object (safeData is make(object{}), not $params)
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///template_safe_whitelist.js': <<<CODE
+var app = require('express')();
+app.set('view engine', 'ejs');
+
+const ALLOWED_KEYS = ['name', 'bio', 'avatar'];
+
+app.post('/profile', function (req, res) {
+    const input = req.body.profile;
+    const safeData = {};
+    for (const key of ALLOWED_KEYS) {
+        if (key in input) {
+            safeData[key] = input[key];
+        }
+    }
+    res.render('profile', safeData);
+});
+CODE
+)
+
+// Test 9: SAFE — pug is NOT in the vulnerable engine list; gate fails.
+// $vulnSetCall is empty → $vulnApp is empty → $confirmedRes is empty
+// → $confirmedDataArg is empty → $taintedRender is empty.
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///template_safe_pug.js': <<<CODE
+var app = require('express')();
+app.set('view engine', 'pug');
+
+app.post('/profile', function (req, res) {
+    res.render('profile', req.body);
+});
+CODE
+)
+
+// Test 10: SAFE — mustache is NOT in the vulnerable engine list; gate fails.
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///template_safe_mustache.js': <<<CODE
+var app = require('express')();
+app.set('view engine', 'mustache');
+
+app.post('/page', function (req, res) {
+    res.render('page', req.body);
+});
+CODE
+)
+
+// Test 11: SAFE — custom renderer class with no app.set(); gate fails entirely.
+desc(
+	lang: "js"
+	alert_min: 0
+	'safefile:///template_safe_custom_renderer.js': <<<CODE
+class MyRenderer {
+    render(template, data) {
+        return template.replace('{{name}}', data.name);
+    }
+}
+const renderer = new MyRenderer();
+const result = renderer.render('Hello {{name}}', req.body);
+CODE
+)

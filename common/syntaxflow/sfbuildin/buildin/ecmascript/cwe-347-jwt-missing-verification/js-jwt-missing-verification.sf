@@ -203,7 +203,7 @@ alert $zeroSecret for {
 // Embedded test cases
 // =====================================================================
 
-// Test 1: VULNERABLE — false as secret key (CodeQL canonical example)
+// Test 1: VULNERABLE — false as secret key (canonical example)
 desc(
 	lang: "js"
 	alert_min: 1

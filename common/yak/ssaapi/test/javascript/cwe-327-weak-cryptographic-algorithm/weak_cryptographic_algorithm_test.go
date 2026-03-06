@@ -42,7 +42,7 @@ func runOnFile(t *testing.T, rule, filename, code string) int {
 // TestWeakCryptoAlgorithm_Positive 验证弱加密算法触发告警。
 func TestWeakCryptoAlgorithm_Positive(t *testing.T) {
 	rule := loadRule(t)
-	// DES cipher — CodeQL canonical example
+	// DES cipher — canonical example
 	code := `
 const crypto = require('crypto');
 

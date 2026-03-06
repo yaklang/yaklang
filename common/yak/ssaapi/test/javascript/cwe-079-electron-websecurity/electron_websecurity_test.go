@@ -55,7 +55,6 @@ func runOnCode(t *testing.T, ruleContent, filename, code string) int {
 }
 
 // TestWebSecurity_Positive_BasicFalse 基础检测：webSecurity: false
-// 对应 CodeQL 文档中的标准漏洞示例。
 func TestWebSecurity_Positive_BasicFalse(t *testing.T) {
 	rule := loadWebSecurityRule(t)
 	code := `
@@ -170,7 +169,6 @@ const mainWindow = new BrowserWindow({
 // ============================================================
 
 // TestInsecureContent_Positive_BasicTrue 基础检测：allowRunningInsecureContent: true
-// 对应 CodeQL 文档中的标准漏洞示例。
 func TestInsecureContent_Positive_BasicTrue(t *testing.T) {
 	rule := loadInsecureContentRule(t)
 	code := `

@@ -195,7 +195,7 @@ alert $weakHash for {
 // Embedded test cases
 // =====================================================================
 
-// Test 1: VULNERABLE — DES cipher (CodeQL canonical example)
+// Test 1: VULNERABLE — DES cipher (canonical example)
 desc(
 	lang: "js"
 	alert_min: 1
@@ -305,7 +305,7 @@ const cipher = crypto.createCipheriv('bf-cbc', Buffer.alloc(16), Buffer.alloc(8)
 CODE
 )
 
-// Test 9: SAFE — AES-128 encryption (CodeQL canonical safe example)
+// Test 9: SAFE — AES-128 encryption (canonical safe example)
 desc(
 	lang: "js"
 	alert_min: 0
