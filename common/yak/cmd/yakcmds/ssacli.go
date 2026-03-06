@@ -37,7 +37,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfanalyzer"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
-	"github.com/yaklang/yaklang/common/urfavecli"
+	cli "github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -803,7 +803,7 @@ var syntaxflowCompletion = &cli.Command{
 						log.Errorf("failed to read file %s: %v", fileName, err)
 						continue
 					}
-					rule, err := sfcompletion.CompleteRuleDesc(fileName, string(raw), aiOpts...)
+					rule, err := sfcompletion.CompleteRule(fileName, string(raw), aiOpts...)
 					if err != nil {
 						errorCount.Add(1)
 						err = utils.Errorf("failed parse complete file %s: %v", fileName, err)

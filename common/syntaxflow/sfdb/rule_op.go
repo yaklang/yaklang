@@ -120,23 +120,6 @@ func DeleteRuleByRuleName(name string) error {
 	return db.Where("rule_name = ?", name).Unscoped().Delete(&schema.SyntaxFlowRule{}).Error
 }
 
-// UpdateRuleContent 仅更新规则的 Content 字段
-// 若不存在匹配的规则（影响 0 行），返回错误
-func UpdateRuleContent(ruleName, content string) error {
-	if ruleName == "" {
-		return utils.Errorf("rule name is empty")
-	}
-	db := consts.GetGormProfileDatabase()
-	result := db.Model(&schema.SyntaxFlowRule{}).Where("rule_name = ?", ruleName).Update("content", content)
-	if result.Error != nil {
-		return result.Error
-	}
-	if result.RowsAffected == 0 {
-		return utils.Errorf("no rule found with rule_name=%s in profile database, update had no effect (规则 %s 在 profile 数据库中不存在，无法更新)", ruleName, ruleName)
-	}
-	return nil
-}
-
 func DeleteBuildInRule() error {
 	db := consts.GetGormProfileDatabase()
 	return db.Where("is_build_in_rule = ?", true).Unscoped().Delete(&schema.SyntaxFlowRule{}).Error
