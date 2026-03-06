@@ -122,7 +122,7 @@ func TestVulinboxBuildPerformance(t *testing.T) {
 
 // TestDebugBuildPerformance 硬编码目录 go2ssa 的性能测试，仅在本地运行（GitHub CI 自动跳过）
 func TestDebugBuildPerformance(t *testing.T) {
-	if os.Getenv("GITHUB_ACTIONS") != "" || os.Getenv("CI") != "" {
+	if utils.InGithubActions() {
 		t.Skip("skip debug build test on GitHub/CI")
 	}
 

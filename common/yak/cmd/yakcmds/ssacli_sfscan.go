@@ -351,12 +351,6 @@ func parseConfigFileWithCliFlagOverride(cliCtx *cli.Context) (res *ssaCliConfig,
 	}
 	config.Format = sfreport.ReportTypeFromString(outputFormat)
 
-	// CLI 参数覆盖：并发数
-	if concurrency := cliCtx.Int("concurrency"); concurrency > 0 {
-		_ = cfg.Update(ssaconfig.WithCompileConcurrency(concurrency))
-		log.Infof("Using CLI concurrency (overrides config): %d", concurrency)
-	}
-
 	// 处理输出文件：CLI 参数优先于配置文件
 	outputFile := cfg.GetOutputFile()
 
@@ -532,6 +526,11 @@ func applyCompileCliOverrides(cfg *ssaconfig.Config, cliCtx *cli.Context) error 
 	}
 	if cliCtx.IsSet("with-dataflow-path") {
 		opts = append(opts, ssaconfig.WithOutputDataflowPath(cliCtx.Bool("with-dataflow-path")))
+	}
+	if cliCtx.IsSet("concurrency") {
+		if c := cliCtx.Int("concurrency"); c > 0 {
+			opts = append(opts, ssaconfig.WithCompileConcurrency(c))
+		}
 	}
 	if err := cfg.Update(opts...); err != nil {
 		return utils.Errorf("apply cli overrides failed: %v", err)
