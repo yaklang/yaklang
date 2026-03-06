@@ -387,6 +387,32 @@ hijackHTTPRequest = func(isHttps, url, req, forward, drop) {
 	checkCallerLoads(HOOK_MirrorHTTPFlow, 1, utils.CalcSha1(reloadPluginCode, HOOK_MirrorHTTPFlow, pluginName))
 }
 
+func TestMixCaller_LoadHotPatchSilently(t *testing.T) {
+	caller, err := NewMixPluginCaller()
+	require.NoError(t, err)
+	caller.SetLoadPluginTimeout(1)
+
+	initMsgSeen := false
+	caller.ordinaryFeedback = func(i interface{}, item ...interface{}) {
+		if fmt.Sprint(i) == "Initializing HotPatched MITM HOOKS" {
+			initMsgSeen = true
+		}
+	}
+
+	code := `
+mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {
+	s = "silent"
+}
+`
+	err = caller.LoadHotPatchSilently(utils.TimeoutContextSeconds(2), []*ypb.ExecParamItem{}, code)
+	require.NoError(t, err)
+	require.False(t, initMsgSeen)
+
+	res, ok := caller.callers.table.Load(HOOK_MirrorHTTPFlow)
+	require.True(t, ok)
+	require.Len(t, res, 1)
+}
+
 func TestPortscanPlugin(t *testing.T) {
 	l1, _ := net.Listen("tcp", "127.0.0.1:0")
 	defer l1.Close()
