@@ -119,12 +119,6 @@ func YaklangScriptChecking(code string, pluginType string) []any {
 	return nil
 }
 
-// SyntaxFlowRuleChecking stub, overridden by static_analyzer.RegisterExport
-func SyntaxFlowRuleCheckingStub(code string) []any {
-	log.Warn("SyntaxFlowRuleChecking is not implemented! Please contact developers to fix it.")
-	return nil
-}
-
 func RegisterExport(name string, value any) {
 	if _, ok := Exports[name]; !ok {
 		log.Warnf("ssa Export [%s] create by Register but no default implement", name)
@@ -149,7 +143,7 @@ var Exports = map[string]any{
 	"withExternLib":                WithExternLib,
 	"withExternValue":              WithExternValue,
 	"withProgramName":              WithProgramName,
-	"withSetProgramName":            WithSetProgramName,
+	"withSetProgramName":           WithSetProgramName,
 	"withDescription":              WithProgramDescription,
 	"withProcess":                  WithProcess,
 	"withEntryFile":                WithFileSystemEntry,
@@ -171,8 +165,7 @@ var Exports = map[string]any{
 	"Java":       ssaconfig.JAVA,
 
 	/// static analyze
-	"YaklangScriptChecking":   YaklangScriptChecking,
-	"SyntaxFlowRuleChecking": SyntaxFlowRuleCheckingStub,
+	"YaklangScriptChecking": YaklangScriptChecking,
 
 	// result
 	"NewResultFromDB": LoadResultByID,

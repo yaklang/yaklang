@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
@@ -37,6 +38,11 @@ func CreateSSATools() ([]*aitool.Tool, error) {
 	// 注册 ssa-grep 工具
 	if err := registerGrepTool(factory); err != nil {
 		return nil, err
+	}
+
+	// 注册 SyntaxFlow 工具 (check-syntaxflow-syntax)
+	if err := registerSyntaxFlowTool(factory); err != nil {
+		log.Errorf("register check-syntaxflow-syntax tool: %v", err)
 	}
 
 	return factory.Tools(), nil
