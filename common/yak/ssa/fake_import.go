@@ -1,5 +1,7 @@
 package ssa
 
+import "strings"
+
 func (p *Program) GenerateVirtualLib(packagePath string) (*Program, error) {
 	app := p.GetApplication()
 	lib := app.NewLibrary(packagePath, []string{})
@@ -40,12 +42,18 @@ func fakeImportValue(lib *Program, name string) Value {
 }
 func fakeImportType(lib *Program, name string, token CanStartStopToken) Type {
 	builder := lib.GetAndCreateFunctionBuilder(lib.PkgName, string(VirtualFunctionName))
-	if t, ok := lib.ExportType[name]; ok {
-		return t
+	candidates := []string{name}
+	if strings.Contains(name, ".") {
+		candidates = append(candidates, strings.ReplaceAll(name, ".", "$"))
 	}
-	if t := lib.GetBluePrint(name); t != nil {
-		lib.ExportType[name] = t
-		return t
+	for _, candidate := range candidates {
+		if t, ok := lib.ExportType[candidate]; ok {
+			return t
+		}
+		if t := lib.GetBluePrint(candidate); t != nil {
+			lib.ExportType[candidate] = t
+			return t
+		}
 	}
 	if lib.IsVirtualImport() {
 		builder.SetEditor(lib.GetCurrentEditor())
