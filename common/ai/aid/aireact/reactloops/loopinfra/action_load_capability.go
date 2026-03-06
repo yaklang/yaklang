@@ -443,19 +443,24 @@ func handleLoadFocusMode(
 		return
 	}
 
+	// When err==nil, the focus mode completed successfully. The 'ok' from ExecuteLoopTaskIF
+	// is task.IsAsyncMode() (true=async, false=sync), NOT "usable results". Sync focus modes
+	// (e.g. write_syntaxflow_rule with directly_answer) return ok=false but have produced
+	// usable results. Treating ok=false as UNSUCCESSFUL caused infinite retry loops.
 	if !ok {
-		log.Warnf("load_capability: focus mode '%s' completed UNSUCCESSFULLY", identifier)
-		unsuccessfulMsg := fmt.Sprintf(
-			"Focus mode '%s' completed UNSUCCESSFULLY. "+
-				"The focused sub-loop finished but did not produce usable results. "+
-				"Do NOT retry the same focus mode. Proceed with a different approach.",
-			identifier)
-		invoker.AddToTimeline("[LOAD_CAPABILITY_FOCUS_MODE_UNSUCCESSFUL]", unsuccessfulMsg)
-		op.Feedback(unsuccessfulMsg)
-		op.SetReflectionLevel(reactloops.ReflectionLevel_Deep)
-		op.SetReflectionData("focus_mode_name", identifier)
-		op.Continue()
-		return
+		// log.Warnf("load_capability: focus mode '%s' completed UNSUCCESSFULLY", identifier)
+		// unsuccessfulMsg := fmt.Sprintf(
+		// 	"Focus mode '%s' completed UNSUCCESSFULLY. "+
+		// 		"The focused sub-loop finished but did not produce usable results. "+
+		// 		"Do NOT retry the same focus mode. Proceed with a different approach.",
+		// 	identifier)
+		// invoker.AddToTimeline("[LOAD_CAPABILITY_FOCUS_MODE_UNSUCCESSFUL]", unsuccessfulMsg)
+		// op.Feedback(unsuccessfulMsg)
+		// op.SetReflectionLevel(reactloops.ReflectionLevel_Deep)
+		// op.SetReflectionData("focus_mode_name", identifier)
+		// op.Continue()
+		// return
+		log.Infof("load_capability: focus mode '%s' completed synchronously (ok=IsAsyncMode=false)", identifier)
 	}
 
 	successMsg := fmt.Sprintf(

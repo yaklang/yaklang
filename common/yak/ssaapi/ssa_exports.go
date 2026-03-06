@@ -125,12 +125,6 @@ func SyntaxFlowRuleCheckingStub(code string) []any {
 	return nil
 }
 
-// VerifySFRuleMatchesSample stub, overridden by sfverify.RegisterExport
-func VerifySFRuleMatchesSampleStub(ruleContent, sampleCode, filename, language string) map[string]any {
-	log.Warn("VerifySFRuleMatchesSample is not implemented! Please contact developers to fix it.")
-	return map[string]any{"matched": false, "message": "VerifySFRuleMatchesSample not implemented"}
-}
-
 func RegisterExport(name string, value any) {
 	if _, ok := Exports[name]; !ok {
 		log.Warnf("ssa Export [%s] create by Register but no default implement", name)
@@ -177,9 +171,8 @@ var Exports = map[string]any{
 	"Java":       ssaconfig.JAVA,
 
 	/// static analyze
-	"YaklangScriptChecking":       YaklangScriptChecking,
-	"SyntaxFlowRuleChecking":     SyntaxFlowRuleCheckingStub,
-	"VerifySFRuleMatchesSample":   VerifySFRuleMatchesSampleStub,
+	"YaklangScriptChecking":   YaklangScriptChecking,
+	"SyntaxFlowRuleChecking": SyntaxFlowRuleCheckingStub,
 
 	// result
 	"NewResultFromDB": LoadResultByID,
