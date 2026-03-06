@@ -20,6 +20,8 @@
 ./scripts/build_runtime_go.sh
 ```
 
+运行时静态库中包含 `ssa2llvm` 编译出的 Yak 代码所需的基础运行时能力，以及部分 yak 标准库函数绑定（例如 `poc.*`）。
+
 构建完成后可在这里看到产物：
 
 - `common/yak/ssa2llvm/runtime/libyak.a`

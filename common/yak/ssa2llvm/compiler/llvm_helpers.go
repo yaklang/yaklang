@@ -51,6 +51,16 @@ func buildTrunc(b llvm.Builder, val llvm.Value, dest llvm.Type, name string) llv
 	return valueFromC(res)
 }
 
+func buildOr(b llvm.Builder, lhs, rhs llvm.Value, name string) llvm.Value {
+	cname := C.CString(name)
+	defer C.free(unsafe.Pointer(cname))
+	cb := (C.LLVMBuilderRef)(unsafe.Pointer(b.C))
+	clhs := (C.LLVMValueRef)(unsafe.Pointer(lhs.C))
+	crhs := (C.LLVMValueRef)(unsafe.Pointer(rhs.C))
+	res := C.LLVMBuildOr(cb, clhs, crhs, cname)
+	return valueFromC(res)
+}
+
 func valueFromC(v C.LLVMValueRef) llvm.Value {
 	var ret llvm.Value
 	*(*unsafe.Pointer)(unsafe.Pointer(&ret)) = unsafe.Pointer(v)

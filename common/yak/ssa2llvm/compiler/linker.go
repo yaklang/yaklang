@@ -30,6 +30,7 @@ func CompileLLVMToBinary(llFile, binFile string, linkRuntime bool, extraArgs ...
 		args = append(args,
 			runtimeArchive,
 			"-lgc",
+			"-lm",
 			"-lpthread",
 			"-ldl",
 		)

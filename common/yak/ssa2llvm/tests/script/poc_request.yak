@@ -1,0 +1,11 @@
+url = os.Getenv("YAK_TEST_URL")
+rsp, req, err = poc.Get(
+    url,
+    poc.timeout(2),
+)
+if err != nil {
+    println(0)
+} else {
+    body = string(poc.GetHTTPPacketBody(rsp.RawPacket))
+    println(body)
+}
