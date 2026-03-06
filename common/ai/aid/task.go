@@ -118,6 +118,10 @@ func (t *AiTask) GetUserInput() string {
 		currentInput = t.AIStatefulTaskBase.GetUserInput()
 	}
 
+	// 构建输出：用户原始输入部分
+	if t.Coordinator.userInput != "" {
+		buf.WriteString(t.Coordinator.userInput)
+	}
 	// 构建输出：父任务部分
 	if len(parentInputs) > 0 {
 		buf.WriteString("<|PARENT_TASK|>\n")
