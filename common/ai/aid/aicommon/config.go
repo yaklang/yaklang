@@ -2677,6 +2677,15 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 		opts = append(opts, WithContextProvider(i.ContextProviderManager))
 	}
 
+	// Dynamic planning propagation
+	opts = append(opts, WithDisableDynamicPlanning(i.DisableDynamicPlanning))
+	if i.AiPlanReviewControl != nil {
+		opts = append(opts, WithAiPlanReviewControl(i.AiPlanReviewControl))
+	}
+	if i.AiTaskReviewControl != nil {
+		opts = append(opts, WithAiTaskReviewControl(i.AiTaskReviewControl))
+	}
+
 	// PlanPrompt - additional context for plan phase only
 	if i.PlanPrompt != "" {
 		opts = append(opts, WithPlanPrompt(i.PlanPrompt))

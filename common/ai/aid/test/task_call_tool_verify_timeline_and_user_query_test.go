@@ -124,6 +124,7 @@ func TestAITaskCallToolStdOut_VerifyTimelineAndUserQuery(t *testing.T) {
 		aicommon.WithSystemFileOperator(),
 		aicommon.WithNoOpMemoryTriage(),
 		aicommon.WithDisableIntentRecognition(true),
+		aicommon.WithDisableDynamicPlanning(true),
 		aicommon.WithPersistentSessionId(timelineId),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
