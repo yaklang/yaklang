@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -78,7 +77,10 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 		func(rsp *aicommon.AIResponse) error {
 			stream := rsp.GetOutputStreamReader("re-act-verify", true, r.Emitter)
 
-			// stream = io.TeeReader(stream, os.Stdout)
+			var rawResponse bytes.Buffer
+			stream = io.TeeReader(stream, &rawResponse)
+
+			var eventIds = new(sync.Map)
 
 			createReasonCallback := func(prompt string) func(key string, reader io.Reader) {
 				return func(key string, reader io.Reader) {
@@ -95,6 +97,7 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 								r.AddToTimeline("verify", prompt+": "+out.String())
 								emitStreamIdReference(event)
 							}
+							eventIds.Store(event.GetStreamEventWriterId(), struct{}{})
 						},
 					)
 					if err != nil {
@@ -134,11 +137,7 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 							log.Errorf("failed to emit human_readable_result stream event: %v", err)
 							return
 						}
-						streamEventId := jsonpath.FindFirst(event.Content, `$.event_writer_id`) // stream event id != "
-						streamId := utils.InterfaceToString(streamEventId)
-						if streamId != "" {
-
-						}
+						eventIds.Store(event.GetStreamEventWriterId(), struct{}{})
 					},
 				),
 				aicommon.WithActionFieldStreamHandler(
@@ -166,6 +165,7 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 							log.Errorf("failed to emit next_movements stream event: %v", err)
 							return
 						}
+						eventIds.Store(event.GetStreamEventWriterId(), struct{}{})
 					},
 				),
 			)
@@ -190,6 +190,12 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 					"NextMovements": nextMovements,
 				}))
 			}
+
+			eventIds.Range(func(k, v interface{}) bool {
+				kString := utils.InterfaceToString(k)
+				r.EmitTextReferenceMaterial(kString, rawResponse.String())
+				return true
+			})
 			return nil
 		},
 	)
