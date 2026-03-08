@@ -15,6 +15,49 @@ var instruction string
 //go:embed prompts/reflection_output_example.txt
 var outputExample string
 
+const reActPostSummary = `
+请根据你刚才执行的所有步骤，以 **Markdown 格式** 输出一份结构化总结，格式如下：
+
+【注意：回答过程中，保持克制，不要使用任何 EMOJI，这是一个工业生产级别的系统】
+
+---
+
+## 执行总结
+
+简要描述本次任务的目标和整体结果。
+
+---
+
+## 执行过程回顾
+
+按步骤列出你做了什么，每一步的关键操作和结果：
+
+1. **步骤一**：...
+2. **步骤二**：...
+3. **步骤三**：...
+
+---
+
+## 最终结果
+
+说明任务是否完成，以及核心产出是什么。
+
+---
+
+## 下一步建议
+
+[友善地引导用户进行下一步行动]，可以说：
+
+1. "如果您觉得我的结果有缺陷，请您不吝赐教"
+2. "如果您有任何其他问题或需要进一步的帮助，请随时告诉我！"
+3. "我们可以继续做xxx，您允许的话我们马上开始！"
+
+引发用户的兴趣和参与，鼓励他们继续互动。
+
+【注意：下一步建议并不一定需要出现，也不需要太死板，以引导用户交互为核心目标，上述列表只需要选择性表达即可】
+
+`
+
 func init() {
 	err := reactloops.RegisterLoopFactory(
 		schema.AI_REACT_LOOP_NAME_DEFAULT,
@@ -29,6 +72,22 @@ func init() {
 				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
 				reactloops.WithPersistentInstruction(instruction),
 				reactloops.WithReflectionOutputExample(outputExample),
+				reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, operator *reactloops.OnPostIterationOperator) {
+					if !isDone {
+						return
+					}
+					if loop.GetLastAction().ActionType == schema.AI_REACT_LOOP_ACTION_DIRECTLY_ANSWER {
+						log.Infof("iteration %d: action is directly answer, exiting loop and returning final answer", iteration)
+						return
+					}
+
+					directlySummary, _ := loop.GetInvoker().DirectlyAnswer(
+						task.GetContext(), reActPostSummary, nil, nil,
+					)
+					if directlySummary != "" {
+						loop.GetInvoker().AddToTimeline("final_summary", directlySummary)
+					}
+				}),
 			}
 
 			// 检查是否有 GetEnableSelfReflection 方法（向后兼容）

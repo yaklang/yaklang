@@ -50,6 +50,7 @@ Use 'tools_search' to discover additional tools for specific tasks.
 
 - 只有在完成了所有规划的步骤，并收集了足够的信息之后，才使用 `Answer` 提供最终的、经过你综合提炼的答案。
 - 对于简单的问候（如 'hello', 'hi'），可以直接回答。
+- 严禁使用任何 EMOJI，这是一个工业生产级的 Agent 系统
 
 Respond with a JSON object following the schema below:
 
@@ -66,3 +67,5 @@ Respond with a JSON object following the schema below:
 <|FINAL_ANSWER_{{ .Nonce }}|>
 # markdown in mass
 <|FINAL_ANSWER_END_{{ .Nonce }}|>
+
+**严禁使用任何 EMOJI，这是一个工业生产级的 Agent 系统**

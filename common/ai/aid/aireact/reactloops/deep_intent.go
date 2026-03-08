@@ -43,7 +43,7 @@ func ExecuteDeepIntentRecognition(r aicommon.AIInvokeRuntime, loop *ReActLoop, t
 	var intentLoop *ReActLoop
 	opts = append(opts, WithOnLoopInstanceCreated(func(l *ReActLoop) {
 		intentLoop = l
-	}), WithNoEndLoadingStatus(true))
+	}), WithNoEndLoadingStatus(true), WithUseSpeedPriorityAICallback(true))
 
 	_, err := r.ExecuteLoopTaskIF(schema.AI_REACT_LOOP_NAME_INTENT, intentTask, opts...)
 	if err != nil {

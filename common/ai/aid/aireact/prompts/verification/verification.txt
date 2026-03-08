@@ -231,7 +231,7 @@ IMPORTANT GUIDELINES:
 
 **任务完成时（必须设置 completed_task_index）：**
 ```json
-{"@action": "verify-satisfaction", "user_satisfied": true, "completed_task_index": "任务索引", "human_readable_result": "简短描述", "reasoning": "简明扼要分析"}
+{"@action": "verify-satisfaction", "user_satisfied": true, "completed_task_index": "任务索引", "reasoning": "简明扼要分析"}
 ```
 
 **任务未完成时（completed_task_index 为空）：**

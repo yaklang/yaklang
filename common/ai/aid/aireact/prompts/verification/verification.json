@@ -4,7 +4,6 @@
     "required": [
         "@action",
         "user_satisfied",
-        "human_readable_result",
         "reasoning"
     ],
     "properties": {
