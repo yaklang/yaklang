@@ -644,6 +644,13 @@ func TestReAct_ToolUse_WithNoToolsCache(t *testing.T) {
 			return rsp, nil
 		}
 
+		if utils.MatchAllOfSubString(prompt, "FINAL_ANSWER", "answer_payload") && !utils.MatchAllOfSubString(prompt, "require_tool") {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "mocked post-iteration summary"}`))
+			rsp.Close()
+			return rsp, nil
+		}
+
 		fmt.Println("Unexpected prompt:", prompt)
 
 		return nil, utils.Errorf("unexpected prompt: %s", prompt)
