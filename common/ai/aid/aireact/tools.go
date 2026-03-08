@@ -71,6 +71,7 @@ func NewTestReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 		aicommon.WithDisableIntentRecognition(true),
 		aicommon.WithDisableAutoSkills(true),
 		aicommon.WithGenerateReport(false),
+		aicommon.WithDisableDynamicPlanning(true),
 	}
 	basicOption = append(basicOption, opts...)
 	ins, err := NewReAct(

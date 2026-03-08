@@ -30,9 +30,33 @@ func (c *Config) DoWaitAgreeWithPolicy(ctx context.Context, policy AgreePolicyTy
 
 	switch policy {
 	case AgreePolicyYOLO, AgreePolicyAuto:
+		if !c.DisableDynamicPlanning {
+			reviewType := endpoint.GetReviewType()
+			switch reviewType {
+			case schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE:
+				if c.AiPlanReviewControl != nil {
+					if result, err := c.AiPlanReviewControl(ctx, c, endpoint); err == nil {
+						endpoint.SetParams(result)
+						endpoint.Release()
+						return
+					} else {
+						log.Warnf("dynamic planning: plan review callback failed: %v, fallback to auto-continue", err)
+					}
+				}
+			case schema.EVENT_TYPE_TASK_REVIEW_REQUIRE:
+				if c.AiTaskReviewControl != nil {
+					if result, err := c.AiTaskReviewControl(ctx, c, endpoint); err == nil {
+						endpoint.SetParams(result)
+						endpoint.Release()
+						return
+					} else {
+						log.Warnf("dynamic planning: task review callback failed: %v, fallback to auto-continue", err)
+					}
+				}
+			}
+		}
 		c.Emitter.EmitInfo("yolo policy auto agree all")
 		log.Infof("Auto-approving tool usage (non-interactive mode)")
-		// Set default continue response
 		endpoint.SetParams(aitool.InvokeParams{"suggestion": "continue"})
 		endpoint.Release()
 		return

@@ -1,0 +1,53 @@
+{{ if .Timeline }}# Timeline Memory
+{{ .Timeline }}
+{{ end }}
+
+# Plan Review Task
+
+You are a plan quality reviewer. Analyze the following task plan and decide whether it should proceed as-is or needs modification.
+
+## Current Plan
+{{ .PlanDetails }}
+
+## User's Original Request
+{{ .UserQuery }}
+
+## Review Criteria
+1. Are all subtasks specific, measurable, and achievable?
+2. Is the task decomposition complete - are there missing steps?
+3. Are dependencies between subtasks properly ordered?
+4. Is any subtask too vague or too broad?
+5. Is this plan feasible with the available tools?
+
+## Available Suggestions
+- "continue": The plan is reasonable, proceed with execution
+- "unclear": The plan is too vague, needs more specific objectives
+- "incomplete": The plan is missing important steps
+- "create-subtask": Some tasks are too broad and need further decomposition
+
+{{ if eq .Language "zh" }}LANGUAGE: Please respond in Chinese (中文).{{ else }}LANGUAGE: Please respond in English.{{ end }}
+
+# Output Schema
+
+```schema
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["@action", "suggestion", "reason"],
+  "properties": {
+    "@action": { "const": "plan_review" },
+    "suggestion": {
+      "description": "Your review decision",
+      "type": "string",
+      "enum": ["continue", "unclear", "incomplete", "create-subtask"]
+    },
+    "reason": {
+      "description": "Brief explanation for your decision",
+      "type": "string"
+    }
+  }
+}
+```
+
+Example:
+`{"@action": "plan_review", "suggestion": "continue", "reason": "The plan covers all necessary steps with clear objectives."}`
