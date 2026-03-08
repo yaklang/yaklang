@@ -48,6 +48,13 @@ func mockedToolCallingForFileEmit(i aicommon.AICallerConfigIf, req *aicommon.AIR
 		return rsp, nil
 	}
 
+	if utils.MatchAllOfSubString(prompt, "FINAL_ANSWER", "answer_payload") && !utils.MatchAllOfSubString(prompt, "require_tool") {
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "mocked post-iteration summary"}`))
+		rsp.Close()
+		return rsp, nil
+	}
+
 	fmt.Println("Unexpected prompt:", prompt)
 
 	return nil, utils.Errorf("unexpected prompt: %s", prompt)
@@ -280,6 +287,13 @@ func TestReAct_ToolCall_FileEmit_LargeResult(t *testing.T) {
 				return rsp, nil
 			}
 
+			if utils.MatchAllOfSubString(prompt, "FINAL_ANSWER", "answer_payload") && !utils.MatchAllOfSubString(prompt, "require_tool") {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "mocked post-iteration summary"}`))
+				rsp.Close()
+				return rsp, nil
+			}
+
 			return nil, utils.Errorf("unexpected prompt: %s", prompt)
 		}),
 		aicommon.WithEventInputChan(in),
@@ -401,6 +415,13 @@ func mockedToolCallingForEmptyOutput(i aicommon.AICallerConfigIf, req *aicommon.
 	if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "test-reason", "human_readable_result": "mocked thought"}`))
+		rsp.Close()
+		return rsp, nil
+	}
+
+	if utils.MatchAllOfSubString(prompt, "FINAL_ANSWER", "answer_payload") && !utils.MatchAllOfSubString(prompt, "require_tool") {
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "mocked post-iteration summary"}`))
 		rsp.Close()
 		return rsp, nil
 	}
@@ -562,6 +583,13 @@ func mockedToolCallingWithCustomIdentifier(i aicommon.AICallerConfigIf, req *aic
 	if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "test-reason", "human_readable_result": "mocked thought"}`))
+		rsp.Close()
+		return rsp, nil
+	}
+
+	if utils.MatchAllOfSubString(prompt, "FINAL_ANSWER", "answer_payload") && !utils.MatchAllOfSubString(prompt, "require_tool") {
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "mocked post-iteration summary"}`))
 		rsp.Close()
 		return rsp, nil
 	}
@@ -736,6 +764,13 @@ func TestReAct_ToolCall_FileEmit_WithoutIdentifier(t *testing.T) {
 		if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "ok", "human_readable_result": "mocked"}`))
+			rsp.Close()
+			return rsp, nil
+		}
+
+		if utils.MatchAllOfSubString(prompt, "FINAL_ANSWER", "answer_payload") && !utils.MatchAllOfSubString(prompt, "require_tool") {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "mocked post-iteration summary"}`))
 			rsp.Close()
 			return rsp, nil
 		}
