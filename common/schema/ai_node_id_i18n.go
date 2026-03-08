@@ -1,7 +1,10 @@
 package schema
 
 import (
+	"encoding/json"
+	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -10,6 +13,67 @@ import (
 type I18n struct {
 	Zh string `json:"zh"`
 	En string `json:"en"`
+}
+
+type NodeIdI18nTranslatorCallback func(nodeId string) *I18n
+
+var nodeIdI18nTranslator NodeIdI18nTranslatorCallback
+
+func RegisterNodeIdI18nTranslator(cb NodeIdI18nTranslatorCallback) {
+	nodeIdI18nTranslator = cb
+}
+
+type i18nCacheEntry struct {
+	once   sync.Once
+	result *I18n
+}
+
+var i18nDynamicCache sync.Map
+
+const i18nCacheKeyPrefix = "ai_i18n_node_id_"
+
+func getNodeIdI18nFromDB(nodeId string) *I18n {
+	db := GetGormProfileDatabase()
+	if db == nil {
+		return nil
+	}
+	keyStr := strconv.Quote(i18nCacheKeyPrefix + nodeId)
+	var storage GeneralStorage
+	if err := db.Where("key = ?", keyStr).First(&storage).Error; err != nil {
+		return nil
+	}
+	val := storage.Value
+	if val == "" {
+		return nil
+	}
+	unquoted, err := strconv.Unquote(val)
+	if err != nil {
+		unquoted = val
+	}
+	var result I18n
+	if err := json.Unmarshal([]byte(unquoted), &result); err != nil {
+		return nil
+	}
+	if result.Zh == "" && result.En == "" {
+		return nil
+	}
+	return &result
+}
+
+func saveNodeIdI18nToDB(nodeId string, i18n *I18n) {
+	db := GetGormProfileDatabase()
+	if db == nil {
+		return
+	}
+	raw, err := json.Marshal(i18n)
+	if err != nil {
+		return
+	}
+	keyStr := strconv.Quote(i18nCacheKeyPrefix + nodeId)
+	valueStr := strconv.Quote(string(raw))
+	db.Model(&GeneralStorage{}).Where("key = ?", keyStr).Assign(map[string]interface{}{
+		"key": keyStr, "value": valueStr,
+	}).FirstOrCreate(&GeneralStorage{})
 }
 
 var nodeIdMapper = map[string]*I18n{
@@ -616,23 +680,44 @@ func NodeIdToI18n(nodeId string, isStream bool) *I18n {
 	if val, ok := nodeIdMapper[nodeId]; ok {
 		return val
 	}
-	if isStream {
-		if strings.HasPrefix(nodeId, "tool-") {
-			if strings.HasSuffix(nodeId, "-stdout") {
-				return &I18n{
-					Zh: "工具标准输出流",
-					En: "Tool Standard Output",
-				}
-			} else if strings.HasSuffix(nodeId, "-stderr") {
-				return &I18n{
-					Zh: "工具标准错误流",
-					En: "Tool Standard Error",
-				}
+
+	if isStream && strings.HasPrefix(nodeId, "tool-") {
+		if strings.HasSuffix(nodeId, "-stdout") {
+			return &I18n{
+				Zh: "工具标准输出流",
+				En: "Tool Standard Output",
+			}
+		} else if strings.HasSuffix(nodeId, "-stderr") {
+			return &I18n{
+				Zh: "工具标准错误流",
+				En: "Tool Standard Error",
 			}
 		}
-		log.Warn("================================================")
-		log.Warnf("[i18n] nodeId cannot be found in nodeIdMapper: %s", nodeId)
-		log.Warn("================================================")
+	}
+
+	entryI, _ := i18nDynamicCache.LoadOrStore(nodeId, &i18nCacheEntry{})
+	entry := entryI.(*i18nCacheEntry)
+	entry.once.Do(func() {
+		if dbResult := getNodeIdI18nFromDB(nodeId); dbResult != nil {
+			entry.result = dbResult
+			return
+		}
+
+		if nodeIdI18nTranslator != nil {
+			log.Infof("AI is optimizing stream ID: %s", nodeId)
+			translated := nodeIdI18nTranslator(nodeId)
+			if translated != nil && (translated.Zh != "" || translated.En != "") {
+				entry.result = translated
+				saveNodeIdI18nToDB(nodeId, translated)
+				return
+			}
+		}
+
+		log.Debugf("[i18n] nodeId not in static mapper, no translator available: %s", nodeId)
+	})
+
+	if entry.result != nil {
+		return entry.result
 	}
 	return &I18n{
 		Zh: nodeId,

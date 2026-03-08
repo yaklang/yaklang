@@ -15,6 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -38,6 +39,37 @@ func init() {
 			final.Name = "liteforge"
 		}
 		return final, nil
+	})
+
+	schema.RegisterNodeIdI18nTranslator(func(nodeId string) *schema.I18n {
+		prompt := fmt.Sprintf(`You are a UI localization assistant for an AI agent system.
+Translate the following technical stream/node identifier into concise, user-friendly display names.
+The identifier uses underscores or hyphens as word separators.
+
+Identifier: %s
+
+Requirements:
+- Chinese (zh): A short, natural Chinese phrase (2-6 characters preferred)
+- English (en): A short, capitalized English phrase`, nodeId)
+
+		result, err := aicommon.InvokeLiteForge(
+			prompt,
+			aicommon.WithLiteForgeOutputSchemaFromAIToolOptions(
+				aitool.WithStringParam("zh", aitool.WithParam_Description("Chinese user-friendly display name")),
+				aitool.WithStringParam("en", aitool.WithParam_Description("English user-friendly display name")),
+			),
+			aicommon.WithAICallback(aicommon.MustGetSpeedPriorityAIModelCallback()),
+		)
+		if err != nil {
+			log.Debugf("LiteForge nodeId i18n translation failed for %q: %v", nodeId, err)
+			return nil
+		}
+		zh := result.GetString("zh")
+		en := result.GetString("en")
+		if zh == "" && en == "" {
+			return nil
+		}
+		return &schema.I18n{Zh: zh, En: en}
 	})
 }
 
