@@ -141,6 +141,7 @@ func runTestForgeByAICommon(t *testing.T, forge *schema.AIForge, initFlag, persi
 	},
 		aicommon.WithAICallback(MockAICallback(t, initFlag, persistentFlag, "")),
 		aicommon.WithAgreeYOLO(),
+		aicommon.WithDisableDynamicPlanning(true),
 		aicommon.WithDebugPrompt(true),
 	)
 	if err != nil {

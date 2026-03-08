@@ -53,7 +53,7 @@ func TestExecuteForgeAndAutoRegister_UsesLatestDBForge(t *testing.T) {
 
 	resultV1, err := aicommon.ExecuteRegisteredForge(forgeName, context.Background(), []*ypb.ExecParamItem{
 		{Key: "query", Value: "hello"},
-	}, callbackV1, aicommon.WithAgreeYOLO(true))
+	}, callbackV1, aicommon.WithAgreeYOLO(true), aicommon.WithDisableDynamicPlanning(true))
 	require.ErrorContains(t, err, "no subtasks")
 	require.Nil(t, resultV1)
 	require.NotNil(t, gotPlanV1)
@@ -82,7 +82,7 @@ func TestExecuteForgeAndAutoRegister_UsesLatestDBForge(t *testing.T) {
 
 	resultV2, err := ExecuteForgeAndAutoRegister(forgeName, context.Background(), []*ypb.ExecParamItem{
 		{Key: "query", Value: "hello"},
-	}, callbackV2, aicommon.WithAgreeYOLO(true))
+	}, callbackV2, aicommon.WithAgreeYOLO(true), aicommon.WithDisableDynamicPlanning(true))
 	require.ErrorContains(t, err, "no subtasks")
 	require.Nil(t, resultV2)
 	require.NotNil(t, gotPlanV2)
