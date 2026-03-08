@@ -183,6 +183,12 @@ type Config struct {
 	AgreeAIScoreMiddle          float64 // default 0.7
 	AgreeManualCallback         func(context.Context, *Config) (aitool.InvokeParams, error)
 
+	// Dynamic planning: when enabled, YOLO/Auto modes will call AI review callbacks
+	// for plan and task review decisions instead of blindly auto-continuing.
+	DisableDynamicPlanning bool
+	AiPlanReviewControl    PlanningReviewControl
+	AiTaskReviewControl    PlanningReviewControl
+
 	// sync config
 	SyncMutex *sync.RWMutex
 	SyncMap   map[string]func() any
@@ -413,6 +419,8 @@ func newConfig(ctx context.Context) *Config {
 		AgreeAIScoreLow:                    0.4,
 		AgreeAIScoreMiddle:                 0.7,
 		AiAgreeRiskControl:                 DefaultAIAssistantRiskControl,
+		AiPlanReviewControl:                DefaultAIPlanReviewControl,
+		AiTaskReviewControl:                DefaultAITaskReviewControl,
 		MaxIterationCount:                  100,
 		Language:                           "zh", // Default to Chinese
 		TopToolsCount:                      15,
@@ -1242,6 +1250,31 @@ func WithAiAgreeRiskControl(rc RiskControl) ConfigOption {
 		c.m.Lock()
 		c.AiAgreeRiskControl = rc
 		c.m.Unlock()
+		return nil
+	}
+}
+
+func WithDisableDynamicPlanning(b ...bool) ConfigOption {
+	return func(c *Config) error {
+		if len(b) > 0 {
+			c.DisableDynamicPlanning = b[0]
+		} else {
+			c.DisableDynamicPlanning = true
+		}
+		return nil
+	}
+}
+
+func WithAiPlanReviewControl(rc PlanningReviewControl) ConfigOption {
+	return func(c *Config) error {
+		c.AiPlanReviewControl = rc
+		return nil
+	}
+}
+
+func WithAiTaskReviewControl(rc PlanningReviewControl) ConfigOption {
+	return func(c *Config) error {
+		c.AiTaskReviewControl = rc
 		return nil
 	}
 }

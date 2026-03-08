@@ -123,3 +123,7 @@ func (e *Endpoint) Release() {
 func (e *Endpoint) GetId() string {
 	return e.id
 }
+
+func (e *Endpoint) GetReviewType() schema.EventType {
+	return e.reviewType
+}

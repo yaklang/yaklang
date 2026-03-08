@@ -75,7 +75,8 @@ func (e *EndpointManager) CreateEndpointWithEventType(typeName schema.EventType)
 	id := ksuid.New().String()
 	endpoint := &Endpoint{
 		id:              id,
-		sig:             NewEndpointSignal(), // sync.NewCond(&sync.Mutex{}), // 正确初始化 Cond
+		sig:             NewEndpointSignal(),
+		reviewType:      typeName,
 		activeParams:    make(aitool.InvokeParams),
 		reviewMaterials: make(aitool.InvokeParams),
 	}
