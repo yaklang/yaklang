@@ -502,6 +502,7 @@ func TestCoordinator_PlanPrompt_OnlyInPlanPhase(t *testing.T) {
 	coordinator, err := aid.NewCoordinator(
 		userQuery,
 		aicommon.WithAgreeYOLO(true),
+		aicommon.WithDisableIntentRecognition(true),
 		aicommon.WithPlanPrompt(planPromptMarker), // Set the PlanPrompt
 		aicommon.WithEventInputChanx(inputChan),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {

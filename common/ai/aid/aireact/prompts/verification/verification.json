@@ -17,12 +17,8 @@
             "description": "**一个布尔值，用于判断用户的【最终请求】是否已【完全并明确地】达成。仅当最终答案已找到或最终任务已完成时，才能设置为 `true`。在所有其他情况下（例如，工具返回错误、结果为空、或当前只是实现目标的中间步骤），都【必须】设置为 `false`。这是你的默认状态。**",
             "type": "boolean"
         },
-        "human_readable_result": {
-            "description": "**对工具执行【结果】的中立、客观的事实总结。只陈述“发生了什么”和“观察到了什么信息”（例如，“命令 `ls` 列出了3个文件”或“`grep` 命令没有返回任何匹配项”）如果工具的内容相对比较多也比较复杂，允许输出较多的文件来阐述工具结果是如何满足用户需求的，特别是 user_satisfied 为 true 的时候，如果需要输出大片 Markdown 内容，请在JSON响应后使用 `<|HUMAN_READABLE_RESULT_...|> 标签输出，并在 `<|HUMAN_READABLE_RESULT_END_...|> 标签结束，禁止在 JSON 字段内容中出现任何标签内容`。此字段不包含任何主观判断或下一步计划。**",
-            "type": "string"
-        },
         "reasoning": {
-            "description": "**支撑 `user_satisfied` 决策的【战略性分析】。在此解释 `human_readable_result` 中的事实对于完成用户的最终目标意味着什么。如果为 `false`，请解释为何任务尚未完成（例如，“这只是第一步，还需要读取文件内容”）。如果为 `true`，请解释为何此结果标志着任务的最终完成。例如：“找到了用户想要的xxx文件，任务完成”，力求简明扼要，尽量在30字以内**",
+            "description": "【VERDICT】基于 observation 的事实，对 user_satisfied 决策的一句话判定理由。satisfied=true 时说明为何任务已最终完成；satisfied=false 时说明距离完成还差什么。严格控制在 50 字以内。不要复述工具原始输出，直接引用关键事实作为判定依据",
             "type": "string"
         },
         "next_movements": {
