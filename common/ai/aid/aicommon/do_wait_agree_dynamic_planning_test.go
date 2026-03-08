@@ -3,6 +3,7 @@ package aicommon
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -66,19 +67,41 @@ func TestYOLO_DisableDynamicPlanning_AutoContinues(t *testing.T) {
 	}
 }
 
-func TestYOLO_DynamicPlanning_DefaultCallbacks_AutoContinue(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+func mockAICallbackForReview(actionName, suggestion string) AICallbackType {
+	return func(i AICallerConfigIf, req *AIRequest) (*AIResponse, error) {
+		rsp := NewUnboundAIResponse()
+		rsp.EmitOutputStream(strings.NewReader(
+			`{"@action": "` + actionName + `", "suggestion": "` + suggestion + `", "reason": "mock AI decision"}`,
+		))
+		rsp.Close()
+		return rsp, nil
+	}
+}
 
-	c := NewTestConfig(ctx,
-		WithAgreePolicy(AgreePolicyYOLO),
-		WithDisableDynamicPlanning(false),
-	)
-	c.StartEventLoop(ctx)
+func newDynamicPlanningTestConfig(ctx context.Context, aiCallback AICallbackType, opts ...ConfigOption) *Config {
+	c := NewTestConfig(ctx, opts...)
+	c.OriginalAICallback = aiCallback
+	c.QualityPriorityAICallback = aiCallback
+	return c
+}
 
-	t.Run("plan review with default callback returns continue", func(t *testing.T) {
+func TestYOLO_DynamicPlanning_DefaultCallbacks_WithAI(t *testing.T) {
+	t.Run("plan review calls AI and uses suggestion", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		cb := mockAICallbackForReview("plan_review", "continue")
+		c := newDynamicPlanningTestConfig(ctx, cb,
+			WithAgreePolicy(AgreePolicyYOLO),
+			WithDisableDynamicPlanning(false),
+		)
+		c.StartEventLoop(ctx)
+
 		ep := c.Epm.CreateEndpointWithEventType(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE)
 		ep.SetDefaultSuggestionContinue()
+		ep.SetReviewMaterials(aitool.InvokeParams{
+			"plans": map[string]any{"tasks": []string{"task1", "task2"}},
+		})
 
 		done := make(chan struct{})
 		go func() {
@@ -90,14 +113,29 @@ func TestYOLO_DynamicPlanning_DefaultCallbacks_AutoContinue(t *testing.T) {
 		case <-done:
 			params := ep.GetParams()
 			require.Equal(t, "continue", params["suggestion"])
-		case <-time.After(3 * time.Second):
-			t.Fatal("default plan review should auto-continue")
+		case <-time.After(8 * time.Second):
+			t.Fatal("plan review AI call should complete within timeout")
 		}
 	})
 
-	t.Run("task review with default callback returns continue", func(t *testing.T) {
+	t.Run("task review calls AI and uses suggestion", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		cb := mockAICallbackForReview("task_review", "continue")
+		c := newDynamicPlanningTestConfig(ctx, cb,
+			WithAgreePolicy(AgreePolicyYOLO),
+			WithDisableDynamicPlanning(false),
+		)
+		c.StartEventLoop(ctx)
+
 		ep := c.Epm.CreateEndpointWithEventType(schema.EVENT_TYPE_TASK_REVIEW_REQUIRE)
 		ep.SetDefaultSuggestionContinue()
+		ep.SetReviewMaterials(aitool.InvokeParams{
+			"task":          map[string]any{"name": "test task", "goal": "test goal"},
+			"short_summary": "completed successfully",
+			"long_summary":  "the task was completed with all expected results",
+		})
 
 		done := make(chan struct{})
 		go func() {
@@ -109,8 +147,73 @@ func TestYOLO_DynamicPlanning_DefaultCallbacks_AutoContinue(t *testing.T) {
 		case <-done:
 			params := ep.GetParams()
 			require.Equal(t, "continue", params["suggestion"])
-		case <-time.After(3 * time.Second):
-			t.Fatal("default task review should auto-continue")
+		case <-time.After(8 * time.Second):
+			t.Fatal("task review AI call should complete within timeout")
+		}
+	})
+
+	t.Run("plan review AI suggests incomplete", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		cb := mockAICallbackForReview("plan_review", "incomplete")
+		c := newDynamicPlanningTestConfig(ctx, cb,
+			WithAgreePolicy(AgreePolicyYOLO),
+			WithDisableDynamicPlanning(false),
+		)
+		c.StartEventLoop(ctx)
+
+		ep := c.Epm.CreateEndpointWithEventType(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE)
+		ep.SetDefaultSuggestionContinue()
+		ep.SetReviewMaterials(aitool.InvokeParams{
+			"plans": map[string]any{"tasks": []string{"vague task"}},
+		})
+
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			c.DoWaitAgreeWithPolicy(ctx, AgreePolicyYOLO, ep)
+		}()
+
+		select {
+		case <-done:
+			params := ep.GetParams()
+			require.Equal(t, "incomplete", params["suggestion"])
+		case <-time.After(8 * time.Second):
+			t.Fatal("plan review AI should complete within timeout")
+		}
+	})
+
+	t.Run("task review AI suggests deeply_think", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		cb := mockAICallbackForReview("task_review", "deeply_think")
+		c := newDynamicPlanningTestConfig(ctx, cb,
+			WithAgreePolicy(AgreePolicyYOLO),
+			WithDisableDynamicPlanning(false),
+		)
+		c.StartEventLoop(ctx)
+
+		ep := c.Epm.CreateEndpointWithEventType(schema.EVENT_TYPE_TASK_REVIEW_REQUIRE)
+		ep.SetDefaultSuggestionContinue()
+		ep.SetReviewMaterials(aitool.InvokeParams{
+			"task":          map[string]any{"name": "shallow task"},
+			"short_summary": "surface level analysis",
+		})
+
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			c.DoWaitAgreeWithPolicy(ctx, AgreePolicyYOLO, ep)
+		}()
+
+		select {
+		case <-done:
+			params := ep.GetParams()
+			require.Equal(t, "deeply_think", params["suggestion"])
+		case <-time.After(8 * time.Second):
+			t.Fatal("task review AI should complete within timeout")
 		}
 	})
 }
@@ -316,4 +419,68 @@ func TestYOLO_DynamicPlanning_EmptyReviewType_AutoContinue(t *testing.T) {
 	case <-time.After(3 * time.Second):
 		t.Fatal("empty review type should auto-continue immediately")
 	}
+}
+
+func TestYOLO_DynamicPlanning_DefaultCallback_AIFailure_FallbackContinue(t *testing.T) {
+	failingAICallback := func(i AICallerConfigIf, req *AIRequest) (*AIResponse, error) {
+		return nil, errors.New("AI service unavailable")
+	}
+
+	t.Run("plan review AI failure falls back to continue", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		c := newDynamicPlanningTestConfig(ctx, failingAICallback,
+			WithAgreePolicy(AgreePolicyYOLO),
+			WithDisableDynamicPlanning(false),
+		)
+		c.StartEventLoop(ctx)
+
+		ep := c.Epm.CreateEndpointWithEventType(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE)
+		ep.SetDefaultSuggestionContinue()
+
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			c.DoWaitAgreeWithPolicy(ctx, AgreePolicyYOLO, ep)
+		}()
+
+		select {
+		case <-done:
+			params := ep.GetParams()
+			assert.Equal(t, "continue", params["suggestion"],
+				"when default AI callback fails, should fallback to auto-continue")
+		case <-time.After(8 * time.Second):
+			t.Fatal("should not block when AI fails")
+		}
+	})
+
+	t.Run("task review AI failure falls back to continue", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		c := newDynamicPlanningTestConfig(ctx, failingAICallback,
+			WithAgreePolicy(AgreePolicyYOLO),
+			WithDisableDynamicPlanning(false),
+		)
+		c.StartEventLoop(ctx)
+
+		ep := c.Epm.CreateEndpointWithEventType(schema.EVENT_TYPE_TASK_REVIEW_REQUIRE)
+		ep.SetDefaultSuggestionContinue()
+
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			c.DoWaitAgreeWithPolicy(ctx, AgreePolicyYOLO, ep)
+		}()
+
+		select {
+		case <-done:
+			params := ep.GetParams()
+			assert.Equal(t, "continue", params["suggestion"],
+				"when default AI callback fails, should fallback to auto-continue")
+		case <-time.After(8 * time.Second):
+			t.Fatal("should not block when AI fails")
+		}
+	})
 }
