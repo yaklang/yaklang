@@ -170,6 +170,13 @@ func TestReAct_PlanAndExecute_SkipAfterCancel(t *testing.T) {
 				return rsp, nil
 			}
 
+			if utils.MatchAllOfSubString(prompt, "任务执行引擎", "task_long_summary") && !utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_") {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "summary", "status_summary": "done", "task_short_summary": "completed", "task_long_summary": "task completed"}`))
+				rsp.Close()
+				return rsp, nil
+			}
+
 			unreachableCode = true
 			return nil, errors.New("unreachable code")
 		}),
