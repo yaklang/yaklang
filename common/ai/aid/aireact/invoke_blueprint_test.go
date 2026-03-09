@@ -69,6 +69,7 @@ func TestReAct_RequireBlueprint(t *testing.T) {
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			out <- e.ToGRPC()
 		}),
+		aicommon.WithDisableDynamicPlanning(true),
 		aicommon.WithHijackPERequest(func(ctx context.Context, planPayload string) error {
 			forgeExecute = true
 			if strings.Contains(planPayload, flag) {
@@ -184,6 +185,7 @@ func TestReAct_RequireBlueprintWithoutHijacked(t *testing.T) {
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			out <- e.ToGRPC()
 		}),
+		aicommon.WithDisableDynamicPlanning(true),
 	)
 	if err != nil {
 		t.Fatal(err)

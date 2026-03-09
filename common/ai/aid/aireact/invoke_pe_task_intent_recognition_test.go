@@ -167,6 +167,7 @@ func TestReAct_PETask_DeepIntentRecognition(t *testing.T) {
 		}),
 		aicommon.WithAgreeYOLO(true),
 		aicommon.WithShowForgeListInPrompt(true),
+		aicommon.WithDisableDynamicPlanning(true),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -335,6 +336,7 @@ func TestReAct_PlanExec_DeepIntentRecognition(t *testing.T) {
 		}),
 		aicommon.WithAgreeYOLO(true),
 		aicommon.WithAllowPlanUserInteract(true),
+		aicommon.WithDisableDynamicPlanning(true),
 	)
 	if err != nil {
 		t.Fatal(err)

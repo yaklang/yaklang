@@ -180,6 +180,7 @@ func TestReAct_PlanAndExecute_SkipAfterCancel(t *testing.T) {
 		aicommon.WithAgreeYOLO(true),
 		aicommon.WithTools(mockTool),
 		aicommon.WithShowForgeListInPrompt(true),
+		aicommon.WithDisableDynamicPlanning(true),
 	)
 	if err != nil {
 		t.Fatal(err)
