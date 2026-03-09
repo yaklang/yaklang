@@ -29,6 +29,10 @@ type Emitter struct {
 	baseEmitter           BaseEmitter
 	eventProcesserStack   *utils.Stack[EventProcesser]
 	interactiveEventSaver func(string, *schema.AiOutputEvent)
+	// streamNodeIdI18nProvider translates a stream nodeId into i18n labels.
+	// Injected by Config using its own AI callback so that tests with mock
+	// AI callbacks automatically cover stream i18n translation.
+	streamNodeIdI18nProvider func(nodeId string) *schema.I18n
 }
 
 func (i *Emitter) Emit(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
@@ -38,6 +42,10 @@ func (i *Emitter) Emit(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
 // SetId sets the emitter's id
 func (i *Emitter) SetId(id string) {
 	i.id = id
+}
+
+func (i *Emitter) SetStreamNodeIdI18nProvider(p func(nodeId string) *schema.I18n) {
+	i.streamNodeIdI18nProvider = p
 }
 
 func (i *Emitter) AssociativeAIProcess(newProcess *schema.AiProcess) *Emitter {
@@ -660,6 +668,8 @@ func (r *Emitter) emitStreamEvent(e *streamEvent) (*schema.AiOutputEvent, error)
 	if e.nodeId == "thought" {
 		e.nodeId = "re-act-loop-thought"
 	}
+
+	schema.EnsureStreamNodeIdI18n(e.nodeId, r.streamNodeIdI18nProvider)
 
 	if e.startTime.IsZero() {
 		e.startTime = time.Now()
