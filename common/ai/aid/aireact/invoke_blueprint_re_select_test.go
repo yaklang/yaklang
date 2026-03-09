@@ -19,14 +19,14 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func mockedRequireBlueprint_ChangeBlueprint(config aicommon.AICallerConfigIf, req *aicommon.AIRequest, flag string) (*aicommon.AIResponse, error) {
+func mockedRequireBlueprint_ChangeBlueprint(config aicommon.AICallerConfigIf, req *aicommon.AIRequest, flag string, forgeName1 string, forgeName2 string) (*aicommon.AIResponse, error) {
 
 	rsp := config.NewAIResponse()
 	if utils.MatchAllOfSubString(req.GetPrompt(), `require_ai_blueprint`, `require_tool`, "USER_QUERY", `directly_answer`, `ask_for_clarification`) {
 		rs := bytes.NewBufferString(`
 {"@action": "object", "next_action": {
 	"type": "require_ai_blueprint",
-	"blueprint_payload": "xss",
+	"blueprint_payload": "` + forgeName1 + `",
 }, "human_readable_thought": "mocked thought` + flag + `", "cumulative_summary": "..cumulative-mocked` + flag + `.."}
 `)
 		rsp.EmitOutputStream(rs)
@@ -37,7 +37,7 @@ func mockedRequireBlueprint_ChangeBlueprint(config aicommon.AICallerConfigIf, re
 	prompt := req.GetPrompt()
 
 	if utils.MatchAllOfSubString(
-		req.GetPrompt(), `xss`,
+		req.GetPrompt(), forgeName1,
 		"Blueprint Schema:", `Blueprint Description:`,
 		`call-ai-blueprint`,
 	) && !utils.MatchAllOfSubString(prompt, `<|OLD_PARAMS_`) {
@@ -57,7 +57,7 @@ func mockedRequireBlueprint_ChangeBlueprint(config aicommon.AICallerConfigIf, re
 	) {
 		rs := bytes.NewBufferString(`
 {"@action": "change-ai-blueprint", "reasoning": "...[` + codec.Sha1(flag) + `]...",
-"new_blueprint": "sqlinject"}
+"new_blueprint": "` + forgeName2 + `"}
 `)
 		rsp.EmitOutputStream(rs)
 		rsp.Close()
@@ -83,10 +83,34 @@ func mockedRequireBlueprint_ChangeBlueprint(config aicommon.AICallerConfigIf, re
 }
 
 func TestReAct_RequireBlueprint_ChangeBlueprint(t *testing.T) {
-	ensureTestForge(t, "xss")
-	ensureTestForge(t, "sqlinject")
-	defer yakit.DeleteAIForgeByName(consts.GetGormProfileDatabase(), "xss")
-	defer yakit.DeleteAIForgeByName(consts.GetGormProfileDatabase(), "sqlinject")
+	nonce := utils.RandStringBytes(16)
+	forgeName1 := "mock_forge_alpha_" + nonce
+	forgeName2 := "mock_forge_beta_" + nonce
+
+	forge1 := &schema.AIForge{
+		ForgeName:   forgeName1,
+		ForgeType:   "yak",
+		Description: "mock forge alpha " + forgeName1,
+		InitPrompt:  "test init prompt",
+		PlanPrompt:  `{"@action":"plan","query":"-","main_task":"test","main_task_goal":"test","tasks":[{"subtask_name":"t","subtask_goal":"t"}]}`,
+	}
+	forge2 := &schema.AIForge{
+		ForgeName:   forgeName2,
+		ForgeType:   "yak",
+		Description: "mock forge beta " + forgeName2,
+		InitPrompt:  "test init prompt",
+		PlanPrompt:  `{"@action":"plan","query":"-","main_task":"test","main_task_goal":"test","tasks":[{"subtask_name":"t","subtask_goal":"t"}]}`,
+	}
+	db := consts.GetGormProfileDatabase()
+	if err := yakit.CreateAIForge(db, forge1); err != nil {
+		t.Fatalf("failed to create mock forge1: %v", err)
+	}
+	if err := yakit.CreateAIForge(db, forge2); err != nil {
+		yakit.DeleteAIForgeByName(db, forgeName1)
+		t.Fatalf("failed to create mock forge2: %v", err)
+	}
+	defer yakit.DeleteAIForgeByName(db, forgeName1)
+	defer yakit.DeleteAIForgeByName(db, forgeName2)
 
 	flag := ksuid.New().String()
 	in := make(chan *ypb.AIInputEvent, 10)
@@ -100,7 +124,7 @@ func TestReAct_RequireBlueprint_ChangeBlueprint(t *testing.T) {
 	defer cancel()
 	ins, err := NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			return mockedRequireBlueprint_ChangeBlueprint(i, r, flag)
+			return mockedRequireBlueprint_ChangeBlueprint(i, r, flag, forgeName1, forgeName2)
 		}),
 		aicommon.WithDebug(false),
 		aicommon.WithEventInputChan(in),
@@ -228,8 +252,8 @@ LOOP:
 	if !strings.Contains(timeline, codec.Sha1(flag)) {
 		t.Fatal("timeline does not contain codec.Sha1(flag)", flag)
 	}
-	if !strings.Contains(timeline, `sqlinject`) {
-		t.Fatal("timeline does not contain re-selection for sqlinject", flag)
+	if !strings.Contains(timeline, forgeName2) {
+		t.Fatal("timeline does not contain re-selection for forgeName2", flag)
 	}
 	fmt.Println(timeline)
 }

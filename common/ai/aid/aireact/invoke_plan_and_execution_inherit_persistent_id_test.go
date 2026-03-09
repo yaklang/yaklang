@@ -367,8 +367,8 @@ LOOP:
 // TestReAct_ForgeExecution_UserQueryContext 测试 forge execution 必须包含用户原始输入，保证上下文不丢失
 // 即使 AI 生成的 query 参数不包含用户问题，系统也应该自动追加
 func TestReAct_ForgeExecution_UserQueryContext(t *testing.T) {
-	ensureTestForge(t, "xss")
-	defer yakit.DeleteAIForgeByName(consts.GetGormProfileDatabase(), "xss")
+	forgeName, forgeCleanup := createMockForge(t)
+	defer forgeCleanup()
 
 	persistentId := uuid.New().String()
 	userOriginalQuery := "请帮我分析这个漏洞: CVE-2024-" + utils.RandStringBytes(16)
@@ -395,58 +395,58 @@ func TestReAct_ForgeExecution_UserQueryContext(t *testing.T) {
 					t.Errorf("user query NOT found in ReAct main loop prompt")
 				}
 
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "object", "next_action": { "type": "require_ai_blueprint", "blueprint_payload": "xss" },
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`
+{"@action": "object", "next_action": { "type": "require_ai_blueprint", "blueprint_payload": "` + forgeName + `" },
 "human_readable_thought": "requesting forge to analyze vulnerability", "cumulative_summary": "forge analysis"}
 `))
-				rsp.Close()
-				return rsp, nil
+			rsp.Close()
+			return rsp, nil
+		}
+
+		// Blueprint 参数生成
+		if utils.MatchAllOfSubString(prompt, "Blueprint Schema:", "Blueprint Description:", "call-ai-blueprint", forgeName) {
+			// 关键验证点：在生成 blueprint 参数的 prompt 中，用户原始输入必须存在
+			if strings.Contains(prompt, userOriginalQuery) {
+				userQueryFoundInPrompt = true
+				log.Infof("✓ User query found in blueprint parameter generation prompt")
+			} else {
+				log.Errorf("✗ User query NOT found in blueprint parameter generation prompt")
 			}
 
-			// Blueprint 参数生成
-			if utils.MatchAllOfSubString(prompt, "Blueprint Schema:", "Blueprint Description:", "call-ai-blueprint") {
-				// 关键验证点：在生成 blueprint 参数的 prompt 中，用户原始输入必须存在
-				if strings.Contains(prompt, userOriginalQuery) {
-					userQueryFoundInPrompt = true
-					log.Infof("✓ User query found in blueprint parameter generation prompt")
-				} else {
-					log.Errorf("✗ User query NOT found in blueprint parameter generation prompt")
-				}
-
-				// 重要：AI 返回的 query 参数故意不包含用户原始问题，模拟 AI 改写导致信息丢失的情况
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`
+			// 重要：AI 返回的 query 参数故意不包含用户原始问题，模拟 AI 改写导致信息丢失的情况
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "call-ai-blueprint", "params": {"target": "http://example.com", "query": "` + aiGeneratedQuery + `"},
 "human_readable_thought": "generating blueprint parameters (AI rewrote the query)", "cumulative_summary": "forge parameters"}
 `))
-				rsp.Close()
-				return rsp, nil
-			}
-
-			if utils.MatchAllOfSubString(prompt, "FINAL_ANSWER", "answer_payload") {
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "mocked summary"}`))
-				rsp.Close()
-				return rsp, nil
-			}
-
-			if utils.MatchAllOfSubString(prompt, "任务执行引擎", "task_long_summary") {
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "summary", "status_summary": "done", "task_short_summary": "done", "task_long_summary": "done"}`))
-				rsp.Close()
-				return rsp, nil
-			}
-
-			log.Infof("unexpected prompt in TestReAct_ForgeExecution_UserQueryContext")
-			rsp := i.NewAIResponse()
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "fallback"}`))
 			rsp.Close()
 			return rsp, nil
-		}),
-		aicommon.WithEventInputChan(in),
-		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
-			out <- e.ToGRPC()
+		}
+
+		if utils.MatchAllOfSubString(prompt, "FINAL_ANSWER", "answer_payload") {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "mocked summary"}`))
+			rsp.Close()
+			return rsp, nil
+		}
+
+		if utils.MatchAllOfSubString(prompt, "任务执行引擎", "task_long_summary") {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "summary", "status_summary": "done", "task_short_summary": "done", "task_long_summary": "done"}`))
+			rsp.Close()
+			return rsp, nil
+		}
+
+		log.Infof("unexpected prompt in TestReAct_ForgeExecution_UserQueryContext")
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "fallback"}`))
+		rsp.Close()
+		return rsp, nil
+	}),
+	aicommon.WithEventInputChan(in),
+	aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
+		out <- e.ToGRPC()
 		}),
 		aicommon.WithPersistentSessionId(persistentId),
 		aicommon.WithDisableDynamicPlanning(true),

@@ -18,14 +18,14 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func mockedRequireBlueprint_BASIC(config aicommon.AICallerConfigIf, req *aicommon.AIRequest, flag string) (*aicommon.AIResponse, error) {
+func mockedRequireBlueprint_BASIC(config aicommon.AICallerConfigIf, req *aicommon.AIRequest, flag string, forgeName string) (*aicommon.AIResponse, error) {
 
 	rsp := config.NewAIResponse()
 	if utils.MatchAllOfSubString(req.GetPrompt(), `require_ai_blueprint`, `require_tool`, "USER_QUERY", `directly_answer`, `ask_for_clarification`) {
 		rs := bytes.NewBufferString(`
 {"@action": "object", "next_action": {
 	"type": "require_ai_blueprint",
-	"blueprint_payload": "xss",
+	"blueprint_payload": "` + forgeName + `",
 }, "human_readable_thought": "mocked thought` + flag + `", "cumulative_summary": "..cumulative-mocked` + flag + `.."}
 `)
 		rsp.EmitOutputStream(rs)
@@ -34,7 +34,7 @@ func mockedRequireBlueprint_BASIC(config aicommon.AICallerConfigIf, req *aicommo
 	}
 
 	if utils.MatchAllOfSubString(
-		req.GetPrompt(), `xss`,
+		req.GetPrompt(), forgeName,
 		"Blueprint Schema:", `Blueprint Description:`,
 		`call-ai-blueprint`,
 	) {
@@ -72,28 +72,31 @@ func mockedRequireBlueprint_BASIC(config aicommon.AICallerConfigIf, req *aicommo
 	return rsp, nil
 }
 
-func ensureTestForge(t *testing.T, name string) {
+// createMockForge creates a temporary forge with a unique nonce-based name for testing.
+// Returns the forge name and a cleanup function that deletes the forge.
+func createMockForge(t *testing.T) (name string, cleanup func()) {
 	t.Helper()
-	db := consts.GetGormProfileDatabase()
-	existing, _ := yakit.GetAIForgeByName(db, name)
-	if existing != nil {
-		return
-	}
+	nonce := utils.RandStringBytes(16)
+	name = "mock_forge_" + nonce
 	forge := &schema.AIForge{
 		ForgeName:   name,
 		ForgeType:   "yak",
-		Description: "test forge for " + name,
+		Description: "mock test forge " + name,
 		InitPrompt:  "test init prompt",
 		PlanPrompt:  `{"@action":"plan","query":"-","main_task":"test","main_task_goal":"test","tasks":[{"subtask_name":"t","subtask_goal":"t"}]}`,
 	}
-	if err := yakit.CreateAIForge(db, forge); err != nil {
-		t.Fatalf("failed to create test forge %q: %v", name, err)
+	if err := yakit.CreateAIForge(consts.GetGormProfileDatabase(), forge); err != nil {
+		t.Fatalf("failed to create mock forge: %v", err)
 	}
+	cleanup = func() {
+		yakit.DeleteAIForgeByName(consts.GetGormProfileDatabase(), name)
+	}
+	return name, cleanup
 }
 
 func TestReAct_RequireBlueprint(t *testing.T) {
-	ensureTestForge(t, "xss")
-	defer yakit.DeleteAIForgeByName(consts.GetGormProfileDatabase(), "xss")
+	forgeName, forgeCleanup := createMockForge(t)
+	defer forgeCleanup()
 
 	flag := ksuid.New().String()
 	in := make(chan *ypb.AIInputEvent, 10)
@@ -106,7 +109,7 @@ func TestReAct_RequireBlueprint(t *testing.T) {
 	defer cancel()
 	ins, err := NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			return mockedRequireBlueprint_BASIC(i, r, flag)
+			return mockedRequireBlueprint_BASIC(i, r, flag, forgeName)
 		}),
 		aicommon.WithDebug(false),
 		aicommon.WithEventInputChan(in),
@@ -208,8 +211,8 @@ LOOP:
 }
 
 func TestReAct_RequireBlueprintWithoutHijacked(t *testing.T) {
-	ensureTestForge(t, "xss")
-	defer yakit.DeleteAIForgeByName(consts.GetGormProfileDatabase(), "xss")
+	forgeName, forgeCleanup := createMockForge(t)
+	defer forgeCleanup()
 
 	flag := ksuid.New().String()
 	in := make(chan *ypb.AIInputEvent, 10)
@@ -221,10 +224,10 @@ func TestReAct_RequireBlueprintWithoutHijacked(t *testing.T) {
 	aiforgeExecuteConfirmed := false
 	ins, err := NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			if utils.MatchAllOfSubString(r.GetPrompt(), `xss`, "Blueprint Schema:", `call-ai-blueprint`) {
+			if utils.MatchAllOfSubString(r.GetPrompt(), forgeName, "Blueprint Schema:", `call-ai-blueprint`) {
 				aiforgeExecuteConfirmed = true
 			}
-			return mockedRequireBlueprint_BASIC(i, r, flag)
+			return mockedRequireBlueprint_BASIC(i, r, flag, forgeName)
 		}),
 		aicommon.WithDebug(false),
 		aicommon.WithEventInputChan(in),
