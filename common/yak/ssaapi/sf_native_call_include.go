@@ -41,7 +41,7 @@ func createIncludeCache() *utils.Cache[Values] {
 	return utils.NewTTLCache[Values]()
 }
 
-func nativeCallInclude(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (success bool, value sfvm.ValueOperator, err error) {
+func nativeCallInclude(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (success bool, value sfvm.Values, err error) {
 	parent, err := fetchProgram(v)
 	if err != nil {
 		return false, nil, err
@@ -76,19 +76,18 @@ func nativeCallInclude(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.N
 		log.Warnf("get syntaxflow rule library %v error: %v", ruleName, err)
 		return false, nil, err
 	}
-	var queryValue sfvm.ValueOperator
+	var queryValue sfvm.Values
 	if len(inputs) == 0 {
-		queryValue = parent
+		queryValue = sfvm.ValuesOf(parent)
 	} else {
-		// 将 Values 转换为 sfvm.ValueList
-		queryValue = ValuesToSFValueList(inputs)
+		queryValue = ToSFVMValues(inputs)
 	}
 
 	config := frame.GetConfig()
 	result, err := QuerySyntaxflow(
 		QueryWithSFConfig(config),
 		QueryWithProgram(parent),
-		QueryWithInitInputVar(queryValue),
+		QueryWithInitInputValues(queryValue),
 		QueryWithRule(rule),
 	)
 	if err != nil {
@@ -109,8 +108,7 @@ func nativeCallInclude(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.N
 	return true, val, nil
 }
 
-func CreateIncludeValue(vs Values) sfvm.ValueOperator {
-	// value := ValuesToSFValueList(vals)
+func CreateIncludeValue(vs Values) sfvm.Values {
 	var list []sfvm.ValueOperator
 	for _, got := range vs {
 		val := got.NewValue(got.getValue())
@@ -120,13 +118,12 @@ func CreateIncludeValue(vs Values) sfvm.ValueOperator {
 	return sfvm.NewValues(list)
 }
 
-func GetIncludeCacheValue(program *Program, ruleName string, inputValues Values) (hash string, value sfvm.ValueOperator, shouldCache bool) {
-	getRetFromCache := func(hash string) sfvm.ValueOperator {
+func GetIncludeCacheValue(program *Program, ruleName string, inputValues Values) (hash string, value sfvm.Values, shouldCache bool) {
+	getRetFromCache := func(hash string) sfvm.Values {
 		if ret, ok := includeCache.Get(hash); ok {
 			return CreateIncludeValue(ret)
-		} else {
-			return nil
 		}
+		return nil
 	}
 
 	if programHash, ok := program.Hash(); ok {

@@ -42,7 +42,7 @@ func getValueNames(val *Value) []string {
 	return names
 }
 
-var nativeCallName sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+var nativeCallName sfvm.NativeCallFunc = func(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 	var vals []sfvm.ValueOperator
 	v.Recursive(func(operator sfvm.ValueOperator) error {
 		val, ok := operator.(*Value)
@@ -57,13 +57,13 @@ var nativeCallName sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.
 			}
 			_, existed := filter[name]
 			if !existed {
-					filter[name] = struct{}{}
-					results := val.NewConstValue(name, val.GetRange())
-					results.AppendPredecessor(val, frame.WithPredecessorContext("getFuncName"))
-					mergeAnchorBitVectorToResult(results, val)
-					vals = append(vals, results)
-				}
+				filter[name] = struct{}{}
+				results := val.NewConstValue(name, val.GetRange())
+				results.AppendPredecessor(val, frame.WithPredecessorContext("getFuncName"))
+				mergeAnchorBitVectorToResult(sfvm.ValuesOf(results), val)
+				vals = append(vals, results)
 			}
+		}
 
 		return nil
 	})

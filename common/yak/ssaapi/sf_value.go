@@ -95,55 +95,49 @@ func (v *Value) SetAnchorBitVector(bits *utils.BitVector) {
 	v.anchorBits = bits.Clone()
 }
 
-func (v *Value) ExactMatch(ctx context.Context, mod ssadb.MatchMode, want string) (bool, sfvm.ValueOperator, error) {
+func (v *Value) ExactMatch(ctx context.Context, mod ssadb.MatchMode, want string) (bool, sfvm.Values, error) {
 	value := _SearchValue(v, mod, func(s string) bool { return s == want }, sfvm.WithAnalysisContext_Label("search-exact:"+want))
-	results := ValuesToSFValueList(value)
+	results := ToSFVMValues(value)
 	mergeAnchorBitVectorToResult(results, v)
 	return len(value) > 0, results, nil
 }
 
-func (v *Value) GlobMatch(ctx context.Context, mod ssadb.MatchMode, g string) (bool, sfvm.ValueOperator, error) {
+func (v *Value) GlobMatch(ctx context.Context, mod ssadb.MatchMode, g string) (bool, sfvm.Values, error) {
 	value := _SearchValue(v, mod, func(s string) bool {
 		return glob.MustCompile(g).Match(s)
 	}, sfvm.WithAnalysisContext_Label("search-glob:"+g))
-	results := ValuesToSFValueList(value)
+	results := ToSFVMValues(value)
 	mergeAnchorBitVectorToResult(results, v)
 	return len(value) > 0, results, nil
 }
 
-func (v *Value) Merge(sf ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
-	var vals = []sfvm.ValueOperator{v}
-	vals = append(vals, sf...)
-	return MergeSFValueOperator(vals...), nil
-}
-
-func (v *Value) RegexpMatch(ctx context.Context, mod ssadb.MatchMode, re string) (bool, sfvm.ValueOperator, error) {
+func (v *Value) RegexpMatch(ctx context.Context, mod ssadb.MatchMode, re string) (bool, sfvm.Values, error) {
 	value := _SearchValue(v, mod, func(s string) bool {
 		return regexp.MustCompile(re).MatchString(s)
 	}, sfvm.WithAnalysisContext_Label("search-regexp:"+re))
-	results := ValuesToSFValueList(value)
+	results := ToSFVMValues(value)
 	mergeAnchorBitVectorToResult(results, v)
 	return len(value) > 0, results, nil
 }
 
-func (v *Value) CompareString(items *sfvm.StringComparator) (sfvm.ValueOperator, []bool) {
+func (v *Value) CompareString(items *sfvm.StringComparator) (sfvm.Values, []bool) {
 	if v == nil || items == nil {
 		return nil, []bool{false}
 	}
 
 	names := getValueNames(v)
 	names = append(names, yakunquote.TryUnquote(v.String()))
-	return v, []bool{items.Matches(names...)}
+	return sfvm.ValuesOf(v), []bool{items.Matches(names...)}
 }
 
-func (v *Value) CompareConst(comparator *sfvm.ConstComparator) []bool {
+func (v *Value) CompareConst(comparator *sfvm.ConstComparator) bool {
 	if v == nil || comparator == nil {
-		return []bool{false}
+		return false
 	}
-	return []bool{comparator.Matches(v.String())}
+	return comparator.Matches(v.String())
 }
 
-func (v *Value) CompareOpcode(comparator *sfvm.OpcodeComparator) (sfvm.ValueOperator, []bool) {
+func (v *Value) CompareOpcode(comparator *sfvm.OpcodeComparator) (sfvm.Values, []bool) {
 	if v == nil || comparator == nil {
 		return nil, []bool{false}
 	}
@@ -154,25 +148,10 @@ func (v *Value) CompareOpcode(comparator *sfvm.OpcodeComparator) (sfvm.ValueOper
 		ops := []string{v.GetBinaryOperator(), v.GetUnaryOperator()}
 		return slices.Contains(ops, binOp)
 	}
-	return v, []bool{comparator.AllSatisfy(checkOp, checkBinOrUnaryOp)}
+	return sfvm.ValuesOf(v), []bool{comparator.AllSatisfy(checkOp, checkBinOrUnaryOp)}
 }
 
-func (v *Value) Remove(sf ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
-	err := sfvm.NewValues(sf).Recursive(func(operator sfvm.ValueOperator) error {
-		if raw, ok := operator.(ssa.GetIdIF); ok {
-			if v.GetId() == raw.GetId() {
-				return utils.Error("abort")
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		return sfvm.NewEmptyValues(), nil
-	}
-	return v, nil
-}
-
-func (v *Value) GetCallActualParams(start int, contain bool) (sfvm.ValueOperator, error) {
+func (v *Value) GetCallActualParams(start int, contain bool) (sfvm.Values, error) {
 	call, isCall := ssa.ToCall(v.getValue())
 	if !isCall {
 		return nil, utils.Errorf("ssa.Value is not a call")
@@ -209,19 +188,18 @@ func (v *Value) GetCallActualParams(start int, contain bool) (sfvm.ValueOperator
 	if utils.IsNil(rets) {
 		return nil, utils.Errorf("ssa.Value no actual params")
 	}
-	return ValuesToSFValueList(rets), nil
+	return ToSFVMValues(rets), nil
 }
 
-func (v *Value) GetCalled() (sfvm.ValueOperator, error) {
+func (v *Value) GetCalled() (sfvm.Values, error) {
 	ret := v.GetCalledBy()
-	// 将 Values 转换为 sfvm.ValueList 才能调用 AppendPredecessor
-	retValueList := ValuesToSFValueList(ret)
-	retValueList.AppendPredecessor(v, sfvm.WithAnalysisContext_Label("call"))
-	mergeAnchorBitVectorToResult(retValueList, v)
-	return retValueList, nil
+	results := ToSFVMValues(ret)
+	results.AppendPredecessor(v, sfvm.WithAnalysisContext_Label("call"))
+	mergeAnchorBitVectorToResult(results, v)
+	return results, nil
 }
 
-func (v *Value) GetFields() (sfvm.ValueOperator, error) {
+func (v *Value) GetFields() (sfvm.Values, error) {
 	if v.IsMap() || v.IsObject() {
 		members := lo.Map(v.GetAllMember(), func(item *Value, index int) sfvm.ValueOperator {
 			return item
@@ -231,11 +209,11 @@ func (v *Value) GetFields() (sfvm.ValueOperator, error) {
 	return sfvm.NewEmptyValues(), nil
 }
 
-func (v *Value) GetMembersByString(key string) (sfvm.ValueOperator, bool) {
+func (v *Value) GetMembersByString(key string) (sfvm.Values, bool) {
 	if v.IsMap() || v.IsList() || v.IsObject() {
 		for _, m := range v.GetMember(v.NewValue(ssa.NewConst(key))) {
 			if m != nil {
-				return m, true
+				return sfvm.ValuesOf(m), true
 			}
 		}
 		return nil, false
@@ -244,18 +222,18 @@ func (v *Value) GetMembersByString(key string) (sfvm.ValueOperator, bool) {
 	return nil, false
 }
 
-func (v *Value) GetSyntaxFlowUse() (sfvm.ValueOperator, error) {
-	return ValuesToSFValueList(v.GetUsers()), nil
+func (v *Value) GetSyntaxFlowUse() (sfvm.Values, error) {
+	return ToSFVMValues(v.GetUsers()), nil
 }
-func (v *Value) GetSyntaxFlowDef() (sfvm.ValueOperator, error) {
-	return ValuesToSFValueList(v.GetOperands()), nil
+func (v *Value) GetSyntaxFlowDef() (sfvm.Values, error) {
+	return ToSFVMValues(v.GetOperands()), nil
 }
-func (v *Value) GetSyntaxFlowTopDef(sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config, config ...*sfvm.RecursiveConfigItem) (sfvm.ValueOperator, error) {
+func (v *Value) GetSyntaxFlowTopDef(sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config, config ...*sfvm.RecursiveConfigItem) (sfvm.Values, error) {
 	// DataFlowWithSFConfig 返回 Values，需要转换为 sfvm.ValueOperator
 	return DataFlowWithSFConfig(sfResult, sfConfig, v, TopDefAnalysis, config...), nil
 }
 
-func (v *Value) GetSyntaxFlowBottomUse(sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config, config ...*sfvm.RecursiveConfigItem) (sfvm.ValueOperator, error) {
+func (v *Value) GetSyntaxFlowBottomUse(sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config, config ...*sfvm.RecursiveConfigItem) (sfvm.Values, error) {
 	// DataFlowWithSFConfig 返回 Values，需要转换为 sfvm.ValueOperator
 	return DataFlowWithSFConfig(sfResult, sfConfig, v, BottomUseAnalysis, config...), nil
 }
@@ -277,24 +255,22 @@ func (v *Value) ListIndex(i int) (sfvm.ValueOperator, error) {
 }
 
 func (v *Value) AppendPredecessor(operator sfvm.ValueOperator, opts ...sfvm.AnalysisContextOption) error {
-	return operator.Recursive(func(el sfvm.ValueOperator) error {
-		if result, ok := el.(*Value); ok {
-			ctx := sfvm.NewDefaultAnalysisContext()
-			for _, opt := range opts {
-				opt(ctx)
-			}
-			if len(v.Predecessors) > 30 {
-				log.Warnf("Value %s Predecessors too many: %d", v.StringWithRange(), len(v.Predecessors))
-			}
-			v.Predecessors = append(v.Predecessors, &PredecessorValue{
-				Node: result, Info: ctx,
-			})
-		}
+	result, ok := operator.(*Value)
+	if !ok {
 		return nil
-	})
+	}
+	ctx := sfvm.NewDefaultAnalysisContext()
+	for _, opt := range opts {
+		opt(ctx)
+	}
+	if len(v.Predecessors) > 30 {
+		log.Warnf("Value %s Predecessors too many: %d", v.StringWithRange(), len(v.Predecessors))
+	}
+	v.Predecessors = append(v.Predecessors, &PredecessorValue{Node: result, Info: ctx})
+	return nil
 }
 
-func (v *Value) FileFilter(path string, match string, rule map[string]string, rule2 []string) (sfvm.ValueOperator, error) {
+func (v *Value) FileFilter(path string, match string, rule map[string]string, rule2 []string) (sfvm.Values, error) {
 	return v.ParentProgram.FileFilter(path, match, rule, rule2)
 }
 

@@ -26,8 +26,8 @@ type basicBlockInfo struct {
 	index        int
 }
 
-var nativeCallScan = func(direction direction) func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
-	return func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+var nativeCallScan = func(direction direction) func(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
+	return func(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 		var vals []sfvm.ValueOperator
 		prog, err := fetchProgram(v)
 		if err != nil {
@@ -158,11 +158,11 @@ func (b *basicBlockInfo) searchInsts(block *ssa.BasicBlock) {
 			continue
 		}
 
-		if b.matchCheck.CheckUntil(value) {
+		if b.matchCheck.CheckUntil(sfvm.ValuesOf(value)) {
 			b.isFinish = true
 			break
 		}
-		if b.matchCheck.CheckMatch(value) {
+		if b.matchCheck.CheckMatch(sfvm.ValuesOf(value)) {
 			b.results = append(b.results, value)
 		}
 	}

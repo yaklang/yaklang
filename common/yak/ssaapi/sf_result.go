@@ -107,8 +107,8 @@ func CreateResultWithProg(prog *Program, res *sfvm.SFFrameResult) *SyntaxFlowRes
 func (r *SyntaxFlowResult) setMemoryResult(res *sfvm.SFFrameResult) {
 	r.memResult = res
 	size := 0
-	sortFunc := func(vo sfvm.ValueOperator) sfvm.ValueOperator {
-		values := (SyntaxFlowVariableToValues(vo))
+	sortFunc := func(vo sfvm.Values) sfvm.Values {
+		values := FromSFVMValues(vo)
 		size += len(values)
 		sort.Slice(values, func(i, j int) bool {
 			// sort by file
@@ -134,10 +134,9 @@ func (r *SyntaxFlowResult) setMemoryResult(res *sfvm.SFFrameResult) {
 			}
 			return i < j // all same just by index
 		})
-		// 将 Values 转换为 sfvm.ValueOperator
-		return ValuesToSFValueList(values)
+		return ToSFVMValues(values)
 	}
-	res.SymbolTable = res.SymbolTable.Map(func(s string, vo sfvm.ValueOperator) (string, sfvm.ValueOperator, error) {
+	res.SymbolTable = res.SymbolTable.Map(func(s string, vo sfvm.Values) (string, sfvm.Values, error) {
 		return s, sortFunc(vo), nil
 	})
 	res.UnNameValue = sortFunc(res.UnNameValue)

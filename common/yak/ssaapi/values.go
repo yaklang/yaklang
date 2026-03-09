@@ -216,7 +216,10 @@ func (v *Value) Hash() (string, bool) {
 	if v.IsNil() {
 		return "", false
 	}
-	return utils.CalcSha256(v.GetId()), true
+	if id := v.GetId(); id > 0 {
+		return utils.CalcSha256(id), true
+	}
+	return "", false
 }
 
 func (v *Value) GetProgramName() string {
@@ -1160,16 +1163,16 @@ type Values []*Value
 
 func (value Values) Hash() (string, bool) {
 	var retIds []int64
-	haveNil := false
+	haveTransient := false
 	value.ForEach(func(value *Value) {
 		id := value.GetId()
-		if id == -1 {
-			haveNil = true
+		if id <= 0 {
+			haveTransient = true
 			return
 		}
-		retIds = append(retIds, value.GetId())
+		retIds = append(retIds, id)
 	})
-	if haveNil {
+	if haveTransient {
 		return "", false
 	}
 	return utils.CalcSha256(retIds), true

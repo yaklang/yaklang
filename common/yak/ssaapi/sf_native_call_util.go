@@ -9,11 +9,11 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
-func mergeAnchorBitVectorToResult(result sfvm.ValueOperator, source sfvm.ValueOperator) {
+func mergeAnchorBitVectorToResult(result sfvm.Values, source sfvm.ValueOperator) {
 	sfvm.MergeAnchorBitVectorToResult(result, source)
 }
 
-var nativeCallString = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+var nativeCallString = func(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 	if isProgram(v) {
 		return false, nil, utils.Error("string is not supported in program")
 	}
@@ -32,7 +32,7 @@ var nativeCallString = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *s
 
 		results := val.NewConstValue(val.String(), val.GetRange())
 		results.AppendPredecessor(val, frame.WithPredecessorContext("string"))
-		mergeAnchorBitVectorToResult(results, val)
+		mergeAnchorBitVectorToResult(sfvm.ValuesOf(results), val)
 		vals = append(vals, results)
 		return nil
 	})
@@ -42,7 +42,7 @@ var nativeCallString = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *s
 	return false, nil, utils.Error("no value found")
 }
 
-var nativeCallStrLower = sfvm.NativeCallFunc(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+var nativeCallStrLower = sfvm.NativeCallFunc(func(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 	var vals []sfvm.ValueOperator
 	_ = v.Recursive(func(operator sfvm.ValueOperator) error {
 		val, ok := operator.(*Value)
@@ -53,7 +53,7 @@ var nativeCallStrLower = sfvm.NativeCallFunc(func(v sfvm.ValueOperator, frame *s
 			ss := codec.AnyToString(val.GetConstValue())
 			results := val.NewConstValue(strings.ToLower(ss), val.GetRange())
 			results.AppendPredecessor(val, frame.WithPredecessorContext("str-lower"))
-			mergeAnchorBitVectorToResult(results, val)
+			mergeAnchorBitVectorToResult(sfvm.ValuesOf(results), val)
 			vals = append(vals, results)
 			return nil
 		}
@@ -65,7 +65,7 @@ var nativeCallStrLower = sfvm.NativeCallFunc(func(v sfvm.ValueOperator, frame *s
 	return false, nil, utils.Error("no value found")
 })
 
-var nativeCallStrUpper = sfvm.NativeCallFunc(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+var nativeCallStrUpper = sfvm.NativeCallFunc(func(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 	var vals []sfvm.ValueOperator
 	_ = v.Recursive(func(operator sfvm.ValueOperator) error {
 		val, ok := operator.(*Value)
@@ -76,7 +76,7 @@ var nativeCallStrUpper = sfvm.NativeCallFunc(func(v sfvm.ValueOperator, frame *s
 			ss := codec.AnyToString(val.GetConstValue())
 			results := val.NewConstValue(strings.ToUpper(ss), val.GetRange())
 			results.AppendPredecessor(val, frame.WithPredecessorContext("str-upper"))
-			mergeAnchorBitVectorToResult(results, val)
+			mergeAnchorBitVectorToResult(sfvm.ValuesOf(results), val)
 			vals = append(vals, results)
 			return nil
 		}
@@ -88,7 +88,7 @@ var nativeCallStrUpper = sfvm.NativeCallFunc(func(v sfvm.ValueOperator, frame *s
 	return false, nil, utils.Error("no value found")
 })
 
-var nativeCallRegexp = sfvm.NativeCallFunc(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+var nativeCallRegexp = sfvm.NativeCallFunc(func(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 	if isProgram(v) {
 		return false, nil, utils.Error("regexp is not supported in program")
 	}
@@ -121,7 +121,7 @@ var nativeCallRegexp = sfvm.NativeCallFunc(func(v sfvm.ValueOperator, frame *sfv
 		if val.IsConstInst() {
 			raws = append(raws, codec.AnyToString(val.GetConstValue()))
 		} else {
-			next, calls, _ := nativeCallString(val, frame, nil)
+			next, calls, _ := nativeCallString(sfvm.ValuesOf(val), frame, nil)
 			if next {
 				_ = calls.Recursive(func(op sfvm.ValueOperator) error {
 					rawVal, ok := op.(*Value)
@@ -143,7 +143,7 @@ var nativeCallRegexp = sfvm.NativeCallFunc(func(v sfvm.ValueOperator, frame *sfv
 						}
 						ret := prog.NewConstValue(matched[group])
 						_ = ret.AppendPredecessor(val, frame.WithPredecessorContext("regexp group"))
-						mergeAnchorBitVectorToResult(ret, val)
+						mergeAnchorBitVectorToResult(sfvm.ValuesOf(ret), val)
 						results = append(results, ret)
 					}
 					continue
@@ -153,7 +153,7 @@ var nativeCallRegexp = sfvm.NativeCallFunc(func(v sfvm.ValueOperator, frame *sfv
 				}
 				ret := prog.NewConstValue(matched[0])
 				_ = ret.AppendPredecessor(val, frame.WithPredecessorContext("regexp"))
-				mergeAnchorBitVectorToResult(ret, val)
+				mergeAnchorBitVectorToResult(sfvm.ValuesOf(ret), val)
 				results = append(results, ret)
 			}
 		}

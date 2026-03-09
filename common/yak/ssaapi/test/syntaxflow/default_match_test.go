@@ -10,7 +10,7 @@ import (
 )
 
 func WithSyntaxFlowResult(expected string, handler func(*ssaapi.Value) error) sfvm.Option {
-	return sfvm.WithResultCaptured(func(name string, results sfvm.ValueOperator) error {
+	return sfvm.WithResultCaptured(func(name string, results sfvm.Values) error {
 		if name != expected {
 			return nil
 		}
@@ -41,7 +41,7 @@ dump(a(2))
 	var ssaValueCount = 0
 	var check2 = false
 	var check4 = false
-	prog.SyntaxFlowChain(`dump(* #-> * as $abc)`, ssaapi.QueryWithEnableDebug(true), ssaapi.QueryWithResultCaptured(func(name string, op sfvm.ValueOperator) error {
+	prog.SyntaxFlowChain(`dump(* #-> * as $abc)`, ssaapi.QueryWithEnableDebug(true), ssaapi.QueryWithResultCaptured(func(name string, op sfvm.Values) error {
 		count++
 		return nil
 	}), ssaapi.QueryWithSyntaxFlowResult("abc", func(value *ssaapi.Value) error {

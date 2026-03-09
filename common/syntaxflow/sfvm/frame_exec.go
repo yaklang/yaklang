@@ -32,7 +32,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
-func recursiveDeepChain(element ValueOperator, handle func(operator ValueOperator) bool, visited map[int64]struct{}) error {
+func recursiveDeepChain(element Values, handle func(operator ValueOperator) bool, visited map[int64]struct{}) error {
 	if visited == nil {
 		visited = make(map[int64]struct{})
 	}
@@ -94,7 +94,7 @@ func recursiveDeepChain(element ValueOperator, handle func(operator ValueOperato
 	return recursiveDeepChain(nextValues, handle, visited)
 }
 
-func (s *SFFrame) opPop(unName bool) (ValueOperator, error) {
+func (s *SFFrame) opPop(unName bool) (Values, error) {
 	if s.stack.Len() == 0 {
 		s.debugSubLog(">> pop Error: empty stack")
 		return nil, utils.Errorf("E: stack is empty, cannot pop")
@@ -173,7 +173,7 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 			log.Infof("invalid opcode: %v", v)
 		}
 
-		var newVal ValueOperator
+		var newVal Values
 		var condition []bool
 		if trackErr := s.track("value-op:CompareOpcode", func() error {
 			done := s.startValueOpTiming("CompareOpcode")
@@ -212,7 +212,7 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 		for index, v := range i.Values {
 			comparator.AddCondition(v, ValidConditionFilter(i.MultiOperator[index]))
 		}
-		var newVal ValueOperator
+		var newVal Values
 		var condition []bool
 		if trackErr := s.track("value-op:CompareString", func() error {
 			done := s.startValueOpTiming("CompareString")
@@ -261,7 +261,7 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 		s.debugSubLog(buffer.String())
 		var res []bool
 		_ = value.Recursive(func(v ValueOperator) error {
-			ok, _, _ := call(v, s, params)
+			ok, _, _ := call(ValuesOf(v), s, params)
 			res = append(res, ok)
 			return nil
 		})
@@ -483,7 +483,7 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 
 		// diagnostics: track value operation timing
 		var result bool
-		var next ValueOperator
+		var next Values
 		var err error
 		if trackErr := s.track("value-op:ExactMatch", func() error {
 			done := s.startValueOpTiming("ExactMatch")
@@ -532,8 +532,8 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 					}
 					return nil
 				})
-				results.AppendPredecessor(value, s.WithPredecessorContext("recursive search "+i.UnaryStr))
-				next = append(next, results)
+				results.AppendPredecessors(value, s.WithPredecessorContext("recursive search "+i.UnaryStr))
+				next = append(next, results...)
 				if have {
 					return true
 				}
@@ -579,7 +579,7 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 					}
 					return nil
 				})
-				next = append(next, results)
+				next = append(next, results...)
 				if have {
 					return true
 				}
@@ -592,7 +592,7 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		}
 		results := NewValues(next)
 		s.debugSubLog("result next: %v", ValuesLen(results))
-		_ = results.AppendPredecessor(value, s.WithPredecessorContext("recursive search "+i.UnaryStr))
+		_ = results.AppendPredecessors(value, s.WithPredecessorContext("recursive search "+i.UnaryStr))
 		s.pushStack(results)
 		s.debugSubLog("<< push next")
 		return true, nil
@@ -629,7 +629,7 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 					}
 					return nil
 				})
-				next = append(next, results)
+				next = append(next, results...)
 				if have {
 					return true
 				}
@@ -642,7 +642,7 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		}
 		results := NewValues(next)
 		s.debugSubLog("result next: %v", ValuesLen(results))
-		_ = results.AppendPredecessor(value, s.WithPredecessorContext("recursive search "+i.UnaryStr))
+		_ = results.AppendPredecessors(value, s.WithPredecessorContext("recursive search "+i.UnaryStr))
 		s.pushStack(results)
 		s.debugSubLog("<< push next")
 		return true, nil
@@ -663,7 +663,7 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 			mod |= ssadb.KeyMatch
 		}
 		var result bool
-		var next ValueOperator
+		var next Values
 		if trackErr := s.track("value-op:GlobMatch", func() error {
 			done := s.startValueOpTiming("GlobMatch")
 			defer done()
@@ -702,7 +702,7 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 			mod |= ssadb.KeyMatch
 		}
 		var result bool
-		var next ValueOperator
+		var next Values
 		if trackErr := s.track("value-op:RegexpMatch", func() error {
 			done := s.startValueOpTiming("RegexpMatch")
 			defer done()
@@ -732,7 +732,7 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		if value == nil {
 			return true, utils.Wrap(CriticalError, "get call instruction failed: stack top is empty")
 		}
-		var results ValueOperator
+		var results Values
 		var err error
 		if trackErr := s.track("value-op:GetCalled", func() error {
 			done := s.startValueOpTiming("GetCalled")
@@ -761,7 +761,7 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		if value == nil {
 			return true, utils.Wrap(CriticalError, "get call args failed: stack top is empty")
 		}
-		var results ValueOperator
+		var results Values
 		var err error
 		if trackErr := s.track("value-op:GetCallActualParams", func() error {
 			done := s.startValueOpTiming("GetCallActualParams")
@@ -790,7 +790,7 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		s.debugSubLog("- call GetUser")
 
 		// diagnostics: track value operation timing
-		var vals ValueOperator
+		var vals Values
 		var err error
 		if trackErr := s.track("value-op:GetSyntaxFlowUse", func() error {
 			done := s.startValueOpTiming("GetSyntaxFlowUse")
@@ -804,7 +804,7 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		if err != nil {
 			return true, utils.Errorf("Call .GetSyntaxFlowUse() failed: %v", err)
 		}
-		vals.AppendPredecessor(value, s.WithPredecessorContext("getUser"))
+		vals.AppendPredecessors(value, s.WithPredecessorContext("getUser"))
 		s.debugSubLog("<< push users")
 		s.pushStack(vals)
 		return true, nil
@@ -817,7 +817,7 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		s.debugSubLog("- call BottomUses")
 
 		// diagnostics: track value operation timing
-		var vals ValueOperator
+		var vals Values
 		var err error
 		if trackErr := s.track("value-op:GetSyntaxFlowBottomUse", func() error {
 			done := s.startValueOpTiming("GetSyntaxFlowBottomUse")
@@ -841,7 +841,7 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 			return true, utils.Wrap(CriticalError, "get users failed: stack top is empty")
 		}
 		s.debugSubLog("- call GetDefs")
-		var vals ValueOperator
+		var vals Values
 		var err error
 		if trackErr := s.track("value-op:GetSyntaxFlowDef", func() error {
 			done := s.startValueOpTiming("GetSyntaxFlowDef")
@@ -867,7 +867,7 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		s.ProcessCallback("get topdef %v(%v)", ValuesLen(value), i.SyntaxFlowConfig)
 
 		// diagnostics: track value operation timing
-		var vals ValueOperator
+		var vals Values
 		var err error
 		if trackErr := s.track("value-op:GetSyntaxFlowTopDef", func() error {
 			done := s.startValueOpTiming("GetSyntaxFlowTopDef")
@@ -996,7 +996,7 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 		//	}
 		//	m[item.Key] = item.Value
 		//})
-		s.result.AlertSymbolTable.Set(i.UnaryStr, NewValues([]ValueOperator{value}))
+		s.result.AlertSymbolTable.Set(i.UnaryStr, value)
 		//alStr := i.ValueByIndex(0)
 		//if alStr != "" {
 		//	m["__extra__"] = alStr
@@ -1057,10 +1057,7 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 		if value == nil {
 			return true, utils.Wrap(CriticalError, "BUG: get top defs failed, empty stack")
 		}
-		val, err := value.Merge(vs)
-		if err != nil {
-			return true, utils.Wrapf(CriticalError, "merge failed: %v", err)
-		}
+		val := MergeValues(value, vs)
 		s.pushStack(val)
 		s.debugSubLog("<< push")
 		return true, nil
@@ -1076,10 +1073,7 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 		if value == nil {
 			return true, utils.Wrap(CriticalError, "BUG: get top defs failed, empty stack")
 		}
-		newVal, err := value.Remove(vs)
-		if err != nil {
-			return true, utils.Wrapf(CriticalError, "remove failed: %v", err)
-		}
+		newVal := RemoveValues(value, vs)
 		s.pushStack(newVal)
 		s.debugSubLog("<< push")
 		return true, nil
@@ -1132,7 +1126,7 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 			s.pushStack(NewValues(vals))
 		}
 		return true, nil
-		case OpNativeCall:
+	case OpNativeCall:
 		ruleLabel := ""
 		if s.rule != nil {
 			if s.rule.Title != "" {
@@ -1145,12 +1139,12 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 		if ruleLabel != "" {
 			name += ":" + ruleLabel
 		}
-			var (
-				value ValueOperator
-				ret   ValueOperator
-				ok    bool
-			)
-			if trackErr := diagnostics.TrackLow(name, func() error {
+		var (
+			value Values
+			ret   Values
+			ok    bool
+		)
+		if trackErr := diagnostics.TrackLow(name, func() error {
 			s.debugSubLog(">> pop")
 			value = s.stack.Pop()
 			if value == nil {
@@ -1174,14 +1168,14 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 					return err
 				}
 				return utils.Errorf("get native call failed: %v", err)
-				}
-				return nil
-			}); trackErr != nil {
-				return true, trackErr
 			}
-			s.debugSubLog("<< push: %v", ValuesLen(ret))
-			s.pushStack(ret)
-			return true, nil
+			return nil
+		}); trackErr != nil {
+			return true, trackErr
+		}
+		s.debugSubLog("<< push: %v", ValuesLen(ret))
+		s.pushStack(ret)
+		return true, nil
 	case OpFileFilterJsonPath, OpFileFilterReg, OpFileFilterXpath:
 		opcode2strMap := map[SFVMOpCode]string{
 			OpFileFilterJsonPath: "jsonpath",
@@ -1201,7 +1195,7 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 		paramList := i.Values
 		paramMap := i.FileFilterMethodItem
 		strOpcode := opcode2strMap[i.OpCode]
-		var res ValueOperator
+		var res Values
 		var err error
 		if trackErr := s.track("value-op:FileFilter", func() error {
 			done := s.startValueOpTiming("FileFilter")
@@ -1232,10 +1226,12 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 			return true, trackErr
 		}
 		if utils.IsNil(val) {
-			val = NewEmptyValues()
+			s.pushStack(NewEmptyValues())
+			return true, nil
 		}
-		s.debugSubLog(">> push: %v", ValuesLen(val))
-		s.pushStack(val)
+		next := ValuesOf(val)
+		s.debugSubLog(">> push: %v", ValuesLen(next))
+		s.pushStack(next)
 		return true, nil
 	case OpPushBool:
 		s.debugSubLog(">> peek")
@@ -1253,10 +1249,12 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 			return true, trackErr
 		}
 		if utils.IsNil(val) {
-			val = NewEmptyValues()
+			s.pushStack(NewEmptyValues())
+			return true, nil
 		}
-		s.debugSubLog(">> push: %v", ValuesLen(val))
-		s.pushStack(val)
+		next := ValuesOf(val)
+		s.debugSubLog(">> push: %v", ValuesLen(next))
+		s.pushStack(next)
 		return true, nil
 	case OpPushString:
 		s.debugSubLog(">> peek")
@@ -1274,10 +1272,12 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 			return true, trackErr
 		}
 		if utils.IsNil(val) {
-			val = NewEmptyValues()
+			s.pushStack(NewEmptyValues())
+			return true, nil
 		}
-		s.debugSubLog(">> push: %v", ValuesLen(val))
-		s.pushStack(val)
+		next := ValuesOf(val)
+		s.debugSubLog(">> push: %v", ValuesLen(next))
+		s.pushStack(next)
 		return true, nil
 	default:
 		return false, nil

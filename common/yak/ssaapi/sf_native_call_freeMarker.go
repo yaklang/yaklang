@@ -15,7 +15,7 @@ var (
 	ftlSuffixExtractor = regexp.MustCompile(`spring.freemarker.suffix=(.*)`)
 )
 
-var nativeCallFreeMarker = sfvm.NativeCallFunc(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+var nativeCallFreeMarker = sfvm.NativeCallFunc(func(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 	prog, err := fetchProgram(v)
 	if err != nil {
 		return false, nil, err

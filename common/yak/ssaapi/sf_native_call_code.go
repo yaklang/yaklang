@@ -5,7 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-func nativeCallOpCodes(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+func nativeCallOpCodes(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 	var vals []sfvm.ValueOperator
 	opCodeMap := make(map[ssa.Opcode]struct{})
 	prog, err := fetchProgram(v)
@@ -83,13 +83,15 @@ func nativeCallOpCodes(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.N
 	})
 	for opCode := range opCodeMap {
 		result := prog.NewConstValue(ssa.SSAOpcode2Name[opCode])
-		result.AppendPredecessor(v, frame.WithPredecessorContext("opcodes"))
+		for _, source := range v {
+			_ = result.AppendPredecessor(source, frame.WithPredecessorContext("opcodes"))
+		}
 		vals = append(vals, result)
 	}
 	return true, sfvm.NewValues(vals), nil
 }
 
-func nativeCallSourceCode(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+func nativeCallSourceCode(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 	context := params.GetInt("context")
 	if context == -1 {
 		context = 0
