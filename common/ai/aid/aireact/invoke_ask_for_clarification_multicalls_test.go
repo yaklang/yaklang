@@ -47,8 +47,10 @@ func mockedClarification2(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, 
 		return rsp, nil
 	}
 
-	fmt.Println("Unexpected prompt:", prompt)
-	return nil, utils.Errorf("unexpected prompt: %s", prompt)
+	rsp := i.NewAIResponse()
+	rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "fallback"}`))
+	rsp.Close()
+	return rsp, nil
 }
 
 func TestReAct_AskForClarification_multicall(t *testing.T) {

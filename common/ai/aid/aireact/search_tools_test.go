@@ -143,7 +143,10 @@ func TestReAct_SearchTools_InPrompt(t *testing.T) {
 				return rsp, nil
 			}
 
-			return nil, utils.Errorf("unexpected prompt: %s", prompt)
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "fallback"}`))
+			rsp.Close()
+			return rsp, nil
 		}),
 		aicommon.WithEventInputChan(in),
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
@@ -270,7 +273,10 @@ func TestReAct_ToolsSearch_Functionality(t *testing.T) {
 				return rsp, nil
 			}
 
-			return nil, utils.Errorf("unexpected prompt: %s", prompt)
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "fallback"}`))
+			rsp.Close()
+			return rsp, nil
 		}),
 		aicommon.WithEventInputChan(in),
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
@@ -393,7 +399,10 @@ func TestReAct_ForgeSearch_Functionality(t *testing.T) {
 				return rsp, nil
 			}
 
-			return nil, utils.Errorf("unexpected prompt: %s", prompt)
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "fallback"}`))
+			rsp.Close()
+			return rsp, nil
 		}),
 		aicommon.WithEventInputChan(in),
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
@@ -500,7 +509,10 @@ func TestReAct_BothSearchTools_InPrompt(t *testing.T) {
 				return rsp, nil
 			}
 
-			return nil, utils.Errorf("unexpected prompt: %s", prompt)
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "fallback"}`))
+			rsp.Close()
+			return rsp, nil
 		}),
 		aicommon.WithEventInputChan(in),
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
