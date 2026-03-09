@@ -52,7 +52,7 @@ func mockedRequireBlueprint_ChangeBlueprint(config aicommon.AICallerConfigIf, re
 	}
 
 	if utils.MatchAllOfSubString(
-		req.GetPrompt(), "<|OLD_PARAMS_", "<|AI_BLUEPRINT_", "change-ai-blueprint",
+		req.GetPrompt(), "<|OLD_PARAMS_", "Current AI Blueprint", "change-ai-blueprint",
 		"reasoning", "new_blueprint",
 	) {
 		rs := bytes.NewBufferString(`
@@ -241,6 +241,7 @@ LOOP:
 		t.Fatal("old params leaked")
 	}
 
+	ins.WaitForStream()
 	timeline := ins.DumpTimeline()
 	fmt.Println(timeline)
 	if !strings.Contains(timeline, flag) {
