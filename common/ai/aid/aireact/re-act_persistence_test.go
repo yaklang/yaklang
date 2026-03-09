@@ -31,7 +31,7 @@ func TestReAct_PersistentSession_ToolUse(t *testing.T) {
 	flag := ksuid.New().String()
 	_ = flag
 	in := make(chan *ypb.AIInputEvent, 10)
-	out := make(chan *ypb.AIOutputEvent, 10)
+	out := make(chan *ypb.AIOutputEvent, 200)
 
 	toolCalled := false
 	sleepTool, err := aitool.New(
@@ -76,11 +76,7 @@ func TestReAct_PersistentSession_ToolUse(t *testing.T) {
 		}
 	}()
 
-	du := time.Duration(10)
-	if utils.InGithubActions() {
-		du = time.Duration(5)
-	}
-	after := time.After(du * time.Second)
+	after := time.After(5 * time.Second)
 
 	reviewed := false
 	reviewReleased := false
@@ -325,7 +321,7 @@ WAIT_PLAN:
 	require.True(t, planEnded, "plan should have ended")
 
 	// Wait for defer blocks (emitArtifactsSummaryToTimeline) and timeline throttle (3s) to flush
-	time.Sleep(5 * time.Second)
+	time.Sleep(3500 * time.Millisecond)
 
 	// Capture Session 1 state for later comparison
 	session1WorkDir := reactIns.config.GetOrCreateWorkDir()

@@ -56,6 +56,13 @@ func mockedToolCalling(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, too
 		return rsp, nil
 	}
 
+	if utils.MatchAllOfSubString(prompt, "FINAL_ANSWER", "answer_payload") {
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "mocked summary"}`))
+		rsp.Close()
+		return rsp, nil
+	}
+
 	rsp := i.NewAIResponse()
 	rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "fallback"}`))
 	rsp.Close()
@@ -64,7 +71,7 @@ func mockedToolCalling(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, too
 
 func TestReAct_ToolUse_Timing(t *testing.T) {
 	in := make(chan *ypb.AIInputEvent, 10)
-	out := make(chan *ypb.AIOutputEvent, 10)
+	out := make(chan *ypb.AIOutputEvent, 200)
 
 	toolCalled := false
 	timingTool, err := aitool.New(
@@ -101,7 +108,7 @@ func TestReAct_ToolUse_Timing(t *testing.T) {
 		}
 	}()
 
-	after := time.After(10 * time.Second)
+	after := time.After(5 * time.Second)
 
 	var startTime, endTime int64
 	var durationMs int64 = -1
@@ -109,6 +116,7 @@ func TestReAct_ToolUse_Timing(t *testing.T) {
 	toolStartReceived := false
 	toolDoneReceived := false
 	reviewed := false
+	taskCompleted := false
 	var iid string
 
 LOOP:
@@ -143,7 +151,6 @@ LOOP:
 				if dm := jsonpath.FindFirst(string(e.Content), "$.duration_ms"); dm != nil {
 					durationMs = int64(utils.InterfaceToInt(dm))
 					require.GreaterOrEqual(t, durationMs, int64(0), "duration_ms should be >= 0")
-					// Duration should be reasonable (tool executes immediately, but should still take some time)
 					require.LessOrEqual(t, durationMs, int64(5000), "duration should be less than 5000ms")
 				}
 				if ds := jsonpath.FindFirst(string(e.Content), "$.duration_seconds"); ds != nil {
@@ -182,10 +189,12 @@ LOOP:
 			if e.NodeId == "react_task_status_changed" {
 				result := jsonpath.FindFirst(e.GetContent(), "$..react_task_now_status")
 				if utils.InterfaceToString(result) == "completed" {
-					if toolStartReceived && toolDoneReceived {
-						break LOOP
-					}
+					taskCompleted = true
 				}
+			}
+
+			if taskCompleted && toolStartReceived && toolDoneReceived {
+				break LOOP
 			}
 
 		case <-after:
@@ -209,7 +218,7 @@ func TestReAct_ToolUse(t *testing.T) {
 	flag := ksuid.New().String()
 	_ = flag
 	in := make(chan *ypb.AIInputEvent, 10)
-	out := make(chan *ypb.AIOutputEvent, 10)
+	out := make(chan *ypb.AIOutputEvent, 200)
 
 	toolCalled := false
 	sleepTool, err := aitool.New(
@@ -252,11 +261,7 @@ func TestReAct_ToolUse(t *testing.T) {
 		}
 	}()
 
-	du := time.Duration(10)
-	if utils.InGithubActions() {
-		du = time.Duration(5)
-	}
-	after := time.After(du * time.Second)
+	after := time.After(5 * time.Second)
 
 	reviewed := false
 	reviewReleased := false
@@ -937,7 +942,7 @@ LOOP:
 
 func TestReAct_ToolCallError_Timing(t *testing.T) {
 	in := make(chan *ypb.AIInputEvent, 10)
-	out := make(chan *ypb.AIOutputEvent, 10)
+	out := make(chan *ypb.AIOutputEvent, 200)
 
 	errorTool, err := aitool.New(
 		"error_test",
@@ -972,7 +977,7 @@ func TestReAct_ToolCallError_Timing(t *testing.T) {
 		}
 	}()
 
-	after := time.After(10 * time.Second)
+	after := time.After(5 * time.Second)
 
 	var startTime, endTime int64
 	var durationMs int64 = -1
@@ -980,6 +985,7 @@ func TestReAct_ToolCallError_Timing(t *testing.T) {
 	toolStartReceived := false
 	toolErrorReceived := false
 	reviewed := false
+	taskCompleted := false
 	var iid string
 
 LOOP:
@@ -1044,10 +1050,12 @@ LOOP:
 			if e.NodeId == "react_task_status_changed" {
 				result := jsonpath.FindFirst(e.GetContent(), "$..react_task_now_status")
 				if utils.InterfaceToString(result) == "completed" {
-					if toolStartReceived && toolErrorReceived {
-						break LOOP
-					}
+					taskCompleted = true
 				}
+			}
+
+			if taskCompleted && toolStartReceived && toolErrorReceived {
+				break LOOP
 			}
 
 		case <-after:

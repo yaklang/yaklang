@@ -26,7 +26,7 @@ func TestReAct_ToolUse_FromDB_ViaToolSearch_WithDefaultConfig(t *testing.T) {
 	defer cleanupMockToolFromDB(t, toolName)
 
 	in := make(chan *ypb.AIInputEvent, 10)
-	out := make(chan *ypb.AIOutputEvent, 10)
+	out := make(chan *ypb.AIOutputEvent, 200)
 
 	toolSearchCalled := false
 	mockToolCalled := false
@@ -101,11 +101,7 @@ func TestReAct_ToolUse_FromDB_ViaToolSearch_WithDefaultConfig(t *testing.T) {
 		}
 	}()
 
-	du := time.Duration(150)
-	if utils.InGithubActions() {
-		du = time.Duration(10)
-	}
-	after := time.After(du * time.Second)
+	after := time.After(5 * time.Second)
 
 	var iid string
 LOOP:

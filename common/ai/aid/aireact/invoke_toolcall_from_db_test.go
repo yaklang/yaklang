@@ -160,7 +160,7 @@ func TestReAct_ToolUse_FromDB_ViaToolSearch(t *testing.T) {
 	defer cleanupMockToolFromDB(t, toolName)
 
 	in := make(chan *ypb.AIInputEvent, 10)
-	out := make(chan *ypb.AIOutputEvent, 10)
+	out := make(chan *ypb.AIOutputEvent, 200)
 
 	toolSearchCalled := false
 	mockToolCalled := false
@@ -256,11 +256,7 @@ func TestReAct_ToolUse_FromDB_ViaToolSearch(t *testing.T) {
 		}
 	}()
 
-	du := time.Duration(15)
-	if utils.InGithubActions() {
-		du = time.Duration(10)
-	}
-	after := time.After(du * time.Second)
+	after := time.After(5 * time.Second)
 
 	var iid string
 LOOP:
@@ -359,7 +355,7 @@ func TestReAct_ToolUse_FromDB_DirectCall(t *testing.T) {
 	defer cleanupMockToolFromDB(t, toolName)
 
 	in := make(chan *ypb.AIInputEvent, 10)
-	out := make(chan *ypb.AIOutputEvent, 10)
+	out := make(chan *ypb.AIOutputEvent, 200)
 
 	mockToolCalled := false
 
@@ -401,11 +397,7 @@ func TestReAct_ToolUse_FromDB_DirectCall(t *testing.T) {
 		}
 	}()
 
-	du := time.Duration(10)
-	if utils.InGithubActions() {
-		du = time.Duration(5)
-	}
-	after := time.After(du * time.Second)
+	after := time.After(5 * time.Second)
 
 	var iid string
 	reviewed := false

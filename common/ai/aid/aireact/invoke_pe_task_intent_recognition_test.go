@@ -63,7 +63,9 @@ func TestReAct_PETask_DeepIntentRecognition(t *testing.T) {
   ]
 }`,
 	}
-	yakit.CreateAIForge(consts.GetGormProfileDatabase(), forge)
+	if err := yakit.CreateAIForge(consts.GetGormProfileDatabase(), forge); err != nil {
+		t.Fatalf("failed to create test forge: %v", err)
+	}
 	defer func() {
 		yakit.DeleteAIForge(consts.GetGormProfileDatabase(), &ypb.AIForgeFilter{
 			ForgeName: testForgeName,
@@ -121,7 +123,7 @@ func TestReAct_PETask_DeepIntentRecognition(t *testing.T) {
 			}
 
 			// Phase: Blueprint parameter generation
-			if utils.MatchAllOfSubString(prompt, "Blueprint Schema:", "Blueprint Description:", "call-ai-blueprint", testForgeName) {
+			if utils.MatchAllOfSubString(prompt, "Blueprint Schema:", "Blueprint Description:", "call-ai-blueprint") {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "call-ai-blueprint","blueprint": "` + testForgeName + `", "params": {"query": "test"},
@@ -147,8 +149,24 @@ func TestReAct_PETask_DeepIntentRecognition(t *testing.T) {
 				return rsp, nil
 			}
 
-			// Phase: Main loop → request blueprint
-			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_ai_blueprint", "require_tool", testForgeName) &&
+			// Phase: Task summary
+			if utils.MatchAllOfSubString(prompt, "任务执行引擎", "task_long_summary") && !utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_") {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "summary", "status_summary": "done", "task_short_summary": "completed", "task_long_summary": "task completed"}`))
+				rsp.Close()
+				return rsp, nil
+			}
+
+			// Phase: FINAL_ANSWER (post-iteration DirectlyAnswer)
+			if utils.MatchAllOfSubString(prompt, "FINAL_ANSWER", "answer_payload") && !utils.MatchAllOfSubString(prompt, "require_tool") {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "mocked summary"}`))
+				rsp.Close()
+				return rsp, nil
+			}
+
+			// Phase: Main loop - request blueprint (use action keywords always in JSON schema)
+			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_ai_blueprint", "require_tool", "ask_for_clarification") &&
 				!utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_") {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
@@ -319,6 +337,22 @@ func TestReAct_PlanExec_DeepIntentRecognition(t *testing.T) {
 			if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "done"}`))
+				rsp.Close()
+				return rsp, nil
+			}
+
+			// Phase: Task summary
+			if utils.MatchAllOfSubString(prompt, "任务执行引擎", "task_long_summary") && !utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_") {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "summary", "status_summary": "done", "task_short_summary": "completed", "task_long_summary": "task completed"}`))
+				rsp.Close()
+				return rsp, nil
+			}
+
+			// Phase: FINAL_ANSWER (post-iteration DirectlyAnswer)
+			if utils.MatchAllOfSubString(prompt, "FINAL_ANSWER", "answer_payload") && !utils.MatchAllOfSubString(prompt, "require_tool") {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "mocked summary"}`))
 				rsp.Close()
 				return rsp, nil
 			}

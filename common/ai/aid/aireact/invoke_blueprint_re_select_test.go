@@ -4,16 +4,19 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
-	"testing"
-	"time"
 )
 
 func mockedRequireBlueprint_ChangeBlueprint(config aicommon.AICallerConfigIf, req *aicommon.AIRequest, flag string) (*aicommon.AIResponse, error) {
@@ -80,7 +83,10 @@ func mockedRequireBlueprint_ChangeBlueprint(config aicommon.AICallerConfigIf, re
 }
 
 func TestReAct_RequireBlueprint_ChangeBlueprint(t *testing.T) {
-	// t.Skip()
+	ensureTestForge(t, "xss")
+	ensureTestForge(t, "sqlinject")
+	defer yakit.DeleteAIForgeByName(consts.GetGormProfileDatabase(), "xss")
+	defer yakit.DeleteAIForgeByName(consts.GetGormProfileDatabase(), "sqlinject")
 
 	flag := ksuid.New().String()
 	in := make(chan *ypb.AIInputEvent, 10)

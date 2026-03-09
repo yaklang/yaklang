@@ -12,10 +12,12 @@ import (
 
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -68,11 +70,14 @@ func mockedRequireBlueprint_ModifyParams(config aicommon.AICallerConfigIf, req *
 
 	fmt.Println(prompt)
 
+	rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "fallback"}`))
+	rsp.Close()
 	return rsp, nil
 }
 
 func TestReAct_RequireBlueprint_ModifyParams(t *testing.T) {
-	// t.Skip()
+	ensureTestForge(t, "xss")
+	defer yakit.DeleteAIForgeByName(consts.GetGormProfileDatabase(), "xss")
 
 	flag := ksuid.New().String()
 	in := make(chan *ypb.AIInputEvent, 10)
@@ -213,7 +218,8 @@ LOOP:
 }
 
 func TestReAct_RequireBlueprint_InputParams(t *testing.T) {
-	// t.Skip()
+	ensureTestForge(t, "xss")
+	defer yakit.DeleteAIForgeByName(consts.GetGormProfileDatabase(), "xss")
 
 	flag := aitool.InvokeParams(map[string]interface{}{
 		"key": ksuid.New().String(),

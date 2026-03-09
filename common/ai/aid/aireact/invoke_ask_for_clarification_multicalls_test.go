@@ -47,6 +47,13 @@ func mockedClarification2(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, 
 		return rsp, nil
 	}
 
+	if utils.MatchAllOfSubString(prompt, "FINAL_ANSWER", "answer_payload") {
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "mocked summary"}`))
+		rsp.Close()
+		return rsp, nil
+	}
+
 	rsp := i.NewAIResponse()
 	rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "fallback"}`))
 	rsp.Close()
@@ -57,7 +64,7 @@ func TestReAct_AskForClarification_multicall(t *testing.T) {
 	flag := ksuid.New().String()
 	_ = flag
 	in := make(chan *ypb.AIInputEvent, 10)
-	out := make(chan *ypb.AIOutputEvent, 10)
+	out := make(chan *ypb.AIOutputEvent, 200)
 
 	_ = flag
 	ins, err := NewTestReAct(
@@ -85,7 +92,7 @@ func TestReAct_AskForClarification_multicall(t *testing.T) {
 			}
 		}
 	}()
-	after := time.After(20 * time.Second)
+	after := time.After(10 * time.Second)
 
 	var iid string
 	var flagMatched bool
