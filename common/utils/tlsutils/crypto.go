@@ -575,3 +575,90 @@ func PemVerifySignSha512WithRSA(pemBytes []byte, originData any, sign []byte) er
 	}
 	return rsa.VerifyPKCS1v15(pub, crypto.SHA512, origin, sign)
 }
+
+// getCryptoHash 返回算法名对应的 crypto.Hash，用于 RSA 签名/验证
+func getCryptoHash(name string) crypto.Hash {
+	switch strings.ToUpper(name) {
+	case "MD5":
+		return crypto.MD5
+	case "SHA-1", "SHA1":
+		return crypto.SHA1
+	case "SHA-256", "SHA256":
+		return crypto.SHA256
+	case "SHA-384", "SHA384":
+		return crypto.SHA384
+	case "SHA-512", "SHA512":
+		return crypto.SHA512
+	default:
+		return crypto.SHA256
+	}
+}
+
+// hashData 使用指定算法对数据做摘要
+func hashData(data []byte, h crypto.Hash) []byte {
+	hh := h.New()
+	hh.Write(data)
+	return hh.Sum(nil)
+}
+
+// PemSignRSA 使用 RSA 私钥对数据进行签名，支持 PKCS1v15 与 PSS
+// scheme: "PKCS1v15" | "PSS"
+// hashName: "MD5" | "SHA-1" | "SHA-256" | "SHA-384" | "SHA-512"
+func PemSignRSA(pemBytes []byte, data interface{}, scheme string, hashName string) ([]byte, error) {
+	dataBytes := utils.InterfaceToBytes(data)
+	block, _ := pem.Decode(pemBytes)
+	if block == nil {
+		return nil, utils.Error("parse PEM: no block found")
+	}
+	pri, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	if err != nil {
+		pri, err = x509.ParsePKCS1PrivateKey(block.Bytes)
+		if err != nil {
+			return nil, utils.Errorf("parse private key (PKCS8/PKCS1) failed: %s", err)
+		}
+	}
+	pkey, ok := pri.(*rsa.PrivateKey)
+	if !ok {
+		return nil, utils.Errorf("need *rsa.PrivateKey, got %T", pri)
+	}
+	hashAlg := getCryptoHash(hashName)
+	hashed := hashData(dataBytes, hashAlg)
+
+	switch strings.ToUpper(scheme) {
+	case "PKCS1V15", "PKCS1v15":
+		return rsa.SignPKCS1v15(cryptorand.Reader, pkey, hashAlg, hashed)
+	case "PSS":
+		return rsa.SignPSS(cryptorand.Reader, pkey, hashAlg, hashed, &rsa.PSSOptions{
+			SaltLength: rsa.PSSSaltLengthEqualsHash,
+		})
+	default:
+		return nil, utils.Errorf("unsupported sign scheme: %s (use PKCS1v15 or PSS)", scheme)
+	}
+}
+
+// PemVerifyRSA 使用 RSA 公钥验证签名
+// scheme: "PKCS1v15" | "PSS", hashName 同 PemSignRSA
+func PemVerifyRSA(pemBytes []byte, data interface{}, sign []byte, scheme string, hashName string) error {
+	dataBytes := utils.InterfaceToBytes(data)
+	block, _ := pem.Decode(pemBytes)
+	if block == nil {
+		return utils.Error("parse PEM: no block found")
+	}
+	pub, err := ParseRsaPublicKeyFromPemBlock(block)
+	if err != nil {
+		return utils.Errorf("parse public key failed: %s", err)
+	}
+	hashAlg := getCryptoHash(hashName)
+	hashed := hashData(dataBytes, hashAlg)
+
+	switch strings.ToUpper(scheme) {
+	case "PKCS1V15", "PKCS1v15":
+		return rsa.VerifyPKCS1v15(pub, hashAlg, hashed, sign)
+	case "PSS":
+		return rsa.VerifyPSS(pub, hashAlg, hashed, sign, &rsa.PSSOptions{
+			SaltLength: rsa.PSSSaltLengthEqualsHash,
+		})
+	default:
+		return utils.Errorf("unsupported sign scheme: %s (use PKCS1v15 or PSS)", scheme)
+	}
+}
