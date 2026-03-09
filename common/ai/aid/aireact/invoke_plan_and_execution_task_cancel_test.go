@@ -52,7 +52,9 @@ func TestReAct_PlanAndExecute_TaskCancel(t *testing.T) {
   ]
 }`,
 	}
-	yakit.CreateAIForge(consts.GetGormProfileDatabase(), forge)
+	if err := yakit.CreateAIForge(consts.GetGormProfileDatabase(), forge); err != nil {
+		t.Fatalf("failed to create test forge: %v", err)
+	}
 	defer func() {
 		yakit.DeleteAIForge(consts.GetGormProfileDatabase(), &ypb.AIForgeFilter{
 			ForgeName: testForgeName,
@@ -150,8 +152,7 @@ func TestReAct_PlanAndExecute_TaskCancel(t *testing.T) {
 			}
 
 			// ReAct 主循环的响应 - 请求 blueprint (forge)
-			// 使用更严格的匹配：包含本测试的 testForgeName 且不能包含 PROGRESS_TASK_
-			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_ai_blueprint", "require_tool", testForgeName) &&
+			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_ai_blueprint", "require_tool", "ask_for_clarification") &&
 				!utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_") {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`

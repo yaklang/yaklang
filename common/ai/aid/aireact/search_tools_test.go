@@ -86,7 +86,7 @@ func TestReAct_SearchTools_InPrompt(t *testing.T) {
 	flag := ksuid.New().String()
 	_ = flag
 	in := make(chan *ypb.AIInputEvent, 10)
-	out := make(chan *ypb.AIOutputEvent, 10)
+	out := make(chan *ypb.AIOutputEvent, 200)
 
 	// Track whether the prompt contains the search tools
 	promptContainsToolsSearch := false
@@ -167,11 +167,7 @@ func TestReAct_SearchTools_InPrompt(t *testing.T) {
 		}
 	}()
 
-	du := time.Duration(10)
-	if utils.InGithubActions() {
-		du = time.Duration(5)
-	}
-	after := time.After(du * time.Second)
+	after := time.After(5 * time.Second)
 
 LOOP:
 	for {
@@ -206,7 +202,7 @@ func TestReAct_ToolsSearch_Functionality(t *testing.T) {
 	flag := ksuid.New().String()
 	_ = flag
 	in := make(chan *ypb.AIInputEvent, 10)
-	out := make(chan *ypb.AIOutputEvent, 10)
+	out := make(chan *ypb.AIOutputEvent, 200)
 
 	toolSearchCalled := false
 	searchQuery := ""
@@ -297,11 +293,7 @@ func TestReAct_ToolsSearch_Functionality(t *testing.T) {
 		}
 	}()
 
-	du := time.Duration(10)
-	if utils.InGithubActions() {
-		du = time.Duration(5)
-	}
-	after := time.After(du * time.Second)
+	after := time.After(5 * time.Second)
 
 	var iid string
 LOOP:

@@ -67,7 +67,9 @@ func TestReAct_PlanAndExecute_SkipAfterCancel(t *testing.T) {
   ]
 }`,
 	}
-	yakit.CreateAIForge(consts.GetGormProfileDatabase(), forge)
+	if err := yakit.CreateAIForge(consts.GetGormProfileDatabase(), forge); err != nil {
+		t.Fatalf("failed to create test forge: %v", err)
+	}
 	defer func() {
 		yakit.DeleteAIForge(consts.GetGormProfileDatabase(), &ypb.AIForgeFilter{
 			ForgeName: testForgeName,
@@ -152,7 +154,7 @@ func TestReAct_PlanAndExecute_SkipAfterCancel(t *testing.T) {
 				return rsp, nil
 			}
 
-			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_ai_blueprint", "require_tool", testForgeName) &&
+			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_ai_blueprint", "require_tool", "ask_for_clarification") &&
 				!utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_") {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`

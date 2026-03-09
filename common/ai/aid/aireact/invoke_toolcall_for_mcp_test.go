@@ -195,7 +195,7 @@ func TestReAct_MCPToolUse(t *testing.T) {
 	flag := ksuid.New().String()
 	_ = flag
 	in := make(chan *ypb.AIInputEvent, 10)
-	out := make(chan *ypb.AIOutputEvent, 10)
+	out := make(chan *ypb.AIOutputEvent, 200)
 
 	// Track MCP loading stream events
 	mcpLoadingStarted := false
@@ -238,21 +238,28 @@ func TestReAct_MCPToolUse(t *testing.T) {
 		t.Fatalf("failed to create ReAct instance: %v", err)
 	}
 
-	// Wait a bit for MCP tools to be loaded asynchronously
+	// Poll for MCP tools to be loaded asynchronously (up to 3s)
 	log.Infof("Waiting for MCP tools to be loaded...")
-	time.Sleep(3 * time.Second)
-
-	// Verify that MCP loading streams were emitted
-	mcpLoadingMutex.Lock()
-	if !mcpLoadingStarted {
+	mcpLoadDeadline := time.After(3 * time.Second)
+	for {
+		mcpLoadingMutex.Lock()
+		started := mcpLoadingStarted
+		done := mcpLoadingDone
 		mcpLoadingMutex.Unlock()
-		t.Fatal("Expected MCP loading start stream event, but got none")
+		if started && done {
+			break
+		}
+		select {
+		case <-mcpLoadDeadline:
+			if !started {
+				t.Fatal("Expected MCP loading start stream event, but got none")
+			}
+			if !done {
+				t.Fatal("Expected MCP loading done stream event, but got none")
+			}
+		case <-time.After(50 * time.Millisecond):
+		}
 	}
-	if !mcpLoadingDone {
-		mcpLoadingMutex.Unlock()
-		t.Fatal("Expected MCP loading done stream event, but got none")
-	}
-	mcpLoadingMutex.Unlock()
 
 	log.Infof("MCP tools loaded successfully, checking if tool is available...")
 
@@ -282,11 +289,7 @@ func TestReAct_MCPToolUse(t *testing.T) {
 		}
 	}()
 
-	du := time.Duration(15)
-	if utils.InGithubActions() {
-		du = time.Duration(10)
-	}
-	after := time.After(du * time.Second)
+	after := time.After(5 * time.Second)
 
 	reviewed := false
 	reviewReleased := false

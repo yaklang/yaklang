@@ -10,9 +10,11 @@ import (
 
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -70,7 +72,29 @@ func mockedRequireBlueprint_BASIC(config aicommon.AICallerConfigIf, req *aicommo
 	return rsp, nil
 }
 
+func ensureTestForge(t *testing.T, name string) {
+	t.Helper()
+	db := consts.GetGormProfileDatabase()
+	existing, _ := yakit.GetAIForgeByName(db, name)
+	if existing != nil {
+		return
+	}
+	forge := &schema.AIForge{
+		ForgeName:   name,
+		ForgeType:   "yak",
+		Description: "test forge for " + name,
+		InitPrompt:  "test init prompt",
+		PlanPrompt:  `{"@action":"plan","query":"-","main_task":"test","main_task_goal":"test","tasks":[{"subtask_name":"t","subtask_goal":"t"}]}`,
+	}
+	if err := yakit.CreateAIForge(db, forge); err != nil {
+		t.Fatalf("failed to create test forge %q: %v", name, err)
+	}
+}
+
 func TestReAct_RequireBlueprint(t *testing.T) {
+	ensureTestForge(t, "xss")
+	defer yakit.DeleteAIForgeByName(consts.GetGormProfileDatabase(), "xss")
+
 	flag := ksuid.New().String()
 	in := make(chan *ypb.AIInputEvent, 10)
 	out := make(chan *ypb.AIOutputEvent, 10)
@@ -184,6 +208,9 @@ LOOP:
 }
 
 func TestReAct_RequireBlueprintWithoutHijacked(t *testing.T) {
+	ensureTestForge(t, "xss")
+	defer yakit.DeleteAIForgeByName(consts.GetGormProfileDatabase(), "xss")
+
 	flag := ksuid.New().String()
 	in := make(chan *ypb.AIInputEvent, 10)
 	out := make(chan *ypb.AIOutputEvent, 10)
@@ -194,9 +221,8 @@ func TestReAct_RequireBlueprintWithoutHijacked(t *testing.T) {
 	aiforgeExecuteConfirmed := false
 	ins, err := NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			if utils.MatchAllOfSubString(r.GetPrompt(), `"plan"`, `"main_task"`) {
+			if utils.MatchAllOfSubString(r.GetPrompt(), `xss`, "Blueprint Schema:", `call-ai-blueprint`) {
 				aiforgeExecuteConfirmed = true
-				cancel()
 			}
 			return mockedRequireBlueprint_BASIC(i, r, flag)
 		}),
@@ -239,7 +265,8 @@ LOOP:
 				forgeStarted = true
 			}
 
-			if e.GetType() == string(schema.EVENT_TYPE_EXEC_AIFORGE_REVIEW_REQUIRE) {
+			if e.GetType() == string(schema.EVENT_TYPE_EXEC_AIFORGE_REVIEW_REQUIRE) ||
+				e.GetType() == string(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE) {
 				fmt.Println(string(e.GetContent()))
 				epid := utils.InterfaceToString(jsonpath.FindFirst(e.GetContent(), "$.id"))
 				in <- &ypb.AIInputEvent{
@@ -256,6 +283,10 @@ LOOP:
 						reActProcessing = true
 					}
 				}
+			}
+
+			if aiforgeExecuteConfirmed && forgeStarted && reActProcessing {
+				cancel()
 			}
 		case <-after:
 			break LOOP
