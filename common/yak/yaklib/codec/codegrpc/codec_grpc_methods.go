@@ -833,6 +833,61 @@ func (flow *CodecExecFlow) RSADecrypt(priKey string, decryptSchema string, algor
 	}
 }
 
+// Tag = "签名"
+// CodecName = "RSA签名"
+// Desc = """使用 RSA 私钥对输入数据做数字签名，支持 PKCS#1 v1.5 与 PSS 两种填充方式，常用于身份校验、报文完整性等场景。"""
+// Params = [
+// { Name = "priKey", Type = "text", Required = true, Label = "私钥"},
+// { Name = "signSchema", Type = "select", DefaultValue = "PKCS1v15", Options = ["PKCS1v15", "PSS"], Required = true, Label = "签名方式"},
+// { Name = "algorithm", Type = "select", DefaultValue = "SHA-256", Options = ["MD5", "SHA-1", "SHA-256", "SHA-384", "SHA-512"], Required = true, Label = "哈希算法"},
+// { Name = "output", Type = "select", DefaultValue = "hex", Options = ["hex", "base64"], Required = true, Label = "输出格式"},
+// ]
+func (flow *CodecExecFlow) RSASign(priKey string, signSchema string, algorithm string, output string) error {
+	sig, err := tlsutils.PemSignRSA([]byte(priKey), flow.Text, signSchema, algorithm)
+	if err != nil {
+		return err
+	}
+	switch output {
+	case "base64":
+		flow.Text = []byte(codec.EncodeBase64(sig))
+	case "hex":
+		fallthrough
+	default:
+		flow.Text = []byte(codec.EncodeToHex(sig))
+	}
+	return nil
+}
+
+// Tag = "签名"
+// CodecName = "RSA验证"
+// Desc = """使用 RSA 公钥验证签名是否由对应私钥对给定数据生成，支持 PKCS#1 v1.5 与 PSS。"""
+// Params = [
+// { Name = "pubKey", Type = "text", Required = true, Label = "公钥"},
+// { Name = "signSchema", Type = "select", DefaultValue = "PKCS1v15", Options = ["PKCS1v15", "PSS"], Required = true, Label = "签名方式"},
+// { Name = "algorithm", Type = "select", DefaultValue = "SHA-256", Options = ["MD5", "SHA-1", "SHA-256", "SHA-384", "SHA-512"], Required = true, Label = "哈希算法"},
+// { Name = "signature", Type = "text", Required = true, Label = "签名(Hex或Base64)"},
+// ]
+func (flow *CodecExecFlow) RSAVerify(pubKey string, signSchema string, algorithm string, signature string) error {
+	sigRaw := []byte(strings.TrimSpace(signature))
+	if len(sigRaw) == 0 {
+		return utils.Error("RSA verify error: 签名为空")
+	}
+	// 尝试 Hex 解码，失败则尝试 Base64
+	sig, err := codec.DecodeHex(string(sigRaw))
+	if err != nil {
+		sig, err = codec.DecodeBase64(string(sigRaw))
+		if err != nil {
+			return utils.Errorf("RSA verify error: 签名无法解析为 Hex 或 Base64: %v", err)
+		}
+	}
+	err = tlsutils.PemVerifyRSA([]byte(pubKey), flow.Text, sig, signSchema, algorithm)
+	if err != nil {
+		return err
+	}
+	flow.Text = []byte("验证成功")
+	return nil
+}
+
 // Tag = "Java"
 // CodecName = "反序列化"
 // Desc = """Java反序列化是一种将字节流转换为Java对象的机制，以便可以在网络上传输或将其保存到文件中。
