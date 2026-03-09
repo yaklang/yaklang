@@ -123,7 +123,7 @@ func TestReAct_PETask_DeepIntentRecognition(t *testing.T) {
 			}
 
 			// Phase: Blueprint parameter generation
-			if utils.MatchAllOfSubString(prompt, "Blueprint Schema:", "Blueprint Description:", "call-ai-blueprint") {
+			if utils.MatchAllOfSubString(prompt, "Blueprint Schema:", "Blueprint Description:", "call-ai-blueprint", testForgeName) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "call-ai-blueprint","blueprint": "` + testForgeName + `", "params": {"query": "test"},

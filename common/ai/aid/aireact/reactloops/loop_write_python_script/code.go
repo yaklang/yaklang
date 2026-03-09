@@ -30,7 +30,7 @@ func init() {
 				r,
 				loopinfra.WithLoopVarsPrefix("python"),
 				loopinfra.WithActionSuffix("script"),
-				loopinfra.WithAITagConfig("GEN_PYTHON_SCRIPT", "python_script_code", "python-script", aicommon.TypeTextPlain),
+				loopinfra.WithAITagConfig("GEN_PYTHON_SCRIPT", "python_script_code", "python-script", aicommon.TypeCodePython),
 				loopinfra.WithFileExtension(".py"),
 				loopinfra.WithExitAfterWrite(false),
 				loopinfra.WithFileChanged(pythonLintCheck),
