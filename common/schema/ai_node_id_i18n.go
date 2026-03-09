@@ -15,14 +15,6 @@ type I18n struct {
 	En string `json:"en"`
 }
 
-type NodeIdI18nTranslatorCallback func(nodeId string) *I18n
-
-var nodeIdI18nTranslator NodeIdI18nTranslatorCallback
-
-func RegisterNodeIdI18nTranslator(cb NodeIdI18nTranslatorCallback) {
-	nodeIdI18nTranslator = cb
-}
-
 type i18nCacheEntry struct {
 	once   sync.Once
 	result *I18n
@@ -691,12 +683,17 @@ func EnsureStreamNodeIdI18n(nodeId string, provider func(string) *I18n) {
 	entryI, _ := i18nDynamicCache.LoadOrStore(nodeId, &i18nCacheEntry{})
 	entry := entryI.(*i18nCacheEntry)
 	entry.once.Do(func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Warnf("stream nodeId i18n translation panicked for %q: %v", nodeId, r)
+			}
+		}()
+
 		if dbResult := getNodeIdI18nFromDB(nodeId); dbResult != nil {
 			entry.result = dbResult
 			return
 		}
 		if provider != nil {
-			log.Infof("generating i18n for stream nodeId via provider: %s", nodeId)
 			translated := provider(nodeId)
 			if translated != nil && (translated.Zh != "" || translated.En != "") {
 				entry.result = translated
