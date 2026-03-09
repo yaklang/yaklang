@@ -219,6 +219,14 @@ var CodecExports = map[string]interface{}{
 	"SignSHA512WithRSA":       tlsutils.PemSignSha512WithRSA,
 	"SignVerifySHA512WithRSA": tlsutils.PemVerifySignSha512WithRSA,
 
+	// RSA suite (PKCS#1 v1.5 + auto block processing)
+	"RSAEncryptWithPKCS1v15Block":  tlsutils.RSAEncryptWithPKCS1v15Block,
+	"RSADecryptWithPKCS1v15Block":  tlsutils.RSADecryptWithPKCS1v15Block,
+	"RSASignWithPKCS1v15Digest":    tlsutils.RSASignWithPKCS1v15Digest,
+	"RSAVerifyWithPKCS1v15Digest":  tlsutils.RSAVerifyWithPKCS1v15Digest,
+	"RSAEncryptWithJSEncryptStyle": tlsutils.RSAEncryptWithJSEncryptStyle,
+	"RSADecryptWithJSEncryptStyle": tlsutils.RSADecryptWithJSEncryptStyle,
+
 	"IsUTF8":     codec.IsUTF8,
 	"IsUTF8File": codec.IsUTF8File,
 
