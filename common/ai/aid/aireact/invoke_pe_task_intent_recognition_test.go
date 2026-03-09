@@ -94,7 +94,6 @@ func TestReAct_PETask_DeepIntentRecognition(t *testing.T) {
 
 			// Phase: Intent loop (during PE task init)
 			if utils.MatchAllOfSubString(prompt, "finalize_enrichment", "query_capabilities") &&
-				!utils.MatchAllOfSubString(prompt, "directly_answer") &&
 				!utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_") {
 				count := atomic.AddInt32(&intentLoopCalled, 1)
 				log.Infof("intent loop called during PE task init (count=%d)", count)
@@ -282,7 +281,6 @@ func TestReAct_PlanExec_DeepIntentRecognition(t *testing.T) {
 
 			// Phase: Intent loop (during plan or PE task init)
 			if utils.MatchAllOfSubString(prompt, "finalize_enrichment", "query_capabilities") &&
-				!utils.MatchAllOfSubString(prompt, "directly_answer") &&
 				!utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_") &&
 				!strings.Contains(prompt, "search_knowledge") {
 				count := atomic.AddInt32(&intentLoopCalled, 1)

@@ -2,7 +2,6 @@ package aireact
 
 import (
 	"bytes"
-	"errors"
 	"io"
 	"sync/atomic"
 	"testing"
@@ -180,7 +179,11 @@ func TestReAct_PlanAndExecute_SkipAfterCancel(t *testing.T) {
 			}
 
 			unreachableCode = true
-			return nil, errors.New("unreachable code")
+			log.Warnf("unexpected prompt in skip_after_cancel test, length=%d", len(prompt))
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "fallback"}`))
+			rsp.Close()
+			return rsp, nil
 		}),
 		aicommon.WithEventInputChan(in),
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
