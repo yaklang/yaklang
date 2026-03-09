@@ -101,6 +101,61 @@ func TestFindMatchingPlatform(t *testing.T) {
 	}
 }
 
+func TestFindMatchingDarwinArm64Platform(t *testing.T) {
+	installer := &BaseInstaller{}
+
+	// 创建测试用的下载信息映射
+	downloadInfoMap := map[string]*DownloadInfo{
+		"darwin-arm64": {
+			URL: "https://example.com/darwin",
+		},
+	}
+
+	tests := []struct {
+		name            string
+		platformKey     string
+		expectFound     bool
+		expectedPattern string
+		expectedURL     string
+	}{
+		{
+			name:            "Exact match darwin-arm64",
+			platformKey:     "darwin-arm64",
+			expectFound:     true,
+			expectedPattern: "darwin-arm64",
+			expectedURL:     "https://example.com/darwin",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			downloadInfo, pattern, err := installer.findMatchingPlatform(downloadInfoMap, tt.platformKey)
+
+			if tt.expectFound {
+				if err != nil {
+					t.Errorf("Expected to find match for %s, but got error: %v", tt.platformKey, err)
+					return
+				}
+
+				if pattern != tt.expectedPattern {
+					t.Errorf("Expected pattern '%s', got '%s'", tt.expectedPattern, pattern)
+				}
+
+				if downloadInfo.URL != tt.expectedURL {
+					t.Errorf("Expected URL '%s', got '%s'", tt.expectedURL, downloadInfo.URL)
+				}
+
+				t.Logf("✓ Platform '%s' matched pattern '%s' -> URL: %s", tt.platformKey, pattern, downloadInfo.URL)
+			} else {
+				if err == nil {
+					t.Errorf("Expected no match for %s, but found pattern '%s'", tt.platformKey, pattern)
+				}
+				t.Logf("✓ Platform '%s' correctly not matched", tt.platformKey)
+			}
+		})
+	}
+}
+
 func TestPlatformMatchingPriority(t *testing.T) {
 	installer := &BaseInstaller{}
 
