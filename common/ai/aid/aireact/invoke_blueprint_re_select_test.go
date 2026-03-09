@@ -88,6 +88,7 @@ func TestReAct_RequireBlueprint_ChangeBlueprint(t *testing.T) {
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			out <- e.ToGRPC()
 		}),
+		aicommon.WithDisableDynamicPlanning(true),
 		aicommon.WithHijackPERequest(func(ctx context.Context, planPayload string) error {
 			forgeExecute = true
 			if strings.Contains(planPayload, codec.Sha256(flag)) {

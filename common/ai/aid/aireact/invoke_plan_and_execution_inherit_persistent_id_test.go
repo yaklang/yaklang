@@ -66,7 +66,7 @@ func TestReAct_PlanAndExecute_InheritPersistentId(t *testing.T) {
 			out <- e.ToGRPC()
 		}),
 		aicommon.WithPersistentSessionId(persistentId),
-		// Hijack plan execution 来验证 persistentId 和 timeline 继承
+		aicommon.WithDisableDynamicPlanning(true),
 		aicommon.WithHijackPERequest(func(ctx context.Context, payload string) error {
 			log.Infof("hijacked plan execution with payload: %v", payload)
 			planExecutionAICallbackCalled = true
@@ -238,7 +238,7 @@ func TestReAct_Forge_InheritPersistentId(t *testing.T) {
 			out <- e.ToGRPC()
 		}),
 		aicommon.WithPersistentSessionId(persistentId),
-		// Hijack plan/forge execution
+		aicommon.WithDisableDynamicPlanning(true),
 		aicommon.WithHijackPERequest(func(ctx context.Context, payload string) error {
 			log.Infof("hijacked plan/forge execution with payload: %v", payload)
 			forgeExecutionCalled = true
@@ -429,8 +429,7 @@ func TestReAct_ForgeExecution_UserQueryContext(t *testing.T) {
 			out <- e.ToGRPC()
 		}),
 		aicommon.WithPersistentSessionId(persistentId),
-		// 注意：不使用 hijack，让代码真正执行到 forge execution 的参数处理逻辑
-		// 通过监听 START_PLAN_AND_EXECUTION 事件来验证参数
+		aicommon.WithDisableDynamicPlanning(true),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -668,9 +667,8 @@ func TestReAct_ForgeExecution_Task_UserQueryContext(t *testing.T) {
 		}),
 		aicommon.WithPersistentSessionId(persistentId),
 		aicommon.WithAgreeYOLO(true),
-		aicommon.WithShowForgeListInPrompt(true), // forge execution test needs forge visible in prompt
-		// 注意：不使用 hijack，让代码真正执行到 forge execution 的参数处理逻辑
-		// 通过监听 START_PLAN_AND_EXECUTION 事件来验证参数
+		aicommon.WithShowForgeListInPrompt(true),
+		aicommon.WithDisableDynamicPlanning(true),
 	)
 	if err != nil {
 		t.Fatal(err)
