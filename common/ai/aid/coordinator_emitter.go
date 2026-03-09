@@ -13,6 +13,8 @@ func (c *Coordinator) EmitRequireReviewForTask(task *AiTask, id string) {
 		"task":          task,
 		"short_summary": task.ShortSummary,
 		"long_summary":  task.LongSummary,
+		"progress":      c.runtime.Progress(),
+		"pending_tasks": task.GetPendingSiblingTasksInfo(),
 	}
 	if ep, ok := c.Epm.LoadEndpoint(id); ok {
 		ep.SetReviewMaterials(reqs)

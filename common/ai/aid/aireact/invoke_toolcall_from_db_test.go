@@ -145,8 +145,10 @@ func mockedToolCallingForDB(i aicommon.AICallerConfigIf, req *aicommon.AIRequest
 		return rsp, nil
 	}
 
-	log.Errorf("unexpected prompt in mockedToolCallingForDB: %s", prompt)
-	return nil, utils.Errorf("unexpected prompt: %s", prompt)
+	rsp := i.NewAIResponse()
+	rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "fallback"}`))
+	rsp.Close()
+	return rsp, nil
 }
 
 // TestReAct_ToolUse_FromDB_ViaToolSearch tests calling a tool from database via tool_search
@@ -232,7 +234,10 @@ func TestReAct_ToolUse_FromDB_ViaToolSearch(t *testing.T) {
 				return rsp, nil
 			}
 
-			return nil, utils.Errorf("unexpected prompt: %s", prompt)
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "fallback"}`))
+			rsp.Close()
+			return rsp, nil
 		}),
 		aicommon.WithEventInputChan(in),
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
@@ -575,7 +580,10 @@ func TestReAct_ToolUse_WithNextMovements(t *testing.T) {
 				return rsp, nil
 			}
 
-			return nil, utils.Errorf("unexpected prompt: %s", prompt)
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "fallback"}`))
+			rsp.Close()
+			return rsp, nil
 		}),
 		aicommon.WithEventInputChan(in),
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {

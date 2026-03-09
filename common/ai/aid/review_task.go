@@ -51,8 +51,8 @@ var TaskReviewSuggestions = []*ReviewSuggestion{
 	},
 	{
 		Value:            "adjust_plan",
-		Prompt:           "任务需要调整，用户会输入更新后任务建议",
-		PromptEnglish:    "The task needs to be adjusted, and the user will enter the updated task",
+		Prompt:           "基于当前任务发现的新信息，后续计划需要调整（支持增删改查 delta 操作）",
+		PromptEnglish:    "Based on new findings from the current task, the subsequent plan needs adjustment (supports delta operations: insert/remove/modify/append/replace)",
 		AllowExtraPrompt: true,
 		ParamSchema:      schemaRePlanSuggestion,
 	},
@@ -105,16 +105,25 @@ func (t *AiTask) handleReviewResult(param aitool.InvokeParams) error {
 			"root_task": t.getCurrentTaskPlan(),
 		})
 	case "adjust_plan":
-		suggestion := param.GetString("suggestion")
-		if suggestion == "" {
-			t.EmitError("suggestion is empty")
-			return utils.Error("suggestion is empty")
-		}
-		t.EmitInfo("adjust plan")
-		err := t.AdjustPlan(utils.InterfaceToString(suggestion))
-		if err != nil {
-			t.EmitError("invoke planRequest failed: %v", err)
-			return utils.Errorf("coordinator: invoke planRequest failed: %v", err)
+		deltas := ParseTaskDeltas(param)
+		if len(deltas) > 0 {
+			t.EmitInfo("adjust plan via task deltas (%d operations)", len(deltas))
+			err := t.ApplyTaskDeltas(deltas)
+			if err != nil {
+				t.EmitError("apply task deltas failed: %v", err)
+				return utils.Errorf("coordinator: apply task deltas failed: %v", err)
+			}
+		} else {
+			reason := param.GetString("reason")
+			if reason == "" {
+				reason = param.GetString("extra_prompt")
+			}
+			t.EmitInfo("adjust plan via AI re-plan (reason: %s)", reason)
+			err := t.AdjustPlan(reason)
+			if err != nil {
+				t.EmitError("invoke planRequest failed: %v", err)
+				return utils.Errorf("coordinator: invoke planRequest failed: %v", err)
+			}
 		}
 		t.EmitJSON(schema.EVENT_TYPE_PLAN, "system", map[string]any{
 			"root_task": t.getCurrentTaskPlan(),

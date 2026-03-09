@@ -50,6 +50,8 @@ type TaskReviewPromptData struct {
 	ShortSummary     string
 	LongSummary      string
 	Language         string
+	Progress         string
+	PendingTasks     string
 }
 
 func generatePlanReviewPrompt(config *Config, materials aitool.InvokeParams) (string, error) {
@@ -117,10 +119,12 @@ func generateTaskReviewPrompt(config *Config, materials aitool.InvokeParams) (st
 	if !utils.IsNil(materials) {
 		data.ShortSummary = materials.GetString("short_summary")
 		data.LongSummary = materials.GetString("long_summary")
+		data.Progress = materials.GetString("progress")
+		data.PendingTasks = materials.GetString("pending_tasks")
 
 		materialsCopy := make(aitool.InvokeParams)
 		for k, v := range materials {
-			if k == "selectors" || k == "id" || k == "short_summary" || k == "long_summary" {
+			if k == "selectors" || k == "id" || k == "short_summary" || k == "long_summary" || k == "progress" || k == "pending_tasks" {
 				continue
 			}
 			materialsCopy[k] = v
@@ -209,6 +213,7 @@ func DefaultAIPlanReviewControl(ctx context.Context, config *Config, ep *Endpoin
 
 // DefaultAITaskReviewControl calls AI to review the completed task and decide
 // whether to continue, request deeper analysis, mark as inaccurate, or adjust the plan.
+// When suggestion is "adjust_plan", the AI may also output task_deltas for incremental modifications.
 func DefaultAITaskReviewControl(ctx context.Context, config *Config, ep *Endpoint) (aitool.InvokeParams, error) {
 	materials := ep.GetReviewMaterials()
 
@@ -219,6 +224,7 @@ func DefaultAITaskReviewControl(ctx context.Context, config *Config, ep *Endpoin
 
 	var suggestion string
 	var reason string
+	var taskDeltasArray []aitool.InvokeParams
 
 	err = CallAITransaction(config, prompt, config.CallQualityPriorityAI, func(rsp *AIResponse) error {
 		stream := rsp.GetOutputStreamReader("task-review", true, config.GetEmitter())
@@ -240,6 +246,7 @@ func DefaultAITaskReviewControl(ctx context.Context, config *Config, ep *Endpoin
 		}
 		suggestion = action.GetString("suggestion")
 		reason = action.GetString("reason")
+		taskDeltasArray = action.GetInvokeParamsArray("task_deltas")
 		return nil
 	})
 	if err != nil {
@@ -252,5 +259,13 @@ func DefaultAITaskReviewControl(ctx context.Context, config *Config, ep *Endpoin
 	}
 
 	log.Infof("dynamic planning: task review AI decision: %s (reason: %s)", suggestion, reason)
-	return aitool.InvokeParams{"suggestion": suggestion, "reason": reason}, nil
+	result := aitool.InvokeParams{"suggestion": suggestion, "reason": reason}
+	if len(taskDeltasArray) > 0 {
+		var rawDeltas []interface{}
+		for _, d := range taskDeltasArray {
+			rawDeltas = append(rawDeltas, map[string]interface{}(d))
+		}
+		result["task_deltas"] = rawDeltas
+	}
+	return result, nil
 }
