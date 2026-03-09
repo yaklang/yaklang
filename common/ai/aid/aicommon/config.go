@@ -462,6 +462,12 @@ func newConfig(ctx context.Context) *Config {
 		return e, nil
 	})
 
+	if config.SpeedPriorityAICallback != nil {
+		config.Emitter.SetStreamNodeIdI18nProvider(
+			buildStreamNodeIdI18nProvider(config.SpeedPriorityAICallback),
+		)
+	}
+
 	return config
 }
 
@@ -2766,4 +2772,37 @@ func (c *Config) SetQualityPriorityAICallbackInLock(callback AICallbackType, ser
 	c.QualityPriorityAICallback = callback
 	c.AiServerName = service
 	c.AiModelName = model
+}
+
+func buildStreamNodeIdI18nProvider(aiCallback AICallbackType) func(nodeId string) *schema.I18n {
+	return func(nodeId string) *schema.I18n {
+		prompt := fmt.Sprintf(`You are a UI localization assistant for an AI agent system.
+Translate the following technical stream/node identifier into concise, user-friendly display names.
+The identifier uses underscores or hyphens as word separators.
+
+Identifier: %s
+
+Requirements:
+- Chinese (zh): A short, natural Chinese phrase (2-6 characters preferred)
+- English (en): A short, capitalized English phrase`, nodeId)
+
+		result, err := InvokeLiteForge(
+			prompt,
+			WithLiteForgeOutputSchemaFromAIToolOptions(
+				aitool.WithStringParam("zh", aitool.WithParam_Description("Chinese user-friendly display name")),
+				aitool.WithStringParam("en", aitool.WithParam_Description("English user-friendly display name")),
+			),
+			WithAICallback(aiCallback),
+		)
+		if err != nil {
+			log.Debugf("stream nodeId i18n provider failed for %q: %v", nodeId, err)
+			return nil
+		}
+		zh := result.GetString("zh")
+		en := result.GetString("en")
+		if zh == "" && en == "" {
+			return nil
+		}
+		return &schema.I18n{Zh: zh, En: en}
+	}
 }

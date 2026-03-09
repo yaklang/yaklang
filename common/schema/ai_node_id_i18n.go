@@ -676,6 +676,36 @@ var eventTypeMapper = map[EventType]*I18n{
 	},
 }
 
+// EnsureStreamNodeIdI18n ensures a stream nodeId has i18n translation available
+// before events are emitted. The provider is injected by the Emitter and uses
+// the Config's own AI callback, so mock callbacks in tests automatically cover it.
+func EnsureStreamNodeIdI18n(nodeId string, provider func(string) *I18n) {
+	if _, ok := nodeIdMapper[nodeId]; ok {
+		return
+	}
+	if strings.HasPrefix(nodeId, "tool-") &&
+		(strings.HasSuffix(nodeId, "-stdout") || strings.HasSuffix(nodeId, "-stderr")) {
+		return
+	}
+
+	entryI, _ := i18nDynamicCache.LoadOrStore(nodeId, &i18nCacheEntry{})
+	entry := entryI.(*i18nCacheEntry)
+	entry.once.Do(func() {
+		if dbResult := getNodeIdI18nFromDB(nodeId); dbResult != nil {
+			entry.result = dbResult
+			return
+		}
+		if provider != nil {
+			log.Infof("generating i18n for stream nodeId via provider: %s", nodeId)
+			translated := provider(nodeId)
+			if translated != nil && (translated.Zh != "" || translated.En != "") {
+				entry.result = translated
+				saveNodeIdI18nToDB(nodeId, translated)
+			}
+		}
+	})
+}
+
 func NodeIdToI18n(nodeId string, isStream bool) *I18n {
 	if val, ok := nodeIdMapper[nodeId]; ok {
 		return val
@@ -696,29 +726,16 @@ func NodeIdToI18n(nodeId string, isStream bool) *I18n {
 	}
 
 	if isStream {
-		entryI, _ := i18nDynamicCache.LoadOrStore(nodeId, &i18nCacheEntry{})
-		entry := entryI.(*i18nCacheEntry)
-		entry.once.Do(func() {
-			if dbResult := getNodeIdI18nFromDB(nodeId); dbResult != nil {
-				entry.result = dbResult
-				return
+		// Pure read path: translation is populated by EnsureStreamNodeIdI18n
+		// which runs before stream events are emitted.
+		if cached, ok := i18nDynamicCache.Load(nodeId); ok {
+			entry := cached.(*i18nCacheEntry)
+			if entry.result != nil {
+				return entry.result
 			}
-
-			if nodeIdI18nTranslator != nil {
-				log.Infof("AI is optimizing stream ID: %s", nodeId)
-				translated := nodeIdI18nTranslator(nodeId)
-				if translated != nil && (translated.Zh != "" || translated.En != "") {
-					entry.result = translated
-					saveNodeIdI18nToDB(nodeId, translated)
-					return
-				}
-			}
-
-			log.Debugf("[i18n] nodeId not in static mapper, no translator available: %s", nodeId)
-		})
-
-		if entry.result != nil {
-			return entry.result
+		}
+		if dbResult := getNodeIdI18nFromDB(nodeId); dbResult != nil {
+			return dbResult
 		}
 	}
 
