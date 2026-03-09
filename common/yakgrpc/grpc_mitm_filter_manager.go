@@ -128,8 +128,8 @@ func (m *MITMFilter) updateMatcher() {
 	m.Filters.ExcludeSuffixMatcher = FilterDataToMatchers(m.Data.ExcludeSuffix)
 	m.Filters.IncludeSuffixMatcher = FilterDataToMatchers(m.Data.IncludeSuffix)
 
-	m.Filters.ExcludeHostnamesMatcher = FilterDataToMatchers(m.Data.ExcludeHostnames)
-	m.Filters.IncludeHostnamesMatcher = FilterDataToMatchers(m.Data.IncludeHostnames)
+	m.Filters.ExcludeHostnamesMatcher = FilterDataToMatchers(m.Data.ExcludeHostnames, true) // 支持逗号分隔多域名
+	m.Filters.IncludeHostnamesMatcher = FilterDataToMatchers(m.Data.IncludeHostnames, true)
 
 	m.Filters.ExcludeUriMatcher = FilterDataToMatchers(m.Data.ExcludeUri)
 	m.Filters.IncludeUriMatcher = FilterDataToMatchers(m.Data.IncludeUri)
@@ -159,12 +159,34 @@ func (m *MITMFilter) Update(data *ypb.MITMFilterData) {
 	m.updateMatcher()
 }
 
-func FilterDataToMatchers(data []*ypb.FilterDataItem) *httptpl.YakMatcher {
+// expandGroupByComma 将 Group 中逗号分隔的字符串展开为多个独立项，便于一条规则内支持多域名输入
+func expandGroupByComma(group []string) []string {
+	var result []string
+	for _, s := range group {
+		if strings.Contains(s, ",") {
+			for _, part := range strings.Split(s, ",") {
+				if trimmed := strings.TrimSpace(part); trimmed != "" {
+					result = append(result, trimmed)
+				}
+			}
+		} else {
+			result = append(result, s)
+		}
+	}
+	return result
+}
+
+func FilterDataToMatchers(data []*ypb.FilterDataItem, expandCommaSeparated ...bool) *httptpl.YakMatcher {
+	doExpand := len(expandCommaSeparated) > 0 && expandCommaSeparated[0]
 	var matchers []*httptpl.YakMatcher
 	for _, datum := range data {
+		group := datum.Group
+		if doExpand {
+			group = expandGroupByComma(group)
+		}
 		matcher := &httptpl.YakMatcher{
 			MatcherType: datum.MatcherType,
-			Group:       datum.Group,
+			Group:       group,
 		}
 		matchers = append(matchers, matcher)
 	}
