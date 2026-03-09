@@ -695,30 +695,33 @@ func NodeIdToI18n(nodeId string, isStream bool) *I18n {
 		}
 	}
 
-	entryI, _ := i18nDynamicCache.LoadOrStore(nodeId, &i18nCacheEntry{})
-	entry := entryI.(*i18nCacheEntry)
-	entry.once.Do(func() {
-		if dbResult := getNodeIdI18nFromDB(nodeId); dbResult != nil {
-			entry.result = dbResult
-			return
-		}
-
-		if nodeIdI18nTranslator != nil {
-			log.Infof("AI is optimizing stream ID: %s", nodeId)
-			translated := nodeIdI18nTranslator(nodeId)
-			if translated != nil && (translated.Zh != "" || translated.En != "") {
-				entry.result = translated
-				saveNodeIdI18nToDB(nodeId, translated)
+	if isStream {
+		entryI, _ := i18nDynamicCache.LoadOrStore(nodeId, &i18nCacheEntry{})
+		entry := entryI.(*i18nCacheEntry)
+		entry.once.Do(func() {
+			if dbResult := getNodeIdI18nFromDB(nodeId); dbResult != nil {
+				entry.result = dbResult
 				return
 			}
+
+			if nodeIdI18nTranslator != nil {
+				log.Infof("AI is optimizing stream ID: %s", nodeId)
+				translated := nodeIdI18nTranslator(nodeId)
+				if translated != nil && (translated.Zh != "" || translated.En != "") {
+					entry.result = translated
+					saveNodeIdI18nToDB(nodeId, translated)
+					return
+				}
+			}
+
+			log.Debugf("[i18n] nodeId not in static mapper, no translator available: %s", nodeId)
+		})
+
+		if entry.result != nil {
+			return entry.result
 		}
-
-		log.Debugf("[i18n] nodeId not in static mapper, no translator available: %s", nodeId)
-	})
-
-	if entry.result != nil {
-		return entry.result
 	}
+
 	return &I18n{
 		Zh: nodeId,
 		En: nodeId,
