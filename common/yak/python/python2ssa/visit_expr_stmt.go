@@ -83,6 +83,89 @@ func (b *singleFileBuilder) VisitAssignPart(left *pythonparser.Testlist_star_exp
 	return nil
 }
 
+// collectRightValues collects all right-hand side values from an assign_part.
+func (b *singleFileBuilder) collectRightValues(assignPart *pythonparser.Assign_partContext) []ssa.Value {
+	var rightValues []ssa.Value
+	for _, rightExpr := range assignPart.AllTestlist_star_expr() {
+		rightExprCtx, ok := rightExpr.(*pythonparser.Testlist_star_exprContext)
+		if !ok {
+			continue
+		}
+		if testlist := rightExprCtx.Testlist(); testlist != nil {
+			if testlistCtx, ok := testlist.(*pythonparser.TestlistContext); ok {
+				for _, test := range testlistCtx.AllTest() {
+					if testCtx, ok := test.(*pythonparser.TestContext); ok {
+						if v, ok := b.VisitTest(testCtx).(ssa.Value); ok {
+							rightValues = append(rightValues, v)
+						}
+					}
+				}
+			}
+		} else {
+			tests := rightExprCtx.AllTest()
+			if len(tests) > 0 {
+				for _, test := range tests {
+					if testCtx, ok := test.(*pythonparser.TestContext); ok {
+						if v, ok := b.VisitTest(testCtx).(ssa.Value); ok {
+							rightValues = append(rightValues, v)
+						}
+					}
+				}
+			} else {
+				if v, ok := b.VisitTestlistStarExpr(rightExprCtx).(ssa.Value); ok {
+					rightValues = append(rightValues, v)
+				}
+			}
+		}
+	}
+	return rightValues
+}
+
+// extractLeftTargets extracts left-hand side assignment targets from a testlist_star_expr.
+// Returns two slices: member variables (e.g., self.x) and plain variable names.
+// Each entry in memberVars corresponds to the matching index in the leftTests slice.
+type assignTarget struct {
+	memberVar *ssa.Variable // non-nil when this is a member access (e.g. self.x)
+	varName   string        // plain variable name (e.g. x)
+}
+
+func (b *singleFileBuilder) extractLeftTargets(left *pythonparser.Testlist_star_exprContext) []assignTarget {
+	var targets []assignTarget
+	collectTest := func(testCtx *pythonparser.TestContext) {
+		if mv := b.extractMemberCallVariable(testCtx); mv != nil {
+			targets = append(targets, assignTarget{memberVar: mv})
+		} else if varName := b.extractVariableName(testCtx); varName != "" {
+			targets = append(targets, assignTarget{varName: varName})
+		}
+	}
+	if testlist := left.Testlist(); testlist != nil {
+		if tlCtx, ok := testlist.(*pythonparser.TestlistContext); ok {
+			for _, test := range tlCtx.AllTest() {
+				if tc, ok := test.(*pythonparser.TestContext); ok {
+					collectTest(tc)
+				}
+			}
+		}
+	} else {
+		for _, test := range left.AllTest() {
+			if tc, ok := test.(*pythonparser.TestContext); ok {
+				collectTest(tc)
+			}
+		}
+	}
+	return targets
+}
+
+// assignToTarget performs the actual SSA variable assignment for a single target.
+func (b *singleFileBuilder) assignToTarget(target assignTarget, value ssa.Value) {
+	if target.memberVar != nil {
+		b.AssignVariable(target.memberVar, value)
+	} else if target.varName != "" {
+		variable := b.createVar(target.varName)
+		b.AssignVariable(variable, value)
+	}
+}
+
 // VisitSimpleAssignment visits a simple assignment.
 func (b *singleFileBuilder) VisitSimpleAssignment(left *pythonparser.Testlist_star_exprContext, assignPart *pythonparser.Assign_partContext) interface{} {
 	if b == nil || left == nil || assignPart == nil || b.IsStop() {
@@ -92,145 +175,46 @@ func (b *singleFileBuilder) VisitSimpleAssignment(left *pythonparser.Testlist_st
 	recoverRange := b.SetRange(assignPart)
 	defer recoverRange()
 
-	// Get all right-hand side values
 	rightExprs := assignPart.AllTestlist_star_expr()
 	if len(rightExprs) == 0 {
 		return nil
 	}
 
-	// Visit all right-hand side expressions
-	var rightValues []ssa.Value
-	for _, rightExpr := range rightExprs {
-		if rightExprCtx, ok := rightExpr.(*pythonparser.Testlist_star_exprContext); ok {
-			// Check if it's a testlist (multiple values: 1, 2)
-			if testlist := rightExprCtx.Testlist(); testlist != nil {
-				if testlistCtx, ok := testlist.(*pythonparser.TestlistContext); ok {
-					// Extract all values from testlist
-					for _, test := range testlistCtx.AllTest() {
-						if testCtx, ok := test.(*pythonparser.TestContext); ok {
-							val := b.VisitTest(testCtx)
-							if v, ok := val.(ssa.Value); ok {
-								rightValues = append(rightValues, v)
-							}
-						}
-					}
-				}
-			} else {
-				// Check for multiple tests directly in testlist_star_expr: (test COMMA)+ test?
-				tests := rightExprCtx.AllTest()
-				if len(tests) > 0 {
-					// Multiple values: 1, 2
-					for _, test := range tests {
-						if testCtx, ok := test.(*pythonparser.TestContext); ok {
-							val := b.VisitTest(testCtx)
-							if v, ok := val.(ssa.Value); ok {
-								rightValues = append(rightValues, v)
-							}
-						}
-					}
-				} else {
-					// Single value
-					val := b.VisitTestlistStarExpr(rightExprCtx)
-					if v, ok := val.(ssa.Value); ok {
-						rightValues = append(rightValues, v)
-					}
+	rightValues := b.collectRightValues(assignPart)
+	targets := b.extractLeftTargets(left)
+
+	// Chain assignment: x = y = 10 (multiple ASSIGN tokens in assign_part)
+	if len(rightExprs) > 1 {
+		if len(rightValues) == 0 {
+			return nil
+		}
+		lastValue := rightValues[len(rightValues)-1]
+		// Assign to intermediate targets (indices 0..n-2 of rightExprs map to variables)
+		for i := 0; i < len(rightExprs)-1; i++ {
+			if rightExprCtx, ok := rightExprs[i].(*pythonparser.Testlist_star_exprContext); ok {
+				for _, interTarget := range b.extractLeftTargets(rightExprCtx) {
+					b.assignToTarget(interTarget, lastValue)
 				}
 			}
 		}
+		for _, target := range targets {
+			b.assignToTarget(target, lastValue)
+		}
+		return nil
 	}
 
-	// Get all left-hand side variables
-	var leftVars []string
-	if testlist := left.Testlist(); testlist != nil {
-		// Multiple assignment: a, b = 1, 2
-		if testlistCtx, ok := testlist.(*pythonparser.TestlistContext); ok {
-			for _, test := range testlistCtx.AllTest() {
-				if testCtx, ok := test.(*pythonparser.TestContext); ok {
-					varName := b.extractVariableName(testCtx)
-					if varName != "" {
-						leftVars = append(leftVars, varName)
-					}
-				}
-			}
+	if len(targets) == 0 || len(rightValues) == 0 {
+		return nil
+	}
+
+	if len(targets) == len(rightValues) {
+		for i, target := range targets {
+			b.assignToTarget(target, rightValues[i])
 		}
 	} else {
-		// Single assignment: x = 1
-		tests := left.AllTest()
-		for _, test := range tests {
-			if testCtx, ok := test.(*pythonparser.TestContext); ok {
-				varName := b.extractVariableName(testCtx)
-				if varName != "" {
-					leftVars = append(leftVars, varName)
-				}
-			}
-		}
-	}
-
-	// Handle chain assignment: x = y = 10
-	// In this case, we have multiple ASSIGN tokens, and we assign the last value to all variables
-	if len(rightExprs) > 1 {
-		// Chain assignment: assign the last value to all left variables and intermediate variables
-		lastValue := rightValues[len(rightValues)-1]
-
-		// First, assign to intermediate variables (like y in x = y = 10)
-		for i := 0; i < len(rightExprs)-1; i++ {
-			rightExpr := rightExprs[i]
-			if rightExprCtx, ok := rightExpr.(*pythonparser.Testlist_star_exprContext); ok {
-				// Extract variable name from the intermediate expression
-				if testlist := rightExprCtx.Testlist(); testlist != nil {
-					if testlistCtx, ok := testlist.(*pythonparser.TestlistContext); ok {
-						for _, test := range testlistCtx.AllTest() {
-							if testCtx, ok := test.(*pythonparser.TestContext); ok {
-								varName := b.extractVariableName(testCtx)
-								if varName != "" {
-									variable := b.createVar(varName)
-									b.AssignVariable(variable, lastValue)
-								}
-							}
-						}
-					}
-				} else {
-					// Try to extract variable name from test
-					tests := rightExprCtx.AllTest()
-					for _, test := range tests {
-						if testCtx, ok := test.(*pythonparser.TestContext); ok {
-							varName := b.extractVariableName(testCtx)
-							if varName != "" {
-								variable := b.createVar(varName)
-								b.AssignVariable(variable, lastValue)
-							}
-						}
-					}
-				}
-			}
-		}
-
-		// Then assign to left variables
-		for _, varName := range leftVars {
-			variable := b.createVar(varName)
-			b.AssignVariable(variable, lastValue)
-		}
-	} else if len(leftVars) > 0 && len(rightValues) > 0 {
-		// Multiple assignment: a, b = 1, 2
-		// Or single assignment: x = 1
-		if len(leftVars) == len(rightValues) {
-			// Multiple assignment with matching counts
-			for i, varName := range leftVars {
-				variable := b.createVar(varName)
-				b.AssignVariable(variable, rightValues[i])
-			}
-		} else if len(leftVars) == 1 && len(rightValues) == 1 {
-			// Single assignment
-			variable := b.createVar(leftVars[0])
-			b.AssignVariable(variable, rightValues[0])
-		} else {
-			// Mismatch - assign the first right value to all left variables
-			if len(rightValues) > 0 {
-				for _, varName := range leftVars {
-					variable := b.createVar(varName)
-					b.AssignVariable(variable, rightValues[0])
-				}
-			}
+		// Single RHS or count mismatch: assign first value to all targets
+		for _, target := range targets {
+			b.assignToTarget(target, rightValues[0])
 		}
 	}
 
@@ -668,6 +652,14 @@ func (b *singleFileBuilder) extractMemberCallVariable(testCtx *pythonparser.Test
 
 	attrNameStr := attrNameCtx.GetText()
 	key := b.EmitConstInst(attrNameStr)
+
+	// Lazily register unknown attributes on Blueprint types (Python adds attrs at runtime).
+	// store=false skips SSA instruction emission in the container's function context.
+	if blueprint, ok := ssa.ToClassBluePrintType(obj.GetType()); ok {
+		if existing := blueprint.GetNormalMember(attrNameStr); existing == nil {
+			blueprint.RegisterNormalMember(attrNameStr, b.EmitUndefined(attrNameStr), false)
+		}
+	}
 
 	return b.CreateMemberCallVariable(obj, key)
 }

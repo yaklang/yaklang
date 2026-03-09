@@ -182,6 +182,23 @@ type singleFileBuilder struct {
 	globalNames map[string]bool
 }
 
+// SwitchFunctionBuilder saves the current FunctionBuilder state and switches to the stored one.
+// Returns a function that restores the previous state when called.
+// This is used in Blueprint lazy builders to ensure proper function context.
+func (b *singleFileBuilder) SwitchFunctionBuilder(s *ssa.StoredFunctionBuilder) func() {
+	t := b.StoreFunctionBuilder()
+	b.LoadBuilder(s)
+	return func() {
+		b.LoadBuilder(t)
+	}
+}
+
+// LoadBuilder restores the FunctionBuilder from a stored state.
+func (b *singleFileBuilder) LoadBuilder(s *ssa.StoredFunctionBuilder) {
+	b.FunctionBuilder = s.Current
+	b.LoadFunctionBuilder(s.Store)
+}
+
 // FrontendWithCache parses Python source code and returns the root AST node.
 // It supports optional AntlrCache for improved parsing performance.
 // Similar to java2ssa.Frontend, but for Python syntax.

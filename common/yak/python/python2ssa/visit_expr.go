@@ -462,6 +462,9 @@ func (b *singleFileBuilder) VisitName(raw *pythonparser.NameContext) interface{}
 		return b.EmitConstInst(false)
 	case "None":
 		return b.EmitConstInst(nil)
+	case "super":
+		// Return a super proxy value; actual super() call is handled in VisitArguments
+		return b.emitSuperValue()
 	}
 
 	// Try to read as constant first
@@ -477,6 +480,13 @@ func (b *singleFileBuilder) VisitName(raw *pythonparser.NameContext) interface{}
 
 	// Variable doesn't exist yet, emit undefined
 	return b.EmitUndefined(name)
+}
+
+// emitSuperValue emits a value representing the super() proxy.
+// super() in Python returns a proxy to the parent class; we model it as an undefined
+// with a special tag so callers can recognize it if needed.
+func (b *singleFileBuilder) emitSuperValue() ssa.Value {
+	return b.EmitUndefined("super")
 }
 
 // VisitNumber visits a number node.
@@ -662,16 +672,25 @@ func (b *singleFileBuilder) VisitArguments(raw *pythonparser.ArgumentsContext, o
 		return obj
 	}
 
-	// Handle function or method call
+	// Collect call arguments
+	var args []ssa.Value
 	if arglist := raw.Arglist(); arglist != nil {
-		args := b.VisitArglist(arglist)
-		call := b.NewCall(obj, args)
-		return b.EmitCall(call)
-	} else {
-		// Function call with no arguments
-		call := b.NewCall(obj, []ssa.Value{})
-		return b.EmitCall(call)
+		args = b.VisitArglist(arglist)
 	}
+
+	// Class instantiation: prepend an Undefined $self placeholder so constructor
+	// formal-parameter indices align with call-site arguments.
+	// Avoid ClassConstructor to prevent spurious destructor generation (Python has no __del__).
+	if blueprint, ok := ssa.ToClassBluePrintType(obj.GetType()); ok {
+		selfPlaceholder := b.EmitUndefined(blueprint.Name)
+		selfPlaceholder.SetType(blueprint)
+		callArgs := append([]ssa.Value{selfPlaceholder}, args...)
+		return b.ClassConstructorWithoutDeferDestructor(blueprint, callArgs)
+	}
+
+	// Regular function or method call
+	call := b.NewCall(obj, args)
+	return b.EmitCall(call)
 }
 
 // VisitArglist visits an arglist node.
@@ -713,13 +732,15 @@ func (b *singleFileBuilder) VisitArgument(raw *pythonparser.ArgumentContext) int
 	recoverRange := b.SetRange(raw)
 	defer recoverRange()
 
-	// Handle keyword argument: test ASSIGN test
+	// Handle keyword argument: name=value
+	// Test(0) is the key (identifier), Test(1) is the value expression.
+	// For SSA dataflow purposes we care about the value flowing into the function,
+	// not the key name, so we visit and return the value (Test(1)).
 	if raw.ASSIGN() != nil {
-		// TODO: Handle keyword arguments
-		// For now, just return the value
-		if test := raw.Test(0); test != nil {
-			if testCtx, ok := test.(*pythonparser.TestContext); ok {
-				return b.VisitTest(testCtx)
+		tests := raw.AllTest()
+		if len(tests) >= 2 {
+			if valCtx, ok := tests[1].(*pythonparser.TestContext); ok {
+				return b.VisitTest(valCtx)
 			}
 		}
 		return nil
