@@ -41,15 +41,15 @@ func (b *singleFileBuilder) visitClassBody(suite pythonparser.ISuiteContext, blu
 		return
 	}
 
-	blueprint.AddLazyBuilder(func() {
-		if simpleStmt := suiteCtx.Simple_stmt(); simpleStmt != nil {
-			b.visitClassSimpleStmt(simpleStmt, blueprint)
-		} else if stmts := suiteCtx.AllStmt(); len(stmts) > 0 {
-			for _, stmt := range stmts {
-				b.visitClassStmt(stmt, blueprint)
-			}
+	// Register methods synchronously so the constructor is visible to call sites
+	// in the same scope. Method bodies are still compiled lazily (AddLazyBuilder).
+	if simpleStmt := suiteCtx.Simple_stmt(); simpleStmt != nil {
+		b.visitClassSimpleStmt(simpleStmt, blueprint)
+	} else if stmts := suiteCtx.AllStmt(); len(stmts) > 0 {
+		for _, stmt := range stmts {
+			b.visitClassStmt(stmt, blueprint)
 		}
-	})
+	}
 }
 
 func (b *singleFileBuilder) visitClassSimpleStmt(simpleStmt pythonparser.ISimple_stmtContext, blueprint *ssa.Blueprint) {
@@ -94,11 +94,60 @@ func (b *singleFileBuilder) visitClassStmt(stmt pythonparser.IStmtContext, bluep
 		if classOrFuncDef, ok := compoundStmt.(*pythonparser.Class_or_func_def_stmtContext); ok {
 			if funcdef := classOrFuncDef.Funcdef(); funcdef != nil {
 				if funcdefCtx, ok := funcdef.(*pythonparser.FuncdefContext); ok {
-					b.visitClassMethod(funcdefCtx, blueprint)
+					modifier := b.extractMethodModifier(classOrFuncDef)
+					b.visitClassMethodWithModifier(funcdefCtx, blueprint, modifier)
+				}
+			} else if nestedClassdef := classOrFuncDef.Classdef(); nestedClassdef != nil {
+				if nestedClassdefCtx, ok := nestedClassdef.(*pythonparser.ClassdefContext); ok {
+					b.visitNestedClassdef(nestedClassdefCtx, blueprint)
 				}
 			}
 		}
 	}
+}
+
+func (b *singleFileBuilder) extractMethodModifier(raw *pythonparser.Class_or_func_def_stmtContext) string {
+	if raw == nil {
+		return ""
+	}
+	decorators := raw.AllDecorator()
+	for _, dec := range decorators {
+		decCtx, ok := dec.(*pythonparser.DecoratorContext)
+		if !ok {
+			continue
+		}
+		dottedName := decCtx.Dotted_name()
+		if dottedName == nil {
+			continue
+		}
+		decName := dottedName.GetText()
+		switch decName {
+		case "staticmethod", "classmethod", "property":
+			return decName
+		}
+	}
+	return ""
+}
+
+func (b *singleFileBuilder) visitNestedClassdef(classdef *pythonparser.ClassdefContext, parentBlueprint *ssa.Blueprint) {
+	if classdef == nil {
+		return
+	}
+	nameCtx := classdef.Name()
+	if nameCtx == nil {
+		return
+	}
+	className := parentBlueprint.Name + "." + nameCtx.GetText()
+	arglist := classdef.Arglist()
+	suite := classdef.Suite()
+	if suite == nil {
+		return
+	}
+	nestedBp := b.CreateBlueprint(className, classdef)
+	nestedBp.SetKind(ssa.BlueprintClass)
+	b.GetProgram().SetExportType(className, nestedBp)
+	b.handleClassInheritance(nestedBp, arglist)
+	b.visitClassBody(suite, nestedBp)
 }
 
 func (b *singleFileBuilder) visitClassConstant(exprStmt *pythonparser.Expr_stmtContext, blueprint *ssa.Blueprint) {
@@ -155,6 +204,10 @@ func (b *singleFileBuilder) visitClassConstant(exprStmt *pythonparser.Expr_stmtC
 }
 
 func (b *singleFileBuilder) visitClassMethod(funcdef *pythonparser.FuncdefContext, blueprint *ssa.Blueprint) {
+	b.visitClassMethodWithModifier(funcdef, blueprint, "")
+}
+
+func (b *singleFileBuilder) visitClassMethodWithModifier(funcdef *pythonparser.FuncdefContext, blueprint *ssa.Blueprint, modifier string) {
 	if funcdef == nil || blueprint == nil {
 		return
 	}
@@ -170,32 +223,74 @@ func (b *singleFileBuilder) visitClassMethod(funcdef *pythonparser.FuncdefContex
 	newFunc.SetMethodName(methodName)
 
 	isConstructor := (methodName == "__init__")
+	isStaticMethod := (modifier == "staticmethod")
+	isClassMethod := (modifier == "classmethod")
 
-	if isConstructor {
+	switch {
+	case isConstructor:
+		// Pre-register class name as NormalMember (store=false) so storeField inside
+		// RegisterMagicMethod can resolve the member without emitting an InvalidField error.
+		blueprint.RegisterNormalMember(blueprint.Name, newFunc, false)
 		blueprint.RegisterMagicMethod(ssa.Constructor, newFunc)
-	} else {
+	case isStaticMethod:
+		blueprint.RegisterStaticMethod(methodName, newFunc)
+	case isClassMethod:
+		blueprint.RegisterStaticMethod(methodName, newFunc)
+	default:
 		blueprint.RegisterNormalMethod(methodName, newFunc)
 	}
 
-	newFunc.AddLazyBuilder(func() {
+	store := b.StoreFunctionBuilder()
+	blueprint.AddLazyBuilder(func() {
+		switchHandler := b.SwitchFunctionBuilder(store)
+		defer switchHandler()
+
 		b.FunctionBuilder = b.PushFunction(newFunc)
-
-		selfParam := b.NewParam("self")
-		selfParam.SetType(blueprint)
-
-		if params := funcdef.Typedargslist(); params != nil {
-			b.buildFuncParams(params)
-		}
+		b.MarkedThisClassBlueprint = blueprint
+		defer func() {
+			b.MarkedThisClassBlueprint = nil
+		}()
 
 		if isConstructor {
-			instance := b.EmitEmptyContainer()
+			// $self is a placeholder matching the call-site's prepended Undefined argument.
+			// The real instance is created separately and bound to "self".
+			b.NewParam("$self")
+			instance := b.EmitMakeWithoutType(nil, nil)
 			instance.SetType(blueprint)
 			selfVar := b.CreateVariable("self")
 			b.AssignVariable(selfVar, instance)
+
+			if params := funcdef.Typedargslist(); params != nil {
+				b.buildFuncParamsSkipFirst(params)
+			}
+		} else if isStaticMethod {
+			if params := funcdef.Typedargslist(); params != nil {
+				b.buildFuncParams(params)
+			}
+		} else if isClassMethod {
+			if params := funcdef.Typedargslist(); params != nil {
+				b.buildFuncParamsSkipFirst(params)
+			}
+		} else {
+			selfParam := b.NewParam("self")
+			selfParam.SetType(blueprint)
+			selfVar := b.CreateVariable("self")
+			b.AssignVariable(selfVar, selfParam)
+
+			if params := funcdef.Typedargslist(); params != nil {
+				b.buildFuncParamsSkipFirst(params)
+			}
 		}
 
 		if suite := funcdef.Suite(); suite != nil {
 			b.VisitSuite(suite)
+		}
+
+		if isConstructor {
+			selfVal := b.ReadValue("self")
+			if selfVal != nil {
+				b.EmitReturn([]ssa.Value{selfVal})
+			}
 		}
 
 		b.Finish()

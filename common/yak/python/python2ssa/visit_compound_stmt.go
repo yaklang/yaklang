@@ -604,87 +604,131 @@ func (b *singleFileBuilder) VisitFuncdef(raw pythonparser.IFuncdefContext) inter
 		return nil
 	}
 
-	// Get function name
 	nameCtx := funcdef.Name()
 	if nameCtx == nil {
 		return nil
 	}
 	funcName := nameCtx.GetText()
 
-	// Get the function body (suite)
 	suite := funcdef.Suite()
 	if suite == nil {
 		return nil
 	}
 
-	// Create a new function using the SSA builder
-	// This creates a Function instance that will hold the function's instructions and parameters
 	newFunc := b.NewFunc(funcName)
-
-	// Use PushFunction to switch to the new function context
-	// This is necessary because functions have their own scope for parameters and local variables
 	b.FunctionBuilder = b.PushFunction(newFunc)
 
-	// Parse parameters
 	if params := funcdef.Typedargslist(); params != nil {
 		b.buildFuncParams(params)
 	}
 
-	// Build the function body
 	b.VisitSuite(suite)
-
-	// Finish building the function
-	// This ensures all basic blocks are properly connected and the function is complete
 	b.Finish()
-
-	// Pop back to the parent function
-	// This restores the previous function context (or main module context)
 	b.FunctionBuilder = b.PopFunction()
 
-	// Register the function in the current scope
-	// This allows the function to be called later: `funcName(arg1, arg2)`
 	funcVar := b.CreateVariable(funcName)
 	b.AssignVariable(funcVar, newFunc)
 
 	return nil
 }
 
+// extractNameFromNamedParameter extracts the identifier from a named_parameter node.
+// named_parameter : name (COLON test)?
+func extractNameFromNamedParameter(np pythonparser.INamed_parameterContext) string {
+	if np == nil {
+		return ""
+	}
+	ctx, ok := np.(*pythonparser.Named_parameterContext)
+	if !ok {
+		return ""
+	}
+	if n := ctx.Name(); n != nil {
+		return n.GetText()
+	}
+	return ""
+}
+
+// collectParamNames collects parameter names from a typedargslist.
+// *args names are prefixed with "*", **kwargs names with "**".
+func collectParamNames(paramsCtx *pythonparser.TypedargslistContext) []string {
+	var names []string
+
+	addFromDefParams := func(dp pythonparser.IDef_parametersContext) {
+		ctx, ok := dp.(*pythonparser.Def_parametersContext)
+		if !ok {
+			return
+		}
+		for _, defParam := range ctx.AllDef_parameter() {
+			dp2, ok := defParam.(*pythonparser.Def_parameterContext)
+			if !ok {
+				continue
+			}
+			if np := dp2.Named_parameter(); np != nil { // bare STAR separator has no name
+				if name := extractNameFromNamedParameter(np); name != "" {
+					names = append(names, name)
+				}
+			}
+		}
+	}
+
+	for _, dp := range paramsCtx.AllDef_parameters() {
+		addFromDefParams(dp)
+	}
+
+	if argsCtx := paramsCtx.Args(); argsCtx != nil {
+		if ac, ok := argsCtx.(*pythonparser.ArgsContext); ok {
+			if name := extractNameFromNamedParameter(ac.Named_parameter()); name != "" {
+				names = append(names, "*"+name)
+			}
+		}
+	}
+
+	if kwargsCtx := paramsCtx.Kwargs(); kwargsCtx != nil {
+		if kc, ok := kwargsCtx.(*pythonparser.KwargsContext); ok {
+			if name := extractNameFromNamedParameter(kc.Named_parameter()); name != "" {
+				names = append(names, "**"+name)
+			}
+		}
+	}
+
+	return names
+}
+
+// registerParam strips the leading "*"/"**" prefix and registers the name as an SSA parameter.
+func (b *singleFileBuilder) registerParam(name string) {
+	clean := strings.TrimLeft(name, "*")
+	if clean != "" {
+		b.NewParam(clean)
+	}
+}
+
 // buildFuncParams builds function parameters from typedargslist.
-// It extracts parameter names and creates Parameter instances in SSA.
-// Example Python: `def foo(a, b, c=3):` creates parameters a, b, c with default value 3
+// Handles: positional params, params with defaults, *args, **kwargs, type annotations.
 func (b *singleFileBuilder) buildFuncParams(params pythonparser.ITypedargslistContext) {
 	if params == nil {
 		return
 	}
-
 	paramsCtx, ok := params.(*pythonparser.TypedargslistContext)
 	if !ok {
 		return
 	}
+	for _, name := range collectParamNames(paramsCtx) {
+		b.registerParam(name)
+	}
+}
 
-	// Iterate through all children to find parameters
-	// Python function parameters can be:
-	// - Named parameters: `def foo(a, b):`
-	// - Default parameters: `def foo(a, b=1):`
-	// - Variable-length arguments: `def foo(*args):`
-	// - Keyword-only arguments: `def foo(*, a):`
-	for i := 0; i < paramsCtx.GetChildCount(); i++ {
-		child := paramsCtx.GetChild(i)
-		if defParamsCtx, ok := child.(*pythonparser.Def_parametersContext); ok {
-			for _, defParam := range defParamsCtx.AllDef_parameter() {
-				if defParamCtx, ok := defParam.(*pythonparser.Def_parameterContext); ok {
-					if namedParam := defParamCtx.Named_parameter(); namedParam != nil {
-						if namedParamCtx, ok := namedParam.(*pythonparser.Named_parameterContext); ok {
-							if name := namedParamCtx.Name(); name != nil {
-								paramName := name.GetText()
-								// Create a Parameter instance and add to function's formal parameters
-								// Parameters become available as variables inside the function
-								b.NewParam(paramName)
-							}
-						}
-					}
-				}
-			}
-		}
+// buildFuncParamsSkipFirst builds function parameters, skipping the first one (self/cls).
+// Used for class methods where the first parameter is implicitly handled.
+func (b *singleFileBuilder) buildFuncParamsSkipFirst(params pythonparser.ITypedargslistContext) {
+	if params == nil {
+		return
+	}
+	paramsCtx, ok := params.(*pythonparser.TypedargslistContext)
+	if !ok {
+		return
+	}
+	names := collectParamNames(paramsCtx)
+	for _, name := range names[1:] { // skip self / cls
+		b.registerParam(name)
 	}
 }
