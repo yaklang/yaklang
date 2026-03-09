@@ -524,8 +524,8 @@
   {
     "rule_id": "dc8b9d04-3d71-4ca3-9820-95d21c57b945",
     "rule_name": "检测Golang Beego框架中的CRLF注入漏洞",
-    "hash": "7d94730af59ba58ec40af802f22087b44973bebeccb1b04c82f895122fca332d",
-    "version": "20251230.0001"
+    "hash": "180f3aae44e1caf73caed98aa267ee5659007d4f03db0f700f158cc6c8d9b961",
+    "version": "20260309.0001"
   },
   {
     "rule_id": "a9f2254c-7a3d-4ea9-9830-6ca98bde8cd8",
