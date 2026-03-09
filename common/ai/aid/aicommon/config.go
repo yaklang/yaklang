@@ -2795,7 +2795,7 @@ Requirements:
 			WithAICallback(aiCallback),
 		)
 		if err != nil {
-			log.Debugf("stream nodeId i18n provider failed for %q: %v", nodeId, err)
+			log.Infof("stream nodeId i18n provider skipped for %q: %v", nodeId, err)
 			return nil
 		}
 		zh := result.GetString("zh")
