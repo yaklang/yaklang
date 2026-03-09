@@ -46,7 +46,27 @@ func mockedRequireBlueprint_BASIC(config aicommon.AICallerConfigIf, req *aicommo
 		return rsp, nil
 	}
 
+	if utils.MatchAllOfSubString(req.GetPrompt(), "FINAL_ANSWER", "answer_payload") {
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "mocked summary"}`))
+		rsp.Close()
+		return rsp, nil
+	}
+
+	if utils.MatchAllOfSubString(req.GetPrompt(), "任务执行引擎", "task_long_summary") {
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "summary", "status_summary": "done", "task_short_summary": "completed", "task_long_summary": "completed"}`))
+		rsp.Close()
+		return rsp, nil
+	}
+
+	if utils.MatchAllOfSubString(req.GetPrompt(), `"plan"`, `"main_task"`) {
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "fallback"}`))
+		rsp.Close()
+		return rsp, nil
+	}
+
 	fmt.Println(req.GetPrompt())
+	rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "fallback"}`))
+	rsp.Close()
 	return rsp, nil
 }
 

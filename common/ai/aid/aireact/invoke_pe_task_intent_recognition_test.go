@@ -94,12 +94,18 @@ func TestReAct_PETask_DeepIntentRecognition(t *testing.T) {
 			if utils.MatchAllOfSubString(prompt, "finalize_enrichment", "query_capabilities") &&
 				!utils.MatchAllOfSubString(prompt, "directly_answer") &&
 				!utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_") {
-				atomic.AddInt32(&intentLoopCalled, 1)
-				log.Infof("intent loop called during PE task init")
+				count := atomic.AddInt32(&intentLoopCalled, 1)
+				log.Infof("intent loop called during PE task init (count=%d)", count)
 				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`
+				if count <= 1 {
+					rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "query_capabilities", "human_readable_thought": "searching capabilities", "search_query": "test tools"}
 `))
+				} else {
+					rsp.EmitOutputStream(bytes.NewBufferString(`
+{"@action": "finalize_enrichment", "human_readable_thought": "intent recognition complete", "final_query": "test task"}
+`))
+				}
 				rsp.Close()
 				return rsp, nil
 			}
@@ -261,12 +267,18 @@ func TestReAct_PlanExec_DeepIntentRecognition(t *testing.T) {
 				!utils.MatchAllOfSubString(prompt, "directly_answer") &&
 				!utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_") &&
 				!strings.Contains(prompt, "search_knowledge") {
-				atomic.AddInt32(&intentLoopCalled, 1)
-				log.Infof("intent loop called (count=%d)", atomic.LoadInt32(&intentLoopCalled))
+				count := atomic.AddInt32(&intentLoopCalled, 1)
+				log.Infof("intent loop called (count=%d)", count)
 				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(bytes.NewBufferString(`
+				if count <= 1 {
+					rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "query_capabilities", "human_readable_thought": "searching capabilities", "search_query": "test"}
 `))
+				} else {
+					rsp.EmitOutputStream(bytes.NewBufferString(`
+{"@action": "finalize_enrichment", "human_readable_thought": "intent recognition complete", "final_query": "test"}
+`))
+				}
 				rsp.Close()
 				return rsp, nil
 			}

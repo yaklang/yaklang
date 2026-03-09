@@ -650,12 +650,17 @@ func TestReAct_ForgeExecution_Task_UserQueryContext(t *testing.T) {
 			if utils.MatchAllOfSubString(prompt, planFlag, "PROGRESS_TASK_") {
 				hasUserQueryFoundInTaskExec = strings.Contains(prompt, userOriginalQuery)
 				hasAIQueryFoundInTaskExec = strings.Contains(prompt, aiGeneratedQuery)
-				// aitagNonce := nonce()
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "directly_answer","answer_payload":"` + finishTaskFlag + `"}`))
 				rsp.Close()
 				finishedCh <- true
+				return rsp, nil
+			}
+			if utils.MatchAllOfSubString(prompt, "任务执行引擎", "task_long_summary") && !utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_") {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "summary", "status_summary": "done", "task_short_summary": "completed", "task_long_summary": "task completed"}`))
+				rsp.Close()
 				return rsp, nil
 			}
 			log.Infof("unexpected prompt in TestReAct_ForgeExecution_UserQueryContext")
