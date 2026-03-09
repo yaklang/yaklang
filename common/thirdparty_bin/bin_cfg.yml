@@ -100,6 +100,10 @@ binaries:
         url: "/pandoc/pandoc-darwin-arm64.zip"
         pick: "pandoc"
         bin_path: "pandoc"
+      "darwin-amd64":
+        url: "/pandoc/pandoc-3.8-darwin-amd64.zip"
+        pick: "pandoc"
+        bin_path: "pandoc"
       "windows-amd64":
         url: "/pandoc/pandoc-windows-amd64.zip"
         pick: "pandoc.exe"
