@@ -5,7 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-func getCurrentBlueprint(v sfvm.ValueOperator) []*ssa.Blueprint {
+func getCurrentBlueprint(v any) []*ssa.Blueprint {
 	getBlueprint := func(v *Value) *ssa.Blueprint {
 		if v == nil {
 			return nil
@@ -25,25 +25,22 @@ func getCurrentBlueprint(v sfvm.ValueOperator) []*ssa.Blueprint {
 		return funIns.GetCurrentBlueprint()
 	}
 
+	var values sfvm.Values
+	switch ret := v.(type) {
+	case sfvm.Values:
+		values = ret
+	case sfvm.ValueOperator:
+		values = sfvm.ValuesOf(ret)
+	default:
+		return nil
+	}
+
 	var rets []*ssa.Blueprint
-	v.Recursive(func(operator sfvm.ValueOperator) error {
-		switch ret := operator.(type) {
-		case *Value:
+	_ = values.Recursive(func(operator sfvm.ValueOperator) error {
+		if ret, ok := operator.(*Value); ok {
 			if bp := getBlueprint(ret); bp != nil {
 				rets = append(rets, bp)
 			}
-		case *sfvm.ValueList:
-			// 直接使用 ValueList 的 Recursive 方法遍历其中的 Value
-			ret.Recursive(func(vo sfvm.ValueOperator) error {
-				if val, ok := vo.(*Value); ok {
-					if bp := getBlueprint(val); bp != nil {
-						rets = append(rets, bp)
-					}
-				}
-				return nil
-			})
-		default:
-			return nil
 		}
 		return nil
 	})

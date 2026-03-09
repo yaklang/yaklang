@@ -32,7 +32,7 @@ type queryConfig struct {
 	useCache bool
 	// input
 	program *Program
-	value   sfvm.ValueOperator // use this
+	value   sfvm.Values // use this
 	//  rule
 	ruleContent string
 	ruleName    string
@@ -127,7 +127,7 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 	process(0, "start query syntaxflow")
 	// handler input  value
 	value := config.value
-	if utils.IsNil(value) {
+	if len(value) == 0 {
 		return nil, utils.Errorf("SyntaxflowQuery: value is nil")
 	}
 
@@ -210,10 +210,13 @@ type QueryOption func(*queryConfig)
 func QueryWithProgram(program *Program) QueryOption {
 	return func(c *queryConfig) {
 		c.program = program
-		// Only override c.value if it's not already a ProgramOverLay
-		if _, isOverlay := c.value.(*ProgramOverLay); !isOverlay {
-			c.value = program
+		// Only override c.value if it's not already a ProgramOverLay.
+		if len(c.value) == 1 {
+			if _, isOverlay := c.value[0].(*ProgramOverLay); isOverlay {
+				return
+			}
 		}
+		c.value = sfvm.ValuesOf(program)
 	}
 }
 
@@ -229,9 +232,17 @@ func QueryWithPrograms(programs Programs) QueryOption {
 }
 
 func QueryWithValue(value sfvm.ValueOperator) QueryOption {
+	return QueryWithValues(sfvm.ValuesOf(value))
+}
+
+func QueryWithValues(values sfvm.Values) QueryOption {
 	return func(c *queryConfig) {
-		c.value = value
-		c.program, _ = fetchProgram(value)
+		c.value = values
+		if len(values) == 0 {
+			c.program = nil
+			return
+		}
+		c.program, _ = fetchProgram(values[0])
 	}
 }
 
@@ -308,15 +319,19 @@ func QueryWithSFConfig(config *sfvm.Config) QueryOption {
 	return QueryWithSFOption(sfvm.WithConfig(config))
 }
 
-func QueryWithInitVar(result *omap.OrderedMap[string, sfvm.ValueOperator]) QueryOption {
+func QueryWithInitVar(result *omap.OrderedMap[string, sfvm.Values]) QueryOption {
 	return func(c *queryConfig) {
 		c.opts = append(c.opts, sfvm.WithInitialContextVars(result))
 	}
 }
 
 func QueryWithInitInputVar(value sfvm.ValueOperator) QueryOption {
+	return QueryWithInitInputValues(sfvm.ValuesOf(value))
+}
+
+func QueryWithInitInputValues(value sfvm.Values) QueryOption {
 	return func(c *queryConfig) {
-		result := omap.NewOrderedMap(map[string]sfvm.ValueOperator{})
+		result := omap.NewOrderedMap(map[string]sfvm.Values{})
 		result.Set(DefaultInputVar, value)
 		c.opts = append(c.opts, sfvm.WithInitialContextVars(result))
 	}
@@ -376,7 +391,7 @@ func QueryWithResultCaptured(capture sfvm.ResultCapturedCallback) QueryOption {
 }
 func QueryWithSyntaxFlowResult(expected string, handler func(*Value) error) QueryOption {
 	return func(c *queryConfig) {
-		c.opts = append(c.opts, sfvm.WithResultCaptured(func(name string, results sfvm.ValueOperator) error {
+		c.opts = append(c.opts, sfvm.WithResultCaptured(func(name string, results sfvm.Values) error {
 			if name != expected {
 				return nil
 			}

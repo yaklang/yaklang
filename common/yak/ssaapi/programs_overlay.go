@@ -1132,9 +1132,9 @@ func (p *ProgramOverLay) Recursive(f func(sfvm.ValueOperator) error) error {
 func (p *ProgramOverLay) queryMatch(
 	ctx context.Context,
 	mod ssadb.MatchMode,
-	queryFunc func(*Program, context.Context, ssadb.MatchMode, string, []string) (bool, sfvm.ValueOperator, error),
+	queryFunc func(*Program, context.Context, ssadb.MatchMode, string, []string) (bool, sfvm.Values, error),
 	query string,
-) (bool, sfvm.ValueOperator, error) {
+) (bool, sfvm.Values, error) {
 	if p == nil {
 		return false, nil, nil
 	}
@@ -1198,52 +1198,52 @@ func (p *ProgramOverLay) queryMatch(
 		excludeFiles = append(excludeFiles, currentLayerFoundFiles...)
 	}
 
-	return len(results) > 0, ValuesToSFValueList(results), nil
+	return len(results) > 0, ToSFVMValues(results), nil
 }
 
-func (p *ProgramOverLay) ExactMatch(ctx context.Context, mod ssadb.MatchMode, want string) (bool, sfvm.ValueOperator, error) {
-	return p.queryMatch(ctx, mod, func(prog *Program, ctx context.Context, mod ssadb.MatchMode, query string, excludeFiles []string) (bool, sfvm.ValueOperator, error) {
+func (p *ProgramOverLay) ExactMatch(ctx context.Context, mod ssadb.MatchMode, want string) (bool, sfvm.Values, error) {
+	return p.queryMatch(ctx, mod, func(prog *Program, ctx context.Context, mod ssadb.MatchMode, query string, excludeFiles []string) (bool, sfvm.Values, error) {
 		return prog.matchVariableWithExcludeFiles(ctx, ssadb.ExactCompare, mod, query, excludeFiles)
 	}, want)
 }
 
-func (p *ProgramOverLay) GlobMatch(ctx context.Context, mod ssadb.MatchMode, g string) (bool, sfvm.ValueOperator, error) {
-	return p.queryMatch(ctx, mod, func(prog *Program, ctx context.Context, mod ssadb.MatchMode, query string, excludeFiles []string) (bool, sfvm.ValueOperator, error) {
+func (p *ProgramOverLay) GlobMatch(ctx context.Context, mod ssadb.MatchMode, g string) (bool, sfvm.Values, error) {
+	return p.queryMatch(ctx, mod, func(prog *Program, ctx context.Context, mod ssadb.MatchMode, query string, excludeFiles []string) (bool, sfvm.Values, error) {
 		return prog.matchVariableWithExcludeFiles(ctx, ssadb.GlobCompare, mod, query, excludeFiles)
 	}, g)
 }
 
-func (p *ProgramOverLay) RegexpMatch(ctx context.Context, mod ssadb.MatchMode, re string) (bool, sfvm.ValueOperator, error) {
-	return p.queryMatch(ctx, mod, func(prog *Program, ctx context.Context, mod ssadb.MatchMode, query string, excludeFiles []string) (bool, sfvm.ValueOperator, error) {
+func (p *ProgramOverLay) RegexpMatch(ctx context.Context, mod ssadb.MatchMode, re string) (bool, sfvm.Values, error) {
+	return p.queryMatch(ctx, mod, func(prog *Program, ctx context.Context, mod ssadb.MatchMode, query string, excludeFiles []string) (bool, sfvm.Values, error) {
 		return prog.matchVariableWithExcludeFiles(ctx, ssadb.RegexpCompare, mod, query, excludeFiles)
 	}, re)
 }
 
-func (p *ProgramOverLay) GetCalled() (sfvm.ValueOperator, error) {
+func (p *ProgramOverLay) GetCalled() (sfvm.Values, error) {
 	return nil, utils.Error("ProgramOverLay does not support GetCalled")
 }
 
-func (p *ProgramOverLay) GetCallActualParams(index int, contain bool) (sfvm.ValueOperator, error) {
+func (p *ProgramOverLay) GetCallActualParams(index int, contain bool) (sfvm.Values, error) {
 	return nil, utils.Error("ProgramOverLay does not support GetCallActualParams")
 }
 
-func (p *ProgramOverLay) GetFields() (sfvm.ValueOperator, error) {
+func (p *ProgramOverLay) GetFields() (sfvm.Values, error) {
 	return sfvm.NewEmptyValues(), nil
 }
 
-func (p *ProgramOverLay) GetSyntaxFlowUse() (sfvm.ValueOperator, error) {
+func (p *ProgramOverLay) GetSyntaxFlowUse() (sfvm.Values, error) {
 	return nil, utils.Error("ProgramOverLay does not support GetSyntaxFlowUse")
 }
 
-func (p *ProgramOverLay) GetSyntaxFlowDef() (sfvm.ValueOperator, error) {
+func (p *ProgramOverLay) GetSyntaxFlowDef() (sfvm.Values, error) {
 	return nil, utils.Error("ProgramOverLay does not support GetSyntaxFlowDef")
 }
 
-func (p *ProgramOverLay) GetSyntaxFlowTopDef(sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config, config ...*sfvm.RecursiveConfigItem) (sfvm.ValueOperator, error) {
+func (p *ProgramOverLay) GetSyntaxFlowTopDef(sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config, config ...*sfvm.RecursiveConfigItem) (sfvm.Values, error) {
 	return nil, utils.Error("ProgramOverLay does not support GetSyntaxFlowTopDef")
 }
 
-func (p *ProgramOverLay) GetSyntaxFlowBottomUse(sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config, config ...*sfvm.RecursiveConfigItem) (sfvm.ValueOperator, error) {
+func (p *ProgramOverLay) GetSyntaxFlowBottomUse(sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config, config ...*sfvm.RecursiveConfigItem) (sfvm.Values, error) {
 	return nil, utils.Error("ProgramOverLay does not support GetSyntaxFlowBottomUse")
 }
 
@@ -1260,14 +1260,14 @@ func (p *ProgramOverLay) Remove(values ...sfvm.ValueOperator) (sfvm.ValueOperato
 }
 
 func (p *ProgramOverLay) AppendPredecessor(operator sfvm.ValueOperator, opts ...sfvm.AnalysisContextOption) error {
-	return utils.Error("ProgramOverLay does not support AppendPredecessor")
+	return nil
 }
 
-func (p *ProgramOverLay) FileFilter(path string, match string, rule map[string]string, rule2 []string) (sfvm.ValueOperator, error) {
+func (p *ProgramOverLay) FileFilter(path string, match string, rule map[string]string, rule2 []string) (sfvm.Values, error) {
 	return nil, utils.Error("ProgramOverLay does not support FileFilter")
 }
 
-func (p *ProgramOverLay) CompareString(comparator *sfvm.StringComparator) (sfvm.ValueOperator, []bool) {
+func (p *ProgramOverLay) CompareString(comparator *sfvm.StringComparator) (sfvm.Values, []bool) {
 	if p == nil || len(p.Layers) == 0 {
 		return sfvm.NewEmptyValues(), nil
 	}
@@ -1278,7 +1278,7 @@ func (p *ProgramOverLay) CompareString(comparator *sfvm.StringComparator) (sfvm.
 	return top.Program.CompareString(comparator)
 }
 
-func (p *ProgramOverLay) CompareOpcode(comparator *sfvm.OpcodeComparator) (sfvm.ValueOperator, []bool) {
+func (p *ProgramOverLay) CompareOpcode(comparator *sfvm.OpcodeComparator) (sfvm.Values, []bool) {
 	if p == nil || len(p.Layers) == 0 {
 		return sfvm.NewEmptyValues(), nil
 	}
@@ -1289,10 +1289,17 @@ func (p *ProgramOverLay) CompareOpcode(comparator *sfvm.OpcodeComparator) (sfvm.
 	return top.Program.CompareOpcode(comparator)
 }
 
-func (p *ProgramOverLay) CompareConst(comparator *sfvm.ConstComparator) []bool {
-	return nil
+func (p *ProgramOverLay) CompareConst(comparator *sfvm.ConstComparator) bool {
+	return false
 }
 
 func (p *ProgramOverLay) NewConst(i any, rng ...*memedit.Range) sfvm.ValueOperator {
-	return nil
+	if p == nil || len(p.Layers) == 0 {
+		return nil
+	}
+	top := p.Layers[len(p.Layers)-1]
+	if top == nil || top.Program == nil {
+		return nil
+	}
+	return top.Program.NewConst(i, rng...)
 }

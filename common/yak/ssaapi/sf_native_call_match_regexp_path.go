@@ -68,10 +68,10 @@ func expandExpressPath(routePath string) string {
 //	  the string-path values to test against (e.g. "$stringEndpoint").
 //	  The leading "$" is optional.
 var nativeCallMatchRegexpPath = sfvm.NativeCallFunc(func(
-	v sfvm.ValueOperator,
+	v sfvm.Values,
 	frame *sfvm.SFFrame,
 	params *sfvm.NativeCallActualParams,
-) (bool, sfvm.ValueOperator, error) {
+) (bool, sfvm.Values, error) {
 	// --- 1. Resolve the target variable from the frame symbol table ---
 	targetVarName := params.GetString(0, "target", "var", "against")
 	if targetVarName == "" {
@@ -170,7 +170,9 @@ var nativeCallMatchRegexpPath = sfvm.NativeCallFunc(func(
 		}
 
 		if bypassed {
-			val.AppendPredecessor(v, frame.WithPredecessorContext("matchRegexpPath: bypass risk"))
+			for _, source := range v {
+				_ = val.AppendPredecessor(source, frame.WithPredecessorContext("matchRegexpPath: bypass risk"))
+			}
 			results = append(results, val)
 		}
 		return nil

@@ -33,11 +33,11 @@ func (r *SyntaxFlowResult) GetAllVariable() *orderedmap.OrderedMap {
 
 	r.variable = orderedmap.New()
 	if r.memResult != nil {
-		r.memResult.SymbolTable.ForEach(func(name string, value sfvm.ValueOperator) bool {
+		r.memResult.SymbolTable.ForEach(func(name string, value sfvm.Values) bool {
 			r.variable.Set(name, sfvm.ValuesLen(value))
 			return true
 		})
-		r.memResult.AlertSymbolTable.ForEach(func(key string, value sfvm.ValueOperator) bool {
+		r.memResult.AlertSymbolTable.ForEach(func(key string, value sfvm.Values) bool {
 			if v, ok := r.variable.Get(key); ok && v.(int) > 0 {
 				r.alertVariable = append(r.alertVariable, key)
 			}
@@ -123,7 +123,7 @@ func (r *SyntaxFlowResult) GetValues(name string) Values {
 	// memory
 	if r.memResult != nil {
 		if v, ok := r.memResult.SymbolTable.Get(name); ok {
-			vs := SyntaxFlowVariableToValues(v)
+			vs := FromSFVMValues(v)
 			r.symbol[name] = vs
 			return vs
 		}
@@ -187,7 +187,7 @@ func (r *SyntaxFlowResult) GetUnNameValues() Values {
 	}
 	if r.memResult != nil {
 		// memory
-		r.unName = SyntaxFlowVariableToValues(r.memResult.UnNameValue)
+		r.unName = FromSFVMValues(r.memResult.UnNameValue)
 	} else if r.dbResult != nil {
 		// database
 		r.unName = r.getValueFromDB("_")

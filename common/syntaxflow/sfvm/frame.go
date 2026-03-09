@@ -62,10 +62,10 @@ type SFFrame struct {
 	idx            int     // current opcode index
 	currentProcess float64 // current process
 
-	stack          *utils.Stack[ValueOperator]       // for filter
+	stack          *utils.Stack[Values]              // for filter
 	conditionStack *utils.Stack[ConditionEntry]      // for condition
 	conditionScope *utils.Stack[conditionScopeState] // for condition scope
-	popStack       *utils.Stack[ValueOperator]       //pop stack,for sf
+	popStack       *utils.Stack[Values]              //pop stack,for sf
 
 	// when cache err skip  statement/expr
 	errorSkipStack *utils.Stack[*errorSkipContext]
@@ -151,10 +151,10 @@ func (s *SFFrame) GetContext() context.Context {
 	return s.config.GetContext()
 }
 
-func newSfFrameEx(vars *omap.OrderedMap[string, ValueOperator], text string, codes []*SFI, rule *schema.SyntaxFlowRule, config *Config) *SFFrame {
+func newSfFrameEx(vars *omap.OrderedMap[string, Values], text string, codes []*SFI, rule *schema.SyntaxFlowRule, config *Config) *SFFrame {
 	v := vars
 	if v == nil {
-		v = omap.NewEmptyOrderedMap[string, ValueOperator]()
+		v = omap.NewEmptyOrderedMap[string, Values]()
 	}
 	if rule == nil {
 		rule = &schema.SyntaxFlowRule{}
@@ -168,7 +168,7 @@ func newSfFrameEx(vars *omap.OrderedMap[string, ValueOperator], text string, cod
 	}
 }
 
-func NewSFFrame(vars *omap.OrderedMap[string, ValueOperator], text string, codes []*SFI) *SFFrame {
+func NewSFFrame(vars *omap.OrderedMap[string, Values], text string, codes []*SFI) *SFFrame {
 	return newSfFrameEx(vars, text, codes, nil, nil)
 }
 
@@ -241,18 +241,18 @@ func (s *SFFrame) ExtractNegativeFilesystemAndLanguage() ([]*VerifyFileSystem, e
 
 func (s *SFFrame) Flush() {
 	s.result = NewSFResult(s.rule, s.config)
-	s.stack = utils.NewStack[ValueOperator]()
+	s.stack = utils.NewStack[Values]()
 	s.errorSkipStack = utils.NewStack[*errorSkipContext]()
 	s.conditionStack = utils.NewStack[ConditionEntry]()
 	s.conditionScope = utils.NewStack[conditionScopeState]()
-	s.popStack = utils.NewStack[ValueOperator]()
+	s.popStack = utils.NewStack[Values]()
 	s.idx = 0
 }
 
-func (s *SFFrame) GetSymbolTable() *omap.OrderedMap[string, ValueOperator] {
+func (s *SFFrame) GetSymbolTable() *omap.OrderedMap[string, Values] {
 	return s.result.SymbolTable
 }
-func (s *SFFrame) GetSymbol(sfi *SFI) (ValueOperator, bool) {
+func (s *SFFrame) GetSymbol(sfi *SFI) (Values, bool) {
 	if val, b := s.result.SymbolTable.Get(sfi.UnaryStr); b {
 		return val, b
 	}
@@ -262,7 +262,7 @@ func (s *SFFrame) GetSymbol(sfi *SFI) (ValueOperator, bool) {
 		return NewEmptyValues(), true
 	}
 }
-func (s *SFFrame) GetSymbolByName(name string) (ValueOperator, bool) {
+func (s *SFFrame) GetSymbolByName(name string) (Values, bool) {
 	return s.result.SymbolTable.Get(name)
 }
 func (s *SFFrame) ToLeft() bool {
@@ -286,7 +286,7 @@ func (s *SFFrame) ProcessCallback(msg string, args ...any) {
 		s.config.processCallback(s.idx, fmt.Sprintf(msg, args...))
 	}
 }
-func (s *SFFrame) exec(feedValue ValueOperator) (ret error) {
+func (s *SFFrame) exec(feedValue Values) (ret error) {
 	s.predCounter = 0
 	defer func() {
 		s.predCounter = 0
@@ -318,7 +318,7 @@ func (s *SFFrame) exec(feedValue ValueOperator) (ret error) {
 	})
 }
 
-func (s *SFFrame) execRule(feedValue ValueOperator) error {
+func (s *SFFrame) execRule(feedValue Values) error {
 	ruleLabel := "unknown-rule"
 	if s.rule != nil {
 		if s.rule.Title != "" {
@@ -406,7 +406,7 @@ func (s *SFFrame) execRule(feedValue ValueOperator) error {
 					// Anchor scopes are enabled only for optional filters (?{...} and ?(...)).
 					_, hasParentAnchor := s.ActiveAnchorWidth()
 					source := s.stack.Peek()
-					sourceValues := flattenValues(source)
+					sourceValues := source
 					state.anchorActive = true
 					state.anchorWidth = len(sourceValues)
 					// Root anchor scope must not leak any residual anchor bits across statements.
@@ -490,24 +490,17 @@ func (s *SFFrame) execRule(feedValue ValueOperator) error {
 var CriticalError = utils.Error("CriticalError(Immediately Abort)")
 var AbortError = utils.Error("AbortError(Normal Abort)")
 
-func (s *SFFrame) pushStack(value ValueOperator) {
+func (s *SFFrame) pushStack(value Values) {
 	s.stack.Push(value)
 }
 
-func (s *SFFrame) output(resultName string, operator ValueOperator) error {
-	var values = []ValueOperator{operator}
+func (s *SFFrame) output(resultName string, operator Values) error {
 	// save to result, even if value is empty or nil
 	if resultName == "_" {
-		if unnameValue := s.result.UnNameValue; ValuesLen(unnameValue) != 0 {
-			values = append(values, s.result.UnNameValue)
-		}
-		s.result.UnNameValue = NewValues(values) // for merge
+		s.result.UnNameValue = MergeValues(operator, s.result.UnNameValue)
 	} else {
-		if originValue, existed := s.GetSymbolTable().Get(resultName); existed {
-			values = append(values, originValue)
-		}
-		value := NewValues(values) // for merge
-		s.GetSymbolTable().Set(resultName, value)
+		originValue, _ := s.GetSymbolTable().Get(resultName)
+		s.GetSymbolTable().Set(resultName, MergeValues(operator, originValue))
 	}
 	if s.config != nil {
 		for _, callback := range s.config.onResultCapturedCallbacks {

@@ -26,9 +26,9 @@ type SFFrameResult struct {
 	CheckParams []string
 	Errors      []string
 	// value
-	SymbolTable      *omap.OrderedMap[string, ValueOperator]
-	UnNameValue      ValueOperator
-	AlertSymbolTable *utils.SafeMap[ValueOperator]
+	SymbolTable      *omap.OrderedMap[string, Values]
+	UnNameValue      Values
+	AlertSymbolTable *utils.SafeMap[Values]
 }
 
 func NewSFResult(rule *schema.SyntaxFlowRule, config *Config) *SFFrameResult {
@@ -37,8 +37,8 @@ func NewSFResult(rule *schema.SyntaxFlowRule, config *Config) *SFFrameResult {
 		rule:             rule,
 		Description:      omap.NewEmptyOrderedMap[string, string](),
 		CheckParams:      make([]string, 0),
-		SymbolTable:      omap.NewEmptyOrderedMap[string, ValueOperator](),
-		AlertSymbolTable: utils.NewSafeMap[ValueOperator](),
+		SymbolTable:      omap.NewEmptyOrderedMap[string, Values](),
+		AlertSymbolTable: utils.NewSafeMap[Values](),
 	}
 }
 
@@ -50,20 +50,15 @@ func (s *SFFrameResult) GetRule() *schema.SyntaxFlowRule {
 }
 
 func (s *SFFrameResult) MergeByResult(result *SFFrameResult) {
-	result.SymbolTable.ForEach(func(i string, v ValueOperator) bool {
+	result.SymbolTable.ForEach(func(i string, v Values) bool {
 		if value, ok := s.SymbolTable.Get(i); ok {
-			if merge, err := value.Merge(v); err != nil {
-				log.Errorf("merge value fail: %v", err)
-				return true
-			} else {
-				s.SymbolTable.Set(i, merge)
-			}
+			s.SymbolTable.Set(i, MergeValues(value, v))
 		} else {
 			s.SymbolTable.Set(i, v)
 		}
 		return true
 	})
-	result.AlertSymbolTable.ForEach(func(key string, value ValueOperator) bool {
+	result.AlertSymbolTable.ForEach(func(key string, value Values) bool {
 		s.AlertSymbolTable.Set(key, value)
 		return true
 	})
@@ -132,13 +127,13 @@ func (s *SFFrameResult) String(opts ...ShowOption) string {
 		buf.WriteString("Result Vars: \n")
 	}
 	if cfg.showAll {
-		s.SymbolTable.ForEach(func(i string, v ValueOperator) bool {
+		s.SymbolTable.ForEach(func(i string, v Values) bool {
 			showValueMap(buf, i, v, cfg)
 			return true
 		})
 	} else {
 		if s.AlertSymbolTable.Count() > 0 {
-			s.AlertSymbolTable.ForEach(func(key string, value ValueOperator) bool {
+			s.AlertSymbolTable.ForEach(func(key string, value Values) bool {
 				if info, b := s.GetAlertInfo(key); b {
 					buf.WriteString(fmt.Sprintf("value: %s description: %v\n", key, codec.AnyToString(info.Msg)))
 				}
@@ -146,27 +141,19 @@ func (s *SFFrameResult) String(opts ...ShowOption) string {
 				return true
 			})
 		} else if s.SymbolTable.Len() > 0 {
-			s.SymbolTable.ForEach(func(i string, v ValueOperator) bool {
+			s.SymbolTable.ForEach(func(i string, v Values) bool {
 				showValueMap(buf, i, v, cfg)
 				return true
 			})
 		} else {
-			// use unName value
-			s.UnNameValue.Recursive(func(operator ValueOperator) error {
-				showValueMap(buf, "_", operator, cfg)
-				return nil
-			})
+			showValueMap(buf, "_", s.UnNameValue, cfg)
 		}
 	}
 	return buf.String()
 }
 
-func showValueMap(buf *bytes.Buffer, varName string, value ValueOperator, cfg *showConfig) {
-	var all []ValueOperator
-	_ = value.Recursive(func(operator ValueOperator) error {
-		all = append(all, operator)
-		return nil
-	})
+func showValueMap(buf *bytes.Buffer, varName string, value Values, cfg *showConfig) {
+	all := value
 	if len(all) == 0 {
 		return
 	}

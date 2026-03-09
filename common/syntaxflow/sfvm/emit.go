@@ -417,7 +417,7 @@ func (v *SyntaxFlowVisitor) Show() {
 	}
 }
 
-func (v *SyntaxFlowVisitor) CreateFrame(vars *omap.OrderedMap[string, ValueOperator]) *SFFrame {
+func (v *SyntaxFlowVisitor) CreateFrame(vars *omap.OrderedMap[string, Values]) *SFFrame {
 	return NewSFFrame(vars, v.rule.Content, v.codes)
 }
 

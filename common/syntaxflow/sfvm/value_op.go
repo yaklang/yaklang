@@ -113,52 +113,39 @@ type ValueOperator interface {
 	GetOpcode() string
 	GetBinaryOperator() string
 	GetUnaryOperator() string
-	// Len() int
-
-	// Recursive visits each leaf value in a list/map carrier.
-	Recursive(func(ValueOperator) error) error
 
 	// Search and name/key matching.
-	ExactMatch(context.Context, ssadb.MatchMode, string) (bool, ValueOperator, error)
-	GlobMatch(context.Context, ssadb.MatchMode, string) (bool, ValueOperator, error)
-	RegexpMatch(context.Context, ssadb.MatchMode, string) (bool, ValueOperator, error)
+	ExactMatch(context.Context, ssadb.MatchMode, string) (bool, Values, error)
+	GlobMatch(context.Context, ssadb.MatchMode, string) (bool, Values, error)
+	RegexpMatch(context.Context, ssadb.MatchMode, string) (bool, Values, error)
 
 	// Graph navigation.
-	GetCalled() (ValueOperator, error)
-	GetCallActualParams(int, bool) (ValueOperator, error)
-	GetFields() (ValueOperator, error)
+	GetCalled() (Values, error)
+	GetCallActualParams(int, bool) (Values, error)
+	GetFields() (Values, error)
 
 	// Def-use queries.
-	GetSyntaxFlowUse() (ValueOperator, error)
-	GetSyntaxFlowDef() (ValueOperator, error)
-	GetSyntaxFlowTopDef(*SFFrameResult, *Config, ...*RecursiveConfigItem) (ValueOperator, error)
-	GetSyntaxFlowBottomUse(*SFFrameResult, *Config, ...*RecursiveConfigItem) (ValueOperator, error)
+	GetSyntaxFlowUse() (Values, error)
+	GetSyntaxFlowDef() (Values, error)
+	GetSyntaxFlowTopDef(*SFFrameResult, *Config, ...*RecursiveConfigItem) (Values, error)
+	GetSyntaxFlowBottomUse(*SFFrameResult, *Config, ...*RecursiveConfigItem) (Values, error)
 
 	// List projection for OpListIndex.
 	ListIndex(i int) (ValueOperator, error)
-
-	// Set-like collection operations.
-	Merge(...ValueOperator) (ValueOperator, error)
-	Remove(...ValueOperator) (ValueOperator, error)
 
 	// Optional provenance edge tracking used by some traversals.
 	AppendPredecessor(ValueOperator, ...AnalysisContextOption) error
 
 	// File content filtering.
-	FileFilter(string, string, map[string]string, []string) (ValueOperator, error)
+	FileFilter(string, string, map[string]string, []string) (Values, error)
 
 	// Condition comparators.
-	CompareString(*StringComparator) (ValueOperator, []bool)
-	CompareOpcode(*OpcodeComparator) (ValueOperator, []bool)
-	CompareConst(*ConstComparator) []bool
+	CompareString(*StringComparator) (Values, []bool)
+	CompareOpcode(*OpcodeComparator) (Values, []bool)
+	CompareConst(*ConstComparator) bool
 	NewConst(any, ...*memedit.Range) ValueOperator
 
 	// Anchor bitvector provenance for condition mask alignment and scoped grouping.
-	//
-	// When a value is derived from a source list inside a condition scope, its
-	// AnchorBitVector records which source slot(s) it can map back to.
-	// Outside of condition scope, anchors are ignored and most operations behave
-	// as flat lists.
 	GetAnchorBitVector() *utils.BitVector
 	SetAnchorBitVector(*utils.BitVector)
 }

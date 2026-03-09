@@ -7,20 +7,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// flattenValues collects all leaf values from a (possibly nested) ValueOperator.
-// It preserves traversal order defined by ValueOperator.Recursive.
-func flattenValues(value ValueOperator) []ValueOperator {
-	if utils.IsNil(value) {
-		return nil
-	}
-	var result []ValueOperator
-	_ = value.Recursive(func(operator ValueOperator) error {
-		result = append(result, operator)
-		return nil
-	})
-	return result
-}
-
 type anchorRestoreEntry struct {
 	value ValueOperator
 	bits  *utils.BitVector
@@ -38,7 +24,7 @@ func valueIdentity(value ValueOperator) string {
 //
 // Values that appear multiple times (same identity) get a union of all their slot
 // indices to keep mask alignment stable.
-func assignLocalAnchorBitVector(sourceValues []ValueOperator) []anchorRestoreEntry {
+func assignLocalAnchorBitVector(sourceValues Values) []anchorRestoreEntry {
 	type entry struct {
 		value ValueOperator
 		index int
@@ -104,7 +90,7 @@ func markMaskByBitVector(mask []bool, bits *utils.BitVector) bool {
 	return matched
 }
 
-func buildValueIdentityIndex(source []ValueOperator) map[string][]int {
+func buildValueIdentityIndex(source Values) map[string][]int {
 	indexByIdentity := make(map[string][]int, len(source))
 	for idx, value := range source {
 		if utils.IsNil(value) {
@@ -150,32 +136,30 @@ func mergeAnchorBitVector(dst ValueOperator, src ValueOperator) {
 	dst.SetAnchorBitVector(merged)
 }
 
-func mergeAnchorBitVectorToResult(result ValueOperator, source ValueOperator) {
-	if utils.IsNil(result) || utils.IsNil(source) {
+func mergeAnchorBitVectorToResult(result Values, source ValueOperator) {
+	if result.IsEmpty() || utils.IsNil(source) {
 		return
 	}
 	sourceBits := source.GetAnchorBitVector()
 	if sourceBits == nil || sourceBits.IsEmpty() {
 		return
 	}
-	_ = result.Recursive(func(operator ValueOperator) error {
+	for _, operator := range result {
 		if utils.IsNil(operator) {
-			return nil
+			continue
 		}
 		existing := operator.GetAnchorBitVector()
 		if existing == nil || existing.IsEmpty() {
 			operator.SetAnchorBitVector(sourceBits)
-			return nil
+			continue
 		}
 		merged := existing.Clone()
 		merged.Or(sourceBits)
 		operator.SetAnchorBitVector(merged)
-		return nil
-	})
+	}
 }
 
 // MergeAnchorBitVectorToResult is exported for callers outside sfvm (e.g. ssaapi native calls).
-func MergeAnchorBitVectorToResult(result ValueOperator, source ValueOperator) {
+func MergeAnchorBitVectorToResult(result Values, source ValueOperator) {
 	mergeAnchorBitVectorToResult(result, source)
 }
-

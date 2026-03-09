@@ -16,7 +16,7 @@ import (
 type SyntaxFlowVirtualMachine struct {
 	config *Config
 
-	vars          *omap.OrderedMap[string, ValueOperator]
+	vars          *omap.OrderedMap[string, Values]
 	compileErrors antlr4util.SourceCodeErrors
 
 	debug      bool
@@ -26,11 +26,11 @@ type SyntaxFlowVirtualMachine struct {
 
 func NewSyntaxFlowVirtualMachine(opts ...Option) *SyntaxFlowVirtualMachine {
 	config := NewConfig(opts...)
-	var vars *omap.OrderedMap[string, ValueOperator]
+	var vars *omap.OrderedMap[string, Values]
 	if config.initialContextVars != nil {
 		vars = config.initialContextVars
 	} else {
-		vars = omap.NewEmptyOrderedMap[string, ValueOperator]()
+		vars = omap.NewEmptyOrderedMap[string, Values]()
 	}
 	sfv := &SyntaxFlowVirtualMachine{
 		vars:       vars,
@@ -156,13 +156,13 @@ func (s *SyntaxFlowVirtualMachine) GetCompileErrors() antlr4util.SourceCodeError
 	return s.compileErrors
 }
 
-func (s *SyntaxFlowVirtualMachine) Snapshot() *omap.OrderedMap[string, ValueOperator] {
+func (s *SyntaxFlowVirtualMachine) Snapshot() *omap.OrderedMap[string, Values] {
 	s.frameMutex.Lock()
 	defer s.frameMutex.Unlock()
 	return s.vars.Copy()
 }
 
-func (s *SyntaxFlowVirtualMachine) Feed(i ValueOperator) ([]*SFFrameResult, error) {
+func (s *SyntaxFlowVirtualMachine) Feed(i Values) ([]*SFFrameResult, error) {
 	s.frameMutex.Lock()
 	defer s.frameMutex.Unlock()
 
@@ -182,7 +182,7 @@ func (s *SyntaxFlowVirtualMachine) SetConfig(config *Config) {
 	s.config = config
 }
 
-func (frame *SFFrame) Feed(i ValueOperator, opt ...Option) (*SFFrameResult, error) {
+func (frame *SFFrame) Feed(i Values, opt ...Option) (*SFFrameResult, error) {
 	for _, o := range opt {
 		o(frame.config)
 	}

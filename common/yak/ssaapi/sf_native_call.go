@@ -188,7 +188,7 @@ const (
 )
 
 func init() {
-	registerNativeCall(NativeCall_GetRoot, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+	registerNativeCall(NativeCall_GetRoot, nc_func(func(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 		var result []sfvm.ValueOperator
 		prog, err := fetchProgram(v)
 		if err != nil {
@@ -229,7 +229,7 @@ func init() {
 		return true, sfvm.NewValues(result), nil
 	}))
 
-	registerNativeCall(NativeCall_GetRootParentBlueprint, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+	registerNativeCall(NativeCall_GetRootParentBlueprint, nc_func(func(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 		var result []sfvm.ValueOperator
 		prog, err := fetchProgram(v)
 		if err != nil {
@@ -248,7 +248,7 @@ func init() {
 		}
 		return true, sfvm.NewValues(result), nil
 	}))
-	registerNativeCall(NativeCall_Length, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+	registerNativeCall(NativeCall_Length, nc_func(func(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 		if width, ok := frame.ActiveAnchorWidth(); ok && width > 0 {
 			counts := make([]int, width)
 			_ = v.Recursive(func(operator sfvm.ValueOperator) error {
@@ -286,10 +286,14 @@ func init() {
 			flatCount++
 			return nil
 		})
-		return true, v.NewConst(flatCount), nil
+		ret := v.NewConst(flatCount)
+		if utils.IsNil(ret) {
+			return false, sfvm.NewEmptyValues(), utils.Errorf("no value found")
+		}
+		return true, sfvm.ValuesOf(ret), nil
 	}))
 
-	registerNativeCall(NativeCall_GetInterfaceBlueprint, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+	registerNativeCall(NativeCall_GetInterfaceBlueprint, nc_func(func(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 		var result []sfvm.ValueOperator
 		prog, err := fetchProgram(v)
 		if err != nil {
@@ -309,7 +313,7 @@ func init() {
 		return true, sfvm.NewValues(result), nil
 	}))
 
-	registerNativeCall(NativeCall_GetParentBlueprint, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+	registerNativeCall(NativeCall_GetParentBlueprint, nc_func(func(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 		var result []sfvm.ValueOperator
 		prog, err := fetchProgram(v)
 		if err != nil {
@@ -329,7 +333,7 @@ func init() {
 		return true, sfvm.NewValues(result), nil
 	}))
 
-	registerNativeCall(NativeCall_GetBlurpint, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+	registerNativeCall(NativeCall_GetBlurpint, nc_func(func(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 		var result []sfvm.ValueOperator
 		v.Recursive(func(operator sfvm.ValueOperator) error {
 			switch ret := operator.(type) {
@@ -345,7 +349,7 @@ func init() {
 		})
 		return true, sfvm.NewValues(result), nil
 	}))
-	registerNativeCall(NativeCall_ExtendsBy, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+	registerNativeCall(NativeCall_ExtendsBy, nc_func(func(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 		/*
 		*a<extendsBy($b)> 判断a是否继承自b
 		 */
@@ -394,7 +398,7 @@ func init() {
 		})
 		return true, sfvm.NewValues(result), nil
 	}))
-	registerNativeCall(NativeCall_GetCurrentBlueprint, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+	registerNativeCall(NativeCall_GetCurrentBlueprint, nc_func(func(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 		var result []sfvm.ValueOperator
 		prog, err := fetchProgram(v)
 		if err != nil {
@@ -412,21 +416,20 @@ func init() {
 		return true, sfvm.NewValues(result), nil
 	}))
 
-		registerNativeCall(NativeCall_GetActualParams, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
-			result, err := v.GetCallActualParams(0, true)
-			if err != nil {
-				return false, nil, err
-			}
-			return true, result, nil
-		}), nc_desc("获取实际参数"))
-	registerNativeCall(NativeCall_GetUsers, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+	registerNativeCall(NativeCall_GetActualParams, nc_func(func(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
+		result, err := v.GetCallActualParams(0, true)
+		if err != nil {
+			return false, nil, err
+		}
+		return true, result, nil
+	}), nc_desc("获取实际参数"))
+	registerNativeCall(NativeCall_GetUsers, nc_func(func(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 		depth := params.GetInt(0, "depth")
 		var result []sfvm.ValueOperator
 		v.Recursive(func(operator sfvm.ValueOperator) error {
 			switch ret := operator.(type) {
 			case *Value:
-				// GetUsers() 返回 Values，需要转换为 sfvm.ValueOperator
-				result = append(result, ValuesToSFValueList(ret.GetUsers()))
+				result = append(result, ToSFVMValues(ret.GetUsers())...)
 			}
 			return nil
 		})
@@ -436,27 +439,17 @@ func init() {
 
 		for ; depth > 0; depth-- {
 			var temp []sfvm.ValueOperator
-			for _, v := range result {
-				switch ret := v.(type) {
+			for _, current := range result {
+				switch ret := current.(type) {
 				case *Value:
-					// GetUsers() 返回 Values，需要转换为 sfvm.ValueOperator
-					temp = append(temp, ValuesToSFValueList(ret.GetUsers()))
-				case *sfvm.ValueList:
-					// 直接使用 ValueList 的 Recursive 方法遍历其中的 Value
-					ret.Recursive(func(vo sfvm.ValueOperator) error {
-						if val, ok := vo.(*Value); ok {
-							// GetUsers() 返回 Values，需要转换为 sfvm.ValueOperator
-							temp = append(temp, ValuesToSFValueList(val.GetUsers()))
-						}
-						return nil
-					})
+					temp = append(temp, ToSFVMValues(ret.GetUsers())...)
 				}
 			}
 			result = temp
 		}
 		if len(result) > 0 {
 			vs := sfvm.NewValues(result)
-			vs.AppendPredecessor(v, frame.WithPredecessorContext(fmt.Sprintf("getUsers(depth=%d)", depth)))
+			vs.AppendPredecessors(v, frame.WithPredecessorContext(fmt.Sprintf("getUsers(depth=%d)", depth)))
 			return true, vs, nil
 		}
 		return false, nil, nil
@@ -464,7 +457,7 @@ func init() {
 
 	// NativeCall_GetPredecessors is used to get the predecessors of a value
 	// <getPredecessors()> =  <getPredecessors(1)>
-	registerNativeCall(NativeCall_GetPredecessors, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+	registerNativeCall(NativeCall_GetPredecessors, nc_func(func(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 		var result []*Value
 		v.Recursive(func(operator sfvm.ValueOperator) error {
 			switch ret := operator.(type) {
@@ -526,7 +519,7 @@ func init() {
 
 	// NativeCall_GetFullFileName is used to get the full file name, the input is a file name. eg.
 	// <getFullFileName(filename="xxx")>
-	registerNativeCall(NativeCall_GetFullFileName, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+	registerNativeCall(NativeCall_GetFullFileName, nc_func(func(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 		// TODO:目前使用的是文件整个路径去匹配，而不是仅文件名匹配，后续可以考虑优化、并支持搜索文件夹名
 		var rs []sfvm.ValueOperator
 		targetName := params.GetString("filename")
@@ -565,7 +558,7 @@ func init() {
 		})
 		return true, sfvm.NewValues(rs), nil
 	}))
-	registerNativeCall(NativeCall_GetFilenameByContent, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+	registerNativeCall(NativeCall_GetFilenameByContent, nc_func(func(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 		var rs []sfvm.ValueOperator
 
 		program, err := fetchProgram(v)
@@ -599,7 +592,7 @@ func init() {
 		return true, sfvm.NewValues(rs), nil
 	}))
 	//<foreach_function_inst(hook=`xxx` as $result)> as $result
-	registerNativeCall(NativeCall_Foeach_Func_Inst, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+	registerNativeCall(NativeCall_Foeach_Func_Inst, nc_func(func(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 		var result []sfvm.ValueOperator
 		prog, err := fetchProgram(v)
 		if err != nil {
@@ -624,7 +617,7 @@ func init() {
 		})
 		return true, sfvm.NewValues(result), nil
 	}))
-	registerNativeCall(NativeCall_Java_UnEscape_Output, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+	registerNativeCall(NativeCall_Java_UnEscape_Output, nc_func(func(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 		var res []sfvm.ValueOperator
 
 		// 模板语言输出的标志位
@@ -655,8 +648,7 @@ func init() {
 			}
 			callInst := value.GetCalledBy()
 			callInst.ForEach(func(call *Value) {
-				// GetCallArgs() 返回 Values，需要转换为 sfvm.ValueOperator
-				vals = append(vals, ValuesToSFValueList(call.GetCallArgs()))
+				vals = append(vals, ToSFVMValues(call.GetCallArgs())...)
 			})
 
 			return vals
@@ -671,23 +663,13 @@ func init() {
 			return false, nil, utils.Errorf("no value found")
 		}
 
-		switch i := printValue.(type) {
-		case *Value:
-			vals := getCalledAndCheck(i)
+		for _, item := range printValue {
+			value, ok := item.(*Value)
+			if !ok {
+				continue
+			}
+			vals := getCalledAndCheck(value)
 			res = append(res, vals...)
-		case *sfvm.ValueList:
-			// 直接使用 ValueList 的 Recursive 方法遍历其中的 Value
-			i.Recursive(func(operator sfvm.ValueOperator) error {
-				value, ok := operator.(*Value)
-				if !ok {
-					return nil
-				}
-				vals := getCalledAndCheck(value)
-				res = append(res, vals...)
-				return nil
-			})
-		default:
-			return false, nil, utils.Errorf("invalid value type %T", i)
 		}
 
 		if len(res) > 0 {
@@ -698,7 +680,7 @@ func init() {
 
 	registerNativeCall(NativeCall_IsSanitizeName, nc_func(nativeCallSanitizeNames), nc_desc("检查是否为潜在的过滤函数名称"))
 
-	registerNativeCall(NativeCall_VersionIn, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+	registerNativeCall(NativeCall_VersionIn, nc_func(func(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 		gt := params.GetString("greaterThan")  // <
 		ge := params.GetString("greaterEqual") // <=
 		if gt != "" && ge != "" {
@@ -765,19 +747,19 @@ func init() {
 		}
 		return false, nil, utils.Error("not value in version range")
 	}), nc_desc("获取版本信息"))
-	registerNativeCall(NativeCall_Const, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+	registerNativeCall(NativeCall_Const, nc_func(func(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 		var (
 			results    []sfvm.ValueOperator
 			mode, rule string
 		)
 
-			appendResult := func(source sfvm.ValueOperator, matched sfvm.ValueOperator) {
-				if utils.IsNil(matched) || matched.IsEmpty() {
-					return
-				}
-				mergeAnchorBitVectorToResult(matched, source)
-				results = append(results, matched)
+		appendResult := func(source sfvm.ValueOperator, matched sfvm.Values) {
+			if matched.IsEmpty() {
+				return
 			}
+			mergeAnchorBitVectorToResult(matched, source)
+			results = append(results, matched...)
+		}
 
 		constHandler := func(operator sfvm.ValueOperator) {
 			switch mode {
@@ -835,10 +817,10 @@ func init() {
 		return true, sfvm.NewValues(results), nil
 	}))
 	registerNativeCall(NativeCall_DataFlow, nc_func(nativeCallDataFlow))
-	registerNativeCall(NativeCall_Self, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+	registerNativeCall(NativeCall_Self, nc_func(func(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 		return true, v, nil
 	}))
-	registerNativeCall(NativeCall_Forbid, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+	registerNativeCall(NativeCall_Forbid, nc_func(func(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 		name := params.GetString(0, "var")
 		if name != "" {
 			result, _ := frame.GetSFResult()
@@ -862,7 +844,7 @@ func init() {
 		}
 		return true, v, nil
 	}))
-	registerNativeCall(NativeCall_DeleteVariable, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+	registerNativeCall(NativeCall_DeleteVariable, nc_func(func(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 		name := params.GetString("name", 0)
 		if name != "" {
 			frame.GetSymbolTable().Delete(name)
@@ -882,7 +864,7 @@ func init() {
 	registerNativeCall(NativeCall_OpCodes, nc_func(nativeCallOpCodes))
 
 	//nativeCall-slice
-	registerNativeCall(NativeCall_Slice, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+	registerNativeCall(NativeCall_Slice, nc_func(func(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 		start := params.GetInt(0, "start")
 		index := params.GetInt(0, "index")
 
@@ -906,35 +888,35 @@ func init() {
 			return nil
 		}
 
-			grouped := make(map[int][]sfvm.ValueOperator)
-			groupOrderMap := make(map[int]struct{})
-			var groupedOrder []int
-			var flat []sfvm.ValueOperator
-			_, anchorScope := frame.ActiveAnchorWidth()
-			hasGroup := false
+		grouped := make(map[int][]sfvm.ValueOperator)
+		groupOrderMap := make(map[int]struct{})
+		var groupedOrder []int
+		var flat []sfvm.ValueOperator
+		_, anchorScope := frame.ActiveAnchorWidth()
+		hasGroup := false
 
-			_ = v.Recursive(func(operator sfvm.ValueOperator) error {
-				if utils.IsNil(operator) {
-					return nil
-				}
-				flat = append(flat, operator)
-				if !anchorScope {
-					return nil
-				}
-				bits := operator.GetAnchorBitVector()
-				if bits == nil || bits.IsEmpty() {
-					return nil
-				}
-				hasGroup = true
-				bits.ForEach(func(bitIndex int) {
-					if _, ok := groupOrderMap[bitIndex]; !ok {
-						groupOrderMap[bitIndex] = struct{}{}
-						groupedOrder = append(groupedOrder, bitIndex)
-					}
-					grouped[bitIndex] = append(grouped[bitIndex], operator)
-				})
+		_ = v.Recursive(func(operator sfvm.ValueOperator) error {
+			if utils.IsNil(operator) {
 				return nil
+			}
+			flat = append(flat, operator)
+			if !anchorScope {
+				return nil
+			}
+			bits := operator.GetAnchorBitVector()
+			if bits == nil || bits.IsEmpty() {
+				return nil
+			}
+			hasGroup = true
+			bits.ForEach(func(bitIndex int) {
+				if _, ok := groupOrderMap[bitIndex]; !ok {
+					groupOrderMap[bitIndex] = struct{}{}
+					groupedOrder = append(groupedOrder, bitIndex)
+				}
+				grouped[bitIndex] = append(grouped[bitIndex], operator)
 			})
+			return nil
+		})
 
 		var vals []sfvm.ValueOperator
 		if hasGroup {
@@ -953,7 +935,7 @@ func init() {
 	}))
 	registerNativeCall(NativeCall_MyBatisSink, nc_func(nativeCallMybatisXML), nc_desc("Fins MyBatis Sink for default searching"))
 	registerNativeCall(NativeCall_FreeMarkerSink, nc_func(nativeCallFreeMarker))
-	registerNativeCall(NativeCall_Var, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+	registerNativeCall(NativeCall_Var, nc_func(func(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 		varName := params.GetString(0)
 		//log.Info("syntax flow native call 'as' to", varName)
 
@@ -986,7 +968,7 @@ func init() {
 	registerNativeCall(NativeCall_StrUpper, nc_func(nativeCallStrUpper), nc_desc(`convert a string to upper case`))
 	registerNativeCall(NativeCall_Regexp, nc_func(nativeCallRegexp), nc_desc(`regexp a string, group is available`))
 
-	registerNativeCall(NativeCall_Show, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+	registerNativeCall(NativeCall_Show, nc_func(func(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 		idx := 0
 		_ = v.Recursive(func(operator sfvm.ValueOperator) error {
 			if ret, ok := operator.(*Value); ok {
@@ -1031,7 +1013,7 @@ func init() {
 
 	registerNativeCall(
 		NativeCall_TypeName,
-		nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, actualParams *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		nc_func(func(v sfvm.Values, frame *sfvm.SFFrame, actualParams *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 			/*
 				java.io.File #-> File
 			*/
@@ -1043,12 +1025,12 @@ func init() {
 				}
 				if existed, ok := tmpMap[typ]; ok {
 					_ = existed.AppendPredecessor(val, frame.WithPredecessorContext("typeName"))
-					mergeAnchorBitVectorToResult(existed, val)
+					mergeAnchorBitVectorToResult(sfvm.ValuesOf(existed), val)
 					return
 				}
 				vx := val.NewConstValue(typ, val.GetRange())
 				vx.AppendPredecessor(val, frame.WithPredecessorContext("typeName"))
-				mergeAnchorBitVectorToResult(vx, val)
+				mergeAnchorBitVectorToResult(sfvm.ValuesOf(vx), val)
 				tmpMap[typ] = vx
 				vals = append(vals, vx)
 			}
@@ -1093,7 +1075,7 @@ func init() {
 
 	registerNativeCall(
 		NativeCall_FullTypeName,
-		nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, actualParams *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		nc_func(func(v sfvm.Values, frame *sfvm.SFFrame, actualParams *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 			var vals []sfvm.ValueOperator
 			var tmpMap = make(map[string]sfvm.ValueOperator)
 			addVals := func(val *Value, typ string, rangeIf *memedit.Range) {
@@ -1102,12 +1084,12 @@ func init() {
 				}
 				if existed, ok := tmpMap[typ]; ok {
 					_ = existed.AppendPredecessor(val, frame.WithPredecessorContext("fullTypeName"))
-					mergeAnchorBitVectorToResult(existed, val)
+					mergeAnchorBitVectorToResult(sfvm.ValuesOf(existed), val)
 					return
 				}
 				results := val.NewConstValue(typ, rangeIf)
 				results.AppendPredecessor(val, frame.WithPredecessorContext("fullTypeName"))
-				mergeAnchorBitVectorToResult(results, val)
+				mergeAnchorBitVectorToResult(sfvm.ValuesOf(results), val)
 				tmpMap[typ] = results
 				vals = append(vals, results)
 			}
@@ -1147,7 +1129,7 @@ func init() {
 
 	registerNativeCall(
 		NativeCall_GetFormalParams,
-		nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, actualParams *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		nc_func(func(v sfvm.Values, frame *sfvm.SFFrame, actualParams *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 			var vals []sfvm.ValueOperator
 			v.Recursive(func(operator sfvm.ValueOperator) error {
 				val, ok := operator.(*Value)
@@ -1167,7 +1149,7 @@ func init() {
 						newVal := val.NewValue(param)
 						if newVal != nil {
 							newVal.AppendPredecessor(val, frame.WithPredecessorContext("getFormalParams"))
-							mergeAnchorBitVectorToResult(newVal, val)
+							mergeAnchorBitVectorToResult(sfvm.ValuesOf(newVal), val)
 							vals = append(vals, newVal)
 						}
 					}
@@ -1185,7 +1167,7 @@ func init() {
 
 	registerNativeCall(
 		NativeCall_GetReturns,
-		nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, actualParams *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		nc_func(func(v sfvm.Values, frame *sfvm.SFFrame, actualParams *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 			var vals []sfvm.ValueOperator
 			v.Recursive(func(operator sfvm.ValueOperator) error {
 				val, ok := operator.(*Value)
@@ -1214,7 +1196,7 @@ func init() {
 						new := val.NewValue(retIns)
 						if new != nil {
 							new.AppendPredecessor(val, frame.WithPredecessorContext("getReturns"))
-							mergeAnchorBitVectorToResult(new, val)
+							mergeAnchorBitVectorToResult(sfvm.ValuesOf(new), val)
 							vals = append(vals, new)
 						}
 					}
@@ -1231,7 +1213,7 @@ func init() {
 
 	registerNativeCall(
 		NativeCall_GetCallee,
-		nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		nc_func(func(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 			var vals []sfvm.ValueOperator
 			v.Recursive(func(operator sfvm.ValueOperator) error {
 				val, ok := operator.(*Value)
@@ -1243,7 +1225,7 @@ func init() {
 					call := val.GetCallee()
 					if call != nil {
 						call.AppendPredecessor(val, frame.WithPredecessorContext("getCallee"))
-						mergeAnchorBitVectorToResult(call, val)
+						mergeAnchorBitVectorToResult(sfvm.ValuesOf(call), val)
 						vals = append(vals, call)
 					}
 				}
@@ -1259,7 +1241,7 @@ func init() {
 
 	registerNativeCall(
 		NativeCall_GetFunc,
-		nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, actualParams *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		nc_func(func(v sfvm.Values, frame *sfvm.SFFrame, actualParams *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 			var vals []sfvm.ValueOperator
 			v.Recursive(func(operator sfvm.ValueOperator) error {
 				val, ok := operator.(*Value)
@@ -1269,7 +1251,7 @@ func init() {
 				f := val.GetFunction()
 				if f != nil {
 					f.AppendPredecessor(val, frame.WithPredecessorContext("getFunc"))
-					mergeAnchorBitVectorToResult(f, val)
+					mergeAnchorBitVectorToResult(sfvm.ValuesOf(f), val)
 					vals = append(vals, f)
 				}
 				return nil
@@ -1284,7 +1266,7 @@ func init() {
 
 	registerNativeCall(
 		NativeCall_GetSiblings,
-		nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, actualParams *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		nc_func(func(v sfvm.Values, frame *sfvm.SFFrame, actualParams *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 			var vals []sfvm.ValueOperator
 			v.Recursive(func(operator sfvm.ValueOperator) error {
 				val, ok := operator.(*Value)
@@ -1301,7 +1283,7 @@ func init() {
 							continue
 						}
 						newVal.AppendPredecessor(val, frame.WithPredecessorContext("getSiblings"))
-						mergeAnchorBitVectorToResult(newVal, val)
+						mergeAnchorBitVectorToResult(sfvm.ValuesOf(newVal), val)
 						vals = append(vals, newVal)
 					}
 				}
@@ -1317,7 +1299,7 @@ func init() {
 
 	registerNativeCall(
 		NativeCall_GetMembers,
-		nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, actualParams *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		nc_func(func(v sfvm.Values, frame *sfvm.SFFrame, actualParams *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 			var rets []sfvm.ValueOperator
 			v.Recursive(func(operator sfvm.ValueOperator) error {
 				val, ok := operator.(*Value)
@@ -1330,7 +1312,7 @@ func init() {
 							continue
 						}
 						member.AppendPredecessor(val, frame.WithPredecessorContext("getMembers"))
-						mergeAnchorBitVectorToResult(member, val)
+						mergeAnchorBitVectorToResult(sfvm.ValuesOf(member), val)
 						rets = append(rets, member)
 					}
 				}
@@ -1346,7 +1328,7 @@ func init() {
 
 	registerNativeCall(
 		NativeCall_GetMemberByKey,
-		nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, actualParams *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		nc_func(func(v sfvm.Values, frame *sfvm.SFFrame, actualParams *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 			var rets []sfvm.ValueOperator
 			key := actualParams.GetString(0, "key")
 
@@ -1356,11 +1338,11 @@ func init() {
 					return nil
 				}
 
-					if ret, ok := val.GetMembersByString(key); ok {
-						ret.AppendPredecessor(val, frame.WithPredecessorContext("getMemberByKey"))
-						mergeAnchorBitVectorToResult(ret, val)
-						rets = append(rets, ret)
-					}
+				if ret, ok := val.GetMembersByString(key); ok {
+					ret.AppendPredecessor(val, frame.WithPredecessorContext("getMemberByKey"))
+					mergeAnchorBitVectorToResult(ret, val)
+					rets = append(rets, ret...)
+				}
 
 				return nil
 			})
@@ -1374,20 +1356,20 @@ func init() {
 
 	registerNativeCall(
 		NativeCall_GetObject,
-		nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, actualParams *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		nc_func(func(v sfvm.Values, frame *sfvm.SFFrame, actualParams *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 			var ret []sfvm.ValueOperator
 			v.Recursive(func(operator sfvm.ValueOperator) error {
 				val, ok := operator.(*Value)
 				if !ok {
 					return nil
 				}
-					obj := val.GetObject()
-					if obj != nil {
-						obj.AppendPredecessor(val, frame.WithPredecessorContext("getObject"))
-						mergeAnchorBitVectorToResult(obj, val)
-						ret = append(ret, obj)
-						return nil
-					}
+				obj := val.GetObject()
+				if obj != nil {
+					obj.AppendPredecessor(val, frame.WithPredecessorContext("getObject"))
+					mergeAnchorBitVectorToResult(sfvm.ValuesOf(obj), val)
+					ret = append(ret, obj)
+					return nil
+				}
 				return nil
 			})
 			if len(ret) > 0 {
@@ -1399,32 +1381,32 @@ func init() {
 	)
 	registerNativeCall(
 		NativeCall_GetCall,
-		nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, actualParams *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		nc_func(func(v sfvm.Values, frame *sfvm.SFFrame, actualParams *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 			var vals []sfvm.ValueOperator
 			v.Recursive(func(operator sfvm.ValueOperator) error {
 				val, ok := operator.(*Value)
 				if !ok {
 					return nil
 				}
-					for _, u := range val.GetUsers() {
-						if u.getOpcode() == ssa.SSAOpcodeCall {
-							u.AppendPredecessor(val, frame.WithPredecessorContext("getCall"))
-							mergeAnchorBitVectorToResult(u, val)
-							vals = append(vals, u)
-						}
+				for _, u := range val.GetUsers() {
+					if u.getOpcode() == ssa.SSAOpcodeCall {
+						u.AppendPredecessor(val, frame.WithPredecessorContext("getCall"))
+						mergeAnchorBitVectorToResult(sfvm.ValuesOf(u), val)
+						vals = append(vals, u)
 					}
-					return nil
-				})
-				if len(vals) > 0 {
-					return true, sfvm.NewValues(vals), nil
 				}
-				return false, nil, utils.Error("no value(call) found")
-			}),
-			nc_desc(`获取输入指令的调用指令，输入必须是一个函数指令`),
-		)
+				return nil
+			})
+			if len(vals) > 0 {
+				return true, sfvm.NewValues(vals), nil
+			}
+			return false, nil, utils.Error("no value(call) found")
+		}),
+		nc_desc(`获取输入指令的调用指令，输入必须是一个函数指令`),
+	)
 	registerNativeCall(
 		NativeCall_SearchFunc,
-		nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, actualParams *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
+		nc_func(func(v sfvm.Values, frame *sfvm.SFFrame, actualParams *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 			var vals []sfvm.ValueOperator
 			v.Recursive(func(operator sfvm.ValueOperator) error {
 				if val, ok := operator.(*Value); ok {
@@ -1438,7 +1420,7 @@ func init() {
 							}
 							ok, next, _ := val.ParentProgram.ExactMatch(frame.GetContext(), ssadb.BothMatch, funcName)
 							if ok {
-								vals = append(vals, next)
+								vals = append(vals, next...)
 							}
 						}
 					case ssa.SSAOpcodeParameter:
@@ -1455,7 +1437,7 @@ func init() {
 							ok, next, _ := val.ParentProgram.ExactMatch(frame.GetContext(), ssadb.BothMatch, funcName)
 							if ok {
 								next.AppendPredecessor(val, frame.WithPredecessorContext("searchCall: "+funcName))
-								vals = append(vals, next)
+								vals = append(vals, next...)
 							}
 						}
 					case ssa.SSAOpcodeCall:
@@ -1495,7 +1477,7 @@ func init() {
 						ok, next, _ := val.ParentProgram.ExactMatch(frame.GetContext(), ssadb.BothMatch, funcName)
 						if ok {
 							next.AppendPredecessor(val, frame.WithPredecessorContext("searchCall: "+funcName))
-							vals = append(vals, next)
+							vals = append(vals, next...)
 						}
 					default:
 						//for _, call := range val.GetCalledBy() {
@@ -1519,9 +1501,18 @@ func init() {
 	)
 }
 
-func fetchProgram(v sfvm.ValueOperator) (*Program, error) {
+func fetchProgram(v any) (*Program, error) {
+	var values sfvm.Values
+	switch ret := v.(type) {
+	case sfvm.Values:
+		values = ret
+	case sfvm.ValueOperator:
+		values = sfvm.ValuesOf(ret)
+	default:
+		return nil, utils.Errorf("unsupported program source: %T", v)
+	}
 	var parent *Program
-	v.Recursive(func(operator sfvm.ValueOperator) error {
+	values.Recursive(func(operator sfvm.ValueOperator) error {
 		switch ret := operator.(type) {
 		case *Value:
 			parent = ret.ParentProgram
@@ -1546,15 +1537,22 @@ func fetchProgram(v sfvm.ValueOperator) (*Program, error) {
 	return parent, nil
 }
 
-func isProgram(v sfvm.ValueOperator) bool {
-	_, ok := v.(*Program)
-	if !ok {
-		_ = v.Recursive(func(operator sfvm.ValueOperator) error {
+func isProgram(v any) bool {
+	switch ret := v.(type) {
+	case *Program:
+		return true
+	case sfvm.Values:
+		ok := false
+		_ = ret.Recursive(func(operator sfvm.ValueOperator) error {
 			_, ok = operator.(*Program)
 			return utils.Error("normal abort")
 		})
+		return ok
+	case sfvm.ValueOperator:
+		_, ok := ret.(*Program)
+		return ok
 	}
-	return ok
+	return false
 }
 
 func registerNativeCall(name string, options ...func(*NativeCallDocument)) {
@@ -1571,7 +1569,7 @@ func registerNativeCall(name string, options ...func(*NativeCallDocument)) {
 	sfvm.RegisterNativeCall(n.Name, n.Function)
 }
 
-func haveResult(operator sfvm.ValueOperator) bool {
+func haveResult(operator sfvm.Values) bool {
 	if utils.IsNil(operator) {
 		return false
 	}

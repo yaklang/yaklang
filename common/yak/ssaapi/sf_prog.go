@@ -21,8 +21,8 @@ import (
 
 var _ sfvm.ValueOperator = &Program{}
 
-func (p *Program) CompareConst(comparator *sfvm.ConstComparator) []bool {
-	return []bool{false}
+func (p *Program) CompareConst(comparator *sfvm.ConstComparator) bool {
+	return false
 }
 
 func (p *Program) ShouldUseConditionCandidate() bool {
@@ -33,7 +33,7 @@ func (p *Program) NewConst(i any, rng ...*memedit.Range) sfvm.ValueOperator {
 	return p.NewConstValue(i, rng...)
 }
 
-func (p *Program) CompareOpcode(opcodeItems *sfvm.OpcodeComparator) (sfvm.ValueOperator, []bool) {
+func (p *Program) CompareOpcode(opcodeItems *sfvm.OpcodeComparator) (sfvm.Values, []bool) {
 	ctx := opcodeItems.Context
 	var res Values = lo.FilterMap(
 		ssa.MatchInstructionByOpcodes(ctx, p.Program, opcodeItems.Opcodes...),
@@ -47,14 +47,14 @@ func (p *Program) CompareOpcode(opcodeItems *sfvm.OpcodeComparator) (sfvm.ValueO
 		},
 	)
 	// Return matched values; VM will normalize bool mask against source width.
-	return ValuesToSFValueList(res), nil
+	return ToSFVMValues(res), nil
 }
 
-func (p *Program) CompareString(comparator *sfvm.StringComparator) (sfvm.ValueOperator, []bool) {
+func (p *Program) CompareString(comparator *sfvm.StringComparator) (sfvm.Values, []bool) {
 	var res []sfvm.ValueOperator
 	ctx := comparator.Context
 
-	matchCallByString := func(condition *sfvm.StringCondition) sfvm.ValueOperator {
+	matchCallByString := func(condition *sfvm.StringCondition) sfvm.Values {
 		callMatcher := sfvm.NewStringComparator(sfvm.MatchHave, ctx)
 		callMatcher.Conditions = []*sfvm.StringCondition{condition}
 		var out []sfvm.ValueOperator
@@ -71,7 +71,7 @@ func (p *Program) CompareString(comparator *sfvm.StringComparator) (sfvm.ValueOp
 		}
 		return sfvm.NewValues(out)
 	}
-	matchConstByString := func(condition *sfvm.StringCondition) sfvm.ValueOperator {
+	matchConstByString := func(condition *sfvm.StringCondition) sfvm.Values {
 		constMatcher := sfvm.NewStringComparator(sfvm.MatchHave, ctx)
 		constMatcher.Conditions = []*sfvm.StringCondition{condition}
 		var out []sfvm.ValueOperator
@@ -89,8 +89,8 @@ func (p *Program) CompareString(comparator *sfvm.StringComparator) (sfvm.ValueOp
 		return sfvm.NewValues(out)
 	}
 
-	matchValue := func(condition *sfvm.StringCondition) sfvm.ValueOperator {
-		var v sfvm.ValueOperator
+	matchValue := func(condition *sfvm.StringCondition) sfvm.Values {
+		var v sfvm.Values
 		switch condition.FilterMode {
 		case sfvm.GlobalConditionFilter:
 			_, v, _ = p.GlobMatch(ctx, ssadb.BothMatch, condition.Pattern)
@@ -101,25 +101,13 @@ func (p *Program) CompareString(comparator *sfvm.StringComparator) (sfvm.ValueOp
 		}
 		callMatches := matchCallByString(condition)
 		constMatches := matchConstByString(condition)
-		if utils.IsNil(v) {
-			if utils.IsNil(callMatches) {
+		if v.IsEmpty() {
+			if callMatches.IsEmpty() {
 				return constMatches
 			}
-			merged, err := callMatches.Merge(constMatches)
-			if err != nil {
-				return callMatches
-			}
-			return merged
+			return sfvm.MergeValues(callMatches, constMatches)
 		}
-		merged, err := v.Merge(callMatches)
-		if err != nil {
-			merged = v
-		}
-		merged2, err := merged.Merge(constMatches)
-		if err != nil {
-			return merged
-		}
-		return merged2
+		return sfvm.MergeValues(v, callMatches, constMatches)
 	}
 
 	switch comparator.MatchMode {
@@ -150,8 +138,8 @@ func (p *Program) CompareString(comparator *sfvm.StringComparator) (sfvm.ValueOp
 	case sfvm.MatchHaveAny:
 		for _, condition := range comparator.Conditions {
 			matched := matchValue(condition)
-			if matched != nil {
-				res = append(res, matched)
+			if !matched.IsEmpty() {
+				res = append(res, matched...)
 			}
 		}
 	}
@@ -180,7 +168,7 @@ func (p *Program) AppendPredecessor(sfvm.ValueOperator, ...sfvm.AnalysisContextO
 	return nil
 }
 
-func (p *Program) GetFields() (sfvm.ValueOperator, error) {
+func (p *Program) GetFields() (sfvm.Values, error) {
 	return sfvm.NewEmptyValues(), nil
 }
 
@@ -205,25 +193,25 @@ func (p *Program) Recursive(f func(operator sfvm.ValueOperator) error) error {
 	return f(p)
 }
 
-func (p *Program) ExactMatch(ctx context.Context, mod ssadb.MatchMode, s string) (bool, sfvm.ValueOperator, error) {
+func (p *Program) ExactMatch(ctx context.Context, mod ssadb.MatchMode, s string) (bool, sfvm.Values, error) {
 	return p.matchVariable(ctx, ssadb.ExactCompare, mod, s)
 }
 
-func (p *Program) GlobMatch(ctx context.Context, mod ssadb.MatchMode, g string) (bool, sfvm.ValueOperator, error) {
+func (p *Program) GlobMatch(ctx context.Context, mod ssadb.MatchMode, g string) (bool, sfvm.Values, error) {
 	return p.matchVariable(ctx, ssadb.GlobCompare, mod, g)
 }
 
-func (p *Program) RegexpMatch(ctx context.Context, mod ssadb.MatchMode, re string) (bool, sfvm.ValueOperator, error) {
+func (p *Program) RegexpMatch(ctx context.Context, mod ssadb.MatchMode, re string) (bool, sfvm.Values, error) {
 	return p.matchVariable(ctx, ssadb.RegexpCompare, mod, re)
 }
 
-func (p *Program) matchVariable(ctx context.Context, compareMode ssadb.CompareMode, mod ssadb.MatchMode, pattern string) (bool, sfvm.ValueOperator, error) {
+func (p *Program) matchVariable(ctx context.Context, compareMode ssadb.CompareMode, mod ssadb.MatchMode, pattern string) (bool, sfvm.Values, error) {
 	return p.matchVariableWithExcludeFiles(ctx, compareMode, mod, pattern, nil)
 }
 
 // matchVariableWithExcludeFiles 搜索变量，支持排除指定文件
 // excludeFiles: 要排除的文件路径列表（规范化后的路径，如 "/test.go"）
-func (p *Program) matchVariableWithExcludeFiles(ctx context.Context, compareMode ssadb.CompareMode, mod ssadb.MatchMode, pattern string, excludeFiles []string) (bool, sfvm.ValueOperator, error) {
+func (p *Program) matchVariableWithExcludeFiles(ctx context.Context, compareMode ssadb.CompareMode, mod ssadb.MatchMode, pattern string, excludeFiles []string) (bool, sfvm.Values, error) {
 	var values Values = lo.FilterMap(
 		ssa.MatchInstructionsByVariableWithExcludeFiles(ctx, p.Program, compareMode, mod, pattern, excludeFiles),
 		func(i ssa.Instruction, _ int) (*Value, bool) {
@@ -236,41 +224,48 @@ func (p *Program) matchVariableWithExcludeFiles(ctx context.Context, compareMode
 		},
 	)
 	// 将 Values 转换为 sfvm.ValueOperator
-	return len(values) > 0, ValuesToSFValueList(values), nil
+	return len(values) > 0, ToSFVMValues(values), nil
 }
 
 func (p *Program) ListIndex(i int) (sfvm.ValueOperator, error) {
 	return nil, utils.Error("ssa.Program is not supported list index")
 }
 
-func (p *Program) Merge(sfv ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
-	sfv = append(sfv, p)
-	return MergeSFValueOperator(sfv...), nil
+func (p *Program) Merge(sfv ...sfvm.ValueOperator) (sfvm.Values, error) {
+	groups := make([]sfvm.Values, 0, len(sfv)+1)
+	groups = append(groups, sfvm.ValuesOf(p))
+	for _, value := range sfv {
+		if utils.IsNil(value) {
+			continue
+		}
+		groups = append(groups, sfvm.ValuesOf(value))
+	}
+	return sfvm.MergeValues(groups...), nil
 }
 
-func (p *Program) Remove(...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
+func (p *Program) Remove(...sfvm.ValueOperator) (sfvm.Values, error) {
 	return nil, utils.Error("ssa.Program is not supported remove")
 }
 
-func (p *Program) GetCallActualParams(int, bool) (sfvm.ValueOperator, error) {
+func (p *Program) GetCallActualParams(int, bool) (sfvm.Values, error) {
 	return nil, utils.Error("ssa.Program is not supported call all actual params")
 }
 
-func (p *Program) GetSyntaxFlowDef() (sfvm.ValueOperator, error) {
+func (p *Program) GetSyntaxFlowDef() (sfvm.Values, error) {
 	return nil, utils.Error("ssa.Program is not supported syntax flow def")
 }
-func (p *Program) GetSyntaxFlowUse() (sfvm.ValueOperator, error) {
+func (p *Program) GetSyntaxFlowUse() (sfvm.Values, error) {
 	return nil, utils.Error("ssa.Program is not supported syntax flow use")
 }
-func (p *Program) GetSyntaxFlowTopDef(sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config, config ...*sfvm.RecursiveConfigItem) (sfvm.ValueOperator, error) {
+func (p *Program) GetSyntaxFlowTopDef(sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config, config ...*sfvm.RecursiveConfigItem) (sfvm.Values, error) {
 	return nil, utils.Error("ssa.Program is not supported syntax flow top def")
 }
 
-func (p *Program) GetSyntaxFlowBottomUse(sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config, config ...*sfvm.RecursiveConfigItem) (sfvm.ValueOperator, error) {
+func (p *Program) GetSyntaxFlowBottomUse(sfResult *sfvm.SFFrameResult, sfConfig *sfvm.Config, config ...*sfvm.RecursiveConfigItem) (sfvm.Values, error) {
 	return nil, utils.Error("ssa.Program is not supported syntax flow bottom use")
 }
 
-func (p *Program) GetCalled() (sfvm.ValueOperator, error) {
+func (p *Program) GetCalled() (sfvm.Values, error) {
 	return nil, utils.Error("ssa.Program is not supported called")
 }
 
@@ -460,7 +455,7 @@ func (p *Program) foreach(file2Hash map[string]string, callBack func(string, *me
 	}
 }
 
-func (p *Program) FileFilter(path string, match string, rule map[string]string, rule2 []string) (sfvm.ValueOperator, error) {
+func (p *Program) FileFilter(path string, match string, rule map[string]string, rule2 []string) (sfvm.Values, error) {
 	filter := NewFileFilter(path, match, rule2)
 	if filter == nil {
 		return nil, nil
