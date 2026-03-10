@@ -329,9 +329,9 @@ func (s *SFI) String() string {
 	case OpLogicBang:
 		return fmt.Sprintf(verboseLen+" %v", "(operator) !", s.UnaryStr)
 	case OpConditionScopeStart:
-		return fmt.Sprintf(verboseLen+" anchor(%v)", "condition-scope-start", s.UnaryBool)
+		return fmt.Sprintf(verboseLen+" %v", "condition-scope-start", "")
 	case OpConditionScopeEnd:
-		return fmt.Sprintf(verboseLen+" anchor(%v)", "condition-scope-end", s.UnaryBool)
+		return fmt.Sprintf(verboseLen+" %v", "condition-scope-end", "")
 	case OpPop:
 		return fmt.Sprintf(verboseLen+" %v", "pop", s.UnaryStr)
 	case OpCheckParams:

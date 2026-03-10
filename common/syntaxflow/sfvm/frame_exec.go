@@ -50,6 +50,7 @@ func recursiveDeepChain(element Values, handle func(operator ValueOperator) bool
 
 				fields, _ := operator.GetFields()
 				if fields != nil {
+					mergeAnchorBitVectorToResult(fields, operator)
 					_ = fields.Recursive(func(fieldElement ValueOperator) error {
 						if idGetter, ok := fieldElement.(ssa.GetIdIF); ok {
 							if _, ok := visited[idGetter.GetId()]; ok {
@@ -147,7 +148,7 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 			flag = append(flag, true)
 			return nil
 		})
-		if err := s.pushCondition(vals, flag, nil, false); err != nil {
+		if err := s.pushCondition(flag, nil, false); err != nil {
 			return true, err
 		}
 		return true, nil
@@ -185,7 +186,7 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 		}
 		// Compare only produces condition mask; keep source value stack unchanged in shape.
 		s.pushStack(values)
-		if err := s.pushCondition(values, condition, newVal, true); err != nil {
+		if err := s.pushCondition(condition, newVal, true); err != nil {
 			return true, err
 		}
 		return true, nil
@@ -204,7 +205,7 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 
 		comparator := NewStringComparator(mode, s.GetContext())
 		if len(i.Values) != len(i.MultiOperator) {
-			if err := s.pushCondition(values, []bool{false}, nil, false); err != nil {
+			if err := s.pushCondition([]bool{false}, nil, false); err != nil {
 				return true, err
 			}
 			return true, utils.Wrapf(CriticalError, "sfi values or mutiOperator out size %v", len(i.Values))
@@ -224,7 +225,7 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 		}
 		// Compare only produces condition mask; keep source value stack unchanged in shape.
 		s.pushStack(values)
-		if err := s.pushCondition(values, condition, newVal, true); err != nil {
+		if err := s.pushCondition(condition, newVal, true); err != nil {
 			return true, err
 		}
 		return true, nil
@@ -265,7 +266,7 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 			res = append(res, ok)
 			return nil
 		})
-		if err := s.pushCondition(value, res, nil, false); err != nil {
+		if err := s.pushCondition(res, nil, false); err != nil {
 			return true, err
 		}
 		return true, nil
@@ -290,7 +291,7 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 		}); trackErr != nil {
 			return true, trackErr
 		}
-		if err := s.pushCondition(vs2, conds, nil, false); err != nil {
+		if err := s.pushCondition(conds, nil, false); err != nil {
 			return true, err
 		}
 		return true, nil
@@ -315,7 +316,7 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 		}); trackErr != nil {
 			return true, trackErr
 		}
-		if err := s.pushCondition(vs2, conds, nil, false); err != nil {
+		if err := s.pushCondition(conds, nil, false); err != nil {
 			return true, err
 		}
 		return true, nil
@@ -340,7 +341,7 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 		}); trackErr != nil {
 			return true, trackErr
 		}
-		if err := s.pushCondition(vs2, conds, nil, false); err != nil {
+		if err := s.pushCondition(conds, nil, false); err != nil {
 			return true, err
 		}
 		return true, nil
@@ -365,7 +366,7 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 		}); trackErr != nil {
 			return true, trackErr
 		}
-		if err := s.pushCondition(vs2, conds, nil, false); err != nil {
+		if err := s.pushCondition(conds, nil, false); err != nil {
 			return true, err
 		}
 		return true, nil
@@ -390,7 +391,7 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 		}); trackErr != nil {
 			return true, trackErr
 		}
-		if err := s.pushCondition(vs2, conds, nil, false); err != nil {
+		if err := s.pushCondition(conds, nil, false); err != nil {
 			return true, err
 		}
 		return true, nil
@@ -415,7 +416,7 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 		}); trackErr != nil {
 			return true, trackErr
 		}
-		if err := s.pushCondition(vs2, conds, nil, false); err != nil {
+		if err := s.pushCondition(conds, nil, false); err != nil {
 			return true, err
 		}
 		return true, nil
@@ -440,7 +441,8 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 		if vs == nil {
 			return true, utils.Wrap(CriticalError, "condition failed: stack top is empty")
 		}
-		filtered, err := s.applyCondition(vs)
+		entry := s.popCondition()
+		filtered, err := applyCondition(vs, entry)
 		if err != nil {
 			return true, err
 		}
@@ -458,7 +460,8 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 		if source == nil {
 			return true, utils.Wrap(CriticalError, "filter condition failed: empty source")
 		}
-		if err := s.pushFilterCondition(source, cond); err != nil {
+		_ = source
+		if err := s.pushFilterCondition(cond); err != nil {
 			return true, err
 		}
 		return true, nil
@@ -516,29 +519,69 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		if value == nil {
 			return true, utils.Wrap(CriticalError, "recursive search exact failed: stack top is empty")
 		}
+
+		// Assign local anchors so we can map hits back to their originating roots without
+		// creating a cross-product predecessor graph when multiple roots exist.
+		anchorBase := 0
+		if s.conditionScope != nil && s.conditionScope.Len() > 0 {
+			parent := s.conditionScope.Peek()
+			anchorBase = parent.anchorBase + parent.anchorWidth
+		}
+		anchorRestore := assignLocalAnchorBitVector(value, anchorBase)
+		defer restoreAnchorBitVector(anchorRestore)
+
 		var next []ValueOperator
 		err := recursiveDeepChain(value, func(operator ValueOperator) bool {
 			done := s.startValueOpTiming("RecursiveExactMatch")
 			defer done()
+
 			ok, results, _ := operator.ExactMatch(s.GetContext(), ssadb.BothMatch, i.UnaryStr)
-			if ok {
-				have := false
-				// log.Infof("recursive search exact: %v from: %v", results.String(), operator.String())
-				_ = results.Recursive(func(operator ValueOperator) error {
-					_, ok := operator.(ssa.GetIdIF)
-					if ok {
-						have = true
-						return utils.Error("normal abort")
-					}
-					return nil
-				})
-				results.AppendPredecessors(value, s.WithPredecessorContext("recursive search "+i.UnaryStr))
-				next = append(next, results...)
-				if have {
-					return true
-				}
+			if !ok {
+				return false
 			}
-			return false
+
+			have := false
+			// log.Infof("recursive search exact: %v from: %v", results.String(), operator.String())
+			_ = results.Recursive(func(item ValueOperator) error {
+				if _, ok := item.(ssa.GetIdIF); ok {
+					have = true
+					return utils.Error("normal abort")
+				}
+				return nil
+			})
+
+			_ = results.Recursive(func(hit ValueOperator) error {
+				if utils.IsNil(hit) || hit.IsEmpty() {
+					return nil
+				}
+
+				bits := hit.GetAnchorBitVector()
+				if bits == nil || bits.IsEmpty() {
+					// Best-effort fallback: use the current traversal node's provenance.
+					bits = operator.GetAnchorBitVector()
+				}
+				if bits == nil || bits.IsEmpty() {
+					// No provenance available: at least keep the local edge for debugging.
+					_ = hit.AppendPredecessor(operator, s.WithPredecessorContext("recursive search "+i.UnaryStr))
+					return nil
+				}
+
+				bits.ForEach(func(index int) {
+					rel := index - anchorBase
+					if rel < 0 || rel >= len(value) {
+						return
+					}
+					root := value[rel]
+					if utils.IsNil(root) {
+						return
+					}
+					_ = hit.AppendPredecessor(root, s.WithPredecessorContext("recursive search "+i.UnaryStr))
+				})
+				return nil
+			})
+
+			next = append(next, results...)
+			return have
 		}, nil)
 		if err != nil {
 			err = utils.Wrapf(err, "recursive search exact failed")
@@ -564,27 +607,61 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		}
 		_ = globIns
 
+		anchorBase := 0
+		if s.conditionScope != nil && s.conditionScope.Len() > 0 {
+			parent := s.conditionScope.Peek()
+			anchorBase = parent.anchorBase + parent.anchorWidth
+		}
+		anchorRestore := assignLocalAnchorBitVector(value, anchorBase)
+		defer restoreAnchorBitVector(anchorRestore)
+
 		var next []ValueOperator
 		err = recursiveDeepChain(value, func(operator ValueOperator) bool {
 			done := s.startValueOpTiming("RecursiveGlobMatch")
 			defer done()
+
 			ok, results, _ := operator.GlobMatch(s.GetContext(), mod|ssadb.NameMatch, i.UnaryStr)
-			if ok {
-				have := false
-				_ = results.Recursive(func(operator ValueOperator) error {
-					_, ok := operator.(ssa.GetIdIF)
-					if ok {
-						have = true
-						return utils.Error("normal abort")
-					}
-					return nil
-				})
-				next = append(next, results...)
-				if have {
-					return true
-				}
+			if !ok {
+				return false
 			}
-			return false
+
+			have := false
+			_ = results.Recursive(func(item ValueOperator) error {
+				if _, ok := item.(ssa.GetIdIF); ok {
+					have = true
+					return utils.Error("normal abort")
+				}
+				return nil
+			})
+
+			_ = results.Recursive(func(hit ValueOperator) error {
+				if utils.IsNil(hit) || hit.IsEmpty() {
+					return nil
+				}
+				bits := hit.GetAnchorBitVector()
+				if bits == nil || bits.IsEmpty() {
+					bits = operator.GetAnchorBitVector()
+				}
+				if bits == nil || bits.IsEmpty() {
+					_ = hit.AppendPredecessor(operator, s.WithPredecessorContext("recursive search "+i.UnaryStr))
+					return nil
+				}
+				bits.ForEach(func(index int) {
+					rel := index - anchorBase
+					if rel < 0 || rel >= len(value) {
+						return
+					}
+					root := value[rel]
+					if utils.IsNil(root) {
+						return
+					}
+					_ = hit.AppendPredecessor(root, s.WithPredecessorContext("recursive search "+i.UnaryStr))
+				})
+				return nil
+			})
+
+			next = append(next, results...)
+			return have
 		}, nil)
 		if err != nil {
 			err = utils.Wrapf(err, "recursive search glob failed")
@@ -592,7 +669,6 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		}
 		results := NewValues(next)
 		s.debugSubLog("result next: %v", ValuesLen(results))
-		_ = results.AppendPredecessors(value, s.WithPredecessorContext("recursive search "+i.UnaryStr))
 		s.pushStack(results)
 		s.debugSubLog("<< push next")
 		return true, nil
@@ -610,6 +686,14 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		}
 		_ = regexpIns
 
+		anchorBase := 0
+		if s.conditionScope != nil && s.conditionScope.Len() > 0 {
+			parent := s.conditionScope.Peek()
+			anchorBase = parent.anchorBase + parent.anchorWidth
+		}
+		anchorRestore := assignLocalAnchorBitVector(value, anchorBase)
+		defer restoreAnchorBitVector(anchorRestore)
+
 		var next []ValueOperator
 		err = recursiveDeepChain(value, func(operator ValueOperator) bool {
 			done := s.startValueOpTiming("RecursiveRegexpMatch")
@@ -618,23 +702,49 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 			//if strings.Contains(operator.String(), "aaa") {
 			//	spew.Dump(1)
 			//}
+
 			ok, results, _ := operator.RegexpMatch(s.GetContext(), mod|ssadb.NameMatch, i.UnaryStr)
-			if ok {
-				have := false
-				_ = results.Recursive(func(operator ValueOperator) error {
-					_, ok := operator.(ssa.GetIdIF)
-					if ok {
-						have = true
-						return utils.Error("normal abort")
-					}
-					return nil
-				})
-				next = append(next, results...)
-				if have {
-					return true
-				}
+			if !ok {
+				return false
 			}
-			return false
+
+			have := false
+			_ = results.Recursive(func(item ValueOperator) error {
+				if _, ok := item.(ssa.GetIdIF); ok {
+					have = true
+					return utils.Error("normal abort")
+				}
+				return nil
+			})
+
+			_ = results.Recursive(func(hit ValueOperator) error {
+				if utils.IsNil(hit) || hit.IsEmpty() {
+					return nil
+				}
+				bits := hit.GetAnchorBitVector()
+				if bits == nil || bits.IsEmpty() {
+					bits = operator.GetAnchorBitVector()
+				}
+				if bits == nil || bits.IsEmpty() {
+					_ = hit.AppendPredecessor(operator, s.WithPredecessorContext("recursive search "+i.UnaryStr))
+					return nil
+				}
+				bits.ForEach(func(index int) {
+					rel := index - anchorBase
+					if rel < 0 || rel >= len(value) {
+						return
+					}
+					root := value[rel]
+					if utils.IsNil(root) {
+						return
+					}
+					_ = hit.AppendPredecessor(root, s.WithPredecessorContext("recursive search "+i.UnaryStr))
+				})
+				return nil
+			})
+
+			next = append(next, results...)
+			return have
 		}, nil)
 		if err != nil {
 			err = utils.Wrapf(err, "recursive search regexp failed")
@@ -642,7 +752,6 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		}
 		results := NewValues(next)
 		s.debugSubLog("result next: %v", ValuesLen(results))
-		_ = results.AppendPredecessors(value, s.WithPredecessorContext("recursive search "+i.UnaryStr))
 		s.pushStack(results)
 		s.debugSubLog("<< push next")
 		return true, nil
@@ -795,7 +904,19 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		if trackErr := s.track("value-op:GetSyntaxFlowUse", func() error {
 			done := s.startValueOpTiming("GetSyntaxFlowUse")
 			defer done()
-			vals, err = value.GetSyntaxFlowUse()
+			var out []ValueOperator
+			_ = value.Recursive(func(operator ValueOperator) error {
+				next, nextErr := operator.GetSyntaxFlowUse()
+				if nextErr != nil {
+					err = nextErr
+					return err
+				}
+				mergeAnchorBitVectorToResult(next, operator)
+				_ = next.AppendPredecessor(operator, s.WithPredecessorContext("getUser"))
+				out = append(out, next...)
+				return nil
+			})
+			vals = NewValues(out)
 			return err
 		}); trackErr != nil {
 			return true, trackErr
@@ -804,7 +925,6 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		if err != nil {
 			return true, utils.Errorf("Call .GetSyntaxFlowUse() failed: %v", err)
 		}
-		vals.AppendPredecessors(value, s.WithPredecessorContext("getUser"))
 		s.debugSubLog("<< push users")
 		s.pushStack(vals)
 		return true, nil

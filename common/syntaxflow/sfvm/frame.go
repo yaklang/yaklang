@@ -43,7 +43,10 @@ type conditionScopeState struct {
 	conditionDepth int
 	stackDepth     int
 
-	anchorActive  bool
+	mode              ConditionMode
+	sourceIdentityIdx map[string][]int
+
+	anchorBase    int
 	anchorWidth   int
 	anchorRestore []anchorRestoreEntry
 }
@@ -78,22 +81,19 @@ type SFFrame struct {
 }
 
 func (s *SFFrame) ActiveAnchorWidth() (int, bool) {
+	_, w, ok := s.ActiveAnchorScope()
+	return w, ok
+}
+
+func (s *SFFrame) ActiveAnchorScope() (int, int, bool) {
 	if s == nil || s.conditionScope == nil || s.conditionScope.Len() == 0 {
-		return 0, false
+		return 0, 0, false
 	}
-	width := 0
-	ok := false
-	// Condition scopes are nested; the effective anchor width is the nearest
-	// active anchor scope from the top.
-	s.conditionScope.ForeachStack(func(state conditionScopeState) bool {
-		if state.anchorActive {
-			width = state.anchorWidth
-			ok = true
-			return false
-		}
-		return true
-	})
-	return width, ok
+	state := s.conditionScope.Peek()
+	if state.anchorWidth <= 0 {
+		return 0, 0, false
+	}
+	return state.anchorBase, state.anchorWidth, true
 }
 
 type VerifyFileSystem struct {
@@ -376,9 +376,7 @@ func (s *SFFrame) execRule(feedValue Values) error {
 				// Error-skip can jump over scope-end opcodes; unwind scopes created in this statement.
 				for s.conditionScope.Len() > ctx.scopeDepth {
 					scope := s.conditionScope.Pop()
-					if scope.anchorActive {
-						restoreAnchorBitVector(scope.anchorRestore)
-					}
+					restoreAnchorBitVector(scope.anchorRestore)
 				}
 				for s.conditionStack.Len() > ctx.condDepth {
 					s.conditionStack.Pop()
@@ -402,34 +400,24 @@ func (s *SFFrame) execRule(feedValue Values) error {
 					conditionDepth: s.conditionStack.Len(),
 					stackDepth:     s.stack.Len(),
 				}
-				if i.UnaryBool {
-					// Anchor scopes are enabled only for optional filters (?{...} and ?(...)).
-					_, hasParentAnchor := s.ActiveAnchorWidth()
-					source := s.stack.Peek()
-					sourceValues := source
-					state.anchorActive = true
-					state.anchorWidth = len(sourceValues)
-					// Root anchor scope must not leak any residual anchor bits across statements.
-					// Nested anchor scopes must restore parent anchors for mapping back to the outer source.
-					if !hasParentAnchor {
-						for _, v := range sourceValues {
-							if utils.IsNil(v) {
-								continue
-							}
-							v.SetAnchorBitVector(nil)
-						}
-					}
-					state.anchorRestore = assignLocalAnchorBitVector(sourceValues)
+				// Condition scopes always enable anchor bookkeeping so that derived values can map
+				// back to their originating source slots via AnchorBitVector.
+				sourceValues := s.stack.Peek()
+				state.mode = conditionModeFromSource(sourceValues)
+				state.sourceIdentityIdx = buildValueIdentityIndex(sourceValues)
+				if s.conditionScope.Len() > 0 {
+					parent := s.conditionScope.Peek()
+					state.anchorBase = parent.anchorBase + parent.anchorWidth
 				}
+				state.anchorWidth = len(sourceValues)
+				state.anchorRestore = assignLocalAnchorBitVector(sourceValues, state.anchorBase)
 				s.conditionScope.Push(state)
 			case OpConditionScopeEnd:
 				if s.conditionScope.Len() == 0 {
 					break
 				}
 				scopeState := s.conditionScope.Pop()
-				if scopeState.anchorActive {
-					restoreAnchorBitVector(scopeState.anchorRestore)
-				}
+				restoreAnchorBitVector(scopeState.anchorRestore)
 				if s.stack.Len() != scopeState.stackDepth {
 					return utils.Wrapf(
 						CriticalError,

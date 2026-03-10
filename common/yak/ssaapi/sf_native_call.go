@@ -249,7 +249,7 @@ func init() {
 		return true, sfvm.NewValues(result), nil
 	}))
 	registerNativeCall(NativeCall_Length, nc_func(func(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
-		if width, ok := frame.ActiveAnchorWidth(); ok && width > 0 {
+		if base, width, ok := frame.ActiveAnchorScope(); ok && width > 0 {
 			counts := make([]int, width)
 			_ = v.Recursive(func(operator sfvm.ValueOperator) error {
 				if utils.IsNil(operator) || operator.IsEmpty() {
@@ -260,8 +260,8 @@ func init() {
 					return nil
 				}
 				bits.ForEach(func(index int) {
-					if index >= 0 && index < width {
-						counts[index]++
+					if index >= base && index < base+width {
+						counts[index-base]++
 					}
 				})
 				return nil
@@ -271,7 +271,7 @@ func init() {
 			for index, count := range counts {
 				ret := v.NewConst(count)
 				bits := utils.NewBitVector()
-				bits.Set(index)
+				bits.Set(base + index)
 				ret.SetAnchorBitVector(bits)
 				results = append(results, ret)
 			}
@@ -424,35 +424,38 @@ func init() {
 		return true, result, nil
 	}), nc_desc("获取实际参数"))
 	registerNativeCall(NativeCall_GetUsers, nc_func(func(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
-		depth := params.GetInt(0, "depth")
-		var result []sfvm.ValueOperator
-		v.Recursive(func(operator sfvm.ValueOperator) error {
-			switch ret := operator.(type) {
-			case *Value:
-				result = append(result, ToSFVMValues(ret.GetUsers())...)
-			}
-			return nil
-		})
-		if depth > 0 {
-			depth--
+		requestedDepth := params.GetInt(0, "depth")
+		steps := requestedDepth
+		if steps <= 0 {
+			steps = 1
 		}
 
-		for ; depth > 0; depth-- {
-			var temp []sfvm.ValueOperator
-			for _, current := range result {
-				switch ret := current.(type) {
-				case *Value:
-					temp = append(temp, ToSFVMValues(ret.GetUsers())...)
+		current := v
+		for step := 0; step < steps; step++ {
+			var next []sfvm.ValueOperator
+			err := current.Recursive(func(operator sfvm.ValueOperator) error {
+				ret, ok := operator.(*Value)
+				if !ok || ret == nil {
+					return nil
 				}
+				users := ToSFVMValues(ret.GetUsers())
+				sfvm.MergeAnchorBitVectorToResult(users, ret)
+				_ = users.AppendPredecessor(ret, frame.WithPredecessorContext(fmt.Sprintf("getUsers(depth=%d)", requestedDepth)))
+				next = append(next, users...)
+				return nil
+			})
+			if err != nil {
+				return false, nil, err
 			}
-			result = temp
+			current = sfvm.NewValues(next)
+			if current.IsEmpty() {
+				break
+			}
 		}
-		if len(result) > 0 {
-			vs := sfvm.NewValues(result)
-			vs.AppendPredecessors(v, frame.WithPredecessorContext(fmt.Sprintf("getUsers(depth=%d)", depth)))
-			return true, vs, nil
+		if current.IsEmpty() {
+			return false, nil, nil
 		}
-		return false, nil, nil
+		return true, current, nil
 	}), nc_desc("获取值的Users"))
 
 	// NativeCall_GetPredecessors is used to get the predecessors of a value
@@ -892,7 +895,7 @@ func init() {
 		groupOrderMap := make(map[int]struct{})
 		var groupedOrder []int
 		var flat []sfvm.ValueOperator
-		_, anchorScope := frame.ActiveAnchorWidth()
+		base, width, anchorScope := frame.ActiveAnchorScope()
 		hasGroup := false
 
 		_ = v.Recursive(func(operator sfvm.ValueOperator) error {
@@ -907,13 +910,17 @@ func init() {
 			if bits == nil || bits.IsEmpty() {
 				return nil
 			}
-			hasGroup = true
 			bits.ForEach(func(bitIndex int) {
-				if _, ok := groupOrderMap[bitIndex]; !ok {
-					groupOrderMap[bitIndex] = struct{}{}
-					groupedOrder = append(groupedOrder, bitIndex)
+				rel := bitIndex - base
+				if rel < 0 || rel >= width {
+					return
 				}
-				grouped[bitIndex] = append(grouped[bitIndex], operator)
+				hasGroup = true
+				if _, ok := groupOrderMap[rel]; !ok {
+					groupOrderMap[rel] = struct{}{}
+					groupedOrder = append(groupedOrder, rel)
+				}
+				grouped[rel] = append(grouped[rel], operator)
 			})
 			return nil
 		})
