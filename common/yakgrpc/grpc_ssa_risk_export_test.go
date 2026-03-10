@@ -1,4 +1,4 @@
-package yakgrpc
+package yakgrpc_test
 
 import (
 	"encoding/json"
@@ -19,12 +19,13 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
+	yakgrpc "github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func TestGRPCMUSTPASS_SSARisk_Export_And_Import(t *testing.T) {
-	client, err := NewLocalClient()
+	client, err := yakgrpc.NewLocalClient()
 	require.NoError(t, err)
 
 	program := uuid.NewString()

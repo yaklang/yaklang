@@ -1,4 +1,4 @@
-package yakgrpc
+package yakgrpc_test
 
 import (
 	"context"
@@ -9,33 +9,35 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
+	yakgrpc "github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 // TestCase 定义测试用例
 type TestCase struct {
-	Name          string                        // 测试用例名称
-	FileSystems   []FileSystemConfig            // 文件系统配置列表（支持多个程序）
-	Rules         []RuleConfig                  // 规则配置列表
-	QueryFilter   *ypb.SyntaxFlowScanTaskFilter // 查询过滤器
-	ShowDiffRisk  bool                          // 是否显示差异风险
-	ExpectedTasks []TaskResultConfig            // 预期任务结果列表
-	CleanupFuncs  []func()                      // 清理函数列表
+	Name               string                        // 测试用例名称
+	PrebuiltProgramIDs []string                      // 已预构建的 program ID 列表（可选）
+	FileSystems        []FileSystemConfig            // 文件系统配置列表（支持多个程序）
+	Rules              []RuleConfig                  // 规则配置列表
+	QueryFilter        *ypb.SyntaxFlowScanTaskFilter // 查询过滤器
+	ShowDiffRisk       bool                          // 是否显示差异风险
+	ExpectedTasks      []TaskResultConfig            // 预期任务结果列表
+	CleanupFuncs       []func()                      // 清理函数列表
 	// 额外的验证函数，在基本验证之后执行
 	ExtraValidations []func(t *testing.T, resp *ypb.QuerySyntaxFlowScanTaskResponse, programIDs []string) // 额外验证函数
 }
 
 // FileSystemConfig 文件系统配置
 type FileSystemConfig struct {
-	ProgramName     string             // 程序名称
+	ProgramName     string             // 程序别名（用于查询过滤与断言映射）
 	Language        ssaconfig.Language // 语言
 	ProgramPath     string             // 程序路径
-	BaseProgramName string             // 基础程序名称（用于增量编译）
+	BaseProgramName string             // 基础程序别名或实际程序名（用于增量编译）
 	Files           map[string]string  // 文件路径 -> 文件内容
 }
 
@@ -48,6 +50,21 @@ type RuleConfig struct {
 	Tags       []string // 标签列表
 }
 
+func resolveProgramAliases(programs []string, aliases map[string]string) []string {
+	if len(programs) == 0 {
+		return nil
+	}
+	resolved := make([]string, 0, len(programs))
+	for _, program := range programs {
+		if actual, ok := aliases[program]; ok && actual != "" {
+			resolved = append(resolved, actual)
+			continue
+		}
+		resolved = append(resolved, program)
+	}
+	return resolved
+}
+
 // checkQuerySyntaxFlowScanTask 统一的检查函数
 // 输入：1. 文件系统配置 2. syntaxflow规则 3. 预期结果
 // 内部调用接口检测实际结果和预期结果是否匹配
@@ -55,51 +72,60 @@ func checkQuerySyntaxFlowScanTask(t *testing.T, client ypb.YakClient, testCase T
 	ctx := context.Background()
 
 	// 1. 创建程序
-	var programIDs []string
+	programIDs := append([]string(nil), testCase.PrebuiltProgramIDs...)
+	programAliases := make(map[string]string)
 	var cleanupFuncs []func()
 
 	for _, fsConfig := range testCase.FileSystems {
-		progID := fsConfig.ProgramName
-		if progID == "" {
-			progID = uuid.NewString()
-		}
-		programIDs = append(programIDs, progID)
-
-		// 创建虚拟文件系统
-		vf := filesys.NewVirtualFs()
-		for path, content := range fsConfig.Files {
-			vf.AddFile(path, content)
+		language := fsConfig.Language
+		if language == "" {
+			language = ssaconfig.JAVA
 		}
 
-		// 解析项目
-		opts := []ssaconfig.Option{
-			ssaapi.WithFileSystem(vf),
-			ssaapi.WithLanguage(fsConfig.Language),
-			ssaapi.WithProgramName(progID),
+		compileOptions := []ssaconfig.Option{
+			ssaapi.WithContext(ctx),
+			ssaapi.WithLanguage(language),
 		}
-
 		if fsConfig.ProgramPath != "" {
-			opts = append(opts, ssaapi.WithProgramPath(fsConfig.ProgramPath))
+			compileOptions = append(compileOptions, ssaapi.WithProgramPath(fsConfig.ProgramPath))
 		}
 
 		if fsConfig.BaseProgramName != "" {
-			opts = append(opts, ssaapi.WithBaseProgramName(fsConfig.BaseProgramName))
+			baseProgramName := fsConfig.BaseProgramName
+			if actual, ok := programAliases[baseProgramName]; ok && actual != "" {
+				baseProgramName = actual
+			}
+			compileOptions = append(compileOptions,
+				ssaapi.WithBaseProgramName(baseProgramName),
+				ssaapi.WithEnableIncrementalCompile(true),
+			)
+		} else {
+			compileOptions = append(compileOptions, ssaapi.WithEnableIncrementalCompile(false))
 		}
 
-		programs, err := ssaapi.ParseProject(opts...)
-		require.NoError(t, err)
-		require.NotNil(t, programs)
-		require.Greater(t, len(programs), 0)
-
-		// 添加清理函数
-		cleanupFuncs = append(cleanupFuncs, func() {
-			ssadb.DeleteProgram(ssadb.GetDB(), progID)
-		})
+		var compiledProgramName string
+		ssatest.CheckIncrementalProgramWithOptions(t, compileOptions,
+			ssatest.IncrementalStep{
+				Files: fsConfig.Files,
+				Check: func(overlay *ssaapi.ProgramOverLay, stage ssatest.IncrementalCheckStage) {
+					if stage != ssatest.IncrementalCheckStageCompile || overlay == nil {
+						return
+					}
+					layerNames := overlay.GetLayerProgramNames()
+					require.NotEmpty(t, layerNames)
+					compiledProgramName = layerNames[len(layerNames)-1]
+				},
+			},
+		)
+		require.NotEmpty(t, compiledProgramName)
+		programIDs = append(programIDs, compiledProgramName)
+		if fsConfig.ProgramName != "" {
+			programAliases[fsConfig.ProgramName] = compiledProgramName
+		}
 	}
 
 	// 2. 创建规则并执行扫描
 	var taskIDs []string
-	var ruleNames []string
 	// 记录任务ID到规则名的映射，用于日志
 	taskIDToRuleName := make(map[string]string)
 
@@ -108,7 +134,6 @@ func checkQuerySyntaxFlowScanTask(t *testing.T, client ypb.YakClient, testCase T
 		if ruleName == "" {
 			ruleName = uuid.NewString()
 		}
-		ruleNames = append(ruleNames, ruleName)
 
 		// 创建规则
 		_, err := client.CreateSyntaxFlowRule(ctx, &ypb.CreateSyntaxFlowRuleRequest{
@@ -184,9 +209,11 @@ func checkQuerySyntaxFlowScanTask(t *testing.T, client ypb.YakClient, testCase T
 		queryRequest.Filter = &ypb.SyntaxFlowScanTaskFilter{}
 	}
 
-	// 如果没有指定 Programs，使用所有程序ID
+	// 如果没有指定 Programs，使用所有程序ID；否则将测试里的别名替换成实际编译名
 	if len(queryRequest.Filter.Programs) == 0 {
-		queryRequest.Filter.Programs = programIDs
+		queryRequest.Filter.Programs = append([]string(nil), programIDs...)
+	} else {
+		queryRequest.Filter.Programs = resolveProgramAliases(queryRequest.Filter.Programs, programAliases)
 	}
 
 	resp, err := client.QuerySyntaxFlowScanTask(ctx, queryRequest)
@@ -219,14 +246,10 @@ func checkQuerySyntaxFlowScanTask(t *testing.T, client ypb.YakClient, testCase T
 	// 5. 验证结果
 	require.Equal(t, len(testCase.ExpectedTasks), len(resp.Data), "Expected task count mismatch")
 
-	// 创建任务ID到任务的映射
-	taskMap := make(map[string]*ypb.SyntaxFlowScanTask)
-	for _, task := range resp.Data {
-		taskMap[task.TaskId] = task
-	}
-
 	// 验证每个预期任务
-	for i, expected := range testCase.ExpectedTasks {
+	for i, expectedTask := range testCase.ExpectedTasks {
+		expected := expectedTask
+		expected.Programs = resolveProgramAliases(expected.Programs, programAliases)
 		actualTask := resp.Data[i]
 		log.Infof("=== Validating Expected Task[%d] ===\n", i)
 		log.Infof("Expected: TaskID=%s, Programs=%v, Status=%s, RiskCount=%d, NewRiskCount=%d, HighCount=%d, NewHighCount=%d, LowCount=%d, NewLowCount=%d",
@@ -292,7 +315,7 @@ func checkQuerySyntaxFlowScanTask(t *testing.T, client ypb.YakClient, testCase T
 
 // TestGRPCMUSTPASS_QuerySyntaxFlowScanTask_Basic 基础测试
 func TestGRPCMUSTPASS_QuerySyntaxFlowScanTask_Basic(t *testing.T) {
-	client, err := NewLocalClient(true)
+	client, err := yakgrpc.NewLocalClient(true)
 	require.NoError(t, err)
 
 	progID := uuid.NewString()
@@ -354,7 +377,7 @@ alert $high for {
 
 // TestGRPCMUSTPASS_QuerySyntaxFlowScanTask_WithDiff 测试差异风险计算
 func TestGRPCMUSTPASS_QuerySyntaxFlowScanTask_WithDiff(t *testing.T) {
-	client, err := NewLocalClient(true)
+	client, err := yakgrpc.NewLocalClient(true)
 	require.NoError(t, err)
 
 	progID := uuid.NewString()
@@ -439,22 +462,16 @@ alert $high for {
 // TestGRPCMUSTPASS_QuerySyntaxFlowScanTask_WithIncrementalCompile 测试增量编译场景
 // 验证手动增量编译
 func TestGRPCMUSTPASS_QuerySyntaxFlowScanTask_WithIncrementalCompile(t *testing.T) {
-	client, err := NewLocalClient(true)
+	client, err := yakgrpc.NewLocalClient(true)
 	require.NoError(t, err)
 
-	baseProgID := uuid.NewString()
-	diffProgID := uuid.NewString()
+	var (
+		baseProgID string
+		diffProgID string
+	)
 	ruleName := uuid.NewString()
-
-	testCase := TestCase{
-		Name: "test incremental compile scenario",
-		FileSystems: []FileSystemConfig{
-			{
-				ProgramName: baseProgID,
-				Language:    ssaconfig.JAVA,
-				ProgramPath: "example",
-				Files: map[string]string{
-					"example/src/main/java/com/example/Base.java": `
+	baseSnapshot := map[string]string{
+		"example/src/main/java/com/example/Base.java": `
 package com.example;
 import java.lang.Runtime;
 
@@ -465,15 +482,9 @@ public class Base {
 	}
 }
 `,
-				},
-			},
-			{
-				ProgramName:     diffProgID,
-				Language:        ssaconfig.JAVA,
-				ProgramPath:     "example",
-				BaseProgramName: baseProgID,
-				Files: map[string]string{
-					"example/src/main/java/com/example/Base.java": `
+	}
+	diffSnapshot := map[string]string{
+		"example/src/main/java/com/example/Base.java": `
 package com.example;
 import java.lang.Runtime;
 
@@ -486,7 +497,7 @@ public class Base {
 	}
 }
 `,
-					"example/src/main/java/com/example/NewClass.java": `
+		"example/src/main/java/com/example/NewClass.java": `
 package com.example;
 import java.lang.Runtime;
 
@@ -497,9 +508,42 @@ public class NewClass {
 	}
 }
 `,
-				},
+	}
+	ssatest.CheckIncrementalProgramWithOptions(t,
+		[]ssaconfig.Option{
+			ssaapi.WithLanguage(ssaconfig.JAVA),
+			ssaapi.WithProgramPath("example"),
+			ssaapi.WithContext(context.Background()),
+		},
+		ssatest.IncrementalStep{
+			Files: baseSnapshot,
+			Check: func(overlay *ssaapi.ProgramOverLay, stage ssatest.IncrementalCheckStage) {
+				if stage != ssatest.IncrementalCheckStageCompile || overlay == nil {
+					return
+				}
+				names := overlay.GetLayerProgramNames()
+				require.NotEmpty(t, names)
+				baseProgID = names[0]
 			},
 		},
+		ssatest.IncrementalStep{
+			Files: diffSnapshot,
+			Check: func(overlay *ssaapi.ProgramOverLay, stage ssatest.IncrementalCheckStage) {
+				if stage != ssatest.IncrementalCheckStageCompile || overlay == nil {
+					return
+				}
+				names := overlay.GetLayerProgramNames()
+				require.GreaterOrEqual(t, len(names), 2)
+				diffProgID = names[len(names)-1]
+			},
+		},
+	)
+	require.NotEmpty(t, baseProgID)
+	require.NotEmpty(t, diffProgID)
+
+	testCase := TestCase{
+		Name:               "test incremental compile scenario",
+		PrebuiltProgramIDs: []string{baseProgID, diffProgID},
 		Rules: []RuleConfig{
 			{
 				RuleName: ruleName,
@@ -520,17 +564,23 @@ alert $high for {
 		},
 		ShowDiffRisk: true,
 		ExpectedTasks: []TaskResultConfig{
+			// 当前 QuerySyntaxFlowScanTask 的项目级查询会返回同项目下的 base/diff 两个任务，
+			// 但这里不会把 diff 相对 base 的新增风险单独计入 New*Count。
 			{
-				Programs:  []string{diffProgID},
-				Status:    "done",
-				RiskCount: 7,
-				HighCount: 7,
+				Programs:     []string{diffProgID},
+				Status:       "done",
+				RiskCount:    7,
+				HighCount:    7,
+				NewRiskCount: 0,
+				NewHighCount: 0,
 			},
 			{
-				Programs:  []string{baseProgID},
-				Status:    "done",
-				RiskCount: 7,
-				HighCount: 7,
+				Programs:     []string{baseProgID},
+				Status:       "done",
+				RiskCount:    7,
+				HighCount:    7,
+				NewRiskCount: 0,
+				NewHighCount: 0,
 			},
 		},
 		ExtraValidations: []func(t *testing.T, resp *ypb.QuerySyntaxFlowScanTaskResponse, programIDs []string){
