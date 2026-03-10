@@ -539,8 +539,8 @@ func OverWriteYakPlugin(name string, scriptData *schema.YakScript, enableGenerat
 		}
 		return "", "", nil
 	}
-	pluginHash := func(code string, headImg string, tags string, ignore bool) string {
-		return utils.CalcSha1(string(code), headImg, tags, ignore)
+	pluginHash := func(code string, headImg string, tags string, ignore bool, enableForAI bool, aiDesc string, aiKeywords string) string {
+		return utils.CalcSha1(string(code), headImg, tags, ignore, enableForAI, aiDesc, aiKeywords)
 	}
 
 	codeBytes := GetCorePluginData(name)
@@ -549,7 +549,7 @@ func OverWriteYakPlugin(name string, scriptData *schema.YakScript, enableGenerat
 		log.Errorf("fetch buildin-plugin: %v failed", name)
 		return
 	}
-	newestPluginHash := pluginHash(code, scriptData.HeadImg, scriptData.Tags, scriptData.Ignored)
+	newestPluginHash := pluginHash(code, scriptData.HeadImg, scriptData.Tags, scriptData.Ignored, scriptData.EnableForAI, scriptData.AIDesc, scriptData.AIKeywords)
 
 	databasePlugins := yakit.QueryYakScriptByNames(consts.GetGormProfileDatabase(), name)
 	if len(databasePlugins) == 0 {
@@ -568,7 +568,7 @@ func OverWriteYakPlugin(name string, scriptData *schema.YakScript, enableGenerat
 		return
 	}
 	databasePlugin := databasePlugins[0]
-	if databasePlugin.Content != "" && newestPluginHash == pluginHash(databasePlugin.Content, databasePlugin.HeadImg, databasePlugin.Tags, databasePlugin.Ignored) && databasePlugin.IsCorePlugin {
+	if databasePlugin.Content != "" && newestPluginHash == pluginHash(databasePlugin.Content, databasePlugin.HeadImg, databasePlugin.Tags, databasePlugin.Ignored, databasePlugin.EnableForAI, databasePlugin.AIDesc, databasePlugin.AIKeywords) && databasePlugin.IsCorePlugin {
 		log.Debugf("existed plugin's code is not changed, skip: %v", name)
 		return
 	} else {

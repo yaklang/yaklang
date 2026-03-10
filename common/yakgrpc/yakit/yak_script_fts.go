@@ -3,14 +3,18 @@ package yakit
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 )
 
 const yakScriptAIFTSTable = "yak_scripts_ai_fts"
+
+var yakScriptFTSOnce sync.Once
 
 var yakScriptAIFTSColumns = []string{"script_name", "help", "tags", "ai_desc", "ai_keywords"}
 
@@ -168,6 +172,18 @@ func FilterYakScriptForAI(db *gorm.DB, filter *YakScriptForAIFilter) *gorm.DB {
 	return db
 }
 
+// ensureYakScriptFTSLazy initializes the FTS5 index on first use.
+func ensureYakScriptFTSLazy(db *gorm.DB) {
+	if db == nil || !schema.IsSQLite(db) {
+		return
+	}
+	yakScriptFTSOnce.Do(func() {
+		if err := EnsureYakScriptForAIFTS5(db); err != nil {
+			log.Warnf("lazy init yak_scripts_ai_fts failed: %v", err)
+		}
+	})
+}
+
 // SearchYakScriptForAIBM25 searches enable_for_ai=true YakScripts using
 // BM25 ranking when FTS5 is available. Falls back to LIKE for short keywords,
 // non-SQLite databases, or when the FTS table is missing.
@@ -175,6 +191,8 @@ func SearchYakScriptForAIBM25(db *gorm.DB, filter *YakScriptForAIFilter, limit, 
 	if db == nil {
 		return nil, utils.Errorf("db is nil")
 	}
+
+	ensureYakScriptFTSLazy(db)
 
 	var matches []string
 	if filter != nil {
