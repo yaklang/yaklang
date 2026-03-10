@@ -126,5 +126,7 @@ func AIThirdPartyConfigFromGRPC(cfg *ypb.ThirdPartyApplicationConfig) *AIThirdPa
 		WebhookURL:     cfg.GetWebhookURL(),
 		ExtraParams:    extra,
 		Disabled:       cfg.GetDisabled(),
+		Proxy:          cfg.GetProxy(),
+		NoHttps:        cfg.GetNoHttps(),
 	}
 }
