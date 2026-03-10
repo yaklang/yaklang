@@ -438,6 +438,7 @@ func newConfig(ctx context.Context) *Config {
 		MemoryTriageId:                     "default",
 		m:                                  new(sync.Mutex),
 		InitStatus:                         initStatus,
+		AiCallTokenLimit:                   40 * 1024, // Default to 40 k
 	}
 	config.AiToolManagerOption = append(config.AiToolManagerOption,
 		buildinaitools.WithNoToolsCache(),
