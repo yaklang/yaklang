@@ -26,7 +26,8 @@ type YakScriptMetadata struct {
 	Description string
 	Keywords    []string
 	// Usage 工具使用说明，在参数生成阶段(第2阶段)披露给 AI
-	Usage string
+	Usage       string
+	EnableForAI bool
 }
 
 func ParseYakScriptMetadataProg(name string, prog *ssaapi.Program) (*YakScriptMetadata, error) {
@@ -81,12 +82,24 @@ func ParseYakScriptMetadataProg(name string, prog *ssaapi.Program) (*YakScriptMe
 		usage = append(usage, data)
 	})
 
+	var enableForAI bool
+	prog.Ref("__ENABLE_FOR_AI__").ForEach(func(value *ssaapi.Value) {
+		if !value.IsConstInst() {
+			return
+		}
+		raw := value.String()
+		if raw == "true" || raw == "1" {
+			enableForAI = true
+		}
+	})
+
 	return &YakScriptMetadata{
 		Name:        name,
 		VerboseName: verboseName,
 		Description: strings.Join(desc, "; "),
 		Keywords:    keywords,
 		Usage:       strings.Join(usage, "; "),
+		EnableForAI: enableForAI,
 	}, nil
 }
 

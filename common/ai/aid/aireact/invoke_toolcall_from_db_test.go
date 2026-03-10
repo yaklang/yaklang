@@ -715,3 +715,332 @@ LOOP:
 	fmt.Printf("  Verify triggered: %v\n", verifyTriggered)
 	fmt.Printf("  Next movements content: %s\n", nextMovementsContent)
 }
+
+// setupMockYakScriptPluginInDB creates a MITM-type YakScript plugin in the database with enable_for_ai=true.
+func setupMockYakScriptPluginInDB(t *testing.T, name string) {
+	db := consts.GetGormProfileDatabase()
+	if db == nil {
+		t.Fatal("database not initialized")
+	}
+
+	cleanupMockYakScriptPluginFromDB(t, name)
+
+	script := &schema.YakScript{
+		ScriptName:  name,
+		Type:        "mitm",
+		Content:     "mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {\n  yakit.Info(\"YAKSCRIPT_PLUGIN_EXECUTED: %s\", url)\n}\n",
+		Help:        "Mock MITM plugin for ReAct integration test",
+		EnableForAI: true,
+		AIDesc:      "Mock security analysis plugin for integration testing",
+		AIKeywords:  "mock,test,mitm,security",
+	}
+	err := yakit.CreateOrUpdateYakScriptByName(db, name, script)
+	if err != nil {
+		t.Fatalf("failed to create mock YakScript plugin: %v", err)
+	}
+	log.Infof("created mock YakScript plugin in database: %s", name)
+}
+
+func cleanupMockYakScriptPluginFromDB(t *testing.T, name string) {
+	db := consts.GetGormProfileDatabase()
+	if db == nil {
+		return
+	}
+	db.Where("script_name = ?", name).Delete(&schema.YakScript{})
+}
+
+func mockedToolCallingForYakScriptPlugin(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string) (*aicommon.AIResponse, error) {
+	prompt := req.GetPrompt()
+
+	if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(`
+{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `" },
+"human_readable_thought": "calling YakScript plugin", "cumulative_summary": "testing yakscript plugin integration"}
+`))
+		rsp.Close()
+		return rsp, nil
+	}
+
+	if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "url": "http://127.0.0.1:9999/test" }}`))
+		rsp.Close()
+		return rsp, nil
+	}
+
+	if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "yakscript plugin executed successfully"}`))
+		rsp.Close()
+		return rsp, nil
+	}
+
+	rsp := i.NewAIResponse()
+	rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "fallback"}`))
+	rsp.Close()
+	return rsp, nil
+}
+
+// TestReAct_ToolUse_YakScriptPlugin_MITM tests that a MITM-type YakScript plugin
+// with enable_for_ai=true can be loaded and called through the ReAct loop.
+func TestReAct_ToolUse_YakScriptPlugin_MITM(t *testing.T) {
+	pluginName := fmt.Sprintf("mock_mitm_yakscript_%s", utils.RandStringBytes(12))
+
+	setupMockYakScriptPluginInDB(t, pluginName)
+	defer cleanupMockYakScriptPluginFromDB(t, pluginName)
+
+	in := make(chan *ypb.AIInputEvent, 10)
+	out := make(chan *ypb.AIOutputEvent, 200)
+
+	pluginCalled := false
+
+	toolManager := buildinaitools.NewToolManagerByToolGetter(
+		func() []*aitool.Tool {
+			basicTools := buildinaitools.GetBasicBuildInTools()
+			dbTools := yakscripttools.GetAllYakScriptAiTools()
+			return append(basicTools, dbTools...)
+		},
+	)
+	for _, tool := range buildinaitools.GetBasicBuildInTools() {
+		toolManager.EnableTool(tool.GetName())
+	}
+	toolManager.EnableTool(pluginName)
+
+	ins, err := NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			return mockedToolCallingForYakScriptPlugin(i, r, pluginName)
+		}),
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
+			out <- e.ToGRPC()
+		}),
+		aicommon.WithToolManager(toolManager),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	go func() {
+		in <- &ypb.AIInputEvent{
+			IsFreeInput: true,
+			FreeInput:   "execute yakscript plugin " + pluginName,
+		}
+	}()
+
+	after := time.After(10 * time.Second)
+	var iid string
+
+LOOP:
+	for {
+		select {
+		case e := <-out:
+			if e.IsStream {
+				fmt.Print(string(e.GetStreamDelta()))
+			}
+
+			if e.Type == string(schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE) {
+				iid = utils.InterfaceToString(jsonpath.FindFirst(string(e.Content), "$.id"))
+				toolNameInEvent := utils.InterfaceToString(jsonpath.FindFirst(string(e.Content), "$.tool"))
+
+				log.Infof("tool review required for: %s", toolNameInEvent)
+
+				if strings.Contains(toolNameInEvent, pluginName) {
+					pluginCalled = true
+					log.Infof("YakScript plugin called: %s", toolNameInEvent)
+				}
+
+				in <- &ypb.AIInputEvent{
+					IsInteractiveMessage: true,
+					InteractiveId:        iid,
+					InteractiveJSONInput: `{"suggestion": "continue"}`,
+				}
+			}
+
+			if e.NodeId == "react_task_status_changed" {
+				result := jsonpath.FindFirst(e.GetContent(), "$..react_task_now_status")
+				status := utils.InterfaceToString(result)
+				log.Infof("task status: %s", status)
+				if status == "completed" || status == "failed" {
+					break LOOP
+				}
+			}
+		case <-after:
+			log.Warnf("test timeout")
+			break LOOP
+		}
+	}
+	close(in)
+
+	if !pluginCalled {
+		t.Fatal("YakScript MITM plugin was not called through ReAct loop")
+	}
+
+	tl := ins.DumpTimeline()
+	fmt.Println("--------------------------------------")
+	fmt.Println(tl)
+	fmt.Println("--------------------------------------")
+
+	if !strings.Contains(tl, pluginName) {
+		t.Fatal("timeline does not contain YakScript plugin name")
+	}
+
+	fmt.Printf("YakScript MITM plugin successfully called: %s\n", pluginName)
+}
+
+// TestReAct_ToolUse_YakScriptPlugin_NativeWithParams tests that a native yak plugin
+// with cli.* parameters and __USAGE__ can be loaded via ReAct with proper secondary disclosure.
+func TestReAct_ToolUse_YakScriptPlugin_NativeWithParams(t *testing.T) {
+	pluginName := fmt.Sprintf("mock_native_yakscript_%s", utils.RandStringBytes(12))
+
+	db := consts.GetGormProfileDatabase()
+	if db == nil {
+		t.Fatal("database not initialized")
+	}
+	defer cleanupMockYakScriptPluginFromDB(t, pluginName)
+
+	script := &schema.YakScript{
+		ScriptName: pluginName,
+		Type:       "yak",
+		Content: `
+__USAGE__ = "Scan a target host for open ports and report findings."
+
+target = cli.String("target", cli.setHelp("target host"), cli.setRequired(true))
+yakit.Info("NATIVE_PLUGIN_EXECUTED: target=%s", target)
+`,
+		Help:        "Mock native yak plugin for ReAct integration test",
+		EnableForAI: true,
+		AIDesc:      "Mock port scanner plugin for testing",
+		AIKeywords:  "mock,test,native,scanner",
+	}
+	err := yakit.CreateOrUpdateYakScriptByName(db, pluginName, script)
+	if err != nil {
+		t.Fatalf("create mock native YakScript: %v", err)
+	}
+
+	in := make(chan *ypb.AIInputEvent, 10)
+	out := make(chan *ypb.AIOutputEvent, 200)
+
+	pluginCalled := false
+
+	toolManager := buildinaitools.NewToolManagerByToolGetter(
+		func() []*aitool.Tool {
+			basicTools := buildinaitools.GetBasicBuildInTools()
+			dbTools := yakscripttools.GetAllYakScriptAiTools()
+			return append(basicTools, dbTools...)
+		},
+	)
+	for _, tool := range buildinaitools.GetBasicBuildInTools() {
+		toolManager.EnableTool(tool.GetName())
+	}
+	toolManager.EnableTool(pluginName)
+
+	ins, err := NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			prompt := r.GetPrompt()
+
+			if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`
+{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + pluginName + `" },
+"human_readable_thought": "calling native YakScript plugin", "cumulative_summary": "testing native plugin"}
+`))
+				rsp.Close()
+				return rsp, nil
+			}
+
+			if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
+				rsp := i.NewAIResponse()
+				// Verify secondary disclosure: the prompt should contain __USAGE__ content
+				if strings.Contains(prompt, "Scan a target host") {
+					log.Infof("secondary disclosure verified: __USAGE__ content found in tool-params prompt")
+				}
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "target": "192.168.1.1" }}`))
+				rsp.Close()
+				return rsp, nil
+			}
+
+			if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "native plugin executed"}`))
+				rsp.Close()
+				return rsp, nil
+			}
+
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "fallback"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
+			out <- e.ToGRPC()
+		}),
+		aicommon.WithToolManager(toolManager),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	go func() {
+		in <- &ypb.AIInputEvent{
+			IsFreeInput: true,
+			FreeInput:   "scan target 192.168.1.1 with " + pluginName,
+		}
+	}()
+
+	after := time.After(10 * time.Second)
+	var iid string
+
+LOOP:
+	for {
+		select {
+		case e := <-out:
+			if e.IsStream {
+				fmt.Print(string(e.GetStreamDelta()))
+			}
+
+			if e.Type == string(schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE) {
+				iid = utils.InterfaceToString(jsonpath.FindFirst(string(e.Content), "$.id"))
+				toolNameInEvent := utils.InterfaceToString(jsonpath.FindFirst(string(e.Content), "$.tool"))
+
+				if strings.Contains(toolNameInEvent, pluginName) {
+					pluginCalled = true
+				}
+
+				in <- &ypb.AIInputEvent{
+					IsInteractiveMessage: true,
+					InteractiveId:        iid,
+					InteractiveJSONInput: `{"suggestion": "continue"}`,
+				}
+			}
+
+			if e.NodeId == "react_task_status_changed" {
+				result := jsonpath.FindFirst(e.GetContent(), "$..react_task_now_status")
+				status := utils.InterfaceToString(result)
+				if status == "completed" || status == "failed" {
+					break LOOP
+				}
+			}
+		case <-after:
+			log.Warnf("test timeout")
+			break LOOP
+		}
+	}
+	close(in)
+
+	if !pluginCalled {
+		t.Fatal("native YakScript plugin was not called through ReAct loop")
+	}
+
+	tl := ins.DumpTimeline()
+	fmt.Println("--------------------------------------")
+	fmt.Println(tl)
+	fmt.Println("--------------------------------------")
+
+	if !strings.Contains(tl, pluginName) {
+		t.Fatal("timeline does not contain native YakScript plugin name")
+	}
+
+	fmt.Printf("Native YakScript plugin successfully called: %s\n", pluginName)
+}

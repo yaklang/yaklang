@@ -144,6 +144,40 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 					results.WriteString("### Tools\nNo matching tools found.\n\n")
 				}
 
+				// 1.5 Search Yakit Plugins (YakScript) with enable_for_ai=true via BM25
+				yakScripts, err := yakit.SearchYakScriptForAIBM25(db, &yakit.YakScriptForAIFilter{Keywords: keywords}, 10, 0)
+				if err != nil {
+					log.Warnf("intent loop: yakit plugin search failed: %v", err)
+				}
+				if len(yakScripts) > 0 {
+					results.WriteString("### Matched Yakit Plugins\n")
+					results.WriteString("These are Yakit plugins that can be loaded and executed. Use ScriptName (plugin ID) to load them.\n\n")
+					var pluginNames []string
+					for _, script := range yakScripts {
+						pluginType := strings.ToUpper(script.Type)
+						desc := script.AIDesc
+						if desc == "" {
+							desc = script.Help
+						}
+						desc = utils.ShrinkString(desc, 200)
+						results.WriteString(fmt.Sprintf("- **[%s] %s**: %s", pluginType, script.ScriptName, desc))
+						if script.AIKeywords != "" {
+							results.WriteString(fmt.Sprintf(" [keywords: %s]", script.AIKeywords))
+						}
+						results.WriteString("\n")
+						appendCapDetail(&capDetails, script.ScriptName, "yakit_plugin_"+script.Type, desc)
+						pluginNames = append(pluginNames, script.ScriptName)
+					}
+					results.WriteString("\n")
+					log.Infof("intent loop: found %d yakit plugins for AI", len(yakScripts))
+
+					existingToolNames := loop.Get("matched_tool_names")
+					if existingToolNames != "" {
+						existingToolNames += ","
+					}
+					loop.Set("matched_tool_names", existingToolNames+strings.Join(pluginNames, ","))
+				}
+
 				// 2. Search AI Forges via BM25 trigram
 				forgeSeen := make(map[string]bool)
 				var allForges []*schema.AIForge

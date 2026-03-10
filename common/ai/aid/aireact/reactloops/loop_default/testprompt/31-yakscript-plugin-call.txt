@@ -1,0 +1,13 @@
+任务说明:
+请搜索与 CSRF 检测相关的 Yakit 安全插件，然后对 http://example.com 执行该插件进行安全分析。
+
+期望行为:
+1. 首先通过 search_capabilities 或相关搜索机制找到 CSRF 相关的 Yakit MITM 插件。
+2. 搜索结果中应该包含带有 [MITM] 标签的 Yakit 插件。
+3. 选择合适的 CSRF 检测插件，通过 load_capability 或直接调用该工具。
+4. 使用该工具对目标 URL 进行安全扫描，提供 url 参数。
+
+通过标准:
+- 成功搜索到 CSRF 相关的 Yakit MITM 插件。
+- 插件被正确加载并执行（即使目标不可达，插件调用流程完整即可）。
+- 流程中展示了工具的二次披露信息（Usage）。
