@@ -2,12 +2,12 @@
 请搜索与 CSRF 检测相关的 Yakit 安全插件，然后对 http://example.com 执行该插件进行安全分析。
 
 期望行为:
-1. 首先通过 search_capabilities 或相关搜索机制找到 CSRF 相关的 Yakit MITM 插件。
-2. 搜索结果中应该包含带有 [MITM] 标签的 Yakit 插件。
-3. 选择合适的 CSRF 检测插件，通过 load_capability 或直接调用该工具。
-4. 使用该工具对目标 URL 进行安全扫描，提供 url 参数。
+1. 通过 search_capabilities 搜索，直接在 "Matched Yakit Plugins" 中找到 CSRF 相关的 MITM 插件（如 "CSRF 表单保护与 CORS 配置不当检测"）。
+2. 直接加载并调用该 Yakit MITM 插件（而非通过 query_plugin_by_fp 或 call_yak_plugin 间接调用）。
+3. 调用时传入 url 参数 http://example.com，插件分析 HTTP 流量。
 
 通过标准:
-- 成功搜索到 CSRF 相关的 Yakit MITM 插件。
-- 插件被正确加载并执行（即使目标不可达，插件调用流程完整即可）。
+- search_capabilities 直接返回 Yakit Plugins 列表，包含带 [MITM] 标签的 CSRF 检测插件。
+- 插件被直接加载为 AI Tool 并执行（路径: search_capabilities → load CSRF plugin → call with url）。
+- 不应出现 query_plugin_by_fp 或 call_yak_plugin 等中间工具调用。
 - 流程中展示了工具的二次披露信息（Usage）。
