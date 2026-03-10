@@ -47,6 +47,8 @@ func UpdateAIProvider(db *gorm.DB, id int64, provider *schema.AIThirdPartyConfig
 		"webhook_url":     provider.WebhookURL,
 		"extra_params":    provider.ExtraParams,
 		"disabled":        provider.Disabled,
+		"proxy":           provider.Proxy,
+		"no_https":        provider.NoHttps,
 	}
 	return db.Model(&schema.AIThirdPartyConfig{}).Where("id = ?", id).Updates(updates).Error
 }
