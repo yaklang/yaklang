@@ -518,6 +518,45 @@ func QueryYakScriptByType(db *gorm.DB, t string) []*schema.YakScript {
 	return yakScripts
 }
 
+func QueryYakScriptForAI(db *gorm.DB, keywords []string, limit int) ([]*schema.YakScript, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	db = db.Model(&schema.YakScript{}).Where("enable_for_ai = ?", true)
+	db = db.Where("type IN (?)", []string{"yak", "mitm", "port-scan"})
+
+	if len(keywords) > 0 {
+		var nonEmpty []string
+		for _, k := range keywords {
+			k = strings.TrimSpace(k)
+			if k != "" {
+				nonEmpty = append(nonEmpty, k)
+			}
+		}
+		if len(nonEmpty) > 0 {
+			db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{
+				"script_name", "help", "tags", "ai_desc", "ai_keywords",
+			}, nonEmpty, false)
+		}
+	}
+
+	var scripts []*schema.YakScript
+	if err := db.Limit(limit).Find(&scripts).Error; err != nil {
+		return nil, utils.Errorf("query yak script for ai failed: %v", err)
+	}
+	return scripts, nil
+}
+
+func GetYakScriptByNameForAI(db *gorm.DB, name string) (*schema.YakScript, error) {
+	var script schema.YakScript
+	if err := db.Model(&schema.YakScript{}).Where(
+		"enable_for_ai = ? AND script_name = ?", true, name,
+	).First(&script).Error; err != nil {
+		return nil, utils.Errorf("get yak script for ai by name %q: %v", name, err)
+	}
+	return &script, nil
+}
+
 /*
 YieldYakScripts no use spec, checking
 

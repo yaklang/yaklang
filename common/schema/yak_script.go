@@ -70,6 +70,12 @@ type YakScript struct {
 	sourceScript   *NaslScript // 用于存储原始的 script(可能是由原类型是NaslScript)
 
 	IsCorePlugin bool `json:"is_core_plugin"` // 判断是否是核心插件
+
+	EnableForAI bool   `json:"enable_for_ai" gorm:"column:enable_for_ai;default:false;index"`
+	AIDesc      string `json:"ai_desc" gorm:"column:ai_desc;type:text"`
+	AIKeywords  string `json:"ai_keywords" gorm:"column:ai_keywords;type:text"`
+	AIUsage     string `json:"ai_usage" gorm:"column:ai_usage;type:text"`
+
 	// 废弃字段
 	RiskType string `json:"risk_type"`
 	// 漏洞详情 建议，描述，cwe
