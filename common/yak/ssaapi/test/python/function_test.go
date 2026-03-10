@@ -116,7 +116,7 @@ x = c.get_val()`
 		ssatest.CheckSyntaxFlow(t, code,
 			"get_val() as $ret",
 			map[string][]string{
-				"ret": {"Undefined-c.get_val(Counter())"},
+				"ret": {"Undefined-c.get_val(Function-Counter.Counter(Undefined-Counter))"},
 			},
 			ssaapi.WithLanguage(ssaconfig.PYTHON))
 	})
