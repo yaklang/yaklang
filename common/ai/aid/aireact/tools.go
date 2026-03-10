@@ -30,6 +30,8 @@ func (r *ReAct) getPrioritizedTools(tools []*aitool.Tool, maxCount int) []*aitoo
 		"scan_port",
 		"git-clone",
 		"do_http_request",
+		"cybersecurity-risk",
+		"brute",
 	}
 
 	// Create map for quick lookup
