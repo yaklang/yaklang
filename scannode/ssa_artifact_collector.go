@@ -318,7 +318,38 @@ func (c *SSAArtifactCollector) FinalizeUploadWithProvider(codec string, provider
 	c.mu.Unlock()
 
 	if !hasData {
-		return nil, nil
+		// No stream payload was produced (e.g. zero findings, rule groups yield nothing).
+		// Still upload an "empty" artifact so the Server can receive SSAArtifactReady and
+		// finalize the task (otherwise it may get stuck at "finalizing").
+		//
+		// We intentionally fall back to the single-object parts format here. The Server
+		// currently rejects an empty segments manifest.
+		//
+		// IMPORTANT: for some codecs (e.g. zstd), compressing an empty file may yield
+		// a zero-byte stream which breaks multipart upload. Ensure the parts file has at
+		// least one valid JSON object ("{}") so the artifact is non-empty and importable.
+		c.mu.Lock()
+		if c.initErr != nil {
+			err := c.initErr
+			c.mu.Unlock()
+			return nil, err
+		}
+		if err := c.initSpoolLocked(); err != nil {
+			c.initErr = err
+			c.mu.Unlock()
+			return nil, err
+		}
+		if c.partsFile != nil {
+			_, err := c.partsFile.Write([]byte("{}\n"))
+			if err != nil {
+				c.mu.Unlock()
+				return nil, err
+			}
+			c.rawBytes += int64(len("{}\n"))
+			_ = c.partsFile.Sync()
+		}
+		c.mu.Unlock()
+		return c.BuildAndUploadCompressedArtifactWithProvider(codec, provider)
 	}
 
 	if continuousEnabled && started && done != nil {

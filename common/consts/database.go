@@ -25,6 +25,7 @@ import (
 const (
 	SQLiteExtend = "sqlite3_extended"
 	MySQL        = "mysql"
+	Postgres     = "postgres"
 	SQLite       = "sqlite3"
 
 	DEFAULT_DRIVER = SQLite
@@ -130,8 +131,14 @@ func configureAndOptimizeDB(drive string, db *gorm.DB) {
 	// reference: https://stackoverflow.com/questions/35804884/sqlite-concurrent-writing-performance
 	db.DB().SetConnMaxLifetime(time.Hour)
 	db.DB().SetMaxIdleConns(10)
-	// set MaxOpenConns to disable connections pool, for write speed and "database is locked" error
-	db.DB().SetMaxOpenConns(1)
+	// SQLite must keep a single writer connection to avoid "database is locked" under concurrent writes.
+	// For server databases (MySQL/Postgres), allow a small pool for throughput.
+	switch drive {
+	case SQLiteExtend, SQLite:
+		db.DB().SetMaxOpenConns(1)
+	default:
+		db.DB().SetMaxOpenConns(20)
+	}
 
 	if drive == SQLiteExtend || drive == SQLite {
 		db.Exec("PRAGMA synchronous = OFF;")

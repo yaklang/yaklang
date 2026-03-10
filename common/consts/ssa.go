@@ -9,8 +9,10 @@ import (
 	"github.com/google/uuid"
 
 	_ "github.com/jinzhu/gorm/dialects/mysql"
+	_ "github.com/jinzhu/gorm/dialects/postgres"
 
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/jinzhu/gorm"
 )
@@ -19,6 +21,9 @@ const EmbedSfBuildInRuleKey = "e18179b8cbbea727589cd210c8204306"
 
 const (
 	ENV_SSA_DATABASE_RAW = "SSA_DATABASE_RAW"
+	// ENV_SSA_DB_SKIP_MIGRATE disables SSA DB AutoMigrate/patches for this process.
+	// This is useful when using a read-only SSA-IR DB DSN on scan-only nodes.
+	ENV_SSA_DB_SKIP_MIGRATE = "SSA_DB_SKIP_MIGRATE"
 )
 
 var (
@@ -38,8 +43,11 @@ func GetSSADatabaseInfoFromEnv() string {
 }
 
 func GetSSADataBaseInfo() (string, string) {
-	if !filepath.IsAbs(SSA_PROJECT_DB_RAW) {
-		SSA_PROJECT_DB_RAW = filepath.Join(GetDefaultYakitBaseDir(), SSA_PROJECT_DB_RAW)
+	// Only SQLite uses a filesystem path. DSNs (MySQL/Postgres/...) must not be joined with base dir.
+	if SSA_PROJECT_DB_DIALECT == SQLiteExtend || SSA_PROJECT_DB_DIALECT == SQLite {
+		if !filepath.IsAbs(SSA_PROJECT_DB_RAW) {
+			SSA_PROJECT_DB_RAW = filepath.Join(GetDefaultYakitBaseDir(), SSA_PROJECT_DB_RAW)
+		}
 	}
 	return SSA_PROJECT_DB_DIALECT, SSA_PROJECT_DB_RAW
 }
@@ -57,6 +65,10 @@ func parseDatabaseURL(raw string) (string, string) {
 		case "mysql":
 			// Assuming MySQL is a defined constant for the dialect string
 			return MySQL, connectionDetails
+		case "postgres", "postgresql":
+			// Keep the full raw string to preserve URL scheme.
+			// lib/pq and gorm both accept URL DSNs like: postgres://user:pass@host:5432/db?sslmode=disable
+			return Postgres, raw
 		// Add other supported dialects here
 		// case "postgres", "postgresql":
 		// 	return PostgreSQL, connectionDetails // Assuming PostgreSQL constant exists
@@ -101,8 +113,12 @@ func CreateSSAProjectDatabase(dialect, path string) (*gorm.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	schema.AutoMigrate(db, schema.KEY_SCHEMA_SSA_DATABASE)
-	schema.ApplyPatches(db, schema.KEY_SCHEMA_SSA_DATABASE)
+	// SSA-IR DB may be accessed with a read-only credential (scan-only nodes).
+	// In that case, AutoMigrate would fail even if the schema already exists.
+	if !utils.InterfaceToBoolean(os.Getenv(ENV_SSA_DB_SKIP_MIGRATE)) {
+		schema.AutoMigrate(db, schema.KEY_SCHEMA_SSA_DATABASE)
+		schema.ApplyPatches(db, schema.KEY_SCHEMA_SSA_DATABASE)
+	}
 	configureAndOptimizeDB(dialect, db)
 	return db, nil
 }
