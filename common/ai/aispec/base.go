@@ -2,7 +2,6 @@ package aispec
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -174,6 +173,15 @@ type ImageDescription struct {
 	Url string `json:"url"`
 }
 
+type ChatBaseInterfaceType string
+
+const (
+	// ChatBaseInterfaceTypeChatCompletions uses OpenAI-compatible /v1/chat/completions format.
+	ChatBaseInterfaceTypeChatCompletions ChatBaseInterfaceType = "chat_completions"
+	// ChatBaseInterfaceTypeResponses uses /v1/responses format.
+	ChatBaseInterfaceTypeResponses ChatBaseInterfaceType = "responses"
+)
+
 type ChatBaseContext struct {
 	PoCOptionGenerator  func() ([]poc.PocConfigOption, error)
 	EnableThinking      bool
@@ -183,8 +191,11 @@ type ChatBaseContext struct {
 	StreamHandler       func(io.Reader)
 	ReasonStreamHandler func(reader io.Reader)
 	ErrHandler          func(err error)
-	ImageUrls           []*ImageDescription
-	DisableStream       bool
+	// InterfaceType controls request/response protocol shape.
+	// Default is chat_completions for backward compatibility.
+	InterfaceType ChatBaseInterfaceType
+	ImageUrls     []*ImageDescription
+	DisableStream bool
 	// ToolCallCallback is called when the AI response contains tool_calls.
 	// If set, tool_calls will NOT be converted to <|TOOL_CALL...|> format in the output stream.
 	// If not set, the original behavior (converting to <|TOOL_CALL...|> format) is preserved.
@@ -199,6 +210,12 @@ type ChatBaseContext struct {
 }
 
 type ChatBaseOption func(c *ChatBaseContext)
+
+func WithChatBase_InterfaceType(interfaceType ChatBaseInterfaceType) ChatBaseOption {
+	return func(c *ChatBaseContext) {
+		c.InterfaceType = interfaceType
+	}
+}
 
 func WithChatBase_DisableStream(b bool) ChatBaseOption {
 	return func(c *ChatBaseContext) {
@@ -296,6 +313,7 @@ func WithChatBase_RawHTTPResponseCallback(cb func(headerBytes []byte, bodyPrevie
 func NewChatBaseContext(opts ...ChatBaseOption) *ChatBaseContext {
 	ctx := &ChatBaseContext{
 		EnableThinking: false,
+		InterfaceType:  ChatBaseInterfaceTypeChatCompletions,
 	}
 	for _, i := range opts {
 		i(ctx)
@@ -305,15 +323,15 @@ func NewChatBaseContext(opts ...ChatBaseOption) *ChatBaseContext {
 
 func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) (string, error) {
 	ctx := NewChatBaseContext(chatOpts...)
-	opt := ctx.PoCOptionGenerator
-	streamHandler := ctx.StreamHandler
-	reasonStreamHandler := ctx.ReasonStreamHandler
-	errHandler := ctx.ErrHandler
-
-	opts, err := opt()
-	if err != nil {
-		return "", utils.Errorf("build config failed: %v", err)
+	switch ctx.InterfaceType {
+	case ChatBaseInterfaceTypeResponses:
+		return chatBaseResponses(url, model, msg, ctx)
+	default:
+		return chatBaseChatCompletions(url, model, msg, ctx)
 	}
+}
+
+func chatBaseChatCompletions(url string, model string, msg string, ctx *ChatBaseContext) (string, error) {
 	var msgs []ChatDetail
 	if len(ctx.ImageUrls) <= 0 {
 		msgs = append(msgs, NewUserChatDetail(msg))
@@ -330,7 +348,6 @@ func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) 
 	}
 	msgIns := NewChatMessage(model, msgs)
 	msgIns.Stream = !ctx.DisableStream
-	handleStream := msgIns.Stream
 
 	// Add tools if provided
 	if len(ctx.Tools) > 0 {
@@ -340,12 +357,139 @@ func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) 
 		msgIns.ToolChoice = ctx.ToolChoice
 	}
 
-	var msgResult any = msgIns
+	return executeChatBaseRequest(url, msgIns.Stream, msgIns, ctx, appendStreamHandlerPoCOptionEx)
+}
+
+func chatBaseResponses(url string, model string, msg string, ctx *ChatBaseContext) (string, error) {
+	stream := !ctx.DisableStream
+	req := map[string]any{
+		"model":  model,
+		"input":  buildResponsesInput(msg, ctx.ImageUrls),
+		"stream": stream,
+	}
+
+	tools := convertToolsToResponses(ctx.Tools)
+	if len(tools) > 0 {
+		req["tools"] = tools
+	}
+	if ctx.ToolChoice != nil {
+		req["tool_choice"] = convertToolChoiceToResponses(ctx.ToolChoice)
+	}
+
+	return executeChatBaseRequest(url, stream, req, ctx, appendResponsesStreamHandlerPoCOptionEx)
+}
+
+func buildResponsesInput(msg string, images []*ImageDescription) []map[string]any {
+	var content []map[string]any
+	if len(images) > 0 {
+		if msg == "" {
+			msg = "请描述图片内容"
+		}
+	}
+	if msg != "" {
+		content = append(content, map[string]any{
+			"type": "input_text",
+			"text": msg,
+		})
+	}
+	for _, image := range images {
+		content = append(content, map[string]any{
+			"type":      "input_image",
+			"image_url": image.Url,
+		})
+	}
+	if len(content) == 0 {
+		content = append(content, map[string]any{
+			"type": "input_text",
+			"text": "",
+		})
+	}
+	return []map[string]any{
+		{
+			"role":    "user",
+			"content": content,
+		},
+	}
+}
+
+func convertToolsToResponses(tools []Tool) []any {
+	if len(tools) == 0 {
+		return nil
+	}
+	results := make([]any, 0, len(tools))
+	for _, tool := range tools {
+		if tool.Type == "function" && tool.Function.Name != "" {
+			t := map[string]any{
+				"type":        "function",
+				"name":        tool.Function.Name,
+				"description": tool.Function.Description,
+			}
+			if tool.Function.Parameters != nil {
+				t["parameters"] = tool.Function.Parameters
+			}
+			results = append(results, t)
+			continue
+		}
+		raw, err := json.Marshal(tool)
+		if err != nil {
+			continue
+		}
+		var rawMap map[string]any
+		if err := json.Unmarshal(raw, &rawMap); err != nil {
+			continue
+		}
+		results = append(results, rawMap)
+	}
+	return results
+}
+
+func convertToolChoiceToResponses(choice any) any {
+	choiceMap := utils.InterfaceToGeneralMap(choice)
+	if len(choiceMap) == 0 {
+		return choice
+	}
+	if utils.MapGetString(choiceMap, "type") != "function" {
+		return choice
+	}
+	funcMap := utils.MapGetMapRaw(choiceMap, "function")
+	name := utils.MapGetString(funcMap, "name")
+	if name == "" {
+		return choice
+	}
+	return map[string]any{
+		"type": "function",
+		"name": name,
+	}
+}
+
+type chatBaseStreamHandlerAppender func(
+	isStream bool,
+	opts []poc.PocConfigOption,
+	toolCallCallback func([]*ToolCall),
+	rawResponseCallback func([]byte, []byte),
+) (io.Reader, io.Reader, []poc.PocConfigOption, func())
+
+func executeChatBaseRequest(
+	url string,
+	handleStream bool,
+	msgResult any,
+	ctx *ChatBaseContext,
+	appendHandler chatBaseStreamHandlerAppender,
+) (string, error) {
+	if ctx.PoCOptionGenerator == nil {
+		return "", utils.Error("build config failed: poc option generator is nil")
+	}
+	opts, err := ctx.PoCOptionGenerator()
+	if err != nil {
+		return "", utils.Errorf("build config failed: %v", err)
+	}
+
+	payload := msgResult
 	var raw []byte
 	if ctx.EnableThinkingField != "" {
-		raw, err = json.Marshal(msgIns)
+		raw, err = json.Marshal(msgResult)
 		if err != nil {
-			return "", utils.Errorf("marshal msg[%v] to json failed: %s", spew.Sdump(msgIns), err)
+			return "", utils.Errorf("marshal msg[%v] to json failed: %s", spew.Sdump(msgResult), err)
 		}
 		msgMap := make(map[string]any)
 		err = json.Unmarshal(raw, &msgMap)
@@ -353,10 +497,10 @@ func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) 
 			return "", utils.Errorf("unmarshal msg[%v] to map failed: %s", string(raw), err)
 		}
 		msgMap[ctx.EnableThinkingField] = ctx.EnableThinkingValue
-		msgResult = msgMap
+		payload = msgMap
 	}
 
-	raw, err = json.Marshal(msgResult)
+	raw, err = json.Marshal(payload)
 	if err != nil {
 		return "", utils.Errorf("build msg[%v] to json failed: %s", string(raw), err)
 	}
@@ -373,15 +517,15 @@ func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) 
 	opts = append(opts, poc.WithReplaceHttpPacketBody(raw, false))
 
 	var pr, reasonPr io.Reader
-	var cancel context.CancelFunc
-	pr, reasonPr, opts, cancel = appendStreamHandlerPoCOptionEx(handleStream, opts, ctx.ToolCallCallback, ctx.RawHTTPResponseCallback)
+	var cancel func()
+	pr, reasonPr, opts, cancel = appendHandler(handleStream, opts, ctx.ToolCallCallback, ctx.RawHTTPResponseCallback)
 	wg := new(sync.WaitGroup)
 
 	// 统一处理reasoning stream handler
-	noMerge := reasonStreamHandler != nil
+	noMerge := ctx.ReasonStreamHandler != nil
 
 	// 启动reasoning处理协程（如果需要）
-	if reasonStreamHandler != nil {
+	if ctx.ReasonStreamHandler != nil {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -390,7 +534,7 @@ func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) 
 					log.Warnf("reasonStreamHandler panic: %v", err)
 				}
 			}()
-			reasonStreamHandler(reasonPr)
+			ctx.ReasonStreamHandler(reasonPr)
 		}()
 	}
 
@@ -414,8 +558,8 @@ func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) 
 			streamReader = io.TeeReader(result, &body)
 		}
 
-		if streamHandler != nil {
-			streamHandler(streamReader)
+		if ctx.StreamHandler != nil {
+			ctx.StreamHandler(streamReader)
 		} else {
 			utils.Debug(func() {
 				streamReader = io.TeeReader(streamReader, os.Stdout)
@@ -426,8 +570,8 @@ func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) 
 
 	_, _, err = poc.DoPOST(url, opts...)
 	if err != nil {
-		if errHandler != nil {
-			errHandler(err)
+		if ctx.ErrHandler != nil {
+			ctx.ErrHandler(err)
 		}
 		if !utils.IsNil(cancel) {
 			cancel()

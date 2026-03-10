@@ -2115,3 +2115,179 @@ func TestChatBase_WithoutTools(t *testing.T) {
 	assert.NotContains(t, requestBody, `"tool_choice"`, "Request MUST NOT contain 'tool_choice' field when no tools provided")
 	t.Logf("Request without tools does not contain 'tools' field: %v", !strings.Contains(requestBody, `"tools"`))
 }
+
+const mockResponsesNonStreamRsp = `HTTP/1.1 200 OK
+Connection: close
+Content-Type: application/json; charset=utf-8
+
+{
+  "id": "resp_test_001",
+  "object": "response",
+  "output": [
+    {
+      "id": "msg_test_001",
+      "type": "message",
+      "role": "assistant",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "你好，responses API！"
+        }
+      ]
+    }
+  ],
+  "output_text": "你好，responses API！"
+}
+`
+
+const mockResponsesToolCallRsp = `HTTP/1.1 200 OK
+Connection: close
+Content-Type: application/json; charset=utf-8
+
+{
+  "id": "resp_tool_001",
+  "object": "response",
+  "output": [
+    {
+      "type": "function_call",
+      "id": "fc_001",
+      "call_id": "call_resp_001",
+      "name": "get_weather",
+      "arguments": "{\"location\":\"Boston\"}"
+    }
+  ]
+}
+`
+
+const mockResponsesStreamRsp = `HTTP/1.1 200 OK
+Connection: close
+Content-Type: text/event-stream
+
+event: response.created
+data: {"type":"response.created"}
+
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","delta":"先分析一下。"}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","delta":"你好"}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","delta":" responses"}
+
+data: [DONE]
+`
+
+func TestChatBase_ResponsesAPI_NonStream(t *testing.T) {
+	var capturedRequest []byte
+	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		capturedRequest = req
+		return []byte(mockResponsesNonStreamRsp)
+	})
+
+	res, err := aispec.ChatBase(
+		"http://example.com/v1/responses",
+		"gpt-4.1-mini",
+		"hello",
+		aispec.WithChatBase_InterfaceType(aispec.ChatBaseInterfaceTypeResponses),
+		aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
+			return []poc.PocConfigOption{
+				poc.WithHost(host),
+				poc.WithPort(port),
+				poc.WithForceHTTPS(false),
+				poc.WithTimeout(5),
+			}, nil
+		}),
+	)
+
+	assert.NoError(t, err, "Responses API non-stream request should succeed")
+	assert.Equal(t, "你好，responses API！", res)
+
+	requestBody := string(capturedRequest)
+	assert.Contains(t, requestBody, `"input"`, "Responses request MUST contain input")
+	assert.NotContains(t, requestBody, `"messages"`, "Responses request MUST NOT contain chat.completions messages")
+}
+
+func TestChatBase_ResponsesAPI_ToolCallCallback(t *testing.T) {
+	var capturedRequest []byte
+	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		capturedRequest = req
+		return []byte(mockResponsesToolCallRsp)
+	})
+
+	tools := []aispec.Tool{
+		{
+			Type: "function",
+			Function: aispec.ToolFunction{
+				Name:        "get_weather",
+				Description: "Get weather by location",
+				Parameters: map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"location": map[string]any{"type": "string"},
+					},
+				},
+			},
+		},
+	}
+
+	var receivedToolCalls []*aispec.ToolCall
+	res, err := aispec.ChatBase(
+		"http://example.com/v1/responses",
+		"gpt-4.1-mini",
+		"weather in Boston",
+		aispec.WithChatBase_InterfaceType(aispec.ChatBaseInterfaceTypeResponses),
+		aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
+			return []poc.PocConfigOption{
+				poc.WithHost(host),
+				poc.WithPort(port),
+				poc.WithForceHTTPS(false),
+				poc.WithTimeout(5),
+			}, nil
+		}),
+		aispec.WithChatBase_Tools(tools),
+		aispec.WithChatBase_ToolCallCallback(func(toolCalls []*aispec.ToolCall) {
+			receivedToolCalls = append(receivedToolCalls, toolCalls...)
+		}),
+	)
+
+	assert.NoError(t, err, "Responses API with tool callback should succeed")
+	assert.Len(t, receivedToolCalls, 1, "Should receive one tool call")
+	assert.Equal(t, "call_resp_001", receivedToolCalls[0].ID)
+	assert.Equal(t, "get_weather", receivedToolCalls[0].Function.Name)
+	assert.Contains(t, receivedToolCalls[0].Function.Arguments, "Boston")
+	assert.NotContains(t, res, "<|TOOL_CALL", "Callback mode should not emit legacy tool-call marker")
+
+	requestBody := string(capturedRequest)
+	assert.Contains(t, requestBody, `"tools"`, "Responses request MUST contain tools")
+	assert.Contains(t, requestBody, `"name":"get_weather"`, "Responses tools should use top-level function name")
+	assert.NotContains(t, requestBody, `"function":{"name":"get_weather"`, "Responses tools should not use chat.completions nested function shape")
+}
+
+func TestChatBase_ResponsesAPI_StreamOutputAndReasoning(t *testing.T) {
+	host, port := utils.DebugMockHTTP([]byte(mockResponsesStreamRsp))
+
+	var reasonContent strings.Builder
+	res, err := aispec.ChatBase(
+		"http://example.com/v1/responses",
+		"gpt-4.1-mini",
+		"say hello",
+		aispec.WithChatBase_InterfaceType(aispec.ChatBaseInterfaceTypeResponses),
+		aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
+			return []poc.PocConfigOption{
+				poc.WithHost(host),
+				poc.WithPort(port),
+				poc.WithForceHTTPS(false),
+				poc.WithTimeout(5),
+			}, nil
+		}),
+		aispec.WithChatBase_ReasonStreamHandler(func(reader io.Reader) {
+			data, _ := io.ReadAll(reader)
+			reasonContent.Write(data)
+		}),
+	)
+
+	assert.NoError(t, err, "Responses API SSE request should succeed")
+	assert.Equal(t, "你好 responses", res)
+	assert.Contains(t, reasonContent.String(), "先分析一下。", "Reasoning delta should be captured")
+}
