@@ -174,6 +174,19 @@ func RegisterYakScriptAiToolsCovertHandle(handle func(aitools []*schema.AIYakToo
 	toolCovertHandle = handle
 }
 
+var yakScriptPluginConvertHandle func(script *schema.YakScript) (*aitool.Tool, error)
+
+func RegisterYakScriptPluginConvertHandle(handle func(script *schema.YakScript) (*aitool.Tool, error)) {
+	yakScriptPluginConvertHandle = handle
+}
+
+func ConvertYakScriptPlugin(script *schema.YakScript) (*aitool.Tool, error) {
+	if yakScriptPluginConvertHandle == nil {
+		return nil, nil
+	}
+	return yakScriptPluginConvertHandle(script)
+}
+
 func covertTools(tools []*schema.AIYakTool) []*aitool.Tool {
 	if toolCovertHandle == nil {
 		return nil
