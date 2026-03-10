@@ -23,10 +23,10 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-// extractCurrentTaskContent 从 prompt 中提取 <|CURRENT_TASK|> 和 <|CURRENT_TASK_END|> 之间的内容
+// extractCurrentTaskContent 从 prompt 中提取 <|CURRENT_TASK_{{nonce}}|> 和 <|CURRENT_TASK_END_{{nonce}}|> 之间的内容
 // 返回提取的内容，如果未找到则返回空字符串
 func extractCurrentTaskContent(prompt string) string {
-	re := regexp.MustCompile(`(?s)<\|CURRENT_TASK\|>(.*?)<\|CURRENT_TASK_END\|>`)
+	re := regexp.MustCompile(`(?s)<\|CURRENT_TASK(?:_[a-z0-9]+)?\|>(.*?)<\|CURRENT_TASK_END(?:_[a-z0-9]+)?\|>`)
 	matches := re.FindStringSubmatch(prompt)
 	if len(matches) >= 2 {
 		return matches[1]
@@ -35,7 +35,7 @@ func extractCurrentTaskContent(prompt string) string {
 }
 
 // isCurrentTask 判断当前执行的任务是否为指定的任务名称
-// 通过提取 <|CURRENT_TASK|> 标签内的内容，检查其中是否包含 "任务名称: taskName"
+// 通过提取 <|CURRENT_TASK_{{nonce}}|> 标签内的内容，检查其中是否包含 "任务名称: taskName"
 func isCurrentTask(prompt string, taskName string) bool {
 	currentTaskContent := extractCurrentTaskContent(prompt)
 	if currentTaskContent == "" {
