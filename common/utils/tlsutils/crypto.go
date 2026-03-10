@@ -127,6 +127,57 @@ func GeneratePrivateAndPublicKeyPEMWithPrivateFormatterWithSize(t string, size i
 	return priBuffer.Bytes(), pubBuffer.Bytes(), nil
 }
 
+// pkcs1v15MaxPlaintextLen 单块 PKCS#1 v1.5 加密最大明文长度（字节）
+func pkcs1v15MaxPlaintextLen(pub *rsa.PublicKey) int {
+	return pub.Size() - 11
+}
+
+// rsaEncryptPKCS1v15Blocks 对长明文按块加密（兼容常见 JS 分块方式），块长 = pub.Size()-11，密文块长 = pub.Size()
+func rsaEncryptPKCS1v15Blocks(pub *rsa.PublicKey, data []byte) ([]byte, error) {
+	maxBlock := pkcs1v15MaxPlaintextLen(pub)
+	if len(data) <= maxBlock {
+		return rsa.EncryptPKCS1v15(cryptorand.Reader, pub, data)
+	}
+	var out []byte
+	for len(data) > 0 {
+		chunk := data
+		if len(chunk) > maxBlock {
+			chunk = data[:maxBlock]
+			data = data[maxBlock:]
+		} else {
+			data = nil
+		}
+		enc, err := rsa.EncryptPKCS1v15(cryptorand.Reader, pub, chunk)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, enc...)
+	}
+	return out, nil
+}
+
+// rsaDecryptPKCS1v15Blocks 对长密文按块解密，密文块长 = keySize
+func rsaDecryptPKCS1v15Blocks(pri *rsa.PrivateKey, data []byte) ([]byte, error) {
+	keySize := pri.PublicKey.Size()
+	if len(data) <= keySize {
+		return rsa.DecryptPKCS1v15(cryptorand.Reader, pri, data)
+	}
+	var out []byte
+	for len(data) > 0 {
+		if len(data) < keySize {
+			return nil, errors.New("rsa decrypt: ciphertext length not multiple of key size")
+		}
+		chunk := data[:keySize]
+		data = data[keySize:]
+		dec, err := rsa.DecryptPKCS1v15(cryptorand.Reader, pri, chunk)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, dec...)
+	}
+	return out, nil
+}
+
 func PemPkcs1v15Encrypt(pemBytes []byte, data interface{}) ([]byte, error) {
 	dataBytes := utils.InterfaceToBytes(data)
 	block, _ := pem.Decode(pemBytes)
@@ -138,13 +189,7 @@ func PemPkcs1v15Encrypt(pemBytes []byte, data interface{}) ([]byte, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, `x509.ParsePKIXPublicKey(block.Bytes) failed`)
 	}
-	_, _ = dataBytes, pub
-
-	results, err := rsa.EncryptPKCS1v15(cryptorand.Reader, pub, dataBytes)
-	if err != nil {
-		return nil, errors.Wrap(err, `rsa.EncryptPKCS1v15(cryptorand.Reader, pubKey, dataBytes) error`)
-	}
-	return results, err
+	return rsaEncryptPKCS1v15Blocks(pub, dataBytes)
 }
 
 // EncryptWithPkcs1v15/RSAEncryptWithPKCS1v15 使用 RSA 公钥和 PKCS#1 v1.5 填充方式对给定数据进行加密。
@@ -176,11 +221,9 @@ func Pkcs1v15Encrypt(raw []byte, data interface{}) ([]byte, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, `GetRSAPubKey failed`)
 	}
-	_, _ = dataBytes, pub
-
-	results, err := rsa.EncryptPKCS1v15(cryptorand.Reader, pub, dataBytes)
+	results, err := rsaEncryptPKCS1v15Blocks(pub, dataBytes)
 	if err != nil {
-		return nil, errors.Wrap(err, `rsa.EncryptPKCS1v15(cryptorand.Reader, pubKey, dataBytes) error`)
+		return nil, errors.Wrap(err, `rsa.EncryptPKCS1v15 blocks error`)
 	}
 	return results, err
 }
@@ -347,17 +390,71 @@ func PkcsOAEPEncrypt(raw []byte, data interface{}) ([]byte, error) {
 	return PkcsOAEPEncryptWithHash(raw, data, sha256.New())
 }
 
+// oaepMaxPlaintextLen 单块 OAEP 加密最大明文长度（字节）
+func oaepMaxPlaintextLen(pub *rsa.PublicKey, hashSize int) int {
+	return pub.Size() - 2*hashSize - 2
+}
+
+func rsaEncryptOAEPBlocks(pub *rsa.PublicKey, data []byte, hashFunc hash.Hash, label []byte) ([]byte, error) {
+	hashSize := hashFunc.Size()
+	maxBlock := oaepMaxPlaintextLen(pub, hashSize)
+	if maxBlock <= 0 {
+		return nil, errors.New("rsa oaep: key size too small for hash")
+	}
+	if len(data) <= maxBlock {
+		return rsa.EncryptOAEP(hashFunc, cryptorand.Reader, pub, data, label)
+	}
+	var out []byte
+	for len(data) > 0 {
+		chunk := data
+		if len(chunk) > maxBlock {
+			chunk = data[:maxBlock]
+			data = data[maxBlock:]
+		} else {
+			data = nil
+		}
+		// Each EncryptOAEP may advance hash state; use a fresh hash for each block if needed, or reset.
+		hashFunc.Reset()
+		enc, err := rsa.EncryptOAEP(hashFunc, cryptorand.Reader, pub, chunk, label)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, enc...)
+	}
+	return out, nil
+}
+
+func rsaDecryptOAEPBlocks(pri *rsa.PrivateKey, data []byte, hashFunc hash.Hash, label []byte) ([]byte, error) {
+	keySize := pri.PublicKey.Size()
+	if len(data) <= keySize {
+		return rsa.DecryptOAEP(hashFunc, cryptorand.Reader, pri, data, label)
+	}
+	var out []byte
+	for len(data) > 0 {
+		if len(data) < keySize {
+			return nil, errors.New("rsa oaep decrypt: ciphertext length not multiple of key size")
+		}
+		chunk := data[:keySize]
+		data = data[keySize:]
+		hashFunc.Reset()
+		dec, err := rsa.DecryptOAEP(hashFunc, cryptorand.Reader, pri, chunk, label)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, dec...)
+	}
+	return out, nil
+}
+
 func PkcsOAEPEncryptWithHash(raw []byte, data interface{}, hashFunc hash.Hash) ([]byte, error) {
 	dataBytes := utils.InterfaceToBytes(data)
 	pub, err := GetRSAPubKey(raw)
 	if err != nil {
 		return nil, errors.Wrap(err, `GetRSAPubKey failed`)
 	}
-	_, _ = dataBytes, pub
-
-	results, err := rsa.EncryptOAEP(hashFunc, cryptorand.Reader, pub, dataBytes, nil)
+	results, err := rsaEncryptOAEPBlocks(pub, dataBytes, hashFunc, nil)
 	if err != nil {
-		return nil, errors.Wrap(err, `rsa.EncryptOAEP(cryptorand.Reader, pubKey, dataBytes) error`)
+		return nil, errors.Wrap(err, `rsa.EncryptOAEP blocks error`)
 	}
 	return results, err
 }
@@ -394,10 +491,9 @@ func PkcsOAEPDecryptWithHash(raw []byte, data interface{}, hashFunc hash.Hash) (
 	if err != nil {
 		return nil, errors.Wrap(err, `GetRSAPrivateKey failed`)
 	}
-
-	results, err := rsa.DecryptOAEP(hashFunc, cryptorand.Reader, pri, dataBytes, nil)
+	results, err := rsaDecryptOAEPBlocks(pri, dataBytes, hashFunc, nil)
 	if err != nil {
-		return nil, errors.Wrap(err, `rsa.PemPkcsOAEPDecrypt(cryptorand.Reader, pri, dataBytes) error`)
+		return nil, errors.Wrap(err, `rsa.DecryptOAEP blocks error`)
 	}
 	return results, err
 }
@@ -419,9 +515,9 @@ func PemPkcs1v15Decrypt(pemPriBytes []byte, data interface{}) ([]byte, error) {
 		}
 	}
 
-	results, err := rsa.DecryptPKCS1v15(cryptorand.Reader, pri, dataBytes)
+	results, err := rsaDecryptPKCS1v15Blocks(pri, dataBytes)
 	if err != nil {
-		return nil, errors.Wrap(err, `rsa.DecryptPKCS1v15(cryptorand.Reader, pri, dataBytes) error`)
+		return nil, errors.Wrap(err, `rsa.DecryptPKCS1v15 blocks error`)
 	}
 	return results, err
 }
@@ -454,10 +550,9 @@ func Pkcs1v15Decrypt(raw []byte, data interface{}) ([]byte, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, `GetRSAPrivateKey failed`)
 	}
-
-	results, err := rsa.DecryptPKCS1v15(cryptorand.Reader, pri, dataBytes)
+	results, err := rsaDecryptPKCS1v15Blocks(pri, dataBytes)
 	if err != nil {
-		return nil, errors.Wrap(err, `rsa.DecryptPKCS1v15(cryptorand.Reader, pri, dataBytes) error`)
+		return nil, errors.Wrap(err, `rsa.DecryptPKCS1v15 blocks error`)
 	}
 	return results, err
 }
