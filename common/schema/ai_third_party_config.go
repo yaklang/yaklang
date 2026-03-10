@@ -1,9 +1,10 @@
 package schema
 
 import (
-	"github.com/yaklang/yaklang/common/log"
 	"sort"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
@@ -25,6 +26,7 @@ type AIThirdPartyConfig struct {
 	Domain         string          `json:"domain"`
 	WebhookURL     string          `json:"webhook_url"`
 	ExtraParams    MapStringString `json:"extra_params" gorm:"type:text"`
+	APIType        string          `json:"api_type"`
 	Disabled       bool            `json:"disabled" gorm:"default:false"`
 	Proxy          string          `json:"proxy"`
 	NoHttps        bool            `json:"no_https" gorm:"default:false"`
@@ -82,6 +84,9 @@ func (c *AIThirdPartyConfig) ToThirdPartyConfig() *ypb.ThirdPartyApplicationConf
 		Domain:         c.Domain,
 		WebhookURL:     c.WebhookURL,
 		Disabled:       c.Disabled,
+		Proxy:          c.Proxy,
+		NoHttps:        c.NoHttps,
+		APIType:        c.APIType,
 	}
 	if len(c.ExtraParams) > 0 {
 		cfg.ExtraParams = make([]*ypb.KVPair, 0, len(c.ExtraParams))
@@ -126,5 +131,8 @@ func AIThirdPartyConfigFromGRPC(cfg *ypb.ThirdPartyApplicationConfig) *AIThirdPa
 		WebhookURL:     cfg.GetWebhookURL(),
 		ExtraParams:    extra,
 		Disabled:       cfg.GetDisabled(),
+		Proxy:          cfg.GetProxy(),
+		NoHttps:        cfg.GetNoHttps(),
+		APIType:        cfg.GetAPIType(),
 	}
 }

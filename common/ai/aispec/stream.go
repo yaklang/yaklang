@@ -364,6 +364,418 @@ func appendStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfigOption, t
 	return outReader, reasonReader, opts, cancelFunc
 }
 
+func appendResponsesStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfigOption, toolCallCallback func([]*ToolCall), rawResponseCallback func([]byte, []byte)) (io.Reader, io.Reader, []poc.PocConfigOption, func()) {
+	outReader, outWriter := utils.NewBufPipe(nil)
+	reasonReader, reasonWriter := utils.NewBufPipe(nil)
+
+	cancelFunc := func() {
+		outWriter.Close()
+		reasonWriter.Close()
+	}
+
+	opts = append(opts, poc.WithBodyStreamReaderHandler(func(r []byte, closer io.ReadCloser) {
+		processAIResponseForResponses(r, closer, outWriter, reasonWriter, toolCallCallback, rawResponseCallback)
+	}))
+
+	return outReader, reasonReader, opts, cancelFunc
+}
+
+func processAIResponseForResponses(r []byte, closer io.ReadCloser, outWriter io.Writer, reasonWriter io.Writer, toolCallCallback func([]*ToolCall), rawResponseCallback func([]byte, []byte)) {
+	defer func() {
+		utils.CallGeneralClose(closer)
+		utils.CallGeneralClose(reasonWriter)
+		utils.CallGeneralClose(outWriter)
+	}()
+
+	var chunked bool
+	if te := lowhttp.GetHTTPPacketHeader(r, "transfer-encoding"); utils.IContains(te, "chunked") {
+		chunked = true
+	}
+
+	var mirrorResponse bytes.Buffer
+	statusCode := lowhttp.GetStatusCodeFromResponse(r)
+	if statusCode > 299 {
+		log.Warnf("response status code: %v", statusCode)
+		defer func() {
+			if mirrorResponse.Len() > 0 {
+				log.Infof("response body: %v", utils.ShrinkString(mirrorResponse.String(), 400))
+			}
+		}()
+	}
+
+	defer func() {
+		if rawResponseCallback != nil {
+			bodyPreview := mirrorResponse.Bytes()
+			const maxBodyPreview = 4096
+			if len(bodyPreview) > maxBodyPreview {
+				bodyPreview = bodyPreview[:maxBodyPreview]
+			}
+			rawResponseCallback(r, bodyPreview)
+		}
+	}()
+
+	var reader io.Reader = io.TeeReader(closer, &mirrorResponse)
+	if chunked {
+		reader = httputil.NewChunkedReader(reader)
+	}
+	body, err := io.ReadAll(reader)
+	if err != nil {
+		log.Warnf("failed to read responses body: %v", err)
+		return
+	}
+	if len(bytes.TrimSpace(body)) == 0 {
+		return
+	}
+
+	bodyTrim := bytes.TrimSpace(body)
+	if bodyTrim[0] == '{' || bodyTrim[0] == '[' {
+		if handleResponsesJSONPayload(bodyTrim, outWriter, reasonWriter, toolCallCallback) {
+			return
+		}
+	}
+	handleResponsesSSEPayload(body, outWriter, reasonWriter, toolCallCallback)
+}
+
+type responsesToolCallState struct {
+	byItemID map[string]*ToolCall
+}
+
+func newResponsesToolCallState() *responsesToolCallState {
+	return &responsesToolCallState{
+		byItemID: make(map[string]*ToolCall),
+	}
+}
+
+func (s *responsesToolCallState) getOrCreate(itemID string, index int) *ToolCall {
+	key := itemID
+	if key == "" {
+		key = fmt.Sprintf("index:%d", index)
+	}
+	if tc, ok := s.byItemID[key]; ok {
+		return tc
+	}
+	tc := &ToolCall{
+		Index: index,
+		Type:  "function",
+	}
+	s.byItemID[key] = tc
+	return tc
+}
+
+func handleResponsesJSONPayload(body []byte, outWriter io.Writer, reasonWriter io.Writer, toolCallCallback func([]*ToolCall)) bool {
+	var payload any
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return false
+	}
+	obj := utils.InterfaceToGeneralMap(payload)
+	if len(obj) == 0 {
+		return false
+	}
+	extractResponsesOutputFromObject(obj, outWriter, reasonWriter, toolCallCallback)
+	return true
+}
+
+func handleResponsesSSEPayload(body []byte, outWriter io.Writer, reasonWriter io.Writer, toolCallCallback func([]*ToolCall)) {
+	lineReader := bufio.NewReader(bytes.NewReader(body))
+	toolState := newResponsesToolCallState()
+
+	for {
+		line, err := utils.BufioReadLine(lineReader)
+		if err != nil && len(line) == 0 {
+			return
+		}
+		lineStr := strings.TrimSpace(string(line))
+		if lineStr == "" {
+			continue
+		}
+		if !strings.HasPrefix(lineStr, "data:") {
+			continue
+		}
+		rawEvent := strings.TrimSpace(strings.TrimPrefix(lineStr, "data:"))
+		if rawEvent == "" || rawEvent == "[DONE]" {
+			continue
+		}
+
+		jsonIdentifiers := jsonextractor.ExtractStandardJSON(rawEvent)
+		if len(jsonIdentifiers) == 0 {
+			if strings.HasPrefix(rawEvent, "{") {
+				jsonIdentifiers = append(jsonIdentifiers, rawEvent)
+			} else {
+				continue
+			}
+		}
+
+		for _, j := range jsonIdentifiers {
+			var eventMap map[string]any
+			if err := json.Unmarshal([]byte(j), &eventMap); err != nil {
+				continue
+			}
+			handleResponsesSSEEvent(eventMap, outWriter, reasonWriter, toolCallCallback, toolState)
+		}
+	}
+}
+
+func handleResponsesSSEEvent(event map[string]any, outWriter io.Writer, reasonWriter io.Writer, toolCallCallback func([]*ToolCall), toolState *responsesToolCallState) {
+	eventType := utils.MapGetString(event, "type")
+	switch eventType {
+	case "response.output_text.delta":
+		delta := utils.MapGetString(event, "delta")
+		if delta != "" {
+			outWriter.Write([]byte(delta))
+		}
+	case "response.reasoning_text.delta", "response.reasoning_summary_text.delta":
+		delta := utils.MapGetString(event, "delta")
+		if delta != "" {
+			reasonWriter.Write([]byte(delta))
+		}
+	case "response.function_call_arguments.delta":
+		outputIndex := utils.InterfaceToInt(event["output_index"])
+		itemID := utils.MapGetString(event, "item_id")
+		tc := toolState.getOrCreate(itemID, outputIndex)
+		if callID := utils.MapGetString(event, "call_id"); callID != "" {
+			tc.ID = callID
+		}
+		if name := utils.MapGetString(event, "name"); name != "" {
+			tc.Function.Name = name
+		}
+		delta := utils.MapGetString(event, "delta")
+		if delta != "" {
+			tc.Function.Arguments += delta
+		}
+		if delta == "" {
+			return
+		}
+		if toolCallCallback != nil {
+			toolCallCallback([]*ToolCall{tc.Clone()})
+		} else {
+			outWriter.Write([]byte(delta))
+		}
+	case "response.output_item.added", "response.output_item.done":
+		item := utils.MapGetMapRaw(event, "item")
+		if len(item) <= 0 {
+			return
+		}
+		handleResponsesOutputItem(item, eventType, outWriter, reasonWriter, toolCallCallback, toolState)
+	case "response.completed":
+		// Ignore completed event in streaming mode to avoid duplicate output/tool-calls.
+	default:
+		if strings.Contains(eventType, "reasoning") {
+			delta := utils.MapGetString(event, "delta")
+			if delta == "" {
+				delta = utils.MapGetString(event, "text")
+			}
+			if delta != "" {
+				reasonWriter.Write([]byte(delta))
+			}
+		}
+	}
+}
+
+func handleResponsesOutputItem(item map[string]any, eventType string, outWriter io.Writer, reasonWriter io.Writer, toolCallCallback func([]*ToolCall), toolState *responsesToolCallState) {
+	itemType := utils.MapGetString(item, "type")
+	switch itemType {
+	case "message":
+		text, reason := extractResponsesTextAndReason(item)
+		if reason != "" {
+			reasonWriter.Write([]byte(reason))
+		}
+		if text != "" {
+			outWriter.Write([]byte(text))
+		}
+	case "reasoning":
+		reason := extractResponsesReasoning(item)
+		if reason != "" {
+			reasonWriter.Write([]byte(reason))
+		}
+	case "function_call":
+		tc := parseResponsesFunctionCall(item, utils.InterfaceToInt(item["output_index"]))
+		if tc == nil {
+			return
+		}
+		streamTC := toolState.getOrCreate(utils.MapGetString(item, "id"), tc.Index)
+		if streamTC.ID == "" {
+			streamTC.ID = tc.ID
+		}
+		if streamTC.Type == "" {
+			streamTC.Type = tc.Type
+		}
+		if tc.Function.Name != "" {
+			streamTC.Function.Name = tc.Function.Name
+		}
+		if tc.Function.Arguments != "" {
+			streamTC.Function.Arguments = tc.Function.Arguments
+		}
+		if eventType != "response.output_item.done" {
+			return
+		}
+		if toolCallCallback != nil {
+			toolCallCallback([]*ToolCall{streamTC.Clone()})
+		} else {
+			writeLegacyToolCall(outWriter, streamTC)
+		}
+	}
+}
+
+func extractResponsesOutputFromObject(obj map[string]any, outWriter io.Writer, reasonWriter io.Writer, toolCallCallback func([]*ToolCall)) {
+	if nested := utils.MapGetMapRaw(obj, "response"); len(nested) > 0 {
+		obj = nested
+	}
+
+	outputText := utils.MapGetString(obj, "output_text")
+	if outputText != "" {
+		outWriter.Write([]byte(outputText))
+	}
+
+	var toolCalls []*ToolCall
+	outputItems := utils.InterfaceToSliceInterface(obj["output"])
+	for index, rawItem := range outputItems {
+		item := utils.InterfaceToGeneralMap(rawItem)
+		if len(item) == 0 {
+			continue
+		}
+		switch utils.MapGetString(item, "type") {
+		case "message":
+			if outputText == "" {
+				text, _ := extractResponsesTextAndReason(item)
+				if text != "" {
+					outWriter.Write([]byte(text))
+				}
+			}
+			_, reason := extractResponsesTextAndReason(item)
+			if reason != "" {
+				reasonWriter.Write([]byte(reason))
+			}
+		case "reasoning":
+			reason := extractResponsesReasoning(item)
+			if reason != "" {
+				reasonWriter.Write([]byte(reason))
+			}
+		case "function_call":
+			tc := parseResponsesFunctionCall(item, index)
+			if tc != nil {
+				toolCalls = append(toolCalls, tc)
+			}
+		}
+	}
+	if len(toolCalls) > 0 {
+		if toolCallCallback != nil {
+			toolCallCallback(toolCalls)
+		} else {
+			for _, tc := range toolCalls {
+				writeLegacyToolCall(outWriter, tc)
+			}
+		}
+	}
+}
+
+func extractResponsesTextAndReason(item map[string]any) (string, string) {
+	var textBuilder strings.Builder
+	var reasonBuilder strings.Builder
+	contentItems := utils.InterfaceToSliceInterface(item["content"])
+	for _, rawContent := range contentItems {
+		content := utils.InterfaceToGeneralMap(rawContent)
+		if len(content) == 0 {
+			continue
+		}
+		contentType := utils.MapGetString(content, "type")
+		text := utils.MapGetString(content, "text")
+		if text == "" {
+			text = utils.MapGetString(content, "output_text")
+		}
+		if text == "" {
+			continue
+		}
+		if strings.Contains(contentType, "reasoning") {
+			reasonBuilder.WriteString(text)
+			continue
+		}
+		if contentType == "" || strings.Contains(contentType, "text") {
+			textBuilder.WriteString(text)
+		}
+	}
+	return textBuilder.String(), reasonBuilder.String()
+}
+
+func extractResponsesReasoning(item map[string]any) string {
+	if text := utils.MapGetString(item, "text"); text != "" {
+		return text
+	}
+	var result strings.Builder
+	summary := utils.InterfaceToSliceInterface(item["summary"])
+	for _, raw := range summary {
+		summaryItem := utils.InterfaceToGeneralMap(raw)
+		if len(summaryItem) == 0 {
+			continue
+		}
+		text := utils.MapGetString(summaryItem, "text")
+		if text != "" {
+			result.WriteString(text)
+		}
+	}
+	return result.String()
+}
+
+func parseResponsesFunctionCall(item map[string]any, defaultIndex int) *ToolCall {
+	name := utils.MapGetString(item, "name")
+	args := utils.MapGetString(item, "arguments")
+	if name == "" && args == "" {
+		return nil
+	}
+	index := defaultIndex
+	if raw, ok := item["output_index"]; ok {
+		index = utils.InterfaceToInt(raw)
+	} else if raw, ok := item["index"]; ok {
+		index = utils.InterfaceToInt(raw)
+	}
+	id := utils.MapGetString(item, "call_id")
+	if id == "" {
+		id = utils.MapGetString(item, "id")
+	}
+	return &ToolCall{
+		Index: index,
+		ID:    id,
+		Type:  "function",
+		Function: FuncReturn{
+			Name:      name,
+			Arguments: args,
+		},
+	}
+}
+
+func writeLegacyToolCall(outWriter io.Writer, tc *ToolCall) {
+	if tc == nil {
+		return
+	}
+	if tc.Function.Name == "" {
+		if tc.Function.Arguments != "" {
+			outWriter.Write([]byte(tc.Function.Arguments))
+		}
+		return
+	}
+	funcMap := map[string]any{
+		"name": tc.Function.Name,
+	}
+	if tc.Function.Arguments != "" {
+		funcMap["arguments"] = tc.Function.Arguments
+	}
+	funcMapRaw, err := json.Marshal(funcMap)
+	if err != nil {
+		return
+	}
+	callData, err := utils.RenderTemplate(`
+<|TOOL_CALL_{{ .Nonce }}|>
+{{ .Data }}
+<|TOOL_CALL_END{{ .Nonce }}|>
+`, map[string]any{
+		"Nonce": utils.RandStringBytes(4),
+		"Data":  string(funcMapRaw),
+	})
+	if err != nil {
+		return
+	}
+	outWriter.Write([]byte(callData))
+}
+
 func ChatWithStream(
 	url string, model string, msg string,
 	httpErrHandler func(err error),

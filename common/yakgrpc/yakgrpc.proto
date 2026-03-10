@@ -1012,7 +1012,7 @@ service Yak {
   rpc CreateRelationship(Relationship) returns (DbOperateMessage);
   rpc UpdateRelationship(Relationship) returns (DbOperateMessage);
   rpc DeleteRelationship(DeleteRelationshipRequest) returns (DbOperateMessage);
-  rpc QuerySubERM(QuerySubERMRequest) returns (QuerySubERMResponse);
+  rpc QuerySubERM(QuerySubERMRequest) returns (QuerySubERMResponse);1
   rpc GenerateERMDot(GenerateERMDotRequest) returns (GenerateERMDotResponse);
 
   // Export and Import Knowledge Base
@@ -2809,6 +2809,7 @@ message ThirdPartyApplicationConfig {
   bool Disabled = 9;
   string Proxy = 10;
   bool NoHttps = 11;
+  string APIType = 12;
 }
 
 message DiagnoseNetworkRequest {

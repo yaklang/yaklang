@@ -32,10 +32,11 @@ type AIConfig struct {
 	Timeout  float64 // `app:"name:请求超时时长"`
 	Deadline time.Time
 
-	APIKey string `json:"api_key" app:"name:api_key,verbose:ApiKey,desc:APIKey / Token,required:true,id:1,type:list"`
-	Proxy  string `json:"proxy" app:"name:proxy,verbose:代理地址,id:5"`
-	Host   string
-	Port   int
+	APIKey  string `json:"api_key" app:"name:api_key,verbose:ApiKey,desc:APIKey / Token,required:true,id:1,type:list"`
+	Proxy   string `json:"proxy" app:"name:proxy,verbose:代理地址,id:5"`
+	APIType string `json:"api_type" app:"name:api_type,verbose:API类型,id:6,required:false,default:chat_completions"`
+	Host    string
+	Port    int
 
 	StreamHandler       func(io.Reader)
 	ReasonStreamHandler func(reader io.Reader)
