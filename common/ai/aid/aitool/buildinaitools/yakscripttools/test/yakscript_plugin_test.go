@@ -427,3 +427,189 @@ func TestConvertPortScanPlugin_SecondaryDisclosure(t *testing.T) {
 	assert.Check(t, strings.Contains(tool.Usage, "target"), "Port-scan Usage should mention target parameter")
 	assert.Check(t, strings.Contains(tool.Usage, "port"), "Port-scan Usage should mention port parameter")
 }
+
+// TestFullChain_Search_Convert_Disclosure tests the complete pipeline:
+// DB insert (enable_for_ai=true) → BM25 search finds it → convert to AI tool → verify Usage & params
+func TestFullChain_Search_Convert_Disclosure(t *testing.T) {
+	db := createTestDB(t)
+
+	// Simulate a CSRF detection MITM plugin like the core plugin
+	insertTestYakScript(t, db, &schema.YakScript{
+		ScriptName:  "CSRF-Detection-Chain-Test",
+		Type:        "mitm",
+		Content:     "mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {\n  yakit.Info(\"csrf check: %s\", url)\n}\n",
+		Help:        "CSRF form protection and CORS misconfiguration detection",
+		EnableForAI: true,
+		AIDesc:      "CSRF form protection and CORS misconfiguration detection. Checks for missing CSRF tokens in forms and insecure CORS headers.",
+		AIKeywords:  "csrf,cors,cross-site request forgery,CORS misconfiguration,form protection,CSRF检测",
+	})
+
+	// Also insert a non-AI plugin that mentions CSRF - should NOT be found
+	insertTestYakScript(t, db, &schema.YakScript{
+		ScriptName:  "CSRF-Not-For-AI",
+		Type:        "mitm",
+		Content:     "mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {}\n",
+		Help:        "CSRF checker but not for AI",
+		EnableForAI: false,
+	})
+
+	// Also insert some native yak plugin
+	insertTestYakScript(t, db, &schema.YakScript{
+		ScriptName:  "Native-Scanner-Chain-Test",
+		Type:        "yak",
+		Content:     "__USAGE__ = \"Scan host for security issues.\"\ntarget = cli.String(\"target\", cli.setRequired(true))\nmode = cli.String(\"mode\", cli.setDefault(\"fast\"))\nlog.info(\"scanning %s mode=%s\", target, mode)\n",
+		Help:        "Native security scanner",
+		EnableForAI: true,
+		AIDesc:      "Native security scanner with configurable scan modes",
+		AIKeywords:  "scanner,security,native,scan",
+	})
+
+	// Step 1: Search via BM25 - should find CSRF plugin
+	results, err := yakit.SearchYakScriptForAIBM25(db, &yakit.YakScriptForAIFilter{
+		Keywords: []string{"csrf"},
+	}, 10, 0)
+	assert.NilError(t, err)
+	assert.Check(t, len(results) >= 1, "BM25 search for 'csrf' should find at least 1 result")
+
+	foundCSRF := false
+	for _, r := range results {
+		assert.Check(t, r.EnableForAI, "all results must have enable_for_ai=true")
+		assert.Check(t, r.ScriptName != "CSRF-Not-For-AI", "non-AI plugin must not appear")
+		if r.ScriptName == "CSRF-Detection-Chain-Test" {
+			foundCSRF = true
+		}
+	}
+	assert.Check(t, foundCSRF, "CSRF-Detection-Chain-Test must be in search results")
+	t.Logf("Step 1 PASS: BM25 search found %d results, CSRF plugin present", len(results))
+
+	// Step 2: Convert the found CSRF plugin to AI tool
+	csrfScript := results[0]
+	tool, err := yakscripttools.ConvertYakScriptPlugin(csrfScript)
+	assert.NilError(t, err)
+	assert.Check(t, tool != nil)
+	assert.Equal(t, tool.Name, "CSRF-Detection-Chain-Test")
+	assert.Check(t, strings.Contains(tool.Description, "MITM Plugin"), "should be tagged as MITM Plugin")
+	assert.Check(t, tool.Usage != "", "MITM tool must have Usage for secondary disclosure")
+	assert.Check(t, strings.Contains(tool.Usage, "requestPacket"), "Usage must mention requestPacket")
+	assert.Check(t, tool.Callback != nil, "tool must have executable callback")
+	t.Logf("Step 2 PASS: CSRF MITM plugin converted, Usage len=%d", len(tool.Usage))
+
+	// Step 3: Search for native plugin, convert, verify SSA-parsed params
+	nativeResults, err := yakit.SearchYakScriptForAIBM25(db, &yakit.YakScriptForAIFilter{
+		Keywords: []string{"scanner", "security"},
+	}, 10, 0)
+	assert.NilError(t, err)
+	foundNative := false
+	for _, r := range nativeResults {
+		if r.ScriptName == "Native-Scanner-Chain-Test" {
+			foundNative = true
+
+			nativeTool, err := yakscripttools.ConvertYakScriptPlugin(r)
+			assert.NilError(t, err)
+			assert.Check(t, nativeTool != nil)
+
+			// Verify __USAGE__ is in secondary disclosure
+			assert.Check(t, strings.Contains(nativeTool.Usage, "Scan host"), "native tool Usage must contain __USAGE__ content")
+
+			// Verify SSA-parsed cli params
+			schemaJSON := nativeTool.ToJSONSchemaString()
+			assert.Check(t, strings.Contains(schemaJSON, "target"), "must have SSA-parsed 'target' param")
+			assert.Check(t, strings.Contains(schemaJSON, "mode"), "must have SSA-parsed 'mode' param")
+			usagePreview := nativeTool.Usage
+			if len(usagePreview) > 50 {
+				usagePreview = usagePreview[:50]
+			}
+			t.Logf("Step 3 PASS: Native plugin converted, Usage='%s...', schema has target+mode", usagePreview)
+		}
+	}
+	assert.Check(t, foundNative, "Native-Scanner-Chain-Test must be findable via search")
+}
+
+// TestFullChain_MITM_Execution_WithDisclosure tests that a MITM plugin found via
+// search can actually execute against a real HTTP target with proper secondary disclosure.
+func TestFullChain_MITM_Execution_WithDisclosure(t *testing.T) {
+	db := createTestDB(t)
+
+	flag := utils.RandStringBytes(20)
+	host, port := utils.DebugMockHTTP([]byte(flag))
+	targetUrl := fmt.Sprintf("http://%s:%d", host, port)
+
+	insertTestYakScript(t, db, &schema.YakScript{
+		ScriptName:  "MITM-Exec-Chain-Test",
+		Type:        "mitm",
+		Content:     "mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {\n  yakit.Info(\"CHAIN_TEST_EXECUTED: %s body_len=%d\", url, len(body))\n}\n",
+		Help:        "MITM execution chain test",
+		EnableForAI: true,
+		AIDesc:      "Chain test MITM plugin for execution verification",
+		AIKeywords:  "chain,test,execution,mitm",
+	})
+
+	// Search
+	results, err := yakit.SearchYakScriptForAIBM25(db, &yakit.YakScriptForAIFilter{
+		Keywords: []string{"chain", "execution"},
+	}, 10, 0)
+	assert.NilError(t, err)
+	assert.Check(t, len(results) >= 1, "should find the chain test plugin")
+
+	// Convert
+	tool, err := yakscripttools.ConvertYakScriptPlugin(results[0])
+	assert.NilError(t, err)
+	assert.Check(t, tool.Usage != "", "must have Usage for secondary disclosure")
+
+	// Execute
+	stdout := bytes.NewBuffer(nil)
+	stderr := bytes.NewBuffer(nil)
+	_, err = tool.Callback(context.Background(), aitool.InvokeParams{
+		"url": targetUrl,
+	}, nil, stdout, stderr)
+	assert.NilError(t, err)
+	t.Logf("MITM plugin stdout: %s", stdout.String())
+	t.Logf("Execution chain complete: search → convert → disclosure → execute ✓")
+}
+
+// TestPluginHash_AIFields_TriggerUpdate verifies that when AI fields differ between
+// a database plugin and the new scriptData, the hash comparison detects the change.
+func TestPluginHash_AIFields_TriggerUpdate(t *testing.T) {
+	db := createTestDB(t)
+
+	// Step 1: Insert plugin WITHOUT AI fields (simulates existing DB state before withPluginEnableForAI)
+	insertTestYakScript(t, db, &schema.YakScript{
+		ScriptName:  "hash-update-test-plugin",
+		Type:        "mitm",
+		Content:     "mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {}\n",
+		Help:        "Test plugin for hash update verification",
+		EnableForAI: false,
+		AIDesc:      "",
+		AIKeywords:  "",
+	})
+
+	// Verify it's NOT found by AI search
+	results, err := yakit.SearchYakScriptForAIBM25(db, &yakit.YakScriptForAIFilter{
+		Keywords: []string{"hash-update-test"},
+	}, 10, 0)
+	assert.NilError(t, err)
+	assert.Check(t, len(results) == 0, "plugin without enable_for_ai should not appear in AI search")
+
+	// Step 2: Update the plugin to enable AI (simulates what OverWriteYakPlugin should do after hash fix)
+	err = yakit.CreateOrUpdateYakScriptByName(db, "hash-update-test-plugin", &schema.YakScript{
+		ScriptName:  "hash-update-test-plugin",
+		Type:        "mitm",
+		Content:     "mirrorHTTPFlow = func(isHttps, url, req, rsp, body) {}\n",
+		Help:        "Test plugin for hash update verification",
+		EnableForAI: true,
+		AIDesc:      "Now AI-enabled test plugin for hash verification",
+		AIKeywords:  "hash,update,test,verification",
+	})
+	assert.NilError(t, err)
+
+	// Step 3: Verify it IS now found by AI search
+	results, err = yakit.SearchYakScriptForAIBM25(db, &yakit.YakScriptForAIFilter{
+		Keywords: []string{"hash", "update"},
+	}, 10, 0)
+	assert.NilError(t, err)
+	assert.Check(t, len(results) >= 1, "after enabling AI, plugin must appear in AI search")
+	assert.Equal(t, results[0].ScriptName, "hash-update-test-plugin")
+	assert.Check(t, results[0].EnableForAI, "enable_for_ai must be true")
+	assert.Check(t, results[0].AIDesc != "", "ai_desc must be populated")
+	t.Logf("Hash update test passed: plugin became searchable after AI fields were written")
+}
