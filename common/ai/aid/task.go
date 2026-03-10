@@ -78,9 +78,12 @@ func (t *AiTask) SetSemanticIdentifier(id string) {
 
 func (t *AiTask) GetUserInput() string {
 	if utils.IsNil(t.ParentTask) {
+		if t.AIStatefulTaskBase == nil {
+			return ""
+		}
 		return t.AIStatefulTaskBase.GetUserInput()
 	}
-	var buf bytes.Buffer
+	nonce := strings.ToLower(utils.RandStringBytes(6))
 
 	// 收集父任务链的输入（不包括当前任务）
 	var collectParentInputs func(task *AiTask, depth int) []string
@@ -118,43 +121,50 @@ func (t *AiTask) GetUserInput() string {
 		currentInput = t.AIStatefulTaskBase.GetUserInput()
 	}
 
-	// 构建输出：用户原始输入部分
-	if t.Coordinator.userInput != "" {
-		buf.WriteString(t.Coordinator.userInput)
-	}
-	// 构建输出：父任务部分
-	if len(parentInputs) > 0 {
-		buf.WriteString("<|PARENT_TASK|>\n")
-		for i, input := range parentInputs {
-			if i > 0 {
-				buf.WriteString("\n")
-			}
-			buf.WriteString(input)
-		}
-		buf.WriteString("\n<|PARENT_TASK_END|>\n\n")
+	var rawUserInput string
+	if t.Coordinator != nil {
+		rawUserInput = t.Coordinator.userInput
 	}
 
-	// 当前任务部分
-	buf.WriteString("<|CURRENT_TASK|>\n")
-	if currentInput != "" {
-		buf.WriteString(currentInput)
+	parentInputsJoined := strings.Join(parentInputs, "\n")
+	parentBlock := ""
+	if parentInputsJoined != "" {
+		parentBlock = utils.MustRenderTemplate(`<|PARENT_TASK_{{ .nonce }}|>
+{{ .ParentInputs }}
+<|PARENT_TASK_END_{{ .nonce }}|>
+
+`, map[string]any{
+			"nonce":        nonce,
+			"ParentInputs": parentInputsJoined,
+		})
 	}
-	buf.WriteString("\n<|CURRENT_TASK_END|>\n\n")
 
-	// 追加提示信息
-	buf.WriteString("<|INSTRUCTION|>\n")
-	buf.WriteString("## 任务执行原则\n\n")
-	buf.WriteString("**核心要求**：请专注于完成 `<|CURRENT_TASK|>` 中定义的任务目标。\n\n")
-	buf.WriteString("**父任务的作用**：`<|PARENT_TASK|>` 中的信息仅作为上下文参考，帮助你理解当前任务在整个任务体系中的位置和背景。这些信息不应成为你的执行目标。\n\n")
-	buf.WriteString("**执行边界**：\n")
-	buf.WriteString("- 执行当前任务定义的具体目标和步骤\n")
-	buf.WriteString("- 参考父任务信息以更好地理解上下文\n")
-	buf.WriteString("- 不要尝试执行或修改父任务\n")
-	buf.WriteString("- 不要越界处理不属于当前任务范围的工作\n\n")
-	buf.WriteString("**行动指南**：始终以当前任务的目标为导向，将父任务信息视为辅助理解的背景材料，而非待执行的任务清单。\n")
-	buf.WriteString("<|INSTRUCTION_END|>")
+	templareString := `{{ .RawUserInput }}{{ .ParentBlock }}<|CURRENT_TASK_{{ .nonce }}|>
+{{ .CurrentInput }}
+<|CURRENT_TASK_END_{{ .nonce }}|>
 
-	return buf.String()
+<|INSTRUCTION_{{ .nonce }}|>
+## 任务执行原则
+
+**核心要求**：请专注于完成 <|CURRENT_TASK_{{ .nonce }}|> 中定义的任务目标。
+
+**父任务的作用**：<|PARENT_TASK_{{ .nonce }}|> 中的信息仅作为上下文参考，帮助你理解当前任务在整个任务体系中的位置和背景。这些信息不应成为你的执行目标。
+
+**执行边界**：
+- 执行当前任务定义的具体目标和步骤
+- 参考父任务信息以更好地理解上下文
+- 不要尝试执行或修改父任务
+- 不要越界处理不属于当前任务范围的工作
+
+**行动指南**：始终以当前任务的目标为导向，将父任务信息视为辅助理解的背景材料，而非待执行的任务清单。
+<|INSTRUCTION_END_{{ .nonce }}|>`
+
+	return utils.MustRenderTemplate(templareString, map[string]any{
+		"nonce":        nonce,
+		"RawUserInput": rawUserInput,
+		"ParentBlock":  parentBlock,
+		"CurrentInput": currentInput,
+	})
 }
 
 func (t *AiTask) executed() bool {
