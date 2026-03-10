@@ -86,6 +86,10 @@ func ConvertYPBAIStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.Confi
 		opts = append(opts, aid.WithAiForgeSearchTool())
 	}
 
+	if i.GetAICallTokenLimit() > 0 {
+		opts = append(opts, aicommon.WithAiCallTokenLimit(int64(i.GetAICallTokenLimit())))
+	}
+
 	return opts
 }
 
