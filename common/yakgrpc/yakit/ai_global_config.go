@@ -211,6 +211,8 @@ func mergeProviderAndModel(provider *ypb.ThirdPartyApplicationConfig, model *ypb
 		Domain:         provider.GetDomain(),
 		WebhookURL:     provider.GetWebhookURL(),
 		Disabled:       provider.GetDisabled(),
+		Proxy:          provider.GetProxy(),
+		NoHttps:        provider.GetNoHttps(),
 	}
 
 	extra := mapFromKVPairs(provider.GetExtraParams())

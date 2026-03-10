@@ -82,6 +82,8 @@ func (c *AIThirdPartyConfig) ToThirdPartyConfig() *ypb.ThirdPartyApplicationConf
 		Domain:         c.Domain,
 		WebhookURL:     c.WebhookURL,
 		Disabled:       c.Disabled,
+		Proxy:          c.Proxy,
+		NoHttps:        c.NoHttps,
 	}
 	if len(c.ExtraParams) > 0 {
 		cfg.ExtraParams = make([]*ypb.KVPair, 0, len(c.ExtraParams))

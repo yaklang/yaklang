@@ -2,7 +2,6 @@ package yakgrpc
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,29 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func isCI() bool {
-	ciEnvVars := []string{
-		"CI",
-		"GITHUB_ACTIONS",
-		"GITLAB_CI",
-		"CIRCLECI",
-		"TRAVIS",
-		"JENKINS_HOME",
-		"BUILDKITE",
-	}
-	for _, envVar := range ciEnvVars {
-		if os.Getenv(envVar) != "" {
-			return true
-		}
-	}
-	return false
-}
-
 func TestAIGlobalConfig_GRPC_Local(t *testing.T) {
-	if isCI() {
-		t.Skip("skip grpc ai config local test in CI environment")
-	}
-
 	client, server, err := NewLocalClientAndServerWithTempDatabase(t)
 	require.NoError(t, err)
 	require.NotNil(t, client)
@@ -57,9 +34,11 @@ func TestAIGlobalConfig_GRPC_Local(t *testing.T) {
 			{
 				ModelName: "gpt-4o",
 				Provider: &ypb.ThirdPartyApplicationConfig{
-					Type:   "openai",
-					APIKey: "key-1",
-					Domain: "api.openai.com",
+					Type:    "openai",
+					APIKey:  "key-1",
+					Domain:  "api.openai.com",
+					Proxy:   "http://127.0.0.1:7890",
+					NoHttps: true,
 				},
 				ExtraParams: []*ypb.KVPair{{Key: "temperature", Value: "0.1"}},
 			},
@@ -68,9 +47,11 @@ func TestAIGlobalConfig_GRPC_Local(t *testing.T) {
 			{
 				ModelName: "gpt-4o-mini",
 				Provider: &ypb.ThirdPartyApplicationConfig{
-					Type:   "openai",
-					APIKey: "key-2",
-					Domain: "api.openai.com",
+					Type:    "openai",
+					APIKey:  "key-2",
+					Domain:  "api.openai.com",
+					Proxy:   "socks5://127.0.0.1:1080",
+					NoHttps: false,
 				},
 			},
 		},
@@ -90,6 +71,12 @@ func TestAIGlobalConfig_GRPC_Local(t *testing.T) {
 	require.Len(t, got.IntelligentModels, 1)
 	assert.NotZero(t, got.IntelligentModels[0].ProviderId)
 	assert.NotNil(t, got.IntelligentModels[0].Provider)
+	assert.Equal(t, "http://127.0.0.1:7890", got.IntelligentModels[0].Provider.Proxy)
+	assert.True(t, got.IntelligentModels[0].Provider.NoHttps)
+	require.Len(t, got.LightweightModels, 1)
+	assert.NotNil(t, got.LightweightModels[0].Provider)
+	assert.Equal(t, "socks5://127.0.0.1:1080", got.LightweightModels[0].Provider.Proxy)
+	assert.False(t, got.LightweightModels[0].Provider.NoHttps)
 
 	providers, err := client.ListAIProviders(ctx, &ypb.Empty{})
 	require.NoError(t, err)
