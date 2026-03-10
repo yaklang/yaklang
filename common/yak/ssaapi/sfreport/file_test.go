@@ -1,6 +1,7 @@
 package sfreport
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -77,7 +78,8 @@ func TestFile2EditorRoundTrip(t *testing.T) {
 			require.NoError(t, err)
 
 			assert.Equal(t, programName, convertedEditor.GetProgramName())
-			assert.Equal(t, tt.folderPath, convertedEditor.GetFolderPath())
+			// MemEditor normalizes folderPath to a pure path: no leading/trailing slashes.
+			assert.Equal(t, strings.Trim(tt.folderPath, "/"), convertedEditor.GetFolderPath())
 			assert.Equal(t, tt.fileName, convertedEditor.GetFilename())
 
 			if tt.expectHashMatch {

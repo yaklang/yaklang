@@ -232,6 +232,10 @@ func (y *SyntaxFlowVisitor) VisitConditionExpression(raw sf.IConditionExpression
 			log.Warnf("compile filter-expr in binary compare failed: %v", err)
 			return err
 		}
+		// The compare/condition is applied on the derived list (stack top) and then mapped
+		// back to the duplicated original source via OpFilter, so we need a scope rooted
+		// at the derived list here.
+		y.EmitConditionScopeStart()
 		if i.NumberLiteral() != nil {
 			n := y.VisitNumberLiteral(i.NumberLiteral())
 			y.EmitPushLiteral(n)
@@ -247,6 +251,7 @@ func (y *SyntaxFlowVisitor) VisitConditionExpression(raw sf.IConditionExpression
 		y.EmitOperator(i.GetOp().GetText())
 		// Filter derived values by the comparison result.
 		y.EmitCondition()
+		y.EmitConditionScopeEnd()
 		// Map back to the original source list.
 		y.EmitFilter()
 	case *sf.OpcodeTypeConditionContext:

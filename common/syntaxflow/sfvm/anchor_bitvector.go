@@ -2,6 +2,7 @@ package sfvm
 
 import (
 	"fmt"
+	"reflect"
 	"strconv"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -19,12 +20,26 @@ func valueIdentity(value ValueOperator) string {
 	return fmt.Sprintf("%p", value)
 }
 
-// assignLocalAnchorBitVector overwrites anchor bits for each leaf in sourceValues so
-// they map to the local slot index inside the current condition scope.
+func valuePointerKey(value ValueOperator) string {
+	if utils.IsNil(value) {
+		return ""
+	}
+	v := reflect.ValueOf(value)
+	switch v.Kind() {
+	case reflect.Pointer, reflect.Map, reflect.Slice, reflect.Func, reflect.Chan, reflect.UnsafePointer:
+		return fmt.Sprintf("%T:%d", value, v.Pointer())
+	default:
+		// Fallback: stable-enough within a single execution.
+		return fmt.Sprintf("%T:%s", value, valueIdentity(value))
+	}
+}
+
+// assignLocalAnchorBitVector adds local anchor bits for each leaf in sourceValues so
+// they map to the local slot index inside a scope range [base, base+len(sourceValues)).
 //
 // Values that appear multiple times (same identity) get a union of all their slot
 // indices to keep mask alignment stable.
-func assignLocalAnchorBitVector(sourceValues Values) []anchorRestoreEntry {
+func assignLocalAnchorBitVector(sourceValues Values, base int) []anchorRestoreEntry {
 	type entry struct {
 		value ValueOperator
 		index int
@@ -35,15 +50,16 @@ func assignLocalAnchorBitVector(sourceValues Values) []anchorRestoreEntry {
 		if utils.IsNil(v) {
 			continue
 		}
-		key := valueIdentity(v)
-		if _, ok := restores[key]; !ok {
+		idKey := valueIdentity(v)
+		ptrKey := valuePointerKey(v)
+		if _, ok := restores[ptrKey]; !ok {
 			var cloned *utils.BitVector
 			if bits := v.GetAnchorBitVector(); bits != nil && !bits.IsEmpty() {
 				cloned = bits.Clone()
 			}
-			restores[key] = anchorRestoreEntry{value: v, bits: cloned}
+			restores[ptrKey] = anchorRestoreEntry{value: v, bits: cloned}
 		}
-		group[key] = append(group[key], entry{value: v, index: idx})
+		group[idKey] = append(group[idKey], entry{value: v, index: idx})
 	}
 
 	out := make([]anchorRestoreEntry, 0, len(restores))
@@ -55,12 +71,17 @@ func assignLocalAnchorBitVector(sourceValues Values) []anchorRestoreEntry {
 		if len(entries) == 0 {
 			continue
 		}
-		bits := utils.NewBitVector()
+		local := utils.NewBitVector()
 		for _, e := range entries {
-			bits.Set(e.index)
+			local.Set(base + e.index)
 		}
 		for _, e := range entries {
-			e.value.SetAnchorBitVector(bits)
+			restore := restores[valuePointerKey(e.value)]
+			merged := local.Clone()
+			if restore.bits != nil && !restore.bits.IsEmpty() {
+				merged.Or(restore.bits)
+			}
+			e.value.SetAnchorBitVector(merged)
 		}
 	}
 
@@ -76,14 +97,15 @@ func restoreAnchorBitVector(entries []anchorRestoreEntry) {
 	}
 }
 
-func markMaskByBitVector(mask []bool, bits *utils.BitVector) bool {
+func markMaskByBitVector(mask []bool, bits *utils.BitVector, base int) bool {
 	if bits == nil || bits.IsEmpty() {
 		return false
 	}
 	matched := false
+	end := base + len(mask)
 	bits.ForEach(func(index int) {
-		if index >= 0 && index < len(mask) {
-			mask[index] = true
+		if index >= base && index < end {
+			mask[index-base] = true
 			matched = true
 		}
 	})

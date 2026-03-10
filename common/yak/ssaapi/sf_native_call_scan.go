@@ -42,6 +42,8 @@ var nativeCallScan = func(direction direction) func(v sfvm.Values, frame *sfvm.S
 			if !ok {
 				return nil
 			}
+			// Preserve anchor provenance so condition scopes can map scan results back to their source.
+			sfvm.MergeAnchorBitVectorToResult(sfvm.NewValues(results), val)
 			vals = append(vals, results...)
 			return nil
 		})

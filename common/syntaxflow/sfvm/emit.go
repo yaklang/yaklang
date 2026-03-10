@@ -262,22 +262,6 @@ func (v *SyntaxFlowVisitor) EmitConditionScopeEnd() {
 	})
 }
 
-// Anchor scopes enable local grouping/provenance inside optional filters (?{...} and ?(...)).
-// They reuse OpConditionScopeStart/End with UnaryBool=true, so no new opcodes are needed.
-func (v *SyntaxFlowVisitor) EmitAnchorScopeStart() {
-	v.codes = append(v.codes, &SFI{
-		OpCode:    OpConditionScopeStart,
-		UnaryBool: true,
-	})
-}
-
-func (v *SyntaxFlowVisitor) EmitAnchorScopeEnd() {
-	v.codes = append(v.codes, &SFI{
-		OpCode:    OpConditionScopeEnd,
-		UnaryBool: true,
-	})
-}
-
 func (v *SyntaxFlowVisitor) EmitEqual(i any) {
 	switch i.(type) {
 	case string:

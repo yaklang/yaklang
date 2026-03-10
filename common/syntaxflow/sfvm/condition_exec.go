@@ -74,15 +74,14 @@ func buildValueByID(values Values) map[int64]ValueOperator {
 	return res
 }
 
-func normalizeConditionAgainstSource(source Values, result Values, cond []bool) ([]bool, error) {
-	width := len(source)
+func normalizeConditionAgainstSource(scope conditionScopeState, result Values, cond []bool) ([]bool, error) {
+	width := scope.anchorWidth
 	if width == 0 {
 		return nil, nil
 	}
 	if len(cond) == width {
 		return cond, nil
 	}
-	sourceIdentityIndex := buildValueIdentityIndex(source)
 
 	// Program/overlay-like singleton source: cond can be omitted and derived from result existence.
 	if width == 1 {
@@ -100,9 +99,9 @@ func normalizeConditionAgainstSource(source Values, result Values, cond []bool) 
 			if utils.IsNil(operator) || operator.IsEmpty() {
 				continue
 			}
-			matched := markMaskByBitVector(mask, operator.GetAnchorBitVector())
+			matched := markMaskByBitVector(mask, operator.GetAnchorBitVector(), scope.anchorBase)
 			if !matched {
-				markMaskByValueIdentity(mask, sourceIdentityIndex, operator)
+				markMaskByValueIdentity(mask, scope.sourceIdentityIdx, operator)
 			}
 		}
 	}
@@ -203,8 +202,8 @@ func mergeValuesByID(left Values, right Values, andMode bool) Values {
 	return NewValues(out)
 }
 
-func buildConditionEntry(source Values, cond []bool, candidate Values, fromCompare bool) (ConditionEntry, error) {
-	mode := conditionModeFromSource(source)
+func buildConditionEntry(scope conditionScopeState, cond []bool, candidate Values, fromCompare bool) (ConditionEntry, error) {
+	mode := scope.mode
 	matched := anyTrue(cond)
 	if fromCompare && !matched && hasNonEmptyValue(candidate) {
 		matched = true
@@ -213,7 +212,7 @@ func buildConditionEntry(source Values, cond []bool, candidate Values, fromCompa
 		return newCandidateCondition(matched, candidate), nil
 	}
 	if fromCompare {
-		mask, err := normalizeConditionAgainstSource(source, candidate, cond)
+		mask, err := normalizeConditionAgainstSource(scope, candidate, cond)
 		if err != nil {
 			return ConditionEntry{}, err
 		}
@@ -222,8 +221,19 @@ func buildConditionEntry(source Values, cond []bool, candidate Values, fromCompa
 	return newMaskCondition(cond, candidate), nil
 }
 
-func (s *SFFrame) pushCondition(source Values, cond []bool, candidate Values, fromCompare bool) error {
-	entry, err := buildConditionEntry(source, cond, candidate, fromCompare)
+func (s *SFFrame) activeConditionScope() (conditionScopeState, bool) {
+	if s == nil || s.conditionScope == nil || s.conditionScope.Len() == 0 {
+		return conditionScopeState{}, false
+	}
+	return s.conditionScope.Peek(), true
+}
+
+func (s *SFFrame) pushCondition(cond []bool, candidate Values, fromCompare bool) error {
+	scope, ok := s.activeConditionScope()
+	if !ok {
+		return utils.Wrap(CriticalError, "condition failed: missing condition scope")
+	}
+	entry, err := buildConditionEntry(scope, cond, candidate, fromCompare)
 	if err != nil {
 		return err
 	}
@@ -294,53 +304,36 @@ func (s *SFFrame) applyLogicBinaryCondition(andMode bool) error {
 	}
 }
 
-func buildFilterMask(source Values, cond Values) ([]bool, error) {
-	mask := make([]bool, len(source))
-	sourceIdentityIndex := buildValueIdentityIndex(source)
+func buildFilterMask(scope conditionScopeState, cond Values) ([]bool, error) {
+	mask := make([]bool, scope.anchorWidth)
 	for _, operator := range cond {
 		if utils.IsNil(operator) || operator.IsEmpty() {
 			continue
 		}
-		matched := markMaskByBitVector(mask, operator.GetAnchorBitVector())
+		matched := markMaskByBitVector(mask, operator.GetAnchorBitVector(), scope.anchorBase)
 		if !matched {
-			markMaskByValueIdentity(mask, sourceIdentityIndex, operator)
+			markMaskByValueIdentity(mask, scope.sourceIdentityIdx, operator)
 		}
 	}
 	return mask, nil
 }
 
-func (s *SFFrame) pushFilterCondition(source Values, cond Values) error {
-	if conditionModeFromSource(source) == ConditionModeCandidate {
-		return s.pushCondition(source, []bool{hasNonEmptyValue(cond)}, cond, false)
+func (s *SFFrame) pushFilterCondition(cond Values) error {
+	scope, ok := s.activeConditionScope()
+	if !ok {
+		return utils.Wrap(CriticalError, "condition failed: missing condition scope")
 	}
-	mask, err := buildFilterMask(source, cond)
+	if scope.mode == ConditionModeCandidate {
+		return s.pushCondition([]bool{hasNonEmptyValue(cond)}, cond, false)
+	}
+	mask, err := buildFilterMask(scope, cond)
 	if err != nil {
 		return err
 	}
-	return s.pushCondition(source, mask, cond, false)
+	return s.pushCondition(mask, cond, false)
 }
 
-func filterValueByMask(value Values, cond []bool) (Values, error) {
-	if len(cond) != len(value) {
-		return nil, utils.Wrapf(CriticalError, "condition failed: stack top(%v) vs conds(%v)", len(value), len(cond))
-	}
-	filtered := make([]ValueOperator, 0, len(value))
-	for idx, ok := range cond {
-		if !ok {
-			continue
-		}
-		filtered = append(filtered, value[idx])
-	}
-	return NewValues(filtered), nil
-}
-
-func (s *SFFrame) applyCondition(value Values) (Values, error) {
-	entry := s.popCondition()
-	expectedMode := conditionModeFromSource(value)
-	if entry.Mode != expectedMode {
-		return nil, utils.Wrapf(CriticalError, "condition failed: mode mismatch (%v vs %v)", entry.Mode, expectedMode)
-	}
-
+func applyCondition(value Values, entry ConditionEntry) (Values, error) {
 	switch entry.Mode {
 	case ConditionModeCandidate:
 		if entry.Matched && !entry.Candidate.IsEmpty() {
@@ -348,7 +341,17 @@ func (s *SFFrame) applyCondition(value Values) (Values, error) {
 		}
 		return NewEmptyValues(), nil
 	case ConditionModeMask:
-		return filterValueByMask(value, entry.Mask)
+		if len(entry.Mask) != len(value) {
+			return nil, utils.Wrapf(CriticalError, "condition failed: stack top(%v) vs conds(%v)", len(value), len(entry.Mask))
+		}
+		filtered := make([]ValueOperator, 0, len(value))
+		for idx, ok := range entry.Mask {
+			if !ok {
+				continue
+			}
+			filtered = append(filtered, value[idx])
+		}
+		return NewValues(filtered), nil
 	default:
 		return nil, utils.Wrapf(CriticalError, "condition failed: invalid mode %v", entry.Mode)
 	}
