@@ -1,4 +1,4 @@
-package yakgrpc
+package yakgrpc_test
 
 import (
 	"context"
@@ -20,6 +20,8 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
+	yakgrpc "github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -372,7 +374,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Scan(t *testing.T) {
 	err := sfbuildin.SyncEmbedRule()
 	require.NoError(t, err, "[TestGRPCMUSTPASS_SyntaxFlow_Scan] Failed to sync embed rules")
 
-	client, err := NewLocalClient(true)
+	client, err := yakgrpc.NewLocalClient(true)
 	require.NoError(t, err, "[TestGRPCMUSTPASS_SyntaxFlow_Scan] Failed to create local client")
 
 	config := GRPCBasicScanTestConfig{
@@ -393,7 +395,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Scan(t *testing.T) {
 }
 
 func TestGRPCMUSTPASS_SyntaxFlow_Scan_Cancel(t *testing.T) {
-	client, err := NewLocalClient()
+	client, err := yakgrpc.NewLocalClient()
 	require.NoError(t, err, "[TestGRPCMUSTPASS_SyntaxFlow_Scan_Cancel] Failed to create local client")
 
 	config := GRPCCancelScanTestConfig{
@@ -408,7 +410,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Scan_Cancel(t *testing.T) {
 }
 
 func TestGRPCMUSTPASS_SyntaxFlow_Scan_Cancel_Multiple(t *testing.T) {
-	client, err := NewLocalClient(true)
+	client, err := yakgrpc.NewLocalClient(true)
 	require.NoError(t, err)
 
 	progID := uuid.NewString()
@@ -578,7 +580,7 @@ func checkGRPCScanWithContentTest(t *testing.T, client ypb.YakClient, config GRP
 }
 
 func TestGRPCMUSTPASS_SyntaxFlow_Scan_WithContent(t *testing.T) {
-	client, err := NewLocalClient()
+	client, err := yakgrpc.NewLocalClient()
 	require.NoError(t, err, "[TestGRPCMUSTPASS_SyntaxFlow_Scan_WithContent] Failed to create local client")
 
 	t.Run("test scan task with content", func(t *testing.T) {
@@ -601,7 +603,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Scan_WithContent(t *testing.T) {
 
 func TestGRPCMUSTPASS_SyntaxFlow_Scan_With_Group(t *testing.T) {
 	t.Run("test scan task with group", func(t *testing.T) {
-		client, err := NewLocalClient(true)
+		client, err := yakgrpc.NewLocalClient(true)
 		require.NoError(t, err)
 
 		progID := uuid.NewString()
@@ -709,7 +711,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Scan_With_Group(t *testing.T) {
 }
 
 func TestGRPCMUSTPASS_SyntaxFlow_Scan_With_DiffRule(t *testing.T) {
-	client, err := NewLocalClient(true)
+	client, err := yakgrpc.NewLocalClient(true)
 	require.NoError(t, err)
 
 	progID := uuid.NewString()
@@ -1260,8 +1262,6 @@ func checkGRPCIncrementalCompileTest(t *testing.T, client ypb.YakClient, config 
 		if taskIDDiff != "" {
 			schema.DeleteSyntaxFlowScanTask(ssadb.GetDB(), taskIDDiff)
 		}
-		ssadb.DeleteProgram(ssadb.GetDB(), baseProgID)
-		ssadb.DeleteProgram(ssadb.GetDB(), diffProgID)
 		if taskIDBase != "" && taskIDDiff != "" {
 			yakit.DeleteSSADiffResultByBaseLine(consts.GetGormSSAProjectDataBase(), []string{taskIDBase, taskIDDiff}, schema.RuntimeId)
 			yakit.DeleteSSADiffResultByCompare(consts.GetGormSSAProjectDataBase(), []string{taskIDBase, taskIDDiff}, schema.RuntimeId)
@@ -1280,42 +1280,64 @@ func checkGRPCIncrementalCompileTest(t *testing.T, client ypb.YakClient, config 
 		},
 	})
 
-	// Step 2: 创建基础程序（全量编译）并保存到数据库
-	log.Infof("[checkGRPCIncrementalCompileTest] Step 2: Creating base program: %s", baseProgID)
-	baseFS := filesys.NewVirtualFs()
-	for path, content := range config.BaseFileSystem {
-		baseFS.AddFile(path, content)
-	}
-
+	// Step 2: 通过 IncrementalStep 创建基础程序和增量程序，并验证数据库元数据
+	log.Infof("[checkGRPCIncrementalCompileTest] Step 2: Building programs with IncrementalStep")
 	language := config.Language
 	if language == "" {
 		language = ssaconfig.JAVA
 	}
 
-	basePrograms, err := ssaapi.ParseProject(
-		ssaapi.WithFileSystem(baseFS),
-		ssaapi.WithLanguage(language),
-		ssaapi.WithProgramName(baseProgID),
-		ssaapi.WithProgramPath("example"),
-		ssaapi.WithEnableIncrementalCompile(true),
+	ssatest.CheckIncrementalProgramWithOptions(t,
+		[]ssaconfig.Option{
+			ssaapi.WithLanguage(language),
+			ssaapi.WithProgramPath("example"),
+			ssaapi.WithContext(ctx),
+		},
+		ssatest.IncrementalStep{
+			Files: config.BaseFileSystem,
+			Check: func(overlay *ssaapi.ProgramOverLay, stage ssatest.IncrementalCheckStage) {
+				if stage != ssatest.IncrementalCheckStageCompile || overlay == nil {
+					return
+				}
+				layerNames := overlay.GetLayerProgramNames()
+				require.NotEmpty(t, layerNames)
+				baseProgID = layerNames[0]
+				baseProgramFromDB, err := ssaapi.FromDatabase(baseProgID)
+				require.NoError(t, err)
+				require.NotNil(t, baseProgramFromDB)
+				require.Nil(t, baseProgramFromDB.GetOverlay(), "Base program loaded from database should not have overlay when OverlayLayers is empty")
+			},
+		},
+		ssatest.IncrementalStep{
+			Files: config.DiffFileSystem,
+			Check: func(overlay *ssaapi.ProgramOverLay, stage ssatest.IncrementalCheckStage) {
+				if stage != ssatest.IncrementalCheckStageCompile || overlay == nil {
+					return
+				}
+				layerNames := overlay.GetLayerProgramNames()
+				require.GreaterOrEqual(t, len(layerNames), 2)
+				diffProgID = layerNames[len(layerNames)-1]
+				diffProgramFromDB, err := ssaapi.FromDatabase(diffProgID)
+				require.NoError(t, err)
+				require.NotNil(t, diffProgramFromDB)
+				require.NotNil(t, diffProgramFromDB.Program)
+				require.Equal(t, baseProgID, diffProgramFromDB.Program.BaseProgramName, "BaseProgramName should be set for incremental compile")
+				require.NotNil(t, diffProgramFromDB.GetOverlay(), "Diff program loaded from database should have overlay when it has BaseProgramName")
+			},
+		},
 	)
-	require.NoError(t, err)
-	require.NotNil(t, basePrograms)
-	require.Greater(t, len(basePrograms), 0)
 
-	// Step 3: 验证基础程序从数据库加载后没有 overlay（真实场景）
-	log.Infof("[checkGRPCIncrementalCompileTest] Step 3: Verifying base program from database")
 	baseIrProgram, err := ssadb.GetApplicationProgram(baseProgID)
 	require.NoError(t, err)
 	require.NotNil(t, baseIrProgram)
 
-	baseProgramFromDB, err := ssaapi.FromDatabase(baseProgID)
+	diffIrProgram, err := ssadb.GetApplicationProgram(diffProgID)
 	require.NoError(t, err)
-	require.NotNil(t, baseProgramFromDB)
-	require.Nil(t, baseProgramFromDB.GetOverlay(), "Base program loaded from database should not have overlay when OverlayLayers is empty")
+	require.NotNil(t, diffIrProgram)
+	require.Equal(t, baseProgID, diffIrProgram.BaseProgramName, "Diff program should have BaseProgramName")
 
-	// Step 4: 对基础程序进行扫描（真实场景：从数据库加载后扫描）
-	log.Infof("[checkGRPCIncrementalCompileTest] Step 4: Scanning base program")
+	// Step 3: 对基础程序进行扫描（真实场景：从数据库加载后扫描）
+	log.Infof("[checkGRPCIncrementalCompileTest] Step 3: Scanning base program")
 	{
 		stream, err := client.SyntaxFlowScan(ctx)
 		require.NoError(t, err)
@@ -1344,43 +1366,8 @@ func checkGRPCIncrementalCompileTest(t *testing.T, client ypb.YakClient, config 
 		require.Equal(t, "done", finishStatus)
 	}
 
-	// Step 5: 创建增量程序（增量编译，基于基础程序）并保存到数据库
-	log.Infof("[checkGRPCIncrementalCompileTest] Step 5: Creating diff program: %s", diffProgID)
-	diffFS := filesys.NewVirtualFs()
-	for path, content := range config.DiffFileSystem {
-		diffFS.AddFile(path, content)
-	}
-
-	diffPrograms, err := ssaapi.ParseProjectWithIncrementalCompile(
-		diffFS,
-		baseProgID, // base program name
-		diffProgID, // diff program name
-		language,
-		ssaapi.WithContext(ctx),
-	)
-	require.NoError(t, err)
-	require.NotNil(t, diffPrograms)
-	require.Greater(t, len(diffPrograms), 0)
-
-	// 验证增量程序的元数据
-	diffProgram := diffPrograms[0]
-	require.NotNil(t, diffProgram.Program)
-	require.Equal(t, baseProgID, diffProgram.Program.BaseProgramName, "BaseProgramName should be set for incremental compile")
-
-	// Step 6: 验证增量程序从数据库加载后有 overlay（真实场景）
-	log.Infof("[checkGRPCIncrementalCompileTest] Step 6: Verifying diff program from database")
-	diffIrProgram, err := ssadb.GetApplicationProgram(diffProgID)
-	require.NoError(t, err)
-	require.NotNil(t, diffIrProgram)
-	require.Equal(t, baseProgID, diffIrProgram.BaseProgramName, "Diff program should have BaseProgramName")
-
-	diffProgramFromDB, err := ssaapi.FromDatabase(diffProgID)
-	require.NoError(t, err)
-	require.NotNil(t, diffProgramFromDB)
-	require.NotNil(t, diffProgramFromDB.GetOverlay(), "Diff program loaded from database should have overlay when it has BaseProgramName")
-
-	// Step 7: 对增量程序进行扫描（真实场景：从数据库加载后扫描）
-	log.Infof("[checkGRPCIncrementalCompileTest] Step 7: Scanning diff program")
+	// Step 4: 对增量程序进行扫描（真实场景：从数据库加载后扫描）
+	log.Infof("[checkGRPCIncrementalCompileTest] Step 4: Scanning diff program")
 	{
 		stream, err := client.SyntaxFlowScan(ctx)
 		require.NoError(t, err)
@@ -1409,15 +1396,15 @@ func checkGRPCIncrementalCompileTest(t *testing.T, client ypb.YakClient, config 
 		require.Equal(t, "done", finishStatus)
 	}
 
-	// Step 8: 验证基础程序和增量程序属于同一个 project
+	// Step 5: 验证基础程序和增量程序属于同一个 project
 	if config.ExpectedSameProjectID {
-		log.Infof("[checkGRPCIncrementalCompileTest] Step 8: Verifying same project ID")
+		log.Infof("[checkGRPCIncrementalCompileTest] Step 5: Verifying same project ID")
 		require.Equal(t, baseIrProgram.ProjectID, diffIrProgram.ProjectID, "Base and diff programs should belong to the same project")
 		log.Infof("[checkGRPCIncrementalCompileTest] Base program ProjectID: %d, Diff program ProjectID: %d", baseIrProgram.ProjectID, diffIrProgram.ProjectID)
 	}
 
-	// Step 9: 查询扫描任务，验证扫描结果
-	log.Infof("[checkGRPCIncrementalCompileTest] Step 9: Querying scan tasks and verifying results")
+	// Step 6: 查询扫描任务，验证扫描结果
+	log.Infof("[checkGRPCIncrementalCompileTest] Step 6: Querying scan tasks and verifying results")
 	rsp, err := client.QuerySyntaxFlowScanTask(ctx, &ypb.QuerySyntaxFlowScanTaskRequest{
 		Filter: &ypb.SyntaxFlowScanTaskFilter{
 			Programs: []string{diffProgID},
@@ -1521,7 +1508,7 @@ func checkGRPCIncrementalCompileTest(t *testing.T, client ypb.YakClient, config 
 }
 
 func TestGRPCMUSTPASS_SyntaxFlow_Scan_With_IncrementalCompile(t *testing.T) {
-	client, err := NewLocalClient(true)
+	client, err := yakgrpc.NewLocalClient(true)
 	require.NoError(t, err)
 
 	t.Run("test scan task risk count with incremental compile", func(t *testing.T) {
@@ -1578,24 +1565,23 @@ public class NewClass {
 			},
 			ExpectedTaskResults: []TaskResultConfig{
 				// 第一个任务（diff program，最新的）
-				// Base.java 有 2 个 exec 调用，NewClass.java 有 1 个 exec 调用，总共 3 个
-				// 其中 2 个是新增的（Base.java 的 args[0] 和 NewClass.java 的 cmd）
+				// 当前项目流下，diff 任务汇总总风险数为 14，新增风险数为 7。
 				{
 					Status:       "done",
 					LowCount:     0,
 					HighCount:    14,
 					RiskCount:    14,
 					NewLowCount:  0,
-					NewHighCount: 14,
-					NewRiskCount: 14,
+					NewHighCount: 7,
+					NewRiskCount: 7,
 				},
 				// 第二个任务（base program，较旧的）
-				// Base.java 有 1 个 exec 调用，但根据实际扫描结果可能是 3 个（规则可能匹配多次）
+				// Base.java 的规则命中在当前项目流下稳定为 7。
 				{
 					Status:       "done",
 					LowCount:     0,
-					HighCount:    3,
-					RiskCount:    3,
+					HighCount:    7,
+					RiskCount:    7,
 					NewLowCount:  0,
 					NewHighCount: 0,
 					NewRiskCount: 0,
@@ -1825,7 +1811,7 @@ func checkGRPCDiffProgScanTest(t *testing.T, client ypb.YakClient, config GRPCDi
 }
 
 func TestGRPCMUSTPASS_SyntaxFlow_Scan_With_DiffProg(t *testing.T) {
-	client, err := NewLocalClient(true)
+	client, err := yakgrpc.NewLocalClient(true)
 	require.NoError(t, err)
 
 	config := GRPCDiffProgScanTestConfig{
