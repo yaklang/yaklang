@@ -119,6 +119,16 @@ func TestJwtParse5(t *testing.T) {
 	spew.Dump(newToken)
 }
 
+// TestJwtParse6: alg:none with keys provided must return ErrAlgNoneNotAllowed (no verification success)
+func TestJwtParse6(t *testing.T) {
+	testToken, err := JwtGenerate("None", map[string]interface{}{"login": "admin"}, "JWS", nil)
+	require.NoError(t, err)
+	token, secret, err := JwtParse(testToken, "secret", "mykey")
+	require.ErrorIs(t, err, ErrAlgNoneNotAllowed)
+	require.NotNil(t, token)
+	require.Nil(t, secret)
+}
+
 func TestJwt(t *testing.T) {
 	t.Run("None alg", func(t *testing.T) {
 		s, err := JwtGenerate("None", nil, "JWT", nil)

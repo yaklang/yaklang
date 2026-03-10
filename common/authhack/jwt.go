@@ -11,8 +11,9 @@ import (
 )
 
 var (
-	ErrKeyNotFound = utils.Errorf("key not found")
-	jwtWeakkeyRaw  = `secret
+	ErrKeyNotFound       = utils.Errorf("key not found")
+	ErrAlgNoneNotAllowed = utils.Errorf("alg:none token cannot be verified with keys")
+	jwtWeakkeyRaw        = `secret
 ...
 012345678901234567890123456789XY
 12345
@@ -250,6 +251,10 @@ func JwtParse(tokenStr string, keys ...string) (*Token, []byte, error) {
 			if token != nil && token.Header.Len() > 0 {
 				alg := strings.ToLower(fmt.Sprint(token.Header.GetExact("alg")))
 				if alg == "none" || alg == "<nil>" {
+					// Parse-only (no keys): return token for display. With keys: reject alg:none for verification.
+					if len(keys) > 0 {
+						return token, nil, ErrAlgNoneNotAllowed
+					}
 					return token, nil, nil
 				}
 			}
