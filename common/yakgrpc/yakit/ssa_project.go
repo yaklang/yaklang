@@ -13,23 +13,6 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func SSAProjectToSchemaData(s *ssaproject.SSAProject) (*schema.SSAProject, error) {
-	if s == nil {
-		return nil, utils.Errorf("to schema SSA project failed: SSA project is nil")
-	}
-	var result schema.SSAProject
-	result.ID = uint(s.ID)
-	result.ProjectName = s.ProjectName
-	result.Description = s.Description
-	result.Language = s.Language
-	result.SetTagsList(s.Tags)
-	err := result.SetConfig(s.Config)
-	if err != nil {
-		return nil, utils.Errorf("to schema SSA project failed: %s", err)
-	}
-	return &result, nil
-}
-
 func CreateSSAProject(db *gorm.DB, req *ypb.CreateSSAProjectRequest) (*schema.SSAProject, error) {
 	if req == nil {
 		return nil, utils.Errorf("create SSA project failed: project is nil")
@@ -55,11 +38,10 @@ func CreateSSAProject(db *gorm.DB, req *ypb.CreateSSAProjectRequest) (*schema.SS
 	if err != nil {
 		return nil, utils.Errorf("save SSA project failed: %s", err)
 	}
-	schemaProject, err := SSAProjectToSchemaData(projectBuilder)
-	if err != nil {
-		return nil, utils.Errorf("create SSA project failed: %s", err)
+	if projectBuilder.SSAProject == nil {
+		return nil, utils.Errorf("create SSA project failed: schema project is nil")
 	}
-	return schemaProject, nil
+	return projectBuilder.SSAProject, nil
 }
 
 func UpdateSSAProject(db *gorm.DB, project *ypb.SSAProject) (*schema.SSAProject, error) {
@@ -83,11 +65,10 @@ func UpdateSSAProject(db *gorm.DB, project *ypb.SSAProject) (*schema.SSAProject,
 	if err != nil {
 		return nil, utils.Errorf("update SSA project failed: %s", err)
 	}
-	schemaProject, err := SSAProjectToSchemaData(projectBuilder)
-	if err != nil {
-		return nil, utils.Errorf("update SSA project failed: %s", err)
+	if projectBuilder.SSAProject == nil {
+		return nil, utils.Errorf("update SSA project failed: schema project is nil")
 	}
-	return schemaProject, nil
+	return projectBuilder.SSAProject, nil
 }
 
 type DeleteSSAProjectMode string
