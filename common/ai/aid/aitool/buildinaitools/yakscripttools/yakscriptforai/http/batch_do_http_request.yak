@@ -1,0 +1,848 @@
+__DESC__ = "Batch HTTP request tool for concurrently accessing multiple paths on one or more targets. Supports URL mode (base URL + paths) and Packet mode (raw HTTP request templates with variable substitution). Features include concurrent execution, delay control, timeout, redirect handling, and result aggregation."
+__VERBOSE_NAME__ = "Batch HTTP Request Tool (Concurrent Multi-Path)"
+__KEYWORDS__ = "batch http,request multiple,concurrent,batch request,multi path,path scan,batch url,parallel request,mass request,http flood,path enumeration,directory scan,batch get,batch post"
+
+__USAGE__ = <<<USAGE_BLOCK
+Batch HTTP Request Tool - Usage Guide for AI Parameter Generation
+
+This tool supports two modes of operation:
+  1. URL Mode: Specify a base URL and multiple paths to test concurrently.
+  2. Packet Mode: Provide a raw HTTP request template with {{PATH}} placeholder.
+
+Both modes share common parameters for timeout, concurrency, and result handling.
+
+##############################################################################
+# CRITICAL RULE: AITAG IS MANDATORY FOR "packet", "body", AND "headers"     #
+##############################################################################
+
+*** YOU MUST USE AITAG FOR THESE PARAMETERS - NEVER PUT THEM IN JSON params ***
+
+The "packet", "body", and "headers" parameters contain multi-line text, raw HTTP
+protocol content, or structured payloads (JSON, XML, form data, etc.).
+
+RULE: If a parameter value contains ANY newline, OR is a raw HTTP packet,
+      OR is a structured payload (JSON/XML/HTML body), you MUST use AITAG.
+      Do NOT put it in the JSON "params" object. Instead, omit it from "params"
+      and attach it after the JSON block using AITAG tags.
+
+## Parameters
+
+--- URL Mode Parameters ---
+Required (when packet is empty):
+  base-url        (string)  Base URL or domain. Example: "https://example.com" or "example.com"
+                            If scheme is omitted, https:// is assumed.
+
+Required (for batch operations):
+  paths           (string)  Paths to test, one per line or comma-separated.
+                            Example: "/admin\n/login\n/api/v1/users" or "/admin,/login,/api"
+                            *** MUST use AITAG if paths span multiple lines ***
+
+Optional:
+  method          (string)  HTTP method for all requests. Default: "GET".
+  headers         (string)  Custom headers applied to all requests, one per line: "Key: Value".
+                            *** MUST use AITAG if multiple headers ***
+                            This is the PREFERRED way to set custom headers.
+  body            (string)  Request body content (for POST/PUT/PATCH). Applied to all requests.
+                            *** MUST use AITAG - NEVER put body in JSON params ***
+  content-type    (string)  Content-Type header value. Example: "application/json".
+  query-params    (string)  URL query parameters appended to all requests: "k1=v1&k2=v2".
+  prefix          (string)  Path prefix to prepend to all paths. Example: "/v1/" or "/api/v2/".
+                            If paths already start with /, prefix is still prepended.
+                            Useful for API versioning like /v1/users, /v1/admin.
+
+--- Packet Mode Parameters ---
+Required (to use Packet mode instead of URL mode):
+  packet          (string)  Raw HTTP request template with {{PATH}} placeholder.
+                            The {{PATH}} will be replaced with each path from "paths".
+                            *** MUST use AITAG - NEVER put packet in JSON params ***
+Optional:
+  base-host       (string)  Override Host header value (auto-extracted from packet if not provided).
+
+--- Common Parameters (all OK in JSON params - single-line values) ---
+Optional:
+  https           (string)  Force HTTPS transport: "yes"/"no"/"auto". Default: "auto".
+  timeout         (int)     Request timeout in seconds. Default: 10.
+  concurrent      (int)     Number of concurrent requests. Default: 5.
+                            Set to 1 for sequential requests with delay.
+  delay-seconds   (float)   Delay between requests in seconds. Default: 0.
+                            If > 0, concurrent is automatically set to 1.
+  redirect-times  (int)     Maximum redirects to follow. 0 disables redirects. Default: 3.
+  keyword         (string)  Keyword to search in responses (highlights matches).
+  regexp-match    (string)  Regular expression to search in responses.
+  proxy           (string)  Proxy URL. Example: "http://127.0.0.1:8080".
+  exclude-code    (string)  Exclude responses with these status codes (comma-separated).
+                            Example: "404,403,500"
+  include-code    (string)  Only include responses with these status codes (comma-separated).
+                            Example: "200,301,302"
+  exclude-size    (string)  Exclude responses with Content-Length in these ranges.
+                            Example: "0,100-200" (excludes 0 bytes and 100-200 bytes)
+  max-body-size   (int)     Maximum response size to display per request (bytes). Default: 4096.
+                            Responses (headers + body) larger than this will be truncated in output.
+
+## Quick Reference: Which params go where?
+
+  In JSON params (single-line values):
+    base-url, paths (comma-separated), method, content-type, query-params, prefix,
+    https, timeout, concurrent, delay-seconds, redirect-times,
+    keyword, regexp-match, proxy, exclude-code, include-code, exclude-size, max-body-size
+
+  Via AITAG (multi-line / structured content):
+    packet  -> <|TOOL_PARAM_packet_{NONCE}|> ... <|TOOL_PARAM_packet_END_{NONCE}|>
+    body    -> <|TOOL_PARAM_body_{NONCE}|> ... <|TOOL_PARAM_body_END_{NONCE}|>
+    headers -> <|TOOL_PARAM_headers_{NONCE}|> ... <|TOOL_PARAM_headers_END_{NONCE}|>
+    paths   -> <|TOOL_PARAM_paths_{NONCE}|> ... <|TOOL_PARAM_paths_END_{NONCE}|>  (if multi-line)
+
+## Few-Shot Examples
+
+Replace {NONCE} with the actual nonce from the response format section.
+
+### Example 1: Batch GET requests to multiple paths (URL mode)
+
+User intent: "Check multiple paths on a website"
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "batch_do_http_request",
+  "identifier": "batch_path_check",
+  "params": {
+    "base-url": "https://example.com",
+    "paths": "/admin,/login,/api,/backup,/config",
+    "concurrent": 3,
+    "timeout": 10,
+    "exclude-code": "404"
+  }
+}
+```
+
+### Example 2: Batch POST requests with JSON body (URL mode, body via AITAG)
+
+User intent: "Test multiple API endpoints with the same POST body"
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "batch_do_http_request",
+  "identifier": "batch_api_test",
+  "params": {
+    "base-url": "https://api.example.com",
+    "method": "POST",
+    "content-type": "application/json",
+    "concurrent": 2,
+    "timeout": 15
+  }
+}
+```
+<|TOOL_PARAM_paths_{NONCE}|>
+/v1/users
+/v1/admin
+/v1/settings
+<|TOOL_PARAM_paths_END_{NONCE}|>
+<|TOOL_PARAM_body_{NONCE}|>
+{"action": "test", "source": "batch_tool"}
+<|TOOL_PARAM_body_END_{NONCE}|>
+
+### Example 3: Using prefix for API versioning
+
+User intent: "Test API v2 endpoints with prefix"
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "batch_do_http_request",
+  "identifier": "api_v2_check",
+  "params": {
+    "base-url": "https://api.example.com",
+    "prefix": "/v2/api/",
+    "paths": "users,posts,comments,settings",
+    "concurrent": 5,
+    "timeout": 10
+  }
+}
+```
+
+### Example 4: Batch request with custom headers (via AITAG)
+User intent: "Batch request with custom headers"
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "batch_do_http_request",
+  "identifier": "batch_with_headers",
+  "params": {
+    "base-url": "https://api.example.com",
+    "paths": "/user/1,/user/2,/user/3",
+    "concurrent": 3,
+    "timeout": 10
+  }
+}
+```
+<|TOOL_PARAM_headers_{NONCE}|>
+Authorization: Bearer token123
+X-Custom-Header: value
+<|TOOL_PARAM_headers_END_{NONCE}|>
+
+### Example 5: Batch raw packet requests with path substitution ( Packet mode)
+
+User intent: "Send crafted HTTP requests to multiple paths using a template"
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "batch_do_http_request",
+  "identifier": "batch_packet_test",
+  "params": {
+    "concurrent": 3,
+    "timeout": 10,
+    "keyword": "success"
+  }
+}
+```
+<|TOOL_PARAM_packet_{NONCE}|>
+GET {{PATH}} HTTP/1.1
+Host: target.example.com
+User-Agent: Mozilla/5.0
+Cookie: session=abc123
+Accept: */*
+
+<|TOOL_PARAM_packet_END_{NONCE}|>
+<|TOOL_PARAM_paths_{NONCE}|>
+/admin
+/dashboard
+/settings
+/profile
+<|TOOL_PARAM_paths_END_{NONCE}|>
+
+### Example 6: Sequential requests with delay ( for rate-limited targets)
+
+User intent: "Slowly enumerate paths to avoid rate limiting"
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "batch_do_http_request",
+  "identifier": "slow_path_enum",
+  "params": {
+    "base-url": "https://api.example.com",
+    "paths": "/v1/a,/v1/b,/v1/c,/v1/d,/v1/e",
+    "delay-seconds": 0.5,
+    "timeout": 10
+  }
+}
+```
+
+### Example 7: Multiple targets with same paths (using full URLs in paths)
+
+User intent: "Check the same path across multiple domains"
+
+Note: When paths contain full URLs, base-url is not needed.
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "batch_do_http_request",
+  "identifier": "multi_target_check",
+  "params": {
+    "method": "GET",
+    "concurrent": 5,
+    "timeout": 10
+  }
+}
+```
+<|TOOL_PARAM_paths_{NONCE}|>
+https://site1.com/admin
+https://site2.com/admin
+https://site3.com/admin
+http://site4.local/admin
+<|TOOL_PARAM_paths_END_{NONCE}|>
+
+### Example 8: Directory enumeration with filtering
+
+User intent: "Enumerate directories and filter out 404s and small responses"
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "batch_do_http_request",
+  "identifier": "dir_enum_filtered",
+  "params": {
+    "base-url": "https://target.example.com",
+    "concurrent": 10,
+    "timeout": 8,
+    "exclude-code": "404",
+    "exclude-size": "0",
+    "keyword": "index"
+  }
+}
+```
+<|TOOL_PARAM_paths_{NONCE}|>
+/admin
+/backup
+/config
+/data
+/uploads
+/images
+/js
+/css
+<|TOOL_PARAM_paths_END_{NONCE}|>
+USAGE_BLOCK
+
+yakit.AutoInitYakit()
+
+// --- parse parameters ---
+// URL mode params
+baseUrl = cli.String("base-url", cli.setHelp("base URL or domain for URL mode"), cli.setRequired(false))
+pathsStr = cli.String("paths", cli.setHelp("paths to test, comma-separated or one per line"), cli.setRequired(false))
+method = cli.String("method", cli.setHelp("HTTP method"), cli.setDefault("GET"))
+headers = cli.String("headers", cli.setHelp("custom headers, one per line: Key: Value"), cli.setRequired(false))
+body = cli.String("body", cli.setHelp("request body content"), cli.setRequired(false))
+contentType = cli.String("content-type", cli.setHelp("Content-Type header"), cli.setRequired(false))
+queryParams = cli.String("query-params", cli.setHelp("URL query params: k1=v1&k2=v2"), cli.setRequired(false))
+prefix = cli.String("prefix", cli.setHelp("path prefix to prepend to all paths, e.g. /v1/ or /api/v2/"), cli.setRequired(false))
+curlHeaders = cli.StringSlice("H", cli.setHelp("curl-style headers, can be used multiple times: -H 'Content-Type: application/json' -H 'Authorization: Bearer token'"), cli.setRequired(false))
+
+// Packet mode params
+packet = cli.String("packet", cli.setHelp("raw HTTP request template with {{PATH}} placeholder"), cli.setRequired(false))
+baseHost = cli.String("base-host", cli.setHelp("host header value for packet mode"), cli.setRequired(false))
+
+// Common params
+httpsMode = cli.String("https", cli.setHelp("force HTTPS: yes/no/auto"), cli.setDefault("auto"))
+timeout = cli.Int("timeout", cli.setHelp("request timeout in seconds"), cli.setDefault(10))
+concurrent = cli.Int("concurrent", cli.setHelp("number of concurrent requests"), cli.setDefault(5))
+delaySeconds = cli.Float("delay-seconds", cli.setHelp("delay between requests in seconds"), cli.setDefault(0.0))
+redirectTimes = cli.Int("redirect-times", cli.setHelp("max redirect follows, 0 to disable"), cli.setDefault(3))
+keyword = cli.String("keyword", cli.setHelp("keyword to highlight in response"), cli.setRequired(false))
+regexpMatch = cli.String("regexp-match", cli.setHelp("regex to search in response"), cli.setRequired(false))
+proxy = cli.String("proxy", cli.setHelp("proxy URL, e.g. http://127.0.0.1:8080"), cli.setRequired(false))
+excludeCode = cli.String("exclude-code", cli.setHelp("exclude status codes, comma-separated"), cli.setRequired(false))
+includeCode = cli.String("include-code", cli.setHelp("include only these status codes"), cli.setRequired(false))
+excludeSize = cli.String("exclude-size", cli.setHelp("exclude content-length ranges"), cli.setRequired(false))
+maxBodySize = cli.Int("max-body-size", cli.setHelp("max response body size to display"), cli.setDefault(4096))
+cli.check()
+
+// --- validation ---
+if packet == "" && baseUrl == "" && pathsStr == "" {
+    yakit.Error("at least one of 'base-url', 'packet', or 'paths' must be provided")
+    return
+}
+
+// If paths contains full URLs, we can work without base-url
+hasFullUrls = false
+if str.Contains(pathsStr, "://") {
+    hasFullUrls = true
+}
+
+if packet == "" && baseUrl == "" && !hasFullUrls {
+    yakit.Error("either 'base-url' or full URLs in 'paths' must be provided for URL mode")
+    return
+}
+
+// --- parse paths ---
+paths = make([]string)
+if pathsStr != "" {
+    // Support both newline and comma separation
+    for _, line := range str.SplitAndTrim(pathsStr, "\n") {
+        line = str.TrimSpace(line)
+        if line == "" {
+            continue
+        }
+        // Also split by comma within each line
+        for _, p := range str.SplitAndTrim(line, ",") {
+            p = str.TrimSpace(p)
+            if p != "" {
+                paths = append(paths, p)
+            }
+        }
+    }
+}
+
+// --- apply prefix to paths ---
+if prefix != "" && len(paths) > 0 {
+    // Ensure prefix starts with /
+    if !str.HasPrefix(prefix, "/") {
+        prefix = "/" + prefix
+    }
+    // Ensure prefix ends with /
+    if !str.HasSuffix(prefix, "/") {
+        prefix = prefix + "/"
+    }
+    newPaths = make([]string)
+    for _, p := range paths {
+        // If path starts with /, remove leading / to avoid double slash
+        trimmedPath = p
+        if str.HasPrefix(p, "/") {
+            trimmedPath = p[1:]
+        }
+        // If trimmed path is empty, just use prefix (remove trailing /)
+        if trimmedPath == "" {
+            newPaths = append(newPaths, prefix[:len(prefix)-1])
+        } else {
+            newPaths = append(newPaths, prefix + trimmedPath)
+        }
+    }
+    paths = newPaths
+    yakit.Info("Applied path prefix: %s", prefix)
+}
+
+if len(paths) == 0 {
+    yakit.Error("no valid paths provided")
+    return
+}
+
+// --- merge curl-style headers with headers ---
+if len(curlHeaders) > 0 {
+    curlHeadersStr = ""
+    for _, h := range curlHeaders {
+        // Parse curl-style header: "Key: Value" or "Key=Value"
+        h = str.TrimSpace(h)
+        if h == "" {
+            continue
+        }
+        // Support both "Key: Value" and "Key=Value" formats
+        idx = str.Index(h, ":")
+        if idx > 0 {
+            hKey = str.TrimSpace(h[:idx])
+            hVal = str.TrimSpace(h[idx+1:])
+            curlHeadersStr += hKey + ": " + hVal + "\n"
+        } else {
+            // Try = format
+            idx2 = str.Index(h, "=")
+            if idx2 > 0 {
+                hKey = str.TrimSpace(h[:idx2])
+                hVal = str.TrimSpace(h[idx2+1:])
+                curlHeadersStr += hKey + ": " + hVal + "\n"
+            }
+        }
+    }
+    // Merge with existing headers
+    if headers != "" {
+        headers = curlHeadersStr + headers
+    } else {
+        headers = curlHeadersStr
+    }
+}
+
+yakit.Info("=== Batch HTTP Request Tool ===")
+yakit.Info("Total paths to test: %d", len(paths))
+yakit.Info("Concurrency: %d, Delay: %.2fs, Timeout: %ds", concurrent, delaySeconds, timeout)
+
+// If delay > 0, force sequential execution
+if delaySeconds > 0 {
+    concurrent = 1
+    yakit.Info("Delay specified, forcing sequential execution (concurrent=1)")
+}
+
+// --- parse exclude/include codes ---
+excludeCodeSet = make(map[int]bool)
+if excludeCode != "" {
+    for _, codeStr := range str.SplitAndTrim(excludeCode, ",") {
+        code, _ = atoi(str.TrimSpace(codeStr))
+        if code > 0 {
+            excludeCodeSet[code] = true
+        }
+    }
+}
+
+includeCodeSet = make(map[int]bool)
+if includeCode != "" {
+    for _, codeStr := range str.SplitAndTrim(includeCode, ",") {
+        code, _ = atoi(str.TrimSpace(codeStr))
+        if code > 0 {
+            includeCodeSet[code] = true
+        }
+    }
+}
+
+// --- parse exclude size ranges ---
+excludeSizeRanges = make([]map[string]int)
+if excludeSize != "" {
+    for _, sizeStr := range str.SplitAndTrim(excludeSize, ",") {
+        sizeStr = str.TrimSpace(sizeStr)
+        if str.Contains(sizeStr, "-") {
+            parts = str.SplitN(sizeStr, "-", 2)
+            start, _ = atoi(str.TrimSpace(parts[0]))
+            end, _ = atoi(str.TrimSpace(parts[1]))
+            if start >= 0 && end >= start {
+                excludeSizeRanges = append(excludeSizeRanges, {"start": start, "end": end})
+            }
+        } else {
+            size, _ = atoi(sizeStr)
+            if size >= 0 {
+                excludeSizeRanges = append(excludeSizeRanges, {"start": size, "end": size})
+            }
+        }
+    }
+}
+
+shouldExcludeSize = fn(size) {
+    for _, r = range excludeSizeRanges {
+        if size >= r["start"] && size <= r["end"] {
+            return true
+        }
+    }
+    return false
+}
+
+// --- determine HTTPS ---
+resolveHttps = fn(isAutoDetected) {
+    httpsLower = str.ToLower(httpsMode)
+    if httpsLower == "yes" || httpsLower == "y" || httpsLower == "true" {
+        return true
+    }
+    if httpsLower == "no" || httpsLower == "n" || httpsLower == "false" {
+        return false
+    }
+    return isAutoDetected
+}
+
+// --- build poc options ---
+buildOpts = fn() {
+    opts = []
+    if timeout > 0 {
+        opts.Push(poc.timeout(float64(timeout)))
+    }
+    if redirectTimes <= 0 {
+        opts.Push(poc.noRedirect(true))
+    } else {
+        opts.Push(poc.noRedirect(false), poc.redirectTimes(int(redirectTimes)))
+    }
+    if proxy != "" {
+        opts.Push(poc.proxy(proxy))
+    }
+    return opts
+}
+
+// --- build request from URL mode ---
+buildRequestFromUrlMode = fn(path, base) {
+    rawPacket = undefined
+    isHttps = false
+
+    // Check if path is a full URL
+    if str.HasPrefix(str.ToLower(path), "http://") || str.HasPrefix(str.ToLower(path), "https://") {
+        autoHttps, parsedPacket, err := poc.ParseUrlToHTTPRequestRaw(method, path)
+        if err != nil {
+            return false, nil, err
+        }
+        rawPacket = parsedPacket
+        isHttps = resolveHttps(autoHttps)
+    } else {
+        // Build full URL from base + path
+        fullUrl = base
+        if !str.HasPrefix(str.ToLower(fullUrl), "http://") && !str.HasPrefix(str.ToLower(fullUrl), "https://") {
+            fullUrl = "https://" + fullUrl
+        }
+
+        // Remove trailing slash from base
+        if str.HasSuffix(fullUrl, "/") {
+            fullUrl = fullUrl[:len(fullUrl)-1]
+        }
+
+        // Add leading slash to path if needed
+        if !str.HasPrefix(path, "/") {
+            path = "/" + path
+        }
+
+        fullUrl = fullUrl + path
+
+        autoHttps, parsedPacket, err := poc.ParseUrlToHTTPRequestRaw(method, fullUrl)
+        if err != nil {
+            return false, nil, err
+        }
+        rawPacket = parsedPacket
+        isHttps = resolveHttps(autoHttps)
+    }
+
+    // Apply custom Content-Type
+    if contentType != "" {
+        rawPacket = poc.ReplaceHTTPPacketHeader(rawPacket, "Content-Type", contentType)
+    }
+
+    // Apply custom headers
+    if headers != "" {
+        for _, line := range str.SplitAndTrim(headers, "\n") {
+            line = str.TrimSpace(line)
+            if line == "" {
+                continue
+            }
+            idx = str.Index(line, ":")
+            if idx <= 0 {
+                continue
+            }
+            hKey = str.TrimSpace(line[:idx])
+            hVal = str.TrimSpace(line[idx+1:])
+            if hKey != "" {
+                rawPacket = poc.ReplaceHTTPPacketHeader(rawPacket, hKey, hVal)
+            }
+        }
+    }
+
+    // Apply query params
+    if queryParams != "" {
+        for _, pair := range str.SplitAndTrim(queryParams, "&") {
+            parts = str.SplitN(pair, "=", 2)
+            if len(parts) == 2 {
+                rawPacket = poc.ReplaceHTTPPacketQueryParam(rawPacket, parts[0], parts[1])
+            } elif len(parts) == 1 && parts[0] != "" {
+                rawPacket = poc.ReplaceHTTPPacketQueryParam(rawPacket, parts[0], "")
+            }
+        }
+    }
+
+    // Apply body
+    if body != "" {
+        rawPacket = poc.ReplaceHTTPPacketBody(rawPacket, []byte(body))
+    }
+
+    return isHttps, rawPacket, nil
+}
+
+// --- build request from packet mode ---
+buildRequestFromPacketMode = fn(path) {
+    rawPacket = []byte(str.ReplaceAll(packet, "{{PATH}}", path))
+
+    // Extract host from packet if not provided
+    host = baseHost
+    if host == "" {
+        host = poc.GetHTTPPacketHeader(rawPacket, "Host")
+    }
+
+    autoHttps = str.Contains(host, ":443") || str.HasSuffix(str.ToLower(host), ":443")
+    isHttps = resolveHttps(autoHttps)
+
+    return isHttps, rawPacket, nil
+}
+
+// --- execute single request ---
+executeRequest = fn(idx, path, base) {
+    opts = buildOpts()
+
+    isHttps = false
+    rawPacket = undefined
+    err = undefined
+
+    if packet != "" {
+        isHttps, rawPacket, err = buildRequestFromPacketMode(path)
+    } else {
+        isHttps, rawPacket, err = buildRequestFromUrlMode(path, base)
+    }
+
+    if err != nil {
+        yakit.Error("Request #%d failed to build request for '%s': %v", idx, path, err)
+        return {"idx": idx, "path": path, "success": false, "error": sprint(err)}
+    }
+
+    opts.Push(poc.https(isHttps))
+
+    rspIns, _, err := poc.HTTPEx(rawPacket, opts...)
+    if err != nil {
+        yakit.Error("Request #%d failed for '%s': %v", idx, path, err)
+        return {"idx": idx, "path": path, "success": false, "error": sprint(err)}
+    }
+
+    rsp = rspIns.RawPacket
+    statusCode = poc.GetStatusCodeFromResponse(rsp)
+
+    // Check exclude/include codes
+    if len(excludeCodeSet) > 0 && excludeCodeSet[statusCode] {
+        return {"idx": idx, "path": path, "success": true, "filtered": true, "reason": "excluded-code", "status": statusCode}
+    }
+    if len(includeCodeSet) > 0 && !includeCodeSet[statusCode] {
+        return {"idx": idx, "path": path, "success": true, "filtered": true, "reason": "not-in-include-code", "status": statusCode}
+    }
+
+    // Check exclude size
+    if shouldExcludeSize(rspIns.ResponseBodySize) {
+        return {"idx": idx, "path": path, "success": true, "filtered": true, "reason": "excluded-size", "status": statusCode, "size": rspIns.ResponseBodySize}
+    }
+
+    result = {
+        "idx": idx,
+        "path": path,
+        "success": true,
+        "filtered": false,
+        "status": statusCode,
+        "size": rspIns.ResponseBodySize,
+        "https": isHttps,
+        "response": rsp,
+        "request": rspIns.RawRequest,
+    }
+
+    return result
+}
+
+// --- results collection ---
+results = make([]map[string]any)
+resultsLock = sync.NewLock()
+successCount = 0
+filteredCount = 0
+errorCount = 0
+
+// --- concurrent execution ---
+if concurrent > 1 {
+    yakit.Info("Starting concurrent batch requests...")
+    swg = sync.NewSizedWaitGroup(concurrent)
+
+    for i, p := range paths {
+        swg.Add()
+        go fn(idx, path) {
+            defer swg.Done()
+
+            result = executeRequest(idx+1, path, baseUrl)
+
+            resultsLock.Lock()
+            results = append(results, result)
+            if result["success"] == true && result["filtered"] != true {
+                successCount++
+            } elif result["filtered"] == true {
+                filteredCount++
+            } else {
+                errorCount++
+            }
+            resultsLock.Unlock()
+
+            // Progress indicator
+            if result["filtered"] != true && result["success"] == true {
+                status = result["status"]
+                size = result["size"]
+                yakit.Info("[%d/%d] %s -> Status: %d, Size: %d bytes", idx+1, len(paths), path, status, size)
+            }
+        }(i, p)
+    }
+
+    swg.Wait()
+} else {
+    yakit.Info("Starting sequential batch requests...")
+    for i, p := range paths {
+        result = executeRequest(i+1, p, baseUrl)
+
+        results = append(results, result)
+        if result["success"] == true && result["filtered"] != true {
+            successCount++
+        } elif result["filtered"] == true {
+            filteredCount++
+        } else {
+            errorCount++
+        }
+
+        // Progress indicator
+        if result["filtered"] != true && result["success"] == true {
+            status = result["status"]
+            size = result["size"]
+            yakit.Info("[%d/%d] %s -> Status: %d, Size: %d bytes", i+1, len(paths), p, status, size)
+        }
+
+        // Delay between requests
+        if delaySeconds > 0 && i < len(paths)-1 {
+            sleep(delaySeconds)
+        }
+    }
+}
+
+yakit.Info("=== Batch Request Summary ===")
+yakit.Info("Total: %d, Success: %d, Filtered: %d, Errors: %d", len(paths), successCount, filteredCount, errorCount)
+
+// --- output results ---
+outputFile, err := file.TempFileName("batch-http-results-*.txt")
+if err != nil {
+    yakit.Error("Failed to create output file: %v", err)
+} else {
+    outputContent = sprintf("=== Batch HTTP Request Results ===\n")
+    outputContent += sprintf("Total Requests: %d\n", len(paths))
+    outputContent += sprintf("Successful: %d\n", successCount)
+    outputContent += sprintf("Filtered: %d\n", filteredCount)
+    outputContent += sprintf("Errors: %d\n\n", errorCount)
+
+    hasPattern = (keyword != "" || regexpMatch != "")
+
+    for _, result := range results {
+        if result["filtered"] == true {
+            continue
+        }
+        if result["success"] != true {
+            outputContent += sprintf("--- Request #%d [ERROR] ---\n", result["idx"])
+            outputContent += sprintf("Path: %s\n", result["path"])
+            outputContent += sprintf("Error: %s\n\n", result["error"])
+            continue
+        }
+
+        outputContent += sprintf("--- Request #%d ---\n", result["idx"])
+        outputContent += sprintf("Path: %s\n", result["path"])
+        outputContent += sprintf("Status: %d\n", result["status"])
+        outputContent += sprintf("Size: %d bytes\n", result["size"])
+        outputContent += sprintf("HTTPS: %v\n", result["https"])
+
+        rsp = result["response"]
+        rspStr = string(rsp)
+
+        // Print response (with size limit)
+        if len(rsp) > 0 {
+            if len(rsp) <= maxBodySize {
+                outputContent += sprintf("Response:\n%s\n", rspStr)
+            } else {
+                outputContent += sprintf("Response (truncated to %d bytes):\n%s\n... (truncated)\n", maxBodySize, rspStr[:maxBodySize])
+            }
+        }
+
+        // Keyword and regex matching
+        if hasPattern {
+            edt := memeditor.New(rspStr)
+            if keyword != "" {
+                edt.FindStringRange(keyword, rg => {
+                    matchContent := rg.GetTextContextWithPrompt(3)
+                    if len(matchContent) > 5000 {
+                        matchContent = matchContent[:5000] + "\n... (truncated)"
+                    }
+                    outputContent += sprintf("\nKeyword Match [%s]:\n%s\n", keyword, matchContent)
+                    yakit.Info("Request #%d: Found keyword '%s' in response", result["idx"], keyword)
+                })
+            }
+            if regexpMatch != "" {
+                edt.FindRegexpRange(regexpMatch, rg => {
+                    matchContent := rg.GetTextContextWithPrompt(3)
+                    if len(matchContent) > 5000 {
+                        matchContent = matchContent[:5000] + "\n... (truncated)"
+                    }
+                    outputContent += sprintf("\nRegexp Match [%s]:\n%s\n", regexpMatch, matchContent)
+                    yakit.Info("Request #%d: Found regexp '%s' in response", result["idx"], regexpMatch)
+                })
+            }
+        }
+
+        outputContent += "\n"
+    }
+
+    file.Save(outputFile, outputContent)
+    yakit.Info("Results saved to: %s", outputFile)
+
+    maxInlineOutput = 50000
+    if len(outputContent) <= maxInlineOutput {
+        yakit.Info("%s", outputContent)
+    } else {
+        yakit.Info("%s\n... (output truncated at %d bytes, see full results in saved file)", outputContent[:maxInlineOutput], maxInlineOutput)
+    }
+}
+
+// Print summary table
+yakit.Info("\n=== Results Summary Table ===")
+yakit.Info("%-6s %-50s %-8s %-10s", "Index", "Path", "Status", "Size")
+yakit.Info("%s", "----------------------------------------------------------------------")
+for _, result:= range results {
+    if result["filtered"] == true {
+        continue
+    }
+    if result["success"] == true {
+        path = result["path"]
+        if len(path) > 48 {
+            path = path[:45] + "..."
+        }
+        yakit.Info("%-6d %-50s %-8d %-10d", result["idx"], path, result["status"], result["size"])
+    } else {
+        path = result["path"]
+        if len(path) > 48 {
+            path = path[:45] + "..."
+        }
+        yakit.Info("%-6d %-50s %-8s %-10s", result["idx"], path, "ERROR", "-")
+    }
+}
+
+yakit.Info("\n=== Batch HTTP Request Complete ===")
