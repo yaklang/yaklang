@@ -322,6 +322,64 @@ func GetDefaultAISkillsDir() string {
 	return pt
 }
 
+// aiSkillSubDirs lists the well-known sub-paths checked for AI skills.
+// Each entry is either user-level (rooted at $HOME) or project-level (rooted at $CWD).
+var aiSkillSubDirs = []struct {
+	rel       string // relative path under the root
+	homeLevel bool   // true = $HOME-based, false = $CWD-based
+}{
+	// Cursor
+	{filepath.Join(".cursor", "skills"), true},
+	{filepath.Join(".cursor", "skills"), false},
+	// Claude Code / Claude
+	{filepath.Join(".claude", "skills"), true},
+	{filepath.Join(".claude", "skills"), false},
+	// GitHub Copilot
+	{filepath.Join(".github", "skills"), false},
+	{filepath.Join(".copilot", "skills"), true},
+	// OpenCode
+	{filepath.Join(".opencode", "skills"), true},
+	{filepath.Join(".opencode", "skills"), false},
+}
+
+// GetAllAISkillsDirs returns all directories that should be scanned for AI skills.
+// The first entry is always the yakit global directory (auto-created).
+// Remaining entries come from well-known tool conventions and are only included
+// when the directory actually exists on disk:
+//
+//	User-level ($HOME):  .cursor/skills, .claude/skills, .copilot/skills, .opencode/skills
+//	Project-level ($CWD): .cursor/skills, .claude/skills, .github/skills, .opencode/skills
+func GetAllAISkillsDirs() []string {
+	dirs := []string{GetDefaultAISkillsDir()}
+	seen := make(map[string]struct{})
+	seen[dirs[0]] = struct{}{}
+
+	home := utils.GetHomeDirDefault(".")
+	cwd, cwdErr := os.Getwd()
+
+	for _, entry := range aiSkillSubDirs {
+		var base string
+		if entry.homeLevel {
+			base = home
+		} else {
+			if cwdErr != nil {
+				continue
+			}
+			base = cwd
+		}
+		dir := filepath.Join(base, entry.rel)
+		abs, _ := filepath.Abs(dir)
+		if _, dup := seen[abs]; dup {
+			continue
+		}
+		seen[abs] = struct{}{}
+		if utils.IsDir(dir) {
+			dirs = append(dirs, dir)
+		}
+	}
+	return dirs
+}
+
 func GetDefaultLibsDir() string {
 	pt := filepath.Join(GetDefaultYakitProjectsDir(), "libs")
 	if !utils.IsDir(pt) {
