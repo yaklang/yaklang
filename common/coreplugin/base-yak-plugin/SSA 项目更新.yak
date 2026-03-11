@@ -264,8 +264,7 @@ yakit.Output({
     "project_id": project.ID,
     "project_name": project.ProjectName,
     "description": project.Description,
-    "path":project.URL,
+    "path": project.URL,
     "language": project.Language,
-    "tags": project.Tags,
+    "tags": project.GetTags(),
 })
-

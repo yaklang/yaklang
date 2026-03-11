@@ -1,8 +1,6 @@
 package ssaproject
 
 import (
-	"errors"
-
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
@@ -12,36 +10,44 @@ import (
 )
 
 type SSAProject struct {
-	ID          uint64
-	ProjectName string
-	Description string
-	Tags        []string
-	URL         string
-	Language    ssaconfig.Language
-	Config      *ssaconfig.Config
+	Config *ssaconfig.Config
+	*schema.SSAProject
 }
 
 func (s *SSAProject) setConfig(config *ssaconfig.Config) {
 	s.Config = config
-	s.coverBaseInfo()
 }
 
-func (s *SSAProject) toSchemaData() (*schema.SSAProject, error) {
-	if s == nil {
-		return nil, utils.Errorf("to schema SSA project failed: ssa project builder is nil")
+func (s *SSAProject) fillSchemaProjectFromConfig(project *schema.SSAProject) error {
+	if s == nil || s.Config == nil {
+		return utils.Errorf("fill schema SSA project failed: project or config is nil")
 	}
-	var result schema.SSAProject
-	result.ID = uint(s.ID)
-	result.ProjectName = s.ProjectName
-	result.Description = s.Description
-	result.Language = s.Language
-	result.SetTagsList(s.Tags)
-	result.URL = s.URL
-	err := result.SetConfig(s.Config)
-	if err != nil {
-		return nil, utils.Errorf("to schema SSA project failed: %s", err)
+	if project == nil {
+		return utils.Errorf("fill schema SSA project failed: schema project is nil")
 	}
-	return &result, nil
+	project.ProjectName = s.Config.GetProjectName()
+	project.Description = s.Config.GetProjectDescription()
+	project.Language = s.Config.GetLanguage()
+	project.URL = s.Config.GetCodeSourceLocalFileOrURL()
+	project.SetTagsList(s.Config.GetTags())
+	if err := project.SetConfig(s.Config); err != nil {
+		return utils.Errorf("fill schema SSA project failed: %s", err)
+	}
+	return nil
+}
+
+func (s *SSAProject) loadSchemaProjectByID(db *gorm.DB, id uint) (*schema.SSAProject, error) {
+	if db == nil {
+		return nil, utils.Errorf("load SSA project failed: db is nil")
+	}
+	if id == 0 {
+		return nil, utils.Errorf("load SSA project failed: id is required")
+	}
+	var project schema.SSAProject
+	if err := db.First(&project, id).Error; err != nil {
+		return nil, utils.Errorf("load SSA project failed: %s", err)
+	}
+	return &project, nil
 }
 
 func (s *SSAProject) UpdateConfig(options ...ssaconfig.Option) (err error) {
@@ -70,81 +76,95 @@ func (s *SSAProject) SaveToDB(dbs ...*gorm.DB) (err error) {
 		db = consts.GetGormProfileDatabase()
 	}
 
-	var schemaProject *schema.SSAProject
-	defer func() {
-		if err != nil {
-			return
-		}
-		// 更新或者创建成功时，更新项目配置（因为ID可能会变化）
-		config, err := schemaProject.GetConfig()
-		if err != nil {
-			return
-		}
-		s.setConfig(config)
-	}()
-
 	if s == nil {
 		return utils.Errorf("save SSA project failed: ssa project builder is nil")
 	}
-
-	schemaProject, err = s.toSchemaData()
-	if err != nil {
-		return err
-	}
-	// just create
-	if schemaProject.ID == 0 {
-		err = db.Create(schemaProject).Error
-		return err
+	if s.Config == nil {
+		return utils.Errorf("save SSA project failed: config is nil")
 	}
 
-	// update
-	var existingProject schema.SSAProject
-	err = db.First(&existingProject, schemaProject.ID).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			err = db.Create(schemaProject).Error
+	// Resolve schema project from DB; schema.ID is the source of truth for project_id.
+	if s.SSAProject == nil || s.SSAProject.ID == 0 {
+		if configProjectID := s.Config.GetProjectID(); configProjectID > 0 {
+			project, err := s.loadSchemaProjectByID(db, uint(configProjectID))
+			if err != nil {
+				return err
+			}
+			s.SSAProject = project
+		}
+	} else {
+		project, err := s.loadSchemaProjectByID(db, s.SSAProject.ID)
+		if err != nil {
 			return err
-		} else {
-			return utils.Errorf("check project existence failed: %s", err)
+		}
+		s.SSAProject = project
+	}
+
+	// Existing project: force config.project_id from schema.ID.
+	if s.SSAProject != nil && s.SSAProject.ID > 0 {
+		if err := s.Config.Update(ssaconfig.WithProjectID(uint64(s.SSAProject.ID))); err != nil {
+			return utils.Errorf("update SSA project config failed: %s", err)
 		}
 	}
-	err = db.Model(&existingProject).Updates(schemaProject).Error
-	if err != nil {
+
+	// Create
+	if s.SSAProject == nil || s.SSAProject.ID == 0 {
+		s.SSAProject = &schema.SSAProject{}
+		if err := s.fillSchemaProjectFromConfig(s.SSAProject); err != nil {
+			return err
+		}
+		if err := db.Create(s.SSAProject).Error; err != nil {
+			return err
+		}
+
+		// Persist authoritative project_id into stored config.
+		if err := s.Config.Update(ssaconfig.WithProjectID(uint64(s.SSAProject.ID))); err != nil {
+			return utils.Errorf("update SSA project config failed: %s", err)
+		}
+		if err := s.SSAProject.SetConfig(s.Config); err != nil {
+			return utils.Errorf("update SSA project config failed: %s", err)
+		}
+		if err := db.Model(s.SSAProject).Update("config", s.SSAProject.Config).Error; err != nil {
+			return utils.Errorf("update SSA project config failed: %s", err)
+		}
+		return nil
+	}
+
+	// Update
+	if err := s.fillSchemaProjectFromConfig(s.SSAProject); err != nil {
+		return err
+	}
+	if err := db.Save(s.SSAProject).Error; err != nil {
 		return utils.Errorf("update SSA project failed: %s", err)
 	}
 	return nil
 }
 
-func (s *SSAProject) coverBaseInfo() {
+func (s *SSAProject) GetRuleFilter() *ypb.SyntaxFlowRuleFilter {
 	if s == nil || s.Config == nil {
-		return
+		return nil
 	}
-	s.ProjectName = s.Config.GetProjectName()
-	s.Description = s.Config.GetProjectDescription()
-	s.Tags = s.Config.GetTags()
-	s.Language = s.Config.GetLanguage()
-	s.ID = s.Config.GetProjectID()
-
-	if localFile := s.Config.GetCodeSourceLocalFile(); localFile != "" {
-		s.URL = localFile
-	}
-	if url := s.Config.GetCodeSourceURL(); url != "" {
-		s.URL = url
-	}
+	return s.Config.GetRuleFilter()
 }
 
-func (s *SSAProject) GetRuleFilter() *ypb.SyntaxFlowRuleFilter {
-	return s.Config.GetRuleFilter()
+func (s *SSAProject) GetTags() []string {
+	if s == nil || s.Config == nil {
+		return nil
+	}
+	return s.Config.GetTags()
 }
 
 func (s *SSAProject) Validate() error {
 	if s == nil {
 		return utils.Errorf("validate SSA project failed: ssa project builder is nil")
 	}
-	if s.ProjectName == "" {
+	if s.Config == nil {
+		return utils.Errorf("validate SSA project failed: config is nil")
+	}
+	if s.Config.GetProjectName() == "" {
 		return utils.Errorf("validate SSA project failed: project name is required")
 	}
-	if s.Language == "" {
+	if s.Config.GetLanguage() == "" {
 		return utils.Errorf("validate SSA project failed: language is required")
 	}
 	if s.Config.CodeSource == nil {
@@ -191,15 +211,10 @@ func loadSSAProjectBySchema(project *schema.SSAProject) (*SSAProject, error) {
 	if err != nil {
 		return nil, utils.Errorf("load SSA project failed: %s", err)
 	}
-	builder := &SSAProject{
-		ID:          uint64(project.ID),
-		ProjectName: project.ProjectName,
-		Description: project.Description,
-		Tags:        project.GetTagsList(),
-		Language:    config.GetLanguage(),
-		Config:      config,
-	}
-	return builder, nil
+	return &SSAProject{
+		Config:     config,
+		SSAProject: project,
+	}, nil
 }
 
 func LoadSSAProjectByName(projectName string) (*SSAProject, error) {
