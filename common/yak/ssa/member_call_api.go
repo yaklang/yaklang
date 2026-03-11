@@ -6,6 +6,12 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+type memberCallReadVisitKey struct {
+	objectID     int64
+	keyID        int64
+	wantFunction bool
+}
+
 // ReadMemberCallMethodOrValue read member call method or value depends on type
 func (b *FunctionBuilder) ReadMemberCallMethodOrValue(object, key Value) Value {
 	res := checkCanMemberCallExist(object, key, false)
@@ -34,6 +40,10 @@ func (b *FunctionBuilder) ReadMemberCallValueByName(object Value, key string) Va
 }
 
 func (b *FunctionBuilder) readMemberCallValueEx(object, key Value, wantFunction bool) Value {
+	return b.readMemberCallValueExWithVisited(object, key, wantFunction, nil)
+}
+
+func (b *FunctionBuilder) readMemberCallValueExWithVisited(object, key Value, wantFunction bool, visited map[memberCallReadVisitKey]struct{}) Value {
 	if res := b.CheckMemberCallNilValue(object, key, "readMemberCallVariableEx"); res != nil {
 		return res
 	}
@@ -54,6 +64,20 @@ func (b *FunctionBuilder) readMemberCallValueEx(object, key Value, wantFunction 
 
 	// Phi value: read member from each edge and merge as Phi.
 	if phi, ok := ToPhi(objectt); ok {
+		if visited == nil {
+			visited = make(map[memberCallReadVisitKey]struct{}, 8)
+		}
+		vk := memberCallReadVisitKey{
+			objectID:     objectt.GetId(),
+			keyID:        key.GetId(),
+			wantFunction: wantFunction,
+		}
+		if _, ok := visited[vk]; ok {
+			return b.getFieldValue(objectt, key, wantFunction)
+		}
+		visited[vk] = struct{}{}
+		defer delete(visited, vk)
+
 		res := checkCanMemberCallExist(objectt, key, wantFunction)
 		if ret := b.PeekValueInThisFunction(res.name); ret != nil {
 			return ret
@@ -69,7 +93,7 @@ func (b *FunctionBuilder) readMemberCallValueEx(object, key Value, wantFunction 
 			if !edgeRes.exist {
 				continue
 			}
-			memberValue := b.readMemberCallValueEx(edgeValue, key, wantFunction)
+			memberValue := b.readMemberCallValueExWithVisited(edgeValue, key, wantFunction, visited)
 			if memberValue != nil {
 				edgeValues = append(edgeValues, memberValue)
 			}
