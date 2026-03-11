@@ -601,16 +601,39 @@ func init() {
 		flag := template2java.JAVA_REQUEST_PATH
 		unEscapeKey := template2java.JAVA_UNESCAPE_OUTPUT_PRINT
 
-		checkUnEscape := func(value *Value) bool {
-			t := value.GetType()
-			if t == nil || t.t == nil {
+		shouldCollect := func(method *Value, call *Value) bool {
+			// Prefer call-site context: template2java always emits `_JavaTemplateService(...)`
+			// (and brings in javax.servlet.http types). This avoids relying on unstable `any` types.
+			if call != nil && !call.IsNil() {
+				if inst := call.GetSSAInst(); inst != nil {
+					if fn := inst.GetFunc(); fn != nil {
+						if strings.Contains(fn.GetName(), "_JavaTemplateService") || strings.Contains(fn.GetVerboseName(), "_JavaTemplateService") {
+							return true
+						}
+						for _, paramID := range fn.Params {
+							param, ok := fn.GetValueById(paramID)
+							if !ok || param == nil || param.GetType() == nil {
+								continue
+							}
+							for _, n := range param.GetType().GetFullTypeNames() {
+								if strings.Contains(n, flag) {
+									return true
+								}
+							}
+						}
+					}
+				}
+			}
+
+			// Fallback: type-based heuristic.
+			if method == nil || method.IsNil() {
 				return false
 			}
-			name := t.t.GetFullTypeNames()
-			if len(name) == 0 {
+			t := method.GetType()
+			if t == nil || t.t == nil || t.IsAny() {
 				return false
 			}
-			for _, n := range name {
+			for _, n := range t.t.GetFullTypeNames() {
 				if strings.Contains(n, flag) {
 					return true
 				}
@@ -620,14 +643,33 @@ func init() {
 
 		getCalledAndCheck := func(value *Value) []sfvm.ValueOperator {
 			var vals []sfvm.ValueOperator
-			if !checkUnEscape(value) {
-				return vals
+			visited := make(map[int64]struct{})
+			var walk func(v *Value)
+			walk = func(v *Value) {
+				if v == nil || v.IsNil() {
+					return
+				}
+				if _, ok := visited[v.GetId()]; ok {
+					return
+				}
+				visited[v.GetId()] = struct{}{}
+
+				callInst := v.GetCalledBy()
+				callInst.ForEach(func(call *Value) {
+					if !shouldCollect(v, call) {
+						return
+					}
+					// GetCallArgs() 返回 Values，需要转换为 sfvm.ValueOperator
+					vals = append(vals, ValuesToSFValueList(call.GetCallArgs()))
+				})
+
+				if v.IsPhi() || v.IsSideEffect() {
+					for _, vv := range GetValues(v) {
+						walk(vv)
+					}
+				}
 			}
-			callInst := value.GetCalledBy()
-			callInst.ForEach(func(call *Value) {
-				// GetCallArgs() 返回 Values，需要转换为 sfvm.ValueOperator
-				vals = append(vals, ValuesToSFValueList(call.GetCallArgs()))
-			})
+			walk(value)
 
 			return vals
 		}
