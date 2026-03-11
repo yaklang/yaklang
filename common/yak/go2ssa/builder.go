@@ -152,6 +152,11 @@ type astbuilder struct {
 	specialTypes   map[string]ssa.Type
 	pkgNameCurrent string
 	SetGlobal      bool
+	stableNameSeq  int
+}
+
+func (b *astbuilder) nextGoStableName(prefix string) string {
+	return ssa.NextStableName(prefix, &b.stableNameSeq, "tmp")
 }
 
 func Frontend(src string, cache *ssa.AntlrCache) (*gol.SourceFileContext, error) {

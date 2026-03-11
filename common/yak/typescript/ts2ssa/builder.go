@@ -1,6 +1,7 @@
 package ts2ssa
 
 import (
+	"fmt"
 	"path/filepath"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -57,6 +58,27 @@ type builder struct {
 	reExports map[string]map[string]string // re-exported name -> (path -> exportName)
 	importTbl map[string]map[string]string // libName -> (importItemName -> aliasName)
 
+	stableNameCounter int
+}
+
+func (b *builder) nextTSStableName(prefix string) string {
+	return ssa.NextStableName(prefix, &b.stableNameCounter, "tmp")
+}
+
+func (b *builder) stableTSNameByRange(prefix string, loc *core.TextRange) string {
+	if prefix == "" {
+		prefix = "tmp"
+	}
+	safePrefix := ssa.SanitizeStableNamePart(prefix)
+	if loc == nil {
+		return b.nextTSStableName(safePrefix)
+	}
+	seed := fmt.Sprintf("%s|%d|%d", safePrefix, loc.Pos(), loc.End())
+	hash := utils.CalcSha1(seed)
+	if len(hash) > 12 {
+		hash = hash[:12]
+	}
+	return fmt.Sprintf("%s_%s", safePrefix, hash)
 }
 
 func Frontend(src string) (*ast.SourceFile, error) {

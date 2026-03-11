@@ -35,7 +35,7 @@ func (y *singleFileBuilder) nextJavaStableTemp(prefix string) string {
 
 func (y *singleFileBuilder) nextJavaAnonymousClassName(parentName string) string {
 	y.stableAnonClassSeq++
-	base := sanitizeStableNamePart(parentName)
+	base := ssa.SanitizeStableNamePart(parentName)
 	if base == "" {
 		base = "anonymous_class"
 	}
@@ -75,8 +75,8 @@ func (y *singleFileBuilder) javaStableCallableName(
 	}
 	base := fmt.Sprintf(
 		"%s_%s_%s",
-		sanitizeStableNamePart(ownerName),
-		sanitizeStableNamePart(methodName),
+		ssa.SanitizeStableNamePart(ownerName),
+		ssa.SanitizeStableNamePart(methodName),
 		hash,
 	)
 	suffix := y.stableNameCollision[base]
@@ -85,31 +85,6 @@ func (y *singleFileBuilder) javaStableCallableName(
 		return fmt.Sprintf("%s_%d", base, suffix)
 	}
 	return base
-}
-
-func sanitizeStableNamePart(raw string) string {
-	if raw == "" {
-		return "unnamed"
-	}
-	var b strings.Builder
-	b.Grow(len(raw))
-	for _, r := range raw {
-		switch {
-		case r >= 'a' && r <= 'z':
-			b.WriteRune(r)
-		case r >= 'A' && r <= 'Z':
-			b.WriteRune(r)
-		case r >= '0' && r <= '9':
-			b.WriteRune(r)
-		default:
-			b.WriteByte('_')
-		}
-	}
-	text := strings.Trim(b.String(), "_")
-	if text == "" {
-		return "unnamed"
-	}
-	return text
 }
 
 func javaContextPosKey(raw antlr.ParserRuleContext) string {

@@ -193,6 +193,11 @@ type builder struct {
 	callback       func(str string, filename string)
 	fetchDollarId  func() int
 	currentInclude map[string]struct{}
+	stableNameSeq  int
+}
+
+func (y *builder) nextPHPStableName(prefix string) string {
+	return ssa.NextStableName(prefix, &y.stableNameSeq, "tmp")
 }
 
 func Frontend(src string, caches ...*ssa.AntlrCache) (phpparser.IHtmlDocumentContext, error) {

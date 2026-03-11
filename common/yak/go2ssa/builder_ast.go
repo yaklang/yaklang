@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	gol "github.com/yaklang/yaklang/common/yak/antlr4go/parser"
@@ -501,7 +500,7 @@ func (b *astbuilder) AssignList(leftVariables []*ssa.Variable, rightVariables []
 
 	GetCallField := func(c *ssa.Call, lvs []*ssa.Variable) {
 		length := 1
-		c.SetName(uuid.NewString())
+		c.SetName(b.nextGoStableName("call_unpack"))
 		c.Unpack = true
 		if it, ok := ssa.ToObjectType(c.GetType()); c.GetType().GetTypeKind() == ssa.TupleTypeKind && ok {
 			length = it.Len

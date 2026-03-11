@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/google/uuid"
-
 	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -356,7 +354,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) (v ssa.Value
 		}).Build()
 		return y.ReadValue(variableName)
 	case *phpparser.NullCoalescingExpressionContext:
-		name := uuid.NewString()
+		name := y.nextPHPStableName("null_coalescing")
 		variable := y.CreateVariable(name)
 		y.AssignVariable(variable, y.VisitExpression(ret.Expression(0)))
 		y.CreateIfBuilder().SetCondition(func() ssa.Value {
@@ -400,7 +398,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) (v ssa.Value
 		return rightValue
 
 	case *phpparser.LogicalExpressionContext:
-		id := uuid.NewString()
+		id := y.nextPHPStableName("logical")
 		y.AssignVariable(y.CreateVariable(id), y.EmitValueOnlyDeclare(id))
 		if ret.LogicalXor() != nil {
 			v1 := y.VisitExpression(ret.Expression(0))
