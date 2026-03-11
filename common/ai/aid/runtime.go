@@ -165,7 +165,7 @@ func (r *runtime) NextStep() (*AiTask, bool) {
 	return task, false
 }
 
-func (r *runtime) Invoke(task *AiTask) error {
+func (r *runtime) Invoke(task *AiTask) (retErr error) {
 	if r.RootTask == nil {
 		r.RootTask = task
 	}
@@ -176,6 +176,12 @@ func (r *runtime) Invoke(task *AiTask) error {
 	totalTasks := r.TaskLink.Len()
 	r.config.planLoadingStatus(fmt.Sprintf("开始执行任务队列 (%d 个任务) / Starting Task Queue (%d Tasks)", totalTasks, totalTasks))
 
+	var currentTask *AiTask
+	phase := "executing"
+	defer func() {
+		r.config.savePlanAndExecState(phase, currentTask)
+	}()
+
 	invokeTask := func(current *AiTask) error {
 		// 检查任务是否已被用户主动跳过（Skipped 状态，区别于 Aborted 失败状态）
 		// 如果任务已被用户主动跳过，则直接返回 nil 继续下一个任务
@@ -184,7 +190,6 @@ func (r *runtime) Invoke(task *AiTask) error {
 			r.config.EmitInfo("subtask %s was skipped by user, moving to next task", current.Name)
 			return nil
 		}
-
 		// 检查全局 context 是否被取消（用户终止整个任务）
 		if r.config.IsCtxDone() {
 			r.config.planLoadingStatus("执行已取消 / Execution Cancelled")
@@ -233,12 +238,15 @@ func (r *runtime) Invoke(task *AiTask) error {
 		currentTask, ok := r.NextStep()
 		if !ok {
 			r.config.planLoadingStatus("所有任务执行完成 / All Tasks Completed")
+			phase = "completed"
+			currentTask = nil
 			return nil
 		}
 
 		// Emit current progress
 		r.config.planLoadingStatus(fmt.Sprintf("执行进度: %d/%d - 当前: [%s] / Progress: %d/%d - Current: [%s]",
 			r.currentProgressIndex(), totalTasks, currentTask.Index, r.currentProgressIndex(), totalTasks, currentTask.Index))
+		r.config.savePlanAndExecState("executing", currentTask)
 
 		if err := invokeTask(currentTask); err != nil {
 			// 检查是否是任务被用户主动跳过导致的错误
@@ -257,6 +265,7 @@ func (r *runtime) Invoke(task *AiTask) error {
 			if r.config.IsCtxDone() {
 				r.config.planLoadingStatus("用户终止执行 / User Terminated Execution")
 				r.config.EmitInfo("coordinator context cancelled, stopping execution")
+				phase = "cancelled"
 				return err
 			}
 
@@ -264,6 +273,7 @@ func (r *runtime) Invoke(task *AiTask) error {
 			r.config.EmitPlanExecFail("invoke task[%s] failed: %v", currentTask.Name, err)
 			r.config.EmitError("invoke subtask failed: %v", err)
 			log.Errorf("invoke subtask failed: %v", err)
+			phase = "failed"
 			return err
 		}
 	}

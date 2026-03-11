@@ -19,6 +19,7 @@ const (
 	SYNC_TYPE_MEMORY_CONTEXT              = "memory_sync"
 	SYNC_TYPE_SKIP_SUBTASK_IN_PLAN        = "skip_subtask_in_plan"
 	SYNC_TYPE_REDO_SUBTASK_IN_PLAN        = "redo_subtask_in_plan"
+	SYNC_TYPE_PLAN_EXEC_TASKS            = "plan_exec_tasks"
 
 	ProcessID           string = "process_id"
 	SyncProcessEeventID        = "sync_process_event_id"
@@ -80,6 +81,78 @@ func (c *Config) HandleSyncTimelineEvent(event *ypb.AIInputEvent) error {
 	},
 		event.SyncID,
 	)
+	return nil
+}
+
+func (c *Config) HandleSyncPlanExecTasksEvent(event *ypb.AIInputEvent) error {
+	sessionID := c.PersistentSessionId
+	limit := -1
+	if event.SyncJsonInput != "" {
+		var params map[string]interface{}
+		if err := json.Unmarshal([]byte(event.SyncJsonInput), &params); err == nil {
+			if sid, ok := params["session_id"].(string); ok && sid != "" {
+				sessionID = sid
+			}
+			if l, ok := params["limit"].(float64); ok && l > 0 {
+				limit = int(l)
+			}
+		}
+	}
+
+	db := c.GetDB()
+	if db == nil {
+		c.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "plan_exec_tasks", map[string]interface{}{
+			"session_id": sessionID,
+			"total":      0,
+			"records":    []map[string]interface{}{},
+			"error":      "db is nil",
+		}, event.SyncID)
+		return nil
+	}
+	if sessionID == "" {
+		c.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "plan_exec_tasks", map[string]interface{}{
+			"session_id": sessionID,
+			"total":      0,
+			"records":    []map[string]interface{}{},
+		}, event.SyncID)
+		return nil
+	}
+
+	query := db.Model(&schema.AISessionPlanAndExec{}).Where("session_id = ?", sessionID).Order("updated_at desc")
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+
+	var records []schema.AISessionPlanAndExec
+	if err := query.Find(&records).Error; err != nil {
+		c.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "plan_exec_tasks", map[string]interface{}{
+			"session_id": sessionID,
+			"total":      0,
+			"records":    []map[string]interface{}{},
+			"error":      err.Error(),
+		}, event.SyncID)
+		return nil
+	}
+
+	items := make([]map[string]interface{}, 0, len(records))
+	for _, r := range records {
+		items = append(items, map[string]interface{}{
+			"session_id":      r.SessionID,
+			"coordinator_id":  r.CoordinatorID,
+			"task_tree":       r.TaskTree,
+			"task_progress":   r.TaskProgress,
+			"created_at":      r.CreatedAt,
+			"updated_at":      r.UpdatedAt,
+			"created_at_unix": r.CreatedAt.Unix(),
+			"updated_at_unix": r.UpdatedAt.Unix(),
+		})
+	}
+
+	c.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "plan_exec_tasks", map[string]interface{}{
+		"session_id": sessionID,
+		"total":      len(items),
+		"records":    items,
+	}, event.SyncID)
 	return nil
 }
 
@@ -196,4 +269,5 @@ func (c *Config) RegisterBasicSyncHandlers() {
 	c.InputEventManager.RegisterSyncCallback(SYNC_TYPE_TIMELINE, c.HandleSyncTimelineEvent)
 	c.InputEventManager.RegisterSyncCallback(SYNC_TYPE_UPDATE_CONFIG, c.HandleSyncUpdataConfigEvent)
 	c.InputEventManager.RegisterSyncCallback(SYNC_TYPE_MEMORY_CONTEXT, c.HandleSyncMemoryContextEvent)
+	c.InputEventManager.RegisterSyncCallback(SYNC_TYPE_PLAN_EXEC_TASKS, c.HandleSyncPlanExecTasksEvent)
 }

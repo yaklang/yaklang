@@ -15,3 +15,20 @@ func (a *AISession) TableName() string {
 	return "ai_sessions_v1"
 }
 
+// AISessionPlanAndExec stores PlanAndExec execution state for a session.
+type AISessionPlanAndExec struct {
+	gorm.Model
+
+	SessionID     string `json:"session_id" gorm:"index;not null"`
+	CoordinatorID string `json:"coordinator_id" gorm:"unique_index;not null"`
+
+	// TaskTree stores the serialized plan/execution tree (typically JSON).
+	TaskTree string `json:"task_tree" gorm:"type:text"`
+
+	// TaskProgress stores the serialized progress/state for pause & resume.
+	TaskProgress string `json:"task_progress" gorm:"type:text"`
+}
+
+func (a *AISessionPlanAndExec) TableName() string {
+	return "ai_session_plan_and_execs_v1"
+}
