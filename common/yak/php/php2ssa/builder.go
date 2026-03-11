@@ -292,6 +292,8 @@ type builder struct {
 	currentInclude map[string]struct{}
 
 	dynamicVariableSources map[string][]ssa.Value
+
+	stableNameSeq int
 }
 
 func (b *builder) recordDynamicVariableSource(name string, source ssa.Value) {
@@ -311,6 +313,10 @@ func (b *builder) consumeDynamicVariableSources(name string) []ssa.Value {
 	sources := b.dynamicVariableSources[name]
 	delete(b.dynamicVariableSources, name)
 	return sources
+}
+
+func (y *builder) nextPHPStableName(prefix string) string {
+	return ssa.NextStableName(prefix, &y.stableNameSeq, "tmp")
 }
 
 func Frontend(src string, caches ...*ssa.AntlrCache) (phpparser.IHtmlDocumentContext, error) {

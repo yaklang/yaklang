@@ -1,7 +1,6 @@
 package php2ssa
 
 import (
-	"github.com/google/uuid"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -43,7 +42,7 @@ func (y *builder) VisitCatchClause(raw phpparser.ICatchClauseContext, tryBuilder
 	}
 	tryBuilder.BuildErrorCatch(func() string {
 		if i.VarName() == nil {
-			return uuid.NewString()
+			return y.nextPHPStableName("catch")
 		} else {
 			return i.VarName().GetText()
 		}
