@@ -393,13 +393,13 @@ func Test_Pointer_cfg(t *testing.T) {
 		`, []string{"phi(a)[4,5]", "phi(p.@value)[4,5]"}, t)
 	})
 
-	// Todo: 等待pr: https://github.com/yaklang/yaklang/pull/3176
-	t.Skip()
 	t.Run("pointer cfg for", func(t *testing.T) {
+		// Todo: 等待pr: https://github.com/yaklang/yaklang/pull/3176
+		t.Skip()
 		test.CheckPrintlnValue(`package main
 
-		func main(){
-			a := 1
+			func main(){
+				a := 1
 			var p *int
 
 			for p = &a; ; {
@@ -414,10 +414,12 @@ func Test_Pointer_cfg(t *testing.T) {
 	})
 
 	t.Run("pointer cfg for local", func(t *testing.T) {
+		// Todo: 等待pr: https://github.com/yaklang/yaklang/pull/3176
+		t.Skip()
 		test.CheckPrintlnValue(`package main
 
-		func main(){
-			a := 1
+			func main(){
+				a := 1
 			var p *int
 
 			for p = &a; ; {
@@ -433,10 +435,12 @@ func Test_Pointer_cfg(t *testing.T) {
 	})
 
 	t.Run("pointer cfg for address", func(t *testing.T) {
+		// Todo: 等待pr: https://github.com/yaklang/yaklang/pull/3176
+		t.Skip()
 		test.CheckPrintlnValue(`package main
 
-		func main(){
-			a := 1
+			func main(){
+				a := 1
 			b := 2
 			var p *int
 
@@ -453,12 +457,10 @@ func Test_Pointer_cfg(t *testing.T) {
 		`, []string{"3", "phi(a)[1,3]", "phi(b)[2,3]"}, t)
 	})
 
-	// WIP: cannot achieve this function
-	t.Skip()
 	t.Run("pointer cfg if address", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
 
-		func main(){
+			func main(){
 			a := 1
 			b := 2
 			var p *int
@@ -588,10 +590,8 @@ func Test_Pointer_sideEffect(t *testing.T) {
 		`, []string{"10", "side-effect(42, data.value)"}, t)
 	})
 
-	// TODO
-	t.Skip()
-
 	t.Run("pointer side-effect with nested struct", func(t *testing.T) {
+		t.Skip("TODO: enable after fix/ssa/field/sensetive (nested field-sensitive side effects)")
 		test.CheckPrintlnValue(`package main
 
 		type Inner struct {
@@ -618,6 +618,7 @@ func Test_Pointer_sideEffect(t *testing.T) {
 	})
 
 	t.Run("pointer side-effect with slice", func(t *testing.T) {
+		t.Skip("TODO: enable after fix/ssa/field/sensetive (element/field sensitivity)")
 		test.CheckPrintlnValue(`package main
 
 		func modifySlice(s []int) {
@@ -708,6 +709,7 @@ func Test_Pointer_sideEffect(t *testing.T) {
 	})
 
 	t.Run("pointer side-effect with loop", func(t *testing.T) {
+		t.Skip("TODO: enable after loop-aware pointer side-effect tracking")
 		test.CheckPrintlnValue(`package main
 
 		func modifyInLoop(a *int, count int) {
@@ -728,6 +730,7 @@ func Test_Pointer_sideEffect(t *testing.T) {
 	})
 
 	t.Run("pointer side-effect with map", func(t *testing.T) {
+		t.Skip("TODO: enable after map element/field sensitivity support")
 		test.CheckPrintlnValue(`package main
 
 		func modifyMap(m map[string]int) {
@@ -749,6 +752,7 @@ func Test_Pointer_sideEffect(t *testing.T) {
 	})
 
 	t.Run("pointer side-effect with interface", func(t *testing.T) {
+		t.Skip("TODO: enable after interface dispatch side-effect propagation")
 		test.CheckPrintlnValue(`package main
 
 		type Modifier interface {
@@ -779,6 +783,7 @@ func Test_Pointer_sideEffect(t *testing.T) {
 	})
 
 	t.Run("pointer side-effect with channel", func(t *testing.T) {
+		t.Skip("TODO: enable after chan send/recv SSA support")
 		test.CheckPrintlnValue(`package main
 
 		func modifyThroughChannel(ch chan int) {

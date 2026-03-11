@@ -26,6 +26,23 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, islValue bool) 
 			return b.EmitConstInstPlaceholder(0)
 		}
 	}
+	isPointerLike := func(v ssa.Value) bool {
+		if v == nil || v.GetType() == nil {
+			return false
+		}
+		typ := v.GetType()
+		if typ.GetTypeKind() == ssa.PointerKind {
+			return true
+		}
+		if orTyp, ok := typ.(*ssa.OrType); ok {
+			for _, subTyp := range orTyp.GetTypes() {
+				if subTyp != nil && subTyp.GetTypeKind() == ssa.PointerKind {
+					return true
+				}
+			}
+		}
+		return false
+	}
 	getVariable := func(single getSingleExpr, i int) *ssa.Variable {
 		if s := single.Expression(i); s != nil {
 			_, leftv := b.buildExpression(s.(*gol.ExpressionContext), true)
@@ -63,7 +80,7 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, islValue bool) 
 			case "<-":
 				ssaop = ssa.OpChan
 			case "*":
-				if op1.GetType().GetTypeKind() == ssa.PointerKind {
+				if isPointerLike(op1) {
 					return b.GetOriginValue(op1), nil
 				}
 			case "&":
@@ -186,7 +203,7 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, islValue bool) 
 			}
 			switch op.GetText() {
 			case "*":
-				if op1.GetType().GetTypeKind() == ssa.PointerKind {
+				if isPointerLike(op1) {
 					return nil, b.GetAndCreateOriginPointer(op1)
 				} else if p, ok := ssa.ToParameter(op1); ok && !p.IsFreeValue {
 					if op1Var := getVariable(exp, 0); op1Var != nil {
