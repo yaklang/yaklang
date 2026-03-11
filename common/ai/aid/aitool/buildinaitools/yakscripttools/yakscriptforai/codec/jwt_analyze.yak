@@ -1,0 +1,204 @@
+__DESC__ = "A JWT (JSON Web Token) analysis tool that decodes header/payload, verifies signatures with provided or common weak keys, and performs security analysis including alg:none detection, weak key brute-force, and expiration checks."
+__VERBOSE_NAME__ = "JWT Token Analyzer"
+__KEYWORDS__ = "jwt,token,json web token,security,authentication,authorization,alg none,weak key,signature,claims,header,payload,decode,analyze,bearer"
+
+__USAGE__ = <<<USAGE_BLOCK
+JWT Token Analyzer - Usage Guide for AI Parameter Generation
+
+Decodes and security-analyzes JWT tokens: extracts header/payload, verifies
+signatures, and checks for common vulnerabilities.
+
+Parameters:
+  token           (string, REQUIRED) The JWT token string to analyze.
+                  Format: header.payload.signature (three base64url segments separated by dots)
+
+  keys            (string, optional) Secret key(s) for signature verification.
+                  Comma-separated for multiple keys.
+                  If omitted, decodes without signature verification.
+
+  check-weak-keys (string, optional) Try ~100 common weak JWT signing keys.
+                  Values: "yes" or "no" (default: "no")
+
+Example 1 - Decode without verification:
+{
+  "params": {
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+  }
+}
+
+Example 2 - Verify with a known key:
+{
+  "params": {
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c",
+    "keys": "your-256-bit-secret"
+  }
+}
+
+Example 3 - Brute-force weak keys:
+{
+  "params": {
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U",
+    "check-weak-keys": "yes"
+  }
+}
+USAGE_BLOCK
+
+yakit.AutoInitYakit()
+
+tokenStr = cli.String("token", cli.setRequired(true), cli.setHelp("JWT token string to analyze"))
+keysInput = cli.String("keys", cli.setHelp("verification key(s), comma-separated"))
+checkWeakKeys = cli.String("check-weak-keys", cli.setDefault("no"), cli.setHelp("try common weak JWT keys: yes/no"))
+cli.check()
+
+parts = str.SplitN(tokenStr, ".", 3)
+if len(parts) != 3 {
+    yakit.Error("invalid JWT format: expected 3 dot-separated segments (header.payload.signature), got %d", len(parts))
+    return
+}
+
+headerBytes, headerErr = codec.DecodeBase64Url(parts[0])
+if headerErr != nil {
+    yakit.Error("failed to decode JWT header: %v", headerErr)
+    return
+}
+payloadBytes, payloadErr = codec.DecodeBase64Url(parts[1])
+if payloadErr != nil {
+    yakit.Error("failed to decode JWT payload: %v", payloadErr)
+    return
+}
+
+headerMap = json.loads(string(headerBytes))
+payloadMap = json.loads(string(payloadBytes))
+
+yakit.Info("=== JWT Token Analysis ===")
+
+yakit.Info("")
+yakit.Info("--- Header ---")
+yakit.Info("%s", json.dumps(headerMap, json.withIndent("  ")))
+
+alg = headerMap.GetExact("alg")
+typ = headerMap.GetExact("typ")
+
+yakit.Info("")
+yakit.Info("--- Payload (Claims) ---")
+yakit.Info("%s", json.dumps(payloadMap, json.withIndent("  ")))
+
+exp = payloadMap.GetExact("exp")
+iat = payloadMap.GetExact("iat")
+nbf = payloadMap.GetExact("nbf")
+
+if exp != nil {
+    yakit.Info("  exp (readable): %s", time.Unix(int64(exp), 0).Format("2006-01-02 15:04:05 MST"))
+}
+if iat != nil {
+    yakit.Info("  iat (readable): %s", time.Unix(int64(iat), 0).Format("2006-01-02 15:04:05 MST"))
+}
+if nbf != nil {
+    yakit.Info("  nbf (readable): %s", time.Unix(int64(nbf), 0).Format("2006-01-02 15:04:05 MST"))
+}
+
+yakit.Info("")
+yakit.Info("--- Signature Verification ---")
+sigSegment = parts[2]
+if sigSegment == "" {
+    yakit.Info("Signature segment: (empty)")
+} else {
+    yakit.Info("Signature segment: %s", sigSegment)
+}
+
+signatureVerified = false
+matchedKeyStr = ""
+verificationAttempted = false
+
+if keysInput != "" {
+    verificationAttempted = true
+    keyList = str.SplitAndTrim(keysInput, ",")
+    _, matchedKey, verifyErr = jwt.Parse(tokenStr, keyList...)
+    matchedKeyStr = string(matchedKey)
+    if matchedKeyStr != "" {
+        signatureVerified = true
+        if verifyErr == nil {
+            yakit.Info("[VERIFIED] Signature is VALID with provided key: '%s'", matchedKeyStr)
+        } else {
+            yakit.Info("[KEY_MATCHED] Key '%s' matched, but token has validation issue: %v", matchedKeyStr, verifyErr)
+        }
+    } else {
+        yakit.Info("[FAILED] None of the %d provided key(s) could verify the signature", len(keyList))
+    }
+}
+
+weakKeyCheckEnabled = str.ToLower(str.TrimSpace(checkWeakKeys)) == "yes"
+if !signatureVerified && weakKeyCheckEnabled {
+    verificationAttempted = true
+    weakKeys = jwt.CommonWeakJWTKeys
+    yakit.Info("[INFO] Trying %d common weak keys...", len(weakKeys))
+    _, matchedKey, verifyErr = jwt.Parse(tokenStr, weakKeys...)
+    matchedKeyStr = string(matchedKey)
+    if matchedKeyStr != "" {
+        signatureVerified = true
+        if verifyErr == nil {
+            yakit.Info("[CRITICAL] Signature verified with WEAK KEY: '%s'", matchedKeyStr)
+        } else {
+            yakit.Info("[CRITICAL] Weak key '%s' matched, token validation issue: %v", matchedKeyStr, verifyErr)
+        }
+    } else {
+        yakit.Info("[OK] No common weak keys matched the signature")
+    }
+}
+
+algLower = str.ToLower(sprint(alg))
+isAlgNone = (algLower == "none" || algLower == "" || algLower == "<nil>")
+if isAlgNone {
+    signatureVerified = true
+    yakit.Info("[ALG_NONE] Token uses algorithm 'none' - no signature protection")
+}
+
+if !verificationAttempted && !isAlgNone {
+    yakit.Info("[INFO] No keys provided for verification. Use 'keys' or 'check-weak-keys: yes' to verify")
+}
+
+yakit.Info("")
+yakit.Info("--- Security Analysis ---")
+
+if isAlgNone {
+    yakit.Info("[CRITICAL] Algorithm is '%v' - token has NO cryptographic signature!", alg)
+    yakit.Info("  Attacker can modify payload without invalidating the token.")
+    yakit.Info("  Ensure the server rejects tokens with alg:none.")
+} else {
+    yakit.Info("[OK] Algorithm: %v", alg)
+}
+
+if exp == nil {
+    yakit.Info("[WARN] No expiration claim (exp) - token never expires")
+} else {
+    now = time.Now().Unix()
+    expTs = int64(exp)
+    if now > expTs {
+        yakit.Info("[WARN] Token is EXPIRED since %s", time.Unix(expTs, 0).Format("2006-01-02 15:04:05 MST"))
+    } else {
+        remaining = expTs - now
+        yakit.Info("[OK] Token expires at %s (in %d seconds)", time.Unix(expTs, 0).Format("2006-01-02 15:04:05 MST"), remaining)
+    }
+}
+
+if iat != nil {
+    iatTs = int64(iat)
+    if iatTs > time.Now().Unix() {
+        yakit.Info("[WARN] Issued-at (iat) is in the FUTURE: %s", time.Unix(iatTs, 0).Format("2006-01-02 15:04:05 MST"))
+    }
+}
+
+if nbf != nil {
+    nbfTs = int64(nbf)
+    if time.Now().Unix() < nbfTs {
+        yakit.Info("[WARN] Token is NOT VALID YET (nbf: %s)", time.Unix(nbfTs, 0).Format("2006-01-02 15:04:05 MST"))
+    }
+}
+
+if signatureVerified && weakKeyCheckEnabled && matchedKeyStr != "" && !isAlgNone {
+    yakit.Info("[CRITICAL] Token uses a weak/common signing key: '%s'", matchedKeyStr)
+    yakit.Info("  Recommendation: Use a strong, random key of at least 256 bits")
+}
+
+yakit.Info("")
+yakit.Info("=== Analysis Complete ===")

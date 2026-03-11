@@ -1,0 +1,220 @@
+__DESC__ = "A structured data format conversion tool that converts between JSON, YAML, and XML. Supports auto-detection of input format, pretty printing, format validation, and reformatting."
+__VERBOSE_NAME__ = "Data Format Converter (JSON/YAML/XML)"
+__KEYWORDS__ = "json,yaml,xml,convert,transform,format,prettify,validate,data,config,structured data,serialization,deserialization"
+
+__USAGE__ = <<<USAGE_BLOCK
+Data Format Converter - Usage Guide for AI Parameter Generation
+
+Converts between JSON, YAML, and XML formats. Also supports format validation
+and reformatting/prettifying.
+
+##############################################################################
+# CRITICAL RULE: AITAG IS MANDATORY FOR "input"                             #
+##############################################################################
+
+The "input" parameter contains multi-line structured data. You MUST use AITAG
+to preserve formatting. Do NOT put it in the JSON "params" object.
+
+Parameters:
+  input   (string, REQUIRED, via AITAG) The data to convert/process.
+  from    (string, optional) Source format: "json", "yaml", "xml", or "auto" (default: "auto")
+  to      (string, REQUIRED) Target format: "json", "yaml", or "xml"
+  action  (string, optional) Action: "convert" (default), "format", or "validate"
+          - "convert": Convert from source to target format
+          - "format": Reformat/prettify input in its own format (ignores 'to')
+          - "validate": Check if input is valid in 'from' format (ignores 'to')
+
+Example 1 - Convert JSON to YAML:
+{
+  "params": { "from": "json", "to": "yaml" }
+}
+<|TOOL_PARAM_input_{NONCE}|>
+{
+  "name": "example",
+  "version": "1.0",
+  "features": ["auth", "api"]
+}
+<|/TOOL_PARAM_input_{NONCE}|>
+
+Example 2 - Convert YAML to JSON (auto-detect):
+{
+  "params": { "to": "json" }
+}
+<|TOOL_PARAM_input_{NONCE}|>
+name: example
+version: "1.0"
+features:
+  - auth
+  - api
+<|/TOOL_PARAM_input_{NONCE}|>
+
+Example 3 - Validate JSON:
+{
+  "params": { "from": "json", "to": "json", "action": "validate" }
+}
+<|TOOL_PARAM_input_{NONCE}|>
+{"key": "value"}
+<|/TOOL_PARAM_input_{NONCE}|>
+
+Example 4 - Format/prettify JSON:
+{
+  "params": { "from": "json", "to": "json", "action": "format" }
+}
+<|TOOL_PARAM_input_{NONCE}|>
+{"name":"compact","items":[1,2,3]}
+<|/TOOL_PARAM_input_{NONCE}|>
+USAGE_BLOCK
+
+yakit.AutoInitYakit()
+
+input = cli.String("input", cli.setRequired(true), cli.setHelp("input data to convert"))
+fromFmt = cli.String("from", cli.setDefault("auto"), cli.setHelp("source format: json/yaml/xml/auto"))
+toFmt = cli.String("to", cli.setHelp("target format: json/yaml/xml"))
+action = cli.String("action", cli.setDefault("convert"), cli.setHelp("action: convert/format/validate"))
+cli.check()
+
+fromFmt = str.ToLower(str.TrimSpace(fromFmt))
+toFmt = str.ToLower(str.TrimSpace(toFmt))
+action = str.ToLower(str.TrimSpace(action))
+
+if action == "convert" && toFmt == "" {
+    yakit.Error("'to' parameter is required for convert action")
+    return
+}
+
+// Recursively normalize map keys to string for JSON/YAML compatibility
+normalizeValue = fn(v) {
+    if v == nil {
+        return nil
+    }
+    t = sprintf("%T", v)
+    if str.Contains(t, "map") {
+        m = {}
+        for k, val in v {
+            m[sprint(k)] = normalizeValue(val)
+        }
+        return m
+    }
+    if str.HasPrefix(t, "[]") {
+        arrLen = len(v)
+        arr = []
+        for i := 0; i < arrLen; i++ {
+            arr = append(arr, normalizeValue(v[i]))
+        }
+        return arr
+    }
+    return v
+}
+
+detectFormat = fn(data) {
+    trimmed = str.TrimSpace(data)
+    if str.HasPrefix(trimmed, "{") || str.HasPrefix(trimmed, "[") {
+        _, err = json.New(data)
+        if err == nil {
+            return "json"
+        }
+    }
+    if str.HasPrefix(trimmed, "<") {
+        return "xml"
+    }
+    _, err = yaml.Unmarshal([]byte(data))
+    if err == nil {
+        return "yaml"
+    }
+    return ""
+}
+
+// Parse input into a standard map[string]interface{} compatible structure
+parseInput = fn(data, fmt) {
+    switch fmt {
+    case "json":
+        jObj, err = json.New(data)
+        if err != nil {
+            return nil, err
+        }
+        return jObj.Value(), nil
+    case "yaml":
+        result, err = yaml.Unmarshal([]byte(data))
+        if err != nil {
+            return nil, err
+        }
+        return normalizeValue(result), nil
+    case "xml":
+        result = xml.loads(data)
+        if result == nil {
+            return nil, "xml parsing returned empty result"
+        }
+        return result, nil
+    default:
+        return nil, sprintf("unknown format: %s", fmt)
+    }
+}
+
+serializeOutput = fn(data, fmt) {
+    switch fmt {
+    case "json":
+        result = json.dumps(data, json.withIndent("  "))
+        return result, nil
+    case "yaml":
+        result, err = yaml.Marshal(data)
+        if err != nil {
+            return "", err
+        }
+        return string(result), nil
+    case "xml":
+        result = xml.dumps(data)
+        return string(result), nil
+    default:
+        return "", sprintf("unknown target format: %s", fmt)
+    }
+}
+
+if fromFmt == "auto" {
+    fromFmt = detectFormat(input)
+    if fromFmt == "" {
+        yakit.Error("failed to auto-detect input format. Please specify 'from' parameter explicitly.")
+        return
+    }
+    yakit.Info("[INFO] Auto-detected input format: %s", fromFmt)
+}
+
+if action == "validate" {
+    _, err = parseInput(input, fromFmt)
+    if err != nil {
+        yakit.Info("[INVALID] Input is NOT valid %s: %v", str.ToUpper(fromFmt), err)
+    } else {
+        yakit.Info("[VALID] Input is valid %s", str.ToUpper(fromFmt))
+    }
+    return
+}
+
+if action == "format" {
+    parsed, err = parseInput(input, fromFmt)
+    if err != nil {
+        yakit.Error("failed to parse input as %s: %v", fromFmt, err)
+        return
+    }
+    output, err = serializeOutput(parsed, fromFmt)
+    if err != nil {
+        yakit.Error("failed to format output as %s: %v", fromFmt, err)
+        return
+    }
+    yakit.Info("=== Formatted %s ===", str.ToUpper(fromFmt))
+    yakit.Info("%s", output)
+    return
+}
+
+parsed, err = parseInput(input, fromFmt)
+if err != nil {
+    yakit.Error("failed to parse input as %s: %v", fromFmt, err)
+    return
+}
+
+output, err = serializeOutput(parsed, toFmt)
+if err != nil {
+    yakit.Error("failed to serialize to %s: %v", toFmt, err)
+    return
+}
+
+yakit.Info("=== Converted %s -> %s ===", str.ToUpper(fromFmt), str.ToUpper(toFmt))
+yakit.Info("%s", output)

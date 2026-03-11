@@ -1,0 +1,155 @@
+__DESC__ = "Searches network assets using space search engines (FOFA, Shodan, ZoomEye, Hunter, Quake). Discovers hosts, services, and fingerprints matching the query filter. Requires API key configuration in Yakit settings."
+__VERBOSE_NAME__ = "Network Space Search Engine"
+__KEYWORDS__ = "fofa,shodan,zoomeye,hunter,quake,space engine,network search,asset discovery,fingerprint,reconnaissance,internet scanning"
+
+__USAGE__ = <<<USAGE_BLOCK
+Network Space Search Engine - Usage Guide for AI Parameter Generation
+
+Searches network assets across space search engines. Requires the corresponding
+engine's API key configured in Yakit Third-party Application Settings.
+
+Supported engines: fofa, shodan, zoomeye, hunter, quake
+
+Parameters:
+  engine       (string, required) Search engine name: fofa/shodan/zoomeye/hunter/quake
+  query        (string, required) Search query in the engine's syntax
+  max-records  (int, optional) Maximum number of results. Default: 100
+  max-page     (int, optional) Maximum pages to retrieve. Default: 10
+  page-size    (int, optional) Results per page. Default: 10
+
+Example 1 - FOFA search:
+{
+  "params": {
+    "engine": "fofa",
+    "query": "title=\"login\" && country=\"CN\"",
+    "max-records": 50
+  }
+}
+
+Example 2 - Shodan search:
+{
+  "params": {
+    "engine": "shodan",
+    "query": "apache port:443",
+    "max-records": 20
+  }
+}
+
+Example 3 - Quake search:
+{
+  "params": {
+    "engine": "quake",
+    "query": "service:http AND os:linux",
+    "max-records": 30,
+    "max-page": 3
+  }
+}
+USAGE_BLOCK
+
+yakit.AutoInitYakit()
+
+engine = cli.String("engine", cli.setRequired(true), cli.setHelp("search engine: fofa/shodan/zoomeye/hunter/quake"))
+query = cli.String("query", cli.setRequired(true), cli.setHelp("search query"))
+maxRecords = cli.Int("max-records", cli.setDefault(100), cli.setHelp("max result count"))
+maxPage = cli.Int("max-page", cli.setDefault(10), cli.setHelp("max pages"))
+pageSize = cli.Int("page-size", cli.setDefault(10), cli.setHelp("results per page"))
+cli.check()
+
+engineLower = str.ToLower(str.TrimSpace(engine))
+validEngines = "fofa,shodan,zoomeye,hunter,quake"
+isValid = false
+engineList = str.SplitAndTrim(validEngines, ",")
+for i := 0; i < len(engineList); i++ {
+    if engineList[i] == engineLower {
+        isValid = true
+    }
+}
+if !isValid {
+    yakit.Error("invalid engine '%s'. Supported engines: fofa, shodan, zoomeye, hunter, quake", engine)
+    return
+}
+
+if str.TrimSpace(query) == "" {
+    yakit.Error("query cannot be empty")
+    return
+}
+
+yakit.Info("=== Network Space Search ===")
+yakit.Info("Engine: %s", engineLower)
+yakit.Info("Query: %s", query)
+yakit.Info("Max Records: %d, Max Pages: %d, Page Size: %d", maxRecords, maxPage, pageSize)
+yakit.Info("")
+
+opts = []
+opts = append(opts, spacengine.engine(engineLower))
+if maxRecords > 0 {
+    opts = append(opts, spacengine.maxRecord(maxRecords))
+}
+if maxPage > 0 {
+    opts = append(opts, spacengine.maxPage(maxPage))
+}
+if pageSize > 0 {
+    opts = append(opts, spacengine.pageSize(pageSize))
+}
+
+ch, err = spacengine.Query(query, opts...)
+if err != nil {
+    errStr = sprintf("%v", err)
+    yakit.Error("query failed: %v", err)
+    if str.Contains(str.ToLower(errStr), "key") || str.Contains(str.ToLower(errStr), "config") || str.Contains(str.ToLower(errStr), "auth") || str.Contains(str.ToLower(errStr), "token") || str.Contains(str.ToLower(errStr), "empty") {
+        yakit.Error("[HINT] engine '%s' API key may not be configured. Please configure it in Yakit Settings -> Third-party Application Config -> %s", engineLower, engineLower)
+    }
+    return
+}
+
+resultCount = 0
+for result = range ch {
+    resultCount++
+    yakit.Info("--- Result #%d ---", resultCount)
+    if result.Addr != "" {
+        yakit.Info("  Address: %s", result.Addr)
+    }
+    if result.Host != "" {
+        yakit.Info("  Host: %s", result.Host)
+    }
+    if result.Url != "" {
+        yakit.Info("  URL: %s", result.Url)
+    }
+    if result.HtmlTitle != "" {
+        yakit.Info("  Title: %s", result.HtmlTitle)
+    }
+    if result.Domains != "" {
+        yakit.Info("  Domains: %s", result.Domains)
+    }
+    if result.Province != "" || result.City != "" {
+        yakit.Info("  Location: %s %s", result.Province, result.City)
+    }
+    if result.Asn != "" {
+        yakit.Info("  ASN: %s", result.Asn)
+    }
+    if result.Fingerprints != "" {
+        fp = result.Fingerprints
+        if len(fp) > 200 {
+            fp = fp[:200] + "..."
+        }
+        yakit.Info("  Fingerprints: %s", fp)
+    }
+    if result.Banner != "" {
+        banner = result.Banner
+        if len(banner) > 300 {
+            banner = banner[:300] + "..."
+        }
+        yakit.Info("  Banner: %s", banner)
+    }
+    yakit.Info("  Engine: %s", result.FromEngine)
+    yakit.Info("")
+}
+
+yakit.Info("=== Search Summary ===")
+yakit.Info("Engine: %s", engineLower)
+yakit.Info("Query: %s", query)
+yakit.Info("Results found: %d", resultCount)
+if resultCount == 0 {
+    yakit.Info("No results found for the given query")
+}
+yakit.Info("=== Search Complete ===")

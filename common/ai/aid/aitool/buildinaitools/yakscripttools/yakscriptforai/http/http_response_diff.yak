@@ -1,0 +1,228 @@
+__DESC__ = "Compares two HTTP responses to detect differences. Supports URL mode (send GET to two URLs) and Packet mode (send two raw HTTP packets). Shows status code comparison, content-length difference, and unified diff of response content. Essential for auth bypass detection, WAF analysis, and logic vulnerability verification."
+__VERBOSE_NAME__ = "HTTP Response Diff"
+__KEYWORDS__ = "http,response,diff,compare,difference,authentication,bypass,waf,security,status code,body,headers,content-length"
+
+__USAGE__ = <<<USAGE_BLOCK
+HTTP Response Diff - Usage Guide for AI Parameter Generation
+
+Compares two HTTP responses to find differences. Supports two modes:
+  1. URL Mode: Provide url1 and url2, sends GET requests and compares responses.
+  2. Packet Mode: Provide packet1 and packet2 via AITAG, sends raw packets.
+
+##############################################################################
+# CRITICAL RULE: AITAG IS MANDATORY FOR "packet1" AND "packet2"             #
+##############################################################################
+
+Parameters:
+  url1          (string, required for URL mode) First URL for comparison
+  url2          (string, required for URL mode) Second URL for comparison
+  packet1       (string, required for Packet mode, via AITAG) First raw HTTP packet
+  packet2       (string, required for Packet mode, via AITAG) Second raw HTTP packet
+  timeout       (int, optional) Request timeout in seconds. Default: 10
+  https         (string, optional) Force HTTPS: "true"/"false"/"auto". Default: "auto"
+  proxy         (string, optional) HTTP proxy URL
+  diff-headers  (string, optional) Include headers in diff: "yes"/"no". Default: "yes"
+  diff-body     (string, optional) Include body in diff: "yes"/"no". Default: "yes"
+
+Example 1 - Compare two URLs:
+{
+  "params": {
+    "url1": "http://example.com/admin",
+    "url2": "http://example.com/public",
+    "timeout": 10
+  }
+}
+
+Example 2 - Compare with/without auth cookie (Packet mode):
+{
+  "params": { "timeout": 10 }
+}
+<|TOOL_PARAM_packet1_{NONCE}|>
+GET /admin HTTP/1.1
+Host: example.com
+Cookie: session=valid_token
+
+<|/TOOL_PARAM_packet1_{NONCE}|>
+<|TOOL_PARAM_packet2_{NONCE}|>
+GET /admin HTTP/1.1
+Host: example.com
+
+<|/TOOL_PARAM_packet2_{NONCE}|>
+USAGE_BLOCK
+
+yakit.AutoInitYakit()
+
+url1 = cli.String("url1", cli.setHelp("first URL"))
+url2 = cli.String("url2", cli.setHelp("second URL"))
+packet1 = cli.String("packet1", cli.setHelp("first raw HTTP packet"))
+packet2 = cli.String("packet2", cli.setHelp("second raw HTTP packet"))
+timeout = cli.Int("timeout", cli.setDefault(10), cli.setHelp("request timeout seconds"))
+httpsMode = cli.String("https", cli.setDefault("auto"), cli.setHelp("force HTTPS: true/false/auto"))
+proxy = cli.String("proxy", cli.setHelp("HTTP proxy URL"))
+diffHeaders = cli.String("diff-headers", cli.setDefault("yes"), cli.setHelp("diff headers: yes/no"))
+diffBody = cli.String("diff-body", cli.setDefault("yes"), cli.setHelp("diff body: yes/no"))
+cli.check()
+
+usePacketMode = (packet1 != "" && packet2 != "")
+useUrlMode = (url1 != "" && url2 != "")
+
+if !usePacketMode && !useUrlMode {
+    yakit.Error("provide either (url1 + url2) for URL mode or (packet1 + packet2) for Packet mode")
+    return
+}
+
+buildOpts = fn() {
+    opts = [poc.timeout(timeout)]
+    if proxy != "" {
+        opts = append(opts, poc.proxy(proxy))
+    }
+    httpsLower = str.ToLower(str.TrimSpace(httpsMode))
+    if httpsLower == "true" {
+        opts = append(opts, poc.https(true))
+    } else if httpsLower == "false" {
+        opts = append(opts, poc.https(false))
+    }
+    return opts
+}
+
+extractStatusCode = fn(rspBytes) {
+    rspStr = string(rspBytes)
+    firstLine = str.SplitN(rspStr, "\n", 2)[0]
+    parts = str.SplitN(str.TrimSpace(firstLine), " ", 3)
+    if len(parts) >= 2 {
+        return parts[1]
+    }
+    return "?"
+}
+
+extractHeaders = fn(rspBytes) {
+    rspStr = string(rspBytes)
+    idx = str.Index(rspStr, "\r\n\r\n")
+    if idx < 0 {
+        idx = str.Index(rspStr, "\n\n")
+        if idx < 0 {
+            return rspStr
+        }
+        return rspStr[:idx]
+    }
+    return rspStr[:idx]
+}
+
+extractBody = fn(rspBytes) {
+    rspStr = string(rspBytes)
+    idx = str.Index(rspStr, "\r\n\r\n")
+    if idx >= 0 {
+        return rspStr[idx+4:]
+    }
+    idx = str.Index(rspStr, "\n\n")
+    if idx >= 0 {
+        return rspStr[idx+2:]
+    }
+    return ""
+}
+
+opts = buildOpts()
+
+rspBytes1 = []byte{}
+rspBytes2 = []byte{}
+label1 = ""
+label2 = ""
+
+if useUrlMode {
+    rsp1, _, err1 = poc.Get(url1, opts...)
+    if err1 != nil {
+        yakit.Error("request to url1 failed: %v", err1)
+        return
+    }
+    rsp2, _, err2 = poc.Get(url2, opts...)
+    if err2 != nil {
+        yakit.Error("request to url2 failed: %v", err2)
+        return
+    }
+    label1 = url1
+    label2 = url2
+    rspBytes1 = rsp1.RawPacket
+    rspBytes2 = rsp2.RawPacket
+} else {
+    rsp1, _, err1 = poc.HTTPEx(packet1, opts...)
+    if err1 != nil {
+        yakit.Error("request with packet1 failed: %v", err1)
+        return
+    }
+    rsp2, _, err2 = poc.HTTPEx(packet2, opts...)
+    if err2 != nil {
+        yakit.Error("request with packet2 failed: %v", err2)
+        return
+    }
+    label1 = "Packet 1"
+    label2 = "Packet 2"
+    rspBytes1 = rsp1.RawPacket
+    rspBytes2 = rsp2.RawPacket
+}
+
+yakit.Info("=== HTTP Response Diff ===")
+yakit.Info("")
+
+status1 = extractStatusCode(rspBytes1)
+status2 = extractStatusCode(rspBytes2)
+yakit.Info("Status Code: [%s] %s  vs  [%s] %s", label1, status1, label2, status2)
+if status1 != status2 {
+    yakit.Info("  -> STATUS CODES DIFFER")
+}
+
+yakit.Info("Content-Length: %s = %d bytes  vs  %s = %d bytes", label1, len(rspBytes1), label2, len(rspBytes2))
+yakit.Info("")
+
+showHeaders = str.ToLower(str.TrimSpace(diffHeaders)) == "yes"
+showBody = str.ToLower(str.TrimSpace(diffBody)) == "yes"
+
+if string(rspBytes1) == string(rspBytes2) {
+    yakit.Info("[IDENTICAL] The two responses are exactly the same (no differences)")
+    yakit.Info("")
+    yakit.Info("=== Diff Complete ===")
+    return
+}
+
+if showHeaders {
+    headers1 = extractHeaders(rspBytes1)
+    headers2 = extractHeaders(rspBytes2)
+    if headers1 != headers2 {
+        yakit.Info("--- Headers Diff ---")
+        headerDiff, err = diff.Diff(headers1, headers2)
+        if err != nil {
+            yakit.Info("(diff error: %v)", err)
+        } else {
+            if len(headerDiff) > 5000 {
+                headerDiff = headerDiff[:5000] + "\n... (truncated)"
+            }
+            yakit.Info("%s", headerDiff)
+        }
+        yakit.Info("")
+    } else {
+        yakit.Info("--- Headers: IDENTICAL ---")
+        yakit.Info("")
+    }
+}
+
+if showBody {
+    body1 = extractBody(rspBytes1)
+    body2 = extractBody(rspBytes2)
+    if body1 != body2 {
+        yakit.Info("--- Body Diff ---")
+        bodyDiff, err = diff.Diff(body1, body2)
+        if err != nil {
+            yakit.Info("(diff error: %v)", err)
+        } else {
+            if len(bodyDiff) > 10000 {
+                bodyDiff = bodyDiff[:10000] + "\n... (truncated)"
+            }
+            yakit.Info("%s", bodyDiff)
+        }
+        yakit.Info("")
+    } else {
+        yakit.Info("--- Body: IDENTICAL ---")
+        yakit.Info("")
+    }
+}
+
+yakit.Info("=== Diff Complete ===")
