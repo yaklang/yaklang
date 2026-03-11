@@ -348,6 +348,47 @@ class B {
 	})
 }
 
+func TestMethodOverloadDispatchSideEffect(t *testing.T) {
+	check := func(t *testing.T, invoke string, expect string) {
+		code := `
+class A {
+	int value;
+	void set(int num) {
+		this.value = num;
+	}
+	void set(String num) {
+		this.value = 99;
+	}
+	int get() {
+		return this.value;
+	}
+}
+class Main {
+	void main() {
+		A a = new A();
+		` + invoke + `
+		print(a.get());
+	}
+}
+`
+		ssatest.CheckSyntaxFlow(t, code,
+			`print(* #-> * as $target)`,
+			map[string][]string{
+				"target": {expect},
+			},
+			ssaapi.WithLanguage(ssaconfig.JAVA),
+		)
+	}
+
+	t.Run("prefer int overload", func(t *testing.T) {
+		check(t, `a.set(12);`, "12")
+	})
+
+	t.Run("prefer string overload", func(t *testing.T) {
+		check(t, `a.set("hello");`, "99")
+	})
+}
+
 func Test_Inner_Class(t *testing.T) {
 	t.Run("test outerclass.this ", func(t *testing.T) {
 		code := `

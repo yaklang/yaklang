@@ -3,7 +3,6 @@ package java2ssa
 import (
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
@@ -716,27 +715,59 @@ func (y *singleFileBuilder) VisitMethodCall(raw javaparser.IMethodCallContext, o
 	} else {
 		var memberKey ssa.Value
 		var recover func()
+		var methodName string
 		if ret := i.Identifier(); ret != nil {
 			recover = y.SetRange(ret)
 			text := ret.GetText()
 			_ = text
 			// log.Infof("visitMethodCall: %s: range: %s", text, y.CurrentRange.String())
-			memberKey = y.EmitConstInstPlaceholder(ret.GetText())
+			methodName = ret.GetText()
+			memberKey = y.EmitConstInstPlaceholder(methodName)
 		} else if ret := i.THIS(); ret != nil {
 			// get clazz
 			recover = y.SetRangeFromTerminalNode(ret)
-			memberKey = y.EmitConstInstPlaceholder(ret.GetText())
+			methodName = ret.GetText()
+			memberKey = y.EmitConstInstPlaceholder(methodName)
 		} else if ret = i.SUPER(); ret != nil {
 			// get parent class
 			recover = y.SetRangeFromTerminalNode(ret)
-			memberKey = y.EmitConstInstPlaceholder(ret.GetText())
+			methodName = ret.GetText()
+			memberKey = y.EmitConstInstPlaceholder(methodName)
 		}
-		methodCall := y.ReadMemberCallMethod(object, memberKey)
-		recover()
 
 		var args []ssa.Value
 		if argument := i.Arguments(); argument != nil {
 			args = y.VisitArguments(i.Arguments())
+		}
+
+		var (
+			methodCall     ssa.Value
+			resolvedMethod *ssa.Function
+		)
+		if methodName != "" {
+			if class := y.extractJavaBlueprintFromValue(object); class != nil {
+				resolvedMethod = y.resolveJavaMethodOverload(class, methodName, args)
+			}
+		}
+		if !utils.IsNil(memberKey) {
+			methodCall = y.ReadMemberCallMethod(object, memberKey)
+		}
+		if resolvedMethod != nil {
+			if utils.IsNil(methodCall) {
+				methodCall = resolvedMethod
+			} else {
+				// Keep member-call binding for `this`, but use resolved overload signature/effects.
+				methodCall.SetType(resolvedMethod.GetType())
+			}
+		}
+		if recover != nil {
+			recover()
+		}
+
+		if argument := i.Arguments(); argument != nil {
+			if utils.IsNil(methodCall) {
+				methodCall = y.EmitUndefined(methodName)
+			}
 			c := y.EmitCall(y.NewCall(methodCall, args))
 			if c != nil && methodCall != nil {
 				if methodTyp := methodCall.GetType(); methodTyp != nil {
@@ -1110,7 +1141,7 @@ func (y *singleFileBuilder) VisitLocalVariableDeclaration(raw javaparser.ILocalV
 }
 
 func (y *singleFileBuilder) OnlyVisitVariableDeclaratorName(raw javaparser.IVariableDeclaratorContext) string {
-	name := uuid.NewString()[:4]
+	name := y.nextJavaStableTemp("var_decl")
 	if y == nil || raw == nil || y.IsStop() {
 		return name
 	}
@@ -1684,6 +1715,12 @@ func (y *singleFileBuilder) VisitInnerCreator(raw javaparser.IInnerCreatorContex
 	args := []ssa.Value{obj}
 	arguments := y.VisitClassCreatorRest(i.ClassCreatorRest(), className)
 	args = append(args, arguments...)
+	// 注册过重载的类走重载解析；其余情况保持 main 的 ClassConstructor 语义。
+	if len(y.constructorOverloads[class]) > 0 {
+		if constructorCall := y.callJavaConstructorWithOverload(class, args, false); !utils.IsNil(constructorCall) {
+			return constructorCall
+		}
+	}
 	return y.ClassConstructor(class, args)
 
 }
@@ -1719,7 +1756,7 @@ func (y *singleFileBuilder) VisitCreator(raw javaparser.ICreatorContext) (obj ss
 		args := []ssa.Value{obj}
 		arguments := y.VisitClassCreatorRest(ret, class.Name)
 		args = append(args, arguments...)
-		return nil, y.ClassConstructor(class, args)
+		return nil, y.callJavaConstructorWithOverload(class, args, true)
 	}
 	//array init
 	if ret := i.ArrayCreatorRest(); ret != nil {
@@ -1750,7 +1787,7 @@ func (y *singleFileBuilder) VisitClassCreatorRest(raw javaparser.IClassCreatorRe
 	}
 	if i.ClassBody() != nil {
 		// 匿名类
-		className := uuid.NewString()
+		className := y.nextJavaAnonymousClassName(parentName)
 		class := y.CreateBlueprint(className, i.ClassBody())
 
 		parent := y.GetBluePrint(parentName)
