@@ -60,8 +60,6 @@ func (y *builder) VisitAnonymousClass(raw phpparser.IAnonymousClassContext) ssa.
 	if i == nil {
 		return nil
 	}
-	// cname := uuid.NewString()
-
 	var (
 		interfaces []string
 		extendName string

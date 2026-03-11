@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -2025,7 +2024,7 @@ func (b *builder) VisitBinaryExpression(node *ast.BinaryExpression) ssa.Value {
 		valueName string,
 	) ssa.Value {
 		// 为了聚合产生Phi指令
-		id := valueName + "_" + uuid.NewString()
+		id := b.nextTSStableName(valueName)
 		variable := b.CreateLocalVariable(id)
 		b.AssignVariable(variable, b.EmitValueOnlyDeclare(id))
 		// 只需要使用b.WriteValue设置value到此ID，并最后调用b.ReadValue可聚合产生Phi指令，完成语句预期行为
@@ -2953,7 +2952,7 @@ func (b *builder) VisitFunctionDeclaration(node *ast.FunctionDeclaration) interf
 		funcName = node.Name().AsIdentifier().Text
 	} else {
 		// 函数声明必须有名称，如果没有名称，生成一个唯一名称
-		funcName = "anonymous_func_" + uuid.NewString()
+		funcName = b.stableTSNameByRange("anonymous_func", &node.Loc)
 	}
 
 	// 使用 AST 提供的辅助方法检查修饰符
@@ -3044,7 +3043,7 @@ func (b *builder) VisitFunctionExpression(node *ast.FunctionExpression) ssa.Valu
 	if node.Name() != nil {
 		funcName = node.Name().AsIdentifier().Text
 	} else {
-		funcName = "anonymous_func_" + uuid.NewString()
+		funcName = b.stableTSNameByRange("anonymous_func", &node.Loc)
 	}
 
 	// 使用 AST 提供的辅助方法检查是否是 async 函数
@@ -3118,7 +3117,7 @@ func (b *builder) VisitArrowFunction(node *ast.ArrowFunction) ssa.Value {
 	if node.Name() != nil {
 		funcName = node.Name().AsIdentifier().Text
 	} else {
-		funcName = "arrow_func_" + uuid.NewString()
+		funcName = b.stableTSNameByRange("arrow_func", &node.Loc)
 	}
 
 	// 使用 AST 提供的辅助方法检查是否是 async 函数
@@ -3189,7 +3188,7 @@ func (b *builder) VisitConditionalExpression(node *ast.ConditionalExpression) ss
 		valueName string,
 	) ssa.Value {
 		// 为了聚合产生Phi指令
-		id := valueName + "_" + uuid.NewString()
+		id := b.nextTSStableName(valueName)
 		variable := b.CreateLocalVariable(id)
 		b.AssignVariable(variable, b.EmitValueOnlyDeclare(id))
 		// 只需要使用b.WriteValue设置value到此ID，并最后调用b.ReadValue可聚合产生Phi指令，完成语句预期行为
@@ -4397,7 +4396,7 @@ func (b *builder) ProcessPropertyName(propertyName *ast.PropertyName) string {
 		return propertyName.AsBigIntLiteral().Text[:len(propertyName.AsBigIntLiteral().Text)-1]
 	default:
 		b.NewError(ssa.Error, TAG, UnexpectedPropertyNameType())
-		return uuid.NewString()
+		return b.nextTSStableName("unexpected_property")
 	}
 }
 
@@ -4447,7 +4446,7 @@ func (b *builder) ProcessClassMethod(member *ast.ClassElement, class *ssa.Bluepr
 	}
 
 	// 共同的处理逻辑
-	funcName := fmt.Sprintf("%s_%s_%s", class.Name, methodName, uuid.NewString()[:4])
+	funcName := b.stableTSNameByRange(fmt.Sprintf("%s_%s", class.Name, methodName), &member.Loc)
 	newFunc := b.NewFunc(funcName)
 	newFunc.SetMethodName(methodName)
 
@@ -4511,7 +4510,7 @@ func (b *builder) ProcessClassMethod(member *ast.ClassElement, class *ssa.Bluepr
 
 func (b *builder) ProcessClassCtor(member *ast.ClassElement, class *ssa.Blueprint) {
 	ctor := member.AsConstructorDeclaration()
-	ctorName := fmt.Sprintf("%s_%s_%s", class.Name, "Custom-Constructor", uuid.NewString()[:4])
+	ctorName := b.stableTSNameByRange(fmt.Sprintf("%s_%s", class.Name, "Custom-Constructor"), &member.Loc)
 	params := ctor.Parameters
 
 	// 预处理参数属性（Parameter Properties）
@@ -4614,7 +4613,7 @@ func (b *builder) ProcessMemberName(name *ast.MemberName) string {
 		// panic("unhandled member name type")
 		b.NewError(ssa.Error, TAG, UnhandledMemberNameType())
 	}
-	return fmt.Sprintf("UnexoectedMemberNameKind_%s", uuid.NewString()[:8])
+	return b.nextTSStableName("UnexoectedMemberNameKind")
 }
 
 // VisitEnumDeclaration 访问枚举声明
