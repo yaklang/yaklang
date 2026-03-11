@@ -134,6 +134,22 @@ Anchor 只在 condition scope 里启用，且由同一个 opcode 控制：
 
 嵌套时，`anchorBase` 通过父 scope 叠加得到（父 range 的尾部开始），保证不同 scope 的 bit-range 不重叠。
 
+伪代码（scope start）：
+
+```text
+base = 0
+if hasParentScope:
+  base = parent.base + parent.width
+width = len(source)
+
+for slot i in [0..width):
+  oldBits = source[i].bits
+  localBits(i) = { base + i }          // duplicates: union all their slots
+  source[i].bits = localBits(i) OR oldBits
+```
+
+scope end 会把 `source[i].bits` 恢复为 `oldBits`（避免 scope 内写入的本地 bits 泄漏到外层/后续语句）。
+
 ### 3.4 本地 anchor 的分配策略（含重复值）
 
 当 source 里同一个逻辑值出现多次（例如重复引用/重复 slot），本地 anchor 会取并集：
@@ -149,6 +165,17 @@ Anchor 只在 condition scope 里启用，且由同一个 opcode 控制：
 
 SFVM 在很多“从 value 取下一跳”的地方会做一次 `mergeAnchorBitVectorToResult(result, source)`，确保派生出的 `result` 能携带来源信息。
 
+用代码/数学表达就是：
+
+```text
+// 单值
+child.bits |= parent.bits
+
+// 一对多
+for r in result:
+  r.bits |= source.bits
+```
+
 同时要注意：**native call 也必须遵守这条规则**。否则像 `<scanInstruction>` 这种“从 BasicBlock 派生指令列表”的操作，派生值没有 anchor bits，就无法在 `?{!<scanInstruction>}` 这种表达式里正确映射回源 BasicBlock。
 
 ### 3.6 条件 mask 如何从结果反推 source
@@ -162,6 +189,12 @@ SFVM 在很多“从 value 取下一跳”的地方会做一次 `mergeAnchorBitV
 约束：在 mask-mode 的 condition-scope 内，所有参与回推的值都必须携带 anchor bits；缺失属于实现 bug，VM 会直接报 `CriticalError`，而不是回退做猜测匹配。
 
 这里的关键点是：标记 mask 时只看当前 scope 对应的 bit-range（`anchorBase..anchorBase+anchorWidth`），避免被其它 scope 的 anchor bits 干扰。
+
+回推规则（在当前 scope 范围内投影）：
+
+```text
+mask[i] = true  <=>  (anchorBase + i) in value.bits
+```
 
 ### 3.7 `ConditionEntry` 的两种模式
 

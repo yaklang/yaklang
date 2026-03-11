@@ -113,6 +113,9 @@ func (v Values) pipeLineRun(f func(ValueOperator) (Values, error)) (Values, erro
 	pipe := pipeline.NewPipe(ctx, size, func(operator ValueOperator) (Values, error) {
 		value, err := f(operator)
 		if err == nil {
+			// Provenance propagation for condition scopes:
+			//   for r in value: r.bits |= operator.bits
+			// Without this, OpFilter cannot map derived results back to the scope source slots.
 			mergeAnchorBitVectorToResult(value, operator)
 		}
 		return value, err

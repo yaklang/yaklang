@@ -373,6 +373,11 @@ func (s *SFFrame) execRule(feedValue Values) error {
 				}
 
 				// Error-skip can jump over scope-end opcodes; unwind scopes created in this statement.
+				//
+				// Each condition scope start temporarily overwrites anchor bits on the current
+				// source list (see OpConditionScopeStart). If we skip past OpConditionScopeEnd
+				// we MUST restore those overwritten bits, otherwise anchor provenance would leak
+				// across statements and break subsequent mask alignment.
 				for s.conditionScope.Len() > ctx.scopeDepth {
 					scope := s.conditionScope.Pop()
 					restoreAnchorBitVector(scope.anchorRestore)
@@ -401,6 +406,14 @@ func (s *SFFrame) execRule(feedValue Values) error {
 				}
 				// Condition scopes always enable anchor bookkeeping so that derived values can map
 				// back to their originating source slots via AnchorBitVector.
+				//
+				// For the current scope source list (stack top) with width = len(source):
+				// - We reserve a disjoint bit-range [anchorBase, anchorBase+anchorWidth) for this scope.
+				// - For each source slot i: localBits(i) = {anchorBase + i}.
+				// - We write: source[i].bits = localBits(i) OR oldBits, and remember oldBits in anchorRestore.
+				//
+				// Nested scopes stack their ranges by shifting anchorBase = parent.base + parent.width
+				// so inner scopes can add local provenance without overwriting outer provenance.
 				sourceValues := s.stack.Peek()
 				state.mode = conditionModeFromSource(sourceValues)
 				if s.conditionScope.Len() > 0 {
@@ -415,6 +428,8 @@ func (s *SFFrame) execRule(feedValue Values) error {
 					break
 				}
 				scopeState := s.conditionScope.Pop()
+				// Restore anchor bits overwritten at scope start so they don't leak to outer scopes
+				// and other statements.
 				restoreAnchorBitVector(scopeState.anchorRestore)
 				if s.stack.Len() != scopeState.stackDepth {
 					return utils.Wrapf(
