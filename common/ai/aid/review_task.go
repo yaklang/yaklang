@@ -60,6 +60,7 @@ var TaskReviewSuggestions = []*ReviewSuggestion{
 
 func (t *AiTask) handleReviewResult(param aitool.InvokeParams) error {
 	defer t.runtime.updateTaskLink()
+	planChanged := false
 
 	// 1. 获取审查建议
 	suggestion := param.GetString("suggestion")
@@ -79,6 +80,7 @@ func (t *AiTask) handleReviewResult(param aitool.InvokeParams) error {
 		t.EmitJSON(schema.EVENT_TYPE_PLAN, "system", map[string]any{
 			"root_task": t.getCurrentTaskPlan(),
 		})
+		planChanged = true
 	case "inaccurate":
 		t.EmitInfo("inaccurate")
 		return t.executeTask() // 重新执行
@@ -104,6 +106,7 @@ func (t *AiTask) handleReviewResult(param aitool.InvokeParams) error {
 		t.EmitJSON(schema.EVENT_TYPE_PLAN, "system", map[string]any{
 			"root_task": t.getCurrentTaskPlan(),
 		})
+		planChanged = true
 	case "adjust_plan":
 		deltas := ParseTaskDeltas(param)
 		if len(deltas) > 0 {
@@ -128,9 +131,13 @@ func (t *AiTask) handleReviewResult(param aitool.InvokeParams) error {
 		t.EmitJSON(schema.EVENT_TYPE_PLAN, "system", map[string]any{
 			"root_task": t.getCurrentTaskPlan(),
 		})
+		planChanged = true
 	default:
 		t.EmitError("unknown review suggestion: %s", suggestion)
 		return utils.Errorf("unknown review suggestion: %s", suggestion)
+	}
+	if planChanged {
+		t.Coordinator.savePlanAndExecState("review", t)
 	}
 	return nil
 }

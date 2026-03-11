@@ -37,5 +37,9 @@ func DeleteAISession(profileDB, projectDB *gorm.DB, sessionId string) (deletedRu
 		return deletedRuntimes, 0, err
 	}
 
+	if err = DeleteAISessionPlanAndExecBySessionID(projectDB, sessionId); err != nil {
+		return deletedRuntimes, deletedEvents, err
+	}
+
 	return deletedRuntimes, deletedEvents, nil
 }

@@ -393,6 +393,7 @@ func (c *Coordinator) Run() error {
 	root := rsp.RootTask
 	c.rootTask = root
 	c.ContextProvider.StoreRootTask(root)
+	c.savePlanAndExecState("plan_ready", nil)
 	if len(root.Subtasks) <= 0 {
 		c.planLoadingStatus("无有效子任务 / No Valid Subtasks")
 		c.EmitError("no subtasks found, this task is not a valid task")
