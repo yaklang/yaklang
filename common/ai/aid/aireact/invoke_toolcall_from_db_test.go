@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
@@ -717,13 +718,14 @@ LOOP:
 }
 
 // setupMockYakScriptPluginInDB creates a MITM-type YakScript plugin in the database with enable_for_ai=true.
+// It registers both t.Cleanup and returns a cleanup function for extra safety.
 func setupMockYakScriptPluginInDB(t *testing.T, name string) {
 	db := consts.GetGormProfileDatabase()
 	if db == nil {
 		t.Fatal("database not initialized")
 	}
 
-	cleanupMockYakScriptPluginFromDB(t, name)
+	hardDeleteMockYakScriptPlugin(db, name)
 
 	script := &schema.YakScript{
 		ScriptName:  name,
@@ -739,6 +741,8 @@ func setupMockYakScriptPluginInDB(t *testing.T, name string) {
 		t.Fatalf("failed to create mock YakScript plugin: %v", err)
 	}
 	log.Infof("created mock YakScript plugin in database: %s", name)
+
+	t.Cleanup(func() { hardDeleteMockYakScriptPlugin(db, name) })
 }
 
 func cleanupMockYakScriptPluginFromDB(t *testing.T, name string) {
@@ -746,7 +750,24 @@ func cleanupMockYakScriptPluginFromDB(t *testing.T, name string) {
 	if db == nil {
 		return
 	}
-	db.Where("script_name = ?", name).Delete(&schema.YakScript{})
+	hardDeleteMockYakScriptPlugin(db, name)
+}
+
+func hardDeleteMockYakScriptPlugin(db *gorm.DB, name string) {
+	db.Unscoped().Where("script_name = ?", name).Delete(&schema.YakScript{})
+}
+
+func init() {
+	// Clean up any leaked mock YakScript plugins from previous test runs
+	// that might pollute the real profile database.
+	go func() {
+		db := consts.GetGormProfileDatabase()
+		if db == nil {
+			return
+		}
+		db.Unscoped().Where("script_name LIKE ?", "mock_mitm_yakscript_%").Delete(&schema.YakScript{})
+		db.Unscoped().Where("script_name LIKE ?", "mock_native_yakscript_%").Delete(&schema.YakScript{})
+	}()
 }
 
 func mockedToolCallingForYakScriptPlugin(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string) (*aicommon.AIResponse, error) {
@@ -897,6 +918,9 @@ func TestReAct_ToolUse_YakScriptPlugin_NativeWithParams(t *testing.T) {
 	if db == nil {
 		t.Fatal("database not initialized")
 	}
+
+	hardDeleteMockYakScriptPlugin(db, pluginName)
+	t.Cleanup(func() { hardDeleteMockYakScriptPlugin(db, pluginName) })
 	defer cleanupMockYakScriptPluginFromDB(t, pluginName)
 
 	script := &schema.YakScript{
