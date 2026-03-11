@@ -55,7 +55,7 @@ func (s *Server) GenerateWebShell(context.Context, *ypb.ShellGenerate) (*ypb.Web
 	panic("impl me")
 }
 func (s *Server) CreateWebShell(ctx context.Context, req *ypb.WebShell) (*ypb.WebShell, error) {
-	db := consts.GetGormProjectDatabase()
+	db := s.GetProjectDatabase()
 	if db == nil {
 		log.Error("empty database")
 		return nil, utils.Errorf("no database connection")
@@ -100,11 +100,12 @@ func (s *Server) CreateWebShell(ctx context.Context, req *ypb.WebShell) (*ypb.We
 	if err != nil {
 		return nil, utils.Errorf("create webshell error: %v", err)
 	}
+	delete(webShellManagerCache, int64(webShell.ID))
 	return webShell.ToGRPCModel(), nil
 }
 
 func (s *Server) DeleteWebShell(ctx context.Context, req *ypb.DeleteWebShellRequest) (*ypb.Empty, error) {
-	db := consts.GetGormProjectDatabase()
+	db := s.GetProjectDatabase()
 	if db == nil {
 		log.Error("empty database")
 		return nil, utils.Errorf("no database connection")
@@ -124,7 +125,7 @@ func (s *Server) DeleteWebShell(ctx context.Context, req *ypb.DeleteWebShellRequ
 }
 
 func (s *Server) UpdateWebShell(ctx context.Context, req *ypb.WebShell) (*ypb.WebShell, error) {
-	db := consts.GetGormProjectDatabase()
+	db := s.GetProjectDatabase()
 	if db == nil {
 		log.Error("empty database")
 		return nil, utils.Errorf("no database connection")
@@ -176,7 +177,7 @@ func (s *Server) UpdateWebShell(ctx context.Context, req *ypb.WebShell) (*ypb.We
 }
 
 func (s *Server) QueryWebShells(ctx context.Context, req *ypb.QueryWebShellsRequest) (*ypb.QueryWebShellsResponse, error) {
-	db := consts.GetGormProjectDatabase()
+	db := s.GetProjectDatabase()
 	if db == nil {
 		log.Error("empty database")
 		return nil, utils.Errorf("no database connection")
@@ -197,6 +198,9 @@ func (s *Server) QueryWebShells(ctx context.Context, req *ypb.QueryWebShellsRequ
 
 func (s *Server) Ping(ctx context.Context, req *ypb.WebShellRequest) (*ypb.WebShellResponse, error) {
 	w, err := s.getWebShellManager(req.GetId())
+	if err != nil {
+		return nil, err
+	}
 	ping, err := w.Ping()
 	if err != nil {
 		return nil, err
@@ -212,6 +216,9 @@ func (s *Server) Ping(ctx context.Context, req *ypb.WebShellRequest) (*ypb.WebSh
 
 func (s *Server) GetBasicInfo(ctx context.Context, req *ypb.WebShellRequest) (*ypb.WebShellResponse, error) {
 	w, err := s.getWebShellManager(req.GetId())
+	if err != nil {
+		return nil, err
+	}
 	info, err := w.BasicInfo()
 	if err != nil {
 		return nil, err
