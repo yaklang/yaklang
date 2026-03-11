@@ -282,6 +282,19 @@ func TestRuleRun(t *testing.T) {
 	if utils.InGithubActions() {
 		return
 	}
+	prevLevel := diagnostics.GetLevel()
+	defer diagnostics.SetLevel(prevLevel)
+
+	// Avoid polluting the repo with heap profile artifacts when diagnostics
+	// level is switched to LevelLow in this integration-style test.
+	prevHeapDumpDir, hasHeapDumpDir := os.LookupEnv("YAK_DIAGNOSTICS_HEAP_DUMP_DIR")
+	if !hasHeapDumpDir {
+		_ = os.Setenv("YAK_DIAGNOSTICS_HEAP_DUMP_DIR", t.TempDir())
+		defer os.Unsetenv("YAK_DIAGNOSTICS_HEAP_DUMP_DIR")
+	} else {
+		defer os.Setenv("YAK_DIAGNOSTICS_HEAP_DUMP_DIR", prevHeapDumpDir)
+	}
+
 	name := "检测Java 日志伪造攻击"
 	rule, err := sfdb.GetRule(name)
 	if isLocalRecordNotFound(err) {
