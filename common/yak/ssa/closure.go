@@ -291,6 +291,12 @@ func handleSideEffect(c *Call, funcTyp *FunctionType, buildPointer bool) {
 			}
 			if v.GetType() != nil && v.GetType().GetTypeKind() == PointerKind {
 				se.Name = builder.GetOriginPointerName(v)
+				if se.Kind == PointerSideEffect &&
+					!utils.IsNil(modify) && modify.GetType() != nil && modify.GetType().GetTypeKind() != PointerKind {
+					if deref := builder.GetOriginValue(v); !utils.IsNil(deref) && deref.GetType() != nil && deref.GetType().GetTypeKind() == PointerKind {
+						se.Name = builder.GetOriginPointerName(deref)
+					}
+				}
 			} else {
 				if v.GetName() != "" {
 					se.Name = v.GetName()

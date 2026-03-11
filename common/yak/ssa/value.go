@@ -256,16 +256,67 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 			scope.AssignVariable(p, variable.GetValue())
 		}
 
-		n := strings.TrimPrefix(variable.GetValue().String(), "&")
-		originName, originGlobalId := SplitName(n)
+		type pointerTarget struct {
+			name     string
+			globalID int
+		}
 
-		newValue := b.CopyValue(value)
-		newValue.SetName(originName)
-		newValue.SetVerboseName(originName)
+		targets := make(map[pointerTarget]struct{})
+		var collectTargets func(Value)
+		collectTargets = func(pointer Value) {
+			if pointer == nil {
+				return
+			}
+			if phi, ok := pointer.(*Phi); ok {
+				for _, edgeID := range phi.Edge {
+					if edgeVal, ok := b.GetValueById(edgeID); ok && edgeVal != nil {
+						collectTargets(edgeVal)
+					}
+				}
+				return
+			}
 
-		if newVariable := b.CreateVariableGlobalIndex(originName, originGlobalId); v != nil {
-			b.AssignVariable(newVariable, newValue)
-			newVariable.SetCross(true)
+			n := strings.TrimPrefix(pointer.String(), "&")
+			originName, originGlobalId := SplitName(n)
+			if originName == "" || originGlobalId == 0 {
+				return
+			}
+			targets[pointerTarget{name: originName, globalID: originGlobalId}] = struct{}{}
+		}
+
+		collectTargets(variable.GetValue())
+		multiTarget := len(targets) > 1
+
+		getOriginCurrentValue := func(originName string, originGlobalId int) Value {
+			for _, ver := range GetAllVariablesFromScopeAndParent(scope, originName) {
+				if ver.GetGlobalIndex() == originGlobalId {
+					if val := ver.GetValue(); val != nil {
+						return val
+					}
+					break
+				}
+			}
+			if val := b.PeekValueInThisFunction(originName); val != nil {
+				return val
+			}
+			return b.EmitUndefined(originName)
+		}
+
+		for target := range targets {
+			newValue := b.CopyValue(value)
+			newValue.SetName(target.name)
+			newValue.SetVerboseName(target.name)
+
+			assignValue := Value(newValue)
+			if multiTarget {
+				oldValue := getOriginCurrentValue(target.name, target.globalID)
+				assignValue = b.EmitPhi(target.name, Values{oldValue, newValue})
+			}
+
+			if newVariable := b.CreateVariableGlobalIndex(target.name, target.globalID); newVariable != nil {
+				b.AssignVariable(newVariable, assignValue)
+				newVariable.SetCross(true)
+			}
 		}
 	} else {
 		scope.AssignVariable(variable, value)
