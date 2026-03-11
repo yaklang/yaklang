@@ -145,6 +145,40 @@ func (s *ConfigConsumptionState) GetTierConsumptionStats() *omap.OrderedMap[cons
 	return s.TierConsumptionStat
 }
 
+func (s *ConfigConsumptionState) AddTierInputConsumption(tier consts.ModelTier, inputDelta int64) {
+	if s == nil {
+		return
+	}
+	s.ensure()
+	normalizedTier := normalizeConsumptionTier(tier)
+	s.m.Lock()
+	stats, _ := s.TierConsumptionStat.Get(normalizedTier)
+	if stats == nil {
+		stats = newConsumptionStats()
+		s.TierConsumptionStat.Set(normalizedTier, stats)
+	}
+	s.m.Unlock()
+	stats.Add(inputDelta, 0)
+	atomic.AddInt64(s.InputConsumption, inputDelta)
+}
+
+func (s *ConfigConsumptionState) AddTierOutputConsumption(tier consts.ModelTier, outputDelta int64) {
+	if s == nil {
+		return
+	}
+	s.ensure()
+	normalizedTier := normalizeConsumptionTier(tier)
+	s.m.Lock()
+	stats, _ := s.TierConsumptionStat.Get(normalizedTier)
+	if stats == nil {
+		stats = newConsumptionStats()
+		s.TierConsumptionStat.Set(normalizedTier, stats)
+	}
+	s.m.Unlock()
+	stats.Add(0, outputDelta)
+	atomic.AddInt64(s.OutputConsumption, outputDelta)
+}
+
 func normalizeConsumptionTier(tier consts.ModelTier) consts.ModelTier {
 	if tier == "" {
 		return consts.TierIntelligent
@@ -185,24 +219,29 @@ func (c *Config) ensureTierConsumptionStats() *omap.OrderedMap[consts.ModelTier,
 	return state.GetTierConsumptionStats()
 }
 
-func (c *Config) GetOrCreateTierConsumptionStats(tier consts.ModelTier) *ConsumptionStats {
-	statsByTier := c.ensureTierConsumptionStats()
-	if statsByTier == nil {
-		return nil
-	}
-	normalizedTier := normalizeConsumptionTier(tier)
-	return statsByTier.GetOrSet(normalizedTier, newConsumptionStats())
-}
-
 func (c *Config) AddTierConsumption(tier consts.ModelTier, inputDelta, outputDelta int64) {
 	if inputDelta == 0 && outputDelta == 0 {
 		return
 	}
-	stats := c.GetOrCreateTierConsumptionStats(tier)
-	if stats == nil {
+	state := c.ensureConsumptionState()
+	state.AddTierOutputConsumption(tier, outputDelta)
+	state.AddTierInputConsumption(tier, inputDelta)
+}
+
+func (c *Config) InputConsumptionCallback(tier consts.ModelTier, current int) {
+	state := c.ensureConsumptionState()
+	if state == nil {
 		return
 	}
-	stats.Add(inputDelta, outputDelta)
+	state.AddTierInputConsumption(tier, int64(current))
+}
+
+func (c *Config) OutputConsumptionCallback(tier consts.ModelTier, current int) {
+	state := c.ensureConsumptionState()
+	if state == nil {
+		return
+	}
+	state.AddTierOutputConsumption(tier, int64(current))
 }
 
 func (c *Config) GetTierConsumptionSnapshot() map[string]map[string]int64 {

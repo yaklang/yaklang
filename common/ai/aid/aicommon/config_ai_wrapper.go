@@ -16,9 +16,8 @@ import (
 )
 
 type tierAwareConsumptionCaller struct {
-	AICallerConfigIf
-	config *Config
-	tier   consts.ModelTier
+	*Config
+	tier consts.ModelTier
 }
 
 func (c *tierAwareConsumptionCaller) NewAIResponse() *AIResponse {
@@ -29,22 +28,13 @@ func (c *tierAwareConsumptionCaller) CallAIResponseConsumptionCallback(current i
 	if c == nil {
 		return
 	}
-	if c.AICallerConfigIf != nil {
-		c.AICallerConfigIf.CallAIResponseConsumptionCallback(current)
-	}
-	if c.config != nil {
-		c.config.AddTierConsumption(c.tier, 0, int64(current))
-	}
+	c.Config.OutputConsumptionCallback(c.tier, current)
 }
 
-func wrapCallerWithTierConsumption(base AICallerConfigIf, owner *Config, tier consts.ModelTier) AICallerConfigIf {
-	if base == nil {
-		base = owner
-	}
+func wrapCallerWithTierConsumption(owner *Config, tier consts.ModelTier) AICallerConfigIf {
 	return &tierAwareConsumptionCaller{
-		AICallerConfigIf: base,
-		config:           owner,
-		tier:             tier,
+		Config: owner,
+		tier:   tier,
 	}
 }
 
@@ -89,9 +79,8 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 			if c.AiAutoRetry <= 0 {
 				c.AiAutoRetry = 1
 			}
-			callConfig := wrapCallerWithTierConsumption(config, outConfig, tier)
 			for _idx := 0; _idx < int(c.AiAutoRetry); _idx++ {
-				rsp, err = i(callConfig, request)
+				rsp, err = i(wrapCallerWithTierConsumption(outConfig, tier), request)
 				if err != nil || rsp == nil {
 					c.EmitWarning("ai request err: %v, retry auto time: [%v]", err, _idx+1)
 					time.Sleep(500 * time.Millisecond)
@@ -138,23 +127,23 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 			c.AiAutoRetry = 1
 		}
 		tokenSize := estimateTokens([]byte(request.GetPrompt()))
-		c.EmitJSON(schema.EVENT_TYPE_PRESSURE, "system", map[string]any{
-			"current_cost_token_size": tokenSize,
-			"pressure_token_size":     c.AiCallTokenLimit,
-			"model_tier":              string(tier),
-		})
 
 		start := time.Now()
-		callConfig := wrapCallerWithTierConsumption(config, outConfig, tier)
 		for _idx := 0; _idx < int(c.AiAutoRetry); _idx++ {
-			c.InputConsumptionCallback(tokenSize)
-			c.AddTierConsumption(tier, int64(tokenSize), 0)
-			rsp, err = i(callConfig, request)
+			c.InputConsumptionCallback(tier, tokenSize)
+			rsp, err = i(wrapCallerWithTierConsumption(outConfig, tier), request)
 			if err != nil || rsp == nil {
 				c.EmitWarning("ai request err: %v, retry auto time: [%v]", err, _idx+1)
 				time.Sleep(500 * time.Millisecond)
 				continue
 			}
+			c.EmitJSON(schema.EVENT_TYPE_PRESSURE, "system", map[string]any{
+				"current_cost_token_size": tokenSize,
+				"pressure_token_size":     c.AiCallTokenLimit,
+				"model_tier":              string(tier),
+				"model_name":              rsp.GetModelName(),
+				"provider_name":           rsp.GetProviderName(),
+			})
 			rsp.SetTaskIndex(request.GetTaskIndex())
 
 			var haveFirstByte = utils.NewBool(false)
@@ -196,75 +185,74 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 					saveHandler(teeResp)
 				}()
 
-			haveFirstByte.SetTo(true)
-			c.EmitJSON(schema.EVENT_TYPE_AI_FIRST_BYTE_COST_MS, "system", map[string]any{
-				"ms":            du.Milliseconds(),
-				"second":        du.Seconds(),
-				"model_name":    origRsp.GetModelName(),
-				"provider_name": origRsp.GetProviderName(),
-				"model_tier":    string(tier),
+				haveFirstByte.SetTo(true)
+				c.EmitJSON(schema.EVENT_TYPE_AI_FIRST_BYTE_COST_MS, "system", map[string]any{
+					"ms":            du.Milliseconds(),
+					"second":        du.Seconds(),
+					"model_name":    origRsp.GetModelName(),
+					"provider_name": origRsp.GetProviderName(),
+					"model_tier":    string(tier),
+				})
+			}, func() {
+				du := time.Since(start)
+				provider := origRsp.GetProviderName()
+				model := origRsp.GetModelName()
+				outputBytes := origRsp.GetTotalOutputBytes()
+				firstByteTime := origRsp.GetFirstOutputByteTime()
+				var outputDuration time.Duration
+				if !firstByteTime.IsZero() {
+					outputDuration = time.Since(firstByteTime)
+				}
+				tokenRate := float64(0)
+				if outputDuration.Seconds() > 0 {
+					tokenRate = float64(outputBytes/4) / outputDuration.Seconds()
+				}
+				c.EmitInfo("ai response from %v:%v cost: %v, output duration: %v, estimated %.1f token/s",
+					provider, model, du, outputDuration, tokenRate)
+				c.EmitJSON(schema.EVENT_TYPE_AI_TOTAL_COST_MS, "system", map[string]any{
+					"ms":                 du.Milliseconds(),
+					"second":             du.Seconds(),
+					"model_name":         model,
+					"provider_name":      provider,
+					"model_tier":         string(tier),
+					"token_rate":         tokenRate,
+					"output_bytes":       outputBytes,
+					"output_duration_ms": outputDuration.Milliseconds(),
+				})
+				firstByteCostMs := int64(0)
+				if !firstByteTime.IsZero() {
+					firstByteCostMs = firstByteTime.Sub(start).Milliseconds()
+				}
+				c.EmitJSON(schema.EVENT_TYPE_AI_CALL_SUMMARY, "system", map[string]any{
+					"model_name":              model,
+					"provider_name":           provider,
+					"model_tier":              string(tier),
+					"first_byte_cost_ms":      firstByteCostMs,
+					"total_cost_ms":           du.Milliseconds(),
+					"output_bytes":            outputBytes,
+					"estimated_output_tokens": outputBytes / 4,
+					"token_rate":              tokenRate,
+					"output_duration_ms":      outputDuration.Milliseconds(),
+					"input_token_size":        tokenSize,
+				})
+				if outputBytes == 0 {
+					rawDump := origRsp.GetRawHTTPResponseDump()
+					if rawDump != "" {
+						println(rawDump)
+						c.EmitWarning("[AI Empty Response] model=%v:%v, cost=%v, input_tokens~%d. "+
+							"The AI model returned HTTP 200 but generated 0 output tokens "+
+							"(finish_reason: stop without delta.content). "+
+							"This is typically a transient model-side issue and will be retried automatically.",
+							provider, model, du, tokenSize,
+						)
+					} else {
+						c.EmitWarning("[AI Empty Response] model=%v:%v, cost=%v, input_tokens~%d. "+
+							"The AI model returned an empty response. (no raw HTTP response available)",
+							provider, model, du, tokenSize,
+						)
+					}
+				}
 			})
-		}, func() {
-			du := time.Since(start)
-			provider := origRsp.GetProviderName()
-			model := origRsp.GetModelName()
-			outputBytes := origRsp.GetTotalOutputBytes()
-			firstByteTime := origRsp.GetFirstOutputByteTime()
-			var outputDuration time.Duration
-			if !firstByteTime.IsZero() {
-				outputDuration = time.Since(firstByteTime)
-			}
-			tokenRate := float64(0)
-			if outputDuration.Seconds() > 0 {
-				tokenRate = float64(outputBytes/4) / outputDuration.Seconds()
-			}
-		c.EmitInfo("ai response from %v:%v cost: %v, output duration: %v, estimated %.1f token/s",
-			provider, model, du, outputDuration, tokenRate)
-		c.EmitJSON(schema.EVENT_TYPE_AI_TOTAL_COST_MS, "system", map[string]any{
-			"ms":                 du.Milliseconds(),
-			"second":             du.Seconds(),
-			"model_name":         model,
-			"provider_name":      provider,
-			"model_tier":         string(tier),
-			"token_rate":         tokenRate,
-			"output_bytes":       outputBytes,
-			"output_duration_ms": outputDuration.Milliseconds(),
-		})
-		firstByteCostMs := int64(0)
-		if !firstByteTime.IsZero() {
-			firstByteCostMs = firstByteTime.Sub(start).Milliseconds()
-		}
-		c.EmitJSON(schema.EVENT_TYPE_AI_CALL_SUMMARY, "system", map[string]any{
-			"model_name":              model,
-			"provider_name":           provider,
-			"model_tier":              string(tier),
-			"first_byte_cost_ms":      firstByteCostMs,
-			"total_cost_ms":           du.Milliseconds(),
-			"output_bytes":            outputBytes,
-			"estimated_output_tokens": outputBytes / 4,
-			"token_rate":              tokenRate,
-			"output_duration_ms":      outputDuration.Milliseconds(),
-			"input_token_size":        tokenSize,
-		})
-
-		if outputBytes == 0 {
-			rawDump := origRsp.GetRawHTTPResponseDump()
-			if rawDump != "" {
-				println(rawDump)
-				c.EmitWarning("[AI Empty Response] model=%v:%v, cost=%v, input_tokens~%d. "+
-					"The AI model returned HTTP 200 but generated 0 output tokens "+
-					"(finish_reason: stop without delta.content). "+
-					"This is typically a transient model-side issue and will be retried automatically.",
-					provider, model, du, tokenSize,
-				)
-			} else {
-				c.EmitWarning("[AI Empty Response] model=%v:%v, cost=%v, input_tokens~%d. "+
-					"The AI model returned an empty response. (no raw HTTP response available)",
-					provider, model, du, tokenSize,
-				)
-			}
-		}
-		})
 			if c.DebugPrompt {
 				rsp.Debug(true)
 			}

@@ -41,18 +41,6 @@ func (c *Config) GetOutputConsumption() int64 {
 	return atomic.LoadInt64(output)
 }
 
-func (c *Config) InputConsumptionCallback(current int) {
-	state := c.ensureConsumptionState()
-	if state == nil {
-		return
-	}
-	input, _ := state.GetConsumptionPointers()
-	if input == nil {
-		return
-	}
-	atomic.AddInt64(input, int64(current))
-}
-
 func (c *Config) GetSequenceStart() int64 {
 	return c.Seq
 }
