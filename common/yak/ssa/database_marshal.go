@@ -444,7 +444,7 @@ func unmarshalExtraInformation(cache *ProgramCache, inst Instruction, ir *ssadb.
 		currentBlueprint := utils.MapGetInt64(params, "current_blueprint")
 		if currentBlueprint != -1 {
 			typ := GetTypeFromDB(cache, currentBlueprint)
-			blueprint, ok := ToClassBluePrintType(typ)
+			blueprint, ok := ToBluePrintType(typ)
 			if ok {
 				ret.currentBlueprint = blueprint
 			}

@@ -73,9 +73,9 @@ type Blueprint struct {
 	StaticMethod map[string]*Function
 	MagicMethod  map[BlueprintMagicMethodKind]Value
 
-	NormalMember map[string]Value
-	StaticMember map[string]Value
-	ConstValue   map[string]Value
+	NormalMember map[string][]Value
+	StaticMember map[string][]Value
+	ConstValue   map[string][]Value
 
 	CallBack []func()
 
@@ -109,9 +109,9 @@ func NewBlueprint(name string) *Blueprint {
 		id:           -1,
 		Name:         name,
 		Kind:         BlueprintNone,
-		NormalMember: make(map[string]Value),
-		StaticMember: make(map[string]Value),
-		ConstValue:   make(map[string]Value),
+		NormalMember: make(map[string][]Value),
+		StaticMember: make(map[string][]Value),
+		ConstValue:   make(map[string][]Value),
 
 		NormalMethod: make(map[string]*Function),
 		StaticMethod: make(map[string]*Function),
@@ -199,7 +199,27 @@ func (c *Blueprint) addParentBlueprintEx(parent *Blueprint, relation BlueprintRe
 		return
 	}
 
-	c.setBlueprintRelation(parent, relation)
+	if !c.setBlueprintRelation(parent, relation) {
+		return
+	}
+
+	containsValue := func(values []Value, target Value) bool {
+		if target == nil {
+			for _, existed := range values {
+				if existed == nil {
+					return true
+				}
+			}
+			return false
+		}
+		targetID := target.GetId()
+		for _, existed := range values {
+			if existed != nil && existed.GetId() == targetID {
+				return true
+			}
+		}
+		return false
+	}
 	for name, f := range parent.NormalMethod {
 		c.RegisterNormalMethod(name, f, false)
 	}
@@ -209,14 +229,29 @@ func (c *Blueprint) addParentBlueprintEx(parent *Blueprint, relation BlueprintRe
 	for name, f := range parent.MagicMethod {
 		c.RegisterMagicMethod(name, f)
 	}
-	for name, value := range parent.NormalMember {
-		c.RegisterNormalMember(name, value)
+	for name, values := range parent.NormalMember {
+		for _, value := range values {
+			if containsValue(c.NormalMember[name], value) {
+				continue
+			}
+			c.RegisterNormalMember(name, value)
+		}
 	}
-	for name, value := range parent.StaticMember {
-		c.RegisterStaticMember(name, value)
+	for name, values := range parent.StaticMember {
+		for _, value := range values {
+			if containsValue(c.StaticMember[name], value) {
+				continue
+			}
+			c.RegisterStaticMember(name, value)
+		}
 	}
-	for name, value := range parent.ConstValue {
-		c.RegisterConstMember(name, value)
+	for name, values := range parent.ConstValue {
+		for _, value := range values {
+			if containsValue(c.ConstValue[name], value) {
+				continue
+			}
+			c.RegisterConstMember(name, value)
+		}
 	}
 }
 

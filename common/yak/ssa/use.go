@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/exp/slices"
 )
 
@@ -134,12 +135,22 @@ func (p *Phi) GetControlFlowConditions() []Value {
 }
 
 // / ---- extern lib
-func (e *ExternLib) HasValues() bool   { return true }
-func (e *ExternLib) GetValues() Values { return e.GetValuesByIDs(e.Member) }
+func (e *ExternLib) HasValues() bool { return len(GetMemberPairs(e)) > 0 }
+func (e *ExternLib) GetValues() Values {
+	pairs := GetMemberPairs(e)
+	ret := make(Values, 0, len(pairs))
+	for _, pair := range pairs {
+		if !utils.IsNil(pair.Member) {
+			ret = append(ret, pair.Member)
+		}
+	}
+	return ret
+}
 func (e *ExternLib) ReplaceValue(v Value, to Value) {
-	if index := slices.Index(e.Member, v.GetId()); index != -1 {
-		e.Member[index] = to.GetId()
-		e.MemberMap[v.GetName()] = to.GetId()
+	for index, pair := range e.memberPairs {
+		if pair.member == v.GetId() {
+			e.memberPairs[index].member = to.GetId()
+		}
 	}
 }
 

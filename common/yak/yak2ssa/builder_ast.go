@@ -1630,8 +1630,8 @@ func (b *astbuilder) buildOrdinaryArguments(stmt *yak.OrdinaryArgumentsContext) 
 		ellipsisValue := values[len(values)-1]
 		values = values[:len(values)-1]
 		if !utils.IsNil(ellipsisValue) {
-			for _, val := range ellipsisValue.GetAllMember() {
-				values = append(values, val)
+			for _, pair := range ssa.GetLastWinsMemberPairs(ellipsisValue) {
+				values = append(values, pair.Member)
 			}
 		}
 		hasEll = true

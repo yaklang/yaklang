@@ -65,7 +65,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) (v ssa.Value
 		// 浅拷贝，一个对象
 		// 如果类定义了 __clone，就执行 __clone
 		target := y.VisitExpression(ret.Expression())
-		val, ok := target.GetStringMember("__clone")
+		val, ok := ssa.GetLatestMemberByKeyString(target, "__clone")
 		if !ok {
 			return target
 		}
@@ -455,7 +455,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) (v ssa.Value
 			if function, b := ssa.ToFunction(value); b {
 				function.Build()
 			}
-			if printType, b := ssa.ToClassBluePrintType(value.GetType()); b {
+			if printType, b := ssa.ToBluePrintType(value.GetType()); b {
 				printType.Build()
 			}
 			return value
@@ -473,7 +473,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) (v ssa.Value
 				if function, b := ssa.ToFunction(value); b {
 					function.Build()
 				}
-				if printType, b := ssa.ToClassBluePrintType(value.GetType()); b {
+				if printType, b := ssa.ToBluePrintType(value.GetType()); b {
 					printType.Build()
 				}
 				return value

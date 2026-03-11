@@ -158,7 +158,7 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 					kvs = b.buildLiteralValue(s, true)
 				}
 			case *ssa.Blueprint: // 处理golang库
-				if bp, ok := ssa.ToClassBluePrintType(t); ok {
+				if bp, ok := ssa.ToBluePrintType(t); ok {
 					bp.Build()
 					newtyp := ssa.CreateAnyType()
 					newtyp.SetFullTypeNames(typ.GetFullTypeNames())
@@ -299,9 +299,9 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 				// todo: 只有指针才会复用object，目前默认非指针
 				if m, ok := kvs[0].value.(*ssa.Make); ok {
 					var mkeys, mmembers []ssa.Value
-					for k, m := range m.GetAllMember() {
-						mkeys = append(mkeys, k)
-						mmembers = append(mmembers, m)
+					for _, pair := range ssa.GetLastWinsMemberPairs(m) {
+						mkeys = append(mkeys, pair.Key)
+						mmembers = append(mmembers, pair.Member)
 					}
 					newObject := b.InterfaceAddFieldBuild(len(mkeys),
 						func(i int) ssa.Value {
@@ -368,8 +368,8 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 				continue
 			}
 			isFind := false
-			for k, _ := range rvalue.GetAllMember() {
-				if k.String() == n {
+			for _, pair := range ssa.GetLastWinsMemberPairs(rvalue) {
+				if ssa.GetKeyString(pair.Key) == n {
 					isFind = true
 					break
 				}

@@ -191,8 +191,8 @@ func (c *Compiler) compileParameterMember(inst *ssa.ParameterMember) error {
 
 // compileMemberCall handles generic member access (MemberCall interface)
 func (c *Compiler) compileMemberCall(val ssa.Value, mc ssa.MemberCall) error {
-	obj := mc.GetObject()
-	key := mc.GetKey()
+	obj := ssa.GetLatestObject(val)
+	key := ssa.GetLatestKey(val)
 
 	if obj == nil {
 		return fmt.Errorf("compileMemberCall: object is nil for value %d", val.GetId())
@@ -309,8 +309,8 @@ func (c *Compiler) maybeEmitMemberSet(contextInst ssa.Instruction, val ssa.Value
 		return nil
 	}
 
-	obj := mc.GetObject()
-	key := mc.GetKey()
+	obj := ssa.GetLatestObject(val)
+	key := ssa.GetLatestKey(val)
 	if obj == nil || key == nil {
 		return nil
 	}

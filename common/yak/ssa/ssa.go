@@ -94,6 +94,16 @@ type (
 	Values []Value
 )
 
+type MemberPair struct {
+	Key    Value
+	Member Value
+}
+
+type ObjectKeyPair struct {
+	Object Value
+	Key    Value
+}
+
 // data-flow
 type Node interface {
 
@@ -116,27 +126,18 @@ type Typed interface {
 }
 
 type MemberCall interface {
-	// object  member caller
+	// object member caller
 	IsObject() bool
 	AddMember(Value, Value)
-	GetMember(Value) (Value, bool)
-	GetIndexMember(int) (Value, bool)
-	GetStringMember(string) (Value, bool)
-	SetStringMember(string, Value)
-	DeleteMember( /*key*/ Value)   // delete by key
-	GetAllMember() map[Value]Value // map[key]value
-	ForEachMember(func(k Value, v Value) bool)
+	DeleteMember(Value)
+	GetMemberPairs() []MemberPair
+	GetMembersByExactKey(Value) []Value
+	GetMembersByKeyString(string) []Value
 
-	// ReplaceMember( /* key */ Value /* value */, Value) // replace old-value with new-value
-
-	// member, member callee
+	// member owner pairs
 	IsMember() bool
-	SetObject(Value)
-	SetKey(Value)
-	GetKey() Value
-	GetObject() Value
-
-	// ReplaceObject(Value) // replace old-object to new-object
+	AddObjectKeyPair(Value, Value)
+	GetObjectKeyPairs() []ObjectKeyPair
 }
 
 type AssignAble interface {
@@ -634,9 +635,6 @@ type ExternLib struct {
 	// LibraryName is the application library key for the imported package (e.g. "A"),
 	// which may differ from the import local name (e.g. "alias").
 	LibraryName string
-
-	MemberMap map[string]int64 // value
-	Member    []int64          // value
 }
 
 var (

@@ -59,7 +59,9 @@ func SpinHandle(name string, phiValue, header, latch Value) map[string]Value {
 					pass[start] = struct{}{}
 				}
 
-				for k, v := range start.GetAllMember() {
+				for _, pair := range GetLastWinsMemberPairs(start) {
+					k := pair.Key
+					v := pair.Member
 					res := checkCanMemberCallExist(start, k)
 					if find, ok := ret[res.name]; ok {
 						phi, ok := ToPhi(phiValue)
@@ -81,7 +83,8 @@ func SpinHandle(name string, phiValue, header, latch Value) map[string]Value {
 						}
 					}
 				}
-				for _, v := range start.GetAllMember() {
+				for _, pair := range GetLastWinsMemberPairs(start) {
+					v := pair.Member
 					CreatePhi(v)
 				}
 			}

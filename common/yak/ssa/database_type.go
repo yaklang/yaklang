@@ -188,7 +188,7 @@ func GetTypeFromDB(cache *ProgramCache, id int64) Type {
 		parents, ok := params["parentBlueprints"].([]interface{})
 		if ok {
 			for _, typeId := range parents {
-				blueprint, isBlueprint := ToClassBluePrintType(GetTypeFromDB(cache, int64(utils.InterfaceToInt(typeId))))
+				blueprint, isBlueprint := ToBluePrintType(GetTypeFromDB(cache, int64(utils.InterfaceToInt(typeId))))
 				if isBlueprint {
 					typ.ParentBlueprints = append(typ.ParentBlueprints, blueprint)
 				}
@@ -197,7 +197,7 @@ func GetTypeFromDB(cache *ProgramCache, id int64) Type {
 		interfaces, ok := params["interfaceBlueprints"].([]interface{})
 		if ok {
 			for _, typeId := range interfaces {
-				blueprint, isBlueprint := ToClassBluePrintType(GetTypeFromDB(cache, int64(utils.InterfaceToInt(typeId))))
+				blueprint, isBlueprint := ToBluePrintType(GetTypeFromDB(cache, int64(utils.InterfaceToInt(typeId))))
 				if isBlueprint {
 					typ.InterfaceBlueprints = append(typ.InterfaceBlueprints, blueprint)
 				}

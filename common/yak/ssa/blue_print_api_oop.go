@@ -144,14 +144,8 @@ func (b *FunctionBuilder) ReadSelfMember(name string) Value {
 		if _value := b.PeekValueByVariable(variable); _value != nil {
 			return _value
 		}
-		if val := class.GetStaticMember(name); !utils.IsNil(val) {
-			return val
-		}
-		if normalMember := class.GetNormalMember(name); !utils.IsNil(normalMember) {
-			return normalMember
-		}
-		if method_ := class.GetNormalMethod(name); !utils.IsNil(method_) {
-			return method_
+		if values := class.Read(name); len(values) > 0 {
+			return values[len(values)-1]
 		}
 	}
 	return nil
@@ -203,6 +197,6 @@ func (b *FunctionBuilder) PeekNInnerBlueprint(n int) *Blueprint {
 
 func (b *FunctionBuilder) FakeGetBlueprint(lib *Program, name string, token ...CanStartStopToken) *Blueprint {
 	blueprintType := fakeGetType(lib, name, token...)
-	blueprint, _ := ToClassBluePrintType(blueprintType)
+	blueprint, _ := ToBluePrintType(blueprintType)
 	return blueprint
 }

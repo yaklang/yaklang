@@ -176,9 +176,9 @@ func ToTypeValue(v Instruction) (*TypeValue, bool) {
 
 // type cover
 
-func ToObjectType(t Type) (*ObjectType, bool)        { o, ok := t.(*ObjectType); return o, ok }
-func ToAliasType(t Type) (*AliasType, bool)          { a, ok := t.(*AliasType); return a, ok }
-func ToFunctionType(t Type) (*FunctionType, bool)    { f, ok := t.(*FunctionType); return f, ok }
-func ToBasicType(t Type) (*BasicType, bool)          { b, ok := t.(*BasicType); return b, ok }
-func ToClassBluePrintType(t Type) (*Blueprint, bool) { c, ok := t.(*Blueprint); return c, ok }
-func ToOrType(t Type) (*OrType, bool)                { o, ok := t.(*OrType); return o, ok }
+func ToObjectType(t Type) (*ObjectType, bool)     { o, ok := t.(*ObjectType); return o, ok }
+func ToAliasType(t Type) (*AliasType, bool)       { a, ok := t.(*AliasType); return a, ok }
+func ToFunctionType(t Type) (*FunctionType, bool) { f, ok := t.(*FunctionType); return f, ok }
+func ToBasicType(t Type) (*BasicType, bool)       { b, ok := t.(*BasicType); return b, ok }
+func ToBluePrintType(t Type) (*Blueprint, bool)   { c, ok := t.(*Blueprint); return c, ok }
+func ToOrType(t Type) (*OrType, bool)             { o, ok := t.(*OrType); return o, ok }

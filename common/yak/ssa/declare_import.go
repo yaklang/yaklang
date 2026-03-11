@@ -163,21 +163,25 @@ func (p *Program) ImportTypeStaticAll(lib *Program, classname string) error {
 	if !ok {
 		return utils.Errorf("library %s not contain type: %s", lib.Name, classname)
 	}
-	blueprint, b := ToClassBluePrintType(t)
+	blueprint, b := ToBluePrintType(t)
 	if !b {
 		return utils.Errorf("no support to blueprint")
 	}
 	p.fixImportCallback = append(p.fixImportCallback, func() {
 		//fix
-		for s, value := range blueprint.StaticMember {
-			pkg.val[s] = value
+		for s, values := range blueprint.StaticMember {
+			if len(values) > 0 {
+				pkg.val[s] = values[len(values)-1]
+			}
 		}
 		for s, function := range blueprint.StaticMethod {
 			pkg.val[s] = function
 		}
 	})
-	for s, value := range blueprint.StaticMember {
-		pkg.val[s] = value
+	for s, values := range blueprint.StaticMember {
+		if len(values) > 0 {
+			pkg.val[s] = values[len(values)-1]
+		}
 	}
 	for s, function := range blueprint.StaticMethod {
 		pkg.val[s] = function
@@ -191,9 +195,9 @@ func (p *Program) ImportTypeStaticMemberFromLib(lib *Program, clsName string, na
 	}
 	build := func(blueprint *Blueprint, name string) {
 		p.fixImportCallback = append(p.fixImportCallback, func() {
-			for s, value := range blueprint.StaticMember {
-				if name == s {
-					pkg.val[s] = value
+			for s, values := range blueprint.StaticMember {
+				if name == s && len(values) > 0 {
+					pkg.val[s] = values[len(values)-1]
 				}
 			}
 			for s, function := range blueprint.StaticMethod {
@@ -202,9 +206,9 @@ func (p *Program) ImportTypeStaticMemberFromLib(lib *Program, clsName string, na
 				}
 			}
 		})
-		for s, value := range blueprint.StaticMember {
-			if name == s {
-				pkg.val[s] = value
+		for s, values := range blueprint.StaticMember {
+			if name == s && len(values) > 0 {
+				pkg.val[s] = values[len(values)-1]
 			}
 		}
 		for s, function := range blueprint.StaticMethod {
@@ -217,7 +221,7 @@ func (p *Program) ImportTypeStaticMemberFromLib(lib *Program, clsName string, na
 		err = utils.JoinErrors(err, utils.Errorf("library %s not contain type %s", lib.Name, clsName))
 		return err
 	} else {
-		blueprint, b := ToClassBluePrintType(v)
+		blueprint, b := ToBluePrintType(v)
 		if !b {
 			errx := utils.Errorf("no support other type")
 			return errx

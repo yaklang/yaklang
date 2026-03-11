@@ -705,9 +705,9 @@ func (f *FunctionBuilder) CopyValue(v Value) Value {
 	case *Make:
 		var keys []Value
 		var members []Value
-		for key, member := range v.GetAllMember() {
-			keys = append(keys, key)
-			members = append(members, member)
+		for _, pair := range GetLastWinsMemberPairs(v) {
+			keys = append(keys, pair.Key)
+			members = append(members, pair.Member)
 		}
 		ret = f.InterfaceAddFieldBuild(len(keys),
 			func(i int) Value {

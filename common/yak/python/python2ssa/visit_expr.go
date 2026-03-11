@@ -1238,7 +1238,7 @@ func (b *singleFileBuilder) VisitArguments(raw *pythonparser.ArgumentsContext, o
 	// Class instantiation: prepend an Undefined $self placeholder so constructor
 	// formal-parameter indices align with call-site arguments.
 	// Avoid ClassConstructor to prevent spurious destructor generation (Python has no __del__).
-	if blueprint, ok := ssa.ToClassBluePrintType(obj.GetType()); ok {
+	if blueprint, ok := ssa.ToBluePrintType(obj.GetType()); ok {
 		b.ensureBlueprintConstructorSlot(blueprint)
 		selfPlaceholder := b.EmitUndefined(blueprint.Name)
 		selfPlaceholder.SetType(blueprint)

@@ -17,12 +17,7 @@ func setMemberCallRelationship(obj, key, member Value) {
 		log.Warnf("setMemberCallRelationship empty key obj=%s typ=%v member=%s", obj.GetVerboseName(), obj.GetType(), member.GetVerboseName())
 	}
 	obj.AddMember(key, member)
-	if memberObj := member.GetObject(); utils.IsNil(memberObj) || memberObj.GetId() == obj.GetId() {
-		member.SetObject(obj)
-	}
-	if memberKey := member.GetKey(); utils.IsNil(memberKey) {
-		member.SetKey(key)
-	}
+	AddObjectKeyPair(member, obj, key)
 	if user, ok := obj.(User); ok {
 		key.AddUser(user)
 	}
@@ -34,17 +29,25 @@ func setMemberCallRelationship(obj, key, member Value) {
 			if !ok || edgeValue == nil {
 				continue
 			}
-			if _, ok := edgeValue.GetMember(key); ok { // 避免循环
+
+			// Only propagate to call/invalid-undefined edges.
+			// Avoid scanning member relations for irrelevant edges to reduce overhead
+			// when large Phi nodes have many inputs.
+			shouldPropagate := false
+			switch ins := edgeValue.(type) {
+			case *Call:
+				shouldPropagate = true
+			case *Undefined:
+				shouldPropagate = ins.Kind == UndefinedValueInValid
+			}
+			if !shouldPropagate {
 				continue
 			}
-			if _, ok := edgeValue.(*Call); ok {
-				setMemberCallRelationship(edgeValue, key, member)
+
+			if _, ok := GetLatestMemberByKey(edgeValue, key); ok { // 避免循环
+				continue
 			}
-			if und, ok := edgeValue.(*Undefined); ok {
-				if und.Kind == UndefinedValueInValid {
-					setMemberCallRelationship(edgeValue, key, member)
-				}
-			}
+			setMemberCallRelationship(edgeValue, key, member)
 		}
 	}
 
@@ -118,7 +121,7 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 		ret.typ = method.GetType()
 		return
 	}
-	if blueprint, b := ToClassBluePrintType(valueType); b {
+	if blueprint, b := ToBluePrintType(valueType); b {
 		if method := blueprint.GetStaticMethod(keyText); !utils.IsNil(method) {
 			ret.typ = method.GetType()
 			return
@@ -259,11 +262,11 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 	default:
 	}
 	//保底操作，从val-member中获取
-	if member, exist := value.GetMember(key); exist {
+	if member, exist := GetLatestMemberByKey(value, key); exist {
 		ret.typ = member.GetType()
 		return
 	}
-	member, exist := value.GetStringMember(keyText)
+	member, exist := GetLatestMemberByKeyString(value, keyText)
 	if exist {
 		ret.typ = member.GetType()
 		return
@@ -280,7 +283,12 @@ func setMemberVerboseName(member Value) {
 	if !member.IsMember() {
 		return
 	}
-	text := getMemberVerboseName(member.GetObject(), member.GetKey())
+	obj := GetLatestObject(member)
+	key := GetLatestKey(member)
+	if utils.IsNil(obj) || utils.IsNil(key) {
+		return
+	}
+	text := getMemberVerboseName(obj, key)
 	member.SetVerboseName(text)
 }
 

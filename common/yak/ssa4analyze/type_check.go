@@ -301,7 +301,7 @@ func (t *TypeCheck) TypeCheckUndefine(inst *ssa.Undefined) {
 	}
 
 	if inst.Kind == ssa.UndefinedMemberInValid {
-		obj := inst.GetObject()
+		obj := ssa.GetLatestObject(inst)
 		if utils.IsNil(obj) {
 			return
 		}
@@ -309,7 +309,7 @@ func (t *TypeCheck) TypeCheckUndefine(inst *ssa.Undefined) {
 		if utils.IsNil(objTyp) || objTyp.GetTypeKind() == ssa.AnyTypeKind {
 			return
 		}
-		key := inst.GetKey()
+		key := ssa.GetLatestKey(inst)
 		keyName := ssa.GetKeyString(key)
 		if keyName == "" {
 			return
@@ -467,7 +467,8 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 		if !c.Unpack {
 			if hasError {
 				hasError := true
-				for key := range c.GetAllMember() {
+				for _, pair := range ssa.GetLastWinsMemberPairs(c) {
+					key := pair.Key
 					if c, ok := ssa.ToConstInst(key); ok {
 						if c.IsNumber() {
 							if int(c.Number()) == len(objType.FieldTypes)-1 {

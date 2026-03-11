@@ -620,44 +620,12 @@ func (lz *LazyInstruction) DeleteMember(v Value) {
 	lz.Value.DeleteMember(v)
 }
 
-func (lz *LazyInstruction) ForEachMember(fn func(Value, Value) bool) {
-	lz.check()
-	if utils.IsNil(lz.Value) {
-		return
-	}
-	lz.Value.ForEachMember(fn)
-}
-
-func (lz *LazyInstruction) GetAllMember() map[Value]Value {
-	lz.check()
-	if utils.IsNil(lz.Value) {
-		return nil
-	}
-	return lz.Value.GetAllMember()
-}
-
 func (lz *LazyInstruction) GetAllVariables() map[string]*Variable {
 	lz.check()
 	if utils.IsNil(lz.Value) {
 		return nil
 	}
 	return lz.Value.GetAllVariables()
-}
-
-func (lz *LazyInstruction) GetIndexMember(i int) (Value, bool) {
-	lz.check()
-	if utils.IsNil(lz.Value) {
-		return nil, false
-	}
-	return lz.Value.GetIndexMember(i)
-}
-
-func (lz *LazyInstruction) GetKey() Value {
-	lz.check()
-	if utils.IsNil(lz.Value) {
-		return nil
-	}
-	return lz.Value.GetKey()
 }
 
 func (lz *LazyInstruction) GetLastVariable() *Variable {
@@ -676,28 +644,44 @@ func (lz *LazyInstruction) GetMask() []Value {
 	return lz.Value.GetMask()
 }
 
-func (lz *LazyInstruction) GetMember(v Value) (Value, bool) {
-	lz.check()
-	if utils.IsNil(lz.Value) {
-		return nil, false
-	}
-	return lz.Value.GetMember(v)
-}
-
-func (lz *LazyInstruction) GetObject() Value {
+func (lz *LazyInstruction) GetMemberPairs() []MemberPair {
 	lz.check()
 	if utils.IsNil(lz.Value) {
 		return nil
 	}
-	return lz.Value.GetObject()
+	return lz.Value.GetMemberPairs()
 }
 
-func (lz *LazyInstruction) GetStringMember(n string) (Value, bool) {
+func (lz *LazyInstruction) GetMembersByExactKey(v Value) []Value {
 	lz.check()
 	if utils.IsNil(lz.Value) {
-		return nil, false
+		return nil
 	}
-	return lz.Value.GetStringMember(n)
+	return lz.Value.GetMembersByExactKey(v)
+}
+
+func (lz *LazyInstruction) GetMembersByKeyString(name string) []Value {
+	lz.check()
+	if utils.IsNil(lz.Value) {
+		return nil
+	}
+	return lz.Value.GetMembersByKeyString(name)
+}
+
+func (lz *LazyInstruction) AddObjectKeyPair(obj, key Value) {
+	lz.check()
+	if utils.IsNil(lz.Value) {
+		return
+	}
+	lz.Value.AddObjectKeyPair(obj, key)
+}
+
+func (lz *LazyInstruction) GetObjectKeyPairs() []ObjectKeyPair {
+	lz.check()
+	if utils.IsNil(lz.Value) {
+		return nil
+	}
+	return lz.Value.GetObjectKeyPairs()
 }
 
 func (lz *LazyInstruction) GetType() Type {
@@ -755,22 +739,6 @@ func (lz *LazyInstruction) NewError(e ErrorKind, t ErrorTag, msg string) {
 		return
 	}
 	lz.Value.NewError(e, t, msg)
-}
-
-func (lz *LazyInstruction) SetKey(v Value) {
-	lz.check()
-	if utils.IsNil(lz.Value) {
-		return
-	}
-	lz.Value.SetKey(v)
-}
-
-func (lz *LazyInstruction) SetObject(v Value) {
-	lz.check()
-	if utils.IsNil(lz.Value) {
-		return
-	}
-	lz.Value.SetObject(v)
 }
 
 func (lz *LazyInstruction) SetType(t Type) {
