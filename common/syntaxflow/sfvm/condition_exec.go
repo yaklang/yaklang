@@ -48,6 +48,11 @@ func hasNonEmptyValue(value Values) bool {
 	return !value.IsEmpty()
 }
 
+// conditionModeFromSource decides how a condition scope represents truth:
+//
+//   - Mask mode: common case, source is a list -> represent condition as []bool aligned to source slots.
+//   - Candidate mode: special singleton sources (e.g. Program/Overlay) where a "mask per slot" is not
+//     meaningful; represent condition as a single truth value plus optional candidate values.
 func conditionModeFromSource(source Values) ConditionMode {
 	if len(source) != 1 {
 		return ConditionModeMask
@@ -93,6 +98,11 @@ func normalizeConditionAgainstSource(scope conditionScopeState, result Values, c
 	}
 
 	// General case: map result values back to source by anchor bits.
+	//
+	// In mask-mode, a compare/native-call often produces a derived value list that has been
+	// flattened/expanded, so cond length is not aligned to source slots. We normalize it by
+	// projecting each derived value's anchor bits back to the scope source range:
+	//   mask[i] = true iff (anchorBase+i) in derived.bits
 	mask := make([]bool, width)
 	if !result.IsEmpty() {
 		for _, operator := range result {
@@ -203,6 +213,9 @@ func mergeValuesByID(left Values, right Values, andMode bool) Values {
 			out = orSet.List()
 		}
 	}
+	// Preserve provenance across logical ops:
+	//   outValue.bits |= leftValue.bits
+	//   outValue.bits |= rightValue.bits
 	for _, value := range out {
 		idGetter, ok := value.(ssa.GetIdIF)
 		if !ok {
@@ -321,6 +334,11 @@ func (s *SFFrame) applyLogicBinaryCondition(andMode bool) error {
 }
 
 func buildFilterMask(scope conditionScopeState, cond Values) ([]bool, error) {
+	// Filter conditions are derived values that must carry anchor bits so we can map
+	// them back to the scope source mask:
+	//   mask[i] = true iff (anchorBase+i) in condValue.bits
+	//
+	// Missing/out-of-scope anchor bits in mask-mode is a bug (native call/op forgot to propagate).
 	mask := make([]bool, scope.anchorWidth)
 	for _, operator := range cond {
 		if utils.IsNil(operator) || operator.IsEmpty() {

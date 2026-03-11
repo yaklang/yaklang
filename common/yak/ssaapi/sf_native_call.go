@@ -250,6 +250,15 @@ func init() {
 	}))
 	registerNativeCall(NativeCall_Length, nc_func(func(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 		if base, width, ok := frame.ActiveAnchorScope(); ok && width > 0 {
+			// Anchor-aware length:
+			// count how many derived values belong to each source slot in the active condition scope.
+			//
+			// For each value with bits, we project to the active range [base, base+width):
+			//   counts[i] += 1  iff  (base+i) in value.bits
+			//
+			// The returned per-slot counts also carry anchor bits so they can be compared/filtered
+			// and mapped back to the same source slots:
+			//   out[i].bits = {base+i}
 			counts := make([]int, width)
 			_ = v.Recursive(func(operator sfvm.ValueOperator) error {
 				if utils.IsNil(operator) || operator.IsEmpty() {

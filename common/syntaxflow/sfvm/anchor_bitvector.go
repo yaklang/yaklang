@@ -13,6 +13,8 @@ type anchorRestoreEntry struct {
 	bits  *utils.BitVector
 }
 
+// valueIdentity is the logical identity key for slot-union:
+// duplicates in a scope source list should share the same local slot set.
 func valueIdentity(value ValueOperator) string {
 	if id, ok := fetchId(value); ok {
 		return "id:" + strconv.FormatInt(id, 10)
@@ -20,6 +22,9 @@ func valueIdentity(value ValueOperator) string {
 	return fmt.Sprintf("%p", value)
 }
 
+// valuePointerKey is the physical identity key for restore bookkeeping:
+// the same object can appear multiple times in the source list, but we only
+// need to save/restore its bits once.
 func valuePointerKey(value ValueOperator) string {
 	if utils.IsNil(value) {
 		return ""
@@ -39,6 +44,12 @@ func valuePointerKey(value ValueOperator) string {
 //
 // Values that appear multiple times (same identity) get a union of all their slot
 // indices to keep mask alignment stable.
+//
+// In pseudo code (per slot i):
+//
+//	oldBits := source[i].bits
+//	localBits(i) := {base + i} (duplicates: union all their slots)
+//	source[i].bits = localBits(i) OR oldBits
 func assignLocalAnchorBitVector(sourceValues Values, base int) []anchorRestoreEntry {
 	type entry struct {
 		value ValueOperator
@@ -88,6 +99,8 @@ func assignLocalAnchorBitVector(sourceValues Values, base int) []anchorRestoreEn
 	return out
 }
 
+// restoreAnchorBitVector restores anchor bits overwritten by assignLocalAnchorBitVector
+// at condition-scope start.
 func restoreAnchorBitVector(entries []anchorRestoreEntry) {
 	for _, e := range entries {
 		if utils.IsNil(e.value) {
@@ -97,6 +110,9 @@ func restoreAnchorBitVector(entries []anchorRestoreEntry) {
 	}
 }
 
+// markMaskByBitVector projects anchor bits back to the current scope mask:
+//
+//	mask[i] = true  iff  (base+i) in bits
 func markMaskByBitVector(mask []bool, bits *utils.BitVector, base int) bool {
 	if bits == nil || bits.IsEmpty() {
 		return false
@@ -112,6 +128,9 @@ func markMaskByBitVector(mask []bool, bits *utils.BitVector, base int) bool {
 	return matched
 }
 
+// mergeAnchorBitVector merges provenance from src into dst:
+//
+//	dst.bits |= src.bits
 func mergeAnchorBitVector(dst ValueOperator, src ValueOperator) {
 	if utils.IsNil(dst) || utils.IsNil(src) {
 		return
@@ -130,6 +149,9 @@ func mergeAnchorBitVector(dst ValueOperator, src ValueOperator) {
 	dst.SetAnchorBitVector(merged)
 }
 
+// mergeAnchorBitVectorToResult propagates provenance from a source operator to each derived result:
+//
+//	for r in result: r.bits |= source.bits
 func mergeAnchorBitVectorToResult(result Values, source ValueOperator) {
 	if result.IsEmpty() || utils.IsNil(source) {
 		return
