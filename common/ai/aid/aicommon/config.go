@@ -2758,11 +2758,6 @@ func (c *Config) GetConsumptionConfig() (*int64, *int64, string) {
 	return input, output, state.GetConsumptionUUID()
 }
 
-func (c *Config) GetConsumptionConfigEx() (*int64, *int64, string, *omap.OrderedMap[consts.ModelTier, *ConsumptionStats]) {
-	input, output, uuid := c.GetConsumptionConfig()
-	return input, output, uuid, c.ensureTierConsumptionStats()
-}
-
 func (c *Config) OriginOptions() []ConfigOption {
 	return c.originOptions
 }
