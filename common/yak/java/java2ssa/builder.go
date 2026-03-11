@@ -62,11 +62,14 @@ func (*SSABuilder) BuildFromAST(raw ssa.FrontAST, b *ssa.FunctionBuilder) error 
 		return utils.Errorf("invalid AST type: %T, expected javaparser.ICompilationUnitContext", raw)
 	}
 	build := &singleFileBuilder{
-		FunctionBuilder:   b,
-		constMap:          make(map[string]ssa.Value),
-		fullTypeNameMap:   make(map[string][]string),
-		allImportPkgSlice: make([][]string, 0),
-		selfPkgPath:       make([]string, 0),
+		FunctionBuilder:      b,
+		constMap:             make(map[string]ssa.Value),
+		fullTypeNameMap:      make(map[string][]string),
+		allImportPkgSlice:    make([][]string, 0),
+		selfPkgPath:          make([]string, 0),
+		methodOverloads:      make(map[*ssa.Blueprint]map[string][]*javaCallableCandidate),
+		constructorOverloads: make(map[*ssa.Blueprint][]*javaCallableCandidate),
+		stableNameCollision:  make(map[string]int),
 	}
 	build.initImport()
 	build.VisitCompilationUnit(ast)
@@ -158,6 +161,14 @@ type singleFileBuilder struct {
 	// framework support for spring boot
 	currentUIModel ssa.Value
 	isInController bool
+
+	// java overload and stable naming
+	methodOverloads      map[*ssa.Blueprint]map[string][]*javaCallableCandidate
+	constructorOverloads map[*ssa.Blueprint][]*javaCallableCandidate
+	stableNameCollision  map[string]int
+	callableDeclOrder    int
+	stableTempCounter    int
+	stableAnonClassSeq   int
 }
 
 func Frontend(src string, caches ...*ssa.AntlrCache) (javaparser.ICompilationUnitContext, error) {
