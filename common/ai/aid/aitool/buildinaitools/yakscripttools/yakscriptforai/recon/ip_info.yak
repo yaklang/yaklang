@@ -1,0 +1,166 @@
+__DESC__ = "Queries IP address geolocation, ASN, and ISP information using local MMDB databases (GeoIP2). Supports batch IP queries with comma-separated input. Falls back to amap API if MMDB is unavailable. Provides country, city, coordinates, timezone, ASN, and ISP details."
+__VERBOSE_NAME__ = "IP Geolocation & ASN Lookup"
+__KEYWORDS__ = "ip,geolocation,geoip,asn,isp,location,country,city,mmdb,maxmind,whois,autonomous system,latitude,longitude"
+
+__USAGE__ = <<<USAGE_BLOCK
+IP Geolocation & ASN Lookup - Usage Guide for AI Parameter Generation
+
+Queries IP address geolocation and network information using local MMDB databases.
+Falls back to amap API when MMDB is unavailable.
+
+Parameters:
+  ip  (string, required) IP address or comma-separated list of IPs to query
+
+Example 1 - Single IP:
+{
+  "params": {
+    "ip": "8.8.8.8"
+  }
+}
+
+Example 2 - Multiple IPs:
+{
+  "params": {
+    "ip": "1.1.1.1,8.8.4.4,114.114.114.114"
+  }
+}
+USAGE_BLOCK
+
+yakit.AutoInitYakit()
+
+ipInput = cli.String("ip", cli.setRequired(true), cli.setHelp("IP address or comma-separated list"))
+cli.check()
+
+normalizedInput = str.ReplaceAll(ipInput, "\n", ",")
+allIPs = str.SplitAndTrim(normalizedInput, ",")
+ips = []
+for i := 0; i < len(allIPs); i++ {
+    item = str.TrimSpace(allIPs[i])
+    if item != "" {
+        ips = append(ips, item)
+    }
+}
+
+if len(ips) == 0 {
+    yakit.Error("no valid IP addresses provided")
+    return
+}
+
+yakit.Info("=== IP Geolocation & ASN Lookup ===")
+yakit.Info("Querying %d IP(s)...", len(ips))
+yakit.Info("")
+
+for idx := 0; idx < len(ips); idx++ {
+    ip = ips[idx]
+    yakit.Info("--- [%d/%d] %s ---", idx+1, len(ips), ip)
+
+    geoOk = false
+    ispOk = false
+
+    cityResult, geoErr = db.QueryIPCity(ip)
+    if geoErr == nil && cityResult != nil {
+        geoOk = true
+        countryCode = ""
+        countryName = ""
+        cityName = ""
+
+        try {
+            countryCode = cityResult.Country.IsoCode
+        } catch err { }
+        try {
+            names = cityResult.Country.Names
+            if names != nil {
+                en = names["en"]
+                if en != "" {
+                    countryName = en
+                }
+            }
+        } catch err { }
+        try {
+            cnames = cityResult.City.Names
+            if cnames != nil {
+                cen = cnames["en"]
+                if cen != "" {
+                    cityName = cen
+                }
+            }
+        } catch err { }
+
+        if countryCode != "" || countryName != "" {
+            yakit.Info("  Country: %s (%s)", countryName, countryCode)
+        }
+        if cityName != "" {
+            yakit.Info("  City: %s", cityName)
+        }
+
+        try {
+            lat = cityResult.Location.Latitude
+            lon = cityResult.Location.Longitude
+            yakit.Info("  Coordinates: %.4f, %.4f", lat, lon)
+        } catch err { }
+
+        try {
+            tz = cityResult.Location.TimeZone
+            if tz != "" {
+                yakit.Info("  Timezone: %s", tz)
+            }
+        } catch err { }
+    } else {
+        if geoErr != nil {
+            yakit.Info("  [GEO] MMDB query failed: %v", geoErr)
+        } else {
+            yakit.Info("  [GEO] MMDB query returned empty result")
+        }
+    }
+
+    ispResult, ispErr = db.QueryIPForIPS(ip)
+    if ispErr == nil && ispResult != nil {
+        ispOk = true
+        try {
+            asn = ispResult.AutonomousSystemNumber
+            org = ispResult.AutonomousSystemOrganization
+            if asn > 0 {
+                yakit.Info("  ASN: AS%d (%s)", asn, org)
+            }
+        } catch err { }
+        try {
+            ispName = ispResult.ISP
+            if ispName != "" {
+                yakit.Info("  ISP: %s", ispName)
+            }
+        } catch err { }
+        try {
+            orgName = ispResult.Organization
+            if orgName != "" {
+                yakit.Info("  Organization: %s", orgName)
+            }
+        } catch err { }
+    } else {
+        if ispErr != nil {
+            yakit.Info("  [ISP] MMDB ISP query failed: %v", ispErr)
+        }
+    }
+
+    if !geoOk {
+        yakit.Info("  [FALLBACK] Attempting amap.GetIpLocation for %s...", ip)
+        try {
+            amapResult = amap.GetIpLocation(ip)
+            if amapResult != nil {
+                yakit.Info("  [AMAP] Province: %v", amapResult.Province)
+                yakit.Info("  [AMAP] City: %v", amapResult.City)
+                yakit.Info("  [AMAP] ISP: %v", amapResult.Isp)
+                geoOk = true
+            } else {
+                yakit.Info("  [AMAP] returned empty result")
+            }
+        } catch amapErr {
+            yakit.Info("  [AMAP] fallback also failed: %v", amapErr)
+            yakit.Info("  [HINT] No MMDB database found and amap API key not configured")
+            yakit.Info("  [HINT] Install GeoIP2-City.mmdb to yakit data directory, or configure amap API key in Yakit settings")
+        }
+    }
+
+    yakit.Info("")
+}
+
+yakit.Info("=== Query Complete ===")
