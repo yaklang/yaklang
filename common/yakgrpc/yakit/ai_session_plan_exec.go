@@ -51,3 +51,20 @@ func DeleteAISessionPlanAndExecBySessionID(db *gorm.DB, sessionID string) error 
 	}
 	return err
 }
+
+func GetLatestAISessionPlanAndExecBySessionID(db *gorm.DB, sessionID string) (*schema.AISessionPlanAndExec, error) {
+	if db == nil {
+		return nil, utils.Errorf("db is nil")
+	}
+	if sessionID == "" {
+		return nil, utils.Errorf("session_id is empty")
+	}
+	var record schema.AISessionPlanAndExec
+	if err := db.Where("session_id = ?", sessionID).Order("updated_at desc").First(&record).Error; err != nil {
+		if gorm.IsRecordNotFoundError(err) || strings.Contains(err.Error(), "no such table") || strings.Contains(err.Error(), "doesn't exist") {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &record, nil
+}

@@ -190,6 +190,12 @@ func (r *runtime) Invoke(task *AiTask) (retErr error) {
 			r.config.EmitInfo("subtask %s was skipped by user, moving to next task", current.Name)
 			return nil
 		}
+		// 恢复执行时，如果任务已完成，直接跳过
+		if current.executed() {
+			r.config.planLoadingStatus(fmt.Sprintf("任务 [%s] 已完成 / Task [%s] Completed", current.Index, current.Index))
+			r.config.EmitInfo("subtask %s already completed, moving to next task", current.Name)
+			return nil
+		}
 		// 检查全局 context 是否被取消（用户终止整个任务）
 		if r.config.IsCtxDone() {
 			r.config.planLoadingStatus("执行已取消 / Execution Cancelled")

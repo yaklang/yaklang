@@ -337,89 +337,115 @@ func (c *Coordinator) Run() error {
 	c.registerPEModeInputEventCallback()
 	c.EmitCurrentConfigInfo()
 
-	// Phase 1: Creating plan
-	c.planLoadingStatus("创建任务计划 / Creating Plan...")
-	c.EmitInfo("start to create plan request")
-	planReq, err := c.createPlanRequest(c.userInput)
-	if err != nil {
-		c.planLoadingStatus("计划创建失败 / Plan Creation Failed")
-		c.EmitError("create planRequest failed: %v", err)
-		return utils.Errorf("coordinator: create planRequest failed: %v", err)
+	executeRoot := func(root *AiTask) error {
+		// Phase 6: Executing tasks
+		c.planLoadingStatus("执行任务中 / Executing Tasks...")
+		c.EmitInfo("start to create runtime")
+		rt := c.createRuntime()
+		c.runtime = rt
+		err := rt.Invoke(root)
+		if err != nil {
+			c.planLoadingStatus("任务执行失败 / Task Execution Failed")
+			return err
+		}
+		return nil
 	}
 
-	// Phase 2: Invoking plan (AI generating plan)
-	c.planLoadingStatus("等待 AI 生成计划 / Waiting AI to Generate Plan...")
-	c.EmitInfo("start to invoke plan request")
-	rsp, err := planReq.Invoke()
-	if err != nil {
-		c.planLoadingStatus("计划生成失败 / Plan Generation Failed")
-		c.EmitError("invoke planRequest failed(first): %v", err)
-		return utils.Errorf("coordinator: invoke planRequest failed: %v", err)
+	// Recovery: try resume from persisted plan-exec state
+	recovered := false
+	if recoveredRoot, _, ok := c.tryRecoverPlanAndExec(); ok {
+		c.planLoadingStatus("恢复执行 / Recovering Execution...")
+		c.rootTask = recoveredRoot
+		c.ContextProvider.StoreRootTask(recoveredRoot)
+		if len(recoveredRoot.Subtasks) <= 0 {
+			c.planLoadingStatus("无有效子任务 / No Valid Subtasks")
+			c.EmitError("no subtasks found in recovered task tree")
+			return utils.Errorf("coordinator: no subtasks found in recovered task tree")
+		}
+		if err := executeRoot(recoveredRoot); err != nil {
+			return err
+		}
+		recovered = true
 	}
 
-	// Phase 3: Waiting for user review
-	c.planLoadingStatus("等待用户审查计划 / Waiting User to Review Plan...")
-	ep := c.Epm.CreateEndpointWithEventType(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE)
-	ep.SetDefaultSuggestionContinue()
+	if !recovered {
+		// Phase 1: Creating plan
+		c.planLoadingStatus("创建任务计划 / Creating Plan...")
+		c.EmitInfo("start to create plan request")
+		planReq, err := c.createPlanRequest(c.userInput)
+		if err != nil {
+			c.planLoadingStatus("计划创建失败 / Plan Creation Failed")
+			c.EmitError("create planRequest failed: %v", err)
+			return utils.Errorf("coordinator: create planRequest failed: %v", err)
+		}
 
-	c.EmitRequireReviewForPlan(rsp, ep.GetId())
-	c.DoWaitAgree(c.GetContext(), ep)
-	params := ep.GetParams()
-	c.ReleaseInteractiveEvent(ep.GetId(), params)
-	if params == nil {
-		c.planLoadingStatus("用户审查失败 / User Review Failed")
-		c.EmitError("user review params is nil, plan failed")
-		return utils.Errorf("coordinator: user review params is nil")
-	}
+		// Phase 2: Invoking plan (AI generating plan)
+		c.planLoadingStatus("等待 AI 生成计划 / Waiting AI to Generate Plan...")
+		c.EmitInfo("start to invoke plan request")
+		rsp, err := planReq.Invoke()
+		if err != nil {
+			c.planLoadingStatus("计划生成失败 / Plan Generation Failed")
+			c.EmitError("invoke planRequest failed(first): %v", err)
+			return utils.Errorf("coordinator: invoke planRequest failed: %v", err)
+		}
 
-	// Phase 4: Processing user review
-	c.planLoadingStatus("处理用户审查结果 / Processing User Review...")
-	c.EmitInfo("start to handle review plan response")
-	rsp, err = planReq.handleReviewPlanResponse(rsp, params)
-	if err != nil {
-		c.planLoadingStatus("处理审查结果失败 / Review Processing Failed")
-		c.EmitError("handle review plan response failed: %v", err)
-		return utils.Errorf("coordinator: handle review plan response failed: %v", err)
-	}
+		// Phase 3: Waiting for user review
+		c.planLoadingStatus("等待用户审查计划 / Waiting User to Review Plan...")
+		ep := c.Epm.CreateEndpointWithEventType(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE)
+		ep.SetDefaultSuggestionContinue()
 
-	if rsp.RootTask == nil {
-		c.planLoadingStatus("任务计划无效 / Invalid Task Plan")
-		c.EmitError("root aiTask is nil, plan failed")
-		return utils.Errorf("coordinator: root aiTask is nil")
-	}
+		c.EmitRequireReviewForPlan(rsp, ep.GetId())
+		c.DoWaitAgree(c.GetContext(), ep)
+		params := ep.GetParams()
+		c.ReleaseInteractiveEvent(ep.GetId(), params)
+		if params == nil {
+			c.planLoadingStatus("用户审查失败 / User Review Failed")
+			c.EmitError("user review params is nil, plan failed")
+			return utils.Errorf("coordinator: user review params is nil")
+		}
 
-	// Phase 5: Initializing tasks
-	c.planLoadingStatus("初始化任务队列 / Initializing Task Queue...")
-	root := rsp.RootTask
-	c.rootTask = root
-	c.ContextProvider.StoreRootTask(root)
-	c.savePlanAndExecState("plan_ready", nil)
-	if len(root.Subtasks) <= 0 {
-		c.planLoadingStatus("无有效子任务 / No Valid Subtasks")
-		c.EmitError("no subtasks found, this task is not a valid task")
-		return utils.Errorf("coordinator: no subtasks found")
-	}
-	log.Infof("create aiTask pipeline: %v", root.Name)
-	for stepIdx, taskIns := range root.Subtasks {
-		log.Infof("step %d: %v", stepIdx, taskIns.Name)
-	}
-	alltools, err := c.AiToolManager.GetEnableTools()
-	if err != nil {
-		log.Warnf("coordinator: get all tools failed: %v", err)
-	}
-	if len(alltools) <= 0 {
-		log.Warnf("coordinator: no tools enable")
-	}
+		// Phase 4: Processing user review
+		c.planLoadingStatus("处理用户审查结果 / Processing User Review...")
+		c.EmitInfo("start to handle review plan response")
+		rsp, err = planReq.handleReviewPlanResponse(rsp, params)
+		if err != nil {
+			c.planLoadingStatus("处理审查结果失败 / Review Processing Failed")
+			c.EmitError("handle review plan response failed: %v", err)
+			return utils.Errorf("coordinator: handle review plan response failed: %v", err)
+		}
 
-	// Phase 6: Executing tasks
-	c.planLoadingStatus("执行任务中 / Executing Tasks...")
-	c.EmitInfo("start to create runtime")
-	rt := c.createRuntime()
-	c.runtime = rt
-	err = rt.Invoke(root)
-	if err != nil {
-		c.planLoadingStatus("任务执行失败 / Task Execution Failed")
-		return err
+		if rsp.RootTask == nil {
+			c.planLoadingStatus("任务计划无效 / Invalid Task Plan")
+			c.EmitError("root aiTask is nil, plan failed")
+			return utils.Errorf("coordinator: root aiTask is nil")
+		}
+
+		// Phase 5: Initializing tasks
+		c.planLoadingStatus("初始化任务队列 / Initializing Task Queue...")
+		root := rsp.RootTask
+		c.rootTask = root
+		c.ContextProvider.StoreRootTask(root)
+		c.savePlanAndExecState("plan_ready", nil)
+		if len(root.Subtasks) <= 0 {
+			c.planLoadingStatus("无有效子任务 / No Valid Subtasks")
+			c.EmitError("no subtasks found, this task is not a valid task")
+			return utils.Errorf("coordinator: no subtasks found")
+		}
+		log.Infof("create aiTask pipeline: %v", root.Name)
+		for stepIdx, taskIns := range root.Subtasks {
+			log.Infof("step %d: %v", stepIdx, taskIns.Name)
+		}
+		alltools, err := c.AiToolManager.GetEnableTools()
+		if err != nil {
+			log.Warnf("coordinator: get all tools failed: %v", err)
+		}
+		if len(alltools) <= 0 {
+			log.Warnf("coordinator: no tools enable")
+		}
+
+		if err := executeRoot(root); err != nil {
+			return err
+		}
 	}
 
 	// Phase 7: Generating result/report

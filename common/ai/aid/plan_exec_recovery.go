@@ -1,0 +1,94 @@
+package aid
+
+import (
+	"encoding/json"
+	"strings"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+)
+
+type recoveredTask struct {
+	Index    string          `json:"index"`
+	Name     string          `json:"name"`
+	Goal     string          `json:"goal"`
+	Progress string          `json:"progress"`
+	Summary  string          `json:"summary"`
+	Subtasks []*recoveredTask `json:"subtasks,omitempty"`
+}
+
+func (c *Coordinator) tryRecoverPlanAndExec() (*AiTask, *PlanAndExecProgress, bool) {
+	if c == nil {
+		return nil, nil, false
+	}
+	if c.PersistentSessionId == "" {
+		return nil, nil, false
+	}
+	db := c.GetDB()
+	if db == nil {
+		return nil, nil, false
+	}
+
+	record, err := yakit.GetLatestAISessionPlanAndExecBySessionID(db, c.PersistentSessionId)
+	if err != nil || record == nil {
+		return nil, nil, false
+	}
+	if strings.TrimSpace(record.TaskTree) == "" {
+		return nil, nil, false
+	}
+
+	var progress PlanAndExecProgress
+	if record.TaskProgress != "" {
+		if err := json.Unmarshal([]byte(record.TaskProgress), &progress); err != nil {
+			log.Warnf("recover plan-exec progress parse failed: %v", err)
+		}
+	}
+	if strings.EqualFold(strings.TrimSpace(progress.Phase), "completed") {
+		return nil, &progress, false
+	}
+
+	var rootRecovered recoveredTask
+	if err := json.Unmarshal([]byte(record.TaskTree), &rootRecovered); err != nil {
+		log.Warnf("recover plan-exec task tree parse failed: %v", err)
+		return nil, &progress, false
+	}
+
+	root := c.buildRecoveredTaskTree(&rootRecovered, nil)
+	if root == nil {
+		return nil, &progress, false
+	}
+	return root, &progress, true
+}
+
+func (c *Coordinator) buildRecoveredTaskTree(src *recoveredTask, parent *AiTask) *AiTask {
+	if src == nil {
+		return nil
+	}
+	task := c.generateAITaskWithName(src.Name, src.Goal)
+	task.Index = src.Index
+	task.ParentTask = parent
+	if src.Summary != "" {
+		task.TaskSummary = src.Summary
+	}
+	if task.Index != "" {
+		task.SetID(task.Index)
+	}
+
+	switch strings.ToLower(strings.TrimSpace(src.Progress)) {
+	case string(aicommon.AITaskState_Completed):
+		task.SetStatus(aicommon.AITaskState_Completed)
+	case string(aicommon.AITaskState_Skipped):
+		task.SetStatus(aicommon.AITaskState_Skipped)
+	case string(aicommon.AITaskState_Processing):
+		task.SetStatus(aicommon.AITaskState_Processing)
+	}
+
+	for _, sub := range src.Subtasks {
+		child := c.buildRecoveredTaskTree(sub, task)
+		if child != nil {
+			task.Subtasks = append(task.Subtasks, child)
+		}
+	}
+	return task
+}
