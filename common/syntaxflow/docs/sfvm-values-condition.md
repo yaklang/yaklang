@@ -1,11 +1,12 @@
 # SFVM Values / Condition / Anchor 设计说明（中文）
 
-本文只覆盖这次重构里两块最关键的改动：
+本文说明 SFVM 运行时在 `Values`、`Condition`、`Anchor` 三块的当前设计目标、数据流与关键约束：
 
-- `ValueList -> Values`：把 SFVM 运行时“单值/多值”的混用彻底拆开
-- `Anchor`：在条件过滤作用域（`?{}` / `?()`）内稳定维护“结果属于哪个 source slot”的映射
+- `Values`：SFVM 栈里永远压 `sfvm.Values`，叶子永远是 `sfvm.ValueOperator`
+- `Condition`：`?{}` / `?()` 统一走 condition-scope，支持 `&&` / `||` / `!` 等逻辑组合
+- `Anchor`：在 condition-scope 内用 anchor bits 保持“结果属于哪个 source slot”的可回推映射
 
-目标是让 SFVM 在绝大多数地方保持“拍平的 Values 流”，只在条件作用域内引入必要的分组语义（通过 anchor bits 实现）。
+总体目标是让 SFVM 在绝大多数地方保持“拍平的 Values 流”，只在条件作用域内引入必要的分组语义（通过 anchor bits 实现）。
 
 ## 快速索引（代码位置）
 
@@ -34,7 +35,7 @@ SFVM 是一个“基于栈的值过滤 VM”。很多语句是天然拍平的，
 
 ### 2.1 核心规则
 
-这次重构强制三条硬规则：
+当前实现强制三条硬规则：
 
 1. `sfvm.ValueOperator` 只表示原子值（atomic），不再表示“列表值”
 2. `sfvm.Values` 是 SFVM 运行时唯一容器（栈里永远压的是 `Values`）
@@ -57,7 +58,7 @@ SFVM 是一个“基于栈的值过滤 VM”。很多语句是天然拍平的，
 
 ### 2.3 `NewValues` vs `MergeValues`
 
-这次改动里一个非常重要的语义拆分：
+实现里一个非常重要的语义拆分：
 
 - `sfvm.NewValues(...)`：保序、保重复（不去重）
 - `sfvm.MergeValues(...)`：显式归并/去重（并且合并 anchor bits）
@@ -154,10 +155,11 @@ SFVM 在很多“从 value 取下一跳”的地方会做一次 `mergeAnchorBitV
 
 当比较/过滤产生的 cond 数组长度与 source 宽度不一致时，SFVM 会做归一化：
 
-1. 优先用结果值的 anchor bits 去标记 source mask
-2. 如果结果值没有 anchor bits，再用 value identity 回退匹配（id/指针 identity）
+1. 用结果值的 anchor bits 去标记 source mask
 
 这使得“中间展开/拍平后的候选值集合”仍然能被正确投影回“source slot 的布尔 mask”。
+
+约束：在 mask-mode 的 condition-scope 内，所有参与回推的值都必须携带 anchor bits；缺失属于实现 bug，VM 会直接报 `CriticalError`，而不是回退做猜测匹配。
 
 这里的关键点是：标记 mask 时只看当前 scope 对应的 bit-range（`anchorBase..anchorBase+anchorWidth`），避免被其它 scope 的 anchor bits 干扰。
 

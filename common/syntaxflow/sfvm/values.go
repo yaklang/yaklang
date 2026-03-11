@@ -87,20 +87,6 @@ func (v Values) AppendPredecessor(value ValueOperator, opts ...AnalysisContextOp
 	})
 }
 
-func (v Values) AppendPredecessors(values Values, opts ...AnalysisContextOption) error {
-	return v.Recursive(func(operator ValueOperator) error {
-		for _, value := range values {
-			if utils.IsNil(value) {
-				continue
-			}
-			if err := operator.AppendPredecessor(value, opts...); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-}
-
 func (v Values) CompareConst(comparator *ConstComparator) []bool {
 	res := make([]bool, 0, len(v))
 	for _, operator := range v {

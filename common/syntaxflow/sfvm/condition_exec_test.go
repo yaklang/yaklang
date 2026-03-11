@@ -92,9 +92,11 @@ func TestNormalizeConditionAgainstSource_UsesBitVectorForDuplicateSource(t *test
 	source := NewValues([]ValueOperator{shared, shared})
 	result := NewValues([]ValueOperator{shared})
 
+	anchorRestore := assignLocalAnchorBitVector(source, 0)
+	defer restoreAnchorBitVector(anchorRestore)
+
 	scope := conditionScopeState{
-		anchorWidth:       len(source),
-		sourceIdentityIdx: buildValueIdentityIndex(source),
+		anchorWidth: len(source),
 	}
 	mask, err := normalizeConditionAgainstSource(scope, result, []bool{true})
 	require.NoError(t, err)
@@ -114,8 +116,7 @@ func TestNormalizeConditionAgainstSource_AlignedConditionShouldNotRewriteSourceB
 
 	source := NewValues([]ValueOperator{a, b})
 	scope := conditionScopeState{
-		anchorWidth:       len(source),
-		sourceIdentityIdx: buildValueIdentityIndex(source),
+		anchorWidth: len(source),
 	}
 	mask, err := normalizeConditionAgainstSource(scope, nil, []bool{true, false})
 	require.NoError(t, err)
@@ -140,8 +141,7 @@ func TestBuildFilterMask_UsesBitVector(t *testing.T) {
 	condVal.SetAnchorBitVector(condBits)
 
 	scope := conditionScopeState{
-		anchorWidth:       len(source),
-		sourceIdentityIdx: buildValueIdentityIndex(source),
+		anchorWidth: len(source),
 	}
 	mask, err := buildFilterMask(scope, NewValues([]ValueOperator{condVal}))
 	require.NoError(t, err)
@@ -154,9 +154,11 @@ func TestBuildFilterMask_DerivesMaskFromSourceValueBitVector(t *testing.T) {
 	c := newBitVectorValue("c")
 	source := NewValues([]ValueOperator{a, b, c})
 
+	anchorRestore := assignLocalAnchorBitVector(source, 0)
+	defer restoreAnchorBitVector(anchorRestore)
+
 	scope := conditionScopeState{
-		anchorWidth:       len(source),
-		sourceIdentityIdx: buildValueIdentityIndex(source),
+		anchorWidth: len(source),
 	}
 	mask, err := buildFilterMask(scope, NewValues([]ValueOperator{b}))
 	require.NoError(t, err)
@@ -209,8 +211,7 @@ func TestNormalizeConditionAgainstSource_DerivesMaskFromAnchorBitVector(t *testi
 	cond.SetAnchorBitVector(condBits)
 
 	scope := conditionScopeState{
-		anchorWidth:       len(source),
-		sourceIdentityIdx: buildValueIdentityIndex(source),
+		anchorWidth: len(source),
 	}
 	mask, err := normalizeConditionAgainstSource(scope, NewValues([]ValueOperator{cond}), nil)
 	require.NoError(t, err)

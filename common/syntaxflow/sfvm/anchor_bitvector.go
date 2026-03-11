@@ -112,34 +112,6 @@ func markMaskByBitVector(mask []bool, bits *utils.BitVector, base int) bool {
 	return matched
 }
 
-func buildValueIdentityIndex(source Values) map[string][]int {
-	indexByIdentity := make(map[string][]int, len(source))
-	for idx, value := range source {
-		if utils.IsNil(value) {
-			continue
-		}
-		key := valueIdentity(value)
-		indexByIdentity[key] = append(indexByIdentity[key], idx)
-	}
-	return indexByIdentity
-}
-
-func markMaskByValueIdentity(mask []bool, indexByIdentity map[string][]int, value ValueOperator) bool {
-	if utils.IsNil(value) || len(indexByIdentity) == 0 {
-		return false
-	}
-	indexes, ok := indexByIdentity[valueIdentity(value)]
-	if !ok || len(indexes) == 0 {
-		return false
-	}
-	for _, index := range indexes {
-		if index >= 0 && index < len(mask) {
-			mask[index] = true
-		}
-	}
-	return true
-}
-
 func mergeAnchorBitVector(dst ValueOperator, src ValueOperator) {
 	if utils.IsNil(dst) || utils.IsNil(src) {
 		return
