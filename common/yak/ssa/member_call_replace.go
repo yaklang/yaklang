@@ -183,16 +183,16 @@ func ReplaceMemberCall(old, replacement Value) map[string]Value {
 
 		// 处理 holder 的所有成员，先处理非 Call 成员，再处理 Call 成员
 		if holder.IsObject() {
-			callMap := make(map[Value]Value)
-			for key, member := range holder.GetAllMember() {
-				if _, ok := ToCall(member); ok {
-					callMap[key] = member
+			callPairs := make([]MemberPair, 0)
+			for _, pair := range holder.GetMemberPairs() {
+				if _, ok := ToCall(pair.Member); ok {
+					callPairs = append(callPairs, pair)
 					continue
 				}
-				replace(holder, key, member)
+				replace(holder, pair.Key, pair.Member)
 			}
-			for key, member := range callMap {
-				replace(holder, key, member)
+			for _, pair := range callPairs {
+				replace(holder, pair.Key, pair.Member)
 			}
 		}
 

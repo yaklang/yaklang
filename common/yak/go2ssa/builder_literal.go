@@ -127,7 +127,7 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 					kvs = b.buildLiteralValue(s, true)
 				}
 			case *ssa.Blueprint: // 处理golang库
-				if bp, ok := ssa.ToClassBluePrintType(t); ok {
+				if bp, ok := ssa.ToBluePrintType(t); ok {
 					bp.Build()
 					newtyp := ssa.CreateAnyType()
 					newtyp.SetFullTypeNames(typ.GetFullTypeNames())

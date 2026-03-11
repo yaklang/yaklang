@@ -17,12 +17,7 @@ func setMemberCallRelationship(obj, key, member Value) {
 		log.Warnf("setMemberCallRelationship empty key obj=%s typ=%v member=%s", obj.GetVerboseName(), obj.GetType(), member.GetVerboseName())
 	}
 	obj.AddMember(key, member)
-	if memberObj := member.GetObject(); utils.IsNil(memberObj) || memberObj.GetId() == obj.GetId() {
-		member.SetObject(obj)
-	}
-	if memberKey := member.GetKey(); utils.IsNil(memberKey) {
-		member.SetKey(key)
-	}
+	AddObjectKeyPair(member, obj, key)
 	if user, ok := obj.(User); ok {
 		key.AddUser(user)
 	}

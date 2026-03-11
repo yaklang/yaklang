@@ -250,19 +250,31 @@ func value2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	// object
 	ir.IsObject = anValue.IsObject()
 	if ir.IsObject {
-		member := anValue.getMemberMap()
-		ir.ObjectMembers = make(ssadb.Int64Map, 0, member.Len())
-		member.ForEach(func(i, v int64) bool {
-			ir.ObjectMembers.Append(i, v)
-			return true
-		})
+		pairs := value.GetMemberPairs()
+		if len(pairs) > 0 {
+			ir.ObjectMemberPairs = make(ssadb.Int64Map, 0, len(pairs))
+			for _, pair := range pairs {
+				if utils.IsNil(pair.Key) || utils.IsNil(pair.Member) {
+					continue
+				}
+				ir.ObjectMemberPairs.Append(pair.Key.GetId(), pair.Member.GetId())
+			}
+		}
 	}
 
 	// member
 	ir.IsObjectMember = anValue.IsMember()
 	if ir.IsObjectMember {
-		ir.ObjectParent = anValue.object
-		ir.ObjectKey = anValue.key
+		ownerPairs := value.GetObjectKeyPairs()
+		if len(ownerPairs) > 0 {
+			ir.ObjectOwnerPairs = make(ssadb.Int64Map, 0, len(ownerPairs))
+			for _, pair := range ownerPairs {
+				if utils.IsNil(pair.Object) || utils.IsNil(pair.Key) {
+					continue
+				}
+				ir.ObjectOwnerPairs.Append(pair.Object.GetId(), pair.Key.GetId())
+			}
+		}
 	}
 	// variable
 
@@ -308,14 +320,23 @@ func (c *ProgramCache) valueFromIrCode(cache *ProgramCache, inst Instruction, ir
 	anValue.occultation = ir.Occulatation
 
 	// object
-	ir.ObjectMembers.ForEach(func(key, value int64) {
-		anValue.getMemberMap(true).Set(key, value)
-	})
+	if len(ir.ObjectMemberPairs) > 0 {
+		ir.ObjectMemberPairs.ForEach(func(key, value int64) {
+			anValue.appendMemberPairIDs(key, value)
+		})
+	} else {
+		ir.ObjectMembers.ForEach(func(key, value int64) {
+			anValue.appendMemberPairIDs(key, value)
+		})
+	}
 
 	// object member
-	if ir.IsObjectMember {
-		anValue.object = ir.ObjectParent
-		anValue.key = ir.ObjectKey
+	if len(ir.ObjectOwnerPairs) > 0 {
+		ir.ObjectOwnerPairs.ForEach(func(object, key int64) {
+			anValue.appendOwnerPairIDs(object, key)
+		})
+	} else if ir.ObjectParent > 0 && ir.ObjectKey > 0 {
+		anValue.appendOwnerPairIDs(ir.ObjectParent, ir.ObjectKey)
 	}
 
 	// variable

@@ -94,6 +94,16 @@ type (
 	Values []Value
 )
 
+type MemberPair struct {
+	Key    Value
+	Member Value
+}
+
+type ObjectKeyPair struct {
+	Object Value
+	Key    Value
+}
+
 // data-flow
 type Node interface {
 
@@ -124,8 +134,11 @@ type MemberCall interface {
 	GetStringMember(string) (Value, bool)
 	SetStringMember(string, Value)
 	DeleteMember( /*key*/ Value)   // delete by key
-	GetAllMember() map[Value]Value // map[key]value
+	GetAllMember() map[Value]Value // compatibility last-wins view
 	ForEachMember(func(k Value, v Value) bool)
+	GetMemberPairs() []MemberPair
+	GetMembersByExactKey(Value) []Value
+	GetMembersByKeyString(string) []Value
 
 	// ReplaceMember( /* key */ Value /* value */, Value) // replace old-value with new-value
 
@@ -135,6 +148,8 @@ type MemberCall interface {
 	SetKey(Value)
 	GetKey() Value
 	GetObject() Value
+	AddObjectKeyPair(Value, Value)
+	GetObjectKeyPairs() []ObjectKeyPair
 
 	// ReplaceObject(Value) // replace old-object to new-object
 }

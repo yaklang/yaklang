@@ -700,6 +700,46 @@ func (lz *LazyInstruction) GetStringMember(n string) (Value, bool) {
 	return lz.Value.GetStringMember(n)
 }
 
+func (lz *LazyInstruction) GetMemberPairs() []MemberPair {
+	lz.check()
+	if utils.IsNil(lz.Value) {
+		return nil
+	}
+	return lz.Value.GetMemberPairs()
+}
+
+func (lz *LazyInstruction) GetMembersByExactKey(v Value) []Value {
+	lz.check()
+	if utils.IsNil(lz.Value) {
+		return nil
+	}
+	return lz.Value.GetMembersByExactKey(v)
+}
+
+func (lz *LazyInstruction) GetMembersByKeyString(name string) []Value {
+	lz.check()
+	if utils.IsNil(lz.Value) {
+		return nil
+	}
+	return lz.Value.GetMembersByKeyString(name)
+}
+
+func (lz *LazyInstruction) AddObjectKeyPair(obj, key Value) {
+	lz.check()
+	if utils.IsNil(lz.Value) {
+		return
+	}
+	lz.Value.AddObjectKeyPair(obj, key)
+}
+
+func (lz *LazyInstruction) GetObjectKeyPairs() []ObjectKeyPair {
+	lz.check()
+	if utils.IsNil(lz.Value) {
+		return nil
+	}
+	return lz.Value.GetObjectKeyPairs()
+}
+
 func (lz *LazyInstruction) GetType() Type {
 	lz.check()
 	if utils.IsNil(lz.Value) {

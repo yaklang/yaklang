@@ -998,7 +998,7 @@ func (b *astbuilder) buildParameterDecl(para *gol.ParameterDeclContext) []ssa.Ty
 			typeTypes = append(typeTypes, typeType)
 			p.SetType(typeType)
 
-			if bp, ok := ssa.ToClassBluePrintType(typeType); ok {
+			if bp, ok := ssa.ToBluePrintType(typeType); ok {
 				if len(bp.ParentBlueprints) == 0 {
 					continue
 				}
@@ -2064,8 +2064,8 @@ func (b *astbuilder) buildTypeName(tname *gol.TypeNameContext) ssa.Type {
 		exportType, _ := lib.GetExportType(typName)
 		libType, _ := lib.GetExportType(libName)
 
-		if exportBp, ok := ssa.ToClassBluePrintType(exportType); ok {
-			if libBp, ok := ssa.ToClassBluePrintType(libType); ok {
+		if exportBp, ok := ssa.ToBluePrintType(exportType); ok {
+			if libBp, ok := ssa.ToBluePrintType(libType); ok {
 				exportBp.AddParentBlueprint(libBp)
 			}
 		}

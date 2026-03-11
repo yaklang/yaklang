@@ -169,15 +169,19 @@ func (p *Program) ImportTypeStaticAll(lib *Program, classname string) error {
 	}
 	p.fixImportCallback = append(p.fixImportCallback, func() {
 		//fix
-		for s, value := range blueprint.StaticMember {
-			pkg.val[s] = value
+		for s, values := range blueprint.StaticMember {
+			if len(values) > 0 {
+				pkg.val[s] = values[len(values)-1]
+			}
 		}
 		for s, function := range blueprint.StaticMethod {
 			pkg.val[s] = function
 		}
 	})
-	for s, value := range blueprint.StaticMember {
-		pkg.val[s] = value
+	for s, values := range blueprint.StaticMember {
+		if len(values) > 0 {
+			pkg.val[s] = values[len(values)-1]
+		}
 	}
 	for s, function := range blueprint.StaticMethod {
 		pkg.val[s] = function
@@ -191,9 +195,9 @@ func (p *Program) ImportTypeStaticMemberFromLib(lib *Program, clsName string, na
 	}
 	build := func(blueprint *Blueprint, name string) {
 		p.fixImportCallback = append(p.fixImportCallback, func() {
-			for s, value := range blueprint.StaticMember {
-				if name == s {
-					pkg.val[s] = value
+			for s, values := range blueprint.StaticMember {
+				if name == s && len(values) > 0 {
+					pkg.val[s] = values[len(values)-1]
 				}
 			}
 			for s, function := range blueprint.StaticMethod {
@@ -202,9 +206,9 @@ func (p *Program) ImportTypeStaticMemberFromLib(lib *Program, clsName string, na
 				}
 			}
 		})
-		for s, value := range blueprint.StaticMember {
-			if name == s {
-				pkg.val[s] = value
+		for s, values := range blueprint.StaticMember {
+			if name == s && len(values) > 0 {
+				pkg.val[s] = values[len(values)-1]
 			}
 		}
 		for s, function := range blueprint.StaticMethod {

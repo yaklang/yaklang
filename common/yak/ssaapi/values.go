@@ -775,18 +775,15 @@ func (v *Value) IsFreeValue() bool {
 
 // GetMember get member of object by key
 func (v *Value) GetMember(value *Value) []*Value {
-	var ret []*Value
 	if v.IsNil() {
 		return nil
 	}
-
-	// TODO: key is string or int
-	key := value.getValue().String()
-	node := v.getValue()
-	for name, member := range node.GetAllMember() {
-		if name.String() == key {
-			ret = append(ret, v.NewValue(member))
+	ret := make([]*Value, 0)
+	for _, member := range ssa.GetMembersByKey(v.getValue(), value.getValue()) {
+		if member == nil {
+			continue
 		}
+		ret = append(ret, v.NewValue(member))
 	}
 	return ret
 }
@@ -796,7 +793,6 @@ func (v *Value) GetAllMember() Values {
 	if v.IsNil() {
 		return nil
 	}
-
 	all := v.getValue().GetAllMember()
 	ret := make(Values, 0, len(all))
 	for _, value := range all {
@@ -810,10 +806,10 @@ func (v *Value) GetMembers() [][]*Value {
 	if v.IsNil() {
 		return nil
 	}
-	all := v.getValue().GetAllMember()
+	all := ssa.GetMemberPairs(v.getValue())
 	ret := make([][]*Value, 0, len(all))
-	for key, value := range all {
-		ret = append(ret, []*Value{v.NewValue(key), v.NewValue(value)})
+	for _, pair := range all {
+		ret = append(ret, []*Value{v.NewValue(pair.Key), v.NewValue(pair.Member)})
 	}
 	return ret
 }

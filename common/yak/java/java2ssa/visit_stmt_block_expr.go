@@ -1663,7 +1663,7 @@ func (y *singleFileBuilder) VisitCreator(raw javaparser.ICreatorContext) (obj ss
 		typ = y.VisitCreatedName(ret)
 	}
 
-	class, ok := ssa.ToClassBluePrintType(typ)
+	class, ok := ssa.ToBluePrintType(typ)
 	if ret := i.ClassCreatorRest(); ret != nil && ok {
 		// class := y.GetBluePrint(className)
 		obj := y.EmitUndefined(class.Name)
@@ -2056,7 +2056,7 @@ func (y *singleFileBuilder) VisitIdentifier(raw javaparser.IIdentifierContext, w
 		return nil, bp.Container()
 	}
 	if importType, ok := y.GetProgram().ReadImportType(name); ok {
-		if blueprint, ok := ssa.ToClassBluePrintType(importType); ok {
+		if blueprint, ok := ssa.ToBluePrintType(importType); ok {
 			return nil, blueprint.Container()
 		} else {
 			// no class ? emmmm
