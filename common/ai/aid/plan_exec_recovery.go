@@ -10,19 +10,24 @@ import (
 )
 
 type recoveredTask struct {
-	Index    string          `json:"index"`
-	Name     string          `json:"name"`
-	Goal     string          `json:"goal"`
-	Progress string          `json:"progress"`
-	Summary  string          `json:"summary"`
-	Subtasks []*recoveredTask `json:"subtasks,omitempty"`
+	Index         string           `json:"index"`
+	Name          string           `json:"name"`
+	Goal          string           `json:"goal"`
+	Progress      string           `json:"progress"`
+	Summary       string           `json:"summary"`
+	StatusSummary string           `json:"status_summary"`
+	TaskSummary   string           `json:"task_summary"`
+	ShortSummary  string           `json:"short_summary"`
+	LongSummary   string           `json:"long_summary"`
+	Subtasks      []*recoveredTask `json:"subtasks,omitempty"`
 }
 
 func (c *Coordinator) tryRecoverPlanAndExec() (*AiTask, *PlanAndExecProgress, bool) {
 	if c == nil {
 		return nil, nil, false
 	}
-	if c.PersistentSessionId == "" {
+	coordinatorID := c.GetRuntimeId()
+	if coordinatorID == "" {
 		return nil, nil, false
 	}
 	db := c.GetDB()
@@ -30,7 +35,7 @@ func (c *Coordinator) tryRecoverPlanAndExec() (*AiTask, *PlanAndExecProgress, bo
 		return nil, nil, false
 	}
 
-	record, err := yakit.GetLatestAISessionPlanAndExecBySessionID(db, c.PersistentSessionId)
+	record, err := yakit.GetAISessionPlanAndExecByCoordinatorID(db, coordinatorID)
 	if err != nil || record == nil {
 		return nil, nil, false
 	}
@@ -68,7 +73,19 @@ func (c *Coordinator) buildRecoveredTaskTree(src *recoveredTask, parent *AiTask)
 	task := c.generateAITaskWithName(src.Name, src.Goal)
 	task.Index = src.Index
 	task.ParentTask = parent
-	if src.Summary != "" {
+	if src.StatusSummary != "" {
+		task.StatusSummary = src.StatusSummary
+	}
+	if src.TaskSummary != "" {
+		task.TaskSummary = src.TaskSummary
+	}
+	if src.ShortSummary != "" {
+		task.ShortSummary = src.ShortSummary
+	}
+	if src.LongSummary != "" {
+		task.LongSummary = src.LongSummary
+	}
+	if task.TaskSummary == "" && task.ShortSummary == "" && task.LongSummary == "" && task.StatusSummary == "" && src.Summary != "" {
 		task.TaskSummary = src.Summary
 	}
 	if task.Index != "" {

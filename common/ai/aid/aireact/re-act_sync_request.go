@@ -8,6 +8,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -29,6 +30,8 @@ func (r *ReAct) handleSyncMessage(event *ypb.AIInputEvent) error {
 		return r.HandleSyncTypeReactRemoveTaskEvent(event)
 	case SYNC_TYPE_REACT_CLEAR_TASK:
 		return r.HandleSyncTypeReactClearTaskEvent(event)
+	case SYNC_TYPE_RECOVERY_PLAN_AND_EXEC:
+		return r.HandleSyncTypeRecoveryPlanAndExecEvent(event)
 	default:
 		return fmt.Errorf("unsupported sync type: %s", event.SyncType)
 	}
@@ -42,6 +45,7 @@ func (r *ReAct) RegisterReActSyncEvent() {
 	r.config.InputEventManager.RegisterSyncCallback(SYNC_TYPE_REACT_REMOVE_TASK, r.HandleSyncTypeReactRemoveTaskEvent)
 	r.config.InputEventManager.RegisterSyncCallback(SYNC_TYPE_REACT_CLEAR_TASK, r.HandleSyncTypeReactClearTaskEvent)
 	r.config.InputEventManager.RegisterSyncCallback(SYNC_TYPE_REACT_CANCEL_TASK, r.HandleSyncTypeCancelTaskEvent)
+	r.config.InputEventManager.RegisterSyncCallback(SYNC_TYPE_RECOVERY_PLAN_AND_EXEC, r.HandleSyncTypeRecoveryPlanAndExecEvent)
 }
 
 func (r *ReAct) UnRegisterReActSyncEvent() {
@@ -52,6 +56,7 @@ func (r *ReAct) UnRegisterReActSyncEvent() {
 	r.config.InputEventManager.UnRegisterSyncCallback(SYNC_TYPE_REACT_REMOVE_TASK)
 	r.config.InputEventManager.UnregisterMirrorOfAIInputEvent(SYNC_TYPE_REACT_CLEAR_TASK)
 	r.config.InputEventManager.UnRegisterSyncCallback(SYNC_TYPE_REACT_CANCEL_TASK)
+	r.config.InputEventManager.UnRegisterSyncCallback(SYNC_TYPE_RECOVERY_PLAN_AND_EXEC)
 }
 
 // 单独拆分的 handler 函数
@@ -85,6 +90,58 @@ func (r *ReAct) HandleSyncTypeKnowledgeEvent(event *ypb.AIInputEvent) error {
 		log.Error("no knowledge found")
 	}
 	r.EmitKnowledgeListAboutTask(taskID, knowledgeList, event.SyncID)
+	return nil
+}
+
+func (r *ReAct) HandleSyncTypeRecoveryPlanAndExecEvent(event *ypb.AIInputEvent) error {
+	sessionID := r.config.PersistentSessionId
+	coordinatorID := ""
+	if event.SyncJsonInput != "" {
+		var params map[string]interface{}
+		if err := json.Unmarshal([]byte(event.SyncJsonInput), &params); err != nil {
+			r.EmitSyncEventError("recover_plan_and_exec", fmt.Errorf("failed to parse recovery params: %v", err), event.SyncID)
+			return nil
+		}
+		if sid, ok := params["session_id"].(string); ok && sid != "" {
+			sessionID = sid
+		}
+		if cid, ok := params["coordinator_id"].(string); ok && cid != "" {
+			coordinatorID = cid
+		}
+	}
+	if coordinatorID == "" {
+		r.EmitSyncEventError("recover_plan_and_exec", errors.New("coordinator_id is empty"), event.SyncID)
+		return nil
+	}
+	db := r.config.GetDB()
+	if db == nil {
+		r.EmitSyncEventError("recover_plan_and_exec", errors.New("db is nil"), event.SyncID)
+		return nil
+	}
+	record, err := yakit.GetAISessionPlanAndExecByCoordinatorID(db, coordinatorID)
+	if err != nil || record == nil || record.TaskTree == "" {
+		if err == nil {
+			err = errors.New("no plan-exec recovery data")
+		}
+		r.EmitSyncEventError("recover_plan_and_exec", err, event.SyncID)
+		return nil
+	}
+	if r.GetCurrentTask() == nil {
+		r.EmitSyncEventError("recover_plan_and_exec", errors.New("no current task available for recovery"), event.SyncID)
+		return nil
+	}
+
+	r.EmitSyncEvent("recover_plan_and_exec", map[string]interface{}{
+		"started":        true,
+		"session_id":     sessionID,
+		"coordinator_id": coordinatorID,
+	}, event.SyncID)
+
+	go r.AsyncRecoverPlanAndExecute(r.config.Ctx, coordinatorID, func(err error) {
+		if err != nil {
+			r.EmitPlanExecFail("recover plan-and-exec failed: %v", err)
+		}
+	})
 	return nil
 }
 

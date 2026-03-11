@@ -200,6 +200,9 @@ func (t *AiTask) GetSummary() string {
 	if t.StatusSummary != "" {
 		return t.StatusSummary
 	}
+	if t.AIStatefulTaskBase.GetSummary() != "" {
+		return t.AIStatefulTaskBase.GetSummary()
+	}
 	return ""
 }
 
@@ -251,6 +254,10 @@ func (t *AiTask) MarshalJSON() ([]byte, error) {
 		Subtasks             []*AiTask `json:"subtasks,omitempty"`
 		Progress             string    `json:"progress"` // 添加进度字段
 		Summary              string    `json:"summary"`
+		StatusSummary        string    `json:"status_summary,omitempty"`
+		TaskSummary          string    `json:"task_summary,omitempty"`
+		ShortSummary         string    `json:"short_summary,omitempty"`
+		LongSummary          string    `json:"long_summary,omitempty"`
 		TotalToolCallCount   int64     `json:"total_tool_call_count"`
 		SuccessToolCallCount int       `json:"success_tool_call_count"`
 		FailToolCallCount    int       `json:"fail_tool_call_count"`
@@ -261,6 +268,10 @@ func (t *AiTask) MarshalJSON() ([]byte, error) {
 		Subtasks:             t.Subtasks,
 		Progress:             progress,
 		Summary:              t.GetSummary(),
+		StatusSummary:        t.StatusSummary,
+		TaskSummary:          t.TaskSummary,
+		ShortSummary:         t.ShortSummary,
+		LongSummary:          t.LongSummary,
 		TotalToolCallCount:   int64(len(t.GetAllToolCallResults())),
 		SuccessToolCallCount: t.GetSuccessCallCount(),
 		FailToolCallCount:    t.GetFailCallCount(),

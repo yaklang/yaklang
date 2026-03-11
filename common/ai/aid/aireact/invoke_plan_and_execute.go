@@ -87,7 +87,7 @@ func (r *ReAct) RequireAIForgeAndAsyncExecute(
 			r.emitArtifactsSummaryToTimeline()
 			done(finalError)
 		}()
-		finalError = r.invokePlanAndExecute(taskDone, ctx, "", forgeName, forgeParams)
+		finalError = r.invokePlanAndExecute(taskDone, ctx, "", forgeName, forgeParams, "")
 		if finalError != nil {
 			log.Errorf("AsyncPlanAndExecute error: %v", finalError)
 		}
@@ -116,7 +116,7 @@ func (r *ReAct) AsyncPlanAndExecute(ctx context.Context, planPayload string, onF
 				onFinished(finalError)
 			}
 		}()
-		finalError = r.invokePlanAndExecute(taskDone, ctx, planPayload, "", nil)
+		finalError = r.invokePlanAndExecute(taskDone, ctx, planPayload, "", nil, "")
 		if finalError != nil {
 			log.Errorf("AsyncPlanAndExecute error: %v", finalError)
 		}
@@ -128,7 +128,36 @@ func (r *ReAct) AsyncPlanAndExecute(ctx context.Context, planPayload string, onF
 	}
 }
 
-func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Context, planPayload string, forgeName string, forgeParams any) (finalErr error) {
+func (r *ReAct) AsyncRecoverPlanAndExecute(ctx context.Context, coordinatorID string, onFinished func(error)) {
+	cb := utils.NewCondBarrierContext(ctx)
+	startupBarrier := cb.CreateBarrier("startup")
+
+	taskDone := make(chan struct{})
+	go func() {
+		var finalError error
+		defer func() {
+			if err := cb.Wait("startup"); err != nil {
+				log.Warnf("start up failed: %v", err)
+			}
+			r.AddToTimeline("plan_executeion", fmt.Sprintf("plan recovery: %v is finished", utils.ShrinkString(coordinatorID, 128)))
+			r.emitArtifactsSummaryToTimeline()
+			if onFinished != nil {
+				onFinished(finalError)
+			}
+		}()
+		finalError = r.invokePlanAndExecute(taskDone, ctx, "", "", nil, coordinatorID)
+		if finalError != nil {
+			log.Errorf("AsyncRecoverPlanAndExecute error: %v", finalError)
+		}
+	}()
+	select {
+	case <-taskDone:
+		r.AddToTimeline("plan_execute", fmt.Sprintf("plan recovery: %v is started", utils.ShrinkString(coordinatorID, 128)))
+		startupBarrier.Done()
+	}
+}
+
+func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Context, planPayload string, forgeName string, forgeParams any, coordinatorID string) (finalErr error) {
 	doneOnce := new(sync.Once)
 	done := func() {
 		doneOnce.Do(func() {
@@ -145,7 +174,10 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 
 	// create config with timeline
 	// generate config
-	uid := uuid.New().String()
+	uid := coordinatorID
+	if uid == "" {
+		uid = uuid.New().String()
+	}
 	params := map[string]any{
 		"re-act_id":      r.config.Id,
 		"re-act_task":    r.GetCurrentTask().GetId(),

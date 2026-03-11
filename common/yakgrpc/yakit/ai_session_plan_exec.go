@@ -52,15 +52,15 @@ func DeleteAISessionPlanAndExecBySessionID(db *gorm.DB, sessionID string) error 
 	return err
 }
 
-func GetLatestAISessionPlanAndExecBySessionID(db *gorm.DB, sessionID string) (*schema.AISessionPlanAndExec, error) {
+func GetAISessionPlanAndExecByCoordinatorID(db *gorm.DB, coordinatorID string) (*schema.AISessionPlanAndExec, error) {
 	if db == nil {
 		return nil, utils.Errorf("db is nil")
 	}
-	if sessionID == "" {
-		return nil, utils.Errorf("session_id is empty")
+	if coordinatorID == "" {
+		return nil, utils.Errorf("coordinator_id is empty")
 	}
 	var record schema.AISessionPlanAndExec
-	if err := db.Where("session_id = ?", sessionID).Order("updated_at desc").First(&record).Error; err != nil {
+	if err := db.Where("coordinator_id = ?", coordinatorID).First(&record).Error; err != nil {
 		if gorm.IsRecordNotFoundError(err) || strings.Contains(err.Error(), "no such table") || strings.Contains(err.Error(), "doesn't exist") {
 			return nil, nil
 		}

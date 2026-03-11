@@ -104,3 +104,41 @@ func TestPlanExecTaskTreeRecovery(t *testing.T) {
 	require.Equal(t, recSub2, recSub2a.ParentTask)
 	require.Equal(t, aicommon.AITaskState_Processing, recSub2a.GetStatus())
 }
+
+func TestPlanExecTaskSummaryRoundTrip(t *testing.T) {
+	c := newTestCoordinator(t)
+
+	root := c.generateAITaskWithName("root", "root-goal")
+	root.StatusSummary = "status-summary"
+	root.TaskSummary = "task-summary"
+	root.ShortSummary = "short-summary"
+	root.LongSummary = "long-summary"
+	root.GenerateIndex()
+
+	var recovered recoveredTask
+	raw := utils.Jsonify(root)
+	require.NoError(t, json.Unmarshal(raw, &recovered))
+
+	recRoot := c.buildRecoveredTaskTree(&recovered, nil)
+	require.NotNil(t, recRoot)
+	require.Equal(t, "status-summary", recRoot.StatusSummary)
+	require.Equal(t, "task-summary", recRoot.TaskSummary)
+	require.Equal(t, "short-summary", recRoot.ShortSummary)
+	require.Equal(t, "long-summary", recRoot.LongSummary)
+}
+
+func TestPlanExecTaskSummaryLegacyFallback(t *testing.T) {
+	c := newTestCoordinator(t)
+
+	recovered := &recoveredTask{
+		Index:    "1",
+		Name:     "root",
+		Goal:     "goal",
+		Progress: string(aicommon.AITaskState_Completed),
+		Summary:  "legacy-summary",
+	}
+
+	recRoot := c.buildRecoveredTaskTree(recovered, nil)
+	require.NotNil(t, recRoot)
+	require.Equal(t, "legacy-summary", recRoot.TaskSummary)
+}

@@ -49,6 +49,7 @@ func TestRecovery_SkipCompletedTasks(t *testing.T) {
 	root.GenerateIndex()
 
 	doneTask.SetStatus(aicommon.AITaskState_Completed)
+	doneTask.SetSummary("done task summary")
 
 	db := consts.GetGormProjectDatabase()
 	require.NoError(t, db.AutoMigrate(&schema.AISessionPlanAndExec{}).Error)
@@ -58,9 +59,10 @@ func TestRecovery_SkipCompletedTasks(t *testing.T) {
 			Delete(&schema.AISessionPlanAndExec{}).Error
 	})
 
+	coordinatorID := uuid.NewString()
 	record := &schema.AISessionPlanAndExec{
 		SessionID:     sessionID,
-		CoordinatorID: uuid.NewString(),
+		CoordinatorID: coordinatorID,
 		TaskTree:      string(utils.Jsonify(root)),
 		TaskProgress:  string(utils.Jsonify(&aid.PlanAndExecProgress{Phase: "executing"})),
 	}
@@ -80,9 +82,12 @@ func TestRecovery_SkipCompletedTasks(t *testing.T) {
 	ins, err := aid.NewCoordinator(
 		"recovery-skip-test",
 		aicommon.WithContext(ctx),
+		aicommon.WithID(coordinatorID),
+		aicommon.WithDisableIntentRecognition(true),
 		aicommon.WithPersistentSessionId(sessionID),
 		aicommon.WithGenerateReport(false),
 		aicommon.WithDisableAutoSkills(true),
+		aicommon.WithAgreePolicy(aicommon.AgreePolicyYOLO),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			if event == nil || event.Type != schema.EVENT_TYPE_STRUCTURED {
 				return
