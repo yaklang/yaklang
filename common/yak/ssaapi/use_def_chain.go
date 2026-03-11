@@ -29,31 +29,38 @@ func showUserDefChainEx(flag int, v *Value) {
 			ret += fmt.Sprintf("%-7s\t%s\t%s\t%s\n", prefix, indexStr, ssa.SSAOpcode2Name[v.getValue().GetOpcode()], v)
 		case 1:
 			ret += fmt.Sprintf("%s\t%s\n\t\t%s\n\t\t%s\n\t\t%s\n", prefix, indexStr, v, v.getValue(), v.getValue().GetRange())
-		default:
 		}
 		return ret
 	}
 
-	for i, v := range v.GetOperands() {
-		ret += show("Operand", i, v)
+	for i, operand := range v.GetOperands() {
+		ret += show("Operand", i, operand)
 	}
 
 	ret += show("Self", -1, v)
-	for i, u := range v.GetUsers() {
-		ret += show("User", i, u)
+	for i, user := range v.GetUsers() {
+		ret += show("User", i, user)
 	}
 
 	if v.IsMember() {
 		ret += "Members:\n"
-		ret += show("Key", -1, v.GetKey())
-		ret += show("Object", -1, v.GetObject())
+		for _, pair := range v.GetObjectKeyPairs() {
+			if len(pair) != 2 {
+				continue
+			}
+			ret += show("Key", -1, pair[1])
+			ret += show("Object", -1, pair[0])
+		}
 	}
 
 	if v.IsObject() {
 		ret += "Object:\n"
-		for _, value := range v.GetAllMember() {
-			ret += show("Key", -1, value.GetKey())
-			ret += show("Member", -1, value)
+		for _, pair := range v.GetMembers() {
+			if len(pair) != 2 {
+				continue
+			}
+			ret += show("Key", -1, pair[0])
+			ret += show("Member", -1, pair[1])
 		}
 	}
 	log.Infof(ret)

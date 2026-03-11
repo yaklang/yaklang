@@ -136,6 +136,25 @@ func TestParameterMemberIsCall(t *testing.T) {
 	})
 }
 
+func TestPhpFieldSensitiveTopDefAndBottomUse(t *testing.T) {
+	code := `<?php
+	class A{
+	    public $safe;
+	    public $cmd;
+	}
+	$obj = new A();
+	$obj->cmd = $_GET[1];
+	$obj->safe = "safe";
+	println($obj->cmd);
+	`
+	ssatest.CheckSyntaxFlowContain(t, code, `println(* #-> * as $param)`, map[string][]string{
+		"param": {"Undefined-_GET"},
+	}, ssaapi.WithLanguage(ssaconfig.PHP))
+	ssatest.CheckSyntaxFlowContain(t, code, `_GET.* --> as $sink`, map[string][]string{
+		"sink": {"Function-println(Undefined-$obj.cmd(valid))"},
+	}, ssaapi.WithLanguage(ssaconfig.PHP))
+}
+
 func TestObject(t *testing.T) {
 	code := `<?php
 function functionCC($a){
@@ -152,5 +171,32 @@ echo($cd);
 		values := result.GetValues("sink")
 		require.Contains(t, values.String(), "Function-echo(Function-functionCC(Undefined-$get(valid)))")
 		return nil
+	}, ssaapi.WithLanguage(ssaconfig.PHP))
+}
+
+func TestPhpFieldSensitiveSharedMemberAcrossObjects(t *testing.T) {
+	code := `<?php
+	class Box{
+	    public $cmd;
+	    public $safe;
+	}
+	function show($left, $right){
+	    println($left->cmd);
+	    println($right->cmd);
+	}
+	$input = $_GET[1];
+	$a = new Box();
+	$b = new Box();
+	$a->cmd = $input;
+	$a->safe = "safe-a";
+	$b->cmd = $input;
+	$b->safe = "safe-b";
+	show($a, $b);
+	`
+	ssatest.CheckSyntaxFlowContain(t, code, `println(* #-> * as $param)`, map[string][]string{
+		"param": {"Undefined-_GET"},
+	}, ssaapi.WithLanguage(ssaconfig.PHP))
+	ssatest.CheckSyntaxFlowContain(t, code, `_GET.* --> as $sink`, map[string][]string{
+		"sink": {"Function-println(ParameterMember-parameter[0].cmd)", "Function-println(ParameterMember-parameter[1].cmd)"},
 	}, ssaapi.WithLanguage(ssaconfig.PHP))
 }
