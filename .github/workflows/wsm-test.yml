@@ -146,11 +146,25 @@ jobs:
         run: |
           $url = "http://127.0.0.1:8087/echo.aspx"
           try {
-            $response = Invoke-WebRequest -Uri $url
+            $response = curl.exe `
+              --retry 10 `
+              --retry-delay 2 `
+              --retry-connrefused `
+              --silent `
+              --show-error `
+              --fail `
+              $url
+            if ($LASTEXITCODE -ne 0) {
+              throw "curl exited with code $LASTEXITCODE"
+            }
             Write-Output "Response Body:"
-            Write-Output $response.Content
+            Write-Output $response
           } catch {
-            Write-Error "Failed to fetch URL $url. Error: $_"
+            & "$env:SystemRoot\System32\inetsrv\appcmd.exe" list site
+            & "$env:SystemRoot\System32\inetsrv\appcmd.exe" list app
+            & "$env:SystemRoot\System32\inetsrv\appcmd.exe" list apppool
+            Get-ChildItem "C:\inetpub\wwwroot\abcd"
+            Write-Error "Failed to fetch URL $url. Error: $($_.Exception.Message)"
           }
       - name: Run Tests
         run: |
