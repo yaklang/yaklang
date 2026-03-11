@@ -54,7 +54,7 @@ options := [
     rag.khopLimit(khoplimit),
     rag.disableERM(disableERM),
     rag.chunkSize(chunkSize),
-    rag.analyzeConcurrency(concurrency)
+    rag.analyzeConcurrency(concurrency),
 ]
 
 if kmax > kmin {
