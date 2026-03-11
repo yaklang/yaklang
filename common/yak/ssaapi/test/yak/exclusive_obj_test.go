@@ -575,3 +575,71 @@ func TestObject_Make(t *testing.T) {
 			}, ssaapi.WithLanguage(ssaconfig.Yak))
 	})
 }
+
+func TestTopDef_FieldSensitive_NoSiblingLeak(t *testing.T) {
+	ssatest.CheckTopDef(t, `
+	a = {}
+	a.b = 1
+	a.c = 999
+	d = a.b
+	`, "d", []string{"1"}, true)
+
+	prog, err := ssaapi.Parse(`a = {}; a.b = 1; a.c = 999; d = a.b`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	prog.Ref("d").GetTopDefs().ForEach(func(value *ssaapi.Value) {
+		if value.GetConstValue() == 999 {
+			t.Fatal("unexpected sibling field leaked into topdef")
+		}
+	})
+}
+
+func TestTopDef_FieldSensitive_MultiObjectSameKey(t *testing.T) {
+	prog, err := ssaapi.Parse(`
+	a = {"k": 1, "other": 10}
+	b = {"k": 2, "other": 20}
+	x = a
+	if cond { x = b }
+	d = x.k
+	`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	check1, check2 := false, false
+	prog.Ref("d").GetTopDefs().ForEach(func(value *ssaapi.Value) {
+		if value.GetConstValue() == 1 {
+			check1 = true
+		}
+		if value.GetConstValue() == 2 {
+			check2 = true
+		}
+		if value.GetConstValue() == 10 || value.GetConstValue() == 20 {
+			t.Fatal("unexpected sibling field leaked into multi-object topdef")
+		}
+	})
+	if !check1 || !check2 {
+		t.Fatal("want both object-key definitions")
+	}
+}
+
+func TestTopDef_FieldSensitive_SharedValueAcrossObjects(t *testing.T) {
+	code := `
+	src = 9
+	a = {}
+	b = {}
+	a.cmd = src
+	a.safe = 1
+	b.cmd = src
+	b.safe = 2
+	x = a.cmd
+	y = b.cmd
+	`
+	ssatest.CheckSyntaxFlowContain(t, code, `
+	x #-> as $x
+	y #-> as $y
+	`, map[string][]string{
+		"x": {"9"},
+		"y": {"9"},
+	}, ssaapi.WithLanguage(ssaconfig.Yak))
+}

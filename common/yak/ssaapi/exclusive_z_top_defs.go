@@ -3,6 +3,7 @@ package ssaapi
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
@@ -32,6 +33,11 @@ func (i *Value) GetTopDefs(opt ...OperationOption) (ret Values) {
 		}
 	}()
 	actx := NewAnalyzeContext(opt...)
+	if i.ParentProgram != nil {
+		actx.Query = func(sf string) Values {
+			return i.ParentProgram.SyntaxFlowChain(sf)
+		}
+	}
 	actx.Self = i
 	actx.direct = TopDefAnalysis
 	ret = i.getTopDefs(actx, opt...)
@@ -54,6 +60,72 @@ func (v Values) GetTopDefs(opts ...OperationOption) Values {
 	return MergeValues(ret)
 }
 
+func isConstructorLikeMemberValue(callee *Value) bool {
+	if callee == nil || !callee.IsMember() {
+		return false
+	}
+	calleeObj, calleeKey := callee.GetObject(), callee.GetKey()
+	if calleeObj == nil || calleeKey == nil {
+		return false
+	}
+	keyName := ssa.GetKeyString(calleeKey.getValue())
+	for _, candidate := range []string{calleeObj.GetName(), calleeObj.GetVerboseName(), calleeObj.String()} {
+		candidate = strings.TrimSpace(candidate)
+		candidate = strings.TrimPrefix(candidate, "Undefined-")
+		candidate = strings.TrimPrefix(candidate, "ExternLib-")
+		if candidate == keyName {
+			return true
+		}
+	}
+	return false
+}
+
+func isConstructorLikeObjectCall(value *Value) bool {
+	if value == nil || value.getValue() == nil {
+		return false
+	}
+	callInst, ok := ssa.ToCall(value.getValue())
+	if !ok || callInst == nil || callInst.Method <= 0 {
+		return false
+	}
+	calleeInst, ok := callInst.GetValueById(callInst.Method)
+	if !ok || calleeInst == nil {
+		return false
+	}
+	return isConstructorLikeMemberValue(value.NewValue(calleeInst))
+}
+
+func isDestructorLikeValue(value *Value) bool {
+	if value == nil {
+		return false
+	}
+	if key := value.GetKey(); key != nil && strings.Contains(strings.ToLower(ssa.GetKeyString(key.getValue())), "destructor") {
+		return true
+	}
+	name := strings.ToLower(value.GetName())
+	verboseName := strings.ToLower(value.GetVerboseName())
+	return strings.Contains(name, "destructor") || strings.Contains(verboseName, "destructor")
+}
+
+func shouldFallbackToObjectTopDefs(value *Value) bool {
+	if value == nil {
+		return false
+	}
+	switch value.GetSSAInst().(type) {
+	case *ssa.Phi, *ssa.SideEffect:
+		return false
+	case *ssa.Make:
+		rawType := GetBareType(value.GetType())
+		if rawType == nil {
+			return false
+		}
+		_, ok := ssa.ToBluePrintType(rawType)
+		return ok
+	default:
+		return true
+	}
+}
+
 func (i *Value) visitedDefs(actx *AnalyzeContext, opt ...OperationOption) (result Values) {
 	var vals Values
 	if i.getValue() == nil {
@@ -73,6 +145,11 @@ func (i *Value) visitedDefs(actx *AnalyzeContext, opt ...OperationOption) (resul
 
 	if maskable, ok := i.getValue().(ssa.Maskable); ok {
 		if len(maskable.GetMask()) == 0 {
+			if i.IsMember() {
+				if filtered := filterOutMember(vals, i); len(filtered) > 0 {
+					return filtered
+				}
+			}
 			return vals
 		}
 		// 拿到上次递归的节点
@@ -90,6 +167,11 @@ func (i *Value) visitedDefs(actx *AnalyzeContext, opt ...OperationOption) (resul
 			if ret := shadow.NewValue(def).getTopDefs(actx, opt...); len(ret) > 0 {
 				vals = append(vals, ret...)
 			}
+		}
+	}
+	if i.IsMember() {
+		if filtered := filterOutMember(vals, i); len(filtered) > 0 {
+			return filtered
 		}
 	}
 	return vals
@@ -146,12 +228,19 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 	checkObject := func() Values {
 		var ret Values
 		obj, key, member := actx.getCurrentObject()
-		if obj != nil && i.IsObject() && i.GetId() != obj.GetId() {
-			for i, m := range i.GetMember(key) {
-				if i == 0 {
+		if obj != nil && key != nil && i.IsObject() {
+			matches := filterOutMember(i.lookupMembersOnObject(key), member)
+			if len(matches) == 0 && i.GetId() == obj.GetId() {
+				matches = filterOutMember(i.lookupMembersOnType(key), member)
+			}
+			if len(matches) == 0 && i.GetId() == obj.GetId() {
+				matches = filterOutMember(i.queryMemberCandidates(actx, key), member)
+			}
+			for index, m := range matches {
+				if index == 0 {
 					actx.popObject()
 				}
-				if m != nil && !ValueCompare(m, member) {
+				if m != nil {
 					ret = append(ret, m.getTopDefs(actx, opt...)...)
 				}
 			}
@@ -171,16 +260,91 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		}
 		if actx._objectStack.Len() < objectAnalyzeLevel {
 			if value.IsMember() {
-				obj := i.NewValue(value.GetObject())
-				key := i.NewValue(value.GetKey())
-				if utils.IsNil(obj) || utils.IsNil(key) {
-					return nil
+				calledAsMethod := lo.SomeBy(apiValue.GetUsers(), func(user *Value) bool {
+					call, ok := ssa.ToCall(user.getValue())
+					return ok && call != nil && call.Method == apiValue.GetId()
+				})
+				resolveMembersFromObjectDefs := func(obj, key *Value) Values {
+					if obj == nil || key == nil {
+						return nil
+					}
+					objectDefs := filterOutMember(obj.getTopDefs(actx, opt...), i)
+					ret := make(Values, 0)
+					for _, objectDef := range objectDefs {
+						if objectDef == nil || !objectDef.IsObject() {
+							continue
+						}
+						matched := filterOutMember(objectDef.lookupMembersOnObject(key), i)
+						if len(matched) == 0 {
+							matched = filterOutMember(objectDef.lookupMembersOnType(key), i)
+						}
+						if len(matched) == 0 {
+							matched = filterOutMember(objectDef.queryMemberCandidates(actx, key), i)
+						}
+						for _, member := range matched {
+							ret = append(ret, member.getTopDefs(actx, opt...)...)
+						}
+					}
+					return MergeValues(ret)
 				}
-				if err := actx.pushObject(obj, key, i); err != nil {
-					return i.visitedDefs(actx, opt...)
+				var results Values
+				for _, pair := range ssa.GetObjectKeyPairs(value) {
+					obj := i.NewValue(pair.Object)
+					key := i.NewValue(pair.Key)
+					if utils.IsNil(obj) || utils.IsNil(key) {
+						continue
+					}
+					if calledAsMethod && !ValueCompare(obj, i) {
+						if obj.IsMember() && !ValueCompare(i, actx.Self) {
+							results = append(results, i)
+						}
+						results = append(results, filterOutMember(obj.getTopDefs(actx, opt...), i)...)
+					}
+					if obj.IsObject() {
+						if !calledAsMethod {
+							switch obj.GetSSAInst().(type) {
+							case *ssa.Phi, *ssa.SideEffect:
+								results = append(results, resolveMembersFromObjectDefs(obj, key)...)
+							}
+						}
+						if len(results) == 0 {
+							if err := actx.pushObject(obj, key, i); err == nil {
+								results = append(results, obj.getTopDefs(actx, opt...)...)
+								if currentObject, currentKey, _ := actx.getCurrentObject(); currentObject != nil && currentKey != nil && currentObject.GetId() == obj.GetId() && currentKey.GetId() == key.GetId() {
+									actx.popObject()
+								}
+							}
+						}
+					}
+					if len(results) == 0 {
+						results = append(results, filterOutMember(obj.lookupMembersOnType(key), i)...)
+					}
+					if len(results) == 0 {
+						results = append(results, filterOutMember(obj.queryMemberCandidates(actx, key), i)...)
+					}
+					if len(results) == 0 && shouldFallbackToObjectTopDefs(obj) {
+						results = append(results, filterOutMember(obj.getTopDefs(actx, opt...), i)...)
+					}
+					if !calledAsMethod && isConstructorLikeObjectCall(obj) {
+						for _, user := range filterOutMember(obj.GetUsers(), i) {
+							if isDestructorLikeValue(user) {
+								continue
+							}
+							results = append(results, user.getTopDefs(actx, opt...)...)
+						}
+					}
 				}
-
-				results := obj.getTopDefs(actx, opt...)
+				results = filterOutDestructor(filterOutMember(MergeValues(results), i))
+				if len(results) == 0 {
+					for _, pair := range ssa.GetObjectKeyPairs(value) {
+						obj := i.NewValue(pair.Object)
+						if utils.IsNil(obj) || ValueCompare(obj, i) || !shouldFallbackToObjectTopDefs(obj) {
+							continue
+						}
+						results = append(results, filterOutMember(obj.getTopDefs(actx, opt...), i)...)
+					}
+					results = filterOutDestructor(filterOutMember(MergeValues(results), i))
+				}
 				if len(results) == 0 && !ValueCompare(i, actx.Self) {
 					results = append(results, i)
 				}
@@ -254,6 +418,36 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		default:
 			callee := i.NewValue(calleeInst)
 			nodes := Values{callee}
+			constructorLikeMember := isConstructorLikeMemberValue(callee)
+			hasMeaningfulArg := false
+			calleeObject := (*Value)(nil)
+			if callee != nil {
+				calleeObject = callee.GetObject()
+			}
+			for _, argID := range inst.Args {
+				argValue, ok := inst.GetValueById(argID)
+				if !ok || argValue == nil {
+					continue
+				}
+				arg := i.NewValue(argValue)
+				if arg == nil {
+					continue
+				}
+				if calleeObject == nil || !ValueCompare(arg, calleeObject) {
+					hasMeaningfulArg = true
+					break
+				}
+			}
+			keepSelfAsTop := i.IsObject() && callee != nil && callee.IsMember() && !constructorLikeMember && hasMeaningfulArg
+			var results Values
+			if keepSelfAsTop {
+				results = append(results, i)
+			}
+			if callee != nil && callee.IsMember() {
+				if calleeObject := callee.GetObject(); calleeObject != nil && calleeObject.IsMember() && !ValueCompare(callee, i) {
+					results = append(results, callee)
+				}
+			}
 			for _, val := range inst.Args {
 				val, ok := inst.GetValueById(val)
 				if ok && val != nil {
@@ -272,13 +466,55 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 					}
 				}
 			}
-			var results Values
-			for _, subNode := range nodes {
+			shouldKeepSelfDepend := func(def *Value) bool {
+				if def == nil {
+					return false
+				}
+				if def.IsConstInst() {
+					return false
+				}
+				if def.IsUndefined() && def.IsMember() {
+					return false
+				}
+				return true
+			}
+			shouldKeepDirectArg := func(node *Value) bool {
+				if node == nil {
+					return false
+				}
+				if callee != nil && callee.IsFunction() {
+					return false
+				}
+				if node.IsConstInst() {
+					return false
+				}
+				return node.IsMember()
+			}
+			for index, subNode := range nodes {
 				if subNode == nil {
 					continue
 				}
+				if index > 0 && shouldKeepDirectArg(subNode) {
+					results = append(results, subNode)
+				}
 				vals := subNode.getTopDefs(actx, opt...)
+				if keepSelfAsTop {
+					for _, def := range vals {
+						if shouldKeepSelfDepend(def) {
+							i.AppendDependOn(def)
+						}
+					}
+				}
 				results = append(results, vals...)
+			}
+			if keepSelfAsTop {
+				var toRemove []*Value
+				for _, dep := range i.GetDependOn() {
+					if !shouldKeepSelfDepend(dep) {
+						toRemove = append(toRemove, dep)
+					}
+				}
+				i.RemoveDependOn(toRemove...)
 			}
 			return results
 		}
@@ -391,28 +627,69 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		}
 		return vals
 	case *ssa.ParameterMember:
+		funVal := i.GetFunction()
+		if funVal == nil {
+			return Values{i}
+		}
+
+		fun, ok := ssa.ToFunction(funVal.getInstruction())
+		if !ok || fun == nil {
+			return Values{i}
+		}
+
+		paraValue, ok := inst.GetFormalParam(fun)
+		if !ok || paraValue == nil {
+			return Values{i}
+		}
+		para, ok := ssa.ToParameter(paraValue)
+		if !ok || para == nil {
+			return Values{i}
+		}
+
+		memberKey, ok := inst.GetValueById(inst.MemberCallKey)
+		if !ok {
+			memberKey = nil
+		}
+		memberKeyValue := i.NewValue(memberKey)
+
 		getParameter := func() Values {
-			funVal := i.GetFunction()
-			if funVal == nil {
-				return Values{i}
+			paraValue := i.NewValue(para)
+			if paraValue == nil {
+				return Values{}
 			}
-
-			fun, ok := ssa.ToFunction(funVal.getInstruction())
-			if !ok || fun == nil {
-				return Values{i}
+			if memberKeyValue != nil {
+				if err := actx.pushObject(paraValue, memberKeyValue, i); err == nil {
+					ret := filterOutMember(paraValue.getTopDefs(actx, opt...), i)
+					if currentObject, currentKey, _ := actx.getCurrentObject(); currentObject != nil && currentObject.GetId() == paraValue.GetId() && currentKey != nil && currentKey.GetId() == memberKeyValue.GetId() {
+						actx.popObject()
+					}
+					if len(ret) > 0 {
+						return ret
+					}
+				}
 			}
-
-			para, ok := inst.GetFormalParam(fun)
-			if !ok || para == nil {
-				return Values{i}
+			return paraValue.getTopDefs(actx, opt...)
+		}
+		resolveActualObjectMember := func(actualParam ssa.Value) Values {
+			if utils.IsNil(actualParam) || memberKeyValue == nil {
+				return nil
 			}
-
-			memberKey, ok := inst.GetValueById(inst.MemberCallKey)
-			if !ok {
-				memberKey = nil
+			actualObj := i.NewValue(actualParam)
+			if actualObj == nil {
+				return nil
 			}
-			actx.pushObject(i.NewValue(para), i.NewValue(memberKey), i.NewValue(ssa.NewConst("")))
-			return i.NewValue(para).getTopDefs(actx, opt...)
+			matched := filterOutMember(actualObj.lookupMembersOnObject(memberKeyValue), i)
+			if len(matched) == 0 {
+				matched = filterOutMember(actualObj.lookupMembersOnType(memberKeyValue), i)
+			}
+			if len(matched) == 0 {
+				matched = filterOutMember(actualObj.queryMemberCandidates(actx, memberKeyValue), i)
+			}
+			ret := make(Values, 0, len(matched))
+			for _, member := range matched {
+				ret = append(ret, member.getTopDefs(actx, opt...)...)
+			}
+			return MergeValues(ret)
 		}
 		getActualValueByCall := func(called *Value) Values {
 			if called == nil {
@@ -424,24 +701,43 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 				return Values{}
 			}
 
-			// 获取实际传入的参数值
-			actualParam, ok := inst.GetActualCallParam(calledInstance)
-			if !ok {
+			if actualMember, ok := inst.GetActualCallParam(calledInstance); ok {
+				traced := i.NewValue(actualMember)
+				if traced != nil && actx.needCrossProcess(i, traced) {
+					if ret := traced.getTopDefs(actx, opt...); len(ret) > 0 {
+						return ret
+					}
+				}
+			}
+
+			if para.FormalParameterIndex >= len(calledInstance.Args) {
 				return Values{}
+			}
+			actualParam, ok := calledInstance.GetValueById(calledInstance.Args[para.FormalParameterIndex])
+			if !ok || utils.IsNil(actualParam) {
+				return Values{}
+			}
+			if ret := resolveActualObjectMember(actualParam); len(ret) > 0 {
+				return ret
 			}
 			traced := i.NewValue(actualParam)
-			if !actx.needCrossProcess(i, traced) {
-				return Values{}
+			if traced != nil && actx.needCrossProcess(i, traced) {
+				if err := actx.pushObject(traced, memberKeyValue, i); err == nil {
+					ret := traced.getTopDefs(actx, opt...)
+					if currentObject, currentKey, _ := actx.getCurrentObject(); currentObject != nil && currentObject.GetId() == traced.GetId() && (memberKeyValue == nil || (currentKey != nil && currentKey.GetId() == memberKeyValue.GetId())) {
+						actx.popObject()
+					}
+					if len(ret) > 0 {
+						return ret
+					}
+				}
+				if ret := filterOutMember(traced.getTopDefs(actx, opt...), i); len(ret) > 0 {
+					return ret
+				}
 			}
-			ret := traced.getTopDefs(actx, opt...)
-			if len(ret) > 0 {
-				return ret
-			} else {
-				return Values{}
-			}
+			return Values{}
 		}
 
-		// 拿上一个调用栈的call
 		getLastCall := func() *Value {
 			called := actx.getLastCauseCall(TopDefAnalysis)
 			if called != nil {
@@ -454,23 +750,21 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		result = append(result, getActualValueByCall(called)...)
 
 		if actx.AllowIgnoreCallStack() && len(result) == 0 {
-			if fun := i.GetFunction(); fun != nil {
-				call2fun := fun.GetCalledBy()
-				for index, call := range call2fun {
-					if index > dataflowValueLimit {
-						log.Warnf("Function %s CalledBy too many: %d", fun.StringWithRange(), len(call2fun))
-						break
-					}
-					val := getActualValueByCall(call)
-					result = append(result, val...)
+			call2fun := funVal.GetCalledBy()
+			for index, call := range call2fun {
+				if index > dataflowValueLimit {
+					log.Warnf("Function %s CalledBy too many: %d", funVal.StringWithRange(), len(call2fun))
+					break
 				}
+				val := getActualValueByCall(call)
+				result = append(result, val...)
 			}
 		}
 
 		if len(result) == 0 {
 			return getParameter()
 		}
-		return result
+		return MergeValues(result)
 	case *ssa.Parameter:
 		getCalledByValue := func(called *Value, isInners ...bool) Values {
 			if called == nil {
@@ -566,6 +860,18 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 			log.Errorf("side effect: %v is not created from call instruction", i.String())
 		}
 	case *ssa.Make:
+		if currentObject, currentKey, currentMember := actx.getCurrentObject(); currentObject != nil && currentKey != nil && currentObject.GetId() == i.GetId() {
+			members := filterOutMember(i.lookupMembersOnObject(currentKey), currentMember)
+			if len(members) == 0 {
+				members = filterOutMember(i.lookupMembersOnType(currentKey), currentMember)
+			}
+			if len(members) == 0 {
+				members = filterOutMember(i.queryMemberCandidates(actx, currentKey), currentMember)
+			}
+			return lo.FlatMap(members, func(item *Value, _ int) []*Value {
+				return item.getTopDefs(actx, opt...)
+			})
+		}
 		var values Values
 		values = append(values, i)
 		var allmember map[ssa.Value]ssa.Value

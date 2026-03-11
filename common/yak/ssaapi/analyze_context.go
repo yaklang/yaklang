@@ -51,6 +51,8 @@ type AnalyzeContext struct {
 
 	// savedPath map[*Value]struct{}
 	recursiveStatusIsLeaf *utils.Stack[node]
+
+	Query func(string) Values
 }
 
 type node struct {
