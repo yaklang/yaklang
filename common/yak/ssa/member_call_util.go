@@ -73,15 +73,97 @@ type checkMemberResult struct {
 	typ     Type
 }
 
+type memberCallVisitKey struct {
+	typKind      TypeKind
+	typID        int64
+	typRaw       string
+	valueID      int64
+	keyID        int64
+	wantFunction bool
+}
+
+func makeMemberCallVisitKey(value, key Value, typ Type, wantFunction bool) memberCallVisitKey {
+	var valueID int64 = -1
+	if !utils.IsNil(value) {
+		valueID = value.GetId()
+	}
+	var keyID int64 = -1
+	if !utils.IsNil(key) {
+		keyID = key.GetId()
+	}
+	typKind := AnyTypeKind
+	typID := int64(-1)
+	typRaw := ""
+	if !utils.IsNil(typ) {
+		typID = typ.GetId()
+		typKind = typ.GetTypeKind()
+		if typID <= 0 {
+			typRaw = typ.RawString()
+		}
+	}
+	return memberCallVisitKey{
+		typKind:      typKind,
+		typID:        typID,
+		typRaw:       typRaw,
+		valueID:      valueID,
+		keyID:        keyID,
+		wantFunction: wantFunction,
+	}
+}
+
 // check can member call, return member name and type
 func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMemberResult) {
+	wantFunction := len(function) > 0 && function[0]
+	objTyp := defaultAnyType
+	if !utils.IsNil(value) {
+		objTyp = value.GetType()
+	}
+	return checkCanMemberCallExistEx(value, key, objTyp, wantFunction, nil, false)
+}
+
+func checkCanMemberCallExistEx(value, key Value, objTyp Type, wantFunction bool, visited map[memberCallVisitKey]struct{}, skipPhi bool) (ret checkMemberResult) {
 	if utils.IsNil(value) || utils.IsNil(key) {
 		log.Errorf("BUG: checkCanMemberCallExist called with nil value: %v, %v", value, key)
 		return
 	}
+
+	if utils.IsNil(objTyp) {
+		objTyp = defaultAnyType
+	}
+
+	if visited == nil {
+		if !skipPhi {
+			if _, ok := ToPhi(value); ok {
+				visited = make(map[memberCallVisitKey]struct{}, 8)
+			}
+		}
+		if visited == nil && objTyp.GetTypeKind() == OrTypeKind {
+			visited = make(map[memberCallVisitKey]struct{}, 8)
+		}
+	}
+	if visited != nil {
+		vk := makeMemberCallVisitKey(value, key, objTyp, wantFunction)
+		if _, ok := visited[vk]; ok {
+			ret.exist = true
+			ret.ObjType = objTyp
+			ret.typ = defaultAnyType
+			if constInst, ok := ToConstInst(key); ok {
+				if constInst.IsNumber() {
+					ret.name = fmt.Sprintf("#%d[%d]", value.GetId(), constInst.Number())
+				} else {
+					ret.name = fmt.Sprintf("#%d.%s", value.GetId(), constInst.VarString())
+				}
+			} else {
+				ret.name = fmt.Sprintf("#%d.#%d", value.GetId(), key.GetId())
+			}
+			return ret
+		}
+		visited[vk] = struct{}{}
+		defer delete(visited, vk)
+	}
+
 	ret.exist = true
-	valueType := value.GetType()
-	ret.ObjType = valueType
+	ret.ObjType = objTyp
 	keyText := GetKeyString(key)
 	if keyText == "" {
 		keyText = key.String()
@@ -89,9 +171,8 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 	if constInst, ok := ToConstInst(key); ok {
 		if constInst.IsNumber() {
 			ret.name = fmt.Sprintf("#%d[%d]", value.GetId(), constInst.Number())
-		}
-		if constInst.IsString() {
-			ret.name = fmt.Sprintf("#%d.%s", value.GetId(), keyText)
+		} else {
+			ret.name = fmt.Sprintf("#%d.%s", value.GetId(), constInst.VarString())
 		}
 	} else {
 		// key is not const value
@@ -101,10 +182,10 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 		} else {
 			ret.name = fmt.Sprintf("#%d.#%d", value.GetId(), key.GetId())
 		}
-		switch valueType.GetTypeKind() {
+		switch objTyp.GetTypeKind() {
 		case SliceTypeKind, MapTypeKind:
-			objTyp, _ := ToObjectType(valueType)
-			ret.typ = objTyp.FieldType
+			typ, _ := ToObjectType(objTyp)
+			ret.typ = typ.FieldType
 			return
 		case BytesTypeKind, StringTypeKind:
 			ret.typ = CreateNumberType()
@@ -119,11 +200,11 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 	// }
 
 	// check is method
-	if method := value.GetProgram().getMethod(valueType, keyText, true); !utils.IsNil(method) {
+	if method := value.GetProgram().getMethod(objTyp, keyText, true); !utils.IsNil(method) {
 		ret.typ = method.GetType()
 		return
 	}
-	if blueprint, b := ToBluePrintType(valueType); b {
+	if blueprint, b := ToBluePrintType(objTyp); b {
 		if isBlueprintStaticAccessValue(value, blueprint) {
 			if method := blueprint.GetStaticMethod(keyText); !utils.IsNil(method) {
 				ret.typ = method.GetType()
@@ -131,44 +212,46 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 			}
 		}
 	}
-	if len(function) > 0 && function[0] {
+	if wantFunction {
 		if ret.typ == nil {
 			ret.exist = false
 		}
 		return ret
 	}
 
-	// Phi value: merge member existence/types from edges.
-	if phi, ok := ToPhi(value); ok {
-		var mergedTypes []Type
-		var found bool
-		for _, edgeID := range phi.Edge {
-			edgeValue, ok := value.GetValueById(edgeID)
-			if !ok || edgeValue == nil {
-				continue
+	// Phi value: merge member existence/types from edges (limit recursion depth by skipping nested phi expansion).
+	if !skipPhi {
+		if phi, ok := ToPhi(value); ok {
+			var mergedTypes []Type
+			var found bool
+			for _, edgeID := range phi.Edge {
+				edgeValue, ok := value.GetValueById(edgeID)
+				if !ok || edgeValue == nil {
+					continue
+				}
+				subRes := checkCanMemberCallExistEx(edgeValue, key, edgeValue.GetType(), wantFunction, visited, true)
+				if subRes.exist {
+					found = true
+				}
+				if !utils.IsNil(subRes.typ) {
+					mergedTypes = append(mergedTypes, subRes.typ)
+				}
 			}
-			subRes := checkCanMemberCallExist(edgeValue, key, function...)
-			if subRes.exist {
-				found = true
+			ret.exist = found
+			if len(mergedTypes) == 1 {
+				ret.typ = mergedTypes[0]
+			} else if len(mergedTypes) > 1 {
+				ret.typ = NewOrType(mergedTypes...)
 			}
-			if !utils.IsNil(subRes.typ) {
-				mergedTypes = append(mergedTypes, subRes.typ)
-			}
+			return ret
 		}
-		ret.exist = found
-		if len(mergedTypes) == 1 {
-			ret.typ = mergedTypes[0]
-		} else if len(mergedTypes) > 1 {
-			ret.typ = NewOrType(mergedTypes...)
-		}
-		return ret
 	}
 
-	switch valueType.GetTypeKind() {
+	switch objTyp.GetTypeKind() {
 	case ObjectTypeKind:
-		typ, ok := ToObjectType(valueType)
+		typ, ok := ToObjectType(objTyp)
 		if !ok {
-			log.Errorf("checkCanMemberCall: %v is structTypeKind but is not a ObjectType", valueType)
+			log.Errorf("checkCanMemberCall: %v is structTypeKind but is not a ObjectType", objTyp)
 			break
 		}
 		if fieldTyp := typ.GetField(key); fieldTyp != nil {
@@ -179,25 +262,22 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 		}
 		return
 	case StructTypeKind: // string
-		typ, ok := ToObjectType(valueType)
+		typ, ok := ToObjectType(objTyp)
 		if !ok {
-			log.Errorf("checkCanMemberCall: %v is structTypeKind but is not a ObjectType", valueType)
+			log.Errorf("checkCanMemberCall: %v is structTypeKind but is not a ObjectType", objTyp)
 			break
 		}
 		if TypeCompare(CreateStringType(), key.GetType()) {
 			if fieldTyp := typ.GetField(key); fieldTyp != nil {
 				ret.typ = fieldTyp
 				return
-			} else {
-				// not this field
 			}
-		} else {
-			// type check error
 		}
+		// type check error
 	case TupleTypeKind:
-		typ, ok := ToObjectType(valueType)
+		typ, ok := ToObjectType(objTyp)
 		if !ok {
-			log.Errorf("checkCanMemberCall: %v is TupleTypeKind but is not a ObjectType", valueType)
+			log.Errorf("checkCanMemberCall: %v is TupleTypeKind but is not a ObjectType", objTyp)
 			break
 		}
 		if TypeCompare(CreateNumberType(), key.GetType()) {
@@ -207,9 +287,9 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 			}
 		}
 	case MapTypeKind: // string / number
-		typ, ok := ToObjectType(valueType)
+		typ, ok := ToObjectType(objTyp)
 		if !ok {
-			log.Errorf("checkCanMemberCall: %v is MapTypeKind but is not a ObjectType", valueType)
+			log.Errorf("checkCanMemberCall: %v is MapTypeKind but is not a ObjectType", objTyp)
 			break
 		}
 		if TypeCompare(typ.KeyTyp, key.GetType()) {
@@ -221,13 +301,12 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 			}
 			ret.typ = typ.FieldType
 			return
-		} else {
-			// type check error
 		}
+		// type check error
 	case SliceTypeKind:
-		typ, ok := ToObjectType(valueType)
+		typ, ok := ToObjectType(objTyp)
 		if !ok {
-			log.Errorf("checkCanMemberCall: %v is SliceTypeKind but is not a ObjectType", valueType)
+			log.Errorf("checkCanMemberCall: %v is SliceTypeKind but is not a ObjectType", objTyp)
 			break
 		}
 		if TypeCompare(CreateNumberType(), key.GetType()) {
@@ -239,21 +318,22 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 			}
 			ret.typ = typ.FieldType
 			return
-		} else {
-			// type check error
 		}
+		// type check error
 	case BytesTypeKind, StringTypeKind: // number
 		if TypeCompare(CreateNumberType(), key.GetType()) {
 			ret.typ = CreateNumberType()
 			return
-		} else {
-			// type check error
 		}
+		// type check error
 	case AnyTypeKind:
 		ret.typ = CreateAnyType()
 		return
 	case ClassBluePrintTypeKind:
-		class := valueType.(*Blueprint)
+		class, ok := objTyp.(*Blueprint)
+		if !ok {
+			break
+		}
 		if method := class.GetNormalMethod(keyText); !utils.IsNil(method) {
 			ret.typ = method.GetType()
 			return
@@ -268,19 +348,16 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 				return
 			}
 		}
+	// OrTypeKind
 	case OrTypeKind:
-		// 拆开 OrType
-		orTyp, ok := ToOrType(value.GetType())
+		orTyp, ok := ToOrType(objTyp)
 		if !ok {
 			return
 		}
 		var mergedTypes []Type
 		var found bool
 		for _, subTyp := range orTyp.GetTypes() {
-			// 构造一个假的 Value 但类型替换成子类型
-			fakeVal := value
-			fakeVal.SetType(subTyp)
-			subRes := checkCanMemberCallExist(fakeVal, key, function...)
+			subRes := checkCanMemberCallExistEx(value, key, subTyp, wantFunction, visited, skipPhi)
 			if subRes.exist {
 				found = true
 			}
@@ -303,8 +380,7 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 		ret.typ = member.GetType()
 		return
 	}
-	member, exist := GetLatestMemberByKeyString(value, keyText)
-	if exist {
+	if member, exist := GetLatestMemberByKeyString(value, keyText); exist {
 		ret.typ = member.GetType()
 		return
 	}
