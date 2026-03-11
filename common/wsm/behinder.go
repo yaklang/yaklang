@@ -128,7 +128,7 @@ func (b *Behinder) EchoResultDecodeFormYak(raw []byte) ([]byte, error) {
 	if err != nil {
 		return nil, utils.Errorf("import %v' s handle failed: %s", "req.GetScriptName()", err)
 	}
-	rspBytes := utils.InterfaceToBytesSlice(result)[0]
+	rspBytes := yakResultToBytes(result)
 
 	return rspBytes, nil
 }
