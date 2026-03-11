@@ -76,13 +76,12 @@ func yakScriptUsage(script *schema.YakScript, fallback string) string {
 
 // convertNativeYakPluginToAITool converts a native yak plugin to an AI tool.
 // It uses SSA to parse cli.* parameters from the script content and extracts
-// __USAGE__ for secondary disclosure during parameter generation phase.
+// metadata (__DESC__, __KEYWORDS__, __USAGE__) for AI tool configuration.
+// Schema fields take priority over script-defined metadata.
 func convertNativeYakPluginToAITool(script *schema.YakScript) (*aitool.Tool, error) {
-	desc := yakScriptDesc(script)
-	keywords := yakScriptKeywords(script)
-
 	var mcpTool *mcp.Tool
-	var usageFromScript string
+	var desc, usage string
+	var keywords []string
 
 	prog, err := static_analyzer.SSAParse(script.Content, "yak")
 	if err != nil {
@@ -90,14 +89,34 @@ func convertNativeYakPluginToAITool(script *schema.YakScript) (*aitool.Tool, err
 		mcpTool = mcp.NewTool(script.ScriptName)
 	} else {
 		mcpTool = yakcliconvert.ConvertCliParameterToTool(script.ScriptName, prog)
+		// Parse metadata once and use all fields
 		meta, metaErr := metadata.ParseYakScriptMetadataProg(script.ScriptName, prog)
-		if metaErr == nil && meta.Usage != "" {
-			usageFromScript = meta.Usage
+		if metaErr == nil {
+			// Use script metadata as base, schema fields will override if set
+			desc = meta.Description
+			keywords = meta.Keywords
+			usage = meta.Usage
 		}
 	}
-	mcpTool.Description = fmt.Sprintf("[Yakit Native Plugin] %s", desc)
 
-	usage := yakScriptUsage(script, usageFromScript)
+	// Schema fields take priority over script-defined metadata
+	if script.AIDesc != "" {
+		desc = script.AIDesc
+	} else if script.Help != "" && desc == "" {
+		desc = script.Help
+	}
+
+	if script.AIKeywords != "" {
+		keywords = strings.Split(script.AIKeywords, ",")
+	} else if script.Tags != "" && len(keywords) == 0 {
+		keywords = strings.Split(script.Tags, ",")
+	}
+
+	if script.AIUsage != "" {
+		usage = script.AIUsage
+	}
+
+	mcpTool.Description = fmt.Sprintf("[Yakit Native Plugin] %s", desc)
 
 	tool, err := aitool.NewFromMCPTool(
 		mcpTool,
