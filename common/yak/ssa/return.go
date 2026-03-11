@@ -181,7 +181,9 @@ func handlerReturnType(rs []*Return, functionType *FunctionType) Type {
 					continue
 				}
 				if result.GetType().GetTypeKind() == ClassBluePrintTypeKind {
-					for key, value := range result.GetAllMember() {
+					for _, pair := range GetLastWinsMemberPairs(result) {
+						key := pair.Key
+						value := pair.Member
 						variable := value.GetLastVariable()
 						functionType.SideEffects = append(functionType.SideEffects, &FunctionSideEffect{
 							Name:        variable.GetName(),

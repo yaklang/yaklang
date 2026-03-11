@@ -71,11 +71,15 @@ type IrCode struct {
 	Occulatation Int64Slice `json:"phis" gorm:"type:text"`
 
 	// OOP Supporting
-	IsObject       bool
-	ObjectMembers  Int64Map `json:"object_members" gorm:"type:text"`
-	IsObjectMember bool
-	ObjectParent   int64 `json:"object_parent"`
-	ObjectKey      int64 `json:"object_key"`
+	IsObject bool
+	// ObjectMembers is legacy single-value storage kept only for backward reads.
+	ObjectMembers     Int64Map `json:"object_members" gorm:"type:text"`
+	ObjectMemberPairs Int64Map `json:"object_member_pairs" gorm:"type:text"`
+	IsObjectMember    bool
+	// ObjectParent/ObjectKey are legacy single-owner fields kept only for backward reads.
+	ObjectParent     int64    `json:"object_parent"`
+	ObjectKey        int64    `json:"object_key"`
+	ObjectOwnerPairs Int64Map `json:"object_owner_pairs" gorm:"type:text"`
 
 	// Maskable
 	MaskedCodes Int64Slice `json:"masked_codes" gorm:"type:text"`

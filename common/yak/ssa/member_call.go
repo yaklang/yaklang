@@ -85,7 +85,7 @@ func (b *FunctionBuilder) getDefaultMemberOrMethodByClass(object, key Value, met
 		return nil
 	}
 	// class blue print
-	bluePrint, ok := ToClassBluePrintType(object.GetType())
+	bluePrint, ok := ToBluePrintType(object.GetType())
 	if !ok {
 		return nil
 	}

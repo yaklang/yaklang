@@ -1679,7 +1679,7 @@ func (b *builder) VisitNamedExports(namedExports *ast.NamedExports) interface{} 
 		// later set value to chain use-def
 		runtimeValue := b.VisitRightValueExpression(element.AsExportSpecifier().Name())
 		if !utils.IsNil(runtimeValue) {
-			if bp, ok := ssa.ToClassBluePrintType(runtimeValue.GetType()); ok {
+			if bp, ok := ssa.ToBluePrintType(runtimeValue.GetType()); ok {
 				b.GetProgram().ExportType[exportName] = bp
 			}
 			ssa.ReplaceAllValue(b.GetProgram().ExportValue[exportName], runtimeValue)
@@ -1775,7 +1775,7 @@ func (b *builder) VisitExpression(node *ast.Expression, isLval bool) (*ssa.Varia
 			if function, ok := ssa.ToFunction(readValue); ok && !utils.IsNil(function.LazyBuilder) {
 				function.Build()
 			}
-			if bp, ok := ssa.ToClassBluePrintType(readValue.GetType()); ok {
+			if bp, ok := ssa.ToBluePrintType(readValue.GetType()); ok {
 				bp.Build()
 			}
 			return nil, readValue
@@ -1816,7 +1816,7 @@ func (b *builder) VisitExpression(node *ast.Expression, isLval bool) (*ssa.Varia
 			// 递归解析导出值和类型
 			externValue, externalType := b.resolveExportValueAndType(prog, lib, identifierName)
 			if !utils.IsNil(externalType) {
-				if lazyBluePrint, ok := ssa.ToClassBluePrintType(externalType); ok {
+				if lazyBluePrint, ok := ssa.ToBluePrintType(externalType); ok {
 					lazyBluePrint.Build()
 					return nil, lazyBluePrint.Container()
 				}
@@ -2175,7 +2175,7 @@ func (b *builder) VisitBinaryExpression(node *ast.BinaryExpression) ssa.Value {
 		return right
 	case ast.KindInKeyword:
 		if b.IsListLike(right) || b.IsMapLike(right) || b.IsObjectLike(right) {
-			_, ok := right.GetMember(left)
+			_, ok := ssa.GetLatestMemberByKey(right, left)
 			return b.EmitConstInst(ok)
 		}
 		return b.EmitUndefined("")
@@ -2776,7 +2776,7 @@ func (b *builder) VisitNewExpression(node *ast.NewExpression) ssa.Value {
 	var isBP bool
 	var class *ssa.Blueprint
 	if !utils.IsNil(classVal) {
-		class, isBP = ssa.ToClassBluePrintType(classVal.GetType())
+		class, isBP = ssa.ToBluePrintType(classVal.GetType())
 	}
 	if utils.IsNil(classVal) || !isBP {
 		class = b.CreateBlueprint(className)

@@ -677,7 +677,7 @@ func (y *builder) VisitStaticClass(raw phpparser.IStaticClassContext) *ssa.Bluep
 	}
 
 	if value != nil {
-		if bp, ok := ssa.ToClassBluePrintType(value.GetType()); ok {
+		if bp, ok := ssa.ToBluePrintType(value.GetType()); ok {
 			return bp
 		}
 		if bp := y.findBlueprint(value.String()); bp != nil {
