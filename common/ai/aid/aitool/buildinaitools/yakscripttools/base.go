@@ -145,16 +145,19 @@ func loadAllYakScriptFromEmbedFS() ([]*schema.AIYakTool, error) {
 }
 
 func LoadYakScriptToAiTools(name string, content string) *schema.AIYakTool {
-	ins, err := metadata.ParseYakScriptMetadata(name, string(content))
+	// Parse once and reuse the program for both metadata and CLI parameter conversion
+	prog, err := static_analyzer.SSAParse(content, "yak")
+	if err != nil {
+		log.Warnf("static_analyzer.SSAParse content[%q] failed: %v", name, err)
+		return nil
+	}
+
+	ins, err := metadata.ParseYakScriptMetadataProg(name, prog)
 	if err != nil {
 		log.Warnf("parse yak script metadata failed: %v", err)
 		return nil
 	}
-	prog, err := static_analyzer.SSAParse(string(content), "yak")
-	if err != nil {
-		log.Warnf(`static_analyzer.SSAParse(string(content), "yak") error: %v`, err)
-		return nil
-	}
+
 	tool := yakcliconvert.ConvertCliParameterToTool(name, prog)
 	params, _ := json.Marshal(tool.InputSchema.ToMap())
 	return &schema.AIYakTool{
@@ -163,7 +166,7 @@ func LoadYakScriptToAiTools(name string, content string) *schema.AIYakTool {
 		Description: ins.Description,
 		Keywords:    strings.Join(ins.Keywords, ","),
 		Usage:       ins.Usage,
-		Content:     string(content),
+		Content:     content,
 		Params:      string(params),
 	}
 }
