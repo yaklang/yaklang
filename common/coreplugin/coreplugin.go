@@ -549,7 +549,7 @@ func syncCorePluginAIFields() error {
 			if !plugin.EnableForAI {
 				continue
 			}
-			if err := db.Model(&schema.YakScript{}).Where("script_name = ?", name).Updates(map[string]interface{}{
+			if err := db.Model(&schema.YakScript{}).Where("script_name = ?", name).UpdateColumns(map[string]interface{}{
 				"enable_for_ai": plugin.EnableForAI,
 				"ai_desc":       plugin.AIDesc,
 				"ai_keywords":   plugin.AIKeywords,
