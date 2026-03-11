@@ -43,8 +43,7 @@ type conditionScopeState struct {
 	conditionDepth int
 	stackDepth     int
 
-	mode              ConditionMode
-	sourceIdentityIdx map[string][]int
+	mode ConditionMode
 
 	anchorBase    int
 	anchorWidth   int
@@ -404,7 +403,6 @@ func (s *SFFrame) execRule(feedValue Values) error {
 				// back to their originating source slots via AnchorBitVector.
 				sourceValues := s.stack.Peek()
 				state.mode = conditionModeFromSource(sourceValues)
-				state.sourceIdentityIdx = buildValueIdentityIndex(sourceValues)
 				if s.conditionScope.Len() > 0 {
 					parent := s.conditionScope.Peek()
 					state.anchorBase = parent.anchorBase + parent.anchorWidth

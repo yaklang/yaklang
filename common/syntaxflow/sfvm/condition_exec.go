@@ -92,16 +92,32 @@ func normalizeConditionAgainstSource(scope conditionScopeState, result Values, c
 		return []bool{matched}, nil
 	}
 
-	// General case: map result values back to source by anchor bits (with identity fallback).
+	// General case: map result values back to source by anchor bits.
 	mask := make([]bool, width)
 	if !result.IsEmpty() {
 		for _, operator := range result {
 			if utils.IsNil(operator) || operator.IsEmpty() {
 				continue
 			}
-			matched := markMaskByBitVector(mask, operator.GetAnchorBitVector(), scope.anchorBase)
+			bits := operator.GetAnchorBitVector()
+			if bits == nil || bits.IsEmpty() {
+				return nil, utils.Wrapf(
+					CriticalError,
+					"condition failed: missing anchor bits for result value %T(%s)",
+					operator,
+					operator.String(),
+				)
+			}
+			matched := markMaskByBitVector(mask, bits, scope.anchorBase)
 			if !matched {
-				markMaskByValueIdentity(mask, scope.sourceIdentityIdx, operator)
+				return nil, utils.Wrapf(
+					CriticalError,
+					"condition failed: anchor bits out of active scope (base=%d,width=%d) for result value %T(%s)",
+					scope.anchorBase,
+					scope.anchorWidth,
+					operator,
+					operator.String(),
+				)
 			}
 		}
 	}
@@ -310,9 +326,25 @@ func buildFilterMask(scope conditionScopeState, cond Values) ([]bool, error) {
 		if utils.IsNil(operator) || operator.IsEmpty() {
 			continue
 		}
-		matched := markMaskByBitVector(mask, operator.GetAnchorBitVector(), scope.anchorBase)
+		bits := operator.GetAnchorBitVector()
+		if bits == nil || bits.IsEmpty() {
+			return nil, utils.Wrapf(
+				CriticalError,
+				"filter condition failed: missing anchor bits for %T(%s)",
+				operator,
+				operator.String(),
+			)
+		}
+		matched := markMaskByBitVector(mask, bits, scope.anchorBase)
 		if !matched {
-			markMaskByValueIdentity(mask, scope.sourceIdentityIdx, operator)
+			return nil, utils.Wrapf(
+				CriticalError,
+				"filter condition failed: anchor bits out of active scope (base=%d,width=%d) for %T(%s)",
+				scope.anchorBase,
+				scope.anchorWidth,
+				operator,
+				operator.String(),
+			)
 		}
 	}
 	return mask, nil
