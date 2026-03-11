@@ -1,8 +1,6 @@
 package ssaapi
 
 import (
-	"fmt"
-
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -23,14 +21,12 @@ func searchMembersWithOverlay(value *Value, overlay *ProgramOverLay) map[string]
 	// 如果当前 value 的 instruction 有成员，直接使用（这是最快的路径）
 	currentInst := value.getValue()
 	if currentInst != nil {
-		currentAllMember := currentInst.GetAllMember()
-		for k, v := range currentAllMember {
-			keyName := k.String()
+		for _, pair := range ssa.GetLastWinsMemberPairs(currentInst) {
+			keyName := ssa.GetKeyString(pair.Key)
 			if keyName == "" {
 				continue
 			}
-			// 创建新的 Value，使用当前 value 的 ParentProgram
-			newValVal, err := value.ParentProgram.NewValue(v)
+			newValVal, err := value.ParentProgram.NewValue(pair.Member)
 			if err == nil && newValVal != nil {
 				memberMap[keyName] = newValVal
 			}
@@ -77,22 +73,15 @@ func searchMembersWithOverlay(value *Value, overlay *ProgramOverLay) map[string]
 			continue
 		}
 
-		// 获取该值的所有成员
-		layerAllMember := layerInst.GetAllMember()
-		for k, v := range layerAllMember {
-			keyName := k.String()
+		for _, pair := range ssa.GetLastWinsMemberPairs(layerInst) {
+			keyName := ssa.GetKeyString(pair.Key)
 			if keyName == "" {
 				continue
 			}
-
-			// 上层覆盖下层：如果成员已存在，跳过（保持上层优先）
-			// 由于我们从上层向下遍历，已存在的成员一定是上层的，所以直接跳过
 			if _, exists := memberMap[keyName]; exists {
 				continue
 			}
-
-			// 创建新的 Value，使用当前 layer 的 Program
-			newValVal, err := layer.Program.NewValue(v)
+			newValVal, err := layer.Program.NewValue(pair.Member)
 			if err == nil && newValVal != nil {
 				memberMap[keyName] = newValVal
 			}
@@ -167,10 +156,9 @@ func SearchWithCFG(value *Value, mod ssadb.MatchMode, compare func(string) bool,
 
 // searchMembersFromInst 从 SSA instruction 中查找成员
 func searchMembersFromInst(value *Value, inst ssa.Value, check func(*Value) bool, add func(*Value)) {
-	allMember := inst.GetAllMember()
-	for k, v := range allMember {
-		if check(value.NewValue(k)) {
-			add(value.NewValue(v))
+	for _, pair := range ssa.GetMemberPairs(inst) {
+		if check(value.NewValue(pair.Key)) {
+			add(value.NewValue(pair.Member))
 		}
 	}
 }
@@ -239,10 +227,12 @@ func SearchWithValue(value *Value, mod ssadb.MatchMode, compare func(string) boo
 			}
 		}
 
-		if key := value.GetKey(); key != nil {
-			keyName := fmt.Sprint(key.GetConstValue())
-			if keyName != "" && compare(keyName) {
-				return true
+		if raw := value.getValue(); raw != nil {
+			for _, pair := range ssa.GetObjectKeyPairs(raw) {
+				keyName := ssa.GetKeyString(pair.Key)
+				if keyName != "" && compare(keyName) {
+					return true
+				}
 			}
 		}
 

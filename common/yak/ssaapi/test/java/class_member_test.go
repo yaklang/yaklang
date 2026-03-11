@@ -155,6 +155,93 @@ UNTIL}-> as $result`)
 
 }
 
+func TestJavaFieldSensitiveAcrossInstances(t *testing.T) {
+	code := createCmdObject(`
+	public void test(@RequestParam String cmd) {
+	    CmdObject a = new CmdObject();
+	    a.setCmd(cmd);
+	    a.setCmd2("safe");
+
+	    CmdObject b = new CmdObject();
+	    b.setCmd("other");
+	    b.setCmd2("other-safe");
+
+	    Runtime.getRuntime().exec(a.getCmd());
+	}
+	`)
+	testExecTopDef(t, &TestCase{
+		Code:    code,
+		Contain: false,
+		Expect: map[string][]string{
+			"target": {"Parameter-cmd", "Undefined-Runtime"},
+		},
+	})
+}
+
+func TestJavaFieldSensitiveTypeFallbackAcrossCall(t *testing.T) {
+	t.Run("positive cmd field", func(t *testing.T) {
+		code := `
+package com.example.utils;
+
+class CmdBase {
+    public String cmd;
+    public String safe;
+}
+
+class CmdChild extends CmdBase {
+}
+
+@RestController()
+public class AstTaintCase001 {
+    private void run(CmdBase holder) throws Exception {
+        Runtime.getRuntime().exec(holder.cmd);
+    }
+
+    public void test(@RequestParam String cmd) throws Exception {
+        CmdBase holder = new CmdChild();
+        holder.cmd = cmd;
+        holder.safe = "safe";
+        run(holder);
+    }
+}
+`
+		ssatest.CheckSyntaxFlowEx(t, code, `Runtime.getRuntime().exec(* #-> * as $target)`, false, map[string][]string{
+			"target": {"Parameter-cmd", "Undefined-Runtime"},
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
+	})
+
+	t.Run("negative safe field", func(t *testing.T) {
+		code := `
+package com.example.utils;
+
+class CmdBase {
+    public String cmd;
+    public String safe;
+}
+
+class CmdChild extends CmdBase {
+}
+
+@RestController()
+public class AstTaintCase001 {
+    private void run(CmdBase holder) throws Exception {
+        Runtime.getRuntime().exec(holder.safe);
+    }
+
+    public void test(@RequestParam String cmd) throws Exception {
+        CmdBase holder = new CmdChild();
+        holder.cmd = cmd;
+        holder.safe = "safe";
+        run(holder);
+    }
+}
+		`
+		ssatest.CheckSyntaxFlowEx(t, code, `Runtime.getRuntime().exec(* #-> * as $target)`, false, map[string][]string{
+			"target": {`"safe"`, "Undefined-Runtime"},
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
+	})
+}
+
 func TestJava_FieldOverwriteBeforeSink(t *testing.T) {
 	code := `
 class Obj { String data; }

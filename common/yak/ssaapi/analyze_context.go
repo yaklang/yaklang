@@ -51,6 +51,8 @@ type AnalyzeContext struct {
 
 	// savedPath map[*Value]struct{}
 	recursiveStatusIsLeaf *utils.Stack[node]
+
+	Query func(string) Values
 }
 
 type node struct {
@@ -301,6 +303,30 @@ func (g *AnalyzeContext) getCurrentObject() (*Value, *Value, *Value) {
 	}
 	item := g._objectStack.Peek()
 	return item.object, item.key, item.member
+}
+
+// withObject pushes an object/key/member triple onto the object stack, runs fn,
+// and pops the entry if it is still on top of the stack.
+//
+// This avoids fragile manual push/pop pairing in callers, especially when fn
+// triggers nested analysis that may consume (pop) the same entry.
+func (g *AnalyzeContext) withObject(obj, key, member *Value, fn func() Values) Values {
+	if fn == nil {
+		return nil
+	}
+	if err := g.pushObject(obj, key, member); err != nil {
+		return nil
+	}
+	defer func() {
+		currentObject, currentKey, currentMember := g.getCurrentObject()
+		if currentObject == nil || currentKey == nil || currentMember == nil {
+			return
+		}
+		if currentObject.GetId() == obj.GetId() && currentKey.GetId() == key.GetId() && currentMember.GetId() == member.GetId() {
+			g.popObject()
+		}
+	}()
+	return fn()
 }
 func (g *AnalyzeContext) foreachObjectStack(f func(*Value, *Value, *Value) bool) {
 	for i := 0; i < g._objectStack.Len(); i++ {

@@ -26,6 +26,11 @@ func (v *Value) GetBottomUses(opt ...OperationOption) (ret Values) {
 		}
 	}()
 	actx := NewAnalyzeContext(opt...)
+	if v.ParentProgram != nil {
+		actx.Query = func(sf string) Values {
+			return v.ParentProgram.SyntaxFlowChain(sf)
+		}
+	}
 	actx.Self = v
 	actx.direct = BottomUseAnalysis
 	ret = v.getBottomUses(actx, opt...)
@@ -48,45 +53,113 @@ func (v Values) GetBottomUses(opts ...OperationOption) Values {
 	return MergeValues(ret)
 }
 
+func (v *Value) bottomUsesThroughReturn(retValue *Value, retInst *ssa.Return, actx *AnalyzeContext, opt ...OperationOption) Values {
+	if v == nil || retValue == nil || retInst == nil {
+		return nil
+	}
+	returnIndexes := make([]int, 0, len(retInst.Results))
+	for index, result := range retInst.Results {
+		if result == v.GetId() {
+			returnIndexes = append(returnIndexes, index)
+			continue
+		}
+		resultValue, ok := retInst.GetValueById(result)
+		if !ok || resultValue == nil {
+			continue
+		}
+		if matches := retValue.NewValue(resultValue).GetTopDefs(append(opt, WithUntilNode(func(item *Value) bool {
+			return item.GetId() == v.GetId()
+		}))...); len(matches) > 0 {
+			returnIndexes = append(returnIndexes, index)
+		}
+	}
+	if len(returnIndexes) == 0 {
+		return nil
+	}
+	calls := make(Values, 0)
+	if currentCall := actx.getLastCauseCall(BottomUseAnalysis); currentCall != nil {
+		calls = append(calls, currentCall)
+	} else if function := retInst.GetFunc(); function != nil {
+		calls = append(calls, retValue.NewValue(function).GetCalledBy()...)
+	}
+	ret := make(Values, 0)
+	for _, call := range calls {
+		if call == nil {
+			continue
+		}
+		for _, returnIndex := range returnIndexes {
+			returnKey := retValue.NewValue(ssa.NewConst(returnIndex))
+			members := call.GetMember(returnKey)
+			for _, member := range members {
+				ret = append(ret, actx.withObject(call, returnKey, member, func() Values {
+					return member.getBottomUses(actx, opt...)
+				})...)
+			}
+		}
+	}
+	return MergeValues(ret)
+}
+
 func (v *Value) visitUserFallback(actx *AnalyzeContext, opt ...OperationOption) Values {
 	var vals Values
 	if v.IsObject() {
 		exist := false
+		var constrainedKey *Value
 		actx.foreachObjectStack(func(obj *Value, key *Value, val *Value) bool {
 			if obj.GetId() == v.GetId() {
 				exist = true
+				constrainedKey = key
 				return false
 			}
 			return true
 		})
 		if !exist {
-			v.GetAllMember().ForEach(func(value *Value) {
-				_ = actx.pushObject(v, value.GetKey(), value)
-				vals = append(vals, value.getBottomUses(actx, opt...)...)
-				actx.popObject()
-			})
+			for _, pair := range v.GetMembers() {
+				if len(pair) != 2 || pair[0] == nil || pair[1] == nil {
+					continue
+				}
+				vals = append(vals, actx.withObject(v, pair[0], pair[1], func() Values {
+					return pair[1].getBottomUses(actx, opt...)
+				})...)
+			}
+		} else if constrainedKey != nil {
+			for _, value := range v.lookupMembersOnObject(constrainedKey) {
+				vals = append(vals, actx.withObject(v, constrainedKey, value, func() Values {
+					return value.getBottomUses(actx, opt...)
+				})...)
+			}
 		}
 	}
 	if v.IsMember() {
-		currentObject := v.GetObject()
-		currentKey := v.GetKey()
-		exist := false
-		actx.foreachObjectStack(func(obj *Value, key *Value, value *Value) bool {
-			if currentObject.GetId() == obj.GetId() && key.GetId() == currentKey.GetId() {
-				exist = true
-				return false
+		for _, pair := range ssa.GetObjectKeyPairs(v.getValue()) {
+			currentObject := v.NewValue(pair.Object)
+			currentKey := v.NewValue(pair.Key)
+			if currentObject == nil || currentKey == nil {
+				continue
 			}
-			return true
-		})
-		if !exist {
-			_ = actx.pushObject(currentObject, currentKey, v)
-			vals = append(vals, currentObject.getBottomUses(actx, opt...)...)
-			actx.popObject()
+			exist := false
+			actx.foreachObjectStack(func(obj *Value, key *Value, value *Value) bool {
+				if currentObject.GetId() == obj.GetId() && key.GetId() == currentKey.GetId() {
+					exist = true
+					return false
+				}
+				return true
+			})
+			if !exist {
+				vals = append(vals, actx.withObject(currentObject, currentKey, v, func() Values {
+					return currentObject.getBottomUses(actx, opt...)
+				})...)
+			}
 		}
 	}
 	// log.Infof("current Value: %s", v)
 	v.GetUsers().ForEach(func(value *Value) {
-		// log.Infof("value %s", value)
+		if retInst, ok := ssa.ToReturn(value.GetSSAInst()); ok {
+			if ret := v.bottomUsesThroughReturn(value, retInst, actx, opt...); len(ret) > 0 {
+				vals = append(vals, ret...)
+				return
+			}
+		}
 		if ret := value.getBottomUses(actx, opt...); len(ret) > 0 {
 			vals = append(vals, ret...)
 		}
@@ -222,6 +295,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 		}
 
 		if isFunc {
+			trackedSources := make(Values, 0)
 			for index, arg := range inst.Args {
 				if index >= len(fun.Params) {
 					continue
@@ -236,6 +310,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 				}
 				val := v.NewValue(paramValue)
 				if val != nil {
+					trackedSources = append(trackedSources, val)
 					vals = append(vals, val.getBottomUses(actx, opt...)...)
 				}
 			}
@@ -253,12 +328,55 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 				}
 				val := v.NewValue(memberValue)
 				if val != nil {
+					trackedSources = append(trackedSources, val)
 					vals = append(vals, val.getBottomUses(actx, opt...)...)
 				}
 			}
+			if len(vals) == 0 && len(trackedSources) > 0 {
+				returnIndexes := map[int]struct{}{}
+				for _, source := range trackedSources {
+					if source == nil {
+						continue
+					}
+					for _, retID := range fun.Return {
+						retInst, ok := fun.GetValueById(retID)
+						if !ok || retInst == nil {
+							continue
+						}
+						retValue, ok := ssa.ToReturn(retInst)
+						if !ok || retValue == nil {
+							continue
+						}
+						for returnIndex, resultID := range retValue.Results {
+							if resultID == source.GetId() {
+								returnIndexes[returnIndex] = struct{}{}
+								continue
+							}
+							resultValue, ok := retValue.GetValueById(resultID)
+							if !ok || resultValue == nil {
+								continue
+							}
+							if matches := v.NewValue(resultValue).GetTopDefs(append(opt, WithUntilNode(func(item *Value) bool {
+								return item.GetId() == source.GetId()
+							}))...); len(matches) > 0 {
+								returnIndexes[returnIndex] = struct{}{}
+							}
+						}
+					}
+				}
+				precise := make(Values, 0)
+				for returnIndex := range returnIndexes {
+					if members := v.GetMember(v.NewValue(ssa.NewConst(returnIndex))); members != nil {
+						for _, member := range members {
+							precise = append(precise, member.getBottomUses(actx, opt...)...)
+						}
+					}
+				}
+				vals = append(vals, precise...)
+			}
 		}
 		if len(vals) > 0 {
-			return vals
+			return MergeValues(vals)
 		} else {
 			return v.visitUserFallback(actx, opt...)
 		}
@@ -274,46 +392,66 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 			return nil
 		}
 		call := actx.getLastCauseCall(BottomUseAnalysis)
+		source := actx.nodeStack.PeekN(1)
+		if source == nil {
+			source = v
+		}
+		returnIndexes := make([]int, 0, len(inst.Results))
+		for index, result := range inst.Results {
+			if result == source.GetId() {
+				returnIndexes = append(returnIndexes, index)
+				continue
+			}
+			resultValue, ok := inst.GetValueById(result)
+			if !ok || resultValue == nil {
+				continue
+			}
+			if matches := v.NewValue(resultValue).GetTopDefs(append(opt, WithUntilNode(func(item *Value) bool {
+				return item.GetId() == source.GetId()
+			}))...); len(matches) > 0 {
+				returnIndexes = append(returnIndexes, index)
+			}
+		}
+		collectReturnMembers := func(call *Value) Values {
+			if call == nil {
+				return nil
+			}
+			ret := make(Values, 0)
+			for _, returnIndex := range returnIndexes {
+				returnKey := v.NewValue(ssa.NewConst(returnIndex))
+				members := call.GetMember(returnKey)
+				if members == nil {
+					continue
+				}
+				for _, member := range members {
+					ret = append(ret, actx.withObject(call, returnKey, member, func() Values {
+						return member.getBottomUses(actx, opt...)
+					})...)
+				}
+			}
+			return ret
+		}
 		if call == nil {
 			callee := v.NewValue(function)
 			called := callee.GetCalledBy()
-			for index, call := range called {
+			for index, subCall := range called {
 				if index > dataflowValueLimit {
 					break
 				}
-				val := call.getBottomUses(actx, opt...)
-				vals = append(vals, val...)
+				vals = append(vals, collectReturnMembers(subCall)...)
 			}
-
-			// called.ForEach(func(value *Value) {
-			// 	vals = append(vals, value.getBottomUses(actx, opt...)...)
-			// })
+			if len(vals) > 0 {
+				return vals
+			}
+			for index, subCall := range called {
+				if index > dataflowValueLimit {
+					break
+				}
+				vals = append(vals, subCall.getBottomUses(actx, opt...)...)
+			}
 			return vals
 		}
-		exists := make(map[int64]struct{})
-		exists[actx.nodeStack.PeekN(1).GetId()] = struct{}{}
-
-		getReturnIndex := -1
-		for index, result := range inst.Results {
-			if _, ok := exists[result]; ok {
-				getReturnIndex = index
-			}
-		}
-		if getReturnIndex != -1 {
-			members := call.GetMember(v.NewValue(ssa.NewConst(getReturnIndex)))
-			if members == nil {
-				// TODO:这个日志报太多了，先注释了，后面遇到问题再修一下
-				//log.Errorf("BUG: (return instruction 's member is nil),check it")
-			} else {
-				for i, member := range members {
-					if i == 0 {
-						actx.pushObject(call, member.GetKey(), member)
-					}
-					vals = append(vals, member.getBottomUses(actx, opt...)...)
-					actx.popObject()
-				}
-			}
-		}
+		vals = append(vals, collectReturnMembers(call)...)
 		if len(vals) == 0 {
 			vals = append(vals, v.NewValue(call.getValue()).getBottomUses(actx, opt...)...)
 		}

@@ -792,20 +792,20 @@ func (v *Value) GetMember(value *Value) []*Value {
 	return ret
 }
 
-// GetAllMember get all member of object
+// GetAllMember get all unique members of an object using last-wins semantics.
 func (v *Value) GetAllMember() Values {
 	if v.IsNil() {
 		return nil
 	}
-	all := v.getValue().GetAllMember()
-	ret := make(Values, 0, len(all))
-	for _, value := range all {
-		ret = append(ret, v.NewValue(value))
+	pairs := ssa.GetLastWinsMemberPairs(v.getValue())
+	ret := make(Values, 0, len(pairs))
+	for _, pair := range pairs {
+		ret = append(ret, v.NewValue(pair.Member))
 	}
 	return ret
 }
 
-// GetAllMember get member keys and values
+// GetMembers get member keys and values.
 func (v *Value) GetMembers() [][]*Value {
 	if v.IsNil() {
 		return nil
@@ -814,6 +814,18 @@ func (v *Value) GetMembers() [][]*Value {
 	ret := make([][]*Value, 0, len(all))
 	for _, pair := range all {
 		ret = append(ret, []*Value{v.NewValue(pair.Key), v.NewValue(pair.Member)})
+	}
+	return ret
+}
+
+func (v *Value) GetObjectKeyPairs() [][]*Value {
+	if v.IsNil() {
+		return nil
+	}
+	all := ssa.GetObjectKeyPairs(v.getValue())
+	ret := make([][]*Value, 0, len(all))
+	for _, pair := range all {
+		ret = append(ret, []*Value{v.NewValue(pair.Object), v.NewValue(pair.Key)})
 	}
 	return ret
 }
@@ -852,29 +864,28 @@ func (v *Value) IsMember() bool {
 	return v.getValue().IsMember()
 }
 
-// GetObject get object of member
+// GetObject returns the latest owner object for convenience APIs.
 func (v *Value) GetObject() *Value {
 	if v.IsNil() || v.getValue() == nil {
 		return nil
 	}
-	obj := v.getValue().GetObject()
+	obj := ssa.GetLatestObject(v.getValue())
 	if obj == nil {
 		return nil
 	}
-
 	return v.NewValue(obj)
 }
 
-// GetKey get key of member
+// GetKey returns the latest owner key for convenience APIs.
 func (v *Value) GetKey() *Value {
 	if v.IsNil() || v.getValue() == nil {
 		return nil
 	}
-
-	if v.getValue().GetKey() == nil {
+	key := ssa.GetLatestKey(v.getValue())
+	if key == nil {
 		return nil
 	}
-	return v.NewValue(v.getValue().GetKey())
+	return v.NewValue(key)
 }
 
 func GetValues(v *Value) Values {
@@ -1177,13 +1188,14 @@ func (value Values) Hash() (string, bool) {
 func (value Values) Ref(name string) Values {
 	ret := make(Values, 0, len(value))
 	for _, v := range value {
-		v.GetAllMember().ForEach(func(v *Value) {
-			if v.GetKey().getValue() != nil {
-				if v.GetKey().getValue().String() == name {
-					ret = append(ret, v)
-				}
+		for _, pair := range v.GetMembers() {
+			if len(pair) != 2 || pair[0] == nil || pair[1] == nil {
+				continue
 			}
-		})
+			if pair[0].getValue() != nil && pair[0].getValue().String() == name {
+				ret = append(ret, pair[1])
+			}
+		}
 	}
 	return ret
 }
