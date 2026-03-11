@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/yaklang/antlr/v4"
-	"github.com/google/uuid"
 
 	"github.com/yaklang/yaklang/common/utils"
 
@@ -475,15 +474,13 @@ func (y *singleFileBuilder) VisitEnumConstants(raw javaparser.IEnumConstantsCont
 		}
 		enumName := constant.Identifier().GetText()
 		arguments := constant.Arguments()
-		constructor := class.Constructor
-		if constructor == nil {
+		if class.Constructor == nil && len(y.constructorOverloads[class]) == 0 {
 			setMember(enumName, obj)
 		} else {
 			args := []ssa.Value{obj}
 			arguments := y.VisitArguments(arguments)
 			args = append(args, arguments...)
-			c := y.NewCall(constructor, args)
-			y.EmitCall(c)
+			y.callJavaConstructorWithOverload(class, args, false)
 			setMember(enumName, obj)
 		}
 
@@ -606,7 +603,8 @@ func (y *singleFileBuilder) VisitMethodDeclaration(
 	}
 
 	key := i.Identifier().GetText()
-	funcName := fmt.Sprintf("%s_%s_%s", class.Name, key, uuid.NewString()[:4])
+	params, variadic := y.collectJavaFormalParameterSignatures(i.FormalParameters())
+	funcName := y.javaStableCallableName("method", class, key, params, variadic, i)
 	methodName := key
 	newFunc := y.NewFunc(funcName)
 	newFunc.SetMethodName(methodName)
@@ -619,6 +617,7 @@ func (y *singleFileBuilder) VisitMethodDeclaration(
 	} else {
 		class.RegisterNormalMethod(key, newFunc)
 	}
+	y.registerJavaMethodOverload(class, key, newFunc, params, variadic)
 	store := y.StoreFunctionBuilder()
 	for _, def := range defCallback {
 		log.Debugf("def: %s %s ", funcName, key)
@@ -889,12 +888,16 @@ func (y *singleFileBuilder) VisitConstructorDeclaration(raw javaparser.IConstruc
 	}
 
 	key := i.Identifier().GetText()
-	pkgName := y.GetProgram()
-	funcName := fmt.Sprintf("%s_%s_%s_%s", pkgName.Name, class.Name, key, uuid.NewString()[:4])
+	params, variadic := y.collectJavaFormalParameterSignatures(i.FormalParameters())
+	funcName := y.javaStableCallableName("constructor", class, key, params, variadic, i)
 	newFunc := y.NewFunc(funcName)
-	class.Constructor = newFunc
+	newFunc.SetMethodName(key)
+	y.registerJavaConstructorOverload(class, newFunc, params, variadic)
+	if class.Constructor == nil {
+		class.Constructor = newFunc
+		class.RegisterMagicMethod(ssa.Constructor, newFunc)
+	}
 	newFunc.AddThrow(y.VisitThrowsClause(i)...)
-	class.RegisterMagicMethod(ssa.Constructor, newFunc)
 	store := y.StoreFunctionBuilder()
 	formalParameters := ssa.DetachAST(i.FormalParameters())
 	block := ssa.DetachAST(i.Block())
