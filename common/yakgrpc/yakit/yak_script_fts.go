@@ -172,6 +172,33 @@ func FilterYakScriptForAI(db *gorm.DB, filter *YakScriptForAIFilter) *gorm.DB {
 	return db
 }
 
+// RebuildYakScriptAIFTS performs a filtered rebuild of the FTS5 index,
+// re-indexing only enable_for_ai=true rows. Unlike FTS5's built-in 'rebuild'
+// command (which reads ALL rows from the content table), this preserves the
+// selective indexing design.
+func RebuildYakScriptAIFTS(db *gorm.DB) error {
+	if db == nil || !schema.IsSQLite(db) {
+		return nil
+	}
+	if !db.HasTable(yakScriptAIFTSTable) {
+		return nil
+	}
+
+	fts := fmt.Sprintf("%q", yakScriptAIFTSTable)
+	deleteAllSQL := fmt.Sprintf("INSERT INTO %s(%s) VALUES('delete-all');", fts, fts)
+	if err := db.Exec(deleteAllSQL).Error; err != nil {
+		return err
+	}
+
+	insertCols := "rowid, " + quoteColumns(yakScriptAIFTSColumns)
+	selectCols := `"id", ` + quoteColumns(yakScriptAIFTSColumns)
+	populateSQL := fmt.Sprintf(
+		"INSERT INTO %s(%s) SELECT %s FROM \"yak_scripts\" WHERE \"enable_for_ai\" = 1;",
+		fts, insertCols, selectCols,
+	)
+	return db.Exec(populateSQL).Error
+}
+
 // ensureYakScriptFTSLazy initializes the FTS5 index on first use.
 func ensureYakScriptFTSLazy(db *gorm.DB) {
 	if db == nil || !schema.IsSQLite(db) {
@@ -180,6 +207,10 @@ func ensureYakScriptFTSLazy(db *gorm.DB) {
 	yakScriptFTSOnce.Do(func() {
 		if err := EnsureYakScriptForAIFTS5(db); err != nil {
 			log.Warnf("lazy init yak_scripts_ai_fts failed: %v", err)
+			return
+		}
+		if err := RebuildYakScriptAIFTS(db); err != nil {
+			log.Warnf("lazy rebuild yak_scripts_ai_fts failed: %v", err)
 		}
 	})
 }

@@ -511,6 +511,57 @@ func init() {
 			return hash
 		}, syncCorePluginEmbedInternal)
 	}, "sync-core-plugin-for-yakit")
+
+	yakit.RegisterPostInitDatabaseFunction(func() error {
+		return syncCorePluginAIFields()
+	}, "sync-core-plugin-ai-fields")
+}
+
+// corePluginAIFieldsVersion is bumped whenever AI metadata for core plugins
+// changes in Go code. Since these changes don't touch the embedded .yak files,
+// the normal embed-FS hash check won't trigger a resync. This version string
+// forces a one-time full sync when incremented.
+const corePluginAIFieldsVersion = "v1"
+
+// syncCorePluginAIFields ensures AI metadata (enable_for_ai, ai_desc, ai_keywords)
+// is written to the database for core plugins. This runs independently from the
+// embed FS hash check, because AI field changes (in Go code) don't alter the
+// embedded .yak file content.
+func syncCorePluginAIFields() error {
+	key := "core-plugin-ai-fields-version"
+	if yakit.Get(key) == corePluginAIFieldsVersion {
+		return nil
+	}
+
+	log.Infof("core plugin AI fields version changed (want %s), forcing sync", corePluginAIFieldsVersion)
+
+	if len(buildInPlugin) == 0 {
+		if err := syncCorePluginEmbedInternal(); err != nil {
+			log.Warnf("sync core plugin embed for AI fields failed: %v", err)
+			return nil
+		}
+	} else {
+		db := consts.GetGormProfileDatabase()
+		if db == nil {
+			return nil
+		}
+		for name, plugin := range buildInPlugin {
+			if !plugin.EnableForAI {
+				continue
+			}
+			if err := db.Model(&schema.YakScript{}).Where("script_name = ?", name).Updates(map[string]interface{}{
+				"enable_for_ai": plugin.EnableForAI,
+				"ai_desc":       plugin.AIDesc,
+				"ai_keywords":   plugin.AIKeywords,
+			}).Error; err != nil {
+				log.Warnf("sync AI fields for core plugin %q failed: %v", name, err)
+			}
+		}
+	}
+
+	yakit.Set(key, corePluginAIFieldsVersion)
+	log.Infof("core plugin AI fields synced to version %s", corePluginAIFieldsVersion)
+	return nil
 }
 
 // only use for test

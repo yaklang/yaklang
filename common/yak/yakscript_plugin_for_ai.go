@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools/metadata"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
@@ -23,6 +24,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -135,17 +137,29 @@ func executeNativeYakPlugin(ctx context.Context, script *schema.YakScript, param
 
 	engine := NewYakitVirtualClientScriptEngine(yakitClient)
 
+	stdout.Write([]byte(fmt.Sprintf("[info] executing native yak plugin: %s\n", script.ScriptName)))
+	var paramDesc []string
 	var args []string
 	for k, v := range params {
 		switch ret := v.(type) {
 		case bool:
 			if ret {
 				args = append(args, "--"+k)
+				paramDesc = append(paramDesc, fmt.Sprintf("%s=true", k))
 			}
 		default:
 			args = append(args, "--"+k, fmt.Sprint(ret))
+			valStr := fmt.Sprint(ret)
+			if len(valStr) > 80 {
+				valStr = valStr[:80] + "..."
+			}
+			paramDesc = append(paramDesc, fmt.Sprintf("%s=%q", k, valStr))
 		}
 	}
+	if len(paramDesc) > 0 {
+		stdout.Write([]byte(fmt.Sprintf("[info] parameters: %s\n", strings.Join(paramDesc, ", "))))
+	}
+
 	cliApp := GetHookCliApp(args)
 	engine.RegisterEngineHooks(func(ae *antlr4yak.Engine) error {
 		BindYakitPluginContextToEngine(
@@ -170,7 +184,68 @@ func executeNativeYakPlugin(ctx context.Context, script *schema.YakScript, param
 		stderr.Write([]byte(err.Error()))
 		return nil, err
 	}
-	return "", nil
+
+	return collectNativePluginResult(runtimeId, script.ScriptName, stdout), nil
+}
+
+func collectNativePluginResult(runtimeId string, pluginName string, stdout io.Writer) string {
+	var result strings.Builder
+	result.WriteString(fmt.Sprintf("Native yak plugin execution completed: %s\n", pluginName))
+
+	if runtimeId == "" {
+		return result.String()
+	}
+
+	db := consts.GetGormProjectDatabase()
+	if db == nil {
+		return result.String()
+	}
+
+	risks, err := yakit.GetRisksByRuntimeId(db, runtimeId)
+	if err != nil {
+		log.Warnf("query risks by runtimeId %q failed: %v", runtimeId, err)
+		return result.String()
+	}
+
+	if len(risks) == 0 {
+		return result.String()
+	}
+
+	result.WriteString(fmt.Sprintf("\n=== Vulnerabilities Found: %d ===\n", len(risks)))
+	stdout.Write([]byte(fmt.Sprintf("[info] found %d vulnerability(ies) from plugin execution\n", len(risks))))
+	for i, r := range risks {
+		severity := r.Severity
+		if severity == "" {
+			severity = "info"
+		}
+		title := r.Title
+		if title == "" {
+			title = r.TitleVerbose
+		}
+		riskLine := fmt.Sprintf("[%d] [%s] %s", i+1, strings.ToUpper(severity), title)
+		if r.Url != "" {
+			riskLine += fmt.Sprintf(" | URL: %s", r.Url)
+		}
+		result.WriteString(riskLine + "\n")
+
+		if r.RiskType != "" {
+			result.WriteString(fmt.Sprintf("    Type: %s", r.RiskType))
+			if r.RiskTypeVerbose != "" {
+				result.WriteString(fmt.Sprintf(" (%s)", r.RiskTypeVerbose))
+			}
+			result.WriteString("\n")
+		}
+		if r.Payload != "" {
+			payload := r.Payload
+			if len(payload) > 200 {
+				payload = payload[:200] + "..."
+			}
+			result.WriteString(fmt.Sprintf("    Payload: %s\n", payload))
+		}
+	}
+	result.WriteString("=== End of Vulnerability Report ===\n")
+
+	return result.String()
 }
 
 const defaultMitmUsage = `MITM Plugin Usage Guide for AI Parameter Generation
@@ -246,9 +321,17 @@ func executeMitmPlugins(ctx context.Context, scripts []*schema.YakScript, params
 		isHttps = detectedHttps
 	}
 
+	var runtimeId string
+	if runtimeConfig != nil {
+		runtimeId = runtimeConfig.RuntimeID
+	}
+
 	manager, err := NewMixPluginCaller()
 	if err != nil {
 		return nil, utils.Errorf("create MixPluginCaller failed: %v", err)
+	}
+	if runtimeId != "" {
+		manager.SetRuntimeId(runtimeId)
 	}
 
 	manager.SetFeedback(func(result *ypb.ExecResult) error {
@@ -262,9 +345,11 @@ func executeMitmPlugins(ctx context.Context, scripts []*schema.YakScript, params
 		return nil
 	})
 
+	var pluginNames []string
 	var loadWg sync.WaitGroup
 	var loadErrs []string
 	for _, script := range scripts {
+		pluginNames = append(pluginNames, script.ScriptName)
 		loadWg.Add(1)
 		go func(s *schema.YakScript) {
 			defer loadWg.Done()
@@ -280,6 +365,14 @@ func executeMitmPlugins(ctx context.Context, scripts []*schema.YakScript, params
 		return nil, utils.Errorf("all plugins failed to load: %s", strings.Join(loadErrs, "; "))
 	}
 
+	scheme := "http"
+	if isHttps {
+		scheme = "https"
+	}
+	targetURL := lowhttp.GetUrlFromHTTPRequest(scheme, []byte(reqPacket))
+	stdout.Write([]byte(fmt.Sprintf("[info] loaded %d plugin(s): %s\n", len(pluginNames)-len(loadErrs), strings.Join(pluginNames, ", "))))
+	stdout.Write([]byte(fmt.Sprintf("[info] sending HTTP request to: %s (https=%v)\n", targetURL, isHttps)))
+
 	var pocOpts []poc.PocConfigOption
 	if isHttps {
 		pocOpts = append(pocOpts, poc.WithForceHTTPS(true))
@@ -290,17 +383,83 @@ func executeMitmPlugins(ctx context.Context, scripts []*schema.YakScript, params
 		return nil, utils.Errorf("send HTTP request failed: %v", err)
 	}
 
+	statusCode := lowhttp.ExtractStatusCodeFromResponse(rspBytes)
 	body := lowhttp.GetHTTPPacketBody(rspBytes)
-	scheme := "http"
-	if isHttps {
-		scheme = "https"
-	}
 	urlForMirror := lowhttp.GetUrlFromHTTPRequest(scheme, reqBytes)
+	stdout.Write([]byte(fmt.Sprintf("[info] HTTP response: status=%d, body_length=%d\n", statusCode, len(body))))
+	stdout.Write([]byte(fmt.Sprintf("[info] analyzing HTTP flow for vulnerabilities via plugin(s)...\n")))
 
 	manager.MirrorHTTPFlow(isHttps, urlForMirror, reqBytes, rspBytes, body)
 	manager.GetNativeCaller().Wait()
 
-	return "MITM plugin execution completed", nil
+	return collectMitmPluginResult(runtimeId, pluginNames, urlForMirror, stdout), nil
+}
+
+func collectMitmPluginResult(runtimeId string, pluginNames []string, targetURL string, stdout io.Writer) string {
+	var result strings.Builder
+	result.WriteString(fmt.Sprintf("MITM plugin execution completed for target: %s\n", targetURL))
+	result.WriteString(fmt.Sprintf("Plugins executed: %s\n", strings.Join(pluginNames, ", ")))
+
+	if runtimeId == "" {
+		result.WriteString("No risks collected (runtimeId unavailable)\n")
+		return result.String()
+	}
+
+	db := consts.GetGormProjectDatabase()
+	if db == nil {
+		result.WriteString("No risks collected (database unavailable)\n")
+		return result.String()
+	}
+
+	risks, err := yakit.GetRisksByRuntimeId(db, runtimeId)
+	if err != nil {
+		log.Warnf("query risks by runtimeId %q failed: %v", runtimeId, err)
+		result.WriteString("No risks collected (query failed)\n")
+		return result.String()
+	}
+
+	if len(risks) == 0 {
+		result.WriteString("Scan completed: no vulnerabilities found.\n")
+		stdout.Write([]byte("[info] scan completed: no vulnerabilities found\n"))
+		return result.String()
+	}
+
+	result.WriteString(fmt.Sprintf("\n=== Vulnerabilities Found: %d ===\n", len(risks)))
+	stdout.Write([]byte(fmt.Sprintf("[info] scan completed: found %d vulnerability(ies)\n", len(risks))))
+	for i, r := range risks {
+		severity := r.Severity
+		if severity == "" {
+			severity = "info"
+		}
+		title := r.Title
+		if title == "" {
+			title = r.TitleVerbose
+		}
+		riskLine := fmt.Sprintf("[%d] [%s] %s", i+1, strings.ToUpper(severity), title)
+		if r.Url != "" {
+			riskLine += fmt.Sprintf(" | URL: %s", r.Url)
+		}
+		result.WriteString(riskLine + "\n")
+		stdout.Write([]byte(fmt.Sprintf("[risk] %s\n", riskLine)))
+
+		if r.RiskType != "" {
+			result.WriteString(fmt.Sprintf("    Type: %s", r.RiskType))
+			if r.RiskTypeVerbose != "" {
+				result.WriteString(fmt.Sprintf(" (%s)", r.RiskTypeVerbose))
+			}
+			result.WriteString("\n")
+		}
+		if r.Payload != "" {
+			payload := r.Payload
+			if len(payload) > 200 {
+				payload = payload[:200] + "..."
+			}
+			result.WriteString(fmt.Sprintf("    Payload: %s\n", payload))
+		}
+	}
+	result.WriteString("=== End of Vulnerability Report ===\n")
+
+	return result.String()
 }
 
 const defaultPortScanUsage = `Port-Scan Plugin Usage Guide for AI Parameter Generation
@@ -362,9 +521,17 @@ func executePortScanPlugins(ctx context.Context, scripts []*schema.YakScript, pa
 		return nil, utils.Errorf("invalid port %q: %v", portStr, err)
 	}
 
+	var runtimeId string
+	if runtimeConfig != nil {
+		runtimeId = runtimeConfig.RuntimeID
+	}
+
 	manager, err := NewMixPluginCaller()
 	if err != nil {
 		return nil, utils.Errorf("create MixPluginCaller failed: %v", err)
+	}
+	if runtimeId != "" {
+		manager.SetRuntimeId(runtimeId)
 	}
 
 	manager.SetFeedback(func(result *ypb.ExecResult) error {
@@ -378,9 +545,11 @@ func executePortScanPlugins(ctx context.Context, scripts []*schema.YakScript, pa
 		return nil
 	})
 
+	var pluginNames []string
 	var loadWg sync.WaitGroup
 	var loadErrs []string
 	for _, script := range scripts {
+		pluginNames = append(pluginNames, script.ScriptName)
 		loadWg.Add(1)
 		go func(s *schema.YakScript) {
 			defer loadWg.Done()
@@ -396,6 +565,9 @@ func executePortScanPlugins(ctx context.Context, scripts []*schema.YakScript, pa
 		return nil, utils.Errorf("all plugins failed to load: %s", strings.Join(loadErrs, "; "))
 	}
 
+	stdout.Write([]byte(fmt.Sprintf("[info] loaded %d plugin(s): %s\n", len(pluginNames)-len(loadErrs), strings.Join(pluginNames, ", "))))
+	stdout.Write([]byte(fmt.Sprintf("[info] scanning target %s:%d (state=OPEN)\n", target, port)))
+
 	matchResult := &fp.MatchResult{
 		Target: target,
 		Port:   port,
@@ -405,7 +577,74 @@ func executePortScanPlugins(ctx context.Context, scripts []*schema.YakScript, pa
 	manager.HandleServiceScanResult(matchResult)
 	manager.GetNativeCaller().Wait()
 
-	return "Port-scan plugin execution completed", nil
+	return collectPortScanPluginResult(runtimeId, pluginNames, target, port, stdout), nil
+}
+
+func collectPortScanPluginResult(runtimeId string, pluginNames []string, target string, port int, stdout io.Writer) string {
+	var result strings.Builder
+	result.WriteString(fmt.Sprintf("Port-scan plugin execution completed for target: %s:%d\n", target, port))
+	result.WriteString(fmt.Sprintf("Plugins executed: %s\n", strings.Join(pluginNames, ", ")))
+
+	if runtimeId == "" {
+		result.WriteString("No risks collected (runtimeId unavailable)\n")
+		return result.String()
+	}
+
+	db := consts.GetGormProjectDatabase()
+	if db == nil {
+		result.WriteString("No risks collected (database unavailable)\n")
+		return result.String()
+	}
+
+	risks, err := yakit.GetRisksByRuntimeId(db, runtimeId)
+	if err != nil {
+		log.Warnf("query risks by runtimeId %q failed: %v", runtimeId, err)
+		result.WriteString("No risks collected (query failed)\n")
+		return result.String()
+	}
+
+	if len(risks) == 0 {
+		result.WriteString("Scan completed: no vulnerabilities found.\n")
+		stdout.Write([]byte("[info] scan completed: no vulnerabilities found\n"))
+		return result.String()
+	}
+
+	result.WriteString(fmt.Sprintf("\n=== Vulnerabilities Found: %d ===\n", len(risks)))
+	stdout.Write([]byte(fmt.Sprintf("[info] scan completed: found %d vulnerability(ies)\n", len(risks))))
+	for i, r := range risks {
+		severity := r.Severity
+		if severity == "" {
+			severity = "info"
+		}
+		title := r.Title
+		if title == "" {
+			title = r.TitleVerbose
+		}
+		riskLine := fmt.Sprintf("[%d] [%s] %s", i+1, strings.ToUpper(severity), title)
+		if r.Url != "" {
+			riskLine += fmt.Sprintf(" | URL: %s", r.Url)
+		}
+		result.WriteString(riskLine + "\n")
+		stdout.Write([]byte(fmt.Sprintf("[risk] %s\n", riskLine)))
+
+		if r.RiskType != "" {
+			result.WriteString(fmt.Sprintf("    Type: %s", r.RiskType))
+			if r.RiskTypeVerbose != "" {
+				result.WriteString(fmt.Sprintf(" (%s)", r.RiskTypeVerbose))
+			}
+			result.WriteString("\n")
+		}
+		if r.Payload != "" {
+			payload := r.Payload
+			if len(payload) > 200 {
+				payload = payload[:200] + "..."
+			}
+			result.WriteString(fmt.Sprintf("    Payload: %s\n", payload))
+		}
+	}
+	result.WriteString("=== End of Vulnerability Report ===\n")
+
+	return result.String()
 }
 
 // dumpToolParamsJSON is a helper for debugging/testing the tool's input schema.
