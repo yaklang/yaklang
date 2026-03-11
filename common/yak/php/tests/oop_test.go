@@ -416,7 +416,7 @@ class A {
 $a = new A(1);
 println($a->getNum());`
 		ssatest.CheckPrintlnValue(code, []string{
-			"Undefined-$a.getNum(valid)(Function-A.A(Undefined-A,1)) member[side-effect(Parameter-$num, $this.num)]",
+			"Undefined-$a.getNum(valid)(Function-A.A(Undefined-A,1)) member[1]",
 		}, t)
 	})
 }
@@ -452,7 +452,7 @@ $c = new class("2"){
     }
 };
 println($c->a);`
-	ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-$a, $this.a)"}, t)
+	ssatest.CheckPrintlnValue(code, []string{`"2"`}, t)
 }
 
 //func TestOOP_custom_member(t *testing.T) {
@@ -575,7 +575,7 @@ class childB extends b{
 $a = new childB(1);
 println($a->a);
 `
-		ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-$a, $this.a)"}, t)
+		ssatest.CheckPrintlnValue(code, []string{"1"}, t)
 	})
 
 	t.Run("no impl __construct and get parent custom member", func(t *testing.T) {
@@ -595,7 +595,7 @@ class childB extends b{
 $b = new childB(1);
 println($b->a);
 `
-		ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-$a, $this.a)"}, t)
+		ssatest.CheckPrintlnValue(code, []string{"1"}, t)
 	})
 	t.Run("class custom member", func(t *testing.T) {
 		code := `<?php
@@ -724,21 +724,21 @@ class b
 
 	t.Run("anymous-class with parent", func(t *testing.T) {
 		code := `<?php
-	
-	class a
-	{
-	   public $a;
-	
-	   public function __construct($a)
-	   {
-	       $this->a = $a;
-	   }
-	}
-	
-	$c = new class("2") extends a {
-	};
-	println($c->a);`
-		ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-$a, $this.a)"}, t)
+		
+		class a
+		{
+		   public $a;
+		
+		   public function __construct($a)
+		   {
+		       $this->a = $a;
+		   }
+		}
+		
+		$c = new class("2") extends a {
+		};
+		println($c->a);`
+		ssatest.CheckPrintlnValue(code, []string{`"2"`}, t)
 	})
 	t.Run("class const", func(t *testing.T) {
 		code := `<?php
@@ -836,15 +836,15 @@ println($a->a);`
 	})
 	t.Run("test oop constructor", func(t *testing.T) {
 		code := `<?php
-class A{
-	public function __construct($a){
-		$this->b = $a;
+	class A{
+		public function __construct($a){
+			$this->b = $a;
+		}
 	}
-}
-$a = new A(2);
-println($a->b);
-`
-		ssatest.CheckPrintlnValue(code, []string{"side-effect(Parameter-$a, $this.b)"}, t)
+	$a = new A(2);
+	println($a->b);
+	`
+		ssatest.CheckPrintlnValue(code, []string{"2"}, t)
 	})
 	t.Run("test oop return", func(t *testing.T) {
 		code := `<?php
