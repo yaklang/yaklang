@@ -1012,7 +1012,7 @@ service Yak {
   rpc CreateRelationship(Relationship) returns (DbOperateMessage);
   rpc UpdateRelationship(Relationship) returns (DbOperateMessage);
   rpc DeleteRelationship(DeleteRelationshipRequest) returns (DbOperateMessage);
-  rpc QuerySubERM(QuerySubERMRequest) returns (QuerySubERMResponse);1
+  rpc QuerySubERM(QuerySubERMRequest) returns (QuerySubERMResponse);
   rpc GenerateERMDot(GenerateERMDotRequest) returns (GenerateERMDotResponse);
 
   // Export and Import Knowledge Base
