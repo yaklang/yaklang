@@ -372,17 +372,13 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 		config.restorePersistentSession()
 	}
 
-	// Auto-load skills from default directory unless explicitly disabled
-	// This enables automatic skill discovery from ~/.yakit-projects/ai-skills
+	// Auto-load skills from all well-known directories unless explicitly disabled.
+	// Scanned dirs: ~/yakit-projects/ai-skills, ~/.cursor/skills, $CWD/.cursor/skills
+	// RefreshFromDirs is protected by a 60-second cooldown inside AutoSkillLoader.
 	if !config.disableAutoSkills && config.skillLoader == nil {
-		skillsDir := consts.GetDefaultAISkillsDir()
-		if utils.IsDir(skillsDir) {
-			config.ensureSkillLoader()
-			if count, err := config.skillLoader.AddLocalDir(skillsDir); err != nil {
-				log.Warnf("failed to auto-load skills from %s: %v", skillsDir, err)
-			} else if count > 0 {
-				log.Debugf("auto-loaded %d skills from %s", count, skillsDir)
-			}
+		loader := config.ensureSkillLoader()
+		if loader != nil {
+			loader.RefreshFromDirs(consts.GetAllAISkillsDirs())
 		}
 	}
 
@@ -937,6 +933,8 @@ func (c *Config) LoadBuiltinSkillsFS(fsys fi.FileSystem) error {
 // It respects disableAutoSkills: if auto-skills are disabled, this is a no-op.
 // This is the preferred way to load skills: built-in skills are first extracted
 // to the directory, then loaded from there, allowing users to view and modify them.
+// Uses RescanLocalDir to always re-walk the directory, since built-in skills may
+// have been freshly extracted after the initial RefreshFromDirs scan.
 func (c *Config) LoadBuiltinSkillsFromDir(dirPath string) error {
 	if c.disableAutoSkills {
 		return nil
@@ -945,7 +943,7 @@ func (c *Config) LoadBuiltinSkillsFromDir(dirPath string) error {
 	if loader == nil {
 		return utils.Error("failed to ensure skill loader")
 	}
-	_, err := loader.AddLocalDir(dirPath)
+	_, err := loader.RescanLocalDir(dirPath)
 	return err
 }
 

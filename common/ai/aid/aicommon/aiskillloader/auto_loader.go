@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"io/fs"
 	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -22,6 +24,9 @@ type AutoSkillLoader struct {
 	skills map[string]*skillEntry
 
 	sources []fi.FileSystem
+
+	cooldown    *utils.CoolDown
+	scannedDirs map[string]struct{}
 }
 
 // AutoSkillLoaderOption configures AutoSkillLoader construction.
@@ -66,7 +71,9 @@ func WithAutoLoad_FileSystem(fsys fi.FileSystem) AutoSkillLoaderOption {
 // SKILL.md files from multiple sources.
 func NewAutoSkillLoader(opts ...AutoSkillLoaderOption) (*AutoSkillLoader, error) {
 	l := &AutoSkillLoader{
-		skills: make(map[string]*skillEntry),
+		skills:      make(map[string]*skillEntry),
+		cooldown:    utils.NewCoolDown(time.Minute),
+		scannedDirs: make(map[string]struct{}),
 	}
 
 	for _, opt := range opts {
@@ -257,12 +264,91 @@ func (l *AutoSkillLoader) AddSource(fsys fi.FileSystem) (int, error) {
 
 // AddLocalDir adds a local directory as a skill source.
 // This is a convenience method that wraps AddSource.
+// Directories already scanned are skipped to avoid duplicate discovery.
 func (l *AutoSkillLoader) AddLocalDir(dirPath string) (int, error) {
 	if !utils.IsDir(dirPath) {
 		return 0, utils.Errorf("skill directory does not exist: %s", dirPath)
 	}
+	absPath, _ := filepath.Abs(dirPath)
+	l.mu.RLock()
+	_, alreadyScanned := l.scannedDirs[absPath]
+	l.mu.RUnlock()
+	if alreadyScanned {
+		return 0, nil
+	}
+
 	localFS := filesys.NewRelLocalFs(dirPath)
-	return l.AddSource(localFS)
+	count, err := l.AddSource(localFS)
+	if err == nil {
+		l.mu.Lock()
+		l.scannedDirs[absPath] = struct{}{}
+		l.mu.Unlock()
+	}
+	return count, err
+}
+
+// RefreshFromDirs scans the given directories for skills, subject to a 60-second cooldown.
+// Within the cooldown period, subsequent calls are silently skipped.
+// Already-scanned directories (by absolute path) are never re-walked even when
+// the cooldown expires, ensuring truly new dirs are picked up without redundant I/O.
+func (l *AutoSkillLoader) RefreshFromDirs(dirs []string) {
+	l.cooldown.Do(func() {
+		for _, dir := range dirs {
+			absDir, _ := filepath.Abs(dir)
+			l.mu.RLock()
+			_, alreadyScanned := l.scannedDirs[absDir]
+			l.mu.RUnlock()
+			if alreadyScanned {
+				continue
+			}
+			if !utils.IsDir(dir) {
+				continue
+			}
+			localFS := filesys.NewRelLocalFs(dir)
+			if err := l.discoverSkills(localFS); err != nil {
+				log.Warnf("failed to discover skills from %s: %v", dir, err)
+				continue
+			}
+			l.mu.Lock()
+			l.sources = append(l.sources, localFS)
+			l.scannedDirs[absDir] = struct{}{}
+			l.mu.Unlock()
+			log.Debugf("refreshed skills from directory: %s", dir)
+		}
+	})
+}
+
+// RescanLocalDir re-discovers skills from a directory that may have been
+// previously scanned. Unlike AddLocalDir, it always re-walks the directory,
+// picking up any newly added or changed SKILL.md files.
+// Used by LoadBuiltinSkillsFromDir after extracting embedded skills to disk.
+func (l *AutoSkillLoader) RescanLocalDir(dirPath string) (int, error) {
+	if !utils.IsDir(dirPath) {
+		return 0, utils.Errorf("skill directory does not exist: %s", dirPath)
+	}
+
+	l.mu.RLock()
+	beforeCount := len(l.skills)
+	l.mu.RUnlock()
+
+	localFS := filesys.NewRelLocalFs(dirPath)
+	if err := l.discoverSkills(localFS); err != nil {
+		return 0, err
+	}
+
+	absPath, _ := filepath.Abs(dirPath)
+	l.mu.Lock()
+	if _, exists := l.scannedDirs[absPath]; !exists {
+		l.sources = append(l.sources, localFS)
+	}
+	l.scannedDirs[absPath] = struct{}{}
+	l.mu.Unlock()
+
+	l.mu.RLock()
+	afterCount := len(l.skills)
+	l.mu.RUnlock()
+
+	return afterCount - beforeCount, nil
 }
 
 // AddZipFile adds a zip file as a skill source.
