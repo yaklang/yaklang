@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
@@ -146,21 +147,12 @@ func MergeValues(allVs ...Values) Values {
 			return
 		}
 		// template value will not merge, this value create in query Runtime
-			if v.GetId() == -1 {
-				templateValue = append(templateValue, v)
-				return
-			}
-			if existValue, exist := tmp.Get(v.GetId()); exist {
-				if anchorBits := v.GetAnchorBitVector(); anchorBits != nil && !anchorBits.IsEmpty() {
-					existingBits := existValue.GetAnchorBitVector()
-					if existingBits == nil || existingBits.IsEmpty() {
-						existValue.SetAnchorBitVector(anchorBits)
-					} else {
-						merged := existingBits.Clone()
-						merged.Or(anchorBits)
-						existValue.SetAnchorBitVector(merged)
-					}
-				}
+		if v.GetId() == -1 {
+			templateValue = append(templateValue, v)
+			return
+		}
+		if existValue, exist := tmp.Get(v.GetId()); exist {
+			sfvm.MergeAnchor(v, existValue)
 
 			// merge v to exist value
 			if v.EffectOn != nil {
@@ -181,10 +173,10 @@ func MergeValues(allVs ...Values) Values {
 			for _, pred := range v.Predecessors {
 				existValue.Predecessors = utils.AppendSliceItemWhenNotExists(existValue.Predecessors, pred)
 			}
-		} else {
-			// set v is exist
-			tmp.Set(v.GetId(), v)
+			return
 		}
+		// set v is exist
+		tmp.Set(v.GetId(), v)
 	}
 
 	for _, vs := range allVs {

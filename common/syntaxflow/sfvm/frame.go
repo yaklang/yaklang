@@ -45,9 +45,11 @@ type conditionScopeState struct {
 
 	mode ConditionMode
 
-	anchorBase    int
-	anchorWidth   int
-	anchorRestore []anchorRestoreEntry
+	anchorBase     int
+	anchorWidth    int
+	source         Values
+	slotAnchorBits []*utils.BitVector
+	anchorRestore  []anchorRestoreEntry
 }
 
 type SFFrame struct {
@@ -93,6 +95,32 @@ func (s *SFFrame) ActiveAnchorScope() (int, int, bool) {
 		return 0, 0, false
 	}
 	return state.anchorBase, state.anchorWidth, true
+}
+
+func (s *SFFrame) nextAnchorScopeBase() int {
+	if s == nil || s.conditionScope == nil || s.conditionScope.Len() == 0 {
+		return 0
+	}
+	parent := s.conditionScope.Peek()
+	return parent.anchorBase + parent.anchorWidth
+}
+
+func (s *SFFrame) beginConditionScope(source Values) conditionScopeState {
+	state := conditionScopeState{
+		conditionDepth: s.conditionStack.Len(),
+		stackDepth:     s.stack.Len(),
+		mode:           conditionModeFromSource(source),
+		anchorBase:     s.nextAnchorScopeBase(),
+		anchorWidth:    len(source),
+		source:         source.Clone(),
+	}
+	state.slotAnchorBits = buildSlotAnchorBitVectors(source, state.anchorBase)
+	state.anchorRestore = assignLocalAnchorBitVector(source, state.anchorBase)
+	return state
+}
+
+func (s *SFFrame) restoreConditionScope(scope conditionScopeState) {
+	restoreAnchorBitVector(scope.anchorRestore)
 }
 
 type VerifyFileSystem struct {
@@ -380,7 +408,7 @@ func (s *SFFrame) execRule(feedValue Values) error {
 				// across statements and break subsequent mask alignment.
 				for s.conditionScope.Len() > ctx.scopeDepth {
 					scope := s.conditionScope.Pop()
-					restoreAnchorBitVector(scope.anchorRestore)
+					s.restoreConditionScope(scope)
 				}
 				for s.conditionStack.Len() > ctx.condDepth {
 					s.conditionStack.Pop()
@@ -400,10 +428,6 @@ func (s *SFFrame) execRule(feedValue Values) error {
 				if s.stack.Len() == 0 {
 					return utils.Wrap(CriticalError, "condition scope start failed: stack top is empty")
 				}
-				state := conditionScopeState{
-					conditionDepth: s.conditionStack.Len(),
-					stackDepth:     s.stack.Len(),
-				}
 				// Condition scopes always enable anchor bookkeeping so that derived values can map
 				// back to their originating source slots via AnchorBitVector.
 				//
@@ -415,14 +439,7 @@ func (s *SFFrame) execRule(feedValue Values) error {
 				// Nested scopes stack their ranges by shifting anchorBase = parent.base + parent.width
 				// so inner scopes can add local provenance without overwriting outer provenance.
 				sourceValues := s.stack.Peek()
-				state.mode = conditionModeFromSource(sourceValues)
-				if s.conditionScope.Len() > 0 {
-					parent := s.conditionScope.Peek()
-					state.anchorBase = parent.anchorBase + parent.anchorWidth
-				}
-				state.anchorWidth = len(sourceValues)
-				state.anchorRestore = assignLocalAnchorBitVector(sourceValues, state.anchorBase)
-				s.conditionScope.Push(state)
+				s.conditionScope.Push(s.beginConditionScope(sourceValues))
 			case OpConditionScopeEnd:
 				if s.conditionScope.Len() == 0 {
 					break
@@ -430,7 +447,7 @@ func (s *SFFrame) execRule(feedValue Values) error {
 				scopeState := s.conditionScope.Pop()
 				// Restore anchor bits overwritten at scope start so they don't leak to outer scopes
 				// and other statements.
-				restoreAnchorBitVector(scopeState.anchorRestore)
+				s.restoreConditionScope(scopeState)
 				if s.stack.Len() != scopeState.stackDepth {
 					return utils.Wrapf(
 						CriticalError,

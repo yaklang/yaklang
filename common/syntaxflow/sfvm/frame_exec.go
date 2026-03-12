@@ -32,59 +32,87 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
-func recursiveDeepChain(element Values, handle func(operator ValueOperator) bool, visited map[int64]struct{}) error {
+func recursiveDeepChain(frame *SFFrame, element Values, handle func(operator ValueOperator) (bool, error), visited map[int64]struct{}) error {
 	if visited == nil {
 		visited = make(map[int64]struct{})
 	}
 
 	var next []ValueOperator
 
-	val, _ := element.GetCalled()
-	if val != nil {
-		_ = val.Recursive(func(operator ValueOperator) error {
+	val, err := RunValueOperatorPipeline(element, ValuePipelineOptions{Frame: frame}, func(operator ValueOperator) (Values, error) {
+		return operator.GetCalled()
+	})
+	if err != nil {
+		return err
+	}
+	if !val.IsEmpty() {
+		if err := val.Recursive(func(operator ValueOperator) error {
 			if idGetter, ok := operator.(ssa.GetIdIF); ok {
 				if _, ok := visited[idGetter.GetId()]; ok {
 					return nil
 				}
 				visited[idGetter.GetId()] = struct{}{}
 
-				fields, _ := operator.GetFields()
-				if fields != nil {
-					mergeAnchorBitVectorToResult(fields, operator)
-					_ = fields.Recursive(func(fieldElement ValueOperator) error {
+				fields, err := RunValueOperatorPipeline(ValuesOf(operator), ValuePipelineOptions{Frame: frame}, func(vo ValueOperator) (Values, error) {
+					return vo.GetFields()
+				})
+				if err != nil {
+					return err
+				}
+				if !fields.IsEmpty() {
+					if err := fields.Recursive(func(fieldElement ValueOperator) error {
 						if idGetter, ok := fieldElement.(ssa.GetIdIF); ok {
 							if _, ok := visited[idGetter.GetId()]; ok {
 								return nil
 							}
 							visited[idGetter.GetId()] = struct{}{}
 
-							if !handle(fieldElement) {
+							stop, err := handle(fieldElement)
+							if err != nil {
+								return err
+							}
+							if !stop {
 								next = append(next, fieldElement)
 							}
 						}
 						return nil
-					})
+					}); err != nil {
+						return err
+					}
 				}
 			}
 			return nil
-		})
+		}); err != nil {
+			return err
+		}
 	}
 
-	val, _ = element.GetFields()
-	if val != nil {
-		_ = val.Recursive(func(operator ValueOperator) error {
+	val, err = RunValueOperatorPipeline(element, ValuePipelineOptions{Frame: frame}, func(operator ValueOperator) (Values, error) {
+		return operator.GetFields()
+	})
+	if err != nil {
+		return err
+	}
+	if !val.IsEmpty() {
+		if err := val.Recursive(func(operator ValueOperator) error {
 			if idGetter, ok := operator.(ssa.GetIdIF); ok {
 				if _, ok := visited[idGetter.GetId()]; ok {
 					return nil
 				}
 				visited[idGetter.GetId()] = struct{}{}
 
-				if !handle(operator) {
+				stop, err := handle(operator)
+				if err != nil {
+					return err
+				}
+				if !stop {
 					next = append(next, operator)
 				}
 			}
 			return nil
-		})
+		}); err != nil {
+			return err
+		}
 	}
 
 	if len(next) <= 0 {
@@ -92,7 +120,41 @@ func recursiveDeepChain(element Values, handle func(operator ValueOperator) bool
 	}
 
 	nextValues := NewValues(next)
-	return recursiveDeepChain(nextValues, handle, visited)
+	return recursiveDeepChain(frame, nextValues, handle, visited)
+}
+
+func (s *SFFrame) recursiveSearch(value Values, timingName string, label string, match func(ValueOperator) (Values, error)) (Values, error) {
+	var next []ValueOperator
+	err := recursiveDeepChain(s, value, func(operator ValueOperator) (bool, error) {
+		done := s.startValueOpTiming(timingName)
+		defer done()
+
+		results, err := s.runValueOperatorPipeline(ValuesOf(operator), "recursive search "+label, func(vo ValueOperator) (Values, error) {
+			return match(vo)
+		})
+		if err != nil {
+			return false, err
+		}
+		if results.IsEmpty() {
+			return false, nil
+		}
+
+		have := false
+		_ = results.Recursive(func(item ValueOperator) error {
+			if _, ok := item.(ssa.GetIdIF); ok {
+				have = true
+				return utils.Error("normal abort")
+			}
+			return nil
+		})
+
+		next = append(next, results...)
+		return have, nil
+	}, nil)
+	if err != nil {
+		return nil, err
+	}
+	return NewValues(next), nil
 }
 
 func (s *SFFrame) opPop(unName bool) (Values, error) {
@@ -491,7 +553,11 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		if trackErr := s.track("value-op:ExactMatch", func() error {
 			done := s.startValueOpTiming("ExactMatch")
 			defer done()
-			result, next, err = value.ExactMatch(s.GetContext(), mod, i.UnaryStr)
+			next, err = s.runValueOperatorPipeline(value, "", func(vo ValueOperator) (Values, error) {
+				_, matched, err := vo.ExactMatch(s.GetContext(), mod, i.UnaryStr)
+				return matched, err
+			})
+			result = !next.IsEmpty()
 			return err
 		}); trackErr != nil {
 			return true, trackErr
@@ -520,74 +586,13 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 			return true, utils.Wrap(CriticalError, "recursive search exact failed: stack top is empty")
 		}
 
-		// Assign local anchors so we can map hits back to their originating roots without
-		// creating a cross-product predecessor graph when multiple roots exist.
-		anchorBase := 0
-		if s.conditionScope != nil && s.conditionScope.Len() > 0 {
-			parent := s.conditionScope.Peek()
-			anchorBase = parent.anchorBase + parent.anchorWidth
-		}
-		anchorRestore := assignLocalAnchorBitVector(value, anchorBase)
-		defer restoreAnchorBitVector(anchorRestore)
-
-		var next []ValueOperator
-		err := recursiveDeepChain(value, func(operator ValueOperator) bool {
-			done := s.startValueOpTiming("RecursiveExactMatch")
-			defer done()
-
-			ok, results, _ := operator.ExactMatch(s.GetContext(), ssadb.BothMatch, i.UnaryStr)
-			if !ok {
-				return false
-			}
-
-			have := false
-			// log.Infof("recursive search exact: %v from: %v", results.String(), operator.String())
-			_ = results.Recursive(func(item ValueOperator) error {
-				if _, ok := item.(ssa.GetIdIF); ok {
-					have = true
-					return utils.Error("normal abort")
-				}
-				return nil
-			})
-
-			_ = results.Recursive(func(hit ValueOperator) error {
-				if utils.IsNil(hit) || hit.IsEmpty() {
-					return nil
-				}
-
-				bits := hit.GetAnchorBitVector()
-				if bits == nil || bits.IsEmpty() {
-					// Best-effort fallback: use the current traversal node's provenance.
-					bits = operator.GetAnchorBitVector()
-				}
-				if bits == nil || bits.IsEmpty() {
-					// No provenance available: at least keep the local edge for debugging.
-					_ = hit.AppendPredecessor(operator, s.WithPredecessorContext("recursive search "+i.UnaryStr))
-					return nil
-				}
-
-				bits.ForEach(func(index int) {
-					rel := index - anchorBase
-					if rel < 0 || rel >= len(value) {
-						return
-					}
-					root := value[rel]
-					if utils.IsNil(root) {
-						return
-					}
-					_ = hit.AppendPredecessor(root, s.WithPredecessorContext("recursive search "+i.UnaryStr))
-				})
-				return nil
-			})
-
-			next = append(next, results...)
-			return have
-		}, nil)
+		results, err := s.recursiveSearch(value, "RecursiveExactMatch", i.UnaryStr, func(operator ValueOperator) (Values, error) {
+			_, matched, err := operator.ExactMatch(s.GetContext(), ssadb.BothMatch, i.UnaryStr)
+			return matched, err
+		})
 		if err != nil {
 			err = utils.Wrapf(err, "recursive search exact failed")
 		}
-
-		results := NewValues(next)
 		s.debugSubLog("result next: %v", ValuesLen(results))
 		s.pushStack(results)
 		s.debugSubLog("<< push next")
@@ -607,67 +612,14 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		}
 		_ = globIns
 
-		anchorBase := 0
-		if s.conditionScope != nil && s.conditionScope.Len() > 0 {
-			parent := s.conditionScope.Peek()
-			anchorBase = parent.anchorBase + parent.anchorWidth
-		}
-		anchorRestore := assignLocalAnchorBitVector(value, anchorBase)
-		defer restoreAnchorBitVector(anchorRestore)
-
-		var next []ValueOperator
-		err = recursiveDeepChain(value, func(operator ValueOperator) bool {
-			done := s.startValueOpTiming("RecursiveGlobMatch")
-			defer done()
-
-			ok, results, _ := operator.GlobMatch(s.GetContext(), mod|ssadb.NameMatch, i.UnaryStr)
-			if !ok {
-				return false
-			}
-
-			have := false
-			_ = results.Recursive(func(item ValueOperator) error {
-				if _, ok := item.(ssa.GetIdIF); ok {
-					have = true
-					return utils.Error("normal abort")
-				}
-				return nil
-			})
-
-			_ = results.Recursive(func(hit ValueOperator) error {
-				if utils.IsNil(hit) || hit.IsEmpty() {
-					return nil
-				}
-				bits := hit.GetAnchorBitVector()
-				if bits == nil || bits.IsEmpty() {
-					bits = operator.GetAnchorBitVector()
-				}
-				if bits == nil || bits.IsEmpty() {
-					_ = hit.AppendPredecessor(operator, s.WithPredecessorContext("recursive search "+i.UnaryStr))
-					return nil
-				}
-				bits.ForEach(func(index int) {
-					rel := index - anchorBase
-					if rel < 0 || rel >= len(value) {
-						return
-					}
-					root := value[rel]
-					if utils.IsNil(root) {
-						return
-					}
-					_ = hit.AppendPredecessor(root, s.WithPredecessorContext("recursive search "+i.UnaryStr))
-				})
-				return nil
-			})
-
-			next = append(next, results...)
-			return have
-		}, nil)
+		results, err := s.recursiveSearch(value, "RecursiveGlobMatch", i.UnaryStr, func(operator ValueOperator) (Values, error) {
+			_, matched, err := operator.GlobMatch(s.GetContext(), mod|ssadb.NameMatch, i.UnaryStr)
+			return matched, err
+		})
 		if err != nil {
 			err = utils.Wrapf(err, "recursive search glob failed")
 			s.debugSubLog("ERROR: %v", err)
 		}
-		results := NewValues(next)
 		s.debugSubLog("result next: %v", ValuesLen(results))
 		s.pushStack(results)
 		s.debugSubLog("<< push next")
@@ -686,71 +638,14 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		}
 		_ = regexpIns
 
-		anchorBase := 0
-		if s.conditionScope != nil && s.conditionScope.Len() > 0 {
-			parent := s.conditionScope.Peek()
-			anchorBase = parent.anchorBase + parent.anchorWidth
-		}
-		anchorRestore := assignLocalAnchorBitVector(value, anchorBase)
-		defer restoreAnchorBitVector(anchorRestore)
-
-		var next []ValueOperator
-		err = recursiveDeepChain(value, func(operator ValueOperator) bool {
-			done := s.startValueOpTiming("RecursiveRegexpMatch")
-			defer done()
-			//log.Infof("recursive search regexp: %v", operator.String())
-			//if strings.Contains(operator.String(), "aaa") {
-			//	spew.Dump(1)
-			//}
-
-			ok, results, _ := operator.RegexpMatch(s.GetContext(), mod|ssadb.NameMatch, i.UnaryStr)
-			if !ok {
-				return false
-			}
-
-			have := false
-			_ = results.Recursive(func(item ValueOperator) error {
-				if _, ok := item.(ssa.GetIdIF); ok {
-					have = true
-					return utils.Error("normal abort")
-				}
-				return nil
-			})
-
-			_ = results.Recursive(func(hit ValueOperator) error {
-				if utils.IsNil(hit) || hit.IsEmpty() {
-					return nil
-				}
-				bits := hit.GetAnchorBitVector()
-				if bits == nil || bits.IsEmpty() {
-					bits = operator.GetAnchorBitVector()
-				}
-				if bits == nil || bits.IsEmpty() {
-					_ = hit.AppendPredecessor(operator, s.WithPredecessorContext("recursive search "+i.UnaryStr))
-					return nil
-				}
-				bits.ForEach(func(index int) {
-					rel := index - anchorBase
-					if rel < 0 || rel >= len(value) {
-						return
-					}
-					root := value[rel]
-					if utils.IsNil(root) {
-						return
-					}
-					_ = hit.AppendPredecessor(root, s.WithPredecessorContext("recursive search "+i.UnaryStr))
-				})
-				return nil
-			})
-
-			next = append(next, results...)
-			return have
-		}, nil)
+		results, err := s.recursiveSearch(value, "RecursiveRegexpMatch", i.UnaryStr, func(operator ValueOperator) (Values, error) {
+			_, matched, err := operator.RegexpMatch(s.GetContext(), mod|ssadb.NameMatch, i.UnaryStr)
+			return matched, err
+		})
 		if err != nil {
 			err = utils.Wrapf(err, "recursive search regexp failed")
 			s.debugSubLog("ERROR: %v", err)
 		}
-		results := NewValues(next)
 		s.debugSubLog("result next: %v", ValuesLen(results))
 		s.pushStack(results)
 		s.debugSubLog("<< push next")
@@ -776,7 +671,11 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		if trackErr := s.track("value-op:GlobMatch", func() error {
 			done := s.startValueOpTiming("GlobMatch")
 			defer done()
-			result, next, err = value.GlobMatch(s.GetContext(), mod, i.UnaryStr)
+			next, err = s.runValueOperatorPipeline(value, "", func(vo ValueOperator) (Values, error) {
+				_, matched, err := vo.GlobMatch(s.GetContext(), mod, i.UnaryStr)
+				return matched, err
+			})
+			result = !next.IsEmpty()
 			return err
 		}); trackErr != nil {
 			return true, trackErr
@@ -815,7 +714,11 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		if trackErr := s.track("value-op:RegexpMatch", func() error {
 			done := s.startValueOpTiming("RegexpMatch")
 			defer done()
-			result, next, err = value.RegexpMatch(s.GetContext(), mod, regexpIns.String())
+			next, err = s.runValueOperatorPipeline(value, "", func(vo ValueOperator) (Values, error) {
+				_, matched, err := vo.RegexpMatch(s.GetContext(), mod, regexpIns.String())
+				return matched, err
+			})
+			result = !next.IsEmpty()
 			return err
 		}); trackErr != nil {
 			return true, trackErr
@@ -846,7 +749,9 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		if trackErr := s.track("value-op:GetCalled", func() error {
 			done := s.startValueOpTiming("GetCalled")
 			defer done()
-			results, err = value.GetCalled()
+			results, err = s.runValueOperatorPipeline(value, "", func(vo ValueOperator) (Values, error) {
+				return vo.GetCalled()
+			})
 			return err
 		}); trackErr != nil {
 			return true, trackErr
@@ -875,7 +780,9 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		if trackErr := s.track("value-op:GetCallActualParams", func() error {
 			done := s.startValueOpTiming("GetCallActualParams")
 			defer done()
-			results, err = value.GetCallActualParams(i.UnaryInt, i.UnaryBool)
+			results, err = s.runValueOperatorPipeline(value, "", func(vo ValueOperator) (Values, error) {
+				return vo.GetCallActualParams(i.UnaryInt, i.UnaryBool)
+			})
 			return err
 		}); trackErr != nil {
 			return true, trackErr
@@ -904,19 +811,9 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		if trackErr := s.track("value-op:GetSyntaxFlowUse", func() error {
 			done := s.startValueOpTiming("GetSyntaxFlowUse")
 			defer done()
-			var out []ValueOperator
-			_ = value.Recursive(func(operator ValueOperator) error {
-				next, nextErr := operator.GetSyntaxFlowUse()
-				if nextErr != nil {
-					err = nextErr
-					return err
-				}
-				mergeAnchorBitVectorToResult(next, operator)
-				_ = next.AppendPredecessor(operator, s.WithPredecessorContext("getUser"))
-				out = append(out, next...)
-				return nil
+			vals, err = s.runValueOperatorPipeline(value, "getUser", func(vo ValueOperator) (Values, error) {
+				return vo.GetSyntaxFlowUse()
 			})
-			vals = NewValues(out)
 			return err
 		}); trackErr != nil {
 			return true, trackErr
@@ -942,7 +839,9 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		if trackErr := s.track("value-op:GetSyntaxFlowBottomUse", func() error {
 			done := s.startValueOpTiming("GetSyntaxFlowBottomUse")
 			defer done()
-			vals, err = value.GetSyntaxFlowBottomUse(s.result, s.config, i.SyntaxFlowConfig...)
+			vals, err = s.runValueOperatorPipeline(value, "", func(vo ValueOperator) (Values, error) {
+				return vo.GetSyntaxFlowBottomUse(s.result, s.config, i.SyntaxFlowConfig...)
+			})
 			return err
 		}); trackErr != nil {
 			return true, trackErr
@@ -966,7 +865,9 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		if trackErr := s.track("value-op:GetSyntaxFlowDef", func() error {
 			done := s.startValueOpTiming("GetSyntaxFlowDef")
 			defer done()
-			vals, err = value.GetSyntaxFlowDef()
+			vals, err = s.runValueOperatorPipeline(value, "", func(vo ValueOperator) (Values, error) {
+				return vo.GetSyntaxFlowDef()
+			})
 			return err
 		}); trackErr != nil {
 			return true, trackErr
@@ -992,7 +893,9 @@ func (s *SFFrame) execValueFilter(i *SFI) (bool, error) {
 		if trackErr := s.track("value-op:GetSyntaxFlowTopDef", func() error {
 			done := s.startValueOpTiming("GetSyntaxFlowTopDef")
 			defer done()
-			vals, err = value.GetSyntaxFlowTopDef(s.result, s.config, i.SyntaxFlowConfig...)
+			vals, err = s.runValueOperatorPipeline(value, "", func(vo ValueOperator) (Values, error) {
+				return vo.GetSyntaxFlowTopDef(s.result, s.config, i.SyntaxFlowConfig...)
+			})
 			return err
 		}); trackErr != nil {
 			return true, trackErr

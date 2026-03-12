@@ -80,10 +80,10 @@ func TestSimpleDotGraphEdgeLabel(t *testing.T) {
 				$result1...ccc() as $result2`,
 			map[string][]ssatest.PathInTest{
 				"result1": {
-					{From: "a", To: ".h", Label: "recursive search h"},
+					{From: ".g", To: ".h", Label: "recursive search h"},
 				},
 				"result2": {
-					{From: ".h", To: ".ccc", Label: "recursive search ccc"},
+					{From: ".bbb", To: ".ccc", Label: "recursive search ccc"},
 				},
 			},
 		},

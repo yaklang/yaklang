@@ -39,64 +39,71 @@ func valuePointerKey(value ValueOperator) string {
 	}
 }
 
+func buildSlotAnchorBitVectors(sourceValues Values, base int) []*utils.BitVector {
+	slotBits := make([]*utils.BitVector, len(sourceValues))
+	for idx, value := range sourceValues {
+		if utils.IsNil(value) {
+			continue
+		}
+		var bits *utils.BitVector
+		if existed := value.GetAnchorBitVector(); existed != nil && !existed.IsEmpty() {
+			bits = existed.Clone()
+		} else {
+			bits = utils.NewBitVector()
+		}
+		bits.Set(base + idx)
+		slotBits[idx] = bits
+	}
+	return slotBits
+}
+
 // assignLocalAnchorBitVector adds local anchor bits for each leaf in sourceValues so
 // they map to the local slot index inside a scope range [base, base+len(sourceValues)).
 //
 // Values that appear multiple times (same identity) get a union of all their slot
 // indices to keep mask alignment stable.
-//
-// In pseudo code (per slot i):
-//
-//	oldBits := source[i].bits
-//	localBits(i) := {base + i} (duplicates: union all their slots)
-//	source[i].bits = localBits(i) OR oldBits
 func assignLocalAnchorBitVector(sourceValues Values, base int) []anchorRestoreEntry {
-	type entry struct {
-		value ValueOperator
-		index int
-	}
-	group := make(map[string][]entry, len(sourceValues))
-	restores := make(map[string]anchorRestoreEntry, len(sourceValues))
+	restores := make([]anchorRestoreEntry, 0, len(sourceValues))
+	savedPointers := make(map[string]struct{}, len(sourceValues))
+	localBitsByIdentity := make(map[string]*utils.BitVector, len(sourceValues))
+
 	for idx, v := range sourceValues {
 		if utils.IsNil(v) {
 			continue
 		}
-		idKey := valueIdentity(v)
 		ptrKey := valuePointerKey(v)
-		if _, ok := restores[ptrKey]; !ok {
+		if _, ok := savedPointers[ptrKey]; !ok {
+			savedPointers[ptrKey] = struct{}{}
 			var cloned *utils.BitVector
 			if bits := v.GetAnchorBitVector(); bits != nil && !bits.IsEmpty() {
 				cloned = bits.Clone()
 			}
-			restores[ptrKey] = anchorRestoreEntry{value: v, bits: cloned}
+			restores = append(restores, anchorRestoreEntry{value: v, bits: cloned})
 		}
-		group[idKey] = append(group[idKey], entry{value: v, index: idx})
+
+		idKey := valueIdentity(v)
+		localBits := localBitsByIdentity[idKey]
+		if localBits == nil {
+			localBits = utils.NewBitVector()
+			localBitsByIdentity[idKey] = localBits
+		}
+		localBits.Set(base + idx)
 	}
 
-	out := make([]anchorRestoreEntry, 0, len(restores))
 	for _, restore := range restores {
-		out = append(out, restore)
-	}
-
-	for _, entries := range group {
-		if len(entries) == 0 {
+		localBits := localBitsByIdentity[valueIdentity(restore.value)]
+		if localBits == nil || localBits.IsEmpty() {
+			restore.value.SetAnchorBitVector(restore.bits)
 			continue
 		}
-		local := utils.NewBitVector()
-		for _, e := range entries {
-			local.Set(base + e.index)
+		merged := localBits.Clone()
+		if restore.bits != nil && !restore.bits.IsEmpty() {
+			merged.Or(restore.bits)
 		}
-		for _, e := range entries {
-			restore := restores[valuePointerKey(e.value)]
-			merged := local.Clone()
-			if restore.bits != nil && !restore.bits.IsEmpty() {
-				merged.Or(restore.bits)
-			}
-			e.value.SetAnchorBitVector(merged)
-		}
+		restore.value.SetAnchorBitVector(merged)
 	}
 
-	return out
+	return restores
 }
 
 // restoreAnchorBitVector restores anchor bits overwritten by assignLocalAnchorBitVector
@@ -128,54 +135,53 @@ func markMaskByBitVector(mask []bool, bits *utils.BitVector, base int) bool {
 	return matched
 }
 
-// mergeAnchorBitVector merges provenance from src into dst:
-//
-//	dst.bits |= src.bits
-func mergeAnchorBitVector(dst ValueOperator, src ValueOperator) {
-	if utils.IsNil(dst) || utils.IsNil(src) {
-		return
-	}
-	srcBits := src.GetAnchorBitVector()
-	if srcBits == nil || srcBits.IsEmpty() {
+func mergeAnchorBits(dst ValueOperator, sourceBits *utils.BitVector) {
+	if utils.IsNil(dst) || sourceBits == nil || sourceBits.IsEmpty() {
 		return
 	}
 	dstBits := dst.GetAnchorBitVector()
 	if dstBits == nil || dstBits.IsEmpty() {
-		dst.SetAnchorBitVector(srcBits)
+		dst.SetAnchorBitVector(sourceBits.Clone())
 		return
 	}
 	merged := dstBits.Clone()
-	merged.Or(srcBits)
+	merged.Or(sourceBits)
 	dst.SetAnchorBitVector(merged)
 }
 
-// mergeAnchorBitVectorToResult propagates provenance from a source operator to each derived result:
+// MergeAnchor propagates provenance from source to each destination value:
 //
-//	for r in result: r.bits |= source.bits
-func mergeAnchorBitVectorToResult(result Values, source ValueOperator) {
-	if result.IsEmpty() || utils.IsNil(source) {
+//	for each d in dst: d.bits |= source.bits
+func MergeAnchor(source ValueOperator, dst ...ValueOperator) {
+	if utils.IsNil(source) {
 		return
 	}
 	sourceBits := source.GetAnchorBitVector()
 	if sourceBits == nil || sourceBits.IsEmpty() {
 		return
 	}
-	for _, operator := range result {
-		if utils.IsNil(operator) {
-			continue
-		}
-		existing := operator.GetAnchorBitVector()
-		if existing == nil || existing.IsEmpty() {
-			operator.SetAnchorBitVector(sourceBits)
-			continue
-		}
-		merged := existing.Clone()
-		merged.Or(sourceBits)
-		operator.SetAnchorBitVector(merged)
+	for _, operator := range dst {
+		mergeAnchorBits(operator, sourceBits)
 	}
 }
 
-// MergeAnchorBitVectorToResult is exported for callers outside sfvm (e.g. ssaapi native calls).
-func MergeAnchorBitVectorToResult(result Values, source ValueOperator) {
-	mergeAnchorBitVectorToResult(result, source)
+func forEachAnchorIndexInScope(operator ValueOperator, base int, width int, visit func(int)) bool {
+	if utils.IsNil(operator) || operator.IsEmpty() || width <= 0 {
+		return false
+	}
+	bits := operator.GetAnchorBitVector()
+	if bits == nil || bits.IsEmpty() {
+		return false
+	}
+
+	matched := false
+	end := base + width
+	bits.ForEach(func(index int) {
+		if index < base || index >= end {
+			return
+		}
+		matched = true
+		visit(index - base)
+	})
+	return matched
 }

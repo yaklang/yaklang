@@ -222,10 +222,10 @@ func mergeValuesByID(left Values, right Values, andMode bool) Values {
 			continue
 		}
 		if leftValue, ok := leftByIDMap[idGetter.GetId()]; ok {
-			mergeAnchorBitVector(value, leftValue)
+			MergeAnchor(leftValue, value)
 		}
 		if rightValue, ok := rightByIDMap[idGetter.GetId()]; ok {
-			mergeAnchorBitVector(value, rightValue)
+			MergeAnchor(rightValue, value)
 		}
 	}
 	return NewValues(out)
