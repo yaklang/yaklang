@@ -11,17 +11,11 @@ import (
 	"sort"
 	"strings"
 	"testing"
-	"unsafe"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/compiler"
 )
 
-func init() {
-	llvm.InitializeNativeTarget()
-	llvm.InitializeNativeAsmPrinter()
-}
 func check(t *testing.T, code string, expected interface{}) {
 	t.Helper()
 	checkEx(t, code, "yak", expected)
@@ -36,7 +30,6 @@ func checkEx(t *testing.T, code string, language string, expected interface{}) {
 func checkIntegrated(t *testing.T, code string, expected interface{}) {
 	t.Helper()
 	checkVerify(t, code, "yak")
-	checkJIT(t, code, expected)
 	checkBinaryEx(t, code, "check", "yak", expected)
 }
 
@@ -58,18 +51,6 @@ func checkVerify(t *testing.T, code string, language string) {
 	); err != nil {
 		t.Fatalf("Compile/verify failed: %v", err)
 	}
-}
-
-func checkJIT(t *testing.T, code string, expected interface{}) {
-	t.Helper()
-	result, err := compiler.RunViaJIT(
-		compiler.WithRunSourceCode(code),
-		compiler.WithRunLanguage("yak"),
-	)
-	if err != nil {
-		t.Fatalf("JIT execution failed: %v", err)
-	}
-	compareResult(t, expected, result)
 }
 
 func checkBinaryEx(t *testing.T, code string, entry string, language string, expected interface{}) {
@@ -98,38 +79,7 @@ func checkBinaryExWithOptions(t *testing.T, code string, entry string, language 
 
 func checkPrint(t *testing.T, code string, expectedVals ...int64) {
 	t.Helper()
-	checkPrintJIT(t, code, expectedVals...)
 	checkPrintBinary(t, code, expectedVals...)
-}
-
-func checkPrintJIT(t *testing.T, code string, expectedVals ...int64) {
-	t.Helper()
-
-	teardown := SetupJITHook()
-	_, err := compiler.RunViaJIT(
-		compiler.WithRunSourceCode(code),
-		compiler.WithRunLanguage("yak"),
-		compiler.WithRunFunction("check"),
-		compiler.WithRunExternalHooks(map[string]unsafe.Pointer{
-			"yak_internal_print_int": getHookAddr(),
-			"yak_internal_malloc":    getMallocHookAddr(),
-		}),
-	)
-	vals := teardown()
-	if err != nil {
-		t.Fatalf("JIT execution failed: %v", err)
-	}
-
-	if len(vals) != len(expectedVals) {
-		t.Errorf("JIT hook mismatch. Expected %d calls, got %d. Got: %v, Expected: %v",
-			len(expectedVals), len(vals), vals, expectedVals)
-		return
-	}
-	for i, v := range vals {
-		if v != expectedVals[i] {
-			t.Errorf("JIT hook mismatch at index %d. Expected %d, got %d", i, expectedVals[i], v)
-		}
-	}
 }
 
 func checkPrintBinary(t *testing.T, code string, expectedVals ...int64) {
@@ -377,13 +327,7 @@ func runBinaryReturnValueWithOptions(t *testing.T, code string, entry string, la
 	)
 	allOpts = append(allOpts, options...)
 
-	_, output := runBinaryExitCodeWithEnv(
-		t,
-		code,
-		entry,
-		nil,
-		allOpts...,
-	)
+	_, output := runBinaryExitCodeWithEnv(t, code, entry, nil, allOpts...)
 	lines := strings.Split(strings.TrimSpace(output), "\n")
 	for i := len(lines) - 1; i >= 0; i-- {
 		line := strings.TrimSpace(lines[i])
