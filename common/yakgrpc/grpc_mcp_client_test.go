@@ -2,7 +2,11 @@ package yakgrpc
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
@@ -11,6 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mcp"
+	mcpmodel "github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -53,9 +58,10 @@ func TestMCPServerCRUD(t *testing.T) {
 
 		// 测试添加 sse 类型服务器
 		req2 := &ypb.AddMCPServerRequest{
-			Name: "test-sse-server-unique",
-			Type: "sse",
-			URL:  "http://localhost:8080/sse",
+			Name:    "test-sse-server-unique",
+			Type:    "sse",
+			URL:     "http://localhost:8080/sse",
+			Headers: []*ypb.KVPair{{Key: "Authorization", Value: "Bearer initial-token"}},
 		}
 
 		resp2, err := server.AddMCPServer(ctx, req2)
@@ -124,6 +130,18 @@ func TestMCPServerCRUD(t *testing.T) {
 		assert.GreaterOrEqual(t, len(resp.GetMCPServers()), 2) // 至少有我们刚添加的两个
 		assert.Greater(t, resp.GetTotal(), int64(0))
 
+		var foundSSEServer bool
+		for _, srv := range resp.GetMCPServers() {
+			if srv.GetName() != "test-sse-server-unique" {
+				continue
+			}
+			foundSSEServer = true
+			require.Len(t, srv.GetHeaders(), 1)
+			assert.Equal(t, "Authorization", srv.GetHeaders()[0].GetKey())
+			assert.Equal(t, "Bearer initial-token", srv.GetHeaders()[0].GetValue())
+		}
+		assert.True(t, foundSSEServer)
+
 		// 测试关键词搜索
 		req2 := &ypb.GetAllMCPServersRequest{
 			Keyword: "stdio",
@@ -189,6 +207,7 @@ func TestMCPServerCRUD(t *testing.T) {
 			Name:    "updated-stdio-server",
 			Type:    "stdio",
 			Command: "npx -y @modelcontextprotocol/server-filesystem /home",
+			Headers: []*ypb.KVPair{{Key: "X-Test-Header", Value: "updated-token"}},
 		}
 
 		updateResp, err := server.UpdateMCPServer(ctx, updateReq)
@@ -212,6 +231,9 @@ func TestMCPServerCRUD(t *testing.T) {
 		updatedServer := verifyResp.GetMCPServers()[0]
 		assert.Equal(t, "updated-stdio-server", updatedServer.GetName())
 		assert.Equal(t, "npx -y @modelcontextprotocol/server-filesystem /home", updatedServer.GetCommand())
+		require.Len(t, updatedServer.GetHeaders(), 1)
+		assert.Equal(t, "X-Test-Header", updatedServer.GetHeaders()[0].GetKey())
+		assert.Equal(t, "updated-token", updatedServer.GetHeaders()[0].GetValue())
 	})
 
 	// 测试删除 MCP 服务器
@@ -533,6 +555,27 @@ func TestMCPServerToolsRetrieval(t *testing.T) {
 		}
 	})
 
+	t.Run("TestGetMCPServerToolsWithSSEHeaders", func(t *testing.T) {
+		headerServer := newMockMCPHeaderServer(t, map[string]string{
+			"Authorization": "Bearer yak-test-token",
+		})
+		defer headerServer.Close()
+
+		mcpServerConfig := &schema.MCPServer{
+			Name: "test-sse-server-with-header",
+			Type: "sse",
+			URL:  headerServer.URL + "/sse",
+			Headers: schema.MapStringAny{
+				"Authorization": "Bearer yak-test-token",
+			},
+		}
+
+		tools, err := grpcServer.getMCPServerTools(ctx, mcpServerConfig)
+		require.NoError(t, err)
+		require.Len(t, tools, 1)
+		assert.Equal(t, "header-tool", tools[0].GetName())
+	})
+
 	t.Run("TestGetMCPServerToolsWithStdio", func(t *testing.T) {
 		// 测试 stdio 类型的 MCP 服务器（使用一个简单的 echo 命令作为 mock）
 		mcpServerConfig := &schema.MCPServer{
@@ -570,4 +613,143 @@ func TestMCPServerToolsRetrieval(t *testing.T) {
 		assert.Nil(t, tools)
 		assert.Contains(t, err.Error(), "unsupported server type")
 	})
+}
+
+func newMockMCPHeaderServer(t *testing.T, expectedHeaders map[string]string) *httptest.Server {
+	t.Helper()
+
+	const sessionID = "header-test-session"
+
+	var (
+		sessionMu      sync.Mutex
+		sessionWriter  http.ResponseWriter
+		sessionFlusher http.Flusher
+	)
+
+	checkHeaders := func(w http.ResponseWriter, r *http.Request) bool {
+		for key, expectedValue := range expectedHeaders {
+			if r.Header.Get(key) != expectedValue {
+				http.Error(w, "missing required header", http.StatusUnauthorized)
+				return false
+			}
+		}
+		return true
+	}
+
+	tool := mcpmodel.NewTool("header-tool", mcpmodel.WithDescription("tool behind auth header"))
+
+	var testServer *httptest.Server
+	testServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !checkHeaders(w, r) {
+			return
+		}
+
+		switch r.URL.Path {
+		case "/sse":
+			if r.Method != http.MethodGet {
+				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+				return
+			}
+
+			flusher, ok := w.(http.Flusher)
+			if !ok {
+				http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+				return
+			}
+
+			w.Header().Set("Content-Type", "text/event-stream")
+			w.Header().Set("Cache-Control", "no-cache")
+			w.Header().Set("Connection", "keep-alive")
+
+			sessionMu.Lock()
+			sessionWriter = w
+			sessionFlusher = flusher
+			sessionMu.Unlock()
+
+			fmt.Fprintf(w, "event: endpoint\ndata: %s/message?sessionId=%s\n\n", testServer.URL, sessionID)
+			flusher.Flush()
+
+			<-r.Context().Done()
+
+			sessionMu.Lock()
+			sessionWriter = nil
+			sessionFlusher = nil
+			sessionMu.Unlock()
+		case "/message":
+			if r.Method != http.MethodPost {
+				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+				return
+			}
+			if r.URL.Query().Get("sessionId") != sessionID {
+				http.Error(w, "invalid session", http.StatusBadRequest)
+				return
+			}
+
+			var request struct {
+				JSONRPC string `json:"jsonrpc"`
+				ID      int64  `json:"id"`
+				Method  string `json:"method"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+
+			if request.Method == "notifications/initialized" {
+				w.WriteHeader(http.StatusAccepted)
+				return
+			}
+
+			var response any
+			switch request.Method {
+			case "initialize":
+				response = &mcpmodel.JSONRPCResponse{
+					JSONRPC: mcpmodel.JSONRPC_VERSION,
+					ID:      request.ID,
+					Result: &mcpmodel.InitializeResult{
+						ProtocolVersion: mcpmodel.LATEST_PROTOCOL_VERSION,
+						ServerInfo: mcpmodel.Implementation{
+							Name:    "header-required-server",
+							Version: "1.0.0",
+						},
+					},
+				}
+			case "tools/list":
+				response = &mcpmodel.JSONRPCResponse{
+					JSONRPC: mcpmodel.JSONRPC_VERSION,
+					ID:      request.ID,
+					Result: &mcpmodel.ListToolsResult{
+						Tools: []*mcpmodel.Tool{tool},
+					},
+				}
+			default:
+				http.Error(w, "unsupported method", http.StatusBadRequest)
+				return
+			}
+
+			payload, err := json.Marshal(response)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			sessionMu.Lock()
+			if sessionWriter == nil || sessionFlusher == nil {
+				sessionMu.Unlock()
+				http.Error(w, "sse session not ready", http.StatusConflict)
+				return
+			}
+			fmt.Fprintf(sessionWriter, "event: message\ndata: %s\n\n", payload)
+			sessionFlusher.Flush()
+			sessionMu.Unlock()
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusAccepted)
+			_, _ = w.Write(payload)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+
+	return testServer
 }

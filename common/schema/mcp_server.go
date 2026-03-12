@@ -17,6 +17,7 @@ type MCPServer struct {
 	Command string       `gorm:"type:text" json:"command"`   // 启动命令 (for stdio type)
 	Enable  bool         `gorm:"default:true" json:"enable"` // 是否启用
 	Envs    MapStringAny `gorm:"type:text" json:"env"`       // 环境变量
+	Headers MapStringAny `gorm:"type:text" json:"headers"`   // 自定义请求头
 }
 
 func (m *MCPServer) TableName() string {
@@ -29,6 +30,10 @@ func (m *MCPServer) ToGRPC() *ypb.MCPServer {
 	for k, v := range m.Envs {
 		envs = append(envs, &ypb.KVPair{Key: k, Value: fmt.Sprintf("%v", v)})
 	}
+	headers := make([]*ypb.KVPair, 0, len(m.Headers))
+	for k, v := range m.Headers {
+		headers = append(headers, &ypb.KVPair{Key: k, Value: fmt.Sprintf("%v", v)})
+	}
 	return &ypb.MCPServer{
 		ID:      int64(m.ID),
 		Name:    m.Name,
@@ -38,11 +43,20 @@ func (m *MCPServer) ToGRPC() *ypb.MCPServer {
 		Enable:  m.Enable,
 		Tools:   []*ypb.MCPServerTool{}, // 工具列表将在需要时动态获取
 		Envs:    envs,
+		Headers: headers,
 	}
 }
 
 // ToGRPCWithTools 转换为包含工具列表的gRPC响应格式
 func (m *MCPServer) ToGRPCWithTools(tools []*ypb.MCPServerTool) *ypb.MCPServer {
+	envs := make([]*ypb.KVPair, 0, len(m.Envs))
+	for k, v := range m.Envs {
+		envs = append(envs, &ypb.KVPair{Key: k, Value: fmt.Sprintf("%v", v)})
+	}
+	headers := make([]*ypb.KVPair, 0, len(m.Headers))
+	for k, v := range m.Headers {
+		headers = append(headers, &ypb.KVPair{Key: k, Value: fmt.Sprintf("%v", v)})
+	}
 	return &ypb.MCPServer{
 		ID:      int64(m.ID),
 		Name:    m.Name,
@@ -51,6 +65,8 @@ func (m *MCPServer) ToGRPCWithTools(tools []*ypb.MCPServerTool) *ypb.MCPServer {
 		Command: m.Command,
 		Enable:  m.Enable,
 		Tools:   tools,
+		Envs:    envs,
+		Headers: headers,
 	}
 }
 

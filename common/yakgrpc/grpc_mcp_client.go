@@ -13,6 +13,25 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+func kvPairsToMapStringAny(kvPairs []*ypb.KVPair) schema.MapStringAny {
+	result := make(schema.MapStringAny, len(kvPairs))
+	for _, item := range kvPairs {
+		if item == nil || item.GetKey() == "" {
+			continue
+		}
+		result[item.GetKey()] = item.GetValue()
+	}
+	return result
+}
+
+func mapStringAnyToStringMap(input schema.MapStringAny) map[string]string {
+	result := make(map[string]string, len(input))
+	for key, value := range input {
+		result[key] = fmt.Sprintf("%v", value)
+	}
+	return result
+}
+
 // AddMCPServer 添加MCP服务器
 func (s *Server) AddMCPServer(ctx context.Context, req *ypb.AddMCPServerRequest) (*ypb.GeneralResponse, error) {
 	if req.GetName() == "" {
@@ -52,17 +71,14 @@ func (s *Server) AddMCPServer(ctx context.Context, req *ypb.AddMCPServerRequest)
 		}, nil
 	}
 
-	envs := make(schema.MapStringAny)
-	for _, env := range req.GetEnvs() {
-		envs[env.GetKey()] = env.GetValue()
-	}
 	server := &schema.MCPServer{
 		Name:    req.GetName(),
 		Type:    req.GetType(),
 		URL:     req.GetURL(),
 		Command: req.GetCommand(),
 		Enable:  req.GetEnable(),
-		Envs:    envs,
+		Envs:    kvPairsToMapStringAny(req.GetEnvs()),
+		Headers: kvPairsToMapStringAny(req.GetHeaders()),
 	}
 
 	err := yakit.CreateMCPServer(s.GetProfileDatabase(), server)
@@ -119,17 +135,14 @@ func (s *Server) UpdateMCPServer(ctx context.Context, req *ypb.UpdateMCPServerRe
 		}, nil
 	}
 
-	envs := make(schema.MapStringAny)
-	for _, env := range req.GetEnvs() {
-		envs[env.GetKey()] = env.GetValue()
-	}
 	server := &schema.MCPServer{
 		Name:    req.GetName(),
 		Type:    req.GetType(),
 		URL:     req.GetURL(),
 		Command: req.GetCommand(),
 		Enable:  req.GetEnable(),
-		Envs:    envs,
+		Envs:    kvPairsToMapStringAny(req.GetEnvs()),
+		Headers: kvPairsToMapStringAny(req.GetHeaders()),
 	}
 
 	err := yakit.UpdateMCPServer(s.GetProfileDatabase(), req.GetID(), server)
@@ -204,7 +217,7 @@ func (s *Server) getMCPServerTools(ctx context.Context, server *schema.MCPServer
 			return nil, err
 		}
 	case "sse":
-		sseMcpClient, err := client.NewSSEMCPClient(server.URL)
+		sseMcpClient, err := client.NewSSEMCPClient(server.URL, mapStringAnyToStringMap(server.Headers))
 		if err != nil {
 			return nil, utils.Errorf("create sse mcp client failed: %s", err)
 		}

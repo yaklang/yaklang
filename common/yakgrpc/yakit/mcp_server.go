@@ -50,6 +50,8 @@ func CreateOrUpdateMCPServer(db *gorm.DB, server *schema.MCPServer) error {
 		"url":     server.URL,
 		"command": server.Command,
 		"enable":  server.Enable,
+		"envs":    server.Envs,
+		"headers": server.Headers,
 	}
 	return db.Model(&schema.MCPServer{}).Where("name = ?", server.Name).Updates(updateData).Error
 }
@@ -108,6 +110,7 @@ func UpdateMCPServer(db *gorm.DB, id int64, server *schema.MCPServer) error {
 		"command": server.Command,
 		"enable":  server.Enable,
 		"envs":    server.Envs,
+		"headers": server.Headers,
 	}
 	return db.Model(&schema.MCPServer{}).Where("id = ?", id).Updates(updateData).Error
 }
