@@ -80,7 +80,7 @@ var loopAction_EnhanceKnowledgeAnswer = &reactloops.LoopAction{
 					"The knowledge base could not provide results. "+
 					"You MUST use web_search or internet_research to find the answer from the internet. "+
 					"Do NOT retry knowledge_enhance_answer for the same query.")
-			op.Fail(err.Error())
+			op.Exit()
 			return
 		}
 
@@ -90,7 +90,7 @@ var loopAction_EnhanceKnowledgeAnswer = &reactloops.LoopAction{
 					"The knowledge base does not contain relevant information for this topic. "+
 					"You MUST use web_search or internet_research to find the answer from the internet. "+
 					"Do NOT retry knowledge_enhance_answer for the same query.")
-			op.Fail("knowledge enhancement returned empty results for: " + rewriteQuery)
+			op.Exit()
 			return
 		}
 
@@ -99,7 +99,7 @@ var loopAction_EnhanceKnowledgeAnswer = &reactloops.LoopAction{
 			invoker.AddToTimeline("knowledge_enhance_insufficient",
 				"Knowledge enhancement compression FAILED for query '"+rewriteQuery+"': "+err.Error()+". "+
 					"Consider using web_search or internet_research as alternative information sources.")
-			op.Fail(err.Error())
+			op.Exit()
 			return
 		}
 		enhancedAnswer = result
