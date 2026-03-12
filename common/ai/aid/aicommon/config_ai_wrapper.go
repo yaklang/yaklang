@@ -137,13 +137,6 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 				time.Sleep(500 * time.Millisecond)
 				continue
 			}
-			c.EmitJSON(schema.EVENT_TYPE_PRESSURE, "system", map[string]any{
-				"current_cost_token_size": tokenSize,
-				"pressure_token_size":     c.AiCallTokenLimit,
-				"model_tier":              string(tier),
-				"model_name":              rsp.GetModelName(),
-				"provider_name":           rsp.GetProviderName(),
-			})
 			rsp.SetTaskIndex(request.GetTaskIndex())
 
 			var haveFirstByte = utils.NewBool(false)
@@ -192,6 +185,13 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 					"model_name":    origRsp.GetModelName(),
 					"provider_name": origRsp.GetProviderName(),
 					"model_tier":    string(tier),
+				})
+				c.EmitJSON(schema.EVENT_TYPE_PRESSURE, "system", map[string]any{
+					"current_cost_token_size": tokenSize,
+					"pressure_token_size":     c.AiCallTokenLimit,
+					"model_tier":              string(tier),
+					"model_name":              rsp.GetModelName(),
+					"provider_name":           rsp.GetProviderName(),
 				})
 			}, func() {
 				du := time.Since(start)
