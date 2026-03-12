@@ -144,11 +144,14 @@ for idx := 0; idx < len(ips); idx++ {
     if !geoOk {
         yakit.Info("  [FALLBACK] Attempting amap.GetIpLocation for %s...", ip)
         try {
-            amapResult = amap.GetIpLocation(ip)
+            amapResult, amapErr := amap.GetIpLocation(ip)
+            if amapErr != nil {
+                die(amapErr)
+            }
             if amapResult != nil {
                 yakit.Info("  [AMAP] Province: %v", amapResult.Province)
                 yakit.Info("  [AMAP] City: %v", amapResult.City)
-                yakit.Info("  [AMAP] ISP: %v", amapResult.Isp)
+                yakit.Info("  [AMAP] AdCode: %v", amapResult.AdCode)
                 geoOk = true
             } else {
                 yakit.Info("  [AMAP] returned empty result")
