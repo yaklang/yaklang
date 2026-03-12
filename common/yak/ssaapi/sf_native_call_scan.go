@@ -27,28 +27,18 @@ type basicBlockInfo struct {
 }
 
 var nativeCallScan = func(direction direction) func(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
-	return func(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
-		var vals []sfvm.ValueOperator
-		prog, err := fetchProgram(v)
-		if err != nil {
-			return false, nil, err
+	return sfvm.ValueSingleNativeCall(func(operator sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (sfvm.Values, error) {
+		val, ok := operator.(*Value)
+		if !ok {
+			return sfvm.NewEmptyValues(), nil
 		}
-		v.Recursive(func(operator sfvm.ValueOperator) error {
-			val, ok := operator.(*Value)
-			if !ok {
-				return nil
-			}
-			results := searchAlongBasicBlock(val.getValue(), prog, frame, params, direction)
-			if !ok {
-				return nil
-			}
-			// Preserve anchor provenance so condition scopes can map scan results back to their source.
-			sfvm.MergeAnchorBitVectorToResult(sfvm.NewValues(results), val)
-			vals = append(vals, results...)
-			return nil
-		})
-		return true, sfvm.NewValues(vals), nil
-	}
+		prog := val.ParentProgram
+		if prog == nil {
+			return sfvm.NewEmptyValues(), nil
+		}
+		results := searchAlongBasicBlock(val.getValue(), prog, frame, params, direction)
+		return sfvm.NewValues(results), nil
+	})
 }
 
 func searchAlongBasicBlock(

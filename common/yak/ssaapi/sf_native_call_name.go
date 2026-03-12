@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
@@ -42,33 +41,25 @@ func getValueNames(val *Value) []string {
 	return names
 }
 
-var nativeCallName sfvm.NativeCallFunc = func(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
-	var vals []sfvm.ValueOperator
-	v.Recursive(func(operator sfvm.ValueOperator) error {
-		val, ok := operator.(*Value)
-		if !ok {
-			return nil
-		}
-		names := getValueNames(val)
-		filter := make(map[string]struct{})
-		for _, name := range names {
-			if name == "" {
-				continue
-			}
-			_, existed := filter[name]
-			if !existed {
-				filter[name] = struct{}{}
-				results := val.NewConstValue(name, val.GetRange())
-				results.AppendPredecessor(val, frame.WithPredecessorContext("getFuncName"))
-				mergeAnchorBitVectorToResult(sfvm.ValuesOf(results), val)
-				vals = append(vals, results)
-			}
-		}
-
-		return nil
-	})
-	if len(vals) > 0 {
-		return true, sfvm.NewValues(vals), nil
+var nativeCallName sfvm.NativeCallFunc = sfvm.ValueSingleNativeCall(func(operator sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (sfvm.Values, error) {
+	val, ok := operator.(*Value)
+	if !ok {
+		return sfvm.NewEmptyValues(), nil
 	}
-	return false, nil, utils.Error("no value found")
-}
+	names := getValueNames(val)
+	filter := make(map[string]struct{})
+	results := make([]sfvm.ValueOperator, 0, len(names))
+	for _, name := range names {
+		if name == "" {
+			continue
+		}
+		if _, existed := filter[name]; existed {
+			continue
+		}
+		filter[name] = struct{}{}
+		ret := val.NewConstValue(name, val.GetRange())
+		ret.AppendPredecessor(val, frame.WithPredecessorContext("getFuncName"))
+		results = append(results, ret)
+	}
+	return sfvm.NewValues(results), nil
+})

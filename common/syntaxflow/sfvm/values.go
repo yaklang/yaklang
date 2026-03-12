@@ -14,6 +14,11 @@ import (
 
 type Values []ValueOperator
 
+type ValuePipelineOptions struct {
+	Frame            *SFFrame
+	PredecessorLabel string
+}
+
 func NewValues(values []ValueOperator) Values {
 	if len(values) == 0 {
 		return NewEmptyValues()
@@ -107,25 +112,55 @@ func (v Values) NewConst(i any, rng ...*memedit.Range) ValueOperator {
 	return operator.NewConst(i, rng...)
 }
 
-func (v Values) pipeLineRun(f func(ValueOperator) (Values, error)) (Values, error) {
+func RunValueOperatorPipeline(values Values, opts ValuePipelineOptions, f func(ValueOperator) (Values, error)) (Values, error) {
+	if values.IsEmpty() {
+		return NewEmptyValues(), nil
+	}
+
 	ctx := context.Background()
-	size := len(v)
+	if opts.Frame != nil {
+		ctx = opts.Frame.GetContext()
+	}
+	propagateAnchors := false
+	if opts.Frame != nil {
+		_, _, propagateAnchors = opts.Frame.ActiveAnchorScope()
+	}
+
+	size := len(values)
 	pipe := pipeline.NewPipe(ctx, size, func(operator ValueOperator) (Values, error) {
 		value, err := f(operator)
-		if err == nil {
-			// Provenance propagation for condition scopes:
-			//   for r in value: r.bits |= operator.bits
-			// Without this, OpFilter cannot map derived results back to the scope source slots.
-			mergeAnchorBitVectorToResult(value, operator)
+		if err != nil {
+			return value, err
 		}
-		return value, err
+		if opts.PredecessorLabel != "" && opts.Frame != nil {
+			_ = value.AppendPredecessor(operator, opts.Frame.WithPredecessorContext(opts.PredecessorLabel))
+		}
+		if propagateAnchors {
+			MergeAnchor(operator, value...)
+		}
+		return value, nil
 	})
-	_ = v.Recursive(func(operator ValueOperator) error {
+	_ = values.Recursive(func(operator ValueOperator) error {
 		pipe.Feed(operator)
 		return nil
 	})
 	pipe.Close()
-	return MergeValues(lo.ChannelToSlice(pipe.Out())...), nil
+	results := MergeValues(lo.ChannelToSlice(pipe.Out())...)
+	if err := pipe.Error(); err != nil {
+		return results, err
+	}
+	return results, nil
+}
+
+func (v Values) pipeLineRun(f func(ValueOperator) (Values, error)) (Values, error) {
+	return RunValueOperatorPipeline(v, ValuePipelineOptions{}, f)
+}
+
+func (s *SFFrame) runValueOperatorPipeline(source Values, predecessorLabel string, f func(ValueOperator) (Values, error)) (Values, error) {
+	return RunValueOperatorPipeline(source, ValuePipelineOptions{
+		Frame:            s,
+		PredecessorLabel: predecessorLabel,
+	}, f)
 }
 
 func (v Values) CompareOpcode(comparator *OpcodeComparator) (Values, []bool) {
@@ -135,7 +170,7 @@ func (v Values) CompareOpcode(comparator *OpcodeComparator) (Values, []bool) {
 		matched, result := operator.CompareOpcode(comparator)
 		res = append(res, result...)
 		filtered := pickCandidateByMask(matched, result)
-		mergeAnchorBitVectorToResult(filtered, operator)
+		MergeAnchor(operator, filtered...)
 		candidates = append(candidates, filtered...)
 		return nil
 	})
@@ -149,7 +184,7 @@ func (v Values) CompareString(comparator *StringComparator) (Values, []bool) {
 		matched, result := operator.CompareString(comparator)
 		res = append(res, result...)
 		filtered := pickCandidateByMask(matched, result)
-		mergeAnchorBitVectorToResult(filtered, operator)
+		MergeAnchor(operator, filtered...)
 		candidates = append(candidates, filtered...)
 		return nil
 	})
@@ -266,7 +301,7 @@ func MergeValues(groups ...Values) Values {
 			}
 			key := valueCollectionKey(value)
 			if idx, ok := indexByKey[key]; ok {
-				mergeAnchorBitVector(result[idx], value)
+				MergeAnchor(value, result[idx])
 				continue
 			}
 			indexByKey[key] = len(result)
@@ -322,7 +357,7 @@ func IntersectValues(left Values, right Values) Values {
 		if !ok {
 			continue
 		}
-		mergeAnchorBitVector(value, matched)
+		MergeAnchor(matched, value)
 		result = append(result, value)
 	}
 	return result

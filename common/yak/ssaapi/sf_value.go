@@ -97,27 +97,21 @@ func (v *Value) SetAnchorBitVector(bits *utils.BitVector) {
 
 func (v *Value) ExactMatch(ctx context.Context, mod ssadb.MatchMode, want string) (bool, sfvm.Values, error) {
 	value := _SearchValue(v, mod, func(s string) bool { return s == want }, sfvm.WithAnalysisContext_Label("search-exact:"+want))
-	results := ToSFVMValues(value)
-	mergeAnchorBitVectorToResult(results, v)
-	return len(value) > 0, results, nil
+	return len(value) > 0, ToSFVMValues(value), nil
 }
 
 func (v *Value) GlobMatch(ctx context.Context, mod ssadb.MatchMode, g string) (bool, sfvm.Values, error) {
 	value := _SearchValue(v, mod, func(s string) bool {
 		return glob.MustCompile(g).Match(s)
 	}, sfvm.WithAnalysisContext_Label("search-glob:"+g))
-	results := ToSFVMValues(value)
-	mergeAnchorBitVectorToResult(results, v)
-	return len(value) > 0, results, nil
+	return len(value) > 0, ToSFVMValues(value), nil
 }
 
 func (v *Value) RegexpMatch(ctx context.Context, mod ssadb.MatchMode, re string) (bool, sfvm.Values, error) {
 	value := _SearchValue(v, mod, func(s string) bool {
 		return regexp.MustCompile(re).MatchString(s)
 	}, sfvm.WithAnalysisContext_Label("search-regexp:"+re))
-	results := ToSFVMValues(value)
-	mergeAnchorBitVectorToResult(results, v)
-	return len(value) > 0, results, nil
+	return len(value) > 0, ToSFVMValues(value), nil
 }
 
 func (v *Value) CompareString(items *sfvm.StringComparator) (sfvm.Values, []bool) {
@@ -164,7 +158,6 @@ func (v *Value) GetCallActualParams(start int, contain bool) (sfvm.Values, error
 			return
 		}
 		ret := v.NewValue(value)
-		ret.SetAnchorBitVector(v.GetAnchorBitVector())
 		ret.AppendPredecessor(v, sfvm.WithAnalysisContext_Label(
 			fmt.Sprintf("actual-args[%d](containRest:%v)", start, contain),
 		))
@@ -195,7 +188,6 @@ func (v *Value) GetCalled() (sfvm.Values, error) {
 	ret := v.GetCalledBy()
 	results := ToSFVMValues(ret)
 	results.AppendPredecessor(v, sfvm.WithAnalysisContext_Label("call"))
-	mergeAnchorBitVectorToResult(results, v)
 	return results, nil
 }
 
