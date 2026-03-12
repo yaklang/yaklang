@@ -436,6 +436,8 @@ func normalizeForgeType(raw string) string {
 		return schema.FORGE_TYPE_Config
 	case schema.FORGE_TYPE_YAK:
 		return schema.FORGE_TYPE_YAK
+	case schema.FORGE_TYPE_SkillMD:
+		return schema.FORGE_TYPE_SkillMD
 	default:
 		return ft
 	}
@@ -571,8 +573,10 @@ func dumpForgeToDir(forge *schema.AIForge, forgeDir string, effectiveName string
 	if effectiveName != "" {
 		yakName = effectiveName
 	}
-	if err := os.WriteFile(filepath.Join(forgeDir, fmt.Sprintf("%s.yak", yakName)), []byte(forge.ForgeContent), 0o644); err != nil {
-		return err
+	if forgeType != schema.FORGE_TYPE_SkillMD {
+		if err := os.WriteFile(filepath.Join(forgeDir, fmt.Sprintf("%s.yak", yakName)), []byte(forge.ForgeContent), 0o644); err != nil {
+			return err
+		}
 	}
 
 	if forgeType == schema.FORGE_TYPE_Config {
@@ -650,7 +654,7 @@ func parseForgeFromDir(cfgDir string, overrideName string) (*schema.AIForge, err
 	}
 
 	yakContent, yakErr := readYakContent(cfgDir, forgeName)
-	if yakErr != nil && cfg.ForgeContent == "" {
+	if yakErr != nil && cfg.ForgeContent == "" && forgeType != schema.FORGE_TYPE_SkillMD {
 		return nil, yakErr
 	}
 
@@ -676,6 +680,7 @@ func parseForgeFromDir(cfgDir string, overrideName string) (*schema.AIForge, err
 		ToolKeywords:       cfg.ToolKeywords,
 		Actions:            cfg.Actions,
 		Tags:               cfg.Tags,
+		FSBytes:            append([]byte(nil), cfg.FSBytes...),
 		InitPrompt:         initPrompt,
 		PersistentPrompt:   persistentPrompt,
 		PlanPrompt:         planPrompt,

@@ -385,6 +385,7 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 			}
 		}
 	}
+	config.loadSkillMDForgesIntoSkillLoader()
 
 	return config
 }

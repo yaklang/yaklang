@@ -243,7 +243,8 @@ func FastIntentMatch(r aicommon.AIInvokeRuntime, input string) *FastMatchResult 
 		}
 
 		forges, err := yakit.SearchAIForgeBM25(db, &yakit.AIForgeSearchFilter{
-			Keywords: []string{trimmed},
+			ForgeTypes: schema.RunnableForgeTypes(),
+			Keywords:   []string{trimmed},
 		}, 5, 0)
 		if err != nil {
 			log.Warnf("fast intent match: BM25 forge search failed: %v", err)

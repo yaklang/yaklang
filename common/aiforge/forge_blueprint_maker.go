@@ -66,6 +66,7 @@ type YakForgeBlueprintConfig struct {
 	Tools              string `json:"tools,omitempty"`
 	Description        string `json:"description,omitempty"`
 	ForgeContent       string `json:"forge_content,omitempty"`
+	FSBytes            []byte `json:"fs_bytes,omitempty"`
 	ParamsUIConfig     string `json:"params_ui_config,omitempty"`
 	UserPersistentData string `json:"user_persistent_data,omitempty"`
 	Author             string `json:"author,omitempty"`
@@ -115,6 +116,7 @@ func (c *YakForgeBlueprintConfig) WithSchemaForge(forge *schema.AIForge) *YakFor
 	c.Description = forge.Description
 	c.Actions = forge.Actions
 	c.ForgeContent = forge.ForgeContent
+	c.FSBytes = append([]byte(nil), forge.FSBytes...)
 	c.Tags = forge.Tags
 	c.CLIParameterRuleYaklangCode = forge.Params
 	c.ParamsUIConfig = forge.ParamsUIConfig

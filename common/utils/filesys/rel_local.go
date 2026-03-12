@@ -84,6 +84,9 @@ func (f *RelLocalFs) Rel(base string, target string) (string, error) {
 }
 func (f *RelLocalFs) WriteFile(name string, data []byte, perm os.FileMode) error {
 	name = f.Join(f.rel, name)
+	if err := os.MkdirAll(filepath.Dir(name), 0o755); err != nil {
+		return err
+	}
 	return os.WriteFile(name, data, perm)
 }
 func (f *RelLocalFs) Delete(name string) error {

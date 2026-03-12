@@ -101,6 +101,26 @@ func GetAIForgeByName(db *gorm.DB, name string) (*schema.AIForge, error) {
 	return &forge, nil
 }
 
+func GetAIForgeByNameAndTypes(db *gorm.DB, name string, forgeTypes ...string) (*schema.AIForge, error) {
+	query := db.Where("forge_name = ?", name)
+	if len(forgeTypes) > 0 {
+		query = query.Where("forge_type IN (?)", forgeTypes)
+	}
+	var forge schema.AIForge
+	if db := query.First(&forge); db.Error != nil {
+		return nil, db.Error
+	}
+	return &forge, nil
+}
+
+func GetAIForgesByType(db *gorm.DB, forgeType string) ([]*schema.AIForge, error) {
+	var forges []*schema.AIForge
+	if db := db.Where("forge_type = ?", forgeType).Find(&forges); db.Error != nil {
+		return nil, db.Error
+	}
+	return forges, nil
+}
+
 func GetAIForgeByID(db *gorm.DB, id int64) (*schema.AIForge, error) {
 	var forge schema.AIForge
 	if db := db.Where("id = ?", id).First(&forge); db.Error != nil {

@@ -2,6 +2,8 @@ package yakgrpc
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -208,4 +210,48 @@ query = cli.String("query", cli.setRequired(true))`
 	require.Equal(t, "", forge.ForgeVerboseName)
 	require.Len(t, forge.ToolKeywords, 0)
 	require.Len(t, forge.Tag, 0)
+}
+
+func TestAIForgeSkillPathRoundTrip(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	name := uuid.New().String()
+	skillDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(skillDir, "scripts"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(skillDir, "scripts", "helper.py"), []byte("print('hello')"), 0o644))
+
+	_, err = client.CreateAIForge(ctx, &ypb.AIForge{
+		ForgeName: name,
+		ForgeType: "skillmd",
+		SkillPath: skillDir,
+	})
+	require.NoError(t, err)
+	defer func() {
+		_, err = client.DeleteAIForge(ctx, &ypb.AIForgeFilter{ForgeName: name})
+		require.NoError(t, err)
+	}()
+
+	forge, err := client.GetAIForge(ctx, &ypb.GetAIForgeRequest{ForgeName: name, InflateSkillPath: true})
+	require.NoError(t, err)
+	require.NotEmpty(t, forge.GetSkillPath())
+	content, err := os.ReadFile(filepath.Join(forge.GetSkillPath(), "scripts", "helper.py"))
+	require.NoError(t, err)
+	require.Equal(t, "print('hello')", string(content))
+
+	_, err = client.UpdateAIForge(ctx, &ypb.AIForge{
+		ForgeName:    name,
+		ForgeType:    "skillmd",
+		Description:  "updated",
+		ForgeContent: "",
+	})
+	require.NoError(t, err)
+
+	forge, err = client.GetAIForge(ctx, &ypb.GetAIForgeRequest{ForgeName: name, InflateSkillPath: true})
+	require.NoError(t, err)
+	content, err = os.ReadFile(filepath.Join(forge.GetSkillPath(), "scripts", "helper.py"))
+	require.NoError(t, err)
+	require.Equal(t, "print('hello')", string(content))
 }

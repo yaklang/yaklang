@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/utils"
@@ -112,7 +113,7 @@ func ExecuteForge(
 }
 
 func ExecuteForgeAndAutoRegister(forgeName string, ctx context.Context, params []*ypb.ExecParamItem, opts ...aicommon.ConfigOption) (*ForgeResult, error) {
-	forgeIns, err := yakit.GetAIForgeByName(consts.GetGormProfileDatabase(), forgeName)
+	forgeIns, err := yakit.GetAIForgeByNameAndTypes(consts.GetGormProfileDatabase(), forgeName, schema.RunnableForgeTypes()...)
 	if err == nil {
 		cfg := NewYakForgeBlueprintConfigFromSchemaForge(forgeIns)
 		blueprint, buildErr := cfg.Build()

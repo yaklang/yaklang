@@ -133,7 +133,8 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 				var allForges []*schema.AIForge
 
 				forges, err := yakit.SearchAIForgeBM25(db, &yakit.AIForgeSearchFilter{
-					Keywords: keywords,
+					ForgeTypes: schema.RunnableForgeTypes(),
+					Keywords:   keywords,
 				}, 10, 0)
 				if err != nil {
 					log.Warnf("intent loop: BM25 forge AND-search failed: %v", err)

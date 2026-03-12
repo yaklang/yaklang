@@ -43,7 +43,14 @@ func (ForgeFactory) Query(ctx context.Context, opts ...aicommon.ForgeQueryOption
 	if err != nil {
 		return nil, err
 	}
-	return data, nil
+	res := make([]*schema.AIForge, 0, len(data))
+	for _, forge := range data {
+		if forge == nil || !schema.IsRunnableForgeType(forge.ForgeType) {
+			continue
+		}
+		res = append(res, forge)
+	}
+	return res, nil
 }
 
 func (f *ForgeFactory) GenerateAIForgeListForPrompt(forges []*schema.AIForge) (string, error) {
@@ -69,7 +76,7 @@ func (f *ForgeFactory) GetAIForge(name string) (*schema.AIForge, error) {
 	db := consts.GetGormProfileDatabase()
 	log.Debugf("ForgeFactory.GetAIForge: name=%q", name)
 
-	return yakit.GetAIForgeByName(db, name)
+	return yakit.GetAIForgeByNameAndTypes(db, name, schema.RunnableForgeTypes()...)
 }
 
 // GenerateAIJSONSchemaFromSchemaAIForge  从 AIForge 生成对应的 aitool.ToolOption 选项
