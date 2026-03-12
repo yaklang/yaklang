@@ -254,20 +254,31 @@ func (m *AiToolManager) GetToolByName(name string) (*aitool.Tool, error) {
 		}
 	}
 
-	// 从数据库中查找工具
-	toolFromDB, err := yakit.GetAIYakTool(consts.GetGormProfileDatabase(), name)
-	if err != nil {
-		return nil, fmt.Errorf("cannot found [%v] neithor in database nor in enable tools: %v", name, err)
+	db := consts.GetGormProfileDatabase()
+
+	// 从 ai_yak_tools 数据库中查找工具
+	toolFromDB, err := yakit.GetAIYakTool(db, name)
+	if err == nil {
+		convertedTools := yakscripttools.ConvertTools([]*schema.AIYakTool{toolFromDB})
+		if len(convertedTools) > 0 {
+			return convertedTools[0], nil
+		}
+		log.Errorf("convert tool [%s] from ai_yak_tools database failed", name)
 	}
 
-	// 将 schema.AIYakTool 转换为 aitool.Tool
-	convertedTools := yakscripttools.ConvertTools([]*schema.AIYakTool{toolFromDB})
-	if len(convertedTools) == 0 {
-		log.Errorf("convert tool [%s] from database failed", name)
-		return nil, fmt.Errorf("convert tool [%v] from database failed", name)
+	// 从 yak_scripts 数据库中查找 enable_for_ai=true 的 Yakit 插件
+	scriptFromDB, scriptErr := yakit.GetYakScriptByNameForAI(db, name)
+	if scriptErr == nil {
+		convertedTool, convertErr := yakscripttools.ConvertYakScriptPlugin(scriptFromDB)
+		if convertErr == nil && convertedTool != nil {
+			return convertedTool, nil
+		}
+		if convertErr != nil {
+			log.Errorf("convert YakScript plugin [%s] failed: %v", name, convertErr)
+		}
 	}
 
-	return convertedTools[0], nil
+	return nil, fmt.Errorf("cannot find [%v] in ai_yak_tools, yak_scripts, or enabled tools", name)
 }
 
 // SearchTools 通过字符串搜索相关工具

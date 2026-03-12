@@ -22,6 +22,9 @@ type pluginConfig struct {
 	Tags                []string
 	EnableGenerateParam bool
 	Ignore              bool
+	EnableForAI         bool
+	AIDesc              string
+	AIKeywords          string
 }
 
 type pluginOption func(*pluginConfig)
@@ -57,6 +60,14 @@ func withPluginEnableGenerateParam(b bool) pluginOption {
 	}
 }
 
+func withPluginEnableForAI(desc string, keywords string) pluginOption {
+	return func(config *pluginConfig) {
+		config.EnableForAI = true
+		config.AIDesc = desc
+		config.AIKeywords = keywords
+	}
+}
+
 func registerBuildInPlugin(pluginType string, name string, opt ...pluginOption) {
 	codes := string(GetCorePluginData(name))
 	if len(codes) <= 0 {
@@ -82,6 +93,9 @@ func registerBuildInPlugin(pluginType string, name string, opt ...pluginOption) 
 		IsCorePlugin:       true,
 		HeadImg:            `https://yaklang.oss-cn-beijing.aliyuncs.com/yaklang-avator-logo.png`,
 		Ignored:            config.Ignore,
+		EnableForAI:        config.EnableForAI,
+		AIDesc:             config.AIDesc,
+		AIKeywords:         config.AIKeywords,
 	}
 	buildInPlugin[name] = plugin
 	OverWriteYakPlugin(plugin.ScriptName, plugin, config.EnableGenerateParam)
@@ -109,21 +123,37 @@ func syncCorePluginEmbedInternal() error {
 		"HTTP请求走私",
 		withPluginAuthors("V1ll4n"),
 		withPluginHelp("HTTP请求走私漏洞检测，通过设置畸形的 Content-Length(CL) 和 Transfer-Encoding(TE) 来检测服务器是否会对畸形数据包产生不安全的反应。"),
+		withPluginEnableForAI(
+			"HTTP Request Smuggling vulnerability detection. Detects CL.TE/TE.CL/TE.TE smuggling by sending malformed Content-Length and Transfer-Encoding headers.",
+			"http request smuggling,CL.TE,TE.CL,request smuggling,HTTP走私,smuggling detection",
+		),
 	)
 	registerBuildInPlugin(
 		"mitm", "CSRF 表单保护与 CORS 配置不当检测",
 		withPluginHelp("检测应用是否存在 CSRF 表单保护，以及 CORS 配置不当"),
 		withPluginAuthors("Rookie"),
+		withPluginEnableForAI(
+			"CSRF form protection and CORS misconfiguration detection. Checks for missing CSRF tokens in forms and insecure CORS headers.",
+			"csrf,cors,cross-site request forgery,CORS misconfiguration,form protection,CSRF检测",
+		),
 	)
 	registerBuildInPlugin(
 		"mitm", "Fastjson 综合检测",
 		withPluginHelp("综合 FastJSON 反序列化漏洞检测"),
 		withPluginAuthors("z3"),
+		withPluginEnableForAI(
+			"Fastjson deserialization vulnerability detection. Comprehensive detection for Fastjson RCE via JNDI injection and other attack vectors.",
+			"fastjson,deserialization,RCE,JNDI,java,Fastjson反序列化,远程代码执行",
+		),
 	)
 	registerBuildInPlugin(
 		"mitm", "Shiro 指纹识别 + 弱密码检测",
 		withPluginHelp("识别应用是否是 Shiro 应用，尝试检测默认 KEY (CBC/GCM 模式均支持)，当发现默认KEY之后进行一次利用链检测"),
 		withPluginAuthors("z3", "go0p"),
+		withPluginEnableForAI(
+			"Apache Shiro fingerprinting and default key detection. Identifies Shiro applications via rememberMe cookie, tests default encryption keys (CBC/GCM), and attempts exploitation chain detection.",
+			"shiro,apache shiro,rememberMe,default key,CBC,GCM,deserialization,shiro检测,弱密码",
+		),
 	)
 	registerBuildInPlugin(
 		"mitm", "Shiro 自定义检测",
@@ -134,37 +164,65 @@ func syncCorePluginEmbedInternal() error {
 	registerBuildInPlugin(
 		"mitm", "SSRF HTTP Public",
 		withPluginHelp("检测参数中的 SSRF 漏洞"),
+		withPluginEnableForAI(
+			"Server-Side Request Forgery (SSRF) detection. Tests HTTP parameters for SSRF vulnerabilities by injecting external callback URLs.",
+			"ssrf,server-side request forgery,SSRF检测,内网探测,请求伪造",
+		),
 	)
 	registerBuildInPlugin(
 		"mitm", "SQL注入-UNION注入-MD5函数",
 		withPluginHelp("Union 注入，使用 md5 函数检测特征输出（mysql/postgres）"),
 		withPluginAuthors("V1ll4n"),
+		withPluginEnableForAI(
+			"SQL injection detection using UNION-based technique with MD5 function output verification. Supports MySQL and PostgreSQL.",
+			"sql injection,union injection,sqli,mysql,postgres,SQL注入,UNION注入,MD5",
+		),
 	)
 	registerBuildInPlugin(
 		"mitm", "SQL注入-MySQL-ErrorBased",
 		withPluginHelp("MySQL 报错注入（使用 MySQL 十六进制字符串特征检测）"),
 		withPluginAuthors("V1ll4n"),
+		withPluginEnableForAI(
+			"MySQL error-based SQL injection detection using hex string characteristic verification.",
+			"sql injection,error-based,mysql,sqli,报错注入,SQL注入,MySQL注入",
+		),
 	)
 	registerBuildInPlugin(
 		"mitm", "SQL注入-时间盲注-Sleep",
 		withPluginHelp("SQL 时间盲注"),
 		withPluginAuthors("WAY"),
+		withPluginEnableForAI(
+			"Time-based blind SQL injection detection using SLEEP/WAITFOR/pg_sleep functions.",
+			"sql injection,blind sqli,time-based,sleep,时间盲注,SQL注入",
+		),
 	)
 	registerBuildInPlugin(
 		"mitm", "SQL注入-堆叠注入",
 		withPluginHelp("SQL 堆叠注入（带回显），使用 md5 函数检测特征输出（mysql/postgres）"),
 		withPluginAuthors("WAY"),
+		withPluginEnableForAI(
+			"Stacked queries SQL injection detection with echo output using MD5 function (MySQL/PostgreSQL).",
+			"sql injection,stacked queries,sqli,mysql,postgres,堆叠注入,SQL注入",
+		),
 	)
 	registerBuildInPlugin(
 		"mitm",
 		"SSTI Expr 服务器模版表达式注入",
 		withPluginHelp("SSTI 服务器模版表达式注入漏洞（通用漏洞检测）"),
 		withPluginAuthors("V1ll4n"),
+		withPluginEnableForAI(
+			"Server-Side Template Injection (SSTI) and expression injection detection. Universal detection for template engines like Jinja2, Thymeleaf, FreeMarker, etc.",
+			"ssti,template injection,expression injection,jinja2,thymeleaf,freemarker,模板注入,表达式注入",
+		),
 	)
 	registerBuildInPlugin(
 		"mitm", "Swagger JSON 泄漏",
 		withPluginHelp("检查网站是否开放 Swagger JSON 的 API 信息"),
 		withPluginAuthors("V1ll4n"),
+		withPluginEnableForAI(
+			"Swagger JSON API information leakage detection. Checks if the target exposes Swagger/OpenAPI documentation endpoints.",
+			"swagger,api leakage,openapi,information disclosure,swagger泄漏,API信息泄漏",
+		),
 	)
 	//registerBuildInPlugin(
 	//	"mitm", "启发式SQL注入检测",
@@ -175,21 +233,37 @@ func syncCorePluginEmbedInternal() error {
 		"mitm", "基础 XSS 检测",
 		withPluginHelp("一个检测参数中的 XSS 算法，支持各种被编码或 JSON 中的 XSS 检测"),
 		withPluginAuthors("WaY"),
+		withPluginEnableForAI(
+			"Cross-Site Scripting (XSS) detection. Tests parameters for reflected XSS with encoding bypass and JSON context support.",
+			"xss,cross-site scripting,reflected xss,XSS检测,跨站脚本,编码绕过",
+		),
 	)
 	registerBuildInPlugin(
 		"mitm", "文件包含",
 		withPluginHelp(`利用PHP伪协议特性和base64收敛特性测试文件包含`),
 		withPluginAuthors("V1ll4n"),
+		withPluginEnableForAI(
+			"Local/Remote File Inclusion (LFI/RFI) detection using PHP pseudo-protocol and base64 convergence characteristics.",
+			"file inclusion,lfi,rfi,php,pseudo-protocol,文件包含,本地文件包含,远程文件包含",
+		),
 	)
 	registerBuildInPlugin(
 		"mitm", "开放 URL 重定向漏洞",
 		withPluginHelp("检测开放 URL 重定向漏洞，可检查 meta / js / location 中的内容"),
 		withPluginAuthors("Rookie"),
+		withPluginEnableForAI(
+			"Open URL redirect vulnerability detection. Checks meta tags, JavaScript redirects, and Location headers for open redirect issues.",
+			"open redirect,url redirect,重定向,URL重定向,开放重定向",
+		),
 	)
 	registerBuildInPlugin(
 		"mitm", "回显命令注入",
 		withPluginHelp("检测回显型命令注入漏洞（不检测 Cookie 中的命令注入）"),
 		withPluginAuthors("V1ll4n"),
+		withPluginEnableForAI(
+			"Echo-based command injection detection. Tests parameters for OS command injection with output reflection (excludes Cookie parameters).",
+			"command injection,rce,os command,命令注入,回显命令注入,远程命令执行",
+		),
 	)
 	registerBuildInPlugin(
 		"mitm", "修改 HTTP 请求 Header",
@@ -351,12 +425,20 @@ func syncCorePluginEmbedInternal() error {
 		"SQL注入-Path参数注入",
 		withPluginAuthors("intSheep"),
 		withPluginHelp("SQL注入检测，针对RESTful API风格设计的Path参数进行SQL注入检测"),
+		withPluginEnableForAI(
+			"SQL injection detection targeting RESTful API path parameters.",
+			"sql injection,path parameter,restful api,sqli,SQL注入,Path参数注入,RESTful",
+		),
 	)
 	registerBuildInPlugin(
 		"mitm",
 		"SQL注入-高危Header注入",
 		withPluginAuthors("intSheep"),
 		withPluginHelp("SQL注入检测，针对高风险的HTTP Header(如X-Forwarded-For、Referer)进行SQL注入检测"),
+		withPluginEnableForAI(
+			"SQL injection detection targeting high-risk HTTP headers (X-Forwarded-For, Referer, etc.).",
+			"sql injection,header injection,X-Forwarded-For,Referer,sqli,SQL注入,Header注入",
+		),
 	)
 
 	registerBuildInPlugin(
@@ -429,6 +511,57 @@ func init() {
 			return hash
 		}, syncCorePluginEmbedInternal)
 	}, "sync-core-plugin-for-yakit")
+
+	yakit.RegisterPostInitDatabaseFunction(func() error {
+		return syncCorePluginAIFields()
+	}, "sync-core-plugin-ai-fields")
+}
+
+// corePluginAIFieldsVersion is bumped whenever AI metadata for core plugins
+// changes in Go code. Since these changes don't touch the embedded .yak files,
+// the normal embed-FS hash check won't trigger a resync. This version string
+// forces a one-time full sync when incremented.
+const corePluginAIFieldsVersion = "v1"
+
+// syncCorePluginAIFields ensures AI metadata (enable_for_ai, ai_desc, ai_keywords)
+// is written to the database for core plugins. This runs independently from the
+// embed FS hash check, because AI field changes (in Go code) don't alter the
+// embedded .yak file content.
+func syncCorePluginAIFields() error {
+	key := "core-plugin-ai-fields-version"
+	if yakit.Get(key) == corePluginAIFieldsVersion {
+		return nil
+	}
+
+	log.Infof("core plugin AI fields version changed (want %s), forcing sync", corePluginAIFieldsVersion)
+
+	if len(buildInPlugin) == 0 {
+		if err := syncCorePluginEmbedInternal(); err != nil {
+			log.Warnf("sync core plugin embed for AI fields failed: %v", err)
+			return nil
+		}
+	} else {
+		db := consts.GetGormProfileDatabase()
+		if db == nil {
+			return nil
+		}
+		for name, plugin := range buildInPlugin {
+			if !plugin.EnableForAI {
+				continue
+			}
+			if err := db.Model(&schema.YakScript{}).Where("script_name = ?", name).UpdateColumns(map[string]interface{}{
+				"enable_for_ai": plugin.EnableForAI,
+				"ai_desc":       plugin.AIDesc,
+				"ai_keywords":   plugin.AIKeywords,
+			}).Error; err != nil {
+				log.Warnf("sync AI fields for core plugin %q failed: %v", name, err)
+			}
+		}
+	}
+
+	yakit.Set(key, corePluginAIFieldsVersion)
+	log.Infof("core plugin AI fields synced to version %s", corePluginAIFieldsVersion)
+	return nil
 }
 
 // only use for test
@@ -457,8 +590,8 @@ func OverWriteYakPlugin(name string, scriptData *schema.YakScript, enableGenerat
 		}
 		return "", "", nil
 	}
-	pluginHash := func(code string, headImg string, tags string, ignore bool) string {
-		return utils.CalcSha1(string(code), headImg, tags, ignore)
+	pluginHash := func(code string, headImg string, tags string, ignore bool, enableForAI bool, aiDesc string, aiKeywords string) string {
+		return utils.CalcSha1(string(code), headImg, tags, ignore, enableForAI, aiDesc, aiKeywords)
 	}
 
 	codeBytes := GetCorePluginData(name)
@@ -467,7 +600,7 @@ func OverWriteYakPlugin(name string, scriptData *schema.YakScript, enableGenerat
 		log.Errorf("fetch buildin-plugin: %v failed", name)
 		return
 	}
-	newestPluginHash := pluginHash(code, scriptData.HeadImg, scriptData.Tags, scriptData.Ignored)
+	newestPluginHash := pluginHash(code, scriptData.HeadImg, scriptData.Tags, scriptData.Ignored, scriptData.EnableForAI, scriptData.AIDesc, scriptData.AIKeywords)
 
 	databasePlugins := yakit.QueryYakScriptByNames(consts.GetGormProfileDatabase(), name)
 	if len(databasePlugins) == 0 {
@@ -486,7 +619,7 @@ func OverWriteYakPlugin(name string, scriptData *schema.YakScript, enableGenerat
 		return
 	}
 	databasePlugin := databasePlugins[0]
-	if databasePlugin.Content != "" && newestPluginHash == pluginHash(databasePlugin.Content, databasePlugin.HeadImg, databasePlugin.Tags, databasePlugin.Ignored) && databasePlugin.IsCorePlugin {
+	if databasePlugin.Content != "" && newestPluginHash == pluginHash(databasePlugin.Content, databasePlugin.HeadImg, databasePlugin.Tags, databasePlugin.Ignored, databasePlugin.EnableForAI, databasePlugin.AIDesc, databasePlugin.AIKeywords) && databasePlugin.IsCorePlugin {
 		log.Debugf("existed plugin's code is not changed, skip: %v", name)
 		return
 	} else {

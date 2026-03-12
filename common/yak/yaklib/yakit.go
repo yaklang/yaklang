@@ -308,10 +308,42 @@ func ConvertExecResultIntoAIToolCallStdoutLog(i *ypb.ExecResult, onlyAIOutputOpt
 		switch logInfo.Level {
 		case "file", "debug", "progress":
 			return ""
+		case "json-risk":
+			return convertRiskLogToReadable(logInfo.Data)
 		}
 		return fmt.Sprintf("[%s] %s", logInfo.Level, logInfo.Data)
 	}
 	return i.String()
+}
+
+func convertRiskLogToReadable(data string) string {
+	var riskData map[string]any
+	if err := json.Unmarshal([]byte(data), &riskData); err != nil {
+		return "[risk] " + data
+	}
+
+	severity, _ := riskData["Severity"].(string)
+	if severity == "" {
+		severity = "info"
+	}
+	title, _ := riskData["Title"].(string)
+	if title == "" {
+		if tv, ok := riskData["TitleVerbose"].(string); ok {
+			title = tv
+		}
+	}
+	url, _ := riskData["Url"].(string)
+	riskType, _ := riskData["RiskType"].(string)
+
+	var parts []string
+	parts = append(parts, fmt.Sprintf("[risk][%s] %s", strings.ToUpper(severity), title))
+	if url != "" {
+		parts = append(parts, fmt.Sprintf("URL: %s", url))
+	}
+	if riskType != "" {
+		parts = append(parts, fmt.Sprintf("Type: %s", riskType))
+	}
+	return strings.Join(parts, " | ")
 }
 
 // convertYakitFileLogToSummary extracts a brief summary from yakit.File log data
