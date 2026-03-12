@@ -27,12 +27,15 @@ func GetBuiltinSkillsFS() fi.FileSystem {
 }
 
 // ExtractBuiltinSkillsToDir extracts built-in skills from the embedded filesystem
-// to a target directory on disk (typically ~/yakit-projects/ai-skills/).
+// to a target directory on disk (typically ~/yakit-projects/ai-skills/builtin/).
 // This enables users to view, modify, and extend skills directly on the filesystem.
+// Built-in skills are placed under a "builtin/" subdirectory to separate them from
+// user-created skills that live directly under the target directory.
 //
 // Only files that don't exist or have changed content are written, avoiding
 // unnecessary disk I/O. The embedded FS layout is "skills/<skill-name>/SKILL.md";
-// the "skills/" prefix is stripped so the output becomes "<targetDir>/<skill-name>/SKILL.md".
+// the "skills/" prefix is stripped and "builtin/" is prepended, so the output
+// becomes "<targetDir>/builtin/<skill-name>/SKILL.md".
 func ExtractBuiltinSkillsToDir(targetDir string) error {
 	embedFS := filesys.NewEmbedFS(builtinSkillsFS)
 
@@ -54,8 +57,8 @@ func ExtractBuiltinSkillsToDir(targetDir string) error {
 				return nil
 			}
 
-			// Target path on disk
-			targetPath := filepath.Join(targetDir, relPath)
+			// Target path: <targetDir>/builtin/<skill-name>/SKILL.md
+			targetPath := filepath.Join(targetDir, "builtin", relPath)
 
 			// Check if file already exists with same content (skip if unchanged)
 			existing, err := os.ReadFile(targetPath)
