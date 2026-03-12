@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/obfuscation"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
@@ -30,19 +31,23 @@ type CompileConfig struct {
 	ExtraLinkArgs     []string
 	SkipRuntimeLink   bool
 	PrintEntryResult  bool
+	SSAObfuscators    []string
+	LLVMObfuscators   []string
 }
 
 type CompileOption func(*CompileConfig)
 
 type RunConfig struct {
-	SourceFile     string
-	SourceCode     string
-	Language       string
-	FunctionName   string
-	Args           []uint64
-	PrintIR        bool
-	ExternalHooks  map[string]unsafe.Pointer
-	ExternBindings map[string]ExternBinding
+	SourceFile      string
+	SourceCode      string
+	Language        string
+	FunctionName    string
+	Args            []uint64
+	PrintIR         bool
+	ExternalHooks   map[string]unsafe.Pointer
+	ExternBindings  map[string]ExternBinding
+	SSAObfuscators  []string
+	LLVMObfuscators []string
 }
 
 type RunOption func(*RunConfig)
@@ -122,6 +127,18 @@ func WithCompilePrintEntryResult(enabled bool) CompileOption {
 	return func(c *CompileConfig) { c.PrintEntryResult = enabled }
 }
 
+func WithCompileSSAObfuscators(names ...string) CompileOption {
+	return func(c *CompileConfig) {
+		c.SSAObfuscators = appendObfuscatorNames(c.SSAObfuscators, names...)
+	}
+}
+
+func WithCompileLLVMObfuscators(names ...string) CompileOption {
+	return func(c *CompileConfig) {
+		c.LLVMObfuscators = appendObfuscatorNames(c.LLVMObfuscators, names...)
+	}
+}
+
 func WithCompileConfig(cfg CompileConfig) CompileOption {
 	return func(c *CompileConfig) {
 		c.SourceFile = cfg.SourceFile
@@ -135,6 +152,8 @@ func WithCompileConfig(cfg CompileConfig) CompileOption {
 		c.PrintIR = cfg.PrintIR
 		c.SkipRuntimeLink = cfg.SkipRuntimeLink
 		c.PrintEntryResult = cfg.PrintEntryResult
+		c.SSAObfuscators = append(c.SSAObfuscators, cfg.SSAObfuscators...)
+		c.LLVMObfuscators = append(c.LLVMObfuscators, cfg.LLVMObfuscators...)
 		if len(cfg.ExtraLinkArgs) > 0 {
 			c.ExtraLinkArgs = append(c.ExtraLinkArgs, cfg.ExtraLinkArgs...)
 		}
@@ -190,6 +209,18 @@ func WithRunExternBindings(bindings map[string]ExternBinding) RunOption {
 	return func(c *RunConfig) { c.ExternBindings = bindings }
 }
 
+func WithRunSSAObfuscators(names ...string) RunOption {
+	return func(c *RunConfig) {
+		c.SSAObfuscators = appendObfuscatorNames(c.SSAObfuscators, names...)
+	}
+}
+
+func WithRunLLVMObfuscators(names ...string) RunOption {
+	return func(c *RunConfig) {
+		c.LLVMObfuscators = appendObfuscatorNames(c.LLVMObfuscators, names...)
+	}
+}
+
 func WithRunConfig(cfg RunConfig) RunOption {
 	return func(c *RunConfig) {
 		c.SourceFile = cfg.SourceFile
@@ -201,6 +232,8 @@ func WithRunConfig(cfg RunConfig) RunOption {
 		c.Args = append(c.Args[:0], cfg.Args...)
 		c.PrintIR = cfg.PrintIR
 		c.ExternBindings = cfg.ExternBindings
+		c.SSAObfuscators = append(c.SSAObfuscators, cfg.SSAObfuscators...)
+		c.LLVMObfuscators = append(c.LLVMObfuscators, cfg.LLVMObfuscators...)
 		if c.ExternalHooks == nil {
 			c.ExternalHooks = make(map[string]unsafe.Pointer, len(cfg.ExternalHooks))
 		}
@@ -219,7 +252,14 @@ func RunViaJIT(opts ...RunOption) (int64, error) {
 		}
 	}
 
-	_, comp, _, err := compileInput(cfg.SourceFile, cfg.SourceCode, cfg.Language, cfg.ExternBindings)
+	_, comp, _, err := compileInput(
+		cfg.SourceFile,
+		cfg.SourceCode,
+		cfg.Language,
+		cfg.ExternBindings,
+		cfg.SSAObfuscators,
+		cfg.LLVMObfuscators,
+	)
 	if err != nil {
 		return 0, err
 	}
@@ -269,7 +309,12 @@ func RunViaJIT(opts ...RunOption) (int64, error) {
 	return int64(result.Int(true)), nil
 }
 
-func compileInput(sourceFile, sourceCode, language string, externBindings map[string]ExternBinding) (*ssaapi.Program, *Compiler, string, error) {
+func compileInput(
+	sourceFile, sourceCode, language string,
+	externBindings map[string]ExternBinding,
+	ssaObfuscators []string,
+	llvmObfuscators []string,
+) (*ssaapi.Program, *Compiler, string, error) {
 	code, sourceLabel, language, err := resolveCompileInput(sourceFile, sourceCode, language)
 	if err != nil {
 		return nil, nil, "", err
@@ -281,6 +326,9 @@ func compileInput(sourceFile, sourceCode, language string, externBindings map[st
 	if err != nil {
 		return nil, nil, "", utils.Errorf("SSA parse failed: %v", err)
 	}
+	if err := obfuscation.ApplySSA(progBundle.Program, ssaObfuscators); err != nil {
+		return nil, nil, "", utils.Errorf("SSA obfuscation failed: %v", err)
+	}
 
 	llvm.InitializeNativeTarget()
 	llvm.InitializeNativeAsmPrinter()
@@ -291,6 +339,10 @@ func compileInput(sourceFile, sourceCode, language string, externBindings map[st
 	if err := comp.Compile(); err != nil {
 		comp.Dispose()
 		return nil, nil, "", utils.Errorf("LLVM compilation failed: %v", err)
+	}
+	if err := obfuscation.ApplyLLVM(comp.Mod, llvmObfuscators); err != nil {
+		comp.Dispose()
+		return nil, nil, "", utils.Errorf("LLVM obfuscation failed: %v", err)
 	}
 
 	if err := llvm.VerifyModule(comp.Mod, llvm.PrintMessageAction); err != nil {
@@ -396,7 +448,14 @@ func CompileToExecutable(opts ...CompileOption) error {
 		}
 	}
 
-	_, comp, ir, err := compileInput(cfg.SourceFile, cfg.SourceCode, cfg.Language, cfg.ExternBindings)
+	_, comp, ir, err := compileInput(
+		cfg.SourceFile,
+		cfg.SourceCode,
+		cfg.Language,
+		cfg.ExternBindings,
+		cfg.SSAObfuscators,
+		cfg.LLVMObfuscators,
+	)
 	if err != nil {
 		return err
 	}
@@ -555,4 +614,8 @@ func buildSSAOptions(language string) []ssaconfig.Option {
 	}
 
 	return opts
+}
+
+func appendObfuscatorNames(dst []string, names ...string) []string {
+	return append(dst, obfuscation.NormalizeNames(names)...)
 }

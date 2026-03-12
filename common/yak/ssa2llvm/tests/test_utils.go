@@ -84,6 +84,18 @@ func checkBinaryEx(t *testing.T, code string, entry string, language string, exp
 	}
 }
 
+func checkBinaryExWithOptions(t *testing.T, code string, entry string, language string, expected interface{}, options ...runBinaryOption) {
+	t.Helper()
+	want, ok := expectedToInt64(expected)
+	if !ok {
+		t.Fatalf("Unsupported expected value type for binary check: %T", expected)
+	}
+	binaryRet, output := runBinaryReturnValueWithOptions(t, code, entry, language, options...)
+	if binaryRet != want {
+		t.Fatalf("Binary return mismatch. Expected: %d, Got: %d, Output: %q", want, binaryRet, output)
+	}
+}
+
 func checkPrint(t *testing.T, code string, expectedVals ...int64) {
 	t.Helper()
 	checkPrintJIT(t, code, expectedVals...)
@@ -166,6 +178,20 @@ func withCompileLanguage(language string) runBinaryOption {
 func withCompilePrintEntryResult(enabled bool) runBinaryOption {
 	return func(cfg *runBinaryConfig) error {
 		cfg.compileOpts = append(cfg.compileOpts, compiler.WithCompilePrintEntryResult(enabled))
+		return nil
+	}
+}
+
+func withCompileSSAObfuscators(names ...string) runBinaryOption {
+	return func(cfg *runBinaryConfig) error {
+		cfg.compileOpts = append(cfg.compileOpts, compiler.WithCompileSSAObfuscators(names...))
+		return nil
+	}
+}
+
+func withCompileLLVMObfuscators(names ...string) runBinaryOption {
+	return func(cfg *runBinaryConfig) error {
+		cfg.compileOpts = append(cfg.compileOpts, compiler.WithCompileLLVMObfuscators(names...))
 		return nil
 	}
 }
@@ -339,13 +365,24 @@ func runBinaryExitCodeWithEnv(t *testing.T, code string, entry string, env map[s
 
 func runBinaryReturnValue(t *testing.T, code string, entry string, language string) (int64, string) {
 	t.Helper()
+	return runBinaryReturnValueWithOptions(t, code, entry, language)
+}
+
+func runBinaryReturnValueWithOptions(t *testing.T, code string, entry string, language string, options ...runBinaryOption) (int64, string) {
+	t.Helper()
+	allOpts := make([]runBinaryOption, 0, len(options)+2)
+	allOpts = append(allOpts,
+		withCompileLanguage(language),
+		withCompilePrintEntryResult(true),
+	)
+	allOpts = append(allOpts, options...)
+
 	_, output := runBinaryExitCodeWithEnv(
 		t,
 		code,
 		entry,
 		nil,
-		withCompileLanguage(language),
-		withCompilePrintEntryResult(true),
+		allOpts...,
 	)
 	lines := strings.Split(strings.TrimSpace(output), "\n")
 	for i := len(lines) - 1; i >= 0; i-- {
