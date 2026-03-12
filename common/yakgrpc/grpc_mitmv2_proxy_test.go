@@ -104,6 +104,74 @@ poc.Get(mockUrl, poc.proxy(mitmProxy), poc.replaceQueryParam("u", token))~`,
 	}
 }
 
+func TestGRPCMUSTPASS_MITMV2_DownstreamProxy_SpecialCharsCredentials(t *testing.T) {
+	// 下游代理地址中凭据含 @ 等特殊字符，验证能正确解析并启动
+	var downstreamPassed bool
+	token := utils.RandNumberStringBytes(10)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	_, mockPort := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.URL.Query().Get("u") == token {
+			downstreamPassed = true
+		}
+		writer.Write([]byte("ok"))
+	})
+	mockUrl := "http://" + utils.HostPort("127.0.0.1", mockPort)
+
+	port := utils.GetRandomAvailableTCPPort()
+	server, err := crep.NewMITMServer(crep.MITM_SetHTTPRequestHijack(func(https bool, req *http.Request) *http.Request {
+		if req.URL.Query().Get("u") == token {
+			downstreamPassed = true
+		}
+		return req
+	}))
+	require.NoError(t, err)
+	addr := utils.HostPort("127.0.0.1", port)
+	go func() {
+		server.Serve(ctx, addr)
+	}()
+	require.NoError(t, utils.WaitConnect(addr, 10))
+
+	mitmPort := utils.GetRandomAvailableTCPPort()
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	stream, err := client.MITMV2(ctx)
+	require.NoError(t, err)
+	// 密码含 @，未手动编码
+	downstreamWithSpecialChars := "http://user:pass@word@" + utils.HostPort("127.0.0.1", port)
+	stream.Send(&ypb.MITMV2Request{
+		Host:            "127.0.0.1",
+		Port:            uint32(mitmPort),
+		DownstreamProxy: downstreamWithSpecialChars,
+	})
+	started := false
+	for {
+		data, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		if data.GetMessage().GetIsMessage() {
+			msg := string(data.GetMessage().GetMessage())
+			if strings.Contains(msg, "starting mitm server") {
+				started = true
+				_, _ = yak.Execute(
+					`poc.Get(mockUrl, poc.proxy(mitmProxy), poc.replaceQueryParam("u", token))~`,
+					map[string]any{
+						"mockUrl":   mockUrl,
+						"mitmProxy": "http://" + utils.HostPort("127.0.0.1", mitmPort),
+						"token":     token,
+					})
+			}
+			if strings.Contains(msg, "ERROR") && strings.Contains(msg, "downstream") {
+				t.Fatalf("MITM should not fail with downstream parse error when credentials have @: %s", msg)
+			}
+		}
+	}
+	require.True(t, started, "MITM should start")
+	require.True(t, downstreamPassed, "request should pass through downstream proxy")
+}
+
 func TestGRPCMUSTPASS_MITMV2_S5Proxy(t *testing.T) {
 	var (
 		networkIsPassed bool
