@@ -143,31 +143,8 @@ func (m *SkillsContextManager) persistAllMetasToDB() error {
 	if m.db == nil || m.loader == nil {
 		return nil
 	}
-	for _, meta := range m.loader.AllSkillMetas() {
-		fsys, err := m.loader.GetFileSystem(meta.Name)
-		if err != nil {
-			log.Warnf("failed to get filesystem for skill %q: %v", meta.Name, err)
-			continue
-		}
-		hash := ComputeSkillHash(fsys)
-		existing, err := yakit.GetAISkillByName(m.db, meta.Name)
-		if err == nil && existing != nil && existing.Hash == hash {
-			continue
-		}
-		skill := &schema.AISkill{
-			Name:                   meta.Name,
-			Description:            meta.Description,
-			License:                meta.License,
-			Keywords:               buildKeywordsString(meta),
-			Body:                   meta.Body,
-			Hash:                   hash,
-			DisableModelInvocation: meta.DisableModelInvocation,
-		}
-		if err := yakit.CreateOrUpdateAISkill(m.db, skill); err != nil {
-			log.Warnf("failed to persist skill %q: %v", meta.Name, err)
-		}
-	}
-	return nil
+	_, err := ImportAISkillsToDB(m.db, m.loader)
+	return err
 }
 
 // SetMaxBytes sets the total context size limit.

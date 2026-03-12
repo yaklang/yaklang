@@ -46,6 +46,10 @@ func CopyToRefLocal(srcFs filesys_interface.FileSystem, dest string) (*RelLocalF
 
 func CopyToTemporary(srcFs filesys_interface.FileSystem) *RelLocalFs {
 	name := filepath.Join(os.TempDir(), "copied-"+utils.RandStringBytes(12))
+	if err := os.MkdirAll(name, 0o755); err != nil {
+		log.Errorf("mkdir temp copy dir error: %v", err)
+		return NewRelLocalFs(name)
+	}
 	temp := NewRelLocalFs(name)
 	_, err := Copy(temp, srcFs)
 	if err != nil {

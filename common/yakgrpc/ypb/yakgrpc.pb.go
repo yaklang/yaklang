@@ -9873,7 +9873,7 @@ type AIForgeFilter struct {
 	state      protoimpl.MessageState `protogen:"open.v1"`
 	ForgeName  string                 `protobuf:"bytes,1,opt,name=ForgeName,proto3" json:"ForgeName,omitempty"`
 	ForgeNames []string               `protobuf:"bytes,11,rep,name=ForgeNames,proto3" json:"ForgeNames,omitempty"`
-	ForgeType  string                 `protobuf:"bytes,2,opt,name=ForgeType,proto3" json:"ForgeType,omitempty"` // enum: yak or config
+	ForgeType  string                 `protobuf:"bytes,2,opt,name=ForgeType,proto3" json:"ForgeType,omitempty"` // enum: yak, config or skillmd
 	Keyword    string                 `protobuf:"bytes,3,opt,name=Keyword,proto3" json:"Keyword,omitempty"`
 	// tag
 	Tag           []string `protobuf:"bytes,4,rep,name=Tag,proto3" json:"Tag,omitempty"`
@@ -9967,7 +9967,7 @@ type AIForge struct {
 	Id                 int64                  `protobuf:"varint,1,opt,name=Id,proto3" json:"Id,omitempty"`
 	ForgeName          string                 `protobuf:"bytes,2,opt,name=ForgeName,proto3" json:"ForgeName,omitempty"`
 	ForgeContent       string                 `protobuf:"bytes,3,opt,name=ForgeContent,proto3" json:"ForgeContent,omitempty"` // yak type is yak script, config type is empty
-	ForgeType          string                 `protobuf:"bytes,4,opt,name=ForgeType,proto3" json:"ForgeType,omitempty"`       // yak or config
+	ForgeType          string                 `protobuf:"bytes,4,opt,name=ForgeType,proto3" json:"ForgeType,omitempty"`       // yak, config or skillmd
 	Description        string                 `protobuf:"bytes,5,opt,name=Description,proto3" json:"Description,omitempty"`
 	ParamsUIConfig     string                 `protobuf:"bytes,6,opt,name=ParamsUIConfig,proto3" json:"ParamsUIConfig,omitempty"`         // json config for UI
 	Params             string                 `protobuf:"bytes,7,opt,name=Params,proto3" json:"Params,omitempty"`                         // cli parameters
@@ -9982,6 +9982,7 @@ type AIForge struct {
 	ResultPrompt       string                 `protobuf:"bytes,16,opt,name=ResultPrompt,proto3" json:"ResultPrompt,omitempty"`         // 结果提示语
 	ForgeVerboseName   string                 `protobuf:"bytes,17,opt,name=ForgeVerboseName,proto3" json:"ForgeVerboseName,omitempty"` // 给用户看的展示名称
 	Author             string                 `protobuf:"bytes,18,opt,name=Author,proto3" json:"Author,omitempty"`
+	SkillPath          string                 `protobuf:"bytes,19,opt,name=SkillPath,proto3" json:"SkillPath,omitempty"` // local path used to import/export serialized skill filesystem
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -10138,6 +10139,13 @@ func (x *AIForge) GetForgeVerboseName() string {
 func (x *AIForge) GetAuthor() string {
 	if x != nil {
 		return x.Author
+	}
+	return ""
+}
+
+func (x *AIForge) GetSkillPath() string {
+	if x != nil {
+		return x.SkillPath
 	}
 	return ""
 }
@@ -10399,11 +10407,12 @@ func (x *ImportAIForgeRequest) GetPassword() string {
 }
 
 type GetAIForgeRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ID            int64                  `protobuf:"varint,1,opt,name=ID,proto3" json:"ID,omitempty"`
-	ForgeName     string                 `protobuf:"bytes,2,opt,name=ForgeName,proto3" json:"ForgeName,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	ID               int64                  `protobuf:"varint,1,opt,name=ID,proto3" json:"ID,omitempty"`
+	ForgeName        string                 `protobuf:"bytes,2,opt,name=ForgeName,proto3" json:"ForgeName,omitempty"`
+	InflateSkillPath bool                   `protobuf:"varint,3,opt,name=InflateSkillPath,proto3" json:"InflateSkillPath,omitempty"` // restore stored skill filesystem into a temporary directory and return its path
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *GetAIForgeRequest) Reset() {
@@ -10448,6 +10457,13 @@ func (x *GetAIForgeRequest) GetForgeName() string {
 		return x.ForgeName
 	}
 	return ""
+}
+
+func (x *GetAIForgeRequest) GetInflateSkillPath() bool {
+	if x != nil {
+		return x.InflateSkillPath
+	}
+	return false
 }
 
 type AIFocus struct {
@@ -68544,7 +68560,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\aKeyword\x18\x03 \x01(\tR\aKeyword\x12\x10\n" +
 	"\x03Tag\x18\x04 \x03(\tR\x03Tag\x12\x0e\n" +
 	"\x02Id\x18\x05 \x01(\x03R\x02Id\x12$\n" +
-	"\rShowTemporary\x18\x06 \x01(\bR\rShowTemporary\"\xcb\x04\n" +
+	"\rShowTemporary\x18\x06 \x01(\bR\rShowTemporary\"\xe9\x04\n" +
 	"\aAIForge\x12\x0e\n" +
 	"\x02Id\x18\x01 \x01(\x03R\x02Id\x12\x1c\n" +
 	"\tForgeName\x18\x02 \x01(\tR\tForgeName\x12\"\n" +
@@ -68568,7 +68584,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"PlanPrompt\x12\"\n" +
 	"\fResultPrompt\x18\x10 \x01(\tR\fResultPrompt\x12*\n" +
 	"\x10ForgeVerboseName\x18\x11 \x01(\tR\x10ForgeVerboseName\x12\x16\n" +
-	"\x06Author\x18\x12 \x01(\tR\x06Author\"n\n" +
+	"\x06Author\x18\x12 \x01(\tR\x06Author\x12\x1c\n" +
+	"\tSkillPath\x18\x13 \x01(\tR\tSkillPath\"n\n" +
 	"\x13QueryAIForgeRequest\x12+\n" +
 	"\n" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +
@@ -68596,10 +68613,11 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\tInputPath\x18\x01 \x01(\tR\tInputPath\x12\x1c\n" +
 	"\tOverwrite\x18\x02 \x01(\bR\tOverwrite\x12\"\n" +
 	"\fNewForgeName\x18\x03 \x01(\tR\fNewForgeName\x12\x1a\n" +
-	"\bPassword\x18\x04 \x01(\tR\bPassword\"A\n" +
+	"\bPassword\x18\x04 \x01(\tR\bPassword\"m\n" +
 	"\x11GetAIForgeRequest\x12\x0e\n" +
 	"\x02ID\x18\x01 \x01(\x03R\x02ID\x12\x1c\n" +
-	"\tForgeName\x18\x02 \x01(\tR\tForgeName\"\xdb\x01\n" +
+	"\tForgeName\x18\x02 \x01(\tR\tForgeName\x12*\n" +
+	"\x10InflateSkillPath\x18\x03 \x01(\bR\x10InflateSkillPath\"\xdb\x01\n" +
 	"\aAIFocus\x12\x12\n" +
 	"\x04Name\x18\x01 \x01(\tR\x04Name\x12 \n" +
 	"\vDescription\x18\x02 \x01(\tR\vDescription\x120\n" +

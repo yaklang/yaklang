@@ -381,6 +381,7 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 			loader.RefreshFromDirs(consts.GetAllAISkillsDirs())
 		}
 	}
+	config.loadSkillMDForgesIntoSkillLoader()
 
 	return config
 }

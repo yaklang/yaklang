@@ -30,6 +30,7 @@ type AIForge struct {
 	PersistentPrompt string
 	PlanPrompt       string
 	ResultPrompt     string
+	FSBytes          []byte `gorm:"type:blob"`
 
 	IsTemporary bool // for temporary use, will be cleaned up later
 }
@@ -52,6 +53,15 @@ func (a *AIForge) GetKeywords() []string {
 
 var FORGE_TYPE_YAK = "yak"
 var FORGE_TYPE_Config = "config"
+var FORGE_TYPE_SkillMD = "skillmd"
+
+func IsRunnableForgeType(forgeType string) bool {
+	return forgeType == FORGE_TYPE_YAK || forgeType == FORGE_TYPE_Config
+}
+
+func RunnableForgeTypes() []string {
+	return []string{FORGE_TYPE_YAK, FORGE_TYPE_Config}
+}
 
 func (a *AIForge) AfterCreate(tx *gorm.DB) (err error) {
 	broadcastData.Call("aiforge", "create")

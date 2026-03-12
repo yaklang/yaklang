@@ -48,6 +48,9 @@ func ExecuteForge(forgeName string, i any, iopts ...any) (any, error) {
 	if err != nil {
 		return nil, utils.Errorf("failed to get forge instance: %v", err)
 	}
+	if !schema.IsRunnableForgeType(forgeIns.ForgeType) {
+		return nil, utils.Errorf("forge %q has unsupported runtime type %q", forgeName, forgeIns.ForgeType)
+	}
 
 	if forgeIns.ForgeType != schema.FORGE_TYPE_YAK {
 		// todo: support json config forge

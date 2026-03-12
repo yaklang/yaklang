@@ -18,6 +18,7 @@ func AIForgeVTableName() string {
 // It does not depend on ypb.AIForgeFilter to avoid protobuf coupling in the intent layer.
 type AIForgeSearchFilter struct {
 	ForgeNames []string
+	ForgeTypes []string
 	Keywords   []string
 }
 
@@ -38,6 +39,7 @@ func FilterAIForgeForSearch(db *gorm.DB, filter *AIForgeSearchFilter) *gorm.DB {
 
 	// Qualify column names with base table to avoid ambiguity during BM25 JOIN
 	db = bizhelper.ExactQueryStringArrayOr(db, aiForgesTable+".forge_name", filter.ForgeNames)
+	db = bizhelper.ExactQueryStringArrayOr(db, aiForgesTable+".forge_type", filter.ForgeTypes)
 	var keywords []string
 	for _, kw := range filter.Keywords {
 		kw = strings.TrimSpace(kw)
