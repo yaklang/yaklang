@@ -4179,6 +4179,7 @@ func TestStringIndexSlice(t *testing.T) {
 a = "Hello, Yak"
 println(a[0])
 assert sprint(a[0]) == "H", "println(a[0]) should print H"
+assert sprint(a[0] + 1) == "H1", "a[0]+1 should concat string with number"
 assert sprint(a[1:5]) == "ello", "println(a[1:5]) should print ello"
 assert sprint(a[3:0:-1]) == "lle", "println(a[3:0:-1]) should print lle"
 `)
