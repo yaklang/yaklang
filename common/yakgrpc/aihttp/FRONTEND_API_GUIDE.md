@@ -1,48 +1,49 @@
-# AIHTTP Frontend API Guide
+# AIHTTP 前端 API 指南
 
-> Audience: frontend developers (Web/CLI/TUI) integrating `common/yakgrpc/aihttp` gateway.
+> 适用对象：接入 `common/yakgrpc/aihttp` 网关的前端开发者（Web / CLI / TUI）。
 
-## 1. Overview
+## 1. 概览
 
-`aihttp` is an HTTP/SSE gateway built on top of yakgrpc streaming APIs.
+`aihttp` 是构建在 yakgrpc 流式 API 之上的 HTTP / SSE 网关。
 
-- Base route prefix (default): `/agent`
-- Main groups:
-  - `/run/*`: runtime execution and event streaming
-  - `/session/*`: session metadata and management
-  - `/setting/*`: chat setting, model/provider/focus options
+- 基础路由前缀（默认）：`/agent`
+- 主要分组：
+  - `/run/*`：运行时执行与事件流
+  - `/ypb.Yak/*`：兼容 gRPC 的标准路由
+  - `/session/*`：会话元数据与管理
+  - `/setting/*`：聊天设置、模型 / Provider / Focus 选项
 
-The gateway supports:
+该网关支持：
 
-- Create/reuse a run session
-- Stream AI output via SSE
-- Push runtime input/hotpatch/interactive events while running
-- Update settings and fetch provider/model/focus metadata
+- 创建 / 复用运行会话
+- 通过 SSE 流式接收 AI 输出
+- 在运行过程中推送运行时输入 / 热补丁 / 交互事件
+- 更新设置并拉取 provider / model / focus 元数据
 
 ---
 
-## 2. Authentication & Common Behavior
+## 2. 认证与通用行为
 
-## 2.1 Optional auth headers
+## 2.1 可选认证头
 
-If gateway enables auth, frontend should provide:
+如果网关开启了认证，前端应携带：
 
 - `Authorization: Bearer <jwt>`
 - `X-TOTP-Code: <totp_code>`
 
-If missing/invalid, API returns `401`.
+如果缺失或无效，API 会返回 `401`。
 
 ## 2.2 CORS
 
-Gateway always returns:
+网关始终会返回：
 
 - `Access-Control-Allow-Origin: *`
 - `Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS`
 - `Access-Control-Allow-Headers: Content-Type, Authorization, X-TOTP-Code`
 
-## 2.3 Error response format
+## 2.3 错误响应格式
 
-All HTTP errors are JSON:
+所有 HTTP 错误都使用 JSON：
 
 ```json
 {
@@ -54,33 +55,33 @@ All HTTP errors are JSON:
 
 ---
 
-## 3. Recommended Frontend Flow
+## 3. 推荐的前端接入流程
 
-For a **new conversation**:
+对于**新会话**：
 
-1. `POST /session` to get `run_id`
-2. Connect `GET /run/{run_id}/events` SSE first
-3. Wait for SSE event: `listener_ready`
-4. Call `POST /run/{run_id}` with first input event
-5. During output, user can still send input via `POST /run/{run_id}/events/push`
+1. 调用 `POST /session` 获取 `run_id`
+2. 先连接 `GET /run/{run_id}/events` SSE
+3. 等待 SSE 事件：`listener_ready`
+4. 调用 `POST /ypb.Yak/StartAIReAct/{run_id}`，并发送首个输入事件
+5. 输出过程中，用户仍可通过 `POST /ypb.Yak/StartAIReAct/{run_id}` 或兼容旧版的 `POST /run/{run_id}/events/push` 继续发送输入
 
-For an **existing session**:
+对于**已有会话**：
 
-1. Ensure session exists in backend runtime map (or recreate by `POST /session` with known `run_id`)
-2. Connect SSE
-3. Call `/run/{run_id}` or `/run/{run_id}/events/push` to continue
+1. 确保该会话已存在于后端运行时映射中（或使用已知 `run_id` 调用 `POST /session` 重新恢复）
+2. 连接 SSE
+3. 调用 `/ypb.Yak/StartAIReAct/{run_id}` 或兼容旧版的 `/run/{run_id}/events/push` 继续对话
 
-Cancel current run:
+取消当前运行：
 
-- `POST /run/{run_id}/cancel`
+- `POST /ypb.Yak/StartAIReAct/{run_id}/cancel`
 
 ---
 
-## 4. Data Models (Frontend-facing)
+## 4. 数据模型（面向前端）
 
 ## 4.1 `AIParams`
 
-Used in session creation and run input params.
+用于创建会话以及运行输入参数。
 
 ```json
 {
@@ -110,46 +111,70 @@ Used in session creation and run input params.
 }
 ```
 
-## 4.2 `PushEventRequest`
+## 4.2 `ypb.AIInputEvent`
 
-Used by `/run/{run_id}` and `/run/{run_id}/events/push`.
+以下接口的标准请求体：
+
+- `POST /ypb.Yak/StartAIReAct/{run_id}`
+- `POST /ypb.Yak/StartAIReAct/{run_id}/events/push`
+- 旧版 `POST /run/{run_id}`
+- 旧版 `POST /run/{run_id}/events/push`
 
 ```json
 {
-  "type": "free_input|interactive|sync",
-  "content": "optional fallback text",
-  "params": { "...AIParams" },
-
-  "is_config_hotpatch": false,
-  "hotpatch_type": "AIService|ModelName|...",
-  "is_start": false,
-
-  "is_interactive_message": false,
-  "interactive_id": "event_uuid",
-  "interactive_json_input": "{\"approved\":true}",
-
-  "is_sync_message": false,
-  "sync_type": "optional",
-  "sync_json_input": "{}",
-  "sync_id": "optional",
-
-  "is_free_input": true,
-  "free_input": "user text",
-  "attached_files": [],
-  "focus_mode_loop": "optional"
+  "IsStart": false,
+  "Params": {
+    "AIService": "openai",
+    "AIModelName": "gpt-4.1",
+    "UseDefaultAIConfig": true
+  },
+  "IsConfigHotpatch": false,
+  "HotpatchType": "AIService",
+  "IsInteractiveMessage": false,
+  "InteractiveId": "event_uuid",
+  "InteractiveJSONInput": "{\"approved\":true}",
+  "IsSyncMessage": false,
+  "SyncType": "optional",
+  "SyncJsonInput": "{}",
+  "SyncID": "optional",
+  "IsFreeInput": true,
+  "FreeInput": "user text",
+  "AttachedFilePath": [],
+  "FocusModeLoop": "optional"
 }
 ```
 
-At least one payload is required:
+请求中至少需要包含以下任意一种负载：
 
-- `is_config_hotpatch`
-- interactive input
-- sync input
-- free input
-- `focus_mode_loop`
-- `attached_files`
+- `IsStart=true`，用于仅启动的一帧
+- `IsConfigHotpatch`
+- 交互输入
+- 同步输入
+- 自由输入
+- `FocusModeLoop`
+- `AttachedFilePath`
 
-## 4.3 `RunEvent` (SSE payload core)
+为了兼容历史调用方式，仍然接受旧版 `PushEventRequest` 的 snake_case 请求体；但新的调用方应直接发送 `ypb.AIInputEvent`。
+
+## 4.3 `ypb.AIEventQueryRequest`
+
+用于 `POST /ypb.Yak/QueryAIEvent` 的标准请求体。
+
+```json
+{
+  "Filter": {
+    "SessionID": "run-id"
+  },
+  "Pagination": {
+    "Page": 1,
+    "Limit": 20,
+    "OrderBy": "id",
+    "Order": "desc"
+  }
+}
+```
+
+## 4.4 `RunEvent`（SSE 核心负载）
 
 ```json
 {
@@ -172,19 +197,19 @@ At least one payload is required:
 
 ---
 
-## 5. API Details
+## 5. API 详情
 
-All paths below are relative to `<base>/<prefix>`, default prefix is `/agent`.
+下文所有路径都相对于 `<base>/<prefix>`，默认前缀为 `/agent`。
 
-## 5.1 Setting APIs
+## 5.1 设置类 API
 
 ### `GET /setting`
 
-- Purpose: get current AI agent chat setting
-- Request body: none
-- Response: current setting JSON (keys are **PascalCase** in current backend response)
+- 用途：获取当前 AI Agent 聊天设置
+- 请求体：无
+- 响应：当前设置 JSON（当前后端响应中的键名为 **PascalCase**）
 
-Example response:
+响应示例：
 
 ```json
 {
@@ -200,13 +225,13 @@ Example response:
 
 ### `POST /setting`
 
-- Purpose: patch and save setting
-- Behavior:
-  - merges request patch into existing setting
-  - accepts both snake_case and PascalCase keys
-  - applies defaults for missing core fields
+- 用途：增量更新并保存设置
+- 行为：
+  - 将请求补丁合并到现有设置中
+  - 同时接受 snake_case 和 PascalCase 键名
+  - 对缺失的核心字段应用默认值
 
-Example patch:
+补丁示例：
 
 ```json
 {
@@ -217,23 +242,23 @@ Example patch:
 }
 ```
 
-Response: full saved setting (PascalCase keys).
+响应：完整保存后的设置（PascalCase 键名）。
 
 ---
 
 ### `GET /setting/global`
 
-- Purpose: get global network config (passthrough gRPC `GetGlobalNetworkConfig`)
-- Request body: none
-- Response: `GetGlobalNetworkConfigResponse`
+- 用途：获取全局网络配置（透传 gRPC `GetGlobalNetworkConfig`）
+- 请求体：无
+- 响应：`GetGlobalNetworkConfigResponse`
 
 ### `POST /setting/global`
 
-- Purpose: update global network config (passthrough gRPC `SetGlobalNetworkConfig`)
-- Request body: `GlobalNetworkConfig`
-- Response: same config object saved
+- 用途：更新全局网络配置（透传 gRPC `SetGlobalNetworkConfig`）
+- 请求体：`GlobalNetworkConfig`
+- 响应：保存后的同一份配置对象
 
-`GlobalNetworkConfig` fields include (not exhaustive):
+`GlobalNetworkConfig` 包含的字段包括（不限于）：
 
 - `DisableSystemDNS`
 - `CustomDNSServers`
@@ -249,29 +274,29 @@ Response: full saved setting (PascalCase keys).
 
 ### `POST /setting/appconfigs/template/get`
 
-- Purpose: fetch third-party application config form templates (passthrough gRPC `GetThirdPartyAppConfigTemplate`)
-- Request body: `{}` (or empty JSON object)
-- Response: `GetThirdPartyAppConfigTemplateResponse`
+- 用途：获取第三方应用配置表单模板（透传 gRPC `GetThirdPartyAppConfigTemplate`）
+- 请求体：`{}`（或空 JSON 对象）
+- 响应：`GetThirdPartyAppConfigTemplateResponse`
 
-Template item fields:
+模板项字段：
 
-- `Name`: config key name
-- `Verbose`: display label
-- `Type`: input type (`string` / `number` / `bool` / `list`)
-- `Required`: whether this key is mandatory
-- `DefaultValue`: default field value
-- `Desc`: description text
-- `Extra`: extra metadata
+- `Name`：配置键名
+- `Verbose`：展示标签
+- `Type`：输入类型（`string` / `number` / `bool` / `list`）
+- `Required`：该键是否必填
+- `DefaultValue`：字段默认值
+- `Desc`：描述文本
+- `Extra`：附加元数据
 
 ---
 
 ### `POST /setting/providers/get`
 
-- Purpose: fetch AI providers list
-- Request body: `{}` (or empty JSON object)
-- Response: gRPC passthrough `ListAIProvidersResponse`
+- 用途：获取 AI Provider 列表
+- 请求体：`{}`（或空 JSON 对象）
+- 响应：透传 gRPC `ListAIProvidersResponse`
 
-Example response:
+响应示例：
 
 ```json
 {
@@ -290,22 +315,22 @@ Example response:
 
 ### `POST /setting/aimodels/get`
 
-- Purpose: fetch models by provider config
-- Request body supports multiple forms:
+- 用途：根据 provider 配置获取模型列表
+- 请求体支持多种格式：
 
-1) Legacy string:
+1) 旧版字符串：
 
 ```json
 { "Config": "openai" }
 ```
 
-2) Legacy JSON string:
+2) 旧版 JSON 字符串：
 
 ```json
 { "Config": "{\"Type\":\"openai\",\"APIKey\":\"***\"}" }
 ```
 
-3) Object payload:
+3) 对象负载：
 
 ```json
 {
@@ -319,9 +344,9 @@ Example response:
 }
 ```
 
-4) Flat object (same fields at top level) is also accepted.
+4) 也接受扁平对象（同样字段直接放在顶层）。
 
-Response:
+响应：
 
 ```json
 {
@@ -331,11 +356,11 @@ Response:
 
 ### `POST /setting/aifocus/get`
 
-- Purpose: get available AI focus modes
-- Request body: `{}` (optional)
-- Response: gRPC passthrough `QueryAIFocusResponse`
+- 用途：获取可用的 AI Focus 模式
+- 请求体：`{}`（可选）
+- 响应：透传 gRPC `QueryAIFocusResponse`
 
-Example:
+示例：
 
 ```json
 {
@@ -352,12 +377,12 @@ Example:
 
 ---
 
-## 5.2 Session APIs
+## 5.2 会话类 API
 
 ### `POST /session`
 
-- Purpose: create a run session (or resume existing run_id in memory)
-- Request:
+- 用途：创建一个运行会话（或恢复内存中已有的 `run_id`）
+- 请求：
 
 ```json
 {
@@ -366,7 +391,7 @@ Example:
 }
 ```
 
-- Response (`201` for new, `200` for existing):
+- 响应（新建返回 `201`，已存在返回 `200`）：
 
 ```json
 {
@@ -377,8 +402,8 @@ Example:
 
 ### `GET /session/all`
 
-- Purpose: list all sessions (active in-memory + persisted metadata)
-- Response:
+- 用途：列出全部会话（内存中活跃会话 + 已持久化元数据）
+- 响应：
 
 ```json
 {
@@ -396,14 +421,14 @@ Example:
 
 ### `POST /session/{run_id}/title`
 
-- Purpose: update session title metadata
-- Request:
+- 用途：更新会话标题元数据
+- 请求：
 
 ```json
 { "title": "new title" }
 ```
 
-- Response:
+- 响应：
 
 ```json
 {
@@ -415,16 +440,16 @@ Example:
 
 ---
 
-## 5.3 Run APIs
+## 5.3 运行类 API
 
-### `POST /run/{run_id}`
+### `POST /ypb.Yak/StartAIReAct/{run_id}`
 
-- Purpose: submit first/normal input event for a run
-- Notes:
-  - requires existing session in run manager
-  - if first valid input, backend starts grpc stream automatically
-- Request: `PushEventRequest`
-- Response:
+- 用途：为某次运行提交首个 / 普通输入事件
+- 说明：
+  - 需要该会话已存在于 run manager 中
+  - 如果这是第一个有效输入，后端会自动启动 gRPC 流
+- 请求：`ypb.AIInputEvent`
+- 响应：
 
 ```json
 {
@@ -433,49 +458,62 @@ Example:
 }
 ```
 
-### `POST /run/{run_id}/events/push`
+### `POST /ypb.Yak/StartAIReAct/{run_id}/events/push`
 
-- Purpose: push additional runtime event while run is pending/running
-- Typical use:
-  - user enters new message during streaming
-  - interactive review response
-  - runtime hotpatch
-- Request: `PushEventRequest`
-- Response:
+- 用途：在运行处于 pending / running 状态时继续推送事件
+- 典型使用场景：
+  - 用户在流式输出过程中输入新消息
+  - 交互式审核响应
+  - 运行时热补丁
+- 请求：`ypb.AIInputEvent`
+- 响应：
 
 ```json
 { "status": "accepted" }
 ```
 
-### `GET /run/{run_id}/events` (SSE)
+以下旧版别名仍然可用：
 
-- Purpose: subscribe to streaming output events
-- Response content-type: `text/event-stream`
-- Server emits:
-  - immediate ready:
+- `POST /run/{run_id}`
+- `POST /run/{run_id}/events/push`
+- `GET /run/{run_id}/events`
+- `POST /run/{run_id}/cancel`
+
+### `POST /ypb.Yak/QueryAIEvent`
+
+- 用途：以 gRPC 原生请求 / 响应结构查询已持久化事件
+- 请求：`ypb.AIEventQueryRequest`
+- 响应：`ypb.AIEventQueryResponse`
+
+### `GET /ypb.Yak/StartAIReAct/{run_id}/events`（SSE）
+
+- 用途：订阅流式输出事件
+- 响应 content-type：`text/event-stream`
+- 服务端会发送：
+  - 立即返回就绪事件：
 
 ```json
 { "type": "listener_ready", "status": "ok", "run_id": "..." }
 ```
 
-  - heartbeat every ~15s:
+  - 大约每 15 秒一次心跳：
 
 ```json
 { "type": "heartbeat", "timestamp": 1730000000 }
 ```
 
-  - AI output as serialized `RunEvent`
-  - terminal status:
+  - AI 输出，序列化后的 `RunEvent`
+  - 终态状态：
 
 ```json
 { "type": "done", "status": "completed|cancelled|failed" }
 ```
 
-### `POST /run/{run_id}/cancel`
+### `POST /ypb.Yak/StartAIReAct/{run_id}/cancel`
 
-- Purpose: cancel a running/pending run
-- Request body: none
-- Response:
+- 用途：取消一个正在运行 / 等待中的任务
+- 请求体：无
+- 响应：
 
 ```json
 {
@@ -486,33 +524,33 @@ Example:
 
 ---
 
-## 6. Frontend Integration Notes
+## 6. 前端接入注意事项
 
-1. **Always connect SSE first for new run**
-   - wait for `listener_ready`, then call `/run/{run_id}`.
+1. **新运行一定要先连接 SSE**
+   - 等待 `listener_ready` 后，再调用 `/run/{run_id}`。
 
-2. **User input during streaming**
-   - call `/run/{run_id}/events/push` with `type=free_input`.
+2. **流式输出期间的用户输入**
+   - 使用 `type=free_input` 调用 `/run/{run_id}/events/push`。
 
-3. **Provider/model selection**
-   - get current setting via `GET /setting`
-   - get providers via `/setting/providers/get`
-   - decide provider, then call `/setting/aimodels/get`
-   - update selected provider/model via `POST /setting`.
+3. **Provider / Model 选择流程**
+   - 先通过 `GET /setting` 获取当前设置
+   - 再通过 `/setting/providers/get` 获取 providers
+   - 确定 provider 后调用 `/setting/aimodels/get`
+   - 最后通过 `POST /setting` 更新选中的 provider / model
 
-4. **Setting key naming**
-   - write with snake_case is recommended for frontend patch requests
-   - backend response currently uses PascalCase key names.
+4. **设置项命名规则**
+   - 前端发 patch 请求时，推荐使用 snake_case
+   - 后端当前响应使用 PascalCase 键名
 
-5. **Deprecated old APIs**
-   - old `/session/{run_id}/send` and `/session/{run_id}/close` flow is replaced by `/run/*` flow.
+5. **废弃的旧 API**
+   - 旧的 `/session/{run_id}/send` 与 `/session/{run_id}/close` 流程已被 `/run/*` 流程替代。
 
 ---
 
-## 7. Minimal Frontend Sequence Example
+## 7. 最小前端时序示例
 
 ```ts
-// 1) create session
+// 1) 创建会话
 const createResp = await fetch("/agent/session", {
   method: "POST",
   headers: { "Content-Type": "application/json" },
@@ -520,12 +558,12 @@ const createResp = await fetch("/agent/session", {
 }).then(r => r.json());
 const runID = createResp.run_id;
 
-// 2) connect SSE
+// 2) 连接 SSE
 const es = new EventSource(`/agent/run/${runID}/events`);
 es.onmessage = async (ev) => {
   const data = JSON.parse(ev.data);
   if (data.type === "listener_ready") {
-    // 3) first run input
+    // 3) 首次运行输入
     await fetch(`/agent/run/${runID}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -534,7 +572,7 @@ es.onmessage = async (ev) => {
   }
 };
 
-// 4) send input during streaming
+// 4) 在流式输出过程中继续发送输入
 await fetch(`/agent/run/${runID}/events/push`, {
   method: "POST",
   headers: { "Content-Type": "application/json" },

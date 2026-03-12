@@ -12,6 +12,22 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+func (gw *AIAgentHTTPGateway) handleQueryAIEvent(w http.ResponseWriter, r *http.Request) {
+	var req ypb.AIEventQueryRequest
+	if err := readProtoJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
+		return
+	}
+
+	resp, err := gw.yakClient.QueryAIEvent(r.Context(), &req)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "query AI event failed: "+err.Error())
+		return
+	}
+
+	writeProtoJSON(w, http.StatusOK, resp)
+}
+
 func (gw *AIAgentHTTPGateway) handleSSEEvents(w http.ResponseWriter, r *http.Request) {
 	runID := mux.Vars(r)["run_id"]
 
