@@ -4173,6 +4173,17 @@ assert 1 + b"1" == b"11", "int + bytes == bytes failed"
 	})
 }
 
+// TestStringIndexSlice 覆盖字符串下标与切片：a[0] 为单字符字符串打印 H，a[1:5] 为 ello，a[3:0:-1] 为 lle
+func TestStringIndexSlice(t *testing.T) {
+	_marshallerTest(`
+a = "Hello, Yak"
+println(a[0])
+assert sprint(a[0]) == "H", "println(a[0]) should print H"
+assert sprint(a[1:5]) == "ello", "println(a[1:5]) should print ello"
+assert sprint(a[3:0:-1]) == "lle", "println(a[3:0:-1]) should print lle"
+`)
+}
+
 func TestCancelCtx(t *testing.T) {
 	code := `
 wg = NewSizedWaitGroup(1)

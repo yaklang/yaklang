@@ -1472,7 +1472,8 @@ func (v *Frame) _execCode(c *Code, debug bool) {
 						subStr := string([]rune{sliceRes.Interface().(rune)})
 						v.push(NewValue("string", subStr, subStr))
 					default:
-						v.push(NewValue("char", sliceRes.Interface().(rune), fmt.Sprintf("%c", sliceRes.Interface())))
+						subStr := string([]rune{sliceRes.Interface().(rune)})
+						v.push(NewValue("string", subStr, subStr))
 					}
 				} else {
 					value := NewValue(sliceRes.Type().String(), sliceRes.Interface(), fmt.Sprint(sliceRes))
