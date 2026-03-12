@@ -318,7 +318,7 @@ nativecall 的问题和普通 value operator 一样：
 - `a?{.b}`：在 scope 内对 `a` 做 `.b`，然后把匹配映射回每个 `a`
 - `a?(.b || .c)`：同样的条件机制，只是语法是 `?()`（函数式写法）
 
-### 4.1 call-wide vs per-arg 的差异（你之前提的例子）
+### 5.1 call-wide vs per-arg 的差异（你之前提的例子）
 
 下面两种写法语义不同，且这种差异是被保留的：
 
