@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"google.golang.org/protobuf/proto"
 )
 
 func (gw *AIAgentHTTPGateway) handleCreateSession(w http.ResponseWriter, r *http.Request) {
@@ -38,7 +39,7 @@ func (gw *AIAgentHTTPGateway) handleCreateSession(w http.ResponseWriter, r *http
 	}
 	params := mergeParams(req.Params, setting)
 
-	session := gw.runManager.Create(runID, params)
+	session := gw.runManager.Create(runID, ConvertAIParamsToYPB(params, runID), params.AttachedFiles)
 	if db := gw.getDB(); db != nil {
 		if _, err := yakit.EnsureAISessionMeta(db, runID); err != nil {
 			log.Warnf("ensure ai session meta failed for %s: %v", runID, err)
@@ -52,6 +53,10 @@ func (gw *AIAgentHTTPGateway) handleCreateSession(w http.ResponseWriter, r *http
 }
 
 func (gw *AIAgentHTTPGateway) handleRun(w http.ResponseWriter, r *http.Request) {
+	gw.handleStreamInput(w, r, true)
+}
+
+func (gw *AIAgentHTTPGateway) handleStreamInput(w http.ResponseWriter, r *http.Request, allowStart bool) {
 	runID := mux.Vars(r)["run_id"]
 	if runID == "" {
 		writeError(w, http.StatusBadRequest, "run_id is required")
@@ -69,32 +74,45 @@ func (gw *AIAgentHTTPGateway) handleRun(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	var req PushEventRequest
-	if err := readJSON(r, &req); err != nil {
+	if !allowStart && session.Status != RunStatusRunning && session.Status != RunStatusPending {
+		writeError(w, http.StatusConflict, "run is not active, current status: "+string(session.Status))
+		return
+	}
+
+	event, err := readAIInputEventRequest(r, runID)
+	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
 		return
 	}
 
-	if req.Params != nil {
+	startOnly := allowStart && event.GetIsStart() && !hasInputPayload(event)
+
+	if allowStart && event.GetParams() != nil {
 		setting, err := gw.GetSettingFromDB()
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "load setting failed: "+err.Error())
 			return
 		}
-		session.Params = mergeParams(*req.Params, setting)
+		session.StartParams = mergeStartParams(event.GetParams(), setting, runID)
 	}
 
-	event := convertPushToInputEvent(req, runID)
-	if !hasInputPayload(event) {
+	if !startOnly && !hasInputPayload(event) {
 		writeError(w, http.StatusBadRequest, "input event is empty")
 		return
 	}
 
-	if session.MarkStreamStarted() {
-		go gw.runGRPCStream(session, session.Params)
+	if allowStart && session.MarkStreamStarted() {
+		go gw.runGRPCStream(session)
 	}
 
-	session.PushInput(event)
+	if !startOnly {
+		if event.GetIsStart() {
+			cloned := proto.Clone(event).(*ypb.AIInputEvent)
+			cloned.IsStart = false
+			event = cloned
+		}
+		session.PushInput(event)
+	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"run_id": runID,
@@ -195,7 +213,86 @@ func mergeParams(req AIParams, defaults aiAgentChatSettingPayload) AIParams {
 	return req
 }
 
-func (gw *AIAgentHTTPGateway) runGRPCStream(session *RunSession, startParams AIParams) {
+func mergeStartParams(req *ypb.AIStartParams, defaults aiAgentChatSettingPayload, runID string) *ypb.AIStartParams {
+	params := cloneStartParams(req, runID)
+	if params.GetUseDefaultAIConfig() || defaults.UseDefaultAIConfig {
+		params.UseDefaultAIConfig = true
+		if params.GetAIService() == "" {
+			params.AIService = defaults.AIService
+		}
+		if params.GetAIModelName() == "" {
+			params.AIModelName = defaults.AIModelName
+		}
+		if params.GetForgeName() == "" {
+			params.ForgeName = defaults.ForgeName
+		}
+		if params.GetReviewPolicy() == "" {
+			params.ReviewPolicy = defaults.ReviewPolicy
+		}
+		if params.GetReActMaxIteration() == 0 {
+			params.ReActMaxIteration = defaults.ReActMaxIteration
+		}
+		if !params.GetDisableToolUse() {
+			params.DisableToolUse = defaults.DisableToolUse
+		}
+		if !params.GetEnableSystemFileSystemOperator() {
+			params.EnableSystemFileSystemOperator = defaults.EnableSystemFileSystemOperator
+		}
+		if !params.GetDisallowRequireForUserPrompt() {
+			params.DisallowRequireForUserPrompt = defaults.DisallowRequireForUserPrompt
+		}
+		if params.GetAIReviewRiskControlScore() == 0 {
+			params.AIReviewRiskControlScore = defaults.AIReviewRiskControlScore
+		}
+		if params.GetAICallAutoRetry() == 0 {
+			params.AICallAutoRetry = defaults.AICallAutoRetry
+		}
+		if params.GetAITransactionRetry() == 0 {
+			params.AITransactionRetry = defaults.AITransactionRetry
+		}
+		if !params.GetEnableAISearchTool() {
+			params.EnableAISearchTool = defaults.EnableAISearchTool
+		}
+		if !params.GetEnableAISearchInternet() {
+			params.EnableAISearchInternet = defaults.EnableAISearchInternet
+		}
+		if !params.GetEnableQwenNoThinkMode() {
+			params.EnableQwenNoThinkMode = defaults.EnableQwenNoThinkMode
+		}
+		if !params.GetAllowPlanUserInteract() {
+			params.AllowPlanUserInteract = defaults.AllowPlanUserInteract
+		}
+		if params.GetPlanUserInteractMaxCount() == 0 {
+			params.PlanUserInteractMaxCount = defaults.PlanUserInteractMaxCount
+		}
+		if params.GetTimelineItemLimit() == 0 {
+			params.TimelineItemLimit = defaults.TimelineItemLimit
+		}
+		if params.GetTimelineContentSizeLimit() == 0 && defaults.TimelineContentSizeLimit > 0 {
+			params.TimelineContentSizeLimit = defaults.TimelineContentSizeLimit * 1024
+		}
+		if params.GetUserInteractLimit() == 0 {
+			params.UserInteractLimit = defaults.UserInteractLimit
+		}
+		if params.GetTimelineSessionID() == runID && defaults.TimelineSessionID != "" {
+			params.TimelineSessionID = defaults.TimelineSessionID
+		}
+	}
+	return params
+}
+
+func cloneStartParams(params *ypb.AIStartParams, runID string) *ypb.AIStartParams {
+	if params == nil {
+		return &ypb.AIStartParams{TimelineSessionID: runID}
+	}
+	cloned := proto.Clone(params).(*ypb.AIStartParams)
+	if cloned.GetTimelineSessionID() == "" {
+		cloned.TimelineSessionID = runID
+	}
+	return cloned
+}
+
+func (gw *AIAgentHTTPGateway) runGRPCStream(session *RunSession) {
 	session.Status = RunStatusRunning
 
 	stream, err := gw.yakClient.StartAIReAct(session.ctx)
@@ -205,11 +302,10 @@ func (gw *AIAgentHTTPGateway) runGRPCStream(session *RunSession, startParams AIP
 		return
 	}
 
-	grpcStartParams := ConvertAIParamsToYPB(startParams, session.RunID)
 	startMsg := &ypb.AIInputEvent{
 		IsStart:          true,
-		Params:           grpcStartParams,
-		AttachedFilePath: startParams.AttachedFiles,
+		Params:           cloneStartParams(session.StartParams, session.RunID),
+		AttachedFilePath: append([]string(nil), session.StartAttachedFiles...),
 	}
 	if err := stream.Send(startMsg); err != nil {
 		log.Errorf("send start message failed for run %s: %v", session.RunID, err)

@@ -1,42 +1,33 @@
 package aihttp
 
 import (
+	"fmt"
 	"net/http"
 
-	"github.com/gorilla/mux"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func (gw *AIAgentHTTPGateway) handlePushEvent(w http.ResponseWriter, r *http.Request) {
-	runID := mux.Vars(r)["run_id"]
+	gw.handleStreamInput(w, r, false)
+}
 
-	session, ok := gw.runManager.Get(runID)
-	if !ok {
-		writeError(w, http.StatusNotFound, "run not found: "+runID)
-		return
+func readAIInputEventRequest(r *http.Request, runID string) (*ypb.AIInputEvent, error) {
+	body, err := readRawBody(r)
+	if err != nil {
+		return nil, err
 	}
 
-	if session.Status != RunStatusRunning && session.Status != RunStatusPending {
-		writeError(w, http.StatusConflict, "run is not active, current status: "+string(session.Status))
-		return
+	var event ypb.AIInputEvent
+	if err := readProtoJSONBytes(body, &event); err == nil {
+		return &event, nil
+	} else {
+		var legacy PushEventRequest
+		if legacyErr := readJSONBytes(body, &legacy); legacyErr == nil {
+			return convertPushToInputEvent(legacy, runID), nil
+		} else {
+			return nil, fmt.Errorf("parse AIInputEvent failed: %v; parse legacy PushEventRequest failed: %v", err, legacyErr)
+		}
 	}
-
-	var req PushEventRequest
-	if err := readJSON(r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
-		return
-	}
-
-	inputEvent := convertPushToInputEvent(req, runID)
-	if !hasInputPayload(inputEvent) {
-		writeError(w, http.StatusBadRequest, "input event is empty")
-		return
-	}
-	session.PushInput(inputEvent)
-
-	writeJSON(w, http.StatusOK, map[string]string{
-		"status": "accepted",
-	})
 }
 
 func convertPushToInputEvent(req PushEventRequest, runID string) *ypb.AIInputEvent {
