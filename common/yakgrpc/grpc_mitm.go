@@ -194,25 +194,10 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			if strings.TrimSpace(proxy) == "" {
 				continue
 			}
-			proxyUrl, err2 := url.Parse(proxy)
-			if err2 != nil {
-				errMsg := fmt.Sprintf("下游代理检测失败 / downstream proxy failed:[%v] %v", proxy, err2)
-				log.Errorf("代理检测失败 / proxy check failed:[%v] %v", proxy, err2)
-				feedbackToUser(errMsg)
-				proxyErrors = append(proxyErrors, errMsg)
-				continue
-			}
-			_, port, err := utils.ParseStringToHostPort(proxyUrl.Host)
+			proxyUrl, err := parseDownstreamProxy(proxy)
 			if err != nil {
-				errMsg := fmt.Sprintf("下游代理检测失败 / downstream proxy failed:[%v] %v", proxy, "parse host to host:port failed "+err.Error())
+				errMsg := fmt.Sprintf("下游代理检测失败 / downstream proxy failed:[%v] %v", proxy, err)
 				log.Errorf("代理检测失败 / proxy check failed:[%v] %v", proxy, err)
-				feedbackToUser(errMsg)
-				proxyErrors = append(proxyErrors, errMsg)
-				continue
-			}
-			if port <= 0 {
-				errMsg := fmt.Sprintf("下游代理检测失败 / downstream proxy failed:[%v] %v", proxy, "缺乏端口（Miss Port）")
-				log.Errorf("代理检测失败 / proxy check failed:[%v] 缺乏端口（Miss Port）", proxy)
 				feedbackToUser(errMsg)
 				proxyErrors = append(proxyErrors, errMsg)
 				continue
@@ -2196,4 +2181,68 @@ func (t *taskStatus) setStatus(s hijackStatusCode) {
 	t.status = s
 	t.statusChangeCond.Broadcast()
 	t.statusChangeCond.L.Unlock()
+}
+
+// parseDownstreamProxy 解析并校验下游代理，凭据含 @# 等特殊字符时能正确解析
+func parseDownstreamProxy(proxy string) (*url.URL, error) {
+	normalized, err := normalizeProxyURL(proxy)
+	if err != nil {
+		return nil, err
+	}
+	u, err := url.Parse(normalized)
+	if err != nil {
+		return nil, err
+	}
+	_, port, err := utils.ParseStringToHostPort(u.Host)
+	if err != nil {
+		return nil, utils.Errorf("parse host to host:port failed " + err.Error())
+	}
+	if port <= 0 {
+		return nil, utils.Errorf("缺乏端口（Miss Port）")
+	}
+	return u, nil
+}
+
+// parseProxyCreds 按「最后 @」拆分 userinfo 与 host，返回 (scheme, user, pass, host)。无认证时 ok=false。
+// 自实现原因：# 为 RFC fragment 分隔符，url.Parse 在 # 处截断，密码含 # 时 @host 被当 fragment 丢弃。
+// 注：Go 的 url.Parse 对 @ 已用 LastIndex 且允许 userinfo 含 @，但 # 的问题无法规避，故统一自解析。
+func parseProxyCreds(raw string) (scheme, user, pass, host string, ok bool, err error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", "", "", "", false, utils.Errorf("empty proxy")
+	}
+	idx := strings.Index(raw, "://")
+	if idx < 0 {
+		return "", "", "", "", false, utils.Errorf("invalid proxy format")
+	}
+	scheme, rest := raw[:idx], raw[idx+3:]
+	lastAt := strings.LastIndex(rest, "@")
+	if lastAt < 0 {
+		return scheme, "", "", rest, false, nil
+	}
+	host = rest[lastAt+1:]
+	if i := strings.Index(host, "#"); i >= 0 {
+		host = host[:i]
+	}
+	user, pass = rest[:lastAt], ""
+	if colon := strings.Index(user, ":"); colon >= 0 {
+		user, pass = user[:colon], user[colon+1:]
+	}
+	return scheme, user, pass, host, true, nil
+}
+
+// normalizeProxyURL 凭据含 @# 等特殊字符时 url.Parse 可能解析错误，按「最后 @ 分隔」重解析并编码。
+func normalizeProxyURL(raw string) (string, error) {
+	scheme, user, pass, host, hasAuth, err := parseProxyCreds(raw)
+	if err != nil {
+		return "", err
+	}
+	if !hasAuth {
+		return raw, nil
+	}
+	ui := url.User(user)
+	if pass != "" {
+		ui = url.UserPassword(user, pass)
+	}
+	return scheme + "://" + ui.String() + "@" + host, nil
 }

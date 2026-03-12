@@ -163,25 +163,10 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			if strings.TrimSpace(proxy) == "" {
 				continue
 			}
-			proxyUrl, err2 := url.Parse(proxy)
-			if err2 != nil {
-				errMsg := fmt.Sprintf("下游代理检测失败 / downstream proxy failed:[%v] %v", proxy, err2)
-				log.Errorf("代理检测失败 / proxy check failed:[%v] %v", proxy, err2)
-				feedbackToUser(errMsg)
-				proxyErrors = append(proxyErrors, errMsg)
-				continue
-			}
-			_, port, err := utils.ParseStringToHostPort(proxyUrl.Host)
+			proxyUrl, err := parseDownstreamProxy(proxy)
 			if err != nil {
-				errMsg := fmt.Sprintf("下游代理检测失败 / downstream proxy failed:[%v] %v", proxy, "parse host to host:port failed "+err.Error())
+				errMsg := fmt.Sprintf("下游代理检测失败 / downstream proxy failed:[%v] %v", proxy, err)
 				log.Errorf("代理检测失败 / proxy check failed:[%v] %v", proxy, err)
-				feedbackToUser(errMsg)
-				proxyErrors = append(proxyErrors, errMsg)
-				continue
-			}
-			if port <= 0 {
-				errMsg := fmt.Sprintf("下游代理检测失败 / downstream proxy failed:[%v] %v", proxy, "缺乏端口（Miss Port）")
-				log.Errorf("代理检测失败 / proxy check failed:[%v] 缺乏端口（Miss Port）", proxy)
 				feedbackToUser(errMsg)
 				proxyErrors = append(proxyErrors, errMsg)
 				continue
