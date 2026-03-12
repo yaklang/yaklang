@@ -1,3 +1,4 @@
+*.yakc
 *.test
 # yak
 ./gen/*
