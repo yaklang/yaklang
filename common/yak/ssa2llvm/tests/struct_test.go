@@ -4,8 +4,8 @@ import (
 	"testing"
 )
 
-// TestStruct_JIT tests basic struct operations in JIT mode
-func TestStruct_JIT(t *testing.T) {
+// TestStruct_Binary tests basic struct operations in binary mode.
+func TestStruct_Binary(t *testing.T) {
 	// Skipping due to environment parser issue where 'type Point' is parsed as 'typePoint'
 	t.Skip("Skipping struct test due to environment parser issue")
 

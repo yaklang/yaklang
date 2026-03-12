@@ -3,6 +3,9 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/compiler"
@@ -27,31 +30,30 @@ func main() {
 	}
 }
 
-var compileCommand = cli.Command{
-	Name:      "compile",
-	Aliases:   []string{"c"},
-	Usage:     "Compile source code to native executable (default) or LLVM IR",
-	ArgsUsage: "<source-file>",
-	Flags: []cli.Flag{
+type buildCommandConfig struct {
+	sourceFile string
+	outputFile string
+	language   string
+	function   string
+	printIR    bool
+	ssaObf     []string
+	llvmObf    []string
+}
+
+func sharedBuildFlags() []cli.Flag {
+	return []cli.Flag{
 		cli.StringFlag{
 			Name:  "output,o",
-			Usage: "Output file path (default: a.out on Unix, a.exe on Windows)",
+			Usage: "Output executable path (run keeps and executes it when set)",
 		},
 		cli.StringFlag{
 			Name:  "language,l",
 			Usage: "Source language (yak, go, python, javascript, java, php, c, typescript)",
 		},
-		cli.BoolFlag{
-			Name:  "emit-llvm,S",
-			Usage: "Emit LLVM IR (.ll) instead of native binary",
-		},
-		cli.BoolFlag{
-			Name:  "emit-asm,s",
-			Usage: "Emit assembly (.s) instead of native binary",
-		},
-		cli.BoolFlag{
-			Name:  "c",
-			Usage: "Compile only (no linking), output object file",
+		cli.StringFlag{
+			Name:  "function,f",
+			Usage: "Entry function name",
+			Value: "check",
 		},
 		cli.BoolFlag{
 			Name:  "print-ir",
@@ -67,41 +69,38 @@ var compileCommand = cli.Command{
 			Usage: "Apply LLVM obfuscators by name or glob pattern (repeatable or comma-separated; see `ssa2llvm obfuscators`)",
 			Value: &cli.StringSlice{},
 		},
-	},
+	}
+}
+
+var compileCommand = cli.Command{
+	Name:      "compile",
+	Aliases:   []string{"c"},
+	Usage:     "Compile source code to native executable (default) or LLVM IR",
+	ArgsUsage: "<source-file>",
+	Flags: append(sharedBuildFlags(),
+		cli.BoolFlag{
+			Name:  "emit-llvm,S",
+			Usage: "Emit LLVM IR (.ll) instead of native binary",
+		},
+		cli.BoolFlag{
+			Name:  "emit-asm,s",
+			Usage: "Emit assembly (.s) instead of native binary",
+		},
+		cli.BoolFlag{
+			Name:  "c",
+			Usage: "Compile only (no linking), output object file",
+		},
+	),
 	Action: compileAction,
 }
 
 var runCommand = cli.Command{
 	Name:      "run",
 	Aliases:   []string{"r"},
-	Usage:     "Compile and execute via JIT",
+	Usage:     "Compile and run the executable (use -o to keep the binary)",
 	ArgsUsage: "<source-file>",
-	Flags: []cli.Flag{
-		cli.StringFlag{
-			Name:  "language,l",
-			Usage: "Source language (yak, go, python, javascript, java, php, c, typescript)",
-		},
-		cli.StringFlag{
-			Name:  "function,f",
-			Usage: "Entry function name to execute",
-			Value: "check",
-		},
-		cli.BoolFlag{
-			Name:  "print-ir",
-			Usage: "Print generated LLVM IR before execution",
-		},
-		cli.StringSliceFlag{
-			Name:  "ssa-obf",
-			Usage: "Apply SSA obfuscators by name or glob pattern (repeatable or comma-separated; see `ssa2llvm obfuscators`)",
-			Value: &cli.StringSlice{},
-		},
-		cli.StringSliceFlag{
-			Name:  "llvm-obf",
-			Usage: "Apply LLVM obfuscators by name or glob pattern (repeatable or comma-separated; see `ssa2llvm obfuscators`)",
-			Value: &cli.StringSlice{},
-		},
-	},
-	Action: runAction,
+	Flags:     sharedBuildFlags(),
+	Action:    runAction,
 }
 
 var obfuscatorsCommand = cli.Command{
@@ -117,44 +116,45 @@ Names can be repeated, passed as comma-separated lists, or selected with glob pa
 }
 
 func compileAction(c *cli.Context) error {
-	if c.NArg() < 1 {
-		return fmt.Errorf("missing source file argument")
-	}
-
-	return compiler.CompileToExecutable(
-		compiler.WithCompileSourceFile(c.Args().First()),
-		compiler.WithCompileLanguage(c.String("language")),
-		compiler.WithCompileOutputFile(c.String("output")),
-		compiler.WithCompileEmitLLVM(c.Bool("emit-llvm")),
-		compiler.WithCompileEmitAsm(c.Bool("emit-asm")),
-		compiler.WithCompileOnly(c.Bool("c")),
-		compiler.WithCompilePrintIR(c.Bool("print-ir")),
-		compiler.WithCompileSSAObfuscators(c.StringSlice("ssa-obf")...),
-		compiler.WithCompileLLVMObfuscators(c.StringSlice("llvm-obf")...),
-	)
-}
-
-func runAction(c *cli.Context) error {
-	if c.NArg() < 1 {
-		return fmt.Errorf("missing source file argument")
-	}
-
-	functionName := c.String("function")
-	result, err := compiler.RunViaJIT(
-		compiler.WithRunSourceFile(c.Args().First()),
-		compiler.WithRunLanguage(c.String("language")),
-		compiler.WithRunFunction(functionName),
-		compiler.WithRunPrintIR(c.Bool("print-ir")),
-		compiler.WithRunSSAObfuscators(c.StringSlice("ssa-obf")...),
-		compiler.WithRunLLVMObfuscators(c.StringSlice("llvm-obf")...),
-	)
+	cfg, err := newBuildCommandConfig(c)
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("\n=== Execution Result ===\n")
-	fmt.Printf("Function '%s' returned: %d\n", functionName, result)
+	options := append(cfg.compileOptions(),
+		compiler.WithCompileEmitLLVM(c.Bool("emit-llvm")),
+		compiler.WithCompileEmitAsm(c.Bool("emit-asm")),
+		compiler.WithCompileOnly(c.Bool("c")),
+	)
+	return compiler.CompileToExecutable(options...)
+}
 
+func runAction(c *cli.Context) error {
+	cfg, err := newBuildCommandConfig(c)
+	if err != nil {
+		return err
+	}
+
+	cleanup, err := cfg.prepareRunOutput()
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+
+	if err := compiler.CompileToExecutable(cfg.compileOptions()...); err != nil {
+		return err
+	}
+
+	cmd := exec.Command(cfg.outputFile)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			return cli.NewExitError("", exitErr.ExitCode())
+		}
+		return err
+	}
 	return nil
 }
 
@@ -173,6 +173,61 @@ func listObfuscatorsAction(c *cli.Context) error {
 	fmt.Println("Quote glob patterns like '*' to avoid shell expansion.")
 	fmt.Println("Run `ssa2llvm compile --help` or `ssa2llvm run --help` for full flag details.")
 	return nil
+}
+
+func newBuildCommandConfig(c *cli.Context) (*buildCommandConfig, error) {
+	if c.NArg() < 1 {
+		return nil, fmt.Errorf("missing source file argument")
+	}
+
+	return &buildCommandConfig{
+		sourceFile: c.Args().First(),
+		outputFile: strings.TrimSpace(c.String("output")),
+		language:   c.String("language"),
+		function:   c.String("function"),
+		printIR:    c.Bool("print-ir"),
+		ssaObf:     c.StringSlice("ssa-obf"),
+		llvmObf:    c.StringSlice("llvm-obf"),
+	}, nil
+}
+
+func (cfg *buildCommandConfig) compileOptions() []compiler.CompileOption {
+	return []compiler.CompileOption{
+		compiler.WithCompileSourceFile(cfg.sourceFile),
+		compiler.WithCompileLanguage(cfg.language),
+		compiler.WithCompileOutputFile(cfg.outputFile),
+		compiler.WithCompileEntryFunction(cfg.function),
+		compiler.WithCompilePrintIR(cfg.printIR),
+		compiler.WithCompileSSAObfuscators(cfg.ssaObf...),
+		compiler.WithCompileLLVMObfuscators(cfg.llvmObf...),
+	}
+}
+
+func (cfg *buildCommandConfig) prepareRunOutput() (func(), error) {
+	if cfg.outputFile != "" {
+		return func() {}, nil
+	}
+
+	tmpDir, err := os.MkdirTemp("", "ssa2llvm-run-*")
+	if err != nil {
+		return nil, fmt.Errorf("create temp run dir failed: %w", err)
+	}
+
+	cfg.outputFile = filepath.Join(tmpDir, defaultRunBinaryName())
+	return func() {
+		_ = os.RemoveAll(tmpDir)
+	}, nil
+}
+
+func defaultRunBinaryName() string {
+	if isWindows() {
+		return "run.exe"
+	}
+	return "run.out"
+}
+
+func isWindows() bool {
+	return filepath.Separator == '\\'
 }
 
 func printObfuscatorGroup(title string, flagExample string, names []string) {

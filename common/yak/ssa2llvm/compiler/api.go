@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"unsafe"
 
 	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/log"
@@ -36,28 +35,6 @@ type CompileConfig struct {
 }
 
 type CompileOption func(*CompileConfig)
-
-type RunConfig struct {
-	SourceFile      string
-	SourceCode      string
-	Language        string
-	FunctionName    string
-	Args            []uint64
-	PrintIR         bool
-	ExternalHooks   map[string]unsafe.Pointer
-	ExternBindings  map[string]ExternBinding
-	SSAObfuscators  []string
-	LLVMObfuscators []string
-}
-
-type RunOption func(*RunConfig)
-
-func defaultRunConfig() *RunConfig {
-	return &RunConfig{
-		FunctionName:  "check",
-		ExternalHooks: make(map[string]unsafe.Pointer),
-	}
-}
 
 func defaultCompileConfig() *CompileConfig {
 	return &CompileConfig{}
@@ -166,147 +143,6 @@ func WithCompileConfig(cfg CompileConfig) CompileOption {
 			}
 		}
 	}
-}
-
-func WithRunSourceFile(path string) RunOption {
-	return func(c *RunConfig) { c.SourceFile = path }
-}
-
-func WithRunSourceCode(code string) RunOption {
-	return func(c *RunConfig) { c.SourceCode = code }
-}
-
-func WithRunLanguage(language string) RunOption {
-	return func(c *RunConfig) { c.Language = language }
-}
-
-func WithRunFunction(name string) RunOption {
-	return func(c *RunConfig) { c.FunctionName = name }
-}
-
-func WithRunArgs(args ...uint64) RunOption {
-	return func(c *RunConfig) {
-		c.Args = append(c.Args[:0], args...)
-	}
-}
-
-func WithRunPrintIR(enabled bool) RunOption {
-	return func(c *RunConfig) { c.PrintIR = enabled }
-}
-
-func WithRunExternalHooks(hooks map[string]unsafe.Pointer) RunOption {
-	return func(c *RunConfig) {
-		if c.ExternalHooks == nil {
-			c.ExternalHooks = make(map[string]unsafe.Pointer, len(hooks))
-		}
-		for name, addr := range hooks {
-			c.ExternalHooks[name] = addr
-		}
-	}
-}
-
-func WithRunExternBindings(bindings map[string]ExternBinding) RunOption {
-	return func(c *RunConfig) { c.ExternBindings = bindings }
-}
-
-func WithRunSSAObfuscators(names ...string) RunOption {
-	return func(c *RunConfig) {
-		c.SSAObfuscators = appendObfuscatorNames(c.SSAObfuscators, names...)
-	}
-}
-
-func WithRunLLVMObfuscators(names ...string) RunOption {
-	return func(c *RunConfig) {
-		c.LLVMObfuscators = appendObfuscatorNames(c.LLVMObfuscators, names...)
-	}
-}
-
-func WithRunConfig(cfg RunConfig) RunOption {
-	return func(c *RunConfig) {
-		c.SourceFile = cfg.SourceFile
-		c.SourceCode = cfg.SourceCode
-		c.Language = cfg.Language
-		if cfg.FunctionName != "" {
-			c.FunctionName = cfg.FunctionName
-		}
-		c.Args = append(c.Args[:0], cfg.Args...)
-		c.PrintIR = cfg.PrintIR
-		c.ExternBindings = cfg.ExternBindings
-		c.SSAObfuscators = append(c.SSAObfuscators, cfg.SSAObfuscators...)
-		c.LLVMObfuscators = append(c.LLVMObfuscators, cfg.LLVMObfuscators...)
-		if c.ExternalHooks == nil {
-			c.ExternalHooks = make(map[string]unsafe.Pointer, len(cfg.ExternalHooks))
-		}
-		for name, addr := range cfg.ExternalHooks {
-			c.ExternalHooks[name] = addr
-		}
-	}
-}
-
-// RunViaJIT compiles and executes the code using LLVM JIT.
-func RunViaJIT(opts ...RunOption) (int64, error) {
-	cfg := defaultRunConfig()
-	for _, opt := range opts {
-		if opt != nil {
-			opt(cfg)
-		}
-	}
-
-	_, comp, _, err := compileInput(
-		cfg.SourceFile,
-		cfg.SourceCode,
-		cfg.Language,
-		cfg.ExternBindings,
-		cfg.SSAObfuscators,
-		cfg.LLVMObfuscators,
-	)
-	if err != nil {
-		return 0, err
-	}
-
-	if cfg.PrintIR {
-		fmt.Println("\n=== Generated LLVM IR ===")
-		fmt.Println(comp.Mod.String())
-		fmt.Println()
-	}
-
-	engine, err := llvm.NewExecutionEngine(comp.Mod)
-	if err != nil {
-		comp.Dispose()
-		return 0, utils.Errorf("failed to create JIT engine: %v", err)
-	}
-
-	// Register external hooks (mappings)
-	for name, addr := range cfg.ExternalHooks {
-		fnVal := comp.Mod.NamedFunction(name)
-		if !fnVal.IsNil() {
-			engine.AddGlobalMapping(fnVal, addr)
-		}
-	}
-
-	// Dispose order is important (LIFO):
-	// 1. engine.Dispose() (releases Module)
-	// 2. comp.Builder.Dispose()
-	// 3. comp.LLVMCtx.Dispose()
-	defer comp.LLVMCtx.Dispose()
-	defer comp.Builder.Dispose()
-	defer engine.Dispose()
-
-	functionName, fn, err := resolveEntryFunction(comp.Mod, cfg.FunctionName)
-	if err != nil {
-		return 0, err
-	}
-
-	// Prepare arguments
-	llvmArgs := make([]llvm.GenericValue, len(cfg.Args))
-	for i, arg := range cfg.Args {
-		llvmArgs[i] = llvm.NewGenericValueFromInt(comp.LLVMCtx.Int64Type(), arg, false)
-	}
-
-	log.Infof("executing function: %s()", functionName)
-	result := engine.RunFunction(fn, llvmArgs)
-
-	return int64(result.Int(true)), nil
 }
 
 func compileInput(
