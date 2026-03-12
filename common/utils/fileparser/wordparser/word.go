@@ -371,7 +371,7 @@ func parseTableNode(e Element) (WordNode, error) {
 
 		rowData := processRow(row)
 		if len(rowData) > 0 {
-			if len(content.Rows) == 0 {
+			if content.Headers == nil {
 				content.Headers = rowData
 			} else {
 				content.Rows = append(content.Rows, rowData)

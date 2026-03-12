@@ -1,0 +1,688 @@
+__DESC__ = "Excel data query tool with support for column selection, row filtering, sorting, aggregation (count/sum/avg/min/max), and pagination. Reads Excel files natively without external dependencies like pandas. Ideal for data analysis, transaction investigation, and structured data extraction from spreadsheets."
+__VERBOSE_NAME__ = "Excel Data Query"
+__KEYWORDS__ = "excel query,data filter,sort,aggregate,sum,count,avg,group by,xlsx,spreadsheet,data analysis,column select,pagination,excel search,transaction analysis,financial data,excel read"
+
+__USAGE__ = <<<USAGE_BLOCK
+Excel Data Query Tool - Parameter Description for JSON Tool Calls
+
+Queries Excel data with filtering, sorting, aggregation, and pagination.
+Use read_excel_info first to understand the data schema.
+
+Required Parameters:
+  input           (string)  Path to the Excel file (.xls or .xlsx).
+
+Optional Parameters:
+  sheet           (string)  Sheet name to query. If omitted, uses the first sheet.
+  columns         (string)  Comma-separated column names to select.
+                            Example: "Name,Amount,Date"
+                            If omitted, all columns are returned.
+  filter          (string)  Filter expression. Supports multiple conditions separated by AND.
+                            Operators: ==, !=, >, <, >=, <=, contains, !contains, startswith, endswith
+                            Examples:
+                              "Amount>50000"
+                              "Status==completed"
+                              "Name contains Zhang"
+                              "Amount>10000 AND Type==income"
+                            Column names and values are trimmed automatically.
+  sort_by         (string)  Column name to sort by.
+  sort_desc       (bool)    Sort in descending order. Default: false.
+  limit           (int)     Max rows to return. Default: 50.
+  offset          (int)     Number of rows to skip (for pagination). Default: 0.
+  group_by        (string)  Column name to group by for aggregation.
+  agg             (string)  Aggregation function: count, sum, avg, min, max.
+                            Requires group_by to be set.
+  agg_column      (string)  Column to aggregate on. Required for sum/avg/min/max.
+  output_format   (string)  Output format: table (default), csv, json.
+  output          (string)  Output file path. If omitted, prints to stdout.
+
+Examples:
+
+1. Basic query with filter:
+```json
+{
+  "@action": "call-tool",
+  "tool": "query_excel_data",
+  "identifier": "filter_large_transactions",
+  "params": {
+    "input": "/path/to/data.xlsx",
+    "filter": "Amount>50000",
+    "sort_by": "Amount",
+    "sort_desc": true,
+    "limit": 20
+  }
+}
+```
+
+2. Aggregation query:
+```json
+{
+  "@action": "call-tool",
+  "tool": "query_excel_data",
+  "identifier": "sum_by_counterparty",
+  "params": {
+    "input": "/path/to/data.xlsx",
+    "group_by": "CounterpartyName",
+    "agg": "sum",
+    "agg_column": "Amount",
+    "sort_desc": true,
+    "limit": 20
+  }
+}
+```
+USAGE_BLOCK
+
+yakit.AutoInitYakit()
+
+inputFile := cli.String("input", cli.setRequired(true), cli.setHelp("Path to Excel file"))
+sheetName := cli.String("sheet", cli.setRequired(false), cli.setHelp("Sheet name to query"))
+columnsStr := cli.String("columns", cli.setRequired(false), cli.setHelp("Comma-separated column names"))
+filterExpr := cli.String("filter", cli.setRequired(false), cli.setHelp("Filter expression"))
+sortBy := cli.String("sort_by", cli.setRequired(false), cli.setHelp("Column to sort by"))
+sortDesc := cli.Bool("sort_desc", cli.setRequired(false), cli.setDefault(false), cli.setHelp("Sort descending"))
+limit := cli.Int("limit", cli.setRequired(false), cli.setDefault(50), cli.setHelp("Max rows to return"))
+offset := cli.Int("offset", cli.setRequired(false), cli.setDefault(0), cli.setHelp("Rows to skip"))
+groupBy := cli.String("group_by", cli.setRequired(false), cli.setHelp("Column to group by"))
+aggFunc := cli.String("agg", cli.setRequired(false), cli.setHelp("Aggregation: count, sum, avg, min, max"))
+aggColumn := cli.String("agg_column", cli.setRequired(false), cli.setHelp("Column to aggregate"))
+outputFormat := cli.String("output_format", cli.setRequired(false), cli.setDefault("table"), cli.setHelp("Output format: table, csv, json"))
+outputFile := cli.String("output", cli.setRequired(false), cli.setHelp("Output file path"))
+
+cli.check()
+
+if !file.IsExisted(inputFile) {
+    yakit.Error("Input file does not exist: %v", inputFile)
+    return
+}
+
+yakit.Info("Parsing Excel file: %v", inputFile)
+
+nodes, err := excel.Parse(inputFile)
+if err != nil {
+    yakit.Error("Failed to parse Excel file: %v", err)
+    return
+}
+
+classifier := excel.ClassifyNodes(nodes)
+
+if len(classifier.Tables) == 0 {
+    yakit.Error("No table data found in Excel file")
+    return
+}
+
+var targetTable
+targetTable = nil
+if sheetName != "" {
+    for _, table := range classifier.Tables {
+        if table.SheetName == sheetName {
+            targetTable = table
+            break
+        }
+    }
+    if targetTable == nil {
+        yakit.Error("Sheet '%v' not found. Available sheets:", sheetName)
+        for _, table := range classifier.Tables {
+            yakit.Info("  - %v (%v rows)", table.SheetName, len(table.Rows))
+        }
+        return
+    }
+} else {
+    targetTable = classifier.Tables[0]
+}
+
+yakit.Info("Querying sheet: %v (%v rows, %v columns)", targetTable.SheetName, len(targetTable.Rows), len(targetTable.Headers))
+
+headers := targetTable.Headers
+rows := targetTable.Rows
+
+// Build column index map
+colIndex := make(map[string]int)
+colSet := make(map[string]bool)
+for i, h := range headers {
+    colIndex[h] = i
+    colSet[h] = true
+}
+
+colExists = (name) => {
+    for _, h := range headers {
+        if h == name {
+            return true
+        }
+    }
+    return false
+}
+
+// Parse selected columns
+var selectedCols
+selectedCols = []
+if columnsStr != "" {
+    parts := str.Split(columnsStr, ",")
+    for _, p := range parts {
+        p = str.TrimSpace(p)
+        if p != "" {
+            selectedCols = append(selectedCols, p)
+        }
+    }
+} else {
+    selectedCols = headers
+}
+
+for _, col := range selectedCols {
+    if !colExists(col) {
+        yakit.Error("Column '%v' not found. Available columns: %v", col, str.Join(headers, ", "))
+        return
+    }
+}
+
+getCellValue = (row, colName) => {
+    if !colExists(colName) {
+        return ""
+    }
+    idx := colIndex[colName]
+    if idx >= len(row) {
+        return ""
+    }
+    return row[idx]
+}
+
+toNumber = (s) => {
+    s = str.TrimSpace(sprint(s))
+    if s == "" || s == "NaN" || s == "nan" {
+        return 0.0, false
+    }
+    s = str.ReplaceAll(s, ",", "")
+    if !str.MatchAllOfRegexp(s, `^-?\d+\.?\d*$`) {
+        return 0.0, false
+    }
+    return parseFloat(s), true
+}
+
+// Parse and apply filter
+parseCondition = (condStr) => {
+    condStr = str.TrimSpace(condStr)
+    operators := [">=", "<=", "!=", "==", ">", "<", " contains ", " !contains ", " startswith ", " endswith "]
+    for _, op := range operators {
+        opTrimmed := str.TrimSpace(op)
+        idx := str.Index(condStr, op)
+        if idx >= 0 {
+            colName := str.TrimSpace(condStr[:idx])
+            value := str.TrimSpace(condStr[idx + len(op):])
+            return colName, opTrimmed, value
+        }
+    }
+    return "", "", ""
+}
+
+matchRow = (row, conditions) => {
+    for _, cond := range conditions {
+        colName := cond["col"]
+        op := cond["op"]
+        expected := cond["val"]
+
+        actual := getCellValue(row, colName)
+        actual = str.TrimSpace(actual)
+
+        switch op {
+        case "==":
+            if actual != expected {
+                return false
+            }
+        case "!=":
+            if actual == expected {
+                return false
+            }
+        case ">":
+            numA, okA := toNumber(actual)
+            numE, okE := toNumber(expected)
+            if !okA || !okE || numA <= numE {
+                return false
+            }
+        case "<":
+            numA, okA := toNumber(actual)
+            numE, okE := toNumber(expected)
+            if !okA || !okE || numA >= numE {
+                return false
+            }
+        case ">=":
+            numA, okA := toNumber(actual)
+            numE, okE := toNumber(expected)
+            if !okA || !okE || numA < numE {
+                return false
+            }
+        case "<=":
+            numA, okA := toNumber(actual)
+            numE, okE := toNumber(expected)
+            if !okA || !okE || numA > numE {
+                return false
+            }
+        case "contains":
+            if !str.Contains(actual, expected) {
+                return false
+            }
+        case "!contains":
+            if str.Contains(actual, expected) {
+                return false
+            }
+        case "startswith":
+            if !str.HasPrefix(actual, expected) {
+                return false
+            }
+        case "endswith":
+            if !str.HasSuffix(actual, expected) {
+                return false
+            }
+        }
+    }
+    return true
+}
+
+var conditions
+conditions = []
+if filterExpr != "" {
+    parts := str.SplitN(filterExpr, " AND ", -1)
+    for _, part := range parts {
+        part = str.TrimSpace(part)
+        if part == "" {
+            continue
+        }
+        colName, op, val := parseCondition(part)
+        if colName == "" {
+            yakit.Error("Invalid filter condition: '%v'", part)
+            return
+        }
+        if !colExists(colName) {
+            yakit.Error("Filter column '%v' not found. Available: %v", colName, str.Join(headers, ", "))
+            return
+        }
+        conditions = append(conditions, {"col": colName, "op": op, "val": val})
+    }
+}
+
+var filteredRows
+filteredRows = []
+for _, row := range rows {
+    if len(conditions) > 0 {
+        if !matchRow(row, conditions) {
+            continue
+        }
+    }
+    filteredRows = append(filteredRows, row)
+}
+
+yakit.Info("Rows after filter: %v (from %v)", len(filteredRows), len(rows))
+
+// Aggregation mode
+if groupBy != "" {
+    if !colExists(groupBy) {
+        yakit.Error("Group-by column '%v' not found. Available: %v", groupBy, str.Join(headers, ", "))
+        return
+    }
+
+    if aggFunc == "" {
+        aggFunc = "count"
+    }
+
+    aggFunc = str.ToLower(aggFunc)
+    validAggs := ["count", "sum", "avg", "min", "max"]
+    isValid := false
+    for _, v := range validAggs {
+        if v == aggFunc {
+            isValid = true
+            break
+        }
+    }
+    if !isValid {
+        yakit.Error("Invalid aggregation: '%v'. Supported: count, sum, avg, min, max", aggFunc)
+        return
+    }
+
+    if aggFunc != "count" && aggColumn == "" {
+        yakit.Error("agg_column is required for %v aggregation", aggFunc)
+        return
+    }
+
+    if aggColumn != "" {
+        if !colExists(aggColumn) {
+            yakit.Error("Aggregation column '%v' not found", aggColumn)
+            return
+        }
+    }
+
+    groups := make(map[string]var)
+    groupOrder := []
+    for _, row := range filteredRows {
+        key := getCellValue(row, groupBy)
+        found := false
+        for _, k := range groupOrder {
+            if k == key {
+                found = true
+                break
+            }
+        }
+        if !found {
+            groups[key] = []
+            groupOrder = append(groupOrder, key)
+        }
+        groups[key] = append(groups[key], row)
+    }
+
+    var aggResults
+    aggResults = []
+    for _, key := range groupOrder {
+        groupRows := groups[key]
+        result := {"Key": key, "Value": 0.0, "Count": len(groupRows)}
+
+        switch aggFunc {
+        case "count":
+            result["Value"] = float64(len(groupRows))
+        case "sum":
+            total := 0.0
+            for _, r := range groupRows {
+                v := getCellValue(r, aggColumn)
+                n, ok := toNumber(v)
+                if ok {
+                    total = total + n
+                }
+            }
+            result["Value"] = total
+        case "avg":
+            total := 0.0
+            cnt := 0
+            for _, r := range groupRows {
+                v := getCellValue(r, aggColumn)
+                n, ok := toNumber(v)
+                if ok {
+                    total = total + n
+                    cnt++
+                }
+            }
+            if cnt > 0 {
+                result["Value"] = total / float64(cnt)
+            }
+        case "min":
+            first := true
+            minVal := 0.0
+            for _, r := range groupRows {
+                v := getCellValue(r, aggColumn)
+                n, ok := toNumber(v)
+                if ok {
+                    if first || n < minVal {
+                        minVal = n
+                        first = false
+                    }
+                }
+            }
+            result["Value"] = minVal
+        case "max":
+            first := true
+            maxVal := 0.0
+            for _, r := range groupRows {
+                v := getCellValue(r, aggColumn)
+                n, ok := toNumber(v)
+                if ok {
+                    if first || n > maxVal {
+                        maxVal = n
+                        first = false
+                    }
+                }
+            }
+            result["Value"] = maxVal
+        }
+
+        aggResults = append(aggResults, result)
+    }
+
+    if sortBy == "" || sortBy == groupBy {
+        for i := 0; i < len(aggResults); i++ {
+            for j := i + 1; j < len(aggResults); j++ {
+                shouldSwap := false
+                if sortDesc {
+                    shouldSwap = aggResults[j]["Value"] > aggResults[i]["Value"]
+                } else {
+                    shouldSwap = aggResults[j]["Value"] < aggResults[i]["Value"]
+                }
+                if shouldSwap {
+                    tmp := aggResults[i]
+                    aggResults[i] = aggResults[j]
+                    aggResults[j] = tmp
+                }
+            }
+        }
+    }
+
+    endIdx := len(aggResults)
+    if offset > 0 && offset < endIdx {
+        aggResults = aggResults[offset:]
+    }
+    if limit > 0 && limit < len(aggResults) {
+        aggResults = aggResults[:limit]
+    }
+
+    var resultBuf
+    resultBuf = ""
+    aggLabel := aggFunc
+    if aggColumn != "" {
+        aggLabel = sprintf("%v(%v)", aggFunc, aggColumn)
+    }
+
+    if outputFormat == "csv" {
+        resultBuf = sprintf("%v,%v,count\n", groupBy, aggLabel)
+        for _, r := range aggResults {
+            resultBuf = resultBuf + sprintf("%v,%v,%v\n", r["Key"], r["Value"], r["Count"])
+        }
+    } else if outputFormat == "json" {
+        resultBuf = "[\n"
+        for i, r := range aggResults {
+            comma := ","
+            if i == len(aggResults) - 1 {
+                comma = ""
+            }
+            resultBuf = resultBuf + sprintf("  {\"group\": \"%v\", \"value\": %v, \"count\": %v}%v\n", r["Key"], r["Value"], r["Count"], comma)
+        }
+        resultBuf = resultBuf + "]\n"
+    } else {
+        resultBuf = sprintf("Aggregation: %v grouped by %v\n", aggLabel, groupBy)
+        resultBuf = resultBuf + sprintf("Total groups: %v\n\n", len(aggResults))
+        resultBuf = resultBuf + sprintf("%-40s | %20s | %10s\n", groupBy, aggLabel, "count")
+        resultBuf = resultBuf + sprintf("%v\n", str.Repeat("-", 76))
+        for _, r := range aggResults {
+            key := sprint(r["Key"])
+            if len(key) > 40 {
+                key = key[:37] + "..."
+            }
+            resultBuf = resultBuf + sprintf("%-40s | %20.2f | %10v\n", key, r["Value"], r["Count"])
+        }
+    }
+
+    if outputFile != "" {
+        dir := file.GetDirPath(outputFile)
+        if dir != "" && !file.IsExisted(dir) {
+            file.MkdirAll(dir)
+        }
+        file.Save(outputFile, resultBuf)
+        yakit.Info("Aggregation results saved to: %v", outputFile)
+    } else {
+        yakit.Info(resultBuf)
+    }
+
+    yakit.Info("Aggregation query completed: %v groups", len(aggResults))
+    return
+}
+
+// Sort
+if sortBy != "" {
+    if !colExists(sortBy) {
+        yakit.Error("Sort column '%v' not found", sortBy)
+        return
+    }
+    sortColIdx := colIndex[sortBy]
+
+    for i := 0; i < len(filteredRows); i++ {
+        for j := i + 1; j < len(filteredRows); j++ {
+            valI := ""
+            valJ := ""
+            if sortColIdx < len(filteredRows[i]) {
+                valI = filteredRows[i][sortColIdx]
+            }
+            if sortColIdx < len(filteredRows[j]) {
+                valJ = filteredRows[j][sortColIdx]
+            }
+
+            numI, okI := toNumber(valI)
+            numJ, okJ := toNumber(valJ)
+
+            shouldSwap := false
+            if okI && okJ {
+                if sortDesc {
+                    shouldSwap = numJ > numI
+                } else {
+                    shouldSwap = numJ < numI
+                }
+            } else {
+                if sortDesc {
+                    shouldSwap = valJ > valI
+                } else {
+                    shouldSwap = valJ < valI
+                }
+            }
+
+            if shouldSwap {
+                tmp := filteredRows[i]
+                filteredRows[i] = filteredRows[j]
+                filteredRows[j] = tmp
+            }
+        }
+    }
+}
+
+// Pagination
+totalFiltered := len(filteredRows)
+if offset > 0 && offset < len(filteredRows) {
+    filteredRows = filteredRows[offset:]
+}
+if limit > 0 && limit < len(filteredRows) {
+    filteredRows = filteredRows[:limit]
+}
+
+// Output
+var resultBuf
+resultBuf = ""
+
+if outputFormat == "csv" {
+    selectedHeaders := []
+    for _, col := range selectedCols {
+        selectedHeaders = append(selectedHeaders, col)
+    }
+    resultBuf = str.Join(selectedHeaders, ",") + "\n"
+    for _, row := range filteredRows {
+        vals := []
+        for _, col := range selectedCols {
+            v := getCellValue(row, col)
+            v = str.ReplaceAll(v, "\"", "\"\"")
+            if str.Contains(v, ",") || str.Contains(v, "\"") || str.Contains(v, "\n") {
+                v = "\"" + v + "\""
+            }
+            vals = append(vals, v)
+        }
+        resultBuf = resultBuf + str.Join(vals, ",") + "\n"
+    }
+} else if outputFormat == "json" {
+    resultBuf = "[\n"
+    for i, row := range filteredRows {
+        comma := ","
+        if i == len(filteredRows) - 1 {
+            comma = ""
+        }
+        resultBuf = resultBuf + "  {"
+        for j, col := range selectedCols {
+            v := getCellValue(row, col)
+            v = str.ReplaceAll(v, "\\", "\\\\")
+            v = str.ReplaceAll(v, "\"", "\\\"")
+            sep := ""
+            if j > 0 {
+                sep = ", "
+            }
+            resultBuf = resultBuf + sprintf("%v\"%v\": \"%v\"", sep, col, v)
+        }
+        resultBuf = resultBuf + sprintf("}%v\n", comma)
+    }
+    resultBuf = resultBuf + "]\n"
+} else {
+    resultBuf = sprintf("Sheet: %v | Total: %v | Showing: %v (offset %v, limit %v)\n",
+        targetTable.SheetName, totalFiltered, len(filteredRows), offset, limit)
+    if filterExpr != "" {
+        resultBuf = resultBuf + sprintf("Filter: %v\n", filterExpr)
+    }
+    if sortBy != "" {
+        dir := "ASC"
+        if sortDesc {
+            dir = "DESC"
+        }
+        resultBuf = resultBuf + sprintf("Sort: %v %v\n", sortBy, dir)
+    }
+    resultBuf = resultBuf + "\n"
+
+    padRight = (s, width) => {
+        s = sprint(s)
+        for len(s) < width {
+            s = s + " "
+        }
+        return s
+    }
+
+    colWidths := make(map[string]int)
+    for _, col := range selectedCols {
+        w := len(col)
+        if w < 6 {
+            w = 6
+        }
+        if w > 30 {
+            w = 30
+        }
+        colWidths[col] = w
+    }
+
+    headerLine := "| "
+    sepLine := "| "
+    for _, col := range selectedCols {
+        w := colWidths[col]
+        displayH := col
+        if len(displayH) > w {
+            displayH = displayH[:w-3] + "..."
+        }
+        headerLine = headerLine + padRight(displayH, w) + " | "
+        sepLine = sepLine + str.Repeat("-", w) + " | "
+    }
+    resultBuf = resultBuf + headerLine + "\n"
+    resultBuf = resultBuf + sepLine + "\n"
+
+    for _, row := range filteredRows {
+        rowLine := "| "
+        for _, col := range selectedCols {
+            w := colWidths[col]
+            v := getCellValue(row, col)
+            v = str.ReplaceAll(v, "\n", " ")
+            if len(v) > w {
+                v = v[:w-3] + "..."
+            }
+            rowLine = rowLine + padRight(v, w) + " | "
+        }
+        resultBuf = resultBuf + rowLine + "\n"
+    }
+}
+
+if outputFile != "" {
+    dir := file.GetDirPath(outputFile)
+    if dir != "" && !file.IsExisted(dir) {
+        file.MkdirAll(dir)
+    }
+    err := file.Save(outputFile, resultBuf)
+    if err != nil {
+        yakit.Error("Failed to save output: %v", err)
+        return
+    }
+    yakit.Info("Query results saved to: %v", outputFile)
+} else {
+    yakit.Info(resultBuf)
+}
+
+yakit.Info("Query completed: %v rows returned", len(filteredRows))

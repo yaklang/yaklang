@@ -132,6 +132,65 @@ else
 fi
 <|TOOL_PARAM_command_END_{NONCE}|>
 
+### Example 5: Python script execution (WRITE-THEN-RUN pattern - MANDATORY)
+
+IMPORTANT: For Python scripts longer than 5 lines, NEVER pipe code directly via
+heredoc (python3 << 'EOF'). This causes shell parse errors with Python shebangs,
+docstrings, and complex string formatting.
+
+Instead, use cat to WRITE the script to a .py file first, then EXECUTE it:
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "bash",
+  "identifier": "python_data_analysis",
+  "params": {
+    "timeout": 120
+  }
+}
+```
+
+<|TOOL_PARAM_command_{NONCE}|>
+cat > analysis_script.py << 'PYEOF'
+#!/usr/bin/env python3
+"""This script analyzes data - docstrings are safe here."""
+import json
+import os
+
+data_file = "/path/to/data.json"
+with open(data_file) as f:
+    data = json.load(f)
+
+print(f"Records: {len(data)}")
+for key, value in data.items():
+    print(f"  {key}: {value}")
+PYEOF
+
+python3 analysis_script.py
+<|TOOL_PARAM_command_END_{NONCE}|>
+
+Key points:
+  - cat > file.py << 'PYEOF' safely writes ANY Python syntax (shebangs, docstrings, f-strings)
+  - The PYEOF delimiter must be on its own line with no leading whitespace
+  - After writing, execute with: python3 file.py
+  - Both steps happen in ONE bash tool call, no need to call write_file separately
+  - For data analysis, prefer native tools (read_excel_info, query_excel_data) over pandas
+
+For short Python one-liners (< 5 lines without docstrings), you may use:
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "bash",
+  "identifier": "quick_python_check",
+  "params": {
+    "command": "python3 -c \"import os; print(os.listdir('.'))\"",
+    "timeout": 10
+  }
+}
+```
+
 ## Key Rules
 
 1. ** TIMEOUT IS MANDATORY ** -- Always set timeout explicitly. Do NOT rely on the default 60s.
@@ -142,6 +201,10 @@ fi
 4. Limit output: pipe through | head -N; limit search: add -maxdepth to find
 5. Use fallback chains for cross-platform: cmd1 2>/dev/null || cmd2 || echo "not available"
 6. NEVER generate indefinite commands (no tail -f, no watch, no ping without -c)
+7. ** PYTHON SCRIPTS ** -- For Python scripts > 5 lines, ALWAYS use the WRITE-THEN-RUN
+   pattern: cat > script.py << 'PYEOF' to write the file, then python3 script.py to run.
+   NEVER pipe Python code directly via python3 << 'EOF'. This avoids shell parse errors
+   with shebangs, docstrings, and complex string formatting.
 USAGE_BLOCK
 
 yakit.AutoInitYakit()
