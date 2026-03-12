@@ -1,0 +1,298 @@
+__DESC__ = "Word document structured reader. Extracts and organizes content from .docx files into separate sections: text body, tables, and attachments (images, charts, OLE objects). Provides cleaner output than parse_office_to_text by separating content types and offering optional table-only or text-only extraction."
+__VERBOSE_NAME__ = "Word Document Structure Reader"
+__KEYWORDS__ = "word,docx,document,text extraction,table extraction,word structure,document analysis,word reader,office document,doc parsing,word tables,word content,document sections"
+
+__USAGE__ = <<<USAGE_BLOCK
+Word Document Structure Reader - Parameter Description for JSON Tool Calls
+
+Reads a .docx file and outputs structured content separated by type:
+text body, tables, and attachment inventory (images, charts, etc).
+More structured than parse_office_to_text.
+
+Required Parameters:
+  input           (string)  Path to the Word document (.docx).
+                            Note: .doc (legacy format) is NOT supported.
+
+Optional Parameters:
+  text_only       (bool)    Only extract text content, skip tables and attachments.
+                            Default: false.
+  tables_only     (bool)    Only extract tables. Default: false.
+  attachments     (bool)    Include attachment inventory (images, charts, OLE objects).
+                            Default: true.
+  output          (string)  Output file path. If omitted, prints to stdout.
+
+Example:
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "read_word_structure",
+  "identifier": "read_contract_doc",
+  "params": {
+    "input": "/path/to/contract.docx"
+  }
+}
+```
+USAGE_BLOCK
+
+yakit.AutoInitYakit()
+
+inputFile := cli.String("input", cli.setRequired(true), cli.setHelp("Path to Word document (.docx)"))
+textOnly := cli.Bool("text_only", cli.setRequired(false), cli.setDefault(false), cli.setHelp("Only extract text content"))
+tablesOnly := cli.Bool("tables_only", cli.setRequired(false), cli.setDefault(false), cli.setHelp("Only extract tables"))
+includeAttachments := cli.Bool("attachments", cli.setRequired(false), cli.setDefault(true), cli.setHelp("Include attachment inventory"))
+outputFile := cli.String("output", cli.setRequired(false), cli.setHelp("Output file path"))
+
+cli.check()
+
+if !file.IsExisted(inputFile) {
+    yakit.Error("Input file does not exist: %v", inputFile)
+    return
+}
+
+ext := file.GetExt(inputFile)
+if ext != ".docx" {
+    yakit.Error("Unsupported format: %v. Only .docx is supported (not .doc)", ext)
+    return
+}
+
+yakit.Info("Parsing Word document: %v", inputFile)
+
+res, err := fileparser.ParseFile(inputFile)
+if err != nil {
+    yakit.Error("Failed to parse Word document: %v", err)
+    return
+}
+
+if res == nil {
+    yakit.Error("No content extracted from document")
+    return
+}
+
+var resultBuf
+resultBuf = ""
+
+appendLine = (line) => {
+    resultBuf = resultBuf + line + "\n"
+}
+
+fileInfo, _ := file.Stat(inputFile)
+fileSize := 0
+if fileInfo != nil {
+    fileSize = fileInfo.Size()
+}
+
+appendLine("=" * 70)
+appendLine(sprintf("Word Document: %v", file.GetBase(inputFile)))
+appendLine(sprintf("File Size: %v bytes (%v KB)", fileSize, fileSize / 1024))
+
+contentTypes := []
+if res["text"] != nil {
+    contentTypes = append(contentTypes, "text")
+}
+if res["table"] != nil {
+    contentTypes = append(contentTypes, "tables")
+}
+if res["image"] != nil {
+    contentTypes = append(contentTypes, sprintf("images(%v)", len(res["image"])))
+}
+if res["chart"] != nil {
+    contentTypes = append(contentTypes, sprintf("charts(%v)", len(res["chart"])))
+}
+if res["ole"] != nil {
+    contentTypes = append(contentTypes, sprintf("ole(%v)", len(res["ole"])))
+}
+if res["vba"] != nil {
+    contentTypes = append(contentTypes, sprintf("vba(%v)", len(res["vba"])))
+}
+if res["pdf"] != nil {
+    contentTypes = append(contentTypes, sprintf("pdf(%v)", len(res["pdf"])))
+}
+appendLine(sprintf("Content types: %v", str.Join(contentTypes, ", ")))
+appendLine("=" * 70)
+
+// Text content
+if !tablesOnly {
+    textParts := res["text"]
+    if textParts != nil && len(textParts) > 0 {
+        appendLine("")
+        appendLine("## TEXT CONTENT")
+        appendLine(str.Repeat("-", 70))
+
+        for _, textFile := range textParts {
+            textContent := string(textFile.BinaryData)
+            if textFile.Metadata != nil && textFile.Metadata["count"] != "" {
+                appendLine(sprintf("(Text segments: %v)", textFile.Metadata["count"]))
+            }
+            appendLine("")
+
+            lines := str.Split(textContent, "\n")
+            totalLines := len(lines)
+            appendLine(sprintf("Total lines: %v", totalLines))
+            appendLine("")
+
+            if totalLines <= 500 {
+                appendLine(textContent)
+            } else {
+                for i := 0; i < 200; i++ {
+                    if i < totalLines {
+                        appendLine(lines[i])
+                    }
+                }
+                appendLine("")
+                appendLine(sprintf("... [%v lines omitted, showing first 200 and last 100] ...", totalLines - 300))
+                appendLine("")
+                startIdx := totalLines - 100
+                if startIdx < 200 {
+                    startIdx = 200
+                }
+                for i := startIdx; i < totalLines; i++ {
+                    appendLine(lines[i])
+                }
+            }
+        }
+    } else {
+        if !tablesOnly {
+            appendLine("")
+            appendLine("## TEXT CONTENT")
+            appendLine("(No text content found)")
+        }
+    }
+}
+
+// Tables
+if !textOnly {
+    tableParts := res["table"]
+    if tableParts != nil && len(tableParts) > 0 {
+        appendLine("")
+        appendLine("## TABLES")
+        appendLine(str.Repeat("-", 70))
+
+        for _, tableFile := range tableParts {
+            tableContent := string(tableFile.BinaryData)
+            if tableFile.Metadata != nil && tableFile.Metadata["count"] != "" {
+                appendLine(sprintf("(Total tables: %v)", tableFile.Metadata["count"]))
+            }
+            appendLine("")
+            appendLine(tableContent)
+        }
+    } else {
+        if !textOnly {
+            appendLine("")
+            appendLine("## TABLES")
+            appendLine("(No tables found)")
+        }
+    }
+}
+
+// Attachments inventory
+if includeAttachments && !textOnly && !tablesOnly {
+    hasAttachments := false
+
+    imageParts := res["image"]
+    if imageParts != nil && len(imageParts) > 0 {
+        hasAttachments = true
+        appendLine("")
+        appendLine("## IMAGES")
+        appendLine(str.Repeat("-", 70))
+        appendLine(sprintf("Total images: %v", len(imageParts)))
+        appendLine("")
+        for i, imgFile := range imageParts {
+            mimeType := ""
+            imgSize := ""
+            if imgFile.Metadata != nil {
+                mimeType = imgFile.Metadata["mime_type"]
+                imgSize = imgFile.Metadata["size"]
+            }
+            if mimeType == "" {
+                mimeType = "unknown"
+            }
+            if imgSize == "" {
+                imgSize = sprint(len(imgFile.BinaryData))
+            }
+            appendLine(sprintf("  %v. %v (type: %v, size: %v bytes)", i + 1, imgFile.FileName, mimeType, imgSize))
+        }
+    }
+
+    chartParts := res["chart"]
+    if chartParts != nil && len(chartParts) > 0 {
+        hasAttachments = true
+        appendLine("")
+        appendLine("## CHARTS")
+        appendLine(str.Repeat("-", 70))
+        appendLine(sprintf("Total charts: %v", len(chartParts)))
+        for i, chartFile := range chartParts {
+            appendLine(sprintf("  %v. %v", i + 1, chartFile.FileName))
+        }
+    }
+
+    oleParts := res["ole"]
+    if oleParts != nil && len(oleParts) > 0 {
+        hasAttachments = true
+        appendLine("")
+        appendLine("## OLE OBJECTS (Embedded)")
+        appendLine(str.Repeat("-", 70))
+        appendLine(sprintf("Total OLE objects: %v", len(oleParts)))
+        for i, oleFile := range oleParts {
+            oleType := ""
+            if oleFile.Metadata != nil {
+                oleType = oleFile.Metadata["type"]
+            }
+            appendLine(sprintf("  %v. %v (type: %v)", i + 1, oleFile.FileName, oleType))
+        }
+    }
+
+    vbaParts := res["vba"]
+    if vbaParts != nil && len(vbaParts) > 0 {
+        hasAttachments = true
+        appendLine("")
+        appendLine("## VBA MACROS (WARNING: potential security risk)")
+        appendLine(str.Repeat("-", 70))
+        appendLine(sprintf("Total VBA modules: %v", len(vbaParts)))
+        for i, vbaFile := range vbaParts {
+            moduleName := ""
+            if vbaFile.Metadata != nil {
+                moduleName = vbaFile.Metadata["module"]
+            }
+            appendLine(sprintf("  %v. %v (module: %v)", i + 1, vbaFile.FileName, moduleName))
+        }
+    }
+
+    pdfParts := res["pdf"]
+    if pdfParts != nil && len(pdfParts) > 0 {
+        hasAttachments = true
+        appendLine("")
+        appendLine("## EMBEDDED PDFs")
+        appendLine(str.Repeat("-", 70))
+        appendLine(sprintf("Total PDFs: %v", len(pdfParts)))
+        for i, pdfFile := range pdfParts {
+            appendLine(sprintf("  %v. %v (size: %v bytes)", i + 1, pdfFile.FileName, len(pdfFile.BinaryData)))
+        }
+    }
+
+    if !hasAttachments {
+        appendLine("")
+        appendLine("## ATTACHMENTS")
+        appendLine("(No images, charts, or embedded objects found)")
+    }
+}
+
+appendLine("")
+appendLine("=" * 70)
+
+if outputFile != "" {
+    dir := file.GetDirPath(outputFile)
+    if dir != "" && !file.IsExisted(dir) {
+        file.MkdirAll(dir)
+    }
+    err := file.Save(outputFile, resultBuf)
+    if err != nil {
+        yakit.Error("Failed to save output: %v", err)
+        return
+    }
+    yakit.Info("Document structure saved to: %v", outputFile)
+} else {
+    yakit.Info(resultBuf)
+}
+
+yakit.Info("Word document parsing completed successfully")

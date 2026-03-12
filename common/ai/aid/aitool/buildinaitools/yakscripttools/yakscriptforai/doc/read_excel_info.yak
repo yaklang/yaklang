@@ -1,0 +1,293 @@
+__DESC__ = "Excel file structure exploration tool. Reads an Excel file and outputs structured information including sheet list, column names with inferred data types, row counts, and preview rows. Ideal for understanding data layout before querying or analyzing Excel data."
+__VERBOSE_NAME__ = "Excel Structure Explorer"
+__KEYWORDS__ = "excel,xlsx,xls,spreadsheet,data exploration,column names,sheet list,data types,row count,preview,schema,structure,data analysis,excel info,excel schema"
+
+__USAGE__ = <<<USAGE_BLOCK
+Excel Structure Explorer Tool - Parameter Description for JSON Tool Calls
+
+Reads an Excel file and outputs structured information: sheet names, column headers,
+inferred data types, row counts, and preview data. Use this tool FIRST before
+query_excel_data to understand the data layout.
+
+Required Parameters:
+  input           (string)  Path to the Excel file (.xls or .xlsx).
+
+Optional Parameters:
+  sheet           (string)  Specific sheet name to inspect. If omitted, all sheets are shown.
+  preview_rows    (int)     Number of preview rows to display. Default: 5.
+                            Set to 0 to skip preview.
+  output          (string)  Output file path. If omitted, results are printed to stdout.
+
+Example:
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "read_excel_info",
+  "identifier": "explore_transaction_data",
+  "params": {
+    "input": "/path/to/transactions.xlsx",
+    "preview_rows": 3
+  }
+}
+```
+USAGE_BLOCK
+
+yakit.AutoInitYakit()
+
+inputFile := cli.String("input", cli.setRequired(true), cli.setHelp("Path to Excel file (.xls or .xlsx)"))
+sheetFilter := cli.String("sheet", cli.setRequired(false), cli.setHelp("Specific sheet name to inspect, omit for all sheets"))
+previewRows := cli.Int("preview_rows", cli.setRequired(false), cli.setDefault(5), cli.setHelp("Number of preview rows to display, default 5"))
+outputFile := cli.String("output", cli.setRequired(false), cli.setHelp("Output file path, omit to print to stdout"))
+
+cli.check()
+
+if !file.IsExisted(inputFile) {
+    yakit.Error("Input file does not exist: %v", inputFile)
+    return
+}
+
+ext := file.GetExt(inputFile)
+if ext != ".xls" && ext != ".xlsx" {
+    yakit.Error("Unsupported file format: %v. Supported: .xls, .xlsx", ext)
+    return
+}
+
+yakit.Info("Parsing Excel file: %v", inputFile)
+
+nodes, err := excel.Parse(inputFile)
+if err != nil {
+    yakit.Error("Failed to parse Excel file: %v", err)
+    return
+}
+
+classifier := excel.ClassifyNodes(nodes)
+
+inferType = (values) => {
+    if len(values) == 0 {
+        return "unknown"
+    }
+    intCount = 0
+    floatCount = 0
+    dateCount = 0
+    emptyCount = 0
+    for v in values {
+        v = str.TrimSpace(sprint(v))
+        if v == "" || v == "NaN" || v == "nan" {
+            emptyCount++
+            continue
+        }
+        if str.MatchAllOfRegexp(v, `^\-?\d+$`) {
+            intCount++
+            continue
+        }
+        if str.MatchAllOfRegexp(v, `^\-?\d+\.?\d*$`) {
+            floatCount++
+            continue
+        }
+        if str.MatchAllOfRegexp(v, `^\d{4}[\-/]\d{1,2}[\-/]\d{1,2}`) {
+            dateCount++
+            continue
+        }
+    }
+    nonEmpty = len(values) - emptyCount
+    if nonEmpty == 0 {
+        return "empty"
+    }
+    if intCount == nonEmpty {
+        return "integer"
+    }
+    if (intCount + floatCount) == nonEmpty {
+        return "number"
+    }
+    if dateCount == nonEmpty {
+        return "datetime"
+    }
+    if dateCount > 0 && dateCount >= nonEmpty / 2 {
+        return "datetime/text"
+    }
+    return "text"
+}
+
+padRight = (s, width) => {
+    s = sprint(s)
+    for len(s) < width {
+        s = s + " "
+    }
+    return s
+}
+
+var resultBuf
+resultBuf = ""
+
+appendLine = (line) => {
+    resultBuf = resultBuf + line + "\n"
+}
+
+fileInfo, _ := file.Stat(inputFile)
+fileSize := 0
+if fileInfo != nil {
+    fileSize = fileInfo.Size()
+}
+
+appendLine("=" * 70)
+appendLine(sprintf("Excel File Structure: %v", file.GetBase(inputFile)))
+appendLine(sprintf("File Size: %v bytes (%v KB)", fileSize, fileSize / 1024))
+appendLine(sprintf("Total Sheets: %v", len(classifier.Tables)))
+appendLine("=" * 70)
+
+for _, table := range classifier.Tables {
+    sheetName := table.SheetName
+    if sheetFilter != "" && sheetName != sheetFilter {
+        continue
+    }
+
+    headers := table.Headers
+    rows := table.Rows
+
+    appendLine("")
+    appendLine(sprintf("--- Sheet: %v ---", sheetName))
+    appendLine(sprintf("Columns: %v", len(headers)))
+    appendLine(sprintf("Data Rows: %v", len(rows)))
+    appendLine("")
+
+    sampleSize := 100
+    if len(rows) < sampleSize {
+        sampleSize = len(rows)
+    }
+
+    appendLine("Column Schema:")
+    appendLine(sprintf("  %-4s | %-30s | %-15s | %-10s", "#", "Column Name", "Inferred Type", "Non-Empty"))
+    appendLine(sprintf("  %s", str.Repeat("-", 70)))
+
+    for colIdx, header := range headers {
+        var sampleValues
+        sampleValues = []
+        nonEmptyCount := 0
+        for rowIdx := 0; rowIdx < sampleSize; rowIdx++ {
+            row := rows[rowIdx]
+            cellVal := ""
+            if colIdx < len(row) {
+                cellVal = row[colIdx]
+            }
+            sampleValues = append(sampleValues, cellVal)
+            if str.TrimSpace(cellVal) != "" {
+                nonEmptyCount++
+            }
+        }
+        colType := inferType(sampleValues)
+        nonEmptyPct := "0%"
+        if sampleSize > 0 {
+            nonEmptyPct = sprintf("%v%%", nonEmptyCount * 100 / sampleSize)
+        }
+        displayHeader := header
+        if len(displayHeader) > 30 {
+            displayHeader = displayHeader[:27] + "..."
+        }
+        appendLine(sprintf("  %-4d | %-30s | %-15s | %-10s", colIdx + 1, displayHeader, colType, nonEmptyPct))
+    }
+
+    if previewRows > 0 && len(rows) > 0 {
+        showRows := previewRows
+        if showRows > len(rows) {
+            showRows = len(rows)
+        }
+        appendLine("")
+        appendLine(sprintf("Preview (first %v rows):", showRows))
+
+        colWidths := make(map[int]int)
+        for colIdx, header := range headers {
+            w := len(header)
+            if w < 6 {
+                w = 6
+            }
+            if w > 25 {
+                w = 25
+            }
+            colWidths[colIdx] = w
+        }
+
+        headerLine := "  | "
+        sepLine := "  | "
+        for colIdx, header := range headers {
+            w := colWidths[colIdx]
+            displayH := header
+            if len(displayH) > w {
+                displayH = displayH[:w-3] + "..."
+            }
+            headerLine = headerLine + padRight(displayH, w) + " | "
+            sepLine = sepLine + str.Repeat("-", w) + " | "
+        }
+        appendLine(headerLine)
+        appendLine(sepLine)
+
+        for rowIdx := 0; rowIdx < showRows; rowIdx++ {
+            row := rows[rowIdx]
+            rowLine := "  | "
+            for colIdx := range headers {
+                w := colWidths[colIdx]
+                cellVal := ""
+                if colIdx < len(row) {
+                    cellVal = row[colIdx]
+                }
+                cellVal = str.ReplaceAll(cellVal, "\n", " ")
+                if len(cellVal) > w {
+                    cellVal = cellVal[:w-3] + "..."
+                }
+                rowLine = rowLine + padRight(cellVal, w) + " | "
+            }
+            appendLine(rowLine)
+        }
+    }
+}
+
+if sheetFilter != "" {
+    found := false
+    for _, table := range classifier.Tables {
+        if table.SheetName == sheetFilter {
+            found = true
+            break
+        }
+    }
+    if !found {
+        appendLine(sprintf("\nSheet '%v' not found. Available sheets:", sheetFilter))
+        for _, table := range classifier.Tables {
+            appendLine(sprintf("  - %v (%v rows)", table.SheetName, len(table.Rows)))
+        }
+    }
+}
+
+stats := classifier.GetStatistics()
+hasExtra := false
+extras := ""
+for k, v := range stats {
+    if v > 0 && k != "表格数量" && k != "文本数量" {
+        if !hasExtra {
+            extras = extras + "\nAdditional elements found:\n"
+            hasExtra = true
+        }
+        extras = extras + sprintf("  - %v: %v\n", k, v)
+    }
+}
+if hasExtra {
+    appendLine(extras)
+}
+
+appendLine("=" * 70)
+
+if outputFile != "" {
+    dir := file.GetDirPath(outputFile)
+    if dir != "" && !file.IsExisted(dir) {
+        file.MkdirAll(dir)
+    }
+    err := file.Save(outputFile, resultBuf)
+    if err != nil {
+        yakit.Error("Failed to save output: %v", err)
+        return
+    }
+    yakit.Info("Structure info saved to: %v", outputFile)
+} else {
+    yakit.Info(resultBuf)
+}
+
+yakit.Info("Excel structure exploration completed")
