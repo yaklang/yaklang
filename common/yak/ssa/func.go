@@ -5,6 +5,7 @@ import (
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 )
 
 func (p *Program) NewFunction(name string) *Function {
@@ -72,6 +73,22 @@ func (p *Program) NewFunctionWithParent(name string, parent *Function) *Function
 func (f *Function) SetCurrentBlueprint(blueprint *Blueprint) {
 	f.currentBlueprint = blueprint
 }
+
+func (f *Function) GetOrCreateBuilder() *FunctionBuilder {
+	if f == nil {
+		return nil
+	}
+	if f.builder != nil {
+		return f.builder
+	}
+
+	var editor *memedit.MemEditor
+	if prog := f.GetProgram(); prog != nil {
+		editor = prog.GetCurrentEditor()
+	}
+	return NewBuilder(editor, f, nil)
+}
+
 func (f *Function) GetCurrentBlueprint() *Blueprint {
 	return f.currentBlueprint
 }
