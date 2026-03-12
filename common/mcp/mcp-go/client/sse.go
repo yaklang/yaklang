@@ -28,6 +28,7 @@ type SSEMCPClient struct {
 	baseURL        *url.URL
 	endpoint       *url.URL
 	httpClient     *http.Client
+	headers        map[string]string
 	requestID      atomic.Int64
 	responses      map[int64]chan RPCResponse
 	mu             sync.RWMutex
@@ -42,10 +43,17 @@ type SSEMCPClient struct {
 
 // NewSSEMCPClient creates a new SSE-based MCP client with the given base URL.
 // Returns an error if the URL is invalid.
-func NewSSEMCPClient(baseURL string) (*SSEMCPClient, error) {
+func NewSSEMCPClient(baseURL string, headers ...map[string]string) (*SSEMCPClient, error) {
 	parsedURL, err := url.Parse(baseURL)
 	if err != nil {
 		return nil, fmt.Errorf("invalid URL: %w", err)
+	}
+
+	customHeaders := make(map[string]string)
+	if len(headers) > 0 {
+		for k, v := range headers[0] {
+			customHeaders[k] = v
+		}
 	}
 
 	return &SSEMCPClient{
@@ -58,10 +66,17 @@ func NewSSEMCPClient(baseURL string) (*SSEMCPClient, error) {
 			},
 			Timeout: 60 * time.Minute,
 		},
+		headers:      customHeaders,
 		responses:    make(map[int64]chan RPCResponse),
 		done:         make(chan struct{}),
 		endpointChan: make(chan struct{}),
 	}, nil
+}
+
+func (c *SSEMCPClient) applyHeaders(req *http.Request) {
+	for key, value := range c.headers {
+		req.Header.Set(key, value)
+	}
 }
 
 // Start initiates the SSE connection to the server and waits for the endpoint information.
@@ -79,6 +94,7 @@ func (c *SSEMCPClient) Start(ctx context.Context) error {
 	req.Header.Set("Accept", "text/event-stream")
 	req.Header.Set("Cache-Control", "no-cache")
 	req.Header.Set("Connection", "keep-alive")
+	c.applyHeaders(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -323,6 +339,7 @@ func (c *SSEMCPClient) sendRequest(
 	}
 
 	req.Header.Set("Content-Type", "application/json")
+	c.applyHeaders(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -409,6 +426,7 @@ func (c *SSEMCPClient) Initialize(
 	}
 
 	req.Header.Set("Content-Type", "application/json")
+	c.applyHeaders(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

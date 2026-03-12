@@ -18,6 +18,14 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+func mapStringAnyToStringMap(input schema.MapStringAny) map[string]string {
+	result := make(map[string]string, len(input))
+	for key, value := range input {
+		result[key] = fmt.Sprintf("%v", value)
+	}
+	return result
+}
+
 func LoadAllEnabledAIToolsFromMCPServers(db *gorm.DB, ctx context.Context) ([]*Tool, error) {
 	return LoadAllEnabledAIToolsFromMCPServersWithCallback(db, ctx, nil, nil, nil)
 }
@@ -160,7 +168,7 @@ func createMCPClient(server *schema.MCPServer) (client.MCPClient, error) {
 		return client.NewStdioMCPClient(command, []string{}, args...)
 
 	case "sse":
-		sseMcpClient, err := client.NewSSEMCPClient(server.URL)
+		sseMcpClient, err := client.NewSSEMCPClient(server.URL, mapStringAnyToStringMap(server.Headers))
 		if err != nil {
 			return nil, utils.Errorf("create sse mcp client failed: %v", err)
 		}
