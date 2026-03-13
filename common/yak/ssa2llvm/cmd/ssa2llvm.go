@@ -143,12 +143,30 @@ func compileAction(c *cli.Context) error {
 	tempOutput := filepath.Join(buildDir, filepath.Base(finalOutput))
 
 	runtimeArchive := ""
+	extraLinkArgs := make([]string, 0, 1)
 	if !emitLLVM && !emitAsm && !compileOnly {
-		archivePath, extractErr := runtimeembed.ExtractLibyakToDir(buildDir)
-		if extractErr == nil {
+		if cfg.stdlibComp {
+			archivePath, gcLibDir, buildErr := buildRuntimeArchiveFromEmbeddedSource(buildDir)
+			if buildErr != nil {
+				return buildErr
+			}
 			runtimeArchive = archivePath
-		} else if extractErr != runtimeembed.ErrNoEmbeddedRuntime {
-			return extractErr
+			if strings.TrimSpace(gcLibDir) != "" {
+				extraLinkArgs = append(extraLinkArgs, "-L"+gcLibDir)
+			}
+		} else {
+			archivePath, extractErr := runtimeembed.ExtractLibyakToDir(buildDir)
+			if extractErr == nil {
+				runtimeArchive = archivePath
+			} else if extractErr != runtimeembed.ErrNoEmbeddedRuntime {
+				return extractErr
+			}
+
+			if _, gcErr := runtimeembed.ExtractLibgcToDir(buildDir); gcErr == nil {
+				extraLinkArgs = append(extraLinkArgs, "-L"+buildDir)
+			} else if gcErr != runtimeembed.ErrNoEmbeddedRuntime {
+				return gcErr
+			}
 		}
 	}
 
@@ -156,6 +174,7 @@ func compileAction(c *cli.Context) error {
 		compiler.WithCompileWorkDir(buildDir),
 		compiler.WithCompileOutputFile(tempOutput),
 		compiler.WithCompileStdlibCompile(cfg.stdlibComp),
+		compiler.WithCompileExtraLinkArgs(extraLinkArgs...),
 		compiler.WithCompileEmitLLVM(c.Bool("emit-llvm")),
 		compiler.WithCompileEmitAsm(c.Bool("emit-asm")),
 		compiler.WithCompileOnly(c.Bool("c")),
@@ -193,17 +212,36 @@ func runAction(c *cli.Context) error {
 	}
 
 	runtimeArchive := ""
-	archivePath, extractErr := runtimeembed.ExtractLibyakToDir(buildDir)
-	if extractErr == nil {
+	extraLinkArgs := make([]string, 0, 1)
+	if cfg.stdlibComp {
+		archivePath, gcLibDir, buildErr := buildRuntimeArchiveFromEmbeddedSource(buildDir)
+		if buildErr != nil {
+			return buildErr
+		}
 		runtimeArchive = archivePath
-	} else if extractErr != runtimeembed.ErrNoEmbeddedRuntime {
-		return extractErr
+		if strings.TrimSpace(gcLibDir) != "" {
+			extraLinkArgs = append(extraLinkArgs, "-L"+gcLibDir)
+		}
+	} else {
+		archivePath, extractErr := runtimeembed.ExtractLibyakToDir(buildDir)
+		if extractErr == nil {
+			runtimeArchive = archivePath
+		} else if extractErr != runtimeembed.ErrNoEmbeddedRuntime {
+			return extractErr
+		}
+
+		if _, gcErr := runtimeembed.ExtractLibgcToDir(buildDir); gcErr == nil {
+			extraLinkArgs = append(extraLinkArgs, "-L"+buildDir)
+		} else if gcErr != runtimeembed.ErrNoEmbeddedRuntime {
+			return gcErr
+		}
 	}
 
 	options := append(cfg.compileOptions(),
 		compiler.WithCompileWorkDir(buildDir),
 		compiler.WithCompileOutputFile(tempOutput),
 		compiler.WithCompileStdlibCompile(cfg.stdlibComp),
+		compiler.WithCompileExtraLinkArgs(extraLinkArgs...),
 	)
 	if runtimeArchive != "" {
 		options = append(options, compiler.WithCompileRuntimeArchive(runtimeArchive))
@@ -255,6 +293,38 @@ func listObfuscatorsAction(c *cli.Context) error {
 	fmt.Println("Quote glob patterns like '*' to avoid shell expansion.")
 	fmt.Println("Run `ssa2llvm compile --help` or `ssa2llvm run --help` for full flag details.")
 	return nil
+}
+
+func buildRuntimeArchiveFromEmbeddedSource(buildDir string) (archivePath string, gcLibDir string, err error) {
+	srcDir := filepath.Join(buildDir, "ssa2llvm-stdlib-src")
+	if _, err := runtimeembed.ExtractRuntimeSourceToDir(srcDir); err != nil {
+		return "", "", err
+	}
+
+	gcLibDir = filepath.Join(srcDir, "common/yak/ssa2llvm/runtime/runtime_go/libs")
+	if _, statErr := os.Stat(filepath.Join(gcLibDir, "libgc.a")); statErr != nil {
+		return "", "", fmt.Errorf("embedded runtime source is missing libgc.a under %s (rebuild embedded resources)", gcLibDir)
+	}
+
+	goPath, err := exec.LookPath("go")
+	if err != nil {
+		return "", "", fmt.Errorf("go toolchain not found in PATH (required for --stdlib-compile): %w", err)
+	}
+
+	archivePath = filepath.Join(buildDir, "libyak.a")
+	cmd := exec.Command(goPath, "build", "-buildmode=c-archive", "-o", archivePath, "./common/yak/ssa2llvm/runtime/runtime_go")
+	cmd.Dir = srcDir
+	cmd.Env = append(os.Environ(),
+		"CGO_ENABLED=1",
+		"GOWORK=off",
+		"GOCACHE="+filepath.Join(buildDir, "gocache"),
+		"GOMODCACHE="+filepath.Join(buildDir, "gomodcache"),
+	)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", "", fmt.Errorf("build embedded stdlib/runtime failed: %v\n%s", err, out)
+	}
+	return archivePath, gcLibDir, nil
 }
 
 func newBuildCommandConfig(c *cli.Context) (*buildCommandConfig, error) {
