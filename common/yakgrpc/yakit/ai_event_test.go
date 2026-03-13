@@ -163,3 +163,45 @@ func TestYieldAIEvent(t *testing.T) {
 		assert.True(t, count < totalEvents-1)
 	})
 }
+
+func TestAiOutputEvent_ShouldSave_StructuredNodeIdBlacklist(t *testing.T) {
+	cases := []struct {
+		name  string
+		event *schema.AiOutputEvent
+		want  bool
+	}{
+		{
+			name:  "structured status should not save",
+			event: &schema.AiOutputEvent{Type: schema.EVENT_TYPE_STRUCTURED, NodeId: "status"},
+			want:  false,
+		},
+		{
+			name:  "structured system should not save",
+			event: &schema.AiOutputEvent{Type: schema.EVENT_TYPE_STRUCTURED, NodeId: "system"},
+			want:  false,
+		},
+		{
+			name:  "structured status detail should save",
+			event: &schema.AiOutputEvent{Type: schema.EVENT_TYPE_STRUCTURED, NodeId: "status_detail"},
+			want:  true,
+		},
+		{
+			name:  "structured user should save",
+			event: &schema.AiOutputEvent{Type: schema.EVENT_TYPE_STRUCTURED, NodeId: "user"},
+			want:  true,
+		},
+		{
+			name:  "non structured status should save",
+			event: &schema.AiOutputEvent{Type: schema.EVENT_TYPE_STREAM, NodeId: "status"},
+			want:  true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.event.ShouldSave(); got != tc.want {
+				t.Fatalf("ShouldSave() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}

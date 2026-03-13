@@ -3,6 +3,7 @@ package schema
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/samber/lo"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/jsonextractor"
@@ -219,7 +220,21 @@ func (e *AiOutputEvent) ShouldSave() bool {
 		e.Type == EVENT_TYPE_AI_CALL_SUMMARY {
 		return false
 	}
+	if e.structTypeNodeIdNotSave() {
+		return false
+	}
 	return true
+}
+
+func (e *AiOutputEvent) structTypeNodeIdNotSave() bool {
+	if e.Type != EVENT_TYPE_STRUCTURED {
+		return false
+	}
+	blackList := []string{
+		"status",
+		"system",
+	}
+	return lo.Contains(blackList, e.NodeId)
 }
 
 func (e *AiOutputEvent) IsInteractive() bool {

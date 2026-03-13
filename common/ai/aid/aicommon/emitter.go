@@ -162,6 +162,19 @@ func (r *Emitter) EmitJSON(typeName schema.EventType, id string, i any) (*schema
 	return r.emit(event)
 }
 
+func (r *Emitter) EmitSystemJSON(typeName schema.EventType, id string, i any) (*schema.AiOutputEvent, error) {
+	event := &schema.AiOutputEvent{
+		CoordinatorId: r.id,
+		Type:          typeName,
+		NodeId:        id,
+		IsJson:        true,
+		Content:       utils.Jsonify(i),
+		Timestamp:     time.Now().Unix(),
+		IsSystem:      true,
+	}
+	return r.emit(event)
+}
+
 func (r *Emitter) EmitSyncJSON(typeName schema.EventType, id string, i any, syncID string) (*schema.AiOutputEvent, error) {
 	event := &schema.AiOutputEvent{
 		CoordinatorId: r.id,
@@ -249,6 +262,10 @@ func (r *Emitter) EmitTextStreamWithTaskIndex(nodeId string, content string, tas
 	)
 }
 
+func (r *Emitter) EmitSystemStructured(id string, i any) (*schema.AiOutputEvent, error) {
+	return r.EmitSystemJSON(schema.EVENT_TYPE_STRUCTURED, id, i)
+}
+
 func (r *Emitter) EmitStructured(id string, i any) (*schema.AiOutputEvent, error) {
 	return r.EmitJSON(schema.EVENT_TYPE_STRUCTURED, id, i)
 }
@@ -309,7 +326,7 @@ func (r *Emitter) EmitLogWithLevel(level, name, fmtlog string, items ...any) (*s
 		log.Error(message)
 	}
 
-	return r.EmitStructured(nodeName, map[string]any{
+	return r.EmitSystemStructured(nodeName, map[string]any{
 		"level":   level,
 		"message": message,
 	})
