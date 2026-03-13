@@ -278,6 +278,23 @@ func (s *Server) StringFuzzer(rootCtx context.Context, req *ypb.StringFuzzerRequ
 	return &ypb.StringFuzzerResponse{Results: res}, nil
 }
 
+func buildHTTPFuzzerHotPatchChain(req *ypb.FuzzerRequest) yak.HotPatchChain {
+	enabled, _, globalCode := yakit.GetGlobalHotPatchVersionAndCode()
+	if !enabled {
+		globalCode = ""
+	}
+
+	moduleCode := req.GetHotPatchCode()
+	if req.GetDisableHotPatch() {
+		moduleCode = ""
+	}
+
+	return yak.HotPatchChain{
+		GlobalCode: globalCode,
+		ModuleCode: moduleCode,
+	}
+}
+
 func (s *Server) RedirectRequest(ctx context.Context, req *ypb.RedirectRequestParams) (*ypb.FuzzerResponse, error) {
 	result := lowhttp.GetRedirectFromHTTPResponse([]byte(req.GetResponse()), false)
 	if result == "" {
@@ -512,14 +529,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 
 	// hot code
 	var extraOpt []mutate.FuzzConfigOpt
-	enabled, _, globalCode := yakit.GetGlobalHotPatchVersionAndCode()
-	if !enabled || req.GetDisableHotPatch() {
-		globalCode = ""
-	}
-	hotPatchChain := yak.HotPatchChain{
-		GlobalCode: globalCode,
-		ModuleCode: req.GetHotPatchCode(),
-	}
+	hotPatchChain := buildHTTPFuzzerHotPatchChain(req)
 	if strings.TrimSpace(hotPatchChain.GlobalCode) != "" || strings.TrimSpace(hotPatchChain.ModuleCode) != "" {
 		extraOpt = append(extraOpt, yak.Fuzz_WithAllHotPatchChained(stream.Context(), hotPatchChain)...)
 		extraOpt = append(extraOpt, mutate.Fuzz_WithExtraFuzzTagHandler("request", func(s string) []string {
@@ -964,7 +974,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_ConnPool(lowhttp.NewHttpConnPool(stream.Context(), int(concurrent*50), int(concurrent))))
 		}
 
-		if !req.GetDisableHotPatch() {
+		if strings.TrimSpace(hotPatchChain.GlobalCode) != "" || strings.TrimSpace(hotPatchChain.ModuleCode) != "" {
 			beforeRequest, afterRequest, mirrorHTTPFlow, retryHandler, customFailureChecker, mockHTTPRequest := yak.MutateHookCallerChained(stream.Context(), hotPatchChain, nil)
 			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_HookCodeCaller(beforeRequest, afterRequest, mirrorHTTPFlow, retryHandler, customFailureChecker, mockHTTPRequest))
 		}
