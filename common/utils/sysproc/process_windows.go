@@ -155,7 +155,7 @@ func (s *searcher) Search(b []byte, ip netip.Addr, port uint16) (uint32, error) 
 			}
 		}
 
-		// according to MSDN, only the lower 16 bits of dwLocalPort are used and the port number is in network endian.
+		// port is in network byte order per MSDN
 		// this field can be illustrated as follows depends on different machine endianess:
 		//     little endian: [ MSB LSB  0   0  ]   interpret as native uint32 is ((LSB<<8)|MSB)
 		//       big  endian: [  0   0  MSB LSB ]   interpret as native uint32 is ((MSB<<8)|LSB)
@@ -182,14 +182,16 @@ func newSearcher(isV4, isTCP bool) *searcher {
 	tcpState := -1
 	switch {
 	case isV4 && isTCP:
-		// struct MIB_TCPROW_OWNER_PID
-		itemSize, port, ip, ipSize, pid, tcpState = 24, 8, 4, 4, 20, 0
+		// struct MIB_TCPROW_OWNER_PID: match RemoteAddr/RemotePort (conn.RemoteAddr)
+		// layout: state(0) localAddr(4) localPort(8) remoteAddr(12) remotePort(16) pid(20)
+		itemSize, port, ip, ipSize, pid, tcpState = 24, 16, 12, 4, 20, 0
 	case isV4 && !isTCP:
 		// struct MIB_UDPROW_OWNER_PID
 		itemSize, port, ip, ipSize, pid = 12, 4, 0, 4, 8
 	case !isV4 && isTCP:
-		// struct MIB_TCP6ROW_OWNER_PID
-		itemSize, port, ip, ipSize, pid, tcpState = 56, 20, 0, 16, 52, 48
+		// struct MIB_TCP6ROW_OWNER_PID: match ucRemoteAddr/dwRemotePort (conn.RemoteAddr)
+		// layout: localAddr(0) localScopeId(16) localPort(20) remoteAddr(24) remoteScopeId(40) remotePort(44) state(48) pid(52)
+		itemSize, port, ip, ipSize, pid, tcpState = 56, 44, 24, 16, 52, 48
 	case !isV4 && !isTCP:
 		// struct MIB_UDP6ROW_OWNER_PID
 		itemSize, port, ip, ipSize, pid = 28, 20, 0, 16, 24
