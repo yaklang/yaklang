@@ -674,13 +674,14 @@ jobs:
           if wget --spider --server-response "$HISTORY_URL" 2>&1 | grep 'HTTP/.* 200' >/dev/null; then
             echo "Downloading history_versions.txt..."
             wget -O history_versions.txt -q $HISTORY_URL
-            cat ./current_version.txt ./history_versions.txt > new_history_versions.txt 
+            # Deduplicate: avoid duplicate entries when workflow is re-run (e.g. after Docker build failure)
+            cat ./current_version.txt ./history_versions.txt | tr -d '\r' | awk 'NF && !seen[$0]++' > new_history_versions.txt
           else
             echo "history_versions.txt not found or server did not return HTTP 200 for $HISTORY_URL, skipping download."
             cat ./current_version.txt > new_history_versions.txt
           fi
           
-          echo "Uploading version.txt to oss"
+          echo "Uploading version.txt to oss (deduplicated)"
           cat new_history_versions.txt | head -n 100
           cat new_history_versions.txt | head -n 100 > active_versions.txt
           
