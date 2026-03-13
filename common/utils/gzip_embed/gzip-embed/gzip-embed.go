@@ -7,9 +7,10 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
-	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -58,15 +59,20 @@ func main() {
 		cli.StringFlag{
 			Name: "gz",
 		},
+		cli.BoolFlag{
+			Name:  "include-targz",
+			Usage: "include *.tar.gz files from source (default: excluded to avoid packaging nested archives)",
+		},
 	}
 	app.Action = func(c *cli.Context) {
 		sourceDir := c.String("source")
 		gzName := c.String("gz")
 		withRootPath := c.Bool("root-path")
+		includeTarGz := c.Bool("include-targz")
 		if gzName == "" {
 			gzName = fmt.Sprintf("%s.tar.gz", sourceDir)
 		}
-		err := targz(sourceDir, gzName, withRootPath)
+		err := targz(sourceDir, gzName, withRootPath, includeTarGz)
 		if err != nil {
 			log.Error(err)
 		}
@@ -95,7 +101,7 @@ func writeEmbedFile(cache bool, sourceDir string, gzName string) {
 	}))
 	os.WriteFile("embed.go", []byte(code), 0644)
 }
-func targz(path string, gzName string, withRootPath bool) error {
+func targz(path string, gzName string, withRootPath bool, includeTarGz bool) error {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return err
 	}
@@ -122,12 +128,18 @@ func targz(path string, gzName string, withRootPath bool) error {
 		relBase = filepath.Dir(path)
 	}
 
+	gzAbs := gzName
+	if cwd, err := os.Getwd(); err == nil && !filepath.IsAbs(gzAbs) {
+		gzAbs = filepath.Join(cwd, gzAbs)
+	}
+	gzAbs = filepath.Clean(gzAbs)
+
 	// 递归地添加文件夹内容到 tar 归档
 	err = filepath.Walk(path, func(filePath string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		return addFileToTarWriter(filePath, info, relBase, tarWriter)
+		return addFileToTarWriter(filePath, info, relBase, tarWriter, gzAbs, includeTarGz)
 	})
 
 	if err != nil {
@@ -135,12 +147,17 @@ func targz(path string, gzName string, withRootPath bool) error {
 	}
 	return nil
 }
-func addFileToTarWriter(path string, info os.FileInfo, rootDir string, tarWriter *tar.Writer) error {
+func addFileToTarWriter(path string, info os.FileInfo, rootDir string, tarWriter *tar.Writer, gzAbs string, includeTarGz bool) error {
+	if abs, err := filepath.Abs(path); err == nil && filepath.Clean(abs) == gzAbs {
+		return nil
+	}
+
 	// 获取文件的基本名称
 	baseName := filepath.Base(path)
 
-	// 确保不将输出文件包括在内（排除所有 .tar.gz 文件）
-	if filepath.Ext(baseName) == ".gz" && filepath.Ext(baseName[:len(baseName)-3]) == ".tar" {
+	// Default behavior: exclude *.tar.gz to avoid packaging nested archives.
+	// For source distributions that legitimately embed .tar.gz, pass --include-targz.
+	if !includeTarGz && strings.HasSuffix(baseName, ".tar.gz") {
 		return nil
 	}
 	if baseName == "output.tar.gz" {

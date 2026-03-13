@@ -302,10 +302,6 @@ func CompileToExecutable(opts ...CompileOption) error {
 		}
 	}
 
-	if cfg.StdlibCompile {
-		log.Warnf("--stdlib-compile is not implemented yet; continuing with the built-in runtime archive")
-	}
-
 	_, comp, ir, err := compileInput(
 		cfg.SourceFile,
 		cfg.SourceCode,

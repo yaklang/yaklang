@@ -34,7 +34,7 @@
 
 如果你希望发布的 `ssa2llvm` CLI 不依赖外置的 `libyak.a`，可以把运行时归档打包进二进制，并在编译时自动释放到临时构建目录供 clang 链接。
 
-生成嵌入资源（会在 `common/yak/ssa2llvm/runtimeembed/` 下生成 `ssa2llvm-runtime.tar.gz`）：
+生成嵌入资源（会在 `common/yak/ssa2llvm/runtimeembed/` 下生成 `ssa2llvm-runtime.tar.gz` 和 `ssa2llvm-runtime-src.tar.gz`）：
 
 ```bash
 ./scripts/build_runtime_embed.sh
@@ -43,8 +43,18 @@
 然后用 `gzip_embed` 构建 tag 编译 CLI（示例）：
 
 ```bash
-go build -tags gzip_embed ./common/yak/ssa2llvm/cmd
+go build -tags ssa2llvm_gzip_embed ./common/yak/ssa2llvm/cmd
 ```
+
+## 现场编译 stdlib/runtime（`--stdlib-compile`）
+
+当你使用发布版 CLI（没有 yaklang 项目目录）时，如果希望在编译 Yak 代码时现场编译 `libyak.a`，可以使用：
+
+```bash
+ssa2llvm compile demo.yak --stdlib-compile
+```
+
+该模式会把内置的 runtime 源码（`ssa2llvm-runtime-src.tar.gz`）释放到临时目录，并执行 `go build -buildmode=c-archive` 生成 `libyak.a`，随后再进入 clang 链接阶段。
 
 ## 快速验证
 
