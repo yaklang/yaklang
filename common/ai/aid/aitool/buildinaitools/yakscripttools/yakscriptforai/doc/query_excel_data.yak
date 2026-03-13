@@ -732,6 +732,10 @@ if outputFile != "" {
         return
     }
     yakit.Info("Query results saved to: %v", outputFile)
+    outInfo, outErr = file.Stat(outputFile)
+    if outErr == nil {
+        yakit.File(outputFile, yakit.fileWriteAction(outInfo.Size(), "extract", "excel query results"))
+    }
 } else {
     yakit.Info(resultBuf)
 }
@@ -744,9 +748,20 @@ if targetTable.Metadata != nil {
     }
 }
 
+baseName = file.GetBase(inputFile)
+baseName = str.ReplaceAll(baseName, ".xlsx", "")
+baseName = str.ReplaceAll(baseName, ".xls", "")
+cacheHint = sprintf("/tmp/%v_cache.csv", baseName)
+
 if totalDataRows > 500 {
     yakit.Info("Query completed: %v rows returned (source: %v total data rows)", len(filteredRows), totalDataRows)
-    yakit.Info("[PERFORMANCE NOTICE] This file has %v rows. Each query_excel_data call re-parses the entire file from disk (~30s for large files). If you need additional statistics from this same file, DO NOT call this tool again. Instead, use the bash tool to write and execute a Python script with pandas, which reads the file once and computes all metrics in-memory. Example: python3 -c \"import pandas as pd; import json; df = pd.read_excel('%v'); results = {'count': len(df), 'stats': df.describe().to_dict()}; print(json.dumps(results, default=str, ensure_ascii=False))\"", totalDataRows, inputFile)
+    yakit.Info("[PERFORMANCE NOTICE] This file has %v rows. Each query_excel_data call re-parses the entire file from disk (~30s for large files).", totalDataRows)
+    yakit.Info("  If you need additional statistics from this same file, DO NOT call this tool again.")
+    yakit.Info("  Instead, use bash tool with a Python pandas script that reads the file once and computes all metrics.")
+    yakit.Info("[CACHING TIP] Check if a CSV cache exists at: %v", cacheHint)
+    yakit.Info("  If it exists, use pd.read_csv('%v') in your Python script (~1s vs ~30s for Excel).", cacheHint)
+    yakit.Info("  If not, create one: df = pd.read_excel('%v'); df.to_csv('%v', index=False)", inputFile, cacheHint)
+    yakit.Info("  Schema reference: /tmp/%v_schema.txt (saved by read_excel_info)", baseName)
 } else {
     yakit.Info("Query completed: %v rows returned", len(filteredRows))
 }
