@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
@@ -161,11 +162,43 @@ func (s *ScanNode) rpc_invokeScript(ctx context.Context, node string, req *scanr
 		})
 	}
 
+	waitStart := time.Now()
+	log.Infof(
+		"invoke limiter wait: task=%s subtask=%s runtime=%s active=%d/%d",
+		req.TaskId,
+		req.SubTaskId,
+		req.RuntimeId,
+		s.invokeLimiter.activeCount(),
+		s.invokeLimiter.capacity(),
+	)
 	releaseLimiter, err := s.invokeLimiter.acquire(ctx)
 	if err != nil {
 		return nil, err
 	}
-	defer releaseLimiter()
+	waitMs := time.Since(waitStart).Milliseconds()
+	log.Infof(
+		"invoke limiter acquired: task=%s subtask=%s runtime=%s wait_ms=%d active=%d/%d",
+		req.TaskId,
+		req.SubTaskId,
+		req.RuntimeId,
+		waitMs,
+		s.invokeLimiter.activeCount(),
+		s.invokeLimiter.capacity(),
+	)
+	defer func() {
+		activeBeforeRelease := s.invokeLimiter.activeCount()
+		releaseLimiter()
+		log.Infof(
+			"invoke limiter released: task=%s subtask=%s runtime=%s active_before=%d/%d active_after=%d/%d",
+			req.TaskId,
+			req.SubTaskId,
+			req.RuntimeId,
+			activeBeforeRelease,
+			s.invokeLimiter.capacity(),
+			s.invokeLimiter.activeCount(),
+			s.invokeLimiter.capacity(),
+		)
+	}()
 
 	ssaDBRaw := strings.TrimSpace(utils.InterfaceToString(paramsKeyValue[scannodeSSADataBaseRawParamKey]))
 	skipSSAMigrate := utils.InterfaceToBoolean(paramsKeyValue[scannodeSSASkipMigrateParamKey])
