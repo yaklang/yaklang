@@ -443,7 +443,7 @@ func TestForgeFactory_GetAIForge(t *testing.T) {
 	setupTestDatabase(t)
 
 	// 创建测试数据
-	testForgeName := "test-get-forge"
+	testForgeName := "test-get-forge" + utils.RandStringBytes(10)
 	testForge := createTestAIForge(t, testForgeName)
 	defer func() {
 		// 清理测试数据
@@ -479,14 +479,15 @@ func TestForgeFactory_GetAIForge(t *testing.T) {
 	})
 
 	t.Run("GetAIForge with special characters in name", func(t *testing.T) {
-		specialNames := []string{
+		specialNamePrefixes := []string{
 			"test-forge-with-dashes",
 			"test_forge_with_underscores",
 			"test.forge.with.dots",
 			"test123",
 		}
 
-		for _, name := range specialNames {
+		for _, prefix := range specialNamePrefixes {
+			name := prefix + "-" + utils.RandStringBytes(8)
 			t.Run(fmt.Sprintf("name=%s", name), func(t *testing.T) {
 				// 创建特殊名称的测试 forge
 				specialForge := createTestAIForge(t, name)
