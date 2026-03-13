@@ -101,7 +101,7 @@ func firstValue(values Values) ValueOperator {
 }
 
 func nativeCallGroups(values Values, frame *SFFrame) []nativeCallGroup {
-	scope, ok := frame.activeConditionScope()
+	scope, ok := frame.activeAnchorScope()
 	if !ok || scope.anchorWidth <= 0 {
 		template := firstValue(values)
 		return []nativeCallGroup{{

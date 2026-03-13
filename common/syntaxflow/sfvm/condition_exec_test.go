@@ -95,7 +95,7 @@ func TestNormalizeConditionAgainstSource_UsesBitVectorForDuplicateSource(t *test
 	anchorRestore := assignLocalAnchorBitVector(source, 0)
 	defer restoreAnchorBitVector(anchorRestore)
 
-	scope := conditionScopeState{
+	scope := anchorScopeState{
 		anchorWidth: len(source),
 	}
 	mask, err := normalizeConditionAgainstSource(scope, result, []bool{true})
@@ -115,7 +115,7 @@ func TestNormalizeConditionAgainstSource_AlignedConditionShouldNotRewriteSourceB
 	b.SetAnchorBitVector(bBits)
 
 	source := NewValues([]ValueOperator{a, b})
-	scope := conditionScopeState{
+	scope := anchorScopeState{
 		anchorWidth: len(source),
 	}
 	mask, err := normalizeConditionAgainstSource(scope, nil, []bool{true, false})
@@ -140,7 +140,7 @@ func TestBuildFilterMask_UsesBitVector(t *testing.T) {
 	condBits.Set(2)
 	condVal.SetAnchorBitVector(condBits)
 
-	scope := conditionScopeState{
+	scope := anchorScopeState{
 		anchorWidth: len(source),
 	}
 	mask, err := buildFilterMask(scope, NewValues([]ValueOperator{condVal}))
@@ -157,7 +157,7 @@ func TestBuildFilterMask_DerivesMaskFromSourceValueBitVector(t *testing.T) {
 	anchorRestore := assignLocalAnchorBitVector(source, 0)
 	defer restoreAnchorBitVector(anchorRestore)
 
-	scope := conditionScopeState{
+	scope := anchorScopeState{
 		anchorWidth: len(source),
 	}
 	mask, err := buildFilterMask(scope, NewValues([]ValueOperator{b}))
@@ -219,7 +219,7 @@ func TestNormalizeConditionAgainstSource_DerivesMaskFromAnchorBitVector(t *testi
 	condBits.Set(2)
 	cond.SetAnchorBitVector(condBits)
 
-	scope := conditionScopeState{
+	scope := anchorScopeState{
 		anchorWidth: len(source),
 	}
 	mask, err := normalizeConditionAgainstSource(scope, NewValues([]ValueOperator{cond}), nil)

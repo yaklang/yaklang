@@ -235,7 +235,7 @@ func (y *SyntaxFlowVisitor) VisitConditionExpression(raw sf.IConditionExpression
 		// The compare/condition is applied on the derived list (stack top) and then mapped
 		// back to the duplicated original source via OpFilter, so we need a scope rooted
 		// at the derived list here.
-		y.EmitConditionScopeStart()
+		y.EmitAnchorScopeStart()
 		if i.NumberLiteral() != nil {
 			n := y.VisitNumberLiteral(i.NumberLiteral())
 			y.EmitPushLiteral(n)
@@ -251,7 +251,7 @@ func (y *SyntaxFlowVisitor) VisitConditionExpression(raw sf.IConditionExpression
 		y.EmitOperator(i.GetOp().GetText())
 		// Filter derived values by the comparison result.
 		y.EmitCondition()
-		y.EmitConditionScopeEnd()
+		y.EmitAnchorScopeEnd()
 		// Map back to the original source list.
 		y.EmitFilter()
 	case *sf.OpcodeTypeConditionContext:
@@ -321,9 +321,9 @@ func (y *SyntaxFlowVisitor) VisitConditionExpression(raw sf.IConditionExpression
 			return nil
 		}
 		for idx, exp := range conds {
-			y.EmitConditionScopeStart()
+			y.EmitAnchorScopeStart()
 			y.VisitConditionExpression(exp)
-			y.EmitConditionScopeEnd()
+			y.EmitAnchorScopeEnd()
 			if idx > 0 {
 				y.EmitOperator("&&")
 			}
@@ -334,17 +334,17 @@ func (y *SyntaxFlowVisitor) VisitConditionExpression(raw sf.IConditionExpression
 			return nil
 		}
 		for idx, exp := range conds {
-			y.EmitConditionScopeStart()
+			y.EmitAnchorScopeStart()
 			y.VisitConditionExpression(exp)
-			y.EmitConditionScopeEnd()
+			y.EmitAnchorScopeEnd()
 			if idx > 0 {
 				y.EmitOperator("||")
 			}
 		}
 	case *sf.NotConditionContext:
-		y.EmitConditionScopeStart()
+		y.EmitAnchorScopeStart()
 		y.VisitConditionExpression(i.ConditionExpression())
-		y.EmitConditionScopeEnd()
+		y.EmitAnchorScopeEnd()
 		y.EmitOperator("!")
 	case *sf.ParenConditionContext:
 		y.VisitConditionExpression(i.ConditionExpression())

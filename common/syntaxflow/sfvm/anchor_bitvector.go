@@ -107,7 +107,7 @@ func assignLocalAnchorBitVector(sourceValues Values, base int) []anchorRestoreEn
 }
 
 // restoreAnchorBitVector restores anchor bits overwritten by assignLocalAnchorBitVector
-// at condition-scope start.
+// at anchor-scope start.
 func restoreAnchorBitVector(entries []anchorRestoreEntry) {
 	for _, e := range entries {
 		if utils.IsNil(e.value) {

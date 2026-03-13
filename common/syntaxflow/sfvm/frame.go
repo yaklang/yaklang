@@ -39,7 +39,7 @@ type errorSkipContext struct {
 	scopeDepth int
 }
 
-type conditionScopeState struct {
+type anchorScopeState struct {
 	conditionDepth int
 	stackDepth     int
 
@@ -66,10 +66,10 @@ type SFFrame struct {
 	idx            int     // current opcode index
 	currentProcess float64 // current process
 
-	stack          *utils.Stack[Values]              // for filter
-	conditionStack *utils.Stack[ConditionEntry]      // for condition
-	conditionScope *utils.Stack[conditionScopeState] // for condition scope
-	popStack       *utils.Stack[Values]              //pop stack,for sf
+	stack          *utils.Stack[Values]           // for filter
+	conditionStack *utils.Stack[ConditionEntry]   // for condition
+	anchorScope    *utils.Stack[anchorScopeState] // for anchor scope
+	popStack       *utils.Stack[Values]           //pop stack,for sf
 
 	// when cache err skip  statement/expr
 	errorSkipStack *utils.Stack[*errorSkipContext]
@@ -87,10 +87,10 @@ func (s *SFFrame) ActiveAnchorWidth() (int, bool) {
 }
 
 func (s *SFFrame) ActiveAnchorScope() (int, int, bool) {
-	if s == nil || s.conditionScope == nil || s.conditionScope.Len() == 0 {
+	if s == nil || s.anchorScope == nil || s.anchorScope.Len() == 0 {
 		return 0, 0, false
 	}
-	state := s.conditionScope.Peek()
+	state := s.anchorScope.Peek()
 	if state.anchorWidth <= 0 {
 		return 0, 0, false
 	}
@@ -98,15 +98,15 @@ func (s *SFFrame) ActiveAnchorScope() (int, int, bool) {
 }
 
 func (s *SFFrame) nextAnchorScopeBase() int {
-	if s == nil || s.conditionScope == nil || s.conditionScope.Len() == 0 {
+	if s == nil || s.anchorScope == nil || s.anchorScope.Len() == 0 {
 		return 0
 	}
-	parent := s.conditionScope.Peek()
+	parent := s.anchorScope.Peek()
 	return parent.anchorBase + parent.anchorWidth
 }
 
-func (s *SFFrame) beginConditionScope(source Values) conditionScopeState {
-	state := conditionScopeState{
+func (s *SFFrame) beginAnchorScope(source Values) anchorScopeState {
+	state := anchorScopeState{
 		conditionDepth: s.conditionStack.Len(),
 		stackDepth:     s.stack.Len(),
 		mode:           conditionModeFromSource(source),
@@ -119,7 +119,7 @@ func (s *SFFrame) beginConditionScope(source Values) conditionScopeState {
 	return state
 }
 
-func (s *SFFrame) restoreConditionScope(scope conditionScopeState) {
+func (s *SFFrame) restoreAnchorScope(scope anchorScopeState) {
 	restoreAnchorBitVector(scope.anchorRestore)
 }
 
@@ -271,7 +271,7 @@ func (s *SFFrame) Flush() {
 	s.stack = utils.NewStack[Values]()
 	s.errorSkipStack = utils.NewStack[*errorSkipContext]()
 	s.conditionStack = utils.NewStack[ConditionEntry]()
-	s.conditionScope = utils.NewStack[conditionScopeState]()
+	s.anchorScope = utils.NewStack[anchorScopeState]()
 	s.popStack = utils.NewStack[Values]()
 	s.idx = 0
 }
@@ -402,13 +402,13 @@ func (s *SFFrame) execRule(feedValue Values) error {
 
 				// Error-skip can jump over scope-end opcodes; unwind scopes created in this statement.
 				//
-				// Each condition scope start temporarily overwrites anchor bits on the current
-				// source list (see OpConditionScopeStart). If we skip past OpConditionScopeEnd
+				// Each anchor scope start temporarily overwrites anchor bits on the current
+				// source list (see OpAnchorScopeStart). If we skip past OpAnchorScopeEnd
 				// we MUST restore those overwritten bits, otherwise anchor provenance would leak
 				// across statements and break subsequent mask alignment.
-				for s.conditionScope.Len() > ctx.scopeDepth {
-					scope := s.conditionScope.Pop()
-					s.restoreConditionScope(scope)
+				for s.anchorScope.Len() > ctx.scopeDepth {
+					scope := s.anchorScope.Pop()
+					s.restoreAnchorScope(scope)
 				}
 				for s.conditionStack.Len() > ctx.condDepth {
 					s.conditionStack.Pop()
@@ -424,11 +424,11 @@ func (s *SFFrame) execRule(feedValue Values) error {
 					s.debugSubLog(">> stack top is nil (push input)")
 					s.pushStack(feedValue)
 				}
-			case OpConditionScopeStart:
+			case OpAnchorScopeStart:
 				if s.stack.Len() == 0 {
-					return utils.Wrap(CriticalError, "condition scope start failed: stack top is empty")
+					return utils.Wrap(CriticalError, "anchor scope start failed: stack top is empty")
 				}
-				// Condition scopes always enable anchor bookkeeping so that derived values can map
+				// Anchor scopes always enable anchor bookkeeping so that derived values can map
 				// back to their originating source slots via AnchorBitVector.
 				//
 				// For the current scope source list (stack top) with width = len(source):
@@ -439,19 +439,19 @@ func (s *SFFrame) execRule(feedValue Values) error {
 				// Nested scopes stack their ranges by shifting anchorBase = parent.base + parent.width
 				// so inner scopes can add local provenance without overwriting outer provenance.
 				sourceValues := s.stack.Peek()
-				s.conditionScope.Push(s.beginConditionScope(sourceValues))
-			case OpConditionScopeEnd:
-				if s.conditionScope.Len() == 0 {
+				s.anchorScope.Push(s.beginAnchorScope(sourceValues))
+			case OpAnchorScopeEnd:
+				if s.anchorScope.Len() == 0 {
 					break
 				}
-				scopeState := s.conditionScope.Pop()
+				scopeState := s.anchorScope.Pop()
 				// Restore anchor bits overwritten at scope start so they don't leak to outer scopes
 				// and other statements.
-				s.restoreConditionScope(scopeState)
+				s.restoreAnchorScope(scopeState)
 				if s.stack.Len() != scopeState.stackDepth {
 					return utils.Wrapf(
 						CriticalError,
-						"condition scope stack unbalanced: %d vs want(%d)",
+						"anchor scope stack unbalanced: %d vs want(%d)",
 						s.stack.Len(),
 						scopeState.stackDepth,
 					)
@@ -471,7 +471,7 @@ func (s *SFFrame) execRule(feedValue Values) error {
 					end:        i.UnaryInt,
 					stackDepth: s.stack.Len(),
 					condDepth:  s.conditionStack.Len(),
-					scopeDepth: s.conditionScope.Len(),
+					scopeDepth: s.anchorScope.Len(),
 				})
 
 			default:
