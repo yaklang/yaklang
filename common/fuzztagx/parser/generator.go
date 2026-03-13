@@ -200,8 +200,13 @@ func (f *TagExecNode) exec(s *FuzzResult) error {
 		}
 	}
 	var err error
+	var errMu sync.Mutex
 	getter := func() (*FuzzResult, error) {
-		return <-ch, err
+		result := <-ch
+		errMu.Lock()
+		e := err
+		errMu.Unlock()
+		return result, e
 	}
 
 	go func() {
@@ -209,46 +214,49 @@ func (f *TagExecNode) exec(s *FuzzResult) error {
 		defer f.config.swg.Done()
 		defer func() {
 			if e := recover(); e != nil {
+				errMu.Lock()
 				err = utils.Error(e)
+				errMu.Unlock()
 			}
 			close(ch)
 			execCtxCancel()
 		}()
 		if f.data.IsFlowControl() {
-			err = f.data.Exec(execCtx, s, func(result *FuzzResult) {}, f.methodCtx.methodTable)
+			execErr := f.data.Exec(execCtx, s, func(result *FuzzResult) {}, f.methodCtx.methodTable)
+			errMu.Lock()
+			err = execErr
+			errMu.Unlock()
 		} else {
-			err = f.data.Exec(execCtx, s, receiver, f.methodCtx.methodTable)
+			execErr := f.data.Exec(execCtx, s, receiver, f.methodCtx.methodTable)
+			errMu.Lock()
+			err = execErr
+			errMu.Unlock()
 		}
 	}()
 
 	newGetter := func() (*FuzzResult, error) {
-		r, err := getter()
+		r, getterErr := getter()
 		if r == nil {
 			f.finished = true
-			return nil, err
+			return nil, getterErr
 		}
 		f.methodCtx.UpdateLabels(f)
 		r.Source = append(r.Source, s)
 		r.ByTag = true
-		r.Error = err
-		return r, err
+		r.Error = getterErr
+		return r, getterErr
 	}
 	f.getter = newGetter
-	//if len(res) == 0 {
-	//	res = []*FuzzResult{NewFuzzResultWithData("")}
-	//}
-	//for _, r := range res {
-	//
-	//}
 
+	errMu.Lock()
 	if !f.config.AssertError {
 		err = nil
 	}
-	if err != nil {
-		return err
+	retErr := err
+	errMu.Unlock()
+	if retErr != nil {
+		return retErr
 	}
-	//f.methodCtx.UpdateLabels(f)
-	//f.cache = &res
 	return nil
 }
 func (f *TagExecNode) Exec() (bool, error) {

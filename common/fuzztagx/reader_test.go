@@ -13,6 +13,23 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+type safeBuf struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (s *safeBuf) Write(p []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.buf.Write(p)
+}
+
+func (s *safeBuf) String() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.buf.String()
+}
+
 func TestReader(t *testing.T) {
 	gener, err := NewTagReader("aaa\n{{sleep(1)}}sdfa", map[string]*parser.TagMethod{
 		"sleep": {
@@ -74,15 +91,13 @@ func TestReader(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	buf := &bytes.Buffer{}
+	buf := &safeBuf{}
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		n, err := utils.RealTimeCopy(buf, reader)
-		if err != nil {
-			t.Fatal(err)
-		}
+		n, copyErr := utils.RealTimeCopy(buf, reader)
+		assert.NoError(t, copyErr)
 		assert.Equal(t, int64(8), n)
 	}()
 	time.Sleep(time.Millisecond * 500)

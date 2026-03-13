@@ -7,7 +7,6 @@ import (
 	"io"
 	"strings"
 	"sync"
-	"sync/atomic"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -19,47 +18,58 @@ import (
 
 func planTasksStreamHandler(fieldReader io.Reader, emitWriter io.Writer) {
 	var mu sync.Mutex
-	var taskCount atomic.Int32
+	var taskCount int32
+	var taskBuf bytes.Buffer
 
 	err := jsonextractor.ExtractStructuredJSONFromStream(fieldReader,
 		jsonextractor.WithRegisterMultiFieldStreamHandler(
 			[]string{"subtask_name", "subtask_goal", "subtask_identifier", "depends_on"},
 			func(key string, reader io.Reader, parents []string) {
 				reader = utils.JSONStringReader(reader)
-				var buf bytes.Buffer
+				raw, _ := io.ReadAll(reader)
+				content := string(raw)
+
+				mu.Lock()
+				defer mu.Unlock()
+
 				switch key {
 				case "subtask_name":
-					if taskCount.Add(1) > 1 {
-						buf.WriteString("\n")
+					if taskBuf.Len() > 0 {
+						taskBuf.WriteTo(emitWriter)
 					}
-					buf.WriteString("[")
-					io.Copy(&buf, reader)
-					buf.WriteString("]")
+					taskCount++
+					if taskCount > 1 {
+						taskBuf.WriteString("\n")
+					}
+					taskBuf.WriteString("[")
+					taskBuf.WriteString(content)
+					taskBuf.WriteString("]")
 				case "subtask_goal":
-					buf.WriteString(": ")
-					io.Copy(&buf, reader)
+					taskBuf.WriteString(": ")
+					taskBuf.WriteString(content)
 				case "subtask_identifier":
-					buf.WriteString(" #")
-					io.Copy(&buf, reader)
+					taskBuf.WriteString(" #")
+					taskBuf.WriteString(content)
 				case "depends_on":
-					raw, _ := io.ReadAll(reader)
-					trimmed := strings.TrimSpace(string(raw))
+					trimmed := strings.TrimSpace(content)
 					if trimmed != "" && trimmed != "[]" {
 						var deps []string
 						if json.Unmarshal([]byte(trimmed), &deps) == nil && len(deps) > 0 {
-							buf.WriteString(fmt.Sprintf(" (depends: %s)", strings.Join(deps, ", ")))
+							taskBuf.WriteString(fmt.Sprintf(" (depends: %s)", strings.Join(deps, ", ")))
 						}
 					}
 				}
-				mu.Lock()
-				buf.WriteTo(emitWriter)
-				mu.Unlock()
 			},
 		),
 		jsonextractor.WithStreamErrorCallback(func(err error) {
 			log.Errorf("plan tasks stream parse error: %v", err)
 		}),
 	)
+	mu.Lock()
+	if taskBuf.Len() > 0 {
+		taskBuf.WriteTo(emitWriter)
+	}
+	mu.Unlock()
 	if err != nil {
 		log.Errorf("plan tasks stream handler error: %v", err)
 	}
