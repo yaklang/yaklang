@@ -86,6 +86,10 @@ func GetCliBasicConfig(idPrefix string) []cli.Flag {
 			Name:  "mq-pass",
 			Value: "awesome-palm-password",
 		},
+		cli.StringFlag{
+			Name:  "mq-vhost",
+			Value: "palm",
+		},
 		//cli.StringFlag{
 		//	Name:  "token",
 		//	Value: "",
@@ -109,6 +113,6 @@ func LoadAMQPConfigFromCliContext(c *cli.Context) *AMQPConfig {
 		Port:        c.Int("mq-port"),
 		Username:    c.String("mq-user"),
 		Password:    c.String("mq-pass"),
-		VirtualHost: "palm",
+		VirtualHost: c.String("mq-vhost"),
 	}
 }
