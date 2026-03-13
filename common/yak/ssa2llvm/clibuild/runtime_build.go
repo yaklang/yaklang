@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtimeembed"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/trace"
 )
 
 // BuildRuntimeArchiveFromSourceTree builds libyak.a from an extracted yaklang source tree.
@@ -45,6 +46,7 @@ func BuildRuntimeArchiveFromSourceTree(buildDir, srcDir string) (archivePath str
 		"GOWORK=off",
 		"GOCACHE="+filepath.Join(buildDir, "gocache"),
 	)
+	trace.PrintCmd(cmd)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", "", fmt.Errorf("build runtime archive failed: %v\n%s", err, out)

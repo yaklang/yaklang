@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/trace"
 )
 
 // CompileLLVMToBinary compiles an LLVM IR file to a native executable.
@@ -41,6 +42,7 @@ func CompileLLVMToBinary(llFile, binFile string, linkRuntime bool, runtimeArchiv
 	args = append(args, "-o", binFile)
 
 	cmd := exec.Command(clangPath, args...)
+	trace.PrintCmd(cmd)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return utils.Errorf("clang linking failed: %v\n%s", err, output)
@@ -77,6 +79,7 @@ func CompileLLVMToAsm(llFile, asmFile string) error {
 	}
 
 	cmd := exec.Command(llcPath, llFile, "-o", asmFile)
+	trace.PrintCmd(cmd)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return utils.Errorf("llc failed: %v\n%s", err, output)
@@ -91,6 +94,7 @@ func CompileLLVMToObject(llFile, objFile string) error {
 	}
 
 	cmd := exec.Command(llcPath, "-filetype=obj", llFile, "-o", objFile)
+	trace.PrintCmd(cmd)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return utils.Errorf("llc failed: %v\n%s", err, output)

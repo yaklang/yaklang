@@ -32,6 +32,7 @@ func recoverRuntimePanic() {
 }
 
 const yakTaggedPointerMask = uint64(1) << 62
+const yakShadowMagic = uint64(0x59414B5353413251) // "YAKSSA2Q" (opaque marker)
 
 func tryResolveShadowString(ptr unsafe.Pointer) (string, bool) {
 	defer func() {
@@ -109,7 +110,13 @@ func yak_host_release_handle(id C.uintptr_t) {
 func yak_internal_release_shadow(ptr unsafe.Pointer) {
 	defer recoverRuntimePanic()
 	// Reconstruct the handle ID from the C memory
-	handleID := *(*C.uintptr_t)(ptr)
+	if ptr == nil {
+		return
+	}
+	if *(*uint64)(ptr) != yakShadowMagic {
+		return
+	}
+	handleID := *(*C.uintptr_t)(unsafe.Pointer(uintptr(ptr) + 8))
 
 	if gcLogEnabled() {
 		fmt.Printf("[Yak GC] Finalizer triggered\n")
@@ -124,11 +131,14 @@ func yak_internal_release_shadow(ptr unsafe.Pointer) {
 func yak_runtime_new_shadow(handleID C.uintptr_t) (ret unsafe.Pointer) {
 	defer recoverRuntimePanic()
 	// 1. Allocate memory managed by Boehm GC
-	// We allocate 8 bytes to store the handleID (sizeof(uintptr_t))
-	ptr := C.GC_malloc(C.size_t(8))
+	// Layout:
+	//   [0:8]  magic (yakShadowMagic)
+	//   [8:16] handleID (uintptr_t)
+	ptr := C.GC_malloc(C.size_t(16))
 
-	// 2. Write the handleID into the allocated memory
-	*(*C.uintptr_t)(ptr) = handleID
+	// 2. Write the magic + handleID into the allocated memory
+	*(*uint64)(ptr) = yakShadowMagic
+	*(*C.uintptr_t)(unsafe.Pointer(uintptr(ptr) + 8)) = handleID
 
 	// 3. Register Finalizer
 	// When Boehm GC determines 'ptr' is unreachable, it will call yak_finalizer_proxy(ptr, nil)
@@ -150,7 +160,10 @@ func handleFromShadow(objPtr unsafe.Pointer) (cgo.Handle, bool) {
 	if objPtr == nil {
 		return 0, false
 	}
-	handleID := *(*C.uintptr_t)(objPtr)
+	if *(*uint64)(objPtr) != yakShadowMagic {
+		return 0, false
+	}
+	handleID := *(*C.uintptr_t)(unsafe.Pointer(uintptr(objPtr) + 8))
 	return cgo.Handle(handleID), true
 }
 

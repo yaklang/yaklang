@@ -1,0 +1,5 @@
+yakit.Info("i=%v", 1)
+yakit.Warn("w=%v", "x")
+yakit.Debug("d=%v", 2)
+yakit.Error("e=%v", 3)
+

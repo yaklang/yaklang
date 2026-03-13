@@ -98,6 +98,35 @@ func yak_runtime_gc() {
 	}
 }
 
+// Minimal stdlib dispatcher for tests that skip linking the full yak runtime.
+// Only builtin printing is implemented here.
+func yak_std_call(funcID int64, argc int64, argv *C.uint64_t) int64 {
+	if argc <= 0 || argv == nil {
+		if funcID == 7 {
+			fmt.Println()
+		}
+		return 0
+	}
+	args := unsafe.Slice((*uint64)(unsafe.Pointer(argv)), int(argc))
+	switch funcID {
+	case 5: // print
+		for _, a := range args {
+			fmt.Print(int64(a))
+		}
+	case 7: // println
+		for i, a := range args {
+			if i > 0 {
+				fmt.Print(" ")
+			}
+			fmt.Print(int64(a))
+		}
+		fmt.Println()
+	default:
+		// ignore
+	}
+	return 0
+}
+
 func yak_internal_print_int(n int64) {
 	fmt.Println(n)
 }

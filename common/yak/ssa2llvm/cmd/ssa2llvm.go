@@ -1,20 +1,36 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
+	"sort"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/log"
 	cli "github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/clibuild"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/compiler"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/obfuscation"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtimeembed"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/trace"
 )
 
+const buildCacheVersion = "ssa2llvm-cache-v1"
+
 func main() {
+	// Keep CLI output quiet by default (more like `go build`). Users can override via LOG_LEVEL.
+	if strings.TrimSpace(os.Getenv("LOG_LEVEL")) == "" {
+		cfg := log.GetConfig().Clone()
+		cfg.Level = "error"
+		log.SetConfig(cfg)
+	}
+
 	app := cli.NewApp()
 	app.Name = "ssa2llvm"
 	app.Usage = "SSA to LLVM compiler - compile source code to native executables"
@@ -41,6 +57,8 @@ type buildCommandConfig struct {
 	ssaObf     []string
 	llvmObf    []string
 	stdlibComp bool
+	trace      bool
+	force      bool
 }
 
 func sharedBuildFlags() []cli.Flag {
@@ -75,6 +93,14 @@ func sharedBuildFlags() []cli.Flag {
 		cli.BoolFlag{
 			Name:  "stdlib-compile",
 			Usage: "Compile stdlib together with source and apply obfuscation (reserved; not implemented yet)",
+		},
+		cli.BoolFlag{
+			Name:  "x",
+			Usage: "Print the external commands as they are executed (like `go build -x`)",
+		},
+		cli.BoolFlag{
+			Name:  "a",
+			Usage: "Force rebuilding cached work directories (like `go build -a`)",
 		},
 	}
 }
@@ -127,12 +153,7 @@ func compileAction(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-
-	buildDir, err := os.MkdirTemp("", "ssa2llvm-build-*")
-	if err != nil {
-		return fmt.Errorf("create temp build dir failed: %w", err)
-	}
-	defer os.RemoveAll(buildDir)
+	maybeEnableInfoLoggingForTrace(cfg.trace)
 
 	finalOutput := strings.TrimSpace(c.String("output"))
 	emitLLVM := c.Bool("emit-llvm")
@@ -141,7 +162,34 @@ func compileAction(c *cli.Context) error {
 	if finalOutput == "" {
 		finalOutput = defaultCompileOutputPath(cfg.sourceFile, emitLLVM, emitAsm, compileOnly)
 	}
-	tempOutput := filepath.Join(buildDir, filepath.Base(finalOutput))
+
+	workKey, err := buildWorkKey(cfg, buildWorkKeyOptions{
+		emitLLVM:    emitLLVM,
+		emitAsm:     emitAsm,
+		compileOnly: compileOnly,
+	})
+	if err != nil {
+		return err
+	}
+
+	buildDir := buildWorkDirFromKey(workKey)
+	if cfg.force {
+		if cfg.trace {
+			trace.SetEnabled(true)
+		}
+		_ = os.RemoveAll(buildDir)
+	}
+	if err := os.MkdirAll(buildDir, 0o755); err != nil {
+		return fmt.Errorf("prepare work dir failed: %w", err)
+	}
+	trace.SetEnabled(cfg.trace)
+	trace.PrintWorkDir(buildDir)
+
+	tempOutput := buildArtifactPath(buildDir, emitLLVM, emitAsm, compileOnly)
+	if info, err := os.Stat(tempOutput); err == nil && !info.IsDir() && info.Size() > 0 && !cfg.force {
+		trace.Printf("# cache hit\n")
+		return copyFilePreserveMode(tempOutput, finalOutput)
+	}
 
 	runtimeArchive := ""
 	extraLinkArgs := make([]string, 0, 1)
@@ -186,7 +234,7 @@ func compileAction(c *cli.Context) error {
 	if err := compiler.CompileToExecutable(options...); err != nil {
 		return err
 	}
-	return moveFile(tempOutput, finalOutput)
+	return copyFilePreserveMode(tempOutput, finalOutput)
 }
 
 func runAction(c *cli.Context) error {
@@ -194,21 +242,33 @@ func runAction(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
+	maybeEnableInfoLoggingForTrace(cfg.trace)
 
-	buildDir, err := os.MkdirTemp("", "ssa2llvm-build-*")
+	workKey, err := buildWorkKey(cfg, buildWorkKeyOptions{})
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(buildDir)
+	buildDir := buildWorkDirFromKey(workKey)
+	if cfg.force {
+		if cfg.trace {
+			trace.SetEnabled(true)
+		}
+		_ = os.RemoveAll(buildDir)
+	}
+	if err := os.MkdirAll(buildDir, 0o755); err != nil {
+		return fmt.Errorf("prepare work dir failed: %w", err)
+	}
+	trace.SetEnabled(cfg.trace)
+	trace.PrintWorkDir(buildDir)
 
 	finalOutput := strings.TrimSpace(c.String("output"))
 	tempOutput := ""
 	runPath := ""
 	if finalOutput != "" {
-		tempOutput = filepath.Join(buildDir, filepath.Base(finalOutput))
+		tempOutput = buildArtifactPath(buildDir, false, false, false)
 		runPath = finalOutput
 	} else {
-		tempOutput = filepath.Join(buildDir, defaultRunBinaryName())
+		tempOutput = buildArtifactPath(buildDir, false, false, false)
 		runPath = tempOutput
 	}
 
@@ -248,12 +308,16 @@ func runAction(c *cli.Context) error {
 		options = append(options, compiler.WithCompileRuntimeArchive(runtimeArchive))
 	}
 
-	if err := compiler.CompileToExecutable(options...); err != nil {
-		return err
+	if info, err := os.Stat(tempOutput); err != nil || info.IsDir() || info.Size() == 0 || cfg.force {
+		if err := compiler.CompileToExecutable(options...); err != nil {
+			return err
+		}
+	} else {
+		trace.Printf("# cache hit\n")
 	}
 
 	if finalOutput != "" {
-		if err := moveFile(tempOutput, finalOutput); err != nil {
+		if err := copyFilePreserveMode(tempOutput, finalOutput); err != nil {
 			return err
 		}
 	}
@@ -267,6 +331,7 @@ func runAction(c *cli.Context) error {
 	}
 
 	cmd := exec.Command(execPath)
+	trace.PrintCmd(cmd)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -310,6 +375,8 @@ func newBuildCommandConfig(c *cli.Context) (*buildCommandConfig, error) {
 		ssaObf:     c.StringSlice("ssa-obf"),
 		llvmObf:    c.StringSlice("llvm-obf"),
 		stdlibComp: c.Bool("stdlib-compile"),
+		trace:      c.Bool("x"),
+		force:      c.Bool("a"),
 	}, nil
 }
 
@@ -370,6 +437,120 @@ func moveFile(src, dst string) error {
 	return nil
 }
 
+type buildWorkKeyOptions struct {
+	emitLLVM    bool
+	emitAsm     bool
+	compileOnly bool
+}
+
+func buildWorkKey(cfg *buildCommandConfig, opts buildWorkKeyOptions) (string, error) {
+	if cfg == nil {
+		return "", fmt.Errorf("compute work key failed: nil config")
+	}
+	srcPath := strings.TrimSpace(cfg.sourceFile)
+	if srcPath == "" {
+		return "", fmt.Errorf("compute work key failed: empty source file")
+	}
+	code, err := os.ReadFile(srcPath)
+	if err != nil {
+		return "", fmt.Errorf("compute work key failed: read source file: %w", err)
+	}
+
+	ssaObf := append([]string{}, cfg.ssaObf...)
+	llvmObf := append([]string{}, cfg.llvmObf...)
+	sort.Strings(ssaObf)
+	sort.Strings(llvmObf)
+
+	h := sha256.New()
+	write := func(s string) {
+		_, _ = io.WriteString(h, s)
+		_, _ = io.WriteString(h, "\n")
+	}
+	write(buildCacheVersion)
+	write("goos=" + runtime.GOOS)
+	write("goarch=" + runtime.GOARCH)
+	write("lang=" + strings.TrimSpace(cfg.language))
+	write("entry=" + strings.TrimSpace(cfg.function))
+	write(fmt.Sprintf("emitLLVM=%t", opts.emitLLVM))
+	write(fmt.Sprintf("emitAsm=%t", opts.emitAsm))
+	write(fmt.Sprintf("compileOnly=%t", opts.compileOnly))
+	write(fmt.Sprintf("printIR=%t", cfg.printIR))
+	write(fmt.Sprintf("stdlibCompile=%t", cfg.stdlibComp))
+	write("ssaObf=" + strings.Join(ssaObf, ","))
+	write("llvmObf=" + strings.Join(llvmObf, ","))
+	_, _ = h.Write(code)
+
+	sum := h.Sum(nil)
+	return hex.EncodeToString(sum), nil
+}
+
+func buildWorkDirFromKey(key string) string {
+	key = strings.TrimSpace(key)
+	if len(key) > 32 {
+		key = key[:32]
+	}
+	if key == "" {
+		key = "unknown"
+	}
+	return filepath.Join(os.TempDir(), "yakssa-compile-"+key)
+}
+
+func buildArtifactPath(workDir string, emitLLVM, emitAsm, compileOnly bool) string {
+	switch {
+	case emitLLVM:
+		return filepath.Join(workDir, "cache.ll")
+	case emitAsm:
+		return filepath.Join(workDir, "cache.s")
+	case compileOnly:
+		return filepath.Join(workDir, "cache.o")
+	default:
+		if isWindows() {
+			return filepath.Join(workDir, "cache.exe")
+		}
+		return filepath.Join(workDir, "cache.bin")
+	}
+}
+
+func copyFilePreserveMode(src, dst string) error {
+	if strings.TrimSpace(dst) == "" {
+		return fmt.Errorf("copy output failed: empty destination path")
+	}
+	if src == dst {
+		return nil
+	}
+	srcInfo, err := os.Stat(src)
+	if err != nil {
+		return fmt.Errorf("copy output failed: stat source: %w", err)
+	}
+	if srcInfo.IsDir() {
+		return fmt.Errorf("copy output failed: source is a directory: %s", src)
+	}
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		return fmt.Errorf("copy output failed: create output dir: %w", err)
+	}
+
+	in, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("copy output failed: open source: %w", err)
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return fmt.Errorf("copy output failed: create destination: %w", err)
+	}
+	_, copyErr := io.Copy(out, in)
+	closeErr := out.Close()
+	if copyErr != nil {
+		return fmt.Errorf("copy output failed: %w", copyErr)
+	}
+	if closeErr != nil {
+		return fmt.Errorf("copy output failed: close destination: %w", closeErr)
+	}
+	_ = os.Chmod(dst, srcInfo.Mode())
+	return nil
+}
+
 func printObfuscatorGroup(title string, flagExample string, names []string) {
 	fmt.Println(title + ":")
 	if len(names) == 0 {
@@ -380,4 +561,19 @@ func printObfuscatorGroup(title string, flagExample string, names []string) {
 		fmt.Printf("  - %s\n", name)
 	}
 	fmt.Printf("  use with: %s\n", flagExample)
+}
+
+// maybeEnableInfoLoggingForTrace upgrades the global log level when -x is set
+// and the user didn't explicitly choose a LOG_LEVEL. This makes hidden internal
+// compile/link logs visible, similar to what users expect from a verbose build.
+func maybeEnableInfoLoggingForTrace(traceEnabled bool) {
+	if !traceEnabled {
+		return
+	}
+	if strings.TrimSpace(os.Getenv("LOG_LEVEL")) != "" {
+		return
+	}
+	cfg := log.GetConfig().Clone()
+	cfg.Level = "info"
+	log.SetConfig(cfg)
 }

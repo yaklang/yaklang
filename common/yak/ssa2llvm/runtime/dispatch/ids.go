@@ -21,4 +21,15 @@ const (
 
 	// os
 	IDOsGetenv FuncID = 4
+
+	// builtin printing
+	IDPrint   FuncID = 5
+	IDPrintf  FuncID = 6
+	IDPrintln FuncID = 7
+
+	// yakit logging (minimal)
+	IDYakitInfo  FuncID = 8
+	IDYakitWarn  FuncID = 9
+	IDYakitDebug FuncID = 10
+	IDYakitError FuncID = 11
 )
