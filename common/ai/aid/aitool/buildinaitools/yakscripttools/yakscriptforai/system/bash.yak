@@ -1,6 +1,6 @@
 __DESC__ = "跨平台Shell命令执行工具，支持bash/cmd/powershell，具备超时控制和输出捕获。bash脚本以set -e（遇错退出）和set -x（命令追踪）模式执行，适用于系统管理、自动化脚本和运维操作。"
 __VERBOSE_NAME__ = "跨平台Shell命令执行工具"
-__KEYWORDS__ = "shell command,bash,cmd,powershell,命令行工具,系统管理,自动化脚本,运维工具,shell script,command execution,系统操作,终端命令,system administration,automation tools,操作系统,跨平台命令,timeout,超时控制"
+__KEYWORDS__ = "shell command,bash,cmd,powershell,命令行工具,系统管理,自动化脚本,运维工具,shell script,command execution,系统操作,终端命令,system administration,automation tools,操作系统,跨平台命令,timeout,超时控制,python script,pandas,data analysis,excel analysis,csv cache,data cache,批量分析"
 
 __USAGE__ = <<<USAGE_BLOCK
 Cross-Platform Shell Command Execution Tool - Usage Guide for AI Parameter Generation
@@ -175,7 +175,7 @@ Key points:
   - The PYEOF delimiter must be on its own line with no leading whitespace
   - After writing, execute with: python3 file.py
   - Both steps happen in ONE bash tool call, no need to call write_file separately
-  - For data analysis, prefer native tools (read_excel_info, query_excel_data) over pandas
+  - For multi-step data analysis on large files, prefer Python pandas over repeated query_excel_data calls
 
 For short Python one-liners (< 5 lines without docstrings), you may use:
 
@@ -191,6 +191,56 @@ For short Python one-liners (< 5 lines without docstrings), you may use:
 }
 ```
 
+### Example 6: Python data analysis with caching (RECOMMENDED for large files)
+
+For Excel/CSV files > 10MB or analysis spanning multiple bash tool calls,
+use a cache-first pattern to avoid re-reading large files every time:
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "bash",
+  "identifier": "cached_data_analysis",
+  "params": {
+    "timeout": 120
+  }
+}
+```
+
+<|TOOL_PARAM_command_{NONCE}|>
+cat > /tmp/analysis_with_cache.py << 'PYEOF'
+import pandas as pd, json, os
+
+EXCEL_FILE = "/path/to/large_data.xlsx"
+CACHE_FILE = "/tmp/large_data_cache.csv"
+
+# Cache-first: load from CSV cache if available (~1s), otherwise read Excel (~30s+)
+if os.path.exists(CACHE_FILE):
+    print(f"[cache hit] Loading from: {CACHE_FILE}")
+    df = pd.read_csv(CACHE_FILE)
+else:
+    print(f"[cache miss] Reading Excel: {EXCEL_FILE}")
+    df = pd.read_excel(EXCEL_FILE, sheet_name="Sheet1")
+    df.to_csv(CACHE_FILE, index=False)
+    print(f"[cache saved] {CACHE_FILE} ({os.path.getsize(CACHE_FILE)} bytes)")
+
+results = {"row_count": len(df), "columns": list(df.columns)}
+print(json.dumps(results, ensure_ascii=False, indent=2, default=str))
+
+# Save results for downstream tasks
+with open("/tmp/analysis_results.json", "w") as f:
+    json.dump(results, f, ensure_ascii=False, indent=2, default=str)
+print(f"Results saved to /tmp/analysis_results.json")
+PYEOF
+python3 /tmp/analysis_with_cache.py
+<|TOOL_PARAM_command_END_{NONCE}|>
+
+Key caching rules:
+  - First script: pd.read_excel() + df.to_csv() to create cache
+  - All subsequent scripts: pd.read_csv() from cache (10x faster)
+  - Save analysis results to JSON files for downstream tasks to read
+  - Use /tmp/ for cache files (auto-cleaned on reboot)
+
 ## Key Rules
 
 1. ** TIMEOUT IS MANDATORY ** -- Always set timeout explicitly. Do NOT rely on the default 60s.
@@ -205,6 +255,9 @@ For short Python one-liners (< 5 lines without docstrings), you may use:
    pattern: cat > script.py << 'PYEOF' to write the file, then python3 script.py to run.
    NEVER pipe Python code directly via python3 << 'EOF'. This avoids shell parse errors
    with shebangs, docstrings, and complex string formatting.
+8. ** DATA CACHING ** -- When analyzing large data files (Excel > 10MB), save a CSV cache
+   after the first read. Subsequent scripts should check for and use the cache.
+   Save analysis results to JSON files so downstream tasks can reuse them.
 USAGE_BLOCK
 
 yakit.AutoInitYakit()
@@ -366,7 +419,10 @@ cmd.Stdout = stdoutbuf
 cmd.Stderr = stderrbuf
 
 // 执行命令并处理结果
+startTime = time.Now()
 err = cmd.Run()
+elapsed = time.Since(startTime)
+elapsedSec = int(elapsed.Seconds())
 isTimeout = false
 exitCode = 0
 
@@ -437,5 +493,40 @@ if count <= 0 {
         yakit.Info("No output captured before timeout")
     } else {
         yakit.Info("No output found, %v command execution completed (possibly with empty output)", shellType)
+    }
+}
+
+yakit.Info("Execution completed in %ds", elapsedSec)
+
+if elapsedSec > 20 && !isTimeout {
+    stdoutStr = stdoutbuf.String()
+    hasPython = str.Contains(command, "python") || str.Contains(command, ".py")
+    hasExcel = str.Contains(command, "read_excel") || str.Contains(command, ".xlsx") || str.Contains(command, ".xls")
+    hasCsv = str.Contains(command, "read_csv") || str.Contains(command, ".csv")
+    hasPandas = str.Contains(command, "pandas") || str.Contains(command, "import pd") || str.Contains(command, "pd.read")
+    hasJson = str.Contains(command, "json.dump") || str.Contains(command, "json.loads")
+    hasCache = str.Contains(command, "_cache.csv") || str.Contains(command, "_cache.pkl") || str.Contains(command, "to_csv") || str.Contains(command, "to_pickle")
+
+    if hasPython && hasExcel && !hasCache {
+        yakit.Info("[SLOW EXECUTION: %ds] Python script loaded Excel data without caching.", elapsedSec)
+        yakit.Info("[CACHING ADVICE] Save a CSV/pickle cache after loading Excel so subsequent scripts run 10x faster:")
+        yakit.Info("  df.to_csv('/tmp/<name>_cache.csv', index=False)  # then use pd.read_csv() in later scripts")
+        yakit.Info("  OR df.to_pickle('/tmp/<name>_cache.pkl')  # preserves dtypes, use pd.read_pickle() later")
+    } elif hasPython && hasPandas && !hasExcel && !hasCache {
+        yakit.Info("[SLOW EXECUTION: %ds] Python pandas script took a while.", elapsedSec)
+        yakit.Info("[ADVICE] If processing large datasets, consider saving intermediate results to a file:")
+        yakit.Info("  import json; json.dump(results, open('/tmp/analysis_results.json','w'), default=str)")
+        yakit.Info("  This lets subsequent tasks read results directly without re-computation.")
+    } elif hasPython && hasCache {
+        yakit.Info("[EXECUTION: %ds] Script used data caching. If still slow, the computation itself is heavy.", elapsedSec)
+        yakit.Info("[ADVICE] Consider saving final analysis results to JSON for downstream tasks.")
+    } elif hasPython {
+        yakit.Info("[SLOW EXECUTION: %ds] Python script took a while to complete.", elapsedSec)
+        yakit.Info("[ADVICE] For large data processing, save results to files for reuse across tasks:")
+        yakit.Info("  - Data files: df.to_csv('/tmp/<name>.csv', index=False)")
+        yakit.Info("  - Analysis results: json.dump(results, open('/tmp/results.json','w'), default=str)")
+    } else {
+        yakit.Info("[SLOW EXECUTION: %ds] Command took over 20 seconds.", elapsedSec)
+        yakit.Info("[ADVICE] If this command processes large files repeatedly, consider caching intermediate results to /tmp/ for reuse.")
     }
 }

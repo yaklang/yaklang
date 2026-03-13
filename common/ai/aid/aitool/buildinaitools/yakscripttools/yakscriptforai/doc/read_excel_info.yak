@@ -288,6 +288,7 @@ if hasExtra {
 appendLine("=" * 70)
 
 totalRows := 0
+sheetNames := []
 for _, table := range classifier.Tables {
     rowCount := len(table.Rows)
     if table.Metadata != nil {
@@ -297,26 +298,7 @@ for _, table := range classifier.Tables {
         }
     }
     totalRows = totalRows + rowCount
-}
-if totalRows > 1000 {
-    appendLine("")
-    appendLine("[ANALYSIS RECOMMENDATION]")
-    appendLine(sprintf("This file contains %v+ data rows across %v sheet(s).", totalRows, len(classifier.Tables)))
-    appendLine("For comprehensive data analysis (multiple statistics, grouping, cross-file joins),")
-    appendLine("prefer writing a Python script via bash tool instead of calling query_excel_data repeatedly.")
-    appendLine("Each query_excel_data call re-parses the entire file (~30s for large files).")
-    appendLine("A single Python pandas script reads the file once and computes everything in-memory.")
-    appendLine("")
-    appendLine("Example: use bash tool to run a Python script like:")
-    appendLine("  import pandas as pd; import json")
-    appendLine("  df = pd.read_excel('<file_path>')")
-    appendLine("  results = {")
-    appendLine("    'row_count': len(df),")
-    appendLine("    'by_group': df.groupby('<col>')['<value_col>'].agg(['count','sum']).to_dict(),")
-    appendLine("    'top10': df.nlargest(10, '<value_col>').to_dict('records'),")
-    appendLine("  }")
-    appendLine("  print(json.dumps(results, ensure_ascii=False, indent=2, default=str))")
-    appendLine("")
+    sheetNames = append(sheetNames, table.SheetName)
 }
 
 appendLine("=" * 70)
@@ -336,14 +318,39 @@ if outputFile != "" {
     yakit.Info(resultBuf)
 }
 
+baseName = file.GetBase(inputFile)
+baseName = str.ReplaceAll(baseName, ".xlsx", "")
+baseName = str.ReplaceAll(baseName, ".xls", "")
+schemaFile = sprintf("/tmp/%v_schema.txt", baseName)
+file.Save(schemaFile, resultBuf)
+schemaInfo, schemaErr = file.Stat(schemaFile)
+if schemaErr == nil {
+    yakit.File(schemaFile, yakit.fileWriteAction(schemaInfo.Size(), "extract", "excel schema exploration result"))
+    yakit.Info("[SAVED] Schema info saved to %v (%v bytes) for future reference by other tasks", schemaFile, schemaInfo.Size())
+}
+
 yakit.Info("Excel structure exploration completed")
 
+firstSheet = ""
+if len(sheetNames) > 0 {
+    firstSheet = sheetNames[0]
+}
+
 if totalRows > 500 {
-    yakit.Info("[NEXT STEP RECOMMENDATION] This file has %v data rows. For data analysis, you have two options:", totalRows)
-    yakit.Info("  Option A (simple, 1-2 queries only): Use query_excel_data for a single filter or aggregation.")
-    yakit.Info("  Option B (complex analysis, STRONGLY RECOMMENDED): Use bash tool to write a Python script with pandas.")
-    yakit.Info("    - Python reads the file ONCE and computes ALL statistics in-memory (10x faster than multiple query_excel_data calls)")
-    yakit.Info("    - Supports: date grouping, multi-aggregation, cross-file joins, pivot tables, and advanced analytics")
-    yakit.Info("    - Example: python3 -c \"import pandas as pd; import json; df = pd.read_excel('%v'); print(json.dumps({'rows': len(df), 'columns': list(df.columns)}, default=str))\"", inputFile)
-    yakit.Info("  RULE: If your analysis plan requires 3+ different statistics, ALWAYS choose Option B.")
+    yakit.Info("[NEXT STEP RECOMMENDATION] This file has %v data rows across %v sheet(s).", totalRows, len(sheetNames))
+    yakit.Info("  Sheet names: %v", str.Join(sheetNames, ", "))
+    yakit.Info("  Option A (1-2 simple queries): Use query_excel_data for a single filter or aggregation.")
+    yakit.Info("  Option B (complex analysis, STRONGLY RECOMMENDED): Use bash tool with Python pandas.")
+    yakit.Info("")
+    yakit.Info("[DATA CACHING TIP] Your FIRST Python script should create a CSV cache for 10x faster subsequent reads:")
+    yakit.Info("  import pandas as pd, os")
+    yakit.Info("  CACHE = '/tmp/%v_cache.csv'", baseName)
+    yakit.Info("  if os.path.exists(CACHE):")
+    yakit.Info("      df = pd.read_csv(CACHE)  # ~1 second")
+    yakit.Info("  else:")
+    yakit.Info("      df = pd.read_excel('%v', sheet_name='%v')  # ~30s for large files", inputFile, firstSheet)
+    yakit.Info("      df.to_csv(CACHE, index=False)")
+    yakit.Info("")
+    yakit.Info("  RULE: If your analysis requires 3+ statistics, ALWAYS use Python via bash with caching.")
+    yakit.Info("  Schema reference file: %v", schemaFile)
 }
