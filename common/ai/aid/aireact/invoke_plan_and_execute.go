@@ -198,6 +198,31 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 	planCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	// Preserve user original input in plan payload (mirrors forge branch logic)
+	// AI-rewritten plan_request_payload may lose details like file paths
+	if planPayload != "" {
+		currentTask := r.GetCurrentTask()
+		if currentTask != nil {
+			userOriginalInput := currentTask.GetUserInput()
+			if userOriginalInput != "" && !strings.Contains(planPayload, userOriginalInput) {
+				nonce := utils.RandStringBytes(4)
+				planPayload = utils.MustRenderTemplate(`
+<|用户原始需求_{{.nonce}}|>
+{{ .UserOriginalInput }}
+<|用户原始需求_END_{{.nonce}}|>
+---
+{{ .PlanPayload }}
+`,
+					map[string]any{
+						"nonce":             nonce,
+						"UserOriginalInput": userOriginalInput,
+						"PlanPayload":       planPayload,
+					})
+				log.Infof("enhanced plan payload with user original input to preserve context")
+			}
+		}
+	}
+
 	// if hijackPlanRequest is set, use it to handle the plan request
 	// this is useful for testing/mocking and advanced usage
 	if r.config.HijackPERequest != nil {
