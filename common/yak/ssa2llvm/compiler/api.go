@@ -21,6 +21,7 @@ type CompileConfig struct {
 	SourceCode        string
 	Language          string
 	OutputFile        string
+	WorkDir           string
 	EntryFunctionName string
 	EmitLLVM          bool
 	EmitAsm           bool
@@ -29,9 +30,11 @@ type CompileConfig struct {
 	ExternBindings    map[string]ExternBinding
 	ExtraLinkArgs     []string
 	SkipRuntimeLink   bool
+	RuntimeArchive    string
 	PrintEntryResult  bool
 	SSAObfuscators    []string
 	LLVMObfuscators   []string
+	StdlibCompile     bool
 }
 
 type CompileOption func(*CompileConfig)
@@ -54,6 +57,10 @@ func WithCompileLanguage(language string) CompileOption {
 
 func WithCompileOutputFile(path string) CompileOption {
 	return func(c *CompileConfig) { c.OutputFile = path }
+}
+
+func WithCompileWorkDir(dir string) CompileOption {
+	return func(c *CompileConfig) { c.WorkDir = dir }
 }
 
 func WithCompileEntryFunction(name string) CompileOption {
@@ -100,6 +107,10 @@ func WithCompileSkipRuntimeLink(enabled bool) CompileOption {
 	return func(c *CompileConfig) { c.SkipRuntimeLink = enabled }
 }
 
+func WithCompileRuntimeArchive(path string) CompileOption {
+	return func(c *CompileConfig) { c.RuntimeArchive = path }
+}
+
 func WithCompilePrintEntryResult(enabled bool) CompileOption {
 	return func(c *CompileConfig) { c.PrintEntryResult = enabled }
 }
@@ -116,21 +127,28 @@ func WithCompileLLVMObfuscators(names ...string) CompileOption {
 	}
 }
 
+func WithCompileStdlibCompile(enabled bool) CompileOption {
+	return func(c *CompileConfig) { c.StdlibCompile = enabled }
+}
+
 func WithCompileConfig(cfg CompileConfig) CompileOption {
 	return func(c *CompileConfig) {
 		c.SourceFile = cfg.SourceFile
 		c.SourceCode = cfg.SourceCode
 		c.Language = cfg.Language
 		c.OutputFile = cfg.OutputFile
+		c.WorkDir = cfg.WorkDir
 		c.EntryFunctionName = cfg.EntryFunctionName
 		c.EmitLLVM = cfg.EmitLLVM
 		c.EmitAsm = cfg.EmitAsm
 		c.CompileOnly = cfg.CompileOnly
 		c.PrintIR = cfg.PrintIR
 		c.SkipRuntimeLink = cfg.SkipRuntimeLink
+		c.RuntimeArchive = cfg.RuntimeArchive
 		c.PrintEntryResult = cfg.PrintEntryResult
 		c.SSAObfuscators = append(c.SSAObfuscators, cfg.SSAObfuscators...)
 		c.LLVMObfuscators = append(c.LLVMObfuscators, cfg.LLVMObfuscators...)
+		c.StdlibCompile = cfg.StdlibCompile
 		if len(cfg.ExtraLinkArgs) > 0 {
 			c.ExtraLinkArgs = append(c.ExtraLinkArgs, cfg.ExtraLinkArgs...)
 		}
@@ -284,6 +302,10 @@ func CompileToExecutable(opts ...CompileOption) error {
 		}
 	}
 
+	if cfg.StdlibCompile {
+		log.Warnf("--stdlib-compile is not implemented yet; continuing with the built-in runtime archive")
+	}
+
 	_, comp, ir, err := compileInput(
 		cfg.SourceFile,
 		cfg.SourceCode,
@@ -333,7 +355,7 @@ func CompileToExecutable(opts ...CompileOption) error {
 		return nil
 	}
 
-	tmpLL, err := os.CreateTemp("", "ssa2llvm-*.ll")
+	tmpLL, err := os.CreateTemp(cfg.WorkDir, "ssa2llvm-*.ll")
 	if err != nil {
 		return utils.Errorf("failed to create temp file: %v", err)
 	}
@@ -368,7 +390,7 @@ func CompileToExecutable(opts ...CompileOption) error {
 		return nil
 	}
 
-	if err := CompileLLVMToBinary(tmpLL.Name(), outputFile, !cfg.SkipRuntimeLink, cfg.ExtraLinkArgs...); err != nil {
+	if err := CompileLLVMToBinary(tmpLL.Name(), outputFile, !cfg.SkipRuntimeLink, cfg.RuntimeArchive, cfg.ExtraLinkArgs...); err != nil {
 		return err
 	}
 

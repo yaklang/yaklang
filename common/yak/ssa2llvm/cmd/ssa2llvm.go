@@ -7,9 +7,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/urfavecli"
+	cli "github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/compiler"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/obfuscation"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtimeembed"
 )
 
 func main() {
@@ -38,6 +39,7 @@ type buildCommandConfig struct {
 	printIR    bool
 	ssaObf     []string
 	llvmObf    []string
+	stdlibComp bool
 }
 
 func sharedBuildFlags() []cli.Flag {
@@ -68,6 +70,10 @@ func sharedBuildFlags() []cli.Flag {
 			Name:  "llvm-obf",
 			Usage: "Apply LLVM obfuscators by name or glob pattern (repeatable or comma-separated; see `ssa2llvm obfuscators`)",
 			Value: &cli.StringSlice{},
+		},
+		cli.BoolFlag{
+			Name:  "stdlib-compile",
+			Usage: "Compile stdlib together with source and apply obfuscation (reserved; not implemented yet)",
 		},
 	}
 }
@@ -121,12 +127,46 @@ func compileAction(c *cli.Context) error {
 		return err
 	}
 
+	buildDir, err := os.MkdirTemp("", "ssa2llvm-build-*")
+	if err != nil {
+		return fmt.Errorf("create temp build dir failed: %w", err)
+	}
+	defer os.RemoveAll(buildDir)
+
+	finalOutput := strings.TrimSpace(c.String("output"))
+	emitLLVM := c.Bool("emit-llvm")
+	emitAsm := c.Bool("emit-asm")
+	compileOnly := c.Bool("c")
+	if finalOutput == "" {
+		finalOutput = defaultCompileOutputPath(cfg.sourceFile, emitLLVM, emitAsm, compileOnly)
+	}
+	tempOutput := filepath.Join(buildDir, filepath.Base(finalOutput))
+
+	runtimeArchive := ""
+	if !emitLLVM && !emitAsm && !compileOnly {
+		archivePath, extractErr := runtimeembed.ExtractLibyakToDir(buildDir)
+		if extractErr == nil {
+			runtimeArchive = archivePath
+		} else if extractErr != runtimeembed.ErrNoEmbeddedRuntime {
+			return extractErr
+		}
+	}
+
 	options := append(cfg.compileOptions(),
+		compiler.WithCompileWorkDir(buildDir),
+		compiler.WithCompileOutputFile(tempOutput),
+		compiler.WithCompileStdlibCompile(cfg.stdlibComp),
 		compiler.WithCompileEmitLLVM(c.Bool("emit-llvm")),
 		compiler.WithCompileEmitAsm(c.Bool("emit-asm")),
 		compiler.WithCompileOnly(c.Bool("c")),
 	)
-	return compiler.CompileToExecutable(options...)
+	if runtimeArchive != "" {
+		options = append(options, compiler.WithCompileRuntimeArchive(runtimeArchive))
+	}
+	if err := compiler.CompileToExecutable(options...); err != nil {
+		return err
+	}
+	return moveFile(tempOutput, finalOutput)
 }
 
 func runAction(c *cli.Context) error {
@@ -135,17 +175,59 @@ func runAction(c *cli.Context) error {
 		return err
 	}
 
-	cleanup, err := cfg.prepareRunOutput()
+	buildDir, err := os.MkdirTemp("", "ssa2llvm-build-*")
 	if err != nil {
 		return err
 	}
-	defer cleanup()
+	defer os.RemoveAll(buildDir)
 
-	if err := compiler.CompileToExecutable(cfg.compileOptions()...); err != nil {
+	finalOutput := strings.TrimSpace(c.String("output"))
+	tempOutput := ""
+	runPath := ""
+	if finalOutput != "" {
+		tempOutput = filepath.Join(buildDir, filepath.Base(finalOutput))
+		runPath = finalOutput
+	} else {
+		tempOutput = filepath.Join(buildDir, defaultRunBinaryName())
+		runPath = tempOutput
+	}
+
+	runtimeArchive := ""
+	archivePath, extractErr := runtimeembed.ExtractLibyakToDir(buildDir)
+	if extractErr == nil {
+		runtimeArchive = archivePath
+	} else if extractErr != runtimeembed.ErrNoEmbeddedRuntime {
+		return extractErr
+	}
+
+	options := append(cfg.compileOptions(),
+		compiler.WithCompileWorkDir(buildDir),
+		compiler.WithCompileOutputFile(tempOutput),
+		compiler.WithCompileStdlibCompile(cfg.stdlibComp),
+	)
+	if runtimeArchive != "" {
+		options = append(options, compiler.WithCompileRuntimeArchive(runtimeArchive))
+	}
+
+	if err := compiler.CompileToExecutable(options...); err != nil {
 		return err
 	}
 
-	cmd := exec.Command(cfg.outputFile)
+	if finalOutput != "" {
+		if err := moveFile(tempOutput, finalOutput); err != nil {
+			return err
+		}
+	}
+
+	execPath := runPath
+	if !filepath.IsAbs(execPath) {
+		abs, absErr := filepath.Abs(execPath)
+		if absErr == nil {
+			execPath = abs
+		}
+	}
+
+	cmd := exec.Command(execPath)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -188,6 +270,7 @@ func newBuildCommandConfig(c *cli.Context) (*buildCommandConfig, error) {
 		printIR:    c.Bool("print-ir"),
 		ssaObf:     c.StringSlice("ssa-obf"),
 		llvmObf:    c.StringSlice("llvm-obf"),
+		stdlibComp: c.Bool("stdlib-compile"),
 	}, nil
 }
 
@@ -203,22 +286,6 @@ func (cfg *buildCommandConfig) compileOptions() []compiler.CompileOption {
 	}
 }
 
-func (cfg *buildCommandConfig) prepareRunOutput() (func(), error) {
-	if cfg.outputFile != "" {
-		return func() {}, nil
-	}
-
-	tmpDir, err := os.MkdirTemp("", "ssa2llvm-run-*")
-	if err != nil {
-		return nil, fmt.Errorf("create temp run dir failed: %w", err)
-	}
-
-	cfg.outputFile = filepath.Join(tmpDir, defaultRunBinaryName())
-	return func() {
-		_ = os.RemoveAll(tmpDir)
-	}, nil
-}
-
 func defaultRunBinaryName() string {
 	if isWindows() {
 		return "run.exe"
@@ -228,6 +295,40 @@ func defaultRunBinaryName() string {
 
 func isWindows() bool {
 	return filepath.Separator == '\\'
+}
+
+func defaultCompileOutputPath(sourceFile string, emitLLVM, emitAsm, compileOnly bool) string {
+	switch {
+	case emitLLVM:
+		return replaceExt(sourceFile, ".ll")
+	case emitAsm:
+		return replaceExt(sourceFile, ".s")
+	case compileOnly:
+		return replaceExt(sourceFile, ".o")
+	default:
+		if isWindows() {
+			return "a.exe"
+		}
+		return "a.out"
+	}
+}
+
+func replaceExt(filename, newExt string) string {
+	base := strings.TrimSuffix(filename, filepath.Ext(filename))
+	return base + newExt
+}
+
+func moveFile(src, dst string) error {
+	if src == dst {
+		return nil
+	}
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		return fmt.Errorf("create output dir failed: %w", err)
+	}
+	if err := os.Rename(src, dst); err != nil {
+		return fmt.Errorf("rename output failed: %w", err)
+	}
+	return nil
 }
 
 func printObfuscatorGroup(title string, flagExample string, names []string) {

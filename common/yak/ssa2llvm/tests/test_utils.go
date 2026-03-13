@@ -10,11 +10,22 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/compiler"
 )
+
+var ensureRuntimeOnce sync.Once
+
+func ensureRuntimeArchiveOnce(t *testing.T) {
+	t.Helper()
+	ensureRuntimeOnce.Do(func() {
+		repoRoot := RepoRoot(t)
+		EnsureRuntimeArchive(t, repoRoot)
+	})
+}
 
 func check(t *testing.T, code string, expected interface{}) {
 	t.Helper()
@@ -243,6 +254,8 @@ func newRunBinaryConfig(t *testing.T, options ...runBinaryOption) *runBinaryConf
 
 func compileBinary(t *testing.T, code string, entry string, cfg *runBinaryConfig) (string, func()) {
 	t.Helper()
+
+	ensureRuntimeArchiveOnce(t)
 
 	cleanup := func() {
 		for i := len(cfg.cleanup) - 1; i >= 0; i-- {

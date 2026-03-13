@@ -11,7 +11,7 @@ import (
 
 // CompileLLVMToBinary compiles an LLVM IR file to a native executable.
 // When linkRuntime is true, it links against the default yak runtime archive.
-func CompileLLVMToBinary(llFile, binFile string, linkRuntime bool, extraArgs ...string) error {
+func CompileLLVMToBinary(llFile, binFile string, linkRuntime bool, runtimeArchiveOverride string, extraArgs ...string) error {
 	clangPath, err := findLLVMTool("clang")
 	if err != nil {
 		return err
@@ -23,9 +23,12 @@ func CompileLLVMToBinary(llFile, binFile string, linkRuntime bool, extraArgs ...
 	}
 
 	if linkRuntime {
-		runtimeArchive, err := findRuntimeArchive()
-		if err != nil {
-			return err
+		runtimeArchive := runtimeArchiveOverride
+		if runtimeArchive == "" {
+			runtimeArchive, err = findRuntimeArchive()
+			if err != nil {
+				return err
+			}
 		}
 		args = append(args,
 			runtimeArchive,
