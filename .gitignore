@@ -63,3 +63,5 @@ common/aiforge/*.tar.gz
 common/coreplugin/*.tar.gz
 common/syntaxflow/sfbuildin/*.tar.gz
 common/yso/resources/*.tar.gz
+common/yak/ssa2llvm/runtimeembed/*.tar.gz
+common/yak/ssa2llvm/runtimeembed/ssa2llvm-runtime/

@@ -30,6 +30,22 @@
 
 - `runtime/build_runtime_go.sh`
 
+## 将 runtime 嵌入到 CLI（可选）
+
+如果你希望发布的 `ssa2llvm` CLI 不依赖外置的 `libyak.a`，可以把运行时归档打包进二进制，并在编译时自动释放到临时构建目录供 clang 链接。
+
+生成嵌入资源（会在 `common/yak/ssa2llvm/runtimeembed/` 下生成 `ssa2llvm-runtime.tar.gz`）：
+
+```bash
+./scripts/build_runtime_embed.sh
+```
+
+然后用 `gzip_embed` 构建 tag 编译 CLI（示例）：
+
+```bash
+go build -tags gzip_embed ./common/yak/ssa2llvm/cmd
+```
+
 ## 快速验证
 
 ```bash
