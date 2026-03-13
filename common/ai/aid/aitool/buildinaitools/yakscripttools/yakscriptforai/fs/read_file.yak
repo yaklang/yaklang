@@ -1,29 +1,42 @@
-__DESC__ = "一个统一的用于安全读取文件的工具，支持按字节块读取和按行分段读取两种模式，适用于处理不同类型的文件读取需求。"
-__VERBOSE_NAME__ = "统一文件读取工具"
-__KEYWORDS__ = "memory management,文件读取,大文件处理,file handling,reading,data processing,buffer,performance,内存安全,偏移读取,chunk size,offset,streaming,文件分块,数据块,文件处理,流式读取,large file,分段读取,lines size,line reading,统一读取"
+__DESC__ = "A unified text file reader that supports line-based and byte-chunk reading modes. Automatically detects binary file formats via mimetype (magic bytes) and redirects to appropriate built-in tools (read_excel_info, query_excel_data, read_word_structure, parse_office_to_text, zip_viewer, analyze_pcap, etc.) or Python scripts."
+__VERBOSE_NAME__ = "Unified File Reader"
+__KEYWORDS__ = "memory management,file reading,large file,file handling,reading,data processing,buffer,performance,offset,chunk size,streaming,line reading,binary detection,mimetype,excel,xlsx,pdf,docx,zip,pcap,office,read_excel_info,query_excel_data,parse_office_to_text"
 
 __USAGE__ = <<<USAGE_BLOCK
 Unified File Reader Tool - Parameter Description for JSON Tool Calls
+
+This tool reads TEXT files safely with two modes: line-based and byte-chunk.
+It uses mimetype (magic bytes) to detect binary file formats automatically.
 
 Required Parameters:
   file            (string)  The target file path you want to read.
 
 Optional Parameters:
-  mode            (string)  Read mode that determines how the file is read:
-                            - "lines" (default): read by line segments, suitable for text files.
-                            - "chunk": read by byte chunks with offset, suitable for binary
-                              files or precise byte-level access.
-  chunk-size      (int)     Size of the byte chunk to read when mode is "chunk".
-                            Maximum and default: 30000 bytes.
-                            Only effective when mode is "chunk".
-  offset          (int)     Byte offset from the start of the file when mode is "chunk".
-                            Line offset (1-based) when mode is "lines".
-                            Default: 0.
-  lines           (int)     Number of lines to read when mode is "lines".
-                            Default: 50.
-  line-size       (int)     Maximum characters per line when mode is "lines".
-                            Lines exceeding this length will be truncated.
-                            Default: 512.
+  mode            (string)  Read mode:
+                            - "lines" (default): read by line segments, for text files.
+                            - "chunk": read by byte chunks with offset.
+  chunk-size      (int)     Byte chunk size (mode=chunk). Max/default: 30000.
+  offset          (int)     Byte offset (mode=chunk) or line offset (mode=lines). Default: 0.
+  lines           (int)     Number of lines to read (mode=lines). Default: 50.
+  line-size       (int)     Max characters per line (mode=lines). Default: 512.
+
+Binary File Detection:
+  Before reading, this tool detects binary formats using the mimetype library
+  (magic bytes analysis). When a binary file is detected:
+
+  - No garbled binary content is output.
+  - The file type and MIME type are reported.
+  - Appropriate built-in tools are recommended:
+
+    Excel (.xlsx/.xls)  -> read_excel_info, query_excel_data, parse_office_to_text
+    Word (.docx)        -> read_word_structure, parse_office_to_text
+    PPT (.pptx/.ppt)    -> parse_office_to_text
+    ZIP (.zip/.jar)     -> zip_viewer
+    PCAP (.pcap)        -> analyze_pcap
+    PDF (.pdf)          -> Python PyPDF2 via bash
+    SQLite (.db)        -> sqlite3 via bash
+
+  Always try the recommended built-in tool first. Use Python via bash as fallback.
 USAGE_BLOCK
 
 /*
@@ -102,16 +115,265 @@ if !file.IsExisted(t) {
     return
 }
 
-if mode != "chunk" && mode != "lines" {
-    yakit.Error("invalid mode: %v, must be 'chunk' or 'lines'", mode)
-    return
-}
-
+// File size retrieval
 size = 0
 try {
     size = file.Stat(t)~.Size()
 } catch e {
     size = 0
+}
+
+// ================================================================
+// File type detection using mimetype (magic bytes) + extension
+// ================================================================
+detectedMime = ""
+try {
+    mimeResult = mimetype.DetectFile(t)~
+    detectedMime = mimeResult.String()
+} catch e {}
+
+ext = ""
+dotParts = str.Split(t, ".")
+if len(dotParts) > 1 {
+    ext = "." + str.ToLower(dotParts[len(dotParts)-1])
+}
+
+// Determine if file content is text-readable based on MIME type
+textMimeWhitelist = ",application/json,application/xml,application/javascript,application/x-sh,application/x-python,application/x-ruby,application/x-perl,application/x-yaml,application/toml,application/sql,application/x-httpd-php,application/csv,application/x-ndjson,application/xhtml+xml,"
+isTextByMime = false
+if detectedMime != "" {
+    if str.HasPrefix(detectedMime, "text/") {
+        isTextByMime = true
+    }
+    baseMime = detectedMime
+    semiIdx = str.Index(detectedMime, ";")
+    if semiIdx >= 0 {
+        baseMime = str.TrimSpace(detectedMime[:semiIdx])
+    }
+    if str.Contains(textMimeWhitelist, "," + baseMime + ",") {
+        isTextByMime = true
+    }
+}
+
+// Extension-based fallback for known binary types (when mimetype detection is unavailable)
+knownBinaryExts = ",.xlsx,.xls,.xlsm,.xlsb,.docx,.doc,.pptx,.ppt,.pptm,.pdf,.odt,.ods,.odp,.zip,.tar,.gz,.tgz,.bz2,.xz,.7z,.rar,.jar,.war,.ear,.apk,.ipa,.deb,.rpm,.msi,.pkg,.png,.jpg,.jpeg,.gif,.bmp,.ico,.webp,.tiff,.tif,.psd,.mp3,.mp4,.avi,.mkv,.mov,.wav,.flac,.ogg,.wmv,.wma,.aac,.m4a,.exe,.dll,.so,.dylib,.class,.pyc,.pyo,.o,.obj,.a,.lib,.db,.sqlite,.sqlite3,.mdb,.accdb,.bin,.dat,.iso,.dmg,.img,.wasm,.ttf,.otf,.woff,.woff2,.eot,.pcap,.pcapng,.cap,.dmp,.core,.parquet,.avro,.arrow,"
+
+isBinaryFile = false
+if detectedMime != "" && !isTextByMime {
+    isBinaryFile = true
+} else if detectedMime == "" && ext != "" && str.Contains(knownBinaryExts, "," + ext + ",") {
+    isBinaryFile = true
+}
+
+if isBinaryFile {
+    // Friendly binary file type name
+    typeName = "Binary File"
+    if str.Contains(detectedMime, "spreadsheet") || str.Contains(detectedMime, "excel") || ext == ".xlsx" || ext == ".xls" || ext == ".xlsm" || ext == ".xlsb" {
+        typeName = "Excel Spreadsheet"
+    } else if str.Contains(detectedMime, "wordprocessing") || str.Contains(detectedMime, "msword") || ext == ".docx" || ext == ".doc" {
+        typeName = "Word Document"
+    } else if str.Contains(detectedMime, "presentation") || str.Contains(detectedMime, "powerpoint") || ext == ".pptx" || ext == ".ppt" {
+        typeName = "PowerPoint Presentation"
+    } else if str.Contains(detectedMime, "pdf") || ext == ".pdf" {
+        typeName = "PDF Document"
+    } else if str.HasPrefix(detectedMime, "image/") || ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".gif" || ext == ".bmp" || ext == ".webp" {
+        typeName = "Image File"
+    } else if str.HasPrefix(detectedMime, "audio/") || ext == ".mp3" || ext == ".wav" || ext == ".flac" || ext == ".ogg" {
+        typeName = "Audio File"
+    } else if str.HasPrefix(detectedMime, "video/") || ext == ".mp4" || ext == ".avi" || ext == ".mkv" || ext == ".mov" {
+        typeName = "Video File"
+    } else if str.Contains(detectedMime, "zip") || ext == ".zip" || ext == ".7z" || ext == ".rar" || ext == ".gz" || ext == ".tgz" || ext == ".bz2" || ext == ".xz" || ext == ".tar" || ext == ".jar" || ext == ".war" {
+        typeName = "Compressed Archive"
+    } else if ext == ".db" || ext == ".sqlite" || ext == ".sqlite3" || ext == ".mdb" || ext == ".accdb" {
+        typeName = "Database File"
+    } else if ext == ".pcap" || ext == ".pcapng" || ext == ".cap" {
+        typeName = "Network Capture File"
+    } else if ext == ".exe" || ext == ".dll" || ext == ".so" || ext == ".dylib" {
+        typeName = "Executable/Library"
+    } else if ext == ".parquet" || ext == ".avro" || ext == ".arrow" {
+        typeName = "Columnar Data File"
+    }
+
+    mimeInfo = ""
+    if detectedMime != "" {
+        mimeInfo = sprintf("MIME: %s\n", detectedMime)
+    }
+
+    // Build suggestion: recommend built-in yak tools first, Python as alternative
+    suggestion = ""
+    if ext == ".xlsx" || ext == ".xls" || ext == ".xlsm" || ext == ".xlsb" || str.Contains(detectedMime, "spreadsheet") || str.Contains(detectedMime, "excel") {
+        suggestion = sprintf(
+            "[Built-in Tools (Recommended)]\n" +
+            "  1. read_excel_info - Explore structure (sheets, columns, data types, preview):\n" +
+            "     Call tool \"read_excel_info\" with params: {\"input\": \"%s\"}\n\n" +
+            "  2. query_excel_data - Query data with filtering, sorting, aggregation:\n" +
+            "     Call tool \"query_excel_data\" with params: {\"input\": \"%s\", \"limit\": 50}\n" +
+            "     Supports: filter (\"Amount>50000\"), sort_by, group_by, agg (sum/avg/count)\n\n" +
+            "  3. parse_office_to_text - Convert to plain text:\n" +
+            "     Call tool \"parse_office_to_text\" with params: {\"input\": \"%s\"}\n\n" +
+            "[Alternative: Python via bash]\n" +
+            "  python3 -c \"import pandas as pd; xl=pd.ExcelFile('%s'); print(xl.sheet_names)\"\n" +
+            "  (Requires: pip3 install pandas openpyxl)",
+            t, t, t, t,
+        )
+    } else if ext == ".docx" || (ext == ".doc" && str.Contains(detectedMime, "word")) || str.Contains(detectedMime, "wordprocessing") {
+        suggestion = sprintf(
+            "[Built-in Tools (Recommended)]\n" +
+            "  1. read_word_structure - Read document sections (text, tables, attachments):\n" +
+            "     Call tool \"read_word_structure\" with params: {\"input\": \"%s\"}\n\n" +
+            "  2. parse_office_to_text - Convert to plain text:\n" +
+            "     Call tool \"parse_office_to_text\" with params: {\"input\": \"%s\"}\n\n" +
+            "[Alternative: Python via bash]\n" +
+            "  python3 -c \"from docx import Document; [print(p.text) for p in Document('%s').paragraphs]\"\n" +
+            "  (Requires: pip3 install python-docx)",
+            t, t, t,
+        )
+    } else if ext == ".pptx" || ext == ".ppt" || ext == ".pptm" || ext == ".doc" || str.Contains(detectedMime, "presentation") || str.Contains(detectedMime, "powerpoint") {
+        suggestion = sprintf(
+            "[Built-in Tool (Recommended)]\n" +
+            "  parse_office_to_text - Extract all text content from Office document:\n" +
+            "  Call tool \"parse_office_to_text\" with params: {\"input\": \"%s\"}",
+            t,
+        )
+    } else if ext == ".pdf" || str.Contains(detectedMime, "pdf") {
+        suggestion = sprintf(
+            "[Python via bash]\n" +
+            "  python3 << 'PYEOF'\n" +
+            "from PyPDF2 import PdfReader\n" +
+            "reader = PdfReader('%s')\n" +
+            "for i, page in enumerate(reader.pages):\n" +
+            "    print('=== Page', i+1, '===')\n" +
+            "    print(page.extract_text())\n" +
+            "PYEOF\n" +
+            "  (Requires: pip3 install PyPDF2)",
+            t,
+        )
+    } else if ext == ".zip" || ext == ".jar" || ext == ".war" || ext == ".ear" || str.Contains(detectedMime, "zip") {
+        suggestion = sprintf(
+            "[Built-in Tool (Recommended)]\n" +
+            "  zip_viewer - Browse ZIP file entries with pagination:\n" +
+            "  Call tool \"zip_viewer\" with params: {\"filepath\": \"%s\"}\n\n" +
+            "[Alternative: bash]\n" +
+            "  unzip -l '%s'",
+            t, t,
+        )
+    } else if ext == ".gz" || ext == ".tgz" || ext == ".bz2" || ext == ".xz" || ext == ".tar" {
+        suggestion = sprintf(
+            "[bash commands]\n" +
+            "  tar -tf '%s'     # list contents\n" +
+            "  zcat '%s' | head -100     # peek compressed text",
+            t, t,
+        )
+    } else if ext == ".pcap" || ext == ".pcapng" || ext == ".cap" {
+        suggestion = sprintf(
+            "[Built-in Tool (Recommended)]\n" +
+            "  analyze_pcap - Analyze network packet capture:\n" +
+            "  Call tool \"analyze_pcap\" with params: {\"file\": \"%s\"}\n\n" +
+            "[Alternative: bash]\n" +
+            "  tcpdump -r '%s' -c 50",
+            t, t,
+        )
+    } else if ext == ".db" || ext == ".sqlite" || ext == ".sqlite3" {
+        suggestion = sprintf(
+            "[bash commands]\n" +
+            "  sqlite3 '%s' '.tables'\n" +
+            "  sqlite3 '%s' '.schema'\n" +
+            "  sqlite3 '%s' 'SELECT * FROM table_name LIMIT 20;'",
+            t, t, t,
+        )
+    } else if ext == ".parquet" || ext == ".avro" || ext == ".arrow" {
+        suggestion = sprintf(
+            "[Python via bash]\n" +
+            "  python3 -c \"import pandas as pd; df=pd.read_parquet('%s'); print(df.shape); print(df.head(20))\"\n" +
+            "  (Requires: pip3 install pandas pyarrow)",
+            t,
+        )
+    } else {
+        suggestion = sprintf(
+            "[Step 1] Identify the exact type:\n" +
+            "  Use bash tool: file '%s'\n\n" +
+            "[Step 2] Then choose an appropriate tool or Python library based on the identified type.",
+            t,
+        )
+    }
+
+    yakit.Warn(
+        "This file is not a text file and cannot be read directly with read_file.\n\n" +
+        "[Detected] %s (extension: %s)\n" +
+        "%s" +
+        "[Size] %v bytes\n\n" +
+        "read_file is designed for text files (source code, config, logs, etc.). " +
+        "For this binary format, please use the tools below.\n\n" +
+        "%s",
+        typeName, ext, mimeInfo, size, suggestion,
+    )
+    return
+}
+
+// Content-based binary detection (fallback for unknown extensions)
+// Uses mimetype library for accurate magic-byte analysis
+if detectedMime == "" {
+    probeFile, probeErr = file.OpenFile(t, file.O_RDONLY, 0644)
+    if probeErr == nil {
+        probeData, _ = io.ReadAll(io.LimitReader(probeFile, 8192))
+        probeFile.Close()
+        if len(probeData) > 0 {
+            probeMime = ""
+            try {
+                probeMimeResult = mimetype.Detect(probeData)~
+                probeMime = probeMimeResult.String()
+            } catch e {}
+
+            isBinary = false
+            if probeMime != "" && !str.HasPrefix(probeMime, "text/") {
+                semiIdx = str.Index(probeMime, ";")
+                baseProbeMime = probeMime
+                if semiIdx >= 0 {
+                    baseProbeMime = str.TrimSpace(probeMime[:semiIdx])
+                }
+                if !str.Contains(textMimeWhitelist, "," + baseProbeMime + ",") {
+                    isBinary = true
+                }
+            }
+
+            if !isBinary {
+                nullByteCount = 0
+                checkLen = len(probeData)
+                for i = 0; i < checkLen; i++ {
+                    if probeData[i] == 0 {
+                        nullByteCount++
+                    }
+                }
+                if nullByteCount > 0 {
+                    isBinary = true
+                }
+            }
+
+            if isBinary {
+                probeMimeInfo = ""
+                if probeMime != "" {
+                    probeMimeInfo = sprintf("Detected MIME: %s\n", probeMime)
+                }
+                yakit.Warn(
+                    "This file appears to contain binary (non-text) data.\n\n" +
+                    "[Size] %v bytes\n" +
+                    "%s\n" +
+                    "read_file is designed for text files. Reading binary data as text produces garbled output.\n\n" +
+                    "[Recommended]\n" +
+                    "  1. Identify the file type: use bash tool to run: file '%s'\n" +
+                    "  2. Then use an appropriate built-in tool or Python library to process it.\n" +
+                    "  3. Use search_capabilities or tools_search to find matching tools.",
+                    size, probeMimeInfo, t,
+                )
+                return
+            }
+        }
+    }
+}
+
+if mode != "chunk" && mode != "lines" {
+    yakit.Error("invalid mode: %v, must be 'chunk' or 'lines'", mode)
+    return
 }
 
 if mode == "chunk" {

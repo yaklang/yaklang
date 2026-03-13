@@ -59,7 +59,9 @@ func makeToolForwardAction(
 
 var readFileAction = makeToolForwardAction(
 	"read_file", "read_file",
-	"Read the content of a local file by path.",
+	"Read the content of a local TEXT file by path. "+
+		"Uses mimetype (magic bytes) to detect binary files and recommends appropriate built-in tools instead of outputting garbled data. "+
+		"For Excel use read_excel_info/query_excel_data, for Word/PPT use read_word_structure/parse_office_to_text, for ZIP use zip_viewer, for PCAP use analyze_pcap.",
 	[]aitool.ToolOption{
 		aitool.WithStringParam("path",
 			aitool.WithParam_Required(true),

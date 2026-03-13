@@ -71,7 +71,10 @@ func appendFileResults(loop *reactloops.ReActLoop, content string) {
 
 var readFileAction = makeToolForwardAction(
 	"read_file", "read_file",
-	"Read the content of a local file by path. Use this to understand project files, configurations, and existing code for better planning.",
+	"Read the content of a local TEXT file by path. Use this to understand project files, configurations, and existing code for better planning. "+
+		"Uses mimetype (magic bytes) to detect binary files and will NOT output garbled data. "+
+		"For binary files, it recommends built-in tools: read_excel_info/query_excel_data (Excel), read_word_structure/parse_office_to_text (Word/PPT), zip_viewer (ZIP), analyze_pcap (PCAP). "+
+		"Python via bash is suggested as fallback only.",
 	[]aitool.ToolOption{
 		aitool.WithStringParam("path",
 			aitool.WithParam_Required(true),
