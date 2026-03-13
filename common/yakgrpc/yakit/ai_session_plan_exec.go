@@ -52,6 +52,20 @@ func DeleteAISessionPlanAndExecBySessionID(db *gorm.DB, sessionID string) error 
 	return err
 }
 
+func DeleteAllAISessionPlanAndExec(db *gorm.DB) (int64, error) {
+	if db == nil {
+		return 0, utils.Errorf("db is nil")
+	}
+	deletedPlans, err := countRowsIgnoreMissingTable(db, &schema.AISessionPlanAndExec{})
+	if err != nil {
+		return 0, err
+	}
+	if err := schema.DropRecreateTable(db, &schema.AISessionPlanAndExec{}); err != nil {
+		return deletedPlans, err
+	}
+	return deletedPlans, nil
+}
+
 func GetAISessionPlanAndExecByCoordinatorID(db *gorm.DB, coordinatorID string) (*schema.AISessionPlanAndExec, error) {
 	if db == nil {
 		return nil, utils.Errorf("db is nil")

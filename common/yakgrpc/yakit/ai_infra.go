@@ -181,9 +181,15 @@ func DeleteAgentRuntimeByPersistentSession(db *gorm.DB, sessionId string) (int64
 }
 
 func DeleteAllAgentRuntime(db *gorm.DB) (int64, error) {
-	db = db.Model(&schema.AIAgentRuntime{})
-	if db = db.Unscoped().Delete(&schema.AIAgentRuntime{}); db.Error != nil {
-		return 0, db.Error
+	if db == nil {
+		return 0, utils.Errorf("database is nil")
 	}
-	return db.RowsAffected, nil
+	deletedRuntimes, err := countRowsIgnoreMissingTable(db, &schema.AIAgentRuntime{})
+	if err != nil {
+		return 0, err
+	}
+	if err := schema.DropRecreateTable(db, &schema.AIAgentRuntime{}); err != nil {
+		return deletedRuntimes, err
+	}
+	return deletedRuntimes, nil
 }
