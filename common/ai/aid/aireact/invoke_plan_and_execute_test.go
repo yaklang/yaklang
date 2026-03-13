@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 	"testing"
 	"time"
 
@@ -78,7 +79,7 @@ func TestReAct_PlanAndExecute_Basic(t *testing.T) {
 		aicommon.WithTools(sleepTool),
 		aicommon.WithHijackPERequest(func(ctx context.Context, payload string) error {
 			planDo = true
-			if payload == flag {
+			if strings.Contains(payload, flag) {
 				planMatchFlag = true
 			}
 			return nil
@@ -218,4 +219,159 @@ LOOP:
 	}
 	fmt.Println(tl)
 	fmt.Println("--------------------------------------")
+}
+
+func TestReAct_PlanAndExecute_PreservesUserOriginalInput(t *testing.T) {
+	flag := ksuid.New().String()
+	userInput := "analyze files at /Users/test/data/kh13616个人交易情况.xlsx and /Users/test/data/kh13616所有目标对手交易情况.xlsx"
+
+	in := make(chan *ypb.AIInputEvent, 10)
+	out := make(chan *ypb.AIOutputEvent, 10)
+
+	var capturedPayload string
+	planDo := false
+	planContainsFlag := false
+	planContainsUserInput := false
+	planContainsFilePath := false
+
+	ins, err := NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			return mockedRequestPlanAndExecuting_Normal(i, r, flag)
+		}),
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
+			out <- e.ToGRPC()
+		}),
+		aicommon.WithHijackPERequest(func(ctx context.Context, payload string) error {
+			planDo = true
+			capturedPayload = payload
+			if strings.Contains(payload, flag) {
+				planContainsFlag = true
+			}
+			if strings.Contains(payload, userInput) {
+				planContainsUserInput = true
+			}
+			if strings.Contains(payload, "/Users/test/data/kh13616个人交易情况.xlsx") {
+				planContainsFilePath = true
+			}
+			return nil
+		}),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = ins
+
+	go func() {
+		in <- &ypb.AIInputEvent{
+			IsFreeInput: true,
+			FreeInput:   userInput,
+		}
+	}()
+
+	du := time.Duration(10)
+	if utils.InGithubActions() {
+		du = time.Duration(5)
+	}
+	after := time.After(du * time.Second)
+
+LOOP:
+	for {
+		select {
+		case e := <-out:
+			if e.Type == string(schema.EVENT_TYPE_STRUCTURED) && e.NodeId == "react_task_status_changed" {
+				result := utils.InterfaceToString(jsonpath.FindFirst(e.Content, `$..react_task_now_status`))
+				if result == "completed" {
+					break LOOP
+				}
+			}
+		case <-after:
+			break LOOP
+		}
+	}
+	close(in)
+
+	if !planDo {
+		t.Fatal("expected plan execution to be triggered")
+	}
+	if !planContainsFlag {
+		t.Fatalf("expected payload to contain plan_request_payload flag %q, got: %s", flag, capturedPayload)
+	}
+	if !planContainsUserInput {
+		t.Fatalf("expected payload to contain user original input %q, got: %s", userInput, capturedPayload)
+	}
+	if !planContainsFilePath {
+		t.Fatalf("expected payload to contain file path, got: %s", capturedPayload)
+	}
+
+	fmt.Println("--- Captured Plan Payload ---")
+	fmt.Println(capturedPayload)
+	fmt.Println("--- End ---")
+}
+
+func TestReAct_PlanAndExecute_NoEnhancementWhenPayloadContainsInput(t *testing.T) {
+	userInput := "simple task"
+	planPayloadWithInput := userInput + " - detailed plan"
+
+	in := make(chan *ypb.AIInputEvent, 10)
+	out := make(chan *ypb.AIOutputEvent, 10)
+
+	var capturedPayload string
+	planDo := false
+
+	ins, err := NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			return mockedRequestPlanAndExecuting_Normal(i, r, planPayloadWithInput)
+		}),
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
+			out <- e.ToGRPC()
+		}),
+		aicommon.WithHijackPERequest(func(ctx context.Context, payload string) error {
+			planDo = true
+			capturedPayload = payload
+			return nil
+		}),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = ins
+
+	go func() {
+		in <- &ypb.AIInputEvent{
+			IsFreeInput: true,
+			FreeInput:   userInput,
+		}
+	}()
+
+	du := time.Duration(10)
+	if utils.InGithubActions() {
+		du = time.Duration(5)
+	}
+	after := time.After(du * time.Second)
+
+LOOP:
+	for {
+		select {
+		case e := <-out:
+			if e.Type == string(schema.EVENT_TYPE_STRUCTURED) && e.NodeId == "react_task_status_changed" {
+				result := utils.InterfaceToString(jsonpath.FindFirst(e.Content, `$..react_task_now_status`))
+				if result == "completed" {
+					break LOOP
+				}
+			}
+		case <-after:
+			break LOOP
+		}
+	}
+	close(in)
+
+	if !planDo {
+		t.Fatal("expected plan execution to be triggered")
+	}
+
+	if strings.Contains(capturedPayload, "用户原始需求") {
+		t.Fatalf("expected no enhancement when plan payload already contains user input, but got enhanced payload: %s", capturedPayload)
+	}
 }
