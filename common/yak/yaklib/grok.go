@@ -3,14 +3,15 @@ package yaklib
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
+	"strings"
 
 	"github.com/bcicen/jstream"
 	"github.com/jinzhu/gorm/dialects/postgres"
 	"github.com/pkg/errors"
 	"github.com/vjeantet/grok"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 var (
@@ -172,37 +173,50 @@ func JsonStreamToMapList(reader io.Reader) []map[string]interface{} {
 	return JsonStreamToMapListWithDepth(reader, 0)
 }
 
-// JsonToMapList 将 json 字符串 line 解析为 map 列表
+// JsonToMapList 将 json 字符串 line 解析为 map 列表，保留嵌套结构（对象/数组不会被转为字符串）
 // Example:
 // ```
 // str.JsonToMapList(`{"a":1,"b":2} {"c":3, "d":4}`) // [map[a:1 b:2] map[c:3 d:4]]
+// str.JsonToMapList(`{"a":{"x":1},"b":[]}`)         // [map[a:map[x:1] b:[]]
 // ```
-func JsonToMapList(line string) []map[string]string {
-	var r []map[string]string
+func JsonToMapList(line string) []map[string]any {
+	var r []map[string]any
 	for kv := range jstream.NewDecoder(bytes.NewBufferString(line), 0).Stream() {
-		m := map[string]string{}
 		switch raw := kv.Value.(type) {
 		case map[string]interface{}:
+			m := make(map[string]any, len(raw))
 			for k, v := range raw {
-				m[k] = fmt.Sprintf("%v", v)
+				m[k] = v
+			}
+			if len(m) > 0 {
+				r = append(r, m)
 			}
 		default:
 			log.Errorf("recv: %v cannot handled", kv.Value)
 			continue
 		}
-		if len(m) > 0 {
-			r = append(r, m)
-		}
 	}
 	return r
 }
 
-// JsonToMap 将 json 字符串 line 解析为 map
+// JsonToMap 将 json 字符串 line 解析为 map，保留嵌套结构（对象/数组不会被转为字符串）
+// 单对象时优先用 json.Unmarshal 确保嵌套正确；多对象（如 `{} {}`）时回退到 jstream。
 // Example:
 // ```
-// str.JsonToMap(`{"a":1,"b":2}`) // map[a:1 b:2]
+// str.JsonToMap(`{"a":1,"b":2}`)           // map[a:1 b:2]
+// str.JsonToMap(`{"b":{},"c":[],"d":{"d1":""}}`)  // 嵌套结构完整保留
 // ```
-func JsonToMap(line string) map[string]string {
+func JsonToMap(line string) map[string]any {
+	line = strings.TrimSpace(line)
+	if line == "" {
+		return nil
+	}
+	// 单对象优先用 json.Unmarshal，保证嵌套 map/array 不被转为字符串
+	var m map[string]any
+	if err := json.Unmarshal([]byte(line), &m); err == nil {
+		return m
+	}
+	// 多对象或格式异常时回退到 jstream
 	raws := JsonToMapList(line)
 	if len(raws) > 0 {
 		return raws[0]
@@ -210,17 +224,24 @@ func JsonToMap(line string) map[string]string {
 	return nil
 }
 
-// ParamsGetOr 从 map 中获取 key 对应的值，如果不存在则返回 defaultValue
+// ParamsGetOr 从 map 中获取 key 对应的值，如果不存在则返回 defaultValue。支持 map[string]string 与 map[string]any。
 // Example:
 // ```
 // str.ParamsGetOr({"a": "1"}, "a", "2") // 1
 // str.ParamsGetOr({"a": "1"}, "b", "2") // 2
 // ```
-func ParamsGetOr(i map[string]string, key, defaultValue string) string {
-	if i != nil {
-		raw, ok := i[key]
-		if ok {
-			return raw
+func ParamsGetOr(i any, key, defaultValue string) string {
+	if i == nil {
+		return defaultValue
+	}
+	switch m := i.(type) {
+	case map[string]any:
+		if v, ok := m[key]; ok && v != nil {
+			return utils.InterfaceToString(v)
+		}
+	case map[string]string:
+		if v, ok := m[key]; ok {
+			return v
 		}
 	}
 	return defaultValue
