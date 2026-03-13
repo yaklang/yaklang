@@ -332,6 +332,118 @@ func ParseExcelFile(filePath string) ([]ExcelNode, error) {
 	return nodes, nil
 }
 
+// ParseExcelTableOnly parses an Excel file and returns only TableNode and HiddenSheetNode entries.
+// It skips per-cell processing (TextNode, URLNode, FormulaNode, etc.) for much better performance
+// on large files. The returned nodes are fully compatible with ClassifyNodes.
+func ParseExcelTableOnly(filePath string) ([]ExcelNode, error) {
+	return ParseExcelTableFast(filePath, 0)
+}
+
+// ParseExcelTableFast parses an Excel file using streaming API for optimal performance on large files.
+// maxDataRows controls how many data rows to store per sheet:
+//   - maxDataRows <= 0: reads ALL rows (same as ParseExcelTableOnly)
+//   - maxDataRows > 0: stores only the first maxDataRows rows, but counts all rows accurately.
+//     The total count is available via Metadata["total_data_rows"].
+//     Rows beyond maxDataRows are iterated with Next() only (no Columns() call),
+//     which skips shared string resolution and avoids memory allocation.
+func ParseExcelTableFast(filePath string, maxDataRows int) ([]ExcelNode, error) {
+	f, err := excelize.OpenFile(filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	var nodes []ExcelNode
+
+	sheets := f.GetSheetList()
+	for _, sheet := range sheets {
+		visible, err := f.GetSheetVisible(sheet)
+		if err != nil {
+			log.Debugf("failed to get sheet visibility for %s: %v", sheet, err)
+		}
+
+		headers, dataRows, totalDataRows, err := readSheetStreaming(f, sheet, maxDataRows)
+		if err != nil {
+			log.Errorf("failed to read sheet %s: %v", sheet, err)
+			continue
+		}
+		if headers == nil {
+			continue
+		}
+
+		if !visible {
+			nodes = append(nodes, ExcelNode{
+				Type: HiddenSheetNode,
+				Content: HiddenSheetContent{
+					SheetName: sheet,
+					Headers:   headers,
+					Rows:      dataRows,
+					HideType:  "普通隐藏",
+				},
+			})
+		}
+
+		nodes = append(nodes, ExcelNode{
+			Type: TableNode,
+			Content: TableContent{
+				SheetName: sheet,
+				Headers:   headers,
+				Rows:      dataRows,
+				Metadata: map[string]string{
+					"total_rows":      strconv.Itoa(totalDataRows + 1),
+					"total_data_rows": strconv.Itoa(totalDataRows),
+					"sheet_name":      sheet,
+					"visible":         strconv.FormatBool(visible),
+				},
+			},
+		})
+	}
+
+	return nodes, nil
+}
+
+func readSheetStreaming(f *excelize.File, sheet string, maxDataRows int) (headers []string, dataRows [][]string, totalDataRows int, err error) {
+	rows, err := f.Rows(sheet)
+	if err != nil {
+		return nil, nil, 0, err
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		return nil, nil, 0, nil
+	}
+	headers, err = rows.Columns()
+	if err != nil {
+		return nil, nil, 0, err
+	}
+	if len(headers) == 0 {
+		return nil, nil, 0, nil
+	}
+
+	storeAll := maxDataRows <= 0
+	if storeAll {
+		dataRows = make([][]string, 0, 1024)
+	} else {
+		dataRows = make([][]string, 0, maxDataRows)
+	}
+
+	for rows.Next() {
+		totalDataRows++
+		if storeAll || totalDataRows <= maxDataRows {
+			cols, colErr := rows.Columns()
+			if colErr != nil {
+				return nil, nil, 0, colErr
+			}
+			dataRows = append(dataRows, cols)
+		}
+	}
+
+	if rows.Error() != nil {
+		return nil, nil, 0, rows.Error()
+	}
+	return headers, dataRows, totalDataRows, nil
+}
+
 // isURL 简单判断字符串是否为URL
 func isURL(str string) bool {
 	return strings.HasPrefix(str, "http://") || strings.HasPrefix(str, "https://") ||

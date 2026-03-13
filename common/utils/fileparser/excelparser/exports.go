@@ -23,6 +23,8 @@ var ExcelExports = map[string]interface{}{
 	"InsertImage": InsertImage,
 
 	// 现有的解析功能
-	"Parse":         ParseExcelFile,
-	"ClassifyNodes": ClassifyNodes,
+	"Parse":          ParseExcelFile,
+	"ParseTableOnly": ParseExcelTableOnly,
+	"ParseTableFast": ParseExcelTableFast,
+	"ClassifyNodes":  ClassifyNodes,
 }
