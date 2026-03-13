@@ -7,7 +7,7 @@
 **通用探索：**
 - 用 `find_files` 了解项目结构或目标环境
 - 用 `grep_text` 搜索关键代码或配置
-- 用 `read_file` 阅读核心文件内容
+- 用 `read_file` 阅读核心文本文件内容（自动检测二进制文件并推荐内置工具如 read_excel_info、parse_office_to_text 等）
 - 用 `web_search` 获取领域最佳实践
 - 用 `search_knowledge` 搜索知识库补充背景知识
 - 用 `loading_skills` 加载专业技能获取操作指南

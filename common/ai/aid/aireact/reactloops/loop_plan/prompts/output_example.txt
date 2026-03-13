@@ -24,6 +24,15 @@
 }
 ```
 
+**注意：二进制文件处理**
+`read_file` 使用 mimetype (magic bytes) 自动检测二进制文件格式。检测到二进制文件时，工具不会输出乱码，而是返回文件类型和推荐的**内置工具**。请优先使用推荐的内置工具：
+- Excel (.xlsx/.xls) -> 使用 `read_excel_info`（查看结构）或 `query_excel_data`（查询数据）
+- Word (.docx) -> 使用 `read_word_structure` 或 `parse_office_to_text`
+- PPT/Office文档 -> 使用 `parse_office_to_text`
+- ZIP/JAR -> 使用 `zip_viewer`
+- PCAP -> 使用 `analyze_pcap`
+- PDF/其他 -> 通过 `bash` 执行 Python 脚本作为替代方案
+
 #### **3. 当你需要搜索代码中的特定模式或关键词时，使用 `grep_text`**
 
 **使用场景:**

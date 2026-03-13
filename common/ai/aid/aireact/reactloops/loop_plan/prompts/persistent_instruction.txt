@@ -37,7 +37,7 @@
 
 在规划之前，你可以使用以下工具来收集信息，确保规划基于充分的事实和知识：
 
-- **`read_file`**：读取本地文件内容，了解项目现有代码、配置和文档
+- **`read_file`**：读取本地文本文件内容，了解项目现有代码、配置和文档。该工具使用 mimetype (magic bytes) 自动检测二进制文件格式（Excel/Word/PDF/ZIP/图片等），对二进制文件不会输出乱码，而是返回文件类型和推荐的内置工具。对于 Excel 文件推荐使用 `read_excel_info` 或 `query_excel_data`，Word 文件推荐使用 `read_word_structure` 或 `parse_office_to_text`，ZIP 文件推荐 `zip_viewer`，PCAP 文件推荐 `analyze_pcap`。仅当内置工具不满足需求时，再使用 bash 执行 Python 脚本作为替代
 - **`find_files`**：按模式搜索文件，了解项目结构和文件组织方式
 - **`grep_text`**：在文件中搜索特定文本模式，定位关键代码、配置项或关键词
 - **`web_search`**：搜索互联网获取实时信息、技术文档、最佳实践和行业知识

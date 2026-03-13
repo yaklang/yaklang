@@ -53,6 +53,7 @@
   - 优先使用针对性命令：`uname -a`（系统信息）、`df -h`（磁盘）、`ps aux`（进程）、`lsof -i:PORT`（指定端口）
 - **检查文件或目录** 在执行某些命令之前，如果你不确定某个目录或文件是否存在，请使用 `bash` 的 `ls` 命令进行检查，避免因路径错误导致的执行失败。
 - **善用文件查看内容操作** 注意 `read_file`, `tail_file`, `head_file`, `grep` 等工具可以辅助你查看文件或文件内容内容，提供行号和上下文支持。
+- **二进制文件处理** `read_file` 使用 mimetype (magic bytes) 自动检测二进制文件格式（Excel/Word/PDF/ZIP/图片/数据库等），不会输出乱码内容，而是返回文件类型说明和推荐的处理工具。当检测到二进制文件时，优先使用推荐的**内置工具**：Excel 使用 `read_excel_info` / `query_excel_data`，Word 使用 `read_word_structure`，Office 文档使用 `parse_office_to_text`，ZIP 使用 `zip_viewer`，PCAP 使用 `analyze_pcap`。仅当内置工具无法满足需求时，再通过 `bash` 执行 Python 脚本作为替代方案。
 - **修改文件原则** 先查看文件内容，再决定修改文件，修改文件尽量使用 `modify_file` 工具，避免直接使用 `bash` 来执行 `echo '...' > file` 这类命令，因为直接覆盖文件内容可能会导致数据丢失。
 - **工具执行结果处理** 如果一个工具输出了海量的信息，一般来说会被保存在特定文件中，你需要使用 read_file 分片读取或者直接搜索你感兴趣的内容。
 - **搜索 grep 是一个重要工具** 一次搜索可能并不对，你可以尝试使用不同的关键字或者正则多次搜索你感兴趣的东西，善于使用内置的 grep 的功能。
