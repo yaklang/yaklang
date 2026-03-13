@@ -18,6 +18,20 @@ type invokeLimiter struct {
 	totalN int
 }
 
+func (l *invokeLimiter) activeCount() int {
+	if l == nil || l.total == nil {
+		return 0
+	}
+	return len(l.total)
+}
+
+func (l *invokeLimiter) capacity() int {
+	if l == nil {
+		return 0
+	}
+	return l.totalN
+}
+
 func (l *invokeLimiter) acquire(ctx context.Context) (release func(), err error) {
 	if l == nil {
 		return func() {}, nil
