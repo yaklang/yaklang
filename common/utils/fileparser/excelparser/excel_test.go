@@ -1,8 +1,10 @@
 package excelparser
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -307,6 +309,280 @@ func TestDumpToFiles(t *testing.T) {
 		if !strings.Contains(nameDefContent, "TestName") {
 			t.Errorf("自定义名称内容不包含预期的名称: %s", nameDefContent)
 		}
+	}
+}
+
+func TestParseExcelTableOnly_DataConsistency(t *testing.T) {
+	testFile := createTestExcelFile(t)
+	defer os.Remove(testFile)
+
+	fullNodes, err := ParseExcelFile(testFile)
+	if err != nil {
+		t.Fatalf("ParseExcelFile failed: %v", err)
+	}
+
+	tableOnlyNodes, err := ParseExcelTableOnly(testFile)
+	if err != nil {
+		t.Fatalf("ParseExcelTableOnly failed: %v", err)
+	}
+
+	fullClassifier := ClassifyNodes(fullNodes)
+	tableOnlyClassifier := ClassifyNodes(tableOnlyNodes)
+
+	if len(fullClassifier.Tables) != len(tableOnlyClassifier.Tables) {
+		t.Fatalf("table count mismatch: ParseExcelFile=%d, ParseExcelTableOnly=%d",
+			len(fullClassifier.Tables), len(tableOnlyClassifier.Tables))
+	}
+
+	for i, fullTable := range fullClassifier.Tables {
+		lightTable := tableOnlyClassifier.Tables[i]
+
+		if fullTable.SheetName != lightTable.SheetName {
+			t.Errorf("table[%d] sheet name mismatch: %q vs %q", i, fullTable.SheetName, lightTable.SheetName)
+		}
+
+		if len(fullTable.Headers) != len(lightTable.Headers) {
+			t.Errorf("table[%d] %q header count mismatch: %d vs %d",
+				i, fullTable.SheetName, len(fullTable.Headers), len(lightTable.Headers))
+		} else {
+			for j := range fullTable.Headers {
+				if fullTable.Headers[j] != lightTable.Headers[j] {
+					t.Errorf("table[%d] %q header[%d] mismatch: %q vs %q",
+						i, fullTable.SheetName, j, fullTable.Headers[j], lightTable.Headers[j])
+				}
+			}
+		}
+
+		if len(fullTable.Rows) != len(lightTable.Rows) {
+			t.Errorf("table[%d] %q row count mismatch: %d vs %d",
+				i, fullTable.SheetName, len(fullTable.Rows), len(lightTable.Rows))
+		} else {
+			for r := range fullTable.Rows {
+				fullRow := fullTable.Rows[r]
+				lightRow := lightTable.Rows[r]
+				if len(fullRow) != len(lightRow) {
+					t.Errorf("table[%d] %q row[%d] column count mismatch: %d vs %d",
+						i, fullTable.SheetName, r, len(fullRow), len(lightRow))
+					continue
+				}
+				for c := range fullRow {
+					if fullRow[c] != lightRow[c] {
+						t.Errorf("table[%d] %q row[%d] col[%d] mismatch: %q vs %q",
+							i, fullTable.SheetName, r, c, fullRow[c], lightRow[c])
+					}
+				}
+			}
+		}
+	}
+
+	if len(fullClassifier.HiddenSheets) != len(tableOnlyClassifier.HiddenSheets) {
+		t.Errorf("hidden sheet count mismatch: %d vs %d",
+			len(fullClassifier.HiddenSheets), len(tableOnlyClassifier.HiddenSheets))
+	}
+
+	t.Logf("data consistency verified: %d tables, %d hidden sheets", len(fullClassifier.Tables), len(fullClassifier.HiddenSheets))
+}
+
+func createLargeTestExcelFile(t testing.TB, rowCount int) string {
+	f := excelize.NewFile()
+	defer f.Close()
+
+	sheet := "Sheet1"
+	f.SetCellValue(sheet, "A1", "ID")
+	f.SetCellValue(sheet, "B1", "Name")
+	f.SetCellValue(sheet, "C1", "Amount")
+	f.SetCellValue(sheet, "D1", "Date")
+	f.SetCellValue(sheet, "E1", "Type")
+
+	types := []string{"income", "expense", "transfer"}
+	for i := 0; i < rowCount; i++ {
+		rowStr := strconv.Itoa(i + 2)
+		f.SetCellValue(sheet, "A"+rowStr, i+1)
+		f.SetCellValue(sheet, "B"+rowStr, fmt.Sprintf("User_%d", i%1000))
+		f.SetCellValue(sheet, "C"+rowStr, float64(i)*1.5+100.0)
+		f.SetCellValue(sheet, "D"+rowStr, fmt.Sprintf("2024-01-%02d", i%28+1))
+		f.SetCellValue(sheet, "E"+rowStr, types[i%3])
+	}
+
+	tempDir := t.TempDir()
+	tempFile := filepath.Join(tempDir, "large_test.xlsx")
+	if err := f.SaveAs(tempFile); err != nil {
+		t.Fatalf("failed to create large test Excel: %v", err)
+	}
+	return tempFile
+}
+
+func TestParseExcelTableOnly_LargeFile_DataConsistency(t *testing.T) {
+	rowCount := 10000
+	testFile := createLargeTestExcelFile(t, rowCount)
+	defer os.Remove(testFile)
+
+	fullNodes, err := ParseExcelFile(testFile)
+	if err != nil {
+		t.Fatalf("ParseExcelFile failed: %v", err)
+	}
+	tableOnlyNodes, err := ParseExcelTableOnly(testFile)
+	if err != nil {
+		t.Fatalf("ParseExcelTableOnly failed: %v", err)
+	}
+
+	fullClassifier := ClassifyNodes(fullNodes)
+	tableOnlyClassifier := ClassifyNodes(tableOnlyNodes)
+
+	if len(fullClassifier.Tables) != len(tableOnlyClassifier.Tables) {
+		t.Fatalf("table count mismatch: full=%d, tableOnly=%d",
+			len(fullClassifier.Tables), len(tableOnlyClassifier.Tables))
+	}
+
+	for i, fullTable := range fullClassifier.Tables {
+		lightTable := tableOnlyClassifier.Tables[i]
+		if fullTable.SheetName != lightTable.SheetName {
+			t.Errorf("sheet name mismatch at %d", i)
+		}
+		if len(fullTable.Rows) != len(lightTable.Rows) {
+			t.Fatalf("row count mismatch for sheet %q: full=%d, tableOnly=%d",
+				fullTable.SheetName, len(fullTable.Rows), len(lightTable.Rows))
+		}
+		if len(fullTable.Headers) != len(lightTable.Headers) {
+			t.Fatalf("header count mismatch for sheet %q: full=%d, tableOnly=%d",
+				fullTable.SheetName, len(fullTable.Headers), len(lightTable.Headers))
+		}
+
+		sampleRows := []int{0, 1, 100, 1000, 5000, len(fullTable.Rows) - 1}
+		for _, rowIdx := range sampleRows {
+			if rowIdx >= len(fullTable.Rows) {
+				continue
+			}
+			fullRow := fullTable.Rows[rowIdx]
+			lightRow := lightTable.Rows[rowIdx]
+			for colIdx := range fullTable.Headers {
+				fullVal, lightVal := "", ""
+				if colIdx < len(fullRow) {
+					fullVal = fullRow[colIdx]
+				}
+				if colIdx < len(lightRow) {
+					lightVal = lightRow[colIdx]
+				}
+				if fullVal != lightVal {
+					t.Errorf("cell mismatch at row %d col %d: full=%q, tableOnly=%q",
+						rowIdx, colIdx, fullVal, lightVal)
+				}
+			}
+		}
+	}
+
+	t.Logf("large file data consistency verified: %d rows", rowCount)
+}
+
+func TestParseExcelTableFast_MaxRows(t *testing.T) {
+	rowCount := 5000
+	maxRows := 100
+	testFile := createLargeTestExcelFile(t, rowCount)
+	defer os.Remove(testFile)
+
+	nodes, err := ParseExcelTableFast(testFile, maxRows)
+	if err != nil {
+		t.Fatalf("ParseExcelTableFast failed: %v", err)
+	}
+
+	classifier := ClassifyNodes(nodes)
+	if len(classifier.Tables) != 1 {
+		t.Fatalf("expected 1 table, got %d", len(classifier.Tables))
+	}
+
+	table := classifier.Tables[0]
+	if len(table.Rows) != maxRows {
+		t.Errorf("expected %d sampled rows, got %d", maxRows, len(table.Rows))
+	}
+	if len(table.Headers) != 5 {
+		t.Errorf("expected 5 headers, got %d", len(table.Headers))
+	}
+
+	totalDataRows := table.Metadata["total_data_rows"]
+	if totalDataRows != strconv.Itoa(rowCount) {
+		t.Errorf("expected total_data_rows=%d, got %s", rowCount, totalDataRows)
+	}
+
+	totalRows := table.Metadata["total_rows"]
+	if totalRows != strconv.Itoa(rowCount+1) {
+		t.Errorf("expected total_rows=%d, got %s", rowCount+1, totalRows)
+	}
+}
+
+func TestParseExcelTableFast_AllRows(t *testing.T) {
+	rowCount := 2000
+	testFile := createLargeTestExcelFile(t, rowCount)
+	defer os.Remove(testFile)
+
+	nodes, err := ParseExcelTableFast(testFile, 0)
+	if err != nil {
+		t.Fatalf("ParseExcelTableFast failed: %v", err)
+	}
+
+	classifier := ClassifyNodes(nodes)
+	if len(classifier.Tables) != 1 {
+		t.Fatalf("expected 1 table, got %d", len(classifier.Tables))
+	}
+
+	table := classifier.Tables[0]
+	if len(table.Rows) != rowCount {
+		t.Errorf("expected %d rows, got %d", rowCount, len(table.Rows))
+	}
+
+	fullNodes, err := ParseExcelFile(testFile)
+	if err != nil {
+		t.Fatalf("ParseExcelFile failed: %v", err)
+	}
+	fullClassifier := ClassifyNodes(fullNodes)
+	fullTable := fullClassifier.Tables[0]
+
+	sampleRows := []int{0, 1, 500, 999, rowCount - 1}
+	for _, idx := range sampleRows {
+		if idx >= len(table.Rows) || idx >= len(fullTable.Rows) {
+			continue
+		}
+		for c := range table.Headers {
+			got, want := "", ""
+			if c < len(table.Rows[idx]) {
+				got = table.Rows[idx][c]
+			}
+			if c < len(fullTable.Rows[idx]) {
+				want = fullTable.Rows[idx][c]
+			}
+			if got != want {
+				t.Errorf("row[%d] col[%d] mismatch: fast=%q, full=%q", idx, c, got, want)
+			}
+		}
+	}
+}
+
+func BenchmarkParseExcelFile(b *testing.B) {
+	testFile := createLargeTestExcelFile(b, 5000)
+	defer os.Remove(testFile)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = ParseExcelFile(testFile)
+	}
+}
+
+func BenchmarkParseExcelTableOnly(b *testing.B) {
+	testFile := createLargeTestExcelFile(b, 5000)
+	defer os.Remove(testFile)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = ParseExcelTableOnly(testFile)
+	}
+}
+
+func BenchmarkParseExcelTableFast_LimitedRows(b *testing.B) {
+	testFile := createLargeTestExcelFile(b, 5000)
+	defer os.Remove(testFile)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = ParseExcelTableFast(testFile, 200)
 	}
 }
 

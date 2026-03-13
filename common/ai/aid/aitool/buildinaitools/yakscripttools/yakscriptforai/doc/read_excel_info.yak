@@ -55,7 +55,11 @@ if ext != ".xls" && ext != ".xlsx" {
 
 yakit.Info("Parsing Excel file: %v", inputFile)
 
-nodes, err := excel.Parse(inputFile)
+maxSampleRows := 200
+if previewRows > maxSampleRows {
+    maxSampleRows = previewRows
+}
+nodes, err := excel.ParseTableFast(inputFile, maxSampleRows)
 if err != nil {
     yakit.Error("Failed to parse Excel file: %v", err)
     return
@@ -145,10 +149,18 @@ for _, table := range classifier.Tables {
     headers := table.Headers
     rows := table.Rows
 
+    totalDataRows := len(rows)
+    if table.Metadata != nil {
+        v := table.Metadata["total_data_rows"]
+        if v != "" {
+            totalDataRows = parseInt(v)
+        }
+    }
+
     appendLine("")
     appendLine(sprintf("--- Sheet: %v ---", sheetName))
     appendLine(sprintf("Columns: %v", len(headers)))
-    appendLine(sprintf("Data Rows: %v", len(rows)))
+    appendLine(sprintf("Data Rows: %v", totalDataRows))
     appendLine("")
 
     sampleSize := 100

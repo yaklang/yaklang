@@ -96,7 +96,7 @@ if !file.IsExisted(inputFile) {
 
 yakit.Info("Parsing Excel file: %v", inputFile)
 
-nodes, err := excel.Parse(inputFile)
+nodes, err := excel.ParseTableFast(inputFile, 0)
 if err != nil {
     yakit.Error("Failed to parse Excel file: %v", err)
     return
