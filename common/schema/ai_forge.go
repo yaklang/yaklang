@@ -56,7 +56,7 @@ var FORGE_TYPE_Config = "config"
 var FORGE_TYPE_SkillMD = "skillmd"
 
 func IsRunnableForgeType(forgeType string) bool {
-	return forgeType == FORGE_TYPE_YAK || forgeType == FORGE_TYPE_Config
+	return forgeType == FORGE_TYPE_YAK || forgeType == FORGE_TYPE_Config || forgeType == ""
 }
 
 func RunnableForgeTypes() []string {
