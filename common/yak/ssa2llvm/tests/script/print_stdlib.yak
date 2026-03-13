@@ -1,0 +1,5 @@
+print("hello")
+print(" ")
+println("world", 123)
+printf("x=%v\n", 1)
+

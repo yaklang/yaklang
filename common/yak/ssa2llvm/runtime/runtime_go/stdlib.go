@@ -6,6 +6,7 @@ package main
 import "C"
 
 import (
+	"fmt"
 	"os"
 	"runtime/cgo"
 	"unsafe"
@@ -14,6 +15,48 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/dispatch"
 )
+
+func normalizePrintArg(v any) any {
+	switch val := v.(type) {
+	case []byte:
+		return string(val)
+	case uint8:
+		if val >= 32 && val <= 126 {
+			return fmt.Sprintf("'%c'", val)
+		}
+		return fmt.Sprintf("'\\x%02x'", val)
+	default:
+		return v
+	}
+}
+
+func decodeTaggedArg(v uint64) any {
+	// Untagged values are just integers in our current calling convention.
+	if (v & yakTaggedPointerMask) == 0 {
+		return int64(v)
+	}
+
+	raw := v &^ yakTaggedPointerMask
+	ptr := unsafe.Pointer(uintptr(raw))
+	if ptr == nil {
+		return ""
+	}
+	if h, ok := handleFromShadow(ptr); ok {
+		return h.Value()
+	}
+	return C.GoString((*C.char)(ptr))
+}
+
+func normalizeDecodedArgs(args []uint64) []any {
+	if len(args) == 0 {
+		return nil
+	}
+	out := make([]any, 0, len(args))
+	for _, a := range args {
+		out = append(out, normalizePrintArg(decodeTaggedArg(a)))
+	}
+	return out
+}
 
 func newStdlibShadow(value any) unsafe.Pointer {
 	if value == nil {
@@ -107,6 +150,51 @@ func stdlibOsGetenv(args []uint64) int64 {
 	return int64(uintptr(unsafe.Pointer(C.CString(val))))
 }
 
+func stdlibPrint(args []uint64) int64 {
+	defer recoverRuntimePanic()
+	decoded := normalizeDecodedArgs(args)
+	_, _ = fmt.Fprint(os.Stdout, decoded...)
+	return 0
+}
+
+func stdlibPrintln(args []uint64) int64 {
+	defer recoverRuntimePanic()
+	decoded := normalizeDecodedArgs(args)
+	_, _ = fmt.Fprintln(os.Stdout, decoded...)
+	return 0
+}
+
+func stdlibPrintf(args []uint64) int64 {
+	defer recoverRuntimePanic()
+	if len(args) < 1 {
+		return 0
+	}
+	formatAny := decodeTaggedArg(args[0])
+	formatStr, ok := formatAny.(string)
+	if !ok {
+		formatStr = fmt.Sprint(formatAny)
+	}
+	decoded := normalizeDecodedArgs(args[1:])
+	_, _ = fmt.Fprintf(os.Stdout, formatStr, decoded...)
+	return 0
+}
+
+func stdlibYakitLog(level string, args []uint64) int64 {
+	defer recoverRuntimePanic()
+	if len(args) == 0 {
+		return 0
+	}
+	formatAny := decodeTaggedArg(args[0])
+	formatStr, ok := formatAny.(string)
+	if !ok {
+		formatStr = fmt.Sprint(formatAny)
+	}
+	decoded := normalizeDecodedArgs(args[1:])
+	msg := fmt.Sprintf(formatStr, decoded...)
+	_, _ = fmt.Fprintf(os.Stderr, "[yakit][%s] %s\n", level, msg)
+	return 0
+}
+
 //export yak_std_call
 func yak_std_call(funcID int64, argc int64, argv *C.uint64_t) int64 {
 	defer recoverRuntimePanic()
@@ -125,6 +213,20 @@ func yak_std_call(funcID int64, argc int64, argv *C.uint64_t) int64 {
 		return stdlibPocGetHTTPPacketBody(args)
 	case dispatch.IDOsGetenv:
 		return stdlibOsGetenv(args)
+	case dispatch.IDPrint:
+		return stdlibPrint(args)
+	case dispatch.IDPrintf:
+		return stdlibPrintf(args)
+	case dispatch.IDPrintln:
+		return stdlibPrintln(args)
+	case dispatch.IDYakitInfo:
+		return stdlibYakitLog("info", args)
+	case dispatch.IDYakitWarn:
+		return stdlibYakitLog("warn", args)
+	case dispatch.IDYakitDebug:
+		return stdlibYakitLog("debug", args)
+	case dispatch.IDYakitError:
+		return stdlibYakitLog("error", args)
 	default:
 		return 0
 	}

@@ -41,7 +41,7 @@ func TestIR_ObjectInteropCalls(t *testing.T) {
 	requireIRContainsInOrder(t, ir,
 		"call ptr @yak_runtime_get_object",
 		"call i64 @yak_runtime_get_field",
-		"call void @yak_internal_print_int",
+		"call i64 @yak_std_call",
 	)
 }
 
@@ -62,7 +62,7 @@ func TestIR_LoopEmitsBranchesAndCalls(t *testing.T) {
 	requireIRContainsInOrder(t, ir,
 		"br i1",
 		"call ptr @yak_runtime_get_object",
-		"call void @yak_internal_print_int",
+		"call i64 @yak_std_call",
 	)
 }
 
@@ -86,7 +86,7 @@ func TestIR_CustomExternBindingPointerReturn(t *testing.T) {
 	requireIRContainsInOrder(t, ir,
 		"call ptr @yak_runtime_get_object",
 		"call i64 @yak_runtime_get_field",
-		"call void @yak_internal_print_int",
+		"call i64 @yak_std_call",
 	)
 }
 
@@ -108,6 +108,6 @@ func TestIR_CustomExternBindingOverrideGetObject(t *testing.T) {
 	require.NoError(t, err)
 	requireIRContainsInOrder(t, ir,
 		"call i64 @yak_internal_malloc",
-		"call void @yak_internal_print_int",
+		"call i64 @yak_std_call",
 	)
 }

@@ -27,6 +27,8 @@ func (c *Compiler) compileStdlibDispatchCall(inst *ssa.Call, binding ExternBindi
 	argc := len(inst.Args)
 	i64 := c.LLVMCtx.Int64Type()
 	argvPtr := llvm.ConstPointerNull(llvm.PointerType(i64, 0))
+	const yakTaggedPointerMask uint64 = 1 << 62
+	tagPointers := shouldTagStdlibArgPointers(binding.DispatchID)
 
 	if argc > 0 {
 		mallocFn, mallocType := c.getOrInsertMalloc()
@@ -39,7 +41,12 @@ func (c *Compiler) compileStdlibDispatchCall(inst *ssa.Call, binding ExternBindi
 			if err != nil {
 				return fmt.Errorf("compileStdlibDispatchCall: failed to resolve argument %d: %w", i, err)
 			}
+			isPointer := argVal.Type().IntTypeWidth() == 0
 			argI64 := c.coerceToInt64(argVal)
+			if tagPointers && isPointer {
+				tag := llvm.ConstInt(c.LLVMCtx.Int64Type(), yakTaggedPointerMask, false)
+				argI64 = buildOr(c.Builder, argI64, tag, "yak_std_arg_tag")
+			}
 			idx := llvm.ConstInt(i64, uint64(i), false)
 			elemPtr := c.Builder.CreateGEP(i64, argvPtr, []llvm.Value{idx}, "")
 			c.Builder.CreateStore(argI64, elemPtr)
@@ -65,4 +72,14 @@ func (c *Compiler) compileStdlibDispatchCall(inst *ssa.Call, binding ExternBindi
 	}
 
 	return nil
+}
+
+func shouldTagStdlibArgPointers(id dispatch.FuncID) bool {
+	switch id {
+	case dispatch.IDPrint, dispatch.IDPrintf, dispatch.IDPrintln,
+		dispatch.IDYakitInfo, dispatch.IDYakitWarn, dispatch.IDYakitDebug, dispatch.IDYakitError:
+		return true
+	default:
+		return false
+	}
 }

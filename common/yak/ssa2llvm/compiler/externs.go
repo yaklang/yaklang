@@ -29,9 +29,32 @@ type ExternBinding struct {
 
 var defaultExternBindings = map[string]ExternBinding{
 	"println": {
-		Symbol: "yak_internal_print_int",
-		Params: []LLVMExternType{ExternTypeI64},
-		Return: ExternTypeVoid,
+		Return:     ExternTypeVoid,
+		DispatchID: dispatch.IDPrintln,
+	},
+	"print": {
+		Return:     ExternTypeVoid,
+		DispatchID: dispatch.IDPrint,
+	},
+	"printf": {
+		Return:     ExternTypeVoid,
+		DispatchID: dispatch.IDPrintf,
+	},
+	"yakit.Info": {
+		Return:     ExternTypeVoid,
+		DispatchID: dispatch.IDYakitInfo,
+	},
+	"yakit.Warn": {
+		Return:     ExternTypeVoid,
+		DispatchID: dispatch.IDYakitWarn,
+	},
+	"yakit.Debug": {
+		Return:     ExternTypeVoid,
+		DispatchID: dispatch.IDYakitDebug,
+	},
+	"yakit.Error": {
+		Return:     ExternTypeVoid,
+		DispatchID: dispatch.IDYakitError,
 	},
 	"poc.timeout": {
 		Return:     ExternTypePtr,
