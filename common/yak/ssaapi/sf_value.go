@@ -193,8 +193,11 @@ func (v *Value) GetCalled() (sfvm.ValueOperator, error) {
 
 func (v *Value) GetFields() (sfvm.ValueOperator, error) {
 	if v.IsMap() || v.IsObject() {
-		members := lo.Map(v.GetAllMember(), func(item *Value, index int) sfvm.ValueOperator {
-			return item
+		members := lo.FilterMap(v.GetMembers(), func(item []*Value, index int) (sfvm.ValueOperator, bool) {
+			if len(item) != 2 || item[1] == nil {
+				return nil, false
+			}
+			return item[1], true
 		})
 		return sfvm.NewValues(members), nil
 	}
@@ -203,14 +206,17 @@ func (v *Value) GetFields() (sfvm.ValueOperator, error) {
 
 func (v *Value) GetMembersByString(key string) (sfvm.ValueOperator, bool) {
 	if v.IsMap() || v.IsList() || v.IsObject() {
-		for _, m := range v.GetMember(v.NewValue(ssa.NewConst(key))) {
-			if m != nil {
-				return m, true
+		members := lo.FilterMap(v.GetMember(v.NewValue(ssa.NewConst(key))), func(item *Value, _ int) (sfvm.ValueOperator, bool) {
+			if item == nil {
+				return nil, false
 			}
+			return item, true
+		})
+		if len(members) > 0 {
+			return sfvm.NewValues(members), true
 		}
 		return nil, false
 	}
-	// return v.GetUsers(), nil
 	return nil, false
 }
 

@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"sort"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
 func (v *Value) lookupMembersOnObject(key *Value) Values {
@@ -20,6 +22,77 @@ func (v *Value) lookupMembersOnObject(key *Value) Values {
 			continue
 		}
 		ret = append(ret, v.NewValue(member))
+	}
+	return MergeValues(ret)
+}
+
+func sameBareOrFullTypeName(lhs, rhs ssa.Type) bool {
+	if lhs == nil || rhs == nil {
+		return false
+	}
+	if lhs.String() != "" && lhs.String() == rhs.String() {
+		return true
+	}
+	lhsNames := append([]string{lhs.String()}, lhs.GetFullTypeNames()...)
+	rhsNames := append([]string{rhs.String()}, rhs.GetFullTypeNames()...)
+	for _, left := range lhsNames {
+		if left == "" {
+			continue
+		}
+		for _, right := range rhsNames {
+			if right != "" && left == right {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func memberMatchesKeyName(member *Value, keyName string) bool {
+	if member == nil || member.getValue() == nil || keyName == "" {
+		return false
+	}
+	for _, pair := range ssa.GetObjectKeyPairs(member.getValue()) {
+		if ssa.GetKeyString(pair.Key) == keyName {
+			return true
+		}
+	}
+	return false
+}
+
+func (v *Value) lookupMembersByIndexedKey(key *Value) Values {
+	if v == nil || key == nil || v.ParentProgram == nil || v.ParentProgram.Program == nil || key.getValue() == nil {
+		return nil
+	}
+	keyName := ssa.GetKeyString(key.getValue())
+	if keyName == "" {
+		return nil
+	}
+	currentType := GetBareType(v.GetType())
+	insts := ssa.MatchInstructionsByVariable(context.Background(), v.ParentProgram.Program, ssadb.ExactCompare, ssadb.KeyMatch, keyName)
+	ret := make(Values, 0, len(insts))
+	for _, inst := range insts {
+		candidate, ok := ssa.ToValue(inst)
+		if !ok || utils.IsNil(candidate) {
+			continue
+		}
+		item := v.NewValue(candidate)
+		if item == nil || !item.IsMember() || !memberMatchesKeyName(item, keyName) {
+			continue
+		}
+		if currentType != nil {
+			matchedType := false
+			for _, pair := range ssa.GetObjectKeyPairs(candidate) {
+				if sameBareOrFullTypeName(currentType, pair.Object.GetType()) {
+					matchedType = true
+					break
+				}
+			}
+			if !matchedType {
+				continue
+			}
+		}
+		ret = append(ret, item)
 	}
 	return MergeValues(ret)
 }
@@ -44,6 +117,7 @@ func (v *Value) lookupMembersOnType(key *Value) Values {
 	for _, candidate := range v.lookupObjectsByTypeName() {
 		ret = append(ret, candidate.lookupMembersOnObject(key)...)
 	}
+	ret = append(ret, v.lookupMembersByIndexedKey(key)...)
 	return MergeValues(ret)
 }
 
@@ -197,6 +271,35 @@ func (v *Value) queryMemberCandidates(actx *AnalyzeContext, key *Value) Values {
 		if len(ret) > 0 {
 			break
 		}
+	}
+	if len(ret) == 0 {
+		ret = append(ret, filterMembersByKeyString(actx.Query(keyName), keyName)...)
+	}
+	return MergeValues(ret)
+}
+
+func filterMembersByKeyString(values Values, keyName string) Values {
+	if keyName == "" {
+		return nil
+	}
+	ret := make(Values, 0)
+	for _, item := range values {
+		if item == nil || item.getValue() == nil {
+			continue
+		}
+		if item.IsMember() {
+			for _, pair := range ssa.GetObjectKeyPairs(item.getValue()) {
+				if ssa.GetKeyString(pair.Key) == keyName {
+					ret = append(ret, item)
+					break
+				}
+			}
+			continue
+		}
+		if !item.IsObject() {
+			continue
+		}
+		ret = append(ret, item.lookupMembersOnObject(item.NewValue(ssa.NewConst(keyName)))...)
 	}
 	return MergeValues(ret)
 }

@@ -205,8 +205,8 @@ func init() {
 				}
 				return
 			}
-			obj := value.GetObject()
-			if utils.IsNil(obj) {
+			pairs := ssa.GetObjectKeyPairs(value)
+			if len(pairs) == 0 {
 				newValue, err2 := prog.NewValue(value)
 				if err2 != nil {
 					return
@@ -214,7 +214,9 @@ func init() {
 				result = append(result, newValue)
 				return
 			}
-			getRoot(obj)
+			for _, pair := range pairs {
+				getRoot(pair.Object)
+			}
 		}
 		v.Recursive(func(operator sfvm.ValueOperator) error {
 			switch ret := operator.(type) {
@@ -304,7 +306,7 @@ func init() {
 		v.Recursive(func(operator sfvm.ValueOperator) error {
 			switch ret := operator.(type) {
 			case *Value:
-				_, isBlueprint := ssa.ToClassBluePrintType(ret.getValue().GetType())
+				_, isBlueprint := ssa.ToBluePrintType(ret.getValue().GetType())
 				if isBlueprint {
 					result = append(result, ret)
 				}
@@ -329,7 +331,7 @@ func init() {
 		val.Recursive(func(operator sfvm.ValueOperator) error {
 			switch ret := operator.(type) {
 			case *Value:
-				typ, isBlueprint := ssa.ToClassBluePrintType(ret.getValue().GetType())
+				typ, isBlueprint := ssa.ToBluePrintType(ret.getValue().GetType())
 				if isBlueprint {
 					extends = append(extends, typ)
 				}
@@ -339,7 +341,7 @@ func init() {
 			return nil
 		})
 		check := func(p ssa.Type) bool {
-			typ, isBlueprint := ssa.ToClassBluePrintType(p)
+			typ, isBlueprint := ssa.ToBluePrintType(p)
 			if isBlueprint {
 				return false
 			}
@@ -1198,17 +1200,19 @@ func init() {
 				if !ok {
 					return nil
 				}
-				obj := val.GetObject()
-				if obj == nil {
-					return nil
-				}
-				for _, elements := range obj.GetMembers() {
-					for _, newVal := range elements {
-						if newVal == nil {
-							continue
+				for _, owner := range val.GetObjectKeyPairs() {
+					if len(owner) != 2 || owner[0] == nil {
+						continue
+					}
+					obj := owner[0]
+					for _, elements := range obj.GetMembers() {
+						for _, newVal := range elements {
+							if newVal == nil {
+								continue
+							}
+							newVal.AppendPredecessor(val, frame.WithPredecessorContext("getSiblings"))
+							vals = append(vals, newVal)
 						}
-						newVal.AppendPredecessor(val, frame.WithPredecessorContext("getSiblings"))
-						vals = append(vals, newVal)
 					}
 				}
 				return nil
@@ -1285,11 +1289,13 @@ func init() {
 				if !ok {
 					return nil
 				}
-				obj := val.GetObject()
-				if obj != nil {
+				for _, owner := range val.GetObjectKeyPairs() {
+					if len(owner) != 2 || owner[0] == nil {
+						continue
+					}
+					obj := owner[0]
 					obj.AppendPredecessor(val, frame.WithPredecessorContext("getObject"))
 					ret = append(ret, obj)
-					return nil
 				}
 				return nil
 			})

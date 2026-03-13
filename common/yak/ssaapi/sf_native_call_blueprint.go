@@ -10,7 +10,7 @@ func getCurrentBlueprint(v sfvm.ValueOperator) []*ssa.Blueprint {
 		if v == nil {
 			return nil
 		}
-		bp, isBlueprint := ssa.ToClassBluePrintType(v.getValue().GetType())
+		bp, isBlueprint := ssa.ToBluePrintType(v.getValue().GetType())
 		if isBlueprint {
 			return bp
 		}

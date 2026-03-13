@@ -21,10 +21,12 @@ func getValueNames(val *Value) []string {
 		val.ShortString(),
 		val.GetSSAInst().GetVerboseName(),
 	}
-	if val.IsMember() {
-		constVal, ok := ssa.ToConstInst(val.GetKey().GetSSAInst())
-		if ok {
-			names = append(names, constVal.VarString())
+	if val.IsMember() && val.getValue() != nil {
+		for _, pair := range ssa.GetObjectKeyPairs(val.getValue()) {
+			constVal, ok := ssa.ToConstInst(pair.Key)
+			if ok {
+				names = append(names, constVal.VarString())
+			}
 		}
 	}
 

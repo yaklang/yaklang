@@ -61,20 +61,23 @@ func (v Values) GetTopDefs(opts ...OperationOption) Values {
 }
 
 func isConstructorLikeMemberValue(callee *Value) bool {
-	if callee == nil || !callee.IsMember() {
+	if callee == nil || !callee.IsMember() || callee.getValue() == nil {
 		return false
 	}
-	calleeObj, calleeKey := callee.GetObject(), callee.GetKey()
-	if calleeObj == nil || calleeKey == nil {
-		return false
-	}
-	keyName := ssa.GetKeyString(calleeKey.getValue())
-	for _, candidate := range []string{calleeObj.GetName(), calleeObj.GetVerboseName(), calleeObj.String()} {
-		candidate = strings.TrimSpace(candidate)
-		candidate = strings.TrimPrefix(candidate, "Undefined-")
-		candidate = strings.TrimPrefix(candidate, "ExternLib-")
-		if candidate == keyName {
-			return true
+	for _, pair := range ssa.GetObjectKeyPairs(callee.getValue()) {
+		calleeObj := callee.NewValue(pair.Object)
+		calleeKey := callee.NewValue(pair.Key)
+		if calleeObj == nil || calleeKey == nil {
+			continue
+		}
+		keyName := ssa.GetKeyString(calleeKey.getValue())
+		for _, candidate := range []string{calleeObj.GetName(), calleeObj.GetVerboseName(), calleeObj.String()} {
+			candidate = strings.TrimSpace(candidate)
+			candidate = strings.TrimPrefix(candidate, "Undefined-")
+			candidate = strings.TrimPrefix(candidate, "ExternLib-")
+			if candidate == keyName {
+				return true
+			}
 		}
 	}
 	return false
@@ -99,8 +102,12 @@ func isDestructorLikeValue(value *Value) bool {
 	if value == nil {
 		return false
 	}
-	if key := value.GetKey(); key != nil && strings.Contains(strings.ToLower(ssa.GetKeyString(key.getValue())), "destructor") {
-		return true
+	if raw := value.getValue(); raw != nil {
+		for _, pair := range ssa.GetObjectKeyPairs(raw) {
+			if strings.Contains(strings.ToLower(ssa.GetKeyString(pair.Key)), "destructor") {
+				return true
+			}
+		}
 	}
 	name := strings.ToLower(value.GetName())
 	verboseName := strings.ToLower(value.GetVerboseName())
@@ -571,7 +578,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 						if !ok {
 							continue
 						}
-						val, ok := traceValue.GetStringMember(retIndexRawStr)
+						val, ok := ssa.GetLatestMemberByKeyString(traceValue, retIndexRawStr)
 						if ok && val != nil {
 							topDefValue := i.NewValue(val)
 							if topDefValue != nil {
@@ -666,6 +673,15 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 					if len(ret) > 0 {
 						return ret
 					}
+				}
+				matched := filterOutMember(paraValue.lookupMembersOnType(memberKeyValue), i)
+				if len(matched) == 0 {
+					matched = filterOutMember(paraValue.queryMemberCandidates(actx, memberKeyValue), i)
+				}
+				if len(matched) > 0 {
+					return lo.FlatMap(matched, func(item *Value, _ int) []*Value {
+						return item.getTopDefs(actx, opt...)
+					})
 				}
 			}
 			return paraValue.getTopDefs(actx, opt...)
@@ -874,11 +890,9 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		}
 		var values Values
 		values = append(values, i)
-		var allmember map[ssa.Value]ssa.Value
-		allmember = inst.GetAllMember()
-		for key, member := range allmember {
-			value := i.NewValue(member)
-			if err := actx.pushObject(i, i.NewValue(key), value); err != nil {
+		for _, pair := range ssa.GetMemberPairs(inst) {
+			value := i.NewValue(pair.Member)
+			if err := actx.pushObject(i, i.NewValue(pair.Key), value); err != nil {
 				//log.Errorf("push object failed: %v", err)
 				// continue
 			} else {

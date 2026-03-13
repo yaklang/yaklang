@@ -88,11 +88,10 @@ func (v *Value) bottomUsesThroughReturn(retValue *Value, retInst *ssa.Return, ac
 			continue
 		}
 		for _, returnIndex := range returnIndexes {
-			members := call.GetMember(retValue.NewValue(ssa.NewConst(returnIndex)))
-			for i, member := range members {
-				if i == 0 {
-					actx.pushObject(call, member.GetKey(), member)
-				}
+			returnKey := retValue.NewValue(ssa.NewConst(returnIndex))
+			members := call.GetMember(returnKey)
+			for _, member := range members {
+				_ = actx.pushObject(call, returnKey, member)
 				ret = append(ret, member.getBottomUses(actx, opt...)...)
 				actx.popObject()
 			}
@@ -115,11 +114,14 @@ func (v *Value) visitUserFallback(actx *AnalyzeContext, opt ...OperationOption) 
 			return true
 		})
 		if !exist {
-			v.GetAllMember().ForEach(func(value *Value) {
-				_ = actx.pushObject(v, value.GetKey(), value)
-				vals = append(vals, value.getBottomUses(actx, opt...)...)
+			for _, pair := range v.GetMembers() {
+				if len(pair) != 2 || pair[0] == nil || pair[1] == nil {
+					continue
+				}
+				_ = actx.pushObject(v, pair[0], pair[1])
+				vals = append(vals, pair[1].getBottomUses(actx, opt...)...)
 				actx.popObject()
-			})
+			}
 		} else if constrainedKey != nil {
 			for _, value := range v.lookupMembersOnObject(constrainedKey) {
 				_ = actx.pushObject(v, constrainedKey, value)
@@ -416,14 +418,13 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 			}
 			ret := make(Values, 0)
 			for _, returnIndex := range returnIndexes {
-				members := call.GetMember(v.NewValue(ssa.NewConst(returnIndex)))
+				returnKey := v.NewValue(ssa.NewConst(returnIndex))
+				members := call.GetMember(returnKey)
 				if members == nil {
 					continue
 				}
-				for i, member := range members {
-					if i == 0 {
-						actx.pushObject(call, member.GetKey(), member)
-					}
+				for _, member := range members {
+					_ = actx.pushObject(call, returnKey, member)
 					ret = append(ret, member.getBottomUses(actx, opt...)...)
 					actx.popObject()
 				}
