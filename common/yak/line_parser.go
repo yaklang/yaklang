@@ -2,12 +2,13 @@ package yak
 
 import (
 	"context"
+	"io"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
-	"io"
-	"strings"
 )
 
 type TextHandlingScript struct {
@@ -38,7 +39,7 @@ func NewTextParser() *TextParser {
 	return parser
 }
 
-func (t *TextParser) ParseLine(r io.Reader, handler func(line string, r map[string]string, data []map[string]string)) error {
+func (t *TextParser) ParseLine(r io.Reader, handler func(line string, r map[string]string, data []map[string]any)) error {
 	var (
 		matchedRule string
 	)
@@ -94,10 +95,10 @@ func (t *TextParser) ParseLine(r io.Reader, handler func(line string, r map[stri
 			}
 		}
 
-		var jsonData []map[string]string
+		var jsonData []map[string]any
 		if raw, ok := t.engine.GetVar("JSON_DATA"); ok {
-			if strRawMaps, tOk := raw.([]map[string]string); tOk {
-				jsonData = append(jsonData, strRawMaps...)
+			if rawMaps, tOk := raw.([]map[string]any); tOk {
+				jsonData = append(jsonData, rawMaps...)
 			}
 		}
 
