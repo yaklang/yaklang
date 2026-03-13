@@ -48,7 +48,7 @@ func hasNonEmptyValue(value Values) bool {
 	return !value.IsEmpty()
 }
 
-// conditionModeFromSource decides how a condition scope represents truth:
+// conditionModeFromSource decides how an anchor scope represents truth:
 //
 //   - Mask mode: common case, source is a list -> represent condition as []bool aligned to source slots.
 //   - Candidate mode: special singleton sources (e.g. Program/Overlay) where a "mask per slot" is not
@@ -79,7 +79,7 @@ func buildValueByID(values Values) map[int64]ValueOperator {
 	return res
 }
 
-func normalizeConditionAgainstSource(scope conditionScopeState, result Values, cond []bool) ([]bool, error) {
+func normalizeConditionAgainstSource(scope anchorScopeState, result Values, cond []bool) ([]bool, error) {
 	width := scope.anchorWidth
 	if width == 0 {
 		return nil, nil
@@ -231,7 +231,7 @@ func mergeValuesByID(left Values, right Values, andMode bool) Values {
 	return NewValues(out)
 }
 
-func buildConditionEntry(scope conditionScopeState, cond []bool, candidate Values, fromCompare bool) (ConditionEntry, error) {
+func buildConditionEntry(scope anchorScopeState, cond []bool, candidate Values, fromCompare bool) (ConditionEntry, error) {
 	mode := scope.mode
 	matched := anyTrue(cond)
 	if fromCompare && !matched && hasNonEmptyValue(candidate) {
@@ -250,17 +250,17 @@ func buildConditionEntry(scope conditionScopeState, cond []bool, candidate Value
 	return newMaskCondition(cond, candidate), nil
 }
 
-func (s *SFFrame) activeConditionScope() (conditionScopeState, bool) {
-	if s == nil || s.conditionScope == nil || s.conditionScope.Len() == 0 {
-		return conditionScopeState{}, false
+func (s *SFFrame) activeAnchorScope() (anchorScopeState, bool) {
+	if s == nil || s.anchorScope == nil || s.anchorScope.Len() == 0 {
+		return anchorScopeState{}, false
 	}
-	return s.conditionScope.Peek(), true
+	return s.anchorScope.Peek(), true
 }
 
 func (s *SFFrame) pushCondition(cond []bool, candidate Values, fromCompare bool) error {
-	scope, ok := s.activeConditionScope()
+	scope, ok := s.activeAnchorScope()
 	if !ok {
-		return utils.Wrap(CriticalError, "condition failed: missing condition scope")
+		return utils.Wrap(CriticalError, "condition failed: missing anchor scope")
 	}
 	entry, err := buildConditionEntry(scope, cond, candidate, fromCompare)
 	if err != nil {
@@ -333,7 +333,7 @@ func (s *SFFrame) applyLogicBinaryCondition(andMode bool) error {
 	}
 }
 
-func buildFilterMask(scope conditionScopeState, cond Values) ([]bool, error) {
+func buildFilterMask(scope anchorScopeState, cond Values) ([]bool, error) {
 	// Filter conditions are derived values that must carry anchor bits so we can map
 	// them back to the scope source mask:
 	//   mask[i] = true iff (anchorBase+i) in condValue.bits
@@ -369,9 +369,9 @@ func buildFilterMask(scope conditionScopeState, cond Values) ([]bool, error) {
 }
 
 func (s *SFFrame) pushFilterCondition(cond Values) error {
-	scope, ok := s.activeConditionScope()
+	scope, ok := s.activeAnchorScope()
 	if !ok {
-		return utils.Wrap(CriticalError, "condition failed: missing condition scope")
+		return utils.Wrap(CriticalError, "condition failed: missing anchor scope")
 	}
 	if scope.mode == ConditionModeCandidate {
 		return s.pushCondition([]bool{hasNonEmptyValue(cond)}, cond, false)

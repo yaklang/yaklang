@@ -250,15 +250,15 @@ func (v *SyntaxFlowVisitor) EmitFilter() {
 	})
 }
 
-func (v *SyntaxFlowVisitor) EmitConditionScopeStart() {
+func (v *SyntaxFlowVisitor) EmitAnchorScopeStart() {
 	v.codes = append(v.codes, &SFI{
-		OpCode: OpConditionScopeStart,
+		OpCode: OpAnchorScopeStart,
 	})
 }
 
-func (v *SyntaxFlowVisitor) EmitConditionScopeEnd() {
+func (v *SyntaxFlowVisitor) EmitAnchorScopeEnd() {
 	v.codes = append(v.codes, &SFI{
-		OpCode: OpConditionScopeEnd,
+		OpCode: OpAnchorScopeEnd,
 	})
 }
 

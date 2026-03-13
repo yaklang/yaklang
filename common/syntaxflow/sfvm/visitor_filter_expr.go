@@ -46,9 +46,9 @@ func (y *SyntaxFlowVisitor) VisitFilterItem(raw sf.IFilterItemContext) error {
 		//先拿到所有的call，然后再去拿callArgs
 		y.EmitGetCall()
 		if filter.Question() != nil {
-			// Call-arg filtering relies on grouping by the parent call; enable condition scope
+			// Call-arg filtering relies on grouping by the parent call; enable anchor scope
 			// so args can map back to their originating call via AnchorBitVector.
-			y.EmitConditionScopeStart()
+			y.EmitAnchorScopeStart()
 			y.EmitOpEmptyCompare()
 			if filter.ActualParam() != nil {
 				y.VisitActualParam(filter.ActualParam(), true)
@@ -56,13 +56,13 @@ func (y *SyntaxFlowVisitor) VisitFilterItem(raw sf.IFilterItemContext) error {
 				// no actual-param filter: keep original call filtering behavior
 				y.EmitCondition()
 			}
-			y.EmitConditionScopeEnd()
+			y.EmitAnchorScopeEnd()
 		} else if filter.ActualParam() != nil {
 			// Plain arg extraction still needs per-call grouping so nested filters like
 			// `*<slice(...)>` run against each call's arg set instead of the flattened union.
-			y.EmitConditionScopeStart()
+			y.EmitAnchorScopeStart()
 			y.VisitActualParam(filter.ActualParam(), false)
-			y.EmitConditionScopeEnd()
+			y.EmitAnchorScopeEnd()
 		}
 		//检查栈顶，应该可以被里面的值影响到
 		y.EmitCheckStackTop()
@@ -85,10 +85,10 @@ func (y *SyntaxFlowVisitor) VisitFilterItem(raw sf.IFilterItemContext) error {
 			y.VisitNameFilter(true, member.NameFilter())
 		}
 	case *sf.OptionalFilterContext:
-		y.EmitConditionScopeStart()
+		y.EmitAnchorScopeStart()
 		y.VisitConditionExpression(filter.ConditionExpression())
 		y.EmitCondition()
-		y.EmitConditionScopeEnd()
+		y.EmitAnchorScopeEnd()
 	case *sf.NextFilterContext:
 		y.EmitGetUsers()
 	case *sf.DefFilterContext:
@@ -116,12 +116,12 @@ func (y *SyntaxFlowVisitor) VisitFilterItem(raw sf.IFilterItemContext) error {
 	case *sf.IntersectionRefFilterContext:
 		y.EmitIntersectionRef(strings.TrimLeft(filter.RefVariable().GetText(), "$"))
 	case *sf.VersionInFilterContext:
-		y.EmitConditionScopeStart()
+		y.EmitAnchorScopeStart()
 		if versionIn := filter.VersionInExpression(); versionIn != nil {
 			y.VisitVersionInExpression(versionIn)
 		}
 		y.EmitCondition()
-		y.EmitConditionScopeEnd()
+		y.EmitAnchorScopeEnd()
 	default:
 		panic("BUG: in filterExpr")
 	}
@@ -374,11 +374,11 @@ func (y *SyntaxFlowVisitor) VisitActualParam(i sf.IActualParamContext, haveQuest
 		case *sf.FilterExpressionAndContext:
 			conds := c.AllConditionExpression()
 			for idx, exp := range conds {
-				y.EmitConditionScopeStart()
+				y.EmitAnchorScopeStart()
 				if err := visitCallArgConditionExpression(exp, argStart, containOther); err != nil {
 					return err
 				}
-				y.EmitConditionScopeEnd()
+				y.EmitAnchorScopeEnd()
 				if idx > 0 {
 					y.EmitOperator("&&")
 				}
@@ -387,22 +387,22 @@ func (y *SyntaxFlowVisitor) VisitActualParam(i sf.IActualParamContext, haveQuest
 		case *sf.FilterExpressionOrContext:
 			conds := c.AllConditionExpression()
 			for idx, exp := range conds {
-				y.EmitConditionScopeStart()
+				y.EmitAnchorScopeStart()
 				if err := visitCallArgConditionExpression(exp, argStart, containOther); err != nil {
 					return err
 				}
-				y.EmitConditionScopeEnd()
+				y.EmitAnchorScopeEnd()
 				if idx > 0 {
 					y.EmitOperator("||")
 				}
 			}
 			return nil
 		case *sf.NotConditionContext:
-			y.EmitConditionScopeStart()
+			y.EmitAnchorScopeStart()
 			if err := visitCallArgConditionExpression(c.ConditionExpression(), argStart, containOther); err != nil {
 				return err
 			}
-			y.EmitConditionScopeEnd()
+			y.EmitAnchorScopeEnd()
 			y.EmitOperator("!")
 			return nil
 		case *sf.ParenConditionContext:
@@ -427,7 +427,7 @@ func (y *SyntaxFlowVisitor) VisitActualParam(i sf.IActualParamContext, haveQuest
 			// The filter-expr produces a derived list (e.g. `*<len>`). Compare/condition should be
 			// evaluated on that derived list while preserving its anchor bits back to the call list,
 			// so start the scope after the filter-expr has produced the derived values.
-			y.EmitConditionScopeStart()
+			y.EmitAnchorScopeStart()
 			if c.NumberLiteral() != nil {
 				n := y.VisitNumberLiteral(c.NumberLiteral())
 				y.EmitPushLiteral(n)
@@ -442,7 +442,7 @@ func (y *SyntaxFlowVisitor) VisitActualParam(i sf.IActualParamContext, haveQuest
 			}
 			y.EmitOperator(c.GetOp().GetText())
 			y.EmitCondition()
-			y.EmitConditionScopeEnd()
+			y.EmitAnchorScopeEnd()
 			y.EmitFilter()
 			return nil
 		case *sf.OpcodeTypeConditionContext:
@@ -452,37 +452,37 @@ func (y *SyntaxFlowVisitor) VisitActualParam(i sf.IActualParamContext, haveQuest
 				ops = append(ops, opcode.GetText())
 			}
 			y.EmitPushCallArgs(argStart, containOther)
-			y.EmitConditionScopeStart()
+			y.EmitAnchorScopeStart()
 			y.EmitCompareOpcode(ops)
 			y.EmitCondition()
-			y.EmitConditionScopeEnd()
+			y.EmitAnchorScopeEnd()
 			y.EmitFilter()
 			return nil
 		case *sf.StringContainAnyConditionContext:
 			res := y.VisitStringLiteralWithoutStarGroup(c.StringLiteralWithoutStarGroup())
 			y.EmitPushCallArgs(argStart, containOther)
-			y.EmitConditionScopeStart()
+			y.EmitAnchorScopeStart()
 			y.EmitCompareString(res, MatchHaveAny)
 			y.EmitCondition()
-			y.EmitConditionScopeEnd()
+			y.EmitAnchorScopeEnd()
 			y.EmitFilter()
 			return nil
 		case *sf.StringContainHaveConditionContext:
 			res := y.VisitStringLiteralWithoutStarGroup(c.StringLiteralWithoutStarGroup())
 			y.EmitPushCallArgs(argStart, containOther)
-			y.EmitConditionScopeStart()
+			y.EmitAnchorScopeStart()
 			y.EmitCompareString(res, MatchHave)
 			y.EmitCondition()
-			y.EmitConditionScopeEnd()
+			y.EmitAnchorScopeEnd()
 			y.EmitFilter()
 			return nil
 		default:
 			// Fallback: treat as an arg-level condition expression, then lift to call-level via OpFilter.
 			y.EmitPushCallArgs(argStart, containOther)
-			y.EmitConditionScopeStart()
+			y.EmitAnchorScopeStart()
 			y.VisitConditionExpression(expr)
 			y.EmitCondition()
-			y.EmitConditionScopeEnd()
+			y.EmitAnchorScopeEnd()
 			y.EmitFilter()
 			return nil
 		}
