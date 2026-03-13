@@ -21,7 +21,15 @@ import (
 )
 
 type TaskManager struct {
-	tasks *sync.Map
+	tasks    *sync.Map
+	recentMu sync.Mutex
+	recent   []*taskRecentRecord
+}
+
+type taskRecentRecord struct {
+	FinishedTimestamp int64
+	WaitMs            int64
+	ExecMs            int64
 }
 
 func GetPalmHomeDir() string {
@@ -29,15 +37,41 @@ func GetPalmHomeDir() string {
 }
 
 func (t *TaskManager) Add(taskId string, task *Task) {
-	task.StartTimestamp = time.Now().Unix()
+	now := time.Now().Unix()
+	task.mu.Lock()
+	task.StartTimestamp = now
 	ddl, ok := task.Ctx.Deadline()
 	if ok {
 		task.DeadlineTimestamp = ddl.Unix()
 	}
+	if task.Status == "" {
+		task.Status = "running"
+	}
+	if task.Status == "running" && task.RunningTimestamp == 0 {
+		task.RunningTimestamp = now
+	}
+	task.mu.Unlock()
 	t.tasks.Store(taskId, task)
 }
 
 func (t *TaskManager) Remove(taskId string) {
+	if raw, ok := t.tasks.Load(taskId); ok {
+		task := raw.(*Task)
+		now := time.Now().Unix()
+		task.mu.RLock()
+		waitMs := task.WaitMs
+		runningTs := task.RunningTimestamp
+		task.mu.RUnlock()
+		execMs := int64(0)
+		if runningTs > 0 {
+			execMs = now*1000 - runningTs*1000
+		}
+		t.recordRecent(&taskRecentRecord{
+			FinishedTimestamp: now,
+			WaitMs:            waitMs,
+			ExecMs:            execMs,
+		})
+	}
 	t.tasks.Delete(taskId)
 }
 
@@ -50,6 +84,84 @@ func (t *TaskManager) All() []*Task {
 	return tasks
 }
 
+func (t *TaskManager) MarkRunning(taskId string, waitMs int64) {
+	ins, ok := t.tasks.Load(taskId)
+	if !ok {
+		return
+	}
+	task := ins.(*Task)
+	task.mu.Lock()
+	task.Status = "running"
+	task.WaitMs = waitMs
+	task.RunningTimestamp = time.Now().Unix()
+	task.mu.Unlock()
+}
+
+func (t *TaskManager) Snapshot(capacity int) ([]*scanrpc.Task, int, int, int64, int64, int64) {
+	var (
+		activeCount int
+		queueCount  int
+		ret         []*scanrpc.Task
+	)
+	t.tasks.Range(func(_, value interface{}) bool {
+		task := value.(*Task)
+		snap := task.snapshotRPC()
+		ret = append(ret, snap)
+		switch snap.Status {
+		case "queued":
+			queueCount++
+		default:
+			activeCount++
+		}
+		return true
+	})
+	recentAvgWaitMs, recentAvgExecMs, recentCompletedCount := t.recentStats(15 * time.Minute)
+	return ret, activeCount, queueCount, recentAvgWaitMs, recentAvgExecMs, recentCompletedCount
+}
+
+func (t *TaskManager) recordRecent(record *taskRecentRecord) {
+	if record == nil {
+		return
+	}
+	t.recentMu.Lock()
+	defer t.recentMu.Unlock()
+	t.recent = append(t.recent, record)
+	cutoff := time.Now().Add(-30 * time.Minute).Unix()
+	trimIndex := 0
+	for trimIndex < len(t.recent) && t.recent[trimIndex].FinishedTimestamp < cutoff {
+		trimIndex++
+	}
+	if trimIndex > 0 {
+		t.recent = append([]*taskRecentRecord(nil), t.recent[trimIndex:]...)
+	}
+}
+
+func (t *TaskManager) recentStats(window time.Duration) (int64, int64, int64) {
+	t.recentMu.Lock()
+	defer t.recentMu.Unlock()
+	if len(t.recent) == 0 {
+		return 0, 0, 0
+	}
+	cutoff := time.Now().Add(-window).Unix()
+	var (
+		totalWait int64
+		totalExec int64
+		count     int64
+	)
+	for _, item := range t.recent {
+		if item == nil || item.FinishedTimestamp < cutoff {
+			continue
+		}
+		totalWait += item.WaitMs
+		totalExec += item.ExecMs
+		count++
+	}
+	if count == 0 {
+		return 0, 0, 0
+	}
+	return totalWait / count, totalExec / count, count
+}
+
 func (t *TaskManager) GetTaskById(taskId string) (*Task, error) {
 	ins, ok := t.tasks.Load(taskId)
 	if ok {
@@ -59,12 +171,36 @@ func (t *TaskManager) GetTaskById(taskId string) (*Task, error) {
 }
 
 type Task struct {
+	mu                sync.RWMutex
 	TaskType          string
 	TaskId            string
+	RootTaskID        string
+	SubTaskID         string
+	RuntimeID         string
+	Status            string
+	WaitMs            int64
 	Ctx               context.Context
 	Cancel            context.CancelFunc
 	StartTimestamp    int64
+	RunningTimestamp  int64
 	DeadlineTimestamp int64
+}
+
+func (t *Task) snapshotRPC() *scanrpc.Task {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return &scanrpc.Task{
+		TaskID:            t.TaskId,
+		RootTaskID:        t.RootTaskID,
+		SubTaskID:         t.SubTaskID,
+		RuntimeID:         t.RuntimeID,
+		TaskType:          t.TaskType,
+		Status:            t.Status,
+		WaitMs:            t.WaitMs,
+		StartTimestamp:    t.StartTimestamp,
+		RunningTimestamp:  t.RunningTimestamp,
+		DeadlineTimestamp: t.DeadlineTimestamp,
+	}
 }
 
 func (s *ScanNode) initScanRPC() {
@@ -186,17 +322,16 @@ func (s *ScanNode) initScanRPC() {
 	}
 	// task api
 	scanHelper.DoSCAN_GetRunningTasks = func(ctx context.Context, node string, req *scanrpc.SCAN_GetRunningTasksRequest, broker *mq.Broker) (*scanrpc.SCAN_GetRunningTasksResponse, error) {
-		tasks := manager.All()
-		var ret []*scanrpc.Task
-		for _, r := range tasks {
-			ret = append(ret, &scanrpc.Task{
-				TaskID:            r.TaskId,
-				TaskType:          r.TaskType,
-				StartTimestamp:    r.StartTimestamp,
-				DeadlineTimestamp: r.DeadlineTimestamp,
-			})
-		}
-		return &scanrpc.SCAN_GetRunningTasksResponse{Tasks: ret}, nil
+		ret, activeCount, queueCount, recentAvgWaitMs, recentAvgExecMs, recentCompletedCount := manager.Snapshot(s.invokeLimiter.capacity())
+		return &scanrpc.SCAN_GetRunningTasksResponse{
+			Tasks:                ret,
+			ActiveCount:          activeCount,
+			QueueCount:           queueCount,
+			Capacity:             s.invokeLimiter.capacity(),
+			RecentAvgWaitMs:      recentAvgWaitMs,
+			RecentAvgExecMs:      recentAvgExecMs,
+			RecentCompletedCount: recentCompletedCount,
+		}, nil
 	}
 	scanHelper.DoSCAN_StopTask = func(ctx context.Context, node string, req *scanrpc.SCAN_StopTaskRequest, broker *mq.Broker) (*scanrpc.SCAN_StopTaskResponse, error) {
 		t, err := manager.GetTaskById(req.TaskId)

@@ -15,7 +15,13 @@ type SCAN_StartScriptRequest struct {
 type SCAN_StartScriptResponse struct{}
 type SCAN_GetRunningTasksRequest struct{}
 type SCAN_GetRunningTasksResponse struct {
-	Tasks []*Task
+	Tasks                []*Task
+	ActiveCount          int
+	QueueCount           int
+	Capacity             int
+	RecentAvgWaitMs      int64
+	RecentAvgExecMs      int64
+	RecentCompletedCount int64
 }
 type SCAN_StopTaskRequest struct {
 	TaskId string
@@ -348,7 +354,13 @@ func GenerateSCANClientHelper(callRpc callRpcHandler) *SCANClientHelper {
 
 type Task struct {
 	TaskID            string
+	RootTaskID        string
+	SubTaskID         string
+	RuntimeID         string
 	TaskType          string
+	Status            string
+	WaitMs            int64
 	StartTimestamp    int64
+	RunningTimestamp  int64
 	DeadlineTimestamp int64
 }

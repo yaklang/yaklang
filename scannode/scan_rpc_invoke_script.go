@@ -134,6 +134,10 @@ func (s *ScanNode) rpc_invokeScript(ctx context.Context, node string, req *scanr
 	s.manager.Add(taskId, &Task{
 		TaskType: "script-task",
 		TaskId:   taskId,
+		RootTaskID: req.TaskId,
+		SubTaskID: req.SubTaskId,
+		RuntimeID: req.RuntimeId,
+		Status:   "queued",
 		Ctx:      ctx,
 		Cancel:   cancel,
 	})
@@ -176,6 +180,7 @@ func (s *ScanNode) rpc_invokeScript(ctx context.Context, node string, req *scanr
 		return nil, err
 	}
 	waitMs := time.Since(waitStart).Milliseconds()
+	s.manager.MarkRunning(taskId, waitMs)
 	log.Infof(
 		"invoke limiter acquired: task=%s subtask=%s runtime=%s wait_ms=%d active=%d/%d",
 		req.TaskId,
