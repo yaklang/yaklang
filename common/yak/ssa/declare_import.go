@@ -163,7 +163,7 @@ func (p *Program) ImportTypeStaticAll(lib *Program, classname string) error {
 	if !ok {
 		return utils.Errorf("library %s not contain type: %s", lib.Name, classname)
 	}
-	blueprint, b := ToClassBluePrintType(t)
+	blueprint, b := ToBluePrintType(t)
 	if !b {
 		return utils.Errorf("no support to blueprint")
 	}
@@ -221,7 +221,7 @@ func (p *Program) ImportTypeStaticMemberFromLib(lib *Program, clsName string, na
 		err = utils.JoinErrors(err, utils.Errorf("library %s not contain type %s", lib.Name, clsName))
 		return err
 	} else {
-		blueprint, b := ToClassBluePrintType(v)
+		blueprint, b := ToBluePrintType(v)
 		if !b {
 			errx := utils.Errorf("no support other type")
 			return errx

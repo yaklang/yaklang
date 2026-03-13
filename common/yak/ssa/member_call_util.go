@@ -29,7 +29,7 @@ func setMemberCallRelationship(obj, key, member Value) {
 			if !ok || edgeValue == nil {
 				continue
 			}
-			if _, ok := edgeValue.GetMember(key); ok { // 避免循环
+			if _, ok := GetLatestMemberByKey(edgeValue, key); ok { // 避免循环
 				continue
 			}
 			if _, ok := edgeValue.(*Call); ok {
@@ -111,7 +111,7 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 		ret.typ = method.GetType()
 		return
 	}
-	if blueprint, b := ToClassBluePrintType(value.GetType()); b {
+	if blueprint, b := ToBluePrintType(value.GetType()); b {
 		if method := blueprint.GetStaticMethod(key.String()); !utils.IsNil(method) {
 			ret.typ = method.GetType()
 			return
@@ -252,11 +252,11 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 	default:
 	}
 	//保底操作，从val-member中获取
-	if member, exist := value.GetMember(key); exist {
+	if member, exist := GetLatestMemberByKey(value, key); exist {
 		ret.typ = member.GetType()
 		return
 	}
-	member, exist := value.GetStringMember(key.String())
+	member, exist := GetLatestMemberByKeyString(value, key.String())
 	if exist {
 		ret.typ = member.GetType()
 		return
@@ -273,7 +273,12 @@ func setMemberVerboseName(member Value) {
 	if !member.IsMember() {
 		return
 	}
-	text := getMemberVerboseName(member.GetObject(), member.GetKey())
+	obj := GetLatestObject(member)
+	key := GetLatestKey(member)
+	if utils.IsNil(obj) || utils.IsNil(key) {
+		return
+	}
+	text := getMemberVerboseName(obj, key)
 	member.SetVerboseName(text)
 }
 

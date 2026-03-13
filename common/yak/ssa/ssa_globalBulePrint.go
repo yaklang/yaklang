@@ -32,7 +32,7 @@ func (b *FunctionBuilder) AddGlobalVariable(name string, valueFunc func() Value)
 
 		scope := b.CurrentBlock.ScopeTable
 		for _, v := range scope.GetAllVariables() {
-			if object := v.GetValue().GetObject(); object != nil && object.GetId() == value.GetId() {
+			if object := GetLatestObject(v.GetValue()); object != nil && object.GetId() == value.GetId() {
 				variable := b.CreateMemberCallVariable(globalVarsContainer, b.EmitConstInstPlaceholder(v.GetName()))
 				b.AssignVariable(variable, v.GetValue())
 			}
@@ -40,7 +40,6 @@ func (b *FunctionBuilder) AddGlobalVariable(name string, valueFunc func() Value)
 		variable := b.CreateMemberCallVariable(globalVarsContainer, b.EmitConstInstPlaceholder(name))
 		b.AssignVariable(variable, value)
 	})
-
 }
 
 func (b *FunctionBuilder) CheckGlobalVariablePhi(l *Variable, r Value) bool {
@@ -56,13 +55,11 @@ func (b *FunctionBuilder) CheckGlobalVariablePhi(l *Variable, r Value) bool {
 		return false
 	}
 
-	for i, _ := range globalVarsContainer.GetAllMember() {
-		if i.String() == name {
-			globalVarsContainer.GetAllMember()[i] = r
-			return true
-		}
+	if _, ok := GetLatestMemberByKeyString(globalVarsContainer, name); !ok {
+		return false
 	}
-	return false
+	setMemberCallRelationship(globalVarsContainer, b.EmitConstInstPlaceholder(name), r)
+	return true
 }
 
 func (b *FunctionBuilder) GetGlobalVariables() map[string]Value {
@@ -78,8 +75,8 @@ func (b *FunctionBuilder) GetGlobalVariables() map[string]Value {
 		return variables
 	}
 
-	for i, m := range globalVarsContainer.GetAllMember() {
-		variables[i.String()] = m
+	for _, pair := range GetLastWinsMemberPairs(globalVarsContainer) {
+		variables[pair.Key.String()] = pair.Member
 	}
 	return variables
 }
@@ -106,9 +103,9 @@ func (b *FunctionBuilder) LoadGlobalVariable() {
 	}
 
 	globalVarsContainer := prog.GlobalVariablesBlueprint.Container()
-	for i, m := range globalVarsContainer.GetAllMember() {
-		variable := b.CreateVariableCross(i.String())
-		b.AssignVariable(variable, m)
+	for _, pair := range GetLastWinsMemberPairs(globalVarsContainer) {
+		variable := b.CreateVariableCross(pair.Key.String())
+		b.AssignVariable(variable, pair.Member)
 	}
 }
 
@@ -123,5 +120,5 @@ func (p *Program) GetGlobalVariable(name string) (Value, bool) {
 		return nil, false
 	}
 
-	return globalVarsContainer.GetStringMember(name)
+	return GetLatestMemberByKeyString(globalVarsContainer, name)
 }

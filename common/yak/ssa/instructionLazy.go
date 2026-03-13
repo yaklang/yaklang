@@ -620,44 +620,12 @@ func (lz *LazyInstruction) DeleteMember(v Value) {
 	lz.Value.DeleteMember(v)
 }
 
-func (lz *LazyInstruction) ForEachMember(fn func(Value, Value) bool) {
-	lz.check()
-	if utils.IsNil(lz.Value) {
-		return
-	}
-	lz.Value.ForEachMember(fn)
-}
-
-func (lz *LazyInstruction) GetAllMember() map[Value]Value {
-	lz.check()
-	if utils.IsNil(lz.Value) {
-		return nil
-	}
-	return lz.Value.GetAllMember()
-}
-
 func (lz *LazyInstruction) GetAllVariables() map[string]*Variable {
 	lz.check()
 	if utils.IsNil(lz.Value) {
 		return nil
 	}
 	return lz.Value.GetAllVariables()
-}
-
-func (lz *LazyInstruction) GetIndexMember(i int) (Value, bool) {
-	lz.check()
-	if utils.IsNil(lz.Value) {
-		return nil, false
-	}
-	return lz.Value.GetIndexMember(i)
-}
-
-func (lz *LazyInstruction) GetKey() Value {
-	lz.check()
-	if utils.IsNil(lz.Value) {
-		return nil
-	}
-	return lz.Value.GetKey()
 }
 
 func (lz *LazyInstruction) GetLastVariable() *Variable {
@@ -674,30 +642,6 @@ func (lz *LazyInstruction) GetMask() []Value {
 		return nil
 	}
 	return lz.Value.GetMask()
-}
-
-func (lz *LazyInstruction) GetMember(v Value) (Value, bool) {
-	lz.check()
-	if utils.IsNil(lz.Value) {
-		return nil, false
-	}
-	return lz.Value.GetMember(v)
-}
-
-func (lz *LazyInstruction) GetObject() Value {
-	lz.check()
-	if utils.IsNil(lz.Value) {
-		return nil
-	}
-	return lz.Value.GetObject()
-}
-
-func (lz *LazyInstruction) GetStringMember(n string) (Value, bool) {
-	lz.check()
-	if utils.IsNil(lz.Value) {
-		return nil, false
-	}
-	return lz.Value.GetStringMember(n)
 }
 
 func (lz *LazyInstruction) GetMemberPairs() []MemberPair {
@@ -795,22 +739,6 @@ func (lz *LazyInstruction) NewError(e ErrorKind, t ErrorTag, msg string) {
 		return
 	}
 	lz.Value.NewError(e, t, msg)
-}
-
-func (lz *LazyInstruction) SetKey(v Value) {
-	lz.check()
-	if utils.IsNil(lz.Value) {
-		return
-	}
-	lz.Value.SetKey(v)
-}
-
-func (lz *LazyInstruction) SetObject(v Value) {
-	lz.check()
-	if utils.IsNil(lz.Value) {
-		return
-	}
-	lz.Value.SetObject(v)
 }
 
 func (lz *LazyInstruction) SetType(t Type) {

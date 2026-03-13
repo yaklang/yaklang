@@ -126,32 +126,18 @@ type Typed interface {
 }
 
 type MemberCall interface {
-	// object  member caller
+	// object member caller
 	IsObject() bool
 	AddMember(Value, Value)
-	GetMember(Value) (Value, bool)
-	GetIndexMember(int) (Value, bool)
-	GetStringMember(string) (Value, bool)
-	SetStringMember(string, Value)
-	DeleteMember( /*key*/ Value)   // delete by key
-	GetAllMember() map[Value]Value // compatibility last-wins view
-	ForEachMember(func(k Value, v Value) bool)
+	DeleteMember(Value)
 	GetMemberPairs() []MemberPair
 	GetMembersByExactKey(Value) []Value
 	GetMembersByKeyString(string) []Value
 
-	// ReplaceMember( /* key */ Value /* value */, Value) // replace old-value with new-value
-
-	// member, member callee
+	// member owner pairs
 	IsMember() bool
-	SetObject(Value)
-	SetKey(Value)
-	GetKey() Value
-	GetObject() Value
 	AddObjectKeyPair(Value, Value)
 	GetObjectKeyPairs() []ObjectKeyPair
-
-	// ReplaceObject(Value) // replace old-object to new-object
 }
 
 type AssignAble interface {
@@ -645,9 +631,6 @@ type ExternLib struct {
 
 	table   map[string]any
 	builder *FunctionBuilder
-
-	MemberMap map[string]int64 // value
-	Member    []int64          // value
 }
 
 var (

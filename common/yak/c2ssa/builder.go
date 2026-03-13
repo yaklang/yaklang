@@ -202,8 +202,8 @@ func (b *astbuilder) GetGlobalVariables() map[string]ssa.Value {
 		return variables
 	}
 
-	for i, m := range globalVarsContainer.GetAllMember() {
-		variables[i.String()] = m
+	for _, pair := range ssa.GetLastWinsMemberPairs(globalVarsContainer) {
+		variables[ssa.GetKeyString(pair.Key)] = pair.Member
 	}
 	return variables
 }

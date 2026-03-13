@@ -313,8 +313,8 @@ func (b *astbuilder) handleImportPackage() {
 
 		if importp, _ := b.GetImportPackageUser(id); importp != nil {
 			for n, g := range importp.ExportValue {
-				ex.Member = append(ex.Member, g.GetId())
-				ex.MemberMap[n] = g.GetId()
+				ssa.AddObjectKeyPair(g, ex, b.EmitConstInst(n))
+				ex.AddMember(b.EmitConstInst(n), g)
 			}
 		}
 

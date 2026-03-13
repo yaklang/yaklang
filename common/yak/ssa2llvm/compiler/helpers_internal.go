@@ -37,8 +37,8 @@ func (c *Compiler) resolveValueName(fn *ssa.Function, val ssa.Value) string {
 		}
 	}
 	if mc, ok := val.(ssa.MemberCall); ok && mc.IsMember() {
-		objName := c.resolveMemberObjectName(fn, mc.GetObject())
-		keyName := c.resolveMemberKeyString(mc.GetKey())
+		objName := c.resolveMemberObjectName(fn, ssa.GetLatestObject(val))
+		keyName := c.resolveMemberKeyString(ssa.GetLatestKey(val))
 		switch {
 		case objName != "" && keyName != "":
 			return objName + "." + keyName

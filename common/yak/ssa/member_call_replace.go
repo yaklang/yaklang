@@ -40,16 +40,27 @@ func ReplaceMemberCall(old, replacement Value) map[string]Value {
 			if utils.IsNil(root) || utils.IsNil(targetObj) {
 				return
 			}
-			if currentObj := root.GetObject(); !utils.IsNil(currentObj) && currentObj.GetId() != target.GetId() && currentObj.GetId() != holder.GetId() {
-				// 已指向有效对象，无需修改
+			pairs := GetObjectKeyPairs(root)
+			if len(pairs) == 0 {
+				root.AddObjectKeyPair(targetObj, pickMemberKey(root, rootKey))
 				return
 			}
-			root.SetObject(targetObj)
-			if root.IsMember() {
-				currentKey := root.GetKey()
-				if utils.IsNil(currentKey) || currentKey.GetId() == target.GetId() || currentKey.GetId() == holder.GetId() {
-					root.SetKey(pickMemberKey(root, rootKey))
+			updated := make([]ObjectKeyPair, 0, len(pairs))
+			changed := false
+			for _, pair := range pairs {
+				if !utils.IsNil(pair.Object) && pair.Object.GetId() != target.GetId() && pair.Object.GetId() != holder.GetId() {
+					updated = append(updated, pair)
+					continue
 				}
+				key := pair.Key
+				if utils.IsNil(key) || key.GetId() == target.GetId() || key.GetId() == holder.GetId() {
+					key = pickMemberKey(root, rootKey)
+				}
+				updated = append(updated, ObjectKeyPair{Object: targetObj, Key: key})
+				changed = true
+			}
+			if changed {
+				SetObjectKeyPairs(root, updated)
 			}
 		}
 
@@ -59,8 +70,8 @@ func ReplaceMemberCall(old, replacement Value) map[string]Value {
 				return
 			}
 
-			trueKey := member.GetKey()
-			if _, ok := container.GetMember(key); ok {
+			trueKey := GetLatestKey(member)
+			if _, ok := GetLatestMemberByKey(container, key); ok {
 				container.DeleteMember(key)
 			}
 
@@ -94,7 +105,7 @@ func ReplaceMemberCall(old, replacement Value) map[string]Value {
 				toMember = builder.ReadMemberCallValue(replacement, key)
 			}
 
-			if utils.IsNil(toMember.GetObject()) || toMember.GetObject().GetId() == target.GetId() || toMember.GetObject().GetId() == holder.GetId() {
+			if toMemberObj := GetLatestObject(toMember); utils.IsNil(toMemberObj) || toMemberObj.GetId() == target.GetId() || toMemberObj.GetId() == holder.GetId() {
 				fixBranch(toMember, replacement, key)
 			}
 
@@ -129,7 +140,7 @@ func ReplaceMemberCall(old, replacement Value) map[string]Value {
 
 			// 处理 IsMember 情况：如果 member 是成员访问，需要递归处理其 object
 			if !shouldRecurse && member.IsMember() && !utils.IsNil(toMember) {
-				memberObj := member.GetObject()
+				memberObj := GetLatestObject(member)
 				if !utils.IsNil(memberObj) && memberObj.IsObject() {
 					memberObjID := memberObj.GetId()
 					if memberObjID == target.GetId() {
@@ -138,7 +149,7 @@ func ReplaceMemberCall(old, replacement Value) map[string]Value {
 						toMemberForRecursion = replacement
 						shouldRecurse = true
 					} else {
-						toMemberObj := toMember.GetObject()
+						toMemberObj := GetLatestObject(toMember)
 						if !utils.IsNil(toMemberObj) && toMemberObj.IsObject() && memberObjID != toMemberObj.GetId() {
 							_, memberObjVisited := visited[memberObjID]
 							_, toMemberObjVisited := visited[toMemberObj.GetId()]
@@ -208,7 +219,7 @@ func ReplaceMemberCall(old, replacement Value) map[string]Value {
 
 func pickMemberKey(member, fallback Value) Value {
 	if !utils.IsNil(member) {
-		if k := member.GetKey(); !utils.IsNil(k) {
+		if k := GetLatestKey(member); !utils.IsNil(k) {
 			return k
 		}
 	}

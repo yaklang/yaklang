@@ -62,16 +62,13 @@ func TryGetSimilarityKey(table []string, name string) string {
 }
 
 func (ex *ExternLib) BuildField(key string) Value {
-	if id, ok := ex.MemberMap[key]; ok {
-		if value, ok := ex.GetValueById(id); ok {
-			return value
-		}
+	if value, ok := GetLatestMemberByKeyString(ex, key); ok {
+		return value
 	}
 	b := ex.builder
 	if v, ok := ex.table[key]; ok {
 		v := b.BuildValueFromAny(ex.GetName()+"."+key, v)
-		ex.MemberMap[key] = v.GetId()
-		ex.Member = append(ex.Member, v.GetId())
+		setMemberCallRelationship(ex, b.EmitConstInstPlaceholder(key), v)
 		return v
 	}
 	return nil
@@ -127,10 +124,8 @@ func (b *FunctionBuilder) TryBuildExternLibValue(extern *ExternLib, key Value) V
 	if phiIns, ok := ToPhi(key); ok {
 		if ret := b.tryBuildExternFieldForPhi(extern, phiIns, make(map[int64]struct{})); ret != nil {
 			return ret
-		} else {
-			if m, ok := extern.GetMember(key); ok {
-				return m
-			}
+		} else if m, ok := GetLatestMemberByKey(extern, key); ok {
+			return m
 		}
 	} else {
 		want := b.TryGetSimilarityKey(extern.GetName(), key.String())

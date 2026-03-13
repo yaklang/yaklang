@@ -14,7 +14,9 @@ func ParseClassBluePrint(this Value, objectTyp *ObjectType) (ret Type) {
 	}
 	blue := NewBlueprint(objectTyp.Name)
 
-	for key, member := range this.GetAllMember() {
+	for _, pair := range GetLastWinsMemberPairs(this) {
+		key := pair.Key
+		member := pair.Member
 		// if not function , just append this field to normal field
 		typ := member.GetType()
 		if typ.GetTypeKind() != FunctionTypeKind {

@@ -235,9 +235,9 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 				// todo: 只有指针才会复用object，目前默认非指针
 				if m, ok := kvs[0].value.(*ssa.Make); ok {
 					var mkeys, mmembers []ssa.Value
-					for k, m := range m.GetAllMember() {
-						mkeys = append(mkeys, k)
-						mmembers = append(mmembers, m)
+					for _, pair := range ssa.GetLastWinsMemberPairs(m) {
+						mkeys = append(mkeys, pair.Key)
+						mmembers = append(mmembers, pair.Member)
 					}
 					newObject := b.InterfaceAddFieldBuild(len(mkeys),
 						func(i int) ssa.Value {
@@ -314,8 +314,8 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 		// 非指针匿名结构体，需要创建对象
 		for n, a := range o.AnonymousField {
 			isFind := false
-			for k, _ := range rvalue.GetAllMember() {
-				if k.String() == n {
+			for _, pair := range ssa.GetLastWinsMemberPairs(rvalue) {
+				if ssa.GetKeyString(pair.Key) == n {
 					isFind = true
 					break
 				}

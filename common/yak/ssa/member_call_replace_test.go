@@ -30,16 +30,20 @@ func TestReplaceMemberCallRebindsMemberObject(t *testing.T) {
 	key := builder.EmitConstInst("field")
 
 	setMemberCallRelationship(holder, key, member)
-	require.Equal(t, holder.GetId(), member.GetObject().GetId(), "precondition: member should belong to holder")
+	owner, ok := GetLatestObjectKeyPair(member)
+	require.True(t, ok, "precondition: member should belong to holder")
+	require.Equal(t, holder.GetId(), owner.Object.GetId(), "precondition: member should belong to holder")
 
 	expectedName := checkCanMemberCallExist(replacement, key).name
 	result := ReplaceMemberCall(holder, replacement)
 
 	require.Contains(t, result, expectedName, "returned mapping should include updated member name")
 	updated := result[expectedName]
-	require.Equal(t, replacement.GetId(), updated.GetObject().GetId(), "updated member should point to replacement object")
+	updatedOwner, ok := GetLatestObjectKeyPair(updated)
+	require.True(t, ok)
+	require.Equal(t, replacement.GetId(), updatedOwner.Object.GetId(), "updated member should point to replacement object")
 
-	got, ok := replacement.GetMember(key)
+	got, ok := GetLatestMemberByKey(replacement, key)
 	require.True(t, ok, "replacement should expose member for key")
 	require.Equal(t, updated.GetId(), got.GetId(), "member relationship should persist after replacement")
 }
@@ -63,18 +67,22 @@ func TestReplaceMemberCallPropagatesNestedMembers(t *testing.T) {
 	parentName := checkCanMemberCallExist(replacement, parentKey).name
 	require.Contains(t, result, parentName)
 	parentUpdated := result[parentName]
-	require.Equal(t, replacement.GetId(), parentUpdated.GetObject().GetId())
+	parentOwner, ok := GetLatestObjectKeyPair(parentUpdated)
+	require.True(t, ok)
+	require.Equal(t, replacement.GetId(), parentOwner.Object.GetId())
 
 	childName := checkCanMemberCallExist(parentUpdated, childKey).name
 	require.Contains(t, result, childName)
 	childUpdated := result[childName]
-	require.Equal(t, parentUpdated.GetId(), childUpdated.GetObject().GetId())
+	childOwner, ok := GetLatestObjectKeyPair(childUpdated)
+	require.True(t, ok)
+	require.Equal(t, parentUpdated.GetId(), childOwner.Object.GetId())
 
-	parentValue, ok := replacement.GetMember(parentKey)
+	parentValue, ok := GetLatestMemberByKey(replacement, parentKey)
 	require.True(t, ok)
 	require.Equal(t, parentUpdated.GetId(), parentValue.GetId())
 
-	childValue, ok := parentValue.GetMember(childKey)
+	childValue, ok := GetLatestMemberByKey(parentValue, childKey)
 	require.True(t, ok)
 	require.Equal(t, childUpdated.GetId(), childValue.GetId())
 }
@@ -120,5 +128,7 @@ func TestReplaceMemberCallOnExternLib(t *testing.T) {
 	name := checkCanMemberCallExist(replacement, key).name
 	require.Contains(t, result, name)
 	updated := result[name]
-	require.Equal(t, replacement.GetId(), updated.GetObject().GetId())
+	updatedOwner, ok := GetLatestObjectKeyPair(updated)
+	require.True(t, ok)
+	require.Equal(t, replacement.GetId(), updatedOwner.Object.GetId())
 }
