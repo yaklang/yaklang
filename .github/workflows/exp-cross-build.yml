@@ -633,6 +633,7 @@ jobs:
           } >> $GITHUB_OUTPUT
 
       - name: Publish Release INFO
+        if: false  # temporarily disabled: AI release note generation (chatglm extractjson failure)
         continue-on-error: true
         run: |
           # 定义文件路径
