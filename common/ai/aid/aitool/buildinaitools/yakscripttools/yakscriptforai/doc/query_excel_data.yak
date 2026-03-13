@@ -1,4 +1,4 @@
-__DESC__ = "Excel data query tool with support for column selection, row filtering, sorting, aggregation (count/sum/avg/min/max), and pagination. Reads Excel files natively without external dependencies like pandas. Ideal for data analysis, transaction investigation, and structured data extraction from spreadsheets."
+__DESC__ = "Excel data query tool for SIMPLE one-off lookups: column selection, row filtering, sorting, single aggregation, pagination. PERFORMANCE WARNING: Each call re-parses the entire file (30+ seconds for large files). For multi-step analysis requiring 2+ queries on the same file, strongly prefer using bash tool to write a Python pandas script instead - it reads the file once and runs all computations in-memory, which is 10x faster for batch analysis."
 __VERBOSE_NAME__ = "Excel Data Query"
 __KEYWORDS__ = "excel query,data filter,sort,aggregate,sum,count,avg,group by,xlsx,spreadsheet,data analysis,column select,pagination,excel search,transaction analysis,financial data,excel read"
 
@@ -7,6 +7,53 @@ Excel Data Query Tool - Parameter Description for JSON Tool Calls
 
 Queries Excel data with filtering, sorting, aggregation, and pagination.
 Use read_excel_info first to understand the data schema.
+
+## CRITICAL: Performance & Tool Selection Guide
+
+Each call to this tool re-parses the ENTIRE Excel file from disk.
+For a 40MB file, parsing alone takes ~30 seconds per call.
+
+### When to use this tool (GOOD):
+- Single one-off query: quick filter, lookup specific rows, verify data
+- Simple aggregation: one group-by with one metric
+- You only need 1-2 calls total on this file
+
+### When NOT to use this tool (use Python via bash instead):
+- You need 3+ different statistics from the same file
+  (e.g., count by type AND sum by type AND yearly trend AND top-10 etc.)
+- You need derived field grouping (e.g., group by YEAR extracted from datetime)
+- You need cross-file joins or correlations (e.g., match transactions across 2 files)
+- You need complex analytics (percentiles, pivot tables, Union-Find clustering)
+- You need multi-dimensional aggregation in one pass
+
+### Recommended: Python script for batch analysis
+
+When you need comprehensive analysis, write ONE Python script via bash tool:
+
+```python
+import pandas as pd
+import json
+
+df = pd.read_excel('/path/to/data.xlsx')
+results = {}
+
+# Multiple aggregations in one pass (replaces 5+ query_excel_data calls)
+results['total_rows'] = len(df)
+results['by_type_count'] = df.groupby('Type')['Amount'].count().to_dict()
+results['by_type_sum'] = df.groupby('Type')['Amount'].sum().to_dict()
+results['by_year'] = df.groupby(df['Date'].dt.year)['Amount'].agg(['count','sum']).to_dict()
+results['top10_by_amount'] = df.nlargest(10, 'Amount')[['Name','Amount','Date']].to_dict('records')
+results['amount_max'] = float(df['Amount'].max())
+results['amount_min'] = float(df['Amount'].min())
+results['amount_mean'] = float(df['Amount'].mean())
+
+print(json.dumps(results, ensure_ascii=False, indent=2, default=str))
+```
+
+This reads the file ONCE (~30s) and computes EVERYTHING in-memory (milliseconds).
+Compared to 7 separate query_excel_data calls (7x30s = 210s), this saves ~180 seconds.
+
+## Parameters
 
 Required Parameters:
   input           (string)  Path to the Excel file (.xls or .xlsx).
@@ -37,7 +84,7 @@ Optional Parameters:
 
 Examples:
 
-1. Basic query with filter:
+1. Basic query with filter (GOOD - single query):
 ```json
 {
   "@action": "call-tool",
@@ -53,7 +100,7 @@ Examples:
 }
 ```
 
-2. Aggregation query:
+2. Aggregation query (GOOD - single aggregation):
 ```json
 {
   "@action": "call-tool",
@@ -69,6 +116,10 @@ Examples:
   }
 }
 ```
+
+3. BAD PRACTICE - DO NOT DO THIS:
+   Calling this tool 5+ times on the same large file for different aggregations.
+   Each call re-parses the file (~30s each). Write ONE Python script via bash instead.
 USAGE_BLOCK
 
 yakit.AutoInitYakit()
@@ -685,4 +736,17 @@ if outputFile != "" {
     yakit.Info(resultBuf)
 }
 
-yakit.Info("Query completed: %v rows returned", len(filteredRows))
+totalDataRows := len(rows)
+if targetTable.Metadata != nil {
+    v := targetTable.Metadata["total_data_rows"]
+    if v != "" {
+        totalDataRows = parseInt(v)
+    }
+}
+
+if totalDataRows > 500 {
+    yakit.Info("Query completed: %v rows returned (source: %v total data rows)", len(filteredRows), totalDataRows)
+    yakit.Info("[PERFORMANCE NOTICE] This file has %v rows. Each query_excel_data call re-parses the entire file from disk (~30s for large files). If you need additional statistics from this same file, DO NOT call this tool again. Instead, use the bash tool to write and execute a Python script with pandas, which reads the file once and computes all metrics in-memory. Example: python3 -c \"import pandas as pd; import json; df = pd.read_excel('%v'); results = {'count': len(df), 'stats': df.describe().to_dict()}; print(json.dumps(results, default=str, ensure_ascii=False))\"", totalDataRows, inputFile)
+} else {
+    yakit.Info("Query completed: %v rows returned", len(filteredRows))
+}
