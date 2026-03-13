@@ -101,6 +101,29 @@ func (s *Server) DeleteAISession(ctx context.Context, req *ypb.DeleteAISessionRe
 		filter = &ypb.DeleteAISessionFilter{}
 	}
 
+	if req.GetDeleteAll() {
+		deletedSessions, deletedRuntimes, deletedEvents, deletedPlanExec, err := yakit.DeleteAllAISessionData(
+			s.GetProfileDatabase(),
+			s.GetProjectDatabase(),
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		return &ypb.DbOperateMessage{
+			TableName:  (&schema.AISession{}).TableName(),
+			Operation:  "delete",
+			EffectRows: deletedRuntimes + deletedEvents,
+			ExtraMessage: fmt.Sprintf(
+				"delete_all=true deleted_sessions=%d deleted_runtimes=%d deleted_events=%d deleted_plan_exec=%d",
+				deletedSessions,
+				deletedRuntimes,
+				deletedEvents,
+				deletedPlanExec,
+			),
+		}, nil
+	}
+
 	targetSessionIDs, err := yakit.QueryAISessionIDsForDelete(s.GetProjectDatabase(), filter, req.GetDeleteAll())
 	if err != nil {
 		return nil, err

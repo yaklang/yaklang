@@ -142,21 +142,30 @@ func QueryAIEventIDByProcessID(db *gorm.DB, processID string) ([]string, error) 
 	return eventIDs, nil
 }
 
-// DeleteAllAIEvent deletes all AI events from the database
+// DeleteAllAIEvent deletes all AI events from the database.
 func DeleteAllAIEvent(db *gorm.DB) error {
-	return utils.GormTransaction(db, func(tx *gorm.DB) error {
-		// First, delete all associations
-		if err := tx.Model(&schema.AiProcessAndAiEvent{}).Delete(&schema.AiProcessAndAiEvent{}).Error; err != nil {
-			log.Errorf("delete AI event associations failed: %v", err)
-			return err
-		}
-		// Then, delete all events
-		if err := tx.Model(&schema.AiOutputEvent{}).Unscoped().Delete(&schema.AiOutputEvent{}).Error; err != nil {
-			log.Errorf("delete all AI events failed: %v", err)
-			return err
-		}
-		return nil
-	})
+	_, err := DeleteAllAIEventWithCount(db)
+	return err
+}
+
+// DeleteAllAIEventWithCount deletes all AI events and returns deleted event count.
+func DeleteAllAIEventWithCount(db *gorm.DB) (int64, error) {
+	if db == nil {
+		return 0, utils.Errorf("database is nil")
+	}
+	deletedEvents, err := countRowsIgnoreMissingTable(db, &schema.AiOutputEvent{})
+	if err != nil {
+		return 0, err
+	}
+	if err := schema.DropRecreateTable(db, &schema.AiProcessAndAiEvent{}); err != nil {
+		log.Errorf("drop & recreate AI event associations failed: %v", err)
+		return deletedEvents, err
+	}
+	if err := schema.DropRecreateTable(db, &schema.AiOutputEvent{}); err != nil {
+		log.Errorf("drop & recreate AI events failed: %v", err)
+		return deletedEvents, err
+	}
+	return deletedEvents, nil
 }
 
 // DeleteAIEventBySessionID deletes AI events under a session and their process associations.

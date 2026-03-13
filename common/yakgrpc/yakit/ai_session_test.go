@@ -60,6 +60,75 @@ func TestDeleteAISession_DeletesRuntimeAndEvents(t *testing.T) {
 	require.Equal(t, int64(1), assocCount)
 }
 
+func TestDeleteAllAISessionData(t *testing.T) {
+	projectDB, err := utils.CreateTempTestDatabaseInMemory()
+	require.NoError(t, err)
+	profileDB, err := utils.CreateTempTestDatabaseInMemory()
+	require.NoError(t, err)
+
+	require.NoError(t, projectDB.AutoMigrate(
+		&schema.AISession{},
+		&schema.AiOutputEvent{},
+		&schema.AiProcessAndAiEvent{},
+		&schema.AISessionPlanAndExec{},
+	).Error)
+	require.NoError(t, profileDB.AutoMigrate(&schema.AIAgentRuntime{}).Error)
+
+	sessionA := "sess-" + uuid.NewString()
+	sessionB := "sess-" + uuid.NewString()
+
+	_, err = CreateOrUpdateAISessionMeta(projectDB, sessionA, "title-a")
+	require.NoError(t, err)
+	_, err = CreateOrUpdateAISessionMeta(projectDB, sessionB, "title-b")
+	require.NoError(t, err)
+
+	require.NoError(t, projectDB.Create(&schema.AISessionPlanAndExec{
+		SessionID:     sessionA,
+		CoordinatorID: "coord-a",
+		TaskTree:      "{}",
+		TaskProgress:  "{}",
+	}).Error)
+	require.NoError(t, projectDB.Create(&schema.AISessionPlanAndExec{
+		SessionID:     sessionB,
+		CoordinatorID: "coord-b",
+		TaskTree:      "{}",
+		TaskProgress:  "{}",
+	}).Error)
+
+	require.NoError(t, profileDB.Create(&schema.AIAgentRuntime{Uuid: uuid.NewString(), PersistentSession: sessionA, Name: "a1"}).Error)
+	require.NoError(t, profileDB.Create(&schema.AIAgentRuntime{Uuid: uuid.NewString(), PersistentSession: sessionA, Name: "a2"}).Error)
+	require.NoError(t, profileDB.Create(&schema.AIAgentRuntime{Uuid: uuid.NewString(), PersistentSession: sessionB, Name: "b1"}).Error)
+
+	e1 := uuid.NewString()
+	e2 := uuid.NewString()
+	e3 := uuid.NewString()
+	require.NoError(t, projectDB.Create(&schema.AiOutputEvent{EventUUID: e1, SessionId: sessionA}).Error)
+	require.NoError(t, projectDB.Create(&schema.AiOutputEvent{EventUUID: e2, SessionId: sessionA}).Error)
+	require.NoError(t, projectDB.Create(&schema.AiOutputEvent{EventUUID: e3, SessionId: sessionB}).Error)
+	require.NoError(t, projectDB.Create(&schema.AiProcessAndAiEvent{ProcessesId: "p1", EventId: e1}).Error)
+	require.NoError(t, projectDB.Create(&schema.AiProcessAndAiEvent{ProcessesId: "p2", EventId: e2}).Error)
+	require.NoError(t, projectDB.Create(&schema.AiProcessAndAiEvent{ProcessesId: "p3", EventId: e3}).Error)
+
+	deletedSessions, deletedRuntimes, deletedEvents, deletedPlanExec, err := DeleteAllAISessionData(profileDB, projectDB)
+	require.NoError(t, err)
+	require.Equal(t, int64(2), deletedSessions)
+	require.Equal(t, int64(3), deletedRuntimes)
+	require.Equal(t, int64(3), deletedEvents)
+	require.Equal(t, int64(2), deletedPlanExec)
+
+	var count int64
+	require.NoError(t, profileDB.Model(&schema.AIAgentRuntime{}).Count(&count).Error)
+	require.Equal(t, int64(0), count)
+	require.NoError(t, projectDB.Model(&schema.AiOutputEvent{}).Count(&count).Error)
+	require.Equal(t, int64(0), count)
+	require.NoError(t, projectDB.Model(&schema.AiProcessAndAiEvent{}).Count(&count).Error)
+	require.Equal(t, int64(0), count)
+	require.NoError(t, projectDB.Model(&schema.AISession{}).Count(&count).Error)
+	require.Equal(t, int64(0), count)
+	require.NoError(t, projectDB.Model(&schema.AISessionPlanAndExec{}).Count(&count).Error)
+	require.Equal(t, int64(0), count)
+}
+
 func TestQueryAISessionIDsForDelete_ByAfterTimestamp(t *testing.T) {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)

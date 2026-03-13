@@ -169,6 +169,20 @@ func DeleteAISessionMetaBySessionID(db *gorm.DB, sessionID string) (int64, error
 	return result.RowsAffected, result.Error
 }
 
+func DeleteAllAISessionMeta(db *gorm.DB) (int64, error) {
+	if db == nil {
+		return 0, utils.Errorf("database is nil")
+	}
+	deletedSessions, err := countRowsIgnoreMissingTable(db, &schema.AISession{})
+	if err != nil {
+		return 0, err
+	}
+	if err := schema.DropRecreateTable(db, &schema.AISession{}); err != nil {
+		return deletedSessions, err
+	}
+	return deletedSessions, nil
+}
+
 // MigrateAISessionMetaFromEvents migrates session titles from ai_output_events to ai_sessions_v1.
 // It is idempotent and guarded by a migration flag in profile DB via SetKey/GetKey.
 func MigrateAISessionMetaFromEvents(profileDB, projectDB *gorm.DB) error {
