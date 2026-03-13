@@ -292,6 +292,10 @@ func MergeValues(groups ...Values) Values {
 	if len(groups) == 0 {
 		return NewEmptyValues()
 	}
+	type provenanceMerger interface {
+		MergeProvenanceFrom(ValueOperator)
+	}
+
 	result := make(Values, 0)
 	indexByKey := make(map[string]int)
 	for _, group := range groups {
@@ -301,6 +305,9 @@ func MergeValues(groups ...Values) Values {
 			}
 			key := valueCollectionKey(value)
 			if idx, ok := indexByKey[key]; ok {
+				if merger, ok := result[idx].(provenanceMerger); ok {
+					merger.MergeProvenanceFrom(value)
+				}
 				MergeAnchor(value, result[idx])
 				continue
 			}

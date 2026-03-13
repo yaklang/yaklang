@@ -35,6 +35,34 @@ func (v *Value) ShouldUseConditionCandidate() bool {
 	return false
 }
 
+func (v *Value) MergeProvenanceFrom(source sfvm.ValueOperator) {
+	if v == nil || utils.IsNil(source) {
+		return
+	}
+	other, ok := source.(*Value)
+	if !ok || other == nil {
+		return
+	}
+
+	for _, pred := range other.Predecessors {
+		v.Predecessors = utils.AppendSliceItemWhenNotExists(v.Predecessors, pred)
+	}
+	if other.EffectOn != nil {
+		other.EffectOn.ForEach(func(_ string, effect *Value) bool {
+			effect.RemoveDependOn(other)
+			v.AppendEffectOn(effect)
+			return true
+		})
+	}
+	if other.DependOn != nil {
+		other.DependOn.ForEach(func(_ string, depend *Value) bool {
+			depend.RemoveEffectOn(other)
+			v.AppendDependOn(depend)
+			return true
+		})
+	}
+}
+
 func (v *Value) GetOpcode() string {
 	return v.getOpcode().String()
 }
@@ -161,6 +189,7 @@ func (v *Value) GetCallActualParams(start int, contain bool) (sfvm.Values, error
 		ret.AppendPredecessor(v, sfvm.WithAnalysisContext_Label(
 			fmt.Sprintf("actual-args[%d](containRest:%v)", start, contain),
 		))
+		sfvm.MergeAnchor(v, ret)
 		rets = append(rets, ret)
 	}
 	add := func(param []int64) {

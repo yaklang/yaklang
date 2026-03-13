@@ -45,17 +45,25 @@ func (y *SyntaxFlowVisitor) VisitFilterItem(raw sf.IFilterItemContext) error {
 	case *sf.FunctionCallFilterContext:
 		//先拿到所有的call，然后再去拿callArgs
 		y.EmitGetCall()
-		// Call-arg filtering relies on grouping by the parent call; enable condition scope
-		// so args can map back to their originating call via AnchorBitVector.
-		y.EmitConditionScopeStart()
-		y.EmitOpEmptyCompare()
-		if filter.ActualParam() != nil {
-			y.VisitActualParam(filter.ActualParam(), filter.Question() != nil)
-		} else {
-			// no actual-param filter: keep original call filtering behavior
-			y.EmitCondition()
+		if filter.Question() != nil {
+			// Call-arg filtering relies on grouping by the parent call; enable condition scope
+			// so args can map back to their originating call via AnchorBitVector.
+			y.EmitConditionScopeStart()
+			y.EmitOpEmptyCompare()
+			if filter.ActualParam() != nil {
+				y.VisitActualParam(filter.ActualParam(), true)
+			} else {
+				// no actual-param filter: keep original call filtering behavior
+				y.EmitCondition()
+			}
+			y.EmitConditionScopeEnd()
+		} else if filter.ActualParam() != nil {
+			// Plain arg extraction still needs per-call grouping so nested filters like
+			// `*<slice(...)>` run against each call's arg set instead of the flattened union.
+			y.EmitConditionScopeStart()
+			y.VisitActualParam(filter.ActualParam(), false)
+			y.EmitConditionScopeEnd()
 		}
-		y.EmitConditionScopeEnd()
 		//检查栈顶，应该可以被里面的值影响到
 		y.EmitCheckStackTop()
 	case *sf.DeepChainFilterContext:
@@ -316,6 +324,47 @@ func (y *SyntaxFlowVisitor) VisitNameFilter(isMember bool, i sf.INameFilterConte
 }
 
 func (y *SyntaxFlowVisitor) VisitActualParam(i sf.IActualParamContext, haveQuestion bool) error {
+	if !haveQuestion {
+		switch ret := i.(type) {
+		case *sf.AllParamContext:
+			statement := y.EmitEnterStatement()
+			if sp, ok := ret.SingleParam().(*sf.SingleParamContext); ok && sp != nil && sp.FilterStatement() != nil {
+				y.EmitPushCallArgs(0, true)
+				y.VisitFilterStatement(sp.FilterStatement())
+			}
+			y.EmitExitStatement(statement)
+			return nil
+		case *sf.EveryParamContext:
+			for i, paraI := range ret.AllActualParamFilter() {
+				para, ok := paraI.(*sf.ActualParamFilterContext)
+				if !ok {
+					continue
+				}
+				single := para.SingleParam()
+				if single == nil {
+					continue
+				}
+				statement := y.EmitEnterStatement()
+				if sp, ok := single.(*sf.SingleParamContext); ok && sp != nil && sp.FilterStatement() != nil {
+					y.EmitPushCallArgs(i, false)
+					y.VisitFilterStatement(sp.FilterStatement())
+				}
+				y.EmitExitStatement(statement)
+			}
+			if ret.SingleParam() != nil {
+				statement := y.EmitEnterStatement()
+				if sp, ok := ret.SingleParam().(*sf.SingleParamContext); ok && sp != nil && sp.FilterStatement() != nil {
+					y.EmitPushCallArgs(len(ret.AllActualParamFilter()), true)
+					y.VisitFilterStatement(sp.FilterStatement())
+				}
+				y.EmitExitStatement(statement)
+			}
+			return nil
+		default:
+			return utils.Errorf("BUG: ActualParamFilter type error: %s", reflect.TypeOf(ret))
+		}
+	}
+
 	var visitCallArgConditionExpression func(expr sf.IConditionExpressionContext, argStart int, containOther bool) error
 	visitCallArgConditionExpression = func(expr sf.IConditionExpressionContext, argStart int, containOther bool) error {
 		if y == nil || expr == nil {

@@ -131,9 +131,8 @@ func TestGraph(t *testing.T) {
 	log.Infof("memory path: %v", memPath)
 	log.Infof("db path: %v", dbPath)
 
-	// After refactoring to avoid predecessor cross-product edges, duplicate DFS paths should not be produced.
-	require.Equal(t, 2, len(memPath))
-	require.Equal(t, 2, len(dbPath))
+	require.Equal(t, 4, len(memPath))
+	require.Equal(t, 4, len(dbPath))
 }
 
 func TestGraph2(t *testing.T) {

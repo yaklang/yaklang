@@ -367,6 +367,12 @@ func extendOverlayWithNewLayer(baseOverlay *ProgramOverLay, newLayerProgram *Pro
 		}
 	}
 
+	// 复用 baseOverlay 的 FileToLayerMap，然后添加新的 layer 的文件映射
+	baseOverlay.FileToLayerMap.ForEach(func(normalizedPath string, layerIdx int) bool {
+		overlay.FileToLayerMap.Set(normalizedPath, layerIdx)
+		return true
+	})
+
 	newLayerProgram.ForEachAllFile(func(filePath string, me *memedit.MemEditor) bool {
 		if filePath == "" {
 			return true
@@ -388,12 +394,6 @@ func extendOverlayWithNewLayer(baseOverlay *ProgramOverLay, newLayerProgram *Pro
 	})
 
 	overlay.Layers = append(overlay.Layers, newLayer)
-
-	// 复用 baseOverlay 的 FileToLayerMap，然后添加新的 layer 的文件映射
-	baseOverlay.FileToLayerMap.ForEach(func(normalizedPath string, layerIdx int) bool {
-		overlay.FileToLayerMap.Set(normalizedPath, layerIdx)
-		return true
-	})
 
 	// 复用 baseOverlay 的 AggregatedFS，避免重新调用 aggregateFileSystems()
 	// 这样可以避免访问 layer1 的 program，防止更新 layer1 的 updated_at
@@ -868,6 +868,30 @@ func (p *ProgramOverLay) IsOverridden(v *Value) bool {
 	return topLayerIndex > valueLayerIndex
 }
 
+func (p *ProgramOverLay) isVisibleValueInLayer(v *Value, layer *ProgramLayer, layerPosition int) bool {
+	if v == nil || p == nil || layer == nil || layer.Program == nil {
+		return false
+	}
+
+	filePath := p.getValueFilePath(v)
+	if filePath == "" {
+		return true
+	}
+
+	normalizedPath := removeProgramNamePrefix(filePath, layer.Program.GetProgramName())
+	normalizedPath = strings.TrimPrefix(normalizedPath, "/")
+	if p.isFileDeleted(normalizedPath, layerPosition) {
+		return false
+	}
+
+	topLayerIndex, exists := p.FileToLayerMap.Get(normalizedPath)
+	if exists && topLayerIndex != layer.LayerIndex {
+		return false
+	}
+
+	return true
+}
+
 // Ref 实现基于层的查找策略：从上层到下层，上层覆盖下层
 func (p *ProgramOverLay) Ref(name string) Values {
 	var result Values
@@ -875,60 +899,21 @@ func (p *ProgramOverLay) Ref(name string) Values {
 		return result
 	}
 
-	foundFiles := utils.NewSafeMap[struct{}]()
-	excludeFiles := make([]string, 0)
-
 	for i := len(p.Layers) - 1; i >= 0; i-- {
 		layer := p.Layers[i]
 		if layer == nil || layer.Program == nil {
 			continue
 		}
 
-		layerProgramName := layer.Program.GetProgramName()
-
 		var layerValues Values
-		if len(excludeFiles) > 0 {
-			layerValues = layer.Program.refWithExcludeFiles(name, excludeFiles)
-		} else {
-			layerValues = layer.Program.Ref(name)
-		}
-
-		currentLayerFoundFiles := make([]string, 0)
+		layerValues = layer.Program.Ref(name)
 
 		for _, v := range layerValues {
-			filePath := p.getValueFilePath(v)
-			if filePath == "" {
-				result = append(result, v)
+			if !p.isVisibleValueInLayer(v, layer, i) {
 				continue
 			}
-
-			normalizedPath := removeProgramNamePrefix(filePath, layerProgramName)
-			normalizedPath = strings.TrimPrefix(normalizedPath, "/")
-
-			if p.isFileDeleted(normalizedPath, i) {
-				continue
-			}
-
-			if foundFiles.Have(normalizedPath) {
-				continue
-			}
-
-			if layer.FileSet.Have(normalizedPath) {
-				foundFiles.Set(normalizedPath, struct{}{})
-				currentLayerFoundFiles = append(currentLayerFoundFiles, normalizedPath)
-				result = append(result, v)
-			} else {
-				actualLayerIndex, exists := p.FileToLayerMap.Get(normalizedPath)
-				if exists && actualLayerIndex > layer.LayerIndex {
-					continue
-				}
-				foundFiles.Set(normalizedPath, struct{}{})
-				currentLayerFoundFiles = append(currentLayerFoundFiles, normalizedPath)
-				result = append(result, v)
-			}
+			result = append(result, v)
 		}
-
-		excludeFiles = append(excludeFiles, currentLayerFoundFiles...)
 	}
 
 	return result
@@ -1139,9 +1124,7 @@ func (p *ProgramOverLay) queryMatch(
 		return false, nil, nil
 	}
 
-	var results Values
-	foundFiles := utils.NewSafeMap[struct{}]()
-	excludeFiles := make([]string, 0)
+	results := make([]sfvm.ValueOperator, 0)
 
 	for i := len(p.Layers) - 1; i >= 0; i-- {
 		layer := p.Layers[i]
@@ -1149,56 +1132,27 @@ func (p *ProgramOverLay) queryMatch(
 			continue
 		}
 
-		layerProgramName := layer.Program.GetProgramName()
-
-		matched, vals, err := queryFunc(layer.Program, ctx, mod, query, excludeFiles)
+		matched, vals, err := queryFunc(layer.Program, ctx, mod, query, nil)
 		if err != nil {
 			continue
 		}
 
-		currentLayerFoundFiles := make([]string, 0)
-
 		if matched {
 			vals.Recursive(func(op sfvm.ValueOperator) error {
 				if v, ok := op.(*Value); ok {
-					filePath := p.getValueFilePath(v)
-					if filePath == "" {
-						results = append(results, v)
+					if !p.isVisibleValueInLayer(v, layer, i) {
 						return nil
 					}
-
-					normalizedPath := removeProgramNamePrefix(filePath, layerProgramName)
-					normalizedPath = strings.TrimPrefix(normalizedPath, "/")
-					if p.isFileDeleted(normalizedPath, i) {
-						return nil
-					}
-
-					if foundFiles.Have(normalizedPath) {
-						return nil
-					}
-
-					if layer.FileSet.Have(normalizedPath) {
-						foundFiles.Set(normalizedPath, struct{}{})
-						currentLayerFoundFiles = append(currentLayerFoundFiles, normalizedPath)
-						results = append(results, v)
-					} else {
-						actualLayerIndex, exists := p.FileToLayerMap.Get(normalizedPath)
-						if exists && actualLayerIndex > layer.LayerIndex {
-							return nil
-						}
-						foundFiles.Set(normalizedPath, struct{}{})
-						currentLayerFoundFiles = append(currentLayerFoundFiles, normalizedPath)
-						results = append(results, v)
-					}
+					results = append(results, v)
+					return nil
 				}
+				results = append(results, op)
 				return nil
 			})
 		}
-
-		excludeFiles = append(excludeFiles, currentLayerFoundFiles...)
 	}
 
-	return len(results) > 0, ToSFVMValues(results), nil
+	return len(results) > 0, sfvm.NewValues(results), nil
 }
 
 func (p *ProgramOverLay) ExactMatch(ctx context.Context, mod ssadb.MatchMode, want string) (bool, sfvm.Values, error) {
@@ -1267,26 +1221,51 @@ func (p *ProgramOverLay) FileFilter(path string, match string, rule map[string]s
 	return nil, utils.Error("ProgramOverLay does not support FileFilter")
 }
 
-func (p *ProgramOverLay) CompareString(comparator *sfvm.StringComparator) (sfvm.Values, []bool) {
+func (p *ProgramOverLay) compareAcrossLayers(compare func(*Program) (sfvm.Values, []bool)) sfvm.Values {
 	if p == nil || len(p.Layers) == 0 {
-		return sfvm.NewEmptyValues(), nil
+		return sfvm.NewEmptyValues()
 	}
-	top := p.Layers[len(p.Layers)-1]
-	if top == nil || top.Program == nil {
-		return sfvm.NewEmptyValues(), nil
+
+	results := make([]sfvm.ValueOperator, 0)
+	for i := len(p.Layers) - 1; i >= 0; i-- {
+		layer := p.Layers[i]
+		if layer == nil || layer.Program == nil {
+			continue
+		}
+
+		values, _ := compare(layer.Program)
+		if values.IsEmpty() {
+			continue
+		}
+
+		_ = values.Recursive(func(operator sfvm.ValueOperator) error {
+			v, ok := operator.(*Value)
+			if !ok {
+				results = append(results, operator)
+				return nil
+			}
+			if !p.isVisibleValueInLayer(v, layer, i) {
+				return nil
+			}
+
+			results = append(results, v)
+			return nil
+		})
 	}
-	return top.Program.CompareString(comparator)
+
+	return sfvm.NewValues(results)
+}
+
+func (p *ProgramOverLay) CompareString(comparator *sfvm.StringComparator) (sfvm.Values, []bool) {
+	return p.compareAcrossLayers(func(prog *Program) (sfvm.Values, []bool) {
+		return prog.CompareString(comparator)
+	}), nil
 }
 
 func (p *ProgramOverLay) CompareOpcode(comparator *sfvm.OpcodeComparator) (sfvm.Values, []bool) {
-	if p == nil || len(p.Layers) == 0 {
-		return sfvm.NewEmptyValues(), nil
-	}
-	top := p.Layers[len(p.Layers)-1]
-	if top == nil || top.Program == nil {
-		return sfvm.NewEmptyValues(), nil
-	}
-	return top.Program.CompareOpcode(comparator)
+	return p.compareAcrossLayers(func(prog *Program) (sfvm.Values, []bool) {
+		return prog.CompareOpcode(comparator)
+	}), nil
 }
 
 func (p *ProgramOverLay) CompareConst(comparator *sfvm.ConstComparator) bool {
