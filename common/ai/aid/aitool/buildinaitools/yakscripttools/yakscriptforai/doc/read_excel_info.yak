@@ -1,4 +1,4 @@
-__DESC__ = "Excel file structure exploration tool. Reads an Excel file and outputs structured information including sheet list, column names with inferred data types, row counts, and preview rows. Ideal for understanding data layout before querying or analyzing Excel data."
+__DESC__ = "Excel file structure exploration tool. Reads an Excel file and outputs sheet list, column names with inferred data types, row counts, and preview rows. Use this FIRST to understand data layout. IMPORTANT: For subsequent multi-step data analysis (3+ queries), prefer writing a Python pandas script via bash tool instead of calling query_excel_data repeatedly - each query_excel_data call re-parses the entire file."
 __VERBOSE_NAME__ = "Excel Structure Explorer"
 __KEYWORDS__ = "excel,xlsx,xls,spreadsheet,data exploration,column names,sheet list,data types,row count,preview,schema,structure,data analysis,excel info,excel schema"
 
@@ -287,6 +287,40 @@ if hasExtra {
 
 appendLine("=" * 70)
 
+totalRows := 0
+for _, table := range classifier.Tables {
+    rowCount := len(table.Rows)
+    if table.Metadata != nil {
+        v := table.Metadata["total_data_rows"]
+        if v != "" {
+            rowCount = parseInt(v)
+        }
+    }
+    totalRows = totalRows + rowCount
+}
+if totalRows > 1000 {
+    appendLine("")
+    appendLine("[ANALYSIS RECOMMENDATION]")
+    appendLine(sprintf("This file contains %v+ data rows across %v sheet(s).", totalRows, len(classifier.Tables)))
+    appendLine("For comprehensive data analysis (multiple statistics, grouping, cross-file joins),")
+    appendLine("prefer writing a Python script via bash tool instead of calling query_excel_data repeatedly.")
+    appendLine("Each query_excel_data call re-parses the entire file (~30s for large files).")
+    appendLine("A single Python pandas script reads the file once and computes everything in-memory.")
+    appendLine("")
+    appendLine("Example: use bash tool to run a Python script like:")
+    appendLine("  import pandas as pd; import json")
+    appendLine("  df = pd.read_excel('<file_path>')")
+    appendLine("  results = {")
+    appendLine("    'row_count': len(df),")
+    appendLine("    'by_group': df.groupby('<col>')['<value_col>'].agg(['count','sum']).to_dict(),")
+    appendLine("    'top10': df.nlargest(10, '<value_col>').to_dict('records'),")
+    appendLine("  }")
+    appendLine("  print(json.dumps(results, ensure_ascii=False, indent=2, default=str))")
+    appendLine("")
+}
+
+appendLine("=" * 70)
+
 if outputFile != "" {
     dir := file.GetDirPath(outputFile)
     if dir != "" && !file.IsExisted(dir) {
@@ -303,3 +337,13 @@ if outputFile != "" {
 }
 
 yakit.Info("Excel structure exploration completed")
+
+if totalRows > 500 {
+    yakit.Info("[NEXT STEP RECOMMENDATION] This file has %v data rows. For data analysis, you have two options:", totalRows)
+    yakit.Info("  Option A (simple, 1-2 queries only): Use query_excel_data for a single filter or aggregation.")
+    yakit.Info("  Option B (complex analysis, STRONGLY RECOMMENDED): Use bash tool to write a Python script with pandas.")
+    yakit.Info("    - Python reads the file ONCE and computes ALL statistics in-memory (10x faster than multiple query_excel_data calls)")
+    yakit.Info("    - Supports: date grouping, multi-aggregation, cross-file joins, pivot tables, and advanced analytics")
+    yakit.Info("    - Example: python3 -c \"import pandas as pd; import json; df = pd.read_excel('%v'); print(json.dumps({'rows': len(df), 'columns': list(df.columns)}, default=str))\"", inputFile)
+    yakit.Info("  RULE: If your analysis plan requires 3+ different statistics, ALWAYS choose Option B.")
+}
