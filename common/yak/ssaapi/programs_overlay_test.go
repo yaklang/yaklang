@@ -232,6 +232,50 @@ public class Main {
 	)
 }
 
+func TestOverlay_StringLiteralUsesVisibleLayer(t *testing.T) {
+	ssatest.CheckIncrementalProgram(t,
+		ssatest.IncrementalStep{
+			Files: map[string]string{
+				"A.java": `
+public class A {
+  static string valueStr = "Value from Base";
+}`,
+				"Config.java": `
+public class Config {
+  static string configValue = "Config from Base";
+}`,
+			},
+		},
+		ssatest.IncrementalStep{
+			Files: map[string]string{
+				"A.java": `
+public class A {
+  static string valueStr = "Value from Diff";
+}`,
+			},
+			Check: func(overlay *ssaapi.ProgramOverLay, _ ssatest.IncrementalCheckStage) {
+				require.NotNil(t, overlay)
+
+				diffRes, err := overlay.SyntaxFlowWithError(`"Value from Diff" as $res`)
+				require.NoError(t, err)
+				ssatest.CompareResult(t, true, diffRes, map[string][]string{
+					"res": {"Value from Diff"},
+				})
+
+				baseRes, err := overlay.SyntaxFlowWithError(`"Value from Base" as $res`)
+				require.NoError(t, err)
+				require.Empty(t, baseRes.GetValues("res"))
+
+				configRes, err := overlay.SyntaxFlowWithError(`"Config from Base" as $res`)
+				require.NoError(t, err)
+				ssatest.CompareResult(t, true, configRes, map[string][]string{
+					"res": {"Config from Base"},
+				})
+			},
+		},
+	)
+}
+
 func TestOverlay_CrossLayer_Flow(t *testing.T) {
 	rule := `println(, * as $arg); $arg #-> as $data`
 	ssatest.CheckIncrementalProgram(t,

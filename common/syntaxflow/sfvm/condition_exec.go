@@ -391,6 +391,9 @@ func applyCondition(value Values, entry ConditionEntry) (Values, error) {
 		}
 		return NewEmptyValues(), nil
 	case ConditionModeMask:
+		if value.IsEmpty() {
+			return NewEmptyValues(), nil
+		}
 		if len(entry.Mask) != len(value) {
 			return nil, utils.Wrapf(CriticalError, "condition failed: stack top(%v) vs conds(%v)", len(value), len(entry.Mask))
 		}

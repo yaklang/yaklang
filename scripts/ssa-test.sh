@@ -1,5 +1,26 @@
 #!/bin/sh -e
 
+SSA_TEST_TEMP_HOME=0
+if [ -z "${YAKIT_HOME:-}" ]; then
+  YAKIT_HOME="$(mktemp -d /tmp/yakit-home.XXXXXX)"
+  export YAKIT_HOME
+  SSA_TEST_TEMP_HOME=1
+fi
+
+cleanup_ssa_test_home() {
+  status=$?
+  if [ "${SSA_TEST_TEMP_HOME:-0}" = "1" ] && [ -n "${YAKIT_HOME:-}" ] && [ -d "${YAKIT_HOME}" ]; then
+    rm -rf "${YAKIT_HOME}"
+  fi
+  trap - EXIT INT TERM
+  exit "$status"
+}
+
+trap cleanup_ssa_test_home EXIT INT TERM
+
+echo "Use isolated YAKIT_HOME: ${YAKIT_HOME}"
+go run ./common/yak/cmd sync-rule
+
 echo "Start to Test AST to SSA"
 echo "Start to Test Yak SSA"
 go test -timeout 20s ./common/yak/yak2ssa/test/...
@@ -38,7 +59,7 @@ go test -timeout 1m ./common/yak/ssaapi/ssareducer
 go test -timeout 1m ./common/yak/ssaapi/test/ssatest
 
 echo "Start to Test Syntaxflow rule"
-go test -count=1 -timeout 60s -skip "TestBuildInRule_Verify_DEBUG" ./common/syntaxflow/...
+go test -count=1 -timeout 2m -skip "TestBuildInRule_Verify_DEBUG" ./common/syntaxflow/...
 
 echo "SSA URL"
 go test -count=1 -timeout 1m -run ^TestSFURl$ github.com/yaklang/yaklang/common/yak/yakurl

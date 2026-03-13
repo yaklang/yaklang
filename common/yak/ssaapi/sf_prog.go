@@ -72,39 +72,36 @@ func (p *Program) CompareString(comparator *sfvm.StringComparator) (sfvm.Values,
 		return sfvm.NewValues(out)
 	}
 	matchConstByString := func(condition *sfvm.StringCondition) sfvm.Values {
-		constMatcher := sfvm.NewStringComparator(sfvm.MatchHave, ctx)
-		constMatcher.Conditions = []*sfvm.StringCondition{condition}
-		var out []sfvm.ValueOperator
-		for _, inst := range ssa.MatchInstructionByOpcodes(ctx, p.Program, ssa.SSAOpcodeConstInst) {
-			val, err := p.NewValue(inst)
-			if err != nil || val == nil {
-				continue
-			}
-			names := getValueNames(val)
-			names = append(names, codec.AnyToString(val.String()))
-			if constMatcher.Matches(names...) {
-				out = append(out, val)
-			}
+		matchMode := ssadb.ConstType
+		switch condition.FilterMode {
+		case sfvm.GlobalConditionFilter:
+			_, out, _ := p.GlobMatch(ctx, matchMode, condition.Pattern)
+			return out
+		case sfvm.RegexpConditionFilter:
+			_, out, _ := p.RegexpMatch(ctx, matchMode, condition.Pattern)
+			return out
+		case sfvm.ExactConditionFilter:
+			_, out, _ := p.RegexpMatch(ctx, matchMode, fmt.Sprintf(".*%s.*", regexp.QuoteMeta(condition.Pattern)))
+			return out
+		default:
+			return sfvm.NewEmptyValues()
 		}
-		return sfvm.NewValues(out)
 	}
 
 	matchValue := func(condition *sfvm.StringCondition) sfvm.Values {
 		var v sfvm.Values
+		matchMode := ssadb.NameMatch
 		switch condition.FilterMode {
 		case sfvm.GlobalConditionFilter:
-			_, v, _ = p.GlobMatch(ctx, ssadb.BothMatch, condition.Pattern)
+			_, v, _ = p.GlobMatch(ctx, matchMode, condition.Pattern)
 		case sfvm.RegexpConditionFilter:
-			_, v, _ = p.RegexpMatch(ctx, ssadb.BothMatch, condition.Pattern)
+			_, v, _ = p.RegexpMatch(ctx, matchMode, condition.Pattern)
 		case sfvm.ExactConditionFilter:
-			_, v, _ = p.RegexpMatch(ctx, ssadb.BothMatch, fmt.Sprintf(".*%s.*", condition.Pattern))
+			_, v, _ = p.RegexpMatch(ctx, matchMode, fmt.Sprintf(".*%s.*", regexp.QuoteMeta(condition.Pattern)))
 		}
 		callMatches := matchCallByString(condition)
 		constMatches := matchConstByString(condition)
 		if v.IsEmpty() {
-			if callMatches.IsEmpty() {
-				return constMatches
-			}
 			return sfvm.MergeValues(callMatches, constMatches)
 		}
 		return sfvm.MergeValues(v, callMatches, constMatches)

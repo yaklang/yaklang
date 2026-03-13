@@ -285,14 +285,23 @@ func init() {
 		if err != nil {
 			return false, nil, err
 		}
-		blueprints := getCurrentBlueprint(v)
-		for _, blueprint := range blueprints {
+		existed := make(map[int64]*Value)
+		walkCurrentBlueprint(v, func(source *Value, blueprint *ssa.Blueprint) {
 			for _, parent := range blueprint.GetRootParentBlueprints() {
-				if val, err := prog.NewValue(parent.Container()); err == nil {
-					result = append(result, val)
+				val, err := prog.NewValue(parent.Container())
+				if err != nil || val == nil {
+					continue
 				}
+				val.AppendPredecessor(source, frame.WithPredecessorContext("getRootParentBlueprint"))
+				if current, ok := existed[val.GetId()]; ok {
+					sfvm.MergeAnchor(source, current)
+					continue
+				}
+				sfvm.MergeAnchor(source, val)
+				existed[val.GetId()] = val
+				result = append(result, val)
 			}
-		}
+		})
 		if len(result) == 0 {
 			return false, nil, utils.Errorf("no parents blueprint found")
 		}
@@ -306,14 +315,23 @@ func init() {
 		if err != nil {
 			return false, nil, err
 		}
-		blueprints := getCurrentBlueprint(v)
-		for _, blueprint := range blueprints {
+		existed := make(map[int64]*Value)
+		walkCurrentBlueprint(v, func(source *Value, blueprint *ssa.Blueprint) {
 			for _, parent := range blueprint.GetAllInterfaceBlueprints() {
-				if val, err := prog.NewValue(parent.Container()); err == nil {
-					result = append(result, val)
+				val, err := prog.NewValue(parent.Container())
+				if err != nil || val == nil {
+					continue
 				}
+				val.AppendPredecessor(source, frame.WithPredecessorContext("getInterfaceBlueprint"))
+				if current, ok := existed[val.GetId()]; ok {
+					sfvm.MergeAnchor(source, current)
+					continue
+				}
+				sfvm.MergeAnchor(source, val)
+				existed[val.GetId()] = val
+				result = append(result, val)
 			}
-		}
+		})
 		if len(result) == 0 {
 			return false, nil, utils.Errorf("no parents blueprint found")
 		}
@@ -326,14 +344,23 @@ func init() {
 		if err != nil {
 			return false, nil, err
 		}
-		blueprints := getCurrentBlueprint(v)
-		for _, blueprint := range blueprints {
+		existed := make(map[int64]*Value)
+		walkCurrentBlueprint(v, func(source *Value, blueprint *ssa.Blueprint) {
 			for _, parent := range blueprint.GetAllParentsBlueprint() {
-				if val, err := prog.NewValue(parent.Container()); err == nil {
-					result = append(result, val)
+				val, err := prog.NewValue(parent.Container())
+				if err != nil || val == nil {
+					continue
 				}
+				val.AppendPredecessor(source, frame.WithPredecessorContext("getParentBlueprint"))
+				if current, ok := existed[val.GetId()]; ok {
+					sfvm.MergeAnchor(source, current)
+					continue
+				}
+				sfvm.MergeAnchor(source, val)
+				existed[val.GetId()] = val
+				result = append(result, val)
 			}
-		}
+		})
 		if len(result) == 0 {
 			return false, nil, utils.Errorf("no parents blueprint found")
 		}
@@ -411,12 +438,21 @@ func init() {
 		if err != nil {
 			return false, nil, err
 		}
-		blueprints := getCurrentBlueprint(v)
-		for _, blueprint := range blueprints {
-			if val, err := prog.NewValue(blueprint.Container()); err == nil {
-				result = append(result, val)
+		existed := make(map[int64]*Value)
+		walkCurrentBlueprint(v, func(source *Value, blueprint *ssa.Blueprint) {
+			val, err := prog.NewValue(blueprint.Container())
+			if err != nil || val == nil {
+				return
 			}
-		}
+			val.AppendPredecessor(source, frame.WithPredecessorContext("getCurrentBlueprint"))
+			if current, ok := existed[val.GetId()]; ok {
+				sfvm.MergeAnchor(source, current)
+				return
+			}
+			sfvm.MergeAnchor(source, val)
+			existed[val.GetId()] = val
+			result = append(result, val)
+		})
 		if len(result) == 0 {
 			return false, nil, utils.Errorf("no blueprint found")
 		}
@@ -816,6 +852,8 @@ func init() {
 		v.Recursive(func(operator sfvm.ValueOperator) error {
 			switch ret := operator.(type) {
 			case *Program:
+				constHandler(ret)
+			case *ProgramOverLay:
 				constHandler(ret)
 			case *Value:
 				if ret.IsConstInst() {
