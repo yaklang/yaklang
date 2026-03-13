@@ -11,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -147,6 +148,44 @@ func TestHotPatchTemplate(t *testing.T) {
 	gots = queryResp.GetData()
 	checkYpbHotPatchTemplate(t, 0, gots[0])
 
+}
+
+func TestQueryHotPatchTemplateList_GlobalSortedByNewestCreatedFirst(t *testing.T) {
+	client, server, err := NewLocalClientAndServerWithTempDatabase(t)
+	require.NoError(t, err)
+
+	ctx := utils.TimeoutContextSeconds(8)
+	typeName := defaultGlobalHotPatchTemplateType
+	names := []string{"global-old", "global-mid", "global-new"}
+
+	for _, name := range names {
+		_, err = client.CreateHotPatchTemplate(ctx, &ypb.HotPatchTemplate{
+			Name:    name,
+			Content: "content-" + name,
+			Type:    typeName,
+		})
+		require.NoError(t, err)
+	}
+
+	base := time.Unix(1700000000, 0)
+	require.NoError(t, server.GetProfileDatabase().
+		Model(&schema.HotPatchTemplate{}).
+		Where("name = ? AND type = ?", names[0], typeName).
+		UpdateColumn("created_at", base).Error)
+	require.NoError(t, server.GetProfileDatabase().
+		Model(&schema.HotPatchTemplate{}).
+		Where("name = ? AND type = ?", names[1], typeName).
+		UpdateColumn("created_at", base.Add(time.Minute)).Error)
+	require.NoError(t, server.GetProfileDatabase().
+		Model(&schema.HotPatchTemplate{}).
+		Where("name = ? AND type = ?", names[2], typeName).
+		UpdateColumn("created_at", base.Add(2*time.Minute)).Error)
+
+	listResp, err := client.QueryHotPatchTemplateList(ctx, &ypb.QueryHotPatchTemplateListRequest{
+		Type: typeName,
+	})
+	require.NoError(t, err)
+	require.Equal(t, []string{names[2], names[1], names[0]}, listResp.GetName())
 }
 
 type TestServerWrapper struct {

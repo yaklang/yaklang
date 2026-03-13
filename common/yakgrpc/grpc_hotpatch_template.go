@@ -102,16 +102,25 @@ func (s *Server) QueryHotPatchTemplate(ctx context.Context, req *ypb.HotPatchTem
 }
 
 func (s *Server) QueryHotPatchTemplateList(ctx context.Context, req *ypb.QueryHotPatchTemplateListRequest) (*ypb.QueryHotPatchTemplateListResponse, error) {
+	paging := &ypb.Paging{
+		Page:    1,
+		Limit:   -1,
+		OrderBy: "name",
+	}
+	if req.GetType() == defaultGlobalHotPatchTemplateType {
+		paging = &ypb.Paging{
+			Page:     1,
+			Limit:    -1,
+			RawOrder: "created_at desc, id desc",
+		}
+	}
+
 	_, names, err := yakit.QueryHotPatchTemplateList(
 		s.GetProfileDatabase(),
 		&ypb.HotPatchTemplateRequest{
 			Type: req.GetType(),
 		},
-		&ypb.Paging{
-			Page:    1,
-			Limit:   -1,
-			OrderBy: "name",
-		},
+		paging,
 	)
 	if err != nil {
 		return nil, err

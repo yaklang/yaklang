@@ -358,6 +358,81 @@ handle1 = s => {die("expected panic")}
 	}
 }
 
+func TestGRPCMUSTPASS_HTTPFuzzer_DisableHotPatch_DoesNotDisableGlobal(t *testing.T) {
+	client, server, err := NewLocalClientAndServerWithTempDatabase(t)
+	require.NoError(t, err)
+
+	ctx := utils.TimeoutContextSeconds(12)
+	const globalName = "global-disable-hotpatch-check"
+	const globalType = "global"
+	globalCode := `
+handle = func(params) { return ["global-tag"] }
+beforeRequest = func(isHttps, originReq, req) {
+    return poc.ReplaceHTTPPacketHeader(req, "X-Global-Hook", "1")
+}
+afterRequest = func(isHttps, originReq, req, originRsp, rsp) {
+    return poc.ReplaceHTTPPacketBody(rsp, "global-rsp")
+}
+`
+	_, err = client.CreateHotPatchTemplate(ctx, &ypb.HotPatchTemplate{
+		Name:    globalName,
+		Type:    globalType,
+		Content: globalCode,
+	})
+	require.NoError(t, err)
+
+	_, err = server.SetGlobalHotPatchConfig(ctx, &ypb.SetGlobalHotPatchConfigRequest{
+		Config: &ypb.GlobalHotPatchConfig{
+			Enabled: true,
+			Items: []*ypb.GlobalHotPatchTemplateRef{
+				{Name: globalName, Type: globalType},
+			},
+		},
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_, _ = server.ResetGlobalHotPatchConfig(context.Background(), &ypb.Empty{})
+	})
+
+	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		require.Contains(t, string(req), "X-Global-Hook: 1")
+		require.NotContains(t, string(req), "X-Module-Hook: 1")
+		require.Contains(t, string(req), "\r\n\r\nglobal-tag")
+		require.NotContains(t, string(req), "\r\n\r\nmodule-tag")
+		return []byte("HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\norigin-rsp")
+	})
+	target := utils.HostPort(host, port)
+
+	moduleCode := `
+handle = func(params) { return ["module-tag"] }
+beforeRequest = func(isHttps, originReq, req) {
+    return poc.ReplaceHTTPPacketHeader(req, "X-Module-Hook", "1")
+}
+afterRequest = func(isHttps, originReq, req, originRsp, rsp) {
+    return poc.ReplaceHTTPPacketBody(rsp, "module-rsp")
+}
+`
+	recv, err := client.HTTPFuzzer(ctx, &ypb.FuzzerRequest{
+		Request:         "POST / HTTP/1.1\r\nHost: " + target + "\r\nContent-Type: text/plain\r\n\r\n{{yak(handle)}}",
+		HotPatchCode:    moduleCode,
+		DisableHotPatch: true,
+		ForceFuzz:       true,
+	})
+	require.NoError(t, err)
+
+	rsp, err := recv.Recv()
+	require.NoError(t, err)
+	require.Contains(t, string(rsp.RequestRaw), "X-Global-Hook: 1")
+	require.NotContains(t, string(rsp.RequestRaw), "X-Module-Hook: 1")
+	require.Contains(t, string(rsp.RequestRaw), "\r\n\r\nglobal-tag")
+	require.NotContains(t, string(rsp.RequestRaw), "\r\n\r\nmodule-tag")
+	require.Contains(t, string(rsp.ResponseRaw), "global-rsp")
+	require.NotContains(t, string(rsp.ResponseRaw), "module-rsp")
+
+	_, err = recv.Recv()
+	require.Error(t, err)
+}
+
 func TestGRPCMUSTPASS_HTTPFuzzer_FuzzWithHotPatch(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
