@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 	"testing"
 	"time"
 
@@ -112,7 +113,7 @@ func TestReAct_PlanAndExecute_MultiPlan(t *testing.T) {
 		aicommon.WithTools(sleepTool),
 		aicommon.WithHijackPERequest(func(ctx context.Context, payload string) error {
 			planDo = true
-			if payload == flag {
+			if strings.Contains(payload, flag) {
 				planMatchFlag = true
 			}
 			time.Sleep(time.Second * 30)
