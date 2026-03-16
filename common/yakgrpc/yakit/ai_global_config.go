@@ -240,6 +240,7 @@ func recoverProvidersFromDeprecatedConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig) 
 		return
 	}
 	needsRecovery := false
+	updated := false
 	collectIDs := func(models []*ypb.AIModelConfig, ids map[int64]struct{}) {
 		for _, model := range models {
 			if model == nil || model.GetProvider() != nil {
@@ -287,6 +288,7 @@ func recoverProvidersFromDeprecatedConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig) 
 			}
 			if legacy, ok := legacyMap[model.GetProviderId()]; ok {
 				model.Provider = legacy.ToThirdPartyConfig()
+				updated = true
 			}
 		}
 	}
@@ -294,4 +296,17 @@ func recoverProvidersFromDeprecatedConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig) 
 	fillProvider(cfg.IntelligentModels)
 	fillProvider(cfg.LightweightModels)
 	fillProvider(cfg.VisionModels)
+
+	if !updated {
+		return
+	}
+
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		log.Debugf("persist recovered ai global config failed: %v", err)
+		return
+	}
+	if err := SetKey(db, consts.AI_GLOBAL_CONFIG_KEY, string(data)); err != nil {
+		log.Debugf("persist recovered ai global config failed: %v", err)
+	}
 }
