@@ -236,6 +236,11 @@ func GRPCYakScriptToYakitScript(script *ypb.YakScript) *schema.YakScript {
 		raw, _ := json.Marshal(i)
 		return strconv.Quote(string(raw))
 	}
+	// Params 空值时用 "[]" 确保 GORM 写入（零值 "" 会被跳过）
+	paramsStr := getMarshalRaw(script.Params)
+	if paramsStr == "" {
+		paramsStr = strconv.Quote("[]")
+	}
 	if script.IsGeneralModule && script.GeneralModuleKey == "" {
 		script.GeneralModuleKey = script.ScriptName
 		script.GeneralModuleVerbose = script.ScriptName
@@ -245,7 +250,7 @@ func GRPCYakScriptToYakitScript(script *ypb.YakScript) *schema.YakScript {
 		Type:                 script.Type,
 		Content:              script.Content,
 		Level:                script.Level,
-		Params:               getMarshalRaw(script.Params),
+		Params:               paramsStr,
 		PluginEnvKey:         getMarshalRaw(script.PluginEnvKey),
 		RiskDetail:           getMarshalRaw(script.RiskInfo),
 		Help:                 script.Help,
@@ -954,9 +959,11 @@ func (s *Server) SaveNewYakScript(ctx context.Context, request *ypb.SaveNewYakSc
 			return nil, utils.Errorf("save plugin failed! content is invalid(潜在语法错误): %s", err)
 		}
 	}
+
 	script.ScriptName = strings.TrimSpace(script.ScriptName)
 	isUpdate := script.Id > 0
-	err := yakit.CreateOrUpdateYakScript(s.GetProfileDatabase(), script.Id, GRPCYakScriptToYakitScript(script))
+	toSave := GRPCYakScriptToYakitScript(script)
+	err := yakit.CreateOrUpdateYakScript(s.GetProfileDatabase(), script.Id, toSave)
 	if err != nil {
 		if isUpdate {
 			if strings.Contains(err.Error(), "UNIQUE constraint failed: yak_scripts.script_name") {

@@ -246,6 +246,56 @@ mirrorNewWebsitePathParams = func(isHttps /*bool*/, url /*string*/, req /*[]byte
 	assert.True(t, len(id.Params) == 1)
 }
 
+// TestSaveNewYakScript_ClearParamsWhenCliRemoved 验证：新建 yak 规则带 cli 保存后读取有参数，删除 cli 后 SaveNewYakScript 再读取确保 Params 已清空
+func TestSaveNewYakScript_ClearParamsWhenCliRemoved(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	scriptName := uuid.NewString()
+	contentWithCli := `target = cli.String("target", cli.setDefault("http://example.com"))
+cli.check()
+yakit.Info("target: " + target)
+`
+	contentWithoutCli := `yakit.AutoInitYakit()
+yakit.Info("no cli params")
+`
+
+	// 1. 新建带 cli 的 yak 规则并保存
+	script, err := client.SaveNewYakScript(context.Background(), &ypb.SaveNewYakScriptRequest{
+		ScriptName: scriptName,
+		Type:       "yak",
+		Content:    contentWithCli,
+		Params: []*ypb.YakScriptParam{{
+			Field:        "target",
+			DefaultValue: "http://example.com",
+			TypeVerbose:  "text",
+			Required:     true,
+		}},
+	})
+	require.NoError(t, err)
+	defer client.DeleteYakScript(context.Background(), &ypb.DeleteYakScriptRequest{Id: script.Id})
+
+	// 2. 读取并验证有参数
+	got, err := client.GetYakScriptById(context.Background(), &ypb.GetYakScriptByIdRequest{Id: script.Id})
+	require.NoError(t, err)
+	require.Len(t, got.Params, 1, "保存 cli 后应从数据库读取到 1 个参数")
+
+	// 3. 使用 SaveNewYakScript 删除 cli 部分（content 改为无 cli，Params 仍传旧的以模拟编辑器未重解析）
+	_, err = client.SaveNewYakScript(context.Background(), &ypb.SaveNewYakScriptRequest{
+		Id:         script.Id,
+		ScriptName: scriptName,
+		Type:       "yak",
+		Content:    contentWithoutCli,
+		Params:     nil, // 模拟客户端
+	})
+	require.NoError(t, err)
+
+	// 4. 再次读取，确保 Params 已清空
+	got2, err := client.GetYakScriptById(context.Background(), &ypb.GetYakScriptByIdRequest{Id: script.Id})
+	require.NoError(t, err)
+	require.Len(t, got2.Params, 0, "删除 cli 后 SaveNewYakScript 应清空 Params，数据库应无参数")
+}
+
 func TestExportLocalYakScriptStream(t *testing.T) {
 	test := assert.New(t)
 
