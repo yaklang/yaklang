@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -16,6 +15,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/yaklang/yaklang/common/yak/yaklib"
 
 	"github.com/mattn/go-sqlite3"
 	"github.com/yaklang/yaklang/common/schema"
@@ -482,17 +483,26 @@ func (s *Server) SavePayloadToFileStream(req *ypb.SavePayloadRequest, stream ypb
 		}
 	}()
 
-	saveDataByFilter := func(s string, rawLen, hitCount int64) error {
+	// 去重逻辑对 JSON 结构行（], } 等）不生效，直接写入；普通 payload 按内容去重
+	saveDataByFilter := func(line string, rawLen int64) error {
 		handledSize += rawLen
-		newLine := true
-		if handledSize >= total {
-			newLine = false
-		}
-
-		if !dataFilter.Exist(s) {
+		newLine := handledSize < total
+		if yakit.IsJSONStructLine(line) {
 			filtered++
-			dataFilter.Insert(s)
-			if _, err := dstWriter.WriteString(s); err != nil {
+			if _, err := dstWriter.WriteString(line); err != nil {
+				return err
+			}
+			if newLine {
+				if _, err := dstWriter.WriteString("\n"); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+		if !dataFilter.Exist(line) {
+			filtered++
+			dataFilter.Insert(line)
+			if _, err := dstWriter.WriteString(line); err != nil {
 				return err
 			}
 			if newLine {
@@ -504,9 +514,6 @@ func (s *Server) SavePayloadToFileStream(req *ypb.SavePayloadRequest, stream ypb
 			duplicate++
 		}
 		return nil
-	}
-	saveDataByFilterNoHitCount := func(line string, rawLen int64) error {
-		return saveDataByFilter(line, rawLen, 0)
 	}
 
 	handleFile := func(f string) error {
@@ -520,7 +527,9 @@ func (s *Server) SavePayloadToFileStream(req *ypb.SavePayloadRequest, stream ypb
 		total += state.Size()
 
 		feedback(-1, "正在处理文件: "+f)
-		return yakit.ReadPayloadFileLineWithCallBack(ctx, f, saveDataByFilter)
+		return yakit.ReadPayloadFileLineWithCallBack(ctx, f, func(line string, rawLen int64, _ int64) error {
+			return saveDataByFilter(line, rawLen)
+		})
 	}
 
 	ticker := time.NewTicker(time.Second)
@@ -546,7 +555,7 @@ func (s *Server) SavePayloadToFileStream(req *ypb.SavePayloadRequest, stream ypb
 	} else {
 		total += int64(len(content))
 		feedback(0, "开始解析数据")
-		yakit.ReadQuotedLinesWithCallBack(content, saveDataByFilterNoHitCount)
+		yakit.ReadQuotedLinesWithCallBack(content, func(line string, rawLen int64) error { return saveDataByFilter(line, rawLen) })
 	}
 
 	feedback(1, fmt.Sprintf("检测到有%d项重复数据", duplicate))
@@ -696,10 +705,18 @@ func (s *Server) RemoveDuplicatePayloads(req *ypb.NameRequest, stream ypb.Yak_Re
 		if total < handledSize {
 			total = handledSize + 1
 		}
+		if yakit.IsJSONStructLine(line) {
+			// 去重逻辑对 [] 和 {} 不生效，直接写入
+			filtered++
+			if _, err := file.WriteLineString(line); err != nil {
+				return utils.Wrap(err, "write payload to file error")
+			}
+			continue
+		}
+		// 普通 payload 按内容去重
 		if dataFilter.Exist(line) {
 			duplicate++
 			continue
-
 		}
 		filtered++
 		dataFilter.Insert(line)

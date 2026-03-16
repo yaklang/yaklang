@@ -104,6 +104,24 @@ func TrimWhitespaceExceptSpace(r rune) bool {
 	return false
 }
 
+// IsJSONStructLine 判断是否为 JSON 结构行（如 ], }, [, { 等），去重逻辑对此类行不生效，直接写入以保留 JSON 结构。
+// line 为 payload 文件中的 Quoted 行，需 Unquote 后再判断；若 Unquote 失败则检查 Quoted 形式的 ]," 或 }," 等后缀。
+func IsJSONStructLine(line string) bool {
+	trimmed := line
+	if uq, err := strconv.Unquote(line); err == nil {
+		trimmed = strings.TrimSpace(uq)
+	}
+	// 纯结构符：] } [ { 及带逗号形式
+	if trimmed == "]" || trimmed == "}" || trimmed == "[" || trimmed == "{" ||
+		strings.HasSuffix(trimmed, "],") || strings.HasSuffix(trimmed, "},") ||
+		strings.HasSuffix(trimmed, "[,") || strings.HasSuffix(trimmed, "{,") {
+		return true
+	}
+	// Quoted 形式下 Unquote 失败时的后备判断
+	return strings.HasSuffix(line, `],"`) || strings.HasSuffix(line, `},"`) ||
+		strings.HasSuffix(line, `[,"`) || strings.HasSuffix(line, `{,"`)
+}
+
 func CheckExistGroup(db *gorm.DB, group string) (*schema.Payload, error) {
 	var (
 		payload schema.Payload
@@ -122,6 +140,10 @@ func SavePayloadByFilename(db *gorm.DB, group string, fileName string) error {
 }
 
 func ReadPayloadFileLineWithCallBack(ctx context.Context, fileName string, handler func(line string, rawLen int64, hitCount int64) error) error {
+	return ReadPayloadFileLineWithCallBackWithIndex(ctx, fileName, handler)
+}
+
+func ReadPayloadFileLineWithCallBackWithIndex(ctx context.Context, fileName string, handler func(line string, rawLen int64, hitCount int64) error) error {
 	fd, err := os.Open(fileName)
 	if err != nil {
 		return err
@@ -195,6 +217,10 @@ func SavePayloadGroupByRaw(db *gorm.DB, group string, data string) error {
 }
 
 func ReadQuotedLinesWithCallBack(data string, handler func(line string, rawLen int64) error) error {
+	return ReadQuotedLinesWithCallBackWithIndex(data, handler)
+}
+
+func ReadQuotedLinesWithCallBackWithIndex(data string, handler func(line string, rawLen int64) error) error {
 	r := bufio.NewReader(strings.NewReader(data))
 	for {
 		lineRaw, err := r.ReadBytes('\n')

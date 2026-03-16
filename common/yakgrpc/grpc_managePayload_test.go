@@ -880,6 +880,73 @@ func TestPayload(t *testing.T) {
 		comparePayload(got, want, t)
 	})
 
+	// 验证 JSON 中 ], } 等结构性重复行不被错误去重，用于测试自定义 payload 加载
+	t.Run("SavePayloadToFileStream_PreservesJSONStructuralLines", func(t *testing.T) {
+		jsonContent := `[
+  {
+    "name": "测试自定义payload加载",
+    "type": "similarity",
+    "logic": "all",
+    "payloads": [
+        "'test'"
+    ],
+    "conditions": [
+      {
+        "payload": "'test'",
+        "compareWith": "original",
+        "threshold": -0.9,
+        "thresholdOperator": "<",
+        "timeThreshold": 5000,
+        "timeThresholdOperator": "<"
+      }
+    ],
+    "description": "用于验证自定义.payload.文件加载功能是否正常"
+  }
+]
+`
+		group := uuid.NewString()
+		save2file(local, t, group, "", jsonContent)
+		defer deleteGroup(local, t, group)
+
+		rsp := queryFromFile(local, t, group, "")
+		got := string(rsp.Data)
+		comparePayload(got, jsonContent, t)
+	})
+
+	// 验证自动去重按钮不会错误合并 JSON 中 ], } 等结构性重复行
+	t.Run("RemoveDuplicatePayloads_PreservesJSONStructuralLines", func(t *testing.T) {
+		jsonContent := `[
+  {
+    "name": "测试自定义payload加载",
+    "type": "similarity",
+    "logic": "all",
+    "payloads": [
+        "'test'"
+    ],
+    "conditions": [
+      {
+        "payload": "'test'",
+        "compareWith": "original",
+        "threshold": -0.9,
+        "thresholdOperator": "<",
+        "timeThreshold": 5000,
+        "timeThresholdOperator": "<"
+      }
+    ],
+    "description": "用于验证自定义.payload.文件加载功能是否正常"
+  }
+]
+`
+		group := uuid.NewString()
+		save2file(local, t, group, "", jsonContent)
+		defer deleteGroup(local, t, group)
+
+		removeDuplicatePayloads(local, t, group)
+		rsp := queryFromFile(local, t, group, "")
+		got := string(rsp.Data)
+		comparePayload(got, jsonContent, t)
+	})
+
 	t.Run("ExportPayloadBatch", func(t *testing.T) {
 		group1, group2 := uuid.NewString(), uuid.NewString()
 		data1 := "payload1\npayload2"
