@@ -2,7 +2,6 @@ package aihttp
 
 import (
 	"net/http"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
@@ -79,7 +78,7 @@ func (gw *AIAgentHTTPGateway) handleStreamInput(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	event, err := readAIInputEventRequest(r, runID)
+	event, err := readAIInputEventRequest(r)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
 		return
@@ -114,16 +113,18 @@ func (gw *AIAgentHTTPGateway) handleStreamInput(w http.ResponseWriter, r *http.R
 		session.PushInput(event)
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
-		"run_id": runID,
-		"status": "accepted",
-	})
+	writeProtoJSON(w, http.StatusOK, newResultOutputEvent("accepted"))
 }
 
 func (gw *AIAgentHTTPGateway) handleCancelRun(w http.ResponseWriter, r *http.Request) {
 	runID := mux.Vars(r)["run_id"]
 	if runID == "" {
 		writeError(w, http.StatusBadRequest, "run_id is required")
+		return
+	}
+
+	if _, err := readOptionalAIInputEventRequest(r); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
 		return
 	}
 
@@ -135,10 +136,7 @@ func (gw *AIAgentHTTPGateway) handleCancelRun(w http.ResponseWriter, r *http.Req
 
 	session.Cancel()
 
-	writeJSON(w, http.StatusOK, map[string]any{
-		"run_id": runID,
-		"status": "cancelled",
-	})
+	writeProtoJSON(w, http.StatusOK, newResultOutputEvent(string(RunStatusCancelled)))
 }
 
 func mergeParams(req AIParams, defaults aiAgentChatSettingPayload) AIParams {
@@ -347,9 +345,7 @@ func (gw *AIAgentHTTPGateway) runGRPCStream(session *RunSession) {
 			return
 		}
 
-		event := convertOutputToRunEvent(resp)
-
-		session.AddEvent(event)
+		session.AddEvent(normalizeOutputEvent(resp))
 	}
 }
 
@@ -391,35 +387,4 @@ func ConvertAIParamsToYPB(p AIParams, runID string) *ypb.AIStartParams {
 		params.TimelineSessionID = p.TimelineSessionID
 	}
 	return params
-}
-
-func convertOutputToRunEvent(e *ypb.AIOutputEvent) RunEvent {
-	event := RunEvent{
-		ID:            uuid.New().String(),
-		Type:          e.Type,
-		CoordinatorID: e.CoordinatorId,
-		AIModelName:   e.AIModelName,
-		NodeID:        string(e.NodeId),
-		IsSystem:      e.IsSystem,
-		IsStream:      e.IsStream,
-		IsReason:      e.IsReason,
-		Timestamp:     e.Timestamp,
-		TaskIndex:     e.TaskIndex,
-		EventUUID:     e.EventUUID,
-		TaskUUID:      e.TaskUUID,
-	}
-
-	if len(e.StreamDelta) > 0 {
-		event.StreamDelta = string(e.StreamDelta)
-	}
-
-	if len(e.Content) > 0 {
-		event.Content = string(e.Content)
-	}
-
-	if event.Timestamp <= 0 {
-		event.Timestamp = time.Now().Unix()
-	}
-
-	return event
 }

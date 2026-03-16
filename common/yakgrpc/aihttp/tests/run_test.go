@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/yakgrpc/aihttp"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func TestGetRunNotFound(t *testing.T) {
@@ -22,7 +22,7 @@ func TestGetRunNotFound(t *testing.T) {
 func TestRunNotFound(t *testing.T) {
 	gw := newTestGateway(t)
 
-	body, _ := json.Marshal(aihttp.PushEventRequest{Type: "free_input", FreeInput: "hello"})
+	body, _ := json.Marshal(&ypb.AIInputEvent{IsFreeInput: true, FreeInput: "hello"})
 	req := httptest.NewRequest("POST", "/agent/run/nonexistent-id", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := performRequest(gw, req)
@@ -32,7 +32,7 @@ func TestRunNotFound(t *testing.T) {
 func TestPushEventNotFound(t *testing.T) {
 	gw := newTestGateway(t)
 
-	body, _ := json.Marshal(aihttp.PushEventRequest{Type: "interactive"})
+	body, _ := json.Marshal(&ypb.AIInputEvent{IsInteractiveMessage: true})
 	req := httptest.NewRequest("POST", "/agent/run/no-such-id/events/push", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := performRequest(gw, req)

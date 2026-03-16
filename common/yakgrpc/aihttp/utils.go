@@ -53,8 +53,19 @@ func readProtoJSON(r *http.Request, msg proto.Message) error {
 }
 
 func readRawBody(r *http.Request) ([]byte, error) {
-	if r.Body == nil {
+	data, err := readOptionalRawBody(r)
+	if err != nil {
+		return nil, err
+	}
+	if len(data) == 0 {
 		return nil, fmt.Errorf("request body is empty")
+	}
+	return data, nil
+}
+
+func readOptionalRawBody(r *http.Request) ([]byte, error) {
+	if r.Body == nil {
+		return nil, nil
 	}
 	defer r.Body.Close()
 	data, err := io.ReadAll(r.Body)
@@ -62,7 +73,7 @@ func readRawBody(r *http.Request) ([]byte, error) {
 		return nil, err
 	}
 	if len(bytes.TrimSpace(data)) == 0 {
-		return nil, fmt.Errorf("request body is empty")
+		return nil, nil
 	}
 	return data, nil
 }
@@ -87,4 +98,13 @@ func writeSSEData(w http.ResponseWriter, data string) {
 	if f, ok := w.(http.Flusher); ok {
 		f.Flush()
 	}
+}
+
+func writeProtoSSEData(w http.ResponseWriter, msg proto.Message) error {
+	data, err := protojson.MarshalOptions{UseProtoNames: true}.Marshal(msg)
+	if err != nil {
+		return err
+	}
+	writeSSEData(w, string(data))
+	return nil
 }
