@@ -54,7 +54,7 @@ func checkVerify(t *testing.T, code string, language string) {
 	_ = tmpIR.Close()
 	defer os.Remove(tmpIR.Name())
 
-	if err := compiler.CompileToExecutable(
+	if _, err := compiler.CompileToExecutable(
 		compiler.WithCompileSourceCode(code),
 		compiler.WithCompileLanguage(language),
 		compiler.WithCompileEmitLLVM(true),
@@ -290,7 +290,7 @@ func compileBinary(t *testing.T, code string, entry string, cfg *runBinaryConfig
 	)
 	options = append(options, cfg.compileOpts...)
 
-	if err := compiler.CompileToExecutable(options...); err != nil {
+	if _, err := compiler.CompileToExecutable(options...); err != nil {
 		cleanup()
 		t.Fatalf("Binary compilation failed: %v", err)
 	}

@@ -11,6 +11,8 @@ import (
 	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/embed"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/trace"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/obfuscation"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
@@ -21,6 +23,12 @@ type CompileConfig struct {
 	SourceCode        string
 	Language          string
 	OutputFile        string
+	// FinalOutputFile, when set, copies the built artifact to this path (preserving mode).
+	// Useful when building into a cached work dir but the user requested -o <path>.
+	FinalOutputFile   string
+	// FinalOutputAuto selects the default output path based on source file and mode.
+	// (e.g. foo.yak -> foo.ll when EmitLLVM, else a.out)
+	FinalOutputAuto bool
 	WorkDir           string
 	EntryFunctionName string
 	EmitLLVM          bool
@@ -35,6 +43,13 @@ type CompileConfig struct {
 	SSAObfuscators    []string
 	LLVMObfuscators   []string
 	StdlibCompile     bool
+
+	// CacheEnabled uses a deterministic work dir under $TMP and reuses existing artifacts.
+	CacheEnabled bool
+	// Force removes any existing work dir and rebuilds (like `go build -a`).
+	Force bool
+	// Trace prints WORK=... and external commands (like `go build -x`).
+	Trace bool
 }
 
 type CompileOption func(*CompileConfig)
@@ -57,6 +72,15 @@ func WithCompileLanguage(language string) CompileOption {
 
 func WithCompileOutputFile(path string) CompileOption {
 	return func(c *CompileConfig) { c.OutputFile = path }
+}
+
+// WithCompileFinalOutputFile copies the produced artifact to dst on success.
+func WithCompileFinalOutputFile(dst string) CompileOption {
+	return func(c *CompileConfig) { c.FinalOutputFile = dst }
+}
+
+func WithCompileFinalOutputAuto(enabled bool) CompileOption {
+	return func(c *CompileConfig) { c.FinalOutputAuto = enabled }
 }
 
 func WithCompileWorkDir(dir string) CompileOption {
@@ -131,12 +155,26 @@ func WithCompileStdlibCompile(enabled bool) CompileOption {
 	return func(c *CompileConfig) { c.StdlibCompile = enabled }
 }
 
+func WithCompileCacheEnabled(enabled bool) CompileOption {
+	return func(c *CompileConfig) { c.CacheEnabled = enabled }
+}
+
+func WithCompileForceRebuild(enabled bool) CompileOption {
+	return func(c *CompileConfig) { c.Force = enabled }
+}
+
+func WithCompileTrace(enabled bool) CompileOption {
+	return func(c *CompileConfig) { c.Trace = enabled }
+}
+
 func WithCompileConfig(cfg CompileConfig) CompileOption {
 	return func(c *CompileConfig) {
 		c.SourceFile = cfg.SourceFile
 		c.SourceCode = cfg.SourceCode
 		c.Language = cfg.Language
 		c.OutputFile = cfg.OutputFile
+		c.FinalOutputFile = cfg.FinalOutputFile
+		c.FinalOutputAuto = cfg.FinalOutputAuto
 		c.WorkDir = cfg.WorkDir
 		c.EntryFunctionName = cfg.EntryFunctionName
 		c.EmitLLVM = cfg.EmitLLVM
@@ -149,6 +187,9 @@ func WithCompileConfig(cfg CompileConfig) CompileOption {
 		c.SSAObfuscators = append(c.SSAObfuscators, cfg.SSAObfuscators...)
 		c.LLVMObfuscators = append(c.LLVMObfuscators, cfg.LLVMObfuscators...)
 		c.StdlibCompile = cfg.StdlibCompile
+		c.CacheEnabled = cfg.CacheEnabled
+		c.Force = cfg.Force
+		c.Trace = cfg.Trace
 		if len(cfg.ExtraLinkArgs) > 0 {
 			c.ExtraLinkArgs = append(c.ExtraLinkArgs, cfg.ExtraLinkArgs...)
 		}
@@ -294,13 +335,119 @@ func renameConflictingMainFunctions(mod llvm.Module, entryFunc string) string {
 	return entryFunc
 }
 
-func CompileToExecutable(opts ...CompileOption) error {
+type CompileResult struct {
+	WorkDir   string
+	Artifact  string
+	CacheHit  bool
+	RuntimeA  string
+	ExtraLink []string
+}
+
+func CompileToExecutable(opts ...CompileOption) (CompileResult, error) {
 	cfg := defaultCompileConfig()
 	for _, opt := range opts {
 		if opt != nil {
 			opt(cfg)
 		}
 	}
+
+	res, err := compileWithConfig(cfg)
+	if err != nil {
+		return CompileResult{}, err
+	}
+	return res, nil
+}
+
+func compileWithConfig(cfg *CompileConfig) (CompileResult, error) {
+	if cfg == nil {
+		return CompileResult{}, utils.Errorf("compile failed: nil config")
+	}
+
+	// If requested, enable go-build-like trace for WORK and command lines.
+	trace.SetEnabled(cfg.Trace)
+
+	linking := !cfg.EmitLLVM && !cfg.EmitAsm && !cfg.CompileOnly && !cfg.SkipRuntimeLink
+
+	// Build into a deterministic cached work dir when enabled and WorkDir isn't explicit.
+	if cfg.CacheEnabled && strings.TrimSpace(cfg.WorkDir) == "" {
+		key, keyErr := cachedWorkKeyFromConfig(cfg)
+		if keyErr != nil {
+			return CompileResult{}, keyErr
+		}
+		cfg.WorkDir = cachedWorkDirFromKey(key)
+	}
+	// When linking (or extracting embedded runtime), we need a writable directory.
+	if linking && strings.TrimSpace(cfg.WorkDir) == "" {
+		tmp, err := os.MkdirTemp("", "yakssa-work-*")
+		if err != nil {
+			return CompileResult{}, utils.Errorf("prepare work dir failed: %v", err)
+		}
+		cfg.WorkDir = tmp
+	}
+	if cfg.WorkDir != "" {
+		if cfg.Force {
+			_ = os.RemoveAll(cfg.WorkDir)
+		}
+		if err := os.MkdirAll(cfg.WorkDir, 0o755); err != nil {
+			return CompileResult{}, utils.Errorf("prepare work dir failed: %v", err)
+		}
+		if cfg.Trace {
+			trace.PrintWorkDir(cfg.WorkDir)
+		}
+	}
+
+	artifactPath := strings.TrimSpace(cfg.OutputFile)
+	if cfg.CacheEnabled && strings.TrimSpace(cfg.WorkDir) != "" {
+		artifactPath = cachedArtifactPath(cfg.WorkDir, cfg)
+		cfg.OutputFile = artifactPath
+	}
+	if artifactPath != "" && cfg.CacheEnabled && !cfg.Force {
+		if info, err := os.Stat(artifactPath); err == nil && !info.IsDir() && info.Size() > 0 {
+			// Cache hit: optionally still copy to final output.
+			if dst := finalOutputPath(cfg); strings.TrimSpace(dst) != "" {
+				if err := CopyFilePreserveMode(artifactPath, dst); err != nil {
+					return CompileResult{}, err
+				}
+			}
+			return CompileResult{
+				WorkDir:  cfg.WorkDir,
+				Artifact: artifactPath,
+				CacheHit: true,
+			}, nil
+		}
+	}
+
+	// Prepare runtime archive when linking and no archive is explicitly provided.
+	runtimeArchive := strings.TrimSpace(cfg.RuntimeArchive)
+	extraLinkArgs := append([]string{}, cfg.ExtraLinkArgs...)
+	if linking && runtimeArchive == "" {
+		if cfg.StdlibCompile {
+			archivePath, gcLibDir, buildErr := embed.BuildRuntimeArchiveFromEmbeddedSource(cfg.WorkDir)
+			if buildErr != nil {
+				return CompileResult{}, buildErr
+			}
+			runtimeArchive = archivePath
+			cfg.RuntimeArchive = archivePath
+			if strings.TrimSpace(gcLibDir) != "" {
+				extraLinkArgs = append(extraLinkArgs, "-L"+gcLibDir)
+			}
+		} else {
+			if archivePath, extractErr := embed.ExtractLibyakToDir(cfg.WorkDir); extractErr == nil {
+				runtimeArchive = archivePath
+				cfg.RuntimeArchive = archivePath
+			} else if extractErr != embed.ErrNoEmbeddedRuntime {
+				return CompileResult{}, extractErr
+			}
+
+			if _, gcErr := embed.ExtractLibgcToDir(cfg.WorkDir); gcErr == nil {
+				// Extracted libgc.a into the work dir; clang will use -L$WORK -lgc.
+				extraLinkArgs = append(extraLinkArgs, "-L"+cfg.WorkDir)
+			} else if gcErr != embed.ErrNoEmbeddedRuntime {
+				return CompileResult{}, gcErr
+			}
+		}
+	}
+	cfg.ExtraLinkArgs = extraLinkArgs
 
 	_, comp, ir, err := compileInput(
 		cfg.SourceFile,
@@ -311,13 +458,13 @@ func CompileToExecutable(opts ...CompileOption) error {
 		cfg.LLVMObfuscators,
 	)
 	if err != nil {
-		return err
+		return CompileResult{}, err
 	}
 	defer comp.Dispose()
 
 	entryFunc, _, err := resolveEntryFunction(comp.Mod, cfg.EntryFunctionName)
 	if err != nil {
-		return err
+		return CompileResult{}, err
 	}
 	entryFunc = renameConflictingMainFunctions(comp.Mod, entryFunc)
 
@@ -345,20 +492,25 @@ func CompileToExecutable(opts ...CompileOption) error {
 			outputFile = replaceExt(cfg.SourceFile, ".ll")
 		}
 		if err := os.WriteFile(outputFile, []byte(ir), 0644); err != nil {
-			return utils.Errorf("failed to write LLVM IR: %v", err)
+			return CompileResult{}, utils.Errorf("failed to write LLVM IR: %v", err)
 		}
 		log.Infof("LLVM IR written to: %s", outputFile)
-		return nil
+		if dst := finalOutputPath(cfg); strings.TrimSpace(dst) != "" {
+			if err := CopyFilePreserveMode(outputFile, dst); err != nil {
+				return CompileResult{}, err
+			}
+		}
+		return CompileResult{WorkDir: cfg.WorkDir, Artifact: outputFile, CacheHit: false}, nil
 	}
 
 	tmpLL, err := os.CreateTemp(cfg.WorkDir, "ssa2llvm-*.ll")
 	if err != nil {
-		return utils.Errorf("failed to create temp file: %v", err)
+		return CompileResult{}, utils.Errorf("failed to create temp file: %v", err)
 	}
 	defer os.Remove(tmpLL.Name())
 
 	if _, err := tmpLL.Write([]byte(ir)); err != nil {
-		return utils.Errorf("failed to write temp IR: %v", err)
+		return CompileResult{}, utils.Errorf("failed to write temp IR: %v", err)
 	}
 	tmpLL.Close()
 
@@ -368,10 +520,15 @@ func CompileToExecutable(opts ...CompileOption) error {
 			outputFile = replaceExt(cfg.SourceFile, ".s")
 		}
 		if err := CompileLLVMToAsm(tmpLL.Name(), outputFile); err != nil {
-			return err
+			return CompileResult{}, err
 		}
 		log.Infof("Assembly written to: %s", outputFile)
-		return nil
+		if dst := finalOutputPath(cfg); strings.TrimSpace(dst) != "" {
+			if err := CopyFilePreserveMode(outputFile, dst); err != nil {
+				return CompileResult{}, err
+			}
+		}
+		return CompileResult{WorkDir: cfg.WorkDir, Artifact: outputFile, CacheHit: false}, nil
 	}
 
 	if cfg.CompileOnly {
@@ -380,18 +537,60 @@ func CompileToExecutable(opts ...CompileOption) error {
 			outputFile = replaceExt(cfg.SourceFile, ".o")
 		}
 		if err := CompileLLVMToObject(tmpLL.Name(), outputFile); err != nil {
-			return err
+			return CompileResult{}, err
 		}
 		log.Infof("Object file written to: %s", outputFile)
-		return nil
+		if dst := finalOutputPath(cfg); strings.TrimSpace(dst) != "" {
+			if err := CopyFilePreserveMode(outputFile, dst); err != nil {
+				return CompileResult{}, err
+			}
+		}
+		return CompileResult{WorkDir: cfg.WorkDir, Artifact: outputFile, CacheHit: false}, nil
 	}
 
 	if err := CompileLLVMToBinary(tmpLL.Name(), outputFile, !cfg.SkipRuntimeLink, cfg.RuntimeArchive, cfg.ExtraLinkArgs...); err != nil {
-		return err
+		return CompileResult{}, err
 	}
 
 	log.Infof("Executable written to: %s", outputFile)
-	return nil
+	if dst := finalOutputPath(cfg); strings.TrimSpace(dst) != "" {
+		if err := CopyFilePreserveMode(outputFile, dst); err != nil {
+			return CompileResult{}, err
+		}
+	}
+	return CompileResult{
+		WorkDir:   cfg.WorkDir,
+		Artifact:  outputFile,
+		CacheHit:  false,
+		RuntimeA:  runtimeArchive,
+		ExtraLink: extraLinkArgs,
+	}, nil
+}
+
+func finalOutputPath(cfg *CompileConfig) string {
+	if cfg == nil {
+		return ""
+	}
+	if strings.TrimSpace(cfg.FinalOutputFile) != "" {
+		return strings.TrimSpace(cfg.FinalOutputFile)
+	}
+	if !cfg.FinalOutputAuto {
+		return ""
+	}
+	// Follow the CLI defaults.
+	switch {
+	case cfg.EmitLLVM:
+		return replaceExt(cfg.SourceFile, ".ll")
+	case cfg.EmitAsm:
+		return replaceExt(cfg.SourceFile, ".s")
+	case cfg.CompileOnly:
+		return replaceExt(cfg.SourceFile, ".o")
+	default:
+		if runtime.GOOS == "windows" {
+			return "a.exe"
+		}
+		return "a.out"
+	}
 }
 
 func addMainWrapper(ir, entryFunc string, printEntryResult bool) string {

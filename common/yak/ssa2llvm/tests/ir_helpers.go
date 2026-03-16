@@ -60,7 +60,7 @@ func CompileLLVMIRString(t *testing.T, code string, language string, options ...
 	)
 	compileOptions = append(compileOptions, options...)
 
-	if err := compiler.CompileToExecutable(compileOptions...); err != nil {
+	if _, err := compiler.CompileToExecutable(compileOptions...); err != nil {
 		t.Fatalf("compile llvm ir failed: %v", err)
 	}
 

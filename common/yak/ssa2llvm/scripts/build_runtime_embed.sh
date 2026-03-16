@@ -6,7 +6,7 @@ SSA2LLVM_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 REPO_ROOT="$(cd "${SSA2LLVM_DIR}/../../.." && pwd)"
 
 RUNTIME_DIR="${SSA2LLVM_DIR}/runtime"
-RUNTIMEEMBED_DIR="${SSA2LLVM_DIR}/runtimeembed"
+RUNTIMEEMBED_DIR="${SSA2LLVM_DIR}/runtime/embed"
 STAGE_DIR="${RUNTIMEEMBED_DIR}/ssa2llvm-runtime"
 
 echo "[ssa2llvm] building runtime archive..."
@@ -17,9 +17,26 @@ if [[ ! -f "${RUNTIME_DIR}/libyak.a" ]]; then
   exit 1
 fi
 
-LIBGC_PATH="$(cc -print-file-name=libgc.a 2>/dev/null || true)"
+resolve_libgc() {
+  local tools=("cc" "gcc" "clang")
+  local tool=""
+  local out=""
+  for tool in "${tools[@]}"; do
+    if ! command -v "${tool}" >/dev/null 2>&1; then
+      continue
+    fi
+    out="$("${tool}" -print-file-name=libgc.a 2>/dev/null || true)"
+    if [[ -n "${out}" && "${out}" != "libgc.a" && -f "${out}" ]]; then
+      echo "${out}"
+      return 0
+    fi
+  done
+  return 1
+}
+
+LIBGC_PATH="$(resolve_libgc 2>/dev/null || true)"
 if [[ -z "${LIBGC_PATH}" || "${LIBGC_PATH}" == "libgc.a" || ! -f "${LIBGC_PATH}" ]]; then
-  echo "[ssa2llvm] libgc.a not found (need libgc-dev / bdwgc static library). cc -print-file-name=libgc.a => ${LIBGC_PATH}" >&2
+  echo "[ssa2llvm] libgc.a not found (need libgc-dev / bdwgc static library). Tried: cc/gcc/clang -print-file-name=libgc.a" >&2
   exit 1
 fi
 
