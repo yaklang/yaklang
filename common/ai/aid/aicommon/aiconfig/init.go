@@ -21,12 +21,6 @@ var (
 )
 
 func init() {
-	// ensure AIBalanceProviderConfig is loaded after database initialization
-	yakit.RegisterPostInitDatabaseFunction(func() error {
-		yakit.EnsureAIBalanceProviderConfig(consts.GetGormProfileDatabase())
-		return nil
-	})
-
 	// Register a post-init database function to ensure TieredAIConfig is loaded
 	// This will be called after the database is initialized
 	yakit.RegisterPostInitDatabaseFunction(func() error {
@@ -81,15 +75,15 @@ func EnsureConfigLoaded() {
 }
 
 func buildDefaultAIGlobalConfig() *ypb.AIGlobalConfig {
-	aibalanceId := yakit.EnsureAIBalanceProviderConfig(consts.GetGormProfileDatabase())
+	aibalanceProvider := yakit.DefaultAIBalanceProviderConfig()
 	return &ypb.AIGlobalConfig{
 		Enabled:         true,
 		RoutingPolicy:   "balance",
 		DisableFallback: false,
 		IntelligentModels: []*ypb.AIModelConfig{
 			{
-				ProviderId: aibalanceId,
-				ModelName:  "memfit-standard-free",
+				Provider:  cloneThirdPartyConfig(aibalanceProvider),
+				ModelName: "memfit-standard-free",
 				ExtraParams: []*ypb.KVPair{
 					{Key: consts.ModelExtraParamKey, Value: "memfit-standard-free"},
 				},
@@ -97,8 +91,8 @@ func buildDefaultAIGlobalConfig() *ypb.AIGlobalConfig {
 		},
 		LightweightModels: []*ypb.AIModelConfig{
 			{
-				ProviderId: aibalanceId,
-				ModelName:  "memfit-light-free",
+				Provider:  cloneThirdPartyConfig(aibalanceProvider),
+				ModelName: "memfit-light-free",
 				ExtraParams: []*ypb.KVPair{
 					{Key: consts.ModelExtraParamKey, Value: "memfit-light-free"},
 				},
@@ -106,8 +100,8 @@ func buildDefaultAIGlobalConfig() *ypb.AIGlobalConfig {
 		},
 		VisionModels: []*ypb.AIModelConfig{
 			{
-				ProviderId: aibalanceId,
-				ModelName:  "memfit-vision-free",
+				Provider:  cloneThirdPartyConfig(aibalanceProvider),
+				ModelName: "memfit-vision-free",
 				ExtraParams: []*ypb.KVPair{
 					{Key: consts.ModelExtraParamKey, Value: "memfit-vision-free"},
 				},
@@ -150,7 +144,7 @@ func hasAvailableModelConfig(models []*ypb.AIModelConfig) bool {
 		if model == nil {
 			continue
 		}
-		if model.GetProviderId() != 0 || model.GetProvider() != nil {
+		if model.GetProvider() != nil {
 			return true
 		}
 	}
@@ -212,6 +206,40 @@ func cloneAIModelConfigs(configs []*ypb.AIModelConfig) []*ypb.AIModelConfig {
 	models := make([]*ypb.AIModelConfig, 0, len(configs))
 	models = append(models, configs...)
 	return models
+}
+
+func cloneThirdPartyConfig(cfg *ypb.ThirdPartyApplicationConfig) *ypb.ThirdPartyApplicationConfig {
+	if cfg == nil {
+		return nil
+	}
+	return &ypb.ThirdPartyApplicationConfig{
+		Type:           cfg.GetType(),
+		APIKey:         cfg.GetAPIKey(),
+		UserIdentifier: cfg.GetUserIdentifier(),
+		UserSecret:     cfg.GetUserSecret(),
+		Namespace:      cfg.GetNamespace(),
+		Domain:         cfg.GetDomain(),
+		WebhookURL:     cfg.GetWebhookURL(),
+		Disabled:       cfg.GetDisabled(),
+		Proxy:          cfg.GetProxy(),
+		NoHttps:        cfg.GetNoHttps(),
+		APIType:        cfg.GetAPIType(),
+		ExtraParams:    cloneKVPairs(cfg.GetExtraParams()),
+	}
+}
+
+func cloneKVPairs(kvs []*ypb.KVPair) []*ypb.KVPair {
+	if len(kvs) == 0 {
+		return nil
+	}
+	cloned := make([]*ypb.KVPair, 0, len(kvs))
+	for _, kv := range kvs {
+		if kv == nil {
+			continue
+		}
+		cloned = append(cloned, &ypb.KVPair{Key: kv.GetKey(), Value: kv.GetValue()})
+	}
+	return cloned
 }
 
 func warnIfLegacyConfigFileExists() {

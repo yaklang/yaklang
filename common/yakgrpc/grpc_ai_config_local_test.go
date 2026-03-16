@@ -88,30 +88,30 @@ func TestAIGlobalConfig_GRPC_Local(t *testing.T) {
 	assert.Equal(t, "default-model", got.DefaultModelId)
 	assert.Equal(t, 0.88, got.GlobalWeight)
 	require.Len(t, got.IntelligentModels, 1)
-	assert.NotZero(t, got.IntelligentModels[0].ProviderId)
 	assert.NotNil(t, got.IntelligentModels[0].Provider)
 
 	providers, err := client.ListAIProviders(ctx, &ypb.Empty{})
 	require.NoError(t, err)
 	assert.GreaterOrEqual(t, len(providers.Providers), 2)
+	require.NotEmpty(t, providers.Providers)
+	selected := providers.Providers[0]
 
-	upsert, err := client.UpsertAIProvider(ctx, &ypb.UpsertAIProviderRequest{
+	_, err = client.UpsertAIProvider(ctx, &ypb.UpsertAIProviderRequest{
 		Provider: &ypb.AIProvider{
+			Id: selected.GetId(),
 			Config: &ypb.ThirdPartyApplicationConfig{
-				Type:   "custom",
-				APIKey: "custom-key",
-				Domain: "custom.example.com",
+				Type:   selected.GetConfig().GetType(),
+				APIKey: "updated-key",
+				Domain: selected.GetConfig().GetDomain(),
 			},
 		},
 	})
-	require.NoError(t, err)
-	require.NotNil(t, upsert.GetProvider())
-	assert.NotZero(t, upsert.Provider.Id)
+	require.Error(t, err)
 
 	queryResp, err := client.QueryAIProvider(ctx, &ypb.QueryAIProvidersRequest{
 		Filter: &ypb.AIProviderFilter{
-			Ids:    []int64{upsert.Provider.Id},
-			AIType: []string{"custom"},
+			Ids:    []int64{selected.GetId()},
+			AIType: []string{selected.GetConfig().GetType()},
 		},
 		Pagination: &ypb.Paging{
 			Page:    1,
@@ -124,8 +124,8 @@ func TestAIGlobalConfig_GRPC_Local(t *testing.T) {
 	require.NotNil(t, queryResp)
 	assert.Equal(t, int64(1), queryResp.Total)
 	require.Len(t, queryResp.Providers, 1)
-	assert.Equal(t, upsert.Provider.Id, queryResp.Providers[0].Id)
+	assert.Equal(t, selected.GetId(), queryResp.Providers[0].Id)
 
-	_, err = client.DeleteAIProvider(ctx, &ypb.DeleteAIProviderRequest{Id: upsert.Provider.Id})
-	require.NoError(t, err)
+	_, err = client.DeleteAIProvider(ctx, &ypb.DeleteAIProviderRequest{Id: selected.GetId()})
+	require.Error(t, err)
 }

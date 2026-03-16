@@ -1,11 +1,13 @@
 package yakit
 
 import (
-	"errors"
+	"hash/fnv"
+	"math"
+	"sort"
+	"strconv"
+	"strings"
 
 	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -17,119 +19,190 @@ const (
 	aiProviderDefaultDomain = "aibalance.yaklang.com"
 )
 
-func CreateAIProvider(db *gorm.DB, provider *schema.AIThirdPartyConfig) error {
-	if db == nil {
-		return utils.Error("no set database")
+func DefaultAIBalanceProviderConfig() *ypb.ThirdPartyApplicationConfig {
+	return &ypb.ThirdPartyApplicationConfig{
+		Type:   aiProviderTypeAIBalance,
+		APIKey: aiProviderDefaultAPIKey,
+		Domain: aiProviderDefaultDomain,
 	}
-	if provider == nil {
-		return utils.Error("provider is nil")
-	}
-	provider.Hash = provider.CalcHash()
-	return db.Create(provider).Error
 }
 
-func UpdateAIProvider(db *gorm.DB, id int64, provider *schema.AIThirdPartyConfig) error {
-	if db == nil {
-		return utils.Error("no set database")
-	}
-	if provider == nil {
-		return utils.Error("provider is nil")
-	}
-	provider.Hash = provider.CalcHash()
-	updates := map[string]interface{}{
-		"hash":            provider.Hash,
-		"type":            provider.Type,
-		"api_key":         provider.APIKey,
-		"user_identifier": provider.UserIdentifier,
-		"user_secret":     provider.UserSecret,
-		"namespace":       provider.Namespace,
-		"domain":          provider.Domain,
-		"webhook_url":     provider.WebhookURL,
-		"extra_params":    provider.ExtraParams,
-		"disabled":        provider.Disabled,
-		"proxy":           provider.Proxy,
-		"no_https":        provider.NoHttps,
-		"api_type":        provider.APIType,
-	}
-	return db.Model(&schema.AIThirdPartyConfig{}).Where("id = ?", id).Updates(updates).Error
-}
-
-func UpsertAIProvider(db *gorm.DB, provider *schema.AIThirdPartyConfig) (*schema.AIThirdPartyConfig, error) {
+func ListAIProviders(db *gorm.DB) ([]*ypb.AIProvider, error) {
 	if db == nil {
 		return nil, utils.Error("no set database")
 	}
-	if provider == nil {
-		return nil, utils.Error("provider is nil")
-	}
-	provider.Hash = provider.CalcHash()
-
-	var existProvider schema.AIThirdPartyConfig
-	err := db.Model(&schema.AIThirdPartyConfig{}).Where("hash = ?", provider.Hash).First(&existProvider).Error
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+	cfg, err := GetAIGlobalConfig(db)
+	if err != nil {
 		return nil, err
 	}
-	if err == nil {
-		if err := UpdateAIProvider(db, int64(existProvider.ID), provider); err != nil {
-			return nil, err
-		}
-		return GetAIProvider(db, int64(existProvider.ID))
-	}
-
-	if provider.ID > 0 {
-		if err := UpdateAIProvider(db, int64(provider.ID), provider); err != nil {
-			return nil, err
-		}
-		return GetAIProvider(db, int64(provider.ID))
-	}
-
-	if err := CreateAIProvider(db, provider); err != nil {
-		return nil, err
-	}
-	return provider, nil
+	return buildProvidersFromGlobalConfig(cfg), nil
 }
 
-func GetAIProvider(db *gorm.DB, id int64) (*schema.AIThirdPartyConfig, error) {
-	if db == nil {
-		return nil, utils.Error("no set database")
-	}
-	var provider schema.AIThirdPartyConfig
-	if err := db.Model(&schema.AIThirdPartyConfig{}).Where("id = ?", id).First(&provider).Error; err != nil {
-		return nil, err
-	}
-	return &provider, nil
-}
-
-func ListAIProviders(db *gorm.DB) ([]*schema.AIThirdPartyConfig, error) {
-	if db == nil {
-		return nil, utils.Error("no set database")
-	}
-	var providers []*schema.AIThirdPartyConfig
-	if err := db.Model(&schema.AIThirdPartyConfig{}).Order("id asc").Find(&providers).Error; err != nil {
-		return nil, err
-	}
-	return providers, nil
-}
-
-func FilterAIProvider(db *gorm.DB, filter *ypb.AIProviderFilter) *gorm.DB {
-	db = db.Model(&schema.AIThirdPartyConfig{})
-	if filter == nil {
-		return db
-	}
-
-	db = bizhelper.ExactQueryInt64ArrayOr(db, "id", filter.GetIds())
-	db = bizhelper.ExactQueryStringArrayOr(db, "type", filter.GetAIType())
-	return db
-}
-
-func QueryAIProviders(db *gorm.DB, filter *ypb.AIProviderFilter, paging *ypb.Paging) (*bizhelper.Paginator, []*schema.AIThirdPartyConfig, error) {
+func QueryAIProviders(db *gorm.DB, filter *ypb.AIProviderFilter, paging *ypb.Paging) (*bizhelper.Paginator, []*ypb.AIProvider, error) {
 	if db == nil {
 		return nil, nil, utils.Error("no set database")
 	}
 
-	db = FilterAIProvider(db, filter)
+	providers, err := ListAIProviders(db)
+	if err != nil {
+		return nil, nil, err
+	}
 
+	filtered := filterAIProviders(providers, filter)
+	paging = normalizePaging(paging)
+	sortAIProviders(filtered, paging.GetOrderBy(), paging.GetOrder())
+
+	total := len(filtered)
+	limit := int(paging.GetLimit())
+	page := int(paging.GetPage())
+	offset := 0
+	result := filtered
+
+	if limit != -1 {
+		offset = (page - 1) * limit
+		if offset >= total {
+			result = nil
+		} else {
+			end := offset + limit
+			if end > total {
+				end = total
+			}
+			result = filtered[offset:end]
+		}
+	}
+
+	totalPage := 0
+	if limit != 0 {
+		totalPage = int(math.Ceil(float64(total) / float64(limit)))
+	}
+
+	prevPage := page
+	if page > 1 {
+		prevPage = page - 1
+	}
+	nextPage := page + 1
+	if page == totalPage {
+		nextPage = page
+	}
+
+	return &bizhelper.Paginator{
+		TotalRecord: total,
+		TotalPage:   totalPage,
+		Records:     result,
+		Offset:      offset,
+		Limit:       limit,
+		Page:        page,
+		PrevPage:    prevPage,
+		NextPage:    nextPage,
+	}, result, nil
+}
+
+func UpsertAIProvider(db *gorm.DB, provider *ypb.AIProvider) (*ypb.AIProvider, error) {
+	if db == nil {
+		return nil, utils.Error("no set database")
+	}
+	return nil, utils.Error("upsert ai provider is deprecated; update AIGlobalConfig instead")
+}
+
+func DeleteAIProvider(db *gorm.DB, id int64) error {
+	if db == nil {
+		return utils.Error("no set database")
+	}
+	return utils.Error("delete ai provider is deprecated; update AIGlobalConfig instead")
+}
+
+func buildProvidersFromGlobalConfig(cfg *ypb.AIGlobalConfig) []*ypb.AIProvider {
+	if cfg == nil {
+		return nil
+	}
+
+	providers := make(map[string]*ypb.AIProvider)
+	addProvider := func(model *ypb.AIModelConfig) {
+		if model == nil {
+			return
+		}
+		provider := model.GetProvider()
+		if provider == nil {
+			return
+		}
+		hash := providerSignature(provider)
+		if hash == "" {
+			return
+		}
+		if _, exists := providers[hash]; exists {
+			return
+		}
+		providerID := model.GetProviderId()
+		if providerID == 0 {
+			providerID = providerIDFromHash(hash)
+		}
+		providers[hash] = &ypb.AIProvider{
+			Id:     providerID,
+			Config: cloneThirdPartyConfig(provider),
+		}
+	}
+
+	for _, model := range cfg.GetIntelligentModels() {
+		addProvider(model)
+	}
+	for _, model := range cfg.GetLightweightModels() {
+		addProvider(model)
+	}
+	for _, model := range cfg.GetVisionModels() {
+		addProvider(model)
+	}
+
+	result := make([]*ypb.AIProvider, 0, len(providers))
+	for _, provider := range providers {
+		result = append(result, provider)
+	}
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].GetId() == result[j].GetId() {
+			return result[i].GetConfig().GetType() < result[j].GetConfig().GetType()
+		}
+		return result[i].GetId() < result[j].GetId()
+	})
+
+	return result
+}
+
+func filterAIProviders(providers []*ypb.AIProvider, filter *ypb.AIProviderFilter) []*ypb.AIProvider {
+	if filter == nil {
+		return providers
+	}
+
+	idSet := map[int64]struct{}{}
+	for _, id := range filter.GetIds() {
+		idSet[id] = struct{}{}
+	}
+	typeSet := map[string]struct{}{}
+	for _, t := range filter.GetAIType() {
+		typeSet[t] = struct{}{}
+	}
+
+	result := make([]*ypb.AIProvider, 0, len(providers))
+	for _, provider := range providers {
+		if provider == nil || provider.GetConfig() == nil {
+			continue
+		}
+		if len(idSet) > 0 {
+			if _, ok := idSet[provider.GetId()]; !ok {
+				continue
+			}
+		}
+		if len(typeSet) > 0 {
+			if _, ok := typeSet[provider.GetConfig().GetType()]; !ok {
+				continue
+			}
+		}
+		result = append(result, provider)
+	}
+	return result
+}
+
+func normalizePaging(paging *ypb.Paging) *ypb.Paging {
 	if paging == nil {
-		paging = &ypb.Paging{Page: 1, Limit: 10, OrderBy: "id", Order: "asc"}
+		return &ypb.Paging{Page: 1, Limit: 10, OrderBy: "id", Order: "asc"}
 	}
 	if paging.GetPage() <= 0 {
 		paging.Page = 1
@@ -143,61 +216,133 @@ func QueryAIProviders(db *gorm.DB, filter *ypb.AIProviderFilter, paging *ypb.Pag
 	if paging.GetRawOrder() == "" && paging.GetOrder() == "" {
 		paging.Order = "asc"
 	}
-
-	var providers []*schema.AIThirdPartyConfig
-	pag, db := bizhelper.YakitPagingQuery(db, paging, &providers)
-	if db.Error != nil {
-		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
-	}
-	return pag, providers, nil
+	return paging
 }
 
-func DeleteAIProvider(db *gorm.DB, id int64) error {
-	if db == nil {
-		return utils.Error("no set database")
+func sortAIProviders(providers []*ypb.AIProvider, orderBy, order string) {
+	orderBy = strings.ToLower(strings.TrimSpace(orderBy))
+	order = strings.ToLower(strings.TrimSpace(order))
+	if orderBy == "" {
+		orderBy = "id"
 	}
-	return db.Model(&schema.AIThirdPartyConfig{}).Where("id = ?", id).Unscoped().Delete(&schema.AIThirdPartyConfig{}).Error
+	desc := order == "desc"
+
+	sort.Slice(providers, func(i, j int) bool {
+		a := providers[i]
+		b := providers[j]
+		if a == nil || b == nil {
+			return a != nil
+		}
+
+		var less bool
+		switch orderBy {
+		case "type":
+			at := a.GetConfig().GetType()
+			bt := b.GetConfig().GetType()
+			if at == bt {
+				less = a.GetId() < b.GetId()
+			} else {
+				less = at < bt
+			}
+		default:
+			if a.GetId() == b.GetId() {
+				less = a.GetConfig().GetType() < b.GetConfig().GetType()
+			} else {
+				less = a.GetId() < b.GetId()
+			}
+		}
+
+		if desc {
+			return !less
+		}
+		return less
+	})
 }
 
-func LoadAIProviderMap(db *gorm.DB) (map[int64]*schema.AIThirdPartyConfig, error) {
-	providers, err := ListAIProviders(db)
-	if err != nil {
-		return nil, err
+func filterModelsByProvider(models []*ypb.AIModelConfig, id int64, removed bool) ([]*ypb.AIModelConfig, bool) {
+	if len(models) == 0 {
+		return nil, removed
 	}
-	result := make(map[int64]*schema.AIThirdPartyConfig, len(providers))
-	for _, p := range providers {
-		if p == nil {
+	result := models[:0]
+	for _, model := range models {
+		if providerMatches(model, id, "") {
+			removed = true
 			continue
 		}
-		result[int64(p.ID)] = p
+		result = append(result, model)
 	}
-	return result, nil
+	if len(result) == 0 {
+		return nil, removed
+	}
+	return result, removed
 }
 
-// EnsureAIBalanceProviderConfig ensures the default aibalance provider exists.
-// This keeps fresh installs usable with free AI services.
-func EnsureAIBalanceProviderConfig(db *gorm.DB) int64 {
-	if db == nil {
-		return 0
+func providerMatches(model *ypb.AIModelConfig, id int64, hash string) bool {
+	if model == nil || model.GetProvider() == nil {
+		return false
 	}
-	var existConfig schema.AIThirdPartyConfig
-	if err := db.Model(&schema.AIThirdPartyConfig{}).Where("type = ?", aiProviderTypeAIBalance).First(&existConfig).Error; err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		log.Warnf("query aibalance provider failed: %v", err)
-		return 0
+	if id != 0 {
+		if model.GetProviderId() == id {
+			return true
+		}
+		modelHash := providerSignature(model.GetProvider())
+		if providerIDFromHash(modelHash) == id {
+			return true
+		}
 	}
-	if existConfig.ID != 0 {
-		return int64(existConfig.ID)
+	if hash == "" {
+		return false
+	}
+	return providerSignature(model.GetProvider()) == hash
+}
+
+func providerSignature(cfg *ypb.ThirdPartyApplicationConfig) string {
+	if cfg == nil {
+		return ""
+	}
+	extra := make(map[string]string)
+	keys := make([]string, 0, len(cfg.GetExtraParams()))
+	for _, kv := range cfg.GetExtraParams() {
+		if kv == nil {
+			continue
+		}
+		key := kv.GetKey()
+		extra[key] = kv.GetValue()
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	var builder strings.Builder
+	for _, k := range keys {
+		builder.WriteString(k)
+		builder.WriteString("=")
+		builder.WriteString(extra[k])
+		builder.WriteString(";")
 	}
 
-	provider := &schema.AIThirdPartyConfig{
-		Type:   aiProviderTypeAIBalance,
-		APIKey: aiProviderDefaultAPIKey,
-		Domain: aiProviderDefaultDomain,
-	}
-	if err := db.Create(provider).Error; err != nil {
-		log.Warnf("create default aibalance provider failed: %v", err)
+	return utils.CalcSha256(
+		cfg.GetType(),
+		cfg.GetAPIKey(),
+		cfg.GetUserIdentifier(),
+		cfg.GetUserSecret(),
+		cfg.GetNamespace(),
+		cfg.GetDomain(),
+		cfg.GetWebhookURL(),
+		builder.String(),
+		cfg.GetProxy(),
+		cfg.GetNoHttps(),
+	)
+}
+
+func providerIDFromHash(hash string) int64 {
+	if hash == "" {
 		return 0
 	}
-	log.Infof("Added default AIBalance provider config (key: %s)", aiProviderDefaultAPIKey)
-	return int64(provider.ID)
+	if len(hash) >= 16 {
+		if v, err := strconv.ParseUint(hash[:16], 16, 64); err == nil {
+			return int64(v & math.MaxInt64)
+		}
+	}
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(hash))
+	return int64(h.Sum64() & math.MaxInt64)
 }

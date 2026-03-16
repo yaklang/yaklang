@@ -5,6 +5,7 @@ import (
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -44,10 +45,7 @@ func GetAIGlobalConfig(db *gorm.DB) (*ypb.AIGlobalConfig, error) {
 	if cfg.RoutingPolicy == "" {
 		cfg.RoutingPolicy = defaultRoutingPolicy
 	}
-	providerMap, _ := LoadAIProviderMap(db)
-	fillProviders(cfg.IntelligentModels, providerMap)
-	fillProviders(cfg.LightweightModels, providerMap)
-	fillProviders(cfg.VisionModels, providerMap)
+	recoverProvidersFromDeprecatedConfig(db, cfg)
 	return cfg, nil
 }
 
@@ -59,13 +57,13 @@ func SetAIGlobalConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig) (*ypb.AIGlobalConfi
 		return nil, utils.Error("config is nil")
 	}
 
-	if err := normalizeModelConfigs(db, cfg.IntelligentModels); err != nil {
+	if err := validateModelConfigs(cfg.IntelligentModels); err != nil {
 		return nil, err
 	}
-	if err := normalizeModelConfigs(db, cfg.LightweightModels); err != nil {
+	if err := validateModelConfigs(cfg.LightweightModels); err != nil {
 		return nil, err
 	}
-	if err := normalizeModelConfigs(db, cfg.VisionModels); err != nil {
+	if err := validateModelConfigs(cfg.VisionModels); err != nil {
 		return nil, err
 	}
 
@@ -84,21 +82,6 @@ func ApplyAIGlobalConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig) error {
 		consts.SetTieredAIConfig(nil)
 		return nil
 	}
-	providerMap, _ := LoadAIProviderMap(db)
-
-	cloneExtraParams := func(extra []*ypb.KVPair) []*ypb.KVPair {
-		if len(extra) == 0 {
-			return nil
-		}
-		cloned := make([]*ypb.KVPair, 0, len(extra))
-		for _, kv := range extra {
-			if kv == nil {
-				continue
-			}
-			cloned = append(cloned, &ypb.KVPair{Key: kv.GetKey(), Value: kv.GetValue()})
-		}
-		return cloned
-	}
 
 	buildModels := func(models []*ypb.AIModelConfig) []*ypb.AIModelConfig {
 		if len(models) == 0 {
@@ -109,7 +92,7 @@ func ApplyAIGlobalConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig) error {
 			if model == nil {
 				continue
 			}
-			providerCfg := resolveProviderForModel(model, providerMap)
+			providerCfg := cloneThirdPartyConfig(model.GetProvider())
 			if providerCfg == nil {
 				continue
 			}
@@ -117,7 +100,7 @@ func ApplyAIGlobalConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig) error {
 				ProviderId:  model.GetProviderId(),
 				Provider:    providerCfg,
 				ModelName:   model.GetModelName(),
-				ExtraParams: cloneExtraParams(model.GetExtraParams()),
+				ExtraParams: cloneKVPairs(model.GetExtraParams()),
 			})
 		}
 		return result
@@ -151,7 +134,7 @@ func ApplyAIGlobalConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig) error {
 	return nil
 }
 
-func normalizeModelConfigs(db *gorm.DB, models []*ypb.AIModelConfig) error {
+func validateModelConfigs(models []*ypb.AIModelConfig) error {
 	if len(models) == 0 {
 		return nil
 	}
@@ -159,43 +142,11 @@ func normalizeModelConfigs(db *gorm.DB, models []*ypb.AIModelConfig) error {
 		if model == nil {
 			continue
 		}
-
-		providerId := model.GetProviderId()
-		if model.GetProvider() != nil {
-			provider := schema.AIThirdPartyConfigFromGRPC(model.GetProvider())
-			if providerId > 0 {
-				provider.ID = uint(providerId)
-			}
-			provider.CalcHash()
-			saved, err := UpsertAIProvider(db, provider)
-			if err != nil {
-				return err
-			}
-			model.ProviderId = int64(saved.ID)
-			model.Provider = nil
-			providerId = model.ProviderId
-		}
-
-		if providerId == 0 {
+		if model.GetProvider() == nil {
 			return utils.Error("model config missing provider")
-		}
-		if _, err := GetAIProvider(db, providerId); err != nil {
-			return err
 		}
 	}
 	return nil
-}
-
-func resolveProviderForModel(model *ypb.AIModelConfig, providerMap map[int64]*schema.AIThirdPartyConfig) *ypb.ThirdPartyApplicationConfig {
-	if model == nil {
-		return nil
-	}
-	if model.GetProviderId() != 0 {
-		if provider, ok := providerMap[model.GetProviderId()]; ok {
-			return provider.ToThirdPartyConfig()
-		}
-	}
-	return model.GetProvider()
 }
 
 func mergeProviderAndModel(provider *ypb.ThirdPartyApplicationConfig, model *ypb.AIModelConfig) *ypb.ThirdPartyApplicationConfig {
@@ -228,17 +179,6 @@ func mergeProviderAndModel(provider *ypb.ThirdPartyApplicationConfig, model *ypb
 	return merged
 }
 
-func fillProviders(models []*ypb.AIModelConfig, providerMap map[int64]*schema.AIThirdPartyConfig) {
-	for _, model := range models {
-		if model == nil || model.Provider != nil || model.ProviderId == 0 {
-			continue
-		}
-		if provider, ok := providerMap[model.ProviderId]; ok {
-			model.Provider = provider.ToThirdPartyConfig()
-		}
-	}
-}
-
 func mapFromKVPairs(kvs []*ypb.KVPair) map[string]string {
 	if len(kvs) == 0 {
 		return map[string]string{}
@@ -259,4 +199,99 @@ func kvPairsFromMap(m map[string]string) []*ypb.KVPair {
 		pairs = append(pairs, &ypb.KVPair{Key: k, Value: v})
 	}
 	return pairs
+}
+
+func cloneKVPairs(kvs []*ypb.KVPair) []*ypb.KVPair {
+	if len(kvs) == 0 {
+		return nil
+	}
+	cloned := make([]*ypb.KVPair, 0, len(kvs))
+	for _, kv := range kvs {
+		if kv == nil {
+			continue
+		}
+		cloned = append(cloned, &ypb.KVPair{Key: kv.GetKey(), Value: kv.GetValue()})
+	}
+	return cloned
+}
+
+func cloneThirdPartyConfig(cfg *ypb.ThirdPartyApplicationConfig) *ypb.ThirdPartyApplicationConfig {
+	if cfg == nil {
+		return nil
+	}
+	return &ypb.ThirdPartyApplicationConfig{
+		Type:           cfg.GetType(),
+		APIKey:         cfg.GetAPIKey(),
+		UserIdentifier: cfg.GetUserIdentifier(),
+		UserSecret:     cfg.GetUserSecret(),
+		Namespace:      cfg.GetNamespace(),
+		Domain:         cfg.GetDomain(),
+		WebhookURL:     cfg.GetWebhookURL(),
+		Disabled:       cfg.GetDisabled(),
+		Proxy:          cfg.GetProxy(),
+		NoHttps:        cfg.GetNoHttps(),
+		APIType:        cfg.GetAPIType(),
+		ExtraParams:    cloneKVPairs(cfg.GetExtraParams()),
+	}
+}
+
+func recoverProvidersFromDeprecatedConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig) {
+	if db == nil || cfg == nil {
+		return
+	}
+	needsRecovery := false
+	collectIDs := func(models []*ypb.AIModelConfig, ids map[int64]struct{}) {
+		for _, model := range models {
+			if model == nil || model.GetProvider() != nil {
+				continue
+			}
+			if model.GetProviderId() == 0 {
+				continue
+			}
+			needsRecovery = true
+			ids[model.GetProviderId()] = struct{}{}
+		}
+	}
+
+	ids := make(map[int64]struct{})
+	collectIDs(cfg.GetIntelligentModels(), ids)
+	collectIDs(cfg.GetLightweightModels(), ids)
+	collectIDs(cfg.GetVisionModels(), ids)
+	if !needsRecovery || len(ids) == 0 {
+		return
+	}
+
+	idList := make([]int64, 0, len(ids))
+	for id := range ids {
+		idList = append(idList, id)
+	}
+
+	var legacyProviders []*schema.AIThirdPartyConfig
+	if err := db.Model(&schema.AIThirdPartyConfig{}).Where("id in (?)", idList).Find(&legacyProviders).Error; err != nil {
+		log.Debugf("recover deprecated ai providers failed: %v", err)
+		return
+	}
+
+	legacyMap := make(map[int64]*schema.AIThirdPartyConfig, len(legacyProviders))
+	for _, provider := range legacyProviders {
+		if provider == nil {
+			continue
+		}
+		legacyMap[int64(provider.ID)] = provider
+	}
+
+	fillProvider := func(models []*ypb.AIModelConfig) {
+		for _, model := range models {
+			if model == nil || model.GetProvider() != nil || model.GetProviderId() == 0 {
+				continue
+			}
+			if legacy, ok := legacyMap[model.GetProviderId()]; ok {
+				model.Provider = legacy.ToThirdPartyConfig()
+			}
+		}
+	}
+
+	fillProvider(cfg.IntelligentModels)
+	fillProvider(cfg.LightweightModels)
+	fillProvider(cfg.VisionModels)
 }
