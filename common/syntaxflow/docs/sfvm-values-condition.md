@@ -292,6 +292,11 @@ nativecall 的问题和普通 value operator 一样：
 
 空组必须保留这一点很关键。像 `<len>` 这种 grouped nativecall，在 condition 中语义上需要对每个 slot 都给出结果；没有结果和结果为 0 不是一回事。
 
+实现上，分组逻辑由 `sfvm.Values.AnchorGroups(base,width)` 提供；nativecall wrapper 仅负责：
+
+- 给每个 slot 找到一个 `slotSource`（优先取 scope 的原始 source slot，空位再回退到该组的 first）
+- 把 scope 的 slot anchor bits 合并回 nativecall 派生结果
+
 ### 4.4 grouped nativecall 的所有权边界
 
 `ValuesNativeCall` 解决的不是“业务逻辑”，而是“框架如何把 grouped 语义正确地放到 condition 里运行”。

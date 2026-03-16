@@ -186,7 +186,7 @@ const (
 	NativeCall_MatchRegexpPath = "matchRegexpPath"
 )
 
-var nativeCallLength = sfvm.ValuesNativeCall(func(group sfvm.Values, template sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (sfvm.Values, error) {
+var nativeCallLength = sfvm.ValuesNativeCall(func(group sfvm.Values, slotSource sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (sfvm.Values, error) {
 	count := 0
 	_ = group.Recursive(func(operator sfvm.ValueOperator) error {
 		if utils.IsNil(operator) || operator.IsEmpty() {
@@ -196,21 +196,21 @@ var nativeCallLength = sfvm.ValuesNativeCall(func(group sfvm.Values, template sf
 		return nil
 	})
 
-	if utils.IsNil(template) {
-		template, _ = group.First()
+	if utils.IsNil(slotSource) {
+		slotSource, _ = group.First()
 	}
-	if utils.IsNil(template) {
+	if utils.IsNil(slotSource) {
 		return sfvm.NewEmptyValues(), nil
 	}
 
-	result := template.NewConst(count)
+	result := slotSource.NewConst(count)
 	if utils.IsNil(result) {
 		return sfvm.NewEmptyValues(), nil
 	}
 	return sfvm.ValuesOf(result), nil
 })
 
-var nativeCallSlice = sfvm.ValuesNativeCall(func(group sfvm.Values, template sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (sfvm.Values, error) {
+var nativeCallSlice = sfvm.ValuesNativeCall(func(group sfvm.Values, slotSource sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (sfvm.Values, error) {
 	start := params.GetInt(0, "start")
 	index := params.GetInt(0, "index")
 

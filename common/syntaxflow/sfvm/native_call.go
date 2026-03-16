@@ -68,7 +68,7 @@ func (n *NativeCallActualParams) GetInt(index any, extra ...any) int {
 type NativeCallFunc func(v Values, frame *SFFrame, params *NativeCallActualParams) (bool, Values, error)
 
 type ValueSingleNativeCallFunc func(operator ValueOperator, frame *SFFrame, params *NativeCallActualParams) (Values, error)
-type ValuesNativeCallFunc func(group Values, template ValueOperator, frame *SFFrame, params *NativeCallActualParams) (Values, error)
+type ValuesNativeCallFunc func(group Values, slotSource ValueOperator, frame *SFFrame, params *NativeCallActualParams) (Values, error)
 
 var nativeCallTable = map[string]NativeCallFunc{}
 
@@ -83,65 +83,9 @@ func GetNativeCall(name string) (NativeCallFunc, error) {
 	return nil, utils.Wrap(CriticalError, "native call not found: "+name)
 }
 
-type nativeCallGroup struct {
-	index      int
-	values     Values
-	template   ValueOperator
-	anchorBits *utils.BitVector
-}
-
 type nativeCallGroupResult struct {
 	index  int
 	values Values
-}
-
-func firstValue(values Values) ValueOperator {
-	value, _ := values.First()
-	return value
-}
-
-func nativeCallGroups(values Values, frame *SFFrame) []nativeCallGroup {
-	scope, ok := frame.activeAnchorScope()
-	if !ok || scope.anchorWidth <= 0 {
-		template := firstValue(values)
-		return []nativeCallGroup{{
-			index:      0,
-			values:     values,
-			template:   template,
-			anchorBits: nil,
-		}}
-	}
-
-	grouped := make([]Values, scope.anchorWidth)
-	_ = values.Recursive(func(operator ValueOperator) error {
-		forEachAnchorIndexInScope(operator, scope.anchorBase, scope.anchorWidth, func(rel int) {
-			grouped[rel] = append(grouped[rel], operator)
-		})
-		return nil
-	})
-
-	groups := make([]nativeCallGroup, 0, scope.anchorWidth)
-	for idx := 0; idx < scope.anchorWidth; idx++ {
-		var template ValueOperator
-		if idx < len(scope.source) {
-			template = scope.source[idx]
-		}
-		if utils.IsNil(template) {
-			template = firstValue(grouped[idx])
-		}
-
-		var anchorBits *utils.BitVector
-		if idx < len(scope.slotAnchorBits) {
-			anchorBits = scope.slotAnchorBits[idx]
-		}
-		groups = append(groups, nativeCallGroup{
-			index:      idx,
-			values:     grouped[idx],
-			template:   template,
-			anchorBits: anchorBits,
-		})
-	}
-	return groups
 }
 
 func ValueSingleNativeCall(f ValueSingleNativeCallFunc) NativeCallFunc {
@@ -161,30 +105,55 @@ func ValueSingleNativeCall(f ValueSingleNativeCallFunc) NativeCallFunc {
 
 func ValuesNativeCall(f ValuesNativeCallFunc) NativeCallFunc {
 	return func(v Values, frame *SFFrame, params *NativeCallActualParams) (bool, Values, error) {
-		groups := nativeCallGroups(v, frame)
-		if len(groups) == 0 {
-			return false, nil, utils.Error("no value found")
-		}
-
 		ctx := context.Background()
 		if frame != nil {
 			ctx = frame.GetContext()
 		}
 
-		pipe := pipeline.NewPipe(ctx, len(groups), func(group nativeCallGroup) (nativeCallGroupResult, error) {
-			values, err := f(group.values, group.template, frame, params)
+		var groups []Values
+		var slotSources []ValueOperator
+		var slotAnchorBits []*utils.BitVector
+
+		scope, ok := frame.activeAnchorScope()
+		if !ok || scope.anchorWidth <= 0 {
+			groups = []Values{v}
+			slotSource, _ := v.First()
+			slotSources = []ValueOperator{slotSource}
+			slotAnchorBits = []*utils.BitVector{nil}
+		} else {
+			groups = v.AnchorGroups(scope.anchorBase, scope.anchorWidth)
+			slotSources = make([]ValueOperator, scope.anchorWidth)
+			for idx := 0; idx < scope.anchorWidth; idx++ {
+				var slotSource ValueOperator
+				if idx < len(scope.source) {
+					slotSource = scope.source[idx]
+				}
+				if utils.IsNil(slotSource) {
+					slotSource, _ = groups[idx].First()
+				}
+				slotSources[idx] = slotSource
+			}
+			slotAnchorBits = scope.slotAnchorBits
+		}
+
+		if len(groups) == 0 {
+			return false, nil, utils.Error("no value found")
+		}
+
+		pipe := pipeline.NewPipe(ctx, len(groups), func(idx int) (nativeCallGroupResult, error) {
+			values, err := f(groups[idx], slotSources[idx], frame, params)
 			if err != nil {
 				return nativeCallGroupResult{}, err
 			}
-			if group.anchorBits != nil && !group.anchorBits.IsEmpty() {
+			if idx < len(slotAnchorBits) && slotAnchorBits[idx] != nil && !slotAnchorBits[idx].IsEmpty() {
 				for _, value := range values {
-					mergeAnchorBits(value, group.anchorBits)
+					mergeAnchorBits(value, slotAnchorBits[idx])
 				}
 			}
-			return nativeCallGroupResult{index: group.index, values: values}, nil
+			return nativeCallGroupResult{index: idx, values: values}, nil
 		})
-		for _, group := range groups {
-			pipe.Feed(group)
+		for idx := 0; idx < len(groups); idx++ {
+			pipe.Feed(idx)
 		}
 		pipe.Close()
 

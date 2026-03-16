@@ -504,7 +504,10 @@ func (s *SFFrame) execFilterAndCondition(i *SFI) (bool, error) {
 			return true, utils.Wrap(CriticalError, "condition failed: stack top is empty")
 		}
 		entry := s.popCondition()
-		filtered, err := applyCondition(vs, entry)
+		if entry == nil {
+			return true, utils.Wrap(CriticalError, "condition failed: empty condition stack")
+		}
+		filtered, err := entry.Apply(vs)
 		if err != nil {
 			return true, err
 		}
