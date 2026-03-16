@@ -88,12 +88,8 @@ func TestAIGlobalConfig_GRPC_Local(t *testing.T) {
 	assert.Equal(t, "default-model", got.DefaultModelId)
 	assert.Equal(t, 0.88, got.GlobalWeight)
 	require.Len(t, got.IntelligentModels, 1)
-	assert.NotZero(t, got.IntelligentModels[0].ProviderId)
 	assert.NotNil(t, got.IntelligentModels[0].Provider)
-
-	providers, err := client.ListAIProviders(ctx, &ypb.Empty{})
-	require.NoError(t, err)
-	assert.GreaterOrEqual(t, len(providers.Providers), 2)
+	assert.Equal(t, "openai", got.IntelligentModels[0].GetProvider().GetType())
 
 	upsert, err := client.UpsertAIProvider(ctx, &ypb.UpsertAIProviderRequest{
 		Provider: &ypb.AIProvider{
@@ -125,6 +121,27 @@ func TestAIGlobalConfig_GRPC_Local(t *testing.T) {
 	assert.Equal(t, int64(1), queryResp.Total)
 	require.Len(t, queryResp.Providers, 1)
 	assert.Equal(t, upsert.Provider.Id, queryResp.Providers[0].Id)
+
+	_, err = client.SetAIGlobalConfig(ctx, &ypb.AIGlobalConfig{
+		Enabled: true,
+		IntelligentModels: []*ypb.AIModelConfig{
+			{
+				ModelName:  "use-provider-id",
+				ProviderId: upsert.Provider.Id,
+				Provider:   &ypb.ThirdPartyApplicationConfig{},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	hydrated, err := client.GetAIGlobalConfig(ctx, &ypb.Empty{})
+	require.NoError(t, err)
+	require.Len(t, hydrated.IntelligentModels, 1)
+	assert.Equal(t, upsert.Provider.Id, hydrated.IntelligentModels[0].ProviderId)
+	require.NotNil(t, hydrated.IntelligentModels[0].Provider)
+	assert.Equal(t, "custom", hydrated.IntelligentModels[0].GetProvider().GetType())
+	assert.Equal(t, "custom-key", hydrated.IntelligentModels[0].GetProvider().GetAPIKey())
+	assert.Equal(t, "custom.example.com", hydrated.IntelligentModels[0].GetProvider().GetDomain())
 
 	_, err = client.DeleteAIProvider(ctx, &ypb.DeleteAIProviderRequest{Id: upsert.Provider.Id})
 	require.NoError(t, err)

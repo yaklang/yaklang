@@ -27,6 +27,10 @@ func HasAIGlobalConfig(db *gorm.DB) bool {
 }
 
 func GetAIGlobalConfig(db *gorm.DB) (*ypb.AIGlobalConfig, error) {
+	return GetRawAIGlobalConfig(db)
+}
+
+func GetRawAIGlobalConfig(db *gorm.DB) (*ypb.AIGlobalConfig, error) {
 	if db == nil {
 		return nil, utils.Error("no set database")
 	}
@@ -44,10 +48,25 @@ func GetAIGlobalConfig(db *gorm.DB) (*ypb.AIGlobalConfig, error) {
 	if cfg.RoutingPolicy == "" {
 		cfg.RoutingPolicy = defaultRoutingPolicy
 	}
-	providerMap, _ := LoadAIProviderMap(db)
-	fillProviders(cfg.IntelligentModels, providerMap)
-	fillProviders(cfg.LightweightModels, providerMap)
-	fillProviders(cfg.VisionModels, providerMap)
+	hydrateAIGlobalConfigProviders(db, cfg)
+	return cfg, nil
+}
+
+func SetRawAIGlobalConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig) (*ypb.AIGlobalConfig, error) {
+	if db == nil {
+		return nil, utils.Error("no set database")
+	}
+	if cfg == nil {
+		return nil, utils.Error("config is nil")
+	}
+
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		return nil, err
+	}
+	if err := SetKey(db, consts.AI_GLOBAL_CONFIG_KEY, string(data)); err != nil {
+		return nil, err
+	}
 	return cfg, nil
 }
 
@@ -230,13 +249,44 @@ func mergeProviderAndModel(provider *ypb.ThirdPartyApplicationConfig, model *ypb
 
 func fillProviders(models []*ypb.AIModelConfig, providerMap map[int64]*schema.AIThirdPartyConfig) {
 	for _, model := range models {
-		if model == nil || model.Provider != nil || model.ProviderId == 0 {
+		if model == nil || model.ProviderId == 0 || hasProviderConfig(model.Provider) {
 			continue
 		}
 		if provider, ok := providerMap[model.ProviderId]; ok {
 			model.Provider = provider.ToThirdPartyConfig()
 		}
 	}
+}
+
+func hydrateAIGlobalConfigProviders(db *gorm.DB, cfg *ypb.AIGlobalConfig) {
+	if db == nil || cfg == nil {
+		return
+	}
+	providerMap, err := LoadAIProviderMap(db)
+	if err != nil {
+		return
+	}
+	fillProviders(cfg.IntelligentModels, providerMap)
+	fillProviders(cfg.LightweightModels, providerMap)
+	fillProviders(cfg.VisionModels, providerMap)
+}
+
+func hasProviderConfig(provider *ypb.ThirdPartyApplicationConfig) bool {
+	if provider == nil {
+		return false
+	}
+	return provider.GetType() != "" ||
+		provider.GetAPIKey() != "" ||
+		provider.GetUserIdentifier() != "" ||
+		provider.GetUserSecret() != "" ||
+		provider.GetNamespace() != "" ||
+		provider.GetDomain() != "" ||
+		provider.GetWebhookURL() != "" ||
+		len(provider.GetExtraParams()) > 0 ||
+		provider.GetDisabled() ||
+		provider.GetProxy() != "" ||
+		provider.GetNoHttps() ||
+		provider.GetAPIType() != ""
 }
 
 func mapFromKVPairs(kvs []*ypb.KVPair) map[string]string {

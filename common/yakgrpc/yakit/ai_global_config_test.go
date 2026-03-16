@@ -150,6 +150,54 @@ func TestSetAIGlobalConfigRequiresProvider(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestGetRawAIGlobalConfigHydratesProvidersByID(t *testing.T) {
+	db := setupAIGlobalConfigTestDB(t)
+	defer db.Close()
+
+	provider, err := UpsertAIProvider(db, &schema.AIThirdPartyConfig{
+		Type:   "custom",
+		APIKey: "custom-key",
+		Domain: "custom.example.com",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, provider)
+
+	_, err = SetRawAIGlobalConfig(db, &ypb.AIGlobalConfig{
+		IntelligentModels: []*ypb.AIModelConfig{{
+			ModelName:  "smart-model",
+			ProviderId: int64(provider.ID),
+			Provider:   &ypb.ThirdPartyApplicationConfig{},
+		}},
+		LightweightModels: []*ypb.AIModelConfig{{
+			ModelName:  "light-model",
+			ProviderId: int64(provider.ID),
+		}},
+		VisionModels: []*ypb.AIModelConfig{{
+			ModelName:  "vision-model",
+			ProviderId: int64(provider.ID),
+			Provider:   &ypb.ThirdPartyApplicationConfig{},
+		}},
+	})
+	require.NoError(t, err)
+
+	loaded, err := GetRawAIGlobalConfig(db)
+	require.NoError(t, err)
+	require.NotNil(t, loaded)
+
+	require.Len(t, loaded.IntelligentModels, 1)
+	require.NotNil(t, loaded.IntelligentModels[0].Provider)
+	assert.Equal(t, "custom", loaded.IntelligentModels[0].GetProvider().GetType())
+	assert.Equal(t, "custom-key", loaded.IntelligentModels[0].GetProvider().GetAPIKey())
+
+	require.Len(t, loaded.LightweightModels, 1)
+	require.NotNil(t, loaded.LightweightModels[0].Provider)
+	assert.Equal(t, "custom.example.com", loaded.LightweightModels[0].GetProvider().GetDomain())
+
+	require.Len(t, loaded.VisionModels, 1)
+	require.NotNil(t, loaded.VisionModels[0].Provider)
+	assert.Equal(t, int64(provider.ID), loaded.VisionModels[0].ProviderId)
+}
+
 func lookupExtraParam(cfg *ypb.AIModelConfig, key string) string {
 	if cfg == nil {
 		return ""

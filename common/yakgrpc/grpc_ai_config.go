@@ -10,7 +10,7 @@ import (
 )
 
 func (s *Server) GetAIGlobalConfig(ctx context.Context, _ *ypb.Empty) (*ypb.AIGlobalConfig, error) {
-	cfg, err := yakit.GetAIGlobalConfig(s.GetProfileDatabase())
+	cfg, err := yakit.GetRawAIGlobalConfig(s.GetProfileDatabase())
 	if err != nil {
 		return nil, err
 	}
@@ -24,11 +24,11 @@ func (s *Server) SetAIGlobalConfig(ctx context.Context, cfg *ypb.AIGlobalConfig)
 	if cfg == nil {
 		return nil, utils.Error("config is nil")
 	}
-	normalized, err := yakit.SetAIGlobalConfig(s.GetProfileDatabase(), cfg)
+	saved, err := yakit.SetRawAIGlobalConfig(s.GetProfileDatabase(), cfg)
 	if err != nil {
 		return nil, err
 	}
-	if err := yakit.ApplyAIGlobalConfig(s.GetProfileDatabase(), normalized); err != nil {
+	if err := yakit.ApplyAIGlobalConfig(s.GetProfileDatabase(), saved); err != nil {
 		return nil, err
 	}
 	return &ypb.Empty{}, nil
