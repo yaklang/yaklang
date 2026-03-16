@@ -133,13 +133,14 @@ func targz(path string, gzName string, withRootPath bool, includeTarGz bool) err
 		gzAbs = filepath.Join(cwd, gzAbs)
 	}
 	gzAbs = filepath.Clean(gzAbs)
+	gzInfo, _ := os.Stat(gzAbs)
 
 	// 递归地添加文件夹内容到 tar 归档
 	err = filepath.Walk(path, func(filePath string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		return addFileToTarWriter(filePath, info, relBase, tarWriter, gzAbs, includeTarGz)
+		return addFileToTarWriter(filePath, info, relBase, tarWriter, gzAbs, gzInfo, includeTarGz)
 	})
 
 	if err != nil {
@@ -147,9 +148,16 @@ func targz(path string, gzName string, withRootPath bool, includeTarGz bool) err
 	}
 	return nil
 }
-func addFileToTarWriter(path string, info os.FileInfo, rootDir string, tarWriter *tar.Writer, gzAbs string, includeTarGz bool) error {
+func addFileToTarWriter(path string, info os.FileInfo, rootDir string, tarWriter *tar.Writer, gzAbs string, gzInfo os.FileInfo, includeTarGz bool) error {
 	if abs, err := filepath.Abs(path); err == nil && filepath.Clean(abs) == gzAbs {
 		return nil
+	}
+	// When paths contain symlinks, string-cleaned comparisons are insufficient.
+	// Use os.SameFile to avoid accidentally packing the output tar.gz into itself.
+	if gzInfo != nil {
+		if curInfo, err := os.Stat(path); err == nil && os.SameFile(curInfo, gzInfo) {
+			return nil
+		}
 	}
 
 	// 获取文件的基本名称

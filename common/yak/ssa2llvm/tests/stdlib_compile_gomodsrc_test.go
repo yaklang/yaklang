@@ -10,8 +10,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/yak/ssa2llvm/clibuild"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/compiler"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/embed"
 )
 
 func TestStdlibCompileFromGomodsrcTree(t *testing.T) {
@@ -42,7 +42,7 @@ func TestStdlibCompileFromGomodsrcTree(t *testing.T) {
 	require.NoError(t, os.MkdirAll(gcDstDir, 0o755))
 	require.NoError(t, copyFileBytes(libgcPath, filepath.Join(gcDstDir, "libgc.a")))
 
-	archivePath, gcLibDir, err := clibuild.BuildRuntimeArchiveFromSourceTree(buildDir, srcDir)
+	archivePath, gcLibDir, err := embed.BuildRuntimeArchiveFromSourceTree(buildDir, srcDir)
 	require.NoError(t, err)
 
 	// Compile a known-good yak program using this runtime archive and run it.
@@ -54,7 +54,7 @@ func TestStdlibCompileFromGomodsrcTree(t *testing.T) {
 	require.NoError(t, os.WriteFile(tmpYak, codeBytes, 0o644))
 
 	outBin := filepath.Join(tmpRoot, "example.bin")
-	require.NoError(t, compiler.CompileToExecutable(
+	_, err = compiler.CompileToExecutable(
 		compiler.WithCompileWorkDir(buildDir),
 		compiler.WithCompileSourceFile(tmpYak),
 		compiler.WithCompileLanguage("yak"),
@@ -62,7 +62,8 @@ func TestStdlibCompileFromGomodsrcTree(t *testing.T) {
 		compiler.WithCompileOutputFile(outBin),
 		compiler.WithCompileRuntimeArchive(archivePath),
 		compiler.WithCompileExtraLinkArgs("-L"+gcLibDir),
-	))
+	)
+	require.NoError(t, err)
 
 	run := exec.Command(outBin)
 	runOut, runErr := run.CombinedOutput()

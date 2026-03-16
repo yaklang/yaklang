@@ -1,4 +1,4 @@
-package clibuild
+package embed
 
 import (
 	"fmt"
@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtimeembed"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/trace"
 )
 
@@ -44,7 +43,6 @@ func BuildRuntimeArchiveFromSourceTree(buildDir, srcDir string) (archivePath str
 	cmd.Env = append(os.Environ(),
 		"CGO_ENABLED=1",
 		"GOWORK=off",
-		"GOCACHE="+filepath.Join(buildDir, "gocache"),
 	)
 	trace.PrintCmd(cmd)
 	out, err := cmd.CombinedOutput()
@@ -62,7 +60,7 @@ func BuildRuntimeArchiveFromSourceTree(buildDir, srcDir string) (archivePath str
 // and then builds libyak.a from it. The caller is expected to pass "-L<gcLibDir>" to clang.
 func BuildRuntimeArchiveFromEmbeddedSource(buildDir string) (archivePath string, gcLibDir string, err error) {
 	srcDir := filepath.Join(buildDir, "ssa2llvm-stdlib-src")
-	if _, err := runtimeembed.ExtractRuntimeSourceToDir(srcDir); err != nil {
+	if _, err := ExtractRuntimeSourceToDir(srcDir); err != nil {
 		return "", "", err
 	}
 	return BuildRuntimeArchiveFromSourceTree(buildDir, srcDir)

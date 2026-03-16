@@ -38,7 +38,7 @@ check = () => {
 
 func TestSSAObfuscationUnknownName(t *testing.T) {
 	tmpIR := t.TempDir() + "/missing.ll"
-	err := compiler.CompileToExecutable(
+	_, err := compiler.CompileToExecutable(
 		compiler.WithCompileSourceCode(`check = () => { return 1 }`),
 		compiler.WithCompileLanguage("yak"),
 		compiler.WithCompileEmitLLVM(true),

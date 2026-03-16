@@ -17,6 +17,7 @@ import (
 	"runtime"
 	"runtime/cgo"
 	"strconv"
+	"sync"
 	"time"
 	"unsafe"
 )
@@ -33,6 +34,11 @@ func recoverRuntimePanic() {
 
 const yakTaggedPointerMask = uint64(1) << 62
 const yakShadowMagic = uint64(0x59414B5353413251) // "YAKSSA2Q" (opaque marker)
+
+// shadowHandles tracks valid shadow allocations without dereferencing pointers.
+// This avoids signal-based crashes (SIGSEGV) when a bogus/freed pointer is passed
+// into the runtime from user code; such crashes cannot be recovered by `recover()`.
+var shadowHandles sync.Map // map[uintptr]uintptr(handleID)
 
 func tryResolveShadowString(ptr unsafe.Pointer) (string, bool) {
 	defer func() {
@@ -109,14 +115,18 @@ func yak_host_release_handle(id C.uintptr_t) {
 //export yak_internal_release_shadow
 func yak_internal_release_shadow(ptr unsafe.Pointer) {
 	defer recoverRuntimePanic()
-	// Reconstruct the handle ID from the C memory
 	if ptr == nil {
 		return
 	}
-	if *(*uint64)(ptr) != yakShadowMagic {
+	handleAny, ok := shadowHandles.LoadAndDelete(uintptr(ptr))
+	if !ok {
 		return
 	}
-	handleID := *(*C.uintptr_t)(unsafe.Pointer(uintptr(ptr) + 8))
+	handleRaw, ok := handleAny.(uintptr)
+	if !ok {
+		return
+	}
+	handleID := C.uintptr_t(handleRaw)
 
 	if gcLogEnabled() {
 		fmt.Printf("[Yak GC] Finalizer triggered\n")
@@ -139,6 +149,7 @@ func yak_runtime_new_shadow(handleID C.uintptr_t) (ret unsafe.Pointer) {
 	// 2. Write the magic + handleID into the allocated memory
 	*(*uint64)(ptr) = yakShadowMagic
 	*(*C.uintptr_t)(unsafe.Pointer(uintptr(ptr) + 8)) = handleID
+	shadowHandles.Store(uintptr(ptr), uintptr(handleID))
 
 	// 3. Register Finalizer
 	// When Boehm GC determines 'ptr' is unreachable, it will call yak_finalizer_proxy(ptr, nil)
@@ -156,15 +167,18 @@ func yak_runtime_new_shadow(handleID C.uintptr_t) (ret unsafe.Pointer) {
 }
 
 func handleFromShadow(objPtr unsafe.Pointer) (cgo.Handle, bool) {
-	defer recoverRuntimePanic()
 	if objPtr == nil {
 		return 0, false
 	}
-	if *(*uint64)(objPtr) != yakShadowMagic {
+	handleAny, ok := shadowHandles.Load(uintptr(objPtr))
+	if !ok {
 		return 0, false
 	}
-	handleID := *(*C.uintptr_t)(unsafe.Pointer(uintptr(objPtr) + 8))
-	return cgo.Handle(handleID), true
+	handleRaw, ok := handleAny.(uintptr)
+	if !ok {
+		return 0, false
+	}
+	return cgo.Handle(handleRaw), true
 }
 
 func resolveField(obj any, name string) (reflect.Value, bool) {

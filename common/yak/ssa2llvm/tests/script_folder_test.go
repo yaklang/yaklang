@@ -28,7 +28,7 @@ func TestScriptFolder_CompileAndRun(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			out := filepath.Join(tmpDir, name)
 
-			if err := compiler.CompileToExecutable(
+			if _, err := compiler.CompileToExecutable(
 				compiler.WithCompileSourceFile(script),
 				compiler.WithCompileLanguage("yak"),
 				compiler.WithCompileOutputFile(out),

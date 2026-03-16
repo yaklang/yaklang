@@ -1,6 +1,6 @@
 //go:build ssa2llvm_gzip_embed
 
-package runtimeembed
+package embed
 
 import (
 	"embed"

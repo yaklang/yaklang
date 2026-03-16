@@ -1,4 +1,4 @@
-package runtimeembed
+package embed
 
 import (
 	"errors"
