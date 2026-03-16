@@ -61,6 +61,35 @@ func (v Values) Recursive(f func(operator ValueOperator) error) error {
 	return nil
 }
 
+// AnchorGroups groups leaf values by their anchor bits within the active scope range
+// [base, base+width). The returned slice always has length = width (empty groups are kept).
+//
+// A single value can belong to multiple groups if it carries multiple in-scope anchor bits.
+func (v Values) AnchorGroups(base int, width int) []Values {
+	if width <= 0 {
+		return nil
+	}
+	groups := make([]Values, width)
+	end := base + width
+	_ = v.Recursive(func(operator ValueOperator) error {
+		if utils.IsNil(operator) || operator.IsEmpty() {
+			return nil
+		}
+		bits := operator.GetAnchorBitVector()
+		if bits == nil || bits.IsEmpty() {
+			return nil
+		}
+		bits.ForEach(func(index int) {
+			if index < base || index >= end {
+				return
+			}
+			groups[index-base] = append(groups[index-base], operator)
+		})
+		return nil
+	})
+	return groups
+}
+
 func (v Values) String() string {
 	var res []string
 	for _, item := range v {

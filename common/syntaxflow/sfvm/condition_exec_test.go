@@ -171,10 +171,8 @@ func TestApplyCondition_Mask(t *testing.T) {
 	c := newBitVectorValue("c")
 	source := NewValues([]ValueOperator{a, b, c})
 
-	filtered, err := applyCondition(source, ConditionEntry{
-		Mode: ConditionModeMask,
-		Mask: []bool{true, false, true},
-	})
+	entry := newMaskCondition([]bool{true, false, true})
+	filtered, err := entry.Apply(source)
 	require.NoError(t, err)
 	require.Equal(t, 2, ValuesLen(filtered))
 
@@ -187,10 +185,8 @@ func TestApplyCondition_Mask(t *testing.T) {
 }
 
 func TestApplyCondition_EmptyValueReturnsEmpty(t *testing.T) {
-	filtered, err := applyCondition(NewEmptyValues(), ConditionEntry{
-		Mode: ConditionModeMask,
-		Mask: []bool{true},
-	})
+	entry := newMaskCondition([]bool{true})
+	filtered, err := entry.Apply(NewEmptyValues())
 	require.NoError(t, err)
 	require.True(t, filtered.IsEmpty())
 }
@@ -200,10 +196,8 @@ func TestApplyCondition_MaskLengthMismatch(t *testing.T) {
 	b := newBitVectorValue("b")
 	source := NewValues([]ValueOperator{a, b})
 
-	_, err := applyCondition(source, ConditionEntry{
-		Mode: ConditionModeMask,
-		Mask: []bool{true},
-	})
+	entry := newMaskCondition([]bool{true})
+	_, err := entry.Apply(source)
 	require.Error(t, err)
 }
 
