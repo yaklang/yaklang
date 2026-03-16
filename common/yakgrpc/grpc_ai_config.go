@@ -3,7 +3,6 @@ package yakgrpc
 import (
 	"context"
 
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -39,14 +38,7 @@ func (s *Server) ListAIProviders(ctx context.Context, _ *ypb.Empty) (*ypb.ListAI
 	if err != nil {
 		return nil, err
 	}
-	resp := &ypb.ListAIProvidersResponse{}
-	for _, provider := range providers {
-		if provider == nil {
-			continue
-		}
-		resp.Providers = append(resp.Providers, provider.ToAIProvider())
-	}
-	return resp, nil
+	return &ypb.ListAIProvidersResponse{Providers: providers}, nil
 }
 
 func (s *Server) QueryAIProvider(ctx context.Context, req *ypb.QueryAIProvidersRequest) (*ypb.QueryAIProvidersResponse, error) {
@@ -86,12 +78,7 @@ func (s *Server) QueryAIProvider(ctx context.Context, req *ypb.QueryAIProvidersR
 		Total: int64(pag.TotalRecord),
 	}
 
-	for _, provider := range providers {
-		if provider == nil {
-			continue
-		}
-		resp.Providers = append(resp.Providers, provider.ToAIProvider())
-	}
+	resp.Providers = providers
 
 	return resp, nil
 }
@@ -100,15 +87,11 @@ func (s *Server) UpsertAIProvider(ctx context.Context, req *ypb.UpsertAIProvider
 	if req == nil || req.Provider == nil || req.Provider.Config == nil {
 		return nil, utils.Error("provider config is required")
 	}
-	model := schema.AIThirdPartyConfigFromGRPC(req.Provider.Config)
-	if req.Provider.Id > 0 {
-		model.ID = uint(req.Provider.Id)
-	}
-	provider, err := yakit.UpsertAIProvider(s.GetProfileDatabase(), model)
+	provider, err := yakit.UpsertAIProvider(s.GetProfileDatabase(), req.Provider)
 	if err != nil {
 		return nil, err
 	}
-	return &ypb.UpsertAIProviderResponse{Provider: provider.ToAIProvider()}, nil
+	return &ypb.UpsertAIProviderResponse{Provider: provider}, nil
 }
 
 func (s *Server) DeleteAIProvider(ctx context.Context, req *ypb.DeleteAIProviderRequest) (*ypb.Empty, error) {

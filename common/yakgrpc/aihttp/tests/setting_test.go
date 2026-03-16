@@ -8,8 +8,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -27,11 +25,6 @@ func TestGetSetting(t *testing.T) {
 }
 
 func TestListAIProviders(t *testing.T) {
-	db := consts.GetGormProfileDatabase()
-	if db != nil {
-		require.NoError(t, db.AutoMigrate(&schema.AIThirdPartyConfig{}).Error)
-	}
-
 	gw := newTestGateway(t)
 
 	req := httptest.NewRequest("POST", "/agent/setting/providers/get", bytes.NewReader([]byte(`{}`)))

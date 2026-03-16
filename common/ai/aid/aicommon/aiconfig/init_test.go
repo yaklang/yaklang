@@ -226,7 +226,7 @@ func TestEnsureConfigLoaded_NoConfig_LoadsDefaults(t *testing.T) {
 	providers, err := yakit.ListAIProviders(consts.GetGormProfileDatabase())
 	require.NoError(t, err)
 	assert.NotEmpty(t, providers)
-	assert.Equal(t, "aibalance", providers[0].Type)
+	assert.Equal(t, "aibalance", providers[0].GetConfig().GetType())
 }
 
 // Config file on disk must be IGNORED by EnsureConfigLoaded.

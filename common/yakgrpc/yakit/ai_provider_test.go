@@ -14,103 +14,102 @@ import (
 func setupAIProviderTestDB(t *testing.T) *gorm.DB {
 	db, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&schema.AIThirdPartyConfig{}).Error)
+	require.NoError(t, db.AutoMigrate(&schema.GeneralStorage{}).Error)
 	return db
 }
 
-func TestEnsureAIBalanceProviderConfig(t *testing.T) {
+func TestListAIProviders_FromGlobalConfig(t *testing.T) {
 	db := setupAIProviderTestDB(t)
 	defer db.Close()
 
-	EnsureAIBalanceProviderConfig(db)
+	cfg := &ypb.AIGlobalConfig{
+		IntelligentModels: []*ypb.AIModelConfig{
+			{
+				ModelName: "gpt-4o",
+				Provider: &ypb.ThirdPartyApplicationConfig{
+					Type:   "openai",
+					APIKey: "key-1",
+					Domain: "api.openai.com",
+				},
+			},
+		},
+		LightweightModels: []*ypb.AIModelConfig{
+			{
+				ModelName: "gpt-4o-mini",
+				Provider: &ypb.ThirdPartyApplicationConfig{
+					Type:   "azure",
+					APIKey: "key-2",
+					Domain: "azure.example.com",
+				},
+			},
+		},
+	}
+	_, err := SetAIGlobalConfig(db, cfg)
+	require.NoError(t, err)
+
 	providers, err := ListAIProviders(db)
 	require.NoError(t, err)
-	assert.Len(t, providers, 1)
-	assert.Equal(t, "aibalance", providers[0].Type)
-
-	// Idempotent
-	EnsureAIBalanceProviderConfig(db)
-	providers, err = ListAIProviders(db)
-	require.NoError(t, err)
-	assert.Len(t, providers, 1)
+	assert.Len(t, providers, 2)
 }
 
-func TestQueryAIProviders(t *testing.T) {
+func TestQueryAIProviders_Filter(t *testing.T) {
 	db := setupAIProviderTestDB(t)
 	defer db.Close()
 
-	p1 := &schema.AIThirdPartyConfig{Type: "openai", APIKey: "key-1", Domain: "api.openai.com"}
-	p2 := &schema.AIThirdPartyConfig{Type: "azure", APIKey: "key-2", Domain: "azure.example.com"}
-	p3 := &schema.AIThirdPartyConfig{Type: "openai", APIKey: "key-3", Domain: "api.openai.com"}
-
-	require.NoError(t, CreateAIProvider(db, p1))
-	require.NoError(t, CreateAIProvider(db, p2))
-	require.NoError(t, CreateAIProvider(db, p3))
-
-	pag, providers, err := QueryAIProviders(db, nil, &ypb.Paging{Page: 1, Limit: 2, OrderBy: "id", Order: "asc"})
+	cfg := &ypb.AIGlobalConfig{
+		IntelligentModels: []*ypb.AIModelConfig{
+			{
+				ModelName: "gpt-4o",
+				Provider: &ypb.ThirdPartyApplicationConfig{
+					Type:   "openai",
+					APIKey: "key-1",
+					Domain: "api.openai.com",
+				},
+			},
+		},
+		LightweightModels: []*ypb.AIModelConfig{
+			{
+				ModelName: "gpt-4o-mini",
+				Provider: &ypb.ThirdPartyApplicationConfig{
+					Type:   "openai",
+					APIKey: "key-2",
+					Domain: "api.openai.com",
+				},
+			},
+			{
+				ModelName: "azure-mini",
+				Provider: &ypb.ThirdPartyApplicationConfig{
+					Type:   "azure",
+					APIKey: "key-3",
+					Domain: "azure.example.com",
+				},
+			},
+		},
+	}
+	_, err := SetAIGlobalConfig(db, cfg)
 	require.NoError(t, err)
-	require.NotNil(t, pag)
-	assert.Equal(t, 3, pag.TotalRecord)
-	require.Len(t, providers, 2)
-	assert.Equal(t, p1.ID, providers[0].ID)
-	assert.Equal(t, p2.ID, providers[1].ID)
 
-	pag, providers, err = QueryAIProviders(db, &ypb.AIProviderFilter{
+	pag, providers, err := QueryAIProviders(db, &ypb.AIProviderFilter{
 		AIType: []string{"openai"},
 	}, &ypb.Paging{Page: 1, Limit: 10, OrderBy: "id", Order: "asc"})
 	require.NoError(t, err)
 	require.NotNil(t, pag)
 	assert.Equal(t, 2, pag.TotalRecord)
-	require.Len(t, providers, 2)
-	assert.Equal(t, p1.ID, providers[0].ID)
-	assert.Equal(t, p3.ID, providers[1].ID)
-
-	pag, providers, err = QueryAIProviders(db, &ypb.AIProviderFilter{
-		Ids: []int64{int64(p2.ID)},
-	}, nil)
-	require.NoError(t, err)
-	require.NotNil(t, pag)
-	assert.Equal(t, 1, pag.TotalRecord)
-	require.Len(t, providers, 1)
-	assert.Equal(t, p2.ID, providers[0].ID)
+	assert.Len(t, providers, 2)
 }
 
-func TestUpsertAIProvider_ByHash(t *testing.T) {
+func TestUpsertAndDeleteAIProvider_Deprecated(t *testing.T) {
 	db := setupAIProviderTestDB(t)
 	defer db.Close()
 
-	first, err := UpsertAIProvider(db, &schema.AIThirdPartyConfig{
-		Type:   "openai",
-		APIKey: "key-1",
-		Domain: "api.openai.com",
+	_, err := UpsertAIProvider(db, &ypb.AIProvider{
+		Config: &ypb.ThirdPartyApplicationConfig{
+			Type:   "openai",
+			APIKey: "key-1",
+			Domain: "api.openai.com",
+		},
 	})
-	require.NoError(t, err)
-	require.NotZero(t, first.ID)
-	require.NotEmpty(t, first.Hash)
+	require.Error(t, err)
 
-	same, err := UpsertAIProvider(db, &schema.AIThirdPartyConfig{
-		Type:   "openai",
-		APIKey: "key-1",
-		Domain: "api.openai.com",
-	})
-	require.NoError(t, err)
-	assert.Equal(t, first.ID, same.ID)
-	assert.Equal(t, first.Hash, same.Hash)
-
-	providers, err := ListAIProviders(db)
-	require.NoError(t, err)
-	assert.Len(t, providers, 1)
-
-	changed, err := UpsertAIProvider(db, &schema.AIThirdPartyConfig{
-		Type:   "openai",
-		APIKey: "key-2",
-		Domain: "api.openai.com",
-	})
-	require.NoError(t, err)
-	assert.NotEqual(t, first.ID, changed.ID)
-	assert.NotEqual(t, first.Hash, changed.Hash)
-
-	providers, err = ListAIProviders(db)
-	require.NoError(t, err)
-	assert.Len(t, providers, 2)
+	require.Error(t, DeleteAIProvider(db, 1))
 }
