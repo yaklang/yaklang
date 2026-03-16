@@ -59,6 +59,12 @@ type SFFrame struct {
 	rule   *schema.SyntaxFlowRule
 
 	VerifyFsInfo []*VerifyFsInfo
+	// initialContextVars is the symbol table snapshot used as the fallback
+	// for OpNewRef when the current execution result has no such variable.
+	//
+	// It is separate from Config.initialContextVars to keep NewSFFrame usable
+	// without requiring callers to thread options/config.
+	initialContextVars *omap.OrderedMap[string, Values]
 
 	// install meta info and result info
 	result *SFFrameResult
@@ -188,10 +194,12 @@ func newSfFrameEx(vars *omap.OrderedMap[string, Values], text string, codes []*S
 	}
 
 	return &SFFrame{
-		Text:         text,
-		Codes:        codes,
-		rule:         rule,
-		VerifyFsInfo: make([]*VerifyFsInfo, 0),
+		Text:               text,
+		Codes:              codes,
+		rule:               rule,
+		config:             config,
+		VerifyFsInfo:       make([]*VerifyFsInfo, 0),
+		initialContextVars: v,
 	}
 }
 
@@ -283,11 +291,17 @@ func (s *SFFrame) GetSymbol(sfi *SFI) (Values, bool) {
 	if val, b := s.result.SymbolTable.Get(sfi.UnaryStr); b {
 		return val, b
 	}
-	if initVars := s.config.initialContextVars; initVars != nil {
-		return initVars.Get(sfi.UnaryStr)
-	} else {
-		return NewEmptyValues(), true
+	if s.config != nil {
+		if initVars := s.config.initialContextVars; initVars != nil {
+			return initVars.Get(sfi.UnaryStr)
+		}
 	}
+	if s.initialContextVars != nil {
+		if v, ok := s.initialContextVars.Get(sfi.UnaryStr); ok {
+			return v, ok
+		}
+	}
+	return NewEmptyValues(), true
 }
 func (s *SFFrame) GetSymbolByName(name string) (Values, bool) {
 	return s.result.SymbolTable.Get(name)
@@ -460,9 +474,20 @@ func (s *SFFrame) execRule(feedValue Values) error {
 				if s.conditionStack.Len() <= scopeLen {
 					break
 				}
+				beforeLen := s.conditionStack.Len()
 				latest := s.conditionStack.Pop()
+				dropped := 0
 				for s.conditionStack.Len() > scopeLen {
 					s.conditionStack.Pop()
+					dropped++
+				}
+				if dropped > 0 {
+					s.debugSubLog(
+						"anchor scope end: dropped %d extra condition entries (before=%d wantDepth=%d)",
+						dropped,
+						beforeLen,
+						scopeLen,
+					)
 				}
 				s.conditionStack.Push(latest)
 			case OpEnterStatement:

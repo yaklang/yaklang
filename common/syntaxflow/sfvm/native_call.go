@@ -114,7 +114,12 @@ func ValuesNativeCall(f ValuesNativeCallFunc) NativeCallFunc {
 		var slotSources []ValueOperator
 		var slotAnchorBits []*utils.BitVector
 
-		scope, ok := frame.activeAnchorScope()
+		// Explicit nil-guard: native calls can be executed without an SFFrame (e.g. utility usage/tests).
+		var scope anchorScopeState
+		ok := false
+		if frame != nil {
+			scope, ok = frame.activeAnchorScope()
+		}
 		if !ok || scope.anchorWidth <= 0 {
 			groups = []Values{v}
 			slotSource, _ := v.First()
