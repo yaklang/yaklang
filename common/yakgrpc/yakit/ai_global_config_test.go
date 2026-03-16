@@ -287,6 +287,52 @@ func TestGetAIGlobalConfig_RecoversDeprecatedProviders(t *testing.T) {
 	assert.Equal(t, "legacy-key", loaded.IntelligentModels[0].Provider.APIKey)
 }
 
+func TestGetAIGlobalConfig_RecoversOnlyWhenProviderInfoMissing(t *testing.T) {
+	db, err := utils.CreateTempTestDatabaseInMemory()
+	require.NoError(t, err)
+	defer db.Close()
+	require.NoError(t, db.AutoMigrate(&schema.GeneralStorage{}, &schema.AIThirdPartyConfig{}).Error)
+
+	legacy := &schema.AIThirdPartyConfig{
+		Type:   "openai",
+		APIKey: "legacy-key",
+		Domain: "api.openai.com",
+	}
+	require.NoError(t, db.Create(legacy).Error)
+
+	cfg := &ypb.AIGlobalConfig{
+		Enabled:       true,
+		RoutingPolicy: "balance",
+		IntelligentModels: []*ypb.AIModelConfig{
+			{
+				ModelName: "has-provider",
+				Provider: &ypb.ThirdPartyApplicationConfig{
+					Type:   "azure",
+					APIKey: "new-key",
+					Domain: "azure.example.com",
+				},
+				ProviderId: int64(legacy.ID),
+			},
+			{
+				ModelName:  "legacy-model",
+				ProviderId: int64(legacy.ID),
+			},
+		},
+	}
+	raw, err := json.Marshal(cfg)
+	require.NoError(t, err)
+	require.NoError(t, SetKey(db, consts.AI_GLOBAL_CONFIG_KEY, string(raw)))
+
+	loaded, err := GetAIGlobalConfig(db)
+	require.NoError(t, err)
+	require.Len(t, loaded.IntelligentModels, 2)
+	assert.NotNil(t, loaded.IntelligentModels[0].Provider)
+	assert.Equal(t, "azure", loaded.IntelligentModels[0].Provider.Type)
+	assert.NotNil(t, loaded.IntelligentModels[1].Provider)
+	assert.Equal(t, "openai", loaded.IntelligentModels[1].Provider.Type)
+	assert.Equal(t, "legacy-key", loaded.IntelligentModels[1].Provider.APIKey)
+}
+
 func lookupExtraParam(cfg *ypb.AIModelConfig, key string) string {
 	if cfg == nil {
 		return ""
