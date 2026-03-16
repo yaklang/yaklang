@@ -29,12 +29,45 @@ const (
 type ReportRecord struct {
 	gorm.Model
 
-	Title       string
-	PublishedAt time.Time `json:"published_at"`
-	Hash        string    `json:"hash" gorm:"unique_index"`
-	Owner       string    `json:"owner"`
-	From        string    `json:"from"`
-	QuotedJson  string    `json:"quoted_json"`
+	Title            string
+	PublishedAt      time.Time  `json:"published_at"`
+	Hash             string     `json:"hash" gorm:"unique_index"`
+	Owner            string     `json:"owner"`
+	From             string     `json:"from"`
+	ReportType       string     `json:"report_type" gorm:"index"`
+	ScopeType        string     `json:"scope_type" gorm:"index"`
+	ScopeName        string     `json:"scope_name"`
+	ProjectName      string     `json:"project_name" gorm:"index"`
+	ProgramName      string     `json:"program_name" gorm:"index"`
+	TaskID           string     `json:"task_id" gorm:"index"`
+	TaskCount        int64      `json:"task_count"`
+	ScanBatch        int64      `json:"scan_batch" gorm:"index"`
+	RiskTotal        int64      `json:"risk_total"`
+	RiskCritical     int64      `json:"risk_critical"`
+	RiskHigh         int64      `json:"risk_high"`
+	RiskMedium       int64      `json:"risk_medium"`
+	RiskLow          int64      `json:"risk_low"`
+	SourceFinishedAt *time.Time `json:"source_finished_at" gorm:"index"`
+	QueryJSON        string     `json:"query_json" gorm:"type:text"`
+	QuotedJson       string     `json:"quoted_json"`
+}
+
+type ReportRecordMeta struct {
+	ReportType       string
+	ScopeType        string
+	ScopeName        string
+	ProjectName      string
+	ProgramName      string
+	TaskID           string
+	TaskCount        int64
+	ScanBatch        int64
+	RiskTotal        int64
+	RiskCritical     int64
+	RiskHigh         int64
+	RiskMedium       int64
+	RiskLow          int64
+	SourceFinishedAt *time.Time
+	QueryJSON        string
 }
 
 func (i *ReportRecord) ToGRPCModel() *ypb.Report {
@@ -62,10 +95,11 @@ func (r *ReportRecord) BeforeSave() {
 }
 
 type Report struct {
-	TitleValue string        `json:"title"`
-	OwnerValue string        `json:"owner"`
-	FromValue  string        `json:"from"`
-	Items      []*ReportItem `json:"items"`
+	TitleValue string            `json:"title"`
+	OwnerValue string            `json:"owner"`
+	FromValue  string            `json:"from"`
+	Items      []*ReportItem     `json:"items"`
+	RecordMeta *ReportRecordMeta `json:"-"`
 }
 
 func safeStr(i interface{}, items ...interface{}) string {
@@ -83,6 +117,10 @@ func (r *Report) Owner(i interface{}, items ...interface{}) {
 
 func (r *Report) From(i interface{}, items ...interface{}) {
 	r.FromValue = safeStr(i, items...)
+}
+
+func (r *Report) SetRecordMeta(meta *ReportRecordMeta) {
+	r.RecordMeta = meta
 }
 
 func (r *Report) append(item *ReportItem) {
@@ -270,13 +308,39 @@ func (r *Report) ToRecord() (*ReportRecord, error) {
 	if from == "" {
 		from = "default"
 	}
-	return &ReportRecord{
+	record := &ReportRecord{
 		Title:       r.TitleValue,
 		PublishedAt: time.Now(),
 		Owner:       owner,
 		From:        from,
 		QuotedJson:  strconv.Quote(string(raw)),
-	}, nil
+		ReportType:  "generic",
+	}
+	applyReportMeta(record, r.RecordMeta)
+	return record, nil
+}
+
+func applyReportMeta(record *ReportRecord, meta *ReportRecordMeta) {
+	if record == nil || meta == nil {
+		return
+	}
+	if meta.ReportType != "" {
+		record.ReportType = meta.ReportType
+	}
+	record.ScopeType = meta.ScopeType
+	record.ScopeName = meta.ScopeName
+	record.ProjectName = meta.ProjectName
+	record.ProgramName = meta.ProgramName
+	record.TaskID = meta.TaskID
+	record.TaskCount = meta.TaskCount
+	record.ScanBatch = meta.ScanBatch
+	record.RiskTotal = meta.RiskTotal
+	record.RiskCritical = meta.RiskCritical
+	record.RiskHigh = meta.RiskHigh
+	record.RiskMedium = meta.RiskMedium
+	record.RiskLow = meta.RiskLow
+	record.SourceFinishedAt = meta.SourceFinishedAt
+	record.QueryJSON = meta.QueryJSON
 }
 
 func (r *ReportRecord) ToReport() (*Report, error) {
