@@ -2,6 +2,7 @@ package yakit
 
 import (
 	"encoding/json"
+	"strings"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
@@ -235,6 +236,23 @@ func cloneThirdPartyConfig(cfg *ypb.ThirdPartyApplicationConfig) *ypb.ThirdParty
 	}
 }
 
+func modelNeedsLegacyRecovery(model *ypb.AIModelConfig) bool {
+	if model == nil {
+		return false
+	}
+	provider := model.GetProvider()
+	if provider == nil {
+		return true
+	}
+	if strings.TrimSpace(provider.GetType()) == "" {
+		return true
+	}
+	if strings.TrimSpace(provider.GetAPIKey()) == "" {
+		return true
+	}
+	return false
+}
+
 func recoverProvidersFromDeprecatedConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig) {
 	if db == nil || cfg == nil {
 		return
@@ -243,7 +261,7 @@ func recoverProvidersFromDeprecatedConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig) 
 	updated := false
 	collectIDs := func(models []*ypb.AIModelConfig, ids map[int64]struct{}) {
 		for _, model := range models {
-			if model == nil || model.GetProvider() != nil {
+			if model == nil || !modelNeedsLegacyRecovery(model) {
 				continue
 			}
 			if model.GetProviderId() == 0 {
@@ -283,7 +301,7 @@ func recoverProvidersFromDeprecatedConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig) 
 
 	fillProvider := func(models []*ypb.AIModelConfig) {
 		for _, model := range models {
-			if model == nil || model.GetProvider() != nil || model.GetProviderId() == 0 {
+			if model == nil || model.GetProviderId() == 0 || !modelNeedsLegacyRecovery(model) {
 				continue
 			}
 			if legacy, ok := legacyMap[model.GetProviderId()]; ok {
