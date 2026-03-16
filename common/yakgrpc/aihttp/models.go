@@ -65,47 +65,6 @@ type UpdateSessionTitleRequest struct {
 	Title string `json:"title"`
 }
 
-type RunEvent struct {
-	ID            string `json:"id"`
-	Type          string `json:"type"`
-	CoordinatorID string `json:"coordinator_id,omitempty"`
-	AIModelName   string `json:"ai_model_name,omitempty"`
-	NodeID        string `json:"node_id,omitempty"`
-	IsSystem      bool   `json:"is_system,omitempty"`
-	IsStream      bool   `json:"is_stream,omitempty"`
-	IsReason      bool   `json:"is_reason,omitempty"`
-	StreamDelta   string `json:"stream_delta,omitempty"`
-	Content       string `json:"content,omitempty"`
-	Timestamp     int64  `json:"timestamp"`
-	TaskIndex     string `json:"task_index,omitempty"`
-	EventUUID     string `json:"event_uuid,omitempty"`
-	TaskUUID      string `json:"task_uuid,omitempty"`
-}
-
-type PushEventRequest struct {
-	Type    string `json:"type"`
-	Content string `json:"content,omitempty"`
-
-	IsStart          bool      `json:"is_start,omitempty"`
-	IsConfigHotpatch bool      `json:"is_config_hotpatch,omitempty"`
-	HotpatchType     string    `json:"hotpatch_type,omitempty"`
-	Params           *AIParams `json:"params,omitempty"`
-
-	IsInteractiveMessage bool   `json:"is_interactive_message,omitempty"`
-	InteractiveID        string `json:"interactive_id,omitempty"`
-	InteractiveJSONInput string `json:"interactive_json_input,omitempty"`
-
-	IsSyncMessage bool   `json:"is_sync_message,omitempty"`
-	SyncType      string `json:"sync_type,omitempty"`
-	SyncJSONInput string `json:"sync_json_input,omitempty"`
-	SyncID        string `json:"sync_id,omitempty"`
-
-	IsFreeInput   bool     `json:"is_free_input,omitempty"`
-	FreeInput     string   `json:"free_input,omitempty"`
-	AttachedFiles []string `json:"attached_files,omitempty"`
-	FocusModeLoop string   `json:"focus_mode_loop,omitempty"`
-}
-
 type SettingAIProvider struct {
 	ID         int64  `json:"id"`
 	Type       string `json:"type"`

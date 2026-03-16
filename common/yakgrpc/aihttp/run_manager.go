@@ -2,7 +2,6 @@ package aihttp
 
 import (
 	"context"
-	"encoding/json"
 	"sort"
 	"sync"
 	"time"
@@ -18,7 +17,7 @@ type RunSession struct {
 	StartParams        *ypb.AIStartParams
 	StartAttachedFiles []string
 
-	subscribers   map[string]chan RunEvent
+	subscribers   map[string]chan *ypb.AIOutputEvent
 	subscribersMu sync.RWMutex
 
 	inputChan *chanx.UnlimitedChan[*ypb.AIInputEvent]
@@ -37,14 +36,14 @@ type RunSession struct {
 func NewRunSession(parentCtx context.Context, runID string, startParams *ypb.AIStartParams, startAttachedFiles []string) *RunSession {
 	ctx, cancel := context.WithCancel(parentCtx)
 	if runID == "" {
-		runID = uuid.New().String()
+		runID = uuid.NewString()
 	}
 	return &RunSession{
 		RunID:              runID,
 		Status:             RunStatusPending,
 		StartParams:        startParams,
 		StartAttachedFiles: append([]string(nil), startAttachedFiles...),
-		subscribers:        make(map[string]chan RunEvent),
+		subscribers:        make(map[string]chan *ypb.AIOutputEvent),
 		inputChan:          chanx.NewUnlimitedChan[*ypb.AIInputEvent](ctx, 10),
 		ctx:                ctx,
 		cancel:             cancel,
@@ -52,7 +51,10 @@ func NewRunSession(parentCtx context.Context, runID string, startParams *ypb.AIS
 	}
 }
 
-func (rs *RunSession) AddEvent(e RunEvent) {
+func (rs *RunSession) AddEvent(e *ypb.AIOutputEvent) {
+	if e == nil {
+		return
+	}
 	rs.subscribersMu.RLock()
 	defer rs.subscribersMu.RUnlock()
 	for _, ch := range rs.subscribers {
@@ -64,9 +66,9 @@ func (rs *RunSession) AddEvent(e RunEvent) {
 	}
 }
 
-func (rs *RunSession) Subscribe() (string, chan RunEvent) {
-	id := uuid.New().String()
-	ch := make(chan RunEvent, 256)
+func (rs *RunSession) Subscribe() (string, chan *ypb.AIOutputEvent) {
+	id := uuid.NewString()
+	ch := make(chan *ypb.AIOutputEvent, 256)
 
 	rs.subscribersMu.Lock()
 	rs.subscribers[id] = ch
@@ -112,17 +114,11 @@ func (rs *RunSession) Complete(err error) {
 		rs.Status = RunStatusCompleted
 	}
 
-	doneEvent := RunEvent{
-		ID:        uuid.New().String(),
-		Type:      "done",
-		Timestamp: now.Unix(),
-	}
 	if err != nil {
-		doneEvent.Type = "error"
-		doneBytes, _ := json.Marshal(map[string]string{"error": err.Error()})
-		doneEvent.Content = string(doneBytes)
+		rs.AddEvent(newFailedOutputEvent(err))
+		return
 	}
-	rs.AddEvent(doneEvent)
+	rs.AddEvent(newResultOutputEvent(string(RunStatusCompleted)))
 }
 
 func (rs *RunSession) Cancel() {
@@ -133,14 +129,7 @@ func (rs *RunSession) Cancel() {
 	now := time.Now()
 	rs.FinishedAt = &now
 
-	doneEvent := RunEvent{
-		ID:        uuid.New().String(),
-		Type:      "done",
-		Timestamp: now.Unix(),
-	}
-	doneBytes, _ := json.Marshal(map[string]string{"status": "cancelled"})
-	doneEvent.Content = string(doneBytes)
-	rs.AddEvent(doneEvent)
+	rs.AddEvent(newResultOutputEvent(string(RunStatusCancelled)))
 
 	rs.cancel()
 }

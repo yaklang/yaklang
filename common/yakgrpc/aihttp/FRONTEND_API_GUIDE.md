@@ -9,9 +9,10 @@
 - 基础路由前缀（默认）：`/agent`
 - 主要分组：
   - `/run/*`：运行时执行与事件流
-  - `/ypb.Yak/*`：兼容 gRPC 的标准路由
   - `/session/*`：会话元数据与管理
   - `/setting/*`：聊天设置、模型 / Provider / Focus 选项
+
+说明：本文仅覆盖当前对外提供的 `/run/*`、`/session/*`、`/setting/*` 三组 HTTP 接口；底层运行逻辑会桥接到 gRPC `StartAIReAct` 等能力。
 
 该网关支持：
 
@@ -62,18 +63,18 @@
 1. 调用 `POST /session` 获取 `run_id`
 2. 先连接 `GET /run/{run_id}/events` SSE
 3. 等待 SSE 事件：`listener_ready`
-4. 调用 `POST /ypb.Yak/StartAIReAct/{run_id}`，并发送首个输入事件
-5. 输出过程中，用户仍可通过 `POST /ypb.Yak/StartAIReAct/{run_id}` 或兼容旧版的 `POST /run/{run_id}/events/push` 继续发送输入
+4. 调用 `POST /run/{run_id}` 提交首条输入（网关会在内部启动并桥接到底层 gRPC 流）
+5. 输出过程中，如需继续输入，统一使用 `POST /run/{run_id}/events/push`
 
 对于**已有会话**：
 
-1. 确保该会话已存在于后端运行时映射中（或使用已知 `run_id` 调用 `POST /session` 重新恢复）
+1. 确保后端已存在该会话；如果不确定，可使用已知 `run_id` 再次调用 `POST /session` 进行恢复
 2. 连接 SSE
-3. 调用 `/ypb.Yak/StartAIReAct/{run_id}` 或兼容旧版的 `/run/{run_id}/events/push` 继续对话
+3. 继续对话时，按场景调用 `/run/{run_id}` 或 `/run/{run_id}/events/push`
 
 取消当前运行：
 
-- `POST /ypb.Yak/StartAIReAct/{run_id}/cancel`
+- `POST /run/{run_id}/cancel`
 
 ---
 
@@ -81,7 +82,10 @@
 
 ## 4.1 `AIParams`
 
-用于创建会话以及运行输入参数。
+用于 `POST /session` 的 `params` 字段。
+
+说明：运行时输入事件里的 `Params` 字段类型是 `ypb.AIStartParams`，不是这里的 `AIParams`。
+`AIParams` 是 `aihttp` 在“创建会话”阶段额外封装的一层 HTTP JSON 结构。
 
 ```json
 {
@@ -115,10 +119,8 @@
 
 以下接口的标准请求体：
 
-- `POST /ypb.Yak/StartAIReAct/{run_id}`
-- `POST /ypb.Yak/StartAIReAct/{run_id}/events/push`
-- 旧版 `POST /run/{run_id}`
-- 旧版 `POST /run/{run_id}/events/push`
+- `POST /run/{run_id}`
+- `POST /run/{run_id}/events/push`
 
 ```json
 {
@@ -140,13 +142,19 @@
   "IsFreeInput": true,
   "FreeInput": "user text",
   "AttachedFilePath": [],
+  "AttachedResourceInfo": [
+    {
+      "Key": "optional",
+      "Type": "optional",
+      "Value": "optional"
+    }
+  ],
   "FocusModeLoop": "optional"
 }
 ```
 
-请求中至少需要包含以下任意一种负载：
+以下任一项命中，即视为请求中包含“有效输入负载”：
 
-- `IsStart=true`，用于仅启动的一帧
 - `IsConfigHotpatch`
 - 交互输入
 - 同步输入
@@ -154,46 +162,36 @@
 - `FocusModeLoop`
 - `AttachedFilePath`
 
-为了兼容历史调用方式，仍然接受旧版 `PushEventRequest` 的 snake_case 请求体；但新的调用方应直接发送 `ypb.AIInputEvent`。
+- `POST /run/{run_id}`：既可以发送仅启动的一帧（`IsStart=true` 且无其他有效输入负载），也可以直接发送普通输入事件。
+- `POST /run/{run_id}/events/push`：必须携带上面的任一有效输入负载；仅传 `IsStart=true` 会被判定为无效请求。
+- `AttachedResourceInfo` 字段当前可随请求一并传入，但**单独传它本身不会被网关视为有效输入负载**。
 
-## 4.3 `ypb.AIEventQueryRequest`
+`/run/{run_id}` 与 `/run/{run_id}/events/push` 现仅接受 `ypb.AIInputEvent` 请求体，不再兼容旧版 `PushEventRequest`。
 
-用于 `POST /ypb.Yak/QueryAIEvent` 的标准请求体。
-
-```json
-{
-  "Filter": {
-    "SessionID": "run-id"
-  },
-  "Pagination": {
-    "Page": 1,
-    "Limit": 20,
-    "OrderBy": "id",
-    "Order": "desc"
-  }
-}
-```
-
-## 4.4 `RunEvent`（SSE 核心负载）
+## 4.3 `ypb.AIOutputEvent`（运行接口与 SSE 统一使用的响应负载）
 
 ```json
 {
-  "id": "uuid",
-  "type": "stream|structured|thought|done|error|...",
-  "coordinator_id": "optional",
-  "ai_model_name": "optional",
-  "node_id": "optional",
-  "is_system": false,
-  "is_stream": true,
-  "is_reason": false,
-  "stream_delta": "optional",
-  "content": "optional",
-  "timestamp": 1730000000,
-  "task_index": "optional",
-  "event_uuid": "optional",
-  "task_uuid": "optional"
+	"CoordinatorId": "optional",
+	"Type": "accepted|listener_ready|heartbeat|completed|cancelled|failed|stream|structured|thought|...",
+	"NodeId": "optional",
+	"IsSystem": false,
+	"IsStream": true,
+	"IsReason": false,
+	"StreamDelta": "base64-encoded bytes",
+	"IsJson": false,
+	"IsResult": false,
+	"Content": "base64-encoded bytes",
+	"Timestamp": 1730000000,
+	"TaskIndex": "optional",
+	"EventUUID": "optional",
+	"TaskUUID": "optional"
 }
 ```
+
+说明：`Content` / `StreamDelta` 是 `bytes` 字段，通过 HTTP JSON 返回时会按 protobuf JSON 规则编码为 base64 字符串。
+
+这里只展示常用字段；完整字段定义以 proto 为准。
 
 ---
 
@@ -229,7 +227,7 @@
 - 行为：
   - 将请求补丁合并到现有设置中
   - 同时接受 snake_case 和 PascalCase 键名
-  - 对缺失的核心字段应用默认值
+  - 未提供的字段保留当前值
 
 补丁示例：
 
@@ -272,10 +270,24 @@
 
 ---
 
+### `GET /setting/aiconfig`
+
+- 用途：获取 AI 全局配置（透传 gRPC `GetAIGlobalConfig`）
+- 请求体：无
+- 响应：`AIGlobalConfig`
+
+### `POST /setting/aiconfig`
+
+- 用途：更新 AI 全局配置（透传 gRPC `SetAIGlobalConfig`）
+- 请求体：`AIGlobalConfig`
+- 响应：保存后的同一份配置对象
+
+---
+
 ### `POST /setting/appconfigs/template/get`
 
 - 用途：获取第三方应用配置表单模板（透传 gRPC `GetThirdPartyAppConfigTemplate`）
-- 请求体：`{}`（或空 JSON 对象）
+- 请求体：可为空；也可以传 `{}`
 - 响应：`GetThirdPartyAppConfigTemplateResponse`
 
 模板项字段：
@@ -293,7 +305,7 @@
 ### `POST /setting/providers/get`
 
 - 用途：获取 AI Provider 列表
-- 请求体：`{}`（或空 JSON 对象）
+- 请求体：可为空；也可以传 `{}`
 - 响应：透传 gRPC `ListAIProvidersResponse`
 
 响应示例：
@@ -357,7 +369,7 @@
 ### `POST /setting/aifocus/get`
 
 - 用途：获取可用的 AI Focus 模式
-- 请求体：`{}`（可选）
+- 请求体：可为空
 - 响应：透传 gRPC `QueryAIFocusResponse`
 
 示例：
@@ -442,23 +454,26 @@
 
 ## 5.3 运行类 API
 
-### `POST /ypb.Yak/StartAIReAct/{run_id}`
+### `POST /run/{run_id}`
 
 - 用途：为某次运行提交首个 / 普通输入事件
 - 说明：
   - 需要该会话已存在于 run manager 中
-  - 如果这是第一个有效输入，后端会自动启动 gRPC 流
+  - 如果这是第一个有效输入，后端会自动启动底层 gRPC 流
 - 请求：`ypb.AIInputEvent`
-- 响应：
+- 响应：`ypb.AIOutputEvent`（仅表示网关已接收该输入；实际输出仍通过 SSE 推送）
 
 ```json
 {
-  "run_id": "uuid",
-  "status": "accepted"
+	"Type": "accepted",
+	"IsSystem": true,
+	"IsResult": true,
+	"Timestamp": 1730000000,
+	"EventUUID": "uuid"
 }
 ```
 
-### `POST /ypb.Yak/StartAIReAct/{run_id}/events/push`
+### `POST /run/{run_id}/events/push`
 
 - 用途：在运行处于 pending / running 状态时继续推送事件
 - 典型使用场景：
@@ -466,59 +481,72 @@
   - 交互式审核响应
   - 运行时热补丁
 - 请求：`ypb.AIInputEvent`
-- 响应：
+- 响应：`ypb.AIOutputEvent`（仅表示网关已接收该输入；实际输出仍通过 SSE 推送）
 
 ```json
-{ "status": "accepted" }
+{
+	"Type": "accepted",
+	"IsSystem": true,
+	"IsResult": true,
+	"Timestamp": 1730000000,
+	"EventUUID": "uuid"
+}
 ```
 
-以下旧版别名仍然可用：
-
-- `POST /run/{run_id}`
-- `POST /run/{run_id}/events/push`
-- `GET /run/{run_id}/events`
-- `POST /run/{run_id}/cancel`
-
-### `POST /ypb.Yak/QueryAIEvent`
-
-- 用途：以 gRPC 原生请求 / 响应结构查询已持久化事件
-- 请求：`ypb.AIEventQueryRequest`
-- 响应：`ypb.AIEventQueryResponse`
-
-### `GET /ypb.Yak/StartAIReAct/{run_id}/events`（SSE）
+### `GET /run/{run_id}/events`（SSE）
 
 - 用途：订阅流式输出事件
 - 响应 content-type：`text/event-stream`
+- 每条消息都以 `data: <AIOutputEvent JSON>` 的形式下发
 - 服务端会发送：
   - 立即返回就绪事件：
 
 ```json
-{ "type": "listener_ready", "status": "ok", "run_id": "..." }
+{
+	"Type": "listener_ready",
+	"IsSystem": true,
+	"Timestamp": 1730000000,
+	"EventUUID": "uuid"
+}
 ```
 
   - 大约每 15 秒一次心跳：
 
 ```json
-{ "type": "heartbeat", "timestamp": 1730000000 }
+{
+	"Type": "heartbeat",
+	"IsSystem": true,
+	"Timestamp": 1730000000,
+	"EventUUID": "uuid"
+}
 ```
 
-  - AI 输出，序列化后的 `RunEvent`
+  - AI 输出，序列化后的 `ypb.AIOutputEvent`
   - 终态状态：
 
 ```json
-{ "type": "done", "status": "completed|cancelled|failed" }
+{
+	"Type": "completed|cancelled|failed",
+	"IsSystem": true,
+	"IsResult": true,
+	"Timestamp": 1730000000,
+	"EventUUID": "uuid"
+}
 ```
 
-### `POST /ypb.Yak/StartAIReAct/{run_id}/cancel`
+### `POST /run/{run_id}/cancel`
 
 - 用途：取消一个正在运行 / 等待中的任务
-- 请求体：无
-- 响应：
+- 请求体：可为空；若传入则使用 `ypb.AIInputEvent` 结构（当前仅做结构校验，不参与取消逻辑）
+- 响应：`ypb.AIOutputEvent`
 
 ```json
 {
-  "run_id": "uuid",
-  "status": "cancelled"
+	"Type": "cancelled",
+	"IsSystem": true,
+	"IsResult": true,
+	"Timestamp": 1730000000,
+	"EventUUID": "uuid"
 }
 ```
 
@@ -530,7 +558,7 @@
    - 等待 `listener_ready` 后，再调用 `/run/{run_id}`。
 
 2. **流式输出期间的用户输入**
-   - 使用 `type=free_input` 调用 `/run/{run_id}/events/push`。
+   - 使用 `ypb.AIInputEvent{IsFreeInput: true, FreeInput: ...}` 调用 `/run/{run_id}/events/push`。
 
 3. **Provider / Model 选择流程**
    - 先通过 `GET /setting` 获取当前设置
@@ -539,7 +567,7 @@
    - 最后通过 `POST /setting` 更新选中的 provider / model
 
 4. **设置项命名规则**
-   - 前端发 patch 请求时，推荐使用 snake_case
+   - 前端发送设置更新请求时，推荐使用 snake_case
    - 后端当前响应使用 PascalCase 键名
 
 5. **废弃的旧 API**
@@ -562,13 +590,14 @@ const runID = createResp.run_id;
 const es = new EventSource(`/agent/run/${runID}/events`);
 es.onmessage = async (ev) => {
   const data = JSON.parse(ev.data);
-  if (data.type === "listener_ready") {
+  if (data.Type === "listener_ready") {
     // 3) 首次运行输入
     await fetch(`/agent/run/${runID}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type: "free_input", free_input: "你好" })
+      body: JSON.stringify({ IsStart: true, IsFreeInput: true, FreeInput: "你好" })
     });
+    // 这里拿到的是 accepted 确认，实际输出继续从 SSE 接收
   }
 };
 
@@ -576,6 +605,11 @@ es.onmessage = async (ev) => {
 await fetch(`/agent/run/${runID}/events/push`, {
   method: "POST",
   headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ type: "free_input", free_input: "继续" })
+  body: JSON.stringify({ IsFreeInput: true, FreeInput: "继续" })
 });
+
+// 5) 监听终态后按需关闭连接
+// if (["completed", "cancelled", "failed"].includes(data.Type)) {
+//   es.close();
+// }
 ```
