@@ -31,6 +31,7 @@ var SSAProjectTables = []any{
 
 	// report
 	&schema.ReportRecord{},
+	&schema.ReportRecordFile{},
 
 	//diff result
 	&schema.SSADiffResult{},
@@ -38,6 +39,7 @@ var SSAProjectTables = []any{
 	&schema.ProjectGeneralStorage{},
 
 	&schema.ReportRecord{},
+	&schema.ReportRecordFile{},
 }
 
 func init() {
