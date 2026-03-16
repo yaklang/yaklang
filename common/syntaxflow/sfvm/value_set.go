@@ -1,7 +1,23 @@
 package sfvm
 
+import "sort"
+
 type ValueSet struct {
 	m map[int64]ValueOperator
+}
+
+type valueSetListSort struct {
+	ids    []int64
+	values []ValueOperator
+}
+
+func (s valueSetListSort) Len() int { return len(s.ids) }
+func (s valueSetListSort) Less(i, j int) bool {
+	return s.ids[i] < s.ids[j]
+}
+func (s valueSetListSort) Swap(i, j int) {
+	s.ids[i], s.ids[j] = s.ids[j], s.ids[i]
+	s.values[i], s.values[j] = s.values[j], s.values[i]
 }
 
 func NewValueSet() *ValueSet {
@@ -23,10 +39,19 @@ func (v *ValueSet) Has(id int64) bool {
 }
 
 func (v *ValueSet) List() []ValueOperator {
-	var res []ValueOperator
-	for _, v := range v.m {
-		res = append(res, v)
+	if v == nil || len(v.m) == 0 {
+		return nil
 	}
+
+	ids := make([]int64, len(v.m))
+	res := make([]ValueOperator, len(v.m))
+	idx := 0
+	for id, value := range v.m {
+		ids[idx] = id
+		res[idx] = value
+		idx++
+	}
+	sort.Sort(valueSetListSort{ids: ids, values: res})
 	return res
 }
 
