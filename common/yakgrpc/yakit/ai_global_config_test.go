@@ -276,6 +276,15 @@ func TestGetAIGlobalConfig_RecoversDeprecatedProviders(t *testing.T) {
 	require.NotNil(t, loaded.IntelligentModels[0].Provider)
 	assert.Equal(t, "openai", loaded.IntelligentModels[0].Provider.Type)
 	assert.Equal(t, "legacy-key", loaded.IntelligentModels[0].Provider.APIKey)
+
+	require.NoError(t, db.Unscoped().Delete(&schema.AIThirdPartyConfig{}, legacy.ID).Error)
+
+	loaded, err = GetAIGlobalConfig(db)
+	require.NoError(t, err)
+	require.Len(t, loaded.IntelligentModels, 1)
+	require.NotNil(t, loaded.IntelligentModels[0].Provider)
+	assert.Equal(t, "openai", loaded.IntelligentModels[0].Provider.Type)
+	assert.Equal(t, "legacy-key", loaded.IntelligentModels[0].Provider.APIKey)
 }
 
 func lookupExtraParam(cfg *ypb.AIModelConfig, key string) string {
