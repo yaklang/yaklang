@@ -67,13 +67,19 @@ func GetIntelligentAIModelCallback() (AICallbackType, error) {
 		return nil, aiconfig.ErrTieredConfigDisabled
 	}
 
-	mgr := aiconfig.GetGlobalManager()
-	config := mgr.GetFirstConfig(consts.TierIntelligent)
-	if config == nil {
-		return nil, aiconfig.ErrNoConfigAvailable
-	}
+	return func(i AICallerConfigIf, req *AIRequest) (*AIResponse, error) {
+		mgr := aiconfig.GetGlobalManager()
+		config := mgr.GetFirstConfig(consts.TierIntelligent)
+		if config == nil {
+			return nil, aiconfig.ErrNoConfigAvailable
+		}
 
-	return CreateCallbackFromConfig(config)
+		callback, err := CreateCallbackFromConfig(config)
+		if err != nil {
+			return nil, err
+		}
+		return callback(i, req)
+	}, nil
 }
 
 func GetIntelligentAIModelInfo() (string, string, error) {
@@ -97,13 +103,19 @@ func GetLightweightAIModelCallback() (AICallbackType, error) {
 		return nil, aiconfig.ErrTieredConfigDisabled
 	}
 
-	mgr := aiconfig.GetGlobalManager()
-	config := mgr.GetFirstConfig(consts.TierLightweight)
-	if config == nil {
-		return nil, aiconfig.ErrNoConfigAvailable
-	}
+	return func(i AICallerConfigIf, req *AIRequest) (*AIResponse, error) {
+		mgr := aiconfig.GetGlobalManager()
+		config := mgr.GetFirstConfig(consts.TierLightweight)
+		if config == nil {
+			return nil, aiconfig.ErrNoConfigAvailable
+		}
 
-	return CreateCallbackFromConfig(config)
+		callback, err := CreateCallbackFromConfig(config)
+		if err != nil {
+			return nil, err
+		}
+		return callback(i, req)
+	}, nil
 }
 
 // GetVisionAIModelCallback returns the AI callback for vision models
@@ -113,13 +125,19 @@ func GetVisionAIModelCallback() (AICallbackType, error) {
 		return nil, aiconfig.ErrTieredConfigDisabled
 	}
 
-	mgr := aiconfig.GetGlobalManager()
-	config := mgr.GetFirstConfig(consts.TierVision)
-	if config == nil {
-		return nil, aiconfig.ErrNoConfigAvailable
-	}
+	return func(i AICallerConfigIf, req *AIRequest) (*AIResponse, error) {
+		mgr := aiconfig.GetGlobalManager()
+		config := mgr.GetFirstConfig(consts.TierVision)
+		if config == nil {
+			return nil, aiconfig.ErrNoConfigAvailable
+		}
 
-	return CreateCallbackFromConfig(config)
+		callback, err := CreateCallbackFromConfig(config)
+		if err != nil {
+			return nil, err
+		}
+		return callback(i, req)
+	}, nil
 }
 
 // GetDefaultAIModelCallback returns the default callback based on user-configured policy
@@ -132,13 +150,19 @@ func GetDefaultAIModelCallback() (AICallbackType, error) {
 		return nil, aiconfig.ErrTieredConfigDisabled
 	}
 
-	policy := aiconfig.GetCurrentPolicy()
-	config, err := aiconfig.GetModelByPolicy(policy)
-	if err != nil {
-		return nil, err
-	}
+	return func(i AICallerConfigIf, req *AIRequest) (*AIResponse, error) {
+		policy := aiconfig.GetCurrentPolicy()
+		config, err := aiconfig.GetModelByPolicy(policy)
+		if err != nil {
+			return nil, err
+		}
 
-	return CreateCallbackFromConfig(config)
+		callback, err := CreateCallbackFromConfig(config)
+		if err != nil {
+			return nil, err
+		}
+		return callback(i, req)
+	}, nil
 }
 
 // GetAIModelCallbackByTierAndProviderAndModel returns the AI callback for the first config
@@ -148,13 +172,20 @@ func GetAIModelCallbackByTierAndProviderAndModel(tier consts.ModelTier, provider
 		return nil, aiconfig.ErrTieredConfigDisabled
 	}
 
-	mgr := aiconfig.GetGlobalManager()
-	config := mgr.GetFirstConfigByTierAndProviderAndModel(tier, providerName, modelName)
-	if config == nil {
-		return nil, aiconfig.ErrNoConfigAvailable
-	}
+	return func(i AICallerConfigIf, req *AIRequest) (*AIResponse, error) {
+		mgr := aiconfig.GetGlobalManager()
+		config := mgr.GetFirstConfigByTierAndProviderAndModel(tier, providerName, modelName)
+		if config == nil {
+			return nil, aiconfig.ErrNoConfigAvailable
+		}
 
-	return CreateCallbackFromConfig(config)
+		callback, err := CreateCallbackFromConfig(config)
+		if err != nil {
+			return nil, err
+		}
+		return callback(i, req)
+	}, nil
+
 }
 
 // GetCallbackByTier returns the AI callback for a specific model tier
