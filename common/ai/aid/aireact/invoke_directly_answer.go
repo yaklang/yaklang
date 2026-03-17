@@ -5,11 +5,12 @@ import (
 	"context"
 	"sync"
 
+	"io"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"io"
 )
 
 // DirectlyAnswerOption configures DirectlyAnswer behavior
@@ -63,6 +64,17 @@ func (r *ReAct) DirectlyAnswer(ctx context.Context, query string, tools []*aitoo
 	if err != nil {
 		return "", err
 	}
+	errorWarp := func(err error) error {
+		if err == nil {
+			return nil
+		}
+		return utils.Wrapf(
+			err,
+			"AITAG retry hint: previous response format was invalid. If your final answer is long, multi-line, markdown, or code, you MUST use AITAG instead of answer_payload. Example:\n{\"@action\":\"directly_answer\"}\n<|FINAL_ANSWER_%s|>\n# your markdown answer\n<|FINAL_ANSWER_END_%s|>",
+			nonceStr,
+			nonceStr,
+		)
+	}
 
 	var finalResult string
 	var referenceOnce = new(sync.Once)
@@ -100,6 +112,8 @@ func (r *ReAct) DirectlyAnswer(ctx context.Context, query string, tools []*aitoo
 		r.config.CallQualityPriorityAI,
 		func(rsp *aicommon.AIResponse) error {
 			stream := rsp.GetOutputStreamReader("directly_answer", true, r.Emitter)
+
+			hasAnswerPayloadKey := false
 			action, err := aicommon.ExtractActionFromStream(
 				ctx,
 				stream, "object",
@@ -109,6 +123,7 @@ func (r *ReAct) DirectlyAnswer(ctx context.Context, query string, tools []*aitoo
 				aicommon.WithActionFieldStreamHandler(
 					[]string{"answer_payload"},
 					func(key string, reader io.Reader) {
+						hasAnswerPayloadKey = true
 						var out bytes.Buffer
 						reader = utils.JSONStringReader(reader)
 						reader = io.TeeReader(reader, &out)
@@ -130,7 +145,7 @@ func (r *ReAct) DirectlyAnswer(ctx context.Context, query string, tools []*aitoo
 					}),
 			)
 			if err != nil {
-				return err
+				return errorWarp(err)
 			}
 			var payload string
 			if r := action.GetString("answer_payload"); r != "" {
@@ -138,6 +153,9 @@ func (r *ReAct) DirectlyAnswer(ctx context.Context, query string, tools []*aitoo
 			}
 			if payload == "" {
 				payload = action.GetString("next_action.answer_payload")
+			}
+			if payload == "" && !hasAnswerPayloadKey {
+				return errorWarp(utils.Error("no answer_payload key in stream"))
 			}
 			finalResult = payload
 			return nil
