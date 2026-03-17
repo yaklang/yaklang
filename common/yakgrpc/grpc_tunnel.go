@@ -3,6 +3,10 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"math/rand"
+	"strings"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/cybertunnel"
@@ -12,9 +16,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"math/rand"
-	"strings"
-	"time"
 )
 
 func (s *Server) GetTunnelServerExternalIP(ctx context.Context, p *ypb.GetTunnelServerExternalIPParams) (*ypb.GetTunnelServerExternalIPResponse, error) {
