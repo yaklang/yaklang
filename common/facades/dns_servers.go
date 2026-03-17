@@ -2,14 +2,15 @@ package facades
 
 import (
 	"context"
-	"github.com/miekg/dns"
-	"github.com/yaklang/yaklang/common/domainextractor"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"net"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/miekg/dns"
+	"github.com/yaklang/yaklang/common/domainextractor"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func fqdn(r string) string {
@@ -41,6 +42,9 @@ type DNSServer struct {
 	hijackCallback func(t string, domain string) string
 	callback       FacadeCallback
 	addrConvertor  func(i string) string
+
+	// configuredDotDomains 配置的根域（含前导点）
+	configuredDotDomains []string
 }
 
 func (d *DNSServer) SetCallback(f FacadeCallback) {
@@ -62,12 +66,17 @@ func NewDNSServer(domain, dnsLogIP, serveIPRaw string, port int) (*DNSServer, er
 		return nil, utils.Errorf("parsed listen/served ip[%v] failed", dnsLogIP)
 	}
 
-	domain = dns.Fqdn(domain)
+	var configuredDotDomains []string
+	for _, part := range utils.PrettifyListFromStringSplitEx(domain, ",", "|") {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			configuredDotDomains = append(configuredDotDomains, "."+dns.Fqdn(part))
+		}
+	}
 	ins := &DNSServer{
-		// mxDomain:  fmt.Sprintf("mail.%v", domain),
-		// dotDomain: fmt.Sprintf(".%v", domain),
-		ipAddr: ipAddr,
-		ttl:    3600,
+		ipAddr:               ipAddr,
+		ttl:                  3600,
+		configuredDotDomains: configuredDotDomains,
 	}
 
 	addr := utils.HostPort(serveIP.String(), port)
@@ -86,10 +95,23 @@ func NewDNSServer(domain, dnsLogIP, serveIPRaw string, port int) (*DNSServer, er
 
 func (d *DNSServer) handleQuestion(question dns.Question, w dns.ResponseWriter, r *dns.Msg) {
 
-	rootDomain := domainextractor.ExtractRootDomain(question.Name)
-	dotDomain := fqdn(rootDomain)
-	if !strings.HasPrefix(dotDomain, ".") {
-		dotDomain = "." + dotDomain
+	domain := r.Question[0].Name
+	dotDomain := ""
+	if len(d.configuredDotDomains) > 0 {
+		domainLower := strings.ToLower(domain)
+		for _, cand := range d.configuredDotDomains {
+			if strings.HasSuffix(domainLower, strings.ToLower(cand)) {
+				dotDomain = cand
+				break
+			}
+		}
+	}
+	if dotDomain == "" {
+		rootDomain := domainextractor.ExtractRootDomain(question.Name)
+		dotDomain = fqdn(rootDomain)
+		if !strings.HasPrefix(dotDomain, ".") {
+			dotDomain = "." + dotDomain
+		}
 	}
 
 	visitorLog := NewVisitorLog("dns")
@@ -110,7 +132,6 @@ func (d *DNSServer) handleQuestion(question dns.Question, w dns.ResponseWriter, 
 	requestMsg := r.String()
 	//log.Infof("NEW DNS Req: %v", requestMsg)
 	visitorLog.Set("raw", requestMsg)
-	domain := m.Question[0].Name
 	visitorLog.SetDomain(domain)
 	log.Infof("dns req for: %s [%v]", domain, dotDomain)
 	if strings.HasSuffix(strings.ToLower(domain), strings.ToLower(dotDomain)) {
