@@ -21,6 +21,7 @@ type RegWrapperInterface interface {
 
 	FindSubmatch(b []byte) ([][]byte, error)
 	FindStringSubmatch(s string) ([]string, error)
+	FindAllStringSubmatch(s string) ([][]string, error)
 
 	FindAllSubmatchIndex(s string) ([][]int, error)
 
@@ -125,6 +126,13 @@ func (r *RegexpWrapper) FindStringSubmatch(s string) ([]string, error) {
 		ret = append(ret, data...)
 	}
 	return ret, nil
+}
+
+func (r *RegexpWrapper) FindAllStringSubmatch(s string) ([][]string, error) {
+	if r.getReg() == nil {
+		return nil, errors.New("regexp is nil")
+	}
+	return r.getReg().FindAllStringSubmatch(s, -1), nil
 }
 
 func (r *RegexpWrapper) FindAllSubmatchIndex(s string) ([][]int, error) {
@@ -302,11 +310,38 @@ func (r *Regexp2Wrapper) FindStringSubmatch(s string) ([]string, error) {
 	if err != nil {
 		return []string{""}, err
 	}
+	if matchRes == nil {
+		return nil, nil
+	}
 	result := make([]string, matchRes.GroupCount())
 	for index, g := range matchRes.Groups() {
 		result[index] = g.String()
 	}
 	return result, nil
+}
+
+func (r *Regexp2Wrapper) FindAllStringSubmatch(s string) ([][]string, error) {
+	if r.getReg() == nil {
+		return nil, errors.New("regexp is nil")
+	}
+	matchRes, err := r.getReg().FindStringMatch(s)
+	if err != nil {
+		return nil, err
+	}
+	var results [][]string
+	for matchRes != nil {
+		groups := matchRes.Groups()
+		row := make([]string, len(groups))
+		for i, g := range groups {
+			row[i] = g.String()
+		}
+		results = append(results, row)
+		matchRes, err = r.getReg().FindNextMatch(matchRes)
+		if err != nil {
+			return results, err
+		}
+	}
+	return results, nil
 }
 
 func (r *Regexp2Wrapper) ReplaceAll(src, repl []byte) ([]byte, error) {

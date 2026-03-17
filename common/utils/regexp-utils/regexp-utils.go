@@ -2,9 +2,11 @@ package regexp_utils
 
 import (
 	"fmt"
+	"regexp"
 	"time"
 
 	"github.com/dlclark/regexp2"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -72,13 +74,7 @@ func NewYakRegexpUtils(raw string, options ...YakRegexpUtilsOption) *YakRegexpUt
 }
 
 func (m *YakRegexpUtils) CanUse() bool {
-	if reg := m.getPriorityRegexp(); reg.CanUse() {
-		return true
-	}
-	if reg := m.getSecondaryRegexp(); reg.CanUse() {
-		return true
-	}
-	return false
+	return m.getUsableRegexp() != nil
 }
 
 func (m *YakRegexpUtils) Hash() string {
@@ -105,138 +101,117 @@ func (m *YakRegexpUtils) getSecondaryRegexp() RegWrapperInterface {
 	}
 }
 
+// getUsableRegexp 返回第一个可用的 regexp（优先标准库，失败时回退 regexp2 支持 lookbehind/lookahead）
+func (m *YakRegexpUtils) getUsableRegexp() RegWrapperInterface {
+	if reg := m.getPriorityRegexp(); reg.CanUse() {
+		return reg
+	}
+	if reg := m.getSecondaryRegexp(); reg.CanUse() {
+		return reg
+	}
+	return nil
+}
+
 func (m *YakRegexpUtils) String() string {
 	return m.regexpRaw
 }
 
 func (m *YakRegexpUtils) Match(b []byte) (bool, error) {
-	if reg := m.getPriorityRegexp(); reg.CanUse() {
+	if reg := m.getUsableRegexp(); reg != nil {
 		return reg.Match(b)
-	} else if reg := m.getSecondaryRegexp(); reg.CanUse() {
-		return reg.Match(b)
-	} else {
-		return false, utils.Error("yak regexp match fail: no usable regexp")
 	}
+	return false, utils.Error("yak regexp match fail: no usable regexp")
 }
 
 func (m *YakRegexpUtils) MatchString(s string) (bool, error) {
-	if reg := m.getPriorityRegexp(); reg.CanUse() {
+	if reg := m.getUsableRegexp(); reg != nil {
 		return reg.MatchString(s)
-	} else if reg := m.getSecondaryRegexp(); reg.CanUse() {
-		return reg.MatchString(s)
-	} else {
-		return false, utils.Error("yak regexp match fail: no usable regexp")
 	}
+	return false, utils.Error("yak regexp match fail: no usable regexp")
 }
 
 func (m *YakRegexpUtils) Find(b []byte) ([]byte, error) {
-	if reg := m.getPriorityRegexp(); reg.CanUse() {
+	if reg := m.getUsableRegexp(); reg != nil {
 		return reg.Find(b)
-	} else if reg := m.getSecondaryRegexp(); reg.CanUse() {
-		return reg.Find(b)
-	} else {
-		return nil, utils.Error("yak regexp find fail: no usable regexp")
 	}
+	return nil, utils.Error("yak regexp find fail: no usable regexp")
 }
 
 func (m *YakRegexpUtils) FindString(s string) (string, error) {
-	if reg := m.getPriorityRegexp(); reg.CanUse() {
+	if reg := m.getUsableRegexp(); reg != nil {
 		return reg.FindString(s)
-	} else if reg := m.getSecondaryRegexp(); reg.CanUse() {
-		return reg.FindString(s)
-	} else {
-		return "", utils.Error("yak regexp find fail: no usable regexp")
 	}
+	return "", utils.Error("yak regexp find fail: no usable regexp")
 }
 
 func (m *YakRegexpUtils) FindSubmatch(b []byte) ([][]byte, error) {
-	if reg := m.getPriorityRegexp(); reg.CanUse() {
+	if reg := m.getUsableRegexp(); reg != nil {
 		return reg.FindSubmatch(b)
-	} else if reg := m.getSecondaryRegexp(); reg.CanUse() {
-		return reg.FindSubmatch(b)
-	} else {
-		return nil, utils.Error("yak regexp find fail: no usable regexp")
 	}
+	return nil, utils.Error("yak regexp find fail: no usable regexp")
 }
 
 func (m *YakRegexpUtils) FindStringSubmatch(s string) ([]string, error) {
-	if reg := m.getPriorityRegexp(); reg.CanUse() {
+	if reg := m.getUsableRegexp(); reg != nil {
 		return reg.FindStringSubmatch(s)
-	} else if reg := m.getSecondaryRegexp(); reg.CanUse() {
-		return reg.FindStringSubmatch(s)
-	} else {
-		return nil, utils.Error("yak regexp find fail: no usable regexp")
 	}
+	return nil, utils.Error("yak regexp find fail: no usable regexp")
+}
+
+func (m *YakRegexpUtils) FindAllStringSubmatch(s string) ([][]string, error) {
+	if reg := m.getUsableRegexp(); reg != nil {
+		return reg.FindAllStringSubmatch(s)
+	}
+	return nil, utils.Errorf("yak regexp find fail: no usable regexp: %s", m.regexpRaw)
 }
 
 func (m *YakRegexpUtils) FindAllSubmatchIndex(s string) ([][]int, error) {
-	if reg := m.getPriorityRegexp(); reg.CanUse() {
+	if reg := m.getUsableRegexp(); reg != nil {
 		return reg.FindAllSubmatchIndex(s)
-	} else if reg := m.getSecondaryRegexp(); reg.CanUse() {
-		return reg.FindAllSubmatchIndex(s)
-	} else {
-		return nil, utils.Errorf("yak regexp find fail: no usable regexp: %s", m.regexpRaw)
 	}
+	return nil, utils.Errorf("yak regexp find fail: no usable regexp: %s", m.regexpRaw)
 }
 
 func (m *YakRegexpUtils) FindAll(b []byte) ([][]byte, error) {
-	if reg := m.getPriorityRegexp(); reg.CanUse() {
+	if reg := m.getUsableRegexp(); reg != nil {
 		return reg.FindAll(b)
-	} else if reg := m.getSecondaryRegexp(); reg.CanUse() {
-		return reg.FindAll(b)
-	} else {
-		return nil, utils.Error("yak regexp find fail: no usable regexp")
 	}
+	return nil, utils.Error("yak regexp find fail: no usable regexp")
 }
 
 func (m *YakRegexpUtils) FindAllString(s string) ([]string, error) {
-	if reg := m.getPriorityRegexp(); reg.CanUse() {
+	if reg := m.getUsableRegexp(); reg != nil {
 		return reg.FindAllString(s)
-	} else if reg := m.getSecondaryRegexp(); reg.CanUse() {
-		return reg.FindAllString(s)
-	} else {
-		return nil, utils.Error("yak regexp find fail: no usable regexp")
 	}
+	return nil, utils.Error("yak regexp find fail: no usable regexp")
 }
 
 func (m *YakRegexpUtils) ReplaceAll(src, repl []byte) ([]byte, error) {
-	if reg := m.getPriorityRegexp(); reg.CanUse() {
+	if reg := m.getUsableRegexp(); reg != nil {
 		return reg.ReplaceAll(src, repl)
-	} else if reg := m.getSecondaryRegexp(); reg.CanUse() {
-		return reg.ReplaceAll(src, repl)
-	} else {
-		return nil, utils.Error("yak regexp replace fail: no usable regexp")
 	}
+	return nil, utils.Error("yak regexp replace fail: no usable regexp")
 }
 
 func (m *YakRegexpUtils) ReplaceAllString(src, repl string) (string, error) {
-	if reg := m.getPriorityRegexp(); reg.CanUse() {
+	if reg := m.getUsableRegexp(); reg != nil {
 		return reg.ReplaceAllString(src, repl)
-	} else if reg := m.getSecondaryRegexp(); reg.CanUse() {
-		return reg.ReplaceAllString(src, repl)
-	} else {
-		return "", utils.Error("yak regexp replace fail: no usable regexp")
 	}
+	return "", utils.Error("yak regexp replace fail: no usable regexp")
 }
 
 func (m *YakRegexpUtils) ReplaceAllFunc(src []byte, repl func([]byte) []byte) ([]byte, error) {
-	if reg := m.getPriorityRegexp(); reg.CanUse() {
+	if reg := m.getUsableRegexp(); reg != nil {
 		return reg.ReplaceAllFunc(src, repl)
-	} else if reg := m.getSecondaryRegexp(); reg.CanUse() {
-		return reg.ReplaceAllFunc(src, repl)
-	} else {
-		return nil, utils.Error("yak regexp replace fail: no usable regexp")
 	}
+	return nil, utils.Error("yak regexp replace fail: no usable regexp")
 }
 
 func (m *YakRegexpUtils) ReplaceAllStringFunc(src string, repl func(string) string) (string, error) {
-	if reg := m.getPriorityRegexp(); reg.CanUse() {
+	if reg := m.getUsableRegexp(); reg != nil {
 		return reg.ReplaceAllStringFunc(src, repl)
-	} else if reg := m.getSecondaryRegexp(); reg.CanUse() {
-		return reg.ReplaceAllStringFunc(src, repl)
-	} else {
-		return "", utils.Error("yak regexp replace fail: no usable regexp")
 	}
+	return "", utils.Error("yak regexp replace fail: no usable regexp")
 }
 
 var DefaultYakRegexpManager = NewYakRegexpManager()
@@ -258,4 +233,18 @@ func (manager *YakRegexpManager) GetYakRegexp(raw string, options ...YakRegexpUt
 	}
 	manager.regs.Set(raw, reg)
 	return reg
+}
+
+// ResolveGroupIndices 解析 groupNames 为数字索引。仅标准 regexp 支持 SubexpIndex；
+// 当 pattern 含 lookbehind 等 regexp 不支持语法时，regexp.Compile 失败，仅返回 groupIndices。
+func ResolveGroupIndices(pattern string, groupIndices []int, groupNames []string) []int {
+	resolved := append([]int{}, groupIndices...)
+	if re, err := regexp.Compile(pattern); err == nil {
+		for _, name := range groupNames {
+			if n := re.SubexpIndex(name); n >= 0 {
+				resolved = append(resolved, n)
+			}
+		}
+	}
+	return lo.Uniq(resolved)
 }
