@@ -11,13 +11,13 @@ import (
 
 	"github.com/antchfx/xmlquery"
 	"github.com/itchyny/gojq"
-	"github.com/samber/lo"
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/htmlquery"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -118,25 +118,16 @@ func (y *YakExtractor) ExecuteWithRequest(rsp []byte, req []byte, isHttps bool, 
 	case "regex":
 		for _, group := range y.Groups {
 			if group != "" {
-				r, err := regexp.Compile(group)
+				allMatches, err := regexp_utils.NewYakRegexpUtils(group).FindAllStringSubmatch(material)
 				if err != nil {
 					log.Errorf("compile[%v] failed: %v", group, err)
-					continue
+					return nil, utils.Errorf("regex compile failed: %w", err)
 				}
-
-				var regexpMatchGroup []int
-				if len(y.RegexpMatchGroupName) > 0 {
-					for _, groupName := range y.RegexpMatchGroupName {
-						regexpMatchGroup = append(regexpMatchGroup, r.SubexpIndex(groupName))
-					}
-				}
-				regexpMatchGroup = lo.Uniq(append(regexpMatchGroup, y.RegexpMatchGroup...))
+				regexpMatchGroup := regexp_utils.ResolveGroupIndices(group, y.RegexpMatchGroup, y.RegexpMatchGroupName)
 				if len(regexpMatchGroup) == 0 {
 					regexpMatchGroup = []int{0}
 				}
-
-				// just append result which in match group
-				for _, res := range r.FindAllStringSubmatch(material, -1) {
+				for _, res := range allMatches {
 					for _, i := range regexpMatchGroup {
 						if i < len(res) {
 							addResult(res[i])
