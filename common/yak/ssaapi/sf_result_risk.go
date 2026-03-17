@@ -3,6 +3,7 @@ package ssaapi
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -10,6 +11,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -106,8 +108,8 @@ func buildSSARisk(
 		Line:     riskCodeRange.StartLine,
 		Language: string(result.program.GetLanguage()),
 	}
-	if fun := value.GetFunction(); fun != nil {
-		newSSARisk.FunctionName = utils.EscapeInvalidUTF8Byte([]byte(fun.GetName()))
+	if functionName := stableRiskFunctionName(value); functionName != "" {
+		newSSARisk.FunctionName = functionName
 	}
 	// modify info by alertMsg
 	alertInfo, _ := result.GetAlertInfo(variable)
@@ -157,6 +159,26 @@ func buildSSARisk(
 	)
 	newSSARisk.Hash = newSSARisk.CalcHash()
 	return newSSARisk
+}
+
+func stableRiskFunctionName(value *Value) string {
+	if value == nil {
+		return ""
+	}
+	fun := value.GetFunction()
+	if fun == nil {
+		return ""
+	}
+	rawName := strings.TrimSpace(fun.GetName())
+	if funcInst, ok := ssa.ToFunction(fun.GetSSAInst()); ok {
+		// Prefer semantic method names when present. They are more stable than
+		// compiler-generated internal function names and avoid build-specific suffix drift.
+		methodName := strings.TrimSpace(funcInst.GetMethodName())
+		if methodName != "" {
+			return utils.EscapeInvalidUTF8Byte([]byte(methodName))
+		}
+	}
+	return utils.EscapeInvalidUTF8Byte([]byte(rawName))
 }
 
 func ssaRiskName(variable string, index int) string {

@@ -899,21 +899,51 @@ func (p *ProgramOverLay) Ref(name string) Values {
 		return result
 	}
 
+	foundFiles := utils.NewSafeMap[struct{}]()
+	excludeFiles := make([]string, 0)
+
 	for i := len(p.Layers) - 1; i >= 0; i-- {
 		layer := p.Layers[i]
 		if layer == nil || layer.Program == nil {
 			continue
 		}
 
+		layerProgramName := layer.Program.GetProgramName()
 		var layerValues Values
-		layerValues = layer.Program.Ref(name)
+		if len(excludeFiles) > 0 {
+			layerValues = layer.Program.refWithExcludeFiles(name, excludeFiles)
+		} else {
+			layerValues = layer.Program.Ref(name)
+		}
+
+		currentLayerFoundFiles := utils.NewSafeMap[struct{}]()
 
 		for _, v := range layerValues {
 			if !p.isVisibleValueInLayer(v, layer, i) {
 				continue
 			}
+
+			filePath := p.getValueFilePath(v)
+			if filePath == "" {
+				result = append(result, v)
+				continue
+			}
+
+			normalizedPath := removeProgramNamePrefix(filePath, layerProgramName)
+			normalizedPath = strings.TrimPrefix(normalizedPath, "/")
+			if foundFiles.Have(normalizedPath) {
+				continue
+			}
+
+			currentLayerFoundFiles.Set(normalizedPath, struct{}{})
 			result = append(result, v)
 		}
+
+		currentLayerFoundFiles.ForEach(func(file string, _ struct{}) bool {
+			foundFiles.Set(file, struct{}{})
+			excludeFiles = append(excludeFiles, file)
+			return true
+		})
 	}
 
 	return result
@@ -1125,6 +1155,8 @@ func (p *ProgramOverLay) queryMatch(
 	}
 
 	results := make([]sfvm.ValueOperator, 0)
+	foundFiles := utils.NewSafeMap[struct{}]()
+	excludeFiles := make([]string, 0)
 
 	for i := len(p.Layers) - 1; i >= 0; i-- {
 		layer := p.Layers[i]
@@ -1132,17 +1164,33 @@ func (p *ProgramOverLay) queryMatch(
 			continue
 		}
 
-		matched, vals, err := queryFunc(layer.Program, ctx, mod, query, nil)
+		layerProgramName := layer.Program.GetProgramName()
+		matched, vals, err := queryFunc(layer.Program, ctx, mod, query, excludeFiles)
 		if err != nil {
 			continue
 		}
 
+		currentLayerFoundFiles := utils.NewSafeMap[struct{}]()
 		if matched {
 			vals.Recursive(func(op sfvm.ValueOperator) error {
 				if v, ok := op.(*Value); ok {
 					if !p.isVisibleValueInLayer(v, layer, i) {
 						return nil
 					}
+
+					filePath := p.getValueFilePath(v)
+					if filePath == "" {
+						results = append(results, v)
+						return nil
+					}
+
+					normalizedPath := removeProgramNamePrefix(filePath, layerProgramName)
+					normalizedPath = strings.TrimPrefix(normalizedPath, "/")
+					if foundFiles.Have(normalizedPath) {
+						return nil
+					}
+
+					currentLayerFoundFiles.Set(normalizedPath, struct{}{})
 					results = append(results, v)
 					return nil
 				}
@@ -1150,6 +1198,12 @@ func (p *ProgramOverLay) queryMatch(
 				return nil
 			})
 		}
+
+		currentLayerFoundFiles.ForEach(func(file string, _ struct{}) bool {
+			foundFiles.Set(file, struct{}{})
+			excludeFiles = append(excludeFiles, file)
+			return true
+		})
 	}
 
 	return len(results) > 0, sfvm.NewValues(results), nil
