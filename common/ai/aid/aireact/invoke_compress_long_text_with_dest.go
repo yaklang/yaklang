@@ -1,8 +1,10 @@
 package aireact
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"github.com/davecgh/go-spew/spew"
 	"io"
 	"sort"
 	"strconv"
@@ -331,12 +333,29 @@ ALREADY_EXTRACTED 部分包含了之前已经提取过的内容。请注意：
 		}),
 	)
 
+	var invokerEmitter *aicommon.Emitter
+	if invoker != nil {
+		if config := invoker.GetConfig(); config != nil {
+			invokerEmitter = config.GetEmitter()
+		}
+	}
+
 	if err != nil {
+		invokerEmitter.EmitDefaultStreamEvent(
+			"error",
+			bytes.NewBufferString("Compression failed: "+err.Error()),
+			taskIndex,
+		)
 		log.Errorf("compressKnowledgeChunkWithScore: LiteForge failed: %v", err)
 		return nil
 	}
 
 	if forgeResult == nil {
+		invokerEmitter.EmitDefaultStreamEvent(
+			"error",
+			bytes.NewBufferString("Compression failed: "+`压缩结果为空`),
+			taskIndex,
+		)
 		return nil
 	}
 
@@ -374,5 +393,6 @@ ALREADY_EXTRACTED 部分包含了之前已经提取过的内容。请注意：
 			Score:     score,
 		})
 	}
+	spew.Dump(results)
 	return results
 }

@@ -19,6 +19,30 @@ Optional Parameters:
 Binary File Detection:
   Same as read_file - detects binary formats and recommends built-in tools.
   See read_file tool documentation for details.
+
+## Few-Shot Examples
+
+Example 1 - Read first 50 lines of a file:
+{
+  "@action": "call-tool",
+  "tool": "read_file_lines",
+  "identifier": "read_source_file",
+  "params": {
+    "file": "/home/user/project/main.go"
+  }
+}
+
+Example 2 - Read lines 100-130 of a log file:
+{
+  "@action": "call-tool",
+  "tool": "read_file_lines",
+  "identifier": "read_log_lines",
+  "params": {
+    "file": "/var/log/app.log",
+    "offset": 100,
+    "lines": 30
+  }
+}
 USAGE_BLOCK
 
 /*

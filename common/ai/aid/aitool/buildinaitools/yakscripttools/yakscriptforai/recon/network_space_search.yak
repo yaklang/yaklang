@@ -19,6 +19,9 @@ Parameters:
 
 Example 1 - FOFA search:
 {
+  "@action": "call-tool",
+  "tool": "network_space_search",
+  "identifier": "fofa_search_login_pages",
   "params": {
     "engine": "fofa",
     "query": "title=\"login\" && country=\"CN\"",
@@ -28,6 +31,9 @@ Example 1 - FOFA search:
 
 Example 2 - Shodan search:
 {
+  "@action": "call-tool",
+  "tool": "network_space_search",
+  "identifier": "shodan_search_apache",
   "params": {
     "engine": "shodan",
     "query": "apache port:443",
@@ -37,6 +43,9 @@ Example 2 - Shodan search:
 
 Example 3 - Quake search:
 {
+  "@action": "call-tool",
+  "tool": "network_space_search",
+  "identifier": "quake_search_linux_http",
   "params": {
     "engine": "quake",
     "query": "service:http AND os:linux",

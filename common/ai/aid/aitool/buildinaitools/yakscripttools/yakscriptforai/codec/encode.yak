@@ -3,21 +3,58 @@ __VERBOSE_NAME__ = "多格式文本编码"
 __KEYWORDS__ = "representation,transformation,数据转换,url编码,双重url编码,unicode编码,hex,url encoding,base32,cipher,编码工具,文本处理,base64,double url encoding,conversion,格式转换,encoding,data format"
 
 __USAGE__ = <<<USAGE_BLOCK
-Multi-Format Text Encoder - Parameter Description for JSON Tool Calls
+Multi-Format Text Encoder - Usage Guide for AI Parameter Generation
 
-Required Parameters:
-  type            (string)  The encoding method to use. Available options:
-                            - "base64" or "b64": Base64 encoding.
-                            - "base64url": Base64 URL-safe encoding.
-                            - "base32": Base32 encoding.
-                            - "hex": Bytes to hexadecimal string.
-                            - "doubleurl": Double URL encoding (encode URL encoding twice).
-                            - "quote" or "ascii": ASCII quoted-printable encoding.
-                            - "html" or "htmlentity": HTML entity encoding.
-                            - "htmlhex": HTML hex entity encoding.
-                            - "url": URL percent-encoding.
-                            - "unicode": Unicode escape sequence encoding.
-  text            (string)  The plain text to encode.
+Encodes plain text into various encoding formats.
+
+Parameters:
+  type    (string, REQUIRED) The encoding method. Available options:
+          - "base64" or "b64": Base64 encoding.
+          - "base64url": Base64 URL-safe encoding.
+          - "base32": Base32 encoding.
+          - "hex": Bytes to hexadecimal string.
+          - "doubleurl": Double URL encoding (encode URL encoding twice).
+          - "quote" or "ascii": ASCII quoted-printable encoding.
+          - "html" or "htmlentity": HTML entity encoding.
+          - "htmlhex": HTML hex entity encoding.
+          - "url": URL percent-encoding.
+          - "unicode": Unicode escape sequence encoding.
+  text    (string, REQUIRED) The plain text to encode.
+
+## Few-Shot Examples
+
+Example 1 - Encode text to Base64:
+{
+  "@action": "call-tool",
+  "tool": "encode",
+  "identifier": "encode_base64_text",
+  "params": {
+    "type": "base64",
+    "text": "Hello World"
+  }
+}
+
+Example 2 - Encode text to Hex:
+{
+  "@action": "call-tool",
+  "tool": "encode",
+  "identifier": "encode_hex_text",
+  "params": {
+    "type": "hex",
+    "text": "Hello"
+  }
+}
+
+Example 3 - URL percent-encode text:
+{
+  "@action": "call-tool",
+  "tool": "encode",
+  "identifier": "encode_url_text",
+  "params": {
+    "type": "url",
+    "text": "key=value&name=hello world"
+  }
+}
 USAGE_BLOCK
 
 tn := cli.String("type", cli.setRequired(true), cli.setHelp("encode method, available options: base64/b64, base64url, base32, hex, doubleurl, quote/ascii, html/htmlentity, htmlhex, url, unicode"))

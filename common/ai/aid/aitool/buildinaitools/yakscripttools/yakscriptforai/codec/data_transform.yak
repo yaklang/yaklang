@@ -26,6 +26,9 @@ Parameters:
 
 Example 1 - Convert JSON to YAML:
 {
+  "@action": "call-tool",
+  "tool": "data_transform",
+  "identifier": "convert_json_to_yaml",
   "params": { "from": "json", "to": "yaml" }
 }
 <|TOOL_PARAM_input_{NONCE}|>
@@ -34,10 +37,13 @@ Example 1 - Convert JSON to YAML:
   "version": "1.0",
   "features": ["auth", "api"]
 }
-<|/TOOL_PARAM_input_{NONCE}|>
+<|TOOL_PARAM_input_END_{NONCE}|>
 
 Example 2 - Convert YAML to JSON (auto-detect):
 {
+  "@action": "call-tool",
+  "tool": "data_transform",
+  "identifier": "convert_yaml_to_json",
   "params": { "to": "json" }
 }
 <|TOOL_PARAM_input_{NONCE}|>
@@ -46,23 +52,29 @@ version: "1.0"
 features:
   - auth
   - api
-<|/TOOL_PARAM_input_{NONCE}|>
+<|TOOL_PARAM_input_END_{NONCE}|>
 
 Example 3 - Validate JSON:
 {
+  "@action": "call-tool",
+  "tool": "data_transform",
+  "identifier": "validate_json_input",
   "params": { "from": "json", "to": "json", "action": "validate" }
 }
 <|TOOL_PARAM_input_{NONCE}|>
 {"key": "value"}
-<|/TOOL_PARAM_input_{NONCE}|>
+<|TOOL_PARAM_input_END_{NONCE}|>
 
 Example 4 - Format/prettify JSON:
 {
+  "@action": "call-tool",
+  "tool": "data_transform",
+  "identifier": "prettify_json",
   "params": { "from": "json", "to": "json", "action": "format" }
 }
 <|TOOL_PARAM_input_{NONCE}|>
 {"name":"compact","items":[1,2,3]}
-<|/TOOL_PARAM_input_{NONCE}|>
+<|TOOL_PARAM_input_END_{NONCE}|>
 USAGE_BLOCK
 
 yakit.AutoInitYakit()

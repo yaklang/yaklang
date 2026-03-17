@@ -37,6 +37,44 @@ Binary File Detection:
     SQLite (.db)        -> sqlite3 via bash
 
   Always try the recommended built-in tool first. Use Python via bash as fallback.
+
+## Few-Shot Examples
+
+Example 1 - Read a text file (default lines mode):
+{
+  "@action": "call-tool",
+  "tool": "read_file",
+  "identifier": "read_config_file",
+  "params": {
+    "file": "/etc/nginx/nginx.conf"
+  }
+}
+
+Example 2 - Read with pagination (lines mode, start from line 100):
+{
+  "@action": "call-tool",
+  "tool": "read_file",
+  "identifier": "read_log_page2",
+  "params": {
+    "file": "/var/log/app.log",
+    "mode": "lines",
+    "offset": 100,
+    "lines": 50
+  }
+}
+
+Example 3 - Read binary-safe with byte chunk mode:
+{
+  "@action": "call-tool",
+  "tool": "read_file",
+  "identifier": "read_file_chunk",
+  "params": {
+    "file": "/tmp/data.bin",
+    "mode": "chunk",
+    "offset": 0,
+    "chunk-size": 5000
+  }
+}
 USAGE_BLOCK
 
 /*

@@ -13,6 +13,9 @@ Parameters:
 
 Example 1 - Single IP:
 {
+  "@action": "call-tool",
+  "tool": "ip_info",
+  "identifier": "lookup_single_ip",
   "params": {
     "ip": "8.8.8.8"
   }
@@ -20,6 +23,9 @@ Example 1 - Single IP:
 
 Example 2 - Multiple IPs:
 {
+  "@action": "call-tool",
+  "tool": "ip_info",
+  "identifier": "lookup_multiple_ips",
   "params": {
     "ip": "1.1.1.1,8.8.4.4,114.114.114.114"
   }
