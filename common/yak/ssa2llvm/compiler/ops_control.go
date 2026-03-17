@@ -74,39 +74,13 @@ func (c *Compiler) compilePhi(inst *ssa.Phi) error {
 }
 
 func (c *Compiler) llvmValueTypeForSSA(t ssa.Type) llvm.Type {
-	if t == nil {
-		return c.LLVMCtx.Int64Type()
-	}
-
-	switch t.GetTypeKind() {
-	case ssa.ObjectTypeKind, ssa.SliceTypeKind, ssa.MapTypeKind, ssa.PointerKind, ssa.StringTypeKind:
-		return llvm.PointerType(c.LLVMCtx.Int8Type(), 0)
-	case ssa.AnyTypeKind:
-		return c.LLVMCtx.Int64Type()
-	case ssa.StructTypeKind:
-		base := c.TypeConverter.ConvertType(t)
-		return llvm.PointerType(base, 0)
-	default:
-		return c.LLVMCtx.Int64Type()
-	}
+	// SSA2LLVM currently uses a single `i64` value representation for all YakSSA values.
+	// Heap/stack addresses are carried as uintptr/i64 and cast to pointers only when
+	// calling runtime/extern helpers.
+	return c.LLVMCtx.Int64Type()
 }
 
 func (c *Compiler) inferPhiType(inst *ssa.Phi) llvm.Type {
-	fn := inst.GetFunc()
-	if fn != nil {
-		for _, edgeID := range inst.Edge {
-			edgeVal, ok := fn.GetValueById(edgeID)
-			if !ok || edgeVal == nil {
-				continue
-			}
-			if _, isUndef := edgeVal.(*ssa.Undefined); isUndef {
-				continue
-			}
-			if c.ssaValueIsPointer(edgeVal, fn) {
-				return llvm.PointerType(c.LLVMCtx.Int8Type(), 0)
-			}
-		}
-	}
 	return c.llvmValueTypeForSSA(inst.GetType())
 }
 
