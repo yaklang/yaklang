@@ -78,6 +78,67 @@ func TestSetAndGetAIGlobalConfig(t *testing.T) {
 	assert.Len(t, providers, 2)
 }
 
+func TestSetAIGlobalConfig_UpdateProxyNoHttpsDomain(t *testing.T) {
+	db := setupAIGlobalConfigTestDB(t)
+	defer db.Close()
+
+	first := &ypb.AIGlobalConfig{
+		Enabled:       true,
+		RoutingPolicy: "balance",
+		IntelligentModels: []*ypb.AIModelConfig{
+			{
+				ModelName: "model-a",
+				Provider: &ypb.ThirdPartyApplicationConfig{
+					Type:    "openai",
+					APIKey:  "key-a",
+					Domain:  "api.openai.com",
+					Proxy:   "http://127.0.0.1:8080",
+					NoHttps: false,
+				},
+			},
+		},
+	}
+	_, err := SetAIGlobalConfig(db, first)
+	require.NoError(t, err)
+
+	loaded, err := GetAIGlobalConfig(db)
+	require.NoError(t, err)
+	require.Len(t, loaded.IntelligentModels, 1)
+	provider := loaded.IntelligentModels[0].GetProvider()
+	require.NotNil(t, provider)
+	assert.Equal(t, "api.openai.com", provider.GetDomain())
+	assert.Equal(t, "http://127.0.0.1:8080", provider.GetProxy())
+	assert.False(t, provider.GetNoHttps())
+
+	updated := &ypb.AIGlobalConfig{
+		Enabled:       true,
+		RoutingPolicy: "balance",
+		IntelligentModels: []*ypb.AIModelConfig{
+			{
+				ModelName: "model-a",
+				Provider: &ypb.ThirdPartyApplicationConfig{
+					Type:    "openai",
+					APIKey:  "key-a",
+					Domain:  "api.openai.com.cn",
+					Proxy:   "http://127.0.0.1:9090",
+					NoHttps: true,
+				},
+			},
+		},
+	}
+	_, err = SetAIGlobalConfig(db, updated)
+	require.NoError(t, err)
+
+	loaded, err = GetAIGlobalConfig(db)
+	require.NoError(t, err)
+	require.Len(t, loaded.IntelligentModels, 1)
+	provider = loaded.IntelligentModels[0].GetProvider()
+	require.NotNil(t, provider)
+	assert.Equal(t, "api.openai.com.cn", provider.GetDomain())
+	assert.Equal(t, "http://127.0.0.1:9090", provider.GetProxy())
+	assert.True(t, provider.GetNoHttps())
+}
+
 func TestSetAIGlobalConfig_MultipleProvidersOrderAndUpdate(t *testing.T) {
 	db := setupAIGlobalConfigTestDB(t)
 	defer db.Close()
@@ -89,17 +150,21 @@ func TestSetAIGlobalConfig_MultipleProvidersOrderAndUpdate(t *testing.T) {
 			{
 				ModelName: "model-a",
 				Provider: &ypb.ThirdPartyApplicationConfig{
-					Type:   "openai",
-					APIKey: "key-a",
-					Domain: "api.openai.com",
+					Type:    "openai",
+					APIKey:  "key-a",
+					Domain:  "api.openai.com",
+					Proxy:   "http://127.0.0.1:8080",
+					NoHttps: false,
 				},
 			},
 			{
 				ModelName: "model-b",
 				Provider: &ypb.ThirdPartyApplicationConfig{
-					Type:   "azure",
-					APIKey: "key-b",
-					Domain: "azure.example.com",
+					Type:    "azure",
+					APIKey:  "key-b",
+					Domain:  "azure.example.com",
+					Proxy:   "socks5://127.0.0.1:1080",
+					NoHttps: true,
 				},
 			},
 		},
@@ -107,9 +172,11 @@ func TestSetAIGlobalConfig_MultipleProvidersOrderAndUpdate(t *testing.T) {
 			{
 				ModelName: "model-c",
 				Provider: &ypb.ThirdPartyApplicationConfig{
-					Type:   "openai",
-					APIKey: "key-c",
-					Domain: "api.openai.com",
+					Type:    "openai",
+					APIKey:  "key-c",
+					Domain:  "api.openai.com",
+					Proxy:   "http://127.0.0.1:8081",
+					NoHttps: false,
 				},
 			},
 		},
@@ -122,8 +189,14 @@ func TestSetAIGlobalConfig_MultipleProvidersOrderAndUpdate(t *testing.T) {
 	require.Len(t, loaded.IntelligentModels, 2)
 	assert.Equal(t, "model-a", loaded.IntelligentModels[0].GetModelName())
 	assert.Equal(t, "openai", loaded.IntelligentModels[0].GetProvider().GetType())
+	assert.Equal(t, "api.openai.com", loaded.IntelligentModels[0].GetProvider().GetDomain())
+	assert.Equal(t, "http://127.0.0.1:8080", loaded.IntelligentModels[0].GetProvider().GetProxy())
+	assert.False(t, loaded.IntelligentModels[0].GetProvider().GetNoHttps())
 	assert.Equal(t, "model-b", loaded.IntelligentModels[1].GetModelName())
 	assert.Equal(t, "azure", loaded.IntelligentModels[1].GetProvider().GetType())
+	assert.Equal(t, "azure.example.com", loaded.IntelligentModels[1].GetProvider().GetDomain())
+	assert.Equal(t, "socks5://127.0.0.1:1080", loaded.IntelligentModels[1].GetProvider().GetProxy())
+	assert.True(t, loaded.IntelligentModels[1].GetProvider().GetNoHttps())
 
 	updated := &ypb.AIGlobalConfig{
 		Enabled:       true,
@@ -132,17 +205,21 @@ func TestSetAIGlobalConfig_MultipleProvidersOrderAndUpdate(t *testing.T) {
 			{
 				ModelName: "model-a",
 				Provider: &ypb.ThirdPartyApplicationConfig{
-					Type:   "openai",
-					APIKey: "key-a-updated",
-					Domain: "api.openai.com",
+					Type:    "openai",
+					APIKey:  "key-a-updated",
+					Domain:  "api.openai.com.cn",
+					Proxy:   "http://127.0.0.1:9090",
+					NoHttps: true,
 				},
 			},
 			{
 				ModelName: "model-b",
 				Provider: &ypb.ThirdPartyApplicationConfig{
-					Type:   "azure",
-					APIKey: "key-b-updated",
-					Domain: "azure.example.com",
+					Type:    "azure",
+					APIKey:  "key-b-updated",
+					Domain:  "azure2.example.com",
+					Proxy:   "http://127.0.0.1:9091",
+					NoHttps: false,
 				},
 			},
 		},
@@ -150,9 +227,11 @@ func TestSetAIGlobalConfig_MultipleProvidersOrderAndUpdate(t *testing.T) {
 			{
 				ModelName: "model-c",
 				Provider: &ypb.ThirdPartyApplicationConfig{
-					Type:   "openai",
-					APIKey: "key-c-updated",
-					Domain: "api.openai.com",
+					Type:    "openai",
+					APIKey:  "key-c-updated",
+					Domain:  "api.openai.com",
+					Proxy:   "http://127.0.0.1:9092",
+					NoHttps: true,
 				},
 			},
 		},
@@ -165,9 +244,18 @@ func TestSetAIGlobalConfig_MultipleProvidersOrderAndUpdate(t *testing.T) {
 	require.Len(t, loaded.IntelligentModels, 2)
 	assert.Equal(t, "model-a", loaded.IntelligentModels[0].GetModelName())
 	assert.Equal(t, "key-a-updated", loaded.IntelligentModels[0].GetProvider().GetAPIKey())
+	assert.Equal(t, "api.openai.com.cn", loaded.IntelligentModels[0].GetProvider().GetDomain())
+	assert.Equal(t, "http://127.0.0.1:9090", loaded.IntelligentModels[0].GetProvider().GetProxy())
+	assert.True(t, loaded.IntelligentModels[0].GetProvider().GetNoHttps())
 	assert.Equal(t, "model-b", loaded.IntelligentModels[1].GetModelName())
 	assert.Equal(t, "key-b-updated", loaded.IntelligentModels[1].GetProvider().GetAPIKey())
+	assert.Equal(t, "azure2.example.com", loaded.IntelligentModels[1].GetProvider().GetDomain())
+	assert.Equal(t, "http://127.0.0.1:9091", loaded.IntelligentModels[1].GetProvider().GetProxy())
+	assert.False(t, loaded.IntelligentModels[1].GetProvider().GetNoHttps())
 	assert.Equal(t, "key-c-updated", loaded.LightweightModels[0].GetProvider().GetAPIKey())
+	assert.Equal(t, "api.openai.com", loaded.LightweightModels[0].GetProvider().GetDomain())
+	assert.Equal(t, "http://127.0.0.1:9092", loaded.LightweightModels[0].GetProvider().GetProxy())
+	assert.True(t, loaded.LightweightModels[0].GetProvider().GetNoHttps())
 }
 
 func TestApplyAIGlobalConfig(t *testing.T) {
@@ -189,9 +277,11 @@ func TestApplyAIGlobalConfig(t *testing.T) {
 			{
 				ModelName: "gpt-4o",
 				Provider: &ypb.ThirdPartyApplicationConfig{
-					Type:   "openai",
-					APIKey: "key-1",
-					Domain: "api.openai.com",
+					Type:    "openai",
+					APIKey:  "key-1",
+					Domain:  "api.openai.com",
+					Proxy:   "http://127.0.0.1:8080",
+					NoHttps: true,
 				},
 			},
 		},
@@ -199,9 +289,11 @@ func TestApplyAIGlobalConfig(t *testing.T) {
 			{
 				ModelName: "gpt-4o-mini",
 				Provider: &ypb.ThirdPartyApplicationConfig{
-					Type:   "openai",
-					APIKey: "key-2",
-					Domain: "api.openai.com",
+					Type:    "openai",
+					APIKey:  "key-2",
+					Domain:  "api.openai.com",
+					Proxy:   "http://127.0.0.1:8081",
+					NoHttps: false,
 				},
 			},
 		},
@@ -222,6 +314,14 @@ func TestApplyAIGlobalConfig(t *testing.T) {
 	assert.Len(t, applied.LightweightConfigs, 1)
 	assert.Equal(t, "gpt-4o", lookupExtraParam(applied.IntelligentConfigs[0], "model"))
 	assert.Equal(t, "gpt-4o-mini", lookupExtraParam(applied.LightweightConfigs[0], "model"))
+	require.NotNil(t, applied.IntelligentConfigs[0].GetProvider())
+	assert.Equal(t, "api.openai.com", applied.IntelligentConfigs[0].GetProvider().GetDomain())
+	assert.Equal(t, "http://127.0.0.1:8080", applied.IntelligentConfigs[0].GetProvider().GetProxy())
+	assert.True(t, applied.IntelligentConfigs[0].GetProvider().GetNoHttps())
+	require.NotNil(t, applied.LightweightConfigs[0].GetProvider())
+	assert.Equal(t, "api.openai.com", applied.LightweightConfigs[0].GetProvider().GetDomain())
+	assert.Equal(t, "http://127.0.0.1:8081", applied.LightweightConfigs[0].GetProvider().GetProxy())
+	assert.False(t, applied.LightweightConfigs[0].GetProvider().GetNoHttps())
 }
 
 func TestSetAIGlobalConfigRequiresProvider(t *testing.T) {
