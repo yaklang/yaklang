@@ -3,26 +3,193 @@ __VERBOSE_NAME__ = "多格式文本解码"
 __KEYWORDS__ = "数据处理,格式转换,base64解码,数据解码,解码工具,base32解码,decode,double url,encoding schemes,data transformation,text processing,hex解码,编码转换,文本解码,url解码,base64,url encoding,base32,format conversion,decoding tools"
 
 __USAGE__ = <<<USAGE_BLOCK
-Multi-Format Text Decoder - Parameter Description for JSON Tool Calls
+Multi-Format Text Decoder - Usage Guide for AI Parameter Generation
 
-Required Parameters:
-  type            (string)  The decoding method to use. Available options:
-                            - "base64" or "b64": Base64 decoding.
-                            - "base64url": Base64 URL-safe decoding.
-                            - "base32": Base32 decoding.
-                            - "hex": Hexadecimal string to bytes.
-                            - "doubleurl": Double URL decoding (decode URL encoding twice).
-                            - "quote" or "ascii": ASCII quoted-printable decoding.
-                            - "html" or "htmlentity": HTML entity decoding.
-                            - "htmlhex": HTML hex entity decoding.
-                            - "url": URL percent-encoding decoding.
-                            - "unicode": Unicode escape sequence decoding.
-  text            (string)  The encoded text to decode.
+Decodes encoded text strings. The "text" parameter must be a valid encoded STRING
+(not byte arrays, not raw binary data).
+
+Parameters:
+  type    (string, REQUIRED) The decoding method. Options:
+          - "base64" or "b64": Standard Base64 decoding.
+            Input: Base64 encoded string (A-Z, a-z, 0-9, +, /, = only).
+          - "base64url": Base64 URL-safe decoding (uses - and _ instead of + and /).
+            Input: Base64url encoded string (A-Z, a-z, 0-9, -, _, = only).
+          - "base32": Base32 decoding.
+            Input: Base32 encoded string (A-Z, 2-7, = only).
+          - "hex": Hexadecimal string to text.
+            Input: Hex string like "48656c6c6f" or "0x48656c6c6f" (0-9, a-f, A-F).
+          - "doubleurl": Double URL decoding (decode URL percent-encoding twice).
+            Input: Double-encoded URL string like "%2548ello" -> "%48ello" -> "Hello".
+          - "url": URL percent-encoding decoding.
+            Input: URL encoded string like "Hello%20World" or "%E4%BD%A0%E5%A5%BD".
+          - "html" or "htmlentity": HTML entity decoding.
+            Input: String with HTML entities like "&amp;lt;div&amp;gt;" or "&#60;div&#62;".
+          - "htmlhex": HTML hex entity decoding (same decoder as html/htmlentity).
+            Input: String with hex HTML entities like "&#x3c;div&#x3e;".
+          - "unicode": Unicode escape sequence decoding.
+            Input: String with \uXXXX sequences like "\u0048\u0065\u006c\u006c\u006f".
+          - "quote" or "ascii": Go-style quoted string unquoting (strconv.Unquote).
+            *** WARNING: Input MUST be wrapped in double quotes! ***
+            Input: A Go string literal like "\"Hello\\nWorld\"" (with outer quotes).
+            This is NOT a general-purpose ASCII decoder.
+
+  text    (string, REQUIRED) The encoded text string to decode.
+
+## IMPORTANT: Input Must Be a Text String
+
+This tool decodes TEXT strings only. Do NOT pass:
+  - Byte arrays like [72, 101, 108, 108, 111]
+  - Raw binary data
+  - File paths (use read_file tool instead)
+  - JSON objects or arrays
+
+If you have a byte array, convert it to a hex string first, then use type="hex".
+If you have binary data or complex encoding, use the bash tool with a Python script.
+
+## Few-Shot Examples
+
+Example 1 - Decode Base64:
+{
+  "@action": "call-tool",
+  "tool": "decode",
+  "identifier": "decode_base64_text",
+  "params": {
+    "type": "base64",
+    "text": "SGVsbG8gV29ybGQ="
+  }
+}
+
+Example 2 - Decode URL encoding:
+{
+  "@action": "call-tool",
+  "tool": "decode",
+  "identifier": "decode_url_encoding",
+  "params": {
+    "type": "url",
+    "text": "Hello%20World%21"
+  }
+}
+
+Example 3 - Decode Hex string:
+{
+  "@action": "call-tool",
+  "tool": "decode",
+  "identifier": "decode_hex_string",
+  "params": {
+    "type": "hex",
+    "text": "48656c6c6f"
+  }
+}
+
+Example 4 - Decode Unicode escapes:
+{
+  "@action": "call-tool",
+  "tool": "decode",
+  "identifier": "decode_unicode_escapes",
+  "params": {
+    "type": "unicode",
+    "text": "\\u0048\\u0065\\u006c\\u006c\\u006f"
+  }
+}
+
+Example 5 - Decode HTML entities:
+{
+  "@action": "call-tool",
+  "tool": "decode",
+  "identifier": "decode_html_entities",
+  "params": {
+    "type": "html",
+    "text": "&lt;script&gt;alert(1)&lt;/script&gt;"
+  }
+}
+
+Example 6 - Decode Double URL encoding:
+{
+  "@action": "call-tool",
+  "tool": "decode",
+  "identifier": "decode_double_url",
+  "params": {
+    "type": "doubleurl",
+    "text": "%2548%2565%256c%256c%256f"
+  }
+}
+
+Example 7 - Decode Base64URL (JWT segments etc.):
+{
+  "@action": "call-tool",
+  "tool": "decode",
+  "identifier": "decode_base64url_segment",
+  "params": {
+    "type": "base64url",
+    "text": "eyJhbGciOiJIUzI1NiJ9"
+  }
+}
+
+## Common Mistakes
+
+1. Using type="ascii" to decode general text -> WRONG.
+   "ascii"/"quote" calls Go's strconv.Unquote, which requires input wrapped in double
+   quotes with valid Go escape sequences. For general decoding, use "base64", "hex",
+   "url", or "auto_decode" tool instead.
+
+2. Passing byte arrays like [120, 114, 188] as text -> WRONG.
+   This tool expects encoded TEXT strings, not numeric arrays. Convert byte arrays to
+   hex first, or use bash tool with: python3 -c "print(bytes([120,114,188]).decode('utf-8','replace'))"
+
+3. Passing raw binary or non-printable data -> WRONG.
+   Use the bash tool with Python for binary data processing.
+
+## Fallback
+
+If this tool cannot handle your data:
+  1. Try the "auto_decode" tool which automatically detects encoding.
+  2. Use the bash tool to write a Python script for custom decoding, e.g.:
+     python3 -c "import base64; print(base64.b64decode('...').decode('utf-8','replace'))"
 USAGE_BLOCK
 
 tn := cli.String("type", cli.setRequired(true), cli.setHelp("decode method, available options: base64/b64, base64url, base32, hex, doubleurl, quote/ascii, html/htmlentity, htmlhex, url, unicode"))
 txt := cli.String("text", cli.setRequired(true), cli.setHelp("the original text you want to decode"))
 cli.check()
+
+txt = str.TrimSpace(txt)
+
+typeHints = {
+    "base64":    "Base64 input should only contain A-Z, a-z, 0-9, +, /, = characters. Make sure the input is a valid Base64 encoded string.",
+    "b64":       "Base64 input should only contain A-Z, a-z, 0-9, +, /, = characters. Make sure the input is a valid Base64 encoded string.",
+    "base64url": "Base64URL input should only contain A-Z, a-z, 0-9, -, _, = characters.",
+    "base32":    "Base32 input should only contain A-Z, 2-7, = characters.",
+    "hex":       "Hex input should only contain 0-9, a-f, A-F characters (with optional 0x prefix). Example: '48656c6c6f' or '0x48656c6c6f'.",
+    "quote":     "The 'quote'/'ascii' type requires input wrapped in double quotes with valid Go escape sequences. Example: '\"Hello\\nWorld\"'. This is NOT a general-purpose text decoder.",
+    "ascii":     "The 'quote'/'ascii' type requires input wrapped in double quotes with valid Go escape sequences. Example: '\"Hello\\nWorld\"'. This is NOT a general-purpose text decoder.",
+    "url":       "URL encoded input should contain percent-encoded sequences like %20, %3D. Example: 'Hello%20World'.",
+    "doubleurl": "Double URL encoded input should contain double percent-encoded sequences like %2520. Example: '%2548ello'.",
+    "unicode":   "Unicode input should contain \\uXXXX escape sequences. Example: '\\u0048\\u0065\\u006c\\u006c\\u006f'.",
+    "html":      "HTML entity input should contain entities like &lt; &gt; &amp; or &#60; &#x3c;.",
+    "htmlentity":"HTML entity input should contain entities like &lt; &gt; &amp; or &#60; &#x3c;.",
+    "htmlhex":   "HTML hex entity input should contain entities like &#x3c; &#x3e;.",
+}
+pythonFallbacks = {
+    "base64":    "python3 -c \"import base64,sys; print(base64.b64decode(sys.argv[1]).decode('utf-8','replace'))\" 'YOUR_BASE64_DATA'",
+    "b64":       "python3 -c \"import base64,sys; print(base64.b64decode(sys.argv[1]).decode('utf-8','replace'))\" 'YOUR_BASE64_DATA'",
+    "base64url": "python3 -c \"import base64,sys; print(base64.urlsafe_b64decode(sys.argv[1]+'==').decode('utf-8','replace'))\" 'YOUR_DATA'",
+    "base32":    "python3 -c \"import base64,sys; print(base64.b32decode(sys.argv[1]).decode('utf-8','replace'))\" 'YOUR_DATA'",
+    "hex":       "python3 -c \"import sys; print(bytes.fromhex(sys.argv[1]).decode('utf-8','replace'))\" 'YOUR_HEX_DATA'",
+    "url":       "python3 -c \"import urllib.parse,sys; print(urllib.parse.unquote(sys.argv[1]))\" 'YOUR_URL_ENCODED_DATA'",
+    "doubleurl": "python3 -c \"import urllib.parse,sys; print(urllib.parse.unquote(urllib.parse.unquote(sys.argv[1])))\" 'YOUR_DATA'",
+    "html":      "python3 -c \"import html,sys; print(html.unescape(sys.argv[1]))\" 'YOUR_HTML_DATA'",
+    "htmlentity":"python3 -c \"import html,sys; print(html.unescape(sys.argv[1]))\" 'YOUR_HTML_DATA'",
+    "htmlhex":   "python3 -c \"import html,sys; print(html.unescape(sys.argv[1]))\" 'YOUR_HTML_DATA'",
+    "unicode":   "python3 -c \"import sys; print(sys.argv[1].encode().decode('unicode_escape'))\" 'YOUR_UNICODE_DATA'",
+    "quote":     "python3 -c \"import ast,sys; print(ast.literal_eval(sys.argv[1]))\" 'YOUR_QUOTED_STRING'",
+    "ascii":     "python3 -c \"import ast,sys; print(ast.literal_eval(sys.argv[1]))\" 'YOUR_QUOTED_STRING'",
+}
+
+if tn == "hex" {
+    if str.HasPrefix(txt, "0x") || str.HasPrefix(txt, "0X") {
+        txt = txt[2:]
+    }
+    txt = str.ReplaceAll(txt, " ", "")
+}
 
 var result
 var err
@@ -42,15 +209,32 @@ case "html", "htmlentity", "htmlhex":
     err = nil
 case "url":
     result, err = codec.DecodeUrl(txt)
+case "doubleurl":
+    result, err = codec.DoubleDecodeUrl(txt)
 case "unicode":
     result = codec.UnicodeDecode(txt)
     err = nil
 default:
-    yakit.Error("unknown encode type: %v" % tn)
+    yakit.Error("unknown decode type: %v. Available types: base64, base64url, base32, hex, doubleurl, url, html, htmlhex, unicode, quote/ascii", tn)
+    yakit.Info("[SUGGESTION] Try 'auto_decode' tool for automatic encoding detection.")
+    yakit.Info("[SUGGESTION] Or use bash tool with Python for custom decoding.")
     return
 }
 if err != nil {
-    yakit.Error("decode %v error: %v, try another decode method..." % [tn, err])
+    hint = typeHints[tn]
+    if hint == nil || hint == "" {
+        hint = "Check that your input matches the expected format for this decode type."
+    }
+    yakit.Error("decode [%v] failed: %v", tn, err)
+    yakit.Info("[HINT] %s", hint)
+    yakit.Info("[SUGGESTION] Try 'auto_decode' tool to automatically detect the encoding format.")
+    pyCmd = pythonFallbacks[tn]
+    if pyCmd != nil && pyCmd != "" {
+        yakit.Info("[SUGGESTION] Or use bash tool with this Python command: %s", pyCmd)
+    } else {
+        yakit.Info("[SUGGESTION] Or use bash tool with a Python script for custom decoding.")
+    }
     return
 }
-yakit.Info("decode result: %#v", string(result))
+yakit.Info("=== Decode Result (type: %s) ===", tn)
+yakit.Info("%s", string(result))

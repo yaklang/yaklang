@@ -21,6 +21,9 @@ Parameters:
 
 Example 1 - Decode without verification:
 {
+  "@action": "call-tool",
+  "tool": "jwt_analyze",
+  "identifier": "jwt_decode_only",
   "params": {
     "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
   }
@@ -28,6 +31,9 @@ Example 1 - Decode without verification:
 
 Example 2 - Verify with a known key:
 {
+  "@action": "call-tool",
+  "tool": "jwt_analyze",
+  "identifier": "jwt_verify_with_key",
   "params": {
     "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c",
     "keys": "your-256-bit-secret"
@@ -36,6 +42,9 @@ Example 2 - Verify with a known key:
 
 Example 3 - Brute-force weak keys:
 {
+  "@action": "call-tool",
+  "tool": "jwt_analyze",
+  "identifier": "jwt_brute_weak_keys",
   "params": {
     "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U",
     "check-weak-keys": "yes"

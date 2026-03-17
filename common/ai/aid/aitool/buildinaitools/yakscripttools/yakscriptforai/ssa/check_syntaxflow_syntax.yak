@@ -14,6 +14,28 @@ Rules:
   - If "syntaxflow-code" is provided, it is checked directly.
   - If "path" is provided, tool reads file content and then checks syntax.
   - Use this for .sf files; do NOT use check-yaklang-syntax for SyntaxFlow rules.
+
+## Few-Shot Examples
+
+Example 1 - Check SyntaxFlow rule from code string:
+{
+  "@action": "call-tool",
+  "tool": "check_syntaxflow_syntax",
+  "identifier": "check_sf_rule_string",
+  "params": {
+    "syntaxflow-code": "desc(title: 'XSS check')\n*?{opcode: call && <getFunc><name>?{have: innerHTML}} as $sink"
+  }
+}
+
+Example 2 - Check SyntaxFlow rule from file:
+{
+  "@action": "call-tool",
+  "tool": "check_syntaxflow_syntax",
+  "identifier": "check_sf_rule_file",
+  "params": {
+    "path": "/path/to/rule.sf"
+  }
+}
 USAGE_BLOCK
 
 code = cli.String(

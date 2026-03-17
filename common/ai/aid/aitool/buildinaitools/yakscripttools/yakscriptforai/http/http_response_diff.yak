@@ -26,6 +26,9 @@ Parameters:
 
 Example 1 - Compare two URLs:
 {
+  "@action": "call-tool",
+  "tool": "http_response_diff",
+  "identifier": "diff_admin_vs_public",
   "params": {
     "url1": "http://example.com/admin",
     "url2": "http://example.com/public",
@@ -35,6 +38,9 @@ Example 1 - Compare two URLs:
 
 Example 2 - Compare with/without auth cookie (Packet mode):
 {
+  "@action": "call-tool",
+  "tool": "http_response_diff",
+  "identifier": "diff_auth_bypass_check",
   "params": { "timeout": 10 }
 }
 <|TOOL_PARAM_packet1_{NONCE}|>
@@ -42,12 +48,12 @@ GET /admin HTTP/1.1
 Host: example.com
 Cookie: session=valid_token
 
-<|/TOOL_PARAM_packet1_{NONCE}|>
+<|TOOL_PARAM_packet1_END_{NONCE}|>
 <|TOOL_PARAM_packet2_{NONCE}|>
 GET /admin HTTP/1.1
 Host: example.com
 
-<|/TOOL_PARAM_packet2_{NONCE}|>
+<|TOOL_PARAM_packet2_END_{NONCE}|>
 USAGE_BLOCK
 
 yakit.AutoInitYakit()

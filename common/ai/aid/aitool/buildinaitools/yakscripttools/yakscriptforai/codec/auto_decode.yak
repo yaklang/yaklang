@@ -1,25 +1,122 @@
 __DESC__ = "一个自动尝试多种解码方法来处理给定文本的工具，它会遍历所有可能的解码结果并显示原始文本、解码类型和解码后的结果。"
 __VERBOSE_NAME__ = "文本自动解码"
-__KEYWORDS__ = "文本解码,自动解码,编码识别,文本处理,解码工具,数据处理"
+__KEYWORDS__ = "文本解码,自动解码,编码识别,文本处理,解码工具,数据处理,auto decode,detect encoding,smart decode"
 
 __USAGE__ = <<<USAGE_BLOCK
-Auto Decode Tool - Parameter Description for JSON Tool Calls
+Auto Decode Tool - Usage Guide for AI Parameter Generation
 
-Required Parameters:
-  text            (string)  The encoded text to automatically decode. The tool will
-                            try all possible decoding methods (base64, url, hex, etc.)
-                            and display each successful decode result with the original
-                            text, decode type, and decoded output.
+Automatically detects and decodes encoded text. Tries all known encoding formats
+and shows each successful decoding step. Use this tool when you are NOT SURE which
+encoding was used, or when the text may have multiple layers of encoding.
+
+Supported auto-detection formats (in priority order):
+  1. URL percent-encoding (%XX sequences)
+  2. HTML entity encoding (&amp; &#60; &#x3c; etc.)
+  3. Hexadecimal encoding (0-9, a-f pairs)
+  4. Unicode escape sequences (\uXXXX)
+  5. Base32 encoding (A-Z, 2-7, = padding)
+  6. Base64 encoding (A-Z, a-z, 0-9, +, /, = padding)
+  7. JWT tokens (three dot-separated base64url segments)
+  8. Character set detection (e.g., GBK to UTF-8)
+
+Parameters:
+  text    (string, REQUIRED) The encoded text to automatically decode.
+
+## When to Use This Tool
+
+- You received encoded data but don't know the encoding type.
+- The data might have multiple layers of encoding (e.g., Base64 wrapped URL encoding).
+- You want a quick overview of all possible decodings.
+- You suspect the text is a JWT token.
+
+## When NOT to Use This Tool
+
+- You already know the encoding type -> use the "decode" tool with a specific type.
+- The input is a byte array like [72, 101, 108] -> NOT supported, use bash with Python.
+- The input is binary/file data -> use bash with Python or specific file tools.
+
+## Few-Shot Examples
+
+Example 1 - Auto-decode URL encoded text:
+{
+  "@action": "call-tool",
+  "tool": "auto_decode",
+  "identifier": "auto_decode_url_text",
+  "params": {
+    "text": "Hello%20World%21"
+  }
+}
+
+Example 2 - Auto-decode Base64 text:
+{
+  "@action": "call-tool",
+  "tool": "auto_decode",
+  "identifier": "auto_decode_base64_text",
+  "params": {
+    "text": "SGVsbG8gV29ybGQ="
+  }
+}
+
+Example 3 - Auto-decode multi-layer encoding (Base64 containing URL encoding):
+{
+  "@action": "call-tool",
+  "tool": "auto_decode",
+  "identifier": "auto_decode_multi_layer",
+  "params": {
+    "text": "SGVsbG8lMjBXb3JsZA=="
+  }
+}
+
+Example 4 - Auto-decode a JWT token:
+{
+  "@action": "call-tool",
+  "tool": "auto_decode",
+  "identifier": "auto_decode_jwt_token",
+  "params": {
+    "text": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+  }
+}
+
+## Fallback
+
+If auto_decode returns no results or "no encoding detected":
+  1. Try the "decode" tool with a specific type (base64, hex, url, etc.).
+  2. For JWT tokens, use the "jwt_analyze" tool for detailed analysis.
+  3. Use bash tool with Python for custom decoding:
+     python3 -c "import base64; print(base64.b64decode('YOUR_DATA').decode('utf-8','replace'))"
 USAGE_BLOCK
 
 text = cli.String("text", cli.setRequired(true), cli.setHelp("target text"))
 cli.check()
+
+text = str.TrimSpace(text)
+
+results = codec.AutoDecode(text)
 count := 0
-for i in codec.AutoDecode(text) {
-    count ++
-    yakit.Info("[%v] decode[%v] from: %#v to %#v" % [count, i.Type, i.Origin, i.Result])
+hasNoEncoding := false
+for i in results {
+    if i.Type == "No" {
+        hasNoEncoding = true
+        continue
+    }
+    count++
+    yakit.Info("=== Decode Step %d ===", count)
+    yakit.Info("Type: %s (%s)", i.Type, i.TypeVerbose)
+    yakit.Info("Input:  %s", i.Origin)
+    yakit.Info("Output: %s", i.Result)
+    yakit.Info("")
 }
-if count <= 0 {
-    yakit.Warn("auto decode failed... no some info provided")
-    return
+
+if count > 0 {
+    yakit.Info("=== Auto Decode Complete: %d decoding(s) applied ===", count)
+} else if hasNoEncoding {
+    yakit.Warn("No encoding detected in the input text.")
+    yakit.Info("[SUGGESTION] The text may already be plain text, or the encoding format is not supported by auto-detection.")
+    yakit.Info("[SUGGESTION] If you know the encoding type, use the 'decode' tool with a specific type parameter (base64, hex, url, etc.).")
+    yakit.Info("[SUGGESTION] For JWT tokens, use 'jwt_analyze' tool for detailed analysis.")
+    yakit.Info("[SUGGESTION] For complex/binary data, use bash tool with a Python script, e.g.: python3 -c \"import base64; print(base64.b64decode('YOUR_DATA').decode('utf-8','replace'))\"")
+} else {
+    yakit.Warn("Auto decode produced no results.")
+    yakit.Info("[SUGGESTION] Use 'decode' tool with a specific type (base64, hex, url, unicode, html, etc.).")
+    yakit.Info("[SUGGESTION] Or use bash tool with a Python script for custom decoding.")
 }
