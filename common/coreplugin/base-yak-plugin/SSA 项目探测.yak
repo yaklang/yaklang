@@ -186,9 +186,11 @@ origin = target
 proxy = str.TrimSpace(proxy.Lower())
 javaDir = []
 // jsDir = ["node_modules"]
-// jsFiles = ["package-lock.json","package.json","yarn.lock"]
+jsFiles = ["package-lock.json", "package.json", "yarn.lock", "tsconfig.json"]
 phpFiles = ["index.php", "composer.json", "composer.lock", "wp-config.php", "config.php"]
 javaFiles = ["web.xml", "pom.xml", "application.properties", "struts.xml", "application.yml", "log4j2.xml", "log4j.properties", "shiro.ini"]
+// 后缀名 -> 语言，用于统一从文件扩展名推断语言
+extToLanguage = {"js": "js", "mjs": "js", "cjs": "js", "ts": "ts", "tsx": "ts", "php": "php", "java": "java", "go": "go", "yak": "yak"}
 var countMap = map[string]int{"php": 0, "go": 0, "java": 0, "yak": 0, "js": 0, "ts": 0}
 
 params = {"program_name": "", "project_name": "", "language": "", "info": {"kind": "", "local_file": "", "url": "", "proxy": {"proxy": false, "url": ""}, "branch": "", "path": ""}, "description": "", "file_count": 0, "error": {"kind": "", "msg": ""}, "compile_immediately": false}
@@ -287,27 +289,24 @@ compile from [${params.info.kind}]${params.info.url}${params.info.local_file}
     `
 }
 
-//获取zip中的信息，确定语言
+//获取zip中的信息，确定语言（使用后缀名 extToLanguage 映射）
 func getZipinfo(basePath) {
     if params.language != "" {
         return
     }
-    
 
-    zip.Recursive(
-        basePath, 
+    err = zip.Recursive(
+        basePath,
         (dir, path, info) => {
             if !info.IsDir() {
                 params.file_count++
             }
-            
 
             ext = file.GetExt(path).Lower().TrimLeft(".")
-            countinfo = countMap[ext]
-            if countinfo != nil {
-                countMap[ext] = countinfo + 1
+            if ext in extToLanguage {
+                lang = extToLanguage[ext]
+                countMap[lang] = countMap[lang] + 1
             }
-            
 
             if params.language == "" {
                 if info.IsDir() {
@@ -318,15 +317,19 @@ func getZipinfo(basePath) {
                     if info.Name().Lower() in javaFiles {
                         setLanguage(ssa.Java)
                     }
-                    
-
                     if info.Name().Lower() in phpFiles {
                         setLanguage(ssa.PHP)
                     }
+                    if info.Name().Lower() in jsFiles {
+                        setLanguage(ssa.Javascript)
+                    }
                 }
             }
-        }, 
+        },
     )
+    if err != nil {
+        newLanguageNeedSelectException(sprintf("遍历 zip 失败: %v", err))
+    }
 }
 
 func getLocalInfo(localFile) {
@@ -373,11 +376,10 @@ func getLocalInfo(localFile) {
             filesys.onFileStat(func(path, info) {
                 params.file_count++
                 ext = file.GetExt(path).Lower().TrimLeft(".")
-                if ext in countMap {
-                    countinfo = countMap[ext]
-                    countMap[ext] = countinfo + 1
+                if ext in extToLanguage {
+                    lang = extToLanguage[ext]
+                    countMap[lang] = countMap[lang] + 1
                 }
-                
 
                 if params.language == "" {
                     switch  {
@@ -385,6 +387,8 @@ func getLocalInfo(localFile) {
                         setLanguage(ssa.Java)
                     case info.Name().Lower() in phpFiles:
                         setLanguage(ssa.PHP)
+                    case info.Name().Lower() in jsFiles:
+                        setLanguage(ssa.Javascript)
                     }
                 }
             }), 

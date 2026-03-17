@@ -1,17 +1,18 @@
 package ssatest
 
 import (
+	"archive/zip"
 	"embed"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils/yakgit"
 	"net"
 	"net/http"
 	"os"
 
 	"github.com/gorilla/mux"
-
+	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/yakgit"
 )
 
 //go:embed testfile
@@ -70,6 +71,53 @@ func GetZipWithJarFile() (string, error) {
 		return "", err
 	}
 	return zipPath, nil
+}
+
+// CreateZipWithContents 创建包含指定文件的 zip，用于测试语言检测。files: 相对路径 -> 文件内容
+func CreateZipWithContents(files map[string]string) (string, error) {
+	dir := os.TempDir()
+	zipPath := dir + "/test-" + uuid.New().String() + ".zip"
+	f, err := os.Create(zipPath)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	w := zip.NewWriter(f)
+	for name, content := range files {
+		writer, err := w.Create(name)
+		if err != nil {
+			w.Close()
+			os.Remove(zipPath)
+			return "", err
+		}
+		_, err = writer.Write([]byte(content))
+		if err != nil {
+			w.Close()
+			os.Remove(zipPath)
+			return "", err
+		}
+	}
+	err = w.Close()
+	if err != nil {
+		os.Remove(zipPath)
+		return "", err
+	}
+	return zipPath, nil
+}
+
+// GetZipWithJSFile 创建仅包含 main.js 的 zip，用于测试 zip 内 .js 语言自动检测
+func GetZipWithJSFile() (string, error) {
+	return CreateZipWithContents(map[string]string{
+		"main.js": "console.log('hello');\nmodule.exports = {};",
+	})
+}
+
+// GetZipWithPackageJSONAndJS 创建包含 package.json + main.js 的 zip，用于测试 jsFiles 特征文件检测
+func GetZipWithPackageJSONAndJS() (string, error) {
+	return CreateZipWithContents(map[string]string{
+		"package.json": `{"name":"test","version":"1.0.0"}`,
+		"main.js":      "console.log('hello');",
+	})
 }
 
 func GetNestedJarFile() (string, error) {
