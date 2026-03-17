@@ -78,6 +78,29 @@ func TestSSAAutoDetective(t *testing.T) {
 		require.Equal(t, config.GetCodeSourceLocalFile(), zipPath)
 	})
 
+	t.Run("check zip with .js only", func(t *testing.T) {
+		zipPath, err := ssatest.GetZipWithJSFile()
+		require.NoError(t, err)
+		config, err := check(t, zipPath)
+		require.NoError(t, err)
+		log.Infof("config (zip with .js): %v", config)
+		require.Equal(t, string(config.GetLanguage()), "js", "zip containing only main.js should auto-detect as JavaScript")
+		require.NotNil(t, config.CodeSource)
+		require.Equal(t, string(config.GetCodeSourceKind()), "compression")
+		require.Equal(t, config.GetCodeSourceLocalFile(), zipPath)
+	})
+
+	t.Run("check zip with package.json and .js", func(t *testing.T) {
+		zipPath, err := ssatest.GetZipWithPackageJSONAndJS()
+		require.NoError(t, err)
+		config, err := check(t, zipPath)
+		require.NoError(t, err)
+		log.Infof("config (zip with package.json+.js): %v", config)
+		require.Equal(t, string(config.GetLanguage()), "js", "zip with package.json and main.js should auto-detect as JavaScript")
+		require.NotNil(t, config.CodeSource)
+		require.Equal(t, string(config.GetCodeSourceKind()), "compression")
+	})
+
 	t.Run("check error path", func(t *testing.T) {
 		dir := os.TempDir()
 		dir = path.Join(dir, uuid.NewString(), uuid.NewString())
