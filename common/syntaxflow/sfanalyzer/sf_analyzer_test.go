@@ -2,29 +2,144 @@ package sfanalyzer
 
 import (
 	_ "embed"
+	"fmt"
+	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 //go:embed testdata/demoRule.sf
 var goodRuleDemo string // This rule contents both positive and negative tests and can pass tests. With solution, desc and alert
 
+type wantProblem struct {
+	typ      string
+	severity string
+}
+
+type checkcase struct {
+	name        string
+	ruleContent string
+
+	wantScore       int
+	wantGrade       string
+	wantMinProblems int
+
+	// wantTotalProblems enforces exact problem count when >= 0.
+	// Use -1 to skip exact count check (still enforces wantMinProblems).
+	wantTotalProblems int
+
+	// wantProblemsPrefix enforces problem list order for the first N problems.
+	wantProblemsPrefix []wantProblem
+
+	// wantContains asserts problems include these items (order-insensitive).
+	wantContains []wantProblem
+
+	// want*Count enforces exact severity counts when >= 0. Use -1 to skip.
+	wantErrorCount   int
+	wantWarningCount int
+	wantInfoCount    int
+}
+
+type gradeCase struct {
+	score     int
+	wantGrade string
+}
+
+func clampScore(score int) int {
+	if score < MinScore {
+		return MinScore
+	}
+	return score
+}
+
+func hasProblem(problems []SyntaxFlowRuleProblem, want wantProblem) bool {
+	for _, p := range problems {
+		if p.Type == want.typ && p.Severity == want.severity {
+			return true
+		}
+	}
+	return false
+}
+
+func severityCounts(problems []SyntaxFlowRuleProblem) (errors, warnings, infos int) {
+	for _, p := range problems {
+		switch p.Severity {
+		case Error:
+			errors++
+		case Warning:
+			warnings++
+		case Info:
+			infos++
+		}
+	}
+	return
+}
+
+func formatProblems(problems []SyntaxFlowRuleProblem) string {
+	if len(problems) == 0 {
+		return "(no problems)"
+	}
+	var b strings.Builder
+	for i, p := range problems {
+		fmt.Fprintf(&b, "%d) Type=%s Severity=%s Desc=%s Suggestion=%s\n", i+1, p.Type, p.Severity, p.Description, p.Suggestion)
+	}
+	return b.String()
+}
+
+func check(t *testing.T, cases []checkcase) {
+	t.Helper()
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			analyzer := NewSyntaxFlowAnalyzer(tc.ruleContent)
+			result := analyzer.Analyze()
+
+			require.Equal(t, tc.wantScore, result.Score, "问题详情:\n%s", formatProblems(result.Problems))
+
+			grade := GetGrade(result.Score)
+			require.Equal(t, tc.wantGrade, grade, "score=%d\n问题详情:\n%s", result.Score, formatProblems(result.Problems))
+
+			require.GreaterOrEqual(t, len(result.Problems), tc.wantMinProblems, "问题详情:\n%s", formatProblems(result.Problems))
+			require.True(t, tc.wantTotalProblems < 0 || len(result.Problems) == tc.wantTotalProblems, "期望问题数 %d，实际 %d\n问题详情:\n%s", tc.wantTotalProblems, len(result.Problems), formatProblems(result.Problems))
+
+			require.GreaterOrEqual(t, len(result.Problems), len(tc.wantProblemsPrefix), "问题详情:\n%s", formatProblems(result.Problems))
+			for i := range tc.wantProblemsPrefix {
+				got := result.Problems[i]
+				want := tc.wantProblemsPrefix[i]
+				require.Equal(t, want.typ, got.Type, "第%d个问题\n问题详情:\n%s", i+1, formatProblems(result.Problems))
+				require.Equal(t, want.severity, got.Severity, "第%d个问题\n问题详情:\n%s", i+1, formatProblems(result.Problems))
+			}
+
+			for _, want := range tc.wantContains {
+				require.True(t, hasProblem(result.Problems, want), "期望找到问题 Type=%s Severity=%s\n问题详情:\n%s", want.typ, want.severity, formatProblems(result.Problems))
+			}
+
+			errors, warnings, infos := severityCounts(result.Problems)
+			require.True(t, tc.wantErrorCount < 0 || errors == tc.wantErrorCount, "期望 error 数量 %d，实际 %d\n问题详情:\n%s", tc.wantErrorCount, errors, formatProblems(result.Problems))
+			require.True(t, tc.wantWarningCount < 0 || warnings == tc.wantWarningCount, "期望 warning 数量 %d，实际 %d\n问题详情:\n%s", tc.wantWarningCount, warnings, formatProblems(result.Problems))
+			require.True(t, tc.wantInfoCount < 0 || infos == tc.wantInfoCount, "期望 info 数量 %d，实际 %d\n问题详情:\n%s", tc.wantInfoCount, infos, formatProblems(result.Problems))
+		})
+	}
+}
+
 // TestSyntaxFlowAnalyzer_SyntaxError 测试语法错误情况
 func TestSyntaxFlowAnalyzer_SyntaxError(t *testing.T) {
-	tests := []struct {
-		name                string
-		ruleContent         string
-		expectedScore       int
-		expectedMinProblems int
-		expectedProblemType string
-		expectedSeverity    string
-	}{
+	check(t, []checkcase{
 		{
-			name:                "完全语法错误",
-			ruleContent:         `invalid syntax here $$$`,
-			expectedScore:       MaxScore - SyntaxErrorPenalty, // 100 - 100 = 0
-			expectedMinProblems: 1,                             // 至少有1个语法错误
-			expectedProblemType: ProblemTypeSyntaxError,
-			expectedSeverity:    Error,
+			name:              "完全语法错误",
+			ruleContent:       `invalid syntax here $$$`,
+			wantScore:         clampScore(MaxScore - SyntaxErrorPenalty), // 100 - 100 = 0
+			wantGrade:         "F",
+			wantMinProblems:   1,
+			wantTotalProblems: -1,
+			wantContains: []wantProblem{
+				{typ: ProblemTypeSyntaxError, severity: Error},
+			},
+			wantErrorCount:   -1,
+			wantWarningCount: 0,
+			wantInfoCount:    0,
 		},
 		{
 			name: "部分语法错误",
@@ -33,52 +148,23 @@ func TestSyntaxFlowAnalyzer_SyntaxError(t *testing.T) {
 )
 
 test.* as $result &&& invalid syntax`,
-			expectedScore:       MaxScore - SyntaxErrorPenalty, // 100 - 100 = 0
-			expectedMinProblems: 1,                             // 至少有1个语法错误
-			expectedProblemType: ProblemTypeSyntaxError,
-			expectedSeverity:    Error,
+			wantScore:         clampScore(MaxScore - SyntaxErrorPenalty),
+			wantGrade:         "F",
+			wantMinProblems:   1,
+			wantTotalProblems: -1,
+			wantContains: []wantProblem{
+				{typ: ProblemTypeSyntaxError, severity: Error},
+			},
+			wantErrorCount:   -1,
+			wantWarningCount: 0,
+			wantInfoCount:    0,
 		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			analyzer := NewSyntaxFlowAnalyzer(tt.ruleContent)
-			result := analyzer.Analyze()
-
-			// 验证分数
-			if result.Score != tt.expectedScore {
-				t.Errorf("期望得分 %d，实际得分 %d", tt.expectedScore, result.Score)
-			}
-
-			// 验证问题数量（至少要有期望的最少数量）
-			if len(result.Problems) < tt.expectedMinProblems {
-				t.Errorf("期望至少 %d 个问题，实际 %d 个问题", tt.expectedMinProblems, len(result.Problems))
-			}
-
-			// 验证至少有一个语法错误问题
-			hasSyntaxError := false
-			for _, problem := range result.Problems {
-				if problem.Type == tt.expectedProblemType && problem.Severity == tt.expectedSeverity {
-					hasSyntaxError = true
-					break
-				}
-			}
-			if !hasSyntaxError {
-				t.Errorf("期望找到类型为 %s，严重性为 %s 的问题", tt.expectedProblemType, tt.expectedSeverity)
-			}
-		})
-	}
+	})
 }
 
 // TestSyntaxFlowAnalyzer_MissingAlert 测试缺少alert语句
 func TestSyntaxFlowAnalyzer_MissingAlert(t *testing.T) {
-	tests := []struct {
-		name                 string
-		ruleContent          string
-		expectedScore        int
-		expectedProblemTypes []string
-		expectedSeverity     []string
-	}{
+	check(t, []checkcase{
 		{
 			name: "缺少alert语句",
 			ruleContent: `desc(
@@ -88,56 +174,66 @@ func TestSyntaxFlowAnalyzer_MissingAlert(t *testing.T) {
 )
 
 test.* as $result`,
-			expectedScore:        MaxScore - MissingAlertPenalty - MissingPositiveTestPenalty - MissingNegativeTestPenalty, // 100 - 100 - 15 - 5 = -20，但最低为0
-			expectedProblemTypes: []string{ProblemTypeMissingPositiveTestData, ProblemTypeMissingNegativeTestData, ProblemTypeMissingAlert},
-			expectedSeverity:     []string{Warning, Warning, Error},
+			wantScore:         clampScore(MaxScore - MissingAlertPenalty - MissingPositiveTestPenalty - MissingNegativeTestPenalty),
+			wantGrade:         "F",
+			wantMinProblems:   3,
+			wantTotalProblems: 3,
+			wantProblemsPrefix: []wantProblem{
+				{typ: ProblemTypeMissingPositiveTestData, severity: Warning},
+				{typ: ProblemTypeMissingNegativeTestData, severity: Warning},
+				{typ: ProblemTypeMissingAlert, severity: Error},
+			},
+			wantErrorCount:   1,
+			wantWarningCount: 2,
+			wantInfoCount:    0,
 		},
-	}
+	})
+}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			analyzer := NewSyntaxFlowAnalyzer(tt.ruleContent)
-			result := analyzer.Analyze()
-
-			// 确保分数不低于0
-			expectedScore := tt.expectedScore
-			if expectedScore < 0 {
-				expectedScore = 0
-			}
-
-			// 验证分数
-			if result.Score != expectedScore {
-				t.Errorf("期望得分 %d，实际得分 %d", expectedScore, result.Score)
-				t.Logf("问题详情: %+v", result.Problems)
-			}
-
-			// 验证是否包含alert缺失问题
-			hasAlertProblem := false
-			for _, problem := range result.Problems {
-				if problem.Type == ProblemTypeMissingAlert {
-					hasAlertProblem = true
-					if problem.Severity != Error {
-						t.Errorf("缺少alert应该是Error级别，实际 %s", problem.Severity)
-					}
-					break
-				}
-			}
-			if !hasAlertProblem {
-				t.Errorf("应该检测到缺少alert问题")
-			}
-		})
-	}
+func TestSyntaxFlowAnalyzer_EmptyRule_NoError(t *testing.T) {
+	check(t, []checkcase{
+		{
+			name:              "空字符串规则不应产生Error",
+			ruleContent:       "",
+			wantScore:         MinScore,
+			wantGrade:         "F",
+			wantMinProblems:   5,
+			wantTotalProblems: 5,
+			wantProblemsPrefix: []wantProblem{
+				{typ: ProblemTypeLackDescriptionField, severity: Warning},
+				{typ: ProblemTypeLackSolutionField, severity: Warning},
+				{typ: ProblemTypeMissingPositiveTestData, severity: Warning},
+				{typ: ProblemTypeMissingNegativeTestData, severity: Warning},
+				{typ: ProblemTypeMissingAlert, severity: Warning},
+			},
+			wantErrorCount:   0,
+			wantWarningCount: 5,
+			wantInfoCount:    0,
+		},
+		{
+			name:              "纯空白规则不应产生Error",
+			ruleContent:       " \n\t ",
+			wantScore:         MinScore,
+			wantGrade:         "F",
+			wantMinProblems:   5,
+			wantTotalProblems: 5,
+			wantProblemsPrefix: []wantProblem{
+				{typ: ProblemTypeLackDescriptionField, severity: Warning},
+				{typ: ProblemTypeLackSolutionField, severity: Warning},
+				{typ: ProblemTypeMissingPositiveTestData, severity: Warning},
+				{typ: ProblemTypeMissingNegativeTestData, severity: Warning},
+				{typ: ProblemTypeMissingAlert, severity: Warning},
+			},
+			wantErrorCount:   0,
+			wantWarningCount: 5,
+			wantInfoCount:    0,
+		},
+	})
 }
 
 // TestSyntaxFlowAnalyzer_DescriptionFields 测试描述字段检查
 func TestSyntaxFlowAnalyzer_DescriptionFields(t *testing.T) {
-	tests := []struct {
-		name                 string
-		ruleContent          string
-		expectedScore        int
-		expectedProblemTypes []string
-		expectedSeverity     []string
-	}{
+	check(t, []checkcase{
 		{
 			name: "缺少description字段",
 			ruleContent: `desc(
@@ -147,9 +243,18 @@ func TestSyntaxFlowAnalyzer_DescriptionFields(t *testing.T) {
 
 test.* as $result;
 alert $result;`,
-			expectedScore:        MaxScore - MissingDescriptionPenalty - MissingPositiveTestPenalty - MissingNegativeTestPenalty, // 100 - 40 - 15 - 5 = 40
-			expectedProblemTypes: []string{ProblemTypeLackDescriptionField, ProblemTypeMissingPositiveTestData, ProblemTypeMissingNegativeTestData},
-			expectedSeverity:     []string{Warning, Warning, Warning},
+			wantScore:         MaxScore - MissingDescriptionPenalty - MissingPositiveTestPenalty - MissingNegativeTestPenalty, // 100 - 40 - 15 - 5 = 40
+			wantGrade:         "F",
+			wantMinProblems:   3,
+			wantTotalProblems: 3,
+			wantProblemsPrefix: []wantProblem{
+				{typ: ProblemTypeLackDescriptionField, severity: Warning},
+				{typ: ProblemTypeMissingPositiveTestData, severity: Warning},
+				{typ: ProblemTypeMissingNegativeTestData, severity: Warning},
+			},
+			wantErrorCount:   0,
+			wantWarningCount: 3,
+			wantInfoCount:    0,
 		},
 		{
 			name: "缺少solution字段",
@@ -160,9 +265,18 @@ alert $result;`,
 
 test.* as $result;
 alert $result;`,
-			expectedScore:        MaxScore - MissingSolutionPenalty - MissingPositiveTestPenalty - MissingNegativeTestPenalty, // 100 - 10 - 15 - 5 = 70
-			expectedProblemTypes: []string{ProblemTypeLackSolutionField, ProblemTypeMissingPositiveTestData, ProblemTypeMissingNegativeTestData},
-			expectedSeverity:     []string{Warning, Warning, Warning},
+			wantScore:         MaxScore - MissingSolutionPenalty - MissingPositiveTestPenalty - MissingNegativeTestPenalty, // 100 - 10 - 15 - 5 = 70
+			wantGrade:         "C",
+			wantMinProblems:   3,
+			wantTotalProblems: 3,
+			wantProblemsPrefix: []wantProblem{
+				{typ: ProblemTypeLackSolutionField, severity: Warning},
+				{typ: ProblemTypeMissingPositiveTestData, severity: Warning},
+				{typ: ProblemTypeMissingNegativeTestData, severity: Warning},
+			},
+			wantErrorCount:   0,
+			wantWarningCount: 3,
+			wantInfoCount:    0,
 		},
 		{
 			name: "缺少多个字段",
@@ -172,9 +286,19 @@ alert $result;`,
 
 test.* as $result;
 alert $result;`,
-			expectedScore:        MaxScore - MissingDescriptionPenalty - MissingSolutionPenalty - MissingPositiveTestPenalty - MissingNegativeTestPenalty, // 100 - 40 - 10 - 15 - 5 = 30
-			expectedProblemTypes: []string{ProblemTypeLackDescriptionField, ProblemTypeLackSolutionField, ProblemTypeMissingPositiveTestData, ProblemTypeMissingNegativeTestData},
-			expectedSeverity:     []string{Warning, Warning, Warning, Warning},
+			wantScore:         MaxScore - MissingDescriptionPenalty - MissingSolutionPenalty - MissingPositiveTestPenalty - MissingNegativeTestPenalty, // 100 - 40 - 10 - 15 - 5 = 30
+			wantGrade:         "F",
+			wantMinProblems:   4,
+			wantTotalProblems: 4,
+			wantProblemsPrefix: []wantProblem{
+				{typ: ProblemTypeLackDescriptionField, severity: Warning},
+				{typ: ProblemTypeLackSolutionField, severity: Warning},
+				{typ: ProblemTypeMissingPositiveTestData, severity: Warning},
+				{typ: ProblemTypeMissingNegativeTestData, severity: Warning},
+			},
+			wantErrorCount:   0,
+			wantWarningCount: 4,
+			wantInfoCount:    0,
 		},
 		{
 			name: "完整描述字段",
@@ -186,56 +310,24 @@ alert $result;`,
 
 test.* as $result;
 alert $result;`,
-			expectedScore:        MaxScore - MissingPositiveTestPenalty - MissingNegativeTestPenalty, // 100 - 15 - 5 = 80
-			expectedProblemTypes: []string{ProblemTypeMissingPositiveTestData, ProblemTypeMissingNegativeTestData},
-			expectedSeverity:     []string{Warning, Warning},
+			wantScore:         MaxScore - MissingPositiveTestPenalty - MissingNegativeTestPenalty, // 100 - 15 - 5 = 80
+			wantGrade:         "B",
+			wantMinProblems:   2,
+			wantTotalProblems: 2,
+			wantProblemsPrefix: []wantProblem{
+				{typ: ProblemTypeMissingPositiveTestData, severity: Warning},
+				{typ: ProblemTypeMissingNegativeTestData, severity: Warning},
+			},
+			wantErrorCount:   0,
+			wantWarningCount: 2,
+			wantInfoCount:    0,
 		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			analyzer := NewSyntaxFlowAnalyzer(tt.ruleContent)
-			result := analyzer.Analyze()
-
-			// 验证分数
-			if result.Score != tt.expectedScore {
-				t.Errorf("期望得分 %d，实际得分 %d", tt.expectedScore, result.Score)
-				t.Logf("问题详情: %+v", result.Problems)
-			}
-
-			// 验证问题数量
-			if len(result.Problems) != len(tt.expectedProblemTypes) {
-				t.Errorf("期望 %d 个问题，实际 %d 个问题", len(tt.expectedProblemTypes), len(result.Problems))
-				for i, problem := range result.Problems {
-					t.Logf("问题 %d: Type=%s, Severity=%s, Desc=%s", i, problem.Type, problem.Severity, problem.Description)
-				}
-			}
-
-			// 验证具体问题类型和严重性
-			for i, expectedType := range tt.expectedProblemTypes {
-				if i < len(result.Problems) {
-					if result.Problems[i].Type != expectedType {
-						t.Errorf("第%d个问题期望类型 %s，实际 %s", i+1, expectedType, result.Problems[i].Type)
-					}
-					if result.Problems[i].Severity != tt.expectedSeverity[i] {
-						t.Errorf("第%d个问题期望严重性 %s，实际 %s", i+1, tt.expectedSeverity[i], result.Problems[i].Severity)
-					}
-				}
-			}
-		})
-	}
+	})
 }
 
 // TestSyntaxFlowAnalyzer_TestData 测试数据检查
 func TestSyntaxFlowAnalyzer_TestData(t *testing.T) {
-	tests := []struct {
-		name                 string
-		ruleContent          string
-		expectedScore        int
-		expectedProblemTypes []string
-		expectedSeverity     []string
-		expectedGrade        string
-	}{
+	check(t, []checkcase{
 		{
 			name: "什么测试都没有",
 			ruleContent: `desc(
@@ -246,10 +338,17 @@ func TestSyntaxFlowAnalyzer_TestData(t *testing.T) {
 
 Runtime.getRuntime().exec(* as $cmd) as $result;
 alert $result;`,
-			expectedScore:        MaxScore - MissingPositiveTestPenalty - MissingNegativeTestPenalty, // 100 - 15 - 5 = 80
-			expectedProblemTypes: []string{ProblemTypeMissingPositiveTestData, ProblemTypeMissingNegativeTestData},
-			expectedSeverity:     []string{Warning, Warning},
-			expectedGrade:        "B",
+			wantScore:         MaxScore - MissingPositiveTestPenalty - MissingNegativeTestPenalty, // 100 - 15 - 5 = 80
+			wantGrade:         "B",
+			wantMinProblems:   2,
+			wantTotalProblems: 2,
+			wantProblemsPrefix: []wantProblem{
+				{typ: ProblemTypeMissingPositiveTestData, severity: Warning},
+				{typ: ProblemTypeMissingNegativeTestData, severity: Warning},
+			},
+			wantErrorCount:   0,
+			wantWarningCount: 2,
+			wantInfoCount:    0,
 		},
 		{
 			name: "只有正向测试没有反向测试",
@@ -257,6 +356,7 @@ alert $result;`,
 	title: "测试规则",
 	description: "详细描述",
 	solution: "解决方案",
+	alert_min: 1,
 	alert_min: 1,
 	language: java,
 	'file://positive.java': <<<EOF
@@ -270,10 +370,16 @@ EOF
 
 Runtime.getRuntime().exec(* as $cmd) as $result;
 alert $result;`,
-			expectedScore:        MaxScore - MissingNegativeTestPenalty,
-			expectedProblemTypes: []string{ProblemTypeMissingNegativeTestData},
-			expectedSeverity:     []string{Warning},
-			expectedGrade:        "A",
+			wantScore:         MaxScore - MissingNegativeTestPenalty,
+			wantGrade:         "A",
+			wantMinProblems:   1,
+			wantTotalProblems: 1,
+			wantProblemsPrefix: []wantProblem{
+				{typ: ProblemTypeMissingNegativeTestData, severity: Warning},
+			},
+			wantErrorCount:   0,
+			wantWarningCount: 1,
+			wantInfoCount:    0,
 		},
 		{
 			name: "只有反向测试没有正向测试",
@@ -294,10 +400,16 @@ SAFE
 
 Runtime.getRuntime().exec(* as $cmd) as $result;
 alert $result;`,
-			expectedScore:        MaxScore - MissingPositiveTestPenalty, // 实际上测试不通过，因为缺少正向测试导致验证失败
-			expectedProblemTypes: []string{ProblemTypeMissingPositiveTestData},
-			expectedSeverity:     []string{Warning},
-			expectedGrade:        "B",
+			wantScore:         MaxScore - MissingPositiveTestPenalty,
+			wantGrade:         "B",
+			wantMinProblems:   1,
+			wantTotalProblems: 1,
+			wantProblemsPrefix: []wantProblem{
+				{typ: ProblemTypeMissingPositiveTestData, severity: Warning},
+			},
+			wantErrorCount:   0,
+			wantWarningCount: 1,
+			wantInfoCount:    0,
 		},
 		{
 			name: "正反测试都有但正向测试不通过",
@@ -325,10 +437,16 @@ SAFE
 
 Runtime.getRuntime().exec(* as $cmd) as $result;
 alert $result;`,
-			expectedScore:        MinScore, // 测试用例不通过直接0分
-			expectedProblemTypes: []string{ProblemTypeTestCaseNotPass},
-			expectedSeverity:     []string{Error},
-			expectedGrade:        "F",
+			wantScore:         MinScore, // 测试用例不通过直接0分
+			wantGrade:         "F",
+			wantMinProblems:   1,
+			wantTotalProblems: 1,
+			wantProblemsPrefix: []wantProblem{
+				{typ: ProblemTypeTestCaseNotPass, severity: Error},
+			},
+			wantErrorCount:   1,
+			wantWarningCount: 0,
+			wantInfoCount:    0,
 		},
 		{
 			name: "正反测试都有但反向测试不通过",
@@ -356,10 +474,16 @@ SAFE
 
 Runtime.getRuntime().exec(* as $cmd) as $result;
 alert $result;`,
-			expectedScore:        MinScore, // 测试用例不通过直接0分
-			expectedProblemTypes: []string{ProblemTypeTestCaseNotPass},
-			expectedSeverity:     []string{Error},
-			expectedGrade:        "F",
+			wantScore:         MinScore, // 测试用例不通过直接0分
+			wantGrade:         "F",
+			wantMinProblems:   1,
+			wantTotalProblems: 1,
+			wantProblemsPrefix: []wantProblem{
+				{typ: ProblemTypeTestCaseNotPass, severity: Error},
+			},
+			wantErrorCount:   1,
+			wantWarningCount: 0,
+			wantInfoCount:    0,
 		},
 		{
 			name: "正反测试都有且都通过",
@@ -387,100 +511,57 @@ SAFE
 
 Runtime.getRuntime().exec(* as $cmd) as $result;
 alert $result;`,
-			expectedScore:        MaxScore, // 仍然测试不通过，可能是因为alert_high设置问题
-			expectedProblemTypes: []string{},
-			expectedSeverity:     []string{},
-			expectedGrade:        "S",
+			wantScore:          MaxScore,
+			wantGrade:          "S",
+			wantMinProblems:    0,
+			wantTotalProblems:  0,
+			wantProblemsPrefix: []wantProblem{},
+			wantErrorCount:     0,
+			wantWarningCount:   0,
+			wantInfoCount:      0,
 		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			analyzer := NewSyntaxFlowAnalyzer(tt.ruleContent)
-			result := analyzer.Analyze()
-
-			// 验证分数
-			if result.Score != tt.expectedScore {
-				t.Errorf("期望得分 %d，实际得分 %d", tt.expectedScore, result.Score)
-				t.Logf("问题详情: %+v", result.Problems)
-			}
-
-			// 验证等级
-			grade := GetGrade(result.Score)
-			if grade != tt.expectedGrade {
-				t.Errorf("期望等级 %s，实际等级 %s", tt.expectedGrade, grade)
-			}
-
-			// 验证问题数量
-			if len(result.Problems) != len(tt.expectedProblemTypes) {
-				t.Errorf("期望 %d 个问题，实际 %d 个问题", len(tt.expectedProblemTypes), len(result.Problems))
-				for i, problem := range result.Problems {
-					t.Logf("问题 %d: Type=%s, Severity=%s, Desc=%s", i, problem.Type, problem.Severity, problem.Description)
-				}
-			}
-
-			// 验证具体问题类型和严重性
-			for i, expectedType := range tt.expectedProblemTypes {
-				if i < len(result.Problems) {
-					if result.Problems[i].Type != expectedType {
-						t.Errorf("第%d个问题期望类型 %s，实际 %s", i+1, expectedType, result.Problems[i].Type)
-					}
-					if result.Problems[i].Severity != tt.expectedSeverity[i] {
-						t.Errorf("第%d个问题期望严重性 %s，实际 %s", i+1, tt.expectedSeverity[i], result.Problems[i].Severity)
-					}
-				}
-			}
-
-			t.Logf("测试案例: %s, 分数: %d, 等级: %s, 问题数: %d", tt.name, result.Score, grade, len(result.Problems))
-		})
-	}
+	})
 }
 
 // TestSyntaxFlowAnalyzer_CompleteRule 测试完整规则
 func TestSyntaxFlowAnalyzer_CompleteRule(t *testing.T) {
-	// 使用嵌入的完整规则进行测试
-	if goodRuleDemo != "" {
-		analyzer := NewSyntaxFlowAnalyzer(goodRuleDemo)
-		result := analyzer.Analyze()
+	require.NotEmpty(t, strings.TrimSpace(goodRuleDemo), "goodRuleDemo is empty")
 
-		// 完整规则应该得高分（90分以上）
-		if result.Score < GradeSMin {
-			t.Errorf("完整规则应该得S级（%d分），实际得分 %d", GradeSMin, result.Score)
-			t.Logf("问题详情: %+v", result.Problems)
-		}
-
-		// 验证等级
-		grade := GetGrade(result.Score)
-		if grade != "S" {
-			t.Errorf("完整规则应该得S级，实际等级 %s", grade)
-		}
-	}
+	check(t, []checkcase{
+		{
+			name:               "demoRule.sf",
+			ruleContent:        goodRuleDemo,
+			wantScore:          MaxScore,
+			wantGrade:          "S",
+			wantMinProblems:    0,
+			wantTotalProblems:  0,
+			wantProblemsPrefix: []wantProblem{},
+			wantErrorCount:     0,
+			wantWarningCount:   0,
+			wantInfoCount:      0,
+		},
+	})
 }
 
 // TestSyntaxFlowAnalyzer_GradeSystem 测试等级系统
 func TestSyntaxFlowAnalyzer_GradeSystem(t *testing.T) {
-	tests := []struct {
-		score         int
-		expectedGrade string
-	}{
-		{score: 100, expectedGrade: "S"},
-		{95, "A"},
-		{90, "A"},
-		{85, "B"},
-		{80, "B"},
-		{75, "C"},
-		{70, "C"},
-		{65, "D"},
-		{60, "D"},
-		{55, "F"},
-		{0, "F"},
+	tests := []gradeCase{
+		{score: 100, wantGrade: "S"},
+		{score: 95, wantGrade: "A"},
+		{score: 90, wantGrade: "A"},
+		{score: 85, wantGrade: "B"},
+		{score: 80, wantGrade: "B"},
+		{score: 75, wantGrade: "C"},
+		{score: 70, wantGrade: "C"},
+		{score: 65, wantGrade: "D"},
+		{score: 60, wantGrade: "D"},
+		{score: 55, wantGrade: "F"},
+		{score: 0, wantGrade: "F"},
 	}
 
 	for _, tt := range tests {
 		grade := GetGrade(tt.score)
-		if grade != tt.expectedGrade {
-			t.Errorf("分数 %d 期望等级 %s，实际 %s", tt.score, tt.expectedGrade, grade)
-		}
+		require.Equal(t, tt.wantGrade, grade, "score=%d", tt.score)
 	}
 }
 
@@ -525,34 +606,23 @@ alert $result;`,
 	results := BatchAnalyze(rules)
 
 	// 验证结果数量
-	if len(results) != 4 {
-		t.Errorf("期望4个结果，实际得到 %d", len(results))
-	}
+	require.Len(t, results, 4)
 
 	// 验证语法错误规则得分为0
-	if syntaxErrorResult, ok := results["syntax_error_rule"]; ok {
-		expectedScore := MaxScore - SyntaxErrorPenalty
-		if expectedScore < 0 {
-			expectedScore = 0
-		}
-		if syntaxErrorResult.Score != expectedScore {
-			t.Errorf("语法错误规则期望得分 %d，实际: %d", expectedScore, syntaxErrorResult.Score)
-		}
-	}
+	syntaxErrorResult, ok := results["syntax_error_rule"]
+	require.True(t, ok)
+	expectedScore := clampScore(MaxScore - SyntaxErrorPenalty)
+	require.Equal(t, expectedScore, syntaxErrorResult.Score)
 
 	// 验证缺少alert规则得分为0
-	if missingAlertResult, ok := results["missing_alert_rule"]; ok {
-		if missingAlertResult.Score != 0 {
-			t.Errorf("缺少alert规则应该是0分，实际: %d", missingAlertResult.Score)
-		}
-	}
+	missingAlertResult, ok := results["missing_alert_rule"]
+	require.True(t, ok)
+	require.Equal(t, 0, missingAlertResult.Score)
 
 	// 验证不完整规则不是满分
-	if incompleteResult, ok := results["incomplete_rule"]; ok {
-		if incompleteResult.Score == MaxScore {
-			t.Errorf("不完整规则不应该是满分")
-		}
-	}
+	incompleteResult, ok := results["incomplete_rule"]
+	require.True(t, ok)
+	require.NotEqual(t, MaxScore, incompleteResult.Score)
 
 	// 记录所有结果用于调试
 	for name, result := range results {

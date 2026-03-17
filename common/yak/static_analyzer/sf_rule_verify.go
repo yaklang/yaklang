@@ -10,9 +10,9 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/memedit"
-	"github.com/yaklang/yaklang/common/yak/static_analyzer/result"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer/result"
 )
 
 // SampleVerificationResult 规则与样例匹配验证结果（原 sfverify.VerifySFRuleMatchesSampleResult）
@@ -30,9 +30,9 @@ type SampleVerificationResult struct {
 
 // SyntaxFlowCheckResult 合并语法检查与正例自检结果
 type SyntaxFlowCheckResult struct {
-	SyntaxErrors   []*result.StaticAnalyzeResult
+	SyntaxErrors    []*result.StaticAnalyzeResult
 	FormattedErrors string // 语法错误的富格式输出，供 AI 工具直接展示
-	Sample         *SampleVerificationResult
+	Sample          *SampleVerificationResult
 }
 
 // SyntaxFlowRuleCheckingWithSample 语法检查 + 正例自检（当 sampleCode、language 非空时）
@@ -56,7 +56,14 @@ func SyntaxFlowRuleCheckingWithSample(code, sampleCode, filename, language strin
 // syntaxFlowCompileAndCheck 编译一次，返回语法错误（有则）或已编译的 frame（无错误时）
 func syntaxFlowCompileAndCheck(code string) ([]*result.StaticAnalyzeResult, *sfvm.SFFrame) {
 	vm := sfvm.NewSyntaxFlowVirtualMachine()
-	frame, err := vm.Compile(code)
+	compileContent := code
+	// SyntaxFlow rules are frequently drafted from an empty editor. Normalize fully blank content
+	// (whitespace-only) to a single newline so it can be parsed as an empty program and NOT be
+	// treated as a syntax error.
+	if strings.TrimSpace(compileContent) == "" {
+		compileContent = "\n"
+	}
+	frame, err := vm.Compile(compileContent)
 	if err == nil {
 		return nil, frame
 	}
@@ -189,17 +196,17 @@ func verifySFRuleMatchesSampleWithFrame(frame *sfvm.SFFrame, ruleContent, sample
 	progs, err := ssaapi.ParseProjectWithFS(vfs, ssaapi.WithLanguage(lang))
 	if err != nil {
 		return SampleVerificationResult{
-			Matched: false,
-			Message: "样例代码解析失败: " + err.Error(),
-			Error:   err.Error(),
+			Matched:    false,
+			Message:    "样例代码解析失败: " + err.Error(),
+			Error:      err.Error(),
 			Suggestion: "请确认 sample_code 为有效的 " + string(lang) + " 代码，且 filename 扩展名正确（如 .go/.java/.php/.c）",
 		}
 	}
 	if len(progs) == 0 {
 		return SampleVerificationResult{
-			Matched: false,
-			Message: "样例代码未能生成有效程序",
-			Error:   "empty_program",
+			Matched:    false,
+			Message:    "样例代码未能生成有效程序",
+			Error:      "empty_program",
 			Suggestion: "请检查 sample_code 是否包含可解析的入口（如 package main、class 等）",
 		}
 	}
@@ -211,17 +218,17 @@ func verifySFRuleMatchesSampleWithFrame(frame *sfvm.SFFrame, ruleContent, sample
 	sfResult, err := ssaapi.QuerySyntaxflow(opts...)
 	if err != nil {
 		return SampleVerificationResult{
-			Matched: false,
-			Message: "规则执行失败: " + err.Error(),
-			Error:   err.Error(),
+			Matched:    false,
+			Message:    "规则执行失败: " + err.Error(),
+			Error:      err.Error(),
 			Suggestion: "请先调用 check-syntaxflow-syntax 检查规则语法，并确认规则中的 include/lib 引用是否可用",
 		}
 	}
 	if len(sfResult.GetErrors()) > 0 {
 		return SampleVerificationResult{
-			Matched: false,
-			Message: "规则执行有错误: " + strings.Join(sfResult.GetErrors(), "; "),
-			Error:   strings.Join(sfResult.GetErrors(), "; "),
+			Matched:    false,
+			Message:    "规则执行有错误: " + strings.Join(sfResult.GetErrors(), "; "),
+			Error:      strings.Join(sfResult.GetErrors(), "; "),
 			Suggestion: "检查规则逻辑是否与样例中的 API/调用方式一致，如 source/sink 方法名、数据流路径等",
 		}
 	}

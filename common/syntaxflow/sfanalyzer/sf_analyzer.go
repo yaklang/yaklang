@@ -112,7 +112,14 @@ func (s *SyntaxFlowAnalyzer) checkBasicSyntax(result *SyntaxFlowRuleAnalyzeResul
 	}
 	// 使用sfvm编译检查语法
 	vm := sfvm.NewSyntaxFlowVirtualMachine()
-	frame, err := vm.Compile(s.ruleContent)
+	compileContent := s.ruleContent
+	// SyntaxFlow rules are frequently drafted from an empty editor. Normalize fully blank content
+	// (whitespace-only) to a single newline so it can be parsed as an empty program and scored as a
+	// draft rule instead of being treated as a syntax error.
+	if strings.TrimSpace(compileContent) == "" {
+		compileContent = "\n"
+	}
+	frame, err := vm.Compile(compileContent)
 	if err != nil {
 		result.Score -= SyntaxErrorPenalty // 语法错误直接扣100分
 
@@ -204,9 +211,17 @@ func (s *SyntaxFlowAnalyzer) checkRuleLogic(result *SyntaxFlowRuleAnalyzeResult,
 	// 检查是否有alert语句
 	hasAlert := len(frame.GetRule().AlertDesc) > 0
 	if !hasAlert {
+		severity := Error
+		// For a completely blank draft rule (only whitespace), treat missing alert as a warning
+		// instead of an error. Users often start from an empty editor; this should not be reported
+		// as a hard error while still keeping the score at 0.
+		if strings.TrimSpace(s.ruleContent) == "" {
+			severity = Warning
+		}
+
 		result.Problems = append(result.Problems, SyntaxFlowRuleProblem{
 			Type:        ProblemTypeMissingAlert,
-			Severity:    Error,
+			Severity:    severity,
 			Description: "缺少告警语句",
 			Suggestion:  "规则应该包含alert语句来产生检测结果",
 		})
