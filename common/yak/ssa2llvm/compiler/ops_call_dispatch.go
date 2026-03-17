@@ -5,32 +5,18 @@ import (
 
 	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/dispatch"
 )
 
 func (c *Compiler) getOrInsertStdlibDispatcher() (llvm.Value, llvm.Type) {
 	fn := c.Mod.NamedFunction(dispatch.DispatcherSymbol)
 
-	i64 := c.LLVMCtx.Int64Type()
-	argvPtr := llvm.PointerType(i64, 0)
-	fnType := llvm.FunctionType(i64, []llvm.Type{i64, i64, argvPtr}, false)
+	i8Ptr := llvm.PointerType(c.LLVMCtx.Int8Type(), 0)
+	fnType := llvm.FunctionType(c.LLVMCtx.VoidType(), []llvm.Type{i8Ptr}, false)
 
 	if fn.IsNil() {
 		fn = llvm.AddFunction(c.Mod, dispatch.DispatcherSymbol, fnType)
-	}
-	return fn, fnType
-}
-
-func (c *Compiler) getOrInsertAsyncStdlibDispatcher() (llvm.Value, llvm.Type) {
-	name := "yak_runtime_async_std_call"
-	fn := c.Mod.NamedFunction(name)
-
-	i64 := c.LLVMCtx.Int64Type()
-	argvPtr := llvm.PointerType(i64, 0)
-	fnType := llvm.FunctionType(c.LLVMCtx.VoidType(), []llvm.Type{i64, i64, argvPtr}, false)
-
-	if fn.IsNil() {
-		fn = llvm.AddFunction(c.Mod, name, fnType)
 	}
 	return fn, fnType
 }
@@ -40,44 +26,56 @@ func (c *Compiler) compileStdlibDispatchCall(inst *ssa.Call, binding ExternBindi
 
 	argc := len(inst.Args)
 	i64 := c.LLVMCtx.Int64Type()
-	argvPtr := llvm.ConstPointerNull(llvm.PointerType(i64, 0))
 	const yakTaggedPointerMask uint64 = 1 << 62
 	tagPointers := shouldTagStdlibArgPointers(binding.DispatchID)
 
-	if argc > 0 {
-		mallocFn, mallocType := c.getOrInsertMalloc()
-		sizeBytes := llvm.ConstInt(i64, uint64(argc*8), false)
-		rawPtr := c.Builder.CreateCall(mallocType, mallocFn, []llvm.Value{sizeBytes}, "yak_std_argv_mem")
-		argvPtr = c.Builder.CreateIntToPtr(rawPtr, llvm.PointerType(i64, 0), "yak_std_argv_ptr")
+	ctxI8, ctxI64, err := c.allocInvokeContext(argc, "yak_std_ctx")
+	if err != nil {
+		return err
+	}
+	target := llvm.ConstInt(i64, uint64(binding.DispatchID), false)
+	if err := c.initInvokeContext(ctxI64, abi.KindDispatch, target, argc); err != nil {
+		return err
+	}
 
-		fn := inst.GetFunc()
-		for i, argID := range inst.Args {
-			argVal, err := c.getValue(inst, argID)
-			if err != nil {
-				return fmt.Errorf("compileStdlibDispatchCall: failed to resolve argument %d: %w", i, err)
-			}
-			isPointer := false
-			if fn != nil {
-				if ssaValAny, ok := fn.GetValueById(argID); ok && ssaValAny != nil {
-					if ssaVal, ok := ssaValAny.(ssa.Value); ok {
-						isPointer = c.ssaValueIsPointer(ssaVal, fn)
-					}
+	fn := inst.GetFunc()
+	for i, argID := range inst.Args {
+		argVal, err := c.getValue(inst, argID)
+		if err != nil {
+			return fmt.Errorf("compileStdlibDispatchCall: failed to resolve argument %d: %w", i, err)
+		}
+
+		argI64 := c.coerceToInt64(argVal)
+		root := llvm.ConstInt(i64, 0, false)
+
+		isPointer := false
+		if fn != nil {
+			if ssaValAny, ok := fn.GetValueById(argID); ok && ssaValAny != nil {
+				if ssaVal, ok := ssaValAny.(ssa.Value); ok {
+					isPointer = c.ssaValueIsPointer(ssaVal, fn)
 				}
 			}
-			argI64 := c.coerceToInt64(argVal)
-			if tagPointers && isPointer {
-				tag := llvm.ConstInt(c.LLVMCtx.Int64Type(), yakTaggedPointerMask, false)
-				argI64 = buildOr(c.Builder, argI64, tag, "yak_std_arg_tag")
-			}
-			idx := llvm.ConstInt(i64, uint64(i), false)
-			elemPtr := c.Builder.CreateGEP(i64, argvPtr, []llvm.Value{idx}, "")
-			c.Builder.CreateStore(argI64, elemPtr)
+		}
+
+		if tagPointers && isPointer {
+			root = argI64
+			tag := llvm.ConstInt(i64, yakTaggedPointerMask, false)
+			argI64 = buildOr(c.Builder, argI64, tag, "yak_std_arg_tag")
+		}
+
+		if err := c.storeInvokeContextArg(ctxI64, i, argI64); err != nil {
+			return err
+		}
+		if err := c.storeInvokeContextRoot(ctxI64, argc, i, root); err != nil {
+			return err
 		}
 	}
 
-	idVal := llvm.ConstInt(i64, uint64(binding.DispatchID), false)
-	argcVal := llvm.ConstInt(i64, uint64(argc), false)
-	callResult := c.Builder.CreateCall(dispatcherType, dispatcher, []llvm.Value{idVal, argcVal, argvPtr}, "")
+	c.Builder.CreateCall(dispatcherType, dispatcher, []llvm.Value{ctxI8}, "")
+	callResult, err := c.loadCtxWordFrom(ctxI64, abi.WordRet, "")
+	if err != nil {
+		return err
+	}
 
 	if inst.GetId() > 0 {
 		c.Values[inst.GetId()] = callResult
@@ -90,48 +88,55 @@ func (c *Compiler) compileStdlibDispatchCall(inst *ssa.Call, binding ExternBindi
 }
 
 func (c *Compiler) compileAsyncStdlibDispatchCall(inst *ssa.Call, binding ExternBinding) error {
-	asyncDispatcher, asyncDispatcherType := c.getOrInsertAsyncStdlibDispatcher()
-
 	argc := len(inst.Args)
 	i64 := c.LLVMCtx.Int64Type()
-	argvPtr := llvm.ConstPointerNull(llvm.PointerType(i64, 0))
 	const yakTaggedPointerMask uint64 = 1 << 62
 	tagPointers := shouldTagStdlibArgPointers(binding.DispatchID)
 
-	if argc > 0 {
-		mallocFn, mallocType := c.getOrInsertMalloc()
-		sizeBytes := llvm.ConstInt(i64, uint64(argc*8), false)
-		rawPtr := c.Builder.CreateCall(mallocType, mallocFn, []llvm.Value{sizeBytes}, "yak_async_std_argv_mem")
-		argvPtr = c.Builder.CreateIntToPtr(rawPtr, llvm.PointerType(i64, 0), "yak_async_std_argv_ptr")
+	ctxI8, ctxI64, err := c.allocInvokeContext(argc, "yak_async_std_ctx")
+	if err != nil {
+		return err
+	}
+	target := llvm.ConstInt(i64, uint64(binding.DispatchID), false)
+	if err := c.initInvokeContext(ctxI64, abi.KindDispatch, target, argc); err != nil {
+		return err
+	}
 
-		fn := inst.GetFunc()
-		for i, argID := range inst.Args {
-			argVal, err := c.getValue(inst, argID)
-			if err != nil {
-				return fmt.Errorf("compileAsyncStdlibDispatchCall: failed to resolve argument %d: %w", i, err)
-			}
-			isPointer := false
-			if fn != nil {
-				if ssaValAny, ok := fn.GetValueById(argID); ok && ssaValAny != nil {
-					if ssaVal, ok := ssaValAny.(ssa.Value); ok {
-						isPointer = c.ssaValueIsPointer(ssaVal, fn)
-					}
+	fn := inst.GetFunc()
+	for i, argID := range inst.Args {
+		argVal, err := c.getValue(inst, argID)
+		if err != nil {
+			return fmt.Errorf("compileAsyncStdlibDispatchCall: failed to resolve argument %d: %w", i, err)
+		}
+
+		argI64 := c.coerceToInt64(argVal)
+		root := llvm.ConstInt(i64, 0, false)
+
+		isPointer := false
+		if fn != nil {
+			if ssaValAny, ok := fn.GetValueById(argID); ok && ssaValAny != nil {
+				if ssaVal, ok := ssaValAny.(ssa.Value); ok {
+					isPointer = c.ssaValueIsPointer(ssaVal, fn)
 				}
 			}
-			argI64 := c.coerceToInt64(argVal)
-			if tagPointers && isPointer {
-				tag := llvm.ConstInt(c.LLVMCtx.Int64Type(), yakTaggedPointerMask, false)
-				argI64 = buildOr(c.Builder, argI64, tag, "yak_std_arg_tag")
-			}
-			idx := llvm.ConstInt(i64, uint64(i), false)
-			elemPtr := c.Builder.CreateGEP(i64, argvPtr, []llvm.Value{idx}, "")
-			c.Builder.CreateStore(argI64, elemPtr)
+		}
+
+		if tagPointers && isPointer {
+			root = argI64
+			tag := llvm.ConstInt(i64, yakTaggedPointerMask, false)
+			argI64 = buildOr(c.Builder, argI64, tag, "yak_std_arg_tag")
+		}
+
+		if err := c.storeInvokeContextArg(ctxI64, i, argI64); err != nil {
+			return err
+		}
+		if err := c.storeInvokeContextRoot(ctxI64, argc, i, root); err != nil {
+			return err
 		}
 	}
 
-	idVal := llvm.ConstInt(i64, uint64(binding.DispatchID), false)
-	argcVal := llvm.ConstInt(i64, uint64(argc), false)
-	c.Builder.CreateCall(asyncDispatcherType, asyncDispatcher, []llvm.Value{idVal, argcVal, argvPtr}, "")
+	spawnFn, spawnType := c.getOrInsertRuntimeSpawn()
+	c.Builder.CreateCall(spawnType, spawnFn, []llvm.Value{ctxI8}, "")
 
 	if inst.GetId() > 0 {
 		zero := llvm.ConstInt(i64, 0, false)

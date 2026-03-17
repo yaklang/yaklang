@@ -29,7 +29,21 @@ var (
 	activeObjs = map[uintptr]C.uintptr_t{}
 )
 
-func getObject(initVal int64) unsafe.Pointer {
+func getObject(ctx unsafe.Pointer) {
+	const (
+		wordArgc    = 5
+		wordRet     = 6
+		headerWords = 10
+	)
+	if ctx == nil {
+		return
+	}
+	argc := int(int64(*(*uint64)(unsafe.Pointer(uintptr(ctx) + uintptr(wordArgc)*8))))
+	var initVal int64
+	if argc > 0 {
+		initVal = int64(*(*uint64)(unsafe.Pointer(uintptr(ctx) + uintptr(headerWords)*8)))
+	}
+
 	obj := &mockObject{Number: initVal, Name: "YakTest"}
 	handle := cgo.NewHandle(obj)
 	shadow := C.malloc(C.size_t(8))
@@ -40,7 +54,7 @@ func getObject(initVal int64) unsafe.Pointer {
 	objMu.Unlock()
 
 	fmt.Printf("[Go] Created object %d with handle %d\n", initVal, handle)
-	return shadow
+	*(*uint64)(unsafe.Pointer(uintptr(ctx) + uintptr(wordRet)*8)) = uint64(uintptr(shadow))
 }
 
 func yak_runtime_get_field(objPtr unsafe.Pointer, name *C.char) int64 {
@@ -76,13 +90,26 @@ func yak_runtime_set_field(objPtr unsafe.Pointer, name *C.char, val int64) {
 	}
 }
 
-func dump(objPtr unsafe.Pointer) {
-	if objPtr == nil {
+func dump(ctx unsafe.Pointer) {
+	const (
+		wordArgc    = 5
+		wordRet     = 6
+		headerWords = 10
+	)
+	if ctx == nil {
 		return
 	}
-	handleID := *(*C.uintptr_t)(objPtr)
-	h := cgo.Handle(handleID)
-	fmt.Printf("[Go] Dump: %+v\n", h.Value())
+	argc := int(int64(*(*uint64)(unsafe.Pointer(uintptr(ctx) + uintptr(wordArgc)*8))))
+	if argc > 0 {
+		arg0 := *(*uint64)(unsafe.Pointer(uintptr(ctx) + uintptr(headerWords)*8))
+		objPtr := unsafe.Pointer(uintptr(arg0))
+		if objPtr != nil {
+			handleID := *(*C.uintptr_t)(objPtr)
+			h := cgo.Handle(handleID)
+			fmt.Printf("[Go] Dump: %+v\n", h.Value())
+		}
+	}
+	*(*uint64)(unsafe.Pointer(uintptr(ctx) + uintptr(wordRet)*8)) = 0
 }
 
 func yak_runtime_gc() {
