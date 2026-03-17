@@ -348,8 +348,11 @@ func (b *astbuilder) buildGoStmt(stmt *yak.GoStmtContext) ssa.Value {
 	if stmt, ok := stmt.CallExpr().(*yak.CallExprContext); ok {
 		c = b.buildCallExpr(stmt)
 	}
+	if c == nil {
+		return nil
+	}
 	c.Async = true
-	return c
+	return b.EmitCall(c)
 }
 
 // return stmt

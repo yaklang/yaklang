@@ -13,6 +13,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/dispatch"
 )
 
@@ -80,13 +81,6 @@ func resolveStdlibValue[T any](ptr unsafe.Pointer) (T, bool) {
 		return zero, false
 	}
 	return value, true
-}
-
-func argvAsSlice(argv *C.uint64_t, argc int) []uint64 {
-	if argc <= 0 || argv == nil {
-		return nil
-	}
-	return unsafe.Slice((*uint64)(unsafe.Pointer(argv)), argc)
 }
 
 func stdlibPocTimeout(args []uint64) int64 {
@@ -195,39 +189,57 @@ func stdlibYakitLog(level string, args []uint64) int64 {
 	return 0
 }
 
-//export yak_std_call
-func yak_std_call(funcID int64, argc int64, argv *C.uint64_t) int64 {
+//export yak_runtime_dispatch
+func yak_runtime_dispatch(ctx unsafe.Pointer) {
 	defer recoverRuntimePanic()
+
+	if ctx == nil {
+		return
+	}
+
+	kind := ctxLoadWord(ctx, abi.WordKind)
+	if kind != abi.KindDispatch {
+		return
+	}
+
+	argc := ctxArgc(ctx)
 	if argc < 0 || argc > 256 {
-		return 0
+		return
 	}
+	args := ctxArgsSlice(ctx, argc)
 
-	args := argvAsSlice(argv, int(argc))
+	id := dispatch.FuncID(int64(ctxLoadWord(ctx, abi.WordTarget)))
 
-	switch dispatch.FuncID(funcID) {
+	var ret int64
+	switch id {
 	case dispatch.IDPocTimeout:
-		return stdlibPocTimeout(args)
+		ret = stdlibPocTimeout(args)
 	case dispatch.IDPocGet:
-		return stdlibPocGet(args)
+		ret = stdlibPocGet(args)
 	case dispatch.IDPocGetHTTPPacketBody:
-		return stdlibPocGetHTTPPacketBody(args)
+		ret = stdlibPocGetHTTPPacketBody(args)
 	case dispatch.IDOsGetenv:
-		return stdlibOsGetenv(args)
+		ret = stdlibOsGetenv(args)
 	case dispatch.IDPrint:
-		return stdlibPrint(args)
+		ret = stdlibPrint(args)
 	case dispatch.IDPrintf:
-		return stdlibPrintf(args)
+		ret = stdlibPrintf(args)
 	case dispatch.IDPrintln:
-		return stdlibPrintln(args)
+		ret = stdlibPrintln(args)
 	case dispatch.IDYakitInfo:
-		return stdlibYakitLog("info", args)
+		ret = stdlibYakitLog("info", args)
 	case dispatch.IDYakitWarn:
-		return stdlibYakitLog("warn", args)
+		ret = stdlibYakitLog("warn", args)
 	case dispatch.IDYakitDebug:
-		return stdlibYakitLog("debug", args)
+		ret = stdlibYakitLog("debug", args)
 	case dispatch.IDYakitError:
-		return stdlibYakitLog("error", args)
+		ret = stdlibYakitLog("error", args)
+	case dispatch.IDWaitAllAsyncCallFinish:
+		yakAsyncWaitGroup.Wait()
+		ret = 0
 	default:
-		return 0
+		ret = 0
 	}
+
+	ctxSetRet(ctx, ret)
 }

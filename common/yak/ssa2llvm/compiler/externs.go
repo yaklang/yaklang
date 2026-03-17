@@ -28,6 +28,10 @@ type ExternBinding struct {
 }
 
 var defaultExternBindings = map[string]ExternBinding{
+	"waitAllAsyncCallFinish": {
+		Symbol: "yak_runtime_async_wait",
+		Return: ExternTypeVoid,
+	},
 	"println": {
 		Return:     ExternTypeVoid,
 		DispatchID: dispatch.IDPrintln,

@@ -15,15 +15,15 @@ func (c *Compiler) compileMake(inst *ssa.Make) error {
 	case ssa.StructTypeKind:
 		return c.compileMakeStruct(inst, typ)
 	case ssa.AnyTypeKind, ssa.ObjectTypeKind:
-		// For Any/Object types, allocate a generic pointer (i8*)
-		// This is used by YakSSA for scope management and dynamic typing
+		// For Any/Object types, allocate generic memory. We represent addresses as `i64`
+		// (uintptr) and only cast to pointers at FFI/runtime boundaries.
 		return c.compileMakeGeneric(inst)
 	case ssa.SliceTypeKind, ssa.MapTypeKind:
-		// Slices and maps are represented as pointers for now
+		// Slices and maps are represented as addresses (`i64`) for now.
 		return c.compileMakeGeneric(inst)
 	default:
-		// For unhandled types, create a null pointer placeholder
-		c.Values[inst.GetId()] = llvm.ConstPointerNull(llvm.PointerType(c.LLVMCtx.Int8Type(), 0))
+		// For unhandled types, create a null/zero placeholder
+		c.Values[inst.GetId()] = llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
 		return nil
 	}
 }
@@ -31,16 +31,15 @@ func (c *Compiler) compileMake(inst *ssa.Make) error {
 // compileMakeGeneric allocates a generic object (i8*)
 func (c *Compiler) compileMakeGeneric(inst *ssa.Make) error {
 	if !inst.HasUsers() {
-		c.Values[inst.GetId()] = llvm.ConstPointerNull(llvm.PointerType(c.LLVMCtx.Int8Type(), 0))
+		c.Values[inst.GetId()] = llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
 		return nil
 	}
 	// Allocate 8 bytes (one i64) as placeholder
 	size := llvm.ConstInt(c.LLVMCtx.Int64Type(), 8, false)
 	mallocFn, mallocType := c.getOrInsertMalloc()
 	rawVal := c.Builder.CreateCall(mallocType, mallocFn, []llvm.Value{size}, "generic_alloc")
-	// Cast i64 -> i8*
-	rawPtr := c.Builder.CreateIntToPtr(rawVal, llvm.PointerType(c.LLVMCtx.Int8Type(), 0), "generic_ptr")
-	c.Values[inst.GetId()] = rawPtr
+	// Keep as i64 (uintptr)
+	c.Values[inst.GetId()] = rawVal
 	return nil
 }
 
@@ -49,7 +48,7 @@ func (c *Compiler) compileMakeStruct(inst *ssa.Make, typ ssa.Type) error {
 	// 1. Get LLVM type for the struct
 	llvmType := c.TypeConverter.ConvertType(typ)
 	if !inst.HasUsers() {
-		c.Values[inst.GetId()] = llvm.ConstPointerNull(llvm.PointerType(llvmType, 0))
+		c.Values[inst.GetId()] = llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
 		return nil
 	}
 
@@ -68,9 +67,8 @@ func (c *Compiler) compileMakeStruct(inst *ssa.Make, typ ssa.Type) error {
 	rawVal := c.Builder.CreateCall(mallocType, mallocFn, []llvm.Value{size}, "malloc_call")
 
 	// 4. Cast i64 -> struct*
-	structPtr := c.Builder.CreateIntToPtr(rawVal, llvm.PointerType(llvmType, 0), "struct_ptr")
-
-	c.Values[inst.GetId()] = structPtr
+	// Keep as i64 (uintptr)
+	c.Values[inst.GetId()] = rawVal
 	return nil
 }
 

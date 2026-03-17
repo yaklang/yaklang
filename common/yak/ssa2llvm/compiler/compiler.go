@@ -23,6 +23,9 @@ type Compiler struct {
 	// Blocks maps YakSSA BasicBlock IDs to LLVM BasicBlocks.
 	Blocks map[int64]llvm.BasicBlock
 
+	// Funcs maps YakSSA Function IDs to LLVM function values.
+	Funcs map[int64]llvm.Value
+
 	// Program is the YakSSA program being compiled.
 	Program *ssa.Program
 
@@ -33,6 +36,16 @@ type Compiler struct {
 
 	// ExternBindings maps source-level function names to runtime symbols/signatures.
 	ExternBindings map[string]ExternBinding
+
+	// Per-function lowering state.
+	invokeCtx   llvm.Value // i8* pointing to an InvokeContext allocation
+	returnBlock llvm.BasicBlock
+
+	// Error handling (try/catch/finally) metadata for the current function.
+	exceptionValueIDs   map[int64]struct{}
+	activeHandlerByBlock map[int64]int64
+	catchBodyByHandler   map[int64]int64
+	catchTargetByBlock   map[int64]int64 // catchBody block -> final/done block
 }
 
 type CompilerOption func(*Compiler)
@@ -56,6 +69,7 @@ func NewCompiler(ctx context.Context, prog *ssa.Program, opts ...CompilerOption)
 		Builder:        c.NewBuilder(),
 		Values:         make(map[int64]llvm.Value),
 		Blocks:         make(map[int64]llvm.BasicBlock),
+		Funcs:          make(map[int64]llvm.Value),
 		Program:        prog,
 		TypeConverter:  types.NewTypeConverter(c),
 		ExternBindings: cloneExternBindings(defaultExternBindings),
@@ -100,23 +114,21 @@ func (c *Compiler) Compile() error {
 // CompileFunction compiles a single YakSSA function to LLVM IR.
 func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 	c.CurrentFunction = fn
-	// 1. Create function declaration
-	// Assuming int64 for all types for this phase
-	paramTypes := make([]llvm.Type, len(fn.Params))
-	for i := range paramTypes {
-		paramTypes[i] = c.LLVMCtx.Int64Type()
+	// 1. Get or declare LLVM function with a stable unique symbol name.
+	llvmFn, _ := c.getOrDeclareLLVMFunction(fn)
+	c.invokeCtx = llvm.Value{}
+	c.returnBlock = llvm.BasicBlock{}
+	if err := c.prepareErrorHandling(fn); err != nil {
+		return err
 	}
 
-	// retType=Int64, isVarArg=false
-	fnType := llvm.FunctionType(c.LLVMCtx.Int64Type(), paramTypes, false)
-	llvmFn := llvm.AddFunction(c.Mod, fn.GetName(), fnType)
-
-	// 2. Register parameters to Values map
-	for i, paramID := range fn.Params {
-		paramVal := llvmFn.Param(i)
-		paramVal.SetName(fmt.Sprintf("param_%d", paramID))
-		c.Values[paramID] = paramVal
+	// 2. Register the InvokeContext parameter.
+	if llvmFn.ParamsCount() < 1 {
+		return fmt.Errorf("missing invoke context parameter for function %s", fn.GetName())
 	}
+	ctxParam := llvmFn.Param(0)
+	ctxParam.SetName(fmt.Sprintf("ctx_%d", fn.GetId()))
+	c.invokeCtx = ctxParam
 
 	// 3. Pre-create all BasicBlocks
 	// LLVM IR requires jump targets to exist, so we create them first.
@@ -124,8 +136,20 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 		bb := c.LLVMCtx.AddBasicBlock(llvmFn, fmt.Sprintf("bb_%d", blockID))
 		c.Blocks[blockID] = bb
 	}
+	// Add the unified return block last so the real entry block remains first.
+	if fn.DeferBlock > 0 {
+		c.returnBlock = c.LLVMCtx.AddBasicBlock(llvmFn, fmt.Sprintf("yak_ret_%d", fn.GetId()))
+	}
 
-	// 4. Compile Instructions in each Block
+	// 4. Bind parameters from the InvokeContext in the entry block.
+	if entryBB, ok := c.Blocks[fn.EnterBlock]; ok {
+		c.Builder.SetInsertPointAtEnd(entryBB)
+		if err := c.bindParamsFromContext(fn); err != nil {
+			return err
+		}
+	}
+
+	// 5. Compile Instructions in each Block
 	for _, blockID := range fn.Blocks {
 		bb, ok := c.Blocks[blockID]
 		if !ok {
@@ -171,17 +195,39 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 				continue
 			}
 			inst := instVal
+			isTerminator := false
 			switch inst.(type) {
-			case *ssa.Return, *ssa.Jump, *ssa.If, *ssa.Loop:
-				hasTerminator = true
+			case *ssa.Return, *ssa.Jump, *ssa.If, *ssa.Loop, *ssa.Panic:
+				isTerminator = true
 			}
 
 			if err := c.compileInstruction(inst); err != nil {
 				return err
 			}
+			if isTerminator {
+				hasTerminator = true
+				break
+			}
 		}
 
 		// Add terminator based on block structure if not already present
+		if !hasTerminator {
+			// Defer block always falls through to the unified return.
+			if fn.DeferBlock > 0 && blockID == fn.DeferBlock && !c.returnBlock.IsNil() {
+				c.Builder.CreateBr(c.returnBlock)
+				hasTerminator = true
+			}
+		}
+		if !hasTerminator && c.catchTargetByBlock != nil {
+			if targetID, ok := c.catchTargetByBlock[blockID]; ok && targetID > 0 {
+				targetBB, ok := c.Blocks[targetID]
+				if !ok {
+					return fmt.Errorf("catch target block %d not found", targetID)
+				}
+				c.Builder.CreateBr(targetBB)
+				hasTerminator = true
+			}
+		}
 		if !hasTerminator {
 			if len(blockObj.Succs) == 2 {
 				// This is an If - find the condition from last BinOp (comparison)
@@ -218,13 +264,29 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 			}
 
 			// If still no terminator, add default return
-			if !hasTerminator {
-				c.Builder.CreateRet(llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false))
+				if !hasTerminator {
+					if fn.DeferBlock > 0 && !c.returnBlock.IsNil() {
+						// Implicit return 0 through defer.
+						if err := c.storeContextReturn(llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)); err != nil {
+							return err
+						}
+						deferBB, ok := c.Blocks[fn.DeferBlock]
+						if !ok {
+							return fmt.Errorf("defer block %d not found for function %s", fn.DeferBlock, fn.GetName())
+						}
+						c.Builder.CreateBr(deferBB)
+					} else {
+						// Implicit return 0.
+						if err := c.storeContextReturn(llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)); err != nil {
+							return err
+						}
+						c.Builder.CreateRetVoid()
+					}
+				}
 			}
 		}
-	}
 
-	// 5. Resolve Phis (Pass 2)
+	// 6. Resolve Phis (Pass 2)
 	for _, blockID := range fn.Blocks {
 		val, ok := fn.GetValueById(blockID)
 		if !ok {
@@ -246,6 +308,11 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 				}
 			}
 		}
+	}
+
+	if fn.DeferBlock > 0 && !c.returnBlock.IsNil() {
+		c.Builder.SetInsertPointAtEnd(c.returnBlock)
+		c.Builder.CreateRetVoid()
 	}
 
 	return nil

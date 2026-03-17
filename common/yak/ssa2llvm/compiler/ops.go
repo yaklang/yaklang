@@ -25,6 +25,12 @@ func (c *Compiler) compileInstruction(inst ssa.Instruction) error {
 		return c.compileConst(op)
 	case *ssa.Call:
 		return c.compileCall(op)
+	case *ssa.SideEffect:
+		return c.compileSideEffect(op)
+	case *ssa.Panic:
+		return c.compilePanic(op)
+	case *ssa.Recover:
+		return c.compileRecover(op)
 	case *ssa.Make:
 		return c.compileMake(op)
 	case *ssa.ParameterMember:
@@ -40,6 +46,16 @@ func (c *Compiler) compileInstruction(inst ssa.Instruction) error {
 // getValue resolves an SSA value ID to an LLVM value, performing lazy compilation
 // for constants if they haven't been visited yet.
 func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, error) {
+	// Exception values (try/catch `err`) are backed by the current function's panic slot.
+	// These values can be referenced in multiple blocks, so do not cache the load.
+	if c != nil && c.exceptionValueIDs != nil && !c.panicSlot.IsNil() {
+		if _, ok := c.exceptionValueIDs[id]; ok {
+			i64 := c.LLVMCtx.Int64Type()
+			slotPtr := c.Builder.CreateIntToPtr(c.panicSlot, llvm.PointerType(i64, 0), fmt.Sprintf("yak_panic_ptr_%d", id))
+			return c.Builder.CreateLoad(i64, slotPtr, fmt.Sprintf("yak_exc_%d", id)), nil
+		}
+	}
+
 	// 1. Check cache
 	if val, ok := c.Values[id]; ok {
 		return val, nil
@@ -138,17 +154,17 @@ func (c *Compiler) compileBinOp(inst *ssa.BinOp, resultID int64) error {
 	case ssa.OpMod:
 		val = c.Builder.CreateSRem(lhs, rhs, name)
 	case ssa.OpGt:
-		val = c.Builder.CreateICmp(llvm.IntSGT, lhs, rhs, name)
+		val = buildZExt(c.Builder, c.Builder.CreateICmp(llvm.IntSGT, lhs, rhs, name), c.LLVMCtx.Int64Type(), name)
 	case ssa.OpLt:
-		val = c.Builder.CreateICmp(llvm.IntSLT, lhs, rhs, name)
+		val = buildZExt(c.Builder, c.Builder.CreateICmp(llvm.IntSLT, lhs, rhs, name), c.LLVMCtx.Int64Type(), name)
 	case ssa.OpGtEq:
-		val = c.Builder.CreateICmp(llvm.IntSGE, lhs, rhs, name)
+		val = buildZExt(c.Builder, c.Builder.CreateICmp(llvm.IntSGE, lhs, rhs, name), c.LLVMCtx.Int64Type(), name)
 	case ssa.OpLtEq:
-		val = c.Builder.CreateICmp(llvm.IntSLE, lhs, rhs, name)
+		val = buildZExt(c.Builder, c.Builder.CreateICmp(llvm.IntSLE, lhs, rhs, name), c.LLVMCtx.Int64Type(), name)
 	case ssa.OpEq:
-		val = c.Builder.CreateICmp(llvm.IntEQ, lhs, rhs, name)
+		val = buildZExt(c.Builder, c.Builder.CreateICmp(llvm.IntEQ, lhs, rhs, name), c.LLVMCtx.Int64Type(), name)
 	case ssa.OpNotEq:
-		val = c.Builder.CreateICmp(llvm.IntNE, lhs, rhs, name)
+		val = buildZExt(c.Builder, c.Builder.CreateICmp(llvm.IntNE, lhs, rhs, name), c.LLVMCtx.Int64Type(), name)
 	default:
 		return fmt.Errorf("unknown BinOp opcode: %v", inst.Op)
 	}
@@ -203,7 +219,12 @@ func (c *Compiler) compileConst(inst *ssa.ConstInst) error {
 		}
 		return nil
 	} else if inst.IsString() {
-		llvmVal := buildGlobalStringPtr(c.Builder, inst.VarString(), fmt.Sprintf("str_%d", id))
+		ptr := buildGlobalStringPtr(c.Builder, inst.VarString(), fmt.Sprintf("str_%d", id))
+		// Represent pointers as i64 (uintptr) in LLVM IR.
+		// NOTE: Do not tag here. Tagging is applied selectively at stdlib
+		// call sites (e.g. print/println) so non-print stdlib calls can receive
+		// raw C-string pointers.
+		llvmVal := constPtrToInt(ptr, c.LLVMCtx.Int64Type())
 		c.Values[id] = llvmVal
 		if err := c.maybeEmitMemberSet(inst, inst, llvmVal); err != nil {
 			return err
@@ -224,8 +245,35 @@ func (c *Compiler) compileConst(inst *ssa.ConstInst) error {
 }
 
 func (c *Compiler) compileReturn(inst *ssa.Return) error {
+	// If this function has a DeferBlock, route all returns through it.
+	if c.CurrentFunction != nil && c.CurrentFunction.DeferBlock > 0 && !c.returnBlock.IsNil() {
+		retVal := llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
+		if len(inst.Results) > 0 {
+			val, err := c.getValue(inst, inst.Results[0])
+			if err != nil {
+				return err
+			}
+			retVal = c.coerceToInt64(val)
+		}
+		if c.returnSlot.IsNil() {
+			return fmt.Errorf("compileReturn: missing return slot for deferred function %s", c.CurrentFunction.GetName())
+		}
+		i64 := c.LLVMCtx.Int64Type()
+		slotPtr := c.Builder.CreateIntToPtr(c.returnSlot, llvm.PointerType(i64, 0), fmt.Sprintf("yak_ret_ptr_%d", c.CurrentFunction.GetId()))
+		c.Builder.CreateStore(retVal, slotPtr)
+
+		deferBB, ok := c.Blocks[c.CurrentFunction.DeferBlock]
+		if !ok {
+			return fmt.Errorf("compileReturn: defer block %d not found", c.CurrentFunction.DeferBlock)
+		}
+		c.Builder.CreateBr(deferBB)
+		return nil
+	}
+
+	// All compiled YakSSA functions currently use an `i64` return type.
+	// Yak `return` without values maps to returning 0.
 	if len(inst.Results) == 0 {
-		c.Builder.CreateRetVoid()
+		c.Builder.CreateRet(llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false))
 		return nil
 	}
 
@@ -235,7 +283,7 @@ func (c *Compiler) compileReturn(inst *ssa.Return) error {
 	if err != nil {
 		return err
 	}
-	c.Builder.CreateRet(val)
+	c.Builder.CreateRet(c.coerceToInt64(val))
 	return nil
 }
 
@@ -259,6 +307,7 @@ func (c *Compiler) compileTypeCast(inst *ssa.TypeCast) error {
 		}
 	}
 
+	val = c.coerceToInt64(val)
 	c.Values[inst.GetId()] = val
 	if err := c.maybeEmitMemberSet(inst, inst, val); err != nil {
 		return err

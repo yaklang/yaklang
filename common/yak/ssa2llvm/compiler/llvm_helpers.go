@@ -61,6 +61,20 @@ func buildOr(b llvm.Builder, lhs, rhs llvm.Value, name string) llvm.Value {
 	return valueFromC(res)
 }
 
+func constPtrToInt(val llvm.Value, dest llvm.Type) llvm.Value {
+	cv := (C.LLVMValueRef)(unsafe.Pointer(val.C))
+	ct := (C.LLVMTypeRef)(unsafe.Pointer(dest.C))
+	res := C.LLVMConstPtrToInt(cv, ct)
+	return valueFromC(res)
+}
+
+func constAdd(lhs, rhs llvm.Value) llvm.Value {
+	clhs := (C.LLVMValueRef)(unsafe.Pointer(lhs.C))
+	crhs := (C.LLVMValueRef)(unsafe.Pointer(rhs.C))
+	res := C.LLVMConstAdd(clhs, crhs)
+	return valueFromC(res)
+}
+
 func valueFromC(v C.LLVMValueRef) llvm.Value {
 	var ret llvm.Value
 	*(*unsafe.Pointer)(unsafe.Pointer(&ret)) = unsafe.Pointer(v)
