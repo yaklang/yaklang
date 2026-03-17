@@ -2,14 +2,17 @@ package aiforge
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/jinzhu/gorm"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/embed/testdata"
 )
 
 func newTestForgeDB(t *testing.T) *gorm.DB {
@@ -240,4 +243,47 @@ func TestExportImportForgeWithTools(t *testing.T) {
 	storedTool, err := yakit.GetAIYakTool(db, tool.Name)
 	require.NoError(t, err)
 	assertToolFields(t, tool, storedTool)
+}
+
+func TestLoadSkillForgeFromEmbeddedZip(t *testing.T) {
+	buf, err := testdata.Asset("data/aiforge/skill-only.zip")
+	require.NoError(t, err)
+
+	zipPath := filepath.Join(t.TempDir(), "skill-only.zip")
+	require.NoError(t, os.WriteFile(zipPath, buf, 0o644))
+
+	archive, err := LoadAIForgesFromZip(zipPath)
+	require.NoError(t, err)
+	require.Len(t, archive.AIForges, 1)
+
+	forge := archive.AIForges[0]
+	require.Equal(t, schema.FORGE_TYPE_SkillMD, forge.ForgeType)
+	require.Equal(t, "embedded-skill", forge.ForgeName)
+	require.Equal(t, "Embedded skill for aiforge import/export tests.", forge.Description)
+	require.Equal(t, "Hello from embedded skill.", forge.InitPrompt)
+	require.Equal(t, "owner:test", forge.Tags)
+	require.NotEmpty(t, forge.FSBytes)
+
+	loaded, err := aiskillloader.AIForgeToLoadedSkill(forge)
+	require.NoError(t, err)
+	content, err := loaded.FileSystem.ReadFile("scripts/helper.py")
+	require.NoError(t, err)
+	require.Equal(t, "print('hello')\n", string(content))
+
+	renamed, err := LoadAIForgesFromZip(zipPath, WithImportNewName("renamed-skill"))
+	require.NoError(t, err)
+	require.Len(t, renamed.AIForges, 1)
+	require.Equal(t, "renamed-skill", renamed.AIForges[0].ForgeName)
+
+	db := newTestForgeDB(t)
+	defer db.Close()
+
+	imported, err := ImportAIForgesFromZip(db, zipPath, WithImportOverwrite(true))
+	require.NoError(t, err)
+	require.Len(t, imported, 1)
+
+	stored, err := yakit.GetAIForgeByName(db, "embedded-skill")
+	require.NoError(t, err)
+	require.Equal(t, schema.FORGE_TYPE_SkillMD, stored.ForgeType)
+	require.NotEmpty(t, stored.FSBytes)
 }
