@@ -2,9 +2,11 @@ package loop_knowledge_enhance
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"strconv"
+	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -106,7 +108,14 @@ func makeFinalSummaryAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 				finalReport,
 				nil,
 			)
-			_ = result
+			if result == "" {
+				r.GetConfig().GetEmitter().EmitTextMarkdownStreamEvent(
+					"re-act-loop-answer-payload",
+					strings.NewReader(finalReport),
+					loop.GetCurrentTask().GetId(),
+					func() {},
+				)
+			}
 			log.Infof("Final summary direct answer result: %s", utils.ShrinkTextBlock(result, 2048))
 			if err != nil {
 				op.Continue()
