@@ -3,7 +3,6 @@ package compiler
 import (
 	"fmt"
 
-	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
@@ -18,11 +17,9 @@ func (c *Compiler) compilePanic(inst *ssa.Panic) error {
 	}
 	infoVal = c.coerceToInt64(infoVal)
 
-	// Persist the panic value for catch/recover paths.
-	if !c.panicSlot.IsNil() {
-		i64 := c.LLVMCtx.Int64Type()
-		slotPtr := c.Builder.CreateIntToPtr(c.panicSlot, llvm.PointerType(i64, 0), fmt.Sprintf("yak_panic_ptr_%d", inst.GetId()))
-		c.Builder.CreateStore(infoVal, slotPtr)
+	// Persist the panic value for catch/recover paths and for propagation to callers.
+	if err := c.storeContextPanic(infoVal); err != nil {
+		return err
 	}
 
 	block := inst.GetBlock()
@@ -34,8 +31,16 @@ func (c *Compiler) compilePanic(inst *ssa.Panic) error {
 		handlerID = c.activeHandlerByBlock[block.GetId()]
 	}
 	if handlerID == 0 {
-		// Unhandled panic: for now, terminate the function.
-		c.Builder.CreateRet(llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false))
+		// Unhandled panic: propagate to caller (through defer if present).
+		if c.CurrentFunction != nil && c.CurrentFunction.DeferBlock > 0 && !c.returnBlock.IsNil() {
+			deferBB, ok := c.Blocks[c.CurrentFunction.DeferBlock]
+			if !ok {
+				return fmt.Errorf("compilePanic: defer block %d not found", c.CurrentFunction.DeferBlock)
+			}
+			c.Builder.CreateBr(deferBB)
+			return nil
+		}
+		c.Builder.CreateRetVoid()
 		return nil
 	}
 
@@ -44,8 +49,16 @@ func (c *Compiler) compilePanic(inst *ssa.Panic) error {
 		catchBodyID = c.catchBodyByHandler[handlerID]
 	}
 	if catchBodyID == 0 {
-		// No catch block; route to final/done if available, else terminate.
-		c.Builder.CreateRet(llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false))
+		// No catch block; propagate to caller (through defer if present).
+		if c.CurrentFunction != nil && c.CurrentFunction.DeferBlock > 0 && !c.returnBlock.IsNil() {
+			deferBB, ok := c.Blocks[c.CurrentFunction.DeferBlock]
+			if !ok {
+				return fmt.Errorf("compilePanic: defer block %d not found", c.CurrentFunction.DeferBlock)
+			}
+			c.Builder.CreateBr(deferBB)
+			return nil
+		}
+		c.Builder.CreateRetVoid()
 		return nil
 	}
 
@@ -62,15 +75,12 @@ func (c *Compiler) compileRecover(inst *ssa.Recover) error {
 		return nil
 	}
 
-	val := llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
-	if !c.panicSlot.IsNil() {
-		i64 := c.LLVMCtx.Int64Type()
-		slotPtr := c.Builder.CreateIntToPtr(c.panicSlot, llvm.PointerType(i64, 0), fmt.Sprintf("yak_panic_ptr_%d", inst.GetId()))
-		val = c.Builder.CreateLoad(i64, slotPtr, fmt.Sprintf("yak_panic_load_%d", inst.GetId()))
+	val, err := c.loadContextPanic(fmt.Sprintf("yak_panic_load_%d", inst.GetId()))
+	if err != nil {
+		return err
 	}
 	if inst.GetId() > 0 {
 		c.Values[inst.GetId()] = c.coerceToInt64(val)
 	}
 	return nil
 }
-

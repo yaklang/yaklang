@@ -25,17 +25,17 @@ type ExternBinding struct {
 	// runtime dispatcher entry (yak_std_call). Keep it opaque to reduce the
 	// number of exported symbols in the final binary.
 	DispatchID dispatch.FuncID
-}
+	}
 
-var defaultExternBindings = map[string]ExternBinding{
-	"waitAllAsyncCallFinish": {
-		Symbol: "yak_runtime_async_wait",
-		Return: ExternTypeVoid,
-	},
-	"println": {
-		Return:     ExternTypeVoid,
-		DispatchID: dispatch.IDPrintln,
-	},
+	var defaultExternBindings = map[string]ExternBinding{
+		"waitAllAsyncCallFinish": {
+			Return:     ExternTypeVoid,
+			DispatchID: dispatch.IDWaitAllAsyncCallFinish,
+		},
+		"println": {
+			Return:     ExternTypeVoid,
+			DispatchID: dispatch.IDPrintln,
+		},
 	"print": {
 		Return:     ExternTypeVoid,
 		DispatchID: dispatch.IDPrint,

@@ -462,20 +462,27 @@ func compileWithConfig(cfg *CompileConfig) (CompileResult, error) {
 	}
 	defer comp.Dispose()
 
-	entryFunc, _, err := resolveEntryFunction(comp.Mod, cfg.EntryFunctionName)
-	if err != nil {
-		return CompileResult{}, err
-	}
-	entryFunc = renameConflictingMainFunctions(comp.Mod, entryFunc)
+		entryFunc, _, err := resolveEntryFunction(comp.Mod, cfg.EntryFunctionName)
+		if err != nil {
+			return CompileResult{}, err
+		}
+		entryFunc = renameConflictingMainFunctions(comp.Mod, entryFunc)
 
-	// Regenerate IR because we modified the module (renamed function)
-	ir = comp.Mod.String()
+		if err := comp.addMainWrapperToModule(entryFunc, cfg.PrintEntryResult); err != nil {
+			return CompileResult{}, err
+		}
 
-	ir = addMainWrapper(ir, entryFunc, cfg.PrintEntryResult)
+		// Verify again after emitting the wrapper entrypoint.
+		if err := llvm.VerifyModule(comp.Mod, llvm.PrintMessageAction); err != nil {
+			return CompileResult{}, utils.Errorf("LLVM verification failed after adding main wrapper: %v", err)
+		}
 
-	if cfg.PrintIR {
-		fmt.Println(ir)
-	}
+		// Regenerate IR because we modified the module (renamed function + wrapper).
+		ir = comp.Mod.String()
+
+		if cfg.PrintIR {
+			fmt.Println(ir)
+		}
 
 	outputFile := cfg.OutputFile
 	if outputFile == "" {

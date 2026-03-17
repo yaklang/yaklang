@@ -48,11 +48,9 @@ func (c *Compiler) compileInstruction(inst ssa.Instruction) error {
 func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, error) {
 	// Exception values (try/catch `err`) are backed by the current function's panic slot.
 	// These values can be referenced in multiple blocks, so do not cache the load.
-	if c != nil && c.exceptionValueIDs != nil && !c.panicSlot.IsNil() {
+	if c != nil && c.exceptionValueIDs != nil {
 		if _, ok := c.exceptionValueIDs[id]; ok {
-			i64 := c.LLVMCtx.Int64Type()
-			slotPtr := c.Builder.CreateIntToPtr(c.panicSlot, llvm.PointerType(i64, 0), fmt.Sprintf("yak_panic_ptr_%d", id))
-			return c.Builder.CreateLoad(i64, slotPtr, fmt.Sprintf("yak_exc_%d", id)), nil
+			return c.loadContextPanic(fmt.Sprintf("yak_exc_%d", id))
 		}
 	}
 
@@ -245,23 +243,20 @@ func (c *Compiler) compileConst(inst *ssa.ConstInst) error {
 }
 
 func (c *Compiler) compileReturn(inst *ssa.Return) error {
+	retVal := llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
+	if len(inst.Results) > 0 {
+		val, err := c.getValue(inst, inst.Results[0])
+		if err != nil {
+			return err
+		}
+		retVal = c.coerceToInt64(val)
+	}
+	if err := c.storeContextReturn(retVal); err != nil {
+		return err
+	}
+
 	// If this function has a DeferBlock, route all returns through it.
 	if c.CurrentFunction != nil && c.CurrentFunction.DeferBlock > 0 && !c.returnBlock.IsNil() {
-		retVal := llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
-		if len(inst.Results) > 0 {
-			val, err := c.getValue(inst, inst.Results[0])
-			if err != nil {
-				return err
-			}
-			retVal = c.coerceToInt64(val)
-		}
-		if c.returnSlot.IsNil() {
-			return fmt.Errorf("compileReturn: missing return slot for deferred function %s", c.CurrentFunction.GetName())
-		}
-		i64 := c.LLVMCtx.Int64Type()
-		slotPtr := c.Builder.CreateIntToPtr(c.returnSlot, llvm.PointerType(i64, 0), fmt.Sprintf("yak_ret_ptr_%d", c.CurrentFunction.GetId()))
-		c.Builder.CreateStore(retVal, slotPtr)
-
 		deferBB, ok := c.Blocks[c.CurrentFunction.DeferBlock]
 		if !ok {
 			return fmt.Errorf("compileReturn: defer block %d not found", c.CurrentFunction.DeferBlock)
@@ -270,20 +265,7 @@ func (c *Compiler) compileReturn(inst *ssa.Return) error {
 		return nil
 	}
 
-	// All compiled YakSSA functions currently use an `i64` return type.
-	// Yak `return` without values maps to returning 0.
-	if len(inst.Results) == 0 {
-		c.Builder.CreateRet(llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false))
-		return nil
-	}
-
-	// Only support single return value for now
-	retID := inst.Results[0]
-	val, err := c.getValue(inst, retID)
-	if err != nil {
-		return err
-	}
-	c.Builder.CreateRet(c.coerceToInt64(val))
+	c.Builder.CreateRetVoid()
 	return nil
 }
 

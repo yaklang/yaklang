@@ -141,15 +141,7 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 		c.returnBlock = c.LLVMCtx.AddBasicBlock(llvmFn, fmt.Sprintf("yak_ret_%d", fn.GetId()))
 	}
 
-	// 4. Bind parameters from the InvokeContext in the entry block.
-	if entryBB, ok := c.Blocks[fn.EnterBlock]; ok {
-		c.Builder.SetInsertPointAtEnd(entryBB)
-		if err := c.bindParamsFromContext(fn); err != nil {
-			return err
-		}
-	}
-
-	// 5. Compile Instructions in each Block
+	// 4. Compile Instructions in each Block
 	for _, blockID := range fn.Blocks {
 		bb, ok := c.Blocks[blockID]
 		if !ok {
@@ -169,23 +161,31 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 		}
 
 		// First, create Phi nodes at the beginning of the block
-		for _, phiID := range blockObj.Phis {
-			phiVal, ok := fn.GetValueById(phiID)
-			if !ok {
-				continue
+			for _, phiID := range blockObj.Phis {
+				phiVal, ok := fn.GetValueById(phiID)
+				if !ok {
+					continue
+				}
+				if phi, ok := phiVal.(*ssa.Phi); ok {
+					if err := c.compilePhi(phi); err != nil {
+						return err
+					}
+				}
 			}
-			if phi, ok := phiVal.(*ssa.Phi); ok {
-				if err := c.compilePhi(phi); err != nil {
+
+			// Bind parameters from InvokeContext after phi nodes, to keep entry-block
+			// phi ordering valid for LLVM IR.
+			if blockID == fn.EnterBlock {
+				if err := c.bindParamsFromContext(fn); err != nil {
 					return err
 				}
 			}
-		}
 
-		// Then compile regular instructions
-		hasTerminator := false
-		for _, instID := range blockObj.Insts {
-			instVal, ok := fn.GetInstructionById(instID)
-			if !ok || instVal == nil {
+			// Then compile regular instructions
+			hasTerminator := false
+			for _, instID := range blockObj.Insts {
+				instVal, ok := fn.GetInstructionById(instID)
+				if !ok || instVal == nil {
 				continue
 			}
 			if instVal.IsLazy() {
@@ -256,14 +256,14 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 					c.Builder.CreateCondBr(condVal, trueBlock, falseBlock)
 					hasTerminator = true
 				}
-			} else if len(blockObj.Succs) == 1 {
-				// This is a Jump
-				targetBlock := c.Blocks[blockObj.Succs[0]]
-				c.Builder.CreateBr(targetBlock)
-				hasTerminator = true
-			}
+				} else if len(blockObj.Succs) == 1 {
+					// This is a Jump
+					targetBlock := c.Blocks[blockObj.Succs[0]]
+					c.Builder.CreateBr(targetBlock)
+					hasTerminator = true
+				}
 
-			// If still no terminator, add default return
+				// If still no terminator, add default return
 				if !hasTerminator {
 					if fn.DeferBlock > 0 && !c.returnBlock.IsNil() {
 						// Implicit return 0 through defer.
@@ -283,8 +283,8 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 						c.Builder.CreateRetVoid()
 					}
 				}
+				}
 			}
-		}
 
 	// 6. Resolve Phis (Pass 2)
 	for _, blockID := range fn.Blocks {

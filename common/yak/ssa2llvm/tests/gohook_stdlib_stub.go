@@ -12,31 +12,75 @@ func yakStdCallStubGoCode() string {
 	return `
 // Minimal stdlib dispatcher for tests that skip linking the full yak runtime.
 // Only builtin printing is implemented here.
-func yak_std_call(funcID int64, argc int64, argv *C.uint64_t) int64 {
-	if argc <= 0 || argv == nil {
-		if dispatch.FuncID(funcID) == dispatch.IDPrintln {
-			fmt.Println()
-		}
-		return 0
+func yak_runtime_dispatch(ctx unsafe.Pointer) {
+	const (
+		yakTaggedPointerMask = uint64(1) << 62
+
+		wordKind   = 2
+		wordTarget = 4
+		wordArgc   = 5
+		wordRet    = 6
+
+		headerWords  = 10
+		kindDispatch = 2
+	)
+
+	if ctx == nil {
+		return
 	}
-	args := unsafe.Slice((*uint64)(unsafe.Pointer(argv)), int(argc))
-	switch dispatch.FuncID(funcID) {
+
+	loadWord := func(word int) uint64 {
+		return *(*uint64)(unsafe.Pointer(uintptr(ctx) + uintptr(word)*8))
+	}
+	storeWord := func(word int, value uint64) {
+		*(*uint64)(unsafe.Pointer(uintptr(ctx) + uintptr(word)*8)) = value
+	}
+
+	if loadWord(wordKind) != kindDispatch {
+		return
+	}
+
+	argc := int(int64(loadWord(wordArgc)))
+	if argc < 0 || argc > 256 {
+		return
+	}
+
+	var args []uint64
+	if argc > 0 {
+		base := (*uint64)(unsafe.Pointer(uintptr(ctx) + uintptr(headerWords)*8))
+		args = unsafe.Slice(base, argc)
+	}
+
+	decodePrint := func(v uint64) any {
+		if (v & yakTaggedPointerMask) == 0 {
+			return int64(v)
+		}
+		raw := v &^ yakTaggedPointerMask
+		if raw == 0 {
+			return ""
+		}
+		return C.GoString((*C.char)(unsafe.Pointer(uintptr(raw))))
+	}
+
+	id := dispatch.FuncID(int64(loadWord(wordTarget)))
+	switch id {
 	case dispatch.IDPrint:
 		for _, a := range args {
-			fmt.Print(int64(a))
+			fmt.Print(decodePrint(a))
 		}
 	case dispatch.IDPrintln:
 		for i, a := range args {
 			if i > 0 {
 				fmt.Print(" ")
 			}
-			fmt.Print(int64(a))
+			fmt.Print(decodePrint(a))
 		}
 		fmt.Println()
 	default:
 		// ignore
 	}
-	return 0
+
+	storeWord(wordRet, 0)
 }
 `
 }
