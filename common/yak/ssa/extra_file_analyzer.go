@@ -128,18 +128,14 @@ func (d *PreHandlerBase) PreHandlerProject(fi.FileSystem, FrontAST, *FunctionBui
 }
 
 func (d *PreHandlerBase) Clearup() {
-	if diagnostics.Enabled(diagnostics.LevelLow) {
-		diagnostics.LogHeapSnapshot("antlr_clearup_before_release", false)
-	}
+	diagnostics.LogHeapSnapshot("antlr_clearup_before_release", false)
 
 	d.antlrMutex.Lock()
 	// Clear DFA cache explicitly
 	d.Caches = nil
 	d.antlrMutex.Unlock()
 
-	if diagnostics.Enabled(diagnostics.LevelLow) {
-		diagnostics.LogHeapSnapshot("antlr_clearup_after_release", true)
-	}
+	diagnostics.LogHeapSnapshot("antlr_clearup_after_release", true)
 }
 
 func (a *AntlrCache) Empty() bool {

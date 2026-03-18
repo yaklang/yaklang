@@ -263,7 +263,7 @@ func GetMethod(t Type, id string, peek ...bool) *Function {
 		f = fun
 		// peek is true, don't build
 		if len(peek) == 0 || !peek[0] {
-			buildFunctionWithPerfTracking(f)
+			_ = f.Build()
 		}
 	}
 

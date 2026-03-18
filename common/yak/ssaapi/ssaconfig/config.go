@@ -135,7 +135,6 @@ func defaultSSACompileConfig() *SSACompileConfig {
 		ReCompile:                false,
 		MemoryCompile:            false,
 		Concurrency:              defaultCompileConcurrency(),
-		FilePerformanceLog:       false,
 		StopOnCliCheck:           false,
 		EnableIncrementalCompile: false,
 		BaseProgramName:          "",

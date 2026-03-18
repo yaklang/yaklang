@@ -8,6 +8,10 @@ import (
 )
 
 func TestSFVMWithDiagnostics(t *testing.T) {
+	origLevel := diagnostics.GetLevel()
+	defer diagnostics.SetLevel(origLevel)
+	diagnostics.SetLevel(diagnostics.LevelNormal) // Track 需 LevelNormal 及以上才记录
+
 	// Create a diagnostics recorder
 	recorder := diagnostics.NewRecorder()
 

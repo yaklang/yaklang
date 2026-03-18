@@ -4,6 +4,7 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/asyncdb"
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
@@ -32,7 +33,6 @@ func (c *SimpleCache[T]) Delete(key string, inst T) {
 	}
 	data = utils.RemoveSliceItem(data, inst)
 	c.cache.Set(key, data)
-	return
 }
 
 func (c *SimpleCache[T]) Add(key string, item T) {
@@ -72,10 +72,11 @@ const (
 )
 
 func (s *SimpleCache[T]) SetSaver(f func([]simpleCacheItem[T]), opt ...asyncdb.Option) {
-	opt = append(opt,
+	// 默认在前、调用方 opt 在后，使 initIndex 传入的 saveSize(≥IndexSaveSize) 优先生效
+	opt = append([]asyncdb.Option{
 		asyncdb.WithSaveSize(defaultSaveSize),
 		asyncdb.WithSaveTimeout(saveTime),
-	)
+	}, opt...)
 	s.save = asyncdb.NewSave(f, opt...)
 }
 
@@ -97,8 +98,11 @@ func (c *ProgramCache) initIndex(databaseKind ProgramCacheKind, saveSize int) {
 						return nil
 					})
 				}
-				c.diagnosticsTrack("ssa.Database.SaveIrSourceBatch", saveStep)
-				return
+				if rec := c.program.DiagnosticsRecorder(); rec != nil {
+					_, _ = rec.ForKind(TrackKindDatabase).Track("ssa.Database.SaveIrSourceBatch", saveStep)
+				} else {
+					_ = diagnostics.RunStepsWithoutRecording([]func() error{saveStep})
+				}
 			},
 			asyncdb.WithSaveSize(saveSize),
 		)
@@ -116,8 +120,11 @@ func (c *ProgramCache) initIndex(databaseKind ProgramCacheKind, saveSize int) {
 						return nil
 					})
 				}
-				c.diagnosticsTrack("ssa.Database.SaveIrOffsetBatch", saveStep)
-				return
+				if rec := c.program.DiagnosticsRecorder(); rec != nil {
+					_, _ = rec.ForKind(TrackKindDatabase).Track("ssa.Database.SaveIrOffsetBatch", saveStep)
+				} else {
+					_ = diagnostics.RunStepsWithoutRecording([]func() error{saveStep})
+				}
 			},
 			asyncdb.WithSaveSize(saveSize),
 		)
@@ -139,8 +146,11 @@ func (c *ProgramCache) initIndex(databaseKind ProgramCacheKind, saveSize int) {
 						return nil
 					})
 				}
-				c.diagnosticsTrack("ssa.Database.SaveIrIndexBatch", saveStep)
-				return
+				if rec := c.program.DiagnosticsRecorder(); rec != nil {
+					_, _ = rec.ForKind(TrackKindDatabase).Track("ssa.Database.SaveIrIndexBatch", saveStep)
+				} else {
+					_ = diagnostics.RunStepsWithoutRecording([]func() error{saveStep})
+				}
 			},
 			asyncdb.WithSaveSize(saveSize),
 		)

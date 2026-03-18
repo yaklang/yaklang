@@ -141,16 +141,6 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 				b.NewError(ssa.Error, TAG, NotCreateBluePrint(n))
 				continue
 			}
-			// if o, ok := s.(*ssa.ObjectType); ok {
-			// 	for pn, _ := range o.AnonymousField {
-			// 		pbp := b.GetBluePrint(pn)
-			// 		if pbp == nil {
-			// 			b.NewError(ssa.Warn, TAG, StructNotFind(n))
-			// 			pbp = b.CreateBlueprint(pn)
-			// 		}
-			// 		bp.AddParentBlueprint(pbp)
-			// 	}
-			// }
 
 			if i, ok := s.(*ssa.InterfaceType); ok {
 				store := b.StoreFunctionBuilder()
@@ -158,9 +148,9 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 				if !ok {
 					continue
 				}
-				log.Infof("add interface funcName = %s", fun.GetName())
+				// log.Infof("add interface funcName = %s", fun.GetName())
 				fun.AddLazyBuilder(func() {
-					log.Infof("build interface funcName = %s", fun.GetName())
+					// log.Infof("build interface funcName = %s", fun.GetName())
 					switchHandler := b.SwitchFunctionBuilder(store)
 					defer func() {
 						switchHandler()

@@ -150,8 +150,6 @@ excludeFile := cli.String(
     cli.setCliGroup("compile"), 
 )
 
-filePerformanceLog := cli.Bool("filePerformanceLog", cli.setDefault(false), cli.setVerboseName("文件性能日志"), cli.setHelp("启用文件级别编译性能日志"), cli.setCliGroup("compile"))
-
 // 增量编译选项
 enableIncrementalCompile := cli.Bool(
     "incremental-compile", 
@@ -592,7 +590,6 @@ options = [
     ssa.withStrictMode(strictMode),
     ssa.withDescription(description),
     ssa.withEntryFile(entry...),
-    ssa.withFilePerformanceLog(filePerformanceLog),
     ssa.withCodeSourceJarRecursiveParse(jarRecursiveParse),
 ]
 

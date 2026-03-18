@@ -137,9 +137,13 @@ func saveIrCode(prog *Program, db *gorm.DB, f func(int)) func(t []*ssadb.IrCode)
 			})
 		}
 		if prog != nil {
-			prog.DiagnosticsTrack("ssa.Database.SaveIrCodeBatch", saveStep)
+			if rec := prog.DiagnosticsRecorder(); rec != nil {
+				_, _ = rec.ForKind(TrackKindDatabase).Track("ssa.Database.SaveIrCodeBatch", saveStep)
+			} else {
+				_ = saveStep()
+			}
 		} else {
-			saveStep()
+			_ = saveStep()
 		}
 		f(len(t))
 	}
@@ -183,9 +187,13 @@ func saveIrType(prog *Program, db *gorm.DB) func(t []*ssadb.IrType) {
 			})
 		}
 		if prog != nil {
-			prog.DiagnosticsTrack("ssa.Database.SaveIrTypeBatch", saveStep)
+			if rec := prog.DiagnosticsRecorder(); rec != nil {
+				_, _ = rec.ForKind(TrackKindDatabase).Track("ssa.Database.SaveIrTypeBatch", saveStep)
+			} else {
+				_ = saveStep()
+			}
 		} else {
-			saveStep()
+			_ = saveStep()
 		}
 	}
 }

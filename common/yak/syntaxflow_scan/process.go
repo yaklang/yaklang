@@ -35,7 +35,6 @@ type processMonitor struct {
 	resultCh        chan *ssaapi.SyntaxFlowResult
 	waitGroup       sync.WaitGroup
 	closed          atomic.Bool
-	eventWithRule   bool
 }
 
 type RuleResultCallback func(*ssaapi.SyntaxFlowResult)
@@ -103,7 +102,7 @@ func (pm *processMonitor) Close() {
 	pm.waitGroup.Wait()
 }
 
-func newProcessMonitor(ctx context.Context, ttl time.Duration, callback RuleProcessCallback, resultCallback RuleResultCallback, eventWithRule bool) *processMonitor {
+func newProcessMonitor(ctx context.Context, ttl time.Duration, callback RuleProcessCallback, resultCallback RuleResultCallback) *processMonitor {
 	pm := &processMonitor{
 		ctx:             ctx,
 		Status:          omap.NewEmptyOrderedMap[string, *RuleProcessInfo](),
@@ -112,7 +111,6 @@ func newProcessMonitor(ctx context.Context, ttl time.Duration, callback RuleProc
 		monitorTTL:      ttl,
 		eventCh:         make(chan struct{}, 128),
 		resultCh:        make(chan *ssaapi.SyntaxFlowResult, 128),
-		eventWithRule:   eventWithRule,
 	}
 	return pm
 }
@@ -140,7 +138,7 @@ func (pm *processMonitor) StartMonitor() {
 				if !ok {
 					return
 				}
-				pm.reportProcess(pm.eventWithRule)
+				pm.reportProcess(true)
 			case res, ok := <-pm.resultCh:
 				if !ok {
 					return

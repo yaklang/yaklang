@@ -128,12 +128,12 @@ func TestCodeCompile(t *testing.T) {
 	}
 
 	if true {
-		diagnostics.LogRecorder("memory", memoryRecorder)
+		memoryRecorder.Log("memory")
 		log.Errorf("----------------------------------------------------------------------------------------------")
 		log.Errorf("----------------------------------------------------------------------------------------------")
 		log.Errorf("----------------------------------------------------------------------------------------------")
 		log.Errorf("----------------------------------------------------------------------------------------------")
-		diagnostics.LogRecorder("database", databaseRecorder)
+		databaseRecorder.Log("database")
 		log.Errorf("----------------------------------------------------------------------------------------------")
 		log.Errorf("----------------------------------------------------------------------------------------------")
 		log.Errorf("----------------------------------------------------------------------------------------------")
@@ -273,7 +273,7 @@ $sink #-> ?{opcode: param} as $result;
 	require.NotNil(t, result)
 	result.GetValues("result").Show()
 	log.Infof("Time: \n\tCompile time: %s, \n\tQuery time: %s, \n\tTotal time: %s", compile, query, compile+query)
-	diagnostics.LogRecorder("compile")
+	diagnostics.DefaultRecorder().Log("compile")
 }
 
 func TestA(t *testing.T) {
@@ -304,7 +304,7 @@ func TestA(t *testing.T) {
 
 	fileList := make([]string, 0)
 	fileMap := make(map[string]struct{})
-	diagnostics.Track("collect file", func() error {
+	diagnostics.Track(diagnostics.TrackKindGeneral, "collect file", func() error {
 		filesys.Recursive(".",
 			filesys.WithFileSystem(refFS),
 			filesys.WithDirStat(func(fullPath string, fi fs.FileInfo) error {
@@ -334,7 +334,7 @@ func TestA(t *testing.T) {
 
 	var ch <-chan *ssareducer.FileContent
 
-	diagnostics.Track("getFileHandler", func() error {
+	diagnostics.Track(diagnostics.TrackKindGeneral, "getFileHandler", func() error {
 		ch = config.GetFileHandler(
 			refFS,
 			fileList,
@@ -350,7 +350,7 @@ func TestA(t *testing.T) {
 			// 	log.Infof("file %s ", fc.Path)
 		}
 	}
-	diagnostics.LogRecorder("compile")
+	diagnostics.DefaultRecorder().Log("compile")
 }
 
 func TestRuleRun(t *testing.T) {
@@ -389,6 +389,5 @@ func TestRuleRun(t *testing.T) {
 	require.NotNil(t, result)
 	require.Equal(t, 409, result.GetValues("a").Len())
 
-	diagnostics.LogRecorder("")
-
+	diagnostics.DefaultRecorder().Log("")
 }

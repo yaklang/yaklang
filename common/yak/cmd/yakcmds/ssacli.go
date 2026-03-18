@@ -283,10 +283,6 @@ When --syntaxflow is provided, a follow-up SyntaxFlowQuery is executed for quick
 			Name:  "concurrency",
 			Usage: "compile concurrency: worker count for parallel file parsing. 0 or unset = NumCPU/2 (default). >0 to override.",
 		},
-		cli.BoolFlag{
-			Name:  "file-perf-log",
-			Usage: "enable file-level compile performance log output",
-		},
 	},
 	Action: func(c *cli.Context) error {
 		if ret, err := log.ParseLevel(c.String("log")); err == nil {
@@ -349,12 +345,6 @@ When --syntaxflow is provided, a follow-up SyntaxFlowQuery is executed for quick
 		programName := compileConfig.GetProgramName()
 		reCompile := compileConfig.GetCompileReCompile()
 		targetPath := compileConfig.GetCodeSourceLocalFileOrURL()
-
-		if programName != "" {
-			defer func() {
-				diagnostics.LogRecorder("compile")
-			}()
-		}
 
 		// check program name duplicate
 		if programName != "" {
@@ -1382,16 +1372,6 @@ and exports structured report (sarif/irify).`,
 			Usage: `set log level, default is info, optional value: debug, info, warn, error`,
 		},
 
-		cli.BoolFlag{
-			Name:  "rule-perf-log",
-			Usage: "enable per-rule performance profiling log",
-		},
-
-		cli.BoolFlag{
-			Name:  "file-perf-log",
-			Usage: "enable file-level compile performance profiling log",
-		},
-
 		cli.StringFlag{
 			Name:  "exclude-file",
 			Usage: `exclude files by glob, e.g. targets/*, vendor/*`,
@@ -1428,10 +1408,6 @@ and exports structured report (sarif/irify).`,
 				level = log.InfoLevel
 			}
 			log.SetLevel(level)
-		}
-		if diagnostics.Enabled(diagnostics.LevelLow) {
-			defer diagnostics.DefaultRecorder().Log("code-scan")
-			defer diagnostics.LogHeapSnapshot("code_scan_end", true)
 		}
 
 		// 检查是否指定了 config 文件，如果是则走 config-scan 模式
@@ -1524,7 +1500,6 @@ and exports structured report (sarif/irify).`,
 		scanOpt = append(scanOpt,
 			syntaxflow_scan.WithPrograms(progs...),
 			syntaxflow_scan.WithReporter(reportInstance),
-			syntaxflow_scan.WithProcessRuleDetail(true),
 		)
 
 		if useConfigMode {
@@ -1554,28 +1529,19 @@ and exports structured report (sarif/irify).`,
 			scanOpt = append(scanOpt,
 				ssaconfig.WithRuleFilter(ruleFilter),
 				ssaconfig.WithSyntaxFlowMemory(c.Bool("memory")),
-				syntaxflow_scan.WithRulePerformanceLog(c.Bool("rule-perf-log")),
 			)
 		}
 
-		if c.Bool("rule-perf-log") {
-			scanOpt = append(scanOpt, syntaxflow_scan.WithRulePerformanceLog(true))
-		}
-
-		perfLogEnabled := config.GetCompileFilePerformanceLog() || c.Bool("rule-perf-log") || c.Bool("file-perf-log")
 		scanOpt = append(scanOpt,
 			syntaxflow_scan.WithProcessCallback(func(taskID, status string, progress float64, info *syntaxflow_scan.RuleProcessInfoList) {
-				// 日志统计时输出，仅当 file-perf-log 或 rule-perf-log 至少开启一个时使用 [SSA_PERF] 标记
-				if !perfLogEnabled {
-					return
-				}
-				diagnostics.LogPerfLineIf(perfLogEnabled, "[Task %s]", taskID)
-				diagnostics.LogPerfLineIf(perfLogEnabled, "\tstatus=%s progress=%.2f%%", status, progress*100.0)
+				// Minimal header always shown
+				log.Infof("[Task %s]", taskID)
+				log.Infof("\tstatus=%s progress=%.2f%%", status, progress*100.0)
 
 				if info == nil {
 					return
 				}
-				diagnostics.LogPerfLineIf(perfLogEnabled, "\tFailed=%d Skipped=%d Success=%d Finished=%d Total=%d Risk=%d",
+				log.Infof("\tFailed=%d Skipped=%d Success=%d Finished=%d Total=%d Risk=%d",
 					info.FailedQuery, info.SkippedQuery, info.SuccessQuery,
 					info.FinishedQuery, info.TotalQuery, info.RiskCount,
 				)
@@ -1612,7 +1578,7 @@ and exports structured report (sarif/irify).`,
 						duration, rule.Info,
 					))
 				}
-				diagnostics.LogPerfIf(perfLogEnabled, b.String())
+				log.Info(b.String())
 
 				if len(runningRules) > 0 {
 					log.Debugf("\t=== DEBUG: %d rule(s) still running ===", len(runningRules))
@@ -1633,48 +1599,8 @@ and exports structured report (sarif/irify).`,
 			log.Errorf("scan failed: %s", err)
 			return err
 		}
-		// 输出编译性能汇总表格
-		compileRecorder := diagnostics.DefaultRecorder()
-		if compileRecorder != nil {
-			snapshots := compileRecorder.Snapshot()
-			if len(snapshots) > 0 {
-				table := diagnostics.FormatPerformanceTable("Compilation Performance Summary", snapshots)
-				log.Info("\n" + table)
-			}
-		}
-		// 输出文件性能汇总表格
-		if len(progs) > 0 && progs[0] != nil {
-			if progConfig := progs[0].GetConfig(); progConfig != nil {
-				filePerfRecorder := progConfig.GetFilePerformanceRecorder()
-				if filePerfRecorder != nil {
-					snapshots := filePerfRecorder.Snapshot()
-					if len(snapshots) > 0 {
-						merged := diagnostics.MergeBuildAndLazyBuildForDisplay(snapshots)
-						table := diagnostics.FormatPerformanceTable("File Compilation Performance Summary", merged)
-						log.Info("\n" + table)
-					}
-				}
-			}
-		}
 		return nil
 	},
-}
-
-func formatDuration(d time.Duration) string {
-	if d == 0 {
-		return "0.00ns"
-	}
-	units := []time.Duration{time.Hour, time.Minute, time.Second, time.Millisecond, time.Microsecond, time.Nanosecond}
-	names := []string{"h", "m", "s", "ms", "us", "ns"}
-
-	for i, u := range units {
-		if d >= u {
-			val := float64(d) / float64(u)
-			return fmt.Sprintf("%4.2f%s", val, names[i])
-		}
-	}
-	// fallback (shouldn't normally be reached)
-	return fmt.Sprintf("%.2fns", float64(d)/float64(time.Nanosecond))
 }
 
 var syntaxFlowEvaluate = &cli.Command{

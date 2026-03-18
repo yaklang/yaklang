@@ -1,10 +1,11 @@
 package java2ssa
 
 import (
+	"fmt"
 	"sync/atomic"
 	"time"
 
-	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
@@ -24,7 +25,7 @@ var (
 func deltaAssignVariableCostFrom(t time.Time) {
 	du := atomic.AddInt64(&assignVariableCostNano, time.Now().Sub(t).Nanoseconds())
 	if ret := time.Duration(du).Seconds(); ret > float64(lastAssignVariableSecond+1) {
-		log.Infof("abnormal deltaAssignVariableCost cost: %v cost-heavy-percent: %.2f%%", time.Duration(du), 100*(float64(du)/float64(time.Since(initTime))))
+		diagnostics.LogLow(ssa.TrackKindBuild, "Java", fmt.Sprintf("abnormal deltaAssignVariableCost cost: %v cost-heavy-percent: %.2f%%", time.Duration(du), 100*(float64(du)/float64(time.Since(initTime)))))
 		lastAssignVariableSecond = int64(ret)
 	}
 }
@@ -32,7 +33,7 @@ func deltaAssignVariableCostFrom(t time.Time) {
 func deltaAnnotationCostFrom(t time.Time) {
 	du := atomic.AddInt64(&annotationCostNano, time.Now().Sub(t).Nanoseconds())
 	if ret := time.Duration(du).Seconds(); ret > float64(lastAnnotationSecond+1) {
-		log.Infof("abnormal deltaAnnotationCost cost: %v cost-heavy-percent: %.2f%%", time.Duration(du), 100*(float64(du)/float64(time.Since(initTime))))
+		diagnostics.LogLow(ssa.TrackKindBuild, "Java", fmt.Sprintf("abnormal deltaAnnotationCost cost: %v cost-heavy-percent: %.2f%%", time.Duration(du), 100*(float64(du)/float64(time.Since(initTime)))))
 		lastAnnotationSecond = int64(ret)
 	}
 }
@@ -40,7 +41,7 @@ func deltaAnnotationCostFrom(t time.Time) {
 func deltaPackageCostFrom(t time.Time) {
 	du := atomic.AddInt64(&packageCostNano, time.Now().Sub(t).Nanoseconds())
 	if ret := time.Duration(du).Seconds(); ret > float64(lastPackageSecond+1) {
-		log.Infof("abnormal deltaPackageCost cost: %v cost-heavy-percent: %.2f%%", time.Duration(du), 100*(float64(du)/float64(time.Since(initTime))))
+		diagnostics.LogLow(ssa.TrackKindBuild, "Java", fmt.Sprintf("abnormal deltaPackageCost cost: %v cost-heavy-percent: %.2f%%", time.Duration(du), 100*(float64(du)/float64(time.Since(initTime)))))
 		lastPackageSecond = int64(ret)
 	}
 }
@@ -48,12 +49,12 @@ func deltaPackageCostFrom(t time.Time) {
 func ShowJavaCompilingCost() {
 	ret := atomic.LoadInt64(&annotationCostNano)
 	if time.Duration(ret).Milliseconds() > 300 {
-		log.Infof("Java Annotation cost: %v", time.Duration(ret))
+		diagnostics.LogLow(ssa.TrackKindBuild, "Java", fmt.Sprintf("Annotation cost: %v", time.Duration(ret)))
 	}
 
 	ret = atomic.LoadInt64(&packageCostNano)
 	if time.Duration(ret).Milliseconds() > 300 {
-		log.Infof("Java Package cost: %v", time.Duration(ret))
+		diagnostics.LogLow(ssa.TrackKindBuild, "Java", fmt.Sprintf("Package cost: %v", time.Duration(ret)))
 	}
 }
 

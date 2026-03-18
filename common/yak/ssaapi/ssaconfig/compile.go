@@ -198,7 +198,6 @@ type SSACompileConfig struct {
 	MemoryCompile            bool          `json:"memory_compile"`
 	Concurrency              int           `json:"compile_concurrency"`
 	CompileIrCacheTTL        time.Duration `json:"compile_ir_cache_ttl"`
-	FilePerformanceLog       bool          `json:"file_performance_log"`
 	StopOnCliCheck           bool          `json:"stop_on_cli_check"`
 	EnableIncrementalCompile bool          `json:"enable_incremental_compile"`
 	BaseProgramName          string        `json:"base_program_name"`
@@ -332,23 +331,6 @@ func (c *Config) SetCompileConcurrency(concurrency int) {
 	c.SSACompile.Concurrency = concurrency
 }
 
-func (c *Config) GetCompileFilePerformanceLog() bool {
-	if c == nil || c.SSACompile == nil {
-		return false
-	}
-	return c.SSACompile.FilePerformanceLog
-}
-
-func (c *Config) SetCompileFilePerformanceLog(enable bool) {
-	if c == nil {
-		return
-	}
-	if c.SSACompile == nil {
-		c.SSACompile = defaultSSACompileConfig()
-	}
-	c.SSACompile.FilePerformanceLog = enable
-}
-
 // --- 编译配置 Options ---
 
 // WithCompileStrictMode 设置严格模式
@@ -435,17 +417,6 @@ func WithCompileConcurrency(concurrency int) Option {
 			return err
 		}
 		c.SSACompile.Concurrency = concurrency
-		return nil
-	}
-}
-
-// WithCompileFilePerformanceLog 设置文件级别性能日志
-func WithCompileFilePerformanceLog(enable bool) Option {
-	return func(c *Config) error {
-		if err := c.ensureSSACompile("Compile File Performance Log"); err != nil {
-			return err
-		}
-		c.SSACompile.FilePerformanceLog = enable
 		return nil
 	}
 }

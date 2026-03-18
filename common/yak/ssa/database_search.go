@@ -14,10 +14,16 @@ import (
 
 func MatchInstructionByOpcodes(ctx context.Context, prog *Program, opcodes ...Opcode) []Instruction {
 	var insts []Instruction
-	_ = diagnostics.TrackLow("ssa.MatchInstructionByOpcodes", func() error {
+	doWork := func() error {
 		insts = matchInstructionByOpcodes(ctx, prog, opcodes...)
 		return nil
-	})
+	}
+	steps := []func() error{doWork}
+	if rec := prog.DiagnosticsRecorder(); rec != nil {
+		_, _ = rec.ForKind(diagnostics.TrackKindGeneral).Track("ssa.MatchInstructionByOpcodes", steps...)
+	} else {
+		_ = diagnostics.RunStepsWithoutRecording(steps)
+	}
 	return insts
 }
 

@@ -18,6 +18,7 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
@@ -37,6 +38,12 @@ func TestVerifiedRule(t *testing.T) {
 	t.Cleanup(func() {
 		capture.Stop()
 	})
+
+	// 避免 LevelHigh 时大量 diagnostics 输出到 stdout 导致 StartGoroutineLogCapture 管道阻塞、测试超时
+	origLevel := diagnostics.GetLevel()
+	defer diagnostics.SetLevel(origLevel)
+	diagnostics.SetLevel(diagnostics.LevelOff)
+
 	for rule := range sfdb.YieldSyntaxFlowRules(db, context.Background()) {
 		caseName := strings.Join(append(strings.Split(rule.Tag, "|"), rule.RuleName), "/")
 		f, err := sfvm.NewSyntaxFlowVirtualMachine().Compile(rule.Content)

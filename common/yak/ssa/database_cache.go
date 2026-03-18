@@ -8,6 +8,7 @@ import (
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
@@ -251,7 +252,11 @@ func (c *ProgramCache) SaveToDatabase(cb ...func(int)) {
 		return nil
 	}
 	steps := []func() error{f1, f2, f3, f4, f5, f6, f7, f8, f9}
-	c.diagnosticsTrack("ssa.ProgramCache.SaveToDatabase", steps...)
+	if rec := c.program.DiagnosticsRecorder(); rec != nil {
+		_, _ = rec.ForKind(TrackKindDatabase).Track("ssa.ProgramCache.SaveToDatabase", steps...)
+	} else {
+		_ = diagnostics.RunStepsWithoutRecording(steps)
+	}
 }
 
 func (c *ProgramCache) CountInstruction() int {

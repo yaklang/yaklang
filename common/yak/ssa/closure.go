@@ -7,30 +7,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// scopeLookupKey (scope, name) 用于缓存 scope 变量查找，避免重复遍历
-type scopeLookupKey struct {
-	s ScopeIF
-	n string
-}
-
-// scopeCacheGet 从 cache 获取或通过 compute 计算并缓存，供 cachedScopeLookup 复用
-func scopeCacheGet(cache map[scopeLookupKey]*Variable, key scopeLookupKey, compute func() *Variable) *Variable {
-	if v, ok := cache[key]; ok {
-		return v
-	}
-	v := compute()
-	cache[key] = v
-	return v
-}
-
-// cachedScopeLookup 带缓存的 scope 变量查找，lookup 为实际查找函数
-func cachedScopeLookup(cache map[scopeLookupKey]*Variable, scope ScopeIF, name string, lookup func(ScopeIF, string) *Variable) *Variable {
-	if utils.IsNil(scope) {
-		return nil
-	}
-	return scopeCacheGet(cache, scopeLookupKey{s: scope, n: name}, func() *Variable { return lookup(scope, name) })
-}
-
 type SideEffectKind string
 
 const (
@@ -255,11 +231,6 @@ func handleSideEffectInner(c *Call, funcTyp *FunctionType, shouldProcess func(*F
 	function := c.GetFunc()
 	builder := function.builder
 
-	getScopeCache := make(map[scopeLookupKey]*Variable)
-	getFromScope := func(scope ScopeIF, name string) *Variable {
-		return cachedScopeLookup(getScopeCache, scope, name, GetFristLocalVariableFromScopeAndParent)
-	}
-
 	for _, se := range funcTyp.SideEffects {
 		if !shouldProcess(se) {
 			continue
@@ -302,7 +273,7 @@ func handleSideEffectInner(c *Call, funcTyp *FunctionType, shouldProcess func(*F
 
 		switch se.MemberCallKind {
 		case NoMemberCall:
-			if ret := getFromScope(currentScope, se.Name); ret != nil {
+			if ret := GetFristLocalVariableFromScopeAndParent(currentScope, se.Name); ret != nil {
 				if modifyScope.IsSameOrSubScope(ret.GetScope()) {
 					continue
 				}
@@ -450,11 +421,6 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 	function := c.GetFunc()
 	builder := function.builder
 
-	getScopeCache := make(map[scopeLookupKey]*Variable)
-	getFromScope := func(scope ScopeIF, name string) *Variable {
-		return cachedScopeLookup(getScopeCache, scope, name, GetFristLocalVariableFromScopeAndParent)
-	}
-
 	// GetScope: 递归查找 scope 变量（含 Parameter 的 parent 链）
 	var GetScope func(ScopeIF, string, *FunctionBuilder) *Variable
 	GetScope = func(scope ScopeIF, name string, b *FunctionBuilder) *Variable {
@@ -503,7 +469,7 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 		// is object
 		switch se.MemberCallKind {
 		case NoMemberCall:
-			if ret := getFromScope(currentScope, se.Name); ret != nil {
+			if ret := GetFristLocalVariableFromScopeAndParent(currentScope, se.Name); ret != nil {
 				if modifyScope.IsSameOrSubScope(ret.GetScope()) {
 					continue
 				}
@@ -824,11 +790,6 @@ func handleArgumentFunctionSideEffect(c *Call, calleeFuncTyp *FunctionType) {
 		return
 	}
 
-	getScopeCache := make(map[scopeLookupKey]*Variable)
-	getFromScope := func(scope ScopeIF, name string) *Variable {
-		return cachedScopeLookup(getScopeCache, scope, name, ReadVariableFromScopeAndParent)
-	}
-
 	// Get the callee function (not just its type) to analyze parameter usage
 	method, ok := c.GetValueById(c.Method)
 	if !ok || utils.IsNil(method) {
@@ -890,7 +851,7 @@ func handleArgumentFunctionSideEffect(c *Call, calleeFuncTyp *FunctionType) {
 			}
 
 			if sideEffect := builder.EmitSideEffect(se.Name, c, modify); sideEffect != nil {
-				if v := getFromScope(currentScope, se.Name); v != nil {
+				if v := ReadVariableFromScopeAndParent(currentScope, se.Name); v != nil {
 					variable.SetCaptured(v)
 				}
 				builder.AssignVariable(variable, sideEffect)

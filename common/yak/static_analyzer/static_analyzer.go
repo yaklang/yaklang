@@ -3,10 +3,10 @@ package static_analyzer
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfanalyzer"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -72,12 +72,18 @@ func StaticAnalyzeWithContext(ctx context.Context, code, codeTyp string, kind St
 	default:
 	}
 
-	perfRecorder := diagnostics.NewRecorder()
+	// lifecycle: 仅 LevelHigh 时创建 recorder 并输出表格，节约内存（与 AST/Build/Scan/Database 统一）
+	var perfRecorder *diagnostics.Recorder
+	if diagnostics.Enabled(diagnostics.LevelHigh) {
+		perfRecorder = diagnostics.NewRecorder()
+	}
 	defer func() {
-		snapshots := perfRecorder.Snapshot()
-		if len(snapshots) > 0 {
-			table := diagnostics.FormatPerformanceTable("Static Analysis Performance", snapshots)
-			fmt.Println(table)
+		if rec := perfRecorder; rec != nil {
+			snap := rec.Snapshot()
+			if len(snap) > 0 {
+				payload := diagnostics.TablePayloadFromMeasurements("Static Analysis Performance", snap)
+				diagnostics.LogTable(ssa.TrackKindStaticAnalyze, payload, true)
+			}
 		}
 	}()
 
@@ -85,12 +91,18 @@ func StaticAnalyzeWithContext(ctx context.Context, code, codeTyp string, kind St
 	switch codeTyp {
 	case "yak", "mitm", "port-scan", "codec":
 		// Yaklang 编译
-		yaklangStart := time.Now()
-		newEngine := yaklang.New()
-		newEngine.SetStrictMode(false)
-		_, err := newEngine.Compile(code)
-		yaklangDuration := time.Since(yaklangStart)
-		perfRecorder.RecordDuration("Yaklang StaticAnalyze", yaklangDuration)
+		var err error
+		runYakCompile := func() error {
+			newEngine := yaklang.New()
+			newEngine.SetStrictMode(false)
+			_, e := newEngine.Compile(code)
+			return e
+		}
+		if perfRecorder != nil {
+			_, err = perfRecorder.ForKind(ssa.TrackKindStaticAnalyze).Track("Yaklang StaticAnalyze", runYakCompile)
+		} else {
+			err = diagnostics.RunStepsWithoutRecording([]func() error{runYakCompile})
+		}
 
 		select {
 		case <-ctx.Done():
@@ -122,10 +134,15 @@ func StaticAnalyzeWithContext(ctx context.Context, code, codeTyp string, kind St
 			return results
 		}
 
-		ruleStart := time.Now()
-		results = append(results, checkRules(codeTyp, prog, kind).Get()...)
-		ruleDuration := time.Since(ruleStart)
-		perfRecorder.RecordDuration("Rule Check", ruleDuration)
+		ruleCheck := func() error {
+			results = append(results, checkRules(codeTyp, prog, kind).Get()...)
+			return nil
+		}
+		if perfRecorder != nil {
+			_, _ = perfRecorder.ForKind(ssa.TrackKindStaticAnalyze).Track("Rule Check", ruleCheck)
+		} else {
+			_ = diagnostics.RunStepsWithoutRecording([]func() error{ruleCheck})
+		}
 
 		select {
 		case <-ctx.Done():
@@ -155,10 +172,16 @@ func StaticAnalyzeWithContext(ctx context.Context, code, codeTyp string, kind St
 		}
 	case "syntaxflow":
 		// 第1步：语法检测（必须通过，富集错误信息）
-		sfStart := time.Now()
-		syntaxErrs, frame := syntaxFlowCompileAndCheck(code)
-		sfDuration := time.Since(sfStart)
-		perfRecorder.RecordDuration("SyntaxFlow Compile", sfDuration)
+		var syntaxErrs []*result.StaticAnalyzeResult
+		var frame *sfvm.SFFrame
+		if perfRecorder != nil {
+			_, _ = perfRecorder.ForKind(ssa.TrackKindStaticAnalyze).Track("SyntaxFlow Compile", func() error {
+				syntaxErrs, frame = syntaxFlowCompileAndCheck(code)
+				return nil
+			})
+		} else {
+			syntaxErrs, frame = syntaxFlowCompileAndCheck(code)
+		}
 
 		if len(syntaxErrs) > 0 {
 			// 富集：添加结构化错误 + 富格式提示
@@ -234,22 +257,13 @@ func SSAParse(code, scriptType string, o ...ssaconfig.Option) (*ssaapi.Program, 
 	return ssaapi.Parse(code, opt...)
 }
 
-// SSAParseWithPerf 带性能记录的 SSA 解析
+// SSAParseWithPerf 带性能记录的 SSA 解析，通过显式 WithDiagnosticsRecorder 传入 recorder
 func SSAParseWithPerf(code, scriptType string, perfRecorder *diagnostics.Recorder, o ...ssaconfig.Option) (*ssaapi.Program, error) {
 	opt := GetPluginSSAOpt(scriptType)
 	opt = append(opt, ssaapi.WithEnableCache(true))
 	opt = append(opt, o...)
-
-	// 如果提供了性能记录器，启用 diagnostics 并设置记录器
 	if perfRecorder != nil {
-		opt = append(opt, ssaapi.WithDiagnostics(true))
-		// 创建一个选项来设置性能记录器，使用 ssaconfig.SetOption 创建接收 *Config 的选项
-		setPerfRecorderOpt := ssaconfig.SetOption("ssa_compile/perf_recorder", func(c *ssaapi.Config, rec *diagnostics.Recorder) {
-			c.SetDiagnosticsRecorder(rec)
-		})
-		opt = append(opt, setPerfRecorderOpt(perfRecorder))
+		opt = append(opt, ssaapi.WithDiagnosticsRecorder(perfRecorder))
 	}
-
-	// 使用公开的 Parse 方法
 	return ssaapi.Parse(code, opt...)
 }
