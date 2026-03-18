@@ -44,8 +44,7 @@ type buildCommandConfig struct {
 	language   string
 	function   string
 	printIR    bool
-	ssaObf     []string
-	llvmObf    []string
+	obf        []string
 	stdlibComp bool
 	trace      bool
 	force      bool
@@ -71,13 +70,8 @@ func sharedBuildFlags() []cli.Flag {
 			Usage: "Print generated LLVM IR to stdout",
 		},
 		cli.StringSliceFlag{
-			Name:  "ssa-obf",
-			Usage: "Apply SSA obfuscators by name or glob pattern (repeatable or comma-separated; see `ssa2llvm obfuscators`)",
-			Value: &cli.StringSlice{},
-		},
-		cli.StringSliceFlag{
-			Name:  "llvm-obf",
-			Usage: "Apply LLVM obfuscators by name or glob pattern (repeatable or comma-separated; see `ssa2llvm obfuscators`)",
+			Name:  "obf",
+			Usage: "Apply obfuscators by name or glob pattern (repeatable or comma-separated; see `ssa2llvm obfuscators`)",
 			Value: &cli.StringSlice{},
 		},
 		cli.BoolFlag{
@@ -133,7 +127,7 @@ var obfuscatorsCommand = cli.Command{
 	UsageText: "ssa2llvm obfuscators",
 	Description: `Show the obfuscators currently registered in ssa2llvm.
 
-Use the printed names with --ssa-obf or --llvm-obf on the compile/run commands.
+Use the printed names with --obf on the compile/run commands.
 Names can be repeated, passed as comma-separated lists, or selected with glob patterns.`,
 	Action: listObfuscatorsAction,
 }
@@ -159,8 +153,7 @@ func compileAction(c *cli.Context) error {
 		compiler.WithCompileEmitAsm(emitAsm),
 		compiler.WithCompileOnly(compileOnly),
 		compiler.WithCompilePrintIR(cfg.printIR),
-		compiler.WithCompileSSAObfuscators(cfg.ssaObf...),
-		compiler.WithCompileLLVMObfuscators(cfg.llvmObf...),
+		compiler.WithCompileObfuscators(cfg.obf...),
 		compiler.WithCompileStdlibCompile(cfg.stdlibComp),
 		compiler.WithCompileCacheEnabled(true),
 		compiler.WithCompileTrace(cfg.trace),
@@ -184,8 +177,7 @@ func runAction(c *cli.Context) error {
 		compiler.WithCompileLanguage(cfg.language),
 		compiler.WithCompileEntryFunction(cfg.function),
 		compiler.WithCompilePrintIR(cfg.printIR),
-		compiler.WithCompileSSAObfuscators(cfg.ssaObf...),
-		compiler.WithCompileLLVMObfuscators(cfg.llvmObf...),
+		compiler.WithCompileObfuscators(cfg.obf...),
 		compiler.WithCompileStdlibCompile(cfg.stdlibComp),
 		compiler.WithCompileCacheEnabled(true),
 		compiler.WithCompileTrace(cfg.trace),
@@ -226,15 +218,17 @@ func runAction(c *cli.Context) error {
 }
 
 func listObfuscatorsAction(c *cli.Context) error {
-	printObfuscatorGroup("SSA obfuscators", "--ssa-obf <name>", obfuscation.ListSSA())
+	printObfuscatorGroup("SSA obfuscators", "--obf <name>", obfuscation.ListByKind(obfuscation.KindSSA))
 	fmt.Println()
-	printObfuscatorGroup("LLVM obfuscators", "--llvm-obf <name>", obfuscation.ListLLVM())
+	printObfuscatorGroup("Hybrid obfuscators", "--obf <name>", obfuscation.ListByKind(obfuscation.KindHybrid))
+	fmt.Println()
+	printObfuscatorGroup("LLVM obfuscators", "--obf <name>", obfuscation.ListByKind(obfuscation.KindLLVM))
 	fmt.Println()
 	fmt.Println("Usage:")
-	fmt.Println("  ssa2llvm compile demo.yak --ssa-obf addsub")
-	fmt.Println("  ssa2llvm run demo.yak --ssa-obf addsub")
-	fmt.Println("  ssa2llvm compile demo.yak --ssa-obf addsub --llvm-obf xor")
-	fmt.Println("  ssa2llvm run demo.yak --ssa-obf 'add*' --llvm-obf 'x*'")
+	fmt.Println("  ssa2llvm compile demo.yak --obf addsub")
+	fmt.Println("  ssa2llvm run demo.yak --obf addsub")
+	fmt.Println("  ssa2llvm compile demo.yak --obf xor")
+	fmt.Println("  ssa2llvm run demo.yak --obf 'add*' --obf 'x*'")
 	fmt.Println()
 	fmt.Println("Names can be repeated, passed as comma-separated lists, or selected with glob patterns.")
 	fmt.Println("Quote glob patterns like '*' to avoid shell expansion.")
@@ -252,8 +246,7 @@ func newBuildCommandConfig(c *cli.Context) (*buildCommandConfig, error) {
 		language:   c.String("language"),
 		function:   c.String("function"),
 		printIR:    c.Bool("print-ir"),
-		ssaObf:     c.StringSlice("ssa-obf"),
-		llvmObf:    c.StringSlice("llvm-obf"),
+		obf:        c.StringSlice("obf"),
 		stdlibComp: c.Bool("stdlib-compile"),
 		trace:      c.Bool("x"),
 		force:      c.Bool("a"),

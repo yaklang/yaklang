@@ -11,94 +11,166 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-type SSAObfuscator interface {
+type Stage int
+
+const (
+	StageSSA Stage = iota
+	StageLLVM
+)
+
+type Kind int
+
+const (
+	KindSSA Kind = iota
+	KindHybrid
+	KindLLVM
+)
+
+func (k Kind) String() string {
+	switch k {
+	case KindSSA:
+		return "ssa"
+	case KindHybrid:
+		return "hybrid"
+	case KindLLVM:
+		return "llvm"
+	default:
+		return "unknown"
+	}
+}
+
+type Context struct {
+	Stage Stage
+
+	SSA  *ssa.Program
+	LLVM llvm.Module
+
+	// EntryFunction is the user-requested entry function name for the build.
+	// Hybrid obfuscators may use it to decide how to transform whole-program control flow.
+	EntryFunction string
+}
+
+type Obfuscator interface {
 	Name() string
-	Run(*ssa.Program) error
+	Kind() Kind
+	Apply(*Context) error
 }
 
-type LLVMObfuscator interface {
-	Name() string
-	Run(llvm.Module) error
+type Info struct {
+	Name string
+	Kind Kind
 }
 
-var Default = struct {
-	SSA  map[string]SSAObfuscator
-	LLVM map[string]LLVMObfuscator
-}{
-	SSA:  make(map[string]SSAObfuscator),
-	LLVM: make(map[string]LLVMObfuscator),
-}
+var Default = make(map[string]Obfuscator)
 
-func RegisterSSA(obfuscator SSAObfuscator) {
+func Register(obfuscator Obfuscator) {
 	if obfuscator == nil {
-		log.Warnf("skip nil SSA obfuscator registration")
+		log.Warnf("skip nil obfuscator registration")
 		return
 	}
 
 	name := normalizeName(obfuscator.Name())
 	if name == "" {
-		log.Warnf("skip SSA obfuscator registration with empty name")
+		log.Warnf("skip obfuscator registration with empty name")
 		return
 	}
-	if _, exists := Default.SSA[name]; exists {
-		log.Warnf("skip duplicate SSA obfuscator registration %q", name)
+	if _, exists := Default[name]; exists {
+		log.Warnf("skip duplicate obfuscator registration %q", name)
 		return
 	}
 
-	Default.SSA[name] = obfuscator
+	Default[name] = obfuscator
 }
 
-func RegisterLLVM(obfuscator LLVMObfuscator) {
-	if obfuscator == nil {
-		log.Warnf("skip nil LLVM obfuscator registration")
-		return
+func ApplySSA(ctx *Context, names []string) error {
+	if ctx == nil {
+		return nil
 	}
-
-	name := normalizeName(obfuscator.Name())
-	if name == "" {
-		log.Warnf("skip LLVM obfuscator registration with empty name")
-		return
-	}
-	if _, exists := Default.LLVM[name]; exists {
-		log.Warnf("skip duplicate LLVM obfuscator registration %q", name)
-		return
-	}
-
-	Default.LLVM[name] = obfuscator
+	ctx.Stage = StageSSA
+	return applyStage(ctx, names)
 }
 
-func ApplySSA(program *ssa.Program, names []string) error {
-	resolved, err := expandNames("ssa", names, sortedKeys(Default.SSA))
+func ApplyLLVM(ctx *Context, names []string) error {
+	if ctx == nil {
+		return nil
+	}
+	ctx.Stage = StageLLVM
+	return applyStage(ctx, names)
+}
+
+func List() []Info {
+	names := sortedKeys(Default)
+	out := make([]Info, 0, len(names))
+	for _, name := range names {
+		obf := Default[name]
+		kind := KindSSA
+		if obf != nil {
+			kind = obf.Kind()
+		}
+		out = append(out, Info{Name: name, Kind: kind})
+	}
+	return out
+}
+
+func ListByKind(kind Kind) []string {
+	names := sortedKeys(Default)
+	out := make([]string, 0, len(names))
+	for _, name := range names {
+		obf := Default[name]
+		if obf == nil || obf.Kind() != kind {
+			continue
+		}
+		out = append(out, name)
+	}
+	return out
+}
+
+func applyStage(ctx *Context, names []string) error {
+	resolved, err := expandNames("obf", names, sortedKeys(Default))
 	if err != nil {
 		return err
 	}
+
+	if ctx.Stage == StageSSA {
+		// SSA-only first, then hybrid SSA.
+		if err := applyKinds(ctx, resolved, KindSSA); err != nil {
+			return err
+		}
+		return applyKinds(ctx, resolved, KindHybrid)
+	}
+
+	// LLVM: hybrid first, then LLVM-only.
+	if err := applyKinds(ctx, resolved, KindHybrid); err != nil {
+		return err
+	}
+	return applyKinds(ctx, resolved, KindLLVM)
+}
+
+func applyKinds(ctx *Context, resolved []string, kind Kind) error {
 	for _, name := range resolved {
-		if err := Default.SSA[name].Run(program); err != nil {
-			return fmt.Errorf("ssa obfuscator %q failed: %w", name, err)
+		obf := Default[name]
+		if obf == nil || obf.Kind() != kind {
+			continue
+		}
+		if err := obf.Apply(ctx); err != nil {
+			return fmt.Errorf("%s obfuscator %q failed: %w", ctx.StageLabel(), name, err)
 		}
 	}
 	return nil
 }
 
-func ApplyLLVM(module llvm.Module, names []string) error {
-	resolved, err := expandNames("llvm", names, sortedKeys(Default.LLVM))
-	if err != nil {
-		return err
+func (ctx *Context) StageLabel() string {
+	if ctx == nil {
+		return "obf"
 	}
-	for _, name := range resolved {
-		if err := Default.LLVM[name].Run(module); err != nil {
-			return fmt.Errorf("llvm obfuscator %q failed: %w", name, err)
-		}
+	switch ctx.Stage {
+	case StageSSA:
+		return "ssa"
+	case StageLLVM:
+		return "llvm"
+	default:
+		return "obf"
 	}
-	return nil
-}
-
-func ListSSA() []string {
-	return sortedKeys(Default.SSA)
-}
-
-func ListLLVM() []string {
-	return sortedKeys(Default.LLVM)
 }
 
 func NormalizeNames(names []string) []string {

@@ -16,7 +16,7 @@ check = () => {
 `
 
 	checkBinaryEx(t, code, "check", "yak", 84)
-	checkBinaryExWithOptions(t, code, "check", "yak", 84, withCompileSSAObfuscators("addsub"))
+	checkBinaryExWithOptions(t, code, "check", "yak", 84, withCompileObfuscators("addsub"))
 }
 
 func TestLLVMObfuscationXOR(t *testing.T) {
@@ -33,7 +33,7 @@ check = () => {
 `
 
 	checkBinaryEx(t, code, "check", "yak", 84)
-	checkBinaryExWithOptions(t, code, "check", "yak", 84, withCompileLLVMObfuscators("xor"))
+	checkBinaryExWithOptions(t, code, "check", "yak", 84, withCompileObfuscators("xor"))
 }
 
 func TestSSAObfuscationUnknownName(t *testing.T) {
@@ -43,7 +43,7 @@ func TestSSAObfuscationUnknownName(t *testing.T) {
 		compiler.WithCompileLanguage("yak"),
 		compiler.WithCompileEmitLLVM(true),
 		compiler.WithCompileOutputFile(tmpIR),
-		compiler.WithCompileSSAObfuscators("missing"),
+		compiler.WithCompileObfuscators("missing"),
 	)
 	if err == nil {
 		t.Fatal("expected unknown obfuscator error")

@@ -10,11 +10,15 @@ import (
 type addSubSSAObfuscator struct{}
 
 func init() {
-	core.RegisterSSA(addSubSSAObfuscator{})
+	core.Register(addSubSSAObfuscator{})
 }
 
 func (addSubSSAObfuscator) Name() string {
 	return "addsub"
+}
+
+func (addSubSSAObfuscator) Kind() core.Kind {
+	return core.KindSSA
 }
 
 // Run rewrites direct SSA add/sub instructions into equivalent three-node forms.
@@ -26,7 +30,11 @@ func (addSubSSAObfuscator) Name() string {
 //
 // k is derived from the original instruction id, so the pass is deterministic
 // for the same SSA graph while still breaking the original arithmetic shape.
-func (addSubSSAObfuscator) Run(program *ssa.Program) error {
+func (addSubSSAObfuscator) Apply(ctx *core.Context) error {
+	if ctx == nil || ctx.Stage != core.StageSSA {
+		return nil
+	}
+	program := ctx.SSA
 	if program == nil {
 		return nil
 	}

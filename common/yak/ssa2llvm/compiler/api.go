@@ -40,8 +40,7 @@ type CompileConfig struct {
 	SkipRuntimeLink   bool
 	RuntimeArchive    string
 	PrintEntryResult  bool
-	SSAObfuscators    []string
-	LLVMObfuscators   []string
+	Obfuscators       []string
 	StdlibCompile     bool
 
 	// CacheEnabled uses a deterministic work dir under $TMP and reuses existing artifacts.
@@ -145,15 +144,9 @@ func WithCompilePrintEntryResult(enabled bool) CompileOption {
 	return func(c *CompileConfig) { c.PrintEntryResult = enabled }
 }
 
-func WithCompileSSAObfuscators(names ...string) CompileOption {
+func WithCompileObfuscators(names ...string) CompileOption {
 	return func(c *CompileConfig) {
-		c.SSAObfuscators = appendObfuscatorNames(c.SSAObfuscators, names...)
-	}
-}
-
-func WithCompileLLVMObfuscators(names ...string) CompileOption {
-	return func(c *CompileConfig) {
-		c.LLVMObfuscators = appendObfuscatorNames(c.LLVMObfuscators, names...)
+		c.Obfuscators = appendObfuscatorNames(c.Obfuscators, names...)
 	}
 }
 
@@ -190,8 +183,7 @@ func WithCompileConfig(cfg CompileConfig) CompileOption {
 		c.SkipRuntimeLink = cfg.SkipRuntimeLink
 		c.RuntimeArchive = cfg.RuntimeArchive
 		c.PrintEntryResult = cfg.PrintEntryResult
-		c.SSAObfuscators = append(c.SSAObfuscators, cfg.SSAObfuscators...)
-		c.LLVMObfuscators = append(c.LLVMObfuscators, cfg.LLVMObfuscators...)
+		c.Obfuscators = append(c.Obfuscators, cfg.Obfuscators...)
 		c.StdlibCompile = cfg.StdlibCompile
 		c.CacheEnabled = cfg.CacheEnabled
 		c.Force = cfg.Force
@@ -213,8 +205,8 @@ func WithCompileConfig(cfg CompileConfig) CompileOption {
 func compileInput(
 	sourceFile, sourceCode, language string,
 	externBindings map[string]ExternBinding,
-	ssaObfuscators []string,
-	llvmObfuscators []string,
+	entryFunction string,
+	obfuscators []string,
 ) (*ssaapi.Program, *Compiler, string, error) {
 	code, sourceLabel, language, err := resolveCompileInput(sourceFile, sourceCode, language)
 	if err != nil {
@@ -227,7 +219,7 @@ func compileInput(
 	if err != nil {
 		return nil, nil, "", utils.Errorf("SSA parse failed: %v", err)
 	}
-	if err := obfuscation.ApplySSA(progBundle.Program, ssaObfuscators); err != nil {
+	if err := obfuscation.ApplySSA(progBundle.Program, entryFunction, obfuscators); err != nil {
 		return nil, nil, "", utils.Errorf("SSA obfuscation failed: %v", err)
 	}
 
@@ -241,7 +233,7 @@ func compileInput(
 		comp.Dispose()
 		return nil, nil, "", utils.Errorf("LLVM compilation failed: %v", err)
 	}
-	if err := obfuscation.ApplyLLVM(comp.Mod, llvmObfuscators); err != nil {
+	if err := obfuscation.ApplyLLVM(comp.Mod, entryFunction, obfuscators); err != nil {
 		comp.Dispose()
 		return nil, nil, "", utils.Errorf("LLVM obfuscation failed: %v", err)
 	}
@@ -454,8 +446,8 @@ func compileWithConfig(cfg *CompileConfig) (CompileResult, error) {
 		cfg.SourceCode,
 		cfg.Language,
 		cfg.ExternBindings,
-		cfg.SSAObfuscators,
-		cfg.LLVMObfuscators,
+		cfg.EntryFunctionName,
+		cfg.Obfuscators,
 	)
 	if err != nil {
 		return CompileResult{}, err

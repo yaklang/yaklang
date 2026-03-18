@@ -13,9 +13,9 @@ func TestNormalizeNames(t *testing.T) {
 }
 
 func TestGlobPatterns(t *testing.T) {
-	require.NoError(t, ApplySSA(nil, []string{"add*"}))
-	require.NoError(t, ApplyLLVM(llvm.Module{}, []string{"*"}))
+	require.NoError(t, ApplySSA(nil, "", []string{"add*"}))
+	require.NoError(t, ApplyLLVM(llvm.Module{}, "", []string{"*"}))
 
-	err := ApplySSA(nil, []string{"missing*"})
+	err := ApplySSA(nil, "", []string{"missing*"})
 	require.Error(t, err)
 }
