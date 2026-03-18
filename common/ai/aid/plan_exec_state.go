@@ -10,6 +10,11 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
+const (
+	Phase_NotCompleted = "NotCompleted" // 未完成
+	Phase_Completed    = "Completed"    // 已完成
+)
+
 type PlanAndExecProgress struct {
 	TotalTasks       int    `json:"total_tasks"`
 	CompletedTasks   int    `json:"completed_tasks"`
