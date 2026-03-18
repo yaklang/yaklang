@@ -299,6 +299,7 @@ const (
 	Yak_GetCurrentRules_FullMethodName                            = "/ypb.Yak/GetCurrentRules"
 	Yak_SetCurrentRules_FullMethodName                            = "/ypb.Yak/SetCurrentRules"
 	Yak_QueryMITMReplacerRules_FullMethodName                     = "/ypb.Yak/QueryMITMReplacerRules"
+	Yak_DeduplicateMITMReplacerRules_FullMethodName               = "/ypb.Yak/DeduplicateMITMReplacerRules"
 	Yak_GenerateURL_FullMethodName                                = "/ypb.Yak/GenerateURL"
 	Yak_ExtractDataToFile_FullMethodName                          = "/ypb.Yak/ExtractDataToFile"
 	Yak_AutoDecode_FullMethodName                                 = "/ypb.Yak/AutoDecode"
@@ -360,6 +361,8 @@ const (
 	Yak_MigrateLegacyDatabase_FullMethodName                      = "/ypb.Yak/MigrateLegacyDatabase"
 	Yak_QueryMITMRuleExtractedData_FullMethodName                 = "/ypb.Yak/QueryMITMRuleExtractedData"
 	Yak_ExportMITMRuleExtractedData_FullMethodName                = "/ypb.Yak/ExportMITMRuleExtractedData"
+	Yak_DeleteMITMRuleExtractedData_FullMethodName                = "/ypb.Yak/DeleteMITMRuleExtractedData"
+	Yak_DeduplicateMITMRuleExtractedData_FullMethodName           = "/ypb.Yak/DeduplicateMITMRuleExtractedData"
 	Yak_ImportChaosMakerRules_FullMethodName                      = "/ypb.Yak/ImportChaosMakerRules"
 	Yak_QueryChaosMakerRule_FullMethodName                        = "/ypb.Yak/QueryChaosMakerRule"
 	Yak_DeleteChaosMakerRuleByID_FullMethodName                   = "/ypb.Yak/DeleteChaosMakerRuleByID"
@@ -978,6 +981,7 @@ type YakClient interface {
 	GetCurrentRules(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*MITMContentReplacers, error)
 	SetCurrentRules(ctx context.Context, in *MITMContentReplacers, opts ...grpc.CallOption) (*Empty, error)
 	QueryMITMReplacerRules(ctx context.Context, in *QueryMITMReplacerRulesRequest, opts ...grpc.CallOption) (*QueryMITMReplacerRulesResponse, error)
+	DeduplicateMITMReplacerRules(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	GenerateURL(ctx context.Context, in *GenerateURLRequest, opts ...grpc.CallOption) (*GenerateURLResponse, error)
 	ExtractDataToFile(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ExtractDataToFileRequest, ExtractDataToFileResult], error)
 	// 尝试自动解码
@@ -1064,6 +1068,8 @@ type YakClient interface {
 	// 从规则中提取数据
 	QueryMITMRuleExtractedData(ctx context.Context, in *QueryMITMRuleExtractedDataRequest, opts ...grpc.CallOption) (*QueryMITMRuleExtractedDataResponse, error)
 	ExportMITMRuleExtractedData(ctx context.Context, in *ExportMITMRuleExtractedDataRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExportMITMRuleExtractedDataResponse], error)
+	DeleteMITMRuleExtractedData(ctx context.Context, in *DeleteMITMRuleExtractedDataRequest, opts ...grpc.CallOption) (*Empty, error)
+	DeduplicateMITMRuleExtractedData(ctx context.Context, in *DeduplicateMITMRuleExtractedDataRequest, opts ...grpc.CallOption) (*DeduplicateMITMRuleExtractedDataResponse, error)
 	// ChaosMakerRule: Bas
 	ImportChaosMakerRules(ctx context.Context, in *ImportChaosMakerRulesRequest, opts ...grpc.CallOption) (*Empty, error)
 	QueryChaosMakerRule(ctx context.Context, in *QueryChaosMakerRuleRequest, opts ...grpc.CallOption) (*QueryChaosMakerRuleResponse, error)
@@ -4596,6 +4602,16 @@ func (c *yakClient) QueryMITMReplacerRules(ctx context.Context, in *QueryMITMRep
 	return out, nil
 }
 
+func (c *yakClient) DeduplicateMITMReplacerRules(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*DbOperateMessage, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DbOperateMessage)
+	err := c.cc.Invoke(ctx, Yak_DeduplicateMITMReplacerRules_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) GenerateURL(ctx context.Context, in *GenerateURLRequest, opts ...grpc.CallOption) (*GenerateURLResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GenerateURLResponse)
@@ -5274,6 +5290,26 @@ func (c *yakClient) ExportMITMRuleExtractedData(ctx context.Context, in *ExportM
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_ExportMITMRuleExtractedDataClient = grpc.ServerStreamingClient[ExportMITMRuleExtractedDataResponse]
+
+func (c *yakClient) DeleteMITMRuleExtractedData(ctx context.Context, in *DeleteMITMRuleExtractedDataRequest, opts ...grpc.CallOption) (*Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, Yak_DeleteMITMRuleExtractedData_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) DeduplicateMITMRuleExtractedData(ctx context.Context, in *DeduplicateMITMRuleExtractedDataRequest, opts ...grpc.CallOption) (*DeduplicateMITMRuleExtractedDataResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeduplicateMITMRuleExtractedDataResponse)
+	err := c.cc.Invoke(ctx, Yak_DeduplicateMITMRuleExtractedData_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
 
 func (c *yakClient) ImportChaosMakerRules(ctx context.Context, in *ImportChaosMakerRulesRequest, opts ...grpc.CallOption) (*Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -8687,6 +8723,7 @@ type YakServer interface {
 	GetCurrentRules(context.Context, *Empty) (*MITMContentReplacers, error)
 	SetCurrentRules(context.Context, *MITMContentReplacers) (*Empty, error)
 	QueryMITMReplacerRules(context.Context, *QueryMITMReplacerRulesRequest) (*QueryMITMReplacerRulesResponse, error)
+	DeduplicateMITMReplacerRules(context.Context, *Empty) (*DbOperateMessage, error)
 	GenerateURL(context.Context, *GenerateURLRequest) (*GenerateURLResponse, error)
 	ExtractDataToFile(grpc.BidiStreamingServer[ExtractDataToFileRequest, ExtractDataToFileResult]) error
 	// 尝试自动解码
@@ -8773,6 +8810,8 @@ type YakServer interface {
 	// 从规则中提取数据
 	QueryMITMRuleExtractedData(context.Context, *QueryMITMRuleExtractedDataRequest) (*QueryMITMRuleExtractedDataResponse, error)
 	ExportMITMRuleExtractedData(*ExportMITMRuleExtractedDataRequest, grpc.ServerStreamingServer[ExportMITMRuleExtractedDataResponse]) error
+	DeleteMITMRuleExtractedData(context.Context, *DeleteMITMRuleExtractedDataRequest) (*Empty, error)
+	DeduplicateMITMRuleExtractedData(context.Context, *DeduplicateMITMRuleExtractedDataRequest) (*DeduplicateMITMRuleExtractedDataResponse, error)
 	// ChaosMakerRule: Bas
 	ImportChaosMakerRules(context.Context, *ImportChaosMakerRulesRequest) (*Empty, error)
 	QueryChaosMakerRule(context.Context, *QueryChaosMakerRuleRequest) (*QueryChaosMakerRuleResponse, error)
@@ -9946,6 +9985,9 @@ func (UnimplementedYakServer) SetCurrentRules(context.Context, *MITMContentRepla
 func (UnimplementedYakServer) QueryMITMReplacerRules(context.Context, *QueryMITMReplacerRulesRequest) (*QueryMITMReplacerRulesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryMITMReplacerRules not implemented")
 }
+func (UnimplementedYakServer) DeduplicateMITMReplacerRules(context.Context, *Empty) (*DbOperateMessage, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeduplicateMITMReplacerRules not implemented")
+}
 func (UnimplementedYakServer) GenerateURL(context.Context, *GenerateURLRequest) (*GenerateURLResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GenerateURL not implemented")
 }
@@ -10128,6 +10170,12 @@ func (UnimplementedYakServer) QueryMITMRuleExtractedData(context.Context, *Query
 }
 func (UnimplementedYakServer) ExportMITMRuleExtractedData(*ExportMITMRuleExtractedDataRequest, grpc.ServerStreamingServer[ExportMITMRuleExtractedDataResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method ExportMITMRuleExtractedData not implemented")
+}
+func (UnimplementedYakServer) DeleteMITMRuleExtractedData(context.Context, *DeleteMITMRuleExtractedDataRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteMITMRuleExtractedData not implemented")
+}
+func (UnimplementedYakServer) DeduplicateMITMRuleExtractedData(context.Context, *DeduplicateMITMRuleExtractedDataRequest) (*DeduplicateMITMRuleExtractedDataResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeduplicateMITMRuleExtractedData not implemented")
 }
 func (UnimplementedYakServer) ImportChaosMakerRules(context.Context, *ImportChaosMakerRulesRequest) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ImportChaosMakerRules not implemented")
@@ -15605,6 +15653,24 @@ func _Yak_QueryMITMReplacerRules_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_DeduplicateMITMReplacerRules_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).DeduplicateMITMReplacerRules(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_DeduplicateMITMReplacerRules_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).DeduplicateMITMReplacerRules(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_GenerateURL_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GenerateURLRequest)
 	if err := dec(in); err != nil {
@@ -16631,6 +16697,42 @@ func _Yak_ExportMITMRuleExtractedData_Handler(srv interface{}, stream grpc.Serve
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_ExportMITMRuleExtractedDataServer = grpc.ServerStreamingServer[ExportMITMRuleExtractedDataResponse]
+
+func _Yak_DeleteMITMRuleExtractedData_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteMITMRuleExtractedDataRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).DeleteMITMRuleExtractedData(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_DeleteMITMRuleExtractedData_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).DeleteMITMRuleExtractedData(ctx, req.(*DeleteMITMRuleExtractedDataRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_DeduplicateMITMRuleExtractedData_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeduplicateMITMRuleExtractedDataRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).DeduplicateMITMRuleExtractedData(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_DeduplicateMITMRuleExtractedData_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).DeduplicateMITMRuleExtractedData(ctx, req.(*DeduplicateMITMRuleExtractedDataRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
 
 func _Yak_ImportChaosMakerRules_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ImportChaosMakerRulesRequest)
@@ -21870,6 +21972,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Yak_QueryMITMReplacerRules_Handler,
 		},
 		{
+			MethodName: "DeduplicateMITMReplacerRules",
+			Handler:    _Yak_DeduplicateMITMReplacerRules_Handler,
+		},
+		{
 			MethodName: "GenerateURL",
 			Handler:    _Yak_GenerateURL_Handler,
 		},
@@ -22076,6 +22182,14 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "QueryMITMRuleExtractedData",
 			Handler:    _Yak_QueryMITMRuleExtractedData_Handler,
+		},
+		{
+			MethodName: "DeleteMITMRuleExtractedData",
+			Handler:    _Yak_DeleteMITMRuleExtractedData_Handler,
+		},
+		{
+			MethodName: "DeduplicateMITMRuleExtractedData",
+			Handler:    _Yak_DeduplicateMITMRuleExtractedData_Handler,
 		},
 		{
 			MethodName: "ImportChaosMakerRules",

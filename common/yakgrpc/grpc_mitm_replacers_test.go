@@ -1098,6 +1098,17 @@ func TestGRPCMUSTPASS_QueryMITMReplacerRules(t *testing.T) {
 			EnableForBody:     true,
 			Disabled:          false,
 		},
+		{
+			Index:            6,
+			VerboseName:      "带标签规则",
+			Rule:             `password`,
+			Result:           "***",
+			Color:            "red",
+			EnableForRequest: true,
+			EnableForBody:    true,
+			Disabled:         false,
+			ExtraTag:         []string{"敏感词标记", "PII"},
+		},
 	}
 
 	// 设置测试规则
@@ -1114,8 +1125,8 @@ func TestGRPCMUSTPASS_QueryMITMReplacerRules(t *testing.T) {
 		{
 			name:          "空关键字查询所有规则",
 			keyword:       "",
-			expectedCount: 5,
-			expectedNames: []string{"测试规则1 - API密钥检测", "SQL注入检测", "用户代理替换", "禁用规则", "XSS检测"},
+			expectedCount: 6,
+			expectedNames: []string{"测试规则1 - API密钥检测", "SQL注入检测", "用户代理替换", "禁用规则", "XSS检测", "带标签规则"},
 			description:   "应该返回所有规则包括禁用的",
 		},
 		{
@@ -1152,6 +1163,20 @@ func TestGRPCMUSTPASS_QueryMITMReplacerRules(t *testing.T) {
 			expectedCount: 3,
 			expectedNames: []string{"测试规则1 - API密钥检测", "SQL注入检测", "XSS检测"},
 			description:   "应该支持中文关键字搜索",
+		},
+		{
+			name:          "按ExtraTag搜索",
+			keyword:       "敏感词",
+			expectedCount: 1,
+			expectedNames: []string{"带标签规则"},
+			description:   "应该能按ExtraTag搜索规则",
+		},
+		{
+			name:          "按ExtraTag搜索PII",
+			keyword:       "PII",
+			expectedCount: 1,
+			expectedNames: []string{"带标签规则"},
+			description:   "应该能按ExtraTag英文搜索",
 		},
 		{
 			name:          "搜索禁用规则",
@@ -1208,7 +1233,7 @@ func TestGRPCMUSTPASS_QueryMITMReplacerRules(t *testing.T) {
 						"关键字'%s': 期望找到规则'%s'", tc.keyword, expectedName)
 				}
 
-				// 验证返回的规则确实包含关键字
+				// 验证返回的规则确实包含关键字（名称、规则内容、结果或ExtraTag）
 				if tc.keyword != "" {
 					keywordLower := strings.ToLower(tc.keyword)
 					for _, rule := range resp.Rules.Rules {
@@ -1218,9 +1243,16 @@ func TestGRPCMUSTPASS_QueryMITMReplacerRules(t *testing.T) {
 							strings.Contains(strings.ToLower(rule.Rule), keywordLower)
 						resultMatch := rule.Result != "" &&
 							strings.Contains(strings.ToLower(rule.Result), keywordLower)
+						extraTagMatch := false
+						for _, tag := range rule.GetExtraTag() {
+							if tag != "" && strings.Contains(strings.ToLower(tag), keywordLower) {
+								extraTagMatch = true
+								break
+							}
+						}
 
-						assert.True(t, nameMatch || ruleMatch || resultMatch,
-							"规则'%s'应该在名称、规则内容或结果中包含关键字'%s'",
+						assert.True(t, nameMatch || ruleMatch || resultMatch || extraTagMatch,
+							"规则'%s'应该在名称、规则内容、结果或ExtraTag中包含关键字'%s'",
 							rule.VerboseName, tc.keyword)
 					}
 				}
@@ -1230,6 +1262,41 @@ func TestGRPCMUSTPASS_QueryMITMReplacerRules(t *testing.T) {
 
 	_, err = client.SetCurrentRules(ctx, &ypb.MITMContentReplacers{Rules: []*ypb.MITMContentReplacer{}})
 	require.NoError(t, err)
+}
+
+func TestGRPCMUSTPASS_DeduplicateMITMReplacerRules(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ctx := context.Background()
+
+	// 创建含重复的规则
+	dupRules := []*ypb.MITMContentReplacer{
+		{Index: 0, VerboseName: "规则A", Rule: `token`, Result: "***"},
+		{Index: 1, VerboseName: "规则A", Rule: `token`, Result: "***"}, // 与上条重复
+		{Index: 2, VerboseName: "规则B", Rule: `pass`, Result: "xxx"},
+		{Index: 3, VerboseName: "规则A", Rule: `token`, Result: "***"}, // 再次重复
+	}
+	_, err = client.SetCurrentRules(ctx, &ypb.MITMContentReplacers{Rules: dupRules})
+	require.NoError(t, err)
+
+	resp, err := client.DeduplicateMITMReplacerRules(ctx, &ypb.Empty{})
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.Equal(t, int64(2), resp.EffectRows, "应去除2条重复规则")
+
+	// 验证去重结果
+	rulesResp, err := client.QueryMITMReplacerRules(ctx, &ypb.QueryMITMReplacerRulesRequest{KeyWord: ""})
+	require.NoError(t, err)
+	require.Len(t, rulesResp.Rules.Rules, 2, "去重后应剩2条规则")
+	names := make([]string, len(rulesResp.Rules.Rules))
+	for i, r := range rulesResp.Rules.Rules {
+		names[i] = r.VerboseName
+	}
+	require.Contains(t, names, "规则A")
+	require.Contains(t, names, "规则B")
+
+	// 清理
+	_, _ = client.SetCurrentRules(ctx, &ypb.MITMContentReplacers{Rules: []*ypb.MITMContentReplacer{}})
 }
 
 func TestMITMReplaceRule_matchByPacketInfo(t *testing.T) {
