@@ -202,6 +202,23 @@ iframes, dynamically loaded content, or pages requiring JS execution to render.
 ### Extract cookies
   eval js: document.cookie
 
+## SPA Pages (Vue/React/Angular) - Timing Issue
+
+SPA pages load a minimal HTML shell first, then JavaScript frameworks render content asynchronously.
+This means snapshot and eval may find 0 elements immediately after open.
+
+The tool auto-detects hash routes (#/) and waits for SPA rendering, but some pages need more time.
+
+If eval returns 0 elements after open:
+  1. op=wait wait-type=ms wait-value=3000  (give SPA time to render)
+  2. Re-run op=eval to discover elements
+  3. Or use a self-retrying JS pattern that polls until elements appear:
+     JS: (function poll(n){var els=document.querySelectorAll('input,button');
+          if(els.length>0||n<=0) return JSON.stringify(Array.from(els).map(e=>({tag:e.tagName,name:e.name,id:e.id,type:e.type})));
+          return new Promise(r=>setTimeout(()=>r(poll(n-1)),1000))})(5)
+
+Signs of SPA pages: URL contains #/, empty title after load, hasVue/hasReact/hasAngular in page info.
+
 ## Key Rules
 
 1. For login/form pages, PREFER JavaScript strategy over snapshot strategy.
@@ -212,6 +229,7 @@ iframes, dynamically loaded content, or pages requiring JS execution to render.
 6. Use AITAG for multi-line JavaScript in the "js" parameter.
 7. Close the browser when done to release resources.
 8. The open op auto-snapshots, but if refs are 0, switch to JS immediately.
+9. For SPA pages: if eval finds 0 elements, WAIT 3 seconds then retry. Do NOT spin.
 USAGE_BLOCK
 
 yakit.AutoInitYakit()
@@ -292,12 +310,37 @@ case "open":
     }
     yakit.Info("navigated to %v", url)
 
+    // SPA 检测: 哈希路由 (#/) 或常见 SPA 标志表明页面需要额外等待 JS 框架渲染
+    isSPA = str.Contains(url, "#/") || str.Contains(url, "#!/")
+    if isSPA {
+        yakit.Info("detected SPA hash route in URL, waiting for framework rendering...")
+        sleep(2)
+    }
+
     // 自动 snapshot 获取元素引用
     snap, err = page.Snapshot()
     if err != nil {
         yakit.Warn("auto-snapshot failed: %v", err)
         return
     }
+
+    // SPA 自适应等待: snapshot 返回 0 refs 时，轮询等待 DOM 中出现表单元素
+    if snap.RefMap.Count() <= 0 {
+        maxWaitRounds = 5
+        for i = 0; i < maxWaitRounds; i++ {
+            elemCount, evalErr = page.Evaluate("document.querySelectorAll('input,select,textarea,button,[role=button],[role=textbox]').length")
+            if evalErr == nil && parseInt(sprint(elemCount)) > 0 {
+                yakit.Info("SPA rendering detected: found %v interactive elements after waiting, re-taking snapshot...", elemCount)
+                snap, err = page.Snapshot()
+                if err != nil {
+                    yakit.Warn("re-snapshot after SPA wait failed: %v", err)
+                }
+                break
+            }
+            sleep(1)
+        }
+    }
+
     snapText = snap.Text
     if len(snapText) > 5000 {
         snapText = snapText[:5000] + "\n... (truncated)"
@@ -306,11 +349,13 @@ case "open":
 
     if snap.RefMap.Count() <= 0 {
         yakit.Info("WARNING: snapshot returned 0 interactive element refs on this page.")
-        yakit.Info("DO NOT retry snapshot -- it will return 0 refs again on dynamic/SPA pages.")
-        yakit.Info("SWITCH TO JavaScript strategy: use op=eval to discover form fields:")
-        yakit.Info("  Example JS: JSON.stringify(Array.from(document.querySelectorAll('input,select,textarea,button')).map(el=>({tag:el.tagName,type:el.type,name:el.name,id:el.id,placeholder:el.placeholder,selector:el.id?'#'+el.id:(el.name?el.tagName.toLowerCase()+\"[name='\"+el.name+\"']\":''),text:el.textContent.trim().slice(0,50)})))")
-        yakit.Info("Then use CSS selectors directly: op=fill target='input[name=username]' value='admin'")
-        yakit.Info("Or fill+submit in ONE eval call for maximum efficiency.")
+        yakit.Info("This is common on SPA pages (Vue/React/Angular) where elements render asynchronously.")
+        yakit.Info("DO NOT retry snapshot -- use op=eval with JS to discover and interact with form fields:")
+        yakit.Info("IMPORTANT: If eval also returns 0 elements, the page may need more time to render.")
+        yakit.Info("  Step 1: op=wait wait-type=ms wait-value=3000  (wait for SPA rendering)")
+        yakit.Info("  Step 2: op=eval to discover form fields:")
+        yakit.Info("    JS: JSON.stringify(Array.from(document.querySelectorAll('input,select,textarea,button')).map(el=>({tag:el.tagName,type:el.type,name:el.name,id:el.id,placeholder:el.placeholder,selector:el.id?'#'+el.id:(el.name?el.tagName.toLowerCase()+\"[name='\"+el.name+\"']\":''),text:el.textContent.trim().slice(0,50)})))")
+        yakit.Info("  Step 3: use CSS selectors with op=fill and op=click, or do everything in ONE eval call.")
     }
 
 case "snapshot":
@@ -331,11 +376,13 @@ case "snapshot":
 
     if snap.RefMap.Count() <= 0 {
         yakit.Info("WARNING: snapshot returned 0 interactive element refs.")
-        yakit.Info("DO NOT retry snapshot -- it will return 0 refs again on this page.")
-        yakit.Info("SWITCH TO JavaScript strategy: use op=eval to discover form fields:")
-        yakit.Info("  Example JS: JSON.stringify(Array.from(document.querySelectorAll('input,select,textarea,button')).map(el=>({tag:el.tagName,type:el.type,name:el.name,id:el.id,selector:el.id?'#'+el.id:(el.name?el.tagName.toLowerCase()+\"[name='\"+el.name+\"']\":''),text:el.textContent.trim().slice(0,50)})))")
-        yakit.Info("Then use CSS selectors directly: op=fill target='input[name=username]' value='admin'")
-        yakit.Info("Or fill+submit in ONE eval call. DO NOT call snapshot again.")
+        yakit.Info("This may be a SPA page where elements render asynchronously.")
+        yakit.Info("DO NOT retry snapshot immediately. Instead:")
+        yakit.Info("  Step 1: op=wait wait-type=ms wait-value=3000  (wait for SPA rendering)")
+        yakit.Info("  Step 2: op=eval to discover form fields:")
+        yakit.Info("    JS: JSON.stringify(Array.from(document.querySelectorAll('input,select,textarea,button')).map(el=>({tag:el.tagName,type:el.type,name:el.name,id:el.id,selector:el.id?'#'+el.id:(el.name?el.tagName.toLowerCase()+\"[name='\"+el.name+\"']\":''),text:el.textContent.trim().slice(0,50)})))")
+        yakit.Info("  Step 3: use CSS selectors with op=fill and op=click, or do everything in ONE eval call.")
+        yakit.Info("DO NOT call snapshot again -- use eval with JS instead.")
     }
 
 case "click":
@@ -555,10 +602,19 @@ case "eval":
         resultStr = resultStr[:5000] + "\n... (truncated)"
     }
     yakit.Info("eval result:\n%v", resultStr)
-    yakit.Info("TIP: If the result contains CSS selectors (e.g. input[name='username'], #login-btn), use them directly:")
-    yakit.Info("  op=fill target='input[name=username]' value='admin'")
-    yakit.Info("  op=click target='button[type=submit]'")
-    yakit.Info("  Or do everything in a single op=eval call: fill fields + click submit via JS for maximum efficiency.")
+
+    // 检测 eval 结果中是否包含 "totalElements": 0 或 "elements": [] 的模式
+    if str.Contains(resultStr, `"totalElements": 0`) || str.Contains(resultStr, `"totalElements":0`) || str.Contains(resultStr, `"elements": []`) || str.Contains(resultStr, `"elements":[]`) {
+        yakit.Info("NOTE: eval found 0 elements. This is likely a SPA timing issue -- the page may still be rendering.")
+        yakit.Info("  Try: op=wait wait-type=ms wait-value=3000, then re-run this eval.")
+        yakit.Info("  Or use a self-retrying JS pattern:")
+        yakit.Info("    JS: (function poll(n){var els=document.querySelectorAll('input,button');if(els.length>0||n<=0)return JSON.stringify(Array.from(els).map(e=>({tag:e.tagName,name:e.name,id:e.id,type:e.type})));return new Promise(r=>setTimeout(()=>r(poll(n-1)),1000))})(5)")
+    } else {
+        yakit.Info("TIP: If the result contains CSS selectors (e.g. input[name='username'], #login-btn), use them directly:")
+        yakit.Info("  op=fill target='input[name=username]' value='admin'")
+        yakit.Info("  op=click target='button[type=submit]'")
+        yakit.Info("  Or do everything in a single op=eval call: fill fields + click submit via JS for maximum efficiency.")
+    }
 
 case "back":
     page, err = getPage()
