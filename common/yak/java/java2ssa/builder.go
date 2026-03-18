@@ -176,6 +176,7 @@ func Frontend(src string, caches ...*ssa.AntlrCache) (javaparser.ICompilationUni
 	parser.AddErrorListener(errListener)
 	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())
 	ast := parser.CompilationUnit()
+	antlr4util.DetachLexerTokenSource(lexer)
 	return ast, errListener.Error()
 }
 

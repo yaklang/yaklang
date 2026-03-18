@@ -90,5 +90,6 @@ func FrontEnd(src string, cache *ssa.AntlrCache) (yak.IProgramContext, error) {
 	parser.AddErrorListener(errListener)
 	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())
 	ast := parser.Program()
+	antlr4util.DetachLexerTokenSource(lexer)
 	return ast, errListener.Error()
 }
