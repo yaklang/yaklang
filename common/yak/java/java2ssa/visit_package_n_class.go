@@ -247,7 +247,7 @@ func (y *singleFileBuilder) VisitMemberDeclaration(raw javaparser.IMemberDeclara
 			}
 		})
 	} else if ret := i.RecordDeclaration(); ret != nil {
-		log.Infof("todo: java17: %v", ret.GetText())
+		log.Debugf("todo: java17: %v", ret.GetText())
 	} else if ret := i.MethodDeclaration(); ret != nil {
 		y.VisitMethodDeclaration(ret, class, modifiers)
 	} else if ret := i.GenericMethodDeclaration(); ret != nil {
@@ -607,11 +607,11 @@ func (y *singleFileBuilder) VisitMethodDeclaration(
 	}
 	store := y.StoreFunctionBuilder()
 	for _, def := range defCallback {
-		log.Infof("def: %s %s ", funcName, key)
+		log.Debugf("def: %s %s ", funcName, key)
 		def(newFunc)
 	}
 	newFunc.AddLazyBuilder(func() {
-		log.Infof("lazybuild: %s %s ", funcName, key)
+		log.Debugf("lazybuild: %s %s ", funcName, key)
 		switchHandler := y.SwitchFunctionBuilder(store)
 		defer switchHandler()
 		y.FunctionBuilder = y.PushFunction(newFunc)
@@ -633,7 +633,7 @@ func (y *singleFileBuilder) VisitMethodDeclaration(
 		newFunc.Type.AddAnnotationFunc(annotationFunc...)
 		y.FunctionBuilder = y.PopFunction()
 		if len(annotationFunc) > 0 || len(defCallback) > 0 {
-			log.Infof("start to build annotation ref to def: %v", funcName)
+			log.Debugf("start to build annotation ref to def: %v", funcName)
 		}
 	})
 	return

@@ -104,14 +104,14 @@ func (y *singleFileBuilder) VisitAnnotation(annotationContext javaparser.IAnnota
 
 		val := y.CreateVariable(annotationName, annotationContext)
 		container := y.EmitEmptyContainer()
-		log.Infof("create annotation container[%v]: %v", container.GetId(), annotationName)
+		log.Debugf("create annotation container[%v]: %v", container.GetId(), annotationName)
 		y.AssignVariable(val, container)
 		annotationContainerVariable = val
 		annotationContainerInstance = container
 		for name, member := range data {
 			val := y.CreateMemberCallVariable(container, y.EmitConstInstPlaceholder(name))
 			val.AddRange(annotationRange, true)
-			log.Infof("create annotation-key: %v.%v -> %v", annotationName, name, member)
+			log.Debugf("create annotation-key: %v.%v -> %v", annotationName, name, member)
 			y.AssignVariable(val, member)
 		}
 	}
@@ -158,7 +158,7 @@ func (y *singleFileBuilder) VisitAnnotation(annotationContext javaparser.IAnnota
 				return
 			}
 			// create @RequestMap.ref -> @RequestMap (ref or _)
-			log.Infof("start to build annotation ref to def: (%v)%v", value.GetId(), value.GetName())
+			log.Debugf("start to build annotation ref to def: (%v)%v", value.GetId(), value.GetName())
 			annotationToRef := "__ref__"
 			ref := y.CreateMemberCallVariable(annotationContainerInstance, y.EmitConstInstPlaceholder(annotationToRef))
 			y.AssignVariable(ref, value)

@@ -305,7 +305,7 @@ func (c *Call) handlerReturnType() {
 		}
 	}
 	if utils.IsNil(funcTyp.ReturnType) {
-		log.Warnf("[ssa.Call.handlerReturnType] skip setting type for call %s: return type is nil", method.GetName())
+		log.Debugf("[ssa.Call.handlerReturnType] skip setting type for call %s: return type is nil", method.GetName())
 		return
 	}
 	// inference call instruction type

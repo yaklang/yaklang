@@ -113,9 +113,9 @@ func (b *astbuilder) buildFunctionDefinition(ast *cparser.FunctionDefinitionCont
 			}
 
 			store := b.StoreFunctionBuilder()
-			log.Infof("add function funcName = %s", funcName)
+			log.Debugf("add function funcName = %s", funcName)
 			newFunc.AddLazyBuilder(func() {
-				log.Infof("build function funcName = %s", funcName)
+				log.Debugf("build function funcName = %s", funcName)
 				switchHandler := b.SwitchFunctionBuilder(store)
 				defer func() {
 					switchHandler()

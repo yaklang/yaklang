@@ -24,7 +24,7 @@ var (
 func deltaAssignVariableCostFrom(t time.Time) {
 	du := atomic.AddInt64(&assignVariableCostNano, time.Now().Sub(t).Nanoseconds())
 	if ret := time.Duration(du).Seconds(); ret > float64(lastAssignVariableSecond+1) {
-		log.Infof("abnormal deltaAssignVariableCost cost: %v cost-heavy-percent: %.2f%%", time.Duration(du), 100*(float64(du)/float64(time.Since(initTime))))
+		log.Debugf("abnormal deltaAssignVariableCost cost: %v cost-heavy-percent: %.2f%%", time.Duration(du), 100*(float64(du)/float64(time.Since(initTime))))
 		lastAssignVariableSecond = int64(ret)
 	}
 }
@@ -32,7 +32,7 @@ func deltaAssignVariableCostFrom(t time.Time) {
 func deltaAnnotationCostFrom(t time.Time) {
 	du := atomic.AddInt64(&annotationCostNano, time.Now().Sub(t).Nanoseconds())
 	if ret := time.Duration(du).Seconds(); ret > float64(lastAnnotationSecond+1) {
-		log.Infof("abnormal deltaAnnotationCost cost: %v cost-heavy-percent: %.2f%%", time.Duration(du), 100*(float64(du)/float64(time.Since(initTime))))
+		log.Debugf("abnormal deltaAnnotationCost cost: %v cost-heavy-percent: %.2f%%", time.Duration(du), 100*(float64(du)/float64(time.Since(initTime))))
 		lastAnnotationSecond = int64(ret)
 	}
 }
@@ -40,7 +40,7 @@ func deltaAnnotationCostFrom(t time.Time) {
 func deltaPackageCostFrom(t time.Time) {
 	du := atomic.AddInt64(&packageCostNano, time.Now().Sub(t).Nanoseconds())
 	if ret := time.Duration(du).Seconds(); ret > float64(lastPackageSecond+1) {
-		log.Infof("abnormal deltaPackageCost cost: %v cost-heavy-percent: %.2f%%", time.Duration(du), 100*(float64(du)/float64(time.Since(initTime))))
+		log.Debugf("abnormal deltaPackageCost cost: %v cost-heavy-percent: %.2f%%", time.Duration(du), 100*(float64(du)/float64(time.Since(initTime))))
 		lastPackageSecond = int64(ret)
 	}
 }
@@ -48,12 +48,12 @@ func deltaPackageCostFrom(t time.Time) {
 func ShowJavaCompilingCost() {
 	ret := atomic.LoadInt64(&annotationCostNano)
 	if time.Duration(ret).Milliseconds() > 300 {
-		log.Infof("Java Annotation cost: %v", time.Duration(ret))
+		log.Debugf("Java Annotation cost: %v", time.Duration(ret))
 	}
 
 	ret = atomic.LoadInt64(&packageCostNano)
 	if time.Duration(ret).Milliseconds() > 300 {
-		log.Infof("Java Package cost: %v", time.Duration(ret))
+		log.Debugf("Java Package cost: %v", time.Duration(ret))
 	}
 }
 
