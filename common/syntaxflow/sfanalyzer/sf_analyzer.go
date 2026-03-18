@@ -293,31 +293,6 @@ func evaluateVerifyFilesystemWithRuleAndFrame(rule *schema.SyntaxFlowRule, frame
 	if err != nil {
 		return err
 	}
-	log.Infof("unsafe filesystem start")
-	if verifyFs == nil {
-		log.Errorf("no positive filesystem found in rule: %s", rule.RuleName)
-	}
-
-	for _, f := range verifyFs {
-		err = checkWithFS(f.GetVirtualFs(), func(p ssaapi.Programs) error {
-			opts := []ssaapi.QueryOption{
-				ssaapi.QueryWithPrograms(p),
-				ssaapi.QueryWithFrame(frame),
-				ssaapi.QueryWithInitInputVar(p[0]),
-			}
-			result, err := ssaapi.QuerySyntaxflow(opts...)
-			if err != nil {
-				return utils.Errorf("syntax flow content failed: %v", err)
-			}
-			if err := checkResult(f, rule, result); err != nil {
-				return err
-			}
-			return nil
-		}, ssaapi.WithLanguage(f.GetLanguage()))
-		if err != nil {
-			return err
-		}
-	}
 
 	check := func(result *ssaapi.SyntaxFlowResult) error {
 		if len(result.GetAlertVariables()) > 0 {
@@ -329,30 +304,62 @@ func evaluateVerifyFilesystemWithRuleAndFrame(rule *schema.SyntaxFlowRule, frame
 		return nil
 	}
 
-	verifyFs, _ = frame.ExtractNegativeFilesystemAndLanguage()
-	if verifyFs == nil {
-		log.Errorf("no positive filesystem found in rule: %s", rule.RuleName)
+	negativeVerifyFs, err := frame.ExtractNegativeFilesystemAndLanguage()
+	if err != nil {
+		return err
 	}
-	log.Debug("safe filesystem start")
-	for _, f := range verifyFs {
-		err = checkWithFS(f.GetVirtualFs(), func(programs ssaapi.Programs) error {
-			opts := []ssaapi.QueryOption{
-				ssaapi.QueryWithPrograms(programs),
-				ssaapi.QueryWithFrame(frame),
-				ssaapi.QueryWithEnableDebug(),
-				ssaapi.QueryWithInitInputVar(programs[0]),
-			}
-			result, err := ssaapi.QuerySyntaxflow(opts...)
+	if len(verifyFs) == 0 && len(negativeVerifyFs) == 0 {
+		// Draft/empty rules frequently contain no testcases yet. Treat this as "nothing to verify"
+		// instead of logging errors.
+		return nil
+	}
+
+	if len(verifyFs) > 0 {
+		log.Infof("unsafe filesystem start")
+		for _, f := range verifyFs {
+			err = checkWithFS(f.GetVirtualFs(), func(p ssaapi.Programs) error {
+				opts := []ssaapi.QueryOption{
+					ssaapi.QueryWithPrograms(p),
+					ssaapi.QueryWithFrame(frame),
+					ssaapi.QueryWithInitInputVar(p[0]),
+				}
+				result, err := ssaapi.QuerySyntaxflow(opts...)
+				if err != nil {
+					return utils.Errorf("syntax flow content failed: %v", err)
+				}
+				if err := checkResult(f, rule, result); err != nil {
+					return err
+				}
+				return nil
+			}, ssaapi.WithLanguage(f.GetLanguage()))
 			if err != nil {
-				return utils.Errorf("syntax flow content failed: %v", err)
+				return err
 			}
-			if err := check(result); err != nil {
-				return utils.Errorf("check content failed: %v", err)
+		}
+	}
+
+	if len(negativeVerifyFs) > 0 {
+		log.Debug("safe filesystem start")
+		for _, f := range negativeVerifyFs {
+			err = checkWithFS(f.GetVirtualFs(), func(programs ssaapi.Programs) error {
+				opts := []ssaapi.QueryOption{
+					ssaapi.QueryWithPrograms(programs),
+					ssaapi.QueryWithFrame(frame),
+					ssaapi.QueryWithEnableDebug(),
+					ssaapi.QueryWithInitInputVar(programs[0]),
+				}
+				result, err := ssaapi.QuerySyntaxflow(opts...)
+				if err != nil {
+					return utils.Errorf("syntax flow content failed: %v", err)
+				}
+				if err := check(result); err != nil {
+					return utils.Errorf("check content failed: %v", err)
+				}
+				return nil
+			}, ssaapi.WithLanguage(f.GetLanguage()))
+			if err != nil {
+				return err
 			}
-			return nil
-		}, ssaapi.WithLanguage(f.GetLanguage()))
-		if err != nil {
-			return err
 		}
 	}
 	return nil
