@@ -3,8 +3,6 @@ package js2ssa
 import (
 	"path/filepath"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
-
 	JS "github.com/yaklang/yaklang/common/yak/antlr4JS/parser"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -55,18 +53,16 @@ type astbuilder struct {
 	cmap map[string]struct{}
 }
 
-func Frontend(src string, caches ...*ssa.AntlrCache) (*JS.ProgramContext, error) {
-	errListener := antlr4util.NewErrorListener()
-	lexer := JS.NewJavaScriptLexer(antlr.NewInputStream(src))
-	lexer.RemoveErrorListeners()
-	lexer.AddErrorListener(errListener)
-	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
-	parser := JS.NewJavaScriptParser(tokenStream)
-	parser.RemoveErrorListeners()
-	parser.AddErrorListener(errListener)
-	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())
-	ast := parser.Program().(*JS.ProgramContext)
-	return ast, errListener.Error()
+func Frontend(src string, _ ...*ssa.AntlrCache) (*JS.ProgramContext, error) {
+	return antlr4util.ParseASTWithSLLFirst(
+		src,
+		JS.NewJavaScriptLexer,
+		JS.NewJavaScriptParser,
+		nil,
+		func(parser *JS.JavaScriptParser) *JS.ProgramContext {
+			return parser.Program().(*JS.ProgramContext)
+		},
+	)
 }
 
 func (b *astbuilder) AddToCmap(key string) {

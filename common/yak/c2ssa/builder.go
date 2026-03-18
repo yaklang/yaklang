@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
@@ -138,19 +137,17 @@ type astbuilder struct {
 }
 
 func Frontend(src string, cache *ssa.AntlrCache) (*cparser.CompilationUnitContext, error) {
-	errListener := antlr4util.NewErrorListener()
-	lexer := cparser.NewCLexer(antlr.NewInputStream(src))
-	lexer.RemoveErrorListeners()
-	lexer.AddErrorListener(errListener)
-	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
-	parser := cparser.NewCParser(tokenStream)
-	ssa.ParserSetAntlrCache(parser, lexer, cache)
-	parser.RemoveErrorListeners()
-	parser.AddErrorListener(errListener)
-	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())
-	ast := parser.CompilationUnit().(*cparser.CompilationUnitContext)
-	antlr4util.DetachLexerTokenSource(lexer)
-	return ast, errListener.Error()
+	return antlr4util.ParseASTWithSLLFirst(
+		src,
+		cparser.NewCLexer,
+		cparser.NewCParser,
+		func(lexer *cparser.CLexer, parser *cparser.CParser) {
+			ssa.ParserSetAntlrCache(parser, lexer, cache)
+		},
+		func(parser *cparser.CParser) *cparser.CompilationUnitContext {
+			return parser.CompilationUnit().(*cparser.CompilationUnitContext)
+		},
+	)
 }
 
 type PackageInfo struct {

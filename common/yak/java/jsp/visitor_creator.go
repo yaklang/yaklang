@@ -1,7 +1,6 @@
 package jsp
 
 import (
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
@@ -26,18 +25,17 @@ func (b *VisitorCreator) Create(editor *memedit.MemEditor) (tl.TemplateVisitor, 
 }
 
 func Front(code string) (jspparser.IJspDocumentsContext, error) {
-	errListener := antlr4util.NewErrorListener()
-	lexer := jspparser.NewJSPLexer(antlr.NewInputStream(code))
-	lexer.RemoveErrorListeners()
-	lexer.AddErrorListener(errListener)
-	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
-	parser := jspparser.NewJSPParser(tokenStream)
-	parser.RemoveErrorListeners()
-	parser.AddErrorListener(errListener)
-	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())
-	ast := parser.JspDocuments()
-	if len(errListener.GetErrors()) == 0 {
-		return ast, nil
+	ast, err := antlr4util.ParseASTWithSLLFirst(
+		code,
+		jspparser.NewJSPLexer,
+		jspparser.NewJSPParser,
+		nil,
+		func(parser *jspparser.JSPParser) jspparser.IJspDocumentsContext {
+			return parser.JspDocuments()
+		},
+	)
+	if err != nil {
+		return nil, utils.Errorf("parse AST FrontEnd error: %v", err)
 	}
-	return nil, utils.Errorf("parse AST FrontEnd error: %v", errListener.GetErrorString())
+	return ast, nil
 }

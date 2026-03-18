@@ -3,7 +3,6 @@ package python2ssa
 import (
 	"path/filepath"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/utils"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -207,19 +206,17 @@ func FrontendWithCache(src string, caches ...*ssa.AntlrCache) (pythonparser.IRoo
 	if len(caches) > 0 {
 		cache = caches[0]
 	}
-	errListener := antlr4util.NewErrorListener()
-	lexer := pythonparser.NewPythonLexer(antlr.NewInputStream(src))
-	lexer.RemoveErrorListeners()
-	lexer.AddErrorListener(errListener)
-	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
-	parser := pythonparser.NewPythonParser(tokenStream)
-	ssa.ParserSetAntlrCache(parser, lexer, cache)
-	parser.RemoveErrorListeners()
-	parser.AddErrorListener(errListener)
-	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())
-	ast := parser.Root()
-	antlr4util.DetachLexerTokenSource(lexer)
-	return ast, errListener.Error()
+	return antlr4util.ParseASTWithSLLFirst(
+		src,
+		pythonparser.NewPythonLexer,
+		pythonparser.NewPythonParser,
+		func(lexer *pythonparser.PythonLexer, parser *pythonparser.PythonParser) {
+			ssa.ParserSetAntlrCache(parser, lexer, cache)
+		},
+		func(parser *pythonparser.PythonParser) pythonparser.IRootContext {
+			return parser.Root()
+		},
+	)
 }
 
 // Frontend parses Python source code and returns the root AST node.
