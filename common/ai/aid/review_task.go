@@ -137,7 +137,7 @@ func (t *AiTask) handleReviewResult(param aitool.InvokeParams) error {
 		return utils.Errorf("unknown review suggestion: %s", suggestion)
 	}
 	if planChanged {
-		t.Coordinator.savePlanAndExecState("review", t)
+		t.Coordinator.savePlanAndExecState(Phase_NotCompleted, t)
 	}
 	return nil
 }
