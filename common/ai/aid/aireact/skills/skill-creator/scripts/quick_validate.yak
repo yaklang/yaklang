@@ -1,0 +1,112 @@
+MAX_SKILL_NAME_LENGTH = 64
+
+fail = fn(msg) {
+    println("[ERROR] " + msg)
+    os.Exit(1)
+}
+
+extractFrontmatter = fn(content) {
+    if !str.HasPrefix(content, "---\n") {
+        return "", "no valid YAML frontmatter found"
+    }
+    rest = content[4:]
+    endIndex = str.Index(rest, "\n---")
+    if endIndex < 0 {
+        return "", "no valid YAML frontmatter found"
+    }
+    return rest[:endIndex], nil
+}
+
+skillDir := cli.String("skill-dir", cli.setRequired(true), cli.setHelp("path to the skill directory"))
+cli.check()
+
+skillMD = file.Join(skillDir, "SKILL.md")
+if !file.IsExisted(skillMD) {
+    fail("SKILL.md not found")
+}
+
+rawContent, err := file.ReadFile(skillMD)
+if err != nil {
+    fail(sprintf("failed to read SKILL.md: %v", err))
+}
+content = string(rawContent)
+
+frontmatterText, err = extractFrontmatter(content)
+if err != nil {
+    fail(err)
+}
+
+meta, err := yaml.Unmarshal([]byte(frontmatterText))
+if err != nil {
+    fail(sprintf("invalid YAML in frontmatter: %v", err))
+}
+if meta == nil {
+    fail("frontmatter must be a YAML object")
+}
+
+allowedKeys = {
+    "name": true,
+    "description": true,
+    "license": true,
+    "compatibility": true,
+    "metadata": true,
+    "disable-model-invocation": true,
+}
+
+errors = []
+appendError = fn(msg) {
+    errors = append(errors, msg)
+}
+
+for key, _ in meta {
+    keyStr = sprint(key)
+    if allowedKeys[keyStr] == nil {
+        appendError(sprintf("unexpected key in frontmatter: %s", keyStr))
+    }
+}
+
+nameValue = ""
+if meta["name"] == nil {
+    appendError("missing 'name' in frontmatter")
+} else {
+    nameValue = str.TrimSpace(sprint(meta["name"]))
+    if nameValue == "" {
+        appendError("frontmatter 'name' must not be empty")
+    } else {
+        if !re.Match(`^[a-z0-9-]+$`, nameValue) {
+            appendError(sprintf("name '%s' should be lowercase hyphen-case", nameValue))
+        }
+        if str.HasPrefix(nameValue, "-") || str.HasSuffix(nameValue, "-") || str.Contains(nameValue, "--") {
+            appendError(sprintf("name '%s' cannot start/end with '-' or contain consecutive '-'", nameValue))
+        }
+        if len(nameValue) > MAX_SKILL_NAME_LENGTH {
+            appendError(sprintf("name '%s' is too long (%d > %d)", nameValue, len(nameValue), MAX_SKILL_NAME_LENGTH))
+        }
+    }
+}
+
+descriptionValue = ""
+if meta["description"] == nil {
+    appendError("missing 'description' in frontmatter")
+} else {
+    descriptionValue = str.TrimSpace(sprint(meta["description"]))
+    if descriptionValue == "" {
+        appendError("frontmatter 'description' must not be empty")
+    } else {
+        if str.Contains(descriptionValue, "<") || str.Contains(descriptionValue, ">") {
+            appendError("description cannot contain angle brackets")
+        }
+        if len(descriptionValue) > 1024 {
+            appendError(sprintf("description is too long (%d > 1024)", len(descriptionValue)))
+        }
+    }
+}
+
+if len(errors) > 0 {
+    for item in errors {
+        println("[ERROR] " + item)
+    }
+    os.Exit(1)
+}
+
+println("Skill is valid!")

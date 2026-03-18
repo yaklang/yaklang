@@ -76,6 +76,11 @@ type ReAct struct {
 	config        *aicommon.Config
 	promptManager *PromptManager
 
+	yakExecutablePath       string
+	aiSkillsInstallDir      string
+	builtinSkillsInstallDir string
+	aiSkillsScannedDirs     []string
+
 	inputChanx *chanx.UnlimitedChan[*ypb.AIInputEvent]
 
 	// 任务队列相关
@@ -114,6 +119,27 @@ const SKIP_AI_REVIEW = "skip_ai_review"
 
 func (r *ReAct) GetConfig() aicommon.AICallerConfigIf {
 	return r.config
+}
+
+func (r *ReAct) GetYakExecutablePath() string {
+	return r.yakExecutablePath
+}
+
+func (r *ReAct) GetAISkillsInstallDir() string {
+	return r.aiSkillsInstallDir
+}
+
+func (r *ReAct) GetBuiltinAISkillsInstallDir() string {
+	return r.builtinSkillsInstallDir
+}
+
+func (r *ReAct) GetAISkillsScannedDirs() []string {
+	if len(r.aiSkillsScannedDirs) == 0 {
+		return nil
+	}
+	result := make([]string, len(r.aiSkillsScannedDirs))
+	copy(result, r.aiSkillsScannedDirs)
+	return result
 }
 
 func (r *ReAct) SaveTimeline() {
@@ -200,6 +226,7 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 	configLoadingStart := time.Now()
 	opts = append(opts, aicommon.WithAIBlueprintManager(aiforge.NewForgeFactory()))
 	cfg := aicommon.NewConfig(context.Background(), opts...)
+	yakExecutablePath, _ := os.Executable()
 
 	// Extract built-in skills to ~/yakit-projects/ai-skills/ (respects disableAutoSkills)
 	// then load from the local directory, so users can view/modify/extend skills on disk.
@@ -218,13 +245,17 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 	// artifacts directory is lazily created when user input arrives (ensureWorkDirectory)
 	// artifacts field starts as nil and is initialized in ensureWorkDirectory or getArtifacts
 	react := &ReAct{
-		config:               cfg,
-		Emitter:              cfg.Emitter, // Use the emitter from config
-		taskQueue:            NewTaskQueue("react-main-queue"),
-		mirrorOfAIInputEvent: make(map[string]func(*ypb.AIInputEvent)),
-		saveTimelineThrottle: utils.NewThrottleEx(3, true, true),
-		artifacts:            nil, // lazy: created in ensureWorkDirectory
-		wg:                   new(sync.WaitGroup),
+		config:                  cfg,
+		Emitter:                 cfg.Emitter, // Use the emitter from config
+		yakExecutablePath:       yakExecutablePath,
+		aiSkillsInstallDir:      aiSkillsDir,
+		builtinSkillsInstallDir: filepath.Join(aiSkillsDir, "builtin"),
+		aiSkillsScannedDirs:     consts.GetAllAISkillsDirs(),
+		taskQueue:               NewTaskQueue("react-main-queue"),
+		mirrorOfAIInputEvent:    make(map[string]func(*ypb.AIInputEvent)),
+		saveTimelineThrottle:    utils.NewThrottleEx(3, true, true),
+		artifacts:               nil, // lazy: created in ensureWorkDirectory
+		wg:                      new(sync.WaitGroup),
 	}
 
 	if cfg.PersistentSessionId != "" && cfg.GetDB() != nil {

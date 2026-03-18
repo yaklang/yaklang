@@ -1,0 +1,177 @@
+MAX_SKILL_NAME_LENGTH = 64
+
+SKILL_TEMPLATE = <<<SKILL_TEMPLATE_BLOCK
+---
+name: {{SKILL_NAME}}
+description: >
+  [TODO: 用 1-3 句话说明这个 Skill 做什么，以及什么用户请求或上下文应该触发它。]
+---
+
+# {{SKILL_NAME}}
+
+## Overview
+
+[TODO: 用 1-2 句话说明这个 Skill 的目标和边界。]
+
+## Workflow
+
+1. [TODO: 写明进入任务后的第一步]
+2. [TODO: 写明关键决策点]
+3. [TODO: 写明产出或退出条件]
+
+## Resources
+
+- `scripts/`: [TODO: 哪些重复流程需要写成 Yak 脚本]
+- `references/`: [TODO: 哪些长文档按需加载]
+- `assets/`: [TODO: 哪些模板或素材会被最终产物使用]
+SKILL_TEMPLATE_BLOCK
+
+EXAMPLE_SCRIPT = <<<EXAMPLE_SCRIPT_BLOCK
+name := cli.String("name", cli.setDefault("world"), cli.setHelp("target name"))
+cli.check()
+
+println(sprintf("hello, %s", name))
+EXAMPLE_SCRIPT_BLOCK
+
+EXAMPLE_REFERENCE = <<<EXAMPLE_REFERENCE_BLOCK
+# Example Reference
+
+用于存放按需加载的补充说明。
+
+## 适合放进 references/ 的内容
+
+- 详细接口文档
+- 数据表结构
+- 决策树或排障说明
+- 大段示例输入输出
+EXAMPLE_REFERENCE_BLOCK
+
+EXAMPLE_ASSET = <<<EXAMPLE_ASSET_BLOCK
+This is a placeholder asset file.
+Replace it with templates, icons, fixtures, or other output resources when needed.
+EXAMPLE_ASSET_BLOCK
+
+fail = fn(msg) {
+    println("[ERROR] " + msg)
+    os.Exit(1)
+}
+
+ok = fn(msg) {
+    println("[OK] " + msg)
+}
+
+normalizeSkillName = fn(skillName) {
+    normalized = str.ToLower(str.TrimSpace(skillName))
+    normalized = re.ReplaceAll(normalized, `[^a-z0-9]+`, "-")
+    normalized = re.ReplaceAll(normalized, `-+`, "-")
+    normalized = re.ReplaceAll(normalized, `^-+`, "")
+    normalized = re.ReplaceAll(normalized, `-+$`, "")
+    return normalized
+}
+
+writeTextFile = fn(filename, content) {
+    dir = file.GetDirPath(filename)
+    if dir != "" && !file.IsExisted(dir) {
+        err := file.MkdirAll(dir)
+        if err != nil {
+            return err
+        }
+    }
+    return file.Save(filename, content)
+}
+
+createExampleFile = fn(skillDir, resourceName, skillName) {
+    switch resourceName {
+    case "scripts":
+        content = str.ReplaceAll(EXAMPLE_SCRIPT, "{{SKILL_NAME}}", skillName)
+        return writeTextFile(file.Join(skillDir, "scripts", "example.yak"), content)
+    case "references":
+        return writeTextFile(file.Join(skillDir, "references", "example.md"), EXAMPLE_REFERENCE)
+    case "assets":
+        return writeTextFile(file.Join(skillDir, "assets", "example_asset.txt"), EXAMPLE_ASSET)
+    default:
+        return nil
+    }
+}
+
+rawName := cli.String("name", cli.setRequired(true), cli.setHelp("skill name, will be normalized to lowercase hyphen-case"))
+outputPath := cli.String("path", cli.setRequired(true), cli.setHelp("parent directory used to create the skill folder"))
+resourcesRaw := cli.String("resources", cli.setDefault(""), cli.setHelp("comma-separated resource directories: scripts,references,assets"))
+examples := cli.Bool("examples", cli.setDefault(false), cli.setHelp("create example files inside selected resource directories"))
+cli.check()
+
+skillName = normalizeSkillName(rawName)
+if skillName == "" {
+    fail("skill name must contain at least one letter or digit")
+}
+if len(skillName) > MAX_SKILL_NAME_LENGTH {
+    fail(sprintf("skill name '%s' is too long (%d > %d)", skillName, len(skillName), MAX_SKILL_NAME_LENGTH))
+}
+if skillName != rawName {
+    println(sprintf("[INFO] normalized skill name from '%s' to '%s'", rawName, skillName))
+}
+
+allowedResources = {"scripts": true, "references": true, "assets": true}
+resources = []
+seen = {}
+if str.TrimSpace(resourcesRaw) != "" {
+    for item in str.Split(resourcesRaw, ",") {
+        item = str.TrimSpace(item)
+        if item == "" {
+            continue
+        }
+        if allowedResources[item] == nil {
+            fail(sprintf("unknown resource type: %s (allowed: scripts,references,assets)", item))
+        }
+        if seen[item] == nil {
+            resources = append(resources, item)
+            seen[item] = true
+        }
+    }
+}
+
+if examples && len(resources) == 0 {
+    fail("--examples requires --resources to be set")
+}
+
+skillDir = file.Join(outputPath, skillName)
+if file.IsExisted(skillDir) {
+    fail(sprintf("skill directory already exists: %s", skillDir))
+}
+
+err := file.MkdirAll(skillDir)
+if err != nil {
+    fail(sprintf("failed to create skill directory: %v", err))
+}
+ok(sprintf("created skill directory: %s", skillDir))
+
+skillContent = str.ReplaceAll(SKILL_TEMPLATE, "{{SKILL_NAME}}", skillName)
+err = writeTextFile(file.Join(skillDir, "SKILL.md"), skillContent)
+if err != nil {
+    fail(sprintf("failed to create SKILL.md: %v", err))
+}
+ok("created SKILL.md")
+
+for resourceName in resources {
+    resourceDir = file.Join(skillDir, resourceName)
+    err = file.MkdirAll(resourceDir)
+    if err != nil {
+        fail(sprintf("failed to create %s/: %v", resourceName, err))
+    }
+    ok(sprintf("created %s/", resourceName))
+
+    if examples {
+        err = createExampleFile(skillDir, resourceName, skillName)
+        if err != nil {
+            fail(sprintf("failed to create example file in %s/: %v", resourceName, err))
+        }
+        ok(sprintf("created example file in %s/", resourceName))
+    }
+}
+
+println("")
+println(sprintf("[OK] skill '%s' initialized successfully", skillName))
+println("Next steps:")
+println("1. Complete SKILL.md and make sure the description clearly states when to use the skill.")
+println("2. Add or replace files in scripts/, references/, and assets/ as needed.")
+println("3. Run quick_validate.yak before using or submitting the skill.")
