@@ -1,152 +1,139 @@
-# SSA to LLVM Compiler - Project Structure
+# ssa2llvm Project Notes
 
-## Directory Layout
+## 目标
+
+`ssa2llvm` 的目标是把 YakSSA 编译为 LLVM IR，并进一步生成：
+
+- LLVM IR
+- 汇编
+- 目标文件
+- 原生可执行文件
+
+当前主路径是 **AOT 编译 + `libyak.a` 运行时链接**，而不是早期的 JIT-only 实验路径。
+
+## 目录结构
 
 ```
 common/yak/ssa2llvm/
-├── cmd/
-│   └── yakssa.go              # CLI entry point (compile, run commands)
-├── compiler/
-│   ├── compiler.go            # Core compiler orchestration
-│   ├── ops.go                 # Arithmetic operations (add, sub, mul, div, mod)
-│   ├── ops_control.go         # Control flow (if, jump, return, phi)
-│   ├── ops_call.go            # Function calls
-│   ├── ops_memory.go          # Memory operations (TODO: Phase 2)
-│   ├── arithmetic_test.go     # Unit tests for arithmetic
-│   ├── call_test.go           # Unit tests for calls
-│   └── control_test.go        # Unit tests for control flow
-├── types/
-│   ├── converter.go           # Type conversion (TODO: Phase 2)
-│   └── layout.go              # Memory layouts (TODO: Phase 2)
-├── runtime/
-│   ├── runtime.c              # C runtime (TODO: Phase 2)
-│   └── bindings.go            # LLVM bindings for runtime (TODO: Phase 2)
-├── tests/
-│   ├── basic_test.go          # Basic arithmetic tests
-│   ├── call_test.go           # Function call tests
-│   ├── cfg_test.go            # Control flow tests
-│   ├── multilang_test.go      # Multi-language tests
-│   ├── jit_test.go            # JIT execution tests
-│   ├── runner_test.go         # Integration test runner
-│   ├── test_utils.go          # Test utilities
-│   ├── testdata_compile_test.go  # Testdata compilation test
-│   └── testdata/              # Multi-language example files
-│       ├── example.yak
-│       ├── example.go
-│       ├── example.py
-│       ├── example.js
-│       ├── example.ts
-│       ├── example.java
-│       ├── example.php
-│       └── example.c
-└── STATUS.md                  # Implementation status documentation
+├── cmd/           # CLI：compile / run / obfuscators
+├── compiler/      # SSA → LLVM lowering、linker、wrapper、InvokeContext ABI
+├── docs/          # 机制文档
+├── obfuscation/   # SSA / LLVM obfuscator
+├── runtime/       # libyak.a、dispatch ids、runtime glue、embed 资源
+├── scripts/       # 依赖安装、runtime 构建、CLI 构建脚本
+├── tests/         # 从 IR 到最终二进制运行结果的集成测试
+├── trace/         # 外部命令 trace
+├── types/         # 类型与布局辅助
+└── STATUS.md      # 当前实现状态
 ```
 
-## Current Status (Phase 1)
+## 编译流水线
 
-### ✅ Completed
-- Basic arithmetic (+, -, *, /, %)
-- Comparisons (>, <, >=, <=, ==, !=)
-- Control flow (if-else, loops, break)
-- Functions (simple, nested, recursive, multi-param)
-- SSA constructs (Phi nodes, basic blocks)
-- Multi-language support (Yak, Go, Python, JS, Java, PHP, C, TypeScript)
-- **All 15 tests passing (100%)**
+1. 前端把源码解析为 YakSSA；
+2. `compiler` 预创建 LLVM function / basic block / phi；
+3. 各类 SSA 指令 lowering 到 LLVM；
+4. 注入 `main` wrapper，把 Yak 入口函数接成原生程序入口；
+5. 根据命令选择输出 `.ll` / `.s` / `.o` / 可执行文件；
+6. 需要链接时，通过 `clang` 把产物和 `common/yak/ssa2llvm/runtime/libyak.a`、`libgc` 接起来。
 
-### ⏳ Phase 2 (TODO)
-- Type system (float, string, bool, arrays, structs, maps)
-- Memory operations (Make, MemberCall, field access, indexing)
-- C runtime (map ops, string ops, memory management, exceptions)
-- LLVM optimization passes
+## 当前核心设计
 
-## CLI Usage
+### 1. 单参数 `InvokeContext` 调用 ABI
 
-### Compile to LLVM IR
-```bash
-yak ssa compile example.yak -o output.ll --print-ir
-```
+所有调用面统一成：
 
-### Run via JIT
-```bash
-yak ssa run example.yak
-```
+- 编译后的 Yak 函数
+- extern hook
+- stdlib dispatcher
+- `go` 异步启动入口
 
-### Options
-- `--language, -l`: Source language (yak, go, python, javascript, etc.)
-- `--output, -o`: Output file path
-- `--print-ir`: Print generated LLVM IR
-- `--function, -f`: Entry function name (default: check)
-- `--verify`: Verify LLVM module (default: true)
+都围绕 `InvokeContext` 工作。这样普通调用、dispatch 调用、异步调用共享同一套参数/返回值/异常槽协议。
 
-## Test Commands
+参考：
 
-```bash
-# Run all tests
-go test ./common/yak/ssa2llvm/tests/...
+- `common/yak/ssa2llvm/compiler/invoke_ctx_internal.go`
+- `common/yak/ssa2llvm/compiler/invoke_ctx_calling_internal.go`
+- `common/yak/ssa2llvm/runtime/abi/abi.go`
 
-# Run specific test categories
-go test ./common/yak/ssa2llvm/tests -run TestBasic
-go test ./common/yak/ssa2llvm/tests -run TestCall
-go test ./common/yak/ssa2llvm/tests -run TestCFG
-go test ./common/yak/ssa2llvm/tests -run TestLang
+### 2. stdlib 统一 dispatch
 
-# Run testdata compilation tests
-go test ./common/yak/ssa2llvm/tests -run TestCompileTestdata
-```
+标准库函数不直接导出成大量 runtime 符号，而是先绑定稳定的 `dispatch.FuncID`，再统一调用：
 
-## Architecture
+- `yak_runtime_dispatch`
 
-### Compilation Pipeline
+参考：
 
-1. **Parse**: Source → SSA (via ssaapi.Parse)
-2. **Setup**: Create LLVM Module, Functions, BasicBlocks
-3. **Compile**: 
-   - Pass 1: Create Phi nodes
-   - Pass 2: Compile instructions
-   - Pass 3: Add terminators
-   - Pass 4: Resolve Phi incoming values
-4. **Verify**: Check LLVM module validity
-5. **Execute**: JIT or AOT compilation
+- `common/yak/ssa2llvm/compiler/externs.go`
+- `common/yak/ssa2llvm/compiler/ops_call_dispatch.go`
+- `common/yak/ssa2llvm/runtime/runtime_go/stdlib.go`
 
-### Key Design Decisions
+### 3. `go` 语句走 runtime spawn
 
-1. **All values are i64**: Phase 1 treats everything as 64-bit integers
-2. **Terminator inference**: Since YakSSA If/Jump may not be in Values map, we infer from BasicBlock successors
-3. **Phi resolution**: Handle YakSSA's Undefined edges by filtering and fallback strategies
-4. **Resource management**: ExecutionEngine owns Module (avoid double-free)
+Yak 的 `go` 语句会把 `ssa.Call.Async` 置位，编译后统一走：
 
-## Example Code
+- `yak_runtime_spawn(ctx)`
 
-```go
-package main
+runtime 再根据 `ctx.kind` 选择执行 callable 还是 dispatch，并用 C 侧 root 链表让 Boehm GC 在异步期间仍能看到 `ctx`。
 
-import (
-    "context"
-    "github.com/yaklang/yaklang/common/yak/ssa2llvm/compiler"
-    "github.com/yaklang/yaklang/common/yak/ssaapi"
-    "tinygo.org/x/go-llvm"
-)
+参考：
 
-func main() {
-    llvm.InitializeNativeTarget()
-    llvm.InitializeNativeAsmPrinter()
-    
-    code := `check = () => { return 42 }`
-    prog, _ := ssaapi.Parse(code)
-    
-    c := compiler.NewCompiler(context.Background(), prog.Program)
-    c.Compile()
-    
-    engine, _ := llvm.NewExecutionEngine(c.Mod)
-    defer engine.Dispose()
-    
-    fn := c.Mod.NamedFunction("check")
-    result := engine.RunFunction(fn, []llvm.GenericValue{})
-    
-    println(result.Int(true)) // Output: 42
-}
-```
+- `common/yak/yak2ssa/builder_ast.go`
+- `common/yak/ssa2llvm/runtime/runtime_go/spawn.go`
+- `common/yak/ssa2llvm/runtime/runtime_go/ctx_root.c`
 
-## Contributing
+### 4. `defer` / `panic` / `recover` / `try-catch-finally`
 
-See [STATUS.md](STATUS.md) for detailed implementation status and future roadmap.
+当前不是用 LLVM 原生异常机制，而是把错误处理 lower 成：
+
+- `InvokeContext.Panic`
+- YakSSA CFG
+- 函数级 `DeferBlock`
+
+参考：
+
+- `common/yak/ssa2llvm/compiler/error_handling_internal.go`
+- `common/yak/ssa2llvm/compiler/ops_panic.go`
+- `common/yak/ssa2llvm/compiler/ops.go`
+- `common/yak/ssa/cfg.go`
+
+### 5. Go 对象与 Boehm GC 的混合对象模型
+
+运行时里的复杂对象由 Go 持有真实状态，LLVM/C 侧只持有 shadow object；Boehm 回收 shadow object 时再反向释放 Go handle。
+
+参考：
+
+- `common/yak/ssa2llvm/runtime/runtime_go/yak_lib.go`
+- `common/yak/ssa2llvm/runtime/runtime_go/c_stub.c`
+
+## 测试策略
+
+当前测试不是只校验 IR 是否生成，还会尽量走到：
+
+- 编译到汇编/目标文件/可执行文件
+- 链接 `libyak.a`
+- 运行最终二进制
+- 校验退出码和输出内容
+
+重点测试目录：
+
+- `common/yak/ssa2llvm/tests/go_stmt_test.go`
+- `common/yak/ssa2llvm/tests/complex_syntax_test.go`
+- `common/yak/ssa2llvm/tests/extern_hook_test.go`
+- `common/yak/ssa2llvm/tests/print_test.go`
+- `common/yak/ssa2llvm/tests/struct_test.go`
+
+## 维护建议
+
+后续继续演进时，优先遵守下面几条：
+
+- 新调用能力优先扩 `InvokeContext`，不要重新引入多套函数参数 ABI；
+- 新 stdlib 能力优先补 `dispatch id + runtime dispatcher`，不要散落很多导出符号；
+- defer/panic/recover 相关状态优先收束到统一 metadata/上下文结构，不要继续扩散大量平行参数；
+- 测试保持“最终二进制可运行且输出正确”为准，而不是只看 IR 生成成功。
+
+## 相关文档
+
+- `common/yak/ssa2llvm/docs/dispatch-and-stdlib.md`
+- `common/yak/ssa2llvm/docs/context-call-and-goroutine.md`
+- `common/yak/ssa2llvm/docs/error-handling.md`
+- `common/yak/ssa2llvm/docs/gc-mechanism.md`
