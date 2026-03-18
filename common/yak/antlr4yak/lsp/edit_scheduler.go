@@ -211,12 +211,12 @@ func (es *EditScheduler) processTask(task *AnalysisTask) {
 	}
 
 	// 执行编译
-	start := time.Now()
-	prog, err := es.compileDocument(content, task.ScriptType, needReparseAST, syntaxCache)
-	duration := time.Since(start)
+	var prog *ssaapi.Program
+	var err error
+	prog, err = es.compileDocument(content, task.ScriptType, needReparseAST, syntaxCache)
 
 	if err != nil {
-		log.Errorf("[LSP Scheduler] compilation failed for %s: %v (took %v)", task.URI, err, duration)
+		log.Errorf("[LSP Scheduler] compilation failed for %s: %v", task.URI, err)
 		if task.Callback != nil {
 			task.Callback(nil, err)
 		}
@@ -225,8 +225,6 @@ func (es *EditScheduler) processTask(task *AnalysisTask) {
 
 	// 更新缓存
 	doc.SetSSACache(prog, newHash.Semantic)
-	log.Infof("[LSP Scheduler] compiled %s successfully (took %v)", task.URI, duration)
-
 	if task.Callback != nil {
 		task.Callback(prog, nil)
 	}

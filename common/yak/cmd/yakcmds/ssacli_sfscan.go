@@ -9,7 +9,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
-	"github.com/yaklang/yaklang/common/urfavecli"
+	cli "github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa_compile"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -122,9 +122,9 @@ func parseSFScanConfigFromCli(c *cli.Context) (res *ssaCliConfig, err error) {
 		opts = append(opts, ssaconfig.WithOutputDataflowPath(true))
 	}
 
-	// file-perf-log: 启用文件级别性能日志
-	if c.Bool("file-perf-log") {
-		opts = append(opts, ssaconfig.WithCompileFilePerformanceLog(true))
+	// 编译并发数（code-scan 与 ssa-compile 共用）
+	if concurrency := c.Int("concurrency"); concurrency > 0 {
+		opts = append(opts, ssaconfig.WithCompileConcurrency(concurrency))
 	}
 
 	// 创建统一配置
@@ -216,12 +216,12 @@ func logCompileStageMessage(command string, config *ssaCliConfig) {
 	}
 
 	log.Infof(
-		"[%s] compile options: re-compile=%v entry-files=%d exclude-files=%d file-perf-log=%v compile-memory=%v scan-memory=%v",
+		"[%s] compile options: re-compile=%v concurrency=%d entry-files=%d exclude-files=%d compile-memory=%v scan-memory=%v",
 		command,
 		config.GetCompileReCompile(),
+		config.GetCompileConcurrency(),
 		len(config.GetCompileEntryFiles()),
 		len(config.GetCompileExcludeFiles()),
-		config.GetCompileFilePerformanceLog(),
 		config.GetCompileMemory(),
 		config.GetSyntaxFlowMemory(),
 	)
@@ -259,6 +259,10 @@ func getProgram(ctx context.Context, config *ssaCliConfig) ([]*ssaapi.Program, e
 			req.Options = buildCompileOptionsForDetect(config.Config)
 		}
 
+		// 传递编译并发数（用于 SSA 项目探测/编译）
+		// if c := config.GetCompileConcurrency(); c > 0 {
+		// 	para["concurrency"] = c
+		// }
 		res, err := ssa_compile.ParseProjectWithAutoDetective(ctx, req)
 		if err != nil {
 			return nil, err
@@ -411,8 +415,8 @@ func parseCompileConfigFromCli(c *cli.Context) (res *ssaCliConfig, err error) {
 	if entry := c.String("entry"); entry != "" {
 		opts = append(opts, ssaconfig.WithCompileEntryFiles(entry))
 	}
-	if c.Bool("file-perf-log") {
-		opts = append(opts, ssaconfig.WithCompileFilePerformanceLog(true))
+	if concurrency := c.Int("concurrency"); concurrency > 0 {
+		opts = append(opts, ssaconfig.WithCompileConcurrency(concurrency))
 	}
 
 	cfg, err := ssaconfig.NewCLIScanConfig(opts...)
@@ -450,9 +454,6 @@ func buildCompileOptionsForDetect(cfg *ssaconfig.Config) []ssaconfig.Option {
 	}
 	if cfg.GetCompileReCompile() {
 		opts = append(opts, ssaconfig.WithCompileReCompile(true))
-	}
-	if cfg.GetCompileFilePerformanceLog() {
-		opts = append(opts, ssaconfig.WithCompileFilePerformanceLog(true))
 	}
 	if cfg.GetCompileStrictMode() {
 		opts = append(opts, ssaconfig.WithCompileStrictMode(true))
@@ -496,9 +497,6 @@ func applyCompileCliOverrides(cfg *ssaconfig.Config, cliCtx *cli.Context) error 
 			ssaconfig.WithSyntaxFlowMemory(enable),
 		)
 	}
-	if cliCtx.IsSet("file-perf-log") {
-		opts = append(opts, ssaconfig.WithCompileFilePerformanceLog(cliCtx.Bool("file-perf-log")))
-	}
 	if cliCtx.IsSet("re-compile") {
 		opts = append(opts, ssaconfig.WithCompileReCompile(cliCtx.Bool("re-compile")))
 	}
@@ -513,6 +511,11 @@ func applyCompileCliOverrides(cfg *ssaconfig.Config, cliCtx *cli.Context) error 
 	}
 	if cliCtx.IsSet("with-dataflow-path") {
 		opts = append(opts, ssaconfig.WithOutputDataflowPath(cliCtx.Bool("with-dataflow-path")))
+	}
+	if cliCtx.IsSet("concurrency") {
+		if c := cliCtx.Int("concurrency"); c > 0 {
+			opts = append(opts, ssaconfig.WithCompileConcurrency(c))
+		}
 	}
 	if err := cfg.Update(opts...); err != nil {
 		return utils.Errorf("apply cli overrides failed: %v", err)

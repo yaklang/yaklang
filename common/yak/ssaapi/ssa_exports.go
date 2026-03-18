@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/memedit"
 
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
@@ -58,6 +59,16 @@ func ClearCache() {
 func Parse(code string, opts ...ssaconfig.Option) (*Program, error) {
 	input := strings.NewReader(code)
 	return ParseFromReader(input, opts...)
+}
+
+// ParseWithPerformanceCapture 解析并返回性能 snapshot，供调用方经 MeasurementsToRows+LogTable 输出。
+// 替代通过 SetDiagnosticsRecorder 注入的方式，显式返回性能数据。
+func ParseWithPerformanceCapture(code string, opts ...ssaconfig.Option) (*Program, []diagnostics.Measurement, error) {
+	rec := diagnostics.NewRecorder()
+	opts = append(opts, WithDiagnosticsRecorder(rec))
+	prog, err := Parse(code, opts...)
+	snap := rec.Snapshot()
+	return prog, snap, err
 }
 
 // ParseFromReader parse simple file to ssa.Program
@@ -154,7 +165,6 @@ var Exports = map[string]any{
 	"withExcludeFile":              WithExcludeFunc,
 	"withDefaultExcludeFunc":       WithExcludeFunc, // deprecated, use withExcludeFile instead
 	"withMemory":                   WithMemory,
-	"withFilePerformanceLog":       WithFilePerformanceLog,
 	"withBaseProgramName":          WithBaseProgramName,
 	"withEnableIncrementalCompile": WithEnableIncrementalCompile,
 

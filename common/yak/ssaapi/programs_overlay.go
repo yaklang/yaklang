@@ -1031,7 +1031,8 @@ func (p *ProgramOverLay) ensureLayerProgramLoaded(layer *ProgramLayer) {
 				log.Debugf("LazyBuild panic for layer %d: %v", layer.LayerIndex, r)
 			}
 		}()
-		layer.Program.Program.LazyBuild()
+		prog := layer.Program.Program
+		prog.LazyBuild()
 	}()
 }
 

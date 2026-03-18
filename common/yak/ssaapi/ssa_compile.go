@@ -1,8 +1,6 @@
 package ssaapi
 
 import (
-	"time"
-
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -139,6 +137,11 @@ func (c *Config) parseSimple(r *memedit.MemEditor) (ret *ssa.Program, err error)
 
 	prog, builder, err := c.init(c.fs, 1)
 	prog.SetPreHandler(true)
+	if rec := c.DiagnosticsRecorder(); rec != nil {
+		prog.SetDiagnosticsRecorder(rec)
+		diagnostics.SetCurrentRecorder(rec)
+		defer diagnostics.ClearCurrentRecorder()
+	}
 	c.LanguageBuilder.InitHandler(builder)
 	// builder.SetRangeInit(r)
 	if err != nil {
@@ -146,34 +149,25 @@ func (c *Config) parseSimple(r *memedit.MemEditor) (ret *ssa.Program, err error)
 	}
 
 	// AST 解析阶段
-	astStart := time.Now()
-	ast, err := c.LanguageBuilder.ParseAST(r.GetSourceCode(), nil)
-	astDuration := time.Since(astStart)
-	if c.diagnosticsRecorder != nil {
-		c.diagnosticsRecorder.RecordDuration("SSA AST Parse", astDuration)
-	}
+	var ast interface{}
+	_, err = c.DiagnosticsRecorder().ForKind(ssa.TrackKindAST).Track("SSA AST Parse", func() error {
+		ast, err = c.LanguageBuilder.ParseAST(r.GetSourceCode(), nil)
+		return err
+	})
 	defer c.LanguageBuilder.Clearup()
 	if !c.ignoreSyntaxErr && err != nil {
 		return nil, utils.Errorf("parse file error: %v", err)
 	}
 	c.LanguageBuilder.PreHandlerFile(ast, r, builder)
 
-	// Build 阶段
+	// Build 阶段：Build 内部已由 LazyBuild 细分 Track，此处不再做外层 Track
 	prog.SetPreHandler(false)
-	buildStart := time.Now()
-	if err := prog.Build(ast, r, builder); err != nil {
+	if err = prog.Build(ast, r, builder); err != nil {
 		return nil, err
 	}
 	builder.Finish()
 	ssa4analyze.RunAnalyzer(prog)
-	buildDuration := time.Since(buildStart)
-	if c.diagnosticsRecorder != nil {
-		c.diagnosticsRecorder.RecordDuration("SSA Build", buildDuration)
-	}
-
-	if diagnostics.Enabled(diagnostics.LevelLow) {
-		diagnostics.LogHeapSnapshot("ssa_compile_simple_end", true)
-	}
+	diagnostics.LogHeapSnapshot("ssa_compile_simple_end", true)
 	return prog, nil
 }
 

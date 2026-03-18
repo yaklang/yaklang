@@ -3,11 +3,11 @@ package ssaapi
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io/fs"
 	"runtime"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -29,48 +29,56 @@ func (c *Config) GetFileHandler(
 	handlerFilesMap map[string]struct{},
 ) <-chan *ssareducer.FileContent {
 	parse := func(path string, content []byte, store *utils.SafeMap[any]) (ssa.FrontAST, error) {
-		start := time.Now()
-		defer func() {
-			log.Infof("pre-handler cost:%v parse ast: %s; size(%v)", time.Since(start), path, Size(len(content)))
-		}()
-
-		defer func() {
-			if r := recover(); r != nil {
-				log.Errorf("pre-handler parse [%s] error %v  ", path, r)
-				utils.PrintCurrentGoroutineRuntimeStack()
-			}
-		}()
-		if _, needBuild := handlerFilesMap[path]; !needBuild {
-			// don't need parse ast
-			return nil, nil
+		var ast ssa.FrontAST
+		var err error
+		astName := fmt.Sprintf("AST[%s]", path)
+		rec := c.DiagnosticsRecorder()
+		trackFn := func(fn func() error) error {
+			_, err := rec.ForKind(ssa.TrackKindAST).Track(astName, fn)
+			return err
 		}
-
-		var cache *ssa.AntlrCache
-		raw, ok := store.Get(key)
-		if ok {
-			if raw, ok := raw.(*ssa.AntlrCache); ok && raw != nil {
-				cache = raw
-			}
-		}
-		if cache == nil {
-			cache = c.LanguageBuilder.GetAntlrCache()
-			log.Errorf("get antlr cache from store failed, new one, path: %s, goroutine id: %d", path, getGID())
-			store.Set(key, cache)
-		}
-
-		if language := c.LanguageBuilder; language != nil {
-			if language.FilterParseAST(path) {
-				ast, err := language.ParseAST(utils.UnsafeBytesToString(content), cache)
-				if err != nil {
-					log.Infof("parsed file[%s] parse [%s]AST error[%s]", path, language.GetLanguage(), err)
+		_ = trackFn(func() error {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Errorf("pre-handler parse [%s] error %v  ", path, r)
+					utils.PrintCurrentGoroutineRuntimeStack()
 				}
-				return ast, err
-			} else {
-				log.Debugf("skip parse ast file: %s filter by %s", path, language.GetLanguage())
-				return nil, nil
+			}()
+			if _, needBuild := handlerFilesMap[path]; !needBuild {
+				return nil
 			}
+
+			var cache *ssa.AntlrCache
+			raw, ok := store.Get(key)
+			if ok {
+				if raw, ok := raw.(*ssa.AntlrCache); ok && raw != nil {
+					cache = raw
+				}
+			}
+			if cache == nil {
+				cache = c.LanguageBuilder.GetAntlrCache()
+				log.Errorf("get antlr cache from store failed, new one, path: %s, goroutine id: %d", path, getGID())
+				store.Set(key, cache)
+			}
+
+			if language := c.LanguageBuilder; language != nil {
+				if language.FilterParseAST(path) {
+					ast, err = language.ParseAST(utils.UnsafeBytesToString(content), cache)
+					if err != nil {
+						log.Infof("parsed file[%s] parse [%s]AST error[%s]", path, language.GetLanguage(), err)
+					}
+					return err
+				}
+				log.Debugf("skip parse ast file: %s filter by %s", path, language.GetLanguage())
+				return nil
+			}
+			err = utils.Errorf("not select language %s", c.GetLanguage())
+			return err
+		})
+		if rec != nil && len(content) > 0 {
+			rec.AddSizeToEntry(astName, int64(len(content)))
 		}
-		return nil, utils.Errorf("not select language %s", c.GetLanguage())
+		return ast, err
 	}
 	initWorker := func() *utils.SafeMap[any] {
 		ret := utils.NewSafeMap[any]()

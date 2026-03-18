@@ -3,8 +3,8 @@ package ssa
 import (
 	"sync"
 
-	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"go.uber.org/atomic"
 )
 
@@ -13,24 +13,23 @@ type lazyTask func()
 
 // LazyBuilder 是一个并发安全、内存安全的延迟执行器
 type LazyBuilder struct {
-	_lazybuild_name string
-	tasks           []lazyTask
-	mu              sync.RWMutex
-	build           atomic.Bool
+	name  string
+	tasks []lazyTask
+	mu    sync.RWMutex
+	build atomic.Bool
 }
 
 // NewLazyBuilder 创建一个新的 LazyBuilder 实例
 func NewLazyBuilder(name string) *LazyBuilder {
 	lz := &LazyBuilder{
-		_lazybuild_name: name + "||" + uuid.NewString(),
-		tasks:           make([]lazyTask, 0),
+		name:  name,
+		tasks: make([]lazyTask, 0),
 	}
 	return lz
 }
 
-// Add 添加一个延迟执行的任务。
-// work 是要执行的函数，ctx 是要传递给该函数的上下文数据。
-func (l *LazyBuilder) AddLazyBuilder(work func(), async ...bool) {
+// AddLazyBuilder 添加延迟执行的任务
+func (l *LazyBuilder) AddLazyBuilder(work func(), _ ...bool) {
 	if l == nil {
 		log.Errorf("LazyBuilder is nil")
 		return
@@ -41,26 +40,33 @@ func (l *LazyBuilder) AddLazyBuilder(work func(), async ...bool) {
 	l.tasks = append(l.tasks, lazyTask(work))
 }
 
-// Build 执行所有已添加的任务，该方法在整个生命周期中只会有效执行一次。
-func (l *LazyBuilder) Build() {
+// HasBeenBuilt 返回是否已完成构建（用于跳过重复追踪）
+func (l *LazyBuilder) HasBeenBuilt() bool {
 	if l == nil {
-		// log.Errorf("LazyBuilder is nil")
-		return
+		return true
+	}
+	return l.build.Load()
+}
+
+// Build 执行所有已添加的任务，该方法在整个生命周期中只会有效执行一次。
+// 返回值 hadTasks：是否曾通过 AddLazyBuilder 添加过任务（用于诊断从未添加任务的 case）
+func (l *LazyBuilder) Build() (hadTasks bool) {
+	if l == nil {
+		return false
 	}
 
 	if l.build.Load() {
-		// log.Errorf("LazyBuilder is nil or already built")
-		return // 已经构建过，直接返回
+		return false // 已经构建过，直接返回，不计入 hadTasks
 	}
 
 	l.build.Store(true)
 
 	l.mu.Lock()
-	defer l.mu.Unlock()
-
 	tasksToRun := l.tasks
 	l.tasks = nil // 【关键】立即清空，释放对闭包和上下文的引用
-	_ = tasksToRun
+	l.mu.Unlock()
+
+	hadTasks = len(tasksToRun) > 0
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -68,28 +74,27 @@ func (l *LazyBuilder) Build() {
 		}
 	}()
 
-	// // 依次执行所有任务
-	for _, task := range tasksToRun {
-		if task != nil {
-			task()
+	runTasks := func() error {
+		for _, task := range tasksToRun {
+			if task != nil {
+				task()
+			}
 		}
+		return nil
 	}
+	if hadTasks {
+		_ = TrackBuildWithOptions(diagnostics.GetCurrentRecorder(), l.name, runTasks,
+			WithTrackKind(TrackKindBuild),
+			WithTrackDepthEnabled(true))
+	}
+	return hadTasks
 }
 
 type ASTIF interface {
 	GetText() string
 }
 
-/*
-LazyBuilder -- Build:
-when build, each program should call visitAST
-  - when preHandler: mark ast hash to prog.astMap
-  - when not preHandler: delete ast hash from prog.astMap
-
-when all ast visit done, build instruction and save to database
-
-note: need defer func\visit stmt finish\...
-*/
+// VisitAst 遍历 AST，preHandler 时标记 hash，否则删除；全部完成后触发 LazyBuild
 func (p *Program) VisitAst(ast ASTIF) {
 	hash := utils.CalcSha256(ast.GetText())
 
@@ -105,14 +110,23 @@ func (p *Program) VisitAst(ast ASTIF) {
 		if len(p.astMap) == 0 {
 			p.Application.ProcessInfof("program %s all ast visit done", p.Name)
 			p.Application.ProcessInfof("program %s build Instruction", p.Name)
-			p.LazyBuild() // build instruction
+			p.LazyBuild()
 			p.Application.ProcessInfof("program %s build Instruction(%d)", p.Name, p.Cache.CountInstruction())
-			// will cause instruction not save bug
-			// p.Cache.SaveToDatabase() // save instruction
 			builder := p.GetAndCreateFunctionBuilder("", string(MainFunctionName))
 			builder.SyntaxIncludingStack = nil
 		}
 	}
+}
+
+func buildFuncID(p *Program, fun *Function) string {
+	id := fun.GetName()
+	if id == "" {
+		id = "anonymous"
+	}
+	if pkg := p.GetProgramName(); pkg != "" {
+		id = pkg + "/" + id
+	}
+	return id
 }
 
 func (p *Program) LazyBuild() {
@@ -171,7 +185,6 @@ func (p *Program) LazyBuild() {
 	}
 	if function == nil && virtualFunction == nil {
 		log.Errorf("main function is not found and virtual function is not found")
-		return
 	}
 }
 

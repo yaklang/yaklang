@@ -21,7 +21,7 @@ compile_immediately := cli.Bool(
     cli.setCliGroup("compile"), 
 )
 
-concurrency := cli.Int("concurrency", cli.setVerboseName("并发数"), cli.setCliGroup("compile"), cli.setDefault(10), cli.setHelp("编译时，同时进行编译的文件数量"))
+concurrency := cli.Int("concurrency", cli.setVerboseName("编译并发数"), cli.setCliGroup("compile"), cli.setDefault(10), cli.setHelp("编译时，同时进行编译的文件数量。0 或未设置时默认使用核心数/2"))
 
 proxy = cli.String("proxy", cli.setHelp("remote url proxy"))
 timeout = 3
@@ -149,8 +149,6 @@ excludeFile := cli.String(
     cli.setHelp("使用相对路径 可用Glob匹配 逗号分割"),
     cli.setCliGroup("compile"), 
 )
-
-filePerformanceLog := cli.Bool("filePerformanceLog", cli.setDefault(false), cli.setVerboseName("文件性能日志"), cli.setHelp("启用文件级别编译性能日志"), cli.setCliGroup("compile"))
 
 // 增量编译选项
 enableIncrementalCompile := cli.Bool(
@@ -592,7 +590,6 @@ options = [
     ssa.withStrictMode(strictMode),
     ssa.withDescription(description),
     ssa.withEntryFile(entry...),
-    ssa.withFilePerformanceLog(filePerformanceLog),
     ssa.withCodeSourceJarRecursiveParse(jarRecursiveParse),
 ]
 

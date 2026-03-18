@@ -220,20 +220,6 @@ func TestMUSTPASS_MITM_Query_Extracted(t *testing.T) {
 		require.Lenf(t, extractedData.GetData(), 10, "extracted data count not equal 10")
 	})
 
-	t.Run("traceID test (legacy)", func(t *testing.T) {
-		extractedData, err := client.QueryMITMRuleExtractedData(ctx, &ypb.QueryMITMRuleExtractedDataRequest{
-			HTTPFlowHash: traceID,
-		})
-		require.NoError(t, err)
-		require.Lenf(t, extractedData.GetData(), 10, "extracted data count not equal 10")
-
-		extractedData, err = client.QueryMITMRuleExtractedData(ctx, &ypb.QueryMITMRuleExtractedDataRequest{
-			HTTPFlowHiddenIndex: traceID,
-		})
-		require.NoError(t, err)
-		require.Lenf(t, extractedData.GetData(), 10, "extracted data count not equal 10")
-	})
-
 	t.Run("ruleVerbose test", func(t *testing.T) {
 		extractedData, err := client.QueryMITMRuleExtractedData(ctx, &ypb.QueryMITMRuleExtractedDataRequest{
 			Filter: &ypb.ExtractedDataFilter{

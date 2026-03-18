@@ -47,41 +47,40 @@ func (c *Config) parseProjectWithFS(
 	preHandlerFiles := make([]string, 0)
 	handlerFilesMap := make(map[string]struct{})
 	handlerFiles := make([]string, 0)
+	folder2Save := make([][]string, 0)
 
 	var err error
-	start := time.Now()
+	filePerfRecorder := c.DiagnosticsRecorder()
 
-	processCallback(0.0, fmt.Sprintf("parse project in fs: %v, path: %v", filesystem, c.GetCodeSource().ToJSONString()))
-	processCallback(0.0, "calculate total size of project")
+	calculateTime, err = filePerfRecorder.ForKind(diagnostics.TrackKindGeneral).TrackLow("calculate project size", func() error {
+		processCallback(0.0, fmt.Sprintf("parse project in fs: %v, path: %v", filesystem, c.GetCodeSource().ToJSONString()))
+		processCallback(0.0, "calculate total size of project")
+		if programName != "" {
+			folder2Save = append(folder2Save, []string{"/", programName})
+		}
 
-	folder2Save := make([][]string, 0)
-	if programName != "" {
-		folder2Save = append(folder2Save, []string{"/", programName})
-	}
+		filesystem = c.swapLanguageFs(filesystem)
+		scanResult, errScan := ScanProjectFiles(ScanConfig{
+			ProgramName:     programName,
+			ProgramPath:     programPath,
+			FileSystem:      filesystem,
+			ExcludeFunc:     c.excludeFile,
+			CheckLanguage:   c.checkLanguage,
+			CheckPreHandler: c.checkLanguagePreHandler,
+			Context:         c.ctx,
+		})
+		if errScan != nil {
+			return errScan
+		}
 
-	filesystem = c.swapLanguageFs(filesystem)
-	// get total size
-	// scan project files
-	scanResult, err := ScanProjectFiles(ScanConfig{
-		ProgramName:     programName,
-		ProgramPath:     programPath,
-		FileSystem:      filesystem,
-		ExcludeFunc:     c.excludeFile,
-		CheckLanguage:   c.checkLanguage,
-		CheckPreHandler: c.checkLanguagePreHandler,
-		Context:         c.ctx,
+		folder2Save = append(folder2Save, scanResult.Folders...)
+		handlerTotal = scanResult.HandlerTotal
+		handlerFiles = scanResult.HandlerFiles
+		preHandlerTotal = scanResult.PreHandlerTotal
+		preHandlerFiles = scanResult.PreHandlerFiles
+		handlerFilesMap = scanResult.HandlerFilesMap
+		return nil
 	})
-	if err != nil {
-		return nil, err
-	}
-
-	folder2Save = append(folder2Save, scanResult.Folders...)
-	handlerTotal = scanResult.HandlerTotal
-	handlerFiles = scanResult.HandlerFiles
-	preHandlerTotal = scanResult.PreHandlerTotal
-	preHandlerFiles = scanResult.PreHandlerFiles
-	handlerFilesMap = scanResult.HandlerFilesMap
-	calculateTime = time.Since(start)
 	if err != nil {
 		return nil, err
 	}
@@ -123,12 +122,8 @@ func (c *Config) parseProjectWithFS(
 
 	var AstErr error
 	fileContents := make([]*ssareducer.FileContent, 0, preHandlerTotal)
-	enableFilePerfLog := c.Config != nil && c.Config.GetCompileFilePerformanceLog()
-	// 创建文件性能 recorder
-	if enableFilePerfLog && c.filePerformanceRecorder == nil {
-		c.filePerformanceRecorder = diagnostics.NewRecorder()
-	}
-	filePerfRecorder := c.filePerformanceRecorder
+	// 统一使用 filePerfRecorder；RunWithCurrentRecorderErr 管理 currentRecorder 生命周期
+	prog.SetDiagnosticsRecorder(filePerfRecorder)
 	// pre handler  0-40%
 	f1 := func() error {
 		preHandlerNum := 0
@@ -141,69 +136,63 @@ func (c *Config) parseProjectWithFS(
 		}
 		prog.SetPreHandler(true)
 		prog.ProcessInfof("pre-handler parse project in fs: %v, path: %v", filesystem, c.GetCodeSource().ToJSONString())
-		start = time.Now()
 
-		ch := c.GetFileHandler(
-			filesystem, preHandlerFiles, handlerFilesMap,
-		)
-		// diagnostics.DumpHeap(diagnostics.WithName("ast"))
-		for fileContent := range ch {
-			fileASTStart := time.Now()
-			if fileContent.Status == ssareducer.FileStatusFsError {
-				log.Errorf("skip file: %s with fs error: %v", fileContent.Path, fileContent.Err)
-				prog.ProcessInfof("skip  file: %s with fs error: %v", fileContent.Path, fileContent.Err)
-				continue
-			}
-
-			if fileContent.Status == ssareducer.FileParseASTError {
-				log.Errorf("parse Ast file: %s error: %s", fileContent.Path, fileContent.Err)
-				AstErr = utils.Errorf("parse Ast file: %s error: %s", fileContent.Path, fileContent.Err)
-				// continue
-			}
-
-			editor := prog.CreateEditor(fileContent.Content, fileContent.Path)
-			// editor := prog.CreateEditor([]byte{}, fileContent.Path)
-
-			fileContent.Editor = editor
-			fileContents = append(fileContents, fileContent)
-
-			if fileContent.Err != nil {
-				prog.ProcessInfof("file %s parse ast error: %v", fileContent.Path, fileContent.Err)
-				AstErr = utils.JoinErrors(AstErr,
-					utils.Errorf("pre-handler parse file %s error: %v", fileContent.Path, fileContent.Err),
-				)
-			}
-
-			preHandlerProcess() // notify the process
-			// handler
-			if language := c.LanguageBuilder; language != nil {
-				func() {
-					defer func() {
-						if r := recover(); r != nil {
-							log.Errorf("pre-handler parse [%s] error %v  ", fileContent.Path, r)
-							utils.PrintCurrentGoroutineRuntimeStack()
-						}
-					}()
-					language.InitHandler(builder)
-					err = language.PreHandlerProject(filesystem, fileContent.AST, builder, editor)
-					if err != nil {
-						log.Errorf("pre-handler parse [%s] error %v", fileContent.Path, err)
+		preHandlerTime, _ = filePerfRecorder.ForKind(ssa.TrackKindAST).TrackLow("pre-handler phase", func() error {
+			ch := c.GetFileHandler(
+				filesystem, preHandlerFiles, handlerFilesMap,
+			)
+			for fileContent := range ch {
+			func() {
+				path := fileContent.Path
+				astName := fmt.Sprintf("AST[%s]", path)
+				work := func() error {
+					if fileContent.Status == ssareducer.FileStatusFsError {
+						log.Errorf("skip file: %s with fs error: %v", fileContent.Path, fileContent.Err)
+						prog.ProcessInfof("skip  file: %s with fs error: %v", fileContent.Path, fileContent.Err)
+						return nil
 					}
-				}()
-			}
-			// 记录文件级别的 AST 解析时间
-			if enableFilePerfLog {
-				fileASTTime := time.Since(fileASTStart)
-				// 收集到 recorder（记录所有文件，不设阈值）
-				if filePerfRecorder != nil {
-					filePerfRecorder.RecordDuration(fmt.Sprintf("AST[%s]", fileContent.Path), fileASTTime)
-					if fileASTTime > 100*time.Millisecond { // 只记录超过 100ms 的文件到日志
-						log.Infof("[File Performance] AST parse: %s, time: %v", fileContent.Path, fileASTTime)
+					if fileContent.Status == ssareducer.FileParseASTError {
+						log.Errorf("parse Ast file: %s error: %s", fileContent.Path, fileContent.Err)
+						AstErr = utils.Errorf("parse Ast file: %s error: %s", fileContent.Path, fileContent.Err)
 					}
+					editor := prog.CreateEditor(fileContent.Content, fileContent.Path)
+					fileContent.Editor = editor
+					fileContents = append(fileContents, fileContent)
+					if fileContent.Err != nil {
+						prog.ProcessInfof("file %s parse ast error: %v", fileContent.Path, fileContent.Err)
+						AstErr = utils.JoinErrors(AstErr,
+							utils.Errorf("pre-handler parse file %s error: %v", fileContent.Path, fileContent.Err),
+						)
+					}
+					preHandlerProcess()
+					if language := c.LanguageBuilder; language != nil {
+						func() {
+							defer func() {
+								if r := recover(); r != nil {
+									log.Errorf("pre-handler parse [%s] error %v  ", fileContent.Path, r)
+									utils.PrintCurrentGoroutineRuntimeStack()
+								}
+							}()
+							language.InitHandler(builder)
+							err = language.PreHandlerProject(filesystem, fileContent.AST, builder, editor)
+							if err != nil {
+								log.Errorf("pre-handler parse [%s] error %v", fileContent.Path, err)
+							}
+						}()
+					}
+					return nil
 				}
-			}
+				sizeClosure := func() error {
+					if len(fileContent.Content) > 0 {
+						filePerfRecorder.AddSizeToEntry(astName, int64(len(fileContent.Content)))
+					}
+					return nil
+				}
+				_, _ = filePerfRecorder.ForKind(ssa.TrackKindAST).Track(astName, work, sizeClosure)
+			}()
 		}
-		preHandlerTime = time.Since(start)
+		return nil
+		})
 		if AstErr != nil && c.GetCompileStrictMode() {
 			return utils.Errorf("pre-handler parse project error: %v", AstErr)
 		}
@@ -234,82 +223,60 @@ func (c *Config) parseProjectWithFS(
 			}
 		}
 		prog.SetPreHandler(false)
-		start = time.Now()
 
-		// ssareducer.FilesHandler(
-		// 	c.ctx, filesystem, handlerFiles,
-		// 	func(path string, content []byte) {
-		for _, fileContent := range fileContents {
-			if _, needBuild := handlerFilesMap[fileContent.Path]; !needBuild {
-				continue // skip if not in handlerFilesMap
-			}
-			handlerProcess()
-			if fileContent.Status == ssareducer.FileStatusFsError {
-				log.Errorf("skip file: %s with fs error: %v", fileContent.Path, fileContent.Err)
-				prog.ProcessInfof("skip  file: %s with fs error: %v", fileContent.Path, fileContent.Err)
-				continue
-			}
-			// Check if this file needs to be compiled (is in handlerFiles)
-			// If not, it's an extra file (like XML) that should be kept in filesystem but not compiled
-			needsCompile := false
+		var parseErr error
+		parseErr = func() error {
+			// O(1) lookup: handlerFilesSet for needsCompile check
+			handlerFilesSet := make(map[string]struct{}, len(handlerFiles))
 			for _, hf := range handlerFiles {
-				if hf == fileContent.Path {
-					needsCompile = true
-					break
+				handlerFilesSet[hf] = struct{}{}
+			}
+			for _, fileContent := range fileContents {
+				if _, needBuild := handlerFilesMap[fileContent.Path]; !needBuild {
+					continue // skip if not in handlerFilesMap
 				}
-			}
-			// If file doesn't need compilation (extra file), ensure it's added to FileList
-			// and skip the build step but keep it in filesystem
-			if !needsCompile {
-				// Ensure extra files (like XML) are added to FileList even if they don't need compilation
-				if fileContent.Editor != nil {
-					prog.PushEditor(fileContent.Editor)
-					prog.PopEditor(true)
+				handlerProcess()
+				if fileContent.Status == ssareducer.FileStatusFsError {
+					log.Errorf("skip file: %s with fs error: %v", fileContent.Path, fileContent.Err)
+					prog.ProcessInfof("skip  file: %s with fs error: %v", fileContent.Path, fileContent.Err)
+					continue
 				}
-				continue
-			}
-			// Only skip if AST is nil AND the file needs to be compiled
-			// Extra files (like XML) may have nil AST but should still be kept in filesystem
-			if fileContent.Status == ssareducer.FileParseASTError || fileContent.AST == nil {
-				log.Errorf("skip file: %s due to AST parse error or nil AST: %v", fileContent.Path, fileContent.Err)
-				prog.ProcessInfof("skip  file: %s due to AST parse error or nil AST: %v", fileContent.Path, fileContent.Err)
-				continue
-			}
-			// log.Infof("visited file: ", prog.GetIncludeFiles())
-			if prog.ShouldVisit(fileContent.Editor.GetUrl()) {
-				log.Infof("parse file %s done skip in main build", fileContent.Path)
-				continue
-			}
-			path := fileContent.Path
-			ast := fileContent.AST
-			fileContent.AST = nil // clear AST
-			func() {
-				fileBuildStart := time.Now()
-				defer func() {
-					if r := recover(); r != nil {
-						log.Errorf("parse [%s] error %v  ", path, r)
-						utils.PrintCurrentGoroutineRuntimeStack()
+				// Check if this file needs to be compiled (is in handlerFiles)
+				if _, needsCompile := handlerFilesSet[fileContent.Path]; !needsCompile {
+					if fileContent.Editor != nil {
+						prog.PushEditor(fileContent.Editor)
+						prog.PopEditor(true)
 					}
-					// 记录文件级别的 Build 时间
-					if enableFilePerfLog {
-						fileBuildTime := time.Since(fileBuildStart)
-						// 收集到 recorder（记录所有文件，不设阈值）
-						if filePerfRecorder != nil {
-							filePerfRecorder.RecordDuration(fmt.Sprintf("Build[%s]", path), fileBuildTime)
-							if fileBuildTime > 100*time.Millisecond { // 只记录超过 100ms 的文件到日志
-								log.Infof("[File Performance] Build: %s, time: %v", path, fileBuildTime)
-							}
+					continue
+				}
+				if fileContent.Status == ssareducer.FileParseASTError || fileContent.AST == nil {
+					log.Errorf("skip file: %s due to AST parse error or nil AST: %v", fileContent.Path, fileContent.Err)
+					prog.ProcessInfof("skip  file: %s due to AST parse error or nil AST: %v", fileContent.Path, fileContent.Err)
+					continue
+				}
+				if prog.ShouldVisit(fileContent.Editor.GetUrl()) {
+					log.Infof("parse file %s done skip in main build", fileContent.Path)
+					continue
+				}
+				path := fileContent.Path
+				ast := fileContent.AST
+				fileContent.AST = nil // clear AST
+				func() {
+					defer func() {
+						if r := recover(); r != nil {
+							log.Errorf("parse [%s] error %v  ", path, r)
+							utils.PrintCurrentGoroutineRuntimeStack()
 						}
+					}()
+					if e := prog.Build(ast, fileContent.Editor, builder); e != nil {
+						log.Errorf("parse %#v failed: %v", path, e)
 					}
 				}()
-				// build
-				if err := prog.Build(ast, fileContent.Editor, builder); err != nil {
-					log.Errorf("parse %#v failed: %v", path, err)
-				}
-			}()
-		}
+			}
+			return nil
+		}()
+		_ = parseErr
 		fileContents = make([]*ssareducer.FileContent, 0)
-		parseTime = time.Since(start)
 		if c.isStop() {
 			return ErrContextCancel
 		}
@@ -333,10 +300,10 @@ func (c *Config) parseProjectWithFS(
 			prog.FileHashMap = make(map[string]int)
 		}
 		if prog.DatabaseKind != ssa.ProgramCacheMemory { // save program
-			start := time.Now()
-			prog.UpdateToDatabaseWithWG(&wg)
-			since := time.Since(start)
-			log.Infof("program %s save to database cost: %s", prog.Name, since)
+			_ = filePerfRecorder.ForKind(ssa.TrackKindDatabase).TrackLowLog(fmt.Sprintf("program %s save to database", prog.Name), func() error {
+				prog.UpdateToDatabaseWithWG(&wg)
+				return nil
+			})
 		}
 		return nil
 	}
@@ -354,41 +321,41 @@ func (c *Config) parseProjectWithFS(
 		prevProcess := 0.9
 		_ = prevProcess
 		lock := sync.Mutex{}
-		prog.Cache.SaveToDatabase(func(size int) {
-			lock.Lock()
-			defer lock.Unlock()
-			index += size
-			process = 0.9 + (float64(index)/float64(total))*0.1
-			if (process - prevProcess) > 0.0001 { // is 90.01%/90.02%/....
-				prog.ProcessInfof("Saving instructions: %d complete(total %d)", index, total)
-				prevProcess = process
-			}
+		var saveErr error
+		saveTime, saveErr = filePerfRecorder.ForKind(ssa.TrackKindDatabase).TrackLow("save cache instructions", func() error {
+			prog.Cache.SaveToDatabase(func(size int) {
+				lock.Lock()
+				defer lock.Unlock()
+				index += size
+				process = 0.9 + (float64(index)/float64(total))*0.1
+				if (process - prevProcess) > 0.0001 { // is 90.01%/90.02%/....
+					prog.ProcessInfof("Saving instructions: %d complete(total %d)", index, total)
+					prevProcess = process
+				}
+			})
+			return nil
 		})
-		saveTime = time.Since(start)
-		return nil
+		return saveErr
 	}
 	f6 := func() error {
 		wg.Wait()
 		return nil
 	}
-	if err := c.DiagnosticsTrack("ParseProjectWithFS", f1, f2, f3, f4, f5, f6); err != nil {
+	if err := diagnostics.RunWithCurrentRecorderErr(filePerfRecorder, func() error {
+		for _, fn := range []func() error{f1, f2, f3, f4, f5, f6} {
+			if err := fn(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
 		return nil, err
 	}
 
-	// 输出文件性能汇总表格
-	if enableFilePerfLog && filePerfRecorder != nil {
-		snapshots := filePerfRecorder.Snapshot()
-		if len(snapshots) > 0 {
-			table := diagnostics.FormatPerformanceTable("File Compilation Performance Summary", snapshots)
-			fmt.Println(table)
-		} else {
-			fmt.Println("File Performance: no data recorded")
-		}
-	}
-
-	if diagnostics.Enabled(diagnostics.LevelLow) {
-		diagnostics.LogHeapSnapshot("ssa_compile_project_end", true)
-	}
+	// 展示层：表格由 ParseProject 的 defer LogDiagnostics 统一打印一次，此处仅输出总耗时
+	totalCompile := calculateTime + preHandlerTime + saveTime
+	diagnostics.LogLow(ssa.TrackKindBuild, "", fmt.Sprintf("total compile elapsed %v", totalCompile))
+	diagnostics.LogHeapSnapshot("ssa_compile_project_end", true)
 
 	return NewProgram(prog, c), nil
 }

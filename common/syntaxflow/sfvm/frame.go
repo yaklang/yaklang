@@ -519,7 +519,7 @@ func (s *SFFrame) execRule(feedValue Values) error {
 			}
 			return nil
 		}
-		err := diagnostics.TrackLow(name, execOpcode)
+		_, err := diagnostics.TrackLow(diagnostics.TrackKindGeneral, name, execOpcode)
 		if err != nil {
 			return err
 		}

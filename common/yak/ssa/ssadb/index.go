@@ -50,21 +50,19 @@ func SaveIrIndexBatch(db *gorm.DB, items []*IrIndex) {
 	if db == nil || len(items) == 0 {
 		return
 	}
-
-	err := diagnostics.TrackLow("Database.SaveIRIndexBatch", func() error {
+	_, _ = diagnostics.GetCurrentRecorder().ForKind(diagnostics.TrackKind("Database")).TrackLow("ssadb.SaveIrIndexBatch", func() error {
 		for _, item := range items {
 			if item == nil {
 				continue
 			}
 			if err := db.Create(item).Error; err != nil {
+				fmt.Printf("SaveIrIndexBatch failed: %v\n", err)
 				return err
 			}
 		}
 		return nil
 	})
-	if err != nil {
-		fmt.Printf("SaveIrIndexBatch failed: %v\n", err)
-	}
+	diagnostics.LogLow(diagnostics.TrackKind("Database"), "", fmt.Sprintf("SaveIrIndexBatch batch %d items", len(items)))
 }
 
 type IrVariable struct {
@@ -90,19 +88,21 @@ func GetScope(programName, scopeName string, cache *NameCache) ([]IrVariable, er
 	}
 	var results []result
 
-	err := db.Model(&IrIndex{}).
-		Select("variable_id, value_id, version_id").
-		Where("program_name = ? AND scope_name = ? AND deleted_at IS NULL", programName, scopeName).
-		Where(`version_id = (
-			SELECT max(sub.version_id) FROM ` + TableIrIndices + ` AS sub
-			WHERE sub.variable_id = ` + TableIrIndices + `.variable_id
-			  AND sub.scope_name = ` + TableIrIndices + `.scope_name
-			  AND sub.program_name = ` + TableIrIndices + `.program_name
-		)`).Scan(&results).Error
-
+	_, err := diagnostics.GetCurrentRecorder().ForKind(diagnostics.TrackKind("Database")).TrackLow("ssadb.GetScope", func() error {
+		return db.Model(&IrIndex{}).
+			Select("variable_id, value_id, version_id").
+			Where("program_name = ? AND scope_name = ? AND deleted_at IS NULL", programName, scopeName).
+			Where(`version_id = (
+				SELECT max(sub.version_id) FROM ` + TableIrIndices + ` AS sub
+				WHERE sub.variable_id = ` + TableIrIndices + `.variable_id
+				  AND sub.scope_name = ` + TableIrIndices + `.scope_name
+				  AND sub.program_name = ` + TableIrIndices + `.program_name
+			)`).Scan(&results).Error
+	})
 	if err != nil {
 		return nil, err
 	}
+	diagnostics.LogLow(diagnostics.TrackKind("Database"), "", fmt.Sprintf("ssadb.GetScope scope=%s", scopeName))
 
 	// Resolve names locally using cache
 	ret := make([]IrVariable, 0, len(results))

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/format"
 	"github.com/yaklang/yaklang/common/yak/c2ssa"
 	"github.com/yaklang/yaklang/common/yak/go2ssa"
 )
@@ -113,10 +114,10 @@ func TestGRPCMUSTPASS_GoProjectASTPerformance(t *testing.T) {
 
 		// 立即输出结果，不缓存
 		if err != nil {
-			fmt.Printf("%-60s %12s %15s (错误: %s)\n", displayPath, formatSize(fileSize), duration, err.Error())
+			fmt.Printf("%-60s %12s %15s (错误: %s)\n", displayPath, format.FormatSize(fileSize), duration, err.Error())
 			errorCount++
 		} else {
-			fmt.Printf("%-60s %12s %15s\n", displayPath, formatSize(fileSize), duration)
+			fmt.Printf("%-60s %12s %15s\n", displayPath, format.FormatSize(fileSize), duration)
 			totalFiles++
 			totalSize += fileSize
 			totalTime += duration
@@ -138,7 +139,7 @@ func TestGRPCMUSTPASS_GoProjectASTPerformance(t *testing.T) {
 	if errorCount > 0 {
 		fmt.Printf("错误文件数: %d\n", errorCount)
 	}
-	fmt.Printf("总大小: %s\n", formatSize(totalSize))
+	fmt.Printf("总大小: %s\n", format.FormatSize(totalSize))
 	fmt.Printf("总耗时: %v\n", totalTime)
 	if totalFiles > 0 {
 		fmt.Printf("平均耗时: %v\n", totalTime/time.Duration(totalFiles))
@@ -253,10 +254,10 @@ func TestGRPCMUSTPASS_CProjectASTPerformance(t *testing.T) {
 
 		// 立即输出结果，不缓存
 		if err != nil {
-			fmt.Printf("%-60s %12s %15s (错误: %s)\n", displayPath, formatSize(fileSize), duration, err.Error())
+			fmt.Printf("%-60s %12s %15s (错误: %s)\n", displayPath, format.FormatSize(fileSize), duration, err.Error())
 			errorCount++
 		} else {
-			fmt.Printf("%-60s %12s %15s\n", displayPath, formatSize(fileSize), duration)
+			fmt.Printf("%-60s %12s %15s\n", displayPath, format.FormatSize(fileSize), duration)
 			totalFiles++
 			totalSize += fileSize
 			totalTime += duration
@@ -278,7 +279,7 @@ func TestGRPCMUSTPASS_CProjectASTPerformance(t *testing.T) {
 	if errorCount > 0 {
 		fmt.Printf("错误文件数: %d\n", errorCount)
 	}
-	fmt.Printf("总大小: %s\n", formatSize(totalSize))
+	fmt.Printf("总大小: %s\n", format.FormatSize(totalSize))
 	fmt.Printf("总耗时: %v\n", totalTime)
 	if totalFiles > 0 {
 		fmt.Printf("平均耗时: %v\n", totalTime/time.Duration(totalFiles))
@@ -287,19 +288,3 @@ func TestGRPCMUSTPASS_CProjectASTPerformance(t *testing.T) {
 	fmt.Printf("==========================================\n\n")
 }
 
-// formatSize 格式化文件大小，参考 ssaapi.Size 函数
-func formatSize(size int64) string {
-	if size < 1024 {
-		return fmt.Sprintf("%dB", size)
-	}
-	sizeKB := float64(size) / 1024.0
-	if sizeKB < 1024 {
-		return fmt.Sprintf("%.2fKB", sizeKB)
-	}
-	sizeMB := sizeKB / 1024.0
-	if sizeMB < 1024 {
-		return fmt.Sprintf("%.2fMB", sizeMB)
-	}
-	sizeGB := sizeMB / 1024.0
-	return fmt.Sprintf("%.2fGB", sizeGB)
-}

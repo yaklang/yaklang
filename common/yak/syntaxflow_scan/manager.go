@@ -101,6 +101,10 @@ func createEmptySyntaxFlowTaskByID(
 		ctx = context.Background()
 	}
 
+	var ruleProfiler *diagnostics.Recorder
+	if diagnostics.Enabled(diagnostics.LevelHigh) {
+		ruleProfiler = diagnostics.NewRecorder()
+	}
 	var rootctx, cancel = context.WithCancel(ctx)
 	m := &scanManager{
 		taskID:       taskId,
@@ -109,19 +113,15 @@ func createEmptySyntaxFlowTaskByID(
 		resumeSignal: sync.NewCond(&sync.Mutex{}),
 		cancel:       cancel,
 		callback:     NewScanTaskCallbacks(),
-		ruleProfiler: diagnostics.NewRecorder(),
+		ruleProfiler: ruleProfiler,
 	}
 	m.callback.Set(runningID, config.ScanTaskCallback)
 	// syntaxFlowScanManagerMap.Set(taskId, m)
 	m.Config = config
 	// 设置进度回调
-	eventWithRule := false
-	if config != nil && config.ScanTaskCallback != nil {
-		eventWithRule = config.ScanTaskCallback.ProcessWithRule
-	}
 	m.processMonitor = newProcessMonitor(ctx, 3*time.Second, func(progress float64, info *RuleProcessInfoList) {
 		m.callback.Process(m.taskID, m.status, progress, info)
-	}, m.notifyResult, eventWithRule)
+	}, m.notifyResult)
 	return m, nil
 }
 
@@ -344,9 +344,8 @@ func (m *scanManager) Stop(runningID string) {
 	m.processMonitor.Close()
 
 	// 在 processMonitor.Close() 之后输出 Scan Summary
-	// 此时所有 callback 都已完成，数据是准确的
-	enableRulePerf := m.Config.IsEnableRulePerformanceLog()
-	m.logScanPerformance(m.scanDuration, enableRulePerf)
+	// 此时所有 callback 都已完成，数据是准确的（YAK_DIAGNOSTICS_LOG_LEVEL 非 off 时输出规则性能）
+	m.logScanSummary()
 }
 
 func (m *scanManager) IsStop() bool {

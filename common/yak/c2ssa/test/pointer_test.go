@@ -577,11 +577,11 @@ func Test_Pointer_SideEffect(t *testing.T) {
 		println(arr[0]); // 1
 		println(arr[1]); // 2
 		modify_array(arr);
-		println(arr[0]); // side-effect(100, #20[0])
-		println(arr[1]); // side-effect(200, #20[1])
+		println(arr[0]); // side-effect(100, #29[0])
+		println(arr[1]); // side-effect(200, #29[1])
 	}
 
-			`, []string{"1", "2", "side-effect(100, #20[0])", "side-effect(200, #20[1])"}, t)
+			`, []string{"1", "2", "side-effect(100, #29[0])", "side-effect(200, #29[1])"}, t)
 	})
 
 	t.Run("pointer side-effect with double pointer", func(t *testing.T) {

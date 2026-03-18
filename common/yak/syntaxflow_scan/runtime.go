@@ -10,6 +10,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
@@ -87,14 +88,8 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 		}
 	}
 
-	// 检查是否启用规则级别的详细性能监控
-	enableRulePerf := m.Config.IsEnableRulePerformanceLog()
-
-	// 将查询逻辑包装到函数中
-	f := func() error {
-		var ruleRecorder *diagnostics.Recorder
-		option := []ssaapi.QueryOption{}
-		option = append(option,
+	doQuery := func() error {
+		option := []ssaapi.QueryOption{
 			ssaapi.QueryWithContext(m.ctx),
 			ssaapi.QueryWithTaskID(m.taskID),
 			ssaapi.QueryWithProcessCallback(func(f float64, info string) {
@@ -102,16 +97,11 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 			}),
 			ssaapi.QueryWithSave(m.kind),
 			ssaapi.QueryWithProjectId(m.Config.GetProjectID()),
-		)
+		}
 		if m.Config.GetSyntaxFlowMemory() {
 			option = append(option, ssaapi.QueryWithMemory())
 		}
-		if enableRulePerf {
-			ruleRecorder = diagnostics.NewRecorder()
-			option = append(option, ssaapi.QueryWithRuleDiagnosticsRecorder(ruleRecorder))
-		}
 
-		// 执行规则查询
 		var err error
 		var res *ssaapi.SyntaxFlowResult
 		if overlay := prog.GetOverlay(); overlay != nil {
@@ -129,35 +119,14 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 			m.markRuleFailed()
 			m.errorCallback("program %s exc rule %s failed: %s", prog.GetProgramName(), rule.RuleName, err)
 		}
-
-		// 在规则执行完成后输出性能日志
-		if enableRulePerf && ruleRecorder != nil {
-			// 确保性能日志输出，即使日志级别较高
-			snapshots := ruleRecorder.Snapshot()
-			if len(snapshots) > 0 {
-				log.Info("========================================")
-				log.Infof("Rule Performance: %s", rule.RuleName)
-				log.Info("========================================")
-				for _, snapshot := range snapshots {
-					log.Info(snapshot.String())
-				}
-				log.Info("========================================")
-			} else {
-				// 即使没有数据，也输出提示信息
-				log.Debugf("Rule Performance: %s - no performance data recorded", rule.RuleName)
-			}
-		}
 		return nil
 	}
 
-	// 根据配置决定是否记录规则级别的详细性能
-	if enableRulePerf && m.ruleProfiler != nil {
-		// 构建 profile 名称：只使用规则名
-		profileName := rule.RuleName
-		m.ruleProfiler.Track(profileName, f)
+	// 仅在启用规则级性能且等级满足时走 Track 路径，否则直接执行，避免 diagnostics 影响扫描结果
+	if m.ruleProfiler != nil {
+		_, _ = m.ruleProfiler.ForKind(ssa.TrackKindScan).TrackHigh(rule.RuleName, doQuery)
 	} else {
-		// 不启用性能监控时，直接执行
-		f()
+		_ = doQuery()
 	}
 }
 
@@ -189,31 +158,25 @@ func (m *scanManager) errorCallback(format string, a ...interface{}) {
 	log.Errorf(format, a...)
 }
 
-// logScanPerformance 记录扫描性能统计报告
-func (m *scanManager) logScanPerformance(totalDuration time.Duration, enableRulePerf bool) {
-	// 使用 log.Info 确保性能日志总是输出
-	log.Info("=== Scan Total ===")
-	log.Infof("Time: %v", totalDuration)
-	log.Info("==================")
-
-	if enableRulePerf && m.ruleProfiler != nil {
-		snapshots := m.ruleProfiler.Snapshot()
-		if len(snapshots) > 0 {
-			// 生成并输出性能汇总表格
-			table := diagnostics.FormatPerformanceTable("Scan Performance Summary", snapshots)
-			log.Info("\n" + table)
-		} else {
-			log.Infof("Rule Performance (scan): no data recorded")
+// logScanSummary 使用 LogTable，内部仅 LevelHigh 时输出表格
+func (m *scanManager) logScanSummary() {
+	diagnostics.LogLow(ssa.TrackKindScan, "", fmt.Sprintf("total scan elapsed %v", m.scanDuration))
+	if m.ruleProfiler != nil {
+		snap := m.ruleProfiler.Snapshot()
+		if len(snap) > 0 {
+			headers, rows := diagnostics.MeasurementsToRows(snap)
+			if len(rows) > 0 {
+				diagnostics.LogTable(ssa.TrackKindScan, &diagnostics.TablePayload{Title: "Scan Performance Summary", Headers: headers, Rows: rows}, false)
+			}
 		}
 	}
-	// 总是输出扫描汇总表格
 	summaryData := map[string]string{
-		"Total Scan Time": totalDuration.String(),
+		"Total Scan Time": m.scanDuration.String(),
 		"Total Rules":     fmt.Sprintf("%d", m.processMonitor.TotalQuery.Load()),
 		"Success Rules":   fmt.Sprintf("%d", m.processMonitor.SuccessQuery.Load()),
 		"Failed Rules":    fmt.Sprintf("%d", m.processMonitor.FailedQuery.Load()),
 		"Risk Count":      fmt.Sprintf("%d", m.processMonitor.RiskCount.Load()),
 	}
-	table := diagnostics.FormatSimpleTable("Scan Summary", summaryData)
-	log.Info("\n" + table)
+	headers, rows := diagnostics.MapToRows(summaryData)
+	diagnostics.LogTable(ssa.TrackKindScan, &diagnostics.TablePayload{Title: "Scan Summary", Headers: headers, Rows: rows}, false)
 }

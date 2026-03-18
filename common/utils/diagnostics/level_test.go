@@ -10,7 +10,7 @@ func TestTraceLevelSkipsWhenDisabled(t *testing.T) {
 
 	SetLevel(LevelHigh)
 	run := false
-	if err := Track("trace-skip", func() error {
+	if _, err := Track(TrackKindGeneral, "trace-skip", func() error {
 		run = true
 		return nil
 	}); err != nil {
@@ -30,8 +30,8 @@ func TestTraceLevelRecordsWhenAllowed(t *testing.T) {
 	defer SetLevel(origLevel)
 	defer ReplaceDefault(origRec)
 
-	SetLevel(LevelLow)
-	if err := Track("measure-allowed", func() error { return nil }); err != nil {
+	SetLevel(LevelHigh)
+	if _, err := TrackHigh(TrackKindGeneral, "measure-allowed", func() error { return nil }); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	snaps := DefaultRecorder().Snapshot()

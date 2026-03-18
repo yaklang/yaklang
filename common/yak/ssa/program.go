@@ -310,7 +310,7 @@ func (prog *Program) Finish() {
 	this mean some file build in preHandler but not build in Build
 	*/
 	// log.Errorf("BUG!! program %s has not finish ast", prog.Name)
-	prog.LazyBuild() // finish
+	prog.LazyBuild()
 	// }
 	prog.UpStream.ForEach(func(i string, v *Program) bool {
 		v.Finish()

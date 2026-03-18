@@ -89,7 +89,7 @@ func yieldIrCodes(ctx context.Context, progName string, ids []int64) <-chan *IrC
 	outC := chanx.NewUnlimitedChan[*IrCode](ctx, 100)
 	go func() {
 		defer outC.Close()
-		_ = diagnostics.TrackLow("ssadb.yieldIrCodes", func() error {
+		_, _ = diagnostics.GetCurrentRecorder().ForKind(diagnostics.TrackKindGeneral).TrackLow("ssadb.yieldIrCodes", func() error {
 			idsToLoad := make([]int64, 0, len(ids))
 			cache := GetIrCodeCache(progName)
 			// Load from cache first
@@ -127,7 +127,7 @@ func SearchVariable(db *gorm.DB, ctx context.Context, progName string, cache *Na
 // SearchVariableWithExcludeFiles searches variables, supports excluding specified files
 func SearchVariableWithExcludeFiles(db *gorm.DB, ctx context.Context, progName string, cache *NameCache, compareMode CompareMode, matchMod MatchMode, value string, excludeFiles []string) <-chan *IrCode {
 	var result <-chan *IrCode
-	_ = diagnostics.TrackLow("ssadb.SearchVariableWithExcludeFiles", func() error {
+	_, _ = diagnostics.GetCurrentRecorder().ForKind(diagnostics.TrackKindGeneral).TrackLow("ssadb.SearchVariableWithExcludeFiles", func() error {
 		result = searchVariableWithExcludeFiles(db, ctx, progName, cache, compareMode, matchMod, value, excludeFiles)
 		return nil
 	})

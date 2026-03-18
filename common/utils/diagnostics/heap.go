@@ -211,7 +211,7 @@ func writeHeapProfile(cfg heapDumpConfig, alloc uint64, phase string) error {
 	if err := os.Rename(tmp, target); err != nil {
 		return err
 	}
-	log.Infof("[heap] snapshot profile saved: %s", target)
+	LogLow(TrackKindHeap, "", fmt.Sprintf("snapshot profile saved: %s", target))
 	return nil
 }
 
@@ -247,8 +247,8 @@ func withPhaseName(name string, phase string) string {
 }
 
 func logHeapStats(name string, stats runtime.MemStats) {
-	log.Infof(
-		"[heap] %s alloc=%dMB heap_alloc=%dMB heap_inuse=%dMB heap_idle=%dMB heap_objects=%d num_gc=%d",
+	LogLow(TrackKindHeap, "", fmt.Sprintf(
+		"%s alloc=%dMB heap_alloc=%dMB heap_inuse=%dMB heap_idle=%dMB heap_objects=%d num_gc=%d",
 		name,
 		bytesToMB(stats.Alloc),
 		bytesToMB(stats.HeapAlloc),
@@ -256,7 +256,7 @@ func logHeapStats(name string, stats runtime.MemStats) {
 		bytesToMB(stats.HeapIdle),
 		stats.HeapObjects,
 		stats.NumGC,
-	)
+	))
 }
 
 func resolveHeapProfileTarget(cfg heapDumpConfig, alloc uint64, phase string) string {
@@ -264,7 +264,7 @@ func resolveHeapProfileTarget(cfg heapDumpConfig, alloc uint64, phase string) st
 	if target == "" {
 		name := fmt.Sprintf(
 			"heap_profile_%s_%d_%s",
-			time.Now().Format("2006-01-02-15:04:05.000000000"),
+			time.Now().Format("2006-01-02-15-04-05.000000000"),
 			bytesToMB(alloc),
 			normalizeHeapName(cfg.name),
 		)
@@ -286,7 +286,11 @@ func resolveHeapProfileTarget(cfg heapDumpConfig, alloc uint64, phase string) st
 }
 
 // LogHeapSnapshot logs heap memory usage, and optionally logs the GC-before/after delta.
+// LevelHigh 时输出；level 在内部判断，调用方无需外部 Enabled 包裹。
 func LogHeapSnapshot(name string, withRuntimeGC bool) {
+	if !Enabled(LevelHigh) {
+		return
+	}
 	DumpHeap(
 		WithName(name),
 		WithRuntimeGC(withRuntimeGC),

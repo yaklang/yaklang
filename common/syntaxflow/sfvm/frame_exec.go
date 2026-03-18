@@ -1170,7 +1170,7 @@ func (s *SFFrame) execSyntaxFlowOp(i *SFI) (bool, error) {
 			ret   Values
 			ok    bool
 		)
-		if trackErr := diagnostics.TrackLow(name, func() error {
+		if _, trackErr := diagnostics.TrackLow(diagnostics.TrackKindGeneral, name, func() error {
 			s.debugSubLog(">> pop")
 			value = s.stack.Pop()
 			if value == nil {

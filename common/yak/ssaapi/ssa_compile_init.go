@@ -2,7 +2,6 @@ package ssaapi
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
@@ -25,13 +24,6 @@ func (c *Config) init(filesystem filesys_interface.FileSystem, fileSize int) (*s
 	) (err error) {
 		filePath := src.GetUrl()
 		application.ProcessInfof("start to compile : %v", filePath)
-		start := time.Now()
-		defer func() {
-			application.ProcessInfof(
-				"compile finish file: %s, cost: %v",
-				filePath, time.Since(start),
-			)
-		}()
 
 		LanguageBuilder := c.LanguageBuilder
 		// check builder
@@ -88,6 +80,7 @@ func (c *Config) init(filesystem filesys_interface.FileSystem, fileSize int) (*s
 			log.Warnf("(BUG or in DEBUG Mode)Range not found for %s", fb.GetName())
 		}
 		err = LanguageBuilder.BuildFromAST(ast, fb)
+		application.ProcessInfof("compile finish file: %s", filePath)
 		return err
 	}
 	builder := application.GetAndCreateFunctionBuilder(string(ssa.MainFunctionName), string(ssa.MainFunctionName))

@@ -62,11 +62,8 @@ type Config struct {
 
 	astSequence ssareducer.ASTSequenceType
 
-	// diagnostics configuration
-	diagnosticsEnabled  bool
-	diagnosticsRecorder *diagnostics.Recorder
-	// file performance recorder
-	filePerformanceRecorder *diagnostics.Recorder
+	// perfRecorder：统一 Recorder，用于 AST/Build/Database/Scan，单文件与项目编译共用；由 Level 控制懒创建
+	perfRecorder *diagnostics.Recorder
 
 	// incremental compilation information
 	// isIncremental 和 baseProgramName 已移至 ssaconfig.SSACompileConfig
@@ -302,8 +299,6 @@ var WithSetProgramName = ssaconfig.WithSetProgramName
 var WithMemory = ssaconfig.WithCompileMemoryCompile
 
 var WithConcurrency = ssaconfig.WithCompileConcurrency
-
-var WithFilePerformanceLog = ssaconfig.WithCompileFilePerformanceLog
 
 var WithDatabaseProgramCacheHitter = ssaconfig.SetOption("ssa_compile/database_program_cache_hitter", func(c *Config, h func(i any)) {
 	c.DatabaseProgramCacheHitter = h
