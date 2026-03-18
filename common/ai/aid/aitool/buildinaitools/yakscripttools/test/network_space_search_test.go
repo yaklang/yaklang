@@ -120,7 +120,7 @@ func TestNetworkSpaceSearch_ShodanWithoutAPIKey(t *testing.T) {
 }
 
 func TestNetworkSpaceSearch_AllValidEngineNames(t *testing.T) {
-	engines := []string{"fofa", "shodan", "zoomeye", "hunter", "quake"}
+	engines := []string{"fofa", "shodan", "zoomeye", "hunter", "quake", "zone"}
 	tool := getNetworkSpaceSearchTool(t)
 
 	for i := 0; i < len(engines); i++ {

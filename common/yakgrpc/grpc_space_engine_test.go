@@ -33,6 +33,9 @@ func TestServer_GetSpaceEngineStatus(t *testing.T) {
 		{
 			name: "fofa",
 		},
+		{
+			name: "zone",
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
