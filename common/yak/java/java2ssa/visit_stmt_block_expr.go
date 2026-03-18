@@ -1860,12 +1860,12 @@ func (y *singleFileBuilder) VisitCreatedName(raw javaparser.ICreatedNameContext)
 				object = y.ReadValue(name)
 				typ := y.AddFullTypeNameFromMap(name, nil)
 				typ.AddFullTypeName(name)
-				log.Infof("VisitCreatedName: get first object type: %v", typ.GetFullTypeNames())
+				log.Debugf("VisitCreatedName: get first object type: %v", typ.GetFullTypeNames())
 				object.SetType(typ)
 			} else {
 				key := y.EmitConstInstPlaceholder(name)
 				typ := y.CreateSubType(name, object.GetType())
-				log.Infof("VisitCreatedName: get sub  type: %v", typ.GetFullTypeNames())
+				log.Debugf("VisitCreatedName: get sub  type: %v", typ.GetFullTypeNames())
 				object = y.ReadMemberCallValue(object, key)
 				object.SetType(typ)
 			}
@@ -1873,12 +1873,12 @@ func (y *singleFileBuilder) VisitCreatedName(raw javaparser.ICreatedNameContext)
 		if !utils.IsNil(object) {
 			class.RegisterMagicMethod(ssa.Constructor, object)
 			for _, name := range object.GetType().GetFullTypeNames() {
-				log.Infof("add full type name: %s", name)
+				log.Debugf("add full type name: %s", name)
 				class.AddFullTypeName(name)
 			}
 		}
 	}
-	log.Infof("visit created name: %s", className)
+	log.Debugf("visit created name: %s", className)
 	class.AddFullTypeName(fullClassName)
 	return class
 }

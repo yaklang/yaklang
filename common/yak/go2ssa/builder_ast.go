@@ -158,9 +158,9 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 				if !ok {
 					continue
 				}
-				log.Infof("add interface funcName = %s", fun.GetName())
+				log.Debugf("add interface funcName = %s", fun.GetName())
 				fun.AddLazyBuilder(func() {
-					log.Infof("build interface funcName = %s", fun.GetName())
+					log.Debugf("build interface funcName = %s", fun.GetName())
 					switchHandler := b.SwitchFunctionBuilder(store)
 					defer func() {
 						switchHandler()
@@ -721,9 +721,9 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) {
 	}
 
 	store := b.StoreFunctionBuilder()
-	log.Infof("add function funcName = %s", funcName)
+	log.Debugf("add function funcName = %s", funcName)
 	newFunc.AddLazyBuilder(func() {
-		log.Infof("build function funcName = %s", funcName)
+		log.Debugf("build function funcName = %s", funcName)
 		switchHandler := b.SwitchFunctionBuilder(store)
 		defer func() {
 			switchHandler()
@@ -861,9 +861,9 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 	}
 
 	store := b.StoreFunctionBuilder()
-	log.Infof("add method funcName = %s", funcName)
+	log.Debugf("add method funcName = %s", funcName)
 	newFunc.AddLazyBuilder(func() {
-		log.Infof("build method funcName = %s", funcName)
+		log.Debugf("build method funcName = %s", funcName)
 		switchHandler := b.SwitchFunctionBuilder(store)
 		defer func() {
 			switchHandler()

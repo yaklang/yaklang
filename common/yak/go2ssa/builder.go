@@ -129,7 +129,7 @@ func (s *SSABuilder) BuildFromAST(raw ssa.FrontAST, builder *ssa.FunctionBuilder
 	}
 	// log.Infof("ast: %s", ast.ToStringTree(ast.GetParser().GetRuleNames(), ast.GetParser()))
 	astBuilder.build(ast)
-	log.Infof("Program: %v done\n", astBuilder.pkgNameCurrent)
+	log.Debugf("Program: %v done\n", astBuilder.pkgNameCurrent)
 	return nil
 }
 

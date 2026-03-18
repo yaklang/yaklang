@@ -22,7 +22,7 @@ func (c *Blueprint) IsMagicMethodName(name BlueprintMagicMethodKind) bool {
 
 func (c *Blueprint) RegisterMagicMethod(name BlueprintMagicMethodKind, val Value) {
 	if !c.IsMagicMethodName(name) {
-		log.Warnf("register magic method fail: not magic method")
+		log.Debugf("register magic method fail: not magic method: %q", name)
 		//return
 	}
 	if method, exit := c.MagicMethod[name]; exit {

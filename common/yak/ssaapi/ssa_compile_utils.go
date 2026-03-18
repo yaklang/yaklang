@@ -31,7 +31,7 @@ func (c *Config) GetFileHandler(
 	parse := func(path string, content []byte, store *utils.SafeMap[any]) (ssa.FrontAST, error) {
 		start := time.Now()
 		defer func() {
-			log.Infof("pre-handler cost:%v parse ast: %s; size(%v)", time.Since(start), path, Size(len(content)))
+			log.Debugf("pre-handler cost:%v parse ast: %s; size(%v)", time.Since(start), path, Size(len(content)))
 		}()
 
 		defer func() {
@@ -54,7 +54,7 @@ func (c *Config) GetFileHandler(
 		}
 		if cache == nil {
 			cache = c.LanguageBuilder.GetAntlrCache()
-			log.Errorf("get antlr cache from store failed, new one, path: %s, goroutine id: %d", path, getGID())
+			log.Debugf("get antlr cache from store failed, new one, path: %s, goroutine id: %d", path, getGID())
 			store.Set(key, cache)
 		}
 
@@ -62,7 +62,7 @@ func (c *Config) GetFileHandler(
 			if language.FilterParseAST(path) {
 				ast, err := language.ParseAST(utils.UnsafeBytesToString(content), cache)
 				if err != nil {
-					log.Infof("parsed file[%s] parse [%s]AST error[%s]", path, language.GetLanguage(), err)
+					log.Debugf("parsed file[%s] parse [%s]AST error[%s]", path, language.GetLanguage(), err)
 				}
 				return ast, err
 			} else {

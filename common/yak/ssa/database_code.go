@@ -80,7 +80,7 @@ func fitRange(c *ssadb.IrCode, rangeIns *memedit.Range, inst Instruction) {
 		if _, isBlock := ToBasicBlock(inst); isBlock {
 			log.Debugf("(DEBUG MODE) Range not found for BasicBlock %s", c.Name)
 		} else {
-			log.Warnf("(BUG or in DEBUG MODE) Range not found for %s", c.Name)
+			log.Debugf("(BUG or in DEBUG MODE) Range not found for %s", c.Name)
 		}
 		return
 	}
@@ -124,13 +124,13 @@ func instruction2IrCode(inst Instruction, ir *ssadb.IrCode) {
 		block, ok := ToBasicBlock(ret)
 		if ok && block != nil && block.GetRange() != nil {
 			codeRange = block.GetRange()
-			log.Warnf("Fallback, the %v is not set range, use its basic_block instance' ", inst.GetName())
+			log.Debugf("Fallback, the %v is not set range, use its basic_block instance' ", inst.GetName())
 		}
 	}
 
 	if codeRange == nil {
 		if ret := inst.GetFunc().GetRange(); ret != nil {
-			log.Warnf("Fallback, the %v is not set range, use its function instance' ", inst.GetName())
+			log.Debugf("Fallback, the %v is not set range, use its function instance' ", inst.GetName())
 			inst.SetRange(ret)
 			codeRange = ret
 		}

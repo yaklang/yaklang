@@ -168,7 +168,7 @@ func (c *Config) Processf(process float64, format string, arg ...any) {
 	if c.process != nil {
 		c.process(msg, process)
 	} else {
-		log.Info(msg, process)
+		log.Debug(msg, process)
 	}
 }
 
