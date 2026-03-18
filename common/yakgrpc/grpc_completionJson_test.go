@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils"
 	_ "github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -59,4 +60,17 @@ func TestServer_GetYakitCompletionRaw_Antlr4Yak(t *testing.T) {
 	if len(rsp.RawJson) <= 0 {
 		t.Fatal("empty result")
 	}
+}
+
+func TestStaticAnalyzeError_SyntaxFlowBlankRule(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	resp, err := client.StaticAnalyzeError(context.Background(), &ypb.StaticAnalyzeErrorRequest{
+		Code:       []byte(" \n\t"),
+		PluginType: "syntaxflow",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.Empty(t, resp.Result)
 }

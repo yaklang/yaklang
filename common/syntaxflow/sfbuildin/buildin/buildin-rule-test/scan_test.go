@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfanalysis"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
@@ -54,7 +55,7 @@ func TestVerifiedRule(t *testing.T) {
 				detach()
 			}()
 			t.Log("Start to verify: " + rule.RuleName)
-			err := ssatest.EvaluateVerifyFilesystemWithRule(rule, t, false, sfvm.WithEnableDebug(true))
+			err := sfanalysis.EvaluateVerifyFilesystemWithRule(rule, sfanalysis.WithVerifyNegative(true))
 			if err != nil {
 				failedMu.Lock()
 				failedRules = append(failedRules, caseName)
@@ -96,7 +97,7 @@ func TestVerify_DEBUG(t *testing.T) {
 		t.Run(rule.RuleName, func(t *testing.T) {
 			t.Parallel()
 			t.Log("Start to verify: " + rule.RuleName)
-			err := ssatest.EvaluateVerifyFilesystemWithRule(rule, t, false, sfvm.WithEnableDebug(true))
+			err := sfanalysis.EvaluateVerifyFilesystemWithRule(rule, sfanalysis.WithVerifyNegative(true))
 			if err != nil {
 				require.NoError(t, err)
 			}

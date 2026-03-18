@@ -185,7 +185,17 @@ func (p *Program) LazyBuild() {
 	if virtualFunction != nil {
 		virtualFunction.Finish()
 	}
-	if function == nil && virtualFunction == nil {
+	initFunction := p.GetFunction(string(InitFunctionName), "")
+	if initFunction != nil {
+		initFunction.Finish()
+	}
+	if function == nil && virtualFunction == nil && initFunction == nil {
+		// Library/placeholder programs may legitimately contain no entry functions.
+		// Treat this as "nothing to finish" instead of an error log which is noisy in
+		// contexts like SyntaxFlow rule verification and language-server analysis.
+		if p.ProgramKind != Application {
+			return
+		}
 		log.Errorf("main function is not found and virtual function is not found")
 		return
 	}

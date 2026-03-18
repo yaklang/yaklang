@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfanalyzer"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfanalysis"
 	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -154,43 +154,30 @@ func StaticAnalyzeWithContext(ctx context.Context, code, codeTyp string, kind St
 			})
 		}
 	case "syntaxflow":
-		// 第1步：语法检测（必须通过，富集错误信息）
 		sfStart := time.Now()
-		syntaxErrs, frame := syntaxFlowCompileAndCheck(code)
+		switch kind {
+		case Score:
+			report := sfanalysis.Analyze(ctx, code, sfanalysis.DefaultOptions(sfanalysis.ProfileQuality))
+			if report.Quality != nil {
+				results = append(results, report.Quality.GetStaticAnalyzeResults()...)
+			}
+		default:
+			report := sfanalysis.Analyze(ctx, code, sfanalysis.DefaultOptions(sfanalysis.ProfileEditor))
+			results = append(results, report.SyntaxErrors...)
+			if len(report.SyntaxErrors) > 0 {
+				results = append(results, &result.StaticAnalyzeResult{
+					Message:         "【SyntaxFlow 语法错误】\n" + report.FormattedSyntaxErrors,
+					Severity:        result.Error,
+					StartLineNumber: 0,
+					StartColumn:     0,
+					EndLineNumber:   0,
+					EndColumn:       1,
+					From:            "syntaxflow_formatted",
+				})
+			}
+		}
 		sfDuration := time.Since(sfStart)
-		perfRecorder.RecordDuration("SyntaxFlow Compile", sfDuration)
-
-		if len(syntaxErrs) > 0 {
-			// 富集：添加结构化错误 + 富格式提示
-			results = append(results, syntaxErrs...)
-			results = append(results, &result.StaticAnalyzeResult{
-				Message:         "【SyntaxFlow 语法错误】\n" + FormatSyntaxFlowErrors(code, syntaxErrs),
-				Severity:        result.Error,
-				StartLineNumber: 0,
-				StartColumn:     0,
-				EndLineNumber:   0,
-				EndColumn:       1,
-				From:            "syntaxflow_formatted",
-			})
-			return results
-		}
-
-		// 第2步：规则正确性检测（内嵌 file://、UNSAFE 正反例，必须通过，富集错误信息）
-		if err := sfanalyzer.EvaluateVerifyFilesystemWithFrame(frame); err != nil {
-			results = append(results, &result.StaticAnalyzeResult{
-				Message:         fmt.Sprintf("【规则正确性检测失败】正反例验证未通过：%v", err),
-				Severity:        result.Error,
-				StartLineNumber: 0,
-				StartColumn:     0,
-				EndLineNumber:   0,
-				EndColumn:       1,
-				From:            "syntaxflow_verify",
-			})
-			return results
-		}
-
-		// 第3步：规则打分（直接打印结果，不阻塞，供用户参考）
-		_ = sfanalyzer.NewSyntaxFlowAnalyzer(code).Analyze() // Analyze 内部会 log.Info 输出评分
+		perfRecorder.RecordDuration("SyntaxFlow Analyze", sfDuration)
 	default:
 		log.Error("静态分析失败：未知的代码类型")
 	}

@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfanalyzer"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfanalysis"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -35,16 +35,16 @@ func TestEvaluateSyntaxFlowRule_WithDirectRuleInput(t *testing.T) {
 )
 
 Runtime.getRuntime().exec(* as $cmd) as $result;
-alert $result;`,
+			alert $result;`,
 			expectError:   false,
-			expectedScore: int64(sfanalyzer.MaxScore - sfanalyzer.MissingPositiveTestPenalty - sfanalyzer.MissingNegativeTestPenalty), // 100 - 15 - 5 = 80
+			expectedScore: int64(sfanalysis.MaxScore - sfanalysis.MissingPositiveTestPenalty - sfanalysis.MissingNegativeTestPenalty), // 100 - 15 - 5 = 80
 			checkProblems: false,
 		},
 		{
 			name:          "完全语法错误",
 			ruleInput:     `invalid syntax here $$$`,
 			expectError:   false,
-			expectedScore: int64(sfanalyzer.MaxScore - sfanalyzer.SyntaxErrorPenalty), // 100 - 100 = 0
+			expectedScore: int64(sfanalysis.MaxScore - sfanalysis.SyntaxErrorPenalty), // 100 - 100 = 0
 			checkProblems: true,
 		},
 		{
@@ -55,7 +55,7 @@ alert $result;`,
 
 test.* as $result &&& invalid syntax`,
 			expectError:   false,
-			expectedScore: int64(sfanalyzer.MaxScore - sfanalyzer.SyntaxErrorPenalty), // 100 - 100 = 0
+			expectedScore: int64(sfanalysis.MaxScore - sfanalysis.SyntaxErrorPenalty), // 100 - 100 = 0
 			checkProblems: true,
 		},
 		{
@@ -68,7 +68,7 @@ test.* as $result &&& invalid syntax`,
 Runtime.getRuntime().exec(* as $cmd) as $result;
 alert $result;`,
 			expectError:   false,
-			expectedScore: int64(sfanalyzer.MaxScore - sfanalyzer.MissingDescriptionPenalty - sfanalyzer.MissingPositiveTestPenalty - sfanalyzer.MissingNegativeTestPenalty), // 100 - 40 - 15 - 5 = 40
+			expectedScore: int64(sfanalysis.MaxScore - sfanalysis.MissingDescriptionPenalty - sfanalysis.MissingPositiveTestPenalty - sfanalysis.MissingNegativeTestPenalty), // 100 - 40 - 15 - 5 = 40
 			checkProblems: true,
 		},
 		{
@@ -81,7 +81,7 @@ alert $result;`,
 Runtime.getRuntime().exec(* as $cmd) as $result;
 alert $result;`,
 			expectError:   false,
-			expectedScore: int64(sfanalyzer.MaxScore - sfanalyzer.MissingSolutionPenalty - sfanalyzer.MissingPositiveTestPenalty - sfanalyzer.MissingNegativeTestPenalty), // 100 - 10 - 15 - 5 = 70
+			expectedScore: int64(sfanalysis.MaxScore - sfanalysis.MissingSolutionPenalty - sfanalysis.MissingPositiveTestPenalty - sfanalysis.MissingNegativeTestPenalty), // 100 - 10 - 15 - 5 = 70
 			checkProblems: true,
 		},
 		{
@@ -93,7 +93,7 @@ alert $result;`,
 Runtime.getRuntime().exec(* as $cmd) as $result;
 alert $result;`,
 			expectError:   false,
-			expectedScore: int64(sfanalyzer.MaxScore - sfanalyzer.MissingDescriptionPenalty - sfanalyzer.MissingSolutionPenalty - sfanalyzer.MissingPositiveTestPenalty - sfanalyzer.MissingNegativeTestPenalty), // 100 - 40 - 10 - 15 - 5 = 30
+			expectedScore: int64(sfanalysis.MaxScore - sfanalysis.MissingDescriptionPenalty - sfanalysis.MissingSolutionPenalty - sfanalysis.MissingPositiveTestPenalty - sfanalysis.MissingNegativeTestPenalty), // 100 - 40 - 10 - 15 - 5 = 30
 			checkProblems: true,
 		},
 		{
@@ -106,15 +106,22 @@ alert $result;`,
 
 Runtime.getRuntime().exec(* as $cmd) as $result;`,
 			expectError:   false,
-			expectedScore: int64(sfanalyzer.MinScore), // 缺少alert直接0分
+			expectedScore: int64(sfanalysis.MinScore), // 缺少alert直接0分
 			checkProblems: true,
 		},
 		{
 			name:          "空规则",
 			ruleInput:     "",
-			expectError:   true, // 数据库找不到报错
+			expectError:   false,
 			expectedScore: 0,
-			checkProblems: false,
+			checkProblems: true,
+		},
+		{
+			name:          "空白规则",
+			ruleInput:     " \n\t",
+			expectError:   false,
+			expectedScore: 0,
+			checkProblems: true,
 		},
 	}
 
@@ -195,7 +202,7 @@ alert $result;`
 		require.NotNil(t, resp)
 
 		// 由于是完整规则但缺少测试数据，应该是80分
-		expectedScore := int64(sfanalyzer.MaxScore - sfanalyzer.MissingPositiveTestPenalty - sfanalyzer.MissingNegativeTestPenalty) // 100 - 15 - 5 = 80
+		expectedScore := int64(sfanalysis.MaxScore - sfanalysis.MissingPositiveTestPenalty - sfanalysis.MissingNegativeTestPenalty) // 100 - 15 - 5 = 80
 		assert.Equal(t, expectedScore, resp.Score)
 	})
 
@@ -256,7 +263,7 @@ alert $result;`
 		require.NotNil(t, resp)
 
 		// 由于直接传入的规则更完整，应该是80分（缺少测试数据）
-		expectedScore := int64(sfanalyzer.MaxScore - sfanalyzer.MissingPositiveTestPenalty - sfanalyzer.MissingNegativeTestPenalty) // 100 - 15 - 5 = 80
+		expectedScore := int64(sfanalysis.MaxScore - sfanalysis.MissingPositiveTestPenalty - sfanalysis.MissingNegativeTestPenalty) // 100 - 15 - 5 = 80
 		assert.Equal(t, expectedScore, resp.Score)
 	})
 }
@@ -275,16 +282,16 @@ func TestEvaluateSyntaxFlowRule_AnalyzeResults(t *testing.T) {
 		{
 			name:                "语法错误",
 			ruleContent:         `Runtime.getRuntime().exec( as $invalid`,
-			expectedProblemType: []string{sfanalyzer.ProblemTypeSyntaxError},
-			expectedSeverity:    []string{sfanalyzer.Error},
+			expectedProblemType: []string{sfanalysis.ProblemTypeSyntaxError},
+			expectedSeverity:    []string{sfanalysis.Error},
 		},
 		{
 			name: "缺少描述字段",
 			ruleContent: `desc(title: "测试")
 Runtime.getRuntime().exec(* as $cmd) as $result;
 alert $result;`,
-			expectedProblemType: []string{sfanalyzer.ProblemTypeLackDescriptionField},
-			expectedSeverity:    []string{sfanalyzer.Warning},
+			expectedProblemType: []string{sfanalysis.ProblemTypeLackDescriptionField},
+			expectedSeverity:    []string{sfanalysis.Warning},
 		},
 		{
 			name: "缺少alert语句",
@@ -295,8 +302,8 @@ alert $result;`,
 )
 
 Runtime.getRuntime().exec(* as $cmd) as $result;`,
-			expectedProblemType: []string{sfanalyzer.ProblemTypeMissingPositiveTestData, sfanalyzer.ProblemTypeMissingNegativeTestData, sfanalyzer.ProblemTypeMissingAlert},
-			expectedSeverity:    []string{sfanalyzer.Warning, sfanalyzer.Warning, sfanalyzer.Error},
+			expectedProblemType: []string{sfanalysis.ProblemTypeMissingPositiveTestData, sfanalysis.ProblemTypeMissingNegativeTestData, sfanalysis.ProblemTypeMissingAlert},
+			expectedSeverity:    []string{sfanalysis.Warning, sfanalysis.Warning, sfanalysis.Error},
 		},
 		{
 			name: "缺少测试数据",
@@ -307,9 +314,21 @@ Runtime.getRuntime().exec(* as $cmd) as $result;`,
 )
 
 Runtime.getRuntime().exec(* as $cmd) as $result;
-alert $result;`,
-			expectedProblemType: []string{sfanalyzer.ProblemTypeMissingPositiveTestData, sfanalyzer.ProblemTypeMissingNegativeTestData},
-			expectedSeverity:    []string{sfanalyzer.Warning, sfanalyzer.Warning},
+	alert $result;`,
+			expectedProblemType: []string{sfanalysis.ProblemTypeMissingPositiveTestData, sfanalysis.ProblemTypeMissingNegativeTestData},
+			expectedSeverity:    []string{sfanalysis.Warning, sfanalysis.Warning},
+		},
+		{
+			name:        "空白规则",
+			ruleContent: " \n\t",
+			expectedProblemType: []string{
+				sfanalysis.ProblemTypeLackDescriptionField,
+				sfanalysis.ProblemTypeLackSolutionField,
+				sfanalysis.ProblemTypeMissingPositiveTestData,
+				sfanalysis.ProblemTypeMissingNegativeTestData,
+				sfanalysis.ProblemTypeMissingAlert,
+			},
+			expectedSeverity: []string{sfanalysis.Warning},
 		},
 	}
 
@@ -368,7 +387,7 @@ EOF
 
 Runtime.getRuntime().exec(* as $cmd) as $result;
 alert $result;`,
-			expectedScore: int64(sfanalyzer.MaxScore - sfanalyzer.MissingNegativeTestPenalty), // 100 - 5 = 95
+			expectedScore: int64(sfanalysis.MaxScore - sfanalysis.MissingNegativeTestPenalty), // 100 - 5 = 95
 		},
 		{
 			name: "正反测试都有",
@@ -396,7 +415,7 @@ SAFE
 
 Runtime.getRuntime().exec(* as $cmd) as $result;
 alert $result;`,
-			expectedScore: int64(sfanalyzer.MaxScore), // 100分
+			expectedScore: int64(sfanalysis.MaxScore), // 100分
 		},
 		{
 			name: "测试用例不通过",
@@ -417,7 +436,7 @@ EOF
 
 Runtime.getRuntime().exec(* as $cmd) as $result;
 alert $result;`,
-			expectedScore: int64(sfanalyzer.MinScore), // 测试用例不通过直接0分
+			expectedScore: int64(sfanalysis.MinScore), // 测试用例不通过直接0分
 		},
 	}
 
@@ -452,7 +471,8 @@ func TestEvaluateSyntaxFlowRule_EmptyRequests(t *testing.T) {
 	t.Run("完全空的请求", func(t *testing.T) {
 		req := &ypb.SmokingEvaluatePluginRequest{}
 
-		_, err := client.SmokingEvaluatePlugin(context.Background(), req)
-		assert.Error(t, err)
+		resp, err := client.SmokingEvaluatePlugin(context.Background(), req)
+		assert.NoError(t, err)
+		assert.NotNil(t, resp)
 	})
 }

@@ -14,9 +14,9 @@ import (
 	_ "github.com/yaklang/yaklang/common/aiforge/aibp"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfanalysis"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -231,8 +231,7 @@ func validateRuleWithStrictMode(ruleContent, ruleName string) error {
 		Content:  ruleContent,
 	}
 
-	// 使用ssatest进行严格模式验证
-	err = ssatest.EvaluateVerifyFilesystemWithRule(tempRule, nil, true)
+	err = sfanalysis.EvaluateVerifyFilesystemWithRule(tempRule, sfanalysis.WithStrictEmbeddedVerify())
 	if err != nil {
 		return utils.Errorf("strict mode validation failed: %v", err)
 	}
