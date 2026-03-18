@@ -2,6 +2,8 @@ package memedit
 
 import (
 	"bytes"
+	"crypto/md5"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"path"
@@ -42,8 +44,13 @@ type MemEditor struct {
 }
 
 func NewMemEditorByBytes(bs []byte) *MemEditor {
-	str := utils.UnsafeBytesToString(bs)
-	return NewMemEditor(str)
+	editor := &MemEditor{
+		safeSourceCode:     NewSafeString(bs),
+		lineLensMap:        make(map[int]int),
+		lineStartOffsetMap: make(map[int]int),
+	}
+	editor.recalculateLineMappings()
+	return editor
 }
 
 func NewMemEditor(sourceCode string) *MemEditor {
@@ -230,24 +237,31 @@ func (ve *MemEditor) GetIrSourceHash() string {
 	}
 	folderPath := ve.folderPath // 使用内部规范化的路径
 	fileName := ve.GetFilename()
-	sourceCode := ve.GetSourceCode()
 
-	// 构建用于 hash 的字符串，使用明确的分隔符
-	// 格式: {programName}/{folderPath}/{fileName}|{sourceCode}
-	var hashData string
-	if folderPath == "" {
-		// 如果 folderPath 为空，格式为: {programName}/{fileName}|{sourceCode}
-		hashData = programName + "/" + fileName + "|" + sourceCode
-	} else {
-		// 正常情况: {programName}/{folderPath}/{fileName}|{sourceCode}
-		hashData = programName + "/" + folderPath + "/" + fileName + "|" + sourceCode
+	var sourceBytes []byte
+	if ve.safeSourceCode != nil {
+		sourceBytes = ve.safeSourceCode.Bytes()
 	}
 	// 如果源代码为空，也返回空字符串
-	if hashData == "/|" {
+	if programName == "" && folderPath == "" && fileName == "" && len(sourceBytes) == 0 {
 		return ""
 	}
-	hash := codec.Md5(hashData)
-	return hash
+
+	// Compute md5(programName + "/" + folderPath + "/" + fileName + "|" + sourceCode)
+	// without allocating the full concatenated string.
+	h := md5.New()
+	_, _ = h.Write(utils.UnsafeStringToBytes(programName))
+	_, _ = h.Write([]byte{'/'})
+	if folderPath != "" {
+		_, _ = h.Write(utils.UnsafeStringToBytes(folderPath))
+		_, _ = h.Write([]byte{'/'})
+	}
+	_, _ = h.Write(utils.UnsafeStringToBytes(fileName))
+	_, _ = h.Write([]byte{'|'})
+	if len(sourceBytes) > 0 {
+		_, _ = h.Write(sourceBytes)
+	}
+	return hex.EncodeToString(h.Sum(nil))
 }
 
 func (ve *MemEditor) GetLength() int {
@@ -843,6 +857,18 @@ func (ve *MemEditor) GetSourceCode(index ...int) string {
 		log.Warnf("GetSourceCode: invalid index: %v", index)
 		return ""
 	}
+}
+
+// GetSourceCodeUnsafe returns the full source code without allocating a new string.
+//
+// WARNING: The returned string aliases internal buffers. It is intended for
+// read-only, performance-sensitive paths (e.g. scanning/matching). Do not use it
+// if the underlying editor may be mutated concurrently.
+func (ve *MemEditor) GetSourceCodeUnsafe() string {
+	if ve == nil || ve.safeSourceCode == nil {
+		return ""
+	}
+	return utils.UnsafeBytesToString(ve.safeSourceCode.Bytes())
 }
 
 func (e *MemEditor) GetTextContextWithPrompt(p *Range, n int, msg ...string) string {

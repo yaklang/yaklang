@@ -3,12 +3,12 @@ package ssareducer
 import (
 	"context"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
-	"github.com/yaklang/yaklang/common/utils/pipeline"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
@@ -53,114 +53,166 @@ func FilesHandler(
 	orderType ASTSequenceType,
 	concurrency int,
 ) <-chan *FileContent {
-	bufSize := len(paths)
-	readFilePipe := pipeline.NewPipe[string, *FileContent](
-		ctx, bufSize, func(path string) (*FileContent, error) {
-			// check file size with maxFileSize
-			info, err := filesystem.Stat(path)
-			if err != nil {
-				log.Errorf("stat file[%s] error: %s", path, err)
-				return &FileContent{
-					Path:   path,
-					Err:    err,
-					Status: FileStatusFsError,
-				}, nil
-			}
-			if info.Size() > maxFileSize {
-				err := utils.Errorf("file size %d exceeds max limit %d", info.Size(), maxFileSize)
-				log.Errorf("%s %s", err, path)
-				return &FileContent{
-					Path:   path,
-					Err:    err,
-					Status: FileStatusFsError,
-				}, nil
-			}
-
-			content, err := filesystem.ReadFile(path)
-			if err != nil {
-				log.Errorf("read file[%s] error: %s", path, err)
-				return &FileContent{
-					Path:   path,
-					Err:    err,
-					Status: FileStatusFsError,
-				}, nil
-			}
-			var fileErr error = err
-			// Check if content is a text file
-			return &FileContent{
-				Path:    path,
-				Content: content,
-				Err:     fileErr,
-				Status:  FileStatusSuccess,
-			}, nil
-		},
-		concurrency,
-	)
-	readFilePipe.FeedSlice(paths)
-
-	parseASTPipe := pipeline.NewPipeWithStore[*FileContent, *FileContent](
-		ctx, bufSize, func(fileContent *FileContent, store *utils.SafeMap[any]) (*FileContent, error) {
-			if fileContent.Status == FileStatusFsError {
-				return fileContent, nil
-			}
-			start := time.Now()
-			ast, err := handler(fileContent.Path, fileContent.Content, store)
-			fileContent.Duration = time.Since(start)
-			fileContent.AST = ast
-			fileContent.Err = err
-			if err != nil {
-				log.Errorf("parse file[%s] error: %s", fileContent.Path, err)
-				fileContent.Status = FileParseASTError
-			} else {
-				fileContent.Status = FileParseASTSuccess
-			}
-			return fileContent, nil
-		},
-		initWorker,
-		concurrency,
-	)
-
-	sort := func(index int) <-chan *FileContent {
-		out := make([]*FileContent, 0, len(paths))
-		for fc := range parseASTPipe.Out() {
-			out = append(out, fc)
-		}
-
-		pathIndex := make(map[string]int, len(paths))
-		for i, p := range paths {
-			pathIndex[p] = i
-		}
-
-		slices.SortFunc(out, func(a, b *FileContent) int {
-			indexA := pathIndex[a.Path]
-			indexB := pathIndex[b.Path]
-			if indexA < indexB {
-				return index
-			}
-			if indexA > indexB {
-				return -index
-			}
-			return 0
-		})
-		ch := make(chan *FileContent, bufSize)
-		go func() {
-			defer close(ch)
-			for _, fc := range out {
-				ch <- fc
-			}
-		}()
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if concurrency <= 0 {
+		concurrency = 10
+	}
+	if len(paths) == 0 {
+		ch := make(chan *FileContent)
+		close(ch)
 		return ch
 	}
 
-	parseASTPipe.FeedChannel(readFilePipe.Out())
-	switch orderType {
-	case OutOfOrder:
-		return parseASTPipe.Out()
-	case Order:
-		return sort(-1)
-	case ReverseOrder:
-		return sort(1)
+	// Bound in-flight file contents (content + AST) to avoid unbounded memory growth when
+	// parsing is faster than downstream consumption (e.g. pre-handler/build).
+	outBuf := concurrency * 2
+	if outBuf < 16 {
+		outBuf = 16
+	}
+	if outBuf > len(paths) {
+		outBuf = len(paths)
 	}
 
-	return parseASTPipe.Out()
+	type fileJob struct {
+		index int
+		path  string
+	}
+	type fileResult struct {
+		index int
+		fc    *FileContent
+	}
+
+	jobs := make(chan fileJob, outBuf)
+	results := make(chan fileResult, outBuf)
+
+	go func() {
+		defer close(jobs)
+		for i, p := range paths {
+			select {
+			case <-ctx.Done():
+				return
+			case jobs <- fileJob{index: i, path: p}:
+			}
+		}
+	}()
+
+	var wg sync.WaitGroup
+	wg.Add(concurrency)
+	for i := 0; i < concurrency; i++ {
+		go func() {
+			defer wg.Done()
+			var store *utils.SafeMap[any]
+			if initWorker != nil {
+				store = initWorker()
+			}
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case job, ok := <-jobs:
+					if !ok {
+						return
+					}
+
+					fc := &FileContent{Path: job.path}
+					info, err := filesystem.Stat(job.path)
+					if err != nil {
+						log.Errorf("stat file[%s] error: %s", job.path, err)
+						fc.Err = err
+						fc.Status = FileStatusFsError
+					} else if info.Size() > maxFileSize {
+						err := utils.Errorf("file size %d exceeds max limit %d", info.Size(), maxFileSize)
+						log.Errorf("%s %s", err, job.path)
+						fc.Err = err
+						fc.Status = FileStatusFsError
+					} else {
+						content, err := filesystem.ReadFile(job.path)
+						if err != nil {
+							log.Errorf("read file[%s] error: %s", job.path, err)
+							fc.Err = err
+							fc.Status = FileStatusFsError
+						} else {
+							fc.Content = content
+							fc.Status = FileStatusSuccess
+							start := time.Now()
+							ast, err := handler(job.path, content, store)
+							fc.Duration = time.Since(start)
+							fc.AST = ast
+							fc.Err = err
+							if err != nil {
+								fc.Status = FileParseASTError
+							} else {
+								fc.Status = FileParseASTSuccess
+							}
+						}
+					}
+
+					select {
+					case <-ctx.Done():
+						return
+					case results <- fileResult{index: job.index, fc: fc}:
+					}
+				}
+			}
+		}()
+	}
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	out := make(chan *FileContent, outBuf)
+	go func() {
+		defer close(out)
+		switch orderType {
+		case OutOfOrder:
+			for r := range results {
+				if r.fc == nil {
+					continue
+				}
+				select {
+				case <-ctx.Done():
+					return
+				case out <- r.fc:
+				}
+			}
+			return
+		case Order, ReverseOrder:
+			ordered := make([]*FileContent, len(paths))
+			for r := range results {
+				ordered[r.index] = r.fc
+			}
+			if orderType == ReverseOrder {
+				slices.Reverse(ordered)
+			}
+			for _, fc := range ordered {
+				if fc == nil {
+					continue
+				}
+				select {
+				case <-ctx.Done():
+					return
+				case out <- fc:
+				}
+			}
+			return
+		default:
+			for r := range results {
+				if r.fc == nil {
+					continue
+				}
+				select {
+				case <-ctx.Done():
+					return
+				case out <- r.fc:
+				}
+			}
+			return
+		}
+	}()
+
+	return out
 }

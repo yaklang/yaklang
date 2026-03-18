@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/trace"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -24,6 +25,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssalog"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -277,59 +279,108 @@ $sink #-> ?{opcode: param} as $result;
 }
 
 func TestA(t *testing.T) {
-	t.Skip("Skip TestA")
-	go func() {
-		err := http.ListenAndServe(":18080", nil)
-		if err != nil {
-			return
-		}
-	}()
-	// diagnostics.StartHeapMonitor(time.Second, diagnostics.WithFileName("heap.prof"))
+	t.Skip("deprecated: use TestASTParseFileMetrics_DecompiledCodeTarget")
+}
 
-	path := "/home/wlz/Developer/pfsense"
-	file := "src/usr/local/pfSense/include/Services/Filesystem/Provider/SystemProvider.php"
-	parseAllFile := true
+func TestASTParseFileMetrics_DecompiledCodeTarget(t *testing.T) {
+	if utils.InGithubActions() {
+		t.Skip("local-only profiling test")
+	}
+	if os.Getenv("YAK_RUN_AST_PARSE_FILE_METRICS_TEST") == "" {
+		t.Skip("set YAK_RUN_AST_PARSE_FILE_METRICS_TEST=1 to run local AST parse profiling")
+	}
+
+	antlr4util.ResetSLLFirstCounters()
+
+	ssalog.Log.SetLevel("info")
+	t.Setenv("YAK_AST_PARSE_FILE_METRICS", "1")
+
+	if os.Getenv("YAK_START_PPROF") != "" {
+		go func() {
+			_ = http.ListenAndServe(":18080", nil)
+		}()
+	}
+
+	path := os.Getenv("YAK_AST_PARSE_FILE_METRICS_TARGET")
+	if path == "" {
+		path = "/tmp/decompiled-code-target"
+	}
 	refFS := filesys.NewRelLocalFs(path)
-	_ = file
+	if _, err := refFS.Stat("."); err != nil {
+		t.Skipf("target path not found: %s (%v)", path, err)
+	}
 
 	config, err := ssaapi.DefaultConfig(
 		ssaapi.WithFileSystem(refFS),
-		ssaapi.WithLanguage(ssaconfig.PHP),
+		ssaapi.WithLanguage(ssaconfig.JAVA),
 		ssaapi.WithProcess(func(msg string, process float64) {
 			log.Infof("Process: %s, %.2f%%", msg, process*100)
 		}),
-		ssaapi.WithConcurrency(runtime.NumCPU()),
+		ssaapi.WithConcurrency(func() int {
+			concurrency := runtime.NumCPU()
+			if raw := os.Getenv("YAK_AST_PARSE_FILE_METRICS_CONCURRENCY"); raw != "" {
+				if v, err := strconv.Atoi(raw); err == nil && v > 0 {
+					concurrency = v
+				}
+			}
+			return concurrency
+		}()),
 	)
 	require.NoError(t, err)
 
 	fileList := make([]string, 0)
 	fileMap := make(map[string]struct{})
-	diagnostics.Track("collect file", func() error {
-		filesys.Recursive(".",
-			filesys.WithFileSystem(refFS),
-			filesys.WithDirStat(func(fullPath string, fi fs.FileInfo) error {
-				// check folder folderName
-				_, folderName := refFS.PathSplit(fullPath)
-				if folderName == "test" || folderName == ".git" {
-					return filesys.SkipDir
-				}
-				return nil
-			}),
-			filesys.WithFileStat(func(fileName string, fi os.FileInfo) error {
-				if fi.IsDir() {
+	limit := 0
+	if raw := os.Getenv("YAK_AST_PARSE_FILE_METRICS_LIMIT"); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v > 0 {
+			limit = v
+		}
+	}
+	if singleFile := os.Getenv("YAK_AST_PARSE_FILE_METRICS_FILE"); singleFile != "" {
+		if _, err := refFS.Stat(singleFile); err != nil {
+			t.Fatalf("metrics file not found: %s (%v)", singleFile, err)
+		}
+		fileList = append(fileList, singleFile)
+		fileMap[singleFile] = struct{}{}
+	} else {
+		diagnostics.Track("collect file", func() error {
+			filesys.Recursive(".",
+				filesys.WithFileSystem(refFS),
+				filesys.WithDirStat(func(fullPath string, fi fs.FileInfo) error {
+					// check folder folderName
+					_, folderName := refFS.PathSplit(fullPath)
+					if folderName == "test" || folderName == ".git" {
+						return filesys.SkipDir
+					}
 					return nil
-				}
+				}),
+				filesys.WithFileStat(func(fileName string, fi os.FileInfo) error {
+					if fi.IsDir() {
+						return nil
+					}
 
-				// log.Infof("file: %s", s)
-				if parseAllFile || fileName == file {
+					if refFS.Ext(fileName) != ".java" {
+						return nil
+					}
+
+					// Parse all Java files under target root.
 					fileList = append(fileList, fileName)
 					fileMap[fileName] = struct{}{}
-				}
-				return nil
-			}),
-		)
-		return nil
-	})
+					return nil
+				}),
+			)
+			return nil
+		})
+		if limit > 0 && len(fileList) > limit {
+			fileList = fileList[:limit]
+			for k := range fileMap {
+				delete(fileMap, k)
+			}
+			for _, p := range fileList {
+				fileMap[p] = struct{}{}
+			}
+		}
+	}
 	// log.Errorf("FileList: %+v", fileList)
 
 	var ch <-chan *ssareducer.FileContent
@@ -350,6 +401,11 @@ func TestA(t *testing.T) {
 			// 	log.Infof("file %s ", fc.Path)
 		}
 	}
+	stats := antlr4util.SLLFirstCountersSnapshot()
+	log.Debugf(
+		"[antlr-sll-first] ll_only=%d sll_attempts=%d fallbacks=%d cancelled=%d error=%d",
+		stats.LLOnly, stats.SLLAttempts, stats.Fallbacks, stats.FallbackCancelled, stats.FallbackError,
+	)
 	diagnostics.LogRecorder("compile")
 }
 
@@ -361,7 +417,6 @@ func TestRuleRun(t *testing.T) {
 	rule, err := sfdb.GetRule(name)
 	require.NoError(t, err)
 	_ = rule
-
 
 	progName := "RuoYi-Cloud-Plus(2025-12-03 15:22:29)"
 	prog, err := ssaapi.FromDatabase(progName)

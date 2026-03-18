@@ -18,6 +18,7 @@ import (
 	"runtime/debug"
 	"runtime/pprof"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils/omap"
@@ -114,7 +115,9 @@ func init() {
 
 	// set double
 	const GCPercentDefault = 8
-	log.Debugf("GC Percent Origin: %v -> %v", debug.SetGCPercent(GCPercentDefault), GCPercentDefault)
+	if strings.TrimSpace(os.Getenv("GOGC")) == "" {
+		log.Debugf("GC Percent Origin: %v -> %v", debug.SetGCPercent(GCPercentDefault), GCPercentDefault)
+	}
 	/*
 		进行一些必要初始化，永远不要再 init 中直接调用数据库，不然会破坏数据库加载的顺序
 	*/

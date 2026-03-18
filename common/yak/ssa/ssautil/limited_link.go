@@ -46,9 +46,29 @@ func (n *LinkNode[T]) First() VersionedIF[T] {
 }
 
 func (n *LinkNode[T]) All() []VersionedIF[T] {
-	var ret []VersionedIF[T]
+	if n == nil || n.header == nil {
+		return nil
+	}
+
+	// Preserve existing order: newest -> oldest (last appended first).
+	// Previous implementation prepended into a slice on each iteration (O(n^2) allocations).
+	// We instead allocate once and fill from the tail.
+	length := 0
+	if n.last != nil && n.last.ID >= 0 {
+		// IDs are assigned sequentially from 0.
+		length = int(n.last.ID + 1)
+	}
+	if length <= 0 {
+		for current := n.header; current != nil; current = current.next {
+			length++
+		}
+	}
+
+	ret := make([]VersionedIF[T], length)
+	i := length - 1
 	for current := n.header; current != nil; current = current.next {
-		ret = append([]VersionedIF[T]{current.value}, ret...)
+		ret[i] = current.value
+		i--
 	}
 	return ret
 }

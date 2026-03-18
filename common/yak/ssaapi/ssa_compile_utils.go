@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -25,6 +26,7 @@ var (
 const (
 	key                 = "antlr_cache"
 	antlrWorkerStatsKey = "antlr_worker_stats"
+	envSSAReparseAST    = "YAK_SSA_REPARSE_AST_FOR_BUILD"
 )
 
 type antlrWorkerStats struct {
@@ -35,6 +37,11 @@ type antlrCacheResetConfig struct {
 	enabled         bool
 	resetEveryFiles int
 }
+
+var (
+	ssaReparseASTOnce   sync.Once
+	ssaReparseASTCached bool
+)
 
 func getAntlrCacheResetConfig() antlrCacheResetConfig {
 	cfg := antlrCacheResetConfig{
@@ -55,6 +62,19 @@ func getAntlrCacheResetConfig() antlrCacheResetConfig {
 		cfg.enabled = false
 	}
 	return cfg
+}
+
+func getSSAReparseASTForBuildEnabled() bool {
+	ssaReparseASTOnce.Do(func() {
+		raw := strings.TrimSpace(os.Getenv(envSSAReparseAST))
+		switch strings.ToLower(raw) {
+		case "1", "true", "yes", "on":
+			ssaReparseASTCached = true
+		default:
+			ssaReparseASTCached = false
+		}
+	})
+	return ssaReparseASTCached
 }
 
 func (c *Config) GetFileHandler(
@@ -98,7 +118,61 @@ func (c *Config) GetFileHandler(
 
 		if language := c.LanguageBuilder; language != nil {
 			if language.FilterParseAST(path) {
+				metricsEnabled := astParseFileMetricsEnabled()
+				var memBefore astParseMemSnapshot
+				var cacheBefore antlrRuntimeCacheStats
+				if metricsEnabled {
+					memBefore = readASTParseMemSnapshot()
+					cacheBefore = readAntlrRuntimeCacheStats(cache)
+				}
+
+				parseStart := time.Now()
 				ast, err := language.ParseAST(utils.UnsafeBytesToString(content), cache)
+				parseDur := time.Since(parseStart)
+
+				if metricsEnabled {
+					memAfter := readASTParseMemSnapshot()
+					cacheAfter := readAntlrRuntimeCacheStats(cache)
+					sizeBytes := uint64(len(content))
+					heapAllocDelta := int64(memAfter.HeapAlloc) - int64(memBefore.HeapAlloc)
+					heapInuseDelta := int64(memAfter.HeapInuse) - int64(memBefore.HeapInuse)
+					totalAllocDelta := memAfter.TotalAlloc - memBefore.TotalAlloc
+
+					log.Infof(
+						"AST_METRIC\tworker=%d\tfile=%s\tsize=%d\tsize_h=%s\tparse_ms=%d\tparse_h=%s"+
+							"\theap_alloc_b=%d\theap_alloc_b_h=%s\theap_alloc_a=%d\theap_alloc_a_h=%s\theap_alloc_d=%s\theap_alloc_d_h=%s"+
+							"\theap_inuse_b=%d\theap_inuse_b_h=%s\theap_inuse_a=%d\theap_inuse_a_h=%s\theap_inuse_d=%s\theap_inuse_d_h=%s"+
+							"\theap_obj_b=%d\theap_obj_a=%d\theap_obj_d=%s"+
+							"\ttotal_alloc_b=%d\ttotal_alloc_b_h=%s\ttotal_alloc_a=%d\ttotal_alloc_a_h=%s\ttotal_alloc_d=%d\ttotal_alloc_d_h=%s"+
+							"\tmallocs_b=%d\tmallocs_a=%d\tmallocs_d=%d"+
+							"\tfrees_b=%d\tfrees_a=%d\tfrees_d=%d"+
+							"\tnum_gc_b=%d\tnum_gc_a=%d\tnum_gc_d=%d"+
+							"\tcache_lexer_dfa_states_b=%d\tcache_lexer_dfa_states_a=%d\tcache_lexer_dfa_states_d=%d"+
+							"\tcache_parser_dfa_states_b=%d\tcache_parser_dfa_states_a=%d\tcache_parser_dfa_states_d=%d"+
+							"\tcache_lexer_pred_ctx_b=%d\tcache_lexer_pred_ctx_a=%d\tcache_lexer_pred_ctx_d=%d"+
+							"\tcache_parser_pred_ctx_b=%d\tcache_parser_pred_ctx_a=%d\tcache_parser_pred_ctx_d=%d"+
+							"\tcache_lexer_dfa_cnt=%d\tcache_parser_dfa_cnt=%d",
+						getGID(),
+						path,
+						len(content),
+						formatBytesHuman(sizeBytes),
+						parseDur.Milliseconds(),
+						parseDur.String(),
+						memBefore.HeapAlloc, formatBytesHuman(memBefore.HeapAlloc), memAfter.HeapAlloc, formatBytesHuman(memAfter.HeapAlloc), formatSignedDelta(heapAllocDelta), formatBytesDeltaHuman(heapAllocDelta),
+						memBefore.HeapInuse, formatBytesHuman(memBefore.HeapInuse), memAfter.HeapInuse, formatBytesHuman(memAfter.HeapInuse), formatSignedDelta(heapInuseDelta), formatBytesDeltaHuman(heapInuseDelta),
+						memBefore.HeapObjects, memAfter.HeapObjects, formatSignedDelta(int64(memAfter.HeapObjects)-int64(memBefore.HeapObjects)),
+						memBefore.TotalAlloc, formatBytesHuman(memBefore.TotalAlloc), memAfter.TotalAlloc, formatBytesHuman(memAfter.TotalAlloc), totalAllocDelta, formatBytesHuman(totalAllocDelta),
+						memBefore.Mallocs, memAfter.Mallocs, memAfter.Mallocs-memBefore.Mallocs,
+						memBefore.Frees, memAfter.Frees, memAfter.Frees-memBefore.Frees,
+						memBefore.NumGC, memAfter.NumGC, uint64(memAfter.NumGC-memBefore.NumGC),
+						cacheBefore.LexerDFAStates, cacheAfter.LexerDFAStates, cacheAfter.LexerDFAStates-cacheBefore.LexerDFAStates,
+						cacheBefore.ParserDFAStates, cacheAfter.ParserDFAStates, cacheAfter.ParserDFAStates-cacheBefore.ParserDFAStates,
+						cacheBefore.LexerPredCtx, cacheAfter.LexerPredCtx, cacheAfter.LexerPredCtx-cacheBefore.LexerPredCtx,
+						cacheBefore.ParserPredCtx, cacheAfter.ParserPredCtx, cacheAfter.ParserPredCtx-cacheBefore.ParserPredCtx,
+						cacheAfter.LexerDFACnt, cacheAfter.ParserDFACnt,
+					)
+				}
+
 				if err != nil {
 					log.Debugf("parsed file[%s] parse [%s]AST error[%s]", path, language.GetLanguage(), err)
 				}

@@ -91,16 +91,28 @@ when all ast visit done, build instruction and save to database
 note: need defer func\visit stmt finish\...
 */
 func (p *Program) VisitAst(ast ASTIF) {
-	hash := utils.CalcSha256(ast.GetText())
+	if p == nil {
+		return
+	}
+	key := ""
+	if editor := p.GetCurrentEditor(); editor != nil {
+		key = editor.GetUrl()
+	}
+	if key == "" && ast != nil {
+		key = ast.GetText()
+	}
+	if key == "" {
+		return
+	}
 
 	if p.PreHandler() {
-		p.astMap[hash] = struct{}{}
+		p.astMap[key] = struct{}{}
 	} else {
-		if _, ok := p.astMap[hash]; !ok {
-			log.Warnf("ast[%v] is not found in ast map", p.GetProgramName())
+		if _, ok := p.astMap[key]; !ok {
+			log.Debugf("ast is not found in ast map: program=%s key=%s", p.GetProgramName(), key)
 			return
 		}
-		delete(p.astMap, hash)
+		delete(p.astMap, key)
 
 		if len(p.astMap) == 0 {
 			p.Application.ProcessInfof("program %s all ast visit done", p.Name)
