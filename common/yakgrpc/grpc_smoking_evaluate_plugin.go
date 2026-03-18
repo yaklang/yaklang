@@ -15,7 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfanalyzer"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfanalysis"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -75,7 +75,7 @@ func (s *Server) SmokingEvaluatePlugin(ctx context.Context, req *ypb.SmokingEval
 		pluginType = req.GetPluginType()
 		pluginCode = req.GetCode()
 	)
-	if pluginCode == "" {
+	if pluginCode == "" && pluginName != "" {
 		// full plugin code by name
 		switch pluginType {
 		case schema.SCRIPT_TYPE_SYNTAXFLOW:
@@ -182,9 +182,12 @@ func BuildPluginTestingJunkData() []byte {
 // 只在评分中使用
 func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType string, pluginTestingServer *PluginTestingEchoServer) (*ypb.SmokingEvaluatePluginResponse, error) {
 	if pluginType == schema.SCRIPT_TYPE_SYNTAXFLOW {
-		sfAnalyzer := sfanalyzer.NewSyntaxFlowAnalyzer(pluginCode)
-		sfAnalyzeRes := sfAnalyzer.Analyze()
-		return sfAnalyzeRes.GetResponse(), nil
+		opts := sfanalysis.DefaultOptions(sfanalysis.ProfileQuality)
+		report := sfanalysis.Analyze(ctx, pluginCode, opts)
+		if report.Quality == nil {
+			return (&sfanalysis.SyntaxFlowRuleAnalyzeResult{Score: sfanalysis.MinScore, MaxScore: sfanalysis.MaxScore}).GetResponse(), nil
+		}
+		return report.Quality.GetResponse(), nil
 	}
 
 	defer pluginTestingServer.ClearRequestsHistory()

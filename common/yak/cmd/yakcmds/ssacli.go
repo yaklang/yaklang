@@ -35,7 +35,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfanalyzer"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfanalysis"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	cli "github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/utils"
@@ -1702,7 +1702,8 @@ var syntaxFlowEvaluate = &cli.Command{
 			return utils.Errorf("target file or directory not found: %v", target)
 		}
 
-		results := make(map[string]*sfanalyzer.SyntaxFlowRuleAnalyzeResult)
+		opts := sfanalysis.DefaultOptions(sfanalysis.ProfileQuality)
+		results := make(map[string]*sfanalysis.SyntaxFlowRuleAnalyzeResult)
 
 		// Process single file or directory
 		if utils.IsFile(target) {
@@ -1716,8 +1717,11 @@ var syntaxFlowEvaluate = &cli.Command{
 			}
 			fileName := filepath.Base(target)
 
-			analyzer := sfanalyzer.NewSyntaxFlowAnalyzer(string(content))
-			result := analyzer.Analyze()
+			report := sfanalysis.Analyze(context.Background(), string(content), opts)
+			result := report.Quality
+			if result == nil {
+				result = &sfanalysis.SyntaxFlowRuleAnalyzeResult{Score: sfanalysis.MinScore, MaxScore: sfanalysis.MaxScore}
+			}
 			results[fileName] = result
 		} else {
 			// Process directory
@@ -1732,8 +1736,11 @@ var syntaxFlowEvaluate = &cli.Command{
 					return nil
 				}
 				fileName := filepath.Base(s)
-				analyzer := sfanalyzer.NewSyntaxFlowAnalyzer(string(content))
-				result := analyzer.Analyze()
+				report := sfanalysis.Analyze(context.Background(), string(content), opts)
+				result := report.Quality
+				if result == nil {
+					result = &sfanalysis.SyntaxFlowRuleAnalyzeResult{Score: sfanalysis.MinScore, MaxScore: sfanalysis.MaxScore}
+				}
 				results[fileName] = result
 				return nil
 			}))
@@ -1768,8 +1775,8 @@ var syntaxFlowEvaluate = &cli.Command{
 			for fileName, result := range results {
 				fmt.Printf("\n=== %s ===\n", fileName)
 				fmt.Printf("得分: %d/%d\n", result.Score, result.MaxScore)
-				grade := sfanalyzer.GetGrade(result.Score)
-				fmt.Printf("等级: %s (%s)\n", grade, sfanalyzer.GetGradeDescription(grade))
+				grade := sfanalysis.GetGrade(result.Score)
+				fmt.Printf("等级: %s (%s)\n", grade, sfanalysis.GetGradeDescription(grade))
 
 				// 始终显示问题概览
 				if len(result.Problems) > 0 {
@@ -1779,11 +1786,11 @@ var syntaxFlowEvaluate = &cli.Command{
 
 					for _, problem := range result.Problems {
 						switch problem.Severity {
-						case sfanalyzer.Error:
+						case sfanalysis.Error:
 							errorCount++
-						case sfanalyzer.Warning:
+						case sfanalysis.Warning:
 							warningCount++
-						case sfanalyzer.Info:
+						case sfanalysis.Info:
 							infoCount++
 						}
 					}

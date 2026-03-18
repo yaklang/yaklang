@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfanalyzer"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfanalysis"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -414,7 +414,7 @@ func TestGRPCMUSTPASS_LANGUAGE_SMOKING_EVALUATE_SYNTAXFLOW_BATCH(t *testing.T) {
 
 Runtime.getRuntime().exec(* as $cmd) as $result;
 alert $result;`,
-				score: int64(sfanalyzer.MaxScore - sfanalyzer.MissingPositiveTestPenalty - sfanalyzer.MissingNegativeTestPenalty), // 80
+				score: int64(sfanalysis.MaxScore - sfanalysis.MissingPositiveTestPenalty - sfanalysis.MissingNegativeTestPenalty), // 80
 			},
 			{
 				name: "test_batch_rule_2",
@@ -426,7 +426,7 @@ alert $result;`,
 
 executeQuery(* as $sql) as $result;
 alert $result;`,
-				score: int64(sfanalyzer.MaxScore - sfanalyzer.MissingSolutionPenalty - sfanalyzer.MissingPositiveTestPenalty - sfanalyzer.MissingNegativeTestPenalty), // 70
+				score: int64(sfanalysis.MaxScore - sfanalysis.MissingSolutionPenalty - sfanalysis.MissingPositiveTestPenalty - sfanalysis.MissingNegativeTestPenalty), // 70
 			},
 			{
 				name: "test_batch_rule_3",
@@ -453,7 +453,7 @@ SAFE
 
 Runtime.getRuntime().exec(* as $cmd) as $result;
 alert $result;`,
-				score: int64(sfanalyzer.MaxScore), // 100
+				score: int64(sfanalysis.MaxScore), // 100
 			},
 		}
 
