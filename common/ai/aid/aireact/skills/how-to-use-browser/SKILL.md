@@ -1,5 +1,5 @@
 ---
-name: use-browser
+name: how-to-use-browser
 description: >
   Browser automation skill for web page interaction. Covers opening URLs,
   taking accessibility snapshots with element refs, clicking, filling forms,
