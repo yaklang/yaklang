@@ -5,10 +5,8 @@ import (
 	"errors"
 	"io/fs"
 	"os"
-	"runtime"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -24,24 +22,19 @@ var (
 )
 
 const (
-	key                 = "antlr_cache"
-	antlrWorkerStatsKey = "antlr_worker_stats"
-	envSSAReparseAST    = "YAK_SSA_REPARSE_AST_FOR_BUILD"
+	antlrWorkerStateKey = "antlr_worker_state"
 )
-
-type antlrWorkerStats struct {
-	filesParsed int
-}
 
 type antlrCacheResetConfig struct {
 	enabled         bool
 	resetEveryFiles int
 }
 
-var (
-	ssaReparseASTOnce   sync.Once
-	ssaReparseASTCached bool
-)
+type antlrWorkerState struct {
+	cache           *ssa.AntlrCache
+	filesParsed     int
+	resetEveryFiles int
+}
 
 func getAntlrCacheResetConfig() antlrCacheResetConfig {
 	cfg := antlrCacheResetConfig{
@@ -64,17 +57,83 @@ func getAntlrCacheResetConfig() antlrCacheResetConfig {
 	return cfg
 }
 
-func getSSAReparseASTForBuildEnabled() bool {
-	ssaReparseASTOnce.Do(func() {
-		raw := strings.TrimSpace(os.Getenv(envSSAReparseAST))
-		switch strings.ToLower(raw) {
-		case "1", "true", "yes", "on":
-			ssaReparseASTCached = true
-		default:
-			ssaReparseASTCached = false
-		}
+func newAntlrWorkerStore(language ssa.PreHandlerAnalyzer, resetCfg antlrCacheResetConfig) *utils.SafeMap[any] {
+	ret := utils.NewSafeMap[any]()
+	ret.Set(antlrWorkerStateKey, &antlrWorkerState{
+		cache:           newAntlrWorkerCache(language),
+		resetEveryFiles: resetCfg.resetEveryFiles,
 	})
-	return ssaReparseASTCached
+	return ret
+}
+
+func newAntlrWorkerCache(language ssa.PreHandlerAnalyzer) *ssa.AntlrCache {
+	if language == nil || !ssa.WorkerAntlrCacheEnabled() {
+		return nil
+	}
+	return language.GetAntlrCache()
+}
+
+func getAntlrWorkerState(
+	store *utils.SafeMap[any],
+	language ssa.PreHandlerAnalyzer,
+	resetCfg antlrCacheResetConfig,
+) *antlrWorkerState {
+	if store == nil {
+		return &antlrWorkerState{
+			cache:           newAntlrWorkerCache(language),
+			resetEveryFiles: resetCfg.resetEveryFiles,
+		}
+	}
+
+	if raw, ok := store.Get(antlrWorkerStateKey); ok {
+		if state, ok := raw.(*antlrWorkerState); ok && state != nil {
+			return state
+		}
+	}
+
+	state := &antlrWorkerState{
+		cache:           newAntlrWorkerCache(language),
+		resetEveryFiles: resetCfg.resetEveryFiles,
+	}
+	store.Set(antlrWorkerStateKey, state)
+	return state
+}
+
+func (s *antlrWorkerState) Parse(language ssa.PreHandlerAnalyzer, source string) (ssa.FrontAST, error) {
+	ast, err := language.ParseAST(source, s.cache)
+	if s == nil || s.cache == nil || s.resetEveryFiles <= 0 {
+		return ast, err
+	}
+
+	s.filesParsed++
+	if s.filesParsed%s.resetEveryFiles == 0 {
+		s.cache.ResetRuntimeCaches()
+	}
+	return ast, err
+}
+
+func parseFileAST(
+	language ssa.PreHandlerAnalyzer,
+	languageName string,
+	path string,
+	source string,
+	store *utils.SafeMap[any],
+	resetCfg antlrCacheResetConfig,
+) (ssa.FrontAST, error) {
+	if language == nil {
+		return nil, utils.Errorf("not select language %s", languageName)
+	}
+	if !language.FilterParseAST(path) {
+		log.Debugf("skip parse ast file: %s filter by %s", path, languageName)
+		return nil, nil
+	}
+
+	state := getAntlrWorkerState(store, language, resetCfg)
+	ast, err := state.Parse(language, source)
+	if err != nil {
+		log.Debugf("parsed file[%s] parse [%s]AST error[%s]", path, languageName, err)
+	}
+	return ast, err
 }
 
 func (c *Config) GetFileHandler(
@@ -86,7 +145,7 @@ func (c *Config) GetFileHandler(
 	parse := func(path string, content []byte, store *utils.SafeMap[any]) (ssa.FrontAST, error) {
 		start := time.Now()
 		defer func() {
-			log.Debugf("pre-handler cost:%v parse ast: %s; size(%v)", time.Since(start), path, Size(len(content)))
+			log.Debugf("pre-handler cost:%v parse ast: %s; size(%s)", time.Since(start), path, formatFileSize(len(content)))
 		}()
 
 		defer func() {
@@ -100,110 +159,17 @@ func (c *Config) GetFileHandler(
 			return nil, nil
 		}
 
-		var cache *ssa.AntlrCache
-		if ssa.WorkerAntlrCacheEnabled() {
-			raw, ok := store.Get(key)
-			if ok {
-				if raw, ok := raw.(*ssa.AntlrCache); ok && raw != nil {
-					cache = raw
-				}
-			}
-			if cache == nil {
-				cache = c.LanguageBuilder.GetAntlrCache()
-				if cache != nil {
-					store.Set(key, cache)
-				}
-			}
-		}
-
-		if language := c.LanguageBuilder; language != nil {
-			if language.FilterParseAST(path) {
-				metricsEnabled := astParseFileMetricsEnabled()
-				var memBefore astParseMemSnapshot
-				var cacheBefore antlrRuntimeCacheStats
-				if metricsEnabled {
-					memBefore = readASTParseMemSnapshot()
-					cacheBefore = readAntlrRuntimeCacheStats(cache)
-				}
-
-				parseStart := time.Now()
-				ast, err := language.ParseAST(utils.UnsafeBytesToString(content), cache)
-				parseDur := time.Since(parseStart)
-
-				if metricsEnabled {
-					memAfter := readASTParseMemSnapshot()
-					cacheAfter := readAntlrRuntimeCacheStats(cache)
-					sizeBytes := uint64(len(content))
-					heapAllocDelta := int64(memAfter.HeapAlloc) - int64(memBefore.HeapAlloc)
-					heapInuseDelta := int64(memAfter.HeapInuse) - int64(memBefore.HeapInuse)
-					totalAllocDelta := memAfter.TotalAlloc - memBefore.TotalAlloc
-
-					log.Infof(
-						"AST_METRIC\tworker=%d\tfile=%s\tsize=%d\tsize_h=%s\tparse_ms=%d\tparse_h=%s"+
-							"\theap_alloc_b=%d\theap_alloc_b_h=%s\theap_alloc_a=%d\theap_alloc_a_h=%s\theap_alloc_d=%s\theap_alloc_d_h=%s"+
-							"\theap_inuse_b=%d\theap_inuse_b_h=%s\theap_inuse_a=%d\theap_inuse_a_h=%s\theap_inuse_d=%s\theap_inuse_d_h=%s"+
-							"\theap_obj_b=%d\theap_obj_a=%d\theap_obj_d=%s"+
-							"\ttotal_alloc_b=%d\ttotal_alloc_b_h=%s\ttotal_alloc_a=%d\ttotal_alloc_a_h=%s\ttotal_alloc_d=%d\ttotal_alloc_d_h=%s"+
-							"\tmallocs_b=%d\tmallocs_a=%d\tmallocs_d=%d"+
-							"\tfrees_b=%d\tfrees_a=%d\tfrees_d=%d"+
-							"\tnum_gc_b=%d\tnum_gc_a=%d\tnum_gc_d=%d"+
-							"\tcache_lexer_dfa_states_b=%d\tcache_lexer_dfa_states_a=%d\tcache_lexer_dfa_states_d=%d"+
-							"\tcache_parser_dfa_states_b=%d\tcache_parser_dfa_states_a=%d\tcache_parser_dfa_states_d=%d"+
-							"\tcache_lexer_pred_ctx_b=%d\tcache_lexer_pred_ctx_a=%d\tcache_lexer_pred_ctx_d=%d"+
-							"\tcache_parser_pred_ctx_b=%d\tcache_parser_pred_ctx_a=%d\tcache_parser_pred_ctx_d=%d"+
-							"\tcache_lexer_dfa_cnt=%d\tcache_parser_dfa_cnt=%d",
-						getGID(),
-						path,
-						len(content),
-						formatBytesHuman(sizeBytes),
-						parseDur.Milliseconds(),
-						parseDur.String(),
-						memBefore.HeapAlloc, formatBytesHuman(memBefore.HeapAlloc), memAfter.HeapAlloc, formatBytesHuman(memAfter.HeapAlloc), formatSignedDelta(heapAllocDelta), formatBytesDeltaHuman(heapAllocDelta),
-						memBefore.HeapInuse, formatBytesHuman(memBefore.HeapInuse), memAfter.HeapInuse, formatBytesHuman(memAfter.HeapInuse), formatSignedDelta(heapInuseDelta), formatBytesDeltaHuman(heapInuseDelta),
-						memBefore.HeapObjects, memAfter.HeapObjects, formatSignedDelta(int64(memAfter.HeapObjects)-int64(memBefore.HeapObjects)),
-						memBefore.TotalAlloc, formatBytesHuman(memBefore.TotalAlloc), memAfter.TotalAlloc, formatBytesHuman(memAfter.TotalAlloc), totalAllocDelta, formatBytesHuman(totalAllocDelta),
-						memBefore.Mallocs, memAfter.Mallocs, memAfter.Mallocs-memBefore.Mallocs,
-						memBefore.Frees, memAfter.Frees, memAfter.Frees-memBefore.Frees,
-						memBefore.NumGC, memAfter.NumGC, uint64(memAfter.NumGC-memBefore.NumGC),
-						cacheBefore.LexerDFAStates, cacheAfter.LexerDFAStates, cacheAfter.LexerDFAStates-cacheBefore.LexerDFAStates,
-						cacheBefore.ParserDFAStates, cacheAfter.ParserDFAStates, cacheAfter.ParserDFAStates-cacheBefore.ParserDFAStates,
-						cacheBefore.LexerPredCtx, cacheAfter.LexerPredCtx, cacheAfter.LexerPredCtx-cacheBefore.LexerPredCtx,
-						cacheBefore.ParserPredCtx, cacheAfter.ParserPredCtx, cacheAfter.ParserPredCtx-cacheBefore.ParserPredCtx,
-						cacheAfter.LexerDFACnt, cacheAfter.ParserDFACnt,
-					)
-				}
-
-				if err != nil {
-					log.Debugf("parsed file[%s] parse [%s]AST error[%s]", path, language.GetLanguage(), err)
-				}
-				if resetCfg.enabled && cache != nil {
-					if raw, ok := store.Get(antlrWorkerStatsKey); ok && raw != nil {
-						if stats, _ := raw.(*antlrWorkerStats); stats != nil {
-							stats.filesParsed++
-							if stats.filesParsed%resetCfg.resetEveryFiles == 0 {
-								cache.ResetRuntimeCaches()
-							}
-						}
-					}
-				}
-				return ast, err
-			} else {
-				log.Debugf("skip parse ast file: %s filter by %s", path, language.GetLanguage())
-				return nil, nil
-			}
-		}
-		return nil, utils.Errorf("not select language %s", c.GetLanguage())
+		return parseFileAST(
+			c.LanguageBuilder,
+			string(c.GetLanguage()),
+			path,
+			utils.UnsafeBytesToString(content),
+			store,
+			resetCfg,
+		)
 	}
 	initWorker := func() *utils.SafeMap[any] {
-		ret := utils.NewSafeMap[any]()
-		ret.Set(antlrWorkerStatsKey, &antlrWorkerStats{})
-		if ssa.WorkerAntlrCacheEnabled() {
-			cache := c.LanguageBuilder.GetAntlrCache()
-			if cache != nil {
-				ret.Set(key, cache)
-			}
-		}
-		return ret
+		return newAntlrWorkerStore(c.LanguageBuilder, resetCfg)
 	}
 	return ssareducer.FilesHandler(
 		c.ctx, filesystem, preHandlerFiles,
@@ -212,17 +178,8 @@ func (c *Config) GetFileHandler(
 		int(c.GetCompileConcurrency()),
 	)
 }
-func getGID() uint64 {
-	var buf [64]byte
-	// false=不获取全堆栈，仅当前G的ID
-	n := runtime.Stack(buf[:], false)
-	// 堆栈开头格式: "goroutine 123 [running]:"
-	idStr := strings.Fields(strings.TrimPrefix(string(buf[:n]), "goroutine "))[0]
-	id, _ := strconv.ParseUint(idStr, 10, 64)
-	return id
-}
 
-func Size(size int) string {
+func formatFileSize(size int) string {
 	if size < 1024 {
 		return strconv.Itoa(size) + "B"
 	}
