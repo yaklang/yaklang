@@ -179,6 +179,12 @@ func formatFileSize(size int) string {
 	return strconv.FormatFloat(sizeGB, 'f', 2, 64) + "GB"
 }
 
+// Size formats bytes into a human-readable string.
+// Kept for backward compatibility across packages/tests.
+func Size(size int) string {
+	return formatFileSize(size)
+}
+
 type ScanResult struct {
 	HandlerFiles    []string
 	PreHandlerFiles []string
