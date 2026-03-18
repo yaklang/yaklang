@@ -169,7 +169,11 @@ func (p *Program) LazyBuild() {
 	if virtualFunction != nil {
 		virtualFunction.Finish()
 	}
-	if function == nil && virtualFunction == nil {
+	initFunction := p.GetFunction(string(InitFunctionName), "")
+	if initFunction != nil {
+		initFunction.Finish()
+	}
+	if function == nil && virtualFunction == nil && initFunction == nil {
 		log.Errorf("main function is not found and virtual function is not found")
 		return
 	}
