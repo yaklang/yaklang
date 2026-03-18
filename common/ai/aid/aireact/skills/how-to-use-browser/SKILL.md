@@ -106,6 +106,41 @@ eval js: JSON.stringify({url:location.href, title:document.title, body:document.
 
 ---
 
+## 2.6 SPA Pages Timing Issue (Vue/React/Angular)
+
+SPA pages (identified by `#/` in URL) load a minimal HTML shell first, then JavaScript frameworks
+render content **asynchronously**. This causes a timing gap:
+
+- `Navigate()` completes when the base HTML `load` event fires
+- But SPA framework components haven't mounted yet
+- Both `snapshot` and `eval(querySelectorAll)` may return 0 elements
+
+The `open` handler auto-detects hash routes and waits, but some pages need more time.
+
+### If eval still returns 0 elements after open:
+
+```
+1. wait wait-type=ms wait-value=3000  (give SPA more time to render)
+2. eval JS to discover elements (retry)
+3. Or use a self-retrying JS pattern:
+   (function poll(n){
+     var els = document.querySelectorAll('input,button');
+     if(els.length > 0 || n <= 0)
+       return JSON.stringify(Array.from(els).map(e=>({tag:e.tagName,name:e.name,id:e.id,type:e.type})));
+     return new Promise(r => setTimeout(() => r(poll(n-1)), 1000));
+   })(5)
+```
+
+### Signs of SPA page:
+- URL contains `#/` or `#!/`
+- Page title is empty after load
+- `readyState: "complete"` but `totalElements: 0`
+- `hasVue`/`hasReact`/`hasAngular` flags in page info
+
+> **RULE**: If eval returns 0 elements, WAIT then retry. Do NOT spin on snapshot or eval.
+
+---
+
 ## 3. Operations Reference
 
 ### 3.1 Navigation Operations
@@ -291,6 +326,7 @@ Use `@e1` as the `target` for click/fill operations.
    - Or perform the entire interaction (fill + submit) in a single `eval` call
    - Common causes: SPA frameworks, Shadow DOM, iframes, dynamically loaded content
 10. **Prefer JavaScript for login/form pages**: A single `eval` call that fills form fields and clicks submit is more efficient and reliable than multiple separate fill/click calls, especially on dynamic pages.
+11. **SPA timing: eval returns 0 elements too**: If `eval` also returns 0 elements (e.g. `totalElements: 0`), the SPA hasn't finished rendering yet. Use `wait wait-type=ms wait-value=3000` then retry eval. Do NOT spin -- wait first, then retry ONCE. If still 0, the page may use iframes or Shadow DOM.
 
 ---
 
