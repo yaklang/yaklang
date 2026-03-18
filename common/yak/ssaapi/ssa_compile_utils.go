@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io/fs"
+	"os"
 	"runtime"
 	"strconv"
 	"strings"
@@ -21,13 +22,47 @@ var (
 	ErrNoFoundCompiledFile error = errors.New("not found can compiled file")
 )
 
-const key = "antlr_cache"
+const (
+	key                 = "antlr_cache"
+	antlrWorkerStatsKey = "antlr_worker_stats"
+)
+
+type antlrWorkerStats struct {
+	filesParsed int
+}
+
+type antlrCacheResetConfig struct {
+	enabled         bool
+	resetEveryFiles int
+}
+
+func getAntlrCacheResetConfig() antlrCacheResetConfig {
+	cfg := antlrCacheResetConfig{
+		enabled:         true,
+		resetEveryFiles: 100,
+	}
+	if raw := strings.TrimSpace(os.Getenv("YAK_ANTLR_CACHE_RESET_FILES")); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil {
+			if v <= 0 {
+				cfg.enabled = false
+				cfg.resetEveryFiles = 0
+			} else {
+				cfg.resetEveryFiles = v
+			}
+		}
+	}
+	if cfg.resetEveryFiles <= 0 {
+		cfg.enabled = false
+	}
+	return cfg
+}
 
 func (c *Config) GetFileHandler(
 	filesystem filesys_interface.FileSystem,
 	preHandlerFiles []string,
 	handlerFilesMap map[string]struct{},
 ) <-chan *ssareducer.FileContent {
+	resetCfg := getAntlrCacheResetConfig()
 	parse := func(path string, content []byte, store *utils.SafeMap[any]) (ssa.FrontAST, error) {
 		start := time.Now()
 		defer func() {
@@ -46,16 +81,19 @@ func (c *Config) GetFileHandler(
 		}
 
 		var cache *ssa.AntlrCache
-		raw, ok := store.Get(key)
-		if ok {
-			if raw, ok := raw.(*ssa.AntlrCache); ok && raw != nil {
-				cache = raw
+		if ssa.WorkerAntlrCacheEnabled() {
+			raw, ok := store.Get(key)
+			if ok {
+				if raw, ok := raw.(*ssa.AntlrCache); ok && raw != nil {
+					cache = raw
+				}
 			}
-		}
-		if cache == nil {
-			cache = c.LanguageBuilder.GetAntlrCache()
-			log.Debugf("get antlr cache from store failed, new one, path: %s, goroutine id: %d", path, getGID())
-			store.Set(key, cache)
+			if cache == nil {
+				cache = c.LanguageBuilder.GetAntlrCache()
+				if cache != nil {
+					store.Set(key, cache)
+				}
+			}
 		}
 
 		if language := c.LanguageBuilder; language != nil {
@@ -63,6 +101,16 @@ func (c *Config) GetFileHandler(
 				ast, err := language.ParseAST(utils.UnsafeBytesToString(content), cache)
 				if err != nil {
 					log.Debugf("parsed file[%s] parse [%s]AST error[%s]", path, language.GetLanguage(), err)
+				}
+				if resetCfg.enabled && cache != nil {
+					if raw, ok := store.Get(antlrWorkerStatsKey); ok && raw != nil {
+						if stats, _ := raw.(*antlrWorkerStats); stats != nil {
+							stats.filesParsed++
+							if stats.filesParsed%resetCfg.resetEveryFiles == 0 {
+								cache.ResetRuntimeCaches()
+							}
+						}
+					}
 				}
 				return ast, err
 			} else {
@@ -74,8 +122,13 @@ func (c *Config) GetFileHandler(
 	}
 	initWorker := func() *utils.SafeMap[any] {
 		ret := utils.NewSafeMap[any]()
-		ret.Set(key, c.LanguageBuilder.GetAntlrCache())
-		log.Debugf("create antrl cache, goroutine id: %d", getGID())
+		ret.Set(antlrWorkerStatsKey, &antlrWorkerStats{})
+		if ssa.WorkerAntlrCacheEnabled() {
+			cache := c.LanguageBuilder.GetAntlrCache()
+			if cache != nil {
+				ret.Set(key, cache)
+			}
+		}
 		return ret
 	}
 	return ssareducer.FilesHandler(
