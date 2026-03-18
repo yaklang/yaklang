@@ -1,10 +1,11 @@
 package ssa
 
 import (
+	"os"
+	"strings"
 	"sync"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
-	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
@@ -39,6 +40,64 @@ type AntlrCache struct {
 	ParserATN                    *antlr.ATN
 	ParserDfaCache               []*antlr.DFA
 	ParserPredictionContextCache *antlr.PredictionContextCache
+}
+
+const envAntlrWorkerCache = "YAK_ANTLR_WORKER_CACHE"
+
+var (
+	antlrWorkerCacheOnce   sync.Once
+	antlrWorkerCacheCached bool
+)
+
+func WorkerAntlrCacheEnabled() bool {
+	antlrWorkerCacheOnce.Do(func() {
+		raw := strings.TrimSpace(os.Getenv(envAntlrWorkerCache))
+		if raw == "" {
+			antlrWorkerCacheCached = true
+			return
+		}
+		switch strings.ToLower(raw) {
+		case "0", "false", "no", "off", "disable", "disabled":
+			antlrWorkerCacheCached = false
+		default:
+			antlrWorkerCacheCached = true
+		}
+	})
+	return antlrWorkerCacheCached
+}
+
+func (a *AntlrCache) ResetRuntimeCaches() {
+	if a == nil || a.Empty() {
+		return
+	}
+
+	if a.ParserATN != nil {
+		decisionToDFA := make([]*antlr.DFA, len(a.ParserATN.DecisionToState))
+		for i, state := range a.ParserATN.DecisionToState {
+			decisionToDFA[i] = antlr.NewDFA(state, i)
+		}
+		a.ParserDfaCache = decisionToDFA
+		a.ParserPredictionContextCache = antlr.NewPredictionContextCache()
+	}
+
+	if a.LexerATN != nil {
+		decisionToDFA := make([]*antlr.DFA, len(a.LexerATN.DecisionToState))
+		for i, state := range a.LexerATN.DecisionToState {
+			decisionToDFA[i] = antlr.NewDFA(state, i)
+		}
+		a.LexerDfaCache = decisionToDFA
+		a.LexerPredictionContextCache = antlr.NewPredictionContextCache()
+	}
+}
+
+func (a *AntlrCache) Clear() {
+	if a == nil {
+		return
+	}
+	a.LexerDfaCache = nil
+	a.LexerPredictionContextCache = nil
+	a.ParserDfaCache = nil
+	a.ParserPredictionContextCache = nil
 }
 
 type CreateBuilder func() Builder
@@ -128,18 +187,14 @@ func (d *PreHandlerBase) PreHandlerProject(fi.FileSystem, FrontAST, *FunctionBui
 }
 
 func (d *PreHandlerBase) Clearup() {
-	if diagnostics.Enabled(diagnostics.LevelLow) {
-		diagnostics.LogHeapSnapshot("antlr_clearup_before_release", false)
-	}
-
 	d.antlrMutex.Lock()
-	// Clear DFA cache explicitly
+	for _, cache := range d.Caches {
+		if cache != nil {
+			cache.Clear()
+		}
+	}
 	d.Caches = nil
 	d.antlrMutex.Unlock()
-
-	if diagnostics.Enabled(diagnostics.LevelLow) {
-		diagnostics.LogHeapSnapshot("antlr_clearup_after_release", true)
-	}
 }
 
 func (a *AntlrCache) Empty() bool {
@@ -148,6 +203,9 @@ func (a *AntlrCache) Empty() bool {
 
 // createAntlrCache creates new DFA cache and prediction context cache for the given ATN
 func createAntlrCache(lexer, parser []int32) *AntlrCache {
+	if !WorkerAntlrCacheEnabled() {
+		return nil
+	}
 	CreateCacheFromATN := func(serializedATN []int32) (*antlr.ATN, []*antlr.DFA, *antlr.PredictionContextCache) {
 		atn := antlr.NewATNDeserializer(nil).Deserialize(serializedATN)
 		decisionToDFA := make([]*antlr.DFA, len(atn.DecisionToState))
@@ -159,7 +217,6 @@ func createAntlrCache(lexer, parser []int32) *AntlrCache {
 	}
 
 	cache := &AntlrCache{}
-	log.Debugf("Creating new ANTLR cache")
 	if parser != nil {
 		atn, decisionToDFA, predictionContextCache := CreateCacheFromATN(parser)
 		cache.ParserATN = atn
