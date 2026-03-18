@@ -245,16 +245,7 @@ func LoadAIForgesFromZip(zipPath string, opts ...ForgeImportOption) (*AIForgesAr
 	if zipPath == "" {
 		return nil, utils.Error("zip path is required")
 	}
-	if exist, _ := utils.PathExists(zipPath); !exist {
-		return nil, utils.Errorf("zip path not exists: %s", zipPath)
-	}
 	opt := applyImportOptions(opts...)
-
-	tmpDir, err := os.MkdirTemp("", "aiforge-import-*")
-	if err != nil {
-		return nil, err
-	}
-	defer os.RemoveAll(tmpDir)
 
 	progress := func(percent float64, msg string) {
 		if opt.progress != nil {
@@ -263,33 +254,52 @@ func LoadAIForgesFromZip(zipPath string, opts ...ForgeImportOption) (*AIForgesAr
 	}
 	progress(0, "start loading")
 
-	fileBytes, err := os.ReadFile(zipPath)
-	if err != nil {
-		return nil, err
-	}
-	if opt.password != "" {
-		fileBytes, err = codec.SM4DecryptCBCWithPKCSPadding(
-			codec.PKCS7Padding([]byte(opt.password)),
-			fileBytes,
-			codec.PKCS7Padding([]byte(opt.password)),
-		)
+	rootDir := ""
+	if utils.IsDir(zipPath) {
+		if opt.password != "" {
+			return nil, utils.Error("password is not supported when importing from directory")
+		}
+		rootDir = zipPath
+	} else {
+		if exist, _ := utils.PathExists(zipPath); !exist {
+			return nil, utils.Errorf("zip path not exists: %s", zipPath)
+		}
+
+		tmpDir, err := os.MkdirTemp("", "aiforge-import-*")
 		if err != nil {
 			return nil, err
 		}
-	}
-	if err := extractZipBytes(fileBytes, tmpDir); err != nil {
-		return nil, err
+		defer os.RemoveAll(tmpDir)
+
+		fileBytes, err := os.ReadFile(zipPath)
+		if err != nil {
+			return nil, err
+		}
+		if opt.password != "" {
+			fileBytes, err = codec.SM4DecryptCBCWithPKCSPadding(
+				codec.PKCS7Padding([]byte(opt.password)),
+				fileBytes,
+				codec.PKCS7Padding([]byte(opt.password)),
+			)
+			if err != nil {
+				return nil, err
+			}
+		}
+		if err := extractZipBytes(fileBytes, tmpDir); err != nil {
+			return nil, err
+		}
+		rootDir = tmpDir
 	}
 
-	cfgPaths, err := findAllForgeCfg(tmpDir)
+	cfgPaths, err := findAllForgeCfg(rootDir)
 	if err != nil {
 		return nil, err
 	}
-	toolCfgPaths, err := findAllAIToolCfg(tmpDir)
+	toolCfgPaths, err := findAllAIToolCfg(rootDir)
 	if err != nil {
 		return nil, err
 	}
-	skillPaths, err := findAllSkillMD(tmpDir)
+	skillPaths, err := findAllSkillMD(rootDir)
 	if err != nil {
 		return nil, err
 	}
