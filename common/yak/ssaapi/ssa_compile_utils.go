@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -25,63 +26,67 @@ const (
 	antlrWorkerStateKey = "antlr_worker_state"
 )
 
-type antlrCacheResetConfig struct {
-	enabled         bool
-	resetEveryFiles int
+var (
+	antlrCacheResetEveryFilesOnce   sync.Once
+	antlrCacheResetEveryFilesCached int
+)
+
+func antlrCacheResetEveryFiles() int {
+	antlrCacheResetEveryFilesOnce.Do(func() {
+		antlrCacheResetEveryFilesCached = 100
+		if raw := strings.TrimSpace(os.Getenv("YAK_ANTLR_CACHE_RESET_FILES")); raw != "" {
+			if v, err := strconv.Atoi(raw); err == nil {
+				antlrCacheResetEveryFilesCached = v
+			}
+		}
+		if antlrCacheResetEveryFilesCached <= 0 {
+			antlrCacheResetEveryFilesCached = 0
+		}
+	})
+	return antlrCacheResetEveryFilesCached
 }
 
 type antlrWorkerState struct {
-	cache           *ssa.AntlrCache
-	filesParsed     int
+	cache       *ssa.AntlrCache
+	filesParsed int
+}
+
+type antlrASTParseWorker struct {
+	language     ssa.PreHandlerAnalyzer
+	languageName string
 	resetEveryFiles int
 }
 
-func getAntlrCacheResetConfig() antlrCacheResetConfig {
-	cfg := antlrCacheResetConfig{
-		enabled:         true,
-		resetEveryFiles: 100,
+func newAntlrASTParseWorker(c *Config) *antlrASTParseWorker {
+	if c == nil {
+		return &antlrASTParseWorker{}
 	}
-	if raw := strings.TrimSpace(os.Getenv("YAK_ANTLR_CACHE_RESET_FILES")); raw != "" {
-		if v, err := strconv.Atoi(raw); err == nil {
-			if v <= 0 {
-				cfg.enabled = false
-				cfg.resetEveryFiles = 0
-			} else {
-				cfg.resetEveryFiles = v
-			}
-		}
+	return &antlrASTParseWorker{
+		language:        c.LanguageBuilder,
+		languageName:    string(c.GetLanguage()),
+		resetEveryFiles: antlrCacheResetEveryFiles(),
 	}
-	if cfg.resetEveryFiles <= 0 {
-		cfg.enabled = false
-	}
-	return cfg
 }
 
-func newAntlrWorkerStore(language ssa.PreHandlerAnalyzer, resetCfg antlrCacheResetConfig) *utils.SafeMap[any] {
-	ret := utils.NewSafeMap[any]()
-	ret.Set(antlrWorkerStateKey, &antlrWorkerState{
-		cache:           newAntlrWorkerCache(language),
-		resetEveryFiles: resetCfg.resetEveryFiles,
+func (p *antlrASTParseWorker) initWorker() *utils.SafeMap[any] {
+	store := utils.NewSafeMap[any]()
+	store.Set(antlrWorkerStateKey, &antlrWorkerState{
+		cache: p.newWorkerCache(),
 	})
-	return ret
+	return store
 }
 
-func newAntlrWorkerCache(language ssa.PreHandlerAnalyzer) *ssa.AntlrCache {
-	if language == nil || !ssa.WorkerAntlrCacheEnabled() {
+func (p *antlrASTParseWorker) newWorkerCache() *ssa.AntlrCache {
+	if p == nil || p.language == nil || !ssa.WorkerAntlrCacheEnabled() {
 		return nil
 	}
-	return language.GetAntlrCache()
+	return p.language.GetAntlrCache()
 }
 
-func getAntlrWorkerState(
-	store *utils.SafeMap[any],
-	language ssa.PreHandlerAnalyzer,
-	resetCfg antlrCacheResetConfig,
-) *antlrWorkerState {
+func (p *antlrASTParseWorker) workerState(store *utils.SafeMap[any]) *antlrWorkerState {
 	if store == nil {
 		return &antlrWorkerState{
-			cache:           newAntlrWorkerCache(language),
-			resetEveryFiles: resetCfg.resetEveryFiles,
+			cache: p.newWorkerCache(),
 		}
 	}
 
@@ -92,46 +97,32 @@ func getAntlrWorkerState(
 	}
 
 	state := &antlrWorkerState{
-		cache:           newAntlrWorkerCache(language),
-		resetEveryFiles: resetCfg.resetEveryFiles,
+		cache: p.newWorkerCache(),
 	}
 	store.Set(antlrWorkerStateKey, state)
 	return state
 }
 
-func (s *antlrWorkerState) Parse(language ssa.PreHandlerAnalyzer, source string) (ssa.FrontAST, error) {
-	ast, err := language.ParseAST(source, s.cache)
-	if s == nil || s.cache == nil || s.resetEveryFiles <= 0 {
-		return ast, err
+func (p *antlrASTParseWorker) parseFileAST(path string, source string, store *utils.SafeMap[any]) (ssa.FrontAST, error) {
+	if p == nil || p.language == nil {
+		return nil, utils.Errorf("not select language %s", p.languageName)
 	}
-
-	s.filesParsed++
-	if s.filesParsed%s.resetEveryFiles == 0 {
-		s.cache.ResetRuntimeCaches()
-	}
-	return ast, err
-}
-
-func parseFileAST(
-	language ssa.PreHandlerAnalyzer,
-	languageName string,
-	path string,
-	source string,
-	store *utils.SafeMap[any],
-	resetCfg antlrCacheResetConfig,
-) (ssa.FrontAST, error) {
-	if language == nil {
-		return nil, utils.Errorf("not select language %s", languageName)
-	}
-	if !language.FilterParseAST(path) {
-		log.Debugf("skip parse ast file: %s filter by %s", path, languageName)
+	if !p.language.FilterParseAST(path) {
+		log.Debugf("skip parse ast file: %s filter by %s", path, p.languageName)
 		return nil, nil
 	}
 
-	state := getAntlrWorkerState(store, language, resetCfg)
-	ast, err := state.Parse(language, source)
+	state := p.workerState(store)
+	ast, err := p.language.ParseAST(source, state.cache)
+	if state == nil || state.cache == nil || p.resetEveryFiles <= 0 {
+		return ast, err
+	}
+	state.filesParsed++
+	if state.filesParsed%p.resetEveryFiles == 0 {
+		state.cache.ResetRuntimeCaches()
+	}
 	if err != nil {
-		log.Debugf("parsed file[%s] parse [%s]AST error[%s]", path, languageName, err)
+		log.Debugf("parsed file[%s] parse [%s]AST error[%s]", path, p.languageName, err)
 	}
 	return ast, err
 }
@@ -141,7 +132,7 @@ func (c *Config) GetFileHandler(
 	preHandlerFiles []string,
 	handlerFilesMap map[string]struct{},
 ) <-chan *ssareducer.FileContent {
-	resetCfg := getAntlrCacheResetConfig()
+	parser := newAntlrASTParseWorker(c)
 	parse := func(path string, content []byte, store *utils.SafeMap[any]) (ssa.FrontAST, error) {
 		start := time.Now()
 		defer func() {
@@ -159,17 +150,10 @@ func (c *Config) GetFileHandler(
 			return nil, nil
 		}
 
-		return parseFileAST(
-			c.LanguageBuilder,
-			string(c.GetLanguage()),
-			path,
-			utils.UnsafeBytesToString(content),
-			store,
-			resetCfg,
-		)
+		return parser.parseFileAST(path, utils.UnsafeBytesToString(content), store)
 	}
 	initWorker := func() *utils.SafeMap[any] {
-		return newAntlrWorkerStore(c.LanguageBuilder, resetCfg)
+		return parser.initWorker()
 	}
 	return ssareducer.FilesHandler(
 		c.ctx, filesystem, preHandlerFiles,
