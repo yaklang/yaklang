@@ -1,0 +1,108 @@
+// 20_use_browser_fill_type.yak
+// Test fill and type operations using a page with form elements.
+// Uses a data: URI to create a test form without external dependencies.
+//
+// Run: go run common/yak/cmd/yak.go common/browser/yaktests/20_use_browser_fill_type.yak
+
+defer browser.CloseAll()
+
+session = "test-fill-type"
+
+log.Info("===== test: open browser with form page =====")
+b, err = browser.Open(
+    browser.id(session),
+    browser.headless(true),
+    browser.timeout(30),
+)
+assert err == nil, sprintf("open failed: %v", err)
+
+formHTML = `data:text/html,
+<html>
+<head><title>Test Form</title></head>
+<body>
+  <h1>Login Form</h1>
+  <form id="login-form">
+    <label for="username">Username:</label>
+    <input type="text" id="username" name="username" placeholder="Enter username">
+    <br>
+    <label for="password">Password:</label>
+    <input type="password" id="password" name="password" placeholder="Enter password">
+    <br>
+    <textarea id="notes" name="notes" placeholder="Notes"></textarea>
+    <br>
+    <button type="submit" id="submit-btn">Login</button>
+  </form>
+</body>
+</html>`
+
+page, err = b.Navigate(formHTML)
+assert err == nil, sprintf("navigate to form failed: %v", err)
+sleep(0.5)
+
+log.Info("===== test: snapshot to get refs =====")
+snap, err = page.Snapshot()
+assert err == nil, sprintf("snapshot failed: %v", err)
+log.Info("snapshot: %v nodes, %v refs", snap.NodeCount, snap.RefMap.Count())
+log.Info("snapshot text:\n%v", snap.Text)
+
+// Find refs for username, password, notes fields
+assert snap.RefMap.Count() > 0, "should have element refs"
+
+log.Info("===== test: fill username field =====")
+err = page.Fill("@e1", "admin_user")
+assert err == nil, sprintf("fill username failed: %v", err)
+log.Info("filled username with 'admin_user'")
+
+log.Info("===== test: fill password field =====")
+err = page.Fill("@e2", "secret123")
+assert err == nil, sprintf("fill password failed: %v", err)
+log.Info("filled password with 'secret123'")
+
+log.Info("===== test: fill textarea =====")
+err = page.Fill("@e3", "This is a test note for automation")
+assert err == nil, sprintf("fill notes failed: %v", err)
+log.Info("filled notes textarea")
+
+log.Info("===== test: verify filled values via eval =====")
+usernameVal, err = page.Evaluate("document.getElementById('username').value")
+assert err == nil, sprintf("get username value failed: %v", err)
+assert sprint(usernameVal) == "admin_user", sprintf("username should be 'admin_user', got: %v", usernameVal)
+log.Info("username value verified: %v", usernameVal)
+
+passwordVal, err = page.Evaluate("document.getElementById('password').value")
+assert err == nil, sprintf("get password value failed: %v", err)
+assert sprint(passwordVal) == "secret123", sprintf("password should be 'secret123', got: %v", passwordVal)
+log.Info("password value verified: %v", passwordVal)
+
+notesVal, err = page.Evaluate("document.getElementById('notes').value")
+assert err == nil, sprintf("get notes value failed: %v", err)
+assert str.Contains(sprint(notesVal), "test note"), sprintf("notes should contain 'test note', got: %v", notesVal)
+log.Info("notes value verified: %v", notesVal)
+
+log.Info("===== test: type text at focus =====")
+// Focus the username field and type additional text
+page.Evaluate("document.getElementById('username').focus()")
+sleep(0.3)
+err = page.Type("_extra")
+assert err == nil, sprintf("type failed: %v", err)
+log.Info("typed '_extra' at focused username field")
+
+usernameVal2, err = page.Evaluate("document.getElementById('username').value")
+assert err == nil, sprintf("get username value after type failed: %v", err)
+log.Info("username after type: %v", usernameVal2)
+
+log.Info("===== test: click submit button =====")
+snap2, err = page.Snapshot()
+assert err == nil, sprintf("pre-click snapshot failed: %v", err)
+log.Info("pre-click snapshot: %v refs", snap2.RefMap.Count())
+
+err = page.Click("@e4")
+assert err == nil, sprintf("click submit failed: %v", err)
+log.Info("clicked submit button")
+
+log.Info("===== test: close browser =====")
+err = browser.Close(browser.id(session))
+assert err == nil, sprintf("close failed: %v", err)
+log.Info("browser closed")
+
+log.Info("===== ALL FILL/TYPE TESTS PASSED =====")

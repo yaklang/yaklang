@@ -7,12 +7,15 @@ var Exports = map[string]interface{}{
 	"Close":    CloseByID,
 	"CloseAll": CloseAll,
 
-	"id":        WithID,
-	"headless":  WithHeadless,
-	"proxy":     WithProxy,
-	"timeout":   WithTimeout,
-	"exePath":   WithExePath,
-	"wsAddress": WithWsAddress,
-	"noSandBox": WithNoSandBox,
-	"leakless":  WithLeakless,
+	"HaveBrowserInstalled": HaveBrowserInstalled,
+
+	"id":         WithID,
+	"headless":   WithHeadless,
+	"proxy":      WithProxy,
+	"timeout":    WithTimeout,
+	"exePath":    WithExePath,
+	"wsAddress":  WithWsAddress,
+	"controlURL": WithControlURL,
+	"noSandBox":  WithNoSandBox,
+	"leakless":   WithLeakless,
 }

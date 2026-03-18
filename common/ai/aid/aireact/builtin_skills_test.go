@@ -26,6 +26,7 @@ var allBuiltinSkills = []struct {
 	{"recon-planning", "skills/recon-planning/SKILL.md", []string{"OWASP", "Recon", "Scoping"}},
 	{"web-crawler", "skills/web-crawler/SKILL.md", []string{"URL", "API", "JavaScript"}},
 	{"pentest-task-design", "skills/pentest-task-design/SKILL.md", []string{"scan_port", "do_http_request", "OWASP", "Phase"}},
+	{"use-browser", "skills/use-browser/SKILL.md", []string{"snapshot", "click", "fill", "screenshot", "CDP"}},
 }
 
 // TestBuiltinSkillsFS_ContainsAllSkills verifies that the embedded filesystem

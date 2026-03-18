@@ -1,0 +1,43 @@
+// GUI cross-process test step 3: reconnect, verify, close
+// run in sequence: 13 -> 14 -> 15
+// User should see: browser window closes
+
+controlFile = "/tmp/browser_gui_control_url.txt"
+
+log.info("===== GUI step 3: read controlURL =====")
+ctrlURLBytes = file.ReadFile(controlFile)~
+ctrlURL = str.TrimSpace(string(ctrlURLBytes))
+assert len(ctrlURL) > 0, "controlURL file should not be empty"
+log.info("read controlURL: %v", ctrlURL)
+
+log.info("===== GUI step 3: reconnect to visible browser =====")
+b, err = browser.Open(browser.controlURL(ctrlURL), browser.timeout(10))
+assert err == nil, sprintf("reconnect failed: %v", err)
+
+log.info("===== GUI step 3: verify tabs from previous steps =====")
+tabs, err = b.ListTabs()
+assert err == nil, sprintf("list tabs failed: %v", err)
+log.info("total tabs: %v", len(tabs))
+for _, tab = range tabs {
+    log.info("  [%v] %v", tab["index"], tab["url"])
+}
+assert len(tabs) >= 2, sprintf("should have >= 2 tabs, got: %v", len(tabs))
+
+log.info("===== GUI step 3: take final screenshot =====")
+page, err = b.CurrentPage()
+if err == nil {
+    imgData, err = page.Screenshot()
+    if err == nil {
+        log.info("final screenshot: %v bytes", len(imgData))
+    }
+}
+
+log.info("===== GUI step 3: close browser (user should see window close) =====")
+err = b.Close()
+assert err == nil, sprintf("close browser failed: %v", err)
+log.info("browser closed")
+
+os.Remove(controlFile)
+log.info("removed %v", controlFile)
+
+log.info("===== GUI CROSS-PROCESS TEST PASSED (all 3 steps) =====")

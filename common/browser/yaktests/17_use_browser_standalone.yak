@@ -1,0 +1,98 @@
+// 17_use_browser_standalone.yak
+// Standalone test for the browser module APIs used by use_browser.yak
+// Tests the full workflow: open -> snapshot -> get -> click -> screenshot -> close
+//
+// Run: go run common/yak/cmd/yak.go common/browser/yaktests/17_use_browser_standalone.yak
+
+defer browser.CloseAll()
+
+session = "test-browser"
+targetURL = "https://example.com"
+
+log.Info("===== test 1: open browser and navigate =====")
+b, err = browser.Open(
+    browser.id(session),
+    browser.headless(true),
+    browser.timeout(30),
+)
+assert err == nil, sprintf("open browser failed: %v", err)
+log.Info("browser opened, session=%v", session)
+
+page, err = b.Navigate(targetURL)
+assert err == nil, sprintf("navigate failed: %v", err)
+log.Info("navigated to %v", page.URL())
+
+log.Info("===== test 2: snapshot =====")
+snap, err = page.Snapshot()
+assert err == nil, sprintf("snapshot failed: %v", err)
+assert snap.NodeCount > 0, sprintf("node count should be > 0, got: %v", snap.NodeCount)
+log.Info("snapshot: %v nodes, %v refs", snap.NodeCount, snap.RefMap.Count())
+log.Info("snapshot text:\n%v", snap.Text)
+
+log.Info("===== test 3: get title =====")
+title, err = page.Title()
+assert err == nil, sprintf("get title failed: %v", err)
+assert str.Contains(title, "Example"), sprintf("title should contain 'Example', got: %v", title)
+log.Info("title: %v", title)
+
+log.Info("===== test 4: get url =====")
+currentURL = page.URL()
+assert str.Contains(currentURL, "example.com"), sprintf("url should contain example.com, got: %v", currentURL)
+log.Info("url: %v", currentURL)
+
+log.Info("===== test 5: get text via evaluate =====")
+textResult, err = page.Evaluate("document.body.innerText")
+assert err == nil, sprintf("evaluate failed: %v", err)
+textStr = sprint(textResult)
+assert len(textStr) > 0, "page text should not be empty"
+log.Info("page text (first 200): %v", textStr[:min(200, len(textStr))])
+
+log.Info("===== test 6: screenshot =====")
+imgData, err = page.Screenshot()
+assert err == nil, sprintf("screenshot failed: %v", err)
+assert len(imgData) > 100, sprintf("screenshot should be > 100 bytes, got: %v", len(imgData))
+assert imgData[0] == 0x89, "screenshot should start with PNG header"
+log.Info("screenshot: %v bytes (PNG verified)", len(imgData))
+
+log.Info("===== test 7: click link =====")
+err = page.Click("@e1")
+assert err == nil, sprintf("click @e1 failed: %v", err)
+sleep(1)
+log.Info("clicked @e1, url after click: %v", page.URL())
+
+log.Info("===== test 8: re-snapshot after click =====")
+snap2, err = page.Snapshot()
+assert err == nil, sprintf("re-snapshot failed: %v", err)
+assert snap2.NodeCount > 0, "re-snapshot node count should be > 0"
+log.Info("post-click snapshot: %v nodes, %v refs", snap2.NodeCount, snap2.RefMap.Count())
+
+log.Info("===== test 9: back navigation =====")
+err = page.Back()
+assert err == nil, sprintf("back failed: %v", err)
+sleep(1)
+log.Info("navigated back, url: %v", page.URL())
+
+log.Info("===== test 10: browser.Get reuses instance =====")
+b2, err = browser.Get(browser.id(session))
+assert err == nil, sprintf("get browser failed: %v", err)
+assert b2.ID() == session, sprintf("session mismatch, expected %v got %v", session, b2.ID())
+log.Info("browser.Get returned same instance: %v", b2.ID())
+
+log.Info("===== test 11: tab management =====")
+tabs, err = b.ListTabs()
+assert err == nil, sprintf("list tabs failed: %v", err)
+log.Info("tabs: %v", len(tabs))
+for _, tab := range tabs {
+    log.Info("  [%v] %v", tab["index"], tab["url"])
+}
+
+log.Info("===== test 12: close browser =====")
+err = browser.Close(browser.id(session))
+assert err == nil, sprintf("close failed: %v", err)
+log.Info("browser closed")
+
+_, err = browser.Get(browser.id(session))
+assert err != nil, "get after close should fail"
+log.Info("get after close correctly returns error")
+
+log.Info("===== ALL STANDALONE TESTS PASSED =====")

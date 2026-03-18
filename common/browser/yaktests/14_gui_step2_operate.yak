@@ -1,0 +1,71 @@
+// GUI cross-process test step 2: reconnect to visible browser and operate
+// run in sequence: 13 -> 14 -> 15
+// User can observe: new tab opens, text is filled, link is clicked
+
+controlFile = "/tmp/browser_gui_control_url.txt"
+
+log.info("===== GUI step 2: read controlURL =====")
+ctrlURLBytes = file.ReadFile(controlFile)~
+ctrlURL = str.TrimSpace(string(ctrlURLBytes))
+assert len(ctrlURL) > 0, "controlURL file should not be empty"
+log.info("read controlURL: %v", ctrlURL)
+
+log.info("===== GUI step 2: reconnect to visible browser =====")
+b, err = browser.Open(browser.controlURL(ctrlURL), browser.timeout(10))
+assert err == nil, sprintf("reconnect failed: %v", err)
+
+log.info("===== GUI step 2: list tabs from step 1 =====")
+tabs, err = b.ListTabs()
+assert err == nil, sprintf("list tabs failed: %v", err)
+log.info("found %v tabs from step 1", len(tabs))
+for _, tab = range tabs {
+    log.info("  [%v] %v", tab["index"], tab["url"])
+}
+
+log.info("===== GUI step 2: get existing page and snapshot =====")
+page, err = b.CurrentPage()
+assert err == nil, sprintf("get current page failed: %v", err)
+
+snap, err = page.Snapshot()
+assert err == nil, sprintf("snapshot failed: %v", err)
+log.info("page snapshot: %v nodes, %v refs", snap.NodeCount, snap.RefMap.Count())
+
+// find textbox ref and fill it -- user should see text appear
+extractRef = func(snapText, role) {
+    lines = str.Split(snapText, "\n")
+    for _, line = range lines {
+        if str.Contains(line, role) && str.Contains(line, "ref=") {
+            parts = str.SplitN(line, "ref=", 2)
+            if len(parts) < 2 { continue }
+            refPart = parts[1]
+            result = ""
+            for i = 0; i < len(refPart); i++ {
+                ch = sprintf("%c", refPart[i])
+                if ch == "]" || ch == "," || ch == " " { break }
+                result = result + ch
+            }
+            if result != "" { return result }
+        }
+    }
+    return ""
+}
+
+log.info("===== GUI step 2: fill textbox (user should see text appear) =====")
+textboxRef = extractRef(snap.Text, "textbox")
+if textboxRef != "" {
+    err = page.Fill("@" + textboxRef, "cross-process-GUI-test")
+    if err == nil {
+        log.info("filled @%v with 'cross-process-GUI-test'", textboxRef)
+    } else {
+        log.info("fill @%v error: %v", textboxRef, err)
+    }
+}
+
+sleep(1)
+
+log.info("===== GUI step 2: open a new tab (user should see new tab) =====")
+page2, err = b.NewTab("http://127.0.0.1:8787/misc/healthy")
+assert err == nil, sprintf("new tab failed: %v", err)
+log.info("opened new tab: %v", page2.URL())
+
+log.info("===== GUI STEP 2 DONE -- browser window stays open =====")

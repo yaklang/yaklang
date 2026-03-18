@@ -1,0 +1,74 @@
+// 18_use_browser_react.yak
+// Test aim.InvokeReAct with use_browser tool
+// AI should open https://example.com, get title, and close the browser.
+//
+// Run: go run common/yak/cmd/yak.go common/browser/yaktests/18_use_browser_react.yak
+
+defer browser.CloseAll()
+
+var executionError = nil
+var titleSeen = false
+var closeSeen = false
+
+testPrompt = `You have a browser automation tool called "use_browser". Please perform these tasks in order:
+
+1. Open the page https://example.com using op=open with url parameter
+2. Get the page title using op=get with subop=title
+3. Close the browser using op=close
+
+Report each result as you go.`
+
+log.Info("========================================")
+log.Info("Testing aim.InvokeReAct with use_browser tool")
+log.Info("========================================")
+
+err = aim.InvokeReAct(
+    testPrompt,
+    aim.includeToolNames("use_browser"),
+    aim.aiConfig("aibalance"),
+    aim.timeout(180),
+    aim.maxIteration(10),
+    aim.yoloMode(),
+    aim.onEvent(func(react, event) {
+        eventType = string(event.Type)
+        contentStr = string(event.Content)
+
+        if len(contentStr) > 300 {
+            log.Info("event: type=%v content(truncated)=%v...", eventType, contentStr[:300])
+        } else {
+            log.Info("event: type=%v content=%v", eventType, contentStr)
+        }
+
+        if str.Contains(contentStr, "Example Domain") {
+            titleSeen = true
+        }
+        if str.Contains(contentStr, "closed") || str.Contains(contentStr, "close") {
+            closeSeen = true
+        }
+    }),
+    aim.onFinished(func(react) {
+        log.Info("ReAct loop finished")
+    }),
+)
+
+if err != nil {
+    executionError = err
+    log.Error("ReAct execution error: %v", err)
+}
+
+log.Info("========================================")
+log.Info("TEST RESULTS")
+log.Info("========================================")
+
+if executionError != nil {
+    log.Error("execution error: %v", executionError)
+} else {
+    log.Info("execution completed successfully")
+}
+
+log.Info("title 'Example Domain' seen in events: %v", titleSeen)
+log.Info("close action seen in events: %v", closeSeen)
+
+log.Info("========================================")
+log.Info("TEST COMPLETED")
+log.Info("========================================")

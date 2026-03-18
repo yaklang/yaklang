@@ -7,6 +7,7 @@ const defaultBrowserID = "default"
 type BrowserConfig struct {
 	id string
 
+	controlURL   string
 	wsAddress    string
 	exePath      string
 	proxyAddress string
@@ -83,5 +84,11 @@ func WithLeakless(leakless bool) BrowserOption {
 func WithTimeout(timeout float64) BrowserOption {
 	return func(c *BrowserConfig) {
 		c.timeout = time.Duration(timeout * float64(time.Second))
+	}
+}
+
+func WithControlURL(controlURL string) BrowserOption {
+	return func(c *BrowserConfig) {
+		c.controlURL = controlURL
 	}
 }

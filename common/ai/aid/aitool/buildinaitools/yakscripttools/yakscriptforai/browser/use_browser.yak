@@ -1,0 +1,677 @@
+__DESC__ = "Browser automation tool using yaklang native browser module (go-rod/CDP). Supports navigating pages, taking accessibility snapshots with element refs (@e1, @e2), clicking, filling forms, typing, screenshots, getting page info, waiting for elements, evaluating JavaScript, tab management, and more. The browser instance persists across tool calls via session ID."
+__VERBOSE_NAME__ = "Browser Automation Tool"
+__KEYWORDS__ = "browser,chrome,automation,click,fill,type,snapshot,screenshot,navigate,scrape,web,form,login,CDP,headless,accessibility,ref,DOM,page,wait,scroll,eval,tab,cookie,selector"
+
+__USAGE__ = <<<USAGE_BLOCK
+Browser Automation Tool - Usage Guide for AI Parameter Generation
+
+This tool provides browser automation via the yaklang native browser module.
+The core workflow is: open URL -> snapshot (get refs) -> interact (using refs) -> re-snapshot.
+
+Snapshot returns an accessibility tree with element refs like @e1, @e2, etc.
+Use these refs as "target" to click, fill, type, hover, etc.
+The browser instance persists across tool calls using the same session name.
+
+## Parameters
+
+Required:
+  op        (string)  The browser operation to perform. One of:
+                      Navigation: "open", "back", "forward", "reload", "close"
+                      Snapshot:   "snapshot"
+                      Interact:   "click", "fill", "type"
+                      Info:       "get"
+                      Wait:       "wait"
+                      Capture:    "screenshot"
+                      Script:     "eval"
+                      Tab:        "tab_list", "tab_new", "tab_switch", "tab_close"
+
+Conditional (depends on op):
+  url       (string)  URL to navigate to.           Required for: op=open, op=tab_new
+  target    (string)  Element ref (@eN) or CSS sel.  Required for: op=click/fill
+  value     (string)  Text to fill/type.
+                      Required for: op=fill/type
+  subop     (string)  Sub-operation for "get": title, url, html, text, cookies.
+                      Required for: op=get
+  js        (string)  JavaScript code for eval operation.
+                      Required for: op=eval
+                      *** Use AITAG for multi-line JS ***
+
+Optional:
+  timeout   (int)     Browser timeout in seconds. Default: 30.
+  session   (string)  Browser session ID for instance reuse. Default: "ai-browser".
+  headless  (string)  "yes" (default) or "no" to show browser window.
+  wait-type (string)  Wait condition: "selector", "visible", "ms".
+                      Required for: op=wait
+  wait-value(string)  Wait condition value (CSS selector or milliseconds).
+                      Required for: op=wait
+  tab-index (string)  Tab index for tab_switch/tab_close.
+
+## Workflow Pattern
+
+Step 1: Open a page (op=open, url=...)
+        -> automatically takes a snapshot and returns refs
+Step 2: Interact using refs (op=click target=@e1, op=fill target=@e2 value=...)
+Step 3: Re-snapshot after page changes (op=snapshot)
+        -> refs are invalidated after page changes
+Step 4: Close the browser when done (op=close)
+
+## Few-Shot Examples
+
+### Example 1: Open URL (auto-snapshots)
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "use_browser",
+  "identifier": "open_page",
+  "params": {
+    "op": "open",
+    "url": "https://example.com",
+    "timeout": 15
+  }
+}
+```
+
+### Example 2: Fill a form field and click submit
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "use_browser",
+  "identifier": "fill_email",
+  "params": {
+    "op": "fill",
+    "target": "@e1",
+    "value": "user@example.com"
+  }
+}
+```
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "use_browser",
+  "identifier": "click_submit",
+  "params": {
+    "op": "click",
+    "target": "@e3"
+  }
+}
+```
+
+### Example 3: Re-snapshot after page change
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "use_browser",
+  "identifier": "refresh_refs",
+  "params": {
+    "op": "snapshot"
+  }
+}
+```
+
+### Example 4: Get page title
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "use_browser",
+  "identifier": "check_title",
+  "params": {
+    "op": "get",
+    "subop": "title"
+  }
+}
+```
+
+### Example 5: Take screenshot
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "use_browser",
+  "identifier": "capture_page",
+  "params": {
+    "op": "screenshot"
+  }
+}
+```
+
+### Example 6: Wait for element then interact
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "use_browser",
+  "identifier": "wait_for_form",
+  "params": {
+    "op": "wait",
+    "wait-type": "selector",
+    "wait-value": "#login-form"
+  }
+}
+```
+
+### Example 7: Evaluate JavaScript
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "use_browser",
+  "identifier": "run_js",
+  "params": {
+    "op": "eval",
+    "timeout": 10
+  }
+}
+```
+
+<|TOOL_PARAM_js_{NONCE}|>
+JSON.stringify({
+  title: document.title,
+  links: Array.from(document.querySelectorAll("a")).map(a => a.href).slice(0, 10)
+})
+<|TOOL_PARAM_js_END_{NONCE}|>
+
+### Example 8: Close browser
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "use_browser",
+  "identifier": "close_browser",
+  "params": {
+    "op": "close"
+  }
+}
+```
+
+### Example 9: Wait milliseconds
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "use_browser",
+  "identifier": "wait_2s",
+  "params": {
+    "op": "wait",
+    "wait-type": "ms",
+    "wait-value": "2000"
+  }
+}
+```
+
+### Example 10: Type text at current focus (no selector)
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "use_browser",
+  "identifier": "type_text",
+  "params": {
+    "op": "type",
+    "value": "hello world"
+  }
+}
+```
+
+## Key Rules
+
+1. ALWAYS take a snapshot after opening a page or after page navigation.
+2. Refs (@e1, @e2) are INVALIDATED after page changes -- re-snapshot to get fresh refs.
+3. Use "wait" before interacting with dynamically loaded content.
+4. Set reasonable timeout values (10-30s for most operations).
+5. Use "get" with subop="title" or subop="url" to verify you are on the expected page.
+6. For multi-line JavaScript, ALWAYS use AITAG for the "js" parameter.
+7. Close the browser when done to avoid leaked processes.
+8. The open op auto-snapshots, so you do NOT need a separate snapshot call after open.
+USAGE_BLOCK
+
+yakit.AutoInitYakit()
+
+// ========== CLI Parameters ==========
+op = cli.String("op", cli.setRequired(true), cli.setHelp("browser operation: open/snapshot/click/fill/type/get/wait/screenshot/eval/back/forward/reload/close/tab_list/tab_new/tab_switch/tab_close"))
+url = cli.String("url", cli.setRequired(false), cli.setHelp("URL for open/tab_new operations"))
+target = cli.String("target", cli.setRequired(false), cli.setHelp("element ref (@eN) or CSS selector for click/fill"))
+value = cli.String("value", cli.setRequired(false), cli.setHelp("text value for fill/type"))
+subop = cli.String("subop", cli.setRequired(false), cli.setHelp("sub-operation for get: title/url/html/text/cookies"))
+js = cli.String("js", cli.setRequired(false), cli.setHelp("JavaScript code for eval operation. Use AITAG for multi-line scripts."))
+session = cli.String("session", cli.setRequired(false), cli.setHelp("browser session ID for instance reuse"), cli.setDefault("ai-browser"))
+headless = cli.String("headless", cli.setRequired(false), cli.setHelp("yes/no to show browser window"), cli.setDefault("yes"))
+timeoutSeconds = cli.Int("timeout", cli.setRequired(false), cli.setHelp("browser timeout in seconds"), cli.setDefault(30))
+waitType = cli.String("wait-type", cli.setRequired(false), cli.setHelp("wait condition: selector/visible/ms"))
+waitValue = cli.String("wait-value", cli.setRequired(false), cli.setHelp("wait condition value"))
+tabIndex = cli.String("tab-index", cli.setRequired(false), cli.setHelp("tab index for tab_switch/tab_close"))
+
+cli.check()
+
+// ========== Helper: get or open browser instance ==========
+getBrowser = func() {
+    b, err = browser.Get(browser.id(session))
+    if err != nil {
+        yakit.Error("no browser instance found for session %v, use op=open first: %v", session, err)
+        return undefined, err
+    }
+    return b, nil
+}
+
+// ========== Helper: get current page from browser instance ==========
+getPage = func() {
+    b, err = getBrowser()
+    if err != nil {
+        return undefined, err
+    }
+    page, err = b.CurrentPage()
+    if err != nil {
+        yakit.Error("no page found in session %v: %v", session, err)
+        return undefined, err
+    }
+    return page, nil
+}
+
+// ========== Browser installation check for open ==========
+if str.ToLower(op) == "open" {
+    if !browser.HaveBrowserInstalled() {
+        yakit.Error("No Chrome/Chromium browser found on this system. Please install Chrome or Chromium first. On macOS you can download from https://www.google.com/chrome/ or install via: brew install --cask google-chrome")
+        return
+    }
+}
+
+// ========== Op dispatch ==========
+switch str.ToLower(op) {
+
+case "open":
+    if url == "" {
+        yakit.Error("op=open requires --url parameter")
+        return
+    }
+
+    isHeadless = str.ToLower(headless) != "no"
+    b, err = browser.Open(
+        browser.id(session),
+        browser.headless(isHeadless),
+        browser.timeout(float64(timeoutSeconds)),
+    )
+    if err != nil {
+        yakit.Error("failed to open browser: %v", err)
+        return
+    }
+    yakit.Info("browser opened, session=%v, headless=%v", session, isHeadless)
+
+    page, err = b.Navigate(url)
+    if err != nil {
+        yakit.Error("failed to navigate to %v: %v", url, err)
+        return
+    }
+    yakit.Info("navigated to %v", url)
+
+    // 自动 snapshot 获取元素引用
+    snap, err = page.Snapshot()
+    if err != nil {
+        yakit.Warn("auto-snapshot failed: %v", err)
+        return
+    }
+    snapText = snap.Text
+    if len(snapText) > 5000 {
+        snapText = snapText[:5000] + "\n... (truncated)"
+    }
+    yakit.Info("page opened and snapshot taken (%v nodes, %v refs):\n%v", snap.NodeCount, snap.RefMap.Count(), snapText)
+
+case "snapshot":
+    page, err = getPage()
+    if err != nil {
+        return
+    }
+    snap, err = page.Snapshot()
+    if err != nil {
+        yakit.Error("snapshot failed: %v", err)
+        return
+    }
+    snapText = snap.Text
+    if len(snapText) > 5000 {
+        snapText = snapText[:5000] + "\n... (truncated)"
+    }
+    yakit.Info("snapshot (%v nodes, %v refs):\n%v", snap.NodeCount, snap.RefMap.Count(), snapText)
+
+case "click":
+    if target == "" {
+        yakit.Error("op=click requires --target parameter (e.g. @e1 or CSS selector)")
+        return
+    }
+    page, err = getPage()
+    if err != nil {
+        return
+    }
+    err = page.Click(target)
+    if err != nil {
+        yakit.Error("click %v failed: %v", target, err)
+        return
+    }
+    yakit.Info("clicked %v", target)
+    sleep(0.5)
+
+    // 点击后自动 snapshot 以获取新的引用
+    snap, snapErr = page.Snapshot()
+    if snapErr == nil {
+        snapText = snap.Text
+        if len(snapText) > 3000 {
+            snapText = snapText[:3000] + "\n... (truncated)"
+        }
+        yakit.Info("post-click snapshot (%v nodes, %v refs):\n%v", snap.NodeCount, snap.RefMap.Count(), snapText)
+    }
+
+case "fill":
+    if target == "" {
+        yakit.Error("op=fill requires --target parameter (e.g. @e1 or CSS selector)")
+        return
+    }
+    if value == "" {
+        yakit.Error("op=fill requires --value parameter")
+        return
+    }
+    page, err = getPage()
+    if err != nil {
+        return
+    }
+    err = page.Fill(target, value)
+    if err != nil {
+        yakit.Error("fill %v failed: %v", target, err)
+        return
+    }
+    yakit.Info("filled %v with text (length=%v)", target, len(value))
+
+case "type":
+    if value == "" {
+        yakit.Error("op=type requires --value parameter")
+        return
+    }
+    page, err = getPage()
+    if err != nil {
+        return
+    }
+    err = page.Type(value)
+    if err != nil {
+        yakit.Error("type failed: %v", err)
+        return
+    }
+    yakit.Info("typed text at current focus (length=%v)", len(value))
+
+case "get":
+    if subop == "" {
+        yakit.Error("op=get requires --subop parameter (title/url/html/text/cookies)")
+        return
+    }
+    page, err = getPage()
+    if err != nil {
+        return
+    }
+
+    switch str.ToLower(subop) {
+    case "title":
+        title, err = page.Title()
+        if err != nil {
+            yakit.Error("get title failed: %v", err)
+            return
+        }
+        yakit.Info("page title: %v", title)
+
+    case "url":
+        currentURL = page.URL()
+        yakit.Info("page url: %v", currentURL)
+
+    case "html":
+        html, err = page.HTML()
+        if err != nil {
+            yakit.Error("get html failed: %v", err)
+            return
+        }
+        if len(html) > 10000 {
+            html = html[:10000] + "\n... (truncated, total " + sprint(len(html)) + " chars)"
+        }
+        yakit.Info("page html:\n%v", html)
+
+    case "text":
+        textResult, err = page.Evaluate("document.body.innerText")
+        if err != nil {
+            yakit.Error("get text failed: %v", err)
+            return
+        }
+        textStr = sprint(textResult)
+        if len(textStr) > 5000 {
+            textStr = textStr[:5000] + "\n... (truncated)"
+        }
+        yakit.Info("page text:\n%v", textStr)
+
+    case "cookies":
+        cookies, err = page.GetCookies()
+        if err != nil {
+            yakit.Error("get cookies failed: %v", err)
+            return
+        }
+        yakit.Info("cookies (%v):", len(cookies))
+        for _, c := range cookies {
+            yakit.Info("  %v=%v (domain=%v, path=%v)", c.Name, c.Value, c.Domain, c.Path)
+        }
+
+    default:
+        yakit.Error("unknown get subop: %v (supported: title, url, html, text, cookies)", subop)
+    }
+
+case "wait":
+    if waitType == "" {
+        yakit.Error("op=wait requires --wait-type parameter (selector/visible/ms)")
+        return
+    }
+    if waitValue == "" {
+        yakit.Error("op=wait requires --wait-value parameter")
+        return
+    }
+
+    switch str.ToLower(waitType) {
+    case "selector":
+        page, err = getPage()
+        if err != nil {
+            return
+        }
+        err = page.WaitSelector(waitValue)
+        if err != nil {
+            yakit.Error("wait for selector %v failed: %v", waitValue, err)
+            return
+        }
+        yakit.Info("element matching %v appeared", waitValue)
+
+    case "visible":
+        page, err = getPage()
+        if err != nil {
+            return
+        }
+        err = page.WaitVisible(waitValue)
+        if err != nil {
+            yakit.Error("wait for visible %v failed: %v", waitValue, err)
+            return
+        }
+        yakit.Info("element %v is now visible", waitValue)
+
+    case "ms":
+        ms = parseInt(waitValue)
+        if ms <= 0 {
+            yakit.Error("invalid milliseconds value: %v", waitValue)
+            return
+        }
+        sleep(float64(ms) / 1000.0)
+        yakit.Info("waited %vms", ms)
+
+    default:
+        yakit.Error("unknown wait-type: %v (supported: selector, visible, ms)", waitType)
+    }
+
+case "screenshot":
+    page, err = getPage()
+    if err != nil {
+        return
+    }
+    imgData, err = page.Screenshot()
+    if err != nil {
+        yakit.Error("screenshot failed: %v", err)
+        return
+    }
+
+    // 保存到临时文件
+    tmpFile, tmpErr = file.TempFileName("browser_screenshot_*.png")
+    if tmpErr != nil {
+        yakit.Error("failed to create temp file: %v", tmpErr)
+        return
+    }
+    file.Save(tmpFile, imgData)
+    yakit.Info("screenshot saved to %v (%v bytes)", tmpFile, len(imgData))
+
+    // 同时输出 base64
+    b64, b64Err = page.ScreenshotBase64()
+    if b64Err == nil {
+        yakit.Info("screenshot base64 (first 100 chars): %v...", b64[:min(100, len(b64))])
+    }
+
+case "eval":
+    if js == "" {
+        yakit.Error("op=eval requires --js parameter (JavaScript code)")
+        return
+    }
+    page, err = getPage()
+    if err != nil {
+        return
+    }
+    result, err = page.Evaluate(js)
+    if err != nil {
+        yakit.Error("eval failed: %v", err)
+        return
+    }
+    resultStr = sprint(result)
+    if len(resultStr) > 5000 {
+        resultStr = resultStr[:5000] + "\n... (truncated)"
+    }
+    yakit.Info("eval result:\n%v", resultStr)
+
+case "back":
+    page, err = getPage()
+    if err != nil {
+        return
+    }
+    err = page.Back()
+    if err != nil {
+        yakit.Error("back failed: %v", err)
+        return
+    }
+    yakit.Info("navigated back, current url: %v", page.URL())
+
+case "forward":
+    page, err = getPage()
+    if err != nil {
+        return
+    }
+    err = page.Forward()
+    if err != nil {
+        yakit.Error("forward failed: %v", err)
+        return
+    }
+    yakit.Info("navigated forward, current url: %v", page.URL())
+
+case "reload":
+    page, err = getPage()
+    if err != nil {
+        return
+    }
+    err = page.Reload()
+    if err != nil {
+        yakit.Error("reload failed: %v", err)
+        return
+    }
+    yakit.Info("page reloaded, current url: %v", page.URL())
+
+case "close":
+    err = browser.Close(browser.id(session))
+    if err != nil {
+        yakit.Warn("close session %v: %v (may already be closed)", session, err)
+    } else {
+        yakit.Info("browser session %v closed", session)
+    }
+
+case "tab_list":
+    b, err = getBrowser()
+    if err != nil {
+        return
+    }
+    tabs, err = b.ListTabs()
+    if err != nil {
+        yakit.Error("list tabs failed: %v", err)
+        return
+    }
+    yakit.Info("tabs (%v):", len(tabs))
+    for _, tab := range tabs {
+        yakit.Info("  [%v] %v - %v", tab["index"], tab["url"], tab["title"])
+    }
+
+case "tab_new":
+    if url == "" {
+        yakit.Error("op=tab_new requires --url parameter")
+        return
+    }
+    b, err = getBrowser()
+    if err != nil {
+        return
+    }
+    page, err = b.NewTab(url)
+    if err != nil {
+        yakit.Error("new tab failed: %v", err)
+        return
+    }
+    yakit.Info("new tab opened: %v", url)
+
+    // 自动 snapshot
+    snap, snapErr = page.Snapshot()
+    if snapErr == nil {
+        snapText = snap.Text
+        if len(snapText) > 3000 {
+            snapText = snapText[:3000] + "\n... (truncated)"
+        }
+        yakit.Info("new tab snapshot (%v nodes, %v refs):\n%v", snap.NodeCount, snap.RefMap.Count(), snapText)
+    }
+
+case "tab_switch":
+    if tabIndex == "" {
+        yakit.Error("op=tab_switch requires --tab-index parameter")
+        return
+    }
+    b, err = getBrowser()
+    if err != nil {
+        return
+    }
+    idx = parseInt(tabIndex)
+    page, err = b.SwitchTab(idx)
+    if err != nil {
+        yakit.Error("switch to tab %v failed: %v", idx, err)
+        return
+    }
+    yakit.Info("switched to tab %v, url: %v", idx, page.URL())
+
+case "tab_close":
+    if tabIndex == "" {
+        yakit.Error("op=tab_close requires --tab-index parameter")
+        return
+    }
+    b, err = getBrowser()
+    if err != nil {
+        return
+    }
+    idx = parseInt(tabIndex)
+    err = b.CloseTab(idx)
+    if err != nil {
+        yakit.Error("close tab %v failed: %v", idx, err)
+        return
+    }
+    yakit.Info("tab %v closed", idx)
+
+default:
+    yakit.Error("unknown op: %v. Supported: open, snapshot, click, fill, type, get, wait, screenshot, eval, back, forward, reload, close, tab_list, tab_new, tab_switch, tab_close", op)
+}

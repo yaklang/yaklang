@@ -88,7 +88,8 @@ browser.CloseAll()
 | `browser.proxy(string)` | string | `""` | HTTP 代理地址 |
 | `browser.timeout(float64)` | float64(秒) | `30` | 操作超时时间 |
 | `browser.exePath(string)` | string | 自动检测 | Chrome 可执行文件路径 |
-| `browser.wsAddress(string)` | string | `""` | 远程 WebSocket 调试地址 |
+| `browser.controlURL(string)` | string | `""` | 直连已运行 Chrome 的 WebSocket URL（跨进程复用） |
+| `browser.wsAddress(string)` | string | `""` | 远程 managed launcher 地址 |
 | `browser.noSandBox(bool)` | bool | `true` | 禁用沙箱（Linux 需要） |
 | `browser.leakless(bool)` | bool | `false` | 防泄漏模式 |
 
@@ -141,11 +142,12 @@ err = b.CloseTab(1)
 err = b.Close()
 ```
 
-#### b.ID() / b.IsClosed()
+#### b.ID() / b.IsClosed() / b.ControlURL()
 
 ```yak
-id = b.ID()          // "default"
-closed = b.IsClosed() // false
+id = b.ID()              // "default"
+closed = b.IsClosed()     // false
+ctrlURL = b.ControlURL()  // "ws://127.0.0.1:9222/devtools/browser/..."
 ```
 
 ### BrowserPage 方法
@@ -301,9 +303,38 @@ for {
 }
 ```
 
+## 跨进程复用
+
+通过 `controlURL` 实现多个 yak 脚本进程共享同一个 Chrome 实例：
+
+```yak
+// 脚本 A: 启动浏览器，保存 controlURL
+b, err = browser.Open(browser.headless(true), browser.leakless(false))
+page, _ = b.Navigate("http://example.com")
+file.Save("/tmp/ctrl_url.txt", b.ControlURL())
+// 脚本退出，不调用 Close，Chrome 继续运行
+```
+
+```yak
+// 脚本 B (另一个进程): 通过 controlURL 重连
+ctrlURL = string(file.ReadFile("/tmp/ctrl_url.txt")~)
+b, err = browser.Open(browser.controlURL(ctrlURL))
+tabs, _ = b.ListTabs()   // 能看到脚本 A 打开的页面
+page, _ = b.CurrentPage() // 获取脚本 A 的页面继续操作
+```
+
+```yak
+// 脚本 C: 重连并关闭
+ctrlURL = string(file.ReadFile("/tmp/ctrl_url.txt")~)
+b, _ = browser.Open(browser.controlURL(ctrlURL))
+b.Close()  // 真正关闭 Chrome 进程
+```
+
 ## 测试
 
 测试脚本位于 `common/browser/yaktests/`，覆盖全部 API：
+
+### 基础测试（独立运行）
 
 ```bash
 go run common/yak/cmd/yak.go common/browser/yaktests/01_lifecycle.yak
@@ -317,6 +348,26 @@ go run common/yak/cmd/yak.go common/browser/yaktests/08_multi_instance.yak
 go run common/yak/cmd/yak.go common/browser/yaktests/09_tabs.yak
 ```
 
+### 跨进程测试（必须顺序运行）
+
+```bash
+# Headless 跨进程三部曲
+go run common/yak/cmd/yak.go common/browser/yaktests/10_cross_step1_open.yak
+go run common/yak/cmd/yak.go common/browser/yaktests/11_cross_step2_operate.yak
+go run common/yak/cmd/yak.go common/browser/yaktests/12_cross_step3_close.yak
+
+# GUI 跨进程三部曲（可见浏览器窗口）
+go run common/yak/cmd/yak.go common/browser/yaktests/13_gui_step1_open.yak
+go run common/yak/cmd/yak.go common/browser/yaktests/14_gui_step2_operate.yak
+go run common/yak/cmd/yak.go common/browser/yaktests/15_gui_step3_close.yak
+```
+
+### AI 模拟测试
+
+```bash
+go run common/yak/cmd/yak.go common/browser/yaktests/16_ai_login.yak
+```
+
 | 脚本 | 覆盖范围 |
 |------|----------|
 | 01_lifecycle | Open / Get / List / Close / CloseAll / IsClosed |
@@ -328,6 +379,9 @@ go run common/yak/cmd/yak.go common/browser/yaktests/09_tabs.yak
 | 07_screenshot | Screenshot / ScreenshotBase64 |
 | 08_multi_instance | 多 ID 并行 / Get 复用 / 分别关闭 |
 | 09_tabs | ListTabs / NewTab / SwitchTab / CloseTab |
+| 10-12 | 跨进程 headless: 启动/重连操作/验证关闭 |
+| 13-15 | 跨进程 GUI: 同上但可见窗口 |
+| 16 | AI 模拟登录: snapshot 探索 + 填表 + 提交 |
 
 ## 使用示例
 

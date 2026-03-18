@@ -1,0 +1,31 @@
+// GUI cross-process test step 1: launch VISIBLE browser and save controlURL
+// run in sequence: 13 -> 14 -> 15
+// DO NOT close browser -- user can observe the window
+
+targetURL = "http://127.0.0.1:8787/"
+controlFile = "/tmp/browser_gui_control_url.txt"
+
+log.info("===== GUI step 1: launch visible browser =====")
+b, err = browser.Open(browser.headless(false), browser.leakless(false), browser.timeout(10))
+assert err == nil, sprintf("open browser failed: %v", err)
+log.info("visible browser launched, id=%v", b.ID())
+
+ctrlURL = b.ControlURL()
+assert len(ctrlURL) > 0, "controlURL should not be empty"
+log.info("controlURL: %v", ctrlURL)
+
+log.info("===== GUI step 1: navigate to target =====")
+page, err = b.Navigate(targetURL)
+assert err == nil, sprintf("navigate failed: %v", err)
+log.info("navigated to %v -- user should see the Vulinbox page", page.URL())
+
+snap, err = page.Snapshot()
+assert err == nil, sprintf("snapshot failed: %v", err)
+log.info("snapshot: %v nodes, %v refs", snap.NodeCount, snap.RefMap.Count())
+
+log.info("===== GUI step 1: save controlURL to file =====")
+err = file.Save(controlFile, ctrlURL)
+assert err == nil, sprintf("save controlURL failed: %v", err)
+log.info("controlURL saved to %v", controlFile)
+
+log.info("===== GUI STEP 1 DONE -- browser window stays open =====")
