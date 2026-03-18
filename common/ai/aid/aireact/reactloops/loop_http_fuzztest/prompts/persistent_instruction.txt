@@ -29,7 +29,7 @@ You are now in HTTP fuzzing mode, specialized for testing HTTP request parameter
 - **XSS**: `<script>`, `javascript:`, `onerror=`, `onload=`
 - **Path Traversal**: `../`, `..\\`, `....//`, `%2e%2e%2f`
 - **Command Injection**: `;`, `|`, `&&`, `$(command)`, `` `command` ``
-- **Template Injection**: `{{7*7}}`, `${7*7}`, `<%= 7*7 %>`
+- **Template Injection**: `{{"{{7*7}}"}}`, `${7*7}`, `<%= 7*7 %>`
 - **Header Injection**: `\r\n`, `%0d%0a`
 
 ### Response Analysis Tips
@@ -67,4 +67,3 @@ Since there is **no browser environment** available, XSS must be verified throug
 - Consider encoding requirements (URL encoding, Base64, etc.)
 - Test one parameter at a time for accurate attribution
 - When tools report `[XSS_DETECTION]` or `[XSS_VERDICT]`, use this as strong evidence for vulnerability confirmation
-

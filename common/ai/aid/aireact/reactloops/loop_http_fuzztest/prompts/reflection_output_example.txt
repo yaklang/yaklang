@@ -40,7 +40,7 @@
   "human_readable_thought": "Testing JSON body parameter for template injection",
   "body_type": "json_params",
   "param_name": "username",
-  "param_values": ["{{7*7}}", "${7*7}", "<%= 7*7 %>", "#{7*7}"],
+  "param_values": ["{{"{{7*7}}"}}", "${7*7}", "<%= 7*7 %>", "#{7*7}"],
   "reason": "Testing for server-side template injection in JSON body"
 }
 ```
@@ -51,7 +51,7 @@
   "@action": "fuzz_cookie",
   "human_readable_thought": "Testing session cookie manipulation",
   "cookie_name": "session",
-  "cookie_values": ["admin", "root", "' OR '1'='1", "{{constructor.constructor('return this')()}}"],
+  "cookie_values": ["admin", "root", "' OR '1'='1", "{{"{{constructor.constructor('return this')()}}"}}"],
   "raw_mode": false,
   "reason": "Testing session cookie for privilege escalation and injection"
 }
@@ -66,4 +66,3 @@
   "reason": "Checking if the endpoint responds differently to various HTTP methods"
 }
 ```
-
