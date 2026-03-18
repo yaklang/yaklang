@@ -1,21 +1,39 @@
-__DESC__ = "Browser automation tool using yaklang native browser module (go-rod/CDP). Supports navigating pages, taking accessibility snapshots with element refs (@e1, @e2), clicking, filling forms, typing, screenshots, getting page info, waiting for elements, evaluating JavaScript, tab management, and more. The browser instance persists across tool calls via session ID."
+__DESC__ = <<<DESC_BLOCK
+Browser automation tool (go-rod/CDP). Two interaction strategies:
+
+1. Snapshot strategy: open -> snapshot (get @eN refs) -> fill/click using refs.
+   Works for simple static pages. If snapshot returns 0 refs, DO NOT retry -- switch to JS strategy.
+
+2. JavaScript strategy (PREFERRED for login/form pages): open -> eval JS to discover selectors ->
+   fill/click using CSS selectors, OR do everything in a single eval call.
+   More reliable for SPA/React/Vue/dynamic pages. A single eval can fill a form and submit it.
+
+Both "target" for click/fill accept @eN refs AND CSS selectors (e.g. "input[name=username]").
+The browser instance persists across tool calls via session ID.
+DESC_BLOCK
 __VERBOSE_NAME__ = "Browser Automation Tool"
-__KEYWORDS__ = "browser,chrome,automation,click,fill,type,snapshot,screenshot,navigate,scrape,web,form,login,CDP,headless,accessibility,ref,DOM,page,wait,scroll,eval,tab,cookie,selector"
+__KEYWORDS__ = "browser,chrome,automation,click,fill,type,snapshot,screenshot,navigate,scrape,web,form,login,CDP,headless,accessibility,ref,DOM,page,wait,scroll,eval,tab,cookie,selector,javascript"
 
 __USAGE__ = <<<USAGE_BLOCK
-Browser Automation Tool - Usage Guide for AI Parameter Generation
+Browser Automation Tool - Usage Guide
 
-This tool provides browser automation via the yaklang native browser module.
-The core workflow is: open URL -> snapshot (get refs) -> interact (using refs) -> re-snapshot.
+## Two Strategies (Choose Based on Page Type)
 
-Snapshot returns an accessibility tree with element refs like @e1, @e2, etc.
-Use these refs as "target" to click, fill, type, hover, etc.
-The browser instance persists across tool calls using the same session name.
+### Strategy A: Snapshot + Refs (simple static pages)
+  open -> snapshot (get @e1, @e2 refs) -> fill/click using refs -> re-snapshot
+  Good for: static HTML pages where snapshot returns interactive element refs.
+
+### Strategy B: JavaScript-First (RECOMMENDED for login/form/SPA pages)
+  open -> eval JS to extract selectors -> fill/click using CSS selectors
+  OR: open -> eval JS that fills form + clicks submit in one call
+  Good for: SPA, React, Vue, dynamic pages, pages where snapshot returns 0 refs.
+
+*** If snapshot returns 0 refs, DO NOT retry snapshot. Switch to Strategy B immediately. ***
 
 ## Parameters
 
 Required:
-  op        (string)  The browser operation to perform. One of:
+  op        (string)  One of:
                       Navigation: "open", "back", "forward", "reload", "close"
                       Snapshot:   "snapshot"
                       Interact:   "click", "fill", "type"
@@ -25,208 +43,175 @@ Required:
                       Script:     "eval"
                       Tab:        "tab_list", "tab_new", "tab_switch", "tab_close"
 
-Conditional (depends on op):
-  url       (string)  URL to navigate to.           Required for: op=open, op=tab_new
-  target    (string)  Element ref (@eN) or CSS sel.  Required for: op=click/fill
-  value     (string)  Text to fill/type.
-                      Required for: op=fill/type
-  subop     (string)  Sub-operation for "get": title, url, html, text, cookies.
-                      Required for: op=get
-  js        (string)  JavaScript code for eval operation.
-                      Required for: op=eval
-                      *** Use AITAG for multi-line JS ***
+Conditional:
+  url       (string)  URL for op=open/tab_new
+  target    (string)  @eN ref OR CSS selector for op=click/fill
+                      Examples: "@e1", "input[name=username]", "#login-btn", "button[type=submit]"
+  value     (string)  Text for op=fill/type
+  subop     (string)  Sub-op for "get": title, url, html, text, cookies
+  js        (string)  JavaScript for op=eval. Use AITAG for multi-line JS.
 
 Optional:
-  timeout   (int)     Browser timeout in seconds. Default: 30.
-  session   (string)  Browser session ID for instance reuse. Default: "ai-browser".
-  headless  (string)  "yes" (default) or "no" to show browser window.
-  wait-type (string)  Wait condition: "selector", "visible", "ms".
-                      Required for: op=wait
-  wait-value(string)  Wait condition value (CSS selector or milliseconds).
-                      Required for: op=wait
-  tab-index (string)  Tab index for tab_switch/tab_close.
+  timeout   (int)     Timeout in seconds. Default: 30.
+  session   (string)  Session ID. Default: "ai-browser".
+  headless  (string)  "yes" (default) or "no".
+  wait-type (string)  "selector", "visible", or "ms" for op=wait
+  wait-value(string)  CSS selector or ms value for op=wait
+  tab-index (string)  Tab index for tab_switch/tab_close
 
-## Workflow Pattern
+## JavaScript-First Strategy (RECOMMENDED for Login/Form Pages)
 
-Step 1: Open a page (op=open, url=...)
-        -> automatically takes a snapshot and returns refs
-Step 2: Interact using refs (op=click target=@e1, op=fill target=@e2 value=...)
-Step 3: Re-snapshot after page changes (op=snapshot)
-        -> refs are invalidated after page changes
-Step 4: Close the browser when done (op=close)
+For login pages, forms, and dynamic content, using op=eval with JavaScript is MORE RELIABLE
+than snapshot+fill+click. A single eval call can:
+  - Discover all form fields
+  - Fill username and password
+  - Click the submit button
+  - Return the result
 
-## Few-Shot Examples
-
-### Example 1: Open URL (auto-snapshots)
+### Example: Discover form fields with one eval call
 
 ```json
 {
   "@action": "call-tool",
   "tool": "use_browser",
-  "identifier": "open_page",
-  "params": {
-    "op": "open",
-    "url": "https://example.com",
-    "timeout": 15
-  }
+  "identifier": "discover_form_fields",
+  "params": { "op": "eval" }
 }
 ```
 
-### Example 2: Fill a form field and click submit
+<|TOOL_PARAM_js_{NONCE}|>
+JSON.stringify(Array.from(document.querySelectorAll("input,select,textarea,button")).map(el => ({
+  tag: el.tagName, type: el.type||"", name: el.name||"", id: el.id||"",
+  placeholder: el.placeholder||"", selector: el.id ? "#"+el.id : (el.name ? el.tagName.toLowerCase()+"[name='"+el.name+"']" : ""),
+  text: el.textContent.trim().slice(0,50)
+})))
+<|TOOL_PARAM_js_END_{NONCE}|>
+
+### Example: Fill login form and submit in ONE eval call
 
 ```json
 {
   "@action": "call-tool",
   "tool": "use_browser",
-  "identifier": "fill_email",
-  "params": {
-    "op": "fill",
-    "target": "@e1",
-    "value": "user@example.com"
-  }
+  "identifier": "js_login",
+  "params": { "op": "eval" }
 }
 ```
 
-```json
-{
-  "@action": "call-tool",
-  "tool": "use_browser",
-  "identifier": "click_submit",
-  "params": {
-    "op": "click",
-    "target": "@e3"
-  }
-}
-```
+<|TOOL_PARAM_js_{NONCE}|>
+(function(){
+  var u = document.querySelector("input[name='username']");
+  var p = document.querySelector("input[name='password']");
+  var btn = document.querySelector("button[type='submit']");
+  if(!u||!p||!btn) return JSON.stringify({error:"form fields not found", fields: document.querySelectorAll("input").length});
+  u.value = "admin"; u.dispatchEvent(new Event("input",{bubbles:true}));
+  p.value = "password123"; p.dispatchEvent(new Event("input",{bubbles:true}));
+  btn.click();
+  return JSON.stringify({status:"submitted", username:"admin"});
+})()
+<|TOOL_PARAM_js_END_{NONCE}|>
 
-### Example 3: Re-snapshot after page change
-
-```json
-{
-  "@action": "call-tool",
-  "tool": "use_browser",
-  "identifier": "refresh_refs",
-  "params": {
-    "op": "snapshot"
-  }
-}
-```
-
-### Example 4: Get page title
+### Example: After login, check if succeeded
 
 ```json
 {
   "@action": "call-tool",
   "tool": "use_browser",
-  "identifier": "check_title",
-  "params": {
-    "op": "get",
-    "subop": "title"
-  }
-}
-```
-
-### Example 5: Take screenshot
-
-```json
-{
-  "@action": "call-tool",
-  "tool": "use_browser",
-  "identifier": "capture_page",
-  "params": {
-    "op": "screenshot"
-  }
-}
-```
-
-### Example 6: Wait for element then interact
-
-```json
-{
-  "@action": "call-tool",
-  "tool": "use_browser",
-  "identifier": "wait_for_form",
-  "params": {
-    "op": "wait",
-    "wait-type": "selector",
-    "wait-value": "#login-form"
-  }
-}
-```
-
-### Example 7: Evaluate JavaScript
-
-```json
-{
-  "@action": "call-tool",
-  "tool": "use_browser",
-  "identifier": "run_js",
-  "params": {
-    "op": "eval",
-    "timeout": 10
-  }
+  "identifier": "check_login_result",
+  "params": { "op": "eval" }
 }
 ```
 
 <|TOOL_PARAM_js_{NONCE}|>
 JSON.stringify({
+  url: location.href,
   title: document.title,
-  links: Array.from(document.querySelectorAll("a")).map(a => a.href).slice(0, 10)
+  bodyText: document.body.innerText.slice(0,500),
+  cookies: document.cookie
 })
 <|TOOL_PARAM_js_END_{NONCE}|>
 
-### Example 8: Close browser
+## Snapshot + Refs Strategy (Simple Pages)
+
+Step 1: Open a page (op=open) -> auto-snapshot returns refs
+Step 2: Interact using refs (op=fill target=@e1 value=..., op=click target=@e2)
+Step 3: Re-snapshot after page changes (op=snapshot) -> refs refresh
+Step 4: Close when done (op=close)
+
+### Example: Open and interact with refs
 
 ```json
-{
-  "@action": "call-tool",
-  "tool": "use_browser",
-  "identifier": "close_browser",
-  "params": {
-    "op": "close"
-  }
-}
+{ "@action": "call-tool", "tool": "use_browser", "identifier": "open_page",
+  "params": { "op": "open", "url": "https://example.com", "timeout": 15 } }
 ```
-
-### Example 9: Wait milliseconds
 
 ```json
-{
-  "@action": "call-tool",
-  "tool": "use_browser",
-  "identifier": "wait_2s",
-  "params": {
-    "op": "wait",
-    "wait-type": "ms",
-    "wait-value": "2000"
-  }
-}
+{ "@action": "call-tool", "tool": "use_browser", "identifier": "fill_field",
+  "params": { "op": "fill", "target": "@e1", "value": "user@example.com" } }
 ```
-
-### Example 10: Type text at current focus (no selector)
 
 ```json
-{
-  "@action": "call-tool",
-  "tool": "use_browser",
-  "identifier": "type_text",
-  "params": {
-    "op": "type",
-    "value": "hello world"
-  }
-}
+{ "@action": "call-tool", "tool": "use_browser", "identifier": "click_btn",
+  "params": { "op": "click", "target": "@e3" } }
 ```
+
+## Using CSS Selectors Directly (No Snapshot Needed)
+
+fill and click accept CSS selectors directly. After discovering selectors via eval,
+you can use them without needing snapshot refs:
+
+```json
+{ "@action": "call-tool", "tool": "use_browser", "identifier": "fill_username",
+  "params": { "op": "fill", "target": "input[name='username']", "value": "admin" } }
+```
+
+```json
+{ "@action": "call-tool", "tool": "use_browser", "identifier": "fill_password",
+  "params": { "op": "fill", "target": "input[name='password']", "value": "pass123" } }
+```
+
+```json
+{ "@action": "call-tool", "tool": "use_browser", "identifier": "click_login",
+  "params": { "op": "click", "target": "button[type='submit']" } }
+```
+
+## Snapshot Returns 0 Refs? (Troubleshooting)
+
+If snapshot returns 0 interactive element refs:
+  *** DO NOT retry snapshot. It will return 0 refs again. ***
+
+Instead:
+  1. Use op=eval with JS to discover form fields (see JS examples above)
+  2. Use the CSS selectors from JS results with op=fill and op=click directly
+  3. Or fill + submit the form entirely within a single op=eval call
+
+Common causes of 0 refs: SPA frameworks (React/Vue/Angular), Shadow DOM,
+iframes, dynamically loaded content, or pages requiring JS execution to render.
+
+## Powerful JS Patterns
+
+### Extract CSRF token from hidden field
+  eval js: document.querySelector("input[name='_token']").value
+
+### Get all links on page
+  eval js: JSON.stringify(Array.from(document.querySelectorAll("a")).map(a=>({href:a.href,text:a.textContent.trim()})))
+
+### Check response after form submit (wait + inspect)
+  eval js: JSON.stringify({url:location.href, title:document.title, body:document.body.innerText.slice(0,500)})
+
+### Extract cookies
+  eval js: document.cookie
 
 ## Key Rules
 
-1. ALWAYS take a snapshot after opening a page or after page navigation.
-2. Refs (@e1, @e2) are INVALIDATED after page changes -- re-snapshot to get fresh refs.
-3. Use "wait" before interacting with dynamically loaded content.
-4. Set reasonable timeout values (10-30s for most operations).
-5. Use "get" with subop="title" or subop="url" to verify you are on the expected page.
-6. For multi-line JavaScript, ALWAYS use AITAG for the "js" parameter.
-7. Close the browser when done to avoid leaked processes.
-8. The open op auto-snapshots, so you do NOT need a separate snapshot call after open.
+1. For login/form pages, PREFER JavaScript strategy over snapshot strategy.
+2. If snapshot returns 0 refs, DO NOT retry. Use eval JS to discover selectors.
+3. fill and click accept BOTH @eN refs AND CSS selectors (e.g. "input[name=username]").
+4. A single eval call can fill a form + click submit -- more efficient than multiple tool calls.
+5. After eval that submits a form, use another eval or get to check the result.
+6. Use AITAG for multi-line JavaScript in the "js" parameter.
+7. Close the browser when done to release resources.
+8. The open op auto-snapshots, but if refs are 0, switch to JS immediately.
 USAGE_BLOCK
 
 yakit.AutoInitYakit()
@@ -319,6 +304,15 @@ case "open":
     }
     yakit.Info("page opened and snapshot taken (%v nodes, %v refs):\n%v", snap.NodeCount, snap.RefMap.Count(), snapText)
 
+    if snap.RefMap.Count() <= 0 {
+        yakit.Info("WARNING: snapshot returned 0 interactive element refs on this page.")
+        yakit.Info("DO NOT retry snapshot -- it will return 0 refs again on dynamic/SPA pages.")
+        yakit.Info("SWITCH TO JavaScript strategy: use op=eval to discover form fields:")
+        yakit.Info("  Example JS: JSON.stringify(Array.from(document.querySelectorAll('input,select,textarea,button')).map(el=>({tag:el.tagName,type:el.type,name:el.name,id:el.id,placeholder:el.placeholder,selector:el.id?'#'+el.id:(el.name?el.tagName.toLowerCase()+\"[name='\"+el.name+\"']\":''),text:el.textContent.trim().slice(0,50)})))")
+        yakit.Info("Then use CSS selectors directly: op=fill target='input[name=username]' value='admin'")
+        yakit.Info("Or fill+submit in ONE eval call for maximum efficiency.")
+    }
+
 case "snapshot":
     page, err = getPage()
     if err != nil {
@@ -335,6 +329,15 @@ case "snapshot":
     }
     yakit.Info("snapshot (%v nodes, %v refs):\n%v", snap.NodeCount, snap.RefMap.Count(), snapText)
 
+    if snap.RefMap.Count() <= 0 {
+        yakit.Info("WARNING: snapshot returned 0 interactive element refs.")
+        yakit.Info("DO NOT retry snapshot -- it will return 0 refs again on this page.")
+        yakit.Info("SWITCH TO JavaScript strategy: use op=eval to discover form fields:")
+        yakit.Info("  Example JS: JSON.stringify(Array.from(document.querySelectorAll('input,select,textarea,button')).map(el=>({tag:el.tagName,type:el.type,name:el.name,id:el.id,selector:el.id?'#'+el.id:(el.name?el.tagName.toLowerCase()+\"[name='\"+el.name+\"']\":''),text:el.textContent.trim().slice(0,50)})))")
+        yakit.Info("Then use CSS selectors directly: op=fill target='input[name=username]' value='admin'")
+        yakit.Info("Or fill+submit in ONE eval call. DO NOT call snapshot again.")
+    }
+
 case "click":
     if target == "" {
         yakit.Error("op=click requires --target parameter (e.g. @e1 or CSS selector)")
@@ -349,7 +352,7 @@ case "click":
         yakit.Error("click %v failed: %v", target, err)
         return
     }
-    yakit.Info("clicked %v", target)
+    yakit.Info("clicked %v (both @eN refs and CSS selectors like 'button[type=submit]' are supported as target)", target)
     sleep(0.5)
 
     // 点击后自动 snapshot 以获取新的引用
@@ -380,7 +383,7 @@ case "fill":
         yakit.Error("fill %v failed: %v", target, err)
         return
     }
-    yakit.Info("filled %v with text (length=%v)", target, len(value))
+    yakit.Info("filled %v with text (length=%v). Both @eN refs and CSS selectors (e.g. 'input[name=username]') work as target.", target, len(value))
 
 case "type":
     if value == "" {
@@ -552,6 +555,10 @@ case "eval":
         resultStr = resultStr[:5000] + "\n... (truncated)"
     }
     yakit.Info("eval result:\n%v", resultStr)
+    yakit.Info("TIP: If the result contains CSS selectors (e.g. input[name='username'], #login-btn), use them directly:")
+    yakit.Info("  op=fill target='input[name=username]' value='admin'")
+    yakit.Info("  op=click target='button[type=submit]'")
+    yakit.Info("  Or do everything in a single op=eval call: fill fields + click submit via JS for maximum efficiency.")
 
 case "back":
     page, err = getPage()
@@ -636,6 +643,10 @@ case "tab_new":
             snapText = snapText[:3000] + "\n... (truncated)"
         }
         yakit.Info("new tab snapshot (%v nodes, %v refs):\n%v", snap.NodeCount, snap.RefMap.Count(), snapText)
+
+        if snap.RefMap.Count() <= 0 {
+            yakit.Info("WARNING: snapshot returned 0 refs. Use op=eval with JS to discover elements instead of retrying snapshot.")
+        }
     }
 
 case "tab_switch":

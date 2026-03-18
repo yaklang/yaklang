@@ -1,11 +1,12 @@
 ---
 name: how-to-use-browser
 description: >
-  Browser automation skill for web page interaction. Covers opening URLs,
-  taking accessibility snapshots with element refs, clicking, filling forms,
-  typing text, taking screenshots, evaluating JavaScript, tab management,
-  and navigating back/forward. Built on go-rod/CDP with headless Chrome.
-  Used for web scraping, login automation, form submission, and UI testing.
+  Browser automation skill for web page interaction. Two strategies:
+  (1) Snapshot + refs for simple static pages;
+  (2) JavaScript-first for login forms, SPA, and dynamic pages (PREFERRED).
+  Covers opening URLs, snapshots, clicking, filling forms, evaluating JS,
+  screenshots, tab management, and navigation. Built on go-rod/CDP with headless Chrome.
+  If snapshot returns 0 element refs, DO NOT retry -- switch to JavaScript strategy immediately.
 ---
 
 # Browser Automation Skill (use_browser)
@@ -41,6 +42,67 @@ open -> snapshot -> interact -> re-snapshot -> ... -> close
 
 > Element refs (`@eN`) are **invalidated** after any page navigation or significant DOM change.
 > Always re-snapshot after clicks, form submissions, or navigation.
+
+---
+
+## 2.5 JavaScript-First Strategy (RECOMMENDED for Login/Form/SPA Pages)
+
+For login pages, forms, and SPA (React/Vue/Angular) pages, use **JavaScript evaluation**
+instead of the snapshot+refs workflow. This is more reliable because:
+
+1. SPA pages often render interactive elements via JavaScript, making snapshot return 0 refs.
+2. A single `eval` call can fill a form and submit it -- more efficient than multiple tool calls.
+3. CSS selectors from JS work directly with `fill` and `click` operations.
+
+### When to use JS-first:
+- Login forms (username/password + submit)
+- Any page where snapshot returns 0 interactive refs
+- Complex forms with dynamic validation
+- Pages that require JavaScript to render
+
+### JS-first workflow:
+```
+open -> eval JS to discover form fields -> fill/click with CSS selectors (or do everything in one eval)
+```
+
+### Step 1: Discover form fields
+```
+eval js: JSON.stringify(Array.from(document.querySelectorAll('input,select,textarea,button')).map(el=>({
+  tag:el.tagName, type:el.type, name:el.name, id:el.id,
+  placeholder:el.placeholder,
+  selector: el.id ? '#'+el.id : (el.name ? el.tagName.toLowerCase()+"[name='"+el.name+"']" : '')
+})))
+```
+
+### Step 2a: Use CSS selectors with fill/click
+```
+fill target='input[name=username]' value='admin'
+fill target='input[name=password]' value='password123'
+click target='button[type=submit]'
+```
+
+### Step 2b: OR do everything in ONE eval call (most efficient)
+```
+eval js:
+(function(){
+  var u = document.querySelector("input[name='username']");
+  var p = document.querySelector("input[name='password']");
+  var btn = document.querySelector("button[type='submit']");
+  if(!u||!p||!btn) return JSON.stringify({error:"fields not found"});
+  u.value="admin"; u.dispatchEvent(new Event("input",{bubbles:true}));
+  p.value="pass123"; p.dispatchEvent(new Event("input",{bubbles:true}));
+  btn.click();
+  return JSON.stringify({status:"submitted"});
+})()
+```
+
+### Step 3: Verify result
+```
+eval js: JSON.stringify({url:location.href, title:document.title, body:document.body.innerText.slice(0,500)})
+```
+
+> **CRITICAL**: If snapshot returns 0 refs, DO NOT retry snapshot. It will return 0 refs again.
+> Switch to JavaScript strategy immediately.
 
 ---
 
@@ -134,15 +196,34 @@ Use `@e1` as the `target` for click/fill operations.
 
 ### 5.1 Login Flow
 
+**Method A: JavaScript-First (RECOMMENDED)**
+
+```
+1. open url=https://target.com/login
+2. eval js: JSON.stringify(Array.from(document.querySelectorAll('input,button')).map(el=>({
+     tag:el.tagName, type:el.type, name:el.name, id:el.id,
+     selector: el.id ? '#'+el.id : (el.name ? el.tagName.toLowerCase()+"[name='"+el.name+"']" : '')
+   })))
+   -> discover: input[name='username'], input[name='password'], button[type='submit']
+3. fill target=input[name='username'] value=admin
+4. fill target=input[name='password'] value=password123
+5. click target=button[type='submit']
+6. eval js: JSON.stringify({url:location.href, title:document.title, body:document.body.innerText.slice(0,300)})
+   -> check if login succeeded
+```
+
+**Method B: Snapshot + Refs (only if snapshot returns refs)**
+
 ```
 1. open url=https://target.com/login
    -> snapshot shows: textbox "Username" @e1, textbox "Password" @e2, button "Login" @e3
 2. fill target=@e1 value=admin
 3. fill target=@e2 value=password123
 4. click target=@e3
-5. snapshot
-   -> check if login succeeded by examining page content
+5. snapshot -> check if login succeeded
 ```
+
+> If snapshot in step 1 returns 0 refs, DO NOT retry. Switch to Method A immediately.
 
 ### 5.2 Form Submission
 
@@ -197,13 +278,19 @@ Use `@e1` as the `target` for click/fill operations.
 ## 6. Best Practices
 
 1. **Always snapshot after open**: `open` auto-snapshots, but after any navigation (`click`, `back`, `forward`, `reload`), call `snapshot` explicitly to refresh refs.
-2. **Use refs, not CSS selectors**: Prefer `@eN` refs from snapshots over raw CSS selectors. Refs are stable within a single snapshot.
+2. **Refs or CSS selectors**: Both `@eN` refs and CSS selectors (e.g. `input[name=username]`, `#submit-btn`) work as targets for `fill` and `click`. Use refs when snapshot provides them; use CSS selectors when discovered via `eval`.
 3. **Set reasonable timeouts**: Use `timeout=10` for fast pages, `timeout=30` for slow ones.
 4. **Wait for dynamic content**: Use `wait` before interacting with elements that load asynchronously.
 5. **Close when done**: Always call `close` to release browser resources and avoid leaked processes.
 6. **Check page state**: Use `get subop=title` or `get subop=url` to verify you are on the expected page before interacting.
-7. **Handle errors gracefully**: If a click or fill fails, re-snapshot and inspect the page state.
+7. **Handle errors gracefully**: If a click or fill fails, re-snapshot and inspect the page state. If snapshot returns 0 refs, switch to JavaScript strategy.
 8. **Session persistence**: The browser instance persists across tool calls using the same session ID. Default session is `ai-browser`.
+9. **When snapshot returns 0 refs**: This is common on SPA/React/Vue pages. **DO NOT retry snapshot** -- it will return 0 refs again. Instead:
+   - Use `eval` with JS to discover form fields: `document.querySelectorAll('input,button')`
+   - Use the CSS selectors from JS results directly with `fill` and `click`
+   - Or perform the entire interaction (fill + submit) in a single `eval` call
+   - Common causes: SPA frameworks, Shadow DOM, iframes, dynamically loaded content
+10. **Prefer JavaScript for login/form pages**: A single `eval` call that fills form fields and clicks submit is more efficient and reliable than multiple separate fill/click calls, especially on dynamic pages.
 
 ---
 
