@@ -8,7 +8,6 @@ import (
 	"github.com/yaklang/yaklang/common/sca"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
@@ -200,20 +199,17 @@ func Frontend(src string, caches ...*ssa.AntlrCache) (phpparser.IHtmlDocumentCon
 	if len(caches) > 0 {
 		cache = caches[0]
 	}
-	errListener := antlr4util.NewErrorListener()
-	lexer := phpparser.NewPHPLexer(antlr.NewInputStream(src))
-	lexer.RemoveErrorListeners()
-	lexer.AddErrorListener(errListener)
-	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
-	parser := phpparser.NewPHPParser(tokenStream)
-	ssa.ParserSetAntlrCache(parser, lexer, cache)
-	parser.RemoveErrorListeners()
-	parser.AddErrorListener(errListener)
-	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())
-	ast := parser.HtmlDocument()
-	// log.Errorf("ast: %v", ast.ToStringTree(parser.RuleNames, parser))
-	antlr4util.DetachLexerTokenSource(lexer)
-	return ast, errListener.Error()
+	return antlr4util.ParseASTWithSLLFirst(
+		src,
+		phpparser.NewPHPLexer,
+		phpparser.NewPHPParser,
+		func(lexer *phpparser.PHPLexer, parser *phpparser.PHPParser) {
+			ssa.ParserSetAntlrCache(parser, lexer, cache)
+		},
+		func(parser *phpparser.PHPParser) phpparser.IHtmlDocumentContext {
+			return parser.HtmlDocument()
+		},
+	)
 }
 
 func (b *builder) AssignConst(name string, value ssa.Value) bool {

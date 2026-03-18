@@ -7,7 +7,6 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/javaclassparser"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -165,19 +164,17 @@ func Frontend(src string, caches ...*ssa.AntlrCache) (javaparser.ICompilationUni
 	if len(caches) > 0 {
 		cache = caches[0]
 	}
-	errListener := antlr4util.NewErrorListener()
-	lexer := javaparser.NewJavaLexer(antlr.NewInputStream(src))
-	lexer.RemoveErrorListeners()
-	lexer.AddErrorListener(errListener)
-	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
-	parser := javaparser.NewJavaParser(tokenStream)
-	ssa.ParserSetAntlrCache(parser, lexer, cache)
-	parser.RemoveErrorListeners()
-	parser.AddErrorListener(errListener)
-	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())
-	ast := parser.CompilationUnit()
-	antlr4util.DetachLexerTokenSource(lexer)
-	return ast, errListener.Error()
+	return antlr4util.ParseASTWithSLLFirst(
+		src,
+		javaparser.NewJavaLexer,
+		javaparser.NewJavaParser,
+		func(lexer *javaparser.JavaLexer, parser *javaparser.JavaParser) {
+			ssa.ParserSetAntlrCache(parser, lexer, cache)
+		},
+		func(parser *javaparser.JavaParser) javaparser.ICompilationUnitContext {
+			return parser.CompilationUnit()
+		},
+	)
 }
 
 func (b *singleFileBuilder) AssignConst(name string, value ssa.Value) bool {
