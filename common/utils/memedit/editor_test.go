@@ -17,6 +17,22 @@ func TestNewMemEditor_SMOCKING(t *testing.T) {
 	}
 }
 
+func TestNewMemEditorByBytes_DoesNotCopy(t *testing.T) {
+	bs := []byte("Hello\nWorld\nThis is a test")
+	editor := NewMemEditorByBytes(bs)
+	if editor == nil {
+		t.Fatal("Failed to create MemEditor instance")
+	}
+	if editor.safeSourceCode == nil {
+		t.Fatal("safeSourceCode should not be nil")
+	}
+	if len(editor.safeSourceCode.bytes) == 0 {
+		t.Fatal("safeSourceCode.bytes should not be empty")
+	}
+	assert.Equal(t, string(bs), editor.GetSourceCode())
+	assert.Equal(t, &bs[0], &editor.safeSourceCode.bytes[0])
+}
+
 func TestGetLine(t *testing.T) {
 	editor := NewMemEditor("Hello\nWorld\nThis is a test")
 
