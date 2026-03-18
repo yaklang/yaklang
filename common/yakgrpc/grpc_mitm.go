@@ -2025,10 +2025,69 @@ func (s *Server) QueryMITMReplacerRules(ctx context.Context, req *ypb.QueryMITMR
 			filteredRules = append(filteredRules, rule)
 			continue
 		}
+
+		// 检查 ExtraTag
+		for _, tag := range rule.GetExtraTag() {
+			if tag != "" && strings.Contains(strings.ToLower(tag), keywordLower) {
+				filteredRules = append(filteredRules, rule)
+				break
+			}
+		}
 	}
 
 	return &ypb.QueryMITMReplacerRulesResponse{
 		Rules: &ypb.MITMContentReplacers{Rules: filteredRules},
+	}, nil
+}
+
+func (s *Server) DeduplicateMITMReplacerRules(ctx context.Context, _ *ypb.Empty) (*ypb.DbOperateMessage, error) {
+	result := yakit.GetKey(s.GetProfileDatabase(), yakit.MITMReplacerKeyRecords)
+	var allRules []*ypb.MITMContentReplacer
+	if result != "" {
+		if err := json.Unmarshal([]byte(result), &allRules); err != nil {
+			return nil, utils.Errorf("unmarshal MITM replacer rules failed: %s", err)
+		}
+	}
+	beforeCount := len(allRules)
+	if beforeCount == 0 {
+		return &ypb.DbOperateMessage{
+			TableName:    "mitm_replacer_rules",
+			Operation:    "deduplicate",
+			EffectRows:   0,
+			ExtraMessage: "no rules to deduplicate",
+		}, nil
+	}
+
+	// 按 Rule+Result+VerboseName 去重，保留首次出现的
+	seen := make(map[string]bool)
+	var deduped []*ypb.MITMContentReplacer
+	for _, rule := range allRules {
+		key := rule.GetRule() + "|||" + rule.GetResult() + "|||" + rule.GetVerboseName()
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		deduped = append(deduped, rule)
+	}
+
+	// 重新分配 Index
+	for i := range deduped {
+		deduped[i].Index = int32(i)
+	}
+
+	raw, err := json.Marshal(deduped)
+	if err != nil {
+		return nil, err
+	}
+	if err := yakit.SetKey(s.GetProfileDatabase(), yakit.MITMReplacerKeyRecords, string(raw)); err != nil {
+		return nil, err
+	}
+	removed := int64(beforeCount - len(deduped))
+	return &ypb.DbOperateMessage{
+		TableName:    "mitm_replacer_rules",
+		Operation:    "deduplicate",
+		EffectRows:   removed,
+		ExtraMessage: fmt.Sprintf("removed %d duplicate rules", removed),
 	}, nil
 }
 

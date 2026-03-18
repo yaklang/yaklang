@@ -2307,7 +2307,7 @@ Host: %s:%d
 		flow := flows.Data[0]
 
 		data, err := client.QueryMITMRuleExtractedData(ctx, &ypb.QueryMITMRuleExtractedDataRequest{
-			HTTPFlowHiddenIndex: flow.HiddenIndex,
+			Filter: &ypb.ExtractedDataFilter{TraceID: []string{flow.HiddenIndex}},
 		})
 		require.NoError(t, err)
 		require.Len(t, data.GetData(), 1)

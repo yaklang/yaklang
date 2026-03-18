@@ -7,6 +7,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path"
+	"path/filepath"
+	"strings"
+	"time"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -15,17 +21,13 @@ import (
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"os"
-	"path"
-	"path/filepath"
-	"strings"
-	"time"
 )
 
 func (s *Server) QueryMITMRuleExtractedData(ctx context.Context, req *ypb.QueryMITMRuleExtractedDataRequest) (*ypb.QueryMITMRuleExtractedDataResponse, error) {
 	db := s.GetProjectDatabase()
-	if len(req.GetFilter().GetTraceID()) == 0 && req.GetHTTPFlowHiddenIndex() == "" && req.GetHTTPFlowHash() == "" {
-		return nil, utils.Error("query mitm rule extracted data need hiddenIndex at last")
+	f := req.GetFilter()
+	if f == nil || (len(f.GetTraceID()) == 0 && len(f.GetRuleVerbose()) == 0 && len(f.GetAnalyzedIds()) == 0) {
+		return nil, utils.Error("query mitm rule extracted data need filter (TraceID, RuleVerbose or AnalyzedIds)")
 	}
 	p, data, err := yakit.QueryExtractedDataPagination(db, req)
 	if err != nil {
@@ -49,6 +51,40 @@ func (s *Server) QueryMITMRuleExtractedData(ctx context.Context, req *ypb.QueryM
 		Total:      int64(p.TotalRecord),
 		Pagination: req.GetPagination(),
 	}, nil
+}
+
+func (s *Server) DeleteMITMRuleExtractedData(ctx context.Context, req *ypb.DeleteMITMRuleExtractedDataRequest) (*ypb.Empty, error) {
+	if req == nil {
+		return &ypb.Empty{}, nil
+	}
+	ids := req.GetIds()
+	if len(ids) == 0 && req.Id > 0 {
+		ids = []int64{req.Id}
+	}
+	if len(ids) == 0 {
+		return &ypb.Empty{}, nil
+	}
+	db := s.GetProjectDatabase()
+	if err := yakit.BatchDeleteExtractedDataByIDs(db, ids); err != nil {
+		return nil, err
+	}
+	return &ypb.Empty{}, nil
+}
+
+// DeduplicateMITMRuleExtractedData 按 trace_id+规则名+规则数据去重，即对指定包内的提取数据去重，
+// 删除重复项（保留 id 最小的一条）。Filter 为空或 Filter.TraceID 为空时对全表去重。
+func (s *Server) DeduplicateMITMRuleExtractedData(ctx context.Context, req *ypb.DeduplicateMITMRuleExtractedDataRequest) (*ypb.DeduplicateMITMRuleExtractedDataResponse, error) {
+	db := s.GetProjectDatabase()
+	filter := req.GetFilter()
+	var traceIds []string
+	if filter != nil {
+		traceIds = filter.GetTraceID()
+	}
+	deleted, err := yakit.DeduplicateExtractedData(db, traceIds...)
+	if err != nil {
+		return nil, err
+	}
+	return &ypb.DeduplicateMITMRuleExtractedDataResponse{DeletedCount: deleted}, nil
 }
 
 func (s *Server) ExportMITMRuleExtractedData(req *ypb.ExportMITMRuleExtractedDataRequest, stream ypb.Yak_ExportMITMRuleExtractedDataServer) error {
@@ -100,7 +136,7 @@ func (s *Server) ExportMITMRuleExtractedData(req *ypb.ExportMITMRuleExtractedDat
 			return err
 		}
 		for data := range bizhelper.YieldModel[*schema.ExtractedData](stream.Context(), db) {
-			sendFeedBack(fmt.Sprintf("Exported records"), 1)
+			sendFeedBack("Exported records", 1)
 			line := fmt.Sprintf("%s,%s\n", utils.QuoteCSV(data.RuleVerbose), utils.QuoteCSV(data.Data))
 			if duplicateFilter.Exist(line) {
 				continue
@@ -116,7 +152,7 @@ func (s *Server) ExportMITMRuleExtractedData(req *ypb.ExportMITMRuleExtractedDat
 		encoder := json.NewEncoder(exportFp)
 		exportFp.WriteString("[")
 		for data := range bizhelper.YieldModel[*schema.ExtractedData](stream.Context(), db) {
-			sendFeedBack(fmt.Sprintf("Exported records"), 1)
+			sendFeedBack("Exported records", 1)
 			hash := utils.CalcSha256(data.RuleVerbose, data.Data)
 			if duplicateFilter.Exist(hash) {
 				continue

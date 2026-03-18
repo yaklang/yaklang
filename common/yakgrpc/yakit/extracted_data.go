@@ -85,6 +85,59 @@ func DeleteExtractedDataByID(db *gorm.DB, id int64) error {
 	return nil
 }
 
+// BatchDeleteExtractedDataByIDs 按 ID 列表批量删除提取数据
+func BatchDeleteExtractedDataByIDs(db *gorm.DB, ids []int64) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	if db := db.Model(&schema.ExtractedData{}).Where("id IN (?)", ids).Unscoped().Delete(&schema.ExtractedData{}); db.Error != nil {
+		return db.Error
+	}
+	return nil
+}
+
+// DeduplicateExtractedData 按 (trace_id, rule_verbose, data) 去重，即对指定包内的提取数据去重，
+// 每组保留 id 最小的一条。traceIds 为空时对全表去重；非空时仅处理指定 trace_id 的记录。
+func DeduplicateExtractedData(db *gorm.DB, traceIds ...string) (int64, error) {
+	if err := db.AutoMigrate(&schema.ExtractedData{}).Error; err != nil {
+		return 0, err
+	}
+	db = db.Model(&schema.ExtractedData{})
+	if len(traceIds) > 0 {
+		db = bizhelper.ExactQueryStringArrayOr(db, "trace_id", traceIds)
+	}
+	var list []schema.ExtractedData
+	if err := db.Select("id, trace_id, rule_verbose, data").Find(&list).Error; err != nil {
+		return 0, err
+	}
+	type key struct {
+		TraceId     string
+		RuleVerbose string
+		Data        string
+	}
+	groupMinID := make(map[key]uint)
+	for _, row := range list {
+		k := key{row.TraceId, row.RuleVerbose, row.Data}
+		if prev, ok := groupMinID[k]; !ok || row.ID < prev {
+			groupMinID[k] = row.ID
+		}
+	}
+	var toDelete []uint
+	for _, row := range list {
+		if groupMinID[key{row.TraceId, row.RuleVerbose, row.Data}] != row.ID {
+			toDelete = append(toDelete, row.ID)
+		}
+	}
+	if len(toDelete) == 0 {
+		return 0, nil
+	}
+	res := db.Unscoped().Where("id IN (?)", toDelete).Delete(&schema.ExtractedData{})
+	if res.Error != nil {
+		return 0, res.Error
+	}
+	return res.RowsAffected, nil
+}
+
 func FilterExtractedData(db *gorm.DB, filter *ypb.ExtractedDataFilter) *gorm.DB {
 	if filter == nil {
 		return db
@@ -92,6 +145,10 @@ func FilterExtractedData(db *gorm.DB, filter *ypb.ExtractedDataFilter) *gorm.DB 
 	db = bizhelper.ExactQueryStringArrayOr(db, "trace_id", filter.GetTraceID())
 	db = bizhelper.ExactQueryStringArrayOr(db, "rule_verbose", filter.GetRuleVerbose())
 	db = bizhelper.ExactQueryInt64ArrayOr(db, "analyzed_http_flow_id", filter.GetAnalyzedIds())
+	// Keyword 模糊搜索：规则名称、数据内容
+	if filter.GetKeyword() != "" {
+		db = bizhelper.FuzzSearchEx(db, []string{"rule_verbose", "data"}, filter.GetKeyword(), false)
+	}
 	return db
 }
 func QueryExtractedDataOnlyName(db *gorm.DB) ([]*schema.ExtractedData, error) {
@@ -116,8 +173,7 @@ func QueryExtractedDataPagination(db *gorm.DB, req *ypb.QueryMITMRuleExtractedDa
 			}
 		}
 	}
-
-	db = FilterExtractedData(db, filter)
+	db = FilterExtractedData(db, req.GetFilter())
 	if req.OnlyName {
 		result, err := QueryExtractedDataOnlyName(db)
 		if err != nil {
