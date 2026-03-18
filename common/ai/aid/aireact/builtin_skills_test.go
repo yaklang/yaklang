@@ -27,6 +27,7 @@ var allBuiltinSkills = []struct {
 	{"web-crawler", "skills/web-crawler/SKILL.md", []string{"URL", "API", "JavaScript"}},
 	{"pentest-task-design", "skills/pentest-task-design/SKILL.md", []string{"scan_port", "do_http_request", "OWASP", "Phase"}},
 	{"how-to-use-browser", "skills/how-to-use-browser/SKILL.md", []string{"snapshot", "click", "fill", "screenshot", "CDP"}},
+	{"authorization-bypass", "skills/authorization-bypass/SKILL.md", []string{"IDOR", "WSTG-ATHZ-02", "Horizontal", "Vertical", "do_http_request"}},
 }
 
 // TestBuiltinSkillsFS_ContainsAllSkills verifies that the embedded filesystem
