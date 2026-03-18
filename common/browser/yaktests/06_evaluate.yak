@@ -1,0 +1,53 @@
+// browser module JavaScript evaluation test
+// covers: page.Evaluate(js)
+
+defer browser.CloseAll()
+
+targetURL = "http://127.0.0.1:8787/"
+
+log.info("===== setup: open browser and navigate =====")
+b, err = browser.Open(browser.headless(true), browser.timeout(10))
+assert err == nil, sprintf("open browser failed: %v", err)
+
+page, err = b.Navigate(targetURL)
+assert err == nil, sprintf("navigate failed: %v", err)
+log.info("navigated to %v", targetURL)
+
+log.info("===== test 1: evaluate document.title =====")
+jsTitle, err = page.Evaluate("document.title")
+assert err == nil, sprintf("evaluate document.title failed: %v", err)
+pageTitle, _ = page.Title()
+log.info("js document.title: %v", jsTitle)
+log.info("page.Title(): %v", pageTitle)
+assert str.Contains(sprintf("%v", jsTitle), sprintf("%v", pageTitle)) || str.Contains(sprintf("%v", pageTitle), sprintf("%v", jsTitle)), "evaluate document.title should match page.Title()"
+
+log.info("===== test 2: evaluate arithmetic =====")
+result, err = page.Evaluate("1 + 1")
+assert err == nil, sprintf("evaluate 1+1 failed: %v", err)
+log.info("1 + 1 = %v", result)
+
+log.info("===== test 3: evaluate window.location.href =====")
+jsURL, err = page.Evaluate("window.location.href")
+assert err == nil, sprintf("evaluate location.href failed: %v", err)
+pageURL = page.URL()
+log.info("js location.href: %v", jsURL)
+log.info("page.URL(): %v", pageURL)
+assert str.Contains(sprintf("%v", jsURL), "127.0.0.1:8787"), "location.href should contain host"
+
+log.info("===== test 4: evaluate DOM query =====")
+linkCount, err = page.Evaluate("document.querySelectorAll('a').length")
+assert err == nil, sprintf("evaluate querySelectorAll failed: %v", err)
+log.info("total <a> elements: %v", linkCount)
+
+log.info("===== test 5: evaluate complex expression =====")
+result2, err = page.Evaluate("document.body.children.length")
+assert err == nil, sprintf("evaluate body.children.length failed: %v", err)
+log.info("body children count: %v", result2)
+
+log.info("===== test 6: evaluate string construction =====")
+result3, err = page.Evaluate("'hello' + ' ' + 'world'")
+assert err == nil, sprintf("evaluate string concat failed: %v", err)
+assert sprintf("%v", result3) == "hello world", sprintf("string concat should be 'hello world', got: %v", result3)
+log.info("string concat: %v", result3)
+
+log.info("===== EVALUATE TEST PASSED =====")

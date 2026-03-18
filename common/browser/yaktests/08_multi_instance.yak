@@ -1,0 +1,79 @@
+// browser module multi-instance test
+// covers: browser.id / browser.Open multi / browser.Get cross-stage / browser.List / browser.Close
+
+defer browser.CloseAll()
+
+targetURL = "http://127.0.0.1:8787/"
+
+log.info("===== test 1: open default instance =====")
+b1, err = browser.Open(browser.headless(true), browser.timeout(10))
+assert err == nil, sprintf("open default browser failed: %v", err)
+assert b1.ID() == "default", sprintf("expected id 'default', got: %v", b1.ID())
+log.info("opened default browser, id=%v", b1.ID())
+
+log.info("===== test 2: open scanner instance =====")
+b2, err = browser.Open(browser.id("scanner"), browser.headless(true), browser.timeout(10))
+assert err == nil, sprintf("open scanner browser failed: %v", err)
+assert b2.ID() == "scanner", sprintf("expected id 'scanner', got: %v", b2.ID())
+log.info("opened scanner browser, id=%v", b2.ID())
+
+log.info("===== test 3: open crawler instance =====")
+b3, err = browser.Open(browser.id("crawler"), browser.headless(true), browser.timeout(10))
+assert err == nil, sprintf("open crawler browser failed: %v", err)
+assert b3.ID() == "crawler", sprintf("expected id 'crawler', got: %v", b3.ID())
+log.info("opened crawler browser, id=%v", b3.ID())
+
+log.info("===== test 4: List contains all 3 ids =====")
+ids = browser.List()
+assert len(ids) == 3, sprintf("expected 3 instances, got: %v (%v)", len(ids), ids)
+log.info("active instances: %v", ids)
+
+log.info("===== test 5: each instance navigates independently =====")
+page1, err = b1.Navigate(targetURL)
+assert err == nil, sprintf("default navigate failed: %v", err)
+log.info("default navigated to %v", targetURL)
+
+page2, err = b2.Navigate(targetURL)
+assert err == nil, sprintf("scanner navigate failed: %v", err)
+log.info("scanner navigated to %v", targetURL)
+
+page3, err = b3.Navigate(targetURL)
+assert err == nil, sprintf("crawler navigate failed: %v", err)
+log.info("crawler navigated to %v", targetURL)
+
+log.info("===== test 6: Get scanner by id =====")
+gotScanner, err = browser.Get(browser.id("scanner"))
+assert err == nil, sprintf("get scanner failed: %v", err)
+assert gotScanner.ID() == "scanner", sprintf("expected scanner, got: %v", gotScanner.ID())
+log.info("got scanner via Get, id=%v", gotScanner.ID())
+
+log.info("===== test 7: Close crawler =====")
+err = browser.Close(browser.id("crawler"))
+assert err == nil, sprintf("close crawler failed: %v", err)
+log.info("closed crawler instance")
+
+ids2 = browser.List()
+assert len(ids2) == 2, sprintf("expected 2 instances after closing crawler, got: %v (%v)", len(ids2), ids2)
+log.info("active instances after close crawler: %v", ids2)
+
+log.info("===== test 8: Get closed crawler should fail =====")
+_, err = browser.Get(browser.id("crawler"))
+assert err != nil, "get closed crawler should return error"
+log.info("get closed crawler error (expected): %v", err)
+
+log.info("===== test 9: remaining instances still work =====")
+title1, err = page1.Title()
+assert err == nil, sprintf("default page title failed: %v", err)
+log.info("default page title: %v", title1)
+
+title2, err = page2.Title()
+assert err == nil, sprintf("scanner page title failed: %v", err)
+log.info("scanner page title: %v", title2)
+
+log.info("===== test 10: CloseAll clears everything =====")
+browser.CloseAll()
+ids3 = browser.List()
+assert len(ids3) == 0, sprintf("expected 0 instances after CloseAll, got: %v", ids3)
+log.info("all instances closed, list is empty")
+
+log.info("===== MULTI INSTANCE TEST PASSED =====")

@@ -50,6 +50,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/openapi"
 
+	"github.com/yaklang/yaklang/common/browser"
 	"github.com/yaklang/yaklang/common/binx"
 	"github.com/yaklang/yaklang/common/utils/yakgit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -304,6 +305,9 @@ func initYaklangLib() {
 
 	// simulator
 	yaklang.Import("simulator", simulator.Exports)
+
+	// browser (AI-friendly browser automation)
+	yaklang.Import("browser", browser.Exports)
 
 	// crawlerX
 	yaklang.Import("crawlerx", crawlerx.CrawlerXExports)

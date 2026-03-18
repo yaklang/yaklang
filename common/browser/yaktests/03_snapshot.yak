@@ -1,0 +1,55 @@
+// browser module snapshot test
+// covers: page.Snapshot / SnapshotResult.Text / SnapshotResult.NodeCount / SnapshotResult.RefMap / RefMap.Count
+
+defer browser.CloseAll()
+
+targetURL = "http://127.0.0.1:8787/"
+
+log.info("===== setup: open browser and navigate =====")
+b, err = browser.Open(browser.headless(true), browser.timeout(10))
+assert err == nil, sprintf("open browser failed: %v", err)
+
+page, err = b.Navigate(targetURL)
+assert err == nil, sprintf("navigate failed: %v", err)
+log.info("navigated to %v", targetURL)
+
+log.info("===== test 1: Snapshot returns valid result =====")
+snap, err = page.Snapshot()
+assert err == nil, sprintf("snapshot failed: %v", err)
+log.info("snapshot completed")
+
+log.info("===== test 2: NodeCount > 0 =====")
+assert snap.NodeCount > 0, sprintf("node count should be > 0, got: %v", snap.NodeCount)
+log.info("node count: %v", snap.NodeCount)
+
+log.info("===== test 3: RefMap.Count > 0 =====")
+refCount = snap.RefMap.Count()
+assert refCount > 0, sprintf("ref count should be > 0 (page has interactive elements), got: %v", refCount)
+log.info("ref count: %v", refCount)
+
+log.info("===== test 4: Text is not empty and contains ref markers =====")
+text = snap.Text
+assert len(text) > 0, "snapshot text should not be empty"
+assert str.Contains(text, "ref=e"), sprintf("snapshot text should contain ref=e markers, got first 200 chars: %v", text[:min(200, len(text))])
+log.info("snapshot text length: %v chars", len(text))
+
+log.info("===== test 5: Text has tree structure (lines start with '- ') =====")
+lines = str.Split(text, "\n")
+treeLineCount = 0
+for _, line = range lines {
+    trimmed = str.TrimSpace(line)
+    if str.HasPrefix(trimmed, "- ") {
+        treeLineCount++
+    }
+}
+assert treeLineCount > 0, "snapshot text should have tree structure lines starting with '- '"
+log.info("tree structure lines: %v", treeLineCount)
+
+log.info("===== test 6: print snapshot excerpt =====")
+excerpt = text
+if len(excerpt) > 1000 {
+    excerpt = excerpt[:1000]
+}
+log.info("snapshot excerpt:\n%v", excerpt)
+
+log.info("===== SNAPSHOT TEST PASSED =====")
