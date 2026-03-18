@@ -20,6 +20,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/spacengine/hunter"
 	"github.com/yaklang/yaklang/common/utils/spacengine/quake"
 	"github.com/yaklang/yaklang/common/utils/spacengine/zoomeye"
+	"github.com/yaklang/yaklang/common/utils/spacengine/zone"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
@@ -32,6 +33,7 @@ const (
 	SPACE_ENGINE_SHODAN  = "shodan"
 	SPACE_ENGINE_HUNTER  = "hunter"
 	SPACE_ENGINE_QUAKE   = "quake"
+	SPACE_ENGINE_ZONE    = "zone"
 
 	SPACE_ENGINE_STATUS_NORMAL          = "normal"
 	SPACE_ENGINE_STATUS_ERROR           = "error"
@@ -60,6 +62,8 @@ func (s *Server) GetSpaceEngineAccountStatus(ctx context.Context, req *ypb.GetSp
 		client = quake.NewClientEx(key, domain)
 	case SPACE_ENGINE_FOFA:
 		client = fofa.NewClientEx(req.GetAccount(), key, domain)
+	case SPACE_ENGINE_ZONE:
+		client = zone.NewClientEx(key, domain)
 	default:
 		result.Status = SPACE_ENGINE_STATUS_INVALID_TYPE
 		return
@@ -81,6 +85,9 @@ func (s *Server) GetSpaceEngineAccountStatus(ctx context.Context, req *ypb.GetSp
 	gjsonResult := gjson.ParseBytes(bodyRaw)
 
 	switch req.GetType() {
+	case SPACE_ENGINE_ZONE:
+		// 0.zone 无明确剩余配额，UserProfile 通过轻量查询验证，code==0 即有效
+		result.Remain = -1
 	case SPACE_ENGINE_ZOOMEYE:
 		quota := gjsonResult.Get("quota_info")
 		if !quota.Exists() {
@@ -169,6 +176,8 @@ func (s *Server) GetSpaceEngineAccountStatusV2(ctx context.Context, req *ypb.Thi
 		client = quake.NewClientEx(key, domain)
 	case SPACE_ENGINE_FOFA:
 		client = fofa.NewClientEx(cfg.UserIdentifier, key, domain)
+	case SPACE_ENGINE_ZONE:
+		client = zone.NewClientEx(key, domain)
 	default:
 		result.Status = SPACE_ENGINE_STATUS_INVALID_TYPE
 		return
@@ -190,6 +199,8 @@ func (s *Server) GetSpaceEngineAccountStatusV2(ctx context.Context, req *ypb.Thi
 	gjsonResult := gjson.ParseBytes(bodyRaw)
 
 	switch req.GetType() {
+	case SPACE_ENGINE_ZONE:
+		result.Remain = -1
 	case SPACE_ENGINE_ZOOMEYE:
 		quota := gjsonResult.Get("quota_info")
 		if !quota.Exists() {

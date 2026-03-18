@@ -1,6 +1,6 @@
-__DESC__ = "Searches network assets using space search engines (FOFA, Shodan, ZoomEye, Hunter, Quake). Discovers hosts, services, and fingerprints matching the query filter. Requires API key configuration in Yakit settings."
+__DESC__ = "Searches network assets using space search engines (FOFA, Shodan, ZoomEye, Hunter, Quake, Zone). Discovers hosts, services, and fingerprints matching the query filter. Requires API key configuration in Yakit settings."
 __VERBOSE_NAME__ = "Network Space Search Engine"
-__KEYWORDS__ = "fofa,shodan,zoomeye,hunter,quake,space engine,network search,asset discovery,fingerprint,reconnaissance,internet scanning"
+__KEYWORDS__ = "fofa,shodan,zoomeye,hunter,quake,zone,零零测绘,space engine,network search,asset discovery,fingerprint,reconnaissance,internet scanning"
 
 __USAGE__ = <<<USAGE_BLOCK
 Network Space Search Engine - Usage Guide for AI Parameter Generation
@@ -8,10 +8,10 @@ Network Space Search Engine - Usage Guide for AI Parameter Generation
 Searches network assets across space search engines. Requires the corresponding
 engine's API key configured in Yakit Third-party Application Settings.
 
-Supported engines: fofa, shodan, zoomeye, hunter, quake
+Supported engines: fofa, shodan, zoomeye, hunter, quake, zone
 
 Parameters:
-  engine       (string, required) Search engine name: fofa/shodan/zoomeye/hunter/quake
+  engine       (string, required) Search engine name: fofa/shodan/zoomeye/hunter/quake/zone
   query        (string, required) Search query in the engine's syntax
   max-records  (int, optional) Maximum number of results. Default: 100
   max-page     (int, optional) Maximum pages to retrieve. Default: 10
@@ -53,11 +53,20 @@ Example 3 - Quake search:
     "max-page": 3
   }
 }
+
+Example 4 - Zone (零零测绘) search:
+{
+  "params": {
+    "engine": "zone",
+    "query": "(country=中国)&&(status_code=200)",
+    "max-records": 50
+  }
+}
 USAGE_BLOCK
 
 yakit.AutoInitYakit()
 
-engine = cli.String("engine", cli.setRequired(true), cli.setHelp("search engine: fofa/shodan/zoomeye/hunter/quake"))
+engine = cli.String("engine", cli.setRequired(true), cli.setHelp("search engine: fofa/shodan/zoomeye/hunter/quake/zone"))
 query = cli.String("query", cli.setRequired(true), cli.setHelp("search query"))
 maxRecords = cli.Int("max-records", cli.setDefault(100), cli.setHelp("max result count"))
 maxPage = cli.Int("max-page", cli.setDefault(10), cli.setHelp("max pages"))
@@ -65,7 +74,7 @@ pageSize = cli.Int("page-size", cli.setDefault(10), cli.setHelp("results per pag
 cli.check()
 
 engineLower = str.ToLower(str.TrimSpace(engine))
-validEngines = "fofa,shodan,zoomeye,hunter,quake"
+validEngines = "fofa,shodan,zoomeye,hunter,quake,zone"
 isValid = false
 engineList = str.SplitAndTrim(validEngines, ",")
 for i := 0; i < len(engineList); i++ {
@@ -74,7 +83,7 @@ for i := 0; i < len(engineList); i++ {
     }
 }
 if !isValid {
-    yakit.Error("invalid engine '%s'. Supported engines: fofa, shodan, zoomeye, hunter, quake", engine)
+    yakit.Error("invalid engine '%s'. Supported engines: fofa, shodan, zoomeye, hunter, quake, zone", engine)
     return
 }
 
