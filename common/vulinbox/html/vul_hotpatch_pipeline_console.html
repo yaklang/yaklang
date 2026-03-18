@@ -1,0 +1,789 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>全局热加载 Pipeline 教学页</title>
+    <style>
+        :root {
+            --bg: #f2ede2;
+            --paper: rgba(255, 251, 245, 0.92);
+            --paper-strong: #fffaf1;
+            --ink: #1d2a33;
+            --muted: #6a7278;
+            --accent: #bf4d28;
+            --accent-strong: #8c2f14;
+            --teal: #176b62;
+            --line: rgba(29, 42, 51, 0.12);
+            --shadow: 0 20px 60px rgba(38, 33, 28, 0.12);
+            --radius: 24px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            margin: 0;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at top left, rgba(191, 77, 40, 0.16), transparent 28%),
+                radial-gradient(circle at top right, rgba(23, 107, 98, 0.14), transparent 24%),
+                linear-gradient(180deg, #f7f2e8 0%, #ece6dc 100%);
+            font-family: "Iowan Old Style", "Palatino Linotype", "Noto Serif SC", "Songti SC", serif;
+        }
+
+        a {
+            color: inherit;
+        }
+
+        .page {
+            max-width: 1240px;
+            margin: 0 auto;
+            padding: 28px 20px 56px;
+        }
+
+        .hero,
+        .card {
+            background: var(--paper);
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(8px);
+        }
+
+        .hero {
+            padding: 30px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .hero::after {
+            content: "";
+            position: absolute;
+            inset: auto -80px -90px auto;
+            width: 260px;
+            height: 260px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(191, 77, 40, 0.18), transparent 70%);
+            pointer-events: none;
+        }
+
+        .eyebrow {
+            display: inline-flex;
+            padding: 6px 12px;
+            border-radius: 999px;
+            background: rgba(29, 42, 51, 0.06);
+            color: var(--muted);
+            font-size: 12px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        h1,
+        h2,
+        h3 {
+            margin: 0;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+
+        h1 {
+            margin-top: 16px;
+            font-size: clamp(34px, 5vw, 56px);
+            max-width: 760px;
+        }
+
+        h2 {
+            font-size: 28px;
+            margin-bottom: 14px;
+        }
+
+        h3 {
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+
+        p {
+            margin: 0;
+            line-height: 1.8;
+            color: var(--muted);
+        }
+
+        .hero-copy {
+            margin-top: 14px;
+            max-width: 760px;
+            font-size: 18px;
+        }
+
+        .hero-actions,
+        .toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .hero-actions {
+            margin-top: 20px;
+        }
+
+        .hero-grid,
+        .content-grid,
+        .console-grid,
+        .payload-grid,
+        .field-grid,
+        .session-grid {
+            display: grid;
+            gap: 16px;
+        }
+
+        .hero-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            margin-top: 26px;
+        }
+
+        .hero-stat,
+        .mini-card {
+            padding: 16px 18px;
+            background: rgba(255, 255, 255, 0.55);
+            border: 1px solid rgba(29, 42, 51, 0.08);
+            border-radius: 20px;
+        }
+
+        .hero-stat strong,
+        .mini-card strong {
+            display: block;
+            margin-bottom: 6px;
+            color: var(--ink);
+            font-size: 15px;
+        }
+
+        .content-grid {
+            grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.9fr);
+            margin-top: 18px;
+        }
+
+        .console-grid {
+            grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.9fr);
+            margin-top: 18px;
+        }
+
+        .card {
+            padding: 24px;
+        }
+
+        .section-copy {
+            margin-bottom: 18px;
+        }
+
+        .checklist,
+        .tips {
+            margin: 0;
+            padding-left: 18px;
+            color: var(--ink);
+            line-height: 1.9;
+        }
+
+        .checklist li + li,
+        .tips li + li {
+            margin-top: 8px;
+        }
+
+        .formula,
+        pre {
+            margin: 0;
+            padding: 16px 18px;
+            border-radius: 18px;
+            background: #1f232b;
+            color: #f6efe6;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            font-family: "SFMono-Regular", "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+            font-size: 13px;
+            line-height: 1.7;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            min-height: 88px;
+        }
+
+        .formula {
+            margin-top: 18px;
+        }
+
+        .field-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            margin: 18px 0 16px;
+        }
+
+        label {
+            display: block;
+            font-size: 14px;
+            color: var(--ink);
+        }
+
+        .label-copy {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--muted);
+        }
+
+        input,
+        select,
+        textarea {
+            width: 100%;
+            border: 1px solid rgba(29, 42, 51, 0.14);
+            border-radius: 16px;
+            background: rgba(255, 250, 241, 0.94);
+            color: var(--ink);
+            padding: 12px 14px;
+            font: inherit;
+        }
+
+        textarea {
+            min-height: 128px;
+            resize: vertical;
+            font-family: "SFMono-Regular", "JetBrains Mono", Consolas, monospace;
+            font-size: 13px;
+            line-height: 1.7;
+        }
+
+        button,
+        .ghost-link {
+            border: 0;
+            border-radius: 999px;
+            padding: 11px 18px;
+            font: inherit;
+            cursor: pointer;
+            transition: transform 140ms ease, box-shadow 140ms ease, background 140ms ease;
+            text-decoration: none;
+        }
+
+        button:hover,
+        .ghost-link:hover {
+            transform: translateY(-1px);
+        }
+
+        .primary {
+            color: #fff7ef;
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
+            box-shadow: 0 12px 24px rgba(140, 47, 20, 0.2);
+        }
+
+        .secondary,
+        .ghost-link {
+            color: var(--ink);
+            background: rgba(29, 42, 51, 0.08);
+        }
+
+        .status-bar {
+            margin-top: 16px;
+            padding: 12px 14px;
+            border-radius: 16px;
+            background: rgba(29, 42, 51, 0.06);
+            color: var(--muted);
+        }
+
+        .status-bar[data-tone="ok"] {
+            background: rgba(23, 107, 98, 0.12);
+            color: var(--teal);
+        }
+
+        .status-bar[data-tone="warn"] {
+            background: rgba(191, 77, 40, 0.12);
+            color: var(--accent-strong);
+        }
+
+        .payload-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            margin-top: 18px;
+        }
+
+        .payload-grid .wide {
+            grid-column: 1 / -1;
+        }
+
+        .session-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            margin-top: 14px;
+        }
+
+        .session-key {
+            font-family: "SFMono-Regular", "JetBrains Mono", Consolas, monospace;
+            font-size: 13px;
+            color: var(--ink);
+        }
+
+        .anchor-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .anchor-title a {
+            color: var(--accent-strong);
+            text-decoration: none;
+            font-size: 14px;
+        }
+
+        @media (max-width: 960px) {
+            .hero-grid,
+            .content-grid,
+            .console-grid,
+            .payload-grid,
+            .field-grid,
+            .session-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .page {
+                padding: 18px 14px 40px;
+            }
+
+            .hero,
+            .card {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="page">
+    <section class="hero">
+        <span class="eyebrow">Vulinbox / Global HotPatch / Pipeline</span>
+        <h1>全局热加载 Pipeline 教学页</h1>
+        <p class="hero-copy">
+            这个页面不是只放说明文字的 docs。它会在浏览器里真实跑通
+            <strong>bootstrap -> 解 ticket -> 计算 HMAC -> 发送明文 JSON -> 解密 AES-CBC 响应</strong>
+            这一整条链路，方便用户直接点击进入靶场做手工验证。
+        </p>
+        <div class="hero-actions">
+            <a class="ghost-link" href="/">返回 Vulinbox 首页</a>
+            <a class="ghost-link" href="{{.BootstrapPath}}" target="_blank">查看 bootstrap 原始接口</a>
+            <a class="ghost-link" href="#console">跳到前端实操台</a>
+        </div>
+        <div class="hero-grid">
+            <div class="hero-stat">
+                <strong>Global HotPatch</strong>
+                负责动态取会话、补 `X-Pipeline-*` 头，以及把响应解回明文 JSON。
+            </div>
+            <div class="hero-stat">
+                <strong>Module HotPatch</strong>
+                继续盯住业务请求体，直接改 `keyword`，做 SQL 注入 payload 变异和命中判断。
+            </div>
+            <div class="hero-stat">
+                <strong>为什么不是前端加密案例</strong>
+                因为这里故意让请求体保持明文，重点讲 pipeline 的分层，而不是讲前端 JS 逆向。
+            </div>
+        </div>
+    </section>
+
+    <section class="content-grid">
+        <article class="card">
+            <div class="anchor-title">
+                <h2>为什么这个靶场适合讲全局热加载</h2>
+                <a href="{{.DocsPath}}#console">直接去实操</a>
+            </div>
+            <p class="section-copy">
+                如果一个场景只是“前端自己先 AES 加密，再把密文交给服务端”，那更像是协议复刻问题，
+                模块热加载自己就能搞定，未必能把 global 的价值讲出来。这个靶场故意把协议层和业务层拆开，让 pipeline 更清楚。
+            </p>
+            <ol class="checklist">
+                <li>请求体保持明文 JSON，模块热加载还能直接改 `keyword`、`status`、`page` 这些业务字段。</li>
+                <li>请求之前必须先去拿动态会话，并补 `X-Pipeline-Session`、`X-Pipeline-Timestamp`、`X-Pipeline-Signature`，这部分天然适合放在全局热加载。</li>
+                <li>服务端统一返回 AES-CBC 信封，响应回来先由全局热加载解包，模块热加载再根据明文结果做命中判断。</li>
+            </ol>
+            <div class="formula">签名公式
+
+hex(HMAC-SHA256(session_key, METHOD + "\n" + PATH + "\n" + TIMESTAMP))</div>
+        </article>
+
+        <aside class="card">
+            <h2>协议摘要</h2>
+            <div class="mini-card">
+                <strong>步骤 1</strong>
+                `GET {{.BootstrapPath}}`，拿到 `ticket` 和 `iv`。
+            </div>
+            <div class="mini-card" style="margin-top: 12px;">
+                <strong>步骤 2</strong>
+                用固定引导密钥 `{{.BootstrapKey}}` 解密 `ticket`，得到 `session_id` 和 `session_key`。
+            </div>
+            <div class="mini-card" style="margin-top: 12px;">
+                <strong>步骤 3</strong>
+                用明文 JSON 请求 `POST {{.SearchPath}}`，只在 Header 里带动态签名。
+            </div>
+            <div class="mini-card" style="margin-top: 12px;">
+                <strong>步骤 4</strong>
+                如果响应头里有 `X-Pipeline-Encrypted: 1`，就继续用 `session_key` 解 `data` 字段。
+            </div>
+        </aside>
+    </section>
+
+    <section id="console" class="console-grid">
+        <article class="card">
+            <div class="anchor-title">
+                <h2>前端实操台</h2>
+                <a href="{{.DocsPath}}">回到教学页顶部</a>
+            </div>
+            <p class="section-copy">
+                这个区域同时支持两种用法：你既可以手工点一次 bootstrap 看清协议细节，也可以像启用全局热加载那样，直接把原始请求发出去，让 MITM 或 Global HotPatch 去补协议层。
+            </p>
+            <div class="toolbar">
+                <button id="bootstrap-btn" class="secondary" type="button">手工获取动态会话（可选）</button>
+                <button id="normal-btn" class="secondary" type="button">装载正常请求</button>
+                <button id="inject-btn" class="secondary" type="button">装载 SQL 注入 Payload</button>
+                <button id="search-btn" class="primary" type="button">发送搜索请求</button>
+            </div>
+            <div class="status-bar" id="status-bar" data-tone="warn">点击“发送搜索请求”时，页面不会先拦截你；如果本地没有会话，就直接发原始请求，方便抓包或交给全局热加载处理。</div>
+
+            <div class="field-grid">
+                <label>
+                    <span class="label-copy">keyword</span>
+                    <input id="keyword" value="{{.NormalKeyword}}">
+                </label>
+                <label>
+                    <span class="label-copy">status</span>
+                    <input id="status" value="{{.Status}}">
+                </label>
+                <label>
+                    <span class="label-copy">page</span>
+                    <input id="page" type="number" min="1" value="{{.Page}}">
+                </label>
+                <label>
+                    <span class="label-copy">size</span>
+                    <input id="size" type="number" min="1" max="20" value="{{.Size}}">
+                </label>
+            </div>
+
+            <label>
+                <span class="label-copy">明文 JSON 请求体</span>
+                <textarea id="body-preview" readonly></textarea>
+            </label>
+
+            <div class="payload-grid">
+                <div>
+                    <h3>bootstrap 原始返回</h3>
+                    <pre id="bootstrap-raw">手工点击或自动 bootstrap 后展示。</pre>
+                </div>
+                <div>
+                    <h3>解密后的 ticket</h3>
+                    <pre id="ticket-plain">会展示 session_id / session_key / expires_at。</pre>
+                </div>
+                <div>
+                    <h3>HTTP 请求预览</h3>
+                    <pre id="request-preview">这里会展示带签名头的请求预览。</pre>
+                </div>
+                <div>
+                    <h3>加密响应信封</h3>
+                    <pre id="response-envelope">这里会展示响应里的 iv / data。</pre>
+                </div>
+                <div class="wide">
+                    <h3>解密后的响应明文</h3>
+                    <pre id="response-plain">这里会展示最终明文 JSON，方便确认注入是否已经生效。</pre>
+                </div>
+            </div>
+        </article>
+
+        <aside class="card">
+            <h2>提示</h2>
+            <p class="section-copy">
+                页面会把动态会话完整展示出来；但它不会强迫你必须先点 bootstrap。也就是说，这个前端不会先在浏览器里把请求卡死，而是优先把请求发出去，方便你在 MITM 里观察、转发，或者交给全局热加载去补签。
+            </p>
+            <div class="session-grid">
+                <div class="mini-card">
+                    <strong>Session ID</strong>
+                    <div id="session-id" class="session-key">未初始化</div>
+                </div>
+                <div class="mini-card">
+                    <strong>过期时间</strong>
+                    <div id="expires-at">未初始化</div>
+                </div>
+                <div class="mini-card" style="grid-column: 1 / -1;">
+                    <strong>Session Key</strong>
+                    <div id="session-key" class="session-key">未初始化</div>
+                </div>
+            </div>
+            <h3 style="margin-top: 20px;">对应到全局热加载时，应该怎么拆</h3>
+            <ul class="tips">
+                <li>`beforeRequest(global)`：先请求 bootstrap，缓存 `session_id`、`session_key`，再补齐 `X-Pipeline-*` 头。</li>
+                <li>`beforeRequest(module)`：继续改业务参数，把 `keyword` 替换成注入 payload。</li>
+                <li>`afterResponse(global)`：识别 `X-Pipeline-Encrypted: 1`，把 `data` 解成明文 JSON。</li>
+                <li>`afterResponse(module)`：基于明文响应判断是否命中，例如 `row_count` 是否暴涨、是否出现 `admin` 结果。</li>
+            </ul>
+        </aside>
+    </section>
+</div>
+
+<script>
+    const docsPath = {{printf "%q" .DocsPath}};
+    const bootstrapPath = {{printf "%q" .BootstrapPath}};
+    const searchPath = {{printf "%q" .SearchPath}};
+    const bootstrapKeyText = {{printf "%q" .BootstrapKey}};
+    const normalPayload = {
+        keyword: {{printf "%q" .NormalKeyword}},
+        status: {{printf "%q" .Status}},
+        page: {{.Page}},
+        size: {{.Size}}
+    };
+    const injectPayload = {
+        keyword: {{printf "%q" .InjectKeyword}},
+        status: {{printf "%q" .Status}},
+        page: {{.Page}},
+        size: {{.Size}}
+    };
+
+    const state = {
+        sessionId: '',
+        sessionKeyBytes: null,
+        expiresAt: 0
+    };
+
+    const ids = {
+        keyword: document.getElementById('keyword'),
+        status: document.getElementById('status'),
+        page: document.getElementById('page'),
+        size: document.getElementById('size'),
+        bodyPreview: document.getElementById('body-preview'),
+        bootstrapRaw: document.getElementById('bootstrap-raw'),
+        ticketPlain: document.getElementById('ticket-plain'),
+        requestPreview: document.getElementById('request-preview'),
+        responseEnvelope: document.getElementById('response-envelope'),
+        responsePlain: document.getElementById('response-plain'),
+        sessionId: document.getElementById('session-id'),
+        sessionKey: document.getElementById('session-key'),
+        expiresAt: document.getElementById('expires-at'),
+        statusBar: document.getElementById('status-bar')
+    };
+
+    function bytesFromUtf8(value) {
+        return new TextEncoder().encode(value);
+    }
+
+    function utf8FromBytes(value) {
+        return new TextDecoder().decode(value);
+    }
+
+    function base64ToBytes(value) {
+        const raw = atob(value);
+        const bytes = new Uint8Array(raw.length);
+        for (let index = 0; index < raw.length; index += 1) {
+            bytes[index] = raw.charCodeAt(index);
+        }
+        return bytes;
+    }
+
+    function bytesToHex(value) {
+        return Array.from(value).map((item) => item.toString(16).padStart(2, '0')).join('');
+    }
+
+    function formatObject(value) {
+        if (typeof value === 'string') {
+            return value;
+        }
+        return JSON.stringify(value, null, 2);
+    }
+
+    function isPlainSearchResult(value) {
+        if (!value || typeof value !== 'object') {
+            return false;
+        }
+        return typeof value.row_count === 'number' || Array.isArray(value.rows);
+    }
+
+    function setStatus(message, tone) {
+        ids.statusBar.textContent = message;
+        ids.statusBar.dataset.tone = tone;
+    }
+
+    function getFormPayload() {
+        return {
+            keyword: ids.keyword.value,
+            status: ids.status.value,
+            page: Number.parseInt(ids.page.value, 10) || 1,
+            size: Number.parseInt(ids.size.value, 10) || 10
+        };
+    }
+
+    function syncPayloadPreview() {
+        ids.bodyPreview.value = JSON.stringify(getFormPayload(), null, 2);
+    }
+
+    function loadPayload(payload) {
+        ids.keyword.value = payload.keyword;
+        ids.status.value = payload.status;
+        ids.page.value = String(payload.page);
+        ids.size.value = String(payload.size);
+        syncPayloadPreview();
+    }
+
+    function updateSessionView(ticket) {
+        ids.sessionId.textContent = ticket.session_id;
+        ids.sessionKey.textContent = ticket.session_key;
+        ids.expiresAt.textContent = new Date(ticket.expires_at * 1000).toLocaleString('zh-CN', { hour12: false });
+    }
+
+    function hasSession() {
+        return Boolean(state.sessionId && state.sessionKeyBytes);
+    }
+
+    async function decryptTicket(ticketB64, ivB64) {
+        const key = await crypto.subtle.importKey(
+            'raw',
+            bytesFromUtf8(bootstrapKeyText),
+            { name: 'AES-CBC' },
+            false,
+            ['decrypt']
+        );
+        const plainBuffer = await crypto.subtle.decrypt(
+            { name: 'AES-CBC', iv: base64ToBytes(ivB64) },
+            key,
+            base64ToBytes(ticketB64)
+        );
+        return JSON.parse(utf8FromBytes(new Uint8Array(plainBuffer)));
+    }
+
+    async function bootstrapSession() {
+        setStatus('正在获取动态会话并解密 ticket。', 'warn');
+        const response = await fetch(bootstrapPath);
+        const data = await response.json();
+        ids.bootstrapRaw.textContent = formatObject(data);
+        const ticket = await decryptTicket(data.ticket, data.iv);
+        ids.ticketPlain.textContent = formatObject(ticket);
+
+        state.sessionId = ticket.session_id;
+        state.sessionKeyBytes = base64ToBytes(ticket.session_key);
+        state.expiresAt = ticket.expires_at;
+
+        updateSessionView(ticket);
+        setStatus('动态会话已就绪，可以直接发送搜索请求。', 'ok');
+    }
+
+    async function signRequest(timestamp) {
+        const key = await crypto.subtle.importKey(
+            'raw',
+            state.sessionKeyBytes,
+            { name: 'HMAC', hash: 'SHA-256' },
+            false,
+            ['sign']
+        );
+        const signBuffer = await crypto.subtle.sign(
+            'HMAC',
+            key,
+            bytesFromUtf8(`POST\n${searchPath}\n${timestamp}`)
+        );
+        return bytesToHex(new Uint8Array(signBuffer));
+    }
+
+    async function decryptEnvelope(envelope) {
+        const key = await crypto.subtle.importKey(
+            'raw',
+            state.sessionKeyBytes,
+            { name: 'AES-CBC' },
+            false,
+            ['decrypt']
+        );
+        const plainBuffer = await crypto.subtle.decrypt(
+            { name: 'AES-CBC', iv: base64ToBytes(envelope.iv) },
+            key,
+            base64ToBytes(envelope.data)
+        );
+        return JSON.parse(utf8FromBytes(new Uint8Array(plainBuffer)));
+    }
+
+    async function sendSearch() {
+        const payload = getFormPayload();
+        const body = JSON.stringify(payload, null, 2);
+        const headers = {
+            'Content-Type': 'application/json'
+        };
+        const previewLines = [
+            `POST ${searchPath} HTTP/1.1`,
+            'Content-Type: application/json'
+        ];
+        if (hasSession()) {
+            const timestamp = String(Math.floor(Date.now() / 1000));
+            const signature = await signRequest(timestamp);
+            headers['X-Pipeline-Session'] = state.sessionId;
+            headers['X-Pipeline-Timestamp'] = timestamp;
+            headers['X-Pipeline-Signature'] = signature;
+            previewLines.push(`X-Pipeline-Session: ${state.sessionId}`);
+            previewLines.push(`X-Pipeline-Timestamp: ${timestamp}`);
+            previewLines.push(`X-Pipeline-Signature: ${signature}`);
+            setStatus('正在发送带本地会话头的请求。', 'warn');
+        } else {
+            previewLines.push('X-Pipeline-Session: <not set>');
+            previewLines.push('X-Pipeline-Timestamp: <not set>');
+            previewLines.push('X-Pipeline-Signature: <not set>');
+            setStatus('正在发送未补签的原始请求。这样更适合抓包或交给全局热加载处理。', 'warn');
+        }
+        previewLines.push('');
+        previewLines.push(body);
+        ids.requestPreview.textContent = previewLines.join('\n');
+
+        const response = await fetch(searchPath, {
+            method: 'POST',
+            headers,
+            body
+        });
+
+        const envelope = await response.json();
+
+        ids.responseEnvelope.textContent = formatObject(envelope);
+
+        if (response.headers.get('X-Pipeline-Encrypted') === '1') {
+            if (!hasSession()) {
+                ids.responsePlain.textContent = [
+                    '响应已经是加密信封，但当前前端并没有本地 session_key，所以无法直接在浏览器里解密。',
+                    '如果你是在演示手工协议，可以先点“手工获取动态会话”；如果你是在验证全局热加载，这正是应该交给 Global HotPatch 处理的场景。',
+                    '',
+                    formatObject(envelope)
+                ].join('\n');
+                setStatus('请求已发出并收到加密响应，但当前前端没有会话密钥，无法本地解密。', 'warn');
+                return;
+            }
+            const plain = await decryptEnvelope(envelope);
+            ids.responsePlain.textContent = formatObject(plain);
+            setStatus(`请求完成，命中 ${plain.row_count ?? 0} 条结果。`, 'ok');
+            return;
+        }
+
+        ids.responsePlain.textContent = formatObject(envelope);
+        if (isPlainSearchResult(envelope)) {
+            setStatus(`请求完成，命中 ${envelope.row_count ?? 0} 条结果。`, 'ok');
+            return;
+        }
+        setStatus('请求已经发出，服务端返回了明文结果。若未启用全局热加载，这通常就是协议校验失败后的直接反馈。', 'warn');
+    }
+
+    ids.keyword.addEventListener('input', syncPayloadPreview);
+    ids.status.addEventListener('input', syncPayloadPreview);
+    ids.page.addEventListener('input', syncPayloadPreview);
+    ids.size.addEventListener('input', syncPayloadPreview);
+
+    document.getElementById('normal-btn').addEventListener('click', () => loadPayload(normalPayload));
+    document.getElementById('inject-btn').addEventListener('click', () => loadPayload(injectPayload));
+    document.getElementById('bootstrap-btn').addEventListener('click', async () => {
+        try {
+            await bootstrapSession();
+        } catch (error) {
+            setStatus(`获取动态会话失败：${error.message}`, 'warn');
+            ids.ticketPlain.textContent = error.stack || String(error);
+        }
+    });
+    document.getElementById('search-btn').addEventListener('click', async () => {
+        try {
+            await sendSearch();
+        } catch (error) {
+            setStatus(`发送请求失败：${error.message}`, 'warn');
+            ids.responsePlain.textContent = error.stack || String(error);
+        }
+    });
+
+    loadPayload(normalPayload);
+</script>
+</body>
+</html>

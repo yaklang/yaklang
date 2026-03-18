@@ -156,6 +156,7 @@ func (s *VulinServer) init() {
 
 	s.registerVulRouter()
 	s.registerMiscRoute()
+	s.registerHotPatchPipelineRoute()
 	s.registerPipelineNSmuggle()
 
 	s.registerAuthorizationBypass()
