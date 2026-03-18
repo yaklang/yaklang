@@ -3,6 +3,7 @@ package antlr4util
 import (
 	"os"
 	"strings"
+	"sync"
 	"sync/atomic"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
@@ -16,29 +17,37 @@ const envAntlrSLLFirstStats = "YAK_ANTLR_SLL_FIRST_STATS"
 //
 // Default: enabled (for performance). Set YAK_ANTLR_SLL_FIRST=0/false/off to disable.
 func SLLFirstEnabled() bool {
-	raw := strings.TrimSpace(os.Getenv(envAntlrSLLFirst))
-	if raw == "" {
-		return true
-	}
-	switch strings.ToLower(raw) {
-	case "0", "false", "no", "off", "disable", "disabled":
-		return false
-	default:
-		return true
-	}
+	sllFirstConfigOnce.Do(func() {
+		raw := strings.TrimSpace(os.Getenv(envAntlrSLLFirst))
+		if raw == "" {
+			sllFirstEnabledCached = true
+			return
+		}
+		switch strings.ToLower(raw) {
+		case "0", "false", "no", "off", "disable", "disabled":
+			sllFirstEnabledCached = false
+		default:
+			sllFirstEnabledCached = true
+		}
+	})
+	return sllFirstEnabledCached
 }
 
 func SLLFirstStatsEnabled() bool {
-	raw := strings.TrimSpace(os.Getenv(envAntlrSLLFirstStats))
-	if raw == "" {
-		return false
-	}
-	switch strings.ToLower(raw) {
-	case "1", "true", "yes", "y", "on", "enable", "enabled":
-		return true
-	default:
-		return false
-	}
+	sllFirstStatsOnce.Do(func() {
+		raw := strings.TrimSpace(os.Getenv(envAntlrSLLFirstStats))
+		if raw == "" {
+			sllFirstStatsEnabledCached = false
+			return
+		}
+		switch strings.ToLower(raw) {
+		case "1", "true", "yes", "y", "on", "enable", "enabled":
+			sllFirstStatsEnabledCached = true
+		default:
+			sllFirstStatsEnabledCached = false
+		}
+	})
+	return sllFirstStatsEnabledCached
 }
 
 type SLLFirstCounters struct {
@@ -50,6 +59,12 @@ type SLLFirstCounters struct {
 }
 
 var (
+	sllFirstConfigOnce sync.Once
+	sllFirstEnabledCached bool
+
+	sllFirstStatsOnce          sync.Once
+	sllFirstStatsEnabledCached bool
+
 	sllFirstLLOnly            uint64
 	sllFirstSLLAttempts       uint64
 	sllFirstFallbacks         uint64
@@ -127,23 +142,34 @@ func ParseASTWithSLLFirst[L antlr.Lexer, P antlr.Parser, T any](
 		return ast, errListener.Error(), cancelled
 	}
 
+	statsEnabled := SLLFirstStatsEnabled()
 	if !SLLFirstEnabled() {
-		atomic.AddUint64(&sllFirstLLOnly, 1)
+		if statsEnabled {
+			atomic.AddUint64(&sllFirstLLOnly, 1)
+		}
 		ast, err, _ := run(antlr.PredictionModeLL, antlr.NewDefaultErrorStrategy())
 		return ast, err
 	}
 
-	atomic.AddUint64(&sllFirstSLLAttempts, 1)
+	if statsEnabled {
+		atomic.AddUint64(&sllFirstSLLAttempts, 1)
+	}
 	ast, err, cancelled := run(antlr.PredictionModeSLL, antlr.NewBailErrorStrategy())
 	if !cancelled && err == nil {
 		return ast, nil
 	}
 
-	atomic.AddUint64(&sllFirstFallbacks, 1)
+	if statsEnabled {
+		atomic.AddUint64(&sllFirstFallbacks, 1)
+	}
 	if cancelled {
-		atomic.AddUint64(&sllFirstFallbackCancelled, 1)
+		if statsEnabled {
+			atomic.AddUint64(&sllFirstFallbackCancelled, 1)
+		}
 	} else if err != nil {
-		atomic.AddUint64(&sllFirstFallbackError, 1)
+		if statsEnabled {
+			atomic.AddUint64(&sllFirstFallbackError, 1)
+		}
 	}
 
 	ast, err, _ = run(antlr.PredictionModeLL, antlr.NewDefaultErrorStrategy())
