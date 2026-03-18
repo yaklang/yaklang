@@ -23,7 +23,7 @@
 
 核心导出 API：
 
-- `yak_runtime_get_object`
+- `yak_runtime_new_shadow`
 - `yak_runtime_get_field`
 - `yak_runtime_set_field`
 - `yak_runtime_dump_handle`
@@ -31,9 +31,9 @@
 
 ## 对象分配与生命周期
 
-1. `yak_runtime_get_object` 创建 Go 对象，并存入 `cgo.Handle`。
-2. `yak_runtime_new_shadow` 使用 `GC_malloc` 分配 8 字节影子对象内存。
-3. 影子对象里保存 `handleID`（`uintptr_t`）。
+1. Go 侧（例如 stdlib 实现）创建 Go 对象，并存入 `cgo.Handle` 得到 `handleID`。
+2. Go 侧调用 `yak_runtime_new_shadow(handleID)`，用 `GC_malloc` 分配影子对象内存（当前为 16 字节：magic + handleID）。
+3. 影子对象里保存 `handleID`（`uintptr_t`），同时在 Go 侧的 `shadowHandles` map 里登记一份（避免对潜在的无效指针解引用）。
 4. 通过 `GC_register_finalizer` 注册 Boehm finalizer。
 5. 影子对象被回收时：
    - C 回调 `yak_finalizer_proxy` 被触发；
@@ -61,7 +61,7 @@
 
 可通过脚本安装：
 
-- `./scripts/install_deps_ubuntu.sh`
+- `./common/yak/ssa2llvm/scripts/install_deps_ubuntu.sh`
 
 当前依赖包：
 

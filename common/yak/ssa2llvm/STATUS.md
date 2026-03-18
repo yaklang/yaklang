@@ -1,219 +1,103 @@
-# SSA to LLVM Compiler - Implementation Status
+# ssa2llvm Status
 
-## ✅ Completed Features
+## 当前基线
 
-### 1. Core Compilation Pipeline
-- **SSA Program → LLVM IR** transformation
-- **Function compilation** with parameters and return values
-- **Basic block** pre-creation and compilation
-- **Instruction compilation** with proper ordering
-- **Module verification** before JIT execution
+`ssa2llvm` 当前已经从“基础 SSA → LLVM 实验”演进为一条完整的 AOT 路径：
 
-### 2. Arithmetic Operations
-- Addition (`+`)
-- Subtraction (`-`)
-- Multiplication (`*`)
-- Division (`/`)
-- Modulo (`%`)
+- YakSSA → LLVM IR
+- LLVM IR → 汇编 / 目标文件 / 原生二进制
+- 链接 `common/yak/ssa2llvm/runtime/libyak.a`
+- 运行最终二进制并校验输出结果
 
-### 3. Comparison Operations
-- Greater than (`>`)
-- Less than (`<`)
-- Greater or equal (`>=`)
-- Less or equal (`<=`)
-- Equal (`==`)
-- Not equal (`!=`)
+## 已完成的核心能力
 
-### 4. Control Flow
-- **Conditional branches** (if-else)
-- **Unconditional branches** (goto/jump)
-- **Nested conditionals**
-- **Loop structures** (for, while)
-- **Loop control** (break, continue)
+### 编译与链接
 
-### 5. Function Features
-- **Simple function calls**
-- **Nested function calls**
-- **Multiple parameters**
-- **Recursive functions** (e.g., fibonacci)
-- **Return values**
+- LLVM module / function / basic block 预创建
+- phi 预建与收尾解析
+- `llc` / `clang` 产出 `.ll` / `.s` / `.o` / 可执行文件
+- `libyak.a + libgc` 链接路径
+- `main` wrapper 自动注入
 
-### 6. SSA Constructs
-- **Phi nodes** with flexible edge/pred matching
-- **Basic blocks** with predecessor/successor tracking
-- **Constant propagation**
-- **Parameter passing**
+### 调用 ABI
 
-### 7. Multi-Language Support
-- Yaklang (native)
-- Go syntax
-- Python syntax
-- JavaScript syntax
+- 单参数 `InvokeContext` 调用协议
+- 编译后的 Yak 函数调用
+- extern hook 调用
+- stdlib dispatch 调用
+- `go` 异步调用与等待
 
-## 🏗️ Architecture
+### 语法与控制流
 
-### Compilation Phases
+- 常量、算术、比较
+- `if` / `for` / `return`
+- 普通函数调用、递归调用
+- `ParameterMember` / side-effect 相关 lowering 基础路径
+- `defer`
+- `panic`
+- `recover`
+- `try-catch-finally`
 
-```
-Phase 1: Function Setup
-├── Create LLVM function signature
-├── Register parameters
-└── Pre-create all basic blocks
+### 运行时
 
-Phase 2: Instruction Compilation
-├── For each basic block:
-│   ├── Create Phi nodes (Pass 1)
-│   ├── Compile regular instructions
-│   └── Infer and add terminator
+- stdlib dispatcher
+- Go 对象 + shadow object + Boehm GC 混合模型
+- `waitAllAsyncCallFinish()`
+- runtime 嵌入与 `--stdlib-compile` 模式
 
-Phase 3: Phi Resolution
-└── Resolve all Phi incoming values/blocks
-```
+### 测试
 
-### Key Design Decisions
+已有测试覆盖：
 
-1. **Terminator Inference**: Since YakSSA If/Jump instructions may not be in the Values map, we infer terminators from BasicBlock successor counts:
-   - 2 successors → conditional branch
-   - 1 successor → unconditional branch
-   - 0 successors → return (if no explicit return)
+- 基础算术与控制流
+- 函数调用与递归
+- 多语言前端输入
+- print / stdlib / extern hook
+- `go` 语句
+- 复杂语法
+- struct / interop / obfuscation
+- 编译缓存与 runtime 嵌入
 
-2. **Phi Handling**: YakSSA Phi semantics differ from standard SSA:
-   - May have Undefined edges
-   - Edge count may not match predecessor count
-   - Solution: Filter Undefined values and use fallback strategies
+## 当前限制
 
-3. **Resource Management**: ExecutionEngine takes ownership of Module, so we avoid disposing Module when using JIT.
+### 值表示仍然偏 `i64`
 
-## 📊 Test Coverage
+- LLVM 侧目前依然以 `i64` 作为主值表示；
+- 字符串、对象、复杂值依赖指针编码、shadow object、tag/root 协议；
+- 这使 ABI 简洁，但类型语义仍需要继续细化。
 
-All 15 tests passing:
+### 错误处理是 CFG lowering，不是原生异常展开
 
-### Basic Tests (2/2)
-- ✅ TestBasicArithmetic
-- ✅ TestComplexExpressions
+- 当前 `panic`/`recover` 建立在 `InvokeContext.Panic` 上；
+- `defer` 通过函数级 `DeferBlock` 收口；
+- 不是 LLVM `landingpad` / 栈展开模型；
+- 多 catch 目前按单 catch 入口处理。
 
-### Function Call Tests (4/4)
-- ✅ TestCall_Simple
-- ✅ TestCall_Nested
-- ✅ TestCall_Recursive_Fib
-- ✅ TestCall_MultipleArgs
+### 异步错误传播仍然较保守
 
-### Control Flow Tests (5/5)
-- ✅ TestCFG_IfElse
-- ✅ TestCFG_NestedIf
-- ✅ TestCFG_Loop
-- ✅ TestCFG_LoopWithBreak
-- ✅ TestCFG_FactorialLoop
+- goroutine 内部的 Go runtime panic 会被 runtime 捕获并打印；
+- 不会自动回流成上层 Yak `catch` 值；
+- 普通调用边界上的跨函数 panic 传播协议还可以继续加强。
 
-### Language Tests (4/4)
-- ✅ TestLang_Yak
-- ✅ TestLang_Go
-- ✅ TestLang_Python
-- ✅ TestLang_JS
+## 推荐验证方式
 
-## 🎯 Verified Scenarios
-
-```yaklang
-// Arithmetic
-10 + 20 * 2 → 50
-
-// Function calls
-add = (a,b) => a+b
-add(10,20) → 30
-
-// Recursion
-fib(10) → 55
-
-// Conditionals
-if x > 10 { 100 } else { 200 } → 100
-
-// Loops
-sum(1..5) → 15
+```bash
+mkdir -p .db
+export YAKIT_HOME="$PWD/.db"
+./common/yak/ssa2llvm/scripts/build_runtime_go.sh
+go test ./common/yak/ssa2llvm/... -count=1
 ```
 
-## 📝 Known Limitations
+如果要验证最终产物链路，建议再额外执行一次：
 
-1. **Type System**: Currently only supports i64 (64-bit integers)
-   - No floats, strings, or complex types
-   - All values treated as signed 64-bit integers
-
-2. **Memory Operations**: Not implemented
-   - No heap allocation
-   - No pointers/references
-   - No arrays or structs
-
-3. **Advanced SSA**: Not implemented
-   - No exception handling
-   - No switch statements (only if-else)
-   - No closures or captured variables
-
-4. **Optimizations**: No LLVM optimization passes applied
-   - Direct SSA → IR translation
-   - Could benefit from LLVM's optimization pipeline
-
-## 🚀 Future Enhancements
-
-### Short Term
-- Add type support (f64, strings, booleans)
-- Implement basic memory operations
-- Apply LLVM optimization passes
-- Better error messages
-
-### Long Term
-- Full type system integration
-- Closure support with captured variables
-- Exception handling
-- FFI (Foreign Function Interface)
-- AOT (Ahead-of-Time) compilation
-- LLVM IR optimization pipeline integration
-
-## 📚 Usage Example
-
-```go
-package main
-
-import (
-    "context"
-    "github.com/yaklang/yaklang/common/yak/ssa2llvm/compiler"
-    "github.com/yaklang/yaklang/common/yak/ssaapi"
-    "tinygo.org/x/go-llvm"
-)
-
-func main() {
-    llvm.InitializeNativeTarget()
-    llvm.InitializeNativeAsmPrinter()
-    
-    code := `
-    fib = (n) => {
-        if n <= 2 { return 1 }
-        return fib(n-1) + fib(n-2)
-    }
-    check = () => fib(10)
-    `
-    
-    prog, _ := ssaapi.Parse(code)
-    c := compiler.NewCompiler(context.Background(), prog.Program)
-    c.Compile()
-    
-    engine, _ := llvm.NewExecutionEngine(c.Mod)
-    defer engine.Dispose()
-    
-    fn := c.Mod.NamedFunction("check")
-    result := engine.RunFunction(fn, []llvm.GenericValue{})
-    
-    println(result.Int(true)) // Output: 55
-}
+```bash
+go build -o ./ssa2llvm ./common/yak/ssa2llvm/cmd
+./ssa2llvm run demo.yak
 ```
 
-## 🏆 Achievements
+## 后续建议
 
-- **100% test pass rate** (15/15 tests)
-- **Complete basic feature set** for integer computation
-- **Multi-language support** from day one
-- **Robust Phi handling** for complex control flow
-- **Production-ready** for basic integer computations
-
----
-
-**Status**: ✅ Phase 1 Complete - Ready for basic integer JIT compilation
-**Next Phase**: Type system expansion and memory operations
+- 继续围绕 `InvokeContext` 收口调用与错误处理 metadata；
+- 补强复杂对象、blueprint、member、side-effect 的覆盖与测试；
+- 如果未来要做更强的异常语义，再单独设计跨函数 panic 传播协议；
+- 维持“最终二进制可运行且输出正确”的测试标准，不只验证 IR。
