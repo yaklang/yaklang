@@ -11,24 +11,24 @@ import (
 	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/obfuscation"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/embed"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/trace"
-	"github.com/yaklang/yaklang/common/yak/ssa2llvm/obfuscation"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 type CompileConfig struct {
-	SourceFile        string
-	SourceCode        string
-	Language          string
-	OutputFile        string
+	SourceFile string
+	SourceCode string
+	Language   string
+	OutputFile string
 	// FinalOutputFile, when set, copies the built artifact to this path (preserving mode).
 	// Useful when building into a cached work dir but the user requested -o <path>.
-	FinalOutputFile   string
+	FinalOutputFile string
 	// FinalOutputAuto selects the default output path based on source file and mode.
 	// (e.g. foo.yak -> foo.ll when EmitLLVM, else a.out)
-	FinalOutputAuto bool
+	FinalOutputAuto   bool
 	WorkDir           string
 	EntryFunctionName string
 	EmitLLVM          bool
@@ -462,27 +462,27 @@ func compileWithConfig(cfg *CompileConfig) (CompileResult, error) {
 	}
 	defer comp.Dispose()
 
-		entryFunc, _, err := resolveEntryFunction(comp.Mod, cfg.EntryFunctionName)
-		if err != nil {
-			return CompileResult{}, err
-		}
-		entryFunc = renameConflictingMainFunctions(comp.Mod, entryFunc)
+	entryFunc, _, err := resolveEntryFunction(comp.Mod, cfg.EntryFunctionName)
+	if err != nil {
+		return CompileResult{}, err
+	}
+	entryFunc = renameConflictingMainFunctions(comp.Mod, entryFunc)
 
-		if err := comp.addMainWrapperToModule(entryFunc, cfg.PrintEntryResult); err != nil {
-			return CompileResult{}, err
-		}
+	if err := comp.addMainWrapperToModule(entryFunc, cfg.PrintEntryResult); err != nil {
+		return CompileResult{}, err
+	}
 
-		// Verify again after emitting the wrapper entrypoint.
-		if err := llvm.VerifyModule(comp.Mod, llvm.PrintMessageAction); err != nil {
-			return CompileResult{}, utils.Errorf("LLVM verification failed after adding main wrapper: %v", err)
-		}
+	// Verify again after emitting the wrapper entrypoint.
+	if err := llvm.VerifyModule(comp.Mod, llvm.PrintMessageAction); err != nil {
+		return CompileResult{}, utils.Errorf("LLVM verification failed after adding main wrapper: %v", err)
+	}
 
-		// Regenerate IR because we modified the module (renamed function + wrapper).
-		ir = comp.Mod.String()
+	// Regenerate IR because we modified the module (renamed function + wrapper).
+	ir = comp.Mod.String()
 
-		if cfg.PrintIR {
-			fmt.Println(ir)
-		}
+	if cfg.PrintIR {
+		fmt.Println(ir)
+	}
 
 	outputFile := cfg.OutputFile
 	if outputFile == "" {

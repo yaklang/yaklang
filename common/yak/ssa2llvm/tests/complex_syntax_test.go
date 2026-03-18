@@ -69,4 +69,3 @@ func TestComplex_TryCatchFinally_Panic(t *testing.T) {
 	}
 	`, 1, 2)
 }
-

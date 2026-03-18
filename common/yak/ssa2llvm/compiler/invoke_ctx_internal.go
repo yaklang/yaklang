@@ -89,4 +89,3 @@ func (c *Compiler) bindParamsFromContext(fn *ssa.Function) error {
 
 	return nil
 }
-

@@ -47,14 +47,15 @@ var (
 // }
 
 // InterfaceLayout: {type: *TypeInfo, data: *void}
-// InterfaceLayout = ObjectLayout{
-//     Size: 16,
-//     Alignment: 8,
-//     FieldOffsets: map[string]int64{
-//         "type": 0,
-//         "data": 8,
-//     },
-// }
+//
+//	InterfaceLayout = ObjectLayout{
+//	    Size: 16,
+//	    Alignment: 8,
+//	    FieldOffsets: map[string]int64{
+//	        "type": 0,
+//	        "data": 8,
+//	    },
+//	}
 )
 
 // GetLayout returns the memory layout for a given type name

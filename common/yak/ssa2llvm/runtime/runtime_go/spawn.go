@@ -73,4 +73,3 @@ func yak_runtime_spawn(ctx unsafe.Pointer) {
 		}
 	}(handle)
 }
-
