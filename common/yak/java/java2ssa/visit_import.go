@@ -57,12 +57,12 @@ func (y *singleFileBuilder) VisitAllImport(i *javaparser.CompilationUnitContext)
 					prog = p
 					break
 				} else {
-					log.Debugf("Dependencies Missed: Import package not found(%v)", err)
+					log.Warnf("Dependencies Missed: Import package not found(%v)", err)
 				}
 			}
 		}
 		if prog == nil {
-			log.Debugf("Dependencies Missed: Import package %v but not found", pkgNames)
+			log.Warnf("Dependencies Missed: Import package %v but not found", pkgNames)
 			continue
 		}
 		prog.PushEditor(y.GetEditor())

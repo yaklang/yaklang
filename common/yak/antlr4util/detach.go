@@ -7,6 +7,8 @@ import (
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 )
 
+const antlrRuntimeVersion = "github.com/antlr/antlr4/runtime/Go/antlr/v4 v4.0.0-20220911224424-aa1f1f12a846"
+
 type tokenSourcePairer interface {
 	GetTokenSourceCharStreamPair() *antlr.TokenSourceCharStreamPair
 }
@@ -21,6 +23,9 @@ type tokenSourcePairer interface {
 //
 // After detaching, tokens can still read text via charStream, but no longer
 // retain the lexer through tokenSource.
+//
+// This depends on unexported fields in the pinned ANTLR Go runtime above.
+// Keep `common/yak/antlr4util/detach_test.go` passing when upgrading ANTLR.
 func DetachLexerTokenSource(lexer any) {
 	pairer, ok := lexer.(tokenSourcePairer)
 	if !ok {
@@ -40,6 +45,9 @@ func DetachLexerTokenSource(lexer any) {
 // If we later reset/replace worker caches, that old cache can still be retained
 // through ctx.parser -> parser.Interpreter -> BaseATNSimulator, preventing GC
 // and causing huge memory retention on large projects.
+//
+// This depends on unexported fields in the pinned ANTLR Go runtime above.
+// Keep `common/yak/antlr4util/detach_test.go` passing when upgrading ANTLR.
 func DetachParserATNSimulatorCaches(parser antlr.Parser) {
 	if parser == nil {
 		return

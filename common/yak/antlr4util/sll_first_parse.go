@@ -99,6 +99,10 @@ func SLLFirstCountersSnapshot() SLLFirstCounters {
 //   - Detaches lexer tokenSource from tokens after parse to reduce retention
 //
 // setup is optional and can be used to apply per-language settings such as ANTLR caches.
+//
+// LL fallback is triggered for either ParseCancellationException or a listener
+// error collected during the SLL pass. Retrying on listener errors keeps the
+// previous behavior of returning the richer LL diagnostics/recovery result.
 func ParseASTWithSLLFirst[L antlr.Lexer, P antlr.Parser, T any](
 	src string,
 	newLexer func(antlr.CharStream) L,

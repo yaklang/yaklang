@@ -43,6 +43,8 @@ type MemEditor struct {
 	cursor             int // 模拟光标位置（指针功能）
 }
 
+// NewMemEditorByBytes reuses the provided byte slice without copying it.
+// Callers must treat bs as immutable after this call.
 func NewMemEditorByBytes(bs []byte) *MemEditor {
 	editor := &MemEditor{
 		safeSourceCode:     NewSafeString(bs),

@@ -1,6 +1,7 @@
 package antlr4util
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
@@ -8,6 +9,8 @@ import (
 )
 
 func TestDetachLexerTokenSource(t *testing.T) {
+	assertUnexportedFieldExists(t, &antlr.TokenSourceCharStreamPair{}, "tokenSource")
+
 	lexer := javaparser.NewJavaLexer(antlr.NewInputStream("class A{}"))
 	tok := lexer.NextToken()
 	if tok == nil || tok.GetTokenType() == antlr.TokenEOF {
@@ -30,6 +33,9 @@ func TestDetachLexerTokenSource(t *testing.T) {
 }
 
 func TestDetachParserATNSimulatorCaches(t *testing.T) {
+	assertUnexportedFieldExists(t, antlr.NewParserATNSimulator(nil, nil, nil, nil).BaseATNSimulator, "decisionToDFA")
+	assertUnexportedFieldExists(t, antlr.NewParserATNSimulator(nil, nil, nil, nil).BaseATNSimulator, "sharedContextCache")
+
 	lexer := javaparser.NewJavaLexer(antlr.NewInputStream("class A{}"))
 	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
 	parser := javaparser.NewJavaParser(tokenStream)
@@ -53,4 +59,17 @@ func TestDetachParserATNSimulatorCaches(t *testing.T) {
 	if interp.SharedContextCache() != nil {
 		t.Fatalf("expected sharedContextCache to be nil after detach")
 	}
+}
+
+func assertUnexportedFieldExists(t *testing.T, target any, fieldName string) {
+	t.Helper()
+
+	value := reflect.ValueOf(target)
+	if value.Kind() != reflect.Ptr || value.IsNil() {
+		t.Fatalf("target must be a non-nil pointer, got %T", target)
+	}
+	if value.Elem().FieldByName(fieldName).IsValid() {
+		return
+	}
+	t.Fatalf("antlr runtime field %q not found on %T; update detach.go for %s", fieldName, target, antlrRuntimeVersion)
 }

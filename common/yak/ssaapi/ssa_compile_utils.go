@@ -114,7 +114,7 @@ func (p *antlrASTParseWorker) parseFileAST(path string, source string, store *ut
 
 	state := p.workerState(store)
 	ast, err := p.language.ParseAST(source, state.cache)
-	if state == nil || state.cache == nil || p.resetEveryFiles <= 0 {
+	if state.cache == nil || p.resetEveryFiles <= 0 {
 		return ast, err
 	}
 	state.filesParsed++
