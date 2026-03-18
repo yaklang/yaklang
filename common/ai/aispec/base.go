@@ -39,6 +39,9 @@ func ListChatModels(url string, opt func() ([]poc.PocConfigOption, error)) ([]*M
 		// remove /chat/completions
 		url = url[:len(url)-len("/chat/completions")]
 		url += "/models"
+	} else if strings.HasSuffix(url, "/responses") {
+		url = url[:len(url)-len("/responses")]
+		url += "/models"
 	}
 
 	log.Infof("requtest GET to %v to find available models", url)
@@ -323,7 +326,11 @@ func NewChatBaseContext(opts ...ChatBaseOption) *ChatBaseContext {
 
 func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) (string, error) {
 	ctx := NewChatBaseContext(chatOpts...)
-	switch ctx.InterfaceType {
+	interfaceType := ctx.InterfaceType
+	if interfaceType == ChatBaseInterfaceTypeChatCompletions && strings.HasSuffix(strings.TrimRight(strings.ToLower(url), "/"), "/responses") {
+		interfaceType = ChatBaseInterfaceTypeResponses
+	}
+	switch interfaceType {
 	case ChatBaseInterfaceTypeResponses:
 		return chatBaseResponses(url, model, msg, ctx)
 	default:
