@@ -111,4 +111,3 @@ func (c *Compiler) storeInvokeContextRoot(ctxI64 llvm.Value, argc int, index int
 	word := int64(abi.HeaderWords) + int64(argc) + int64(index)
 	return c.storeCtxWordFrom(ctxI64, word, val)
 }
-

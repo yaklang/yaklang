@@ -27,4 +27,3 @@ func TestStdlibYakit_Stderr(t *testing.T) {
 		t.Fatalf("unexpected output: %q", got)
 	}
 }
-

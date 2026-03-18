@@ -57,4 +57,3 @@ func ctxSetRet(ctx unsafe.Pointer, value int64) {
 	}
 	ctxStoreWord(ctx, abi.WordRet, uint64(value))
 }
-

@@ -44,4 +44,3 @@ const (
 
 	HeaderWords = 10
 )
-

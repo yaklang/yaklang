@@ -156,4 +156,3 @@ func (c *Compiler) compileCall(inst *ssa.Call) error {
 
 	return fmt.Errorf("compileCall: unable to resolve callee %q", calleeName)
 }
-

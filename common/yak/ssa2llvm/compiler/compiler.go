@@ -42,7 +42,7 @@ type Compiler struct {
 	returnBlock llvm.BasicBlock
 
 	// Error handling (try/catch/finally) metadata for the current function.
-	exceptionValueIDs   map[int64]struct{}
+	exceptionValueIDs    map[int64]struct{}
 	activeHandlerByBlock map[int64]int64
 	catchBodyByHandler   map[int64]int64
 	catchTargetByBlock   map[int64]int64 // catchBody block -> final/done block
@@ -161,31 +161,31 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 		}
 
 		// First, create Phi nodes at the beginning of the block
-			for _, phiID := range blockObj.Phis {
-				phiVal, ok := fn.GetValueById(phiID)
-				if !ok {
-					continue
-				}
-				if phi, ok := phiVal.(*ssa.Phi); ok {
-					if err := c.compilePhi(phi); err != nil {
-						return err
-					}
-				}
+		for _, phiID := range blockObj.Phis {
+			phiVal, ok := fn.GetValueById(phiID)
+			if !ok {
+				continue
 			}
-
-			// Bind parameters from InvokeContext after phi nodes, to keep entry-block
-			// phi ordering valid for LLVM IR.
-			if blockID == fn.EnterBlock {
-				if err := c.bindParamsFromContext(fn); err != nil {
+			if phi, ok := phiVal.(*ssa.Phi); ok {
+				if err := c.compilePhi(phi); err != nil {
 					return err
 				}
 			}
+		}
 
-			// Then compile regular instructions
-			hasTerminator := false
-			for _, instID := range blockObj.Insts {
-				instVal, ok := fn.GetInstructionById(instID)
-				if !ok || instVal == nil {
+		// Bind parameters from InvokeContext after phi nodes, to keep entry-block
+		// phi ordering valid for LLVM IR.
+		if blockID == fn.EnterBlock {
+			if err := c.bindParamsFromContext(fn); err != nil {
+				return err
+			}
+		}
+
+		// Then compile regular instructions
+		hasTerminator := false
+		for _, instID := range blockObj.Insts {
+			instVal, ok := fn.GetInstructionById(instID)
+			if !ok || instVal == nil {
 				continue
 			}
 			if instVal.IsLazy() {
@@ -256,35 +256,35 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 					c.Builder.CreateCondBr(condVal, trueBlock, falseBlock)
 					hasTerminator = true
 				}
-				} else if len(blockObj.Succs) == 1 {
-					// This is a Jump
-					targetBlock := c.Blocks[blockObj.Succs[0]]
-					c.Builder.CreateBr(targetBlock)
-					hasTerminator = true
-				}
+			} else if len(blockObj.Succs) == 1 {
+				// This is a Jump
+				targetBlock := c.Blocks[blockObj.Succs[0]]
+				c.Builder.CreateBr(targetBlock)
+				hasTerminator = true
+			}
 
-				// If still no terminator, add default return
-				if !hasTerminator {
-					if fn.DeferBlock > 0 && !c.returnBlock.IsNil() {
-						// Implicit return 0 through defer.
-						if err := c.storeContextReturn(llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)); err != nil {
-							return err
-						}
-						deferBB, ok := c.Blocks[fn.DeferBlock]
-						if !ok {
-							return fmt.Errorf("defer block %d not found for function %s", fn.DeferBlock, fn.GetName())
-						}
-						c.Builder.CreateBr(deferBB)
-					} else {
-						// Implicit return 0.
-						if err := c.storeContextReturn(llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)); err != nil {
-							return err
-						}
-						c.Builder.CreateRetVoid()
+			// If still no terminator, add default return
+			if !hasTerminator {
+				if fn.DeferBlock > 0 && !c.returnBlock.IsNil() {
+					// Implicit return 0 through defer.
+					if err := c.storeContextReturn(llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)); err != nil {
+						return err
 					}
-				}
+					deferBB, ok := c.Blocks[fn.DeferBlock]
+					if !ok {
+						return fmt.Errorf("defer block %d not found for function %s", fn.DeferBlock, fn.GetName())
+					}
+					c.Builder.CreateBr(deferBB)
+				} else {
+					// Implicit return 0.
+					if err := c.storeContextReturn(llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)); err != nil {
+						return err
+					}
+					c.Builder.CreateRetVoid()
 				}
 			}
+		}
+	}
 
 	// 6. Resolve Phis (Pass 2)
 	for _, blockID := range fn.Blocks {

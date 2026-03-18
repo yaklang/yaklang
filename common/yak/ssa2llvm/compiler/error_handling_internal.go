@@ -145,4 +145,3 @@ func (c *Compiler) prepareErrorHandling(fn *ssa.Function) error {
 
 	return nil
 }
-
