@@ -114,6 +114,7 @@ var spaceEngineTemplateProfiles = []spaceEngineTemplateProfile{
 	{Name: "quake", Verbose: "Quake", Domain: "https://quake.360.net"},
 	{Name: "hunter", Verbose: "Hunter", Domain: "https://hunter.qianxin.com"},
 	{Name: "zoomeye", Verbose: "ZoomEye", Domain: "https://api.zoomeye.org"},
+	{Name: "zone", Verbose: "零零测绘", Domain: "https://0.zone"},
 }
 
 func buildThirdPartyAppConfigTemplates() ([]*ypb.GetThirdPartyAppConfigTemplate, error) {
