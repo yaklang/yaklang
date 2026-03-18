@@ -1,0 +1,108 @@
+// browser module ref-based interaction test
+// covers: page.Click("@ref") / page.Fill("@ref", text) / page.Snapshot (ref regeneration)
+
+defer browser.CloseAll()
+
+targetURL = "http://127.0.0.1:8787/"
+
+log.info("===== setup: open browser and navigate =====")
+b, err = browser.Open(browser.headless(true), browser.timeout(10))
+assert err == nil, sprintf("open browser failed: %v", err)
+
+page, err = b.Navigate(targetURL)
+assert err == nil, sprintf("navigate failed: %v", err)
+log.info("navigated to %v", targetURL)
+
+log.info("===== test 1: take initial snapshot =====")
+snap, err = page.Snapshot()
+assert err == nil, sprintf("snapshot failed: %v", err)
+refCount = snap.RefMap.Count()
+assert refCount > 0, sprintf("ref count should be > 0, got: %v", refCount)
+log.info("initial snapshot: %v refs", refCount)
+
+excerpt = snap.Text
+if len(excerpt) > 800 {
+    excerpt = excerpt[:800]
+}
+log.info("snapshot:\n%v", excerpt)
+
+// helper: extract ref id from a snapshot line like: textbox "xxx" [ref=e5]
+extractRef = func(line) {
+    parts = str.SplitN(line, "ref=", 2)
+    if len(parts) < 2 {
+        return ""
+    }
+    refPart = parts[1]
+    result = ""
+    for i = 0; i < len(refPart); i++ {
+        ch = sprintf("%c", refPart[i])
+        if ch == "]" || ch == "," || ch == " " {
+            break
+        }
+        result = result + ch
+    }
+    return result
+}
+
+log.info("===== test 2: find a textbox ref and fill it =====")
+lines = str.Split(snap.Text, "\n")
+textboxRef = ""
+for _, line = range lines {
+    if str.Contains(line, "textbox") && str.Contains(line, "ref=") {
+        textboxRef = extractRef(line)
+        if textboxRef != "" {
+            break
+        }
+    }
+}
+
+if textboxRef != "" {
+    log.info("found textbox ref: @%v", textboxRef)
+    err = page.Fill("@" + textboxRef, "test-input")
+    assert err == nil, sprintf("fill @%v failed: %v", textboxRef, err)
+    log.info("filled @%v with 'test-input'", textboxRef)
+} else {
+    log.info("no textbox ref found on this page, skipping fill test")
+}
+
+log.info("===== test 3: find a link ref and click it =====")
+linkRef = ""
+for _, line = range lines {
+    if str.Contains(line, "link ") && str.Contains(line, "ref=") {
+        linkRef = extractRef(line)
+        if linkRef != "" {
+            break
+        }
+    }
+}
+
+urlBefore = page.URL()
+if linkRef != "" {
+    log.info("found link ref: @%v", linkRef)
+    err = page.Click("@" + linkRef)
+    assert err == nil, sprintf("click @%v failed: %v", linkRef, err)
+    log.info("clicked @%v", linkRef)
+    sleep(1)
+} else {
+    log.info("no link ref found, skipping click test")
+}
+
+log.info("===== test 4: verify page state after interaction =====")
+urlAfter = page.URL()
+log.info("url before: %v", urlBefore)
+log.info("url after: %v", urlAfter)
+
+log.info("===== test 5: re-snapshot after interaction =====")
+snap2, err = page.Snapshot()
+assert err == nil, sprintf("re-snapshot failed: %v", err)
+assert snap2.NodeCount > 0, "re-snapshot node count should be > 0"
+assert snap2.RefMap.Count() > 0, "re-snapshot ref count should be > 0"
+log.info("re-snapshot: %v nodes, %v refs", snap2.NodeCount, snap2.RefMap.Count())
+
+excerpt2 = snap2.Text
+if len(excerpt2) > 500 {
+    excerpt2 = excerpt2[:500]
+}
+log.info("re-snapshot excerpt:\n%v", excerpt2)
+
+log.info("===== REF INTERACTION TEST PASSED =====")

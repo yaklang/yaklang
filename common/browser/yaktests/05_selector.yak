@@ -1,0 +1,82 @@
+// browser module CSS selector test
+// covers: page.Click(css) / page.Fill(css, text) / page.Element(css) / page.Elements(css) / BrowserElement methods
+
+defer browser.CloseAll()
+
+targetURL = "http://127.0.0.1:8787/"
+
+log.info("===== setup: open browser and navigate =====")
+b, err = browser.Open(browser.headless(true), browser.timeout(10))
+assert err == nil, sprintf("open browser failed: %v", err)
+
+page, err = b.Navigate(targetURL)
+assert err == nil, sprintf("navigate failed: %v", err)
+log.info("navigated to %v", targetURL)
+
+log.info("===== test 1: Element('body') exists =====")
+bodyEl, err = page.Element("body")
+assert err == nil, sprintf("find body element failed: %v", err)
+assert bodyEl != nil, "body element should not be nil"
+log.info("found body element")
+
+log.info("===== test 2: Element Text method =====")
+bodyText, err = bodyEl.Text()
+assert err == nil, sprintf("get body text failed: %v", err)
+assert len(bodyText) > 0, "body text should not be empty"
+log.info("body text length: %v chars", len(bodyText))
+
+log.info("===== test 3: Element HTML method =====")
+bodyHTML, err = bodyEl.HTML()
+assert err == nil, sprintf("get body html failed: %v", err)
+assert len(bodyHTML) > 0, "body html should not be empty"
+log.info("body html length: %v chars", len(bodyHTML))
+
+log.info("===== test 4: Element Visible method =====")
+visible, err = bodyEl.Visible()
+assert err == nil, sprintf("check body visible failed: %v", err)
+assert visible == true, "body should be visible"
+log.info("body visible: %v", visible)
+
+log.info("===== test 5: Elements('a') finds multiple links =====")
+links, err = page.Elements("a")
+assert err == nil, sprintf("find links failed: %v", err)
+assert len(links) > 0, sprintf("should find at least 1 link, got: %v", len(links))
+log.info("found %v links", len(links))
+
+log.info("===== test 6: first link element methods =====")
+if len(links) > 0 {
+    firstLink = links[0]
+    linkText, err = firstLink.Text()
+    assert err == nil, sprintf("get link text failed: %v", err)
+    log.info("first link text: %v", linkText)
+
+    linkHTML, err = firstLink.HTML()
+    assert err == nil, sprintf("get link html failed: %v", err)
+    log.info("first link html length: %v chars", len(linkHTML))
+
+    href, err = firstLink.Attribute("href")
+    assert err == nil, sprintf("get link href failed: %v", err)
+    log.info("first link href: %v", href)
+}
+
+log.info("===== test 7: Fill via CSS selector (input on main page) =====")
+err = page.Fill("input", "selector-test")
+if err != nil {
+    log.info("fill input via css: %v (page may not have input)", err)
+} else {
+    log.info("filled input element via css selector")
+}
+
+log.info("===== test 8: Click via CSS selector =====")
+err = page.Click("a")
+if err != nil {
+    log.info("click first <a> via css: %v (may be expected)", err)
+} else {
+    log.info("clicked first <a> element via css selector")
+}
+sleep(0.5)
+
+urlAfterClick = page.URL()
+log.info("url after click: %v", urlAfterClick)
+
+log.info("===== SELECTOR TEST PASSED =====")

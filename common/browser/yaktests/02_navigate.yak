@@ -1,0 +1,49 @@
+// browser module navigation test
+// covers: b.Navigate / page.Title / page.URL / page.HTML / page.Reload / page.NavigateAndWait
+
+defer browser.CloseAll()
+
+targetURL = "http://127.0.0.1:8787/"
+
+log.info("===== test 1: Navigate to target =====")
+b, err = browser.Open(browser.headless(true), browser.timeout(10))
+assert err == nil, sprintf("open browser failed: %v", err)
+
+page, err = b.Navigate(targetURL)
+assert err == nil, sprintf("navigate failed: %v", err)
+log.info("navigated to %v", targetURL)
+
+log.info("===== test 2: URL contains target host =====")
+url = page.URL()
+assert str.Contains(url, "127.0.0.1:8787"), sprintf("url should contain 127.0.0.1:8787, got: %v", url)
+log.info("page url: %v", url)
+
+log.info("===== test 3: Title is not empty =====")
+title, err = page.Title()
+assert err == nil, sprintf("get title failed: %v", err)
+assert len(title) > 0, "title should not be empty"
+log.info("page title: %v", title)
+
+log.info("===== test 4: HTML contains expected tags =====")
+html, err = page.HTML()
+assert err == nil, sprintf("get html failed: %v", err)
+assert len(html) > 0, "html should not be empty"
+assert str.Contains(str.ToLower(html), "<html") || str.Contains(str.ToLower(html), "<body"), "html should contain html or body tag"
+log.info("html length: %v bytes", len(html))
+
+log.info("===== test 5: Reload preserves URL =====")
+err = page.Reload()
+assert err == nil, sprintf("reload failed: %v", err)
+sleep(0.5)
+urlAfterReload = page.URL()
+assert str.Contains(urlAfterReload, "127.0.0.1:8787"), sprintf("url after reload should still contain host, got: %v", urlAfterReload)
+log.info("url after reload: %v", urlAfterReload)
+
+log.info("===== test 6: Navigate to different path =====")
+page2, err = b.Navigate("http://127.0.0.1:8787/misc/healthy")
+assert err == nil, sprintf("navigate to /misc/healthy failed: %v", err)
+url2 = page2.URL()
+assert str.Contains(url2, "healthy") || str.Contains(url2, "misc"), sprintf("url should contain new path, got: %v", url2)
+log.info("navigated to new path, url: %v", url2)
+
+log.info("===== NAVIGATE TEST PASSED =====")

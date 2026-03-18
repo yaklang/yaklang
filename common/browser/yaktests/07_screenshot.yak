@@ -1,0 +1,37 @@
+// browser module screenshot test
+// covers: page.Screenshot / page.ScreenshotBase64
+
+defer browser.CloseAll()
+
+targetURL = "http://127.0.0.1:8787/"
+
+log.info("===== setup: open browser and navigate =====")
+b, err = browser.Open(browser.headless(true), browser.timeout(10))
+assert err == nil, sprintf("open browser failed: %v", err)
+
+page, err = b.Navigate(targetURL)
+assert err == nil, sprintf("navigate failed: %v", err)
+log.info("navigated to %v", targetURL)
+
+log.info("===== test 1: Screenshot returns non-empty bytes =====")
+imgData, err = page.Screenshot()
+assert err == nil, sprintf("screenshot failed: %v", err)
+assert len(imgData) > 100, sprintf("screenshot should be > 100 bytes, got: %v", len(imgData))
+log.info("screenshot bytes: %v", len(imgData))
+
+log.info("===== test 2: Screenshot data starts with PNG header =====")
+// PNG files start with 0x89 0x50 0x4E 0x47 (i.e. .PNG)
+assert imgData[0] == 0x89, sprintf("first byte should be 0x89 (PNG), got: 0x%02x", imgData[0])
+assert imgData[1] == 0x50, sprintf("second byte should be 0x50 (P), got: 0x%02x", imgData[1])
+assert imgData[2] == 0x4E, sprintf("third byte should be 0x4E (N), got: 0x%02x", imgData[2])
+assert imgData[3] == 0x47, sprintf("fourth byte should be 0x47 (G), got: 0x%02x", imgData[3])
+log.info("verified PNG header bytes")
+
+log.info("===== test 3: ScreenshotBase64 returns valid data URI =====")
+b64, err = page.ScreenshotBase64()
+assert err == nil, sprintf("screenshotBase64 failed: %v", err)
+assert str.HasPrefix(b64, "data:image/png;base64,"), sprintf("base64 should start with data URI prefix, got prefix: %v", b64[:min(30, len(b64))])
+assert len(b64) > 50, sprintf("base64 string should be > 50 chars, got: %v", len(b64))
+log.info("screenshotBase64 length: %v chars", len(b64))
+
+log.info("===== SCREENSHOT TEST PASSED =====")

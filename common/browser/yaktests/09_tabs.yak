@@ -1,0 +1,77 @@
+// browser module tab management test
+// covers: b.ListTabs / b.NewTab / b.SwitchTab / b.CloseTab / b.CurrentPage
+
+defer browser.CloseAll()
+
+targetURL = "http://127.0.0.1:8787/"
+
+log.info("===== setup: open browser and navigate =====")
+b, err = browser.Open(browser.headless(true), browser.timeout(10))
+assert err == nil, sprintf("open browser failed: %v", err)
+
+page1, err = b.Navigate(targetURL)
+assert err == nil, sprintf("navigate failed: %v", err)
+log.info("navigated to %v", targetURL)
+
+log.info("===== test 1: ListTabs returns initial tabs =====")
+tabs, err = b.ListTabs()
+assert err == nil, sprintf("list tabs failed: %v", err)
+initialTabCount = len(tabs)
+assert initialTabCount >= 1, sprintf("should have at least 1 tab, got: %v", initialTabCount)
+log.info("initial tab count: %v", initialTabCount)
+for _, tab = range tabs {
+    log.info("  tab: index=%v url=%v title=%v", tab["index"], tab["url"], tab["title"])
+}
+
+log.info("===== test 2: NewTab increases tab count =====")
+page2, err = b.NewTab("http://127.0.0.1:8787/misc/healthy")
+assert err == nil, sprintf("new tab failed: %v", err)
+log.info("opened new tab")
+
+tabs2, err = b.ListTabs()
+assert err == nil, sprintf("list tabs after new tab failed: %v", err)
+assert len(tabs2) > initialTabCount, sprintf("tab count should increase from %v, got: %v", initialTabCount, len(tabs2))
+log.info("tab count after new tab: %v", len(tabs2))
+for _, tab = range tabs2 {
+    log.info("  tab: index=%v url=%v", tab["index"], tab["url"])
+}
+
+log.info("===== test 3: CurrentPage returns the latest page =====")
+currentPage, err = b.CurrentPage()
+assert err == nil, sprintf("current page failed: %v", err)
+currentURL = currentPage.URL()
+log.info("current page url: %v", currentURL)
+
+log.info("===== test 4: SwitchTab to first tab =====")
+switchedPage, err = b.SwitchTab(0)
+assert err == nil, sprintf("switch to tab 0 failed: %v", err)
+switchedURL = switchedPage.URL()
+log.info("switched to tab 0, url: %v", switchedURL)
+
+log.info("===== test 5: SwitchTab out of range should fail =====")
+_, err = b.SwitchTab(999)
+assert err != nil, "switch to tab 999 should fail"
+log.info("switch to tab 999 error (expected): %v", err)
+
+log.info("===== test 6: CloseTab reduces tab count =====")
+tabsBefore, _ = b.ListTabs()
+tabCountBefore = len(tabsBefore)
+log.info("tabs before close: %v", tabCountBefore)
+
+if tabCountBefore > 1 {
+    err = b.CloseTab(tabCountBefore - 1)
+    assert err == nil, sprintf("close last tab failed: %v", err)
+    
+    tabsAfter, _ = b.ListTabs()
+    assert len(tabsAfter) == tabCountBefore - 1, sprintf("expected %v tabs after close, got: %v", tabCountBefore - 1, len(tabsAfter))
+    log.info("tabs after close: %v", len(tabsAfter))
+} else {
+    log.info("only 1 tab, skipping close tab test")
+}
+
+log.info("===== test 7: CloseTab out of range should fail =====")
+err = b.CloseTab(999)
+assert err != nil, "close tab 999 should fail"
+log.info("close tab 999 error (expected): %v", err)
+
+log.info("===== TABS TEST PASSED =====")

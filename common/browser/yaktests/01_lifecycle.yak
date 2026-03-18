@@ -1,0 +1,62 @@
+// browser module lifecycle test
+// covers: browser.Open / browser.Get / browser.List / browser.Close / browser.CloseAll / b.IsClosed / b.ID
+
+defer browser.CloseAll()
+
+log.info("===== test 1: open default instance =====")
+b, err = browser.Open(browser.headless(true), browser.timeout(10))
+assert err == nil, sprintf("open default browser should not fail: %v", err)
+assert b.ID() == "default", sprintf("default browser id should be 'default', got: %v", b.ID())
+log.info("opened default browser, id=%v", b.ID())
+
+log.info("===== test 2: re-open same id reuses instance =====")
+b2, err = browser.Open(browser.headless(true))
+assert err == nil, sprintf("re-open default browser should not fail: %v", err)
+assert b2.ID() == "default", sprintf("re-opened browser id should be 'default', got: %v", b2.ID())
+log.info("re-opened default browser, id=%v (reused)", b2.ID())
+
+log.info("===== test 3: Get existing instance =====")
+b3, err = browser.Get()
+assert err == nil, sprintf("get default browser should not fail: %v", err)
+assert b3.ID() == "default", sprintf("got browser id should be 'default', got: %v", b3.ID())
+log.info("get default browser ok, id=%v", b3.ID())
+
+log.info("===== test 4: List contains default =====")
+ids = browser.List()
+assert len(ids) >= 1, sprintf("list should have at least 1 instance, got: %v", len(ids))
+found = false
+for _, id = range ids {
+    if id == "default" {
+        found = true
+    }
+}
+assert found, "list should contain 'default'"
+log.info("list ids: %v", ids)
+
+log.info("===== test 5: Close default instance =====")
+err = browser.Close()
+assert err == nil, sprintf("close default browser should not fail: %v", err)
+log.info("closed default browser")
+
+log.info("===== test 6: IsClosed should be true =====")
+assert b.IsClosed() == true, "browser should be closed after Close()"
+log.info("isClosed = %v", b.IsClosed())
+
+log.info("===== test 7: Get closed instance should fail =====")
+_, err = browser.Get()
+assert err != nil, "get closed instance should return error"
+log.info("get closed instance error (expected): %v", err)
+
+log.info("===== test 8: re-Open creates new instance =====")
+b4, err = browser.Open(browser.headless(true), browser.timeout(10))
+assert err == nil, sprintf("re-open after close should not fail: %v", err)
+assert b4.IsClosed() == false, "new instance should not be closed"
+log.info("re-opened default browser after close, id=%v", b4.ID())
+
+log.info("===== test 9: CloseAll clears everything =====")
+browser.CloseAll()
+ids = browser.List()
+assert len(ids) == 0, sprintf("list should be empty after CloseAll, got: %v", ids)
+log.info("closeAll done, list is empty")
+
+log.info("===== LIFECYCLE TEST PASSED =====")
