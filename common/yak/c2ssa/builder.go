@@ -149,6 +149,7 @@ func Frontend(src string, cache *ssa.AntlrCache) (*cparser.CompilationUnitContex
 	parser.AddErrorListener(errListener)
 	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())
 	ast := parser.CompilationUnit().(*cparser.CompilationUnitContext)
+	antlr4util.DetachLexerTokenSource(lexer)
 	return ast, errListener.Error()
 }
 

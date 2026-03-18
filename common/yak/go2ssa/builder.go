@@ -166,6 +166,7 @@ func Frontend(src string, cache *ssa.AntlrCache) (*gol.SourceFileContext, error)
 	parser.AddErrorListener(errListener)
 	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())
 	ast := parser.SourceFile().(*gol.SourceFileContext)
+	antlr4util.DetachLexerTokenSource(lexer)
 	return ast, errListener.Error()
 }
 

@@ -218,6 +218,7 @@ func FrontendWithCache(src string, caches ...*ssa.AntlrCache) (pythonparser.IRoo
 	parser.AddErrorListener(errListener)
 	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())
 	ast := parser.Root()
+	antlr4util.DetachLexerTokenSource(lexer)
 	return ast, errListener.Error()
 }
 
