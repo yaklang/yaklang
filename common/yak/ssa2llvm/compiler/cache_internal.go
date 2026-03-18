@@ -41,10 +41,8 @@ func cachedWorkKeyFromConfig(cfg *CompileConfig) (string, error) {
 		code = b
 	}
 
-	ssaObf := append([]string{}, cfg.SSAObfuscators...)
-	llvmObf := append([]string{}, cfg.LLVMObfuscators...)
-	sort.Strings(ssaObf)
-	sort.Strings(llvmObf)
+	obf := append([]string{}, cfg.Obfuscators...)
+	sort.Strings(obf)
 
 	h := sha256.New()
 	write := func(s string) {
@@ -96,8 +94,7 @@ func cachedWorkKeyFromConfig(cfg *CompileConfig) (string, error) {
 			write("embeddedRuntimeHash=<none>")
 		}
 	}
-	write("ssaObf=" + strings.Join(ssaObf, ","))
-	write("llvmObf=" + strings.Join(llvmObf, ","))
+	write("obf=" + strings.Join(obf, ","))
 	if strings.TrimSpace(cfg.RuntimeArchive) != "" {
 		write("runtimeArchive=" + strings.TrimSpace(cfg.RuntimeArchive))
 	}

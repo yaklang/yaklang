@@ -24,7 +24,7 @@ check = () => {
 		t,
 		code,
 		"yak",
-		compiler.WithCompileLLVMObfuscators("xor"),
+		compiler.WithCompileObfuscators("xor"),
 	)
 	require.Greater(t, strings.Count(afterIR, " xor i64 "), strings.Count(beforeIR, " xor i64 "))
 	require.Greater(t, strings.Count(afterIR, " and i64 "), strings.Count(beforeIR, " and i64 "))
@@ -46,7 +46,7 @@ check = () => {
 		t,
 		code,
 		"yak",
-		compiler.WithCompileLLVMObfuscators("xor"),
+		compiler.WithCompileObfuscators("xor"),
 	)
 	require.Greater(t, strings.Count(afterIR, " xor i64 "), strings.Count(beforeIR, " xor i64 "))
 	require.Greater(t, strings.Count(afterIR, " and i64 "), strings.Count(beforeIR, " and i64 "))

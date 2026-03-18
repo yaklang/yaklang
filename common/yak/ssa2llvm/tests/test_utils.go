@@ -138,16 +138,9 @@ func withCompilePrintEntryResult(enabled bool) runBinaryOption {
 	}
 }
 
-func withCompileSSAObfuscators(names ...string) runBinaryOption {
+func withCompileObfuscators(names ...string) runBinaryOption {
 	return func(cfg *runBinaryConfig) error {
-		cfg.compileOpts = append(cfg.compileOpts, compiler.WithCompileSSAObfuscators(names...))
-		return nil
-	}
-}
-
-func withCompileLLVMObfuscators(names ...string) runBinaryOption {
-	return func(cfg *runBinaryConfig) error {
-		cfg.compileOpts = append(cfg.compileOpts, compiler.WithCompileLLVMObfuscators(names...))
+		cfg.compileOpts = append(cfg.compileOpts, compiler.WithCompileObfuscators(names...))
 		return nil
 	}
 }

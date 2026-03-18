@@ -10,11 +10,15 @@ import (
 type xorLLVMObfuscator struct{}
 
 func init() {
-	core.RegisterLLVM(xorLLVMObfuscator{})
+	core.Register(xorLLVMObfuscator{})
 }
 
 func (xorLLVMObfuscator) Name() string {
 	return "xor"
+}
+
+func (xorLLVMObfuscator) Kind() core.Kind {
+	return core.KindLLVM
 }
 
 // Run rewrites integer LLVM add/sub instructions into xor-based arithmetic forms.
@@ -26,7 +30,11 @@ func (xorLLVMObfuscator) Name() string {
 //
 // This keeps the arithmetic equivalent while changing the IR shape into a small
 // xor/and/shift network that can be matched directly in tests.
-func (xorLLVMObfuscator) Run(module llvm.Module) error {
+func (xorLLVMObfuscator) Apply(ctx *core.Context) error {
+	if ctx == nil || ctx.Stage != core.StageLLVM {
+		return nil
+	}
+	module := ctx.LLVM
 	if module.C == nil {
 		return nil
 	}

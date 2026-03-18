@@ -7,36 +7,51 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/obfuscation/core"
 )
 
-type SSAObfuscator = core.SSAObfuscator
+type Stage = core.Stage
 
-type LLVMObfuscator = core.LLVMObfuscator
+const (
+	StageSSA  = core.StageSSA
+	StageLLVM = core.StageLLVM
+)
+
+type Kind = core.Kind
+
+const (
+	KindSSA    = core.KindSSA
+	KindHybrid = core.KindHybrid
+	KindLLVM   = core.KindLLVM
+)
+
+type Context = core.Context
+type Obfuscator = core.Obfuscator
+type Info = core.Info
 
 var Default = core.Default
 
-func RegisterSSA(obfuscator SSAObfuscator) {
-	core.RegisterSSA(obfuscator)
+func Register(obfuscator Obfuscator) {
+	core.Register(obfuscator)
 }
 
-func RegisterLLVM(obfuscator LLVMObfuscator) {
-	core.RegisterLLVM(obfuscator)
+func ApplySSA(program *ssa.Program, entryFunction string, names []string) error {
+	return core.ApplySSA(&core.Context{
+		SSA:           program,
+		EntryFunction: entryFunction,
+	}, names)
 }
 
-func ApplySSA(program *ssa.Program, names []string) error {
-	return core.ApplySSA(program, names)
+func ApplyLLVM(module llvm.Module, entryFunction string, names []string) error {
+	return core.ApplyLLVM(&core.Context{
+		LLVM:          module,
+		EntryFunction: entryFunction,
+	}, names)
 }
 
-func ApplyLLVM(module llvm.Module, names []string) error {
-	return core.ApplyLLVM(module, names)
+func List() []Info {
+	return core.List()
 }
 
-func ListSSA() []string {
-	return core.ListSSA()
+func ListByKind(kind Kind) []string {
+	return core.ListByKind(kind)
 }
 
-func ListLLVM() []string {
-	return core.ListLLVM()
-}
-
-func NormalizeNames(names []string) []string {
-	return core.NormalizeNames(names)
-}
+func NormalizeNames(names []string) []string { return core.NormalizeNames(names) }
