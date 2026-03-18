@@ -17,6 +17,7 @@ var SpaceEngineExports = map[string]interface{}{
 	"QuakeQuery":   _quake,
 	"HunterQuery":  _hunter,
 	"ZoomeyeQuery": _zoomeye,
+	"ZoneQuery":    _zone,
 
 	"Query": Query,
 
@@ -31,6 +32,7 @@ var SpaceEngineExports = map[string]interface{}{
 	"quake":       withUseQuake,
 	"hunter":      withUseHunter,
 	"fofa":        withUseFofa,
+	"zone":        withUseZone,
 	"engine":      withEngine,
 }
 
@@ -46,6 +48,8 @@ func withEngine(i string, auth ...string) _spaceEngineConfigOpt {
 		return withUseHunter(auth...)
 	case "fofa":
 		return withUseFofa(auth...)
+	case "zone":
+		return withUseZone(auth...)
 	}
 	return func(c *_spaceEngineConfig) {
 		defaultConfig := &base.BaseSpaceEngineConfig{}
@@ -158,6 +162,23 @@ func withUseFofa(auth ...string) _spaceEngineConfigOpt {
 	}
 }
 
+func withUseZone(api ...string) _spaceEngineConfigOpt {
+	return func(c *_spaceEngineConfig) {
+		c.engine = "zone"
+		cfg := &base.BaseSpaceEngineConfig{}
+		err := consts.GetThirdPartyApplicationConfig("zone", cfg)
+		if err != nil {
+			log.Debug(err)
+		}
+		if len(api) > 0 {
+			c.apiKey = api[0]
+		} else {
+			c.apiKey = cfg.APIKey
+		}
+		c.domain = cfg.Domain
+	}
+}
+
 func Query(filter string, opts ..._spaceEngineConfigOpt) (chan *base.NetSpaceEngineResult, error) {
 	config := &_spaceEngineConfig{
 		maxRecord: 100,
@@ -178,6 +199,8 @@ func Query(filter string, opts ..._spaceEngineConfigOpt) (chan *base.NetSpaceEng
 		return _hunter(config.user, config.apiKey, filter, opts...)
 	case "zoomeye":
 		return _zoomeye(config.apiKey, filter, opts...)
+	case "zone":
+		return _zone(config.apiKey, filter, opts...)
 	default:
 		return nil, utils.Error("invalid engine " + config.engine)
 	}
@@ -336,4 +359,29 @@ func _zoomeye(key string, filter string, opts ..._spaceEngineConfigOpt) (chan *b
 		RetryTimes:       config.retryTimes,
 	}
 	return spacengine.ZoomeyeQueryWithConfig(key, filter, config.maxPage, config.maxRecord, queryConfig, config.domain)
+}
+
+func _zone(key string, filter string, opts ..._spaceEngineConfigOpt) (chan *base.NetSpaceEngineResult, error) {
+	config := &_spaceEngineConfig{
+		maxRecord:        1000, // 默认最多1000条记录
+		maxPage:          10,   // 默认最多翻10页
+		pageSize:         40,   // 0.zone 每页最大40条
+		randomDelayRange: 2,    // 0.zone 建议2秒延迟避免限频
+		retryTimes:       0,
+	}
+
+	for _, opt := range opts {
+		opt(config)
+	}
+
+	if config.pageSize > 40 {
+		log.Warn("zone page size maximum 40")
+		config.pageSize = 40
+	}
+
+	queryConfig := &base.QueryConfig{
+		RandomDelayRange: config.randomDelayRange,
+		RetryTimes:       config.retryTimes,
+	}
+	return spacengine.ZoneQueryWithConfig(key, filter, config.maxPage, config.maxRecord, queryConfig, config.domain)
 }
