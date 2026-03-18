@@ -96,6 +96,10 @@ func (p *Program) VisitAst(ast ASTIF) {
 	}
 	key := ""
 	if editor := p.GetCurrentEditor(); editor != nil {
+		// Prefer the editor URL over AST text:
+		// - it avoids hashing/retaining large AST text blobs on hot paths
+		// - it keeps per-file visit tracking stable across identical file contents
+		// This assumes a compile run does not reuse the same URL for different file contents.
 		key = editor.GetUrl()
 	}
 	if key == "" && ast != nil {
