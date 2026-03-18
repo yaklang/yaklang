@@ -287,3 +287,71 @@ func TestLoadSkillForgeFromEmbeddedZip(t *testing.T) {
 	require.Equal(t, schema.FORGE_TYPE_SkillMD, stored.ForgeType)
 	require.NotEmpty(t, stored.FSBytes)
 }
+
+func TestLoadAIForgesFromDirectory(t *testing.T) {
+	root := t.TempDir()
+
+	yakForge := &schema.AIForge{
+		ForgeName:    "yak-dir-" + t.Name(),
+		ForgeType:    schema.FORGE_TYPE_YAK,
+		ForgeContent: "println('dir')",
+	}
+	require.NoError(t, dumpForgeToDir(yakForge, filepath.Join(root, yakForge.ForgeName), yakForge.ForgeName))
+
+	skillDir := filepath.Join(root, "skill-dir")
+	require.NoError(t, os.MkdirAll(filepath.Join(skillDir, "scripts"), 0o755))
+	skillMD := `---
+name: dir-skill
+description: Directory skill for import test.
+metadata:
+  owner: test
+---
+Skill body from directory.
+`
+	require.NoError(t, os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte(skillMD), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(skillDir, "scripts", "helper.py"), []byte("print('dir')\n"), 0o644))
+
+	archive, err := LoadAIForgesFromZip(root)
+	require.NoError(t, err)
+	require.Len(t, archive.AIForges, 2)
+
+	var loadedYak *schema.AIForge
+	var loadedSkill *schema.AIForge
+	for _, forge := range archive.AIForges {
+		switch forge.ForgeName {
+		case yakForge.ForgeName:
+			loadedYak = forge
+		case "dir-skill":
+			loadedSkill = forge
+		}
+	}
+	require.NotNil(t, loadedYak)
+	require.Equal(t, schema.FORGE_TYPE_YAK, loadedYak.ForgeType)
+	require.Equal(t, "println('dir')", loadedYak.ForgeContent)
+
+	require.NotNil(t, loadedSkill)
+	require.Equal(t, schema.FORGE_TYPE_SkillMD, loadedSkill.ForgeType)
+	require.Equal(t, "Directory skill for import test.", loadedSkill.Description)
+	require.Equal(t, "Skill body from directory.", loadedSkill.InitPrompt)
+	require.Equal(t, "owner:test", loadedSkill.Tags)
+	require.NotEmpty(t, loadedSkill.FSBytes)
+
+	loadedSkillFS, err := aiskillloader.AIForgeToLoadedSkill(loadedSkill)
+	require.NoError(t, err)
+	helper, err := loadedSkillFS.FileSystem.ReadFile("scripts/helper.py")
+	require.NoError(t, err)
+	require.Equal(t, "print('dir')\n", string(helper))
+
+	db := newTestForgeDB(t)
+	defer db.Close()
+
+	imported, err := ImportAIForgesFromZip(db, root, WithImportOverwrite(true))
+	require.NoError(t, err)
+	require.Len(t, imported, 2)
+
+	_, err = yakit.GetAIForgeByName(db, yakForge.ForgeName)
+	require.NoError(t, err)
+	storedSkill, err := yakit.GetAIForgeByName(db, "dir-skill")
+	require.NoError(t, err)
+	require.Equal(t, schema.FORGE_TYPE_SkillMD, storedSkill.ForgeType)
+}
