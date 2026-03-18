@@ -45,24 +45,58 @@ func ShrinkAndSafeToFile(i any) string {
 
 var EnableNewLoadOption = true
 
+func isResponsesAPIType(apiType string) bool {
+	return strings.EqualFold(strings.TrimSpace(apiType), string(ChatBaseInterfaceTypeResponses))
+}
+
+func resolveDefaultURIByAPIType(config *AIConfig, defaultURI string) string {
+	if config == nil {
+		return defaultURI
+	}
+	if strings.EqualFold(strings.TrimSpace(config.Type), "ollama") {
+		return defaultURI
+	}
+	if !isResponsesAPIType(config.APIType) {
+		return defaultURI
+	}
+	if !strings.Contains(defaultURI, "/chat/completions") {
+		return defaultURI
+	}
+	return strings.Replace(defaultURI, "/chat/completions", "/responses", 1)
+}
+
 func GetBaseURLFromConfig(config *AIConfig, defaultRootUrl, defaultUri string) string {
-	return GetBaseURLFromConfigEx(config, defaultRootUrl, defaultUri, true)
+	return GetBaseURLFromConfigEx(config, defaultRootUrl, resolveDefaultURIByAPIType(config, defaultUri), true)
 }
 
 func GetBaseURLFromConfigEx(config *AIConfig, defaultRootUrl, defaultUri string, openaiMode bool) string {
 	fixDomain(config)
+	normalizedDefaultURI := defaultUri
+	if normalizedDefaultURI == "" {
+		normalizedDefaultURI = "/"
+	} else if !strings.HasPrefix(normalizedDefaultURI, "/") {
+		normalizedDefaultURI = "/" + normalizedDefaultURI
+	}
 
-	keepChatCompletionsSuffix := func(s string) string {
-		if !strings.HasSuffix(s, "/chat/completions") {
-			trimSlash := strings.TrimRight(s, "/")
-			s = trimSlash + "/chat/completions"
+	keepDefaultSuffix := func(s string) string {
+		trimSlash := strings.TrimRight(s, "/")
+		if !strings.HasSuffix(trimSlash, normalizedDefaultURI) {
+			pathSegments := strings.Split(strings.Trim(normalizedDefaultURI, "/"), "/")
+			for i := len(pathSegments) - 1; i > 0; i-- {
+				overlap := "/" + strings.Join(pathSegments[:i], "/")
+				if strings.HasSuffix(trimSlash, overlap) {
+					s = trimSlash + "/" + strings.Join(pathSegments[i:], "/")
+					return s
+				}
+			}
+			s = trimSlash + normalizedDefaultURI
 		}
 		return s
 	}
 
 	if config.BaseURL != "" {
 		if openaiMode {
-			config.BaseURL = keepChatCompletionsSuffix(config.BaseURL)
+			config.BaseURL = keepDefaultSuffix(config.BaseURL)
 		}
 		return config.BaseURL
 	}
@@ -84,12 +118,12 @@ func GetBaseURLFromConfigEx(config *AIConfig, defaultRootUrl, defaultUri string,
 	if err != nil {
 		result := rootUrl + defaultUri
 		if openaiMode {
-			result = keepChatCompletionsSuffix(result)
+			result = keepDefaultSuffix(result)
 		}
 		return result
 	}
 	if openaiMode {
-		urlPath = keepChatCompletionsSuffix(urlPath)
+		urlPath = keepDefaultSuffix(urlPath)
 	}
 	return urlPath
 }
@@ -172,6 +206,10 @@ func buildOptionsFromProviderAndModel(provider *ypb.ThirdPartyApplicationConfig,
 
 	if provider.Proxy != "" {
 		opts = append(opts, WithProxy(provider.Proxy))
+	}
+
+	if provider.APIType != "" {
+		opts = append(opts, WithAPIType(provider.APIType))
 	}
 
 	if modelName != "" {

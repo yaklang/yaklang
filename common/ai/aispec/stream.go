@@ -32,15 +32,83 @@ func mergeReasonIntoOutputStream(reason io.Reader, out io.Reader) io.Reader {
 				utils.PrintCurrentGoroutineRuntimeStack()
 			}
 		}()
+
+		type firstReadResult struct {
+			source string
+			data   []byte
+			err    error
+		}
+
 		reasonBuf := bufio.NewReader(reason)
-		runeResult, n, _ := reasonBuf.ReadRune()
-		if n > 0 {
+		outBuf := bufio.NewReader(out)
+		firstResultCh := make(chan firstReadResult, 2)
+
+		go func() {
+			r, size, err := reasonBuf.ReadRune()
+			if err != nil {
+				firstResultCh <- firstReadResult{source: "reason", err: err}
+				return
+			}
+			if size > 0 {
+				firstResultCh <- firstReadResult{source: "reason", data: []byte(string(r))}
+				return
+			}
+			firstResultCh <- firstReadResult{source: "reason", err: io.EOF}
+		}()
+
+		go func() {
+			b, err := outBuf.ReadByte()
+			if err != nil {
+				firstResultCh <- firstReadResult{source: "out", err: err}
+				return
+			}
+			firstResultCh <- firstReadResult{source: "out", data: []byte{b}}
+		}()
+
+		first := <-firstResultCh
+
+		writeReason := func(firstBytes []byte) {
+			if len(firstBytes) == 0 {
+				return
+			}
 			pw.WriteString("<think>")
-			pw.WriteString(string([]rune{runeResult}))
-			reasonBuf.WriteTo(pw)
+			_, _ = pw.Write(firstBytes)
+			_, _ = reasonBuf.WriteTo(pw)
 			pw.WriteString("</think>\n")
 		}
-		io.Copy(pw, out)
+
+		writeOut := func(firstBytes []byte) {
+			if len(firstBytes) > 0 {
+				_, _ = pw.Write(firstBytes)
+			}
+			_, _ = io.Copy(pw, outBuf)
+		}
+
+		if first.source == "reason" && len(first.data) > 0 {
+			writeReason(first.data)
+			second := <-firstResultCh
+			if second.source == "out" {
+				writeOut(second.data)
+			}
+			return
+		}
+
+		if first.source == "out" && len(first.data) > 0 {
+			writeOut(first.data)
+			second := <-firstResultCh
+			if second.source == "reason" {
+				writeReason(second.data)
+			}
+			return
+		}
+
+		second := <-firstResultCh
+		if second.source == "reason" {
+			writeReason(second.data)
+		}
+		if second.source == "out" {
+			writeOut(second.data)
+		}
 	}()
 	return pr
 }
@@ -373,6 +441,15 @@ func appendResponsesStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfig
 		reasonWriter.Close()
 	}
 
+	opts = append(opts, poc.WithReplaceHttpPacketHeader("Content-Type", "application/json"))
+	if isStream {
+		opts = append(opts,
+			poc.WithConnPool(false),
+			poc.WithNoBodyBuffer(true),
+			poc.WithReplaceHttpPacketHeader("Accept", "text/event-stream"),
+		)
+	}
+
 	opts = append(opts, poc.WithBodyStreamReaderHandler(func(r []byte, closer io.ReadCloser) {
 		processAIResponseForResponses(r, closer, outWriter, reasonWriter, toolCallCallback, rawResponseCallback)
 	}))
@@ -418,39 +495,64 @@ func processAIResponseForResponses(r []byte, closer io.ReadCloser, outWriter io.
 	if chunked {
 		reader = httputil.NewChunkedReader(reader)
 	}
-	body, err := io.ReadAll(reader)
-	if err != nil {
-		log.Warnf("failed to read responses body: %v", err)
-		return
-	}
-	if len(bytes.TrimSpace(body)) == 0 {
+
+	contentType := strings.ToLower(lowhttp.GetHTTPPacketHeader(r, "content-type"))
+	bufferedReader := bufio.NewReader(reader)
+	if strings.Contains(contentType, "text/event-stream") {
+		handleResponsesSSEStream(bufferedReader, outWriter, reasonWriter, toolCallCallback)
 		return
 	}
 
-	bodyTrim := bytes.TrimSpace(body)
-	if bodyTrim[0] == '{' || bodyTrim[0] == '[' {
+	prefix, firstNonSpace, err := readResponsesPrefix(bufferedReader)
+	if err != nil && len(prefix) == 0 {
+		if err != io.EOF {
+			log.Warnf("failed to read responses body prefix: %v", err)
+		}
+		return
+	}
+
+	fullReader := io.MultiReader(bytes.NewReader(prefix), bufferedReader)
+	if firstNonSpace == '{' || firstNonSpace == '[' {
+		body, readErr := io.ReadAll(fullReader)
+		if readErr != nil {
+			log.Warnf("failed to read responses body: %v", readErr)
+			return
+		}
+		bodyTrim := bytes.TrimSpace(body)
+		if len(bodyTrim) == 0 {
+			return
+		}
 		if handleResponsesJSONPayload(bodyTrim, outWriter, reasonWriter, toolCallCallback) {
 			return
 		}
+		handleResponsesSSEStream(bytes.NewReader(body), outWriter, reasonWriter, toolCallCallback)
+		return
 	}
-	handleResponsesSSEPayload(body, outWriter, reasonWriter, toolCallCallback)
+
+	handleResponsesSSEStream(fullReader, outWriter, reasonWriter, toolCallCallback)
 }
 
 type responsesToolCallState struct {
-	byItemID map[string]*ToolCall
+	byItemID          map[string]*ToolCall
+	streamedMessageID map[string]struct{}
 }
 
 func newResponsesToolCallState() *responsesToolCallState {
 	return &responsesToolCallState{
-		byItemID: make(map[string]*ToolCall),
+		byItemID:          make(map[string]*ToolCall),
+		streamedMessageID: make(map[string]struct{}),
 	}
 }
 
-func (s *responsesToolCallState) getOrCreate(itemID string, index int) *ToolCall {
-	key := itemID
-	if key == "" {
-		key = fmt.Sprintf("index:%d", index)
+func (s *responsesToolCallState) buildKey(itemID string, index int) string {
+	if itemID != "" {
+		return itemID
 	}
+	return fmt.Sprintf("index:%d", index)
+}
+
+func (s *responsesToolCallState) getOrCreate(itemID string, index int) *ToolCall {
+	key := s.buildKey(itemID, index)
 	if tc, ok := s.byItemID[key]; ok {
 		return tc
 	}
@@ -460,6 +562,15 @@ func (s *responsesToolCallState) getOrCreate(itemID string, index int) *ToolCall
 	}
 	s.byItemID[key] = tc
 	return tc
+}
+
+func (s *responsesToolCallState) markMessageStreamed(itemID string, index int) {
+	s.streamedMessageID[s.buildKey(itemID, index)] = struct{}{}
+}
+
+func (s *responsesToolCallState) hasMessageStreamed(itemID string, index int) bool {
+	_, ok := s.streamedMessageID[s.buildKey(itemID, index)]
+	return ok
 }
 
 func handleResponsesJSONPayload(body []byte, outWriter io.Writer, reasonWriter io.Writer, toolCallCallback func([]*ToolCall)) bool {
@@ -476,7 +587,11 @@ func handleResponsesJSONPayload(body []byte, outWriter io.Writer, reasonWriter i
 }
 
 func handleResponsesSSEPayload(body []byte, outWriter io.Writer, reasonWriter io.Writer, toolCallCallback func([]*ToolCall)) {
-	lineReader := bufio.NewReader(bytes.NewReader(body))
+	handleResponsesSSEStream(bytes.NewReader(body), outWriter, reasonWriter, toolCallCallback)
+}
+
+func handleResponsesSSEStream(reader io.Reader, outWriter io.Writer, reasonWriter io.Writer, toolCallCallback func([]*ToolCall)) {
+	lineReader := bufio.NewReader(reader)
 	toolState := newResponsesToolCallState()
 
 	for {
@@ -515,12 +630,32 @@ func handleResponsesSSEPayload(body []byte, outWriter io.Writer, reasonWriter io
 	}
 }
 
+func readResponsesPrefix(reader *bufio.Reader) ([]byte, byte, error) {
+	var prefix bytes.Buffer
+	for {
+		b, err := reader.ReadByte()
+		if err != nil {
+			return prefix.Bytes(), 0, err
+		}
+		prefix.WriteByte(b)
+		switch b {
+		case ' ', '\n', '\r', '\t':
+			continue
+		default:
+			return prefix.Bytes(), b, nil
+		}
+	}
+}
+
 func handleResponsesSSEEvent(event map[string]any, outWriter io.Writer, reasonWriter io.Writer, toolCallCallback func([]*ToolCall), toolState *responsesToolCallState) {
 	eventType := utils.MapGetString(event, "type")
 	switch eventType {
 	case "response.output_text.delta":
+		outputIndex := utils.InterfaceToInt(event["output_index"])
+		itemID := utils.MapGetString(event, "item_id")
 		delta := utils.MapGetString(event, "delta")
 		if delta != "" {
+			toolState.markMessageStreamed(itemID, outputIndex)
 			outWriter.Write([]byte(delta))
 		}
 	case "response.reasoning_text.delta", "response.reasoning_summary_text.delta":
@@ -555,7 +690,8 @@ func handleResponsesSSEEvent(event map[string]any, outWriter io.Writer, reasonWr
 		if len(item) <= 0 {
 			return
 		}
-		handleResponsesOutputItem(item, eventType, outWriter, reasonWriter, toolCallCallback, toolState)
+		outputIndex := utils.InterfaceToInt(event["output_index"])
+		handleResponsesOutputItem(item, outputIndex, eventType, outWriter, reasonWriter, toolCallCallback, toolState)
 	case "response.completed":
 		// Ignore completed event in streaming mode to avoid duplicate output/tool-calls.
 	default:
@@ -571,7 +707,7 @@ func handleResponsesSSEEvent(event map[string]any, outWriter io.Writer, reasonWr
 	}
 }
 
-func handleResponsesOutputItem(item map[string]any, eventType string, outWriter io.Writer, reasonWriter io.Writer, toolCallCallback func([]*ToolCall), toolState *responsesToolCallState) {
+func handleResponsesOutputItem(item map[string]any, outputIndex int, eventType string, outWriter io.Writer, reasonWriter io.Writer, toolCallCallback func([]*ToolCall), toolState *responsesToolCallState) {
 	itemType := utils.MapGetString(item, "type")
 	switch itemType {
 	case "message":
@@ -579,7 +715,9 @@ func handleResponsesOutputItem(item map[string]any, eventType string, outWriter 
 		if reason != "" {
 			reasonWriter.Write([]byte(reason))
 		}
-		if text != "" {
+		itemID := utils.MapGetString(item, "id")
+		if text != "" && !toolState.hasMessageStreamed(itemID, outputIndex) {
+			toolState.markMessageStreamed(itemID, outputIndex)
 			outWriter.Write([]byte(text))
 		}
 	case "reasoning":

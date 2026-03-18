@@ -555,6 +555,12 @@ func WithProxy(p string) AIConfigOption {
 	}
 }
 
+func WithAPIType(apiType string) AIConfigOption {
+	return func(c *AIConfig) {
+		c.APIType = strings.TrimSpace(apiType)
+	}
+}
+
 // WithAPIKey 设置 AI 服务的 API 密钥，这是访问 AI 服务的必需凭证。
 //
 // 参数：

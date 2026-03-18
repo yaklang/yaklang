@@ -5,13 +5,16 @@ package tests
 import (
 	"fmt"
 	"io"
+	"net/http"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 )
 
@@ -2178,6 +2181,25 @@ data: {"type":"response.output_text.delta","delta":" responses"}
 data: [DONE]
 `
 
+const mockResponsesStreamDuplicateMessageRsp = `HTTP/1.1 200 OK
+Connection: close
+Content-Type: text/event-stream
+
+event: response.output_item.added
+data: {"type":"response.output_item.added","item":{"id":"msg_dup_001","type":"message","status":"in_progress","content":[],"role":"assistant"},"output_index":0}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","item_id":"msg_dup_001","output_index":0,"delta":"ok"}
+
+event: response.output_text.done
+data: {"type":"response.output_text.done","item_id":"msg_dup_001","output_index":0,"text":"ok"}
+
+event: response.output_item.done
+data: {"type":"response.output_item.done","item":{"id":"msg_dup_001","type":"message","status":"completed","content":[{"type":"output_text","text":"ok"}],"role":"assistant"},"output_index":0}
+
+data: [DONE]
+`
+
 func TestChatBase_ResponsesAPI_NonStream(t *testing.T) {
 	var capturedRequest []byte
 	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
@@ -2190,6 +2212,7 @@ func TestChatBase_ResponsesAPI_NonStream(t *testing.T) {
 		"gpt-4.1-mini",
 		"hello",
 		aispec.WithChatBase_InterfaceType(aispec.ChatBaseInterfaceTypeResponses),
+		aispec.WithChatBase_DisableStream(true),
 		aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
 			return []poc.PocConfigOption{
 				poc.WithHost(host),
@@ -2206,6 +2229,8 @@ func TestChatBase_ResponsesAPI_NonStream(t *testing.T) {
 	requestBody := string(capturedRequest)
 	assert.Contains(t, requestBody, `"input"`, "Responses request MUST contain input")
 	assert.NotContains(t, requestBody, `"messages"`, "Responses request MUST NOT contain chat.completions messages")
+	assert.Equal(t, "application/json", lowhttp.GetHTTPPacketHeader(capturedRequest, "Content-Type"))
+	assert.Contains(t, requestBody, `"stream":false`)
 }
 
 func TestChatBase_ResponsesAPI_ToolCallCallback(t *testing.T) {
@@ -2264,8 +2289,42 @@ func TestChatBase_ResponsesAPI_ToolCallCallback(t *testing.T) {
 	assert.NotContains(t, requestBody, `"function":{"name":"get_weather"`, "Responses tools should not use chat.completions nested function shape")
 }
 
+func TestChatBase_ResponsesAPI_StreamDoesNotDuplicateOutputItemDoneText(t *testing.T) {
+	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		return []byte(mockResponsesStreamDuplicateMessageRsp)
+	})
+
+	var streamed strings.Builder
+	res, err := aispec.ChatBase(
+		"http://example.com/v1/responses",
+		"gpt-4.1-mini",
+		"hello",
+		aispec.WithChatBase_InterfaceType(aispec.ChatBaseInterfaceTypeResponses),
+		aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
+			return []poc.PocConfigOption{
+				poc.WithHost(host),
+				poc.WithPort(port),
+				poc.WithForceHTTPS(false),
+				poc.WithTimeout(5),
+			}, nil
+		}),
+		aispec.WithChatBase_StreamHandler(func(reader io.Reader) {
+			data, _ := io.ReadAll(reader)
+			streamed.Write(data)
+		}),
+	)
+
+	assert.NoError(t, err)
+	assert.Equal(t, "ok", res)
+	assert.Equal(t, "ok", streamed.String())
+}
+
 func TestChatBase_ResponsesAPI_StreamOutputAndReasoning(t *testing.T) {
-	host, port := utils.DebugMockHTTP([]byte(mockResponsesStreamRsp))
+	var capturedRequest []byte
+	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		capturedRequest = req
+		return []byte(mockResponsesStreamRsp)
+	})
 
 	var reasonContent strings.Builder
 	res, err := aispec.ChatBase(
@@ -2290,4 +2349,232 @@ func TestChatBase_ResponsesAPI_StreamOutputAndReasoning(t *testing.T) {
 	assert.NoError(t, err, "Responses API SSE request should succeed")
 	assert.Equal(t, "你好 responses", res)
 	assert.Contains(t, reasonContent.String(), "先分析一下。", "Reasoning delta should be captured")
+	assert.Equal(t, "application/json", lowhttp.GetHTTPPacketHeader(capturedRequest, "Content-Type"))
+	assert.Equal(t, "text/event-stream", lowhttp.GetHTTPPacketHeader(capturedRequest, "Accept"))
+}
+
+func TestChatBase_ResponsesAPI_StreamHandlerIsIncremental(t *testing.T) {
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "text/event-stream")
+		writer.WriteHeader(http.StatusOK)
+		flusher, ok := writer.(http.Flusher)
+		if !ok {
+			t.Fatal("expected http flusher")
+		}
+
+		_, _ = writer.Write([]byte(`event: response.output_text.delta
+`))
+		_, _ = writer.Write([]byte(`data: {"type":"response.output_text.delta","delta":"你好"}
+
+`))
+		flusher.Flush()
+
+		time.Sleep(250 * time.Millisecond)
+
+		_, _ = writer.Write([]byte(`event: response.output_text.delta
+`))
+		_, _ = writer.Write([]byte(`data: {"type":"response.output_text.delta","delta":" world"}
+
+`))
+		_, _ = writer.Write([]byte(`data: [DONE]
+
+`))
+		flusher.Flush()
+	})
+
+	start := time.Now()
+	firstChunkCh := make(chan time.Duration, 1)
+	var streamed strings.Builder
+
+	res, err := aispec.ChatBase(
+		"http://example.com/v1/responses",
+		"gpt-4.1-mini",
+		"hello",
+		aispec.WithChatBase_InterfaceType(aispec.ChatBaseInterfaceTypeResponses),
+		aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
+			return []poc.PocConfigOption{
+				poc.WithHost(host),
+				poc.WithPort(port),
+				poc.WithForceHTTPS(false),
+				poc.WithTimeout(5),
+			}, nil
+		}),
+		aispec.WithChatBase_StreamHandler(func(reader io.Reader) {
+			buf := make([]byte, 16)
+			n, err := reader.Read(buf)
+			if n > 0 {
+				firstChunkCh <- time.Since(start)
+				streamed.Write(buf[:n])
+			}
+			if err != nil && err != io.EOF {
+				return
+			}
+			rest, _ := io.ReadAll(reader)
+			streamed.Write(rest)
+		}),
+	)
+	totalDuration := time.Since(start)
+
+	assert.NoError(t, err)
+	assert.Equal(t, "你好 world", res)
+	assert.Equal(t, "你好 world", streamed.String())
+	assert.Greater(t, totalDuration, 200*time.Millisecond)
+
+	select {
+	case firstChunkDelay := <-firstChunkCh:
+		assert.Less(t, firstChunkDelay, totalDuration-100*time.Millisecond)
+	case <-time.After(2 * time.Second):
+		t.Fatal("did not receive first streamed chunk in time")
+	}
+}
+
+func TestChatBase_ResponsesAPI_StreamHandlerWaitsForContinueSignal(t *testing.T) {
+	continueCh := make(chan struct{})
+	host, port := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "text/event-stream")
+		writer.WriteHeader(http.StatusOK)
+		flusher, ok := writer.(http.Flusher)
+		if !ok {
+			t.Fatal("expected http flusher")
+		}
+
+		_, _ = writer.Write([]byte(`event: response.created
+`))
+		_, _ = writer.Write([]byte(`data: {"type":"response.created"}
+
+`))
+		_, _ = writer.Write([]byte(`event: response.reasoning_summary_text.delta
+`))
+		_, _ = writer.Write([]byte(`data: {"type":"response.reasoning_summary_text.delta","delta":"先分析一下。"}
+
+`))
+		_, _ = writer.Write([]byte(`event: response.output_text.delta
+`))
+		_, _ = writer.Write([]byte(`data: {"type":"response.output_text.delta","delta":"你好"}
+
+`))
+		flusher.Flush()
+
+		<-continueCh
+
+		_, _ = writer.Write([]byte(`event: response.output_text.delta
+`))
+		_, _ = writer.Write([]byte(`data: {"type":"response.output_text.delta","delta":" responses"}
+
+`))
+		_, _ = writer.Write([]byte(`data: [DONE]
+
+`))
+		flusher.Flush()
+	})
+
+	type chatResult struct {
+		res string
+		err error
+	}
+
+	firstOutputCh := make(chan string, 1)
+	streamErrCh := make(chan error, 1)
+	resultCh := make(chan chatResult, 1)
+	var streamed strings.Builder
+	var reasonContent strings.Builder
+
+	go func() {
+		res, err := aispec.ChatBase(
+			"http://example.com/v1/responses",
+			"gpt-4.1-mini",
+			"hello",
+			aispec.WithChatBase_InterfaceType(aispec.ChatBaseInterfaceTypeResponses),
+			aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
+				return []poc.PocConfigOption{
+					poc.WithHost(host),
+					poc.WithPort(port),
+					poc.WithForceHTTPS(false),
+					poc.WithTimeout(5),
+				}, nil
+			}),
+			aispec.WithChatBase_StreamHandler(func(reader io.Reader) {
+				buf := make([]byte, len([]byte("你好")))
+				n, err := io.ReadFull(reader, buf)
+				if err != nil {
+					streamErrCh <- err
+					return
+				}
+				firstOutput := string(buf[:n])
+				streamed.WriteString(firstOutput)
+				firstOutputCh <- firstOutput
+				rest, err := io.ReadAll(reader)
+				if err != nil {
+					streamErrCh <- err
+					return
+				}
+				streamed.Write(rest)
+			}),
+			aispec.WithChatBase_ReasonStreamHandler(func(reader io.Reader) {
+				data, _ := io.ReadAll(reader)
+				reasonContent.Write(data)
+			}),
+		)
+		resultCh <- chatResult{res: res, err: err}
+	}()
+
+	select {
+	case firstOutput := <-firstOutputCh:
+		assert.Equal(t, "你好", firstOutput)
+	case err := <-streamErrCh:
+		t.Fatalf("stream handler failed before continue: %v", err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("did not receive first streamed output in time")
+	}
+
+	select {
+	case result := <-resultCh:
+		t.Fatalf("chat returned before continue signal: %+v", result)
+	case err := <-streamErrCh:
+		t.Fatalf("stream handler failed while waiting for continue: %v", err)
+	case <-time.After(150 * time.Millisecond):
+	}
+
+	close(continueCh)
+
+	select {
+	case err := <-streamErrCh:
+		t.Fatalf("stream handler failed after continue: %v", err)
+	case result := <-resultCh:
+		assert.NoError(t, result.err)
+		assert.Equal(t, "你好 responses", result.res)
+		assert.Equal(t, result.res, streamed.String())
+		assert.Equal(t, "先分析一下。", reasonContent.String())
+	case <-time.After(2 * time.Second):
+		t.Fatal("chat did not finish after continue signal")
+	}
+}
+
+func TestChatBase_InfersResponsesInterfaceFromURL(t *testing.T) {
+	var capturedRequest []byte
+	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		capturedRequest = req
+		return []byte(mockResponsesNonStreamRsp)
+	})
+
+	res, err := aispec.ChatBase(
+		"http://example.com/v1/responses",
+		"gpt-4.1-mini",
+		"hello",
+		aispec.WithChatBase_PoCOptions(func() ([]poc.PocConfigOption, error) {
+			return []poc.PocConfigOption{
+				poc.WithHost(host),
+				poc.WithPort(port),
+				poc.WithForceHTTPS(false),
+				poc.WithTimeout(5),
+			}, nil
+		}),
+	)
+
+	assert.NoError(t, err, "Responses API inference should succeed")
+	assert.Equal(t, "你好，responses API！", res)
+
+	requestBody := string(capturedRequest)
+	assert.Contains(t, requestBody, `"input"`, "Responses request MUST contain input")
+	assert.NotContains(t, requestBody, `"messages"`, "Responses request MUST NOT contain chat.completions messages")
 }
