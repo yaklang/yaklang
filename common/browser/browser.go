@@ -15,12 +15,13 @@ import (
 )
 
 type BrowserInstance struct {
-	mu      sync.Mutex
-	id      string
-	browser *rod.Browser
-	pages   []*BrowserPage
-	config  *BrowserConfig
-	closed  bool
+	mu         sync.Mutex
+	id         string
+	browser    *rod.Browser
+	pages      []*BrowserPage
+	config     *BrowserConfig
+	closed     bool
+	controlURL string
 }
 
 func newBrowserInstance(id string, config *BrowserConfig) (*BrowserInstance, error) {
@@ -38,6 +39,9 @@ func newBrowserInstance(id string, config *BrowserConfig) (*BrowserInstance, err
 func (inst *BrowserInstance) launch() error {
 	inst.browser = rod.New()
 
+	if inst.config.controlURL != "" {
+		return inst.connectDirect()
+	}
 	if inst.config.wsAddress != "" {
 		return inst.connectRemote()
 	}
@@ -70,6 +74,7 @@ func (inst *BrowserInstance) launchLocal() error {
 		return fmt.Errorf("launch browser: %w", err)
 	}
 
+	inst.controlURL = controlURL
 	inst.browser = inst.browser.ControlURL(controlURL)
 	err = inst.browser.Connect()
 	if err != nil {
@@ -77,7 +82,20 @@ func (inst *BrowserInstance) launchLocal() error {
 	}
 
 	_ = inst.browser.IgnoreCertErrors(true)
-	log.Infof("browser instance %q launched (local)", inst.id)
+	log.Infof("browser instance %q launched (local, controlURL=%s)", inst.id, controlURL)
+	return nil
+}
+
+func (inst *BrowserInstance) connectDirect() error {
+	inst.controlURL = inst.config.controlURL
+	inst.browser = inst.browser.ControlURL(inst.controlURL)
+	err := inst.browser.Connect()
+	if err != nil {
+		return fmt.Errorf("connect to browser via controlURL %s: %w", inst.controlURL, err)
+	}
+
+	_ = inst.browser.IgnoreCertErrors(true)
+	log.Infof("browser instance %q connected (direct: %s)", inst.id, inst.controlURL)
 	return nil
 }
 
@@ -122,6 +140,10 @@ func (inst *BrowserInstance) connectRemote() error {
 
 func (inst *BrowserInstance) ID() string {
 	return inst.id
+}
+
+func (inst *BrowserInstance) ControlURL() string {
+	return inst.controlURL
 }
 
 func (inst *BrowserInstance) Navigate(urlStr string) (*BrowserPage, error) {

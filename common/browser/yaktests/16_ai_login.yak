@@ -1,0 +1,155 @@
+// AI login simulation test (non-headless)
+// simulates how an AI agent would explore a login page and attempt to log in
+// target: http://127.0.0.1:8787/logic/user/login
+
+defer browser.CloseAll()
+
+loginURL = "http://127.0.0.1:8787/logic/user/login"
+
+// helper: extract ref id from snapshot text by role keyword
+extractRef = func(snapText, role) {
+    lines = str.Split(snapText, "\n")
+    for _, line = range lines {
+        if str.Contains(line, role) && str.Contains(line, "ref=") {
+            parts = str.SplitN(line, "ref=", 2)
+            if len(parts) < 2 { continue }
+            refPart = parts[1]
+            result = ""
+            for i = 0; i < len(refPart); i++ {
+                ch = sprintf("%c", refPart[i])
+                if ch == "]" || ch == "," || ch == " " { break }
+                result = result + ch
+            }
+            if result != "" { return result }
+        }
+    }
+    return ""
+}
+
+// helper: extract all refs matching a role
+extractAllRefs = func(snapText, role) {
+    refs = []
+    lines = str.Split(snapText, "\n")
+    for _, line = range lines {
+        if str.Contains(line, role) && str.Contains(line, "ref=") {
+            parts = str.SplitN(line, "ref=", 2)
+            if len(parts) < 2 { continue }
+            refPart = parts[1]
+            result = ""
+            for i = 0; i < len(refPart); i++ {
+                ch = sprintf("%c", refPart[i])
+                if ch == "]" || ch == "," || ch == " " { break }
+                result = result + ch
+            }
+            if result != "" {
+                refs = append(refs, result)
+            }
+        }
+    }
+    return refs
+}
+
+log.info("===== AI agent: open visible browser =====")
+b, err = browser.Open(browser.headless(false), browser.timeout(15))
+assert err == nil, sprintf("open browser failed: %v", err)
+
+log.info("===== AI agent: navigate to login page =====")
+page, err = b.Navigate(loginURL)
+assert err == nil, sprintf("navigate to login page failed: %v", err)
+log.info("navigated to %v", page.URL())
+sleep(1)
+
+log.info("===== AI agent step 1: explore page via snapshot =====")
+snap, err = page.Snapshot()
+assert err == nil, sprintf("snapshot failed: %v", err)
+log.info("page structure: %v nodes, %v interactive refs", snap.NodeCount, snap.RefMap.Count())
+
+excerpt = snap.Text
+if len(excerpt) > 2000 {
+    excerpt = excerpt[:2000]
+}
+log.info("snapshot:\n%v", excerpt)
+
+log.info("===== AI agent step 2: identify form fields =====")
+// find all textbox refs (username and password fields)
+textboxRefs = extractAllRefs(snap.Text, "textbox")
+log.info("found %v textbox fields", len(textboxRefs))
+for i, ref = range textboxRefs {
+    log.info("  textbox[%v]: @%v", i, ref)
+}
+
+// find button ref (login/submit button)
+buttonRef = extractRef(snap.Text, "button")
+log.info("found button ref: @%v", buttonRef)
+
+log.info("===== AI agent step 3: fill credentials =====")
+if len(textboxRefs) >= 2 {
+    // first textbox = username, second = password
+    usernameRef = textboxRefs[0]
+    passwordRef = textboxRefs[1]
+    
+    log.info("filling username @%v with 'admin'", usernameRef)
+    err = page.Fill("@" + usernameRef, "admin")
+    if err != nil {
+        log.info("fill username error: %v", err)
+    }
+    sleep(0.5)
+    
+    log.info("filling password @%v with 'admin'", passwordRef)
+    err = page.Fill("@" + passwordRef, "admin")
+    if err != nil {
+        log.info("fill password error: %v", err)
+    }
+    sleep(0.5)
+} else if len(textboxRefs) == 1 {
+    log.info("only 1 textbox found, filling with 'admin'")
+    err = page.Fill("@" + textboxRefs[0], "admin")
+    if err != nil {
+        log.info("fill error: %v", err)
+    }
+} else {
+    log.info("no textbox fields found, trying CSS selectors")
+    page.Fill("input[type=text]", "admin")
+    page.Fill("input[type=password]", "admin")
+}
+
+log.info("===== AI agent step 4: click login button =====")
+if buttonRef != "" {
+    log.info("clicking login button @%v", buttonRef)
+    err = page.Click("@" + buttonRef)
+    if err != nil {
+        log.info("click button error: %v, trying CSS fallback", err)
+        page.Click("button[type=submit]")
+    }
+} else {
+    log.info("no button ref found, trying CSS selectors")
+    err = page.Click("button[type=submit]")
+    if err != nil {
+        page.Click("button")
+    }
+}
+
+sleep(2)
+
+log.info("===== AI agent step 5: observe result =====")
+urlAfterLogin = page.URL()
+log.info("url after login attempt: %v", urlAfterLogin)
+
+snap2, err = page.Snapshot()
+if err == nil {
+    excerpt2 = snap2.Text
+    if len(excerpt2) > 1000 {
+        excerpt2 = excerpt2[:1000]
+    }
+    log.info("page after login:\n%v", excerpt2)
+} else {
+    log.info("post-login snapshot error: %v", err)
+}
+
+title, _ = page.Title()
+log.info("page title after login: %v", title)
+
+jsResult, _ = page.Evaluate("document.body.innerText.substring(0, 200)")
+log.info("page text: %v", jsResult)
+
+log.info("===== AI LOGIN SIMULATION COMPLETED =====")

@@ -4,11 +4,17 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/go-rod/rod/lib/launcher"
 	"github.com/yaklang/yaklang/common/log"
 )
 
 var globalManager = &BrowserManager{
 	browsers: make(map[string]*BrowserInstance),
+}
+
+func HaveBrowserInstalled() bool {
+	_, has := launcher.LookPath()
+	return has
 }
 
 type BrowserManager struct {

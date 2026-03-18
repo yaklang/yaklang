@@ -1,0 +1,48 @@
+// cross-process test step 2: reconnect to existing browser and operate
+// run in sequence: 10 -> 11 -> 12
+// DO NOT close browser -- Chrome must survive for step 3
+
+controlFile = "/tmp/browser_control_url.txt"
+
+log.info("===== step 2: read controlURL from file =====")
+ctrlURLBytes = file.ReadFile(controlFile)~
+ctrlURL = str.TrimSpace(string(ctrlURLBytes))
+assert len(ctrlURL) > 0, "controlURL file should not be empty"
+log.info("read controlURL: %v", ctrlURL)
+
+log.info("===== step 2: reconnect to existing browser =====")
+b, err = browser.Open(browser.controlURL(ctrlURL), browser.timeout(10))
+assert err == nil, sprintf("reconnect failed: %v", err)
+log.info("reconnected to browser, id=%v", b.ID())
+
+log.info("===== step 2: list tabs (should see step1 page) =====")
+tabs, err = b.ListTabs()
+assert err == nil, sprintf("list tabs failed: %v", err)
+assert len(tabs) >= 1, sprintf("should have at least 1 tab from step1, got: %v", len(tabs))
+log.info("found %v tabs:", len(tabs))
+for _, tab = range tabs {
+    log.info("  [%v] %v", tab["index"], tab["url"])
+}
+
+log.info("===== step 2: get current page and verify =====")
+page, err = b.CurrentPage()
+assert err == nil, sprintf("get current page failed: %v", err)
+url = page.URL()
+log.info("current page url: %v", url)
+
+log.info("===== step 2: take snapshot on reconnected page =====")
+snap, err = page.Snapshot()
+assert err == nil, sprintf("snapshot failed: %v", err)
+assert snap.NodeCount > 0, "snapshot should have nodes"
+log.info("snapshot: %v nodes, %v refs", snap.NodeCount, snap.RefMap.Count())
+
+log.info("===== step 2: open a new tab =====")
+page2, err = b.NewTab("http://127.0.0.1:8787/misc/healthy")
+assert err == nil, sprintf("new tab failed: %v", err)
+log.info("opened new tab: %v", page2.URL())
+
+tabs2, err = b.ListTabs()
+assert err == nil, sprintf("list tabs after new tab failed: %v", err)
+log.info("tabs after new tab: %v", len(tabs2))
+
+log.info("===== STEP 2 DONE -- browser left running for step 3 =====")

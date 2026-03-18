@@ -423,3 +423,107 @@ assert len(browser.List()) == 0
 
 log.info("=== E2E TEST PASSED ===")
 ```
+
+## 示例 11: 跨进程复用 -- 启动并保留
+
+脚本 A 启动浏览器，保存 controlURL 到文件，退出时不关闭 Chrome。
+
+```yak
+// save as: step1_open.yak
+// DO NOT close browser
+
+b, err = browser.Open(browser.headless(true), browser.leakless(false), browser.timeout(10))
+assert err == nil, sprintf("open failed: %v", err)
+
+page, _ = b.Navigate("http://127.0.0.1:8787/")
+log.info("navigated to %v", page.URL())
+
+snap, _ = page.Snapshot()
+log.info("page has %v refs", snap.RefMap.Count())
+
+ctrlURL = b.ControlURL()
+log.info("controlURL: %v", ctrlURL)
+file.Save("/tmp/ctrl_url.txt", ctrlURL)
+log.info("controlURL saved, browser left running")
+```
+
+## 示例 12: 跨进程复用 -- 重连并操作
+
+脚本 B 在另一个进程中读取 controlURL，重连到同一个 Chrome，继续操作。
+
+```yak
+// save as: step2_operate.yak
+// DO NOT close browser
+
+ctrlURL = str.TrimSpace(string(file.ReadFile("/tmp/ctrl_url.txt")~))
+b, err = browser.Open(browser.controlURL(ctrlURL), browser.timeout(10))
+assert err == nil, sprintf("reconnect failed: %v", err)
+
+tabs, _ = b.ListTabs()
+log.info("found %v tabs from previous script", len(tabs))
+for _, tab = range tabs {
+    log.info("  %v - %v", tab["url"], tab["title"])
+}
+
+page, _ = b.CurrentPage()
+snap, _ = page.Snapshot()
+log.info("snapshot: %v nodes", snap.NodeCount)
+
+page2, _ = b.NewTab("http://127.0.0.1:8787/misc/healthy")
+log.info("opened new tab: %v", page2.URL())
+log.info("browser still running for next script")
+```
+
+## 示例 13: 跨进程复用 -- 验证并关闭
+
+脚本 C 重连，验证前两个脚本的状态，然后关闭。
+
+```yak
+// save as: step3_close.yak
+
+ctrlURL = str.TrimSpace(string(file.ReadFile("/tmp/ctrl_url.txt")~))
+b, _ = browser.Open(browser.controlURL(ctrlURL), browser.timeout(10))
+
+tabs, _ = b.ListTabs()
+log.info("accumulated tabs: %v", len(tabs))
+
+b.Close()
+os.Remove("/tmp/ctrl_url.txt")
+log.info("browser closed and cleanup done")
+```
+
+## 示例 14: AI 模拟登录
+
+模拟 AI Agent 探索登录页面并尝试登录（非 headless，可视观察）。
+
+```yak
+defer browser.CloseAll()
+
+b, err = browser.Open(browser.headless(false), browser.timeout(15))
+assert err == nil, sprintf("open failed: %v", err)
+
+page, err = b.Navigate("http://127.0.0.1:8787/logic/user/login")
+assert err == nil, sprintf("navigate failed: %v", err)
+sleep(1)
+
+// AI step 1: 获取页面结构
+snap, _ = page.Snapshot()
+log.info("page: %v nodes, %v refs", snap.NodeCount, snap.RefMap.Count())
+log.info("snapshot:\n%v", snap.Text)
+
+// AI step 2: 通过 snapshot 或 CSS 选择器找到输入框
+// 填写用户名和密码
+page.Fill("input[type=text]", "admin")
+sleep(0.3)
+page.Fill("input[type=password]", "admin")
+sleep(0.3)
+
+// AI step 3: 点击登录按钮
+page.Click("button")
+sleep(2)
+
+// AI step 4: 观察结果
+log.info("url after login: %v", page.URL())
+jsResult, _ = page.Evaluate("document.body.innerText.substring(0, 300)")
+log.info("page text: %v", jsResult)
+```

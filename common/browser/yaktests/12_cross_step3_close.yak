@@ -1,0 +1,38 @@
+// cross-process test step 3: reconnect, verify accumulated state, close
+// run in sequence: 10 -> 11 -> 12
+
+controlFile = "/tmp/browser_control_url.txt"
+
+log.info("===== step 3: read controlURL from file =====")
+ctrlURLBytes = file.ReadFile(controlFile)~
+ctrlURL = str.TrimSpace(string(ctrlURLBytes))
+assert len(ctrlURL) > 0, "controlURL file should not be empty"
+log.info("read controlURL: %v", ctrlURL)
+
+log.info("===== step 3: reconnect to existing browser =====")
+b, err = browser.Open(browser.controlURL(ctrlURL), browser.timeout(10))
+assert err == nil, sprintf("reconnect failed: %v", err)
+log.info("reconnected to browser, id=%v", b.ID())
+
+log.info("===== step 3: verify accumulated tabs =====")
+tabs, err = b.ListTabs()
+assert err == nil, sprintf("list tabs failed: %v", err)
+log.info("total tabs: %v", len(tabs))
+for _, tab = range tabs {
+    log.info("  [%v] %v", tab["index"], tab["url"])
+}
+// step1 opened 1 page (about:blank+navigate = 2 tabs including initial blank),
+// step2 opened 1 more tab
+// the exact count depends on Chrome behavior, but we should have >= 2
+assert len(tabs) >= 2, sprintf("should have at least 2 tabs (step1 + step2), got: %v", len(tabs))
+
+log.info("===== step 3: close browser =====")
+err = b.Close()
+assert err == nil, sprintf("close browser failed: %v", err)
+log.info("browser closed")
+
+log.info("===== step 3: cleanup controlURL file =====")
+os.Remove(controlFile)
+log.info("removed %v", controlFile)
+
+log.info("===== CROSS-PROCESS HEADLESS TEST PASSED (all 3 steps) =====")

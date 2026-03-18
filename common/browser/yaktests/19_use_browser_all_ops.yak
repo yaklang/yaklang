@@ -1,0 +1,313 @@
+// 19_use_browser_all_ops.yak
+// Comprehensive test for ALL operations in use_browser.yak
+// Each operation is tested using the same browser module API patterns as the tool.
+// This validates the full op dispatch behavior in a single process.
+//
+// Run: go run common/yak/cmd/yak.go common/browser/yaktests/19_use_browser_all_ops.yak
+
+defer browser.CloseAll()
+
+session = "test-all-ops"
+testURL = "https://example.com"
+passCount = 0
+failCount = 0
+
+runTest = func(name, testFunc) {
+    log.Info("===== TEST: %v =====", name)
+    try {
+        testFunc()
+        passCount++
+        log.Info("PASS: %v", name)
+    } catch err {
+        failCount++
+        log.Error("FAIL: %v - %v", name, err)
+    }
+}
+
+// ===== TEST: browser.HaveBrowserInstalled() =====
+runTest("HaveBrowserInstalled", func() {
+    result = browser.HaveBrowserInstalled()
+    assert result == true, "browser should be installed"
+    log.Info("HaveBrowserInstalled() = %v", result)
+})
+
+// ===== TEST: op=open =====
+runTest("op=open", func() {
+    b, err = browser.Open(
+        browser.id(session),
+        browser.headless(true),
+        browser.timeout(30),
+    )
+    assert err == nil, sprintf("open failed: %v", err)
+
+    page, err = b.Navigate(testURL)
+    assert err == nil, sprintf("navigate failed: %v", err)
+
+    snap, err = page.Snapshot()
+    assert err == nil, sprintf("snapshot failed: %v", err)
+    assert snap.NodeCount > 0, "node count should be > 0"
+    log.Info("opened %v, snapshot: %v nodes, %v refs", testURL, snap.NodeCount, snap.RefMap.Count())
+})
+
+// ===== TEST: op=snapshot =====
+runTest("op=snapshot", func() {
+    b, err = browser.Get(browser.id(session))
+    assert err == nil, sprintf("get browser failed: %v", err)
+    page, err = b.CurrentPage()
+    assert err == nil, sprintf("get page failed: %v", err)
+
+    snap, err = page.Snapshot()
+    assert err == nil, sprintf("snapshot failed: %v", err)
+    assert snap.NodeCount > 0, "node count should be > 0"
+    assert str.Contains(snap.Text, "Example Domain"), "snapshot should contain page content"
+    log.Info("snapshot: %v nodes, %v refs", snap.NodeCount, snap.RefMap.Count())
+})
+
+// ===== TEST: op=get subop=title =====
+runTest("op=get subop=title", func() {
+    b, err = browser.Get(browser.id(session))
+    assert err == nil, sprintf("get browser failed: %v", err)
+    page, err = b.CurrentPage()
+    assert err == nil, sprintf("get page failed: %v", err)
+
+    title, err = page.Title()
+    assert err == nil, sprintf("get title failed: %v", err)
+    assert str.Contains(title, "Example"), sprintf("title should contain 'Example', got: %v", title)
+    log.Info("title: %v", title)
+})
+
+// ===== TEST: op=get subop=url =====
+runTest("op=get subop=url", func() {
+    b, err = browser.Get(browser.id(session))
+    assert err == nil, sprintf("get browser failed: %v", err)
+    page, err = b.CurrentPage()
+    assert err == nil, sprintf("get page failed: %v", err)
+
+    currentURL = page.URL()
+    assert str.Contains(currentURL, "example.com"), sprintf("url should contain example.com, got: %v", currentURL)
+    log.Info("url: %v", currentURL)
+})
+
+// ===== TEST: op=get subop=html =====
+runTest("op=get subop=html", func() {
+    b, err = browser.Get(browser.id(session))
+    assert err == nil, sprintf("get browser failed: %v", err)
+    page, err = b.CurrentPage()
+    assert err == nil, sprintf("get page failed: %v", err)
+
+    html, err = page.HTML()
+    assert err == nil, sprintf("get html failed: %v", err)
+    assert len(html) > 100, "html should have substantial content"
+    assert str.Contains(html, "<html"), "html should contain <html tag"
+    log.Info("html length: %v", len(html))
+})
+
+// ===== TEST: op=get subop=text =====
+runTest("op=get subop=text", func() {
+    b, err = browser.Get(browser.id(session))
+    assert err == nil, sprintf("get browser failed: %v", err)
+    page, err = b.CurrentPage()
+    assert err == nil, sprintf("get page failed: %v", err)
+
+    textResult, err = page.Evaluate("document.body.innerText")
+    assert err == nil, sprintf("evaluate failed: %v", err)
+    textStr = sprint(textResult)
+    assert len(textStr) > 0, "page text should not be empty"
+    log.Info("text (first 100): %v", textStr[:min(100, len(textStr))])
+})
+
+// ===== TEST: op=get subop=cookies =====
+runTest("op=get subop=cookies", func() {
+    b, err = browser.Get(browser.id(session))
+    assert err == nil, sprintf("get browser failed: %v", err)
+    page, err = b.CurrentPage()
+    assert err == nil, sprintf("get page failed: %v", err)
+
+    cookies, err = page.GetCookies()
+    assert err == nil, sprintf("get cookies failed: %v", err)
+    log.Info("cookies count: %v", len(cookies))
+})
+
+// ===== TEST: op=screenshot =====
+runTest("op=screenshot", func() {
+    b, err = browser.Get(browser.id(session))
+    assert err == nil, sprintf("get browser failed: %v", err)
+    page, err = b.CurrentPage()
+    assert err == nil, sprintf("get page failed: %v", err)
+
+    imgData, err = page.Screenshot()
+    assert err == nil, sprintf("screenshot failed: %v", err)
+    assert len(imgData) > 100, sprintf("screenshot too small: %v bytes", len(imgData))
+    assert imgData[0] == 0x89, "should be PNG format"
+    log.Info("screenshot: %v bytes", len(imgData))
+
+    b64, err = page.ScreenshotBase64()
+    assert err == nil, sprintf("screenshot base64 failed: %v", err)
+    assert len(b64) > 100, "base64 should have content"
+    log.Info("screenshot base64 length: %v", len(b64))
+})
+
+// ===== TEST: op=eval =====
+runTest("op=eval", func() {
+    b, err = browser.Get(browser.id(session))
+    assert err == nil, sprintf("get browser failed: %v", err)
+    page, err = b.CurrentPage()
+    assert err == nil, sprintf("get page failed: %v", err)
+
+    result, err = page.Evaluate("document.title")
+    assert err == nil, sprintf("eval failed: %v", err)
+    resultStr = sprint(result)
+    assert str.Contains(resultStr, "Example"), sprintf("eval should return title, got: %v", resultStr)
+    log.Info("eval result: %v", resultStr)
+
+    result2, err = page.Evaluate("1 + 2 + 3")
+    assert err == nil, sprintf("eval math failed: %v", err)
+    log.Info("eval 1+2+3 = %v", result2)
+
+    result3, err = page.Evaluate("JSON.stringify({links: document.querySelectorAll('a').length})")
+    assert err == nil, sprintf("eval complex failed: %v", err)
+    log.Info("eval links JSON: %v", result3)
+})
+
+// ===== TEST: op=click =====
+runTest("op=click", func() {
+    b, err = browser.Get(browser.id(session))
+    assert err == nil, sprintf("get browser failed: %v", err)
+    page, err = b.CurrentPage()
+    assert err == nil, sprintf("get page failed: %v", err)
+
+    snap, err = page.Snapshot()
+    assert err == nil, sprintf("pre-click snapshot failed: %v", err)
+    log.Info("pre-click refs: %v", snap.RefMap.Count())
+
+    err = page.Click("@e1")
+    assert err == nil, sprintf("click @e1 failed: %v", err)
+    sleep(1)
+    log.Info("clicked @e1, url now: %v", page.URL())
+
+    snap2, err = page.Snapshot()
+    assert err == nil, sprintf("post-click snapshot failed: %v", err)
+    log.Info("post-click: %v nodes", snap2.NodeCount)
+})
+
+// ===== TEST: op=back =====
+runTest("op=back", func() {
+    b, err = browser.Get(browser.id(session))
+    assert err == nil, sprintf("get browser failed: %v", err)
+    page, err = b.CurrentPage()
+    assert err == nil, sprintf("get page failed: %v", err)
+
+    err = page.Back()
+    assert err == nil, sprintf("back failed: %v", err)
+    sleep(1)
+    log.Info("navigated back, url: %v", page.URL())
+})
+
+// ===== TEST: op=reload =====
+runTest("op=reload", func() {
+    b, err = browser.Get(browser.id(session))
+    assert err == nil, sprintf("get browser failed: %v", err)
+    page, err = b.CurrentPage()
+    assert err == nil, sprintf("get page failed: %v", err)
+
+    err = page.Reload()
+    assert err == nil, sprintf("reload failed: %v", err)
+    sleep(1)
+    title, err = page.Title()
+    assert err == nil, sprintf("title after reload failed: %v", err)
+    log.Info("reloaded, title: %v", title)
+})
+
+// ===== TEST: op=wait (ms) =====
+runTest("op=wait (ms)", func() {
+    startTime = now()
+    sleep(0.5)
+    elapsed = now().Sub(startTime)
+    assert elapsed.Milliseconds() >= 400, sprintf("wait should sleep, elapsed: %v", elapsed)
+    log.Info("waited 500ms OK, elapsed: %v", elapsed)
+})
+
+// ===== TEST: op=tab_list =====
+runTest("op=tab_list", func() {
+    b, err = browser.Get(browser.id(session))
+    assert err == nil, sprintf("get browser failed: %v", err)
+
+    tabs, err = b.ListTabs()
+    assert err == nil, sprintf("list tabs failed: %v", err)
+    assert len(tabs) >= 1, sprintf("should have at least 1 tab, got: %v", len(tabs))
+    log.Info("tabs: %v", len(tabs))
+    for _, tab := range tabs {
+        log.Info("  [%v] %v", tab["index"], tab["url"])
+    }
+})
+
+// ===== TEST: op=tab_new =====
+runTest("op=tab_new", func() {
+    b, err = browser.Get(browser.id(session))
+    assert err == nil, sprintf("get browser failed: %v", err)
+
+    page, err = b.NewTab("https://example.com")
+    assert err == nil, sprintf("new tab failed: %v", err)
+    sleep(1)
+
+    snap, err = page.Snapshot()
+    assert err == nil, sprintf("new tab snapshot failed: %v", err)
+    log.Info("new tab: %v nodes", snap.NodeCount)
+
+    tabs, err = b.ListTabs()
+    assert err == nil, sprintf("list tabs after new failed: %v", err)
+    assert len(tabs) >= 2, sprintf("should have >= 2 tabs, got: %v", len(tabs))
+    log.Info("tabs after new: %v", len(tabs))
+})
+
+// ===== TEST: op=tab_switch =====
+runTest("op=tab_switch", func() {
+    b, err = browser.Get(browser.id(session))
+    assert err == nil, sprintf("get browser failed: %v", err)
+
+    page, err = b.SwitchTab(0)
+    assert err == nil, sprintf("switch tab failed: %v", err)
+    log.Info("switched to tab 0, url: %v", page.URL())
+})
+
+// ===== TEST: op=tab_close =====
+runTest("op=tab_close", func() {
+    b, err = browser.Get(browser.id(session))
+    assert err == nil, sprintf("get browser failed: %v", err)
+
+    tabs, err = b.ListTabs()
+    assert err == nil, sprintf("list tabs failed: %v", err)
+    tabCount = len(tabs)
+    log.Info("tabs before close: %v", tabCount)
+
+    if tabCount >= 2 {
+        err = b.CloseTab(tabCount - 1)
+        assert err == nil, sprintf("close tab failed: %v", err)
+        log.Info("closed last tab")
+
+        tabs2, err = b.ListTabs()
+        assert err == nil, sprintf("list tabs after close failed: %v", err)
+        assert len(tabs2) == tabCount - 1, sprintf("should have %v tabs, got: %v", tabCount-1, len(tabs2))
+        log.Info("tabs after close: %v", len(tabs2))
+    } else {
+        log.Info("only 1 tab, skipping close to preserve browser")
+    }
+})
+
+// ===== TEST: op=close =====
+runTest("op=close", func() {
+    err = browser.Close(browser.id(session))
+    assert err == nil, sprintf("close failed: %v", err)
+    log.Info("browser session %v closed", session)
+
+    _, err = browser.Get(browser.id(session))
+    assert err != nil, "get after close should fail"
+    log.Info("get after close correctly returns error")
+})
+
+// ===== SUMMARY =====
+log.Info("==========================================")
+log.Info("ALL OPS TEST RESULTS: %v passed, %v failed", passCount, failCount)
+log.Info("==========================================")
+assert failCount == 0, sprintf("%v tests failed", failCount)
+log.Info("ALL TESTS PASSED")

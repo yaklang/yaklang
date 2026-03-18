@@ -1,0 +1,35 @@
+// cross-process test step 1: launch browser and save controlURL
+// run in sequence: 10 -> 11 -> 12
+// DO NOT close browser -- Chrome must survive for step 2 and 3
+
+targetURL = "http://127.0.0.1:8787/"
+controlFile = "/tmp/browser_control_url.txt"
+
+log.info("===== step 1: launch browser =====")
+b, err = browser.Open(browser.headless(true), browser.leakless(false), browser.timeout(10))
+assert err == nil, sprintf("open browser failed: %v", err)
+log.info("browser launched, id=%v", b.ID())
+
+log.info("===== step 1: get controlURL =====")
+ctrlURL = b.ControlURL()
+assert len(ctrlURL) > 0, "controlURL should not be empty"
+assert str.HasPrefix(ctrlURL, "ws://"), sprintf("controlURL should start with ws://, got: %v", ctrlURL)
+log.info("controlURL: %v", ctrlURL)
+
+log.info("===== step 1: navigate to target =====")
+page, err = b.Navigate(targetURL)
+assert err == nil, sprintf("navigate failed: %v", err)
+url = page.URL()
+assert str.Contains(url, "127.0.0.1:8787"), sprintf("url should contain host, got: %v", url)
+log.info("navigated to %v", url)
+
+snap, err = page.Snapshot()
+assert err == nil, sprintf("snapshot failed: %v", err)
+log.info("snapshot: %v nodes, %v refs", snap.NodeCount, snap.RefMap.Count())
+
+log.info("===== step 1: save controlURL to file =====")
+err = file.Save(controlFile, ctrlURL)
+assert err == nil, sprintf("save controlURL failed: %v", err)
+log.info("controlURL saved to %v", controlFile)
+
+log.info("===== STEP 1 DONE -- browser left running for step 2 =====")
