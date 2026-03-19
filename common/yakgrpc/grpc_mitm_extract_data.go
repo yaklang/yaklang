@@ -54,19 +54,19 @@ func (s *Server) QueryMITMRuleExtractedData(ctx context.Context, req *ypb.QueryM
 }
 
 func (s *Server) DeleteMITMRuleExtractedData(ctx context.Context, req *ypb.DeleteMITMRuleExtractedDataRequest) (*ypb.Empty, error) {
-	if req == nil {
+	if req == nil || req.GetFilter() == nil {
 		return &ypb.Empty{}, nil
 	}
-	ids := req.GetIds()
-	if len(ids) == 0 && req.Id > 0 {
-		ids = []int64{req.Id}
-	}
-	if len(ids) == 0 {
+	filter := req.GetFilter()
+	// 至少需要一种过滤条件，避免误删全表
+	if len(filter.GetIds()) == 0 && len(filter.GetTraceID()) == 0 && len(filter.GetRuleVerbose()) == 0 &&
+		len(filter.GetAnalyzedIds()) == 0 && filter.GetKeyword() == "" {
 		return &ypb.Empty{}, nil
 	}
-	db := s.GetProjectDatabase()
-	if err := yakit.BatchDeleteExtractedDataByIDs(db, ids); err != nil {
-		return nil, err
+	db := s.GetProjectDatabase().Model(&schema.ExtractedData{})
+	db = yakit.FilterExtractedData(db, filter)
+	if res := db.Unscoped().Delete(&schema.ExtractedData{}); res.Error != nil {
+		return nil, res.Error
 	}
 	return &ypb.Empty{}, nil
 }

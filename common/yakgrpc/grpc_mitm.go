@@ -2058,11 +2058,18 @@ func (s *Server) DeduplicateMITMReplacerRules(ctx context.Context, _ *ypb.Empty)
 		}, nil
 	}
 
-	// 按 Rule+Result+VerboseName 去重，保留首次出现的
-	seen := make(map[string]bool)
+	// 按 Rule+Result+VerboseName 去重，保留首次出现的（用结构体作 key 避免分隔符导致的哈希碰撞）
+	type ruleKey struct {
+		Rule, Result, VerboseName string
+	}
+	seen := make(map[ruleKey]bool)
 	var deduped []*ypb.MITMContentReplacer
 	for _, rule := range allRules {
-		key := rule.GetRule() + "|||" + rule.GetResult() + "|||" + rule.GetVerboseName()
+		key := ruleKey{
+			Rule:       rule.GetRule(),
+			Result:     rule.GetResult(),
+			VerboseName: rule.GetVerboseName(),
+		}
 		if seen[key] {
 			continue
 		}

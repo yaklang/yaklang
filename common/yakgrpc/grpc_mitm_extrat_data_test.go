@@ -347,16 +347,20 @@ func TestMUSTPASS_MITM_Delete_Extracted(t *testing.T) {
 		description        string
 	}{
 		{
-			name:               "按Id删除单条",
-			req:                &ypb.DeleteMITMRuleExtractedDataRequest{Id: ids[0]},
+			name: "按Filter.Ids删除单条",
+			req: &ypb.DeleteMITMRuleExtractedDataRequest{
+				Filter: &ypb.ExtractedDataFilter{Ids: []int64{ids[0]}},
+			},
 			expectedCountAfter: len(ids) - 1,
-			description:        "按Id删除后应减少1条",
+			description:        "按Filter.Ids删除单条后应减少1条",
 		},
 		{
-			name:               "按Ids批量删除",
-			req:                &ypb.DeleteMITMRuleExtractedDataRequest{Ids: ids[1:]},
+			name: "按Filter.Ids批量删除",
+			req: &ypb.DeleteMITMRuleExtractedDataRequest{
+				Filter: &ypb.ExtractedDataFilter{Ids: ids[1:]},
+			},
 			expectedCountAfter: 0,
-			description:        "按Ids批量删除后应剩0条",
+			description:        "按Filter.Ids批量删除后应剩0条",
 		},
 	}
 

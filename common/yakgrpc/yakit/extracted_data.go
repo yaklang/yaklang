@@ -145,6 +145,7 @@ func FilterExtractedData(db *gorm.DB, filter *ypb.ExtractedDataFilter) *gorm.DB 
 	db = bizhelper.ExactQueryStringArrayOr(db, "trace_id", filter.GetTraceID())
 	db = bizhelper.ExactQueryStringArrayOr(db, "rule_verbose", filter.GetRuleVerbose())
 	db = bizhelper.ExactQueryInt64ArrayOr(db, "analyzed_http_flow_id", filter.GetAnalyzedIds())
+	db = bizhelper.ExactQueryInt64ArrayOr(db, "id", filter.GetIds())
 	// Keyword 模糊搜索：规则名称、数据内容
 	if filter.GetKeyword() != "" {
 		db = bizhelper.FuzzSearchEx(db, []string{"rule_verbose", "data"}, filter.GetKeyword(), false)
