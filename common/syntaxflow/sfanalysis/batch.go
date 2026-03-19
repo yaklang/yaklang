@@ -10,10 +10,9 @@ func BatchAnalyze(rules map[string]string) map[string]*SyntaxFlowRuleAnalyzeResu
 		return map[string]*SyntaxFlowRuleAnalyzeResult{}
 	}
 
-	opts := DefaultOptions(ProfileQuality)
 	results := make(map[string]*SyntaxFlowRuleAnalyzeResult, len(rules))
 	for name, content := range rules {
-		report := Analyze(context.Background(), content, opts)
+		report := Analyze(context.Background(), content, WithProfile(ProfileQuality))
 		if report == nil || report.Quality == nil {
 			results[name] = &SyntaxFlowRuleAnalyzeResult{Score: MinScore, MaxScore: MaxScore}
 			continue

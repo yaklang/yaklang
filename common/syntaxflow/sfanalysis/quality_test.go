@@ -91,7 +91,7 @@ func formatProblems(problems []SyntaxFlowRuleProblem) string {
 func analyzeQualityContent(t *testing.T, ruleContent string) *SyntaxFlowRuleAnalyzeResult {
 	t.Helper()
 
-	report := Analyze(context.Background(), ruleContent, DefaultOptions(ProfileQuality))
+	report := Analyze(context.Background(), ruleContent, WithProfile(ProfileQuality))
 	require.NotNil(t, report)
 	require.NotNil(t, report.Quality)
 	return report.Quality

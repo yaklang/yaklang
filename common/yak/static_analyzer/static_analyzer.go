@@ -157,12 +157,12 @@ func StaticAnalyzeWithContext(ctx context.Context, code, codeTyp string, kind St
 		sfStart := time.Now()
 		switch kind {
 		case Score:
-			report := sfanalysis.Analyze(ctx, code, sfanalysis.DefaultOptions(sfanalysis.ProfileQuality))
+			report := sfanalysis.Analyze(ctx, code, sfanalysis.WithProfile(sfanalysis.ProfileQuality))
 			if report.Quality != nil {
 				results = append(results, report.Quality.GetStaticAnalyzeResults()...)
 			}
 		default:
-			report := sfanalysis.Analyze(ctx, code, sfanalysis.DefaultOptions(sfanalysis.ProfileEditor))
+			report := sfanalysis.Analyze(ctx, code, sfanalysis.WithProfile(sfanalysis.ProfileEditor))
 			results = append(results, report.SyntaxErrors...)
 			if len(report.SyntaxErrors) > 0 {
 				results = append(results, &result.StaticAnalyzeResult{

@@ -182,8 +182,7 @@ func BuildPluginTestingJunkData() []byte {
 // 只在评分中使用
 func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType string, pluginTestingServer *PluginTestingEchoServer) (*ypb.SmokingEvaluatePluginResponse, error) {
 	if pluginType == schema.SCRIPT_TYPE_SYNTAXFLOW {
-		opts := sfanalysis.DefaultOptions(sfanalysis.ProfileQuality)
-		report := sfanalysis.Analyze(ctx, pluginCode, opts)
+		report := sfanalysis.Analyze(ctx, pluginCode, sfanalysis.WithProfile(sfanalysis.ProfileQuality))
 		if report.Quality == nil {
 			return (&sfanalysis.SyntaxFlowRuleAnalyzeResult{Score: sfanalysis.MinScore, MaxScore: sfanalysis.MaxScore}).GetResponse(), nil
 		}
