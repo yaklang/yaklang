@@ -160,6 +160,8 @@ jobs:
     needs: check-wip
     if: needs.check-wip.outputs.should_run_tests == 'true'
     runs-on: ubuntu-22.04
+    outputs:
+      artifact_id: ${{ steps.upload_shared_suite.outputs.artifact-id }}
     steps:
       - name: Check out code
         uses: actions/checkout@v3
@@ -217,6 +219,7 @@ jobs:
           ./scripts/ci/package-test-artifact.sh
 
       - name: Upload shared suite
+        id: upload_shared_suite
         uses: actions/upload-artifact@v4
         with:
           name: essential-tests-yakgrpc
@@ -228,6 +231,8 @@ jobs:
     needs: check-wip
     if: needs.check-wip.outputs.should_run_tests == 'true'
     runs-on: ubuntu-22.04
+    outputs:
+      artifact_id: ${{ steps.upload_shared_suite.outputs.artifact-id }}
     steps:
       - name: Check out code
         uses: actions/checkout@v3
@@ -285,6 +290,7 @@ jobs:
           ./scripts/ci/package-test-artifact.sh
 
       - name: Upload shared suite
+        id: upload_shared_suite
         uses: actions/upload-artifact@v4
         with:
           name: essential-tests-coreplugin
@@ -439,6 +445,34 @@ jobs:
                 {"package": "./common/crawlerx/...", "timeout": "5m"},
                 {"package": "./common/crawler", "timeout": "20s", "run": "TestMUSTPASS"}
               ]
+
+          - name: "Test gRPC StaticAnalyze / BuildIn SyntaxFlow Rule / SSA / SSA-API / SF Scan"
+            test_configs: |
+              [
+                {"package": "./common/yak/static_analyzer/test/...", "timeout": "20s"},
+                {"package": "./common/syntaxflow/sfbuildin/...", "timeout": "5m"},
+                {"package": "./common/yak/ssaapi/test/syntaxflow", "timeout": "1m"},
+                {"package": "./common/syntaxflow/sfanalysis/...", "timeout": "20s"},
+                {"package": "./common/yak/ssa/...", "timeout": "20s"},
+                {"package": "./common/yak/ssaapi", "timeout": "1m"},
+                {"package": "./common/yak/ssaapi/ssareducer", "timeout": "1m"},
+                {"package": "./common/yak/ssaapi/test/ssatest", "timeout": "1m"},
+                {"package": "./common/yak/syntaxflow_scan/...", "timeout": "1m"}
+              ]
+
+          - name: "Test Integration MITM / SyntaxFlow"
+            test_configs: |
+              [
+                {"package": "./common/syntaxflow/tests", "timeout": "20s"},
+                {"package": "./common/syntaxflow/sfdb/...", "timeout": "20s"},
+                {"package": "./common/syntaxflow/sfvm/...", "timeout": "20s"}
+              ]
+
+          - name: "Test SFWeb"
+            test_configs: |
+              [
+                {"package": "./common/sfweb/...", "timeout": "4m"}
+              ]
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -565,18 +599,15 @@ jobs:
           - name: "Test gRPC MUSTPASS SyntaxFlow | SSA"
             artifact_name: "essential-tests-yakgrpc"
             artifact_file: "essential-tests-yakgrpc.tar.gz"
-            compile_local: "1"
+            compile_local: "0"
             sync_rule: "1"
             test_configs: |
               [
                 {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_SyntaxFlow"},
-                {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_SSA"},
-                {"package": "./common/sfweb/...", "timeout": "4m"}
+                {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_SSA"}
               ]
             local_test_configs: |
-              [
-                {"package": "./common/sfweb/...", "timeout": "4m"}
-              ]
+              []
 
           - name: "Test gRPC In 2m"
             artifact_name: "essential-tests-yakgrpc"
@@ -703,53 +734,27 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: "Test gRPC StaticAnalyze / BuildIn SyntaxFlow Rule / SSA / SSA-API / SF Scan"
+          - name: "Test Coreplugin AnalyzeMustPASS"
             artifact_name: "essential-tests-coreplugin"
             artifact_file: "essential-tests-coreplugin.tar.gz"
-            compile_local: "1"
+            compile_local: "0"
             test_configs: |
               [
-                {"package": "./common/yak/static_analyzer/test/...", "timeout": "20s"},
-                {"package": "./common/coreplugin", "timeout": "1m", "run": "TestAnalyzeMustPASS"},
-                {"package": "./common/syntaxflow/sfbuildin/...", "timeout": "5m"},
-                {"package": "./common/yak/ssaapi/test/syntaxflow", "timeout": "1m"},
-                {"package": "./common/syntaxflow/sfanalysis/...", "timeout": "20s"},
-                {"package": "./common/yak/ssa/...", "timeout": "20s"},
-                {"package": "./common/yak/ssaapi", "timeout": "1m"},
-                {"package": "./common/yak/ssaapi/ssareducer", "timeout": "1m"},
-                {"package": "./common/yak/ssaapi/test/ssatest", "timeout": "1m"},
-                {"package": "./common/yak/syntaxflow_scan/...", "timeout": "1m"}
+                {"package": "./common/coreplugin", "timeout": "1m", "run": "TestAnalyzeMustPASS"}
               ]
             local_test_configs: |
-              [
-                {"package": "./common/yak/static_analyzer/test/...", "timeout": "20s"},
-                {"package": "./common/syntaxflow/sfbuildin/...", "timeout": "5m"},
-                {"package": "./common/yak/ssaapi/test/syntaxflow", "timeout": "1m"},
-                {"package": "./common/syntaxflow/sfanalysis/...", "timeout": "20s"},
-                {"package": "./common/yak/ssa/...", "timeout": "20s"},
-                {"package": "./common/yak/ssaapi", "timeout": "1m"},
-                {"package": "./common/yak/ssaapi/ssareducer", "timeout": "1m"},
-                {"package": "./common/yak/ssaapi/test/ssatest", "timeout": "1m"},
-                {"package": "./common/yak/syntaxflow_scan/...", "timeout": "1m"}
-              ]
+              []
 
-          - name: "Test Integration MITM / SyntaxFlow"
+          - name: "Test Coreplugin MITM"
             artifact_name: "essential-tests-coreplugin"
             artifact_file: "essential-tests-coreplugin.tar.gz"
-            compile_local: "1"
+            compile_local: "0"
             test_configs: |
               [
-                {"package": "./common/coreplugin", "timeout": "2m", "run": "TestGRPCMUSTPASS_MITM"},
-                {"package": "./common/syntaxflow/tests", "timeout": "20s"},
-                {"package": "./common/syntaxflow/sfdb/...", "timeout": "20s"},
-                {"package": "./common/syntaxflow/sfvm/...", "timeout": "20s"}
+                {"package": "./common/coreplugin", "timeout": "2m", "run": "TestGRPCMUSTPASS_MITM"}
               ]
             local_test_configs: |
-              [
-                {"package": "./common/syntaxflow/tests", "timeout": "20s"},
-                {"package": "./common/syntaxflow/sfdb/...", "timeout": "20s"},
-                {"package": "./common/syntaxflow/sfvm/...", "timeout": "20s"}
-              ]
+              []
 
           - name: "Test Vulinbox Coreplugin Fastjson"
             artifact_name: "essential-tests-coreplugin"
@@ -873,10 +878,60 @@ jobs:
           path: /tmp/*.log
           if-no-files-found: warn
 
+  cleanup-yakgrpc-artifact:
+    needs: [prepare-yakgrpc, test-prepared-yakgrpc]
+    if: needs.prepare-yakgrpc.result == 'success' && needs.test-prepared-yakgrpc.result == 'success'
+    runs-on: ubuntu-22.04
+    permissions:
+      actions: write
+    steps:
+      - name: Delete yakgrpc artifact
+        env:
+          ARTIFACT_ID: ${{ needs.prepare-yakgrpc.outputs.artifact_id }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -z "$ARTIFACT_ID" ]; then
+            echo "::warning::No yakgrpc artifact id found, skip deletion"
+            exit 0
+          fi
+          curl -fsSL \
+            -X DELETE \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID" \
+            && echo "Deleted yakgrpc artifact $ARTIFACT_ID" \
+            || echo "::warning::Failed to delete yakgrpc artifact $ARTIFACT_ID"
+
+  cleanup-coreplugin-artifact:
+    needs: [prepare-coreplugin, test-prepared-coreplugin]
+    if: needs.prepare-coreplugin.result == 'success' && needs.test-prepared-coreplugin.result == 'success'
+    runs-on: ubuntu-22.04
+    permissions:
+      actions: write
+    steps:
+      - name: Delete coreplugin artifact
+        env:
+          ARTIFACT_ID: ${{ needs.prepare-coreplugin.outputs.artifact_id }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -z "$ARTIFACT_ID" ]; then
+            echo "::warning::No coreplugin artifact id found, skip deletion"
+            exit 0
+          fi
+          curl -fsSL \
+            -X DELETE \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID" \
+            && echo "Deleted coreplugin artifact $ARTIFACT_ID" \
+            || echo "::warning::Failed to delete coreplugin artifact $ARTIFACT_ID"
+
   post-check:
     name: Save Test Results to Cache
-    needs: [check-wip, test-local, test-prepared-yakgrpc, test-prepared-coreplugin]
-    if: needs.check-wip.outputs.should_run_tests == 'true' && success()
+    needs: [test-local, test-prepared-yakgrpc, test-prepared-coreplugin]
+    if: success()
     runs-on: ubuntu-22.04
     steps:
       - name: 'Check Out'
