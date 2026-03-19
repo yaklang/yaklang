@@ -27,6 +27,9 @@ type ActionReflection struct {
 	// SPIN 检测结果（整合到自我反思中）
 	IsSpinning bool   `json:"is_spinning,omitempty"`
 	SpinReason string `json:"spin_reason,omitempty"`
+
+	// 任务推进判断：AI 认为任务正常推进时为 true，可清零 spin 计数
+	IsTaskProgressing bool `json:"is_task_progressing,omitempty"`
 }
 
 // Dump 生成适合放入 Prompt 的格式化字符串（使用 nonce 保护）

@@ -793,13 +793,16 @@ LOOP:
 		}
 
 		if r.ShouldForceExitDueToSpin() {
-			log.Warnf("ReactLoop[%v] force exiting due to %d consecutive spin warnings (threshold: %d)",
-				r.loopName, r.consecutiveSpinWarnings, r.maxConsecutiveSpinWarnings)
-			r.GetInvoker().AddToTimeline("force_spin_exit",
-				fmt.Sprintf("loop force-exited after %d consecutive spin detections", r.consecutiveSpinWarnings))
+			log.Warnf("ReactLoop[%v] spin threshold reached (%d consecutive warnings), adding timeline pressure instead of force-exiting",
+				r.loopName, r.consecutiveSpinWarnings)
+			r.GetInvoker().AddToTimeline("spin_pressure",
+				fmt.Sprintf("[SPIN PRESSURE] %d consecutive spin warnings detected. "+
+					"You MUST change your approach immediately. "+
+					"Use a completely different action type or strategy. "+
+					"The task remains incomplete and requires a new direction. "+
+					"Continuing with the same approach will not help.", r.consecutiveSpinWarnings))
 			r.ResetSpinWarning()
-			needSummary.SetTo(true)
-			break LOOP
+			// 不强制退出 loop，仅通过 timeline 施压，由 max_iterations 上限兜底
 		}
 
 		// 检查 operator 状态
