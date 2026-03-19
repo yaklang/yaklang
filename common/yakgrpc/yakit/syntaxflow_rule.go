@@ -1,6 +1,7 @@
 package yakit
 
 import (
+	"path/filepath"
 	"strings"
 
 	"github.com/jinzhu/gorm"
@@ -192,18 +193,37 @@ func UpdateSyntaxFlowRule(db *gorm.DB, rule *ypb.SyntaxFlowRuleInput) (*schema.S
 	if rule.Content == "" {
 		return nil, utils.Errorf("update syntaxFlow rule failed: rule content is empty")
 	}
-	dbRule, err2 := ParseSyntaxFlowInput(rule)
-	if err2 != nil {
-		return nil, utils.Errorf("update syntaxFlow rule failed: %s", err2)
-	}
 	updateRule, err := sfdb.QueryRuleByName(consts.GetGormProfileDatabase(), rule.GetRuleName())
 	if err != nil {
 		return nil, utils.Errorf("update syntaxFlow rule failed: %s", err)
 	}
-	updateRule.Language = ssaconfig.Language(rule.GetLanguage())
+
+	language := rule.GetLanguage()
+	if strings.TrimSpace(language) == "" {
+		language = string(updateRule.Language)
+	}
+	parseInput := &ypb.SyntaxFlowRuleInput{
+		RuleName:    rule.GetRuleName(),
+		Content:     rule.GetContent(),
+		Language:    language,
+		Tags:        rule.GetTags(),
+		Description: rule.GetDescription(),
+		AlertMsg:    rule.GetAlertMsg(),
+	}
+	dbRule, err2 := ParseSyntaxFlowInput(parseInput)
+	if err2 != nil {
+		return nil, utils.Errorf("update syntaxFlow rule failed: %s", err2)
+	}
+	if dbRule.Language != "" {
+		updateRule.Language = dbRule.Language
+	}
 	updateRule.Content = rule.GetContent()
-	updateRule.Tag = strings.Join(rule.GetTags(), ",")
-	updateRule.Description = rule.GetDescription()
+	if len(rule.GetTags()) > 0 {
+		updateRule.Tag = strings.Join(rule.GetTags(), ",")
+	}
+	if rule.GetDescription() != "" {
+		updateRule.Description = rule.GetDescription()
+	}
 	updateRule.AlertDesc = dbRule.AlertDesc
 	updateRule.TitleZh = dbRule.TitleZh
 	updateRule.OpCodes = dbRule.OpCodes
@@ -239,22 +259,68 @@ func QuerySameGroupByRule(db *gorm.DB, req *ypb.SyntaxFlowRuleFilter) ([]*schema
 }
 
 func ParseSyntaxFlowInput(ruleInput *ypb.SyntaxFlowRuleInput) (*schema.SyntaxFlowRule, error) {
-	language, err := ssaconfig.ValidateLanguage(ruleInput.Language)
-	if err != nil {
-		return nil, err
+	if ruleInput == nil {
+		return nil, utils.Error("parse syntaxflow rule failed: rule input is nil")
 	}
 	rule, _ := sfdb.CheckSyntaxFlowRuleContent(ruleInput.Content)
-	rule.Language = language
-	rule.RuleName = ruleInput.RuleName
-	rule.Tag = strings.Join(ruleInput.Tags, "|")
-	rule.Title = ruleInput.RuleName
-	//rule.Groups = sfdb.GetOrCreateGroups(consts.GetGormProfileDatabase(), ruleInput.GroupNames)
-	rule.Description = ruleInput.Description
+	if rule == nil {
+		rule = &schema.SyntaxFlowRule{}
+	}
+
+	if strings.TrimSpace(ruleInput.Language) != "" {
+		language, err := ssaconfig.ValidateLanguage(ruleInput.Language)
+		if err != nil {
+			return nil, err
+		}
+		rule.Language = language
+	} else if rule.Language == "" {
+		if inferred := inferLanguageFromRuleName(ruleInput.RuleName); inferred != "" {
+			rule.Language = inferred
+		} else {
+			rule.Language = ssaconfig.General
+		}
+	}
+
+	if strings.TrimSpace(ruleInput.RuleName) != "" {
+		rule.RuleName = ruleInput.RuleName
+		if strings.TrimSpace(rule.Title) == "" {
+			rule.Title = ruleInput.RuleName
+		}
+	}
+
+	if len(ruleInput.Tags) > 0 {
+		rule.Tag = strings.Join(ruleInput.Tags, "|")
+	}
+	if strings.TrimSpace(ruleInput.Description) != "" {
+		rule.Description = ruleInput.Description
+	}
+	if rule.Content == "" {
+		rule.Content = ruleInput.Content
+	}
 	rule.Version = sfdb.UpdateVersion(rule.Version)
+	if rule.AlertDesc == nil {
+		rule.AlertDesc = schema.MapEx[string, *schema.SyntaxFlowDescInfo]{}
+	}
 	for s, message := range ruleInput.AlertMsg {
 		rule.AlertDesc[s] = schema.ToSyntaxFlowAlertDesc(message)
 	}
 	return rule, nil
+}
+
+func inferLanguageFromRuleName(ruleName string) ssaconfig.Language {
+	if strings.TrimSpace(ruleName) == "" {
+		return ""
+	}
+	base := filepath.Base(ruleName)
+	languageRaw, _, ok := strings.Cut(base, "-")
+	if !ok {
+		return ""
+	}
+	lang, err := ssaconfig.ValidateLanguage(languageRaw)
+	if err != nil {
+		return ""
+	}
+	return lang
 }
 
 func QueryBuildInRule(db *gorm.DB) []*schema.SyntaxFlowRule {
