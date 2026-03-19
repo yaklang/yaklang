@@ -567,6 +567,163 @@ if rsp.Contains(getParam("token")) {
 	}
 }
 
+func TestGRPCMUSTPASS_MITMV2_GM_IsHttps(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	token := utils.RandStringBytes(40)
+
+	mockGMHost, mockGMPort := utils.DebugMockGMHTTP(ctx, func(req []byte) []byte {
+		rsp, _, _ := lowhttp.FixHTTPResponse([]byte("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nOK"))
+		return rsp
+	})
+	mockHttpsHost, mockHttpsPort := utils.DebugMockHTTPSEx(func(req []byte) []byte {
+		rsp, _, _ := lowhttp.FixHTTPResponse([]byte("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nOK"))
+		return rsp
+	})
+	mockHost, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		rsp, _, _ := lowhttp.FixHTTPResponse([]byte("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nOK"))
+		return rsp
+	})
+
+	rPort := utils.GetRandomAvailableTCPPort()
+	proxy := "http://127.0.0.1:" + fmt.Sprint(rPort)
+
+	stream, err := client.MITMV2(ctx)
+	require.NoError(t, err)
+
+	stream.Send(&ypb.MITMV2Request{
+		Host:             "127.0.0.1",
+		Port:             uint32(rPort),
+		SetAutoForward:   true,
+		AutoForwardValue: true,
+		EnableGMTLS:      true,
+	})
+
+	for {
+		rsp, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		if !strings.Contains(spew.Sdump(rsp), `starting mitm server`) {
+			continue
+		}
+
+		gmPacket := lowhttp.ReplaceHTTPPacketHeader([]byte("GET /v2-gm-ishttps-"+token+" HTTP/1.1\r\nHost: placeholder\r\n\r\n"), "Host", utils.HostPort(mockGMHost, mockGMPort))
+		_, err = yak.NewScriptEngine(10).ExecuteEx(`
+rsp, req = poc.HTTP(string(getParam("packet")), poc.proxy(getParam("proxy")), poc.host(getParam("h")), poc.port(getParam("p")), poc.https(true))~
+`, map[string]any{"packet": gmPacket, "proxy": proxy, "h": mockGMHost, "p": mockGMPort})
+		require.NoError(t, err)
+
+		httpsPacket := lowhttp.ReplaceHTTPPacketHeader([]byte("GET /v2-https-ishttps-"+token+" HTTP/1.1\r\nHost: placeholder\r\n\r\n"), "Host", utils.HostPort(mockHttpsHost, mockHttpsPort))
+		_, err = yak.NewScriptEngine(10).ExecuteEx(`
+rsp, req = poc.HTTP(string(getParam("packet")), poc.proxy(getParam("proxy")), poc.host(getParam("h")), poc.port(getParam("p")), poc.https(true))~
+`, map[string]any{"packet": httpsPacket, "proxy": proxy, "h": mockHttpsHost, "p": mockHttpsPort})
+		require.NoError(t, err)
+
+		httpPacket := lowhttp.ReplaceHTTPPacketHeader([]byte("GET /v2-http-ishttps-"+token+" HTTP/1.1\r\nHost: placeholder\r\n\r\n"), "Host", utils.HostPort(mockHost, mockPort))
+		_, err = yak.NewScriptEngine(10).ExecuteEx(`
+rsp, req = poc.HTTP(string(getParam("packet")), poc.proxy(getParam("proxy")), poc.host(getParam("h")), poc.port(getParam("p")))~
+`, map[string]any{"packet": httpPacket, "proxy": proxy, "h": mockHost, "p": mockPort})
+		require.NoError(t, err)
+
+		time.Sleep(time.Second)
+
+		_, gmFlows, err := yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{SearchURL: "/v2-gm-ishttps-" + token})
+		require.NoError(t, err)
+		require.NotEmpty(t, gmFlows, "GM flow should be recorded")
+		require.True(t, gmFlows[0].IsHTTPS, "GM-TLS flow.IsHTTPS should be true")
+		require.True(t, strings.HasPrefix(gmFlows[0].Url, "https://"), "GM-TLS flow.Url should start with https://")
+
+		_, httpsFlows, err := yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{SearchURL: "/v2-https-ishttps-" + token})
+		require.NoError(t, err)
+		require.NotEmpty(t, httpsFlows, "HTTPS flow should be recorded")
+		require.True(t, httpsFlows[0].IsHTTPS, "HTTPS flow.IsHTTPS should be true")
+		require.True(t, strings.HasPrefix(httpsFlows[0].Url, "https://"), "HTTPS flow.Url should start with https://")
+
+		_, httpFlows, err := yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{SearchURL: "/v2-http-ishttps-" + token})
+		require.NoError(t, err)
+		require.NotEmpty(t, httpFlows, "HTTP flow should be recorded")
+		require.False(t, httpFlows[0].IsHTTPS, "plain HTTP flow.IsHTTPS should be false")
+		require.True(t, strings.HasPrefix(httpFlows[0].Url, "http://"), "plain HTTP flow.Url should start with http://")
+
+		break
+	}
+}
+
+func TestGRPCMUSTPASS_MITMV2_HTTPS_IsHttps(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	token := utils.RandStringBytes(40)
+
+	mockHttpsHost, mockHttpsPort := utils.DebugMockHTTPSEx(func(req []byte) []byte {
+		rsp, _, _ := lowhttp.FixHTTPResponse([]byte("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nOK"))
+		return rsp
+	})
+	mockHost, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		rsp, _, _ := lowhttp.FixHTTPResponse([]byte("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nOK"))
+		return rsp
+	})
+
+	rPort := utils.GetRandomAvailableTCPPort()
+	proxy := "http://127.0.0.1:" + fmt.Sprint(rPort)
+
+	stream, err := client.MITMV2(ctx)
+	require.NoError(t, err)
+
+	stream.Send(&ypb.MITMV2Request{
+		Host:             "127.0.0.1",
+		Port:             uint32(rPort),
+		SetAutoForward:   true,
+		AutoForwardValue: true,
+	})
+
+	for {
+		rsp, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		if !strings.Contains(spew.Sdump(rsp), `starting mitm server`) {
+			continue
+		}
+
+		httpsPacket := lowhttp.ReplaceHTTPPacketHeader([]byte("GET /v2-nongm-https-"+token+" HTTP/1.1\r\nHost: placeholder\r\n\r\n"), "Host", utils.HostPort(mockHttpsHost, mockHttpsPort))
+		_, err = yak.NewScriptEngine(10).ExecuteEx(`
+rsp, req = poc.HTTP(string(getParam("packet")), poc.proxy(getParam("proxy")), poc.host(getParam("h")), poc.port(getParam("p")), poc.https(true))~
+`, map[string]any{"packet": httpsPacket, "proxy": proxy, "h": mockHttpsHost, "p": mockHttpsPort})
+		require.NoError(t, err)
+
+		httpPacket := lowhttp.ReplaceHTTPPacketHeader([]byte("GET /v2-nongm-http-"+token+" HTTP/1.1\r\nHost: placeholder\r\n\r\n"), "Host", utils.HostPort(mockHost, mockPort))
+		_, err = yak.NewScriptEngine(10).ExecuteEx(`
+rsp, req = poc.HTTP(string(getParam("packet")), poc.proxy(getParam("proxy")), poc.host(getParam("h")), poc.port(getParam("p")))~
+`, map[string]any{"packet": httpPacket, "proxy": proxy, "h": mockHost, "p": mockPort})
+		require.NoError(t, err)
+
+		time.Sleep(time.Second)
+
+		_, httpsFlows, err := yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{SearchURL: "/v2-nongm-https-" + token})
+		require.NoError(t, err)
+		require.NotEmpty(t, httpsFlows, "HTTPS flow should be recorded")
+		require.True(t, httpsFlows[0].IsHTTPS, "HTTPS flow.IsHTTPS should be true")
+		require.True(t, strings.HasPrefix(httpsFlows[0].Url, "https://"), "HTTPS flow.Url should start with https://")
+
+		_, httpFlows, err := yakit.QueryHTTPFlow(consts.GetGormProjectDatabase(), &ypb.QueryHTTPFlowRequest{SearchURL: "/v2-nongm-http-" + token})
+		require.NoError(t, err)
+		require.NotEmpty(t, httpFlows, "HTTP flow should be recorded")
+		require.False(t, httpFlows[0].IsHTTPS, "plain HTTP flow.IsHTTPS should be false")
+		require.True(t, strings.HasPrefix(httpFlows[0].Url, "http://"), "plain HTTP flow.Url should start with http://")
+
+		break
+	}
+}
+
 // TestGRPCMUSTPASS_MITM_Drop 测试MITM设置手动劫持并丢弃响应后MITM响应的行为和HTTP History的记录是否符合预期
 func TestGRPCMUSTPASS_MITMV2_Drop(t *testing.T) {
 	client, err := NewLocalClient() // 新建一个 yakit client
