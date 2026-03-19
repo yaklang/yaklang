@@ -154,6 +154,14 @@ func TestArtifactsVisibility_AfterAsyncPlanExecution(t *testing.T) {
 	_, err := os.Stat(filepath.Join(workDir, "task_1-1_network_scan"))
 	require.NoError(t, err, "task_1-1 directory should exist after plan execution in workdir: %s", workDir)
 
+	// Record callCount BEFORE sending the second input.
+	// The first task's completion may trigger additional AI calls (auto-summary via directly_answer),
+	// so callCount may already be > 1. We need to wait for a NEW call triggered by the second input.
+	promptMu.Lock()
+	callCountBeforeSecondInput := callCount
+	promptMu.Unlock()
+	log.Infof("[TEST] callCount before second input: %d", callCountBeforeSecondInput)
+
 	// Now send a SECOND input event (simulating subsequent conversation in the same session)
 	go func() {
 		in <- &ypb.AIInputEvent{
@@ -162,7 +170,8 @@ func TestArtifactsVisibility_AfterAsyncPlanExecution(t *testing.T) {
 		}
 	}()
 
-	// Wait for the second AI callback
+	// Wait for an AI callback triggered by the second input (callCount must exceed the
+	// value recorded before we sent the second input).
 	deadline2 := time.After(15 * time.Second)
 	secondCallDone := false
 WAIT_SECOND:
@@ -170,7 +179,7 @@ WAIT_SECOND:
 		select {
 		case <-out:
 			promptMu.Lock()
-			if callCount >= 2 {
+			if callCount > callCountBeforeSecondInput {
 				secondCallDone = true
 			}
 			promptMu.Unlock()
@@ -183,11 +192,13 @@ WAIT_SECOND:
 		}
 	}
 
-	// Verify the second prompt contains the artifacts information
+	// Verify the prompt from the second input contains the artifacts information
 	promptMu.Lock()
 	defer promptMu.Unlock()
 
-	require.GreaterOrEqual(t, len(capturedPrompts), 2, "should have captured at least 2 prompts")
+	require.Greater(t, len(capturedPrompts), callCountBeforeSecondInput,
+		"should have captured prompts after the second input (callCountBefore=%d, total=%d)",
+		callCountBeforeSecondInput, len(capturedPrompts))
 
 	secondPrompt := capturedPrompts[len(capturedPrompts)-1]
 
