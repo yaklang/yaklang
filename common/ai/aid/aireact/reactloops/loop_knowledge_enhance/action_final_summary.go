@@ -108,6 +108,7 @@ func makeFinalSummaryAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 				finalReport,
 				nil,
 			)
+			directAnswerDelivered := false
 			if result == "" {
 				r.GetConfig().GetEmitter().EmitTextMarkdownStreamEvent(
 					"re-act-loop-answer-payload",
@@ -115,13 +116,20 @@ func makeFinalSummaryAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 					loop.GetCurrentTask().GetId(),
 					func() {},
 				)
+				directAnswerDelivered = true
 			}
 			log.Infof("Final summary direct answer result: %s", utils.ShrinkTextBlock(result, 2048))
-			if err != nil {
-				op.Continue()
-			} else {
-				op.Exit()
+			if err == nil {
+				directAnswerDelivered = true
 			}
+
+			if directAnswerDelivered {
+				markFinalSummaryDirectAnswered(loop)
+				op.Exit()
+				return
+			}
+
+			op.Continue()
 		},
 	)
 }

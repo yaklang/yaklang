@@ -53,7 +53,7 @@ func ProcessAttachedData(r aicommon.AIInvokeRuntime, loop *reactloops.ReActLoop,
 		if finalSummary != "" {
 			searchResultsSummary = finalSummary
 		} else {
-			searchResultsSummary = loop.Get("search_results_summary")
+			searchResultsSummary = knowledgeEnhanceLoop.Get("search_results_summary")
 		}
 
 		if searchResultsSummary != "" {

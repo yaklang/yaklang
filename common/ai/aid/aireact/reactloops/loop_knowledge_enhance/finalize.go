@@ -1,6 +1,7 @@
 package loop_knowledge_enhance
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -14,12 +15,53 @@ import (
 
 // maxFinalDocBytes is the maximum size for the final aggregated knowledge document
 const maxFinalDocBytes = 50 * 1024 // 50KB
+const finalSummaryDirectAnsweredKey = "final_summary_direct_answered"
+
+func markFinalSummaryDirectAnswered(loop *reactloops.ReActLoop) {
+	loop.Set(finalSummaryDirectAnsweredKey, true)
+}
+
+func hasFinalSummaryDirectAnswered(loop *reactloops.ReActLoop) bool {
+	return utils.InterfaceToBoolean(loop.Get(finalSummaryDirectAnsweredKey))
+}
+
+func getDirectAnswerContext(loop *reactloops.ReActLoop) context.Context {
+	ctx := loop.GetConfig().GetContext()
+	task := loop.GetCurrentTask()
+	if task != nil && !utils.IsNil(task.GetContext()) {
+		ctx = task.GetContext()
+	}
+	return ctx
+}
+
+func deliverFinalAnswerFallback(loop *reactloops.ReActLoop, invoker aicommon.AIInvokeRuntime, finalContent string) {
+	finalContent = strings.TrimSpace(finalContent)
+	if finalContent == "" {
+		log.Infof("knowledge enhance finalize: skip fallback direct answer because final content is empty")
+		return
+	}
+
+	if hasFinalSummaryDirectAnswered(loop) {
+		log.Infof("knowledge enhance finalize: skip fallback direct answer because content was already delivered")
+		return
+	}
+
+	result, err := invoker.DirectlyAnswer(getDirectAnswerContext(loop), finalContent, nil)
+	if err != nil {
+		log.Warnf("knowledge enhance finalize: failed to directly answer with final report: %v", err)
+		return
+	}
+
+	markFinalSummaryDirectAnswered(loop)
+	log.Infof("knowledge enhance finalize: delivered fallback direct answer, response: %s", utils.ShrinkTextBlock(result, 512))
+}
 
 // generateFinalKnowledgeDocument aggregates all compressed knowledge from rounds
 // into a single document limited to 50KB
-func generateFinalKnowledgeDocument(loop *reactloops.ReActLoop, invoker aicommon.AIInvokeRuntime) {
+func generateFinalKnowledgeDocument(loop *reactloops.ReActLoop, invoker aicommon.AIInvokeRuntime) string {
 	userQuery := loop.Get("user_query")
 	finalSummary := loop.Get("final_summary") // 从 evaluateNextMovements 获取的总结
+	searchResultsSummary := loop.Get("search_results_summary")
 	maxIterations := loop.GetCurrentIterationIndex()
 
 	// Collect all compressed results and artifact files
@@ -39,11 +81,6 @@ func generateFinalKnowledgeDocument(loop *reactloops.ReActLoop, invoker aicommon
 				artifactFiles = append(artifactFiles, artifactFile)
 			}
 		}
-	}
-
-	if len(allCompressedResults) == 0 {
-		log.Infof("generateFinalKnowledgeDocument: no compressed results to aggregate")
-		return
 	}
 
 	log.Infof("generateFinalKnowledgeDocument: aggregating %d compressed results from %d artifact files",
@@ -87,6 +124,10 @@ func generateFinalKnowledgeDocument(loop *reactloops.ReActLoop, invoker aicommon
 		finalDoc.WriteString("## 总体回答\n\n")
 		finalDoc.WriteString(finalSummary)
 		finalDoc.WriteString("\n\n")
+	} else if searchResultsSummary != "" {
+		finalDoc.WriteString("## 当前知识摘要\n\n")
+		finalDoc.WriteString(searchResultsSummary)
+		finalDoc.WriteString("\n\n")
 	}
 
 	// Metadata section
@@ -107,8 +148,15 @@ func generateFinalKnowledgeDocument(loop *reactloops.ReActLoop, invoker aicommon
 
 	// Main content section
 	finalDoc.WriteString("## 详细知识内容\n\n")
-	finalDoc.WriteString(mergedContent)
-	finalDoc.WriteString("\n\n")
+	if mergedContent != "" {
+		finalDoc.WriteString(mergedContent)
+		finalDoc.WriteString("\n\n")
+	} else if searchResultsSummary != "" {
+		finalDoc.WriteString(searchResultsSummary)
+		finalDoc.WriteString("\n\n")
+	} else {
+		finalDoc.WriteString("本次没有收集到可供聚合的知识片段。\n\n")
+	}
 
 	// Next movements summary (for reference)
 	if nextMovementsSummary != "" {
@@ -160,6 +208,8 @@ func generateFinalKnowledgeDocument(loop *reactloops.ReActLoop, invoker aicommon
 
 	// Store final document path in loop context
 	loop.Set("final_knowledge_document", finalFilename)
+	loop.Set("knowledge_search_status", "completed")
+	return finalContent
 }
 
 // BuildOnPostIterationHook creates the hook for generating final document when loop is done
@@ -172,12 +222,14 @@ func BuildOnPostIterationHook(invoker aicommon.AIInvokeRuntime) reactloops.ReAct
 			if reasonErr, ok := reason.(error); ok && strings.Contains(reasonErr.Error(), "max iterations") {
 				log.Infof("knowledge enhance loop ended due to max iterations, generating insufficient data report")
 				// 生成"资料不足"报告
-				generateInsufficientDataReport(loop, invoker)
+				finalContent := generateInsufficientDataReport(loop, invoker)
+				deliverFinalAnswerFallback(loop, invoker, finalContent)
 				// 忽略错误，不让专注模式报错退出
 				operator.IgnoreError()
 			} else {
 				// 正常结束，生成完整报告
-				generateFinalKnowledgeDocument(loop, invoker)
+				finalContent := generateFinalKnowledgeDocument(loop, invoker)
+				deliverFinalAnswerFallback(loop, invoker, finalContent)
 			}
 		}
 	})
@@ -185,7 +237,7 @@ func BuildOnPostIterationHook(invoker aicommon.AIInvokeRuntime) reactloops.ReAct
 
 // generateInsufficientDataReport 生成资料不足报告
 // 当循环因超出最大迭代次数而结束时调用
-func generateInsufficientDataReport(loop *reactloops.ReActLoop, invoker aicommon.AIInvokeRuntime) {
+func generateInsufficientDataReport(loop *reactloops.ReActLoop, invoker aicommon.AIInvokeRuntime) string {
 	userQuery := loop.Get("user_query")
 	searchHistory := loop.Get("search_history")
 	searchResultsSummary := loop.Get("search_results_summary")
@@ -312,4 +364,5 @@ func generateInsufficientDataReport(loop *reactloops.ReActLoop, invoker aicommon
 	// Store report path in loop context
 	loop.Set("final_knowledge_document", finalFilename)
 	loop.Set("knowledge_search_status", "insufficient")
+	return finalContent
 }
