@@ -763,6 +763,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			Url:         urlStr,
 			ResponseId:  responseCounter,
 			Request:     wsReq,
+			IsHttps:     httpctx.GetRequestHTTPSWithFallback(req) || enableGMTLS,
 			RemoteAddr:  httpctx.GetRemoteAddr(req),
 			IsWebsocket: true,
 		}
@@ -1147,7 +1148,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				feedbackOrigin := &ypb.MITMResponse{
 					Request:             wsReq,
 					Payload:             raw,
-					IsHttps:             false,
+					IsHttps:             httpctx.GetRequestHTTPSWithFallback(req) || enableGMTLS,
 					Url:                 urlStr,
 					Id:                  id,
 					FilterData:          filterManager.Data,
@@ -1428,10 +1429,12 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			}
 			httpctx.SetRequestViewedByUser(originReqIns)
 			for {
+				// IsHttps: 前端配置国密时强制 HTTPS，否则从 httpctx/TLS/ConnectToHTTPS 获取
+				isHttpsVal := httpctx.GetRequestHTTPSWithFallback(originReqIns) || enableGMTLS
 				feedbackOrigin := &ypb.MITMResponse{
 					Request:             req,
 					Refresh:             false,
-					IsHttps:             isHttps,
+					IsHttps:             isHttpsVal,
 					Url:                 urlStr,
 					Id:                  id,
 					FilterData:          filterManager.Data,
@@ -1496,7 +1499,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 					// 保存到数据库
 					log.Debugf("start to create httpflow from mitm[%v %v]", originReqIns.Method, truncate(originReqIns.URL.String()))
 					startCreateFlow := time.Now()
-					flow, err := yakit.CreateHTTPFlowFromHTTPWithNoRspSaved(isHttps, originReqIns, "mitm", originReqIns.URL.String(), remoteAddr, yakit.CreateHTTPFlowWithRequestIns(fixReqIns))
+					flow, err := yakit.CreateHTTPFlowFromHTTPWithNoRspSaved(httpctx.GetRequestHTTPSWithFallback(originReqIns) || enableGMTLS, originReqIns, "mitm", originReqIns.URL.String(), remoteAddr, yakit.CreateHTTPFlowWithRequestIns(fixReqIns))
 					if err != nil {
 						log.Errorf("save http flow[%v %v] from mitm failed: %s", originReqIns.Method, originReqIns.URL.String(), err)
 						return nil
@@ -1647,19 +1650,20 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			}
 		}
 
-		// 保存到数据库
+		// 保存到数据库（前端配置国密时强制 HTTPS，否则从 req 的 httpctx/TLS/ConnectToHTTPS 获取）
+		saveIsHttps := httpctx.GetRequestHTTPSWithFallback(req) || enableGMTLS
 		log.Debugf("start to create httpflow from mitm[%v %v]", req.Method, truncate(reqUrl))
 		startCreateFlow := time.Now()
 		var flow *schema.HTTPFlow
 		if httpctx.GetContextBoolInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_NOLOG) {
-			flow, err = yakit.CreateHTTPFlowFromHTTPWithNoRspSaved(isHttps, req, "mitm", reqUrl, remoteAddr)
+			flow, err = yakit.CreateHTTPFlowFromHTTPWithNoRspSaved(saveIsHttps, req, "mitm", reqUrl, remoteAddr)
 			flow.StatusCode = 200 // 先设置成200
 		} else {
 			var duration time.Duration
 			if i, ok := httpctx.GetResponseTraceInfo(req).(*lowhttp.LowhttpTraceInfo); ok {
 				duration = i.TotalTime
 			}
-			flow, err = yakit.CreateHTTPFlowFromHTTPWithBodySaved(isHttps, req, rsp, "mitm", reqUrl, remoteAddr, yakit.CreateHTTPFlowWithDuration(duration)) // , !responseOverSize)
+			flow, err = yakit.CreateHTTPFlowFromHTTPWithBodySaved(saveIsHttps, req, rsp, "mitm", reqUrl, remoteAddr, yakit.CreateHTTPFlowWithDuration(duration)) // , !responseOverSize)
 		}
 		if err != nil {
 			log.Errorf("save http flow[%v %v] from mitm failed: %s", req.Method, reqUrl, err)
