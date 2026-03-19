@@ -65,3 +65,26 @@ func TestConfig_WithID_SyncsEmitterId(t *testing.T) {
 		"Event CoordinatorId should match the custom ID set via WithID. "+
 			"This test ensures WithID syncs the Emitter's internal id, preventing a third CoordinatorId leak.")
 }
+
+func TestGetLastIDFromConfigOptions(t *testing.T) {
+	firstID := uuid.NewString()
+	lastID := uuid.NewString()
+
+	id, ok := GetLastIDFromConfigOptions(
+		WithAIServiceName("test-service"),
+		WithID(firstID),
+		WithLanguage("zh"),
+		WithID(lastID),
+	)
+	require.True(t, ok)
+	require.Equal(t, lastID, id)
+}
+
+func TestGetLastIDFromConfigOptions_NoID(t *testing.T) {
+	id, ok := GetLastIDFromConfigOptions(
+		WithAIServiceName("test-service"),
+		WithLanguage("zh"),
+	)
+	require.False(t, ok)
+	require.Empty(t, id)
+}

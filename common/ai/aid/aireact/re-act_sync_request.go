@@ -126,11 +126,6 @@ func (r *ReAct) HandleSyncTypeRecoveryPlanAndExecEvent(event *ypb.AIInputEvent) 
 		r.EmitSyncEventError("recover_plan_and_exec", err, event.SyncID)
 		return nil
 	}
-	if r.GetCurrentTask() == nil {
-		r.EmitSyncEventError("recover_plan_and_exec", errors.New("no current task available for recovery"), event.SyncID)
-		return nil
-	}
-
 	r.EmitSyncEvent("recover_plan_and_exec", map[string]interface{}{
 		"started":        true,
 		"session_id":     sessionID,

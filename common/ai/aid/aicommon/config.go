@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"math/rand/v2"
+	"reflect"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -29,6 +31,42 @@ import (
 )
 
 type ConfigOption func(*Config) error
+
+var configOptionIDRegistry sync.Map
+
+type configIDOptionMeta struct {
+	id  string
+	key uintptr
+}
+
+func (o *configIDOptionMeta) apply(c *Config) error {
+	if c.m == nil {
+		c.m = &sync.Mutex{}
+	}
+	c.m.Lock()
+	defer c.m.Unlock()
+	c.Id = o.id
+	// Also update Emitter's id to keep them in sync
+	if c.Emitter != nil {
+		c.Emitter.SetId(o.id)
+	}
+	return nil
+}
+
+// GetLastIDFromConfigOptions returns the final id configured by WithID in opts.
+// It scans from the end and stops on the first matching WithID option.
+func GetLastIDFromConfigOptions(opts ...ConfigOption) (string, bool) {
+	for i := len(opts) - 1; i >= 0; i-- {
+		opt := opts[i]
+		if opt == nil {
+			continue
+		}
+		if id, ok := configOptionIDRegistry.Load(reflect.ValueOf(opt).Pointer()); ok {
+			return id.(string), true
+		}
+	}
+	return "", false
+}
 
 type ConfigInitStatus struct {
 	PersistentSessionRestored *utils.AtomicBool
@@ -475,19 +513,14 @@ func newConfig(ctx context.Context) *Config {
 
 // WithID sets the runtime id for the config.
 func WithID(id string) ConfigOption {
-	return func(c *Config) error {
-		if c.m == nil {
-			c.m = &sync.Mutex{}
-		}
-		c.m.Lock()
-		defer c.m.Unlock()
-		c.Id = id
-		// Also update Emitter's id to keep them in sync
-		if c.Emitter != nil {
-			c.Emitter.SetId(id)
-		}
-		return nil
-	}
+	meta := &configIDOptionMeta{id: id}
+	opt := ConfigOption(meta.apply)
+	meta.key = reflect.ValueOf(opt).Pointer()
+	configOptionIDRegistry.Store(meta.key, id)
+	runtime.SetFinalizer(meta, func(m *configIDOptionMeta) {
+		configOptionIDRegistry.Delete(m.key)
+	})
+	return opt
 }
 
 // WithContext sets the context (and optional cancel) for the config.
