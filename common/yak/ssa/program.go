@@ -36,7 +36,6 @@ func NewProgram(
 		UpStream:                omap.NewEmptyOrderedMap[string, *Program](),
 		DownStream:              make(map[string]*Program),
 		errors:                  make([]*SSAError, 0),
-		astMap:                  make(map[string]struct{}),
 		OffsetMap:               make(map[int]*OffsetItem),
 		OffsetSortedSlice:       make([]int, 0),
 		Funcs:                   omap.NewEmptyOrderedMap[string, *Function](),
@@ -57,6 +56,8 @@ func NewProgram(
 		config:                  NewLanguageConfig(),
 		NameCache:               ssadb.NewNameCache(programName),
 		compileConfig:           cfg,
+		rootBuildSeq:            make([]RootBuildRunner, 0),
+		rootBuildByID:           make(map[string]RootBuildRunner),
 	}
 
 	prog.GlobalVariablesBlueprint = NewBlueprint("__GlobalVariables__")
@@ -85,7 +86,6 @@ func NewTmpProgram(ProgramName string) *Program {
 		UpStream:                omap.NewEmptyOrderedMap[string, *Program](),
 		DownStream:              make(map[string]*Program),
 		errors:                  make([]*SSAError, 0),
-		astMap:                  make(map[string]struct{}),
 		OffsetMap:               make(map[int]*OffsetItem),
 		OffsetSortedSlice:       make([]int, 0),
 		Funcs:                   omap.NewEmptyOrderedMap[string, *Function](),
@@ -105,6 +105,8 @@ func NewTmpProgram(ProgramName string) *Program {
 		CurrentIncludingStack:   utils.NewStack[string](),
 		config:                  NewLanguageConfig(),
 		NameCache:               ssadb.NewNameCache(ProgramName),
+		rootBuildSeq:            make([]RootBuildRunner, 0),
+		rootBuildByID:           make(map[string]RootBuildRunner),
 	}
 	prog.Application = prog
 	prog.DatabaseKind = ProgramCacheMemory
@@ -112,13 +114,18 @@ func NewTmpProgram(ProgramName string) *Program {
 }
 func (prog *Program) createSubProgram(name string, kind ssadb.ProgramKind, path ...string) *Program {
 	fs := prog.Loader.GetFilesysFileSystem()
-	programPath := prog.Loader.GetBasePath()
-	if currentEditor := prog.GetCurrentEditor(); currentEditor != nil {
-		fullPath := currentEditor.GetFilename()
-		endPath := fs.Join(path...)
-		if prefix, _, ok := strings.Cut(fullPath, endPath); ok {
-			programPath = prefix
-		}
+	currentEditor := prog.GetCurrentEditor()
+	if currentEditor == nil && prog.Application != nil && prog.Application != prog {
+		currentEditor = prog.Application.GetCurrentEditor()
+	}
+	fullPath := prog.Loader.GetBasePath()
+	if currentEditor != nil {
+		fullPath = currentEditor.GetFilename()
+	}
+	endPath := fs.Join(path...)
+	programPath, _, _ := strings.Cut(fullPath, endPath)
+	if programPath == "" {
+		programPath = prog.Loader.GetBasePath()
 	}
 	subProg := NewProgram(cloneProgramConfig(prog.compileConfig, name), prog.DatabaseKind, kind, fs, programPath, 0)
 	subProg.Application = prog.Application
@@ -350,25 +357,104 @@ func (prog *Program) Finish() {
 	}
 	prog.finished = true
 
-	// check instruction build
-	// if len(prog.astMap) != 0 {
-	/* in end this program not delete all astMap item,
-	this mean some file build in preHandler but not build in Build
-	*/
-	// log.Errorf("BUG!! program %s has not finish ast", prog.Name)
-	prog.LazyBuild() // finish
-	// }
-
-	pending := make([]*Program, 0)
+	prog.LazyBuild()
+	children := make([]*Program, 0, prog.UpStream.Len())
 	prog.UpStream.ForEach(func(_ string, v *Program) bool {
 		if v != nil {
-			pending = append(pending, v)
+			children = append(children, v)
 		}
 		return true
 	})
-	for _, v := range pending {
-		v.Finish()
+	for _, child := range children {
+		child.Finish()
 	}
+}
+
+func (prog *Program) registerRootBuildTask(task RootBuildRunner) RootBuildRunner {
+	if prog == nil || task == nil {
+		return nil
+	}
+	app := prog.GetApplication()
+	if app == nil {
+		app = prog
+	}
+	if existing, ok := app.rootBuildByID[task.ID()]; ok {
+		return existing
+	}
+	app.rootBuildByID[task.ID()] = task
+	app.rootBuildSeq = append(app.rootBuildSeq, task)
+	return task
+}
+
+func (prog *Program) RegisterRootTask(kind RootBuildKind, name string, work func()) *RootBuildTask {
+	task, _ := prog.registerRootBuildTask(NewRootBuildTask(kind, name, work)).(*RootBuildTask)
+	return task
+}
+
+func (prog *Program) RegisterRootFunction(name string, fun *Function) *RootBuildTask {
+	if fun == nil {
+		return nil
+	}
+	task, _ := prog.registerRootBuildTask(NewRootBuildTask(RootBuildKindFunction, name, func() {
+		fun.Build()
+	})).(*RootBuildTask)
+	return task
+}
+
+func (prog *Program) RegisterRootBlueprint(name string, blueprint *Blueprint) *RootBuildTask {
+	if blueprint == nil {
+		return nil
+	}
+	task, _ := prog.registerRootBuildTask(NewRootBuildTask(RootBuildKindBlueprint, name, func() {
+		blueprint.Build()
+	})).(*RootBuildTask)
+	return task
+}
+
+func (prog *Program) RegisterRootTopLevel(name string, editor *memedit.MemEditor, builder *FunctionBuilder, work func(*FunctionBuilder)) *TopLevelBuilder {
+	if builder == nil {
+		return nil
+	}
+	task, _ := prog.registerRootBuildTask(NewTopLevelBuilder(name, prog, editor, builder, work)).(*TopLevelBuilder)
+	return task
+}
+
+func (prog *Program) RunRootBuilds() {
+	_ = prog.RunRootBuildsWithCallback(nil)
+}
+
+func (prog *Program) RootBuildCount() int {
+	if prog == nil {
+		return 0
+	}
+	app := prog.GetApplication()
+	if app == nil {
+		app = prog
+	}
+	return len(app.rootBuildSeq)
+}
+
+func (prog *Program) RunRootBuildsWithCallback(afterEach func(index int, total int) bool) bool {
+	if prog == nil {
+		return true
+	}
+	app := prog.GetApplication()
+	if app == nil {
+		app = prog
+	}
+	total := len(app.rootBuildSeq)
+	for index, task := range app.rootBuildSeq {
+		if task == nil {
+			continue
+		}
+		task.Build()
+		if afterEach != nil {
+			if !afterEach(index+1, total) {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func (prog *Program) SearchIndexAndOffsetByOffset(searchOffset int) (index int, offset int) {
