@@ -111,6 +111,20 @@ func SetRequestHTTPS(r *http.Request, b bool) {
 	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_IsHttps, b)
 }
 
+// GetRequestHTTPSWithFallback 从 httpctx/TLS/ConnectToHTTPS 获取，MITM 路径由上游（handleProxyAuth/h2）设置
+func GetRequestHTTPSWithFallback(r *http.Request) bool {
+	if r == nil {
+		return false
+	}
+	if r.TLS != nil || GetRequestHTTPS(r) {
+		return true
+	}
+	if GetContextBoolInfoFromRequest(r, REQUEST_CONTEXT_ConnectToHTTPS) {
+		return true
+	}
+	return false
+}
+
 func GetContextBoolInfoFromRequest(r *http.Request, key string) bool {
 	infoMap := GetContextInfoMap(r)
 	v, ok := infoMap.Load(key)

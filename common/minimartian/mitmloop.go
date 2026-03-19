@@ -837,6 +837,11 @@ func (p *Proxy) handleProxyAuth(conn net.Conn, req *http.Request, timer *time.Ti
 
 	if ctx.GetSessionBoolValue(httpctx.REQUEST_CONTEXT_KEY_ViaConnect) {
 		httpctx.SetRequestViaCONNECT(req, true)
+		// CONNECT 隧道内的请求目标为 HTTPS，应标记为 isHttps（国密开启时应自动开启 HTTPS）
+		if !isHttps && ctx.GetSessionBoolValue(httpctx.REQUEST_CONTEXT_ConnectToHTTPS) {
+			isHttps = true
+			httpctx.SetRequestHTTPS(req, true)
+		}
 	}
 
 	if needAuth {
