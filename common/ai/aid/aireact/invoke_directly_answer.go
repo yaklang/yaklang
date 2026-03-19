@@ -147,6 +147,7 @@ func (r *ReAct) DirectlyAnswer(ctx context.Context, query string, tools []*aitoo
 			if err != nil {
 				return errorWarp(err)
 			}
+			action.WaitStream(ctx)
 			var payload string
 			if r := action.GetString("answer_payload"); r != "" {
 				payload = r

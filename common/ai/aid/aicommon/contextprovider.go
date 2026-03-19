@@ -446,6 +446,7 @@ func ArtifactsContextProvider(config AICallerConfigIf, emitter *Emitter, key str
 	var entries []artifactFileEntry
 	walkErr := filepath.Walk(workDir, func(path string, fi os.FileInfo, err error) error {
 		if err != nil {
+			log.Warnf("[ArtifactsContextProvider] walk error for %s: %v", path, err)
 			return nil // skip errors
 		}
 		if fi.IsDir() {
@@ -455,6 +456,7 @@ func ArtifactsContextProvider(config AICallerConfigIf, emitter *Emitter, key str
 		if err != nil {
 			relPath = path
 		}
+		log.Infof("[ArtifactsContextProvider] found file: %s", relPath)
 		entries = append(entries, artifactFileEntry{
 			RelPath: relPath,
 			Size:    fi.Size(),
@@ -465,6 +467,8 @@ func ArtifactsContextProvider(config AICallerConfigIf, emitter *Emitter, key str
 	if walkErr != nil {
 		log.Warnf("artifacts context provider: walk error: %v", walkErr)
 	}
+
+	log.Infof("[ArtifactsContextProvider] total entries found: %d in workDir: %s", len(entries), workDir)
 
 	if len(entries) == 0 {
 		return "", nil
