@@ -429,6 +429,15 @@ func appendStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfigOption, t
 		processAIResponse(r, closer, outWriter, reasonWriter, toolCallCallback, rawResponseCallback)
 	}))
 
+	opts = append(opts, poc.WithReplaceHttpPacketHeader("Content-Type", "application/json"))
+	if isStream {
+		opts = append(opts,
+			poc.WithConnPool(false),
+			poc.WithNoBodyBuffer(true),
+			poc.WithReplaceHttpPacketHeader("Accept", "text/event-stream"),
+		)
+	}
+
 	return outReader, reasonReader, opts, cancelFunc
 }
 
