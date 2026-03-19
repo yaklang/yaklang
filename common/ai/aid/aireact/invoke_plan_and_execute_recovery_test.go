@@ -97,7 +97,7 @@ func TestReAct_RecoveryPlanAndExec_SkipCompletedTasks(t *testing.T) {
 	doneCalls := 0
 	todoCalls := 0
 
-	reactIns, err := NewTestReAct(
+	_, err := NewTestReAct(
 		aicommon.WithPersistentSessionId(sessionID),
 		aicommon.WithEventInputChan(in),
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
@@ -148,9 +148,6 @@ func TestReAct_RecoveryPlanAndExec_SkipCompletedTasks(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	reactTask := aicommon.NewStatefulTaskBase("react-task-"+uuid.NewString(), "recovery-input", context.Background(), nil, true)
-	reactIns.SetCurrentTask(reactTask)
-
 	syncID := ksuid.New().String()
 	in <- &ypb.AIInputEvent{
 		IsSyncMessage: true,
@@ -160,11 +157,12 @@ func TestReAct_RecoveryPlanAndExec_SkipCompletedTasks(t *testing.T) {
 	}
 
 	var (
-		syncStarted   bool
-		planStarted   bool
-		planEnded     bool
-		recoveredIDOK bool
-		sessionIDOK   bool
+		syncStarted    bool
+		planStarted    bool
+		planEnded      bool
+		recoveredIDOK  bool
+		sessionIDOK    bool
+		recoveryTaskOK bool
 	)
 
 	after := time.After(20 * time.Second)
@@ -194,6 +192,13 @@ LOOP:
 				result := utils.InterfaceToString(jsonpath.FindFirst(e.Content, `$..coordinator_id`))
 				if result == coordinatorID {
 					planStarted = true
+					var payload map[string]any
+					if err := json.Unmarshal(e.Content, &payload); err == nil {
+						recoveryTaskID := utils.InterfaceToString(payload["re-act_task"])
+						if strings.HasPrefix(recoveryTaskID, recoveryTaskIDPrefix) {
+							recoveryTaskOK = true
+						}
+					}
 				}
 			}
 			if e.Type == string(schema.EVENT_TYPE_END_PLAN_AND_EXECUTION) {
@@ -214,6 +219,7 @@ LOOP:
 	require.True(t, recoveredIDOK, "expected recovery sync to carry coordinator_id")
 	require.True(t, sessionIDOK, "expected recovery sync to carry session_id")
 	require.True(t, planStarted, "expected recovery plan execution to start")
+	require.True(t, recoveryTaskOK, "expected recovery plan execution to use recovery task id prefix")
 	require.True(t, planEnded, "expected recovery plan execution to end")
 
 	mu.Lock()
