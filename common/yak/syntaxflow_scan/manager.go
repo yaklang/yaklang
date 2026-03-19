@@ -301,20 +301,23 @@ func (m *scanManager) initByConfig() error {
 
 	// log.Errorf("config: %v", config.Config.GetRuleInput())
 	if input := config.GetRuleInput(); len(input) != 0 {
-		// start debug mode scan task
-		ruleCh := make(chan *schema.SyntaxFlowRule)
-		go func() {
-			defer close(ruleCh)
-			for _, rinput := range input {
-				if rule, err := yakit.ParseSyntaxFlowInput(rinput); err != nil {
-					m.errorCallback("compile rule failed: %s", err)
-				} else {
-					ruleCh <- rule
-				}
+		// start debug mode scan task (use provided rule inputs)
+		rules := make([]*schema.SyntaxFlowRule, 0, len(input))
+		for _, rinput := range input {
+			rule, err := yakit.ParseSyntaxFlowInput(rinput)
+			if err != nil {
+				m.errorCallback("compile rule failed: %s", err)
+				continue
 			}
-		}()
+			rules = append(rules, rule)
+		}
+		ruleCh := make(chan *schema.SyntaxFlowRule, len(rules))
+		for _, r := range rules {
+			ruleCh <- r
+		}
+		close(ruleCh)
 		m.ruleChan = ruleCh
-		m.rulesCount = 1
+		m.rulesCount = int64(len(rules))
 		m.kind = schema.SFResultKindDebug
 	} else if config.GetRuleFilter() != nil {
 		if err := setRuleChan(config.GetRuleFilter()); err != nil {

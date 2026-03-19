@@ -149,6 +149,50 @@ func TestStartScan_WithRuleProcessCallback(t *testing.T) {
 	log.Infof("测试完成: 任务ID=%s, 规则进度回调次数=%d", taskID, ruleProgress.Count())
 }
 
+func TestStartScan_CustomRuleInput_NoLanguage_NotSkipped(t *testing.T) {
+	progID := uuid.NewString()
+	f := prepareTestProgram(t, progID)
+	defer f()
+
+	// Only provide Content (no Language/RuleName metadata), which used to make the rule skipped.
+	rule := `desc(
+  title: "test-get-call",
+  type: audit
+)
+
+.get() as $call;
+alert $call;
+`
+
+	var mu sync.Mutex
+	var lastInfo *RuleProcessInfoList
+	var lastProgress float64
+
+	err := StartScan(context.Background(),
+		ssaconfig.WithProgramNames(progID),
+		ssaconfig.WithRuleInputRaw(rule),
+		WithProcessCallback(func(taskID, status string, progress float64, info *RuleProcessInfoList) {
+			mu.Lock()
+			defer mu.Unlock()
+			lastProgress = progress
+			if info != nil {
+				lastInfo = info
+			}
+		}),
+	)
+
+	require.NoError(t, err)
+
+	mu.Lock()
+	defer mu.Unlock()
+	require.NotNil(t, lastInfo)
+	require.Equal(t, int64(1), lastInfo.TotalQuery)
+	require.Equal(t, int64(1), lastInfo.FinishedQuery)
+	require.Equal(t, int64(0), lastInfo.SkippedQuery)
+	require.Equal(t, int64(1), lastInfo.SuccessQuery+lastInfo.FailedQuery)
+	require.Equal(t, 1.0, lastProgress)
+}
+
 func TestPauseAndCheck(t *testing.T) {
 	progID := uuid.NewString()
 	f := prepareTestProgram(t, progID)
