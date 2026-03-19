@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -34,6 +35,9 @@ func TestArtifactsVisibility_AfterAsyncPlanExecution(t *testing.T) {
 	callCount := 0
 
 	var reactIns *ReAct
+
+	// Synchronization for HijackPERequest completion
+	hijackDone := make(chan struct{})
 
 	var insErr error
 	reactIns, insErr = NewTestReAct(
@@ -63,30 +67,56 @@ func TestArtifactsVisibility_AfterAsyncPlanExecution(t *testing.T) {
 			return rsp, nil
 		}),
 		aicommon.WithHijackPERequest(func(ctx context.Context, payload string) error {
+			defer close(hijackDone) // Signal completion
+
 			// Get the actual workdir that ensureWorkDirectory created
 			workDir := reactIns.config.GetOrCreateWorkDir()
+			log.Infof("[TEST] HijackPERequest: workDir = %s", workDir)
 
 			// Simulate plan execution: create task artifact files in the workdir
 			task1Dir := filepath.Join(workDir, "task_1-1_network_scan")
-			os.MkdirAll(filepath.Join(task1Dir, "tool_calls"), 0755)
-			os.WriteFile(
+			if err := os.MkdirAll(filepath.Join(task1Dir, "tool_calls"), 0755); err != nil {
+				log.Warnf("[TEST] Failed to create task1Dir/tool_calls: %v", err)
+			}
+			if err := os.WriteFile(
 				filepath.Join(task1Dir, "tool_calls", "1_bash_nmap_scan.md"),
 				[]byte("# Tool Call: bash\n## Parameters\ncommand: nmap -sV 192.168.1.0/24\n## Result\nHost is up"),
 				0644,
-			)
-			os.WriteFile(
+			); err != nil {
+				log.Warnf("[TEST] Failed to write 1_bash_nmap_scan.md: %v", err)
+			}
+			if err := os.WriteFile(
 				filepath.Join(task1Dir, "task_1_1_result_summary.txt"),
 				[]byte("Scan completed: 254 hosts scanned, 12 hosts up"),
 				0644,
-			)
+			); err != nil {
+				log.Warnf("[TEST] Failed to write task_1_1_result_summary.txt: %v", err)
+			}
 
 			task2Dir := filepath.Join(workDir, "task_1-2_vuln_analysis")
-			os.MkdirAll(task2Dir, 0755)
-			os.WriteFile(
+			if err := os.MkdirAll(task2Dir, 0755); err != nil {
+				log.Warnf("[TEST] Failed to create task2Dir: %v", err)
+			}
+			if err := os.WriteFile(
 				filepath.Join(task2Dir, "task_1_2_result_summary.txt"),
 				[]byte("No critical vulnerabilities found"),
 				0644,
-			)
+			); err != nil {
+				log.Warnf("[TEST] Failed to write task_1_2_result_summary.txt: %v", err)
+			}
+
+			// List all files created
+			log.Infof("[TEST] Files created in workDir:")
+			filepath.Walk(workDir, func(path string, info os.FileInfo, err error) error {
+				if err != nil {
+					return nil
+				}
+				if !info.IsDir() {
+					relPath, _ := filepath.Rel(workDir, path)
+					log.Infof("[TEST]   - %s", relPath)
+				}
+				return nil
+			})
 			return nil
 		}),
 	)
@@ -108,27 +138,16 @@ func TestArtifactsVisibility_AfterAsyncPlanExecution(t *testing.T) {
 		}
 	}()
 
-	// Wait for plan execution to complete
-	deadline := time.After(15 * time.Second)
-	planFinished := false
-WAIT_PLAN:
-	for {
-		select {
-		case <-out:
-			promptMu.Lock()
-			if callCount >= 1 {
-				planFinished = true
-			}
-			promptMu.Unlock()
-			if planFinished {
-				// Give time for defer blocks (emitArtifactsSummaryToTimeline) to complete
-				time.Sleep(1 * time.Second)
-				break WAIT_PLAN
-			}
-		case <-deadline:
-			t.Fatal("timeout waiting for plan execution to complete")
-		}
+	// Wait for HijackPERequest to complete (this ensures files are created)
+	select {
+	case <-hijackDone:
+		log.Infof("[TEST] HijackPERequest completed")
+	case <-time.After(15 * time.Second):
+		t.Fatal("timeout waiting for HijackPERequest to complete")
 	}
+
+	// Give time for defer blocks (emitArtifactsSummaryToTimeline) to complete
+	time.Sleep(1 * time.Second)
 
 	// Verify the task directories were created in the actual workdir
 	workDir := reactIns.config.GetOrCreateWorkDir()
