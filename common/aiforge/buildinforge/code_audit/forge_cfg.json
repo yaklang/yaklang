@@ -1,9 +1,7 @@
 {
 	"name": "code_audit",
 	"verbose_name": "AI 代码安全审计",
-	"description": "对代码项目进行安全审计，识别潜在漏洞（SQL注入、命令注入、XSS、文件操作、反序列化等），追踪数据流验证可利用性，生成审计报告",
+	"description": "对代码项目进行全面的安全审计。采用四阶段方法论（项目探索→结构化扫描→逐漏洞验证→报告生成），识别具有真实利用价值的高置信度安全漏洞，生成专业 Markdown 格式审计报告。",
 	"tool_keywords": "代码审计,安全分析,漏洞挖掘,源码审计",
-	"tools": "read_file,list_files,grep,write_file",
-	"actions": "code_audit_verify",
-	"tags": "代码审计,安全分析,漏洞挖掘,源码审计,SQL注入,命令注入,XSS,文件包含,反序列化"
+	"tags": "代码审计,安全分析,漏洞挖掘,源码审计,SQL注入,命令注入,XSS,文件包含,反序列化,路径遍历,XXE,SSRF,权限绕过"
 }

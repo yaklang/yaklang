@@ -1,0 +1,149 @@
+## Phase 3 Action 输出示例
+
+验证 VULN-001（SQL 注入）的完整交互序列如下：
+
+---
+
+### Step 1：read_code 读取 Sink 点上下文（行号准确时）
+
+```json
+{
+  "@action": "read_code",
+  "human_readable_thought": "先读取 handler/user.go Sink 点（第88行）附近的代码，了解参数来源。",
+  "file_path": "handler/user.go",
+  "start_line": 48,
+  "end_line": 100
+}
+```
+
+### Step 1（备用）：行号不准确时，改用 search_keyword 搜索
+
+```json
+{
+  "@action": "read_code",
+  "human_readable_thought": "Finding 记录的行号26702超出文件实际行数1925，改用 search_keyword 搜索 Sink 函数名 call_user_func 来定位代码。",
+  "file_path": "modules/geshi/geshi.php",
+  "search_keyword": "call_user_func"
+}
+```
+
+---
+
+### Step 2：trace_data_flow 记录第一个节点（Sink 点）
+
+```json
+{
+  "@action": "trace_data_flow",
+  "human_readable_thought": "读取代码后确认：第88行 db.Raw() 的参数 name 来自第55行的 c.Query(\"name\")，是直接的 HTTP GET 参数。记录第一步追踪。",
+  "step": 1,
+  "variable": "name",
+  "trace_location": "handler/user.go:55",
+  "source_type": "http_param",
+  "trace_note": "c.Query(\"name\") 直接读取 GET 参数 name，未经任何处理即传入 db.Raw()"
+}
+```
+
+---
+
+### Step 3：trace_data_flow 记录第二个节点（Source 已找到）
+
+```json
+{
+  "@action": "trace_data_flow",
+  "human_readable_thought": "name 在 handler/user.go:55 处直接从 HTTP 请求获取，已追踪到 Source。数据流完整：HTTP GET name 参数 → c.Query() → db.Raw() 拼接，无中间处理。",
+  "step": 2,
+  "variable": "name",
+  "trace_location": "handler/user.go:88",
+  "source_type": "http_param",
+  "trace_note": "Sink点：db.Raw(\"SELECT * FROM users WHERE name='\" + name + \"'\") 直接拼接用户输入"
+}
+```
+
+---
+
+### 如果存在过滤：note_filter
+
+**有效过滤示例**（导致 safe 结论）：
+```json
+{
+  "@action": "note_filter",
+  "human_readable_thought": "发现第45行对 id 参数做了 strconv.Atoi() 转换，转换失败会 return error，确保 id 只能是整数，SQL 注入无法成立。",
+  "filter_location": "handler/user.go:45",
+  "filter_type": "type_cast",
+  "effectiveness": "effective",
+  "filter_note": "id, err := strconv.Atoi(c.Query(\"id\"))；if err != nil { return }。整数类型无法注入 SQL，此路径安全。"
+}
+```
+
+**无效过滤示例**（不影响 confirmed 结论）：
+```json
+{
+  "@action": "note_filter",
+  "human_readable_thought": "发现第40行有字符串替换，但只替换了单引号，攻击者可用双引号或十六进制编码绕过，该过滤无效。",
+  "filter_location": "handler/user.go:40",
+  "filter_type": "blacklist",
+  "effectiveness": "ineffective",
+  "filter_note": "strings.Replace(name, \"'\", \"\", -1) 仅过滤单引号，攻击者可使用 \" 或 \\x27 绕过。"
+}
+```
+
+---
+
+### Step 4：conclude_finding 输出结论
+
+**confirmed 结论示例**：
+```json
+{
+  "@action": "conclude_finding",
+  "human_readable_thought": "VULN-001 验证完成。数据流完整且无有效过滤：HTTP GET name → c.Query() → db.Raw() 直接拼接。结论 confirmed，置信度 9。",
+  "finding_id": "VULN-001",
+  "status": "confirmed",
+  "confidence": 9,
+  "reason": "HTTP GET 参数 name 经 c.Query(\"name\") 获取，未经任何过滤直接拼接进 db.Raw() 的 SQL 字符串。Source 完全可控，数据流无断层，无参数化查询或类型强转防护。",
+  "data_flow": "GET /api/users?name=  →  c.Query(\"name\")[handler/user.go:55]  →  db.Raw(\"SELECT * FROM users WHERE name='\" + name + \"'\")[handler/user.go:88]",
+  "exploit": "GET /api/users?name=' UNION SELECT id,password FROM admin_users-- 可提取管理员账号密码哈希值。",
+  "fix": "改用参数化查询：db.Where(\"name = ?\", name).Find(&users)"
+}
+```
+
+**safe 结论示例**（有有效过滤）：
+```json
+{
+  "@action": "conclude_finding",
+  "human_readable_thought": "VULN-002 验证发现，id 参数在进入 db.Exec 前经 strconv.Atoi() 强制转换为整数，失败时 early return，整数类型无法注入。结论 safe。",
+  "finding_id": "VULN-002",
+  "status": "safe",
+  "confidence": 9,
+  "reason": "id 参数在 handler/product.go:34 经 strconv.Atoi() 转换为整数，非数字输入触发 early return error。整数类型无法注入 SQL 字符，攻击路径被有效阻断。",
+  "data_flow": "GET /api/product?id=  →  strconv.Atoi(c.Query(\"id\"))[handler/product.go:34]  →  [error: return]  或  db.Exec(\"...WHERE id=?\", id)[repository/product.go:78]",
+  "exploit": "",
+  "fix": "当前实现已安全，建议维持现有模式。"
+}
+```
+
+**uncertain 结论示例**（自定义过滤难以判断）：
+```json
+{
+  "@action": "conclude_finding",
+  "human_readable_thought": "VULN-003 存在自定义 sanitize() 函数（util/sanitize.go:45），其逻辑有多个替换步骤，静态分析无法完全确定是否可被绕过。结论 uncertain，置信度 5。",
+  "finding_id": "VULN-003",
+  "status": "uncertain",
+  "confidence": 5,
+  "reason": "数据流路径存在，但中途调用了自定义 sanitize() 函数（util/sanitize.go:45），其内部实现复杂（多层 Replace + 正则），静态分析无法确定所有边界情况是否可被绕过。建议人工动态测试。",
+  "data_flow": "POST /api/comment body.content  →  util.Sanitize(content)[handler/comment.go:52]  →  db.Exec(\"INSERT INTO comments VALUES('\"+content+\"')\")[repository/comment.go:92]",
+  "exploit": "待人工验证 sanitize() 是否可被 GBK 宽字节攻击或 Unicode 编码绕过。",
+  "fix": "改用参数化查询彻底消除风险，不应依赖过滤函数的正确性。"
+}
+```
+
+---
+
+### complete_verify 示例
+
+```json
+{
+  "@action": "complete_verify",
+  "human_readable_thought": "已完成全部 4 个 Finding 验证：VULN-001 confirmed（SQL注入，置信度9），VULN-002 safe（类型强转有效），VULN-003 uncertain（自定义过滤难以判断），VULN-004 confirmed（命令注入，置信度8）。",
+  "summary": "共验证 4 个 Finding：confirmed 2 个（VULN-001 SQL注入、VULN-004 命令注入），uncertain 1 个（VULN-003 XSS，自定义过滤），safe 1 个（VULN-002 整数类型转换有效）。"
+}
+```

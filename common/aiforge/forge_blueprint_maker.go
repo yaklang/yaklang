@@ -202,6 +202,10 @@ func (c *YakForgeBlueprintConfig) Build() (*ForgeBlueprint, error) {
 			}
 			return plan
 		}
+		// When using a fixed mock plan, disable PE_TASK intent recognition so the
+		// subtask goal is executed directly (load_capability calls) without the intent
+		// loop re-routing to a forge/blueprint.
+		aidOpts = append(aidOpts, aicommon.WithDisableIntentRecognition(true))
 	}
 	var tools []*aitool.Tool
 	if config.Tools != "" {
@@ -224,6 +228,9 @@ func (c *YakForgeBlueprintConfig) Build() (*ForgeBlueprint, error) {
 		WithResultHandler(func(s string, err error) {
 			if err != nil {
 				log.Errorf("Failed to get result: %v", err)
+				return
+			}
+			if config.Actions == "" {
 				return
 			}
 			actions := strings.Split(config.Actions, ",")
