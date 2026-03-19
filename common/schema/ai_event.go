@@ -54,7 +54,7 @@ const (
 	AI_REACT_LOOP_NAME_PLAN                = "plan"
 	AI_REACT_LOOP_NAME_KNOWLEDGE_ENHANCE   = "knowledge_enhance"
 	AI_REACT_LOOP_NAME_REPORT_GENERATING   = "report_generating"
-	AI_REACT_LOOP_NAME_CODE_AUDIT_VERIFY   = "code_audit_verify"
+	AI_REACT_LOOP_NAME_CODE_SECURITY_AUDIT = "code_security_audit"
 	AI_REACT_LOOP_NAME_INTENT              = "intent"
 	AI_REACT_LOOP_NAME_INTERNET_RESEARCH   = "internet_research"
 	AI_REACT_LOOP_NAME_SMART_QA            = "smart_qa"

@@ -112,6 +112,29 @@ func (m *Timeline) GetTimelineItemIDs() []int64 {
 	return m.idToTimelineItem.Keys()
 }
 
+// GetMaxID 返回当前 timeline 中最大的条目 ID。
+// 如果 timeline 为空则返回 0。
+func (m *Timeline) GetMaxID() int64 {
+	ids := m.idToTimelineItem.Keys()
+	var maxID int64
+	for _, id := range ids {
+		if id > maxID {
+			maxID = id
+		}
+	}
+	return maxID
+}
+
+// TruncateAfter 软删除所有 ID 严格大于 checkpointID 的 timeline 条目。
+// 用于在串行 sub-agent 结束后恢复 timeline 状态，实现 agent 间上下文隔离。
+func (m *Timeline) TruncateAfter(checkpointID int64) {
+	for _, id := range m.idToTimelineItem.Keys() {
+		if id > checkpointID {
+			m.SoftDelete(id)
+		}
+	}
+}
+
 func (m *Timeline) ClearRuntimeConfig() {
 	m.ai = nil
 	m.config = nil

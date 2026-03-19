@@ -1688,6 +1688,16 @@ func WithForgeName(name string) ConfigOption {
 	}
 }
 
+// WithForgeDirectLoopName sets the loop name that the forge should directly enter.
+// When set, the Coordinator skips plan-and-execute and directly runs the specified
+// ReAct loop, passing the user input to it as the task goal.
+func WithForgeDirectLoopName(loopName string) ConfigOption {
+	return func(c *Config) error {
+		c.SetConfig("ForgeDirectLoopName", loopName)
+		return nil
+	}
+}
+
 func WithWorkdir(dir string) ConfigOption {
 	return func(c *Config) error {
 		if c.m == nil {

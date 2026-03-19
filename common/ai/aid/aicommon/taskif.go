@@ -386,6 +386,30 @@ func (s *AIStatefulTaskBase) SetAttachedDatas(attachedDatas []*AttachedResource)
 
 var _ AIStatefulTask = (*AIStatefulTaskBase)(nil)
 
+// NewSubTaskBase 创建一个"子任务"——从父 task 的 context 派生独立 context。
+// 子任务完成/取消时只影响自身 context，不会取消父任务的 context，
+// 因此多个子任务可以串行复用同一父 task 的生命周期。
+func NewSubTaskBase(
+	parentTask AIStatefulTask,
+	subTaskId string,
+	userInput string,
+	skipEvent ...bool,
+) *AIStatefulTaskBase {
+	var parentCtx context.Context
+	if parentTask != nil {
+		parentCtx = parentTask.GetContext()
+	}
+	if parentCtx == nil {
+		parentCtx = context.Background()
+	}
+
+	var emitter *Emitter
+	if parentTask != nil {
+		emitter = parentTask.GetEmitter()
+	}
+	return NewStatefulTaskBase(subTaskId, userInput, parentCtx, emitter, skipEvent...)
+}
+
 func NewStatefulTaskBase(
 	taskId string,
 	userInput string,
