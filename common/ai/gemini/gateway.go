@@ -232,7 +232,7 @@ func (c *Client) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
 	}
 
 	if c.config.Timeout > 0 {
-		log.Debugf("Setting connect timeout: %d seconds", c.config.Timeout)
+		log.Debugf("Setting connect timeout: %v seconds", c.config.Timeout)
 		opts = append(opts, poc.WithConnectTimeout(c.config.Timeout))
 	}
 	// Add a general timeout for the whole request, matching http client timeout if set.
