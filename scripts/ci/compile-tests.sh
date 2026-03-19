@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# 可覆写：并行度、输出目录、测试配置
-JOBS=${JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.ncpu || echo 2)}
+# 可覆写：编译 worker 数、go test -p、输出目录、测试配置
+DEFAULT_CPUS=$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.ncpu || echo 2)
+COMPILE_WORKERS=${COMPILE_WORKERS:-${JOBS:-$DEFAULT_CPUS}}
+GO_TEST_P=${GO_TEST_P:-1}
 TEST_BIN_DIR="${TEST_BIN_DIR:-/tmp/test_binaries}"
 TEST_CONFIG="${TEST_CONFIG:-}"  # 测试配置文件（JSON格式），必须提供
+RESET_TEST_BIN_DIR="${RESET_TEST_BIN_DIR:-1}"  # 0=保留已有产物并增量编译
 
 if [[ -z "$TEST_CONFIG" ]]; then
   echo "ERROR: TEST_CONFIG environment variable must be set"
@@ -22,16 +25,23 @@ if ! command -v jq >/dev/null 2>&1; then
 fi
 
 echo "=== Compile Tests from Config ==="
-echo "JOBS=$JOBS"
+echo "COMPILE_WORKERS=$COMPILE_WORKERS"
+echo "GO_TEST_P=$GO_TEST_P"
 echo "BIN_DIR=$TEST_BIN_DIR"
 echo "CONFIG=$TEST_CONFIG"
+echo "RESET_TEST_BIN_DIR=$RESET_TEST_BIN_DIR"
 echo ""
 
 # 记录开始时间
 compile_start=$(date +%s)
 
-rm -rf "$TEST_BIN_DIR"
-mkdir -p "$TEST_BIN_DIR"
+if [[ "$RESET_TEST_BIN_DIR" == "1" ]]; then
+  rm -rf "$TEST_BIN_DIR"
+  mkdir -p "$TEST_BIN_DIR"
+else
+  mkdir -p "$TEST_BIN_DIR"
+  rm -f "$TEST_BIN_DIR/compiled_tests.txt" "$TEST_BIN_DIR/failed_packages.txt"
+fi
 
 # 创建临时文件存储 package -> race 映射（兼容 bash 3.x）
 RACE_CONFIG_CACHE="$TEST_BIN_DIR/.race_config_cache"
@@ -112,7 +122,7 @@ compile_one() {
   fi
 
   # 构建编译参数
-  local compile_args=("-p=$JOBS" "-c" "-o" "$bin")
+  local compile_args=("-p=$GO_TEST_P" "-c" "-o" "$bin")
   local enable_race_for_pkg=0
   
   # 检查该包是否需要启用race检测
@@ -139,10 +149,10 @@ compile_one() {
 
 export -f compile_one
 export -f should_enable_race
-export TEST_BIN_DIR JOBS RACE_CONFIG_CACHE
+export TEST_BIN_DIR GO_TEST_P RACE_CONFIG_CACHE
 
 echo "=== Compiling test packages ==="
-printf '%s\0' "${PKGS[@]}" | xargs -0 -n1 -P "$JOBS" bash -c 'compile_one "$1"' _
+printf '%s\0' "${PKGS[@]}" | xargs -0 -n1 -P "$COMPILE_WORKERS" bash -c 'compile_one "$1"' _
 
 echo ""
 echo "=== Compile Summary ==="
@@ -176,4 +186,3 @@ fi
 
 echo ""
 echo "All tests compiled successfully"
-
