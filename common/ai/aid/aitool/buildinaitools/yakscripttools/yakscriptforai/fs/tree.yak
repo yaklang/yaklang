@@ -36,7 +36,8 @@ Optional Parameters:
   max-depth       (int)     Maximum directory depth to recurse into. Entries deeper than this
                             level are not shown. Default: 6.
   max-lines       (int)     Maximum total lines in the output. Once reached, remaining entries
-                            are truncated with a notice. Default: 200.
+                            are truncated with a notice. Set to 0 or negative for unlimited.
+                            Default: 200.
 
 Filter Evaluation Order:
   1. exclude name blacklist (path component exact match)
@@ -186,7 +187,7 @@ filesys.Recursive(path, filesys.onStat((isDir, pathname, info) => {
     defer func { recover() }
 
     if truncated { return }
-    if lineCount >= maxLines {
+    if maxLines > 0 && lineCount >= maxLines {
         truncated = true
         return
     }
@@ -237,8 +238,4 @@ if truncated {
     result.WriteString(sprintf("(output truncated at %v lines, use --max-lines to increase)\n", maxLines))
 }
 
-// Output to stdout (captured by AI tool framework as tool result)
-println(result.String())
-
-// Also log for visibility
-yakit.Info("Directory tree: %v (%v dirs, %v files)", path, dirCount, fileCount)
+yakit.Info("%s", result.String())
