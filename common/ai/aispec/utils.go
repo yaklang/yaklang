@@ -3,9 +3,10 @@ package aispec
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/url"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -80,7 +81,7 @@ func GetBaseURLFromConfigEx(config *AIConfig, defaultRootUrl, defaultUri string,
 
 	keepDefaultSuffix := func(s string) string {
 		trimSlash := strings.TrimRight(s, "/")
-		if !strings.HasSuffix(trimSlash, normalizedDefaultURI) {
+		if !strings.HasSuffix(trimSlash, normalizedDefaultURI) && !strings.Contains(trimSlash, "chat/completions") {
 			pathSegments := strings.Split(strings.Trim(normalizedDefaultURI, "/"), "/")
 			for i := len(pathSegments) - 1; i > 0; i-- {
 				overlap := "/" + strings.Join(pathSegments[:i], "/")

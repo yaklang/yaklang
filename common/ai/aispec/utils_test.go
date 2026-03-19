@@ -60,3 +60,29 @@ func TestGetBaseURLFromConfig_DoesNotRewriteOllamaAPIType(t *testing.T) {
 		GetBaseURLFromConfig(config, "http://127.0.0.1:11434", "/v1/chat/completions"),
 	)
 }
+
+func TestGetBaseURLFromConfig_PreservesExplicitChatCompletionsBaseURL(t *testing.T) {
+	t.Run("responses api type keeps explicit chat completions endpoint", func(t *testing.T) {
+		config := NewDefaultAIConfig(
+			WithType("openai"),
+			WithAPIType("responses"),
+			WithBaseURL("https://proxy.example.com/v1/chat/completions"),
+		)
+
+		assert.Equal(t,
+			"https://proxy.example.com/v1/chat/completions",
+			GetBaseURLFromConfig(config, "https://api.openai.com", "/v1/chat/completions"),
+		)
+	})
+
+	t.Run("openai mode does not append default suffix to explicit chat completions endpoint", func(t *testing.T) {
+		config := NewDefaultAIConfig(
+			WithBaseURL("https://proxy.example.com/custom/chat/completions"),
+		)
+
+		assert.Equal(t,
+			"https://proxy.example.com/custom/chat/completions",
+			GetBaseURLFromConfigEx(config, "https://api.openai.com", "/v1/responses", true),
+		)
+	})
+}
