@@ -17,8 +17,8 @@ TEST_SKIP_PATTERN="${TEST_SKIP_PATTERN:-}"  # -test.skip（用来跳过某些测
 TEST_CONFIG="${TEST_CONFIG:-}"  # JSON格式的测试配置文件
 
 # 构建包路径到二进制文件的映射
-declare -a ALL_TEST_BINS
-declare -a ALL_TEST_PKGS
+declare -a ALL_TEST_BINS=()
+declare -a ALL_TEST_PKGS=()
 
 build_package_map() {
   echo "Building package to binary mapping..."
@@ -313,7 +313,7 @@ if [[ -n "$TEST_CONFIG" && -f "$TEST_CONFIG" ]]; then
   echo ""
   
   uncovered_count=0
-  uncovered_tests=()
+  declare -a uncovered_tests=()
   for i in "${!ALL_TEST_BINS[@]}"; do
     # 检查是否已处理
     is_processed=0
@@ -376,4 +376,3 @@ else
 fi
 
 exit $rc
-
