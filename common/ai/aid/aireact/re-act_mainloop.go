@@ -24,6 +24,10 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+type skillLoaderRescanner interface {
+	RescanLocalDir(dirPath string) (int, error)
+}
+
 const (
 	sessionTitleGeneratedKey = "session_title_generated"
 	sessionTitleDisableKey   = "disable_session_title_generation"
@@ -124,6 +128,70 @@ func (r *ReAct) executeMainLoop(task aicommon.AIStatefulTask) (bool, error) {
 	return r.ExecuteLoopTask(focus, task, loopOptions...)
 }
 
+func mergeUniqueSkillDirs(dirLists ...[]string) []string {
+	seen := make(map[string]struct{})
+	var result []string
+	for _, dirs := range dirLists {
+		for _, dir := range dirs {
+			dir = strings.TrimSpace(dir)
+			if dir == "" {
+				continue
+			}
+			if _, ok := seen[dir]; ok {
+				continue
+			}
+			seen[dir] = struct{}{}
+			result = append(result, dir)
+		}
+	}
+	return result
+}
+
+func (r *ReAct) refreshSkillsForTaskStart() {
+	if r == nil || r.config == nil {
+		return
+	}
+
+	loader := r.config.GetSkillLoader()
+	if loader == nil {
+		return
+	}
+
+	rescanner, ok := loader.(skillLoaderRescanner)
+	if !ok {
+		return
+	}
+
+	dirs := mergeUniqueSkillDirs(
+		r.aiSkillsScannedDirs,
+		consts.GetAllAISkillsDirs(),
+		[]string{r.aiSkillsInstallDir, r.builtinSkillsInstallDir},
+	)
+	if len(dirs) == 0 {
+		return
+	}
+	r.aiSkillsScannedDirs = dirs
+
+	rescannedDirs := 0
+	discoveredSkills := 0
+	for _, dir := range dirs {
+		if !utils.IsDir(dir) {
+			continue
+		}
+		count, err := rescanner.RescanLocalDir(dir)
+		if err != nil {
+			log.Warnf("failed to rescan skills from %s at task start: %v", dir, err)
+			continue
+		}
+		rescannedDirs++
+		discoveredSkills += count
+	}
+
+	if r.config.DebugEvent || discoveredSkills > 0 {
+		log.Infof("refreshed skills at task start: rescanned %d directories, discovered %d new skills", rescannedDirs, discoveredSkills)
+	}
+}
+
 func (r *ReAct) selectLoopForTask(task aicommon.AIStatefulTask) (string, string, []reactloops.ReActLoopOption) {
 	defaultFocus := r.config.Focus
 	userQuery := task.GetUserInput()
@@ -203,6 +271,8 @@ func (r *ReAct) ExecuteLoopTaskIF(taskTypeName string, task aicommon.AIStatefulT
 }
 
 func (r *ReAct) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTask, options ...reactloops.ReActLoopOption) (bool, error) {
+	r.refreshSkillsForTaskStart()
+
 	defaultOptions := []reactloops.ReActLoopOption{
 		reactloops.WithMemoryTriage(r.memoryTriage),
 		reactloops.WithMemoryPool(r.config.MemoryPool),

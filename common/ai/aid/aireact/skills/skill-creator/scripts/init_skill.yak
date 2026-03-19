@@ -171,7 +171,9 @@ for resourceName in resources {
 
 println("")
 println(sprintf("[OK] skill '%s' initialized successfully", skillName))
+println("[IMPORTANT] init_skill.yak only created a scaffold. The skill is NOT complete yet.")
 println("Next steps:")
 println("1. Complete SKILL.md and make sure the description clearly states when to use the skill.")
 println("2. Add or replace files in scripts/, references/, and assets/ as needed.")
-println("3. Run quick_validate.yak before using or submitting the skill.")
+println("3. Replace TODOs and example files instead of leaving placeholders in the final skill.")
+println("4. Run quick_validate.yak before using or submitting the skill.")

@@ -42,6 +42,10 @@ func newSkillResourceTestRuntime(t *testing.T) *skillResourceTestRuntime {
 	}
 }
 
+func (r *skillResourceTestRuntime) GetYakExecutablePath() string {
+	return "/usr/local/bin/yak"
+}
+
 func (r *skillResourceTestRuntime) EmitFileArtifactWithExt(name, ext string, data any) string {
 	r.emittedArtifactMu.Lock()
 	defer r.emittedArtifactMu.Unlock()
@@ -151,7 +155,8 @@ func TestLoadSkillResources_Verifier_MissingResourcePath(t *testing.T) {
 	action := mustBuildAction(t, schema.AI_REACT_LOOP_ACTION_LOAD_SKILL_RESOURCES, map[string]any{})
 	ac, err := loop.GetActionHandler(schema.AI_REACT_LOOP_ACTION_LOAD_SKILL_RESOURCES)
 	require.NoError(t, err)
-	assert.Error(t, ac.ActionVerifier(loop, action))
+	assert.NoError(t, ac.ActionVerifier(loop, action))
+	assert.Equal(t, "validation_failed", loop.Get("_load_resource_skip"))
 }
 
 func TestLoadSkillResources_Verifier_InvalidResourceType(t *testing.T) {
@@ -168,7 +173,8 @@ func TestLoadSkillResources_Verifier_InvalidResourceType(t *testing.T) {
 	})
 	ac, err := loop.GetActionHandler(schema.AI_REACT_LOOP_ACTION_LOAD_SKILL_RESOURCES)
 	require.NoError(t, err)
-	assert.Error(t, ac.ActionVerifier(loop, action))
+	assert.NoError(t, ac.ActionVerifier(loop, action))
+	assert.Equal(t, "validation_failed", loop.Get("_load_resource_skip"))
 }
 
 func TestLoadSkillResources_Verifier_DefaultsToDocument(t *testing.T) {
@@ -218,7 +224,8 @@ func TestLoadSkillResources_Verifier_MissingFilePath(t *testing.T) {
 	})
 	ac, err := loop.GetActionHandler(schema.AI_REACT_LOOP_ACTION_LOAD_SKILL_RESOURCES)
 	require.NoError(t, err)
-	assert.Error(t, ac.ActionVerifier(loop, action))
+	assert.NoError(t, ac.ActionVerifier(loop, action))
+	assert.Equal(t, "validation_failed", loop.Get("_load_resource_skip"))
 }
 
 // --- Document handler tests ---
@@ -390,6 +397,8 @@ func TestLoadSkillResources_Script_FuzzyMatch(t *testing.T) {
 	assert.True(t, op.IsContinued())
 	assert.True(t, runtime.hasTimelineEntry("skill_script_resource_loaded"))
 	assert.Contains(t, op.GetFeedback().String(), "fuzzy matched")
+	assert.True(t, runtime.timelineEntryContains("skill_script_resource_loaded", "Recommended command: /usr/local/bin/yak"))
+	assert.True(t, runtime.timelineEntryContains("use_script", "/usr/local/bin/yak"))
 }
 
 func TestLoadSkillResources_Script_SkillNotFound(t *testing.T) {
@@ -460,8 +469,8 @@ func TestLoadSkillResources_Verifier_PatternAndResourcePathBothEmpty(t *testing.
 	action := mustBuildAction(t, schema.AI_REACT_LOOP_ACTION_LOAD_SKILL_RESOURCES, map[string]any{})
 	ac, _ := loop.GetActionHandler(schema.AI_REACT_LOOP_ACTION_LOAD_SKILL_RESOURCES)
 	err := ac.ActionVerifier(loop, action)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "either")
+	assert.NoError(t, err)
+	assert.Equal(t, "validation_failed", loop.Get("_load_resource_skip"))
 }
 
 func TestLoadSkillResources_Verifier_PatternAndResourcePathBothSet(t *testing.T) {
@@ -478,8 +487,8 @@ func TestLoadSkillResources_Verifier_PatternAndResourcePathBothSet(t *testing.T)
 	})
 	ac, _ := loop.GetActionHandler(schema.AI_REACT_LOOP_ACTION_LOAD_SKILL_RESOURCES)
 	err := ac.ActionVerifier(loop, action)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "mutually exclusive")
+	assert.NoError(t, err)
+	assert.Equal(t, "validation_failed", loop.Get("_load_resource_skip"))
 }
 
 func TestLoadSkillResources_Verifier_PatternOnly(t *testing.T) {
@@ -511,8 +520,28 @@ func TestLoadSkillResources_Verifier_PatternInvalidRegex(t *testing.T) {
 	})
 	ac, _ := loop.GetActionHandler(schema.AI_REACT_LOOP_ACTION_LOAD_SKILL_RESOURCES)
 	err := ac.ActionVerifier(loop, action)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid grep pattern")
+	assert.NoError(t, err)
+	assert.Equal(t, "validation_failed", loop.Get("_load_resource_skip"))
+}
+
+func TestLoadSkillResources_Handler_InvalidParamsSoftFails(t *testing.T) {
+	runtime := newSkillResourceTestRuntime(t)
+	vfs := filesys.NewVirtualFs()
+	vfs.AddFile("s1/SKILL.md", buildTestSkillMD("s1", "desc", "body"))
+	loader, _ := aiskillloader.NewFSSkillLoader(vfs)
+	loop, task := newSkillResourceLoop(t, runtime, loader)
+
+	action := mustBuildAction(t, schema.AI_REACT_LOOP_ACTION_LOAD_SKILL_RESOURCES, map[string]any{})
+	ac, err := loop.GetActionHandler(schema.AI_REACT_LOOP_ACTION_LOAD_SKILL_RESOURCES)
+	require.NoError(t, err)
+	require.NoError(t, ac.ActionVerifier(loop, action))
+
+	op := reactloops.NewActionHandlerOperator(task)
+	ac.ActionHandler(loop, action, op)
+
+	assert.True(t, op.IsContinued())
+	assert.True(t, runtime.hasTimelineEntry("skill_resource_validation_failed"))
+	assert.Contains(t, op.GetFeedback().String(), "requires either 'resource_path' or 'pattern'")
 }
 
 func TestLoadSkillResources_Verifier_PatternWithSkillName(t *testing.T) {

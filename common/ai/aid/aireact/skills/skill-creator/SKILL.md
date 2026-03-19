@@ -61,6 +61,30 @@ common/ai/aid/aireact/skills/<skill-name>/
 
 优先加载并执行 `@skill-creator/scripts/init_skill.yak`。
 
+先理解：`init_skill.yak` 只负责生成脚手架，不会自动把 Skill 写完整。
+执行成功后，必须继续修改生成出来的 `SKILL.md`、`scripts/`、`references/`、`assets/`，直到该 Skill 可以被实际使用。
+
+如果你不确定脚本参数，先看帮助：
+
+```bash
+yak /abs/path/to/init_skill.yak -h
+```
+
+核心参数：
+
+- `--name`: skill 名称，会被规范化为小写连字符格式
+- `--path`: skill 父目录。当前仓库一般应使用 `common/ai/aid/aireact/skills`
+- `--resources`: 需要预创建的资源目录，逗号分隔，可选值为 `scripts,references,assets`
+- `--examples`: 是否在已创建的资源目录中放入示例文件
+
+常见命令示例：
+
+```bash
+yak /abs/path/to/init_skill.yak --name my-skill --path common/ai/aid/aireact/skills
+yak /abs/path/to/init_skill.yak --name my-skill --path common/ai/aid/aireact/skills --resources scripts,references
+yak /abs/path/to/init_skill.yak --name my-skill --path common/ai/aid/aireact/skills --resources scripts,references,assets --examples
+```
+
 如果你已经拿到了脚本绝对路径，直接运行：
 
 ```bash
@@ -73,6 +97,14 @@ yak /abs/path/to/init_skill.yak --name my-skill --path common/ai/aid/aireact/ski
 - `resource_type`: `script`
 
 ### Step 4: 编写 SKILL.md 和资源文件
+
+重要：运行 `init_skill.yak` 后不能结束任务。初始化只是生成占位模板，后续至少要完成下面这些动作：
+
+1. 打开新建目录里的 `SKILL.md`
+2. 替换 frontmatter 里的占位 `description`
+3. 补完正文流程，而不是保留 TODO
+4. 根据需求实现或删除 `scripts/`、`references/`、`assets/` 中的示例文件
+5. 如果没有某类资源需求，就不要保留空目录或无意义示例
 
 更新 `SKILL.md` 时重点关注：
 
@@ -137,7 +169,7 @@ yak /abs/path/to/quick_validate.yak --skill-dir /abs/path/to/skill-folder
 本 Skill 自带三类脚本：
 
 1. `init_skill.yak`
-   用于创建 Skill 目录、生成 `SKILL.md` 模板和可选资源目录。
+   用于创建 Skill 目录、生成 `SKILL.md` 模板和可选资源目录。它只生成脚手架，不会完成 skill 内容本身。
 2. `quick_validate.yak`
    用于快速校验 `SKILL.md` 的 frontmatter 和命名约束。
 
