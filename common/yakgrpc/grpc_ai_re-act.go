@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -29,6 +30,11 @@ func ConvertYPBAIStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.Confi
 	if i == nil {
 		return opts
 	}
+
+	if extra := extractExtraReActConfig(i); len(extra) > 0 {
+		opts = append(opts, aicommon.WithExtraReActConfigMap(extra))
+	}
+
 	if i.DisallowRequireForUserPrompt {
 		opts = append(opts, aicommon.WithAllowRequireForUserInteract(false))
 	} else {
@@ -91,6 +97,28 @@ func ConvertYPBAIStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.Confi
 	}
 
 	return opts
+}
+
+func extractExtraReActConfig(i *ypb.AIStartParams) map[string]string {
+	if i == nil || len(i.GetExtraReActConfig()) == 0 {
+		return nil
+	}
+
+	result := make(map[string]string)
+	for _, pair := range i.GetExtraReActConfig() {
+		if pair == nil {
+			continue
+		}
+		key := strings.TrimSpace(pair.GetKey())
+		if key == "" {
+			continue
+		}
+		result[key] = strings.TrimSpace(pair.GetValue())
+	}
+	if len(result) == 0 {
+		return nil
+	}
+	return result
 }
 
 func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {

@@ -1,0 +1,19 @@
+* 本轮关键信息写入 `cumulative_summary`。
+* 直接回答：
+  `{"@action": "directly_answer", "answer_payload": "..."}`
+
+* 大段输出使用 AI Tag：
+{"@action": "directly_answer"}
+<|FINAL_ANSWER_{{ .Nonce }}|>
+...
+<|FINAL_ANSWER_END_{{ .Nonce }}|>
+
+* 工具调用：
+  `{"@action": "require_tool", "tool_require_payload": "tool_name", "human_readable_thought": "...", "cumulative_summary": "..."}`
+{{ if .AllowKnowledgeEnhanceAnswer }}* 知识增强：
+  `{"@action": "knowledge_enhance_answer", "rewrite_user_query_for_knowledge_enhance": "...", "human_readable_thought": "..."}`
+{{ end }}{{ if .AllowPlan }}* 复杂任务优先：
+  `{"@action": "request_plan_and_execution", "plan_request_payload": "...", "human_readable_thought": "..."}`
+* 使用 Blueprint：
+  `{"@action": "require_ai_blueprint", "blueprint_payload": "blueprint_name", "human_readable_thought": "..."}`
+{{ end }}
