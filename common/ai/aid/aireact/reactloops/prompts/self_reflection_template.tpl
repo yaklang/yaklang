@@ -52,10 +52,14 @@ This is spin warning #{{.SpinDetection.SpinWarningCount}}. Previous warnings hav
 
 ### Required Analysis
 
-1. Are these actions repeating the same logic without progress? (Almost certainly YES at this escalation level)
-2. If SPIN is confirmed, identify the ROOT CAUSE — why is the agent unable to choose a different action?
-3. Your suggestions MUST include CONCRETE alternative action types (not vague advice).
-4. Your suggestions MUST name specific tool/action that DIFFERS from '{{.SpinDetection.ActionType}}'.
+Carefully examine whether this is a TRUE SPIN or normal task progression:
+- If the action parameters/targets are DIFFERENT across calls (e.g. different URLs, different queries), this is likely NOT a spin — the agent is making progress with varied inputs. Set `is_spinning` to `false` and `is_task_progressing` to `true`.
+- If the action is genuinely repeating the same logic with identical or near-identical parameters and no new information is gained → this IS a spin. Set `is_spinning` to `true`.
+
+If SPIN is confirmed:
+1. Identify the ROOT CAUSE — why is the agent unable to choose a different action?
+2. Your suggestions MUST include CONCRETE alternative action types (not vague advice).
+3. Your suggestions MUST name specific tool/action that DIFFERS from '{{.SpinDetection.ActionType}}'.
 
 {{if ge .SpinDetection.EscalationLevel 3}}### CRITICAL: SWOT-Based Suggestion Generation
 
@@ -91,19 +95,17 @@ Answer these questions in your suggestions:
 <|ANALYSIS_REQUIREMENTS_{{.Nonce}}|>
 ## Analysis Requirements
 
-{{if .SpinDetection}}**SPIN DETECTED — Escalation Level {{.SpinDetection.EscalationLevel}}**
+{{if .SpinDetection}}**Potential SPIN Detected — Escalation Level {{.SpinDetection.EscalationLevel}}**
 
-This is NOT a routine reflection. The agent is in a confirmed SPIN state.
+The system detected {{.SpinDetection.ConsecutiveCount}} consecutive executions of the same action type '{{.SpinDetection.ActionType}}'.
+However, this does NOT automatically mean the agent is spinning. You MUST judge independently:
 
-MANDATORY output:
-1. Set `is_spinning` to `true`
-2. Provide `spin_reason` with the root cause
-3. Provide `suggestions` with CONCRETE, ACTIONABLE break-out steps:
+- If the action parameters/targets differ meaningfully across calls → set `is_spinning` to `false` and `is_task_progressing` to `true`
+- If the actions are truly repetitive with no progress → set `is_spinning` to `true`, provide `spin_reason`, and provide `suggestions` with CONCRETE break-out steps:
    - Each suggestion MUST name a specific action type different from '{{.SpinDetection.ActionType}}'
    - Each suggestion MUST be imperative ("DO X", "USE Y", "SWITCH TO Z")
-   - Do NOT suggest "consider" or "try" — use direct commands
 {{if ge .SpinDetection.EscalationLevel 3}}
-4. **CRITICAL**: This is the FINAL escalation. If your suggestions do not break the loop, the task will be force-terminated as UNSUCCESSFUL.
+**WARNING**: This is escalation level {{.SpinDetection.EscalationLevel}}. If the agent IS truly spinning, it must change approach immediately.
 {{end}}
 {{else}}Perform a brief reflection on this action. All fields are optional — provide only what's relevant.
 

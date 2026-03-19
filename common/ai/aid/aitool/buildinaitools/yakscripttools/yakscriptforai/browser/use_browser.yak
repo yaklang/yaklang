@@ -54,7 +54,7 @@ Conditional:
 Optional:
   timeout   (int)     Timeout in seconds. Default: 30.
   session   (string)  Session ID. Default: "ai-browser".
-  headless  (string)  "yes" (default) or "no".
+  headless  (string)  "no" (default, visible browser) or "yes" (headless).
   wait-type (string)  "selector", "visible", or "ms" for op=wait
   wait-value(string)  CSS selector or ms value for op=wait
   tab-index (string)  Tab index for tab_switch/tab_close
@@ -242,7 +242,7 @@ value = cli.String("value", cli.setRequired(false), cli.setHelp("text value for 
 subop = cli.String("subop", cli.setRequired(false), cli.setHelp("sub-operation for get: title/url/html/text/cookies"))
 js = cli.String("js", cli.setRequired(false), cli.setHelp("JavaScript code for eval operation. Use AITAG for multi-line scripts."))
 session = cli.String("session", cli.setRequired(false), cli.setHelp("browser session ID for instance reuse"), cli.setDefault("ai-browser"))
-headless = cli.String("headless", cli.setRequired(false), cli.setHelp("yes/no to show browser window"), cli.setDefault("yes"))
+headless = cli.String("headless", cli.setRequired(false), cli.setHelp("yes/no to show browser window (default: no, visible)"), cli.setDefault("no"))
 timeoutSeconds = cli.Int("timeout", cli.setRequired(false), cli.setHelp("browser timeout in seconds"), cli.setDefault(30))
 waitType = cli.String("wait-type", cli.setRequired(false), cli.setHelp("wait condition: selector/visible/ms"))
 waitValue = cli.String("wait-value", cli.setRequired(false), cli.setHelp("wait condition value"))

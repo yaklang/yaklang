@@ -357,19 +357,27 @@ func (r *ReActLoop) fillReflectionFromAction(action *aicommon.Action, reflection
 	// action 自动解析了 suggestions 数组 (直接作为字符串数组)
 	reflection.Suggestions = params.GetStringSlice("suggestions")
 
+	// 处理任务推进判断：如果 AI 明确认为任务正常推进，优先清零 spin 计数
+	reflection.IsTaskProgressing = params.GetBool("is_task_progressing")
+	if reflection.IsTaskProgressing {
+		r.ResetSpinWarning()
+		log.Infof("task is progressing normally (different params/targets), spin warning counter reset")
+	}
+
 	// 处理 SPIN 检测结果（整合到自我反思中）
+	// 若 is_task_progressing 已为 true，则忽略 is_spinning（任务有进展优先）
 	reflection.IsSpinning = params.GetBool("is_spinning")
-	if reflection.IsSpinning {
+	if reflection.IsSpinning && !reflection.IsTaskProgressing {
 		reflection.SpinReason = params.GetString("spin_reason")
 
 		r.addSpinWarningToTimeline(reflection)
 		r.IncrementSpinWarning()
-	} else {
+	} else if !reflection.IsTaskProgressing {
 		r.ResetSpinWarning()
 	}
 
-	log.Infof("filled reflection from action: suggestions[%d], spinning[%v]",
-		len(reflection.Suggestions), reflection.IsSpinning)
+	log.Infof("filled reflection from action: suggestions[%d], spinning[%v], task_progressing[%v]",
+		len(reflection.Suggestions), reflection.IsSpinning, reflection.IsTaskProgressing)
 }
 
 // addSpinWarningToTimeline 将 SPIN 警告添加到 Timeline

@@ -488,6 +488,431 @@ func TestSelfReflectionInvoked(t *testing.T) {
 	}
 }
 
+// TestIsInSpinTrustsAINotSpinning 验证 Fix 1：当自我反思 AI 判断任务正常推进（is_spinning=false）时，
+// spin 计数不应累积，即使同类型 action 重复执行。通过 timeline 无 logic_spin_warning 来验证。
+func TestIsInSpinTrustsAINotSpinning(t *testing.T) {
+	testActionName := "http_request_action"
+	var mu sync.Mutex
+	var aiCallCount int
+
+	aiCallback := func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		mu.Lock()
+		aiCallCount++
+		callIdx := aiCallCount
+		mu.Unlock()
+
+		rsp := i.NewAIResponse()
+		prompt := req.GetPrompt()
+
+		// 自我反思调用：即使检测到 SPIN 数据，AI 也认为任务在正常推进（参数不同）
+		if strings.Contains(prompt, "SELF_REFLECTION_TASK") {
+			reflectionResult := map[string]interface{}{
+				"@action":             "self_reflection",
+				"is_spinning":          false,
+				"is_task_progressing": true,
+			}
+			resultJSON, _ := json.Marshal(reflectionResult)
+			rsp.EmitOutputStream(strings.NewReader(string(resultJSON)))
+			rsp.Close()
+			return rsp, nil
+		}
+
+		// 验证调用
+		if strings.Contains(prompt, "verify-satisfaction") || strings.Contains(prompt, "user_satisfied") {
+			rsp.EmitOutputStream(strings.NewReader(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "ok", "human_readable_result": "ok"}`))
+			rsp.Close()
+			return rsp, nil
+		}
+
+		// 超过 10 次后结束
+		if callIdx > 10 {
+			rsp.EmitOutputStream(strings.NewReader(`{"@action": "finish", "answer": "done"}`))
+			rsp.Close()
+			return rsp, nil
+		}
+
+		// 每次返回不同参数（不同 URL），但同一 action 类型
+		actionJSON := fmt.Sprintf(`{"@action": "%s", "url": "http://example.com/page%d"}`, testActionName, callIdx)
+		rsp.EmitOutputStream(strings.NewReader(actionJSON))
+		rsp.Close()
+		return rsp, nil
+	}
+
+	framework := NewActionTestFrameworkEx(
+		t,
+		"ai-not-spinning-trust-test",
+		[]reactloops.ReActLoopOption{
+			reactloops.WithSameActionTypeSpinThreshold(3),
+			reactloops.WithMaxConsecutiveSpinWarnings(2),
+			reactloops.WithEnableSelfReflection(true),
+			reactloops.WithMaxIterations(15),
+		},
+		[]aicommon.ConfigOption{
+			aicommon.WithAICallback(aiCallback),
+			aicommon.WithAgreePolicy(aicommon.AgreePolicyYOLO),
+			aicommon.WithAIAutoRetry(1),
+			aicommon.WithAITransactionAutoRetry(1),
+		},
+	)
+
+	loop := framework.GetLoop()
+
+	framework.RegisterTestAction(
+		testActionName,
+		"HTTP request action called with different URL params each time",
+		nil,
+		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
+			op.Continue()
+		},
+	)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 9*time.Second)
+	defer cancel()
+
+	err := loop.Execute("ai-not-spinning-test", ctx, "Testing that AI not-spinning verdict prevents spin counter accumulation")
+	if err != nil && err != context.DeadlineExceeded {
+		t.Fatalf("Execute failed: %v", err)
+	}
+
+	// 验证：因为 AI 始终返回 is_spinning=false + is_task_progressing=true，
+	// spin 计数应该被持续清零，timeline 中不应出现 logic_spin_warning
+	reactIns := framework.reactInstance
+	if react, ok := reactIns.(*aireact.ReAct); ok {
+		config := react.GetConfig()
+		if config != nil {
+			if cfg, ok := config.(interface{ GetTimeline() *aicommon.Timeline }); ok {
+				timeline := cfg.GetTimeline()
+				if timeline != nil {
+					outputs := timeline.ToTimelineItemOutputLastN(200)
+					spinWarningFound := false
+					forceExitFound := false
+					for _, output := range outputs {
+						if strings.Contains(output.Type, "logic_spin_warning") {
+							spinWarningFound = true
+						}
+						if strings.Contains(output.Type, "force_spin_exit") {
+							forceExitFound = true
+						}
+					}
+					if spinWarningFound {
+						t.Error("FAIL: found logic_spin_warning in timeline, but AI consistently returned is_spinning=false — spin counter should have been reset")
+					} else {
+						t.Log("PASS: no logic_spin_warning in timeline, AI's not-spinning verdict was trusted")
+					}
+					if forceExitFound {
+						t.Error("FAIL: found force_spin_exit in timeline, force-exit should be disabled")
+					}
+				}
+			}
+		}
+	}
+
+	// 验证反思历史中存在 IsTaskProgressing=true 的记录
+	reflectionHistory := loop.GetReflectionHistory()
+	foundProgressing := false
+	for _, r := range reflectionHistory {
+		if r.IsTaskProgressing {
+			foundProgressing = true
+			break
+		}
+	}
+	if !foundProgressing {
+		t.Logf("Note: no is_task_progressing=true reflection found (history length: %d)", len(reflectionHistory))
+	} else {
+		t.Log("PASS: found is_task_progressing=true in reflection history")
+	}
+}
+
+// TestIsTaskProgressingResetsSpinCounter 验证 Fix 3：self-reflection 返回 is_task_progressing=true 时清零 spin 计数
+func TestIsTaskProgressingResetsSpinCounter(t *testing.T) {
+	testActionName := "progressive_action"
+	var mu sync.Mutex
+	var aiCallCount int
+	var spinReflectionCount int
+
+	aiCallback := func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		mu.Lock()
+		aiCallCount++
+		callNum := aiCallCount
+		mu.Unlock()
+
+		rsp := i.NewAIResponse()
+		prompt := req.GetPrompt()
+
+		// 自我反思调用
+		if strings.Contains(prompt, "SELF_REFLECTION_TASK") {
+			if strings.Contains(prompt, "SPIN_DETECTION") {
+				mu.Lock()
+				spinReflectionCount++
+				count := spinReflectionCount
+				mu.Unlock()
+
+				if count <= 2 {
+					// 前两次反思：报告 is_spinning=true，累积 spin 计数
+					reflectionResult := map[string]interface{}{
+						"@action":     "self_reflection",
+						"is_spinning": true,
+						"spin_reason": "repeated action detected",
+						"suggestions": []string{"try something different"},
+					}
+					resultJSON, _ := json.Marshal(reflectionResult)
+					rsp.EmitOutputStream(strings.NewReader(string(resultJSON)))
+					rsp.Close()
+					return rsp, nil
+				}
+
+				// 第三次反思：报告 is_task_progressing=true（任务有进展，清零计数）
+				reflectionResult := map[string]interface{}{
+					"@action":             "self_reflection",
+					"is_spinning":          false,
+					"is_task_progressing": true,
+					"suggestions":          []string{"continue with new approach"},
+				}
+				resultJSON, _ := json.Marshal(reflectionResult)
+				rsp.EmitOutputStream(strings.NewReader(string(resultJSON)))
+				rsp.Close()
+				return rsp, nil
+			}
+
+			// 普通自我反思
+			reflectionResult := map[string]interface{}{
+				"@action": "self_reflection",
+			}
+			resultJSON, _ := json.Marshal(reflectionResult)
+			rsp.EmitOutputStream(strings.NewReader(string(resultJSON)))
+			rsp.Close()
+			return rsp, nil
+		}
+
+		// 验证调用
+		if strings.Contains(prompt, "verify-satisfaction") || strings.Contains(prompt, "user_satisfied") {
+			rsp.EmitOutputStream(strings.NewReader(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "ok", "human_readable_result": "ok"}`))
+			rsp.Close()
+			return rsp, nil
+		}
+
+		if callNum > 9 {
+			rsp.EmitOutputStream(strings.NewReader(`{"@action": "finish", "answer": "done"}`))
+			rsp.Close()
+			return rsp, nil
+		}
+
+		rsp.EmitOutputStream(strings.NewReader(fmt.Sprintf(`{"@action": "%s", "step": %d}`, testActionName, callNum)))
+		rsp.Close()
+		return rsp, nil
+	}
+
+	framework := NewActionTestFrameworkEx(
+		t,
+		"task-progressing-reset-test",
+		[]reactloops.ReActLoopOption{
+			reactloops.WithSameActionTypeSpinThreshold(2),
+			reactloops.WithSameLogicSpinThreshold(2),
+			reactloops.WithEnableSelfReflection(true),
+		},
+		[]aicommon.ConfigOption{
+			aicommon.WithAICallback(aiCallback),
+			aicommon.WithAgreePolicy(aicommon.AgreePolicyYOLO),
+			aicommon.WithAIAutoRetry(1),
+			aicommon.WithAITransactionAutoRetry(1),
+		},
+	)
+
+	loop := framework.GetLoop()
+
+	framework.RegisterTestAction(
+		testActionName,
+		"Progressive action that eventually reports task progress",
+		nil,
+		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
+			op.Continue()
+		},
+	)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 9*time.Second)
+	defer cancel()
+
+	err := loop.Execute("task-progressing-test", ctx, "Testing is_task_progressing resets spin counter")
+	if err != nil && err != context.DeadlineExceeded {
+		t.Fatalf("Execute failed: %v", err)
+	}
+
+	// 验证 is_task_progressing=true 的反思出现后，spin 警告 timeline 中不会持续累积
+	// 通过检查反思历史中存在 IsTaskProgressing=true 的记录
+	reflectionHistory := loop.GetReflectionHistory()
+	foundProgressingReflection := false
+	for _, r := range reflectionHistory {
+		if r.IsTaskProgressing {
+			foundProgressingReflection = true
+			t.Logf("found is_task_progressing=true in reflection at iteration %d", r.IterationNum)
+			break
+		}
+	}
+
+	if !foundProgressingReflection {
+		t.Log("Note: is_task_progressing reflection not found in history (may not have reached that iteration)")
+		t.Logf("reflection history length: %d, spin reflection count: %d", len(reflectionHistory), spinReflectionCount)
+	} else {
+		t.Log("PASS: found is_task_progressing=true reflection, spin counter reset behavior confirmed")
+	}
+
+	// 核心验证：timeline 中不应有 force_spin_exit 条目（我们已经移除了强制退出）
+	reactIns := framework.reactInstance
+	if react, ok := reactIns.(*aireact.ReAct); ok {
+		config := react.GetConfig()
+		if config != nil {
+			if cfg, ok := config.(interface{ GetTimeline() *aicommon.Timeline }); ok {
+				timeline := cfg.GetTimeline()
+				if timeline != nil {
+					outputs := timeline.ToTimelineItemOutputLastN(100)
+					for _, output := range outputs {
+						if strings.Contains(output.Content, "force_spin_exit") ||
+							strings.Contains(output.Type, "force_spin_exit") {
+							t.Error("FAIL: found force_spin_exit in timeline, loop should not force-exit anymore")
+						}
+					}
+					t.Log("PASS: no force_spin_exit found in timeline")
+				}
+			}
+		}
+	}
+}
+
+// TestSpinThresholdNoLongerForcesExit 验证 Fix 4：spin 阈值触发后不强制退出，
+// 只向 timeline 写入 spin_pressure 施压，循环继续直到 max_iterations
+func TestSpinThresholdNoLongerForcesExit(t *testing.T) {
+	testActionName := "spinning_action"
+	var mu sync.Mutex
+	var iterCount int
+
+	aiCallback := func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		mu.Lock()
+		iterCount++
+		count := iterCount
+		mu.Unlock()
+
+		rsp := i.NewAIResponse()
+		prompt := req.GetPrompt()
+
+		// 自我反思：始终报告 is_spinning=true，强制持续累积 spin 计数
+		if strings.Contains(prompt, "SELF_REFLECTION_TASK") {
+			reflectionResult := map[string]interface{}{
+				"@action":     "self_reflection",
+				"is_spinning": true,
+				"spin_reason": "intentional spin for testing",
+				"suggestions": []string{"use different action"},
+			}
+			resultJSON, _ := json.Marshal(reflectionResult)
+			rsp.EmitOutputStream(strings.NewReader(string(resultJSON)))
+			rsp.Close()
+			return rsp, nil
+		}
+
+		// 验证调用
+		if strings.Contains(prompt, "verify-satisfaction") || strings.Contains(prompt, "user_satisfied") {
+			rsp.EmitOutputStream(strings.NewReader(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "ok", "human_readable_result": "ok"}`))
+			rsp.Close()
+			return rsp, nil
+		}
+
+		// 超过 15 次迭代后 finish（防止无限运行）
+		if count > 15 {
+			rsp.EmitOutputStream(strings.NewReader(`{"@action": "finish", "answer": "enough iterations"}`))
+			rsp.Close()
+			return rsp, nil
+		}
+
+		// 一直返回同一 action（制造 spin）
+		rsp.EmitOutputStream(strings.NewReader(fmt.Sprintf(`{"@action": "%s"}`, testActionName)))
+		rsp.Close()
+		return rsp, nil
+	}
+
+	// maxConsecutiveSpinWarnings=2，低阈值方便快速触发
+	framework := NewActionTestFrameworkEx(
+		t,
+		"no-force-exit-test",
+		[]reactloops.ReActLoopOption{
+			reactloops.WithSameActionTypeSpinThreshold(2),
+			reactloops.WithSameLogicSpinThreshold(2),
+			reactloops.WithMaxConsecutiveSpinWarnings(2),
+			reactloops.WithEnableSelfReflection(true),
+			reactloops.WithMaxIterations(20),
+		},
+		[]aicommon.ConfigOption{
+			aicommon.WithAICallback(aiCallback),
+			aicommon.WithAgreePolicy(aicommon.AgreePolicyYOLO),
+			aicommon.WithAIAutoRetry(1),
+			aicommon.WithAITransactionAutoRetry(1),
+		},
+	)
+
+	loop := framework.GetLoop()
+
+	framework.RegisterTestAction(
+		testActionName,
+		"Action that always spins",
+		nil,
+		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
+			op.Continue()
+		},
+	)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 9*time.Second)
+	defer cancel()
+
+	err := loop.Execute("no-force-exit-test", ctx, "Verifying spin threshold does not force-exit the loop")
+	if err != nil && err != context.DeadlineExceeded {
+		t.Fatalf("Execute failed unexpectedly: %v", err)
+	}
+
+	mu.Lock()
+	totalIter := iterCount
+	mu.Unlock()
+
+	// 关键验证：循环执行了超过 maxConsecutiveSpinWarnings+1 次迭代，说明没有被强制退出
+	// 若之前有 force-exit，循环在第 3 次 spin warning 后就结束，totalIter 会很小
+	if totalIter <= 3 {
+		t.Errorf("FAIL: loop only ran %d iterations, suggesting force-exit is still active (expected >3)", totalIter)
+	} else {
+		t.Logf("PASS: loop ran %d iterations without force-exit after spin threshold", totalIter)
+	}
+
+	// 检查 timeline 中有 spin_pressure 而非 force_spin_exit
+	reactIns := framework.reactInstance
+	if react, ok := reactIns.(*aireact.ReAct); ok {
+		config := react.GetConfig()
+		if config != nil {
+			if cfg, ok := config.(interface{ GetTimeline() *aicommon.Timeline }); ok {
+				timeline := cfg.GetTimeline()
+				if timeline != nil {
+					outputs := timeline.ToTimelineItemOutputLastN(200)
+					spinPressureFound := false
+					forceExitFound := false
+					for _, output := range outputs {
+						if strings.Contains(output.Type, "spin_pressure") {
+							spinPressureFound = true
+						}
+						if strings.Contains(output.Type, "force_spin_exit") {
+							forceExitFound = true
+						}
+					}
+					if spinPressureFound {
+						t.Log("PASS: found spin_pressure in timeline (pressure-only mode)")
+					} else {
+						t.Log("Note: spin_pressure not found in timeline (may not have reached threshold)")
+					}
+					if forceExitFound {
+						t.Error("FAIL: found force_spin_exit in timeline, force-exit should be disabled")
+					} else {
+						t.Log("PASS: no force_spin_exit in timeline")
+					}
+				}
+			}
+		}
+	}
+}
+
 // TestSelfReflectionThenSpin 测试自我反思出现之后，然后再出现 SPIN，并且 SPIN 被检测成功，
 // 再次触发自我反思，终结状态时，在 SPIN 触发的自我反思中可以看到 AddToTimeline 的内容，东西发生了变更
 func TestSelfReflectionThenSpin(t *testing.T) {

@@ -168,6 +168,11 @@ func buildReflectionSchema() string {
 			aitool.WithParam_Description(suggestionsDesc),
 			aitool.WithParam_Required(false),
 		),
+		aitool.WithBoolParam(
+			"is_task_progressing",
+			aitool.WithParam_Description("任务是否正常推进中（可选）：即使使用了相同类型的 action，如果参数不同、目标不同、有实质进展，则为 true。返回 true 时 SPIN 计数将被清零。"),
+			aitool.WithParam_Required(false),
+		),
 	)
 	return schema
 }

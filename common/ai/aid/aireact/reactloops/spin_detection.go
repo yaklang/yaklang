@@ -47,18 +47,8 @@ func (r *ReActLoop) IsInSpin() (bool, *SpinDetectionResult) {
 		if result != nil && result.IsSpinning {
 			return true, result
 		}
-		// 如果 AI 检测认为不是 SPIN，但简单检测触发了，仍然返回简单检测结果
-		history := r.GetLastNAction(r.sameActionTypeSpinThreshold)
-		if len(history) >= r.sameActionTypeSpinThreshold {
-			lastAction := history[len(history)-1]
-			return true, &SpinDetectionResult{
-				IsSpinning:       true,
-				Reason:           fmt.Sprintf("连续 %d 次执行相同的 Action 类型: %s", len(history), lastAction.ActionType),
-				Suggestions:      []string{"尝试使用不同的 Action 类型", "检查任务目标是否明确"},
-				ActionType:       lastAction.ActionType,
-				ConsecutiveCount: len(history),
-			}
-		}
+		// AI 判断不是 SPIN（例如同一工具使用了不同参数），信任 AI 的结论
+		return false, nil
 	}
 	return false, nil
 }
