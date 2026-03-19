@@ -4,18 +4,12 @@ import (
 	"fmt"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/schema"
 )
 
 // ResolveIdentifier resolves an identifier name against ALL registries:
-// tools, focused mode loops (via the loop registry), forges, and skills (via Config).
+// tools, forges, skills (via Config), and focused mode loops (via the loop registry).
 //
-// Resolution order: tools -> focused mode loops -> forges -> skills.
-//
-// Focused mode loops take priority over forges, ensuring that if an identifier
-// happens to match both a loop and a forge, it is always dispatched via
-// handleLoadFocusMode rather than handleLoadForge. In practice, loop names and
-// forge names should be kept distinct to avoid ambiguity.
+// Resolution order: tools -> forges -> skills -> focused mode loops.
 //
 // This method extends Config.ResolveIdentifier by additionally checking the
 // reactloops loop registry (RegisterLoopFactory). This is necessary because
@@ -25,15 +19,16 @@ import (
 // This method is the primary entry point for action handlers that need to resolve
 // an identifier and provide helpful AI feedback.
 func (r *ReActLoop) ResolveIdentifier(name string) *aicommon.ResolvedIdentifier {
-	// 1. Check tools first (highest priority – direct executable capability).
+	// First, delegate to Config for tool/forge/skill resolution
 	if cfg, ok := r.config.(*aicommon.Config); ok {
-		if toolResult := cfg.ResolveIdentifierToolOnly(name); toolResult != nil && !toolResult.IsUnknown() {
-			return toolResult
+		result := cfg.ResolveIdentifier(name)
+		if !result.IsUnknown() {
+			return result
 		}
 	}
 
-	// 2. Check focused mode loops BEFORE forges.
-	// Loops take priority to ensure focus mode is always entered directly.
+	// Config returned Unknown, or config type assertion failed.
+	// Check the focused mode loop registry as a final fallback.
 	if _, ok := GetLoopFactory(name); ok {
 		meta, _ := GetLoopMetadata(name)
 		description := ""
@@ -43,20 +38,15 @@ func (r *ReActLoop) ResolveIdentifier(name string) *aicommon.ResolvedIdentifier 
 		return &aicommon.ResolvedIdentifier{
 			Name:         name,
 			IdentityType: aicommon.ResolvedAs_FocusedMode,
-			ActionType:   schema.AI_REACT_LOOP_ACTION_LOAD_CAPABILITY,
+			ActionType:   "", // focused mode is not entered via AI actions
 			Suggestion: fmt.Sprintf(
-				"'%s' is a Focused Mode Loop (专注模式).%s "+
-					"Use load_capability to enter this mode directly.",
+				"IMPORTANT: '%s' is a Focused Mode Loop (专注模式), NOT a skill, tool, or blueprint.%s "+
+					"Focused modes are entered automatically when assigned to a task. "+
+					"You CANNOT enter this mode via loading_skills, require_tool, or require_ai_blueprint. "+
+					"Do NOT retry the current action with this name. "+
+					"If you need capabilities from this focused mode, describe your needs directly instead.",
 				name, description,
 			),
-		}
-	}
-
-	// 3. Fall back to Config for forge/skill resolution.
-	if cfg, ok := r.config.(*aicommon.Config); ok {
-		result := cfg.ResolveIdentifier(name)
-		if !result.IsUnknown() {
-			return result
 		}
 	}
 

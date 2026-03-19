@@ -81,23 +81,6 @@ func (r *ResolvedIdentifier) GetAlternative(t ResolvedIdentifierType) *ResolvedI
 // the reactloops package. Use ReActLoop.ResolveIdentifier() for full resolution
 // including focused mode loops.
 // Returns ResolvedAs_Unknown if the name is not found in any registry.
-// ResolveIdentifierToolOnly checks only the tool registry and returns a tool
-// ResolvedIdentifier if found, or nil otherwise. This is used by ReActLoop's
-// ResolveIdentifier to give tools the highest priority before checking loops.
-func (c *Config) ResolveIdentifierToolOnly(name string) *ResolvedIdentifier {
-	if name == "" || c.AiToolManager == nil {
-		return nil
-	}
-	if _, err := c.AiToolManager.GetToolByName(name); err == nil {
-		return &ResolvedIdentifier{
-			Name:         name,
-			IdentityType: ResolvedAs_Tool,
-			ActionType:   schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL,
-		}
-	}
-	return nil
-}
-
 func (c *Config) ResolveIdentifier(name string) *ResolvedIdentifier {
 	if name == "" {
 		return &ResolvedIdentifier{
