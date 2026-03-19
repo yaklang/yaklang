@@ -1702,7 +1702,6 @@ var syntaxFlowEvaluate = &cli.Command{
 			return utils.Errorf("target file or directory not found: %v", target)
 		}
 
-		opts := sfanalysis.DefaultOptions(sfanalysis.ProfileQuality)
 		results := make(map[string]*sfanalysis.SyntaxFlowRuleAnalyzeResult)
 
 		// Process single file or directory
@@ -1717,7 +1716,7 @@ var syntaxFlowEvaluate = &cli.Command{
 			}
 			fileName := filepath.Base(target)
 
-			report := sfanalysis.Analyze(context.Background(), string(content), opts)
+			report := sfanalysis.Analyze(context.Background(), string(content), sfanalysis.WithProfile(sfanalysis.ProfileQuality))
 			result := report.Quality
 			if result == nil {
 				result = &sfanalysis.SyntaxFlowRuleAnalyzeResult{Score: sfanalysis.MinScore, MaxScore: sfanalysis.MaxScore}
@@ -1736,7 +1735,7 @@ var syntaxFlowEvaluate = &cli.Command{
 					return nil
 				}
 				fileName := filepath.Base(s)
-				report := sfanalysis.Analyze(context.Background(), string(content), opts)
+				report := sfanalysis.Analyze(context.Background(), string(content), sfanalysis.WithProfile(sfanalysis.ProfileQuality))
 				result := report.Quality
 				if result == nil {
 					result = &sfanalysis.SyntaxFlowRuleAnalyzeResult{Score: sfanalysis.MinScore, MaxScore: sfanalysis.MaxScore}

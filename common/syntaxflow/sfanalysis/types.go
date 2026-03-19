@@ -1,6 +1,8 @@
 package sfanalysis
 
 import (
+	"strings"
+
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/result"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -15,63 +17,77 @@ const (
 	ProfileVerify   Profile = "verify"
 )
 
-type VerifyOption func(*verifyConfig)
+type Option func(*config)
 
-type Options struct {
-	Profile             Profile
-	AllowBlank          bool
-	NeedFormattedSyntax bool
-	CheckMetadata       bool
-	CheckRuleLogic      bool
-	NeedScore           bool
-	VerifyEmbeddedTests bool
-	VerifyOptions       []VerifyOption
-	VerifySampleCode    bool
-	SampleCode          string
-	SampleFilename      string
-	SampleLanguage      string
+type config struct {
+	profile             Profile
+	needFormattedSyntax bool
+	checkMetadata       bool
+	checkRuleLogic      bool
+	needScore           bool
+	verifyEmbeddedTests bool
+	verifySampleCode    bool
+	sampleCode          string
+	sampleFilename      string
+	sampleLanguage      string
+	requirePositive     bool
+	requireNegative     bool
+	verifyNegative      bool
+	strictAlertHigh     bool
 }
 
-func DefaultVerifyOptions(profile Profile) []VerifyOption {
-	switch profile {
-	case ProfileQuality:
-		return []VerifyOption{WithVerifyNegative(true)}
-	case ProfileVerify:
-		return []VerifyOption{WithVerifyNegative(true)}
-	default:
-		return nil
+func newConfig(opts ...Option) config {
+	cfg := config{}
+	WithProfile(ProfileEditor)(&cfg)
+	for _, opt := range opts {
+		if opt == nil {
+			continue
+		}
+		opt(&cfg)
+	}
+	return cfg
+}
+
+func WithProfile(profile Profile) Option {
+	return func(c *config) {
+		c.profile = profile
+		c.needFormattedSyntax = false
+		c.checkMetadata = false
+		c.checkRuleLogic = false
+		c.needScore = false
+		c.verifyEmbeddedTests = false
+		c.requirePositive = false
+		c.requireNegative = false
+		c.verifyNegative = false
+		c.strictAlertHigh = false
+
+		switch profile {
+		case ProfileAISyntax:
+			c.needFormattedSyntax = true
+		case ProfileQuality:
+			c.checkMetadata = true
+			c.checkRuleLogic = true
+			c.needScore = true
+			c.verifyEmbeddedTests = true
+			c.verifyNegative = true
+		case ProfileVerify:
+			c.verifyEmbeddedTests = true
+			c.verifyNegative = true
+		case ProfileEditor, "":
+			c.profile = ProfileEditor
+			c.needFormattedSyntax = true
+		default:
+			c.needFormattedSyntax = true
+		}
 	}
 }
 
-func DefaultOptions(profile Profile) Options {
-	switch profile {
-	case ProfileAISyntax:
-		return Options{
-			Profile:             profile,
-			AllowBlank:          true,
-			NeedFormattedSyntax: true,
-		}
-	case ProfileQuality:
-		return Options{
-			Profile:             profile,
-			CheckMetadata:       true,
-			CheckRuleLogic:      true,
-			NeedScore:           true,
-			VerifyEmbeddedTests: true,
-			VerifyOptions:       DefaultVerifyOptions(profile),
-		}
-	case ProfileVerify:
-		return Options{
-			Profile:             profile,
-			VerifyEmbeddedTests: true,
-			VerifyOptions:       DefaultVerifyOptions(profile),
-		}
-	default:
-		return Options{
-			Profile:             ProfileEditor,
-			AllowBlank:          true,
-			NeedFormattedSyntax: true,
-		}
+func WithSampleVerification(sampleCode, sampleFilename, sampleLanguage string) Option {
+	return func(c *config) {
+		c.verifySampleCode = strings.TrimSpace(sampleCode) != "" && strings.TrimSpace(sampleLanguage) != ""
+		c.sampleCode = sampleCode
+		c.sampleFilename = sampleFilename
+		c.sampleLanguage = sampleLanguage
 	}
 }
 

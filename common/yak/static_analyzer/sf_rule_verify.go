@@ -17,16 +17,13 @@ type SyntaxFlowCheckResult struct {
 }
 
 func SyntaxFlowRuleCheckingWithSample(code, sampleCode, filename, language string) SyntaxFlowCheckResult {
-	opts := sfanalysis.DefaultOptions(sfanalysis.ProfileAISyntax)
+	opts := []sfanalysis.Option{sfanalysis.WithProfile(sfanalysis.ProfileAISyntax)}
 	sampleCode = strings.TrimSpace(sampleCode)
 	if sampleCode != "" && language != "" {
-		opts.VerifySampleCode = true
-		opts.SampleCode = sampleCode
-		opts.SampleFilename = filename
-		opts.SampleLanguage = language
+		opts = append(opts, sfanalysis.WithSampleVerification(sampleCode, filename, language))
 	}
 
-	report := sfanalysis.Analyze(context.Background(), code, opts)
+	report := sfanalysis.Analyze(context.Background(), code, opts...)
 	return SyntaxFlowCheckResult{
 		SyntaxErrors:    report.SyntaxErrors,
 		FormattedErrors: report.FormattedSyntaxErrors,

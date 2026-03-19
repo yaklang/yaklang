@@ -11,33 +11,26 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
-type verifyConfig struct {
-	requirePositive bool
-	requireNegative bool
-	verifyNegative  bool
-	strictAlertHigh bool
-}
-
-func WithRequirePositive(v bool) VerifyOption {
-	return func(c *verifyConfig) {
+func WithRequirePositive(v bool) Option {
+	return func(c *config) {
 		c.requirePositive = v
 	}
 }
 
-func WithRequireNegative(v bool) VerifyOption {
-	return func(c *verifyConfig) {
+func WithRequireNegative(v bool) Option {
+	return func(c *config) {
 		c.requireNegative = v
 	}
 }
 
-func WithVerifyNegative(v bool) VerifyOption {
-	return func(c *verifyConfig) {
+func WithVerifyNegative(v bool) Option {
+	return func(c *config) {
 		c.verifyNegative = v
 	}
 }
 
-func WithStrictEmbeddedVerify() VerifyOption {
-	return func(c *verifyConfig) {
+func WithStrictEmbeddedVerify() Option {
+	return func(c *config) {
 		c.requirePositive = true
 		c.requireNegative = true
 		c.verifyNegative = true
@@ -45,11 +38,11 @@ func WithStrictEmbeddedVerify() VerifyOption {
 	}
 }
 
-func EvaluateVerifyFilesystemWithFrame(frame *sfvm.SFFrame, opts ...VerifyOption) error {
-	return runEmbeddedVerifyWithFrame(frame, opts...).Error
+func EvaluateVerifyFilesystemWithFrame(frame *sfvm.SFFrame, opts ...Option) error {
+	return runEmbeddedVerifyWithFrame(frame, newConfig(opts...)).Error
 }
 
-func EvaluateVerifyFilesystemWithRule(rule *schema.SyntaxFlowRule, opts ...VerifyOption) error {
+func EvaluateVerifyFilesystemWithRule(rule *schema.SyntaxFlowRule, opts ...Option) error {
 	if rule == nil {
 		return utils.Error("syntaxflow rule is nil")
 	}
@@ -65,15 +58,7 @@ func EvaluateVerifyFilesystemWithRule(rule *schema.SyntaxFlowRule, opts ...Verif
 	return EvaluateVerifyFilesystemWithFrame(frame, opts...)
 }
 
-func runEmbeddedVerifyWithFrame(frame *sfvm.SFFrame, opts ...VerifyOption) *EmbeddedVerifyReport {
-	cfg := verifyConfig{}
-	for _, opt := range opts {
-		if opt == nil {
-			continue
-		}
-		opt(&cfg)
-	}
-
+func runEmbeddedVerifyWithFrame(frame *sfvm.SFFrame, cfg config) *EmbeddedVerifyReport {
 	report := &EmbeddedVerifyReport{}
 	if frame == nil {
 		report.Error = utils.Error("syntaxflow frame is nil")
@@ -165,7 +150,7 @@ func checkNegativeResult(result *ssaapi.SyntaxFlowResult) error {
 	return nil
 }
 
-func checkPositiveResult(verifyFs *sfvm.VerifyFileSystem, rule *schema.SyntaxFlowRule, result *ssaapi.SyntaxFlowResult, cfg verifyConfig) (errs error) {
+func checkPositiveResult(verifyFs *sfvm.VerifyFileSystem, rule *schema.SyntaxFlowRule, result *ssaapi.SyntaxFlowResult, cfg config) (errs error) {
 	defer func() {
 		if errs == nil {
 			return

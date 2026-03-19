@@ -9,26 +9,26 @@ import (
 
 func TestAnalyzeBlankRuleProfiles(t *testing.T) {
 	t.Run("editor allows blank rule", func(t *testing.T) {
-		report := Analyze(context.Background(), " \n\t", DefaultOptions(ProfileEditor))
+		report := Analyze(context.Background(), " \n\t", WithProfile(ProfileEditor))
 		require.True(t, report.IsBlank)
 		require.Empty(t, report.SyntaxErrors)
 		require.Nil(t, report.Quality)
 	})
 
 	t.Run("ai syntax allows blank rule without sample", func(t *testing.T) {
-		report := Analyze(context.Background(), " \n\t", DefaultOptions(ProfileAISyntax))
+		report := Analyze(context.Background(), " \n\t", WithProfile(ProfileAISyntax))
 		require.True(t, report.IsBlank)
 		require.Empty(t, report.SyntaxErrors)
 		require.Nil(t, report.Sample)
 	})
 
 	t.Run("ai syntax rejects blank rule during sample verify", func(t *testing.T) {
-		opts := DefaultOptions(ProfileAISyntax)
-		opts.VerifySampleCode = true
-		opts.SampleCode = "package main\nfunc main() {}"
-		opts.SampleLanguage = "golang"
-
-		report := Analyze(context.Background(), " \n\t", opts)
+		report := Analyze(
+			context.Background(),
+			" \n\t",
+			WithProfile(ProfileAISyntax),
+			WithSampleVerification("package main\nfunc main() {}", "", "golang"),
+		)
 		require.True(t, report.IsBlank)
 		require.NotNil(t, report.Sample)
 		require.False(t, report.Sample.Matched)
@@ -36,7 +36,7 @@ func TestAnalyzeBlankRuleProfiles(t *testing.T) {
 	})
 
 	t.Run("quality rejects blank rule", func(t *testing.T) {
-		report := Analyze(context.Background(), " \n\t", DefaultOptions(ProfileQuality))
+		report := Analyze(context.Background(), " \n\t", WithProfile(ProfileQuality))
 		require.True(t, report.IsBlank)
 		require.NotNil(t, report.Quality)
 		require.Equal(t, MinScore, report.Quality.Score)

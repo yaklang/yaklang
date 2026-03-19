@@ -25,15 +25,15 @@ type compileOutcome struct {
 	compileErr   error
 }
 
-func Analyze(ctx context.Context, code string, opts Options) *Report {
+func Analyze(ctx context.Context, code string, opts ...Option) *Report {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	opts = normalizeOptions(opts)
+	cfg := newConfig(opts...)
 
 	isBlank := strings.TrimSpace(code) == ""
 	report := &Report{
-		Profile: opts.Profile,
+		Profile: cfg.profile,
 		Code:    code,
 		IsBlank: isBlank,
 	}
@@ -45,7 +45,7 @@ func Analyze(ctx context.Context, code string, opts Options) *Report {
 		compileContent = "\n"
 	}
 
-	if opts.VerifySampleCode && isBlank && strings.TrimSpace(opts.SampleCode) != "" && opts.SampleLanguage != "" {
+	if cfg.verifySampleCode && isBlank && strings.TrimSpace(cfg.sampleCode) != "" && cfg.sampleLanguage != "" {
 		report.Sample = &SampleVerificationResult{
 			Matched:    false,
 			Message:    "规则内容为空白，无法执行正例自检",
@@ -62,11 +62,11 @@ func Analyze(ctx context.Context, code string, opts Options) *Report {
 
 	compiled := compileSyntaxFlow(compileContent)
 	report.SyntaxErrors = compiled.syntaxErrors
-	if opts.NeedFormattedSyntax && len(compiled.syntaxErrors) > 0 {
+	if cfg.needFormattedSyntax && len(compiled.syntaxErrors) > 0 {
 		report.FormattedSyntaxErrors = FormatSyntaxFlowErrors(code, compiled.syntaxErrors)
 	}
 	if len(compiled.syntaxErrors) > 0 {
-		if needsQualityResult(opts) {
+		if needsQualityResult(cfg) {
 			report.Quality = newQualityResult()
 			report.Quality.Score -= SyntaxErrorPenalty
 			appendSyntaxProblems(report.Quality, compiled)
@@ -77,34 +77,24 @@ func Analyze(ctx context.Context, code string, opts Options) *Report {
 
 	report.Frame = compiled.frame
 
-	if opts.VerifyEmbeddedTests {
-		report.EmbeddedVerify = runEmbeddedVerifyWithFrame(compiled.frame, opts.VerifyOptions...)
+	if cfg.verifyEmbeddedTests {
+		report.EmbeddedVerify = runEmbeddedVerifyWithFrame(compiled.frame, cfg)
 	}
 
-	if opts.VerifySampleCode && !isBlank {
-		sample := verifySFRuleMatchesSampleWithFrame(compiled.frame, code, opts.SampleCode, opts.SampleFilename, opts.SampleLanguage)
+	if cfg.verifySampleCode && !isBlank {
+		sample := verifySFRuleMatchesSampleWithFrame(compiled.frame, code, cfg.sampleCode, cfg.sampleFilename, cfg.sampleLanguage)
 		report.Sample = &sample
 	}
 
-	if needsQualityResult(opts) {
+	if needsQualityResult(cfg) {
 		report.Quality = analyzeQuality(compiled.frame, report.EmbeddedVerify, isBlank)
 	}
 
 	return report
 }
 
-func normalizeOptions(opts Options) Options {
-	if opts.Profile == "" {
-		opts = DefaultOptions(ProfileEditor)
-	}
-	if opts.VerifyEmbeddedTests && len(opts.VerifyOptions) == 0 {
-		opts.VerifyOptions = DefaultVerifyOptions(opts.Profile)
-	}
-	return opts
-}
-
-func needsQualityResult(opts Options) bool {
-	return opts.CheckMetadata || opts.CheckRuleLogic || opts.NeedScore
+func needsQualityResult(cfg config) bool {
+	return cfg.checkMetadata || cfg.checkRuleLogic || cfg.needScore
 }
 
 func newQualityResult() *SyntaxFlowRuleAnalyzeResult {
