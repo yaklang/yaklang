@@ -36,10 +36,42 @@ func (b *astbuilder) build(ast *cparser.CompilationUnitContext) {
 	}
 
 	if b.PreHandler() {
+		if unit := ast.TranslationUnit(); unit != nil {
+			b.prebuildTranslationUnit(unit.(*cparser.TranslationUnitContext))
+		}
 		exportHandler()
 	} else {
 		if unit := ast.TranslationUnit(); unit != nil {
-			b.buildTranslationUnit(unit.(*cparser.TranslationUnitContext))
+			b.buildTranslationUnitRuntime(unit.(*cparser.TranslationUnitContext))
+		}
+	}
+}
+
+func (b *astbuilder) prebuildTranslationUnit(ast *cparser.TranslationUnitContext) {
+	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	defer recoverRange()
+
+	for _, e := range ast.AllExternalDeclaration() {
+		b.prebuildExternalDeclaration(e.(*cparser.ExternalDeclarationContext))
+	}
+}
+
+func (b *astbuilder) prebuildExternalDeclaration(ast *cparser.ExternalDeclarationContext) {
+	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	defer recoverRange()
+
+	if f := ast.FunctionDefinition(); f != nil {
+		b.buildFunctionDefinition(f.(*cparser.FunctionDefinitionContext))
+		return
+	}
+	if ds := ast.DeclarationSpecifier(); ds != nil {
+		b.buildDeclarationSpecifier(ds.(*cparser.DeclarationSpecifierContext))
+		return
+	}
+	if d := ast.Declaration(); d != nil {
+		decl := d.(*cparser.DeclarationContext)
+		if spec := decl.DeclarationSpecifier(); spec != nil {
+			b.buildDeclarationSpecifier(spec.(*cparser.DeclarationSpecifierContext))
 		}
 	}
 }
@@ -50,6 +82,15 @@ func (b *astbuilder) buildTranslationUnit(ast *cparser.TranslationUnitContext) {
 
 	for _, e := range ast.AllExternalDeclaration() {
 		b.buildExternalDeclaration(e.(*cparser.ExternalDeclarationContext))
+	}
+}
+
+func (b *astbuilder) buildTranslationUnitRuntime(ast *cparser.TranslationUnitContext) {
+	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	defer recoverRange()
+
+	for _, e := range ast.AllExternalDeclaration() {
+		b.buildExternalDeclarationRuntime(e.(*cparser.ExternalDeclarationContext))
 	}
 }
 
@@ -70,6 +111,16 @@ func (b *astbuilder) buildExternalDeclaration(ast *cparser.ExternalDeclarationCo
 		// 处理宏调用语句（如 FF_DISABLE_DEPRECATION_WARNINGS）
 		b.buildMacroCallStatement(mcs.(*cparser.MacroCallStatementContext))
 	}
+}
+
+func (b *astbuilder) buildExternalDeclarationRuntime(ast *cparser.ExternalDeclarationContext) {
+	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	defer recoverRange()
+
+	if ast.FunctionDefinition() != nil {
+		return
+	}
+	b.buildExternalDeclaration(ast)
 }
 
 func (b *astbuilder) buildFunctionDefinition(ast *cparser.FunctionDefinitionContext) {

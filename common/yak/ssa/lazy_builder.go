@@ -81,55 +81,47 @@ type ASTIF interface {
 	GetText() string
 }
 
-/*
-LazyBuilder -- Build:
-when build, each program should call visitAST
-  - when preHandler: mark ast hash to prog.astMap
-  - when not preHandler: delete ast hash from prog.astMap
+type RootBuildKind string
 
-when all ast visit done, build instruction and save to database
+const (
+	RootBuildKindFunction  RootBuildKind = "function"
+	RootBuildKindBlueprint RootBuildKind = "blueprint"
+	RootBuildKindTopLevel  RootBuildKind = "top-level"
+	RootBuildKindHelper    RootBuildKind = "helper"
+)
 
-note: need defer func\visit stmt finish\...
-*/
+type RootBuildRunner interface {
+	ID() string
+	Build()
+}
+
+type RootBuildTask struct {
+	kind RootBuildKind
+	name string
+	*LazyBuilder
+}
+
+func NewRootBuildTask(kind RootBuildKind, name string, work func()) *RootBuildTask {
+	task := &RootBuildTask{
+		kind:        kind,
+		name:        name,
+		LazyBuilder: NewLazyBuilder("RootBuild:" + string(kind) + ":" + name),
+	}
+	if work != nil {
+		task.AddLazyBuilder(work)
+	}
+	return task
+}
+
+func (r *RootBuildTask) ID() string {
+	if r == nil {
+		return ""
+	}
+	return string(r.kind) + ":" + r.name
+}
+
 func (p *Program) VisitAst(ast ASTIF) {
-	if p == nil {
-		return
-	}
-	key := ""
-	if editor := p.GetCurrentEditor(); editor != nil {
-		// Prefer the editor URL over AST text:
-		// - it avoids hashing/retaining large AST text blobs on hot paths
-		// - it keeps per-file visit tracking stable across identical file contents
-		// This assumes a compile run does not reuse the same URL for different file contents.
-		key = editor.GetUrl()
-	}
-	if key == "" && ast != nil {
-		key = ast.GetText()
-	}
-	if key == "" {
-		return
-	}
-
-	if p.PreHandler() {
-		p.astMap[key] = struct{}{}
-	} else {
-		if _, ok := p.astMap[key]; !ok {
-			log.Debugf("ast is not found in ast map: program=%s key=%s", p.GetProgramName(), key)
-			return
-		}
-		delete(p.astMap, key)
-
-		if len(p.astMap) == 0 {
-			p.Application.ProcessInfof("program %s all ast visit done", p.Name)
-			p.Application.ProcessInfof("program %s build Instruction", p.Name)
-			p.LazyBuild() // build instruction
-			p.Application.ProcessInfof("program %s build Instruction(%d)", p.Name, p.Cache.CountInstruction())
-			// will cause instruction not save bug
-			// p.Cache.SaveToDatabase() // save instruction
-			builder := p.GetAndCreateFunctionBuilder("", string(MainFunctionName))
-			builder.SyntaxIncludingStack = nil
-		}
-	}
+	_ = ast
 }
 
 func (p *Program) LazyBuild() {
