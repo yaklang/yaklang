@@ -16,6 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 )
 
@@ -210,6 +211,9 @@ type ChatBaseContext struct {
 	// RawHTTPResponseCallback is called after the AI HTTP response is fully consumed,
 	// providing the raw HTTP response header and a body preview for debugging.
 	RawHTTPResponseCallback func(headerBytes []byte, bodyPreview []byte)
+	// RawHTTPRequestResponseCallback is called after the AI HTTP response is fully consumed,
+	// providing the raw request bytes and response debug data for debugging.
+	RawHTTPRequestResponseCallback RawHTTPRequestResponseCallback
 }
 
 type ChatBaseOption func(c *ChatBaseContext)
@@ -310,6 +314,12 @@ func WithChatBase_ToolCallCallback(cb func([]*ToolCall)) ChatBaseOption {
 func WithChatBase_RawHTTPResponseCallback(cb func(headerBytes []byte, bodyPreview []byte)) ChatBaseOption {
 	return func(c *ChatBaseContext) {
 		c.RawHTTPResponseCallback = cb
+	}
+}
+
+func WithChatBase_RawHTTPRequestResponseCallback(cb RawHTTPRequestResponseCallback) ChatBaseOption {
+	return func(c *ChatBaseContext) {
+		c.RawHTTPRequestResponseCallback = cb
 	}
 }
 
@@ -525,7 +535,25 @@ func executeChatBaseRequest(
 
 	var pr, reasonPr io.Reader
 	var cancel func()
-	pr, reasonPr, opts, cancel = appendHandler(handleStream, opts, ctx.ToolCallCallback, ctx.RawHTTPResponseCallback)
+	var requestPacket []byte
+	rawResponseCallback := func(headerBytes []byte, bodyPreview []byte) {
+		if ctx.RawHTTPResponseCallback != nil {
+			ctx.RawHTTPResponseCallback(headerBytes, bodyPreview)
+		}
+		if ctx.RawHTTPRequestResponseCallback != nil {
+			ctx.RawHTTPRequestResponseCallback(requestPacket, headerBytes, bodyPreview)
+		}
+	}
+	pr, reasonPr, opts, cancel = appendHandler(handleStream, opts, ctx.ToolCallCallback, rawResponseCallback)
+	requestPacket = poc.BuildRequest(
+		lowhttp.UrlToRequestPacket(
+			"POST",
+			url,
+			nil,
+			strings.HasPrefix(strings.ToLower(url), "https://"),
+		),
+		opts...,
+	)
 	wg := new(sync.WaitGroup)
 
 	// 统一处理reasoning stream handler

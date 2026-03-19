@@ -121,6 +121,7 @@ func (g *Gateway) Chat(s string, f ...any) (string, error) {
 		aispec.WithChatBase_Tools(g.Config.Tools),
 		aispec.WithChatBase_ToolChoice(g.Config.ToolChoice),
 		aispec.WithChatBase_RawHTTPResponseCallback(g.Config.RawHTTPResponseCallback),
+		aispec.WithChatBase_RawHTTPRequestResponseCallback(g.Config.RawHTTPRequestResponseCallback),
 	)
 }
 
@@ -129,7 +130,16 @@ func (g *Gateway) ExtractData(msg string, desc string, fields map[string]any) (m
 }
 
 func (g *Gateway) ChatStream(s string) (io.Reader, error) {
-	return aispec.ChatWithStream(g.TargetUrl, g.Config.Model, s, g.Config.HTTPErrorHandler, g.Config.StreamHandler, g.AIClient.BuildHTTPOptions)
+	return aispec.ChatWithStream(
+		g.TargetUrl,
+		g.Config.Model,
+		s,
+		g.Config.HTTPErrorHandler,
+		g.Config.StreamHandler,
+		g.AIClient.BuildHTTPOptions,
+		aispec.WithChatBase_RawHTTPResponseCallback(g.Config.RawHTTPResponseCallback),
+		aispec.WithChatBase_RawHTTPRequestResponseCallback(g.Config.RawHTTPRequestResponseCallback),
+	)
 }
 
 func NewGateway() *Gateway {
@@ -808,25 +818,27 @@ var Exports = map[string]any{
 	"ListModels":              ListModels,
 	"ListModelByProviderType": ListModelByProviderType,
 
-	"thinking":                 aispec.WithEnableThinking,
-	"timeout":                  aispec.WithTimeout,
-	"proxy":                    aispec.WithProxy,
-	"model":                    aispec.WithModel,
-	"apiKey":                   aispec.WithAPIKey,
-	"noHttps":                  aispec.WithNoHttps,
-	"funcCallRetryTimes":       aispec.WithFunctionCallRetryTimes,
-	"domain":                   aispec.WithDomain,
-	"baseURL":                  aispec.WithBaseURL,
-	"onStream":                 aispec.WithStreamHandler,
-	"onReasonStream":           aispec.WithReasonStreamHandler,
-	"debugStream":              aispec.WithDebugStream,
-	"type":                     aispec.WithType,
-	"imageFile":                aispec.WithImageFile,
-	"imageBase64":              aispec.WithImageBase64,
-	"imageRaw":                 aispec.WithImageRaw,
-	"toolCallCallback":         aispec.WithToolCallCallback,
-	"modelInfoCallback":        aispec.WithModelInfoCallback,
-	"modelInfoConfirmCallback": aispec.WithModelInfoConfirmCallback,
+	"thinking":                       aispec.WithEnableThinking,
+	"timeout":                        aispec.WithTimeout,
+	"proxy":                          aispec.WithProxy,
+	"model":                          aispec.WithModel,
+	"apiKey":                         aispec.WithAPIKey,
+	"noHttps":                        aispec.WithNoHttps,
+	"funcCallRetryTimes":             aispec.WithFunctionCallRetryTimes,
+	"domain":                         aispec.WithDomain,
+	"baseURL":                        aispec.WithBaseURL,
+	"onStream":                       aispec.WithStreamHandler,
+	"onReasonStream":                 aispec.WithReasonStreamHandler,
+	"debugStream":                    aispec.WithDebugStream,
+	"type":                           aispec.WithType,
+	"imageFile":                      aispec.WithImageFile,
+	"imageBase64":                    aispec.WithImageBase64,
+	"imageRaw":                       aispec.WithImageRaw,
+	"toolCallCallback":               aispec.WithToolCallCallback,
+	"modelInfoCallback":              aispec.WithModelInfoCallback,
+	"modelInfoConfirmCallback":       aispec.WithModelInfoConfirmCallback,
+	"rawHTTPResponseCallback":        aispec.WithRawHTTPResponseCallback,
+	"rawHTTPRequestResponseCallback": aispec.WithRawHTTPRequestResponseCallback,
 }
 
 // CreateChatterFromConfig creates a chat function from AIModelConfig.

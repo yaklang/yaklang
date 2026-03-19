@@ -52,6 +52,8 @@ func (g *GatewayClient) Chat(s string, function ...any) (string, error) {
 		aispec.WithChatBase_Tools(g.config.Tools),
 		aispec.WithChatBase_ToolChoice(g.config.ToolChoice),
 		aispec.WithChatBase_ToolCallCallback(g.config.ToolCallCallback),
+		aispec.WithChatBase_RawHTTPResponseCallback(g.config.RawHTTPResponseCallback),
+		aispec.WithChatBase_RawHTTPRequestResponseCallback(g.config.RawHTTPRequestResponseCallback),
 	)
 }
 
@@ -60,7 +62,16 @@ func (g *GatewayClient) ExtractData(msg string, desc string, fields map[string]a
 }
 
 func (g *GatewayClient) ChatStream(s string) (io.Reader, error) {
-	return aispec.ChatWithStream(g.targetUrl, g.config.Model, s, g.config.HTTPErrorHandler, g.config.StreamHandler, g.BuildHTTPOptions)
+	return aispec.ChatWithStream(
+		g.targetUrl,
+		g.config.Model,
+		s,
+		g.config.HTTPErrorHandler,
+		g.config.StreamHandler,
+		g.BuildHTTPOptions,
+		aispec.WithChatBase_RawHTTPResponseCallback(g.config.RawHTTPResponseCallback),
+		aispec.WithChatBase_RawHTTPRequestResponseCallback(g.config.RawHTTPRequestResponseCallback),
+	)
 }
 
 func (g *GatewayClient) newLoadOption(opt ...aispec.AIConfigOption) {

@@ -21,6 +21,11 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 )
 
+// RawHTTPRequestResponseCallback captures the raw request bytes and response debug data.
+// The response is exposed as header bytes plus a body preview because streaming responses
+// may not be fully buffered in memory.
+type RawHTTPRequestResponseCallback func(requestBytes []byte, responseHeaderBytes []byte, bodyPreview []byte)
+
 type AIConfig struct {
 	// gateway network config
 	BaseURL string
@@ -74,6 +79,9 @@ type AIConfig struct {
 	// RawHTTPResponseCallback is called with the raw HTTP response header and body preview
 	// when an AI response completes. Used for debugging AI call failures.
 	RawHTTPResponseCallback func(headerBytes []byte, bodyPreview []byte)
+	// RawHTTPRequestResponseCallback is called with the raw HTTP request bytes and
+	// response debug data when an AI response completes.
+	RawHTTPRequestResponseCallback RawHTTPRequestResponseCallback
 }
 
 func WithExtraHeader(headers ...*ypb.HTTPHeader) AIConfigOption {
@@ -859,5 +867,11 @@ func WithModelInfoConfirmCallback(cb func(provider, model string)) AIConfigOptio
 func WithRawHTTPResponseCallback(cb func(headerBytes []byte, bodyPreview []byte)) AIConfigOption {
 	return func(c *AIConfig) {
 		c.RawHTTPResponseCallback = cb
+	}
+}
+
+func WithRawHTTPRequestResponseCallback(cb RawHTTPRequestResponseCallback) AIConfigOption {
+	return func(c *AIConfig) {
+		c.RawHTTPRequestResponseCallback = cb
 	}
 }
