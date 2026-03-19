@@ -9,9 +9,9 @@ import (
 )
 
 func TestReActLoop_ResolveIdentifier_FocusedModeLoop(t *testing.T) {
-	// code_audit_verify is a registered focused mode loop (registered at init time by loop_code_audit_verify).
+	// code_security_audit is a registered focused mode loop (registered at init time by loop_code_security_audit).
 	// It should be resolved as ResolvedAs_FocusedMode, not Unknown.
-	loopName := schema.AI_REACT_LOOP_NAME_CODE_AUDIT_VERIFY
+	loopName := schema.AI_REACT_LOOP_NAME_CODE_SECURITY_AUDIT
 
 	// Verify the loop is actually registered
 	_, ok := GetLoopFactory(loopName)
