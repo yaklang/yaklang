@@ -278,6 +278,22 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "任务规划",
 		En: "Task Planning",
 	},
+	"main-plan": {
+		Zh: "主任务",
+		En: "Main Plan",
+	},
+	"plan-review": {
+		Zh: "任务规划反思",
+		En: "Plan Review",
+	},
+	"task-review": {
+		Zh: "任务反思",
+		En: "Task Review",
+	},
+	"main-plan-goal": {
+		Zh: "主任务目标",
+		En: "Main Plan Target",
+	},
 	"decision": {
 		Zh: "决策",
 		En: "Decision",
