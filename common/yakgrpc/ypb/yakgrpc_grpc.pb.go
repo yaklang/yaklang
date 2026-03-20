@@ -426,7 +426,7 @@ const (
 	Yak_GetThirdPartyAppConfigTemplate_FullMethodName             = "/ypb.Yak/GetThirdPartyAppConfigTemplate"
 	Yak_CheckHahValidAiConfig_FullMethodName                      = "/ypb.Yak/CheckHahValidAiConfig"
 	Yak_ListAiModel_FullMethodName                                = "/ypb.Yak/ListAiModel"
-	Yak_TestAIModel_FullMethodName                                = "/ypb.Yak/TestAIModel"
+	Yak_AIConfigHealthCheck_FullMethodName                        = "/ypb.Yak/AIConfigHealthCheck"
 	Yak_GetAIGlobalConfig_FullMethodName                          = "/ypb.Yak/GetAIGlobalConfig"
 	Yak_SetAIGlobalConfig_FullMethodName                          = "/ypb.Yak/SetAIGlobalConfig"
 	Yak_ListAIProviders_FullMethodName                            = "/ypb.Yak/ListAIProviders"
@@ -1158,7 +1158,7 @@ type YakClient interface {
 	// AI相关
 	CheckHahValidAiConfig(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GeneralResponse, error)
 	ListAiModel(ctx context.Context, in *ListAiModelRequest, opts ...grpc.CallOption) (*ListAiModelResponse, error)
-	TestAIModel(ctx context.Context, in *TestAIModelRequest, opts ...grpc.CallOption) (*TestAIModelResponse, error)
+	AIConfigHealthCheck(ctx context.Context, in *AIConfigHealthCheckRequest, opts ...grpc.CallOption) (*AIConfigHealthCheckResponse, error)
 	GetAIGlobalConfig(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*AIGlobalConfig, error)
 	SetAIGlobalConfig(ctx context.Context, in *AIGlobalConfig, opts ...grpc.CallOption) (*Empty, error)
 	ListAIProviders(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ListAIProvidersResponse, error)
@@ -6096,10 +6096,10 @@ func (c *yakClient) ListAiModel(ctx context.Context, in *ListAiModelRequest, opt
 	return out, nil
 }
 
-func (c *yakClient) TestAIModel(ctx context.Context, in *TestAIModelRequest, opts ...grpc.CallOption) (*TestAIModelResponse, error) {
+func (c *yakClient) AIConfigHealthCheck(ctx context.Context, in *AIConfigHealthCheckRequest, opts ...grpc.CallOption) (*AIConfigHealthCheckResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(TestAIModelResponse)
-	err := c.cc.Invoke(ctx, Yak_TestAIModel_FullMethodName, in, out, cOpts...)
+	out := new(AIConfigHealthCheckResponse)
+	err := c.cc.Invoke(ctx, Yak_AIConfigHealthCheck_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -8911,7 +8911,7 @@ type YakServer interface {
 	// AI相关
 	CheckHahValidAiConfig(context.Context, *Empty) (*GeneralResponse, error)
 	ListAiModel(context.Context, *ListAiModelRequest) (*ListAiModelResponse, error)
-	TestAIModel(context.Context, *TestAIModelRequest) (*TestAIModelResponse, error)
+	AIConfigHealthCheck(context.Context, *AIConfigHealthCheckRequest) (*AIConfigHealthCheckResponse, error)
 	GetAIGlobalConfig(context.Context, *Empty) (*AIGlobalConfig, error)
 	SetAIGlobalConfig(context.Context, *AIGlobalConfig) (*Empty, error)
 	ListAIProviders(context.Context, *Empty) (*ListAIProvidersResponse, error)
@@ -10379,8 +10379,8 @@ func (UnimplementedYakServer) CheckHahValidAiConfig(context.Context, *Empty) (*G
 func (UnimplementedYakServer) ListAiModel(context.Context, *ListAiModelRequest) (*ListAiModelResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListAiModel not implemented")
 }
-func (UnimplementedYakServer) TestAIModel(context.Context, *TestAIModelRequest) (*TestAIModelResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method TestAIModel not implemented")
+func (UnimplementedYakServer) AIConfigHealthCheck(context.Context, *AIConfigHealthCheckRequest) (*AIConfigHealthCheckResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AIConfigHealthCheck not implemented")
 }
 func (UnimplementedYakServer) GetAIGlobalConfig(context.Context, *Empty) (*AIGlobalConfig, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetAIGlobalConfig not implemented")
@@ -17739,20 +17739,20 @@ func _Yak_ListAiModel_Handler(srv interface{}, ctx context.Context, dec func(int
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Yak_TestAIModel_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(TestAIModelRequest)
+func _Yak_AIConfigHealthCheck_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AIConfigHealthCheckRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(YakServer).TestAIModel(ctx, in)
+		return srv.(YakServer).AIConfigHealthCheck(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Yak_TestAIModel_FullMethodName,
+		FullMethod: Yak_AIConfigHealthCheck_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(YakServer).TestAIModel(ctx, req.(*TestAIModelRequest))
+		return srv.(YakServer).AIConfigHealthCheck(ctx, req.(*AIConfigHealthCheckRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -22402,8 +22402,8 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Yak_ListAiModel_Handler,
 		},
 		{
-			MethodName: "TestAIModel",
-			Handler:    _Yak_TestAIModel_Handler,
+			MethodName: "AIConfigHealthCheck",
+			Handler:    _Yak_AIConfigHealthCheck_Handler,
 		},
 		{
 			MethodName: "GetAIGlobalConfig",

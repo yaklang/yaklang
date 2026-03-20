@@ -49,7 +49,7 @@ func (s *Server) ListAiModel(ctx context.Context, req *ypb.ListAiModelRequest) (
 	return rsp, nil
 }
 
-func (s *Server) TestAIModel(ctx context.Context, req *ypb.TestAIModelRequest) (*ypb.TestAIModelResponse, error) {
+func (s *Server) AIConfigHealthCheck(ctx context.Context, req *ypb.AIConfigHealthCheckRequest) (*ypb.AIConfigHealthCheckResponse, error) {
 	if req == nil {
 		return nil, utils.Error("request is nil")
 	}
@@ -68,7 +68,7 @@ func (s *Server) TestAIModel(ctx context.Context, req *ypb.TestAIModelRequest) (
 		return nil, utils.Errorf("unsupported ai type: %s", providerType)
 	}
 
-	resp := &ypb.TestAIModelResponse{}
+	resp := &ypb.AIConfigHealthCheckResponse{}
 	start := time.Now()
 	var firstByteOnce sync.Once
 	markFirstByte := func(reader io.Reader) {
