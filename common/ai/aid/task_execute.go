@@ -226,6 +226,9 @@ func (t *AiTask) execute() error {
 		}),
 	)
 	if err != nil {
+		if t.GetStatus() == aicommon.AITaskState_Processing {
+			t.SetStatus(aicommon.AITaskState_Aborted)
+		}
 		if t.GetStatus() == aicommon.AITaskState_Skipped {
 			return nil
 		}
@@ -253,6 +256,9 @@ func (t *AiTask) executeTaskPushTaskIndex() error {
 // executeTask 实际执行任务并返回结果
 func (t *AiTask) executeTask() error {
 	if t.IsCtxDone() {
+		if t.GetStatus() == aicommon.AITaskState_Processing {
+			t.SetStatus(aicommon.AITaskState_Aborted)
+		}
 		t.planLoadingStatus(fmt.Sprintf("任务 [%s] 上下文已取消 / Task [%s] Context Cancelled", t.Index, t.Index))
 		return utils.Errorf("context is done")
 	}

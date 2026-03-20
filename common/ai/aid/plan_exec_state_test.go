@@ -142,3 +142,28 @@ func TestPlanExecTaskSummaryLegacyFallback(t *testing.T) {
 	require.NotNil(t, recRoot)
 	require.Equal(t, "legacy-summary", recRoot.TaskSummary)
 }
+
+func TestPlanExecTaskAbortedRoundTrip(t *testing.T) {
+	c := newTestCoordinator(t)
+
+	root := c.generateAITaskWithName("root", "root-goal")
+	sub := c.generateAITaskWithName("aborted-subtask", "aborted-goal")
+	sub.ParentTask = root
+	root.Subtasks = []*AiTask{sub}
+	root.GenerateIndex()
+
+	sub.SetStatus(aicommon.AITaskState_Aborted)
+	sub.SetSummary("aborted-summary")
+
+	var recovered recoveredTask
+	raw := utils.Jsonify(root)
+	require.NoError(t, json.Unmarshal(raw, &recovered))
+	require.Len(t, recovered.Subtasks, 1)
+	require.Equal(t, string(aicommon.AITaskState_Aborted), recovered.Subtasks[0].Progress)
+
+	recRoot := c.buildRecoveredTaskTree(&recovered, nil)
+	require.NotNil(t, recRoot)
+	require.Len(t, recRoot.Subtasks, 1)
+	require.Equal(t, aicommon.AITaskState_Aborted, recRoot.Subtasks[0].GetStatus())
+	require.Equal(t, "aborted-summary", recRoot.Subtasks[0].TaskSummary)
+}

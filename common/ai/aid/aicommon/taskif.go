@@ -353,6 +353,12 @@ func (s *AIStatefulTaskBase) SetStatus(status AITaskState) {
 	}
 }
 
+// RestoreStatus rehydrates a persisted status without triggering cancellation or events.
+// This is used when rebuilding task state from storage and the task may need a fresh context.
+func (s *AIStatefulTaskBase) RestoreStatus(status AITaskState) {
+	s.status = status
+}
+
 func (s *AIStatefulTaskBase) GetCreatedAt() time.Time {
 	return s.createdAt
 }

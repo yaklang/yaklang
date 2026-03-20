@@ -94,11 +94,13 @@ func (c *Coordinator) buildRecoveredTaskTree(src *recoveredTask, parent *AiTask)
 
 	switch strings.ToLower(strings.TrimSpace(src.Progress)) {
 	case string(aicommon.AITaskState_Completed):
-		task.SetStatus(aicommon.AITaskState_Completed)
+		task.AIStatefulTaskBase.RestoreStatus(aicommon.AITaskState_Completed)
+	case string(aicommon.AITaskState_Aborted):
+		task.AIStatefulTaskBase.RestoreStatus(aicommon.AITaskState_Aborted)
 	case string(aicommon.AITaskState_Skipped):
-		task.SetStatus(aicommon.AITaskState_Skipped)
+		task.AIStatefulTaskBase.RestoreStatus(aicommon.AITaskState_Skipped)
 	case string(aicommon.AITaskState_Processing):
-		task.SetStatus(aicommon.AITaskState_Processing)
+		task.AIStatefulTaskBase.RestoreStatus(aicommon.AITaskState_Processing)
 	}
 
 	for _, sub := range src.Subtasks {
