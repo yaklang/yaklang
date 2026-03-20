@@ -6,7 +6,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/wsm/payloads/godzilla"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/url"
 	"path/filepath"
@@ -132,8 +131,11 @@ func (g *GodzillaFileSystemAction) newGodzillaFormId(id string) (*Godzilla, erro
 	if err != nil {
 		return nil, utils.Errorf("cannot parse id[%s] as int: %s", id, err)
 	}
-	db := consts.GetGormProjectDatabase()
-	shell, err := yakit.GetWebShell(db, int64(idInt))
+	shell, packetScript, payloadScript, err := loadWebShellAndCodecScripts(
+		consts.GetGormProjectDatabase(),
+		consts.GetGormProfileDatabase(),
+		int64(idInt),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -141,20 +143,11 @@ func (g *GodzillaFileSystemAction) newGodzillaFormId(id string) (*Godzilla, erro
 	if err != nil {
 		return nil, err
 	}
-	if shell.GetPacketCodecName() != "" {
-		script, err := yakit.GetYakScriptByName(db, shell.GetPacketCodecName())
-		if err != nil {
-			return nil, err
-		}
-
-		manager.SetPacketScriptContent(script.Content)
+	if packetScript != "" {
+		manager.SetPacketScriptContent(packetScript)
 	}
-	if shell.GetPayloadCodecName() != "" {
-		script, err := yakit.GetYakScriptByName(db, shell.GetPayloadCodecName())
-		if err != nil {
-			return nil, err
-		}
-		manager.SetPayloadScriptContent(script.Content)
+	if payloadScript != "" {
+		manager.SetPayloadScriptContent(payloadScript)
 	}
 	g.godzillaCache[id] = manager
 	return manager, nil
