@@ -23,15 +23,15 @@ import (
 const recoveryTaskIDPrefix = "react-recovery-"
 
 func formatRecoveryTaskID(coordinatorID string) string {
-	return recoveryTaskIDPrefix + sanitizeForTaskId(coordinatorID)
+	return recoveryTaskIDPrefix + sanitizeForTaskId(coordinatorID) + uuid.New().String()
 }
 
-func newRecoveryPlanExecTask(ctx context.Context, coordinatorID string) aicommon.AIStatefulTask {
+func newRecoveryPlanExecTask(ctx context.Context, emitter *aicommon.Emitter, coordinatorID string) aicommon.AIStatefulTask {
 	return aicommon.NewStatefulTaskBase(
 		formatRecoveryTaskID(coordinatorID),
 		coordinatorID,
 		ctx,
-		nil,
+		emitter,
 		true,
 	)
 }
@@ -148,6 +148,9 @@ func (r *ReAct) AsyncRecoverPlanAndExecute(ctx context.Context, coordinatorID st
 	cb := utils.NewCondBarrierContext(ctx)
 	startupBarrier := cb.CreateBarrier("startup")
 
+	recoveryTask := newRecoveryPlanExecTask(ctx, r.Emitter, coordinatorID)
+	r.addRuntimeTask(recoveryTask)
+
 	taskDone := make(chan struct{})
 	go func() {
 		var finalError error
@@ -161,9 +164,14 @@ func (r *ReAct) AsyncRecoverPlanAndExecute(ctx context.Context, coordinatorID st
 				onFinished(finalError)
 			}
 		}()
-		finalError = r.invokePlanAndExecute(taskDone, ctx, newRecoveryPlanExecTask(ctx, coordinatorID), "", "", nil, coordinatorID)
+		finalError = r.invokePlanAndExecute(taskDone, recoveryTask.GetContext(), recoveryTask, "", "", nil, coordinatorID)
 		if finalError != nil {
 			log.Errorf("AsyncRecoverPlanAndExecute error: %v", finalError)
+			recoveryTask.SetStatus(aicommon.AITaskState_Aborted)
+			r.AddToTimeline("error", fmt.Sprintf("recovery task execution failed: %v", finalError))
+		} else {
+			recoveryTask.SetStatus(aicommon.AITaskState_Completed)
+			r.AddToTimeline("success", "recovery task execution succeeded")
 		}
 	}()
 	select {
