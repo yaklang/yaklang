@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -395,15 +396,16 @@ func TestYieldFun(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	i := 0
-	var finished bool
+	var counter atomic.Int32
+	var finished atomic.Bool
 	generator := parser.NewGenerator(nil, nodes, map[string]*parser.TagMethod{
 		"genStringList": &parser.TagMethod{
 			YieldFun: func(ctx context.Context, params string, yield func(*parser.FuzzResult)) error {
-				for ; i < 10; i++ {
-					yield(parser.NewFuzzResultWithData(strconv.Itoa(i)))
+				for counter.Load() < 10 {
+					yield(parser.NewFuzzResultWithData(strconv.Itoa(int(counter.Load()))))
+					counter.Add(1)
 				}
-				finished = true
+				finished.Store(true)
 				return nil
 			},
 		},
@@ -412,10 +414,10 @@ func TestYieldFun(t *testing.T) {
 		generator.Next()
 	}
 	assert.Equal(t, "2", string(generator.Result().GetData()))
-	assert.Equal(t, 3, i)
+	assert.Equal(t, int32(3), counter.Load())
 	generator.Cancel()
 	generator.Wait()
-	assert.Equal(t, true, finished)
+	assert.Equal(t, true, finished.Load())
 }
 
 func TestFuzztagGeneratorCancel(t *testing.T) {
