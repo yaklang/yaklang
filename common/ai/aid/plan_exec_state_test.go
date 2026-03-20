@@ -142,3 +142,125 @@ func TestPlanExecTaskSummaryLegacyFallback(t *testing.T) {
 	require.NotNil(t, recRoot)
 	require.Equal(t, "legacy-summary", recRoot.TaskSummary)
 }
+
+// TestMUSTPASS_TopologicalSortSubtasks_NoDeps tests sorting of tasks without any
+// dependency relationships – original order should be preserved.
+func TestMUSTPASS_TopologicalSortSubtasks_NoDeps(t *testing.T) {
+c := newTestCoordinator(t)
+a := c.generateAITaskWithName("a", "goal-a")
+b := c.generateAITaskWithName("b", "goal-b")
+cc := c.generateAITaskWithName("c", "goal-c")
+
+sorted := topologicalSortSubtasks([]*AiTask{a, b, cc})
+require.Len(t, sorted, 3)
+require.Equal(t, "a", sorted[0].Name)
+require.Equal(t, "b", sorted[1].Name)
+require.Equal(t, "c", sorted[2].Name)
+}
+
+// TestMUSTPASS_TopologicalSortSubtasks_LinearChain tests that a linear chain
+// a -> b -> c is correctly ordered as a, b, c.
+func TestMUSTPASS_TopologicalSortSubtasks_LinearChain(t *testing.T) {
+c := newTestCoordinator(t)
+a := c.generateAITaskWithName("a", "goal-a")
+b := c.generateAITaskWithName("b", "goal-b")
+cc := c.generateAITaskWithName("c", "goal-c")
+b.DependsOn = []string{"a"}
+cc.DependsOn = []string{"b"}
+
+// Input in reverse dependency order to ensure sorting actually does work.
+sorted := topologicalSortSubtasks([]*AiTask{cc, b, a})
+require.Len(t, sorted, 3)
+require.Equal(t, "a", sorted[0].Name)
+require.Equal(t, "b", sorted[1].Name)
+require.Equal(t, "c", sorted[2].Name)
+}
+
+// TestMUSTPASS_TopologicalSortSubtasks_DiamondDeps tests a diamond dependency
+// pattern: b and c both depend on a; d depends on both b and c.
+func TestMUSTPASS_TopologicalSortSubtasks_DiamondDeps(t *testing.T) {
+c := newTestCoordinator(t)
+a := c.generateAITaskWithName("a", "goal-a")
+b := c.generateAITaskWithName("b", "goal-b")
+cc := c.generateAITaskWithName("c", "goal-c")
+d := c.generateAITaskWithName("d", "goal-d")
+b.DependsOn = []string{"a"}
+cc.DependsOn = []string{"a"}
+d.DependsOn = []string{"b", "c"}
+
+// Provide tasks in an unordered fashion.
+sorted := topologicalSortSubtasks([]*AiTask{d, cc, b, a})
+require.Len(t, sorted, 4)
+
+idxOf := func(name string) int {
+for i, t := range sorted {
+if t.Name == name {
+return i
+}
+}
+return -1
+}
+require.Less(t, idxOf("a"), idxOf("b"), "a must precede b")
+require.Less(t, idxOf("a"), idxOf("c"), "a must precede c")
+require.Less(t, idxOf("b"), idxOf("d"), "b must precede d")
+require.Less(t, idxOf("c"), idxOf("d"), "c must precede d")
+}
+
+// TestMUSTPASS_TopologicalSortSubtasks_CycleSafe verifies that a cyclic
+// dependency graph does not cause an infinite loop – all tasks are returned.
+func TestMUSTPASS_TopologicalSortSubtasks_CycleSafe(t *testing.T) {
+c := newTestCoordinator(t)
+a := c.generateAITaskWithName("a", "goal-a")
+b := c.generateAITaskWithName("b", "goal-b")
+a.DependsOn = []string{"b"}
+b.DependsOn = []string{"a"} // cycle
+
+sorted := topologicalSortSubtasks([]*AiTask{a, b})
+// No tasks should be silently dropped.
+require.Len(t, sorted, 2)
+}
+
+// TestMUSTPASS_TopologicalSortSubtasks_ExternalDepIgnored ensures that
+// dependencies that reference tasks outside the current slice are simply ignored
+// and do not block the task from being scheduled.
+func TestMUSTPASS_TopologicalSortSubtasks_ExternalDepIgnored(t *testing.T) {
+c := newTestCoordinator(t)
+a := c.generateAITaskWithName("a", "goal-a")
+a.DependsOn = []string{"nonexistent"}
+
+sorted := topologicalSortSubtasks([]*AiTask{a})
+require.Len(t, sorted, 1)
+require.Equal(t, "a", sorted[0].Name)
+}
+
+// TestMUSTPASS_UpdateTaskLink_RespectsDepends verifies that after updateTaskLink
+// the task execution list follows the topological ordering dictated by DependsOn.
+func TestMUSTPASS_UpdateTaskLink_RespectsDepends(t *testing.T) {
+c := newTestCoordinator(t)
+
+root := c.generateAITaskWithName("root", "root-goal")
+taskA := c.generateAITaskWithName("a", "goal-a")
+taskB := c.generateAITaskWithName("b", "goal-b")
+taskC := c.generateAITaskWithName("c", "goal-c")
+
+// b depends on a; c depends on b – linear chain in reverse input order.
+taskB.DependsOn = []string{"a"}
+taskC.DependsOn = []string{"b"}
+root.Subtasks = []*AiTask{taskC, taskB, taskA} // deliberately reversed
+
+root.GenerateIndex()
+
+r := &runtime{RootTask: root}
+r.updateTaskLink()
+
+// Collect names from the linked list (skip root at position 0).
+var names []string
+for i := 1; i < r.TaskLink.Len(); i++ {
+task, ok := r.TaskLink.Get(i)
+require.True(t, ok)
+names = append(names, task.Name)
+}
+
+require.Equal(t, []string{"a", "b", "c"}, names,
+"tasks must appear in dependency order (a before b before c)")
+}

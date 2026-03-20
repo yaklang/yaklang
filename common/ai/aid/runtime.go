@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -289,5 +290,138 @@ func (r *runtime) updateTaskLink() {
 	if r.RootTask == nil {
 		return
 	}
-	r.TaskLink = DFSOrderAiTask(r.RootTask)
+	r.TaskLink = topologicalDFSOrderAiTask(r.RootTask)
+}
+
+// topologicalDFSOrderAiTask returns all tasks in a deterministic order that
+// respects the DependsOn relationships declared on each AiTask.
+//
+// Algorithm:
+//  1. The root node itself is placed first (it is a container, not executed directly).
+//  2. For every node that has immediate subtasks, those subtasks are sorted using
+//     Kahn's topological-sort before being appended, so that each subtask appears
+//     after every task it explicitly depends on.
+//  3. Nested subtasks (grandchildren, etc.) are recursively handled the same way.
+//  4. If a cycle or unresolvable dependency is detected the remaining tasks are
+//     appended in their original order so execution is never silently lost.
+func topologicalDFSOrderAiTask(root *AiTask) *linktable.LinkedList[*AiTask] {
+	result := linktable.New[*AiTask]()
+
+	var visit func(task *AiTask)
+	visit = func(task *AiTask) {
+		result.PushBack(task)
+
+		if len(task.Subtasks) == 0 {
+			return
+		}
+
+		// Sort the immediate children so that declared dependencies are
+		// executed before the tasks that depend on them.
+		sorted := topologicalSortSubtasks(task.Subtasks)
+		for _, child := range sorted {
+			visit(child)
+		}
+	}
+
+	visit(root)
+	return result
+}
+
+// topologicalSortSubtasks reorders tasks so that every task appears after all
+// tasks it depends on (via the DependsOn field).  Dependencies that do not
+// correspond to any task in the provided slice are simply ignored.
+//
+// If the dependency graph contains a cycle the cyclic tasks are appended in
+// their original order at the end so that no task is dropped.
+func topologicalSortSubtasks(tasks []*AiTask) []*AiTask {
+	if len(tasks) <= 1 {
+		return tasks
+	}
+
+	// Build a name-to-position map; first occurrence wins if names collide.
+	nameToTask := make(map[string]*AiTask, len(tasks))
+	for _, t := range tasks {
+		if _, exists := nameToTask[t.Name]; !exists {
+			nameToTask[t.Name] = t
+		}
+	}
+
+	// Kahn's algorithm -------------------------------------------------
+	// inDegree[name] = number of unresolved dependencies within this slice.
+	inDegree := make(map[string]int, len(tasks))
+	// dependents[x] = names of tasks in this slice that directly depend on x.
+	dependents := make(map[string][]string, len(tasks))
+
+	for _, t := range tasks {
+		if _, ok := inDegree[t.Name]; !ok {
+			inDegree[t.Name] = 0
+		}
+		for _, dep := range t.DependsOn {
+			if _, exists := nameToTask[dep]; exists {
+				inDegree[t.Name]++
+				dependents[dep] = append(dependents[dep], t.Name)
+			}
+			// Dependencies outside the slice are ignored (already satisfied).
+		}
+	}
+
+	// Seed the queue with tasks that have no in-slice dependencies.
+	// Preserve original relative order for determinism.
+	var queue []*AiTask
+	for _, t := range tasks {
+		if inDegree[t.Name] == 0 {
+			queue = append(queue, t)
+		}
+	}
+
+	// Build a name-to-original-index map for stable ordering of newly-ready tasks.
+	// Built once here and reused inside the main loop.
+	origIdx := make(map[string]int, len(tasks))
+	for i, t := range tasks {
+		origIdx[t.Name] = i
+	}
+
+	result := make([]*AiTask, 0, len(tasks))
+	processed := make(map[string]bool, len(tasks))
+
+	for len(queue) > 0 {
+		cur := queue[0]
+		queue = queue[1:]
+
+		if processed[cur.Name] {
+			continue
+		}
+		processed[cur.Name] = true
+		result = append(result, cur)
+
+		// Unlock tasks that depended on this one.
+		// Append newly-ready tasks preserving their original relative order.
+		var newlyReady []*AiTask
+		for _, depName := range dependents[cur.Name] {
+			inDegree[depName]--
+			if inDegree[depName] == 0 {
+				if dt, ok := nameToTask[depName]; ok && !processed[depName] {
+					newlyReady = append(newlyReady, dt)
+				}
+			}
+		}
+		// Keep original relative order among newly-ready tasks.
+		if len(newlyReady) > 1 {
+			sort.Slice(newlyReady, func(i, j int) bool {
+				return origIdx[newlyReady[i].Name] < origIdx[newlyReady[j].Name]
+			})
+		}
+		queue = append(queue, newlyReady...)
+	}
+
+	// Append any remaining tasks (cycles or duplicate names) in original order.
+	if len(result) < len(tasks) {
+		for _, t := range tasks {
+			if !processed[t.Name] {
+				result = append(result, t)
+			}
+		}
+	}
+
+	return result
 }

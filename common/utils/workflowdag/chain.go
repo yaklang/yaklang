@@ -1,5 +1,7 @@
 package workflowdag
 
+import "sync"
+
 // ChainEntry represents an execution chain entry point
 type ChainEntry[T DAGNode] interface {
 	// GetEntryNode returns the entry node of this chain
@@ -198,15 +200,135 @@ func (c *ChainIterator[T]) executeNode(nodeID string, handler func(node T) error
 	return handler(node)
 }
 
-// ExecuteConcurrent executes nodes concurrently where possible
-// Nodes at the same stage can be executed in parallel
-// The handler is called concurrently for nodes whose dependencies are all satisfied
+// ExecuteConcurrent executes nodes concurrently where possible.
+// Nodes at the same execution stage can run in parallel; later stages wait for
+// all earlier-stage nodes to complete.
+//
+// concurrency controls the maximum number of nodes that may run simultaneously:
+//   - > 0: at most concurrency nodes run in parallel
+//   - 0 or negative: unlimited parallelism (all ready nodes start immediately)
 func (c *ChainIterator[T]) ExecuteConcurrent(handler func(node T) error, concurrency int) error {
-	if concurrency <= 0 {
-		concurrency = 1
+	if concurrency < 0 {
+		concurrency = 0
 	}
 
-	// Use a simple sequential execution for now
-	// TODO: Implement true concurrent execution with worker pool
-	return c.Execute(handler)
+	// Collect all nodes that this entry will execute (the entry itself plus all
+	// of its transitive dependencies, following the deps direction).
+	execNodes := c.collectDepsNodes(c.entryNode.GetID(), make(map[string]bool))
+	if len(execNodes) == 0 {
+		return nil
+	}
+
+	// Group nodes by their execution stage so that independent nodes at the
+	// same stage can run concurrently.
+	stageMap := make(map[int][]T)
+	maxStage := 0
+	for _, node := range execNodes {
+		stage := c.GetStageIndex(node.GetID())
+		if stage < 0 {
+			stage = 0
+		}
+		stageMap[stage] = append(stageMap[stage], node)
+		if stage > maxStage {
+			maxStage = stage
+		}
+	}
+
+	// Execute each stage in ascending order; nodes within a stage run concurrently.
+	for stage := 0; stage <= maxStage; stage++ {
+		nodesAtStage := stageMap[stage]
+
+		var wg sync.WaitGroup
+		var firstErr error
+		var errMu sync.Mutex
+
+		// sem limits parallelism; a nil channel means unlimited concurrency.
+		var sem chan struct{}
+		if concurrency > 0 {
+			sem = make(chan struct{}, concurrency)
+		}
+
+		for _, node := range nodesAtStage {
+			nodeID := node.GetID()
+
+			// Claim exclusive execution rights for this node.
+			// If another goroutine (or a prior chain) already claimed it, skip.
+			if !c.dag.TryExecute(nodeID) {
+				continue
+			}
+
+			wg.Add(1)
+			n := node
+
+			// Acquire a slot from the semaphore before spawning the goroutine so
+			// that we never have more than concurrency goroutines running at once.
+			if sem != nil {
+				sem <- struct{}{}
+			}
+
+			go func() {
+				defer wg.Done()
+				if sem != nil {
+					defer func() { <-sem }()
+				}
+
+				if err := handler(n); err != nil {
+					if !n.AllowFailed() {
+						errMu.Lock()
+						if firstErr == nil {
+							firstErr = err
+						}
+						errMu.Unlock()
+					}
+				}
+			}()
+		}
+
+		// Wait for all goroutines in this stage before advancing.
+		wg.Wait()
+
+		errMu.Lock()
+		err := firstErr
+		errMu.Unlock()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// collectDepsNodes collects the given node plus all of its transitive
+// dependencies (following the deps/DependsOn direction).  Already-executed
+// nodes are excluded, and visiting is tracked to handle cycles safely.
+func (c *ChainIterator[T]) collectDepsNodes(nodeID string, visiting map[string]bool) []T {
+	// Skip already-executed nodes (claimed by another chain or stage).
+	if c.dag.IsExecuted(nodeID) {
+		return nil
+	}
+
+	// Cycle guard.
+	if visiting[nodeID] {
+		return nil
+	}
+
+	node, exists := c.dag.GetNode(nodeID)
+	if !exists {
+		return nil
+	}
+
+	visiting[nodeID] = true
+	defer func() { visiting[nodeID] = false }()
+
+	var result []T
+
+	// Recursively collect dependencies first.
+	for _, depID := range c.dag.GetDependencies(nodeID) {
+		result = append(result, c.collectDepsNodes(depID, visiting)...)
+	}
+
+	// Append the node itself after its dependencies so each node appears at
+	// most once and always after the nodes it depends on.
+	result = append(result, node)
+	return result
 }

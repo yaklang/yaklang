@@ -1306,3 +1306,157 @@ func TestMUSTPASS_DuplicateDependencies(t *testing.T) {
 
 	assert.Equal(t, 2, executedCount)
 }
+
+// TestMUSTPASS_ExecuteConcurrent_IndependentNodes tests that independent nodes
+// run concurrently and complete without deadlock.
+func TestMUSTPASS_ExecuteConcurrent_IndependentNodes(t *testing.T) {
+ctx := context.Background()
+dag := New[*TestNode](ctx)
+
+nodeA := NewTestNode("A")
+nodeB := NewTestNode("B")
+nodeC := NewTestNode("C")
+
+require.NoError(t, dag.AddNodes(nodeA, nodeB, nodeC))
+require.NoError(t, dag.Build())
+
+entryCh, err := dag.Entries()
+require.NoError(t, err)
+
+var mu sync.Mutex
+executed := make(map[string]int)
+
+for chain := range entryCh {
+err := chain.ExecuteConcurrent(func(node *TestNode) error {
+mu.Lock()
+executed[node.GetID()]++
+mu.Unlock()
+node.Execute()
+return nil
+}, 4)
+require.NoError(t, err)
+}
+
+assert.Equal(t, 1, executed["A"])
+assert.Equal(t, 1, executed["B"])
+assert.Equal(t, 1, executed["C"])
+}
+
+// TestMUSTPASS_ExecuteConcurrent_DiamondPattern tests that diamond-shaped
+// dependencies (A -> B, A -> C, B+C -> D) execute in the correct order.
+func TestMUSTPASS_ExecuteConcurrent_DiamondPattern(t *testing.T) {
+ctx := context.Background()
+dag := New[*TestNode](ctx)
+
+//     D
+//    / \
+//   B   C
+//    \ /
+//     A
+nodeA := NewTestNode("A")
+nodeB := NewTestNode("B", "A")
+nodeC := NewTestNode("C", "A")
+nodeD := NewTestNode("D", "B", "C")
+
+require.NoError(t, dag.AddNodes(nodeA, nodeB, nodeC, nodeD))
+require.NoError(t, dag.Build())
+
+entryCh, err := dag.Entries()
+require.NoError(t, err)
+
+var mu sync.Mutex
+var order []string
+
+for chain := range entryCh {
+err := chain.ExecuteConcurrent(func(node *TestNode) error {
+mu.Lock()
+order = append(order, node.GetID())
+mu.Unlock()
+return nil
+}, 4)
+require.NoError(t, err)
+}
+
+// All four nodes must be executed exactly once.
+counts := make(map[string]int)
+for _, id := range order {
+counts[id]++
+}
+assert.Equal(t, 1, counts["A"])
+assert.Equal(t, 1, counts["B"])
+assert.Equal(t, 1, counts["C"])
+assert.Equal(t, 1, counts["D"])
+
+// A must come before both B and C; B and C must come before D.
+idxOf := func(id string) int {
+for i, v := range order {
+if v == id {
+return i
+}
+}
+return -1
+}
+assert.Less(t, idxOf("A"), idxOf("B"), "A must execute before B")
+assert.Less(t, idxOf("A"), idxOf("C"), "A must execute before C")
+assert.Less(t, idxOf("B"), idxOf("D"), "B must execute before D")
+assert.Less(t, idxOf("C"), idxOf("D"), "C must execute before D")
+}
+
+// TestMUSTPASS_ExecuteConcurrent_Concurrency1 verifies that concurrency=1
+// behaves like sequential execution (no concurrent executions).
+func TestMUSTPASS_ExecuteConcurrent_Concurrency1(t *testing.T) {
+ctx := context.Background()
+dag := New[*TestNode](ctx)
+
+nodeA := NewTestNode("A")
+nodeB := NewTestNode("B")
+nodeC := NewTestNode("C")
+
+require.NoError(t, dag.AddNodes(nodeA, nodeB, nodeC))
+require.NoError(t, dag.Build())
+
+var active int32
+
+entryCh, err := dag.Entries()
+require.NoError(t, err)
+
+for chain := range entryCh {
+err := chain.ExecuteConcurrent(func(node *TestNode) error {
+cur := atomic.AddInt32(&active, 1)
+assert.Equal(t, int32(1), cur, "only one node should run at a time with concurrency=1")
+atomic.AddInt32(&active, -1)
+return nil
+}, 1)
+require.NoError(t, err)
+}
+}
+
+// TestMUSTPASS_ExecuteConcurrent_ErrorPropagation verifies that a non-AllowFailed
+// node error causes ExecuteConcurrent to return an error.
+func TestMUSTPASS_ExecuteConcurrent_ErrorPropagation(t *testing.T) {
+ctx := context.Background()
+dag := New[*TestNode](ctx)
+
+nodeA := NewTestNode("A")
+nodeB := NewTestNode("B")
+
+require.NoError(t, dag.AddNodes(nodeA, nodeB))
+require.NoError(t, dag.Build())
+
+entryCh, err := dag.Entries()
+require.NoError(t, err)
+
+sentinel := fmt.Errorf("intentional error")
+for chain := range entryCh {
+err := chain.ExecuteConcurrent(func(node *TestNode) error {
+if node.GetID() == "A" {
+return sentinel
+}
+return nil
+}, 4)
+if err != nil {
+assert.ErrorIs(t, err, sentinel)
+return
+}
+}
+}
