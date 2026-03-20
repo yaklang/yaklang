@@ -255,6 +255,21 @@ func Test_Values_Graph_Dot(t *testing.T) {
 		require.Contains(t, graph.String(), "Test3")
 	})
 
+	t.Run("deduplicate same predecessor edge", func(t *testing.T) {
+		progName := uuid.NewString()
+		prog, err := ssaapi.Parse(``, ssaapi.WithProgramName(progName))
+		require.NoError(t, err)
+		value1 := CreateValue(prog, 1)
+		value2 := CreateValue(prog, 2)
+
+		require.NoError(t, value1.AppendPredecessor(value2, sfvm.WithAnalysisContext_Label("same"), sfvm.WithAnalysisContext_Step(1)))
+		require.NoError(t, value1.AppendPredecessor(value2, sfvm.WithAnalysisContext_Label("same"), sfvm.WithAnalysisContext_Step(1)))
+		require.Len(t, value1.GetPredecessors(), 1)
+
+		require.NoError(t, value1.AppendPredecessor(value2, sfvm.WithAnalysisContext_Label("different"), sfvm.WithAnalysisContext_Step(1)))
+		require.Len(t, value1.GetPredecessors(), 2)
+	})
+
 	t.Run("test dfs with cycle", func(t *testing.T) {
 		prog, err := ssaapi.Parse("")
 		require.NoError(t, err)

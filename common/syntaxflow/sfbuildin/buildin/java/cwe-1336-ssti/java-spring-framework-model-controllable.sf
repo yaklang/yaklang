@@ -87,9 +87,13 @@ REFERENCE
 )
 
 <include('java-spring-mvc-param')>?{<typeName>?{have: "String"}} as $param;
-$param<getFunc><getReturns> as $returns;
-$returns?{<typeName>?{have: "ModelAndView"}} as $result;
-$returns #{
+$param<getFunc> as $entryMethod;
+$entryMethod<getReturns>?{<typeName>?{have: "ModelAndView"}} as $returns;
+
+ModelAndView(*<slice(index=1)> as $sink);
+.setViewName?{<getObject><typeName>?{have: "ModelAndView"}}(*<slice(index=1)> as $sink);
+
+$sink #{
     until: `* & $param `,
 }-> as $source;
 $source<dataflow(exclude=<<<CODE

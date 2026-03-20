@@ -70,7 +70,7 @@ ResponseBody.__ref__<getMembers>?{.annotation.*Mapping} as $entryMethods;
 // ResponseBody修饰方法
 ResponseBody.__ref__?{.annotation.*Mapping} as $entryMethods;
 
-$entryMethods<getReturns> as $sink;
+$entryMethods<getReturns>?{<typeName>?{have: String}} as $sink;
 $sink #{
     until: `* & $params `,
 }-> as $source;
@@ -320,7 +320,7 @@ UNSAFE
 
 desc(
 	lang: java
-	alert_num:2
+	alert_num:1
 	'file://reflective.java': <<<UNSAFE
 
 import cn.hutool.core.date.DateUtil;
