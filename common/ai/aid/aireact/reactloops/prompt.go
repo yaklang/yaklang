@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -142,15 +143,17 @@ func (r *ReActLoop) generateLoopPrompt(
 		}
 	}
 
+	isCompactContext := aicommon.ResolveModelContextLevel(r.GetConfig()) == aicommon.ModelContextLevelCompact
+
 	// Render skills context if the manager is available
 	var skillsContext string
-	if r.skillsContextManager != nil {
+	if r.skillsContextManager != nil && !isCompactContext {
 		skillsContext = r.skillsContextManager.Render(nonce)
 	}
 
 	// Render extra capabilities discovered via intent recognition
 	var extraCapabilities string
-	if r.extraCapabilities != nil && r.extraCapabilities.HasCapabilities() {
+	if r.extraCapabilities != nil && r.extraCapabilities.HasCapabilities() && !isCompactContext {
 		extraCapabilities = r.extraCapabilities.Render(nonce)
 	}
 

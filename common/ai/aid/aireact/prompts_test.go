@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -221,6 +222,36 @@ func TestPromptManager__InPromptGeneration(t *testing.T) {
 	callMutex.Unlock()
 
 	t.Log("Dynamic context provider correctly called during prompt generation")
+}
+
+func TestPromptManager_GetBasicPromptInfo_CompactContextLevel(t *testing.T) {
+	react, err := NewTestReAct(
+		aicommon.WithModelContextLevel(aicommon.ModelContextLevelCompact),
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "done"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create ReAct instance: %v", err)
+	}
+
+	prompt, _, err := react.GetBasicPromptInfo(nil)
+	if err != nil {
+		t.Fatalf("GetBasicPromptInfo failed: %v", err)
+	}
+
+	if !strings.Contains(prompt, "# Tooling") {
+		t.Fatalf("compact prompt should use compact base template, got: %s", prompt)
+	}
+	if strings.Contains(prompt, "## Core Traits (核心性格)") {
+		t.Fatalf("compact prompt should not contain the standard long traits block, got: %s", prompt)
+	}
+	if strings.Contains(prompt, "# 工具调用系统") {
+		t.Fatalf("compact prompt should not contain the standard tool-system section, got: %s", prompt)
+	}
 }
 
 func TestPromptManager_WithTracedDynamicContextProvider(t *testing.T) {

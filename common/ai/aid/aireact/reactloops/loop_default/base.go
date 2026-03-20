@@ -12,8 +12,14 @@ import (
 //go:embed prompts/instruction.txt
 var instruction string
 
+//go:embed prompts/instruction_compact.txt
+var instructionCompact string
+
 //go:embed prompts/reflection_output_example.txt
 var outputExample string
+
+//go:embed prompts/reflection_output_example_compact.txt
+var outputExampleCompact string
 
 const reActPostSummary = `
 请根据你刚才执行的所有步骤，以 **Markdown 格式** 输出一份结构化总结，格式如下：
@@ -58,10 +64,18 @@ const reActPostSummary = `
 
 `
 
+func selectLoopPromptTemplates(cfg aicommon.AICallerConfigIf) (string, string) {
+	if aicommon.ResolveModelContextLevel(cfg) == aicommon.ModelContextLevelCompact {
+		return instructionCompact, outputExampleCompact
+	}
+	return instruction, outputExample
+}
+
 func init() {
 	err := reactloops.RegisterLoopFactory(
 		schema.AI_REACT_LOOP_NAME_DEFAULT,
 		func(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {
+			persistentInstruction, reflectionOutputExample := selectLoopPromptTemplates(r.GetConfig())
 			preset := []reactloops.ReActLoopOption{
 				reactloops.WithAllowRAG(true),
 				reactloops.WithAllowToolCall(true),
@@ -70,8 +84,8 @@ func init() {
 				reactloops.WithInitTask(buildInitTask(r)),
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
-				reactloops.WithPersistentInstruction(instruction),
-				reactloops.WithReflectionOutputExample(outputExample),
+				reactloops.WithPersistentInstruction(persistentInstruction),
+				reactloops.WithReflectionOutputExample(reflectionOutputExample),
 				reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, operator *reactloops.OnPostIterationOperator) {
 					if !isDone {
 						return
@@ -117,14 +131,15 @@ func init() {
 	err = reactloops.RegisterLoopFactory(
 		schema.AI_REACT_LOOP_NAME_PE_TASK,
 		func(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {
+			persistentInstruction, reflectionOutputExample := selectLoopPromptTemplates(r.GetConfig())
 			preset := []reactloops.ReActLoopOption{
 				reactloops.WithAllowRAG(true),
 				reactloops.WithAllowToolCall(true),
 				reactloops.WithInitTask(buildPETaskInitTask(r)),
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
-				reactloops.WithPersistentInstruction(instruction),
-				reactloops.WithReflectionOutputExample(outputExample),
+				reactloops.WithPersistentInstruction(persistentInstruction),
+				reactloops.WithReflectionOutputExample(reflectionOutputExample),
 			}
 
 			// 检查是否有 GetEnableSelfReflection 方法（向后兼容）

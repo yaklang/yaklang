@@ -42,6 +42,10 @@ func TestConvertYPBAIStartParamsToReActConfig(t *testing.T) {
 		AIService:                    aiService,
 		DisableAISearchForge:         true, // just to test that this field is ignored, not start embedding server in ci test
 		AICallTokenLimit:             100 * 1024,
+		ExtraReActConfig: []*ypb.KVPair{
+			{Key: aicommon.ExtraReActConfigKeyModelContextLevel, Value: "compact"},
+			{Key: "custom_hint", Value: "enabled"},
+		},
 	}
 
 	opts := ConvertYPBAIStartParamsToReActConfig(start)
@@ -63,6 +67,12 @@ func TestConvertYPBAIStartParamsToReActConfig(t *testing.T) {
 	require.Equal(t, start.DisableToolUse, cfg.DisableToolUse)
 	require.ElementsMatch(t, start.IncludeSuggestedToolKeywords, cfg.Keywords)
 	require.Equal(t, start.AICallTokenLimit, cfg.AiCallTokenLimit)
+	require.Equal(t, aicommon.ModelContextLevelCompact, aicommon.ResolveModelContextLevel(cfg))
+	require.Equal(t, "enabled", aicommon.ResolveExtraReActConfigValue(cfg, "custom_hint"))
+
+	childCfg := aicommon.NewConfig(context.Background(), aicommon.ConvertConfigToOptions(cfg)...)
+	require.Equal(t, aicommon.ModelContextLevelCompact, aicommon.ResolveModelContextLevel(childCfg))
+	require.Equal(t, "enabled", aicommon.ResolveExtraReActConfigValue(childCfg, "custom_hint"))
 	// AiServerName is no longer set from frontend params (WithAIChatInfo deprecated),
 	// it is now auto-detected via ModelInfoCallback during actual AI gateway calls.
 }

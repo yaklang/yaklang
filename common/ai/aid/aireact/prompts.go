@@ -58,6 +58,9 @@ var changeBlueprintPromptTemplate string
 //go:embed prompts/base/base.txt
 var basePrompt string
 
+//go:embed prompts/base/base_compact.txt
+var baseCompactPrompt string
+
 //go:embed prompts/utils/conversation_title.txt
 var conversationTitlePrompt string
 
@@ -292,12 +295,14 @@ func (pm *PromptManager) GetAvailableAIForgeBlueprints() string {
 
 func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[string]any, error) {
 	result := make(map[string]any)
+	modelContextLevel := aicommon.ResolveModelContextLevel(pm.react.config)
 	result["CurrentTime"] = time.Now().Format("2006-01-02 15:04:05")
 	result["OSArch"] = fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)
 	result["WorkingDir"] = pm.workdir
 	result["WorkingDirGlance"] = pm.GetGlanceWorkdir(pm.workdir)
 	result["DynamicContext"] = pm.DynamicContext()
 	result["Language"] = pm.react.config.GetLanguage()
+	result["ModelContextLevel"] = modelContextLevel
 
 	taskType := "react"
 	if forgeName := pm.react.config.GetForgeName(); forgeName != "" {
@@ -311,12 +316,12 @@ func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[s
 	allowPlanAndExec := pm.react.config.GetEnablePlanAndExec() && pm.react.GetCurrentPlanExecutionTask() == nil
 
 	result["AllowPlan"] = allowPlanAndExec
-	if allowPlanAndExec {
+	if allowPlanAndExec && modelContextLevel != aicommon.ModelContextLevelCompact {
 		result["AIForgeList"] = pm.GetAvailableAIForgeBlueprints()
 	}
 	// ShowForgeList controls whether forge list is rendered in base prompt
 	// Default false: forges are discoverable via search_capabilities instead of being listed in prompt
-	result["ShowForgeList"] = pm.react.config.GetShowForgeListInPrompt()
+	result["ShowForgeList"] = pm.react.config.GetShowForgeListInPrompt() && modelContextLevel != aicommon.ModelContextLevelCompact
 	result["AllowAskForClarification"] = pm.react.config.GetEnableUserInteract()
 	result["AllowKnowledgeEnhanceAnswer"] = pm.react.config.GetEnhanceKnowledgeManager() == nil || !pm.react.config.GetDisableEnhanceDirectlyAnswer()
 	result["AskForClarificationCurrentTime"] = pm.react.currentUserInteractiveCount
@@ -324,9 +329,13 @@ func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[s
 	if len(tools) > 0 {
 		result["Tools"] = tools
 		result["ToolsCount"] = len(tools)
-		result["TopToolsCount"] = len(tools)
-		result["TopTools"] = tools
-		result["HasMoreTools"] = false
+		topToolsCount := len(tools)
+		if modelContextLevel == aicommon.ModelContextLevelCompact && topToolsCount > 5 {
+			topToolsCount = 5
+		}
+		result["TopToolsCount"] = topToolsCount
+		result["TopTools"] = tools[:topToolsCount]
+		result["HasMoreTools"] = len(tools) > topToolsCount
 	} else {
 		var err error
 		// use getter for ai tool manager and handle nil
@@ -340,10 +349,14 @@ func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[s
 		}
 		result["Tools"] = tools
 		result["ToolsCount"] = len(tools)
-		result["TopToolsCount"] = pm.react.config.GetTopToolsCount()
+		topToolsCount := pm.react.config.GetTopToolsCount()
+		if modelContextLevel == aicommon.ModelContextLevelCompact && (topToolsCount <= 0 || topToolsCount > 5) {
+			topToolsCount = 5
+		}
+		result["TopToolsCount"] = topToolsCount
 		// Get prioritized tools
 		if len(tools) > 0 {
-			topTools := pm.react.getPrioritizedTools(tools, pm.react.config.GetTopToolsCount())
+			topTools := pm.react.getPrioritizedTools(tools, topToolsCount)
 			result["TopTools"] = topTools
 			result["HasMoreTools"] = len(tools) > len(topTools)
 		} else {
@@ -359,7 +372,11 @@ func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[s
 	} else {
 		result["Timeline"] = ""
 	}
-	return basePrompt, result, nil
+	promptTemplate := basePrompt
+	if modelContextLevel == aicommon.ModelContextLevelCompact {
+		promptTemplate = baseCompactPrompt
+	}
+	return promptTemplate, result, nil
 }
 
 // ToolParamsPromptResult contains the generated prompt and metadata for AITAG parsing
