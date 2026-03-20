@@ -59,10 +59,11 @@ func (c *Coordinator) EmitPopTask(task *AiTask) {
 	c.EmitStructured("system", map[string]any{
 		"type": "pop_task",
 		"task": map[string]any{
-			"index":     task.Index,
-			"name":      task.Name,
-			"goal":      task.Goal,
-			"task_uuid": task.GetUUID(),
+			"index":       task.Index,
+			"name":        task.Name,
+			"goal":        task.Goal,
+			"task_uuid":   task.GetUUID(),
+			"task_status": task.GetProgressStatue(),
 		},
 	})
 }
