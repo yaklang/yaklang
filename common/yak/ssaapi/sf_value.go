@@ -284,6 +284,23 @@ func (v *Value) AppendPredecessor(operator sfvm.ValueOperator, opts ...sfvm.Anal
 	for _, opt := range opts {
 		opt(ctx)
 	}
+	for _, pred := range v.Predecessors {
+		if pred == nil || pred.Node == nil {
+			continue
+		}
+		if !ValueCompare(pred.Node, result) {
+			continue
+		}
+		if pred.Info == nil {
+			if ctx.Label == "" && ctx.Step == -1 {
+				return nil
+			}
+			continue
+		}
+		if pred.Info.Label == ctx.Label && pred.Info.Step == ctx.Step {
+			return nil
+		}
+	}
 	if len(v.Predecessors) > 30 {
 		log.Warnf("Value %s Predecessors too many: %d", v.StringWithRange(), len(v.Predecessors))
 	}
