@@ -68,7 +68,7 @@ SOLUTION
 REFERENCE
 )
 
-<include("java-spring-param")>  as $source;
+<include("java-spring-mvc-param")>  as $source;
 <include("java-delete-filename-sink")> as $sink;
 
 $sink #{

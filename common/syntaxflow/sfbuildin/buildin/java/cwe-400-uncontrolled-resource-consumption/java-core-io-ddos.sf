@@ -87,7 +87,7 @@ REFERENCE
 
 <include("java-net-socket-read")> as $source
 <include("java-servlet-param")> as $source
-<include("java-spring-param")> as $source
+<include("java-spring-mvc-param")> as $source
 check $source
 
 // BufferedReader使用readLine读取数据，并且没有使用length方法读取长度以进行限制
