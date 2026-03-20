@@ -64104,7 +64104,7 @@ func (x *ListAiModelResponse) GetModelName() []string {
 	return nil
 }
 
-type TestAIModelRequest struct {
+type AIConfigHealthCheckRequest struct {
 	state         protoimpl.MessageState       `protogen:"open.v1"`
 	Config        *ThirdPartyApplicationConfig `protobuf:"bytes,1,opt,name=Config,proto3" json:"Config,omitempty"`
 	Content       string                       `protobuf:"bytes,2,opt,name=Content,proto3" json:"Content,omitempty"`
@@ -64112,20 +64112,20 @@ type TestAIModelRequest struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *TestAIModelRequest) Reset() {
-	*x = TestAIModelRequest{}
+func (x *AIConfigHealthCheckRequest) Reset() {
+	*x = AIConfigHealthCheckRequest{}
 	mi := &file_yakgrpc_proto_msgTypes[902]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *TestAIModelRequest) String() string {
+func (x *AIConfigHealthCheckRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*TestAIModelRequest) ProtoMessage() {}
+func (*AIConfigHealthCheckRequest) ProtoMessage() {}
 
-func (x *TestAIModelRequest) ProtoReflect() protoreflect.Message {
+func (x *AIConfigHealthCheckRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_yakgrpc_proto_msgTypes[902]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -64137,26 +64137,26 @@ func (x *TestAIModelRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use TestAIModelRequest.ProtoReflect.Descriptor instead.
-func (*TestAIModelRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use AIConfigHealthCheckRequest.ProtoReflect.Descriptor instead.
+func (*AIConfigHealthCheckRequest) Descriptor() ([]byte, []int) {
 	return file_yakgrpc_proto_rawDescGZIP(), []int{902}
 }
 
-func (x *TestAIModelRequest) GetConfig() *ThirdPartyApplicationConfig {
+func (x *AIConfigHealthCheckRequest) GetConfig() *ThirdPartyApplicationConfig {
 	if x != nil {
 		return x.Config
 	}
 	return nil
 }
 
-func (x *TestAIModelRequest) GetContent() string {
+func (x *AIConfigHealthCheckRequest) GetContent() string {
 	if x != nil {
 		return x.Content
 	}
 	return ""
 }
 
-type TestAIModelResponse struct {
+type AIConfigHealthCheckResponse struct {
 	state              protoimpl.MessageState `protogen:"open.v1"`
 	FirstByteCostMs    int64                  `protobuf:"varint,1,opt,name=FirstByteCostMs,proto3" json:"FirstByteCostMs,omitempty"`
 	TotalCostMs        int64                  `protobuf:"varint,2,opt,name=TotalCostMs,proto3" json:"TotalCostMs,omitempty"`
@@ -64168,20 +64168,20 @@ type TestAIModelResponse struct {
 	sizeCache          protoimpl.SizeCache
 }
 
-func (x *TestAIModelResponse) Reset() {
-	*x = TestAIModelResponse{}
+func (x *AIConfigHealthCheckResponse) Reset() {
+	*x = AIConfigHealthCheckResponse{}
 	mi := &file_yakgrpc_proto_msgTypes[903]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *TestAIModelResponse) String() string {
+func (x *AIConfigHealthCheckResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*TestAIModelResponse) ProtoMessage() {}
+func (*AIConfigHealthCheckResponse) ProtoMessage() {}
 
-func (x *TestAIModelResponse) ProtoReflect() protoreflect.Message {
+func (x *AIConfigHealthCheckResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_yakgrpc_proto_msgTypes[903]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -64193,47 +64193,47 @@ func (x *TestAIModelResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use TestAIModelResponse.ProtoReflect.Descriptor instead.
-func (*TestAIModelResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use AIConfigHealthCheckResponse.ProtoReflect.Descriptor instead.
+func (*AIConfigHealthCheckResponse) Descriptor() ([]byte, []int) {
 	return file_yakgrpc_proto_rawDescGZIP(), []int{903}
 }
 
-func (x *TestAIModelResponse) GetFirstByteCostMs() int64 {
+func (x *AIConfigHealthCheckResponse) GetFirstByteCostMs() int64 {
 	if x != nil {
 		return x.FirstByteCostMs
 	}
 	return 0
 }
 
-func (x *TestAIModelResponse) GetTotalCostMs() int64 {
+func (x *AIConfigHealthCheckResponse) GetTotalCostMs() int64 {
 	if x != nil {
 		return x.TotalCostMs
 	}
 	return 0
 }
 
-func (x *TestAIModelResponse) GetRawRequest() string {
+func (x *AIConfigHealthCheckResponse) GetRawRequest() string {
 	if x != nil {
 		return x.RawRequest
 	}
 	return ""
 }
 
-func (x *TestAIModelResponse) GetResponseStatusCode() int32 {
+func (x *AIConfigHealthCheckResponse) GetResponseStatusCode() int32 {
 	if x != nil {
 		return x.ResponseStatusCode
 	}
 	return 0
 }
 
-func (x *TestAIModelResponse) GetResponseContent() string {
+func (x *AIConfigHealthCheckResponse) GetResponseContent() string {
 	if x != nil {
 		return x.ResponseContent
 	}
 	return ""
 }
 
-func (x *TestAIModelResponse) GetErrorMessage() string {
+func (x *AIConfigHealthCheckResponse) GetErrorMessage() string {
 	if x != nil {
 		return x.ErrorMessage
 	}
@@ -73565,11 +73565,11 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x12ListAiModelRequest\x12\x16\n" +
 	"\x06Config\x18\x01 \x01(\tR\x06Config\"3\n" +
 	"\x13ListAiModelResponse\x12\x1c\n" +
-	"\tModelName\x18\x01 \x03(\tR\tModelName\"h\n" +
-	"\x12TestAIModelRequest\x128\n" +
+	"\tModelName\x18\x01 \x03(\tR\tModelName\"p\n" +
+	"\x1aAIConfigHealthCheckRequest\x128\n" +
 	"\x06Config\x18\x01 \x01(\v2 .ypb.ThirdPartyApplicationConfigR\x06Config\x12\x18\n" +
-	"\aContent\x18\x02 \x01(\tR\aContent\"\xff\x01\n" +
-	"\x13TestAIModelResponse\x12(\n" +
+	"\aContent\x18\x02 \x01(\tR\aContent\"\x87\x02\n" +
+	"\x1bAIConfigHealthCheckResponse\x12(\n" +
 	"\x0fFirstByteCostMs\x18\x01 \x01(\x03R\x0fFirstByteCostMs\x12 \n" +
 	"\vTotalCostMs\x18\x02 \x01(\x03R\vTotalCostMs\x12\x1e\n" +
 	"\n" +
@@ -73944,7 +73944,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\tAesBase64\x10\x03\x12\n" +
 	"\n" +
 	"\x06XorRaw\x10\x04\x12\r\n" +
-	"\tXorBase64\x10\x052\xf7\xe8\x02\n" +
+	"\tXorBase64\x10\x052\x8f\xe9\x02\n" +
 	"\x03Yak\x12+\n" +
 	"\aVersion\x12\n" +
 	".ypb.Empty\x1a\x14.ypb.VersionResponse\x12H\n" +
@@ -74544,8 +74544,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	".ypb.Empty\x1a+.ypb.GetThirdPartyAppConfigTemplateResponse\x129\n" +
 	"\x15CheckHahValidAiConfig\x12\n" +
 	".ypb.Empty\x1a\x14.ypb.GeneralResponse\x12@\n" +
-	"\vListAiModel\x12\x17.ypb.ListAiModelRequest\x1a\x18.ypb.ListAiModelResponse\x12@\n" +
-	"\vTestAIModel\x12\x17.ypb.TestAIModelRequest\x1a\x18.ypb.TestAIModelResponse\x124\n" +
+	"\vListAiModel\x12\x17.ypb.ListAiModelRequest\x1a\x18.ypb.ListAiModelResponse\x12X\n" +
+	"\x13AIConfigHealthCheck\x12\x1f.ypb.AIConfigHealthCheckRequest\x1a .ypb.AIConfigHealthCheckResponse\x124\n" +
 	"\x11GetAIGlobalConfig\x12\n" +
 	".ypb.Empty\x1a\x13.ypb.AIGlobalConfig\x124\n" +
 	"\x11SetAIGlobalConfig\x12\x13.ypb.AIGlobalConfig\x1a\n" +
@@ -75703,8 +75703,8 @@ var file_yakgrpc_proto_goTypes = []any{
 	(*ExportNoteResponse)(nil),                                // 903: ypb.ExportNoteResponse
 	(*ListAiModelRequest)(nil),                                // 904: ypb.ListAiModelRequest
 	(*ListAiModelResponse)(nil),                               // 905: ypb.ListAiModelResponse
-	(*TestAIModelRequest)(nil),                                // 906: ypb.TestAIModelRequest
-	(*TestAIModelResponse)(nil),                               // 907: ypb.TestAIModelResponse
+	(*AIConfigHealthCheckRequest)(nil),                        // 906: ypb.AIConfigHealthCheckRequest
+	(*AIConfigHealthCheckResponse)(nil),                       // 907: ypb.AIConfigHealthCheckResponse
 	(*AIProvider)(nil),                                        // 908: ypb.AIProvider
 	(*AIProviderFilter)(nil),                                  // 909: ypb.AIProviderFilter
 	(*QueryAIProvidersRequest)(nil),                           // 910: ypb.QueryAIProvidersRequest
@@ -76345,7 +76345,7 @@ var file_yakgrpc_proto_depIdxs = []int32{
 	662,  // 576: ypb.SearchNoteContentResponse.Pagination:type_name -> ypb.Paging
 	890,  // 577: ypb.SearchNoteContentResponse.Data:type_name -> ypb.NoteContent
 	891,  // 578: ypb.ExportNoteRequest.Filter:type_name -> ypb.NoteFilter
-	213,  // 579: ypb.TestAIModelRequest.Config:type_name -> ypb.ThirdPartyApplicationConfig
+	213,  // 579: ypb.AIConfigHealthCheckRequest.Config:type_name -> ypb.ThirdPartyApplicationConfig
 	213,  // 580: ypb.AIProvider.Config:type_name -> ypb.ThirdPartyApplicationConfig
 	909,  // 581: ypb.QueryAIProvidersRequest.Filter:type_name -> ypb.AIProviderFilter
 	662,  // 582: ypb.QueryAIProvidersRequest.Pagination:type_name -> ypb.Paging
@@ -76811,7 +76811,7 @@ var file_yakgrpc_proto_depIdxs = []int32{
 	4,    // 1042: ypb.Yak.GetThirdPartyAppConfigTemplate:input_type -> ypb.Empty
 	4,    // 1043: ypb.Yak.CheckHahValidAiConfig:input_type -> ypb.Empty
 	904,  // 1044: ypb.Yak.ListAiModel:input_type -> ypb.ListAiModelRequest
-	906,  // 1045: ypb.Yak.TestAIModel:input_type -> ypb.TestAIModelRequest
+	906,  // 1045: ypb.Yak.AIConfigHealthCheck:input_type -> ypb.AIConfigHealthCheckRequest
 	4,    // 1046: ypb.Yak.GetAIGlobalConfig:input_type -> ypb.Empty
 	917,  // 1047: ypb.Yak.SetAIGlobalConfig:input_type -> ypb.AIGlobalConfig
 	4,    // 1048: ypb.Yak.ListAIProviders:input_type -> ypb.Empty
@@ -77418,7 +77418,7 @@ var file_yakgrpc_proto_depIdxs = []int32{
 	743,  // 1649: ypb.Yak.GetThirdPartyAppConfigTemplate:output_type -> ypb.GetThirdPartyAppConfigTemplateResponse
 	6,    // 1650: ypb.Yak.CheckHahValidAiConfig:output_type -> ypb.GeneralResponse
 	905,  // 1651: ypb.Yak.ListAiModel:output_type -> ypb.ListAiModelResponse
-	907,  // 1652: ypb.Yak.TestAIModel:output_type -> ypb.TestAIModelResponse
+	907,  // 1652: ypb.Yak.AIConfigHealthCheck:output_type -> ypb.AIConfigHealthCheckResponse
 	917,  // 1653: ypb.Yak.GetAIGlobalConfig:output_type -> ypb.AIGlobalConfig
 	4,    // 1654: ypb.Yak.SetAIGlobalConfig:output_type -> ypb.Empty
 	912,  // 1655: ypb.Yak.ListAIProviders:output_type -> ypb.ListAIProvidersResponse

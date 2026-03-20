@@ -749,7 +749,7 @@ service Yak {
   // AI相关
   rpc CheckHahValidAiConfig(Empty) returns (GeneralResponse);
   rpc ListAiModel(ListAiModelRequest) returns (ListAiModelResponse);
-  rpc TestAIModel(TestAIModelRequest) returns (TestAIModelResponse);
+  rpc AIConfigHealthCheck(AIConfigHealthCheckRequest) returns (AIConfigHealthCheckResponse);
   rpc GetAIGlobalConfig(Empty) returns (AIGlobalConfig);
   rpc SetAIGlobalConfig(AIGlobalConfig) returns (Empty);
   rpc ListAIProviders(Empty) returns (ListAIProvidersResponse);
@@ -8483,12 +8483,12 @@ message ListAiModelResponse{
   repeated string ModelName = 1;
 }
 
-message TestAIModelRequest{
+message AIConfigHealthCheckRequest{
   ThirdPartyApplicationConfig Config = 1;
   string Content = 2;
 }
 
-message TestAIModelResponse{
+message AIConfigHealthCheckResponse{
   int64 FirstByteCostMs = 1;
   int64 TotalCostMs = 2;
   string RawRequest = 3;

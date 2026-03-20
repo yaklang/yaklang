@@ -99,7 +99,7 @@ func (c *testAIModelClient) GetModelList() ([]*aispec.ModelMeta, error) {
 	return nil, nil
 }
 
-func TestGRPC_Ai_Test_Model(t *testing.T) {
+func TestGRPC_Ai_Config_Health_Check(t *testing.T) {
 	const providerType = "grpc-ai-model-test-provider"
 	aispec.Register(providerType, func() aispec.AIClient {
 		return &testAIModelClient{
@@ -110,7 +110,7 @@ func TestGRPC_Ai_Test_Model(t *testing.T) {
 	client, err := NewLocalClientWithTempDatabase(t)
 	require.NoError(t, err)
 
-	rsp, err := client.TestAIModel(context.Background(), &ypb.TestAIModelRequest{
+	rsp, err := client.AIConfigHealthCheck(context.Background(), &ypb.AIConfigHealthCheckRequest{
 		Config: &ypb.ThirdPartyApplicationConfig{
 			Type:   providerType,
 			APIKey: "test-key",
