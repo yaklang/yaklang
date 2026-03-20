@@ -10,7 +10,7 @@ const ExistedCorePluginEmbedFSHash string = "679ee10e06f422a7bd4b9f9123173d7e01e
 // ExistedSyntaxFlowEmbedFSHash contains the SHA256 hash of the embedded SyntaxFlow filesystem.
 // This hash is used to verify the integrity of SyntaxFlow rules and templates embedded in the binary.
 // The hash is automatically calculated from the SyntaxFlow rule files during compilation.
-const ExistedSyntaxFlowEmbedFSHash string = "43d00fa6112a0145e81a64f94950dd55cd37690fc3c01108b38f44d1c6c851e6"
+const ExistedSyntaxFlowEmbedFSHash string = "114560d2b52e610c236c0aa74747ef664c5a11e5f46acc10e87050dcde3e935f"
 
 // ExistedBuildInForgeEmbedFSHash contains the SHA256 hash of the embedded build-in forge filesystem.
 // This hash is used to verify the integrity of the built-in forge templates and resources.
@@ -20,4 +20,4 @@ const ExistedBuildInForgeEmbedFSHash string = "5001dc8c6f14a3c804849ea722d1813c9
 // ExistedBuildInAIToolEmbedFSHash contains the SHA256 hash of the embedded AI tool filesystem.
 // This hash is used to verify the integrity of AI-related tools and configurations embedded in the binary.
 // These tools include AI-powered analysis engines and machine learning models for security testing.
-const ExistedBuildInAIToolEmbedFSHash string = "94f597066755a3642a1dbd31630747387912ca6a78b6e3b79a509b5e2b211744"
+const ExistedBuildInAIToolEmbedFSHash string = "8e7f39a293b1296e6136aa552d56056ca6ce2b5c67d5791b39c6c7a2a743bbd2"

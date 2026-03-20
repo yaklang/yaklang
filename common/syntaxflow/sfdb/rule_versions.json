@@ -1052,8 +1052,8 @@
   {
     "rule_id": "be6b4a42-40ed-42c9-9f8e-9ad6e41820d3",
     "rule_name": "检测Java IO库拒绝服务漏洞",
-    "hash": "928d069abe0c84da9a24dfc1c8f2bcededfb711467897c7479e670ed8fdaac5a",
-    "version": "20251230.0001"
+    "hash": "729bdb6bf784527284059abb878caa78792ed11ee78a0ba7c7592d3980286857",
+    "version": "20260320.0001"
   },
   {
     "rule_id": "76220d53-28f1-45e2-bc45-b059e76739dd",
@@ -1196,8 +1196,8 @@
   {
     "rule_id": "52765bd8-011f-49f1-a492-c8f172b3acdc",
     "rule_name": "检测 Java Spring Boot 任意文件删除",
-    "hash": "8170956debde562525f59b0f5a3c723cb20359d195b2b6ebdcd5e9348c558250",
-    "version": "20251230.0001"
+    "hash": "3cd8af830582bb66680c68e524dca88b0dcbd9c73361cbe97794e0762479a939",
+    "version": "20260320.0001"
   },
   {
     "rule_id": "41bfcaa6-f47e-4843-8bf0-9575eea4ee7a",
