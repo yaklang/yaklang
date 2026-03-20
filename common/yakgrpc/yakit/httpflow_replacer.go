@@ -21,6 +21,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"net/http"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -62,6 +63,35 @@ func (a Rules) Swap(i, j int) { // 重写 Swap() 方法
 
 func (a Rules) Less(i, j int) bool { // 重写 Less() 方法， 从大到小排序
 	return a[i].Index < a[j].Index
+}
+
+// ruleShouldSkipBySuffix 规则级后缀白名单：若 url 的 path 后缀在 ExcludeSuffix 中，则跳过该规则。
+func ruleShouldSkipBySuffix(rule *ypb.MITMContentReplacer, urlOrPath string) bool {
+	if rule == nil || len(rule.GetExcludeSuffix()) == 0 {
+		return false
+	}
+	pathPart := urlOrPath
+	if u, err := url.Parse(urlOrPath); err == nil && u.Path != "" {
+		pathPart = u.Path
+	}
+	ext := lowhttp.GetPathSuffix(pathPart)
+	if ext == "" {
+		return false
+	}
+	extLower := strings.ToLower(ext)
+	for _, s := range rule.GetExcludeSuffix() {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue
+		}
+		if !strings.HasPrefix(s, ".") {
+			s = "." + s
+		}
+		if strings.ToLower(s) == extLower {
+			return true
+		}
+	}
+	return false
 }
 
 func FixPacket(packet []byte, isReq bool) (fixed []byte, use bool) {
@@ -132,8 +162,16 @@ func (m *MITMReplaceRule) MatchByHTTPFlow(rsp string) ([]*MatchResult, error) {
 	var ret string
 	for ; err == nil && match != nil; match, err = r.FindNextMatch(match) {
 		if match.GroupCount() > 1 {
-			// backoff compatible
-			if len(m.GetRegexpGroups()) == 0 {
+			tpl := m.GetRegexpResultTemplate()
+			if tpl != "" {
+				ret = FormatRegexpGroups(tpl, func(n int) string {
+					g := match.GroupByNumber(n)
+					if g != nil {
+						return g.String()
+					}
+					return ""
+				})
+			} else if len(m.GetRegexpGroups()) == 0 {
 				extractGroup := match.GroupByNumber(1)
 				if extractGroup != nil {
 					ret = extractGroup.String()
@@ -232,8 +270,16 @@ func (m *MITMReplaceRule) MatchByPacketInfo(info *PacketInfo) ([]*MatchResult, e
 
 		for ; err == nil && match != nil; match, err = r.FindNextMatch(match) {
 			if match.GroupCount() > 1 {
-				// backoff compatible
-				if len(m.GetRegexpGroups()) == 0 {
+				tpl := m.GetRegexpResultTemplate()
+				if tpl != "" {
+					ret = FormatRegexpGroups(tpl, func(n int) string {
+						g := match.GroupByNumber(n)
+						if g != nil {
+							return g.String()
+						}
+						return ""
+					})
+				} else if len(m.GetRegexpGroups()) == 0 {
 					extractGroup := match.GroupByNumber(1)
 					if extractGroup != nil {
 						ret = extractGroup.String()
@@ -710,6 +756,9 @@ func (m *MitmReplacer) HookColorWs(rawPacket []byte, flow *schema.WebsocketFlow)
 		if !rule.EnableForRequest && !rule.EnableForResponse {
 			continue
 		}
+		if ruleShouldSkipBySuffix(rule.MITMContentReplacer, "") {
+			continue
+		}
 
 		match, err := rule.MatchRawSimple(rawPacket)
 		if err != nil {
@@ -766,6 +815,9 @@ func (m *MitmReplacer) HookColor(request, response []byte, req *http.Request, fl
 			if err == nil && !matchString {
 				continue
 			}
+		}
+		if ruleShouldSkipBySuffix(rule.MITMContentReplacer, httpctx.GetRequestURL(req)) {
+			continue
 		}
 
 		if rule.EnableForRequest {
@@ -1060,6 +1112,9 @@ func (m *MitmReplacer) Hook(isRequest, isResponse bool, url string, origin []byt
 				continue
 			}
 		}
+		if ruleShouldSkipBySuffix(rule.MITMContentReplacer, url) {
+			continue
+		}
 		matched, packet, err := rule.MatchAndReplacePacket(modifiedPacket, isRequest)
 		if err != nil && !IsMatchTimeout(err) {
 			log.Errorf("match package failed: %v", err)
@@ -1172,6 +1227,9 @@ func (m *MitmReplacer) HookColorLowhttp(flow *lowhttp.LowhttpResponse) []*schema
 			if err == nil && !matchString {
 				continue
 			}
+		}
+		if ruleShouldSkipBySuffix(rule.MITMContentReplacer, httpctx.GetRequestURL(req)) {
+			continue
 		}
 
 		if rule.EnableForRequest {

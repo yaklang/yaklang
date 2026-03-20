@@ -51059,11 +51059,15 @@ type MITMContentReplacer struct {
 	// 只有替换数据
 	ExtraRepeat bool `protobuf:"varint,16,opt,name=ExtraRepeat,proto3" json:"ExtraRepeat,omitempty"`
 	// 匹配掉之后直接丢包
-	Drop          bool    `protobuf:"varint,17,opt,name=Drop,proto3" json:"Drop,omitempty"`
-	EffectiveURL  string  `protobuf:"bytes,18,opt,name=EffectiveURL,proto3" json:"EffectiveURL,omitempty"`
-	RegexpGroups  []int64 `protobuf:"varint,19,rep,packed,name=RegexpGroups,proto3" json:"RegexpGroups,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Drop         bool    `protobuf:"varint,17,opt,name=Drop,proto3" json:"Drop,omitempty"`
+	EffectiveURL string  `protobuf:"bytes,18,opt,name=EffectiveURL,proto3" json:"EffectiveURL,omitempty"`
+	RegexpGroups []int64 `protobuf:"varint,19,rep,packed,name=RegexpGroups,proto3" json:"RegexpGroups,omitempty"`
+	// 规则级后缀白名单：这些后缀下规则不生效
+	ExcludeSuffix []string `protobuf:"bytes,20,rep,name=ExcludeSuffix,proto3" json:"ExcludeSuffix,omitempty"`
+	// 正则捕获组输出模板，支持 $1、\1、{1} 等格式，如 "$1个$3"
+	RegexpResultTemplate string `protobuf:"bytes,21,opt,name=RegexpResultTemplate,proto3" json:"RegexpResultTemplate,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *MITMContentReplacer) Reset() {
@@ -51227,6 +51231,20 @@ func (x *MITMContentReplacer) GetRegexpGroups() []int64 {
 		return x.RegexpGroups
 	}
 	return nil
+}
+
+func (x *MITMContentReplacer) GetExcludeSuffix() []string {
+	if x != nil {
+		return x.ExcludeSuffix
+	}
+	return nil
+}
+
+func (x *MITMContentReplacer) GetRegexpResultTemplate() string {
+	if x != nil {
+		return x.RegexpResultTemplate
+	}
+	return ""
 }
 
 type RemoveHookParams struct {
@@ -72598,7 +72616,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x0eCaCertificates\x18\x03 \x03(\fR\x0eCaCertificates\x12 \n" +
 	"\vPkcs12Bytes\x18\x04 \x01(\fR\vPkcs12Bytes\x12&\n" +
 	"\x0ePkcs12Password\x18\x05 \x01(\fR\x0ePkcs12Password\x12\x12\n" +
-	"\x04Host\x18\x06 \x01(\tR\x04Host\"\xa2\x05\n" +
+	"\x04Host\x18\x06 \x01(\tR\x04Host\"\xfc\x05\n" +
 	"\x13MITMContentReplacer\x12\x12\n" +
 	"\x04Rule\x18\x01 \x01(\tR\x04Rule\x12\x1c\n" +
 	"\tNoReplace\x18\x02 \x01(\bR\tNoReplace\x12\x16\n" +
@@ -72619,7 +72637,9 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\vExtraRepeat\x18\x10 \x01(\bR\vExtraRepeat\x12\x12\n" +
 	"\x04Drop\x18\x11 \x01(\bR\x04Drop\x12\"\n" +
 	"\fEffectiveURL\x18\x12 \x01(\tR\fEffectiveURL\x12\"\n" +
-	"\fRegexpGroups\x18\x13 \x03(\x03R\fRegexpGroups\"n\n" +
+	"\fRegexpGroups\x18\x13 \x03(\x03R\fRegexpGroups\x12$\n" +
+	"\rExcludeSuffix\x18\x14 \x03(\tR\rExcludeSuffix\x122\n" +
+	"\x14RegexpResultTemplate\x18\x15 \x01(\tR\x14RegexpResultTemplate\"n\n" +
 	"\x10RemoveHookParams\x12\x1a\n" +
 	"\bClearAll\x18\x01 \x01(\bR\bClearAll\x12\x1a\n" +
 	"\bHookName\x18\x02 \x03(\tR\bHookName\x12\"\n" +
