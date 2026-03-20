@@ -1004,6 +1004,272 @@ Cookie: %s
 	require.NotContains(t, string(res), extraCookieValue)
 }
 
+// excludeSuffixTestConfig 规则级后缀白名单测试配置
+type excludeSuffixTestConfig struct {
+	name          string
+	excludeSuffix []string
+	requestURL    string
+	responseBody  string
+	expectSkip    bool   // true 表示规则应被跳过，无提取
+	expectData    string // 未跳过时期望提取的数据
+}
+
+func TestRuleExcludeSuffix_Config(t *testing.T) {
+	responseTemplate := `HTTP/1.1 200 OK
+Content-Type: application/json
+Content-Length: 12
+
+secret-key: x`
+
+	for _, cfg := range []excludeSuffixTestConfig{
+		{
+			name:          "skips_when_suffix_matches_js",
+			excludeSuffix: []string{".js"},
+			requestURL:    "https://example.com/static/app.js",
+			responseBody:  responseTemplate,
+			expectSkip:    true,
+		},
+		{
+			name:          "skips_when_suffix_matches_css",
+			excludeSuffix: []string{".js", ".css"},
+			requestURL:    "https://example.com/style/main.css",
+			responseBody:  responseTemplate,
+			expectSkip:    true,
+		},
+		{
+			name:          "applies_when_suffix_not_excluded",
+			excludeSuffix: []string{".js", ".css"},
+			requestURL:    "https://example.com/api/data",
+			responseBody:  responseTemplate,
+			expectSkip:    false,
+			expectData:    "secret-key",
+		},
+		{
+			name:          "applies_when_no_suffix_in_path",
+			excludeSuffix: []string{".js"},
+			requestURL:    "https://example.com/api",
+			responseBody:  responseTemplate,
+			expectSkip:    false,
+			expectData:    "secret-key",
+		},
+		{
+			name:          "empty_exclude_suffix_no_effect",
+			excludeSuffix: []string{},
+			requestURL:    "https://example.com/static/app.js",
+			responseBody:  responseTemplate,
+			expectSkip:    false,
+			expectData:    "secret-key",
+		},
+	} {
+		t.Run(cfg.name, func(t *testing.T) {
+			replacer := yakit.NewMITMReplacer()
+			replacer.SetRules(&ypb.MITMContentReplacer{
+				Rule:              `secret-key`,
+				NoReplace:         true,
+				Result:            ``,
+				Color:             "",
+				EnableForResponse: true,
+				EnableForHeader:   true,
+				EnableForBody:     true,
+				Index:             0,
+				ExtraTag:          []string{"secret"},
+				Disabled:          false,
+				VerboseName:       "",
+				ExcludeSuffix:     cfg.excludeSuffix,
+			})
+			responseBytes := []byte(cfg.responseBody)
+			req, _ := http.NewRequest("GET", cfg.requestURL, nil)
+			httpctx.SetRequestURL(req, cfg.requestURL)
+			extractedData := replacer.HookColor([]byte(""), responseBytes, req, &schema.HTTPFlow{})
+			if cfg.expectSkip {
+				require.Len(t, extractedData, 0, "rule should be skipped for excluded suffix")
+			} else {
+				require.Len(t, extractedData, 1)
+				require.Equal(t, cfg.expectData, extractedData[0].Data)
+			}
+		})
+	}
+}
+
+// hookColorModifiedPacketTestConfig 对修改后的包生效测试配置
+type hookColorModifiedPacketTestConfig struct {
+	name           string
+	replaceRule    string // 规则1：替换匹配内容
+	replaceResult  string // 替换结果
+	mirrorRule     string // 规则2：mirror 规则匹配（修改后才会出现的内容）
+	mirrorTag      string // mirror 规则的 ExtraTag
+	originalBody   string // 原始请求 body 中的内容
+	expectExtract  string // 期望 HookColor 提取的数据（来自修改后的包）
+}
+
+func TestHookColorUsesModifiedPacket_Config(t *testing.T) {
+	for _, cfg := range []hookColorModifiedPacketTestConfig{
+		{
+			name:          "mirror_matches_replaced_content",
+			replaceRule:   `百度`,
+			replaceResult: `REPLACED`,
+			mirrorRule:    `REPLACED`,
+			mirrorTag:     "r2",
+			originalBody:  `{"product": "百度"}`,
+			expectExtract: "REPLACED",
+		},
+		{
+			name:          "mirror_matches_simple_replace",
+			replaceRule:   `foo`,
+			replaceResult: `bar`,
+			mirrorRule:    `bar`,
+			mirrorTag:     "r2",
+			originalBody:  `{"key": "foo"}`,
+			expectExtract: "bar",
+		},
+	} {
+		t.Run(cfg.name, func(t *testing.T) {
+			replacer := yakit.NewMITMReplacer()
+			replacer.SetRules(
+				&ypb.MITMContentReplacer{
+					Rule:             cfg.replaceRule,
+					NoReplace:        false,
+					Result:           cfg.replaceResult,
+					Color:            "red",
+					EnableForRequest: true,
+					EnableForHeader:  true,
+					EnableForBody:    true,
+					Index:            0,
+					ExtraTag:         []string{"r1"},
+					Disabled:         false,
+					VerboseName:      "",
+				},
+				&ypb.MITMContentReplacer{
+					Rule:             cfg.mirrorRule,
+					NoReplace:        true,
+					Result:           ``,
+					Color:            "blue",
+					EnableForRequest: true,
+					EnableForHeader:  true,
+					EnableForBody:    true,
+					Index:            0,
+					ExtraTag:         []string{cfg.mirrorTag},
+					Disabled:         false,
+					VerboseName:      "",
+				})
+			requestBytes := []byte(`GET / HTTP/1.1
+Host: example.com
+
+` + cfg.originalBody)
+			req, _ := lowhttp.ParseBytesToHttpRequest(requestBytes)
+			_, modifiedBytes, _ := replacer.Hook(true, false, "http://example.com/", requestBytes)
+			httpctx.AppendMatchedRule(req, replacer.GetRawRules()[0].MITMContentReplacer)
+			flow := &schema.HTTPFlow{}
+			extractedData := replacer.HookColor(modifiedBytes, []byte(""), req, flow)
+			require.Len(t, extractedData, 1)
+			require.Equal(t, cfg.expectExtract, extractedData[0].Data)
+			require.Contains(t, flow.Tags, cfg.mirrorTag)
+		})
+	}
+}
+
+// regexpResultTemplateTestConfig 模板格式 $1/\1/{1} 测试配置
+type regexpResultTemplateTestConfig struct {
+	name           string
+	rule           string
+	template       string
+	packetBody     string
+	expectResult   string
+	testMatchPacket bool // true 测试 MatchPacket，false 测试 HookColor
+}
+
+func TestMITMReplaceRule_RegexpResultTemplate_Config(t *testing.T) {
+	for _, cfg := range []regexpResultTemplateTestConfig{
+		{
+			name:             "match_packet_dollar_syntax",
+			rule:             `(\w+)-(\w+)-(\w+)`,
+			template:         `$1个$2和$3`,
+			packetBody:       `HTTP/1.1 200 OK
+Content-Type: text/plain
+Content-Length: 11
+
+abc-def-ghi`,
+			expectResult:     "abc个def和ghi",
+			testMatchPacket:  true,
+		},
+		{
+			name:             "match_packet_brace_syntax",
+			rule:             `(\d+):(\d+)`,
+			template:         `{1}时{2}分`,
+			packetBody:       `HTTP/1.1 200 OK
+Content-Length: 5
+
+12:30`,
+			expectResult:     "12时30分",
+			testMatchPacket:  true,
+		},
+		{
+			name:             "hook_color_dollar_syntax",
+			rule:             `(a)(b)(c)`,
+			template:         `$1个$2和$3`,
+			packetBody:       `HTTP/1.1 200 OK
+Content-Type: application/json
+Content-Length: 3
+
+abc`,
+			expectResult:     "a个b和c",
+			testMatchPacket:  false,
+		},
+		{
+			name:             "hook_color_backslash_syntax",
+			rule:             `(x)(y)`,
+			template:         `\1-\2`,
+			packetBody:       `HTTP/1.1 200 OK
+Content-Length: 2
+
+xy`,
+			expectResult:     "x-y",
+			testMatchPacket:  false,
+		},
+	} {
+		t.Run(cfg.name, func(t *testing.T) {
+			if cfg.testMatchPacket {
+				rule := &yakit.MITMReplaceRule{
+					MITMContentReplacer: &ypb.MITMContentReplacer{
+						Rule:                 cfg.rule,
+						EnableForResponse:    true,
+						EnableForBody:        true,
+						EnableForRequest:     false,
+						EnableForHeader:      false,
+						EnableForURI:         false,
+						RegexpResultTemplate: cfg.template,
+					},
+				}
+				_, results, err := rule.MatchPacket([]byte(cfg.packetBody), false)
+				require.NoError(t, err)
+				require.Len(t, results, 1)
+				require.Equal(t, cfg.expectResult, results[0].MatchResult)
+			} else {
+				replacer := yakit.NewMITMReplacer()
+				replacer.SetRules(&ypb.MITMContentReplacer{
+					Rule:                 cfg.rule,
+					NoReplace:            true,
+					Result:               ``,
+					Color:                "",
+					EnableForResponse:    true,
+					EnableForHeader:      true,
+					EnableForBody:        true,
+					Index:                0,
+					ExtraTag:             nil,
+					Disabled:             false,
+					VerboseName:          "",
+					RegexpResultTemplate: cfg.template,
+				})
+				req, err := http.NewRequest("GET", "https://www.baidu.com", nil)
+				require.NoError(t, err)
+				extractedData := replacer.HookColor([]byte(""), []byte(cfg.packetBody), req, &schema.HTTPFlow{})
+				require.Len(t, extractedData, 1)
+				require.Equal(t, cfg.expectResult, extractedData[0].Data)
+			}
+		})
+	}
+}
+
 func TestGRPCMUSTPASS_HookColorWithRegexpGroup(t *testing.T) {
 	replacer := yakit.NewMITMReplacer()
 	replacer.SetRules(&ypb.MITMContentReplacer{
