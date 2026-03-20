@@ -87,12 +87,50 @@ func TestGRPCMUSTTPASS_MITM_HijackFilter(t *testing.T) {
 	require.False(t, unexpectedHijacked, "hijack filter not work, unexpected request hijacked")
 }
 
+// TestGRPCMUSTPASS_MITMFilter_RuleName 测试 FilterDataItem.RuleName 在 MITM 过滤器和劫持过滤器中的持久化
+func TestGRPCMUSTPASS_MITMFilter_RuleName(t *testing.T) {
+	local, err := NewLocalClientWithTempDatabase(t)
+	require.NoError(t, err)
+	ctx := utils.TimeoutContextSeconds(5)
+
+	ruleName := uuid.NewString()
+	config := &ypb.SetMITMFilterRequest{
+		FilterData: &ypb.MITMFilterData{
+			ExcludeHostnames: []*ypb.FilterDataItem{
+				{
+					MatcherType: httptpl.MATCHER_TYPE_GLOB,
+					Group:       []string{"*.google.com", "*gstatic.com"},
+					RuleName:    ruleName,
+				},
+			},
+		},
+	}
+
+	// 测试 MITM 过滤器 RuleName 持久化
+	_, err = local.SetMITMFilter(ctx, config)
+	require.NoError(t, err)
+	gotFilter, err := local.GetMITMFilter(ctx, &ypb.Empty{})
+	require.NoError(t, err)
+	require.NotEmpty(t, gotFilter.FilterData.GetExcludeHostnames(), "ExcludeHostnames should not be empty")
+	require.Equal(t, ruleName, gotFilter.FilterData.GetExcludeHostnames()[0].GetRuleName(),
+		"MITM filter RuleName should persist after Set/Get")
+
+	// 测试劫持过滤器 RuleName 持久化
+	_, err = local.SetMITMHijackFilter(ctx, config)
+	require.NoError(t, err)
+	gotHijack, err := local.GetMITMHijackFilter(ctx, &ypb.Empty{})
+	require.NoError(t, err)
+	require.NotEmpty(t, gotHijack.FilterData.GetExcludeHostnames(), "ExcludeHostnames should not be empty")
+	require.Equal(t, ruleName, gotHijack.FilterData.GetExcludeHostnames()[0].GetRuleName(),
+		"Hijack filter RuleName should persist after Set/Get")
+}
+
 func TestGRPCMUSTPASS_Get_Set_HijackFilter(t *testing.T) {
 	local, err := NewLocalClientWithTempDatabase(t)
 	require.NoError(t, err)
 
 	compareFilterDataItem := func(x, y *ypb.FilterDataItem) bool {
-		return x.MatcherType == y.MatcherType && reflect.DeepEqual(x.Group, y.Group)
+		return x.MatcherType == y.MatcherType && reflect.DeepEqual(x.Group, y.Group) && x.RuleName == y.RuleName
 	}
 	compareFilterDataItems := func(x, y []*ypb.FilterDataItem) bool {
 		if len(x) != len(y) {
@@ -135,6 +173,8 @@ func TestGRPCMUSTPASS_Get_Set_HijackFilter(t *testing.T) {
 	}
 
 	ctx := utils.TimeoutContextSeconds(5)
+	ruleNameInclude := uuid.NewString()
+	ruleNameExclude := uuid.NewString()
 	want := &ypb.SetMITMFilterRequest{
 		FilterData: &ypb.MITMFilterData{
 			IncludeHostnames: []*ypb.FilterDataItem{
@@ -144,6 +184,7 @@ func TestGRPCMUSTPASS_Get_Set_HijackFilter(t *testing.T) {
 						uuid.NewString(),
 						uuid.NewString(),
 					},
+					RuleName: ruleNameInclude,
 				},
 			},
 			ExcludeHostnames: []*ypb.FilterDataItem{
@@ -153,6 +194,7 @@ func TestGRPCMUSTPASS_Get_Set_HijackFilter(t *testing.T) {
 						uuid.NewString(),
 						uuid.NewString(),
 					},
+					RuleName: ruleNameExclude,
 				},
 			},
 			IncludeSuffix: []*ypb.FilterDataItem{

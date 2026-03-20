@@ -107,6 +107,7 @@ func safeFilterDataItem(item *ypb.FilterDataItem) *ypb.FilterDataItem {
 	}
 	item.Group = codec.StringArrayUtf8SafeEscape(item.Group)
 	item.MatcherType = codec.StringUtf8SafeEscape(item.MatcherType)
+	item.RuleName = codec.StringUtf8SafeEscape(item.RuleName)
 	return item
 }
 
