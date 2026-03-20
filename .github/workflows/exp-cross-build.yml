@@ -674,7 +674,8 @@ jobs:
           if wget --spider --server-response "$HISTORY_URL" 2>&1 | grep 'HTTP/.* 200' >/dev/null; then
             echo "Downloading history_versions.txt..."
             wget -O history_versions.txt -q $HISTORY_URL
-            cat ./current_version.txt ./history_versions.txt > new_history_versions.txt 
+            # 去重：当前版本置顶，历史版本中已存在的当前版本会被过滤，避免 rerun CI 产生重复
+            { cat ./current_version.txt; cat history_versions.txt; } | awk '!seen[$0]++' > new_history_versions.txt
           else
             echo "history_versions.txt not found or server did not return HTTP 200 for $HISTORY_URL, skipping download."
             cat ./current_version.txt > new_history_versions.txt
