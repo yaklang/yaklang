@@ -13,6 +13,13 @@ import (
 //go:embed prompts/loop_template.tpl
 var coreTemplate string
 
+type runtimeEnvironmentProvider interface {
+	GetYakExecutablePath() string
+	GetAISkillsInstallDir() string
+	GetBuiltinAISkillsInstallDir() string
+	GetAISkillsScannedDirs() []string
+}
+
 func (r *ReActLoop) generateSchemaString(disallowExit bool) (string, error) {
 	// loop
 	// build in code
@@ -161,6 +168,16 @@ func (r *ReActLoop) generateLoopPrompt(
 	infos["OutputExample"] = outputExample
 	infos["SkillsContext"] = skillsContext
 	infos["ExtraCapabilities"] = extraCapabilities
+	infos["YakExecutablePath"] = ""
+	infos["AISkillsInstallDir"] = ""
+	infos["BuiltinAISkillsInstallDir"] = ""
+	infos["AISkillsScannedDirs"] = []string{}
+	if provider, ok := r.invoker.(runtimeEnvironmentProvider); ok {
+		infos["YakExecutablePath"] = provider.GetYakExecutablePath()
+		infos["AISkillsInstallDir"] = provider.GetAISkillsInstallDir()
+		infos["BuiltinAISkillsInstallDir"] = provider.GetBuiltinAISkillsInstallDir()
+		infos["AISkillsScannedDirs"] = provider.GetAISkillsScannedDirs()
+	}
 	infos["Nonce"] = nonce
 	infos["UserQuery"] = userInput
 	infos["Schema"] = schema

@@ -28,6 +28,7 @@ var allBuiltinSkills = []struct {
 	{"pentest-task-design", "skills/pentest-task-design/SKILL.md", []string{"scan_port", "do_http_request", "OWASP", "Phase"}},
 	{"how-to-use-browser", "skills/how-to-use-browser/SKILL.md", []string{"snapshot", "click", "fill", "screenshot", "CDP"}},
 	{"authorization-bypass", "skills/authorization-bypass/SKILL.md", []string{"IDOR", "WSTG-ATHZ-02", "Horizontal", "Vertical", "do_http_request"}},
+	{"skill-creator", "skills/skill-creator/SKILL.md", []string{"SKILL.md", "Yak", "quick_validate.yak", "load_skill_resources"}},
 }
 
 // TestBuiltinSkillsFS_ContainsAllSkills verifies that the embedded filesystem
@@ -117,6 +118,30 @@ func TestExtractBuiltinSkills_WritesToBuiltinSubdir(t *testing.T) {
 	oldPath := filepath.Join(tmpDir, "code-review", "SKILL.md")
 	if _, err := os.Stat(oldPath); err == nil {
 		t.Errorf("file should NOT exist at old path %s (should be under builtin/)", oldPath)
+	}
+}
+
+func TestExtractBuiltinSkills_AlsoWritesSkillResources(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	if err := ExtractBuiltinSkillsToDir(tmpDir); err != nil {
+		t.Fatalf("ExtractBuiltinSkillsToDir failed: %v", err)
+	}
+
+	expectedResources := []string{
+		filepath.Join(tmpDir, "builtin", "skill-creator", "scripts", "init_skill.yak"),
+		filepath.Join(tmpDir, "builtin", "skill-creator", "scripts", "quick_validate.yak"),
+	}
+
+	for _, path := range expectedResources {
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Errorf("expected extracted resource at %s but got error: %v", path, err)
+			continue
+		}
+		if info.Size() == 0 {
+			t.Errorf("extracted resource %s is empty", path)
+		}
 	}
 }
 

@@ -1,5 +1,16 @@
 {{ .Background }}
 
+{{ if or .YakExecutablePath .AISkillsInstallDir .BuiltinAISkillsInstallDir }}<|RUNTIME_ENVIRONMENT_{{ .Nonce }}|>
+# Runtime Environment
+- Yak executable absolute path: {{ .YakExecutablePath }}
+- AI skills installation directory: {{ .AISkillsInstallDir }}
+- Built-in skills installation directory: {{ .BuiltinAISkillsInstallDir }}
+{{ if .AISkillsScannedDirs }}- Auto-scanned skill directories:
+{{ range .AISkillsScannedDirs }}  - {{ . }}
+{{ end }}{{ end }}
+<|RUNTIME_ENVIRONMENT_END_{{ .Nonce }}|>
+{{ end }}
+
 <|USER_QUERY_{{ .Nonce }}|>
 {{ .UserQuery }}
 <|USER_QUERY_END_{{ .Nonce }}|>

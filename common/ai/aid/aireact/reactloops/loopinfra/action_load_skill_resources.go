@@ -2,7 +2,9 @@ package loopinfra
 
 import (
 	"fmt"
+	"path/filepath"
 	"regexp"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
@@ -12,6 +14,10 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+type yakExecutableProvider interface {
+	GetYakExecutablePath() string
+}
 
 var loopAction_LoadSkillResources = &reactloops.LoopAction{
 	ActionType: schema.AI_REACT_LOOP_ACTION_LOAD_SKILL_RESOURCES,
@@ -56,6 +62,22 @@ var loopAction_LoadSkillResources = &reactloops.LoopAction{
 		{FieldName: "skill_name", AINodeId: "load_skill_resources_skill_name"},
 	},
 	ActionVerifier: func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
+		loop.Set("_load_resource_skip", "")
+		loop.Set("_load_resource_skip_message", "")
+		loop.Set("_load_resource_mode", "")
+		loop.Set("_load_resource_skill", "")
+		loop.Set("_load_resource_path", "")
+		loop.Set("_load_resource_raw", "")
+		loop.Set("_load_resource_type", "")
+		loop.Set("_grep_pattern", "")
+		loop.Set("_grep_skill_name", "")
+
+		setValidationSkip := func(msg string) error {
+			loop.Set("_load_resource_skip", "validation_failed")
+			loop.Set("_load_resource_skip_message", msg)
+			return nil
+		}
+
 		mgr := loop.GetSkillsContextManager()
 		if mgr == nil {
 			return utils.Error("skills context manager is not available")
@@ -65,15 +87,24 @@ var loopAction_LoadSkillResources = &reactloops.LoopAction{
 		pattern := action.GetString("pattern")
 
 		if resourcePath == "" && pattern == "" {
-			return utils.Error("load_skill_resources requires either 'resource_path' or 'pattern'")
+			return setValidationSkip(
+				"load_skill_resources requires either 'resource_path' or 'pattern'. " +
+					"Example: use resource_path='@skill-name/file.md' to load a file, " +
+					"or use pattern='keyword' to search across skill files.",
+			)
 		}
 		if resourcePath != "" && pattern != "" {
-			return utils.Error("'resource_path' and 'pattern' are mutually exclusive — provide only one")
+			return setValidationSkip(
+				"'resource_path' and 'pattern' are mutually exclusive. " +
+					"Provide only one of them in a single load_skill_resources action.",
+			)
 		}
 
 		if pattern != "" {
 			if _, err := regexp.Compile(pattern); err != nil {
-				return utils.Errorf("invalid grep pattern %q: %v", pattern, err)
+				return setValidationSkip(
+					fmt.Sprintf("invalid grep pattern %q: %v. Provide a valid regex or plain string pattern.", pattern, err),
+				)
 			}
 			skillName := action.GetString("skill_name")
 			loop.Set("_load_resource_mode", "grep")
@@ -84,10 +115,15 @@ var loopAction_LoadSkillResources = &reactloops.LoopAction{
 
 		skillName, filePath, err := aiskillloader.ParseSkillResourcePath(resourcePath)
 		if err != nil {
-			return utils.Wrapf(err, "invalid resource_path")
+			return setValidationSkip(
+				fmt.Sprintf("invalid resource_path: %v. Use the format '@skill-name/path/to/file'.", err),
+			)
 		}
 		if filePath == "" {
-			return utils.Error("resource_path must include a file path after the skill name (e.g. @skill/file.md)")
+			return setValidationSkip(
+				"resource_path must include a file path after the skill name. " +
+					"Example: @skill/file.md or @skill/scripts/run.yak",
+			)
 		}
 
 		resourceType := action.GetString("resource_type")
@@ -95,7 +131,9 @@ var loopAction_LoadSkillResources = &reactloops.LoopAction{
 			resourceType = "document"
 		}
 		if resourceType != "document" && resourceType != "script" {
-			return utils.Errorf("resource_type must be 'document' or 'script', got %q", resourceType)
+			return setValidationSkip(
+				fmt.Sprintf("resource_type must be 'document' or 'script', got %q.", resourceType),
+			)
 		}
 
 		loop.Set("_load_resource_mode", "load")
@@ -106,6 +144,19 @@ var loopAction_LoadSkillResources = &reactloops.LoopAction{
 		return nil
 	},
 	ActionHandler: func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
+		if loop.Get("_load_resource_skip") == "validation_failed" {
+			msg := loop.Get("_load_resource_skip_message")
+			if msg == "" {
+				msg = "load_skill_resources parameters are invalid. Provide either resource_path or pattern."
+			}
+			loop.Set("_load_resource_skip", "")
+			loop.Set("_load_resource_skip_message", "")
+			loop.GetInvoker().AddToTimeline("skill_resource_validation_failed", msg)
+			op.Feedback(msg)
+			op.Continue()
+			return
+		}
+
 		mgr := loop.GetSkillsContextManager()
 		if mgr == nil {
 			op.Fail("skills context manager is not available")
@@ -201,6 +252,8 @@ func handleScriptResource(
 
 	summary := aiskillloader.FormatResourceLoadSummary(result)
 	log.Infof("loaded script resource: %s", summary)
+	scriptExt := strings.ToLower(filepath.Ext(result.FilePath))
+	commandHint := buildScriptCommandHint(invoker, result.AbsolutePath, scriptExt)
 
 	timelineMsg := fmt.Sprintf(
 		"Script resource '%s' resolved to absolute path '%s'. %s.",
@@ -209,15 +262,13 @@ func handleScriptResource(
 	if result.MaterializedToArtifacts {
 		timelineMsg += " Script materialized from virtual filesystem to artifacts directory."
 	}
-	timelineMsg += " Use this path directly in shell commands."
+	if commandHint != "" {
+		timelineMsg += " " + commandHint
+	} else {
+		timelineMsg += " Use this path directly in shell commands."
+	}
 	invoker.AddToTimeline("skill_script_resource_loaded", timelineMsg)
-	invoker.AddToTimeline(
-		"use_script",
-		"Use the absolute path of the script to execute it directly in shell commands.\n"+
-			"if the script is python script, use python [abs-path].py to exec\n"+
-			"if the script is yak script, use yak [abs-path].yak to exec\n"+
-			"if u dont know how to use it, 'yak script.yak -h' or 'python script.py -h' is helpful",
-	)
+	invoker.AddToTimeline("use_script", buildScriptUsageGuidance(invoker, result.AbsolutePath, scriptExt))
 
 	feedbackMsg := fmt.Sprintf(
 		"Script resource '%s' loaded successfully. %s. "+
@@ -233,9 +284,52 @@ func handleScriptResource(
 	if result.MaterializedToArtifacts {
 		feedbackMsg += " The script was materialized from a virtual filesystem to the artifacts directory."
 	}
+	if commandHint != "" {
+		feedbackMsg += " " + commandHint
+	}
 	feedbackMsg += " The path reference is now visible in the SKILLS_CONTEXT section."
 	op.Feedback(feedbackMsg)
 	op.Continue()
+}
+
+func getYakExecutablePath(invoker aicommon.AIInvokeRuntime) string {
+	if provider, ok := invoker.(yakExecutableProvider); ok {
+		return strings.TrimSpace(provider.GetYakExecutablePath())
+	}
+	return ""
+}
+
+func buildScriptCommandHint(invoker aicommon.AIInvokeRuntime, absPath string, scriptExt string) string {
+	switch scriptExt {
+	case ".yak":
+		yakPath := getYakExecutablePath(invoker)
+		if yakPath != "" {
+			return fmt.Sprintf("Recommended command: %s %s", yakPath, absPath)
+		}
+		return fmt.Sprintf("Recommended command: yak %s", absPath)
+	case ".py", ".python":
+		return fmt.Sprintf("Recommended command: python %s", absPath)
+	default:
+		return ""
+	}
+}
+
+func buildScriptUsageGuidance(invoker aicommon.AIInvokeRuntime, absPath string, scriptExt string) string {
+	switch scriptExt {
+	case ".yak":
+		yakPath := getYakExecutablePath(invoker)
+		if yakPath != "" {
+			return "Use the Yak executable absolute path from the RUNTIME_ENVIRONMENT section to execute the script directly in shell commands.\n" +
+				fmt.Sprintf("Recommended command: %s %s", yakPath, absPath)
+		}
+		return "Use the yak command to execute the script directly in shell commands.\n" +
+			fmt.Sprintf("Recommended command: yak %s", absPath)
+	case ".py", ".python":
+		return "Use the python interpreter to execute the script directly in shell commands.\n" +
+			fmt.Sprintf("Recommended command: python %s", absPath)
+	default:
+		return "Use the absolute path of the script to execute it directly in shell commands."
+	}
 }
 
 func handleGrepResource(
