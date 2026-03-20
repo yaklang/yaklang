@@ -230,8 +230,8 @@
   {
     "rule_id": "48c2c107-024f-4abc-a940-ed637847f22c",
     "rule_name": "检测通用硬编码凭据",
-    "hash": "06829c0e6944f9cb4c53995449128e847754d98ed3fc952974ef673f54461781",
-    "version": "20260313.0001"
+    "hash": "2ba3bfce06b518071c4b5b16238591e729138b4b83abb0ae4ec2777fe7449bb2",
+    "version": "20260320.0001"
   },
   {
     "rule_id": "5b485362-1df1-40df-afc4-a3252bee0150",
