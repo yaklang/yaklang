@@ -860,8 +860,8 @@
   {
     "rule_id": "0d552b29-dc8b-4f92-86f9-22badc7b5a87",
     "rule_name": "检测 Java Spring Framework ModelAndView SSTI 漏洞",
-    "hash": "033513b480a50f9e3a2d0bf1042bf0acb7c08fcc5a46af6d71e702e0d80b613b",
-    "version": "20251230.0001"
+    "hash": "1634e9039b88a8de2491b14d8383bd0a4e9debe12d9fa36049c0440c0b4175e2",
+    "version": "20260320.0001"
   },
   {
     "rule_id": "0257563a-689d-4f55-9aa7-6ffcbb4df95f",
@@ -1292,8 +1292,8 @@
   {
     "rule_id": "cad09b46-5b0f-4c43-9b43-2b786b9c625f",
     "rule_name": "检测Java SpringBoot RestController XSS漏洞",
-    "hash": "62b8a1fe32d432b5225fedbf8d6353214fb30b11fae27c548d6585ade928da23",
-    "version": "20251230.0001"
+    "hash": "86df180c56db360e31f3b65a14873256efb7a2fd86a0b34ca61cc05dd429c34e",
+    "version": "20260320.0001"
   },
   {
     "rule_id": "c44e3929-2379-46d2-ad00-b30fece5e2e1",
