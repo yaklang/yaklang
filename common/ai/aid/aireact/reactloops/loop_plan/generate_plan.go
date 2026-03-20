@@ -18,49 +18,75 @@ import (
 )
 
 func planTasksStreamHandler(fieldReader io.Reader, emitWriter io.Writer) {
-	var mu sync.Mutex
 	var taskCount atomic.Int32
+
+	// Ordering mechanism: syncCallback runs synchronously in the parser goroutine
+	// (before each field handler goroutine is spawned), establishing a deterministic
+	// chain of channels. Each handler goroutine waits for the previous one to finish
+	// writing before it writes, eliminating the race on emitWriter output ordering.
+	type orderCtx struct {
+		waitCh <-chan struct{}
+		doneCh chan struct{}
+	}
+	var ctxMap sync.Map // reader -> *orderCtx
+
+	// prevDone is only accessed by syncCallback which runs sequentially in the parser goroutine.
+	initCh := make(chan struct{})
+	close(initCh)
+	prevDone := (<-chan struct{})(initCh)
 
 	wg := new(sync.WaitGroup)
 
-	err := jsonextractor.ExtractStructuredJSONFromStream(fieldReader,
-		jsonextractor.WithRegisterMultiFieldStreamHandler(
-			[]string{"subtask_name", "subtask_goal", "subtask_identifier", "depends_on"},
-			func(key string, reader io.Reader, parents []string) {
-				wg.Add(1)
-				defer wg.Done()
+	syncCallback := func(key string, reader io.Reader, parents []string) {
+		myDone := make(chan struct{})
+		ctxMap.Store(reader, &orderCtx{waitCh: prevDone, doneCh: myDone})
+		prevDone = myDone
+	}
 
-				reader = utils.JSONStringReader(reader)
-				var buf bytes.Buffer
-				switch key {
-				case "subtask_name":
-					if taskCount.Add(1) > 1 {
-						buf.WriteString("\n")
-					}
-					buf.WriteString("[")
-					io.Copy(&buf, reader)
-					buf.WriteString("]")
-				case "subtask_goal":
-					buf.WriteString(": ")
-					io.Copy(&buf, reader)
-				case "subtask_identifier":
-					buf.WriteString(" #")
-					io.Copy(&buf, reader)
-				case "depends_on":
-					raw, _ := io.ReadAll(reader)
-					trimmed := strings.TrimSpace(string(raw))
-					if trimmed != "" && trimmed != "[]" {
-						var deps []string
-						if json.Unmarshal([]byte(trimmed), &deps) == nil && len(deps) > 0 {
-							buf.WriteString(fmt.Sprintf(" (depends: %s)", strings.Join(deps, ", ")))
-						}
-					}
+	handler := func(key string, reader io.Reader, parents []string) {
+		v, _ := ctxMap.LoadAndDelete(reader)
+		oc := v.(*orderCtx)
+
+		wg.Add(1)
+		defer wg.Done()
+		defer close(oc.doneCh)
+
+		reader = utils.JSONStringReader(reader)
+		var buf bytes.Buffer
+		switch key {
+		case "subtask_name":
+			if taskCount.Add(1) > 1 {
+				buf.WriteString("\n")
+			}
+			buf.WriteString("[")
+			io.Copy(&buf, reader)
+			buf.WriteString("]")
+		case "subtask_goal":
+			buf.WriteString(": ")
+			io.Copy(&buf, reader)
+		case "subtask_identifier":
+			buf.WriteString(" #")
+			io.Copy(&buf, reader)
+		case "depends_on":
+			raw, _ := io.ReadAll(reader)
+			trimmed := strings.TrimSpace(string(raw))
+			if trimmed != "" && trimmed != "[]" {
+				var deps []string
+				if json.Unmarshal([]byte(trimmed), &deps) == nil && len(deps) > 0 {
+					buf.WriteString(fmt.Sprintf(" (depends: %s)", strings.Join(deps, ", ")))
 				}
-				mu.Lock()
-				buf.WriteTo(emitWriter)
-				mu.Unlock()
-			},
-		),
+			}
+		}
+
+		<-oc.waitCh
+		buf.WriteTo(emitWriter)
+	}
+
+	err := jsonextractor.ExtractStructuredJSONFromStream(fieldReader,
+		jsonextractor.WithRegisterFieldStreamHandlerAndStartCallback("subtask_name", handler, syncCallback),
+		jsonextractor.WithRegisterFieldStreamHandlerAndStartCallback("subtask_identifier", handler, syncCallback),
+		jsonextractor.WithRegisterFieldStreamHandlerAndStartCallback("subtask_goal", handler, syncCallback),
+		jsonextractor.WithRegisterFieldStreamHandlerAndStartCallback("depends_on", handler, syncCallback),
 		jsonextractor.WithStreamErrorCallback(func(err error) {
 			log.Errorf("plan tasks stream parse error: %v", err)
 		}),
