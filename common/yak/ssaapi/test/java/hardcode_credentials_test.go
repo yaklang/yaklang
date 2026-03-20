@@ -1,6 +1,7 @@
 package java
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -20,6 +21,7 @@ func initHardcodeRule(t *testing.T) string {
 	require.NoError(t, sfbuildin.SyncEmbedRule())
 	rule, err := sfdb.GetRulePure("检测通用硬编码凭据")
 	require.NoError(t, err, "buildin rule '检测通用硬编码凭据' not found")
+	require.Contains(t, rule.Content, "configCredential", "buildin rule content 未包含本次新增的配置凭据逻辑")
 	return rule.Content
 }
 
@@ -84,6 +86,77 @@ func TestHardcodeCredentials_DetectRealSecrets(t *testing.T) {
 		} else {
 			t.Logf("命中 %d 处硬编码凭据，符合预期", total)
 		}
+		return nil
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
+}
+
+func TestHardcodeCredentials_DetectYamlConfigSecrets(t *testing.T) {
+	ruleContent := initHardcodeRule(t)
+
+	vfs := filesys.NewVirtualFs()
+	vfs.AddFile("application.yml", `
+server:
+  port: 8100
+
+spring:
+  application:
+    name: epri-cdio
+  cloud:
+    nacos:
+      config:
+        server-addr: 10.43.201.168:18848
+        group: DEFAULT_GROUP
+        file-extension: yml
+        username: nacos
+        password: nacos@hyitFramework$2022
+        name: epri-backend-discipline-inspection.yaml
+`)
+
+	ssatest.CheckWithFS(vfs, t, func(programs ssaapi.Programs) error {
+		result, err := programs.SyntaxFlowWithError(ruleContent)
+		require.NoError(t, err)
+
+		configHits := result.GetValues("configCredential")
+		require.NotEmpty(t, configHits, "期望 general 规则中的 configCredential 变量命中 YAML 配置密码")
+
+		total := 0
+		foundPassword := false
+		for _, v := range configHits {
+			if strings.Contains(codec.AnyToString(v), "nacos@hyitFramework$2022") {
+				foundPassword = true
+			}
+		}
+		for _, name := range result.GetAlertVariables() {
+			for range result.GetValues(name) {
+				total++
+			}
+		}
+		require.Greater(t, total, 0, "期望 YAML 配置命中还能生成 alert 结果，但规则未报告任何告警")
+		require.True(t, foundPassword, "期望命中 application.yml 中的 password 值")
+		return nil
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
+}
+
+func TestHardcodeCredentials_NoFalsePositiveForYamlEnvPlaceholder(t *testing.T) {
+	ruleContent := initHardcodeRule(t)
+
+	vfs := filesys.NewVirtualFs()
+	vfs.AddFile("application.yml", `
+spring:
+  datasource:
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+`)
+
+	ssatest.CheckWithFS(vfs, t, func(programs ssaapi.Programs) error {
+		result, err := programs.SyntaxFlowWithError(ruleContent)
+		require.NoError(t, err)
+
+		total := 0
+		for _, name := range result.GetAlertVariables() {
+			total += len(result.GetValues(name))
+		}
+		require.Equal(t, 0, total, "环境变量占位符不应被识别为硬编码凭据")
 		return nil
 	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }

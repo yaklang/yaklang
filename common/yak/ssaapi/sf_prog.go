@@ -2,7 +2,6 @@ package ssaapi
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"regexp"
 
@@ -355,22 +354,26 @@ func NewFileFilter(file, matchType string, match []string) *FileFilter {
 				continue
 			}
 			matchContent = append(matchContent, func(data string) []Index {
-				m := make(map[string]interface{})
-				err := json.Unmarshal([]byte(data), &m)
+				structuredData, err := parseStructuredContent(data)
 				if err != nil {
-					log.Errorf("json parse error: %s", err)
+					log.Errorf("structured parse error: %s", err)
 					return nil
 				}
 
-				matched, err := jsonFilter(m)
+				matched, err := jsonFilter(structuredData)
 				if err != nil {
 					log.Errorf("json path match content error: %s", err)
 					return nil
 				}
 
-				searchResults, ok := matched.([]interface{})
-				if !ok {
+				var searchResults []interface{}
+				switch ret := matched.(type) {
+				case nil:
 					return nil
+				case []interface{}:
+					searchResults = ret
+				default:
+					searchResults = []interface{}{ret}
 				}
 
 				res := make([]Index, 0)
