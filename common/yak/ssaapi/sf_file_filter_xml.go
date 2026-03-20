@@ -192,5 +192,13 @@ func isXML(data []byte) bool {
 
 func isYAML(data []byte) bool {
 	var y any
-	return yaml.Unmarshal(data, &y) == nil
+	if err := yaml.Unmarshal(data, &y); err != nil {
+		return false
+	}
+	switch y.(type) {
+	case map[string]any, map[any]any, []any:
+		return true
+	default:
+		return false
+	}
 }
