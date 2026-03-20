@@ -39,17 +39,22 @@ func TestRecovery_SkipCompletedTasks(t *testing.T) {
 
 	root := newRawTaskForRecovery("root", "root-goal")
 	doneMarker := uuid.NewString()
+	abortedMarker := uuid.NewString()
 	todoMarker := uuid.NewString()
 	doneTask := newRawTaskForRecovery("done-task-"+doneMarker, "done-goal-"+doneMarker)
+	abortedTask := newRawTaskForRecovery("aborted-task-"+abortedMarker, "aborted-goal-"+abortedMarker)
 	todoTask := newRawTaskForRecovery("todo-task-"+todoMarker, "todo-goal-"+todoMarker)
 
 	doneTask.ParentTask = root
+	abortedTask.ParentTask = root
 	todoTask.ParentTask = root
-	root.Subtasks = []*aid.AiTask{doneTask, todoTask}
+	root.Subtasks = []*aid.AiTask{doneTask, abortedTask, todoTask}
 	root.GenerateIndex()
 
 	doneTask.SetStatus(aicommon.AITaskState_Completed)
 	doneTask.SetSummary("done task summary")
+	abortedTask.SetStatus(aicommon.AITaskState_Aborted)
+	abortedTask.SetSummary("aborted task should be retried")
 
 	db := consts.GetGormProjectDatabase()
 	require.NoError(t, db.AutoMigrate(&schema.AISessionPlanAndExec{}).Error)
@@ -69,11 +74,12 @@ func TestRecovery_SkipCompletedTasks(t *testing.T) {
 	require.NoError(t, yakit.CreateOrUpdateAISessionPlanAndExec(db, record))
 
 	var (
-		mu          sync.Mutex
-		pushed      = make(map[string]int)
-		popped      = make(map[string]int)
-		aiDoneCalls int
-		aiTodoCalls int
+		mu             sync.Mutex
+		pushed         = make(map[string]int)
+		popped         = make(map[string]int)
+		aiDoneCalls    int
+		aiAbortedCalls int
+		aiTodoCalls    int
 	)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -128,6 +134,11 @@ func TestRecovery_SkipCompletedTasks(t *testing.T) {
 				aiDoneCalls++
 				mu.Unlock()
 			}
+			if strings.Contains(block, abortedMarker) {
+				mu.Lock()
+				aiAbortedCalls++
+				mu.Unlock()
+			}
 			if strings.Contains(block, todoMarker) {
 				mu.Lock()
 				aiTodoCalls++
@@ -152,9 +163,12 @@ func TestRecovery_SkipCompletedTasks(t *testing.T) {
 
 	require.Equal(t, 0, pushed["1-1"], "completed task should not be pushed in recovery")
 	require.Equal(t, 0, popped["1-1"], "completed task should not be popped in recovery")
-	require.Equal(t, 1, pushed["1-2"], "pending task should be pushed exactly once in recovery")
-	require.Equal(t, 1, popped["1-2"], "pending task should be popped exactly once in recovery")
+	require.Equal(t, 1, pushed["1-2"], "aborted task should be pushed exactly once in recovery")
+	require.Equal(t, 1, popped["1-2"], "aborted task should be popped exactly once in recovery")
+	require.Equal(t, 1, pushed["1-3"], "pending task should be pushed exactly once in recovery")
+	require.Equal(t, 1, popped["1-3"], "pending task should be popped exactly once in recovery")
 
 	require.Equal(t, 0, aiDoneCalls, "completed task should not trigger AI calls in recovery")
+	require.Greater(t, aiAbortedCalls, 0, "aborted task should trigger AI calls in recovery")
 	require.Greater(t, aiTodoCalls, 0, "pending task should trigger AI calls in recovery")
 }

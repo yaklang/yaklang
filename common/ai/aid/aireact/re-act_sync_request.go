@@ -134,7 +134,7 @@ func (r *ReAct) HandleSyncTypeRecoveryPlanAndExecEvent(event *ypb.AIInputEvent) 
 
 	go r.AsyncRecoverPlanAndExecute(r.config.Ctx, coordinatorID, func(err error) {
 		if err != nil {
-			r.EmitPlanExecFail("recover plan-and-exec failed: %v", err)
+			log.Errorf("recover plan-and-exec failed: %v", err)
 		}
 	})
 	return nil

@@ -176,10 +176,9 @@ func (r *runtime) Invoke(task *AiTask) (retErr error) {
 	totalTasks := r.TaskLink.Len()
 	r.config.planLoadingStatus(fmt.Sprintf("开始执行任务队列 (%d 个任务) / Starting Task Queue (%d Tasks)", totalTasks, totalTasks))
 
-	var currentTask *AiTask
 	phase := Phase_NotCompleted
 	defer func() {
-		r.config.savePlanAndExecState(phase, currentTask)
+		r.config.savePlanAndExecState(phase, r.RootTask)
 	}()
 
 	invokeTask := func(current *AiTask) error {
@@ -252,7 +251,7 @@ func (r *runtime) Invoke(task *AiTask) (retErr error) {
 		// Emit current progress
 		r.config.planLoadingStatus(fmt.Sprintf("执行进度: %d/%d - 当前: [%s] / Progress: %d/%d - Current: [%s]",
 			r.currentProgressIndex(), totalTasks, currentTask.Index, r.currentProgressIndex(), totalTasks, currentTask.Index))
-		r.config.savePlanAndExecState(Phase_NotCompleted, currentTask)
+		r.config.savePlanAndExecState(Phase_NotCompleted, r.RootTask)
 
 		if err := invokeTask(currentTask); err != nil {
 			// 检查是否是任务被用户主动跳过导致的错误
