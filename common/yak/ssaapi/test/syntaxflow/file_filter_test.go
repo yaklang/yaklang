@@ -117,6 +117,72 @@ func TestFileFilterJson(t *testing.T) {
 	})
 }
 
+func TestFileFilterYamlJsonPath(t *testing.T) {
+	t.Run("test match yaml by jsonpath", func(t *testing.T) {
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("application.yml", `
+server:
+  port: 8100
+
+spring:
+  application:
+    name: epri-cdio
+  cloud:
+    nacos:
+      config:
+        server-addr: 10.43.201.168:18848
+        group: DEFAULT_GROUP
+        file-extension: yml
+        username: nacos
+        password: nacos@hyitFramework$2022
+        name: epri-backend-discipline-inspection.yaml
+`)
+		ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
+			vals, err := programs.SyntaxFlowWithError(`
+${*.yml}.json("$..username") as $username;
+${*.yml}.json("$..password") as $password;
+`)
+			require.NoError(t, err)
+
+			username := vals.GetValues("username")
+			require.Contains(t, username.String(), "nacos")
+			require.Contains(t, username.StringEx(1), "14:19 - 14:24")
+
+			password := vals.GetValues("password")
+			require.Contains(t, password.String(), "nacos@hyitFramework$2022")
+			require.Contains(t, password.StringEx(1), "15:19 - 15:43")
+			return nil
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
+	})
+}
+
+func TestFileFilterYamlCredentialRegexp(t *testing.T) {
+	t.Run("test match yaml credentials by regexp", func(t *testing.T) {
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("application.yml", `
+server:
+  port: 8100
+
+spring:
+  cloud:
+    nacos:
+      config:
+        username: nacos
+        password: nacos@hyitFramework$2022
+`)
+		ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
+			vals, err := programs.SyntaxFlowWithError(`
+${*.yml}.regexp(/(?im)^\s*["']?(?:[A-Za-z0-9_.-]*?(?:password|passwd|secret|token|access[_-]?key|secret[_-]?key|api[_-]?key|client[_-]?secret|private[_-]?key)[A-Za-z0-9_.-]*)["']?\s*:\s*(?!["']?(?:\$\{|\{\{))[^\r\n#]+/) as $credential
+`)
+			require.NoError(t, err)
+
+			credential := vals.GetValues("credential")
+			require.Contains(t, credential.String(), "password: nacos@hyitFramework$2022")
+			return nil
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
+	})
+}
+
 func TestFileFilterMatchJsonByXpath(t *testing.T) {
 	t.Run("test match json by xpath 1", func(t *testing.T) {
 		vf := filesys.NewVirtualFs()
