@@ -256,6 +256,8 @@ func (t *AiTask) MarshalJSON() ([]byte, error) {
 		progress = string(aicommon.AITaskState_Completed)
 	} else if t.executing() {
 		progress = string(aicommon.AITaskState_Processing)
+	} else if t.GetStatus() == aicommon.AITaskState_Aborted {
+		progress = string(aicommon.AITaskState_Aborted)
 	} else if t.skiped() {
 		progress = string(aicommon.AITaskState_Skipped)
 	}
