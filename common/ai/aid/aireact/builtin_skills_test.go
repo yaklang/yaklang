@@ -5,10 +5,14 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aimem"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 // allBuiltinSkills lists every built-in skill that ships with the binary.
@@ -28,6 +32,26 @@ var allBuiltinSkills = []struct {
 	{"pentest-task-design", "skills/pentest-task-design/SKILL.md", []string{"scan_port", "do_http_request", "OWASP", "Phase"}},
 	{"how-to-use-browser", "skills/how-to-use-browser/SKILL.md", []string{"snapshot", "click", "fill", "screenshot", "CDP"}},
 	{"authorization-bypass", "skills/authorization-bypass/SKILL.md", []string{"IDOR", "WSTG-ATHZ-02", "Horizontal", "Vertical", "do_http_request"}},
+}
+
+func useTempBuiltinSkillReleaseDB(t *testing.T) {
+	t.Helper()
+
+	dbPath := filepath.Join(t.TempDir(), "profile.db")
+	db, err := consts.CreateProfileDatabase(dbPath)
+	if err != nil {
+		t.Fatalf("failed to create temp profile db: %v", err)
+	}
+
+	originalResolver := builtinSkillReleaseDB
+	builtinSkillReleaseDB = func() *gorm.DB {
+		return db
+	}
+
+	t.Cleanup(func() {
+		builtinSkillReleaseDB = originalResolver
+		_ = db.Close()
+	})
 }
 
 // TestBuiltinSkillsFS_ContainsAllSkills verifies that the embedded filesystem
@@ -92,6 +116,7 @@ func TestBuiltinSkillsFS_AllMetaValid(t *testing.T) {
 // TestExtractBuiltinSkills_WritesToBuiltinSubdir verifies that
 // ExtractBuiltinSkillsToDir places files under a "builtin/" subdirectory.
 func TestExtractBuiltinSkills_WritesToBuiltinSubdir(t *testing.T) {
+	useTempBuiltinSkillReleaseDB(t)
 	tmpDir := t.TempDir()
 
 	if err := ExtractBuiltinSkillsToDir(tmpDir); err != nil {
@@ -110,6 +135,9 @@ func TestExtractBuiltinSkills_WritesToBuiltinSubdir(t *testing.T) {
 		if info.Size() == 0 {
 			t.Errorf("extracted file %s is empty", expectedPath)
 		}
+		if releasedAt, ok := getBuiltinSkillReleaseTime(relPath); !ok || releasedAt.IsZero() {
+			t.Errorf("expected release time to be recorded for %s", relPath)
+		}
 		t.Logf("verified extracted: %s (%d bytes)", expectedPath, info.Size())
 	}
 
@@ -117,6 +145,155 @@ func TestExtractBuiltinSkills_WritesToBuiltinSubdir(t *testing.T) {
 	oldPath := filepath.Join(tmpDir, "code-review", "SKILL.md")
 	if _, err := os.Stat(oldPath); err == nil {
 		t.Errorf("file should NOT exist at old path %s (should be under builtin/)", oldPath)
+	}
+}
+
+func TestExtractBuiltinSkills_PreservesExistingFile(t *testing.T) {
+	useTempBuiltinSkillReleaseDB(t)
+	tmpDir := t.TempDir()
+	relPath := strings.TrimPrefix(allBuiltinSkills[0].fsPath, "skills/")
+	targetPath := filepath.Join(tmpDir, "builtin", relPath)
+	customContent := []byte("user customized skill content\n")
+
+	if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
+		t.Fatalf("failed to create target dir: %v", err)
+	}
+	if err := os.WriteFile(targetPath, customContent, 0o644); err != nil {
+		t.Fatalf("failed to write custom skill file: %v", err)
+	}
+
+	if err := ExtractBuiltinSkillsToDir(tmpDir); err != nil {
+		t.Fatalf("ExtractBuiltinSkillsToDir failed: %v", err)
+	}
+
+	got, err := os.ReadFile(targetPath)
+	if err != nil {
+		t.Fatalf("failed to read preserved skill file: %v", err)
+	}
+	if string(got) != string(customContent) {
+		t.Fatalf("existing skill file was overwritten, got %q", string(got))
+	}
+	if raw := yakit.GetKey(builtinSkillReleaseDB(), builtinSkillReleaseKey(relPath)); raw != "" {
+		t.Fatalf("expected no release record for pre-existing local file, got %q", raw)
+	}
+}
+
+func TestExtractBuiltinSkills_PreservesModifiedFileAfterRelease(t *testing.T) {
+	useTempBuiltinSkillReleaseDB(t)
+	tmpDir := t.TempDir()
+	relPath := strings.TrimPrefix(allBuiltinSkills[0].fsPath, "skills/")
+	targetPath := filepath.Join(tmpDir, "builtin", relPath)
+
+	if err := ExtractBuiltinSkillsToDir(tmpDir); err != nil {
+		t.Fatalf("first ExtractBuiltinSkillsToDir failed: %v", err)
+	}
+
+	originalRelease := yakit.GetKey(builtinSkillReleaseDB(), builtinSkillReleaseKey(relPath))
+	if originalRelease == "" {
+		t.Fatal("expected release record after initial extraction")
+	}
+
+	customContent := []byte("user modified after release\n")
+	if err := os.WriteFile(targetPath, customContent, 0o644); err != nil {
+		t.Fatalf("failed to modify skill file: %v", err)
+	}
+
+	releasedAt, ok := getBuiltinSkillReleaseTime(relPath)
+	if !ok {
+		t.Fatal("expected parsed release time after initial extraction")
+	}
+	modifiedAt := releasedAt.Add(2 * time.Second)
+	if err := os.Chtimes(targetPath, modifiedAt, modifiedAt); err != nil {
+		t.Fatalf("failed to update skill file mtime: %v", err)
+	}
+
+	if err := ExtractBuiltinSkillsToDir(tmpDir); err != nil {
+		t.Fatalf("second ExtractBuiltinSkillsToDir failed: %v", err)
+	}
+
+	got, err := os.ReadFile(targetPath)
+	if err != nil {
+		t.Fatalf("failed to read modified skill file: %v", err)
+	}
+	if string(got) != string(customContent) {
+		t.Fatalf("modified skill file was overwritten, got %q", string(got))
+	}
+	if currentRelease := yakit.GetKey(builtinSkillReleaseDB(), builtinSkillReleaseKey(relPath)); currentRelease != originalRelease {
+		t.Fatalf("expected release record to remain unchanged, got %q want %q", currentRelease, originalRelease)
+	}
+	if info, err := os.Stat(targetPath); err != nil {
+		t.Fatalf("failed to stat modified skill file: %v", err)
+	} else if !info.ModTime().After(releasedAt) {
+		t.Fatalf("expected modified skill file mtime %v to be after release time %v", info.ModTime(), releasedAt)
+	}
+}
+
+func TestExtractBuiltinSkills_PreservesExistingFileEvenWithPriorReleaseRecord(t *testing.T) {
+	useTempBuiltinSkillReleaseDB(t)
+	tmpDir := t.TempDir()
+	relPath := strings.TrimPrefix(allBuiltinSkills[0].fsPath, "skills/")
+	targetPath := filepath.Join(tmpDir, "builtin", relPath)
+	customContent := []byte("keep legacy customized content\n")
+
+	if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
+		t.Fatalf("failed to create target dir: %v", err)
+	}
+	if err := os.WriteFile(targetPath, customContent, 0o644); err != nil {
+		t.Fatalf("failed to seed custom skill file: %v", err)
+	}
+
+	legacyReleaseAt := time.Now().Add(2 * time.Hour)
+	markBuiltinSkillReleased(relPath, legacyReleaseAt)
+	olderMtime := legacyReleaseAt.Add(-1 * time.Hour)
+	if err := os.Chtimes(targetPath, olderMtime, olderMtime); err != nil {
+		t.Fatalf("failed to backdate skill file mtime: %v", err)
+	}
+
+	if err := ExtractBuiltinSkillsToDir(tmpDir); err != nil {
+		t.Fatalf("ExtractBuiltinSkillsToDir failed: %v", err)
+	}
+
+	got, err := os.ReadFile(targetPath)
+	if err != nil {
+		t.Fatalf("failed to read preserved legacy skill file: %v", err)
+	}
+	if string(got) != string(customContent) {
+		t.Fatalf("legacy skill file was overwritten, got %q", string(got))
+	}
+	currentRelease, ok := getBuiltinSkillReleaseTime(relPath)
+	if !ok {
+		t.Fatal("expected existing release record to remain readable")
+	}
+	if currentRelease.UnixMilli() != legacyReleaseAt.UnixMilli() {
+		t.Fatalf("expected release record to remain unchanged, got %v want %v", currentRelease, legacyReleaseAt)
+	}
+	if info, err := os.Stat(targetPath); err != nil {
+		t.Fatalf("failed to stat legacy skill file: %v", err)
+	} else if !info.ModTime().Before(currentRelease) {
+		t.Fatalf("expected legacy skill file mtime %v to remain before release time %v", info.ModTime(), currentRelease)
+	}
+}
+
+func TestExtractBuiltinSkills_ReleaseRecordMatchesWrittenFileTime(t *testing.T) {
+	useTempBuiltinSkillReleaseDB(t)
+	tmpDir := t.TempDir()
+	relPath := strings.TrimPrefix(allBuiltinSkills[0].fsPath, "skills/")
+	targetPath := filepath.Join(tmpDir, "builtin", relPath)
+
+	if err := ExtractBuiltinSkillsToDir(tmpDir); err != nil {
+		t.Fatalf("ExtractBuiltinSkillsToDir failed: %v", err)
+	}
+
+	info, err := os.Stat(targetPath)
+	if err != nil {
+		t.Fatalf("failed to stat extracted skill file: %v", err)
+	}
+	releasedAt, ok := getBuiltinSkillReleaseTime(relPath)
+	if !ok {
+		t.Fatal("expected release record after extraction")
+	}
+	if releasedAt.UnixMilli() != info.ModTime().UnixMilli() {
+		t.Fatalf("expected release record %v to match file mod time %v", releasedAt, info.ModTime())
 	}
 }
 
