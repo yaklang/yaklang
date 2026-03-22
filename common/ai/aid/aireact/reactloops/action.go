@@ -53,7 +53,7 @@ func buildSchema(actions ...*LoopAction) string {
 		aitool.WithStringParam(
 			"human_readable_thought",
 			aitool.WithParam_Description(
-				"Provide a brief summary of your thoughts regarding the current task. This thought will serve as the basis for subsequent actions, so please ensure its accuracy and completeness.",
+				"Optional. Omit this field when @action is 'directly_answer' or when the next step is already obvious. If you do provide it, keep it to one short, action-oriented sentence only (prefer <=12 Chinese characters or <=8 English words).",
 			),
 		),
 	}

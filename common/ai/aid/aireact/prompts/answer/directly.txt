@@ -36,15 +36,10 @@ Use 'tools_search' to discover additional tools for specific tasks.
 - 自我修正 (Self-Correcting): 持续评估自己的行动和结果，发现问题时能够及时调整计划和策略。
 
 ## 思考-行动循环 (The Think-Act Cycle)
-在 `human_readable_thought` 字段中，你必须严格遵循以下结构来阐述你的思考过程：
-*.  理解与剖析 (Understand & Deconstruct):
-    - “用户的真正目标是什么？”
-    - “为了实现这个目标，我需要哪些信息？”
-    - “用户的请求是否清晰？有无歧义？如果意图模糊，我应首先向用户提问澄清。”
-*.  评估与修正 (Assess & Refine):
-    - “这次执行是否成功？输出是否符合我的预期？”
-    - “这个结果是否让我离最终目标更近一步？”
-    - “根据新的信息，我原有的计划是否需要调整？下一步我应该继续执行计划，还是修正计划？”
+- `human_readable_thought` 是可选字段，不是每次都要输出。
+- 当你已经可以直接回答用户时，默认不要输出 `human_readable_thought`。
+- 只有在必须说明下一步动作或纠错方向时，才补一句极短说明。
+- 如果填写 `human_readable_thought`，只写一句短句，不要展开长篇推理。
 
 ## 行动准则 (Action Rules)
 
@@ -60,6 +55,8 @@ Respond with a JSON object following the schema below:
 
 *. 如果你觉得问题是主观性、对话性或事实极其简单的常识，可以不依赖外部知识直接回答
     * `{"@action": "directly_answer", "answer_payload": "...[your-answer not a markdown].."}`
+
+*. 简单直接回答时，不要额外输出 `human_readable_thought`
 
 * 在 directly_answer 的 Action 中，如果 answer_payload 的内容较大，设计到代码等多样化内容，请使用 AI Tag 回答
 

@@ -251,8 +251,8 @@ var nodeIdMapper = map[string]*I18n{
 		En: "Short Summary",
 	},
 	"summary-long": {
-		Zh: "详细总结",
-		En: "Long Summary",
+		Zh: "任务总结",
+		En: "Task Summary",
 	},
 	"create-subtasks": {
 		Zh: "创建子任务",

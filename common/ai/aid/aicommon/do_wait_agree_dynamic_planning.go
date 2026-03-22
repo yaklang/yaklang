@@ -8,11 +8,13 @@ import (
 	"fmt"
 	"io"
 	"runtime"
+	"strings"
 	"text/template"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 )
@@ -232,14 +234,6 @@ func DefaultAITaskReviewControl(ctx context.Context, config *Config, ep *Endpoin
 			ctx,
 			stream, "task_review",
 			WithActionAlias("object"),
-			WithActionFieldStreamHandler([]string{"reason"}, func(key string, reader io.Reader) {
-				reader = utils.JSONStringReader(utils.UTF8Reader(reader))
-				config.GetEmitter().EmitDefaultStreamEvent(
-					"task-review",
-					reader,
-					rsp.GetTaskIndex(),
-				)
-			}),
 		)
 		if err != nil {
 			return fmt.Errorf("extract task_review action failed: %w", err)
@@ -258,8 +252,30 @@ func DefaultAITaskReviewControl(ctx context.Context, config *Config, ep *Endpoin
 		suggestion = "continue"
 	}
 
+	compactReason := compactTaskReviewReason(suggestion, reason)
+	if config.GetEmitter() != nil {
+		_, _ = config.GetEmitter().EmitDefaultStreamEvent(
+			"task-review",
+			strings.NewReader(compactReason),
+			ep.GetId(),
+		)
+		payload := map[string]any{
+			"verdict":    taskReviewVerdict(suggestion),
+			"suggestion": suggestion,
+			"reason":     compactReason,
+		}
+		if len(taskDeltasArray) > 0 {
+			var rawDeltas []interface{}
+			for _, d := range taskDeltasArray {
+				rawDeltas = append(rawDeltas, map[string]interface{}(d))
+			}
+			payload["task_deltas"] = rawDeltas
+		}
+		_, _ = config.GetEmitter().EmitJSON(schema.EVENT_TYPE_STRUCTURED, "task-review", payload)
+	}
+
 	log.Infof("dynamic planning: task review AI decision: %s (reason: %s)", suggestion, reason)
-	result := aitool.InvokeParams{"suggestion": suggestion, "reason": reason}
+	result := aitool.InvokeParams{"suggestion": suggestion, "reason": compactReason}
 	if len(taskDeltasArray) > 0 {
 		var rawDeltas []interface{}
 		for _, d := range taskDeltasArray {
@@ -268,4 +284,26 @@ func DefaultAITaskReviewControl(ctx context.Context, config *Config, ep *Endpoin
 		result["task_deltas"] = rawDeltas
 	}
 	return result, nil
+}
+
+func taskReviewVerdict(suggestion string) string {
+	if suggestion == "adjust_plan" {
+		return "需要修改后续任务"
+	}
+	return "无需修改后续任务"
+}
+
+func compactTaskReviewReason(suggestion, reason string) string {
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		if suggestion == "adjust_plan" {
+			reason = "发现新证据，后续任务需调整。"
+		} else {
+			reason = "当前结果支持继续按原计划执行。"
+		}
+	}
+	if len([]rune(reason)) > 48 {
+		reason = string([]rune(reason)[:48]) + "..."
+	}
+	return fmt.Sprintf("%s：%s", taskReviewVerdict(suggestion), reason)
 }

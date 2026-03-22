@@ -20,7 +20,7 @@ func mockedFreeInputOutput(config aicommon.AICallerConfigIf, flag string) (*aico
 {"@action": "object", "next_action": {
 	"type": "directly_answer",
 	"answer_payload": "..[mocked_answer` + flag + `]..",
-}, "human_readable_thought": "mocked thought` + flag + `", "cumulative_summary": "..cumulative-mocked` + flag + `.."}
+}, "cumulative_summary": "..cumulative-mocked` + flag + `.."}
 `)
 	rsp.EmitOutputStream(rs)
 	rsp.Close()
