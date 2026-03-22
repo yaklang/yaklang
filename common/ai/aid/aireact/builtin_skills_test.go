@@ -54,6 +54,26 @@ func useTempBuiltinSkillReleaseDB(t *testing.T) {
 	})
 }
 
+func useTempYakitHome(t *testing.T) string {
+	t.Helper()
+
+	tempDir := t.TempDir()
+	originalYakitHome := os.Getenv("YAKIT_HOME")
+	if err := os.Setenv("YAKIT_HOME", tempDir); err != nil {
+		t.Fatalf("failed to set YAKIT_HOME: %v", err)
+	}
+	consts.ResetYakitHomeOnce()
+
+	t.Cleanup(func() {
+		if err := os.Setenv("YAKIT_HOME", originalYakitHome); err != nil {
+			t.Fatalf("failed to restore YAKIT_HOME: %v", err)
+		}
+		consts.ResetYakitHomeOnce()
+	})
+
+	return tempDir
+}
+
 // TestBuiltinSkillsFS_ContainsAllSkills verifies that the embedded filesystem
 // contains all expected built-in SKILL.md files.
 func TestBuiltinSkillsFS_ContainsAllSkills(t *testing.T) {
@@ -359,4 +379,32 @@ func TestBuiltinSkills_DisabledWhenRequested(t *testing.T) {
 	}
 
 	t.Log("confirmed: no built-in skills loaded when DisableAutoSkills is set")
+}
+
+func TestBuiltinSkills_DisabledDoesNotExtractBuiltinFiles(t *testing.T) {
+	useTempBuiltinSkillReleaseDB(t)
+	tempYakitHome := useTempYakitHome(t)
+
+	_, err := NewReAct(
+		aicommon.WithMemoryTriage(aimem.NewMockMemoryTriage()),
+		aicommon.WithEnableSelfReflection(false),
+		aicommon.WithDisallowMCPServers(true),
+		aicommon.WithDisableSessionTitleGeneration(true),
+		aicommon.WithDisableIntentRecognition(true),
+		aicommon.WithDisableAutoSkills(true),
+	)
+	if err != nil {
+		t.Fatalf("NewReAct failed: %v", err)
+	}
+
+	relPath := strings.TrimPrefix(allBuiltinSkills[0].fsPath, "skills/")
+	extractedPath := filepath.Join(tempYakitHome, "ai-skills", "builtin", relPath)
+	if _, err := os.Stat(extractedPath); err == nil {
+		t.Fatalf("builtin skill should not be extracted when auto-skills are disabled: %s", extractedPath)
+	} else if !os.IsNotExist(err) {
+		t.Fatalf("failed to stat builtin skill path %s: %v", extractedPath, err)
+	}
+	if raw := yakit.GetKey(builtinSkillReleaseDB(), builtinSkillReleaseKey(relPath)); raw != "" {
+		t.Fatalf("expected no release record when auto-skills are disabled, got %q", raw)
+	}
 }
