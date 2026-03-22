@@ -201,14 +201,16 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 	opts = append(opts, aicommon.WithAIBlueprintManager(aiforge.NewForgeFactory()))
 	cfg := aicommon.NewConfig(context.Background(), opts...)
 
-	// Extract built-in skills to ~/yakit-projects/ai-skills/ (respects disableAutoSkills)
-	// then load from the local directory, so users can view/modify/extend skills on disk.
-	aiSkillsDir := consts.GetDefaultAISkillsDir()
-	if err := ExtractBuiltinSkillsToDir(aiSkillsDir); err != nil {
-		log.Warnf("failed to extract built-in skills to %s: %v", aiSkillsDir, err)
-	}
-	if err := cfg.LoadBuiltinSkillsFromDir(aiSkillsDir); err != nil {
-		log.Warnf("failed to load skills from %s: %v", aiSkillsDir, err)
+	// Extract built-in skills to ~/yakit-projects/ai-skills/ only when auto-skills
+	// are enabled, then load from the local directory so users can modify them on disk.
+	if !cfg.IsAutoSkillsDisabled() {
+		aiSkillsDir := consts.GetDefaultAISkillsDir()
+		if err := ExtractBuiltinSkillsToDir(aiSkillsDir); err != nil {
+			log.Warnf("failed to extract built-in skills to %s: %v", aiSkillsDir, err)
+		}
+		if err := cfg.LoadBuiltinSkillsFromDir(aiSkillsDir); err != nil {
+			log.Warnf("failed to load skills from %s: %v", aiSkillsDir, err)
+		}
 	}
 
 	if du := time.Since(configLoadingStart); du > 500*time.Millisecond {

@@ -877,6 +877,15 @@ func (c *Config) GetSkillLoader() aiskillloader.SkillLoader {
 	return c.skillLoader
 }
 
+// IsAutoSkillsDisabled reports whether automatic skill discovery and built-in
+// skill loading are disabled for this config.
+func (c *Config) IsAutoSkillsDisabled() bool {
+	if c == nil {
+		return true
+	}
+	return c.disableAutoSkills
+}
+
 // GetRestoredSkillNames returns skill names restored from a previous persistent session.
 func (c *Config) GetRestoredSkillNames() []string {
 	return c.restoredSkillNames
