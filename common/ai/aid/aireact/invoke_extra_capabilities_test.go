@@ -76,13 +76,24 @@ func TestReAct_ExtraCapabilities_DeepIntent(t *testing.T) {
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := r.GetPrompt()
 
+			// Capability catalog match helper used by query_capabilities.
+			// Return the forge identifier so deep intent can continue normally.
+			if utils.MatchAllOfSubString(prompt, "capability matcher", "matched_identifiers") ||
+				utils.MatchAllOfSubString(prompt, `"const": "capability-catalog-match"`, "matched_identifiers") {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`
+{"@action": "capability-catalog-match", "matched_identifiers": ["` + testForgeName + `"]}
+`))
+				rsp.Close()
+				return rsp, nil
+			}
+
 			// ---- Phase 1: Intent loop (single iteration with MaxIterations=1) ----
-			// The intent loop prompt contains "finalize_enrichment" and "query_capabilities"
-			// (from schema/output examples) but NOT "directly_answer" (filtered out).
+			// Match the intent loop by its intent-specific actions instead of assuming
+			// directly_answer is absent. Prompt examples may legitimately include it.
 			// With MaxIterations(1), only 1 iteration runs. After that, the post-iteration
 			// hook auto-generates the intent summary via LiteForge.
-			if utils.MatchAllOfSubString(prompt, "finalize_enrichment", "query_capabilities") &&
-				!utils.MatchAllOfSubString(prompt, "directly_answer") {
+			if utils.MatchAllOfSubString(prompt, "finalize_enrichment", "query_capabilities") {
 				atomic.AddInt32(&intentSearchCalled, 1)
 				log.Infof("intent loop: returning query_capabilities action (single iteration)")
 				rsp := i.NewAIResponse()
@@ -94,8 +105,11 @@ func TestReAct_ExtraCapabilities_DeepIntent(t *testing.T) {
 			}
 
 			// ---- Phase 3: Main loop ----
-			// The main loop prompt contains "directly_answer" action.
-			if utils.MatchAllOfSubString(prompt, "directly_answer") {
+			// The main loop prompt contains directly_answer, but should not be confused
+			// with the intent loop or the capability matcher helper.
+			if utils.MatchAllOfSubString(prompt, "directly_answer") &&
+				!utils.MatchAllOfSubString(prompt, "finalize_enrichment", "query_capabilities") &&
+				!utils.MatchAllOfSubString(prompt, `"const": "capability-catalog-match"`, "matched_identifiers") {
 				atomic.AddInt32(&mainLoopCalled, 1)
 
 				// Check whether EXTRA_CAPABILITIES block appears in the prompt

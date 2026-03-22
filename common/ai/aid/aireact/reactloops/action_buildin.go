@@ -10,7 +10,7 @@ import (
 
 var loopAction_Finish = &LoopAction{
 	ActionType:  "finish",
-	Description: "Finish the task, MUST fill the 'human_readable_thought' field",
+	Description: "Finish the task. Add 'human_readable_thought' only if a brief closing note is needed.",
 	ActionHandler: func(loop *ReActLoop, action *aicommon.Action, operator *LoopActionHandlerOperator) {
 		loop.invoker.AddToTimeline("finish", "AI decided mark the current Task is finished")
 		operator.Exit()
@@ -19,7 +19,7 @@ var loopAction_Finish = &LoopAction{
 
 var loopAction_DirectlyAnswer = &LoopAction{
 	ActionType:  "directly_answer",
-	Description: "Directly the 'answer_payload' field",
+	Description: "Answer the user directly via 'answer_payload' or FINAL_ANSWER tag. For simple direct answers, omit 'human_readable_thought'.",
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
 			"answer_payload",

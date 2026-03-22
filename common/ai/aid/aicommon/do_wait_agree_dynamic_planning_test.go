@@ -2,6 +2,7 @@ package aicommon
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -216,6 +217,78 @@ func TestYOLO_DynamicPlanning_DefaultCallbacks_WithAI(t *testing.T) {
 			t.Fatal("task review AI should complete within timeout")
 		}
 	})
+}
+
+func TestYOLO_DynamicPlanning_TaskReview_EmitsCompactStructuredObservation(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	events := make(chan *schema.AiOutputEvent, 32)
+	originalReason := "发现登录入口暴露且原计划假设错误，需要补充验证并调整后续任务执行顺序，避免继续沿用无效路径。"
+
+	cb := func(i AICallerConfigIf, req *AIRequest) (*AIResponse, error) {
+		rsp := NewUnboundAIResponse()
+		rsp.EmitOutputStream(strings.NewReader(`{"@action":"task_review","suggestion":"adjust_plan","reason":"` + originalReason + `","task_deltas":[{"op":"remove","ref_task_index":"1-4"}]}`))
+		rsp.Close()
+		return rsp, nil
+	}
+
+	c := newDynamicPlanningTestConfig(ctx, cb,
+		WithAgreePolicy(AgreePolicyYOLO),
+		WithDisableDynamicPlanning(false),
+		WithEventHandler(func(e *schema.AiOutputEvent) {
+			events <- e
+		}),
+	)
+	c.StartEventLoop(ctx)
+
+	ep := c.Epm.CreateEndpointWithEventType(schema.EVENT_TYPE_TASK_REVIEW_REQUIRE)
+	ep.SetDefaultSuggestionContinue()
+	ep.SetReviewMaterials(aitool.InvokeParams{
+		"task":          map[string]any{"name": "login review", "goal": "review task output"},
+		"long_summary":  "found login endpoint and invalid assumptions",
+		"pending_tasks": "1-4 SMB enumeration",
+	})
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		c.DoWaitAgreeWithPolicy(ctx, AgreePolicyYOLO, ep)
+	}()
+
+	select {
+	case <-done:
+		params := ep.GetParams()
+		require.Equal(t, "adjust_plan", params["suggestion"])
+		reason := params.GetString("reason")
+		require.Contains(t, reason, "需要修改后续任务")
+		require.Less(t, len([]rune(reason)), len([]rune(originalReason))+10)
+	case <-time.After(8 * time.Second):
+		t.Fatal("task review AI call should complete within timeout")
+	}
+
+	deadline := time.After(3 * time.Second)
+	for {
+		select {
+		case evt := <-events:
+			if evt.Type != schema.EVENT_TYPE_STRUCTURED || evt.NodeId != "task-review" {
+				continue
+			}
+
+			var payload map[string]any
+			require.NoError(t, json.Unmarshal(evt.Content, &payload))
+			require.Equal(t, "需要修改后续任务", payload["verdict"])
+			require.Equal(t, "adjust_plan", payload["suggestion"])
+			require.Contains(t, payload["reason"], "需要修改后续任务")
+
+			rawDeltas, ok := payload["task_deltas"].([]any)
+			require.True(t, ok)
+			require.Len(t, rawDeltas, 1)
+			return
+		case <-deadline:
+			t.Fatal("did not receive compact structured task-review event")
+		}
+	}
 }
 
 func TestYOLO_DynamicPlanning_CustomPlanReview(t *testing.T) {

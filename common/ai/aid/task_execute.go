@@ -306,13 +306,6 @@ func (t *AiTask) generateTaskSummary(summary, nextMovements string) error {
 
 	var shortSummary, statusSummary, taskSummary, longSummary string
 
-	// nodeId mapper for different summary keys
-	summaryNodeIdMapper := map[string]string{
-		"status_summary":     "summary-status",
-		"task_short_summary": "summary-short",
-		"task_long_summary":  "summary-long",
-	}
-
 	// reference material emission tracking (once per transaction, not per key)
 	var referenceEmittedOnce sync.Once
 
@@ -321,7 +314,7 @@ func (t *AiTask) generateTaskSummary(summary, nextMovements string) error {
 	err = t.CallAITransaction(summaryPromptWellFormed, func(summaryReader *aicommon.AIResponse) error { // 异步过程 使用无 id的 原始ai callback
 		action, err := aicommon.ExtractValidActionFromStream(t.Ctx, summaryReader.GetUnboundStreamReader(false), "summary",
 			aicommon.WithActionFieldStreamHandler(
-				[]string{"status_summary", "task_short_summary", "task_long_summary"},
+				[]string{"task_long_summary"},
 				func(key string, r io.Reader) {
 					// Recover from any panic in stream handler
 					defer func() {
@@ -333,11 +326,7 @@ func (t *AiTask) generateTaskSummary(summary, nextMovements string) error {
 					log.Debugf("summary stream handler started for field [%s]", key)
 					t.planLoadingStatus(fmt.Sprintf("任务 [%s] 处理 %s / Task [%s] Processing %s", t.Index, key, t.Index, key))
 
-					// get the corresponding nodeId for this key
-					nodeId, ok := summaryNodeIdMapper[key]
-					if nodeId == "" || !ok {
-						nodeId = "summary" // fallback
-					}
+					nodeId := "summary-long"
 
 					// Use TeeReader to capture content while streaming
 					var contentBuffer bytes.Buffer
@@ -365,11 +354,7 @@ func (t *AiTask) generateTaskSummary(summary, nextMovements string) error {
 					}
 
 					// Emit stream event with callback for reference material
-					if nodeId == "summary-long" {
-						event, emitErr = t.EmitTextMarkdownStreamEvent(nodeId, teeReader, t.GetIndex(), onEnd)
-					} else {
-						event, emitErr = t.EmitDefaultStreamEvent(nodeId, teeReader, t.GetIndex(), onEnd)
-					}
+					event, emitErr = t.EmitTextMarkdownStreamEvent(nodeId, teeReader, t.GetIndex(), onEnd)
 
 					if emitErr != nil {
 						log.Errorf("failed to emit %s stream event: %v", key, emitErr)
@@ -389,17 +374,34 @@ func (t *AiTask) generateTaskSummary(summary, nextMovements string) error {
 		shortSummary = action.GetString("task_short_summary")
 		longSummary = action.GetString("task_long_summary")
 
-		if shortSummary != "" {
-			taskSummary = shortSummary
-		}
-		if longSummary != "" && taskSummary == "" {
+		if longSummary != "" {
 			taskSummary = longSummary
+		}
+		if taskSummary == "" && shortSummary != "" {
+			taskSummary = shortSummary
 		}
 		if shortSummary == "" && statusSummary == "" && longSummary == "" {
 			return utils.Errorf("error: short summary ,stats summary ,long summary are empty, retry it until summary finished")
 		}
 		return nil
 	})
+	if longSummary == "" && taskSummary != "" {
+		var event *schema.AiOutputEvent
+		event, err = t.EmitTextMarkdownStreamEvent("summary-long", strings.NewReader(taskSummary), t.GetIndex())
+		if err != nil {
+			log.Warnf("emit fallback task summary failed: %v", err)
+		} else if event != nil && summaryPromptWellFormed != "" {
+			referenceEmittedOnce.Do(func() {
+				streamId := event.GetContentJSONPath(`$.event_writer_id`)
+				if streamId != "" {
+					_, refErr := t.EmitTextReferenceMaterial(streamId, summaryPromptWellFormed)
+					if refErr != nil {
+						log.Warnf("emit reference material for fallback task summary failed: %v", refErr)
+					}
+				}
+			})
+		}
+	}
 	if statusSummary != "" {
 		t.StatusSummary = statusSummary
 	}
@@ -411,6 +413,8 @@ func (t *AiTask) generateTaskSummary(summary, nextMovements string) error {
 	}
 	if longSummary != "" {
 		t.LongSummary = longSummary
+	} else if taskSummary != "" {
+		t.LongSummary = taskSummary
 	}
 
 	t.planLoadingStatus(fmt.Sprintf("任务 [%s] 总结完成 / Task [%s] Summary Completed", t.Index, t.Index))
@@ -633,7 +637,7 @@ func (t *AiTask) saveResultSummary(taskDir string, summary, nextMovements, statu
 		contentBuilder.WriteString("\n\n")
 		hasContent = true
 	}
-	if statusSummary != "" {
+	if statusSummary != "" && statusSummary != taskSummary && statusSummary != longSummary {
 		contentBuilder.WriteString("### Status Summary\n")
 		contentBuilder.WriteString(statusSummary)
 		contentBuilder.WriteString("\n\n")
@@ -645,13 +649,13 @@ func (t *AiTask) saveResultSummary(taskDir string, summary, nextMovements, statu
 		contentBuilder.WriteString("\n\n")
 		hasContent = true
 	}
-	if shortSummary != "" {
+	if shortSummary != "" && shortSummary != taskSummary && shortSummary != longSummary {
 		contentBuilder.WriteString("### Short Summary\n")
 		contentBuilder.WriteString(shortSummary)
 		contentBuilder.WriteString("\n\n")
 		hasContent = true
 	}
-	if longSummary != "" {
+	if longSummary != "" && longSummary != taskSummary {
 		contentBuilder.WriteString("### Long Summary\n")
 		contentBuilder.WriteString(longSummary)
 		contentBuilder.WriteString("\n\n")
