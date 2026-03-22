@@ -374,12 +374,7 @@ func (t *AiTask) generateTaskSummary(summary, nextMovements string) error {
 		shortSummary = action.GetString("task_short_summary")
 		longSummary = action.GetString("task_long_summary")
 
-		if longSummary != "" {
-			taskSummary = longSummary
-		}
-		if taskSummary == "" && shortSummary != "" {
-			taskSummary = shortSummary
-		}
+		_, taskSummary = selectTaskSummaries(statusSummary, shortSummary, longSummary)
 		if shortSummary == "" && statusSummary == "" && longSummary == "" {
 			return utils.Errorf("error: short summary ,stats summary ,long summary are empty, retry it until summary finished")
 		}
@@ -405,8 +400,9 @@ func (t *AiTask) generateTaskSummary(summary, nextMovements string) error {
 	if statusSummary != "" {
 		t.StatusSummary = statusSummary
 	}
-	if taskSummary != "" {
-		t.TaskSummary = taskSummary
+	conciseTaskSummary, _ := selectTaskSummaries(statusSummary, shortSummary, longSummary)
+	if conciseTaskSummary != "" {
+		t.TaskSummary = conciseTaskSummary
 	}
 	if shortSummary != "" {
 		t.ShortSummary = shortSummary
@@ -426,6 +422,26 @@ func (t *AiTask) generateTaskSummary(summary, nextMovements string) error {
 	}
 
 	return nil
+}
+
+func selectTaskSummaries(statusSummary, shortSummary, longSummary string) (conciseSummary string, displaySummary string) {
+	if shortSummary != "" {
+		conciseSummary = shortSummary
+	} else if longSummary != "" {
+		conciseSummary = longSummary
+	} else {
+		conciseSummary = statusSummary
+	}
+
+	if longSummary != "" {
+		displaySummary = longSummary
+	} else if shortSummary != "" {
+		displaySummary = shortSummary
+	} else {
+		displaySummary = statusSummary
+	}
+
+	return conciseSummary, displaySummary
 }
 
 // saveTaskArtifacts saves timeline diff and result summary to files in the task directory
