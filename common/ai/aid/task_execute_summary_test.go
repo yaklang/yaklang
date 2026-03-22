@@ -34,3 +34,14 @@ func TestSaveResultSummary_DeduplicatesEquivalentSummarySections(t *testing.T) {
 	require.NotContains(t, text, "### Short Summary")
 	require.NotContains(t, text, "### Long Summary")
 }
+
+func TestSelectTaskSummaries_PrefersShortForTaskSummaryAndLongForDisplay(t *testing.T) {
+	concise, display := selectTaskSummaries(
+		"status summary",
+		"result is 2",
+		"本次任务完成了对1+1的值的计算。通过计算，我们得到了1+1的值为2。",
+	)
+
+	require.Equal(t, "result is 2", concise)
+	require.Equal(t, "本次任务完成了对1+1的值的计算。通过计算，我们得到了1+1的值为2。", display)
+}
