@@ -12,6 +12,7 @@ import (
 )
 
 const NeedRecommendCapabilitiesCount = 15
+const intentSummaryMaxRunes = reactloops.IntentSummaryMaxRunes
 
 func VerifyIntentLoopNeedReAnalysis(loop *reactloops.ReActLoop) bool {
 	existingAnalysis := loop.Get("intent_analysis")
@@ -67,7 +68,8 @@ func generateIntentSummaryViaLiteForge(loop *reactloops.ReActLoop, invoker aicom
 	matchedSkillNames := loop.Get("matched_skill_names")
 
 	if searchResults == "" && matchedToolNames == "" && matchedForgeNames == "" && matchedSkillNames == "" {
-		loop.Set("intent_analysis", "## Intent Analysis\n\nNo capabilities found for the given query.")
+		loop.Set("intent_summary", "未识别到可用能力")
+		loop.Set("intent_analysis", "未识别到可用能力")
 		log.Infof("intent finalize: no search results available, setting default analysis")
 		return
 	}
@@ -81,15 +83,12 @@ before the AI could produce a final analysis. Based on the search results collec
 generate a concise intent analysis for the user's query.
 
 Requirements:
-1. Summarize what the user wants to accomplish
-2. List the matched capabilities (tools, forges, skills) and briefly explain why they are relevant
-3. Provide recommended capabilities for the main loop to use
-4. intent_summary must follow this template:
-   "The user said [summary], the purpose is: [intent]. Based on searching [keywords],
-   recommend using tools [tool names], Forge/Blueprint [forge names], loading skills [skill names].
-   Enter focus mode: [focus mode names] to achieve the goal."
-   Omit capability types with no matches.
-5. Output should be concise and actionable
+1. Summarize only the core user intent
+2. intent_summary must be very short, ideally around 20 Chinese characters or similarly brief in English
+3. Do NOT repeat the user's full request
+4. Do NOT describe the search process
+5. Do NOT include tools, forges, skills, or focus modes in intent_summary; put them only in recommended_capabilities
+6. Output should be concise and actionable
 <|INSTRUCTION_END_{{ .Nonce }}|>
 
 <|USER_QUERY_{{ .Nonce }}|>
@@ -149,6 +148,7 @@ Skills: {{ .MatchedSkillNames }}
 	}
 
 	intentSummary := strings.TrimSpace(forgeResult.GetString("intent_summary"))
+	intentSummary = reactloops.CompactIntentSummary(intentSummary)
 	recommendedCaps := VerifyIdentifiers(loop, forgeResult.GetStringSlice("recommended_capabilities"))
 
 	// Merge catalog pre-matched identifiers
@@ -168,15 +168,11 @@ Skills: {{ .MatchedSkillNames }}
 	}
 
 	// Build and set intent_analysis
-	var analysis strings.Builder
-	analysis.WriteString("## Intent Analysis (auto-generated on loop exit)\n\n")
-	if intentSummary != "" {
-		analysis.WriteString(intentSummary)
-	} else {
-		analysis.WriteString("Unable to generate intent summary from collected data.")
+	if intentSummary == "" {
+		intentSummary = reactloops.CompactIntentSummary(userQuery)
 	}
-	analysis.WriteString("\n\n")
-	loop.Set("intent_analysis", analysis.String())
+	loop.Set("intent_summary", intentSummary)
+	loop.Set("intent_analysis", intentSummary)
 
 	// Build tool recommendations from matched names + AI recommendations
 	var toolRecommendations strings.Builder
@@ -226,21 +222,23 @@ func buildFallbackIntentAnalysis(loop *reactloops.ReActLoop) {
 	matchedForgeNames := loop.Get("matched_forge_names")
 	matchedSkillNames := loop.Get("matched_skill_names")
 
-	var analysis strings.Builder
-	analysis.WriteString("## Intent Analysis (fallback - max iterations reached)\n\n")
-	analysis.WriteString("The intent recognition loop reached its maximum iteration limit before producing a final analysis.\n\n")
-
-	if matchedToolNames != "" {
-		analysis.WriteString("### Matched Tools\n" + matchedToolNames + "\n\n")
+	intentSummary := reactloops.CompactIntentSummary(loop.Get("intent_summary"))
+	if intentSummary == "" {
+		switch {
+		case matchedToolNames != "" && matchedForgeNames != "":
+			intentSummary = "识别相关工具与蓝图"
+		case matchedToolNames != "":
+			intentSummary = "识别相关工具能力"
+		case matchedForgeNames != "":
+			intentSummary = "识别相关蓝图能力"
+		case matchedSkillNames != "":
+			intentSummary = "识别相关技能能力"
+		default:
+			intentSummary = "意图识别已完成"
+		}
 	}
-	if matchedForgeNames != "" {
-		analysis.WriteString("### Matched Forges\n" + matchedForgeNames + "\n\n")
-	}
-	if matchedSkillNames != "" {
-		analysis.WriteString("### Matched Skills\n" + matchedSkillNames + "\n\n")
-	}
-
-	loop.Set("intent_analysis", analysis.String())
+	loop.Set("intent_summary", intentSummary)
+	loop.Set("intent_analysis", intentSummary)
 
 	if matchedToolNames != "" {
 		loop.Set("recommended_tools", "Matched tools: "+matchedToolNames)
@@ -273,31 +271,37 @@ func logFinalIntentSummary(loop *reactloops.ReActLoop, invoker aicommon.AIInvoke
 	intentAnalysis := loop.Get("intent_analysis")
 	recommendedTools := loop.Get("recommended_tools")
 	recommendedForges := loop.Get("recommended_forges")
-	contextEnrichment := loop.Get("context_enrichment")
 	matchedSkillNames := loop.Get("matched_skill_names")
 
 	var summary strings.Builder
 	summary.WriteString("=== Intent Recognition Final Summary ===\n")
 
+	compactSummary := reactloops.CompactIntentSummary(loop.Get("intent_summary"))
+	if compactSummary == "" {
+		compactSummary = reactloops.CompactIntentSummary(intentAnalysis)
+	}
 	if intentAnalysis != "" {
-		summary.WriteString(fmt.Sprintf("[Intent Analysis] %s\n", utils.ShrinkString(intentAnalysis, 500)))
+		summary.WriteString(fmt.Sprintf("[Intent] %s\n", compactSummary))
 	}
 	if recommendedTools != "" {
-		summary.WriteString(fmt.Sprintf("[Recommended Tools] %s\n", recommendedTools))
+		summary.WriteString(fmt.Sprintf("[Tools] %s\n", utils.ShrinkString(recommendedTools, 120)))
 	}
 	if recommendedForges != "" {
-		summary.WriteString(fmt.Sprintf("[Recommended Forges] %s\n", recommendedForges))
+		summary.WriteString(fmt.Sprintf("[Forges] %s\n", utils.ShrinkString(recommendedForges, 120)))
 	}
 	if matchedSkillNames != "" {
-		summary.WriteString(fmt.Sprintf("[Matched Skills] %s\n", matchedSkillNames))
-	}
-	if contextEnrichment != "" {
-		summary.WriteString(fmt.Sprintf("[Context Enrichment] %s\n", utils.ShrinkString(contextEnrichment, 500)))
+		summary.WriteString(fmt.Sprintf("[Skills] %s\n", utils.ShrinkString(matchedSkillNames, 120)))
 	}
 
 	summary.WriteString("=== End Intent Recognition Final Summary ===")
 
 	log.Infof("%s", summary.String())
 
-	invoker.AddToTimeline("intent_recognition_finalized", summary.String())
+	if compactSummary != "" {
+		invoker.AddToTimeline("intent_recognition_finalized", fmt.Sprintf("意图识别完成：%s", compactSummary))
+	}
+}
+
+func compactIntentSummary(summary string) string {
+	return reactloops.CompactIntentSummary(summary)
 }

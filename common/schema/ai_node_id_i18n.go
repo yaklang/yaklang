@@ -97,6 +97,58 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "意图识别",
 		En: "Intent Recognition",
 	},
+	"intent_analysis": {
+		Zh: "意图分析",
+		En: "Intent Analysis",
+	},
+	"intent_finalized": {
+		Zh: "意图识别完成",
+		En: "Intent Finalized",
+	},
+	"intent_recognition_finalized": {
+		Zh: "意图识别完成",
+		En: "Intent Recognition Finalized",
+	},
+	"intent_recommended_tools": {
+		Zh: "推荐工具",
+		En: "Recommended Tools",
+	},
+	"intent_recommended_forges": {
+		Zh: "推荐蓝图",
+		En: "Recommended Forges",
+	},
+	"intent_context_enrichment": {
+		Zh: "能力上下文",
+		En: "Capability Context",
+	},
+	"search_capabilities": {
+		Zh: "能力搜索",
+		En: "Capability Search",
+	},
+	"search_capabilities_start": {
+		Zh: "开始搜索能力",
+		En: "Capability Search Started",
+	},
+	"search_capabilities_analysis": {
+		Zh: "能力意图分析",
+		En: "Capability Intent Analysis",
+	},
+	"search_capabilities_completed": {
+		Zh: "能力搜索完成",
+		En: "Capability Search Completed",
+	},
+	"load_capability_intent_analysis": {
+		Zh: "能力候选分析",
+		En: "Capability Candidate Analysis",
+	},
+	"[LOAD_CAPABILITY_INTENT_DONE]": {
+		Zh: "能力候选已识别",
+		En: "Capability Candidates Identified",
+	},
+	"web_search_recommended": {
+		Zh: "建议使用网页搜索",
+		En: "Web Search Recommended",
+	},
 	"semantic_search_yaklang_samples": {
 		Zh: "Yaklang样本语义搜索",
 		En: "Yaklang Samples Semantic Search",

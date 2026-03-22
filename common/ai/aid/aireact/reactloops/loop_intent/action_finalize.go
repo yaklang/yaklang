@@ -2,6 +2,7 @@ package loop_intent
 
 import (
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -24,10 +25,7 @@ func makeFinalizeEnrichmentAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 	toolOpts := []aitool.ToolOption{
 		aitool.WithStringParam("intent_summary",
 			aitool.WithParam_Description(
-				"结构化意图摘要，大致遵循模板，表达含义即可：「用户说「{摘要}」，目的是：{意图}。通过搜索「{关键词}」得到的结果，"+
-					"可以推荐接下来的步骤使用工具 {tools}，蓝图（Forge）{forges}，加载技能 {skills}。"+
-					"启动专注模式：{focus_modes} 来实现目标。」无匹配的类型可省略。/ "+
-					"Structured intent summary following the template. Omit capability types with no matches."),
+				"极短意图标签，只描述用户想做什么，目标约 20 字。不要复述原请求，不要写推荐能力，不要解释搜索过程。/ Short intent label only, around 20 characters in Chinese or similarly brief in English."),
 			aitool.WithParam_Required(true),
 		),
 		aitool.WithStringArrayParamEx("recommended_capabilities",
@@ -42,7 +40,7 @@ func makeFinalizeEnrichmentAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 		desc,
 		toolOpts,
 		[]*reactloops.LoopStreamField{
-			{AINodeId: "intent", FieldName: "intent_summary"},
+			{AINodeId: "intent", FieldName: "intent_summary", StreamHandler: intentSummaryStreamHandler},
 			{AINodeId: "intent", FieldName: "recommended_capabilities"},
 		},
 		// Verifier
@@ -55,7 +53,7 @@ func makeFinalizeEnrichmentAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 		},
 		// Handler
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
-			intentSummary := strings.TrimSpace(action.GetString("intent_summary"))
+			intentSummary := reactloops.CompactIntentSummary(action.GetString("intent_summary"))
 			recommendedCaps := action.GetStringSlice("recommended_capabilities")
 
 			// Verify AI-recommended identifiers and merge with catalog pre-matched ones
@@ -80,10 +78,10 @@ func makeFinalizeEnrichmentAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 				utils.ShrinkString(intentSummary, 200), recommendedCaps)
 
 			// Build the structured intent analysis
+			loop.Set("intent_summary", intentSummary)
+
 			var analysis strings.Builder
-			analysis.WriteString("## 意图分析 / Intent Analysis\n\n")
 			analysis.WriteString(intentSummary)
-			analysis.WriteString("\n\n")
 
 			// Build recommended tools/forges from search + AI recommendations
 			matchedToolNames := loop.Get("matched_tool_names")
@@ -140,16 +138,18 @@ func makeFinalizeEnrichmentAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 			loop.Set("recommended_forges", forgeRecommendations.String())
 			loop.Set("context_enrichment", enrichment.String())
 
-			r.AddToTimeline("intent_finalized", fmt.Sprintf(
-				"Intent analysis completed: %s | Tools: %s | Forges: %s | Skills: %s",
-				utils.ShrinkString(intentSummary, 100),
-				matchedToolNames,
-				matchedForgeNames,
-				matchedSkillNames,
-			))
+			r.AddToTimeline("intent_finalized", fmt.Sprintf("意图识别完成：%s", intentSummary))
 
 			log.Infof("intent loop: enrichment finalized, exiting loop")
 			op.Exit()
 		},
 	)
+}
+
+func intentSummaryStreamHandler(fieldReader io.Reader, emitWriter io.Writer) {
+	content, err := io.ReadAll(fieldReader)
+	if err != nil {
+		return
+	}
+	_, _ = emitWriter.Write([]byte(reactloops.CompactIntentSummary(string(content))))
 }

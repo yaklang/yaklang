@@ -484,9 +484,14 @@ func handleLoadUnknown(
 	log.Infof("load_capability: intent fallback completed, analysis=%d bytes, tools=%s, forges=%s, skills=%s",
 		len(intentAnalysis), matchedToolNames, matchedForgeNames, matchedSkillNames)
 
+	compactIntent := reactloops.CompactIntentSummary(intentAnalysis)
+	if compactIntent == "" {
+		compactIntent = reactloops.CompactIntentSummary(identifier)
+	}
+
 	if intentAnalysis != "" {
-		loop.Set("intent_analysis", intentAnalysis)
-		invoker.AddToTimeline("load_capability_intent_analysis", intentAnalysis)
+		loop.Set("intent_analysis", compactIntent)
+		invoker.AddToTimeline("load_capability_intent_analysis", fmt.Sprintf("意图识别：%s", compactIntent))
 	}
 	if recommendedTools != "" {
 		loop.Set("intent_recommended_tools", recommendedTools)
@@ -501,36 +506,28 @@ func handleLoadUnknown(
 	populateExtraCapabilitiesFromIntent(invoker, loop, matchedToolNames, matchedForgeNames, matchedSkillNames)
 
 	var summary strings.Builder
-	summary.WriteString(fmt.Sprintf("## Capability Search Results for: %s\n\n", identifier))
-	summary.WriteString(fmt.Sprintf("'%s' was NOT found as a direct match. "+
-		"Intent recognition discovered the following alternatives:\n\n", identifier))
-	if intentAnalysis != "" {
-		summary.WriteString(intentAnalysis)
-		summary.WriteString("\n\n")
+	summary.WriteString(fmt.Sprintf("未找到能力名：%s\n", identifier))
+	if compactIntent != "" {
+		summary.WriteString("意图：" + compactIntent + "\n")
 	}
-	if recommendedTools != "" {
-		summary.WriteString("**Recommended Tools**: " + recommendedTools + "\n")
+	if tools := reactloops.CompactCapabilityNames(matchedToolNames, 3); tools != "" {
+		summary.WriteString("可用工具：" + tools + "\n")
 	}
-	if recommendedForges != "" {
-		summary.WriteString("**Recommended Forges**: " + recommendedForges + "\n")
+	if forges := reactloops.CompactCapabilityNames(matchedForgeNames, 3); forges != "" {
+		summary.WriteString("可用蓝图：" + forges + "\n")
 	}
-	if matchedSkillNames != "" {
-		summary.WriteString("**Matched Skills**: " + matchedSkillNames + "\n")
+	if skills := reactloops.CompactCapabilityNames(matchedSkillNames, 3); skills != "" {
+		summary.WriteString("可用技能：" + skills + "\n")
 	}
-	if contextEnrichment != "" {
-		summary.WriteString("\n" + contextEnrichment)
-	}
-	summary.WriteString("\n---\n")
-	summary.WriteString(fmt.Sprintf(
-		"IMPORTANT: '%s' is confirmed as NOT a valid capability name. "+
-			"Do NOT call load_capability('%s') again. "+
-			"Use the discovered capabilities above with their correct names, or choose a different approach.\n",
-		identifier, identifier))
+	summary.WriteString(fmt.Sprintf("不要再次 load_capability(%q)，请改用以上正确名称。", identifier))
 
 	invoker.AddToTimeline("[LOAD_CAPABILITY_INTENT_DONE]",
-		fmt.Sprintf("Intent fallback completed for '%s': tools=[%s], forges=[%s], skills=[%s]. "+
-			"Do NOT retry load_capability('%s').",
-			identifier, matchedToolNames, matchedForgeNames, matchedSkillNames, identifier))
+		fmt.Sprintf("能力候选已识别：%s | 工具[%s] 蓝图[%s] 技能[%s] | 不要再次 load_capability(%s)",
+			compactIntent,
+			reactloops.CompactCapabilityNames(matchedToolNames, 2),
+			reactloops.CompactCapabilityNames(matchedForgeNames, 2),
+			reactloops.CompactCapabilityNames(matchedSkillNames, 2),
+			identifier))
 
 	op.Feedback(summary.String())
 	op.Continue()

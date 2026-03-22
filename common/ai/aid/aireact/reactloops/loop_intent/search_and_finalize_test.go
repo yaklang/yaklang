@@ -1,7 +1,9 @@
 package loop_intent
 
 import (
+	"bytes"
 	"encoding/json"
+	"io"
 	"strings"
 	"testing"
 
@@ -563,4 +565,39 @@ func TestCapabilityEnrichment_AllFourTypesEndToEnd(t *testing.T) {
 	}
 
 	t.Logf("end-to-end enrichment test passed with nonce=%s", nonce)
+}
+
+func TestCompactIntentSummary_RemovesNarrationAndTruncates(t *testing.T) {
+	input := "用户说「执行全面的主机健康状态扫描」，目的是：系统化评估主机健康状态，识别性能瓶颈与资源占用问题。通过搜索得到后续可用能力。"
+	output := compactIntentSummary(input)
+	if output == "" {
+		t.Fatal("expected non-empty compact summary")
+	}
+	if strings.Contains(output, "用户说") || strings.Contains(output, "通过搜索") {
+		t.Fatalf("unexpected narration kept in compact summary: %s", output)
+	}
+	if len([]rune(output)) > intentSummaryMaxRunes {
+		t.Fatalf("compact summary should be <= %d runes, got %d: %s", intentSummaryMaxRunes, len([]rune(output)), output)
+	}
+}
+
+func TestIntentSummaryStreamHandler_CompressesOutput(t *testing.T) {
+	pr, pw := io.Pipe()
+	go func() {
+		defer pw.Close()
+		_, _ = pw.Write([]byte("用户说『扫描 example.com 的开放端口』，目的是：对目标域名进行端口扫描并识别服务。推荐使用工具 synscan。"))
+	}()
+
+	var buf bytes.Buffer
+	intentSummaryStreamHandler(pr, &buf)
+	output := buf.String()
+	if output == "" {
+		t.Fatal("expected compressed output")
+	}
+	if len([]rune(output)) > intentSummaryMaxRunes {
+		t.Fatalf("compressed output too long: %s", output)
+	}
+	if strings.Contains(output, "推荐") || strings.Contains(output, "用户说") {
+		t.Fatalf("compressed output should not include narration or recommendations: %s", output)
+	}
 }
