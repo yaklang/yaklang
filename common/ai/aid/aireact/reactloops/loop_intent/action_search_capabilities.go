@@ -63,7 +63,7 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
 			// if the intent_summary is provided by the intent analysis step, store it for context , can reduce the step of intent analysis in finalize_enrichment
 			if summary := action.GetString("intent_summary"); summary != "" {
-				loop.Set("intent_summary", summary)
+				loop.Set("intent_summary", reactloops.CompactIntentSummary(summary))
 			}
 			query := strings.TrimSpace(action.GetString("search_query"))
 			log.Infof("intent loop: searching capabilities with query: %s", query)

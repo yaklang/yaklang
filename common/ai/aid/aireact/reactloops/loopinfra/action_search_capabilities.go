@@ -56,7 +56,7 @@ var loopAction_SearchCapabilities = &reactloops.LoopAction{
 		}
 
 		log.Infof("search_capabilities action: running intent loop for query: %s", utils.ShrinkString(query, 200))
-		invoker.AddToTimeline("search_capabilities_start", fmt.Sprintf("Searching capabilities for: %s", query))
+		invoker.AddToTimeline("search_capabilities_start", fmt.Sprintf("开始搜索能力：%s", reactloops.CompactIntentSummary(query)))
 
 		intentTask := aicommon.NewStatefulTaskBase(
 			invoker.GetCurrentTaskId()+"_search_cap",
@@ -102,9 +102,14 @@ var loopAction_SearchCapabilities = &reactloops.LoopAction{
 		log.Infof("search_capabilities action: intent loop completed, analysis=%d bytes, tools=%s, forges=%s, skills=%s",
 			len(intentAnalysis), matchedToolNames, matchedForgeNames, matchedSkillNames)
 
+		compactIntent := reactloops.CompactIntentSummary(intentAnalysis)
+		if compactIntent == "" {
+			compactIntent = reactloops.CompactIntentSummary(query)
+		}
+
 		if intentAnalysis != "" {
-			loop.Set("intent_analysis", intentAnalysis)
-			invoker.AddToTimeline("search_capabilities_analysis", intentAnalysis)
+			loop.Set("intent_analysis", compactIntent)
+			invoker.AddToTimeline("search_capabilities_analysis", fmt.Sprintf("意图识别：%s", compactIntent))
 		}
 		if recommendedTools != "" {
 			loop.Set("intent_recommended_tools", recommendedTools)
@@ -119,29 +124,27 @@ var loopAction_SearchCapabilities = &reactloops.LoopAction{
 		populateExtraCapabilitiesFromIntent(invoker, loop, matchedToolNames, matchedForgeNames, matchedSkillNames)
 
 		var summary strings.Builder
-		summary.WriteString(fmt.Sprintf("## Capability Search Results for: %s\n\n", query))
-		if intentAnalysis != "" {
-			summary.WriteString(intentAnalysis)
-			summary.WriteString("\n\n")
+		summary.WriteString("能力搜索已完成\n")
+		if compactIntent != "" {
+			summary.WriteString("意图：" + compactIntent + "\n")
 		}
-		if recommendedTools != "" {
-			summary.WriteString("**Recommended Tools**: " + recommendedTools + "\n")
+		if tools := reactloops.CompactCapabilityNames(matchedToolNames, 3); tools != "" {
+			summary.WriteString("工具：" + tools + "\n")
 		}
-		if recommendedForges != "" {
-			summary.WriteString("**Recommended Forges**: " + recommendedForges + "\n")
+		if forges := reactloops.CompactCapabilityNames(matchedForgeNames, 3); forges != "" {
+			summary.WriteString("蓝图：" + forges + "\n")
 		}
-		if matchedSkillNames != "" {
-			summary.WriteString("**Matched Skills**: " + matchedSkillNames + "\n")
+		if skills := reactloops.CompactCapabilityNames(matchedSkillNames, 3); skills != "" {
+			summary.WriteString("技能：" + skills + "\n")
 		}
-		if contextEnrichment != "" {
-			summary.WriteString("\n" + contextEnrichment)
-		}
-		summary.WriteString("\n---\n")
-		summary.WriteString("Capability search completed. The discovered capabilities are now available in your context. Proceed with your task.\n")
+		summary.WriteString("相关能力已加入上下文，可继续执行任务。")
 
 		invoker.AddToTimeline("search_capabilities_completed",
-			fmt.Sprintf("Search completed: tools=[%s], forges=[%s], skills=[%s]",
-				matchedToolNames, matchedForgeNames, matchedSkillNames))
+			fmt.Sprintf("能力搜索完成：%s | 工具[%s] 蓝图[%s] 技能[%s]",
+				compactIntent,
+				reactloops.CompactCapabilityNames(matchedToolNames, 2),
+				reactloops.CompactCapabilityNames(matchedForgeNames, 2),
+				reactloops.CompactCapabilityNames(matchedSkillNames, 2)))
 
 		operator.Feedback(summary.String())
 		operator.Continue()

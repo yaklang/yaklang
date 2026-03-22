@@ -85,29 +85,26 @@ func ApplyDeepIntentResult(r aicommon.AIInvokeRuntime, loop *ReActLoop, result *
 
 	if result.IntentAnalysis != "" {
 		loop.Set("intent_analysis", result.IntentAnalysis)
-		r.AddToTimeline("intent_analysis", result.IntentAnalysis)
+		r.AddToTimeline("intent_analysis", "意图识别："+CompactIntentSummary(result.IntentAnalysis))
 	}
 	if result.RecommendedTools != "" {
 		loop.Set("intent_recommended_tools", result.RecommendedTools)
-		r.AddToTimeline("intent_recommended_tools", result.RecommendedTools)
+		r.AddToTimeline("intent_recommended_tools", "推荐工具："+CompactCapabilityNames(result.MatchedToolNames, 3))
 	}
 	if result.RecommendedForges != "" {
 		loop.Set("intent_recommended_forges", result.RecommendedForges)
-		r.AddToTimeline("intent_recommended_forges", result.RecommendedForges)
+		r.AddToTimeline("intent_recommended_forges", "推荐蓝图："+CompactCapabilityNames(result.MatchedForgeNames, 3))
 	}
 	if result.ContextEnrichment != "" {
 		loop.Set("intent_context_enrichment", result.ContextEnrichment)
-		r.AddToTimeline("intent_context_enrichment", result.ContextEnrichment)
+		r.AddToTimeline("intent_context_enrichment", "已补充能力上下文")
 	}
 
 	PopulateExtraCapabilitiesFromDeepIntent(r, loop, result)
 
 	if result.MatchedToolNames != "" && strings.Contains(result.MatchedToolNames, "web_search") {
 		r.AddToTimeline("web_search_recommended",
-			"web_search tool was identified as relevant for this query. "+
-				"If knowledge_enhance_answer or knowledge base search cannot provide sufficient results, "+
-				"you MUST call web_search to find the answer from the internet. "+
-				"Do NOT repeatedly retry knowledge_enhance_answer if it already failed.")
+			"建议使用 web_search，避免重复知识增强重试。")
 	}
 
 	log.Infof("deep intent results applied to loop context")

@@ -7,10 +7,10 @@
   {"@action": "query_capabilities", "search_query": "信息收集 子域名扫描 reconnaissance subdomain"}
 
 * 当用户明确指定了某个能力名称（如"执行 hostscan"），搜索确认后直接输出：
-  {"@action": "finalize_enrichment", "intent_summary": "用户说「执行 hostscan」，目的是：执行主机健康状态扫描。推荐使用蓝图 hostscan。", "recommended_capabilities": ["hostscan"]}
+  {"@action": "finalize_enrichment", "intent_summary": "执行主机健康扫描", "recommended_capabilities": ["hostscan"]}
 
 * 当搜索结果匹配到多种能力时，只列出有结果的类型：
-  {"@action": "finalize_enrichment", "intent_summary": "用户说「对目标 192.168.1.0/24 做渗透测试」，目的是：对目标网段进行完整渗透测试流程。推荐使用工具 synscan, servicescan，蓝图 report_generating。", "recommended_capabilities": ["synscan", "servicescan", "report_generating"]}
+  {"@action": "finalize_enrichment", "intent_summary": "目标网段渗透测试", "recommended_capabilities": ["synscan", "servicescan", "report_generating"]}
 
 * 当搜索结果中只有工具匹配时（省略无匹配的类型）：
-  {"@action": "finalize_enrichment", "intent_summary": "用户说「扫描 example.com 的开放端口」，目的是：对目标域名进行端口扫描。推荐使用工具 synscan, servicescan。", "recommended_capabilities": ["synscan", "servicescan"]}
+  {"@action": "finalize_enrichment", "intent_summary": "目标域名端口扫描", "recommended_capabilities": ["synscan", "servicescan"]}
