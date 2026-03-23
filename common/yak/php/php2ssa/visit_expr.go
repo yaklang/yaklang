@@ -1366,8 +1366,11 @@ func (y *builder) VisitDefineExpr(raw phpparser.IDefineExprContext) ssa.Value {
 	var flag bool
 	if i.Defined() != nil {
 		undefined := y.EmitUndefined(i.Defined().GetText())
-		visitConstantString := y.VisitConstantString(i.ConstantString())
-		call := y.NewCall(undefined, []ssa.Value{visitConstantString})
+		arg := y.VisitExpression(i.Expression())
+		if arg == nil {
+			arg = y.EmitUndefined("defined-arg")
+		}
+		call := y.NewCall(undefined, []ssa.Value{arg})
 		emitCall := y.EmitCall(call)
 		return emitCall
 	}

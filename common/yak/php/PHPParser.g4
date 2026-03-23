@@ -598,7 +598,7 @@ flexiVariable
 
 defineExpr
     : Define '(' constantString ',' expression ')'
-    | Defined '(' constantString ')'
+    | Defined '(' expression ')'
     ;
 
 variable
@@ -684,7 +684,8 @@ arrayItemList
     ;
 
 arrayItem
-    : expression ('=>' expression)?
+    : '...' expression
+    | expression ('=>' expression)?
     | (expression '=>')? '&' chain
     ;
 
@@ -811,8 +812,7 @@ hereDocContent
     ;
 
 interpolatedStringPart
-    : CurlyOpen functionCall CloseCurlyBracket
-    | CurlyOpen expression CloseCurlyBracket
+    : CurlyOpen expression CloseCurlyBracket
     | OpenCurlyBracket expression CloseCurlyBracket
     | StringPart
     | UnicodeEscape

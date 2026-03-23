@@ -4,14 +4,14 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
-	"path"
+	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
@@ -34,46 +34,47 @@ func validateSource(t *testing.T, filename string, src string) {
 		lexer.RemoveErrorListeners()
 		lexer.AddErrorListener(errListener)
 		tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
-		source := tokenStream.GetTokenSource()
-		for {
-			t := source.NextToken()
-			if t == nil || t.GetTokenType() == antlr.TokenEOF {
-				break
+		if os.Getenv("YAK_PHP_DEBUG_TOKENS") != "" {
+			source := tokenStream.GetTokenSource()
+			for {
+				t := source.NextToken()
+				if t == nil || t.GetTokenType() == antlr.TokenEOF {
+					break
+				}
+				ty := t.GetTokenType()
+				switch t.GetText() {
+				case "=":
+					fmt.Print("ASSIGN ")
+					switch ty {
+					case phpparser.PHPLexerEq:
+						fmt.Print("EQ ")
+					case phpparser.PHPLexerHtmlEquals:
+						fmt.Print("HTML_EQ ")
+					}
+				case "<<<":
+					fmt.Print("HEREDOC ")
+					if ty != phpparser.PHPLexerStartNowDoc {
+						fmt.Print("NOT_START_NOWDOC BAD... ")
+					}
+				case "EOF":
+					fmt.Print("EOF ")
+					switch ty {
+					case phpparser.PHPLexerHereDocIdentiferName:
+						fmt.Print("HERE_DOC_NAME ")
+					}
+				case "\nEOF":
+					fmt.Print("HERE DOC END ")
+					if ty != phpparser.PHPLexerEndDoc {
+						fmt.Print("NOT_END_NOWDOC BAD... ")
+					}
+				}
+				fmt.Println(t)
 			}
-			ty := t.GetTokenType()
-			switch t.GetText() {
-			case "=":
-				fmt.Print("ASSIGN ")
-				switch ty {
-				case phpparser.PHPLexerEq:
-					fmt.Print("EQ ")
-				case phpparser.PHPLexerHtmlEquals:
-					fmt.Print("HTML_EQ ")
-				}
-			case "<<<":
-				fmt.Print("HEREDOC ")
-				if ty != phpparser.PHPLexerStartNowDoc {
-					fmt.Print("NOT_START_NOWDOC BAD... ")
-				}
-			case "EOF":
-				fmt.Print("EOF ")
-				switch ty {
-				case phpparser.PHPLexerHereDocIdentiferName:
-					fmt.Print("HERE_DOC_NAME ")
-				}
-			case "\nEOF":
-				fmt.Print("HERE DOC END ")
-				if ty != phpparser.PHPLexerEndDoc {
-					fmt.Print("NOT_END_NOWDOC BAD... ")
-				}
-			}
-			fmt.Println(t)
 		}
 
 		if errListener.GetErrorString() != "" {
 			t.Fatalf("Lexer failed: %v", errListener.GetErrorString())
 		}
-		spew.Dump(errListener.GetErrors())
 
 		_, err := php2ssa.Frontend(src)
 		require.Nil(t, err, "parse AST FrontEnd error: %v", err)
@@ -81,25 +82,26 @@ func validateSource(t *testing.T, filename string, src string) {
 }
 
 func TestAllSyntaxForPHP_G4(t *testing.T) {
-	entry, err := syntaxFs.ReadDir("syntax")
-	if err != nil {
-		t.Fatalf("no embed syntax files found: %v", err)
-	}
-	for _, f := range entry {
-		if f.IsDir() {
-			continue
+	err := fs.WalkDir(syntaxFs, "syntax", func(syntaxPath string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
 		}
-		syntaxPath := path.Join("syntax", f.Name())
-		if !strings.HasSuffix(syntaxPath, ".php") {
-			continue
+		if d.IsDir() {
+			return nil
+		}
+		switch strings.ToLower(filepath.Ext(syntaxPath)) {
+		case ".php", ".inc":
+		default:
+			return nil
 		}
 		raw, err := syntaxFs.ReadFile(syntaxPath)
 		if err != nil {
-			t.Fatalf("cannot found syntax fs: %v", syntaxPath)
+			return fmt.Errorf("cannot found syntax fs %s: %w", syntaxPath, err)
 		}
-		//ssatest.MockSSA(t, string(raw))
 		validateSource(t, syntaxPath, string(raw))
-	}
+		return nil
+	})
+	require.NoError(t, err, "walk syntax fixtures")
 }
 
 func TestSyntax_(t *testing.T) {
@@ -163,13 +165,121 @@ if (is_array(config_get_path("interfaces/{$interface}"))) {
 	require.NotNil(t, ast)
 }
 
+func TestPHPInterpolatedStringWithLiteralCurly(t *testing.T) {
+	code := `<?php
+$lease = "lease {$_POST['deleteip']} {\n";
+$script = "} else {\n";
+print("{");
+`
+	ast, err := php2ssa.Frontend(code)
+	require.NoError(t, err)
+	require.NotNil(t, ast)
+}
+
+func TestPHPEscapedDollarWithCurlyInterpolation(t *testing.T) {
+	code := `<?php
+$rule = "pass in \${$oc['descr']} keep state";
+`
+	ast, err := php2ssa.Frontend(code)
+	require.NoError(t, err)
+	require.NotNil(t, ast)
+}
+
+func TestPHPDefinedWithExpression(t *testing.T) {
+	code := `<?php
+class A {
+	function check($name) {
+		if (defined($this->order[$name])) {
+			return true;
+		}
+		return defined($name);
+	}
+}
+`
+	ast, err := php2ssa.Frontend(code)
+	require.NoError(t, err)
+	require.NotNil(t, ast)
+}
+
+func TestPHPIndentedHereDoc(t *testing.T) {
+	code := `<?php
+class A {
+	function render($input) {
+		return <<<EOT
+		<div class="inputselectcombo">
+			{$this->_select}
+			<span>$input</span>
+		</div>
+		EOT;
+	}
+}
+`
+	ast, err := php2ssa.Frontend(code)
+	require.NoError(t, err)
+	require.NotNil(t, ast)
+}
+
+func TestPHPPfsenseFilterRuleString(t *testing.T) {
+	code := `<?php
+$rules_temp[] = "pass in {$log_preferences['default_pass']} quick on \${$oc['descr']} proto udp from any port = 67 to any port = 68 tag \"dhcpin\" no state ridentifier {$increment_tracker()} {$make_rule_label_string("allow dhcp replies in {$oc['descr']}")}";
+`
+	validateSource(t, "pfsense-filter-rule", code)
+}
+
+func TestPHPIndexedInterpolationBasic(t *testing.T) {
+	validateSource(t, "indexed-interpolation-basic", `<?php $s = "{$a['b']}";`)
+}
+
+func TestPHPIndexedInterpolationPfsenseVar(t *testing.T) {
+	validateSource(t, "indexed-interpolation-pfsense-var", `<?php $s = "{$log_preferences['default_pass']}";`)
+}
+
+func TestPHPPrefixedIndexedInterpolationPfsenseVar(t *testing.T) {
+	validateSource(t, "prefixed-indexed-interpolation-pfsense-var", `<?php $s = "pass in {$log_preferences['default_pass']}";`)
+}
+
+func TestPHPMixedInterpolationWithEscapedDollarTarget(t *testing.T) {
+	validateSource(t, "mixed-interpolation-escaped-dollar-target", `<?php $s = "pass in {$log_preferences['default_pass']} quick on \${$oc['descr']}";`)
+}
+
+func TestPHPMixedInterpolationWithFunctionCall(t *testing.T) {
+	validateSource(t, "mixed-interpolation-function-call", `<?php $s = "pass in {$log_preferences['default_pass']} quick on \${$oc['descr']} ridentifier {$increment_tracker()}";`)
+}
+
+func TestPHPMixedInterpolationWithNestedStringInterpolation(t *testing.T) {
+	validateSource(t, "mixed-interpolation-nested-string-interpolation", `<?php $s = "pass in {$log_preferences['default_pass']} quick on \${$oc['descr']} ridentifier {$increment_tracker()} {$make_rule_label_string("allow dhcp replies in {$oc['descr']}")}";`)
+}
+
+func TestPHPArraySpreadElement(t *testing.T) {
+	validateSource(t, "array-spread-element", `<?php $mod_dirs = ['/boot/kernel', ...$add_dirs];`)
+}
+
+func TestPHPBackQuoteWithEscapedBacktick(t *testing.T) {
+	validateSource(t, "backquote-escaped-backtick", "<?php $key = trim(`KEY=\\`dd count=1 2>/dev/null\\`; echo \\$KEY`);")
+}
+
 type ParseError struct {
 	Duration time.Duration
 	Message  string
 }
 
+func phpProjectASTRoot(t *testing.T) string {
+	t.Helper()
+
+	if root := os.Getenv("YAK_PHP_PROJECT_AST_TARGET"); root != "" {
+		return root
+	}
+
+	home, err := os.UserHomeDir()
+	require.NoError(t, err)
+	return filepath.Join(home, "Target", "pfsense")
+}
+
 func TestProjectAst(t *testing.T) {
-	path := "/home/wlz/Developer/pfsense"
+	path := phpProjectASTRoot(t)
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("project ast target unavailable: %s: %v", path, err)
+	}
 
 	errorFiles := make(map[string]*ssareducer.FileContent)
 
@@ -217,7 +327,11 @@ func TestProjectAst(t *testing.T) {
 	}
 	end := time.Since(start)
 	log.Infof("Total parse %d files cost: %v", len(fileMap), end)
+	failedFiles := make([]string, 0, len(errorFiles))
 	for fname, fc := range errorFiles {
+		failedFiles = append(failedFiles, fname)
 		log.Errorf("Parse file %s failed: %v", fname, fc.Err)
 	}
+	sort.Strings(failedFiles)
+	require.Empty(t, failedFiles, "project AST parse failed for %d files under %s: %v", len(failedFiles), path, failedFiles)
 }

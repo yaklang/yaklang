@@ -330,7 +330,7 @@ Real    : (LNum '.' LNum? | LNum? '.' LNum) ExponentPart? | LNum+ ExponentPart;
 Hex     : '0x' HexDigit+ ('_' HexDigit+)*;
 Binary  : '0b' [01]+ ('_' [01]+)*;
 
-BackQuoteString   : '`' ~'`'* '`';
+BackQuoteString   : '`' (~('`' | '\\') | '\\' .)* '`';
 SingleQuoteString : '\'' (~('\'' | '\\') | '\\' .)* '\'';
 DoubleQuote       : '"' -> pushMode(InterpolationString);
 
@@ -345,10 +345,10 @@ mode InterpolationString;
 VarNameInInterpolation : '$' NameString -> type(VarName); // TODO: fix such cases: "$people->john"
 DollarString           : '$'            -> type(StringPart);
 CurlyDollar:
-    '{' { this.IsCurlyDollar(1) }? { this.SetInsideString(); } -> type(CurlyOpen), pushMode(PHP)
+    '{' { this.IsCurlyDollarInterpolationOpen(1) }? { this.SetInsideString(); } -> type(CurlyOpen), pushMode(PHP)
 ;
 CurlyOpen
-    : '{' { this.IsCurlyOpen() }? { this.SetInsideString(); } -> pushMode(PHP)
+    : '{' { this.IsComplexInterpolationCurlyOpen() }? { this.SetInsideString(); } -> pushMode(PHP)
     ;
 CurlyString                : '{'    -> type(StringPart);
 EscapedChar                : '\\' . -> type(StringPart);
@@ -366,10 +366,10 @@ CommentEnd              : [\r\n] -> channel(SkipChannel), popMode; // exit from 
 mode HereDocIdentifer;
 HereDocIdentiferWhite: [ \r\t] -> skip;
 HereDocIdentiferName: ({this.startRecordHereDocLabel()}NameString{this.endRecordHereDocLabel()}) | ('\'' ({this.startRecordHereDocLabel()}NameString{this.endRecordHereDocLabel()}) '\'');
-HereDocIdentifierBreak: '\n' -> popMode,pushMode(HereDoc);
+HereDocIdentifierBreak: '\r'? '\n' -> popMode,pushMode(HereDoc);
 
 mode HereDoc;
-EndDoc: '\n' Label {this.DocIsEnd()}? ->popMode;
+EndDoc: [ \t]* Label ';'? {this.DocIsEnd()}? ->popMode;
 HereDocText: '\n' | (~[\n]+) ;
 HereDocVariable: '$' Label;
 
