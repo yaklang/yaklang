@@ -66,6 +66,97 @@ public class Outer {
 }`
 }
 
+func decompiledAnonymousClassMissingCommaThisSource() string {
+	return `package com.example;
+
+import java.util.Timer;
+import java.util.TimerTask;
+
+public class Main {
+    long reconnectInterval;
+
+    void run() {
+        Timer timer = new Timer("tmc-reconnect", true);
+        timer.schedule(new TimerTask() {
+            public void run() {}
+        }this.reconnectInterval, this.reconnectInterval);
+    }
+}`
+}
+
+func decompiledAnonymousClassMissingCommaNewSource() string {
+	return `package com.example;
+
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.RejectedExecutionHandler;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+
+public class Main {
+    void run() {
+        ThreadPoolExecutor executor = new ThreadPoolExecutor(10, 100, 60L, TimeUnit.SECONDS, new LinkedBlockingQueue<>(1000), new ThreadFactory() {
+            public Thread newThread(Runnable r) {
+                return new Thread(r, "xxl-rpc");
+            }
+        }new RejectedExecutionHandler() {
+            public void rejectedExecution(Runnable r, ThreadPoolExecutor executor) {}
+        });
+    }
+}`
+}
+
+func decompiledMergeLambdaMissingCommaSource() string {
+	return `package com.example;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+public class Main {
+    public Map<String, List<String>> run() {
+        return Arrays.asList("a", "a").stream().collect(Collectors.toMap(v -> v, v -> {
+            List<String> list = new java.util.ArrayList<>();
+            list.add(v);
+            return list;
+        }(list1, list2) -> {
+            list1.addAll(list2);
+            return list1;
+        }));
+    }
+}`
+}
+
+func decompiledDuplicateAssignmentTempsSource() string {
+	return `package com.example;
+
+import java.util.List;
+
+public class Main {
+    public Long run(List<String> values) {
+        Long total = Long.valueOf(0L);
+        for (String value : values)
+            Long long_1 = total, long_2 = total = Long.valueOf(total.longValue() + 1L);
+        return total;
+    }
+}`
+}
+
+func decompiledBareCallablePlaceholderSource() string {
+	return `package com.example;
+
+import java.util.Arrays;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+public class Main {
+    public Map<String, String> run() {
+        return Arrays.asList("a").stream().collect(Collectors.toMap(v -> v, v -> v, ()));
+    }
+}`
+}
+
 func TestAllSyntaxForJava_G4(t *testing.T) {
 	entry, err := codeFs.ReadDir("code")
 	if err != nil {
@@ -257,5 +348,35 @@ func TestLegacyEnumIdentifierCompatibility(t *testing.T) {
 func TestDecompiledSyntheticOuterThisAssignment(t *testing.T) {
 	src := decompiledSyntheticOuterThisAssignmentSource()
 	validateSource(t, "decompiled_synthetic_outer_this_assignment.java", src)
+	CheckAllJavaCode(src, t)
+}
+
+func TestDecompiledAnonymousClassMissingCommaBeforeThis(t *testing.T) {
+	src := decompiledAnonymousClassMissingCommaThisSource()
+	validateSource(t, "decompiled_anonymous_class_missing_comma_before_this.java", src)
+	CheckAllJavaCode(src, t)
+}
+
+func TestDecompiledAnonymousClassMissingCommaBeforeNew(t *testing.T) {
+	src := decompiledAnonymousClassMissingCommaNewSource()
+	validateSource(t, "decompiled_anonymous_class_missing_comma_before_new.java", src)
+	CheckAllJavaCode(src, t)
+}
+
+func TestDecompiledMergeLambdaMissingComma(t *testing.T) {
+	src := decompiledMergeLambdaMissingCommaSource()
+	validateSource(t, "decompiled_merge_lambda_missing_comma.java", src)
+	CheckAllJavaCode(src, t)
+}
+
+func TestDecompiledDuplicateAssignmentTemps(t *testing.T) {
+	src := decompiledDuplicateAssignmentTempsSource()
+	validateSource(t, "decompiled_duplicate_assignment_temps.java", src)
+	CheckAllJavaCode(src, t)
+}
+
+func TestDecompiledBareCallablePlaceholder(t *testing.T) {
+	src := decompiledBareCallablePlaceholderSource()
+	validateSource(t, "decompiled_bare_callable_placeholder.java", src)
 	CheckAllJavaCode(src, t)
 }
