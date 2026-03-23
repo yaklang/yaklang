@@ -16,6 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
@@ -26,6 +27,10 @@ import (
 
 //go:embed syntax/***
 var syntaxFs embed.FS
+
+var phpTestAntlrCache = func() *ssa.AntlrCache {
+	return php2ssa.CreateBuilder().GetAntlrCache()
+}()
 
 func validateSource(t *testing.T, filename string, src string) {
 	t.Run(fmt.Sprintf("syntax file: %v", filename), func(t *testing.T) {
@@ -76,7 +81,7 @@ func validateSource(t *testing.T, filename string, src string) {
 			t.Fatalf("Lexer failed: %v", errListener.GetErrorString())
 		}
 
-		_, err := php2ssa.Frontend(src)
+		_, err := php2ssa.Frontend(src, phpTestAntlrCache)
 		require.Nil(t, err, "parse AST FrontEnd error: %v", err)
 	})
 }
@@ -276,6 +281,10 @@ func phpProjectASTRoot(t *testing.T) string {
 }
 
 func TestProjectAst(t *testing.T) {
+	if os.Getenv("YAK_PHP_RUN_PROJECT_AST") == "" {
+		t.Skip("set YAK_PHP_RUN_PROJECT_AST=1 to run local pfsense project AST integration")
+	}
+
 	path := phpProjectASTRoot(t)
 	if _, err := os.Stat(path); err != nil {
 		t.Fatalf("project ast target unavailable: %s: %v", path, err)

@@ -31,12 +31,11 @@ options {
 // Also see here: https://github.com/antlr/grammars-v4/tree/master/html
 
 htmlDocument
-    : Shebang? htmlDocumentElement* EOF
+    : Shebang? htmlDocumentElement? (phpBlock htmlDocumentElement?)* EOF
     ;
 
 htmlDocumentElement
-    : inlineHtml
-    | phpBlock
+    : (htmlElement | ScriptText)+
     ;
 
 inlineHtml
@@ -360,7 +359,7 @@ declareStatement
     ;
 
 inlineHtmlStatement
-    : inlineHtml+
+    : (htmlElement | ScriptText)+
     ;
 
 declareList

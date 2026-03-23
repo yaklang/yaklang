@@ -141,6 +141,7 @@ func Frontend(src string, cache *ssa.AntlrCache) (*cparser.CompilationUnitContex
 		src,
 		cparser.NewCLexer,
 		cparser.NewCParser,
+		nil,
 		func(lexer *cparser.CLexer, parser *cparser.CParser) {
 			ssa.ParserSetAntlrCache(parser, lexer, cache)
 		},

@@ -158,6 +158,7 @@ func Frontend(src string, cache *ssa.AntlrCache) (*gol.SourceFileContext, error)
 		src,
 		gol.NewGoLexer,
 		gol.NewGoParser,
+		nil,
 		func(lexer *gol.GoLexer, parser *gol.GoParser) {
 			ssa.ParserSetAntlrCache(parser, lexer, cache)
 		},

@@ -59,7 +59,7 @@ type SLLFirstCounters struct {
 }
 
 var (
-	sllFirstConfigOnce sync.Once
+	sllFirstConfigOnce    sync.Once
 	sllFirstEnabledCached bool
 
 	sllFirstStatsOnce          sync.Once
@@ -107,6 +107,7 @@ func ParseASTWithSLLFirst[L antlr.Lexer, P antlr.Parser, T any](
 	src string,
 	newLexer func(antlr.CharStream) L,
 	newParser func(antlr.TokenStream) P,
+	decorateTokenSource func(antlr.TokenSource) antlr.TokenSource,
 	setup func(lexer L, parser P),
 	entry func(parser P) T,
 ) (T, error) {
@@ -117,6 +118,9 @@ func ParseASTWithSLLFirst[L antlr.Lexer, P antlr.Parser, T any](
 		lexer.AddErrorListener(errListener)
 
 		tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
+		if decorateTokenSource != nil {
+			tokenStream.SetTokenSource(decorateTokenSource(lexer))
+		}
 		parser := newParser(tokenStream)
 		if setup != nil {
 			setup(lexer, parser)
