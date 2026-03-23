@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io/fs"
-	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -101,7 +100,7 @@ func (l *AutoSkillLoader) discoverSkills(rootFS fi.FileSystem) error {
 				return nil
 			}
 
-			parentDir := path.Dir(pathname)
+			parentDir := filepath.Dir(pathname)
 			if parentDir == "." {
 				parentDir = ""
 			}
@@ -125,7 +124,7 @@ func (l *AutoSkillLoader) discoverSkills(rootFS fi.FileSystem) error {
 				skillFS = &subDirFS{
 					parent:  rootFS,
 					subDir:  parentDir,
-					dirName: path.Base(parentDir),
+					dirName: filepath.Base(parentDir),
 				}
 			}
 
