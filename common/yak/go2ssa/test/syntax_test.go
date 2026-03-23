@@ -37,3 +37,4 @@ func TestAllSyntaxForGo_G4(t *testing.T) {
 		validateSource(t, codePath, string(raw))
 	}
 }
+
