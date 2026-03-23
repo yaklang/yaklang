@@ -185,20 +185,8 @@ func (r *ReAct) HandleSyncTypeCancelTaskEvent(event *ypb.AIInputEvent) error {
 
 	log.Infof("cancelling task: %s", targetTaskId)
 
-	// 调用任务的 Cancel 方法，这会取消任务的 context
-	targetTask.Cancel()
-
+	r.CancelTask(targetTask, event)
 	// 设置任务状态为 Aborted
-	targetTask.SetStatus(aicommon.AITaskState_Aborted)
-
-	// 发送任务取消事件
-	r.EmitSyncEvent("react_task_cancelled", map[string]interface{}{
-		"task_id":      targetTask.GetId(),
-		"user_input":   targetTask.GetUserInput(),
-		"cancelled_at": time.Now(),
-	}, event.SyncID)
-
-	log.Infof("task %s has been cancelled", targetTask.GetId())
 	return nil
 }
 
@@ -268,6 +256,33 @@ func (r *ReAct) HandleSyncTypeReactJumpQueueEvent(event *ypb.AIInputEvent) error
 	return nil
 }
 
+func (r *ReAct) CancelTask(task aicommon.AIStatefulTask, event *ypb.AIInputEvent) {
+
+	if task.IsAsyncMode() {
+		task.SetAsyncDeferCallback(func(err error) {
+			// 发送任务取消事件
+			r.EmitSyncEvent("react_task_cancelled", map[string]interface{}{
+				"task_id":      task.GetId(),
+				"user_input":   task.GetUserInput(),
+				"cancelled_at": time.Now(),
+			}, event.SyncID)
+			// 设置任务状态为 Aborted
+			task.SetStatus(aicommon.AITaskState_Aborted)
+		})
+		// 调用任务的 Cancel 方法，这会取消任务的 context
+		task.Cancel()
+	} else {
+		task.Cancel()
+		r.EmitSyncEvent("react_task_cancelled", map[string]interface{}{
+			"task_id":      task.GetId(),
+			"user_input":   task.GetUserInput(),
+			"cancelled_at": time.Now(),
+		}, event.SyncID)
+		// 设置任务状态为 Aborted
+		task.SetStatus(aicommon.AITaskState_Aborted)
+	}
+}
+
 func (r *ReAct) HandleSyncTypeReactCancelCurrentTaskEvent(event *ypb.AIInputEvent) error {
 	// 中断当前正在执行的任务
 	currentTask := r.GetCurrentTask()
@@ -276,20 +291,7 @@ func (r *ReAct) HandleSyncTypeReactCancelCurrentTaskEvent(event *ypb.AIInputEven
 		return nil
 	}
 
-	log.Infof("cancelling current task: %s", currentTask.GetId())
-
-	// 调用任务的 Cancel 方法，这会取消任务的 context
-	currentTask.Cancel()
-
-	// 设置任务状态为 Aborted
-	currentTask.SetStatus(aicommon.AITaskState_Aborted)
-
-	// 发送任务取消事件
-	r.EmitSyncEvent("react_task_cancelled", map[string]interface{}{
-		"task_id":      currentTask.GetId(),
-		"user_input":   currentTask.GetUserInput(),
-		"cancelled_at": time.Now(),
-	}, event.SyncID)
+	r.CancelTask(currentTask, event)
 
 	log.Infof("current task %s has been cancelled", currentTask.GetId())
 	return nil

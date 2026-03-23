@@ -196,6 +196,10 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 		}
 	}()
 
+	defer func() {
+		task.CallAsyncDeferCallback(finalErr)
+	}()
+
 	// create config with timeline
 	// generate config
 	uid := coordinatorID
