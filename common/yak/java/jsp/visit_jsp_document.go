@@ -250,9 +250,10 @@ func (y *JSPVisitor) VisitHtmlTag(raw jspparser.IHtmlTagContext) (tagType TagTyp
 		return
 	}
 
+	tagType = JSP_TAG_PURE_HTML
+
 	// pure HTML tag
 	if i.JSP_JSTL_COLON() == nil {
-		tagType = JSP_TAG_PURE_HTML
 		return
 	}
 
