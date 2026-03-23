@@ -15,6 +15,9 @@ type Config struct {
 	SyntaxFlow     *SyntaxFlowConfig     `json:"SyntaxFlow,omitempty"`
 	SyntaxFlowScan *SyntaxFlowScanConfig `json:"SyntaxFlowScan,omitempty"`
 	SyntaxFlowRule *SyntaxFlowRuleConfig `json:"SyntaxFlowRule,omitempty"`
+	ScanPolicy     *ScanPolicyConfig     `json:"ScanPolicy,omitempty"`   // 扫描策略配置
+	ScanNode       *ScanNodeConfig       `json:"ScanNode,omitempty"`     // 扫描节点配置
+	ScanSchedule   *ScanScheduleConfig   `json:"ScanSchedule,omitempty"` // 定时扫描配置
 	Output         *OutputConfig         `json:"Output,omitempty"`
 
 	// 其他配置项可以在这里添加
@@ -287,6 +290,12 @@ func WithJsonRawConfig(raw []byte) Option {
 		if err != nil {
 			return err
 		}
+
+		// 自动将 ScanPolicy 应用到 RuleFilter
+		if c.ScanPolicy != nil {
+			_ = c.SetScanPolicy(c.ScanPolicy)
+		}
+
 		return nil
 	}
 }

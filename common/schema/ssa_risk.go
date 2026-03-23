@@ -20,8 +20,8 @@ type SSARisk struct {
 	// risk info
 	Title        string             `json:"title"`
 	TitleVerbose string             `json:"title_verbose"`
-	Description  string             `json:"description" gorm:"type:longtext"`
-	Solution     string             `json:"solution" gorm:"type:longtext"`
+	Description  string             `json:"description" gorm:"type:text"`
+	Solution     string             `json:"solution" gorm:"type:text"`
 	RiskType     string             `json:"risk_type"`
 	Details      string             `json:"details"`
 	Severity     SyntaxFlowSeverity `json:"severity" gorm:"index"`
@@ -45,8 +45,8 @@ type SSARisk struct {
 	ProgramName string `json:"program_name" gorm:"index"`
 	// file url yakurl
 	CodeSourceUrl string `json:"code_source_url" gorm:"index"`
-	CodeRange     string `json:"code_range" gorm:"type:longtext"`
-	CodeFragment  string `json:"code_fragment" gorm:"type:longtext"`
+	CodeRange     string `json:"code_range" gorm:"type:text"`
+	CodeFragment  string `json:"code_fragment" gorm:"type:text"`
 	// for query risk
 	FunctionName string `json:"function_name" gorm:"index"`
 	Line         int64  `json:"line" gorm:"index"`

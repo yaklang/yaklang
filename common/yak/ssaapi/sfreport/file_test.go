@@ -1,7 +1,6 @@
 package sfreport
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -15,6 +14,7 @@ func TestFile2EditorRoundTrip(t *testing.T) {
 		name            string
 		sourceCode      string
 		folderPath      string
+		wantFolderPath  string // normalizeFolderPath strips leading "/"
 		fileName        string
 		fullCode        bool
 		expectHashMatch bool
@@ -23,6 +23,7 @@ func TestFile2EditorRoundTrip(t *testing.T) {
 			name:            "nested path",
 			sourceCode:      "public class Test { }",
 			folderPath:      "/src/main/java",
+			wantFolderPath:  "src/main/java",
 			fileName:        "Test.java",
 			fullCode:        true,
 			expectHashMatch: true,
@@ -31,6 +32,7 @@ func TestFile2EditorRoundTrip(t *testing.T) {
 			name:            "root level file",
 			sourceCode:      "",
 			folderPath:      "/",
+			wantFolderPath:  "",
 			fileName:        "empty.txt",
 			fullCode:        true,
 			expectHashMatch: true,
@@ -39,6 +41,7 @@ func TestFile2EditorRoundTrip(t *testing.T) {
 			name:            "special characters",
 			sourceCode:      "print('你好世界')",
 			folderPath:      "/app",
+			wantFolderPath:  "app",
 			fileName:        "main.py",
 			fullCode:        true,
 			expectHashMatch: true,
@@ -47,6 +50,7 @@ func TestFile2EditorRoundTrip(t *testing.T) {
 			name:            "truncated code",
 			sourceCode:      "public class VeryLongClass {\n    public static void main(String[] args) {\n        System.out.println(\"Line 1\");\n    }\n}",
 			folderPath:      "/src",
+			wantFolderPath:  "src",
 			fileName:        "VeryLongClass.java",
 			fullCode:        false,
 			expectHashMatch: false,
@@ -78,8 +82,7 @@ func TestFile2EditorRoundTrip(t *testing.T) {
 			require.NoError(t, err)
 
 			assert.Equal(t, programName, convertedEditor.GetProgramName())
-			// MemEditor normalizes folderPath to a pure path: no leading/trailing slashes.
-			assert.Equal(t, strings.Trim(tt.folderPath, "/"), convertedEditor.GetFolderPath())
+			assert.Equal(t, tt.wantFolderPath, convertedEditor.GetFolderPath())
 			assert.Equal(t, tt.fileName, convertedEditor.GetFilename())
 
 			if tt.expectHashMatch {

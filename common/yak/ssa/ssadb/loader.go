@@ -147,8 +147,18 @@ func searchVariableWithExcludeFiles(db *gorm.DB, ctx context.Context, progName s
 		if compareMode == ExactCompare {
 			query = query.Where("string = ?", value)
 		} else {
-			// This REGEXP operation on the 'string' column (TEXT) is likely a full table scan if no index exists
-			query = query.Where("string REGEXP ?", value)
+			// This regex operation on the 'string' column (TEXT) is likely a full table scan if no index exists.
+			// Keep dialect compatibility:
+			// - SQLite: "REGEXP" via the registered regexp() function in sqlite3_extended driver.
+			// - MySQL:  "REGEXP"
+			// - Postgres: "~"
+			dialect := db.Dialect().GetName()
+			switch dialect {
+			case "postgres", "postgresql":
+				query = query.Where("string ~ ?", value)
+			default:
+				query = query.Where("string REGEXP ?", value)
+			}
 		}
 		// ConstType query also needs file exclusion
 		if len(excludeFiles) > 0 {

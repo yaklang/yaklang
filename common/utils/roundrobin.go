@@ -3,11 +3,13 @@ package utils
 import (
 	"container/ring"
 	"fmt"
+	"sync"
 )
 
 type StringRoundRobinSelector struct {
-	l []string
-	r *ring.Ring
+	mu sync.Mutex
+	l  []string
+	r  *ring.Ring
 }
 
 func NewStringRoundRobinSelector(l ...string) *StringRoundRobinSelector {
@@ -23,10 +25,16 @@ func NewStringRoundRobinSelector(l ...string) *StringRoundRobinSelector {
 }
 
 func (s *StringRoundRobinSelector) List() []string {
-	return s.l[:]
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return append([]string(nil), s.l...)
 }
 
 func (s *StringRoundRobinSelector) Add(raw ...string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	s.l = append(s.l, raw...)
 	r := ring.New(len(s.l))
 	for _, v := range s.l {
@@ -37,12 +45,21 @@ func (s *StringRoundRobinSelector) Add(raw ...string) {
 }
 
 func (s *StringRoundRobinSelector) Next() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.r == nil {
+		return ""
+	}
 	result := s.r.Value
 	s.r = s.r.Next()
 	return fmt.Sprintf("%v", result)
 }
 
 func (s *StringRoundRobinSelector) Len() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	n := 0
 	if s.r != nil {
 		n = 1
