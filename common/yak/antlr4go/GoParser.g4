@@ -194,7 +194,7 @@ simpleStmt
     ;
 
 assignment
-    : expressionList assign_op expressionList
+    : expressionList assign_op ws* expressionList
     ;
 
 assign_op
@@ -214,7 +214,7 @@ incDecStmt
     ;
 
 shortVarDecl
-    : identifierList DECLARE_ASSIGN expressionList
+    : identifierList DECLARE_ASSIGN ws* expressionList
     ;
 
 labeledStmt
@@ -467,7 +467,7 @@ operandName
     ;
 
 qualifiedIdent
-    : IDENTIFIER DOT IDENTIFIER
+    : IDENTIFIER ws* DOT ws* IDENTIFIER
     ;
 
 compositeLit
