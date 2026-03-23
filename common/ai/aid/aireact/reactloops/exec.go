@@ -624,7 +624,7 @@ LOOP:
 			r.finishIterationLoopWithError(iterationCount, task, transactionErr)
 			log.Errorf("Failed to execute loop: %v", transactionErr)
 			needSummary.SetTo(true)
-			break LOOP
+			return transactionErr
 		}
 
 		utils.Debug(func() {
@@ -637,7 +637,7 @@ LOOP:
 			r.finishIterationLoopWithError(iterationCount, task, utils.Error("action is nil in ReActLoop"))
 			log.Error("action is nil in ReActLoop")
 			needSummary.SetTo(true)
-			break LOOP
+			return utils.Error("action is nil in ReActLoop")
 		}
 		actionName := actionParams.Name()
 
