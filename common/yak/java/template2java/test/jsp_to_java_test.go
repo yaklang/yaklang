@@ -173,7 +173,7 @@ func TestJSP2Java_Content(t *testing.T) {
 			[]string{
 				"switch (true) {",
 				`case elExpr.parse("valueToSwitch eq 'case1'"):`,
-				`out.write("					Value is case1");`,
+				`out.write("\t\t\t\t\tValue is case1");`,
 				"default:"},
 		},
 		{

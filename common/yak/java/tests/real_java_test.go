@@ -284,12 +284,15 @@ func TestRuleRun(t *testing.T) {
 	}
 	name := "检测Java 日志伪造攻击"
 	rule, err := sfdb.GetRule(name)
+	if isLocalRecordNotFound(err) {
+		t.Skipf("skip TestRuleRun: rule %q is not in local syntaxflow database", name)
+	}
 	require.NoError(t, err)
 	_ = rule
 
 	progName := "RuoYi-Cloud-Plus(2025-12-03 15:22:29)"
 	prog, err := ssaapi.FromDatabase(progName)
-	if err != nil && strings.Contains(err.Error(), "record not found") {
+	if isLocalRecordNotFound(err) {
 		t.Skipf("skip TestRuleRun: program %q is not in local ssa database", progName)
 	}
 	require.NoError(t, err)
@@ -315,4 +318,11 @@ func TestRuleRun(t *testing.T) {
 
 	diagnostics.LogRecorder("")
 
+}
+
+func isLocalRecordNotFound(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(strings.ToLower(err.Error()), "record not found")
 }
