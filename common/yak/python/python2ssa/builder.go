@@ -210,6 +210,7 @@ func FrontendWithCache(src string, caches ...*ssa.AntlrCache) (pythonparser.IRoo
 		src,
 		pythonparser.NewPythonLexer,
 		pythonparser.NewPythonParser,
+		nil,
 		func(lexer *pythonparser.PythonLexer, parser *pythonparser.PythonParser) {
 			ssa.ParserSetAntlrCache(parser, lexer, cache)
 		},

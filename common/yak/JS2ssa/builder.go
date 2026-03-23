@@ -59,6 +59,7 @@ func Frontend(src string, _ ...*ssa.AntlrCache) (*JS.ProgramContext, error) {
 		JS.NewJavaScriptLexer,
 		JS.NewJavaScriptParser,
 		nil,
+		nil,
 		func(parser *JS.JavaScriptParser) *JS.ProgramContext {
 			return parser.Program().(*JS.ProgramContext)
 		},

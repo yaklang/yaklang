@@ -203,6 +203,7 @@ func Frontend(src string, caches ...*ssa.AntlrCache) (phpparser.IHtmlDocumentCon
 		src,
 		phpparser.NewPHPLexer,
 		phpparser.NewPHPParser,
+		newHTMLCoalescingTokenSource,
 		func(lexer *phpparser.PHPLexer, parser *phpparser.PHPParser) {
 			ssa.ParserSetAntlrCache(parser, lexer, cache)
 		},

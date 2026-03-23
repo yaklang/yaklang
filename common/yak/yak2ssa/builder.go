@@ -82,6 +82,7 @@ func FrontEnd(src string, cache *ssa.AntlrCache) (yak.IProgramContext, error) {
 		src,
 		yak.NewYaklangLexer,
 		yak.NewYaklangParser,
+		nil,
 		func(lexer *yak.YaklangLexer, parser *yak.YaklangParser) {
 			ssa.ParserSetAntlrCache(parser, lexer, cache)
 		},

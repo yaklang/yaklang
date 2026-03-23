@@ -19,9 +19,13 @@ func (y *builder) VisitHtmlDocument(raw phpparser.IHtmlDocumentContext) interfac
 		// handle shebang
 	}
 
-	elements := i.AllHtmlDocumentElement()
-	for _, el := range elements {
-		y.VisitHtmlDocumentElement(el)
+	for _, child := range i.GetChildren() {
+		switch current := child.(type) {
+		case phpparser.IHtmlDocumentElementContext:
+			y.VisitHtmlDocumentElement(current)
+		case phpparser.IPhpBlockContext:
+			y.VisitPhpBlock(current)
+		}
 	}
 	return nil
 }
@@ -38,10 +42,10 @@ func (y *builder) VisitHtmlDocumentElement(raw phpparser.IHtmlDocumentElementCon
 		return nil
 	}
 
-	if ret := i.InlineHtml(); ret != nil {
-		y.VisitInlineHtml(ret)
-	} else if ret := i.PhpBlock(); ret != nil {
-		y.VisitPhpBlock(ret)
+	for _, child := range i.GetChildren() {
+		if current, ok := child.(phpparser.IHtmlElementContext); ok {
+			y.VisitHtmlElement(current)
+		}
 	}
 	return nil
 }

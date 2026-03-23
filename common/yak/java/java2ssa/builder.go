@@ -168,6 +168,7 @@ func Frontend(src string, caches ...*ssa.AntlrCache) (javaparser.ICompilationUni
 		src,
 		javaparser.NewJavaLexer,
 		javaparser.NewJavaParser,
+		nil,
 		func(lexer *javaparser.JavaLexer, parser *javaparser.JavaParser) {
 			ssa.ParserSetAntlrCache(parser, lexer, cache)
 		},

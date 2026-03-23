@@ -24,11 +24,16 @@ func (b *VisitorCreator) Create(editor *memedit.MemEditor) (tl.TemplateVisitor, 
 	return visitor, nil
 }
 
+// TODO: This parser is on the real template2java path for JSP. If profiling
+// later shows JSP mixed static-content/template parsing has the same kind of
+// ANTLR decision explosion as PHP, consider adding a JSP-specific token-source
+// coalescing optimization here instead of treating it as test-only code.
 func Front(code string) (jspparser.IJspDocumentsContext, error) {
 	ast, err := antlr4util.ParseASTWithSLLFirst(
 		code,
 		jspparser.NewJSPLexer,
 		jspparser.NewJSPParser,
+		nil,
 		nil,
 		func(parser *jspparser.JSPParser) jspparser.IJspDocumentsContext {
 			return parser.JspDocuments()
