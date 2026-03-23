@@ -444,7 +444,7 @@ func (y *singleFileBuilder) VisitEnumDeclaration(raw javaparser.IEnumDeclaration
 }
 
 func (y *singleFileBuilder) VisitEnumConstants(raw javaparser.IEnumConstantsContext, class *ssa.Blueprint) {
-	if y == nil || raw == nil || y.IsStop() {
+	if y == nil || raw == nil || class == nil || y.IsStop() {
 		return
 	}
 	recoverRange := y.SetRange(raw)
@@ -463,7 +463,10 @@ func (y *singleFileBuilder) VisitEnumConstants(raw javaparser.IEnumConstantsCont
 	obj.SetType(class)
 	setMember := class.RegisterNormalMember
 	for _, enumConstant := range allEnumConstant {
-		constant := enumConstant.(*javaparser.EnumConstantContext)
+		constant, ok := enumConstant.(*javaparser.EnumConstantContext)
+		if !ok || constant == nil || constant.Identifier() == nil {
+			continue
+		}
 		enumName := constant.Identifier().GetText()
 		arguments := constant.Arguments()
 		constructor := class.Constructor
@@ -483,7 +486,7 @@ func (y *singleFileBuilder) VisitEnumConstants(raw javaparser.IEnumConstantsCont
 }
 
 func (y *singleFileBuilder) VisitEnumConstant(raw javaparser.IEnumConstantContext, class *ssa.Blueprint) {
-	if y == nil || raw == nil || y.IsStop() {
+	if y == nil || raw == nil || class == nil || y.IsStop() {
 		return
 	}
 	recoverRange := y.SetRange(raw)
@@ -498,6 +501,10 @@ func (y *singleFileBuilder) VisitEnumConstant(raw javaparser.IEnumConstantContex
 	}
 
 	setMember := class.RegisterStaticMember
+
+	if i.Identifier() == nil {
+		return
+	}
 
 	name := i.Identifier().GetText()
 	setMember(name, y.EmitValueOnlyDeclare(name))

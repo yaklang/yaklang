@@ -7,6 +7,7 @@ import (
 )
 
 func GetAST(code string) (*freemarkerparser.FreemarkerParser, error) {
+	code = normalizeDirectiveHeaderExpr(code)
 	var ins any = antlr4util.GetASTParser(code, freemarkerparser.NewFreemarkerLexer, freemarkerparser.NewFreemarkerParser)
 	switch ret := ins.(type) {
 	case *freemarkerparser.FreemarkerParser:

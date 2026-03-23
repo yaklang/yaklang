@@ -164,6 +164,7 @@ func Frontend(src string, caches ...*ssa.AntlrCache) (javaparser.ICompilationUni
 	if len(caches) > 0 {
 		cache = caches[0]
 	}
+	src = normalizeDecompiledJava(src)
 	return antlr4util.ParseASTWithSLLFirst(
 		src,
 		javaparser.NewJavaLexer,

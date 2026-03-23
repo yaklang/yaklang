@@ -1,11 +1,15 @@
 package test
 
 import (
+	"embed"
 	"fmt"
 	"github.com/stretchr/testify/require"
 	tj "github.com/yaklang/yaklang/common/yak/java/template2java"
 	"testing"
 )
+
+//go:embed testdata/*.ftl
+var testdataFS embed.FS
 
 func TestFreeMarker2Java_Content(t *testing.T) {
 	tests := []struct {
@@ -44,6 +48,22 @@ func TestFreeMarker2Java_Content(t *testing.T) {
 			"for ( Object user : elExpr.parse(\"users\")) {",
 			"out.print(elExpr.parse(\"${user.name}\"));",
 		}},
+		{"test quoted raw text", "return \"??/query\";\n@RequestMapping(value = \"/\")", []string{
+			"out.write(\"return \\\"??/query\\\";\");",
+			"out.write(\"@RequestMapping(value = \\\"/\\\")\");",
+		}},
+		{"test quoted inline expression and single quoted condition", "<#if prop.name != 'createdBy'>\n${r\"#{item}\"}\n</#if>", []string{
+			"if (prop.name!=\"createdBy\") {",
+			"out.print(elExpr.parse(\"${r\\\"#{item}\\\"}\"));",
+		}},
+		{"test if elseif else bodies", "<#if status == \"active\">A<#elseif status == \"inactive\">B<#else>C</#if>", []string{
+			"if (status==\"active\") {",
+			"out.write(\"A\");",
+			"} else if (status==\"inactive\") {",
+			"out.write(\"B\");",
+			"} else {",
+			"out.write(\"C\");",
+		}},
 	}
 	check := func(jspCode string, wants []string) {
 		codeInfo, err := tj.ConvertTemplateToJava(tj.Freemarker, jspCode, "test.ftl")
@@ -61,4 +81,16 @@ func TestFreeMarker2Java_Content(t *testing.T) {
 			check(tt.code, tt.wants)
 		})
 	}
+}
+
+func TestFreeMarker2Java_MapperFragment(t *testing.T) {
+	raw, err := testdataFS.ReadFile("testdata/mapper_where_clause.ftl")
+	require.NoError(t, err)
+	codeInfo, err := tj.ConvertTemplateToJava(tj.Freemarker, string(raw), "mapper_where_clause.ftl")
+	require.NoError(t, err)
+	require.NotNil(t, codeInfo)
+	checkJavaFront(t, codeInfo.GetContent())
+	require.Contains(t, codeInfo.GetContent(), `if (prop.name=="createdDate") {`)
+	require.Contains(t, codeInfo.GetContent(), `if ((prop_index>1)) {`)
+	require.Contains(t, codeInfo.GetContent(), `} else {`)
 }
