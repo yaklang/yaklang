@@ -88,6 +88,34 @@
 4. **详细注释**: 包含漏洞原理说明和使用指导
 5. **安全合规**: 包含免责声明和安全使用提醒
 
+## POC Python代码规范
+
+### URL拼接（必读）
+
+用户传入的 `--url` 参数可能包含子目录前缀，例如 `http://127.0.0.1/DVWA`、`http://host/app/v2` 等。
+
+**禁止**使用 `urljoin(base, '/absolute/path')`：当第二个参数以 `/` 开头时，`urljoin` 会丢弃 base 的整个路径部分：
+
+```
+urljoin('http://127.0.0.1/DVWA', '/vulnerabilities/sqli') 
+  → http://127.0.0.1/vulnerabilities/sqli   ← /DVWA 被丢弃！
+```
+
+**必须**在 POC 中定义并使用如下 helper 函数拼接所有 URL：
+
+```python
+def build_url(base: str, path: str) -> str:
+    return base.rstrip('/') + '/' + path.lstrip('/')
+```
+
+示例：
+```python
+# 正确
+url = build_url(args.url, '/vulnerabilities/sqli_blind/')
+# 错误
+url = urljoin(args.url, '/vulnerabilities/sqli_blind/')
+```
+
 ## 代码分析重点
 - **API端点**: 从@RequestMapping、@GetMapping等注解提取路径和方法
 - **参数识别**: 分析函数参数、请求参数、数据类型等
