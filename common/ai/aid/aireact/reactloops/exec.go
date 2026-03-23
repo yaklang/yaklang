@@ -524,6 +524,10 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 		}
 	}()
 
+	if task.GetStatus() == aicommon.AITaskState_Skipped {
+		return utils.Errorf("ReActLoop task is skipped")
+	}
+
 	taskStartProcessing()
 
 	// Initialize timeline differ to track changes during this task execution
