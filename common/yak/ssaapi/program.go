@@ -338,6 +338,23 @@ func (p *Program) GetValueByIdMust(id int64) *Value {
 	return v
 }
 
+func (p *Program) getValueByIdFromOverlay(id int64) (*Value, error) {
+	if p == nil || p.overlay == nil {
+		return nil, utils.Errorf("instruction not found: %d", id)
+	}
+	for i := len(p.overlay.Layers) - 1; i >= 0; i-- {
+		layer := p.overlay.Layers[i]
+		if layer == nil || layer.Program == nil || layer.Program == p {
+			continue
+		}
+		v, err := layer.Program.GetValueById(id)
+		if err == nil && v != nil {
+			return v, nil
+		}
+	}
+	return nil, utils.Errorf("instruction not found: %d", id)
+}
+
 // from audit node id
 func (v *Value) NewValueFromAuditNode(nodeID string) *Value {
 	value := v.ParentProgram.NewValueFromAuditNode(ssadb.GetDB(), nodeID)
@@ -384,8 +401,11 @@ func (p *Program) NewValueFromAuditNode(db *gorm.DB, nodeID string) *Value {
 	}
 	val, err := p.GetValueById(auditNode.IRCodeID)
 	if err != nil {
-		log.Errorf("NewValueFromDB: get value by id failed: %v", err)
-		return nil
+		val, err = p.getValueByIdFromOverlay(auditNode.IRCodeID)
+		if err != nil {
+			log.Errorf("NewValueFromDB: get value by id failed: %v", err)
+			return nil
+		}
 	}
 	val.auditNode = auditNode
 
