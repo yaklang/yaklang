@@ -77,7 +77,9 @@ func NewPagination(p *Param, result interface{}) (*Paginator, *gorm.DB) {
 			}
 		}()
 		if shouldQueryCount {
-			if tx.Count(&count); tx.Error != nil {
+			countDB := tx.Count(&count)
+			if countDB.Error != nil {
+				tx.Error = countDB.Error
 				return
 			}
 			if p.QueryCountOnce {
@@ -87,21 +89,27 @@ func NewPagination(p *Param, result interface{}) (*Paginator, *gorm.DB) {
 		}
 
 		if p.Limit == -1 {
-			tx.Find(result)
+			queryDB := tx.Find(result)
+			if queryDB.Error != nil {
+				tx.Error = queryDB.Error
+			}
 		} else {
 			if p.Page == 1 {
 				offset = 0
 			} else {
 				offset = (p.Page - 1) * p.Limit
 			}
-			tx.Limit(p.Limit).Offset(offset).Find(result)
+			queryDB := tx.Limit(p.Limit).Offset(offset).Find(result)
+			if queryDB.Error != nil {
+				tx.Error = queryDB.Error
+			}
 		}
 	}
 
 	if p.DisableTransaction {
 		queryFunc(db)
 	} else {
-		utils.GormTransactionReturnDb(db, queryFunc)
+		db = utils.GormTransactionReturnDb(db, queryFunc)
 	}
 
 	if p.Limit == -1 {
