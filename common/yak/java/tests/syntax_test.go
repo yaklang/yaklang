@@ -52,6 +52,20 @@ public class Main {
 }`
 }
 
+func decompiledSyntheticOuterThisAssignmentSource() string {
+	return `package com.example;
+
+public class Outer {
+    class Handler {
+        private final Outer this$0;
+
+        private Handler(Outer this$0) {
+            Outer.this = Outer.this;
+        }
+    }
+}`
+}
+
 func TestAllSyntaxForJava_G4(t *testing.T) {
 	entry, err := codeFs.ReadDir("code")
 	if err != nil {
@@ -237,5 +251,11 @@ public class Main {
 func TestLegacyEnumIdentifierCompatibility(t *testing.T) {
 	src := legacyEnumIdentifierSource()
 	validateSource(t, "legacy_enum_identifier.java", src)
+	CheckAllJavaCode(src, t)
+}
+
+func TestDecompiledSyntheticOuterThisAssignment(t *testing.T) {
+	src := decompiledSyntheticOuterThisAssignmentSource()
+	validateSource(t, "decompiled_synthetic_outer_this_assignment.java", src)
 	CheckAllJavaCode(src, t)
 }
