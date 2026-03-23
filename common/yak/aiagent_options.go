@@ -48,6 +48,12 @@ func NewAgent(iopts ...any) *Agent {
 	if ag.ctx == nil {
 		ag.ctx, ag.cancel = context.WithCancel(context.Background())
 	}
+
+	aiCommonConfigId, ok := aicommon.GetLastIDFromConfigOptions(ag.ExtendAICommonOptions...)
+	if ok {
+		ag.CoordinatorId = aiCommonConfigId
+	}
+
 	return ag
 }
 

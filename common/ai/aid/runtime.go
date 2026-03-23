@@ -177,7 +177,7 @@ func (r *runtime) Invoke(task *AiTask) (retErr error) {
 	r.config.planLoadingStatus(fmt.Sprintf("开始执行任务队列 (%d 个任务) / Starting Task Queue (%d Tasks)", totalTasks, totalTasks))
 
 	var currentTask *AiTask
-	phase := "executing"
+	phase := Phase_NotCompleted
 	defer func() {
 		r.config.savePlanAndExecState(phase, currentTask)
 	}()
@@ -241,10 +241,11 @@ func (r *runtime) Invoke(task *AiTask) (retErr error) {
 			})
 		}
 
-		currentTask, ok := r.NextStep()
+		var ok bool
+		currentTask, ok = r.NextStep()
 		if !ok {
 			r.config.planLoadingStatus("所有任务执行完成 / All Tasks Completed")
-			phase = "completed"
+			phase = Phase_Completed
 			currentTask = nil
 			return nil
 		}
@@ -252,7 +253,7 @@ func (r *runtime) Invoke(task *AiTask) (retErr error) {
 		// Emit current progress
 		r.config.planLoadingStatus(fmt.Sprintf("执行进度: %d/%d - 当前: [%s] / Progress: %d/%d - Current: [%s]",
 			r.currentProgressIndex(), totalTasks, currentTask.Index, r.currentProgressIndex(), totalTasks, currentTask.Index))
-		r.config.savePlanAndExecState("executing", currentTask)
+		r.config.savePlanAndExecState(Phase_NotCompleted, currentTask)
 
 		if err := invokeTask(currentTask); err != nil {
 			// 检查是否是任务被用户主动跳过导致的错误
@@ -271,7 +272,6 @@ func (r *runtime) Invoke(task *AiTask) (retErr error) {
 			if r.config.IsCtxDone() {
 				r.config.planLoadingStatus("用户终止执行 / User Terminated Execution")
 				r.config.EmitInfo("coordinator context cancelled, stopping execution")
-				phase = "cancelled"
 				return err
 			}
 
@@ -279,7 +279,6 @@ func (r *runtime) Invoke(task *AiTask) (retErr error) {
 			r.config.EmitPlanExecFail("invoke task[%s] failed: %v", currentTask.Name, err)
 			r.config.EmitError("invoke subtask failed: %v", err)
 			log.Errorf("invoke subtask failed: %v", err)
-			phase = "failed"
 			return err
 		}
 	}

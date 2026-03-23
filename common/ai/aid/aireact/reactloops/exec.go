@@ -376,7 +376,7 @@ func (r *ReActLoop) LoadingStatus(i string) {
 	r.loadingStatus(i)
 }
 
-func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) error {
+func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalError error) {
 	r.loadingStatus("初始化 / initializing...")
 	if !r.noEndLoadingStatus {
 		defer r.loadingStatus("end")
@@ -516,7 +516,6 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) error {
 	}
 
 	var operator = newLoopActionHandlerOperator(task)
-	var finalError error
 	defer func() {
 		if finalError != nil {
 			abort(finalError)

@@ -248,17 +248,24 @@ func (t *AiTask) GetEmitter() *aicommon.Emitter {
 
 }
 
-// MarshalJSON 实现自定义的JSON序列化，跳过AICallback字段
-func (t *AiTask) MarshalJSON() ([]byte, error) {
-	type TaskAlias AiTask // 创建一个别名类型以避免递归调用
+func (t *AiTask) GetProgressStatue() string {
 	var progress string
 	if t.executed() {
 		progress = string(aicommon.AITaskState_Completed)
 	} else if t.executing() {
 		progress = string(aicommon.AITaskState_Processing)
+	} else if t.GetStatus() == aicommon.AITaskState_Aborted {
+		progress = string(aicommon.AITaskState_Aborted)
 	} else if t.skiped() {
 		progress = string(aicommon.AITaskState_Skipped)
 	}
+	return progress
+}
+
+// MarshalJSON 实现自定义的JSON序列化，跳过AICallback字段
+func (t *AiTask) MarshalJSON() ([]byte, error) {
+	type TaskAlias AiTask // 创建一个别名类型以避免递归调用
+	progress := t.GetProgressStatue()
 
 	// 创建一个不包含AICallback的结构体
 	return json.Marshal(struct {

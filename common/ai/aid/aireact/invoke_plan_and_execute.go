@@ -20,6 +20,22 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+const recoveryTaskIDPrefix = "react-recovery-"
+
+func formatRecoveryTaskID(coordinatorID string) string {
+	return recoveryTaskIDPrefix + sanitizeForTaskId(coordinatorID) + uuid.New().String()
+}
+
+func newRecoveryPlanExecTask(ctx context.Context, emitter *aicommon.Emitter, coordinatorID string) aicommon.AIStatefulTask {
+	return aicommon.NewStatefulTaskBase(
+		formatRecoveryTaskID(coordinatorID),
+		coordinatorID,
+		ctx,
+		emitter,
+		true,
+	)
+}
+
 func (r *ReAct) RequireAIForgeAndAsyncExecute(
 	ctx context.Context, forgeName string,
 	onFinished func(error),
@@ -87,7 +103,7 @@ func (r *ReAct) RequireAIForgeAndAsyncExecute(
 			r.emitArtifactsSummaryToTimeline()
 			done(finalError)
 		}()
-		finalError = r.invokePlanAndExecute(taskDone, ctx, "", forgeName, forgeParams, "")
+		finalError = r.invokePlanAndExecute(taskDone, ctx, r.GetCurrentTask(), "", forgeName, forgeParams, "")
 		if finalError != nil {
 			log.Errorf("AsyncPlanAndExecute error: %v", finalError)
 		}
@@ -116,7 +132,7 @@ func (r *ReAct) AsyncPlanAndExecute(ctx context.Context, planPayload string, onF
 				onFinished(finalError)
 			}
 		}()
-		finalError = r.invokePlanAndExecute(taskDone, ctx, planPayload, "", nil, "")
+		finalError = r.invokePlanAndExecute(taskDone, ctx, r.GetCurrentTask(), planPayload, "", nil, "")
 		if finalError != nil {
 			log.Errorf("AsyncPlanAndExecute error: %v", finalError)
 		}
@@ -132,6 +148,9 @@ func (r *ReAct) AsyncRecoverPlanAndExecute(ctx context.Context, coordinatorID st
 	cb := utils.NewCondBarrierContext(ctx)
 	startupBarrier := cb.CreateBarrier("startup")
 
+	recoveryTask := newRecoveryPlanExecTask(ctx, r.Emitter, coordinatorID)
+	r.addRuntimeTask(recoveryTask)
+
 	taskDone := make(chan struct{})
 	go func() {
 		var finalError error
@@ -145,9 +164,14 @@ func (r *ReAct) AsyncRecoverPlanAndExecute(ctx context.Context, coordinatorID st
 				onFinished(finalError)
 			}
 		}()
-		finalError = r.invokePlanAndExecute(taskDone, ctx, "", "", nil, coordinatorID)
+		finalError = r.invokePlanAndExecute(taskDone, recoveryTask.GetContext(), recoveryTask, "", "", nil, coordinatorID)
 		if finalError != nil {
 			log.Errorf("AsyncRecoverPlanAndExecute error: %v", finalError)
+			recoveryTask.SetStatus(aicommon.AITaskState_Aborted)
+			r.AddToTimeline("error", fmt.Sprintf("recovery task execution failed: %v", finalError))
+		} else {
+			recoveryTask.SetStatus(aicommon.AITaskState_Completed)
+			r.AddToTimeline("success", "recovery task execution succeeded")
 		}
 	}()
 	select {
@@ -157,7 +181,7 @@ func (r *ReAct) AsyncRecoverPlanAndExecute(ctx context.Context, coordinatorID st
 	}
 }
 
-func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Context, planPayload string, forgeName string, forgeParams any, coordinatorID string) (finalErr error) {
+func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Context, task aicommon.AIStatefulTask, planPayload string, forgeName string, forgeParams any, coordinatorID string) (finalErr error) {
 	doneOnce := new(sync.Once)
 	done := func() {
 		doneOnce.Do(func() {
@@ -178,9 +202,13 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 	if uid == "" {
 		uid = uuid.New().String()
 	}
+	reactTaskID := ""
+	if task != nil {
+		reactTaskID = task.GetId()
+	}
 	params := map[string]any{
 		"re-act_id":      r.config.Id,
-		"re-act_task":    r.GetCurrentTask().GetId(),
+		"re-act_task":    reactTaskID,
 		"coordinator_id": uid,
 	}
 	r.EmitJSON(schema.EVENT_TYPE_START_PLAN_AND_EXECUTION, r.config.Id, params)
@@ -201,9 +229,8 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 	// Preserve user original input in plan payload (mirrors forge branch logic)
 	// AI-rewritten plan_request_payload may lose details like file paths
 	if planPayload != "" {
-		currentTask := r.GetCurrentTask()
-		if currentTask != nil {
-			userOriginalInput := currentTask.GetUserInput()
+		if task != nil {
+			userOriginalInput := task.GetUserInput()
 			if userOriginalInput != "" && !strings.Contains(planPayload, userOriginalInput) {
 				nonce := utils.RandStringBytes(4)
 				planPayload = utils.MustRenderTemplate(`
@@ -307,9 +334,8 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 
 		// Ensure user original input is preserved in forge parameters
 		// This prevents context loss when AI rewrites the query parameter
-		currentTask := r.GetCurrentTask()
-		if currentTask != nil {
-			userOriginalInput := currentTask.GetUserInput()
+		if task != nil {
+			userOriginalInput := task.GetUserInput()
 			if userOriginalInput != "" && forgeParams != nil {
 				// Check if forgeParams contains user original input
 				forgeParamsStr := utils.InterfaceToString(forgeParams)
