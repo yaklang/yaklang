@@ -21,7 +21,7 @@ type PHPLexerBase struct {
 	_scriptTag     bool
 	_styleTag      bool
 	_phpScript     bool
-	_insideString  bool
+	_insideString  int
 	_htmlNameText  string
 	_prevTokenType int
 
@@ -30,6 +30,9 @@ type PHPLexerBase struct {
 	_heredocIdentifier string
 	_astTags           bool
 	_isVariable        bool
+	_pendingToken      antlr.Token
+	_lastTokenType     int
+	_lastTokenText     string
 }
 
 func reflectGetInt(i any, field string) (finalRet int) {
@@ -73,6 +76,13 @@ func reflectSetInt(i any, field string, target int) {
 }
 
 func (p *PHPLexerBase) NextToken() antlr.Token {
+	if p._pendingToken != nil {
+		token := p._pendingToken
+		p._pendingToken = nil
+		p._lastTokenType = token.GetTokenType()
+		p._lastTokenText = token.GetText()
+		return token
+	}
 	if p.BaseLexer.Interpreter == nil {
 		p.BaseLexer.Interpreter = p.Interpreter
 	}
@@ -106,6 +116,12 @@ func (p *PHPLexerBase) NextToken() antlr.Token {
 		if token.GetText() == "php" && p._htmlNameText == "language" {
 			p._phpScript = true
 		}
+	case PHPLexerEndDoc:
+		if strings.HasSuffix(strings.TrimSpace(token.GetText()), ";") {
+			semi := antlr.NewCommonToken(&antlr.TokenSourceCharStreamPair{}, PHPLexerSemiColon, antlr.TokenDefaultChannel, -1, -1)
+			semi.SetText(";")
+			p._pendingToken = semi
+		}
 	default:
 		mode := reflectGetInt(p.BaseLexer, "mode")
 		if mode == PHPLexerPHP {
@@ -130,6 +146,8 @@ func (p *PHPLexerBase) NextToken() antlr.Token {
 		//} else{}
 
 	}
+	p._lastTokenType = token.GetTokenType()
+	p._lastTokenText = token.GetText()
 	return token
 }
 
@@ -153,16 +171,27 @@ func (p *PHPLexerBase) DocIsEnd() bool {
 	if p._heredocIdentifier == "" {
 		return false
 	}
-	count := len(p._heredocIdentifier) - 1
 	stream := p.GetInputStream()
 	end := stream.Index() - 1
-	if end <= count {
+	if end < 0 {
 		return false
 	}
-	start := end - count
+
+	start := end
+	for start >= 0 {
+		text := stream.GetText(start, start)
+		if text == "\n" || text == "\r" {
+			start++
+			break
+		}
+		start--
+	}
+	if start < 0 {
+		start = 0
+	}
+
 	text := stream.GetText(start, end)
-	result := strings.TrimSpace(text) == p._heredocIdentifier
-	return result
+	return p.GetHeredocEnd(text) == p._heredocIdentifier
 }
 func (p *PHPLexerBase) GetHeredocEnd(i string) string {
 	return strings.TrimRight(strings.TrimSpace(i), ";")
@@ -184,14 +213,14 @@ func (p *PHPLexerBase) PushModeOnHtmlClose() {
 }
 
 func (p *PHPLexerBase) PopModeOnCurlyBracketClose() {
-	if p._insideString {
-		p._insideString = false
+	if p._insideString > 0 {
+		p._insideString--
 		p.PopMode()
 	}
 }
 
 func (p *PHPLexerBase) SetInsideString() {
-	p._insideString = true
+	p._insideString++
 }
 
 func (p *PHPLexerBase) IsNewLineOrStart(i int) bool {
@@ -226,12 +255,35 @@ func (p *PHPLexerBase) IsCurlyDollar(i int) bool {
 	return p.GetInputStream().LA(i) == '$'
 }
 
-func (p *PHPLexerBase) IsCurlyOpen() bool {
+func (p *PHPLexerBase) IsCurlyDollarInterpolationOpen(i int) bool {
+	return p.IsCurlyDollar(i) && !p.IsAfterEscapedDollarToken() && !p.IsPreviousDollarEscaped()
+}
+
+func (p *PHPLexerBase) IsComplexInterpolationCurlyOpen() bool {
+	if p.GetInputStream().LA(-1) != '$' {
+		return false
+	}
+	if p.IsAfterEscapedDollarToken() || p.IsPreviousDollarEscaped() {
+		return false
+	}
+
 	la := p.GetInputStream().LA(1)
 	switch la {
-	case ' ', '\t', '\r', '\n', '{', '$', 0:
+	case ' ', '\t', '\r', '\n', '{', '}', '$', '"', '\'', 0:
 		return false
 	default:
 		return true
 	}
+}
+
+func (p *PHPLexerBase) IsPreviousDollarEscaped() bool {
+	backslashes := 0
+	for offset := 2; p.GetInputStream().LA(-offset) == '\\'; offset++ {
+		backslashes++
+	}
+	return backslashes%2 == 1
+}
+
+func (p *PHPLexerBase) IsAfterEscapedDollarToken() bool {
+	return p._lastTokenType == PHPLexerStringPart && p._lastTokenText == `\$`
 }
