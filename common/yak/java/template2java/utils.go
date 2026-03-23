@@ -8,10 +8,26 @@ import (
 
 func validatePackagePath(path string) string {
 	slash := filepath.ToSlash(path)
-	pkgPath := regexp.MustCompile(`[^a-zA-Z0-9_/.]`).ReplaceAllString(slash, "_")
-	pkgPath = strings.Replace(pkgPath, "/", ".", -1)
-	pkgPath = strings.Trim(pkgPath, ".")
-	return "tmp2java_" + pkgPath
+	parts := strings.FieldsFunc(slash, func(r rune) bool {
+		return r == '/' || r == '.'
+	})
+	sanitized := make([]string, 0, len(parts)+1)
+	sanitized = append(sanitized, "tmp2java")
+	for _, part := range parts {
+		if part == "" {
+			continue
+		}
+		part = regexp.MustCompile(`[^a-zA-Z0-9_]`).ReplaceAllString(part, "_")
+		part = strings.TrimLeft(part, "_")
+		if part == "" {
+			continue
+		}
+		if regexp.MustCompile(`^[0-9]`).MatchString(part) {
+			part = "_" + part
+		}
+		sanitized = append(sanitized, part)
+	}
+	return strings.Join(sanitized, ".")
 }
 
 func validateClassName(fileName string) string {

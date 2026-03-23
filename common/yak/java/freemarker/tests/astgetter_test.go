@@ -121,3 +121,20 @@ func TestGetAST(t *testing.T) {
 		t.Fatal("freeMarker is nil")
 	}
 }
+
+func TestGetAST_NormalizeDirectiveExpr(t *testing.T) {
+	result, err := freemarker.GetAST(`
+<#if (prop_index > 1)>
+and
+</#if>
+<#if prop.name = "createdDate">
+date
+</#if>
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Template() == nil {
+		t.Fatal("freeMarker is nil")
+	}
+}

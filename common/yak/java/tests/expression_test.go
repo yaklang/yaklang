@@ -138,6 +138,22 @@ func TestJava_Simple_Expression(t *testing.T) {
 		a(b());
 		`, t)
 	})
+	t.Run("test decompiled par expression trailing comma", func(t *testing.T) {
+		CheckAllJavaCode(`
+import com.google.gson.reflect.TypeToken;
+import java.util.List;
+
+public class Main {
+    public Object helper(Object type, long size) {
+        return type;
+    }
+
+    public Object run(List<String> entities) {
+        return helper((new TypeToken<List<String>>() {
+        }, ).getType(), (entities != null) ? entities.size() : 0L);
+    }
+}`, t)
+	})
 	t.Run("test simple switch expression", func(t *testing.T) {
 		CheckJavaPrintlnValue(` 
 		int a = 1;

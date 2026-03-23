@@ -1,6 +1,7 @@
 package template2java
 
 import (
+	"fmt"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	tl "github.com/yaklang/yaklang/common/yak/templateLanguage"
@@ -62,7 +63,8 @@ func (t *JavaTemplate) String() string {
 func (t *JavaTemplate) WritePureText(texts string) {
 	texts = tryUnquote(texts)
 	for _, text := range strings.Split(texts, "\n") {
-		t.builder.WriteString("\tout.write(\"" + text + "\");\r\n")
+		t.builder.WriteString(fmt.Sprintf(`	out.write(%q);
+`, text))
 	}
 }
 

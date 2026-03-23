@@ -496,6 +496,7 @@ localVariableDeclaration
 
 identifier
     : IDENTIFIER
+    | ENUM
     | MODULE
     | OPEN
     | REQUIRES
@@ -515,6 +516,7 @@ identifier
 
 typeIdentifier // Identifiers that are not restricted for type declarations
     : IDENTIFIER
+    | ENUM
     | MODULE
     | OPEN
     | REQUIRES
@@ -621,7 +623,7 @@ enhancedForControl
 // EXPRESSIONS
 
 parExpression
-    : '(' expression ')'
+    : '(' expression ','? ')'
     ;
 
 parExpressionList
@@ -761,7 +763,7 @@ lambdaBody
     ;
 
 primary
-    : '(' expression ')'
+    : '(' expression ','? ')'
     | THIS
     | SUPER
     | literal
