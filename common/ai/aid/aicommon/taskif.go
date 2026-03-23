@@ -45,6 +45,8 @@ type AIStatefulTask interface {
 	AITask
 
 	GetId() string
+	SetAsyncDeferCallback(func(err error))
+	CallAsyncDeferCallback(err error)
 	SetResult(string)
 	GetResult() string
 	GetContext() context.Context
@@ -102,6 +104,8 @@ type AIStatefulTaskBase struct {
 
 	focusMode     string
 	semanticLabel string
+
+	asyncDeferCallback func(err error)
 }
 
 func (s *AIStatefulTaskBase) GetFocusMode() string {
@@ -257,6 +261,41 @@ func (s *AIStatefulTaskBase) GetIndex() string {
 		return ""
 	}
 	return s.id
+}
+
+func (s *AIStatefulTaskBase) SetAsyncDeferCallback(callback func(err error)) {
+	if s == nil {
+		return
+	}
+	if s.taskMutex != nil {
+		s.taskMutex.Lock()
+		defer s.taskMutex.Unlock()
+	}
+	s.asyncDeferCallback = callback
+}
+
+func (s *AIStatefulTaskBase) CallAsyncDeferCallback(err error) {
+	if s == nil {
+		return
+	}
+
+	var callback func(error)
+	if s.taskMutex != nil {
+		s.taskMutex.Lock()
+		if s.asyncDeferCallback == nil {
+			s.taskMutex.Unlock()
+			return
+		}
+		callback = s.asyncDeferCallback
+		s.taskMutex.Unlock()
+	} else {
+		if s.asyncDeferCallback == nil {
+			return
+		}
+		callback = s.asyncDeferCallback
+	}
+
+	callback(err)
 }
 
 func (s *AIStatefulTaskBase) Finish(i error) {

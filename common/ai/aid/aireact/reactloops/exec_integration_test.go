@@ -368,6 +368,12 @@ func (m *mockSimpleTask) SetStatus(status aicommon.AITaskState) {
 	m.status = status
 }
 
+func (m *mockSimpleTask) SetAsyncDeferCallback(func(err error)) {
+}
+
+func (m *mockSimpleTask) CallAsyncDeferCallback(err error) {
+}
+
 func (m *mockSimpleTask) GetContext() context.Context {
 	return context.Background()
 }
