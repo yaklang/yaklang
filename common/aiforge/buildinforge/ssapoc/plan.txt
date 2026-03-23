@@ -34,11 +34,15 @@
     },
     {
       "subtask_name": "使用专注模式生成Python POC代码",
-      "subtask_goal": "根据前面收集的漏洞信息、API端点、攻击向量等信息，生成完整的Python POC代码。你需要进入write_python_script专注模式。当用户输入URL目标不可达时你只需要尽量确保Python脚本逻辑正确，忽略网络连接错误"
+      "subtask_goal": "根据前面收集的漏洞信息、API端点、攻击向量等信息，生成完整的Python POC代码。你需要进入write_python_script专注模式。POC脚本必须包含 --url CLI参数用于接收目标地址。当用户输入URL目标不可达时你只需要尽量确保Python脚本逻辑正确，忽略网络连接错误"
     },
     {
-      "subtask_name": "根据已有信息输出包含Python POC的MarkDown报告",
-      "subtask_goal": "基于已有信息生成包含Python POC的MarkDown报告，报告必须包含前一步生成的Python POC代码。MarkDown报告应该以文件的形式被写入到用户指定的save_path中，你应该调用工具来写文件。报告内容包括：1）漏洞概述；2）影响范围；3）完整的Python POC代码（从专注模式生成的代码）；4）使用说明；5）修复建议；6）免责声明。当生成 MarkDown 文件内容时：不要对换行符进行转义，不要使用 `\\n` 形式，必须使用真实的多行文本，content 字段必须是原始 Markdown。报告使用简体中文，对于某些专业术语可以使用对应英文单词"
+      "subtask_name": "真实环境验证POC（目标可达时执行）",
+      "subtask_goal": "当 target_base_url 参数不是默认占位值（http://target.example.com）时，说明用户提供了真实目标，需要对POC进行真实环境验证。仍在 write_python_script 专注模式中执行以下步骤：1）使用 check_target_url_reachable 检查目标是否可达；2）若目标可达，使用 run_poc_against_target 执行POC脚本并分析输出（stdout/stderr/状态码）；3）根据执行结果诊断问题——若出现404则修正端点路径，若出现401/403则补充认证信息，若出现连接错误则核对URL，若出现Python异常则修复脚本逻辑；4）每次修复后重新执行，最多迭代5次，直到漏洞被确认利用成功或确认目标不受影响为止。若目标不可达则跳过本步骤。"
+    },
+    {
+      "subtask_name": "使用报告生成专注模式输出包含Python POC的MarkDown报告",
+      "subtask_goal": "进入 report_generating 专注模式，生成包含Python POC的MarkDown报告。【关键要求】报告中嵌入的Python POC代码必须与落地的.py文件内容完全一致，禁止凭记忆重新生成POC代码。执行步骤：1）进入 report_generating 专注模式；2）使用 read_reference_file 工具读取落地的 python_script_*.py 文件（文件路径来自前序 write_python_script 步骤的输出，在 reactive data 的 Script file 字段中），将其完整内容收录为参考资料；3）使用 write_section 撰写完整报告，报告中的 Python POC 代码块必须原样引用 read_reference_file 读回的内容，不得改动任何一行；报告内容包括：a）漏洞概述；b）影响范围；c）完整的Python POC代码（必须从 read_reference_file 读取，禁止凭记忆重写）；d）使用说明；e）修复建议；f）如果进行了真实环境验证，包含验证结果（是否成功触发漏洞、关键响应输出）；g）免责声明。报告使用简体中文，专业术语可保留英文原文。"
     }
   ]
 }

@@ -60,7 +60,13 @@ Then run: `python3 <script_path> --help`
 
 ### Step 5: Complete
 
-Use `directly_answer` to report results. Make sure you include generated Python script path in your output.
+Use `directly_answer` to report results.
+
+**[CRITICAL] When writing the `directly_answer` content:**
+- **DO NOT re-generate or rewrite Python code** in your answer text.
+- **ONLY reference the script file path** shown in the reactive data (e.g. "The POC script has been saved to `/path/to/python_script_xxx.py`").
+- The script file is the single source of truth. Any code you write in `directly_answer` will diverge from the actual file and confuse users.
+- If the upstream task needs the code content (e.g. for a report), it must use `read_file` to read the `.py` file — not copy from memory.
 
 ## Available Actions
 

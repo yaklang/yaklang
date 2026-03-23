@@ -6,8 +6,14 @@
 {{ .ContextProvider.PersistentMemory }}
 
 ## 重要提醒
-在生成最终报告时，必须包含通过write_python_script专注模式生成的Python POC代码。
-POC代码应该作为报告的核心内容之一，完整嵌入到MarkDown文档中。
+
+### POC代码一致性（最高优先级）
+**[CRITICAL]** 报告中嵌入的Python POC代码必须与落地的 `.py` 文件内容完全一致。
+
+**禁止**凭记忆重新编写或重新生成POC代码。正确做法：
+1. 在生成报告**之前**，必须先使用 `read_reference_file` action 读取落地的 `python_script_*.py` 文件（在 `report_generating` 专注模式中）
+2. 将 `read_reference_file` 返回的文件内容**原样**（逐字节）复制到报告的 Python 代码块中
+3. 任何对代码的改动都会导致前端展示、落地文件、报告三者不一致的严重问题
 
 ## 输出格式规范
 
@@ -15,7 +21,8 @@ POC代码应该作为报告的核心内容之一，完整嵌入到MarkDown文档
 
 **必须确保**：
 1. 如果这个Risk被认为是可生成POC的，那你要确保在生成的MarkDown文档中包含完整的Python POC代码
-2. 报告中的POC代码应该使用Python代码块格式（```python）包裹
+2. 报告中的POC代码必须通过 `report_generating` 专注模式中的 `read_reference_file` 读取落地文件后原样嵌入，禁止重新生成
+3. 报告中的POC代码应该使用Python代码块格式（```python）包裹
 
 根据上面的算法和具体任务内容，按照下面Schema给出具体案例建议，一定要结合当前任务信息。
 ```schema
