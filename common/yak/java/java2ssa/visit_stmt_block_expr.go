@@ -709,10 +709,17 @@ func (y *singleFileBuilder) VisitMethodCall(raw javaparser.IMethodCallContext, o
 		if argument := i.Arguments(); argument != nil {
 			args = y.VisitArguments(i.Arguments())
 			c := y.EmitCall(y.NewCall(methodCall, args))
-			cTyp := y.MergeFullTypeNameForType(methodCall.GetType().GetFullTypeNames(), c.GetType())
-			c.SetType(cTyp)
+			if c != nil && methodCall != nil {
+				if methodTyp := methodCall.GetType(); methodTyp != nil {
+					cTyp := y.MergeFullTypeNameForType(methodTyp.GetFullTypeNames(), c.GetType())
+					c.SetType(cTyp)
+				}
+			}
 			y.HookMemberCallMethod(object, memberKey, args...)
-			return c
+			if c != nil {
+				return c
+			}
+			return y.EmitUndefined(raw.GetText())
 		}
 	}
 
