@@ -8,6 +8,7 @@ var decompiledAnonymousClassMissingCommaCast = regexp.MustCompile(`}\s*\(([A-Za-
 var decompiledNullIdentifierAssign = regexp.MustCompile(`\bnull\b(\s*=)`)
 var decompiledNullIdentifierDot = regexp.MustCompile(`\bnull\b(\s*\.)`)
 var decompiledNullIdentifierPlus = regexp.MustCompile(`\bnull\b(\s*\+)`)
+var decompiledSyntheticOuterThisAssign = regexp.MustCompile(`(?m)^([ \t]*)[A-Za-z_$][A-Za-z0-9_$.<>]*\.this\s*=\s*[A-Za-z_$][A-Za-z0-9_$.<>]*\.this;`)
 
 func normalizeDecompiledJava(src string) string {
 	src = decompiledEmptyCallablePlaceholder.ReplaceAllString(src, "(__yak_decompiled_placeholder__)")
@@ -16,5 +17,6 @@ func normalizeDecompiledJava(src string) string {
 	src = decompiledNullIdentifierAssign.ReplaceAllString(src, "__yak_decompiled_null__$1")
 	src = decompiledNullIdentifierDot.ReplaceAllString(src, "__yak_decompiled_null__$1")
 	src = decompiledNullIdentifierPlus.ReplaceAllString(src, "__yak_decompiled_null__$1")
+	src = decompiledSyntheticOuterThisAssign.ReplaceAllString(src, "${1}this.this$$0 = this$$0;")
 	return src
 }
