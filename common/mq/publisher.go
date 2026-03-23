@@ -18,6 +18,17 @@ type Publisher struct {
 	//confirmChan chan amqp.Confirmation
 }
 
+func (p *Publisher) reset() {
+	if p.ch != nil {
+		_ = p.ch.Close()
+		p.ch = nil
+	}
+	if p.conn != nil {
+		_ = p.conn.Close()
+		p.conn = nil
+	}
+}
+
 func (p *Publisher) PublishTo(exchange, routingKey string, msg amqp.Publishing) error {
 	return p.Publish(3, exchange, routingKey, false, false, msg)
 }
@@ -54,21 +65,20 @@ func (p *Publisher) init() (err error) {
 
 func (p *Publisher) Publish(failRetry int, exchange, routingKey string, mandatory, immediately bool, msg amqp.Publishing) (err error) {
 	for i := 0; i < failRetry; i++ {
+		p.mux.Lock()
 		if p.ch == nil {
-
-			p.mux.Lock()
-			err := p.init()
-			p.mux.Unlock()
-
+			err = p.init()
 			if err != nil {
+				p.mux.Unlock()
 				log.Warnf("init publish failed: %s", err)
 				time.Sleep(500 * time.Millisecond)
 				continue
 			}
 		}
-
-		p.mux.Lock()
 		err := p.ch.Publish(exchange, routingKey, mandatory, immediately, msg)
+		if err != nil {
+			p.reset()
+		}
 		p.mux.Unlock()
 
 		if err != nil {
