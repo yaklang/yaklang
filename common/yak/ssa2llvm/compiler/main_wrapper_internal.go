@@ -56,7 +56,7 @@ func (c *Compiler) addMainWrapperToModule(entryFunc string, printEntryResult boo
 		return err
 	}
 
-	c.Builder.CreateCall(entry.GlobalValueType(), entry, []llvm.Value{ctxI8}, "")
+	c.emitRuntimeInvoke(ctxI8)
 	ret, err := c.loadCtxWordFrom(ctxI64, abi.WordRet, "yak_entry_ret")
 	if err != nil {
 		return err

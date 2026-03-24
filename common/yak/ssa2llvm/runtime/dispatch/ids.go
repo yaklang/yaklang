@@ -4,13 +4,6 @@ package dispatch
 // runtime dispatcher.
 type FuncID int64
 
-// DispatcherSymbol is the single exported runtime entry used to invoke
-// runtime-dispatched functions from LLVM-generated code.
-//
-// The design goal is to keep the final native binary small and harder to
-// reverse by minimizing the amount of readable exported symbols.
-const DispatcherSymbol = "yak_runtime_dispatch"
-
 // NOTE: IDs must stay stable once published, otherwise old binaries or
 // cached IR will call wrong functions.
 const (

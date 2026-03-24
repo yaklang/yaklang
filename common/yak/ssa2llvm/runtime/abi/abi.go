@@ -32,6 +32,14 @@ const (
 )
 
 const (
+	InvokeSymbol = "yak_runtime_invoke"
+)
+
+const (
+	FlagAsync uint64 = 1 << 0
+)
+
+const (
 	WordMagic    = 0
 	WordVersion  = 1
 	WordKind     = 2

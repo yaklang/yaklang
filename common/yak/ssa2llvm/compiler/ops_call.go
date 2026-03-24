@@ -8,21 +8,9 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
 )
 
-func (c *Compiler) getOrInsertRuntimeSpawn() (llvm.Value, llvm.Type) {
-	name := "yak_runtime_spawn"
-	fn := c.Mod.NamedFunction(name)
-
-	i8Ptr := llvm.PointerType(c.LLVMCtx.Int8Type(), 0)
-	fnType := llvm.FunctionType(c.LLVMCtx.VoidType(), []llvm.Type{i8Ptr}, false)
-	if fn.IsNil() {
-		fn = llvm.AddFunction(c.Mod, name, fnType)
-	}
-	return fn, fnType
-}
-
-func (c *Compiler) getOrDeclareExternCallable(symbol string) (llvm.Value, llvm.Type) {
+func (c *Compiler) getOrDeclareExternCallable(symbol string) llvm.Value {
 	if symbol == "" {
-		return llvm.Value{}, llvm.Type{}
+		return llvm.Value{}
 	}
 	fn := c.Mod.NamedFunction(symbol)
 
@@ -31,70 +19,59 @@ func (c *Compiler) getOrDeclareExternCallable(symbol string) (llvm.Value, llvm.T
 	if fn.IsNil() {
 		fn = llvm.AddFunction(c.Mod, symbol, fnType)
 	}
-	return fn, fnType
+	return fn
 }
 
-func (c *Compiler) compileInvokeCallable(inst *ssa.Call, llvmFn llvm.Value, llvmFnType llvm.Type, argIDs []int64) error {
+func (c *Compiler) callArgIDs(inst *ssa.Call) []int64 {
 	if inst == nil {
 		return nil
 	}
-	if llvmFn.IsNil() || llvmFnType.C == nil {
-		return fmt.Errorf("compileInvokeCallable: missing llvm function for call %d", inst.GetId())
+	argIDs := append([]int64{}, inst.Args...)
+	return append(argIDs, inst.ArgMember...)
+}
+
+func (c *Compiler) newCallableContextCallSpec(inst *ssa.Call, llvmFn llvm.Value, argIDs []int64, debugName string) (contextCallSpec, error) {
+	if inst == nil {
+		return contextCallSpec{}, fmt.Errorf("newCallableContextCallSpec: missing call instruction")
+	}
+	if llvmFn.IsNil() {
+		return contextCallSpec{}, fmt.Errorf("newCallableContextCallSpec: missing llvm function for call %d", inst.GetId())
 	}
 
-	argc := len(argIDs)
-	ctxI8, ctxI64, err := c.allocInvokeContext(argc, "yak_call_ctx")
-	if err != nil {
-		return err
+	targetName := debugName
+	if targetName == "" {
+		targetName = "yak_call_target"
 	}
 
-	i64 := c.LLVMCtx.Int64Type()
-	target := c.Builder.CreatePtrToInt(llvmFn, i64, "yak_call_target")
-	if err := c.initInvokeContext(ctxI64, abi.KindCallable, target, argc); err != nil {
-		return err
+	return contextCallSpec{
+		inst:      inst,
+		kind:      abi.KindCallable,
+		target:    c.Builder.CreatePtrToInt(llvmFn, c.LLVMCtx.Int64Type(), targetName),
+		argIDs:    argIDs,
+		async:     inst.Async,
+		ctxName:   "yak_call_ctx",
+		errPrefix: "emitCallableContextCall",
+	}, nil
+}
+
+func (c *Compiler) newDispatchContextCallSpec(inst *ssa.Call, binding ExternBinding) (contextCallSpec, error) {
+	if inst == nil {
+		return contextCallSpec{}, fmt.Errorf("newDispatchContextCallSpec: missing call instruction")
+	}
+	if binding.DispatchID == 0 {
+		return contextCallSpec{}, fmt.Errorf("newDispatchContextCallSpec: missing dispatch id for call %d", inst.GetId())
 	}
 
-	zero := llvm.ConstInt(i64, 0, false)
-	for i, argID := range argIDs {
-		argVal, err := c.getValue(inst, argID)
-		if err != nil {
-			return fmt.Errorf("compileInvokeCallable: failed to resolve argument %d: %w", i, err)
-		}
-		argI64 := c.coerceToInt64(argVal)
-		if err := c.storeInvokeContextArg(ctxI64, i, argI64); err != nil {
-			return err
-		}
-		if err := c.storeInvokeContextRoot(ctxI64, argc, i, zero); err != nil {
-			return err
-		}
-	}
-
-	if inst.Async {
-		spawnFn, spawnType := c.getOrInsertRuntimeSpawn()
-		c.Builder.CreateCall(spawnType, spawnFn, []llvm.Value{ctxI8}, "")
-		if inst.GetId() > 0 {
-			c.Values[inst.GetId()] = zero
-			if err := c.maybeEmitMemberSet(inst, inst, zero); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-
-	c.Builder.CreateCall(llvmFnType, llvmFn, []llvm.Value{ctxI8}, "")
-	ret, err := c.loadCtxWordFrom(ctxI64, abi.WordRet, "")
-	if err != nil {
-		return err
-	}
-	ret = c.coerceToInt64(ret)
-
-	if inst.GetId() > 0 {
-		c.Values[inst.GetId()] = ret
-		if err := c.maybeEmitMemberSet(inst, inst, ret); err != nil {
-			return err
-		}
-	}
-	return nil
+	return contextCallSpec{
+		inst:           inst,
+		kind:           abi.KindDispatch,
+		target:         llvm.ConstInt(c.LLVMCtx.Int64Type(), uint64(binding.DispatchID), false),
+		argIDs:         append([]int64{}, inst.Args...),
+		async:          inst.Async,
+		tagPointerArgs: shouldTagStdlibArgPointers(binding.DispatchID),
+		ctxName:        "yak_dispatch_ctx",
+		errPrefix:      "emitDispatchContextCall",
+	}, nil
 }
 
 // compileCall compiles a ssa.Call instruction to LLVM IR.
@@ -115,17 +92,21 @@ func (c *Compiler) compileCall(inst *ssa.Call) error {
 	// collisions (e.g. duplicated "f$1").
 	if calleeVal != nil {
 		if ssaFn, ok := ssa.ToFunction(calleeVal); ok && ssaFn != nil && !ssaFn.IsExtern() {
-			llvmFn, llvmFnType := c.getOrDeclareLLVMFunction(ssaFn)
-			argIDs := append([]int64{}, inst.Args...)
-			argIDs = append(argIDs, inst.ArgMember...)
-			return c.compileInvokeCallable(inst, llvmFn, llvmFnType, argIDs)
+			llvmFn, _ := c.getOrDeclareLLVMFunction(ssaFn)
+			spec, err := c.newCallableContextCallSpec(inst, llvmFn, c.callArgIDs(inst), "yak_call_target")
+			if err != nil {
+				return err
+			}
+			return c.lowerResolvedContextCall(spec)
 		}
 		if calleeVal.IsMember() {
 			if ft, ok := calleeVal.GetType().(*ssa.FunctionType); ok && ft != nil && ft.This != nil && !ft.This.IsExtern() {
-				llvmFn, llvmFnType := c.getOrDeclareLLVMFunction(ft.This)
-				argIDs := append([]int64{}, inst.Args...)
-				argIDs = append(argIDs, inst.ArgMember...)
-				return c.compileInvokeCallable(inst, llvmFn, llvmFnType, argIDs)
+				llvmFn, _ := c.getOrDeclareLLVMFunction(ft.This)
+				spec, err := c.newCallableContextCallSpec(inst, llvmFn, c.callArgIDs(inst), "yak_call_target")
+				if err != nil {
+					return err
+				}
+				return c.lowerResolvedContextCall(spec)
 			}
 		}
 	}
@@ -134,24 +115,31 @@ func (c *Compiler) compileCall(inst *ssa.Call) error {
 
 	// Stdlib dispatch calls.
 	if binding, ok := c.getExternBinding(calleeName); ok && binding.DispatchID != 0 {
-		if inst.Async {
-			return c.compileAsyncStdlibDispatchCall(inst, binding)
+		spec, err := c.newDispatchContextCallSpec(inst, binding)
+		if err != nil {
+			return err
 		}
-		return c.compileStdlibDispatchCall(inst, binding)
+		return c.lowerResolvedContextCall(spec)
 	}
 
 	// Context-ABI extern/hook calls.
 	if binding, ok := c.getExternBinding(calleeName); ok && binding.Symbol != "" {
-		llvmFn, llvmFnType := c.getOrDeclareExternCallable(binding.Symbol)
-		argIDs := append([]int64{}, inst.Args...)
-		return c.compileInvokeCallable(inst, llvmFn, llvmFnType, argIDs)
+		llvmFn := c.getOrDeclareExternCallable(binding.Symbol)
+		spec, err := c.newCallableContextCallSpec(inst, llvmFn, append([]int64{}, inst.Args...), "yak_extern_target")
+		if err != nil {
+			return err
+		}
+		return c.lowerResolvedContextCall(spec)
 	}
 
 	// Fallback: call a named function using the context ABI.
-	llvmFn, llvmFnType := c.getOrDeclareExternCallable(calleeName)
+	llvmFn := c.getOrDeclareExternCallable(calleeName)
 	if !llvmFn.IsNil() {
-		argIDs := append([]int64{}, inst.Args...)
-		return c.compileInvokeCallable(inst, llvmFn, llvmFnType, argIDs)
+		spec, err := c.newCallableContextCallSpec(inst, llvmFn, append([]int64{}, inst.Args...), "yak_fallback_target")
+		if err != nil {
+			return err
+		}
+		return c.lowerResolvedContextCall(spec)
 	}
 
 	return fmt.Errorf("compileCall: unable to resolve callee %q", calleeName)

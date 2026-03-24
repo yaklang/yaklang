@@ -29,10 +29,33 @@ func recoverAsyncPanic() {
 	}
 }
 
-//export yak_runtime_spawn
-func yak_runtime_spawn(ctx unsafe.Pointer) {
-	defer recoverRuntimePanic()
+func invokeCallable(ctx unsafe.Pointer) {
+	if ctx == nil {
+		return
+	}
+	target := ctxLoadWord(ctx, abi.WordTarget)
+	if target == 0 {
+		return
+	}
+	C.yak_invoke_callable(C.uintptr_t(target), ctx)
+}
 
+func executeInvoke(ctx unsafe.Pointer) {
+	if ctx == nil {
+		return
+	}
+
+	switch ctxLoadWord(ctx, abi.WordKind) {
+	case abi.KindCallable:
+		invokeCallable(ctx)
+	case abi.KindDispatch:
+		invokeDispatch(ctx)
+	default:
+		// ignore
+	}
+}
+
+func spawnInvoke(ctx unsafe.Pointer) {
 	if ctx == nil {
 		return
 	}
@@ -61,15 +84,22 @@ func yak_runtime_spawn(ctx unsafe.Pointer) {
 			return
 		}
 
-		kind := ctxLoadWord(cctx, abi.WordKind)
-		switch kind {
-		case abi.KindCallable:
-			target := ctxLoadWord(cctx, abi.WordTarget)
-			C.yak_invoke_callable(C.uintptr_t(target), cctx)
-		case abi.KindDispatch:
-			yak_runtime_dispatch(cctx)
-		default:
-			// ignore
-		}
+		executeInvoke(cctx)
 	}(handle)
+}
+
+//export yak_runtime_invoke
+func yak_runtime_invoke(ctx unsafe.Pointer) {
+	defer recoverRuntimePanic()
+
+	if ctx == nil {
+		return
+	}
+
+	if (ctxLoadWord(ctx, abi.WordFlags) & abi.FlagAsync) != 0 {
+		spawnInvoke(ctx)
+		return
+	}
+
+	executeInvoke(ctx)
 }

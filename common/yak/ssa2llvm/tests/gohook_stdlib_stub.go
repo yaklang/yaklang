@@ -1,8 +1,8 @@
 package tests
 
-// yakStdCallStubGoCode returns a small Go implementation of the yak stdlib
-// dispatcher symbol used by LLVM-generated code. Tests that skip linking the
-// full runtime can embed this stub into a gohook archive.
+// yakStdCallStubGoCode returns a small Go implementation of the unified invoke
+// entry used by LLVM-generated code. Tests that skip linking the full runtime
+// can embed this stub into a gohook archive.
 //
 // The caller's gohook source must import:
 //   - "fmt"
@@ -10,9 +10,9 @@ package tests
 //   - "github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/dispatch"
 func yakStdCallStubGoCode() string {
 	return `
-// Minimal stdlib dispatcher for tests that skip linking the full yak runtime.
-// Only builtin printing is implemented here.
-func yak_runtime_dispatch(ctx unsafe.Pointer) {
+// Minimal invoke/runtime stub for tests that skip linking the full yak runtime.
+// Only callable dispatch and builtin printing are implemented here.
+func yak_runtime_invoke(ctx unsafe.Pointer) {
 	const (
 		yakTaggedPointerMask = uint64(1) << 62
 
@@ -20,9 +20,12 @@ func yak_runtime_dispatch(ctx unsafe.Pointer) {
 		wordTarget = 4
 		wordArgc   = 5
 		wordRet    = 6
+		wordFlags  = 3
 
 		headerWords  = 10
+		kindCallable = 1
 		kindDispatch = 2
+		flagAsync    = 1 << 0
 	)
 
 	if ctx == nil {
@@ -36,7 +39,22 @@ func yak_runtime_dispatch(ctx unsafe.Pointer) {
 		*(*uint64)(unsafe.Pointer(uintptr(ctx) + uintptr(word)*8)) = value
 	}
 
-	if loadWord(wordKind) != kindDispatch {
+	if (loadWord(wordFlags) & flagAsync) != 0 {
+		storeWord(wordFlags, loadWord(wordFlags) &^ flagAsync)
+		go yak_runtime_invoke(ctx)
+		return
+	}
+
+	switch loadWord(wordKind) {
+	case kindCallable:
+		target := loadWord(wordTarget)
+		if target == 0 {
+			return
+		}
+		C.yak_invoke_callable(C.uintptr_t(target), ctx)
+		return
+	case kindDispatch:
+	default:
 		return
 	}
 

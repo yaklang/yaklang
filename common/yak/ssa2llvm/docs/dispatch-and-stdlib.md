@@ -8,9 +8,10 @@
 
 `ssa2llvm` 的目标之一是减少最终二进制里可读/可枚举的导出符号数量，并且让编译器侧的调用 lowering 稳定、可扩展。
 
-因此 stdlib 调用不直接链接到一堆 `yak_stdlib_xxx` 符号，而是统一为一个 dispatcher：
+因此 stdlib 调用不直接链接到一堆 `yak_stdlib_xxx` 符号，而是统一收敛到 invoke ABI：
 
-- `yak_runtime_dispatch(ctx)`（见 `common/yak/ssa2llvm/runtime/runtime_go/stdlib.go`）
+- `yak_runtime_invoke(ctx)` 作为统一入口
+- `KindDispatch + dispatch id + FlagAsync` 作为 stdlib 分发信息
 
 编译器只需要把“我要调用哪个 stdlib 函数”编码为一个稳定的整数 ID，然后把参数打包进 `InvokeContext` 即可。
 
@@ -25,7 +26,6 @@ dispatch id 定义在：
 里面包含：
 
 - `dispatch.FuncID`：函数 ID 的类型（`int64`）
-- `dispatch.DispatcherSymbol`：dispatcher 符号名（当前为 `yak_runtime_dispatch`）
 - 一组稳定的常量 ID（`IDPrint/IDPrintln/IDOsGetenv/...`）
 
 ### 稳定性约束
@@ -49,27 +49,30 @@ dispatch id 定义在：
 
 1. SSA 里出现 `Call` 指令，callee 名称解析为 `println`
 2. 查到 `ExternBinding{DispatchID: dispatch.IDPrintln}`
-3. lowering 为：构造 `InvokeContext(kind=Dispatch, target=IDPrintln, args=...)`，然后调用 `yak_runtime_dispatch(ctx)`
+3. lowering 为：构造 `InvokeContext(kind=Dispatch, target=IDPrintln, args=...)`，然后调用 `yak_runtime_invoke(ctx)`
 
 相关 lowering 代码：
 
-- `common/yak/ssa2llvm/compiler/ops_call_dispatch.go`
+- `common/yak/ssa2llvm/compiler/ops_call.go`
+- `common/yak/ssa2llvm/compiler/ops_call_context_internal.go`
 
 ---
 
-## 4. Runtime 侧：yak_runtime_dispatch(ctx) 如何执行
+## 4. Runtime 侧：KindDispatch 如何执行
 
-runtime dispatcher 定义在：
+统一 invoke 入口定义在：
 
+- `common/yak/ssa2llvm/runtime/runtime_go/spawn.go`
 - `common/yak/ssa2llvm/runtime/runtime_go/stdlib.go`
 
-核心步骤（概念上）：
+当 `ctx.kind == abi.KindDispatch` 时，runtime 会进入 dispatch 分支。核心步骤（概念上）：
 
-1. 读取 `ctx.kind`，必须是 `abi.KindDispatch`
-2. 读取 `ctx.target`，把它当作 `dispatch.FuncID`
-3. 读取 `ctx.argc` 和参数数组
-4. `switch(id)` 调到具体实现（如 `stdlibPrintln/stdlibOsGetenv/...`）
-5. 将返回值写回 `ctx.ret`
+1. `yak_runtime_invoke(ctx)` 读取 `ctx.flags` 与 `ctx.kind`
+2. 分支到 `invokeDispatch(ctx)`
+3. 读取 `ctx.target`，把它当作 `dispatch.FuncID`
+4. 读取 `ctx.argc` 和参数数组
+5. `switch(id)` 调到具体实现（如 `stdlibPrintln/stdlibOsGetenv/...`）
+6. 将返回值写回 `ctx.ret`
 
 注意：
 
@@ -119,5 +122,4 @@ runtime dispatcher 定义在：
 1. 在 `common/yak/ssa2llvm/runtime/dispatch/ids.go` 增加一个稳定的 `FuncID`
 2. 在 `common/yak/ssa2llvm/runtime/runtime_go/stdlib.go` 的 `switch(id)` 里实现对应分支，并通过 `ctxSetRet` 写回返回值
 3. 在 `common/yak/ssa2llvm/compiler/externs.go` 增加 name→`DispatchID` 的绑定
-4. 如需对参数做 tag（例如打印类），在 `common/yak/ssa2llvm/compiler/ops_call_dispatch.go` 的 `shouldTagStdlibArgPointers` 增加对应 ID
-
+4. 如需对参数做 tag（例如打印类），在 `common/yak/ssa2llvm/compiler/ops_call_context_internal.go` 的 `shouldTagStdlibArgPointers` 增加对应 ID

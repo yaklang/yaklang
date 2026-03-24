@@ -189,19 +189,7 @@ func stdlibYakitLog(level string, args []uint64) int64 {
 	return 0
 }
 
-//export yak_runtime_dispatch
-func yak_runtime_dispatch(ctx unsafe.Pointer) {
-	defer recoverRuntimePanic()
-
-	if ctx == nil {
-		return
-	}
-
-	kind := ctxLoadWord(ctx, abi.WordKind)
-	if kind != abi.KindDispatch {
-		return
-	}
-
+func invokeDispatch(ctx unsafe.Pointer) {
 	argc := ctxArgc(ctx)
 	if argc < 0 || argc > 256 {
 		return
