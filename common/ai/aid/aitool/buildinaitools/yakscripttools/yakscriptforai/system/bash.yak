@@ -241,6 +241,54 @@ Key caching rules:
   - Save analysis results to JSON files for downstream tasks to read
   - Use /tmp/ for cache files (auto-cleaned on reboot)
 
+### Example 7: Windows CMD one-line command (explicit shell)
+
+User intent: "On a Windows host, show OS version, current user, and a system directory"
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "bash",
+  "identifier": "windows_cmd_quick_check",
+  "params": {
+    "command": "ver && whoami && dir C:\\Windows\\System32\\drivers\\etc",
+    "shell": "cmd",
+    "timeout": 15
+  }
+}
+```
+
+### Example 8: Windows PowerShell diagnostic script (AITAG + explicit shell)
+
+User intent: "On a Windows host, show top memory processes and running services"
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "bash",
+  "identifier": "windows_powershell_diagnostics",
+  "params": {
+    "shell": "powershell",
+    "timeout": 30
+  }
+}
+```
+
+<|TOOL_PARAM_command_{NONCE}|>
+Write-Output "=== Computer ==="
+Write-Output $env:COMPUTERNAME
+Write-Output ""
+Write-Output "=== Top 5 Processes By Working Set (MB) ==="
+Get-Process |
+  Sort-Object WorkingSet -Descending |
+  Select-Object -First 5 Name, Id, @{Name="WorkingSetMB"; Expression = { [math]::Round($_.WorkingSet64 / 1MB, 1) }}
+Write-Output ""
+Write-Output "=== Running Services (first 10) ==="
+Get-Service |
+  Where-Object { $_.Status -eq "Running" } |
+  Select-Object -First 10 Name, DisplayName, Status
+<|TOOL_PARAM_command_END_{NONCE}|>
+
 ## Key Rules
 
 1. ** TIMEOUT IS MANDATORY ** -- Always set timeout explicitly. Do NOT rely on the default 60s.
@@ -258,6 +306,8 @@ Key caching rules:
 8. ** DATA CACHING ** -- When analyzing large data files (Excel > 10MB), save a CSV cache
    after the first read. Subsequent scripts should check for and use the cache.
    Save analysis results to JSON files so downstream tasks can reuse them.
+9. ** WINDOWS TARGETS ** -- Set shell explicitly to "cmd" or "powershell" when generating
+   Windows commands. This avoids mixing Bash syntax with Windows command syntax.
 USAGE_BLOCK
 
 yakit.AutoInitYakit()
