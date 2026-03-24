@@ -570,6 +570,7 @@ func TestGenerateVerificationPrompt_RendersTodoSnapshot(t *testing.T) {
 		"- [ ]: [id: create_file]: 创建一个 A.md 文件",
 		"- [x]: [id: rename_file]: 将临时文件改名为最终文件名",
 		"next_movements 只输出增量",
+		"{\"op\": \"doing\", \"id\": \"stable_id\"}",
 		"{\"op\": \"add\", \"id\": \"stable_id\", \"content\": \"新增一个短链路 TODO\"}",
 	) {
 		t.Fatalf("verification prompt should contain structured TODO snapshot and incremental instructions. Got:\n%s", prompt)
@@ -610,9 +611,9 @@ func TestGenerateVerificationPrompt_RendersAbandonedTodosAfterSatisfied(t *testi
 
 	if !utils.MatchAllOfSubString(
 		prompt,
-		"- [ABANDONED]: [id: collect_signal]: 收集页面回显信号",
-		"- [ABANDONED]: [id: retry_payload]: 更换 payload 再次验证",
-		"系统会自动把剩余未关闭 TODO 标记为 `ABANDONED`",
+		"- [SKIPPED]: [id: collect_signal]: 收集页面回显信号",
+		"- [SKIPPED]: [id: retry_payload]: 更换 payload 再次验证",
+		"系统会自动把剩余未关闭 TODO 标记为 `SKIPPED`",
 		"`next_movements` 必须输出 `[]`",
 	) {
 		t.Fatalf("verification prompt should render abandoned TODO items after satisfaction. Got:\n%s", prompt)

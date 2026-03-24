@@ -21,7 +21,7 @@
             "type": "string"
         },
         "next_movements": {
-            "description": "**基于当前结果的【推荐下一步行动增量】。如果 `user_satisfied` 为 `false`，请输出一个对象数组，仅描述本轮相对已有 TODO 列表的增量操作，不要重复整个列表。每个对象必须包含 `op` 与 `id`；当 `op=add` 时必须提供 `content`；当 `op=done` 时通过 `id` 关闭已有 TODO，`content` 可省略。`op` 只允许 `add` 或 `done`。当没有必要新增或关闭 TODO 时，输出空数组 `[]`。当 `user_satisfied` 为 `true` 时，也应输出空数组 `[]`。**",
+            "description": "**基于当前结果的【推荐下一步行动增量】。如果 `user_satisfied` 为 `false`，请输出一个对象数组，仅描述本轮相对已有 TODO 列表的增量操作，不要重复整个列表。每个对象必须包含 `op` 与 `id`；当 `op=add` 时必须提供 `content`；当 `op=doing` 时通过 `id` 标记某个已有 TODO 当前正在进行中，`content` 可省略；当 `op=done` 时通过 `id` 关闭已有 TODO，`content` 可省略。`op` 只允许 `add`、`doing` 或 `done`。当没有必要新增、推进或关闭 TODO 时，输出空数组 `[]`。当 `user_satisfied` 为 `true` 时，也应输出空数组 `[]`。**",
             "type": "array",
             "items": {
                 "type": "object",
@@ -34,6 +34,7 @@
                         "type": "string",
                         "enum": [
                             "add",
+                            "doing",
                             "done"
                         ]
                     },
