@@ -183,8 +183,6 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REF_NAME: ${{ github.ref_name }}
           REPO_ID: ${{ github.repository_id }}
-          RUN_ID: ${{ github.run_id }}
-          RUN_ATTEMPT: ${{ github.run_attempt }}
           RUNNER_OS: ${{ runner.os }}
         run: |
           if [ -n "$PR_NUMBER" ] && [ "$PR_NUMBER" != "null" ]; then
@@ -194,10 +192,9 @@ jobs:
             scope="ref-$safe_ref"
           fi
 
-          cache_prefix="go-build-${REPO_ID}-${scope}-${RUNNER_OS}"
-          cache_key="${cache_prefix}-${RUN_ID}-${RUN_ATTEMPT}"
+          cache_key="go-build-${REPO_ID}-${scope}-${RUNNER_OS}"
 
-          echo "cache_prefix=$cache_prefix" >> "$GITHUB_OUTPUT"
+          echo "cache_prefix=$cache_key" >> "$GITHUB_OUTPUT"
           echo "cache_key=$cache_key" >> "$GITHUB_OUTPUT"
 
       - name: Restore shared Go build cache
@@ -219,11 +216,6 @@ jobs:
         run: |
           go mod download
           go build ./common/utils/... || true
-          go build ./common/mutate/... || true
-          go build ./common/yak/ssaapi/... || true
-          go build ./common/syntaxflow/... || true
-          go build ./common/ai/... || true
-          go build -o /tmp/yak-cache-warmup common/yak/cmd/yak.go || true
           du -sh "$GOCACHE" || true
 
       - name: Save shared Go build cache
