@@ -49485,6 +49485,7 @@ func (x *QueryHTTPFlowResponse) GetTotal() int64 {
 type HTTPFlowsFieldGroupRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	RefreshRequest bool                   `protobuf:"varint,1,opt,name=RefreshRequest,proto3" json:"RefreshRequest,omitempty"`
+	IsAll          bool                   `protobuf:"varint,2,opt,name=IsAll,proto3" json:"IsAll,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -49522,6 +49523,13 @@ func (*HTTPFlowsFieldGroupRequest) Descriptor() ([]byte, []int) {
 func (x *HTTPFlowsFieldGroupRequest) GetRefreshRequest() bool {
 	if x != nil {
 		return x.RefreshRequest
+	}
+	return false
+}
+
+func (x *HTTPFlowsFieldGroupRequest) GetIsAll() bool {
+	if x != nil {
+		return x.IsAll
 	}
 	return false
 }
@@ -72356,9 +72364,10 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +
 	"Pagination\x12!\n" +
 	"\x04Data\x18\x02 \x03(\v2\r.ypb.HTTPFlowR\x04Data\x12\x14\n" +
-	"\x05Total\x18\x03 \x01(\x03R\x05Total\"D\n" +
+	"\x05Total\x18\x03 \x01(\x03R\x05Total\"Z\n" +
 	"\x1aHTTPFlowsFieldGroupRequest\x12&\n" +
-	"\x0eRefreshRequest\x18\x01 \x01(\bR\x0eRefreshRequest\"o\n" +
+	"\x0eRefreshRequest\x18\x01 \x01(\bR\x0eRefreshRequest\x12\x14\n" +
+	"\x05IsAll\x18\x02 \x01(\bR\x05IsAll\"o\n" +
 	"\x1bHTTPFlowsFieldGroupResponse\x12!\n" +
 	"\x04Tags\x18\x01 \x03(\v2\r.ypb.TagsCodeR\x04Tags\x12-\n" +
 	"\n" +
