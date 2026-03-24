@@ -95,18 +95,28 @@ const buildInForgeEmbedKey = "6ef3c850244a2b26ed0b163d1fda9600"
 
 // syncBuildInForgeInternal 将内置 AI forge 从 embed 同步到数据库，不更新 hash（由调用方决定）
 func syncBuildInForgeInternal() error {
-	registerBuildInForge("entity_identify")
-	registerBuildInForge("log_event_formatter")
-	registerBuildInForge("event_analyzer")
 	registerBuildInForge("web_log_monitor")
-	registerBuildInForge("hostscan")
+	registerBuildInForge("flow_report") // 流量分析报告生成
+
+	registerBuildInForge("hostscan") // 主机体检，主要用于测试
 	registerBuildInForge("ssapoc")
-	registerBuildInForge("flow_report")
 	registerBuildInForge("ssa_vulnerability_analyzer")
 	registerBuildInForge("alert_denoising")
-	registerBuildInForge("code_audit")
 	registerBuildInForge("sf_rule_completion")
+	cleanupRemovedBuildInForges()
 	return nil
+}
+
+func cleanupRemovedBuildInForges() {
+	db := consts.GetGormProfileDatabase()
+	if db == nil {
+		return
+	}
+	for _, name := range []string{"entity_identify", "log_event_formatter", "event_analyzer"} {
+		if err := yakit.DeleteAIForgeByName(db, name); err != nil {
+			log.Warnf("delete removed buildin forge %s failed: %v", name, err)
+		}
+	}
 }
 
 // ForceSyncBuildInForge 强制同步内置 AI forge 到数据库，忽略哈希检查（用于版本更新后修复导入失败等场景）
