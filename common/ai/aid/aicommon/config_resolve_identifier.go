@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
 	"github.com/yaklang/yaklang/common/schema"
 )
 
@@ -116,15 +117,12 @@ func (c *Config) ResolveIdentifier(name string) *ResolvedIdentifier {
 
 	// 3. Check skills
 	if sl := c.GetSkillLoader(); sl != nil {
-		for _, meta := range sl.AllSkillMetas() {
-			if meta.Name == name {
-				matches = append(matches, &ResolvedIdentifier{
-					Name:         name,
-					IdentityType: ResolvedAs_Skill,
-					ActionType:   schema.AI_REACT_LOOP_ACTION_LOADING_SKILLS,
-				})
-				break
-			}
+		if _, err := aiskillloader.LookupSkillMeta(sl, name); err == nil {
+			matches = append(matches, &ResolvedIdentifier{
+				Name:         name,
+				IdentityType: ResolvedAs_Skill,
+				ActionType:   schema.AI_REACT_LOOP_ACTION_LOADING_SKILLS,
+			})
 		}
 	}
 

@@ -167,18 +167,16 @@ func PopulateExtraCapabilitiesFromDeepIntent(r aicommon.AIInvokeRuntime, loop *R
 		if provider, ok := cfg.(skillLoaderProvider); ok {
 			skillLoader := provider.GetSkillLoader()
 			if skillLoader != nil && skillLoader.HasSkills() {
-				allMetas := skillLoader.AllSkillMetas()
-				nameSet := make(map[string]bool, len(skillNames))
-				for _, n := range skillNames {
-					nameSet[strings.ToLower(n)] = true
-				}
-				for _, meta := range allMetas {
-					if nameSet[strings.ToLower(meta.Name)] {
-						ecm.AddSkills(ExtraSkillInfo{
-							Name:        meta.Name,
-							Description: meta.Description,
-						})
+				for _, name := range skillNames {
+					meta, err := aiskillloader.LookupSkillMeta(skillLoader, name)
+					if err != nil || meta == nil {
+						log.Debugf("deep_intent: skip skill %q: %v", name, err)
+						continue
 					}
+					ecm.AddSkills(ExtraSkillInfo{
+						Name:        meta.Name,
+						Description: meta.Description,
+					})
 				}
 			}
 		}
