@@ -241,38 +241,10 @@ func searchSkillsFromLoader(r aicommon.AIInvokeRuntime, query string, results *s
 		return
 	}
 
-	// Use AllSkillMetas and do manual substring matching (same as AutoSkillLoader.SearchSkills)
-	allMetas := skillLoader.AllSkillMetas()
-	queryLower := strings.ToLower(query)
-	queryTokens := strings.Fields(queryLower)
-
-	var matchedSkills []*aiskillloader.SkillMeta
-	for _, meta := range allMetas {
-		searchText := strings.ToLower(meta.Name + " " + meta.Description)
-
-		// Full query match
-		if strings.Contains(searchText, queryLower) {
-			matchedSkills = append(matchedSkills, meta)
-			continue
-		}
-
-		// Token-level match
-		if len(queryTokens) > 1 {
-			meaningfulTokens := 0
-			matchCount := 0
-			for _, token := range queryTokens {
-				if len(token) < 2 {
-					continue
-				}
-				meaningfulTokens++
-				if strings.Contains(searchText, token) {
-					matchCount++
-				}
-			}
-			if meaningfulTokens > 0 && matchCount > 0 && matchCount >= (meaningfulTokens+1)/2 {
-				matchedSkills = append(matchedSkills, meta)
-			}
-		}
+	matchedSkills, err := aiskillloader.SearchSkillMetas(skillLoader, query, 10)
+	if err != nil {
+		log.Warnf("intent loop: skill search failed: %v", err)
+		return
 	}
 
 	if len(matchedSkills) > 0 {
