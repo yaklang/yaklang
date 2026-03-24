@@ -74,6 +74,7 @@ func init() {
 		},
 		// Register metadata for better AI understanding
 		reactloops.WithLoopDescription("进入 Java 反编译专家模式：自动反编译 JAR 包，分析导出的 Java 源码，发现并修复语法及编译错误，支持单文件/批量增量修复，适合 JAR 二进制分析和源码重构。"),
+		reactloops.WithLoopDescriptionZh("Java 反编译修复模式：自动反编译 JAR，分析导出的 Java 源码，并修复语法或编译错误。"),
 		reactloops.WithLoopUsagePrompt(`当用户输入一般为 JAR 文件修复导出需求，如：
 - "请帮我反编译 /tmp/xxx.jar 并输出至 ./xxx"
 - "请检查导出的 Java 文件，并一并修复编译错误"

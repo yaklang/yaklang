@@ -10483,6 +10483,7 @@ type AIFocus struct {
 	UsagePrompt         string                 `protobuf:"bytes,4,opt,name=UsagePrompt,proto3" json:"UsagePrompt,omitempty"`
 	VerboseName         string                 `protobuf:"bytes,5,opt,name=VerboseName,proto3" json:"VerboseName,omitempty"`
 	VerboseNameZh       string                 `protobuf:"bytes,6,opt,name=VerboseNameZh,proto3" json:"VerboseNameZh,omitempty"`
+	DescriptionZh       string                 `protobuf:"bytes,7,opt,name=DescriptionZh,proto3" json:"DescriptionZh,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -10555,6 +10556,13 @@ func (x *AIFocus) GetVerboseName() string {
 func (x *AIFocus) GetVerboseNameZh() string {
 	if x != nil {
 		return x.VerboseNameZh
+	}
+	return ""
+}
+
+func (x *AIFocus) GetDescriptionZh() string {
+	if x != nil {
+		return x.DescriptionZh
 	}
 	return ""
 }
@@ -68919,14 +68927,15 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x11GetAIForgeRequest\x12\x0e\n" +
 	"\x02ID\x18\x01 \x01(\x03R\x02ID\x12\x1c\n" +
 	"\tForgeName\x18\x02 \x01(\tR\tForgeName\x12*\n" +
-	"\x10InflateSkillPath\x18\x03 \x01(\bR\x10InflateSkillPath\"\xdb\x01\n" +
+	"\x10InflateSkillPath\x18\x03 \x01(\bR\x10InflateSkillPath\"\x81\x02\n" +
 	"\aAIFocus\x12\x12\n" +
 	"\x04Name\x18\x01 \x01(\tR\x04Name\x12 \n" +
 	"\vDescription\x18\x02 \x01(\tR\vDescription\x120\n" +
 	"\x13OutputExamplePrompt\x18\x03 \x01(\tR\x13OutputExamplePrompt\x12 \n" +
 	"\vUsagePrompt\x18\x04 \x01(\tR\vUsagePrompt\x12 \n" +
 	"\vVerboseName\x18\x05 \x01(\tR\vVerboseName\x12$\n" +
-	"\rVerboseNameZh\x18\x06 \x01(\tR\rVerboseNameZh\"\x15\n" +
+	"\rVerboseNameZh\x18\x06 \x01(\tR\rVerboseNameZh\x12$\n" +
+	"\rDescriptionZh\x18\a \x01(\tR\rDescriptionZh\"\x15\n" +
 	"\x13QueryAIFocusRequest\"8\n" +
 	"\x14QueryAIFocusResponse\x12 \n" +
 	"\x04Data\x18\x01 \x03(\v2\f.ypb.AIFocusR\x04Data\"\xc1\x01\n" +

@@ -101,6 +101,7 @@ func init() {
 			return loop, err
 		},
 		reactloops.WithLoopDescription("General-purpose assistant mode for mixed tasks, combining reasoning, tools, RAG, and AI forges."),
+		reactloops.WithLoopDescriptionZh("通用助手模式：适合处理混合型任务，综合使用推理、工具、RAG 与 AI 蓝图完成工作。"),
 		reactloops.WithLoopUsagePrompt("Use as the primary fallback mode when the request does not require a specialized focused mode. Suitable for broad problem solving, multi-step coordination, and direct responses."),
 		reactloops.WithLoopOutputExample(`
 * When the task is general and no specialized focused mode is needed:
@@ -138,6 +139,7 @@ func init() {
 			return loop, err
 		},
 		reactloops.WithLoopDescription("Plan-execution task mode for structured PE workflows with predefined objectives and execution context."),
+		reactloops.WithLoopDescriptionZh("渗透任务执行模式：面向结构化渗透测试工作流，在既定目标和上下文下推进任务执行。"),
 		reactloops.WithLoopUsagePrompt("Used internally for PE task orchestration when the system has already prepared execution-oriented initialization context and constraints."),
 		reactloops.WithLoopOutputExample(`
 * When entering a structured PE execution task:

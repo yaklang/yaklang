@@ -78,6 +78,7 @@ func init() {
 			return reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_SMART_QA, r, preset...)
 		},
 		reactloops.WithLoopDescription("Smart Q&A mode: an intelligent question-answering assistant that helps users learn and understand topics by leveraging knowledge bases, web search, local files, and persistent memory."),
+		reactloops.WithLoopDescriptionZh("智能问答模式：结合知识库、网络搜索、本地文件和持久记忆，回答问题并帮助用户理解主题。"),
 		reactloops.WithLoopUsagePrompt(`Use this mode when the user needs answers to questions, wants to learn about a topic, or needs to understand something.
 The AI assistant will search knowledge bases, the internet, local files, and persistent memory to provide comprehensive, well-structured answers.`),
 		reactloops.WithLoopOutputExample(`

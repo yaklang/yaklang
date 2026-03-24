@@ -64,12 +64,12 @@ func init() {
 		func(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {
 			help := r.GetConfig().GetConfigString(PLAN_HELP_KEY)
 			planPrompt := r.GetConfig().GetConfigString(PLAN_PROMPT_KEY)
-		allowedActions := []string{
-			"plan", "search_knowledge",
-			"read_file", "find_files", "grep_text",
-			"web_search", "scan_port", "simple_crawler",
-			schema.AI_REACT_LOOP_ACTION_LOADING_SKILLS,
-		}
+			allowedActions := []string{
+				"plan", "search_knowledge",
+				"read_file", "find_files", "grep_text",
+				"web_search", "scan_port", "simple_crawler",
+				schema.AI_REACT_LOOP_ACTION_LOADING_SKILLS,
+			}
 			if r.GetConfig().GetAllowUserInteraction() {
 				allowedActions = append(allowedActions, schema.AI_REACT_LOOP_ACTION_ASK_FOR_CLARIFICATION)
 			}
@@ -99,45 +99,46 @@ func init() {
 				}),
 				reactloops.WithReflectionOutputExample(outputExample),
 				reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
-				currentPlan := loop.Get(PLAN_DATA_KEY)
-				enhance := loop.Get(PLAN_ENHANCE_KEY)
-				fileResults := loop.Get(PLAN_FILE_RESULTS_KEY)
-				webResults := loop.Get(PLAN_WEB_RESULTS_KEY)
-				reconResults := loop.Get(PLAN_RECON_RESULTS_KEY)
-				currentIter := loop.GetCurrentIterationIndex()
-				maxIter := loop.GetMaxIterations()
-				isLastIteration := currentIter+1 >= maxIter
-				if isLastIteration {
-					for _, name := range infoGatheringActions {
-						loop.RemoveAction(name)
+					currentPlan := loop.Get(PLAN_DATA_KEY)
+					enhance := loop.Get(PLAN_ENHANCE_KEY)
+					fileResults := loop.Get(PLAN_FILE_RESULTS_KEY)
+					webResults := loop.Get(PLAN_WEB_RESULTS_KEY)
+					reconResults := loop.Get(PLAN_RECON_RESULTS_KEY)
+					currentIter := loop.GetCurrentIterationIndex()
+					maxIter := loop.GetMaxIterations()
+					isLastIteration := currentIter+1 >= maxIter
+					if isLastIteration {
+						for _, name := range infoGatheringActions {
+							loop.RemoveAction(name)
+						}
+						log.Infof("plan loop: last iteration (%d/%d), removed all info-gathering actions, forcing plan output", currentIter+1, maxIter)
 					}
-					log.Infof("plan loop: last iteration (%d/%d), removed all info-gathering actions, forcing plan output", currentIter+1, maxIter)
-				}
-				renderMap := map[string]any{
-					"Plan":            currentPlan,
-					"Help":            help,
-					"Nonce":           nonce,
-					"Enhance":         enhance,
-					"FileResults":     fileResults,
-					"WebResults":      webResults,
-					"ReconResults":    reconResults,
-					"IsLastIteration": isLastIteration,
-				}
+					renderMap := map[string]any{
+						"Plan":            currentPlan,
+						"Help":            help,
+						"Nonce":           nonce,
+						"Enhance":         enhance,
+						"FileResults":     fileResults,
+						"WebResults":      webResults,
+						"ReconResults":    reconResults,
+						"IsLastIteration": isLastIteration,
+					}
 					return utils.RenderTemplate(reactiveData, renderMap)
 				}),
-			generate(r),
-			searchKnowledge(r),
-			readFileAction(r),
-			findFilesAction(r),
-			grepTextAction(r),
-			webSearchAction(r),
-			scanPortAction(r),
-			simpleCrawlerAction(r),
+				generate(r),
+				searchKnowledge(r),
+				readFileAction(r),
+				findFilesAction(r),
+				grepTextAction(r),
+				webSearchAction(r),
+				scanPortAction(r),
+				simpleCrawlerAction(r),
 			}
 			preset = append(opts, preset...)
 			return reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_PLAN, r, preset...)
 		},
 		reactloops.WithLoopDescription("Loop for generating and refining plans based on user requirements, with multi-source information gathering (knowledge base, file system, internet) and structured thinking frameworks (SMART, Six Thinking Hats, SWOT)."),
+		reactloops.WithLoopDescriptionZh("任务规划模式：围绕用户目标生成和细化执行计划，结合知识库、文件系统和互联网信息完成规划。"),
 		reactloops.WithLoopUsagePrompt("when user needs to create or refine a plan for a specific task. Supports searching knowledge, reading local files, grepping code, internet search, port scanning, web crawling, and loading skills to produce comprehensive plans."),
 		reactloops.WithLoopOutputExample(`
 * When the user asks for a clear executable plan:

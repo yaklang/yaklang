@@ -164,6 +164,7 @@ func init() {
 		},
 		// Register metadata for better AI understanding
 		reactloops.WithLoopDescription("Enter focused mode for Yaklang code generation and modification with access to code samples and syntax checking"),
+		reactloops.WithLoopDescriptionZh("Yaklang 代码生成模式：用于编写或修改 Yaklang 代码，支持样例检索与语法检查。"),
 		reactloops.WithLoopUsagePrompt("Use when user requests to write, modify, or debug Yaklang code. Provides specialized tools: grep_yaklang_samples, write_code, modify_code, insert_code, delete_code with real-time syntax validation"),
 		reactloops.WithLoopOutputExample(`
 * When user requests to write Yaklang code:
