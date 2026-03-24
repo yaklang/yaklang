@@ -378,8 +378,8 @@ jobs:
 
   test-local:
     name: ${{ matrix.name }}
-    needs: prepare-yak
-    if: needs.prepare-yak.result == 'success'
+    needs: [prepare-yak, prepare-yakgrpc, prepare-coreplugin]
+    if: needs.prepare-yak.result == 'success' && needs.prepare-yakgrpc.result == 'success' && needs.prepare-coreplugin.result == 'success'
     runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
@@ -610,12 +610,11 @@ jobs:
 
   test-ai-local:
     name: ${{ matrix.name }}
-    needs: prepare-yak
-    if: needs.prepare-yak.result == 'success'
+    needs: [prepare-yak, prepare-yakgrpc, prepare-coreplugin]
+    if: needs.prepare-yak.result == 'success' && needs.prepare-yakgrpc.result == 'success' && needs.prepare-coreplugin.result == 'success'
     runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
-      max-parallel: 2
       matrix:
         include:
           - name: "Test AI Aid / React"
