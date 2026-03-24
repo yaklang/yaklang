@@ -3,6 +3,7 @@ package ssadb
 import (
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
@@ -50,6 +51,56 @@ func init() {
 	schema.RegisterDatabasePatch(schema.KEY_SCHEMA_SSA_DATABASE, patchIrCodeIndex)
 	schema.RegisterDatabasePatch(schema.KEY_SCHEMA_SSA_DATABASE, patchSSAReportStoreTextColumns)
 	schema.RegisterDatabasePatch(schema.KEY_SCHEMA_SSA_DATABASE, patchMigrateLegacySSAReportStore)
+}
+
+type legacySSAReportRecord struct {
+	gorm.Model
+
+	Title            string
+	PublishedAt      time.Time  `gorm:"column:published_at"`
+	Hash             string     `gorm:"column:hash"`
+	Owner            string     `gorm:"column:owner"`
+	From             string     `gorm:"column:from"`
+	ReportType       string     `gorm:"column:report_type"`
+	ScopeType        string     `gorm:"column:scope_type"`
+	ScopeName        string     `gorm:"column:scope_name"`
+	ProjectName      string     `gorm:"column:project_name"`
+	ProgramName      string     `gorm:"column:program_name"`
+	TaskID           string     `gorm:"column:task_id"`
+	TaskCount        int64      `gorm:"column:task_count"`
+	ScanBatch        int64      `gorm:"column:scan_batch"`
+	RiskTotal        int64      `gorm:"column:risk_total"`
+	RiskCritical     int64      `gorm:"column:risk_critical"`
+	RiskHigh         int64      `gorm:"column:risk_high"`
+	RiskMedium       int64      `gorm:"column:risk_medium"`
+	RiskLow          int64      `gorm:"column:risk_low"`
+	SourceFinishedAt *time.Time `gorm:"column:source_finished_at"`
+	QueryJSON        string     `gorm:"column:query_json"`
+	QuotedJson       string     `gorm:"column:quoted_json"`
+}
+
+func (*legacySSAReportRecord) TableName() string {
+	return "report_records"
+}
+
+type legacySSAReportRecordFile struct {
+	gorm.Model
+
+	ReportRecordID  uint   `gorm:"column:report_record_id"`
+	Format          string `gorm:"column:format"`
+	FileName        string `gorm:"column:file_name"`
+	ObjectKey       string `gorm:"column:object_key"`
+	Bucket          string `gorm:"column:bucket"`
+	ContentType     string `gorm:"column:content_type"`
+	SizeBytes       int64  `gorm:"column:size_bytes"`
+	SHA256          string `gorm:"column:sha256"`
+	Status          string `gorm:"column:status"`
+	CreatedBy       string `gorm:"column:created_by"`
+	GenerationError string `gorm:"column:generation_error"`
+}
+
+func (*legacySSAReportRecordFile) TableName() string {
+	return "report_record_files"
 }
 
 // patchIrSourceQuotedCode patches the QuotedCode column type based on database dialect
@@ -163,12 +214,12 @@ func patchSSAReportStoreTextColumns(db *gorm.DB) {
 }
 
 func patchMigrateLegacySSAReportStore(db *gorm.DB) {
-	if !db.HasTable(&schema.ReportRecord{}) || !db.HasTable(&reportstore.SSAReportRecord{}) {
+	if !db.HasTable("report_records") || !db.HasTable(&reportstore.SSAReportRecord{}) {
 		return
 	}
 
-	var legacyRecords []*schema.ReportRecord
-	if err := db.Model(&schema.ReportRecord{}).Find(&legacyRecords).Error; err != nil {
+	var legacyRecords []*legacySSAReportRecord
+	if err := db.Model(&legacySSAReportRecord{}).Find(&legacyRecords).Error; err != nil {
 		log.Warnf("failed to query legacy ssa report records for migration: %v", err)
 		return
 	}
@@ -231,12 +282,12 @@ func patchMigrateLegacySSAReportStore(db *gorm.DB) {
 		}
 	}
 
-	if !db.HasTable(&schema.ReportRecordFile{}) || !db.HasTable(&reportstore.SSAReportRecordFile{}) {
+	if !db.HasTable("report_record_files") || !db.HasTable(&reportstore.SSAReportRecordFile{}) {
 		return
 	}
 
-	var legacyFiles []*schema.ReportRecordFile
-	if err := db.Model(&schema.ReportRecordFile{}).Find(&legacyFiles).Error; err != nil {
+	var legacyFiles []*legacySSAReportRecordFile
+	if err := db.Model(&legacySSAReportRecordFile{}).Find(&legacyFiles).Error; err != nil {
 		log.Warnf("failed to query legacy ssa report files for migration: %v", err)
 		return
 	}
