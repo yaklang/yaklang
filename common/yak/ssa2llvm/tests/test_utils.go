@@ -375,14 +375,36 @@ func normalizeGoHookCode(goCode string) string {
 		src = "package main\n\n" + src
 	}
 	if !strings.Contains(src, `import "C"`) {
-		inject := "/*\n#include <stdint.h>\n*/\nimport \"C\"\n\n"
+		inject := "/*\n#include <stdint.h>\ntypedef void (*yak_callable_t)(void*);\nstatic inline void yak_invoke_callable(uintptr_t fn, void* ctx) { ((yak_callable_t)fn)(ctx); }\n*/\nimport \"C\"\n\n"
 		src = injectAfterPackage(src, inject)
+	} else {
+		src = ensureGoHookCallableBridge(src)
 	}
 	mainRe := regexp.MustCompile(`(?m)^\s*func\s+main\s*\(\s*\)\s*\{`)
 	if !mainRe.MatchString(src) {
 		src += "\n\nfunc main() {}\n"
 	}
 	return src + "\n"
+}
+
+func ensureGoHookCallableBridge(src string) string {
+	const bridge = "\ntypedef void (*yak_callable_t)(void*);\nstatic inline void yak_invoke_callable(uintptr_t fn, void* ctx) { ((yak_callable_t)fn)(ctx); }\n"
+	if strings.Contains(src, "typedef void (*yak_callable_t)(void*)") ||
+		strings.Contains(src, "static inline void yak_invoke_callable") {
+		return src
+	}
+
+	re := regexp.MustCompile(`(?s)/\*(.*?)\*/\s*import "C"`)
+	if loc := re.FindStringSubmatchIndex(src); loc != nil {
+		_, commentBodyEnd := loc[2], loc[3]
+		var out strings.Builder
+		out.WriteString(src[:commentBodyEnd])
+		out.WriteString(bridge)
+		out.WriteString(src[commentBodyEnd:])
+		return out.String()
+	}
+
+	return strings.Replace(src, `import "C"`, "/*\n#include <stdint.h>\ntypedef void (*yak_callable_t)(void*);\nstatic inline void yak_invoke_callable(uintptr_t fn, void* ctx) { ((yak_callable_t)fn)(ctx); }\n*/\nimport \"C\"", 1)
 }
 
 func prepareGoHookCode(goCode string) (string, []string, error) {

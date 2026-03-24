@@ -57,9 +57,7 @@ common/yak/ssa2llvm/
 
 ### 2. stdlib 统一 dispatch
 
-标准库函数不直接导出成大量 runtime 符号，而是先绑定稳定的 `dispatch.FuncID`，再统一调用：
-
-- `yak_runtime_dispatch`
+标准库函数不直接导出成大量 runtime 符号，而是先绑定稳定的 `dispatch.FuncID`，再通过统一 invoke 入口执行。
 
 参考：
 
@@ -71,7 +69,7 @@ common/yak/ssa2llvm/
 
 Yak 的 `go` 语句会把 `ssa.Call.Async` 置位，编译后统一走：
 
-- `yak_runtime_spawn(ctx)`
+- `yak_runtime_invoke(ctx)` + `FlagAsync`
 
 runtime 再根据 `ctx.kind` 选择执行 callable 还是 dispatch，并用 C 侧 root 链表让 Boehm GC 在异步期间仍能看到 `ctx`。
 
