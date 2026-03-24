@@ -388,20 +388,7 @@ func ExtractTaskFromRawResponse(c *Coordinator, rawResponse string) (retTask *Ai
 		if retTask == nil {
 			return
 		}
-		// Ensure config is propagated to the new task and its subtasks
-		var propagateConfig func(task *AiTask)
-		propagateConfig = func(task *AiTask) {
-			if task == nil {
-				return
-			}
-			task.Coordinator = c
-			for _, sub := range task.Subtasks {
-				sub.ParentTask = task // Ensure parent is set
-				propagateConfig(sub)
-			}
-		}
-		propagateConfig(retTask)
-		retTask.GenerateIndex()
+		c.standardizeTaskTree(retTask)
 	}()
 	var extraReason bytes.Buffer
 	_ = extraReason

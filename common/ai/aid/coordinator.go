@@ -605,9 +605,6 @@ func (c *Coordinator) FindSubtaskByIndex(index string) *AiTask {
 }
 
 func (c *Coordinator) AppendTask(t *AiTask) {
-	defer func() {
-		t.GenerateIndex()
-	}()
 	r := c.runtime
 	task, ok := r.TaskLink.Get(r.currentIndex())
 	if !ok {
@@ -615,7 +612,9 @@ func (c *Coordinator) AppendTask(t *AiTask) {
 		return
 	}
 	if parent := task.ParentTask; parent != nil {
+		t.ParentTask = parent
 		parent.Subtasks = append(parent.Subtasks, t)
+		c.standardizeTaskTreeAndNotify(parent, "task appended")
 	}
 }
 

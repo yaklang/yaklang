@@ -107,7 +107,7 @@ func (p *PlanResponse) MergeSubtask(parentIndex string, name string, goal string
 	if p.RootTask == nil {
 		return
 	}
-	p.RootTask.GenerateIndex()
+	p.RootTask.Coordinator.standardizeTaskTree(p.RootTask)
 
 	p.recursiveMergeSubtask(p.RootTask, func(i *AiTask) error {
 		if i.Index != parentIndex {
@@ -135,29 +135,12 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 		// This handles cases where PlanMocker constructs AiTask objects manually
 		// without going through generateAITaskWithName.
 		if planRes.RootTask != nil {
-			pr.cod.ensureTaskTreeInitialized(planRes.RootTask)
-			planRes.RootTask.GenerateIndex()
+			pr.cod.standardizeTaskTreeAndNotify(planRes.RootTask, "mock plan initialized")
 		}
 		return planRes, nil
 	}
 
 	var rootTask = pr.cod.generateAITaskWithName("root-default", "root-default")
-	defer func() {
-		// Ensure config is propagated to the new task and its subtasks
-		var propagateConfig func(task *AiTask)
-		propagateConfig = func(task *AiTask) {
-			if task == nil {
-				return
-			}
-			task.Coordinator = pr.cod
-			for _, sub := range task.Subtasks {
-				sub.ParentTask = task // Ensure parent is set
-				propagateConfig(sub)
-			}
-		}
-		propagateConfig(rootTask)
-		rootTask.GenerateIndex()
-	}()
 
 	planTask := aicommon.NewStatefulTaskBase(
 		"plan-task",
@@ -238,6 +221,7 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 	if err != nil {
 		return nil, err
 	}
+	pr.cod.standardizeTaskTreeAndNotify(rootTask, "initial plan generated")
 	return pr.cod.newPlanResponse(rootTask), nil
 }
 
@@ -278,7 +262,11 @@ User request: %s`, pr.rawInput)
 
 func (c *Coordinator) generateAITask(params aitool.InvokeParams) *AiTask {
 	task := c.generateAITaskWithName(params.GetAnyToString("subtask_name"), params.GetAnyToString("subtask_goal"))
-	if deps := params.GetStringSlice("depends_on"); len(deps) > 0 {
+	if params.Has("depends_on") {
+		deps := params.GetStringSlice("depends_on")
+		if deps == nil {
+			deps = []string{}
+		}
 		task.DependsOn = deps
 	}
 	if identifier := params.GetAnyToString("subtask_identifier"); identifier != "" {

@@ -127,7 +127,7 @@ func (t *AiTask) ApplyTaskDeltas(deltas []TaskDelta) error {
 			parentTask.Subtasks = append(parentTask.Subtasks, newTask)
 			t.Coordinator.EmitInfo("delta replace_all: new task %q", nt.SubtaskName)
 		}
-		t.propagateAndReindex()
+		t.propagateAndReindex("task delta replace_all applied")
 		return nil
 	}
 
@@ -232,24 +232,15 @@ func (t *AiTask) ApplyTaskDeltas(deltas []TaskDelta) error {
 		}
 	}
 
-	t.propagateAndReindex()
+	t.propagateAndReindex("task delta applied")
 	return nil
 }
 
-func (t *AiTask) propagateAndReindex() {
-	var propagateConfig func(task *AiTask)
-	propagateConfig = func(task *AiTask) {
-		if task == nil {
-			return
-		}
-		task.Coordinator = t.Coordinator
-		for _, sub := range task.Subtasks {
-			sub.ParentTask = task
-			propagateConfig(sub)
-		}
+func (t *AiTask) propagateAndReindex(reason string) {
+	if t.Coordinator == nil {
+		return
 	}
-	propagateConfig(t.ParentTask)
-	t.GenerateIndex()
+	t.Coordinator.standardizeTaskTreeAndNotify(t.ParentTask, reason)
 }
 
 // GetPendingSiblingTasksInfo returns a text description of pending sibling tasks
