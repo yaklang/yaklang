@@ -252,7 +252,9 @@ func TestExec_CreateMirrors_TagWithNewlines(t *testing.T) {
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			// 标签内容前后有换行符
-			rsp.EmitOutputStream(bytes.NewBufferString(`<GEN_CODE>
+			rsp.EmitOutputStream(bytes.NewBufferString(`
+{"@action": "finish", "answer": "Done"}
+<GEN_CODE>
 
 func multiLineFunc() {
 	println("line 1")
@@ -260,7 +262,7 @@ func multiLineFunc() {
 }
 
 </GEN_CODE>
-{"@action": "finish", "answer": "Done"}`))
+`))
 			rsp.Close()
 			return rsp, nil
 		}),

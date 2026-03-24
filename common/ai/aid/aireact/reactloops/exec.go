@@ -127,20 +127,26 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 
 	getNextActionType := func(a *aicommon.Action) string { //legacy support
 		actionType := action.ActionType()
-		if actionType == "object" {
+		if actionType == "object" || actionType == "" {
 			actionType = action.GetString("next_action.type")
 		}
 		return actionType
 	}
 
 	ctxCanceled := utils.NewBool(false)
-	if r.GetCurrentTask() != nil {
-		select {
-		case <-r.GetCurrentTask().GetContext().Done():
-			ctxCanceled.SetTo(true)
-		default:
+	currentCtxCanceled := func() bool {
+		if r.GetCurrentTask() != nil {
+			select {
+			case <-r.GetCurrentTask().GetContext().Done():
+				ctxCanceled.SetTo(true)
+				return true
+			default:
+				return false
+			}
 		}
+		return false
 	}
+	currentCtxCanceled()
 
 	log.Infof("start to call aicommon.CallAITransaction in ReActLoop[%v]", r.loopName)
 	r.loadingStatus("等待 AI 回应 / Waiting AI Respond...")
@@ -162,6 +168,9 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 				true,
 				r.config.GetEmitter(),
 			)
+
+			buf := bytes.NewBuffer(make([]byte, 0))
+			stream = io.TeeReader(stream, buf)
 			tagOptions := r.buildActionTagOption(streamWg, resp.GetTaskIndex(), nonce)
 			streamFields := r.streamFields.Copy()
 
@@ -270,18 +279,27 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 
 			if actionErr != nil {
 				r.loadingStatus("解析响应失败 / Parse Response Failed")
+				log.Errorf("ai response stream content before error: %s", buf.String())
+				if currentCtxCanceled() {
+					actionErr = utils.Wrap(actionErr, "task context canceled while parsing action")
+				}
 				return utils.Wrap(actionErr, "failed to parse action")
 			}
 			actionType := getNextActionType(action)
 			if actionType == "" {
 				r.loadingStatus("动作类型为空 / Action Type Empty")
+				log.Errorf("ai response stream content before error: %s", buf.String())
 				if action != nil {
 					println("=== [DEBUG] action type is empty, raw params dump ===")
 					println(action.DumpRawParams())
 					println("=== [DEBUG] end raw params dump ===")
 				}
-				return utils.Errorf("action type is empty (available_actions=%v)",
+				emptyErr := utils.Errorf("action type is empty (available_actions=%v)",
 					actionNames)
+				if currentCtxCanceled() {
+					emptyErr = utils.Wrap(emptyErr, "task context canceled while parsing action")
+				}
+				return emptyErr
 			}
 
 			r.loadingStatus(fmt.Sprintf("处理动作 [%s] / Processing Action [%s]", actionType, actionType))
