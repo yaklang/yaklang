@@ -335,179 +335,6 @@ jobs:
           retention-days: 1
           compression-level: 0
 
-  prepare-ai:
-    needs: check-wip
-    if: needs.check-wip.outputs.should_run_tests == 'true'
-    runs-on: ubuntu-22.04
-    outputs:
-      artifact_ai_aid_react_id: ${{ steps.upload_ai_aid_react.outputs.artifact-id }}
-      artifact_ai_aid_core_tools_id: ${{ steps.upload_ai_aid_core_tools.outputs.artifact-id }}
-      artifact_ai_rag_id: ${{ steps.upload_ai_rag.outputs.artifact-id }}
-      artifact_ai_forge_misc_id: ${{ steps.upload_ai_forge_misc.outputs.artifact-id }}
-      target_ref: ${{ needs.check-wip.outputs.target_ref }}
-      fork_repo: ${{ needs.check-wip.outputs.fork_repo }}
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v3
-        with:
-          repository: ${{ needs.check-wip.outputs.fork_repo || github.repository }}
-          ref: ${{ needs.check-wip.outputs.target_ref || github.sha }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set up Go 1.x
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: "./go.mod"
-          cache: false
-
-      - name: Configure Go build directories
-        run: |
-          mkdir -p "$RUNNER_TEMP/go-build-cache" "$RUNNER_TEMP/go-mod-cache"
-          echo "GOCACHE=$RUNNER_TEMP/go-build-cache" >> $GITHUB_ENV
-          echo "GOMODCACHE=$RUNNER_TEMP/go-mod-cache" >> $GITHUB_ENV
-
-      - name: Generate AI prepare config
-        run: |
-          cat > /tmp/prepare_ai_test_config.json <<'CONFIGEOF'
-          [
-            {"package": "./common/ai/aid/...", "timeout": "12m", "parallel": 1},
-            {"package": "./common/ai/tests/...", "timeout": "60s", "parallel": 1},
-            {"package": "./common/ai/aispec/...", "timeout": "60s", "parallel": 1},
-            {"package": "./common/aireducer/...", "timeout": "60s", "parallel": 1},
-            {"package": "./common/aiforge/aibp", "timeout": "2m30s", "parallel": 1, "run": "^(TestBuildForgeFromYak|TestNewForgeExecutor)"},
-            {"package": "./common/aiforge", "timeout": "3m", "parallel": 1},
-            {"package": "./common/aibalance/...", "timeout": "30s", "parallel": 1},
-            {"package": "./common/ai/rag/pq/...", "timeout": "60s", "parallel": 1},
-            {"package": "./common/ai/rag/hnsw/...", "timeout": "60s", "parallel": 1},
-            {"package": "./common/ai/rag/entityrepos/...", "timeout": "60s", "parallel": 1},
-            {"package": "./common/ai/rag/vectorstore/...", "timeout": "1m", "run": "TestMUSTPASS", "parallel": 1},
-            {"package": "./common/ai/rag", "timeout": "1m", "run": "TestMUSTPASS", "parallel": 1},
-            {"package": "./common/ai/rag/plugins_rag/...", "timeout": "1m", "run": "TestMUSTPASS", "parallel": 1},
-            {"package": "./common/ai/rag/ragtests/...", "timeout": "1m", "run": "TestMUSTPASS"},
-            {"package": "./common/yakgrpc/aihttp/tests/...", "timeout": "1m"}
-          ]
-          CONFIGEOF
-
-      - name: Compile shared AI test binaries
-        env:
-          GOCACHE: ${{ env.GOCACHE }}
-          GOMODCACHE: ${{ env.GOMODCACHE }}
-        run: |
-          chmod +x ./scripts/ci/compile-tests.sh
-          export TEST_BIN_DIR=/tmp/test_binaries
-          export TEST_CONFIG=/tmp/prepare_ai_test_config.json
-          export COMPILE_WORKERS=2
-          export GO_TEST_P=1
-          ./scripts/ci/compile-tests.sh
-
-      - name: Generate AI package pattern files
-        run: |
-          cat > /tmp/ai_aid_react_patterns.txt <<'EOF'
-          ./common/ai/aid/aireact
-          ./common/ai/aid/aireact/...
-          EOF
-
-          cat > /tmp/ai_aid_core_tools_patterns.txt <<'EOF'
-          ./common/ai/aid
-          ./common/ai/aid/aicommon/...
-          ./common/ai/aid/aimem
-          ./common/ai/aid/aitool
-          ./common/ai/aid/aitool/...
-          ./common/ai/aid/test
-          EOF
-
-          cat > /tmp/ai_rag_patterns.txt <<'EOF'
-          ./common/ai/rag
-          ./common/ai/rag/entityrepos/...
-          ./common/ai/rag/hnsw/...
-          ./common/ai/rag/plugins_rag/...
-          ./common/ai/rag/pq/...
-          ./common/ai/rag/ragtests/...
-          ./common/ai/rag/vectorstore/...
-          EOF
-
-          cat > /tmp/ai_forge_misc_patterns.txt <<'EOF'
-          ./common/aiforge
-          ./common/aiforge/aibp
-          ./common/aireducer/...
-          ./common/aibalance/...
-          ./common/ai/tests/...
-          ./common/ai/aispec/...
-          ./common/yakgrpc/aihttp/tests/...
-          EOF
-
-      - name: Package AI aid/react suite
-        run: |
-          chmod +x ./scripts/ci/package-test-artifact.sh
-          export TEST_BIN_DIR=/tmp/test_binaries
-          export PACKAGE_PATTERNS_FILE=/tmp/ai_aid_react_patterns.txt
-          export INCLUDE_YAK=0
-          export ARTIFACT_PATH=/tmp/essential-tests-ai-aid-react.tar.gz
-          ./scripts/ci/package-test-artifact.sh
-
-      - name: Upload AI aid/react suite
-        id: upload_ai_aid_react
-        uses: actions/upload-artifact@v4
-        with:
-          name: essential-tests-ai-aid-react
-          path: /tmp/essential-tests-ai-aid-react.tar.gz
-          retention-days: 1
-          compression-level: 0
-
-      - name: Package AI aid/core-tools suite
-        run: |
-          chmod +x ./scripts/ci/package-test-artifact.sh
-          export TEST_BIN_DIR=/tmp/test_binaries
-          export PACKAGE_PATTERNS_FILE=/tmp/ai_aid_core_tools_patterns.txt
-          export INCLUDE_YAK=0
-          export ARTIFACT_PATH=/tmp/essential-tests-ai-aid-core-tools.tar.gz
-          ./scripts/ci/package-test-artifact.sh
-
-      - name: Upload AI aid/core-tools suite
-        id: upload_ai_aid_core_tools
-        uses: actions/upload-artifact@v4
-        with:
-          name: essential-tests-ai-aid-core-tools
-          path: /tmp/essential-tests-ai-aid-core-tools.tar.gz
-          retention-days: 1
-          compression-level: 0
-
-      - name: Package AI rag suite
-        run: |
-          chmod +x ./scripts/ci/package-test-artifact.sh
-          export TEST_BIN_DIR=/tmp/test_binaries
-          export PACKAGE_PATTERNS_FILE=/tmp/ai_rag_patterns.txt
-          export INCLUDE_YAK=0
-          export ARTIFACT_PATH=/tmp/essential-tests-ai-rag.tar.gz
-          ./scripts/ci/package-test-artifact.sh
-
-      - name: Upload AI rag suite
-        id: upload_ai_rag
-        uses: actions/upload-artifact@v4
-        with:
-          name: essential-tests-ai-rag
-          path: /tmp/essential-tests-ai-rag.tar.gz
-          retention-days: 1
-          compression-level: 0
-
-      - name: Package AI forge/misc suite
-        run: |
-          chmod +x ./scripts/ci/package-test-artifact.sh
-          export TEST_BIN_DIR=/tmp/test_binaries
-          export PACKAGE_PATTERNS_FILE=/tmp/ai_forge_misc_patterns.txt
-          export INCLUDE_YAK=0
-          export ARTIFACT_PATH=/tmp/essential-tests-ai-forge-misc.tar.gz
-          ./scripts/ci/package-test-artifact.sh
-
-      - name: Upload AI forge/misc suite
-        id: upload_ai_forge_misc
-        uses: actions/upload-artifact@v4
-        with:
-          name: essential-tests-ai-forge-misc
-          path: /tmp/essential-tests-ai-forge-misc.tar.gz
-          retention-days: 1
-          compression-level: 0
-
   test-local:
     name: ${{ matrix.name }}
     needs: check-wip
@@ -714,6 +541,128 @@ jobs:
           export TEST_CONFIG=/tmp/test_config.json
           export SUITE_NAME="${{ matrix.name }}"
           export SUITE_SYNC_RULE="${{ matrix.sync_rule == '1' && '1' || '0' }}"
+          export SUITE_RETRIES=1
+          ./scripts/ci/run-suite-with-retry.sh
+
+      - name: Generate safe artifact name
+        if: failure()
+        id: artifact_name
+        run: |
+          SAFE_NAME=$(echo "${{ matrix.name }}" | sed 's/[^a-zA-Z0-9_-]/_/g')
+          echo "name=test_logs_${SAFE_NAME}_${{ github.run_id }}" >> $GITHUB_OUTPUT
+
+      - name: Upload failure logs (GRPC + test logs)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.artifact_name.outputs.name }}
+          path: /tmp/*.log
+          if-no-files-found: warn
+
+  test-ai-local:
+    name: ${{ matrix.name }}
+    needs: check-wip
+    if: needs.check-wip.outputs.should_run_tests == 'true'
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: "Test AI Aid / React"
+            test_configs: |
+              [
+                {"package": "./common/ai/aid/aireact/...", "timeout": "12m", "parallel": 1}
+              ]
+
+          - name: "Test AI Aid / Core / Tool / Memory"
+            test_configs: |
+              [
+                {"package": "./common/ai/aid", "timeout": "12m", "parallel": 1},
+                {"package": "./common/ai/aid/aicommon/...", "timeout": "12m", "parallel": 1},
+                {"package": "./common/ai/aid/aimem", "timeout": "12m", "parallel": 1},
+                {"package": "./common/ai/aid/aitool/...", "timeout": "12m", "parallel": 1},
+                {"package": "./common/ai/aid/test", "timeout": "12m", "parallel": 1}
+              ]
+
+          - name: "Test AI RAG / Knowledge"
+            test_configs: |
+              [
+                {"package": "./common/ai/rag/pq/...", "timeout": "60s", "parallel": 1},
+                {"package": "./common/ai/rag/hnsw/...", "timeout": "60s", "parallel": 1},
+                {"package": "./common/ai/rag/entityrepos/...", "timeout": "60s", "parallel": 1},
+                {"package": "./common/ai/rag/vectorstore/...", "timeout": "1m", "run": "TestMUSTPASS", "parallel": 1},
+                {"package": "./common/ai/rag", "timeout": "1m", "run": "TestMUSTPASS", "parallel": 1},
+                {"package": "./common/ai/rag/plugins_rag/...", "timeout": "1m", "run": "TestMUSTPASS", "parallel": 1},
+                {"package": "./common/ai/rag/ragtests/...", "timeout": "1m", "run": "TestMUSTPASS"}
+              ]
+
+          - name: "Test AI Forge / Balance / Reducer / AIHTTP"
+            test_configs: |
+              [
+                {"package": "./common/ai/tests/...", "timeout": "60s", "parallel": 1},
+                {"package": "./common/ai/aispec/...", "timeout": "60s", "parallel": 1},
+                {"package": "./common/aireducer/...", "timeout": "60s", "parallel": 1},
+                {"package": "./common/aiforge/aibp", "timeout": "2m30s", "parallel": 1, "run": "^(TestBuildForgeFromYak|TestNewForgeExecutor)"},
+                {"package": "./common/aiforge", "timeout": "3m", "parallel": 1},
+                {"package": "./common/aibalance/...", "timeout": "30s", "parallel": 1},
+                {"package": "./common/yakgrpc/aihttp/tests/...", "timeout": "1m"}
+              ]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          repository: ${{ needs.check-wip.outputs.fork_repo || github.repository }}
+          ref: ${{ needs.check-wip.outputs.target_ref || github.sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "./go.mod"
+          cache: false
+
+      - name: Configure Go build directories
+        run: |
+          mkdir -p "$RUNNER_TEMP/go-build-cache" "$RUNNER_TEMP/go-mod-cache"
+          echo "GOCACHE=$RUNNER_TEMP/go-build-cache" >> $GITHUB_ENV
+          echo "GOMODCACHE=$RUNNER_TEMP/go-mod-cache" >> $GITHUB_ENV
+
+      - name: Generate test config
+        run: |
+          cat > /tmp/test_config.json <<'CONFIGEOF'
+          ${{ matrix.test_configs }}
+          CONFIGEOF
+          cat /tmp/test_config.json
+
+      - name: Compile test binaries
+        env:
+          GOCACHE: ${{ env.GOCACHE }}
+          GOMODCACHE: ${{ env.GOMODCACHE }}
+        run: |
+          chmod +x ./scripts/ci/compile-tests.sh
+          export TEST_BIN_DIR=/tmp/test_binaries
+          export TEST_CONFIG=/tmp/test_config.json
+          export COMPILE_WORKERS=2
+          export GO_TEST_P=1
+          ./scripts/ci/compile-tests.sh
+
+      - name: Build yak binary for GRPC server
+        env:
+          GOCACHE: ${{ env.GOCACHE }}
+          GOMODCACHE: ${{ env.GOMODCACHE }}
+        run: |
+          go build -o ./yak common/yak/cmd/yak.go
+          chmod +x ./yak
+
+      - name: ${{ matrix.name }}
+        run: |
+          chmod +x ./scripts/ci/run-tests.sh ./scripts/ci/run-suite-with-retry.sh
+          export YAK_BINARY_PATH=./yak
+          export TEST_BIN_DIR=/tmp/test_binaries
+          export TEST_TIMEOUT="2m"
+          export TEST_VERBOSE="1"
+          export TEST_CONFIG=/tmp/test_config.json
+          export SUITE_NAME="${{ matrix.name }}"
           export SUITE_RETRIES=1
           ./scripts/ci/run-suite-with-retry.sh
 
@@ -1086,129 +1035,6 @@ jobs:
           path: /tmp/*.log
           if-no-files-found: warn
 
-  test-prepared-ai:
-    name: ${{ matrix.name }}
-    needs: [prepare-yak, prepare-ai]
-    if: needs.prepare-yak.result == 'success' && needs.prepare-ai.result == 'success'
-    runs-on: ubuntu-22.04
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: "Test AI Aid / React"
-            artifact_name: "essential-tests-ai-aid-react"
-            artifact_file: "essential-tests-ai-aid-react.tar.gz"
-            test_configs: |
-              [
-                {"package": "./common/ai/aid/aireact/...", "timeout": "12m", "parallel": 1}
-              ]
-
-          - name: "Test AI Aid / Core / Tool / Memory"
-            artifact_name: "essential-tests-ai-aid-core-tools"
-            artifact_file: "essential-tests-ai-aid-core-tools.tar.gz"
-            test_configs: |
-              [
-                {"package": "./common/ai/aid", "timeout": "12m", "parallel": 1},
-                {"package": "./common/ai/aid/aicommon/...", "timeout": "12m", "parallel": 1},
-                {"package": "./common/ai/aid/aimem", "timeout": "12m", "parallel": 1},
-                {"package": "./common/ai/aid/aitool/...", "timeout": "12m", "parallel": 1},
-                {"package": "./common/ai/aid/test", "timeout": "12m", "parallel": 1}
-              ]
-
-          - name: "Test AI RAG / Knowledge"
-            artifact_name: "essential-tests-ai-rag"
-            artifact_file: "essential-tests-ai-rag.tar.gz"
-            test_configs: |
-              [
-                {"package": "./common/ai/rag/pq/...", "timeout": "60s", "parallel": 1},
-                {"package": "./common/ai/rag/hnsw/...", "timeout": "60s", "parallel": 1},
-                {"package": "./common/ai/rag/entityrepos/...", "timeout": "60s", "parallel": 1},
-                {"package": "./common/ai/rag/vectorstore/...", "timeout": "1m", "run": "TestMUSTPASS", "parallel": 1},
-                {"package": "./common/ai/rag", "timeout": "1m", "run": "TestMUSTPASS", "parallel": 1},
-                {"package": "./common/ai/rag/plugins_rag/...", "timeout": "1m", "run": "TestMUSTPASS", "parallel": 1},
-                {"package": "./common/ai/rag/ragtests/...", "timeout": "1m", "run": "TestMUSTPASS"}
-              ]
-
-          - name: "Test AI Forge / Balance / Reducer / AIHTTP"
-            artifact_name: "essential-tests-ai-forge-misc"
-            artifact_file: "essential-tests-ai-forge-misc.tar.gz"
-            test_configs: |
-              [
-                {"package": "./common/ai/tests/...", "timeout": "60s", "parallel": 1},
-                {"package": "./common/ai/aispec/...", "timeout": "60s", "parallel": 1},
-                {"package": "./common/aireducer/...", "timeout": "60s", "parallel": 1},
-                {"package": "./common/aiforge/aibp", "timeout": "2m30s", "parallel": 1, "run": "^(TestBuildForgeFromYak|TestNewForgeExecutor)"},
-                {"package": "./common/aiforge", "timeout": "3m", "parallel": 1},
-                {"package": "./common/aibalance/...", "timeout": "30s", "parallel": 1},
-                {"package": "./common/yakgrpc/aihttp/tests/...", "timeout": "1m"}
-              ]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          repository: ${{ needs.prepare-ai.outputs.fork_repo || github.repository }}
-          ref: ${{ needs.prepare-ai.outputs.target_ref || github.sha }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Generate test config
-        run: |
-          cat > /tmp/test_config.json <<'CONFIGEOF'
-          ${{ matrix.test_configs }}
-          CONFIGEOF
-          cat /tmp/test_config.json
-
-      - name: Download prepared suite
-        uses: actions/download-artifact@v4
-        with:
-          name: ${{ matrix.artifact_name }}
-          path: ${{ runner.temp }}/prepared-artifact
-
-      - name: Unpack prepared suite
-        run: |
-          chmod +x ./scripts/ci/unpack-test-artifact.sh
-          export ARTIFACT_PATH="${{ runner.temp }}/prepared-artifact/${{ matrix.artifact_file }}"
-          export DEST_DIR="${{ runner.temp }}/prepared-suite"
-          export REQUIRE_YAK=0
-          ./scripts/ci/unpack-test-artifact.sh
-
-      - name: Download shared yak binary
-        uses: actions/download-artifact@v4
-        with:
-          name: essential-tests-yak
-          path: ${{ runner.temp }}/yak-artifact
-
-      - name: Unpack shared yak binary
-        run: |
-          tar -C "${{ runner.temp }}/prepared-suite" -xzf "${{ runner.temp }}/yak-artifact/essential-tests-yak.tar.gz"
-          chmod +x "${{ runner.temp }}/prepared-suite/yak"
-
-      - name: ${{ matrix.name }}
-        run: |
-          chmod +x ./scripts/ci/run-tests.sh ./scripts/ci/run-suite-with-retry.sh "${{ runner.temp }}/prepared-suite/yak"
-          export YAK_BINARY_PATH="${{ runner.temp }}/prepared-suite/yak"
-          export TEST_BIN_DIR="${{ runner.temp }}/prepared-suite/test_binaries"
-          export TEST_TIMEOUT="2m"
-          export TEST_VERBOSE="1"
-          export TEST_CONFIG=/tmp/test_config.json
-          export SUITE_NAME="${{ matrix.name }}"
-          export SUITE_RETRIES=1
-          ./scripts/ci/run-suite-with-retry.sh
-
-      - name: Generate safe artifact name
-        if: failure()
-        id: artifact_name
-        run: |
-          SAFE_NAME=$(echo "${{ matrix.name }}" | sed 's/[^a-zA-Z0-9_-]/_/g')
-          echo "name=test_logs_${SAFE_NAME}_${{ github.run_id }}" >> $GITHUB_OUTPUT
-
-      - name: Upload failure logs (GRPC + test logs)
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ steps.artifact_name.outputs.name }}
-          path: /tmp/*.log
-          if-no-files-found: warn
-
   cleanup-yakgrpc-artifact:
     needs: [prepare-yakgrpc, test-prepared-yakgrpc]
     if: needs.prepare-yakgrpc.result == 'success' && needs.test-prepared-yakgrpc.result == 'success'
@@ -1259,45 +1085,9 @@ jobs:
             && echo "Deleted coreplugin artifact $ARTIFACT_ID" \
             || echo "::warning::Failed to delete coreplugin artifact $ARTIFACT_ID"
 
-  cleanup-ai-artifact:
-    needs: [prepare-ai, test-prepared-ai]
-    if: needs.prepare-ai.result == 'success' && needs.test-prepared-ai.result == 'success'
-    runs-on: ubuntu-22.04
-    permissions:
-      actions: write
-    steps:
-      - name: Delete AI artifacts
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          AI_AID_REACT_ARTIFACT_ID: ${{ needs.prepare-ai.outputs.artifact_ai_aid_react_id }}
-          AI_AID_CORE_TOOLS_ARTIFACT_ID: ${{ needs.prepare-ai.outputs.artifact_ai_aid_core_tools_id }}
-          AI_RAG_ARTIFACT_ID: ${{ needs.prepare-ai.outputs.artifact_ai_rag_id }}
-          AI_FORGE_MISC_ARTIFACT_ID: ${{ needs.prepare-ai.outputs.artifact_ai_forge_misc_id }}
-        run: |
-          for artifact_id in \
-            "$AI_AID_REACT_ARTIFACT_ID" \
-            "$AI_AID_CORE_TOOLS_ARTIFACT_ID" \
-            "$AI_RAG_ARTIFACT_ID" \
-            "$AI_FORGE_MISC_ARTIFACT_ID"
-          do
-            if [ -z "$artifact_id" ]; then
-              echo "::warning::Missing AI artifact id, skip deletion for this entry"
-              continue
-            fi
-
-            curl -fsSL \
-              -X DELETE \
-              -H "Accept: application/vnd.github+json" \
-              -H "Authorization: Bearer $GITHUB_TOKEN" \
-              -H "X-GitHub-Api-Version: 2022-11-28" \
-              "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/$artifact_id" \
-              && echo "Deleted AI artifact $artifact_id" \
-              || echo "::warning::Failed to delete AI artifact $artifact_id"
-          done
-
   cleanup-yak-artifact:
-    needs: [prepare-yak, test-prepared-yakgrpc, test-prepared-coreplugin, test-prepared-ai]
-    if: needs.prepare-yak.result == 'success' && needs.test-prepared-yakgrpc.result == 'success' && needs.test-prepared-coreplugin.result == 'success' && needs.test-prepared-ai.result == 'success'
+    needs: [prepare-yak, test-prepared-yakgrpc, test-prepared-coreplugin]
+    if: needs.prepare-yak.result == 'success' && needs.test-prepared-yakgrpc.result == 'success' && needs.test-prepared-coreplugin.result == 'success'
     runs-on: ubuntu-22.04
     permissions:
       actions: write
@@ -1322,7 +1112,7 @@ jobs:
 
   post-check:
     name: Save Test Results to Cache
-    needs: [check-wip, test-local, test-prepared-yakgrpc, test-prepared-coreplugin, test-prepared-ai]
+    needs: [check-wip, test-local, test-ai-local, test-prepared-yakgrpc, test-prepared-coreplugin]
     if: needs.check-wip.outputs.should_run_tests == 'true' && success()
     runs-on: ubuntu-22.04
     steps:
