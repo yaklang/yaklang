@@ -271,6 +271,21 @@ IMPORTANT GUIDELINES:
 {"@action": "verify-satisfaction", "user_satisfied": false, "completed_task_index": "", "reasoning": "阶段推进：已完成上一项观察，准备进入下一步", "next_movements": [{"op": "done", "id": "collect_page_signal"}, {"op": "add", "id": "replay_with_new_payload", "content": "使用新的 payload 复测并对比响应差异"}]}
 ```
 
+## output_files 文件提取规则（仅在 IsToolCall 时生效）
+
+当【INPUT】是工具调用结果时，你需要识别工具执行过程中**创建或修改**的文件路径：
+
+1. **write_file 工具**: stdout 中 `[write_file] write success. file: <路径>` 包含目标文件路径
+2. **modify_file 工具**: stdout 中 `File <路径> modified successfully` 包含目标文件路径
+3. **bash 工具**: 分析命令内容，识别 `cat > <路径>`、`echo ... > <路径>`、`python3 <路径>` 等模式中涉及的文件路径
+4. **其他工具**: 从 stdout/result 中识别明确的文件创建/修改输出
+
+规则：
+- 只提取**绝对路径**或可解析的路径
+- 排除工具内部的临时脚本文件（如 `ai_bash_script_*.sh`）
+- 如果没有文件产物，输出空数组 `[]`
+- `output_files` 中的路径应该是工具执行**直接产生**的文件，而非工具读取的输入文件
+
 ## 严格禁止
 
 1. 禁止任务已完成时不设置 `completed_task_index`

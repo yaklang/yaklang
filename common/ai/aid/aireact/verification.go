@@ -203,6 +203,7 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 			result.Satisfied = action.GetBool("user_satisfied")
 			result.Reasoning = action.GetString("reasoning")
 			result.CompletedTaskIndex = action.GetString("completed_task_index")
+			result.OutputFiles = action.GetStringSlice("output_files")
 
 			nextMovements := normalizeVerifyNextMovements(action)
 			// Store next_movements in result for status tracking

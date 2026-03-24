@@ -12,7 +12,7 @@ import (
 )
 
 const NeedRecommendCapabilitiesCount = 15
-const intentSummaryMaxRunes = reactloops.IntentSummaryMaxRunes
+const intentSummaryRecommendedRunes = reactloops.IntentSummaryRecommendedRunes
 
 func VerifyIntentLoopNeedReAnalysis(loop *reactloops.ReActLoop) bool {
 	existingAnalysis := loop.Get("intent_analysis")
@@ -84,7 +84,7 @@ generate a concise intent analysis for the user's query.
 
 Requirements:
 1. Summarize only the core user intent
-2. intent_summary must be very short, ideally around 20 Chinese characters or similarly brief in English
+2. intent_summary should stay concise, preferably around 20-24 Chinese characters or similarly brief in English, but complete meaning is more important than strict length
 3. Do NOT repeat the user's full request
 4. Do NOT describe the search process
 5. Do NOT include tools, forges, skills, or focus modes in intent_summary; put them only in recommended_capabilities
@@ -134,7 +134,10 @@ Skills: {{ .MatchedSkillNames }}
 			),
 		},
 		aicommon.WithGeneralConfigStreamableFieldWithNodeId("intent", "intent_summary"),
-		aicommon.WithGeneralConfigStreamableFieldWithNodeId("intent", "recommended_capabilities"),
+		aicommon.WithGeneralConfigStreamableFieldCallback(
+			[]string{"recommended_capabilities"},
+			recommendedCapabilitiesStreamCallback(invoker),
+		),
 	)
 	if err != nil {
 		log.Errorf("intent finalize: LiteForge invocation failed: %v", err)

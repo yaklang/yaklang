@@ -25,7 +25,7 @@ func makeFinalizeEnrichmentAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 	toolOpts := []aitool.ToolOption{
 		aitool.WithStringParam("intent_summary",
 			aitool.WithParam_Description(
-				"极短意图标签，只描述用户想做什么，目标约 20 字。不要复述原请求，不要写推荐能力，不要解释搜索过程。/ Short intent label only, around 20 characters in Chinese or similarly brief in English."),
+				"简短意图标签，只描述用户想做什么，优先保持完整语义。可控制在 20-24 字左右，但不要为了变短而截断关键含义。不要复述原请求，不要写推荐能力，不要解释搜索过程。/ Short intent label only, preferably around 20-24 Chinese characters while preserving complete meaning. Do not repeat the original request, include recommendations, or explain the search process."),
 			aitool.WithParam_Required(true),
 		),
 		aitool.WithStringArrayParamEx("recommended_capabilities",
@@ -41,7 +41,7 @@ func makeFinalizeEnrichmentAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 		toolOpts,
 		[]*reactloops.LoopStreamField{
 			{AINodeId: "intent", FieldName: "intent_summary", StreamHandler: intentSummaryStreamHandler},
-			{AINodeId: "intent", FieldName: "recommended_capabilities"},
+			{AINodeId: "intent", FieldName: "recommended_capabilities", StreamHandler: recommendedCapabilitiesStreamHandler},
 		},
 		// Verifier
 		func(loop *reactloops.ReActLoop, action *aicommon.Action) error {

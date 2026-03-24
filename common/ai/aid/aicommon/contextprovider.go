@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/yakgit/yakdiff"
@@ -216,6 +217,28 @@ func FileContextProvider(filePath string, userPrompt ...string) ContextProvider 
 		result.WriteString("\n--- End of File Content ---\n")
 
 		return result.String(), nil
+	}
+}
+
+// OutputFileContextProvider reads a tool-produced file (up to 40KB) and renders it
+// with line numbers using utils.PrefixLinesWithLineNumbers. Designed for use with
+// RegisterTracedContent to automatically inject output file content into subsequent prompts,
+// enabling the modify_file -> re-execute fast loop.
+func OutputFileContextProvider(filePath string) ContextProvider {
+	return func(config AICallerConfigIf, emitter *Emitter, key string) (string, error) {
+		info, err := aitool.ReadOutputFileFromPath(filePath)
+		if err != nil {
+			return fmt.Sprintf("[Error: failed to read output file %s: %v]", filePath, err), err
+		}
+		var buf strings.Builder
+		buf.WriteString(fmt.Sprintf("## Output File: %s (%s)\n", filePath, formatFileSize(info.Size)))
+		if info.Size > aitool.MaxOutputFileBytes {
+			buf.WriteString(fmt.Sprintf("Note: file truncated to first %d bytes (original: %d bytes)\n", aitool.MaxOutputFileBytes, info.Size))
+		}
+		buf.WriteString("```\n")
+		buf.WriteString(info.LineNumberedContent())
+		buf.WriteString("\n```\n")
+		return buf.String(), nil
 	}
 }
 
