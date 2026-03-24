@@ -15,6 +15,7 @@ var actions = new(sync.Map)
 type LoopMetadata struct {
 	Name                string // loop name
 	Description         string // describes what this loop does
+	DescriptionZh       string // describes what this loop does in Chinese
 	OutputExamplePrompt string // example output for reflection_output_example.txt
 	UsagePrompt         string // usage description for x-@action-rules in schema
 	IsHidden            bool   // whether to hide this loop from the user
@@ -36,6 +37,13 @@ func WithLoopIsHidden(hidden bool) LoopMetadataOption {
 func WithLoopDescription(desc string) LoopMetadataOption {
 	return func(m *LoopMetadata) {
 		m.Description = desc
+	}
+}
+
+// WithLoopDescriptionZh sets the Chinese description of what this loop does
+func WithLoopDescriptionZh(desc string) LoopMetadataOption {
+	return func(m *LoopMetadata) {
+		m.DescriptionZh = desc
 	}
 }
 
@@ -150,6 +158,13 @@ func GetLoopMetadata(name string) (*LoopMetadata, bool) {
 		return nil, false
 	}
 	return metaObj, true
+}
+
+func (m *LoopMetadata) GetDescriptionZh() string {
+	if m == nil {
+		return ""
+	}
+	return m.DescriptionZh
 }
 
 // GetAllLoopMetadata returns all registered loop metadata

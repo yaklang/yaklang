@@ -81,6 +81,7 @@ func init() {
 			return reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_WRITE_PYTHON_SCRIPT, r, preset...)
 		},
 		reactloops.WithLoopDescription("Enter focused mode for Python script generation. Creates production-quality Python scripts with CLI entry points, dependency management, and syntax validation."),
+		reactloops.WithLoopDescriptionZh("Python 脚本生成模式：用于编写或修改生产可用的 Python 脚本，支持 CLI 入口、依赖检查与语法校验。"),
 		reactloops.WithLoopUsagePrompt("Use when user requests to write or modify Python scripts. Provides specialized tools: write_script, modify_script, insert_script, delete_script, check_and_install_dependencies. Use bash tool to execute scripts and install dependencies."),
 		reactloops.WithLoopOutputExample(`
 * When user requests to write a Python script:

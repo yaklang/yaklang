@@ -73,6 +73,7 @@ func init() {
 			return reactloops.NewReActLoop(LoopHTTPFuzztestName, r, preset...)
 		},
 		reactloops.WithLoopDescription("HTTP request fuzzing and response diff analysis for security testing"),
+		reactloops.WithLoopDescriptionZh("HTTP 安全模糊测试模式：对 HTTP 请求进行变异、发送和响应差异分析，用于发现潜在安全问题。"),
 		reactloops.WithVerboseName("HTTP Fuzz Test"),
 		reactloops.WithVerboseNameZh("HTTP 安全模糊测试"),
 		reactloops.WithLoopUsagePrompt("Use when user wants to fuzz HTTP requests and analyze response differences. First use 'set_http_request' to set the target request, then use fuzz actions (fuzz_method, fuzz_path, fuzz_header, fuzz_get_params, fuzz_body, fuzz_cookie) to test"),

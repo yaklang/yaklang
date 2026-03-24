@@ -159,6 +159,7 @@ func init() {
 			return reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_WRITE_SYNTAXFLOW, r, preset...)
 		},
 		reactloops.WithLoopDescription("Enter focused mode for SyntaxFlow rule generation and modification with real-time syntax validation"),
+		reactloops.WithLoopDescriptionZh("SyntaxFlow 规则编写模式：用于生成或修改 SyntaxFlow 规则，并在过程中进行实时语法校验。"),
 		reactloops.WithLoopUsagePrompt("Use when user requests to write, modify, or debug SyntaxFlow vulnerability detection rules. Provides tools: write_rule, modify_rule, insert_rule, delete_rule, check-syntaxflow-syntax (for .sf syntax validation; do NOT use check-yaklang-syntax) with real-time SyntaxFlow compile validation. Keywords: include 必须 as $gin, 正确 <include('golang-gin-context')> as $gin, include 漏写 as, $gin 未定义"),
 		reactloops.WithLoopOutputExample(`
 * When user requests to write SyntaxFlow rule:
