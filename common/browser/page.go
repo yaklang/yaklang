@@ -17,6 +17,7 @@ type BrowserPage struct {
 	browser *BrowserInstance
 	refMap  *RefMap
 	timeout time.Duration
+	mouse   *rod.Mouse
 }
 
 func newBrowserPage(page *rod.Page, browser *BrowserInstance, timeout time.Duration) *BrowserPage {
@@ -25,6 +26,7 @@ func newBrowserPage(page *rod.Page, browser *BrowserInstance, timeout time.Durat
 		browser: browser,
 		refMap:  NewRefMap(),
 		timeout: timeout,
+		mouse:   page.Mouse,
 	}
 }
 
@@ -186,6 +188,49 @@ func (p *BrowserPage) Elements(selector string) (BrowserElements, error) {
 		result = append(result, &BrowserElement{element: el})
 	}
 	return result, nil
+}
+
+// ElementsByLabel get elements by label from accessibility tree
+func (p *BrowserPage) ElementsByLabel(label string) (BrowserElements, error) {
+	results, err := accessibilityGetPageFullAXTree(p.page)
+	if err != nil {
+		return nil, fmt.Errorf("get elements by label error: %w", err)
+	}
+	if len(results.Nodes) == 0 {
+		return nil, nil
+	}
+	seen := make(map[proto.DOMBackendNodeID]struct{})
+	var elements BrowserElements
+	for _, node := range results.Nodes {
+		if node.Name == nil || axValueString(node.Name) != label {
+			continue
+		}
+		if node.BackendDOMNodeID <= 0 {
+			continue
+		}
+
+		backendNodeID := node.BackendDOMNodeID
+		if _, ok := seen[backendNodeID]; ok {
+			continue
+		}
+
+		resolveResult, err := proto.DOMResolveNode{BackendNodeID: backendNodeID}.Call(p.page)
+		if err != nil {
+			return nil, fmt.Errorf("resolve node by label %q: %w", label, err)
+		}
+		if resolveResult.Object == nil {
+			continue
+		}
+
+		el, err := p.page.ElementFromObject(resolveResult.Object)
+		if err != nil {
+			return nil, fmt.Errorf("convert resolved node to element by label %q: %w", label, err)
+		}
+
+		elements = append(elements, &BrowserElement{element: el})
+		seen[backendNodeID] = struct{}{}
+	}
+	return elements, nil
 }
 
 func (p *BrowserPage) GetCookies() ([]*proto.NetworkCookie, error) {

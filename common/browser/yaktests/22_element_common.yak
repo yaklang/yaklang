@@ -1,0 +1,159 @@
+// 22_element_common.yak
+// Test element common.
+// covers: element.SetFiles / element.DoubleClick / element.Checked / element.Select / element.ScrollIntoView / element.Click / element.Hover
+//
+// Run: go run common/yak/cmd/yak.go common/browser/yaktests/22_element_common.yak
+
+defer browser.CloseAll()
+
+session = "element_common"
+test_file_path = "/tmp/browser_gui_control_url.txt"
+uploadUrl = "http://127.0.0.1:8787/upload/main?case=safe"
+
+log.Info("===== test: open browser with form page =====")
+b, err = browser.Open(
+    browser.id(session),
+    browser.headless(true),
+    browser.timeout(30),
+)
+assert err == nil, sprintf("open failed: %v", err)
+
+page, err = b.Navigate(uploadUrl)
+assert err == nil, sprintf("navigate to drag failed: %v", err)
+sleep(0.5)
+
+// set upload
+setFileElement, err = page.Element("#formFile")
+assert err == nil, sprintf("get set file element failed: %v", err)
+
+err = setFileElement.SetFiles(test_file_path)
+assert err == nil, sprintf("set file failed: %v", err)
+
+// check upload
+value, err = setFileElement.Property("value")
+assert err == nil, sprintf("get element property failed: %v", err)
+log.info("set file element text: %v", value)
+
+// double click
+button, err = page.Element("body > div > div > form > button")
+assert err == nil, sprintf("get click element failed: %v", err)
+err = button.DoubleClick()
+assert err == nil, sprintf("double click failed: %v", err)
+
+html = `data:text/html,
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>复选框和下拉选择示例</title>
+</head>
+<body>
+    <h3>复选框和下拉选择示例</h3>
+
+    <div>
+        <h4>复选框示例（已选中状态）</h4>
+        <input type="checkbox" id="agreeCheckbox" checked>
+        <label for="agreeCheckbox">我已阅读并同意条款</label>
+        <br>
+        <input type="checkbox" id="notifyCheckbox" checked>
+        <label for="notifyCheckbox">接收通知</label>
+        <br>
+        <input type="checkbox" id="rememberCheckbox" checked>
+        <label for="rememberCheckbox">记住我的选择</label>
+        <br>
+    </div>
+
+    <div>
+        <h4>下拉选择示例</h4>
+        <select id="citySelect">
+            <option value="beijing">北京</option>
+            <option value="shanghai" selected>上海</option>
+            <option value="guangzhou">广州</option>
+            <option value="shenzhen">深圳</option>
+            <option value="chengdu">成都</option>
+        </select>
+    </div>
+
+    <div>
+        <h4>结果显示</h4>
+        <div id="checkboxResult"></div>
+        <div id="selectResult"></div>
+    </div>
+
+    <script>
+        const agreeCheckbox = document.getElementById('agreeCheckbox');
+        const notifyCheckbox = document.getElementById('notifyCheckbox');
+        const rememberCheckbox = document.getElementById('rememberCheckbox');
+        const citySelect = document.getElementById('citySelect');
+        const checkboxResult = document.getElementById('checkboxResult');
+        const selectResult = document.getElementById('selectResult');
+
+        function updateCheckboxResult() {
+            const agreeStatus = agreeCheckbox.checked ? '已选中' : '未选中';
+            const notifyStatus = notifyCheckbox.checked ? '已选中' : '未选中';
+            const rememberStatus = rememberCheckbox.checked ? '已选中' : '未选中';
+
+            checkboxResult.innerHTML = '复选框状态：<br>' +
+                '同意条款：' + agreeStatus + '<br>' +
+                '接收通知：' + notifyStatus + '<br>' +
+                '记住选择：' + rememberStatus;
+        }
+
+        function updateSelectResult() {
+            const selectedValue = citySelect.value;
+            const selectedText = citySelect.options[citySelect.selectedIndex].text;
+
+            selectResult.innerHTML = '下拉选择结果：<br>' +
+                '选中值：' + selectedValue + '<br>' +
+                '显示文本：' + selectedText;
+        }
+
+        agreeCheckbox.addEventListener('change', updateCheckboxResult);
+        notifyCheckbox.addEventListener('change', updateCheckboxResult);
+        rememberCheckbox.addEventListener('change', updateCheckboxResult);
+        citySelect.addEventListener('change', updateSelectResult);
+
+        updateCheckboxResult();
+        updateSelectResult();
+    </script>
+</body>
+</html>`
+
+newPage, err = b.Navigate(html)
+assert err == nil, sprintf("navigate to html failed: %v", err)
+sleep(0.5)
+
+checkedElementA, err = newPage.Element("#agreeCheckbox")
+assert err == nil, sprintf("get check element A failed: %v", err)
+checkedElementB, err = newPage.Element("#notifyCheckbox")
+assert err == nil, sprintf("get check element B failed: %v", err)
+
+// scroll into view
+err = checkedElementA.ScrollIntoView()
+assert err == nil, sprintf("element scroll into view failed: %v", err)
+
+// hover
+err = checkedElementA.Hover()
+assert err == nil, sprintf("element hover failed: %v", err)
+
+// click
+err = checkedElementA.Click()
+assert err == nil, sprintf("element click failed: %v", err)
+
+// checked
+checkedA, err = checkedElementA.Checked()
+assert err == nil, sprintf("get elementA checked failed: %v", err)
+assert checkedA == false, "elementA should not be checked"
+checkedB, err = checkedElementB.Checked()
+assert err == nil, sprintf("get elementB checked failed: %v", err)
+assert checkedB == true, "checkedB should be checked"
+
+// select
+selectElement, err = newPage.Element("#citySelect")
+assert err == nil, sprintf("get select element failed: %v", err)
+err = selectElement.Select("北京")
+assert err == nil, sprintf("select element failed: %v", err)
+selectResultElement, err = newPage.Element("#selectResult")
+assert err == nil, sprintf("get select result element failed: %v", err)
+resultText, err = selectResultElement.Text()
+assert err == nil, sprintf("get select result element text failed: %v", err)
+log.info("select result element text: %v", resultText)

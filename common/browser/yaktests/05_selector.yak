@@ -31,11 +31,16 @@ assert err == nil, sprintf("get body html failed: %v", err)
 assert len(bodyHTML) > 0, "body html should not be empty"
 log.info("body html length: %v chars", len(bodyHTML))
 
-log.info("===== test 4: Element Visible method =====")
+log.info("===== test 4: Element Visible, Enabled method =====")
 visible, err = bodyEl.Visible()
 assert err == nil, sprintf("check body visible failed: %v", err)
 assert visible == true, "body should be visible"
 log.info("body visible: %v", visible)
+
+enable, err = bodyEl.Enable()
+assert err == nil, sprintf("check body enable failed: %v", err)
+assert enable == true, "body should be enable"
+log.info("body enable: %v", enable)
 
 log.info("===== test 5: Elements('a') finds multiple links =====")
 links, err = page.Elements("a")
@@ -66,6 +71,15 @@ if err != nil {
 } else {
     log.info("filled input element via css selector")
 }
+
+inputElement, err = page.Element("#search-input")
+assert err == nil, sprintf("get input element failed: %v", err)
+err = inputElement.Input("search-input")
+assert err == nil, sprintf("element input failed: %v", err)
+err = inputElement.Type("search-input")
+assert err == nil, sprintf("element type failed: %v", err)
+err = inputElement.Type("错误示范")
+assert err != nil, "element error type not found"
 
 log.info("===== test 8: Click via CSS selector =====")
 err = page.Click("a")
