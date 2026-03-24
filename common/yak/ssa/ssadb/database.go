@@ -1,10 +1,14 @@
 package ssadb
 
 import (
+	"strconv"
+	"strings"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssa/reportstore"
 )
 
 var SSAProjectTables = []any{
@@ -31,21 +35,21 @@ var SSAProjectTables = []any{
 
 	// report
 	&schema.ReportRecord{},
-	&schema.ReportRecordFile{},
+	&reportstore.SSAReportRecord{},
+	&reportstore.SSAReportRecordFile{},
 
 	//diff result
 	&schema.SSADiffResult{},
 
 	&schema.ProjectGeneralStorage{},
-
-	&schema.ReportRecord{},
-	&schema.ReportRecordFile{},
 }
 
 func init() {
 	schema.RegisterDatabaseSchema(schema.KEY_SCHEMA_SSA_DATABASE, SSAProjectTables...)
 	schema.RegisterDatabasePatch(schema.KEY_SCHEMA_SSA_DATABASE, patchIrSourceQuotedCode)
 	schema.RegisterDatabasePatch(schema.KEY_SCHEMA_SSA_DATABASE, patchIrCodeIndex)
+	schema.RegisterDatabasePatch(schema.KEY_SCHEMA_SSA_DATABASE, patchSSAReportStoreTextColumns)
+	schema.RegisterDatabasePatch(schema.KEY_SCHEMA_SSA_DATABASE, patchMigrateLegacySSAReportStore)
 }
 
 // patchIrSourceQuotedCode patches the QuotedCode column type based on database dialect
@@ -120,6 +124,150 @@ func patchIrCodeIndex(db *gorm.DB) {
 	for _, idx := range indexQueries {
 		if err := db.Exec(idx.query).Error; err != nil {
 			log.Warnf("failed to add index %s: %v", idx.name, err)
+		}
+	}
+}
+
+func patchSSAReportStoreTextColumns(db *gorm.DB) {
+	if !db.HasTable(&reportstore.SSAReportRecord{}) {
+		return
+	}
+	dialect := db.Dialect().GetName()
+	if dialect != "mysql" {
+		return
+	}
+
+	queries := []struct {
+		name  string
+		query string
+	}{
+		{
+			"ssa_report_records.source_request_json",
+			"ALTER TABLE `" + reportstore.SSAReportRecordTableName + "` MODIFY COLUMN source_request_json LONGTEXT",
+		},
+		{
+			"ssa_report_records.snapshot_json",
+			"ALTER TABLE `" + reportstore.SSAReportRecordTableName + "` MODIFY COLUMN snapshot_json LONGTEXT",
+		},
+		{
+			"ssa_report_records.preview_json",
+			"ALTER TABLE `" + reportstore.SSAReportRecordTableName + "` MODIFY COLUMN preview_json LONGTEXT",
+		},
+	}
+
+	for _, item := range queries {
+		if err := db.Exec(item.query).Error; err != nil {
+			log.Warnf("failed to widen %s to LONGTEXT: %v", item.name, err)
+		}
+	}
+}
+
+func patchMigrateLegacySSAReportStore(db *gorm.DB) {
+	if !db.HasTable(&schema.ReportRecord{}) || !db.HasTable(&reportstore.SSAReportRecord{}) {
+		return
+	}
+
+	var legacyRecords []*schema.ReportRecord
+	if err := db.Model(&schema.ReportRecord{}).Find(&legacyRecords).Error; err != nil {
+		log.Warnf("failed to query legacy ssa report records for migration: %v", err)
+		return
+	}
+
+	for _, legacy := range legacyRecords {
+		if legacy == nil {
+			continue
+		}
+		reportType := strings.TrimSpace(legacy.ReportType)
+		if reportType == "" {
+			reportType = strings.TrimSpace(legacy.From)
+		}
+		if reportType != "ssa-scan" {
+			continue
+		}
+		var count int64
+		if err := db.Model(&reportstore.SSAReportRecord{}).Where("id = ?", legacy.ID).Count(&count).Error; err != nil {
+			log.Warnf("failed to count migrated ssa report record id=%d: %v", legacy.ID, err)
+			continue
+		}
+		if count > 0 {
+			continue
+		}
+
+		previewJSON := strings.TrimSpace(legacy.QuotedJson)
+		if unquoted, err := strconv.Unquote(legacy.QuotedJson); err == nil {
+			previewJSON = unquoted
+		}
+
+		record := &reportstore.SSAReportRecord{
+			Model:             legacy.Model,
+			Title:             legacy.Title,
+			PublishedAt:       legacy.PublishedAt,
+			Hash:              legacy.Hash,
+			Owner:             legacy.Owner,
+			From:              legacy.From,
+			ReportType:        reportType,
+			ScopeType:         legacy.ScopeType,
+			ScopeName:         legacy.ScopeName,
+			ProjectName:       legacy.ProjectName,
+			ProgramName:       legacy.ProgramName,
+			TaskID:            legacy.TaskID,
+			TaskCount:         legacy.TaskCount,
+			ScanBatch:         legacy.ScanBatch,
+			RiskTotal:         legacy.RiskTotal,
+			RiskCritical:      legacy.RiskCritical,
+			RiskHigh:          legacy.RiskHigh,
+			RiskMedium:        legacy.RiskMedium,
+			RiskLow:           legacy.RiskLow,
+			SourceFinishedAt:  legacy.SourceFinishedAt,
+			SourceRequestJSON: legacy.QueryJSON,
+			PreviewJSON:       previewJSON,
+		}
+		if strings.TrimSpace(record.ReportType) == "" {
+			record.ReportType = strings.TrimSpace(legacy.From)
+		}
+
+		if err := db.Create(record).Error; err != nil {
+			log.Warnf("failed to migrate legacy ssa report record id=%d: %v", legacy.ID, err)
+		}
+	}
+
+	if !db.HasTable(&schema.ReportRecordFile{}) || !db.HasTable(&reportstore.SSAReportRecordFile{}) {
+		return
+	}
+
+	var legacyFiles []*schema.ReportRecordFile
+	if err := db.Model(&schema.ReportRecordFile{}).Find(&legacyFiles).Error; err != nil {
+		log.Warnf("failed to query legacy ssa report files for migration: %v", err)
+		return
+	}
+	for _, legacy := range legacyFiles {
+		if legacy == nil {
+			continue
+		}
+		var count int64
+		if err := db.Model(&reportstore.SSAReportRecordFile{}).Where("id = ?", legacy.ID).Count(&count).Error; err != nil {
+			log.Warnf("failed to count migrated ssa report file id=%d: %v", legacy.ID, err)
+			continue
+		}
+		if count > 0 {
+			continue
+		}
+		file := &reportstore.SSAReportRecordFile{
+			Model:           legacy.Model,
+			ReportRecordID:  legacy.ReportRecordID,
+			Format:          legacy.Format,
+			FileName:        legacy.FileName,
+			ObjectKey:       legacy.ObjectKey,
+			Bucket:          legacy.Bucket,
+			ContentType:     legacy.ContentType,
+			SizeBytes:       legacy.SizeBytes,
+			SHA256:          legacy.SHA256,
+			Status:          legacy.Status,
+			CreatedBy:       legacy.CreatedBy,
+			GenerationError: legacy.GenerationError,
+		}
+		if err := db.Create(file).Error; err != nil {
+			log.Warnf("failed to migrate legacy ssa report file id=%d: %v", legacy.ID, err)
 		}
 	}
 }
