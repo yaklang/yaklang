@@ -161,7 +161,9 @@ jobs:
     if: needs.check-wip.outputs.should_run_tests == 'true'
     runs-on: ubuntu-22.04
     outputs:
-      artifact_id: ${{ steps.upload_yak.outputs.artifact-id }}
+      artifact_id: ${{ steps.upload_prepare_bundle.outputs.artifact-id }}
+      target_ref: ${{ needs.check-wip.outputs.target_ref }}
+      fork_repo: ${{ needs.check-wip.outputs.fork_repo }}
     steps:
       - name: Check out code
         uses: actions/checkout@v3
@@ -190,155 +192,32 @@ jobs:
           go build -o "$RUNNER_TEMP/yak" common/yak/cmd/yak.go
           chmod +x "$RUNNER_TEMP/yak"
 
-      - name: Package yak binary
+      - name: Show go build cache size
         run: |
-          mkdir -p "$RUNNER_TEMP/yak-artifact"
-          cp -a "$RUNNER_TEMP/yak" "$RUNNER_TEMP/yak-artifact/yak"
-          tar -C "$RUNNER_TEMP/yak-artifact" -cf - yak | gzip -1 > "$RUNNER_TEMP/essential-tests-yak.tar.gz"
+          du -sh "$RUNNER_TEMP/go-build-cache"
+          find "$RUNNER_TEMP/go-build-cache" -type f | wc -l | xargs echo "GOCACHE files:"
 
-      - name: Upload yak binary
-        id: upload_yak
+      - name: Package yak and go build cache
+        run: |
+          mkdir -p "$RUNNER_TEMP/prepare-yak-artifact"
+          cp -a "$RUNNER_TEMP/yak" "$RUNNER_TEMP/prepare-yak-artifact/yak"
+          cp -a "$RUNNER_TEMP/go-build-cache" "$RUNNER_TEMP/prepare-yak-artifact/go-build-cache"
+          tar -C "$RUNNER_TEMP/prepare-yak-artifact" -cf - yak go-build-cache | gzip -1 > "$RUNNER_TEMP/essential-tests-prepare-yak.tar.gz"
+          ls -lh "$RUNNER_TEMP/essential-tests-prepare-yak.tar.gz"
+
+      - name: Upload yak and go build cache
+        id: upload_prepare_bundle
         uses: actions/upload-artifact@v4
         with:
-          name: essential-tests-yak
-          path: ${{ runner.temp }}/essential-tests-yak.tar.gz
-          retention-days: 1
-          compression-level: 0
-
-  prepare-yakgrpc:
-    needs: check-wip
-    if: needs.check-wip.outputs.should_run_tests == 'true'
-    runs-on: ubuntu-22.04
-    outputs:
-      artifact_id: ${{ steps.upload_shared_suite.outputs.artifact-id }}
-      target_ref: ${{ needs.check-wip.outputs.target_ref }}
-      fork_repo: ${{ needs.check-wip.outputs.fork_repo }}
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v3
-        with:
-          repository: ${{ needs.check-wip.outputs.fork_repo || github.repository }}
-          ref: ${{ needs.check-wip.outputs.target_ref || github.sha }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set up Go 1.x
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: "./go.mod"
-          cache: false
-
-      - name: Configure Go build directories
-        run: |
-          mkdir -p "$RUNNER_TEMP/go-build-cache" "$RUNNER_TEMP/go-mod-cache"
-          echo "GOCACHE=$RUNNER_TEMP/go-build-cache" >> $GITHUB_ENV
-          echo "GOMODCACHE=$RUNNER_TEMP/go-mod-cache" >> $GITHUB_ENV
-
-      - name: Generate prepare config
-        run: |
-          cat > /tmp/prepare_yakgrpc_test_config.json <<'CONFIGEOF'
-          [
-            {"package": "./common/yakgrpc/...", "timeout": "10m"}
-          ]
-          CONFIGEOF
-
-      - name: Compile shared yakgrpc test binaries
-        env:
-          GOCACHE: ${{ env.GOCACHE }}
-          GOMODCACHE: ${{ env.GOMODCACHE }}
-        run: |
-          chmod +x ./scripts/ci/compile-tests.sh
-          export TEST_BIN_DIR=/tmp/test_binaries
-          export TEST_CONFIG=/tmp/prepare_yakgrpc_test_config.json
-          export COMPILE_WORKERS=2
-          export GO_TEST_P=1
-          ./scripts/ci/compile-tests.sh
-
-      - name: Package shared suite
-        run: |
-          chmod +x ./scripts/ci/package-test-artifact.sh
-          export TEST_BIN_DIR=/tmp/test_binaries
-          export INCLUDE_YAK=0
-          export ARTIFACT_PATH=/tmp/essential-tests-yakgrpc.tar.gz
-          ./scripts/ci/package-test-artifact.sh
-
-      - name: Upload shared suite
-        id: upload_shared_suite
-        uses: actions/upload-artifact@v4
-        with:
-          name: essential-tests-yakgrpc
-          path: /tmp/essential-tests-yakgrpc.tar.gz
-          retention-days: 1
-          compression-level: 0
-
-  prepare-coreplugin:
-    needs: check-wip
-    if: needs.check-wip.outputs.should_run_tests == 'true'
-    runs-on: ubuntu-22.04
-    outputs:
-      artifact_id: ${{ steps.upload_shared_suite.outputs.artifact-id }}
-      target_ref: ${{ needs.check-wip.outputs.target_ref }}
-      fork_repo: ${{ needs.check-wip.outputs.fork_repo }}
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v3
-        with:
-          repository: ${{ needs.check-wip.outputs.fork_repo || github.repository }}
-          ref: ${{ needs.check-wip.outputs.target_ref || github.sha }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set up Go 1.x
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: "./go.mod"
-          cache: false
-
-      - name: Configure Go build directories
-        run: |
-          mkdir -p "$RUNNER_TEMP/go-build-cache" "$RUNNER_TEMP/go-mod-cache"
-          echo "GOCACHE=$RUNNER_TEMP/go-build-cache" >> $GITHUB_ENV
-          echo "GOMODCACHE=$RUNNER_TEMP/go-mod-cache" >> $GITHUB_ENV
-
-      - name: Generate prepare config
-        run: |
-          cat > /tmp/prepare_coreplugin_test_config.json <<'CONFIGEOF'
-          [
-            {"package": "./common/coreplugin", "timeout": "10m"}
-          ]
-          CONFIGEOF
-
-      - name: Compile shared coreplugin test binaries
-        env:
-          GOCACHE: ${{ env.GOCACHE }}
-          GOMODCACHE: ${{ env.GOMODCACHE }}
-        run: |
-          chmod +x ./scripts/ci/compile-tests.sh
-          export TEST_BIN_DIR=/tmp/test_binaries
-          export TEST_CONFIG=/tmp/prepare_coreplugin_test_config.json
-          export COMPILE_WORKERS=1
-          export GO_TEST_P=1
-          ./scripts/ci/compile-tests.sh
-
-      - name: Package shared suite
-        run: |
-          chmod +x ./scripts/ci/package-test-artifact.sh
-          export TEST_BIN_DIR=/tmp/test_binaries
-          export INCLUDE_YAK=0
-          export ARTIFACT_PATH=/tmp/essential-tests-coreplugin.tar.gz
-          ./scripts/ci/package-test-artifact.sh
-
-      - name: Upload shared suite
-        id: upload_shared_suite
-        uses: actions/upload-artifact@v4
-        with:
-          name: essential-tests-coreplugin
-          path: /tmp/essential-tests-coreplugin.tar.gz
+          name: essential-tests-prepare-yak
+          path: ${{ runner.temp }}/essential-tests-prepare-yak.tar.gz
           retention-days: 1
           compression-level: 0
 
   test-local:
     name: ${{ matrix.name }}
-    needs: check-wip
-    if: needs.check-wip.outputs.should_run_tests == 'true'
+    needs: prepare-yak
+    if: needs.prepare-yak.result == 'success'
     runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
@@ -488,8 +367,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
         with:
-          repository: ${{ needs.check-wip.outputs.fork_repo || github.repository }}
-          ref: ${{ needs.check-wip.outputs.target_ref || github.sha }}
+          repository: ${{ needs.prepare-yak.outputs.fork_repo || github.repository }}
+          ref: ${{ needs.prepare-yak.outputs.target_ref || github.sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Go 1.x
@@ -498,10 +377,19 @@ jobs:
           go-version-file: "./go.mod"
           cache: false
 
-      - name: Configure Go build directories
+      - name: Download shared yak and go build cache
+        uses: actions/download-artifact@v4
+        with:
+          name: essential-tests-prepare-yak
+          path: ${{ runner.temp }}/prepare-yak-artifact
+
+      - name: Restore shared yak and go build cache
         run: |
-          mkdir -p "$RUNNER_TEMP/go-build-cache" "$RUNNER_TEMP/go-mod-cache"
-          echo "GOCACHE=$RUNNER_TEMP/go-build-cache" >> $GITHUB_ENV
+          mkdir -p "${{ runner.temp }}/prepare-yak" "$RUNNER_TEMP/go-mod-cache"
+          tar -C "${{ runner.temp }}/prepare-yak" -xzf "${{ runner.temp }}/prepare-yak-artifact/essential-tests-prepare-yak.tar.gz"
+          chmod +x "${{ runner.temp }}/prepare-yak/yak"
+          du -sh "${{ runner.temp }}/prepare-yak/go-build-cache"
+          echo "GOCACHE=${{ runner.temp }}/prepare-yak/go-build-cache" >> $GITHUB_ENV
           echo "GOMODCACHE=$RUNNER_TEMP/go-mod-cache" >> $GITHUB_ENV
 
       - name: Generate test config
@@ -523,18 +411,10 @@ jobs:
           export GO_TEST_P=1
           ./scripts/ci/compile-tests.sh
 
-      - name: Build yak binary for GRPC server
-        env:
-          GOCACHE: ${{ env.GOCACHE }}
-          GOMODCACHE: ${{ env.GOMODCACHE }}
-        run: |
-          go build -o ./yak common/yak/cmd/yak.go
-          chmod +x ./yak
-
       - name: ${{ matrix.name }}
         run: |
           chmod +x ./scripts/ci/run-tests.sh ./scripts/ci/run-suite-with-retry.sh
-          export YAK_BINARY_PATH=./yak
+          export YAK_BINARY_PATH="${{ runner.temp }}/prepare-yak/yak"
           export TEST_BIN_DIR=/tmp/test_binaries
           export TEST_TIMEOUT="2m"
           export TEST_VERBOSE="1"
@@ -561,8 +441,8 @@ jobs:
 
   test-ai-local:
     name: ${{ matrix.name }}
-    needs: check-wip
-    if: needs.check-wip.outputs.should_run_tests == 'true'
+    needs: prepare-yak
+    if: needs.prepare-yak.result == 'success'
     runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
@@ -611,8 +491,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
         with:
-          repository: ${{ needs.check-wip.outputs.fork_repo || github.repository }}
-          ref: ${{ needs.check-wip.outputs.target_ref || github.sha }}
+          repository: ${{ needs.prepare-yak.outputs.fork_repo || github.repository }}
+          ref: ${{ needs.prepare-yak.outputs.target_ref || github.sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Go 1.x
@@ -621,10 +501,19 @@ jobs:
           go-version-file: "./go.mod"
           cache: false
 
-      - name: Configure Go build directories
+      - name: Download shared yak and go build cache
+        uses: actions/download-artifact@v4
+        with:
+          name: essential-tests-prepare-yak
+          path: ${{ runner.temp }}/prepare-yak-artifact
+
+      - name: Restore shared yak and go build cache
         run: |
-          mkdir -p "$RUNNER_TEMP/go-build-cache" "$RUNNER_TEMP/go-mod-cache"
-          echo "GOCACHE=$RUNNER_TEMP/go-build-cache" >> $GITHUB_ENV
+          mkdir -p "${{ runner.temp }}/prepare-yak" "$RUNNER_TEMP/go-mod-cache"
+          tar -C "${{ runner.temp }}/prepare-yak" -xzf "${{ runner.temp }}/prepare-yak-artifact/essential-tests-prepare-yak.tar.gz"
+          chmod +x "${{ runner.temp }}/prepare-yak/yak"
+          du -sh "${{ runner.temp }}/prepare-yak/go-build-cache"
+          echo "GOCACHE=${{ runner.temp }}/prepare-yak/go-build-cache" >> $GITHUB_ENV
           echo "GOMODCACHE=$RUNNER_TEMP/go-mod-cache" >> $GITHUB_ENV
 
       - name: Generate test config
@@ -646,18 +535,10 @@ jobs:
           export GO_TEST_P=1
           ./scripts/ci/compile-tests.sh
 
-      - name: Build yak binary for GRPC server
-        env:
-          GOCACHE: ${{ env.GOCACHE }}
-          GOMODCACHE: ${{ env.GOMODCACHE }}
-        run: |
-          go build -o ./yak common/yak/cmd/yak.go
-          chmod +x ./yak
-
       - name: ${{ matrix.name }}
         run: |
           chmod +x ./scripts/ci/run-tests.sh ./scripts/ci/run-suite-with-retry.sh
-          export YAK_BINARY_PATH=./yak
+          export YAK_BINARY_PATH="${{ runner.temp }}/prepare-yak/yak"
           export TEST_BIN_DIR=/tmp/test_binaries
           export TEST_TIMEOUT="2m"
           export TEST_VERBOSE="1"
@@ -681,19 +562,16 @@ jobs:
           path: /tmp/*.log
           if-no-files-found: warn
 
-  test-prepared-yakgrpc:
+  test-grpc-local:
     name: ${{ matrix.name }}
-    needs: [prepare-yak, prepare-yakgrpc]
-    if: needs.prepare-yak.result == 'success' && needs.prepare-yakgrpc.result == 'success'
+    needs: prepare-yak
+    if: needs.prepare-yak.result == 'success'
     runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
       matrix:
         include:
           - name: "Test gRPC MUSTPASS MITM"
-            artifact_name: "essential-tests-yakgrpc"
-            artifact_file: "essential-tests-yakgrpc.tar.gz"
-            compile_local: "0"
             test_configs: |
               [
                 {"package": "./common/yakgrpc/yakit", "timeout": "1m", "run": "TestMUSTPASS"},
@@ -702,50 +580,30 @@ jobs:
                 {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_MITM.*SlowRuleHook"},
                 {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS.*SlowSQL"}
               ]
-            local_test_configs: |
-              []
 
           - name: "Test gRPC MUSTPASS Fuzzer"
-            artifact_name: "essential-tests-yakgrpc"
-            artifact_file: "essential-tests-yakgrpc.tar.gz"
-            compile_local: "0"
             test_configs: |
               [
                 {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_HTTPFuzzer"},
                 {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_HTTP_"},
                 {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_PluginTrace"}
               ]
-            local_test_configs: |
-              []
 
           - name: "Test gRPC MUSTPASS Language"
-            artifact_name: "essential-tests-yakgrpc"
-            artifact_file: "essential-tests-yakgrpc.tar.gz"
-            compile_local: "0"
             test_configs: |
               [
                 {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_LANGUAGE"}
               ]
-            local_test_configs: |
-              []
 
           - name: "Test gRPC MUSTPASS SyntaxFlow | SSA"
-            artifact_name: "essential-tests-yakgrpc"
-            artifact_file: "essential-tests-yakgrpc.tar.gz"
-            compile_local: "0"
             sync_rule: "1"
             test_configs: |
               [
                 {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_SyntaxFlow"},
                 {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_SSA"}
               ]
-            local_test_configs: |
-              []
 
           - name: "Test gRPC In 2m"
-            artifact_name: "essential-tests-yakgrpc"
-            artifact_file: "essential-tests-yakgrpc.tar.gz"
-            compile_local: "0"
             test_configs: |
               [
                 {"package": "./common/yakgrpc/...", "timeout": "2m", "run": "TestGRPCMUSTPASS_AnalyzeHTTPFlow"},
@@ -755,98 +613,65 @@ jobs:
                 {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_COMMON"},
                 {"package": "./common/yakgrpc/...", "timeout": "1m", "run": "TestAITaskWith", "parallel": 1}
               ]
-            local_test_configs: |
-              []
 
           - name: "Test gRPC Other"
-            artifact_name: "essential-tests-yakgrpc"
-            artifact_file: "essential-tests-yakgrpc.tar.gz"
-            compile_local: "0"
             test_configs: |
               [
                 {"package": "./common/yakgrpc/...", "timeout": "10m", "skip": "^(TestGRPCMUSTPASS_PluginTrace*|TestGRPCMUSTPASS_AnalyzeHTTPFlow*|TestGRPCMUSTPASS_Fingerprint*|TestGRPC_Ai_List_Model|TestGRPCMUSTPASS_HTTP_*|TestAITaskWith*|TestGRPCMUSTPASS_MITM_*|TestGRPCMUSTPASS_HTTPFuzzer*|TestGRPCMUSTPASS_LANGUAGE*|TestGRPCMUSTPASS_COMMON*|TestLARGEGRPCMUSTPASS*|TestGRPCMUSTPASS_SyntaxFlow*|TestGRPCMUSTPASS_SSA*)"}
               ]
-            local_test_configs: |
-              []
     steps:
       - name: Checkout
         uses: actions/checkout@v3
         with:
-          repository: ${{ needs.prepare-yakgrpc.outputs.fork_repo || github.repository }}
-          ref: ${{ needs.prepare-yakgrpc.outputs.target_ref || github.sha }}
+          repository: ${{ needs.prepare-yak.outputs.fork_repo || github.repository }}
+          ref: ${{ needs.prepare-yak.outputs.target_ref || github.sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Generate test configs
-        run: |
-          cat > /tmp/test_config.json <<'CONFIGEOF'
-          ${{ matrix.test_configs }}
-          CONFIGEOF
-          cat > /tmp/local_test_config.json <<'CONFIGEOF'
-          ${{ matrix.local_test_configs }}
-          CONFIGEOF
-          echo "Full test config:"
-          cat /tmp/test_config.json
-          echo "Local compile config:"
-          cat /tmp/local_test_config.json
-
-      - name: Download prepared suite
-        uses: actions/download-artifact@v4
-        with:
-          name: ${{ matrix.artifact_name }}
-          path: ${{ runner.temp }}/prepared-artifact
-
-      - name: Unpack prepared suite
-        run: |
-          chmod +x ./scripts/ci/unpack-test-artifact.sh
-          export ARTIFACT_PATH="${{ runner.temp }}/prepared-artifact/${{ matrix.artifact_file }}"
-          export DEST_DIR="${{ runner.temp }}/prepared-suite"
-          export REQUIRE_YAK=0
-          ./scripts/ci/unpack-test-artifact.sh
-
-      - name: Download shared yak binary
-        uses: actions/download-artifact@v4
-        with:
-          name: essential-tests-yak
-          path: ${{ runner.temp }}/yak-artifact
-
-      - name: Unpack shared yak binary
-        run: |
-          tar -C "${{ runner.temp }}/prepared-suite" -xzf "${{ runner.temp }}/yak-artifact/essential-tests-yak.tar.gz"
-          chmod +x "${{ runner.temp }}/prepared-suite/yak"
-
       - name: Set up Go 1.x
-        if: matrix.compile_local == '1'
         uses: actions/setup-go@v5
         with:
           go-version-file: "./go.mod"
           cache: false
 
-      - name: Configure Go build directories
-        if: matrix.compile_local == '1'
+      - name: Download shared yak and go build cache
+        uses: actions/download-artifact@v4
+        with:
+          name: essential-tests-prepare-yak
+          path: ${{ runner.temp }}/prepare-yak-artifact
+
+      - name: Restore shared yak and go build cache
         run: |
-          mkdir -p "$RUNNER_TEMP/go-build-cache" "$RUNNER_TEMP/go-mod-cache"
-          echo "GOCACHE=$RUNNER_TEMP/go-build-cache" >> $GITHUB_ENV
+          mkdir -p "${{ runner.temp }}/prepare-yak" "$RUNNER_TEMP/go-mod-cache"
+          tar -C "${{ runner.temp }}/prepare-yak" -xzf "${{ runner.temp }}/prepare-yak-artifact/essential-tests-prepare-yak.tar.gz"
+          chmod +x "${{ runner.temp }}/prepare-yak/yak"
+          du -sh "${{ runner.temp }}/prepare-yak/go-build-cache"
+          echo "GOCACHE=${{ runner.temp }}/prepare-yak/go-build-cache" >> $GITHUB_ENV
           echo "GOMODCACHE=$RUNNER_TEMP/go-mod-cache" >> $GITHUB_ENV
 
-      - name: Compile local-only test binaries
-        if: matrix.compile_local == '1'
+      - name: Generate test config
+        run: |
+          cat > /tmp/test_config.json <<'CONFIGEOF'
+          ${{ matrix.test_configs }}
+          CONFIGEOF
+          cat /tmp/test_config.json
+
+      - name: Compile test binaries
         env:
           GOCACHE: ${{ env.GOCACHE }}
           GOMODCACHE: ${{ env.GOMODCACHE }}
         run: |
           chmod +x ./scripts/ci/compile-tests.sh
-          export TEST_BIN_DIR="${{ runner.temp }}/prepared-suite/test_binaries"
-          export TEST_CONFIG=/tmp/local_test_config.json
+          export TEST_BIN_DIR=/tmp/test_binaries
+          export TEST_CONFIG=/tmp/test_config.json
           export COMPILE_WORKERS=2
           export GO_TEST_P=1
-          export RESET_TEST_BIN_DIR=0
           ./scripts/ci/compile-tests.sh
 
       - name: ${{ matrix.name }}
         run: |
-          chmod +x ./scripts/ci/run-tests.sh ./scripts/ci/run-suite-with-retry.sh "${{ runner.temp }}/prepared-suite/yak"
-          export YAK_BINARY_PATH="${{ runner.temp }}/prepared-suite/yak"
-          export TEST_BIN_DIR="${{ runner.temp }}/prepared-suite/test_binaries"
+          chmod +x ./scripts/ci/run-tests.sh ./scripts/ci/run-suite-with-retry.sh "${{ runner.temp }}/prepare-yak/yak"
+          export YAK_BINARY_PATH="${{ runner.temp }}/prepare-yak/yak"
+          export TEST_BIN_DIR=/tmp/test_binaries
           export TEST_TIMEOUT="2m"
           export TEST_VERBOSE="1"
           export TEST_CONFIG=/tmp/test_config.json
@@ -870,148 +695,97 @@ jobs:
           path: /tmp/*.log
           if-no-files-found: warn
 
-  test-prepared-coreplugin:
+  test-coreplugin-local:
     name: ${{ matrix.name }}
-    needs: [prepare-yak, prepare-coreplugin]
-    if: needs.prepare-yak.result == 'success' && needs.prepare-coreplugin.result == 'success'
+    needs: prepare-yak
+    if: needs.prepare-yak.result == 'success'
     runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
       matrix:
         include:
           - name: "Test Coreplugin AnalyzeMustPASS"
-            artifact_name: "essential-tests-coreplugin"
-            artifact_file: "essential-tests-coreplugin.tar.gz"
-            compile_local: "0"
             test_configs: |
               [
                 {"package": "./common/coreplugin", "timeout": "1m", "run": "TestAnalyzeMustPASS"}
               ]
-            local_test_configs: |
-              []
 
           - name: "Test Coreplugin MITM"
-            artifact_name: "essential-tests-coreplugin"
-            artifact_file: "essential-tests-coreplugin.tar.gz"
-            compile_local: "0"
             test_configs: |
               [
                 {"package": "./common/coreplugin", "timeout": "2m", "run": "TestGRPCMUSTPASS_MITM"}
               ]
-            local_test_configs: |
-              []
 
           - name: "Test Vulinbox Coreplugin Fastjson"
-            artifact_name: "essential-tests-coreplugin"
-            artifact_file: "essential-tests-coreplugin.tar.gz"
-            compile_local: "0"
             test_configs: |
               [
                 {"package": "./common/coreplugin", "timeout": "3m", "run": "TestGRPCMUSTPASS_Fastjson"}
               ]
-            local_test_configs: |
-              []
 
           - name: "Test Vulinbox Coreplugin SQL Injection"
-            artifact_name: "essential-tests-coreplugin"
-            artifact_file: "essential-tests-coreplugin.tar.gz"
-            compile_local: "0"
             test_configs: |
               [
                 {"package": "./common/coreplugin", "timeout": "5m", "run": "TestGRPCMUSTPASS_SQL"}
               ]
-            local_test_configs: |
-              []
 
           - name: "Test Vulinbox Coreplugin (XSS/Shiro/SSRF/SSTI/SMUGGLE/CSRF/OPEN_REDIRECT)"
-            artifact_name: "essential-tests-coreplugin"
-            artifact_file: "essential-tests-coreplugin.tar.gz"
-            compile_local: "0"
             test_configs: |
               [
                 {"package": "./common/coreplugin", "timeout": "6m", "run": "^(TestGRPCMUSTPASS_XSS|TestGRPCMUSTPASS_Shiro|TestGRPCMUSTPASS_SSRF|TestGRPCMUSTPASS_SSTI|TestGRPCMUSTPASS_Smuggle|TestGRPCMUSTPASS_CSRF|TestGRPCMUSTPASS_OPEN_REDIRECT)$"}
               ]
-            local_test_configs: |
-              []
     steps:
       - name: Checkout
         uses: actions/checkout@v3
         with:
-          repository: ${{ needs.prepare-coreplugin.outputs.fork_repo || github.repository }}
-          ref: ${{ needs.prepare-coreplugin.outputs.target_ref || github.sha }}
+          repository: ${{ needs.prepare-yak.outputs.fork_repo || github.repository }}
+          ref: ${{ needs.prepare-yak.outputs.target_ref || github.sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Generate test configs
-        run: |
-          cat > /tmp/test_config.json <<'CONFIGEOF'
-          ${{ matrix.test_configs }}
-          CONFIGEOF
-          cat > /tmp/local_test_config.json <<'CONFIGEOF'
-          ${{ matrix.local_test_configs }}
-          CONFIGEOF
-          echo "Full test config:"
-          cat /tmp/test_config.json
-          echo "Local compile config:"
-          cat /tmp/local_test_config.json
-
-      - name: Download prepared suite
-        uses: actions/download-artifact@v4
-        with:
-          name: ${{ matrix.artifact_name }}
-          path: ${{ runner.temp }}/prepared-artifact
-
-      - name: Unpack prepared suite
-        run: |
-          chmod +x ./scripts/ci/unpack-test-artifact.sh
-          export ARTIFACT_PATH="${{ runner.temp }}/prepared-artifact/${{ matrix.artifact_file }}"
-          export DEST_DIR="${{ runner.temp }}/prepared-suite"
-          export REQUIRE_YAK=0
-          ./scripts/ci/unpack-test-artifact.sh
-
-      - name: Download shared yak binary
-        uses: actions/download-artifact@v4
-        with:
-          name: essential-tests-yak
-          path: ${{ runner.temp }}/yak-artifact
-
-      - name: Unpack shared yak binary
-        run: |
-          tar -C "${{ runner.temp }}/prepared-suite" -xzf "${{ runner.temp }}/yak-artifact/essential-tests-yak.tar.gz"
-          chmod +x "${{ runner.temp }}/prepared-suite/yak"
-
       - name: Set up Go 1.x
-        if: matrix.compile_local == '1'
         uses: actions/setup-go@v5
         with:
           go-version-file: "./go.mod"
           cache: false
 
-      - name: Configure Go build directories
-        if: matrix.compile_local == '1'
+      - name: Download shared yak and go build cache
+        uses: actions/download-artifact@v4
+        with:
+          name: essential-tests-prepare-yak
+          path: ${{ runner.temp }}/prepare-yak-artifact
+
+      - name: Restore shared yak and go build cache
         run: |
-          mkdir -p "$RUNNER_TEMP/go-build-cache" "$RUNNER_TEMP/go-mod-cache"
-          echo "GOCACHE=$RUNNER_TEMP/go-build-cache" >> $GITHUB_ENV
+          mkdir -p "${{ runner.temp }}/prepare-yak" "$RUNNER_TEMP/go-mod-cache"
+          tar -C "${{ runner.temp }}/prepare-yak" -xzf "${{ runner.temp }}/prepare-yak-artifact/essential-tests-prepare-yak.tar.gz"
+          chmod +x "${{ runner.temp }}/prepare-yak/yak"
+          du -sh "${{ runner.temp }}/prepare-yak/go-build-cache"
+          echo "GOCACHE=${{ runner.temp }}/prepare-yak/go-build-cache" >> $GITHUB_ENV
           echo "GOMODCACHE=$RUNNER_TEMP/go-mod-cache" >> $GITHUB_ENV
 
-      - name: Compile local-only test binaries
-        if: matrix.compile_local == '1'
+      - name: Generate test config
+        run: |
+          cat > /tmp/test_config.json <<'CONFIGEOF'
+          ${{ matrix.test_configs }}
+          CONFIGEOF
+          cat /tmp/test_config.json
+
+      - name: Compile test binaries
         env:
           GOCACHE: ${{ env.GOCACHE }}
           GOMODCACHE: ${{ env.GOMODCACHE }}
         run: |
           chmod +x ./scripts/ci/compile-tests.sh
-          export TEST_BIN_DIR="${{ runner.temp }}/prepared-suite/test_binaries"
-          export TEST_CONFIG=/tmp/local_test_config.json
+          export TEST_BIN_DIR=/tmp/test_binaries
+          export TEST_CONFIG=/tmp/test_config.json
           export COMPILE_WORKERS=2
           export GO_TEST_P=1
-          export RESET_TEST_BIN_DIR=0
           ./scripts/ci/compile-tests.sh
 
       - name: ${{ matrix.name }}
         run: |
-          chmod +x ./scripts/ci/run-tests.sh ./scripts/ci/run-suite-with-retry.sh "${{ runner.temp }}/prepared-suite/yak"
-          export YAK_BINARY_PATH="${{ runner.temp }}/prepared-suite/yak"
-          export TEST_BIN_DIR="${{ runner.temp }}/prepared-suite/test_binaries"
+          chmod +x ./scripts/ci/run-tests.sh ./scripts/ci/run-suite-with-retry.sh "${{ runner.temp }}/prepare-yak/yak"
+          export YAK_BINARY_PATH="${{ runner.temp }}/prepare-yak/yak"
+          export TEST_BIN_DIR=/tmp/test_binaries
           export TEST_TIMEOUT="2m"
           export TEST_VERBOSE="1"
           export TEST_CONFIG=/tmp/test_config.json
@@ -1035,70 +809,20 @@ jobs:
           path: /tmp/*.log
           if-no-files-found: warn
 
-  cleanup-yakgrpc-artifact:
-    needs: [prepare-yakgrpc, test-prepared-yakgrpc]
-    if: needs.prepare-yakgrpc.result == 'success' && needs.test-prepared-yakgrpc.result == 'success'
-    runs-on: ubuntu-22.04
-    permissions:
-      actions: write
-    steps:
-      - name: Delete yakgrpc artifact
-        env:
-          ARTIFACT_ID: ${{ needs.prepare-yakgrpc.outputs.artifact_id }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          if [ -z "$ARTIFACT_ID" ]; then
-            echo "::warning::No yakgrpc artifact id found, skip deletion"
-            exit 0
-          fi
-          curl -fsSL \
-            -X DELETE \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer $GITHUB_TOKEN" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID" \
-            && echo "Deleted yakgrpc artifact $ARTIFACT_ID" \
-            || echo "::warning::Failed to delete yakgrpc artifact $ARTIFACT_ID"
-
-  cleanup-coreplugin-artifact:
-    needs: [prepare-coreplugin, test-prepared-coreplugin]
-    if: needs.prepare-coreplugin.result == 'success' && needs.test-prepared-coreplugin.result == 'success'
-    runs-on: ubuntu-22.04
-    permissions:
-      actions: write
-    steps:
-      - name: Delete coreplugin artifact
-        env:
-          ARTIFACT_ID: ${{ needs.prepare-coreplugin.outputs.artifact_id }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          if [ -z "$ARTIFACT_ID" ]; then
-            echo "::warning::No coreplugin artifact id found, skip deletion"
-            exit 0
-          fi
-          curl -fsSL \
-            -X DELETE \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer $GITHUB_TOKEN" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID" \
-            && echo "Deleted coreplugin artifact $ARTIFACT_ID" \
-            || echo "::warning::Failed to delete coreplugin artifact $ARTIFACT_ID"
-
   cleanup-yak-artifact:
-    needs: [prepare-yak, test-prepared-yakgrpc, test-prepared-coreplugin]
-    if: needs.prepare-yak.result == 'success' && needs.test-prepared-yakgrpc.result == 'success' && needs.test-prepared-coreplugin.result == 'success'
+    needs: [prepare-yak, test-local, test-ai-local, test-grpc-local, test-coreplugin-local]
+    if: needs.prepare-yak.result == 'success' && needs.test-local.result == 'success' && needs.test-ai-local.result == 'success' && needs.test-grpc-local.result == 'success' && needs.test-coreplugin-local.result == 'success'
     runs-on: ubuntu-22.04
     permissions:
       actions: write
     steps:
-      - name: Delete shared yak artifact
+      - name: Delete shared yak/cache artifact
         env:
           ARTIFACT_ID: ${{ needs.prepare-yak.outputs.artifact_id }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [ -z "$ARTIFACT_ID" ]; then
-            echo "::warning::No shared yak artifact id found, skip deletion"
+            echo "::warning::No shared yak/cache artifact id found, skip deletion"
             exit 0
           fi
           curl -fsSL \
@@ -1107,12 +831,12 @@ jobs:
             -H "Authorization: Bearer $GITHUB_TOKEN" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
             "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID" \
-            && echo "Deleted shared yak artifact $ARTIFACT_ID" \
-            || echo "::warning::Failed to delete shared yak artifact $ARTIFACT_ID"
+            && echo "Deleted shared yak/cache artifact $ARTIFACT_ID" \
+            || echo "::warning::Failed to delete shared yak/cache artifact $ARTIFACT_ID"
 
   post-check:
     name: Save Test Results to Cache
-    needs: [check-wip, test-local, test-ai-local, test-prepared-yakgrpc, test-prepared-coreplugin]
+    needs: [check-wip, test-local, test-ai-local, test-grpc-local, test-coreplugin-local]
     if: needs.check-wip.outputs.should_run_tests == 'true' && success()
     runs-on: ubuntu-22.04
     steps:
