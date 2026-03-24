@@ -37,10 +37,7 @@ func GormTransactionReturnDb(db *gorm.DB, callback func(tx *gorm.DB)) (tx *gorm.
 			if tx.Error != nil {
 				tx.Rollback()
 			} else {
-				commitDB := tx.Commit()
-				if commitDB != nil && commitDB.Error != nil {
-					tx.Error = commitDB.Error
-				}
+				tx.Commit()
 			}
 		}
 	}()
