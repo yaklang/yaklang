@@ -6946,6 +6946,7 @@ message MITMRequest {
   bool enableProxyAuth = 51;
   repeated string dnsServers = 52;
   repeated KVPair hosts = 53;
+  bool EnableHostsMappingBeforeDownstreamProxy = 68;
 
   // max content-length
   int64 maxContentLength = 55;
@@ -8661,6 +8662,7 @@ message MITMV2Request{
   repeated string DnsServers = 13;
   repeated KVPair hosts = 14;
   repeated KVPair HostsMapping = 46;
+  bool EnableHostsMappingBeforeDownstreamProxy = 56;
 
   // max content-length
   int64 MaxContentLength = 15;

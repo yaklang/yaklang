@@ -255,24 +255,25 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		return proxys, routeMap, nil
 	}
 	var (
-		host                        = "127.0.0.1"
-		port                        = 8089
-		packetLimit                 = 8 * 10 * 1000 * 1000 // 80M
-		enableGMTLS                 = firstReq.GetEnableGMTLS()
-		preferGMTLS                 = firstReq.GetPreferGMTLS()
-		onlyGMTLS                   = firstReq.GetOnlyEnableGMTLS()
-		proxyUsername               = firstReq.GetProxyUsername()
-		proxyPassword               = firstReq.GetProxyPassword()
-		dnsServers                  = firstReq.GetDnsServers()
-		disableSystemProxy          = firstReq.GetDisableSystemProxy()
-		forceDisableKeepAlive       = firstReq.GetForceDisableKeepAlive()
-		disableCACertPage           = firstReq.GetDisableCACertPage()
-		disableWebsocketCompression = firstReq.GetDisableWebsocketCompression()
-		randomJA3                   = firstReq.GetRandomJA3()
-		sni                         = firstReq.GetSNI()
-		overwriteSNI                = firstReq.GetOverwriteSNI()
-		filterWebSocket             = utils.NewBool(firstReq.GetFilterWebsocket())
-		pluginConcurrency           = firstReq.GetPluginConcurrency()
+		host                                    = "127.0.0.1"
+		port                                    = 8089
+		packetLimit                             = 8 * 10 * 1000 * 1000 // 80M
+		enableGMTLS                             = firstReq.GetEnableGMTLS()
+		preferGMTLS                             = firstReq.GetPreferGMTLS()
+		onlyGMTLS                               = firstReq.GetOnlyEnableGMTLS()
+		proxyUsername                           = firstReq.GetProxyUsername()
+		proxyPassword                           = firstReq.GetProxyPassword()
+		dnsServers                              = firstReq.GetDnsServers()
+		enableHostsMappingBeforeDownstreamProxy = firstReq.GetEnableHostsMappingBeforeDownstreamProxy()
+		disableSystemProxy                      = firstReq.GetDisableSystemProxy()
+		forceDisableKeepAlive                   = firstReq.GetForceDisableKeepAlive()
+		disableCACertPage                       = firstReq.GetDisableCACertPage()
+		disableWebsocketCompression             = firstReq.GetDisableWebsocketCompression()
+		randomJA3                               = firstReq.GetRandomJA3()
+		sni                                     = firstReq.GetSNI()
+		overwriteSNI                            = firstReq.GetOverwriteSNI()
+		filterWebSocket                         = utils.NewBool(firstReq.GetFilterWebsocket())
+		pluginConcurrency                       = firstReq.GetPluginConcurrency()
 	)
 
 	if firstReq.GetHost() != "" {
@@ -1368,7 +1369,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 					httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest, false) // 设置无需劫持resp
 					httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_IsDropped, true)
 					startCreateFlow := time.Now()
-					flow, err := yakit.CreateHTTPFlowFromHTTPWithNoRspSaved(httpctx.GetRequestHTTPSWithFallback(originReqIns)||enableGMTLS, originReqIns, "mitm", originReqIns.URL.String(), remoteAddr, yakit.CreateHTTPFlowWithRequestIns(fixReqIns))
+					flow, err := yakit.CreateHTTPFlowFromHTTPWithNoRspSaved(httpctx.GetRequestHTTPSWithFallback(originReqIns) || enableGMTLS, originReqIns, "mitm", originReqIns.URL.String(), remoteAddr, yakit.CreateHTTPFlowWithRequestIns(fixReqIns))
 					if err != nil {
 						log.Errorf("save http flow[%v %v] from mitm failed: %s", originReqIns.Method, originReqIns.URL.String(), err)
 						return nil
@@ -1735,6 +1736,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		crep.MITM_SetFindProcessName(true),
 		crep.MITM_SetDNSServers(dnsServers...),
 		crep.MITM_SetHostMapping(hostMapping),
+		crep.MITM_EnableHostsMappingBeforeDownstreamProxy(enableHostsMappingBeforeDownstreamProxy),
 		crep.MITM_SetHTTPForceClose(forceDisableKeepAlive),
 		crep.MITM_SetMaxReadWaitTime(time.Duration(firstReq.GetMaxReadWaitTime())*time.Second),
 		crep.MITM_SetExtraIncomingConnectionChannel(wrapperConnChan),

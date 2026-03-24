@@ -681,6 +681,13 @@ func MITM_SetHostMapping(m map[string]string) MITMConfig {
 	}
 }
 
+func MITM_EnableHostsMappingBeforeDownstreamProxy(b bool) MITMConfig {
+	return func(server *MITMServer) error {
+		server.preferHostMappingBeforeDownstreamProxy = b
+		return nil
+	}
+}
+
 func MITM_SetMaxContentLength(m int64) MITMConfig {
 	return func(server *MITMServer) error {
 		server.maxContentLength = int(m)

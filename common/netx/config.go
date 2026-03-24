@@ -293,6 +293,45 @@ func WithTemporaryHosts(i map[string]string) DNSOption {
 	}
 }
 
+// ResolveHostByTemporaryHosts resolves a host only against the provided temporary hosts mapping.
+// It does not fall back to system hosts or DNS lookup.
+func ResolveHostByTemporaryHosts(host string, hosts map[string]string) (string, bool) {
+	if len(hosts) == 0 {
+		return "", false
+	}
+
+	config := NewDefaultReliableDNSConfig()
+	WithTemporaryHosts(hosts)(config)
+
+	if config.Hosts != nil {
+		if result, ok := config.Hosts[host]; ok && result != "" {
+			return result, true
+		}
+
+		lowerHost := strings.ToLower(host)
+		if lowerHost != host {
+			if result, ok := config.Hosts[lowerHost]; ok && result != "" {
+				return result, true
+			}
+		}
+	}
+
+	if len(config.hostGlobs) > 0 {
+		if result, ok := config.matchHostGlob(host); ok && result != "" {
+			return result, true
+		}
+
+		lowerHost := strings.ToLower(host)
+		if lowerHost != host {
+			if result, ok := config.matchHostGlob(lowerHost); ok && result != "" {
+				return result, true
+			}
+		}
+	}
+
+	return "", false
+}
+
 func WithDNSOnFinished(cb func()) DNSOption {
 	return func(config *ReliableDNSConfig) {
 		config.OnFinished = cb

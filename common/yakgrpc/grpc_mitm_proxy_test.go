@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -21,6 +24,91 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+func startRecordingConnectProxy(t *testing.T) (string, func() []string, func()) {
+	t.Helper()
+
+	var (
+		mu      sync.Mutex
+		targets []string
+	)
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodConnect {
+			http.Error(w, "CONNECT only", http.StatusMethodNotAllowed)
+			return
+		}
+
+		hijacker, ok := w.(http.Hijacker)
+		if !ok {
+			http.Error(w, "hijack not supported", http.StatusInternalServerError)
+			return
+		}
+
+		conn, rw, err := hijacker.Hijack()
+		if err != nil {
+			return
+		}
+
+		if r.Host != "" && r.Host != "/" {
+			mu.Lock()
+			targets = append(targets, r.Host)
+			mu.Unlock()
+		}
+
+		if r.Host == "" || r.Host == "/" {
+			_, _ = rw.WriteString("HTTP/1.1 200 Connection established\r\n\r\n")
+			_ = rw.Flush()
+			_ = conn.Close()
+			return
+		}
+
+		upstreamConn, err := net.DialTimeout("tcp", r.Host, 2*time.Second)
+		if err != nil {
+			_, _ = rw.WriteString("HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\n\r\n")
+			_ = rw.Flush()
+			_ = conn.Close()
+			return
+		}
+
+		_, _ = rw.WriteString("HTTP/1.1 200 Connection established\r\n\r\n")
+		_ = rw.Flush()
+
+		go func() {
+			defer upstreamConn.Close()
+			defer conn.Close()
+			_, _ = io.Copy(upstreamConn, conn)
+		}()
+		go func() {
+			defer upstreamConn.Close()
+			defer conn.Close()
+			_, _ = io.Copy(conn, upstreamConn)
+		}()
+	})
+
+	server := &http.Server{Handler: handler}
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+
+	go func() {
+		_ = server.Serve(ln)
+	}()
+
+	getTargets := func() []string {
+		mu.Lock()
+		defer mu.Unlock()
+		return append([]string(nil), targets...)
+	}
+
+	closeServer := func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		_ = server.Shutdown(shutdownCtx)
+		_ = ln.Close()
+	}
+
+	return "http://" + ln.Addr().String(), getTargets, closeServer
+}
 
 func TemplateTestGRPCMUSTPASS_MITM_WithoutProxy_StatusCard(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -383,6 +471,71 @@ func TestGRPCMUSTPASS_MITM_Runtime_Proxy(t *testing.T) {
 		require.True(t, networkIsPassed, "Network should passed")
 		cancel()
 	}, nil)
+}
+
+func TestGRPCMUSTPASS_MITM_DownstreamProxy_EnableHostsMappingBeforeDownstreamProxy(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	fakeHost := "mitm-hosts-first.invalid"
+	token := utils.RandStringBytes(16)
+
+	targetHost, targetPort := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		_, _ = writer.Write([]byte(token))
+	})
+
+	runCase := func(t *testing.T, enable bool) ([]string, *lowhttp.LowhttpResponse, error) {
+		t.Helper()
+
+		var (
+			rsp    *lowhttp.LowhttpResponse
+			reqErr error
+		)
+
+		targetURL := fmt.Sprintf("http://%s", utils.HostPort(fakeHost, targetPort))
+		downstreamProxy, getTargets, closeProxy := startRecordingConnectProxy(t)
+		defer closeProxy()
+
+		mitmPort := utils.GetRandomAvailableTCPPort()
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+
+		RunMITMTestServerEx(client, ctx, func(stream ypb.Yak_MITMClient) {
+			stream.Send(&ypb.MITMRequest{
+				Host:                                    "127.0.0.1",
+				Port:                                    uint32(mitmPort),
+				DownstreamProxy:                         downstreamProxy,
+				Hosts:                                   []*ypb.KVPair{{Key: fakeHost, Value: targetHost}},
+				EnableHostsMappingBeforeDownstreamProxy: enable,
+			})
+		}, func(stream ypb.Yak_MITMClient) {
+			mitmProxy := "http://" + utils.HostPort("127.0.0.1", mitmPort)
+			rsp, _, reqErr = poc.DoGET(targetURL, poc.WithProxy(mitmProxy))
+			cancel()
+		}, nil)
+
+		require.Eventually(t, func() bool {
+			return len(getTargets()) > 0
+		}, 3*time.Second, 100*time.Millisecond)
+
+		return getTargets(), rsp, reqErr
+	}
+
+	t.Run("disabled", func(t *testing.T) {
+		targets, rsp, err := runCase(t, false)
+		require.Contains(t, targets, utils.HostPort(fakeHost, targetPort))
+		if err == nil && rsp != nil {
+			require.NotContains(t, string(rsp.RawPacket), token)
+		}
+	})
+
+	t.Run("enabled", func(t *testing.T) {
+		targets, rsp, err := runCase(t, true)
+		require.Contains(t, targets, utils.HostPort(targetHost, targetPort))
+		require.NoError(t, err)
+		require.NotNil(t, rsp)
+		require.Contains(t, string(rsp.RawPacket), token)
+	})
 }
 
 func TestGRPCMUSTPASS_MITM_Proxy_MITMPluginInheritProxy(t *testing.T) {
