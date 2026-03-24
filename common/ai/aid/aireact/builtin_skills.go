@@ -1,7 +1,6 @@
 package aireact
 
 import (
-	"embed"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -17,8 +16,9 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
-//go:embed skills
-var builtinSkillsFS embed.FS
+//go:generate gzip-embed -cache --source ./skills --gz skills.tar.gz --root-path --no-embed
+
+var builtinSkillsFS fi.FileSystem
 
 const builtinSkillReleaseTimeKeyPrefix = "ai.builtin_skills.release_time"
 
@@ -33,7 +33,7 @@ var builtinSkillReleaseDB = func() *gorm.DB {
 // The filesystem root contains skill directories (e.g. skills/code-review/),
 // each with a SKILL.md defining the skill metadata and content.
 func GetBuiltinSkillsFS() fi.FileSystem {
-	return filesys.NewEmbedFS(builtinSkillsFS)
+	return builtinSkillsFS
 }
 
 // ExtractBuiltinSkillsToDir extracts built-in skills from the embedded filesystem
@@ -49,7 +49,7 @@ func GetBuiltinSkillsFS() fi.FileSystem {
 // "builtin/" is prepended, so the output becomes
 // "<targetDir>/builtin/<skill-name>/SKILL.md".
 func ExtractBuiltinSkillsToDir(targetDir string) error {
-	embedFS := filesys.NewEmbedFS(builtinSkillsFS)
+	embedFS := GetBuiltinSkillsFS()
 
 	return filesys.SimpleRecursive(
 		filesys.WithFileSystem(embedFS),
