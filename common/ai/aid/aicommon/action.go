@@ -349,11 +349,9 @@ func (m *ActionMaker) ReadFromReader(ctx context.Context, reader io.Reader) *Act
 				onFinished()
 			}
 		}()
-		actionStart := utils.NewBool(false) // indicate whether action is started
 		setStart := func(hitName string) {
 			action.SetName(hitName)
 			action.Set(ActionMagicKey, hitName)
-			actionStart.Set()
 		}
 
 		opts := m.jsonCallback
@@ -361,16 +359,6 @@ func (m *ActionMaker) ReadFromReader(ctx context.Context, reader io.Reader) *Act
 		//  stream set field handler
 		opts = append(opts, jsonextractor.WithFormatKeyValueCallback(func(key, data any, parents []string) {
 			if key == "" {
-				return
-			}
-			if actionStart.IsSet() {
-				keyString := utils.InterfaceToString(key)
-
-				if len(parents) > 0 { // build full key with parents
-					fullKeyString := strings.Join(append(parents, keyString), ".")
-					action.Set(fullKeyString, data) // set full key param
-				}
-				action.Set(keyString, data) // verbose save with simple key, legacy support
 				return
 			}
 			if utils.InterfaceToString(key) == "@action" {
@@ -386,6 +374,14 @@ func (m *ActionMaker) ReadFromReader(ctx context.Context, reader io.Reader) *Act
 						}
 					}
 				}
+			} else {
+				keyString := utils.InterfaceToString(key)
+
+				if len(parents) > 0 { // build full key with parents
+					fullKeyString := strings.Join(append(parents, keyString), ".")
+					action.Set(fullKeyString, data) // set full key param
+				}
+				action.Set(keyString, data) // verbose save with simple key, legacy support
 			}
 		}))
 

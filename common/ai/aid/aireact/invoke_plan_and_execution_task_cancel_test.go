@@ -98,7 +98,6 @@ func TestReAct_PlanAndExecute_TaskCancel(t *testing.T) {
 			}
 
 			<-waitCancelTaskDone
-			cancelTaskSuccess = true
 			return "", nil
 		}),
 	)
@@ -202,6 +201,9 @@ func TestReAct_PlanAndExecute_TaskCancel(t *testing.T) {
 
 	after := time.After(15 * time.Second)
 
+	hasStatusChange := false
+	hasPlanEnd := false
+
 LOOP:
 	for {
 		select {
@@ -219,13 +221,19 @@ LOOP:
 			// }
 
 			if e.GetIsSync() && e.GetSyncID() == syncID && e.NodeId == string("react_task_cancelled") {
+				hasStatusChange = true
 				waitCancelTaskDone <- struct{}{}
+				cancelTaskSuccess = true
 			}
 			if e.Type == string(schema.EVENT_TYPE_AI_TASK_SWITCHED_TO_ASYNC) {
 				task_id := utils.InterfaceToString(jsonpath.FindFirst(e.GetContent(), "$..task_id"))
 				currentTaskID = task_id
 			}
 			if e.Type == string(schema.EVENT_TYPE_END_PLAN_AND_EXECUTION) {
+				hasPlanEnd = true
+			}
+
+			if hasPlanEnd && hasStatusChange {
 				break LOOP
 			}
 			// if e.Type == string(schema.EVENT_TYPE_FAIL_PLAN_AND_EXECUTION) {

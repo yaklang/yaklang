@@ -687,12 +687,12 @@ func TestExec_WithAITagFieldProcessing(t *testing.T) {
 				}
 
 				// 使用提取的nonce返回AITag内容和write_code action
-				rsp.EmitOutputStream(bytes.NewBufferString(utils.MustRenderTemplate(`<|test-code_{{ .nonce }}|>
+				rsp.EmitOutputStream(bytes.NewBufferString(utils.MustRenderTemplate(`{"@action": "finish", "answer": "Code generated"}
+<|test-code_{{ .nonce }}|>
 func main() {
     println("Hello, World!")
 }
-<|test-code_END_{{ .nonce }}|>
-{"@action": "finish", "answer": "Code generated"}`, map[string]any{
+<|test-code_END_{{ .nonce }}|>`, map[string]any{
 					"nonce": nonceStr,
 				})))
 			} else {

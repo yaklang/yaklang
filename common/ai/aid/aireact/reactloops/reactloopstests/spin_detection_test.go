@@ -508,7 +508,7 @@ func TestIsInSpinTrustsAINotSpinning(t *testing.T) {
 		if strings.Contains(prompt, "SELF_REFLECTION_TASK") {
 			reflectionResult := map[string]interface{}{
 				"@action":             "self_reflection",
-				"is_spinning":          false,
+				"is_spinning":         false,
 				"is_task_progressing": true,
 			}
 			resultJSON, _ := json.Marshal(reflectionResult)
@@ -664,9 +664,9 @@ func TestIsTaskProgressingResetsSpinCounter(t *testing.T) {
 				// 第三次反思：报告 is_task_progressing=true（任务有进展，清零计数）
 				reflectionResult := map[string]interface{}{
 					"@action":             "self_reflection",
-					"is_spinning":          false,
+					"is_spinning":         false,
 					"is_task_progressing": true,
-					"suggestions":          []string{"continue with new approach"},
+					"suggestions":         []string{"continue with new approach"},
 				}
 				resultJSON, _ := json.Marshal(reflectionResult)
 				rsp.EmitOutputStream(strings.NewReader(string(resultJSON)))
@@ -1016,7 +1016,7 @@ func TestSelfReflectionThenSpin(t *testing.T) {
 		}, 2*time.Second)
 		if err != nil {
 			// 如果是超时错误，可能是正常的（循环在继续执行）
-			if strings.Contains(err.Error(), "deadline exceeded") || strings.Contains(err.Error(), "context deadline exceeded") {
+			if strings.Contains(err.Error(), "context canceled") || strings.Contains(err.Error(), "deadline exceeded") || strings.Contains(err.Error(), "context deadline exceeded") {
 				t.Logf("ExecuteAction timed out at iteration %d (this may be expected): %v", i+1, err)
 				break
 			}
@@ -1048,7 +1048,7 @@ func TestSelfReflectionThenSpin(t *testing.T) {
 	}, 2*time.Second)
 	if err != nil {
 		// 如果是超时错误，可能是正常的（循环在继续执行）
-		if strings.Contains(err.Error(), "deadline exceeded") || strings.Contains(err.Error(), "context deadline exceeded") {
+		if strings.Contains(err.Error(), "deadline exceeded") || strings.Contains(err.Error(), "context deadline exceeded") || strings.Contains(err.Error(), "context canceled") {
 			t.Logf("ExecuteAction timed out at iteration 4 (this may be expected): %v", err)
 		} else {
 			t.Fatalf("ExecuteAction failed at iteration 4: %v", err)

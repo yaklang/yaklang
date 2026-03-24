@@ -518,6 +518,16 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 		return basicState.(*state)
 	}
 
+	isCurrentInJson := func() bool {
+		inJson := false
+		stack.GetAll(func(a any) {
+			if a.(*state).value == state_jsonObj || a.(*state).value == state_jsonArray {
+				inJson = true
+			}
+		})
+		return inJson
+	}
+
 	getStrSlice := func(s *state) string {
 		if s.start > s.end {
 			return ""
@@ -888,30 +898,36 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 				pushState(state_quote)
 				continue
 			case '"':
-				// 检查下一个字符是否是有效的JSON结构字符（表示字符串结束）
-				// 如果是逗号、冒号、右大括号、右方括号、空格、制表符、换行符等，则字符串结束
-				// 如果下一个字符是点号，再检查点号后面是否是有效结束字符
-				// 否则，这个引号可能是字符串内容的一部分（非标准JSON，但需要容错处理）
-				nextCh, peekErr := reader.Peek()
 				isValidEndChar := false
-				if peekErr == nil {
-					// 有效的结束字符：逗号、冒号、右大括号、右方括号、空格、制表符、换行符、回车符
-					if nextCh == ',' || nextCh == ':' || nextCh == '}' || nextCh == ']' ||
-						nextCh == ' ' || nextCh == '\t' || nextCh == '\n' || nextCh == '\r' {
-						isValidEndChar = true
-					} else if nextCh == '.' {
-						// 如果下一个字符是点号，检查点号后面是否是有效结束字符
-						peek2, peekErr2 := reader.PeekN(2)
-						if peekErr2 == nil && len(peek2) >= 2 {
-							afterDot := peek2[1]
-							if afterDot == ',' || afterDot == ':' || afterDot == '}' || afterDot == ']' ||
-								afterDot == ' ' || afterDot == '\t' || afterDot == '\n' || afterDot == '\r' {
-								isValidEndChar = true
+				if isCurrentInJson() {
+					// 只有在当前处于JSON结构内时才检查结束字符，以避免过早结束字符串
+					// 检查下一个字符是否是有效的JSON结构字符（表示字符串结束）
+					// 如果是逗号、冒号、右大括号、右方括号、空格、制表符、换行符等，则字符串结束
+					// 如果下一个字符是点号，再检查点号后面是否是有效结束字符
+					// 否则，这个引号可能是字符串内容的一部分（非标准JSON，但需要容错处理）
+					nextCh, peekErr := reader.Peek()
+					if peekErr == nil {
+						// 有效的结束字符：逗号、冒号、右大括号、右方括号、空格、制表符、换行符、回车符
+						if nextCh == ',' || nextCh == ':' || nextCh == '}' || nextCh == ']' ||
+							nextCh == ' ' || nextCh == '\t' || nextCh == '\n' || nextCh == '\r' {
+							isValidEndChar = true
+						} else if nextCh == '.' {
+							// 如果下一个字符是点号，检查点号后面是否是有效结束字符
+							peek2, peekErr2 := reader.PeekN(2)
+							if peekErr2 == nil && len(peek2) >= 2 {
+								afterDot := peek2[1]
+								if afterDot == ',' || afterDot == ':' || afterDot == '}' || afterDot == ']' ||
+									afterDot == ' ' || afterDot == '\t' || afterDot == '\n' || afterDot == '\r' {
+									isValidEndChar = true
+								}
 							}
 						}
+					} else if peekErr == io.EOF {
+						// 到达文件末尾，字符串结束
+						isValidEndChar = true
 					}
-				} else if peekErr == io.EOF {
-					// 到达文件末尾，字符串结束
+				} else {
+					// 不在JSON结构内时，直接认为引号结束字符串（容错处理）
 					isValidEndChar = true
 				}
 
