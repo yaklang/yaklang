@@ -81,8 +81,10 @@ func ImportDatabase(reader io.Reader) error {
 	return nil
 }
 
-func MigrateSyntaxFlow(hash string, i *schema.SyntaxFlowRule) error {
-	db := consts.GetGormProfileDatabase()
+func MigrateSyntaxFlowWithDB(db *gorm.DB, hash string, i *schema.SyntaxFlowRule) error {
+	if db == nil {
+		return utils.Errorf("profile db is nil")
+	}
 
 	if hash == "" {
 		hash = i.CalcHash()
@@ -113,6 +115,10 @@ func MigrateSyntaxFlow(hash string, i *schema.SyntaxFlowRule) error {
 	} else {
 		return db.Create(i).Error
 	}
+}
+
+func MigrateSyntaxFlow(hash string, i *schema.SyntaxFlowRule) error {
+	return MigrateSyntaxFlowWithDB(consts.GetGormProfileDatabase(), hash, i)
 }
 
 func DeleteRuleByRuleName(name string) error {
@@ -189,7 +195,10 @@ func CreateRuleByContent(ruleFileName string, content string, buildIn bool, tags
 
 // CreateRuleByContentEx 创建规则（扩展版本，支持元数据增强）
 // filePath: 规则文件的相对路径，用于元数据增强
-func CreateRuleByContentEx(ruleFileName string, content string, filePath string, buildIn bool, tags ...string) (*schema.SyntaxFlowRule, error) {
+func CreateRuleByContentExWithDB(db *gorm.DB, ruleFileName string, content string, filePath string, buildIn bool, tags ...string) (*schema.SyntaxFlowRule, error) {
+	if db == nil {
+		return nil, utils.Errorf("profile db is nil")
+	}
 	languageRaw, _, _ := strings.Cut(ruleFileName, "-")
 	language, err := ssaconfig.ValidateLanguage(languageRaw)
 	if err != nil {
@@ -245,15 +254,19 @@ func CreateRuleByContentEx(ruleFileName string, content string, filePath string,
 			rule.RuleName = rule.Title
 		}
 	}
-	err = MigrateSyntaxFlow(rule.CalcHash(), rule)
+	err = MigrateSyntaxFlowWithDB(db, rule.CalcHash(), rule)
 	if err != nil {
 		return nil, utils.Wrap(err, "migrate syntax flow rule error")
 	}
-	
+
 	// ⭐ 使用元数据增强器自动生成分组，同时添加默认的语言/严重性/目的分组
 	enrichedGroups := enrichRuleGroups(rule, filePath)
-	addGroupsForRule(consts.GetGormProfileDatabase(), rule, true, enrichedGroups...)
+	addGroupsForRule(db, rule, true, enrichedGroups...)
 	return rule, nil
+}
+
+func CreateRuleByContentEx(ruleFileName string, content string, filePath string, buildIn bool, tags ...string) (*schema.SyntaxFlowRule, error) {
+	return CreateRuleByContentExWithDB(consts.GetGormProfileDatabase(), ruleFileName, content, filePath, buildIn, tags...)
 }
 
 func ImportRuleWithoutValid(ruleName string, content string, buildin bool, tags ...string) (*schema.SyntaxFlowRule, error) {
@@ -262,12 +275,16 @@ func ImportRuleWithoutValid(ruleName string, content string, buildin bool, tags 
 
 // ImportRuleWithoutValidEx 导入规则（扩展版本，支持文件路径）
 // filePath: 规则文件的相对路径，用于元数据增强（匹配框架分组）
-func ImportRuleWithoutValidEx(ruleName string, content string, filePath string, buildin bool, tags ...string) (*schema.SyntaxFlowRule, error) {
-	rule, err := CreateRuleByContentEx(ruleName, content, filePath, buildin, tags...)
+func ImportRuleWithoutValidExWithDB(db *gorm.DB, ruleName string, content string, filePath string, buildin bool, tags ...string) (*schema.SyntaxFlowRule, error) {
+	rule, err := CreateRuleByContentExWithDB(db, ruleName, content, filePath, buildin, tags...)
 	if err != nil {
 		return nil, utils.Errorf("create build in rule failed: %s", err)
 	}
 	return rule, nil
+}
+
+func ImportRuleWithoutValidEx(ruleName string, content string, filePath string, buildin bool, tags ...string) (*schema.SyntaxFlowRule, error) {
+	return ImportRuleWithoutValidExWithDB(consts.GetGormProfileDatabase(), ruleName, content, filePath, buildin, tags...)
 }
 
 func ImportValidRule(system fi.FileSystem, ruleName string, content string) error {
