@@ -106,6 +106,7 @@ func (c *Coordinator) handleMemoryGenerationInPostIteration(loop *reactloops.ReA
 }
 
 func (c *Coordinator) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTask, options ...reactloops.ReActLoopOption) error {
+	memoryFlushBuffer := aicommon.NewMemoryFlushBuffer("coordinator", c.TimelineDiffer, nil)
 	taskCtx := task.GetContext()
 	inputChannel := chanx.NewUnlimitedChan[*ypb.AIInputEvent](taskCtx, 10)
 	uid := uuid.NewString()
@@ -147,7 +148,65 @@ func (c *Coordinator) ExecuteLoopTask(taskTypeName string, task aicommon.AIState
 		reactloops.WithMemoryPool(c.MemoryPool),
 		reactloops.WithMemorySizeLimit(int(c.MemoryPoolSize)),
 		reactloops.WithEnableSelfReflection(c.EnableSelfReflection),
-		reactloops.WithOnPostIteraction(c.handleMemoryGenerationInPostIteration),
+		reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, operator *reactloops.OnPostIterationOperator) {
+			operator.DeferAfterCallbacks(func() {
+				if c.MemoryTriage == nil {
+					return
+				}
+
+				payload, err := memoryFlushBuffer.Capture(aicommon.MemoryFlushSignal{
+					Iteration:          iteration,
+					Task:               task,
+					IsDone:             isDone,
+					Reason:             reason,
+					ShouldEndIteration: operator.ShouldEndIteration(),
+				})
+				if err != nil {
+					log.Warnf("timeline differ call failed: %v", err)
+					return
+				}
+				if payload == nil && !isDone {
+					return
+				}
+
+				c.Add(1)
+				go func() {
+					defer func() {
+						if err := recover(); err != nil {
+							log.Errorf("intelligent memory processing panic: %v", err)
+							utils.PrintCurrentGoroutineRuntimeStack()
+						}
+						c.Done()
+					}()
+
+					if payload != nil {
+						if c.Config.DebugEvent {
+							log.Infof("processing memory flush[%s] for iteration %d with %d pending diffs (%d bytes)", payload.FlushReason, iteration, payload.PendingIterations, payload.PendingBytes)
+						}
+						if err := c.MemoryTriage.HandleMemory(payload.ContextualInput); err != nil {
+							log.Warnf("intelligent memory processing failed: %v", err)
+							return
+						}
+					}
+
+					if isDone {
+						searchResult, err := c.MemoryTriage.SearchMemory(task.GetUserInput(), 4096)
+						if err != nil {
+							log.Warnf("memory search for completed task failed: %v", err)
+							return
+						}
+						if len(searchResult.Memories) > 0 {
+							log.Infof("found %d relevant memories for completed task %s (total: %d bytes)", len(searchResult.Memories), task.GetId(), searchResult.ContentBytes)
+							if c.DebugEvent {
+								log.Infof("memory search summary: %s", searchResult.SearchSummary)
+							}
+						} else if c.DebugEvent {
+							log.Infof("no relevant memories found for completed task %s", task.GetId())
+						}
+					}
+				}()
+			})
+		}),
 	}
 
 	defaultOptions = append(defaultOptions, options...)

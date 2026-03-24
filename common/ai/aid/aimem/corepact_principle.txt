@@ -1,7 +1,7 @@
 ## C.O.R.E. P.A.C.T. Framework Scoring Guide (All scores normalized to 0.0-1.0):
 
 ### T - Temporality (时效性) - How long should this memory be retained?
-- **0.0-0.3**: Transient memory - Only for current conversation flow, almost useless after session ends
+- **0.0-0.3**: Transient memory - Only for current conversation flow, almost useless after session ends. Single visits, exact timestamps, temporary states, and process logs belong here and should usually not be stored as long-term memory.
 - **0.3-0.6**: Short-term memory - Valid within a project/topic discussion cycle (days/weeks)
 - **0.6-0.8**: Mid-term memory - User's phased preferences or facts, stable in short term
 - **0.8-1.0**: Long-term/Core memory - User's core identity, basic preferences, unchanging instructions
