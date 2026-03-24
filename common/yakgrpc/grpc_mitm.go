@@ -225,18 +225,19 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		return proxys, nil
 	}
 	var (
-		host                        string = "127.0.0.1"
-		port                        int    = 8089
-		enableGMTLS                        = firstReq.GetEnableGMTLS()
-		preferGMTLS                        = firstReq.GetPreferGMTLS()
-		onlyGMTLS                          = firstReq.GetOnlyEnableGMTLS()
-		proxyUsername                      = firstReq.GetProxyUsername()
-		proxyPassword                      = firstReq.GetProxyPassword()
-		dnsServers                         = firstReq.GetDnsServers()
-		forceDisableKeepAlive              = firstReq.GetForceDisableKeepAlive()
-		disableCACertPage                  = firstReq.GetDisableCACertPage()
-		disableWebsocketCompression        = firstReq.GetDisableWebsocketCompression()
-		randomJA3                          = firstReq.GetRandomJA3()
+		host                                    string = "127.0.0.1"
+		port                                    int    = 8089
+		enableGMTLS                                    = firstReq.GetEnableGMTLS()
+		preferGMTLS                                    = firstReq.GetPreferGMTLS()
+		onlyGMTLS                                      = firstReq.GetOnlyEnableGMTLS()
+		proxyUsername                                  = firstReq.GetProxyUsername()
+		proxyPassword                                  = firstReq.GetProxyPassword()
+		dnsServers                                     = firstReq.GetDnsServers()
+		enableHostsMappingBeforeDownstreamProxy        = firstReq.GetEnableHostsMappingBeforeDownstreamProxy()
+		forceDisableKeepAlive                          = firstReq.GetForceDisableKeepAlive()
+		disableCACertPage                              = firstReq.GetDisableCACertPage()
+		disableWebsocketCompression                    = firstReq.GetDisableWebsocketCompression()
+		randomJA3                                      = firstReq.GetRandomJA3()
 	)
 
 	if firstReq.GetHost() != "" {
@@ -1847,6 +1848,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		crep.MITM_SetFindProcessName(true),
 		crep.MITM_SetDNSServers(dnsServers...),
 		crep.MITM_SetHostMapping(hostMapping),
+		crep.MITM_EnableHostsMappingBeforeDownstreamProxy(enableHostsMappingBeforeDownstreamProxy),
 		crep.MITM_SetHTTPForceClose(forceDisableKeepAlive),
 		crep.MITM_SetMaxReadWaitTime(time.Duration(firstReq.GetMaxReadWaitTime())*time.Second),
 	)
@@ -2066,8 +2068,8 @@ func (s *Server) DeduplicateMITMReplacerRules(ctx context.Context, _ *ypb.Empty)
 	var deduped []*ypb.MITMContentReplacer
 	for _, rule := range allRules {
 		key := ruleKey{
-			Rule:       rule.GetRule(),
-			Result:     rule.GetResult(),
+			Rule:        rule.GetRule(),
+			Result:      rule.GetResult(),
 			VerboseName: rule.GetVerboseName(),
 		}
 		if seen[key] {

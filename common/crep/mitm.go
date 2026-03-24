@@ -325,10 +325,11 @@ type MITMServer struct {
 
 	clientCerts []*ClientCertificationPair
 
-	DNSServers     []string
-	HostMapping    map[string]string
-	via            string
-	allowForwarded bool
+	DNSServers                             []string
+	HostMapping                            map[string]string
+	preferHostMappingBeforeDownstreamProxy bool
+	via                                    string
+	allowForwarded                         bool
 	// httpTransport            *http.Transport
 	proxyUrl                 *url.URL
 	proxyUrls                []*url.URL
@@ -468,6 +469,9 @@ func (m *MITMServer) initConfig() error {
 	}
 	if len(m.HostMapping) > 0 {
 		config = append(config, lowhttp.WithETCHosts(m.HostMapping))
+	}
+	if m.preferHostMappingBeforeDownstreamProxy {
+		config = append(config, lowhttp.WithPreferEtcHostsBeforeProxy(true))
 	}
 	if m.randomJA3 {
 		config = append(config, lowhttp.WithRandomJA3FingerPrint(true))

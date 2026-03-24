@@ -50225,11 +50225,12 @@ type MITMRequest struct {
 	OnlyEnableGMTLS bool `protobuf:"varint,47,opt,name=onlyEnableGMTLS,proto3" json:"onlyEnableGMTLS,omitempty"`
 	PreferGMTLS     bool `protobuf:"varint,48,opt,name=preferGMTLS,proto3" json:"preferGMTLS,omitempty"`
 	// 代理用户名和密码
-	ProxyUsername   string    `protobuf:"bytes,49,opt,name=proxyUsername,proto3" json:"proxyUsername,omitempty"`
-	ProxyPassword   string    `protobuf:"bytes,50,opt,name=proxyPassword,proto3" json:"proxyPassword,omitempty"`
-	EnableProxyAuth bool      `protobuf:"varint,51,opt,name=enableProxyAuth,proto3" json:"enableProxyAuth,omitempty"`
-	DnsServers      []string  `protobuf:"bytes,52,rep,name=dnsServers,proto3" json:"dnsServers,omitempty"`
-	Hosts           []*KVPair `protobuf:"bytes,53,rep,name=hosts,proto3" json:"hosts,omitempty"`
+	ProxyUsername                           string    `protobuf:"bytes,49,opt,name=proxyUsername,proto3" json:"proxyUsername,omitempty"`
+	ProxyPassword                           string    `protobuf:"bytes,50,opt,name=proxyPassword,proto3" json:"proxyPassword,omitempty"`
+	EnableProxyAuth                         bool      `protobuf:"varint,51,opt,name=enableProxyAuth,proto3" json:"enableProxyAuth,omitempty"`
+	DnsServers                              []string  `protobuf:"bytes,52,rep,name=dnsServers,proto3" json:"dnsServers,omitempty"`
+	Hosts                                   []*KVPair `protobuf:"bytes,53,rep,name=hosts,proto3" json:"hosts,omitempty"`
+	EnableHostsMappingBeforeDownstreamProxy bool      `protobuf:"varint,68,opt,name=EnableHostsMappingBeforeDownstreamProxy,proto3" json:"EnableHostsMappingBeforeDownstreamProxy,omitempty"`
 	// max content-length
 	MaxContentLength int64 `protobuf:"varint,55,opt,name=maxContentLength,proto3" json:"maxContentLength,omitempty"`
 	MaxReadWaitTime  int64 `protobuf:"varint,67,opt,name=MaxReadWaitTime,proto3" json:"MaxReadWaitTime,omitempty"`
@@ -50612,6 +50613,13 @@ func (x *MITMRequest) GetHosts() []*KVPair {
 		return x.Hosts
 	}
 	return nil
+}
+
+func (x *MITMRequest) GetEnableHostsMappingBeforeDownstreamProxy() bool {
+	if x != nil {
+		return x.EnableHostsMappingBeforeDownstreamProxy
+	}
+	return false
 }
 
 func (x *MITMRequest) GetMaxContentLength() int64 {
@@ -65639,16 +65647,17 @@ type MITMV2Request struct {
 	SetDownstreamProxy bool `protobuf:"varint,4,opt,name=SetDownstreamProxy,proto3" json:"SetDownstreamProxy,omitempty"` // runtime change proxy
 	EnableHttp2        bool `protobuf:"varint,5,opt,name=EnableHttp2,proto3" json:"EnableHttp2,omitempty"`
 	// gmtls config
-	EnableGMTLS     bool           `protobuf:"varint,6,opt,name=EnableGMTLS,proto3" json:"EnableGMTLS,omitempty"`
-	OnlyEnableGMTLS bool           `protobuf:"varint,7,opt,name=OnlyEnableGMTLS,proto3" json:"OnlyEnableGMTLS,omitempty"`
-	PreferGMTLS     bool           `protobuf:"varint,8,opt,name=PreferGMTLS,proto3" json:"PreferGMTLS,omitempty"`
-	Certificates    []*Certificate `protobuf:"bytes,9,rep,name=Certificates,proto3" json:"Certificates,omitempty"`
-	ProxyUsername   string         `protobuf:"bytes,10,opt,name=ProxyUsername,proto3" json:"ProxyUsername,omitempty"`
-	ProxyPassword   string         `protobuf:"bytes,11,opt,name=ProxyPassword,proto3" json:"ProxyPassword,omitempty"`
-	EnableProxyAuth bool           `protobuf:"varint,12,opt,name=EnableProxyAuth,proto3" json:"EnableProxyAuth,omitempty"`
-	DnsServers      []string       `protobuf:"bytes,13,rep,name=DnsServers,proto3" json:"DnsServers,omitempty"`
-	Hosts           []*KVPair      `protobuf:"bytes,14,rep,name=hosts,proto3" json:"hosts,omitempty"`
-	HostsMapping    []*KVPair      `protobuf:"bytes,46,rep,name=HostsMapping,proto3" json:"HostsMapping,omitempty"`
+	EnableGMTLS                             bool           `protobuf:"varint,6,opt,name=EnableGMTLS,proto3" json:"EnableGMTLS,omitempty"`
+	OnlyEnableGMTLS                         bool           `protobuf:"varint,7,opt,name=OnlyEnableGMTLS,proto3" json:"OnlyEnableGMTLS,omitempty"`
+	PreferGMTLS                             bool           `protobuf:"varint,8,opt,name=PreferGMTLS,proto3" json:"PreferGMTLS,omitempty"`
+	Certificates                            []*Certificate `protobuf:"bytes,9,rep,name=Certificates,proto3" json:"Certificates,omitempty"`
+	ProxyUsername                           string         `protobuf:"bytes,10,opt,name=ProxyUsername,proto3" json:"ProxyUsername,omitempty"`
+	ProxyPassword                           string         `protobuf:"bytes,11,opt,name=ProxyPassword,proto3" json:"ProxyPassword,omitempty"`
+	EnableProxyAuth                         bool           `protobuf:"varint,12,opt,name=EnableProxyAuth,proto3" json:"EnableProxyAuth,omitempty"`
+	DnsServers                              []string       `protobuf:"bytes,13,rep,name=DnsServers,proto3" json:"DnsServers,omitempty"`
+	Hosts                                   []*KVPair      `protobuf:"bytes,14,rep,name=hosts,proto3" json:"hosts,omitempty"`
+	HostsMapping                            []*KVPair      `protobuf:"bytes,46,rep,name=HostsMapping,proto3" json:"HostsMapping,omitempty"`
+	EnableHostsMappingBeforeDownstreamProxy bool           `protobuf:"varint,56,opt,name=EnableHostsMappingBeforeDownstreamProxy,proto3" json:"EnableHostsMappingBeforeDownstreamProxy,omitempty"`
 	// max content-length
 	MaxContentLength int64 `protobuf:"varint,15,opt,name=MaxContentLength,proto3" json:"MaxContentLength,omitempty"`
 	MaxReadWaitTime  int64 `protobuf:"varint,16,opt,name=MaxReadWaitTime,proto3" json:"MaxReadWaitTime,omitempty"`
@@ -65850,6 +65859,13 @@ func (x *MITMV2Request) GetHostsMapping() []*KVPair {
 		return x.HostsMapping
 	}
 	return nil
+}
+
+func (x *MITMV2Request) GetEnableHostsMappingBeforeDownstreamProxy() bool {
+	if x != nil {
+		return x.EnableHostsMappingBeforeDownstreamProxy
+	}
+	return false
 }
 
 func (x *MITMV2Request) GetMaxContentLength() int64 {
@@ -72410,7 +72426,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\n" +
 	"FilterData\x18\x01 \x01(\v2\x13.ypb.MITMFilterDataR\n" +
 	"FilterData\"\x17\n" +
-	"\x15SetMITMFilterResponse\"\xd7\x12\n" +
+	"\x15SetMITMFilterResponse\"\xb1\x13\n" +
 	"\vMITMRequest\x12\x18\n" +
 	"\arequest\x18\x01 \x01(\fR\arequest\x12\x1a\n" +
 	"\bresponse\x18o \x01(\fR\bresponse\x12\x12\n" +
@@ -72471,7 +72487,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\n" +
 	"dnsServers\x184 \x03(\tR\n" +
 	"dnsServers\x12!\n" +
-	"\x05hosts\x185 \x03(\v2\v.ypb.KVPairR\x05hosts\x12*\n" +
+	"\x05hosts\x185 \x03(\v2\v.ypb.KVPairR\x05hosts\x12X\n" +
+	"'EnableHostsMappingBeforeDownstreamProxy\x18D \x01(\bR'EnableHostsMappingBeforeDownstreamProxy\x12*\n" +
 	"\x10maxContentLength\x187 \x01(\x03R\x10maxContentLength\x12(\n" +
 	"\x0fMaxReadWaitTime\x18C \x01(\x03R\x0fMaxReadWaitTime\x12\x12\n" +
 	"\x04Tags\x188 \x03(\tR\x04Tags\x12(\n" +
@@ -73687,7 +73704,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x14WatchProcessResponse\x12\x16\n" +
 	"\x06Action\x18\x01 \x01(\tR\x06Action\x12*\n" +
 	"\aProcess\x18\x02 \x01(\v2\x10.ypb.ProcessInfoR\aProcess\x125\n" +
-	"\vConnections\x18\x03 \x03(\v2\x13.ypb.ConnectionInfoR\vConnections\"\x8c\x13\n" +
+	"\vConnections\x18\x03 \x03(\v2\x13.ypb.ConnectionInfoR\vConnections\"\xe6\x13\n" +
 	"\rMITMV2Request\x12\x12\n" +
 	"\x04Host\x18\x01 \x01(\tR\x04Host\x12\x12\n" +
 	"\x04Port\x18\x02 \x01(\rR\x04Port\x12(\n" +
@@ -73706,7 +73723,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"DnsServers\x18\r \x03(\tR\n" +
 	"DnsServers\x12!\n" +
 	"\x05hosts\x18\x0e \x03(\v2\v.ypb.KVPairR\x05hosts\x12/\n" +
-	"\fHostsMapping\x18. \x03(\v2\v.ypb.KVPairR\fHostsMapping\x12*\n" +
+	"\fHostsMapping\x18. \x03(\v2\v.ypb.KVPairR\fHostsMapping\x12X\n" +
+	"'EnableHostsMappingBeforeDownstreamProxy\x188 \x01(\bR'EnableHostsMappingBeforeDownstreamProxy\x12*\n" +
 	"\x10MaxContentLength\x18\x0f \x01(\x03R\x10MaxContentLength\x12(\n" +
 	"\x0fMaxReadWaitTime\x18\x10 \x01(\x03R\x0fMaxReadWaitTime\x12(\n" +
 	"\x0fFilterWebsocket\x18\x11 \x01(\bR\x0fFilterWebsocket\x124\n" +

@@ -70,6 +70,7 @@ type LowhttpExecConfig struct {
 	UseMITMRule                      bool
 	RequestSource                    string
 	EtcHosts                         map[string]string
+	PreferEtcHostsBeforeProxy        bool
 	DNSServers                       []string
 	RuntimeId                        string
 	FromPlugin                       string
@@ -419,6 +420,12 @@ func WithMaxContentLength(m int) LowhttpOpt {
 func WithETCHosts(hosts map[string]string) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		o.EtcHosts = hosts
+	}
+}
+
+func WithPreferEtcHostsBeforeProxy(b bool) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.PreferEtcHostsBeforeProxy = b
 	}
 }
 

@@ -57,6 +57,19 @@ func afterLog(option *LowhttpExecConfig) {
 	log.Infof("debug counter: %v, %v", "http done", atomic.LoadInt64(option.AfterCount))
 }
 
+func resolveProxyTargetFromEtcHosts(host string, port int, etcHosts map[string]string) (string, bool) {
+	if host == "" || port <= 0 || len(etcHosts) == 0 {
+		return "", false
+	}
+
+	resolvedHost, ok := netx.ResolveHostByTemporaryHosts(host, etcHosts)
+	if !ok || resolvedHost == "" || strings.EqualFold(resolvedHost, host) {
+		return "", false
+	}
+
+	return utils.HostPort(resolvedHost, port), true
+}
+
 func HTTP(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	option := NewLowhttpOption()
 	for _, opt := range opts {
@@ -580,6 +593,11 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 		return response, utils.Errorf("empty port...")
 	}
 	originAddr := utils.HostPort(host, port)
+	if len(proxy) > 0 && option.PreferEtcHostsBeforeProxy {
+		if mappedAddr, ok := resolveProxyTargetFromEtcHosts(host, port, dnsHosts); ok {
+			originAddr = mappedAddr
+		}
+	}
 
 	if timeout <= 0 {
 		timeout = 10 * time.Second
