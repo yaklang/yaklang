@@ -16,7 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func TestGRPCMUSTTPASS_MITM_HijackFilter(t *testing.T) {
+func TestGRPCMUSTPASS_MITM_HijackFilter(t *testing.T) {
 	client, err := NewLocalClientWithTempDatabase(t)
 	require.NoError(t, err)
 	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(40))
@@ -225,7 +225,7 @@ func TestGRPCMUSTPASS_Get_Set_HijackFilter(t *testing.T) {
 	require.Truef(t, compareFilterData(want.FilterData, got.FilterData), "got:\n%s\n\nwant:\n%s", spew.Sdump(got), spew.Sdump(want))
 }
 
-func TestGRPCMUSTTPASS_MITMV2_HijackFilter(t *testing.T) {
+func TestGRPCMUSTPASS_MITMV2_HijackFilter(t *testing.T) {
 	client, err := NewLocalClientWithTempDatabase(t)
 	require.NoError(t, err)
 	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(40))

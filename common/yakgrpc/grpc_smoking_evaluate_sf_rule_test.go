@@ -12,7 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func TestEvaluateSyntaxFlowRule_WithDirectRuleInput(t *testing.T) {
+func TestGRPCMUSTPASS_SyntaxFlowEvaluate_WithDirectRuleInput(t *testing.T) {
 	// 测试直接传入规则内容的情况
 	client, err := NewLocalClient()
 	require.NoError(t, err)
@@ -158,7 +158,7 @@ Runtime.getRuntime().exec(* as $cmd) as $result;`,
 	}
 }
 
-func TestEvaluateSyntaxFlowRule_WithRuleName(t *testing.T) {
+func TestGRPCMUSTPASS_SyntaxFlowEvaluate_WithRuleName(t *testing.T) {
 	// 测试通过规则名称查找规则的情况
 	client, err := NewLocalClient()
 	require.NoError(t, err)
@@ -218,7 +218,7 @@ alert $result;`
 	})
 }
 
-func TestEvaluateSyntaxFlowRule_PriorityRuleInput(t *testing.T) {
+func TestGRPCMUSTPASS_SyntaxFlowEvaluate_PriorityRuleInput(t *testing.T) {
 	// 测试当同时提供规则名称和规则内容时，优先使用规则内容
 	client, err := NewLocalClient()
 	require.NoError(t, err)
@@ -268,7 +268,7 @@ alert $result;`
 	})
 }
 
-func TestEvaluateSyntaxFlowRule_AnalyzeResults(t *testing.T) {
+func TestGRPCMUSTPASS_SyntaxFlowEvaluate_AnalyzeResults(t *testing.T) {
 	// 测试各种类型的分析结果
 	client, err := NewLocalClient()
 	require.NoError(t, err)
@@ -358,7 +358,7 @@ Runtime.getRuntime().exec(* as $cmd) as $result;
 	}
 }
 
-func TestEvaluateSyntaxFlowRule_WithTestData(t *testing.T) {
+func TestGRPCMUSTPASS_SyntaxFlowEvaluate_WithTestData(t *testing.T) {
 	// 测试包含测试数据的规则
 	client, err := NewLocalClient()
 	require.NoError(t, err)
@@ -463,7 +463,7 @@ alert $result;`,
 	}
 }
 
-func TestEvaluateSyntaxFlowRule_EmptyRequests(t *testing.T) {
+func TestGRPCMUSTPASS_SyntaxFlowEvaluate_EmptyRequests(t *testing.T) {
 	// 测试边界条件
 	client, err := NewLocalClient()
 	require.NoError(t, err)

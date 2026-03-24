@@ -1430,7 +1430,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_SyncFuzzTag(t *testing.T) {
 	}
 }
 
-func TestFuzzerBigRequest(t *testing.T) {
+func TestGRPCMUSTPASS_HTTPFUZZER_BigRequest(t *testing.T) {
 	uid := uuid.New().String()
 
 	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\n" +

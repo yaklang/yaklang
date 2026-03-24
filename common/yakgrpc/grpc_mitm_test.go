@@ -1774,7 +1774,7 @@ Host: example.com
 	}
 }
 
-func TestGRPCMUSTTPASS_MITM_CAPages(t *testing.T) {
+func TestGRPCMUSTPASS_MITM_CAPages(t *testing.T) {
 	t.Run("disable", func(t *testing.T) {
 		client, err := NewLocalClient()
 		require.NoError(t, err)
@@ -1825,7 +1825,7 @@ func TestGRPCMUSTTPASS_MITM_CAPages(t *testing.T) {
 	})
 }
 
-func TestGRPCMUSTTPASS_MITM_CheckHistoryDurationField(t *testing.T) {
+func TestGRPCMUSTPASS_MITM_CheckHistoryDurationField(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
@@ -1886,7 +1886,7 @@ Host: example.com
 	}
 }
 
-func TestGRPCMUSTTPASS_MITM_HijackTags(t *testing.T) {
+func TestGRPCMUSTPASS_MITM_HijackTags(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(40))
@@ -1958,7 +1958,7 @@ func TestGRPCMUSTTPASS_MITM_HijackTags(t *testing.T) {
 	require.NotContains(t, flow.Tags, "[手动修改]")
 }
 
-func TestGRPCMUSTTPASS_MITM_ModifyHost(t *testing.T) {
+func TestGRPCMUSTPASS_MITM_ModifyHost(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(40))
@@ -2008,7 +2008,7 @@ func TestGRPCMUSTTPASS_MITM_ModifyHost(t *testing.T) {
 	require.Equal(t, token, string(lowhttp.GetHTTPPacketBody(flow.Response)))
 }
 
-func TestGRPCMUSTTPASS_MITM_GM_Only(t *testing.T) {
+func TestGRPCMUSTPASS_MITM_GM_Only(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(40))
@@ -2045,7 +2045,7 @@ func TestGRPCMUSTTPASS_MITM_GM_Only(t *testing.T) {
 	})
 }
 
-func TestGRPCMUSTTPASS_MITM_GM_Prefer(t *testing.T) {
+func TestGRPCMUSTPASS_MITM_GM_Prefer(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(40))
@@ -2082,8 +2082,8 @@ func TestGRPCMUSTTPASS_MITM_GM_Prefer(t *testing.T) {
 	})
 }
 
-// TestGRPCMUSTTPASS_MITM_GM_Only_Client 测试客户端只支持国密TLS不允许降级的情况 例如某些金融业app
-func TestGRPCMUSTTPASS_MITM_GM_Only_Client_Transparent(t *testing.T) {
+// TestGRPCMUSTPASS_MITM_GM_Only_Client 测试客户端只支持国密TLS不允许降级的情况 例如某些金融业app
+func TestGRPCMUSTPASS_MITM_GM_Only_Client_Transparent(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(40))
@@ -2156,7 +2156,7 @@ func TestGRPCMUSTTPASS_MITM_GM_Only_Client_Transparent(t *testing.T) {
 	})
 }
 
-func TestGRPCMUSTTPASS_MITM_GM_Only_Client_With_HTTPConnect(t *testing.T) {
+func TestGRPCMUSTPASS_MITM_GM_Only_Client_With_HTTPConnect(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(40))
