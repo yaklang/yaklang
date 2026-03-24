@@ -87,7 +87,7 @@ func init() {
 			return reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_KNOWLEDGE_ENHANCE, r, preset...)
 		},
 		// Register metadata for better AI understanding
-		reactloops.WithLoopDescription("附加资源信息收集模式：根据用户问题从附加的资源（知识库、文件、AI工具、AI蓝图）中收集相关信息，用于后续回答。"),
+		reactloops.WithLoopDescription("Supplementary resource collection mode: gather relevant information from attached resources such as knowledge bases, files, AI tools, and AI forges based on the user's question for subsequent answering."),
 		reactloops.WithLoopDescriptionZh("附加资源信息收集模式：根据用户问题从知识库、文件、AI 工具和 AI 蓝图中收集相关信息，用于后续回答。"),
 		reactloops.WithLoopUsagePrompt(`当用户附加了资源（知识库、文件等）时使用此流程收集信息。
 AI会根据用户问题从附加资源中尽可能多地收集相关信息，这些信息将用于后续的回答环节。`),

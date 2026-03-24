@@ -33,7 +33,7 @@ func init() {
 
 			return reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_CODE_SECURITY_AUDIT, r, append(opts, preset...)...)
 		},
-		reactloops.WithLoopDescription("代码安全审计模式：四阶段流水线（项目探索→结构化扫描→逐 finding 验证→报告生成）。"),
+		reactloops.WithLoopDescription("Code security audit mode: a four-phase pipeline (project reconnaissance -> structured finding scan -> finding-by-finding verification -> report generation)."),
 		reactloops.WithLoopDescriptionZh("代码安全审计模式：四阶段流水线（项目探索→结构化扫描→逐 finding 验证→报告生成）。"),
 		reactloops.WithVerboseName("Code Security Audit"),
 		reactloops.WithVerboseNameZh("代码安全审计"),
