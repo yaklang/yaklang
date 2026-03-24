@@ -1206,6 +1206,28 @@ func HTTPFlowTags(refreshRequest bool) ([]*TagAndStatusCode, error) {
 	return tags, nil
 }
 
+func QueryHTTPFlowTags() ([]*TagAndStatusCode, error) {
+	tagSet := make(map[string]struct{})
+	db := consts.GetGormProjectDatabase().Model(&schema.HTTPFlow{}).Select("id, tags").Where("tags IS NOT NULL AND tags != ''")
+	for flow := range YieldHTTPFlows(db, context.Background()) {
+		parts := strings.Split(flow.Tags, "|")
+		for _, part := range parts {
+			part = strings.TrimSpace(part)
+			if part != "" && !strings.HasPrefix(part, schema.COLORPREFIX) {
+				tagSet[part] = struct{}{}
+			}
+		}
+	}
+
+	tags := make([]*TagAndStatusCode, 0)
+	for tag := range tagSet {
+		tags = append(tags, &TagAndStatusCode{
+			Value: tag,
+		})
+	}
+	return tags, nil
+}
+
 func QueryWebsocketFlowsByHTTPFlowHash(db *gorm.DB, req *ypb.DeleteHTTPFlowRequest) *gorm.DB {
 	db = db.Model(&schema.HTTPFlow{})
 

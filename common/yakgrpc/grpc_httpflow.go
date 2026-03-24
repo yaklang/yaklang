@@ -367,7 +367,16 @@ func (s *Server) QueryHTTPFlowsIds(ctx context.Context, req *ypb.QueryHTTPFlowsI
 }
 
 func (s *Server) HTTPFlowsFieldGroup(ctx context.Context, req *ypb.HTTPFlowsFieldGroupRequest) (*ypb.HTTPFlowsFieldGroupResponse, error) {
-	tags, err := yakit.HTTPFlowTags(req.RefreshRequest)
+	var (
+		tags []*yakit.TagAndStatusCode
+		err  error
+	)
+	if req.IsAll {
+		// 需要统计所有tag
+		tags, err = yakit.QueryHTTPFlowTags()
+	} else {
+		tags, err = yakit.HTTPFlowTags(req.RefreshRequest)
+	}
 	// statusCode, err := yakit.HTTPFlowStatusCode(req.RefreshRequest)
 	var tagsCode ypb.HTTPFlowsFieldGroupResponse
 
