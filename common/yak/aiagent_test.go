@@ -1,32 +1,21 @@
 package yak
 
 import (
-	"bytes"
 	"context"
 	_ "embed"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
-	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
-	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/ai/aid"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/aiforge"
-	"github.com/yaklang/yaklang/common/aireducer"
-	"github.com/yaklang/yaklang/common/chunkmaker"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/chanx"
@@ -228,167 +217,17 @@ func (ew *EntityWatcher) WatchEntity(entityValue string, callback func(entityVal
 var testAIWeblogGZIP []byte
 
 func TestWebLogMonitor(t *testing.T) {
-	db, err := NewTestWebLogEventDB(filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String()))
-	if err != nil {
-		return
-	}
-	aiCB := aiforge.GetOpenRouterAICallbackGemini2_5flash()
-	//aiCB = aiforge.GetAIBalance()
-
-	update := func(attackType string, entityValue string) {
-		entity := &Entity{
-			Value: entityValue,
-			Type:  "ip_address",
-		}
-		err := UpdateEntityRemark(db, entity, fmt.Sprintf("Detected %s attack from %s", attackType, entityValue))
-		if err != nil {
-			log.Errorf("UpdateEntityRemark failed: %v", err)
-			return
-		}
-	}
-
-	analyzerWebRequest := func(sourceIP string) {
-		event, err := QueryRecentEvent(db, sourceIP, time.Minute*5)
-		if err != nil {
-			return
-		}
-		if len(event) == 0 {
-			return
-		}
-		eventJsonString, err := json.Marshal(event)
-		if err != nil {
-			return
-		}
-
-		res, err := ExecuteForge("event_analyzer",
-			string(eventJsonString),
-			WithAICallback(aiCB),
-			WithDisallowRequireForUserPrompt(),
-		)
-		if err != nil {
-			return
-		}
-		report := res.(aitool.InvokeParams)
-		if report.GetBool("is_malicious") {
-			fmt.Printf("!!![ATTACK]: detect %s %s \n[confidence_score]:%f\n[behavior_summary]:%s\n[key_evidence]:%s\n", sourceIP, report.GetString("attack_type"), report.GetFloat("confidence_score"), report.GetString("behavior_summary"), spew.Sdump(report.GetStringSlice("key_evidence")))
-		}
-		update(report.GetString("attack_type"), sourceIP)
-	}
-
 	yakit.InitialDatabase()
 	content, err := utils.GzipDeCompress(testAIWeblogGZIP)
 	require.NoError(t, err)
-	fp := bytes.NewReader(content)
-
-	ctx := context.Background()
-	cod, err := aid.NewCoordinatorContext(ctx, "", aicommon.WithAICallback(aiCB))
-	require.NoError(t, err)
-	memory := cod.Memory
-
-	var cacheBuffer []string
-
-	entityMarshal := func(e aitool.InvokeParams) *Entity {
-		return &Entity{
-			Value: e.GetString("entity_value"),
-			Type:  e.GetString("entity_type"),
-		}
-	}
-
-	eventMarshal := func(e aitool.InvokeParams) *WebLogEvent {
-		return &WebLogEvent{
-			SourceIP:       e.GetString("source_ip"),
-			RequestMethod:  e.GetString("request_method"),
-			RequestURI:     e.GetString("request_uri"),
-			EventTime:      parseISO(e.GetString("timestamp")),
-			UserAgent:      e.GetString("user_agent"),
-			StatusCode:     e.GetInt("status_code"),
-			InferredStatus: e.GetString("inferred_status"),
-			ErrorMessage:   e.GetString("error_message"),
-			LogType:        e.GetString("log_type"),
-		}
-	}
-
-	ew := NewEntityWatcher(time.Minute*5, 20)
-
-	reducer, err := aireducer.NewReducerFromReader(
-		fp,
-		aireducer.WithReducerCallback(func(config *aireducer.Config, memory *aid.PromptContextProvider, chunk chunkmaker.Chunk) error {
-			cacheBuffer = append(cacheBuffer, string(chunk.Data()))
-			if len(cacheBuffer) < 10 {
-				return nil
-			}
-			defer func() {
-				cacheBuffer = make([]string, 0)
-			}()
-			logBuffer := strings.Join(cacheBuffer, "\n")
-			wg := sync.WaitGroup{}
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				res, err := ExecuteForge("entity_identify",
-					logBuffer,
-					WithAICallback(aiCB),
-					WithDisallowRequireForUserPrompt(),
-					WithPromptContextProvider(memory),
-				)
-				if err != nil {
-					return
-				}
-				for _, params := range res.([]aitool.InvokeParams) {
-					err := SaveEntity(db, entityMarshal(params))
-					if err != nil {
-						log.Errorf("failed to save entity: %v", err)
-						return
-					}
-				}
-			}()
-
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				res, err := ExecuteForge("log_event_formatter",
-					logBuffer,
-					WithAICallback(aiCB),
-					WithDisallowRequireForUserPrompt(),
-					WithPromptContextProvider(memory),
-				)
-				if err != nil {
-					return
-				}
-				for _, params := range res.([]aitool.InvokeParams) {
-					event := eventMarshal(params)
-					if event.LogType == "WEB_REQUEST" {
-						ew.WatchEntity(event.SourceIP, analyzerWebRequest)
-					}
-					err := SaveEvent(db, event)
-					if err != nil {
-						log.Errorf("failed to save event: %v", err)
-						return
-					}
-				}
-			}()
-
-			wg.Wait()
-			return nil
-		}),
-		aireducer.WithSeparatorTrigger("[INFO]"),
-		aireducer.WithContext(ctx),
-		aireducer.WithMemory(memory),
-	)
-	require.NoError(t, err)
-	err = reducer.Run()
-	require.NoError(t, err)
-	select {}
-}
-
-func TestWebLogMonitorForge(t *testing.T) {
-	yakit.InitialDatabase()
-	_, err := ExecuteForge("web_log_monitor", []*ypb.ExecParamItem{
-		//{Key: "text", Value: monOncleJules},
-
+	logFilePath := filepath.Join(t.TempDir(), "test_ai_weblog.log")
+	require.NoError(t, os.WriteFile(logFilePath, content, 0o600))
+	_, err = ExecuteForge("web_log_monitor", []*ypb.ExecParamItem{
+		{Key: "filePath", Value: logFilePath},
+		{Key: "chunk", Value: "10"},
+		{Key: "concurrency", Value: "2"},
+		{Key: "triggerSec", Value: "1"},
+		{Key: "triggerCount", Value: "2"},
 	}, WithAICallback(aiforge.GetOpenRouterAICallbackGemini2_5flash()))
-	if err != nil {
-		return
-	}
-
+	require.NoError(t, err)
 }
