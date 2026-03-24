@@ -60,6 +60,13 @@ func TestAutoDecodeOneTime(t *testing.T) {
 	t.Run("unicode decode U", func(t *testing.T) {
 		checkAutoDecode(t, `\U00004f60\U0000597d`, []string{"你好"})
 	})
+	t.Run("unicode decode double escaped", func(t *testing.T) {
+		checkAutoDecode(t, `\\u4f60\\u597d`, []string{`\u4f60\u597d`, "你好"})
+	})
+	t.Run("unicode decode json", func(t *testing.T) {
+		checkAutoDecode(t, `"{\"a\":\"\u0062\"}"`, []string{`"{\"a\":\"b\"}"`, `{"a":"b"}`})
+	})
+
 	t.Run("base64 decode", func(t *testing.T) {
 		checkAutoDecode(t, `aGVsbG8=`, []string{"hello"})
 	})

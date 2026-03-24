@@ -27,7 +27,7 @@ type AutoDecodeResult struct {
 }
 
 var (
-	unicodeRegexp    = regexp.MustCompile(`(\\u[\da-fA-F]{4})|(\\U[\da-fA-F]{8})`)
+	unicodeRegexp    = regexp.MustCompile(`(\\\\u[\da-fA-F]{4})|(\\\\U[\da-fA-F]{8})|(\\u[\da-fA-F]{4})|(\\U[\da-fA-F]{8})`)
 	base64Regexp     = regexp.MustCompile(`(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{4})`)
 	urlRegexp        = regexp.MustCompile(`%[\da-fA-F]{2}`)
 	htmlEntityRegexp = regexp.MustCompile(`(&[a-zA-Z]+;)|(&#[a-fA-F0-9]{2};)`)
@@ -51,6 +51,9 @@ var encodeMap = map[string]func(string) string{
 			return ""
 		}
 		return buf.String()
+	},
+	"Unicode Decode": func(s string) string {
+		return JsonUnicodeEncode(s)
 	},
 	"Base64 Decode": func(s string) string {
 		return EncodeBase64(s)
@@ -197,6 +200,11 @@ func AutoDecode(i interface{}) []*AutoDecodeResult {
 		return rawStr, nil
 	}
 	unicodeDecode := func(rawStr string) (string, error) {
+		return JsonUnicodeDecode(rawStr), nil
+	}
+	unescapeString := func(rawStr string) (string, error) {
+		rawStr = strings.TrimLeft(rawStr, "\"")
+		rawStr = strings.TrimRight(rawStr, "\"")
 		return yakunquote.UnquoteInner(rawStr, 0)
 	}
 	base32Detect := func(rawStr string) bool {
@@ -285,6 +293,12 @@ func AutoDecode(i interface{}) []*AutoDecodeResult {
 		}
 		return !failed
 	}
+
+	unquoteStringDetect := func(rawStr string) bool {
+		return strings.HasPrefix(rawStr, "\"") &&
+			strings.HasSuffix(rawStr, "\"")
+	}
+
 	jwtDecode := func(rawStr string) (string, error) {
 		return jwtBuf.String(), nil
 	}
@@ -306,6 +320,11 @@ func AutoDecode(i interface{}) []*AutoDecodeResult {
 		if tryDecode(origin, "Unicode Decode", "Unicode 解码", unicodeRegexp.MatchString, unicodeDecode) {
 			continue
 		}
+		// unescape string
+		if tryDecode(origin, "Unescape String", "Unescape String", unquoteStringDetect, unescapeString) {
+			continue
+		}
+
 		// base32
 		if tryDecode(origin, "Base32 Decode", "Base32 解码", base32Detect, base32Decode) {
 			continue
