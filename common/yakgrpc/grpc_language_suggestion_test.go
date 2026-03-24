@@ -1342,7 +1342,7 @@ x.Find()`,
 	})
 }
 
-func Test_SyntaxflowCompletion(t *testing.T) {
+func TestGRPCMUSTPASS_SyntaxFlowCompletion(t *testing.T) {
 	local, err := NewLocalClient()
 	require.NoError(t, err)
 

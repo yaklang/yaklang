@@ -764,9 +764,13 @@ jobs:
             artifact_file: "essential-tests-yakgrpc.tar.gz"
             test_configs: |
               [
+                {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_HTTPFUZZER"},
                 {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_HTTPFuzzer"},
                 {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_HTTP_"},
-                {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_PluginTrace"}
+                {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_PluginTrace"},
+                {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_FuzzerConfig"},
+                {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_MaxSize"},
+                {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "^(TestPBTest|TestLargePayload)$"}
               ]
 
           - name: "Test gRPC MUSTPASS Language"
@@ -787,7 +791,7 @@ jobs:
                 {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_SSA"}
               ]
 
-          - name: "Test gRPC In 2m"
+          - name: "Test gRPC Scan / Hybrid / Common"
             artifact_name: "essential-tests-yakgrpc"
             artifact_file: "essential-tests-yakgrpc.tar.gz"
             test_configs: |
@@ -797,15 +801,16 @@ jobs:
                 {"package": "./common/yakgrpc/...", "timeout": "2m", "run": "TestGRPCMUSTPASS_HybridScan"},
                 {"package": "./common/yakgrpc/...", "timeout": "2m", "run": "TestLARGEGRPCMUSTPASS"},
                 {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_COMMON"},
-                {"package": "./common/yakgrpc/...", "timeout": "1m", "run": "TestAITaskWith", "parallel": 1}
+                {"package": "./common/yakgrpc/...", "timeout": "1m", "run": "TestAITaskWith", "parallel": 1},
+                {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "^(TestGRPCMUSTPASS_Brute|TestGRPCMUSTPASS_SERVICE_SCAN|TestServer_ScanWithFingerprintGroup|TestServer_CustomFingerprint|TestServer_PortScan|TestServer_HybridScan|TestGRPCMUSTPASS_GenerateYakCode|TestGRPCMUSTPASS_RuleExtractedData)$"}
               ]
 
-          - name: "Test gRPC Other"
+          - name: "Test gRPC Misc / MCP / AI / Output"
             artifact_name: "essential-tests-yakgrpc"
             artifact_file: "essential-tests-yakgrpc.tar.gz"
             test_configs: |
               [
-                {"package": "./common/yakgrpc/...", "timeout": "10m", "skip": "^(TestGRPCMUSTPASS_PluginTrace.*|TestGRPCMUSTPASS_AnalyzeHTTPFlow.*|TestGRPCMUSTPASS_Fingerprint.*|TestGRPC_Ai_List_Model|TestGRPCMUSTPASS_HTTP_.*|TestAITaskWith.*|TestGRPCMUSTPASS_MITM.*|TestGRPCMUSTPASS_MITMV2.*|TestGRPCMUSTPASS_HTTPFuzzer.*|TestGRPCMUSTPASS_LANGUAGE.*|TestGRPCMUSTPASS_COMMON.*|TestLARGEGRPCMUSTPASS.*|TestGRPCMUSTPASS_SyntaxFlow.*|TestGRPCMUSTPASS_SSA.*)$"}
+                {"package": "./common/yakgrpc/...", "timeout": "10m", "skip": "^(TestGRPCMUSTPASS_PluginTrace.*|TestGRPCMUSTPASS_AnalyzeHTTPFlow.*|TestGRPCMUSTPASS_Fingerprint.*|TestGRPC_Ai_List_Model|TestGRPCMUSTPASS_HTTP_.*|TestGRPCMUSTPASS_HTTPFUZZER.*|TestGRPCMUSTPASS_HTTPFuzzer.*|TestAITaskWith.*|TestGRPCMUSTPASS_MITM.*|TestGRPCMUSTPASS_MITMV2.*|TestGRPCMUSTPASS_LANGUAGE.*|TestGRPCMUSTPASS_COMMON.*|TestLARGEGRPCMUSTPASS.*|TestGRPCMUSTPASS_SyntaxFlow.*|TestGRPCMUSTPASS_SSA.*|TestGRPCMUSTPASS_Brute|TestGRPCMUSTPASS_SERVICE_SCAN|TestServer_ScanWithFingerprintGroup|TestServer_CustomFingerprint|TestServer_PortScan|TestServer_HybridScan|TestGRPCMUSTPASS_GenerateYakCode|TestGRPCMUSTPASS_RuleExtractedData|TestPBTest|TestLargePayload)$"}
               ]
     steps:
       - name: Checkout

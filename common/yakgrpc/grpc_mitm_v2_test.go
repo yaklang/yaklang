@@ -998,7 +998,7 @@ rsp, req = poc.HTTP(packet, poc.proxy(mitmProxy))~
 	}
 }
 
-func TestGRPCMUSTTPASS_MITMV2_HijackTags(t *testing.T) {
+func TestGRPCMUSTPASS_MITMV2_HijackTags(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(40))
@@ -1156,7 +1156,7 @@ beforeRequest = func(ishttps /*bool*/, oreq /*[]byte*/, req/*[]byte*/){
 		})
 }
 
-func TestGRPCMUSTPASS_MITMV2_Replacer_replace_content_ManalHijack(t *testing.T) {
+func TestGRPCMUSTPASS_MITMV2_Replacer_ReplaceContent_ManualHijack(t *testing.T) {
 	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(30))
 	defer cancel()
 
@@ -1250,13 +1250,13 @@ func TestGRPCMUSTPASS_MITMV2_Replacer_replace_content_ManalHijack(t *testing.T) 
 	require.True(t, tokenCheck)
 }
 
-func TestAccccc(t *testing.T) {
+func TestGRPCMUSTPASS_MITMV2_Replacer_Drop_ManualHijack_Stress(t *testing.T) {
 	for i := 0; i < 20; i++ {
-		TestGRPCMUSTPASS_MITMV2_Replacer_drop_ManalHijack(t)
+		TestGRPCMUSTPASS_MITMV2_Replacer_Drop_ManualHijack(t)
 	}
 }
 
-func TestGRPCMUSTPASS_MITMV2_Replacer_drop_ManalHijack(t *testing.T) {
+func TestGRPCMUSTPASS_MITMV2_Replacer_Drop_ManualHijack(t *testing.T) {
 	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(30))
 	defer cancel()
 
