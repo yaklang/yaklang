@@ -1,0 +1,105 @@
+// 23_delay.yak
+// Test wait for page delay.
+//
+// Run: go run common/yak/cmd/yak.go common/browser/yaktests/23_delay.yak
+
+defer browser.CloseAll()
+
+session = "delay"
+
+log.Info("===== test: open browser with delay page =====")
+b, err = browser.Open(
+    browser.id(session),
+    browser.headless(false),
+    browser.timeout(30),
+)
+assert err == nil, sprintf("open failed: %v", err)
+
+delayHtml = `data:text/html,
+<html lang="zh-CN">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>延迟显示结构示例</title>
+</head>
+<body>
+	<div id="delayed-content-container"></div>
+
+	<div>
+		<h2>页面正常显示部分（非延迟）</h2>
+		<p>这部分内容在页面加载时就已存在，不需要等待。</p>
+		<p>下面的内容将在3秒后动态添加并显示，不包含任何样式（包括元素上的样式）。</p>
+		<hr>
+	</div>
+
+	<script>
+		const DELAY_TIME = 3000;
+
+		const container = document.getElementById('delayed-content-container');
+
+		function createAndAppendDelayedContent() {
+			const delayedSection = document.createElement('div');
+
+			const title = document.createElement('h3');
+			title.appendChild(document.createTextNode('🎉 延迟显示的内容区域（已显示）'));
+
+			const infoPara = document.createElement('p');
+			infoPara.appendChild(document.createTextNode('此部分内容在页面加载 ' + (DELAY_TIME / 1000) + ' 秒后动态添加。'));
+
+			const examplePara = document.createElement('p');
+			examplePara.appendChild(document.createTextNode('这是延迟显示的结构中的示例文本。没有任何CSS样式，包括元素上的样式（如style属性）。'));
+
+			const list = document.createElement('ul');
+			const listItem1 = document.createElement('li');
+			listItem1.appendChild(document.createTextNode('列表项一：延迟显示生效'));
+			const listItem2 = document.createElement('li');
+			listItem2.appendChild(document.createTextNode('列表项二：完全无样式'));
+			const listItem3 = document.createElement('li');
+			listItem3.appendChild(document.createTextNode('列表项三：仅通过DOM操作实现显示'));
+
+			list.appendChild(listItem1);
+			list.appendChild(listItem2);
+			list.appendChild(listItem3);
+
+			const timestampPara = document.createElement('p');
+			const now = new Date();
+			const timeString = now.toLocaleTimeString();
+			timestampPara.appendChild(document.createTextNode('显示时间: ' + timeString + ' (动态生成)'));
+
+			delayedSection.appendChild(title);
+			delayedSection.appendChild(infoPara);
+			delayedSection.appendChild(examplePara);
+			delayedSection.appendChild(list);
+			delayedSection.appendChild(timestampPara);
+
+			const divider = document.createElement('hr');
+			delayedSection.appendChild(divider);
+
+			container.appendChild(delayedSection);
+		}
+
+		console.log('页面已加载，将在 ' + (DELAY_TIME / 1000) + ' 秒后动态显示隐藏的结构...');
+
+		setTimeout(function() {
+			createAndAppendDelayedContent();
+			console.log('延迟显示的内容已添加到DOM中。');
+		}, DELAY_TIME);
+	</script>
+</body>
+</html>`
+
+
+page, err = b.Navigate(delayHtml)
+assert err == nil, sprintf("navigate to delay failed: %v", err)
+sleep(0.5)
+
+log.info("ready to wait...")
+err = page.WaitText("列表项一：延迟显示生效")
+assert err == nil, sprintf("wait text failed: %v", err)
+log.info("wait text ok")
+
+page2, err = b.Navigate(delayHtml)
+assert err == nil, sprintf("navigate page2 to delay failed: %v: %v", err)
+err = page2.WaitFunction("document.querySelector('#delayed-content-container > div > ul > li:nth-child(3)') != null")
+assert err == nil, sprintf("wait function failed: %v", err)
+log.info("wait function ok")

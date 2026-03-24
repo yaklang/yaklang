@@ -9,49 +9,54 @@ import (
 )
 
 var interactiveRoles = map[string]bool{
-	"button":      true,
-	"link":        true,
-	"textbox":     true,
-	"combobox":    true,
-	"checkbox":    true,
-	"radio":       true,
-	"switch":      true,
-	"slider":      true,
-	"spinbutton":  true,
-	"tab":         true,
-	"menuitem":    true,
-	"option":      true,
-	"treeitem":    true,
-	"searchbox":   true,
+	"button":           true,
+	"link":             true,
+	"textbox":          true,
+	"combobox":         true,
+	"checkbox":         true,
+	"radio":            true,
+	"switch":           true,
+	"slider":           true,
+	"spinbutton":       true,
+	"tab":              true,
+	"menuitem":         true,
+	"option":           true,
+	"treeitem":         true,
+	"searchbox":        true,
 	"menuitemcheckbox": true,
 	"menuitemradio":    true,
 }
 
 type SnapshotResult struct {
-	Text    string
-	RefMap  *RefMap
+	Text      string
+	RefMap    *RefMap
 	NodeCount int
 }
 
 type snapshotNode struct {
-	nodeID          string
-	role            string
-	name            string
-	backendNodeID   int
-	ignored         bool
-	children        []*snapshotNode
-	properties      map[string]string
+	nodeID        string
+	role          string
+	name          string
+	backendNodeID int
+	ignored       bool
+	children      []*snapshotNode
+	properties    map[string]string
 }
 
 func takeSnapshot(page *rod.Page, refMap *RefMap) (*SnapshotResult, error) {
-	err := proto.AccessibilityEnable{}.Call(page)
-	if err != nil {
-		return nil, fmt.Errorf("enable accessibility domain: %w", err)
-	}
+	//err := proto.AccessibilityEnable{}.Call(page)
+	//if err != nil {
+	//	return nil, fmt.Errorf("enable accessibility domain: %w", err)
+	//}
+	//
+	//result, err := proto.AccessibilityGetFullAXTree{}.Call(page)
+	//if err != nil {
+	//	return nil, fmt.Errorf("get full AX tree: %w", err)
+	//}
 
-	result, err := proto.AccessibilityGetFullAXTree{}.Call(page)
+	result, err := accessibilityGetPageFullAXTree(page)
 	if err != nil {
-		return nil, fmt.Errorf("get full AX tree: %w", err)
+		return nil, err
 	}
 
 	if len(result.Nodes) == 0 {
@@ -265,4 +270,16 @@ func axValueString(v *proto.AccessibilityAXValue) string {
 		return ""
 	}
 	return v.Value.Str()
+}
+
+func accessibilityGetPageFullAXTree(page *rod.Page) (*proto.AccessibilityGetFullAXTreeResult, error) {
+	err := proto.AccessibilityEnable{}.Call(page)
+	if err != nil {
+		return nil, fmt.Errorf("enable accessibility domain: %w", err)
+	}
+	result, err := proto.AccessibilityGetFullAXTree{}.Call(page)
+	if err != nil {
+		return nil, fmt.Errorf("get full AX tree: %w", err)
+	}
+	return result, nil
 }

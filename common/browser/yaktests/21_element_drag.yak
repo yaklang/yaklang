@@ -1,0 +1,114 @@
+// 21_element_drag.yak
+// Test drag element.
+// covers: page.Drag / page.ElementsByLabel
+//
+// Run: go run common/yak/cmd/yak.go common/browser/yaktests/21_element_drag.yak
+
+defer browser.CloseAll()
+
+session = "drag"
+
+log.Info("===== test: open browser with drag page =====")
+b, err = browser.Open(
+    browser.id(session),
+    browser.headless(true),
+    browser.timeout(30),
+)
+assert err == nil, sprintf("open failed: %v", err)
+
+dragHTML = `data:text/html,
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>拖动元素-展示特定字符</title>
+</head>
+<body>
+    <h3>拖动左侧元素到右侧区域 → 展示特定字符</h3>
+    <div>
+        <div>
+            <h4>拖拽源</h4>
+            <div draggable="true" data-char="111">元素A (展示111)</div>
+            <div draggable="true" data-char="222">元素B (展示222)</div>
+            <div draggable="true" data-char="333">元素C (展示333)</div>
+        </div>
+
+        <div>
+            <h4>放置区域</h4>
+            <div id="dropZone"">
+                将元素拖拽至此
+                <div id="resultDisplay" value="123">未放置</div>
+            </div>
+        </div>
+        <br clear="all">
+        <button id="resetBtn">重置</button>
+    </div>
+
+    <script>
+        const draggables = document.querySelectorAll('[draggable="true"]');
+        const dropZone = document.getElementById('dropZone');
+        const resultDisplay = document.getElementById('resultDisplay');
+        const resetBtn = document.getElementById('resetBtn');
+
+        draggables.forEach(el => {
+            el.addEventListener('dragstart', function(e) {
+                const char = this.getAttribute('data-char');
+                e.dataTransfer.setData('text/plain', char);
+                e.dataTransfer.effectAllowed = 'copy';
+            });
+        });
+
+        dropZone.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+        });
+
+        dropZone.addEventListener('drop', function(e) {
+            e.preventDefault();
+            const char = e.dataTransfer.getData('text/plain');
+            if (char) {
+                resultDisplay.textContent = char;
+            }
+        });
+
+        resetBtn.addEventListener('click', function() {
+            resultDisplay.textContent = '未放置';
+        });
+    </script>
+</body>
+</html>`
+
+page, err = b.Navigate(dragHTML)
+assert err == nil, sprintf("navigate to drag failed: %v", err)
+sleep(0.5)
+
+// get from element position
+from, err = page.Element("body > div > div > div:nth-child(2)")
+assert err == nil, sprintf("get from element failed: %v", err)
+fromX, fromY, err = from.GetCenterPosition()
+assert err == nil, sprintf("get from element position failed: %v", err)
+
+// get to element position
+to, err = page.Element("#dropZone")
+assert err == nil, sprintf("get to element failed: %v", err)
+toX, toY, err = to.GetCenterPosition()
+assert err == nil, sprintf("get to element position failed: %v", err)
+
+// do drag action
+err = page.Drag(fromX, fromY, toX, toY)
+assert err == nil, sprintf("drag failed: %v", err)
+sleep(1)
+
+// check drag result
+display, err = page.Element("#resultDisplay")
+assert err == nil, sprintf("get display element failed: %v", err)
+displayText, err = display.Text()
+assert err == nil, sprintf("get display text failed: %v", err)
+log.info("display text: %v", displayText)
+
+// label elements
+labelElements, err = page.ElementsByLabel("放置区域")
+assert err == nil, sprintf("get label elements failed: %v", err)
+assert len(labelElements) != 0, sprintf("cannot get label elements")
+labelText, err = labelElements[0].Text()
+assert err == nil, sprintf("get label element text failed: %v", err)
+log.info("label element text: %v", labelText)
