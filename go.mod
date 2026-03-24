@@ -1,6 +1,6 @@
 module github.com/yaklang/yaklang
 
-go 1.22.12
+go 1.22.8
 
 replace github.com/yaklang/yaklang v0.0.0 => ./
 
