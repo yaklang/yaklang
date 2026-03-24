@@ -84,7 +84,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_Pause(t *testing.T) {
 	}
 }
 
-func TestHTTPFuzzer_Pause_SetPauseStatus(t *testing.T) {
+func TestGRPCMUSTPASS_HTTPFUZZER_Pause_SetPauseStatus(t *testing.T) {
 	c, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)

@@ -11,7 +11,7 @@ import (
 	"testing"
 )
 
-func TestGRPCLargeFuzzerRequest_Failed(t *testing.T) {
+func TestGRPCMUSTPASS_HTTPFUZZER_LargeRequest_Failed(t *testing.T) {
 	var crazyBody = "{{repeatstr(A|130000000)}}"
 
 	// 构造一个很容易网络错误的东西

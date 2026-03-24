@@ -14,7 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func TestMUSTPASS_SyntaxFlowRuleUpdate(t *testing.T) {
+func TestGRPCMUSTPASS_SyntaxFlowRuleUpdate(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 
@@ -42,7 +42,7 @@ func TestMUSTPASS_SyntaxFlowRuleUpdate(t *testing.T) {
 	require.False(t, update.GetNeedUpdate())
 }
 
-func TestMUSTPASS_SyntaxFlowRuleUpdateAlertDesc(t *testing.T) {
+func TestGRPCMUSTPASS_SyntaxFlowRuleUpdateAlertDesc(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 	ruleName := uuid.NewString()
