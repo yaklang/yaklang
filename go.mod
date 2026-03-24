@@ -1,6 +1,6 @@
 module github.com/yaklang/yaklang
 
-go 1.22.12
+go 1.22.8
 
 replace github.com/yaklang/yaklang v0.0.0 => ./
 
@@ -41,7 +41,6 @@ require (
 	github.com/docker/go-connections v0.4.0
 	github.com/dop251/goja v0.0.0-20240220182346-e401ed450204
 	github.com/dop251/goja_nodejs v0.0.0-20240221231712-27eeffc9c235
-	github.com/ebitengine/purego v0.9.1
 	github.com/elastic/go-libaudit v0.4.0
 	github.com/emersion/go-message v0.18.0
 	github.com/fsnotify/fsnotify v1.4.9
@@ -165,6 +164,7 @@ require (
 	github.com/distribution/reference v0.5.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dop251/base64dec v0.0.0-20231022112746-c6c9f9a96217 // indirect
+	github.com/ebitengine/purego v0.9.1 // indirect
 	github.com/emersion/go-textwrapper v0.0.0-20200911093747-65d896831594 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/erikstmartin/go-testdb v0.0.0-20160219214506-8d10e4a1bae5 // indirect
