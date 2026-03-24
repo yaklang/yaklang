@@ -35,7 +35,7 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             INPUT="${{ inputs.target }}"
-            
+
             if [ -z "$INPUT" ] || [ "$INPUT" = "" ]; then
               REF="${{ github.ref_name }}"
               echo "No input provided, using current branch: $REF"
@@ -43,39 +43,39 @@ jobs:
               PR_NUM="$INPUT"
               echo "Detected PR number: #$PR_NUM"
               echo "Fetching PR #$PR_NUM information..."
-              
+
               PR_RESPONSE=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
                 -H "Accept: application/vnd.github.v3+json" \
                 "https://api.github.com/repos/${{ github.repository }}/pulls/$PR_NUM")
-              
+
               PR_HEAD_SHA=$(echo "$PR_RESPONSE" | jq -r '.head.sha // empty')
               PR_STATE=$(echo "$PR_RESPONSE" | jq -r '.state // empty')
               PR_TITLE=$(echo "$PR_RESPONSE" | jq -r '.title // empty')
               PR_HEAD_REF=$(echo "$PR_RESPONSE" | jq -r '.head.ref // empty')
               PR_HEAD_REPO=$(echo "$PR_RESPONSE" | jq -r '.head.repo.full_name // empty')
-              
+
               if [ -z "$PR_HEAD_SHA" ] || [ "$PR_HEAD_SHA" = "null" ]; then
                 echo "Failed to get PR #$PR_NUM. Please check if the PR exists and is accessible."
                 exit 1
               fi
-              
+
               echo "PR #$PR_NUM: $PR_TITLE"
               echo "PR state: $PR_STATE"
               echo "PR head branch: $PR_HEAD_REPO:$PR_HEAD_REF"
               echo "PR head commit (latest): $PR_HEAD_SHA"
-              
+
               COMMITS_RESPONSE=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
                 -H "Accept: application/vnd.github.v3+json" \
                 "https://api.github.com/repos/${{ github.repository }}/pulls/$PR_NUM/commits")
-              
+
               COMMIT_COUNT=$(echo "$COMMITS_RESPONSE" | jq '. | length')
               echo "Total commits in PR: $COMMIT_COUNT"
-              
+
               if [ "$COMMIT_COUNT" -gt 0 ]; then
                 echo "Commits in this PR:"
                 echo "$COMMITS_RESPONSE" | jq -r '.[] | "  - \(.sha[0:7]) \(.commit.message | split("\n")[0])"'
               fi
-              
+
               REF="$PR_HEAD_SHA"
               echo "Using PR head commit (latest): $REF"
             elif [[ "$INPUT" =~ ^[a-f0-9]{40}$ ]] || [[ "$INPUT" =~ ^[a-f0-9]{7,}$ ]]; then
@@ -86,12 +86,12 @@ jobs:
               FORK_BRANCH=$(echo "$INPUT" | cut -d':' -f2-)
               REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
               FORK_REPO="$FORK_OWNER/$REPO_NAME"
-              
+
               echo "Detected fork branch format: $INPUT"
               echo "Fork owner: $FORK_OWNER"
               echo "Branch: $FORK_BRANCH"
               echo "Fork repository: $FORK_REPO"
-              
+
               REF="$FORK_BRANCH"
               FORK_REPO_FULL="$FORK_REPO"
               echo "fork_repo=$FORK_REPO_FULL" >> $GITHUB_OUTPUT
@@ -101,11 +101,10 @@ jobs:
               echo "Detected branch/tag: $REF"
             fi
           else
-            # For pull_request events, check if it's from a fork
             echo "is_pull_request=true" >> $GITHUB_OUTPUT
             PR_HEAD_REPO="${{ github.event.pull_request.head.repo.full_name }}"
             PR_BASE_REPO="${{ github.repository }}"
-            
+
             if [ "$PR_HEAD_REPO" = "$PR_BASE_REPO" ]; then
               echo "is_same_repo=true" >> $GITHUB_OUTPUT
             else
@@ -115,13 +114,12 @@ jobs:
             fi
             REF="${{ github.event.pull_request.head.sha }}"
           fi
-          
-          # Set defaults for workflow_dispatch
+
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "is_pull_request=false" >> $GITHUB_OUTPUT
             echo "is_same_repo=true" >> $GITHUB_OUTPUT
           fi
-          
+
           echo "ref=$REF" >> $GITHUB_OUTPUT
           echo "Final target ref: $REF"
 
@@ -154,17 +152,21 @@ jobs:
 
       - name: Finalize outputs
         id: finalize
-        run: |
-          echo "should_run_tests=$SHOULD_RUN" >> $GITHUB_OUTPUT
+        run: echo "should_run_tests=$SHOULD_RUN" >> $GITHUB_OUTPUT
         env:
           SHOULD_RUN: ${{ env.SHOULD_RUN }}
 
-  setup:
+  prepare-yak:
     needs: check-wip
     if: needs.check-wip.outputs.should_run_tests == 'true'
     runs-on: ubuntu-22.04
+    outputs:
+      yak_artifact_id: ${{ steps.upload_yak.outputs.artifact-id }}
+      cache_artifact_id: ${{ steps.upload_yak_cache.outputs.artifact-id }}
+      target_ref: ${{ needs.check-wip.outputs.target_ref }}
+      fork_repo: ${{ needs.check-wip.outputs.fork_repo }}
     steps:
-      - name: Check out code into the Go module directory
+      - name: Check out code
         uses: actions/checkout@v3
         with:
           repository: ${{ needs.check-wip.outputs.fork_repo || github.repository }}
@@ -176,111 +178,300 @@ jobs:
         with:
           go-version-file: "./go.mod"
           cache: false
-        id: go
 
-      # - name: Cache Go modules
-      #   uses: actions/cache@v3
-      #   id: cache-go-modules
-      #   with:
-      #     path: ~/go/pkg/mod
-      #     key: go-modules-${{ runner.os }}-${{ hashFiles('**/go.sum') }}
-      #     restore-keys: |
-      #       go-modules-${{ runner.os }}-${{ hashFiles('**/go.sum') }}
+      - name: Configure Go build directories
+        run: |
+          mkdir -p "$RUNNER_TEMP/go-build-cache" "$RUNNER_TEMP/go-mod-cache"
+          echo "GOCACHE=$RUNNER_TEMP/go-build-cache" >> $GITHUB_ENV
+          echo "GOMODCACHE=$RUNNER_TEMP/go-mod-cache" >> $GITHUB_ENV
 
-      - name: Restore Go Build Cache
-        uses: actions/cache@v3
-        id: cache-go-build
+      - name: Build yak binary
+        env:
+          GOCACHE: ${{ env.GOCACHE }}
+          GOMODCACHE: ${{ env.GOMODCACHE }}
+        run: |
+          go build -o "$RUNNER_TEMP/yak" common/yak/cmd/yak.go
+          chmod +x "$RUNNER_TEMP/yak"
+
+      - name: Show go build cache size
+        run: |
+          du -sh "$RUNNER_TEMP/go-build-cache"
+          find "$RUNNER_TEMP/go-build-cache" -type f | wc -l | xargs echo "GOCACHE files:"
+
+      - name: Package yak binary
+        run: |
+          mkdir -p "$RUNNER_TEMP/yak-artifact"
+          cp -a "$RUNNER_TEMP/yak" "$RUNNER_TEMP/yak-artifact/yak"
+          tar -C "$RUNNER_TEMP/yak-artifact" -cf - yak | gzip -1 > "$RUNNER_TEMP/essential-tests-yak.tar.gz"
+          ls -lh "$RUNNER_TEMP/essential-tests-yak.tar.gz"
+
+      - name: Upload yak binary
+        id: upload_yak
+        uses: actions/upload-artifact@v4
         with:
-          path: ~/.cache/go-build
-          key: go-build-${{ github.event.pull_request.number }}-${{ runner.os }}
-          restore-keys: |
-            go-build-${{ github.event.pull_request.number }}-${{ runner.os }}
+          name: essential-tests-yak
+          path: ${{ runner.temp }}/essential-tests-yak.tar.gz
+          retention-days: 1
+          compression-level: 0
 
-      - name: Init Module
+      - name: Package go build cache
         run: |
-          go mod tidy 
-          echo "Modifying permissions to read-write for pcap-bpf.h"
+          mkdir -p "$RUNNER_TEMP/yak-cache-artifact"
+          cp -a "$RUNNER_TEMP/go-build-cache" "$RUNNER_TEMP/yak-cache-artifact/go-build-cache"
+          tar -C "$RUNNER_TEMP/yak-cache-artifact" -cf - go-build-cache | gzip -1 > "$RUNNER_TEMP/essential-tests-yak-cache.tar.gz"
+          ls -lh "$RUNNER_TEMP/essential-tests-yak-cache.tar.gz"
 
-      - name: Warm up Go Build Cache
-        run: |
-          echo "Warming up Go build cache by building core dependencies..."
-          # 编译核心依赖包，填充 build cache
-          go build ./common/utils/... || true
-          go build ./common/mutate/... || true
-          go build ./common/yak/ssaapi/... || true
-          echo "Build cache warmed up"
-
-      - name: Save Go Build Cache
-        uses: actions/cache/save@v3
+      - name: Upload go build cache
+        id: upload_yak_cache
+        uses: actions/upload-artifact@v4
         with:
-          path: ~/.cache/go-build
-          key: go-build-${{ github.event.pull_request.number }}-${{ runner.os }}
+          name: essential-tests-yak-cache
+          path: ${{ runner.temp }}/essential-tests-yak-cache.tar.gz
+          retention-days: 1
+          compression-level: 0
 
-      - name: Generate Document Data
+  prepare-yakgrpc:
+    needs: prepare-yak
+    if: needs.prepare-yak.result == 'success'
+    runs-on: ubuntu-22.04
+    outputs:
+      artifact_id: ${{ steps.upload_shared_suite.outputs.artifact-id }}
+      target_ref: ${{ needs.prepare-yak.outputs.target_ref }}
+      fork_repo: ${{ needs.prepare-yak.outputs.fork_repo }}
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+        with:
+          repository: ${{ needs.prepare-yak.outputs.fork_repo || github.repository }}
+          ref: ${{ needs.prepare-yak.outputs.target_ref || github.sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "./go.mod"
+          cache: false
+
+      - name: Download shared go build cache
+        uses: actions/download-artifact@v4
+        with:
+          name: essential-tests-yak-cache
+          path: ${{ runner.temp }}/yak-cache-artifact
+
+      - name: Restore shared go build cache
         run: |
-          chmod +x ./scripts/gen-auto-completion.sh
-          ./scripts/gen-auto-completion.sh
+          mkdir -p "${{ runner.temp }}/prepare-yak" "$RUNNER_TEMP/go-mod-cache"
+          tar -C "${{ runner.temp }}/prepare-yak" -xzf "${{ runner.temp }}/yak-cache-artifact/essential-tests-yak-cache.tar.gz"
+          du -sh "${{ runner.temp }}/prepare-yak/go-build-cache"
+          echo "GOCACHE=${{ runner.temp }}/prepare-yak/go-build-cache" >> $GITHUB_ENV
+          echo "GOMODCACHE=$RUNNER_TEMP/go-mod-cache" >> $GITHUB_ENV
 
-      - name: Init Project
+      - name: Generate prepare config
         run: |
-          go build -x common/yak/cmd/yak.go 
-          ./yak --help
+          cat > /tmp/prepare_yakgrpc_test_config.json <<'CONFIGEOF'
+          [
+            {"package": "./common/yakgrpc/...", "timeout": "10m"}
+          ]
+          CONFIGEOF
 
-  test:
+      - name: Compile shared yakgrpc test binaries
+        env:
+          GOCACHE: ${{ env.GOCACHE }}
+          GOMODCACHE: ${{ env.GOMODCACHE }}
+        run: |
+          chmod +x ./scripts/ci/compile-tests.sh
+          export TEST_BIN_DIR=/tmp/test_binaries
+          export TEST_CONFIG=/tmp/prepare_yakgrpc_test_config.json
+          export COMPILE_WORKERS=2
+          export GO_TEST_P=1
+          ./scripts/ci/compile-tests.sh
+
+      - name: Package shared suite
+        run: |
+          chmod +x ./scripts/ci/package-test-artifact.sh
+          export TEST_BIN_DIR=/tmp/test_binaries
+          export INCLUDE_YAK=0
+          export ARTIFACT_PATH=/tmp/essential-tests-yakgrpc.tar.gz
+          ./scripts/ci/package-test-artifact.sh
+
+      - name: Upload shared suite
+        id: upload_shared_suite
+        uses: actions/upload-artifact@v4
+        with:
+          name: essential-tests-yakgrpc
+          path: /tmp/essential-tests-yakgrpc.tar.gz
+          retention-days: 1
+          compression-level: 0
+
+  prepare-coreplugin:
+    needs: prepare-yak
+    if: needs.prepare-yak.result == 'success'
+    runs-on: ubuntu-22.04
+    outputs:
+      artifact_id: ${{ steps.upload_shared_suite.outputs.artifact-id }}
+      target_ref: ${{ needs.prepare-yak.outputs.target_ref }}
+      fork_repo: ${{ needs.prepare-yak.outputs.fork_repo }}
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+        with:
+          repository: ${{ needs.prepare-yak.outputs.fork_repo || github.repository }}
+          ref: ${{ needs.prepare-yak.outputs.target_ref || github.sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "./go.mod"
+          cache: false
+
+      - name: Download shared go build cache
+        uses: actions/download-artifact@v4
+        with:
+          name: essential-tests-yak-cache
+          path: ${{ runner.temp }}/yak-cache-artifact
+
+      - name: Restore shared go build cache
+        run: |
+          mkdir -p "${{ runner.temp }}/prepare-yak" "$RUNNER_TEMP/go-mod-cache"
+          tar -C "${{ runner.temp }}/prepare-yak" -xzf "${{ runner.temp }}/yak-cache-artifact/essential-tests-yak-cache.tar.gz"
+          du -sh "${{ runner.temp }}/prepare-yak/go-build-cache"
+          echo "GOCACHE=${{ runner.temp }}/prepare-yak/go-build-cache" >> $GITHUB_ENV
+          echo "GOMODCACHE=$RUNNER_TEMP/go-mod-cache" >> $GITHUB_ENV
+
+      - name: Generate prepare config
+        run: |
+          cat > /tmp/prepare_coreplugin_test_config.json <<'CONFIGEOF'
+          [
+            {"package": "./common/coreplugin", "timeout": "10m"}
+          ]
+          CONFIGEOF
+
+      - name: Compile shared coreplugin test binaries
+        env:
+          GOCACHE: ${{ env.GOCACHE }}
+          GOMODCACHE: ${{ env.GOMODCACHE }}
+        run: |
+          chmod +x ./scripts/ci/compile-tests.sh
+          export TEST_BIN_DIR=/tmp/test_binaries
+          export TEST_CONFIG=/tmp/prepare_coreplugin_test_config.json
+          export COMPILE_WORKERS=1
+          export GO_TEST_P=1
+          ./scripts/ci/compile-tests.sh
+
+      - name: Package shared suite
+        run: |
+          chmod +x ./scripts/ci/package-test-artifact.sh
+          export TEST_BIN_DIR=/tmp/test_binaries
+          export INCLUDE_YAK=0
+          export ARTIFACT_PATH=/tmp/essential-tests-coreplugin.tar.gz
+          ./scripts/ci/package-test-artifact.sh
+
+      - name: Upload shared suite
+        id: upload_shared_suite
+        uses: actions/upload-artifact@v4
+        with:
+          name: essential-tests-coreplugin
+          path: /tmp/essential-tests-coreplugin.tar.gz
+          retention-days: 1
+          compression-level: 0
+
+  test-local:
     name: ${{ matrix.name }}
-    needs: [check-wip, setup]
-    if: needs.check-wip.outputs.should_run_tests == 'true'
+    needs: prepare-yak
+    if: needs.prepare-yak.result == 'success'
     runs-on: ubuntu-22.04
     strategy:
+      fail-fast: false
       matrix:
         include:
-          - name: "Test Utils/Misc in 2min USE gRPC"
+          - name: "Test lowhttp / DNSX"
             test_configs: |
               [
-                {"package": "./common/yak/cmd/yakcmds/...", "timeout": "20s"},
+                {"package": "./common/utils/lowhttp", "timeout": "3m", "skip": "TestComputeDigestResponseFromRequest|TestComputeDigestResponseFromRequestEx|TestLowhttpResponse2", "retry": 2, "retry_delay": 5},
+                {"package": "./common/utils/lowhttp/poc", "timeout": "20s"},
+                {"package": "./common/facades/...", "timeout": "30s"}
+              ]
+
+          - name: "Test HttpTpl(YakTemplate)"
+            test_configs: |
+              [
+                {"package": "./common/yak/httptpl", "timeout": "1m"}
+              ]
+
+          - name: "Test MustPass - full yak scripts"
+            test_configs: |
+              [
+                {"package": "./common/yak/yaktest/mustpass", "timeout": "5m"}
+              ]
+
+          - name: "Test Crawler / Crawlerx (chromium based crawler)"
+            test_configs: |
+              [
+                {"package": "./common/crawlerx/...", "timeout": "5m"},
+                {"package": "./common/crawler", "timeout": "20s", "run": "TestMUSTPASS"}
+              ]
+
+          - name: "Test SFWeb"
+            sync_rule: "1"
+            test_configs: |
+              [
+                {"package": "./common/sfweb/...", "timeout": "4m"}
+              ]
+          - name: "Test Utils Infra / Parser / Net in 2min USE gRPC"
+            test_configs: |
+              [
                 {"package": "./common/chunkmaker/...", "timeout": "20s"},
                 {"package": "./common/jsonextractor", "timeout": "20s"},
                 {"package": "./common/markdownextractor", "timeout": "20s"},
-                {"package": "./common/yak/yaklib/codec", "timeout": "20s"},
-                {"package": "./common/yak/cartesian", "timeout": "20s"},
                 {"package": "./common/jsonpath", "timeout": "20s"},
                 {"package": "./common/domainextractor", "timeout": "20s"},
+                {"package": "./common/cve", "timeout": "20s", "run": "TestQueryCVEWithFixName"},
+                {"package": "./common/sca/...", "timeout": "20s"},
+                {"package": "./common/openapi/...", "timeout": "30s"},
+                {"package": "./common/pcapx/pcaputil/...", "timeout": "15s"},
+                {"package": "./common/yso/...", "timeout": "20s"},
+                {"package": "./common/yserx", "timeout": "20s"},
+                {"package": "./common/twofa/...", "timeout": "20s"},
+                {"package": "./common/cybertunnel/..."},
+                {"package": "./common/javaclassparser/jarwar/..."},
+                {"package": "./common/bin-parser/...", "timeout": "1m"},
+                {"package": "./common/fp/...", "timeout": "60s"},
+                {"package": "./common/javaclassparser/tests/...", "timeout": "30s"},
+                {"package": "./common/suricata/...", "timeout": "20s", "run": "TestMUSTPASS"},
+                {"package": "./common/chaosmaker", "timeout": "20s", "run": "TestMUSTPASS"},
+                {"package": "./common/pcapx", "timeout": "20s", "run": "TestSmoking_"},
+                {"package": "./common/netx/mustpass", "timeout": "20s"},
+                {"package": "./common/authhack/...", "timeout": "1m"},
+                {"package": "./common/vulinboxagentclient", "timeout": "1m", "run": "TestMUSTPASS"}
+              ]
+
+          - name: "Test Utils Common / Yak Tooling in 2min USE gRPC"
+            test_configs: |
+              [
+                {"package": "./common/yak/cmd/yakcmds/...", "timeout": "20s"},
+                {"package": "./common/yak/yaklib/codec", "timeout": "20s"},
+                {"package": "./common/yak/cartesian", "timeout": "20s"},
                 {"package": "./common/utils/omap/...", "timeout": "30s", "race": true},
                 {"package": "./common/utils", "timeout": "1m"},
                 {"package": "./common/utils/imageutils/...", "timeout": "20s"},
                 {"package": "./common/utils/xml2", "timeout": "10s"},
                 {"package": "./common/utils/tlsutils/...", "timeout": "20s"},
                 {"package": "./common/utils/linktable/...", "timeout": "10s"},
-                {"package": "./common/cve", "timeout": "20s", "run": "TestQueryCVEWithFixName"},
-                {"package": "./common/sca/...", "timeout": "20s"},
                 {"package": "./common/yak/yaklib", "timeout": "20s", "run": "TestMUSTPASS_"},
                 {"package": "./common/yak/yaklib/tools", "timeout": "1m", "run": "TestMUSTPASS_Fp"},
-                {"package": "./common/openapi/...", "timeout": "30s"},
                 {"package": "./common/utils/dot/...", "timeout": "10s"},
                 {"package": "./common/utils/filesys/...", "timeout": "30s"},
                 {"package": "./common/utils/bruteutils/.", "timeout": "15s"},
                 {"package": "./common/utils/memedit/.", "timeout": "15s"},
-                {"package": "./common/pcapx/pcaputil/...", "timeout": "15s"},
                 {"package": "./common/yak/yakurl/...", "timeout": "15s"},
                 {"package": "./common/utils/ziputil/...", "timeout": "20s"},
-                {"package": "./common/yso/...", "timeout": "20s"},
-                {"package": "./common/yserx", "timeout": "20s"},
-                {"package": "./common/twofa/...", "timeout": "20s"},
-                {"package": "./common/cybertunnel/..."},
                 {"package": "./common/utils/yakgit/..."},
                 {"package": "./common/utils/suspect"},
-                {"package": "./common/javaclassparser/jarwar/..."},
-                {"package": "./common/bin-parser/...", "timeout": "1m"},
                 {"package": "./common/yak/antlr4nasl/tests/...", "timeout": "1m"},
-                {"package": "./common/fp/...", "timeout": "60s"},
                 {"package": "./common/utils/gzip_embed/test/...", "timeout": "30s"},
                 {"package": "./common/utils/resources_monitor/...", "timeout": "30s"},
                 {"package": "./common/yak/cmd/...", "timeout": "30s"},
-                {"package": "./common/javaclassparser/tests/...", "timeout": "30s"},
-                {"package": "./common/suricata/...", "timeout": "20s", "run": "TestMUSTPASS"},
-                {"package": "./common/chaosmaker", "timeout": "20s", "run": "TestMUSTPASS"},
-                {"package": "./common/pcapx", "timeout": "20s", "run": "TestSmoking_"},
-                {"package": "./common/netx/mustpass", "timeout": "20s"},
                 {"package": "./common/utils/pingutil", "timeout": "20s", "run": "TestPingAutoConfig"},
                 {"package": "./common/mutate_tests", "timeout": "20s"},
                 {"package": "./common/fuzztag", "timeout": "20s"},
@@ -291,49 +482,11 @@ jobs:
                 {"package": "./common/utils/cli", "timeout": "1m"},
                 {"package": "./common/mcp/yakcliconvert", "timeout": "1m"},
                 {"package": "./common/yak/yakdoc/...", "timeout": "3m"},
-                {"package": "./common/authhack/...", "timeout": "1m"},
-                {"package": "./common/vulinboxagentclient", "timeout": "1m", "run": "TestMUSTPASS"},
                 {"package": "./common/utils/yakgit/yakdiff/...", "timeout": "20s"},
                 {"package": "./common/yak/ssaapi/ssaconfig", "timeout": "20s"}
               ]
-          # 2. AI相关 - 需要串行执行避免数据库锁定
-          - name: "Test AI Infra / RAG / Knowledge"
-            test_configs: |
-              [
-                {"package": "./common/ai/aid/...", "timeout": "12m", "parallel": 1},
-                {"package": "./common/ai/tests/...", "timeout": "60s", "parallel": 1},
-                {"package": "./common/ai/rag/pq/...", "timeout": "60s", "parallel": 1},
-                {"package": "./common/ai/rag/hnsw/...", "timeout": "60s", "parallel": 1},
-                {"package": "./common/ai/aispec/...", "timeout": "60s", "parallel": 1},
-                {"package": "./common/aireducer/...", "timeout": "60s", "parallel": 1},
-                {"package": "./common/aiforge/aibp", "timeout": "2m30s", "parallel": 1, "run": "^(TestBuildForgeFromYak|TestNewForgeExecutor)"},
-                {"package": "./common/aiforge", "timeout": "3m", "parallel": 1},
-                {"package": "./common/aibalance/...", "timeout": "30s", "parallel": 1},
-                {"package": "./common/ai/rag/entityrepos/...", "timeout": "60s", "parallel": 1},
-                {"package": "./common/ai/rag/vectorstore/...", "timeout": "1m", "run": "TestMUSTPASS", "parallel": 1},
-                {"package": "./common/ai/rag", "timeout": "1m", "run": "TestMUSTPASS", "parallel": 1},
-                {"package": "./common/ai/rag/plugins_rag/...", "timeout": "1m", "run": "TestMUSTPASS", "parallel": 1},
-                {"package": "./common/ai/rag/ragtests/...", "timeout": "1m", "run": "TestMUSTPASS"},
-                {"package": "./common/ai/tests/...", "timeout": "1m"},
-                {"package": "./common/yakgrpc/aihttp/tests/...", "timeout": "1m"}
-              ]          
 
-          - name: "Test gRPC StaticAnalyze / BuildIn SyntaxFlow Rule / SSA / SSA-API / SF Scan"
-            test_configs: |
-              [
-                {"package": "./common/yak/static_analyzer/test/...", "timeout": "20s"},
-                {"package": "./common/coreplugin", "timeout": "1m", "run": "TestAnalyzeMustPASS"},
-                {"package": "./common/syntaxflow/sfbuildin/...", "timeout": "5m"},
-                {"package": "./common/yak/ssaapi/test/syntaxflow", "timeout": "1m"},
-                {"package": "./common/syntaxflow/sfanalysis/...", "timeout": "20s"},
-                {"package": "./common/yak/ssa/...", "timeout": "20s"},
-                {"package": "./common/yak/ssaapi", "timeout": "1m"},
-                {"package": "./common/yak/ssaapi/ssareducer", "timeout": "1m"},
-                {"package": "./common/yak/ssaapi/test/ssatest", "timeout": "1m"},
-                {"package": "./common/yak/syntaxflow_scan/...", "timeout": "1m"}
-              ]          
-
-          - name: "Test gRPC SSA Frontend Yak  / JS(TS|ES) | PHP | Python | Golang | C | Java"
+          - name: "Test SSA Frontend Yak / JS(TS|ES) | PHP | Python | Golang | C | Java"
             test_configs: |
               [
                 {"package": "./common/yak/yak2ssa/test/...", "timeout": "20s"},
@@ -354,39 +507,261 @@ jobs:
                 {"package": "./common/yak/c2ssa/...", "timeout": "30s"},
                 {"package": "./common/yak/antlr4c/...", "timeout": "30s"},
                 {"package": "./common/yak/ssaapi/test/c", "timeout": "2m"}
-              ]          
+              ]
 
-          - name: "Test lowhttp / DNSX"
+          - name: "Test StaticAnalyze / Builtin SyntaxFlow Rule / SSA / SSA-API / SF Scan"
             test_configs: |
               [
-                {"package": "./common/utils/lowhttp", "timeout": "3m", "skip": "TestComputeDigestResponseFromRequest|TestComputeDigestResponseFromRequestEx|TestLowhttpResponse2", "retry": 2, "retry_delay": 5},
-                {"package": "./common/utils/lowhttp/poc", "timeout": "20s"},
-                {"package": "./common/facades/...", "timeout": "30s"}
-              ]          
+                {"package": "./common/yak/static_analyzer/test/...", "timeout": "20s"},
+                {"package": "./common/syntaxflow/sfbuildin/...", "timeout": "5m"},
+                {"package": "./common/yak/ssaapi/test/syntaxflow", "timeout": "1m"},
+                {"package": "./common/syntaxflow/sfanalysis/...", "timeout": "20s"},
+                {"package": "./common/yak/ssa/...", "timeout": "20s"},
+                {"package": "./common/yak/ssaapi", "timeout": "1m"},
+                {"package": "./common/yak/ssaapi/ssareducer", "timeout": "1m"},
+                {"package": "./common/yak/ssaapi/test/ssatest", "timeout": "1m"},
+                {"package": "./common/yak/syntaxflow_scan/...", "timeout": "1m"}
+              ]
 
-          - name: "Test HttpTpl(YakTemplate)"
+          - name: "Test Integration SyntaxFlow / SFDB / SFVM"
             test_configs: |
               [
-                {"package": "./common/yak/httptpl", "timeout": "1m"}
-              ]      
+                {"package": "./common/syntaxflow/tests", "timeout": "20s"},
+                {"package": "./common/syntaxflow/sfdb/...", "timeout": "20s"},
+                {"package": "./common/syntaxflow/sfvm/...", "timeout": "20s"}
+              ]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          repository: ${{ needs.prepare-yak.outputs.fork_repo || github.repository }}
+          ref: ${{ needs.prepare-yak.outputs.target_ref || github.sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-          - name: "Test MustPass - full yak scripts"
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "./go.mod"
+          cache: false
+
+      - name: Download shared go build cache
+        uses: actions/download-artifact@v4
+        with:
+          name: essential-tests-yak-cache
+          path: ${{ runner.temp }}/yak-cache-artifact
+
+      - name: Download shared yak binary
+        uses: actions/download-artifact@v4
+        with:
+          name: essential-tests-yak
+          path: ${{ runner.temp }}/yak-artifact
+
+      - name: Restore shared yak and go build cache
+        run: |
+          mkdir -p "${{ runner.temp }}/prepare-yak" "$RUNNER_TEMP/go-mod-cache"
+          tar -C "${{ runner.temp }}/prepare-yak" -xzf "${{ runner.temp }}/yak-artifact/essential-tests-yak.tar.gz"
+          tar -C "${{ runner.temp }}/prepare-yak" -xzf "${{ runner.temp }}/yak-cache-artifact/essential-tests-yak-cache.tar.gz"
+          chmod +x "${{ runner.temp }}/prepare-yak/yak"
+          du -sh "${{ runner.temp }}/prepare-yak/go-build-cache"
+          echo "GOCACHE=${{ runner.temp }}/prepare-yak/go-build-cache" >> $GITHUB_ENV
+          echo "GOMODCACHE=$RUNNER_TEMP/go-mod-cache" >> $GITHUB_ENV
+
+      - name: Generate test config
+        run: |
+          cat > /tmp/test_config.json <<'CONFIGEOF'
+          ${{ matrix.test_configs }}
+          CONFIGEOF
+          cat /tmp/test_config.json
+
+      - name: Compile test binaries
+        env:
+          GOCACHE: ${{ env.GOCACHE }}
+          GOMODCACHE: ${{ env.GOMODCACHE }}
+        run: |
+          chmod +x ./scripts/ci/compile-tests.sh
+          export TEST_BIN_DIR=/tmp/test_binaries
+          export TEST_CONFIG=/tmp/test_config.json
+          export COMPILE_WORKERS=2
+          export GO_TEST_P=1
+          ./scripts/ci/compile-tests.sh
+
+      - name: ${{ matrix.name }}
+        run: |
+          chmod +x ./scripts/ci/run-tests.sh ./scripts/ci/run-suite-with-retry.sh
+          export YAK_BINARY_PATH="${{ runner.temp }}/prepare-yak/yak"
+          export TEST_BIN_DIR=/tmp/test_binaries
+          export TEST_TIMEOUT="2m"
+          export TEST_VERBOSE="1"
+          export TEST_CONFIG=/tmp/test_config.json
+          export SUITE_NAME="${{ matrix.name }}"
+          export SUITE_SYNC_RULE="${{ matrix.sync_rule == '1' && '1' || '0' }}"
+          export SUITE_RETRIES=1
+          ./scripts/ci/run-suite-with-retry.sh
+
+      - name: Generate safe artifact name
+        if: failure()
+        id: artifact_name
+        run: |
+          SAFE_NAME=$(echo "${{ matrix.name }}" | sed 's/[^a-zA-Z0-9_-]/_/g')
+          echo "name=test_logs_${SAFE_NAME}_${{ github.run_id }}" >> $GITHUB_OUTPUT
+
+      - name: Upload failure logs (GRPC + test logs)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.artifact_name.outputs.name }}
+          path: /tmp/*.log
+          if-no-files-found: warn
+
+  test-ai-local:
+    name: ${{ matrix.name }}
+    needs: prepare-yak
+    if: needs.prepare-yak.result == 'success'
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: "Test AI Aid / React"
             test_configs: |
               [
-                {"package": "./common/yak/yaktest/mustpass", "timeout": "5m"}
-              ]     
+                {"package": "./common/ai/aid/aireact/...", "timeout": "12m", "parallel": 1}
+              ]
 
+          - name: "Test AI Aid / Core / Tool / Memory"
+            test_configs: |
+              [
+                {"package": "./common/ai/aid", "timeout": "12m", "parallel": 1},
+                {"package": "./common/ai/aid/aicommon/...", "timeout": "12m", "parallel": 1},
+                {"package": "./common/ai/aid/aimem", "timeout": "12m", "parallel": 1},
+                {"package": "./common/ai/aid/aitool/...", "timeout": "12m", "parallel": 1},
+                {"package": "./common/ai/aid/test", "timeout": "12m", "parallel": 1}
+              ]
+
+          - name: "Test AI RAG / Forge / AIHTTP"
+            test_configs: |
+              [
+                {"package": "./common/ai/rag/pq/...", "timeout": "60s", "parallel": 1},
+                {"package": "./common/ai/rag/hnsw/...", "timeout": "60s", "parallel": 1},
+                {"package": "./common/ai/rag/entityrepos/...", "timeout": "60s", "parallel": 1},
+                {"package": "./common/ai/rag/vectorstore/...", "timeout": "1m", "run": "TestMUSTPASS", "parallel": 1},
+                {"package": "./common/ai/rag", "timeout": "1m", "run": "TestMUSTPASS", "parallel": 1},
+                {"package": "./common/ai/rag/plugins_rag/...", "timeout": "1m", "run": "TestMUSTPASS", "parallel": 1},
+                {"package": "./common/ai/rag/ragtests/...", "timeout": "1m", "run": "TestMUSTPASS"},
+                {"package": "./common/ai/tests/...", "timeout": "60s", "parallel": 1},
+                {"package": "./common/ai/aispec/...", "timeout": "60s", "parallel": 1},
+                {"package": "./common/aireducer/...", "timeout": "60s", "parallel": 1},
+                {"package": "./common/aiforge/aibp", "timeout": "2m30s", "parallel": 1, "run": "^(TestBuildForgeFromYak|TestNewForgeExecutor)"},
+                {"package": "./common/aiforge", "timeout": "3m", "parallel": 1},
+                {"package": "./common/aibalance/...", "timeout": "30s", "parallel": 1},
+                {"package": "./common/yakgrpc/aihttp/tests/...", "timeout": "1m"}
+              ]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          repository: ${{ needs.prepare-yak.outputs.fork_repo || github.repository }}
+          ref: ${{ needs.prepare-yak.outputs.target_ref || github.sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "./go.mod"
+          cache: false
+
+      - name: Download shared go build cache
+        uses: actions/download-artifact@v4
+        with:
+          name: essential-tests-yak-cache
+          path: ${{ runner.temp }}/yak-cache-artifact
+
+      - name: Download shared yak binary
+        uses: actions/download-artifact@v4
+        with:
+          name: essential-tests-yak
+          path: ${{ runner.temp }}/yak-artifact
+
+      - name: Restore shared yak and go build cache
+        run: |
+          mkdir -p "${{ runner.temp }}/prepare-yak" "$RUNNER_TEMP/go-mod-cache"
+          tar -C "${{ runner.temp }}/prepare-yak" -xzf "${{ runner.temp }}/yak-artifact/essential-tests-yak.tar.gz"
+          tar -C "${{ runner.temp }}/prepare-yak" -xzf "${{ runner.temp }}/yak-cache-artifact/essential-tests-yak-cache.tar.gz"
+          chmod +x "${{ runner.temp }}/prepare-yak/yak"
+          du -sh "${{ runner.temp }}/prepare-yak/go-build-cache"
+          echo "GOCACHE=${{ runner.temp }}/prepare-yak/go-build-cache" >> $GITHUB_ENV
+          echo "GOMODCACHE=$RUNNER_TEMP/go-mod-cache" >> $GITHUB_ENV
+
+      - name: Generate test config
+        run: |
+          cat > /tmp/test_config.json <<'CONFIGEOF'
+          ${{ matrix.test_configs }}
+          CONFIGEOF
+          cat /tmp/test_config.json
+
+      - name: Compile test binaries
+        env:
+          GOCACHE: ${{ env.GOCACHE }}
+          GOMODCACHE: ${{ env.GOMODCACHE }}
+        run: |
+          chmod +x ./scripts/ci/compile-tests.sh
+          export TEST_BIN_DIR=/tmp/test_binaries
+          export TEST_CONFIG=/tmp/test_config.json
+          export COMPILE_WORKERS=2
+          export GO_TEST_P=1
+          ./scripts/ci/compile-tests.sh
+
+      - name: ${{ matrix.name }}
+        run: |
+          chmod +x ./scripts/ci/run-tests.sh ./scripts/ci/run-suite-with-retry.sh
+          export YAK_BINARY_PATH="${{ runner.temp }}/prepare-yak/yak"
+          export TEST_BIN_DIR=/tmp/test_binaries
+          export TEST_TIMEOUT="2m"
+          export TEST_VERBOSE="1"
+          export TEST_CONFIG=/tmp/test_config.json
+          export SUITE_NAME="${{ matrix.name }}"
+          export SUITE_RETRIES=1
+          ./scripts/ci/run-suite-with-retry.sh
+
+      - name: Generate safe artifact name
+        if: failure()
+        id: artifact_name
+        run: |
+          SAFE_NAME=$(echo "${{ matrix.name }}" | sed 's/[^a-zA-Z0-9_-]/_/g')
+          echo "name=test_logs_${SAFE_NAME}_${{ github.run_id }}" >> $GITHUB_OUTPUT
+
+      - name: Upload failure logs (GRPC + test logs)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.artifact_name.outputs.name }}
+          path: /tmp/*.log
+          if-no-files-found: warn
+
+  test-prepared-yakgrpc:
+    name: ${{ matrix.name }}
+    needs: [prepare-yak, prepare-yakgrpc]
+    if: needs.prepare-yak.result == 'success' && needs.prepare-yakgrpc.result == 'success'
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
           - name: "Test gRPC MUSTPASS MITM"
+            artifact_name: "essential-tests-yakgrpc"
+            artifact_file: "essential-tests-yakgrpc.tar.gz"
             test_configs: |
               [
-              {"package": "./common/yakgrpc/yakit", "timeout": "1m", "run": "TestMUSTPASS"},
-              {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_MITM_"},
-              {"package": "./common/yakgrpc/...", "timeout": "6m", "run": "TestGRPCMUSTPASS_MITMV2_"},
-              {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_MITM.*SlowRuleHook"},
-              {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS.*SlowSQL"}
+                {"package": "./common/yakgrpc/yakit", "timeout": "1m", "run": "TestMUSTPASS"},
+                {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_MITM_"},
+                {"package": "./common/yakgrpc/...", "timeout": "6m", "run": "TestGRPCMUSTPASS_MITMV2_"},
+                {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_MITM.*SlowRuleHook"},
+                {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS.*SlowSQL"}
               ]
 
           - name: "Test gRPC MUSTPASS Fuzzer"
+            artifact_name: "essential-tests-yakgrpc"
+            artifact_file: "essential-tests-yakgrpc.tar.gz"
             test_configs: |
               [
                 {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_HTTPFuzzer"},
@@ -395,21 +770,26 @@ jobs:
               ]
 
           - name: "Test gRPC MUSTPASS Language"
+            artifact_name: "essential-tests-yakgrpc"
+            artifact_file: "essential-tests-yakgrpc.tar.gz"
             test_configs: |
               [
                 {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_LANGUAGE"}
               ]
 
           - name: "Test gRPC MUSTPASS SyntaxFlow | SSA"
+            artifact_name: "essential-tests-yakgrpc"
+            artifact_file: "essential-tests-yakgrpc.tar.gz"
             sync_rule: "1"
             test_configs: |
               [
-              {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_SyntaxFlow"},
-              {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_SSA"},
-              {"package": "./common/sfweb/...", "timeout": "4m"}
+                {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_SyntaxFlow"},
+                {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_SSA"}
               ]
 
           - name: "Test gRPC In 2m"
+            artifact_name: "essential-tests-yakgrpc"
+            artifact_file: "essential-tests-yakgrpc.tar.gz"
             test_configs: |
               [
                 {"package": "./common/yakgrpc/...", "timeout": "2m", "run": "TestGRPCMUSTPASS_AnalyzeHTTPFlow"},
@@ -421,180 +801,72 @@ jobs:
               ]
 
           - name: "Test gRPC Other"
+            artifact_name: "essential-tests-yakgrpc"
+            artifact_file: "essential-tests-yakgrpc.tar.gz"
             test_configs: |
               [
                 {"package": "./common/yakgrpc/...", "timeout": "10m", "skip": "^(TestGRPCMUSTPASS_PluginTrace*|TestGRPCMUSTPASS_AnalyzeHTTPFlow*|TestGRPCMUSTPASS_Fingerprint*|TestGRPC_Ai_List_Model|TestGRPCMUSTPASS_HTTP_*|TestAITaskWith*|TestGRPCMUSTPASS_MITM_*|TestGRPCMUSTPASS_HTTPFuzzer*|TestGRPCMUSTPASS_LANGUAGE*|TestGRPCMUSTPASS_COMMON*|TestLARGEGRPCMUSTPASS*|TestGRPCMUSTPASS_SyntaxFlow*|TestGRPCMUSTPASS_SSA*)"}
               ]
-
-          - name: "Test Integration MITM / SyntaxFlow"
-            test_configs: |
-              [
-                {"package": "./common/coreplugin", "timeout": "2m", "run": "TestGRPCMUSTPASS_MITM"},
-                {"package": "./common/syntaxflow/tests", "timeout": "20s"},
-                {"package": "./common/syntaxflow/sfdb/...", "timeout": "20s"},
-                {"package": "./common/syntaxflow/sfvm/...", "timeout": "20s"}
-              ]          
-
-          - name: "Test Vulinbox Coreplugin Fastjson"
-            test_configs: |
-              [
-                {"package": "./common/coreplugin", "timeout": "3m", "run": "TestGRPCMUSTPASS_Fastjson"}
-              ]
-
-          - name: "Test Vulinbox Coreplugin SQL Injection"
-            test_configs: |
-              [
-                {"package": "./common/coreplugin", "timeout": "5m", "run": "TestGRPCMUSTPASS_SQL"}
-              ]
-
-          - name: "Test Vulinbox Coreplugin (XSS/Shiro/SSRF/SSTI/SMUGGLE/CSRF/OPEN_REDIRECT)"
-            test_configs: |
-              [
-                {"package": "./common/coreplugin", "timeout": "6m", "run": "^(TestGRPCMUSTPASS_XSS|TestGRPCMUSTPASS_Shiro|TestGRPCMUSTPASS_SSRF|TestGRPCMUSTPASS_SSTI|TestGRPCMUSTPASS_Smuggle|TestGRPCMUSTPASS_CSRF|TestGRPCMUSTPASS_OPEN_REDIRECT)$"}
-              ]
-
-          - name: "Test Crawler / Crawlerx (chromium based crawler)"
-            test_configs: |
-              [
-                {"package": "./common/crawlerx/...", "timeout": "5m"},
-                {"package": "./common/crawler", "timeout": "20s", "run": "TestMUSTPASS"}
-              ]
     steps:
-      - name: "Checkout"
+      - name: Checkout
         uses: actions/checkout@v3
         with:
-          repository: ${{ needs.check-wip.outputs.fork_repo || github.repository }}
-          ref: ${{ needs.check-wip.outputs.target_ref || github.sha }}
+          repository: ${{ needs.prepare-yakgrpc.outputs.fork_repo || github.repository }}
+          ref: ${{ needs.prepare-yakgrpc.outputs.target_ref || github.sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up Go 1.x
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: "./go.mod"
-          cache: false
-        id: go
-
-      # - name: Cache Go modules
-      #   uses: actions/cache@v3
-      #   id: cache-go-modules
-      #   with:
-      #     path: ~/go/pkg/mod
-      #     key: go-modules-${{ runner.os }}-${{ hashFiles('**/go.sum') }}
-      #     restore-keys: |
-      #       go-modules-${{ runner.os }}-${{ hashFiles('**/go.sum') }}
-
-      - name: Restore Go Build Cache
-        uses: actions/cache@v3
-        id: cache-go-build
-        with:
-          path: ~/.cache/go-build
-          key: go-build-${{ github.event.pull_request.number }}-${{ runner.os }}
-          restore-keys: |
-            go-build-${{ github.event.pull_request.number }}-${{ runner.os }}
-
-      - name: Set GOCACHE environment
+      - name: Generate test config
         run: |
-          echo "GOCACHE=$HOME/.cache/go-build" >> $GITHUB_ENV
-          echo "GOMODCACHE=$(go env GOMODCACHE)" >> $GITHUB_ENV
-          if [ -d "$HOME/.cache/go-build" ]; then
-            CACHE_SIZE=$(du -sh "$HOME/.cache/go-build" 2>/dev/null | cut -f1 || echo "0B")
-            echo "Build cache restored: $CACHE_SIZE"
-          else
-            echo "Build cache directory not found"
-          fi
-
-      - name: Init Module
-        env:
-          GOCACHE: ${{ env.GOCACHE }}
-        run: |
-          go mod tidy 
-          echo "Modifying permissions to read-write for pcap-bpf.h"
-
-      - name: Generate Test Config
-        run: |
-          # 根据 matrix 配置生成测试配置文件
-          TEST_CONFIG_FILE="/tmp/test_config.json"
-          
-          # 将 test_configs 写入文件
-          cat > "$TEST_CONFIG_FILE" <<'CONFIGEOF'
+          cat > /tmp/test_config.json <<'CONFIGEOF'
           ${{ matrix.test_configs }}
           CONFIGEOF
-          
-          # 检查是否为空（只包含空白字符）
-          if grep -q '[^[:space:]]' "$TEST_CONFIG_FILE"; then
-            echo "Generated test config file:"
-            cat "$TEST_CONFIG_FILE"
-          else
-            echo "No package-level config specified"
-            echo "[]" > "$TEST_CONFIG_FILE"
-          fi
+          cat /tmp/test_config.json
 
-      - name: Compile Test Binaries
-        env:
-          GOCACHE: ${{ env.GOCACHE }}
-        run: |
-          chmod +x ./scripts/ci/compile-tests.sh
-          export TEST_BIN_DIR=/tmp/test_binaries
-          export TEST_CONFIG="/tmp/test_config.json"
-          echo "Compiling test binaries with build cache..."
-          ./scripts/ci/compile-tests.sh
-          if [ -d "$HOME/.cache/go-build" ]; then
-            echo "Build cache after compilation: $(du -sh $HOME/.cache/go-build 2>/dev/null | cut -f1 || echo '0B')"
-          fi
+      - name: Download prepared suite
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ runner.temp }}/prepared-artifact
 
-      - name: Build yak binary for GRPC server
-        env:
-          GOCACHE: ${{ env.GOCACHE }}
+      - name: Unpack prepared suite
         run: |
-          echo "Building yak binary for GRPC server..."
-          go build -o ./yak common/yak/cmd/yak.go
-          chmod +x ./yak
-          ./yak --help || true
+          chmod +x ./scripts/ci/unpack-test-artifact.sh
+          export ARTIFACT_PATH="${{ runner.temp }}/prepared-artifact/${{ matrix.artifact_file }}"
+          export DEST_DIR="${{ runner.temp }}/prepared-suite"
+          export REQUIRE_YAK=0
+          ./scripts/ci/unpack-test-artifact.sh
 
-      - name: Start GRPC Server
-        env: 
-          SKIP_SYNC_EMBED_RULE_IN_GITHUB: "true"
-        run: |
-          echo "Starting GRPC server for test: ${{ matrix.name }}"
-          nohup ./yak grpc > /tmp/grpc.log 2>&1 < /dev/null &
-          echo "Waiting for GRPC server to start on port 8087..."
-          for i in {1..60}; do
-            if nc -z localhost 8087; then
-              echo "GRPC server is ready on port 8087"
-              break
-            fi
-            echo "Waiting... ($i/60)"
-            sleep 1
-          done
-          if ! nc -z localhost 8087; then
-            echo "GRPC server failed to start within 60 seconds"
-            cat /tmp/grpc.log
-            exit 1
-          fi
+      - name: Download shared yak binary
+        uses: actions/download-artifact@v4
+        with:
+          name: essential-tests-yak
+          path: ${{ runner.temp }}/yak-artifact
 
-      - name: Sync SyntaxFlow Rules
-        if: matrix.sync_rule == '1'
+      - name: Unpack shared yak binary
         run: |
-          echo "Syncing SyntaxFlow rules for test: ${{ matrix.name }}"
-          ./yak sync-rule
+          tar -C "${{ runner.temp }}/prepared-suite" -xzf "${{ runner.temp }}/yak-artifact/essential-tests-yak.tar.gz"
+          chmod +x "${{ runner.temp }}/prepared-suite/yak"
 
       - name: ${{ matrix.name }}
         run: |
-          chmod +x ./scripts/ci/run-tests.sh
-          export TEST_BIN_DIR=/tmp/test_binaries
+          chmod +x ./scripts/ci/run-tests.sh ./scripts/ci/run-suite-with-retry.sh "${{ runner.temp }}/prepared-suite/yak"
+          export YAK_BINARY_PATH="${{ runner.temp }}/prepared-suite/yak"
+          export TEST_BIN_DIR="${{ runner.temp }}/prepared-suite/test_binaries"
           export TEST_TIMEOUT="2m"
           export TEST_VERBOSE="1"
-          export TEST_CONFIG="/tmp/test_config.json"
-          ./scripts/ci/run-tests.sh
+          export TEST_CONFIG=/tmp/test_config.json
+          export SUITE_NAME="${{ matrix.name }}"
+          export SUITE_SYNC_RULE="${{ matrix.sync_rule == '1' && '1' || '0' }}"
+          export SUITE_RETRIES=1
+          ./scripts/ci/run-suite-with-retry.sh
 
       - name: Generate safe artifact name
         if: failure()
         id: artifact_name
         run: |
-          # 将matrix.name中的特殊字符替换为下划线
           SAFE_NAME=$(echo "${{ matrix.name }}" | sed 's/[^a-zA-Z0-9_-]/_/g')
           echo "name=test_logs_${SAFE_NAME}_${{ github.run_id }}" >> $GITHUB_OUTPUT
-          
+
       - name: Upload failure logs (GRPC + test logs)
         if: failure()
         uses: actions/upload-artifact@v4
@@ -603,10 +875,204 @@ jobs:
           path: /tmp/*.log
           if-no-files-found: warn
 
+  test-prepared-coreplugin:
+    name: ${{ matrix.name }}
+    needs: [prepare-yak, prepare-coreplugin]
+    if: needs.prepare-yak.result == 'success' && needs.prepare-coreplugin.result == 'success'
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: "Test Coreplugin AnalyzeMustPASS"
+            artifact_name: "essential-tests-coreplugin"
+            artifact_file: "essential-tests-coreplugin.tar.gz"
+            test_configs: |
+              [
+                {"package": "./common/coreplugin", "timeout": "1m", "run": "TestAnalyzeMustPASS"}
+              ]
+
+          - name: "Test Coreplugin MITM"
+            artifact_name: "essential-tests-coreplugin"
+            artifact_file: "essential-tests-coreplugin.tar.gz"
+            test_configs: |
+              [
+                {"package": "./common/coreplugin", "timeout": "2m", "run": "TestGRPCMUSTPASS_MITM"}
+              ]
+
+          - name: "Test Vulinbox Coreplugin Fastjson"
+            artifact_name: "essential-tests-coreplugin"
+            artifact_file: "essential-tests-coreplugin.tar.gz"
+            test_configs: |
+              [
+                {"package": "./common/coreplugin", "timeout": "3m", "run": "TestGRPCMUSTPASS_Fastjson"}
+              ]
+
+          - name: "Test Vulinbox Coreplugin SQL Injection"
+            artifact_name: "essential-tests-coreplugin"
+            artifact_file: "essential-tests-coreplugin.tar.gz"
+            test_configs: |
+              [
+                {"package": "./common/coreplugin", "timeout": "5m", "run": "TestGRPCMUSTPASS_SQL"}
+              ]
+
+          - name: "Test Vulinbox Coreplugin (XSS/Shiro/SSRF/SSTI/SMUGGLE/CSRF/OPEN_REDIRECT)"
+            artifact_name: "essential-tests-coreplugin"
+            artifact_file: "essential-tests-coreplugin.tar.gz"
+            test_configs: |
+              [
+                {"package": "./common/coreplugin", "timeout": "6m", "run": "^(TestGRPCMUSTPASS_XSS|TestGRPCMUSTPASS_Shiro|TestGRPCMUSTPASS_SSRF|TestGRPCMUSTPASS_SSTI|TestGRPCMUSTPASS_Smuggle|TestGRPCMUSTPASS_CSRF|TestGRPCMUSTPASS_OPEN_REDIRECT)$"}
+              ]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          repository: ${{ needs.prepare-coreplugin.outputs.fork_repo || github.repository }}
+          ref: ${{ needs.prepare-coreplugin.outputs.target_ref || github.sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate test config
+        run: |
+          cat > /tmp/test_config.json <<'CONFIGEOF'
+          ${{ matrix.test_configs }}
+          CONFIGEOF
+          cat /tmp/test_config.json
+
+      - name: Download prepared suite
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ runner.temp }}/prepared-artifact
+
+      - name: Unpack prepared suite
+        run: |
+          chmod +x ./scripts/ci/unpack-test-artifact.sh
+          export ARTIFACT_PATH="${{ runner.temp }}/prepared-artifact/${{ matrix.artifact_file }}"
+          export DEST_DIR="${{ runner.temp }}/prepared-suite"
+          export REQUIRE_YAK=0
+          ./scripts/ci/unpack-test-artifact.sh
+
+      - name: Download shared yak binary
+        uses: actions/download-artifact@v4
+        with:
+          name: essential-tests-yak
+          path: ${{ runner.temp }}/yak-artifact
+
+      - name: Unpack shared yak binary
+        run: |
+          tar -C "${{ runner.temp }}/prepared-suite" -xzf "${{ runner.temp }}/yak-artifact/essential-tests-yak.tar.gz"
+          chmod +x "${{ runner.temp }}/prepared-suite/yak"
+
+      - name: ${{ matrix.name }}
+        run: |
+          chmod +x ./scripts/ci/run-tests.sh ./scripts/ci/run-suite-with-retry.sh "${{ runner.temp }}/prepared-suite/yak"
+          export YAK_BINARY_PATH="${{ runner.temp }}/prepared-suite/yak"
+          export TEST_BIN_DIR="${{ runner.temp }}/prepared-suite/test_binaries"
+          export TEST_TIMEOUT="2m"
+          export TEST_VERBOSE="1"
+          export TEST_CONFIG=/tmp/test_config.json
+          export SUITE_NAME="${{ matrix.name }}"
+          export SUITE_SYNC_RULE="${{ matrix.sync_rule == '1' && '1' || '0' }}"
+          export SUITE_RETRIES=1
+          ./scripts/ci/run-suite-with-retry.sh
+
+      - name: Generate safe artifact name
+        if: failure()
+        id: artifact_name
+        run: |
+          SAFE_NAME=$(echo "${{ matrix.name }}" | sed 's/[^a-zA-Z0-9_-]/_/g')
+          echo "name=test_logs_${SAFE_NAME}_${{ github.run_id }}" >> $GITHUB_OUTPUT
+
+      - name: Upload failure logs (GRPC + test logs)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.artifact_name.outputs.name }}
+          path: /tmp/*.log
+          if-no-files-found: warn
+
+  cleanup-yakgrpc-artifact:
+    needs: [prepare-yakgrpc, test-prepared-yakgrpc]
+    if: needs.prepare-yakgrpc.result == 'success' && needs.test-prepared-yakgrpc.result == 'success'
+    runs-on: ubuntu-22.04
+    permissions:
+      actions: write
+    steps:
+      - name: Delete yakgrpc artifact
+        env:
+          ARTIFACT_ID: ${{ needs.prepare-yakgrpc.outputs.artifact_id }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -z "$ARTIFACT_ID" ]; then
+            echo "::warning::No yakgrpc artifact id found, skip deletion"
+            exit 0
+          fi
+          curl -fsSL \
+            -X DELETE \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID" \
+            && echo "Deleted yakgrpc artifact $ARTIFACT_ID" \
+            || echo "::warning::Failed to delete yakgrpc artifact $ARTIFACT_ID"
+
+  cleanup-coreplugin-artifact:
+    needs: [prepare-coreplugin, test-prepared-coreplugin]
+    if: needs.prepare-coreplugin.result == 'success' && needs.test-prepared-coreplugin.result == 'success'
+    runs-on: ubuntu-22.04
+    permissions:
+      actions: write
+    steps:
+      - name: Delete coreplugin artifact
+        env:
+          ARTIFACT_ID: ${{ needs.prepare-coreplugin.outputs.artifact_id }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -z "$ARTIFACT_ID" ]; then
+            echo "::warning::No coreplugin artifact id found, skip deletion"
+            exit 0
+          fi
+          curl -fsSL \
+            -X DELETE \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID" \
+            && echo "Deleted coreplugin artifact $ARTIFACT_ID" \
+            || echo "::warning::Failed to delete coreplugin artifact $ARTIFACT_ID"
+
+  cleanup-yak-artifact:
+    needs: [prepare-yak, test-local, test-ai-local, test-prepared-yakgrpc, test-prepared-coreplugin]
+    if: needs.prepare-yak.result == 'success' && needs.test-local.result == 'success' && needs.test-ai-local.result == 'success' && needs.test-prepared-yakgrpc.result == 'success' && needs.test-prepared-coreplugin.result == 'success'
+    runs-on: ubuntu-22.04
+    permissions:
+      actions: write
+    steps:
+      - name: Delete shared yak/cache artifacts
+        env:
+          YAK_ARTIFACT_ID: ${{ needs.prepare-yak.outputs.yak_artifact_id }}
+          CACHE_ARTIFACT_ID: ${{ needs.prepare-yak.outputs.cache_artifact_id }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for artifact_id in "$YAK_ARTIFACT_ID" "$CACHE_ARTIFACT_ID"; do
+            if [ -z "$artifact_id" ]; then
+              echo "::warning::Missing shared yak/cache artifact id, skip this entry"
+              continue
+            fi
+            curl -fsSL \
+              -X DELETE \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/$artifact_id" \
+              && echo "Deleted shared yak/cache artifact $artifact_id" \
+              || echo "::warning::Failed to delete shared yak/cache artifact $artifact_id"
+          done
+
   post-check:
     name: Save Test Results to Cache
-    needs: [check-wip, test]
-    if: success()
+    needs: [check-wip, test-local, test-ai-local, test-prepared-yakgrpc, test-prepared-coreplugin]
+    if: needs.check-wip.outputs.should_run_tests == 'true' && success()
     runs-on: ubuntu-22.04
     steps:
       - name: 'Check Out'
