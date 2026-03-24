@@ -33,3 +33,26 @@ type SkillLoader interface {
 	// It is a pure data accessor; filtering/searching should be handled by manager.
 	AllSkillMetas() []*SkillMeta
 }
+
+// SkillMetaLookup is an optional capability for loaders that can resolve a skill
+// metadata record by name without enumerating all skills.
+type SkillMetaLookup interface {
+	GetSkillMeta(name string) (*SkillMeta, error)
+}
+
+// SkillMetaSearcher is an optional capability for loaders that can search skill
+// metadata directly, including lazy database-backed sources.
+type SkillMetaSearcher interface {
+	SearchSkillMetas(query string, limit int) ([]*SkillMeta, error)
+}
+
+// SkillSourceStats describes how many skills are available from each source class.
+type SkillSourceStats struct {
+	LocalCount    int
+	DatabaseCount int
+}
+
+// SkillStatsProvider is an optional capability for loaders that can expose lightweight stats.
+type SkillStatsProvider interface {
+	GetSkillSourceStats() SkillSourceStats
+}

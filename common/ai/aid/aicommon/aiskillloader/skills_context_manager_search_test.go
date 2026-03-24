@@ -2,7 +2,6 @@ package aiskillloader
 
 import (
 	"testing"
-	"time"
 
 	"github.com/jinzhu/gorm"
 	_ "github.com/mattn/go-sqlite3"
@@ -16,7 +15,7 @@ func newSearchTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("failed to create in-memory DB: %v", err)
 	}
-	db.AutoMigrate(&schema.AISkill{})
+	db.AutoMigrate(&schema.AIForge{})
 	return db
 }
 
@@ -72,9 +71,16 @@ func TestManager_SearchKeywordBM25_InMemory(t *testing.T) {
 func TestManager_SearchKeywordBM25_WithDB(t *testing.T) {
 	db := newSearchTestDB(t)
 	defer db.Close()
-	loader, err := NewAutoSkillLoader(WithAutoLoad_FileSystem(buildNestedTestVFS()))
+	sourceLoader, err := NewAutoSkillLoader(WithAutoLoad_FileSystem(buildNestedTestVFS()))
 	if err != nil {
 		t.Fatalf("failed to create autoloader: %v", err)
+	}
+	if _, err := ImportAISkillsToDB(db, sourceLoader); err != nil {
+		t.Fatalf("ImportAISkillsToDB failed: %v", err)
+	}
+	loader, err := NewAutoSkillLoader(WithAutoLoad_Database(db))
+	if err != nil {
+		t.Fatalf("failed to create database-backed autoloader: %v", err)
 	}
 	m := NewSkillsContextManager(loader, WithManagerDB(db))
 
@@ -129,7 +135,7 @@ func TestManager_GetCurrentSelectedSkills(t *testing.T) {
 	}
 }
 
-func TestManager_DBPersistenceOnInit(t *testing.T) {
+func TestManager_DoesNotPersistSkillsOnInit(t *testing.T) {
 	db := newSearchTestDB(t)
 	defer db.Close()
 	loader, err := NewAutoSkillLoader(WithAutoLoad_FileSystem(buildNestedTestVFS()))
@@ -138,37 +144,41 @@ func TestManager_DBPersistenceOnInit(t *testing.T) {
 	}
 	_ = NewSkillsContextManager(loader, WithManagerDB(db))
 
-	skill, err := yakit.GetAISkillByName(db, "top-skill")
-	if err != nil {
-		t.Fatalf("expected top-skill persisted in DB: %v", err)
-	}
-	if skill.Hash == "" {
-		t.Fatal("expected hash to be persisted")
+	if _, err := yakit.GetAIForgeByNameAndTypes(db, "top-skill", schema.FORGE_TYPE_SkillMD); err == nil {
+		t.Fatal("skills context manager should not implicitly persist loader skills into DB")
 	}
 }
 
-func TestManager_DBHashDedup(t *testing.T) {
+func TestManager_DBLoaderIsLazy(t *testing.T) {
 	db := newSearchTestDB(t)
 	defer db.Close()
-	loader, err := NewAutoSkillLoader(WithAutoLoad_FileSystem(buildNestedTestVFS()))
-	if err != nil {
-		t.Fatalf("failed to create autoloader: %v", err)
-	}
-	_ = NewSkillsContextManager(loader, WithManagerDB(db))
-	skill1, err := yakit.GetAISkillByName(db, "top-skill")
-	if err != nil {
-		t.Fatalf("first lookup failed: %v", err)
-	}
-	updatedAt1 := skill1.UpdatedAt
-	time.Sleep(10 * time.Millisecond)
 
-	// Re-initialize with same loader content; hash dedup should avoid updates.
-	_ = NewSkillsContextManager(loader, WithManagerDB(db))
-	skill2, err := yakit.GetAISkillByName(db, "top-skill")
+	sourceLoader, err := NewAutoSkillLoader(WithAutoLoad_FileSystem(buildNestedTestVFS()))
 	if err != nil {
-		t.Fatalf("second lookup failed: %v", err)
+		t.Fatalf("failed to create source autoloader: %v", err)
 	}
-	if !skill2.UpdatedAt.Equal(updatedAt1) {
-		t.Fatalf("expected UpdatedAt unchanged by hash dedup; got %v -> %v", updatedAt1, skill2.UpdatedAt)
+	if _, err := ImportAISkillsToDB(db, sourceLoader); err != nil {
+		t.Fatalf("ImportAISkillsToDB failed: %v", err)
+	}
+
+	loader, err := NewAutoSkillLoader(WithAutoLoad_Database(db))
+	if err != nil {
+		t.Fatalf("failed to create database-backed autoloader: %v", err)
+	}
+	if metas := loader.AllSkillMetas(); len(metas) != 0 {
+		t.Fatalf("database-backed autoloader should not eagerly load metas, got %d", len(metas))
+	}
+
+	m := NewSkillsContextManager(loader, WithManagerDB(db))
+	results, err := m.SearchKeywordBM25("security scanning", 5)
+	if err != nil {
+		t.Fatalf("SearchKeywordBM25 failed: %v", err)
+	}
+	if len(results) == 0 || results[0].Name == "" {
+		t.Fatalf("expected lazy DB search results, got %+v", results)
+	}
+
+	if err := m.LoadSkill("hidden-skill"); err != nil {
+		t.Fatalf("LoadSkill from lazy DB source failed: %v", err)
 	}
 }

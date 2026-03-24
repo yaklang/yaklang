@@ -10,19 +10,25 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 // AutoSkillLoader discovers and loads skills by recursively traversing multiple
-// file system sources. It intentionally focuses on filesystem/read concerns only.
+// filesystem-like sources, including skillmd forges materialized from the database.
 type AutoSkillLoader struct {
 	mu     sync.RWMutex
 	skills map[string]*skillEntry
 
 	sources []fi.FileSystem
+
+	db           *gorm.DB
+	dbSkillCount int
 
 	cooldown    *utils.CoolDown
 	scannedDirs map[string]struct{}
@@ -63,6 +69,13 @@ func WithAutoLoad_FileSystem(fsys fi.FileSystem) AutoSkillLoaderOption {
 		}
 		l.sources = append(l.sources, fsys)
 		return nil
+	}
+}
+
+// WithAutoLoad_Database attaches a lazy database-backed skill source.
+func WithAutoLoad_Database(db *gorm.DB) AutoSkillLoaderOption {
+	return func(l *AutoSkillLoader) error {
+		return l.attachDatabase(db)
 	}
 }
 
@@ -174,16 +187,65 @@ func ComputeSkillHash(skillFS fi.FileSystem) string {
 	return fmt.Sprintf("%x", finalHash)
 }
 
+func getDatabaseSkillCount(db *gorm.DB) (int, error) {
+	if db == nil {
+		return 0, utils.Error("db is nil")
+	}
+	var count int
+	if err := db.Model(&schema.AIForge{}).Where("forge_type = ?", schema.FORGE_TYPE_SkillMD).Count(&count).Error; err != nil {
+		return 0, utils.Wrap(err, "count skillmd forges failed")
+	}
+	return count, nil
+}
+
+func (l *AutoSkillLoader) attachDatabase(db *gorm.DB) error {
+	if db == nil {
+		return utils.Error("db is nil")
+	}
+	count, err := getDatabaseSkillCount(db)
+	if err != nil {
+		return err
+	}
+	l.db = db
+	l.dbSkillCount = count
+	return nil
+}
+
+func (l *AutoSkillLoader) loadSkillFromDatabase(name string) (*LoadedSkill, error) {
+	l.mu.RLock()
+	db := l.db
+	l.mu.RUnlock()
+	if db == nil {
+		return nil, utils.Errorf("skill %q not found", name)
+	}
+
+	forge, err := yakit.GetAIForgeByNameAndTypes(db, name, schema.FORGE_TYPE_SkillMD)
+	if err != nil {
+		return nil, utils.Wrapf(err, "load skill %q from skillmd forge failed", name)
+	}
+	loaded, err := AIForgeToLoadedSkill(forge)
+	if err != nil {
+		return nil, utils.Wrapf(err, "convert skillmd forge %q to loaded skill failed", name)
+	}
+
+	l.mu.Lock()
+	l.skills[name] = &skillEntry{
+		fs:   loaded.FileSystem,
+		meta: loaded.Meta,
+	}
+	l.mu.Unlock()
+	return loaded, nil
+}
+
 // --- SkillLoader interface implementation ---
 
 // LoadSkill loads a specific skill by name.
 func (l *AutoSkillLoader) LoadSkill(name string) (*LoadedSkill, error) {
 	l.mu.RLock()
-	defer l.mu.RUnlock()
-
 	entry, ok := l.skills[name]
+	l.mu.RUnlock()
 	if !ok {
-		return nil, utils.Errorf("skill %q not found", name)
+		return l.loadSkillFromDatabase(name)
 	}
 
 	content, err := entry.fs.ReadFile(skillMDFilename)
@@ -201,11 +263,14 @@ func (l *AutoSkillLoader) LoadSkill(name string) (*LoadedSkill, error) {
 // GetFileSystem returns the read-only filesystem for a specific skill.
 func (l *AutoSkillLoader) GetFileSystem(name string) (fi.FileSystem, error) {
 	l.mu.RLock()
-	defer l.mu.RUnlock()
-
 	entry, ok := l.skills[name]
+	l.mu.RUnlock()
 	if !ok {
-		return nil, utils.Errorf("skill %q not found", name)
+		loaded, err := l.loadSkillFromDatabase(name)
+		if err != nil {
+			return nil, err
+		}
+		return loaded.FileSystem, nil
 	}
 	return entry.fs, nil
 }
@@ -214,10 +279,11 @@ func (l *AutoSkillLoader) GetFileSystem(name string) (fi.FileSystem, error) {
 func (l *AutoSkillLoader) HasSkills() bool {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
-	return len(l.skills) > 0
+	return len(l.skills) > 0 || l.dbSkillCount > 0
 }
 
 // AllSkillMetas returns metadata for all available skills.
+// For database-backed skills, metadata is resolved lazily and therefore not enumerated here.
 func (l *AutoSkillLoader) AllSkillMetas() []*SkillMeta {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
@@ -227,6 +293,87 @@ func (l *AutoSkillLoader) AllSkillMetas() []*SkillMeta {
 		result = append(result, entry.meta)
 	}
 	return result
+}
+
+// GetSkillMeta returns skill metadata by name, using lazy DB lookup when needed.
+func (l *AutoSkillLoader) GetSkillMeta(name string) (*SkillMeta, error) {
+	l.mu.RLock()
+	entry, ok := l.skills[name]
+	db := l.db
+	l.mu.RUnlock()
+	if ok {
+		return entry.meta, nil
+	}
+	if db == nil {
+		return nil, utils.Errorf("skill %q not found", name)
+	}
+	forge, err := yakit.GetAIForgeByNameAndTypes(db, name, schema.FORGE_TYPE_SkillMD)
+	if err != nil {
+		return nil, err
+	}
+	meta := forgeToSkillMetaPreview(forge)
+	if meta == nil {
+		return nil, utils.Errorf("skill %q not found", name)
+	}
+	return meta, nil
+}
+
+// SearchSkillMetas searches local skills structurally and database-backed skillmd forges via BM25.
+func (l *AutoSkillLoader) SearchSkillMetas(query string, limit int) ([]*SkillMeta, error) {
+	local := SearchSkillMetasByStructure(query, l.AllSkillMetas(), limit)
+
+	l.mu.RLock()
+	db := l.db
+	l.mu.RUnlock()
+	if db == nil {
+		return local, nil
+	}
+
+	dbResults, err := yakit.SearchAIForgeBM25(db, &yakit.AIForgeSearchFilter{
+		ForgeTypes: []string{schema.FORGE_TYPE_SkillMD},
+		Keywords:   strings.Fields(strings.TrimSpace(query)),
+	}, limit, 0)
+	if err != nil {
+		if len(local) > 0 {
+			return local, nil
+		}
+		return nil, err
+	}
+
+	seen := make(map[string]struct{}, len(local)+len(dbResults))
+	merged := make([]*SkillMeta, 0, len(local)+len(dbResults))
+	for _, meta := range local {
+		if meta == nil || meta.Name == "" {
+			continue
+		}
+		seen[meta.Name] = struct{}{}
+		merged = append(merged, meta)
+	}
+	for _, forge := range dbResults {
+		meta := forgeToSkillMetaPreview(forge)
+		if meta == nil || meta.Name == "" {
+			continue
+		}
+		if _, exists := seen[meta.Name]; exists {
+			continue
+		}
+		seen[meta.Name] = struct{}{}
+		merged = append(merged, meta)
+	}
+	if limit > 0 && len(merged) > limit {
+		merged = merged[:limit]
+	}
+	return merged, nil
+}
+
+// GetSkillSourceStats returns lightweight source statistics without forcing DB skill enumeration.
+func (l *AutoSkillLoader) GetSkillSourceStats() SkillSourceStats {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	return SkillSourceStats{
+		LocalCount:    len(l.skills),
+		DatabaseCount: l.dbSkillCount,
+	}
 }
 
 // AddSource adds a new filesystem source and discovers skills from it.
@@ -358,6 +505,18 @@ func (l *AutoSkillLoader) AddZipFile(zipPath string) (int, error) {
 		return 0, utils.Wrapf(err, "failed to open zip file: %s", zipPath)
 	}
 	return l.AddSource(zipFS)
+}
+
+// AddDatabase attaches a lazy database-backed skill source.
+func (l *AutoSkillLoader) AddDatabase(db *gorm.DB) (int, error) {
+	before := l.dbSkillCount
+	if err := l.attachDatabase(db); err != nil {
+		return 0, err
+	}
+	if l.dbSkillCount <= before {
+		return 0, nil
+	}
+	return l.dbSkillCount - before, nil
 }
 
 // Ensure AutoSkillLoader implements SkillLoader.

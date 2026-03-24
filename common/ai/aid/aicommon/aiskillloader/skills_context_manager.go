@@ -11,7 +11,6 @@ import (
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -46,7 +45,7 @@ type skillContextState struct {
 // ManagerOption configures SkillsContextManager.
 type ManagerOption func(*SkillsContextManager)
 
-// WithManagerDB enables optional DB persistence and BM25 search.
+// WithManagerDB enables optional database-backed skill loading/search context.
 func WithManagerDB(db *gorm.DB) ManagerOption {
 	return func(m *SkillsContextManager) {
 		m.db = db
@@ -124,27 +123,14 @@ func NewSkillsContextManager(loader SkillLoader, opts ...ManagerOption) *SkillsC
 	return m
 }
 
-// initializeSkillSearchPersistence prepares optional DB persistence/indexes.
+// initializeSkillSearchPersistence prepares optional indexes for DB-backed skill sources.
 func (m *SkillsContextManager) initializeSkillSearchPersistence() {
-	if m.db == nil || m.loader == nil {
+	if m.db == nil {
 		return
 	}
-	m.db.AutoMigrate(&schema.AISkill{})
-	if err := yakit.EnsureAISkillFTS5(m.db); err != nil {
-		log.Warnf("failed to setup ai_skills FTS5 index: %v", err)
+	if err := yakit.EnsureAIForgeFTS5(m.db); err != nil {
+		log.Warnf("failed to setup ai_forges FTS5 index: %v", err)
 	}
-	if err := m.persistAllMetasToDB(); err != nil {
-		log.Warnf("failed to persist initial skills into DB: %v", err)
-	}
-}
-
-// persistAllMetasToDB syncs all loader metadata to DB with hash deduplication.
-func (m *SkillsContextManager) persistAllMetasToDB() error {
-	if m.db == nil || m.loader == nil {
-		return nil
-	}
-	_, err := ImportAISkillsToDB(m.db, m.loader)
-	return err
 }
 
 // SetMaxBytes sets the total context size limit.
@@ -199,24 +185,12 @@ func (m *SkillsContextManager) SearchSkills(query string) ([]*SkillMeta, error) 
 	if m.loader == nil {
 		return nil, utils.Error("skills context manager: no loader configured")
 	}
-	query = strings.TrimSpace(strings.ToLower(query))
-	if query == "" {
-		return nil, nil
-	}
-	var result []*SkillMeta
-	for _, meta := range m.loader.AllSkillMetas() {
-		nameMatch := strings.Contains(strings.ToLower(meta.Name), query)
-		descMatch := strings.Contains(strings.ToLower(meta.Description), query)
-		if nameMatch || descMatch {
-			result = append(result, meta)
-		}
-	}
-	return result, nil
+	return SearchSkillMetas(m.loader, query, 20)
 }
 
 // SearchKeywordBM25 uses SQLite FTS5 BM25 ranking to search skills by keyword.
-// If manager has persistent DB configured, search against ai_skills table.
-// Otherwise create an in-memory SQLite DB for temporary search.
+// Search is built from the current loader view so filesystem skills and database skills
+// participate uniformly without implicitly persisting transient sources.
 func (m *SkillsContextManager) SearchKeywordBM25(query string, limit int) ([]*SkillMeta, error) {
 	if m.loader == nil {
 		return nil, utils.Error("skills context manager: no loader configured")
@@ -229,56 +203,7 @@ func (m *SkillsContextManager) SearchKeywordBM25(query string, limit int) ([]*Sk
 		limit = 10
 	}
 
-	allMetas := m.loader.AllSkillMetas()
-	if len(allMetas) == 0 {
-		return nil, nil
-	}
-
-	filter := &yakit.AISkillSearchFilter{Keywords: query}
-	db := m.db
-	if db == nil {
-		memDB, err := gorm.Open("sqlite3", ":memory:")
-		if err != nil {
-			return nil, utils.Wrapf(err, "failed to create in-memory SQLite for BM25 search")
-		}
-		defer memDB.Close()
-		memDB.AutoMigrate(&schema.AISkill{})
-		if err := yakit.EnsureAISkillFTS5(memDB); err != nil {
-			log.Warnf("failed to setup FTS5 on in-memory DB: %v", err)
-		}
-		for _, meta := range allMetas {
-			skill := &schema.AISkill{
-				Name:                   meta.Name,
-				Description:            meta.Description,
-				License:                meta.License,
-				Keywords:               buildKeywordsString(meta),
-				Body:                   meta.Body,
-				DisableModelInvocation: meta.DisableModelInvocation,
-			}
-			_ = memDB.Create(skill).Error
-		}
-		_ = yakit.EnsureAISkillFTS5(memDB)
-		db = memDB
-	} else {
-		_ = m.persistAllMetasToDB()
-	}
-
-	results, err := yakit.SearchAISkillBM25(db, filter, limit, 0)
-	if err != nil {
-		return nil, utils.Wrapf(err, "BM25 search failed")
-	}
-
-	metaMap := make(map[string]*SkillMeta, len(allMetas))
-	for _, meta := range allMetas {
-		metaMap[meta.Name] = meta
-	}
-	var metas []*SkillMeta
-	for _, r := range results {
-		if meta, ok := metaMap[r.Name]; ok {
-			metas = append(metas, meta)
-		}
-	}
-	return metas, nil
+	return SearchSkillMetas(m.loader, query, limit)
 }
 
 // SearchByAI performs AI-based skill selection through manager callback.
@@ -469,7 +394,14 @@ func (m *SkillsContextManager) Render(nonce string) string {
 	if m.loadedSkills.Len() == 0 {
 		if m.HasRegisteredSkills() {
 			skills := m.loader.AllSkillMetas()
+			stats := GetSkillSourceStats(m.loader)
 			if len(skills) == 0 {
+				if stats.DatabaseCount > 0 {
+					return fmt.Sprintf(
+						"<|SKILLS_CONTEXT_%s|>\nAvailable database-backed skills: %d. Use search_capabilities or loading_skills with an exact skill name to access them.\n<|SKILLS_CONTEXT_END_%s|>",
+						nonce, stats.DatabaseCount, nonce,
+					)
+				}
 				return ""
 			}
 			var buf bytes.Buffer
@@ -485,6 +417,9 @@ func (m *SkillsContextManager) Render(nonce string) string {
 				}
 				buf.WriteString(line)
 				listed++
+			}
+			if stats.DatabaseCount > 0 {
+				buf.WriteString(fmt.Sprintf("  ... plus %d database-backed skills available via search.\n", stats.DatabaseCount))
 			}
 			buf.WriteString(fmt.Sprintf("<|SKILLS_CONTEXT_END_%s|>", nonce))
 			return buf.String()
