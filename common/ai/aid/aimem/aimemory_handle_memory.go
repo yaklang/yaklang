@@ -39,6 +39,8 @@ func (t *AIMemoryTriage) HandleMemory(i any) error {
 		return utils.Errorf("failed to build memory entities: %v", err)
 	}
 
+	entities = t.filterGeneratedMemoryEntities(entities)
+
 	if len(entities) == 0 {
 		log.Infof("no memory entities generated from input")
 		return nil
