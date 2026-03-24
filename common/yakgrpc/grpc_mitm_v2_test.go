@@ -1359,7 +1359,7 @@ func TestGRPCMUSTPASS_MITM_ObsoleteTLS(t *testing.T) {
 
 	tokenCheck := false
 
-	var doOnece sync.Once
+	var doOnce sync.Once
 
 	RunMITMV2TestServerEx(client, ctx, func(stream ypb.Yak_MITMV2Client) {
 		stream.Send(&ypb.MITMV2Request{
@@ -1367,8 +1367,9 @@ func TestGRPCMUSTPASS_MITM_ObsoleteTLS(t *testing.T) {
 			Port: uint32(mitmPort),
 		})
 	}, func(stream ypb.Yak_MITMV2Client) {
-	}, func(stream ypb.Yak_MITMV2Client, msg *ypb.MITMV2Response) {
-		doOnece.Do(func() {
+		doOnce.Do(func() {
+			require.NoError(t, utils.WaitConnect(utils.HostPort("127.0.0.1", mitmPort), 5))
+
 			rsp, err := lowhttp.HTTP(
 				lowhttp.WithPacketBytes([]byte(fmt.Sprintf(`GET / HTTP/1.1
 Host: %s
@@ -1389,7 +1390,7 @@ Host: %s
 			tokenCheck = true
 			cancel()
 		})
-	})
+	}, nil)
 	require.True(t, tokenCheck)
 }
 
@@ -1415,7 +1416,7 @@ func TestGRPCMUSTPASS_MITM_HTTPFlowURL(t *testing.T) {
 
 		tokenCheck := false
 
-		var doOnece sync.Once
+		var doOnce sync.Once
 
 		RunMITMV2TestServerEx(client, ctx, func(stream ypb.Yak_MITMV2Client) {
 			stream.Send(&ypb.MITMV2Request{
@@ -1423,8 +1424,9 @@ func TestGRPCMUSTPASS_MITM_HTTPFlowURL(t *testing.T) {
 				Port: uint32(mitmPort),
 			})
 		}, func(stream ypb.Yak_MITMV2Client) {
-		}, func(stream ypb.Yak_MITMV2Client, msg *ypb.MITMV2Response) {
-			doOnece.Do(func() {
+			doOnce.Do(func() {
+				require.NoError(t, utils.WaitConnect(utils.HostPort("127.0.0.1", mitmPort), 5))
+
 				rsp, err := lowhttp.HTTP(
 					lowhttp.WithPacketBytes([]byte(fmt.Sprintf(`GET / HTTP/1.1
 Host: %s
@@ -1440,7 +1442,7 @@ Host: %s
 				tokenCheck = true
 				cancel()
 			})
-		})
+		}, nil)
 		require.True(t, tokenCheck)
 
 		flows, err := QueryHTTPFlows(utils.TimeoutContextSeconds(5), client, &ypb.QueryHTTPFlowRequest{
@@ -1473,7 +1475,7 @@ Host: %s
 
 		tokenCheck := false
 
-		var doOnece sync.Once
+		var doOnce sync.Once
 
 		RunMITMV2TestServerEx(client, ctx, func(stream ypb.Yak_MITMV2Client) {
 			stream.Send(&ypb.MITMV2Request{
@@ -1481,8 +1483,9 @@ Host: %s
 				Port: uint32(mitmPort),
 			})
 		}, func(stream ypb.Yak_MITMV2Client) {
-		}, func(stream ypb.Yak_MITMV2Client, msg *ypb.MITMV2Response) {
-			doOnece.Do(func() {
+			doOnce.Do(func() {
+				require.NoError(t, utils.WaitConnect(utils.HostPort("127.0.0.1", mitmPort), 5))
+
 				rsp, err := lowhttp.HTTP(
 					lowhttp.WithPacketBytes([]byte(fmt.Sprintf(`GET / HTTP/1.1
 Host: %s
@@ -1497,7 +1500,7 @@ Host: %s
 				tokenCheck = true
 				cancel()
 			})
-		})
+		}, nil)
 		require.True(t, tokenCheck)
 
 		flows, err := QueryHTTPFlows(utils.TimeoutContextSeconds(5), client, &ypb.QueryHTTPFlowRequest{
