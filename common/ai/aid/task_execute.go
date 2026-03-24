@@ -83,7 +83,7 @@ func (t *AiTask) execute() error {
 			if lastRecord != nil {
 				summary = lastRecord.Reason
 				completedTaskIndex = lastRecord.CompletedTaskIndex
-				nextMovements = lastRecord.NextMovements
+				nextMovements = aicommon.FormatVerifyNextMovementsSummary(lastRecord.NextMovements)
 			}
 
 			// Check if current task index is in the completed_task_index list
@@ -145,8 +145,8 @@ func (t *AiTask) execute() error {
 			var lastVerificationInfo string
 			if lastRecord := loop.GetLastSatisfactionRecordFull(); lastRecord != nil {
 				lastVerificationInfo = fmt.Sprintf("satisfied=%v, reasoning=%s", lastRecord.Satisfactory, lastRecord.Reason)
-				if lastRecord.NextMovements != "" {
-					lastVerificationInfo += fmt.Sprintf(", next_movements=%s", lastRecord.NextMovements)
+				if summary := aicommon.FormatVerifyNextMovementsSummary(lastRecord.NextMovements); summary != "" {
+					lastVerificationInfo += fmt.Sprintf(", next_movements=%s", summary)
 				}
 			}
 

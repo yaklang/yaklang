@@ -133,6 +133,7 @@ type VerificationPromptData struct {
 	IsToolCall     bool
 	Payload        string
 	Timeline       string
+	TodoSnapshot   string
 	Language       string
 	Schema         string
 	DynamicContext string
@@ -434,6 +435,7 @@ func (pm *PromptManager) GenerateVerificationPrompt(originalQuery string, isTool
 		IsToolCall:     isToolResult,
 		Payload:        payload,
 		Timeline:       "",
+		TodoSnapshot:   pm.react.RenderVerificationTodoSnapshot(),
 		Language:       pm.react.config.GetLanguage(),
 		Schema:         verificationSchemaJSON,
 		DynamicContext: pm.DynamicContext(),

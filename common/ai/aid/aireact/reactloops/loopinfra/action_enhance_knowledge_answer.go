@@ -132,10 +132,12 @@ var loopAction_EnhanceKnowledgeAnswer = &reactloops.LoopAction{
 			return
 		}
 
+		nextStepsSummary := aicommon.FormatVerifyNextMovementsSummary(verifyResult.NextMovements)
+
 		invoker.AddToTimeline("knowledge_enhance_not_satisfied",
 			"Knowledge enhancement did NOT satisfy the query '"+rewriteQuery+"'. "+
 				"Reasoning: "+verifyResult.Reasoning+". "+
-				"Suggested next steps: "+verifyResult.NextMovements+". "+
+				"Suggested next steps: "+nextStepsSummary+". "+
 				"If the knowledge base lacks relevant information, "+
 				"you MUST try web_search or internet_research to search the internet. "+
 				"Do NOT retry knowledge_enhance_answer with the same approach.")

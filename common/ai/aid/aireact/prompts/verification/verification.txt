@@ -33,6 +33,12 @@ User Raw INPUT/ReAction Thought/Observation:
 {{ .Timeline }}
 <|TIMELINE_END_{{ .Nonce }}|>{{ end }}
 
+{{ if .TodoSnapshot }}# TODO:
+<|TODO_SNAPSHOT_{{ .Nonce }}|>
+{{ .TodoSnapshot }}
+<|TODO_SNAPSHOT_END_{{ .Nonce }}|>
+{{ end }}
+
 
 {{if .EnhanceData}}
 # Knowledge Enhance 帮助判断的增强信息
@@ -108,6 +114,9 @@ User Raw INPUT/ReAction Thought/Observation:
     - 正确：任务是"提取页面内容"，工具成功返回了页面的全部文本 "Hello admin"，判定为 true 因为内容已完整提取
 6.  **工具成功 ≠ 任务失败：区分"工具执行质量"和"目标世界状态"**：当工具正确执行且完整返回了结果，但结果本身"不多"或"看起来简单"时，你需要判断的是**工具是否已经完整地完成了它的使命**，而不是对结果的丰富程度提出额外要求。如果工具日志明确标注了"提取完成"或"所有内容已返回"，就应当信任工具的判断。
     - 例如：URL 内容提取工具返回了页面全部文本只有 11 字，工具日志显示"content extraction complete"——这说明页面确实只有这么多内容，不是提取失败
+7.  **next_movements 只输出增量，不回放全量 TODO**：系统会基于历史记录重建 TODO 列表并展示给你。你只能输出本轮需要“新增”或“关闭”的增量动作；不要重复输出已经存在且未变化的 TODO。
+8.  **TODO 必须保持聚焦且与整体任务对齐**：新增 TODO 时，必须优先服务于当前子任务或当前主任务目标，避免生成偏题、过远期或无执行价值的事项。优先输出能直接推动下一步执行的短链路 TODO。
+9.  **TODO 链路不能过长**：当前 TODO 展示存在 10KB 预算限制。若系统已提示链路过长或 TODO 很多，你应避免继续堆积无关项，优先 `done` 关闭旧项，必要时保持 `next_movements: []`。
 
 RESPONSE FORMAT: Respond with a JSON object following the schema below:
 
@@ -120,19 +129,18 @@ IMPORTANT GUIDELINES:
 - 只有当工具执行完全失败或没有任何相关输出时，才设置user_satisfied为false
 - 重点关注用户的核心需求是否得到满足，而不是执行过程的细节
 - 当 `user_satisfied` 为 false 的时候，需要考虑 `next_movements` 设置好：
-    - “next_movements” 用于描述 AI Agent 的下一步行动计划与执行意图。
-    - 它应包含具体的任务分解、优先级、预期结果，以及为达成目标所需的调用与依赖。
-    - 在该字段中，Agent 可以：
-    - 规划并执行 tool call（包含参数与预期输出）
-    - 触发 @action 调用（如工作流/自动化动作）
-    - 调用其他智能应用（如外部模型、RPA、数据服务）
-    - 进入或切换专注模式（Focus Mode），并说明专注目标与退出条件
-    - “next_movements” 应可迭代更新：每完成或失败一步，就根据上下文与反馈调整后续步骤。
-    - GoodCase: 
-        - "接下来，我需要使用xxx工具来完成xxx的阶段性目标xxxx"
-        - "接下来我短期需要做的事情有：1. xxx; \n2. xxx; \n3. xxx; 这些工作有如下潜在风险和状态评估可能，我接下来会使用 xxx 工具来走一步看一部，随时调整工具调用。"
-        - "虽然遇到了一些问题，但是我们可以尝试新的办法，使用 xxx 工具（和之前不一样）来尝试重新解决这个问题。"
-        - "之前的任务似乎走偏了，我们尝试使用新的内容或者查询一些文件内容来决定下一步怎么走"
+    - `next_movements` 不再是自由文本，而是 TODO 增量操作数组。
+    - 你可以使用：
+    - `{"op": "add", "id": "stable_id", "content": "新增一个短链路 TODO"}`
+    - `{"op": "done", "id": "stable_id"}`
+    - `done` 用于关闭已存在 TODO，`content` 可省略。
+    - `add` 必须提供 `content`，且内容要与当前任务直接对齐。
+    - 如果本轮没有必要增减 TODO，输出 `[]`。
+    - 不要把整套执行计划、风险分析、长段说明重新塞进 `next_movements`。
+    - 只保留 1 到 3 个真正必要的增量动作，避免 TODO 膨胀。
+- 当 `user_satisfied` 为 true 的时候：
+    - `next_movements` 必须输出 `[]`。
+    - 系统会自动把剩余未关闭 TODO 标记为 `ABANDONED`，你不需要手动输出 abandoned 状态。
 - 关于 'reasoning' 的设置，一定要简明扼要，并且战略性分析，我会给你一些简明扼要的风格，作为回答的参考：
     - 工具执行失败：命令返回非零退出码，无法继续任务
     - 任务未完成：当前结果仅确认了文件存在，仍需进行实际修改操作
@@ -187,14 +195,14 @@ IMPORTANT GUIDELINES:
 **场景**：当前子任务 `1-3` 是"分析高CPU进程"，但只执行了 `ps aux` 列出进程，还没分析
 
 ```json
-{"@action": "verify-satisfaction", "user_satisfied": false, "completed_task_index": "", "reasoning": "任务未完成：仅列出了进程，还需分析哪些进程CPU占用高", "next_movements": "对进程列表按CPU排序，识别占用超过10%的进程并分析原因"}
+{"@action": "verify-satisfaction", "user_satisfied": false, "completed_task_index": "", "reasoning": "任务未完成：仅列出了进程，还需分析哪些进程CPU占用高", "next_movements": [{"op": "add", "id": "analyze_high_cpu_processes", "content": "对进程列表按CPU排序，识别高占用进程并分析原因"}]}
 ```
 
 ### 示例4：工具执行成功但当前子任务目标未达成
 **场景**：当前子任务 `1-4` 是"修复权限问题"，但只是用 `ls -la` 查看了权限
 
 ```json
-{"@action": "verify-satisfaction", "user_satisfied": false, "completed_task_index": "", "reasoning": "任务未完成：已定位权限问题但尚未修复", "next_movements": "使用chmod 600命令修复文件权限"}
+{"@action": "verify-satisfaction", "user_satisfied": false, "completed_task_index": "", "reasoning": "任务未完成：已定位权限问题但尚未修复", "next_movements": [{"op": "add", "id": "fix_file_permission", "content": "使用 chmod 600 修复目标文件权限"}]}
 ```
 
 ### 示例5：同时完成多个子任务
@@ -231,12 +239,17 @@ IMPORTANT GUIDELINES:
 
 **任务完成时（必须设置 completed_task_index）：**
 ```json
-{"@action": "verify-satisfaction", "user_satisfied": true, "completed_task_index": "任务索引", "reasoning": "简明扼要分析"}
+{"@action": "verify-satisfaction", "user_satisfied": true, "completed_task_index": "任务索引", "reasoning": "简明扼要分析", "next_movements": []}
 ```
 
 **任务未完成时（completed_task_index 为空）：**
 ```json
-{"@action": "verify-satisfaction", "user_satisfied": false, "completed_task_index": "", "reasoning": "简明扼要分析", "next_movements": "下一步计划"}
+{"@action": "verify-satisfaction", "user_satisfied": false, "completed_task_index": "", "reasoning": "简明扼要分析", "next_movements": [{"op": "add", "id": "next_step_id", "content": "下一步计划"}]}
+```
+
+**关闭已有 TODO 时：**
+```json
+{"@action": "verify-satisfaction", "user_satisfied": false, "completed_task_index": "", "reasoning": "阶段推进：已完成上一项观察，准备进入下一步", "next_movements": [{"op": "done", "id": "collect_page_signal"}, {"op": "add", "id": "replay_with_new_payload", "content": "使用新的 payload 复测并对比响应差异"}]}
 ```
 
 ## 严格禁止
@@ -244,6 +257,8 @@ IMPORTANT GUIDELINES:
 1. 禁止任务已完成时不设置 `completed_task_index`
 2. 禁止任务未完成时设置错误的 `completed_task_index`
 3. 禁止自行发明任务描述中不存在的量化完成标准（如字数、行数、条目数等），并以此为由将已完成的任务判定为未完成
+4. 禁止把完整 TODO 列表重新输出到 `next_movements`
+5. 禁止在 `user_satisfied=true` 时继续输出非空 `next_movements`
 
 错误示例：
 ```json

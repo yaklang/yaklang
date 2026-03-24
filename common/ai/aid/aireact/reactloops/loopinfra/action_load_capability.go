@@ -182,8 +182,8 @@ func handleLoadTool(
 		return
 	}
 	feedbackMsg := fmt.Sprintf("[Verification] Task not yet satisfied.\nReasoning: %s", verifyResult.Reasoning)
-	if verifyResult.NextMovements != "" {
-		feedbackMsg += fmt.Sprintf("\nNext Steps: %s", verifyResult.NextMovements)
+	if summary := aicommon.FormatVerifyNextMovementsSummary(verifyResult.NextMovements); summary != "" {
+		feedbackMsg += fmt.Sprintf("\nNext Steps: %s", summary)
 	}
 	op.Feedback(feedbackMsg)
 	op.Continue()

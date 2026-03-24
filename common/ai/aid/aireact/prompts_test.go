@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -525,6 +526,144 @@ func TestPromptManager_AIForgeList(t *testing.T) {
 	}
 
 	t.Logf("Successfully verified AI Forge List contains hostscan forge")
+}
+
+func TestGenerateVerificationPrompt_RendersTodoSnapshot(t *testing.T) {
+	react, err := NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create ReAct instance: %v", err)
+	}
+
+	react.AppendVerificationHistory(&aicommon.VerifySatisfactionResult{
+		Satisfied: false,
+		Reasoning: "任务未完成",
+		NextMovements: []aicommon.VerifyNextMovement{
+			{Op: "add", ID: "create_file", Content: "创建一个 A.md 文件"},
+			{Op: "add", ID: "rename_file", Content: "将临时文件改名为最终文件名"},
+		},
+	})
+	react.AppendVerificationHistory(&aicommon.VerifySatisfactionResult{
+		Satisfied: false,
+		Reasoning: "阶段推进",
+		NextMovements: []aicommon.VerifyNextMovement{
+			{Op: "done", ID: "rename_file"},
+			{Op: "add", ID: "verify_file", Content: "检查 A.md 是否已写入预期内容"},
+		},
+	})
+
+	prompt, _, err := react.promptManager.GenerateVerificationPrompt("请创建并验证 A.md", true, "tool executed: create file")
+	if err != nil {
+		t.Fatalf("Failed to generate verification prompt: %v", err)
+	}
+
+	if !utils.MatchAllOfSubString(
+		prompt,
+		"# TODO:",
+		"- [ ]: [id: verify_file]: 检查 A.md 是否已写入预期内容",
+		"- [ ]: [id: create_file]: 创建一个 A.md 文件",
+		"- [x]: [id: rename_file]: 将临时文件改名为最终文件名",
+		"next_movements 只输出增量",
+		"{\"op\": \"add\", \"id\": \"stable_id\", \"content\": \"新增一个短链路 TODO\"}",
+	) {
+		t.Fatalf("verification prompt should contain structured TODO snapshot and incremental instructions. Got:\n%s", prompt)
+	}
+}
+
+func TestGenerateVerificationPrompt_RendersAbandonedTodosAfterSatisfied(t *testing.T) {
+	react, err := NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create ReAct instance: %v", err)
+	}
+
+	react.AppendVerificationHistory(&aicommon.VerifySatisfactionResult{
+		Satisfied: false,
+		Reasoning: "任务未完成",
+		NextMovements: []aicommon.VerifyNextMovement{
+			{Op: "add", ID: "collect_signal", Content: "收集页面回显信号"},
+			{Op: "add", ID: "retry_payload", Content: "更换 payload 再次验证"},
+		},
+	})
+	react.AppendVerificationHistory(&aicommon.VerifySatisfactionResult{
+		Satisfied:     true,
+		Reasoning:     "目标达成",
+		NextMovements: []aicommon.VerifyNextMovement{},
+	})
+
+	prompt, _, err := react.promptManager.GenerateVerificationPrompt("观察页面回显", false, "已成功得到完整响应")
+	if err != nil {
+		t.Fatalf("Failed to generate verification prompt: %v", err)
+	}
+
+	if !utils.MatchAllOfSubString(
+		prompt,
+		"- [ABANDONED]: [id: collect_signal]: 收集页面回显信号",
+		"- [ABANDONED]: [id: retry_payload]: 更换 payload 再次验证",
+		"系统会自动把剩余未关闭 TODO 标记为 `ABANDONED`",
+		"`next_movements` 必须输出 `[]`",
+	) {
+		t.Fatalf("verification prompt should render abandoned TODO items after satisfaction. Got:\n%s", prompt)
+	}
+}
+
+func TestGenerateVerificationPrompt_TruncatesLongTodoSnapshotButKeepsFocus(t *testing.T) {
+	react, err := NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create ReAct instance: %v", err)
+	}
+
+	for index := 0; index < 80; index++ {
+		react.AppendVerificationHistory(&aicommon.VerifySatisfactionResult{
+			Satisfied: false,
+			NextMovements: []aicommon.VerifyNextMovement{{
+				Op:      "add",
+				ID:      fmt.Sprintf("todo_%03d", index),
+				Content: strings.Repeat("非常长的待办描述", 30),
+			}},
+		})
+	}
+	react.AppendVerificationHistory(&aicommon.VerifySatisfactionResult{
+		Satisfied: false,
+		NextMovements: []aicommon.VerifyNextMovement{{
+			Op:      "add",
+			ID:      "active_focus",
+			Content: "优先保留这个焦点 TODO",
+		}},
+	})
+
+	prompt, _, err := react.promptManager.GenerateVerificationPrompt("请继续推进当前焦点任务", true, "tool executed: continue")
+	if err != nil {
+		t.Fatalf("Failed to generate verification prompt: %v", err)
+	}
+
+	if !utils.MatchAllOfSubString(
+		prompt,
+		"# TODO:",
+		"active_focus",
+		"TODO history exceeded 10KB",
+	) {
+		t.Fatalf("verification prompt should truncate long TODO history but keep latest focus item. Got:\n%s", prompt)
+	}
 }
 
 // TestPromptManager_GenerateAIBlueprintForgeParamsPrompt 测试 GenerateAIBlueprintForgeParamsPrompt 方法

@@ -280,7 +280,6 @@ func (s *mockSimpleTask) GetFocusMode() string {
 	return ""
 }
 func (s *mockSimpleTask) SetFocusMode(mode string) {
-	return
 }
 func (m *mockSimpleTask) GetDB() *gorm.DB {
 	return nil
