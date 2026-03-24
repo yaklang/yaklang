@@ -152,7 +152,7 @@ func init() {
 			return reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_REPORT_GENERATING, r, preset...)
 		},
 		// 注册元数据，帮助 AI 理解这个 loop 的用途
-		reactloops.WithLoopDescription("报告生成模式：AI 一边查阅资料一边撰写调查报告/分析文章，支持分批编写和修改"),
+		reactloops.WithLoopDescription("Report generation mode: the AI researches while writing investigation reports or analytical articles, with support for iterative drafting and revision."),
 		reactloops.WithLoopDescriptionZh("报告生成模式：AI 一边查阅资料一边撰写调查报告或分析文章，支持分批编写和修改。"),
 		reactloops.WithLoopUsagePrompt(`当用户需要生成调查报告、分析文章、技术文档等长文本时使用。
 AI会先收集资料（读取文件、搜索知识库），然后分批撰写报告，并根据需要进行修改和优化。`),

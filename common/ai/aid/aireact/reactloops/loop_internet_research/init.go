@@ -75,7 +75,7 @@ func init() {
 			preset = append(opts, preset...)
 			return reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_INTERNET_RESEARCH, r, preset...)
 		},
-		reactloops.WithLoopDescription("互联网调研模式：通过互联网搜索引擎收集、阅读、分析和整合信息，生成全面的调研报告。"),
+		reactloops.WithLoopDescription("Internet research mode: collect, read, analyze, and synthesize information from internet search engines to produce comprehensive research reports."),
 		reactloops.WithLoopDescriptionZh("互联网调研模式：通过互联网搜索引擎收集、阅读、分析和整合信息，生成全面的调研报告。"),
 		reactloops.WithLoopUsagePrompt(`当用户需要从互联网获取实时信息、调研某个主题、或验证某些事实时使用此流程。
 AI会通过多轮搜索和页面阅读，从互联网收集相关信息并生成调研报告。`),
