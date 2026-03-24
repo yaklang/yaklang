@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
@@ -25,13 +26,13 @@ func TestImportAISkillsToDB(t *testing.T) {
 	if count != 3 {
 		t.Fatalf("expected 3 imported skills, got %d", count)
 	}
-	if _, err := yakit.GetAISkillByName(db, "top-skill"); err != nil {
+	if _, err := yakit.GetAIForgeByNameAndTypes(db, "top-skill", schema.FORGE_TYPE_SkillMD); err != nil {
 		t.Fatalf("expected top-skill in db: %v", err)
 	}
-	if _, err := yakit.GetAISkillByName(db, "hidden-skill"); err != nil {
+	if _, err := yakit.GetAIForgeByNameAndTypes(db, "hidden-skill", schema.FORGE_TYPE_SkillMD); err != nil {
 		t.Fatalf("expected hidden-skill in db: %v", err)
 	}
-	if _, err := yakit.GetAISkillByName(db, "code-review"); err != nil {
+	if _, err := yakit.GetAIForgeByNameAndTypes(db, "code-review", schema.FORGE_TYPE_SkillMD); err != nil {
 		t.Fatalf("expected code-review in db: %v", err)
 	}
 }
@@ -74,7 +75,7 @@ func TestImportAISkillsFromZipFileToDB(t *testing.T) {
 	if count != 3 {
 		t.Fatalf("expected 3 imported skills, got %d", count)
 	}
-	if _, err := yakit.GetAISkillByName(db, "hidden-skill"); err != nil {
+	if _, err := yakit.GetAIForgeByNameAndTypes(db, "hidden-skill", schema.FORGE_TYPE_SkillMD); err != nil {
 		t.Fatalf("expected hidden-skill in db: %v", err)
 	}
 }
