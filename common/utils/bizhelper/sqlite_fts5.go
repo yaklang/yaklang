@@ -27,7 +27,7 @@ func sqliteFTS5BuildMatchQuery(matches []string) string {
 	default:
 		// Default relationship: OR
 		for i := range cleaned {
-			cleaned[i] = "(" + cleaned[i] + ")"
+			cleaned[i] = fmt.Sprintf(`("%s")`, cleaned[i])
 		}
 		return strings.Join(cleaned, " OR ")
 	}
