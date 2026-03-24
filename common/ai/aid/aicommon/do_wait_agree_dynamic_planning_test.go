@@ -261,8 +261,7 @@ func TestYOLO_DynamicPlanning_TaskReview_EmitsCompactStructuredObservation(t *te
 		params := ep.GetParams()
 		require.Equal(t, "adjust_plan", params["suggestion"])
 		reason := params.GetString("reason")
-		require.Contains(t, reason, "需要修改后续任务")
-		require.Less(t, len([]rune(reason)), len([]rune(originalReason))+10)
+		require.Equal(t, "需要修改后续任务："+originalReason, reason)
 	case <-time.After(8 * time.Second):
 		t.Fatal("task review AI call should complete within timeout")
 	}
@@ -279,7 +278,7 @@ func TestYOLO_DynamicPlanning_TaskReview_EmitsCompactStructuredObservation(t *te
 			require.NoError(t, json.Unmarshal(evt.Content, &payload))
 			require.Equal(t, "需要修改后续任务", payload["verdict"])
 			require.Equal(t, "adjust_plan", payload["suggestion"])
-			require.Contains(t, payload["reason"], "需要修改后续任务")
+			require.Equal(t, "需要修改后续任务："+originalReason, payload["reason"])
 
 			rawDeltas, ok := payload["task_deltas"].([]any)
 			require.True(t, ok)

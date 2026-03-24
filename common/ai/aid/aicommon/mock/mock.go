@@ -86,6 +86,10 @@ func (m *MockedAIConfig) GetOrCreateWorkDir() string {
 	return dir
 }
 
+func (m *MockedAIConfig) GetContextProviderManager() *aicommon.ContextProviderManager {
+	return aicommon.NewContextProviderManager()
+}
+
 func (m *MockedAIConfig) IsCtxDone() bool {
 	select {
 	case <-m.Ctx.Done():

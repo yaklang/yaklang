@@ -302,8 +302,5 @@ func compactTaskReviewReason(suggestion, reason string) string {
 			reason = "当前结果支持继续按原计划执行。"
 		}
 	}
-	if len([]rune(reason)) > 48 {
-		reason = string([]rune(reason)[:48]) + "..."
-	}
 	return fmt.Sprintf("%s：%s", taskReviewVerdict(suggestion), reason)
 }

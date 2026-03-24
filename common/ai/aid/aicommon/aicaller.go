@@ -42,6 +42,7 @@ type AICallerConfigIf interface {
 	GetAiToolManager() *buildinaitools.AiToolManager
 	OriginOptions() []ConfigOption
 	GetOrCreateWorkDir() string
+	GetContextProviderManager() *ContextProviderManager
 }
 
 func AIChatToAICallbackType(cb func(prompt string, opts ...aispec.AIConfigOption) (string, error)) AICallbackType {

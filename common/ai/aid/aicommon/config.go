@@ -2271,6 +2271,10 @@ func (c *Config) GetOrCreateWorkDir() string {
 	return c.workDir
 }
 
+func (c *Config) GetContextProviderManager() *ContextProviderManager {
+	return c.ContextProviderManager
+}
+
 // IsArtifactsPinned checks if EmitPinDirectory has been called
 func (c *Config) IsArtifactsPinned() bool {
 	c.workDirMu.RLock()

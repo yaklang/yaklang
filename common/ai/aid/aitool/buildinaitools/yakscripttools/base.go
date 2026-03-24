@@ -43,13 +43,16 @@ func init() {
 			}
 		}
 		const key = "2b709ef7252a06a0c1cfbb952f77f976"
-		return utils.NewEmbedResourcesMonitor(key, consts.ExistedBuildInAIToolEmbedFSHash).MonitorModifiedWithAction(func() string {
+		err := utils.NewEmbedResourcesMonitor(key, consts.ExistedBuildInAIToolEmbedFSHash).MonitorModifiedWithAction(func() string {
 			buildinHash, _ := BuildInAIToolHash()
 			return buildinHash
 		}, func() error {
 			OverrideYakScriptAiTools()
 			return nil
 		})
+		if err != nil {
+			return err
+		}
 		UpdateAIYakToolAIOutputOption()
 		return nil
 	}, "sync-ai-tool")

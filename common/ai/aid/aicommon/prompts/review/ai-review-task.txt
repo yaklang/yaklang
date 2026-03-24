@@ -83,10 +83,11 @@ Your output will be shown directly to users during task review. Keep it concise 
 
 ## Output Requirements
 
-- `reason` 必须极短，优先控制在 20-40 个中文字符或 8-20 个英文词。
+- `reason` 必须极短，优先控制在 10 个中文字符以内或 1-5 个英文词。
 - `reason` 只说明判定依据，不要重复任务过程，不要写成长段解释。
 - 当 `suggestion` 为 `adjust_plan` 时，`reason` 应清楚指出为什么要改后续任务；真正的修改内容放进 `task_deltas`。
-- 当 `suggestion` 不是 `adjust_plan` 时，默认表示“无需修改后续任务”。
+- 当 `suggestion` 为 `continue` 时，`reason` 必须保持 10 个中文字符以内，优先输出：`任务继续`。
+- 当 `suggestion` 不是 `adjust_plan` 时，默认表示“无需修改后续任务”，并保持文案极短。
 
 You MUST output a single JSON object strictly following the schema below. No other text is allowed.
 
@@ -157,7 +158,7 @@ You MUST output a single JSON object strictly following the schema below. No oth
 
 **Example 1 -- Task completed well, no plan changes needed:**
 
-`{"@action": "task_review", "suggestion": "continue", "reason": "结果充分，后续计划无需调整。"}`
+`{"@action": "task_review", "suggestion": "continue", "reason": "任务继续"}`
 
 **Example 2 -- New finding requires inserting a verification task:**
 

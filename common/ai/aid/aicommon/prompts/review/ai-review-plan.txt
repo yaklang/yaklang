@@ -63,6 +63,9 @@ OS/Arch: {{ .OSArch }}
 
 你必须严格按照下面的 Schema 输出一个 JSON 对象，不得包含任何其他文字。
 
+- 当 `suggestion` 为 `continue` 时，`reason` 必须固定输出：`继续执行。`
+- 当 `suggestion` 不为 `continue` 时，`reason` 也必须尽量简短，避免复述计划步骤、依赖关系和长段分析。
+
 # Output Schema
 
 ```schema
@@ -89,4 +92,4 @@ OS/Arch: {{ .OSArch }}
 
 Example:
 
-`{"@action": "plan_review", "suggestion": "continue", "reason": "计划目标清晰，步骤分解合理，覆盖了用户需求的各个方面，可以直接执行。"}`
+`{"@action": "plan_review", "suggestion": "continue", "reason": "任务规划合理，可以继续执行。"}`

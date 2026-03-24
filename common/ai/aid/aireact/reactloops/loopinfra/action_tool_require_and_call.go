@@ -95,6 +95,21 @@ var loopAction_toolRequireAndCall = &reactloops.LoopAction{
 			operator.Fail(err)
 			return
 		}
+
+		if len(verifyResult.OutputFiles) > 0 {
+			cfg := loop.GetConfig()
+			for _, filePath := range verifyResult.OutputFiles {
+				providerName := "output_file:" + filePath
+				cfg.GetContextProviderManager().RegisterTracedContent(
+					providerName,
+					aicommon.OutputFileContextProvider(filePath),
+				)
+				if emitter := cfg.GetEmitter(); emitter != nil {
+					emitter.EmitPinFilename(filePath)
+				}
+			}
+		}
+
 		loop.PushSatisfactionRecordWithCompletedTaskIndex(verifyResult.Satisfied, verifyResult.Reasoning, verifyResult.CompletedTaskIndex, verifyResult.NextMovements)
 
 		if verifyResult.Satisfied {

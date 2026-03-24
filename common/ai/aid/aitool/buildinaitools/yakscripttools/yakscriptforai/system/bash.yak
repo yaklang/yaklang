@@ -1,4 +1,4 @@
-__DESC__ = "跨平台Shell命令执行工具，支持bash/cmd/powershell，具备超时控制和输出捕获。bash脚本以set -e（遇错退出）和set -x（命令追踪）模式执行，适用于系统管理、自动化脚本和运维操作。"
+__DESC__ = "跨平台Shell命令执行工具，支持bash/cmd/powershell，具备超时控制和输出捕获。bash 与 powershell 脚本默认都不启用命令追踪，不默认回显执行中的命令，适用于系统管理、自动化脚本和运维操作。"
 __VERBOSE_NAME__ = "跨平台Shell命令执行工具"
 __KEYWORDS__ = "shell command,bash,cmd,powershell,命令行工具,系统管理,自动化脚本,运维工具,shell script,command execution,系统操作,终端命令,system administration,automation tools,操作系统,跨平台命令,timeout,超时控制,python script,pandas,data analysis,excel analysis,csv cache,data cache,批量分析"
 
@@ -27,9 +27,9 @@ Optional:
 
 ## Execution Characteristics
 
-bash:  set -e (exit on error) + set -x (trace mode, shows each command with '+' prefix)
+bash:  set -e (exit on error), does not enable command trace by default
 cmd:   executes via "cmd /c", backslashes MUST be escaped: "C:\\Users"
-powershell: $ErrorActionPreference="Stop" + Set-PSDebug -Trace 1
+powershell: $ErrorActionPreference="Stop", does not enable trace by default
 
 ## Safety Rules
 
@@ -308,17 +308,15 @@ switch shellType {
 case "bash":
     // Generate a temporary script file with proper bash settings
     // - set -e: Exit immediately if a command exits with a non-zero status
-    // - set -x: Print commands and their arguments as they are executed (trace mode)
-    // This approach avoids all quoting/escaping issues and provides better debugging
+    // Keep command tracing disabled by default to avoid noisy stderr output.
+    // This approach avoids quoting/escaping issues while keeping output concise.
     
     scriptContent := `#!/bin/bash
 # Auto-generated script by AI tool
 # Exit on error (prevents catastrophic cascading failures)
 set -e
-# Trace mode (shows each command with line numbers for debugging)
-set -x
 
-# User command starts here (line 8)
+# User command starts here
 ` + command + `
 `
     
@@ -354,7 +352,6 @@ set -x
     
     yakit.Info("Executing bash script with %d seconds timeout", timeoutSeconds)
     yakit.Info("Script file: %v", scriptFile)
-    yakit.Info("Script content preview:\n---\n%v\n---", scriptContent)
     
     // Execute the script using bash
     cmd, err = exec.CommandContext(ctx, "bash " + scriptFile)
@@ -369,8 +366,6 @@ case "powershell":
     scriptContent := `# Auto-generated PowerShell script by AI tool
 # Stop on first error
 $ErrorActionPreference = "Stop"
-# Enable verbose output for debugging
-Set-PSDebug -Trace 1
 
 # User command starts here
 ` + command + `
@@ -444,8 +439,7 @@ if err != nil {
         }
         yakit.Error("%v command execution failed (exit code %d): %v", shellType, exitCode, err)
         if shellType == "bash" {
-            yakit.Info("TIP: With 'set -e' enabled, the script exits on the first error. Check the trace output (lines starting with '+') to identify which command failed.")
-            yakit.Info("TIP: Line numbers in error messages are offset by 7 from the original command (due to script header). Subtract 7 to get the actual line in your command.")
+            yakit.Info("TIP: Bash uses 'set -e' by default, so the script exits on the first failing command.")
         }
     }
 }
@@ -481,12 +475,7 @@ if stdoutbuf.Len() > 0 {
 }
 if stderrbuf.Len() > 0 {
     count++
-    // For bash with set -x, stderr contains trace output which is useful for debugging
-    if shellType == "bash" {
-        yakit.Info("Stderr (includes trace output from 'set -x', lines starting with '+' show executed commands):\n%v", toUtf8(stderrbuf.String()))
-    } else {
-        yakit.Info("Stderr:\n%v", toUtf8(stderrbuf.String()))
-    }
+    yakit.Info("Stderr:\n%v", toUtf8(stderrbuf.String()))
 }
 if count <= 0 {
     if isTimeout {

@@ -69,6 +69,13 @@
         "completed_task_index": {
             "type": "string",
             "description": "基于实际情况，如果你遇到了一个任务列表，并且你已经成功完成了其中的某个任务，请在此字段中提供该任务的索引（从0开始）。如果没有完成任何任务，请将此字段留空或省略。如果你认为当前子任务已经完全结束了，也需要设置`user_satisfied`为true。如果要完成多个子任务，编好使用逗号分隔,例如：`1-1,1-3` 如果只完成一个任务，输出 `1-2` 标志 1-2 号任务完成。"
+        },
+        "output_files": {
+            "description": "**工具执行过程中创建或修改的文件路径列表。从工具的 stdout/stderr 和执行上下文中提取所有涉及的文件绝对路径。例如：write_file 创建的文件路径、bash 中 cat > /tmp/script.py 写入的文件路径、modify_file 修改的文件路径。只包含实际存在于磁盘上的文件，不包含临时脚本文件（如 ai_bash_script_*.sh）。如果工具没有创建或修改任何文件，输出空数组 `[]`。**",
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
         }
     },
     "additionalProperties": false

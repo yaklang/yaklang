@@ -226,6 +226,35 @@ func TestCapabilityDetailsJSON_EmptyAndNil(t *testing.T) {
 	}
 }
 
+func TestFormatRecommendedCapabilitiesDisplay_HidesEmptyArray(t *testing.T) {
+	if got := formatRecommendedCapabilitiesDisplay("[]"); got != "" {
+		t.Fatalf("expected empty output, got: %q", got)
+	}
+}
+
+func TestFormatRecommendedCapabilitiesDisplay_PreservesRawNonArray(t *testing.T) {
+	raw := "xss_tool; load_file_tool;"
+	if got := formatRecommendedCapabilitiesDisplay(raw); got != raw {
+		t.Fatalf("expected raw output %q, got %q", raw, got)
+	}
+}
+
+func TestFormatRecommendedCapabilitiesDisplay_FormatsJSONArray(t *testing.T) {
+	got := formatRecommendedCapabilitiesDisplay(`["xss_tool; load_file_tool;", "__DEFAULT__", "nuclei_scan"]`)
+	want := "1. xss_tool\n2. load_file_tool\n3. nuclei_scan"
+	if got != want {
+		t.Fatalf("unexpected formatted output:\nwant:\n%s\n\ngot:\n%s", want, got)
+	}
+}
+
+func TestFormatRecommendedCapabilitiesDisplay_UnquotesJSONStringArray(t *testing.T) {
+	got := formatRecommendedCapabilitiesDisplay(`"[\"xss_tool; load_file_tool;\"]"`)
+	want := "1. xss_tool\n2. load_file_tool"
+	if got != want {
+		t.Fatalf("unexpected formatted output:\nwant:\n%s\n\ngot:\n%s", want, got)
+	}
+}
+
 // --- Focus mode search tests (searchLoopMetadata) ---
 
 func TestSearchLoopMetadata_MatchesNonHiddenLoops(t *testing.T) {
@@ -567,7 +596,7 @@ func TestCapabilityEnrichment_AllFourTypesEndToEnd(t *testing.T) {
 	t.Logf("end-to-end enrichment test passed with nonce=%s", nonce)
 }
 
-func TestCompactIntentSummary_RemovesNarrationAndTruncates(t *testing.T) {
+func TestCompactIntentSummary_RemovesNarrationAndPreservesMeaning(t *testing.T) {
 	input := "用户说「执行全面的主机健康状态扫描」，目的是：系统化评估主机健康状态，识别性能瓶颈与资源占用问题。通过搜索得到后续可用能力。"
 	output := compactIntentSummary(input)
 	if output == "" {
@@ -576,8 +605,8 @@ func TestCompactIntentSummary_RemovesNarrationAndTruncates(t *testing.T) {
 	if strings.Contains(output, "用户说") || strings.Contains(output, "通过搜索") {
 		t.Fatalf("unexpected narration kept in compact summary: %s", output)
 	}
-	if len([]rune(output)) > intentSummaryMaxRunes {
-		t.Fatalf("compact summary should be <= %d runes, got %d: %s", intentSummaryMaxRunes, len([]rune(output)), output)
+	if !strings.Contains(output, "系统化评估主机健康状态") {
+		t.Fatalf("expected core intent to be preserved, got: %s", output)
 	}
 }
 
@@ -593,9 +622,6 @@ func TestIntentSummaryStreamHandler_CompressesOutput(t *testing.T) {
 	output := buf.String()
 	if output == "" {
 		t.Fatal("expected compressed output")
-	}
-	if len([]rune(output)) > intentSummaryMaxRunes {
-		t.Fatalf("compressed output too long: %s", output)
 	}
 	if strings.Contains(output, "推荐") || strings.Contains(output, "用户说") {
 		t.Fatalf("compressed output should not include narration or recommendations: %s", output)
