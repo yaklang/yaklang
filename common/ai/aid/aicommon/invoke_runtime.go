@@ -54,6 +54,8 @@ func FormatVerifyNextMovementsSummary(nextMovements []VerifyNextMovement) string
 				continue
 			}
 			parts = append(parts, "ADD["+movement.ID+"]: "+movement.Content)
+		case "doing":
+			parts = append(parts, "DOING["+movement.ID+"]")
 		case "done":
 			parts = append(parts, "DONE["+movement.ID+"]")
 		default:

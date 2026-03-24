@@ -39,6 +39,21 @@ func TestNormalizeVerifyNextMovements_PrefersStructuredArray(t *testing.T) {
 	require.Equal(t, "cleanup_temp", movements[1].ID)
 }
 
+func TestNormalizeVerifyNextMovements_NormalizesPendingToDoing(t *testing.T) {
+	action, err := aicommon.ExtractActionFromStream(context.Background(), strings.NewReader(`{
+		"@action": "verify-satisfaction",
+		"next_movements": [
+			{"op": "pending", "id": "create_file"}
+		]
+	}`), "verify-satisfaction")
+	require.NoError(t, err)
+
+	movements := normalizeVerifyNextMovements(action)
+	require.Len(t, movements, 1)
+	require.Equal(t, "doing", movements[0].Op)
+	require.Equal(t, "create_file", movements[0].ID)
+}
+
 func TestFormatNextMovementDisplayLine(t *testing.T) {
 	require.Equal(t,
 		"- [+]: [id: create_file]: 创建一个 A.md 文件",
@@ -47,6 +62,10 @@ func TestFormatNextMovementDisplayLine(t *testing.T) {
 	require.Equal(t,
 		"- [x]: [id: remove_temp_name]",
 		formatNextMovementDisplayLine(aicommon.VerifyNextMovement{Op: "done", ID: "remove_temp_name"}),
+	)
+	require.Equal(t,
+		"- [DOING]: [id: create_file]",
+		formatNextMovementDisplayLine(aicommon.VerifyNextMovement{Op: "doing", ID: "create_file"}),
 	)
 }
 

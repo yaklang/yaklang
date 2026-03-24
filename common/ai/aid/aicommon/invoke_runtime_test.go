@@ -35,9 +35,10 @@ func TestVerifySatisfactionNextMovementsArrayExtraction(t *testing.T) {
 func TestFormatVerifyNextMovementsSummary(t *testing.T) {
 	summary := FormatVerifyNextMovementsSummary([]VerifyNextMovement{
 		{Op: "add", ID: "create_file", Content: "创建一个 A.md 文件"},
+		{Op: "doing", ID: "create_file"},
 		{Op: "done", ID: "remove_temp_name"},
 	})
-	require.Equal(t, "ADD[create_file]: 创建一个 A.md 文件; DONE[remove_temp_name]", summary)
+	require.Equal(t, "ADD[create_file]: 创建一个 A.md 文件; DOING[create_file]; DONE[remove_temp_name]", summary)
 }
 
 func TestFormatVerifyNextMovementsSummary_Empty(t *testing.T) {

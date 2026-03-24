@@ -32,8 +32,8 @@ func TestRenderVerificationTodoSnapshot_AggregatesStatuses(t *testing.T) {
 
 	snapshot := renderVerificationTodoSnapshot(history)
 	require.Contains(t, snapshot, "- [x]: [id: collect_signal]: 收集页面响应信号")
-	require.Contains(t, snapshot, "- [ABANDONED]: [id: fix_title]: 修正标题")
-	require.Contains(t, snapshot, "- [ABANDONED]: [id: replay_payload]: 使用新 payload 复测")
+	require.Contains(t, snapshot, "- [SKIPPED]: [id: fix_title]: 修正标题")
+	require.Contains(t, snapshot, "- [SKIPPED]: [id: replay_payload]: 使用新 payload 复测")
 }
 
 func TestRenderVerificationTodoSnapshot_PrioritizesActiveItemsUnderLimit(t *testing.T) {
@@ -84,4 +84,43 @@ func TestBuildVerificationTodoItems_DoneKeepsLatestContent(t *testing.T) {
 	require.Len(t, items, 1)
 	require.Equal(t, verificationTodoStatusDone, items[0].Status)
 	require.Equal(t, "重命名临时文件为最终名称", items[0].Content)
+}
+
+func TestRenderVerificationTodoMarkdownSnapshot_AppliesCurrentDeltaMarkers(t *testing.T) {
+	history := []*aicommon.VerifySatisfactionResult{
+		{
+			Satisfied: false,
+			NextMovements: []aicommon.VerifyNextMovement{
+				{Op: "add", ID: "old_pending", Content: "这是一额个未完成的旧任务"},
+				{Op: "add", ID: "old_done", Content: "这是一个已经完成的旧任务"},
+			},
+		},
+		{
+			Satisfied: false,
+			NextMovements: []aicommon.VerifyNextMovement{
+				{Op: "done", ID: "old_done"},
+			},
+		},
+	}
+
+	current := &aicommon.VerifySatisfactionResult{
+		Satisfied: false,
+		NextMovements: []aicommon.VerifyNextMovement{
+			{Op: "doing", ID: "old_done"},
+			{Op: "done", ID: "old_pending"},
+			{Op: "add", ID: "new_task", Content: "这是一个新增的任务"},
+		},
+	}
+
+	snapshot := renderVerificationTodoMarkdownSnapshot(history, current)
+	require.Contains(t, snapshot, "- [ ] (doing) 这是一个已经完成的旧任务")
+	require.Contains(t, snapshot, "- [ ] (new) 这是一个新增的任务")
+	require.Contains(t, snapshot, "- [x] (done) 这是一额个未完成的旧任务")
+}
+
+func TestSanitizeVerificationTodoMarkdownContent_PreventsLineBreakInjection(t *testing.T) {
+	content := sanitizeVerificationTodoMarkdownContent("第一行\n- [x]: 注入内容\t第二段")
+	require.Equal(t, "第一行 - [x]: 注入内容 第二段", content)
+	require.NotContains(t, content, "\n")
+	require.NotContains(t, content, "\r")
 }

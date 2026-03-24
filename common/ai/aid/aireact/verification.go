@@ -222,6 +222,27 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 				}))
 			}
 
+			markdownSnapshot := r.RenderVerificationTodoMarkdownSnapshot(result)
+			if strings.TrimSpace(markdownSnapshot) != "" {
+				var out bytes.Buffer
+				var outputReader = io.TeeReader(strings.NewReader(markdownSnapshot), &out)
+				var event *schema.AiOutputEvent
+				event, err = r.Emitter.EmitTextMarkdownStreamEvent(
+					"next_movements_snapshot",
+					outputReader,
+					taskID,
+					func() {
+						if out.Len() > 0 {
+							emitNextMovementsReference(event)
+						}
+					},
+				)
+				if err != nil {
+					return utils.Errorf("failed to emit next_movements snapshot markdown stream event: %v", err)
+				}
+				eventIds.Store(event.GetStreamEventWriterId(), struct{}{})
+			}
+
 			eventIds.Range(func(k, v interface{}) bool {
 				kString := utils.InterfaceToString(k)
 				r.EmitTextReferenceMaterial(kString, rawResponse.String())
@@ -289,6 +310,14 @@ func formatNextMovementDisplayLine(movement aicommon.VerifyNextMovement) string 
 			return fmt.Sprintf("- [+]: [id: %s]", id)
 		}
 		return fmt.Sprintf("- [+]: [id: %s]: %s", id, content)
+	case "doing", "pending":
+		if id == "" {
+			return ""
+		}
+		if content == "" {
+			return fmt.Sprintf("- [DOING]: [id: %s]", id)
+		}
+		return fmt.Sprintf("- [DOING]: [id: %s]: %s", id, content)
 	case "done":
 		if id == "" {
 			return ""
@@ -322,7 +351,10 @@ func normalizeVerifyNextMovements(action *aicommon.Action) []aicommon.VerifyNext
 		if movement == nil {
 			continue
 		}
-		op := strings.TrimSpace(movement.GetString("op"))
+		op := strings.ToLower(strings.TrimSpace(movement.GetString("op")))
+		if op == "pending" {
+			op = "doing"
+		}
 		id := strings.TrimSpace(movement.GetString("id"))
 		content := strings.TrimSpace(movement.GetString("content"))
 		if op == "" || id == "" {

@@ -132,7 +132,10 @@ IMPORTANT GUIDELINES:
     - `next_movements` 不再是自由文本，而是 TODO 增量操作数组。
     - 你可以使用：
     - `{"op": "add", "id": "stable_id", "content": "新增一个短链路 TODO"}`
+    - `{"op": "doing", "id": "stable_id"}`
     - `{"op": "done", "id": "stable_id"}`
+    - `doing` 用于标记某个已有 TODO 当前正在进行中，通常只需要 `id`。
+    - 如果某个 TODO 已经存在，而你只是要表达“现在开始做它”或“正在推进它”，优先使用 `doing`，不要重复用 `add` 再创建一次。
     - `done` 用于关闭已存在 TODO，`content` 可省略。
     - `add` 必须提供 `content`，且内容要与当前任务直接对齐。
     - 如果本轮没有必要增减 TODO，输出 `[]`。
@@ -140,7 +143,7 @@ IMPORTANT GUIDELINES:
     - 只保留 1 到 3 个真正必要的增量动作，避免 TODO 膨胀。
 - 当 `user_satisfied` 为 true 的时候：
     - `next_movements` 必须输出 `[]`。
-    - 系统会自动把剩余未关闭 TODO 标记为 `ABANDONED`，你不需要手动输出 abandoned 状态。
+    - 系统会自动把剩余未关闭 TODO 标记为 `SKIPPED`，你不需要手动输出 skipped 状态。
 - 关于 'reasoning' 的设置，一定要简明扼要，并且战略性分析，我会给你一些简明扼要的风格，作为回答的参考：
     - 工具执行失败：命令返回非零退出码，无法继续任务
     - 任务未完成：当前结果仅确认了文件存在，仍需进行实际修改操作
@@ -195,7 +198,7 @@ IMPORTANT GUIDELINES:
 **场景**：当前子任务 `1-3` 是"分析高CPU进程"，但只执行了 `ps aux` 列出进程，还没分析
 
 ```json
-{"@action": "verify-satisfaction", "user_satisfied": false, "completed_task_index": "", "reasoning": "任务未完成：仅列出了进程，还需分析哪些进程CPU占用高", "next_movements": [{"op": "add", "id": "analyze_high_cpu_processes", "content": "对进程列表按CPU排序，识别高占用进程并分析原因"}]}
+{"@action": "verify-satisfaction", "user_satisfied": false, "completed_task_index": "", "reasoning": "任务未完成：仅列出了进程，还需分析哪些进程CPU占用高", "next_movements": [{"op": "doing", "id": "analyze_high_cpu_processes"}]}
 ```
 
 ### 示例4：工具执行成功但当前子任务目标未达成
@@ -246,6 +249,22 @@ IMPORTANT GUIDELINES:
 ```json
 {"@action": "verify-satisfaction", "user_satisfied": false, "completed_task_index": "", "reasoning": "简明扼要分析", "next_movements": [{"op": "add", "id": "next_step_id", "content": "下一步计划"}]}
 ```
+
+**标记已有 TODO 正在推进时：**
+```json
+{"@action": "verify-satisfaction", "user_satisfied": false, "completed_task_index": "", "reasoning": "阶段推进：已进入关键执行阶段", "next_movements": [{"op": "doing", "id": "replay_with_new_payload"}]}
+```
+
+**已有 TODO 不要重复 add，而应切到 doing：**
+```json
+{"@action": "verify-satisfaction", "user_satisfied": false, "completed_task_index": "", "reasoning": "阶段推进：已开始执行现有待办", "next_movements": [{"op": "doing", "id": "verify_http_400_cause"}]}
+```
+
+错误示例：
+```json
+{"@action": "verify-satisfaction", "user_satisfied": false, "completed_task_index": "", "reasoning": "阶段推进：开始处理现有待办", "next_movements": [{"op": "add", "id": "verify_http_400_cause", "content": "分析 HTTP 400 错误原因"}]}
+```
+错误原因：`verify_http_400_cause` 已经存在时，重复 `add` 会造成 TODO 语义膨胀；此时应使用 `doing`。
 
 **关闭已有 TODO 时：**
 ```json

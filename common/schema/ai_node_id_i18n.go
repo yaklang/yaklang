@@ -185,6 +185,10 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "下一步行动",
 		En: "Next Movements",
 	},
+	"next_movements_snapshot": {
+		Zh: "待办事务",
+		En: "TODO",
+	},
 	"self-reflection-suggestions": {
 		Zh: "自省建议",
 		En: "Self Reflection Suggestions",
