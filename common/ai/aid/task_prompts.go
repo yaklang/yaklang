@@ -85,23 +85,6 @@ func (t *AiTask) DeepThink(suggestion string) error {
 		return fmt.Errorf("生成深入思考划分子任务 prompt 失败: %v", err)
 	}
 
-	defer func() {
-		// Ensure config is propagated to the new task and its subtasks
-		var propagateConfig func(task *AiTask)
-		propagateConfig = func(task *AiTask) {
-			if task == nil {
-				return
-			}
-			task.Coordinator = t.Coordinator
-			for _, sub := range task.Subtasks {
-				sub.ParentTask = task // Ensure parent is set
-				propagateConfig(sub)
-			}
-		}
-		propagateConfig(t)
-		t.GenerateIndex()
-	}()
-
 	err = t.CallAITransaction(
 		prompt,
 		func(rsp *aicommon.AIResponse) error {
@@ -137,6 +120,7 @@ func (t *AiTask) DeepThink(suggestion string) error {
 		t.EmitError(err.Error())
 		return err
 	}
+	t.Coordinator.standardizeTaskTreeAndNotify(t, "deep think subtasks updated")
 
 	return nil
 }
@@ -147,23 +131,6 @@ func (t *AiTask) AdjustPlan(suggestion string) error {
 		t.EmitError("error generating dynamic plan prompt: %v", err)
 		return utils.Errorf("error generating dynamic plan prompt: %v", err)
 	}
-	defer func() {
-		// Ensure config is propagated to the new task and its subtasks
-		var propagateConfig func(task *AiTask)
-		propagateConfig = func(task *AiTask) {
-			if task == nil {
-				return
-			}
-			task.Coordinator = t.Coordinator
-			for _, sub := range task.Subtasks {
-				sub.ParentTask = task // Ensure parent is set
-				propagateConfig(sub)
-			}
-		}
-		propagateConfig(t)
-		t.GenerateIndex()
-	}()
-
 	err = t.CallAITransaction(
 		planPrompt,
 		func(response *aicommon.AIResponse) error {
@@ -216,5 +183,6 @@ func (t *AiTask) AdjustPlan(suggestion string) error {
 		t.EmitError("error calling AI transaction: %v", err)
 		return utils.Errorf("error calling AI transaction: %v", err)
 	}
+	t.Coordinator.standardizeTaskTreeAndNotify(t, "dynamic plan updated")
 	return nil
 }

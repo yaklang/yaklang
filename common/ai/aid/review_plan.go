@@ -290,7 +290,7 @@ func (pr *planRequest) generateCreateSubtaskPlan(extraPrompt string, rsp *PlanRe
 	if err != nil {
 		return nil, err
 	}
-	rsp.RootTask.GenerateIndex()
+	pr.cod.standardizeTaskTreeAndNotify(rsp.RootTask, "plan review added subtasks")
 	return rsp, nil
 }
 

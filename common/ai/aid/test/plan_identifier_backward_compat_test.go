@@ -62,12 +62,12 @@ func TestExtractTaskFromRawResponse_OldFormat_NoIdentifierNoDependsOn(t *testing
 	sub1 := task.Subtasks[0]
 	assert.Equal(t, "遍历文件", sub1.Name)
 	assert.Equal(t, "递归遍历目录中所有文件", sub1.Goal)
-	assert.Empty(t, sub1.DependsOn, "old format should have no depends_on")
+	assert.Equal(t, []string{"1"}, sub1.DependsOn, "missing depends_on should default to previous DFS task")
 	assert.NotEmpty(t, sub1.SemanticIdentifier, "SemanticIdentifier should be auto-generated")
 
 	sub2 := task.Subtasks[1]
 	assert.Equal(t, "统计大小", sub2.Name)
-	assert.Empty(t, sub2.DependsOn)
+	assert.Equal(t, []string{"1-1"}, sub2.DependsOn)
 }
 
 func TestExtractTaskFromRawResponse_OldFormat_WithTaskNameTaskDescription(t *testing.T) {
@@ -133,7 +133,7 @@ func TestExtractTaskFromRawResponse_NewFormat_WithIdentifierAndDependsOn(t *test
 	sub1 := task.Subtasks[0]
 	assert.Equal(t, "配置静态分析工具", sub1.Name)
 	assert.Equal(t, "setup_static_analysis", sub1.SemanticIdentifier)
-	assert.Empty(t, sub1.DependsOn)
+	assert.Equal(t, []string{"1"}, sub1.DependsOn)
 
 	sub2 := task.Subtasks[1]
 	assert.Equal(t, "集成到CI/CD", sub2.Name)
@@ -178,12 +178,12 @@ func TestExtractTaskFromRawResponse_MixedFormat_SomeWithIdentifier(t *testing.T)
 
 	sub1 := task.Subtasks[0]
 	assert.Equal(t, "task_with_id", sub1.SemanticIdentifier)
-	assert.Empty(t, sub1.DependsOn)
+	assert.Equal(t, []string{"1"}, sub1.DependsOn)
 
 	sub2 := task.Subtasks[1]
 	assert.NotEmpty(t, sub2.SemanticIdentifier, "auto-generated identifier expected")
 	assert.NotEqual(t, "task_with_id", sub2.SemanticIdentifier)
-	assert.Empty(t, sub2.DependsOn)
+	assert.Equal(t, []string{"1-1"}, sub2.DependsOn)
 
 	sub3 := task.Subtasks[2]
 	assert.NotEmpty(t, sub3.SemanticIdentifier)
@@ -208,7 +208,7 @@ func TestExtractTaskFromRawResponse_EmptyDependsOn(t *testing.T) {
 	task, err := aid.ExtractTaskFromRawResponse(c, raw)
 	require.NoError(t, err)
 	require.Len(t, task.Subtasks, 1)
-	assert.Empty(t, task.Subtasks[0].DependsOn)
+	assert.Equal(t, []string{"1"}, task.Subtasks[0].DependsOn)
 }
 
 func TestExtractPlan_OldFormat_BackwardCompat(t *testing.T) {
@@ -240,6 +240,8 @@ func TestExtractPlan_OldFormat_BackwardCompat(t *testing.T) {
 	assert.Equal(t, "1", planResp.RootTask.Index)
 	assert.Equal(t, "1-1", planResp.RootTask.Subtasks[0].Index)
 	assert.Equal(t, "1-2", planResp.RootTask.Subtasks[1].Index)
+	assert.Equal(t, []string{"1"}, planResp.RootTask.Subtasks[0].DependsOn)
+	assert.Equal(t, []string{"1-1"}, planResp.RootTask.Subtasks[1].DependsOn)
 }
 
 func TestAiTask_DependsOn_Field(t *testing.T) {
@@ -559,7 +561,7 @@ func TestExtractTaskFromRawResponse_MultipleDependencies(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, task.Subtasks, 3)
 
-	assert.Empty(t, task.Subtasks[0].DependsOn)
-	assert.Empty(t, task.Subtasks[1].DependsOn)
+	assert.Equal(t, []string{"1"}, task.Subtasks[0].DependsOn)
+	assert.Equal(t, []string{"1-1"}, task.Subtasks[1].DependsOn)
 	assert.Equal(t, []string{"基础任务A", "基础任务B"}, task.Subtasks[2].DependsOn)
 }
