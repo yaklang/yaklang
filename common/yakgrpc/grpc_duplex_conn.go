@@ -2,8 +2,11 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/schema"
+	"strconv"
+	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/schema"
 
 	uuid "github.com/google/uuid"
 	"github.com/jinzhu/gorm"
@@ -18,8 +21,8 @@ import (
 
 // SlowSQLBroadcastPayload 慢 SQL 推送给前端的完整 payload（insert/query 共用）
 type SlowSQLBroadcastPayload struct {
-	AvgCost            string                     `json:"avg_cost"`
-	AvgCostMs          int64                      `json:"avg_cost_ms"`
+	AvgCost            string                      `json:"avg_cost"`
+	AvgCostMs          int64                       `json:"avg_cost_ms"`
 	Count              int                         `json:"count"`
 	Items              []*yakit.LongSQLDescription `json:"items"`
 	DatabasePathGroups []string                    `json:"database_path_groups"` // 本批慢 SQL 涉及到的 database 路径列表，便于前端按路径清理
@@ -40,6 +43,38 @@ func uniqueDatabasePaths(items []*yakit.LongSQLDescription) []string {
 		out = append(out, path)
 	}
 	return out
+}
+
+func logSlowSQLBroadcastDetails(kind string, items []*yakit.LongSQLDescription) {
+	if len(items) == 0 {
+		return
+	}
+
+	escapeLogValue := strings.NewReplacer("\n", "\\n", "\r", "\\r", "\t", "\\t")
+	for index, item := range items {
+		duration := item.DurationStr
+		if duration == "" {
+			switch {
+			case item.Duration != 0:
+				duration = item.Duration.String()
+			case item.DurationMs != 0:
+				duration = strconv.FormatInt(item.DurationMs, 10) + "ms"
+			default:
+				duration = "0s"
+			}
+		}
+
+		log.Infof(
+			"broadcast slow %s SQL item to frontend: index:%d, duration:%s, duration_ms:%d, func_name:%q, database_path:%q, last_sql:%q",
+			kind,
+			index+1,
+			duration,
+			item.DurationMs,
+			item.FuncName,
+			item.DatabasePath,
+			escapeLogValue.Replace(item.LastSQL),
+		)
+	}
 }
 
 func (s *Server) DuplexConnection(stream ypb.Yak_DuplexConnectionServer) error {
@@ -150,6 +185,7 @@ func (s *Server) DuplexConnection(stream ypb.Yak_DuplexConnectionServer) error {
 	{
 		yakit.RegisterHTTPFlowSlowInsertCallback(func(avgCost time.Duration, items []*yakit.LongSQLDescription) {
 			log.Infof("broadcast slow insert SQL event to frontend: avg_cost:%v, count:%d", avgCost.String(), len(items))
+			logSlowSQLBroadcastDetails("insert", items)
 			yakit.BroadcastData(yakit.ServerPushType_SlowInsertSQL, &SlowSQLBroadcastPayload{
 				AvgCost:            avgCost.String(),
 				AvgCostMs:          avgCost.Milliseconds(),
@@ -164,6 +200,7 @@ func (s *Server) DuplexConnection(stream ypb.Yak_DuplexConnectionServer) error {
 	{
 		yakit.RegisterHTTPFlowSlowQueryCallback(func(avgCost time.Duration, items []*yakit.LongSQLDescription) {
 			log.Infof("broadcast slow query SQL event to frontend: avg_cost:%v, count:%d", avgCost.String(), len(items))
+			logSlowSQLBroadcastDetails("query", items)
 			yakit.BroadcastData(yakit.ServerPushType_SlowQuerySQL, &SlowSQLBroadcastPayload{
 				AvgCost:            avgCost.String(),
 				AvgCostMs:          avgCost.Milliseconds(),

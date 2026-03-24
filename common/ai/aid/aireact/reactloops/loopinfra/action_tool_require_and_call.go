@@ -68,7 +68,7 @@ var loopAction_toolRequireAndCall = &reactloops.LoopAction{
 			return
 		}
 		if directly {
-			answer, err := invoker.DirectlyAnswer(ctx, "在上一次工具调用中，用户中断了工具执行，要求直接回答一些问题", nil)
+			answer, err := invoker.DirectlyAnswer(ctx, "在上一次工具调用中，用户中断了工具执行，要求直接回答一些问题。一般这种情况出现在用户认为这个任务不应该使用工具或者工具无法满足需求的情况下。", nil)
 			if err != nil {
 				operator.Fail(utils.Error("DirectlyAnswer fail, reason: " + err.Error()))
 				return
@@ -103,8 +103,8 @@ var loopAction_toolRequireAndCall = &reactloops.LoopAction{
 		}
 
 		feedbackMsg := fmt.Sprintf("[Verification] Task not yet satisfied.\nReasoning: %s", verifyResult.Reasoning)
-		if verifyResult.NextMovements != "" {
-			feedbackMsg += fmt.Sprintf("\nNext Steps: %s", verifyResult.NextMovements)
+		if summary := aicommon.FormatVerifyNextMovementsSummary(verifyResult.NextMovements); summary != "" {
+			feedbackMsg += fmt.Sprintf("\nNext Steps: %s", summary)
 		}
 		operator.Feedback(feedbackMsg)
 		operator.Continue()

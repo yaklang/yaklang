@@ -27,10 +27,10 @@ type FeedbackProviderFunc func(loop *ReActLoop, feedback *bytes.Buffer, nonce st
 
 // SatisfactionRecord 记录满意度验证的结果，包含验证状态、原因、已完成任务索引和下一步行动计划
 type SatisfactionRecord struct {
-	Satisfactory       bool   `json:"satisfactory"`         // 是否满足用户需求
-	Reason             string `json:"reason"`               // 满意/不满意的原因分析
-	CompletedTaskIndex string `json:"completed_task_index"` // AI 判断已完成的任务索引，如 "1-1" 或 "1-1,1-2"
-	NextMovements      string `json:"next_movements"`       // AI 下一步行动计划，用于任务执行中状态追踪
+	Satisfactory       bool                          `json:"satisfactory"`         // 是否满足用户需求
+	Reason             string                        `json:"reason"`               // 满意/不满意的原因分析
+	CompletedTaskIndex string                        `json:"completed_task_index"` // AI 判断已完成的任务索引，如 "1-1" 或 "1-1,1-2"
+	NextMovements      []aicommon.VerifyNextMovement `json:"next_movements"`       // AI 下一步行动计划，用于任务执行中状态追踪
 }
 
 // ActionRecord 记录每次迭代执行的 Action 信息
@@ -163,7 +163,7 @@ func (r *ReActLoop) PushSatisfactionRecord(satisfactory bool, reason string) {
 }
 
 // PushSatisfactionRecordWithCompletedTaskIndex 推送满意度记录，并同时记录已完成的任务索引和下一步行动计划
-func (r *ReActLoop) PushSatisfactionRecordWithCompletedTaskIndex(satisfactory bool, reason string, completedTaskIndex string, nextMovements string) {
+func (r *ReActLoop) PushSatisfactionRecordWithCompletedTaskIndex(satisfactory bool, reason string, completedTaskIndex string, nextMovements []aicommon.VerifyNextMovement) {
 	r.historySatisfactionReasons = append(r.historySatisfactionReasons, &SatisfactionRecord{
 		Satisfactory:       satisfactory,
 		Reason:             reason,

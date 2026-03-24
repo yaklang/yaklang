@@ -514,6 +514,7 @@ func TestReAct_ToolUse_WithNextMovements(t *testing.T) {
 	toolCalled := false
 	verifyTriggered := false
 	nextMovementsReceived := false
+	nextMovementsID := "use_another_tool"
 	nextMovementsContent := "Next, I need to use another tool to complete the task"
 
 	// Create tool manager and enable the tool
@@ -566,7 +567,7 @@ func TestReAct_ToolUse_WithNextMovements(t *testing.T) {
 "user_satisfied": false, 
 "reasoning": "tool executed but task not complete",
 "human_readable_result": "tool was called successfully",
-"next_movements": "` + nextMovementsContent + `"
+"next_movements": [{"op": "add", "id": "` + nextMovementsID + `", "content": "` + nextMovementsContent + `"}]
 }`))
 				rsp.Close()
 				return rsp, nil
@@ -696,6 +697,9 @@ LOOP:
 	timeline := ins.DumpTimeline()
 	if !strings.Contains(timeline, "NEXT_MOVEMENTS") {
 		t.Fatal("Requirement 4 failed: next_movements marker not found in timeline")
+	}
+	if !strings.Contains(timeline, nextMovementsID) {
+		t.Fatalf("Requirement 4 failed: next_movements id '%s' not found in timeline", nextMovementsID)
 	}
 	if !strings.Contains(timeline, nextMovementsContent) {
 		t.Fatalf("Requirement 4 failed: next_movements content '%s' not found in timeline", nextMovementsContent)

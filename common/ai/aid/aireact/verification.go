@@ -3,7 +3,10 @@ package aireact
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
 	"io"
+	"strings"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -147,10 +150,31 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 				aicommon.WithActionFieldStreamHandler(
 					[]string{"next_movements"},
 					func(key string, rd io.Reader) {
+						trimmedReader := utils.NewTrimLeftReader(utils.UTF8Reader(rd))
+						peekedReader := utils.NewPeekableReader(trimmedReader)
+						firstByte, err := peekedReader.Peek(1)
+						if err != nil && len(firstByte) == 0 {
+							log.Infof("no next_movements provided in verification result, skipping next_movements stream handling")
+							return
+						}
+
+						var displayReader io.Reader
+						if len(firstByte) > 0 && firstByte[0] == '[' {
+							pr, pw := utils.NewBufPipe(nil)
+							go func() {
+								defer pw.Close()
+								if err := writeNextMovementsDisplayStream(peekedReader, pw); err != nil {
+									log.Errorf("failed to stream next_movements display: %v", err)
+								}
+							}()
+							displayReader = pr
+						} else {
+							displayReader = peekedReader
+						}
+
 						var out bytes.Buffer
-						var outputReader = io.TeeReader(utils.JSONStringReader(utils.UTF8Reader(rd)), &out)
+						var outputReader = io.TeeReader(displayReader, &out)
 						var event *schema.AiOutputEvent
-						var err error
 						event, err = r.Emitter.EmitDefaultStreamEvent(
 							"next_movements",
 							outputReader,
@@ -165,6 +189,9 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 							log.Errorf("failed to emit next_movements stream event: %v", err)
 							return
 						}
+						if out.Len() == 0 {
+							return
+						}
 						eventIds.Store(event.GetStreamEventWriterId(), struct{}{})
 					},
 				),
@@ -177,17 +204,21 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 			result.Reasoning = action.GetString("reasoning")
 			result.CompletedTaskIndex = action.GetString("completed_task_index")
 
-			nextMovements := action.GetString("next_movements")
+			nextMovements := normalizeVerifyNextMovements(action)
 			// Store next_movements in result for status tracking
 			result.NextMovements = nextMovements
-			if nextMovements != "" {
+			if len(nextMovements) > 0 {
+				nextMovementsJSON, err := json.MarshalIndent(nextMovements, "", "  ")
+				if err != nil {
+					return utils.Errorf("failed to marshal next_movements: %v", err)
+				}
 				r.AddToTimeline("next_movements", utils.MustRenderTemplate(`
 <|NEXT_MOVEMENTS_{{.Nonce}}|>
 {{ .NextMovements }}
 <|NEXT_MOVEMENTS_END_{{.Nonce}}|>
 `, map[string]string{
 					"Nonce":         utils.RandStringBytes(4),
-					"NextMovements": nextMovements,
+					"NextMovements": string(nextMovementsJSON),
 				}))
 			}
 
@@ -203,8 +234,119 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 		log.Errorf("AI transaction failed during verification: %v", transErr)
 		return nil, transErr
 	}
+	r.AppendVerificationHistory(result)
 
 	return result, nil
+}
+
+func writeNextMovementsDisplayStream(reader io.Reader, writer io.Writer) error {
+	decoder := json.NewDecoder(reader)
+	token, err := decoder.Token()
+	if err != nil {
+		return err
+	}
+	delim, ok := token.(json.Delim)
+	if !ok || delim != '[' {
+		return utils.Errorf("next_movements is not a JSON array")
+	}
+
+	firstLine := true
+	for decoder.More() {
+		var movement aicommon.VerifyNextMovement
+		if err := decoder.Decode(&movement); err != nil {
+			return err
+		}
+		line := formatNextMovementDisplayLine(movement)
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		if !firstLine {
+			if _, err := writer.Write([]byte("\n")); err != nil {
+				return err
+			}
+		}
+		firstLine = false
+		if _, err := io.WriteString(writer, line); err != nil {
+			return err
+		}
+	}
+	_, err = decoder.Token()
+	return err
+}
+
+func formatNextMovementDisplayLine(movement aicommon.VerifyNextMovement) string {
+	id := strings.TrimSpace(movement.ID)
+	content := strings.TrimSpace(movement.Content)
+	switch strings.ToLower(strings.TrimSpace(movement.Op)) {
+	case "add":
+		if id == "" && content == "" {
+			return ""
+		}
+		if id == "" {
+			return fmt.Sprintf("- [+]: %s", content)
+		}
+		if content == "" {
+			return fmt.Sprintf("- [+]: [id: %s]", id)
+		}
+		return fmt.Sprintf("- [+]: [id: %s]: %s", id, content)
+	case "done":
+		if id == "" {
+			return ""
+		}
+		return fmt.Sprintf("- [x]: [id: %s]", id)
+	default:
+		label := strings.ToUpper(strings.TrimSpace(movement.Op))
+		if label == "" {
+			label = "?"
+		}
+		if id == "" && content == "" {
+			return ""
+		}
+		if id == "" {
+			return fmt.Sprintf("- [%s]: %s", label, content)
+		}
+		if content == "" {
+			return fmt.Sprintf("- [%s]: [id: %s]", label, id)
+		}
+		return fmt.Sprintf("- [%s]: [id: %s]: %s", label, id, content)
+	}
+}
+
+func normalizeVerifyNextMovements(action *aicommon.Action) []aicommon.VerifyNextMovement {
+	if action == nil {
+		return nil
+	}
+	nextMovementsRaw := action.GetInvokeParamsArray("next_movements")
+	nextMovements := make([]aicommon.VerifyNextMovement, 0, len(nextMovementsRaw))
+	for _, movement := range nextMovementsRaw {
+		if movement == nil {
+			continue
+		}
+		op := strings.TrimSpace(movement.GetString("op"))
+		id := strings.TrimSpace(movement.GetString("id"))
+		content := strings.TrimSpace(movement.GetString("content"))
+		if op == "" || id == "" {
+			continue
+		}
+		nextMovements = append(nextMovements, aicommon.VerifyNextMovement{
+			Op:      op,
+			Content: content,
+			ID:      id,
+		})
+	}
+	if len(nextMovements) > 0 {
+		return nextMovements
+	}
+
+	legacy := strings.TrimSpace(action.GetString("next_movements"))
+	if legacy == "" {
+		return nil
+	}
+	return []aicommon.VerifyNextMovement{{
+		Op:      "add",
+		ID:      "legacy_next_movements",
+		Content: legacy,
+	}}
 }
 
 // generateVerificationPrompt generates a prompt for verifying user satisfaction

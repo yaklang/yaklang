@@ -72,6 +72,8 @@ type ReAct struct {
 	currentIteration            int
 	currentUserInteractiveCount int64 // 当前用户交互次数
 	knowledgeEmitCounter        int   // Counter for knowledge emit events
+	verificationHistoryMutex    sync.Mutex
+	verificationHistory         []*aicommon.VerifySatisfactionResult
 
 	config        *aicommon.Config
 	promptManager *PromptManager
