@@ -3,6 +3,7 @@ set -euo pipefail
 
 ARTIFACT_PATH="${ARTIFACT_PATH:-}"
 DEST_DIR="${DEST_DIR:-}"
+REQUIRE_YAK="${REQUIRE_YAK:-1}"
 
 if [[ -z "$ARTIFACT_PATH" || -z "$DEST_DIR" ]]; then
   echo "ERROR: ARTIFACT_PATH and DEST_DIR must be set"
@@ -23,12 +24,17 @@ if [[ ! -f "$DEST_DIR/test_binaries/compiled_tests.txt" ]]; then
   exit 1
 fi
 
-if [[ ! -f "$DEST_DIR/yak" ]]; then
-  echo "ERROR: unpacked yak binary is missing"
-  exit 1
-fi
+manifest="$DEST_DIR/test_binaries/compiled_tests.txt"
+find "$DEST_DIR/test_binaries" -maxdepth 1 -type f -name 'test_*' ! -name '*.log' ! -name '*.package' | sort > "$manifest"
 
-chmod +x "$DEST_DIR/yak"
+if [[ "$REQUIRE_YAK" == "1" ]]; then
+  if [[ ! -f "$DEST_DIR/yak" ]]; then
+    echo "ERROR: unpacked yak binary is missing"
+    exit 1
+  fi
+
+  chmod +x "$DEST_DIR/yak"
+fi
 
 echo "Unpacked prepared suite into $DEST_DIR"
 du -sh "$DEST_DIR" 2>/dev/null || true
