@@ -230,8 +230,8 @@
   {
     "rule_id": "48c2c107-024f-4abc-a940-ed637847f22c",
     "rule_name": "检测通用硬编码凭据",
-    "hash": "2ba3bfce06b518071c4b5b16238591e729138b4b83abb0ae4ec2777fe7449bb2",
-    "version": "20260320.0001"
+    "hash": "d56e0b250066046f5f10a772973619b6d6b27fb0656f85e5808814e2fa9d2b6e",
+    "version": "20260324.0001"
   },
   {
     "rule_id": "5b485362-1df1-40df-afc4-a3252bee0150",
@@ -938,8 +938,8 @@
   {
     "rule_id": "cf5bbdfd-fd95-4e50-8adc-119e7629fd38",
     "rule_name": "检测Java硬编码弱密码漏洞",
-    "hash": "bdecdeb901f9f26d3c908229eb182184d42e305b6bc3f916cb14b0a5e7728cd1",
-    "version": "20251230.0001"
+    "hash": "89c869b7fe82b0faee7e1afc29163d71264e2c7b9f0cda8a115bcaab3267664d",
+    "version": "20260324.0001"
   },
   {
     "rule_id": "50d74e0f-2353-4367-a53c-18e8d48d22e1",
