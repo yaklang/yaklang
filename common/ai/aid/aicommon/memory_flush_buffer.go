@@ -107,14 +107,14 @@ func (b *MemoryFlushBuffer) Capture(signal MemoryFlushSignal) (*MemoryFlushPaylo
 }
 
 func (b *MemoryFlushBuffer) resolveFlushReason(signal MemoryFlushSignal) string {
+	if signal.Task != nil && signal.Task.IsAsyncMode() {
+		return "milestone_async_mode"
+	}
 	if signal.IsDone {
 		return "task_done"
 	}
 	if signal.ShouldEndIteration {
 		return "milestone_end_iteration"
-	}
-	if signal.Task != nil && signal.Task.IsAsyncMode() {
-		return "milestone_async_mode"
 	}
 	if b.config.MaxPendingIterations > 0 && b.pendingIterations >= b.config.MaxPendingIterations {
 		return "batch_iteration_limit"

@@ -271,7 +271,7 @@ func (r *ReAct) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTas
 						}
 					}
 
-					if isDone {
+					if isDone && !task.IsAsyncMode() {
 						searchResult, err := r.memoryTriage.SearchMemory(task.GetUserInput(), 4096)
 						if err != nil {
 							log.Warnf("memory search for completed task failed: %v", err)

@@ -189,7 +189,7 @@ func (c *Coordinator) ExecuteLoopTask(taskTypeName string, task aicommon.AIState
 						}
 					}
 
-					if isDone {
+					if isDone && !task.IsAsyncMode() {
 						searchResult, err := c.MemoryTriage.SearchMemory(task.GetUserInput(), 4096)
 						if err != nil {
 							log.Warnf("memory search for completed task failed: %v", err)
