@@ -25,6 +25,15 @@ func initHardcodeRule(t *testing.T) string {
 	return rule.Content
 }
 
+func initWeakPasswordRule(t *testing.T) string {
+	t.Helper()
+	yakit.InitialDatabase()
+	require.NoError(t, sfbuildin.SyncEmbedRule())
+	rule, err := sfdb.GetRulePure("检测Java硬编码弱密码漏洞")
+	require.NoError(t, err, "buildin rule '检测Java硬编码弱密码漏洞' not found")
+	return rule.Content
+}
+
 // TestHardcodeCredentials_NoFalsePositive 验证规则对反编译 Java 伪代码中的普通变量不误报。
 // 这些代码行来自 spring-context JAR 反编译结果，历史上因旧正则 access[(token)|(key)] 触发误报。
 func TestHardcodeCredentials_NoFalsePositive(t *testing.T) {
@@ -133,6 +142,143 @@ spring:
 		}
 		require.Greater(t, total, 0, "期望 YAML 配置命中还能生成 alert 结果，但规则未报告任何告警")
 		require.True(t, foundPassword, "期望命中 application.yml 中的 password 值")
+		return nil
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
+}
+
+// TestHardcodeCredentials_NoFalsePositive_WeixinAccessToken 验证通用规则对微信 WeixinUtils 中
+// URL 模板常量里的 access_token= 参数和变量声明赋值函数调用不误报。
+func TestHardcodeCredentials_NoFalsePositive_WeixinAccessToken(t *testing.T) {
+	ruleContent := initHardcodeRule(t)
+
+	vfs := filesys.NewVirtualFs()
+	vfs.AddFile("WeixinUtils.java", `
+public class WeixinUtils {
+    public static final String MENU_CREATE_URL="https://api.weixin.qq.com/cgi-bin/menu/create?access_token=%s";
+
+    public static void menuCreate(String data){
+        String accessToken = getAccessToken();
+        String content = HttpKit.post(String.format(MENU_CREATE_URL, accessToken), data);
+        System.out.println(content);
+    }
+}
+`)
+
+	ssatest.CheckWithFS(vfs, t, func(programs ssaapi.Programs) error {
+		result, err := programs.SyntaxFlowWithError(ruleContent)
+		require.NoError(t, err)
+
+		total := 0
+		for _, name := range result.GetAlertVariables() {
+			vals := result.GetValues(name)
+			total += len(vals)
+			for _, v := range vals {
+				t.Logf("误报: %s = %v", name, v)
+			}
+		}
+		require.Equal(t, 0, total, "URL 模板中的 access_token= 参数名及变量声明赋值函数调用不应被识别为硬编码凭据")
+		return nil
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
+}
+
+// TestHardcodeCredentials_NoFalsePositive_WeixinFullFile 使用完整的 WeixinUtils 类验证通用规则
+// 不会对以下场景误报：
+//   - URL 模板常量中的 access_token= 查询参数名（GET_JSAPI_TICKET_URL 等）
+//   - 局部变量初始化为空串后赋值（String accessToken = ""）
+//   - 变量声明赋值函数调用（String accessToken = getAccessToken()）
+func TestHardcodeCredentials_NoFalsePositive_WeixinFullFile(t *testing.T) {
+	ruleContent := initHardcodeRule(t)
+
+	vfs := filesys.NewVirtualFs()
+	vfs.AddFile("WeixinUtils.java", `
+package com.cms.util;
+
+public class WeixinUtils {
+    private static final String wechatAppId = "wxxxxxxxxxxxxxxxxx";
+    private static final String wechatSecret = "xxxxxxxxxxxxxxxxxxxxxxxxxx";
+    private static final String xcxAppId = "";
+    private static final String xcxSecret = "";
+    public static final String key = "";
+
+    private static final String GET_TOKEN_URL="https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=%s&secret=%s";
+
+    public static String getAccessToken(){
+        String url = String.format(GET_TOKEN_URL, wechatAppId, wechatSecret);
+        String content = HttpKit.get(url, null);
+        JSONObject jsonObject = JSONObject.parseObject(content);
+        String accessToken = "";
+        if (null != jsonObject) {
+            try {
+                accessToken = jsonObject.getString("access_token");
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+        }
+        return accessToken;
+    }
+
+    private static final String GET_JSAPI_TICKET_URL="https://api.weixin.qq.com/cgi-bin/ticket/getticket?access_token=%s&type=jsapi";
+
+    public static String getJsapiTicket(){
+        String accessToken = getAccessToken();
+        String url = String.format(GET_JSAPI_TICKET_URL, accessToken);
+        String content = HttpKit.get(url, null);
+        JSONObject jsonObject = JSONObject.parseObject(content);
+        return jsonObject.getString("ticket");
+    }
+
+    public static final String MENU_CREATE_URL="https://api.weixin.qq.com/cgi-bin/menu/create?access_token=%s";
+
+    public static void menuCreate(String data){
+        String accessToken = getAccessToken();
+        String content = HttpKit.post(String.format(MENU_CREATE_URL, accessToken), data);
+        System.out.println(content);
+    }
+}
+`)
+
+	ssatest.CheckWithFS(vfs, t, func(programs ssaapi.Programs) error {
+		result, err := programs.SyntaxFlowWithError(ruleContent)
+		require.NoError(t, err)
+
+		total := 0
+		for _, name := range result.GetAlertVariables() {
+			vals := result.GetValues(name)
+			total += len(vals)
+			for _, v := range vals {
+				t.Logf("误报: %s = %v", name, v)
+			}
+		}
+		require.Equal(t, 0, total, "WeixinUtils 中的 access_token 相关用法不应被识别为硬编码凭据")
+		return nil
+	}, ssaapi.WithLanguage(ssaconfig.JAVA))
+}
+
+// TestWeakPassword_NoFalsePositive_EmptyString 验证弱密码规则对空字符串占位符不误报。
+func TestWeakPassword_NoFalsePositive_EmptyString(t *testing.T) {
+	ruleContent := initWeakPasswordRule(t)
+
+	vfs := filesys.NewVirtualFs()
+	vfs.AddFile("WeixinUtils.java", `
+public class WeixinUtils {
+    private static final String xcxSecret = "";
+    private static final String xcxAppId  = "";
+}
+`)
+
+	ssatest.CheckWithFS(vfs, t, func(programs ssaapi.Programs) error {
+		result, err := programs.SyntaxFlowWithError(ruleContent)
+		require.NoError(t, err)
+
+		total := 0
+		for _, name := range result.GetAlertVariables() {
+			vals := result.GetValues(name)
+			total += len(vals)
+			for _, v := range vals {
+				t.Logf("误报: %s = %v", name, v)
+			}
+		}
+		require.Equal(t, 0, total, "空字符串占位符不应被识别为弱密码")
 		return nil
 	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
