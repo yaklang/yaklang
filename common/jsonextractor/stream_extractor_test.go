@@ -205,6 +205,37 @@ func TestExtractJSONStream_BoundaryValue(t *testing.T) {
 	require.Equal(t, `"END"`, captured)
 }
 
+func TestExtractJSONStream_ExtractsJSONAfterTaggedCodeBlocks(t *testing.T) {
+	raw := `<yaklang-code>
+yaklangCode := "test yak code"
+</yaklang-code>
+<python-code>
+pythonCode = "test python code",
+</python-code>
+<javascript-code>
+const jsCode = "test js code";
+</javascript-code>
+{"@action": "finish", "answer": "Multiple codes generated"}`
+
+	results := ExtractStandardJSON(raw)
+	require.Len(t, results, 1)
+	require.JSONEq(t, `{"@action": "finish", "answer": "Multiple codes generated"}`, results[0])
+
+	var action string
+	var answer string
+	err := ExtractStructuredJSON(results[0], WithObjectKeyValue(func(key string, data any) {
+		switch key {
+		case "@action":
+			action = fmt.Sprint(data)
+		case "answer":
+			answer = fmt.Sprint(data)
+		}
+	}))
+	require.NoError(t, err)
+	require.Equal(t, "finish", action)
+	require.Equal(t, "Multiple codes generated", answer)
+}
+
 func TestStreamExtractorArray_SMOKING(t *testing.T) {
 	ExtractStructuredJSON(`{a: []}`, WithRawKeyValueCallback(func(key, data any) {
 		spew.Dump(key)
