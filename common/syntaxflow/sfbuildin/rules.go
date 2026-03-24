@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"strings"
 
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
@@ -27,6 +28,13 @@ func GetRuleFS() *embed.FS {
 }
 
 func SyncRuleFromFileSystem(fsInstance filesys_interface.FileSystem, buildin bool, notifies ...func(process float64, ruleName string)) (err error) {
+	return SyncRuleFromFileSystemToDB(consts.GetGormProfileDatabase(), fsInstance, buildin, notifies...)
+}
+
+func SyncRuleFromFileSystemToDB(db *gorm.DB, fsInstance filesys_interface.FileSystem, buildin bool, notifies ...func(process float64, ruleName string)) (err error) {
+	if db == nil {
+		return utils.Errorf("profile db is nil")
+	}
 	var notify func(process float64, ruleName string)
 	if len(notifies) != 0 {
 		notify = notifies[0]
@@ -82,7 +90,7 @@ func SyncRuleFromFileSystem(fsInstance filesys_interface.FileSystem, buildin boo
 		}
 		content := string(raw)
 		// import builtin rule (传递文件路径用于元数据增强)
-		_, err = sfdb.ImportRuleWithoutValidEx(name, content, s, buildin, tags...)
+		_, err = sfdb.ImportRuleWithoutValidExWithDB(db, name, content, s, buildin, tags...)
 		if err != nil {
 			log.Warnf("import rule %s error: %s", name, err)
 			return err
@@ -119,6 +127,19 @@ func ForceSyncEmbedRule(notifies ...func(process float64, ruleName string)) (err
 		DoneEmbedRule()
 	}
 	return err
+}
+
+func ForceSyncEmbedRuleToDB(db *gorm.DB, notifies ...func(process float64, ruleName string)) (err error) {
+	if db == nil {
+		return utils.Errorf("profile db is nil")
+	}
+	log.Infof("start sync embed rule to custom db")
+	var notify func(process float64, ruleName string)
+	if len(notifies) > 0 {
+		notify = notifies[0]
+	}
+	InitEmbedFSWithNotify(notify)
+	return utils.Wrapf(SyncRuleFromFileSystemToDB(db, ruleFSWithHash, true, notifies...), "init builtin rules to custom db error")
 }
 
 // syncEmbedRuleInternal 内部同步实现（不处理 hash 更新，由调用者决定）
