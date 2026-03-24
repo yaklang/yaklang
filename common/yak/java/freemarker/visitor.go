@@ -4,7 +4,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	freemarkerparser "github.com/yaklang/yaklang/common/yak/java/freemarker/parser"
 	tl "github.com/yaklang/yaklang/common/yak/templateLanguage"
-	"regexp"
 	"strconv"
 	"strings"
 )
@@ -193,41 +192,6 @@ func (y *FreeMarkerVisitor) VisitDirectiveList(raw freemarkerparser.IDirectiveLi
 		y.VisitDirectiveListBodyElements(i.DirectiveListBodyElements())
 	}
 	y.EmitPureCode("}")
-}
-
-var freemarkerSingleQuotedString = regexp.MustCompile(`'([^'\\]*(?:\\.[^'\\]*)*)'`)
-var freemarkerCompactComparePattern = regexp.MustCompile(`([A-Za-z0-9_"\)\]])(gte|lte|gt|lt)([A-Za-z0-9_"\(\[])`)
-var freemarkerCompactEqPattern = regexp.MustCompile(`([^!<>=])=([^=])`)
-
-func normalizeDirectiveExpr(expr string) string {
-	expr = freemarkerSingleQuotedString.ReplaceAllStringFunc(expr, func(raw string) string {
-		content := raw[1 : len(raw)-1]
-		return strconv.Quote(content)
-	})
-	expr = strings.ReplaceAll(expr, " gte ", ">=")
-	expr = strings.ReplaceAll(expr, " lte ", "<=")
-	expr = strings.ReplaceAll(expr, " gt ", ">")
-	expr = strings.ReplaceAll(expr, " lt ", "<")
-	expr = freemarkerCompactComparePattern.ReplaceAllStringFunc(expr, func(raw string) string {
-		m := freemarkerCompactComparePattern.FindStringSubmatch(raw)
-		if len(m) != 4 {
-			return raw
-		}
-		op := m[2]
-		switch op {
-		case "gte":
-			op = ">="
-		case "lte":
-			op = "<="
-		case "gt":
-			op = ">"
-		case "lt":
-			op = "<"
-		}
-		return m[1] + op + m[3]
-	})
-	expr = freemarkerCompactEqPattern.ReplaceAllString(expr, `$1==$2`)
-	return expr
 }
 
 func (y *FreeMarkerVisitor) VisitDirectiveListBodyElements(raw freemarkerparser.IDirectiveListBodyElementsContext) {
