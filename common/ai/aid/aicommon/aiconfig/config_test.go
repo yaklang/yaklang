@@ -49,7 +49,14 @@ func TestIsTieredAIConfig(t *testing.T) {
 func TestGetCurrentPolicy(t *testing.T) {
 	// Save original state
 	originalConfig := consts.GetTieredAIConfig()
-	defer consts.SetTieredAIConfig(originalConfig)
+	originalLoaded := configLoaded
+	defer func() {
+		consts.SetTieredAIConfig(originalConfig)
+		configLoaded = originalLoaded
+	}()
+
+	// Prevent EnsureConfigLoaded from reloading config from DB/defaults during this unit test.
+	configLoaded = true
 
 	// Test default policy
 	consts.SetTieredAIConfig(nil)
