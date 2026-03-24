@@ -68,16 +68,6 @@ func (gw *AIAgentHTTPGateway) handleStreamInput(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	if session.Status == RunStatusCompleted || session.Status == RunStatusFailed || session.Status == RunStatusCancelled {
-		writeError(w, http.StatusConflict, "run is not active, current status: "+string(session.Status))
-		return
-	}
-
-	if !allowStart && session.Status != RunStatusRunning && session.Status != RunStatusPending {
-		writeError(w, http.StatusConflict, "run is not active, current status: "+string(session.Status))
-		return
-	}
-
 	event, err := readAIInputEventRequest(r)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
