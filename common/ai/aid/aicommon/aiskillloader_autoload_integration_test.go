@@ -46,7 +46,7 @@ func newAutoloadTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("failed to create test DB: %v", err)
 	}
-	db.AutoMigrate(&schema.AISkill{})
+	db.AutoMigrate(&schema.AIForge{})
 	return db
 }
 
@@ -152,34 +152,45 @@ func TestAutoSkillLoader_Integration_FoldingWithManySkills(t *testing.T) {
 	}
 }
 
-// --- Integration: AutoSkillLoader + DB + SkillsContextManager ---
+// --- Integration: AutoSkillLoader + DB-backed skillmd forges + SkillsContextManager ---
 
 func TestAutoSkillLoader_Integration_DBAndContextManager(t *testing.T) {
 	db := newAutoloadTestDB(t)
 	defer db.Close()
 
 	vfs := buildAutoloadVFS()
+	sourceLoader, err := aiskillloader.NewAutoSkillLoader(aiskillloader.WithAutoLoad_FileSystem(vfs))
+	if err != nil {
+		t.Fatalf("NewAutoSkillLoader failed: %v", err)
+	}
+	if _, err := aiskillloader.ImportAISkillsToDB(db, sourceLoader); err != nil {
+		t.Fatalf("ImportAISkillsToDB failed: %v", err)
+	}
 	loader, err := aiskillloader.NewAutoSkillLoader(
-		aiskillloader.WithAutoLoad_FileSystem(vfs),
+		aiskillloader.WithAutoLoad_Database(db),
 	)
 	if err != nil {
-		t.Fatalf("NewAutoSkillLoader with DB failed: %v", err)
+		t.Fatalf("NewAutoSkillLoader with database source failed: %v", err)
+	}
+	if metas := loader.AllSkillMetas(); len(metas) != 0 {
+		t.Fatalf("database source should stay lazy at init, got %d eagerly loaded metas", len(metas))
 	}
 
 	mgr := aiskillloader.NewSkillsContextManager(loader, aiskillloader.WithManagerDB(db))
 
-	// Verify skills are in DB
-	skill, err := yakit.GetAISkillByName(db, "deploy-app")
+	forge, err := yakit.GetAIForgeByNameAndTypes(db, "deploy-app", schema.FORGE_TYPE_SkillMD)
 	if err != nil {
-		t.Fatalf("skill should be persisted in DB: %v", err)
+		t.Fatalf("skillmd forge should be persisted in DB: %v", err)
 	}
-	if skill.Description != "Deploy the application to staging or production." {
-		t.Fatalf("unexpected description: %q", skill.Description)
+	if forge.Description != "Deploy the application to staging or production." {
+		t.Fatalf("unexpected description: %q", forge.Description)
 	}
 
-	// Verify manager still works with AutoSkillLoader
 	if !mgr.HasRegisteredSkills() {
 		t.Fatal("manager should have skills")
+	}
+	if rendered := mgr.Render("db_lazy_nonce"); !strings.Contains(rendered, "database-backed skills") {
+		t.Fatalf("expected render to expose database-backed skill stats, got: %s", rendered)
 	}
 
 	_ = mgr.LoadSkill("deploy-app")
@@ -196,8 +207,14 @@ func TestAutoSkillLoader_Integration_BM25ResultsInContext(t *testing.T) {
 	defer db.Close()
 
 	vfs := buildAutoloadVFS()
-	loader, _ := aiskillloader.NewAutoSkillLoader(
+	sourceLoader, _ := aiskillloader.NewAutoSkillLoader(
 		aiskillloader.WithAutoLoad_FileSystem(vfs),
+	)
+	if _, err := aiskillloader.ImportAISkillsToDB(db, sourceLoader); err != nil {
+		t.Fatalf("ImportAISkillsToDB failed: %v", err)
+	}
+	loader, _ := aiskillloader.NewAutoSkillLoader(
+		aiskillloader.WithAutoLoad_Database(db),
 	)
 	mgr := aiskillloader.NewSkillsContextManager(loader, aiskillloader.WithManagerDB(db))
 

@@ -28,7 +28,7 @@ const aiForgesTable = "ai_forges"
 
 // FilterAIForgeForSearch builds a GORM query from AIForgeSearchFilter.
 // This applies keyword-based LIKE search across forge_name, forge_verbose_name,
-// description, tool_keywords, and tags.
+// description, tool_keywords, tags, and init_prompt.
 // Column names are qualified with the base table name to avoid ambiguity when
 // JOINed with the FTS5 virtual table (which indexes some of the same columns).
 func FilterAIForgeForSearch(db *gorm.DB, filter *AIForgeSearchFilter) *gorm.DB {
@@ -54,17 +54,18 @@ func FilterAIForgeForSearch(db *gorm.DB, filter *AIForgeSearchFilter) *gorm.DB {
 		aiForgesTable + ".description",
 		aiForgesTable + ".tool_keywords",
 		aiForgesTable + ".tags",
+		aiForgesTable + ".init_prompt",
 	}, keywords, false)
 	return db
 }
 
 // defaultAIForgeFTS5 defines the FTS5 trigram index configuration for AIForge.
 // Uses external content mode referencing the ai_forges table.
-// Indexes: forge_name, forge_verbose_name, description, tool_keywords, tags
+// Indexes: forge_name, forge_verbose_name, description, tool_keywords, tags, init_prompt
 var defaultAIForgeFTS5 = &bizhelper.SQLiteFTS5Config{
 	BaseModel:    &schema.AIForge{},
 	FTSTable:     AIForgeVTableName(),
-	Columns:      []string{"forge_name", "forge_verbose_name", "description", "tool_keywords", "tags"},
+	Columns:      []string{"forge_name", "forge_verbose_name", "description", "tool_keywords", "tags", "init_prompt"},
 	ContentTable: "ai_forges",
 	Tokenize:     "trigram",
 }
