@@ -1,2 +1,0 @@
-query = cli.String("query", cli.setHelp("目标"))
-cli.check()
