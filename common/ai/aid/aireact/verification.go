@@ -244,6 +244,29 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 				eventIds.Store(event.GetStreamEventWriterId(), struct{}{})
 			}
 
+			deliveryFilesMarkdown := r.RenderVerificationOutputFilesMarkdown(result.OutputFiles)
+			if strings.TrimSpace(deliveryFilesMarkdown) != "" {
+				var out bytes.Buffer
+				var outputReader = io.TeeReader(strings.NewReader(deliveryFilesMarkdown), &out)
+				var event *schema.AiOutputEvent
+				event, err = r.Emitter.EmitTextMarkdownStreamEvent(
+					"delivery_files_snapshot",
+					outputReader,
+					taskID,
+					func() {
+						if out.Len() > 0 {
+							r.AddToTimeline("delivery_files", out.String())
+							emitStreamIdReference(event)
+						}
+					},
+				)
+				if err != nil {
+					return utils.Errorf("failed to emit delivery files markdown stream event: %v", err)
+				}
+				eventIds.Store(event.GetStreamEventWriterId(), struct{}{})
+				r.EmitFileArtifactWithExt("delivery_files", ".md", deliveryFilesMarkdown)
+			}
+
 			eventIds.Range(func(k, v interface{}) bool {
 				kString := utils.InterfaceToString(k)
 				r.EmitTextReferenceMaterial(kString, rawResponse.String())

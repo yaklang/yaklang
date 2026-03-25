@@ -242,12 +242,12 @@ IMPORTANT GUIDELINES:
 
 **任务完成时（必须设置 completed_task_index）：**
 ```json
-{"@action": "verify-satisfaction", "user_satisfied": true, "completed_task_index": "任务索引", "reasoning": "简明扼要分析", "next_movements": []}
+{"@action": "verify-satisfaction", "user_satisfied": true, "completed_task_index": "任务索引", "reasoning": "简明扼要分析", "next_movements": [], "output_files": ["/abs/path/to/result.md"]}
 ```
 
 **任务未完成时（completed_task_index 为空）：**
 ```json
-{"@action": "verify-satisfaction", "user_satisfied": false, "completed_task_index": "", "reasoning": "简明扼要分析", "next_movements": [{"op": "add", "id": "next_step_id", "content": "下一步计划"}]}
+{"@action": "verify-satisfaction", "user_satisfied": false, "completed_task_index": "", "reasoning": "简明扼要分析", "next_movements": [{"op": "add", "id": "next_step_id", "content": "下一步计划"}], "output_files": []}
 ```
 
 **标记已有 TODO 正在推进时：**
@@ -285,6 +285,7 @@ IMPORTANT GUIDELINES:
 - 排除工具内部的临时脚本文件（如 `ai_bash_script_*.sh`）
 - 如果没有文件产物，输出空数组 `[]`
 - `output_files` 中的路径应该是工具执行**直接产生**的文件，而非工具读取的输入文件
+- 这些路径会在 verify 结果中以“交付文件”区块显式展示给用户，并写入 artifact 清单，因此必须尽量完整、准确、可落盘感知
 
 ## 严格禁止
 
