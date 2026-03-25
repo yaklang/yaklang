@@ -93,8 +93,8 @@ func (e *BrowserElement) ScrollIntoView() error {
 	return e.element.ScrollIntoView()
 }
 
-func (e *BrowserElement) SetFiles(filePath string) error {
-	return e.element.SetFiles([]string{filePath})
+func (e *BrowserElement) SetFiles(filePath ...string) error {
+	return e.element.SetFiles(filePath)
 }
 
 func (e *BrowserElement) Evaluate(js string) (interface{}, error) {
