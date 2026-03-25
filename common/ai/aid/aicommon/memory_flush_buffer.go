@@ -1,9 +1,12 @@
 package aicommon
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/utils/chanx"
 )
 
 type MemoryFlushBufferConfig struct {
@@ -26,6 +29,11 @@ type MemoryFlushPayload struct {
 	PendingBytes      int
 }
 
+type memoryFlushAsyncJob struct {
+	signal   MemoryFlushSignal
+	callback func(*MemoryFlushPayload, error)
+}
+
 type MemoryFlushBuffer struct {
 	label  string
 	differ *TimelineDiffer
@@ -37,6 +45,10 @@ type MemoryFlushBuffer struct {
 	pendingIterations int
 	firstIteration    int
 	lastIteration     int
+
+	jobs      *chanx.UnlimitedChan[memoryFlushAsyncJob]
+	workerOnce sync.Once
+	closeOnce sync.Once
 }
 
 func DefaultMemoryFlushBufferConfig() MemoryFlushBufferConfig {
@@ -60,7 +72,44 @@ func NewMemoryFlushBuffer(label string, differ *TimelineDiffer, config *MemoryFl
 		label:  label,
 		differ: differ,
 		config: resolved,
+		jobs:   chanx.NewUnlimitedChan[memoryFlushAsyncJob](context.Background(), 32),
 	}
+}
+
+func (b *MemoryFlushBuffer) ProcessAsync(signal MemoryFlushSignal, callback func(*MemoryFlushPayload, error)) {
+	if b == nil || b.differ == nil {
+		if callback != nil {
+			go callback(nil, nil)
+		}
+		return
+	}
+
+	b.startWorker()
+	b.jobs.SafeFeed(memoryFlushAsyncJob{signal: signal, callback: callback})
+}
+
+func (b *MemoryFlushBuffer) Close() {
+	if b == nil {
+		return
+	}
+	b.closeOnce.Do(func() {
+		if b.jobs != nil {
+			b.jobs.Close()
+		}
+	})
+}
+
+func (b *MemoryFlushBuffer) startWorker() {
+	b.workerOnce.Do(func() {
+		go func() {
+			for job := range b.jobs.OutputChannel() {
+				payload, err := b.Capture(job.signal)
+				if job.callback != nil {
+					job.callback(payload, err)
+				}
+			}
+		}()
+	})
 }
 
 func (b *MemoryFlushBuffer) Capture(signal MemoryFlushSignal) (*MemoryFlushPayload, error) {

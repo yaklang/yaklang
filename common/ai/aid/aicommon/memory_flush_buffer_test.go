@@ -3,7 +3,9 @@ package aicommon
 import (
 	"context"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 )
 
 func TestMemoryFlushBuffer_FlushOnIterationLimit(t *testing.T) {
@@ -98,5 +100,43 @@ func TestMemoryFlushBuffer_FlushOnEndIterationMilestone(t *testing.T) {
 	}
 	if !strings.Contains(payload.ContextualInput, "milestone reached") {
 		t.Fatalf("expected contextual input to include milestone reason")
+	}
+}
+
+func TestMemoryFlushBuffer_ProcessAsyncIsNonBlocking(t *testing.T) {
+	timeline := NewTimeline(nil, nil)
+	differ := NewTimelineDiffer(timeline)
+	differ.SetBaseline()
+	buffer := NewMemoryFlushBuffer("test", differ, &MemoryFlushBufferConfig{MaxPendingIterations: 1, MaxPendingBytes: 4096})
+	defer buffer.Close()
+	task := NewStatefulTaskBase("task-1", "test-input", context.Background(), nil, true)
+
+	timeline.PushText(1, "async diff")
+	var wg sync.WaitGroup
+	wg.Add(1)
+	start := time.Now()
+	buffer.ProcessAsync(MemoryFlushSignal{Iteration: 1, Task: task}, func(payload *MemoryFlushPayload, err error) {
+		defer wg.Done()
+		if err != nil {
+			t.Errorf("unexpected async error: %v", err)
+			return
+		}
+		if payload == nil || payload.FlushReason != "batch_iteration_limit" {
+			t.Errorf("expected async flush payload, got %#v", payload)
+		}
+	})
+	if time.Since(start) > 50*time.Millisecond {
+		t.Fatalf("ProcessAsync should return immediately")
+	}
+
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatalf("timed out waiting for async flush callback")
 	}
 }

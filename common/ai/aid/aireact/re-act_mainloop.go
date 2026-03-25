@@ -204,6 +204,7 @@ func (r *ReAct) ExecuteLoopTaskIF(taskTypeName string, task aicommon.AIStatefulT
 
 func (r *ReAct) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTask, options ...reactloops.ReActLoopOption) (bool, error) {
 	memoryFlushBuffer := aicommon.NewMemoryFlushBuffer("react", r.config.TimelineDiffer, nil)
+	defer memoryFlushBuffer.Close()
 	defaultOptions := []reactloops.ReActLoopOption{
 		reactloops.WithMemoryTriage(r.memoryTriage),
 		reactloops.WithMemoryPool(r.config.MemoryPool),
@@ -235,59 +236,57 @@ func (r *ReAct) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTas
 				if r.memoryTriage == nil {
 					return
 				}
-
-				payload, err := memoryFlushBuffer.Capture(aicommon.MemoryFlushSignal{
+				memoryFlushBuffer.ProcessAsync(aicommon.MemoryFlushSignal{
 					Iteration:          iteration,
 					Task:               task,
 					IsDone:             isDone,
 					Reason:             reason,
 					ShouldEndIteration: operator.ShouldEndIteration(),
-				})
-				if err != nil {
-					log.Warnf("timeline differ call failed: %v", err)
-					return
-				}
-				if payload == nil && !isDone {
-					return
-				}
-
-				r.wg.Add(1)
-				go func() {
-					defer func() {
-						if err := recover(); err != nil {
-							log.Errorf("intelligent memory processing panic: %v", err)
-							utils.PrintCurrentGoroutineRuntimeStack()
-						}
-						r.wg.Done()
-					}()
-
-					if payload != nil {
-						if r.config.DebugEvent {
-							log.Infof("processing memory flush[%s] for iteration %d with %d pending diffs (%d bytes)", payload.FlushReason, iteration, payload.PendingIterations, payload.PendingBytes)
-						}
-						if err := r.memoryTriage.HandleMemory(payload.ContextualInput); err != nil {
-							log.Warnf("intelligent memory processing failed: %v", err)
-							return
-						}
+				}, func(payload *aicommon.MemoryFlushPayload, err error) {
+					if err != nil {
+						log.Warnf("timeline differ call failed: %v", err)
+						return
+					}
+					if payload == nil && !isDone {
+						return
 					}
 
-					if isDone && !task.IsAsyncMode() {
-						searchResult, err := r.memoryTriage.SearchMemory(task.GetUserInput(), 4096)
-						if err != nil {
-							log.Warnf("memory search for completed task failed: %v", err)
-							return
-						}
-
-						if len(searchResult.Memories) > 0 {
-							log.Infof("found %d relevant memories for completed task %s (total: %d bytes)", len(searchResult.Memories), task.GetId(), searchResult.ContentBytes)
-							if r.config.DebugEvent {
-								log.Infof("memory search summary: %s", searchResult.SearchSummary)
+					go func() {
+						defer func() {
+							if err := recover(); err != nil {
+								log.Errorf("intelligent memory processing panic: %v", err)
+								utils.PrintCurrentGoroutineRuntimeStack()
 							}
-						} else if r.config.DebugEvent {
-							log.Infof("no relevant memories found for completed task %s", task.GetId())
+						}()
+
+						if payload != nil {
+							if r.config.DebugEvent {
+								log.Infof("processing memory flush[%s] for iteration %d with %d pending diffs (%d bytes)", payload.FlushReason, iteration, payload.PendingIterations, payload.PendingBytes)
+							}
+							if err := r.memoryTriage.HandleMemory(payload.ContextualInput); err != nil {
+								log.Warnf("intelligent memory processing failed: %v", err)
+								return
+							}
 						}
-					}
-				}()
+
+						if isDone && !task.IsAsyncMode() {
+							searchResult, err := r.memoryTriage.SearchMemory(task.GetUserInput(), 4096)
+							if err != nil {
+								log.Warnf("memory search for completed task failed: %v", err)
+								return
+							}
+
+							if len(searchResult.Memories) > 0 {
+								log.Infof("found %d relevant memories for completed task %s (total: %d bytes)", len(searchResult.Memories), task.GetId(), searchResult.ContentBytes)
+								if r.config.DebugEvent {
+									log.Infof("memory search summary: %s", searchResult.SearchSummary)
+								}
+							} else if r.config.DebugEvent {
+								log.Infof("no relevant memories found for completed task %s", task.GetId())
+							}
+						}
+					}()
+				})
 			})
 		}),
 		reactloops.WithAllowAIForge(r.config.EnablePlanAndExec),
