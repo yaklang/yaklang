@@ -1,6 +1,7 @@
 package yakit
 
 import (
+	"regexp"
 	"strings"
 
 	"github.com/jinzhu/gorm"
@@ -8,6 +9,9 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 )
+
+var aiToolSearchASCIITermRegexp = regexp.MustCompile(`[A-Za-z0-9_]{3,}`)
+var aiToolSearchHanTermRegexp = regexp.MustCompile(`[\p{Han}]{2,}`)
 
 func AIYakToolVTableName() string {
 	return (&schema.AIYakTool{}).TableName() + "_fts"
@@ -104,18 +108,23 @@ func SearchAIYakToolBM25(db *gorm.DB, filter *AIYakToolFilter, limit, offset int
 		return nil, utils.Errorf("db is nil")
 	}
 
-	var matches []string
+	var rawMatches []string
 	if filter != nil {
 		for _, m := range filter.Keywords {
 			m = strings.TrimSpace(m)
 			if m == "" {
 				continue
 			}
-			matches = append(matches, m)
+			rawMatches = append(rawMatches, m)
 		}
 	}
-	if len(matches) == 0 {
+	if len(rawMatches) == 0 {
 		return []*schema.AIYakTool{}, nil
+	}
+
+	matches := expandAIYakToolSearchTerms(rawMatches)
+	if len(matches) == 0 {
+		matches = rawMatches
 	}
 
 	var res = make([]*schema.AIYakTool, 0)
@@ -126,15 +135,92 @@ func SearchAIYakToolBM25(db *gorm.DB, filter *AIYakToolFilter, limit, offset int
 		}
 	}
 	if maxLen < 3 || !schema.IsSQLite(db) || !db.HasTable(defaultAIYakToolFTS5.FTSTable) {
-		if err := FilterAIYakTools(db, filter).Limit(limit).Offset(offset).Find(&res).Error; err != nil {
+		if err := FilterAIYakTools(db, cloneAIYakToolFilterWithKeywords(filter, matches)).Limit(limit).Offset(offset).Find(&res).Error; err != nil {
 			return nil, err
 		}
 		return res, nil
 	}
 
+	ftsFilter := filter
 	if filter != nil {
-		filter.Keywords = nil
+		ftsFilter = cloneAIYakToolFilterWithKeywords(filter, nil)
 	}
 
-	return bizhelper.SQLiteFTS5BM25Match[*schema.AIYakTool](FilterAIYakTools(db, filter), defaultAIYakToolFTS5, matches, limit, offset)
+	res, err := bizhelper.SQLiteFTS5BM25Match[*schema.AIYakTool](FilterAIYakTools(db, ftsFilter), defaultAIYakToolFTS5, matches, limit, offset)
+	if err == nil {
+		return res, nil
+	}
+
+	res = make([]*schema.AIYakTool, 0)
+	if fallbackErr := FilterAIYakTools(db, cloneAIYakToolFilterWithKeywords(filter, matches)).Limit(limit).Offset(offset).Find(&res).Error; fallbackErr != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
+func cloneAIYakToolFilterWithKeywords(filter *AIYakToolFilter, keywords []string) *AIYakToolFilter {
+	if filter == nil {
+		if keywords == nil {
+			return nil
+		}
+		return &AIYakToolFilter{Keywords: append([]string(nil), keywords...)}
+	}
+	cloned := *filter
+	if keywords == nil {
+		cloned.Keywords = nil
+	} else {
+		cloned.Keywords = append([]string(nil), keywords...)
+	}
+	return &cloned
+}
+
+func expandAIYakToolSearchTerms(matches []string) []string {
+	seen := make(map[string]struct{})
+	results := make([]string, 0, len(matches))
+	appendTerm := func(term string) {
+		term = strings.TrimSpace(term)
+		if term == "" {
+			return
+		}
+		if _, ok := seen[term]; ok {
+			return
+		}
+		seen[term] = struct{}{}
+		results = append(results, term)
+	}
+
+	for _, match := range matches {
+		trimmed := strings.TrimSpace(match)
+		if trimmed == "" {
+			continue
+		}
+
+		if isSafeFTS5Term(trimmed) {
+			appendTerm(trimmed)
+		}
+
+		for _, token := range aiToolSearchASCIITermRegexp.FindAllString(trimmed, -1) {
+			appendTerm(strings.ToLower(token))
+		}
+
+		for _, seq := range aiToolSearchHanTermRegexp.FindAllString(trimmed, -1) {
+			runes := []rune(seq)
+			if len(runes) <= 3 {
+				appendTerm(seq)
+				continue
+			}
+
+			for size := 3; size <= 6 && size <= len(runes); size++ {
+				for start := 0; start+size <= len(runes); start++ {
+					appendTerm(string(runes[start : start+size]))
+				}
+			}
+		}
+	}
+
+	return results
+}
+
+func isSafeFTS5Term(term string) bool {
+	return !strings.ContainsAny(term, `"'/:()[]{}\\`)
 }

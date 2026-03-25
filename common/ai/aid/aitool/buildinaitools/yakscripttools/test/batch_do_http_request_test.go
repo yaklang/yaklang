@@ -36,6 +36,20 @@ func getBatchDoHTTPRequestTool(t *testing.T) *aitool.Tool {
 	return tools[0]
 }
 
+func loadBatchDoHTTPRequestAITool(t *testing.T) *schema.AIYakTool {
+	t.Helper()
+	embedFS := yakscripttools.GetEmbedFS()
+	content, err := embedFS.ReadFile("yakscriptforai/http/batch_do_http_request.yak")
+	if err != nil {
+		t.Fatalf("failed to read batch_do_http_request.yak from embed FS: %v", err)
+	}
+	aiTool := yakscripttools.LoadYakScriptToAiTools(batchDoHTTPRequestToolName, string(content))
+	if aiTool == nil {
+		t.Fatalf("failed to parse batch_do_http_request.yak metadata")
+	}
+	return aiTool
+}
+
 func execBatchTool(t *testing.T, tool *aitool.Tool, params aitool.InvokeParams) (stdout, stderr string) {
 	t.Helper()
 	w1, w2 := bytes.NewBuffer(nil), bytes.NewBuffer(nil)
@@ -46,16 +60,26 @@ func execBatchTool(t *testing.T, tool *aitool.Tool, params aitool.InvokeParams) 
 	return w1.String(), w2.String()
 }
 
+func TestBatchDoHTTPRequest_MetadataContainsIntentHints(t *testing.T) {
+	aiTool := loadBatchDoHTTPRequestAITool(t)
+
+	assert.Assert(t, strings.Contains(aiTool.VerboseName, "批量HTTP请求工具"), "verbose name should include Chinese display text")
+	assert.Assert(t, strings.Contains(aiTool.Description, "接口批量验证"), "description should mention API batch validation")
+	assert.Assert(t, strings.Contains(aiTool.Description, "IDOR"), "description should mention IDOR use case")
+	assert.Assert(t, strings.Contains(aiTool.Keywords, "未授权访问验证"), "keywords should include unauthorized access validation")
+	assert.Assert(t, strings.Contains(aiTool.Keywords, "api endpoint validation"), "keywords should include English endpoint validation")
+}
+
 // Test 1: Basic batch GET requests - verify summary output
 func TestBatchDoHTTPRequest_BasicGet(t *testing.T) {
 	host, port := utils.DebugMockHTTP([]byte("response_body"))
 
 	tool := getBatchDoHTTPRequestTool(t)
 	stdout, _ := execBatchTool(t, tool, aitool.InvokeParams{
-		"base-url":    "http://" + host + ":" + strconv.Itoa(port),
-		"paths":       "/path1,/path2",
-		"concurrent":  2,
-		"timeout":     10,
+		"base-url":   "http://" + host + ":" + strconv.Itoa(port),
+		"paths":      "/path1,/path2",
+		"concurrent": 2,
+		"timeout":    10,
 	})
 
 	assert.Assert(t, strings.Contains(stdout, "Total paths to test: 2"), "should show 2 paths")
@@ -70,11 +94,11 @@ func TestBatchDoHTTPRequest_Prefix(t *testing.T) {
 
 	tool := getBatchDoHTTPRequestTool(t)
 	stdout, _ := execBatchTool(t, tool, aitool.InvokeParams{
-		"base-url":    "http://" + host + ":" + strconv.Itoa(port),
-		"paths":       "users,admin",
-		"prefix":      "/v1/api/",
-		"concurrent":  1,
-		"timeout":     10,
+		"base-url":   "http://" + host + ":" + strconv.Itoa(port),
+		"paths":      "users,admin",
+		"prefix":     "/v1/api/",
+		"concurrent": 1,
+		"timeout":    10,
 	})
 
 	assert.Assert(t, strings.Contains(stdout, "Applied path prefix: /v1/api/"), "should show prefix applied")
@@ -144,11 +168,11 @@ func TestBatchDoHTTPRequest_ExcludeCodes(t *testing.T) {
 
 	tool := getBatchDoHTTPRequestTool(t)
 	stdout, _ := execBatchTool(t, tool, aitool.InvokeParams{
-		"base-url":      "http://" + host + ":" + strconv.Itoa(port),
-		"paths":         "/ok,/missing",
-		"exclude-code":  "404",
-		"concurrent":    2,
-		"timeout":       10,
+		"base-url":     "http://" + host + ":" + strconv.Itoa(port),
+		"paths":        "/ok,/missing",
+		"exclude-code": "404",
+		"concurrent":   2,
+		"timeout":      10,
 	})
 
 	assert.Assert(t, strings.Contains(stdout, "success"), "200 response should be shown")
@@ -169,11 +193,11 @@ func TestBatchDoHTTPRequest_IncludeCodes(t *testing.T) {
 
 	tool := getBatchDoHTTPRequestTool(t)
 	stdout, _ := execBatchTool(t, tool, aitool.InvokeParams{
-		"base-url":      "http://" + host + ":" + strconv.Itoa(port),
-		"paths":         "/ok,/created",
-		"include-code":  "200",
-		"concurrent":    2,
-		"timeout":       10,
+		"base-url":     "http://" + host + ":" + strconv.Itoa(port),
+		"paths":        "/ok,/created",
+		"include-code": "200",
+		"concurrent":   2,
+		"timeout":      10,
 	})
 
 	assert.Assert(t, strings.Contains(stdout, "success"), "200 response should be shown")
@@ -192,13 +216,13 @@ func TestBatchDoHTTPRequest_PostWithBody(t *testing.T) {
 
 	tool := getBatchDoHTTPRequestTool(t)
 	stdout, _ := execBatchTool(t, tool, aitool.InvokeParams{
-		"base-url":      "http://" + host + ":" + strconv.Itoa(port),
-		"paths":         "/submit",
-		"method":        "POST",
-		"body":          `{"test":"value"}`,
-		"content-type":  "application/json",
-		"concurrent":    1,
-		"timeout":       10,
+		"base-url":     "http://" + host + ":" + strconv.Itoa(port),
+		"paths":        "/submit",
+		"method":       "POST",
+		"body":         `{"test":"value"}`,
+		"content-type": "application/json",
+		"concurrent":   1,
+		"timeout":      10,
 	})
 
 	assert.Assert(t, strings.Contains(stdout, "post_ok"), "POST with body should succeed")
@@ -229,11 +253,11 @@ func TestBatchDoHTTPRequest_KeywordMatch(t *testing.T) {
 
 	tool := getBatchDoHTTPRequestTool(t)
 	stdout, _ := execBatchTool(t, tool, aitool.InvokeParams{
-		"base-url":    "http://" + host + ":" + strconv.Itoa(port),
-		"paths":       "/test",
-		"keyword":     keyword,
-		"concurrent":  1,
-		"timeout":     10,
+		"base-url":   "http://" + host + ":" + strconv.Itoa(port),
+		"paths":      "/test",
+		"keyword":    keyword,
+		"concurrent": 1,
+		"timeout":    10,
 	})
 
 	assert.Assert(t, strings.Contains(stdout, keyword), "keyword should be found")
@@ -253,11 +277,11 @@ func TestBatchDoHTTPRequest_Redirect(t *testing.T) {
 
 	tool := getBatchDoHTTPRequestTool(t)
 	stdout, _ := execBatchTool(t, tool, aitool.InvokeParams{
-		"base-url":        "http://" + host + ":" + strconv.Itoa(port),
-		"paths":           "/start",
-		"redirect-times":  3,
-		"concurrent":      1,
-		"timeout":         10,
+		"base-url":       "http://" + host + ":" + strconv.Itoa(port),
+		"paths":          "/start",
+		"redirect-times": 3,
+		"concurrent":     1,
+		"timeout":        10,
 	})
 
 	assert.Assert(t, strings.Contains(stdout, flag), "should follow redirect and get final response")
@@ -276,11 +300,11 @@ func TestBatchDoHTTPRequest_NoRedirect(t *testing.T) {
 
 	tool := getBatchDoHTTPRequestTool(t)
 	stdout, _ := execBatchTool(t, tool, aitool.InvokeParams{
-		"base-url":        "http://" + host + ":" + strconv.Itoa(port),
-		"paths":           "/start",
-		"redirect-times":  0,
-		"concurrent":      1,
-		"timeout":         10,
+		"base-url":       "http://" + host + ":" + strconv.Itoa(port),
+		"paths":          "/start",
+		"redirect-times": 0,
+		"concurrent":     1,
+		"timeout":        10,
 	})
 
 	assert.Assert(t, !strings.Contains(stdout, "final_page"), "should not follow redirect when redirect-times=0")
@@ -293,10 +317,10 @@ func TestBatchDoHTTPRequest_ConcurrentMode(t *testing.T) {
 
 	tool := getBatchDoHTTPRequestTool(t)
 	stdout, _ := execBatchTool(t, tool, aitool.InvokeParams{
-		"base-url":    "http://" + host + ":" + strconv.Itoa(port),
-		"paths":       "/a,/b,/c",
-		"concurrent":  3,
-		"timeout":     10,
+		"base-url":   "http://" + host + ":" + strconv.Itoa(port),
+		"paths":      "/a,/b,/c",
+		"concurrent": 3,
+		"timeout":    10,
 	})
 
 	assert.Assert(t, strings.Contains(stdout, "concurrent batch requests"), "should indicate concurrent mode")
@@ -307,10 +331,10 @@ func TestBatchDoHTTPRequest_ConcurrentMode(t *testing.T) {
 func TestBatchDoHTTPRequest_ErrorHandling(t *testing.T) {
 	tool := getBatchDoHTTPRequestTool(t)
 	stdout, _ := execBatchTool(t, tool, aitool.InvokeParams{
-		"base-url":    "http://127.0.0.1:59999", // Unreachable port
-		"paths":       "/test",
-		"concurrent":  1,
-		"timeout":     2, // Short timeout
+		"base-url":   "http://127.0.0.1:59999", // Unreachable port
+		"paths":      "/test",
+		"concurrent": 1,
+		"timeout":    2, // Short timeout
 	})
 
 	assert.Assert(t, strings.Contains(stdout, "Errors: 1"), "should report 1 error for unreachable host")
@@ -328,13 +352,13 @@ func TestBatchDoHTTPRequest_ContentType(t *testing.T) {
 
 	tool := getBatchDoHTTPRequestTool(t)
 	stdout, _ := execBatchTool(t, tool, aitool.InvokeParams{
-		"base-url":      "http://" + host + ":" + strconv.Itoa(port),
-		"paths":         "/submit",
-		"method":        "POST",
-		"body":          "<root/>",
-		"content-type":  "application/xml",
-		"concurrent":    1,
-		"timeout":       10,
+		"base-url":     "http://" + host + ":" + strconv.Itoa(port),
+		"paths":        "/submit",
+		"method":       "POST",
+		"body":         "<root/>",
+		"content-type": "application/xml",
+		"concurrent":   1,
+		"timeout":      10,
 	})
 
 	assert.Assert(t, strings.Contains(stdout, "ctype_ok"), "server should receive correct content-type")
@@ -346,10 +370,10 @@ func TestBatchDoHTTPRequest_ResultsSummary(t *testing.T) {
 
 	tool := getBatchDoHTTPRequestTool(t)
 	stdout, _ := execBatchTool(t, tool, aitool.InvokeParams{
-		"base-url":    "http://" + host + ":" + strconv.Itoa(port),
-		"paths":       "/a,/b",
-		"concurrent":  2,
-		"timeout":     10,
+		"base-url":   "http://" + host + ":" + strconv.Itoa(port),
+		"paths":      "/a,/b",
+		"concurrent": 2,
+		"timeout":    10,
 	})
 
 	assert.Assert(t, strings.Contains(stdout, "Results Summary Table"), "should show summary table")
@@ -366,11 +390,11 @@ func TestBatchDoHTTPRequest_HttpsMode(t *testing.T) {
 
 	tool := getBatchDoHTTPRequestTool(t)
 	stdout, _ := execBatchTool(t, tool, aitool.InvokeParams{
-		"base-url":    "http://" + host + ":" + strconv.Itoa(port),
-		"paths":       "/test",
-		"https":       "no",
-		"concurrent":  1,
-		"timeout":     10,
+		"base-url":   "http://" + host + ":" + strconv.Itoa(port),
+		"paths":      "/test",
+		"https":      "no",
+		"concurrent": 1,
+		"timeout":    10,
 	})
 
 	assert.Assert(t, strings.Contains(stdout, flag), "https=no should work for plain HTTP")
@@ -388,11 +412,11 @@ func TestBatchDoHTTPRequest_QueryParams(t *testing.T) {
 
 	tool := getBatchDoHTTPRequestTool(t)
 	stdout, _ := execBatchTool(t, tool, aitool.InvokeParams{
-		"base-url":      "http://" + host + ":" + strconv.Itoa(port),
-		"paths":         "/search",
-		"query-params":  "foo=bar&baz=qux",
-		"concurrent":    1,
-		"timeout":       10,
+		"base-url":     "http://" + host + ":" + strconv.Itoa(port),
+		"paths":        "/search",
+		"query-params": "foo=bar&baz=qux",
+		"concurrent":   1,
+		"timeout":      10,
 	})
 
 	assert.Assert(t, strings.Contains(stdout, "query_ok"), "query params should be sent correctly")
@@ -416,10 +440,10 @@ func TestBatchDoHTTPRequest_MultiplePaths(t *testing.T) {
 
 	tool := getBatchDoHTTPRequestTool(t)
 	stdout, _ := execBatchTool(t, tool, aitool.InvokeParams{
-		"base-url":    "http://" + host + ":" + strconv.Itoa(port),
-		"paths":       "/api/users,/api/posts",
-		"concurrent":  2,
-		"timeout":     10,
+		"base-url":   "http://" + host + ":" + strconv.Itoa(port),
+		"paths":      "/api/users,/api/posts",
+		"concurrent": 2,
+		"timeout":    10,
 	})
 
 	assert.Assert(t, strings.Contains(stdout, "users_list"), "users endpoint should respond")
@@ -431,18 +455,18 @@ func TestBatchDoHTTPRequest_MultiplePaths(t *testing.T) {
 func TestBatchDoHTTPRequest_EmptyPathsValidation(t *testing.T) {
 	tool := getBatchDoHTTPRequestTool(t)
 	stdout, stderr := execBatchTool(t, tool, aitool.InvokeParams{
-		"base-url":    "http://example.com",
-		"paths":       "", // Empty paths
-		"concurrent":  1,
-		"timeout":     10,
+		"base-url":   "http://example.com",
+		"paths":      "", // Empty paths
+		"concurrent": 1,
+		"timeout":    10,
 	})
 
 	// Should have error in stderr or stdout about missing paths
 	combined := stdout + stderr
 	assert.Assert(t,
 		strings.Contains(combined, "no valid paths") ||
-		strings.Contains(combined, "at least one") ||
-		strings.Contains(combined, "Error"),
+			strings.Contains(combined, "at least one") ||
+			strings.Contains(combined, "Error"),
 		"should report error for empty paths")
 }
 
@@ -458,11 +482,11 @@ func TestBatchDoHTTPRequest_CustomHeaders(t *testing.T) {
 
 	tool := getBatchDoHTTPRequestTool(t)
 	stdout, _ := execBatchTool(t, tool, aitool.InvokeParams{
-		"base-url":    "http://" + host + ":" + strconv.Itoa(port),
-		"paths":       "/test",
-		"headers":     "X-Custom: value123",
-		"concurrent":  1,
-		"timeout":     10,
+		"base-url":   "http://" + host + ":" + strconv.Itoa(port),
+		"paths":      "/test",
+		"headers":    "X-Custom: value123",
+		"concurrent": 1,
+		"timeout":    10,
 	})
 
 	assert.Assert(t, strings.Contains(stdout, "header_received"), "custom header should be sent")
@@ -620,12 +644,12 @@ func TestBatchDoHTTPRequest_PacketBaseHost(t *testing.T) {
 	packet := "GET {{PATH}} HTTP/1.1\r\nHost: " + host + ":" + strconv.Itoa(port) + "\r\n\r\n"
 
 	stdout, _ := execBatchTool(t, tool, aitool.InvokeParams{
-		"packet":    packet,
-		"paths":     "/bh_test",
-		"base-host": host + ":" + strconv.Itoa(port),
-		"https":     "no",
+		"packet":     packet,
+		"paths":      "/bh_test",
+		"base-host":  host + ":" + strconv.Itoa(port),
+		"https":      "no",
 		"concurrent": 1,
-		"timeout":   10,
+		"timeout":    10,
 	})
 
 	assert.Assert(t, strings.Contains(stdout, "basehost_ok:/bh_test"), "base-host should route request correctly")
