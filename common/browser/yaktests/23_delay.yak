@@ -1,6 +1,6 @@
 // 23_delay.yak
 // Test wait for page delay.
-// covers: page.WaitText / page.WaitFunction / page.WaitTime
+// covers: page.WaitText / page.WaitFunction / page.WaitTime / page.Press
 //
 // Run: go run common/yak/cmd/yak.go common/browser/yaktests/23_delay.yak
 
@@ -31,6 +31,10 @@ delayHtml = `data:text/html,
 		<p>这部分内容在页面加载时就已存在，不需要等待。</p>
 		<p>下面的内容将在3秒后动态添加并显示，不包含任何样式（包括元素上的样式）。</p>
 		<hr>
+	</div>
+
+	<div>
+	<textarea></textarea>
 	</div>
 
 	<script>
@@ -108,3 +112,17 @@ assert err == nil, sprintf("navigate page2 to delay failed: %v: %v", err)
 err = page2.WaitFunction("document.querySelector('#delayed-content-container > div > ul > li:nth-child(3)') != null")
 assert err == nil, sprintf("wait function failed: %v", err)
 log.info("wait function ok")
+
+err = page2.Click("body > div:nth-child(3) > textarea")
+sleep(1)
+
+err = page2.Press("enter")
+assert err == nil, sprintf("press enter failed: %v: %v", err)
+
+err = page2.KeyDown("1")
+assert err == nil, sprintf("keydown 1 failed: %v: %v", err)
+time.sleep(5)
+
+err = page2.KeyUp("1")
+assert err == nil, sprintf("keyup 1 failed: %v: %v", err)
+time.sleep(1)

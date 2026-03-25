@@ -81,21 +81,8 @@ page, err = b.Navigate(dragHTML)
 assert err == nil, sprintf("navigate to drag failed: %v", err)
 sleep(0.5)
 
-// get from element position
-from, err = page.Element("body > div > div > div:nth-child(2)")
-assert err == nil, sprintf("get from element failed: %v", err)
-fromX, fromY, err = from.GetCenterPosition()
-assert err == nil, sprintf("get from element position failed: %v", err)
-
-// get to element position
-to, err = page.Element("#dropZone")
-assert err == nil, sprintf("get to element failed: %v", err)
-toX, toY, err = to.GetCenterPosition()
-assert err == nil, sprintf("get to element position failed: %v", err)
-log.info("get element position ok")
-
 // do drag action
-err = page.Drag(fromX, fromY, toX, toY)
+err = page.Drag("body > div > div > div:nth-child(2)", "#dropZone")
 assert err == nil, sprintf("drag failed: %v", err)
 sleep(1)
 log.info("drag ok")

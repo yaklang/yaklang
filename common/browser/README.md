@@ -235,7 +235,7 @@ err = page.SetCookies(cookies)
 err = page.MouseMove(x, y)
 err = page.MouseDown()
 err = page.MouseUp()
-err = page.Drag(fromX, fromY, toX, toY)
+err = page.Drag("@e1", "@e2")
 ```
 
 ### BrowserElement 方法
@@ -411,7 +411,7 @@ go run common/yak/cmd/yak.go common/browser/yaktests/16_ai_login.yak
 | 16                 | AI 模拟登录: snapshot 探索 + 填表 + 提交                               |
 | 21                 | label 元素搜索 / 元素拖动                                            |
 | 22                 | 元素设置文件 / 单双击 / 确认是否已选 / 下拉选择 / 滚动至视野中 / 悬停                   |
-| 23                 | 页面等待固定时间 / 等待文本出现 / 等待js代码执行                                 |
+| 23                 | 页面等待固定时间 / 等待文本出现 / 等待js代码执行 / 按下功能键page.                         |
 
 ## 使用示例
 

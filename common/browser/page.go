@@ -111,6 +111,68 @@ func (p *BrowserPage) Type(text string) error {
 	return p.page.InsertText(text)
 }
 
+func (p *BrowserPage) Hover(selectorOrRef string) error {
+	element, err := p.getElementBySelectorOrRef(selectorOrRef)
+	if err != nil {
+		return err
+	}
+	return element.Hover()
+}
+
+func (p *BrowserPage) Select(selectorOrRef, value string) error {
+	element, err := p.getElementBySelectorOrRef(selectorOrRef)
+	if err != nil {
+		return err
+	}
+	return element.Select(value)
+}
+
+func (p *BrowserPage) Check(selectorOrRef string) error {
+	element, err := p.getElementBySelectorOrRef(selectorOrRef)
+	if err != nil {
+		return err
+	}
+	_, err = element.Evaluate("this.checked = true")
+	return err
+}
+
+func (p *BrowserPage) UnCheck(selectorOrRef string) error {
+	element, err := p.getElementBySelectorOrRef(selectorOrRef)
+	if err != nil {
+		return err
+	}
+	_, err = element.Evaluate("this.checked = false")
+	return err
+}
+
+func (p *BrowserPage) ScrollIntoView(selectorOrRef string) error {
+	element, err := p.getElementBySelectorOrRef(selectorOrRef)
+	if err != nil {
+		return err
+	}
+	return element.ScrollIntoView()
+}
+
+func (p *BrowserPage) Drag(src, tgt string) error {
+	srcX, srcY, err := p.resolveElementCenterBySelectorOfRef(src)
+	if err != nil {
+		return err
+	}
+	tgtX, tgtY, err := p.resolveElementCenterBySelectorOfRef(tgt)
+	if err != nil {
+		return err
+	}
+	return p.drag(srcX, srcY, tgtX, tgtY)
+}
+
+func (p *BrowserPage) SetFiles(selectorOrRef string, files ...string) error {
+	element, err := p.getElementBySelectorOrRef(selectorOrRef)
+	if err != nil {
+		return err
+	}
+	return element.SetFiles(files...)
+}
+
 func (p *BrowserPage) Snapshot() (*SnapshotResult, error) {
 	return takeSnapshot(p.page, p.refMap)
 }
@@ -314,6 +376,26 @@ func (p *BrowserPage) fillByRef(ref string, text string) error {
 	return p.page.InsertText(text)
 }
 
+func (p *BrowserPage) resolveElementCenterBySelectorOfRef(selectorOrRef string) (float64, float64, error) {
+	ref, isRef := ParseRef(selectorOrRef)
+	if isRef {
+		entry, ok := p.refMap.Get(ref)
+		if !ok {
+			return 0, 0, fmt.Errorf("ref %s not found, run Snapshot() first", ref)
+		}
+		return p.resolveElementCenter(entry)
+	} else {
+		elements, err := p.Elements(selectorOrRef)
+		if err != nil {
+			return 0, 0, fmt.Errorf("find elements by selector %s: %w", selectorOrRef, err)
+		}
+		if len(elements) == 0 {
+			return 0, 0, fmt.Errorf("select %s not found", ref)
+		}
+		return elements[0].GetCenterPosition()
+	}
+}
+
 func (p *BrowserPage) resolveElementCenter(entry *RefEntry) (float64, float64, error) {
 	nodeID := proto.DOMBackendNodeID(entry.BackendNodeID)
 
@@ -356,4 +438,46 @@ func (p *BrowserPage) dispatchClick(x, y float64) error {
 		Button:     proto.InputMouseButtonLeft,
 		ClickCount: 1,
 	}.Call(p.page)
+}
+
+func (p *BrowserPage) getElementBySelectorOrRef(selectorOrRef string) (*BrowserElement, error) {
+	var (
+		element *BrowserElement
+		err     error
+	)
+	ref, isRef := ParseRef(selectorOrRef)
+	if isRef {
+		element, err = p.refToElement(ref)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		var elements []*BrowserElement
+		elements, err = p.Elements(selectorOrRef)
+		if err != nil {
+			return nil, err
+		}
+		if len(elements) == 0 {
+			return nil, fmt.Errorf("no elements found for selector %s", selectorOrRef)
+		}
+		element = elements[0]
+	}
+	return element, nil
+}
+
+func (p *BrowserPage) refToElement(ref string) (*BrowserElement, error) {
+	entry, ok := p.refMap.Get(ref)
+	if !ok {
+		return nil, fmt.Errorf("ref %s not found, run Snapshot() first", ref)
+	}
+	nodeID := proto.DOMBackendNodeID(entry.BackendNodeID)
+	resolveResult, err := proto.DOMResolveNode{BackendNodeID: nodeID}.Call(p.page)
+	if err != nil {
+		return nil, fmt.Errorf("resolve node for ref %s: %w", ref, err)
+	}
+	el, err := p.page.ElementFromObject(resolveResult.Object)
+	if err != nil {
+		return nil, fmt.Errorf("convert resolved node %s to element: %w", ref, err)
+	}
+	return &BrowserElement{element: el}, nil
 }
