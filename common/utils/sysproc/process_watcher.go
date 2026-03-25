@@ -3,12 +3,13 @@ package sysproc
 import (
 	"context"
 	"fmt"
-	"github.com/shirou/gopsutil/v4/net"
-	"github.com/shirou/gopsutil/v4/process"
-	"github.com/yaklang/yaklang/common/utils"
 	"log"
 	"sync"
 	"time"
+
+	"github.com/shirou/gopsutil/v3/net"
+	"github.com/shirou/gopsutil/v3/process"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type ProcessBasicInfo struct {

@@ -4,7 +4,7 @@ import (
 	"net"
 	"strings"
 
-	"github.com/shirou/gopsutil/v4/process"
+	"github.com/shirou/gopsutil/v3/process"
 )
 
 type ProcessInfo struct {
