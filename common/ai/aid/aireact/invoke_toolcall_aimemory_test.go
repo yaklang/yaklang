@@ -360,23 +360,19 @@ LOOP:
 	}
 	fmt.Println("--------------------------------------")
 
-	// 等待内存处理完成（包括数据库保存，因为是同步的）
-	ins.Wait()
-
-	// 验证 AIMemory Mock 被调用
-	if mockInvoker.memoryTriageCallCount == 0 {
-		t.Fatal("Expected AIMemory mock to be called, but it was not")
-	}
+	var memoryEntities []schema.AIMemoryEntity
+	require.Eventually(t, func() bool {
+		return mockInvoker.memoryTriageCallCount > 0
+	}, 3*time.Second, 50*time.Millisecond, "Expected AIMemory mock to be called, but it was not")
 	fmt.Printf("AIMemory mock was called %d times\n", mockInvoker.memoryTriageCallCount)
 
-	var memoryEntities []schema.AIMemoryEntity
-	if err := db.Where("session_id = ?", sessionID).Find(&memoryEntities).Error; err != nil {
-		t.Fatalf("Failed to query memory entities: %v", err)
-	}
-
-	if len(memoryEntities) == 0 {
-		t.Fatal("Expected to find memory entities in database, but found none")
-	}
+	require.Eventually(t, func() bool {
+		memoryEntities = nil
+		if err := db.Where("session_id = ?", sessionID).Find(&memoryEntities).Error; err != nil {
+			t.Fatalf("Failed to query memory entities: %v", err)
+		}
+		return len(memoryEntities) > 0
+	}, 5*time.Second, 50*time.Millisecond, "Expected to find memory entities in database, but found none")
 	fmt.Printf("Found %d memory entities in database\n", len(memoryEntities))
 
 	// 验证 memory entities 的内容
