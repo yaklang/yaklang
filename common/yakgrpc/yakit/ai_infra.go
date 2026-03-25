@@ -193,3 +193,59 @@ func DeleteAllAgentRuntime(db *gorm.DB) (int64, error) {
 	}
 	return deletedRuntimes, nil
 }
+
+func QueryAgentRuntimeUUIDsBySessionID(db *gorm.DB, sessionId string) ([]string, error) {
+	if db == nil {
+		return nil, utils.Errorf("database is nil")
+	}
+	if sessionId == "" {
+		return nil, utils.Errorf("sessionId is empty")
+	}
+
+	var coordinatorUUIDs []string
+	if err := db.Model(&schema.AIAgentRuntime{}).
+		Where("persistent_session = ?", sessionId).
+		Pluck("uuid", &coordinatorUUIDs).Error; err != nil {
+		if isMissingTableErr(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return coordinatorUUIDs, nil
+}
+
+func DeleteCheckpointByCoordinatorUUIDs(db *gorm.DB, coordinatorUUIDs []string) (int64, error) {
+	if db == nil {
+		return 0, utils.Errorf("database is nil")
+	}
+	if len(coordinatorUUIDs) == 0 {
+		return 0, nil
+	}
+
+	result := db.Model(&schema.AiCheckpoint{}).
+		Where("coordinator_uuid IN (?)", coordinatorUUIDs).
+		Unscoped().
+		Delete(&schema.AiCheckpoint{})
+	if result.Error != nil {
+		if isMissingTableErr(result.Error) {
+			return 0, nil
+		}
+		return 0, result.Error
+	}
+	return result.RowsAffected, nil
+}
+
+func DeleteAllCheckpoint(db *gorm.DB) (int64, error) {
+	if db == nil {
+		return 0, utils.Errorf("database is nil")
+	}
+
+	deletedCheckpoints, err := countRowsIgnoreMissingTable(db, &schema.AiCheckpoint{})
+	if err != nil {
+		return 0, err
+	}
+	if err := schema.DropRecreateTable(db, &schema.AiCheckpoint{}); err != nil {
+		return deletedCheckpoints, err
+	}
+	return deletedCheckpoints, nil
+}
