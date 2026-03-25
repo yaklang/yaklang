@@ -10,33 +10,33 @@ import (
 // mouse in page
 
 // Move mouse move to target position
-func (p *BrowserPage) Move(x, y float64) error {
+func (p *BrowserPage) MouseMove(x, y float64) error {
 	return p.mouse.MoveTo(proto.Point{X: x, Y: y})
 }
 
-func (p *BrowserPage) Down() error {
+func (p *BrowserPage) MouseDown() error {
 	return p.mouse.Down(proto.InputMouseButtonLeft, 1)
 }
 
-func (p *BrowserPage) Up() error {
+func (p *BrowserPage) MouseUp() error {
 	return p.mouse.Up(proto.InputMouseButtonLeft, 1)
 }
 
 func (p *BrowserPage) Drag(fromX, fromY, toX, toY float64) error {
-	err := p.Move(fromX, fromY)
+	err := p.MouseMove(fromX, fromY)
 	if err != nil {
 		return err
 	}
 	time.Sleep(300 * time.Millisecond)
-	err = p.Down()
+	err = p.MouseDown()
 	if err != nil {
 		return err
 	}
 	time.Sleep(300 * time.Millisecond)
-	err = p.Move(toX, toY)
+	err = p.MouseMove(toX, toY)
 	if err != nil {
 		return err
 	}
 	time.Sleep(300 * time.Millisecond)
-	return p.Up()
+	return p.MouseUp()
 }

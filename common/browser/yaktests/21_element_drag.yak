@@ -92,18 +92,20 @@ to, err = page.Element("#dropZone")
 assert err == nil, sprintf("get to element failed: %v", err)
 toX, toY, err = to.GetCenterPosition()
 assert err == nil, sprintf("get to element position failed: %v", err)
+log.info("get element position ok")
 
 // do drag action
 err = page.Drag(fromX, fromY, toX, toY)
 assert err == nil, sprintf("drag failed: %v", err)
 sleep(1)
+log.info("drag ok")
 
 // check drag result
 display, err = page.Element("#resultDisplay")
 assert err == nil, sprintf("get display element failed: %v", err)
 displayText, err = display.Text()
 assert err == nil, sprintf("get display text failed: %v", err)
-log.info("display text: %v", displayText)
+log.info("drag result display text: %v", displayText)
 
 // label elements
 labelElements, err = page.ElementsByLabel("放置区域")
