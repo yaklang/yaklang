@@ -14,16 +14,34 @@ import (
 func TestDeleteAISession_DeletesRuntimeAndEvents(t *testing.T) {
 	projectDB, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	profileDB := projectDB
-	require.NoError(t, projectDB.AutoMigrate(&schema.AISession{}, &schema.AIAgentRuntime{}, &schema.AiOutputEvent{}, &schema.AiProcessAndAiEvent{}).Error)
+	require.NoError(t, projectDB.AutoMigrate(&schema.AISession{}, &schema.AIAgentRuntime{}, &schema.AiCheckpoint{}, &schema.AiOutputEvent{}, &schema.AiProcessAndAiEvent{}).Error)
 
 	sessionA := "sess-" + uuid.NewString()
 	sessionB := "sess-" + uuid.NewString()
 
-	// runtimes (profile DB)
-	require.NoError(t, profileDB.Create(&schema.AIAgentRuntime{Uuid: uuid.NewString(), PersistentSession: sessionA, Name: "a1"}).Error)
-	require.NoError(t, profileDB.Create(&schema.AIAgentRuntime{Uuid: uuid.NewString(), PersistentSession: sessionA, Name: "a2"}).Error)
-	require.NoError(t, profileDB.Create(&schema.AIAgentRuntime{Uuid: uuid.NewString(), PersistentSession: sessionB, Name: "b1"}).Error)
+	// runtimes (project DB)
+	runtimeA1 := uuid.NewString()
+	runtimeA2 := uuid.NewString()
+	runtimeB1 := uuid.NewString()
+	require.NoError(t, projectDB.Create(&schema.AIAgentRuntime{Uuid: runtimeA1, PersistentSession: sessionA, Name: "a1"}).Error)
+	require.NoError(t, projectDB.Create(&schema.AIAgentRuntime{Uuid: runtimeA2, PersistentSession: sessionA, Name: "a2"}).Error)
+	require.NoError(t, projectDB.Create(&schema.AIAgentRuntime{Uuid: runtimeB1, PersistentSession: sessionB, Name: "b1"}).Error)
+
+	require.NoError(t, projectDB.Create(&schema.AiCheckpoint{
+		CoordinatorUuid: runtimeA1,
+		Seq:             1,
+		Type:            schema.AiCheckpointType_AIInteractive,
+	}).Error)
+	require.NoError(t, projectDB.Create(&schema.AiCheckpoint{
+		CoordinatorUuid: runtimeA2,
+		Seq:             1,
+		Type:            schema.AiCheckpointType_ToolCall,
+	}).Error)
+	require.NoError(t, projectDB.Create(&schema.AiCheckpoint{
+		CoordinatorUuid: runtimeB1,
+		Seq:             1,
+		Type:            schema.AiCheckpointType_Review,
+	}).Error)
 
 	// events + associations (project DB)
 	e1 := uuid.NewString()
@@ -36,15 +54,15 @@ func TestDeleteAISession_DeletesRuntimeAndEvents(t *testing.T) {
 	require.NoError(t, projectDB.Create(&schema.AiProcessAndAiEvent{ProcessesId: "p2", EventId: e2}).Error)
 	require.NoError(t, projectDB.Create(&schema.AiProcessAndAiEvent{ProcessesId: "p3", EventId: e3}).Error)
 
-	deletedRuntimes, deletedEvents, err := DeleteAISession(profileDB, projectDB, sessionA)
+	deletedRuntimes, deletedEvents, err := DeleteAISession(projectDB, sessionA)
 	require.NoError(t, err)
 	require.Equal(t, int64(2), deletedRuntimes)
 	require.Equal(t, int64(2), deletedEvents)
 
 	var runtimeCount int64
-	require.NoError(t, profileDB.Model(&schema.AIAgentRuntime{}).Where("persistent_session = ?", sessionA).Count(&runtimeCount).Error)
+	require.NoError(t, projectDB.Model(&schema.AIAgentRuntime{}).Where("persistent_session = ?", sessionA).Count(&runtimeCount).Error)
 	require.Equal(t, int64(0), runtimeCount)
-	require.NoError(t, profileDB.Model(&schema.AIAgentRuntime{}).Where("persistent_session = ?", sessionB).Count(&runtimeCount).Error)
+	require.NoError(t, projectDB.Model(&schema.AIAgentRuntime{}).Where("persistent_session = ?", sessionB).Count(&runtimeCount).Error)
 	require.Equal(t, int64(1), runtimeCount)
 
 	var eventCount int64
@@ -58,21 +76,26 @@ func TestDeleteAISession_DeletesRuntimeAndEvents(t *testing.T) {
 	require.Equal(t, int64(0), assocCount)
 	require.NoError(t, projectDB.Model(&schema.AiProcessAndAiEvent{}).Where("event_id = ?", e3).Count(&assocCount).Error)
 	require.Equal(t, int64(1), assocCount)
+
+	var checkpointCount int64
+	require.NoError(t, projectDB.Model(&schema.AiCheckpoint{}).Where("coordinator_uuid IN (?)", []string{runtimeA1, runtimeA2}).Count(&checkpointCount).Error)
+	require.Equal(t, int64(0), checkpointCount)
+	require.NoError(t, projectDB.Model(&schema.AiCheckpoint{}).Where("coordinator_uuid = ?", runtimeB1).Count(&checkpointCount).Error)
+	require.Equal(t, int64(1), checkpointCount)
 }
 
 func TestDeleteAllAISessionData(t *testing.T) {
 	projectDB, err := utils.CreateTempTestDatabaseInMemory()
 	require.NoError(t, err)
-	profileDB, err := utils.CreateTempTestDatabaseInMemory()
-	require.NoError(t, err)
 
 	require.NoError(t, projectDB.AutoMigrate(
 		&schema.AISession{},
+		&schema.AIAgentRuntime{},
+		&schema.AiCheckpoint{},
 		&schema.AiOutputEvent{},
 		&schema.AiProcessAndAiEvent{},
 		&schema.AISessionPlanAndExec{},
 	).Error)
-	require.NoError(t, profileDB.AutoMigrate(&schema.AIAgentRuntime{}).Error)
 
 	sessionA := "sess-" + uuid.NewString()
 	sessionB := "sess-" + uuid.NewString()
@@ -95,9 +118,28 @@ func TestDeleteAllAISessionData(t *testing.T) {
 		TaskProgress:  "{}",
 	}).Error)
 
-	require.NoError(t, profileDB.Create(&schema.AIAgentRuntime{Uuid: uuid.NewString(), PersistentSession: sessionA, Name: "a1"}).Error)
-	require.NoError(t, profileDB.Create(&schema.AIAgentRuntime{Uuid: uuid.NewString(), PersistentSession: sessionA, Name: "a2"}).Error)
-	require.NoError(t, profileDB.Create(&schema.AIAgentRuntime{Uuid: uuid.NewString(), PersistentSession: sessionB, Name: "b1"}).Error)
+	runtimeA1 := uuid.NewString()
+	runtimeA2 := uuid.NewString()
+	runtimeB1 := uuid.NewString()
+	require.NoError(t, projectDB.Create(&schema.AIAgentRuntime{Uuid: runtimeA1, PersistentSession: sessionA, Name: "a1"}).Error)
+	require.NoError(t, projectDB.Create(&schema.AIAgentRuntime{Uuid: runtimeA2, PersistentSession: sessionA, Name: "a2"}).Error)
+	require.NoError(t, projectDB.Create(&schema.AIAgentRuntime{Uuid: runtimeB1, PersistentSession: sessionB, Name: "b1"}).Error)
+
+	require.NoError(t, projectDB.Create(&schema.AiCheckpoint{
+		CoordinatorUuid: runtimeA1,
+		Seq:             1,
+		Type:            schema.AiCheckpointType_AIInteractive,
+	}).Error)
+	require.NoError(t, projectDB.Create(&schema.AiCheckpoint{
+		CoordinatorUuid: runtimeA2,
+		Seq:             1,
+		Type:            schema.AiCheckpointType_ToolCall,
+	}).Error)
+	require.NoError(t, projectDB.Create(&schema.AiCheckpoint{
+		CoordinatorUuid: runtimeB1,
+		Seq:             1,
+		Type:            schema.AiCheckpointType_Review,
+	}).Error)
 
 	e1 := uuid.NewString()
 	e2 := uuid.NewString()
@@ -109,7 +151,7 @@ func TestDeleteAllAISessionData(t *testing.T) {
 	require.NoError(t, projectDB.Create(&schema.AiProcessAndAiEvent{ProcessesId: "p2", EventId: e2}).Error)
 	require.NoError(t, projectDB.Create(&schema.AiProcessAndAiEvent{ProcessesId: "p3", EventId: e3}).Error)
 
-	deletedSessions, deletedRuntimes, deletedEvents, deletedPlanExec, err := DeleteAllAISessionData(profileDB, projectDB)
+	deletedSessions, deletedRuntimes, deletedEvents, deletedPlanExec, err := DeleteAllAISessionData(projectDB)
 	require.NoError(t, err)
 	require.Equal(t, int64(2), deletedSessions)
 	require.Equal(t, int64(3), deletedRuntimes)
@@ -117,11 +159,13 @@ func TestDeleteAllAISessionData(t *testing.T) {
 	require.Equal(t, int64(2), deletedPlanExec)
 
 	var count int64
-	require.NoError(t, profileDB.Model(&schema.AIAgentRuntime{}).Count(&count).Error)
+	require.NoError(t, projectDB.Model(&schema.AIAgentRuntime{}).Count(&count).Error)
 	require.Equal(t, int64(0), count)
 	require.NoError(t, projectDB.Model(&schema.AiOutputEvent{}).Count(&count).Error)
 	require.Equal(t, int64(0), count)
 	require.NoError(t, projectDB.Model(&schema.AiProcessAndAiEvent{}).Count(&count).Error)
+	require.Equal(t, int64(0), count)
+	require.NoError(t, projectDB.Model(&schema.AiCheckpoint{}).Count(&count).Error)
 	require.Equal(t, int64(0), count)
 	require.NoError(t, projectDB.Model(&schema.AISession{}).Count(&count).Error)
 	require.Equal(t, int64(0), count)

@@ -102,10 +102,7 @@ func (s *Server) DeleteAISession(ctx context.Context, req *ypb.DeleteAISessionRe
 	}
 
 	if req.GetDeleteAll() {
-		deletedSessions, deletedRuntimes, deletedEvents, deletedPlanExec, err := yakit.DeleteAllAISessionData(
-			s.GetProfileDatabase(),
-			s.GetProjectDatabase(),
-		)
+		deletedSessions, deletedRuntimes, deletedEvents, deletedPlanExec, err := yakit.DeleteAllAISessionData(s.GetProjectDatabase())
 		if err != nil {
 			return nil, err
 		}
@@ -140,7 +137,7 @@ func (s *Server) DeleteAISession(ctx context.Context, req *ypb.DeleteAISessionRe
 	var deletedRuntimes int64
 	var deletedEvents int64
 	for _, sessionID := range targetSessionIDs {
-		runtimeCount, eventCount, err := yakit.DeleteAISession(s.GetProfileDatabase(), s.GetProjectDatabase(), strings.TrimSpace(sessionID))
+		runtimeCount, eventCount, err := yakit.DeleteAISession(s.GetProjectDatabase(), strings.TrimSpace(sessionID))
 		if err != nil {
 			return nil, err
 		}

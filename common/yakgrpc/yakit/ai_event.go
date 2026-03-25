@@ -161,6 +161,10 @@ func DeleteAllAIEventWithCount(db *gorm.DB) (int64, error) {
 		log.Errorf("drop & recreate AI event associations failed: %v", err)
 		return deletedEvents, err
 	}
+	if err = schema.DropRecreateTable(db, &schema.AiProcess{}); err != nil {
+		log.Errorf("drop & recreate AI events failed: %v", err)
+		return deletedEvents, err
+	}
 	if err := schema.DropRecreateTable(db, &schema.AiOutputEvent{}); err != nil {
 		log.Errorf("drop & recreate AI events failed: %v", err)
 		return deletedEvents, err
