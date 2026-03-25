@@ -209,6 +209,9 @@ dataURI, err = page.ScreenshotBase64()      // "data:image/png;base64,..."
 ```yak
 err = page.WaitSelector("div.loaded")
 err = page.WaitVisible("#content")
+err = page.WaitTime(1000)
+err = page.WaitText("Welcome")
+err = page.WaitFunction("window.ready === true")
 ```
 
 #### 元素查找
@@ -216,6 +219,7 @@ err = page.WaitVisible("#content")
 ```yak
 el, err = page.Element("h1")
 els, err = page.Elements("a")
+labelEls, err = page.ElementsByLabel("登陆")
 ```
 
 #### Cookie
@@ -223,6 +227,15 @@ els, err = page.Elements("a")
 ```yak
 cookies, err = page.GetCookies()
 err = page.SetCookies(cookies)
+```
+
+#### 鼠标操作
+
+```yak
+err = page.MouseMove(x, y)
+err = page.MouseDown()
+err = page.MouseUp()
+err = page.Drag(fromX, fromY, toX, toY)
 ```
 
 ### BrowserElement 方法
@@ -233,11 +246,22 @@ err = page.SetCookies(cookies)
 text, err = el.Text()
 html, err = el.HTML()
 value, err = el.Attribute("href")
+property, err = el.Property("id")
 err = el.Click()
+err = el.DoubleClick()
 err = el.Input("text")
+err = el.Type("text")
+err = el.Hover()
+err = el.Select("option_a")
+err = el.ScrollIntoView()
+err, err = el.SetFiles("upload_file.txt")
+value, err = el.Evaluate("")
 err = el.Focus()
 visible, err = el.Visible()
 err = el.WaitVisible()
+disabled, err = el.Disabled()
+checked, err = el.Checked()
+x, y, err = el.GetCenterPosition()
 ```
 
 ### SnapshotResult 字段
@@ -346,6 +370,9 @@ go run common/yak/cmd/yak.go common/browser/yaktests/06_evaluate.yak
 go run common/yak/cmd/yak.go common/browser/yaktests/07_screenshot.yak
 go run common/yak/cmd/yak.go common/browser/yaktests/08_multi_instance.yak
 go run common/yak/cmd/yak.go common/browser/yaktests/09_tabs.yak
+go run common/yak/cmd/yak.go common/browser/yaktests/21_element_drag.yak
+go run common/yak/cmd/yak.go common/browser/yaktests/22_element_common.yak
+go run common/yak/cmd/yak.go common/browser/yaktests/23_delay.yak
 ```
 
 ### 跨进程测试（必须顺序运行）
@@ -368,20 +395,23 @@ go run common/yak/cmd/yak.go common/browser/yaktests/15_gui_step3_close.yak
 go run common/yak/cmd/yak.go common/browser/yaktests/16_ai_login.yak
 ```
 
-| 脚本 | 覆盖范围 |
-|------|----------|
-| 01_lifecycle | Open / Get / List / Close / CloseAll / IsClosed |
-| 02_navigate | Navigate / Title / URL / HTML / Reload |
-| 03_snapshot | Snapshot / Text / NodeCount / RefMap.Count |
-| 04_ref_interaction | Click(@ref) / Fill(@ref) / Snapshot 重新生成 |
-| 05_selector | Click(css) / Fill(css) / Element / Elements / BrowserElement |
-| 06_evaluate | Evaluate JS 表达式 |
-| 07_screenshot | Screenshot / ScreenshotBase64 |
-| 08_multi_instance | 多 ID 并行 / Get 复用 / 分别关闭 |
-| 09_tabs | ListTabs / NewTab / SwitchTab / CloseTab |
-| 10-12 | 跨进程 headless: 启动/重连操作/验证关闭 |
-| 13-15 | 跨进程 GUI: 同上但可见窗口 |
-| 16 | AI 模拟登录: snapshot 探索 + 填表 + 提交 |
+| 脚本                 | 覆盖范围                                                         |
+|--------------------|--------------------------------------------------------------|
+| 01_lifecycle       | Open / Get / List / Close / CloseAll / IsClosed              |
+| 02_navigate        | Navigate / Title / URL / HTML / Reload                       |
+| 03_snapshot        | Snapshot / Text / NodeCount / RefMap.Count                   |
+| 04_ref_interaction | Click(@ref) / Fill(@ref) / Snapshot 重新生成                     |
+| 05_selector        | Click(css) / Fill(css) / Element / Elements / BrowserElement |
+| 06_evaluate        | Evaluate JS 表达式                                              |
+| 07_screenshot      | Screenshot / ScreenshotBase64                                |
+| 08_multi_instance  | 多 ID 并行 / Get 复用 / 分别关闭                                      |
+| 09_tabs            | ListTabs / NewTab / SwitchTab / CloseTab                     |
+| 10-12              | 跨进程 headless: 启动/重连操作/验证关闭                                   |
+| 13-15              | 跨进程 GUI: 同上但可见窗口                                             |
+| 16                 | AI 模拟登录: snapshot 探索 + 填表 + 提交                               |
+| 21                 | label 元素搜索 / 元素拖动                                            |
+| 22                 | 元素设置文件 / 单双击 / 确认是否已选 / 下拉选择 / 滚动至视野中 / 悬停                   |
+| 23                 | 页面等待固定时间 / 等待文本出现 / 等待js代码执行                                 |
 
 ## 使用示例
 

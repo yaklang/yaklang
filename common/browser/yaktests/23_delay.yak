@@ -1,5 +1,6 @@
 // 23_delay.yak
 // Test wait for page delay.
+// covers: page.WaitText / page.WaitFunction / page.WaitTime
 //
 // Run: go run common/yak/cmd/yak.go common/browser/yaktests/23_delay.yak
 
@@ -10,7 +11,7 @@ session = "delay"
 log.Info("===== test: open browser with delay page =====")
 b, err = browser.Open(
     browser.id(session),
-    browser.headless(false),
+    browser.headless(true),
     browser.timeout(30),
 )
 assert err == nil, sprintf("open failed: %v", err)
@@ -97,6 +98,10 @@ log.info("ready to wait...")
 err = page.WaitText("列表项一：延迟显示生效")
 assert err == nil, sprintf("wait text failed: %v", err)
 log.info("wait text ok")
+
+err = page.WaitTime(3000)
+assert err == nil, sprintf("wait time failed: %v", err)
+log.info("wait time ok")
 
 page2, err = b.Navigate(delayHtml)
 assert err == nil, sprintf("navigate page2 to delay failed: %v: %v", err)

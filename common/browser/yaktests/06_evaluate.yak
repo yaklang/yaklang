@@ -50,4 +50,12 @@ assert err == nil, sprintf("evaluate string concat failed: %v", err)
 assert sprintf("%v", result3) == "hello world", sprintf("string concat should be 'hello world', got: %v", result3)
 log.info("string concat: %v", result3)
 
+log.info("===== test 7: element evaluate =====")
+ele, err = page.Element("#search-input")
+assert err == nil, sprintf("get page element failed: %v", err)
+elementEvaluateResult, err = ele.Evaluate("this.id")
+assert err == nil, sprintf("element evaluate failed: %v", err)
+assert sprintf("%v", elementEvaluateResult) == "search-input", sprintf("element evaluate result should be 'search-input', got: %v", elementEvaluateResult)
+log.info("element evaluate result: %v", elementEvaluateResult)
+
 log.info("===== EVALUATE TEST PASSED =====")

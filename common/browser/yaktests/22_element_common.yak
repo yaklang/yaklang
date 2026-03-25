@@ -10,7 +10,7 @@ session = "element_common"
 test_file_path = "/tmp/browser_gui_control_url.txt"
 uploadUrl = "http://127.0.0.1:8787/upload/main?case=safe"
 
-log.Info("===== test: open browser with form page =====")
+log.Info("===== test: open browser with upload page =====")
 b, err = browser.Open(
     browser.id(session),
     browser.headless(true),
@@ -28,6 +28,7 @@ assert err == nil, sprintf("get set file element failed: %v", err)
 
 err = setFileElement.SetFiles(test_file_path)
 assert err == nil, sprintf("set file failed: %v", err)
+log.info("set upload file ok")
 
 // check upload
 value, err = setFileElement.Property("value")
@@ -39,6 +40,7 @@ button, err = page.Element("body > div > div > form > button")
 assert err == nil, sprintf("get click element failed: %v", err)
 err = button.DoubleClick()
 assert err == nil, sprintf("double click failed: %v", err)
+log.info("double click ok")
 
 html = `data:text/html,
 <html lang="zh-CN">
@@ -118,6 +120,8 @@ html = `data:text/html,
 </body>
 </html>`
 
+
+log.Info("===== test 2: open check & select page =====")
 newPage, err = b.Navigate(html)
 assert err == nil, sprintf("navigate to html failed: %v", err)
 sleep(0.5)

@@ -76,10 +76,13 @@ inputElement, err = page.Element("#search-input")
 assert err == nil, sprintf("get input element failed: %v", err)
 err = inputElement.Input("search-input")
 assert err == nil, sprintf("element input failed: %v", err)
+log.info("element input ok")
 err = inputElement.Type("search-input")
 assert err == nil, sprintf("element type failed: %v", err)
+log.info("element type ok")
 err = inputElement.Type("错误示范")
 assert err != nil, "element error type not found"
+log.info("element invalid type check ok")
 
 log.info("===== test 8: Click via CSS selector =====")
 err = page.Click("a")
