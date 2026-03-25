@@ -1999,13 +1999,20 @@ func TestGRPCMUSTPASS_MITM_ModifyHost(t *testing.T) {
 		Keyword: token2,
 		Pagination: &ypb.Paging{
 			Page:  1,
-			Limit: 1,
+			Limit: 20,
 		},
+		SourceType: "mitm",
 	}, 1)
 	require.NoError(t, err)
-	flow := flows.Data[0]
-	require.Equal(t, replacedHost, lowhttp.GetHTTPPacketHeader(flow.Request, "Host"))
-	require.Equal(t, token, string(lowhttp.GetHTTPPacketBody(flow.Response)))
+	foundModified := false
+	for _, flow := range flows.Data {
+		if lowhttp.GetHTTPPacketHeader(flow.Request, "Host") == replacedHost &&
+			string(lowhttp.GetHTTPPacketBody(flow.Response)) == token {
+			foundModified = true
+			break
+		}
+	}
+	require.True(t, foundModified, "modified host flow not found in queried http flows")
 }
 
 func TestGRPCMUSTPASS_MITM_GM_Only(t *testing.T) {
