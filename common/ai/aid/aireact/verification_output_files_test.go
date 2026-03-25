@@ -76,3 +76,18 @@ func TestVerifySatisfactionResult_OutputFiles_Missing(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, result.OutputFiles)
 }
+
+func TestRenderVerificationOutputFilesMarkdown(t *testing.T) {
+	markdown := renderVerificationOutputFilesMarkdown([]string{
+		" /tmp/result.md ",
+		"/tmp/result.md",
+		"/tmp/log.txt",
+		"/tmp/ai_bash_script_123.sh",
+	})
+	require.Equal(t, "## 交付文件\n\n- /tmp/result.md\n- /tmp/log.txt", markdown)
+}
+
+func TestRenderVerificationOutputFilesMarkdown_Empty(t *testing.T) {
+	require.Empty(t, renderVerificationOutputFilesMarkdown(nil))
+	require.Empty(t, renderVerificationOutputFilesMarkdown([]string{"", "   ", "/tmp/ai_bash_script_1.sh"}))
+}
