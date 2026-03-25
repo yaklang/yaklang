@@ -569,6 +569,8 @@ github.com/yaklang/go-llvm v0.0.0-20260129063950-48708b0616fc h1:1Jw9krKcT13FLMk
 github.com/yaklang/go-llvm v0.0.0-20260129063950-48708b0616fc/go.mod h1:L8gVgAxjSL0/ub973fygXVVHoDaYKLC190N6uq+o+tE=
 github.com/yaklang/go-llvm v0.0.0-20260312041226-0ee5831df993 h1:7dnFxFIkPW0pWlXkobYOyRBTTwOQXn0vMhNvYHchgNk=
 github.com/yaklang/go-llvm v0.0.0-20260312041226-0ee5831df993/go.mod h1:L8gVgAxjSL0/ub973fygXVVHoDaYKLC190N6uq+o+tE=
+github.com/yaklang/go-llvm v0.0.0-20260325033841-7304627dfe8f h1:YuuIpas5z91t2S69RrLoBsH1xVBka74B+nga7WC/7Pg=
+github.com/yaklang/go-llvm v0.0.0-20260325033841-7304627dfe8f/go.mod h1:L8gVgAxjSL0/ub973fygXVVHoDaYKLC190N6uq+o+tE=
 github.com/yaklang/go-sqlite3 v0.0.1 h1:IXdqvUAct8FygqoQ3XgWBqw8Bh7qQFa0miTl4cM4B+4=
 github.com/yaklang/go-sqlite3 v0.0.1/go.mod h1:RCLoOuANeSNMmFMCABJyusomiGXnZjkLk20oZSAAh5U=
 github.com/yaklang/pcap v1.0.5 h1:LiatV/vG+1uMzBB+gyNg2rxc5v/yrH4jzk8IsG+iSfE=

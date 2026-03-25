@@ -66,7 +66,7 @@ func (c *Compiler) resolveContextCallArg(inst *ssa.Call, argID int64, tagPointer
 
 	root = argI64
 	tag := llvm.ConstInt(i64, yakTaggedPointerMask, false)
-	argI64 = buildOr(c.Builder, argI64, tag, "yak_ctx_arg_tag")
+	argI64 = c.Builder.CreateOr(argI64, tag, "yak_ctx_arg_tag")
 	return argI64, root, nil
 }
 

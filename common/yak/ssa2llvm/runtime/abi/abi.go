@@ -22,7 +22,7 @@ package abi
 // Boehm-GC-visible, untagged pointer list to keep shadow objects alive.
 
 const (
-	Magic   uint64 = 0x59414B494E564B31 // "YAKINVK1"
+	Magic   uint64 = 0x59414B4354585631 // "YAKCTXV1"
 	Version uint64 = 1
 )
 
@@ -36,7 +36,8 @@ const (
 )
 
 const (
-	FlagAsync uint64 = 1 << 0
+	FlagAsync              uint64 = 1 << 0
+	FlagPanicTaggedPointer uint64 = 1 << 1
 )
 
 const (

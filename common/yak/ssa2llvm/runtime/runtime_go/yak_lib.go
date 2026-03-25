@@ -26,9 +26,7 @@ func main() {}
 
 func recoverRuntimePanic() {
 	if r := recover(); r != nil {
-		if gcLogEnabled() {
-			fmt.Printf("[Yak Runtime] recovered panic: %v\n", r)
-		}
+		logRecoveredRuntimePanic("panic", r)
 	}
 }
 
@@ -181,43 +179,43 @@ func handleFromShadow(objPtr unsafe.Pointer) (cgo.Handle, bool) {
 	return cgo.Handle(handleRaw), true
 }
 
-func resolveField(obj any, name string) (reflect.Value, bool) {
+func resolveField(obj any, name string) (reflect.Value, error) {
 	v := reflect.ValueOf(obj)
 	for v.IsValid() && (v.Kind() == reflect.Interface || v.Kind() == reflect.Ptr) {
 		if v.IsNil() {
-			return reflect.Value{}, false
+			return reflect.Value{}, fmt.Errorf("nil object while resolving %q", name)
 		}
 		v = v.Elem()
 	}
 	if !v.IsValid() {
-		return reflect.Value{}, false
+		return reflect.Value{}, fmt.Errorf("invalid object while resolving %q", name)
 	}
 
 	switch v.Kind() {
 	case reflect.Struct:
 		f := v.FieldByName(name)
 		if !f.IsValid() {
-			return reflect.Value{}, false
+			return reflect.Value{}, fmt.Errorf("field %q not found", name)
 		}
-		return f, true
+		return f, nil
 	case reflect.Map:
 		key, ok := resolveMapKey(v.Type().Key(), name)
 		if !ok {
-			return reflect.Value{}, false
+			return reflect.Value{}, fmt.Errorf("invalid map key %q", name)
 		}
 		f := v.MapIndex(key)
 		if !f.IsValid() {
-			return reflect.Value{}, false
+			return reflect.Value{}, fmt.Errorf("map key %q not found", name)
 		}
-		return f, true
+		return f, nil
 	case reflect.Slice, reflect.Array:
 		idx, ok := resolveCollectionIndex(v.Len(), name)
 		if !ok {
-			return reflect.Value{}, false
+			return reflect.Value{}, fmt.Errorf("index %q out of range", name)
 		}
-		return v.Index(idx), true
+		return v.Index(idx), nil
 	default:
-		return reflect.Value{}, false
+		return reflect.Value{}, fmt.Errorf("type %s does not support member access", v.Kind())
 	}
 }
 
@@ -349,53 +347,59 @@ func valueForSet(targetType reflect.Type, val int64) (reflect.Value, bool) {
 	}
 }
 
-func setRuntimeField(obj any, name string, val int64) bool {
+func setRuntimeField(obj any, name string, val int64) error {
 	v := reflect.ValueOf(obj)
 	if !v.IsValid() {
-		return false
+		return fmt.Errorf("invalid object while setting %q", name)
 	}
 	if v.Kind() == reflect.Interface {
 		if v.IsNil() {
-			return false
+			return fmt.Errorf("nil interface while setting %q", name)
 		}
 		v = v.Elem()
 	}
 	if v.Kind() == reflect.Ptr {
 		if v.IsNil() {
-			return false
+			return fmt.Errorf("nil pointer while setting %q", name)
 		}
 		v = v.Elem()
 	}
 	if !v.IsValid() {
-		return false
+		return fmt.Errorf("invalid object while setting %q", name)
 	}
 
 	switch v.Kind() {
 	case reflect.Struct:
 		f := v.FieldByName(name)
 		if !f.IsValid() {
-			return false
+			return fmt.Errorf("field %q not found", name)
 		}
-		return setReflectValue(f, val)
+		if !setReflectValue(f, val) {
+			return fmt.Errorf("field %q is not assignable from int64", name)
+		}
+		return nil
 	case reflect.Map:
 		key, ok := resolveMapKey(v.Type().Key(), name)
 		if !ok {
-			return false
+			return fmt.Errorf("invalid map key %q", name)
 		}
 		mapVal, ok := valueForSet(v.Type().Elem(), val)
 		if !ok {
-			return false
+			return fmt.Errorf("map value for key %q is not assignable from int64", name)
 		}
 		v.SetMapIndex(key, mapVal)
-		return true
+		return nil
 	case reflect.Slice, reflect.Array:
 		idx, ok := resolveCollectionIndex(v.Len(), name)
 		if !ok {
-			return false
+			return fmt.Errorf("index %q out of range", name)
 		}
-		return setReflectValue(v.Index(idx), val)
+		if !setReflectValue(v.Index(idx), val) {
+			return fmt.Errorf("index %q is not assignable from int64", name)
+		}
+		return nil
 	default:
-		return false
+		return fmt.Errorf("type %s does not support member write", v.Kind())
 	}
 }
 
@@ -406,9 +410,9 @@ func yak_runtime_get_field(objPtr unsafe.Pointer, name *C.char) int64 {
 	if !ok || name == nil {
 		return 0
 	}
-	f, ok := resolveField(h.Value(), C.GoString(name))
-	if !ok {
-		return 0
+	f, err := resolveField(h.Value(), C.GoString(name))
+	if err != nil {
+		panic(err)
 	}
 	return runtimeValueToInt64(f)
 }
@@ -420,7 +424,9 @@ func yak_runtime_set_field(objPtr unsafe.Pointer, name *C.char, val int64) {
 	if !ok || name == nil {
 		return
 	}
-	_ = setRuntimeField(h.Value(), C.GoString(name), val)
+	if err := setRuntimeField(h.Value(), C.GoString(name), val); err != nil {
+		panic(err)
+	}
 }
 
 //export yak_runtime_dump

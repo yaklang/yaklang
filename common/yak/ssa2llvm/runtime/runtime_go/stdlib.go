@@ -13,8 +13,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
-	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
-	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/dispatch"
 )
 
 func normalizePrintArg(v any) any {
@@ -84,7 +82,6 @@ func resolveStdlibValue[T any](ptr unsafe.Pointer) (T, bool) {
 }
 
 func stdlibPocTimeout(args []uint64) int64 {
-	defer recoverRuntimePanic()
 	if len(args) != 1 {
 		return 0
 	}
@@ -93,7 +90,6 @@ func stdlibPocTimeout(args []uint64) int64 {
 }
 
 func stdlibPocGet(args []uint64) int64 {
-	defer recoverRuntimePanic()
 	if len(args) != 2 {
 		return 0
 	}
@@ -114,7 +110,6 @@ func stdlibPocGet(args []uint64) int64 {
 }
 
 func stdlibPocGetHTTPPacketBody(args []uint64) int64 {
-	defer recoverRuntimePanic()
 	if len(args) != 1 {
 		return 0
 	}
@@ -131,7 +126,6 @@ func stdlibPocGetHTTPPacketBody(args []uint64) int64 {
 }
 
 func stdlibOsGetenv(args []uint64) int64 {
-	defer recoverRuntimePanic()
 	if len(args) != 1 {
 		return 0
 	}
@@ -145,21 +139,18 @@ func stdlibOsGetenv(args []uint64) int64 {
 }
 
 func stdlibPrint(args []uint64) int64 {
-	defer recoverRuntimePanic()
 	decoded := normalizeDecodedArgs(args)
 	_, _ = fmt.Fprint(os.Stdout, decoded...)
 	return 0
 }
 
 func stdlibPrintln(args []uint64) int64 {
-	defer recoverRuntimePanic()
 	decoded := normalizeDecodedArgs(args)
 	_, _ = fmt.Fprintln(os.Stdout, decoded...)
 	return 0
 }
 
 func stdlibPrintf(args []uint64) int64 {
-	defer recoverRuntimePanic()
 	if len(args) < 1 {
 		return 0
 	}
@@ -174,7 +165,6 @@ func stdlibPrintf(args []uint64) int64 {
 }
 
 func stdlibYakitLog(level string, args []uint64) int64 {
-	defer recoverRuntimePanic()
 	if len(args) == 0 {
 		return 0
 	}
@@ -187,47 +177,4 @@ func stdlibYakitLog(level string, args []uint64) int64 {
 	msg := fmt.Sprintf(formatStr, decoded...)
 	_, _ = fmt.Fprintf(os.Stderr, "[yakit][%s] %s\n", level, msg)
 	return 0
-}
-
-func invokeDispatch(ctx unsafe.Pointer) {
-	argc := ctxArgc(ctx)
-	if argc < 0 || argc > 256 {
-		return
-	}
-	args := ctxArgsSlice(ctx, argc)
-
-	id := dispatch.FuncID(int64(ctxLoadWord(ctx, abi.WordTarget)))
-
-	var ret int64
-	switch id {
-	case dispatch.IDPocTimeout:
-		ret = stdlibPocTimeout(args)
-	case dispatch.IDPocGet:
-		ret = stdlibPocGet(args)
-	case dispatch.IDPocGetHTTPPacketBody:
-		ret = stdlibPocGetHTTPPacketBody(args)
-	case dispatch.IDOsGetenv:
-		ret = stdlibOsGetenv(args)
-	case dispatch.IDPrint:
-		ret = stdlibPrint(args)
-	case dispatch.IDPrintf:
-		ret = stdlibPrintf(args)
-	case dispatch.IDPrintln:
-		ret = stdlibPrintln(args)
-	case dispatch.IDYakitInfo:
-		ret = stdlibYakitLog("info", args)
-	case dispatch.IDYakitWarn:
-		ret = stdlibYakitLog("warn", args)
-	case dispatch.IDYakitDebug:
-		ret = stdlibYakitLog("debug", args)
-	case dispatch.IDYakitError:
-		ret = stdlibYakitLog("error", args)
-	case dispatch.IDWaitAllAsyncCallFinish:
-		yakAsyncWaitGroup.Wait()
-		ret = 0
-	default:
-		ret = 0
-	}
-
-	ctxSetRet(ctx, ret)
 }

@@ -69,3 +69,18 @@ func TestComplex_TryCatchFinally_Panic(t *testing.T) {
 	}
 	`, 1, 2)
 }
+
+func TestComplex_TryCatchFinally_PanicValue(t *testing.T) {
+	checkPrintBinary(t, `
+	check = () => {
+		try {
+			panic(7)
+		} catch err {
+			println(err)
+		} finally {
+			println(2)
+		}
+		return 0
+	}
+	`, 7, 2)
+}

@@ -12,20 +12,23 @@ func yakStdCallStubGoCode() string {
 	return `
 // Minimal invoke/runtime stub for tests that skip linking the full yak runtime.
 // Only callable dispatch and builtin printing are implemented here.
+//export yak_runtime_invoke
 func yak_runtime_invoke(ctx unsafe.Pointer) {
 	const (
 		yakTaggedPointerMask = uint64(1) << 62
 
 		wordKind   = 2
+		wordFlags  = 3
 		wordTarget = 4
 		wordArgc   = 5
 		wordRet    = 6
-		wordFlags  = 3
+		wordPanic  = 7
 
 		headerWords  = 10
 		kindCallable = 1
 		kindDispatch = 2
 		flagAsync    = 1 << 0
+		flagPanicPtr = 1 << 1
 	)
 
 	if ctx == nil {
@@ -99,6 +102,27 @@ func yak_runtime_invoke(ctx unsafe.Pointer) {
 	}
 
 	storeWord(wordRet, 0)
+}
+
+//export yak_runtime_load_panic_value
+func yak_runtime_load_panic_value(ctx unsafe.Pointer) int64 {
+	const (
+		yakTaggedPointerMask = uint64(1) << 62
+		wordFlags            = 3
+		wordPanic            = 7
+		flagPanicPtr         = 1 << 1
+	)
+	if ctx == nil {
+		return 0
+	}
+	loadWord := func(word int) uint64 {
+		return *(*uint64)(unsafe.Pointer(uintptr(ctx) + uintptr(word)*8))
+	}
+	value := loadWord(wordPanic)
+	if (loadWord(wordFlags) & flagPanicPtr) != 0 {
+		value |= yakTaggedPointerMask
+	}
+	return int64(value)
 }
 `
 }
