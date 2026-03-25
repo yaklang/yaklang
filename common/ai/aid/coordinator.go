@@ -486,6 +486,10 @@ func (c *Coordinator) registerPEModeInputEventCallback() {
 			},
 				event.SyncID,
 			)
+		} else {
+			c.EmitSyncJSON(schema.EVENT_TYPE_PLAN, "system", map[string]any{},
+				event.SyncID,
+			)
 		}
 		return nil
 	})
