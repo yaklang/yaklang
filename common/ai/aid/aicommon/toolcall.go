@@ -23,6 +23,98 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+var toolParamAITagStartRegexp = regexp.MustCompile(`<\|TOOL_PARAM_([A-Za-z0-9_]+)_([A-Za-z0-9]+)\|>`)
+
+type toolParamAITagBlock struct {
+	ParamName string
+	Nonce     string
+	Content   string
+}
+
+func normalizeAITAGBlockContent(content string) string {
+	content = strings.TrimPrefix(content, "\r\n")
+	content = strings.TrimPrefix(content, "\n")
+	content = strings.TrimSuffix(content, "\r\n")
+	content = strings.TrimSuffix(content, "\n")
+	return content
+}
+
+func extractKnownToolParamAITagBlocks(raw string, knownParams []string) []toolParamAITagBlock {
+	if raw == "" {
+		return nil
+	}
+
+	allowedParams := make(map[string]struct{}, len(knownParams))
+	for _, paramName := range knownParams {
+		allowedParams[paramName] = struct{}{}
+	}
+
+	matches := toolParamAITagStartRegexp.FindAllStringSubmatchIndex(raw, -1)
+	blocks := make([]toolParamAITagBlock, 0, len(matches))
+	for _, match := range matches {
+		if len(match) != 6 {
+			continue
+		}
+		paramName := raw[match[2]:match[3]]
+		if len(allowedParams) > 0 {
+			if _, ok := allowedParams[paramName]; !ok {
+				continue
+			}
+		}
+		nonce := raw[match[4]:match[5]]
+		contentStart := match[1]
+		endTag := fmt.Sprintf("<|TOOL_PARAM_%s_END_%s|>", paramName, nonce)
+		endOffset := strings.Index(raw[contentStart:], endTag)
+		if endOffset < 0 {
+			continue
+		}
+		contentEnd := contentStart + endOffset
+		blocks = append(blocks, toolParamAITagBlock{
+			ParamName: paramName,
+			Nonce:     nonce,
+			Content:   normalizeAITAGBlockContent(raw[contentStart:contentEnd]),
+		})
+	}
+	return blocks
+}
+
+func recoverSingleMismatchedAITagParam(invokeParams aitool.InvokeParams, rawAIResponse string, expectedNonce string, knownParams []string, mergedParams map[string]struct{}) (*toolParamAITagBlock, string) {
+	if expectedNonce == "" {
+		return nil, "expected nonce is empty"
+	}
+	if len(mergedParams) > 0 {
+		return nil, "exact nonce aitag already merged"
+	}
+
+	blocks := extractKnownToolParamAITagBlocks(rawAIResponse, knownParams)
+	if len(blocks) == 0 {
+		return nil, "no known aitag blocks found"
+	}
+
+	var mismatched []toolParamAITagBlock
+	for _, block := range blocks {
+		if block.Nonce == expectedNonce {
+			return nil, "found exact nonce aitag block"
+		}
+		mismatched = append(mismatched, block)
+	}
+
+	if len(mismatched) != 1 {
+		return nil, fmt.Sprintf("found %d mismatched aitag blocks", len(mismatched))
+	}
+
+	candidate := mismatched[0]
+	if candidate.Content == "" {
+		return nil, "mismatched aitag block is empty"
+	}
+	if invokeParams.GetString(candidate.ParamName) != "" {
+		return nil, fmt.Sprintf("param %s already has a non-empty value", candidate.ParamName)
+	}
+
+	invokeParams.Set(candidate.ParamName, candidate.Content)
+	return &candidate, ""
+}
+
 type ToolCaller struct {
 	runtimeId  string
 	task       AITask
@@ -364,13 +456,41 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 		}
 
 		// Then, merge AITAG params (they take precedence over JSON params)
+		mergedAITagParams := make(map[string]struct{})
 		if promptMeta != nil && len(promptMeta.ParamNames) > 0 {
 			for _, paramName := range promptMeta.ParamNames {
 				aitagKey := fmt.Sprintf("__aitag__%s", paramName)
 				if aitagValue := callToolAction.GetString(aitagKey); aitagValue != "" {
 					invokeParams.Set(paramName, aitagValue)
+					mergedAITagParams[paramName] = struct{}{}
 					log.Debugf("merged AITAG param[%s] for tool[%s]", paramName, tool.Name)
 				}
+			}
+
+			rawAIResponse = response.String()
+			blocks := extractKnownToolParamAITagBlocks(rawAIResponse, promptMeta.ParamNames)
+			var mismatched []toolParamAITagBlock
+			for _, block := range blocks {
+				if block.Nonce != promptMeta.Nonce {
+					mismatched = append(mismatched, block)
+				}
+			}
+			if len(mismatched) > 0 {
+				parts := make([]string, 0, len(mismatched))
+				for _, block := range mismatched {
+					parts = append(parts, fmt.Sprintf("%s:%s", block.ParamName, block.Nonce))
+				}
+				message := fmt.Sprintf("tool[%s] generated mismatched AITAG nonce, expected=%s observed=%s", tool.Name, promptMeta.Nonce, strings.Join(parts, ", "))
+				log.Warn(message)
+				emitter.EmitWarning(message)
+			}
+
+			if recovered, reason := recoverSingleMismatchedAITagParam(invokeParams, rawAIResponse, promptMeta.Nonce, promptMeta.ParamNames, mergedAITagParams); recovered != nil {
+				message := fmt.Sprintf("tool[%s] recovered single AITAG param[%s] from mismatched nonce[%s], expected nonce[%s]", tool.Name, recovered.ParamName, recovered.Nonce, promptMeta.Nonce)
+				log.Warn(message)
+				emitter.EmitWarning(message)
+			} else if len(mismatched) > 0 {
+				log.Debugf("tool[%s] skipped AITAG nonce fallback: %s", tool.Name, reason)
 			}
 		}
 

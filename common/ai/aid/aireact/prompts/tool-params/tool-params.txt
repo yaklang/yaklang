@@ -175,6 +175,18 @@ done
 - Replace `{param_name}` with the actual parameter name
 - Content between tags is used as-is without any escaping
 - AITAG parameters will override any same-named parameters in the JSON `params` object
+- You MUST copy the nonce `{{ .Nonce }}` exactly as-is for every AITAG start/end tag in this response
+- Never reuse a nonce from examples, timeline, memory, previous attempts, or old tool calls
+- If you use AITAG, the start and end tag must use the SAME parameter name and the SAME current nonce `{{ .Nonce }}`
+
+### Nonce Safety Examples:
+Correct:
+- `<|TOOL_PARAM_script_{{ .Nonce }}|> ... <|TOOL_PARAM_script_END_{{ .Nonce }}|>`
+
+Incorrect:
+- `<|TOOL_PARAM_script_abc123|> ...` because `abc123` is an example nonce, not the current nonce
+- `<|TOOL_PARAM_script_oldnonce|> ...` because reusing a nonce from history or a previous attempt will be ignored
+- `<|TOOL_PARAM_other_param_{{ .Nonce }}|> ... <|TOOL_PARAM_script_END_{{ .Nonce }}|>` because parameter names do not match
 {{ if .ParamNames }}
 ### Available Parameters for this tool:
 {{- range .ParamNames }}

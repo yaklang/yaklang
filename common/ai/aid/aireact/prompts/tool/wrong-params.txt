@@ -20,7 +20,7 @@ OS/Arch: {{ .OSArch }}
 # User Query
 <|USER_QUERY_{{ .Nonce }}|>
 {{ .UserQuery }}
-<|USER_QUERY_{{ .Nonce }}|>
+<|USER_QUERY_END_{{ .Nonce }}|>
 
 # 上下文
 
@@ -28,7 +28,7 @@ OS/Arch: {{ .OSArch }}
 
 <|OLD_PARAMS_{{ .Nonce }}|>
 {{ .OldParams }}
-<|OLD_PARAMS_{{ .Nonce }} END|>
+<|OLD_PARAMS_END_{{ .Nonce }}|>
 
 在执行过程中发现这个工具的参数不适合当前的任务。你需要重新生成一个符合Schema的参数来完成任务。
 
@@ -99,6 +99,18 @@ You can combine both methods - use JSON for simple parameters and AITAG for comp
 - Replace `{param_name}` with the actual parameter name
 - Content between tags is used as-is without any escaping
 - AITAG parameters will override any same-named parameters in the JSON `params` object
+- You MUST copy the nonce `{{ .Nonce }}` exactly as-is for every AITAG start/end tag in this response
+- Never reuse a nonce from the old params, examples, timeline, memory, or the previous failed attempt
+- If you use AITAG, the start and end tag must use the SAME parameter name and the SAME current nonce `{{ .Nonce }}`
+
+### Nonce Safety Examples:
+Correct:
+- `<|TOOL_PARAM_script_{{ .Nonce }}|> ... <|TOOL_PARAM_script_END_{{ .Nonce }}|>`
+
+Incorrect:
+- `<|TOOL_PARAM_script_abc123|> ...` because `abc123` is only an example nonce
+- `<|TOOL_PARAM_script_previous_nonce|> ...` because reusing the previous attempt nonce will be ignored
+- `<|TOOL_PARAM_config_{{ .Nonce }}|> ... <|TOOL_PARAM_script_END_{{ .Nonce }}|>` because parameter names do not match
 {{ if .ParamNames }}
 ### Available Parameters for this tool:
 {{- range .ParamNames }}
