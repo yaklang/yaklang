@@ -295,6 +295,9 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		return err
 	}
 	hostMapping := make(map[string]string)
+	for _, pair := range firstReq.GetHosts() {
+		hostMapping[pair.GetKey()] = pair.GetValue()
+	}
 	for _, pair := range firstReq.GetHostsMapping() {
 		hostMapping[pair.GetKey()] = pair.GetValue()
 	}

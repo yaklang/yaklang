@@ -359,6 +359,71 @@ func TestGRPCMUSTPASS_MITMV2_Runtime_Proxy(t *testing.T) {
 	}, nil)
 }
 
+func TestGRPCMUSTPASS_MITMV2_DownstreamProxy_EnableHostsMappingBeforeDownstreamProxy(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	fakeHost := "mitmv2-hosts-first.invalid"
+	token := utils.RandStringBytes(16)
+
+	targetHost, targetPort := utils.DebugMockHTTPHandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		_, _ = writer.Write([]byte(token))
+	})
+
+	runCase := func(t *testing.T, enable bool) ([]string, *lowhttp.LowhttpResponse, error) {
+		t.Helper()
+
+		var (
+			rsp    *lowhttp.LowhttpResponse
+			reqErr error
+		)
+
+		targetURL := fmt.Sprintf("http://%s", utils.HostPort(fakeHost, targetPort))
+		downstreamProxy, getTargets, closeProxy := startRecordingConnectProxy(t)
+		defer closeProxy()
+
+		mitmPort := utils.GetRandomAvailableTCPPort()
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+
+		RunMITMV2TestServerEx(client, ctx, func(stream ypb.Yak_MITMV2Client) {
+			stream.Send(&ypb.MITMV2Request{
+				Host:                                    "127.0.0.1",
+				Port:                                    uint32(mitmPort),
+				DownstreamProxy:                         downstreamProxy,
+				Hosts:                                   []*ypb.KVPair{{Key: fakeHost, Value: targetHost}},
+				EnableHostsMappingBeforeDownstreamProxy: enable,
+			})
+		}, func(stream ypb.Yak_MITMV2Client) {
+			mitmProxy := "http://" + utils.HostPort("127.0.0.1", mitmPort)
+			rsp, _, reqErr = poc.DoGET(targetURL, poc.WithProxy(mitmProxy))
+			cancel()
+		}, nil)
+
+		require.Eventually(t, func() bool {
+			return len(getTargets()) > 0
+		}, 3*time.Second, 100*time.Millisecond)
+
+		return getTargets(), rsp, reqErr
+	}
+
+	t.Run("disabled", func(t *testing.T) {
+		targets, rsp, err := runCase(t, false)
+		require.Contains(t, targets, utils.HostPort(fakeHost, targetPort))
+		if err == nil && rsp != nil {
+			require.NotContains(t, string(rsp.RawPacket), token)
+		}
+	})
+
+	t.Run("enabled", func(t *testing.T) {
+		targets, rsp, err := runCase(t, true)
+		require.Contains(t, targets, utils.HostPort(targetHost, targetPort))
+		require.NoError(t, err)
+		require.NotNil(t, rsp)
+		require.Contains(t, string(rsp.RawPacket), token)
+	})
+}
+
 func TestGRPCMUSTPASS_MITMV2_Proxy_MITMPluginInheritProxy(t *testing.T) {
 	client, err := NewLocalClient()
 	if err != nil {
