@@ -3,14 +3,15 @@ package health
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/pkg/errors"
-	"github.com/shirou/gopsutil/v4/host"
-	"github.com/yaklang/yaklang/common/log"
 	"net"
 	"os/exec"
 	"os/user"
 	"runtime"
 	"strings"
+
+	"github.com/pkg/errors"
+	"github.com/shirou/gopsutil/v3/host"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 func GetSystemInfo() (*host.InfoStat, error) {

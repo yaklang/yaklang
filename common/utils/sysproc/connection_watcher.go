@@ -3,13 +3,14 @@ package sysproc
 import (
 	"context"
 	"fmt"
-	"github.com/shirou/gopsutil/v4/net"
 	"log"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/shirou/gopsutil/v4/process"
+	"github.com/shirou/gopsutil/v3/net"
+
+	"github.com/shirou/gopsutil/v3/process"
 )
 
 // NewRemoteIPCallback 是发现新外联 IP 时的回调函数签名

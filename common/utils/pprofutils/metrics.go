@@ -15,11 +15,6 @@ package pprofutils
 import (
 	"bytes"
 	"fmt"
-	"github.com/shirou/gopsutil/v4/mem"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -27,6 +22,12 @@ import (
 	"runtime/pprof"
 	"sync"
 	"time"
+
+	"github.com/shirou/gopsutil/v3/mem"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 type MemMetrics struct {
