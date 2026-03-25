@@ -10,10 +10,10 @@ import (
 )
 
 func FilterSSARiskDisposals(db *gorm.DB, filter *ypb.SSARiskDisposalsFilter) *gorm.DB {
+	db = db.Model(&schema.SSARiskDisposals{})
 	if filter == nil {
 		return db
 	}
-	db = db.Model(&schema.SSARiskDisposals{})
 	if len(filter.GetID()) > 0 {
 		db = bizhelper.ExactQueryInt64ArrayOr(db, "id", filter.GetID())
 	}
