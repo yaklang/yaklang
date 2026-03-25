@@ -41,7 +41,9 @@
 
 - `KindCallable` 表示 `Target` 是函数指针；
 - `KindDispatch` 表示 `Target` 是 `dispatch.FuncID`；
-- `Flags` 目前使用 `FlagAsync` 表示是否异步执行；
+- `Flags` 目前使用：
+  - `FlagAsync`：表示是否异步执行；
+  - `FlagPanicTaggedPointer`：表示 `Panic` 槽里保存的是未 tag 的指针，需要在读取时补 tag；
 - `Ret` 是返回值槽；
 - `Panic` 是当前函数的异常/`panic` 槽；
 - `Roots` 是给 Boehm GC 看的原始指针数组，用来保活被 tag 过的对象参数。
@@ -129,7 +131,7 @@ LLVM lowering 后：
 
 - `common/yak/ssa2llvm/compiler/ops_call.go`
 - `common/yak/ssa2llvm/compiler/ops_call_context_internal.go`
-- `common/yak/ssa2llvm/runtime/runtime_go/spawn.go`
+- `common/yak/ssa2llvm/runtime/runtime_go/invoke.go`
 
 ### 5.1 为什么 `spawn` 前要把 ctx 挂到 root 链表
 
@@ -166,7 +168,7 @@ goroutine 内部不会再重新走 async 分支，而是直接进入实际执行
 
 相关实现：
 
-- `common/yak/ssa2llvm/runtime/runtime_go/spawn.go`
+- `common/yak/ssa2llvm/runtime/runtime_go/invoke.go`
 - `common/yak/ssa2llvm/runtime/runtime_go/stdlib.go`
 
 ## 6. `main` wrapper 怎么把入口函数接成可执行程序

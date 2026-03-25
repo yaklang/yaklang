@@ -409,9 +409,10 @@ func ensureGoHookCallableBridge(src string) string {
 
 func prepareGoHookCode(goCode string) (string, []string, error) {
 	src := normalizeGoHookCode(goCode)
-	exported := parseGoExportNames(src)
-	if len(exported) > 0 {
-		return src, exported, nil
+	explicitExported := parseGoExportNames(src)
+	explicitSet := make(map[string]struct{}, len(explicitExported))
+	for _, name := range explicitExported {
+		explicitSet[name] = struct{}{}
 	}
 
 	fset := token.NewFileSet()
@@ -440,7 +441,10 @@ func prepareGoHookCode(goCode string) (string, []string, error) {
 		}
 	}
 	if len(funcs) == 0 {
-		return "", nil, fmt.Errorf("hook goCode has no top-level functions to export")
+		if len(explicitExported) == 0 {
+			return "", nil, fmt.Errorf("hook goCode has no top-level functions to export")
+		}
+		return src, explicitExported, nil
 	}
 
 	sort.Slice(funcs, func(i, j int) bool {
@@ -448,9 +452,19 @@ func prepareGoHookCode(goCode string) (string, []string, error) {
 	})
 
 	lineToExports := make(map[int][]string)
-	seen := make(map[string]struct{}, len(funcs))
+	seen := make(map[string]struct{}, len(funcs)+len(explicitExported))
+	exported := make([]string, 0, len(funcs)+len(explicitExported))
+	for _, name := range explicitExported {
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		exported = append(exported, name)
+		seen[name] = struct{}{}
+	}
 	for _, f := range funcs {
-		lineToExports[f.line] = append(lineToExports[f.line], f.name)
+		if _, ok := explicitSet[f.name]; !ok {
+			lineToExports[f.line] = append(lineToExports[f.line], f.name)
+		}
 		if _, ok := seen[f.name]; !ok {
 			exported = append(exported, f.name)
 			seen[f.name] = struct{}{}

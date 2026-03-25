@@ -160,12 +160,13 @@ LLVM 编译器本身不重新发明这套 CFG，只做两件事：
 
 - 它是 **函数内 CFG lowering**，不是原生异常展开；
 - 当前不会在每次普通函数调用返回后自动检查 callee 的 `panic` 槽并继续向上抛；
-- async goroutine 中的 Go runtime panic 会被 `recoverAsyncPanic()` 打印到 `stderr`，不会回流成 Yak catch 值；
+- invoke runtime 会把 host panic 写回当前 `ctx.panic`，并打印到 `stderr`；
+- 但跨调用边界的 host/runtime panic 仍然没有完整接到 Yak 的 catch/recover 控制流；
 - `recover()` 当前只是“读取当前 context 的 panic 槽”，没有完整的 Go 栈语义。
 
 相关 runtime 代码：
 
-- `common/yak/ssa2llvm/runtime/runtime_go/spawn.go`
+- `common/yak/ssa2llvm/runtime/runtime_go/invoke.go`
 - `common/yak/ssa2llvm/runtime/runtime_go/yak_lib.go`
 
 ## 8. 后续重构建议

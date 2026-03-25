@@ -62,7 +62,7 @@ dispatch id 定义在：
 
 统一 invoke 入口定义在：
 
-- `common/yak/ssa2llvm/runtime/runtime_go/spawn.go`
+- `common/yak/ssa2llvm/runtime/runtime_go/invoke.go`
 - `common/yak/ssa2llvm/runtime/runtime_go/stdlib.go`
 
 当 `ctx.kind == abi.KindDispatch` 时，runtime 会进入 dispatch 分支。核心步骤（概念上）：

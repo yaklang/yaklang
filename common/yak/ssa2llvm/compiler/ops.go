@@ -152,17 +152,17 @@ func (c *Compiler) compileBinOp(inst *ssa.BinOp, resultID int64) error {
 	case ssa.OpMod:
 		val = c.Builder.CreateSRem(lhs, rhs, name)
 	case ssa.OpGt:
-		val = buildZExt(c.Builder, c.Builder.CreateICmp(llvm.IntSGT, lhs, rhs, name), c.LLVMCtx.Int64Type(), name)
+		val = c.Builder.CreateZExt(c.Builder.CreateICmp(llvm.IntSGT, lhs, rhs, name), c.LLVMCtx.Int64Type(), name)
 	case ssa.OpLt:
-		val = buildZExt(c.Builder, c.Builder.CreateICmp(llvm.IntSLT, lhs, rhs, name), c.LLVMCtx.Int64Type(), name)
+		val = c.Builder.CreateZExt(c.Builder.CreateICmp(llvm.IntSLT, lhs, rhs, name), c.LLVMCtx.Int64Type(), name)
 	case ssa.OpGtEq:
-		val = buildZExt(c.Builder, c.Builder.CreateICmp(llvm.IntSGE, lhs, rhs, name), c.LLVMCtx.Int64Type(), name)
+		val = c.Builder.CreateZExt(c.Builder.CreateICmp(llvm.IntSGE, lhs, rhs, name), c.LLVMCtx.Int64Type(), name)
 	case ssa.OpLtEq:
-		val = buildZExt(c.Builder, c.Builder.CreateICmp(llvm.IntSLE, lhs, rhs, name), c.LLVMCtx.Int64Type(), name)
+		val = c.Builder.CreateZExt(c.Builder.CreateICmp(llvm.IntSLE, lhs, rhs, name), c.LLVMCtx.Int64Type(), name)
 	case ssa.OpEq:
-		val = buildZExt(c.Builder, c.Builder.CreateICmp(llvm.IntEQ, lhs, rhs, name), c.LLVMCtx.Int64Type(), name)
+		val = c.Builder.CreateZExt(c.Builder.CreateICmp(llvm.IntEQ, lhs, rhs, name), c.LLVMCtx.Int64Type(), name)
 	case ssa.OpNotEq:
-		val = buildZExt(c.Builder, c.Builder.CreateICmp(llvm.IntNE, lhs, rhs, name), c.LLVMCtx.Int64Type(), name)
+		val = c.Builder.CreateZExt(c.Builder.CreateICmp(llvm.IntNE, lhs, rhs, name), c.LLVMCtx.Int64Type(), name)
 	default:
 		return fmt.Errorf("unknown BinOp opcode: %v", inst.Op)
 	}
@@ -217,12 +217,12 @@ func (c *Compiler) compileConst(inst *ssa.ConstInst) error {
 		}
 		return nil
 	} else if inst.IsString() {
-		ptr := buildGlobalStringPtr(c.Builder, inst.VarString(), fmt.Sprintf("str_%d", id))
+		ptr := c.Builder.CreateGlobalStringPtr(inst.VarString(), fmt.Sprintf("str_%d", id))
 		// Represent pointers as i64 (uintptr) in LLVM IR.
 		// NOTE: Do not tag here. Tagging is applied selectively at stdlib
 		// call sites (e.g. print/println) so non-print stdlib calls can receive
 		// raw C-string pointers.
-		llvmVal := constPtrToInt(ptr, c.LLVMCtx.Int64Type())
+		llvmVal := llvm.ConstPtrToInt(ptr, c.LLVMCtx.Int64Type())
 		c.Values[id] = llvmVal
 		if err := c.maybeEmitMemberSet(inst, inst, llvmVal); err != nil {
 			return err

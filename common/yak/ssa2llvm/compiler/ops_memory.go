@@ -215,26 +215,26 @@ func (c *Compiler) coerceToInt64(val llvm.Value) llvm.Value {
 	if val.Type().IntTypeWidth() > 0 {
 		width := val.Type().IntTypeWidth()
 		if width == 1 {
-			return buildZExt(c.Builder, val, c.LLVMCtx.Int64Type(), "val_i64")
+			return c.Builder.CreateZExt(val, c.LLVMCtx.Int64Type(), "val_i64")
 		}
 		if width > 64 {
-			return buildTrunc(c.Builder, val, c.LLVMCtx.Int64Type(), "val_i64")
+			return c.Builder.CreateTrunc(val, c.LLVMCtx.Int64Type(), "val_i64")
 		}
-		return buildSExt(c.Builder, val, c.LLVMCtx.Int64Type(), "val_i64")
+		return c.Builder.CreateSExt(val, c.LLVMCtx.Int64Type(), "val_i64")
 	}
 	return c.Builder.CreatePtrToInt(val, c.LLVMCtx.Int64Type(), "ptr_i64")
 }
 
 func (c *Compiler) emitRuntimeGetField(objVal llvm.Value, keyStr string, id int64) llvm.Value {
 	fn, fnType := c.getOrInsertRuntimeGetField()
-	keyPtr := buildGlobalStringPtr(c.Builder, keyStr, fmt.Sprintf("member_key_%d", id))
+	keyPtr := c.Builder.CreateGlobalStringPtr(keyStr, fmt.Sprintf("member_key_%d", id))
 	objPtr := c.coerceToI8Ptr(objVal)
 	return c.Builder.CreateCall(fnType, fn, []llvm.Value{objPtr, keyPtr}, "member_get")
 }
 
 func (c *Compiler) emitRuntimeSetField(objVal llvm.Value, keyStr string, val llvm.Value, id int64) {
 	fn, fnType := c.getOrInsertRuntimeSetField()
-	keyPtr := buildGlobalStringPtr(c.Builder, keyStr, fmt.Sprintf("member_key_%d", id))
+	keyPtr := c.Builder.CreateGlobalStringPtr(keyStr, fmt.Sprintf("member_key_%d", id))
 	objPtr := c.coerceToI8Ptr(objVal)
 	intVal := c.coerceToInt64(val)
 	c.Builder.CreateCall(fnType, fn, []llvm.Value{objPtr, keyPtr, intVal}, "")

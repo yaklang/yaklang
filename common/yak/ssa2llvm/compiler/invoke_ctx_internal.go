@@ -51,12 +51,39 @@ func (c *Compiler) storeContextReturn(val llvm.Value) error {
 	return c.storeContextWord(abi.WordRet, val)
 }
 
+func (c *Compiler) getOrInsertRuntimeLoadPanicValue() (llvm.Value, llvm.Type) {
+	name := "yak_runtime_load_panic_value"
+	fn := c.Mod.NamedFunction(name)
+	i8Ptr := llvm.PointerType(c.LLVMCtx.Int8Type(), 0)
+	fnType := llvm.FunctionType(c.LLVMCtx.Int64Type(), []llvm.Type{i8Ptr}, false)
+	if fn.IsNil() {
+		fn = llvm.AddFunction(c.Mod, name, fnType)
+	}
+	return fn, fnType
+}
+
+func (c *Compiler) clearContextFlags(mask uint64) error {
+	flags, err := c.loadContextWord(abi.WordFlags, "yak_ctx_flags")
+	if err != nil {
+		return err
+	}
+	cleared := c.Builder.CreateAnd(flags, llvm.ConstInt(c.LLVMCtx.Int64Type(), ^mask, false), "yak_ctx_flags_clear")
+	return c.storeContextWord(abi.WordFlags, cleared)
+}
+
 func (c *Compiler) storeContextPanic(val llvm.Value) error {
-	return c.storeContextWord(abi.WordPanic, val)
+	if err := c.storeContextWord(abi.WordPanic, val); err != nil {
+		return err
+	}
+	return c.clearContextFlags(abi.FlagPanicTaggedPointer)
 }
 
 func (c *Compiler) loadContextPanic(name string) (llvm.Value, error) {
-	return c.loadContextWord(abi.WordPanic, name)
+	if c == nil || c.invokeCtx.IsNil() {
+		return llvm.Value{}, fmt.Errorf("missing invoke context")
+	}
+	loadFn, loadType := c.getOrInsertRuntimeLoadPanicValue()
+	return c.Builder.CreateCall(loadType, loadFn, []llvm.Value{c.invokeCtx}, name), nil
 }
 
 func (c *Compiler) bindParamsFromContext(fn *ssa.Function) error {

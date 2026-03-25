@@ -68,7 +68,7 @@ func (c *Compiler) addMainWrapperToModule(entryFunc string, printEntryResult boo
 
 	c.Builder.CreateCall(gcFn.GlobalValueType(), gcFn, nil, "")
 
-	exitCode := buildTrunc(c.Builder, ret, c.LLVMCtx.Int32Type(), "exit_code")
+	exitCode := c.Builder.CreateTrunc(ret, c.LLVMCtx.Int32Type(), "exit_code")
 	c.Builder.CreateRet(exitCode)
 	return nil
 }

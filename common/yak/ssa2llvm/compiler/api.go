@@ -54,8 +54,14 @@ type CompileConfig struct {
 
 type CompileOption func(*CompileConfig)
 
-func defaultCompileConfig() *CompileConfig {
-	return &CompileConfig{}
+func newCompileConfig(opts ...CompileOption) *CompileConfig {
+	cfg := &CompileConfig{}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(cfg)
+		}
+	}
+	return cfg
 }
 
 func WithCompileSourceFile(path string) CompileOption {
@@ -344,13 +350,7 @@ type CompileResult struct {
 }
 
 func CompileToExecutable(opts ...CompileOption) (CompileResult, error) {
-	cfg := defaultCompileConfig()
-	for _, opt := range opts {
-		if opt != nil {
-			opt(cfg)
-		}
-	}
-
+	cfg := newCompileConfig(opts...)
 	res, err := compileWithConfig(cfg)
 	if err != nil {
 		return CompileResult{}, err
