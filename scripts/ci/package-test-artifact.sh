@@ -48,7 +48,4 @@ if [[ "$INCLUDE_YAK" == "1" ]]; then
   cp -a "$YAK_BINARY_PATH" "$stage_dir/payload/yak"
 fi
 
-tar -C "$stage_dir/payload" -cf - . | gzip -1 > "$ARTIFACT_PATH"
-
-echo "Packaged test artifact to $ARTIFACT_PATH"
-ls -lh "$ARTIFACT_PATH"
+ARTIFACT_SOURCE_DIR="$stage_dir/payload" ./scripts/ci/package-artifact.sh

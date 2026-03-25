@@ -15,9 +15,7 @@ if [[ ! -f "$ARTIFACT_PATH" ]]; then
   exit 1
 fi
 
-rm -rf "$DEST_DIR"
-mkdir -p "$DEST_DIR"
-tar -C "$DEST_DIR" -xzf "$ARTIFACT_PATH"
+ARTIFACT_PATH="$ARTIFACT_PATH" DEST_DIR="$DEST_DIR" ./scripts/ci/unpack-artifact.sh
 
 if [[ ! -f "$DEST_DIR/test_binaries/compiled_tests.txt" ]]; then
   echo "ERROR: unpacked test binaries are incomplete"
@@ -37,4 +35,3 @@ if [[ "$REQUIRE_YAK" == "1" ]]; then
 fi
 
 echo "Unpacked prepared suite into $DEST_DIR"
-du -sh "$DEST_DIR" 2>/dev/null || true
