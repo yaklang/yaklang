@@ -78,9 +78,10 @@ SOLUTION
 REFERENCE
 )
 
-http?{<fullTypeName>?{have: "net/http"}} as $http;
+http?{<fullTypeName>?{have: "net/http"}} as $entry;
+gin.Context?{<fullTypeName>?{have: "github.com/gin-gonic/gin"}} as $entry
 
-$http.SetCookie as $cookie
+$entry.SetCookie as $cookie
 $cookie(* as $param);
 
 $param #{

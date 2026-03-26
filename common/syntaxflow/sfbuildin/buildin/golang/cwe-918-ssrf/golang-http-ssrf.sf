@@ -102,17 +102,8 @@ SOLUTION
 
 <include('golang-user-input')> as $input;
 
-*.Do(<slice(index=0)>* as $client)
-*.Get(<slice(index=0)>* as $client)
-*.Post(<slice(index=0)>* as $client)
-
-$client?{* #{until: `*<fullTypeName()>?{have: "net/http"}`}->} as $func
-
-$func.Get(* #-> as $param);
-
-$param #{
-	until: "* & $input" 
-}-> as $mid 
+http?{*?{<fullTypeName('net/http')>}} as $http
+$http.Get(*<slice(index=0)>#{until: "* & $input" }->) as $mid
 
 alert $mid for {
 	title: "Golang HTTP SSRF Vulnerability Detected",

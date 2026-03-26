@@ -61,23 +61,25 @@ REFERENCE
 <include('golang-database-gorm')> as $sink;
 <include('golang-user-input')> as $input;
 
+*.db?{*<fullTypeName()>?{have: "gorm.io/gorm/DB"}} as $db
+$db.WithContext() as $sink
+$db as $sink
+
 $sink.Raw as $func;
 $sink.Exec as $func;
 $sink.Row as $func;
 $sink.Rows as $func;
 $sink.ScanRows as $func;
-*.Raw as $func;
-*.Exec as $func;
-*.Row as $func;
-*.Rows as $func;
-*.ScanRows as $func;
 
 $func(* as $param);
 $param #{
     until:`*?{ *?{have: ".Sprintf"} || *?{opcode:add}}`,
 }-> as $unsafe;
 
-$unsafe<getCall> *?{*#{until: "* & $input"}-> } as $high;
+$unsafe<getCall> *?{* #{
+    until: `* & $input`,
+    until: `*?{opcode: param}`,
+}-> } as $high;
 
 alert $high for {
 	type: "vuln",
