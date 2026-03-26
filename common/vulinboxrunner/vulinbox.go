@@ -6,19 +6,26 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"runtime"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
 
-	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/vulinbox"
 )
 
 var (
 	sigExitOnce = new(sync.Once)
+	yakVersion  string
+	gitHash     string
+	buildTime   string
+	goVersion   string
+
+	releaseVersion string
 )
 
 func init() {
@@ -38,10 +45,52 @@ func init() {
 	})
 }
 
+func initializeBuildMetadata() {
+	if yakVersion == "" {
+		yakVersion = "dev"
+	}
+	if gitHash == "" {
+		gitHash = "-"
+	}
+	if buildTime == "" {
+		buildTime = time.Now().String()
+	}
+	if goVersion == "" {
+		goVersion = runtime.Version()
+	}
+	if strings.TrimSpace(releaseVersion) == "" {
+		baseVersion := strings.TrimSpace(yakVersion)
+		baseVersion = strings.TrimPrefix(baseVersion, "vulinbox-")
+		baseVersion = strings.TrimPrefix(baseVersion, "v")
+		releaseVersion = "vulinbox-" + baseVersion
+	}
+}
+
+func currentReleaseVersion() string {
+	initializeBuildMetadata()
+	return strings.TrimSpace(releaseVersion)
+}
+
 func main() {
+	initializeBuildMetadata()
+
 	app := cli.NewApp()
+	app.Version = currentReleaseVersion()
+	cli.VersionPrinter = func(c *cli.Context) {
+		fmt.Println(currentReleaseVersion())
+	}
 
 	// aes rsa - http://116.214.131.28/wui/index.html#/?logintype=1&_key=g2jsh9
+	app.Commands = []cli.Command{
+		{
+			Name:  "version",
+			Usage: "Show release version",
+			Action: func(c *cli.Context) error {
+				fmt.Println(currentReleaseVersion())
+				return nil
+			},
+		},
+	}
 
 	app.Flags = []cli.Flag{
 		cli.IntFlag{

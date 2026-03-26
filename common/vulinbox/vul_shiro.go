@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -129,7 +130,23 @@ var randKey []byte
 
 var randGadget string
 
+func isVersionCommand() bool {
+	if len(os.Args) <= 1 {
+		return false
+	}
+
+	switch os.Args[1] {
+	case "-v", "--version", "-version", "version":
+		return true
+	default:
+		return false
+	}
+}
+
 func init() {
+	if isVersionCommand() {
+		return
+	}
 	rand.NewSource(time.Now().UnixNano())
 	key := keyList[rand.Intn(len(keyList))]
 	//key := keyList[0]

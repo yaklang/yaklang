@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -35,7 +36,23 @@ var (
 
 const COOKIECONST = "YSESSIONID"
 
+func isVersionCommand() bool {
+	if len(os.Args) <= 1 {
+		return false
+	}
+
+	switch os.Args[1] {
+	case "-v", "--version", "-version", "version":
+		return true
+	default:
+		return false
+	}
+}
+
 func init() {
+	if isVersionCommand() {
+		return
+	}
 	log.Infof("default pass generated: %v", defaultPass)
 }
 
