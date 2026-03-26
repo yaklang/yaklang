@@ -373,6 +373,179 @@ window.location="http://a.com/%G"
 	}
 }
 
+// TestNormalizeLocationHeader 验证 Chrome 兼容的多斜杠/反斜杠规范化逻辑。
+//
+// Chrome 的 DoParseAfterSpecialScheme 调用 CountConsecutiveSlashesOrBackslashes，
+// 会消耗 scheme 后任意数量的 '/' 或 '\' 混合序列。当 Location 相对引用以 ≥2 个
+// 此类字符开头时，WHATWG URL 解析器进入 authority 状态，剩余内容成为 host。
+// 我们将其规范化为 "//" + 剩余，以便后续 UrlJoin 能继承原始请求的 scheme。
+// 单个 '/' 或 '\' 保持不变（前者是标准绝对路径引用，后者在相对引用中也进入 path 状态）。
+func TestNormalizeLocationHeader(t *testing.T) {
+	test := assert.New(t)
+
+	cases := []struct {
+		input string
+		want  string
+	}{
+		// ≥2 个纯斜杠 → 收缩为 "//" + 剩余
+		{"///baidu.com", "//baidu.com"},
+		{"////baidu.com/path", "//baidu.com/path"},
+		{"/////foo.com/a/b?q=1", "//foo.com/a/b?q=1"},
+		// ≥2 个纯反斜杠（Chrome 同等对待）
+		{`\\baidu.com`, "//baidu.com"},
+		{`\\\baidu.com/path`, "//baidu.com/path"},
+		// 混合 '/' 和 '\'，共 ≥2 个
+		{`/\baidu.com`, "//baidu.com"},
+		{`\/baidu.com`, "//baidu.com"},
+		{`//\baidu.com`, "//baidu.com"},
+		{`\\/baidu.com`, "//baidu.com"},
+		{`/\/baidu.com/x`, "//baidu.com/x"},
+		// 恰好两个斜杠 → 已是协议相对 URL，不变
+		{"//baidu.com", "//baidu.com"},
+		{"//example.com/path", "//example.com/path"},
+		// 单个 '/' → 标准绝对路径，不变
+		{"/path/to/page", "/path/to/page"},
+		// 单个 '\' → 相对路径字符，不变
+		{`\path`, `\path`},
+		// 零个前导斜杠 → 相对路径，不变
+		{"relative/path", "relative/path"},
+		// 绝对 URL → 不变（首字符不是 '/' 或 '\'）
+		{"http://baidu.com", "http://baidu.com"},
+		{"https://baidu.com/path", "https://baidu.com/path"},
+		// 空字符串 → 不变
+		{"", ""},
+	}
+
+	for _, c := range cases {
+		got := normalizeLocationHeader(c.input)
+		test.Equalf(c.want, got, "normalizeLocationHeader(%q)", c.input)
+	}
+}
+
+// TestGetRedirectFromHTTPResponse_MultiSlashLocation 验证 Location 值含多个
+// 前导斜杠或反斜杠时，GetRedirectFromHTTPResponse 能正确提取并规范化目标 URL，
+// 且后续 MergeUrlFromHTTPRequest 能得到与 Chrome 行为一致的完整跳转地址，
+// 包括 scheme 在 http/https 两种原始请求下均正确继承。
+func TestGetRedirectFromHTTPResponse_MultiSlashLocation(t *testing.T) {
+	// http 原始请求：scheme 应继承为 http
+	httpReq := []byte("GET / HTTP/1.1\r\nHost: origin.com\r\n\r\n")
+	// https 原始请求：scheme 应继承为 https
+	httpsReq := []byte("GET / HTTP/1.1\r\nHost: origin.com\r\n\r\n")
+
+	cases := []struct {
+		name       string
+		packet     string
+		isHttps    bool
+		baseReq    []byte
+		wantResult string // GetRedirectFromHTTPResponse 返回值（规范化后）
+		wantMerged string // MergeUrlFromHTTPRequest 最终合并结果（含正确 scheme）
+	}{
+		// ── 纯斜杠 ──────────────────────────────────────────────────────────
+		{
+			name:       "triple slash, http origin → http://baidu.com",
+			packet:     "HTTP/1.1 302 Found\r\nLocation: ///baidu.com\r\n\r\n",
+			isHttps:    false,
+			baseReq:    httpReq,
+			wantResult: "//baidu.com",
+			wantMerged: "http://baidu.com",
+		},
+		{
+			name:       "triple slash, https origin → https://baidu.com",
+			packet:     "HTTP/1.1 302 Found\r\nLocation: ///baidu.com\r\n\r\n",
+			isHttps:    true,
+			baseReq:    httpsReq,
+			wantResult: "//baidu.com",
+			wantMerged: "https://baidu.com",
+		},
+		{
+			name:       "quad slash with path, http origin",
+			packet:     "HTTP/1.1 301 Moved Permanently\r\nLocation: ////example.com/foo/bar\r\n\r\n",
+			isHttps:    false,
+			baseReq:    httpReq,
+			wantResult: "//example.com/foo/bar",
+			wantMerged: "http://example.com/foo/bar",
+		},
+		{
+			name:       "five slashes with query, http origin",
+			packet:     "HTTP/1.1 302 Found\r\nLocation: /////target.com/page?a=1\r\n\r\n",
+			isHttps:    false,
+			baseReq:    httpReq,
+			wantResult: "//target.com/page?a=1",
+			wantMerged: "http://target.com/page?a=1",
+		},
+		// ── 混合反斜杠 ───────────────────────────────────────────────────────
+		{
+			name:       "slash+backslash mix, http origin → http://baidu.com",
+			packet:     "HTTP/1.1 302 Found\r\nLocation: /\\baidu.com\r\n\r\n",
+			isHttps:    false,
+			baseReq:    httpReq,
+			wantResult: "//baidu.com",
+			wantMerged: "http://baidu.com",
+		},
+		{
+			name:       "backslash+slash mix, https origin → https://baidu.com",
+			packet:     "HTTP/1.1 302 Found\r\nLocation: \\/baidu.com\r\n\r\n",
+			isHttps:    true,
+			baseReq:    httpsReq,
+			wantResult: "//baidu.com",
+			wantMerged: "https://baidu.com",
+		},
+		{
+			name:       "double backslash, http origin → http://baidu.com",
+			packet:     "HTTP/1.1 302 Found\r\nLocation: \\\\baidu.com\r\n\r\n",
+			isHttps:    false,
+			baseReq:    httpReq,
+			wantResult: "//baidu.com",
+			wantMerged: "http://baidu.com",
+		},
+		// ── 正常双斜杠（协议相对 URL）────────────────────────────────────────
+		{
+			name:       "double slash, http origin",
+			packet:     "HTTP/1.1 302 Found\r\nLocation: //baidu.com/path\r\n\r\n",
+			isHttps:    false,
+			baseReq:    httpReq,
+			wantResult: "//baidu.com/path",
+			wantMerged: "http://baidu.com/path",
+		},
+		{
+			name:       "double slash, https origin",
+			packet:     "HTTP/1.1 302 Found\r\nLocation: //baidu.com/path\r\n\r\n",
+			isHttps:    true,
+			baseReq:    httpsReq,
+			wantResult: "//baidu.com/path",
+			wantMerged: "https://baidu.com/path",
+		},
+		// ── 单斜杠相对路径（host 来自原始请求）───────────────────────────────
+		{
+			name:       "single slash relative, http origin",
+			packet:     "HTTP/1.1 302 Found\r\nLocation: /redirect\r\n\r\n",
+			isHttps:    false,
+			baseReq:    httpReq,
+			wantResult: "/redirect",
+			wantMerged: "http://origin.com/redirect",
+		},
+		{
+			name:       "single slash relative, https origin",
+			packet:     "HTTP/1.1 302 Found\r\nLocation: /redirect\r\n\r\n",
+			isHttps:    true,
+			baseReq:    httpsReq,
+			wantResult: "/redirect",
+			wantMerged: "https://origin.com/redirect",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			test := assert.New(t)
+			r := GetRedirectFromHTTPResponse([]byte(c.packet), false)
+			test.Equalf(c.wantResult, r, "GetRedirectFromHTTPResponse result mismatch")
+
+			merged := MergeUrlFromHTTPRequest(c.baseReq, r, c.isHttps)
+			test.Equalf(c.wantMerged, merged, "MergeUrlFromHTTPRequest result mismatch")
+		})
+	}
+}
+
 func TestExtractCookieJarFromHTTPResponse(t *testing.T) {
 	cookies := ExtractCookieJarFromHTTPResponse([]byte(`HTTP/1.1 200 Ok
 Set-Cookie: asdfasdfasdf=1; 
