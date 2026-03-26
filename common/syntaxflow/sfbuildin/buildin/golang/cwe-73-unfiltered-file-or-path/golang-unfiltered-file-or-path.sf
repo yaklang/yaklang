@@ -103,6 +103,7 @@ SOLUTION
 <include('golang-file-read-sink')> as $sink;
 <include('golang-file-write-sink')> as $sink;
 <include('golang-user-input')> as $input;
+<include("golang-os-sink")> as $sink;
 
 strings.HasPrefix(* #-> as $check);
 $path.Clean(* #-> as $check);

@@ -1,0 +1,116 @@
+desc(
+	title: "Check Golang Reflected XSS in Template Engine"
+	type: audit
+	level: mid
+	risk: "跨站脚本（XSS）"
+	desc: <<<DESC
+该规则旨在识别Go语言应用程序中，当使用`text/template`或`html/template`包渲染用户输入数据时，若未进行适当的上下文感知转义处理，可能导致反射型跨站脚本（XSS）漏洞。具体场景包括：直接从HTTP请求参数、Cookie或Header获取数据后，未经过滤或调用`html.EscapeString()`等安全函数，直接传递给模板的`Execute`或`ExecuteTemplate`方法；或者错误地使用了`template.HTML`类型来绕过Go模板引擎默认的自动转义机制。攻击者可以利用此漏洞注入恶意JavaScript代码，当受害者的浏览器解析并执行这些代码时，可能窃取用户的会话令牌（Session Cookie）、重定向用户到钓鱼网站、篡改页面内容或执行其他恶意操作，严重威胁系统的完整性和用户的隐私安全。
+DESC
+	rule_id: "a19a1d21-67ed-4c5f-9dff-34c1a48f5493"
+	solution: <<<SOLUTION
+修复此类漏洞需遵循以下原则：1. 严格实施输入验证与输出转义：所有来自外部的用户输入在传递给模板引擎前，必须根据上下文（HTML、JavaScript、URL等）进行相应的转义处理。对于HTML上下文，务必使用标准库`html.EscapeString()`函数对字符串进行转义。2. 优先使用`html/template`：相比`text/template`，`html/template`默认启用了自动转义功能，能更安全地处理用户输入，应作为首选。3. 避免滥用`template.HTML`：如果业务逻辑确实需要输出原始HTML，必须在赋值给`template.HTML`类型之前，显式调用`html.EscapeString()`确保内容安全，并严格审查数据来源。4. 引入白名单机制：在关键业务逻辑中，限制允许的字符集和结构，防止意外注入。5. 定期审计与扫描：结合SAST工具定期进行代码审计，识别潜在的模板注入点，并参考OWASP Top 10相关指南进行加固。
+SOLUTION
+	reference: <<<REFERENCE
+https://cwe.mitre.org/data/definitions/79.html
+REFERENCE
+	title_zh: "检测Go语言模板引擎中的反射型跨站脚本漏洞"
+)
+
+<include('golang-user-input')> as $input
+
+html.EscapeString #-> as $safeOutput;
+
+html?{<fullTypeName()>?{have: "html"}} as $entry
+template?{<fullTypeName>?{have: 'text/template'}} as $template;
+$template.New() as $new
+
+$new.Must() as $tmpl
+$new.ParseFiles().* as $tmpl
+$template.Must() as $tmpl
+$template.ParseFiles().* as $tmpl
+$tmpl.Execute(*<slice(index=2)> *?{* #{exclude: "$safeOutput"}-> } as $mid )
+$tmpl.ExecuteTemplate(*<slice(index=3)> *?{* #{exclude: "$safeOutput"}-> } as $mid ) 
+
+
+alert $mid for {
+	solution: <<<SOLUTION
+所有来自外部的用户输入必须在传递给模板引擎前经过严格的上下文感知转义处理。对于HTML上下文，应使用html.EscapeString()函数；对于JavaScript上下文，应使用html/template的js转义方法；对于URL上下文，应进行URL编码。避免直接将未经验证的用户输入拼接到模板字符串中。建议统一采用html/template而非text/template，并引入输入验证与白名单机制。
+SOLUTION
+	desc: <<<DESC
+该漏洞发生在Go语言中使用text/template或html/template时，未对用户输入进行充分转义，导致攻击者可注入恶意脚本。当程序从HTTP请求获取数据并直接传递给模板渲染函数（如Execute、ExecuteTemplate），且数据在HTML上下文中被输出时，攻击者可在受害者浏览器中执行任意代码。此漏洞可能导致会话劫持、钓鱼页面伪造等严重安全风险。
+DESC
+	level: "mid",
+	type: "vuln",
+	title: "Reflected Cross-Site Scripting (XSS) in Go Template Rendering",
+	title_zh: "Go模板渲染中的反射型跨站脚本（XSS）漏洞",
+	name: "mid",
+	message: "用户输入未经过滤直接用于模板渲染，存在跨站脚本攻击风险。",
+	risk: "跨站脚本（XSS）",
+}
+
+desc(
+	lang: golang
+	alert_mid: 1
+	'file://unsafe.go': <<<UNSAFE
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"net/http"
+	"path/filepath"
+	"text/template"
+
+	"github.com/google/uuid"
+)
+
+var templates = template.Must(template.ParseGlob("templates/*.html"))
+
+func RootHandler(w http.ResponseWriter, r *http.Request) {
+	data := UserPageData{
+		PageHeader: PageHeader{
+			Title:       "Evil Corp",
+			Description: "Welcome to Evil Corp's Internal Portal!",
+		},
+	}
+	err := templates.ExecuteTemplate(w, "index", data)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+UNSAFE
+	'safefile://safe.go': <<<SAFE
+package main
+
+import (
+	"html"
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"net/http"
+	"path/filepath"
+	"text/template"
+
+	"github.com/google/uuid"
+)
+
+var templates = template.Must(template.ParseGlob("templates/*.html"))
+
+func RootHandler(w http.ResponseWriter, r *http.Request) {
+	data := UserPageData{
+		PageHeader: PageHeader{
+			Title:       html.EscapeString("Evil Corp"),
+			Description: html.EscapeString("Welcome to Evil Corp's Internal Portal!"),
+		},
+	}
+	err := templates.ExecuteTemplate(w, "index", data)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+SAFE
+)

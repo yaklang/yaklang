@@ -1,0 +1,68 @@
+desc(
+	title: "Check Go Server-Side Template Injection Vulnerability"
+	type: audit
+	level: high
+	risk: ""
+	desc: <<<DESC
+该规则用于检测Go语言中是否存在服务器端模板注入（Server-Side Template Injection, SSTI）漏洞。攻击者可通过向应用程序输入恶意模板表达式，利用未过滤的模板引擎执行任意代码，从而导致系统被完全控制。此漏洞常见于使用`text/template`或`html/template`包且未对用户输入进行严格过滤的场景，例如通过`ParseGlob`加载模板文件时未做安全校验。触发条件通常为用户可控的模板路径参数（如`templates/*.html`）未经过滤，攻击者可构造特殊路径（如`*.html`）绕过白名单机制，最终在服务端执行任意Go代码。潜在影响包括数据泄露、服务器被接管、横向渗透等，危害等级高。建议在解析模板前对用户输入进行严格的白名单过滤与转义处理。
+DESC
+	rule_id: "11cd9148-acb9-40d4-9004-08b2d39253a6"
+	title_zh: "检测Go服务器端模板注入漏洞"
+	solution: <<<SOLUTION
+1. 限制模板加载路径，仅允许预定义的安全目录，避免使用用户可控的通配符路径（如`*.html`）。
+2. 对所有模板变量和表达式进行严格的输入验证和转义，禁止执行任意代码。
+3. 使用安全的模板库（如`html/template`）并禁用模板中的危险函数（如`{{.}}`、`{{range}}`等），或在模板渲染前对内容进行沙箱隔离。
+4. 在生产环境中启用模板引擎的严格模式，防止动态模板注入。
+5. 定期审计代码中模板相关逻辑，结合静态分析工具扫描潜在SSTI风险点。
+6. 建议采用最小权限原则，模板渲染进程应运行在低权限账户下，降低攻击面。
+SOLUTION
+	reference: <<<REFERENCE
+https://cwe.mitre.org/data/definitions/1336.html
+REFERENCE
+)
+
+template?{<fullTypeName>?{have: 'text/template'}} as $template;
+
+$template.Must as $tmpl
+
+$tmpl( * #{until: `*.ParseGlob`}->.ParseGlob as $sink)
+$sink(* #->?{have: /\*/} as $high) 
+
+alert $high for {
+	risk: "模板注入",
+	desc: <<<DESC
+代码中使用了 Go 语言的 text/template 包，并通过 ParseGlob 方法动态加载模板文件。攻击者可以控制模板文件名或内容，从而注入恶意模板代码执行任意服务器端逻辑，导致远程代码执行。
+DESC
+	level: "high",
+	type: "vuln",
+	title: "Server-Side Template Injection",
+	title_zh: "服务端模板注入",
+	solution: <<<SOLUTION
+建议将文本模板替换为 html/template 包，该包默认对输出内容进行转义处理，能有效防止模板注入攻击。如果必须使用 text/template，请严格限制模板文件的加载路径和名称，避免用户可控输入参与模板解析过程。
+SOLUTION
+	name: "high",
+	message: "检测到使用 text/template 进行动态模板加载，存在模板注入风险。",
+}
+
+desc(
+	lang: golang
+	alert_high: 1
+	'file://main.go': <<<UNSAFE
+package main
+
+import (
+	"text/template"
+)
+
+var templates = template.Must(template.ParseGlob("templates/*.html"))
+UNSAFE
+	'safefile://main.go': <<<SAFE
+package main
+
+import (
+	"html/template"
+)
+
+var templates = template.Must(template.ParseGlob("templates/*.html"))
+SAFE
+)
