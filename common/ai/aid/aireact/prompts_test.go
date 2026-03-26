@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -221,6 +223,103 @@ func TestPromptManager__InPromptGeneration(t *testing.T) {
 	callMutex.Unlock()
 
 	t.Log("Dynamic context provider correctly called during prompt generation")
+}
+
+func TestPromptManager_GetBasicPromptInfo_CompactContextLevel(t *testing.T) {
+	react, err := NewTestReAct(
+		aicommon.WithModelContextLevel(aicommon.ModelContextLevelCompact),
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "done"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create ReAct instance: %v", err)
+	}
+
+	tools := []*aitool.Tool{
+		aitool.NewWithoutCallback("search_capabilities", aitool.WithDescription("search")),
+		aitool.NewWithoutCallback("web_search", aitool.WithDescription("web")),
+		aitool.NewWithoutCallback("grep", aitool.WithDescription("grep")),
+		aitool.NewWithoutCallback("read_file", aitool.WithDescription("read")),
+		aitool.NewWithoutCallback("write_file", aitool.WithDescription("write")),
+		aitool.NewWithoutCallback("bash", aitool.WithDescription("bash")),
+		aitool.NewWithoutCallback("tree", aitool.WithDescription("tree")),
+	}
+
+	prompt, info, err := react.GetBasicPromptInfo(tools)
+	if err != nil {
+		t.Fatalf("GetBasicPromptInfo failed: %v", err)
+	}
+
+	if !strings.Contains(prompt, "## Core Traits (核心性格)") {
+		t.Fatalf("compact context should still use the standard base template, got: %s", prompt)
+	}
+	if strings.Contains(prompt, "# Tooling") {
+		t.Fatalf("compact context should not switch to a separate compact template, got: %s", prompt)
+	}
+
+	profile := aicommon.GetModelContextProfile(aicommon.ModelContextLevelCompact)
+	if got := info["TopToolsCount"].(int); got != profile.PromptToolCount {
+		t.Fatalf("expected compact tool count %d, got %d", profile.PromptToolCount, got)
+	}
+	if topTools := info["TopTools"].([]*aitool.Tool); len(topTools) != profile.PromptToolCount {
+		t.Fatalf("expected %d top tools, got %d", profile.PromptToolCount, len(topTools))
+	}
+	if !info["HasMoreTools"].(bool) {
+		t.Fatal("compact context should mark extra tools as truncated")
+	}
+}
+
+func TestPromptManager_GetBasicPromptInfo_ModelContextLevel_TimelineLimit(t *testing.T) {
+	buildReact := func(level string) *ReAct {
+		react, err := NewTestReAct(
+			aicommon.WithModelContextLevel(level),
+			aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "done"}`))
+				rsp.Close()
+				return rsp, nil
+			}),
+		)
+		if err != nil {
+			t.Fatalf("Failed to create ReAct instance for %s: %v", level, err)
+		}
+		for i := 0; i < 8; i++ {
+			react.config.GetTimeline().PushText(int64(i+1), strings.Repeat("timeline-entry-", 70))
+		}
+		return react
+	}
+
+	standardReact := buildReact(aicommon.ModelContextLevelStandard)
+	compactReact := buildReact(aicommon.ModelContextLevelCompact)
+	tools := []*aitool.Tool{aitool.NewWithoutCallback("search_capabilities", aitool.WithDescription("search"))}
+
+	_, standardInfo, err := standardReact.GetBasicPromptInfo(tools)
+	if err != nil {
+		t.Fatalf("standard GetBasicPromptInfo failed: %v", err)
+	}
+	_, compactInfo, err := compactReact.GetBasicPromptInfo(tools)
+	if err != nil {
+		t.Fatalf("compact GetBasicPromptInfo failed: %v", err)
+	}
+
+	standardTimeline := standardInfo["Timeline"].(string)
+	compactTimeline := compactInfo["Timeline"].(string)
+	if strings.Contains(standardTimeline, "reducer-memory") {
+		t.Fatalf("standard context should keep this timeline intact, got: %s", standardTimeline)
+	}
+	if !strings.Contains(compactTimeline, "reducer-memory") {
+		t.Fatalf("compact context should use timeline compression output, got: %s", compactTimeline)
+	}
+	if len(compactTimeline) > aicommon.GetModelContextProfile(aicommon.ModelContextLevelCompact).PromptTimelineMaxBytes {
+		t.Fatalf("compact timeline should be capped to %d bytes, got %d", aicommon.GetModelContextProfile(aicommon.ModelContextLevelCompact).PromptTimelineMaxBytes, len(compactTimeline))
+	}
+	if len(compactTimeline) >= len(standardTimeline) {
+		t.Fatalf("compact timeline should be smaller than standard timeline, got compact=%d standard=%d", len(compactTimeline), len(standardTimeline))
+	}
 }
 
 func TestPromptManager_WithTracedDynamicContextProvider(t *testing.T) {

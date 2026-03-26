@@ -222,6 +222,41 @@ func TestSkillsContextManager_SearchSkills(t *testing.T) {
 	}
 }
 
+func TestSkillsContextManager_RenderWithMaxSkills(t *testing.T) {
+	vfs := filesys.NewVirtualFs()
+	for _, name := range []string{"skill-one", "skill-two", "skill-three"} {
+		vfs.AddFile(name+"/SKILL.md", buildTestSkillMD(
+			name,
+			"Description for "+name,
+			"# "+name+"\n\nBody.\n",
+		))
+	}
+
+	loader, err := NewFSSkillLoader(vfs)
+	if err != nil {
+		t.Fatalf("NewFSSkillLoader failed: %v", err)
+	}
+	mgr := NewSkillsContextManager(loader)
+
+	results := mgr.LoadSkills([]string{"skill-one", "skill-two", "skill-three"})
+	for name, loadErr := range results {
+		if loadErr != nil {
+			t.Fatalf("LoadSkills failed for %s: %v", name, loadErr)
+		}
+	}
+
+	rendered := mgr.RenderWithMaxSkills("limit_nonce", 2)
+	if !strings.Contains(rendered, "skill-one") || !strings.Contains(rendered, "skill-two") {
+		t.Fatalf("rendered output should include the first two skills, got: %s", rendered)
+	}
+	if strings.Contains(rendered, "skill-three") {
+		t.Fatalf("rendered output should omit skills beyond the max count, got: %s", rendered)
+	}
+	if !strings.Contains(rendered, "omitted from prompt") {
+		t.Fatalf("rendered output should explain that additional skills were omitted, got: %s", rendered)
+	}
+}
+
 func TestFSSkillLoader_GetFileSystem(t *testing.T) {
 	vfs := buildTestVFS()
 	loader, err := NewFSSkillLoader(vfs)

@@ -248,6 +248,16 @@ func (m *Timeline) SetTimelineContentLimit(contentSize int64) {
 	m.totalDumpContentLimit = contentSize
 }
 
+func (m *Timeline) SetTimelineLimit(limit int) {
+	if m == nil {
+		return
+	}
+	m.SetTimelineContentLimit(int64(limit))
+	if limit > 0 {
+		m.emergencyCompress(limit)
+	}
+}
+
 func (m *Timeline) setAICaller(ai AICaller) {
 	m.ai = ai
 }

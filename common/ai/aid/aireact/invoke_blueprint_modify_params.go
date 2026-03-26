@@ -21,12 +21,14 @@ func (r *ReAct) invokeBlueprintReviewModifyParams(
 	if extraPrompt == "" {
 		extraPrompt = "请根据之前的对话内容和AI应用描述，调整参数，使其更合理。用户觉得旧的参数有问题，不满足需求，请你完善参数内容，或者给一个更详细的版本。"
 	}
-	prompt, err := r.promptManager.GenerateAIBlueprintForgeParamsPromptEx(
-		ins, schemaString, invokeParams, extraPrompt,
+	nonce := utils.RandStringBytes(4)
+	prompt, err := r.promptManager.renderAIBlueprintForgeParamsPromptEx(
+		ins, schemaString, invokeParams, extraPrompt, nonce, r.promptManager.modelContextProfile(),
 	)
 	if err != nil {
 		return nil, nil, false, err
 	}
+	promptFallback := r.promptManager.GenerateAIBlueprintForgeParamsPromptFallback(ins, schemaString, invokeParams, extraPrompt, nonce)
 	release()
 	var newParams = make(aitool.InvokeParams)
 	err = aicommon.CallAITransaction(
@@ -50,6 +52,7 @@ func (r *ReAct) invokeBlueprintReviewModifyParams(
 			}
 			return nil
 		},
+		aicommon.WithAIRequest_PromptFallback(promptFallback),
 	)
 	if err != nil {
 		return nil, nil, false, err

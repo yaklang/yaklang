@@ -166,10 +166,11 @@ func WithToolCaller_GenerateToolParamsBuilder(
 
 // ToolParamsPromptMeta contains the generated prompt and metadata for AITAG parsing
 type ToolParamsPromptMeta struct {
-	Prompt     string
-	Nonce      string
-	ParamNames []string
-	Identifier string // destination identifier extracted from AI response, e.g. "query_large_file", "find_process"
+	Prompt         string
+	Nonce          string
+	ParamNames     []string
+	Identifier     string // destination identifier extracted from AI response, e.g. "query_large_file", "find_process"
+	PromptFallback PromptFallback
 }
 
 // WithToolCaller_GenerateToolParamsBuilderWithMeta sets a builder that returns prompt with metadata for AITAG support
@@ -280,6 +281,11 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 	var callExpectations string
 	var paramDuration time.Duration
 	var rawAIResponse string
+	requestOpts := make([]AIRequestOption, 0, 1)
+	if promptMeta != nil && promptMeta.PromptFallback != nil {
+		requestOpts = append(requestOpts, WithAIRequest_PromptFallback(promptMeta.PromptFallback))
+	}
+
 	err = CallAITransaction(t.config, paramsPrompt, func(request *AIRequest) (*AIResponse, error) {
 		request.SetTaskIndex(t.task.GetIndex())
 		return t.ai.CallAI(request)
@@ -375,7 +381,7 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 		}
 
 		return nil
-	})
+	}, requestOpts...)
 	if err != nil {
 		emitter.EmitError("error calling AI for tool[%v] params: %v", tool.Name, err)
 		handleError(fmt.Sprintf("error calling AI for tool[%v] params: %v", tool.Name, err))

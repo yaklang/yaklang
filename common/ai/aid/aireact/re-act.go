@@ -110,6 +110,10 @@ func (r *ReAct) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[string]any
 	return r.promptManager.GetBasicPromptInfo(tools)
 }
 
+func (r *ReAct) GetBasicPromptInfoWithProfile(tools []*aitool.Tool, profile aicommon.ModelContextProfile) (string, map[string]any, error) {
+	return r.promptManager.GetBasicPromptInfoWithProfile(tools, profile)
+}
+
 const SKIP_AI_REVIEW = "skip_ai_review"
 
 func (r *ReAct) GetConfig() aicommon.AICallerConfigIf {

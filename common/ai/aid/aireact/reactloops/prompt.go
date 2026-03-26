@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -12,6 +14,10 @@ import (
 
 //go:embed prompts/loop_template.tpl
 var coreTemplate string
+
+type basicPromptInfoWithProfileProvider interface {
+	GetBasicPromptInfoWithProfile(tools []*aitool.Tool, profile aicommon.ModelContextProfile) (string, map[string]any, error)
+}
 
 func (r *ReActLoop) generateSchemaString(disallowExit bool) (string, error) {
 	// loop
@@ -96,13 +102,28 @@ func (r *ReActLoop) generateSchemaString(disallowExit bool) (string, error) {
 	return schema, nil
 }
 
-func (r *ReActLoop) generateLoopPrompt(
+func (r *ReActLoop) getRenderInfoWithProfile(profile aicommon.ModelContextProfile) (string, map[string]any, error) {
+	var tools []*aitool.Tool
+	if r.toolsGetter == nil {
+		tools = []*aitool.Tool{}
+	} else {
+		tools = r.toolsGetter()
+	}
+
+	if invoker, ok := r.invoker.(basicPromptInfoWithProfileProvider); ok {
+		return invoker.GetBasicPromptInfoWithProfile(tools, profile)
+	}
+	return r.invoker.GetBasicPromptInfo(tools)
+}
+
+func (r *ReActLoop) generateLoopPromptWithProfile(
 	nonce string,
 	userInput string,
 	memory string,
 	operator *LoopActionHandlerOperator,
+	profile aicommon.ModelContextProfile,
 ) (string, error) {
-	background, infos, err := r.getRenderInfo()
+	background, infos, err := r.getRenderInfoWithProfile(profile)
 	if err != nil {
 		return "", utils.Wrap(err, "get basic prompt info failed")
 	}
@@ -145,13 +166,13 @@ func (r *ReActLoop) generateLoopPrompt(
 	// Render skills context if the manager is available
 	var skillsContext string
 	if r.skillsContextManager != nil {
-		skillsContext = r.skillsContextManager.Render(nonce)
+		skillsContext = r.skillsContextManager.RenderWithMaxSkills(nonce, profile.PromptSkillCount)
 	}
 
 	// Render extra capabilities discovered via intent recognition
 	var extraCapabilities string
 	if r.extraCapabilities != nil && r.extraCapabilities.HasCapabilities() {
-		extraCapabilities = r.extraCapabilities.Render(nonce)
+		extraCapabilities = r.extraCapabilities.RenderWithLimits(nonce, profile.PromptToolCount, profile.PromptSkillCount)
 	}
 
 	infos["InjectedMemory"] = memory
@@ -169,4 +190,38 @@ func (r *ReActLoop) generateLoopPrompt(
 		return "", utils.Wrap(err, "render loop prompt template failed")
 	}
 	return prompt, nil
+}
+
+func (r *ReActLoop) generateLoopPrompt(
+	nonce string,
+	userInput string,
+	memory string,
+	operator *LoopActionHandlerOperator,
+) (string, error) {
+	return r.generateLoopPromptWithProfile(
+		nonce,
+		userInput,
+		memory,
+		operator,
+		aicommon.ResolveModelContextProfile(r.GetConfig()),
+	)
+}
+
+func (r *ReActLoop) generateLoopPromptFallback(
+	nonce string,
+	userInput string,
+	memory string,
+	operator *LoopActionHandlerOperator,
+) aicommon.PromptFallback {
+	profiles := aicommon.BuildGradientModelContextProfiles(aicommon.ResolveModelContextProfile(r.GetConfig()))
+	if len(profiles) == 0 {
+		return nil
+	}
+	return func(expectedContextSize int, currentContextSize int) (string, error) {
+		profile, ok := aicommon.SelectGradientModelContextProfile(profiles, expectedContextSize, currentContextSize)
+		if !ok {
+			return "", nil
+		}
+		return r.generateLoopPromptWithProfile(nonce, userInput, memory, operator, profile)
+	}
 }

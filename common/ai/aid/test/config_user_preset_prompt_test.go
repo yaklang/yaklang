@@ -173,3 +173,39 @@ func TestUserPresetPrompt_DoesNotAffectFormat(t *testing.T) {
 
 	assert.Contains(t, capturedPrompt, "MUST NOT change or override the output format, structure, or schema")
 }
+
+func TestPromptFallback_FallbackByTokenLimit(t *testing.T) {
+	var capturedPrompt string
+	var capturedExpected int
+	var capturedCurrent int
+	cfg := aicommon.NewConfig(
+		context.Background(),
+		aicommon.WithAiCallTokenLimit(8),
+		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			capturedPrompt = request.GetPrompt()
+			rsp := aicommon.NewAIResponse(config)
+			rsp.EmitOutputStream(strings.NewReader("ok"))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+
+	req := aicommon.NewAIRequest(
+		strings.Repeat("a", 80),
+		aicommon.WithAIRequest_PromptFallback(func(expectedContextSize int, currentContextSize int) (string, error) {
+			capturedExpected = expectedContextSize
+			capturedCurrent = currentContextSize
+			if currentContextSize > expectedContextSize*2 {
+				return strings.Repeat("b", 40), nil
+			}
+			return "short prompt", nil
+		}),
+	)
+	req.SetDetachCheckpoint(true)
+	_, err := cfg.CallAI(req)
+	require.NoError(t, err)
+
+	assert.Equal(t, "short prompt", capturedPrompt)
+	assert.Equal(t, 8, capturedExpected)
+	assert.Greater(t, capturedCurrent, capturedExpected)
+}

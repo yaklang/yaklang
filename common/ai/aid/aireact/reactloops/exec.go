@@ -120,7 +120,7 @@ func (r *ReActLoop) Execute(taskId string, ctx context.Context, userInput string
 	return err
 }
 
-func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, nonce string) (*aicommon.Action, *LoopAction, error) {
+func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, nonce string, requestOpts ...aicommon.AIRequestOption) (*aicommon.Action, *LoopAction, error) {
 	var action *aicommon.Action
 	var emitter = r.emitter
 	var actionNames = r.GetAllActionNames()
@@ -303,6 +303,7 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 			r.loadingStatus(fmt.Sprintf("验证动作 [%s] / Verifying Action [%s]", actionType, actionType))
 			return verifier.ActionVerifier(r, action)
 		},
+		requestOpts...,
 	)
 	if transactionErr != nil {
 		r.loadingStatus(fmt.Sprintf("AI 事务失败 / AI Transaction Failed: %v", transactionErr))
@@ -615,9 +616,21 @@ LOOP:
 			r.savePromptToFile(task, iterationCount, prompt)
 		}
 
+		promptFallback := r.generateLoopPromptFallback(
+			nonce,
+			task.GetUserInput(),
+			r.GetCurrentMemoriesContent(),
+			operator,
+		)
+
 		streamWg := new(sync.WaitGroup)
 		/* Generate AI Action */
-		actionParams, handler, transactionErr := r.callAITransaction(streamWg, prompt, nonce)
+		actionParams, handler, transactionErr := r.callAITransaction(
+			streamWg,
+			prompt,
+			nonce,
+			aicommon.WithAIRequest_PromptFallback(promptFallback),
+		)
 
 		streamWg.Wait()
 

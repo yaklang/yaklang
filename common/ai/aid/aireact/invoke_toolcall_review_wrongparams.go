@@ -92,6 +92,7 @@ func (r *ReAct) _invokeToolCall_ReviewWrongParam(ctx context.Context, tool *aito
 				return err
 			}
 		},
+		aicommon.WithAIRequest_PromptFallback(promptMeta.PromptFallback),
 	)
 	if transErr != nil {
 		return nil, transErr

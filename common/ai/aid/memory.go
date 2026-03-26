@@ -355,7 +355,7 @@ func (m *PromptContextProvider) TaskMaxContinue() int64 {
 
 // timeline limit set
 func (m *PromptContextProvider) SetTimelineLimit(i int) {
-	m.timeline.SetTimelineContentLimit(int64(i))
+	m.timeline.SetTimelineLimit(i)
 }
 
 func (m *PromptContextProvider) PromptForToolCallResultsForLastN(n int) string {

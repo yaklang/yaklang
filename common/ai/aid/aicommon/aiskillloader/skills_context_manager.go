@@ -463,6 +463,12 @@ func (m *SkillsContextManager) GetLoader() SkillLoader {
 
 // Render generates the full skills context string for injection into the prompt.
 func (m *SkillsContextManager) Render(nonce string) string {
+	return m.RenderWithMaxSkills(nonce, 0)
+}
+
+// RenderWithMaxSkills generates the skills context string with an optional
+// maxSkills limit. When maxSkills <= 0, all skills are eligible for rendering.
+func (m *SkillsContextManager) RenderWithMaxSkills(nonce string, maxSkills int) string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -477,6 +483,11 @@ func (m *SkillsContextManager) Render(nonce string) string {
 			buf.WriteString("Available Skills (use loading_skills action to load):\n")
 			listed := 0
 			for _, s := range skills {
+				if maxSkills > 0 && listed >= maxSkills {
+					remaining := len(skills) - listed
+					buf.WriteString(fmt.Sprintf("  ... and %d more skills. Use search_capabilities to find specific skills.\n", remaining))
+					break
+				}
 				line := fmt.Sprintf("  - %s: %s\n", s.Name, s.Description)
 				if buf.Len()+len(line) > MetadataListMaxBytes {
 					remaining := len(skills) - listed
@@ -495,15 +506,24 @@ func (m *SkillsContextManager) Render(nonce string) string {
 	var buf bytes.Buffer
 	buf.WriteString(fmt.Sprintf("<|SKILLS_CONTEXT_%s|>\n", nonce))
 
+	renderedCount := 0
 	m.loadedSkills.ForEach(func(name string, state *skillContextState) bool {
+		if maxSkills > 0 && renderedCount >= maxSkills {
+			return false
+		}
 		if state.IsFolded {
 			buf.WriteString(m.renderFolded(state))
 		} else {
 			buf.WriteString(m.renderFull(state))
 		}
 		buf.WriteString("\n")
+		renderedCount++
 		return true
 	})
+
+	if maxSkills > 0 && m.loadedSkills.Len() > renderedCount {
+		buf.WriteString(fmt.Sprintf("... and %d more loaded skills omitted from prompt.\n", m.loadedSkills.Len()-renderedCount))
+	}
 
 	buf.WriteString(fmt.Sprintf("<|SKILLS_CONTEXT_END_%s|>", nonce))
 	return buf.String()
