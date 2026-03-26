@@ -19,6 +19,10 @@ func CreateOrUpdateProgress(db *gorm.DB, runtimeId string, i interface{}) error 
 }
 
 func FilterProgress(db *gorm.DB, filter *ypb.UnfinishedTaskFilter) *gorm.DB {
+	db = db.Model(&schema.Progress{})
+	if filter == nil {
+		return db
+	}
 	db = bizhelper.FuzzQueryLike(db, "task_name", filter.GetTaskName())
 	db = bizhelper.FuzzQueryLike(db, "target", filter.GetTarget())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "progress_source", filter.GetProgressSource())
