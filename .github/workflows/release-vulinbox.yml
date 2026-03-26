@@ -2,6 +2,11 @@ name: Release Vulinbox(OSS Release)
 
 on:
   workflow_dispatch:
+    inputs:
+      release_version:
+        description: "Release version, e.g. 1.2.3 or v1.2.3"
+        type: string
+        required: true
   pull_request:
     paths:
       - "common/vulinbox/**"
@@ -19,36 +24,27 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
-      - name: Set Version by Tag
-        uses: mad9000/actions-find-and-replace-string@1
-        id: fetchtag
-        with:
-          source: ${{ github.ref }}
-          find: "refs/tags/"
-          replace: ""
-      - name: Print RELEASE_VERSION
+
+      - name: Resolve release version
+        shell: bash
         run: |
-          echo "github actions's env VERSION: ${{ steps.fetchtag.outputs.value }}"
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            version="${{ github.event.inputs.release_version }}"
+            version="${version#v}"
+          else
+            version="dev-$(printf '%.7s' "${GITHUB_SHA}")"
+          fi
+
+          echo "VULINBOX_VERSION=${version}" >> "$GITHUB_ENV"
+          echo "VULINBOX_VERSION_TEXT=vulinbox-${version}" >> "$GITHUB_ENV"
+          echo "Resolved VULINBOX_VERSION=${version}"
+          echo "Resolved VULINBOX_VERSION_TEXT=vulinbox-${version}"
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: 1.22.8
           cache: false
-
-      # - name: Cache Go modules
-      #   uses: actions/cache@v3
-      #   id: cache-go-modules
-      #   with:
-      #     path: ~/go/pkg/mod
-      #     key: go-modules-${{ runner.os }}-1.22.8-${{ hashFiles('**/go.sum') }}
-      #     restore-keys: |
-      #       go-modules-${{ runner.os }}-1.22.8-${{ hashFiles('**/go.sum') }}
-
-      #      - name: Download Npcap SDK (Windows)
-      #        run: |
-      #          Invoke-WebRequest https://nmap.org/npcap/dist/npcap-sdk-1.07.zip -OutFile C:\NpcapSDK.zip
-      #          Expand-Archive C:\NpcapSDK.zip -DestinationPath ..\wpdpack
-      #        if: runner.os == 'Windows'
 
       - name: Initialize License Machine
         run: go run common/xlic/cmd/initializer.go --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }}
@@ -57,19 +53,69 @@ jobs:
         run: go run common/yak/cmd/yak.go embed-fs-hash --override --all
 
       - name: Build For Linux
-        run: |
-          go build -ldflags "-linkmode external -extldflags '-static' -s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ steps.fetchtag.outputs.value }}'" -o "./vulinbox_$(go env GOOS)_$(go env GOARCH)" -v common/vulinboxrunner/vulinbox.go
         if: runner.os == 'Linux'
+        run: |
+          go build -ldflags "-linkmode external -extldflags '-static' -s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ env.VULINBOX_VERSION }}' -X 'main.releaseVersion=${{ env.VULINBOX_VERSION_TEXT }}'" -o "./vulinbox_$(go env GOOS)_$(go env GOARCH)" -v common/vulinboxrunner/vulinbox.go
 
       - name: Build For MacOS
-        run: |
-          go build -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ steps.fetchtag.outputs.value }}'" -o "./vulinbox_$(go env GOOS)_$(go env GOARCH)" -v common/vulinboxrunner/vulinbox.go
         if: runner.os == 'macOS'
+        run: |
+          go build -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ env.VULINBOX_VERSION }}' -X 'main.releaseVersion=${{ env.VULINBOX_VERSION_TEXT }}'" -o "./vulinbox_$(go env GOOS)_$(go env GOARCH)" -v common/vulinboxrunner/vulinbox.go
 
       - name: Build For Windows
-        run: |
-          go build -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ steps.fetchtag.outputs.value }}'" -o ./vulinbox_windows_amd64.exe -v common/vulinboxrunner/vulinbox.go
         if: runner.os == 'Windows'
+        run: |
+          go build -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ env.VULINBOX_VERSION }}' -X 'main.releaseVersion=${{ env.VULINBOX_VERSION_TEXT }}'" -o ./vulinbox_windows_amd64.exe -v common/vulinboxrunner/vulinbox.go
+
+      - name: Validate signing secrets
+        if: ${{ runner.os == 'Windows' && github.event_name != 'pull_request' }}
+        shell: pwsh
+        run: |
+          $missing = @()
+          if (-not "${{ secrets.AZURE_YAK_CODE_SIGN_KEY_VAULT_URI }}") { $missing += "AZURE_YAK_CODE_SIGN_KEY_VAULT_URI" }
+          if (-not "${{ secrets.AZURE_YAK_CODE_SIGN_KEY_VAULT_APPLICATION_ID }}") { $missing += "AZURE_YAK_CODE_SIGN_KEY_VAULT_APPLICATION_ID" }
+          if (-not "${{ secrets.AZURE_YAK_CODE_SIGN_KEY_VAULT_DIRECTORY_ID }}") { $missing += "AZURE_YAK_CODE_SIGN_KEY_VAULT_DIRECTORY_ID" }
+          if (-not "${{ secrets.AZURE_YAK_CODE_SIGN_KEY_VAULT_CLIENT_SECRET }}") { $missing += "AZURE_YAK_CODE_SIGN_KEY_VAULT_CLIENT_SECRET" }
+          if (-not "${{ secrets.AZURE_YAK_CODE_SIGN_KEY_VAULT_CERT_NAME }}") { $missing += "AZURE_YAK_CODE_SIGN_KEY_VAULT_CERT_NAME" }
+          if (-not "${{ secrets.AZURE_YAK_CODE_SIGN_KEY_VAULT_TIMESTAMP_URL }}") { $missing += "AZURE_YAK_CODE_SIGN_KEY_VAULT_TIMESTAMP_URL" }
+          if ($missing.Count -gt 0) {
+            throw ("Missing required secrets for signing: " + ($missing -join ", "))
+          }
+
+      - name: Set up .NET (for AzureSignTool)
+        if: ${{ runner.os == 'Windows' && github.event_name != 'pull_request' }}
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Install AzureSignTool
+        if: ${{ runner.os == 'Windows' && github.event_name != 'pull_request' }}
+        shell: pwsh
+        run: |
+          dotnet tool install --global AzureSignTool
+          "$env:USERPROFILE\\.dotnet\\tools" >> $env:GITHUB_PATH
+          AzureSignTool --version
+
+      - name: Sign Windows executable (Azure Key Vault)
+        if: ${{ runner.os == 'Windows' && github.event_name != 'pull_request' }}
+        shell: pwsh
+        run: |
+          AzureSignTool sign `
+            -kvu "${{ secrets.AZURE_YAK_CODE_SIGN_KEY_VAULT_URI }}" `
+            -kvi "${{ secrets.AZURE_YAK_CODE_SIGN_KEY_VAULT_APPLICATION_ID }}" `
+            -kvt "${{ secrets.AZURE_YAK_CODE_SIGN_KEY_VAULT_DIRECTORY_ID }}" `
+            -kvs "${{ secrets.AZURE_YAK_CODE_SIGN_KEY_VAULT_CLIENT_SECRET }}" `
+            -kvc "${{ secrets.AZURE_YAK_CODE_SIGN_KEY_VAULT_CERT_NAME }}" `
+            -tr "${{ secrets.AZURE_YAK_CODE_SIGN_KEY_VAULT_TIMESTAMP_URL }}" `
+            -td sha256 `
+            -v `
+            ".\\vulinbox_windows_amd64.exe"
+
+      - name: Verify signature
+        if: ${{ runner.os == 'Windows' && github.event_name != 'pull_request' }}
+        shell: pwsh
+        run: |
+          Get-AuthenticodeSignature ".\\vulinbox_windows_amd64.exe" | Format-List
 
       - name: Upload Artifacts Windows
         uses: actions/upload-artifact@v4
@@ -93,42 +139,66 @@ jobs:
           path: ./vulinbox_linux_amd64
 
   download_artifacts_and_release:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     needs:
       - build_and_release
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
-      - name: Set Version by Tag
-        uses: mad9000/actions-find-and-replace-string@1
-        id: fetchtag_release
         with:
-          source: ${{ github.ref }}
-          find: "refs/tags/v"
-          replace: ""
-      # 获取 latest 之前的 tag
-      - name: Get previous version
+          fetch-depth: 0
+
+      - name: Resolve release version
+        shell: bash
         run: |
-          echo "::set-output name=value::$(git tag --sort=-v:refname | awk 'NR==2 { sub(/^v/, "", $0); print }')"
-        id: previous_version
+          version="${{ github.event.inputs.release_version }}"
+          version="${version#v}"
+          echo "VULINBOX_VERSION=${version}" >> "$GITHUB_ENV"
+          echo "VULINBOX_VERSION_TEXT=vulinbox-${version}" >> "$GITHUB_ENV"
+          echo "Resolved VULINBOX_VERSION=${version}"
+          echo "Resolved VULINBOX_VERSION_TEXT=vulinbox-${version}"
+
+      - name: Download previous version
+        shell: bash
+        run: |
+          if curl -fsSL "https://yaklang.oss-accelerate.aliyuncs.com/vulinbox/latest/version.txt" -o previous_version.txt; then
+            echo "Downloaded previous version: $(cat previous_version.txt)"
+          else
+            echo "${{ env.VULINBOX_VERSION_TEXT }}" > previous_version.txt
+            echo "No previous version found on OSS, fallback to current version"
+          fi
+
       - name: Download Windows VULINBOX
         uses: actions/download-artifact@v4
         with:
           name: vulinbox_windows_amd64.exe
+
       - name: Download macOS VULINBOX
         uses: actions/download-artifact@v4
         with:
           name: vulinbox_darwin_amd64
+
       - name: Download Linux VULINBOX
         uses: actions/download-artifact@v4
         with:
           name: vulinbox_linux_amd64
+
       - name: Run
         run: ls
+
       - name: Update OSS latest file
-        run: echo "vulinbox-${{ steps.fetchtag_release.outputs.value }}" > ./version.txt
+        run: echo "${{ env.VULINBOX_VERSION_TEXT }}" > ./version.txt
+
       - name: Store previous version in a file
-        run: echo "vulinbox-${{ steps.previous_version.outputs.value }}" > previous_version.txt
+        shell: bash
+        run: |
+          previous_version="$(tr -d '\r\n' < previous_version.txt)"
+          if [ -z "${previous_version}" ]; then
+            previous_version="${{ env.VULINBOX_VERSION_TEXT }}"
+          fi
+          echo "${previous_version}" > previous_version.txt
+
       - name: Upload vulinbox to oss Latest
         uses: tvrcgo/upload-to-oss@master
         with:
@@ -140,8 +210,8 @@ jobs:
             ./version.txt:/vulinbox/latest/version.txt
             ./previous_version.txt:/vulinbox/previous/previous_version.txt
             vulinbox_windows_amd64.exe:/vulinbox/latest/vulinbox_windows_amd64.exe
-            vulinbox_windows_amd64.exe:/vulinbox/${{ steps.fetchtag_release.outputs.value }}/vulinbox_windows_amd64.exe
+            vulinbox_windows_amd64.exe:/vulinbox/${{ env.VULINBOX_VERSION }}/vulinbox_windows_amd64.exe
             vulinbox_linux_amd64:/vulinbox/latest/vulinbox_linux_amd64
-            vulinbox_linux_amd64:/vulinbox/${{ steps.fetchtag_release.outputs.value }}/vulinbox_linux_amd64
+            vulinbox_linux_amd64:/vulinbox/${{ env.VULINBOX_VERSION }}/vulinbox_linux_amd64
             vulinbox_darwin_amd64:/vulinbox/latest/vulinbox_darwin_amd64
-            vulinbox_darwin_amd64:/vulinbox/${{ steps.fetchtag_release.outputs.value }}/vulinbox_darwin_amd64
+            vulinbox_darwin_amd64:/vulinbox/${{ env.VULINBOX_VERSION }}/vulinbox_darwin_amd64
