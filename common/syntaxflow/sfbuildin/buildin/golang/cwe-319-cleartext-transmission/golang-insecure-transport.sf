@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Golang不安全传输漏洞"
 	type: audit
 	level: mid
-	risk: "info-exposure"
+	risk: "信息泄露（Information Exposure）"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -142,7 +142,7 @@ SOLUTION
    - 攻击者可能利用中间人攻击获取敏感信息。
 DESC
 	name: "mid",
-	risk: "info-exposure",
+	risk: "信息泄露（Information Exposure）",
 }
 
 desc(

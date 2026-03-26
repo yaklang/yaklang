@@ -182,7 +182,7 @@ e.printStackTrace();
 #### 3. 对用户输入的XML进行严格验证和过滤
 在解析XML之前，对输入的XML进行验证，确保其结构和内容符合预期，并移除或过滤掉所有外部实体声明和引用。
 SOLUTION
-	risk: "XXE",
+	risk: "XML外部实体（XXE）",
 }
 
 desc(

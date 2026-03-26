@@ -152,7 +152,7 @@ Response response = client.newCall(request).execute();
 System.out.println("Request to: " + request.url());
 ```
 SOLUTION
-	risk: "SSRF",
+	risk: "服务端请求伪造（SSRF）",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

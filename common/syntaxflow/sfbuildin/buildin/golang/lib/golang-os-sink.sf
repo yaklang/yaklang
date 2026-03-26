@@ -123,6 +123,7 @@ REFERENCE
 os?{<fullTypeName>?{have: 'os'}} as $entry;
 $entry.Create as $output;
 $entry.Open as $output;
+$entry.OpenFile as $output;
 $entry.Remove as $output;
 $entry.RemoveAll as $output;
 $entry.Mkdir as $output;

@@ -175,7 +175,7 @@ DESC
 	title: "Check Java SAXBuilder Unsafe Use",
 	title_zh: "检测 Java SAXBuilder 非安全使用",
 	name: "vulnCall",
-	risk: "XXE",
+	risk: "XML外部实体（XXE）",
 }
 
 desc(

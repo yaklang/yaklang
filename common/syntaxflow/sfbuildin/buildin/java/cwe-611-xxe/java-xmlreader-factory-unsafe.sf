@@ -266,7 +266,7 @@ e.printStackTrace();
 DESC
 	level: "high",
 	message: "检测到不安全的 XMLReaderFactory.createXMLReader() 使用，可能导致 XXE 漏洞。",
-	risk: "XXE",
+	risk: "XML外部实体（XXE）",
 	name: "vulCall",
 }
 

@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Golang Cookie路径过宽漏洞"
 	type: audit
 	level: high
-	risk: "csrf"
+	risk: "跨站请求伪造（CSRF）"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -88,7 +88,7 @@ $path?{have: /^"\/"$/} as $high
 
 alert $high for {
 	solution: <<<SOLUTION
-	risk: "csrf",
+	risk: "跨站请求伪造（CSRF）",
 ### 修复建议
 
 #### 1. 限制Cookie的Path属性

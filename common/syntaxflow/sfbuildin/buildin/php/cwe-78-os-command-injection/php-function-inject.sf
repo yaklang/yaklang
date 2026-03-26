@@ -1,7 +1,7 @@
 desc(
 	title: "Detect PHP Code Execution Vulnerability"
 	title_zh: "检测PHP代码执行漏洞"
-	risk: "code-execution"
+	risk: "远程代码执行（RCE）"
 	type: vul
 	desc: <<<DESC
 ### 漏洞描述

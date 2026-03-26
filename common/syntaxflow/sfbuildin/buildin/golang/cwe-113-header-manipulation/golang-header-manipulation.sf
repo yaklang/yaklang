@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Golang头部操纵漏洞"
 	type: audit
 	level: high
-	risk: "xss"
+	risk: "跨站脚本（XSS）"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -130,7 +130,7 @@ SOLUTION
    - 可能被用于跳转到恶意网站。
 DESC
 	name: "high",
-	risk: "xss",
+	risk: "跨站脚本（XSS）",
 }
 
 desc(

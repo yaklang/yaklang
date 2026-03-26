@@ -1,0 +1,148 @@
+desc(
+	title: "Check Go Direct Reflected XSS Vulnerability"
+	title_zh: "检测Go语言直接反射型XSS漏洞"
+	type: vuln
+	level: mid
+	risk: "跨站脚本（XSS）"
+	desc: <<<DESC
+# 检测Go语言直接反射型XSS漏洞
+
+该规则用于检测Go语言Web应用中因未对用户输入进行适当转义而导致的反射型跨站脚本攻击（Reflected XSS）。在HTTP请求处理函数中，若直接将用户输入内容输出到HTTP响应体而不经过HTML转义或安全过滤，攻击者可通过构造恶意URL参数，诱导用户点击，从而在受害者的浏览器中执行任意JavaScript代码。此漏洞通常出现在处理表单数据、URL查询参数或路径参数时，未对输入内容进行有效清理和转义。
+
+**触发场景**：
+- 用户输入通过 `r.Form` 或 `r.URL.Query()` 获取后，未经任何转义直接拼接到HTML响应中；
+- 使用 `fmt.Fprintf(w, ...)` 输出未过滤的字符串，且未调用如 `html.EscapeString` 等安全函数；
+- 应用未设置安全HTTP响应头（如 `X-Content-Type-Options: nosniff`）以增强防护。
+
+**潜在影响**：
+- 攻击者可窃取用户Cookie、会话令牌或重定向用户至钓鱼网站；
+- 用户可能在不知情情况下执行恶意脚本，导致隐私泄露或账户劫持；
+- 对企业品牌形象造成严重损害，尤其在高流量公共Web服务中。
+
+**修复建议**：
+1. 所有从用户输入中获取的数据在输出前必须进行HTML转义，推荐使用 `html.EscapeString` 函数对字符串进行转义处理；
+2. 在输出响应前，应确保所有动态内容均被安全编码，避免直接拼接用户可控输入；
+3. 设置安全HTTP响应头，例如 `Content-Type: text/html; charset=utf-8` 和 `X-Content-Type-Options: nosniff`，防止浏览器自动解析为HTML；
+4. 对输入数据进行长度限制、字符集校验和白名单过滤，拒绝非法或高风险字符；
+5. 使用静态分析工具定期扫描代码库，识别未转义的输出点，并建立自动化规则检查机制。
+
+**示例修复对比**：
+原始代码未对 `Name` 进行转义，直接输出至响应体；修复后使用 `html.EscapeString(Name)` 转义后再输出，有效阻止恶意脚本注入。
+DESC
+	solution: <<<SOLUTION
+# 漏洞修复建议
+
+1. **强制转义用户输入**：在所有输出到HTTP响应体之前，必须对用户可控数据调用 `html.EscapeString` 函数进行HTML实体转义，防止浏览器将其解析为可执行脚本。
+
+2. **优化输出语句**：将 `fmt.Fprintf(w, Name)` 替换为 `fmt.Fprintf(w, "%s", html.EscapeString(Name))`，明确指定格式化方式并确保安全输出。
+
+3. **增加输入验证与过滤**：对来自表单或URL的参数进行正则校验或黑名单过滤，仅允许合法字符通过；对于敏感字段（如name），建议限制长度、禁止特殊符号。
+
+4. **设置安全响应头**：在HTTP响应中添加以下安全头部，提升浏览器防护能力：
+   - `Content-Type: text/html; charset=utf-8`
+   - `X-Content-Type-Options: nosniff`
+   - `X-XSS-Protection: 1; mode=block`
+
+5. **引入自动化扫描与CI集成**：在项目构建流程中集成静态代码分析工具（如YakLang SyntaxFlow），配置规则自动检测未转义输出点，并在代码提交前拦截高危缺陷。
+
+6. **日志与告警机制**：对异常输入行为（如包含`<script>`、`onload=`等关键字）记录日志并触发告警，便于事后追踪攻击来源。
+
+7. **安全编码规范培训**：团队应定期开展安全编码培训，强化开发人员对XSS攻击原理的理解，减少因疏忽导致的安全漏洞。
+
+> **重要提示**：即使在非公开接口或内部系统中，也应遵循相同安全标准，因为攻击面可能随权限提升而扩大。
+SOLUTION
+	reference: <<<REFERENCE
+https://cwe.mitre.org/data/definitions/79.html
+REFERENCE
+	rule_id: "4bf06e42-5deb-47fe-bf75-5cadc4a98af2"
+)
+
+<include("golang-http-sink")> as $http
+<include("golang-user-input")> as $input
+
+html?{<fullTypeName()>?{have: "html"}} as $html
+$html.EscapeString as $safe
+
+fmt?{<fullTypeName>?{have: "fmt"}} as $fmt
+$fmt.Fprintf(*<slice(index=0)> #{until:"* & $http"}-> ) as $sink
+
+$sink<getCallee()>(* ?{*<dataflow(exclude: $safe)>} ) as $mid
+
+alert $mid for {
+	title: "Direct Reflected Cross-Site Scripting (XSS) via User Input",
+	title_zh: "通过用户输入的反射型跨站脚本攻击",
+	level: "mid",
+	risk: "跨站脚本（XSS）",
+	type: "vuln",
+	message: "用户输入未经安全处理，存在XSS风险",
+	solution: <<<SOLUTION
+在输出用户可控数据前，应使用HTML转义函数（如html.EscapeString）对内容进行编码，确保其作为纯文本显示而非可执行脚本。
+SOLUTION
+	desc: <<<DESC
+应用程序未对用户输入进行适当的转义或验证，直接将输入内容输出到HTML页面中，导致攻击者可以通过构造恶意脚本注入并执行。
+DESC
+	name: "mid",
+}
+
+desc(
+	lang: golang
+	alert_mid: 1
+	'file://unsafe.go': <<<UNSAFE
+package main
+
+import (
+    "fmt"
+	"html"
+	"strings"
+	"net/http" 
+)
+
+func sayYourName(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+	fmt.Println(r.Form)
+	fmt.Println("path", r.URL.Path)
+	fmt.Println("scheme", r.URL.Scheme)
+	fmt.Println("r.Form", r.Form)
+	fmt.Println("r.Form[name]", r.Form["name"])
+	var Name string
+	for k, v := range r.Form {
+		fmt.Println("key:", k)
+		Name = strings.Join(v, ",")
+	}
+	fmt.Println(Name)
+	fmt.Fprintf(w, Name)
+}
+UNSAFE
+	'safefile://safe.go': <<<SAFE
+package main
+
+import (
+    "fmt"
+	"html"
+	"strings"
+	"net/http" 
+)
+
+func sayYourName(w http.ResponseWriter, r *http.Request) {
+    if err := r.ParseForm(); err != nil {
+        http.Error(w, "无法解析表单数据", http.StatusBadRequest)
+        return
+    }
+    
+    fmt.Println("请求路径:", r.URL.Path)
+    fmt.Println("请求参数:", r.Form)
+    
+    var Name string
+    if names, ok := r.Form["name"]; ok && len(names) > 0 {
+        Name = strings.Join(names, ",")
+    }
+    
+    safeName := html.EscapeString(Name)
+    
+    w.Header().Set("Content-Type", "text/html; charset=utf-8")
+    w.Header().Set("X-Content-Type-Options", "nosniff")
+    
+    fmt.Fprintf(w, "%s", safeName)  // 使用 %s 格式化，更明确
+}
+SAFE
+)

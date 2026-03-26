@@ -2,7 +2,7 @@ desc(
 	title: "Detect C Command Injection Vulnerability"
 	type: audit
 	level: high
-	risk: "rce"
+	risk: "远程代码执行（RCE）"
 	desc: <<<DESC
 ### 漏洞描述
 

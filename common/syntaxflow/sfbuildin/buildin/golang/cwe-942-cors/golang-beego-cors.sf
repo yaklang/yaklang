@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Golang CORS配置错误漏洞(beego)"
 	type: vuln
 	level: high
-	risk: "ssti"
+	risk: "跨域资源共享（CORS）"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

@@ -73,7 +73,7 @@ alert $result for {
 3. **对上传文件进行白名单校验（扩展名、MIME 类型、文件头 Magic Number）。**
 4. **限制内存和解析时间，防止拒绝服务攻击。**
 SOLUTION
-	risk: "XXE",
+	risk: "XML外部实体（XXE）",
 	name: "result",
 	desc: <<<DESC
 ### 漏洞描述
@@ -118,7 +118,7 @@ SOLUTION
 	title: "SCA: Java xlsx-streamer Dependency Vulnerability Was Detected",
 	title_zh: "SCA: 检测到Java xlsx-streamer依赖漏洞",
 	message: "检测到使用的 xlsx-streamer 版本低于 1.2.0，存在已知安全漏洞，请尽快升级。",
-	risk: "SCA",
+	risk: "软件成分分析（SCA）",
 	name: "vuln_xlsx",
 	desc: <<<DESC
 该规则用于检测xlsx-streamer依赖是否低于1.2.0版本，若低于1.2.0则可能存在已知的安全缺陷，包括但不限于XXE、内存溢出（OOM）、拒绝服务（DoS）等风险。建议升级至最新稳定版本以消除隐患。

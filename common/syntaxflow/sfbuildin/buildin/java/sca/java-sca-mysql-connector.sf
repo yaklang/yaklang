@@ -108,6 +108,6 @@ DESC
 	level: "mid",
 	cve: "CVE-2021-2471",
 	message: "SCA: mysql-connector-java versions between 8.0.17 and 8.0.27 have an information disclosure vulnerability",
-	risk: "SCA",
+	risk: "软件成分分析（SCA）",
 	name: "vuln_mysql_connector_java",
 }

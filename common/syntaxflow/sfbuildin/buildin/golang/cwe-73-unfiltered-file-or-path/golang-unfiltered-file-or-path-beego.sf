@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Golang未过滤的文件或路径漏洞"
 	type: audit
 	level: low
-	risk: "path-traversal"
+	risk: "路径穿越"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -87,7 +87,7 @@ $unsafe.GetFile?{<fullTypeName>?{have: "github.com/beego/beego/v2/server/web"}} 
 
 alert $low for {
 	solution: <<<SOLUTION
-	risk: "path-traversal",
+	risk: "路径穿越",
 ### 修复建议
 #### 1. 验证和限制用户输入路径
 确保所有从用户接收的路径都经过严格的验证，防止路径遍历攻击。例如，可以使用以下方法：

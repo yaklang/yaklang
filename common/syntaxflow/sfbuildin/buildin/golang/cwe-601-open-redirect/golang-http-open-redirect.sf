@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Golang开放重定向漏洞(http)"
 	type: audit
 	level: high
-	risk: "url-redirect"
+	risk: "开放重定向（Open Redirect）"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

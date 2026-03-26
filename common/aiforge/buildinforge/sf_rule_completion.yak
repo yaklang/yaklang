@@ -135,6 +135,7 @@ forgeHandle = func(params) {
         "solution": descRes.GetString("solution"),
         "reference": descRes.GetString("reference"),
         "cwe": descRes.GetInt("cwe"),
+        "rule_id": uuid(),
     }
 
     aidConfig.EmitDefaultStreamEvent("开始 alert 补全", makeReader("正在补全规则 %s 的 alert 块", fileName), "")

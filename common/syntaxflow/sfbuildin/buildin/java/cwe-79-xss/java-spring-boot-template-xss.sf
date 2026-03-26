@@ -96,7 +96,7 @@ spring.freemarker.settings.auto_escaping=true
 5. **输出编码**
 即使模板引擎提供了转义功能，也应了解其工作原理和限制。在某些特殊情况下，可能需要结合上下文敏感的转义（Context-Aware Escaping）。
 SOLUTION
-	risk: "XSS",
+	risk: "跨站脚本（XSS）",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

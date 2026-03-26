@@ -67,7 +67,7 @@ alert $mid for {
 	title: "Potential Java Velocity Evaluate SSTI Vulnerability Was Detected",
 	title_zh: "检测到潜在的Java Velocity Evaluate服务端模板注入漏洞",
 	message: "检测到Java Velocity Evaluate服务端模板注入漏洞，但是从数据源（source）到污染汇聚点（sink）间可能存在过滤函数，需进一步审计进行确认。",
-	risk: "SSTI",
+	risk: "服务器端模板注入（SSTI）",
 	solution: <<<SOLUTION
 ### 修复建议
 #### 1. 禁止直接使用用户输入作为 Velocity.evaluate 的模板内容。
@@ -165,7 +165,7 @@ props.setProperty("class.resource.loader.class", "org.apache.velocity.runtime.re
 Velocity.init(props);
 ```
 SOLUTION
-	risk: "SSTI",
+	risk: "服务器端模板注入（SSTI）",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

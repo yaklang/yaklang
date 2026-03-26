@@ -2,7 +2,7 @@
 desc(
 	title: "Check PHP Unfiltered Directory Reading Vulnerability"
 	title_zh: "检测PHP未过滤目录读取漏洞"
-	risk: "audit"
+	risk: "审计（Audit）"
 	level: "low"
 	desc: <<<DESC
 ### 漏洞描述

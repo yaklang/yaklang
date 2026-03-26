@@ -1,7 +1,7 @@
 desc(
 	title: "Audit PHP Unfiltered File or Path Operations"
 	title_zh: "审计PHP未过滤文件或路径操作"
-	risk: "audit"
+	risk: "审计（Audit）"
 	level: "low"
 	desc: <<<DESC
 ### 漏洞描述

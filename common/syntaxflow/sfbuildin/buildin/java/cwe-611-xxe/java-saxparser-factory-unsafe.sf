@@ -2,7 +2,7 @@ desc(
 	title: "Detect Java SAXParserFactory Unsafe Use"
 	title_zh: "检测 Java SAXParserFactory 不安全使用"
 	type: vuln
-	risk: "XXE"
+	risk: "XML外部实体（XXE）"
 	reference: <<<REFERENCE
 https://docs.oracle.com/javase/8/docs/api/javax/xml/parsers/SAXParserFactory.html
 https://cwe.mitre.org/data/definitions/611.html
@@ -141,7 +141,7 @@ e.printStackTrace();
 #### 3. 输入验证和过滤
 在解析XML之前，对输入数据进行严格的验证和过滤，特别是对特殊字符和结构进行检查，尽管这并不能完全阻止XXE，但可以增加攻击难度。
 SOLUTION
-	risk: "XXE",
+	risk: "XML外部实体（XXE）",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

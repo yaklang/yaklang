@@ -105,6 +105,6 @@ implementation 'com.vaadin:vaadin-server:YOUR_SAFE_VERSION' // 将 YOUR_SAFE_VER
 *   **使用安全的 Vaadin 组件:** 优先使用 Vaadin 提供的标准组件，这些组件通常已经内置了对抗 XSS 的保护措施。
 *   **避免直接使用 `Element.setInnerHTML()` 或类似的未经转义的输出方法:** 如果必须直接操作 DOM 或输出 HTML/JavaScript，请务必对数据进行充分的转义，使用 Vaadin 提供的 `Html.escape()` 或其他安全的转义方法。
 SOLUTION
-	risk: "XSS",
+	risk: "跨站脚本（XSS）",
 	name: "vuln_vaadin_server",
 }

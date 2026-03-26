@@ -86,7 +86,7 @@ DESC
 	level: "info",
 	title: "Unvalidated Apache HttpClient Execution",
 	title_zh: "未验证的Apache HttpClient执行风险",
-	risk: "SSRF",
+	risk: "服务端请求伪造（SSRF）",
 	name: "output",
 	message: "发现未验证的Apache HttpClient执行风险，可能存在SSRF漏洞，建议进一步审查。",
 	solution: <<<SOLUTION

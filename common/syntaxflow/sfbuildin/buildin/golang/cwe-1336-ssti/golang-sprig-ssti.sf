@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Golang中使用Sprig的SSTI漏洞"
 	type: vuln
 	level: low
-	risk: "ssti"
+	risk: "服务器端模板注入（SSTI）"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -110,7 +110,7 @@ $param?{<fullTypeName>?{have: 'sprig'}} as $low;
 
 alert $low for {
 	solution: <<<SOLUTION
-	risk: "ssti",
+	risk: "服务器端模板注入（SSTI）",
 ### 修复建议
 #### 1. 避免直接使用用户输入作为模板内容
 通过避免直接将未经验证的用户输入传递给模板引擎，可以有效防止SSTI漏洞。
@@ -186,7 +186,7 @@ DESC
 	title_zh: "检测到Golang中使用Sprig的SSTI漏洞",
 	name: "low",
 	message: "检测到Golang中使用Sprig的SSTI漏洞，并且从数据源（source）到污染汇聚点（sink）间可能存在过滤函数，需进一步审计进行确认。",
-	risk: "SSTI",
+	risk: "服务器端模板注入（SSTI）",
 }
 
 desc(

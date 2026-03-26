@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Java空Catch块"
 	type: "Code Vulnerability"
 	severity: "low"
-	risk: "error-handling"
+	risk: "错误处理（Error Handling）"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

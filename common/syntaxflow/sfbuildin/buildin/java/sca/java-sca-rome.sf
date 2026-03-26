@@ -126,7 +126,7 @@ DocumentBuilder db = dbf.newDocumentBuilder();
 #### 4. 最小化权限
 运行应用程序的用户应具有最小化的文件系统和网络访问权限，以限制即使发生XXE攻击时的潜在损害。
 SOLUTION
-	risk: "XXE",
+	risk: "XML外部实体（XXE）",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

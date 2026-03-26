@@ -1,7 +1,7 @@
 desc(
 	title: "Audit Java Spring Framework Multipart File Saving"
 	title_zh: "审计Java Spring Framework文件上传保存"
-	risk:"rce"
+	risk:"远程代码执行（RCE）"
 	desc: <<<DESC
 ### 风险描述
 1. **风险原理**
