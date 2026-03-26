@@ -26,7 +26,7 @@ if err !=nil{
     return
 }
 
-language = prog.GetLanguage()
+langKey = string(prog.GetLanguage()) // map 键为 string，不能与 ssaconfig.Language 混用
 searchFilterMethodRule = {
     "go":[],
     "java":[],
@@ -84,8 +84,14 @@ opt = [
     syntaxflow.withCache()
 ]
 
-rules = searchFilterMethodRule[language]
+rules = searchFilterMethodRule[langKey]
+if rules == nil {
+    rules = []
+}
 ruleNums = len(rules)
+if ruleNums == 0 {
+    yakit.Warn("当前语言无预置过滤函数规则或尚未支持: %s", langKey)
+}
 for i,rule := range rules{
     kind = rule["kind"]
     if  kind != kind_input{
