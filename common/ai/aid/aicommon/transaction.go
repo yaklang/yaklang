@@ -59,8 +59,8 @@ func CallAITransaction(
 		if postHandlerErr != nil && req != nil {
 			promptFallback := req.GetPromptFallback()
 			if promptFallback != nil {
-				req.SetPromptFallback(func(expectedContextSize int, currentContextSize int) (string, error) {
-					prompt, err := promptFallback(expectedContextSize, currentContextSize)
+				req.SetPromptFallback(func(expectedContextSize int, currentContextSize int, compressionLevel int) (string, error) {
+					prompt, err := promptFallback(expectedContextSize, currentContextSize, compressionLevel)
 					if err != nil || strings.TrimSpace(prompt) == "" {
 						return prompt, err
 					}

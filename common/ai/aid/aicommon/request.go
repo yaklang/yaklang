@@ -11,7 +11,7 @@ type ImageData struct {
 	IsBase64 bool
 }
 
-type PromptFallback func(expectedContextSize int, currentContextSize int) (string, error)
+type PromptFallback func(expectedContextSize int, currentContextSize int, compressionLevel int) (string, error)
 
 type AIRequest struct {
 	taskIndex              string

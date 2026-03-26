@@ -1,6 +1,9 @@
 package aicommon
 
-import "strings"
+import (
+	"errors"
+	"strings"
+)
 
 const (
 	ExtraReActConfigKeyModelContextLevel = "ModelContextLevel"
@@ -27,6 +30,8 @@ type ModelContextProfile struct {
 	PromptToolCount        int
 	PromptSkillCount       int
 }
+
+var ErrPromptFallbackNoMoreProfiles = errors.New("no more prompt compression profiles")
 
 var modelContextProfiles = map[string]ModelContextProfile{
 	ModelContextLevelStandard: {
@@ -106,6 +111,13 @@ func BuildGradientModelContextProfiles(base ModelContextProfile) []ModelContextP
 	return profiles
 }
 
+func SelectGradientModelContextProfileByLevel(profiles []ModelContextProfile, level int) (ModelContextProfile, bool) {
+	if level < 0 || level >= len(profiles) {
+		return ModelContextProfile{}, false
+	}
+	return profiles[level], true
+}
+
 func SelectGradientModelContextProfile(profiles []ModelContextProfile, expectedContextSize int, currentContextSize int) (ModelContextProfile, bool) {
 	if len(profiles) == 0 || expectedContextSize <= 0 || currentContextSize <= expectedContextSize {
 		return ModelContextProfile{}, false
@@ -130,6 +142,29 @@ func SelectGradientModelContextProfile(profiles []ModelContextProfile, expectedC
 		return ModelContextProfile{}, false
 	}
 	return profiles[idx], true
+}
+
+func NewGradientPromptFallback(base ModelContextProfile, render func(profile ModelContextProfile) (string, error)) PromptFallback {
+	if render == nil {
+		return nil
+	}
+
+	profiles := BuildGradientModelContextProfiles(base)
+	if len(profiles) == 0 {
+		return nil
+	}
+
+	return func(expectedContextSize int, currentContextSize int, compressionLevel int) (string, error) {
+		if expectedContextSize <= 0 || currentContextSize <= expectedContextSize {
+			return "", nil
+		}
+
+		profile, ok := SelectGradientModelContextProfileByLevel(profiles, compressionLevel)
+		if !ok {
+			return "", ErrPromptFallbackNoMoreProfiles
+		}
+		return render(profile)
+	}
 }
 
 func normalizeExtraReActConfigKey(key string) string {

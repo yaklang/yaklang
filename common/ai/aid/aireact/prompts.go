@@ -314,17 +314,7 @@ func (pm *PromptManager) getPromptTimeline() string {
 }
 
 func (pm *PromptManager) buildPromptFallback(render func(profile aicommon.ModelContextProfile) (string, error)) aicommon.PromptFallback {
-	profiles := aicommon.BuildGradientModelContextProfiles(pm.modelContextProfile())
-	if len(profiles) == 0 {
-		return nil
-	}
-	return func(expectedContextSize int, currentContextSize int) (string, error) {
-		profile, ok := aicommon.SelectGradientModelContextProfile(profiles, expectedContextSize, currentContextSize)
-		if !ok {
-			return "", nil
-		}
-		return render(profile)
-	}
+	return aicommon.NewGradientPromptFallback(pm.modelContextProfile(), render)
 }
 
 func (pm *PromptManager) GetAvailableAIForgeBlueprints() string {

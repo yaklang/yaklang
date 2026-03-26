@@ -2,6 +2,7 @@ package aicommon
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -85,8 +86,14 @@ func (c *Config) prepareRequestPrompt(request *AIRequest) (int, error) {
 	currentPrompt := selectedPrompt
 	currentTokens := selectedTokens
 	for idx := 0; idx < 8; idx++ {
-		candidatePromptRaw, err := promptFallback(limit, currentTokens)
+		candidatePromptRaw, err := promptFallback(limit, currentTokens, idx)
 		if err != nil {
+			if errors.Is(err, ErrPromptFallbackNoMoreProfiles) {
+				return 0, utils.Errorf(
+					"ai request prompt exceeded token limit (~%d > %d) and no more prompt compression profiles are available after %d attempt(s)",
+					currentTokens, limit, idx,
+				)
+			}
 			return 0, utils.Wrapf(err, "promptFallback failed at attempt %d (expected=%d, current=%d)", idx+1, limit, currentTokens)
 		}
 		if strings.TrimSpace(candidatePromptRaw) == "" {
@@ -104,10 +111,11 @@ func (c *Config) prepareRequestPrompt(request *AIRequest) (int, error) {
 		}
 
 		if candidatePrompt == currentPrompt || candidateTokens >= currentTokens {
-			return 0, utils.Errorf(
-				"ai request prompt exceeded token limit (~%d > %d) and promptFallback did not shrink enough at attempt %d (~%d)",
+			c.EmitWarning(
+				"ai request prompt exceeded token limit (~%d > %d) and promptFallback did not shrink enough at attempt %d (~%d), trying higher compression level if available",
 				currentTokens, limit, idx+1, candidateTokens,
 			)
+			continue
 		}
 
 		currentPrompt = candidatePrompt

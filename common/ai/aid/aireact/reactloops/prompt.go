@@ -213,15 +213,10 @@ func (r *ReActLoop) generateLoopPromptFallback(
 	memory string,
 	operator *LoopActionHandlerOperator,
 ) aicommon.PromptFallback {
-	profiles := aicommon.BuildGradientModelContextProfiles(aicommon.ResolveModelContextProfile(r.GetConfig()))
-	if len(profiles) == 0 {
-		return nil
-	}
-	return func(expectedContextSize int, currentContextSize int) (string, error) {
-		profile, ok := aicommon.SelectGradientModelContextProfile(profiles, expectedContextSize, currentContextSize)
-		if !ok {
-			return "", nil
-		}
-		return r.generateLoopPromptWithProfile(nonce, userInput, memory, operator, profile)
-	}
+	return aicommon.NewGradientPromptFallback(
+		aicommon.ResolveModelContextProfile(r.GetConfig()),
+		func(profile aicommon.ModelContextProfile) (string, error) {
+			return r.generateLoopPromptWithProfile(nonce, userInput, memory, operator, profile)
+		},
+	)
 }
