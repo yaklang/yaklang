@@ -30,7 +30,7 @@ func mockedToolCallingForJump(i aicommon.AICallerConfigIf, req *aicommon.AIReque
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
+	if isToolParamGenerationPrompt(prompt, toolName) {
 		rsp := i.NewAIResponse()
 		if toolName == "slow_task" {
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "seconds" : 3.0 }}`))

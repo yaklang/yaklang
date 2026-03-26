@@ -22,7 +22,7 @@ import (
 
 func mockedToolCallingMultiple(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string, callCount *int) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
-	if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
+	if isPrimaryDecisionPrompt(prompt) {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "%s" },
@@ -32,7 +32,7 @@ func mockedToolCallingMultiple(i aicommon.AICallerConfigIf, req *aicommon.AIRequ
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
+	if isToolParamGenerationPrompt(prompt, toolName) {
 		*callCount++
 		message := fmt.Sprintf("call %d", *callCount)
 		identifier := fmt.Sprintf("call_%d_test", *callCount)
@@ -43,7 +43,7 @@ func mockedToolCallingMultiple(i aicommon.AICallerConfigIf, req *aicommon.AIRequ
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+	if isVerifySatisfactionPrompt(prompt) {
 		rsp := i.NewAIResponse()
 		// 如果调用次数少于2次，继续调用工具
 		if *callCount < 2 {

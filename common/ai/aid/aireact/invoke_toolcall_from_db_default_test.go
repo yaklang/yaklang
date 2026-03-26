@@ -37,7 +37,7 @@ func TestReAct_ToolUse_FromDB_ViaToolSearch_WithDefaultConfig(t *testing.T) {
 			prompt := r.GetPrompt()
 
 			// First: AI decides to use tools_search
-			if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
+			if isPrimaryDecisionPrompt(prompt) {
 				// Check if we've already called tools_search
 				if !toolSearchCalled {
 					rsp := i.NewAIResponse()
@@ -54,7 +54,7 @@ func TestReAct_ToolUse_FromDB_ViaToolSearch_WithDefaultConfig(t *testing.T) {
 			}
 
 			// Generate parameters
-			if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
+			if isToolParamGenerationPrompt(prompt, "") {
 				rsp := i.NewAIResponse()
 				if strings.Contains(prompt, "tools_search") {
 					// Provide search query

@@ -31,7 +31,7 @@ import (
 
 func mockedToolCalling(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
-	if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
+	if isPrimaryDecisionPrompt(prompt) {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `" },
@@ -41,7 +41,7 @@ func mockedToolCalling(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, too
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
+	if isToolParamGenerationPrompt(prompt, toolName) {
 		rsp := i.NewAIResponse()
 		// Include identifier field for new directory structure
 		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "identifier": "sleep_test", "params": { "seconds" : 0.1 }}`))
@@ -49,7 +49,7 @@ func mockedToolCalling(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, too
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+	if isVerifySatisfactionPrompt(prompt) {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "abc-mocked-reason", "human_readable_result": "mocked thought for verification"}`))
 		rsp.Close()
@@ -612,7 +612,7 @@ func TestReAct_ToolUse_WithNoToolsCache(t *testing.T) {
 	// Custom mock function for this test that responds based on tool execution status
 	mockedToolCallingWithToolStatus := func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		prompt := req.GetPrompt()
-		if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
+		if isPrimaryDecisionPrompt(prompt) {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `" },
@@ -622,7 +622,7 @@ func TestReAct_ToolUse_WithNoToolsCache(t *testing.T) {
 			return rsp, nil
 		}
 
-		if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
+		if isToolParamGenerationPrompt(prompt, toolName) {
 			rsp := i.NewAIResponse()
 			// Include identifier field for new directory structure
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "identifier": "sleep_test", "params": { "seconds" : 0.1 }}`))
@@ -630,7 +630,7 @@ func TestReAct_ToolUse_WithNoToolsCache(t *testing.T) {
 			return rsp, nil
 		}
 
-		if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+		if isVerifySatisfactionPrompt(prompt) {
 			rsp := i.NewAIResponse()
 			// Return satisfied only if tool execution succeeded
 			if toolExecutionSucceeded.IsSet() {
@@ -1230,7 +1230,7 @@ yakit.Info("Enable: %v", enableValue)
 	// 自定义 mocked AI callback 来返回 bool 参数为 false
 	mockedBoolCallback := func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		prompt := req.GetPrompt()
-		if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
+		if isPrimaryDecisionPrompt(prompt) {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `" },
@@ -1240,7 +1240,7 @@ yakit.Info("Enable: %v", enableValue)
 			return rsp, nil
 		}
 
-		if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
+		if isToolParamGenerationPrompt(prompt, toolName) {
 			rsp := i.NewAIResponse()
 			// 明确设置 enable 参数为 false
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "identifier": "bool_test", "params": { "enable": false }}`))
@@ -1256,7 +1256,7 @@ yakit.Info("Enable: %v", enableValue)
 		}
 
 		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": { "type": "directly_answer", "directly_answer_payload": "general mocked response" }}`))
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "general mocked response"}`))
 		rsp.Close()
 		return rsp, nil
 	}

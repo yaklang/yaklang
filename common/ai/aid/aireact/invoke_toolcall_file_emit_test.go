@@ -3,13 +3,14 @@ package aireact
 import (
 	"bytes"
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -23,7 +24,7 @@ import (
 
 func mockedToolCallingForFileEmit(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
-	if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
+	if isPrimaryDecisionPrompt(prompt) {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "%s" },
@@ -33,7 +34,7 @@ func mockedToolCallingForFileEmit(i aicommon.AICallerConfigIf, req *aicommon.AIR
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
+	if isToolParamGenerationPrompt(prompt, toolName) {
 		rsp := i.NewAIResponse()
 		// Include identifier field for new directory structure
 		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "identifier": "test_file_output", "params": { "message" : "test message", "output_lines": 5 }}`))
@@ -41,7 +42,7 @@ func mockedToolCallingForFileEmit(i aicommon.AICallerConfigIf, req *aicommon.AIR
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+	if isVerifySatisfactionPrompt(prompt) {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "test-reason", "human_readable_result": "mocked thought for verification"}`))
 		rsp.Close()
@@ -262,7 +263,7 @@ func TestReAct_ToolCall_FileEmit_LargeResult(t *testing.T) {
 	_, err = NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := r.GetPrompt()
-			if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
+			if isPrimaryDecisionPrompt(prompt) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "%s" },
@@ -272,7 +273,7 @@ func TestReAct_ToolCall_FileEmit_LargeResult(t *testing.T) {
 				return rsp, nil
 			}
 
-			if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
+			if isToolParamGenerationPrompt(prompt, toolName) {
 				rsp := i.NewAIResponse()
 				// Include identifier field for new directory structure
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "identifier": "generate_large_data", "params": { "size" : 5242880 }}`)) // 5MB
@@ -280,7 +281,7 @@ func TestReAct_ToolCall_FileEmit_LargeResult(t *testing.T) {
 				return rsp, nil
 			}
 
-			if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+			if isVerifySatisfactionPrompt(prompt) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "test-reason", "human_readable_result": "mocked thought"}`))
 				rsp.Close()
@@ -394,7 +395,7 @@ LOOP:
 // mockedToolCallingForEmptyOutput mocks AI responses for testing empty stdout/stderr
 func mockedToolCallingForEmptyOutput(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
-	if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
+	if isPrimaryDecisionPrompt(prompt) {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "%s" },
@@ -404,7 +405,7 @@ func mockedToolCallingForEmptyOutput(i aicommon.AICallerConfigIf, req *aicommon.
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
+	if isToolParamGenerationPrompt(prompt, toolName) {
 		rsp := i.NewAIResponse()
 		// Include identifier field for new directory structure
 		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "identifier": "empty_output_test", "params": { "message" : "test message" }}`))
@@ -412,9 +413,9 @@ func mockedToolCallingForEmptyOutput(i aicommon.AICallerConfigIf, req *aicommon.
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+	if isVerifySatisfactionPrompt(prompt) {
 		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "test-reason", "human_readable_result": "mocked thought"}`))
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "test-reason", "human_readable_result": "mocked thought for verification"}`))
 		rsp.Close()
 		return rsp, nil
 	}
@@ -562,7 +563,7 @@ LOOP:
 // mockedToolCallingWithCustomIdentifier mocks AI responses with a custom identifier for testing directory structure
 func mockedToolCallingWithCustomIdentifier(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName, identifier string) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
-	if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
+	if isPrimaryDecisionPrompt(prompt) {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "%s" },
@@ -572,7 +573,7 @@ func mockedToolCallingWithCustomIdentifier(i aicommon.AICallerConfigIf, req *aic
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
+	if isToolParamGenerationPrompt(prompt, toolName) {
 		rsp := i.NewAIResponse()
 		// Include the custom identifier
 		rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`{"@action": "call-tool", "identifier": "%s", "params": { "message" : "test" }}`, identifier)))
@@ -580,7 +581,7 @@ func mockedToolCallingWithCustomIdentifier(i aicommon.AICallerConfigIf, req *aic
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+	if isVerifySatisfactionPrompt(prompt) {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "test-reason", "human_readable_result": "mocked thought"}`))
 		rsp.Close()
@@ -743,7 +744,7 @@ func TestReAct_ToolCall_FileEmit_WithoutIdentifier(t *testing.T) {
 	// Mock without identifier
 	mockedWithoutIdentifier := func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		prompt := req.GetPrompt()
-		if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
+		if isPrimaryDecisionPrompt(prompt) {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(fmt.Sprintf(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "%s" },
@@ -753,7 +754,7 @@ func TestReAct_ToolCall_FileEmit_WithoutIdentifier(t *testing.T) {
 			return rsp, nil
 		}
 
-		if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
+		if isToolParamGenerationPrompt(prompt, toolName) {
 			rsp := i.NewAIResponse()
 			// No identifier field - test fallback behavior
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "message" : "test" }}`))
@@ -761,7 +762,7 @@ func TestReAct_ToolCall_FileEmit_WithoutIdentifier(t *testing.T) {
 			return rsp, nil
 		}
 
-		if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+		if isVerifySatisfactionPrompt(prompt) {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "ok", "human_readable_result": "mocked"}`))
 			rsp.Close()

@@ -113,7 +113,7 @@ func mockedToolCallingForDB(i aicommon.AICallerConfigIf, req *aicommon.AIRequest
 	prompt := req.GetPrompt()
 
 	// First stage: decide to use tool_search or direct tool
-	if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
+	if isPrimaryDecisionPrompt(prompt) {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `" },
@@ -124,7 +124,7 @@ func mockedToolCallingForDB(i aicommon.AICallerConfigIf, req *aicommon.AIRequest
 	}
 
 	// Second stage: generate parameters for the tool
-	if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
+	if isToolParamGenerationPrompt(prompt, "") {
 		rsp := i.NewAIResponse()
 		// For tools_search, provide query parameter
 		if strings.Contains(prompt, "tools_search") {
@@ -138,7 +138,7 @@ func mockedToolCallingForDB(i aicommon.AICallerConfigIf, req *aicommon.AIRequest
 	}
 
 	// Third stage: verify satisfaction
-	if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+	if isVerifySatisfactionPrompt(prompt) {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "abc-mocked-reason-db-tool"}`))
 		rsp.Close()
@@ -191,7 +191,7 @@ func TestReAct_ToolUse_FromDB_ViaToolSearch(t *testing.T) {
 			prompt := r.GetPrompt()
 
 			// First: AI decides to use tools_search
-			if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
+			if isPrimaryDecisionPrompt(prompt) {
 				// Check if we've already called tools_search
 				if !toolSearchCalled {
 					rsp := i.NewAIResponse()
@@ -208,7 +208,7 @@ func TestReAct_ToolUse_FromDB_ViaToolSearch(t *testing.T) {
 			}
 
 			// Generate parameters
-			if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
+			if isToolParamGenerationPrompt(prompt, "") {
 				rsp := i.NewAIResponse()
 				if strings.Contains(prompt, "tools_search") {
 					// Provide search query
@@ -222,7 +222,7 @@ func TestReAct_ToolUse_FromDB_ViaToolSearch(t *testing.T) {
 			}
 
 			// Verify satisfaction
-			if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+			if isVerifySatisfactionPrompt(prompt) {
 				rsp := i.NewAIResponse()
 				// After tools_search, we should continue to call the actual tool
 				if toolSearchCalled && !mockToolCalled {
@@ -539,7 +539,7 @@ func TestReAct_ToolUse_WithNextMovements(t *testing.T) {
 			prompt := r.GetPrompt()
 
 			// First: AI decides to use the tool
-			if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
+			if isPrimaryDecisionPrompt(prompt) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `" },
@@ -550,7 +550,7 @@ func TestReAct_ToolUse_WithNextMovements(t *testing.T) {
 			}
 
 			// Second: Generate parameters for the tool
-			if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
+			if isToolParamGenerationPrompt(prompt, "") {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "message" : "test message" }}`))
 				rsp.Close()
@@ -558,7 +558,7 @@ func TestReAct_ToolUse_WithNextMovements(t *testing.T) {
 			}
 
 			// Third: Verify satisfaction - return false with next_movements
-			if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+			if isVerifySatisfactionPrompt(prompt) {
 				verifyTriggered = true
 				rsp := i.NewAIResponse()
 				// Return user_satisfied=false with next_movements

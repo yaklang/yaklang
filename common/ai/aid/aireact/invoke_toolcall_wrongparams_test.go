@@ -19,7 +19,7 @@ import (
 
 func mockedToolCallingWrongParam_Normal(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
-	if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
+	if isPrimaryDecisionPrompt(prompt) {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `" },
@@ -29,7 +29,7 @@ func mockedToolCallingWrongParam_Normal(i aicommon.AICallerConfigIf, req *aicomm
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
+	if isToolParamGenerationPrompt(prompt, toolName) {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "input" : "mocked-echo-params" }}`))
 		rsp.Close()
@@ -43,19 +43,30 @@ func mockedToolCallingWrongParam_Normal(i aicommon.AICallerConfigIf, req *aicomm
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+	if strings.Contains(prompt, "重新生成一套参数") || strings.Contains(prompt, "参数名不匹配") {
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "seconds" : 0.1 }}`))
+		rsp.Close()
+		return rsp, nil
+	}
+
+	if strings.Contains(prompt, "用户中断了工具执行") || strings.Contains(prompt, "请根据你刚才执行的所有步骤") {
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "directly answer after '` + toolName + `' require and user reject it..........."}`))
+		rsp.Close()
+		return rsp, nil
+	}
+
+	if isVerifySatisfactionPrompt(prompt) {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "abc-mocked-reason"}`))
 		rsp.Close()
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(prompt, `directly_answer`) && !utils.MatchAnyOfSubString(prompt, `require_tool`) {
+	if isDirectAnswerPrompt(prompt) {
 		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "object", "next_action": { "type": "directly_answer", "answer_payload": "directly answer after '` + toolName + `' require and user reject it..........." },
-"human_readable_thought": "mocked thought for tool calling", "cumulative_summary": "..cumulative-mocked for tool calling.."}
-`))
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "directly answer after '` + toolName + `' require and user reject it..........."}`))
 		rsp.Close()
 		return rsp, nil
 

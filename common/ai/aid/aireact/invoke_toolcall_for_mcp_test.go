@@ -24,11 +24,9 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-// mockedMCPToolCalling mocks the AI responses for MCP tool calling
-// nonce is used to verify that the AI reads the schema correctly
 func mockedMCPToolCalling(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string, nonce string) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
-	if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
+	if isPrimaryDecisionPrompt(prompt) {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `" },
@@ -38,7 +36,7 @@ func mockedMCPToolCalling(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, 
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
+	if isToolParamGenerationPrompt(prompt, toolName) {
 		// Verify that the prompt contains the nonce in the schema
 		if !strings.Contains(prompt, nonce) {
 			return nil, utils.Errorf("SECURITY CHECK FAILED: prompt does not contain nonce %s, schema was not properly included", nonce)
@@ -51,7 +49,7 @@ func mockedMCPToolCalling(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, 
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+	if isVerifySatisfactionPrompt(prompt) {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "abc-mocked-reason for mcp"}`))
 		rsp.Close()
@@ -230,9 +228,9 @@ func TestReAct_MCPToolUse(t *testing.T) {
 		}),
 		aicommon.WithMemoryTriage(nil),
 		aicommon.WithEnableSelfReflection(false),
-		aicommon.WithDisallowMCPServers(false),              // Important: enable MCP servers
-		aicommon.WithDisableIntentRecognition(true),          // Prevent intent sub-loop from consuming mock responses
-		aicommon.WithDisableSessionTitleGeneration(true),     // Prevent title generation from consuming mock responses
+		aicommon.WithDisallowMCPServers(false),           // Important: enable MCP servers
+		aicommon.WithDisableIntentRecognition(true),      // Prevent intent sub-loop from consuming mock responses
+		aicommon.WithDisableSessionTitleGeneration(true), // Prevent title generation from consuming mock responses
 	)
 	if err != nil {
 		t.Fatalf("failed to create ReAct instance: %v", err)

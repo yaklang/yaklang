@@ -120,7 +120,7 @@ func TestReAct_PlanAndExecute_SkipAfterCancel(t *testing.T) {
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := r.GetPrompt()
 
-			if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", mockToolName) {
+			if isToolParamGenerationPrompt(prompt, mockToolName) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 {
