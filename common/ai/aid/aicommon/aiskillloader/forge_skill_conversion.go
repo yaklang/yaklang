@@ -17,6 +17,41 @@ import (
 
 const ForgeTagUnknownKey = "unknowkey"
 
+// GenerateSkillMDFromAIForge renders the canonical SKILL.md content from forge fields.
+func GenerateSkillMDFromAIForge(forge *schema.AIForge) (string, error) {
+	if forge == nil {
+		return "", utils.Error("forge is nil")
+	}
+	return renderSkillMDContent(&SkillMeta{
+		Name:          forge.ForgeName,
+		Description:   forge.Description,
+		Compatibility: "",
+		Metadata:      forgeTagsToMetadata(forge.Tags),
+		Body:          forge.InitPrompt,
+	})
+}
+
+// SerializeSkillFileSystemWithGeneratedSkillMD rewrites SKILL.md from forge fields
+// before serializing the rest of the skill filesystem into gzip bytes.
+func SerializeSkillFileSystemWithGeneratedSkillMD(forge *schema.AIForge, fsys fi.FileSystem) ([]byte, error) {
+	if fsys == nil {
+		return nil, utils.Error("skill filesystem is nil")
+	}
+
+	skillMDContent, err := GenerateSkillMDFromAIForge(forge)
+	if err != nil {
+		return nil, utils.Wrap(err, "render skill markdown from forge failed")
+	}
+	if err := fsys.WriteFile(skillMDFilename, []byte(skillMDContent), 0o644); err != nil {
+		return nil, utils.Wrap(err, "write generated skill markdown failed")
+	}
+	fsBytes, err := filesys.SerializeFileSystemToGzipBytes(fsys, filesys.WithGzipFSExcludePaths(skillMDFilename))
+	if err != nil {
+		return nil, utils.Wrap(err, "serialize skill filesystem failed")
+	}
+	return fsBytes, nil
+}
+
 // LoadedSkillToAIForge converts a loaded skill into a forge record of type skillmd.
 // SKILL.md itself is synthesized from mapped forge fields, so it is excluded from FSBytes.
 func LoadedSkillToAIForge(skill *LoadedSkill) (*schema.AIForge, error) {
@@ -52,13 +87,7 @@ func AIForgeToLoadedSkill(forge *schema.AIForge) (*LoadedSkill, error) {
 		return nil, utils.Errorf("forge %q is not skillmd type", forge.ForgeName)
 	}
 
-	skillMDContent, err := renderSkillMDContent(&SkillMeta{
-		Name:          forge.ForgeName,
-		Description:   forge.Description,
-		Compatibility: "",
-		Metadata:      forgeTagsToMetadata(forge.Tags),
-		Body:          forge.InitPrompt,
-	})
+	skillMDContent, err := GenerateSkillMDFromAIForge(forge)
 	if err != nil {
 		return nil, utils.Wrap(err, "render skill markdown from forge failed")
 	}

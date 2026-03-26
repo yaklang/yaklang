@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -273,4 +274,68 @@ func TestAIForgeSkillPathRoundTrip(t *testing.T) {
 	require.Equal(t, "print('hello')", string(content))
 	_, err = os.Stat(filepath.Join(forge.GetSkillPath(), "stale.txt"))
 	require.True(t, os.IsNotExist(err))
+}
+
+func TestAIForgeSkillPathSaveSyncsSkillMD(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	name := uuid.New().String()
+	skillDir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(skillDir, "scripts"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(skillDir, "scripts", "helper.py"), []byte("print('hello')"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte(`---
+name: stale-skill
+description: stale description
+---
+stale body
+`), 0o644))
+
+	_, err = client.CreateAIForge(ctx, &ypb.AIForge{
+		ForgeName:   name,
+		ForgeType:   "skillmd",
+		SkillPath:   skillDir,
+		Description: "Generated description",
+		Tag:         []string{"category:automation", "owner:platform"},
+		InitPrompt:  "Generated body",
+	})
+	require.NoError(t, err)
+	defer func() {
+		_, err = client.DeleteAIForge(ctx, &ypb.AIForgeFilter{ForgeName: name})
+		require.NoError(t, err)
+	}()
+
+	skillMDContent, err := os.ReadFile(filepath.Join(skillDir, "SKILL.md"))
+	require.NoError(t, err)
+	meta, err := aiskillloader.ParseSkillMeta(string(skillMDContent))
+	require.NoError(t, err)
+	require.Equal(t, name, meta.Name)
+	require.Equal(t, "Generated description", meta.Description)
+	require.Equal(t, "Generated body", meta.Body)
+	require.Equal(t, map[string]string{
+		"category": "automation",
+		"owner":    "platform",
+	}, meta.Metadata)
+
+	_, err = client.UpdateAIForge(ctx, &ypb.AIForge{
+		ForgeName:   name,
+		ForgeType:   "skillmd",
+		Description: "Updated description",
+		Tag:         []string{"category:analysis"},
+		InitPrompt:  "Updated body",
+	})
+	require.NoError(t, err)
+
+	skillMDContent, err = os.ReadFile(filepath.Join(skillDir, "SKILL.md"))
+	require.NoError(t, err)
+	meta, err = aiskillloader.ParseSkillMeta(string(skillMDContent))
+	require.NoError(t, err)
+	require.Equal(t, name, meta.Name)
+	require.Equal(t, "Updated description", meta.Description)
+	require.Equal(t, "Updated body", meta.Body)
+	require.Equal(t, map[string]string{
+		"category": "analysis",
+	}, meta.Metadata)
 }

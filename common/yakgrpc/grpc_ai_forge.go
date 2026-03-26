@@ -316,9 +316,12 @@ func hydrateForgeFSBytesFromSkillPath(db *gorm.DB, req *ypb.AIForge, forge *sche
 	if req == nil || forge == nil {
 		return nil
 	}
+	existing, err := getExistingAIForgeForSkillPath(db, req, forge)
 	skillPath := strings.TrimSpace(req.GetSkillPath())
+	if skillPath == "" && existing != nil {
+		skillPath = strings.TrimSpace(existing.SkillPath)
+	}
 	if skillPath == "" {
-		existing, err := getExistingAIForgeForSkillPath(db, req, forge)
 		if err == nil && existing != nil {
 			if len(forge.FSBytes) == 0 && len(existing.FSBytes) > 0 {
 				forge.FSBytes = append([]byte(nil), existing.FSBytes...)
@@ -333,7 +336,12 @@ func hydrateForgeFSBytesFromSkillPath(db *gorm.DB, req *ypb.AIForge, forge *sche
 		return utils.Errorf("skill path is not a directory: %s", skillPath)
 	}
 	localFS := filesys.NewRelLocalFs(skillPath)
-	fsBytes, err := filesys.SerializeFileSystemToGzipBytes(localFS)
+	var fsBytes []byte
+	if forge.ForgeType == schema.FORGE_TYPE_SkillMD {
+		fsBytes, err = aiskillloader.SerializeSkillFileSystemWithGeneratedSkillMD(forge, localFS)
+	} else {
+		fsBytes, err = filesys.SerializeFileSystemToGzipBytes(localFS)
+	}
 	if err != nil {
 		return utils.Wrapf(err, "serialize skill path failed: %s", skillPath)
 	}
