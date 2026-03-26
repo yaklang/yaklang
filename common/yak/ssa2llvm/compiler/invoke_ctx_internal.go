@@ -9,14 +9,14 @@ import (
 )
 
 func (c *Compiler) ctxI64Ptr() (llvm.Value, error) {
-	if c == nil || c.invokeCtx.IsNil() {
+	if c == nil || c.function == nil || c.function.invokeCtx.IsNil() {
 		return llvm.Value{}, fmt.Errorf("missing invoke context")
 	}
 	i64Ptr := llvm.PointerType(c.LLVMCtx.Int64Type(), 0)
-	if c.invokeCtx.Type() == i64Ptr {
-		return c.invokeCtx, nil
+	if c.function.invokeCtx.Type() == i64Ptr {
+		return c.function.invokeCtx, nil
 	}
-	return c.Builder.CreateBitCast(c.invokeCtx, i64Ptr, "yak_ctx_i64p"), nil
+	return c.Builder.CreateBitCast(c.function.invokeCtx, i64Ptr, "yak_ctx_i64p"), nil
 }
 
 func (c *Compiler) ctxWordPtr(word int64) (llvm.Value, error) {
@@ -79,11 +79,11 @@ func (c *Compiler) storeContextPanic(val llvm.Value) error {
 }
 
 func (c *Compiler) loadContextPanic(name string) (llvm.Value, error) {
-	if c == nil || c.invokeCtx.IsNil() {
+	if c == nil || c.function == nil || c.function.invokeCtx.IsNil() {
 		return llvm.Value{}, fmt.Errorf("missing invoke context")
 	}
 	loadFn, loadType := c.getOrInsertRuntimeLoadPanicValue()
-	return c.Builder.CreateCall(loadType, loadFn, []llvm.Value{c.invokeCtx}, name), nil
+	return c.Builder.CreateCall(loadType, loadFn, []llvm.Value{c.function.invokeCtx}, name), nil
 }
 
 func (c *Compiler) bindParamsFromContext(fn *ssa.Function) error {
@@ -112,6 +112,14 @@ func (c *Compiler) bindParamsFromContext(fn *ssa.Function) error {
 		elemPtr := c.Builder.CreateGEP(i64, ctxPtr, []llvm.Value{idx}, "")
 		val := c.Builder.CreateLoad(i64, elemPtr, fmt.Sprintf("pm_%d", memberID))
 		c.Values[memberID] = val
+	}
+
+	freeValueBase := int64(len(fn.Params) + len(fn.ParameterMembers))
+	for i, binding := range orderedFreeValueBindings(fn) {
+		idx := llvm.ConstInt(i64, uint64(argBase+freeValueBase+int64(i)), false)
+		elemPtr := c.Builder.CreateGEP(i64, ctxPtr, []llvm.Value{idx}, "")
+		val := c.Builder.CreateLoad(i64, elemPtr, fmt.Sprintf("fv_%d", binding.ssaID))
+		c.Values[binding.ssaID] = val
 	}
 
 	return nil

@@ -31,21 +31,10 @@ type Compiler struct {
 
 	TypeConverter *types.TypeConverter
 
-	// CurrentFunction being compiled
-	CurrentFunction *ssa.Function
-
 	// ExternBindings maps source-level function names to runtime symbols/signatures.
 	ExternBindings map[string]ExternBinding
 
-	// Per-function lowering state.
-	invokeCtx   llvm.Value // i8* pointing to an InvokeContext allocation
-	returnBlock llvm.BasicBlock
-
-	// Error handling (try/catch/finally) metadata for the current function.
-	exceptionValueIDs    map[int64]struct{}
-	activeHandlerByBlock map[int64]int64
-	catchBodyByHandler   map[int64]int64
-	catchTargetByBlock   map[int64]int64 // catchBody block -> final/done block
+	function *functionCompileContext
 }
 
 type CompilerOption func(*Compiler)
@@ -113,11 +102,12 @@ func (c *Compiler) Compile() error {
 
 // CompileFunction compiles a single YakSSA function to LLVM IR.
 func (c *Compiler) CompileFunction(fn *ssa.Function) error {
-	c.CurrentFunction = fn
+	c.function = newFunctionCompileContext(fn)
+	defer func() {
+		c.function = nil
+	}()
 	// 1. Get or declare LLVM function with a stable unique symbol name.
 	llvmFn, _ := c.getOrDeclareLLVMFunction(fn)
-	c.invokeCtx = llvm.Value{}
-	c.returnBlock = llvm.BasicBlock{}
 	if err := c.prepareErrorHandling(fn); err != nil {
 		return err
 	}
@@ -128,7 +118,7 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 	}
 	ctxParam := llvmFn.Param(0)
 	ctxParam.SetName(fmt.Sprintf("ctx_%d", fn.GetId()))
-	c.invokeCtx = ctxParam
+	c.function.invokeCtx = ctxParam
 
 	// 3. Pre-create all BasicBlocks
 	// LLVM IR requires jump targets to exist, so we create them first.
@@ -138,7 +128,7 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 	}
 	// Add the unified return block last so the real entry block remains first.
 	if fn.DeferBlock > 0 {
-		c.returnBlock = c.LLVMCtx.AddBasicBlock(llvmFn, fmt.Sprintf("yak_ret_%d", fn.GetId()))
+		c.function.returnBlock = c.LLVMCtx.AddBasicBlock(llvmFn, fmt.Sprintf("yak_ret_%d", fn.GetId()))
 	}
 
 	// 4. Compile Instructions in each Block
@@ -213,13 +203,13 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 		// Add terminator based on block structure if not already present
 		if !hasTerminator {
 			// Defer block always falls through to the unified return.
-			if fn.DeferBlock > 0 && blockID == fn.DeferBlock && !c.returnBlock.IsNil() {
-				c.Builder.CreateBr(c.returnBlock)
+			if fn.DeferBlock > 0 && blockID == fn.DeferBlock && !c.function.returnBlock.IsNil() {
+				c.Builder.CreateBr(c.function.returnBlock)
 				hasTerminator = true
 			}
 		}
-		if !hasTerminator && c.catchTargetByBlock != nil {
-			if targetID, ok := c.catchTargetByBlock[blockID]; ok && targetID > 0 {
+		if !hasTerminator && c.function.catchTargetByBlock != nil {
+			if targetID, ok := c.function.catchTargetByBlock[blockID]; ok && targetID > 0 {
 				targetBB, ok := c.Blocks[targetID]
 				if !ok {
 					return fmt.Errorf("catch target block %d not found", targetID)
@@ -265,7 +255,7 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 
 			// If still no terminator, add default return
 			if !hasTerminator {
-				if fn.DeferBlock > 0 && !c.returnBlock.IsNil() {
+				if fn.DeferBlock > 0 && !c.function.returnBlock.IsNil() {
 					// Implicit return 0 through defer.
 					if err := c.storeContextReturn(llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)); err != nil {
 						return err
@@ -310,8 +300,8 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 		}
 	}
 
-	if fn.DeferBlock > 0 && !c.returnBlock.IsNil() {
-		c.Builder.SetInsertPointAtEnd(c.returnBlock)
+	if fn.DeferBlock > 0 && !c.function.returnBlock.IsNil() {
+		c.Builder.SetInsertPointAtEnd(c.function.returnBlock)
 		c.Builder.CreateRetVoid()
 	}
 

@@ -7,10 +7,14 @@ import (
 )
 
 func (c *Compiler) prepareErrorHandling(fn *ssa.Function) error {
-	c.exceptionValueIDs = nil
-	c.activeHandlerByBlock = nil
-	c.catchBodyByHandler = nil
-	c.catchTargetByBlock = nil
+	if c.function == nil {
+		return nil
+	}
+
+	c.function.exceptionValueIDs = nil
+	c.function.activeHandlerByBlock = nil
+	c.function.catchBodyByHandler = nil
+	c.function.catchTargetByBlock = nil
 
 	if fn == nil {
 		return nil
@@ -129,10 +133,10 @@ func (c *Compiler) prepareErrorHandling(fn *ssa.Function) error {
 		_ = resolve(blockID)
 	}
 
-	c.exceptionValueIDs = exceptionIDs
-	c.activeHandlerByBlock = activeHandlerByBlock
-	c.catchBodyByHandler = catchBodyByHandler
-	c.catchTargetByBlock = catchTargetByBlock
+	c.function.exceptionValueIDs = exceptionIDs
+	c.function.activeHandlerByBlock = activeHandlerByBlock
+	c.function.catchBodyByHandler = catchBodyByHandler
+	c.function.catchTargetByBlock = catchTargetByBlock
 
 	for handlerID, catchBody := range catchBodyByHandler {
 		if catchBody == 0 {

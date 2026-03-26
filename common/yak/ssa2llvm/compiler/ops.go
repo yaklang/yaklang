@@ -48,8 +48,8 @@ func (c *Compiler) compileInstruction(inst ssa.Instruction) error {
 func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, error) {
 	// Exception values (try/catch `err`) are backed by the current function's panic slot.
 	// These values can be referenced in multiple blocks, so do not cache the load.
-	if c != nil && c.exceptionValueIDs != nil {
-		if _, ok := c.exceptionValueIDs[id]; ok {
+	if c != nil && c.function != nil && c.function.exceptionValueIDs != nil {
+		if _, ok := c.function.exceptionValueIDs[id]; ok {
 			return c.loadContextPanic(fmt.Sprintf("yak_exc_%d", id))
 		}
 	}
@@ -64,11 +64,11 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 	if contextInst != nil {
 		fn = contextInst.GetFunc()
 	} else {
-		fn = c.CurrentFunction
+		fn = c.currentFunction()
 	}
 
 	if fn == nil {
-		return llvm.Value{}, fmt.Errorf("getValue: cannot determine function (contextInst is nil and CurrentFunction is nil)")
+		return llvm.Value{}, fmt.Errorf("getValue: cannot determine function (contextInst is nil and current function is nil)")
 	}
 
 	valObj, ok := fn.GetValueById(id)
@@ -278,10 +278,11 @@ func (c *Compiler) compileReturn(inst *ssa.Return) error {
 	}
 
 	// If this function has a DeferBlock, route all returns through it.
-	if c.CurrentFunction != nil && c.CurrentFunction.DeferBlock > 0 && !c.returnBlock.IsNil() {
-		deferBB, ok := c.Blocks[c.CurrentFunction.DeferBlock]
+	currentFunction := c.currentFunction()
+	if currentFunction != nil && currentFunction.DeferBlock > 0 && c.function != nil && !c.function.returnBlock.IsNil() {
+		deferBB, ok := c.Blocks[currentFunction.DeferBlock]
 		if !ok {
-			return fmt.Errorf("compileReturn: defer block %d not found", c.CurrentFunction.DeferBlock)
+			return fmt.Errorf("compileReturn: defer block %d not found", currentFunction.DeferBlock)
 		}
 		c.Builder.CreateBr(deferBB)
 		return nil
