@@ -38,14 +38,14 @@ func TestCoordinator_ToolUseReview_WrongTool_SuggestionTools(t *testing.T) {
 
 			prompt := request.GetPrompt()
 
-			if strings.Contains(prompt, "意图识别与上下文增强系统") {
+			if isIntentEnrichmentPrompt(prompt) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finalize_enrichment", "intent_summary": "mocked intent analysis", "recommended_capabilities": "", "context_notes": ""}`))
 				rsp.Close()
 				return rsp, nil
 			}
 
-			if strings.Contains(prompt, "数据处理和总结提示小助手") {
+			if isMemorySummaryPrompt(prompt) {
 				rsp := i.NewAIResponse()
 				if strings.Contains(prompt, "tag-selection") {
 					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "tag-selection", "tags": ["test"]}`))
@@ -58,7 +58,7 @@ func TestCoordinator_ToolUseReview_WrongTool_SuggestionTools(t *testing.T) {
 				return rsp, nil
 			}
 
-			if utils.MatchAllOfSubString(prompt, "plan: when user needs to create or refine a plan for a specific task") {
+			if isPlanPrompt(prompt) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(strings.NewReader(`
 {
@@ -82,7 +82,7 @@ func TestCoordinator_ToolUseReview_WrongTool_SuggestionTools(t *testing.T) {
 				return rsp, nil
 			}
 
-			if utils.MatchAllOfSubString(prompt, "require_tool") {
+			if isNextActionDecisionPrompt(prompt) && strings.Contains(prompt, "require_tool") {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName1 + `" },
@@ -93,28 +93,28 @@ func TestCoordinator_ToolUseReview_WrongTool_SuggestionTools(t *testing.T) {
 
 			}
 
-			if utils.MatchAllOfSubString(prompt, "require-tool", "abandon") {
+			if isWrongToolReviewPrompt(prompt) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "require-tool", "tool": ` + toolName2 + `}`))
 				rsp.Close()
 				return rsp, nil
 			}
 
-			if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
+			if isToolParamGenerationPrompt(prompt, toolName1) || isToolParamGenerationPrompt(prompt, toolName2) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "input" : "mocked-echo-params" }}`))
 				rsp.Close()
 				return rsp, nil
 			}
 
-			if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+			if isVerifySatisfactionPrompt(prompt) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "abc-mocked-reason"}`))
 				rsp.Close()
 				return rsp, nil
 			}
 
-			if utils.MatchAllOfSubString(prompt, "short_summary") {
+			if isSummaryPrompt(prompt) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "summary","task_short_summary":"mock"}`))
 				rsp.Close()
@@ -123,7 +123,7 @@ func TestCoordinator_ToolUseReview_WrongTool_SuggestionTools(t *testing.T) {
 
 			fmt.Println("Unexpected prompt:", prompt)
 
-			return nil, utils.Errorf("unexpected prompt: %s", prompt)
+			return nil, unexpectedPromptError(prompt)
 
 		}),
 	)

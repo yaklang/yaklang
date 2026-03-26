@@ -26,12 +26,12 @@ func mockedToolCalling(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, too
 	defer rsp.Close()
 	fmt.Println("===========" + "request:" + "===========\n" + req.GetPrompt())
 
-	if strings.Contains(prompt, "意图识别与上下文增强系统") {
+	if isIntentEnrichmentPrompt(prompt) {
 		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finalize_enrichment", "intent_summary": "mocked intent analysis", "recommended_capabilities": "", "context_notes": ""}`))
 		return rsp, nil
 	}
 
-	if strings.Contains(prompt, "数据处理和总结提示小助手") {
+	if isMemorySummaryPrompt(prompt) {
 		if strings.Contains(prompt, "tag-selection") {
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "tag-selection", "tags": ["test"]}`))
 		} else if strings.Contains(prompt, "memory-triage") {
@@ -42,7 +42,7 @@ func mockedToolCalling(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, too
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(prompt, "plan: when user needs to create or refine a plan for a specific task") {
+	if isPlanPrompt(prompt) {
 
 		rsp.EmitOutputStream(strings.NewReader(`
 {
@@ -65,7 +65,7 @@ func mockedToolCalling(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, too
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(prompt, "directly_answer", "require_tool") {
+	if isNextActionDecisionPrompt(prompt) && strings.Contains(prompt, "require_tool") {
 		rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `" },
 "human_readable_thought": "mocked thought for tool calling", "cumulative_summary": "..cumulative-mocked for tool calling.."}
@@ -73,23 +73,23 @@ func mockedToolCalling(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, too
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
+	if isToolParamGenerationPrompt(prompt, toolName) {
 
 		rsp.EmitOutputStream(bytes.NewBufferString(params))
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+	if isVerifySatisfactionPrompt(prompt) {
 		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "abc-mocked-reason"}`))
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(prompt, "short_summary") {
+	if isSummaryPrompt(prompt) {
 		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "summary","task_short_summary":"mock"}`))
 		return rsp, nil
 	}
 
-	return nil, utils.Errorf("unexpected prompt: %s", prompt)
+	return nil, unexpectedPromptError(prompt)
 }
 
 func TestCoordinator_GUARDIAN_OUTPUT_SMOKING_ToolUseReview(t *testing.T) {
