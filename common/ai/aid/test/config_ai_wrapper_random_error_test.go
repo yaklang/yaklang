@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid"
-	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai/aid"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/utils/chanx"
@@ -74,6 +75,11 @@ func SyncInputEventEx(syncType string, SyncID string) *ypb.AIInputEvent {
 	}
 }
 
+func isPlanRequestForCoordinatorTest(prompt string) bool {
+	return (strings.Contains(prompt, "任务规划使命") || strings.Contains(prompt, "你是一个输出JSON的任务规划的工具")) &&
+		(strings.Contains(prompt, "PERSISTENT_NcSB") || strings.Contains(prompt, "任务设计输出要求") || strings.Contains(prompt, "```schema"))
+}
+
 func TestCoordinator_RandomAICallbackError(t *testing.T) {
 	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
 	outputChan := make(chan *schema.AiOutputEvent)
@@ -85,18 +91,64 @@ func TestCoordinator_RandomAICallbackError(t *testing.T) {
 	ins, err := aid.NewCoordinator(
 		"test",
 		aicommon.WithEventInputChanx(inputChan),
+		aicommon.WithAIAutoRetry(1),
+		aicommon.WithAITransactionAutoRetry(3),
+		aicommon.WithDisableIntentRecognition(true),
+		aicommon.WithEnableSelfReflection(false),
+		aicommon.WithDisableAutoSkills(true),
+		aicommon.WithDisableSessionTitleGeneration(true),
+		aicommon.WithGenerateReport(false),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
 		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			prompt := request.GetPrompt()
 			m.Lock()
 			defer m.Unlock()
 
 			countInt64 := atomic.AddInt64(count, 1)
 			if countInt64 <= errLimit {
 				return nil, utils.Errorf("mock, unknown err[%v]", count)
+			} else if isPlanRequestForCoordinatorTest(prompt) {
+				count = new(int64)
 			} else {
 				count = new(int64)
+				rsp := aicommon.NewAIResponse(config)
+				defer rsp.Close()
+
+				if utils.MatchAllOfSubString(prompt, "capability matcher", "matched_identifiers") ||
+					utils.MatchAllOfSubString(prompt, `"const": "capability-catalog-match"`, "matched_identifiers") {
+					rsp.EmitOutputStream(strings.NewReader(`{"@action": "capability-catalog-match", "matched_identifiers": []}`))
+					return rsp, nil
+				}
+
+				if isTaskSummaryPrompt(prompt) {
+					rsp.EmitOutputStream(strings.NewReader(`{"@action": "summary", "status_summary": "ok", "task_short_summary": "ok", "task_long_summary": "ok"}`))
+					return rsp, nil
+				}
+
+				if strings.Contains(prompt, "Background") && (strings.Contains(prompt, "Current Time:") || strings.Contains(prompt, "OS/Arch:")) {
+					rsp.EmitOutputStream(strings.NewReader(`{"@action": "object", "next_action": {"type": "finish", "answer_payload": "ok"}, "cumulative_summary": "ok", "human_readable_thought": "ok"}`))
+					return rsp, nil
+				}
+
+				if strings.Contains(prompt, "tag-selection") {
+					rsp.EmitOutputStream(strings.NewReader(`{"@action": "tag-selection", "tags": ["test"]}`))
+					return rsp, nil
+				}
+
+				if strings.Contains(prompt, "memory-triage") {
+					rsp.EmitOutputStream(strings.NewReader(`{"@action": "memory-triage", "memory_entities": []}`))
+					return rsp, nil
+				}
+
+				if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+					rsp.EmitOutputStream(strings.NewReader(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "ok"}`))
+					return rsp, nil
+				}
+
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "finish", "human_readable_thought": "ok"}`))
+				return rsp, nil
 			}
 
 			rsp := aicommon.NewAIResponse(config)
