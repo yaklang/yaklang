@@ -255,6 +255,13 @@ func (f fileSystemAction) Put(params *ypb.RequestYakURLParams) (*ypb.RequestYakU
 	switch query.Get("type") {
 	case "dir":
 		if !isPaste {
+			exists, err := fs.Exists(absPath)
+			if exists {
+				return nil, utils.Error("path exists")
+			}
+			if err != nil {
+				return nil, utils.Wrap(err, "file exists check error")
+			}
 			if err := fs.MkdirAll(absPath, 0o755); err != nil {
 				return nil, utils.Wrap(err, "cannot create directory")
 			}

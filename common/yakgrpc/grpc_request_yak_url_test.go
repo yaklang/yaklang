@@ -135,6 +135,27 @@ func TestRequestYakURLPut(t *testing.T) {
 		require.NoError(t, err)
 		os.Remove(dirName)
 	})
+
+	t.Run("fs-put-dir-duplicate-name-should-error", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		client, err := NewLocalClient()
+		require.NoError(t, err)
+
+		dirName := filepath.Join(os.TempDir(), utils.RandStringBytes(5))
+		err = os.Mkdir(dirName, 0o755)
+		require.NoError(t, err)
+		defer os.RemoveAll(dirName)
+
+		_, err = client.RequestYakURL(ctx, &ypb.RequestYakURLParams{
+			Method: "PUT",
+			Url: &ypb.YakURL{
+				FromRaw: fmt.Sprintf("file://%s?type=dir", dirName),
+			},
+		})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "path exists")
+	})
 }
 
 func TestRequestYakURLPost(t *testing.T) {
