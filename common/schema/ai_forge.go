@@ -30,6 +30,7 @@ type AIForge struct {
 	PersistentPrompt string
 	PlanPrompt       string
 	ResultPrompt     string
+	SkillPath        string
 	FSBytes          []byte `gorm:"type:blob"`
 
 	IsTemporary bool // for temporary use, will be cleaned up later
@@ -99,6 +100,7 @@ func (a *AIForge) ToGRPC() *ypb.AIForge {
 		PlanPrompt:         a.PlanPrompt,
 		ResultPrompt:       a.ResultPrompt,
 		Author:             a.Author,
+		SkillPath:          a.SkillPath,
 	}
 }
 
@@ -120,6 +122,7 @@ func GRPC2AIForge(forge *ypb.AIForge) *AIForge {
 		PlanPrompt:         forge.GetPlanPrompt(),
 		ResultPrompt:       forge.GetResultPrompt(),
 		Author:             forge.GetAuthor(),
+		SkillPath:          forge.GetSkillPath(),
 	}
 	forgeIns.ID = uint(forge.Id)
 	return forgeIns

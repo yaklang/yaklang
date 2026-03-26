@@ -280,6 +280,9 @@ func applyForgeDefaultsFromDB(db *gorm.DB, forge *schema.AIForge) {
 	if forge.ResultPrompt == "" {
 		forge.ResultPrompt = dbForge.ResultPrompt
 	}
+	if forge.SkillPath == "" {
+		forge.SkillPath = dbForge.SkillPath
+	}
 	if len(forge.FSBytes) == 0 {
 		forge.FSBytes = append([]byte(nil), dbForge.FSBytes...)
 	}
@@ -306,6 +309,7 @@ func applyForgeRequestOverrides(req *ypb.AIForge, forge *schema.AIForge) {
 	forge.PersistentPrompt = req.GetPersistentPrompt()
 	forge.PlanPrompt = req.GetPlanPrompt()
 	forge.ResultPrompt = req.GetResultPrompt()
+	forge.SkillPath = req.GetSkillPath()
 }
 
 func hydrateForgeFSBytesFromSkillPath(db *gorm.DB, req *ypb.AIForge, forge *schema.AIForge) error {
@@ -314,19 +318,14 @@ func hydrateForgeFSBytesFromSkillPath(db *gorm.DB, req *ypb.AIForge, forge *sche
 	}
 	skillPath := strings.TrimSpace(req.GetSkillPath())
 	if skillPath == "" {
-		// Preserve existing stored filesystem on updates when no new path is provided.
-		if len(forge.FSBytes) > 0 {
-			return nil
-		}
-		var existing *schema.AIForge
-		var err error
-		if req.GetId() > 0 {
-			existing, err = yakit.GetAIForgeByID(db, req.GetId())
-		} else if forge.ForgeName != "" {
-			existing, err = yakit.GetAIForgeByName(db, forge.ForgeName)
-		}
-		if err == nil && existing != nil && len(existing.FSBytes) > 0 {
-			forge.FSBytes = append([]byte(nil), existing.FSBytes...)
+		existing, err := getExistingAIForgeForSkillPath(db, req, forge)
+		if err == nil && existing != nil {
+			if len(forge.FSBytes) == 0 && len(existing.FSBytes) > 0 {
+				forge.FSBytes = append([]byte(nil), existing.FSBytes...)
+			}
+			if strings.TrimSpace(forge.SkillPath) == "" {
+				forge.SkillPath = strings.TrimSpace(existing.SkillPath)
+			}
 		}
 		return nil
 	}
@@ -338,8 +337,22 @@ func hydrateForgeFSBytesFromSkillPath(db *gorm.DB, req *ypb.AIForge, forge *sche
 	if err != nil {
 		return utils.Wrapf(err, "serialize skill path failed: %s", skillPath)
 	}
+	forge.SkillPath = skillPath
 	forge.FSBytes = fsBytes
 	return nil
+}
+
+func getExistingAIForgeForSkillPath(db *gorm.DB, req *ypb.AIForge, forge *schema.AIForge) (*schema.AIForge, error) {
+	if db == nil {
+		return nil, nil
+	}
+	if req != nil && req.GetId() > 0 {
+		return yakit.GetAIForgeByID(db, req.GetId())
+	}
+	if forge != nil && forge.ForgeName != "" {
+		return yakit.GetAIForgeByName(db, forge.ForgeName)
+	}
+	return nil, nil
 }
 
 func materializeForgeSkillPath(forge *schema.AIForge) (string, error) {
@@ -362,11 +375,13 @@ func materializeForgeSkillPath(forge *schema.AIForge) (string, error) {
 			return "", utils.Wrapf(err, "restore forge filesystem failed: %s", forge.ForgeName)
 		}
 	}
-	tempSkillsRoot := filepath.Join(consts.GetDefaultYakitBaseTempDir(), "temp_skills")
-	if err := os.RemoveAll(tempSkillsRoot); err != nil {
-		return "", utils.Wrap(err, "remove temp_skills directory failed")
+	targetDir, err := resolveForgeSkillMaterializePath(forge)
+	if err != nil {
+		return "", err
 	}
-	targetDir := filepath.Join(tempSkillsRoot, sanitizeTempSkillName(forge.ForgeName))
+	if err := os.RemoveAll(targetDir); err != nil {
+		return "", utils.Wrapf(err, "remove skill path failed: %s", targetDir)
+	}
 	localFS, err := filesys.CopyToRefLocal(fsys, targetDir)
 	if err != nil {
 		return "", utils.Wrapf(err, "failed to materialize forge filesystem: %s", forge.ForgeName)
@@ -376,6 +391,46 @@ func materializeForgeSkillPath(forge *schema.AIForge) (string, error) {
 		return "", utils.Wrap(err, "get materialized skill path failed")
 	}
 	return path, nil
+}
+
+func resolveForgeSkillMaterializePath(forge *schema.AIForge) (string, error) {
+	skillPath := strings.TrimSpace(forge.SkillPath)
+	if skillPath == "" {
+		tempSkillsRoot := filepath.Join(consts.GetDefaultYakitBaseTempDir(), "temp_skills")
+		return filepath.Join(tempSkillsRoot, sanitizeTempSkillName(forge.ForgeName)), nil
+	}
+
+	absPath, err := filepath.Abs(skillPath)
+	if err != nil {
+		return "", utils.Wrapf(err, "resolve skill path failed: %s", skillPath)
+	}
+	absPath = filepath.Clean(absPath)
+	if isDangerousForgeSkillPath(absPath) {
+		return "", utils.Errorf("refuse to materialize forge filesystem into dangerous path: %s", absPath)
+	}
+	return absPath, nil
+}
+
+func isDangerousForgeSkillPath(targetDir string) bool {
+	cleaned := filepath.Clean(strings.TrimSpace(targetDir))
+	if cleaned == "" || cleaned == "." {
+		return true
+	}
+	volume := filepath.VolumeName(cleaned)
+	root := volume + string(os.PathSeparator)
+	if cleaned == root {
+		return true
+	}
+	if homeDir, err := os.UserHomeDir(); err == nil && filepath.Clean(homeDir) == cleaned {
+		return true
+	}
+	if wd, err := os.Getwd(); err == nil {
+		rel, relErr := filepath.Rel(cleaned, filepath.Clean(wd))
+		if relErr == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+			return true
+		}
+	}
+	return false
 }
 
 func sanitizeTempSkillName(name string) string {

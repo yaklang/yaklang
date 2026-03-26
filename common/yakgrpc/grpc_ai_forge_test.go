@@ -234,12 +234,21 @@ func TestAIForgeSkillPathRoundTrip(t *testing.T) {
 		require.NoError(t, err)
 	}()
 
-	forge, err := client.GetAIForge(ctx, &ypb.GetAIForgeRequest{ForgeName: name, InflateSkillPath: true})
+	forge, err := client.GetAIForge(ctx, &ypb.GetAIForgeRequest{ForgeName: name})
 	require.NoError(t, err)
-	require.NotEmpty(t, forge.GetSkillPath())
+	require.Equal(t, skillDir, forge.GetSkillPath())
+
+	require.NoError(t, os.WriteFile(filepath.Join(skillDir, "scripts", "helper.py"), []byte("print('stale')"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(skillDir, "stale.txt"), []byte("stale"), 0o644))
+
+	forge, err = client.GetAIForge(ctx, &ypb.GetAIForgeRequest{ForgeName: name, InflateSkillPath: true})
+	require.NoError(t, err)
+	require.Equal(t, skillDir, forge.GetSkillPath())
 	content, err := os.ReadFile(filepath.Join(forge.GetSkillPath(), "scripts", "helper.py"))
 	require.NoError(t, err)
 	require.Equal(t, "print('hello')", string(content))
+	_, err = os.Stat(filepath.Join(forge.GetSkillPath(), "stale.txt"))
+	require.True(t, os.IsNotExist(err))
 
 	_, err = client.UpdateAIForge(ctx, &ypb.AIForge{
 		ForgeName:    name,
@@ -249,9 +258,19 @@ func TestAIForgeSkillPathRoundTrip(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	forge, err = client.GetAIForge(ctx, &ypb.GetAIForgeRequest{ForgeName: name})
+	require.NoError(t, err)
+	require.Equal(t, skillDir, forge.GetSkillPath())
+
+	require.NoError(t, os.WriteFile(filepath.Join(skillDir, "scripts", "helper.py"), []byte("print('stale again')"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(skillDir, "stale.txt"), []byte("stale-again"), 0o644))
+
 	forge, err = client.GetAIForge(ctx, &ypb.GetAIForgeRequest{ForgeName: name, InflateSkillPath: true})
 	require.NoError(t, err)
+	require.Equal(t, skillDir, forge.GetSkillPath())
 	content, err = os.ReadFile(filepath.Join(forge.GetSkillPath(), "scripts", "helper.py"))
 	require.NoError(t, err)
 	require.Equal(t, "print('hello')", string(content))
+	_, err = os.Stat(filepath.Join(forge.GetSkillPath(), "stale.txt"))
+	require.True(t, os.IsNotExist(err))
 }
