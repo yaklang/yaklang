@@ -21,6 +21,20 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+func isTaskSummaryPrompt(prompt string) bool {
+	return utils.MatchAllOfSubString(prompt, "任务执行引擎", "task_long_summary") &&
+		!utils.MatchAllOfSubString(prompt, "PROGRESS_TASK_")
+}
+
+func isTestToolParamPrompt(prompt string) bool {
+	if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
+		return true
+	}
+
+	return strings.Contains(prompt, "Generate appropriate parameters for this tool call") &&
+		strings.Contains(prompt, "call-tool")
+}
+
 func TestCoordinator_Consumption_SingleTime(t *testing.T) {
 	basicTestCoordinator_Consumption(t)
 }
@@ -60,6 +74,13 @@ func basicTestCoordinator_Consumption(t *testing.T) {
 	ins, err := aid.NewCoordinator(
 		uuid.New().String(),
 		aicommon.WithEventInputChanx(inputChan),
+		aicommon.WithAIAutoRetry(1),
+		aicommon.WithAITransactionAutoRetry(1),
+		aicommon.WithDisableIntentRecognition(true),
+		aicommon.WithEnableSelfReflection(false),
+		aicommon.WithDisableAutoSkills(true),
+		aicommon.WithDisableSessionTitleGeneration(true),
+		aicommon.WithGenerateReport(false),
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outChan.SafeFeed(event)
 		}),
@@ -104,10 +125,15 @@ func basicTestCoordinator_Consumption(t *testing.T) {
 				return rsp, nil
 			}
 
+			if utils.MatchAllOfSubString(prompt, "capability matcher", "matched_identifiers") ||
+				utils.MatchAllOfSubString(prompt, `"const": "capability-catalog-match"`, "matched_identifiers") {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "capability-catalog-match", "matched_identifiers": []}`))
+				time.Sleep(10 * time.Millisecond)
+				return rsp, nil
+			}
+
 			// 处理 summary 请求 - 必须包含所有必需字段
-			if utils.MatchAllOfSubString(prompt, "status_summary", "task_long_summary", "task_short_summary") ||
-				strings.Contains(prompt, "GenerateTaskSummaryPrompt") ||
-				(strings.Contains(prompt, "@action") && strings.Contains(prompt, "summary")) {
+			if isTaskSummaryPrompt(prompt) {
 				summaryJSON := `{
     "@action": "summary",
     "status_summary": "测试状态摘要：任务执行中",
@@ -153,6 +179,18 @@ func basicTestCoordinator_Consumption(t *testing.T) {
 }`
 				rsp.EmitOutputStream(strings.NewReader(decisionJSON))
 				time.Sleep(50 * time.Millisecond)
+				return rsp, nil
+			}
+
+			if strings.Contains(prompt, "tag-selection") {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "tag-selection", "tags": ["test"]}`))
+				time.Sleep(10 * time.Millisecond)
+				return rsp, nil
+			}
+
+			if strings.Contains(prompt, "memory-triage") {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "memory-triage", "memory_entities": []}`))
+				time.Sleep(10 * time.Millisecond)
 				return rsp, nil
 			}
 

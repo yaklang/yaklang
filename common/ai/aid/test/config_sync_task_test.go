@@ -82,6 +82,12 @@ func TestCoordinator_SyncTask(t *testing.T) {
 				return rsp, nil
 			}
 
+			if utils.MatchAllOfSubString(prompt, "capability matcher", "matched_identifiers") ||
+				utils.MatchAllOfSubString(prompt, `"const": "capability-catalog-match"`, "matched_identifiers") {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "capability-catalog-match", "matched_identifiers": []}`))
+				return rsp, nil
+			}
+
 			// 处理 summary 请求 - 必须包含所有必需字段
 			if utils.MatchAllOfSubString(prompt, "status_summary", "task_long_summary", "task_short_summary") ||
 				strings.Contains(prompt, "GenerateTaskSummaryPrompt") ||
@@ -260,6 +266,8 @@ func TestCoordinator_SyncTask_Upgrade(t *testing.T) {
 		"test-upgrade",
 		aicommon.WithTools(aid.EchoTool(), aid.ErrorTool()),
 		aicommon.WithMemoryTriage(aimem.NewMockMemoryTriage()),
+		aicommon.WithAIAutoRetry(1),
+		aicommon.WithAITransactionAutoRetry(1),
 		aicommon.WithDisableIntentRecognition(true),
 		aicommon.WithEnableSelfReflection(false),
 		aicommon.WithDisableAutoSkills(true),
@@ -328,7 +336,7 @@ func TestCoordinator_SyncTask_Upgrade(t *testing.T) {
 				return rsp, nil
 			}
 
-			if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
+			if isTestToolParamPrompt(prompt) {
 
 				if utils.MatchAllOfSubString(request.GetPrompt(), `echo`) {
 					rsp.EmitOutputStream(strings.NewReader(fmt.Sprintf(`{"@action": "call-tool", "tool": "echo", "params": {"input": "%s"}}`, echoToken[echoToolRequestCount])))
@@ -351,24 +359,28 @@ func TestCoordinator_SyncTask_Upgrade(t *testing.T) {
 				return rsp, nil
 			}
 
-			if utils.MatchAllOfSubString(request.GetPrompt(), "status_summary", "task_long_summary", "task_short_summary") {
+			if isTaskSummaryPrompt(request.GetPrompt()) {
 				if firstSummary {
-					rsp.EmitOutputStream(strings.NewReader(fmt.Sprintf(`{"@action": "summary","task_short_summary":"%s"}`, task1Summary)))
+					rsp.EmitOutputStream(strings.NewReader(fmt.Sprintf(`{"@action": "summary", "status_summary": "ok", "task_short_summary": "%s", "task_long_summary": "ok"}`, task1Summary)))
 					firstSummary = false
 				} else {
-					rsp.EmitOutputStream(strings.NewReader(fmt.Sprintf(`{"@action": "summary","task_short_summary":"%s"}`, task2Summary)))
+					rsp.EmitOutputStream(strings.NewReader(fmt.Sprintf(`{"@action": "summary", "status_summary": "ok", "task_short_summary": "%s", "task_long_summary": "ok"}`, task2Summary)))
 				}
 				return rsp, nil
 			}
 
+			if strings.Contains(prompt, "tag-selection") {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "tag-selection", "tags": ["test"]}`))
+				return rsp, nil
+			}
+
+			if strings.Contains(prompt, "memory-triage") {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "memory-triage", "memory_entities": []}`))
+				return rsp, nil
+			}
+
 			if strings.Contains(prompt, "数据处理和总结提示小助手") {
-				if strings.Contains(prompt, "tag-selection") {
-					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "tag-selection", "tags": ["test"]}`))
-				} else if strings.Contains(prompt, "memory-triage") {
-					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "memory-triage", "memory_entities": []}`))
-				} else {
-					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object"}`))
-				}
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object"}`))
 				return rsp, nil
 			}
 

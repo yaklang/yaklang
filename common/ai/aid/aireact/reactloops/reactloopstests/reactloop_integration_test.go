@@ -57,6 +57,15 @@ func TestReActLoop_BasicExecution(t *testing.T) {
 	t.Logf("AI called %d times", callCount)
 }
 
+func isRequireToolParamPrompt(prompt string) bool {
+	if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
+		return true
+	}
+
+	return strings.Contains(prompt, "Generate appropriate parameters for this tool call") &&
+		strings.Contains(prompt, "call-tool")
+}
+
 // TestReActLoop_MultipleIterations 测试多次迭代
 func TestReActLoop_MultipleIterations(t *testing.T) {
 	iterationCount := 0
@@ -81,6 +90,8 @@ func TestReActLoop_MultipleIterations(t *testing.T) {
 
 	reactIns, err := aireact.NewTestReAct(
 		aicommon.WithAgreePolicy(aicommon.AgreePolicyYOLO),
+		aicommon.WithAIAutoRetry(1),
+		aicommon.WithAITransactionAutoRetry(1),
 		aicommon.WithTools(sleepTool),
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := req.GetPrompt()
@@ -104,7 +115,7 @@ func TestReActLoop_MultipleIterations(t *testing.T) {
 				return rsp, nil
 			}
 
-			if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
+			if isRequireToolParamPrompt(prompt) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "seconds" : 0.01 }}`))
 				rsp.Close()
@@ -131,7 +142,10 @@ func TestReActLoop_MultipleIterations(t *testing.T) {
 		t.Fatalf("Failed to create loop: %v", err)
 	}
 
-	err = loop.Execute("multi-iter-task", context.Background(), "test multiple iterations")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err = loop.Execute("multi-iter-task", ctx, "test multiple iterations")
 	if err != nil {
 		t.Fatalf("Execute failed: %v", err)
 	}
@@ -168,6 +182,8 @@ func TestReActLoop_MaxIterationsLimit(t *testing.T) {
 	reactIns, err := aireact.NewTestReAct(
 		aicommon.WithTools(sleepTool),
 		aicommon.WithAgreePolicy(aicommon.AgreePolicyYOLO),
+		aicommon.WithAIAutoRetry(1),
+		aicommon.WithAITransactionAutoRetry(1),
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := req.GetPrompt()
 			if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
@@ -180,7 +196,7 @@ func TestReActLoop_MaxIterationsLimit(t *testing.T) {
 				return rsp, nil
 			}
 
-			if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
+			if isRequireToolParamPrompt(prompt) {
 				callCount++
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "seconds" : 0.01 }}`))
@@ -211,7 +227,10 @@ func TestReActLoop_MaxIterationsLimit(t *testing.T) {
 		t.Fatalf("Failed to create loop: %v", err)
 	}
 
-	err = loop.Execute("max-iter-task", context.Background(), "test max iterations")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err = loop.Execute("max-iter-task", ctx, "test max iterations")
 
 	// 应该达到最大迭代限制
 	if callCount != maxIter {
