@@ -772,7 +772,7 @@ func TestPromptManager_GenerateAIBlueprintForgeParamsPrompt(t *testing.T) {
 	// 测试用例：上下文信息集成测试
 	t.Run("ContextIntegration", func(t *testing.T) {
 		// 设置一些上下文信息
-		react.cumulativeSummary = "Previous task summary"
+		react.AddToTimeline("note", "Previous task summary")
 		react.currentIteration = 2
 		react.config.MaxIterationCount = 10
 

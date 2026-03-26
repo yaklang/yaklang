@@ -30,7 +30,7 @@ func mockedToolCallingForCancel(i aicommon.AICallerConfigIf, req *aicommon.AIReq
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
+	if isToolParamGenerationPrompt(prompt, toolName) {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "seconds" : 2.0 }}`))
 		rsp.Close()

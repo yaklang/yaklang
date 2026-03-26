@@ -21,7 +21,7 @@ const testCallExpectations = "estimated ~2s execution, if timeout force stop and
 
 func mockedToolCallingWithCallExpectations(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
-	if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
+	if isPrimaryDecisionPrompt(prompt) {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `" },
@@ -31,14 +31,16 @@ func mockedToolCallingWithCallExpectations(i aicommon.AICallerConfigIf, req *aic
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
+	if utils.MatchAllOfSubString(prompt, "call-tool") &&
+		(utils.MatchAllOfSubString(prompt, "需要为 '"+toolName+"' 生成参数") ||
+			utils.MatchAllOfSubString(prompt, "Tool Parameter Generation", toolName)) {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "identifier": "sleep_test", "params": { "seconds" : 0.1 }, "call_expectations": "` + testCallExpectations + `"}`))
 		rsp.Close()
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+	if isVerifySatisfactionPrompt(prompt) {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "abc-mocked-reason", "human_readable_result": "mocked thought for verification"}`))
 		rsp.Close()
@@ -238,7 +240,7 @@ func TestToolResult_String_OmitsEmptyCallExpectations(t *testing.T) {
 
 func TestCallExpectations_InToolCallerPresetParams(t *testing.T) {
 	params := aitool.InvokeParams{
-		"key":                               "value",
+		"key":                                "value",
 		aicommon.ReservedKeyCallExpectations: testCallExpectations,
 	}
 

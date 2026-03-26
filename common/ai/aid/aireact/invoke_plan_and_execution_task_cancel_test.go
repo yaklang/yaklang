@@ -114,7 +114,7 @@ func TestReAct_PlanAndExecute_TaskCancel(t *testing.T) {
 			prompt := r.GetPrompt()
 
 			// 工具参数生成 - 最先匹配，避免被其他条件误匹配
-			if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", mockToolName) {
+			if isToolParamGenerationPrompt(prompt, mockToolName) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 {

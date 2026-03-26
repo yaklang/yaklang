@@ -244,7 +244,7 @@ func TestReAct_ToolsSearch_Functionality(t *testing.T) {
 			prompt := r.GetPrompt()
 
 			// When AI decides to use tools_search
-			if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
+			if isPrimaryDecisionPrompt(prompt) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "tools_search" },
@@ -254,7 +254,7 @@ func TestReAct_ToolsSearch_Functionality(t *testing.T) {
 			}
 
 			// When AI generates parameters for tools_search
-			if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
+			if isToolParamGenerationPrompt(prompt, "tools_search") {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "query" : "echo" }}`))
 				rsp.Close()
@@ -262,7 +262,7 @@ func TestReAct_ToolsSearch_Functionality(t *testing.T) {
 			}
 
 			// After tool execution, verify satisfaction
-			if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+			if isVerifySatisfactionPrompt(prompt) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "Successfully found tools"}`))
 				rsp.Close()
@@ -366,7 +366,7 @@ func TestReAct_ForgeSearch_Functionality(t *testing.T) {
 			prompt := r.GetPrompt()
 
 			// When AI decides to use forge_search
-			if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
+			if isPrimaryDecisionPrompt(prompt) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "aiforge_search" },
@@ -376,7 +376,7 @@ func TestReAct_ForgeSearch_Functionality(t *testing.T) {
 			}
 
 			// When AI generates parameters for forge_search
-			if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
+			if isToolParamGenerationPrompt(prompt, "aiforge_search") {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "query" : "test" }}`))
 				rsp.Close()
@@ -384,7 +384,7 @@ func TestReAct_ForgeSearch_Functionality(t *testing.T) {
 			}
 
 			// After tool execution, verify satisfaction
-			if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+			if isVerifySatisfactionPrompt(prompt) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "Successfully searched forges"}`))
 				rsp.Close()
@@ -492,7 +492,7 @@ func TestReAct_BothSearchTools_InPrompt(t *testing.T) {
 			}
 
 			// Mock response - directly answer
-			if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
+			if isPrimaryDecisionPrompt(prompt) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": {"type": "directly_answer"}, "answer_payload": "Both search tools found", 
