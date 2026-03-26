@@ -163,8 +163,8 @@ goroutine 内部不会再重新走 async 分支，而是直接进入实际执行
 当前 `go` 语句不向调用点返回结果：
 
 - 编译器把异步 `Call` 的结果值写成 `0`；
-- 需要等待 goroutine 执行完时，显式调用 `waitAllAsyncCallFinish()`；
-- 这个函数本身也是一个 stdlib dispatch，最终落到 `yakAsyncWaitGroup.Wait()`。
+- `main` wrapper 在入口函数返回后会自动等待所有异步 goroutine；
+- 如果 Yak 代码里需要更细粒度的同步，应使用 `sync.NewWaitGroup()` / `sync.NewSizedWaitGroup()`。
 
 相关实现：
 

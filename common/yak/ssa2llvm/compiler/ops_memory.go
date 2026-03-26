@@ -6,6 +6,7 @@ import (
 
 	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
 )
 
 // compileMake handles SSA Make instruction (allocates arrays, slices, maps, etc.)
@@ -18,8 +19,9 @@ func (c *Compiler) compileMake(inst *ssa.Make) error {
 		// For Any/Object types, allocate generic memory. We represent addresses as `i64`
 		// (uintptr) and only cast to pointers at FFI/runtime boundaries.
 		return c.compileMakeGeneric(inst)
-	case ssa.SliceTypeKind, ssa.MapTypeKind:
-		// Slices and maps are represented as addresses (`i64`) for now.
+	case ssa.SliceTypeKind, ssa.BytesTypeKind:
+		return c.compileMakeSlice(inst, typ)
+	case ssa.MapTypeKind:
 		return c.compileMakeGeneric(inst)
 	default:
 		// For unhandled types, create a null/zero placeholder
@@ -28,12 +30,73 @@ func (c *Compiler) compileMake(inst *ssa.Make) error {
 	}
 }
 
+func (c *Compiler) getOrInsertRuntimeMakeSlice() (llvm.Value, llvm.Type) {
+	name := abi.MakeSliceSymbol
+	fn := c.Mod.NamedFunction(name)
+	i64 := c.LLVMCtx.Int64Type()
+	fnType := llvm.FunctionType(i64, []llvm.Type{i64, i64, i64}, false)
+	if fn.IsNil() {
+		fn = llvm.AddFunction(c.Mod, name, fnType)
+	}
+	return fn, fnType
+}
+
+func sliceElementKind(typ ssa.Type) abi.SliceElemKind {
+	if typ == nil {
+		return abi.SliceElemAny
+	}
+	if typ.GetTypeKind() == ssa.BytesTypeKind {
+		return abi.SliceElemByte
+	}
+
+	objectType, ok := typ.(*ssa.ObjectType)
+	if !ok || objectType == nil || objectType.FieldType == nil {
+		return abi.SliceElemAny
+	}
+
+	switch objectType.FieldType.GetTypeKind() {
+	case ssa.NumberTypeKind:
+		return abi.SliceElemInt64
+	case ssa.StringTypeKind:
+		return abi.SliceElemString
+	case ssa.ByteTypeKind, ssa.BytesTypeKind:
+		return abi.SliceElemByte
+	case ssa.BooleanTypeKind:
+		return abi.SliceElemBool
+	default:
+		return abi.SliceElemAny
+	}
+}
+
+func (c *Compiler) compileMakeSlice(inst *ssa.Make, typ ssa.Type) error {
+	i64 := c.LLVMCtx.Int64Type()
+	length := llvm.ConstInt(i64, 0, false)
+	if inst.Len > 0 {
+		val, err := c.getValue(inst, inst.Len)
+		if err != nil {
+			return err
+		}
+		length = c.coerceToInt64(val)
+	}
+
+	capacity := length
+	if inst.Cap > 0 {
+		val, err := c.getValue(inst, inst.Cap)
+		if err != nil {
+			return err
+		}
+		capacity = c.coerceToInt64(val)
+	}
+
+	makeFn, makeType := c.getOrInsertRuntimeMakeSlice()
+	elemKind := llvm.ConstInt(i64, uint64(sliceElementKind(typ)), false)
+	val := c.Builder.CreateCall(makeType, makeFn, []llvm.Value{elemKind, length, capacity}, "make_slice")
+	c.Values[inst.GetId()] = val
+	return nil
+}
+
 // compileMakeGeneric allocates a generic object (i8*)
 func (c *Compiler) compileMakeGeneric(inst *ssa.Make) error {
-	if !inst.HasUsers() {
-		c.Values[inst.GetId()] = llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
-		return nil
-	}
 	// Allocate 8 bytes (one i64) as placeholder
 	size := llvm.ConstInt(c.LLVMCtx.Int64Type(), 8, false)
 	mallocFn, mallocType := c.getOrInsertMalloc()
@@ -47,10 +110,6 @@ func (c *Compiler) compileMakeGeneric(inst *ssa.Make) error {
 func (c *Compiler) compileMakeStruct(inst *ssa.Make, typ ssa.Type) error {
 	// 1. Get LLVM type for the struct
 	llvmType := c.TypeConverter.ConvertType(typ)
-	if !inst.HasUsers() {
-		c.Values[inst.GetId()] = llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
-		return nil
-	}
 
 	// 2. Calculate size using GEP trick (GetElementPtr null, 1) -> PtrToInt
 	// Null pointer to the struct

@@ -110,7 +110,29 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 		return llvm.Value{}, fmt.Errorf("getValue: compileTypeCast succeeded but value %d not cached", id)
 	}
 
-	// 6. Generic MemberCall
+	// 6. Lazy compile if SideEffect
+	if se, ok := valObj.(*ssa.SideEffect); ok {
+		if err := c.compileSideEffect(se); err != nil {
+			return llvm.Value{}, err
+		}
+		if val, ok := c.Values[id]; ok {
+			return val, nil
+		}
+		return llvm.Value{}, fmt.Errorf("getValue: compileSideEffect succeeded but value %d not cached", id)
+	}
+
+	// 7. Lazy compile if Make
+	if mk, ok := valObj.(*ssa.Make); ok {
+		if err := c.compileMake(mk); err != nil {
+			return llvm.Value{}, err
+		}
+		if val, ok := c.Values[id]; ok {
+			return val, nil
+		}
+		return llvm.Value{}, fmt.Errorf("getValue: compileMake succeeded but value %d not cached", id)
+	}
+
+	// 8. Generic MemberCall
 	if mc, ok := valObj.(ssa.MemberCall); ok && mc.IsMember() {
 		if err := c.compileMemberCall(valObj, mc); err != nil {
 			return llvm.Value{}, err
@@ -121,10 +143,10 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 		return llvm.Value{}, fmt.Errorf("getValue: compileMemberCall succeeded but value %d not cached", id)
 	}
 
-	// 6. Return error if not found and not a constant
+	// 9. Return error if not found and not a constant
 	// This usually means we are referencing an instruction that hasn't been compiled yet
 	// (back-edge or dependency order issue) or not implemented.
-	return llvm.Value{}, fmt.Errorf("getValue: value %d not found (dependency missing?)", id)
+	return llvm.Value{}, fmt.Errorf("getValue: value %d (%T) not found (dependency missing?)", id, valObj)
 }
 
 func (c *Compiler) compileBinOp(inst *ssa.BinOp, resultID int64) error {

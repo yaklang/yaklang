@@ -6,20 +6,25 @@ import (
 	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
-	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/dispatch"
 )
 
 const yakTaggedPointerMask uint64 = 1 << 62
 
 type contextCallSpec struct {
-	inst           *ssa.Call
-	kind           uint64
-	target         llvm.Value
-	argIDs         []int64
-	async          bool
-	tagPointerArgs bool
-	ctxName        string
-	errPrefix      string
+	inst      *ssa.Call
+	kind      uint64
+	target    llvm.Value
+	args      []contextCallArg
+	async     bool
+	ctxName   string
+	errPrefix string
+}
+
+type contextCallArg struct {
+	ssaID         int64
+	value         llvm.Value
+	root          llvm.Value
+	tagPointerArg bool
 }
 
 func (c *Compiler) getOrInsertRuntimeInvoke() (llvm.Value, llvm.Type) {
@@ -55,12 +60,8 @@ func (c *Compiler) resolveContextCallArg(inst *ssa.Call, argID int64, tagPointer
 		return argI64, root, nil
 	}
 
-	ssaValAny, ok := fn.GetValueById(argID)
-	if !ok || ssaValAny == nil {
-		return argI64, root, nil
-	}
-	ssaVal, ok := ssaValAny.(ssa.Value)
-	if !ok || !c.ssaValueIsPointer(ssaVal, fn) {
+	ssaVal, ok := fn.GetValueById(argID)
+	if !ok || ssaVal == nil || !c.ssaValueIsPointer(ssaVal, fn) {
 		return argI64, root, nil
 	}
 
@@ -68,6 +69,26 @@ func (c *Compiler) resolveContextCallArg(inst *ssa.Call, argID int64, tagPointer
 	tag := llvm.ConstInt(i64, yakTaggedPointerMask, false)
 	argI64 = c.Builder.CreateOr(argI64, tag, "yak_ctx_arg_tag")
 	return argI64, root, nil
+}
+
+func (c *Compiler) resolveContextCallArgValue(inst *ssa.Call, arg contextCallArg) (llvm.Value, llvm.Value, error) {
+	if arg.ssaID > 0 {
+		return c.resolveContextCallArg(inst, arg.ssaID, arg.tagPointerArg)
+	}
+
+	i64 := c.LLVMCtx.Int64Type()
+	value := arg.value
+	if value.IsNil() {
+		value = llvm.ConstInt(i64, 0, false)
+	}
+	value = c.coerceToInt64(value)
+	root := arg.root
+	if root.IsNil() {
+		root = llvm.ConstInt(i64, 0, false)
+	} else {
+		root = c.coerceToInt64(root)
+	}
+	return value, root, nil
 }
 
 func (c *Compiler) emitContextCall(spec contextCallSpec) (llvm.Value, error) {
@@ -78,7 +99,7 @@ func (c *Compiler) emitContextCall(spec contextCallSpec) (llvm.Value, error) {
 		return llvm.Value{}, fmt.Errorf("emitContextCall: missing target for call %d", spec.inst.GetId())
 	}
 
-	argc := len(spec.argIDs)
+	argc := len(spec.args)
 	ctxName := spec.ctxName
 	if ctxName == "" {
 		ctxName = "yak_call_ctx"
@@ -98,8 +119,8 @@ func (c *Compiler) emitContextCall(spec contextCallSpec) (llvm.Value, error) {
 		}
 	}
 
-	for index, argID := range spec.argIDs {
-		argI64, root, err := c.resolveContextCallArg(spec.inst, argID, spec.tagPointerArgs)
+	for index, arg := range spec.args {
+		argI64, root, err := c.resolveContextCallArgValue(spec.inst, arg)
 		if err != nil {
 			prefix := spec.errPrefix
 			if prefix == "" {
@@ -146,12 +167,24 @@ func (c *Compiler) lowerResolvedContextCall(spec contextCallSpec) error {
 	return c.finishContextCall(spec.inst, result)
 }
 
-func shouldTagStdlibArgPointers(id dispatch.FuncID) bool {
+func shouldTagStdlibArgPointers(id abi.FuncID) bool {
 	switch id {
-	case dispatch.IDPrint, dispatch.IDPrintf, dispatch.IDPrintln,
-		dispatch.IDYakitInfo, dispatch.IDYakitWarn, dispatch.IDYakitDebug, dispatch.IDYakitError:
+	case abi.IDPrint, abi.IDPrintf, abi.IDPrintln,
+		abi.IDAppend,
+		abi.IDYakitInfo, abi.IDYakitWarn, abi.IDYakitDebug, abi.IDYakitError:
 		return true
 	default:
 		return false
 	}
+}
+
+func ssaArgs(argIDs []int64, tagPointerArgs bool) []contextCallArg {
+	args := make([]contextCallArg, 0, len(argIDs))
+	for _, argID := range argIDs {
+		args = append(args, contextCallArg{
+			ssaID:         argID,
+			tagPointerArg: tagPointerArgs,
+		})
+	}
+	return args
 }

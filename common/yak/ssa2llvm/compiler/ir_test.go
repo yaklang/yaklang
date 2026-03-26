@@ -157,7 +157,6 @@ func TestIR_GoStmtUsesAsyncInvoke(t *testing.T) {
 	code := `
 		func main() {
 			go println(1)
-			waitAllAsyncCallFinish()
 		}
 		`
 	_, _, ir, err := compileToIRFromCodeWithExternBindings(code, "yak", nil)
@@ -177,7 +176,6 @@ func TestIR_GoStmtCallableUsesAsyncInvoke(t *testing.T) {
 
 		func main() {
 			go f(10)
-			waitAllAsyncCallFinish()
 		}
 		`
 	_, _, ir, err := compileToIRFromCodeWithExternBindings(code, "yak", nil)
@@ -202,8 +200,52 @@ func TestIR_MainWrapperUsesUnifiedInvoke(t *testing.T) {
 	requireIRContainsInOrder(t, ir,
 		"define i32 @main()",
 		"call void @yak_runtime_invoke",
-		"call void @yak_internal_print_int",
+		"call void @yak_runtime_wait_async",
 		"call void @yak_runtime_gc",
 	)
+	requireIRAvoidsLegacyCallEntrypoints(t, ir)
+}
+
+func TestIR_SyncWaitGroupUsesDispatch(t *testing.T) {
+	code := `
+		func main() {
+			wg = sync.NewWaitGroup()
+			wg.Add(1)
+			wg.Done()
+			wg.Wait()
+		}
+		`
+	_, _, ir, err := compileToIRFromCodeWithExternBindings(code, "yak", nil)
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, strings.Count(ir, "call void @yak_runtime_invoke"), 4)
+	require.Contains(t, ir, "@yak_runtime_invoke")
+	requireIRAvoidsLegacyCallEntrypoints(t, ir)
+}
+
+func TestIR_MakeSliceUsesRuntimeHelper(t *testing.T) {
+	code := `
+		func main() {
+			a = make([]int, 10)
+			println(a[1])
+		}
+		`
+	_, _, ir, err := compileToIRFromCodeWithExternBindings(code, "yak", nil)
+	require.NoError(t, err)
+	require.Contains(t, ir, "@yak_runtime_make_slice")
+	require.Contains(t, ir, "@yak_runtime_get_field")
+}
+
+func TestIR_AppendUsesDispatch(t *testing.T) {
+	code := `
+		func main() {
+			a = make([]int, 10)
+			a = append(a, 1)
+			print(a)
+		}
+		`
+	_, _, ir, err := compileToIRFromCodeWithExternBindings(code, "yak", nil)
+	require.NoError(t, err)
+	require.Contains(t, ir, "@yak_runtime_make_slice")
+	require.GreaterOrEqual(t, strings.Count(ir, "call void @yak_runtime_invoke"), 2)
 	requireIRAvoidsLegacyCallEntrypoints(t, ir)
 }

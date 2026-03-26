@@ -42,7 +42,7 @@
 
 - stdlib dispatcher
 - Go 对象 + shadow object + Boehm GC 混合模型
-- `waitAllAsyncCallFinish()`
+- `main` wrapper 自动等待异步 goroutine 完成
 - runtime 嵌入与 `--stdlib-compile` 模式
 
 ### 测试
