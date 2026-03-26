@@ -30,6 +30,11 @@ func (c *Compiler) addMainWrapperToModule(entryFunc string, printEntryResult boo
 		gcType := llvm.FunctionType(c.LLVMCtx.VoidType(), nil, false)
 		gcFn = llvm.AddFunction(mod, "yak_runtime_gc", gcType)
 	}
+	waitAsyncFn := mod.NamedFunction("yak_runtime_wait_async")
+	if waitAsyncFn.IsNil() {
+		waitType := llvm.FunctionType(c.LLVMCtx.VoidType(), nil, false)
+		waitAsyncFn = llvm.AddFunction(mod, "yak_runtime_wait_async", waitType)
+	}
 
 	var printFn llvm.Value
 	var printType llvm.Type
@@ -66,6 +71,7 @@ func (c *Compiler) addMainWrapperToModule(entryFunc string, printEntryResult boo
 		c.Builder.CreateCall(printType, printFn, []llvm.Value{ret}, "")
 	}
 
+	c.Builder.CreateCall(waitAsyncFn.GlobalValueType(), waitAsyncFn, nil, "")
 	c.Builder.CreateCall(gcFn.GlobalValueType(), gcFn, nil, "")
 
 	exitCode := c.Builder.CreateTrunc(ret, c.LLVMCtx.Int32Type(), "exit_code")

@@ -32,7 +32,8 @@ const (
 )
 
 const (
-	InvokeSymbol = "yak_runtime_invoke"
+	InvokeSymbol    = "yak_runtime_invoke"
+	MakeSliceSymbol = "yak_runtime_make_slice"
 )
 
 const (
@@ -52,4 +53,54 @@ const (
 	WordReserved = 8
 
 	HeaderWords = 10
+)
+
+// FuncID is the stable identifier passed from LLVM-generated code into the
+// runtime builtin dispatcher.
+type FuncID int64
+
+// NOTE: IDs must stay stable once published, otherwise old binaries or cached
+// IR will call wrong functions.
+const (
+	// poc
+	IDPocTimeout           FuncID = 1
+	IDPocGet               FuncID = 2
+	IDPocGetHTTPPacketBody FuncID = 3
+
+	// os
+	IDOsGetenv FuncID = 4
+
+	// builtin printing
+	IDPrint   FuncID = 5
+	IDPrintf  FuncID = 6
+	IDPrintln FuncID = 7
+
+	// yakit logging (minimal)
+	IDYakitInfo  FuncID = 8
+	IDYakitWarn  FuncID = 9
+	IDYakitDebug FuncID = 10
+	IDYakitError FuncID = 11
+
+	// sync constructors
+	IDSyncNewWaitGroup      FuncID = 12
+	IDSyncNewSizedWaitGroup FuncID = 13
+	IDSyncNewLock           FuncID = 14
+	IDSyncNewMutex          FuncID = 15
+	IDSyncNewRWMutex        FuncID = 16
+
+	// runtime shadow-object method dispatch
+	IDRuntimeShadowMethod FuncID = 17
+
+	// builtin slice helpers
+	IDAppend FuncID = 18
+)
+
+type SliceElemKind int64
+
+const (
+	SliceElemAny SliceElemKind = iota
+	SliceElemInt64
+	SliceElemString
+	SliceElemByte
+	SliceElemBool
 )

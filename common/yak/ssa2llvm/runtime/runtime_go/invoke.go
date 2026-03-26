@@ -18,7 +18,6 @@ import (
 	"unsafe"
 
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
-	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/dispatch"
 )
 
 var yakAsyncMu sync.Mutex
@@ -113,35 +112,46 @@ func invokeDispatch(ctx unsafe.Pointer) {
 	}
 	args := ctxArgsSlice(ctx, argc)
 
-	id := dispatch.FuncID(int64(ctxLoadWord(ctx, abi.WordTarget)))
+	id := abi.FuncID(int64(ctxLoadWord(ctx, abi.WordTarget)))
 
 	var ret int64
 	switch id {
-	case dispatch.IDPocTimeout:
+	case abi.IDPocTimeout:
 		ret = stdlibPocTimeout(args)
-	case dispatch.IDPocGet:
+	case abi.IDPocGet:
 		ret = stdlibPocGet(args)
-	case dispatch.IDPocGetHTTPPacketBody:
+	case abi.IDPocGetHTTPPacketBody:
 		ret = stdlibPocGetHTTPPacketBody(args)
-	case dispatch.IDOsGetenv:
+	case abi.IDOsGetenv:
 		ret = stdlibOsGetenv(args)
-	case dispatch.IDPrint:
+	case abi.IDPrint:
 		ret = stdlibPrint(args)
-	case dispatch.IDPrintf:
+	case abi.IDPrintf:
 		ret = stdlibPrintf(args)
-	case dispatch.IDPrintln:
+	case abi.IDPrintln:
 		ret = stdlibPrintln(args)
-	case dispatch.IDYakitInfo:
+	case abi.IDYakitInfo:
 		ret = stdlibYakitLog("info", args)
-	case dispatch.IDYakitWarn:
+	case abi.IDYakitWarn:
 		ret = stdlibYakitLog("warn", args)
-	case dispatch.IDYakitDebug:
+	case abi.IDYakitDebug:
 		ret = stdlibYakitLog("debug", args)
-	case dispatch.IDYakitError:
+	case abi.IDYakitError:
 		ret = stdlibYakitLog("error", args)
-	case dispatch.IDWaitAllAsyncCallFinish:
-		yakAsyncWaitGroup.Wait()
-		ret = 0
+	case abi.IDSyncNewWaitGroup:
+		ret = stdlibSyncNewWaitGroup(args)
+	case abi.IDSyncNewSizedWaitGroup:
+		ret = stdlibSyncNewSizedWaitGroup(args)
+	case abi.IDSyncNewLock:
+		ret = stdlibSyncNewLock(args)
+	case abi.IDSyncNewMutex:
+		ret = stdlibSyncNewMutex(args)
+	case abi.IDSyncNewRWMutex:
+		ret = stdlibSyncNewRWMutex(args)
+	case abi.IDRuntimeShadowMethod:
+		ret = stdlibRuntimeShadowMethod(args)
+	case abi.IDAppend:
+		ret = stdlibAppend(args)
 	default:
 		ret = 0
 	}
@@ -193,6 +203,11 @@ func spawnInvoke(ctx unsafe.Pointer) {
 
 		executeInvoke(cctx)
 	}(handle)
+}
+
+//export yak_runtime_wait_async
+func yak_runtime_wait_async() {
+	yakAsyncWaitGroup.Wait()
 }
 
 //export yak_runtime_invoke

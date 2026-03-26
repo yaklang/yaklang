@@ -2,7 +2,7 @@ package compiler
 
 import (
 	"github.com/yaklang/go-llvm"
-	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/dispatch"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
 )
 
 type LLVMExternType uint8
@@ -24,57 +24,77 @@ type ExternBinding struct {
 	// DispatchID identifies a stdlib function that should be invoked via the
 	// runtime dispatcher entry (yak_std_call). Keep it opaque to reduce the
 	// number of exported symbols in the final binary.
-	DispatchID dispatch.FuncID
+	DispatchID abi.FuncID
 }
 
 var defaultExternBindings = map[string]ExternBinding{
-	"waitAllAsyncCallFinish": {
-		Return:     ExternTypeVoid,
-		DispatchID: dispatch.IDWaitAllAsyncCallFinish,
-	},
 	"println": {
 		Return:     ExternTypeVoid,
-		DispatchID: dispatch.IDPrintln,
+		DispatchID: abi.IDPrintln,
 	},
 	"print": {
 		Return:     ExternTypeVoid,
-		DispatchID: dispatch.IDPrint,
+		DispatchID: abi.IDPrint,
 	},
 	"printf": {
 		Return:     ExternTypeVoid,
-		DispatchID: dispatch.IDPrintf,
+		DispatchID: abi.IDPrintf,
+	},
+	"append": {
+		Return:     ExternTypePtr,
+		DispatchID: abi.IDAppend,
 	},
 	"yakit.Info": {
 		Return:     ExternTypeVoid,
-		DispatchID: dispatch.IDYakitInfo,
+		DispatchID: abi.IDYakitInfo,
 	},
 	"yakit.Warn": {
 		Return:     ExternTypeVoid,
-		DispatchID: dispatch.IDYakitWarn,
+		DispatchID: abi.IDYakitWarn,
 	},
 	"yakit.Debug": {
 		Return:     ExternTypeVoid,
-		DispatchID: dispatch.IDYakitDebug,
+		DispatchID: abi.IDYakitDebug,
 	},
 	"yakit.Error": {
 		Return:     ExternTypeVoid,
-		DispatchID: dispatch.IDYakitError,
+		DispatchID: abi.IDYakitError,
+	},
+	"sync.NewWaitGroup": {
+		Return:     ExternTypePtr,
+		DispatchID: abi.IDSyncNewWaitGroup,
+	},
+	"sync.NewSizedWaitGroup": {
+		Return:     ExternTypePtr,
+		DispatchID: abi.IDSyncNewSizedWaitGroup,
+	},
+	"sync.NewLock": {
+		Return:     ExternTypePtr,
+		DispatchID: abi.IDSyncNewLock,
+	},
+	"sync.NewMutex": {
+		Return:     ExternTypePtr,
+		DispatchID: abi.IDSyncNewMutex,
+	},
+	"sync.NewRWMutex": {
+		Return:     ExternTypePtr,
+		DispatchID: abi.IDSyncNewRWMutex,
 	},
 	"poc.timeout": {
 		Return:     ExternTypePtr,
-		DispatchID: dispatch.IDPocTimeout,
+		DispatchID: abi.IDPocTimeout,
 	},
 	"poc.Get": {
 		Return:     ExternTypePtr,
-		DispatchID: dispatch.IDPocGet,
+		DispatchID: abi.IDPocGet,
 	},
 	"poc.GetHTTPPacketBody": {
 		Return:     ExternTypePtr,
-		DispatchID: dispatch.IDPocGetHTTPPacketBody,
+		DispatchID: abi.IDPocGetHTTPPacketBody,
 	},
 	"os.Getenv": {
 		Return:     ExternTypePtr,
-		DispatchID: dispatch.IDOsGetenv,
+		DispatchID: abi.IDOsGetenv,
 	},
 }
 
