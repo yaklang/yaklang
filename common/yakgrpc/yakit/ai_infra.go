@@ -113,6 +113,11 @@ func UpdateAIAgentRuntimeLoadedSkillNames(db *gorm.DB, persistentId string, skil
 	return db.Model(&schema.AIAgentRuntime{}).Where("persistent_session = ?", persistentId).Update("loaded_skill_names", skillNames).Error
 }
 
+// UpdateAIAgentRuntimeUserInput updates the quoted_user_input field for an AIAgentRuntime by uuid.
+func UpdateAIAgentRuntimeUserInput(db *gorm.DB, uuid string, quotedInput string) error {
+	return db.Model(&schema.AIAgentRuntime{}).Where("uuid = ?", uuid).Update("quoted_user_input", quotedInput).Error
+}
+
 // GetLatestAIAgentRuntimeByPersistentSession 获取某个持久化会话的最新运行时
 func GetLatestAIAgentRuntimeByPersistentSession(db *gorm.DB, sessionId string) (*schema.AIAgentRuntime, error) {
 	start := time.Now()

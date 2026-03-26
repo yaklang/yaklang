@@ -224,6 +224,78 @@ func TestPromptManager__InPromptGeneration(t *testing.T) {
 	t.Log("Dynamic context provider correctly called during prompt generation")
 }
 
+func TestPromptManager_DynamicContextWithNonce_RendersPrevUserInputAITag(t *testing.T) {
+	react, err := NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create ReAct instance: %v", err)
+	}
+
+	react.config.SetUserInputHistory([]schema.AIAgentUserInputRecord{
+		{Round: 1, Timestamp: time.Date(2026, 3, 26, 10, 0, 0, 0, time.Local), UserInput: "first input"},
+		{Round: 2, Timestamp: time.Date(2026, 3, 26, 10, 5, 0, 0, time.Local), UserInput: "second input"},
+	})
+
+	nonce := "nonce1234"
+	ctx := react.promptManager.DynamicContextWithNonce(nonce)
+	if !utils.MatchAllOfSubString(ctx,
+		"<|PREV_USER_INPUT_"+nonce+"|>",
+		"<|PREV_USER_INPUT_END_"+nonce+"|>",
+		"Round 1",
+		"Round 2",
+		"Time:",
+		"first input",
+		"second input",
+	) {
+		t.Fatalf("dynamic context should contain PREV_USER_INPUT AITAG with history. Got:\n%s", ctx)
+	}
+	if strings.Contains(ctx, "[TRUNCATED_HEAD]") {
+		t.Fatalf("dynamic context should not be truncated for small history. Got:\n%s", ctx)
+	}
+	plainCtx := react.promptManager.DynamicContext()
+	if strings.Contains(plainCtx, "PREV_USER_INPUT_") {
+		t.Fatalf("plain dynamic context should not contain PREV_USER_INPUT AITAG. Got:\n%s", plainCtx)
+	}
+}
+
+func TestPromptManager_DynamicContextWithNonce_TruncatesPrevUserInputHistoryTo20K(t *testing.T) {
+	react, err := NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create ReAct instance: %v", err)
+	}
+
+	oldPayload := "_old_marker" + strings.Repeat("A", 18000)
+	newPayload := strings.Repeat("B", 9000) + "_new_marker"
+	react.config.SetUserInputHistory([]schema.AIAgentUserInputRecord{
+		{Round: 1, Timestamp: time.Date(2026, 3, 26, 10, 0, 0, 0, time.Local), UserInput: oldPayload},
+		{Round: 2, Timestamp: time.Date(2026, 3, 26, 10, 5, 0, 0, time.Local), UserInput: newPayload},
+	})
+
+	ctx := react.promptManager.DynamicContextWithNonce("cut9876")
+	if !strings.Contains(ctx, "[TRUNCATED_HEAD]") {
+		t.Fatalf("dynamic context should mark head truncation when history exceeds 20K. Got length=%d", len(ctx))
+	}
+	if strings.Contains(ctx, oldPayload) || strings.Contains(ctx, "_old_marker") {
+		t.Fatalf("oldest head content should be truncated from PREV_USER_INPUT block")
+	}
+	if !strings.Contains(ctx, "_new_marker") || !strings.Contains(ctx, "Round 2") {
+		t.Fatalf("latest history content should be preserved after truncation. Got:\n%s", ctx)
+	}
+}
+
 func TestPromptManager_WithTracedDynamicContextProvider(t *testing.T) {
 	callCount := 0
 	var countMutex sync.Mutex
