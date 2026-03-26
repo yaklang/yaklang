@@ -16,6 +16,15 @@ type ftsDoc struct {
 
 func (ftsDoc) TableName() string { return "test_fts_docs" }
 
+type conditionalFTSDoc struct {
+	ID      int64  `gorm:"primary_key;column:id"`
+	Title   string `gorm:"column:title"`
+	Body    string `gorm:"column:body"`
+	Enabled bool   `gorm:"column:enabled"`
+}
+
+func (conditionalFTSDoc) TableName() string { return "test_conditional_fts_docs" }
+
 func TestSQLiteFTS5SetupAndBM25Match(t *testing.T) {
 	db, err := createTempTestDatabase()
 	require.NoError(t, err)
@@ -276,5 +285,82 @@ func TestSQLiteFTS5Drop_IdempotentAndCleansArtifacts(t *testing.T) {
 		}
 		require.NoError(t, db.Raw(`SELECT count(*) AS count FROM sqlite_master WHERE type='table' AND name=?;`, cfg.FTSTable).Scan(&row).Error)
 		require.Equal(t, 0, row.Count)
+	}
+}
+
+func TestSQLiteFTS5Setup_ConditionalIndexing(t *testing.T) {
+	db, err := createTempTestDatabase()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	require.NoError(t, db.AutoMigrate(&conditionalFTSDoc{}).Error)
+
+	enabledDoc := &conditionalFTSDoc{Title: "hello world", Body: "visible to fts", Enabled: true}
+	disabledDoc := &conditionalFTSDoc{Title: "hidden world", Body: "not indexed yet", Enabled: false}
+	require.NoError(t, db.Create(enabledDoc).Error)
+	require.NoError(t, db.Create(disabledDoc).Error)
+
+	cfg := &SQLiteFTS5Config{
+		BaseModel:    &conditionalFTSDoc{},
+		FTSTable:     "test_conditional_fts_docs_fts",
+		Columns:      []string{"title", "body"},
+		ContentTable: "test_conditional_fts_docs",
+		IndexedRows: &SQLiteFTS5IndexedRows{
+			Column: "enabled",
+			Value:  true,
+		},
+	}
+
+	if err := SQLiteFTS5Setup(db, cfg); err != nil {
+		if strings.Contains(err.Error(), "no such module: fts5") {
+			t.Skipf("fts5 not available: %v", err)
+		}
+		require.NoError(t, err)
+	}
+
+	{
+		got, err := SQLiteFTS5BM25Match[conditionalFTSDoc](db, cfg, []string{"visible"}, 10, 0)
+		require.NoError(t, err)
+		require.Len(t, got, 1)
+		require.Equal(t, enabledDoc.ID, got[0].ID)
+	}
+	{
+		got, err := SQLiteFTS5BM25Match[conditionalFTSDoc](db, cfg, []string{"hidden"}, 10, 0)
+		require.NoError(t, err)
+		require.Len(t, got, 0)
+	}
+
+	require.NoError(t, db.Model(&conditionalFTSDoc{}).Where("id = ?", disabledDoc.ID).Updates(map[string]any{
+		"enabled": true,
+		"body":    "now indexed after toggle",
+	}).Error)
+	{
+		got, err := SQLiteFTS5BM25Match[conditionalFTSDoc](db, cfg, []string{"toggle"}, 10, 0)
+		require.NoError(t, err)
+		require.Len(t, got, 1)
+		require.Equal(t, disabledDoc.ID, got[0].ID)
+	}
+
+	require.NoError(t, db.Model(&conditionalFTSDoc{}).Where("id = ?", enabledDoc.ID).Updates(map[string]any{
+		"enabled": false,
+		"body":    "should disappear from index",
+	}).Error)
+	{
+		got, err := SQLiteFTS5BM25Match[conditionalFTSDoc](db, cfg, []string{"visible"}, 10, 0)
+		require.NoError(t, err)
+		require.Len(t, got, 0)
+	}
+
+	require.NoError(t, SQLiteFTS5Rebuild(db, cfg))
+	{
+		got, err := SQLiteFTS5BM25Match[conditionalFTSDoc](db, cfg, []string{"toggle"}, 10, 0)
+		require.NoError(t, err)
+		require.Len(t, got, 1)
+		require.Equal(t, disabledDoc.ID, got[0].ID)
+	}
+	{
+		got, err := SQLiteFTS5BM25Match[conditionalFTSDoc](db, cfg, []string{"disappear"}, 10, 0)
+		require.NoError(t, err)
+		require.Len(t, got, 0)
 	}
 }
