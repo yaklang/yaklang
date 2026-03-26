@@ -65,6 +65,17 @@ type SQLiteFTS5Config struct {
 
 	// ContentRowID sets content_rowid for external content (default: RowIDColumn).
 	ContentRowID string
+
+	// IndexedRows optionally limits which rows are indexed and synchronized.
+	// When nil, all rows from the source table are indexed.
+	IndexedRows *SQLiteFTS5IndexedRows
+}
+
+// SQLiteFTS5IndexedRows describes a simple equality predicate for deciding
+// which rows belong in the FTS index.
+type SQLiteFTS5IndexedRows struct {
+	Column string
+	Value  any
 }
 
 type SQLiteFTS5Option func(*SQLiteFTS5Config)
@@ -109,6 +120,15 @@ func WithSQLiteFTS5ExternalContent(contentTable, contentRowID string) SQLiteFTS5
 	return func(c *SQLiteFTS5Config) {
 		c.ContentTable = contentTable
 		c.ContentRowID = contentRowID
+	}
+}
+
+func WithSQLiteFTS5IndexedRows(column string, value any) SQLiteFTS5Option {
+	return func(c *SQLiteFTS5Config) {
+		c.IndexedRows = &SQLiteFTS5IndexedRows{
+			Column: column,
+			Value:  value,
+		}
 	}
 }
 
@@ -157,6 +177,9 @@ func (c *SQLiteFTS5Config) normalize(db *gorm.DB) error {
 			return fmt.Errorf("Columns contains empty column")
 		}
 	}
+	if c.IndexedRows != nil && strings.TrimSpace(c.IndexedRows.Column) == "" {
+		return fmt.Errorf("IndexedRows.Column is empty")
+	}
 	return nil
 }
 
@@ -183,6 +206,54 @@ func sqliteQuoteIdent(name string) string {
 
 func sqliteQuoteStringLiteral(s string) string {
 	return `'` + strings.ReplaceAll(s, `'`, `''`) + `'`
+}
+
+func sqliteFTS5SourceTableAndRowID(cfg *SQLiteFTS5Config) (string, string) {
+	if cfg.ContentTable != "" {
+		return cfg.ContentTable, cfg.ContentRowID
+	}
+	return cfg.BaseTable, cfg.RowIDColumn
+}
+
+func sqliteFTS5QuoteValue(v any) string {
+	switch vv := v.(type) {
+	case nil:
+		return "NULL"
+	case bool:
+		if vv {
+			return "1"
+		}
+		return "0"
+	case string:
+		return sqliteQuoteStringLiteral(vv)
+	case fmt.Stringer:
+		return sqliteQuoteStringLiteral(vv.String())
+	default:
+		return fmt.Sprint(v)
+	}
+}
+
+func sqliteFTS5IndexedRowsExpr(scope string, indexedRows *SQLiteFTS5IndexedRows) string {
+	if indexedRows == nil {
+		return ""
+	}
+	return scope + "." + sqliteQuoteIdent(indexedRows.Column) + " = " + sqliteFTS5QuoteValue(indexedRows.Value)
+}
+
+func sqliteFTS5MaybeWhereIndexedRows(scope string, indexedRows *SQLiteFTS5IndexedRows) string {
+	expr := sqliteFTS5IndexedRowsExpr(scope, indexedRows)
+	if expr == "" {
+		return ""
+	}
+	return " WHERE " + expr
+}
+
+func sqliteFTS5MaybeWhenIndexedRows(scope string, indexedRows *SQLiteFTS5IndexedRows) string {
+	expr := sqliteFTS5IndexedRowsExpr(scope, indexedRows)
+	if expr == "" {
+		return ""
+	}
+	return " WHEN " + expr
 }
 
 func sqliteFTS5CreateVirtualTableResolved(db *gorm.DB, cfg *SQLiteFTS5Config) error {
@@ -219,7 +290,7 @@ func sqliteFTS5MigrateDataResolved(db *gorm.DB, cfg *SQLiteFTS5Config) error {
 	ftsTable := sqliteQuoteIdent(cfg.FTSTable)
 	ftsCmdCol := sqliteQuoteIdent(cfg.FTSTable)
 
-	if cfg.ContentTable != "" {
+	if cfg.ContentTable != "" && cfg.IndexedRows == nil {
 		// External content mode: rebuild from content table.
 		rebuildSQL := fmt.Sprintf("INSERT INTO %s(%s) VALUES('rebuild');", ftsTable, ftsCmdCol)
 		return db.Exec(rebuildSQL).Error
@@ -236,8 +307,10 @@ func sqliteFTS5MigrateDataResolved(db *gorm.DB, cfg *SQLiteFTS5Config) error {
 		}
 	}
 
+	sourceTable, sourceRowID := sqliteFTS5SourceTableAndRowID(cfg)
+
 	selectCols := make([]string, 0, len(cfg.Columns)+1)
-	selectCols = append(selectCols, "b."+sqliteQuoteIdent(cfg.RowIDColumn))
+	selectCols = append(selectCols, "b."+sqliteQuoteIdent(sourceRowID))
 	for _, col := range cfg.Columns {
 		selectCols = append(selectCols, "b."+sqliteQuoteIdent(col))
 	}
@@ -249,11 +322,12 @@ func sqliteFTS5MigrateDataResolved(db *gorm.DB, cfg *SQLiteFTS5Config) error {
 	}
 
 	insertSQL := fmt.Sprintf(
-		"INSERT INTO %s(%s) SELECT %s FROM %s AS b;",
+		"INSERT INTO %s(%s) SELECT %s FROM %s AS b%s;",
 		ftsTable,
 		strings.Join(insertCols, ", "),
 		strings.Join(selectCols, ", "),
-		sqliteQuoteIdent(cfg.BaseTable),
+		sqliteQuoteIdent(sourceTable),
+		sqliteFTS5MaybeWhereIndexedRows("b", cfg.IndexedRows),
 	)
 	return db.Exec(insertSQL).Error
 }
@@ -267,11 +341,15 @@ func sqliteFTS5BindTriggersResolved(db *gorm.DB, cfg *SQLiteFTS5Config) error {
 	triggerPrefix := fmt.Sprintf("%s_%s_fts5", cfg.BaseTable, cfg.FTSTable)
 	ai := sqliteQuoteIdent(triggerPrefix + "_ai")
 	au := sqliteQuoteIdent(triggerPrefix + "_au")
+	auDel := sqliteQuoteIdent(triggerPrefix + "_au_del")
+	auIns := sqliteQuoteIdent(triggerPrefix + "_au_ins")
 	ad := sqliteQuoteIdent(triggerPrefix + "_ad")
 
 	for _, s := range []string{
 		fmt.Sprintf("DROP TRIGGER IF EXISTS %s;", ai),
 		fmt.Sprintf("DROP TRIGGER IF EXISTS %s;", au),
+		fmt.Sprintf("DROP TRIGGER IF EXISTS %s;", auDel),
+		fmt.Sprintf("DROP TRIGGER IF EXISTS %s;", auIns),
 		fmt.Sprintf("DROP TRIGGER IF EXISTS %s;", ad),
 	} {
 		if err := db.Exec(s).Error; err != nil {
@@ -304,29 +382,49 @@ func sqliteFTS5BindTriggersResolved(db *gorm.DB, cfg *SQLiteFTS5Config) error {
 		deleteColsSuffix = ", " + strings.Join(colsCSV, ", ")
 	}
 
-	aiSQL := fmt.Sprintf(`CREATE TRIGGER %s AFTER INSERT ON %s BEGIN
+	aiSQL := fmt.Sprintf(`CREATE TRIGGER %s AFTER INSERT ON %s%s BEGIN
   INSERT INTO %s(%s) VALUES (%s);
-END;`, ai, base, fts, insertCols, newInsertVals)
+END;`, ai, base, sqliteFTS5MaybeWhenIndexedRows("NEW", cfg.IndexedRows), fts, insertCols, newInsertVals)
 
 	// For FTS5 'delete', it is safer to include the old column values when available.
 	oldDeleteValsSuffix := ""
 	if len(oldVals) > 0 {
 		oldDeleteValsSuffix = ", " + strings.Join(oldVals, ", ")
 	}
-	adSQL := fmt.Sprintf(`CREATE TRIGGER %s AFTER DELETE ON %s BEGIN
+	adSQL := fmt.Sprintf(`CREATE TRIGGER %s AFTER DELETE ON %s%s BEGIN
   INSERT INTO %s(%s, rowid%s) VALUES ('delete', old.%s%s);
-END;`, ad, base, fts, ftsCmdCol, deleteColsSuffix, pk, oldDeleteValsSuffix)
+END;`, ad, base, sqliteFTS5MaybeWhenIndexedRows("OLD", cfg.IndexedRows), fts, ftsCmdCol, deleteColsSuffix, pk, oldDeleteValsSuffix)
 
-	auSQL := fmt.Sprintf(`CREATE TRIGGER %s AFTER UPDATE ON %s BEGIN
+	splitUpdate := cfg.IndexedRows != nil
+
+	sqls := []string{aiSQL, adSQL}
+	if splitUpdate {
+		auDelSQL := fmt.Sprintf(`CREATE TRIGGER %s AFTER UPDATE ON %s%s BEGIN
+  INSERT INTO %s(%s, rowid%s) VALUES ('delete', old.%s%s);
+END;`,
+			auDel, base, sqliteFTS5MaybeWhenIndexedRows("OLD", cfg.IndexedRows),
+			fts, ftsCmdCol, deleteColsSuffix, pk, oldDeleteValsSuffix,
+		)
+		auInsSQL := fmt.Sprintf(`CREATE TRIGGER %s AFTER UPDATE ON %s%s BEGIN
+  INSERT INTO %s(%s) VALUES (%s);
+END;`,
+			auIns, base, sqliteFTS5MaybeWhenIndexedRows("NEW", cfg.IndexedRows),
+			fts, insertCols, newInsertVals,
+		)
+		sqls = append(sqls, auDelSQL, auInsSQL)
+	} else {
+		auSQL := fmt.Sprintf(`CREATE TRIGGER %s AFTER UPDATE ON %s BEGIN
   INSERT INTO %s(%s, rowid%s) VALUES ('delete', old.%s%s);
   INSERT INTO %s(%s) VALUES (%s);
 END;`,
-		au, base,
-		fts, ftsCmdCol, deleteColsSuffix, pk, oldDeleteValsSuffix,
-		fts, insertCols, newInsertVals,
-	)
+			au, base,
+			fts, ftsCmdCol, deleteColsSuffix, pk, oldDeleteValsSuffix,
+			fts, insertCols, newInsertVals,
+		)
+		sqls = append(sqls, auSQL)
+	}
 
-	for _, s := range []string{aiSQL, adSQL, auSQL} {
+	for _, s := range sqls {
 		if err := db.Exec(s).Error; err != nil {
 			return err
 		}
@@ -338,11 +436,15 @@ func sqliteFTS5DropTriggersResolved(db *gorm.DB, cfg *SQLiteFTS5Config) error {
 	triggerPrefix := fmt.Sprintf("%s_%s_fts5", cfg.BaseTable, cfg.FTSTable)
 	ai := sqliteQuoteIdent(triggerPrefix + "_ai")
 	au := sqliteQuoteIdent(triggerPrefix + "_au")
+	auDel := sqliteQuoteIdent(triggerPrefix + "_au_del")
+	auIns := sqliteQuoteIdent(triggerPrefix + "_au_ins")
 	ad := sqliteQuoteIdent(triggerPrefix + "_ad")
 
 	for _, s := range []string{
 		fmt.Sprintf("DROP TRIGGER IF EXISTS %s;", ai),
 		fmt.Sprintf("DROP TRIGGER IF EXISTS %s;", au),
+		fmt.Sprintf("DROP TRIGGER IF EXISTS %s;", auDel),
+		fmt.Sprintf("DROP TRIGGER IF EXISTS %s;", auIns),
 		fmt.Sprintf("DROP TRIGGER IF EXISTS %s;", ad),
 	} {
 		if err := db.Exec(s).Error; err != nil {
@@ -365,6 +467,19 @@ func SQLiteFTS5CreateVirtualTable(db *gorm.DB, baseCfg *SQLiteFTS5Config, opts .
 // SQLiteFTS5MigrateData builds (or rebuilds) the FTS index from BaseTable.
 // baseCfg is treated as a template; options are applied on a copy, so baseCfg is not mutated.
 func SQLiteFTS5MigrateData(db *gorm.DB, baseCfg *SQLiteFTS5Config, opts ...SQLiteFTS5Option) error {
+	cfg, err := sqliteFTS5ResolveConfig(db, baseCfg, opts...)
+	if err != nil {
+		return err
+	}
+	if err := sqliteFTS5CreateVirtualTableResolved(db, cfg); err != nil {
+		return err
+	}
+	return sqliteFTS5MigrateDataResolved(db, cfg)
+}
+
+// SQLiteFTS5Rebuild recreates the FTS index contents from the configured source table.
+// Unlike SQLite's built-in FTS5 rebuild command, this helper also supports filtered rebuilds.
+func SQLiteFTS5Rebuild(db *gorm.DB, baseCfg *SQLiteFTS5Config, opts ...SQLiteFTS5Option) error {
 	cfg, err := sqliteFTS5ResolveConfig(db, baseCfg, opts...)
 	if err != nil {
 		return err
