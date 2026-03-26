@@ -21,9 +21,13 @@ descPrompt = <<<DESC_PROMPT
 ### title：规则英文标题，动词+语言+目的，如 Check Java LDAP Injection Vulnerability
 ### title_zh：规则中文标题，如 检测Java LDAP注入漏洞
 ### cwe：CWE编号，纯数字；非漏洞规则可无
-### desc：规则目的和作用，不少于100字，markdown格式描述漏洞原理、触发场景和潜在影响
-### solution：修复建议，不少于100字，markdown格式；非漏洞规则返回none
+### desc：规则目的和作用，不少于100字，markdown格式描述漏洞原理、触发场景和潜在影响，内容必须以中文为主（可保留必要英文术语）
+### solution：修复建议，不少于100字，markdown格式；内容必须以中文为主（可保留必要英文术语）；非漏洞规则返回none
 ### reference：参考资料链接；无则返回none
+
+## 语言要求
+1. 结果整体以中文为主：title_zh、desc、solution 必须使用中文表达。
+2. title 保持英文即可；其余叙述性内容优先中文。
 
 ## 输入
 文件名: %s
@@ -40,6 +44,46 @@ alertPrompt = <<<ALERT_PROMPT
 2. 记录 alert 数量，输出前后数量必须相等。
 3. 每个 alert 需补全：name、title、title_zh、desc、level、message、risk、solution。
 4. level 枚举：critical/high/middle/low/info
+5. 所有描述性字段（title_zh、desc、message、risk、solution）必须以中文为主。
+6. risk 必须是中文风险类型，优先从预设值中选择；若都不合适，可自定义中文风险名。
+
+## risk 预设值（优先选用，中文主表达）
+- SQL 注入
+- 命令注入
+- 表达式注入
+- 模板注入
+- 代码注入
+- 路径遍历
+- 任意文件读取
+- 任意文件写入
+- 文件上传漏洞
+- 本地文件包含
+- 远程文件包含
+- 服务器端请求伪造（SSRF）
+- 跨站脚本（XSS）
+- 跨站请求伪造（CSRF）
+- 开放重定向
+- 点击劫持
+- 会话固定
+- 会话劫持
+- 身份认证缺陷
+- 访问控制缺陷
+- 越权访问
+- 权限提升
+- 敏感信息泄露
+- 隐私数据泄露
+- 反序列化漏洞
+- 远程代码执行
+- 本地代码执行
+- 业务逻辑缺陷
+- 依赖组件风险
+- 不安全加密
+- 弱随机数
+- 证书校验缺失
+- 弱口令
+- 硬编码凭据
+- 安全配置错误
+- 拒绝服务（DoS）
 
 ## 输入
 文件名: %s
@@ -60,12 +104,12 @@ alertSchema = jsonschema.ActionObject(
     jsonschema.paramObjectArray("alert",
         jsonschema.paramString("name", jsonschema.description("alert变量名")),
         jsonschema.paramString("title", jsonschema.description("英文标题")),
-        jsonschema.paramString("title_zh", jsonschema.description("中文标题")),
-        jsonschema.paramString("desc", jsonschema.description("漏洞描述")),
+        jsonschema.paramString("title_zh", jsonschema.description("中文标题（必须中文）")),
+        jsonschema.paramString("desc", jsonschema.description("漏洞描述（以中文为主）")),
         jsonschema.paramString("level", jsonschema.description("风险等级")),
-        jsonschema.paramString("message", jsonschema.description("简短提示")),
-        jsonschema.paramString("risk", jsonschema.description("风险类型")),
-        jsonschema.paramString("solution", jsonschema.description("修复建议")),
+        jsonschema.paramString("message", jsonschema.description("简短提示（以中文为主）")),
+        jsonschema.paramString("risk", jsonschema.description("风险类型（必须中文，优先从预设列表选择，不合适可自定义中文）")),
+        jsonschema.paramString("solution", jsonschema.description("修复建议（以中文为主）")),
     )
 )
 
