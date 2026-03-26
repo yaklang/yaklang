@@ -132,7 +132,7 @@ func (c *Compiler) compileCall(inst *ssa.Call) error {
 	if calleeVal != nil {
 		if ssaFn, ok := ssa.ToFunction(calleeVal); ok && ssaFn != nil && !ssaFn.IsExtern() {
 			llvmFn, _ := c.getOrDeclareLLVMFunction(ssaFn)
-			spec, err := c.newCallableContextCallSpec(inst, llvmFn, ssaArgs(c.callArgIDs(inst), false), "yak_call_target")
+			spec, err := c.newCallableContextCallSpec(inst, llvmFn, c.callableContextArgs(inst, ssaFn), "yak_call_target")
 			if err != nil {
 				return err
 			}
@@ -141,7 +141,7 @@ func (c *Compiler) compileCall(inst *ssa.Call) error {
 		if calleeVal.IsMember() {
 			if ft, ok := calleeVal.GetType().(*ssa.FunctionType); ok && ft != nil && ft.This != nil && !ft.This.IsExtern() {
 				llvmFn, _ := c.getOrDeclareLLVMFunction(ft.This)
-				spec, err := c.newCallableContextCallSpec(inst, llvmFn, ssaArgs(c.callArgIDs(inst), false), "yak_call_target")
+				spec, err := c.newCallableContextCallSpec(inst, llvmFn, c.callableContextArgs(inst, ft.This), "yak_call_target")
 				if err != nil {
 					return err
 				}

@@ -44,6 +44,28 @@ func TestComplex_ObjectFactor_MultipleInstances(t *testing.T) {
 	`, 23)
 }
 
+func TestComplex_Closure_FreeValue(t *testing.T) {
+	check(t, `
+	check = () => {
+		a = 41
+		f = () => a + 1
+		return f()
+	}
+	`, 42)
+}
+
+func TestComplex_Closure_CaptureParameter(t *testing.T) {
+	check(t, `
+	check = () => {
+		f = (a) => {
+			inner = () => a + 1
+			return inner()
+		}
+		return f(41)
+	}
+	`, 42)
+}
+
 func TestComplex_Defer_PrintOrder(t *testing.T) {
 	checkPrintBinary(t, `
 	check = () => {

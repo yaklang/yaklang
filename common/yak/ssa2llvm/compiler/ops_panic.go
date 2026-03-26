@@ -27,15 +27,16 @@ func (c *Compiler) compilePanic(inst *ssa.Panic) error {
 		return fmt.Errorf("compilePanic: panic %d has no block", inst.GetId())
 	}
 	handlerID := int64(0)
-	if c.activeHandlerByBlock != nil {
-		handlerID = c.activeHandlerByBlock[block.GetId()]
+	if c.function != nil && c.function.activeHandlerByBlock != nil {
+		handlerID = c.function.activeHandlerByBlock[block.GetId()]
 	}
 	if handlerID == 0 {
 		// Unhandled panic: propagate to caller (through defer if present).
-		if c.CurrentFunction != nil && c.CurrentFunction.DeferBlock > 0 && !c.returnBlock.IsNil() {
-			deferBB, ok := c.Blocks[c.CurrentFunction.DeferBlock]
+		currentFunction := c.currentFunction()
+		if currentFunction != nil && currentFunction.DeferBlock > 0 && c.function != nil && !c.function.returnBlock.IsNil() {
+			deferBB, ok := c.Blocks[currentFunction.DeferBlock]
 			if !ok {
-				return fmt.Errorf("compilePanic: defer block %d not found", c.CurrentFunction.DeferBlock)
+				return fmt.Errorf("compilePanic: defer block %d not found", currentFunction.DeferBlock)
 			}
 			c.Builder.CreateBr(deferBB)
 			return nil
@@ -45,15 +46,16 @@ func (c *Compiler) compilePanic(inst *ssa.Panic) error {
 	}
 
 	catchBodyID := int64(0)
-	if c.catchBodyByHandler != nil {
-		catchBodyID = c.catchBodyByHandler[handlerID]
+	if c.function != nil && c.function.catchBodyByHandler != nil {
+		catchBodyID = c.function.catchBodyByHandler[handlerID]
 	}
 	if catchBodyID == 0 {
 		// No catch block; propagate to caller (through defer if present).
-		if c.CurrentFunction != nil && c.CurrentFunction.DeferBlock > 0 && !c.returnBlock.IsNil() {
-			deferBB, ok := c.Blocks[c.CurrentFunction.DeferBlock]
+		currentFunction := c.currentFunction()
+		if currentFunction != nil && currentFunction.DeferBlock > 0 && c.function != nil && !c.function.returnBlock.IsNil() {
+			deferBB, ok := c.Blocks[currentFunction.DeferBlock]
 			if !ok {
-				return fmt.Errorf("compilePanic: defer block %d not found", c.CurrentFunction.DeferBlock)
+				return fmt.Errorf("compilePanic: defer block %d not found", currentFunction.DeferBlock)
 			}
 			c.Builder.CreateBr(deferBB)
 			return nil
