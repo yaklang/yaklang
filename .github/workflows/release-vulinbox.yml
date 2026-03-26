@@ -2,11 +2,6 @@ name: Release Vulinbox(OSS Release)
 
 on:
   workflow_dispatch:
-    inputs:
-      release_version:
-        description: "Release version, e.g. 1.2.3 or v1.2.3"
-        type: string
-        required: true
   pull_request:
     paths:
       - "common/vulinbox/**"
@@ -28,11 +23,10 @@ jobs:
       - name: Resolve release version
         shell: bash
         run: |
-          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            version="${{ github.event.inputs.release_version }}"
-            version="${version#v}"
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            version="pr-${{ github.event.pull_request.number }}-$(printf '%.7s' "${GITHUB_SHA}")"
           else
-            version="dev-$(printf '%.7s' "${GITHUB_SHA}")"
+            version="$(printf '%.7s' "${GITHUB_SHA}")"
           fi
 
           echo "VULINBOX_VERSION=${version}" >> "$GITHUB_ENV"
@@ -68,7 +62,7 @@ jobs:
           go build -ldflags "-s -w -X 'main.goVersion=$(go version)' -X 'main.gitHash=$(git show -s --format=%H)' -X 'main.buildTime=$(git show -s --format=%cd)' -X 'main.yakVersion=${{ env.VULINBOX_VERSION }}' -X 'main.releaseVersion=${{ env.VULINBOX_VERSION_TEXT }}'" -o ./vulinbox_windows_amd64.exe -v common/vulinboxrunner/vulinbox.go
 
       - name: Validate signing secrets
-        if: ${{ runner.os == 'Windows' && github.event_name != 'pull_request' }}
+        if: ${{ runner.os == 'Windows' }}
         shell: pwsh
         run: |
           $missing = @()
@@ -83,13 +77,13 @@ jobs:
           }
 
       - name: Set up .NET (for AzureSignTool)
-        if: ${{ runner.os == 'Windows' && github.event_name != 'pull_request' }}
+        if: ${{ runner.os == 'Windows' }}
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "8.0.x"
 
       - name: Install AzureSignTool
-        if: ${{ runner.os == 'Windows' && github.event_name != 'pull_request' }}
+        if: ${{ runner.os == 'Windows' }}
         shell: pwsh
         run: |
           dotnet tool install --global AzureSignTool
@@ -97,7 +91,7 @@ jobs:
           AzureSignTool --version
 
       - name: Sign Windows executable (Azure Key Vault)
-        if: ${{ runner.os == 'Windows' && github.event_name != 'pull_request' }}
+        if: ${{ runner.os == 'Windows' }}
         shell: pwsh
         run: |
           AzureSignTool sign `
@@ -112,7 +106,7 @@ jobs:
             ".\\vulinbox_windows_amd64.exe"
 
       - name: Verify signature
-        if: ${{ runner.os == 'Windows' && github.event_name != 'pull_request' }}
+        if: ${{ runner.os == 'Windows' }}
         shell: pwsh
         run: |
           Get-AuthenticodeSignature ".\\vulinbox_windows_amd64.exe" | Format-List
@@ -139,7 +133,7 @@ jobs:
           path: ./vulinbox_linux_amd64
 
   download_artifacts_and_release:
-    if: ${{ github.event_name == 'workflow_dispatch' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' }}
     needs:
       - build_and_release
     runs-on: ubuntu-24.04
@@ -152,8 +146,12 @@ jobs:
       - name: Resolve release version
         shell: bash
         run: |
-          version="${{ github.event.inputs.release_version }}"
-          version="${version#v}"
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            version="pr-${{ github.event.pull_request.number }}-$(printf '%.7s' "${GITHUB_SHA}")"
+          else
+            version="$(printf '%.7s' "${GITHUB_SHA}")"
+          fi
+
           echo "VULINBOX_VERSION=${version}" >> "$GITHUB_ENV"
           echo "VULINBOX_VERSION_TEXT=vulinbox-${version}" >> "$GITHUB_ENV"
           echo "Resolved VULINBOX_VERSION=${version}"
