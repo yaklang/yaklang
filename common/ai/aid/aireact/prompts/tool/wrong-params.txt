@@ -9,10 +9,6 @@ OS/Arch: {{ .OSArch }}
 {{ if .WorkingDirGlance }}working dir glance: {{ .WorkingDirGlance }}{{ end }}
 {{ if .DynamicContext }}{{ .DynamicContext }} {{end}}
 
-{{ if .ConversationMemory }}# Conversation Memory
-{{ .ConversationMemory }}
-{{ end }}
-
 {{ if .Timeline }}# Timeline Memory
 {{ .Timeline }}
 {{ end }}

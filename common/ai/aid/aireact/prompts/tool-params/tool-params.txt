@@ -1,24 +1,25 @@
 # Tool Parameter Generation
 {{ if .DynamicContext }}{{ .DynamicContext }} {{end}}
-You need to generate parameters for the tool '{{ .ToolName }}'.
+需要为 '{{ .ToolName }}' 生成参数，参数会在后续系统中被评估和执行，需要考虑的内容如下：
 
-Tool Description: {{ .ToolDescription }}
-{{ if .ToolUsage }}
-## Tool Usage Guide
+1. `identifier` 在后续会标记这个工具执行的唯一标识符；
+2. `call_expectations`: 表示这次工具调用预估时间与出现意外情况如何处理，尽量简短简明扼要展示内容
+3. 如果生成的参数过于复杂的话，请你使用 AITAG 来包裹，可以详细参考后续的约束与要求
+
+<|TOOL_DESC_{{ .Nonce}} |>
+{{ .ToolDescription }}
+<|TOOL_DESC_END_{{ .Nonce }}|>
+
+{{ if .ToolUsage }}<|TOOL_USAGE_{{ .Nonce }}|>
 {{ .ToolUsage }}
-{{ end }}
-{{ if .ToolSchema }}Tool Schema:
-```json
+<|TOOL_USAGE_END_{{ .Nonce }}|>{{ end }}
+
+<|TOOL_PARAM_SCHEMA_{{ .Nonce }}|>
 {{ .ToolSchema }}
-```
-{{ end }}
+<|TOOL_PARAM_SCHEMA_END_{{ .Nonce }}|>
 
 {{ if .OriginalQuery }}# Original User Query
 User's original request: {{ .OriginalQuery }}
-{{ end }}
-
-{{ if .CumulativeSummary }}# Task Context & Memory
-Overall task context: {{ .CumulativeSummary }}
 {{ end }}
 
 # Task Progress
@@ -83,7 +84,7 @@ RESPONSE FORMAT: Respond with a JSON object following the @action pattern(Exampl
     "param1": "value1",
     "param2": "value2"
   },
-  "call_expectations": "Estimated ~5s. If timeout, force stop and retry with adjusted params. Success: returns valid data matching the query. Failure: adjust strategy and try alternative params."
+  "call_expectations": "预估4s内结束，强制退出条件：超过10s没有输出判定卡死"
 }
 ```
 

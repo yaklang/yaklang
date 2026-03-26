@@ -1,4 +1,4 @@
-__DESC__ = "A powerful HTTP request tool comparable to curl. Supports two modes: URL mode (specify URL, method, headers, body, params) and Packet mode (send raw HTTP request packet). Features include timeout control, redirect handling, keyword/regex matching, proxy support, and HTTPS auto-detection."
+__DESC__ = "A powerful HTTP request tool comparable to curl. Supports two modes: URL mode (specify URL, method, headers, body, params) and Packet mode (send raw HTTP request packet). Features include timeout control, redirect handling, keyword/regex matching, proxy support, and HTTPS auto-detection. if you want to exec batch requests, please use batch_do_http_request tool instead. 强大的HTTP请求工具，功能媲美curl。支持两种模式：URL模式（指定URL、方法、头部、请求体、参数）和报文模式（发送原始HTTP请求报文）。功能包括超时控制、重定向处理、关键字/正则匹配、代理支持和HTTPS自动检测。如果需要执行批量请求，需要遍历某个参数，同时访问多个请求，请使用batch_do_http_request工具。"
 __VERBOSE_NAME__ = "Powerful HTTP Request Tool (curl-like)"
 __KEYWORDS__ = "http request,curl,web,network,packet,raw request,http response,url,post,get,https,proxy,redirect,header,body,api,http tool,web debug,traffic"
 

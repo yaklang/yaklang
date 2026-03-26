@@ -13,24 +13,19 @@ import (
 )
 
 var loopAction_LoadCapability = &reactloops.LoopAction{
-	ActionType: schema.AI_REACT_LOOP_ACTION_LOAD_CAPABILITY,
-	Description: "Load a capability by identifier. Automatically detects whether the identifier is a " +
-		"tool, AI blueprint (forge), skill, or focus mode loop, and dispatches accordingly. " +
-		"Use this when you know the exact name of a capability but are unsure of its type.",
+	ActionType:  schema.AI_REACT_LOOP_ACTION_LOAD_CAPABILITY,
+	Description: "自动加载一些外部能力，这个外部能力可以被自动检测类型，并且加载。可以出现工具调用(tool)，专注模式(focus_mode)，技能(skill)或者模版/蓝图（forge/blueprint）",
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
 			"identifier",
-			aitool.WithParam_Description(
-				"The exact name of the capability to load. "+
-					"This can be a tool name (e.g. 'check-yaklang-syntax' for .yak, 'check-syntaxflow-syntax' for .sf), "+
-					"an AI blueprint/forge name (e.g. 'code_generator'), "+
-					"a skill name, or a focus mode loop name. "+
-					"The system will automatically detect the type and handle it."),
-			aitool.WithParam_Required(true),
+			aitool.WithParam_Description(`只对 {"@action":"load_capability" ...} 时生效，这个标识符会被自动检测是 skill/tool/forge/focus_mode/filename, 然后自动加载`),
 		),
 	},
 	StreamFields: []*reactloops.LoopStreamField{
-		{FieldName: "identifier", AINodeId: "load_capability"},
+		{
+			FieldName: "identifier",
+			AINodeId:  "load_capability",
+		},
 	},
 	ActionVerifier: loadCapabilityVerifier,
 	ActionHandler:  loadCapabilityHandler,

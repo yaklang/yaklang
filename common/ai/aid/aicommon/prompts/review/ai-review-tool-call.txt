@@ -5,10 +5,6 @@ OS/Arch: {{ .OSArch }}
 {{ if .WorkingDirGlance }}working dir glance: {{ .WorkingDirGlance }}{{ end }}
 <|BACKGROUND_END_{{ .Nonce }}|>
 
-{{ if .ConversationMemory }}# Conversation Memory
-{{ .ConversationMemory }}
-{{ end }}
-
 {{ if .Timeline }}# Timeline Memory
 {{ .Timeline }}
 {{ end }}

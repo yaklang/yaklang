@@ -50,7 +50,7 @@
 如果你想要使用工具，请严格遵循以下流程：
 
 1. **申请工具：** 使用以下格式提交工具申请，确保清晰指定你需要的工具名称。申请内容为：
-   {"@action": "require_tool", "tool_require_payload": "..[your-toolname]..", "cumulative_summary": "...", "human_readable_thought": "..."}
+   {"@action": "require_tool", "tool_require_payload": "..[your-toolname]..", "human_readable_thought": "..."}
    请确保 `tool_require_payload` 中填写的工具名称准确无误，并在 `human_readable_thought` 中简要说明调用该工具的目的和预期结果。
 2. **查看参数：** 在工具申请通过后，系统会返回该工具所需的参数列表。请仔细阅读每个参数的说明，确保理解其用途和格式要求。根据任务需求填写参数，确保输入信息完整且正确。
 3. **执行工具：** 提交参数后，系统将执行工具并返回结果。请关注工具的输出内容，并在后续步骤中根据结果决定下一步行动。

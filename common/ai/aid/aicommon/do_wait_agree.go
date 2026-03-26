@@ -162,17 +162,16 @@ var aiReviewPromptTemplate string
 
 // AIReviewPromptData contains data for AI tool call review prompt
 type AIReviewPromptData struct {
-	CurrentTime        string
-	OSArch             string
-	WorkingDir         string
-	WorkingDirGlance   string
-	ConversationMemory string
-	Timeline           string
-	Nonce              string
-	UserQuery          string
-	Title              string
-	Details            string
-	Language           string
+	CurrentTime      string
+	OSArch           string
+	WorkingDir       string
+	WorkingDirGlance string
+	Timeline         string
+	Nonce            string
+	UserQuery        string
+	Title            string
+	Details          string
+	Language         string
 }
 
 func GenerateAIReviewPrompt(config *Config, userQuery, toolOrTitle, params string) (string, error) {
