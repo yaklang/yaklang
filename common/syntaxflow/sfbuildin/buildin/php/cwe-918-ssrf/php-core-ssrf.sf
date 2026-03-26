@@ -2,7 +2,7 @@ desc(
 	title: "Check PHP SSRF Vulnerability"
 	title_zh: "检测PHP SSRF漏洞"
 	type: vul
-	risk: "ssrf"
+	risk: "服务端请求伪造（SSRF）"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

@@ -84,7 +84,14 @@ SOLUTION
 )
 
 exec?{<fullTypeName>?{have: 'os/exec'}} as $entry
-$entry.Command(* #-> as $output) 
+$entry.Command as $output
+$entry.CommandContext as $output
+
+syscall?{<fullTypeName>?{have: 'syscall'}} as $entry2
+$entry2.Exec as $output
+
+os?{<fullTypeName>?{have: 'os'}} as $entry3
+$entry3.StartProcess as $output
 
 alert $output for {
 	solution: <<<SOLUTION
@@ -170,7 +177,7 @@ DESC
 
 desc(
 	lang: golang
-	alert_min: 2
+	alert_min: 1
 	'file://exec.go': <<<PARAM
 package main
 

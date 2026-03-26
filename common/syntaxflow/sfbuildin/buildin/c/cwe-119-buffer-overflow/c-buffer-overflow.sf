@@ -2,7 +2,7 @@ desc(
 	title: "Check C Buffer Overflow Vulnerability"
 	type: audit
 	level: high
-	risk: "buffer-overflow"
+	risk: "缓冲区溢出（Buffer Overflow）"
 	desc: <<<DESC
 ### 漏洞描述
 

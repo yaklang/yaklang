@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Golang HTTP命令注入漏洞"
 	type: audit
 	level: high
-	risk: "rce"
+	risk: "远程代码执行（RCE）"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -80,7 +80,7 @@ alert $high for {
 	type: "vuln",
 	title: "Golang Command Injection Vulnerability Was Detected",
 	title_zh: "检测到Golang命令注入漏洞",
-	risk: "rce",
+	risk: "远程代码执行（RCE）",
 	name: "high",
 }
 

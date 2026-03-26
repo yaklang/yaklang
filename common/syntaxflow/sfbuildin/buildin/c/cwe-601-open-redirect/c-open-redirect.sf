@@ -2,7 +2,7 @@ desc(
 	title: "Check C Open Redirect Vulnerability"
 	type: audit
 	level: low
-	risk: "url-redirect"
+	risk: "开放重定向（Open Redirect）"
 	desc: <<<DESC
 ### 漏洞描述
 

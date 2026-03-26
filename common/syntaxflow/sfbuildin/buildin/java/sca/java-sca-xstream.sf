@@ -70,7 +70,7 @@ alert $vuln_xstream for {
 	level: "high",
 	message: "SCA: xstream versions between 1.4.11.1 and 1.4.17 have multiple deserialization vulnerabilities",
 	cve: "CVE-2021-39152",
-	risk: "SCA",
+	risk: "软件成分分析（SCA）",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

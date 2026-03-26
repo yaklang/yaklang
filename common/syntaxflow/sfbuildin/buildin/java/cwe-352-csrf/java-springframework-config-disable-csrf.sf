@@ -170,7 +170,7 @@ DESC
 	level: "low",
 	name: "disableCSRF",
 	message: "检测到Java Spring Framework中通过调用`.csrf().disable()`全局禁用了CSRF保护，这可能导致跨站请求伪造攻击。",
-	risk: "CSRF",
+	risk: "跨站请求伪造（CSRF）",
 }
 
 

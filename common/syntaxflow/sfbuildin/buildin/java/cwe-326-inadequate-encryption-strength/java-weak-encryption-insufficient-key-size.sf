@@ -2,7 +2,7 @@ desc(
 	title: "Check Java Weak Encryption - Insufficient Key Size"
 	title_zh: "检测Java弱加密 - 密钥长度不足"
 	type: security
-	risk: 'risky_crypt'
+	risk: '弱加密（Risky Crypt）'
 	level: low
 	desc: <<<DESC
 ### 漏洞描述

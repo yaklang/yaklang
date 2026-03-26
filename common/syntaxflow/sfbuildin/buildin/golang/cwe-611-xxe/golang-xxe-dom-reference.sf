@@ -2,7 +2,7 @@ desc(
 	title: "Check Golang XXE Malicious Document References"
 	type: audit
 	level: high
-	risk: "xxe"
+	risk: "XML外部实体（XXE）"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -136,7 +136,7 @@ alert $high for {
 	title: "Golang XXE Vulnerability Was Detected",
 	title_zh: "检测到Golang XXE漏洞",
 	level: "high",
-	risk: "XXE",
+	risk: "XML外部实体（XXE）",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

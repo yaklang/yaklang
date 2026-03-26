@@ -1,7 +1,7 @@
 desc(
 	title: "Check PHP ThinkPHP SQL Injection Vulnerability"
 	title_zh: "检测PHP ThinkPHP SQL注入漏洞"
-	risk: "audit"
+	risk: "审计（Audit）"
 	level: "low"
 	desc: <<<DESC
 ### 漏洞描述

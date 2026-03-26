@@ -196,7 +196,7 @@ xstream.allowTypes(new Class[]{YourExpectedObject.class});
 #### 4. 避免反序列化来自不受信任来源的数据
 如果可能，避免反序列化任何来自外部、不可信源的序列化数据。
 SOLUTION
-	risk: "XXE",
+	risk: "XML外部实体（XXE）",
 	name: "vuln",
 }
 

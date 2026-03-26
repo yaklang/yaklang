@@ -153,7 +153,7 @@ System.out.println(obj);
 5. **最小化权限原则**
 运行应用程序的用户应具备最低必要的系统权限，即使发生漏洞利用，也能限制攻击者造成的损害。
 SOLUTION
-	risk: "SCA",
+	risk: "软件成分分析（SCA）",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -244,7 +244,7 @@ System.out.println(obj);
 5. **最小化权限原则**
 运行应用程序的用户应具备最低必要的系统权限，即使发生漏洞利用，也能限制攻击者造成的损害。
 SOLUTION
-	risk: "SCA",
+	risk: "软件成分分析（SCA）",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -285,7 +285,7 @@ alert $reachable for {
 	message_zh: "FastJson 使用了不安全的 parseObject/parse 方法(Springboot / Servlet参数可达)",
 	message: "FastJson uses the unsafe parseObject/parse method (parameter reachable)",
 	level: "high",
-	risk: "SCA",
+	risk: "软件成分分析（SCA）",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

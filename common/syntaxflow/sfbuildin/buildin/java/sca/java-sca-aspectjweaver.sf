@@ -74,7 +74,7 @@ implementation 'org.aspectj:aspectjweaver:1.9.6' // 更新到安全版本
 4. **监控与日志记录**
 加强对应用日志和系统日志的监控，及时发现异常的文件下载或执行行为。记录详细的日志信息，以便在发生安全事件时进行追溯和取证。
 SOLUTION
-	risk: "SCA",
+	risk: "软件成分分析（SCA）",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

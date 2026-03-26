@@ -117,7 +117,7 @@ request.getRequestDispatcher("/xss-vulnerable.jsp").forward(request, response);
 #### 3. 输入验证
 虽然输出转义是防止XSS的关键，但输入验证也是重要的补充。根据业务需求，对用户输入的数据类型、格式、长度等进行检查，拒绝明显恶意的或不符合预期的输入。
 SOLUTION
-	risk: "XSS",
+	risk: "跨站脚本（XSS）",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

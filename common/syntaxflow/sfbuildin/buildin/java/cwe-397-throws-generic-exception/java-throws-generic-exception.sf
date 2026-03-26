@@ -3,7 +3,7 @@ desc(
 	title_zh: "审计Java方法声明中抛出过于宽泛的异常"
 	type: "Code Vulnerability"
 	severity: "low"
-	risk:  "error-handling"
+	risk:  "错误处理（Error Handling）"
 	cwe: "CWE-397"
 	desc: <<<DESC
 ### 漏洞描述

@@ -2,7 +2,7 @@ desc(
 	title: "Check Golang Reflected XSS Vulnerability"
 	type: audit
 	level: high
-	risk: "xss"
+	risk: "跨站脚本（XSS）"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -111,7 +111,7 @@ $sink #{
 
 alert $high for {
 	title: "Golang Reflected XSS Vulnerability Was Detected",
-	risk: "XSS",
+	risk: "跨站脚本（XSS）",
 	title_zh: "检测到Golang反射型XSS漏洞",
 	solution: <<<SOLUTION
 ### 修复建议

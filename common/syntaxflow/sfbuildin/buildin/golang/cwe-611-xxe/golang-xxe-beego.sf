@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Golang Beego框架中的XML外部实体(XXE)漏洞"
 	type: vuln
 	level: high
-	risk: "xxe"
+	risk: "XML外部实体（XXE）"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -105,7 +105,7 @@ $param?{have: "XMLParseNoEnt"} as $high
 
 alert $high for {
 	title: "Check Golang XML External Entity (XXE) Vulnerability in Beego",
-	risk: "XXE",
+	risk: "XML外部实体（XXE）",
 	title_zh: "检测Golang Beego框架中的XML外部实体(XXE)漏洞",
 	solution: <<<SOLUTION
 ### 修复建议

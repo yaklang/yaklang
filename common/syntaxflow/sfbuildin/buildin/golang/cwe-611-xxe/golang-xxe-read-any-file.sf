@@ -2,7 +2,7 @@ desc(
 	title: "Check Golang XXE Read Any File"
 	type: audit
 	level: high
-	risk: "xxe"
+	risk: "XML外部实体（XXE）"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -112,7 +112,7 @@ $sink.Entity?{!have: 'xml.HTMLEntity'} as $high;
 
 alert $high for {
 	type: "vuln",
-	risk: "XXE",
+	risk: "XML外部实体（XXE）",
 	title: "Check Golang XXE Read Any File",
 	title_zh: "检测Golang XXE任意文件读取漏洞",
 	solution: <<<SOLUTION

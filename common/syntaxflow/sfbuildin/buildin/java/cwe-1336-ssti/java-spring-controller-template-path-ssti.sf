@@ -197,7 +197,7 @@ DESC
 	level: "high",
 	type: "vuln",
 	message: "Template Path Injection(Direct Use of User Input)",
-	risk: "SSTI",
+	risk: "服务器端模板注入（SSTI）",
 	name: "withoutCall",
 }
 
@@ -298,7 +298,7 @@ DESC
 	message: "Template Path Injection(Filtered Use of User Input)",
 	type: "vuln",
 	name: "unsafeFilteredSink",
-	risk: "SSTI",
+	risk: "服务器端模板注入（SSTI）",
 }
 
 alert $filteredSink for {

@@ -2,7 +2,7 @@ desc(
 	title: "Check Java Privacy Violation - Shoulder Surfing"
 	title_zh: "检查Java隐私泄露 - 肩窥"
 	type:security
-	risk:'info-exposure'
+	risk:'信息泄露（Information Exposure）'
 	level:low
 	desc: <<<DESC
 ### 漏洞描述

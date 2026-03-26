@@ -180,7 +180,7 @@ e.printStackTrace();
 - 远程代码执行（在特定配置下）。
 DESC
 	level: "high",
-	risk: "XXE",
+	risk: "XML外部实体（XXE）",
 	name: "vuln",
 }
 

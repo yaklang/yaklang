@@ -111,7 +111,7 @@ fmt.Println(result) // XXE不会被解析
 2. **验证和过滤输入**
 在解析XML之前，对输入进行严格的验证和过滤，移除或转义潜在的恶意构造，特别是DOCTYPE声明和外部实体引用。
 SOLUTION
-	risk: "XXE",
+	risk: "XML外部实体（XXE）",
 	desc: <<<DESC
 ### 风险描述
 1. **风险原理**

@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Golang未过滤文件路径漏洞"
 	type: audit
 	level: low
-	risk: "path-traversal"
+	risk: "路径穿越"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

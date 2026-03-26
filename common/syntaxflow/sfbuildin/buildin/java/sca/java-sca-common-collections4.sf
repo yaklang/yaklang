@@ -95,7 +95,7 @@ java -Djdk.serialFilter='!org.apache.commons.collections4.functors.*'
 ```
 通过以上任一或组合措施，可以有效缓解 `commons-collections4` 反序列化漏洞带来的风险。
 SOLUTION
-	risk: "SCA",
+	risk: "软件成分分析（SCA）",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

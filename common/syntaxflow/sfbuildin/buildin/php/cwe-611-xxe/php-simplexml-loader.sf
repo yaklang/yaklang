@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测PHP simplexml_load_string XXE漏洞"
 	level: high
 	type: audit
-	risk: "xxe"
+	risk: "XML外部实体（XXE）"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
@@ -97,7 +97,7 @@ $xml = simplexml_load_string($xml_data, 'SimpleXMLElement', LIBXML_NONET);
 3. **使用更安全的替代方案或数据格式**
 如果可能，考虑使用更安全的数据交换格式，如JSON，它不涉及实体引用问题。或者使用专门为安全解析未知XML设计的库。
 SOLUTION
-	risk: "XXE",
+	risk: "XML外部实体（XXE）",
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

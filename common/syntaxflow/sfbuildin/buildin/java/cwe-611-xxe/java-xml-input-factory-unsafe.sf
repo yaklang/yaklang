@@ -156,7 +156,7 @@ DESC
 	level: "high",
 	message: "检测到 Java STAX XMLInputFactory 不安全使用漏洞，未禁用外部实体和 DTD 支持。",
 	name: "vulnCall",
-	risk: "XXE",
+	risk: "XML外部实体（XXE）",
 }
 
 desc(

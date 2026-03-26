@@ -86,6 +86,6 @@ Apache Commons BeanUtils 是一个 Java 库，用于在 JavaBean 属性之间进
 DESC
 	level: "high",
 	cve: "CVE-2019-10086",
-	risk: "SCA",
+	risk: "软件成分分析（SCA）",
 	name: "vuln_commons_beanutils",
 }

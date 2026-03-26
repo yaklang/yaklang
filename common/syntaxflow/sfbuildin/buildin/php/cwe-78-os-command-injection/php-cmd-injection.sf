@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测PHP命令注入漏洞"
 	type: audit
 	level: mid
-	risk:'rce'
+	risk:'远程代码执行（RCE）'
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

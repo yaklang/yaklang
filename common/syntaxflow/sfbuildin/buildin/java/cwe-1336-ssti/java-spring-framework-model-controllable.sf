@@ -180,7 +180,7 @@ DESC
 	message_zh: "识别到 Java Spring Framework 中 ModelAndView 构造函数可控",
 	message: "Recognize Java Spring Framework code that can control the ModelAndView constructor",
 	name: "filteredSource",
-	risk: "SSTI",
+	risk: "服务器端模板注入（SSTI）",
 }
 
 

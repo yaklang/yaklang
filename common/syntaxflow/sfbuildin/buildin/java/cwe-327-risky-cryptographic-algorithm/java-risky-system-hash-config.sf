@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Java风险的系统哈希配置"
 	type: security
 	level: low
-	risk:'risky_crypt'
+	risk:'弱加密（Risky Crypt）'
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

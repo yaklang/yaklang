@@ -1,7 +1,7 @@
 desc(
 	title_zh: "SCA: 检测Java Spring Boot Devtools使用"
 	title: "SCA: Check Java Spring Boot Devtools Usage"
-	risk:"sca"
+	risk:"软件成分分析（SCA）"
 	reference: <<<REFERENCE
 [Spring Boot Devtools 文档](https://docs.spring.io/spring-boot/reference/using/devtools.html)
 [CWE-489](https://cwe.mitre.org/data/definitions/489.html)
@@ -147,7 +147,7 @@ developmentOnly 'org.springframework.boot:spring-boot-starter-devtools'
 DESC
 	level: "info",
 	message: "检测到Java Spring Boot Devtools的使用",
-	risk: "SCA",
+	risk: "软件成分分析（SCA）",
 	name: "weak",
 }
 

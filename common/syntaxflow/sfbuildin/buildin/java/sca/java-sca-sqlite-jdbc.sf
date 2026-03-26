@@ -112,5 +112,5 @@ DESC
 	level: "high",
 	message: "SCA: sqlite-jdbc versions between 3.8.9 and 3.36.0 have an SQL injection vulnerability",
 	name: "vuln_sqlite_jdbc",
-	risk: "SCA",
+	risk: "软件成分分析（SCA）",
 }

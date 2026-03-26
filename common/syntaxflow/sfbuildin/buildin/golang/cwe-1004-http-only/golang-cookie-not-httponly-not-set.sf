@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Golang Cookie HTTPOnly标志缺失"
 	type: audit
 	level: high
-	risk: "xss"
+	risk: "跨站脚本（XSS）"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -97,7 +97,7 @@ $cookie - $safe as $high
 
 alert $high for {
 	solution: <<<SOLUTION
-	risk: "xss",
+	risk: "跨站脚本（XSS）",
 ### 修复建议
 
 #### 1. 为敏感Cookie设置HttpOnly标志

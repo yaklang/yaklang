@@ -101,7 +101,7 @@ DESC
 	title: "SCA: Check Java shiro-core Vulnerability",
 	title_zh: "SCA: 检测Java shiro-core 依赖漏洞",
 	name: "vuln_shiro_core",
-	risk: "SCA",
+	risk: "软件成分分析（SCA）",
 }
 
 desc(

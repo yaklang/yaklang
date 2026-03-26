@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测PHP变量覆盖漏洞"
 	type: audit
 	level: low
-	risk: 'variable_coverage'
+	risk: '变量覆盖（Variable Coverage）'
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

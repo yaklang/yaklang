@@ -2,7 +2,7 @@ desc(
 	title: "Check Java Path Traversal Vulnerability"
 	title_zh: "检测Java路径穿越漏洞"
 	type: vuln
-	risk: "path-traversal"
+	risk: "路径穿越"
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**

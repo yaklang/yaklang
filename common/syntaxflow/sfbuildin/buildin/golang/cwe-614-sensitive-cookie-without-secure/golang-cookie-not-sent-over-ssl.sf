@@ -3,7 +3,7 @@ desc(
 	title_zh: "检测Golang Cookie未通过SSL发送漏洞"
 	type: audit
 	level: low
-	risk: "info-exposure"
+	risk: "信息泄露（Information Exposure）"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -94,7 +94,7 @@ $cookie - $safe as $low
 
 alert $low for {
 	solution: <<<SOLUTION
-	risk: "info-exposure",
+	risk: "信息泄露（Information Exposure）",
 ### 修复建议
 
 #### 1. 设置Secure标志
