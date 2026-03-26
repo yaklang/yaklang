@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,6 +15,15 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+func isLoadCapabilityToolParamPrompt(prompt string) bool {
+	if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
+		return true
+	}
+
+	return strings.Contains(prompt, "Generate appropriate parameters for this tool call") &&
+		strings.Contains(prompt, "call-tool")
+}
 
 // TestReActLoop_LoadCapability_ToolEquivalence verifies that using load_capability
 // with a tool identifier produces the same end-to-end tool execution flow as
@@ -42,11 +52,13 @@ func TestReActLoop_LoadCapability_ToolEquivalence(t *testing.T) {
 
 	reactIns, err := aireact.NewTestReAct(
 		aicommon.WithAgreePolicy(aicommon.AgreePolicyYOLO),
+		aicommon.WithAIAutoRetry(1),
+		aicommon.WithAITransactionAutoRetry(1),
 		aicommon.WithTools(sleepTool),
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := req.GetPrompt()
 
-			if utils.MatchAllOfSubString(prompt, "directly_answer", "load_capability") {
+			if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "load_capability") {
 				iterationCount++
 
 				if iterationCount > 3 {
@@ -66,7 +78,7 @@ func TestReActLoop_LoadCapability_ToolEquivalence(t *testing.T) {
 				return rsp, nil
 			}
 
-			if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
+			if isLoadCapabilityToolParamPrompt(prompt) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "seconds" : 0.01 }}`))
 				rsp.Close()
@@ -93,7 +105,10 @@ func TestReActLoop_LoadCapability_ToolEquivalence(t *testing.T) {
 		t.Fatalf("Failed to create loop: %v", err)
 	}
 
-	err = loop.Execute("load-cap-equiv-task", context.Background(), "test load_capability tool equivalence")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err = loop.Execute("load-cap-equiv-task", ctx, "test load_capability tool equivalence")
 	if err != nil {
 		t.Fatalf("Execute failed: %v", err)
 	}
@@ -132,9 +147,11 @@ func TestReActLoop_LoadCapability_MaxIterationsLimit(t *testing.T) {
 	reactIns, err := aireact.NewTestReAct(
 		aicommon.WithTools(sleepTool),
 		aicommon.WithAgreePolicy(aicommon.AgreePolicyYOLO),
+		aicommon.WithAIAutoRetry(1),
+		aicommon.WithAITransactionAutoRetry(1),
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := req.GetPrompt()
-			if utils.MatchAllOfSubString(prompt, "directly_answer", "load_capability") {
+			if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "load_capability") {
 				// THE KEY DIFFERENCE: use load_capability instead of require_tool
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
@@ -145,7 +162,7 @@ func TestReActLoop_LoadCapability_MaxIterationsLimit(t *testing.T) {
 				return rsp, nil
 			}
 
-			if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
+			if isLoadCapabilityToolParamPrompt(prompt) {
 				callCount++
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "seconds" : 0.01 }}`))
@@ -176,7 +193,10 @@ func TestReActLoop_LoadCapability_MaxIterationsLimit(t *testing.T) {
 		t.Fatalf("Failed to create loop: %v", err)
 	}
 
-	err = loop.Execute("load-cap-max-iter-task", context.Background(), "test load_capability max iterations")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err = loop.Execute("load-cap-max-iter-task", ctx, "test load_capability max iterations")
 
 	if callCount != maxIter {
 		t.Errorf("Expected exactly %d tool calls (same as require_tool), got %d", maxIter, callCount)

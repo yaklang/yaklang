@@ -168,7 +168,7 @@ func TestForgeEquivalence_RequireAIBlueprint_vs_LoadCapability(t *testing.T) {
 			forgeName,
 			`{"@action": "object", "next_action": {"type": "require_ai_blueprint", "blueprint_payload": "`+forgeName+`"},
 			"human_readable_thought": "requesting ai blueprint"}`,
-			[]string{"directly_answer", "require_ai_blueprint"},
+			[]string{"directly_answer", "request_plan_and_execution", "require_ai_blueprint"},
 		)
 
 		if !baselineResult.asyncTriggerCalled {
@@ -191,7 +191,7 @@ func TestForgeEquivalence_RequireAIBlueprint_vs_LoadCapability(t *testing.T) {
 			forgeName,
 			`{"@action": "load_capability", "identifier": "`+forgeName+`",
 			"human_readable_thought": "loading capability for forge"}`,
-			[]string{"directly_answer", "load_capability"},
+			[]string{"directly_answer", "request_plan_and_execution", "load_capability"},
 		)
 
 		if !loadCapResult.asyncTriggerCalled {
