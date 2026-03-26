@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"fmt"
 	"runtime"
+	"strings"
 	"text/template"
 	"time"
 
@@ -17,6 +18,8 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+const prevUserInputTagMaxBytes = 20 * 1024
 
 func nonce() string {
 	return utils.RandAlphaNumStringBytes(5)
@@ -288,7 +291,9 @@ func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[s
 	result["OSArch"] = fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)
 	result["WorkingDir"] = pm.workdir
 	result["WorkingDirGlance"] = pm.GetGlanceWorkdir(pm.workdir)
-	result["DynamicContext"] = pm.DynamicContext()
+	generatedNonce := nonce()
+	result["Nonce"] = generatedNonce
+	result["DynamicContext"] = pm.DynamicContextWithNonce(generatedNonce)
 	result["Language"] = pm.react.config.GetLanguage()
 
 	taskType := "react"
@@ -377,7 +382,7 @@ func (pm *PromptManager) GenerateToolParamsPromptWithMeta(tool *aitool.Tool) (*T
 		ToolName:        tool.Name,
 		ToolDescription: tool.Description,
 		ToolUsage:       tool.Usage,
-		DynamicContext:  pm.DynamicContext(),
+		DynamicContext:  pm.DynamicContextWithNonce(generatedNonce),
 		Nonce:           generatedNonce, // Generate nonce for AITAG format
 	}
 
@@ -427,7 +432,7 @@ func (pm *PromptManager) GenerateVerificationPrompt(originalQuery string, isTool
 		TodoSnapshot:   pm.react.RenderVerificationTodoSnapshot(),
 		Language:       pm.react.config.GetLanguage(),
 		Schema:         verificationSchemaJSON,
-		DynamicContext: pm.DynamicContext(),
+		DynamicContext: pm.DynamicContextWithNonce(nonce),
 		EnhanceData:    enhanceData,
 	}
 
@@ -483,7 +488,7 @@ func (pm *PromptManager) GenerateDirectlyAnswerPrompt(userQuery string, tools []
 		Tools:          tools,
 		ToolsCount:     len(tools),
 		TopToolsCount:  pm.react.config.GetTopToolsCount(),
-		DynamicContext: pm.DynamicContext(),
+		DynamicContext: pm.DynamicContextWithNonce(nonceString),
 	}
 
 	// Set working directory
@@ -517,8 +522,9 @@ func (pm *PromptManager) GenerateToolReSelectPrompt(noUserInteract bool, oldTool
 		OldTool:        oldTool,
 		ToolList:       toolList,
 		Schema:         getReSelectTool(noUserInteract),
-		DynamicContext: pm.DynamicContext(),
+		DynamicContext: "",
 	}
+	data.DynamicContext = pm.DynamicContextWithNonce(data.Nonce)
 
 	if r := pm.react.GetCurrentTask(); r != nil {
 		data.UserQuery = r.GetUserInput()
@@ -557,7 +563,7 @@ func (pm *PromptManager) GenerateReGenerateToolParamsPromptWithMeta(userQuery st
 		Nonce:          generatedNonce,
 		OldParams:      oldParams.Dump(),
 		Schema:         oldTool.ToJSONSchemaString(),
-		DynamicContext: pm.DynamicContext(),
+		DynamicContext: pm.DynamicContextWithNonce(generatedNonce),
 	}
 
 	// Extract parameter names for AITAG hints
@@ -605,8 +611,9 @@ func (pm *PromptManager) GenerateChangeAIBlueprintPrompt(
 		ExtraPrompt:      extraPrompt,
 		Nonce:            utils.RandStringBytes(4),
 		Language:         pm.react.config.GetLanguage(),
-		DynamicContext:   pm.DynamicContext(),
+		DynamicContext:   "",
 	}
+	data.DynamicContext = pm.DynamicContextWithNonce(data.Nonce)
 
 	if utils.IsNil(oldParams) || len(oldParams) <= 0 {
 		data.OldParams = ""
@@ -642,10 +649,11 @@ func (pm *PromptManager) GenerateAIBlueprintForgeParamsPromptEx(
 		BlueprintName:        ins.ForgeName,
 		BlueprintDescription: ins.Description,
 		BlueprintSchema:      blueprintSchema,
-		DynamicContext:       pm.DynamicContext(),
+		DynamicContext:       "",
 		ExtraPrompt:          extraPrompt,
 		Nonce:                utils.RandStringBytes(4),
 	}
+	data.DynamicContext = pm.DynamicContextWithNonce(data.Nonce)
 	if utils.IsNil(oldParams) || len(oldParams) <= 0 {
 		data.OldParams = ""
 	} else {
@@ -694,7 +702,28 @@ func (pm *PromptManager) executeTemplate(name, templateContent string, data inte
 }
 
 func (pm *PromptManager) DynamicContext() string {
-	return pm.cpm.Execute(pm.react.config, pm.react.config.Emitter)
+	baseContext := pm.cpm.Execute(pm.react.config, pm.react.config.Emitter)
+	historyContext := pm.react.config.FormatUserInputHistory()
+	if baseContext == "" {
+		return historyContext
+	}
+	if historyContext == "" {
+		return baseContext
+	}
+	return baseContext + "\n\n" + historyContext
+}
+
+func (pm *PromptManager) DynamicContextWithNonce(nonce string) string {
+	baseContext := pm.cpm.Execute(pm.react.config, pm.react.config.Emitter)
+	historyContext := pm.react.config.FormatUserInputHistoryAITag(nonce, prevUserInputTagMaxBytes)
+	switch {
+	case strings.TrimSpace(baseContext) == "":
+		return historyContext
+	case strings.TrimSpace(historyContext) == "":
+		return baseContext
+	default:
+		return baseContext + "\n\n" + historyContext
+	}
 }
 
 // IntervalReviewPromptData contains data for interval review prompt template

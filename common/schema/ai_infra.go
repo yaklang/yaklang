@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -46,6 +47,12 @@ type AIAgentRuntime struct {
 	LoadedSkillNames string `json:"loaded_skill_names"`
 }
 
+type AIAgentUserInputRecord struct {
+	Round     int       `json:"round"`
+	Timestamp time.Time `json:"timestamp"`
+	UserInput string    `json:"user_input"`
+}
+
 func (a *AIAgentRuntime) GetTimeline() string {
 	if a == nil {
 		return ""
@@ -57,8 +64,61 @@ func (a *AIAgentRuntime) GetTimeline() string {
 	return result
 }
 
+func (a *AIAgentRuntime) GetUserInputHistory() []AIAgentUserInputRecord {
+	if a == nil {
+		return nil
+	}
+
+	raw := strings.TrimSpace(string(codec.StrConvUnquoteForce(a.QuotedUserInput)))
+	if raw == "" || raw == "[]" {
+		return nil
+	}
+
+	var history []AIAgentUserInputRecord
+	if err := json.Unmarshal([]byte(raw), &history); err == nil && len(history) > 0 {
+		fallbackTs := a.UpdatedAt
+		if fallbackTs.IsZero() {
+			fallbackTs = a.CreatedAt
+		}
+		for i := range history {
+			if history[i].Round <= 0 {
+				history[i].Round = i + 1
+			}
+			if history[i].Timestamp.IsZero() {
+				history[i].Timestamp = fallbackTs
+			}
+		}
+		return history
+	}
+
+	fallbackTs := a.UpdatedAt
+	if fallbackTs.IsZero() {
+		fallbackTs = a.CreatedAt
+	}
+	return []AIAgentUserInputRecord{{
+		Round:     1,
+		Timestamp: fallbackTs,
+		UserInput: raw,
+	}}
+}
+
+func QuoteUserInputHistory(history []AIAgentUserInputRecord) (string, error) {
+	if len(history) == 0 {
+		return codec.StrConvQuote(""), nil
+	}
+	payload, err := json.Marshal(history)
+	if err != nil {
+		return "", err
+	}
+	return codec.StrConvQuote(string(payload)), nil
+}
+
 func (a *AIAgentRuntime) GetUserInput() string {
-	return string(codec.StrConvUnquoteForce(a.QuotedUserInput))
+	history := a.GetUserInputHistory()
+	if len(history) == 0 {
+		return strings.TrimSpace(string(codec.StrConvUnquoteForce(a.QuotedUserInput)))
+	}
+	return history[len(history)-1].UserInput
 }
 
 func (a *AIAgentRuntime) ToGRPC() *ypb.AITask {

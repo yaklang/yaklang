@@ -433,3 +433,112 @@ WAIT_PLAN:
 	log.Infof("  session 1 timeline items: %d", reactIns.getTimelineTotal())
 	log.Infof("  session 2 timeline items: %d", ins2.getTimelineTotal())
 }
+
+// TestReAct_PersistentSession_FreeInput verifies that a user's FreeInput from Round 1
+// is persisted into the Timeline and DB, and can be recovered in Round 2 via:
+//  1. config.PrevSessionUserInput (DB restoration)
+//  2. Timeline dump containing the input text
+func TestReAct_PersistentSession_FreeInput(t *testing.T) {
+	pid := uuid.New().String()
+	round1Input := "first-round-path-/tmp/alpha-" + ksuid.New().String()
+	round2Input := "second-round-path-/tmp/beta-" + ksuid.New().String()
+
+	newAnsweringReAct := func(inputChan chan *ypb.AIInputEvent, outputChan chan *ypb.AIOutputEvent) (*ReAct, error) {
+		return NewTestReAct(
+			aicommon.WithEventInputChan(inputChan),
+			aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
+				select {
+				case outputChan <- e.ToGRPC():
+				default:
+				}
+			}),
+			aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "done"}, "human_readable_thought": "done", "cumulative_summary": "done"}`))
+				rsp.Close()
+				return rsp, nil
+			}),
+			aicommon.WithPersistentSessionId(pid),
+		)
+	}
+
+	waitTaskDone := func(t *testing.T, out chan *ypb.AIOutputEvent) {
+		t.Helper()
+		deadline := time.After(10 * time.Second)
+	forLoop:
+		for {
+			select {
+			case e := <-out:
+				if e.NodeId != "react_task_status_changed" {
+					continue
+				}
+				status := utils.InterfaceToString(jsonpath.FindFirst(e.GetContent(), "$..react_task_now_status"))
+				if status == "completed" || status == "failed" {
+					break forLoop
+				}
+			case <-deadline:
+				t.Fatal("timeout waiting for task completion")
+			}
+		}
+	}
+
+	// Round 1: persist the first user input.
+	in1 := make(chan *ypb.AIInputEvent, 10)
+	out1 := make(chan *ypb.AIOutputEvent, 200)
+	_, err := newAnsweringReAct(in1, out1)
+	require.NoError(t, err)
+	in1 <- &ypb.AIInputEvent{IsFreeInput: true, FreeInput: round1Input}
+	waitTaskDone(t, out1)
+	time.Sleep(3500 * time.Millisecond)
+	close(in1)
+
+	// Round 2: restore round 1, then append round 2.
+	in2 := make(chan *ypb.AIInputEvent, 10)
+	out2 := make(chan *ypb.AIOutputEvent, 200)
+	ins2, err := newAnsweringReAct(in2, out2)
+	require.NoError(t, err)
+
+	history2Before := ins2.config.GetUserInputHistory()
+	require.Len(t, history2Before, 1)
+	assert.Equal(t, 1, history2Before[0].Round)
+	assert.Equal(t, round1Input, history2Before[0].UserInput)
+	assert.False(t, history2Before[0].Timestamp.IsZero())
+	assert.Equal(t, round1Input, ins2.config.PrevSessionUserInput)
+
+	dynamic2 := ins2.promptManager.DynamicContext()
+	assert.Contains(t, dynamic2, "Session User Input History")
+	assert.Contains(t, dynamic2, "Round 1")
+	assert.Contains(t, dynamic2, round1Input)
+	assert.Contains(t, dynamic2, "Time:")
+
+	in2 <- &ypb.AIInputEvent{IsFreeInput: true, FreeInput: round2Input}
+	waitTaskDone(t, out2)
+	time.Sleep(3500 * time.Millisecond)
+	close(in2)
+
+	// Round 3: restore both round 1 and round 2.
+	in3 := make(chan *ypb.AIInputEvent, 10)
+	out3 := make(chan *ypb.AIOutputEvent, 200)
+	ins3, err := newAnsweringReAct(in3, out3)
+	require.NoError(t, err)
+
+	history3 := ins3.config.GetUserInputHistory()
+	require.Len(t, history3, 2)
+	assert.Equal(t, 1, history3[0].Round)
+	assert.Equal(t, round1Input, history3[0].UserInput)
+	assert.False(t, history3[0].Timestamp.IsZero())
+	assert.Equal(t, 2, history3[1].Round)
+	assert.Equal(t, round2Input, history3[1].UserInput)
+	assert.False(t, history3[1].Timestamp.IsZero())
+	assert.Equal(t, round2Input, ins3.config.PrevSessionUserInput)
+
+	dynamic3 := ins3.promptManager.DynamicContext()
+	assert.Contains(t, dynamic3, "Session User Input History")
+	assert.Contains(t, dynamic3, "Round 1")
+	assert.Contains(t, dynamic3, round1Input)
+	assert.Contains(t, dynamic3, "Round 2")
+	assert.Contains(t, dynamic3, round2Input)
+	assert.Contains(t, dynamic3, "Time:")
+
+	close(in3)
+}

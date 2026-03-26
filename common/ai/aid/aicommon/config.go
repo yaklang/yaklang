@@ -140,8 +140,10 @@ type Config struct {
 	SeqIdProvider *utils.AtomicInt64IDProvider
 
 	// session id
-	PersistentSessionId string
-	SessionTitle        string
+	PersistentSessionId  string
+	SessionTitle         string
+	PrevSessionUserInput string // last FreeInput restored from the previous persistent session round
+	UserInputHistory     []schema.AIAgentUserInputRecord
 
 	// memory triage id
 	MemoryTriageId string
@@ -2235,6 +2237,121 @@ func (c *Config) AcquireId() int64 {
 	return c.SeqIdProvider.NewID()
 }
 
+func (c *Config) GetUserInputHistory() []schema.AIAgentUserInputRecord {
+	if len(c.UserInputHistory) == 0 {
+		return nil
+	}
+	history := make([]schema.AIAgentUserInputRecord, len(c.UserInputHistory))
+	copy(history, c.UserInputHistory)
+	return history
+}
+
+func (c *Config) SetUserInputHistory(history []schema.AIAgentUserInputRecord) {
+	if len(history) == 0 {
+		c.UserInputHistory = nil
+		c.PrevSessionUserInput = ""
+		return
+	}
+	cloned := make([]schema.AIAgentUserInputRecord, len(history))
+	copy(cloned, history)
+	c.UserInputHistory = cloned
+	c.PrevSessionUserInput = cloned[len(cloned)-1].UserInput
+}
+
+func (c *Config) AppendUserInputHistory(userInput string, timestamp time.Time) (string, error) {
+	history := c.GetUserInputHistory()
+	history = append(history, schema.AIAgentUserInputRecord{
+		Round:     len(history) + 1,
+		Timestamp: timestamp,
+		UserInput: userInput,
+	})
+	c.SetUserInputHistory(history)
+	return schema.QuoteUserInputHistory(history)
+}
+
+func (c *Config) FormatUserInputHistory() string {
+	history := c.GetUserInputHistory()
+	if len(history) == 0 {
+		return ""
+	}
+	entries := c.formatUserInputHistoryEntries()
+	var builder strings.Builder
+	builder.WriteString("# Session User Input History\n")
+	for _, entry := range entries {
+		builder.WriteString(entry)
+	}
+	return builder.String()
+}
+
+func (c *Config) FormatUserInputHistoryAITag(nonce string, maxBytes int) string {
+	body := c.formatUserInputHistoryForPrompt(maxBytes)
+	if body == "" || strings.TrimSpace(nonce) == "" {
+		return body
+	}
+	return fmt.Sprintf("<|PREV_USER_INPUT_%s|>\n%s\n<|PREV_USER_INPUT_END_%s|>", nonce, body, nonce)
+}
+
+func (c *Config) formatUserInputHistoryEntries() []string {
+	history := c.GetUserInputHistory()
+	if len(history) == 0 {
+		return nil
+	}
+	entries := make([]string, 0, len(history))
+	for _, item := range history {
+		timestamp := "unknown"
+		if !item.Timestamp.IsZero() {
+			timestamp = item.Timestamp.Format("2006-01-02 15:04:05")
+		}
+		entries = append(entries, fmt.Sprintf("- Round %d | Time: %s | User Input: %s\n", item.Round, timestamp, item.UserInput))
+	}
+	return entries
+}
+
+func (c *Config) formatUserInputHistoryForPrompt(maxBytes int) string {
+	entries := c.formatUserInputHistoryEntries()
+	if len(entries) == 0 {
+		return ""
+	}
+	header := "# Session User Input History\n"
+	if maxBytes <= 0 {
+		return header + strings.Join(entries, "")
+	}
+
+	marker := "[TRUNCATED_HEAD]\n"
+	remaining := maxBytes - len(header)
+	if remaining <= 0 {
+		return header
+	}
+
+	selected := make([]string, 0, len(entries))
+	truncated := false
+	for i := len(entries) - 1; i >= 0; i-- {
+		entry := entries[i]
+		needed := len(entry)
+		if truncated {
+			needed += len(marker)
+		}
+		if needed <= remaining {
+			selected = append([]string{entry}, selected...)
+			remaining -= len(entry)
+			continue
+		}
+
+		keep := remaining
+		if !truncated {
+			keep -= len(marker)
+		}
+		if keep > 0 {
+			entry = marker + entry[len(entry)-keep:]
+			selected = append([]string{entry}, selected...)
+		}
+		truncated = true
+		break
+	}
+
+	return header + strings.Join(selected, "")
+}
+
 func (c *Config) GetRuntimeId() string {
 	return c.Id
 }
@@ -2520,6 +2637,12 @@ func (c *Config) restorePersistentSession() {
 			c.restoredSkillNames = trimmed
 			log.Infof("restored %d loaded skill names from persistent session [%s]: %v", len(trimmed), c.PersistentSessionId, trimmed)
 		}
+	}
+
+	if history := runtime.GetUserInputHistory(); len(history) > 0 {
+		c.SetUserInputHistory(history)
+		log.Infof("restored %d user input history entries from session [%s], latest: %.80s",
+			len(history), c.PersistentSessionId, c.PrevSessionUserInput)
 	}
 
 	c.InitStatus.SetPersistentSessionRestored(true)
