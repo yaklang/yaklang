@@ -353,7 +353,7 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 	if t.generateToolParamsBuilderWithMeta != nil {
 		promptMeta, err = t.generateToolParamsBuilderWithMeta(tool, tool.Name)
 		if err != nil {
-			emitter.EmitError("error generate tool[%v] params with meta in task: %v", tool.Name, t.task.GetName())
+			emitter.EmitError("error generate tool[%v] params with meta in task: %v, err: %v", tool.Name, t.task.GetName(), err)
 			handleError(fmt.Sprintf("error generate tool[%v] params with meta in task: %v", tool.Name, t.task.GetName()))
 			return nil, err
 		}

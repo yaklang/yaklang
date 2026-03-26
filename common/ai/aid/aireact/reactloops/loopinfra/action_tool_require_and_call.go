@@ -2,6 +2,7 @@ package loopinfra
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -12,11 +13,11 @@ import (
 
 var loopAction_toolRequireAndCall = &reactloops.LoopAction{
 	ActionType:  schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL,
-	Description: "Require tool call",
+	Description: "申请工具调用，执行这个 @action 会进入工具申请流程，查看工具教程以及文档，来生成参数",
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
 			"tool_require_payload",
-			aitool.WithParam_Description("USE THIS FIELD ONLY IF type is 'require_tool'. Provide the exact name of the tool you need to use (e.g., 'check-yaklang-syntax' for .yak, 'check-syntaxflow-syntax' for .sf, 'yak-document'). Another system will handle the parameter generation based on this name. Do NOT include tool arguments here."),
+			aitool.WithParam_Description(`MUST set in {"@action": "require_tool", ... }. 根据上下文信息，提供你想要申请的工具名，只说明工具名即可，严禁包含参数.`),
 		),
 	},
 	ActionVerifier: func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
@@ -42,6 +43,34 @@ var loopAction_toolRequireAndCall = &reactloops.LoopAction{
 		if t != nil {
 			ctx = t.GetContext()
 		}
+
+		// loading file or tool
+		pr, pw := utils.NewPipe()
+		pw.WriteString("loading tool: ")
+		pw.WriteString(toolPayload)
+		pw.WriteString("...")
+		closeOnce := new(sync.Once)
+		closeStatusPipe := func() {
+			closeOnce.Do(func() {
+				pw.Close()
+			})
+		}
+		loop.GetEmitter().EmitDefaultStreamEvent("load_tool", pr, operator.GetTask().GetId())
+		defer closeStatusPipe()
+
+		toolIns, err := loop.GetConfig().GetAiToolManager().GetToolByName(toolPayload)
+		if err != nil {
+			pw.WriteString(fmt.Sprintf("Error: %v", err.Error()))
+		} else {
+			pw.WriteString(utils.MustRenderTemplate(
+				`done! {{ .Name }}{{ if .VerboseName}}({{.VerboseName}}){{ end }} is prepared`,
+				map[string]interface{}{
+					"Name":        toolIns.GetName(),
+					"VerboseName": toolIns.GetVerboseName(),
+				}),
+			)
+		}
+
 		result, directly, err := invoker.ExecuteToolRequiredAndCall(ctx, toolPayload)
 		if err != nil {
 			// Record the error in timeline and allow AI to retry with a different tool or approach

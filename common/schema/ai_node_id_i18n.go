@@ -89,6 +89,10 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "加载能力",
 		En: "Loading Capabilities",
 	},
+	"load_tool": {
+		Zh: "加载工具",
+		En: "Loading Tools",
+	},
 	"loading_skills_name": {
 		Zh: "加载技能",
 		En: "Loading Skills",
@@ -186,7 +190,7 @@ var nodeIdMapper = map[string]*I18n{
 		En: "Next Movements",
 	},
 	"next_movements_snapshot": {
-		Zh: "待办事务",
+		Zh: "待办",
 		En: "TODO",
 	},
 	"delivery_files_snapshot": {

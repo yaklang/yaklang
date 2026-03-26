@@ -14,10 +14,6 @@ Blueprint Description: {{ .BlueprintDescription }}
 User's original request: {{ .OriginalQuery }}
 {{ end }}
 
-{{ if .CumulativeSummary }}# Task Context & Memory
-Overall task context: {{ .CumulativeSummary }}
-{{ end }}
-
 {{ if .OldParams }}<|OLD_PARAMS_{{ .Nonce }}|>
 {{ .OldParams }}
 <|OLD_PARAMS_END{{ .Nonce }}|>{{ end }}{{ if .ExtraPrompt }}

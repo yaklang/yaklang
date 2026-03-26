@@ -14,10 +14,6 @@ You have access to {{ .ToolsCount }} built-in tools. Here are the top {{ .TopToo
 Use 'tools_search' to discover additional tools for specific tasks.
 {{ end }}
 
-{{ if .ConversationMemory }}# Conversation Memory
-{{ .ConversationMemory }}
-{{ end }}
-
 {{ if .Timeline }}# Timeline Memory
 {{ .Timeline }}
 {{ end }}

@@ -65,10 +65,6 @@ var (
 type ReAct struct {
 	*aicommon.Emitter
 
-	// runtime fields
-	cumulativeSummary            string // Cumulative summary for conversation memory
-	cumulativeSummaryHandleQueue *chanx.UnlimitedChan[func() string]
-
 	currentIteration            int
 	currentUserInteractiveCount int64 // 当前用户交互次数
 	knowledgeEmitCounter        int   // Counter for knowledge emit events
@@ -142,16 +138,6 @@ func (r *ReAct) SaveTimeline() {
 			log.Debugf("ReAct: save timeline to db success timeline last updated time: %v", last1[0].Timestamp.String())
 		}
 	})
-}
-
-func (r *ReAct) PushCumulativeSummaryHandle(f func() string) {
-	if r == nil {
-		return
-	}
-	if r.cumulativeSummaryHandleQueue != nil {
-		r.cumulativeSummaryHandleQueue.SafeFeed(f)
-	}
-	return
 }
 
 func (r *ReAct) DumpTimeline() string {
@@ -381,26 +367,6 @@ func (r *ReAct) getTimelineTotal() int {
 func (r *ReAct) startQueueProcessor(ctx context.Context, done chan struct{}) {
 	closeDoneOnce := new(sync.Once)
 	r.queueProcessor.Do(func() {
-		go func() {
-			r.cumulativeSummaryHandleQueue = chanx.NewUnlimitedChan[func() string](ctx, 100)
-			for {
-				select {
-				case f, ok := <-r.cumulativeSummaryHandleQueue.OutputChannel():
-					if !ok {
-						return
-					}
-					if f != nil {
-						s := f()
-						if s != "" {
-							r.cumulativeSummary = s
-						}
-					}
-				case <-ctx.Done():
-					return
-				}
-			}
-		}()
-
 		go func() {
 			defer func() {
 				closeDoneOnce.Do(func() {

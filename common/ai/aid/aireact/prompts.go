@@ -88,42 +88,40 @@ type LoopPromptData struct {
 	AskForClarificationCurrentTime int64
 	AskForClarificationMaxTimes    int64
 
-	CurrentTime        string
-	OSArch             string
-	WorkingDir         string
-	WorkingDirGlance   string
-	AIForgeList        string
-	ShowForgeList      bool
-	Tools              []*aitool.Tool
-	ToolsCount         int
-	TopTools           []*aitool.Tool
-	TopToolsCount      int
-	HasMoreTools       bool
-	ConversationMemory string
-	Timeline           string
-	UserQuery          string
-	Nonce              string
-	Language           string
-	Schema             string
-	DynamicContext     string
-	TaskType           string
-	ForgeName          string
+	CurrentTime      string
+	OSArch           string
+	WorkingDir       string
+	WorkingDirGlance string
+	AIForgeList      string
+	ShowForgeList    bool
+	Tools            []*aitool.Tool
+	ToolsCount       int
+	TopTools         []*aitool.Tool
+	TopToolsCount    int
+	HasMoreTools     bool
+	Timeline         string
+	UserQuery        string
+	Nonce            string
+	Language         string
+	Schema           string
+	DynamicContext   string
+	TaskType         string
+	ForgeName        string
 }
 
 // ToolParamsPromptData contains data for tool parameter generation prompt
 type ToolParamsPromptData struct {
-	ToolName          string
-	ToolDescription   string
-	ToolUsage         string // Usage instructions disclosed at param generation stage (2-phase disclosure)
-	ToolSchema        string
-	OriginalQuery     string
-	CumulativeSummary string
-	CurrentIteration  int
-	MaxIterations     int
-	Timeline          string
-	DynamicContext    string
-	Nonce             string   // Nonce for AITAG format
-	ParamNames        []string // List of parameter names for AITAG hints
+	ToolName         string
+	ToolDescription  string
+	ToolUsage        string // Usage instructions disclosed at param generation stage (2-phase disclosure)
+	ToolSchema       string
+	OriginalQuery    string
+	CurrentIteration int
+	MaxIterations    int
+	Timeline         string
+	DynamicContext   string
+	Nonce            string   // Nonce for AITAG format
+	ParamNames       []string // List of parameter names for AITAG hints
 }
 
 // VerificationPromptData contains data for verification prompt
@@ -142,70 +140,66 @@ type VerificationPromptData struct {
 
 // AIReviewPromptData contains data for AI tool call review prompt
 type AIReviewPromptData struct {
-	CurrentTime        string
-	OSArch             string
-	WorkingDir         string
-	WorkingDirGlance   string
-	ConversationMemory string
-	Timeline           string
-	Nonce              string
-	UserQuery          string
-	Title              string
-	Details            string
-	Language           string
+	CurrentTime      string
+	OSArch           string
+	WorkingDir       string
+	WorkingDirGlance string
+	Timeline         string
+	Nonce            string
+	UserQuery        string
+	Title            string
+	Details          string
+	Language         string
 }
 
 // DirectlyAnswerPromptData contains data for directly answer prompt template
 type DirectlyAnswerPromptData struct {
-	AllowPlan          bool
-	CurrentTime        string
-	OSArch             string
-	WorkingDir         string
-	WorkingDirGlance   string
-	Tools              []*aitool.Tool
-	ToolsCount         int
-	TopTools           []*aitool.Tool
-	TopToolsCount      int
-	HasMoreTools       bool
-	ConversationMemory string
-	Timeline           string
-	UserQuery          string
-	Nonce              string
-	Language           string
-	Schema             string
-	DynamicContext     string
+	AllowPlan        bool
+	CurrentTime      string
+	OSArch           string
+	WorkingDir       string
+	WorkingDirGlance string
+	Tools            []*aitool.Tool
+	ToolsCount       int
+	TopTools         []*aitool.Tool
+	TopToolsCount    int
+	HasMoreTools     bool
+	Timeline         string
+	UserQuery        string
+	Nonce            string
+	Language         string
+	Schema           string
+	DynamicContext   string
 }
 
 // ToolReSelectPromptData contains data for tool reselection prompt template
 type ToolReSelectPromptData struct {
-	CurrentTime        string
-	OSArch             string
-	WorkingDir         string
-	WorkingDirGlance   string
-	ConversationMemory string
-	Timeline           string
-	UserQuery          string
-	Nonce              string
-	OldTool            *aitool.Tool
-	ToolList           []*aitool.Tool
-	Schema             string
-	DynamicContext     string
+	CurrentTime      string
+	OSArch           string
+	WorkingDir       string
+	WorkingDirGlance string
+	Timeline         string
+	UserQuery        string
+	Nonce            string
+	OldTool          *aitool.Tool
+	ToolList         []*aitool.Tool
+	Schema           string
+	DynamicContext   string
 }
 
 // ReGenerateToolParamsPromptData contains data for tool parameter regeneration prompt template
 type ReGenerateToolParamsPromptData struct {
-	CurrentTime        string
-	OSArch             string
-	WorkingDir         string
-	WorkingDirGlance   string
-	ConversationMemory string
-	Timeline           string
-	UserQuery          string
-	Nonce              string
-	OldParams          string
-	Schema             string
-	DynamicContext     string
-	ParamNames         []string // List of parameter names for AITAG hints
+	CurrentTime      string
+	OSArch           string
+	WorkingDir       string
+	WorkingDirGlance string
+	Timeline         string
+	UserQuery        string
+	Nonce            string
+	OldParams        string
+	Schema           string
+	DynamicContext   string
+	ParamNames       []string // List of parameter names for AITAG hints
 }
 
 // AIBlueprintForgeParamsPromptData contains data for AI blueprint forge parameter generation prompt
@@ -214,7 +208,6 @@ type AIBlueprintForgeParamsPromptData struct {
 	BlueprintDescription string
 	BlueprintSchema      string
 	OriginalQuery        string
-	CumulativeSummary    string
 	CurrentIteration     int
 	MaxIterations        int
 	Timeline             string
@@ -226,20 +219,19 @@ type AIBlueprintForgeParamsPromptData struct {
 
 // ChangeAIBlueprintPromptData contains data for changing AI blueprint prompt template
 type ChangeAIBlueprintPromptData struct {
-	CurrentTime        string
-	OSArch             string
-	WorkingDir         string
-	WorkingDirGlance   string
-	ConversationMemory string
-	Timeline           string
-	Nonce              string
-	UserQuery          string
-	CurrentBlueprint   *schema.AIForge
-	ForgeList          string
-	OldParams          string
-	ExtraPrompt        string
-	Language           string
-	DynamicContext     string
+	CurrentTime      string
+	OSArch           string
+	WorkingDir       string
+	WorkingDirGlance string
+	Timeline         string
+	Nonce            string
+	UserQuery        string
+	CurrentBlueprint *schema.AIForge
+	ForgeList        string
+	OldParams        string
+	ExtraPrompt      string
+	Language         string
+	DynamicContext   string
 }
 
 // YaklangCodeActionLoopPromptData contains data for Yaklang code generation action loop prompt
@@ -248,7 +240,6 @@ type YaklangCodeActionLoopPromptData struct {
 	OSArch                    string
 	WorkingDir                string
 	WorkingDirGlance          string
-	ConversationMemory        string
 	Timeline                  string
 	Nonce                     string
 	UserQuery                 string
@@ -353,7 +344,6 @@ func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[s
 		}
 	}
 
-	result["ConversationMemory"] = pm.react.cumulativeSummary
 	// use timeline getter
 	if t := pm.react.config.GetTimeline(); t != nil {
 		result["Timeline"] = t.Dump()
@@ -410,7 +400,6 @@ func (pm *PromptManager) GenerateToolParamsPromptWithMeta(tool *aitool.Tool) (*T
 		}
 		data.Timeline = t.Dump()
 	}
-	data.CumulativeSummary = pm.react.cumulativeSummary
 	data.CurrentIteration = pm.react.currentIteration
 	data.MaxIterations = int(pm.react.config.GetMaxIterations())
 
@@ -469,11 +458,6 @@ func (pm *PromptManager) GenerateAIReviewPrompt(userQuery, toolOrTitle, params s
 		data.WorkingDirGlance = pm.GetGlanceWorkdir(data.WorkingDir)
 	}
 
-	// Set conversation memory
-	if pm.react.cumulativeSummary != "" {
-		data.ConversationMemory = pm.react.cumulativeSummary
-	}
-
 	// Set timeline memory
 	if t := pm.react.config.GetTimeline(); t != nil {
 		data.Timeline = t.Dump()
@@ -514,11 +498,6 @@ func (pm *PromptManager) GenerateDirectlyAnswerPrompt(userQuery string, tools []
 		data.HasMoreTools = len(tools) > len(data.TopTools)
 	}
 
-	// Set conversation memory
-	if pm.react.cumulativeSummary != "" {
-		data.ConversationMemory = pm.react.cumulativeSummary
-	}
-
 	// Set timeline memory
 	if t := pm.react.config.GetTimeline(); t != nil {
 		data.Timeline = t.Dump()
@@ -549,11 +528,6 @@ func (pm *PromptManager) GenerateToolReSelectPrompt(noUserInteract bool, oldTool
 	data.WorkingDir = pm.workdir
 	if data.WorkingDir != "" {
 		data.WorkingDirGlance = pm.GetGlanceWorkdir(data.WorkingDir)
-	}
-
-	// Set conversation memory
-	if pm.react.cumulativeSummary != "" {
-		data.ConversationMemory = pm.react.cumulativeSummary
 	}
 
 	// Set timeline memory
@@ -598,11 +572,6 @@ func (pm *PromptManager) GenerateReGenerateToolParamsPromptWithMeta(userQuery st
 	data.WorkingDir = pm.workdir
 	if data.WorkingDir != "" {
 		data.WorkingDirGlance = pm.GetGlanceWorkdir(data.WorkingDir)
-	}
-
-	// Set conversation memory
-	if pm.react.cumulativeSummary != "" {
-		data.ConversationMemory = pm.react.cumulativeSummary
 	}
 
 	// Set timeline memory
@@ -651,11 +620,6 @@ func (pm *PromptManager) GenerateChangeAIBlueprintPrompt(
 		data.WorkingDirGlance = pm.GetGlanceWorkdir(data.WorkingDir)
 	}
 
-	// Set conversation memory
-	if pm.react.cumulativeSummary != "" {
-		data.ConversationMemory = pm.react.cumulativeSummary
-	}
-
 	// Set timeline memory
 	if t := pm.react.config.GetTimeline(); t != nil {
 		data.Timeline = t.Dump()
@@ -695,7 +659,6 @@ func (pm *PromptManager) GenerateAIBlueprintForgeParamsPromptEx(
 		}
 		data.Timeline = t.Dump()
 	}
-	data.CumulativeSummary = pm.react.cumulativeSummary
 	data.CurrentIteration = pm.react.currentIteration
 	data.MaxIterations = int(pm.react.config.GetMaxIterations())
 	return pm.executeTemplate("blueprint-params", blueprintParamsPromptTemplate, data)
