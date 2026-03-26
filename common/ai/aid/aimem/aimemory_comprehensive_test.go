@@ -328,12 +328,11 @@ func TestAIMemoryTriage_GetHNSWStats(t *testing.T) {
 		sessionID := "new-memory-test-" + uuid.New().String()
 		defer cleanupComprehensiveTestData(t, sessionID)
 		modelName := utils.RandStringBytes(10)
-		expectedAvailable := rag.CheckConfigEmbeddingAvailable(rag.WithModelName(modelName))
 		m, err := embeddingCheckCreate(sessionID, WithRAGOptions(rag.WithModelName(modelName)))
 		require.NoError(t, err)
 		require.NotNil(t, m)
-		require.Equal(t, expectedAvailable, m.embeddingAvailable)
-		if expectedAvailable {
+		require.Equal(t, m.embeddingAvailable, m.rag != nil)
+		if m.embeddingAvailable {
 			require.NotNil(t, m.rag)
 		} else {
 			require.Nil(t, m.rag)

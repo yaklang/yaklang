@@ -22,14 +22,14 @@ func mockedClarification(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, f
 
 	fmt.Println("===========" + "request:" + "===========\n" + req.GetPrompt())
 
-	if strings.Contains(prompt, "意图识别与上下文增强系统") {
+	if isIntentEnrichmentPrompt(prompt) {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finalize_enrichment", "intent_summary": "mocked intent analysis", "recommended_capabilities": "", "context_notes": ""}`))
 		rsp.Close()
 		return rsp, nil
 	}
 
-	if strings.Contains(prompt, "数据处理和总结提示小助手") {
+	if isMemorySummaryPrompt(prompt) {
 		rsp := i.NewAIResponse()
 		if strings.Contains(prompt, "tag-selection") {
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "tag-selection", "tags": ["test"]}`))
@@ -42,7 +42,7 @@ func mockedClarification(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, f
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(prompt, "plan: when user needs to create or refine a plan for a specific task") {
+	if isPlanPrompt(prompt) {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(strings.NewReader(`
 {
@@ -66,7 +66,7 @@ func mockedClarification(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, f
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(prompt, "directly_answer", "require_tool", "ask_for_clarification") {
+	if isNextActionDecisionPrompt(prompt) && strings.Contains(prompt, "ask_for_clarification") {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "ask_for_clarification", "ask_for_clarification_payload": {"question": "...mocked question...", "options": ["` + flag + `", "option2", "option3"]} },
@@ -76,14 +76,14 @@ func mockedClarification(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, f
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(prompt, "short_summary") {
+	if isSummaryPrompt(prompt) {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "summary","task_short_summary":"mock"}`))
 		rsp.Close()
 		return rsp, nil
 	}
 
-	return nil, utils.Errorf("unexpected prompt: %s", prompt)
+	return nil, unexpectedPromptError(prompt)
 }
 
 func TestCoodinator_AllowRequireForUserInteract_UserAct(t *testing.T) {
