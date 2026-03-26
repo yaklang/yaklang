@@ -45,9 +45,11 @@ Required:
 
 Conditional:
   url       (string)  URL for op=open/tab_new
-  target    (string)  @eN ref OR CSS selector for op=click/fill
+  target    (string)  @eN ref OR CSS selector for op=click/fill/drag/setfiles/hover/select/check/uncheck/scrollintoview
                       Examples: "@e1", "input[name=username]", "#login-btn", "button[type=submit]"
-  value     (string)  Text for op=fill/type
+  source    (string)  @eN ref OR CSS selector for op=drag that is element drag from
+                      Examples: "@e1", "input[name=username]", "#login-btn", "button[type=submit]"
+  value     (string)  Text for op=fill/type/setfiles/select/press
   subop     (string)  Sub-op for "get": title, url, html, text, cookies
   js        (string)  JavaScript for op=eval. Use AITAG for multi-line JS.
 
@@ -55,8 +57,8 @@ Optional:
   timeout   (int)     Timeout in seconds. Default: 30.
   session   (string)  Session ID. Default: "ai-browser".
   headless  (string)  "no" (default, visible browser) or "yes" (headless).
-  wait-type (string)  "selector", "visible", or "ms" for op=wait
-  wait-value(string)  CSS selector or ms value for op=wait
+  wait-type (string)  "selector", "visible", "ms", "text" or "js" for op=wait
+  wait-value(string)  CSS selector, ms value, html body text or js condition for op=wait
   tab-index (string)  Tab index for tab_switch/tab_close
 
 ## JavaScript-First Strategy (RECOMMENDED for Login/Form Pages)
@@ -235,16 +237,17 @@ USAGE_BLOCK
 yakit.AutoInitYakit()
 
 // ========== CLI Parameters ==========
-op = cli.String("op", cli.setRequired(true), cli.setHelp("browser operation: open/snapshot/click/fill/type/get/wait/screenshot/eval/back/forward/reload/close/tab_list/tab_new/tab_switch/tab_close"))
+op = cli.String("op", cli.setRequired(true), cli.setHelp("browser operation: open/snapshot/click/fill/type/get/wait/screenshot/eval/back/forward/reload/close/tab_list/tab_new/tab_switch/tab_close/drag/setfiles/hover/select/check/uncheck/scrollintoview/press"))
 url = cli.String("url", cli.setRequired(false), cli.setHelp("URL for open/tab_new operations"))
-target = cli.String("target", cli.setRequired(false), cli.setHelp("element ref (@eN) or CSS selector for click/fill"))
-value = cli.String("value", cli.setRequired(false), cli.setHelp("text value for fill/type"))
+target = cli.String("target", cli.setRequired(false), cli.setHelp("element ref (@eN) or CSS selector for click/fill/drag/setfiles/hover/select/check/uncheck/scrollintoview"))
+source = cli.String("source", cli.setRequired(false), cli.setHelp("element ref (@eN) or CSS selector for drag"))
+value = cli.String("value", cli.setRequired(false), cli.setHelp("text value for fill/type/setfiles/select/press"))
 subop = cli.String("subop", cli.setRequired(false), cli.setHelp("sub-operation for get: title/url/html/text/cookies"))
 js = cli.String("js", cli.setRequired(false), cli.setHelp("JavaScript code for eval operation. Use AITAG for multi-line scripts."))
 session = cli.String("session", cli.setRequired(false), cli.setHelp("browser session ID for instance reuse"), cli.setDefault("ai-browser"))
 headless = cli.String("headless", cli.setRequired(false), cli.setHelp("yes/no to show browser window (default: no, visible)"), cli.setDefault("no"))
 timeoutSeconds = cli.Int("timeout", cli.setRequired(false), cli.setHelp("browser timeout in seconds"), cli.setDefault(30))
-waitType = cli.String("wait-type", cli.setRequired(false), cli.setHelp("wait condition: selector/visible/ms"))
+waitType = cli.String("wait-type", cli.setRequired(false), cli.setHelp("wait condition: selector/visible/ms/text/js"))
 waitValue = cli.String("wait-value", cli.setRequired(false), cli.setHelp("wait condition value"))
 tabIndex = cli.String("tab-index", cli.setRequired(false), cli.setHelp("tab index for tab_switch/tab_close"))
 
@@ -553,8 +556,35 @@ case "wait":
         sleep(float64(ms) / 1000.0)
         yakit.Info("waited %vms", ms)
 
+    // wait for text appear in html body
+    case "text":
+        page, err = getPage()
+        if err != nil {
+            return
+        }
+        err = page.WaitText(waitValue)
+        if err != nil {
+            yakit.Error("wait for text %v failed: %v", waitValue, err)
+            return
+        }
+        yakit.Info("text %v is now in html body", waitValue)
+
+    // wait for js condition
+    case "js":
+        page, err = getPage()
+        if err != nil {
+            return
+        }
+        err = page.WaitFunction(waitValue)
+        if err != nil {
+            yakit.Error("wait for js condition %v failed: %v", waitValue, err)
+            return
+        }
+        yakit.Info("js condition %v satisfied!", waitValue)
+
+
     default:
-        yakit.Error("unknown wait-type: %v (supported: selector, visible, ms)", waitType)
+        yakit.Error("unknown wait-type: %v (supported: selector, visible, ms, text, js)", waitType)
     }
 
 case "screenshot":
@@ -739,6 +769,160 @@ case "tab_close":
     }
     yakit.Info("tab %v closed", idx)
 
+case "drag":
+    // source 拖动来源
+    if source == "" {
+        yakit.Error("op=drag requires --target parameter (e.g. @e1 or CSS selector)")
+        return
+    }
+    // source 拖动目标
+    if target == "" {
+        yakit.Error("op=drag requires --target parameter (e.g. @e1 or CSS selector)")
+        return
+    }
+    page, err = getPage()
+    if err != nil {
+        return
+    }
+    err = page.Drag(source, target)
+    if err != nil {
+        yakit.Error("drag from %v to %v failed: %v", source, target, err)
+        return
+    }
+    yakit.Info("drag from %v to %v (both @eN refs and CSS selectors like 'button[type=submit]' are supported as target)", source, target)
+    sleep(0.5)
+
+    // 点击后自动 snapshot 以获取新的引用
+    snap, snapErr = page.Snapshot()
+    if snapErr == nil {
+        snapText = snap.Text
+        if len(snapText) > 3000 {
+            snapText = snapText[:3000] + "\n... (truncated)"
+        }
+        yakit.Info("post-click snapshot (%v nodes, %v refs):\n%v", snap.NodeCount, snap.RefMap.Count(), snapText)
+    }
+
+case "setfiles":
+    if target == "" {
+        yakit.Error("op=setfiles requires --target parameter (e.g. @e1 or CSS selector)")
+        return
+    }
+    if value == "" {
+        yakit.Error("op=setfiles requires --value parameter (e.g. /tmp/1.txt)")
+        return
+    }
+    page, err = getPage()
+    if err != nil {
+        return
+    }
+    err = page.Upload(target, value)
+    if err != nil {
+        yakit.Error("set %v upload file %v failed: %v", target, value, err)
+        return
+    }
+    yakit.Info("set %v upload file %v", target, value)
+
+case "hover":
+    if target == "" {
+        yakit.Error("op=hover requires --target parameter (e.g. @e1 or CSS selector)")
+        return
+    }
+    page, err = getPage()
+    if err != nil {
+        return
+    }
+    err = page.Hover(target)
+    if err != nil {
+        yakit.Error("hover %v failed: %v", target, err)
+        return
+    }
+    yakit.Info("%v hovered", target)
+
+case "select":
+    if target == "" {
+        yakit.Error("op=select requires --target parameter (e.g. @e1 or CSS selector)")
+        return
+    }
+    if value == "" {
+        yakit.Error("op=select requires --value parameter (e.g. optionA)")
+        return
+    }
+    page, err = getPage()
+    if err != nil {
+        return
+    }
+    err = page.Select(target, value)
+    if err != nil {
+        yakit.Error("element %v select %v failed: %v", target, value, err)
+        return
+    }
+    yakit.Info("element %v %v selected", target, value)
+
+case "check":
+    if target == "" {
+        yakit.Error("op=check requires --target parameter (e.g. @e1 or CSS selector)")
+        return
+    }
+    page, err = getPage()
+    if err != nil {
+        return
+    }
+    err = page.Check(target)
+    if err != nil {
+        yakit.Error("check %v failed: %v", target, err)
+        return
+    }
+    yakit.Info("%v checked", target)
+
+case "uncheck":
+    if target == "" {
+        yakit.Error("op=uncheck requires --target parameter (e.g. @e1 or CSS selector)")
+        return
+    }
+    page, err = getPage()
+    if err != nil {
+        return
+    }
+    err = page.UnCheck(target)
+    if err != nil {
+        yakit.Error("uncheck %v failed: %v", target, err)
+        return
+    }
+    yakit.Info("%v unchecked", target)
+
+case "scrollintoview":
+    if target == "" {
+        yakit.Error("op=scrollintoview requires --target parameter (e.g. @e1 or CSS selector)")
+        return
+    }
+    page, err = getPage()
+    if err != nil {
+        return
+    }
+    err = page.ScrollIntoView(target)
+    if err != nil {
+        yakit.Error("scrollintoview %v failed: %v", target, err)
+        return
+    }
+    yakit.Info("%v scrollintoview done", target)
+
+case "press":
+    // 支持功能键 例如f1-f12,enter,control/ctrl等
+    if value == "" {
+        yakit.Error("op=press requires --value parameter (e.g. ctrl)")
+        return
+    }
+    page, err = getPage()
+    if err != nil {
+        return
+    }
+    err = page.Press(value)
+    if err != nil {
+        yakit.Error("press %v failed: %v", value, err)
+        return
+    }
+    yakit.Info("press %v done", value)
+
 default:
-    yakit.Error("unknown op: %v. Supported: open, snapshot, click, fill, type, get, wait, screenshot, eval, back, forward, reload, close, tab_list, tab_new, tab_switch, tab_close", op)
+    yakit.Error("unknown op: %v. Supported: open, snapshot, click, fill, type, get, wait, screenshot, eval, back, forward, reload, close, tab_list, tab_new, tab_switch, tab_close, drag, setfiles, hover, select, check, uncheck, scrollintoview, press", op)
 }
