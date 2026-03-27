@@ -21,7 +21,7 @@ func queryForge(ctx context.Context, client ypb.YakClient, filter *ypb.AIForgeFi
 	return resp.GetData(), err
 }
 
-func TestAIForgeBaseCurd(t *testing.T) {
+func TestGRPCMUSTPASS_AIForge_BaseCRUD(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
@@ -95,7 +95,7 @@ func TestAIForgeBaseCurd(t *testing.T) {
 	require.Len(t, forge, 0)
 }
 
-func TestGetAIForgeByName(t *testing.T) {
+func TestGRPCMUSTPASS_AIForge_GetByName(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -126,7 +126,7 @@ func TestGetAIForgeByName(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestUpdateAIForgeWithZeroField(t *testing.T) {
+func TestGRPCMUSTPASS_AIForge_UpdateWithZeroField(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -162,7 +162,7 @@ func TestUpdateAIForgeWithZeroField(t *testing.T) {
 	require.Equal(t, "", forge.ForgeContent)
 }
 
-func TestUpdateAIForge_EmptyFieldsOverrideMetadata(t *testing.T) {
+func TestGRPCMUSTPASS_AIForge_UpdateEmptyFieldsOverrideMetadata(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -213,7 +213,7 @@ query = cli.String("query", cli.setRequired(true))`
 	require.Len(t, forge.Tag, 0)
 }
 
-func TestAIForgeSkillPathRoundTrip(t *testing.T) {
+func TestGRPCMUSTPASS_AIForge_SkillPathRoundTrip(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -276,7 +276,7 @@ func TestAIForgeSkillPathRoundTrip(t *testing.T) {
 	require.True(t, os.IsNotExist(err))
 }
 
-func TestAIForgeSkillPathSaveSyncsSkillMD(t *testing.T) {
+func TestGRPCMUSTPASS_AIForge_SkillPathSaveSyncsSkillMD(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

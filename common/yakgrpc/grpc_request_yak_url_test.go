@@ -23,7 +23,7 @@ func ExtraKVPairsToMap(pairs []*ypb.KVPair) map[string]string {
 	return m
 }
 
-func TestRequestYakURLGet(t *testing.T) {
+func TestGRPCMUSTPASS_RequestYakURL_Get(t *testing.T) {
 	t.Run("fs-list", func(t *testing.T) {
 		p := "/"
 		if runtime.GOOS == "windows" {
@@ -94,7 +94,7 @@ func TestRequestYakURLGet(t *testing.T) {
 	})
 }
 
-func TestRequestYakURLPut(t *testing.T) {
+func TestGRPCMUSTPASS_RequestYakURL_Put(t *testing.T) {
 	t.Run("fs-put-file", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
@@ -158,7 +158,7 @@ func TestRequestYakURLPut(t *testing.T) {
 	})
 }
 
-func TestRequestYakURLPost(t *testing.T) {
+func TestGRPCMUSTPASS_RequestYakURL_Post(t *testing.T) {
 	t.Run("fs-post-content", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
@@ -248,7 +248,7 @@ func TestRequestYakURLPost(t *testing.T) {
 	})
 }
 
-func TestRequestYakURLDelete(t *testing.T) {
+func TestGRPCMUSTPASS_RequestYakURL_Delete(t *testing.T) {
 	t.Run("fs-Delete-file", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
