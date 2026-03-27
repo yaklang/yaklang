@@ -1,0 +1,66 @@
+desc(
+	title: "Detect Golang pprof Endpoint Exposure"
+	title_zh: "检测Golang暴露pprof调试端点"
+	type: audit
+	level: low
+	risk: "安全配置错误"
+	desc: <<<DESC
+该规则检测 `net/http/pprof` 的显式导入与 HTTP 服务启动组合。
+在生产环境暴露 pprof 端点可能泄露运行时信息（goroutine、heap、profile），可被攻击者用于侦察与性能打点攻击。
+DESC
+	rule_id: "f34ff7d8-9bbd-4b35-8de2-4178289ce41f"
+	solution: <<<SOLUTION
+仅在内网或调试环境启用 pprof，生产环境建议关闭或放在鉴权与IP白名单之后。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-489](https://cwe.mitre.org/data/definitions/489.html)
+REFERENCE
+)
+
+pprof?{<fullTypeName>?{have: "net/http/pprof"}} as $pprof
+http?{<fullTypeName>?{have: "net/http"}} as $http
+
+$http.ListenAndServe(* as $addr, *)
+$addr?{opcode: const} as $entry
+
+alert $entry for {
+	type: "vuln",
+	level: "low",
+	name: "low",
+	title: "Golang pprof Endpoint Might Be Exposed",
+	title_zh: "可能暴露Golang pprof调试端点",
+	message: "检测到项目导入 net/http/pprof 且启动 HTTP 服务，若未限制访问可能导致敏感运行时信息泄露。",
+	risk: "安全配置错误",
+	desc: <<<DESC
+pprof 默认注册 `/debug/pprof/*` 路径。若直接对外开放，攻击者可利用这些端点收集系统与运行时信息。
+DESC
+	solution: <<<SOLUTION
+为 `/debug/pprof/*` 增加认证与网络访问控制，或在生产环境移除 pprof 导入。
+SOLUTION
+}
+
+desc(
+	lang: golang
+	alert_low: 1
+	'file://unsafe.go': <<<UNSAFE
+package main
+
+import (
+	"net/http"
+	_ "net/http/pprof"
+)
+
+func main() {
+	_ = http.ListenAndServe(":8080", nil)
+}
+UNSAFE
+	'safefile://safe.go': <<<SAFE
+package main
+
+import "net/http"
+
+func main() {
+	_ = http.ListenAndServe("127.0.0.1:8080", nil)
+}
+SAFE
+)

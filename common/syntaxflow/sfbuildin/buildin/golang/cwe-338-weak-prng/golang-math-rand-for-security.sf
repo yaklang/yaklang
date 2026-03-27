@@ -1,0 +1,78 @@
+desc(
+	title: "Detect Golang Insecure Random Source (math/rand)"
+	title_zh: "检测Golang使用不安全随机源（math/rand）"
+	type: vuln
+	level: mid
+	risk: "不安全加密"
+	desc: <<<DESC
+该规则检测 `math/rand` 在安全相关场景中的使用。`math/rand` 为伪随机生成器，输出可预测，
+不适用于 token、验证码、会话ID、密钥等安全用途。
+DESC
+	rule_id: "8bf92ed2-6abf-4f45-b3b2-14f06a88eb36"
+	solution: <<<SOLUTION
+安全随机请使用 `crypto/rand`。例如用 `rand.Read` 生成随机字节并再编码为字符串。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-338](https://cwe.mitre.org/data/definitions/338.html)
+REFERENCE
+)
+
+rand?{<fullTypeName>?{have: "math/rand"}} as $rand
+$rand.Int() as $mid
+$rand.Intn(*) as $mid
+$rand.Uint32() as $mid
+$rand.Read(*) as $mid
+$rand.NewSource(*) as $mid
+
+alert $mid for {
+	type: "vuln",
+	level: "mid",
+	name: "mid",
+	title: "Golang Insecure Random Source Detected",
+	title_zh: "检测到Golang使用不安全随机源",
+	message: "检测到 math/rand 调用，若用于安全场景（token/密钥/会话ID）会导致可预测风险。",
+	risk: "不安全加密",
+	desc: <<<DESC
+`math/rand` 输出可预测，不应用于安全敏感随机值生成。
+DESC
+	solution: <<<SOLUTION
+改用 `crypto/rand`：
+```go
+b := make([]byte, 16)
+_, _ = rand.Read(b) // crypto/rand
+```
+SOLUTION
+}
+
+desc(
+	lang: golang
+	alert_mid: 2
+	'file://unsafe.go': <<<UNSAFE
+package main
+
+import (
+	"fmt"
+	"math/rand"
+)
+
+func main() {
+	token := fmt.Sprintf("%d", rand.Intn(1000000))
+	session := rand.Uint32()
+	_, _ = token, session
+}
+UNSAFE
+	'safefile://safe.go': <<<SAFE
+package main
+
+import (
+	crand "crypto/rand"
+	"encoding/hex"
+)
+
+func main() {
+	b := make([]byte, 16)
+	_, _ = crand.Read(b)
+	_ = hex.EncodeToString(b)
+}
+SAFE
+)

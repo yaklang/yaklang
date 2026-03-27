@@ -326,8 +326,14 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 			}
 
 			handleObjectType = func(rv ssa.Value, typ *ssa.ObjectType) {
+				if utils.IsNil(rv) || typ == nil {
+					return
+				}
 				if typ.GetTypeKind() == ssa.PointerKind {
 					rv = b.ReadMemberCallValue(rv, b.EmitConstInstPlaceholder("@value"))
+					if utils.IsNil(rv) {
+						return
+					}
 					if typ, ok := ssa.ToObjectType(rv.GetType()); ok {
 						handleObjectType(rv, typ)
 					}
@@ -346,8 +352,10 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 							if rightv == nil {
 								rightv, _ = readMemberCall(rv, b.EmitConstInstPlaceholder(text))
 							}
+							if rightv != nil {
+								handleObjectType(rightv, a)
+							}
 						}
-						handleObjectType(rightv, a)
 					}
 				}
 			}

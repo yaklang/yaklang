@@ -262,30 +262,40 @@ func (b *astbuilder) buildImportDecl(importDecl *gol.ImportDeclContext) ([]strin
 	var namel, pathl []string
 
 	for _, i := range importDecl.AllImportSpec() {
-		name, path := b.buildImportSpec(i.(*gol.ImportSpecContext))
-		namel = append(namel, name)
-		pathl = append(pathl, path)
+		names, path := b.buildImportSpec(i.(*gol.ImportSpecContext))
+		for _, name := range names {
+			namel = append(namel, name)
+			pathl = append(pathl, path)
+		}
 	}
 	return namel, pathl
 }
 
-func (b *astbuilder) buildImportSpec(importSpec *gol.ImportSpecContext) (string, string) {
+func (b *astbuilder) buildImportSpec(importSpec *gol.ImportSpecContext) ([]string, string) {
 	recoverRange := b.SetRange(importSpec.BaseParserRuleContext)
 	defer recoverRange()
-	var name string
+	var name []string
 	var path string
 
 	if p := importSpec.ImportPath(); p != nil {
 		path = b.buildImportPath(p.(*gol.ImportPathContext))
 		namel := strings.Split(path, "/")
-		name = namel[len(namel)-1]
+		name = []string{namel[len(namel)-1]}
+		// Go import path 最后段可能包含 '-'，而代码里通常使用包名（如 jwt-go -> jwt）。
+		// 对未显式别名的导入，优先使用 '-' 前第一段作为默认引用名。
+		if strings.Contains(name[0], "-") {
+			parts := strings.Split(name[0], "-")
+			if len(parts) > 0 && parts[0] != "" {
+				name = append(name, parts[0])
+			}
+		}
 	}
 
 	if id := importSpec.IDENTIFIER(); id != nil {
-		name = id.GetText()
+		name = []string{id.GetText()}
 	}
 	if dot := importSpec.DOT(); dot != nil {
-		name = "."
+		name = []string{"."}
 	}
 	return name, path
 }

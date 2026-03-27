@@ -1,0 +1,71 @@
+desc(
+	title: "Detect Golang HTTP Serve Pattern Without Timeout Control"
+	title_zh: "检测Golang使用无超时控制的HTTP Serve模式"
+	type: audit
+	level: low
+	risk: "安全配置错误"
+	desc: <<<DESC
+该规则审计 `http.ListenAndServe`/`http.Serve` 这类模式。若未显式配置超时参数，
+在慢连接或异常请求场景下可能导致资源占用增加（如 Slowloris 风险放大）。
+DESC
+	rule_id: "8e95e502-777f-42f6-8ca9-66ec8a9ae4de"
+	solution: <<<SOLUTION
+优先使用 `http.Server` 并配置 `ReadTimeout`、`ReadHeaderTimeout`、`WriteTimeout`、`IdleTimeout`。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-400](https://cwe.mitre.org/data/definitions/400.html)
+REFERENCE
+)
+
+http?{<fullTypeName>?{have: "net/http"}} as $http
+$http.ListenAndServe() as $low
+$http.Serve() as $low
+
+alert $low for {
+	type: "vuln",
+	level: "low",
+	name: "low",
+	title: "Golang HTTP Serve Pattern Might Miss Timeout Hardening",
+	title_zh: "Golang HTTP服务可能缺少超时加固",
+	message: "检测到使用 ListenAndServe/Serve 模式，建议确认是否已通过 http.Server 配置超时参数。",
+	risk: "安全配置错误",
+	desc: <<<DESC
+缺少服务端超时限制会增加慢连接与资源耗尽风险，尤其在公网暴露服务中更明显。
+DESC
+	solution: <<<SOLUTION
+改为显式 `http.Server` 配置并设置 `ReadHeaderTimeout` 等超时参数。
+SOLUTION
+}
+
+desc(
+	lang: golang
+	alert_low: 1
+	'file://unsafe.go': <<<UNSAFE
+package main
+
+import "net/http"
+
+func main() {
+	_ = http.ListenAndServe(":8080", nil)
+}
+UNSAFE
+	'safefile://safe.go': <<<SAFE
+package main
+
+import (
+	"net/http"
+	"time"
+)
+
+func main() {
+	s := &http.Server{
+		Addr:              ":8080",
+		ReadTimeout:       5 * time.Second,
+		ReadHeaderTimeout: 5 * time.Second,
+		WriteTimeout:      10 * time.Second,
+		IdleTimeout:       30 * time.Second,
+	}
+	_ = s
+}
+SAFE
+)

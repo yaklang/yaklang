@@ -1,0 +1,90 @@
+desc(
+	title: "Check Golang HTTP Directory Traversal Vulnerability"
+	title_zh: "检测Golang HTTP目录遍历漏洞"
+	type: vuln
+	level: high
+	risk: "访问控制缺陷"
+	desc: <<<DESC
+# 漏洞描述
+该规则用于检测Golang程序中使用`http.Dir`时可能存在的目录遍历漏洞。当应用程序将用户可控路径（如`/`）传递给`http.Dir`函数时，攻击者可通过构造特殊URL访问服务器文件系统中的任意文件，从而导致敏感信息泄露或系统被入侵。
+
+## 触发场景
+在HTTP服务中，若未对用户输入的路径进行校验或过滤，直接将其作为`http.Dir`的参数，例如：
+```go
+fs := http.FileServer(http.Dir("/"))
+```
+此时攻击者可访问`/etc/passwd`、`/proc/self/environ`等系统文件，造成严重安全风险。
+
+## 潜在影响
+- 敏感文件泄露（配置文件、数据库凭证、源码等）
+- 远程代码执行（通过上传恶意文件并触发执行）
+- 系统权限提升或拒绝服务
+
+## 修复建议
+应始终对用户输入路径进行白名单验证或规范化处理，避免直接拼接或传入系统根目录。推荐使用相对路径或限定访问范围，例如：
+```go
+fs := http.FileServer(http.Dir("./public"))
+```
+同时应结合`http.StripPrefix`确保路径不会越权访问父目录。
+DESC
+	rule_id: "89e6f7f2-25ac-4492-9057-7e89caa1f54a"
+	solution: <<<SOLUTION
+# 修复建议
+1. 避免使用用户可控输入直接作为`http.Dir`的参数，应进行路径规范化和白名单校验。
+2. 使用相对路径而非绝对路径（如`./public`），限制访问范围。
+3. 在部署前进行安全审计，确保所有静态文件服务均不暴露系统敏感目录。
+4. 启用Web应用防火墙（WAF）或反向代理层，拦截异常路径请求。
+5. 对于必须支持动态路径的服务，应在后端增加严格的权限控制逻辑，例如仅允许访问特定子目录。
+
+## 补充说明
+此规则适用于Go语言Web框架中使用`net/http`包实现静态文件服务的场景。即使代码看似无害，只要路径来源不可信，就存在被利用的风险。建议开发人员在编写此类代码时遵循最小权限原则，并结合自动化扫描工具持续监测潜在漏洞。
+SOLUTION
+	reference: <<<REFERENCE
+https://cwe.mitre.org/data/definitions/22.html
+REFERENCE
+)
+
+http?{<fullTypeName>?{have: "net/http"}} as $http
+$http.Dir(* as $path)
+$path?{opcode: const}?{have: /^\/$/} as $high
+
+alert $high for {
+	type: "vuln",
+	level: "high",
+	name: "high",
+	title: "Path Traversal via Absolute Root Directory Access",
+	title_zh: "通过绝对根目录访问导致的路径遍历漏洞",
+	message: "Dangerous usage of absolute root directory in http.Dir()",
+	risk: "访问控制缺陷",
+	desc: <<<DESC
+The application uses http.Dir("/") to serve static files, allowing direct access to the root directory of the file system. This can lead to unauthorized access to sensitive files outside the intended web root, enabling path traversal attacks.
+DESC
+	solution: <<<SOLUTION
+Avoid using absolute paths like '/' or '/'. Instead, use relative paths such as './public' or specific subdirectories within the project structure. Ensure that the base directory for serving files is strictly controlled and does not expose sensitive system directories.
+SOLUTION
+}
+
+desc(
+	lang: golang
+	alert_high: 1
+	'file://unsafe.go': <<<UNSAFE
+package main
+
+import "net/http"
+
+func main() {
+	fs := http.FileServer(http.Dir("/"))
+	http.Handle("/static/", http.StripPrefix("/static/", fs))
+}
+UNSAFE
+	'safefile://safe.go': <<<SAFE
+package main
+
+import "net/http"
+
+func main() {
+	fs := http.FileServer(http.Dir("./public"))
+	http.Handle("/static/", http.StripPrefix("/static/", fs))
+}
+SAFE
+)

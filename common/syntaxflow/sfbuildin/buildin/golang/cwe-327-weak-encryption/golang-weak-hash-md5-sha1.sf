@@ -1,0 +1,69 @@
+desc(
+	title: "Detect Golang Weak Hash Usage (MD5/SHA1)"
+	title_zh: "检测Golang使用弱哈希算法（MD5/SHA1）"
+	type: vuln
+	level: mid
+	risk: "不安全加密"
+	desc: <<<DESC
+该规则检测 MD5/SHA1 的哈希调用。MD5 与 SHA1 已不适用于安全场景（密码、签名、完整性校验等），
+可能遭受碰撞攻击。
+DESC
+	rule_id: "68f97b0f-4da0-4133-bd95-5a7c05dd0cbc"
+	solution: <<<SOLUTION
+优先使用 SHA-256/512 或更现代方案（如 HMAC-SHA256、Argon2、bcrypt）替代 MD5/SHA1。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-327](https://cwe.mitre.org/data/definitions/327.html)
+REFERENCE
+)
+
+md5?{<fullTypeName>?{have: "crypto/md5"}} as $md5
+sha1?{<fullTypeName>?{have: "crypto/sha1"}} as $sha1
+
+$md5.New() as $mid
+$md5.Sum(*) as $mid
+$sha1.New() as $mid
+$sha1.Sum(*) as $mid
+
+alert $mid for {
+	type: "vuln",
+	level: "mid",
+	name: "mid",
+	title: "Golang Weak Hash Algorithm Usage Detected",
+	title_zh: "检测到Golang使用弱哈希算法",
+	message: "检测到 MD5/SHA1 调用，弱哈希在安全场景下可能被碰撞攻击利用。",
+	risk: "不安全加密",
+	desc: <<<DESC
+MD5/SHA1 已被广泛认为不安全，不应在安全敏感场景中使用。
+DESC
+	solution: <<<SOLUTION
+将 MD5/SHA1 替换为 SHA-256/512；密码场景改用 bcrypt/Argon2，签名场景使用更强摘要算法。
+SOLUTION
+}
+
+desc(
+	lang: golang
+	alert_mid: 2
+	'file://unsafe.go': <<<UNSAFE
+package main
+
+import (
+	"crypto/md5"
+	"crypto/sha1"
+)
+
+func main() {
+	_ = md5.Sum([]byte("secret"))
+	_ = sha1.Sum([]byte("secret"))
+}
+UNSAFE
+	'safefile://safe.go': <<<SAFE
+package main
+
+import "crypto/sha256"
+
+func main() {
+	_ = sha256.Sum256([]byte("secret"))
+}
+SAFE
+)

@@ -95,6 +95,17 @@ func TestImportGolang(t *testing.T) {
 
 		`, []string{"\"https\"", "\"www.example.com\""}, t)
 	})
+
+	t.Run("octal integer literal 0777 and 0o777", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+func main() {
+	println(0777)
+	println(0o777)
+	println(0775)
+}
+		`, []string{"511", "511", "509"}, t)
+	})
 }
 
 func TestInterface_ImplementationRelationship(t *testing.T) {
