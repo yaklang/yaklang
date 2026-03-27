@@ -770,9 +770,8 @@ func TestInstructionCache_TTLReloadFromDB(t *testing.T) {
 	binInst := builder.EmitBinOp(OpAdd, left, right)
 	instID := binInst.GetId()
 
-	require.Eventually(t, func() bool {
-		return ssadb.GetIrCodeItemById(ssadb.GetDB(), programName, instID) != nil
-	}, 3*time.Second, 50*time.Millisecond)
+	builder.Finish()
+	waitInstructionSpilledAfterFinish(t, prog, programName, instID, ttl)
 
 	reloaded := prog.Cache.GetInstruction(instID)
 	require.NotNil(t, reloaded)
@@ -813,15 +812,17 @@ func TestInstructionCache_TTLWritebackDirtyLazyInstruction(t *testing.T) {
 	prog := newProgramWithTTL(programName, ttl, ProgramCacheDBWrite, vf)
 	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
 
-	value := builder.EmitUndefined("writeback")
+	left := builder.EmitUndefined("writeback_left")
+	right := builder.EmitUndefined("writeback_right")
+	value := builder.EmitBinOp(OpAdd, left, right)
 	instID := value.GetId()
-	require.Eventually(t, func() bool {
-		return ssadb.GetIrCodeItemById(ssadb.GetDB(), programName, instID) != nil
-	}, 3*time.Second, 50*time.Millisecond)
+	builder.Finish()
+	waitInstructionSpilledAfterFinish(t, prog, programName, instID, ttl)
 
 	reloaded := prog.Cache.GetInstruction(instID)
 	require.NotNil(t, reloaded)
 	reloaded.SetExtern(true)
+	prog.Cache.InstructionCache.CoolDown([]int64{instID}, ttl)
 
 	require.Eventually(t, func() bool {
 		var ir ssadb.IrCode
@@ -833,8 +834,9 @@ func TestInstructionCache_TTLWritebackDirtyLazyInstruction(t *testing.T) {
 			Where("program_name = ? AND code_id = ?", programName, instID).
 			Order("id DESC").
 			First(&ir).Error
-		return countErr == nil && count == 1 && err == nil && ir.IsExternal
-	}, 3*time.Second, 50*time.Millisecond, "dirty lazy instruction should be written back before eviction")
+		_, resident := prog.Cache.InstructionCache.GetAll()[instID]
+		return countErr == nil && count == 1 && err == nil && ir.IsExternal && !resident
+	}, 3*time.Second, ttl, "dirty lazy instruction should be written back after finish-triggered eviction")
 
 	prog.Finish()
 	prog.UpdateToDatabase()
