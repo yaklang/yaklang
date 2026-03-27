@@ -1,0 +1,62 @@
+desc(
+	title: "Detect Golang unsafe.Pointer Usage"
+	title_zh: "检测Golang使用unsafe.Pointer"
+	type: audit
+	level: low
+	risk: "不安全实现"
+	desc: <<<DESC
+该规则用于审计 `unsafe.Pointer` 相关调用。`unsafe` 包可绕过 Go 类型安全与内存安全边界，
+错误使用可能导致越界访问、内存破坏或未定义行为。
+DESC
+	rule_id: "fd7f3adf-79c2-42b9-b89c-4199ae82d9a4"
+	solution: <<<SOLUTION
+优先使用类型安全的标准库 API。仅在必要且经过严格评审时使用 unsafe，并增加边界检查与测试。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-242](https://cwe.mitre.org/data/definitions/242.html)
+REFERENCE
+)
+
+unsafe?{<fullTypeName>?{have: "unsafe"}} as $unsafe
+$unsafe.Pointer(*) as $low
+$unsafe.Add(*, *) as $low
+$unsafe.Slice(*, *) as $low
+
+alert $low for {
+	type: "vuln",
+	level: "low",
+	name: "low",
+	title: "Golang unsafe Pointer Usage Detected",
+	title_zh: "检测到Golang使用unsafe内存操作",
+	message: "检测到 unsafe.Pointer/unsafe.Add/unsafe.Slice 调用，建议评估内存安全风险。",
+	risk: "不安全实现",
+	desc: <<<DESC
+`unsafe` 相关操作会绕过编译器的内存与类型保护，若边界或生命周期处理不当，可能引入高危缺陷。
+DESC
+	solution: <<<SOLUTION
+尽量改用安全 API；必须使用时要添加边界检查、注释说明和单元测试覆盖。
+SOLUTION
+}
+
+desc(
+	lang: golang
+	alert_low: 1
+	'file://unsafe.go': <<<UNSAFE
+package main
+
+import "unsafe"
+
+func main() {
+	b := []byte{1, 2, 3}
+	_ = unsafe.Pointer(&b[0])
+}
+UNSAFE
+	'safefile://safe.go': <<<SAFE
+package main
+
+func main() {
+	b := []byte{1, 2, 3}
+	_ = b[0]
+}
+SAFE
+)

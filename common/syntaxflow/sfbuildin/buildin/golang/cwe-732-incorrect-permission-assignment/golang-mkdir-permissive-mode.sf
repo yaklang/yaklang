@@ -1,0 +1,62 @@
+desc(
+	title: "Detect Golang Mkdir With Overly Permissive Mode"
+	title_zh: "检测Golang创建目录权限过宽"
+	type: vuln
+	level: mid
+	risk: "安全配置错误"
+	desc: <<<DESC
+该规则检测 `os.Mkdir`/`os.MkdirAll` 使用过宽权限（如 0777、0775）。
+目录权限过宽会放大未授权读取、写入与横向移动风险。
+DESC
+	rule_id: "df52ece5-ac58-4cd9-bda0-11ec7f40eea2"
+	solution: <<<SOLUTION
+目录应遵循最小权限原则，优先使用 `0700` 或按业务最小化授权。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-732](https://cwe.mitre.org/data/definitions/732.html)
+REFERENCE
+)
+
+os?{<fullTypeName>?{have: "os"}} as $os
+$os.Mkdir(* <slice(index=1)> as $mode)
+$os.MkdirAll(* <slice(index=1)> as $mode)
+$mode?{opcode: const}?{have: /^(511|509|0777|0775)$/} as $mid
+
+alert $mid for {
+	type: "vuln",
+	level: "mid",
+	name: "mid",
+	title: "Golang Directory Permission Too Broad",
+	title_zh: "检测到目录权限配置过宽",
+	message: "检测到使用过宽目录权限（如 0777/0775），可能导致未授权访问。",
+	risk: "安全配置错误",
+	desc: <<<DESC
+目录权限过宽会让非预期主体访问或修改目录内容，增加数据泄露与篡改风险。
+DESC
+	solution: <<<SOLUTION
+将目录权限收紧为最小可用值，例如 `0700` 或 `0750`，并结合属主/属组策略控制访问。
+SOLUTION
+}
+
+desc(
+	lang: golang
+	alert_mid: 1
+	'file://unsafe.go': <<<UNSAFE
+package main
+
+import "os"
+
+func main() {
+	_ = os.MkdirAll("/tmp/public-data", 0777)
+}
+UNSAFE
+	'safefile://safe.go': <<<SAFE
+package main
+
+import "os"
+
+func main() {
+	_ = os.MkdirAll("/tmp/app-private", 0700)
+}
+SAFE
+)

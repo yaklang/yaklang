@@ -817,8 +817,14 @@ func (b *astbuilder) buildIntegerLiteral(stmt *gol.IntegerContext) ssa.Value {
 			resultInt64, err = strconv.ParseInt(intStr[2:], 16, 64)
 		} else if num := stmt.BINARY_LIT(); num != nil { // 二进制
 			resultInt64, err = strconv.ParseInt(intStr[2:], 2, 64)
-		} else if num := stmt.OCTAL_LIT(); num != nil { // 八进制
-			resultInt64, err = strconv.ParseInt(intStr[2:], 8, 64)
+		} else if num := stmt.OCTAL_LIT(); num != nil { // 八进制：0o777 或 Go 传统写法 0777（不能统一 intStr[2:]，否则 0777 会变成 "77"）
+			s := strings.ReplaceAll(intStr, "_", "")
+			if strings.HasPrefix(s, "0o") {
+				s = s[2:]
+			} else {
+				s = s[1:]
+			}
+			resultInt64, err = strconv.ParseInt(s, 8, 64)
 		} else {
 			b.NewError(ssa.Error, TAG, fmt.Sprintf("cannot parse num for literal: %s", stmt.GetText()))
 			return b.EmitConstInst(0)

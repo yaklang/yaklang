@@ -88,6 +88,31 @@ func TestImport_function(t *testing.T) {
 	)
 }
 
+func TestImport_alias(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("src/main/go/go.mod", `
+	module github.com/yaklang/yaklang
+	go 1.20
+	`)
+	vf.AddFile("src/main/go/A/test.go", `
+	package main
+
+	import "github.com/dgrijalva/jwt-go"
+
+	func main() {
+		token := jwt.New(jwt.SigningMethodHS256)
+		println(token)
+	}
+	`)
+
+	ssatest.CheckSyntaxFlowWithFS(t, vf, `
+jwt as $a
+		`, map[string][]string{
+		"a": {"ExternLib-jwt"},
+	}, true, ssaapi.WithLanguage(ssaconfig.GO),
+	)
+}
+
 func TestImport_method(t *testing.T) {
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("src/main/go/go.mod", `

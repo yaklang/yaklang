@@ -1,0 +1,75 @@
+desc(
+	title: "Detect Golang Explicit Blank Assignment of Error Returns (G104-style)"
+	title_zh: "检测Golang 使用 _ = 显式丢弃错误返回值（类 G104）"
+	type: audit
+	level: low
+	risk: "错误处理不当"
+	desc: <<<DESC
+对应 gosec G104 中常见模式：通过 `_ = ...` 显式丢弃返回的 `error`。本规则在源码上下文中匹配 `_ =` 与 `os.Remove`、`os.WriteFile`、`os.Chmod` 的组合，提示审计是否应记录、返回或中止流程。不覆盖所有未检查错误场景，但误报相对较低、易于落地。
+DESC
+	rule_id: "d5e6f7a8-b9c0-41d2-e3f4-a5b6c7d8e9f0"
+	solution: <<<SOLUTION
+至少记录错误并向上返回；在可恢复场景应记录日志并 metrics；确需忽略时写明注释与安全理由，避免静默失败。
+SOLUTION
+	reference: <<<REFERENCE
+[gosec G104](https://securego.io/docs/rules/g104.html)
+[CWE-391](https://cwe.mitre.org/data/definitions/391.html)
+REFERENCE
+)
+
+os?{<fullTypeName>?{have: "os"}} as $os
+$os.Remove(*) as $remove
+$remove<sourceCode>?{have: "_ ="} as $low
+$os.WriteFile(*, *, *) as $wf
+$wf<sourceCode>?{have: "_ ="} as $low
+$os.Chmod(*, *) as $ch
+$ch<sourceCode>?{have: "_ ="} as $low
+
+alert $low for {
+	type: "vuln",
+	level: "low",
+	name: "low",
+	title: "Explicit Error Discard via _ = on os.* Call",
+	title_zh: "os 包调用使用 _ = 丢弃错误",
+	message: "检测到 `_ =` 显式丢弃 os.Remove/os.WriteFile/os.Chmod 的错误返回值，请确认是否符合预期。",
+	risk: "错误处理不当",
+	desc: <<<DESC
+显式丢弃错误可能导致删除失败、写文件失败或权限变更失败被忽略，进而引发安全状态与业务状态不一致。
+DESC
+	solution: <<<SOLUTION
+改为 `if err := ...; err != nil { ... }` 或记录并返回错误。
+SOLUTION
+}
+
+desc(
+	lang: golang
+	alert_low: 3
+	'file://unsafe.go': <<<UNSAFE
+package main
+
+import "os"
+
+func main() {
+	_ = os.Remove("a.txt")
+	_ = os.WriteFile("b.txt", []byte("x"), 0o644)
+	_ = os.Chmod("c.txt", 0o600)
+}
+UNSAFE
+	'safefile://safe.go': <<<SAFE
+package main
+
+import "os"
+
+func main() {
+	if err := os.Remove("a.txt"); err != nil {
+		panic(err)
+	}
+	if err := os.WriteFile("b.txt", []byte("x"), 0o644); err != nil {
+		panic(err)
+	}
+	if err := os.Chmod("c.txt", 0o600); err != nil {
+		panic(err)
+	}
+}
+SAFE
+)

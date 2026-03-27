@@ -1,0 +1,75 @@
+desc(
+	title: "Detect Golang ssh.InsecureIgnoreHostKey Usage"
+	title_zh: "检测Golang使用ssh.InsecureIgnoreHostKey"
+	type: vuln
+	level: high
+	risk: "身份认证缺陷"
+	desc: <<<DESC
+该规则用于检测 `golang.org/x/crypto/ssh` 中 `ssh.InsecureIgnoreHostKey()` 的使用。
+该函数会跳过 SSH 主机密钥校验，导致客户端无法验证服务端身份，容易受到中间人攻击（MITM）。
+DESC
+	rule_id: "3b7f83c5-5c95-4b52-8fca-4d848cdb43a1"
+	solution: <<<SOLUTION
+避免使用 `ssh.InsecureIgnoreHostKey()`。
+应改为使用 `knownhosts.New(...)` 或自定义安全的 `HostKeyCallback` 来校验主机指纹。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-295](https://cwe.mitre.org/data/definitions/295.html)
+[Go SSH knownhosts](https://pkg.go.dev/golang.org/x/crypto/ssh/knownhosts)
+REFERENCE
+)
+
+ssh?{<fullTypeName>?{have: "golang.org/x/crypto/ssh"}} as $ssh
+$ssh.InsecureIgnoreHostKey() as $high
+
+alert $high for {
+	type: "vuln",
+	level: "high",
+	name: "high",
+	title: "Golang SSH InsecureIgnoreHostKey Detected",
+	title_zh: "检测到Golang使用不安全的SSH主机校验",
+	message: "检测到使用 ssh.InsecureIgnoreHostKey()，这会禁用SSH主机身份验证，存在中间人攻击风险。",
+	risk: "身份认证缺陷",
+	desc: <<<DESC
+使用 `ssh.InsecureIgnoreHostKey()` 会无条件信任任意主机密钥。
+攻击者可伪造服务端主机并窃听或篡改 SSH 会话流量。
+DESC
+	solution: <<<SOLUTION
+使用 `knownhosts.New(...)` 或安全的 `HostKeyCallback` 校验主机密钥，禁止在生产代码中使用 `InsecureIgnoreHostKey`。
+SOLUTION
+}
+
+desc(
+	lang: golang
+	alert_high: 1
+	'file://unsafe.go': <<<UNSAFE
+package main
+
+import "golang.org/x/crypto/ssh"
+
+func main() {
+	cfg := &ssh.ClientConfig{
+		User: "root",
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+	}
+	_ = cfg
+}
+UNSAFE
+	'safefile://safe.go': <<<SAFE
+package main
+
+import (
+	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/knownhosts"
+)
+
+func main() {
+	cb, _ := knownhosts.New("/home/user/.ssh/known_hosts")
+	cfg := &ssh.ClientConfig{
+		User: "root",
+		HostKeyCallback: cb,
+	}
+	_ = cfg
+}
+SAFE
+)

@@ -1,0 +1,61 @@
+desc(
+	title: "Detect Golang OpenFile With Overly Permissive Mode"
+	title_zh: "检测Golang文件权限配置过宽（OpenFile）"
+	type: vuln
+	level: mid
+	risk: "安全配置错误"
+	desc: <<<DESC
+该规则检测 `os.OpenFile` 第四个权限参数使用过宽模式（如 0777、0666）。
+文件权限过宽可能导致敏感数据被任意读取或篡改。
+DESC
+	rule_id: "d7fce78d-900a-4e9f-b793-72eb86bf6df7"
+	solution: <<<SOLUTION
+遵循最小权限原则，敏感文件建议使用 `0600`，普通可读配置建议 `0640/0644`。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-732](https://cwe.mitre.org/data/definitions/732.html)
+REFERENCE
+)
+
+os?{<fullTypeName>?{have: "os"}} as $os
+$os.OpenFile(* <slice(index=2)> as $perm)
+$perm?{opcode: const}?{have: /^(511|438|0777|0666)$/} as $mid
+
+alert $mid for {
+	type: "vuln",
+	level: "mid",
+	name: "mid",
+	title: "Golang File Permission Too Broad",
+	title_zh: "检测到文件权限配置过宽",
+	message: "检测到 OpenFile 使用过宽权限（如 0666/0777），可能引发敏感文件访问风险。",
+	risk: "安全配置错误",
+	desc: <<<DESC
+过宽文件权限会让非预期主体读取或写入文件内容，造成数据泄露或完整性破坏。
+DESC
+	solution: <<<SOLUTION
+根据业务最小授权设置文件权限，推荐将敏感文件改为 `0600`。
+SOLUTION
+}
+
+desc(
+	lang: golang
+	alert_mid: 1
+	'file://unsafe.go': <<<UNSAFE
+package main
+
+import "os"
+
+func main() {
+	_, _ = os.OpenFile("/tmp/token.txt", os.O_CREATE|os.O_WRONLY, 0666)
+}
+UNSAFE
+	'safefile://safe.go': <<<SAFE
+package main
+
+import "os"
+
+func main() {
+	_, _ = os.OpenFile("/tmp/token.txt", os.O_CREATE|os.O_WRONLY, 0600)
+}
+SAFE
+)

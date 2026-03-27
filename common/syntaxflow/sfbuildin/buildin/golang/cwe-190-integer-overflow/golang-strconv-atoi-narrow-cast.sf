@@ -1,0 +1,76 @@
+desc(
+	title: "Detect Golang strconv.Atoi Result Cast to int16/int32 (G109)"
+	title_zh: "检测Golang 将 strconv.Atoi 结果收窄转换为 int16/int32（G109）"
+	type: audit
+	level: mid
+	risk: "整数溢出或回绕"
+	desc: <<<DESC
+对应 gosec G109：`strconv.Atoi` 返回 `int`（在 Go 中与 `int` 同宽），若再转换为 `int16`/`int32` 等更窄类型，可能因溢出导致逻辑错误与安全判断被绕过（例如边界检查、权限 ID、长度字段等）。
+DESC
+	rule_id: "e6f7a8b9-c0d1-42e3-f4a5-b6c7d8e9f0a1"
+	solution: <<<SOLUTION
+优先使用 `strconv.ParseInt(s, 10, 32)` / `ParseInt(..., 16)` 等带位宽参数 API，并在转换失败或值超出目标类型范围时拒绝处理；避免对不可信字符串先 `Atoi` 再强转窄整数。
+SOLUTION
+	reference: <<<REFERENCE
+[gosec G109](https://securego.io/docs/rules/g109.html)
+[CWE-190](https://cwe.mitre.org/data/definitions/190.html)
+REFERENCE
+)
+
+strconv?{<fullTypeName>?{have: "strconv"}} as $strconv
+$strconv.Atoi(*) as $atoi
+$atoi<sourceCode(context=20)>?{have: /int16|int32/} as $mid
+
+alert $mid for {
+	type: "vuln",
+	level: "mid",
+	name: "mid",
+	title: "strconv.Atoi Result Narrowed to int16/int32",
+	title_zh: "strconv.Atoi 结果被收窄为 int16 或 int32",
+	message: "检测到 Atoi 的整型结果经类型转换变为 int16/int32，存在溢出与逻辑绕过风险。",
+	risk: "整数溢出或回绕",
+	desc: <<<DESC
+不可信输入经 `Atoi` 得到的大整数在收窄转换时可能发生静默截断/溢出，导致后续比较与授权逻辑失真。
+DESC
+	solution: <<<SOLUTION
+使用 `strconv.ParseInt` 指定位宽并校验范围，或在大数场景使用 `math/big`。
+SOLUTION
+}
+
+desc(
+	lang: golang
+	alert_mid: 2
+	'file://unsafe16.go': <<<UNSAFE
+package main
+
+import "strconv"
+
+func u16(s string) int16 {
+	v, _ := strconv.Atoi(s)
+	return int16(v)
+}
+UNSAFE
+	'file://unsafe32.go': <<<UNSAFE
+package main
+
+import "strconv"
+
+func u32(s string) int32 {
+	v, _ := strconv.Atoi(s)
+	return int32(v)
+}
+UNSAFE
+	'safefile://safe.go': <<<SAFE
+package main
+
+import "strconv"
+
+func ok(s string) (int32, error) {
+	v, err := strconv.ParseInt(s, 10, 32)
+	if err != nil {
+		return 0, err
+	}
+	return int32(v), nil
+}
+SAFE
+)

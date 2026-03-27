@@ -26,6 +26,9 @@ func (b *FunctionBuilder) ReadMemberCallValue(object, key Value) Value {
 }
 
 func (b *FunctionBuilder) ReadMemberCallValueByName(object Value, key string) Value {
+	if utils.IsNil(object) {
+		return nil
+	}
 	name := fmt.Sprintf("#%d.%s", object.GetId(), key)
 	if ret := b.PeekValueInThisFunction(name); ret != nil {
 		return ret
