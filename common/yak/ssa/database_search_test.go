@@ -52,9 +52,8 @@ func TestMatchInstructionsByVariableReloadsSpilledInstructionFromMemoryIDIndex(t
 	inst := builder.EmitBinOp(OpAdd, left, right)
 	prog.Cache.AddVariable("needle", inst)
 
-	require.Eventually(t, func() bool {
-		return ssadb.GetIrCodeItemById(ssadb.GetDB(), programName, inst.GetId()) != nil
-	}, 2*time.Second, 20*time.Millisecond)
+	builder.Finish()
+	waitInstructionSpilledAfterFinish(t, prog, programName, inst.GetId(), 20*time.Millisecond)
 
 	results := MatchInstructionsByVariableWithExcludeFiles(
 		context.Background(),
