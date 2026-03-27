@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-func TestMUSSPASSPing(t *testing.T) {
+func TestMUSTPASS_Ping(t *testing.T) {
 	server, err := vulinbox.NewVulinServer(context.Background(), rand.Intn(55535)+10000)
 	if err != nil {
 		t.Fatal(err)
