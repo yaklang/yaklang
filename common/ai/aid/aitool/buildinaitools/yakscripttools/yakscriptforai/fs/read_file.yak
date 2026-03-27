@@ -152,17 +152,12 @@ defaultLineTargetBytes = 10240
 defaultLineHardCap = 400
 
 t := cli.String("file", cli.setRequired(true), cli.setHelp("target file you want to read"))
-mode := cli.String("mode", cli.setDefault("lines"), cli.setHelp("read mode: 'chunk' for byte chunks or 'lines' for line-based reading (default: lines)"))
-chunkSize := cli.Int("chunk-size", cli.setRequired(false), cli.setHelp("size for chunk read when mode=chunk, max: 30000"), cli.setDefault(defaultChunkSize))
+mode := cli.String("mode", cli.setDefault("auto"), cli.setHelp("read mode: 'auto' (default), 'chunk', or 'lines'; auto prefers chunk mode for large text files"))
+chunkSize := cli.Int("chunk-size", cli.setRequired(false), cli.setHelp("size for chunk read when mode=chunk, max: 30000; <=0 uses mode default"), cli.setDefault(0))
 offset := cli.Int("offset", cli.setRequired(false), cli.setDefault(0))
-lines := cli.Int("lines", cli.setRequired(false), cli.setHelp("how many lines you want to read when mode=lines"), cli.setDefault(defaultLineCount))
+lines := cli.Int("lines", cli.setRequired(false), cli.setHelp("how many lines you want to read when mode=lines; <=0 enables auto sizing"), cli.setDefault(0))
 lineSize := cli.Int("line-size", cli.setRequired(false), cli.setHelp("the max columns in a line when mode=lines, default 1024"), cli.setDefault(defaultLineSize))
 cli.check()
-
-modeSpecified := cli.Have("mode")
-chunkSizeSpecified := cli.Have("chunk-size")
-linesSpecified := cli.Have("lines")
-lineSizeSpecified := cli.Have("line-size")
 
 if !file.IsExisted(t) {
     yakit.Warn("%v is not existed", t)
@@ -425,27 +420,32 @@ if detectedMime == "" {
     }
 }
 
-if mode != "chunk" && mode != "lines" {
-    yakit.Error("invalid mode: %v, must be 'chunk' or 'lines'", mode)
+if mode != "auto" && mode != "chunk" && mode != "lines" {
+    yakit.Error("invalid mode: %v, must be 'auto', 'chunk' or 'lines'", mode)
     return
 }
 
-if !modeSpecified && !linesSpecified && !lineSizeSpecified && size > largeTextChunkThreshold {
-    mode = "chunk"
-    if !chunkSizeSpecified {
-        chunkSize = preferredLargeTextChunkSize
+effectiveMode = mode
+effectiveChunkSize = chunkSize
+if effectiveMode == "auto" {
+    if size > largeTextChunkThreshold {
+        effectiveMode = "chunk"
+        if effectiveChunkSize <= 0 {
+            effectiveChunkSize = preferredLargeTextChunkSize
+        }
+        yakit.Info("large text file detected (%v bytes), prefer chunk mode for first read: %v bytes", size, effectiveChunkSize)
+    } else {
+        effectiveMode = "lines"
     }
-    yakit.Info("large text file detected (%v bytes), prefer chunk mode for first read: %v bytes", size, chunkSize)
 }
 
-if mode == "chunk" {
+if effectiveMode == "chunk" {
     // 字节块读取模式
-    if chunkSize <= 0 {
-        yakit.Warn("chunksize should not be less than zero")
-        return
+    if effectiveChunkSize <= 0 {
+        effectiveChunkSize = defaultChunkSize
     }
 
-    if chunkSize > defaultChunkSize {
+    if effectiveChunkSize > defaultChunkSize {
         yakit.Warn("chunksize you input is too large, override %v, for save memory, shrink it.", defaultChunkSize)
         return
     }
@@ -461,7 +461,7 @@ if mode == "chunk" {
         yakit.Error("seek offset failed: %v", err)
         return
     }
-    raw, err := io.ReadAll(io.LimitReader(f, chunkSize))
+    raw, err := io.ReadAll(io.LimitReader(f, effectiveChunkSize))
     _ = err
     n := len(string(raw))
     if n <= 0 && err != nil {
@@ -473,15 +473,12 @@ if mode == "chunk" {
     }
 } else {
     // 按行读取模式
-    if lines <= 0 {
-        yakit.Warn("lines should not be less than zero, default set to %v", defaultLineCount)
+    autoLineMode = lines <= 0
+    if autoLineMode {
         lines = defaultLineCount
     }
     if lineSize <= 0 {
         yakit.Warn("line-size should not be less than zero, default set to %v", defaultLineSize)
-        lineSize = defaultLineSize
-    }
-    if !lineSizeSpecified && lineSize < defaultLineSize {
         lineSize = defaultLineSize
     }
 
@@ -502,7 +499,7 @@ if mode == "chunk" {
     selectedLines = 0
     visibleBytes = 0
     autoTargetBytes = 0
-    if !linesSpecified {
+    if autoLineMode {
         autoTargetBytes = defaultLineTargetBytes
         if size > 0 && size < autoTargetBytes {
             autoTargetBytes = size
@@ -525,8 +522,8 @@ if mode == "chunk" {
             displayText = displayText[:lineSize] + "..."
         }
 
-        if linesSpecified && count > end { break }
-        if !linesSpecified && selectedLines >= defaultLineHardCap { break }
+        if !autoLineMode && count > end { break }
+        if autoLineMode && selectedLines >= defaultLineHardCap { break }
         if formattedContent != "" {
             formattedContent += "\n"
         }
@@ -537,7 +534,7 @@ if mode == "chunk" {
         allContent += text
         selectedLines++
         visibleBytes += len(displayText) + 1
-        if linesSpecified {
+        if !autoLineMode {
             if selectedLines >= lines { break }
         } else {
             if selectedLines >= lines && visibleBytes >= autoTargetBytes { break }
