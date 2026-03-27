@@ -1,13 +1,13 @@
 # ssa2llvm
 
-`ssa2llvm` 负责把 YakSSA lowering 到 LLVM IR，并进一步产出：
+`ssa2llvm` 负责把 YakSSA lowering 到 LLVM IR，并继续产出汇编、目标文件和原生可执行文件。当前主路径是 **AOT 编译 + `libyak.a` 运行时链接**，不再依赖早期的 JIT-only 试验路径。
 
-- LLVM IR（`.ll`）
-- 汇编（`.s`）
-- 目标文件（`.o`）
-- 原生可执行文件
+当前统一约定：
 
-链接阶段默认会接入 `common/yak/ssa2llvm/runtime/libyak.a` 和 `libgc`。当前调用 ABI 已统一为单参数 `InvokeContext`，普通函数调用、stdlib dispatch、`go` 异步调用都走同一套协议。
+- 调用 ABI 统一为单参数 `InvokeContext`
+- 普通 Yak 函数、builtin/stdlib、runtime shadow method、`go` 异步调用都经由 `yak_runtime_invoke`
+- 复杂对象通过 Go object + shadow object + Boehm GC 混合模型运行
+- 测试以“最终二进制可运行且输出正确”为准，不再依赖 hook/stub 复制运行时行为
 
 ## 依赖安装
 
@@ -17,7 +17,7 @@
 ./common/yak/ssa2llvm/scripts/install_deps_ubuntu.sh
 ```
 
-脚本会安装 `ssa2llvm` 运行和测试所需依赖（LLVM、clang 相关头文件、zlib/zstd、libgc）。
+脚本会安装 `ssa2llvm` 运行和测试所需依赖（LLVM、clang、zlib/zstd、libgc 等）。
 
 ## 构建运行时静态库
 
@@ -30,10 +30,6 @@
 产物位置：
 
 - `common/yak/ssa2llvm/runtime/libyak.a`
-
-兼容脚本仍保留在：
-
-- `common/yak/ssa2llvm/runtime/build_runtime_go.sh`
 
 ## 构建 CLI
 
@@ -59,27 +55,33 @@ go build -o ./ssa2llvm ./common/yak/ssa2llvm/cmd
 
 ### 2. 嵌入 runtime 到 CLI
 
-如果发布 CLI 时不想依赖外置 `libyak.a`，可以先打包嵌入资源：
-
 ```bash
 ./common/yak/ssa2llvm/scripts/build_runtime_embed.sh
 go build -tags ssa2llvm_gzip_embed -o ./ssa2llvm ./common/yak/ssa2llvm/cmd
 ```
 
-这会在 `common/yak/ssa2llvm/runtime/embed/` 下生成：
+会在 `common/yak/ssa2llvm/runtime/embed/` 下生成：
 
 - `ssa2llvm-runtime.tar.gz`
 - `ssa2llvm-runtime-src.tar.gz`
 
 ### 3. 现场编译 runtime：`--stdlib-compile`
 
-发布版 CLI 没有本地 yaklang 源码目录时，可在编译 Yak 文件时现场恢复 runtime 源码并构建：
-
 ```bash
 ./ssa2llvm compile demo.yak --stdlib-compile
 ```
 
 该模式会释放 `ssa2llvm-runtime-src.tar.gz`，再执行 `go build -buildmode=c-archive` 生成临时 `libyak.a`，最后进入 clang 链接阶段。
+
+## 当前覆盖的关键能力
+
+- 普通函数调用、递归调用、`go` 异步调用
+- `defer` / `panic` / `recover` / `try-catch-finally`
+- `sync.NewWaitGroup` / `NewSizedWaitGroup` / `NewLock` / `NewMutex` / `NewRWMutex`
+- `sync.NewMap` / `NewPool` / `NewOnce` / `NewCond` 构造入口
+- Go shadow object 反射方法分发
+- `make([]int)` / `make([]int, n)` / `append(a, x)` 这类 slice 基础能力
+- closure freevalue / parameter capture 基线
 
 ## 测试与验证
 
@@ -95,14 +97,14 @@ go test ./common/yak/ssa2llvm/... -count=1
 
 ## 机制文档
 
-- dispatch id 与 stdlib/libyak：`common/yak/ssa2llvm/docs/dispatch-and-stdlib.md`
-- `InvokeContext`、函数调用与 goroutine：`common/yak/ssa2llvm/docs/context-call-and-goroutine.md`
+- builtin ID、stdlib 与 runtime shadow method：`common/yak/ssa2llvm/docs/dispatch-and-stdlib.md`
+- `InvokeContext`、函数调用、closure binding 与 goroutine：`common/yak/ssa2llvm/docs/context-call-and-goroutine.md`
 - `defer` / `panic` / `recover` / `try-catch-finally`：`common/yak/ssa2llvm/docs/error-handling.md`
-- GC 与 shadow object：`common/yak/ssa2llvm/docs/gc-mechanism.md`
+- GC、shadow object、async roots：`common/yak/ssa2llvm/docs/gc-mechanism.md`
 
 ## 关键目录
 
-- `common/yak/ssa2llvm/compiler`：LLVM lowering、linker、wrapper、调用与错误处理
-- `common/yak/ssa2llvm/runtime`：`libyak.a`、dispatch ABI、Go runtime glue
-- `common/yak/ssa2llvm/tests`：从 IR 到最终二进制运行结果的集成测试
+- `common/yak/ssa2llvm/compiler`：SSA → LLVM lowering、wrapper、call/error lowering、函数级编译上下文
+- `common/yak/ssa2llvm/runtime`：`libyak.a`、ABI 定义、Go runtime glue、embed 资源
+- `common/yak/ssa2llvm/tests`：从 IR 到最终二进制输出的集成测试
 - `common/yak/ssa2llvm/obfuscation`：SSA/LLVM obfuscator 注册与实现

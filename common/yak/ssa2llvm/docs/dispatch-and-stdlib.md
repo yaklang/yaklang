@@ -1,125 +1,137 @@
-# Dispatch ID 与 stdlib/libyak 机制说明
+# Builtin ID、stdlib 与 runtime shadow method 机制说明
 
-本文档说明 `ssa2llvm` 里“stdlib 调用”的整体机制：编译器如何把 `println/print/os.Getenv/poc.*` 等函数调用 lowering 为一个统一的 runtime dispatcher（通过 `dispatch id`），以及最终如何与 `libyak.a` 链接并在二进制里运行。
+本文档说明 `ssa2llvm` 当前的 builtin/runtime 调用模型：编译器如何把 `println/print/os.Getenv/poc.*`、`sync.*`、`append` 等调用 lowering 为统一的 builtin ID 分发，以及 Go shadow object 方法如何通过单独的 runtime shadow method 路径执行。
 
----
+## 1. 设计目标
 
-## 1. 设计目标：把 stdlib 变成一个入口
+当前的目标不是导出一堆独立 runtime 符号，而是统一收敛到：
 
-`ssa2llvm` 的目标之一是减少最终二进制里可读/可枚举的导出符号数量，并且让编译器侧的调用 lowering 稳定、可扩展。
+- `yak_runtime_invoke(ctx)` 作为唯一公共运行时入口
+- `InvokeContext.Kind + Target(FuncID)` 作为 builtin/runtime dispatch 信息
 
-因此 stdlib 调用不直接链接到一堆 `yak_stdlib_xxx` 符号，而是统一收敛到 invoke ABI：
+这样做的好处：
 
-- `yak_runtime_invoke(ctx)` 作为统一入口
-- `KindDispatch + dispatch id + FlagAsync` 作为 stdlib 分发信息
+- 编译器侧调用 lowering 只有一套入口
+- builtin 增量扩展只需要加稳定 ID 和 runtime 分支
+- 最终二进制里的公开调用面更小
 
-编译器只需要把“我要调用哪个 stdlib 函数”编码为一个稳定的整数 ID，然后把参数打包进 `InvokeContext` 即可。
+## 2. builtin ID 定义
 
----
+builtin ID 现在定义在：
 
-## 2. dispatch id：稳定的函数编号
+- `common/yak/ssa2llvm/runtime/abi/abi.go`
 
-dispatch id 定义在：
+这里统一包含：
 
-- `common/yak/ssa2llvm/runtime/dispatch/ids.go`
+- `FuncID`
+- 一组稳定的 builtin ID 常量
+- `InvokeContext` header layout
 
-里面包含：
+当前已覆盖：
 
-- `dispatch.FuncID`：函数 ID 的类型（`int64`）
-- 一组稳定的常量 ID（`IDPrint/IDPrintln/IDOsGetenv/...`）
+- `print / printf / println`
+- `yakit.*`
+- `os.Getenv`
+- `poc.*`
+- `sync.NewWaitGroup / NewSizedWaitGroup / NewLock / NewMutex / NewRWMutex`
+- `sync.NewMap / NewPool / NewOnce / NewCond`
+- `append`
+- runtime shadow method dispatch
 
-### 稳定性约束
+这些 ID 一旦发布，应保持稳定；否则旧 IR/旧二进制会调用到错误分支。
 
-这些 ID 一旦发布，就应该保持稳定；否则旧的 IR/二进制可能会调用到错误的 runtime 分支。
+## 3. 编译器侧绑定
 
----
-
-## 3. 编译器侧：从函数名绑定到 DispatchID
-
-编译器的 name→binding 映射在：
+name → builtin ID 的绑定在：
 
 - `common/yak/ssa2llvm/compiler/externs.go`
 
-`ExternBinding` 里有 `DispatchID dispatch.FuncID` 字段：
+`ExternBinding` 当前有两个主要用途：
 
-- 当 `DispatchID != 0` 时，该函数调用会走 stdlib dispatcher lowering。
-- 例如 `println/print/printf/os.Getenv/poc.*` 都在默认 bindings 中绑定了对应的 ID。
+- `DispatchID != 0`：走 builtin ID dispatcher
+- `Symbol != ""`：走 callable extern
 
-一个典型流程：
+例如：
 
-1. SSA 里出现 `Call` 指令，callee 名称解析为 `println`
-2. 查到 `ExternBinding{DispatchID: dispatch.IDPrintln}`
-3. lowering 为：构造 `InvokeContext(kind=Dispatch, target=IDPrintln, args=...)`，然后调用 `yak_runtime_invoke(ctx)`
+1. SSA `Call` 解析到 `println`
+2. 命中 `ExternBinding{DispatchID: abi.IDPrintln}`
+3. 编译器构造 `InvokeContext(kind=Dispatch, target=IDPrintln, args=...)`
+4. 调用 `yak_runtime_invoke(ctx)`
 
-相关 lowering 代码：
+对应 lowering 代码：
 
 - `common/yak/ssa2llvm/compiler/ops_call.go`
 - `common/yak/ssa2llvm/compiler/ops_call_context_internal.go`
 
----
+## 4. runtime 侧如何执行 builtin
 
-## 4. Runtime 侧：KindDispatch 如何执行
-
-统一 invoke 入口定义在：
+runtime dispatcher 位于：
 
 - `common/yak/ssa2llvm/runtime/runtime_go/invoke.go`
 - `common/yak/ssa2llvm/runtime/runtime_go/stdlib.go`
+- `common/yak/ssa2llvm/runtime/runtime_go/sync_runtime.go`
+- `common/yak/ssa2llvm/runtime/runtime_go/slice_runtime.go`
 
-当 `ctx.kind == abi.KindDispatch` 时，runtime 会进入 dispatch 分支。核心步骤（概念上）：
+其中 sync 构造优先复用：
 
-1. `yak_runtime_invoke(ctx)` 读取 `ctx.flags` 与 `ctx.kind`
-2. 分支到 `invokeDispatch(ctx)`
-3. 读取 `ctx.target`，把它当作 `dispatch.FuncID`
-4. 读取 `ctx.argc` 和参数数组
-5. `switch(id)` 调到具体实现（如 `stdlibPrintln/stdlibOsGetenv/...`）
-6. 将返回值写回 `ctx.ret`
+- `common/yak/yaklib/sync.go`
 
-注意：
+这样可以和 Yak 解释执行侧的 sync 语义保持一致，并直接复用 `yaklib` 中的公开实现。
 
-- 目前所有值在 LLVM 侧统一用 `i64` 表示；runtime 需要按照约定对“被标记的指针值”做解码（详见下一节）。
+当 `ctx.kind == abi.KindDispatch` 时，runtime 会：
 
----
+1. 从 `ctx.target` 读取 `abi.FuncID`
+2. 从 `ctx.argc` 与参数区读取参数
+3. 在 `switch(id)` 中进入对应 builtin 实现
+4. 把返回值写回 `ctx.ret`
 
-## 5. Print 类调用的指针 Tag 与 Roots
+当前 builtin 里，`append` 已经是一个真实 runtime builtin，而不是测试 stub 或 CLI 特判。
 
-为了在 LLVM 中把“指针值/字符串”塞进 `i64`，并且让 runtime 能识别哪些参数应该当作字符串/指针来解释，`ssa2llvm` 对部分 stdlib（例如 `print/println/printf/yakit.*`）使用指针 tag 机制：
+## 5. runtime shadow method
 
-- `yakTaggedPointerMask = 1<<62`（见 runtime 侧实现）
-- 编译器在 lowering 时，若某个参数 SSA 类型被判定为“指针样式”（string/object/map/slice/struct/ptr），且该 stdlib 需要 tag，则会对参数做 `or mask`。
+Go shadow object 的方法调用与普通 stdlib 不同：
 
-同时，为了解决 **Boehm GC 只能扫描 C/LLVM 的可达性，无法扫描 Go 栈** 的问题，`InvokeContext` 还带有 `roots` 区域：
+- 它不是 Yak object-factor 本地方法
+- 它也不是一堆按类型手写 `switch`
 
-- 对于被 tag 的指针参数，编译器会把 **未 tag 的原始指针** 写入 `roots[i]`，以便 Boehm GC 能看到真实指针，避免误回收。
+当前路径是：
 
-这部分布局定义在：
+- 编译器把这类调用 lowering 为 `abi.IDRuntimeShadowMethod`
+- runtime 在 `runtime_method.go` 中通过反射：
+  - 找 method
+  - 解码参数
+  - 处理 variadic
+  - 规范化返回值/错误
+
+这条路径当前主要服务于：
+
+- `sync.NewLock()` / `NewMutex()` / `NewRWMutex()` 返回的 shadow object
+- `sync.NewWaitGroup()` / `NewSizedWaitGroup()` 返回的 shadow object
+
+Yak 自己的 object-factor `a.set()` / `a.get()` 仍然走本地函数调用 lowering，不经过这条 runtime shadow method 路径。
+
+## 6. 指针 tag 与 roots
+
+为了让 LLVM 侧仍然用 `i64` 传值，同时又能正确传递字符串/对象指针，`ssa2llvm` 对部分 builtin 参数使用 tagged pointer 机制。
+
+当前关键点：
+
+- 编译器对需要保活/按指针解释的参数加 tag
+- 原始未 tag 指针写入 `InvokeContext.Roots`
+- runtime 解码 tagged pointer 后恢复 Go/shadow object 或 C string
+
+相关定义：
 
 - `common/yak/ssa2llvm/runtime/abi/abi.go`
+- `common/yak/ssa2llvm/compiler/ops_call_context_internal.go`
 
----
-
-## 6. libyak.a：runtime 如何进入最终二进制
-
-`ssa2llvm` 的 runtime 以静态库形式提供：
-
-- `common/yak/ssa2llvm/runtime/libyak.a`
-
-该库主要由 `runtime/runtime_go/*.go`（以及少量 C glue）构建得到，导出给 LLVM/clang 链接使用。
-
-构建脚本：
-
-- `common/yak/ssa2llvm/scripts/build_runtime_go.sh`
-
-链接逻辑：
-
-- `common/yak/ssa2llvm/compiler/linker.go`（通过 `clang` 把 `.ll` + `libyak.a` + `-lgc -lpthread -ldl ...` 链到一起）
-
----
-
-## 7. 如何新增一个 stdlib dispatch 函数
+## 7. 如何新增 builtin
 
 最小步骤：
 
-1. 在 `common/yak/ssa2llvm/runtime/dispatch/ids.go` 增加一个稳定的 `FuncID`
-2. 在 `common/yak/ssa2llvm/runtime/runtime_go/stdlib.go` 的 `switch(id)` 里实现对应分支，并通过 `ctxSetRet` 写回返回值
-3. 在 `common/yak/ssa2llvm/compiler/externs.go` 增加 name→`DispatchID` 的绑定
-4. 如需对参数做 tag（例如打印类），在 `common/yak/ssa2llvm/compiler/ops_call_context_internal.go` 的 `shouldTagStdlibArgPointers` 增加对应 ID
+1. 在 `common/yak/ssa2llvm/runtime/abi/abi.go` 增加稳定 `FuncID`
+2. 在相应 runtime 文件实现逻辑，并在 `invoke.go` 的 dispatcher 中接入
+3. 在 `common/yak/ssa2llvm/compiler/externs.go` 增加 name → `DispatchID` 绑定
+4. 如参数需要 tagged pointer，在 `shouldTagStdlibArgPointers` 中补该 ID
+
+如果新增的是 **Go shadow object 方法**，优先复用 `runtime_method.go` 的反射分发，而不是继续在 `invoke.go` 里加类型特判。

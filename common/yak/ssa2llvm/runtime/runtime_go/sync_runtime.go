@@ -1,77 +1,70 @@
 package main
 
 import (
-	"sync"
-	"sync/atomic"
-
-	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
 )
 
-type runtimeWaitGroup struct {
-	waitGroup sync.WaitGroup
-	count     atomic.Int64
-}
-
-func (wg *runtimeWaitGroup) Add(delta ...int) {
-	if wg == nil {
-		return
-	}
-	n := 1
-	if len(delta) > 0 {
-		n = delta[0]
-	}
-	if n < 0 && wg.count.Load()+int64(n) < 0 {
-		n = -int(wg.count.Load())
-	}
-	wg.count.Add(int64(n))
-	wg.waitGroup.Add(n)
-}
-
-func (wg *runtimeWaitGroup) Done() {
-	if wg == nil {
-		return
-	}
-	wg.Add(-1)
-}
-
-func (wg *runtimeWaitGroup) Wait() {
-	if wg == nil {
-		return
-	}
-	wg.waitGroup.Wait()
-}
+type runtimeWaitGroup = yaklib.WaitGroupProxy
 
 func stdlibSyncNewWaitGroup(args []uint64) int64 {
 	if len(args) != 0 {
 		return 0
 	}
-	return int64(uintptr(newStdlibShadow(&runtimeWaitGroup{})))
+	return int64(uintptr(newStdlibShadow(yaklib.NewWaitGroup())))
 }
 
 func stdlibSyncNewSizedWaitGroup(args []uint64) int64 {
 	if len(args) != 1 {
 		return 0
 	}
-	return int64(uintptr(newStdlibShadow(utils.NewSizedWaitGroup(int(int64(args[0]))))))
+	return int64(uintptr(newStdlibShadow(yaklib.NewSizedWaitGroup(int(int64(args[0]))))))
 }
 
 func stdlibSyncNewLock(args []uint64) int64 {
 	if len(args) != 0 {
 		return 0
 	}
-	return int64(uintptr(newStdlibShadow(new(sync.Mutex))))
+	return int64(uintptr(newStdlibShadow(yaklib.NewLock())))
 }
 
 func stdlibSyncNewMutex(args []uint64) int64 {
 	if len(args) != 0 {
 		return 0
 	}
-	return int64(uintptr(newStdlibShadow(new(sync.Mutex))))
+	return int64(uintptr(newStdlibShadow(yaklib.NewMutex())))
 }
 
 func stdlibSyncNewRWMutex(args []uint64) int64 {
 	if len(args) != 0 {
 		return 0
 	}
-	return int64(uintptr(newStdlibShadow(new(sync.RWMutex))))
+	return int64(uintptr(newStdlibShadow(yaklib.NewRWMutex())))
+}
+
+func stdlibSyncNewMap(args []uint64) int64 {
+	if len(args) != 0 {
+		return 0
+	}
+	return int64(uintptr(newStdlibShadow(yaklib.NewMap())))
+}
+
+func stdlibSyncNewOnce(args []uint64) int64 {
+	if len(args) != 0 {
+		return 0
+	}
+	return int64(uintptr(newStdlibShadow(yaklib.NewOnce())))
+}
+
+func stdlibSyncNewPool(args []uint64) int64 {
+	if len(args) != 0 {
+		return 0
+	}
+	return int64(uintptr(newStdlibShadow(yaklib.NewPool())))
+}
+
+func stdlibSyncNewCond(args []uint64) int64 {
+	if len(args) != 0 {
+		return 0
+	}
+	return int64(uintptr(newStdlibShadow(yaklib.NewCond())))
 }

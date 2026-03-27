@@ -80,6 +80,22 @@ var defaultExternBindings = map[string]ExternBinding{
 		Return:     ExternTypePtr,
 		DispatchID: abi.IDSyncNewRWMutex,
 	},
+	"sync.NewMap": {
+		Return:     ExternTypePtr,
+		DispatchID: abi.IDSyncNewMap,
+	},
+	"sync.NewOnce": {
+		Return:     ExternTypePtr,
+		DispatchID: abi.IDSyncNewOnce,
+	},
+	"sync.NewPool": {
+		Return:     ExternTypePtr,
+		DispatchID: abi.IDSyncNewPool,
+	},
+	"sync.NewCond": {
+		Return:     ExternTypePtr,
+		DispatchID: abi.IDSyncNewCond,
+	},
 	"poc.timeout": {
 		Return:     ExternTypePtr,
 		DispatchID: abi.IDPocTimeout,

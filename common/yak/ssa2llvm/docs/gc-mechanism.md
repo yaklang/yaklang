@@ -2,68 +2,117 @@
 
 本文档说明 `ssa2llvm` 当前使用的 GC 机制实现。
 
-## 总览
+## 1. 总览
 
-`ssa2llvm` 采用 Go 对象 + C 侧影子对象（shadow object）的混合模型：
+`ssa2llvm` 采用 Go 对象 + C 侧 shadow object 的混合模型：
 
-- 对象真实状态保存在 Go 对象中。
-- Go 侧通过 `cgo.NewHandle(obj)` 生成 `handleID`，用它保持对象可达。
-- LLVM/C 侧不直接持有 Go 指针，只持有一个很小的影子对象；影子对象里保存 `handleID`。
-- 影子对象由 Boehm GC（`libgc`）分配和追踪，因此 C/LLVM 栈上的可达性可被正确识别。
-- 当影子对象不可达时，Boehm finalizer 被触发，回调到 Go 执行 `handle.Delete()`。
-- `handle.Delete()` 后，如果 Go 侧没有其他引用，该对象即可被 Go GC 回收。
+- 对象真实状态保存在 Go 对象里
+- Go 侧通过 `cgo.NewHandle(obj)` 持有对象
+- LLVM/C 侧不直接持有 Go 指针，只持有 shadow object
+- shadow object 由 Boehm GC（`libgc`）分配和追踪
+- shadow object 被回收时，再反向删除 Go handle
 
-这形成了完整闭环：Go 创建对象并交给 `cgo.Handle` 保活，C 侧用 Boehm 管理可达性，Boehm 回收时再释放 `cgo.Handle`，最终允许 Go GC 回收对象。
+这样可以同时满足：
 
-## 运行时组件
+- C/LLVM 栈上的可达性由 Boehm 负责
+- Go 对象生命周期由 `cgo.Handle` 间接管理
 
-- 运行时静态库：`common/yak/ssa2llvm/runtime/libyak.a`
-- Go 运行时代码：`common/yak/ssa2llvm/runtime/runtime_go/yak_lib.go`
-- Finalizer 代理（C）：`common/yak/ssa2llvm/runtime/runtime_go/c_stub.c`
+## 2. 运行时组件
 
-核心导出 API：
+核心位置：
+
+- `common/yak/ssa2llvm/runtime/libyak.a`
+- `common/yak/ssa2llvm/runtime/runtime_go/yak_lib.go`
+- `common/yak/ssa2llvm/runtime/runtime_go/c_stub.c`
+- `common/yak/ssa2llvm/runtime/runtime_go/ctx_root.c`
+
+关键导出 API：
 
 - `yak_runtime_new_shadow`
 - `yak_runtime_get_field`
 - `yak_runtime_set_field`
-- `yak_runtime_dump_handle`
 - `yak_runtime_gc`
+- `yak_runtime_wait_async`
+- `yak_runtime_make_slice`
 
-## 对象分配与生命周期
+## 3. shadow object 生命周期
 
-1. Go 侧（例如 stdlib 实现）创建 Go 对象，并存入 `cgo.Handle` 得到 `handleID`。
-2. Go 侧调用 `yak_runtime_new_shadow(handleID)`，用 `GC_malloc` 分配影子对象内存（当前为 16 字节：magic + handleID）。
-3. 影子对象里保存 `handleID`（`uintptr_t`），同时在 Go 侧的 `shadowHandles` map 里登记一份（避免对潜在的无效指针解引用）。
-4. 通过 `GC_register_finalizer` 注册 Boehm finalizer。
-5. 影子对象被回收时：
-   - C 回调 `yak_finalizer_proxy` 被触发；
-   - 回调进入 Go 的 `yak_internal_release_shadow`；
-   - 由 `yak_host_release_handle` 删除对应 `cgo.Handle`，释放 Go 侧引用。
+1. runtime 创建 Go 对象，并放入 `cgo.Handle`
+2. 调用 `yak_runtime_new_shadow(handleID)`，通过 `GC_malloc` 分配 shadow object
+3. shadow object 内保存 magic + handleID
+4. Go 侧 `shadowHandles` map 也登记一份，避免对野指针解引用
+5. `GC_register_finalizer` 注册 Boehm finalizer
+6. shadow object 被回收时：
+   - C 回调 `yak_finalizer_proxy`
+   - 进入 Go 的 `yak_internal_release_shadow`
+   - 最终调用 `yak_host_release_handle` 删除 `cgo.Handle`
 
-## 编译与链接
+## 4. 当前哪些值走 shadow object
 
-- 运行时构建脚本：
-  - `common/yak/ssa2llvm/scripts/build_runtime_go.sh`
-- 最终二进制链接（`CompileLLVMToBinary`）包含：
-  - `-lyak`（运行时库）
-  - `-lgc`（Boehm GC）
-  - `-lpthread -ldl`
+当前主要包括：
 
-## 生成程序中的 GC 触发
+- sync 系列 runtime object
+- runtime 里的 slice object
+- 运行时返回的复杂对象
+- 被 tagged pointer 协议包装并需要跨边界传递的 Go 值
 
-在 `compiler/api.go` 中，会注入 `main` wrapper。执行完 Yak 入口函数后，会调用 `yak_runtime_gc()`：
+Yak object-factor 自己的纯 Yak 对象不一定都走 shadow object；shadow object 主要用于 runtime/Go 持有真实状态的值。
 
-- `GC_gcollect()`：触发 Boehm GC 回收
-- `runtime.GC()`：触发 Go GC 回收
-- 短暂 sleep：用于测试场景下让 finalizer 调度更稳定
+## 5. roots 与 tagged pointer
 
-## Ubuntu/Debian 依赖
+LLVM 侧当前仍大量使用 `i64` 传值，因此：
 
-可通过脚本安装：
+- 某些参数会被编码成 tagged pointer
+- 为了让 Boehm GC 看到真实未 tag 指针，会把原始指针写入 `InvokeContext.Roots`
 
-- `./common/yak/ssa2llvm/scripts/install_deps_ubuntu.sh`
+这主要影响：
 
-当前依赖包：
+- print / printf / println
+- append 等会跨 runtime 边界返回复杂值的 builtin
+- 某些 runtime shadow object 调用参数
+
+## 6. async ctx roots
+
+`go` 异步调用时，`InvokeContext` 不能只依赖当前 C/LLVM 栈存活。
+
+因此 runtime 在 C 侧维护了一条 ctx root 链：
+
+- async 调用启动前把 `ctx` 挂入 root 链
+- goroutine 结束后再移除 root
+- root 挂住期间，`ctx` 及其 `Roots` 都对 Boehm 可见
+
+这保证了异步期间不会把仍在执行的上下文对象误回收。
+
+## 7. main wrapper 中的 GC 触发
+
+`main` wrapper 执行完 Yak 入口函数后，会调用：
+
+- `yak_runtime_wait_async()`
+- `yak_runtime_gc()`
+
+其中 `yak_runtime_gc()` 会做：
+
+- `GC_gcollect()`
+- `runtime.GC()`
+- 一个很短的 sleep，让测试环境里 finalizer 更稳定
+
+这也是为什么很多集成测试能稳定看到 `Releasing handle` 日志。
+
+## 8. 依赖与构建
+
+依赖安装：
+
+```bash
+./common/yak/ssa2llvm/scripts/install_deps_ubuntu.sh
+```
+
+运行时构建：
+
+```bash
+./common/yak/ssa2llvm/scripts/build_runtime_go.sh
+```
+
+关键依赖通常包括：
 
 - `llvm-dev`
 - `libclang-dev`
@@ -71,7 +120,8 @@
 - `libzstd-dev`
 - `libgc-dev`
 
-## 边界与注意事项
+## 9. 注意事项
 
-- 该机制只覆盖“走影子对象路径”的对象生命周期管理，其他所有权模型需要单独设计。
-- `GCLOG` 日志主要用于调试和测试，不应作为生产环境稳定输出约定。
+- `GCLOG` 主要用于调试和测试，不应作为稳定输出协议
+- 当前 GC 机制只覆盖走 shadow object 路径的值
+- 如果未来引入新的复杂值模型，必须先明确它是否纳入 shadow object / root 可达性协议
