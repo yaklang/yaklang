@@ -93,6 +93,12 @@ const (
 
 	// builtin slice helpers
 	IDAppend FuncID = 18
+
+	// additional sync constructors
+	IDSyncNewMap  FuncID = 19
+	IDSyncNewOnce FuncID = 20
+	IDSyncNewPool FuncID = 21
+	IDSyncNewCond FuncID = 22
 )
 
 type SliceElemKind int64

@@ -148,6 +148,14 @@ func invokeDispatch(ctx unsafe.Pointer) {
 		ret = stdlibSyncNewMutex(args)
 	case abi.IDSyncNewRWMutex:
 		ret = stdlibSyncNewRWMutex(args)
+	case abi.IDSyncNewMap:
+		ret = stdlibSyncNewMap(args)
+	case abi.IDSyncNewOnce:
+		ret = stdlibSyncNewOnce(args)
+	case abi.IDSyncNewPool:
+		ret = stdlibSyncNewPool(args)
+	case abi.IDSyncNewCond:
+		ret = stdlibSyncNewCond(args)
 	case abi.IDRuntimeShadowMethod:
 		ret = stdlibRuntimeShadowMethod(args)
 	case abi.IDAppend:

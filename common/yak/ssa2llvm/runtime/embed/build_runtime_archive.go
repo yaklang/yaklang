@@ -53,6 +53,9 @@ func BuildRuntimeArchiveFromSourceTree(buildDir, srcDir string) (archivePath str
 	if _, err := os.Stat(archivePath); err != nil {
 		return "", "", fmt.Errorf("build runtime archive failed: output libyak.a missing: %v", err)
 	}
+	if _, err := writeRuntimeLinkArgsFile(buildDir, srcDir); err != nil {
+		return "", "", err
+	}
 	return archivePath, gcLibDir, nil
 }
 
@@ -64,4 +67,30 @@ func BuildRuntimeArchiveFromEmbeddedSource(buildDir string) (archivePath string,
 		return "", "", err
 	}
 	return BuildRuntimeArchiveFromSourceTree(buildDir, srcDir)
+}
+
+func writeRuntimeLinkArgsFile(buildDir, srcDir string) (string, error) {
+	goPath, err := exec.LookPath("go")
+	if err != nil {
+		return "", fmt.Errorf("go toolchain not found in PATH: %w", err)
+	}
+
+	runtimeDir := filepath.Join(srcDir, "common", "yak", "ssa2llvm", "runtime", "runtime_go")
+	cmd := exec.Command(goPath, "list", "-deps", "-f", "{{if .CgoLDFLAGS}}{{range .CgoLDFLAGS}}{{printf \"%s\\n\" .}}{{end}}{{end}}", ".")
+	cmd.Dir = runtimeDir
+	cmd.Env = append(os.Environ(),
+		"CGO_ENABLED=1",
+		"GOWORK=off",
+	)
+	trace.PrintCmd(cmd)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("build runtime archive failed: collect runtime link args: %v\n%s", err, out)
+	}
+
+	linkFlagsPath := filepath.Join(buildDir, "libyak.linkflags")
+	if err := os.WriteFile(linkFlagsPath, out, 0o644); err != nil {
+		return "", fmt.Errorf("build runtime archive failed: write %s: %v", linkFlagsPath, err)
+	}
+	return linkFlagsPath, nil
 }

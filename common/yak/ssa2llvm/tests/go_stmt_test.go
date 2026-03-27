@@ -179,3 +179,27 @@ func main() {
 	output := runBinaryWithEnv(t, code, "main", nil)
 	requireOutputLinesUnordered(t, output, "7", "8")
 }
+
+func TestSync_Map_StoreLoad(t *testing.T) {
+	code := `
+func main() {
+	m = sync.NewMap()
+	m.Store("a", 12)
+	println(m.Load("a"))
+}
+`
+	output := runBinaryWithEnv(t, code, "main", nil)
+	require.Equal(t, "12\n", output)
+}
+
+func TestSync_Pool_PutGet(t *testing.T) {
+	code := `
+func main() {
+	p = sync.NewPool()
+	p.Put(13)
+	println(p.Get())
+}
+`
+	output := runBinaryWithEnv(t, code, "main", nil)
+	require.Equal(t, "13\n", output)
+}
