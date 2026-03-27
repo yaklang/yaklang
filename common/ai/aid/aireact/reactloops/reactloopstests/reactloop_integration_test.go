@@ -58,7 +58,7 @@ func TestReActLoop_BasicExecution(t *testing.T) {
 }
 
 func isRequireToolParamPrompt(prompt string) bool {
-	if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
+	if utils.MatchAllOfSubString(prompt, "Generate appropriate parameters for this tool call based on the context above", "call-tool") {
 		return true
 	}
 

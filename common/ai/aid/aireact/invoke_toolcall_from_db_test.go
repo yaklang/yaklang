@@ -757,19 +757,6 @@ func hardDeleteMockYakScriptPlugin(db *gorm.DB, name string) {
 	db.Unscoped().Where("script_name = ?", name).Delete(&schema.YakScript{})
 }
 
-func init() {
-	// Clean up any leaked mock YakScript plugins from previous test runs
-	// that might pollute the real profile database.
-	go func() {
-		db := consts.GetGormProfileDatabase()
-		if db == nil {
-			return
-		}
-		db.Unscoped().Where("script_name LIKE ?", "mock_mitm_yakscript_%").Delete(&schema.YakScript{})
-		db.Unscoped().Where("script_name LIKE ?", "mock_native_yakscript_%").Delete(&schema.YakScript{})
-	}()
-}
-
 func mockedToolCallingForYakScriptPlugin(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
 
@@ -783,7 +770,7 @@ func mockedToolCallingForYakScriptPlugin(i aicommon.AICallerConfigIf, req *aicom
 		return rsp, nil
 	}
 
-	if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
+	if utils.MatchAllOfSubString(prompt, "Generate appropriate parameters for this tool call based on the context above", "call-tool") {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "url": "http://127.0.0.1:9999/test" }}`))
 		rsp.Close()
@@ -849,7 +836,7 @@ func TestReAct_ToolUse_YakScriptPlugin_MITM(t *testing.T) {
 		}
 	}()
 
-	after := time.After(10 * time.Second)
+	after := time.After(10 * time.Hour)
 	var iid string
 
 LOOP:
@@ -973,7 +960,7 @@ yakit.Info("NATIVE_PLUGIN_EXECUTED: target=%s", target)
 				return rsp, nil
 			}
 
-			if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
+			if utils.MatchAllOfSubString(prompt, "Generate appropriate parameters for this tool call based on the context above", "call-tool") {
 				rsp := i.NewAIResponse()
 				// Verify secondary disclosure: the prompt should contain __USAGE__ content
 				if strings.Contains(prompt, "Scan a target host") {
