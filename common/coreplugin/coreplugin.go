@@ -299,6 +299,12 @@ func syncCorePluginEmbedInternal() error {
 		withPluginEnableGenerateParam(true),
 		withPluginIgnore(true),
 	)
+	registerBuildInPlugin(
+		"yak", "YakScript AI元数据生成",
+		withPluginHelp("根据 YakScript 的脚本信息和源码生成 ai_desc、ai_keywords、ai_usage"),
+		withPluginAuthors("Rookie"),
+		withPluginEnableGenerateParam(true),
+	)
 
 	registerBuildInPlugin(
 		"yak", "Tun劫持服务",
