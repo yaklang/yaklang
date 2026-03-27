@@ -71,7 +71,10 @@ func isNonFatalCDPError(err error) bool {
 		return false
 	}
 	msg := err.Error()
-	return strings.Contains(msg, "Object reference chain is too long")
+	// "Object reference chain is too long" — rod 内部偶发的非致命错误
+	// "Execution context was destroyed" — SPA/CAS 页面发生跳转/重定向时
+	return strings.Contains(msg, "Object reference chain is too long") ||
+		strings.Contains(msg, "Execution context was destroyed")
 }
 
 func (p *BrowserPage) Reload() error {
