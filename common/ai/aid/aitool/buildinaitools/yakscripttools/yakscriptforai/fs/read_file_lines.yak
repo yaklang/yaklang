@@ -106,12 +106,10 @@ defaultLineHardCap = 400
 // 解析命令行参数
 filePath := cli.String("file", cli.setRequired(true), cli.setHelp("target file you want to read"))
 offset := cli.Int("offset", cli.setRequired(false), cli.setDefault(1), cli.setHelp("start line number (1-based), default is 1"))
-lines := cli.Int("lines", cli.setRequired(false), cli.setDefault(defaultLineCount), cli.setHelp("how many lines you want to read, default is 200"))
+lines := cli.Int("lines", cli.setRequired(false), cli.setDefault(0), cli.setHelp("how many lines you want to read; <=0 enables auto sizing"))
 lineSize := cli.Int("line-size", cli.setRequired(false), cli.setDefault(defaultLineSize), cli.setHelp("the max characters in a line, default is 1024"))
 
 cli.check()
-
-linesSpecified := cli.Have("lines")
 
 // 检查文件是否存在
 if !file.IsExisted(filePath) {
@@ -417,7 +415,9 @@ linesRead := 0
 startLine := offset
 visibleBytes := 0
 autoTargetBytes := 0
-if !linesSpecified {
+autoLineMode := lines <= 0
+if autoLineMode {
+    lines = defaultLineCount
     autoTargetBytes = defaultLineTargetBytes
     if fileSize > 0 && fileSize < autoTargetBytes {
         autoTargetBytes = fileSize
@@ -445,10 +445,10 @@ for {
         continue
     }
 
-    if linesSpecified && linesRead >= lines {
+    if !autoLineMode && linesRead >= lines {
         break
     }
-    if !linesSpecified && linesRead >= defaultLineHardCap {
+    if autoLineMode && linesRead >= defaultLineHardCap {
         break
     }
     
@@ -473,7 +473,7 @@ for {
     linesRead++
     visibleBytes += len(displayText) + 1
 
-    if !linesSpecified && linesRead >= lines && visibleBytes >= autoTargetBytes {
+    if autoLineMode && linesRead >= lines && visibleBytes >= autoTargetBytes {
         break
     }
     
