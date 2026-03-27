@@ -158,14 +158,13 @@ func (c *Coordinator) collectTaskArtifactFiles() []string {
 			taskIndex = "0"
 		}
 		taskDir := filepath.Join(workdir, aicommon.BuildTaskDirName(taskIndex, task.GetSemanticIdentifier()))
-		safeTaskIndex := strings.ReplaceAll(taskIndex, "-", "_")
 
-		summaryPath := filepath.Join(taskDir, fmt.Sprintf("task_%s_result_summary.txt", safeTaskIndex))
+		summaryPath := filepath.Join(taskDir, aicommon.BuildTaskResultSummaryFilename(taskIndex, task.GetSemanticIdentifier()))
 		if _, err := os.Stat(summaryPath); err == nil {
 			files = append(files, summaryPath)
 		}
 
-		timelinePath := filepath.Join(taskDir, fmt.Sprintf("task_%s_timeline_diff.txt", safeTaskIndex))
+		timelinePath := filepath.Join(taskDir, aicommon.BuildTaskTimelineDiffFilename(taskIndex, task.GetSemanticIdentifier()))
 		if _, err := os.Stat(timelinePath); err == nil {
 			files = append(files, timelinePath)
 		}

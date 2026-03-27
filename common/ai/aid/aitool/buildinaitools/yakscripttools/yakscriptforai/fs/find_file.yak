@@ -56,6 +56,7 @@ patterns separated by "|", "," or any other delimiter within the pattern itself.
    - No wildcards, no regex syntax, no special characters.
    - The entire pattern string must appear somewhere in the full absolute path.
    - CORRECT:   {"pattern": "result_summary", "pattern-type": "substr"}
+    - CORRECT:   {"pattern": "timeline_diff", "pattern-type": "substr"}
    - CORRECT:   {"pattern": ".md", "pattern-type": "substr"}
    - WRONG:     {"pattern": "foo|bar", "pattern-type": "substr"}
                  ("|" is treated as a literal character, will match nothing)
@@ -67,7 +68,8 @@ patterns separated by "|", "," or any other delimiter within the pattern itself.
      "[abc]" matches character class.
    - The glob is matched against the FULL absolute path, so use "**" or leading "*"
      to match across directory levels.
-   - CORRECT:   {"pattern": "**/result_summary.txt", "pattern-type": "glob"}
+         - CORRECT:   {"pattern": "**/*_result_summary.txt", "pattern-type": "glob"}
+     - CORRECT:   {"pattern": "**/*_timeline_diff.txt", "pattern-type": "glob"}
    - CORRECT:   {"pattern": "*/tool_calls/*.md", "pattern-type": "glob"}
    - WRONG:     {"pattern": "*.md|*.txt", "pattern-type": "glob"}
                  ("|" is not glob syntax; this is a single invalid glob)
@@ -76,7 +78,7 @@ patterns separated by "|", "," or any other delimiter within the pattern itself.
    - Golang-style regular expression (re2 syntax).
    - This is the ONLY mode where "|" has special meaning (regex alternation).
    - Use this mode when you need to match multiple different patterns in one call.
-   - CORRECT:   {"pattern": "(result_summary\\.txt|directly_answer.*\\.md)", "pattern-type": "regexp"}
+    - CORRECT:   {"pattern": "(.*_(result_summary|timeline_diff)\\.txt|directly_answer.*\\.md)", "pattern-type": "regexp"}
    - CORRECT:   {"pattern": "\\.(md|txt|yaml)$", "pattern-type": "regexp"}
    - CORRECT:   {"pattern": "tool_calls/.*\\.md", "pattern-type": "regexp"}
 
@@ -92,8 +94,9 @@ Strategy B - Use include/include-ext for simple filename or extension filtering:
   {"pattern": "config", "pattern-type": "substr", "include": "config,setting"}
 
 Strategy C - Call the tool multiple times, once per pattern (if patterns are very different):
-  Call 1: {"pattern": "result_summary.txt", "pattern-type": "substr"}
-  Call 2: {"pattern": "directly_answer", "pattern-type": "substr", "include-ext": ".md"}
+        Call 1: {"pattern": "result_summary", "pattern-type": "substr"}
+    Call 2: {"pattern": "timeline_diff", "pattern-type": "substr"}
+    Call 3: {"pattern": "directly_answer", "pattern-type": "substr", "include-ext": ".md"}
 
 === Common Mistakes to Avoid ===
 
@@ -105,9 +108,9 @@ Strategy C - Call the tool multiple times, once per pattern (if patterns are ver
          "*" is a literal character in substr mode, not a wildcard.
          FIX: Use pattern ".md" in substr mode, or use glob/regexp mode.
 
-  WRONG: {"pattern": "result_summary.txt|directly_answer_*.md", "pattern-type": "substr"}
+    WRONG: {"pattern": "*_timeline_diff.txt|directly_answer_*.md", "pattern-type": "substr"}
          Mixes "|" separator (not supported) and "*" wildcard (not supported in substr).
-         FIX: {"pattern": "(result_summary\\.txt|directly_answer_.*\\.md)", "pattern-type": "regexp"}
+            FIX: {"pattern": "(.*_(timeline_diff|result_summary)\\.txt|directly_answer_.*\\.md)", "pattern-type": "regexp"}
 
 Filter Evaluation Order:
   1. type filter (file/dir)

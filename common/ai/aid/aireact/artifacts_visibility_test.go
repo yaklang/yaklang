@@ -86,11 +86,18 @@ func TestArtifactsVisibility_AfterAsyncPlanExecution(t *testing.T) {
 				log.Warnf("[TEST] Failed to write 1_bash_nmap_scan.md: %v", err)
 			}
 			if err := os.WriteFile(
-				filepath.Join(task1Dir, "task_1_1_result_summary.txt"),
+				filepath.Join(task1Dir, aicommon.BuildTaskTimelineDiffFilename("1-1", "network_scan")),
+				[]byte("# Task 1-1 Timeline Diff\n\n- scanned 254 hosts"),
+				0644,
+			); err != nil {
+				log.Warnf("[TEST] Failed to write network scan timeline diff: %v", err)
+			}
+			if err := os.WriteFile(
+				filepath.Join(task1Dir, aicommon.BuildTaskResultSummaryFilename("1-1", "network_scan")),
 				[]byte("Scan completed: 254 hosts scanned, 12 hosts up"),
 				0644,
 			); err != nil {
-				log.Warnf("[TEST] Failed to write task_1_1_result_summary.txt: %v", err)
+				log.Warnf("[TEST] Failed to write network scan result summary: %v", err)
 			}
 
 			task2Dir := filepath.Join(workDir, "task_1-2_vuln_analysis")
@@ -98,11 +105,11 @@ func TestArtifactsVisibility_AfterAsyncPlanExecution(t *testing.T) {
 				log.Warnf("[TEST] Failed to create task2Dir: %v", err)
 			}
 			if err := os.WriteFile(
-				filepath.Join(task2Dir, "task_1_2_result_summary.txt"),
+				filepath.Join(task2Dir, aicommon.BuildTaskResultSummaryFilename("1-2", "vuln_analysis")),
 				[]byte("No critical vulnerabilities found"),
 				0644,
 			); err != nil {
-				log.Warnf("[TEST] Failed to write task_1_2_result_summary.txt: %v", err)
+				log.Warnf("[TEST] Failed to write vuln analysis result summary: %v", err)
 			}
 
 			// List all files created
@@ -211,7 +218,9 @@ WAIT_SECOND:
 		"subsequent conversation prompt should contain task_1-2 directory name")
 	assert.Contains(t, secondPrompt, "1_bash_nmap_scan.md",
 		"subsequent conversation prompt should contain tool call filename")
-	assert.Contains(t, secondPrompt, "task_1_1_result_summary.txt",
+	assert.Contains(t, secondPrompt, "task_1_1_network_scan_timeline_diff.txt",
+		"subsequent conversation prompt should contain timeline diff filename")
+	assert.Contains(t, secondPrompt, "task_1_1_network_scan_result_summary.txt",
 		"subsequent conversation prompt should contain result summary filename")
 
 	t.Logf("artifacts section found in prompt (extracting DynamicContext portion):")
