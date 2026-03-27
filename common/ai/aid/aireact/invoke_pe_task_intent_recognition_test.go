@@ -112,7 +112,7 @@ func TestReAct_PETask_DeepIntentRecognition(t *testing.T) {
 			}
 
 			// Phase: Tool parameter generation
-			if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool") {
+			if utils.MatchAllOfSubString(prompt, "Generate appropriate parameters for this tool call based on the context above") {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "call-tool", "tool": "noop", "params": {}}

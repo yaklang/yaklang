@@ -49,7 +49,7 @@ func isNextActionDecisionPrompt(prompt string) bool {
 }
 
 func isToolParamGenerationPrompt(prompt, toolName string) bool {
-	if strings.Contains(prompt, "You need to generate parameters for the tool") {
+	if strings.Contains(prompt, "Generate appropriate parameters for this tool call based on the context above") {
 		return toolName == "" || strings.Contains(prompt, toolName)
 	}
 

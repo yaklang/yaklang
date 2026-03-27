@@ -24,7 +24,7 @@ import (
 // Priority order (first match wins):
 //   1. verify-satisfaction  — "verify-satisfaction" + "user_satisfied" + "reasoning"
 //   2. self-reflection      — "SELF_REFLECTION_TASK"
-//   3. call-tool params     — "You need to generate parameters for the tool" + "call-tool"
+//   3. call-tool params     — "Generate appropriate parameters for this tool call based on the context above" + "call-tool"
 //   4. main ReAct prompt    — "directly_answer" + "SCHEMA_" + "USER_QUERY"
 //   5. unknown / fallback
 //
@@ -62,7 +62,7 @@ func classifyPrompt(prompt string) promptType {
 	}
 
 	// 3. call-tool params: two markers that uniquely identify it
-	if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
+	if utils.MatchAllOfSubString(prompt, "Generate appropriate parameters for this tool call based on the context above", "call-tool") {
 		return promptCallToolParams
 	}
 

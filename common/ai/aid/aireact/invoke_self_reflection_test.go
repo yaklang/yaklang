@@ -103,7 +103,7 @@ func mockedSelfReflectionToolCalling(i aicommon.AICallerConfigIf, req *aicommon.
 	}
 
 	// Mock tool parameter generation
-	if utils.MatchAllOfSubString(prompt, "You need to generate parameters for the tool", "call-tool") {
+	if utils.MatchAllOfSubString(prompt, "Generate appropriate parameters for this tool call based on the context above", "call-tool") {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "message" : "test_message_` + nonce + `" }}`))
 		rsp.Close()
