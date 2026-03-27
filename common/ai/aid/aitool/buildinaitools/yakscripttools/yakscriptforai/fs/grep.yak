@@ -228,6 +228,43 @@ end = false
 // Maximum number of matches to log individually via yakit.Info IPC
 // to avoid flooding the IPC channel (each yakit.Info is a network round-trip).
 maxIPCLogCount = 20
+maxMatchPreviewBytes = 256
+currentOriginalContent = ""
+
+collectMatchPreview = (offset, offsetEnd) => {
+    if contextBuffer > 0 {
+        return
+    }
+
+    m.Lock()
+    defer m.Unlock()
+
+    if count <= offsetResultCount || count > (maxResult + offsetResultCount) {
+        return
+    }
+    if len(currentOriginalContent) <= 0 {
+        return
+    }
+    if offset < 0 {
+        offset = 0
+    }
+    if offsetEnd > len(currentOriginalContent) {
+        offsetEnd = len(currentOriginalContent)
+    }
+    if offsetEnd <= offset {
+        return
+    }
+
+    matchedStr = currentOriginalContent[offset:offsetEnd]
+    if len(matchedStr) > maxMatchPreviewBytes {
+        matchedStr = matchedStr[:maxMatchPreviewBytes] + "..."
+    }
+    displayCount = count - offsetResultCount
+    if displayCount <= maxIPCLogCount {
+        yakit.Info("  match: %#v", matchedStr)
+    }
+    findRes = append(findRes, matchedStr)
+}
 
 // output uses in-memory rawContent ([]byte) to extract context,
 // avoiding per-match file I/O and excessive yakit.File IPC calls.
@@ -263,7 +300,7 @@ output = (targetFile, offset, offsetEnd, rawContent) => {
         yakit.Info("... (suppressing per-match IPC logs for remaining matches, results still collected)")
     }
 
-    if contextBuffer > 0 && rawContent != nil {
+    if contextBuffer > 0 && len(rawContent) > 0 {
         seekStart = offset - contextBuffer
         if seekStart < 0 {
             seekStart = 0
@@ -283,38 +320,63 @@ output = (targetFile, offset, offsetEnd, rawContent) => {
             }
             findRes = append(findRes, contentStr)
         }
+        return
     }
+
 }
 
 isRegexp = str.ToLower(matchMode) in ["regexp", "re", "regex"]
 
-// Use FindAllStringIndex to avoid slow string slicing ([]rune conversion)
-handleRegexp = (subpattern, targetFile, content, rawContent) => {
-    defer recover()
-    subpatternRe := re.Compile(subpattern)~
-    allMatches := subpatternRe.FindAllStringIndex(string(content), maxResult + offsetResultCount + 1)
-    for _, match = range allMatches {
+scanMatches = (patternRe, targetFile, content, rawContent) => {
+    searchBase = 0
+    for {
         if end { return }
-        output(targetFile, match[0], match[1], rawContent)
+        if searchBase > len(content) {
+            return
+        }
+
+        current = content[searchBase:]
+        match = patternRe.FindStringIndex(current)
+        if match == nil || len(match) < 2 {
+            return
+        }
+
+        start = searchBase + match[0]
+        finish = searchBase + match[1]
+        output(targetFile, start, finish, rawContent)
+        collectMatchPreview(start, finish)
+        if end { return }
+
+        nextBase = finish
+        if nextBase <= searchBase {
+            nextBase = searchBase + 1
+        }
+        if nextBase > len(content) {
+            return
+        }
+        searchBase = nextBase
     }
 }
 
+handleRegexp = (subpattern, targetFile, content, rawContent) => {
+    defer recover()
+    currentOriginalContent = content
+    subpatternRe := re.Compile(subpattern)~
+    scanMatches(subpatternRe, targetFile, content, rawContent)
+}
+
 handle = (patternSubstr, targetFile, content, rawContent) => {
+    workingContent = content
     switch str.ToLower(matchMode){
     case "isubstr", "isubstring":
-        content = str.ToLower(string(content))
+        workingContent = str.ToLower(workingContent)
         patternSubstr = str.ToLower(patternSubstr)
     }
 
-    // Use regex FindAllStringIndex for much better performance
-    // (str.Index + substring triggers slow []rune conversion in yak VM)
     defer recover()
+    currentOriginalContent = content
     patternRe := re.Compile(re.QuoteMeta(patternSubstr))~
-    allMatches := patternRe.FindAllStringIndex(string(content), maxResult + offsetResultCount + 1)
-    for _, match = range allMatches {
-        if end { return }
-        output(targetFile, match[0], match[1], rawContent)
-    }
+    scanMatches(patternRe, targetFile, workingContent, rawContent)
 }
 
 
@@ -399,6 +461,12 @@ if len(findRes) > 0 {
     if len(findRes) > maxStdoutResults {
         println(sprintf("... (%d more matches not shown, use offset to paginate)", len(findRes) - maxStdoutResults))
     }
+    println("=== End of Grep Results ===")
+} else if count > offsetResultCount {
+    shownCount = min(count - offsetResultCount, maxResult)
+    yakit.Info("matches were found but no context text was collected; reporting summary only")
+    println(sprintf("=== Grep Results: %d matches (pattern: %s) ===", shownCount, pattern))
+    println(sprintf("Matched %d results. Use context-buffer > 0 if you need surrounding text excerpts.", shownCount))
     println("=== End of Grep Results ===")
 } else {
     println(sprintf("No matches found for pattern: %s", pattern))

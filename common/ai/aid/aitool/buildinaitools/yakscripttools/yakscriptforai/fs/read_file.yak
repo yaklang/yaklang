@@ -7,18 +7,20 @@ Unified File Reader Tool - Parameter Description for JSON Tool Calls
 
 This tool reads TEXT files safely with two modes: line-based and byte-chunk.
 It uses mimetype (magic bytes) to detect binary file formats automatically.
+When mode is omitted and the text file is large, it prefers a 20KB chunk first read
+so the initial browse is smoother and faster.
 
 Required Parameters:
   file            (string)  The target file path you want to read.
 
 Optional Parameters:
-  mode            (string)  Read mode:
-                            - "lines" (default): read by line segments, for text files.
-                            - "chunk": read by byte chunks with offset.
-  chunk-size      (int)     Byte chunk size (mode=chunk). Max/default: 30000.
-  offset          (int)     Byte offset (mode=chunk) or line offset (mode=lines). Default: 0.
-  lines           (int)     Number of lines to read (mode=lines). Default: 50.
-  line-size       (int)     Max characters per line (mode=lines). Default: 512.
+    mode            (string)  Read mode:
+                                                        - "lines" (default for normal text): read by line segments, for text files.
+                                                        - "chunk": read by byte chunks with offset.
+    chunk-size      (int)     Byte chunk size (mode=chunk). Default/max: 30000. Recommended: 10000-20000 for smooth browsing.
+    offset          (int)     Byte offset (mode=chunk) or line offset (mode=lines). Default: 0.
+    lines           (int)     Number of lines to read (mode=lines). Default: 200. If omitted, the tool tries to return about 10KB of text for smoother reading.
+    line-size       (int)     Max characters per line (mode=lines). Default: 1024.
 
 Binary File Detection:
   Before reading, this tool detects binary formats using the mimetype library
@@ -40,7 +42,7 @@ Binary File Detection:
 
 ## Few-Shot Examples
 
-Example 1 - Read a text file (default lines mode):
+Example 1 - Read a large text file (default behavior may prefer a 20KB chunk first):
 {
   "@action": "call-tool",
   "tool": "read_file",
@@ -59,7 +61,7 @@ Example 2 - Read with pagination (lines mode, start from line 100):
     "file": "/var/log/app.log",
     "mode": "lines",
     "offset": 100,
-    "lines": 50
+    "lines": 120
   }
 }
 
@@ -72,7 +74,7 @@ Example 3 - Read binary-safe with byte chunk mode:
     "file": "/tmp/data.bin",
     "mode": "chunk",
     "offset": 0,
-    "chunk-size": 5000
+    "chunk-size": 20000
   }
 }
 USAGE_BLOCK
@@ -91,21 +93,21 @@ USAGE_BLOCK
    --offset: 读取偏移量，chunk 模式为字节偏移，lines 模式为行偏移 (默认: 0)
 
 3. chunk 模式特有参数：
-   --chunk-size: 每次读取的字节块大小，默认 200 字节，最大 30000 字节 (可选)
+    --chunk-size: 每次读取的字节块大小，默认 30000 字节，推荐 10000-20000，最大 30000 字节 (可选)
 
 4. lines 模式特有参数：
-   --lines: 读取的行数，默认 50 行 (可选)
-   --line-size: 每行的最大长度，默认 512 字符 (可选)
+    --lines: 读取的行数，默认 200 行；未显式指定时会尽量返回约 10KB 文本 (可选)
+    --line-size: 每行的最大长度，默认 1024 字符 (可选)
 
 使用示例：
-1. 按行读取文件前 50 行（默认模式）：
+1. 大文本文件默认优先首读 20KB 字节块；较小文本仍按行读取：
    yak read_file.yak --file test.txt
 
 2. 按行读取文件前 20 行：
    yak read_file.yak --file test.txt --lines 20
 
-3. 按字节块读取文件前 200 字节：
-   yak read_file.yak --file test.txt --mode chunk
+3. 按字节块读取文件前 20K 字节：
+    yak read_file.yak --file test.txt --mode chunk --chunk-size 20000
 
 4. 按行读取文件从第 100 行开始的 20 行：
    yak read_file.yak --file test.txt --mode lines --offset 100 --lines 20
@@ -129,7 +131,8 @@ USAGE_BLOCK
     yak read_file.yak --file test.txt --mode lines --lines -1
 
 注意事项：
-- 默认模式为 lines 模式，读取 50 行内容
+- 未显式指定 mode 且文件较大时，会优先按 chunk 模式首读 20KB，便于快速浏览大文本文件
+- 其余文本场景默认仍按 lines 模式读取，未显式指定时会尽量读取约 10KB 文本，基线为 200 行
 - chunk 模式支持精确的字节偏移读取，适合处理二进制文件或需要精确位置的文件
 - lines 模式按行读取，适合处理文本文件，支持行号显示和统计信息
 - chunk-size 最大限制为 30000 字节，以防止内存溢出
@@ -140,13 +143,26 @@ USAGE_BLOCK
 
 yakit.AutoInitYakit()
 
+defaultChunkSize = 30000
+preferredLargeTextChunkSize = 20000
+largeTextChunkThreshold = 20000
+defaultLineCount = 200
+defaultLineSize = 1024
+defaultLineTargetBytes = 10240
+defaultLineHardCap = 400
+
 t := cli.String("file", cli.setRequired(true), cli.setHelp("target file you want to read"))
 mode := cli.String("mode", cli.setDefault("lines"), cli.setHelp("read mode: 'chunk' for byte chunks or 'lines' for line-based reading (default: lines)"))
-chunkSize := cli.Int("chunk-size", cli.setRequired(false), cli.setHelp("size for chunk read when mode=chunk, max: 30000"), cli.setDefault(30000))
+chunkSize := cli.Int("chunk-size", cli.setRequired(false), cli.setHelp("size for chunk read when mode=chunk, max: 30000"), cli.setDefault(defaultChunkSize))
 offset := cli.Int("offset", cli.setRequired(false), cli.setDefault(0))
-lines := cli.Int("lines", cli.setRequired(false), cli.setHelp("how many lines you want to read when mode=lines"), cli.setDefault(50))
-lineSize := cli.Int("line-size", cli.setRequired(false), cli.setHelp("the max columns in a line when mode=lines, default 512"), cli.setDefault(512))
+lines := cli.Int("lines", cli.setRequired(false), cli.setHelp("how many lines you want to read when mode=lines"), cli.setDefault(defaultLineCount))
+lineSize := cli.Int("line-size", cli.setRequired(false), cli.setHelp("the max columns in a line when mode=lines, default 1024"), cli.setDefault(defaultLineSize))
 cli.check()
+
+modeSpecified := cli.Have("mode")
+chunkSizeSpecified := cli.Have("chunk-size")
+linesSpecified := cli.Have("lines")
+lineSizeSpecified := cli.Have("line-size")
 
 if !file.IsExisted(t) {
     yakit.Warn("%v is not existed", t)
@@ -414,6 +430,14 @@ if mode != "chunk" && mode != "lines" {
     return
 }
 
+if !modeSpecified && !linesSpecified && !lineSizeSpecified && size > largeTextChunkThreshold {
+    mode = "chunk"
+    if !chunkSizeSpecified {
+        chunkSize = preferredLargeTextChunkSize
+    }
+    yakit.Info("large text file detected (%v bytes), prefer chunk mode for first read: %v bytes", size, chunkSize)
+}
+
 if mode == "chunk" {
     // 字节块读取模式
     if chunkSize <= 0 {
@@ -421,8 +445,8 @@ if mode == "chunk" {
         return
     }
 
-    if chunkSize > 30000 {
-        yakit.Warn("chunksize you input is too large, override 30000, for save memory, shrink it.")
+    if chunkSize > defaultChunkSize {
+        yakit.Warn("chunksize you input is too large, override %v, for save memory, shrink it.", defaultChunkSize)
         return
     }
 
@@ -450,12 +474,15 @@ if mode == "chunk" {
 } else {
     // 按行读取模式
     if lines <= 0 {
-        yakit.Warn("lines should not be less than zero, default set to 50")
-        lines = 50
+        yakit.Warn("lines should not be less than zero, default set to %v", defaultLineCount)
+        lines = defaultLineCount
     }
     if lineSize <= 0 {
-        yakit.Warn("line-size should not be less than zero, default set to 50")
-        lineSize = 512
+        yakit.Warn("line-size should not be less than zero, default set to %v", defaultLineSize)
+        lineSize = defaultLineSize
+    }
+    if !lineSizeSpecified && lineSize < defaultLineSize {
+        lineSize = defaultLineSize
     }
 
     f, err := file.OpenFile(t, file.O_RDONLY, 0644)
@@ -472,6 +499,15 @@ if mode == "chunk" {
     if start < 0 { start = 0 }
     end = start + lines
     bytesCount = 0
+    selectedLines = 0
+    visibleBytes = 0
+    autoTargetBytes = 0
+    if !linesSpecified {
+        autoTargetBytes = defaultLineTargetBytes
+        if size > 0 && size < autoTargetBytes {
+            autoTargetBytes = size
+        }
+    }
     for {
         count++
         text, err := f.ReadLine()
@@ -483,18 +519,35 @@ if mode == "chunk" {
         }
         bytesCount += len(text) + 1
         if count <= start { continue }
-        if count > end { break }
+
+        displayText := text
+        if len(displayText) > lineSize {
+            displayText = displayText[:lineSize] + "..."
+        }
+
+        if linesSpecified && count > end { break }
+        if !linesSpecified && selectedLines >= defaultLineHardCap { break }
         if formattedContent != "" {
             formattedContent += "\n"
         }
-        formattedContent += sprintf("%3d | %s", count, text)
+        formattedContent += sprintf("%3d | %s", count, displayText)
+        if allContent != "" {
+            allContent += "\n"
+        }
         allContent += text
-        if count - start >= lines { break }
+        selectedLines++
+        visibleBytes += len(displayText) + 1
+        if linesSpecified {
+            if selectedLines >= lines { break }
+        } else {
+            if selectedLines >= lines && visibleBytes >= autoTargetBytes { break }
+        }
+        if err != nil { break }
     }
     println(formattedContent)
-    yakit.File(t, yakit.fileReadAction(offset, lines, "line", allContent))
+    yakit.File(t, yakit.fileReadAction(offset, selectedLines, "line", allContent))
     if formattedContent != "" {
-        yakit.Info("%s\n\ntotal-bytes: %v read-bytes: %v percent: %.2f%%", formattedContent, size, bytesCount, (float64(bytesCount) / float64(size)) * 100)
+        yakit.Info("%s\n\ntotal-bytes: %v read-bytes: %v displayed-lines: %v displayed-bytes: %v percent: %.2f%%", formattedContent, size, bytesCount, selectedLines, visibleBytes, (float64(bytesCount) / float64(size)) * 100)
     } else {
         yakit.Info("No lines read from offset %v\ntotal-bytes: %v read-bytes: %v percent: %.2f%%", offset, size, bytesCount, (float64(bytesCount) / float64(size)) * 100)
     }

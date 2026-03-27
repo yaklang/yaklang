@@ -5,6 +5,9 @@ __KEYWORDS__ = "爬虫,网络抓取,网页采集,http请求,http响应,无头爬
 __USAGE__ = <<<USAGE_BLOCK
 Simple Crawler Tool - Parameter Description for JSON Tool Calls
 
+This crawler is tuned to get results quickly: it minimizes retries and can
+automatically fall back to HTTP when an HTTPS start URL yields no crawl results.
+
 Required Parameters:
   urls            (string)  Start URL(s) for crawling. Multiple URLs can be provided
                             using comma-separated format.
@@ -12,27 +15,34 @@ Required Parameters:
 Optional Parameters:
   reqs-max        (int)     Maximum number of outbound HTTP requests allowed.
                             If not set, crawler uses internal default behavior.
+    max-retry       (int)     Maximum retry count per request. Default: 1.
   forbid-for-parent-path (string)  Whether to forbid crawling parent paths.
                             Accepted values: "yes"/"no".
   user-agent      (string)  Custom User-Agent header for crawler requests.
   urls-max        (int)     Maximum number of unique URLs to visit.
   max-depth       (int)     Crawl depth limit from the start URL. Default: 2.
   timeout         (int)     Per-request timeout in seconds. Default: 10.
+    https-fallback  (bool)    Whether to retry with HTTP when an HTTPS crawl yields no results. Default: true.
 USAGE_BLOCK
 
 startUrl := cli.String("urls", cli.setHelp("开始简单爬虫的起始页面"), cli.setRequired(true))
 // startUrl = "https://www.example.com,http://127.0.0.1:8787"
 reqsLimit := cli.Int("reqs-max", cli.setHelp("最多对外发送多少请求？"))
+maxRetry := cli.Int("max-retry", cli.setHelp("单个请求最多重试多少次？"), cli.setDefault(1))
 noParent := cli.String("forbid-for-parent-path", cli.setHelp("禁止访问夫目录，使用[yes/no]来控制"))
 ua = cli.String("user-agent", cli.setHelp("手动设置User-Agent"))
 maxUrls = cli.Int("urls-max", cli.setHelp("最多访问多少URL？"))
 maxDepth := cli.Int("max-depth", cli.setHelp("爬虫访问逻辑深度"), cli.setDefault(2))
 timeoutSecond := cli.Int("timeout", cli.setHelp("设置超时秒数(单次请求的秒数)"), cli.setDefault(10))
+httpsFallback := cli.Bool("https-fallback", cli.setHelp("HTTPS 失败时是否自动切回 HTTP"), cli.setDefault(true))
 cli.check()
 
 opts = []
 if reqsLimit > 0 {
     opts.Append(crawler.maxRequest(reqsLimit))
+}
+if maxRetry >= 0 {
+    opts.Append(crawler.maxRetry(maxRetry))
 }
 if noParent in ["yes", "y"] {
     opts.Append(crawler.forbiddenFromParent(true))
@@ -43,48 +53,83 @@ if ua != "" {
 if maxUrls > 0 {
     opts.Append(crawler.maxUrls(maxUrls))
 }
+if maxDepth > 0 {
+    opts.Append(crawler.maxDepth(maxDepth))
+}
 
 if timeoutSecond > 0 {
     opts.Append(crawler.connectTimeout(timeoutSecond))
 }
 
-reqCh, err := crawler.Start(startUrl, opts...)
-if err != nil {
-    yakit.Info("crawler failed: %v", err)
-    return
+targetCandidates = [startUrl]
+if httpsFallback {
+    fallbackStartUrl = str.ReplaceAll(startUrl, "https://", "http://")
+    if fallbackStartUrl != startUrl {
+        targetCandidates.Append(fallbackStartUrl)
+    }
 }
 
-
-
 buf = bufio.NewBuffer()
-for result in reqCh {
-    urlstr := result.Url()
-    // println(urlstr)
-    req, _ := http.dump(result.Request())
-    reqfile = ""
-    try {
-        reqfile = file.TempFileName("crawler-req-*.txt")~
-        file.Save(reqfile, string(req))
-    } catch {}
-    var rspdesc = ""
-    var rspfile = ""
-    try {
-        rsp, _ := http.dump(result.Response()[0])
-        rspdesc = str.Join(poc.GetHTTPPacketFirstLine(rsp), " ")
-        rspfile = file.TempFileName("crawler-req-*.txt")~
-        file.Save(rspfile, string(rsp))
-    } catch {}
+totalResults = 0
+lastErr = ""
+usedFallback = false
+for currentStartUrl in targetCandidates {
+    reqCh, err := crawler.Start(currentStartUrl, opts...)
+    if err != nil {
+        lastErr = sprintf("crawler failed for %v: %v", currentStartUrl, err)
+        yakit.Info(lastErr)
+        continue
+    }
 
-    line := "[%v] [%v]: %v%v%v" % [
-        poc.GetHTTPRequestMethod(req),
-        rspdesc != "" ? (" " + rspdesc) : "",
-        urlstr,
-        reqfile != "" ? (" req in " + reqfile + " ") : "",
-        rspfile != "" ? (" rsp in " + rspfile + " ") : "",
-    ]
-    buf.WriteString(line)
-    buf.WriteString("\n")
-    yakit.Output(line)
+    currentResults = 0
+    for result in reqCh {
+        currentResults++
+        totalResults++
+        urlstr := result.Url()
+        req, _ := http.dump(result.Request())
+        reqfile = ""
+        try {
+            reqfile = file.TempFileName("crawler-req-*.txt")~
+            file.Save(reqfile, string(req))
+        } catch {}
+        var rspdesc = ""
+        var rspfile = ""
+        try {
+            rsp, _ := http.dump(result.Response()[0])
+            rspdesc = str.Join(poc.GetHTTPPacketFirstLine(rsp), " ")
+            rspfile = file.TempFileName("crawler-req-*.txt")~
+            file.Save(rspfile, string(rsp))
+        } catch {}
+
+        line := "[%v] [%v]: %v%v%v" % [
+            poc.GetHTTPRequestMethod(req),
+            rspdesc != "" ? (" " + rspdesc) : "",
+            urlstr,
+            reqfile != "" ? (" req in " + reqfile + " ") : "",
+            rspfile != "" ? (" rsp in " + rspfile + " ") : "",
+        ]
+        buf.WriteString(line)
+        buf.WriteString("\n")
+        yakit.Output(line)
+    }
+
+    if currentResults > 0 {
+        if currentStartUrl != startUrl {
+            usedFallback = true
+        }
+        break
+    }
+
+    if currentStartUrl == startUrl && currentStartUrl != str.ReplaceAll(currentStartUrl, "https://", "http://") {
+        yakit.Info("crawler produced no results for %v, trying HTTP fallback", currentStartUrl)
+    }
+}
+
+if totalResults == 0 && lastErr != "" {
+    yakit.Info(lastErr)
+}
+if usedFallback {
+    yakit.Info("HTTP fallback succeeded after the HTTPS crawl returned no results")
 }
 if len(buf.String()) <= 30000 {
     yakit.Info(string(buf.String()))

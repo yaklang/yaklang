@@ -641,13 +641,11 @@ func (c *Crawler) handleReqResult(r *Req) {
 				log.Errorf("build http request(js) failed: %s", content.UrlPath)
 				return
 			}
-			opts := config.GetLowhttpConfig()
 			urlIns, _ := lowhttp.ExtractURLFromHTTPRequestRaw(reqBytes, reqHttps)
 			if urlIns != nil {
 				log.Infof("Start to fetch JS(via URL): %v", urlIns.String())
 			}
-			opts = append(opts, lowhttp.WithHttps(reqHttps), lowhttp.WithRequest(reqBytes), lowhttp.WithRuntimeId(c.config.runtimeID))
-			rsp, err := lowhttp.HTTP(opts...)
+			rsp, _, err := config.DoHTTPRequest(reqHttps, c.config.runtimeID, lowhttp.WithRequest(reqBytes))
 			if err != nil {
 				return
 			}
@@ -932,19 +930,32 @@ func (c *Crawler) execReq(r *Req) {
 		return
 	}
 
-	// config opts
-	opts := c.config.GetLowhttpConfig()
-	opts = append(opts, lowhttp.WithHttps(r.IsHttps()), lowhttp.WithPacketBytes(r.requestRaw), lowhttp.WithRuntimeId(c.config.runtimeID))
 	if c.config.onLogin != nil && r.IsLoginForm() && r.IsForm() {
 		c.loginOnce.Do(func() {
 			c.config.onLogin(r)
 		})
 	}
 
-	lowRspIns, err := lowhttp.HTTP(opts...)
+	lowRspIns, usedHTTPS, err := c.config.DoHTTPRequest(r.IsHttps(), c.config.runtimeID, lowhttp.WithPacketBytes(r.requestRaw))
 	if err != nil {
 		r.err = err
 		return
+	}
+	if usedHTTPS != r.IsHttps() {
+		if r.request != nil && r.request.URL != nil {
+			if usedHTTPS {
+				r.request.URL.Scheme = "https"
+			} else {
+				r.request.URL.Scheme = "http"
+			}
+		}
+		if r.baseURL != nil {
+			if usedHTTPS {
+				r.baseURL.Scheme = "https"
+			} else {
+				r.baseURL.Scheme = "http"
+			}
+		}
 	}
 	rsp, err := utils.ReadHTTPResponseFromBytes(lowRspIns.RawPacket, r.request)
 	if err != nil {

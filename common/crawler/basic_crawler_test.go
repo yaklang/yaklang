@@ -1,8 +1,9 @@
 package crawler
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestCrawler_Run(t *testing.T) {
@@ -19,6 +20,14 @@ func TestCrawler_Run(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestNewCrawler_DefaultAggressiveTransport(t *testing.T) {
+	crawler, err := NewCrawler("https://example.com")
+	require.NoError(t, err)
+	require.NotNil(t, crawler)
+	require.False(t, crawler.config.verifyCertificate)
+	require.True(t, crawler.config.httpsToHttpFallback)
 }
 
 type buildHttpRequestTestCase struct {

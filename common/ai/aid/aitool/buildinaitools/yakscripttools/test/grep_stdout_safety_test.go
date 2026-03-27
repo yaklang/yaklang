@@ -5,6 +5,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
@@ -33,8 +34,8 @@ func TestGrepTool_StdoutSafety(t *testing.T) {
 
 	// Create a LARGE temporary file (2MB) with test content
 	// The unique marker is hidden in the middle of large content
-	largePrefix := strings.Repeat("NOISE_LINE_PREFIX_AAAA\n", 50000)  // ~1.1MB
-	largeSuffix := strings.Repeat("NOISE_LINE_SUFFIX_BBBB\n", 50000)  // ~1.1MB
+	largePrefix := strings.Repeat("NOISE_LINE_PREFIX_AAAA\n", 50000) // ~1.1MB
+	largeSuffix := strings.Repeat("NOISE_LINE_SUFFIX_BBBB\n", 50000) // ~1.1MB
 	uniqueMarker := "UNIQUE_GREP_TARGET_XYZ789"
 	testContent := largePrefix + uniqueMarker + "\n" + largeSuffix
 
@@ -109,3 +110,64 @@ func TestGrepTool_StdoutSafety(t *testing.T) {
 	t.Logf("✓ All checks passed! Grep tool stdout safety verified.")
 }
 
+func TestGrepTool_RegexpLimitWithoutContext(t *testing.T) {
+	allTools := yakscripttools.GetAllYakScriptAiTools()
+	var grepTool *aitool.Tool
+	for _, tool := range allTools {
+		if tool.GetName() == "grep" {
+			grepTool = tool
+			break
+		}
+	}
+	if grepTool == nil {
+		t.Fatal("grep tool not found")
+	}
+
+	content := strings.Repeat(`<a href="/demo/path">demo</a>`+"\n", 4000)
+	tmpFile, err := consts.TempFile("grep_regexp_limit_*.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tmpFile.Close()
+	if _, err := tmpFile.WriteString(content); err != nil {
+		t.Fatal(err)
+	}
+
+	stdout := bytes.NewBuffer(nil)
+	stderr := bytes.NewBuffer(nil)
+	start := time.Now()
+
+	_, err = grepTool.Callback(context.Background(), aitool.InvokeParams{
+		"path":           tmpFile.Name(),
+		"pattern":        `href="/[^"]*"|href='/[^']*'`,
+		"pattern-mode":   "regexp",
+		"context-buffer": 0,
+		"limit":          5,
+	}, nil, stdout, stderr)
+	if err != nil {
+		t.Fatalf("grep tool execution failed: %v", err)
+	}
+
+	stdoutStr := stdout.String()
+	if strings.Contains(stdoutStr, "No matches found") {
+		t.Fatalf("expected grep output to report matches, got: %s", stdoutStr)
+	}
+	if !strings.Contains(stdoutStr, "=== Grep Results Summary: 5 matches ===") {
+		t.Fatalf("expected grep output to summarize 5 matches, got: %s", stdoutStr)
+	}
+	if !strings.Contains(stdoutStr, `href="/demo/path"`) {
+		t.Fatalf("expected grep output to contain matched href preview, got: %s", stdoutStr)
+	}
+	if strings.Count(stdoutStr, "matched in ") < 5 {
+		t.Fatalf("expected grep output to log at least 5 match positions, got: %s", stdoutStr)
+	}
+	if elapsed := time.Since(start); elapsed > 5*time.Second {
+		t.Fatalf("grep regexp search took too long: %s", elapsed)
+	}
+	if stderr.Len() > 0 {
+		t.Logf("stderr: %s", stderr.String())
+	}
+	if elapsed := time.Since(start); elapsed > time.Second {
+		t.Logf("regexp grep finished in %s", elapsed)
+	}
+}

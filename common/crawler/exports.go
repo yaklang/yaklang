@@ -7,6 +7,8 @@ var Exports = map[string]interface{}{
 	"concurrent":          WithConcurrent,
 	"connectTimeout":      WithConnectTimeout,
 	"timeout":             WithConnectTimeout,
+	"verifyCertificate":   WithVerifyCertificate,
+	"httpsToHttpFallback": WithHTTPSFallback,
 	"domainExclude":       WithDomainBlackList,
 	"domainInclude":       WithDomainWhiteList,
 	"cookie":              WithFixedCookie,
