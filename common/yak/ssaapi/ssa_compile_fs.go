@@ -171,6 +171,7 @@ func (c *Config) parseProjectWithFS(
 	if err != nil {
 		return nil, err
 	}
+	c.Config.SetCompileProjectBytes(scanResult.HandlerBytes)
 
 	prog, builder, err := c.init(filesystem, handlerTotal)
 	if err != nil {
@@ -220,6 +221,9 @@ func (c *Config) parseProjectWithFS(
 	filePerfRecorder := c.filePerformanceRecorder
 	// pre handler  0-40%
 	f1 := func() error {
+		if prog.Cache != nil {
+			prog.Cache.DisableInstructionSpill()
+		}
 		preHandlerNum := 0
 		preHandlerProcess := func() {
 			preHandlerNum++
@@ -312,6 +316,9 @@ func (c *Config) parseProjectWithFS(
 	}
 
 	f3 := func() error {
+		if prog.Cache != nil {
+			prog.Cache.EnableInstructionSpill()
+		}
 		process = 0.4 // 40%
 		// parse project 40%-90%
 		prog.ProcessInfof("parse project start")

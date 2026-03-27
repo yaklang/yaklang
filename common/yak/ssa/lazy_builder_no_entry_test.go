@@ -2,7 +2,6 @@ package ssa
 
 import (
 	"bytes"
-	"context"
 	"os"
 	"testing"
 
@@ -10,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssalog"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 func TestProgramLazyBuild_LibraryWithoutEntry_NoErrorLog(t *testing.T) {
@@ -23,7 +23,9 @@ func TestProgramLazyBuild_LibraryWithoutEntry_NoErrorLog(t *testing.T) {
 		ssalog.Log.SetOutput(os.Stdout)
 	})
 
-	app := NewProgram(context.Background(), t.Name(), ProgramCacheMemory, Application, filesys.NewVirtualFs(), "", 0)
+	cfg, err := ssaconfig.New(ssaconfig.ModeSSACompile, ssaconfig.WithSetProgramName(t.Name()))
+	require.NoError(t, err)
+	app := NewProgram(cfg, ProgramCacheMemory, Application, filesys.NewVirtualFs(), "", 0)
 	editor := memedit.NewMemEditor("")
 	editor.SetFileName("main.yak")
 	app.PushEditor(editor)

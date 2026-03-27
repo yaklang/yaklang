@@ -283,10 +283,17 @@ When --syntaxflow is provided, a follow-up SyntaxFlowQuery is executed for quick
 			Name:  "file-perf-log",
 			Usage: "enable file-level compile performance log output",
 		},
+		cli.StringFlag{
+			Name:  "pprof",
+			Usage: `enable pprof and save pprof file to the given path`,
+		},
 	},
 	Action: func(c *cli.Context) error {
 		if ret, err := log.ParseLevel(c.String("log")); err == nil {
 			log.SetLevel(ret)
+		}
+		if pprofFile := c.String("pprof"); pprofFile != "" {
+			diagnostics.StartHeapMonitor(30*time.Second, diagnostics.WithFileName(pprofFile))
 		}
 
 		configFilePath := c.String("config")
@@ -311,10 +318,12 @@ When --syntaxflow is provided, a follow-up SyntaxFlowQuery is executed for quick
 			}
 			consts.SetGormSSAProjectDatabase(db)
 		}
-		// if not set dialect, use existed db
+		// if not set dialect, bind the current process to the target SSA database path
 		if databaseDialect == "" && databaseFileRaw != "" {
-			// set database path
 			consts.SetSSADatabaseInfo(databaseFileRaw)
+			if err := consts.SetGormSSAProjectDatabaseByInfo(databaseFileRaw); err != nil {
+				return utils.Errorf("open database failed: %v", err)
+			}
 		}
 
 		var (

@@ -1,15 +1,16 @@
 package ssa
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 func newTestBuilder(t *testing.T) (*Program, *FunctionBuilder) {
 	t.Helper()
-	prog := NewProgram(context.Background(), t.Name(), ProgramCacheMemory, Application, nil, "", 0)
+	cfg, _ := ssaconfig.New(ssaconfig.ModeSSACompile, ssaconfig.WithSetProgramName(t.Name()))
+	prog := NewProgram(cfg, ProgramCacheMemory, Application, nil, "", 0)
 	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
 	require.NotNil(t, builder)
 	return prog, builder

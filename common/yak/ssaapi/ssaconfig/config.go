@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"time"
 )
 
 type Config struct {
@@ -124,6 +125,8 @@ func defaultSSACompileConfig() *SSACompileConfig {
 		ReCompile:                false,
 		MemoryCompile:            false,
 		Concurrency:              1,
+		CompileIrCacheTTL:        time.Second,
+		CompileIrCacheMax:        5000,
 		FilePerformanceLog:       false,
 		StopOnCliCheck:           false,
 		EnableIncrementalCompile: false,

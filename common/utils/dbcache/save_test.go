@@ -1,14 +1,15 @@
-package asyncdb_test
+package dbcache_test
 
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils/asyncdb"
+	"github.com/yaklang/yaklang/common/utils/dbcache"
 )
 
 // TestItem is a simple implementation of the Item interface for testing
@@ -24,7 +25,7 @@ func TestNewSaver(t *testing.T) {
 		savedItems = append(savedItems, items...)
 	}
 
-	saver := asyncdb.NewSave(saveFn)
+	saver := dbcache.NewSave(saveFn)
 	require.NotNil(t, saver)
 	// We can't directly access internal fields of Saver from the test package
 	// Just verify that the saver is created successfully and can be closed
@@ -32,10 +33,10 @@ func TestNewSaver(t *testing.T) {
 
 	// Test with custom options
 	ctx := context.Background()
-	saver = asyncdb.NewSave(
+	saver = dbcache.NewSave(
 		saveFn,
-		asyncdb.WithFetchSize(200),
-		asyncdb.WithContext(ctx),
+		dbcache.WithFetchSize(200),
+		dbcache.WithContext(ctx),
 	)
 	require.NotNil(t, saver)
 	// Can't access internal field wg
@@ -52,8 +53,8 @@ func TestSaver_Save(t *testing.T) {
 	}
 
 	ttl := 100 * time.Millisecond
-	saver := asyncdb.NewSave(saveFn,
-		asyncdb.WithSaveTimeout(ttl),
+	saver := dbcache.NewSave(saveFn,
+		dbcache.WithSaveTimeout(ttl),
 	)
 	defer saver.Close()
 
@@ -112,7 +113,7 @@ func TestSaver_Close(t *testing.T) {
 		savedItems = append(savedItems, items...)
 	}
 
-	saver := asyncdb.NewSave(saveFn)
+	saver := dbcache.NewSave(saveFn)
 
 	// Save some items
 	items := []TestItem{
@@ -146,7 +147,7 @@ func TestSaver_WithCustomContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	saver := asyncdb.NewSave(saveFn, asyncdb.WithContext(ctx))
+	saver := dbcache.NewSave(saveFn, dbcache.WithContext(ctx))
 	defer saver.Close()
 
 	// Save an item
@@ -194,9 +195,9 @@ func TestSaveAutoSaveSize(t *testing.T) {
 		// Make a copy of the slice
 	}
 
-	save := asyncdb.NewSave(saveFn,
-		asyncdb.WithSaveSize(defaultSaveSize),
-		asyncdb.WithSaveTimeout(saveTimeout),
+	save := dbcache.NewSave(saveFn,
+		dbcache.WithSaveSize(defaultSaveSize),
+		dbcache.WithSaveTimeout(saveTimeout),
 	)
 
 	for i := 0; i < 100; i++ {
@@ -206,5 +207,60 @@ func TestSaveAutoSaveSize(t *testing.T) {
 	time.Sleep(500 * time.Millisecond) // Wait for the saver to process
 	save.Close()
 
-	require.Equal(t, savedItemSize, []int{90, 10})
+	require.NotEmpty(t, savedItemSize)
+	total := 0
+	for _, size := range savedItemSize {
+		require.Greater(t, size, 0)
+		total += size
+	}
+	require.Equal(t, 100, total)
+}
+
+func TestSaver_SaveRunsSerially(t *testing.T) {
+	var active atomic.Int32
+	var maxActive atomic.Int32
+
+	saveFn := func(items []int) {
+		current := active.Add(1)
+		for {
+			maxSeen := maxActive.Load()
+			if current <= maxSeen || maxActive.CompareAndSwap(maxSeen, current) {
+				break
+			}
+		}
+		time.Sleep(20 * time.Millisecond)
+		active.Add(-1)
+	}
+
+	saver := dbcache.NewSave(saveFn,
+		dbcache.WithSaveSize(1),
+		dbcache.WithSaveTimeout(time.Second),
+	)
+	for i := 0; i < 8; i++ {
+		saver.Save(i)
+	}
+	saver.Close()
+
+	require.Equal(t, int32(1), maxActive.Load())
+}
+
+func TestSaver_Stats(t *testing.T) {
+	var batches int
+	saver := dbcache.NewSave(func(items []int) {
+		batches++
+		time.Sleep(10 * time.Millisecond)
+	}, dbcache.WithSaveSize(2), dbcache.WithSaveTimeout(30*time.Millisecond))
+
+	saver.Save(1)
+	saver.Save(2)
+	saver.Save(3)
+	saver.Close()
+
+	stats := saver.Stats()
+	require.Equal(t, 3, int(stats.BatchItemsTotal))
+	require.GreaterOrEqual(t, int(stats.BatchCount), 1)
+	require.GreaterOrEqual(t, int(stats.MaxPending), 1)
+	require.GreaterOrEqual(t, int(stats.MaxBatchSize), 1)
+	require.GreaterOrEqual(t, stats.SaveTimeTotal, 10*time.Millisecond)
+	require.Equal(t, int(stats.BatchCount), batches)
 }

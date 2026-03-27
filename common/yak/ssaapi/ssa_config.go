@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/gobwas/glob"
 	"github.com/yaklang/yaklang/common/utils"
@@ -41,7 +40,6 @@ type Config struct {
 	process ProcessFunc
 
 	// for build
-	cacheTTL                []time.Duration
 	externLib               map[string]map[string]any
 	externValue             map[string]any
 	defineFunc              map[string]any
@@ -172,18 +170,16 @@ func (c *Config) Processf(process float64, format string, arg ...any) {
 	}
 }
 
-var WithASTOrder = ssaconfig.SetOption("ssa_compile/ast_order", func(c *Config, v ssareducer.ASTSequenceType) {
-	c.astSequence = v
-})
+func WithASTOrder(sequence ssareducer.ASTSequenceType) ssaconfig.Option {
+	return ssaconfig.WithCompileASTSequence(int(sequence))
+}
 
 var WithLogLevel = ssaconfig.SetOption("ssa_compile/log_level", func(c *Config, v string) {
 	c.logLevel = v
 	log.SetLevel(v)
 })
 
-var WithCacheTTL = ssaconfig.SetOption("ssa_compile/cache_ttl", func(c *Config, v time.Duration) {
-	c.cacheTTL = append(c.cacheTTL, v)
-})
+var WithCacheTTL = ssaconfig.WithCompileIrCacheTTL
 
 var WithExcludeFunc = ssaconfig.WithCompileExcludeFiles
 
@@ -344,7 +340,6 @@ func DefaultConfig(opts ...ssaconfig.Option) (*Config, error) {
 	c := &Config{
 		LanguageBuilder:            nil,
 		programPath:                ".",
-		cacheTTL:                   make([]time.Duration, 0),
 		externLib:                  make(map[string]map[string]any),
 		externValue:                make(map[string]any),
 		defineFunc:                 make(map[string]any),
@@ -354,7 +349,7 @@ func DefaultConfig(opts ...ssaconfig.Option) (*Config, error) {
 			return false
 		},
 		logLevel:    "error",
-		astSequence: ssareducer.OutOfOrder,
+		astSequence: ssareducer.ASTSequenceType(sc.GetCompileASTSequence()),
 		Config:      sc,
 	}
 	if !utils.IsNil(sc.SSACompile) {

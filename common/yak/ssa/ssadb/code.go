@@ -130,6 +130,19 @@ func (ir *IrCode) Save(db *gorm.DB) error {
 	return db.Save(ir).Error
 }
 
+func UpsertIrCode(db *gorm.DB, ir *IrCode) error {
+	if db == nil || ir == nil {
+		return nil
+	}
+	record := &IrCode{
+		ProgramName: ir.ProgramName,
+		CodeID:      ir.CodeID,
+	}
+	return db.Where("program_name = ? AND code_id = ?", ir.ProgramName, ir.CodeID).
+		Assign(ir).
+		FirstOrCreate(record).Error
+}
+
 var hash = []string{
 	"", // empty string
 	"d41d8cd98f00b204e9800998ecf8427e",

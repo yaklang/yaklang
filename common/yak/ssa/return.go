@@ -215,6 +215,18 @@ func handlerReturnType(rs []*Return, functionType *FunctionType) Type {
 
 // Finish the function, set FunctionType, set EnterBlock/ExitBlock
 func (f *Function) Finish() {
+	if utils.IsNil(f) {
+		return
+	}
+	if f.finished {
+		return
+	}
+	defer func() {
+		f.finished = true
+		if program := f.GetProgram(); program != nil && program.Cache != nil {
+			program.Cache.CoolDownFunctionInstructions(f)
+		}
+	}()
 	f.EnterBlock = f.Blocks[0]
 	f.ExitBlock = f.Blocks[len(f.Blocks)-1]
 
@@ -320,6 +332,7 @@ func (f *Function) Finish() {
 					continue
 				}
 			}
+
 		}
 
 		ses = append(ses, se)

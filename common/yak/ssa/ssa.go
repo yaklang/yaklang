@@ -347,6 +347,8 @@ type Program struct {
 	config *LanguageConfig
 	ctx    context.Context
 
+	compileConfig *ssaconfig.Config
+
 	NameCache *ssadb.NameCache
 }
 
@@ -410,10 +412,19 @@ type Function struct {
 
 	//if blueprint method,we need record.
 	currentBlueprint *Blueprint
+
+	finished bool
 }
 
 func (f *Function) SetCurrentReturnType(t Type) {
 	f.currentReturnType = t
+}
+
+func (f *Function) IsFinished() bool {
+	if utils.IsNil(f) {
+		return false
+	}
+	return f.finished
 }
 func (f *Function) GetCurrentReturnType() Type {
 	return f.currentReturnType
