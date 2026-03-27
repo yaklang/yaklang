@@ -286,3 +286,81 @@ func TestPredecessorTasksContext_SkipsIncomplete(t *testing.T) {
 	result := mem.PredecessorTasksContext()
 	require.Empty(t, result)
 }
+
+// Markers must stay in sync with prompts/task/current_task_info.txt — tests fail if the template
+// is edited without updating pe-task prompt contract.
+const (
+	peTaskMarkerPredecessorIndex = "--- 前序任务交付索引 ---"
+	peTaskMarkerPrecondition     = "--- 先决条件检查 ---"
+	peTaskMarkerToolHint         = "find_file、grep、read_file"
+)
+
+// TestCurrentTaskInfo_PeTaskPrompt_EndToEnd_WithPredecessors asserts the full rendered CurrentTaskInfo
+// (embedded in pe-task prompts via CurrentTaskInfo) still contains predecessor and precondition sections.
+func TestCurrentTaskInfo_PeTaskPrompt_EndToEnd_WithPredecessors(t *testing.T) {
+	cod := &Coordinator{
+		Config: &aicommon.Config{
+			Ctx:             context.Background(),
+			MaxTaskContinue: 10,
+		},
+		userInput: "e2e user query",
+	}
+
+	root := cod.generateAITaskWithName("Root", "root goal")
+	root.Index = "1"
+
+	done := cod.generateAITaskWithName("Prior Task", "prior goal")
+	done.Index = "1-1"
+	done.ParentTask = root
+	done.ShortSummary = "e2e prior summary token xyz"
+	done.SetStatus(aicommon.AITaskState_Completed)
+
+	cur := cod.generateAITaskWithName("Current Task", "current goal")
+	cur.Index = "1-2"
+	cur.ParentTask = root
+
+	root.Subtasks = []*AiTask{done, cur}
+
+	mem := GetDefaultContextProvider()
+	mem.CurrentTask = cur
+	mem.RootTask = root
+
+	out := mem.CurrentTaskInfo()
+
+	require.Contains(t, out, peTaskMarkerPredecessorIndex, "current_task_info.txt must render predecessor index header for pe-task")
+	require.Contains(t, out, peTaskMarkerPrecondition, "current_task_info.txt must render precondition section for pe-task")
+	require.Contains(t, out, peTaskMarkerToolHint, "precondition block must mention read tools")
+	require.Contains(t, out, "e2e prior summary token xyz", "predecessor index must include predecessor summary text")
+	idx := strings.Index(out, peTaskMarkerPredecessorIndex)
+	pre := strings.Index(out, peTaskMarkerPrecondition)
+	require.Greater(t, pre, idx, "predecessor index block should appear before precondition check")
+}
+
+// TestCurrentTaskInfo_PeTaskPrompt_EndToEnd_NoPredecessors still requires the unconditional precondition section.
+func TestCurrentTaskInfo_PeTaskPrompt_EndToEnd_NoPredecessors(t *testing.T) {
+	cod := &Coordinator{
+		Config: &aicommon.Config{
+			Ctx:             context.Background(),
+			MaxTaskContinue: 10,
+		},
+		userInput: "e2e no pred",
+	}
+
+	root := cod.generateAITaskWithName("Root", "root goal")
+	root.Index = "1"
+
+	first := cod.generateAITaskWithName("Only Task", "only goal")
+	first.Index = "1-1"
+	first.ParentTask = root
+	root.Subtasks = []*AiTask{first}
+
+	mem := GetDefaultContextProvider()
+	mem.CurrentTask = first
+	mem.RootTask = root
+
+	out := mem.CurrentTaskInfo()
+
+	require.NotContains(t, out, peTaskMarkerPredecessorIndex, "no completed prior siblings: predecessor index header must be omitted")
+	require.Contains(t, out, peTaskMarkerPrecondition, "precondition section must always appear in pe-task current_task_info")
+	require.Contains(t, out, peTaskMarkerToolHint)
+}
