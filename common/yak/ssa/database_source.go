@@ -21,19 +21,31 @@ func (p *Program) CreateEditor(raw []byte, filepath string, save ...bool) *memed
 }
 
 func (p *Program) SaveEditor(e *memedit.MemEditor) {
-	if p.DatabaseKind == ProgramCacheMemory {
+	if p.DatabaseKind == ProgramCacheMemory || p.Cache == nil {
 		return
 	}
-	ir := ssadb.MarshalFile(e)
 	hash := e.GetIrSourceHash()
 	log.Debugf("SaveEditor: program=%s, path=%s, hash=%s", p.GetProgramName(), e.GetFolderPath()+e.GetFilename(), hash)
+	if p.Cache != nil && p.Cache.editorHashCache != nil {
+		if p.Cache.editorHashCache.Have(hash) {
+			return
+		}
+		p.Cache.editorHashCache.Set(hash, struct{}{})
+	}
+	ir := ssadb.MarshalFile(e, hash)
 	p.Cache.editorCache.Add(hash, ir)
 }
 
 func (p *Program) SaveFolder(folderPath []string) {
-	if p.DatabaseKind == ProgramCacheMemory {
+	if p.DatabaseKind == ProgramCacheMemory || p.Cache == nil {
 		return
 	}
 	ir := ssadb.MarshalFolder(folderPath)
+	if p.Cache != nil && p.Cache.editorHashCache != nil {
+		if p.Cache.editorHashCache.Have(ir.SourceCodeHash) {
+			return
+		}
+		p.Cache.editorHashCache.Set(ir.SourceCodeHash, struct{}{})
+	}
 	p.Cache.editorCache.Add(ir.SourceCodeHash, ir)
 }

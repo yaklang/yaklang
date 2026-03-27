@@ -182,6 +182,26 @@ func TestEditorHashWithEmptyPath(t *testing.T) {
 	}
 }
 
+func TestEditorHashResetsAfterMetadataOrContentChange(t *testing.T) {
+	editor := NewMemEditor("test code")
+	editor.SetProgramName("application")
+	editor.SetFolderPath("path/to/folder")
+	editor.SetFileName("test.jsp")
+
+	hash1 := editor.GetIrSourceHash()
+	hash1Again := editor.GetIrSourceHash()
+	assert.Equal(t, hash1, hash1Again, "hash should stay stable across repeated calls")
+
+	editor.SetFileName("changed.jsp")
+	hash2 := editor.GetIrSourceHash()
+	assert.NotEqual(t, hash1, hash2, "changing file metadata should invalidate the cached ir source hash")
+
+	err := editor.ReplaceLine(1, "changed content")
+	assert.NoError(t, err)
+	hash3 := editor.GetIrSourceHash()
+	assert.NotEqual(t, hash2, hash3, "changing content should invalidate the cached ir source hash")
+}
+
 // TestGetGlobalFolderPath 测试 GetGlobalFolderPath 方法
 func TestGetGlobalFolderPath(t *testing.T) {
 	tests := []struct {
