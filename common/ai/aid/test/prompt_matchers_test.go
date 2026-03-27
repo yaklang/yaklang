@@ -7,11 +7,18 @@ import (
 )
 
 func isIntentEnrichmentPrompt(prompt string) bool {
-	return strings.Contains(prompt, "意图识别与上下文增强系统")
+	return strings.Contains(prompt, "意图识别与上下文增强系统") ||
+		strings.Contains(prompt, "意图识别与上下文增强") ||
+		(strings.Contains(prompt, "Intent Recognition") && strings.Contains(prompt, "Context Enrichment")) ||
+		utils.MatchAllOfSubString(prompt, "query_capabilities", "finalize_enrichment", "intent_summary")
 }
 
 func isMemorySummaryPrompt(prompt string) bool {
-	return strings.Contains(prompt, "数据处理和总结提示小助手")
+	return strings.Contains(prompt, "数据处理和总结提示小助手") ||
+		strings.Contains(prompt, "tag-selection") ||
+		strings.Contains(prompt, "memory-triage") ||
+		utils.MatchAllOfSubString(prompt, `"const": "tag-selection"`, `"tags"`) ||
+		utils.MatchAllOfSubString(prompt, `"const": "memory-triage"`, `"memory_entities"`)
 }
 
 func isPlanPrompt(prompt string) bool {
