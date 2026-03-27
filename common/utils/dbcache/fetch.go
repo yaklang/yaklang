@@ -1,4 +1,4 @@
-package asyncdb
+package dbcache
 
 import (
 	"context"
@@ -53,7 +53,7 @@ func NewFetchWithConfig[T any](
 func (f *Fetch[T]) fillBuffer() {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Debugf("Databasex Channel: Fetch panic: %v", r)
+			log.Debugf("dbcache fetch panic: %v", r)
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
@@ -82,7 +82,7 @@ func (f *Fetch[T]) fillBuffer() {
 
 			// start := time.Now()
 			// _ = start
-			// log.Debugf("Databasex Channel: Fetch Count Start in fetch buffer %s: buffer(%v|%v) with fetchItem(%v)", f.cfg.name, bufferLen, bufferWeight, currentFetchSize)
+			// log.Debugf("dbcache fetch start %s: buffer(%v|%v) fetchItem(%v)", f.cfg.name, bufferLen, bufferWeight, currentFetchSize)
 			ch := batchFetch(f.fetchFromDB, f.ctx, currentFetchSize)
 			// ch := f.fetchFromDB(f.ctx, currentFetchSize)
 			for item := range ch {
@@ -92,7 +92,7 @@ func (f *Fetch[T]) fillBuffer() {
 				}
 				f.buffer.SafeFeed(item)
 			}
-			// log.Debugf("Databasex Channel: Fetch Count in fetch buffer %s:  fetchItem(%v): Time(%v)", f.cfg.name, f.buffer.Len(), time.Since(start))
+			// log.Debugf("dbcache fetch done %s: fetchItem(%v) time(%v)", f.cfg.name, f.buffer.Len(), time.Since(start))
 		}
 	}
 }
@@ -151,7 +151,7 @@ func batchFetch[T any](
 		go func(size int) {
 			defer func() {
 				if err := recover(); err != nil {
-					log.Errorf("Databasex Channel: batchSave panic: %v", err)
+					log.Errorf("dbcache batch fetch panic: %v", err)
 					utils.PrintCurrentGoroutineRuntimeStack()
 				}
 			}()

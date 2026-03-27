@@ -80,12 +80,9 @@ func MatchInstructionsByVariableWithExcludeFiles(
 			}
 		}
 	}
-	// all application in database, just use sql
-	switch prog.DatabaseKind {
-	case ProgramCacheMemory:
-		// from cache
+
+	loadFromMemory := func() {
 		var check func(string) bool
-		// check := func(s string) bool {
 		switch compareMode {
 		case ssadb.ExactCompare:
 			check = func(s string) bool { return s == name }
@@ -94,9 +91,7 @@ func MatchInstructionsByVariableWithExcludeFiles(
 			if err != nil {
 				return
 			}
-			check = func(s string) bool {
-				return matcher.Match(s)
-			}
+			check = func(s string) bool { return matcher.Match(s) }
 		case ssadb.RegexpCompare:
 			matcher, err := regexp.Compile(name)
 			if err != nil {
@@ -106,38 +101,45 @@ func MatchInstructionsByVariableWithExcludeFiles(
 		default:
 			return
 		}
-		// 对于内存缓存，需要手动过滤排除的文件
+
 		insts := prog.Cache._getByVariableEx(matchMode, check)
-		if len(excludeFiles) > 0 {
-			// 过滤掉排除文件中的指令
-			filteredInsts := make([]Instruction, 0, len(insts))
-			for _, inst := range insts {
-				// 获取指令的文件路径
-				filePath := getInstructionFilePath(inst)
-				if filePath == "" {
-					// 无法确定文件路径，保留（可能是全局值）
-					filteredInsts = append(filteredInsts, inst)
-					continue
-				}
-				// 规范化路径
-				normalizedPath := normalizeFilePathForExclude(filePath)
-				// 检查是否在排除列表中
-				shouldExclude := false
-				for _, excludePath := range excludeFiles {
-					if normalizeFilePathForExclude(excludePath) == normalizedPath {
-						shouldExclude = true
-						break
-					}
-				}
-				if !shouldExclude {
-					filteredInsts = append(filteredInsts, inst)
+		if len(excludeFiles) == 0 {
+			addRes(insts...)
+			return
+		}
+
+		filteredInsts := make([]Instruction, 0, len(insts))
+		for _, inst := range insts {
+			filePath := getInstructionFilePath(inst)
+			if filePath == "" {
+				filteredInsts = append(filteredInsts, inst)
+				continue
+			}
+			normalizedPath := normalizeFilePathForExclude(filePath)
+			shouldExclude := false
+			for _, excludePath := range excludeFiles {
+				if normalizeFilePathForExclude(excludePath) == normalizedPath {
+					shouldExclude = true
+					break
 				}
 			}
-			addRes(filteredInsts...)
-		} else {
-			addRes(insts...)
+			if !shouldExclude {
+				filteredInsts = append(filteredInsts, inst)
+			}
 		}
-	case ProgramCacheDBRead, ProgramCacheDBWrite:
+		addRes(filteredInsts...)
+	}
+
+	// all application in database, just use sql
+	switch prog.DatabaseKind {
+	case ProgramCacheMemory:
+		loadFromMemory()
+	case ProgramCacheDBWrite:
+		// During compile, DBWrite is a live in-memory program with asynchronous spill.
+		// Querying the DB here can immediately reload just-spilled instructions and
+		// amplify save -> reload -> rewrite cost. Prefer the live in-memory indexes.
+		loadFromMemory()
+	case ProgramCacheDBRead:
 		ch := ssadb.SearchVariableWithExcludeFiles(ssadb.GetDBInProgram(prog.Name), ctx, prog.Name, prog.NameCache, compareMode, matchMode, name, excludeFiles)
 		for ir := range ch {
 			var inst Instruction
@@ -184,11 +186,30 @@ func (c *ProgramCache) _getByVariableEx(
 	checkValue func(string) bool,
 ) []Instruction {
 	var ins []Instruction
+	appendResolved := func(ids []int64) {
+		for _, id := range ids {
+			if id <= 0 {
+				continue
+			}
+			inst := c.GetInstruction(id)
+			if inst == nil {
+				continue
+			}
+			ins = append(ins, inst)
+		}
+	}
 	if mod&ssadb.ConstType != 0 {
-		c.ConstCache.ForEach(func(s string, instruction []Instruction) {
-			for _, i := range instruction {
-				if checkValue(i.String()) {
-					ins = append(ins, i)
+		c.ConstCache.ForEach(func(_ string, ids []int64) {
+			for _, id := range ids {
+				if id <= 0 {
+					continue
+				}
+				inst := c.GetInstruction(id)
+				if inst == nil {
+					continue
+				}
+				if checkValue(inst.String()) {
+					ins = append(ins, inst)
 				}
 			}
 		})
@@ -196,24 +217,24 @@ func (c *ProgramCache) _getByVariableEx(
 	}
 	if mod&ssadb.KeyMatch != 0 {
 		// search all instruction
-		c.MemberIndex.ForEach(func(s string, instructions []Instruction) {
+		c.MemberIndex.ForEach(func(s string, instructions []int64) {
 			if checkValue(s) {
-				ins = append(ins, instructions...)
+				appendResolved(instructions)
 			}
 		})
 	}
 	if mod&ssadb.NameMatch != 0 {
 		// search in variable cache
-		c.VariableIndex.ForEach(func(s string, instruction []Instruction) {
+		c.VariableIndex.ForEach(func(s string, instruction []int64) {
 			if checkValue(s) {
-				ins = append(ins, instruction...)
+				appendResolved(instruction)
 			}
 		})
 
 		// search in class instance
-		c.ClassIndex.ForEach(func(s string, instruction []Instruction) {
+		c.ClassIndex.ForEach(func(s string, instruction []int64) {
 			if checkValue(s) {
-				ins = append(ins, instruction...)
+				appendResolved(instruction)
 			}
 		})
 	}

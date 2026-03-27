@@ -1,15 +1,72 @@
 package ssa
 
 import (
-	"context"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
+
+func newProgramWithTTL(programName string, ttl time.Duration, kind ProgramCacheKind, fs *filesys.VirtualFS) *Program {
+	opts := []ssaconfig.Option{
+		ssaconfig.WithSetProgramName(programName),
+	}
+	if ttl > 0 {
+		opts = append(opts, ssaconfig.WithCompileIrCacheTTL(ttl))
+	}
+	cfg, _ := ssaconfig.New(ssaconfig.ModeSSACompile, opts...)
+	return NewProgram(cfg, kind, Application, fs, "", 0)
+}
+
+func TestResolveInstructionCacheSettings(t *testing.T) {
+	cfg, err := ssaconfig.New(ssaconfig.ModeSSACompile)
+	require.NoError(t, err)
+
+	cfg.SetCompileProjectBytes(512 * 1024)
+	ttl, maxEntries := resolveInstructionCacheSettings(cfg)
+	require.Equal(t, time.Duration(0), ttl)
+	require.Equal(t, 0, maxEntries)
+
+	cfg.SetCompileProjectBytes(8 * 1024 * 1024)
+	ttl, maxEntries = resolveInstructionCacheSettings(cfg)
+	require.Equal(t, time.Second, ttl)
+	require.Equal(t, 5000, maxEntries)
+
+	cfg.SetCompileProjectBytes(32 * 1024 * 1024)
+	ttl, maxEntries = resolveInstructionCacheSettings(cfg)
+	require.Equal(t, largeProjectCacheTTL, ttl)
+	require.Equal(t, largeProjectCacheMax, maxEntries)
+}
+
+func TestSaveEditorTracksOnlySourceHashInMemory(t *testing.T) {
+	programName := uuid.NewString()
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
+
+	vf := filesys.NewVirtualFs()
+	prog := newProgramWithTTL(programName, 0, ProgramCacheDBWrite, vf)
+	editor := prog.CreateEditor([]byte("class Demo {}"), "/src/Demo.java", false)
+	hash := editor.GetIrSourceHash()
+
+	prog.SaveEditor(editor)
+	prog.SaveEditor(editor)
+
+	require.Equal(t, 1, prog.Cache.editorHashCache.Count(), "only the source hash should stay resident")
+	require.False(t, prog.Cache.editorCache.Has(hash), "source payload should not stay resident in the saver-only cache")
+
+	prog.Cache.editorCache.Close()
+
+	var count int64
+	err := ssadb.GetDB().Model(&ssadb.IrSource{}).
+		Where("program_name = ? AND source_code_hash = ?", programName, hash).
+		Count(&count).Error
+	require.NoError(t, err)
+	require.Equal(t, int64(1), count)
+}
 
 func TestLazyInstructionSaveAgain(t *testing.T) {
 	t.Skip("this test is not stable, need to fix it")
@@ -19,7 +76,7 @@ func TestLazyInstructionSaveAgain(t *testing.T) {
 
 	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
 	vf := filesys.NewVirtualFs()
-	prog := NewProgram(context.Background(), programName, ProgramCacheDBWrite, Application, vf, "", 0, ttl)
+	prog := newProgramWithTTL(programName, ttl, ProgramCacheDBWrite, vf)
 	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
 	cache := prog.Cache
 	// enable cache save to database
@@ -102,7 +159,7 @@ func TestCache_with_lazyBuilder(t *testing.T) {
 
 	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
 	vf := filesys.NewVirtualFs()
-	prog := NewProgram(context.Background(), programName, ProgramCacheDBWrite, Application, vf, "", 0, ttl)
+	prog := newProgramWithTTL(programName, ttl, ProgramCacheDBWrite, vf)
 	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
 
 	builded := false
@@ -156,7 +213,7 @@ func TestLazySaveType(t *testing.T) {
 
 	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
 	vf := filesys.NewVirtualFs()
-	prog := NewProgram(context.Background(), programName, ProgramCacheDBWrite, Application, vf, "", 0, ttl)
+	prog := newProgramWithTTL(programName, ttl, ProgramCacheDBWrite, vf)
 	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
 
 	// Create a value to test with
@@ -217,7 +274,7 @@ func TestSetVirtualRegister(t *testing.T) {
 
 	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
 	vf := filesys.NewVirtualFs()
-	prog := NewProgram(context.Background(), programName, ProgramCacheDBWrite, Application, vf, "", 0, ttl)
+	prog := newProgramWithTTL(programName, ttl, ProgramCacheDBWrite, vf)
 	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
 
 	// Create a new value
@@ -249,6 +306,407 @@ func TestSetVirtualRegister(t *testing.T) {
 	prog.Cache.SaveToDatabase()
 }
 
+func TestGetTypeFromDBFallsBackToResidentTypeCache(t *testing.T) {
+	programName := uuid.NewString()
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
+
+	vf := filesys.NewVirtualFs()
+	prog := newProgramWithTTL(programName, 0, ProgramCacheDBWrite, vf)
+	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+
+	value := builder.EmitUndefined("residentType")
+	testType := CreateStringType()
+	value.SetType(testType)
+
+	typeID := testType.GetId()
+	require.Greater(t, typeID, int64(0))
+
+	residentType, ok := prog.Cache.TypeCache.Get(typeID)
+	require.True(t, ok, "type should remain resident in the memory bridge")
+	require.NotNil(t, residentType)
+	require.Nil(t, ssadb.GetIrTypeById(ssadb.GetDB(), programName, typeID), "type should not be in DB before type cache close")
+
+	loadedType := GetTypeFromDB(prog.Cache, typeID)
+	require.NotNil(t, loadedType, "type bridge should return resident type before DB persistence")
+	require.Equal(t, typeID, loadedType.GetId())
+	require.Equal(t, testType.String(), loadedType.String())
+}
+
+func TestInstructionReloadKeepsResidentTypeReachable(t *testing.T) {
+	programName := uuid.NewString()
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
+
+	vf := filesys.NewVirtualFs()
+	prog := newProgramWithTTL(programName, 0, ProgramCacheDBWrite, vf)
+	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+
+	value := builder.EmitUndefined("typedValue")
+	testType := CreateStringType()
+	value.SetType(testType)
+
+	typeID := testType.GetId()
+	require.Greater(t, typeID, int64(0))
+	require.Nil(t, ssadb.GetIrTypeById(ssadb.GetDB(), programName, typeID), "type should not be in DB before type cache close")
+
+	irCode, err := marshalIrCode(value)
+	require.NoError(t, err)
+	require.NotNil(t, irCode)
+	require.Equal(t, typeID, irCode.TypeID)
+	require.NoError(t, ssadb.GetDB().Save(irCode).Error)
+
+	prog.Cache.InstructionCache.Delete(value.GetId())
+
+	reloaded := prog.Cache.GetInstruction(value.GetId())
+	require.NotNil(t, reloaded, "instruction should reload from DB")
+
+	reloadedValue, ok := ToValue(reloaded)
+	require.True(t, ok)
+
+	reloadedType := reloadedValue.GetType()
+	require.NotNil(t, reloadedType, "instruction reload should resolve type through memory bridge")
+	require.Equal(t, typeID, reloadedType.GetId())
+	require.Equal(t, testType.String(), reloadedType.String())
+}
+
+func TestGetStringMemberUsesStringIndexWithoutReloadingConstKey(t *testing.T) {
+	programName := uuid.NewString()
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
+
+	vf := filesys.NewVirtualFs()
+	prog := newProgramWithTTL(programName, 0, ProgramCacheDBWrite, vf)
+	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+
+	object := builder.EmitUndefined("obj")
+	member := builder.EmitUndefined("member")
+	key := builder.EmitConstInstPlaceholder(string(BlueprintRelationParents))
+	object.AddMember(key, member)
+
+	prog.Cache.InstructionCache.Delete(key.GetId())
+	_, ok := prog.Cache.InstructionCache.Get(key.GetId())
+	require.False(t, ok, "const key should no longer be resident")
+	require.Nil(t, ssadb.GetIrCodeItemById(ssadb.GetDB(), programName, key.GetId()), "const key should not be reloaded from DB in this test")
+
+	got, ok := object.GetStringMember(string(BlueprintRelationParents))
+	require.True(t, ok, "string member lookup should succeed without reloading the const key")
+	require.NotNil(t, got)
+	require.Equal(t, member.GetId(), got.GetId())
+}
+
+func TestReloadedObjectGetStringMemberDoesNotReloadConstKeyInstruction(t *testing.T) {
+	programName := uuid.NewString()
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
+
+	vf := filesys.NewVirtualFs()
+	prog := newProgramWithTTL(programName, 0, ProgramCacheDBWrite, vf)
+	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+
+	object := builder.EmitUndefined("obj")
+	member := builder.EmitUndefined("member")
+	key := builder.EmitConstInstPlaceholder(string(BlueprintRelationParents))
+	object.AddMember(key, member)
+
+	keyIR, err := marshalIrCode(key)
+	require.NoError(t, err)
+	require.NotNil(t, keyIR)
+	require.NoError(t, ssadb.GetDB().Save(keyIR).Error)
+
+	objectIR, err := marshalIrCode(object)
+	require.NoError(t, err)
+	require.NotNil(t, objectIR)
+	require.NoError(t, ssadb.GetDB().Save(objectIR).Error)
+
+	prog.Cache.InstructionCache.Delete(object.GetId())
+	prog.Cache.InstructionCache.Delete(key.GetId())
+
+	reloadedObject := prog.Cache.GetInstruction(object.GetId())
+	require.NotNil(t, reloadedObject, "object should reload from DB")
+	reloadedValue, ok := ToValue(reloadedObject)
+	require.True(t, ok)
+
+	countBeforeLookup := prog.Cache.InstructionCache.Count()
+	got, ok := reloadedValue.GetStringMember(string(BlueprintRelationParents))
+	require.True(t, ok, "reloaded object should resolve string member without reloading the const key instruction")
+	require.NotNil(t, got)
+	require.Equal(t, member.GetId(), got.GetId())
+	require.Equal(t, countBeforeLookup, prog.Cache.InstructionCache.Count(), "string lookup should not pull the const key instruction back into the cache")
+}
+
+func TestDisableInstructionSpillKeepsInstructionResidentUntilFunctionFinish(t *testing.T) {
+	programName := uuid.NewString()
+	ttl := 20 * time.Millisecond
+
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
+	vf := filesys.NewVirtualFs()
+	prog := newProgramWithTTL(programName, ttl, ProgramCacheDBWrite, vf)
+	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+
+	left := builder.EmitUndefined("spill_guard_left")
+	right := builder.EmitUndefined("spill_guard_right")
+	inst := builder.EmitBinOp(OpAdd, left, right)
+	instID := inst.GetId()
+	require.Greater(t, instID, int64(0))
+
+	prog.Cache.DisableInstructionSpill()
+	require.True(t, prog.Cache.InstructionSpillDisabled())
+
+	time.Sleep(ttl * 3)
+	require.Nil(t, ssadb.GetIrCodeItemById(ssadb.GetDB(), programName, instID), "instruction should not spill while spill is disabled")
+
+	resident := prog.Cache.GetInstruction(instID)
+	require.NotNil(t, resident, "instruction should stay resident while spill is disabled")
+	require.Equal(t, instID, resident.GetId())
+
+	prog.Cache.EnableInstructionSpill()
+	require.False(t, prog.Cache.InstructionSpillDisabled())
+
+	time.Sleep(ttl * 3)
+	require.Nil(t, ssadb.GetIrCodeItemById(ssadb.GetDB(), programName, instID), "instruction should still stay resident before function finish")
+
+	builder.Finish()
+
+	require.Eventually(t, func() bool {
+		return ssadb.GetIrCodeItemById(ssadb.GetDB(), programName, instID) != nil
+	}, 2*time.Second, ttl, "instruction should spill after function finish enables eviction tracking")
+}
+
+func TestHotInstructionStaysResidentAfterSpillReenabled(t *testing.T) {
+	programName := uuid.NewString()
+	ttl := 20 * time.Millisecond
+
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
+	vf := filesys.NewVirtualFs()
+	prog := newProgramWithTTL(programName, ttl, ProgramCacheDBWrite, vf)
+	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+
+	inst := builder.EmitUndefined("spill_guard_hot")
+	instID := inst.GetId()
+	require.Greater(t, instID, int64(0))
+
+	prog.Cache.DisableInstructionSpill()
+	time.Sleep(ttl * 3)
+	require.Nil(t, ssadb.GetIrCodeItemById(ssadb.GetDB(), programName, instID))
+
+	prog.Cache.EnableInstructionSpill()
+	time.Sleep(ttl * 3)
+
+	require.Nil(t, ssadb.GetIrCodeItemById(ssadb.GetDB(), programName, instID), "hot instruction should remain resident after spill is re-enabled")
+	resident := prog.Cache.GetInstruction(instID)
+	require.NotNil(t, resident)
+	require.Equal(t, instID, resident.GetId())
+}
+
+func TestBasicBlockStaysResidentAfterFunctionFinish(t *testing.T) {
+	programName := uuid.NewString()
+	ttl := 20 * time.Millisecond
+
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
+	vf := filesys.NewVirtualFs()
+	prog := newProgramWithTTL(programName, ttl, ProgramCacheDBWrite, vf)
+	prog.compileConfig.SetCompileProjectBytes(largeProjectByteThreshold)
+	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+
+	left := builder.EmitUndefined("left")
+	right := builder.EmitUndefined("right")
+	builder.EmitBinOp(OpAdd, left, right)
+	block := builder.Function.NewBasicBlock("cooldown-target")
+	block.SetScope(NewScope(builder.Function, prog.GetProgramName()))
+	blockID := block.GetId()
+
+	time.Sleep(ttl * 3)
+	require.Nil(t, ssadb.GetIrCodeItemById(ssadb.GetDB(), programName, blockID), "basic block should stay resident before function finish")
+	resident := prog.Cache.GetInstruction(blockID)
+	require.NotNil(t, resident)
+	require.Equal(t, blockID, resident.GetId())
+
+	builder.Finish()
+
+	time.Sleep(ttl * 3)
+	require.Nil(t, ssadb.GetIrCodeItemById(ssadb.GetDB(), programName, blockID), "basic block should remain resident after function finish")
+	resident = prog.Cache.GetInstruction(blockID)
+	require.NotNil(t, resident)
+	require.Equal(t, blockID, resident.GetId())
+}
+
+func waitInstructionSpilledAfterFinish(t *testing.T, prog *Program, programName string, id int64, ttl time.Duration) {
+	t.Helper()
+	require.Eventually(t, func() bool {
+		if ssadb.GetIrCodeItemById(ssadb.GetDB(), programName, id) == nil {
+			return false
+		}
+		_, resident := prog.Cache.InstructionCache.GetAll()[id]
+		return !resident
+	}, 3*time.Second, ttl, "instruction %d should be persisted and evicted from resident cache", id)
+}
+
+func waitInstructionPersisted(t *testing.T, programName string, id int64, ttl time.Duration) {
+	t.Helper()
+	require.Eventually(t, func() bool {
+		return ssadb.GetIrCodeItemById(ssadb.GetDB(), programName, id) != nil
+	}, 3*time.Second, ttl, "instruction %d should be persisted to DB", id)
+}
+
+func TestReloadedInstructionGetBlockUsesResidentHotBasicBlockAfterFinish(t *testing.T) {
+	programName := uuid.NewString()
+	ttl := 20 * time.Millisecond
+
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
+	vf := filesys.NewVirtualFs()
+	prog := newProgramWithTTL(programName, ttl, ProgramCacheDBWrite, vf)
+	prog.compileConfig.SetCompileProjectBytes(largeProjectByteThreshold)
+	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+
+	left := builder.EmitUndefined("left")
+	right := builder.EmitUndefined("right")
+	binInst := builder.EmitBinOp(OpAdd, left, right)
+	instID := binInst.GetId()
+	blockID := builder.CurrentBlock.GetId()
+
+	builder.Finish()
+
+	waitInstructionPersisted(t, programName, instID, ttl)
+	prog.Cache.InstructionCache.Delete(instID)
+	_, residentBeforeLoad := prog.Cache.InstructionCache.GetAll()[blockID]
+	require.True(t, residentBeforeLoad, "basic block should stay resident as a hot instruction")
+	require.Nil(t, ssadb.GetIrCodeItemById(ssadb.GetDB(), programName, blockID), "hot basic block should not spill during compile")
+
+	reloaded := prog.Cache.GetInstruction(instID)
+	require.NotNil(t, reloaded)
+	_, ok := ToLazyInstruction(reloaded)
+	require.True(t, ok, "spilled instruction should reload as LazyInstruction")
+	_, residentAfterInstReload := prog.Cache.InstructionCache.GetAll()[blockID]
+	require.True(t, residentAfterInstReload, "reloading the instruction should still see the resident hot block")
+
+	block := reloaded.GetBlock()
+	require.NotNil(t, block)
+	require.Equal(t, blockID, block.GetId())
+}
+
+func TestInstruction2IrCodeReloadsSpilledBasicBlockAfterFinish(t *testing.T) {
+	programName := uuid.NewString()
+	ttl := 20 * time.Millisecond
+
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
+	vf := filesys.NewVirtualFs()
+	prog := newProgramWithTTL(programName, ttl, ProgramCacheDBWrite, vf)
+	prog.compileConfig.SetCompileProjectBytes(largeProjectByteThreshold)
+	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+
+	left := builder.EmitUndefined("left")
+	right := builder.EmitUndefined("right")
+	binInst := builder.EmitBinOp(OpAdd, left, right)
+	instID := binInst.GetId()
+	blockID := builder.CurrentBlock.GetId()
+	editor := prog.CreateEditor([]byte("class Demo { void run(){ left + right; } }"), "Demo.java", false)
+	rng := editor.GetRangeByPosition(memedit.NewPosition(1, 26), memedit.NewPosition(1, 38))
+	binInst.SetRange(rng)
+	block := builder.CurrentBlock
+	block.SetRange(rng)
+	sourceHash := editor.GetIrSourceHash()
+	require.NoError(t, ssadb.GetDB().Save(ssadb.MarshalFile(editor, sourceHash)).Error)
+
+	builder.Finish()
+
+	instIR, err := marshalIrCode(binInst)
+	require.NoError(t, err)
+	require.NotNil(t, instIR)
+	require.NoError(t, ssadb.GetDB().Save(instIR).Error)
+
+	blockIR, err := marshalIrCode(block)
+	require.NoError(t, err)
+	require.NotNil(t, blockIR)
+	require.NoError(t, ssadb.GetDB().Save(blockIR).Error)
+	prog.Cache.InstructionCache.Delete(instID)
+	prog.Cache.InstructionCache.Delete(blockID)
+
+	reloaded := prog.Cache.GetInstruction(instID)
+	require.NotNil(t, reloaded)
+	_, ok := ToLazyInstruction(reloaded)
+	require.True(t, ok, "spilled instruction should reload as LazyInstruction")
+	_, residentAfterInstReload := prog.Cache.InstructionCache.GetAll()[blockID]
+	require.False(t, residentAfterInstReload, "reloading the instruction itself should not eagerly reload its block")
+
+	ir := ssadb.EmptyIrCode(programName, instID)
+	require.NoError(t, Instruction2IrCode(reloaded, ir))
+	require.Equal(t, blockID, ir.CurrentBlock, "save path still needs block identity for the reloaded instruction")
+	_, residentAfterMarshal := prog.Cache.InstructionCache.GetAll()[blockID]
+	require.False(t, residentAfterMarshal, "Instruction2IrCode should not reload the spilled BasicBlock when it only needs CurrentBlock id")
+}
+
+func TestLazyInstructionHasUsersReflectsPersistedUsers(t *testing.T) {
+	programName := uuid.NewString()
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
+
+	vf := filesys.NewVirtualFs()
+	prog := newProgramWithTTL(programName, 0, ProgramCacheDBWrite, vf)
+	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+
+	left := builder.EmitUndefined("left")
+	right := builder.EmitUndefined("right")
+	_ = builder.EmitBinOp(OpAdd, left, right)
+
+	require.True(t, left.HasUsers(), "resident instruction should report users before reload")
+
+	leftIR, err := marshalIrCode(left)
+	require.NoError(t, err)
+	require.NotNil(t, leftIR)
+	require.NoError(t, ssadb.GetDB().Save(leftIR).Error)
+
+	leftID := left.GetId()
+	prog.Cache.InstructionCache.Delete(leftID)
+
+	reloaded := prog.Cache.GetInstruction(leftID)
+	require.NotNil(t, reloaded)
+	_, ok := ToLazyInstruction(reloaded)
+	require.True(t, ok, "instruction should reload as LazyInstruction")
+
+	value, ok := ToValue(reloaded)
+	require.True(t, ok)
+	require.True(t, value.HasUsers(), "lazy instruction should preserve persisted user information")
+}
+
+func TestCreateVariableIndexWithNilScopeDoesNotPanic(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	prog := newProgramWithTTL(uuid.NewString(), 0, ProgramCacheMemory, vf)
+	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+
+	inst := builder.EmitUndefined("index_scope_guard")
+	variable := builder.CreateVariable("index_scope_guard")
+	require.NotNil(t, variable)
+	builder.AssignVariable(variable, inst)
+	variable.SetScope(nil)
+
+	require.NotPanics(t, func() {
+		index := CreateVariableIndexByName("index_scope_guard", inst)
+		require.NotNil(t, index)
+		require.Empty(t, index.ScopeName)
+	})
+}
+
+func TestSwitchFreevalueInSideEffectSkipsNonCallCallSite(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	prog := newProgramWithTTL(uuid.NewString(), 0, ProgramCacheMemory, vf)
+	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+
+	variable := builder.CreateVariable("captured")
+	require.NotNil(t, variable)
+	value := builder.EmitUndefined("captured")
+	builder.AssignVariable(variable, value)
+
+	nonCall := builder.EmitConstInst("not-call-site")
+	sideEffect := &SideEffect{
+		anValue:  NewValue(),
+		CallSite: nonCall.GetId(),
+		Value:    value.GetId(),
+	}
+	sideEffect.SetProgram(prog)
+	sideEffect.SetFunc(builder.Function)
+	sideEffect.SetBlock(builder.CurrentBlock)
+
+	require.NotPanics(t, func() {
+		builder.SwitchFreevalueInSideEffect("captured", sideEffect)
+	})
+}
+
 // TestEmitExCallsSetVirtualRegister tests emitEx which is the upper level caller of SetVirtualRegister
 func TestEmitExCallsSetVirtualRegister(t *testing.T) {
 	programName := uuid.NewString()
@@ -256,7 +714,7 @@ func TestEmitExCallsSetVirtualRegister(t *testing.T) {
 
 	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
 	vf := filesys.NewVirtualFs()
-	prog := NewProgram(context.Background(), programName, ProgramCacheDBWrite, Application, vf, "", 0, ttl)
+	prog := newProgramWithTTL(programName, ttl, ProgramCacheDBWrite, vf)
 	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
 
 	// Create operands for binop
@@ -296,4 +754,118 @@ func TestEmitExCallsSetVirtualRegister(t *testing.T) {
 		prog.UpdateToDatabase()
 	}
 	prog.Cache.SaveToDatabase()
+}
+
+func TestInstructionCache_TTLReloadFromDB(t *testing.T) {
+	programName := uuid.NewString()
+	ttl := 80 * time.Millisecond
+
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
+	vf := filesys.NewVirtualFs()
+	prog := newProgramWithTTL(programName, ttl, ProgramCacheDBWrite, vf)
+	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+
+	left := builder.EmitUndefined("left")
+	right := builder.EmitUndefined("right")
+	binInst := builder.EmitBinOp(OpAdd, left, right)
+	instID := binInst.GetId()
+
+	require.Eventually(t, func() bool {
+		return ssadb.GetIrCodeItemById(ssadb.GetDB(), programName, instID) != nil
+	}, 3*time.Second, 50*time.Millisecond)
+
+	reloaded := prog.Cache.GetInstruction(instID)
+	require.NotNil(t, reloaded)
+	require.Equal(t, instID, reloaded.GetId())
+	_, ok := ToLazyInstruction(reloaded)
+	require.True(t, ok, "expired instruction should reload as LazyInstruction")
+
+	prog.Finish()
+	prog.UpdateToDatabase()
+	prog.Cache.SaveToDatabase()
+}
+
+func TestInstructionCache_DeleteDoesNotPersist(t *testing.T) {
+	programName := uuid.NewString()
+	ttl := 60 * time.Millisecond
+
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
+	vf := filesys.NewVirtualFs()
+	prog := newProgramWithTTL(programName, ttl, ProgramCacheDBWrite, vf)
+	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+
+	value := builder.EmitUndefined("temp")
+	instID := value.GetId()
+
+	prog.DeleteInstruction(value)
+	time.Sleep(ttl * 2)
+
+	ir := ssadb.GetIrCodeItemById(ssadb.GetDB(), programName, instID)
+	require.Nil(t, ir, "DeleteInstruction should drop the instruction without saving it")
+}
+
+func TestInstructionCache_TTLWritebackDirtyLazyInstruction(t *testing.T) {
+	programName := uuid.NewString()
+	ttl := 80 * time.Millisecond
+
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
+	vf := filesys.NewVirtualFs()
+	prog := newProgramWithTTL(programName, ttl, ProgramCacheDBWrite, vf)
+	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+
+	value := builder.EmitUndefined("writeback")
+	instID := value.GetId()
+	require.Eventually(t, func() bool {
+		return ssadb.GetIrCodeItemById(ssadb.GetDB(), programName, instID) != nil
+	}, 3*time.Second, 50*time.Millisecond)
+
+	reloaded := prog.Cache.GetInstruction(instID)
+	require.NotNil(t, reloaded)
+	reloaded.SetExtern(true)
+
+	require.Eventually(t, func() bool {
+		var ir ssadb.IrCode
+		var count int
+		countErr := ssadb.GetDB().Model(&ssadb.IrCode{}).
+			Where("program_name = ? AND code_id = ?", programName, instID).
+			Count(&count).Error
+		err := ssadb.GetDB().Model(&ssadb.IrCode{}).
+			Where("program_name = ? AND code_id = ?", programName, instID).
+			Order("id DESC").
+			First(&ir).Error
+		return countErr == nil && count == 1 && err == nil && ir.IsExternal
+	}, 3*time.Second, 50*time.Millisecond, "dirty lazy instruction should be written back before eviction")
+
+	prog.Finish()
+	prog.UpdateToDatabase()
+	prog.Cache.SaveToDatabase()
+}
+
+func TestInstructionCache_SaveDeduplicatesSourcesWithinBatch(t *testing.T) {
+	programName := uuid.NewString()
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
+
+	vf := filesys.NewVirtualFs()
+	prog := newProgramWithTTL(programName, 0, ProgramCacheDBWrite, vf)
+	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+
+	editor := prog.CreateEditor([]byte("class A { int x; }"), "A.java")
+	range1 := editor.GetRangeByPosition(memedit.NewPosition(1, 0), memedit.NewPosition(1, 1))
+	range2 := editor.GetRangeByPosition(memedit.NewPosition(1, 2), memedit.NewPosition(1, 3))
+
+	left := builder.EmitUndefined("left")
+	left.SetRange(range1)
+	right := builder.EmitUndefined("right")
+	right.SetRange(range2)
+
+	prog.Finish()
+	prog.UpdateToDatabase()
+	prog.Cache.SaveToDatabase()
+
+	var count int
+	err := ssadb.GetDB().Model(&ssadb.IrSource{}).
+		Where("program_name = ? AND source_code_hash = ?", programName, editor.GetIrSourceHash()).
+		Count(&count).Error
+	require.NoError(t, err)
+	require.Equal(t, 1, count, "same editor hash should only be persisted once per batch")
 }

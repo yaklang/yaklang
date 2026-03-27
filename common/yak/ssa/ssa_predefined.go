@@ -359,10 +359,12 @@ type anValue struct {
 	typId    int64
 	userList []int64
 
-	object     int64
-	key        int64
-	member     *omap.OrderedMap[int64, int64] // map[Value]Value
-	memberOnce sync.Once
+	object             int64
+	key                int64
+	member             *omap.OrderedMap[int64, int64] // map[Value]Value
+	memberOnce         sync.Once
+	memberByString     map[string][]int64
+	memberByStringOnce sync.Once
 
 	variables     *omap.OrderedMap[string, *Variable] // map[string]*Variable
 	variablesOnce sync.Once
@@ -426,6 +428,87 @@ func (n *anValue) getMemberMap(create ...bool) *omap.OrderedMap[int64, int64] {
 	return n.member
 }
 
+func (n *anValue) getMemberStringIndex(create ...bool) map[string][]int64 {
+	shouldCreate := false
+	if len(create) > 0 {
+		shouldCreate = create[0]
+	}
+	if n.memberByString == nil && shouldCreate {
+		n.memberByStringOnce.Do(func() {
+			n.memberByString = make(map[string][]int64)
+		})
+	}
+	return n.memberByString
+}
+
+func memberStringKey(v Value) (string, bool) {
+	lit, ok := ToConstInst(v)
+	if !ok || lit == nil {
+		return "", false
+	}
+	key, ok := lit.value.(string)
+	return key, ok
+}
+
+func (n *anValue) rememberStringMemberID(key string, id int64) {
+	index := n.getMemberStringIndex(true)
+	ids := index[key]
+	filtered := ids[:0]
+	for _, currentID := range ids {
+		if currentID != id {
+			filtered = append(filtered, currentID)
+		}
+	}
+	index[key] = append(filtered, id)
+}
+
+func (n *anValue) rememberStringMemberKey(k Value) {
+	key, ok := memberStringKey(k)
+	if !ok {
+		return
+	}
+	n.rememberStringMemberID(key, k.GetId())
+}
+
+func (n *anValue) forgetStringMemberKey(k Value) {
+	key, ok := memberStringKey(k)
+	if !ok {
+		return
+	}
+	index := n.getMemberStringIndex()
+	if index == nil {
+		return
+	}
+	ids := index[key]
+	if len(ids) == 0 {
+		return
+	}
+	filtered := ids[:0]
+	for _, id := range ids {
+		if id != k.GetId() {
+			filtered = append(filtered, id)
+		}
+	}
+	if len(filtered) == 0 {
+		delete(index, key)
+		return
+	}
+	index[key] = filtered
+}
+
+func (n *anValue) getMemberByKeyID(keyID int64) (Value, bool) {
+	memberMap := n.getMemberMap()
+	if memberMap == nil {
+		return nil, false
+	}
+	ret, ok := memberMap.Get(keyID)
+	if !ok {
+		return nil, false
+	}
+	val, ok := n.GetValueById(ret)
+	return val, ok
+}
+
 func (n *anValue) IsObject() bool {
 	memberMap := n.getMemberMap()
 	if memberMap == nil {
@@ -436,6 +519,7 @@ func (n *anValue) IsObject() bool {
 
 func (n *anValue) AddMember(k, v Value) {
 	n.getMemberMap(true).Set(k.GetId(), v.GetId())
+	n.rememberStringMemberKey(k)
 }
 
 func (n *anValue) DeleteMember(k Value) {
@@ -443,6 +527,7 @@ func (n *anValue) DeleteMember(k Value) {
 	if memberMap != nil {
 		memberMap.Delete(k.GetId())
 	}
+	n.forgetStringMemberKey(k)
 }
 
 func (n *anValue) GetMember(key Value) (Value, bool) {
@@ -476,6 +561,16 @@ func (n *anValue) GetStringMember(key string) (Value, bool) {
 	if memberMap == nil {
 		return nil, false
 	}
+	if index := n.getMemberStringIndex(); index != nil {
+		if ids := index[key]; len(ids) > 0 {
+			for idx := len(ids) - 1; idx >= 0; idx-- {
+				if member, ok := n.getMemberByKeyID(ids[idx]); ok {
+					return member, true
+				}
+			}
+			return nil, false
+		}
+	}
 	keys := memberMap.Keys()
 	for index := len(keys) - 1; index >= 0; index-- {
 		i, ok := n.GetValueById(keys[index])
@@ -490,6 +585,9 @@ func (n *anValue) GetStringMember(key string) (Value, bool) {
 		if !ok {
 			return nil, false
 		}
+		if lit.value == key {
+			n.rememberStringMemberKey(i)
+		}
 		return n.GetValueById(valID)
 	}
 	return nil, false
@@ -499,6 +597,16 @@ func (n *anValue) SetStringMember(key string, v Value) {
 	memberMap := n.getMemberMap(true)
 	if memberMap == nil {
 		return
+	}
+	if index := n.getMemberStringIndex(); index != nil {
+		if ids := index[key]; len(ids) > 0 {
+			for idx := len(ids) - 1; idx >= 0; idx-- {
+				if _, ok := memberMap.Get(ids[idx]); ok {
+					memberMap.Set(ids[idx], v.GetId())
+					return
+				}
+			}
+		}
 	}
 	var lastMatch Value
 	for _, id := range memberMap.Keys() {
@@ -513,6 +621,7 @@ func (n *anValue) SetStringMember(key string, v Value) {
 		lastMatch = i
 	}
 	if lastMatch != nil {
+		n.rememberStringMemberKey(lastMatch)
 		n.AddMember(lastMatch, v)
 	}
 }

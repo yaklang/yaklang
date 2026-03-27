@@ -3,9 +3,11 @@ package ssa_compile
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -186,6 +188,9 @@ func compileProjectByPlugin(ctx context.Context, config *ssaconfig.Config, force
 	compileParam := map[string]string{
 		"config": configJSON,
 	}
+	if databaseRaw := currentSSADatabaseRaw(); databaseRaw != "" {
+		compileParam["database"] = databaseRaw
+	}
 	if forceProgramName {
 		if programName := strings.TrimSpace(config.GetProgramName()); programName != "" {
 			compileParam["program_name"] = programName
@@ -225,6 +230,20 @@ func compileProjectByPlugin(ctx context.Context, config *ssaconfig.Config, force
 		return "", utils.Errorf("failed to compile project: %s", err)
 	}
 	return compiledProgramName, nil
+}
+
+func currentSSADatabaseRaw() string {
+	dialect, raw := consts.GetSSADataBaseInfo()
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	switch strings.ToLower(strings.TrimSpace(dialect)) {
+	case "", "sqlite", "sqlite3":
+		return raw
+	default:
+		return fmt.Sprintf("%s://%s", dialect, raw)
+	}
 }
 
 func loadProgramWithRetry(programName string) (*ssaapi.Program, error) {

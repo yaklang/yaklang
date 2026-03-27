@@ -192,6 +192,7 @@ type ScanResult struct {
 	Folders         [][]string
 	HandlerTotal    int
 	PreHandlerTotal int
+	HandlerBytes    int64
 }
 
 type ScanConfig struct {
@@ -247,6 +248,7 @@ func ScanProjectFiles(cfg ScanConfig) (*ScanResult, error) {
 			}
 			if cfg.CheckLanguage != nil && cfg.CheckLanguage(path) == nil {
 				result.HandlerTotal++
+				result.HandlerBytes += fi.Size()
 				result.HandlerFiles = append(result.HandlerFiles, path)
 			}
 			if cfg.CheckPreHandler != nil && cfg.CheckPreHandler(path) == nil {

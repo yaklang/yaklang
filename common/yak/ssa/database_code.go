@@ -23,6 +23,9 @@ func marshalInstruction(inst Instruction, irCode *ssadb.IrCode) bool {
 		if !lz.ShouldSave() {
 			return false
 		}
+		if !utils.IsNil(lz.Instruction) {
+			inst = lz.Instruction
+		}
 	}
 
 	err := Instruction2IrCode(inst, irCode)
@@ -121,6 +124,7 @@ func instruction2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	if ret := inst.GetRange(); ret != nil {
 		codeRange = ret
 	} else if ret := inst.GetBlock(); ret != nil {
+		// TODO(ir-cache): avoid block/function materialization in range fallback when only source metadata is needed.
 		block, ok := ToBasicBlock(ret)
 		if ok && block != nil && block.GetRange() != nil {
 			codeRange = block.GetRange()
@@ -157,12 +161,7 @@ func instruction2IrCode(inst Instruction, ir *ssadb.IrCode) {
 	// inst.SetRange(codeRange)
 	fitRange(ir, codeRange, inst)
 
-	if fun := inst.GetFunc(); fun != nil {
-		ir.CurrentFunction = fun.GetId()
-	}
-	if block := inst.GetBlock(); block != nil {
-		ir.CurrentBlock = block.GetId()
-	}
+	ir.CurrentFunction, ir.CurrentBlock = instructionLocationIDs(inst)
 
 	ir.IsExternal = inst.IsExtern()
 }
@@ -310,6 +309,14 @@ func (c *ProgramCache) valueFromIrCode(cache *ProgramCache, inst Instruction, ir
 	// object
 	ir.ObjectMembers.ForEach(func(key, value int64) {
 		anValue.getMemberMap(true).Set(key, value)
+		if cache == nil || cache.program == nil {
+			return
+		}
+		irCode := ssadb.GetIrCodeByIdFast(ssadb.GetDB(), cache.program.Name, key)
+		if irCode == nil || irCode.Opcode != int64(SSAOpcodeConstInst) || irCode.String == "" {
+			return
+		}
+		anValue.rememberStringMemberID(irCode.String, key)
 	})
 
 	// object member

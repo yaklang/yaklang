@@ -11,8 +11,7 @@ import (
 )
 
 func (c *Config) init(filesystem filesys_interface.FileSystem, fileSize int) (*ssa.Program, *ssa.FunctionBuilder, error) {
-	programName := c.GetProgramName()
-	application := ssa.NewProgram(c.ctx, programName, c.databaseKind, ssa.Application, filesystem, c.programPath, fileSize, c.cacheTTL...)
+	application := ssa.NewProgram(c.Config, c.databaseKind, ssa.Application, filesystem, c.programPath, fileSize)
 	application.Language = c.GetLanguage()
 	application.ProjectID = c.GetProjectID()
 	application.ProcessInfof = func(s string, v ...any) {
@@ -97,6 +96,6 @@ func (c *Config) init(filesystem filesys_interface.FileSystem, fileSize int) (*s
 	builder.WithExternMethod(c.externMethod)
 	builder.WithExternBuildValueHandler(c.externBuildValueHandler)
 	builder.WithDefineFunction(c.defineFunc)
-	builder.SetContext(c.ctx)
+	builder.SetContext(c.GetContext())
 	return application, builder, nil
 }

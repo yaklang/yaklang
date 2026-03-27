@@ -1,11 +1,9 @@
 package ssa
 
 import (
-	"context"
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 
 	tl "github.com/yaklang/yaklang/common/yak/templateLanguage"
 
@@ -17,16 +15,21 @@ import (
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 func NewProgram(
-	ctx context.Context,
-	ProgramName string, databaseKind ProgramCacheKind, kind ssadb.ProgramKind,
-	fs fi.FileSystem, programPath string, fileSize int,
-	ttl ...time.Duration,
+	cfg *ssaconfig.Config,
+	databaseKind ProgramCacheKind,
+	kind ssadb.ProgramKind,
+	fs fi.FileSystem,
+	programPath string,
+	fileSize int,
 ) *Program {
+	cfg = ensureProgramConfig(cfg)
+	programName := cfg.GetProgramName()
 	prog := &Program{
-		Name:                    ProgramName,
+		Name:                    programName,
 		ProgramKind:             kind,
 		LibraryFile:             make(map[string][]string),
 		UpStream:                omap.NewEmptyOrderedMap[string, *Program](),
@@ -52,7 +55,8 @@ func NewProgram(
 		Template:                make(map[string]tl.TemplateGeneratedInfo),
 		CurrentIncludingStack:   utils.NewStack[string](),
 		config:                  NewLanguageConfig(),
-		NameCache:               ssadb.NewNameCache(ProgramName),
+		NameCache:               ssadb.NewNameCache(programName),
+		compileConfig:           cfg,
 	}
 
 	prog.GlobalVariablesBlueprint = NewBlueprint("__GlobalVariables__")
@@ -61,7 +65,7 @@ func NewProgram(
 
 	if kind == Application {
 		prog.Application = prog
-		prog.Cache = NewDBCache(ctx, prog, databaseKind, fileSize, ttl...)
+		prog.Cache = NewDBCache(cfg, prog, databaseKind, fileSize)
 	}
 	prog.DatabaseKind = databaseKind
 	prog.Loader = ssautil.NewPackageLoader(
@@ -69,7 +73,7 @@ func NewProgram(
 		ssautil.WithIncludePath(programPath),
 		ssautil.WithBasePath(programPath),
 	)
-	prog.ctx = ctx
+	prog.ctx = cfg.GetContext()
 	return prog
 }
 
@@ -117,7 +121,7 @@ func (prog *Program) createSubProgram(name string, kind ssadb.ProgramKind, path 
 			programPath = prefix
 		}
 	}
-	subProg := NewProgram(prog.ctx, name, prog.DatabaseKind, kind, fs, programPath, 0)
+	subProg := NewProgram(cloneProgramConfig(prog.compileConfig, name), prog.DatabaseKind, kind, fs, programPath, 0)
 	subProg.Application = prog.Application
 	subProg.config = prog.config
 	subProg.SetDiagnosticsRecorder(prog.DiagnosticsRecorder())
@@ -146,6 +150,35 @@ func (prog *Program) createSubProgram(name string, kind ssadb.ProgramKind, path 
 	subProg.NameCache = prog.NameCache
 	subProg.fixImportCallback = make([]func(), 0)
 	return subProg
+}
+
+func ensureProgramConfig(cfg *ssaconfig.Config) *ssaconfig.Config {
+	if cfg != nil {
+		return cfg
+	}
+	ret, err := ssaconfig.New(ssaconfig.ModeSSACompile)
+	if err != nil {
+		return &ssaconfig.Config{}
+	}
+	return ret
+}
+
+func cloneProgramConfig(base *ssaconfig.Config, programName string) *ssaconfig.Config {
+	opts := []ssaconfig.Option{
+		ssaconfig.WithSetProgramName(programName),
+	}
+	if base != nil {
+		opts = append(opts,
+			ssaconfig.WithContext(base.GetContext()),
+			ssaconfig.WithCompileIrCacheTTL(base.GetCompileIrCacheTTL()),
+			ssaconfig.WithCompileIrCacheMax(base.GetCompileIrCacheMax()),
+		)
+	}
+	ret, err := ssaconfig.New(ssaconfig.ModeSSACompile, opts...)
+	if err != nil {
+		return ensureProgramConfig(base)
+	}
+	return ret
 }
 func (prog *Program) IsVirtualImport() bool {
 	return prog.config.VirtualImport

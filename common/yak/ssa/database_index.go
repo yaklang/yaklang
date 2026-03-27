@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
@@ -13,10 +14,16 @@ func CreateVariableIndexByMember(member string, inst Instruction) *ssadb.IrIndex
 }
 
 func CreateVariableIndex(inst Instruction, name, member string) *ssadb.IrIndex {
+	if utils.IsNil(inst) {
+		return nil
+	}
 	if inst.GetId() == -1 {
 		return nil
 	}
 	prog := inst.GetProgram()
+	if utils.IsNil(prog) || utils.IsNil(prog.GetApplication()) || utils.IsNil(prog.NameCache) {
+		return nil
+	}
 	progName := prog.GetApplication().GetProgramName()
 
 	index := ssadb.CreateIndex(progName)
@@ -36,8 +43,9 @@ func CreateVariableIndex(inst Instruction, name, member string) *ssadb.IrIndex {
 		variable := value.GetVariable(name)
 		if variable != nil {
 			index.VersionID = variable.GetVersion()
-			scope := variable.GetScope()
-			index.ScopeName = scope.GetScopeName()
+			if scope := variable.GetScope(); scope != nil {
+				index.ScopeName = scope.GetScopeName()
+			}
 		}
 
 		// field
