@@ -3,14 +3,12 @@ package aireact
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -34,30 +32,6 @@ func (r *ReAct) handleFreeValue(event *ypb.AIInputEvent) error {
 
 	if r.config.DebugEvent {
 		log.Infof("Using free input: %s", userInput)
-	}
-
-	// Persist user input into the timeline so it survives across rounds.
-	if r.config.Timeline != nil {
-		r.config.Timeline.PushUserInteraction(
-			aicommon.UserInteractionStage_FreeInput,
-			r.config.AcquireId(),
-			"",
-			userInput,
-		)
-	}
-
-	quotedHistory, err := r.config.AppendUserInputHistory(userInput, time.Now())
-	if err != nil {
-		log.Warnf("ReAct: failed to build user input history payload: %v", err)
-	}
-
-	// Also persist user input history to the DB record so restorePersistentSession can recover all rounds.
-	if r.config.PersistentSessionId != "" && r.config.GetDB() != nil {
-		if err := yakit.UpdateAIAgentRuntimeUserInput(
-			r.config.GetDB(), r.config.GetRuntimeId(),
-			quotedHistory); err != nil {
-			log.Warnf("ReAct: failed to persist user input to DB: %v", err)
-		}
 	}
 
 	// Reset session state if needed
