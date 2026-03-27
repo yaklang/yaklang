@@ -1,6 +1,7 @@
 package tests
 
 import "testing"
+import "github.com/stretchr/testify/require"
 
 func TestComplex_ObjectFactor_MethodCall(t *testing.T) {
 	check(t, `
@@ -105,4 +106,37 @@ func TestComplex_TryCatchFinally_PanicValue(t *testing.T) {
 		return 0
 	}
 	`, 7, 2)
+}
+
+func TestComplex_TryCatchFinally_StringPanicValue(t *testing.T) {
+	code := `
+	check = () => {
+		try {
+			panic("boom")
+		} catch err {
+			println(err)
+		} finally {
+			println("done")
+		}
+		return 0
+	}
+	`
+	output := runBinaryWithEnv(t, code, "check", nil)
+	require.Equal(t, "boom\ndone\n", output)
+}
+
+func TestComplex_CatchRecover_StringPanicValue(t *testing.T) {
+	code := `
+	check = () => {
+		try {
+			panic("boom")
+		} catch err {
+			println(recover())
+			println(err)
+		}
+		return 0
+	}
+	`
+	output := runBinaryWithEnv(t, code, "check", nil)
+	require.Equal(t, "boom\nboom\n", output)
 }

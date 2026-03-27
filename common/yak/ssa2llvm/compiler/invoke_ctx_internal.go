@@ -71,11 +71,26 @@ func (c *Compiler) clearContextFlags(mask uint64) error {
 	return c.storeContextWord(abi.WordFlags, cleared)
 }
 
-func (c *Compiler) storeContextPanic(val llvm.Value) error {
+func (c *Compiler) setContextFlags(mask uint64) error {
+	flags, err := c.loadContextWord(abi.WordFlags, "yak_ctx_flags")
+	if err != nil {
+		return err
+	}
+	set := c.Builder.CreateOr(flags, llvm.ConstInt(c.LLVMCtx.Int64Type(), mask, false), "yak_ctx_flags_set")
+	return c.storeContextWord(abi.WordFlags, set)
+}
+
+func (c *Compiler) storeContextPanic(val llvm.Value, flags uint64) error {
 	if err := c.storeContextWord(abi.WordPanic, val); err != nil {
 		return err
 	}
-	return c.clearContextFlags(abi.FlagPanicTaggedPointer)
+	if err := c.clearContextFlags(abi.FlagPanicTaggedPointer); err != nil {
+		return err
+	}
+	if flags != 0 {
+		return c.setContextFlags(flags)
+	}
+	return nil
 }
 
 func (c *Compiler) loadContextPanic(name string) (llvm.Value, error) {

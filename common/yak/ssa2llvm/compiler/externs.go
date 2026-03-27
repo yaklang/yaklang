@@ -1,6 +1,8 @@
 package compiler
 
 import (
+	"fmt"
+
 	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
 )
@@ -15,8 +17,12 @@ const (
 
 type ExternBinding struct {
 	// Symbol is the target runtime symbol for a direct extern call.
-	// When DispatchID is non-zero, Symbol/Params are ignored and the call
-	// is routed through the stdlib dispatcher.
+	// Symbol bindings are always invoked through the unified InvokeContext ABI
+	// (`void(i8* ctx)`). `Params` are therefore not marshalled at call sites;
+	// they are only kept for legacy configuration detection and should remain
+	// empty on supported bindings.
+	// When DispatchID is non-zero, Symbol/Params/Return are ignored and the call
+	// is routed through the builtin dispatcher.
 	Symbol string
 	Params []LLVMExternType
 	Return LLVMExternType
@@ -150,6 +156,16 @@ func (c *Compiler) getExternBinding(name string) (ExternBinding, bool) {
 	}
 	b, ok := c.ExternBindings[name]
 	return b, ok
+}
+
+func validateExternBindingCallABI(name string, binding ExternBinding) error {
+	if binding.DispatchID != 0 || binding.Symbol == "" {
+		return nil
+	}
+	if len(binding.Params) == 0 {
+		return nil
+	}
+	return fmt.Errorf("extern binding %q uses legacy parameter ABI; symbol bindings are invoked via InvokeContext and must leave Params empty", name)
 }
 
 func (c *Compiler) llvmTypeForExtern(t LLVMExternType) llvm.Type {
