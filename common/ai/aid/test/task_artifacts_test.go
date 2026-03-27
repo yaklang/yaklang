@@ -46,15 +46,14 @@ func TestTaskArtifacts_SaveTimelineDiff(t *testing.T) {
 	require.NotEmpty(t, diff, "diff should not be empty after adding content")
 	require.Contains(t, diff, "test_tool", "diff should contain the tool name")
 
-	// Verify the diff can be saved to file with new naming format
-	taskDir := filepath.Join(tmpDir, "task_1-1")
+	// Verify the diff can be saved to file with semantic naming format
+	semanticIdentifier := "network scan"
+	taskDir := filepath.Join(tmpDir, aicommon.BuildTaskDirName("1-1", semanticIdentifier))
 	err = os.MkdirAll(taskDir, 0755)
 	require.NoError(t, err)
 
-	// New filename format: task_{{index}}_timeline_diff.txt
 	taskIndex := "1-1"
-	safeTaskIndex := strings.ReplaceAll(taskIndex, "-", "_")
-	timelineDiffPath := filepath.Join(taskDir, fmt.Sprintf("task_%s_timeline_diff.txt", safeTaskIndex))
+	timelineDiffPath := filepath.Join(taskDir, aicommon.BuildTaskTimelineDiffFilename(taskIndex, semanticIdentifier))
 	err = os.WriteFile(timelineDiffPath, []byte(diff), 0644)
 	require.NoError(t, err)
 
@@ -77,10 +76,11 @@ func TestTaskArtifacts_SaveResultSummary(t *testing.T) {
 	err = os.MkdirAll(taskDir, 0755)
 	require.NoError(t, err)
 
-	// Test with all fields populated - simulating new format
+	// Test with all fields populated - simulating the summary artifact format
 	t.Run("NewFormatWithAllFields", func(t *testing.T) {
 		taskIndex := "1-1"
 		taskName := "Test Task"
+		semanticIdentifier := "result overview"
 		taskGoal := "Test the result summary"
 		startTime := time.Now().Add(-5 * time.Minute)
 		endTime := time.Now()
@@ -136,9 +136,7 @@ func TestTaskArtifacts_SaveResultSummary(t *testing.T) {
 		contentBuilder.WriteString(" End of Task 1-1 Result Summary\n")
 		contentBuilder.WriteString("============================================================\n")
 
-		// New filename format: task_{{index}}_result_summary.txt
-		safeTaskIndex := strings.ReplaceAll(taskIndex, "-", "_")
-		resultSummaryPath := filepath.Join(taskDir, fmt.Sprintf("task_%s_result_summary.txt", safeTaskIndex))
+		resultSummaryPath := filepath.Join(taskDir, aicommon.BuildTaskResultSummaryFilename(taskIndex, semanticIdentifier))
 		err = os.WriteFile(resultSummaryPath, []byte(contentBuilder.String()), 0644)
 		require.NoError(t, err)
 
@@ -159,17 +157,17 @@ func TestTaskArtifacts_SaveResultSummary(t *testing.T) {
 	// Test filename format with different task indexes
 	t.Run("FilenameFormat", func(t *testing.T) {
 		testCases := []struct {
-			taskIndex    string
-			expectedFile string
+			taskIndex          string
+			semanticIdentifier string
+			expectedFile       string
 		}{
-			{"1", "task_1_result_summary.txt"},
-			{"1-1", "task_1_1_result_summary.txt"},
-			{"1-2-3", "task_1_2_3_result_summary.txt"},
+			{"1", "network scan", "task_1_network_scan_result_summary.txt"},
+			{"1-1", "扫描端口", "task_1_1_扫描端口_result_summary.txt"},
+			{"1-2-3", "", "task_1_2_3_result_summary.txt"},
 		}
 
 		for _, tc := range testCases {
-			safeTaskIndex := strings.ReplaceAll(tc.taskIndex, "-", "_")
-			expectedFilename := fmt.Sprintf("task_%s_result_summary.txt", safeTaskIndex)
+			expectedFilename := aicommon.BuildTaskResultSummaryFilename(tc.taskIndex, tc.semanticIdentifier)
 			require.Equal(t, tc.expectedFile, expectedFilename, "filename should match expected format for index %s", tc.taskIndex)
 		}
 	})
@@ -187,13 +185,14 @@ func TestTaskArtifacts_TaskDirectoryStructure(t *testing.T) {
 	// Test different task index formats with new filenames
 	testCases := []struct {
 		taskIndex           string
+		semanticIdentifier  string
 		expectedDir         string
 		expectedDiffFile    string
 		expectedSummaryFile string
 	}{
-		{"1", "task_1", "task_1_timeline_diff.txt", "task_1_result_summary.txt"},
-		{"1-1", "task_1-1", "task_1_1_timeline_diff.txt", "task_1_1_result_summary.txt"},
-		{"1-2-3", "task_1-2-3", "task_1_2_3_timeline_diff.txt", "task_1_2_3_result_summary.txt"},
+		{"1", "network scan", "task_1_network_scan", "task_1_network_scan_timeline_diff.txt", "task_1_network_scan_result_summary.txt"},
+		{"1-1", "扫描端口", "task_1-1_扫描端口", "task_1_1_扫描端口_timeline_diff.txt", "task_1_1_扫描端口_result_summary.txt"},
+		{"1-2-3", "", "task_1-2-3", "task_1_2_3_timeline_diff.txt", "task_1_2_3_result_summary.txt"},
 	}
 
 	for _, tc := range testCases {
@@ -228,6 +227,48 @@ func TestTaskArtifacts_TaskDirectoryStructure(t *testing.T) {
 	}
 
 	t.Log("TestTaskArtifacts_TaskDirectoryStructure passed")
+}
+
+func TestBuildTaskTimelineDiffFilename(t *testing.T) {
+	testCases := []struct {
+		index              string
+		semanticIdentifier string
+		expected           string
+	}{
+		{"1", "network scan", "task_1_network_scan_timeline_diff.txt"},
+		{"1-1", "扫描端口", "task_1_1_扫描端口_timeline_diff.txt"},
+		{"1-2", "special!@#chars", "task_1_2_specialchars_timeline_diff.txt"},
+		{"1-3", "", "task_1_3_timeline_diff.txt"},
+		{"", "Summary", "task_0_summary_timeline_diff.txt"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(fmt.Sprintf("index=%s_name=%s", tc.index, tc.semanticIdentifier), func(t *testing.T) {
+			result := aicommon.BuildTaskTimelineDiffFilename(tc.index, tc.semanticIdentifier)
+			require.Equal(t, tc.expected, result)
+		})
+	}
+}
+
+func TestBuildTaskResultSummaryFilename(t *testing.T) {
+	testCases := []struct {
+		index              string
+		semanticIdentifier string
+		expected           string
+	}{
+		{"1", "network scan", "task_1_network_scan_result_summary.txt"},
+		{"1-1", "扫描端口", "task_1_1_扫描端口_result_summary.txt"},
+		{"1-2", "special!@#chars", "task_1_2_specialchars_result_summary.txt"},
+		{"1-3", "", "task_1_3_result_summary.txt"},
+		{"", "Summary", "task_0_summary_result_summary.txt"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(fmt.Sprintf("index=%s_name=%s", tc.index, tc.semanticIdentifier), func(t *testing.T) {
+			result := aicommon.BuildTaskResultSummaryFilename(tc.index, tc.semanticIdentifier)
+			require.Equal(t, tc.expected, result)
+		})
+	}
 }
 
 // TestBuildTaskDirName tests the BuildTaskDirName helper function

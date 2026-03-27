@@ -1101,6 +1101,40 @@ func BuildTaskDirName(index, name string) string {
 	return fmt.Sprintf("task_%s_%s", index, sanitized)
 }
 
+// BuildTaskTimelineDiffFilename builds the timeline diff filename with task index and
+// optional semantic identifier. The semantic identifier follows the same sanitization
+// rules as task directory naming so artifact filenames remain semantically aligned.
+// Format: task_{safeIndex}_{sanitized_name}_timeline_diff.txt or
+// task_{safeIndex}_timeline_diff.txt when the semantic identifier is empty.
+func BuildTaskTimelineDiffFilename(index, semanticIdentifier string) string {
+	if index == "" {
+		index = "0"
+	}
+	safeIndex := strings.ReplaceAll(index, "-", "_")
+	sanitized := SanitizeTaskName(semanticIdentifier)
+	if sanitized == "" {
+		return fmt.Sprintf("task_%s_timeline_diff.txt", safeIndex)
+	}
+	return fmt.Sprintf("task_%s_%s_timeline_diff.txt", safeIndex, sanitized)
+}
+
+// BuildTaskResultSummaryFilename builds the result summary filename with task index and
+// optional semantic identifier. The semantic identifier follows the same sanitization
+// rules as task directory naming so downstream AI can infer task meaning from filenames.
+// Format: task_{safeIndex}_{sanitized_name}_result_summary.txt or
+// task_{safeIndex}_result_summary.txt when the semantic identifier is empty.
+func BuildTaskResultSummaryFilename(index, semanticIdentifier string) string {
+	if index == "" {
+		index = "0"
+	}
+	safeIndex := strings.ReplaceAll(index, "-", "_")
+	sanitized := SanitizeTaskName(semanticIdentifier)
+	if sanitized == "" {
+		return fmt.Sprintf("task_%s_result_summary.txt", safeIndex)
+	}
+	return fmt.Sprintf("task_%s_%s_result_summary.txt", safeIndex, sanitized)
+}
+
 func SummaryRank(task AITask, callResult *aitool.ToolResult) string {
 	if callResult.ShrinkResult != "" {
 		return callResult.ShrinkResult

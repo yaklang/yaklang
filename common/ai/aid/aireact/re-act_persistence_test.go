@@ -249,7 +249,12 @@ func TestReAct_PersistentSession_WorkDir(t *testing.T) {
 				0644,
 			)
 			os.WriteFile(
-				filepath.Join(task1Dir, "task_1_1_result_summary.txt"),
+				filepath.Join(task1Dir, aicommon.BuildTaskTimelineDiffFilename("1-1", "network_scan")),
+				[]byte("# Task 1-1 Timeline Diff\n\n- scanned 254 hosts"),
+				0644,
+			)
+			os.WriteFile(
+				filepath.Join(task1Dir, aicommon.BuildTaskResultSummaryFilename("1-1", "network_scan")),
 				[]byte("Scan completed: 254 hosts scanned, 12 hosts up"),
 				0644,
 			)
@@ -382,7 +387,12 @@ WAIT_PLAN:
 	assert.Contains(t, string(content), "12 hosts up",
 		"nmap scan artifact content should be intact")
 
-	content, err = os.ReadFile(filepath.Join(session2WorkDir, "task_1-1_network_scan", "task_1_1_result_summary.txt"))
+	content, err = os.ReadFile(filepath.Join(session2WorkDir, "task_1-1_network_scan", aicommon.BuildTaskTimelineDiffFilename("1-1", "network_scan")))
+	require.NoError(t, err, "timeline diff artifact should be readable from restored WorkDir")
+	assert.Contains(t, string(content), "scanned 254 hosts",
+		"timeline diff content should be intact")
+
+	content, err = os.ReadFile(filepath.Join(session2WorkDir, "task_1-1_network_scan", aicommon.BuildTaskResultSummaryFilename("1-1", "network_scan")))
 	require.NoError(t, err, "result summary artifact should be readable from restored WorkDir")
 	assert.Contains(t, string(content), "254 hosts scanned",
 		"result summary content should be intact")

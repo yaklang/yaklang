@@ -31,11 +31,12 @@ func TestArtifactsContextProvider_BasicOutput(t *testing.T) {
 	task1Dir := filepath.Join(tmpDir, "task_1-1_network_scan")
 	require.NoError(t, os.MkdirAll(filepath.Join(task1Dir, "tool_calls"), 0755))
 	require.NoError(t, os.WriteFile(filepath.Join(task1Dir, "tool_calls", "1_bash_scan.md"), []byte("# Tool Call: bash\nscan result"), 0644))
-	require.NoError(t, os.WriteFile(filepath.Join(task1Dir, "task_1_1_result_summary.txt"), []byte("scan completed successfully"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(task1Dir, BuildTaskTimelineDiffFilename("1-1", "network_scan")), []byte("# Task 1-1 Timeline Diff\n\nscan step 1"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(task1Dir, BuildTaskResultSummaryFilename("1-1", "network_scan")), []byte("scan completed successfully"), 0644))
 
 	task2Dir := filepath.Join(tmpDir, "task_1-2_security_analysis")
 	require.NoError(t, os.MkdirAll(task2Dir, 0755))
-	require.NoError(t, os.WriteFile(filepath.Join(task2Dir, "task_1_2_result_summary.txt"), []byte("no vulnerabilities found"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(task2Dir, BuildTaskResultSummaryFilename("1-2", "security_analysis")), []byte("no vulnerabilities found"), 0644))
 
 	// Create a real Config to use as the AICallerConfigIf (it has GetOrCreateWorkDir)
 	cfg := NewConfig(context.Background())
@@ -54,7 +55,8 @@ func TestArtifactsContextProvider_BasicOutput(t *testing.T) {
 	assert.Contains(t, result, "task_1-1_network_scan", "should contain task directory name")
 	assert.Contains(t, result, "task_1-2_security_analysis", "should contain second task directory name")
 	assert.Contains(t, result, "1_bash_scan.md", "should contain tool call filename")
-	assert.Contains(t, result, "task_1_1_result_summary.txt", "should contain result summary filename")
+	assert.Contains(t, result, "task_1_1_network_scan_timeline_diff.txt", "should contain timeline diff filename")
+	assert.Contains(t, result, "task_1_1_network_scan_result_summary.txt", "should contain result summary filename")
 	// File sizes are displayed as B, KB, or MB depending on size
 	assert.True(t, strings.Contains(result, "B") || strings.Contains(result, "KB") || strings.Contains(result, "MB"),
 		"should contain file size in B/KB/MB format")

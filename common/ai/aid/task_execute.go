@@ -489,7 +489,7 @@ func (t *AiTask) saveTaskArtifacts(summary, nextMovements, statusSummary, taskSu
 	return nil
 }
 
-// saveTimelineDiff saves the timeline diff to task_{{index}}_timeline_diff.txt
+// saveTimelineDiff saves the timeline diff to task_{{index}}_{{semantic_identifier}}_timeline_diff.txt
 // It gets the diff from the ReactLoop which tracks timeline changes during task execution
 func (t *AiTask) saveTimelineDiff(taskDir string) error {
 	// Get task index for filename
@@ -497,8 +497,6 @@ func (t *AiTask) saveTimelineDiff(taskDir string) error {
 	if taskIndex == "" {
 		taskIndex = "0"
 	}
-	// Sanitize task index for filename (replace - with _)
-	safeTaskIndex := strings.ReplaceAll(taskIndex, "-", "_")
 
 	var diff string
 	var err error
@@ -548,8 +546,8 @@ func (t *AiTask) saveTimelineDiff(taskDir string) error {
 		contentBuilder.WriteString(diff)
 	}
 
-	// Save to file with task index in filename
-	timelineDiffPath := filepath.Join(taskDir, fmt.Sprintf("task_%s_timeline_diff.txt", safeTaskIndex))
+	// Save to file with task index and semantic identifier in filename
+	timelineDiffPath := filepath.Join(taskDir, aicommon.BuildTaskTimelineDiffFilename(taskIndex, t.GetSemanticIdentifier()))
 	if err := os.WriteFile(timelineDiffPath, []byte(contentBuilder.String()), 0644); err != nil {
 		return fmt.Errorf("failed to write timeline diff file: %w", err)
 	}
@@ -563,15 +561,13 @@ func (t *AiTask) saveTimelineDiff(taskDir string) error {
 	return nil
 }
 
-// saveResultSummary saves the result summary to task_{{index}}_result_summary.txt
+// saveResultSummary saves the result summary to task_{{index}}_{{semantic_identifier}}_result_summary.txt
 func (t *AiTask) saveResultSummary(taskDir string, summary, nextMovements, statusSummary, taskSummary, shortSummary, longSummary string) error {
 	// Get task index for filename
 	taskIndex := t.Index
 	if taskIndex == "" {
 		taskIndex = "0"
 	}
-	// Sanitize task index for filename (replace - with _)
-	safeTaskIndex := strings.ReplaceAll(taskIndex, "-", "_")
 
 	var contentBuilder strings.Builder
 
@@ -693,8 +689,8 @@ func (t *AiTask) saveResultSummary(taskDir string, summary, nextMovements, statu
 	contentBuilder.WriteString(" End of Task " + taskIndex + " Result Summary\n")
 	contentBuilder.WriteString("=" + strings.Repeat("=", 59) + "\n")
 
-	// Save to file with task index in filename
-	resultSummaryPath := filepath.Join(taskDir, fmt.Sprintf("task_%s_result_summary.txt", safeTaskIndex))
+	// Save to file with task index and semantic identifier in filename
+	resultSummaryPath := filepath.Join(taskDir, aicommon.BuildTaskResultSummaryFilename(taskIndex, t.GetSemanticIdentifier()))
 	if err := os.WriteFile(resultSummaryPath, []byte(contentBuilder.String()), 0644); err != nil {
 		return fmt.Errorf("failed to write result summary file: %w", err)
 	}
