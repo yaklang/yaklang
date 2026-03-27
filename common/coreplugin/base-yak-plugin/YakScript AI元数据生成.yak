@@ -1,0 +1,56 @@
+yakit.AutoInitYakit()
+
+# Input your code!
+__DESC__ = "根据 YakScript 的脚本名、类型、帮助信息、标签、参数和源码，生成 AI 可用的 ai_desc、ai_keywords、ai_usage 三个元数据字段。"
+__VERBOSE_NAME__ = "YakScript AI元数据生成"
+__KEYWORDS__ = "yakscript,ai元数据,ai_desc,ai_keywords,ai_usage,metadata,liteforge"
+
+yakit.AutoInitYakit()
+
+scriptName = cli.String("script_name", cli.setVerboseName("脚本名"), cli.setDefault("script.yak"))
+scriptType = cli.String("type", cli.setVerboseName("脚本类型"), cli.setDefault("yak"))
+descText = cli.Text("desc", cli.setVerboseName("插件描述"))
+tags = cli.String("tags", cli.setVerboseName("标签"))
+content = cli.Text("content", cli.setRequired(true), cli.setVerboseName("脚本源码"))
+cli.check()
+
+prompt = <<<PROMPT
+你是 YakScript 的 AI 元数据生成器。
+请只根据插件的真实功能、输入输出和适用场景，生成适合 AI 检索与调用的元数据。
+
+输出要求：
+1. 当前插件已经明确启用了 enable_for_ai，请只补充 ai_desc、ai_keywords、ai_usage。
+2. ai_desc: 1-2 句简洁说明插件做什么，不要复述实现细节。
+3. ai_keywords: 5-12 个关键词，优先保留检索价值高的中文/英文技术词，去重。
+4. ai_usage: 面向 AI 的使用说明，说明何时使用、关键参数、预期产出，保持简洁实用。
+5. 忽略夸张注释，优先依据代码行为、参数、help、tags 进行判断。
+PROMPT
+
+schema = jsonschema.ActionObject(
+    jsonschema.paramString("ai_desc", jsonschema.description("A concise description of what this YakScript does.")),
+    jsonschema.paramStringArray("ai_keywords", jsonschema.description("Keywords for AI retrieval, including technical aliases when helpful.")),
+    jsonschema.paramString("ai_usage", jsonschema.description("Usage guidance for AI agents, including when to use it, important parameters, and expected output."))
+)
+
+query = sprintf("ScriptName: %s\nType: %s\n", scriptName, scriptType)
+if descText != "" {
+    query += sprintf("Description: %s\n", descText)
+}
+if tags != "" {
+    query += sprintf("Tags: %s\n", tags)
+}
+query += sprintf("\nCode:\n```yak\n%s\n```", content)
+
+res = liteforge.Execute(
+    sprintf("%s\n\ninput:\n%s", prompt, query),
+    liteforge.output(schema),
+    liteforge.speedPriority(),
+)~
+
+result = {
+    "ai_desc": res.GetString("ai_desc"),
+    "ai_keywords": res.GetStringSlice("ai_keywords"),
+    "ai_usage": res.GetString("ai_usage"),
+}
+
+yakit.Output(json.dumps(result))
