@@ -140,19 +140,18 @@ func GetEditorByProgramName(programName string) ([]*memedit.MemEditor, error) {
 }
 
 func MarshalFile(editor *memedit.MemEditor, irSourceHash ...string) *IrSource {
+	hash := editor.GetIrSourceHash()
+	if len(irSourceHash) != 0 && irSourceHash[0] != "" {
+		hash = irSourceHash[0]
+	}
 	// editor 内部已经维护好了规范化的数据，直接使用即可
 	irSource := &IrSource{
 		ProgramName:    editor.GetProgramName(),
-		SourceCodeHash: editor.GetIrSourceHash(),
-		QuotedCode:     strconv.Quote(editor.GetSourceCode()),
+		SourceCodeHash: hash,
+		QuotedCode:     strconv.Quote(editor.GetSourceCodeUnsafe()),
 		FileName:       editor.GetFilename(),
 		FolderPath:     editor.GetGlobalFolderPath(), // 已经是规范化的
 		IsBigFile:      false,
-	}
-	if len(irSourceHash) != 0 && irSourceHash[0] != "" {
-		irSource.SourceCodeHash = irSourceHash[0]
-	} else {
-		irSource.SourceCodeHash = editor.GetIrSourceHash()
 	}
 	return irSource
 }

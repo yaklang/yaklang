@@ -1,6 +1,7 @@
 package memedit
 
 import (
+	"bytes"
 	"unicode/utf8"
 
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -11,11 +12,14 @@ type SafeString struct {
 	bytes     []byte
 
 	// 缓存，懒加载
-	runes []rune
+	runes        []rune
+	runeLen      int
+	asciiChecked bool
+	asciiOnly    bool
 }
 
 func NewSafeString(i any) *SafeString {
-	ss := &SafeString{}
+	ss := &SafeString{runeLen: -1}
 	raw := codec.AnyToBytes(i)
 
 	ss.bytes = raw
@@ -24,10 +28,53 @@ func NewSafeString(i any) *SafeString {
 	return ss
 }
 
+func (s *SafeString) isASCII() bool {
+	if !s.utf8Valid {
+		return false
+	}
+	if s.asciiChecked {
+		return s.asciiOnly
+	}
+	s.asciiChecked = true
+	s.asciiOnly = true
+	for _, b := range s.bytes {
+		if b >= utf8.RuneSelf {
+			s.asciiOnly = false
+			break
+		}
+	}
+	if s.asciiOnly && s.runeLen < 0 {
+		s.runeLen = len(s.bytes)
+	}
+	return s.asciiOnly
+}
+
+func (s *SafeString) runeIndexToByteOffset(idx int) int {
+	if idx <= 0 {
+		return 0
+	}
+	if idx >= s.Len() {
+		return len(s.bytes)
+	}
+	if s.isASCII() {
+		return idx
+	}
+
+	byteOffset := 0
+	for i := 0; i < idx && byteOffset < len(s.bytes); i++ {
+		_, size := utf8.DecodeRune(s.bytes[byteOffset:])
+		byteOffset += size
+	}
+	return byteOffset
+}
+
 // 懒加载 runes
 func (s *SafeString) ensureRunes() {
 	if s.runes == nil && s.utf8Valid {
-		runeCount := utf8.RuneCount(s.bytes)
+		if s.isASCII() {
+			return
+		}
+		runeCount := s.Len()
 		s.runes = make([]rune, runeCount)
 		i := 0
 		tempBytes := s.bytes
@@ -52,37 +99,35 @@ func (s *SafeString) SafeSlice(start int, end ...int) *SafeString {
 	}
 
 	if s.utf8Valid {
-		s.ensureRunes()
-		// 对于UTF-8有效的字符串，我们需要计算字节范围
-		if len(s.runes) == 0 {
+		if s.isASCII() {
+			return &SafeString{
+				utf8Valid:    true,
+				bytes:        s.bytes[start:endIdx],
+				runeLen:      endIdx - start,
+				asciiChecked: true,
+				asciiOnly:    true,
+			}
+		}
+		if endIdx == 0 {
 			return &SafeString{
 				utf8Valid: true,
 				bytes:     []byte{},
+				runeLen:   0,
 			}
 		}
-
-		// 计算字节切片范围
-		var startByteIdx, endByteIdx int
-		if start == 0 {
-			startByteIdx = 0
-		} else {
-			startByteIdx = len([]byte(string(s.runes[:start])))
-		}
-
-		if endIdx >= len(s.runes) {
-			endByteIdx = len(s.bytes)
-		} else {
-			endByteIdx = len([]byte(string(s.runes[:endIdx])))
-		}
+		startByteIdx := s.runeIndexToByteOffset(start)
+		endByteIdx := s.runeIndexToByteOffset(endIdx)
 
 		return &SafeString{
 			utf8Valid: s.utf8Valid,
 			bytes:     s.bytes[startByteIdx:endByteIdx],
+			runeLen:   endIdx - start,
 		}
 	}
 	return &SafeString{
 		utf8Valid: s.utf8Valid,
 		bytes:     s.bytes[start:endIdx],
+		runeLen:   -1,
 	}
 }
 
@@ -96,20 +141,19 @@ func (s *SafeString) Slice(start int, end ...int) string {
 	}
 
 	if s.utf8Valid {
-		s.ensureRunes()
-		return string(s.runes[start:endIdx])
+		startByteIdx := s.runeIndexToByteOffset(start)
+		endByteIdx := s.runeIndexToByteOffset(endIdx)
+		return string(s.bytes[startByteIdx:endByteIdx])
 	}
 	return string(s.bytes[start:endIdx])
 }
 
 func (s *SafeString) SliceBeforeStart(end int) string {
 	if s.utf8Valid {
-		s.ensureRunes()
-		// 添加边界检查：如果请求的长度超过实际长度，使用实际长度
-		if end > len(s.runes) {
-			end = len(s.runes)
+		if end > s.Len() {
+			end = s.Len()
 		}
-		return string(s.runes[:end])
+		return string(s.bytes[:s.runeIndexToByteOffset(end)])
 	}
 	// 对于非 UTF-8，也需要边界检查
 	if end > len(s.bytes) {
@@ -128,6 +172,9 @@ func (s *SafeString) Slice1(idx int) rune {
 	}
 
 	if s.utf8Valid {
+		if s.isASCII() {
+			return rune(s.bytes[idx])
+		}
 		s.ensureRunes()
 		return s.runes[idx]
 	}
@@ -136,6 +183,9 @@ func (s *SafeString) Slice1(idx int) rune {
 
 func (s *SafeString) Runes() []rune {
 	if s.utf8Valid {
+		if s.isASCII() {
+			return []rune(string(s.bytes))
+		}
 		s.ensureRunes()
 		return s.runes
 	}
@@ -155,13 +205,23 @@ func (s *SafeString) String() string {
 
 func (s *SafeString) Len() int {
 	if s.utf8Valid {
-		return utf8.RuneCount(s.bytes)
+		if s.runeLen >= 0 {
+			return s.runeLen
+		}
+		if s.isASCII() {
+			return s.runeLen
+		}
+		s.runeLen = utf8.RuneCount(s.bytes)
+		return s.runeLen
 	}
 	return len(s.bytes)
 }
 
 func (s *SafeString) IndexString(what string) int {
 	if s.utf8Valid {
+		if s.isASCII() {
+			return bytes.Index(s.bytes, []byte(what))
+		}
 		return s.Index([]rune(what))
 	} else {
 		// 对于非UTF-8有效的字节，使用字节搜索
@@ -196,6 +256,16 @@ func (s *SafeString) Index(what []rune) int {
 	}
 
 	if s.utf8Valid {
+		if s.isASCII() {
+			buf := make([]byte, len(what))
+			for i, r := range what {
+				if r >= utf8.RuneSelf {
+					return -1
+				}
+				buf[i] = byte(r)
+			}
+			return bytes.Index(s.bytes, buf)
+		}
 		s.ensureRunes()
 		if len(what) > len(s.runes) {
 			return -1

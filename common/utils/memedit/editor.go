@@ -27,6 +27,7 @@ type MemEditor struct {
 	sourceCodeMd5    string
 	sourceCodeSha1   string
 	sourceCodeSha256 string
+	irSourceHash     string
 
 	// fileUrl and source
 	fileUrl string
@@ -38,8 +39,9 @@ type MemEditor struct {
 	safeSourceCode *SafeString
 
 	// editor
-	lineLensMap        map[int]int
-	lineStartOffsetMap map[int]int
+	lineLensMap        []int
+	lineStartOffsetMap []int
+	lineMappingsReady  bool
 	cursor             int // 模拟光标位置（指针功能）
 }
 
@@ -47,21 +49,15 @@ type MemEditor struct {
 // Callers must treat bs as immutable after this call.
 func NewMemEditorByBytes(bs []byte) *MemEditor {
 	editor := &MemEditor{
-		safeSourceCode:     NewSafeString(bs),
-		lineLensMap:        make(map[int]int),
-		lineStartOffsetMap: make(map[int]int),
+		safeSourceCode: NewSafeString(bs),
 	}
-	editor.recalculateLineMappings()
 	return editor
 }
 
 func NewMemEditor(sourceCode string) *MemEditor {
 	editor := &MemEditor{
-		safeSourceCode:     NewSafeString(sourceCode),
-		lineLensMap:        make(map[int]int),
-		lineStartOffsetMap: make(map[int]int),
+		safeSourceCode: NewSafeString(sourceCode),
 	}
-	editor.recalculateLineMappings()
 	return editor
 }
 
@@ -71,15 +67,41 @@ func NewMemEditorWithFileUrl(sourceCode string, fileUrl string) *MemEditor {
 	return editor
 }
 
+func (ve *MemEditor) ensureLineMappings() {
+	if ve == nil || ve.lineMappingsReady {
+		return
+	}
+	ve.recalculateLineMappings()
+}
+
+func (ve *MemEditor) invalidateLineMappings() {
+	if ve == nil {
+		return
+	}
+	ve.lineMappingsReady = false
+	ve.lineLensMap = nil
+	ve.lineStartOffsetMap = nil
+}
+
+func (ve *MemEditor) invalidateSourceCodeState() {
+	if ve == nil {
+		return
+	}
+	ve.ResetSourceCodeHash()
+	ve.invalidateLineMappings()
+}
+
 func (ve *MemEditor) CodeLength() int {
 	return ve.safeSourceCode.Len()
 }
 
 func (ve *MemEditor) GetLineCount() int {
+	ve.ensureLineMappings()
 	return len(ve.lineLensMap)
 }
 
 func (ve *MemEditor) SetUrl(url string) {
+	ve.ResetSourceCodeHash()
 	ve.fileUrl = url
 }
 
@@ -107,6 +129,7 @@ func (v *MemEditor) GetFilePath() string {
 }
 
 func (ve *MemEditor) SetProgramName(programName string) {
+	ve.ResetSourceCodeHash()
 	ve.programName = programName
 	// 重新规范化 folderPath，因为 programName 改变可能会影响规范化结果
 	if ve.folderPath != "" {
@@ -196,6 +219,7 @@ func (ve *MemEditor) normalizeFolderPath(folderPath string) string {
 }
 
 func (ve *MemEditor) SetFolderPath(folderPath string) {
+	ve.ResetSourceCodeHash()
 	ve.folderPath = ve.normalizeFolderPath(folderPath)
 }
 
@@ -211,6 +235,7 @@ func (ve *MemEditor) GetFolderPath() string {
 }
 
 func (ve *MemEditor) SetFileName(fileName string) {
+	ve.ResetSourceCodeHash()
 	ve.fileName = fileName
 }
 
@@ -231,6 +256,9 @@ func (ve *MemEditor) GetFilename() string {
 func (ve *MemEditor) GetIrSourceHash() string {
 	if ve == nil {
 		return ""
+	}
+	if ve.irSourceHash != "" {
+		return ve.irSourceHash
 	}
 	programName := ve.GetProgramName()
 	// 确保初始化
@@ -263,7 +291,8 @@ func (ve *MemEditor) GetIrSourceHash() string {
 	if len(sourceBytes) > 0 {
 		_, _ = h.Write(sourceBytes)
 	}
-	return hex.EncodeToString(h.Sum(nil))
+	ve.irSourceHash = hex.EncodeToString(h.Sum(nil))
+	return ve.irSourceHash
 }
 
 func (ve *MemEditor) GetLength() int {
@@ -282,6 +311,7 @@ func (ve *MemEditor) GetOffsetByPositionRaw(line, col int) int {
 }
 
 func (ve *MemEditor) GetOffsetByPositionWithError(line, col int) (int, error) {
+	ve.ensureLineMappings()
 	if line < 1 || col < 1 {
 		return 0, errors.New("line number and column number must be positive")
 	}
@@ -314,12 +344,13 @@ func (ve *MemEditor) GetOffsetByPositionWithError(line, col int) (int, error) {
 }
 
 func (ve *MemEditor) GetStartOffsetByLine(x int) (int, error) {
+	ve.ensureLineMappings()
 	if x < 1 {
 		return 0, errors.New("line number should be positive")
 	}
 
 	x = x - 1
-	if _, exists := ve.lineStartOffsetMap[x]; !exists {
+	if x >= len(ve.lineStartOffsetMap) {
 		return 0, errors.New("line number out of range")
 	}
 
@@ -327,12 +358,13 @@ func (ve *MemEditor) GetStartOffsetByLine(x int) (int, error) {
 }
 
 func (ve *MemEditor) GetEndOffsetByLine(x int) (int, error) {
+	ve.ensureLineMappings()
 	if x < 1 {
 		return 0, errors.New("line number should be positive")
 	}
 
 	x = x - 1
-	if _, exists := ve.lineStartOffsetMap[x]; !exists {
+	if x >= len(ve.lineStartOffsetMap) {
 		return 0, errors.New("line number out of range")
 	}
 
@@ -381,6 +413,7 @@ func (ve *MemEditor) MoveCursor(position int) error {
 
 // GetCurrentLine 返回当前光标所在行的内容
 func (ve *MemEditor) GetCurrentLine() (string, error) {
+	ve.ensureLineMappings()
 	for lineNumber, startOffset := range ve.lineStartOffsetMap {
 		if ve.cursor >= startOffset && ve.cursor <= (startOffset+ve.lineLensMap[lineNumber]) {
 			return ve.GetLine(lineNumber + 1)
@@ -399,6 +432,7 @@ func (ve *MemEditor) GetPositionByLine(line, column int) *Position {
 }
 
 func (ve *MemEditor) GetPositionByOffsetWithError(offset int) (*Position, error) {
+	ve.ensureLineMappings()
 	if offset < 0 {
 		// 偏移量为负，返回最初位置
 		return NewPosition(1, 1), errors.New("offset is negative")
@@ -513,7 +547,7 @@ func (ve *MemEditor) UpdateTextByRange(r *Range, newText string) error {
 	ve.safeSourceCode = NewSafeString(before + newText + after) // 构造新的源代码
 
 	// 更新行信息映射
-	ve.recalculateLineMappings()
+	ve.invalidateSourceCodeState()
 	return nil
 }
 
@@ -524,32 +558,54 @@ func (ve *MemEditor) ResetSourceCodeHash() {
 	ve.sourceCodeMd5 = ""
 	ve.sourceCodeSha1 = ""
 	ve.sourceCodeSha256 = ""
+	ve.irSourceHash = ""
 }
 
 // recalculateLineMappings 重新计算行映射
 func (ve *MemEditor) recalculateLineMappings() {
-	ve.ResetSourceCodeHash()
+	data := ve.safeSourceCode.Bytes()
+	lineNums := bytes.Count(data, []byte{'\n'}) + 1
 
-	lines := strings.Split(ve.safeSourceCode.String(), "\n")
-	lineNums := len(lines)
-
-	ve.lineLensMap = make(map[int]int, lineNums)
-	ve.lineStartOffsetMap = make(map[int]int, lineNums)
+	ve.lineLensMap = make([]int, 0, lineNums)
+	ve.lineStartOffsetMap = make([]int, 1, lineNums)
 	currentOffset := 0
-	ve.lineStartOffsetMap[0] = 0
-	for lineNumber, line := range lines {
-		lineLen := 0
-		if utf8.ValidString(line) {
-			lineLen = len([]rune(line))
-		} else {
-			lineLen = len(line)
-		}
-		ve.lineLensMap[lineNumber] = lineLen
-		if lineNumber+1 < len(lines) {
-			ve.lineStartOffsetMap[lineNumber+1] = currentOffset + lineLen + 1
-		}
-		currentOffset += lineLen + 1
+	currentLineLen := 0
+
+	if len(data) == 0 {
+		ve.lineLensMap = append(ve.lineLensMap, 0)
+		ve.lineMappingsReady = true
+		return
 	}
+
+	if ve.safeSourceCode.isASCII() || !ve.safeSourceCode.utf8Valid {
+		for _, b := range data {
+			if b == '\n' {
+				ve.lineLensMap = append(ve.lineLensMap, currentLineLen)
+				currentOffset++
+				ve.lineStartOffsetMap = append(ve.lineStartOffsetMap, currentOffset)
+				currentLineLen = 0
+				continue
+			}
+			currentLineLen++
+			currentOffset++
+		}
+	} else {
+		for len(data) > 0 {
+			r, size := utf8.DecodeRune(data)
+			data = data[size:]
+			if r == '\n' {
+				ve.lineLensMap = append(ve.lineLensMap, currentLineLen)
+				currentOffset++
+				ve.lineStartOffsetMap = append(ve.lineStartOffsetMap, currentOffset)
+				currentLineLen = 0
+				continue
+			}
+			currentLineLen++
+			currentOffset++
+		}
+	}
+	ve.lineLensMap = append(ve.lineLensMap, currentLineLen)
+	ve.lineMappingsReady = true
 }
 
 func (ve *MemEditor) GetTextFromOffset(offset1, offset2 int) string {
@@ -682,6 +738,7 @@ func (ve *MemEditor) IsOffsetValid(offset int) bool {
 }
 
 func (ve *MemEditor) IsValidPosition(line, col int) bool {
+	ve.ensureLineMappings()
 	if line < 1 || col < 0 {
 		return false
 	}
@@ -781,6 +838,7 @@ func (ve *MemEditor) GetContextAroundRange(startPos, endPos *Position, n int, pr
 }
 
 func (ve *MemEditor) GetContextAroundRangeEx(startPos, endPos *Position, n int, prefix func(i int) string, suffix func(i int) string) (string, error) {
+	ve.ensureLineMappings()
 	start, end := ve.GetMinAndMaxOffset(startPos, endPos)
 	if start < 0 || end > ve.safeSourceCode.Len() || start > end {
 		return "", errors.New("invalid range")
@@ -999,13 +1057,14 @@ func (ve *MemEditor) InsertAtOffset(offset int, text string) error {
 	}
 
 	ve.safeSourceCode = NewSafeString(before + text + after)
-	ve.recalculateLineMappings()
+	ve.invalidateSourceCodeState()
 
 	return nil
 }
 
 // InsertAtLine 在指定行号的开头插入文本（行号从1开始）
 func (ve *MemEditor) InsertAtLine(lineNumber int, text string) error {
+	ve.ensureLineMappings()
 	if lineNumber < 1 {
 		return errors.New("line number must be positive")
 	}
@@ -1023,7 +1082,7 @@ func (ve *MemEditor) InsertAtLine(lineNumber int, text string) error {
 		}
 		sourceCode += text
 		ve.safeSourceCode = NewSafeString(sourceCode)
-		ve.recalculateLineMappings()
+		ve.invalidateSourceCodeState()
 		return nil
 	}
 
@@ -1037,6 +1096,7 @@ func (ve *MemEditor) InsertAtLine(lineNumber int, text string) error {
 
 // ReplaceLine 替换指定行的内容（行号从1开始）
 func (ve *MemEditor) ReplaceLine(lineNumber int, text string) error {
+	ve.ensureLineMappings()
 	if lineNumber < 1 {
 		return errors.New("line number must be positive")
 	}
@@ -1062,13 +1122,14 @@ func (ve *MemEditor) ReplaceLine(lineNumber int, text string) error {
 	}
 
 	ve.safeSourceCode = NewSafeString(before + text + after)
-	ve.recalculateLineMappings()
+	ve.invalidateSourceCodeState()
 
 	return nil
 }
 
 // ReplaceLineRange 替换指定行范围的内容（行号从1开始，包含起始和结束行）
 func (ve *MemEditor) ReplaceLineRange(startLine, endLine int, text string) error {
+	ve.ensureLineMappings()
 	if startLine < 1 || endLine < 1 {
 		return errors.New("line numbers must be positive")
 	}
@@ -1098,13 +1159,14 @@ func (ve *MemEditor) ReplaceLineRange(startLine, endLine int, text string) error
 	}
 
 	ve.safeSourceCode = NewSafeString(before + text + after)
-	ve.recalculateLineMappings()
+	ve.invalidateSourceCodeState()
 
 	return nil
 }
 
 // DeleteLine 删除指定行（行号从1开始）
 func (ve *MemEditor) DeleteLine(lineNumber int) error {
+	ve.ensureLineMappings()
 	if lineNumber < 1 {
 		return errors.New("line number must be positive")
 	}
@@ -1147,12 +1209,13 @@ func (ve *MemEditor) DeleteLine(lineNumber int) error {
 		ve.safeSourceCode = NewSafeString(before + after)
 	}
 
-	ve.recalculateLineMappings()
+	ve.invalidateSourceCodeState()
 	return nil
 }
 
 // DeleteLineRange 删除指定行范围（行号从1开始，包含起始和结束行）
 func (ve *MemEditor) DeleteLineRange(startLine, endLine int) error {
+	ve.ensureLineMappings()
 	if startLine < 1 || endLine < 1 {
 		return errors.New("line numbers must be positive")
 	}
@@ -1194,7 +1257,7 @@ func (ve *MemEditor) DeleteLineRange(startLine, endLine int) error {
 	}
 
 	ve.safeSourceCode = NewSafeString(before + after)
-	ve.recalculateLineMappings()
+	ve.invalidateSourceCodeState()
 
 	return nil
 }
@@ -1208,7 +1271,7 @@ func (ve *MemEditor) AppendLine(text string) error {
 	sourceCode += text
 
 	ve.safeSourceCode = NewSafeString(sourceCode)
-	ve.recalculateLineMappings()
+	ve.invalidateSourceCodeState()
 
 	return nil
 }
@@ -1217,7 +1280,7 @@ func (ve *MemEditor) AppendLine(text string) error {
 func (ve *MemEditor) PrependLine(text string) error {
 	sourceCode := text + "\n" + ve.safeSourceCode.String()
 	ve.safeSourceCode = NewSafeString(sourceCode)
-	ve.recalculateLineMappings()
+	ve.invalidateSourceCodeState()
 
 	return nil
 }
