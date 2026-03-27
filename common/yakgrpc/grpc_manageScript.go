@@ -19,6 +19,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/jinzhu/copier"
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools/metadata/genmetadata"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/cve/cveresources"
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -265,6 +266,51 @@ func GRPCYakScriptToYakitScript(script *ypb.YakScript) *schema.YakScript {
 	}
 }
 
+func mergeYakScriptAIFields(dst *schema.YakScript, src *schema.YakScript) {
+	if dst == nil || src == nil {
+		return
+	}
+	if !dst.EnableForAI {
+		dst.EnableForAI = src.EnableForAI
+	}
+	if dst.AIDesc == "" {
+		dst.AIDesc = src.AIDesc
+	}
+	if dst.AIKeywords == "" {
+		dst.AIKeywords = src.AIKeywords
+	}
+	if dst.AIUsage == "" {
+		dst.AIUsage = src.AIUsage
+	}
+}
+
+func completeYakScriptAIFieldsOnSave(ctx context.Context, db *gorm.DB, id int64, script *schema.YakScript) {
+	if script == nil {
+		return
+	}
+
+	var existing *schema.YakScript
+	if id > 0 {
+		if ret, err := yakit.GetYakScript(db, id); err == nil {
+			existing = ret
+		}
+	}
+	if existing == nil && script.ScriptName != "" {
+		if ret, err := yakit.GetYakScriptByName(db, script.ScriptName); err == nil {
+			existing = ret
+		}
+	}
+	mergeYakScriptAIFields(script, existing)
+
+	if !genmetadata.ShouldGenerateYakScriptAIFields(script) {
+		return
+	}
+
+	if err := genmetadata.CompleteYakScriptAIFields(ctx, script); err != nil {
+		log.Warnf("generate AI metadata for YakScript %q failed: %v", script.ScriptName, err)
+	}
+}
+
 func (s *Server) SaveYakScript(ctx context.Context, script *ypb.YakScript) (*ypb.YakScript, error) {
 	switch script.Type {
 	case "yak", "mitm", "port-scan":
@@ -274,7 +320,10 @@ func (s *Server) SaveYakScript(ctx context.Context, script *ypb.YakScript) (*ypb
 		}
 	}
 
-	err := yakit.CreateOrUpdateYakScriptByName(s.GetProfileDatabase(), script.ScriptName, GRPCYakScriptToYakitScript(script))
+	toSave := GRPCYakScriptToYakitScript(script)
+	completeYakScriptAIFieldsOnSave(ctx, s.GetProfileDatabase(), script.GetId(), toSave)
+
+	err := yakit.CreateOrUpdateYakScriptByName(s.GetProfileDatabase(), script.ScriptName, toSave)
 	if err != nil {
 		return nil, utils.Errorf("create or update yakscript failed: %s", err.Error())
 	}
@@ -963,6 +1012,7 @@ func (s *Server) SaveNewYakScript(ctx context.Context, request *ypb.SaveNewYakSc
 	script.ScriptName = strings.TrimSpace(script.ScriptName)
 	isUpdate := script.Id > 0
 	toSave := GRPCYakScriptToYakitScript(script)
+	completeYakScriptAIFieldsOnSave(ctx, s.GetProfileDatabase(), script.GetId(), toSave)
 	err := yakit.CreateOrUpdateYakScript(s.GetProfileDatabase(), script.Id, toSave)
 	if err != nil {
 		if isUpdate {
