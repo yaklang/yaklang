@@ -163,6 +163,9 @@ func (c *Compiler) compileCall(inst *ssa.Call) error {
 
 	// Context-ABI extern/hook calls.
 	if binding, ok := c.getExternBinding(calleeName); ok && binding.Symbol != "" {
+		if err := validateExternBindingCallABI(calleeName, binding); err != nil {
+			return err
+		}
 		llvmFn := c.getOrDeclareExternCallable(binding.Symbol)
 		spec, err := c.newCallableContextCallSpec(inst, llvmFn, ssaArgs(append([]int64{}, inst.Args...), false), "yak_extern_target")
 		if err != nil {

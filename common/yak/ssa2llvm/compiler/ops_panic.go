@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
 )
 
 func (c *Compiler) compilePanic(inst *ssa.Panic) error {
@@ -18,7 +19,7 @@ func (c *Compiler) compilePanic(inst *ssa.Panic) error {
 	infoVal = c.coerceToInt64(infoVal)
 
 	// Persist the panic value for catch/recover paths and for propagation to callers.
-	if err := c.storeContextPanic(infoVal); err != nil {
+	if err := c.storeContextPanic(infoVal, c.panicValueFlags(inst)); err != nil {
 		return err
 	}
 
@@ -70,6 +71,24 @@ func (c *Compiler) compilePanic(inst *ssa.Panic) error {
 	}
 	c.Builder.CreateBr(catchBB)
 	return nil
+}
+
+func (c *Compiler) panicValueFlags(inst *ssa.Panic) uint64 {
+	if c == nil || inst == nil {
+		return 0
+	}
+	fn := inst.GetFunc()
+	if fn == nil {
+		return 0
+	}
+	value, ok := fn.GetValueById(inst.Info)
+	if !ok || value == nil {
+		return 0
+	}
+	if c.ssaValueIsPointer(value, fn) {
+		return abi.FlagPanicTaggedPointer
+	}
+	return 0
 }
 
 func (c *Compiler) compileRecover(inst *ssa.Recover) error {

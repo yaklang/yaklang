@@ -11,7 +11,6 @@ func testInteropExternBindings() map[string]ExternBinding {
 	return map[string]ExternBinding{
 		"getObject": {
 			Symbol: "yak_runtime_get_object",
-			Params: []LLVMExternType{ExternTypeI64},
 			Return: ExternTypePtr,
 		},
 	}
@@ -114,7 +113,6 @@ func TestIR_CustomExternBindingPointerReturn(t *testing.T) {
 	bindings := map[string]ExternBinding{
 		"newObject": {
 			Symbol: "yak_runtime_get_object",
-			Params: []LLVMExternType{ExternTypeI64},
 			Return: ExternTypePtr,
 		},
 	}
@@ -139,7 +137,6 @@ func TestIR_CustomExternBindingOverrideGetObject(t *testing.T) {
 	bindings := map[string]ExternBinding{
 		"getObject": {
 			Symbol: "yak_hook_get_object",
-			Params: []LLVMExternType{ExternTypeI64},
 			Return: ExternTypeI64,
 		},
 	}
@@ -151,6 +148,25 @@ func TestIR_CustomExternBindingOverrideGetObject(t *testing.T) {
 		"call void @yak_runtime_invoke",
 	)
 	requireIRAvoidsLegacyCallEntrypoints(t, ir)
+}
+
+func TestIR_LegacyExternBindingParamsRejected(t *testing.T) {
+	code := `
+		func main() {
+			v = getObject(16)
+			println(v)
+		}
+		`
+	bindings := map[string]ExternBinding{
+		"getObject": {
+			Symbol: "yak_hook_get_object",
+			Params: []LLVMExternType{ExternTypeI64},
+			Return: ExternTypeI64,
+		},
+	}
+	_, _, _, err := compileInput("", code, "yak", bindings, nil, nil)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "legacy parameter ABI")
 }
 
 func TestIR_GoStmtUsesAsyncInvoke(t *testing.T) {
