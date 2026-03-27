@@ -192,9 +192,28 @@ func TestQueryFilterHTTPFlow_SuffixPrecision(t *testing.T) {
 	}
 	InsertHTTPFlow(consts.GetGormProjectDatabase().Debug(), jsWithQueryFlow)
 
+	jsWithTrailingSlashFlow := &schema.HTTPFlow{
+		Url:  fmt.Sprintf("https://example.com/%s.js/", token),
+		Path: fmt.Sprintf("/%s.js/", token),
+	}
+	InsertHTTPFlow(consts.GetGormProjectDatabase().Debug(), jsWithTrailingSlashFlow)
+
+	jsWithTrailingSlashAndQueryFlow := &schema.HTTPFlow{
+		Url:  fmt.Sprintf("https://example.com/%s.js/?param=a", token),
+		Path: fmt.Sprintf("/%s.js/?param=a", token),
+	}
+	InsertHTTPFlow(consts.GetGormProjectDatabase().Debug(), jsWithTrailingSlashAndQueryFlow)
+
 	defer func() {
 		DeleteHTTPFlow(consts.GetGormProjectDatabase(), &ypb.DeleteHTTPFlowRequest{
-			Id: []int64{int64(jsFlow.ID), int64(jsonFlow.ID), int64(jspFlow.ID), int64(jsWithQueryFlow.ID)},
+			Id: []int64{
+				int64(jsFlow.ID),
+				int64(jsonFlow.ID),
+				int64(jspFlow.ID),
+				int64(jsWithQueryFlow.ID),
+				int64(jsWithTrailingSlashFlow.ID),
+				int64(jsWithTrailingSlashAndQueryFlow.ID),
+			},
 		})
 	}()
 
@@ -204,7 +223,7 @@ func TestQueryFilterHTTPFlow_SuffixPrecision(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	var foundJs, foundJson, foundJsp, foundJsWithQuery bool
+	var foundJs, foundJson, foundJsp, foundJsWithQuery, foundJsWithTrailingSlash, foundJsWithTrailingSlashAndQuery bool
 	for _, flow := range flows {
 		if flow.ID == jsFlow.ID {
 			foundJs = true
@@ -218,12 +237,22 @@ func TestQueryFilterHTTPFlow_SuffixPrecision(t *testing.T) {
 		if flow.ID == jsWithQueryFlow.ID {
 			foundJsWithQuery = true
 		}
+		if flow.ID == jsWithTrailingSlashFlow.ID {
+			foundJsWithTrailingSlash = true
+		}
+		if flow.ID == jsWithTrailingSlashAndQueryFlow.ID {
+			foundJsWithTrailingSlashAndQuery = true
+		}
 	}
 
 	// .js 应该被过滤掉（不应该找到）
 	assert.False(t, foundJs, "过滤 .js 时，.js 文件应该被过滤掉")
 	// .js?param=a 也应被过滤掉
 	assert.False(t, foundJsWithQuery, "过滤 .js 时，.js?param=a 路径应该被过滤掉")
+	// .js/ 也应被过滤掉
+	assert.False(t, foundJsWithTrailingSlash, "过滤 .js 时，.js/ 路径应该被过滤掉")
+	// .js/?param=a 也应被过滤掉
+	assert.False(t, foundJsWithTrailingSlashAndQuery, "过滤 .js 时，.js/?param=a 路径应该被过滤掉")
 	// .json 不应该被过滤（应该找到）
 	assert.True(t, foundJson, "过滤 .js 时，.json 文件不应该被过滤")
 	// .jsp 不应该被过滤（应该找到）
@@ -248,9 +277,20 @@ func TestQueryFilterHTTPFlow_SuffixPrecision(t *testing.T) {
 	}
 	InsertHTTPFlow(consts.GetGormProjectDatabase().Debug(), pngWithModifierFlow)
 
+	pngWithTrailingSlashFlow := &schema.HTTPFlow{
+		Url:  fmt.Sprintf("https://example.com/%s.png/", token),
+		Path: fmt.Sprintf("/%s.png/", token),
+	}
+	InsertHTTPFlow(consts.GetGormProjectDatabase().Debug(), pngWithTrailingSlashFlow)
+
 	defer func() {
 		DeleteHTTPFlow(consts.GetGormProjectDatabase(), &ypb.DeleteHTTPFlowRequest{
-			Id: []int64{int64(pngNormalFlow.ID), int64(pngWithParamFlow.ID), int64(pngWithModifierFlow.ID)},
+			Id: []int64{
+				int64(pngNormalFlow.ID),
+				int64(pngWithParamFlow.ID),
+				int64(pngWithModifierFlow.ID),
+				int64(pngWithTrailingSlashFlow.ID),
+			},
 		})
 	}()
 
@@ -258,7 +298,7 @@ func TestQueryFilterHTTPFlow_SuffixPrecision(t *testing.T) {
 		ExcludeSuffix: []string{".png"},
 	})
 	require.NoError(t, errPng)
-	var foundPngModifierWhenExcludePng, foundPngNormal, foundPngWithParam bool
+	var foundPngModifierWhenExcludePng, foundPngNormal, foundPngWithParam, foundPngWithTrailingSlash bool
 	for _, flow := range flowsPng {
 		if flow.ID == pngWithModifierFlow.ID {
 			foundPngModifierWhenExcludePng = true
@@ -269,10 +309,14 @@ func TestQueryFilterHTTPFlow_SuffixPrecision(t *testing.T) {
 		if flow.ID == pngWithParamFlow.ID {
 			foundPngWithParam = true
 		}
+		if flow.ID == pngWithTrailingSlashFlow.ID {
+			foundPngWithTrailingSlash = true
+		}
 	}
 	assert.False(t, foundPngNormal, "过滤 .png 时，普通 .png 文件应该被过滤掉")
 	assert.False(t, foundPngWithParam, "过滤 .png 时，带参数的 .png 文件应该被过滤掉")
 	assert.False(t, foundPngModifierWhenExcludePng, "过滤 .png 时，/428.png!cc_216x216 路径应该被过滤掉")
+	assert.False(t, foundPngWithTrailingSlash, "过滤 .png 时，/foo.png/ 路径应该被过滤掉")
 }
 
 func TestCreateOrUpdateHTTPFlow(t *testing.T) {

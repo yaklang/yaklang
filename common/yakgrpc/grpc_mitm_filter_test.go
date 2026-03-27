@@ -291,8 +291,11 @@ func TestGRPCMUSTPASS_MITM_Filter_ForExcludeSuffixAndContentType(t *testing.T) {
 			{"/abc.png.zip", 0},
 			{"/static/abc.js", 0},
 			{"/static/abc.js?param=value", 0},                  // 测试：带参数的 .js 应该被过滤
+			{"/static/abc.js/", 0},                             // 测试：尾部斜杠的 .js 应该被过滤
+			{"/static/abc.js/?param=value", 0},                 // 测试：尾部斜杠且带参数的 .js 应该被过滤
 			{"/item/assets/oldman/wza1/428.png", 0},            // 测试：图片应该被过滤
 			{"/item/assets/oldman/wza1/428.png!cc_216x216", 0}, // 测试：图片CDN应该被过滤
+			{"/item/assets/oldman/wza1/428.png/", 0},           // 测试：尾部斜杠的图片应该被过滤
 			{"/abc.ajs", 1},
 			{"/abc.json", 1},
 			{"/abc.jsp", 1},              // 测试：过滤 .js 不应该过滤 .jsp

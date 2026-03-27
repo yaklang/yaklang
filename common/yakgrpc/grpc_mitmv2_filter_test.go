@@ -286,6 +286,9 @@ func TestGRPCMUSTPASS_MITMV2_Filter_ForExcludeSuffixAndContentType(t *testing.T)
 			{"/abc.jpg", 1},
 			{"/abc.png.zip", 0},
 			{"/static/abc.js", 0},
+			{"/static/abc.js?param=value", 0},
+			{"/static/abc.js/", 0},
+			{"/static/abc.js/?param=value", 0},
 			{"/abc.ajs", 1},
 			{"/abc.json", 1},
 			{"/abc.jsp", 1},              // 测试：过滤 .js 不应该过滤 .jsp
