@@ -13,8 +13,8 @@ Required Parameters:
 
 Optional Parameters:
   offset          (int)     Starting line number (1-based). Default: 1.
-  lines           (int)     Number of lines to read. Default: 50.
-  line-size       (int)     Max characters per line (truncated if exceeded). Default: 512.
+    lines           (int)     Number of lines to read. Default: 200. If omitted, the tool tries to return about 10KB of text.
+    line-size       (int)     Max characters per line (truncated if exceeded). Default: 1024.
 
 Binary File Detection:
   Same as read_file - detects binary formats and recommends built-in tools.
@@ -22,7 +22,7 @@ Binary File Detection:
 
 ## Few-Shot Examples
 
-Example 1 - Read first 50 lines of a file:
+Example 1 - Read the first section of a file with a wider default page:
 {
   "@action": "call-tool",
   "tool": "read_file_lines",
@@ -58,11 +58,11 @@ USAGE_BLOCK
 参数说明：
   --file: 指定要读取的文件路径 (必需)
   --offset: 起始行号偏移量，从第几行开始读取 (默认: 1，表示从第一行开始)
-  --lines: 读取的行数 (默认: 50)
-  --line-size: 每行的最大长度限制，超过会被截断 (默认: 512 字符)
+    --lines: 读取的行数 (默认: 200；未显式指定时会尽量返回约 10KB 文本)
+    --line-size: 每行的最大长度限制，超过会被截断 (默认: 1024 字符)
 
 使用示例：
-1. 读取文件前 50 行（默认）：
+1. 读取文件首屏内容（默认，约 10KB / 200 行）：
    yak read_file_lines.yak --file test.txt
 
 2. 读取文件前 20 行：
@@ -75,7 +75,7 @@ USAGE_BLOCK
    yak read_file_lines.yak --file test.txt --line-size 256
 
 5. 读取日志文件的最后部分（需要先知道总行数）：
-   yak read_file_lines.yak --file app.log --offset 9950 --lines 50
+    yak read_file_lines.yak --file app.log --offset 9950 --lines 120
 
 6. 测试边界情况 - 偏移量超出文件行数：
    yak read_file_lines.yak --file test.txt --offset 10000
@@ -87,7 +87,7 @@ USAGE_BLOCK
    yak read_file_lines.yak --file test.txt --lines -1
 
 注意事项：
-- 默认从第 1 行开始读取 50 行内容
+- 默认从第 1 行开始读取，未显式指定时会尽量返回约 10KB 文本，基线为 200 行
 - 行号从 1 开始计数（而不是 0）
 - 如果 offset 超出文件总行数，将显示提示信息
 - 每行内容会被限制在 line-size 指定的长度内
@@ -98,13 +98,20 @@ USAGE_BLOCK
 
 yakit.AutoInitYakit()
 
+defaultLineCount = 200
+defaultLineSize = 1024
+defaultLineTargetBytes = 10240
+defaultLineHardCap = 400
+
 // 解析命令行参数
 filePath := cli.String("file", cli.setRequired(true), cli.setHelp("target file you want to read"))
 offset := cli.Int("offset", cli.setRequired(false), cli.setDefault(1), cli.setHelp("start line number (1-based), default is 1"))
-lines := cli.Int("lines", cli.setRequired(false), cli.setDefault(50), cli.setHelp("how many lines you want to read, default is 50"))
-lineSize := cli.Int("line-size", cli.setRequired(false), cli.setDefault(512), cli.setHelp("the max characters in a line, default is 512"))
+lines := cli.Int("lines", cli.setRequired(false), cli.setDefault(defaultLineCount), cli.setHelp("how many lines you want to read, default is 200"))
+lineSize := cli.Int("line-size", cli.setRequired(false), cli.setDefault(defaultLineSize), cli.setHelp("the max characters in a line, default is 1024"))
 
 cli.check()
+
+linesSpecified := cli.Have("lines")
 
 // 检查文件是否存在
 if !file.IsExisted(filePath) {
@@ -368,13 +375,13 @@ if offset < 1 {
 }
 
 if lines <= 0 {
-    yakit.Warn("lines should be greater than 0, setting to 50")
-    lines = 50
+    yakit.Warn("lines should be greater than 0, setting to %v", defaultLineCount)
+    lines = defaultLineCount
 }
 
 if lineSize <= 0 {
-    yakit.Warn("line-size should be greater than 0, setting to 512")
-    lineSize = 512
+    yakit.Warn("line-size should be greater than 0, setting to %v", defaultLineSize)
+    lineSize = defaultLineSize
 }
 
 // 获取文件大小
@@ -408,7 +415,14 @@ lineCount := 0
 bytesRead := 0
 linesRead := 0
 startLine := offset
-endLine := offset + lines - 1
+visibleBytes := 0
+autoTargetBytes := 0
+if !linesSpecified {
+    autoTargetBytes = defaultLineTargetBytes
+    if fileSize > 0 && fileSize < autoTargetBytes {
+        autoTargetBytes = fileSize
+    }
+}
 
 for {
     lineCount++
@@ -430,9 +444,11 @@ for {
     if lineCount < startLine {
         continue
     }
-    
-    // 检查是否已读取足够的行数
-    if lineCount > endLine {
+
+    if linesSpecified && linesRead >= lines {
+        break
+    }
+    if !linesSpecified && linesRead >= defaultLineHardCap {
         break
     }
     
@@ -455,6 +471,11 @@ for {
     allContent += text
     
     linesRead++
+    visibleBytes += len(displayText) + 1
+
+    if !linesSpecified && linesRead >= lines && visibleBytes >= autoTargetBytes {
+        break
+    }
     
     // 如果遇到错误（通常是EOF），退出循环
     if err != nil {
@@ -477,6 +498,7 @@ if formattedContent != "" {
     yakit.Info("Lines read: %v (from line %v to line %v)", linesRead, startLine, startLine + linesRead - 1)
     yakit.Info("Total bytes: %v", fileSize)
     yakit.Info("Bytes read: %v", bytesRead)
+    yakit.Info("Displayed bytes: %v", visibleBytes)
     yakit.Info("Read percentage: %.2f%%", percentRead)
     
     // 使用 yakit.File 记录文件读取操作

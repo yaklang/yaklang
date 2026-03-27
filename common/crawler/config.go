@@ -61,6 +61,8 @@ func (c *Config) init() {
 	c.disallowMIMEType = ExcludedMIME
 	c.startFromParentPath = true
 	c.maxRetryTimes = 3
+	c.verifyCertificate = false
+	c.httpsToHttpFallback = true
 	c.allowMethod = []string{"GET", "POST"}
 	c.allowUrlRegexp = make(map[string]*regexp.Regexp)
 	c.forbiddenUrlRegexp = make(map[string]*regexp.Regexp)
@@ -78,10 +80,12 @@ type Config struct {
 	AuthPassword string
 
 	// Transport 中的配置
-	proxies          []string
-	concurrent       int
-	maxRedirectTimes int
-	connectTimeout   time.Duration // 10s
+	proxies             []string
+	concurrent          int
+	maxRedirectTimes    int
+	connectTimeout      time.Duration // 10s
+	verifyCertificate   bool
+	httpsToHttpFallback bool
 	// tlsConfig        *tls.Config
 
 	// UA
@@ -157,6 +161,7 @@ func (c *Config) GetLowhttpConfig() []lowhttp.LowhttpOpt {
 	if c.maxRedirectTimes > 0 {
 		opts = append(opts, lowhttp.WithRedirectTimes(c.maxRedirectTimes))
 	}
+	opts = append(opts, lowhttp.WithVerifyCertificate(c.verifyCertificate))
 	if c.connectTimeout > 0 {
 		opts = append(opts, lowhttp.WithTimeout(c.connectTimeout))
 	}
@@ -165,6 +170,32 @@ func (c *Config) GetLowhttpConfig() []lowhttp.LowhttpOpt {
 	}
 	c._cachedOpts = opts
 	return opts
+}
+
+func (c *Config) buildLowhttpOpts(https bool, runtimeID string, extra ...lowhttp.LowhttpOpt) []lowhttp.LowhttpOpt {
+	opts := append([]lowhttp.LowhttpOpt{}, c.GetLowhttpConfig()...)
+	opts = append(opts, extra...)
+	if runtimeID != "" {
+		opts = append(opts, lowhttp.WithRuntimeId(runtimeID))
+	}
+	opts = append(opts, lowhttp.WithHttps(https))
+	return opts
+}
+
+func (c *Config) DoHTTPRequest(https bool, runtimeID string, extra ...lowhttp.LowhttpOpt) (*lowhttp.LowhttpResponse, bool, error) {
+	rsp, err := lowhttp.HTTP(c.buildLowhttpOpts(https, runtimeID, extra...)...)
+	if err == nil {
+		return rsp, https, nil
+	}
+	if !https || !c.httpsToHttpFallback {
+		return nil, https, err
+	}
+	log.Warnf("crawler https request failed, fallback to http: %v", err)
+	rsp, fallbackErr := lowhttp.HTTP(c.buildLowhttpOpts(false, runtimeID, extra...)...)
+	if fallbackErr != nil {
+		return nil, false, utils.Errorf("https request failed: %v; http fallback failed: %v", err, fallbackErr)
+	}
+	return rsp, false, nil
 }
 
 func (c *Config) CheckShouldBeHandledURL(u *url.URL) bool {
@@ -405,6 +436,19 @@ func WithConnectTimeout(f float64) ConfigOpt {
 	}
 }
 
+func WithVerifyCertificate(b bool) ConfigOpt {
+	return func(c *Config) {
+		c.verifyCertificate = b
+		c._cachedOpts = nil
+	}
+}
+
+func WithHTTPSFallback(enable bool) ConfigOpt {
+	return func(c *Config) {
+		c.httpsToHttpFallback = enable
+	}
+}
+
 // responseTimeout 是一个选项函数，用于指定爬虫时的响应超时时间，默认为10s
 // ! 未实现
 // Example:
@@ -582,14 +626,19 @@ func WithAutoLogin(username, password string, flags ...string) ConfigOpt {
 			}
 			req.request.Body, _ = req.request.GetBody()
 
-			opts := c.GetLowhttpConfig()
 			req.requestRaw, _ = utils.DumpHTTPRequest(req.request, true)
-			opts = append(opts, lowhttp.WithPacketBytes(req.requestRaw), lowhttp.WithHttps(req.IsHttps()))
 
-			rspIns, err := lowhttp.HTTP(opts...)
+			rspIns, usedHTTPS, err := c.DoHTTPRequest(req.IsHttps(), c.runtimeID, lowhttp.WithPacketBytes(req.requestRaw))
 			if err != nil {
 				req.err = err
 				return
+			}
+			if req.request != nil && req.request.URL != nil && usedHTTPS != req.IsHttps() {
+				if usedHTTPS {
+					req.request.URL.Scheme = "https"
+				} else {
+					req.request.URL.Scheme = "http"
+				}
 			}
 			for _, cookieItem := range lowhttp.ExtractCookieJarFromHTTPResponse(rspIns.RawPacket) {
 				c.cookie = append(c.cookie, &cookie{cookie: cookieItem, allowOverride: false})

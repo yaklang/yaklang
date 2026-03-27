@@ -49,6 +49,24 @@ func TestReActLoop_ToolNotFound_ShouldContinue(t *testing.T) {
 			prompt := req.GetPrompt()
 			rsp := i.NewAIResponse()
 
+			// Verify satisfaction - exit when success
+			if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+				if successToolCalled {
+					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "done", "human_readable_result": "ok"}`))
+				} else {
+					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": false, "reasoning": "retry", "human_readable_result": "failed"}`))
+				}
+				rsp.Close()
+				return rsp, nil
+			}
+
+			// Self-reflection - skip quickly
+			if utils.MatchAllOfSubString(prompt, "SELF_REFLECTION") {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "self-reflection", "suggestions": []}`))
+				rsp.Close()
+				return rsp, nil
+			}
+
 			// Main loop - select tool
 			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_tool") {
 				if firstToolCall {
@@ -66,24 +84,6 @@ func TestReActLoop_ToolNotFound_ShouldContinue(t *testing.T) {
 			// Generate params
 			if utils.MatchAllOfSubString(prompt, "generate parameters", "call-tool") {
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": {"input": "test"}}`))
-				rsp.Close()
-				return rsp, nil
-			}
-
-			// Verify satisfaction - exit when success
-			if utils.MatchAllOfSubString(prompt, "verify-satisfaction") {
-				if successToolCalled {
-					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "done", "human_readable_result": "ok"}`))
-				} else {
-					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": false, "reasoning": "retry", "human_readable_result": "failed"}`))
-				}
-				rsp.Close()
-				return rsp, nil
-			}
-
-			// Self-reflection - skip quickly
-			if utils.MatchAllOfSubString(prompt, "SELF_REFLECTION") {
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "self-reflection", "suggestions": []}`))
 				rsp.Close()
 				return rsp, nil
 			}
@@ -155,6 +155,24 @@ func TestReActLoop_ToolExecutionError_ShouldContinue(t *testing.T) {
 			prompt := req.GetPrompt()
 			rsp := i.NewAIResponse()
 
+			// Verify satisfaction
+			if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+				if successToolCalled {
+					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "done", "human_readable_result": "ok"}`))
+				} else {
+					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": false, "reasoning": "retry", "human_readable_result": "failed"}`))
+				}
+				rsp.Close()
+				return rsp, nil
+			}
+
+			// Self-reflection - skip
+			if utils.MatchAllOfSubString(prompt, "SELF_REFLECTION") {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "self-reflection", "suggestions": []}`))
+				rsp.Close()
+				return rsp, nil
+			}
+
 			// Main loop - select tool
 			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_tool") {
 				if firstToolCall {
@@ -170,24 +188,6 @@ func TestReActLoop_ToolExecutionError_ShouldContinue(t *testing.T) {
 			// Generate params
 			if utils.MatchAllOfSubString(prompt, "generate parameters", "call-tool") {
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": {"input": "test"}}`))
-				rsp.Close()
-				return rsp, nil
-			}
-
-			// Verify satisfaction
-			if utils.MatchAllOfSubString(prompt, "verify-satisfaction") {
-				if successToolCalled {
-					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "done", "human_readable_result": "ok"}`))
-				} else {
-					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": false, "reasoning": "retry", "human_readable_result": "failed"}`))
-				}
-				rsp.Close()
-				return rsp, nil
-			}
-
-			// Self-reflection - skip
-			if utils.MatchAllOfSubString(prompt, "SELF_REFLECTION") {
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "self-reflection", "suggestions": []}`))
 				rsp.Close()
 				return rsp, nil
 			}

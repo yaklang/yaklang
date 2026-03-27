@@ -23,7 +23,7 @@ read_file(file="composer.json")
   推荐用法：先 `tree("<用户指定的项目路径>", max-depth=3)` 获取总览，再深入感兴趣的子目录。
 - **read_file(file, mode?, offset?, lines?)**：
   - 参数名是 `file`（不是 `path`），值为绝对路径
-  - `mode=lines`（默认）：按行读取，`offset` 为起始行号（默认1），`lines` 为行数（默认50）
+  - `mode=lines`（默认）：按行读取，`offset` 为起始行号（默认1），`lines` 为行数（默认200；未显式指定时通常会尽量返回约10KB文本）
   - 自动检测二进制文件并阻止读取
   - 正确示例：`read_file(file="/abs/path/to/config.php", mode="lines", offset=1, lines=80)`
 - **grep(pattern, path?, pattern-mode?, context-buffer?, include-ext?)**：
