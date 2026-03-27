@@ -24,6 +24,38 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+func (r *ReAct) persistTaskUserInput(task aicommon.AIStatefulTask) {
+	if task == nil {
+		return
+	}
+	userInput := strings.TrimSpace(task.GetUserInput())
+	if userInput == "" {
+		return
+	}
+
+	if r.config.Timeline != nil {
+		r.config.Timeline.PushUserInteraction(
+			aicommon.UserInteractionStage_FreeInput,
+			r.config.AcquireId(),
+			"",
+			userInput,
+		)
+	}
+
+	quotedHistory, err := r.config.AppendUserInputHistory(userInput, task.GetCreatedAt())
+	if err != nil {
+		log.Warnf("ReAct: failed to build user input history payload: %v", err)
+		return
+	}
+
+	if r.config.PersistentSessionId != "" && r.config.GetDB() != nil {
+		if err := yakit.UpdateAIAgentRuntimeUserInput(
+			r.config.GetDB(), r.config.GetRuntimeId(), quotedHistory); err != nil {
+			log.Warnf("ReAct: failed to persist user input to DB: %v", err)
+		}
+	}
+}
+
 const (
 	sessionTitleGeneratedKey = "session_title_generated"
 	sessionTitleDisableKey   = "disable_session_title_generation"
@@ -67,6 +99,7 @@ func (r *ReAct) processReActFromQueue() {
 
 	r.addRuntimeTask(nextTask)
 	r.setCurrentTask(nextTask)
+	r.persistTaskUserInput(nextTask)
 	nextTask.SetStatus(aicommon.AITaskState_Processing)
 	if r.config.DebugEvent {
 		log.Infof("Processing task from queue: %s", nextTask.GetId())
