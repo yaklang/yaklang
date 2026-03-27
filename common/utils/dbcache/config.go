@@ -1,4 +1,4 @@
-package asyncdb
+package dbcache
 
 import (
 	"context"
@@ -14,13 +14,17 @@ type config struct {
 	name string
 
 	// save
-	enableSave  bool
-	fetchSize   int
-	saveSize    int
-	saveTimeout time.Duration
+	enableSave      bool
+	fetchSize       int
+	saveSize        int
+	saveTimeout     time.Duration
+	saveParallelism int
+	persistLimit    int
 
 	// context
 	ctx context.Context
+
+	skipEviction any
 }
 
 type Option func(*config)
@@ -59,9 +63,33 @@ func WithSaveTimeout(timeout time.Duration) Option {
 	}
 }
 
+func WithSaveParallelism(parallelism int) Option {
+	return func(c *config) {
+		if parallelism <= 0 {
+			parallelism = 1
+		}
+		c.saveParallelism = parallelism
+	}
+}
+
+func WithPersistLimit(limit int) Option {
+	return func(c *config) {
+		if limit < 0 {
+			limit = 0
+		}
+		c.persistLimit = limit
+	}
+}
+
 func WithContext(ctx context.Context) Option {
 	return func(c *config) {
 		c.ctx = ctx
+	}
+}
+
+func WithSkipEviction[T any](skip func(T) bool) Option {
+	return func(c *config) {
+		c.skipEviction = skip
 	}
 }
 
@@ -69,11 +97,12 @@ const defaultBufferSize = 1000
 
 func NewConfig(opts ...Option) *config {
 	cfg := &config{
-		bufferSize:  defaultBufferSize, // Default buffer size
-		ctx:         context.Background(),
-		fetchSize:   defaultBatchSize,
-		saveSize:    defaultBatchSize,
-		saveTimeout: 500 * time.Millisecond, // 0.5s
+		bufferSize:      defaultBufferSize, // Default buffer size
+		ctx:             context.Background(),
+		fetchSize:       defaultBatchSize,
+		saveSize:        defaultBatchSize,
+		saveTimeout:     500 * time.Millisecond, // 0.5s
+		saveParallelism: 1,
 	}
 	for _, opt := range opts {
 		opt(cfg)

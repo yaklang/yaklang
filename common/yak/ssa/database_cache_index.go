@@ -3,8 +3,9 @@ package ssa
 import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/asyncdb"
+	"github.com/yaklang/yaklang/common/utils/dbcache"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 type simpleCacheItem[T comparable] struct {
@@ -15,17 +16,28 @@ type simpleCacheItem[T comparable] struct {
 type SimpleCache[T comparable] struct {
 	name  string
 	cache *utils.SafeMapWithKey[string, []T] // if  memory exist
-	save  *asyncdb.Save[simpleCacheItem[T]]  // save to database
+	save  *dbcache.Save[simpleCacheItem[T]]  // save to database
 }
 
-func NewSimpleCache[T comparable](name string) *SimpleCache[T] {
+func NewSimpleCache[T comparable](name string, keepResident ...bool) *SimpleCache[T] {
+	resident := true
+	if len(keepResident) > 0 {
+		resident = keepResident[0]
+	}
+	var cache *utils.SafeMapWithKey[string, []T]
+	if resident {
+		cache = utils.NewSafeMapWithKey[string, []T]()
+	}
 	return &SimpleCache[T]{
 		name:  name,
-		cache: utils.NewSafeMapWithKey[string, []T](),
+		cache: cache,
 	}
 }
 
 func (c *SimpleCache[T]) Delete(key string, inst T) {
+	if c == nil || c.cache == nil {
+		return
+	}
 	data, ok := c.cache.Get(key)
 	if !ok {
 		return
@@ -36,18 +48,19 @@ func (c *SimpleCache[T]) Delete(key string, inst T) {
 }
 
 func (c *SimpleCache[T]) Add(key string, item T) {
-	if utils.IsNil(item) {
+	if c == nil || utils.IsNil(item) {
 		return
 	}
-
-	data, ok := c.cache.Get(key)
-	if !ok {
-		data = make([]T, 0, 1)
-	} else if len(data) > 0 && data[len(data)-1] == item {
-		return
+	if c.cache != nil {
+		data, ok := c.cache.Get(key)
+		if !ok {
+			data = make([]T, 0, 1)
+		} else if len(data) > 0 && data[len(data)-1] == item {
+			return
+		}
+		data = append(data, item)
+		c.cache.Set(key, data)
 	}
-	data = append(data, item)
-	c.cache.Set(key, data)
 	if c.save != nil {
 		c.save.Save(simpleCacheItem[T]{
 			Name:  key,
@@ -56,7 +69,18 @@ func (c *SimpleCache[T]) Add(key string, item T) {
 	}
 }
 
+func (c *SimpleCache[T]) Has(key string) bool {
+	if c == nil || c.cache == nil {
+		return false
+	}
+	_, ok := c.cache.Get(key)
+	return ok
+}
+
 func (c *SimpleCache[T]) ForEach(f func(string, []T)) {
+	if c == nil || c.cache == nil {
+		return
+	}
 	c.cache.ForEach(func(key string, value []T) bool {
 		f(key, value)
 		return true
@@ -73,19 +97,19 @@ const (
 	IndexSaveSize = 2000
 )
 
-func (s *SimpleCache[T]) SetSaver(f func([]simpleCacheItem[T]), opt ...asyncdb.Option) {
-	opt = append(opt,
-		asyncdb.WithSaveSize(defaultSaveSize),
-		asyncdb.WithSaveTimeout(saveTime),
-	)
-	s.save = asyncdb.NewSave(f, opt...)
+func (s *SimpleCache[T]) SetSaver(f func([]simpleCacheItem[T]), opt ...dbcache.Option) {
+	baseOpt := []dbcache.Option{
+		dbcache.WithSaveSize(defaultSaveSize),
+		dbcache.WithSaveTimeout(saveTime),
+	}
+	baseOpt = append(baseOpt, opt...)
+	s.save = dbcache.NewSave(f, baseOpt...)
 }
 
-func (c *ProgramCache) initIndex(databaseKind ProgramCacheKind, saveSize int) {
-	if saveSize < IndexSaveSize {
-		saveSize = IndexSaveSize // Ensure minimum save size
-	}
-	c.editorCache = NewSimpleCache[*ssadb.IrSource]("EditorCache")
+func (c *ProgramCache) initIndex(cfg *ssaconfig.Config, databaseKind ProgramCacheKind, saveSize int) {
+	saveSize = resolveAuxiliarySaveSize(cfg, saveSize)
+	c.editorHashCache = utils.NewSafeMapWithKey[string, struct{}]()
+	c.editorCache = NewSimpleCache[*ssadb.IrSource]("EditorCache", false)
 	if databaseKind == ProgramCacheDBWrite {
 		c.editorCache.SetSaver(
 			func(iii []simpleCacheItem[*ssadb.IrSource]) {
@@ -102,11 +126,11 @@ func (c *ProgramCache) initIndex(databaseKind ProgramCacheKind, saveSize int) {
 				c.diagnosticsTrack("ssa.Database.SaveIrSourceBatch", saveStep)
 				return
 			},
-			asyncdb.WithSaveSize(saveSize),
+			dbcache.WithSaveSize(saveSize),
 		)
 	}
 
-	c.offsetCache = NewSimpleCache[*ssadb.IrOffset]("OffsetCache")
+	c.offsetCache = NewSimpleCache[*ssadb.IrOffset]("OffsetCache", false)
 	if databaseKind == ProgramCacheDBWrite {
 		c.offsetCache.SetSaver(
 			func(iii []simpleCacheItem[*ssadb.IrOffset]) {
@@ -121,11 +145,11 @@ func (c *ProgramCache) initIndex(databaseKind ProgramCacheKind, saveSize int) {
 				c.diagnosticsTrack("ssa.Database.SaveIrOffsetBatch", saveStep)
 				return
 			},
-			asyncdb.WithSaveSize(saveSize),
+			dbcache.WithSaveSize(saveSize),
 		)
 	}
 
-	c.indexCache = NewSimpleCache[*ssadb.IrIndex]("IndexCache")
+	c.indexCache = NewSimpleCache[*ssadb.IrIndex]("IndexCache", false)
 	if databaseKind == ProgramCacheDBWrite {
 		c.indexCache.SetSaver(
 			func(iii []simpleCacheItem[*ssadb.IrIndex]) {
@@ -144,65 +168,47 @@ func (c *ProgramCache) initIndex(databaseKind ProgramCacheKind, saveSize int) {
 				c.diagnosticsTrack("ssa.Database.SaveIrIndexBatch", saveStep)
 				return
 			},
-			asyncdb.WithSaveSize(saveSize),
+			dbcache.WithSaveSize(saveSize),
 		)
 	}
 
-	c.VariableIndex = NewSimpleCache[Instruction]("VariableIndex")
-	if databaseKind == ProgramCacheDBWrite {
-		c.VariableIndex.SetSaver(
-			func(items []simpleCacheItem[Instruction]) {
-				for _, item := range items {
-					ret := CreateVariableIndexByName(item.Name, item.Value)
-					c.indexCache.Add("", ret)
+	c.VariableIndex = NewSimpleCache[int64]("VariableIndex")
+	c.MemberIndex = NewSimpleCache[int64]("MemberIndex")
+	c.ClassIndex = NewSimpleCache[int64]("ClassIndex")
+	c.ConstCache = NewSimpleCache[int64]("ConstCache")
+}
 
-					// save to offset
-					if value, ok := item.Value.(Value); ok {
-						variable := value.GetVariable(item.Name)
-						if !utils.IsNil(c.offsetCache) && !utils.IsNil(variable) {
-							for _, offset := range ConvertVariable2Offset(variable, item.Name, int64(value.GetId())) {
-								c.offsetCache.Add("", offset)
-							}
-						}
-					}
-				}
-			},
-			asyncdb.WithSaveSize(saveSize),
-		)
-	}
-	c.MemberIndex = NewSimpleCache[Instruction]("MemberIndex")
-	if databaseKind == ProgramCacheDBWrite {
-		c.MemberIndex.SetSaver(
-			func(items []simpleCacheItem[Instruction]) {
-				for _, item := range items {
-					item := CreateVariableIndexByMember(item.Name, item.Value)
-					c.indexCache.Add("", item)
-				}
-			},
-			asyncdb.WithSaveSize(saveSize),
-		)
+func (c *ProgramCache) enqueueVariableIndex(name string, inst Instruction) {
+	if c == nil || c.ProgramCacheKind != ProgramCacheDBWrite || utils.IsNil(inst) {
+		return
 	}
 
-	c.ClassIndex = NewSimpleCache[Instruction]("ClassIndex")
-	if databaseKind == ProgramCacheDBWrite {
-		c.ClassIndex.SetSaver(
-			func(items []simpleCacheItem[Instruction]) {
-				for _, item := range items {
-					item := CreateClassIndex(item.Name, item.Value)
-					c.indexCache.Add("", item)
-				}
-			},
-			asyncdb.WithSaveSize(saveSize),
-		)
-	}
+	ret := CreateVariableIndexByName(name, inst)
+	c.indexCache.Add("", ret)
 
-	c.ConstCache = NewSimpleCache[Instruction]("ConstCache")
-	if databaseKind == ProgramCacheDBWrite {
-		c.ConstCache.SetSaver(
-			func(ii []simpleCacheItem[Instruction]) {
-			},
-			asyncdb.WithSaveSize(saveSize),
-		)
+	value, ok := inst.(Value)
+	if !ok {
+		return
 	}
+	variable := value.GetVariable(name)
+	if utils.IsNil(variable) {
+		return
+	}
+	for _, offset := range ConvertVariable2Offset(variable, name, value.GetId()) {
+		c.offsetCache.Add("", offset)
+	}
+}
 
+func (c *ProgramCache) enqueueMemberIndex(name string, inst Instruction) {
+	if c == nil || c.ProgramCacheKind != ProgramCacheDBWrite || utils.IsNil(inst) {
+		return
+	}
+	c.indexCache.Add("", CreateVariableIndexByMember(name, inst))
+}
+
+func (c *ProgramCache) enqueueClassIndex(name string, inst Instruction) {
+	if c == nil || c.ProgramCacheKind != ProgramCacheDBWrite || utils.IsNil(inst) {
+		return
+	}
+	c.indexCache.Add("", CreateClassIndex(name, inst))
 }

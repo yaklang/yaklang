@@ -7,6 +7,24 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
+func getResidentType(cache *ProgramCache, id int64) Type {
+	if cache == nil || cache.TypeCache == nil {
+		return nil
+	}
+	if typ, ok := cache.TypeCache.Get(id); ok && !utils.IsNil(typ) {
+		return typ
+	}
+	return nil
+}
+
+func rememberLoadedType(cache *ProgramCache, typ Type) Type {
+	if cache == nil || cache.TypeCache == nil || utils.IsNil(typ) {
+		return typ
+	}
+	cache.TypeCache.Set(typ)
+	return typ
+}
+
 func saveTypeWithValue(value Value, typ Type) {
 	// i know is ugle, just is, and i will fix this after remove init value in ssa/next.go
 	if utils.IsNil(value) {
@@ -119,6 +137,14 @@ func GetTypeFromDB(cache *ProgramCache, id int64) Type {
 		return nil
 	}
 
+	if resident := getResidentType(cache, id); !utils.IsNil(resident) {
+		return resident
+	}
+	if cache == nil || cache.DB == nil || cache.program == nil {
+		log.Warnf("GetTypeFromDB: cache/db/program unavailable for id=%v", id)
+		return nil
+	}
+
 	irType := ssadb.GetIrTypeById(cache.DB, cache.program.GetProgramName(), id)
 	if utils.IsNil(irType) {
 		log.Warnf("GetTypeFromDB: failed type is nil: id: %v", id)
@@ -163,20 +189,20 @@ func GetTypeFromDB(cache *ProgramCache, id int64) Type {
 			// })
 		}
 		typ.fullTypeName = utils.InterfaceToStringSlice(params["fullTypeName"])
-		return typ
+		return rememberLoadedType(cache, typ)
 	case ObjectTypeKind, SliceTypeKind, MapTypeKind, TupleTypeKind, StructTypeKind:
 		typ := NewObjectType()
 		typ.Name = getParamStr("name")
 		typ.fullTypeName = utils.InterfaceToStringSlice(params["fullTypeName"])
 		typ.Kind = TypeKind(kind)
 		typ.SetId(int64(irType.TypeId))
-		return typ
+		return rememberLoadedType(cache, typ)
 	case NumberTypeKind, StringTypeKind, ByteTypeKind, BytesTypeKind, BooleanTypeKind,
 		UndefinedTypeKind, NullTypeKind, AnyTypeKind, ErrorTypeKind:
 		typ := NewBasicType(TypeKind(kind), getParamStr("name"))
 		typ.fullTypeName = utils.InterfaceToStringSlice(params["fullTypeName"])
 		typ.SetId(int64(irType.TypeId))
-		return typ
+		return rememberLoadedType(cache, typ)
 	case ClassBluePrintTypeKind:
 		typ := &Blueprint{
 			LazyBuilder: NewLazyBuilder("Blueprint:" + getParamStr("name")),
@@ -185,6 +211,7 @@ func GetTypeFromDB(cache *ProgramCache, id int64) Type {
 		typ.fullTypeName = utils.InterfaceToStringSlice(params["fullTypeName"])
 		typ.Kind = ValidBlueprintKind(getParamStr("kind"))
 		typ.SetId(int64(irType.TypeId))
+		rememberLoadedType(cache, typ)
 		parents, ok := params["parentBlueprints"].([]interface{})
 		if ok {
 			for _, typeId := range parents {

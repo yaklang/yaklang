@@ -28,9 +28,12 @@ func setMemberCallRelationship(obj, key, member Value) {
 	}
 	//todo：fix one value for more object-key
 
-	handlerMemberCall := func(obj Value) {
-		for _, edgeID := range obj.(*Phi).Edge {
-			edgeValue, ok := obj.GetValueById(edgeID)
+	handlerMemberCall := func(phi *Phi) {
+		if phi == nil {
+			return
+		}
+		for _, edgeID := range phi.Edge {
+			edgeValue, ok := phi.GetValueById(edgeID)
 			if !ok || edgeValue == nil {
 				continue
 			}
@@ -56,7 +59,7 @@ func setMemberCallRelationship(obj, key, member Value) {
 			}
 			if und, ok := ToUndefined(edgeValue); ok { // 遇到库类和return phi value
 				if und.Kind == UndefinedValueValid || und.Kind == UndefinedValueReturn {
-					handlerMemberCall(obj)
+					handlerMemberCall(phi)
 				}
 			}
 		}

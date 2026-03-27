@@ -197,11 +197,14 @@ type SSACompileConfig struct {
 	ReCompile                bool          `json:"re_compile"`
 	MemoryCompile            bool          `json:"memory_compile"`
 	Concurrency              int           `json:"compile_concurrency"`
+	ASTSequence              int           `json:"ast_sequence"`
 	CompileIrCacheTTL        time.Duration `json:"compile_ir_cache_ttl"`
+	CompileIrCacheMax        int           `json:"compile_ir_cache_max"`
 	FilePerformanceLog       bool          `json:"file_performance_log"`
 	StopOnCliCheck           bool          `json:"stop_on_cli_check"`
 	EnableIncrementalCompile bool          `json:"enable_incremental_compile"`
 	BaseProgramName          string        `json:"base_program_name"`
+	CompileProjectBytes      int64         `json:"-"`
 }
 
 // --- 编译配置 Get/Set 方法 ---
@@ -332,6 +335,74 @@ func (c *Config) SetCompileConcurrency(concurrency int) {
 	c.SSACompile.Concurrency = concurrency
 }
 
+func (c *Config) GetCompileASTSequence() int {
+	if c == nil || c.SSACompile == nil {
+		return 0
+	}
+	return c.SSACompile.ASTSequence
+}
+
+func (c *Config) SetCompileASTSequence(sequence int) {
+	if c == nil {
+		return
+	}
+	if c.SSACompile == nil {
+		c.SSACompile = defaultSSACompileConfig()
+	}
+	c.SSACompile.ASTSequence = sequence
+}
+
+func (c *Config) GetCompileIrCacheTTL() time.Duration {
+	if c == nil || c.SSACompile == nil {
+		return 0
+	}
+	return c.SSACompile.CompileIrCacheTTL
+}
+
+func (c *Config) SetCompileIrCacheTTL(ttl time.Duration) {
+	if c == nil {
+		return
+	}
+	if c.SSACompile == nil {
+		c.SSACompile = defaultSSACompileConfig()
+	}
+	c.SSACompile.CompileIrCacheTTL = ttl
+}
+
+func (c *Config) GetCompileIrCacheMax() int {
+	if c == nil || c.SSACompile == nil {
+		return 0
+	}
+	return c.SSACompile.CompileIrCacheMax
+}
+
+func (c *Config) SetCompileIrCacheMax(max int) {
+	if c == nil {
+		return
+	}
+	if c.SSACompile == nil {
+		c.SSACompile = defaultSSACompileConfig()
+	}
+	c.SSACompile.CompileIrCacheMax = max
+}
+
+func (c *Config) GetCompileProjectBytes() int64 {
+	if c == nil || c.SSACompile == nil {
+		return 0
+	}
+	return c.SSACompile.CompileProjectBytes
+}
+
+func (c *Config) SetCompileProjectBytes(size int64) {
+	if c == nil {
+		return
+	}
+	if c.SSACompile == nil {
+		c.SSACompile = defaultSSACompileConfig()
+	}
+	c.SSACompile.CompileProjectBytes = size
+}
+
 func (c *Config) GetCompileFilePerformanceLog() bool {
 	if c == nil || c.SSACompile == nil {
 		return false
@@ -435,6 +506,36 @@ func WithCompileConcurrency(concurrency int) Option {
 			return err
 		}
 		c.SSACompile.Concurrency = concurrency
+		return nil
+	}
+}
+
+func WithCompileASTSequence(sequence int) Option {
+	return func(c *Config) error {
+		if err := c.ensureSSACompile("Compile AST Sequence"); err != nil {
+			return err
+		}
+		c.SSACompile.ASTSequence = sequence
+		return nil
+	}
+}
+
+func WithCompileIrCacheTTL(ttl time.Duration) Option {
+	return func(c *Config) error {
+		if err := c.ensureSSACompile("Compile IR Cache TTL"); err != nil {
+			return err
+		}
+		c.SSACompile.CompileIrCacheTTL = ttl
+		return nil
+	}
+}
+
+func WithCompileIrCacheMax(max int) Option {
+	return func(c *Config) error {
+		if err := c.ensureSSACompile("Compile IR Cache Max"); err != nil {
+			return err
+		}
+		c.SSACompile.CompileIrCacheMax = max
 		return nil
 	}
 }

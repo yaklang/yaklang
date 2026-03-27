@@ -76,7 +76,10 @@ func NewInstructionWithCover[T Instruction](prog *Program, id int64, Cover func(
 
 // // NewLazyInstruction : create a new lazy instruction, only create in cache
 func NewLazyInstruction(prog *Program, id int64) (Instruction, error) {
-	ir := ssadb.GetIrCodeById(ssadb.GetDB(), prog.GetProgramName(), id)
+	// Reload hot-paths should fetch only the target IR row.
+	// Neighbor/user prefetch turns each miss into a heavier DB round-trip and
+	// serializes the main build goroutine on SQLite reads.
+	ir := ssadb.GetIrCodeByIdFast(ssadb.GetDB(), prog.GetProgramName(), id)
 	if ir == nil {
 		return nil, utils.Error("IrCode is nil")
 	}
@@ -176,10 +179,7 @@ func (lz *LazyInstruction) ShouldSave() bool {
 	if utils.IsNil(lz.Instruction) {
 		return false
 	}
-
-	// TODO: use this flag to check if need save
-	// return lz.Modify
-	return lz.Instruction != nil
+	return lz.Modify
 }
 
 // just use lazy instruction
@@ -263,13 +263,20 @@ func (lz *LazyInstruction) HasUsers() bool {
 		log.Errorf("BUG: lazyInstruction IrCode is nil")
 		return false
 	}
-	return len(lz.ir.Users) == 0
+	return len(lz.ir.Users) > 0
 }
 
 func (lz *LazyInstruction) AddUser(user User) {
 	lz.check()
-	lz.Modify = true
+	lz.markModify()
 	lz.Value.AddUser(user)
+}
+
+func (lz *LazyInstruction) markModify() {
+	if lz == nil {
+		return
+	}
+	lz.Modify = true
 }
 
 func (lz *LazyInstruction) HasValues() bool {
@@ -354,6 +361,7 @@ func (lz *LazyInstruction) SetFunc(f *Function) {
 		}
 	}
 	if !utils.IsNil(lz.Instruction) {
+		lz.markModify()
 		lz.Instruction.SetFunc(f)
 		return
 	}
@@ -376,6 +384,7 @@ func (lz *LazyInstruction) SetBlock(b *BasicBlock) {
 		}
 	}
 	if !utils.IsNil(lz.Instruction) {
+		lz.markModify()
 		lz.Instruction.SetBlock(b)
 		return
 	}
@@ -394,6 +403,7 @@ func (lz *LazyInstruction) SetProgram(p *Program) {
 	if utils.IsNil(lz.Instruction) {
 		return
 	}
+	lz.markModify()
 	lz.Instruction.SetProgram(p)
 }
 
@@ -402,6 +412,7 @@ func (lz *LazyInstruction) SetName(name string) {
 	if utils.IsNil(lz.Instruction) {
 		return
 	}
+	lz.markModify()
 	lz.Instruction.SetName(name)
 }
 
@@ -410,6 +421,7 @@ func (lz *LazyInstruction) SetVerboseName(name string) {
 	if utils.IsNil(lz.Instruction) {
 		return
 	}
+	lz.markModify()
 	lz.Instruction.SetVerboseName(name)
 }
 
@@ -418,6 +430,7 @@ func (lz *LazyInstruction) SetIsAnnotation(b bool) {
 	if utils.IsNil(lz.Instruction) {
 		return
 	}
+	lz.markModify()
 	lz.Instruction.SetIsAnnotation(b)
 }
 
@@ -537,6 +550,7 @@ func (lz *LazyInstruction) SetRange(r *memedit.Range) {
 	if utils.IsNil(lz.Instruction) {
 		return
 	}
+	lz.markModify()
 	lz.Instruction.SetRange(r)
 }
 
@@ -569,6 +583,7 @@ func (lz *LazyInstruction) SetExtern(extern bool) {
 	if utils.IsNil(lz.Instruction) {
 		return
 	}
+	lz.markModify()
 	lz.Instruction.SetExtern(extern)
 }
 
@@ -593,6 +608,7 @@ func (lz *LazyInstruction) AddMask(v Value) {
 	if utils.IsNil(lz.Value) {
 		return
 	}
+	lz.markModify()
 	lz.Value.AddMask(v)
 }
 
@@ -601,6 +617,7 @@ func (lz *LazyInstruction) AddMember(v1 Value, v2 Value) {
 	if utils.IsNil(lz.Value) {
 		return
 	}
+	lz.markModify()
 	lz.Value.AddMember(v1, v2)
 }
 
@@ -609,6 +626,7 @@ func (lz *LazyInstruction) AddVariable(v *Variable) {
 	if utils.IsNil(lz.Value) {
 		return
 	}
+	lz.markModify()
 	lz.Value.AddVariable(v)
 }
 
@@ -617,6 +635,7 @@ func (lz *LazyInstruction) DeleteMember(v Value) {
 	if utils.IsNil(lz.Value) {
 		return
 	}
+	lz.markModify()
 	lz.Value.DeleteMember(v)
 }
 
@@ -762,6 +781,7 @@ func (lz *LazyInstruction) SetKey(v Value) {
 	if utils.IsNil(lz.Value) {
 		return
 	}
+	lz.markModify()
 	lz.Value.SetKey(v)
 }
 
@@ -770,6 +790,7 @@ func (lz *LazyInstruction) SetObject(v Value) {
 	if utils.IsNil(lz.Value) {
 		return
 	}
+	lz.markModify()
 	lz.Value.SetObject(v)
 }
 
@@ -778,6 +799,7 @@ func (lz *LazyInstruction) SetType(t Type) {
 	if utils.IsNil(lz.Value) {
 		return
 	}
+	lz.markModify()
 	lz.Value.SetType(t)
 }
 
@@ -802,6 +824,7 @@ func (lz *LazyInstruction) AddPointer(v Value) {
 	if utils.IsNil(lz.Value) {
 		return
 	}
+	lz.markModify()
 	lz.Value.AddPointer(v)
 }
 func (lz *LazyInstruction) GetReference() Value {
@@ -817,6 +840,7 @@ func (lz *LazyInstruction) SetReference(v Value) {
 	if utils.IsNil(lz.Value) {
 		return
 	}
+	lz.markModify()
 	lz.Value.SetReference(v)
 }
 

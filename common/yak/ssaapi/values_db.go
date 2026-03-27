@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/yaklang/yaklang/common/utils/asyncdb"
+	"github.com/yaklang/yaklang/common/utils/dbcache"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
 
 	"github.com/jinzhu/gorm"
@@ -275,9 +275,9 @@ func (g *DBGraph) CreateEdge(edge Edge) error {
 }
 
 type auditDatabase struct {
-	nodeSave   *asyncdb.Save[*ssadb.AuditNode]
-	edgeSave   *asyncdb.Save[*ssadb.AuditEdge]
-	editorSave *asyncdb.Save[*ssadb.IrSource]
+	nodeSave   *dbcache.Save[*ssadb.AuditNode]
+	edgeSave   *dbcache.Save[*ssadb.AuditEdge]
+	editorSave *dbcache.Save[*ssadb.IrSource]
 }
 
 func (a *auditDatabase) SaveNode(node *ssadb.AuditNode) {
@@ -312,7 +312,7 @@ func newAuditDatabase(ctx context.Context, db *gorm.DB, size int) *auditDatabase
 
 	saveSize := size * 2
 
-	ret.nodeSave = asyncdb.NewSave[*ssadb.AuditNode](func(ae []*ssadb.AuditNode) {
+	ret.nodeSave = dbcache.NewSave[*ssadb.AuditNode](func(ae []*ssadb.AuditNode) {
 		if len(ae) == 0 {
 			return
 		}
@@ -325,9 +325,9 @@ func newAuditDatabase(ctx context.Context, db *gorm.DB, size int) *auditDatabase
 			return nil
 		})
 		return
-	}, asyncdb.WithContext(ctx), asyncdb.WithSaveSize(saveSize), asyncdb.WithName("AuditNode"))
+	}, dbcache.WithContext(ctx), dbcache.WithSaveSize(saveSize), dbcache.WithName("AuditNode"))
 
-	ret.edgeSave = asyncdb.NewSave[*ssadb.AuditEdge](func(ae []*ssadb.AuditEdge) {
+	ret.edgeSave = dbcache.NewSave[*ssadb.AuditEdge](func(ae []*ssadb.AuditEdge) {
 		if len(ae) == 0 {
 			return
 		}
@@ -340,9 +340,9 @@ func newAuditDatabase(ctx context.Context, db *gorm.DB, size int) *auditDatabase
 			return nil
 		})
 		return
-	}, asyncdb.WithContext(ctx), asyncdb.WithSaveSize(saveSize), asyncdb.WithName("AuditEdge"))
+	}, dbcache.WithContext(ctx), dbcache.WithSaveSize(saveSize), dbcache.WithName("AuditEdge"))
 
-	ret.editorSave = asyncdb.NewSave[*ssadb.IrSource](func(ae []*ssadb.IrSource) {
+	ret.editorSave = dbcache.NewSave[*ssadb.IrSource](func(ae []*ssadb.IrSource) {
 		if len(ae) == 0 {
 			return
 		}
@@ -355,7 +355,7 @@ func newAuditDatabase(ctx context.Context, db *gorm.DB, size int) *auditDatabase
 			return nil
 		})
 		return
-	}, asyncdb.WithContext(ctx), asyncdb.WithSaveSize(size), asyncdb.WithName("SourceFile"))
+	}, dbcache.WithContext(ctx), dbcache.WithSaveSize(size), dbcache.WithName("SourceFile"))
 
 	return ret
 }

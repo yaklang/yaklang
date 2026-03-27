@@ -651,13 +651,24 @@ func (f *FunctionBuilder) SwitchFreevalueInSideEffect(name string, se *SideEffec
 				if !ok || callSide == nil {
 					return
 				}
-				if bindId, ok := callSide.(*Call).Binding[name]; ok {
+				callInst, ok := ToCall(callSide)
+				if !ok || callInst == nil || callInst.Binding == nil {
+					return
+				}
+				if bindId, ok := callInst.Binding[name]; ok {
 					bind, ok := f.GetValueById(bindId)
 					if !ok || bind == nil {
 						return
 					}
-					bindVariableId = bind.GetLastVariable().GetCaptured().GetId()
-					_ = bindVariableId
+					lastVariable := bind.GetLastVariable()
+					if lastVariable == nil {
+						return
+					}
+					captured := lastVariable.GetCaptured()
+					if captured == nil {
+						return
+					}
+					bindVariableId = captured.GetId()
 				}
 			}
 		}
