@@ -1,6 +1,7 @@
 package test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -31,8 +32,15 @@ func TestCoordinator_SyncTaskInDatabase(t *testing.T) {
 			outputChan <- event
 		}),
 		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			prompt := request.GetPrompt()
 			rsp := config.NewAIResponse()
-			rsp.EmitOutputStream(strings.NewReader(`
+			defer rsp.Close()
+
+			isPlanRequest := (strings.Contains(prompt, "任务规划使命") || strings.Contains(prompt, "你是一个输出JSON的任务规划的工具")) &&
+				(strings.Contains(prompt, "PERSISTENT_NcSB") || strings.Contains(prompt, "任务设计输出要求") || strings.Contains(prompt, "```schema"))
+
+			if isPlanRequest {
+				rsp.EmitOutputStream(strings.NewReader(`
 {
     "@action": "plan",
     "query": "找出 /Users/v1ll4n/Projects/yaklang 目录中最大的文件",
@@ -54,8 +62,62 @@ func TestCoordinator_SyncTaskInDatabase(t *testing.T) {
     ]
 }
 			`))
-			time.Sleep(100 * time.Millisecond)
-			rsp.Close()
+				return rsp, nil
+			}
+
+			if utils.MatchAllOfSubString(prompt, "capability matcher", "matched_identifiers") ||
+				utils.MatchAllOfSubString(prompt, `"const": "capability-catalog-match"`, "matched_identifiers") {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "capability-catalog-match", "matched_identifiers": []}`))
+				return rsp, nil
+			}
+
+			if utils.MatchAllOfSubString(prompt, "status_summary", "task_long_summary", "task_short_summary") ||
+				strings.Contains(prompt, "GenerateTaskSummaryPrompt") ||
+				(strings.Contains(prompt, "@action") && strings.Contains(prompt, "summary")) {
+				rsp.EmitOutputStream(strings.NewReader(`{
+    "@action": "summary",
+    "status_summary": "测试状态摘要：任务执行中",
+    "task_short_summary": "测试任务摘要：查找最大文件",
+    "task_long_summary": "测试详细摘要：正在遍历目录并查找最大文件"
+}`))
+				return rsp, nil
+			}
+
+			if strings.Contains(prompt, "Background") && (strings.Contains(prompt, "Current Time:") || strings.Contains(prompt, "OS/Arch:")) {
+				rsp.EmitOutputStream(strings.NewReader(`{
+    "@action": "object",
+    "next_action": {
+        "type": "finish",
+        "answer_payload": "测试模式：任务已完成"
+    },
+    "cumulative_summary": "测试累积摘要",
+    "human_readable_thought": "测试模式：跳过子任务执行"
+}`))
+				return rsp, nil
+			}
+
+			if utils.MatchAllOfSubString(prompt, "角色设定", "任务执行引擎") ||
+				utils.MatchAllOfSubString(prompt, "directly_answer", "require_tool") ||
+				strings.Contains(prompt, "任务状态") {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "测试模式：跳过子任务执行"}`))
+				return rsp, nil
+			}
+
+			if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "测试模式：任务已完成"}`))
+				return rsp, nil
+			}
+
+			if strings.Contains(prompt, "tool") && (strings.Contains(prompt, "result") || strings.Contains(prompt, "decision")) {
+				rsp.EmitOutputStream(strings.NewReader(`{
+    "@action": "continue-current-task",
+    "status_summary": "工具调用完成",
+    "task_short_summary": "测试工具调用摘要"
+}`))
+				return rsp, nil
+			}
+
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "human_readable_thought": "测试模式：默认完成"}`))
 			return rsp, nil
 		}),
 	)
