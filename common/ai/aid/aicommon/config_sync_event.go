@@ -2,6 +2,7 @@ package aicommon
 
 import (
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -19,7 +20,8 @@ const (
 	SYNC_TYPE_MEMORY_CONTEXT              = "memory_sync"
 	SYNC_TYPE_SKIP_SUBTASK_IN_PLAN        = "skip_subtask_in_plan"
 	SYNC_TYPE_REDO_SUBTASK_IN_PLAN        = "redo_subtask_in_plan"
-	SYNC_TYPE_PLAN_EXEC_TASKS            = "plan_exec_tasks"
+	SYNC_TYPE_PLAN_EXEC_TASKS             = "plan_exec_tasks"
+	SYNC_TYPE_USER_INTERVENTION           = "user_intervention"
 
 	ProcessID           string = "process_id"
 	SyncProcessEeventID        = "sync_process_event_id"
@@ -48,6 +50,30 @@ func (c *Config) HandleSyncPongEvent(e *ypb.AIInputEvent) error {
 	},
 		e.SyncID,
 	)
+	return nil
+}
+
+func (c *Config) HandleSyncUserIntervention(event *ypb.AIInputEvent) error {
+	if event.SyncJsonInput == "" {
+		c.EmitError("sync json input is empty")
+		return nil
+	}
+	var params map[string]interface{}
+	if err := json.Unmarshal([]byte(event.SyncJsonInput), &params); err != nil {
+		c.EmitError("invalid sync json input: %v", err)
+		return nil
+	}
+	content := aitool.InvokeParams(params).GetString("content")
+	if content == "" {
+		c.EmitError("content is empty in sync json input")
+		return nil
+	}
+
+	c.Timeline.PushText(c.AcquireId(), "[User Intervention] "+content)
+
+	c.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "user_intervention", map[string]interface{}{
+		"content": content,
+	}, event.SyncID)
 	return nil
 }
 
@@ -266,6 +292,7 @@ func (c *Config) HandleSyncMemoryContextEvent(event *ypb.AIInputEvent) error {
 func (c *Config) RegisterBasicSyncHandlers() {
 	c.InputEventManager.RegisterSyncCallback(SYNC_TYPE_CONSUMPTION, c.HandleSyncConsumptionEvent)
 	c.InputEventManager.RegisterSyncCallback(SYNC_TYPE_PING, c.HandleSyncPongEvent)
+	c.InputEventManager.RegisterSyncCallback(SYNC_TYPE_USER_INTERVENTION, c.HandleSyncUserIntervention)
 	c.InputEventManager.RegisterSyncCallback(SYNC_TYPE_TIMELINE, c.HandleSyncTimelineEvent)
 	c.InputEventManager.RegisterSyncCallback(SYNC_TYPE_UPDATE_CONFIG, c.HandleSyncUpdataConfigEvent)
 	c.InputEventManager.RegisterSyncCallback(SYNC_TYPE_MEMORY_CONTEXT, c.HandleSyncMemoryContextEvent)
