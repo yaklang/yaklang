@@ -1,0 +1,1 @@
+常用命令：`git status --short` 查看工作树；`rg <pattern>` 搜索代码；`go build ./common/yakgrpc` 或相关包做编译检查；`go test -gcflags='all=-N -l' ./common/yakgrpc -run '<TestName>' -count=1 -timeout=60s` 跑后端单测；必要时用 `nl -ba <file> | sed -n 'start,endp'` 带行号查看实现。Linux 环境，默认 shell 为 zsh。

@@ -818,7 +818,18 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 				utils.PrintCurrentGoroutineRuntimeStack()
 			}
 
-			newHijackRsp := hotPatchPipeline.CallAfterRequestWithCtx(pluginCtx, isHttps, urlStr, httpctx.GetBareRequestBytes(req), httpctx.GetRequestBytes(req), httpctx.GetBareResponseBytes(req), hijackRsp)
+			phaseCtx := hotPatchPipeline.CallAfterRequestWithReq(pluginCtx, req, isHttps, urlStr, httpctx.GetBareRequestBytes(req), httpctx.GetRequestBytes(req), httpctx.GetBareResponseBytes(req), hijackRsp)
+			if phaseCtx == nil {
+				return
+			}
+			if phaseCtx.Dropped {
+				hijackRsp = nil
+				return
+			}
+			newHijackRsp := phaseCtx.Response
+			if len(phaseCtx.ClientResponse) > 0 {
+				newHijackRsp = phaseCtx.ClientResponse
+			}
 			if len(newHijackRsp) > 0 {
 				httpctx.SetResponseModified(req, "yaklang.hook(ex) afterRequest")
 				httpctx.SetHijackedResponseBytes(req, newHijackRsp)
@@ -1292,7 +1303,25 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		pluginCtx := httpctx.GetPluginContext(originReqIns)
 
 		defer func() {
-			newHijackReq := hotPatchPipeline.CallBeforeRequestWithCtx(pluginCtx, isHttps, urlStr, httpctx.GetBareRequestBytes(originReqIns), hijackReq)
+			phaseCtx := hotPatchPipeline.CallBeforeRequestWithReq(pluginCtx, originReqIns, isHttps, urlStr, httpctx.GetBareRequestBytes(originReqIns), hijackReq)
+			if phaseCtx == nil {
+				return
+			}
+			if phaseCtx.Dropped {
+				httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_IsDropped, true)
+				dropped.Set()
+				hijackReq = nil
+				return
+			}
+			if len(phaseCtx.ClientResponse) > 0 {
+				fixedRsp, _, _ := lowhttp.FixHTTPResponse(phaseCtx.ClientResponse)
+				if fixedRsp == nil {
+					fixedRsp = []byte("HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\n\r\n")
+				}
+				httpctx.SetMockResponseBytes(originReqIns, fixedRsp)
+				httpctx.SetShouldMockResponse(originReqIns, true)
+			}
+			newHijackReq := phaseCtx.Request
 			if len(newHijackReq) > 0 && handleRequestModified(newHijackReq) {
 				hijackReq = newHijackReq
 				setModifiedRequest("yaklang.hook beforeRequest", hijackReq)
@@ -1708,8 +1737,9 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		isDroppedSaveFlow := utils.NewBool(false)
 
 		pluginCh := make(chan struct{})
-		hotPatchPipeline.HijackSaveHTTPFlowEx(
+		hotPatchPipeline.HijackSaveHTTPFlowWithReqEx(
 			pluginCtx,
+			req,
 			flow,
 			func() {
 				close(pluginCh)

@@ -1,0 +1,1 @@
+yaklang 是一个以 Go 为主的安全测试/代理/热加载脚本平台代码库，包含 MITM、MITM v2、WebFuzzer、Vulinbox、Yak 脚本运行时、gRPC 服务和大量安全测试相关模块。主要语言是 Go，工程内大量使用 gRPC、HTTP 代理、低层 HTTP 报文处理、Yak VM/脚本执行和测试辅助工具。代码组织上 common/yak 是脚本与 hotpatch runtime，common/yakgrpc 是 gRPC server 与 MITM/WebFuzzer 入口，common/mutate 是 WebFuzzer/http pool 发包链路，docs/ 存放设计与文章。

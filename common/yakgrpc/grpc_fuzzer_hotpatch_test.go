@@ -524,6 +524,89 @@ afterRequest = func(rsp){
 	}
 }
 
+func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_PhaseRequestLocalState(t *testing.T) {
+	client, server, err := NewLocalClientAndServerWithTempDatabase(t)
+	require.NoError(t, err)
+	_, err = server.ResetGlobalHotPatchConfig(context.Background(), &ypb.Empty{})
+	require.NoError(t, err)
+
+	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		require.Contains(t, string(req), "GET /after HTTP/1.1")
+		require.Contains(t, string(req), "X-Phase-Req: phase-ok")
+		return []byte("HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\norig")
+	})
+	target := utils.HostPort(host, port)
+
+	recv, err := client.HTTPFuzzer(utils.TimeoutContextSeconds(10), &ypb.FuzzerRequest{
+		Request: "GET /before HTTP/1.1\r\nHost: " + target + "\r\n\r\n",
+		HotPatchCode: `
+requestIngress = func(ctx) {
+    ctx.Request = str.Replace(string(ctx.Request), "/before", "/after", 1)
+    ctx.SetState("marker", "phase-ok")
+}
+requestProcess = func(ctx) {
+    if ctx.Path != "/after" {
+        die("request metadata not refreshed")
+    }
+    ctx.Request = poc.ReplaceHTTPPacketHeader(ctx.Request, "X-Phase-Req", ctx.State["marker"])
+}
+responseProcess = func(ctx) {
+    if ctx.State["marker"] != "phase-ok" {
+        die("missing request-local state")
+    }
+    if ctx.Path != "/after" {
+        die("request path lost in response phase")
+    }
+    ctx.Response = poc.ReplaceHTTPPacketBody(ctx.Response, ctx.State["marker"])
+}
+`,
+		ForceFuzz: true,
+	})
+	require.NoError(t, err)
+
+	rsp, err := recv.Recv()
+	require.NoError(t, err)
+	require.Contains(t, string(rsp.RequestRaw), "GET /after HTTP/1.1")
+	require.Contains(t, string(rsp.RequestRaw), "X-Phase-Req: phase-ok")
+	require.Contains(t, string(rsp.ResponseRaw), "phase-ok")
+
+	_, err = recv.Recv()
+	require.Error(t, err)
+}
+
+func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_PhaseClientResponseShortCircuit(t *testing.T) {
+	client, server, err := NewLocalClientAndServerWithTempDatabase(t)
+	require.NoError(t, err)
+	_, err = server.ResetGlobalHotPatchConfig(context.Background(), &ypb.Empty{})
+	require.NoError(t, err)
+
+	var called bool
+	host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		called = true
+		return []byte("HTTP/1.1 200 OK\r\nContent-Length: 6\r\n\r\norigin")
+	})
+	target := utils.HostPort(host, port)
+
+	recv, err := client.HTTPFuzzer(utils.TimeoutContextSeconds(10), &ypb.FuzzerRequest{
+		Request: "GET /phase HTTP/1.1\r\nHost: " + target + "\r\n\r\n",
+		HotPatchCode: `
+requestEgress = func(ctx) {
+    ctx.SetClientResponse("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nphase")
+}
+`,
+		ForceFuzz: true,
+	})
+	require.NoError(t, err)
+
+	rsp, err := recv.Recv()
+	require.NoError(t, err)
+	require.False(t, called)
+	require.Contains(t, string(rsp.ResponseRaw), "phase")
+
+	_, err = recv.Recv()
+	require.Error(t, err)
+}
+
 func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_Mirror_Duplicated_ExtractorResults(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)

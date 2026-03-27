@@ -2120,6 +2120,13 @@ func NewYakitFetchFuncFromSrcCodeConfig() *fetchFuncFromSrcCodeConfig {
 	cfg.callArgumentHooks = make(map[string]callArgumentHookFunc)
 	cfg.callArgumentHooks[HOOK_BeforeRequest] = DefaultBeforeRequestCallArgumentHook
 	cfg.callArgumentHooks[HOOK_AfterRequest] = DefaultAfterRequestCallArgumentHook
+	cfg.callArgumentHooks[HOOK_RequestIngress] = DefaultHotPatchPhaseCallArgumentHook
+	cfg.callArgumentHooks[HOOK_RequestProcess] = DefaultHotPatchPhaseCallArgumentHook
+	cfg.callArgumentHooks[HOOK_RequestEgress] = DefaultHotPatchPhaseCallArgumentHook
+	cfg.callArgumentHooks[HOOK_ResponseIngress] = DefaultHotPatchPhaseCallArgumentHook
+	cfg.callArgumentHooks[HOOK_ResponseProcess] = DefaultHotPatchPhaseCallArgumentHook
+	cfg.callArgumentHooks[HOOK_ResponseEgress] = DefaultHotPatchPhaseCallArgumentHook
+	cfg.callArgumentHooks[HOOK_FlowArchive] = DefaultHotPatchPhaseCallArgumentHook
 	return cfg
 }
 

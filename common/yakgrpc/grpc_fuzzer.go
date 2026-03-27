@@ -975,8 +975,16 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		}
 
 		if strings.TrimSpace(hotPatchChain.GlobalCode) != "" || strings.TrimSpace(hotPatchChain.ModuleCode) != "" {
-			beforeRequest, afterRequest, mirrorHTTPFlow, retryHandler, customFailureChecker, mockHTTPRequest := yak.MutateHookCallerChained(stream.Context(), hotPatchChain, nil)
-			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_HookCodeCaller(beforeRequest, afterRequest, mirrorHTTPFlow, retryHandler, customFailureChecker, mockHTTPRequest))
+			hookRuntimeFactory, hotPatchMode, err := yak.BuildHotPatchHTTPPoolRuntimeFactoryChained(stream.Context(), hotPatchChain, nil)
+			if err != nil {
+				return utils.Errorf("build webfuzzer hotpatch runtime failed: %w", err)
+			}
+			if hotPatchMode == yak.HotPatchRuntimeModePhase && hookRuntimeFactory != nil {
+				httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_HookRuntimeFactory(hookRuntimeFactory))
+			} else {
+				beforeRequest, afterRequest, mirrorHTTPFlow, retryHandler, customFailureChecker, mockHTTPRequest := yak.MutateHookCallerChained(stream.Context(), hotPatchChain, nil)
+				httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_HookCodeCaller(beforeRequest, afterRequest, mirrorHTTPFlow, retryHandler, customFailureChecker, mockHTTPRequest))
+			}
 		}
 
 		if req.GetOverwriteSNI() {

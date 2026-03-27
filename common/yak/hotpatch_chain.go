@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/yaklang/yaklang/common/fuzztag"
 	"github.com/yaklang/yaklang/common/log"
@@ -41,6 +42,30 @@ func MutateHookCallerChained(
 	hookCustomFailureChecker,
 	hookMockHTTPRequestHandler,
 ) {
+	mode, err := resolveChainedHotPatchMode(ctx, chain)
+	if err != nil {
+		log.Errorf("resolve hotpatch chain runtime failed: %v", err)
+		return legacyMutateHookCallerChained(ctx, chain, caller, params...)
+	}
+	if mode == HotPatchRuntimeModePhase {
+		return buildPhaseHookCallersChained(ctx, chain, caller, params...)
+	}
+	return legacyMutateHookCallerChained(ctx, chain, caller, params...)
+}
+
+func legacyMutateHookCallerChained(
+	ctx context.Context,
+	chain HotPatchChain,
+	caller YakitCallerIf,
+	params ...*ypb.ExecParamItem,
+) (
+	hookBeforeRequestFunc,
+	hookAfterRequestFunc,
+	hookMirrorHTTPFlowFunc,
+	hookRetryHandlerFunc,
+	hookCustomFailureChecker,
+	hookMockHTTPRequestHandler,
+) {
 	gBefore, gAfter, gMirror, gRetry, gFail, gMock := MutateHookCaller(ctx, chain.GlobalCode, caller, params...)
 	mBefore, mAfter, mMirror, mRetry, mFail, mMock := MutateHookCaller(ctx, chain.ModuleCode, caller, params...)
 	return chainBeforeRequest(gBefore, mBefore),
@@ -49,6 +74,150 @@ func MutateHookCallerChained(
 		chainRetryHandler(gRetry, mRetry),
 		chainCustomFailureChecker(gFail, mFail),
 		chainMockHTTPRequest(gMock, mMock)
+}
+
+func resolveChainedHotPatchMode(ctx context.Context, chain HotPatchChain) (HotPatchRuntimeMode, error) {
+	globalMode, err := DetectHotPatchRuntimeMode(ctx, chain.GlobalCode)
+	if err != nil {
+		return HotPatchRuntimeModeNone, err
+	}
+	moduleMode, err := DetectHotPatchRuntimeMode(ctx, chain.ModuleCode)
+	if err != nil {
+		return HotPatchRuntimeModeNone, err
+	}
+	if globalMode == HotPatchRuntimeModeNone && moduleMode == HotPatchRuntimeModeNone {
+		return HotPatchRuntimeModeNone, nil
+	}
+	if isPhaseChainMode(globalMode, moduleMode) {
+		return HotPatchRuntimeModePhase, nil
+	}
+	if isLegacyChainMode(globalMode, moduleMode) {
+		return HotPatchRuntimeModeLegacy, nil
+	}
+	return HotPatchRuntimeModeNone, utils.Errorf("global hotpatch mode=%q conflicts with module hotpatch mode=%q", globalMode, moduleMode)
+}
+
+func isPhaseChainMode(global, module HotPatchRuntimeMode) bool {
+	if (global != HotPatchRuntimeModeNone && global != HotPatchRuntimeModePhase) ||
+		(module != HotPatchRuntimeModeNone && module != HotPatchRuntimeModePhase) {
+		return false
+	}
+	return global == HotPatchRuntimeModePhase || module == HotPatchRuntimeModePhase
+}
+
+func isLegacyChainMode(global, module HotPatchRuntimeMode) bool {
+	if (global != HotPatchRuntimeModeNone && global != HotPatchRuntimeModeLegacy) ||
+		(module != HotPatchRuntimeModeNone && module != HotPatchRuntimeModeLegacy) {
+		return false
+	}
+	return global == HotPatchRuntimeModeLegacy || module == HotPatchRuntimeModeLegacy
+}
+
+type hotPatchPhaseMockStore struct {
+	mockResponses sync.Map
+}
+
+func (s *hotPatchPhaseMockStore) store(req []byte, rsp []byte) {
+	if len(req) == 0 || len(rsp) == 0 {
+		return
+	}
+	s.mockResponses.Store(utils.CalcSha1(req), append([]byte(nil), rsp...))
+}
+
+func (s *hotPatchPhaseMockStore) take(req []byte) []byte {
+	key := utils.CalcSha1(req)
+	raw, ok := s.mockResponses.LoadAndDelete(key)
+	if !ok {
+		return nil
+	}
+	ret, _ := raw.([]byte)
+	return ret
+}
+
+func buildPhaseHookCallersChained(
+	ctx context.Context,
+	chain HotPatchChain,
+	caller YakitCallerIf,
+	params ...*ypb.ExecParamItem,
+) (
+	hookBeforeRequestFunc,
+	hookAfterRequestFunc,
+	hookMirrorHTTPFlowFunc,
+	hookRetryHandlerFunc,
+	hookCustomFailureChecker,
+	hookMockHTTPRequestHandler,
+) {
+	globalProgram, _, err := compileHotPatchPhaseProgram(ctx, chain.GlobalCode, caller, params...)
+	if err != nil {
+		log.Errorf("compile global hotpatch phase program failed: %v", err)
+		return nil, nil, nil, nil, nil, nil
+	}
+	moduleProgram, _, err := compileHotPatchPhaseProgram(ctx, chain.ModuleCode, caller, params...)
+	if err != nil {
+		log.Errorf("compile module hotpatch phase program failed: %v", err)
+		return nil, nil, nil, nil, nil, nil
+	}
+
+	mockStore := &hotPatchPhaseMockStore{}
+	before := func(https bool, originReq []byte, req []byte) []byte {
+		hotCtx := NewHotPatchRequestPhaseContext("webfuzzer", https, extractHotPatchURL(req, https), originReq, req, nil, nil)
+		runPhaseProgram(globalProgram, ctx, HOOK_RequestIngress, hotCtx)
+		runPhaseProgram(moduleProgram, ctx, HOOK_RequestIngress, hotCtx)
+		runPhaseProgram(globalProgram, ctx, HOOK_RequestProcess, hotCtx)
+		runPhaseProgram(moduleProgram, ctx, HOOK_RequestProcess, hotCtx)
+		runPhaseProgram(moduleProgram, ctx, HOOK_RequestEgress, hotCtx)
+		runPhaseProgram(globalProgram, ctx, HOOK_RequestEgress, hotCtx)
+		if hotCtx.Dropped {
+			log.Errorf("Drop action is not supported in webfuzzer request phase runtime")
+		}
+		if len(hotCtx.ClientResponse) > 0 {
+			mockStore.store(hotCtx.Request, hotCtx.ClientResponse)
+		}
+		if len(hotCtx.Request) == 0 {
+			return req
+		}
+		return hotCtx.Request
+	}
+	after := func(https bool, originReq []byte, req []byte, originRsp []byte, rsp []byte) []byte {
+		hotCtx := NewHotPatchRequestPhaseContext("webfuzzer", https, extractHotPatchURL(req, https), originReq, req, originRsp, rsp)
+		runPhaseProgram(globalProgram, ctx, HOOK_ResponseIngress, hotCtx)
+		runPhaseProgram(moduleProgram, ctx, HOOK_ResponseIngress, hotCtx)
+		runPhaseProgram(globalProgram, ctx, HOOK_ResponseProcess, hotCtx)
+		runPhaseProgram(moduleProgram, ctx, HOOK_ResponseProcess, hotCtx)
+		runPhaseProgram(moduleProgram, ctx, HOOK_ResponseEgress, hotCtx)
+		runPhaseProgram(globalProgram, ctx, HOOK_ResponseEgress, hotCtx)
+		if hotCtx.Dropped {
+			log.Errorf("Drop action is not supported in webfuzzer response phase runtime")
+			return rsp
+		}
+		if len(hotCtx.ClientResponse) > 0 {
+			return hotCtx.ClientResponse
+		}
+		if len(hotCtx.Response) == 0 {
+			return rsp
+		}
+		return hotCtx.Response
+	}
+	mock := func(_ bool, _ string, req []byte, mockResponse func(interface{})) {
+		if rsp := mockStore.take(req); len(rsp) > 0 {
+			mockResponse(rsp)
+		}
+	}
+	return before, after, nil, nil, nil, mock
+}
+
+func runPhaseProgram(program *hotPatchPhaseProgram, ctx context.Context, phase string, hotCtx *HotPatchPhaseContext) {
+	if program == nil || hotCtx == nil || hotCtx.Dropped || hotCtx.Stopped {
+		return
+	}
+	program.CallPhase(ctx, phase, hotCtx)
+	if isHotPatchRequestPhase(phase) {
+		hotCtx.RefreshRequestMetadata()
+	}
+}
+
+func isHotPatchRequestPhase(phase string) bool {
+	return phase == HOOK_RequestIngress || phase == HOOK_RequestProcess || phase == HOOK_RequestEgress
 }
 
 func chainBeforeRequest(global, module hookBeforeRequestFunc) hookBeforeRequestFunc {

@@ -196,6 +196,7 @@ type httpPoolConfig struct {
 	RetryHandler         func(https bool, retryCount int, req []byte, rsp []byte, retryFunc func(...[]byte))
 	CustomFailureChecker func(https bool, req []byte, rsp []byte, fail func(string))
 	MockHTTPRequest      func(https bool, url string, req []byte, mockResponse func(rsp interface{}))
+	HookRuntimeFactory   HTTPPoolRequestHookRuntimeFactory
 	MutateHook           func([]byte) [][]byte
 
 	// 请求来源
@@ -357,6 +358,12 @@ func _hoopPool_SetHookCaller(
 		config.RetryHandler = retryHandler
 		config.CustomFailureChecker = customFailureChecker
 		config.MockHTTPRequest = mockHTTPRequest
+	}
+}
+
+func _httpPool_SetHookRuntimeFactory(factory HTTPPoolRequestHookRuntimeFactory) HttpPoolConfigOption {
+	return func(config *httpPoolConfig) {
+		config.HookRuntimeFactory = factory
 	}
 }
 
@@ -1018,11 +1025,9 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 							https = true
 						}
 
-						if config.HookBeforeRequest != nil {
-							newRequest := config.HookBeforeRequest(https, nil, targetRequest)
-							if len(newRequest) > 0 {
-								targetRequest = newRequest
-							}
+						hookHandlers := newHTTPPoolRequestHookHandlers(config, https, targetRequest)
+						if hookHandlers != nil {
+							targetRequest = hookHandlers.BeforeRequest(targetRequest)
 						}
 
 						var urlStr string
@@ -1348,12 +1353,21 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 							}))
 						}
 
-						if config.RetryHandler != nil {
-							lowhttpOptions = append(lowhttpOptions, lowhttp.WithRetryHandler(config.RetryHandler))
+						if hookHandlers != nil {
+							lowhttpOptions = append(lowhttpOptions, lowhttp.WithRetryHandler(func(https bool, retryCount int, req []byte, rsp []byte, retry func(...[]byte)) {
+								hookHandlers.RetryHandler(retryCount, req, rsp, func(next ...[]byte) {
+									if len(next) > 0 && len(next[0]) > 0 {
+										targetRequest = append([]byte(nil), next[0]...)
+									}
+									retry(next...)
+								})
+							}))
 						}
 
-						if config.CustomFailureChecker != nil {
-							lowhttpOptions = append(lowhttpOptions, lowhttp.WithCustomFailureChecker(config.CustomFailureChecker))
+						if hookHandlers != nil {
+							lowhttpOptions = append(lowhttpOptions, lowhttp.WithCustomFailureChecker(func(https bool, req []byte, rsp []byte, fail func(string)) {
+								hookHandlers.CustomFailureChecker(req, rsp, fail)
+							}))
 						}
 
 						if useConnPool && config.ConnPool != nil {
@@ -1406,9 +1420,9 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 							lowhttpOptions = append(lowhttpOptions, lowhttp.WithRandomChunkedHandler(chunkedHandler))
 						}
 
-						if config.HookAfterRequest != nil {
+						if hookHandlers != nil {
 							lowhttpOptions = append(lowhttpOptions, lowhttp.WithSaveHTTPFlowHandler(func(rspIns *lowhttp.LowhttpResponse) {
-								newRspRaw := config.HookAfterRequest(https, nil, targetRequest, nil, rspIns.RawPacket)
+								newRspRaw := hookHandlers.AfterRequest(targetRequest, rspIns.RawPacket)
 								if len(newRspRaw) > 0 {
 									rspIns.BareResponse = newRspRaw
 									if fixed, _, err := lowhttp.FixHTTPResponse(newRspRaw); err == nil {
@@ -1423,8 +1437,8 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 						// 处理 MockHTTPRequest：如果定义了 mock 响应，则使用 mock 而不是真正发送请求
 						var mockRspRaw []byte
 						mockedRsp := utils.NewBool(false)
-						if config.MockHTTPRequest != nil {
-							config.MockHTTPRequest(https, urlStr, targetRequest, func(rsp interface{}) {
+						if hookHandlers != nil {
+							hookHandlers.MockHTTPRequest(urlStr, targetRequest, func(rsp interface{}) {
 								mockRspRaw = utils.InterfaceToBytes(rsp)
 								if fixed, _, fixErr := lowhttp.FixHTTPResponse(mockRspRaw); fixErr == nil {
 									mockRspRaw = fixed
@@ -1563,12 +1577,12 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 							extra[httpPoolExtraInfoSSEStreamID] = sseStreamID
 							extra[httpPoolExtraInfoSSEFinal] = "1"
 						}
-						if config.MirrorHTTPFlow != nil {
+						if hookHandlers != nil {
 							copiedParams := make(map[string]string)
 							for k, v := range existedParams {
 								copiedParams[k] = v
 							}
-							if ret := config.MirrorHTTPFlow(targetRequest, rsp, copiedParams); ret != nil {
+							if ret := hookHandlers.MirrorHTTPFlow(targetRequest, rsp, copiedParams); ret != nil {
 								generalMap := utils.InterfaceToGeneralMap(ret)
 								for k, vRaw := range generalMap {
 									v := utils.InterfaceToString(vRaw)
@@ -1817,6 +1831,7 @@ var (
 	WithPoolOPt_DelayMaxSeconds            = _httpPool_DelayMaxSeconds
 	WithPoolOPt_DelaySeconds               = _httpPool_DelaySeconds
 	WithPoolOpt_HookCodeCaller             = _hoopPool_SetHookCaller
+	WithPoolOpt_HookRuntimeFactory         = _httpPool_SetHookRuntimeFactory
 	WithPoolOpt_MutateHook                 = _httpPool_MutateHook
 	WithPoolOpt_MutateWithMethods          = _httpPool_MutateHookWithYPBStruct
 	WithPoolOpt_Source                     = _httpPool_Source

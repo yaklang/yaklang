@@ -186,6 +186,13 @@ var (
 		// beforeRequest, afterRequest
 		HOOK_BeforeRequest,
 		HOOK_AfterRequest,
+		HOOK_RequestIngress,
+		HOOK_RequestProcess,
+		HOOK_RequestEgress,
+		HOOK_ResponseIngress,
+		HOOK_ResponseProcess,
+		HOOK_ResponseEgress,
+		HOOK_FlowArchive,
 		// httpFlow analyze
 		HOOK_Analyze_HTTPFlow,
 		HOOK_OnAnalyzeHTTPFlowFinish,
@@ -214,6 +221,9 @@ type MixPluginCaller struct {
 	swg                    *utils.SizedWaitGroup
 	cache                  bool
 	pluginScanFilter       *yakit.PluginScanFilter // 插件扫描黑白名单，现在直接使用yakit全局网络配置
+
+	hotPatchMu   sync.RWMutex
+	hotPatchMode HotPatchRuntimeMode
 }
 
 func (m *MixPluginCaller) LastErr() error {
@@ -562,6 +572,13 @@ func (c *MixPluginCaller) loadHotPatch(ctx context.Context, params []*ypb.ExecPa
 	if !silent {
 		c.FeedbackOrdinary("Initializing HotPatched MITM HOOKS")
 	}
+	mode, err := DetectHotPatchRuntimeMode(ctx, code)
+	if err != nil {
+		if !silent {
+			c.FeedbackOrdinary(fmt.Sprintf("Initialized HotPatched MITM HOOKS FAILED: %v", err.Error()))
+		}
+		return err
+	}
 	paramsMap := make(map[string]any)
 	for _, param := range params {
 		paramsMap[param.GetKey()] = param.GetValue()
@@ -570,8 +587,12 @@ func (c *MixPluginCaller) loadHotPatch(ctx context.Context, params []*ypb.ExecPa
 		HookName:     MITMAndPortScanHooks,
 		RemoveHookID: []string{HotPatchScriptName},
 	})
+	c.setHotPatchMode(HotPatchRuntimeModeNone)
+	if strings.TrimSpace(code) == "" {
+		return nil
+	}
 
-	err := c.callers.AddForYakit(ctx, &schema.YakScript{
+	err = c.callers.AddForYakit(ctx, &schema.YakScript{
 		ScriptName: HotPatchScriptName,
 	}, paramsMap, code, YakitCallerIf(c.feedbackHandler), MITMAndPortScanHooks...)
 	if err != nil {
@@ -580,6 +601,7 @@ func (c *MixPluginCaller) loadHotPatch(ctx context.Context, params []*ypb.ExecPa
 		}
 		return err
 	}
+	c.setHotPatchMode(mode)
 	return nil
 }
 
