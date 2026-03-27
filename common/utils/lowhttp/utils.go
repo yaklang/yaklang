@@ -32,12 +32,14 @@ const (
 const pathExtModifierChars = "!@"
 
 // GetPathSuffix 从 path 中提取文件扩展名（含前导点），供过滤、匹配等使用。
-// 会先去掉 query 部分，再用 path.Ext 取扩展名，去掉 pathExtModifierChars 修饰符后，
+// 会先去掉 query 部分，并兼容 "/main.js/" 这类尾部多一个 "/" 的文件样式路径；
+// 再用 path.Ext 取扩展名，去掉 pathExtModifierChars 修饰符后，
 // 保证返回形如 ".png"、".js" 的字符串（无扩展名或无效时返回 ""）。
 func GetPathSuffix(pathStr string) string {
 	if idx := strings.IndexByte(pathStr, '?'); idx != -1 {
 		pathStr = pathStr[:idx]
 	}
+	pathStr = strings.TrimRight(pathStr, "/")
 	ret := path.Ext(pathStr)
 	if ret == "" {
 		return ""

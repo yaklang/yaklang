@@ -138,6 +138,26 @@ Location: /target`), false)
 	}
 }
 
+func TestGetPathSuffix(t *testing.T) {
+	testcases := []struct {
+		path string
+		want string
+	}{
+		{path: "/static/app.js", want: ".js"},
+		{path: "/static/app.js?version=1", want: ".js"},
+		{path: "/static/app.js/", want: ".js"},
+		{path: "/static/app.js/?version=1", want: ".js"},
+		{path: "/item/assets/428.png!cc_216x216", want: ".png"},
+		{path: "/item/assets/428.png!cc_216x216/", want: ".png"},
+		{path: "/api/health", want: ""},
+		{path: "/", want: ""},
+	}
+
+	for _, tc := range testcases {
+		assert.Equal(t, tc.want, GetPathSuffix(tc.path), tc.path)
+	}
+}
+
 func TestRemoveZeroContentLengthHTTPHeader(t *testing.T) {
 	target := RemoveZeroContentLengthHTTPHeader([]byte(`GET / HTTP/1.1
 Host: www.baidu.com
