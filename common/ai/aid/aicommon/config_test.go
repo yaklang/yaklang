@@ -88,3 +88,14 @@ func TestGetLastIDFromConfigOptions_NoID(t *testing.T) {
 	require.False(t, ok)
 	require.Empty(t, id)
 }
+
+func TestConfig_DefaultToolComposeConcurrency(t *testing.T) {
+	config := NewConfig(context.Background())
+	require.Equal(t, 2, config.ToolComposeConcurrency)
+}
+
+func TestConfig_ToolComposeConcurrencyPropagation(t *testing.T) {
+	parent := NewConfig(context.Background(), WithToolComposeConcurrency(5))
+	child := NewConfig(context.Background(), ConvertConfigToOptions(parent)...)
+	require.Equal(t, 5, child.ToolComposeConcurrency)
+}

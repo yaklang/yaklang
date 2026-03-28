@@ -7,6 +7,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -309,6 +310,147 @@ func TestMUSTPASS_ToolCallDAG_ParallelChains(t *testing.T) {
 
 	// All 4 nodes should be executed
 	assert.Len(t, executedNodes, 4)
+}
+
+func TestMUSTPASS_ToolCallDAG_ExecuteWithHandlerConcurrent_RunsIndependentNodesInParallel(t *testing.T) {
+	input := `[
+		{"call_id": "a", "tool_name": "first"},
+		{"call_id": "b", "tool_name": "second"}
+	]`
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	dag, err := BuildToolCallDAG(ctx, input)
+	require.NoError(t, err)
+
+	started := make(chan string, 2)
+	release := make(chan struct{})
+	var maxRunning int32
+	var running int32
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- dag.ExecuteWithHandlerConcurrent(2, func(ctx context.Context, node *ToolCallNode) error {
+			current := atomic.AddInt32(&running, 1)
+			defer atomic.AddInt32(&running, -1)
+
+			for {
+				observed := atomic.LoadInt32(&maxRunning)
+				if current <= observed || atomic.CompareAndSwapInt32(&maxRunning, observed, current) {
+					break
+				}
+			}
+
+			started <- node.CallID
+			<-release
+			return nil
+		})
+	}()
+
+	select {
+	case <-started:
+	case <-ctx.Done():
+		t.Fatal("first node did not start in time")
+	}
+
+	select {
+	case <-started:
+	case <-ctx.Done():
+		t.Fatal("second node did not start in time")
+	}
+
+	close(release)
+	require.NoError(t, <-errCh)
+	assert.Equal(t, int32(2), atomic.LoadInt32(&maxRunning))
+
+	nodeA, _ := dag.GetNodeByCallID("a")
+	nodeB, _ := dag.GetNodeByCallID("b")
+	assert.Equal(t, NodeStatusCompleted, nodeA.GetStatus())
+	assert.Equal(t, NodeStatusCompleted, nodeB.GetStatus())
+}
+
+func TestMUSTPASS_ToolCallDAG_ExecuteWithHandlerConcurrent_RespectsDependencies(t *testing.T) {
+	input := `[
+		{"call_id": "a", "tool_name": "first"},
+		{"call_id": "b", "tool_name": "second", "depends_on": ["a"]}
+	]`
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	dag, err := BuildToolCallDAG(ctx, input)
+	require.NoError(t, err)
+
+	releaseA := make(chan struct{})
+	bStarted := make(chan struct{}, 1)
+	errCh := make(chan error, 1)
+
+	go func() {
+		<-time.After(200 * time.Millisecond)
+		close(releaseA)
+	}()
+
+	go func() {
+		errCh <- dag.ExecuteWithHandlerConcurrent(2, func(ctx context.Context, node *ToolCallNode) error {
+			switch node.CallID {
+			case "a":
+				<-releaseA
+			case "b":
+				bStarted <- struct{}{}
+			}
+			return nil
+		})
+	}()
+
+	select {
+	case <-bStarted:
+		t.Fatal("dependent node started before dependency finished")
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	select {
+	case <-bStarted:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("dependent node did not execute")
+	}
+	require.NoError(t, <-errCh)
+}
+
+func TestMUSTPASS_ToolCallDAG_ExecuteWithHandlerConcurrent_AllowFailedDependency(t *testing.T) {
+	input := `[
+		{"call_id": "a", "tool_name": "first"},
+		{"call_id": "b", "tool_name": "second", "depends_on": ["a"], "allow_failed": true},
+		{"call_id": "c", "tool_name": "third", "depends_on": ["a"]}
+	]`
+
+	ctx := context.Background()
+	dag, err := BuildToolCallDAG(ctx, input)
+	require.NoError(t, err)
+
+	var executed []string
+	var mu sync.Mutex
+
+	err = dag.ExecuteWithHandlerConcurrent(2, func(ctx context.Context, node *ToolCallNode) error {
+		mu.Lock()
+		executed = append(executed, node.CallID)
+		mu.Unlock()
+		if node.CallID == "a" {
+			return fmt.Errorf("boom")
+		}
+		return nil
+	})
+	assert.Error(t, err)
+	assert.Contains(t, executed, "a")
+	assert.Contains(t, executed, "b")
+	assert.NotContains(t, executed, "c")
+
+	nodeA, _ := dag.GetNodeByCallID("a")
+	nodeB, _ := dag.GetNodeByCallID("b")
+	nodeC, _ := dag.GetNodeByCallID("c")
+	assert.Equal(t, NodeStatusFailed, nodeA.GetStatus())
+	assert.Equal(t, NodeStatusCompleted, nodeB.GetStatus())
+	assert.Equal(t, NodeStatusSkipped, nodeC.GetStatus())
 }
 
 func TestMUSTPASS_ToolCallDAG_DiamondDependency(t *testing.T) {

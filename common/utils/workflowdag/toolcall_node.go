@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/yaklang/yaklang/common/log"
 )
@@ -302,6 +303,230 @@ func (dag *ToolCallDAG) ExecuteWithHandler(handler func(ctx context.Context, nod
 	return nil
 }
 
+type toolCallExecutionResult struct {
+	nodeID string
+	err    error
+}
+
+// ExecuteWithHandlerConcurrent executes ready nodes concurrently while preserving DAG dependencies.
+// A node becomes runnable only after all of its dependencies reach a terminal state.
+// If the node does not allow failed dependencies and any dependency failed/skipped, it is marked skipped.
+func (dag *ToolCallDAG) ExecuteWithHandlerConcurrent(concurrency int, handler func(ctx context.Context, node *ToolCallNode) error) error {
+	if concurrency <= 0 {
+		concurrency = 1
+	}
+
+	nodes := dag.GetAllNodes()
+	if len(nodes) == 0 {
+		return nil
+	}
+
+	ctx := dag.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	type schedulerState struct {
+		remainingDeps map[string]int
+		queued        map[string]bool
+		terminal      map[string]bool
+	}
+
+	state := &schedulerState{
+		remainingDeps: make(map[string]int, len(nodes)),
+		queued:        make(map[string]bool, len(nodes)),
+		terminal:      make(map[string]bool, len(nodes)),
+	}
+
+	nodeMap := make(map[string]*ToolCallNode, len(nodes))
+	ready := make(chan *ToolCallNode, len(nodes))
+	results := make(chan toolCallExecutionResult, len(nodes))
+
+	for _, node := range nodes {
+		nodeMap[node.CallID] = node
+	}
+
+	for _, node := range nodes {
+		deps := 0
+		for _, depID := range node.DependsOn() {
+			if _, ok := nodeMap[depID]; ok {
+				deps++
+			}
+		}
+		state.remainingDeps[node.CallID] = deps
+	}
+
+	var workers sync.WaitGroup
+	for i := 0; i < concurrency; i++ {
+		workers.Add(1)
+		go func() {
+			defer workers.Done()
+			for node := range ready {
+				if node == nil {
+					continue
+				}
+				node.SetStatus(NodeStatusProcessing)
+				err := handler(ctx, node)
+				if err != nil {
+					node.Error = err
+					node.SetStatus(NodeStatusFailed)
+				} else {
+					node.SetStatus(NodeStatusCompleted)
+				}
+				results <- toolCallExecutionResult{nodeID: node.CallID, err: err}
+			}
+		}()
+	}
+
+	markQueued := func(node *ToolCallNode) {
+		if node == nil {
+			return
+		}
+		if state.queued[node.CallID] || state.terminal[node.CallID] {
+			return
+		}
+		state.queued[node.CallID] = true
+		ready <- node
+	}
+
+	markSkipped := func(startID string) {
+		queue := []string{startID}
+		for len(queue) > 0 {
+			nodeID := queue[0]
+			queue = queue[1:]
+
+			if state.terminal[nodeID] {
+				continue
+			}
+			node := nodeMap[nodeID]
+			if node == nil {
+				continue
+			}
+			state.terminal[nodeID] = true
+			node.SetStatus(NodeStatusSkipped)
+
+			for _, dependentID := range dag.GetDependents(nodeID) {
+				dependent := nodeMap[dependentID]
+				if dependent == nil || state.terminal[dependentID] || state.queued[dependentID] {
+					continue
+				}
+				state.remainingDeps[dependentID]--
+				if state.remainingDeps[dependentID] > 0 {
+					continue
+				}
+				if dependent.AllowFailed() {
+					markQueued(dependent)
+					continue
+				}
+				queue = append(queue, dependentID)
+			}
+		}
+	}
+
+	seeded := 0
+	for _, node := range nodes {
+		if state.remainingDeps[node.CallID] == 0 {
+			markQueued(node)
+			seeded++
+		}
+	}
+
+	// Break cycle-only components the same way the sequential executor does: pick one entry per component.
+	if seeded == 0 {
+		entries, err := dag.GetEntries()
+		if err != nil {
+			close(ready)
+			workers.Wait()
+			close(results)
+			return err
+		}
+		for _, entry := range entries {
+			markQueued(entry)
+		}
+	}
+
+	inFlight := 0
+	for _, queued := range state.queued {
+		if queued {
+			inFlight++
+		}
+	}
+	completed := len(state.terminal)
+	var finalErr error
+
+	for completed < len(nodes) {
+		if inFlight == 0 {
+			break
+		}
+
+		result := <-results
+		inFlight--
+		state.terminal[result.nodeID] = true
+		completed = len(state.terminal)
+
+		node := nodeMap[result.nodeID]
+		if node == nil {
+			continue
+		}
+
+		if result.err != nil && !node.AllowFailed() && finalErr == nil {
+			finalErr = result.err
+		}
+
+		for _, dependentID := range dag.GetDependents(result.nodeID) {
+			dependent := nodeMap[dependentID]
+			if dependent == nil || state.terminal[dependentID] || state.queued[dependentID] {
+				continue
+			}
+
+			state.remainingDeps[dependentID]--
+			if state.remainingDeps[dependentID] > 0 {
+				continue
+			}
+
+			dependencyFailed := false
+			for _, depID := range dependent.DependsOn() {
+				depNode := nodeMap[depID]
+				if depNode == nil {
+					continue
+				}
+				if depNode.IsFailed() || depNode.IsSkipped() {
+					dependencyFailed = true
+					break
+				}
+			}
+
+			if dependencyFailed && !dependent.AllowFailed() {
+				markSkipped(dependentID)
+				completed = len(state.terminal)
+				continue
+			}
+
+			markQueued(dependent)
+			inFlight++
+		}
+
+		// If the remaining pending nodes are only cycles, release one component entry at a time.
+		if inFlight == 0 && completed < len(nodes) {
+			for _, entry := range dag.entries {
+				if entry == nil || state.terminal[entry.CallID] || state.queued[entry.CallID] {
+					continue
+				}
+				markQueued(entry)
+				inFlight++
+			}
+		}
+	}
+
+	close(ready)
+	workers.Wait()
+	close(results)
+
+	return finalErr
+}
+
 // GetDOT generates a DOT graph representation
 // Node names are formatted as: call_id(tool_name)
 func (dag *ToolCallDAG) GetDOT() string {
@@ -358,15 +583,15 @@ func escapeQuotes(s string) string {
 
 // GraphNode represents a node in the graph JSON output
 type GraphNode struct {
-	ID         string     `json:"id"`
-	Name       string     `json:"name"`
-	ToolName   string     `json:"tool_name"`
-	CallIntent string     `json:"call_intent"`
-	Status     string     `json:"status"`
-	Stage      int        `json:"stage"`
-	Category   int        `json:"category"` // for echarts node coloring
-	DependsOn  []string   `json:"depends_on"`
-	Error      string     `json:"error,omitempty"`
+	ID         string   `json:"id"`
+	Name       string   `json:"name"`
+	ToolName   string   `json:"tool_name"`
+	CallIntent string   `json:"call_intent"`
+	Status     string   `json:"status"`
+	Stage      int      `json:"stage"`
+	Category   int      `json:"category"` // for echarts node coloring
+	DependsOn  []string `json:"depends_on"`
+	Error      string   `json:"error,omitempty"`
 }
 
 // GraphEdge represents an edge in the graph JSON output
@@ -377,8 +602,8 @@ type GraphEdge struct {
 
 // GraphJSON represents the complete graph in JSON format for echarts
 type GraphJSON struct {
-	Nodes      []GraphNode   `json:"nodes"`
-	Edges      []GraphEdge   `json:"edges"`
+	Nodes      []GraphNode     `json:"nodes"`
+	Edges      []GraphEdge     `json:"edges"`
 	Categories []GraphCategory `json:"categories"`
 }
 
@@ -390,7 +615,7 @@ type GraphCategory struct {
 // GetGraphJSON returns a JSON representation suitable for echarts visualization
 func (dag *ToolCallDAG) GetGraphJSON() *GraphJSON {
 	nodes := dag.GetAllNodes()
-	
+
 	graph := &GraphJSON{
 		Nodes: make([]GraphNode, 0, len(nodes)),
 		Edges: make([]GraphEdge, 0),
@@ -405,7 +630,7 @@ func (dag *ToolCallDAG) GetGraphJSON() *GraphJSON {
 
 	for _, node := range nodes {
 		stage, _ := dag.GetStage(node.CallID)
-		
+
 		graphNode := GraphNode{
 			ID:         node.CallID,
 			Name:       node.DisplayName(),
