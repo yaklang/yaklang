@@ -285,6 +285,7 @@ type Config struct {
 	// Set DisableIntervalReview to true to disable this feature
 	DisableIntervalReview  bool          // Disable interval review during tool execution (default: false, meaning enabled)
 	IntervalReviewDuration time.Duration // Duration between reviews (default 20s)
+	ToolComposeConcurrency int           // Max concurrent tool calls in tool_compose DAG (default 2)
 
 	// iteration limit
 	MaxIterationCount int64
@@ -469,6 +470,7 @@ func newConfig(ctx context.Context) *Config {
 		PerTaskUserInteractiveLimitedTimes: 3, // Default to 3 times
 		EnablePlanAndExec:                  true,
 		AllowRequireForUserInteract:        true,
+		ToolComposeConcurrency:             2,
 		Workdir:                            "",
 		MemoryPoolSize:                     10 * 1024,
 		MemoryPool:                         omap.NewOrderedMap(make(map[string]*MemoryEntity)),
@@ -1565,6 +1567,21 @@ func WithToolCallerIntervalReviewDuration(duration time.Duration) ConfigOption {
 	}
 }
 
+func WithToolComposeConcurrency(n int) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		if n <= 0 {
+			n = 2
+		}
+		c.m.Lock()
+		c.ToolComposeConcurrency = n
+		c.m.Unlock()
+		return nil
+	}
+}
+
 func WithHijackPERequest(fn func(ctx context.Context, planPayload string) error) ConfigOption {
 	return func(c *Config) error {
 		if c.m == nil {
@@ -2468,6 +2485,13 @@ func (c *Config) GetAITransactionAutoRetryCount() int64 {
 	return c.AiTransactionAutoRetry
 }
 
+func (c *Config) GetToolComposeConcurrency() int {
+	if c.ToolComposeConcurrency <= 0 {
+		return 2
+	}
+	return c.ToolComposeConcurrency
+}
+
 func (c *Config) GetTimelineContentSizeLimit() int64 {
 	return int64(c.TimelineContentSizeLimit)
 }
@@ -2779,6 +2803,9 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	}
 	if i.MaxIterationCount > 0 {
 		opts = append(opts, WithMaxIterationCount(i.MaxIterationCount))
+	}
+	if i.ToolComposeConcurrency > 0 {
+		opts = append(opts, WithToolComposeConcurrency(i.ToolComposeConcurrency))
 	}
 	if i.MaxTaskContinue > 0 {
 		opts = append(opts, WithMaxTaskContinue(i.MaxTaskContinue))

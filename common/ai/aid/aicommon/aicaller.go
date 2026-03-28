@@ -31,6 +31,7 @@ type AICallerConfigIf interface {
 	GetContext() context.Context
 	CallAIResponseConsumptionCallback(int)
 	GetAITransactionAutoRetryCount() int64
+	GetToolComposeConcurrency() int
 	GetTimelineContentSizeLimit() int64
 	GetUserInteractiveLimitedTimes() int64
 	GetMaxIterationCount() int64

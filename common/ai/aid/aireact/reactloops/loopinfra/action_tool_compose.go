@@ -205,17 +205,15 @@ Example - Sequential file operations(With AI-Tag tags):
 		log.Infof("Tool compose DAG built successfully with %d nodes", len(dag.GetAllNodes()))
 		invoker.AddToTimeline("[TOOL_COMPOSE_START]", fmt.Sprintf("Executing tool compose DAG with %d nodes", len(dag.GetAllNodes())))
 
-		// Create a semaphore for concurrency control (set to 1 for sequential execution)
-		sem := make(chan struct{}, 1)
+		toolComposeConcurrency := 2
+		if cfg := invoker.GetConfig(); cfg != nil {
+			toolComposeConcurrency = cfg.GetToolComposeConcurrency()
+		}
 		var executionErrors []string
 		var errorsMu sync.Mutex
 
 		// Execute the DAG with concurrency control
-		err = dag.ExecuteWithHandler(func(ctx context.Context, node *workflowdag.ToolCallNode) error {
-			// Acquire semaphore (concurrency = 1 means sequential execution)
-			sem <- struct{}{}
-			defer func() { <-sem }()
-
+		err = dag.ExecuteWithHandlerConcurrent(toolComposeConcurrency, func(ctx context.Context, node *workflowdag.ToolCallNode) error {
 			// Check context cancellation
 			select {
 			case <-ctx.Done():
