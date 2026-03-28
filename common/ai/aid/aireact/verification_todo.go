@@ -17,8 +17,17 @@ const (
 	verificationTodoStatusPending verificationTodoStatus = "PENDING"
 	verificationTodoStatusDoing   verificationTodoStatus = "DOING"
 	verificationTodoStatusDone    verificationTodoStatus = "DONE"
+	verificationTodoStatusDeleted verificationTodoStatus = "DELETED"
 	verificationTodoStatusSkipped verificationTodoStatus = "SKIPPED"
 )
+
+type verificationTodoStats struct {
+	Pending int
+	Doing   int
+	Done    int
+	Deleted int
+	Skipped int
+}
 
 type verificationTodoItem struct {
 	ID        string
@@ -71,7 +80,7 @@ func (r *ReAct) RenderVerificationOutputFilesMarkdown(outputFiles []string) stri
 }
 
 func renderVerificationTodoSnapshot(history []*aicommon.VerifySatisfactionResult) string {
-	items := buildVerificationTodoItems(history)
+	items, _ := buildVerificationTodoItemsAndStats(history)
 	if len(items) == 0 {
 		return "- no tracked TODO items"
 	}
@@ -126,7 +135,7 @@ func renderVerificationTodoSnapshot(history []*aicommon.VerifySatisfactionResult
 }
 
 func renderVerificationTodoMarkdownSnapshot(history []*aicommon.VerifySatisfactionResult, current *aicommon.VerifySatisfactionResult) string {
-	previousItems := buildVerificationTodoItems(history)
+	previousItems, _ := buildVerificationTodoItemsAndStats(history)
 	previousIDs := make(map[string]struct{}, len(previousItems))
 	for _, item := range previousItems {
 		previousIDs[item.ID] = struct{}{}
@@ -135,7 +144,7 @@ func renderVerificationTodoMarkdownSnapshot(history []*aicommon.VerifySatisfacti
 	if current != nil {
 		history = append(append([]*aicommon.VerifySatisfactionResult(nil), history...), current)
 	}
-	items := buildVerificationTodoItems(history)
+	items, _ := buildVerificationTodoItemsAndStats(history)
 	if len(items) == 0 {
 		return ""
 	}
@@ -164,6 +173,7 @@ func renderVerificationTodoMarkdownSnapshot(history []*aicommon.VerifySatisfacti
 	newPending := make([]string, 0)
 	oldDone := make([]string, 0)
 	currentDone := make([]string, 0)
+	deleted := make([]string, 0)
 	skipped := make([]string, 0)
 
 	for _, item := range items {
@@ -182,6 +192,8 @@ func renderVerificationTodoMarkdownSnapshot(history []*aicommon.VerifySatisfacti
 			} else {
 				oldDone = append(oldDone, formatVerificationTodoMarkdownLine(item, ""))
 			}
+		case verificationTodoStatusDeleted:
+			deleted = append(deleted, formatVerificationTodoMarkdownLine(item, "deleted"))
 		case verificationTodoStatusSkipped:
 			skipped = append(skipped, formatVerificationTodoMarkdownLine(item, "skipped"))
 		}
@@ -192,6 +204,7 @@ func renderVerificationTodoMarkdownSnapshot(history []*aicommon.VerifySatisfacti
 	lines = append(lines, newPending...)
 	lines = append(lines, oldDone...)
 	lines = append(lines, currentDone...)
+	lines = append(lines, deleted...)
 	lines = append(lines, skipped...)
 
 	note := "- [x] (truncated) TODO snapshot exceeded 10KB; older items were omitted to keep the view stable."
@@ -218,6 +231,11 @@ func renderVerificationTodoMarkdownSnapshot(history []*aicommon.VerifySatisfacti
 }
 
 func buildVerificationTodoItems(history []*aicommon.VerifySatisfactionResult) []verificationTodoItem {
+	items, _ := buildVerificationTodoItemsAndStats(history)
+	return items
+}
+
+func buildVerificationTodoItemsAndStats(history []*aicommon.VerifySatisfactionResult) ([]verificationTodoItem, verificationTodoStats) {
 	itemsByID := make(map[string]*verificationTodoItem)
 	order := make([]string, 0)
 	for recordIndex, record := range history {
@@ -229,7 +247,7 @@ func buildVerificationTodoItems(history []*aicommon.VerifySatisfactionResult) []
 			if id == "" {
 				continue
 			}
-			switch movement.Op {
+			switch strings.ToLower(strings.TrimSpace(movement.Op)) {
 			case "add":
 				content := strings.TrimSpace(movement.Content)
 				if content == "" {
@@ -261,6 +279,16 @@ func buildVerificationTodoItems(history []*aicommon.VerifySatisfactionResult) []
 				}
 				item.Status = verificationTodoStatusDone
 				item.UpdatedAt = recordIndex
+			case "delete":
+				item, exists := itemsByID[id]
+				if !exists {
+					continue
+				}
+				if content := strings.TrimSpace(movement.Content); content != "" {
+					item.Content = content
+				}
+				item.Status = verificationTodoStatusDeleted
+				item.UpdatedAt = recordIndex
 			}
 		}
 		if record.Satisfied {
@@ -283,7 +311,26 @@ func buildVerificationTodoItems(history []*aicommon.VerifySatisfactionResult) []
 		}
 		items = append(items, *item)
 	}
-	return items
+	return items, calculateVerificationTodoStats(items)
+}
+
+func calculateVerificationTodoStats(items []verificationTodoItem) verificationTodoStats {
+	stats := verificationTodoStats{}
+	for _, item := range items {
+		switch item.Status {
+		case verificationTodoStatusPending:
+			stats.Pending++
+		case verificationTodoStatusDoing:
+			stats.Doing++
+		case verificationTodoStatusDone:
+			stats.Done++
+		case verificationTodoStatusDeleted:
+			stats.Deleted++
+		case verificationTodoStatusSkipped:
+			stats.Skipped++
+		}
+	}
+	return stats
 }
 
 func formatVerificationTodoLine(item verificationTodoItem) string {
@@ -293,6 +340,8 @@ func formatVerificationTodoLine(item verificationTodoItem) string {
 		statusLabel = "[DOING]"
 	case verificationTodoStatusDone:
 		statusLabel = "[x]"
+	case verificationTodoStatusDeleted:
+		statusLabel = "[DELETED]"
 	case verificationTodoStatusSkipped:
 		statusLabel = "[SKIPPED]"
 	}
@@ -306,10 +355,16 @@ func formatVerificationTodoLine(item verificationTodoItem) string {
 func formatVerificationTodoMarkdownLine(item verificationTodoItem, marker string) string {
 	statusLabel := "[ ]"
 	switch item.Status {
-	case verificationTodoStatusDone, verificationTodoStatusSkipped:
+	case verificationTodoStatusDone, verificationTodoStatusDeleted, verificationTodoStatusSkipped:
 		statusLabel = "[x]"
 	}
 	content := sanitizeVerificationTodoMarkdownContent(item.Content)
+	if item.Status == verificationTodoStatusDone || item.Status == verificationTodoStatusDeleted {
+		content = "~~" + content + "~~"
+	}
+	if marker == "" && item.Status == verificationTodoStatusDeleted {
+		marker = "deleted"
+	}
 	if marker == "" {
 		return fmt.Sprintf("- %s %s", statusLabel, content)
 	}

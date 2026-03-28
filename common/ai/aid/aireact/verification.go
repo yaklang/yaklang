@@ -347,6 +347,14 @@ func formatNextMovementDisplayLine(movement aicommon.VerifyNextMovement) string 
 			return ""
 		}
 		return fmt.Sprintf("- [x]: [id: %s]", id)
+	case "delete":
+		if id == "" {
+			return ""
+		}
+		if content == "" {
+			return fmt.Sprintf("- [DELETED]: [id: %s]", id)
+		}
+		return fmt.Sprintf("- [DELETED]: [id: %s]: %s", id, content)
 	default:
 		label := strings.ToUpper(strings.TrimSpace(movement.Op))
 		if label == "" {
