@@ -186,6 +186,13 @@ func emitReviewStructured(config *Config, nodeID string, payload map[string]any)
 	_, _ = config.GetEmitter().EmitJSON(schema.EVENT_TYPE_STRUCTURED, nodeID, payload)
 }
 
+func waitForReviewStreams(config *Config) {
+	if config == nil || config.GetEmitter() == nil {
+		return
+	}
+	config.GetEmitter().WaitForStream()
+}
+
 func normalizeReviewFieldText(raw string) string {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -279,6 +286,7 @@ func DefaultAIPlanReviewControl(ctx context.Context, config *Config, ep *Endpoin
 		"reason":     compactReason,
 	}
 	emitReviewStatus(config, "plan-review", planReviewDisplayMessage(suggestion, compactReason), ep.GetId())
+	waitForReviewStreams(config)
 	emitReviewStructured(config, "plan-review-decision", payload)
 	emitReviewStructured(config, "plan-review", payload)
 
@@ -361,6 +369,7 @@ func DefaultAITaskReviewControl(ctx context.Context, config *Config, ep *Endpoin
 			}
 			payload["task_deltas"] = rawDeltas
 		}
+		waitForReviewStreams(config)
 		emitReviewStructured(config, "task-review-decision", payload)
 		_, _ = config.GetEmitter().EmitJSON(schema.EVENT_TYPE_STRUCTURED, "task-review", payload)
 	}
