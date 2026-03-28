@@ -350,9 +350,37 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "任务规划反思",
 		En: "Plan Review",
 	},
+	"plan-review-status": {
+		Zh: "计划审查状态",
+		En: "Plan Review Status",
+	},
+	"plan-review-reason": {
+		Zh: "计划审查依据",
+		En: "Plan Review Reason",
+	},
+	"plan-review-decision": {
+		Zh: "计划审查结论",
+		En: "Plan Review Decision",
+	},
 	"task-review": {
 		Zh: "任务反思",
 		En: "Task Review",
+	},
+	"task-review-status": {
+		Zh: "任务审查状态",
+		En: "Task Review Status",
+	},
+	"task-review-reason": {
+		Zh: "任务审查依据",
+		En: "Task Review Reason",
+	},
+	"task-review-adjustment": {
+		Zh: "后续任务调整",
+		En: "Pending Task Adjustment",
+	},
+	"task-review-decision": {
+		Zh: "任务审查结论",
+		En: "Task Review Decision",
 	},
 	"main-plan-goal": {
 		Zh: "主任务目标",

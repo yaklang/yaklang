@@ -165,6 +165,76 @@ var validTaskSuggestions = map[string]bool{
 	"adjust_plan":  true,
 }
 
+type reviewFieldStreamSpec struct {
+	FieldKey  string
+	NodeID    string
+	Formatter func(string) string
+}
+
+func emitReviewStatus(config *Config, nodeID, message, taskIndex string) {
+	message = strings.TrimSpace(message)
+	if message == "" || config == nil || config.GetEmitter() == nil {
+		return
+	}
+	_, _ = config.GetEmitter().EmitDefaultStreamEvent(nodeID, strings.NewReader(message), taskIndex)
+}
+
+func emitReviewStructured(config *Config, nodeID string, payload map[string]any) {
+	if config == nil || config.GetEmitter() == nil || len(payload) == 0 {
+		return
+	}
+	_, _ = config.GetEmitter().EmitJSON(schema.EVENT_TYPE_STRUCTURED, nodeID, payload)
+}
+
+func normalizeReviewFieldText(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+
+	var decoded string
+	if err := json.Unmarshal([]byte(raw), &decoded); err == nil {
+		return strings.TrimSpace(decoded)
+	}
+	return raw
+}
+
+func emitReviewFieldStream(config *Config, nodeID, taskIndex string, reader io.Reader, formatter func(string) string) {
+	if config == nil || config.GetEmitter() == nil || reader == nil {
+		return
+	}
+	raw, err := io.ReadAll(utils.UTF8Reader(reader))
+	if err != nil {
+		return
+	}
+	content := normalizeReviewFieldText(string(raw))
+	if formatter != nil {
+		content = formatter(content)
+	}
+	content = strings.TrimSpace(content)
+	if content == "" {
+		return
+	}
+	_, _ = config.GetEmitter().EmitDefaultStreamEvent(nodeID, strings.NewReader(content), taskIndex)
+}
+
+func reviewFieldStreamOptions(config *Config, taskIndex string, specs ...reviewFieldStreamSpec) []ActionMakerOption {
+	if len(specs) == 0 {
+		return nil
+	}
+	result := make([]ActionMakerOption, 0, len(specs))
+	for _, spec := range specs {
+		spec := spec
+		if spec.FieldKey == "" || spec.NodeID == "" {
+			continue
+		}
+		result = append(result, WithActionFieldStreamHandler([]string{spec.FieldKey}, func(_ string, reader io.Reader) {
+			emitReviewFieldStream(config, spec.NodeID, taskIndex, reader, spec.Formatter)
+		}))
+	}
+	return result
+}
+
 // DefaultAIPlanReviewControl calls AI to review the generated plan and decide
 // whether to continue, mark it unclear, mark it incomplete, or request subtask creation.
 func DefaultAIPlanReviewControl(ctx context.Context, config *Config, ep *Endpoint) (aitool.InvokeParams, error) {
@@ -178,21 +248,14 @@ func DefaultAIPlanReviewControl(ctx context.Context, config *Config, ep *Endpoin
 	var suggestion string
 	var reason string
 
+	emitReviewStatus(config, "plan-review-status", "正在审查计划", ep.GetId())
+
 	err = CallAITransaction(config, prompt, config.CallQualityPriorityAI, func(rsp *AIResponse) error {
 		stream := rsp.GetOutputStreamReader("plan-review", true, config.GetEmitter())
-		action, err := ExtractActionFromStream(
-			ctx,
-			stream, "plan_review",
+		actionOpts := []ActionMakerOption{
 			WithActionAlias("object"),
-			WithActionFieldStreamHandler([]string{"reason"}, func(key string, reader io.Reader) {
-				reader = utils.JSONStringReader(utils.UTF8Reader(reader))
-				config.GetEmitter().EmitDefaultStreamEvent(
-					"plan-review",
-					reader,
-					rsp.GetTaskIndex(),
-				)
-			}),
-		)
+		}
+		action, err := ExtractActionFromStream(ctx, stream, "plan_review", actionOpts...)
 		if err != nil {
 			return fmt.Errorf("extract plan_review action failed: %w", err)
 		}
@@ -209,8 +272,18 @@ func DefaultAIPlanReviewControl(ctx context.Context, config *Config, ep *Endpoin
 		suggestion = "continue"
 	}
 
+	compactReason := compactPlanReviewReason(suggestion, reason)
+	payload := map[string]any{
+		"verdict":    planReviewVerdict(suggestion),
+		"suggestion": suggestion,
+		"reason":     compactReason,
+	}
+	emitReviewStatus(config, "plan-review", planReviewDisplayMessage(suggestion, compactReason), ep.GetId())
+	emitReviewStructured(config, "plan-review-decision", payload)
+	emitReviewStructured(config, "plan-review", payload)
+
 	log.Infof("dynamic planning: plan review AI decision: %s (reason: %s)", suggestion, reason)
-	return aitool.InvokeParams{"suggestion": suggestion, "reason": reason}, nil
+	return aitool.InvokeParams{"suggestion": suggestion, "reason": compactReason}, nil
 }
 
 // DefaultAITaskReviewControl calls AI to review the completed task and decide
@@ -226,20 +299,26 @@ func DefaultAITaskReviewControl(ctx context.Context, config *Config, ep *Endpoin
 
 	var suggestion string
 	var reason string
+	var taskDeltaSummary string
 	var taskDeltasArray []aitool.InvokeParams
+
+	emitReviewStatus(config, "task-review-status", "正在审查任务", ep.GetId())
 
 	err = CallAITransaction(config, prompt, config.CallQualityPriorityAI, func(rsp *AIResponse) error {
 		stream := rsp.GetOutputStreamReader("task-review", true, config.GetEmitter())
-		action, err := ExtractActionFromStream(
-			ctx,
-			stream, "task_review",
+		actionOpts := []ActionMakerOption{
 			WithActionAlias("object"),
-		)
+		}
+		actionOpts = append(actionOpts, reviewFieldStreamOptions(config, rsp.GetTaskIndex(),
+			reviewFieldStreamSpec{FieldKey: "task_delta_summary", NodeID: "task-review-adjustment"},
+		)...)
+		action, err := ExtractActionFromStream(ctx, stream, "task_review", actionOpts...)
 		if err != nil {
 			return fmt.Errorf("extract task_review action failed: %w", err)
 		}
 		suggestion = action.GetString("suggestion")
 		reason = action.GetString("reason")
+		taskDeltaSummary = action.GetString("task_delta_summary")
 		taskDeltasArray = action.GetInvokeParamsArray("task_deltas")
 		return nil
 	})
@@ -253,16 +332,27 @@ func DefaultAITaskReviewControl(ctx context.Context, config *Config, ep *Endpoin
 	}
 
 	compactReason := compactTaskReviewReason(suggestion, reason)
+	compactDeltaSummary := compactTaskDeltaSummary(taskDeltaSummary, taskDeltasArray)
 	if config.GetEmitter() != nil {
 		_, _ = config.GetEmitter().EmitDefaultStreamEvent(
 			"task-review",
-			strings.NewReader(compactReason),
+			strings.NewReader(taskReviewDisplayMessage(suggestion, compactReason, compactDeltaSummary)),
 			ep.GetId(),
 		)
+		if compactDeltaSummary != "" && strings.TrimSpace(normalizeReviewFieldText(taskDeltaSummary)) == "" {
+			_, _ = config.GetEmitter().EmitDefaultStreamEvent(
+				"task-review-adjustment",
+				strings.NewReader(compactDeltaSummary),
+				ep.GetId(),
+			)
+		}
 		payload := map[string]any{
 			"verdict":    taskReviewVerdict(suggestion),
 			"suggestion": suggestion,
 			"reason":     compactReason,
+		}
+		if compactDeltaSummary != "" {
+			payload["task_delta_summary"] = compactDeltaSummary
 		}
 		if len(taskDeltasArray) > 0 {
 			var rawDeltas []interface{}
@@ -271,11 +361,15 @@ func DefaultAITaskReviewControl(ctx context.Context, config *Config, ep *Endpoin
 			}
 			payload["task_deltas"] = rawDeltas
 		}
+		emitReviewStructured(config, "task-review-decision", payload)
 		_, _ = config.GetEmitter().EmitJSON(schema.EVENT_TYPE_STRUCTURED, "task-review", payload)
 	}
 
 	log.Infof("dynamic planning: task review AI decision: %s (reason: %s)", suggestion, reason)
 	result := aitool.InvokeParams{"suggestion": suggestion, "reason": compactReason}
+	if compactDeltaSummary != "" {
+		result["task_delta_summary"] = compactDeltaSummary
+	}
 	if len(taskDeltasArray) > 0 {
 		var rawDeltas []interface{}
 		for _, d := range taskDeltasArray {
@@ -284,6 +378,65 @@ func DefaultAITaskReviewControl(ctx context.Context, config *Config, ep *Endpoin
 		result["task_deltas"] = rawDeltas
 	}
 	return result, nil
+}
+
+func planReviewVerdict(suggestion string) string {
+	switch suggestion {
+	case "continue":
+		return "计划合理，继续执行"
+	case "unclear":
+		return "计划目标不清晰"
+	case "incomplete":
+		return "计划缺少关键步骤"
+	case "create-subtask":
+		return "计划需要进一步拆分"
+	default:
+		return "计划审查完成"
+	}
+}
+
+func compactPlanReviewReason(suggestion, reason string) string {
+	reason = strings.TrimSpace(reason)
+	if suggestion == "continue" {
+		return "继续执行"
+	}
+	if reason == "" {
+		switch suggestion {
+		case "unclear":
+			return "目标还不够清晰"
+		case "incomplete":
+			return "缺少关键执行步骤"
+		case "create-subtask":
+			return "当前任务粒度过粗"
+		default:
+			return "计划需要进一步审查"
+		}
+	}
+	return reason
+}
+
+func planReviewDisplayMessage(suggestion, reason string) string {
+	switch suggestion {
+	case "continue":
+		return "继续执行"
+	case "unclear":
+		return "目标不够清晰"
+	case "incomplete":
+		if reason != "" {
+			return reason
+		}
+		return "缺少关键步骤"
+	case "create-subtask":
+		if reason != "" {
+			return reason
+		}
+		return "建议拆分子任务"
+	default:
+		if reason != "" {
+			return reason
+		}
+		return "计划审查完成"
+	}
 }
 
 func taskReviewVerdict(suggestion string) string {
@@ -297,10 +450,126 @@ func compactTaskReviewReason(suggestion, reason string) string {
 	reason = strings.TrimSpace(reason)
 	if reason == "" {
 		if suggestion == "adjust_plan" {
-			reason = "发现新证据，后续任务需调整。"
+			reason = "发现新证据，后续任务需调整"
 		} else {
-			reason = "当前结果支持继续按原计划执行。"
+			reason = "当前结果支持继续按原计划执行"
 		}
 	}
 	return fmt.Sprintf("%s：%s", taskReviewVerdict(suggestion), reason)
+}
+
+func taskReviewDisplayMessage(suggestion, reason, deltaSummary string) string {
+	switch suggestion {
+	case "continue":
+		return "任务继续"
+	case "deeply_think":
+		return "需要深入分析"
+	case "inaccurate":
+		return "结果待重查"
+	case "adjust_plan":
+		if deltaSummary != "" {
+			return "需要调整后续任务"
+		}
+		if reason != "" {
+			return reason
+		}
+		return "需要调整后续任务"
+	default:
+		if reason != "" {
+			return reason
+		}
+		return "任务审查完成"
+	}
+}
+
+func compactTaskDeltaSummary(summary string, taskDeltasArray []aitool.InvokeParams) string {
+	summary = normalizeReviewFieldText(summary)
+	summary = strings.TrimSpace(summary)
+	if summary != "" {
+		return summary
+	}
+	return buildTaskDeltaSummary(taskDeltasArray)
+}
+
+func buildTaskDeltaSummary(taskDeltasArray []aitool.InvokeParams) string {
+	if len(taskDeltasArray) == 0 {
+		return ""
+	}
+	lines := make([]string, 0, len(taskDeltasArray))
+	for _, delta := range taskDeltasArray {
+		line := summarizeTaskDelta(delta)
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		lines = append(lines, line)
+	}
+	return strings.Join(lines, "\n")
+}
+
+func summarizeTaskDelta(delta aitool.InvokeParams) string {
+	op := delta.GetString("op")
+	ref := delta.GetString("ref_task_index")
+	tasks := summarizeTaskDeltaTasks(delta.GetObjectArray("tasks"))
+	updatedName := delta.GetString("updated_name")
+	updatedGoal := delta.GetString("updated_goal")
+
+	switch op {
+	case "insert_after":
+		if ref != "" && tasks != "" {
+			return fmt.Sprintf("在 %s 后新增：%s", ref, tasks)
+		}
+	case "append":
+		if tasks != "" {
+			return fmt.Sprintf("追加任务：%s", tasks)
+		}
+	case "remove":
+		if ref != "" {
+			return fmt.Sprintf("移除任务：%s", ref)
+		}
+	case "modify":
+		parts := make([]string, 0, 2)
+		if updatedName != "" {
+			parts = append(parts, fmt.Sprintf("名称改为“%s”", updatedName))
+		}
+		if updatedGoal != "" {
+			parts = append(parts, fmt.Sprintf("目标改为“%s”", updatedGoal))
+		}
+		if ref != "" && len(parts) > 0 {
+			return fmt.Sprintf("调整任务 %s：%s", ref, strings.Join(parts, "，"))
+		}
+		if ref != "" {
+			return fmt.Sprintf("调整任务：%s", ref)
+		}
+	case "replace_all":
+		if tasks != "" {
+			return fmt.Sprintf("替换剩余任务：%s", tasks)
+		}
+	}
+	if ref != "" {
+		return fmt.Sprintf("调整任务：%s", ref)
+	}
+	if tasks != "" {
+		return fmt.Sprintf("调整任务：%s", tasks)
+	}
+	return ""
+}
+
+func summarizeTaskDeltaTasks(tasks []aitool.InvokeParams) string {
+	if len(tasks) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(tasks))
+	for _, task := range tasks {
+		name := strings.TrimSpace(task.GetString("subtask_name"))
+		goal := strings.TrimSpace(task.GetString("subtask_goal"))
+		switch {
+		case name != "":
+			parts = append(parts, name)
+		case goal != "":
+			parts = append(parts, goal)
+		default:
+			parts = append(parts, "新任务")
+		}
+	}
+	return strings.Join(parts, "、")
 }

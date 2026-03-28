@@ -86,6 +86,7 @@ Your output will be shown directly to users during task review. Keep it concise 
 - `reason` 必须极短，优先控制在 10 个中文字符以内或 1-5 个英文词。
 - `reason` 只说明判定依据，不要重复任务过程，不要写成长段解释。
 - 当 `suggestion` 为 `adjust_plan` 时，`reason` 应清楚指出为什么要改后续任务；真正的修改内容放进 `task_deltas`。
+- 当 `suggestion` 为 `adjust_plan` 时，额外提供 `task_delta_summary`，用 1-3 行短句概括后续任务会怎么改，便于实时展示给用户。
 - 当 `suggestion` 为 `continue` 时，`reason` 必须保持 10 个中文字符以内，优先输出：`任务继续`。
 - 当 `suggestion` 不是 `adjust_plan` 时，默认表示“无需修改后续任务”，并保持文案极短。
 
@@ -109,6 +110,10 @@ You MUST output a single JSON object strictly following the schema below. No oth
     },
     "reason": {
       "description": "Very brief evidence-based explanation for your decision. Keep it short.",
+      "type": "string"
+    },
+    "task_delta_summary": {
+      "description": "Optional short human-readable summary of how pending tasks should be adjusted. Prefer 1-3 short lines. Useful for streaming UI.",
       "type": "string"
     },
     "task_deltas": {
@@ -162,7 +167,7 @@ You MUST output a single JSON object strictly following the schema below. No oth
 
 **Example 2 -- New finding requires inserting a verification task:**
 
-`{"@action": "task_review", "suggestion": "adjust_plan", "reason": "发现 /api/login 存在 SQL 注入迹象，需要补验证任务。", "task_deltas": [{"op": "insert_after", "ref_task_index": "1-1", "tasks": [{"subtask_name": "Verify SQL injection on /api/login", "subtask_goal": "Use sqlmap to confirm the SQL injection vulnerability and determine injection type"}]}]}`
+`{"@action": "task_review", "suggestion": "adjust_plan", "reason": "发现 /api/login 存在 SQL 注入迹象，需要补验证任务。", "task_delta_summary": "在 1-1 后新增：验证 /api/login SQL 注入", "task_deltas": [{"op": "insert_after", "ref_task_index": "1-1", "tasks": [{"subtask_name": "Verify SQL injection on /api/login", "subtask_goal": "Use sqlmap to confirm the SQL injection vulnerability and determine injection type"}]}]}`
 
 **Example 3 -- A pending task is no longer needed:**
 

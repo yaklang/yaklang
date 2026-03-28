@@ -262,30 +262,117 @@ func TestYOLO_DynamicPlanning_TaskReview_EmitsCompactStructuredObservation(t *te
 		require.Equal(t, "adjust_plan", params["suggestion"])
 		reason := params.GetString("reason")
 		require.Equal(t, "需要修改后续任务："+originalReason, reason)
+		require.Equal(t, "移除任务：1-4", params.GetString("task_delta_summary"))
 	case <-time.After(8 * time.Second):
 		t.Fatal("task review AI call should complete within timeout")
 	}
 
+	var sawDecision bool
+	var sawAdjustment bool
+	var sawStatus bool
 	deadline := time.After(3 * time.Second)
 	for {
 		select {
 		case evt := <-events:
-			if evt.Type != schema.EVENT_TYPE_STRUCTURED || evt.NodeId != "task-review" {
-				continue
+			switch {
+			case evt.Type == schema.EVENT_TYPE_STREAM && evt.NodeId == "task-review-status":
+				sawStatus = sawStatus || strings.Contains(string(evt.StreamDelta), "正在审查任务")
+			case evt.Type == schema.EVENT_TYPE_STREAM && evt.NodeId == "task-review-adjustment":
+				sawAdjustment = sawAdjustment || strings.Contains(string(evt.StreamDelta), "移除任务：1-4")
+			case evt.Type == schema.EVENT_TYPE_STRUCTURED && evt.NodeId == "task-review-decision":
+				var payload map[string]any
+				require.NoError(t, json.Unmarshal(evt.Content, &payload))
+				require.Equal(t, "需要修改后续任务", payload["verdict"])
+				require.Equal(t, "adjust_plan", payload["suggestion"])
+				require.Equal(t, "需要修改后续任务："+originalReason, payload["reason"])
+				require.Equal(t, "移除任务：1-4", payload["task_delta_summary"])
+				sawDecision = true
+			case evt.Type == schema.EVENT_TYPE_STRUCTURED && evt.NodeId == "task-review":
+				var payload map[string]any
+				require.NoError(t, json.Unmarshal(evt.Content, &payload))
+				require.Equal(t, "需要修改后续任务", payload["verdict"])
+				require.Equal(t, "adjust_plan", payload["suggestion"])
+				require.Equal(t, "需要修改后续任务："+originalReason, payload["reason"])
+				require.Equal(t, "移除任务：1-4", payload["task_delta_summary"])
+
+				rawDeltas, ok := payload["task_deltas"].([]any)
+				require.True(t, ok)
+				require.Len(t, rawDeltas, 1)
+				if sawDecision && sawAdjustment && sawStatus {
+					return
+				}
 			}
-
-			var payload map[string]any
-			require.NoError(t, json.Unmarshal(evt.Content, &payload))
-			require.Equal(t, "需要修改后续任务", payload["verdict"])
-			require.Equal(t, "adjust_plan", payload["suggestion"])
-			require.Equal(t, "需要修改后续任务："+originalReason, payload["reason"])
-
-			rawDeltas, ok := payload["task_deltas"].([]any)
-			require.True(t, ok)
-			require.Len(t, rawDeltas, 1)
-			return
 		case <-deadline:
-			t.Fatal("did not receive compact structured task-review event")
+			t.Fatalf("missing task review intermediate events: status=%v adjustment=%v decision=%v", sawStatus, sawAdjustment, sawDecision)
+		}
+	}
+}
+
+func TestYOLO_DynamicPlanning_PlanReview_EmitsStructuredDecision(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	events := make(chan *schema.AiOutputEvent, 32)
+	cb := func(i AICallerConfigIf, req *AIRequest) (*AIResponse, error) {
+		rsp := NewUnboundAIResponse()
+		rsp.EmitOutputStream(strings.NewReader(`{"@action":"plan_review","suggestion":"incomplete","reason":"缺少验证步骤"}`))
+		rsp.Close()
+		return rsp, nil
+	}
+
+	c := newDynamicPlanningTestConfig(ctx, cb,
+		WithAgreePolicy(AgreePolicyYOLO),
+		WithDisableDynamicPlanning(false),
+		WithEventHandler(func(e *schema.AiOutputEvent) {
+			events <- e
+		}),
+	)
+	c.StartEventLoop(ctx)
+
+	ep := c.Epm.CreateEndpointWithEventType(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE)
+	ep.SetDefaultSuggestionContinue()
+	ep.SetReviewMaterials(aitool.InvokeParams{
+		"plans": map[string]any{"tasks": []string{"collect evidence"}},
+	})
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		c.DoWaitAgreeWithPolicy(ctx, AgreePolicyYOLO, ep)
+	}()
+
+	select {
+	case <-done:
+		params := ep.GetParams()
+		require.Equal(t, "incomplete", params["suggestion"])
+		require.Equal(t, "缺少验证步骤", params.GetString("reason"))
+	case <-time.After(8 * time.Second):
+		t.Fatal("plan review AI call should complete within timeout")
+	}
+
+	var sawStatus bool
+	var sawDecision bool
+	deadline := time.After(3 * time.Second)
+	for {
+		select {
+		case evt := <-events:
+			switch {
+			case evt.Type == schema.EVENT_TYPE_STREAM && evt.NodeId == "plan-review-status":
+				sawStatus = sawStatus || strings.Contains(string(evt.StreamDelta), "正在审查计划")
+			case evt.Type == schema.EVENT_TYPE_STRUCTURED && evt.NodeId == "plan-review-decision":
+				var payload map[string]any
+				require.NoError(t, json.Unmarshal(evt.Content, &payload))
+				require.Equal(t, "计划缺少关键步骤", payload["verdict"])
+				require.Equal(t, "incomplete", payload["suggestion"])
+				require.Equal(t, "缺少验证步骤", payload["reason"])
+				sawDecision = true
+			case evt.Type == schema.EVENT_TYPE_STRUCTURED && evt.NodeId == "plan-review":
+				if sawStatus && sawDecision {
+					return
+				}
+			}
+		case <-deadline:
+			t.Fatalf("missing plan review events: status=%v decision=%v", sawStatus, sawDecision)
 		}
 	}
 }
