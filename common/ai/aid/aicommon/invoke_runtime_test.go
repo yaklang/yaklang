@@ -37,8 +37,9 @@ func TestFormatVerifyNextMovementsSummary(t *testing.T) {
 		{Op: "add", ID: "create_file", Content: "创建一个 A.md 文件"},
 		{Op: "doing", ID: "create_file"},
 		{Op: "done", ID: "remove_temp_name"},
+		{Op: "delete", ID: "stale_todo"},
 	})
-	require.Equal(t, "ADD[create_file]: 创建一个 A.md 文件; DOING[create_file]; DONE[remove_temp_name]", summary)
+	require.Equal(t, "ADD[create_file]: 创建一个 A.md 文件; DOING[create_file]; DONE[remove_temp_name]; DELETE[stale_todo]", summary)
 }
 
 func TestFormatVerifyNextMovementsSummary_Empty(t *testing.T) {

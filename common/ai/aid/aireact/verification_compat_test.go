@@ -28,15 +28,18 @@ func TestNormalizeVerifyNextMovements_PrefersStructuredArray(t *testing.T) {
 		"@action": "verify-satisfaction",
 		"next_movements": [
 			{"op": "add", "id": "create_file", "content": "创建 A.md"},
-			{"op": "done", "id": "cleanup_temp"}
+			{"op": "done", "id": "cleanup_temp"},
+			{"op": "delete", "id": "stale_todo"}
 		]
 	}`), "verify-satisfaction")
 	require.NoError(t, err)
 
 	movements := normalizeVerifyNextMovements(action)
-	require.Len(t, movements, 2)
+	require.Len(t, movements, 3)
 	require.Equal(t, "create_file", movements[0].ID)
 	require.Equal(t, "cleanup_temp", movements[1].ID)
+	require.Equal(t, "delete", movements[2].Op)
+	require.Equal(t, "stale_todo", movements[2].ID)
 }
 
 func TestNormalizeVerifyNextMovements_NormalizesPendingToDoing(t *testing.T) {
@@ -64,6 +67,10 @@ func TestFormatNextMovementDisplayLine(t *testing.T) {
 		formatNextMovementDisplayLine(aicommon.VerifyNextMovement{Op: "done", ID: "remove_temp_name"}),
 	)
 	require.Equal(t,
+		"- [DELETED]: [id: stale_todo]",
+		formatNextMovementDisplayLine(aicommon.VerifyNextMovement{Op: "delete", ID: "stale_todo"}),
+	)
+	require.Equal(t,
 		"- [DOING]: [id: create_file]",
 		formatNextMovementDisplayLine(aicommon.VerifyNextMovement{Op: "doing", ID: "create_file"}),
 	)
@@ -73,10 +80,11 @@ func TestWriteNextMovementsDisplayStream(t *testing.T) {
 	var out bytes.Buffer
 	err := writeNextMovementsDisplayStream(strings.NewReader(`[
 		{"op":"add","id":"create_file","content":"创建一个 A.md 文件"},
-		{"op":"done","id":"remove_temp_name"}
+		{"op":"done","id":"remove_temp_name"},
+		{"op":"delete","id":"stale_todo"}
 	]`), &out)
 	require.NoError(t, err)
-	require.Equal(t, "- [+]: [id: create_file]: 创建一个 A.md 文件\n- [x]: [id: remove_temp_name]", out.String())
+	require.Equal(t, "- [+]: [id: create_file]: 创建一个 A.md 文件\n- [x]: [id: remove_temp_name]\n- [DELETED]: [id: stale_todo]", out.String())
 }
 
 func TestWriteNextMovementsDisplayStream_InvalidJSON(t *testing.T) {

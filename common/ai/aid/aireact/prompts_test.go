@@ -619,6 +619,7 @@ func TestGenerateVerificationPrompt_RendersTodoSnapshot(t *testing.T) {
 		NextMovements: []aicommon.VerifyNextMovement{
 			{Op: "add", ID: "create_file", Content: "创建一个 A.md 文件"},
 			{Op: "add", ID: "rename_file", Content: "将临时文件改名为最终文件名"},
+			{Op: "add", ID: "obsolete_step", Content: "不再需要的临时步骤"},
 		},
 	})
 	react.AppendVerificationHistory(&aicommon.VerifySatisfactionResult{
@@ -626,6 +627,7 @@ func TestGenerateVerificationPrompt_RendersTodoSnapshot(t *testing.T) {
 		Reasoning: "阶段推进",
 		NextMovements: []aicommon.VerifyNextMovement{
 			{Op: "done", ID: "rename_file"},
+			{Op: "delete", ID: "obsolete_step"},
 			{Op: "add", ID: "verify_file", Content: "检查 A.md 是否已写入预期内容"},
 		},
 	})
@@ -640,9 +642,11 @@ func TestGenerateVerificationPrompt_RendersTodoSnapshot(t *testing.T) {
 		"# TODO:",
 		"- [ ]: [id: verify_file]: 检查 A.md 是否已写入预期内容",
 		"- [ ]: [id: create_file]: 创建一个 A.md 文件",
+		"- [DELETED]: [id: obsolete_step]: 不再需要的临时步骤",
 		"- [x]: [id: rename_file]: 将临时文件改名为最终文件名",
 		"next_movements 只输出增量",
 		"{\"op\": \"doing\", \"id\": \"stable_id\"}",
+		"{\"op\": \"delete\", \"id\": \"stable_id\"}",
 		"{\"op\": \"add\", \"id\": \"stable_id\", \"content\": \"新增一个短链路 TODO\"}",
 	) {
 		t.Fatalf("verification prompt should contain structured TODO snapshot and incremental instructions. Got:\n%s", prompt)

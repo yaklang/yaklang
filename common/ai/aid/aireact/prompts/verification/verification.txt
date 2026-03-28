@@ -140,9 +140,11 @@ IMPORTANT GUIDELINES:
     - `{"op": "add", "id": "stable_id", "content": "新增一个短链路 TODO"}`
     - `{"op": "doing", "id": "stable_id"}`
     - `{"op": "done", "id": "stable_id"}`
+    - `{"op": "delete", "id": "stable_id"}`
     - `doing` 用于标记某个已有 TODO 当前正在进行中，通常只需要 `id`。
     - 如果某个 TODO 已经存在，而你只是要表达“现在开始做它”或“正在推进它”，优先使用 `doing`，不要重复用 `add` 再创建一次。
-    - `done` 用于关闭已存在 TODO，`content` 可省略。
+    - `done` 用于关闭已存在 TODO，表示该事项已经完成，`content` 可省略。
+    - `delete` 用于标记某个已有 TODO 不再需要，表示删除而非完成，`content` 可省略。
     - `add` 必须提供 `content`，且内容要与当前任务直接对齐。
     - 如果本轮没有必要增减 TODO，输出 `[]`。
     - 不要把整套执行计划、风险分析、长段说明重新塞进 `next_movements`。

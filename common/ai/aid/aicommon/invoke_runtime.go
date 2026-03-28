@@ -48,7 +48,7 @@ func FormatVerifyNextMovementsSummary(nextMovements []VerifyNextMovement) string
 	}
 	parts := make([]string, 0, len(nextMovements))
 	for _, movement := range nextMovements {
-		switch movement.Op {
+		switch strings.ToLower(strings.TrimSpace(movement.Op)) {
 		case "add":
 			if movement.Content == "" {
 				parts = append(parts, "ADD["+movement.ID+"]")
@@ -59,6 +59,8 @@ func FormatVerifyNextMovementsSummary(nextMovements []VerifyNextMovement) string
 			parts = append(parts, "DOING["+movement.ID+"]")
 		case "done":
 			parts = append(parts, "DONE["+movement.ID+"]")
+		case "delete":
+			parts = append(parts, "DELETE["+movement.ID+"]")
 		default:
 			parts = append(parts, strings.ToUpper(movement.Op)+"["+movement.ID+"]")
 		}
