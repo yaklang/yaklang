@@ -1,7 +1,10 @@
 package buildinaitools
 
 import (
+	"encoding/json"
 	"fmt"
+	"strings"
+	"sync"
 
 	"github.com/samber/lo"
 
@@ -14,6 +17,17 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
+
+const defaultRecentToolCacheMaxBytes = 20480 // 20KB
+
+// RecentToolEntry records a recently used tool for directly_call_tool action.
+type RecentToolEntry struct {
+	Name          string `json:"name"`
+	Description   string `json:"description"`
+	SchemaSnippet string `json:"schema_snippet"`
+	Usage         string `json:"usage"`
+	Size          int    `json:"size"`
+}
 
 // AiToolManager 是工具管理器的默认实现
 type AiToolManager struct {
@@ -28,6 +42,10 @@ type AiToolManager struct {
 	forgeSearchTool       []*aitool.Tool
 	noCacheTools          bool // 是否不缓存工具
 	enableAllTools        bool // 是否开启所有工具
+
+	recentToolsCache []*RecentToolEntry
+	recentToolsMu    sync.Mutex
+	maxCacheBytes    int
 }
 
 // ToolManagerOption 定义工具管理器的配置选项
@@ -353,4 +371,188 @@ func (m *AiToolManager) EnableAIForgeSearch(searcher searchtools.AISearcher[*sch
 	m.enableForgeSearchTool = true
 	m.aiForgeSearcher = searcher
 	return nil
+}
+
+func (m *AiToolManager) getMaxCacheBytes() int {
+	if m.maxCacheBytes > 0 {
+		return m.maxCacheBytes
+	}
+	return defaultRecentToolCacheMaxBytes
+}
+
+func (m *AiToolManager) totalCacheSize() int {
+	total := 0
+	for _, entry := range m.recentToolsCache {
+		total += entry.Size
+	}
+	return total
+}
+
+// AddRecentlyUsedTool caches a tool for later directly_call_tool usage.
+// Duplicates are moved to the tail (most recent); FIFO eviction when over budget.
+func (m *AiToolManager) AddRecentlyUsedTool(tool *aitool.Tool) {
+	if tool == nil {
+		return
+	}
+	m.recentToolsMu.Lock()
+	defer m.recentToolsMu.Unlock()
+
+	name := tool.GetName()
+	desc := tool.GetDescription()
+	schemaStr := tool.ToJSONSchemaString()
+	usage := tool.GetUsage()
+	entrySize := len(name) + len(desc) + len(schemaStr) + len(usage)
+
+	// remove existing entry with same name (will be re-appended at tail)
+	filtered := make([]*RecentToolEntry, 0, len(m.recentToolsCache))
+	for _, e := range m.recentToolsCache {
+		if e.Name != name {
+			filtered = append(filtered, e)
+		}
+	}
+	m.recentToolsCache = filtered
+
+	newEntry := &RecentToolEntry{
+		Name:          name,
+		Description:   desc,
+		SchemaSnippet: schemaStr,
+		Usage:         usage,
+		Size:          entrySize,
+	}
+	m.recentToolsCache = append(m.recentToolsCache, newEntry)
+
+	maxBytes := m.getMaxCacheBytes()
+	for m.totalCacheSize() > maxBytes && len(m.recentToolsCache) > 1 {
+		m.recentToolsCache = m.recentToolsCache[1:]
+	}
+}
+
+func (m *AiToolManager) IsRecentlyUsedTool(name string) bool {
+	m.recentToolsMu.Lock()
+	defer m.recentToolsMu.Unlock()
+	for _, e := range m.recentToolsCache {
+		if e.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+func (m *AiToolManager) GetRecentToolNames() []string {
+	m.recentToolsMu.Lock()
+	defer m.recentToolsMu.Unlock()
+	names := make([]string, 0, len(m.recentToolsCache))
+	for _, e := range m.recentToolsCache {
+		names = append(names, e.Name)
+	}
+	return names
+}
+
+func (m *AiToolManager) HasRecentlyUsedTools() bool {
+	m.recentToolsMu.Lock()
+	defer m.recentToolsMu.Unlock()
+	return len(m.recentToolsCache) > 0
+}
+
+const recentToolEntryTemplate = `<|TOOL_{{ .Name }}_{{ .Nonce }}|>
+## Tool: {{ .Name }}
+Description: {{ .Description }}
+Params Schema:
+{{ .SchemaSnippet }}
+{{ if .Usage }}__USAGE__: {{ .Usage }}
+{{ end }}<|TOOL_{{ .Name }}_END_{{ .Nonce }}|>
+
+`
+
+const recentToolSummaryFooter = `## How to use directly_call_tool
+
+To call a tool listed above, respond with:
+{"@action": "directly_call_tool", "directly_call_tool_name": "<name>", "directly_call_identifier": "<snake_case_intent>", "directly_call_expectations": "<timing and fallback>", "directly_call_tool_params": <params object matching the Params Schema>}
+`
+
+// ExportRecentToolCache serializes the recent-tool cache entries to a JSON string
+// for persistent storage (e.g. in AIAgentRuntime.RecentToolsCache).
+func (m *AiToolManager) ExportRecentToolCache() string {
+	m.recentToolsMu.Lock()
+	defer m.recentToolsMu.Unlock()
+
+	if len(m.recentToolsCache) == 0 {
+		return ""
+	}
+	raw, err := json.Marshal(m.recentToolsCache)
+	if err != nil {
+		log.Errorf("ExportRecentToolCache marshal error: %v", err)
+		return ""
+	}
+	return string(raw)
+}
+
+// ImportRecentToolCache restores cache entries from a JSON string produced by ExportRecentToolCache.
+// Existing entries with the same name are replaced; FIFO eviction still applies.
+func (m *AiToolManager) ImportRecentToolCache(jsonStr string) {
+	if jsonStr == "" {
+		return
+	}
+	var entries []*RecentToolEntry
+	if err := json.Unmarshal([]byte(jsonStr), &entries); err != nil {
+		log.Errorf("ImportRecentToolCache unmarshal error: %v", err)
+		return
+	}
+
+	m.recentToolsMu.Lock()
+	defer m.recentToolsMu.Unlock()
+
+	existing := make(map[string]struct{})
+	for _, e := range m.recentToolsCache {
+		existing[e.Name] = struct{}{}
+	}
+	for _, entry := range entries {
+		if _, ok := existing[entry.Name]; ok {
+			continue
+		}
+		m.recentToolsCache = append(m.recentToolsCache, entry)
+		existing[entry.Name] = struct{}{}
+	}
+
+	maxBytes := m.getMaxCacheBytes()
+	for m.totalCacheSize() > maxBytes && len(m.recentToolsCache) > 1 {
+		m.recentToolsCache = m.recentToolsCache[1:]
+	}
+}
+
+// GetRecentToolsSummary builds a prompt-friendly summary of cached tools within maxBytes.
+// Each tool is wrapped in AITAG boundaries <|TOOL_{name}_{nonce}|> to prevent confusion.
+func (m *AiToolManager) GetRecentToolsSummary(maxBytes int, nonce string) string {
+	m.recentToolsMu.Lock()
+	defer m.recentToolsMu.Unlock()
+
+	if len(m.recentToolsCache) == 0 {
+		return ""
+	}
+
+	var sb strings.Builder
+	sb.WriteString("# Recently Used Tools (available for directly_call_tool)\n\n")
+	totalLen := sb.Len()
+	entryWritten := false
+	for i, entry := range m.recentToolsCache {
+		block := utils.MustRenderTemplate(recentToolEntryTemplate, map[string]interface{}{
+			"Name":          entry.Name,
+			"Nonce":         nonce,
+			"Description":   entry.Description,
+			"SchemaSnippet": entry.SchemaSnippet,
+			"Usage":         entry.Usage,
+		})
+		// always include at least the first entry even if it exceeds maxBytes
+		if i > 0 && maxBytes > 0 && totalLen+len(block) > maxBytes {
+			break
+		}
+		sb.WriteString(block)
+		totalLen += len(block)
+		entryWritten = true
+	}
+	if !entryWritten {
+		return ""
+	}
+	sb.WriteString(recentToolSummaryFooter)
+	return sb.String()
 }

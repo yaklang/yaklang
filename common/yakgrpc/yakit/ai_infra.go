@@ -113,6 +113,10 @@ func UpdateAIAgentRuntimeLoadedSkillNames(db *gorm.DB, persistentId string, skil
 	return db.Model(&schema.AIAgentRuntime{}).Where("persistent_session = ?", persistentId).Update("loaded_skill_names", skillNames).Error
 }
 
+func UpdateAIAgentRuntimeRecentToolsCache(db *gorm.DB, persistentId string, cacheJSON string) error {
+	return db.Model(&schema.AIAgentRuntime{}).Where("persistent_session = ?", persistentId).Update("recent_tools_cache", cacheJSON).Error
+}
+
 // UpdateAIAgentRuntimeUserInput updates the quoted_user_input field for an AIAgentRuntime by uuid.
 func UpdateAIAgentRuntimeUserInput(db *gorm.DB, uuid string, quotedInput string) error {
 	return db.Model(&schema.AIAgentRuntime{}).Where("uuid = ?", uuid).Update("quoted_user_input", quotedInput).Error

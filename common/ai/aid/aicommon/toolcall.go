@@ -148,6 +148,7 @@ type ToolCaller struct {
 }
 
 const ReservedKeyCallExpectations = "__call_expectations__"
+const ReservedKeyIdentifier = "__identifier__"
 
 type ToolCallerOption func(tc *ToolCaller)
 
@@ -677,9 +678,16 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 	var rawAIParamResponse string
 	if presetParams {
 		invokeParams = presetInvokeParams
+		if id, ok := invokeParams[ReservedKeyIdentifier]; ok {
+			destinationIdentifier = sanitizeIdentifier(utils.InterfaceToString(id))
+			delete(invokeParams, ReservedKeyIdentifier)
+		}
 		if ce, ok := invokeParams[ReservedKeyCallExpectations]; ok {
 			t.callExpectations = utils.InterfaceToString(ce)
 			delete(invokeParams, ReservedKeyCallExpectations)
+		}
+		if destinationIdentifier != "" {
+			t.emitter.EmitInfo("tool[%v] destination identifier: %v", tool.Name, destinationIdentifier)
 		}
 		t.emitter.EmitInfo("use preset params for tool[%v]: %v", tool.Name, invokeParams)
 	} else {

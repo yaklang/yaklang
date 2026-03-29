@@ -31,6 +31,13 @@ func (r *ReActLoop) generateSchemaString(disallowExit bool) (string, error) {
 	if r.allowToolCall != nil && !r.allowToolCall() {
 		disableActionList = append(disableActionList, schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL)
 		disableActionList = append(disableActionList, schema.AI_REACT_LOOP_ACTION_TOOL_COMPOSE)
+		disableActionList = append(disableActionList, schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL)
+	}
+
+	// directly_call_tool is only available when there are recently-used tools in cache
+	toolManager := r.config.GetAiToolManager()
+	if toolManager == nil || !toolManager.HasRecentlyUsedTools() {
+		disableActionList = append(disableActionList, schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL)
 	}
 
 	// Skills conditional actions
@@ -152,6 +159,21 @@ func (r *ReActLoop) generateLoopPrompt(
 	var extraCapabilities string
 	if r.extraCapabilities != nil && r.extraCapabilities.HasCapabilities() {
 		extraCapabilities = r.extraCapabilities.Render(nonce)
+	}
+
+	// Append CACHE_TOOL_CALL block only when summary is non-empty
+	if tm := r.config.GetAiToolManager(); tm != nil && tm.HasRecentlyUsedTools() {
+		if summary := tm.GetRecentToolsSummary(20480, nonce); summary != "" {
+			cacheBlock := utils.MustRenderTemplate(`
+<|CACHE_TOOL_CALL_{{ .Nonce }}>
+{{ .Summary }}
+<|CACHE_TOOL_CALL_END_{{ .Nonce }}>
+			`, map[string]interface{}{
+				"Nonce":   nonce,
+				"Summary": summary,
+			})
+			reactiveData += cacheBlock
+		}
 	}
 
 	infos["InjectedMemory"] = memory
