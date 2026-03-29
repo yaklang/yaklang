@@ -6,7 +6,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -74,19 +73,25 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 			ctx = t.GetContext()
 		}
 
-		// 1. extract params: prefer parsed object from field stream, fallback to string
-		params := action.GetInvokeParams("directly_call_tool_params")
-		if len(params) == 0 {
-			raw := action.GetString("directly_call_tool_params")
-			if raw != "" {
-				parsed := make(aitool.InvokeParams)
-				if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
-					log.Warnf("directly_call_tool: params string is not valid JSON: %v", err)
-					operator.Feedback(utils.Errorf("directly_call_tool: invalid params JSON: %v", err))
-					operator.Continue()
-					return
-				}
+		// 1. extract params: try string-based JSON parse first (since the field is WithStringParam),
+		//    then fall back to object extraction.
+		var params aitool.InvokeParams
+
+		raw := action.GetString("directly_call_tool_params")
+		if raw != "" {
+			parsed := make(aitool.InvokeParams)
+			if err := json.Unmarshal([]byte(raw), &parsed); err == nil && len(parsed) > 0 {
 				params = parsed
+			}
+		}
+
+		if len(params) == 0 {
+			objParams := action.GetInvokeParams("directly_call_tool_params")
+			delete(objParams, "__DEFAULT__")
+			delete(objParams, "__FALLBACK__")
+			delete(objParams, "__[yaklang-raw]__")
+			if len(objParams) > 0 {
+				params = objParams
 			}
 		}
 		if len(params) == 0 {
@@ -106,7 +111,7 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 		// 3. execute
 		result, directly, callErr := invoker.ExecuteToolRequiredAndCallWithoutRequired(ctx, toolName, params)
 
-		if callErr == nil && result != nil {
+		if callErr == nil && result != nil && result.Success {
 			if cachedTool, lookupErr := loop.GetConfig().GetAiToolManager().GetToolByName(toolName); lookupErr == nil {
 				loop.GetConfig().GetAiToolManager().AddRecentlyUsedTool(cachedTool)
 				if realCfg, ok := loop.GetConfig().(*aicommon.Config); ok {
