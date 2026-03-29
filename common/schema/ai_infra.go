@@ -45,6 +45,10 @@ type AIAgentRuntime struct {
 	// LoadedSkillNames stores comma-separated skill names that were loaded in this session.
 	// Used to restore skills across conversations within the same persistent session.
 	LoadedSkillNames string `json:"loaded_skill_names"`
+
+	// RecentToolsCache stores JSON-serialized recently-used tool entries for directly_call_tool.
+	// Persisted per persistent_session so that tools used in one conversation are available in the next.
+	RecentToolsCache string `json:"recent_tools_cache"`
 }
 
 type AIAgentUserInputRecord struct {

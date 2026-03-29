@@ -943,6 +943,25 @@ func (c *Config) SaveLoadedSkillNames(skillNames []string) {
 	}
 }
 
+// SaveRecentToolCache persists the recent-tool cache to the DB for the current persistent session.
+func (c *Config) SaveRecentToolCache() {
+	if c.PersistentSessionId == "" {
+		return
+	}
+	tm := c.GetAiToolManager()
+	if tm == nil {
+		return
+	}
+	db := c.GetDB()
+	if db == nil {
+		return
+	}
+	cacheJSON := tm.ExportRecentToolCache()
+	if err := yakit.UpdateAIAgentRuntimeRecentToolsCache(db, c.PersistentSessionId, cacheJSON); err != nil {
+		log.Warnf("failed to save recent tool cache for session [%s]: %v", c.PersistentSessionId, err)
+	}
+}
+
 // WithDisableAutoSkills controls automatic loading of skills from the default directory
 // and built-in embedded skills.
 // By default (false), NewConfig will automatically load skills from ~/.yakit-projects/ai-skills
@@ -2667,6 +2686,14 @@ func (c *Config) restorePersistentSession() {
 		c.SetUserInputHistory(history)
 		log.Infof("restored %d user input history entries from session [%s], latest: %.80s",
 			len(history), c.PersistentSessionId, c.PrevSessionUserInput)
+	}
+
+	// Restore recent-tool cache from previous session
+	if runtime.RecentToolsCache != "" {
+		if tm := c.GetAiToolManager(); tm != nil {
+			tm.ImportRecentToolCache(runtime.RecentToolsCache)
+			log.Infof("restored recent tool cache from persistent session [%s]", c.PersistentSessionId)
+		}
 	}
 
 	c.InitStatus.SetPersistentSessionRestored(true)
