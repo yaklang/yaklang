@@ -161,9 +161,28 @@ func (t *Tool) InvokeWithRaw(raw string, opts ...ToolInvokeOptions) (*ToolResult
 
 // InvokeWithParams 使用参数映射调用工具
 func (t *Tool) InvokeWithParams(params map[string]any, opts ...ToolInvokeOptions) (*ToolResult, error) {
-	// 验证参数
+	// Temporarily remove runtime_id (injected by ToolCaller.invoke) before validation,
+	// since it's not part of the tool's declared schema.
+	runtimeID, hasRuntimeID := params["runtime_id"]
+	if hasRuntimeID {
+		delete(params, "runtime_id")
+	}
+
 	valid, validationErrors := t.ValidateParams(params)
+
+	if hasRuntimeID {
+		params["runtime_id"] = runtimeID
+	}
+
 	if !valid {
+		log.Errorf("tool[%s] param validation failed: errors=%v, params_keys=%v",
+			t.Name, validationErrors, func() []string {
+				keys := make([]string, 0, len(params))
+				for k := range params {
+					keys = append(keys, k)
+				}
+				return keys
+			}())
 		return &ToolResult{
 			Name:        t.Name,
 			Description: t.Description,
