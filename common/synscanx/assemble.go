@@ -13,8 +13,16 @@ import (
 	"time"
 )
 
+func (s *Scannerx) useLoopbackLikeLinkLayer(host string) bool {
+	if utils.IsLoopback(host) {
+		return true
+	}
+	return !s.supportsARP()
+}
+
 func (s *Scannerx) assembleSynPacket(host string, port int) ([]byte, error) {
 	isLoopback := utils.IsLoopback(host)
+	useLoopbackLink := s.useLoopbackLikeLinkLayer(host)
 
 	var packetBytes []byte
 	var err error
@@ -23,7 +31,14 @@ func (s *Scannerx) assembleSynPacket(host string, port int) ([]byte, error) {
 	dstMac := s.config.RemoteMac
 	srcMac := s.config.SourceMac
 
-	if dstMac == nil {
+	if useLoopbackLink {
+		if runtime.GOOS != "linux" {
+			opts = append(opts, pcapx.WithLoopback(true))
+		} else {
+			opts = append(opts, pcapx.WithEthernet_SrcMac(net.HardwareAddr{0x00, 0x00, 0x00, 0x00, 0x00, 0x00}))
+			opts = append(opts, pcapx.WithEthernet_DstMac(net.HardwareAddr{0x00, 0x00, 0x00, 0x00, 0x00, 0x00}))
+		}
+	} else if dstMac == nil {
 		if isLoopback {
 			// Loopback
 			if runtime.GOOS != "linux" {
@@ -128,6 +143,7 @@ func (s *Scannerx) assembleSynPacket(host string, port int) ([]byte, error) {
 
 func (s *Scannerx) assembleUdpPacket(host string, port int) ([]byte, error) {
 	isLoopback := utils.IsLoopback(host)
+	useLoopbackLink := s.useLoopbackLikeLinkLayer(host)
 
 	var packetBytes []byte
 	var err error
@@ -136,7 +152,14 @@ func (s *Scannerx) assembleUdpPacket(host string, port int) ([]byte, error) {
 	dstMac := s.config.RemoteMac
 	srcMac := s.config.SourceMac
 
-	if dstMac == nil {
+	if useLoopbackLink {
+		if runtime.GOOS == "windows" {
+			opts = append(opts, pcapx.WithLoopback(true))
+		} else {
+			opts = append(opts, pcapx.WithEthernet_SrcMac(net.HardwareAddr{0x00, 0x00, 0x00, 0x00, 0x00, 0x00}))
+			opts = append(opts, pcapx.WithEthernet_DstMac(net.HardwareAddr{0x00, 0x00, 0x00, 0x00, 0x00, 0x00}))
+		}
+	} else if dstMac == nil {
 		if isLoopback {
 			// Loopback
 			if runtime.GOOS == "windows" {
@@ -247,6 +270,9 @@ func (s *Scannerx) assembleUdpPacket(host string, port int) ([]byte, error) {
 }
 
 func (s *Scannerx) assembleArpPacket(host string) ([]byte, error) {
+	if !s.supportsARP() {
+		return nil, utils.Errorf("arp is unsupported on iface %s", s.config.Iface.Name)
+	}
 	var opts []any
 	srcMac := s.config.SourceMac.String()
 	srcIP := s.config.SourceIP.String()

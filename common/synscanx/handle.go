@@ -7,7 +7,6 @@ import (
 	"io"
 	"net"
 	"runtime"
-	"strings"
 	"unicode/utf8"
 
 	"github.com/gopacket/gopacket"
@@ -19,6 +18,23 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
+
+func (s *Scannerx) captureBPF() string {
+	base := "udp || tcp[tcpflags] == tcp-syn|tcp-ack"
+	if s == nil || s.config == nil || s.config.Iface == nil {
+		return base
+	}
+	if s.supportsARP() {
+		base = "arp || " + base
+	}
+	if s.config.Iface.Flags&net.FlagLoopback != 0 {
+		return base
+	}
+	if !s.supportsARP() {
+		return base
+	}
+	return fmt.Sprintf("ether dst %s && (%s)", s.config.Iface.HardwareAddr.String(), base)
+}
 
 // windows 的pcap 错误信息是gb18030编码的，需要转换成utf8
 func handleError(err error) error {
@@ -55,22 +71,14 @@ func (s *Scannerx) initHandle() error {
 		return handleError(err)
 	}
 	log.Infof("pcap open live success: %s", s.config.Iface.Name)
-	var bpf string
-	if s.config.Iface.Flags&net.FlagLoopback == 0 {
-		// Interface is not loopback, set the filter.
-		if s.config.Iface.HardwareAddr == nil || !strings.Contains(s.config.Iface.HardwareAddr.String(), ":") {
-			bpf = "arp || udp || tcp[tcpflags] == tcp-syn|tcp-ack"
-		} else {
-			bpf = fmt.Sprintf("ether dst %s && (arp || udp || tcp[tcpflags] == tcp-syn|tcp-ack)", s.config.Iface.HardwareAddr.String())
-		}
-	} else {
-		// Interface is loopback, set a different filter.
-		// Replace the following line with the appropriate filter for your use case.
-		bpf = "udp || tcp[tcpflags] == tcp-syn|tcp-ack"
-	}
+	bpf := s.captureBPF()
 	err = handle.SetBPFFilter(bpf)
 	if err != nil {
-		if ferr := handle.SetBPFFilter(`arp || udp || tcp[tcpflags] == tcp-syn|tcp-ack`); ferr != nil {
+		fallback := "udp || tcp[tcpflags] == tcp-syn|tcp-ack"
+		if s.supportsARP() {
+			fallback = "arp || " + fallback
+		}
+		if ferr := handle.SetBPFFilter(fallback); ferr != nil {
 			return utils.Errorf("SetBPFFilter failed: %v, bpf: %v", err, bpf)
 		}
 	}
@@ -96,9 +104,10 @@ func (s *Scannerx) initHandlerStart(ctx context.Context) error {
 		var adapters []*pcaputil.DeviceAdapter
 
 		if s.config.Iface != nil {
+			bpf := s.captureBPF()
 			adapters = append(adapters, &pcaputil.DeviceAdapter{
 				DeviceName: s.config.Iface.Name,
-				BPF:        fmt.Sprintf("ether dst %s && (arp || udp  || tcp[tcpflags] == tcp-syn|tcp-ack)", s.config.Iface.HardwareAddr.String()),
+				BPF:        bpf,
 				Snaplen:    128,
 				Promisc:    false,
 				Timeout:    pcap.BlockForever,
