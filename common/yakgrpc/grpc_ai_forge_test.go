@@ -1,9 +1,15 @@
 package yakgrpc
 
 import (
+	"archive/zip"
 	"context"
+	"errors"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -19,6 +25,18 @@ func queryForge(ctx context.Context, client ypb.YakClient, filter *ypb.AIForgeFi
 		Filter:     filter,
 	})
 	return resp.GetData(), err
+}
+
+func waitAIForgeExportDone(t *testing.T, stream ypb.Yak_ExportAIForgeClient) {
+	t.Helper()
+
+	for {
+		_, err := stream.Recv()
+		if errors.Is(err, io.EOF) {
+			return
+		}
+		require.NoError(t, err)
+	}
 }
 
 func TestGRPCMUSTPASS_AIForge_BaseCRUD(t *testing.T) {
@@ -338,4 +356,59 @@ stale body
 	require.Equal(t, map[string]string{
 		"category": "analysis",
 	}, meta.Metadata)
+}
+
+func TestGRPCMUSTPASS_AIForge_ExportUsesMergedForgeNamesAndFilter(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	matchName := uuid.NewString()
+	otherMatchName := uuid.NewString()
+	forgeNames := []string{matchName, otherMatchName}
+	for _, name := range forgeNames {
+		_, err = client.CreateAIForge(ctx, &ypb.AIForge{
+			ForgeName:    name,
+			ForgeType:    "yak",
+			ForgeContent: "println('hello')",
+		})
+		require.NoError(t, err)
+	}
+	t.Cleanup(func() {
+		yakit.DeleteAIForge(consts.GetGormProfileDatabase(), &ypb.AIForgeFilter{
+			ForgeNames: forgeNames,
+		})
+	})
+
+	exportPath := filepath.Join(t.TempDir(), "forge-export.zip")
+	stream, err := client.ExportAIForge(ctx, &ypb.ExportAIForgeRequest{
+		ForgeNames: forgeNames,
+		TargetPath: exportPath,
+		Filter: &ypb.AIForgeFilter{
+			ForgeName: matchName,
+		},
+	})
+	require.NoError(t, err)
+	waitAIForgeExportDone(t, stream)
+
+	t.Cleanup(func() {
+		_ = os.Remove(exportPath)
+	})
+
+	reader, err := zip.OpenReader(exportPath)
+	require.NoError(t, err)
+	defer reader.Close()
+
+	exportedRoots := make(map[string]struct{})
+	for _, file := range reader.File {
+		root := strings.SplitN(file.Name, "/", 2)[0]
+		if root == "" {
+			continue
+		}
+		exportedRoots[root] = struct{}{}
+	}
+
+	require.Contains(t, exportedRoots, matchName)
+	require.Contains(t, exportedRoots, otherMatchName)
 }

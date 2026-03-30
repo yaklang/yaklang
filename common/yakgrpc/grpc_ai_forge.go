@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/samber/lo"
 	"os"
 	"path/filepath"
 	"strings"
@@ -126,11 +127,45 @@ func (s *Server) GetAIForge(ctx context.Context, req *ypb.GetAIForgeRequest) (*y
 	return rsp, nil
 }
 
-func (s *Server) ExportAIForge(req *ypb.ExportAIForgeRequest, stream ypb.Yak_ExportAIForgeServer) error {
-	names := req.GetForgeNames()
+func sanitizeForgeNames(names []string) []string {
 	if len(names) == 0 {
-		return utils.Error("forge names are required")
+		return nil
 	}
+	result := make([]string, 0, len(names))
+	seen := make(map[string]struct{}, len(names))
+	for _, name := range names {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+		result = append(result, name)
+	}
+	return result
+}
+
+func resolveExportForgeNames(forgeNames []string, filter *ypb.AIForgeFilter) *ypb.AIForgeFilter {
+	explicitNames := sanitizeForgeNames(forgeNames)
+	if filter == nil {
+		return &ypb.AIForgeFilter{
+			ForgeNames: explicitNames,
+		}
+	}
+
+	if len(explicitNames) == 0 {
+		return filter
+	}
+
+	forgeNameSet := lo.Uniq(append(append(explicitNames, filter.ForgeNames...), filter.GetForgeName()))
+	filter.ForgeNames = forgeNameSet
+	filter.ForgeName = "" // clear the single forge name to avoid confusion, since ForgeNames takes precedence when both are set
+	return filter
+}
+
+func (s *Server) ExportAIForge(req *ypb.ExportAIForgeRequest, stream ypb.Yak_ExportAIForgeServer) error {
 	progress := func(percent float64, msg string, messageType string) {
 		_ = stream.Send(&ypb.GeneralProgress{
 			Percent:     percent,
@@ -138,11 +173,15 @@ func (s *Server) ExportAIForge(req *ypb.ExportAIForgeRequest, stream ypb.Yak_Exp
 			MessageType: messageType,
 		})
 	}
+
+	currentFilter := resolveExportForgeNames(req.ForgeNames, req.Filter)
+
 	_, err := aiforge.ExportAIForgesToZip(
+		stream.Context(),
 		s.GetProfileDatabase(),
-		names,
+		currentFilter,
 		req.GetToolNames(),
-		"",
+		req.GetTargetPath(),
 		aiforge.WithExportProgress(progress),
 		aiforge.WithExportPassword(req.GetPassword()),
 		aiforge.WithExportOutputName(req.GetOutputName()),
