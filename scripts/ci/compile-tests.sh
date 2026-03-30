@@ -53,15 +53,69 @@ CONFIG_DIRS=($(jq -r '.[].package' "$TEST_CONFIG" | sort -u))
 echo "Found ${#CONFIG_DIRS[@]} unique package patterns in config"
 echo ""
 
-# 发现这些包路径下的实际测试包
+pkg_matches_pattern() {
+  local pkg="$1"
+  local pattern="$2"
+
+  if [[ "$pkg" == "$pattern" ]]; then
+    return 0
+  fi
+
+  if [[ "$pattern" == */... ]]; then
+    local prefix="${pattern%/...}"
+    if [[ "$pkg" == "$prefix" ]] || [[ "${pkg#"$prefix"/}" != "$pkg" ]]; then
+      return 0
+    fi
+  fi
+
+  if [[ "$pattern" == */. ]]; then
+    local exact="${pattern%/.}"
+    if [[ "$pkg" == "$exact" ]]; then
+      return 0
+    fi
+  fi
+
+  return 1
+}
+
+pkg_matches_any_exclude() {
+  local pkg="$1"
+  local exclude_patterns="$2"
+  local pattern=""
+
+  while IFS= read -r pattern; do
+    [[ -z "$pattern" ]] && continue
+    if pkg_matches_pattern "$pkg" "$pattern"; then
+      return 0
+    fi
+  done <<< "$exclude_patterns"
+
+  return 1
+}
+
 echo "=== Discovering test packages ==="
 
-# 一次性用 go list 列出所有测试包，然后用 sort -u 去重
-mapfile -t PKGS < <(
-  for dir in "${CONFIG_DIRS[@]}"; do
-    go list -f '{{if or .TestGoFiles .XTestGoFiles}}{{.ImportPath}}{{end}}' "$dir" 2>/dev/null || true
-  done | sort -u
-)
+DISCOVERED_PKGS_FILE="$TEST_BIN_DIR/.discovered_packages"
+: > "$DISCOVERED_PKGS_FILE"
+
+config_count=$(jq 'length' "$TEST_CONFIG")
+for ((idx=0; idx<config_count; idx++)); do
+  pattern=$(jq -r ".[$idx].package" "$TEST_CONFIG")
+  exclude_packages=$(jq -r ".[$idx].exclude_packages[]? // empty" "$TEST_CONFIG")
+
+  while IFS= read -r pkg; do
+    [[ -z "$pkg" ]] && continue
+
+    pkg_path="./$(echo "$pkg" | sed 's|github.com/yaklang/yaklang/||')"
+    if pkg_matches_any_exclude "$pkg_path" "$exclude_packages"; then
+      continue
+    fi
+
+    echo "$pkg" >> "$DISCOVERED_PKGS_FILE"
+  done < <(go list -f '{{if or .TestGoFiles .XTestGoFiles}}{{.ImportPath}}{{end}}' "$pattern" 2>/dev/null || true)
+done
+
+mapfile -t PKGS < <(sort -u "$DISCOVERED_PKGS_FILE")
 
 if [[ ${#PKGS[@]} -eq 0 ]]; then
   echo "No test packages found"
