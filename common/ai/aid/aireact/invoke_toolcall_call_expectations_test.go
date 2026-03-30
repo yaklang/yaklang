@@ -214,6 +214,26 @@ LOOP:
 		"verify-satisfaction prompt should contain call_expectations via timeline")
 }
 
+func TestNormalizeIntervalReviewFieldContent(t *testing.T) {
+	t.Run("json string", func(t *testing.T) {
+		content, ok := normalizeIntervalReviewFieldContent(strings.NewReader(`"tool running normally"`))
+		require.True(t, ok)
+		require.Equal(t, "tool running normally", content)
+	})
+
+	t.Run("plain text fallback", func(t *testing.T) {
+		content, ok := normalizeIntervalReviewFieldContent(strings.NewReader("still collecting logs"))
+		require.True(t, ok)
+		require.Equal(t, "still collecting logs", content)
+	})
+
+	t.Run("schema object rejected", func(t *testing.T) {
+		content, ok := normalizeIntervalReviewFieldContent(strings.NewReader(`{"type":"string","description":"A brief explanation for the decision"}`))
+		require.False(t, ok)
+		require.Empty(t, content)
+	})
+}
+
 func TestToolResult_String_ContainsCallExpectations(t *testing.T) {
 	result := &aitool.ToolResult{
 		Name:             "test_tool",

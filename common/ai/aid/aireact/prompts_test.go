@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -740,6 +741,48 @@ func TestGenerateVerificationPrompt_TruncatesLongTodoSnapshotButKeepsFocus(t *te
 		"TODO history exceeded 10KB",
 	) {
 		t.Fatalf("verification prompt should truncate long TODO history but keep latest focus item. Got:\n%s", prompt)
+	}
+}
+
+func TestGenerateIntervalReviewPrompt_IncludesConcreteStringGuidance(t *testing.T) {
+	react, err := NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create ReAct instance: %v", err)
+	}
+
+	tool := aitool.NewWithoutCallback(
+		"network_diagnose",
+		aitool.WithStringParam("target"),
+	)
+
+	prompt, err := react.promptManager.GenerateIntervalReviewPromptWithContext(
+		tool,
+		aitool.InvokeParams{"target": "127.0.0.1"},
+		[]byte("partial output"),
+		nil,
+		time.Unix(0, 0),
+		1,
+		"expect structured diagnostics",
+	)
+	if err != nil {
+		t.Fatalf("Failed to generate interval review prompt: %v", err)
+	}
+
+	if !utils.MatchAllOfSubString(
+		prompt,
+		"must be concrete natural-language strings",
+		"Do not copy schema metadata such as",
+		"Example valid response:",
+		`"progress_summary": "已完成网络接口、监听端口与路由配置的采集，正在补充协议与监控指标。"`,
+	) {
+		t.Fatalf("interval review prompt should contain anti-schema guidance and concrete example. Got:\n%s", prompt)
 	}
 }
 
