@@ -2,7 +2,10 @@ package aireact
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
+	"regexp"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -51,6 +54,49 @@ func mockedDirectlyCallToolLegacyWrapped(i aicommon.AICallerConfigIf, req *aicom
 		rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "directly_call_tool", "directly_call_tool_name": "` + toolName + `", "directly_call_identifier": "sleep_briefly", "directly_call_expectations": "~0.1s, instant", "directly_call_tool_params": {"@action": "call-tool", "tool": "` + toolName + `", "params": {"seconds": 0.1}} },
 "human_readable_thought": "directly calling cached tool with wrapped params", "cumulative_summary": "..directly-call-summary.."}
+`))
+		rsp.Close()
+		return rsp, nil
+	}
+
+	if isVerifySatisfactionPrompt(prompt) {
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "directly-call-satisfied", "human_readable_result": "done via directly_call_tool"}`))
+		rsp.Close()
+		return rsp, nil
+	}
+
+	rsp := i.NewAIResponse()
+	rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "fallback"}`))
+	rsp.Close()
+	return rsp, nil
+}
+
+func extractCacheToolNonce(prompt string) string {
+	re := regexp.MustCompile(`<\|CACHE_TOOL_CALL_([A-Za-z0-9]+)\s*>|<\|CACHE_TOOL_CALL_([A-Za-z0-9]+)\>`)
+	matches := re.FindStringSubmatch(prompt)
+	if len(matches) >= 3 {
+		if matches[1] != "" {
+			return matches[1]
+		}
+		return matches[2]
+	}
+	return ""
+}
+
+func mockedDirectlyCallToolWithAITag(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string) (*aicommon.AIResponse, error) {
+	prompt := req.GetPrompt()
+
+	if isPrimaryDecisionPrompt(prompt) {
+		nonce := extractCacheToolNonce(prompt)
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(`
+{"@action": "object", "next_action": { "type": "directly_call_tool", "directly_call_tool_name": "` + toolName + `", "directly_call_identifier": "run_script", "directly_call_expectations": "~0.1s, instant", "directly_call_tool_params": {"timeout": 20} },
+"human_readable_thought": "directly calling cached tool with block params", "cumulative_summary": "..directly-call-summary.."}
+<|TOOL_PARAM_command_` + nonce + `|>
+#!/bin/bash
+echo hello direct call
+<|TOOL_PARAM_command_END_` + nonce + `|>
 `))
 		rsp.Close()
 		return rsp, nil
@@ -209,6 +255,110 @@ LOOP:
 	require.True(t, taskCompleted, "task should complete")
 	require.Equal(t, int32(1), atomic.LoadInt32(&toolCallCount), "tool should be called exactly once")
 	require.True(t, sawParamProgress, "should emit directly_call_tool params progress event")
+}
+
+func TestReAct_DirectlyCallTool_AITagBlockParams(t *testing.T) {
+	in := make(chan *ypb.AIInputEvent, 10)
+	out := make(chan *ypb.AIOutputEvent, 200)
+
+	var toolCallCount int32
+	var capturedCommand atomic.Value
+	var sawBlockProgress bool
+	var requestReferencePayload string
+	var responseReferencePayload string
+	var directCallParamStreamID string
+	bashTool, err := aitool.New(
+		"bash_test",
+		aitool.WithStringParam("command"),
+		aitool.WithNumberParam("timeout"),
+		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+			atomic.AddInt32(&toolCallCount, 1)
+			capturedCommand.Store(params.GetString("command"))
+			return "done", nil
+		}),
+	)
+	require.NoError(t, err)
+
+	react, err := NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			return mockedDirectlyCallToolWithAITag(i, r, "bash_test")
+		}),
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
+			out <- e.ToGRPC()
+		}),
+		aicommon.WithTools(bashTool),
+	)
+	require.NoError(t, err)
+
+	react.config.GetAiToolManager().AddRecentlyUsedTool(bashTool)
+
+	go func() {
+		in <- &ypb.AIInputEvent{
+			IsFreeInput: true,
+			FreeInput:   "test directly call tool with aitag block params",
+		}
+	}()
+
+	timeout := time.After(10 * time.Second)
+	taskCompleted := false
+	var directCallParamStream bytes.Buffer
+
+LOOP:
+	for {
+		select {
+		case e := <-out:
+			if e.Type == string(schema.EVENT_TYPE_STREAM_START) && e.NodeId == "directly_call_tool_params" {
+				directCallParamStreamID = utils.InterfaceToString(jsonpath.FindFirst(string(e.Content), "$.event_writer_id"))
+			}
+			if e.NodeId == "directly_call_tool_params" {
+				directCallParamStream.Write(e.Content)
+			}
+			if strings.Contains(directCallParamStream.String(), "command(BLOCK)") {
+				sawBlockProgress = true
+			}
+			if e.Type == string(schema.EVENT_TYPE_REFERENCE_MATERIAL) {
+				var payload map[string]any
+				require.NoError(t, json.Unmarshal(e.Content, &payload))
+				if utils.InterfaceToString(payload["event_uuid"]) == directCallParamStreamID {
+					payloadStr := utils.InterfaceToString(payload["payload"])
+					if strings.Contains(payloadStr, "AI 请求原文") {
+						requestReferencePayload = payloadStr
+					}
+					if strings.Contains(payloadStr, "AI 响应原文") {
+						responseReferencePayload = payloadStr
+					}
+				}
+			}
+			if e.Type == string(schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE) {
+				iid := utils.InterfaceToString(jsonpath.FindFirst(string(e.Content), "$.id"))
+				in <- &ypb.AIInputEvent{
+					IsInteractiveMessage: true,
+					InteractiveId:        iid,
+					InteractiveJSONInput: `{"suggestion": "continue"}`,
+				}
+			}
+			if e.NodeId == "react_task_status_changed" {
+				result := jsonpath.FindFirst(string(e.Content), "$..react_task_now_status")
+				if utils.InterfaceToString(result) == "completed" {
+					taskCompleted = true
+					break LOOP
+				}
+			}
+		case <-timeout:
+			break LOOP
+		}
+	}
+
+	require.True(t, taskCompleted, "task should complete")
+	require.Equal(t, int32(1), atomic.LoadInt32(&toolCallCount), "tool should be called exactly once")
+	require.Equal(t, "#!/bin/bash\necho hello direct call", capturedCommand.Load())
+	require.True(t, sawBlockProgress, "should surface block-param progress for directly_call_tool")
+	require.Contains(t, directCallParamStream.String(), "command(BLOCK)#!/bin/bash\necho hello direct call")
+	require.NotEmpty(t, directCallParamStreamID, "should emit directly_call_tool params stream id")
+	require.Contains(t, requestReferencePayload, "test directly call tool with aitag block params")
+	require.Contains(t, responseReferencePayload, "\"directly_call_tool_name\": \"bash_test\"")
+	require.Contains(t, responseReferencePayload, "<|TOOL_PARAM_command_")
 }
 
 // TestReAct_DirectlyCallTool_RequireThenDirect uses require_tool first, then directly_call_tool.

@@ -4,11 +4,15 @@ import (
 	_ "embed"
 	"fmt"
 	"slices"
+	"strings"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+const directlyCallToolParamsNodeID = "directly_call_tool_params"
 
 //go:embed prompts/loop_template.tpl
 var coreTemplate string
@@ -163,7 +167,8 @@ func (r *ReActLoop) generateLoopPrompt(
 
 	// Append CACHE_TOOL_CALL block only when summary is non-empty
 	if tm := r.config.GetAiToolManager(); tm != nil && tm.HasRecentlyUsedTools() {
-		if summary := tm.GetRecentToolsSummary(20480, nonce); summary != "" {
+		r.syncRecentToolParamAITagFields(tm.GetRecentToolParamNames())
+		if summary := tm.GetRecentToolsSummary(tm.GetRecentToolCacheMaxBytes(), nonce); summary != "" {
 			cacheBlock := utils.MustRenderTemplate(`
 <|CACHE_TOOL_CALL_{{ .Nonce }}>
 {{ .Summary }}
@@ -191,4 +196,23 @@ func (r *ReActLoop) generateLoopPrompt(
 		return "", utils.Wrap(err, "render loop prompt template failed")
 	}
 	return prompt, nil
+}
+
+func (r *ReActLoop) syncRecentToolParamAITagFields(paramNames []string) {
+	if r.aiTagFields == nil {
+		return
+	}
+	for _, paramName := range paramNames {
+		paramName = strings.TrimSpace(paramName)
+		if paramName == "" {
+			continue
+		}
+		tagName := fmt.Sprintf("TOOL_PARAM_%s", paramName)
+		r.aiTagFields.Set(tagName, &LoopAITagField{
+			TagName:      tagName,
+			VariableName: aicommon.GetToolParamAITagActionKey(paramName),
+			AINodeId:     directlyCallToolParamsNodeID,
+			ContentType:  "text/plain",
+		})
+	}
 }

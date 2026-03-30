@@ -86,6 +86,52 @@ func newDynamicPlanningTestConfig(ctx context.Context, aiCallback AICallbackType
 	return c
 }
 
+func collectRequestAndResponseReferenceMaterials(t *testing.T, events <-chan *schema.AiOutputEvent, deadline <-chan time.Time) (string, string, string, string, map[string]bool) {
+	t.Helper()
+
+	streamStartIDs := make(map[string]bool)
+	var requestPayload string
+	var responsePayload string
+	var requestEventID string
+	var responseEventID string
+
+	for {
+		if requestPayload != "" && responsePayload != "" && streamStartIDs[requestEventID] && streamStartIDs[responseEventID] {
+			return requestPayload, responsePayload, requestEventID, responseEventID, streamStartIDs
+		}
+
+		select {
+		case evt := <-events:
+			if evt == nil {
+				continue
+			}
+			if evt.Type == schema.EVENT_TYPE_STREAM_START {
+				streamStartIDs[evt.GetStreamEventWriterId()] = true
+			}
+			if evt.Type != schema.EVENT_TYPE_REFERENCE_MATERIAL {
+				continue
+			}
+
+			var payload map[string]any
+			require.NoError(t, json.Unmarshal(evt.Content, &payload))
+
+			payloadStr, _ := payload["payload"].(string)
+			eventID, _ := payload["event_uuid"].(string)
+
+			switch {
+			case strings.Contains(payloadStr, "AI 请求原文"):
+				requestPayload = payloadStr
+				requestEventID = eventID
+			case strings.Contains(payloadStr, "AI 响应原文"):
+				responsePayload = payloadStr
+				responseEventID = eventID
+			}
+		case <-deadline:
+			return requestPayload, responsePayload, requestEventID, responseEventID, streamStartIDs
+		}
+	}
+}
+
 func TestYOLO_DynamicPlanning_DefaultCallbacks_WithAI(t *testing.T) {
 	t.Run("plan review calls AI and uses suggestion", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -375,6 +421,114 @@ func TestYOLO_DynamicPlanning_PlanReview_EmitsStructuredDecision(t *testing.T) {
 			t.Fatalf("missing plan review events: status=%v decision=%v", sawStatus, sawDecision)
 		}
 	}
+}
+
+func TestYOLO_DynamicPlanning_PlanReview_EmitsRequestAndResponseReferenceMaterials(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	events := make(chan *schema.AiOutputEvent, 64)
+	planToken := "plan-reference-token"
+	rawResponse := `{"@action":"plan_review","suggestion":"continue","reason":"plan review raw response"}`
+
+	cb := func(i AICallerConfigIf, req *AIRequest) (*AIResponse, error) {
+		rsp := NewUnboundAIResponse()
+		rsp.EmitOutputStream(strings.NewReader(rawResponse))
+		rsp.Close()
+		return rsp, nil
+	}
+
+	c := newDynamicPlanningTestConfig(ctx, cb,
+		WithAgreePolicy(AgreePolicyYOLO),
+		WithDisableDynamicPlanning(false),
+		WithEventHandler(func(e *schema.AiOutputEvent) {
+			events <- e
+		}),
+	)
+	c.StartEventLoop(ctx)
+
+	ep := c.Epm.CreateEndpointWithEventType(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE)
+	ep.SetDefaultSuggestionContinue()
+	ep.SetReviewMaterials(aitool.InvokeParams{
+		"plans": map[string]any{"tasks": []string{planToken}},
+	})
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		c.DoWaitAgreeWithPolicy(ctx, AgreePolicyYOLO, ep)
+	}()
+
+	select {
+	case <-done:
+		params := ep.GetParams()
+		require.Equal(t, "continue", params["suggestion"])
+	case <-time.After(8 * time.Second):
+		t.Fatal("plan review AI call should complete within timeout")
+	}
+
+	requestPayload, responsePayload, requestEventID, responseEventID, streamStartIDs := collectRequestAndResponseReferenceMaterials(t, events, time.After(3*time.Second))
+	require.NotEmpty(t, requestPayload)
+	require.NotEmpty(t, responsePayload)
+	require.Contains(t, requestPayload, planToken)
+	require.Contains(t, responsePayload, rawResponse)
+	require.True(t, streamStartIDs[requestEventID], "request reference should attach to a valid stream event")
+	require.True(t, streamStartIDs[responseEventID], "response reference should attach to a valid stream event")
+}
+
+func TestYOLO_DynamicPlanning_TaskReview_EmitsRequestAndResponseReferenceMaterials(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	events := make(chan *schema.AiOutputEvent, 64)
+	taskToken := "task-reference-token"
+	rawResponse := `{"@action":"task_review","suggestion":"continue","reason":"task review raw response"}`
+
+	cb := func(i AICallerConfigIf, req *AIRequest) (*AIResponse, error) {
+		rsp := NewUnboundAIResponse()
+		rsp.EmitOutputStream(strings.NewReader(rawResponse))
+		rsp.Close()
+		return rsp, nil
+	}
+
+	c := newDynamicPlanningTestConfig(ctx, cb,
+		WithAgreePolicy(AgreePolicyYOLO),
+		WithDisableDynamicPlanning(false),
+		WithEventHandler(func(e *schema.AiOutputEvent) {
+			events <- e
+		}),
+	)
+	c.StartEventLoop(ctx)
+
+	ep := c.Epm.CreateEndpointWithEventType(schema.EVENT_TYPE_TASK_REVIEW_REQUIRE)
+	ep.SetDefaultSuggestionContinue()
+	ep.SetReviewMaterials(aitool.InvokeParams{
+		"task":          map[string]any{"name": "test task", "goal": taskToken},
+		"short_summary": "completed successfully",
+		"long_summary":  taskToken,
+	})
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		c.DoWaitAgreeWithPolicy(ctx, AgreePolicyYOLO, ep)
+	}()
+
+	select {
+	case <-done:
+		params := ep.GetParams()
+		require.Equal(t, "continue", params["suggestion"])
+	case <-time.After(8 * time.Second):
+		t.Fatal("task review AI call should complete within timeout")
+	}
+
+	requestPayload, responsePayload, requestEventID, responseEventID, streamStartIDs := collectRequestAndResponseReferenceMaterials(t, events, time.After(3*time.Second))
+	require.NotEmpty(t, requestPayload)
+	require.NotEmpty(t, responsePayload)
+	require.Contains(t, requestPayload, taskToken)
+	require.Contains(t, responsePayload, rawResponse)
+	require.True(t, streamStartIDs[requestEventID], "request reference should attach to a valid stream event")
+	require.True(t, streamStartIDs[responseEventID], "response reference should attach to a valid stream event")
 }
 
 func TestYOLO_DynamicPlanning_CustomPlanReview(t *testing.T) {

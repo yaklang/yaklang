@@ -1191,6 +1191,18 @@ func WithAiToolManagerOptions(opts ...buildinaitools.ToolManagerOption) ConfigOp
 	}
 }
 
+func WithAiToolManager(manager *buildinaitools.AiToolManager) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		c.AiToolManager = manager
+		c.m.Unlock()
+		return nil
+	}
+}
+
 func WithDisableToolUse(disable bool) ConfigOption {
 	return func(c *Config) error {
 		if c.m == nil {
@@ -2800,6 +2812,9 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	opts = append(opts, WithDisableToolUse(i.DisableToolUse))
 
 	// Tool manager options
+	if i.AiToolManager != nil {
+		opts = append(opts, WithAiToolManager(i.AiToolManager))
+	}
 	if len(i.AiToolManagerOption) > 0 {
 		opts = append(opts, WithAiToolManagerOptions(i.AiToolManagerOption...))
 	}

@@ -14,6 +14,65 @@ import (
 )
 
 const directlyCallToolParamsNodeID = "directly_call_tool_params"
+const directlyCallToolPromptLoopKey = "last_ai_decision_prompt"
+const directlyCallToolResponseLoopKey = "last_ai_decision_response"
+
+func getDirectlyCallToolParamNames(loop *reactloops.ReActLoop, toolName string) []string {
+	if loop == nil || loop.GetConfig() == nil || loop.GetConfig().GetAiToolManager() == nil {
+		return nil
+	}
+	paramNames := loop.GetConfig().GetAiToolManager().GetRecentToolParamNamesByTool(toolName)
+	if len(paramNames) > 0 {
+		return paramNames
+	}
+	return loop.GetConfig().GetAiToolManager().GetRecentToolParamNames()
+}
+
+func hasDirectlyCallToolAITagParams(action *aicommon.Action, paramNames []string) bool {
+	if action == nil || len(paramNames) == 0 {
+		return false
+	}
+	temp := make(aitool.InvokeParams)
+	return len(aicommon.MergeActionAITagParams(action, temp, paramNames)) > 0
+}
+
+func buildDirectlyCallParamDisplayItems(params aitool.InvokeParams, blockParamNames []string) []string {
+	blockSet := make(map[string]struct{}, len(blockParamNames))
+	for _, name := range blockParamNames {
+		blockSet[name] = struct{}{}
+	}
+
+	items := make([]string, 0, len(params))
+	for _, key := range directlyCallParamKeys(params) {
+		if key == aicommon.ReservedKeyIdentifier || key == aicommon.ReservedKeyCallExpectations {
+			continue
+		}
+		if _, ok := blockSet[key]; ok {
+			items = append(items, fmt.Sprintf("%s(BLOCK)", key))
+			continue
+		}
+		items = append(items, fmt.Sprintf("%s: %s", key, utils.ShrinkString(strings.ReplaceAll(utils.InterfaceToString(params[key]), "\n", `\\n`), 80)))
+	}
+	return items
+}
+
+func emitDirectlyCallParamProgress(emit func(string), params aitool.InvokeParams, blockParamNames []string) {
+	blockSet := make(map[string]struct{}, len(blockParamNames))
+	for _, name := range blockParamNames {
+		blockSet[name] = struct{}{}
+	}
+
+	for _, key := range directlyCallParamKeys(params) {
+		if key == aicommon.ReservedKeyIdentifier || key == aicommon.ReservedKeyCallExpectations {
+			continue
+		}
+		if _, ok := blockSet[key]; ok {
+			emit(fmt.Sprintf("%s(BLOCK)%s", key, utils.InterfaceToString(params[key])))
+			continue
+		}
+		emit(fmt.Sprintf("%s: %s", key, utils.ShrinkString(strings.ReplaceAll(utils.InterfaceToString(params[key]), "\n", `\\n`), 80)))
+	}
+}
 
 func getDirectlyCallToolParamPayload(action *aicommon.Action) (string, aitool.InvokeParams) {
 	raw := action.GetString("directly_call_tool_params")
@@ -216,6 +275,7 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 		if mgr == nil || !mgr.IsRecentlyUsedTool(toolName) {
 			return utils.Errorf("tool '%s' is not in the recently-used cache; use require_tool instead", toolName)
 		}
+		paramNames := getDirectlyCallToolParamNames(loop, toolName)
 
 		hasParams := len(action.GetInvokeParams("directly_call_tool_params")) > 0 ||
 			action.GetString("directly_call_tool_params") != ""
@@ -224,7 +284,10 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 			hasParams = len(nextAction.GetObject("directly_call_tool_params")) > 0
 		}
 		if !hasParams {
-			return utils.Error("directly_call_tool_params is required for directly_call_tool but empty")
+			hasParams = hasDirectlyCallToolAITagParams(action, paramNames)
+		}
+		if !hasParams {
+			return utils.Error("directly_call_tool_params is required for directly_call_tool but empty, and no TOOL_PARAM_* AITAG blocks were found")
 		}
 
 		loop.Set("directly_call_tool_name", toolName)
@@ -243,37 +306,62 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 			ctx = t.GetContext()
 		}
 
-		emitStatus := func(string) {}
+		emitProgress := func(string) {}
+		finishProgress := func(string) {}
+		var progressEventID string
 		if emitter := loop.GetEmitter(); emitter != nil && operator.GetTask() != nil {
 			pr, pw := utils.NewPipe()
-			emitter.EmitDefaultStreamEvent(directlyCallToolParamsNodeID, pr, operator.GetTask().GetId())
+			event, _ := emitter.EmitDefaultStreamEvent(directlyCallToolParamsNodeID, pr, operator.GetTask().GetId())
+			if event != nil {
+				progressEventID = event.GetStreamEventWriterId()
+				aicommon.EmitAIRequestAndResponseReferenceMaterials(
+					emitter,
+					progressEventID,
+					loop.Get(directlyCallToolPromptLoopKey),
+					loop.Get(directlyCallToolResponseLoopKey),
+				)
+			}
 			defer pw.Close()
-			emitStatus = func(msg string) {
+			emitProgress = func(msg string) {
+				pw.WriteString(msg)
+				pw.WriteString(" -> ")
+			}
+			finishProgress = func(msg string) {
 				pw.WriteString(msg)
 				pw.WriteString("\n")
 			}
 		}
 		reportStatus := func(msg string) {
 			invoker.AddToTimeline("[DIRECT_CALL_PARAMS]", msg)
-			emitStatus(msg)
 		}
 
 		reportStatus(fmt.Sprintf("preparing directly_call_tool params for '%s'", toolName))
+		emitProgress("[开始处理参数]")
 		raw, objParams := getDirectlyCallToolParamPayload(action)
 		params, notes := normalizeDirectlyCallToolParams(raw, objParams)
+		if params == nil {
+			params = make(aitool.InvokeParams)
+		}
+		mergedBlockParams := aicommon.MergeActionAITagParams(action, params, getDirectlyCallToolParamNames(loop, toolName))
+		if len(mergedBlockParams) > 0 {
+			notes = append(notes, fmt.Sprintf("merged %d AITAG block params: %s", len(mergedBlockParams), strings.Join(mergedBlockParams, ", ")))
+		}
 		for _, note := range notes {
 			reportStatus(note)
 		}
 		if len(params) == 0 {
 			reportStatus("directly_call_tool params extraction failed")
+			finishProgress("[failed]")
 			operator.Feedback(utils.Error("directly_call_tool: no valid params found"))
 			operator.Continue()
 			return
 		}
 
 		paramKeys := directlyCallParamKeys(params)
+		displayItems := buildDirectlyCallParamDisplayItems(params, mergedBlockParams)
+		emitDirectlyCallParamProgress(emitProgress, params, mergedBlockParams)
 		reportStatus(fmt.Sprintf("normalized %d param fields: %s", len(paramKeys), strings.Join(paramKeys, ", ")))
-		operator.Feedback(fmt.Sprintf("Prepared directly_call_tool params for '%s': %d fields [%s]", toolName, len(paramKeys), strings.Join(paramKeys, ", ")))
+		operator.Feedback(fmt.Sprintf("Prepared directly_call_tool params for '%s': %d fields [%s]", toolName, len(displayItems), strings.Join(displayItems, ", ")))
 
 		// 2. inject reserved keys from directly_call_ prefixed fields
 		if id := action.GetString("directly_call_identifier"); id != "" {
@@ -281,8 +369,10 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 		}
 		if ce := action.GetString("directly_call_expectations"); ce != "" {
 			params[aicommon.ReservedKeyCallExpectations] = ce
+			emitProgress("[note] " + ce)
 		}
 		reportStatus(fmt.Sprintf("calling cached tool '%s'", toolName))
+		finishProgress(fmt.Sprintf("调用缓存工具 '%s' [done]", toolName))
 
 		// 3. execute
 		result, directly, callErr := invoker.ExecuteToolRequiredAndCallWithoutRequired(ctx, toolName, params)
