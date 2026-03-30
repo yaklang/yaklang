@@ -101,78 +101,12 @@ func invokeCallable(ctx unsafe.Pointer) {
 	C.yak_invoke_callable(C.uintptr_t(target), ctx)
 }
 
-func invokeDispatch(ctx unsafe.Pointer) {
-	if ctx == nil {
-		return
-	}
-
-	argc := ctxArgc(ctx)
-	if argc < 0 || argc > 256 {
-		return
-	}
-	args := ctxArgsSlice(ctx, argc)
-
-	id := abi.FuncID(int64(ctxLoadWord(ctx, abi.WordTarget)))
-
-	var ret int64
-	switch id {
-	case abi.IDPocTimeout:
-		ret = stdlibPocTimeout(args)
-	case abi.IDPocGet:
-		ret = stdlibPocGet(args)
-	case abi.IDPocGetHTTPPacketBody:
-		ret = stdlibPocGetHTTPPacketBody(args)
-	case abi.IDOsGetenv:
-		ret = stdlibOsGetenv(args)
-	case abi.IDPrint:
-		ret = stdlibPrint(args)
-	case abi.IDPrintf:
-		ret = stdlibPrintf(args)
-	case abi.IDPrintln:
-		ret = stdlibPrintln(args)
-	case abi.IDYakitInfo:
-		ret = stdlibYakitLog("info", args)
-	case abi.IDYakitWarn:
-		ret = stdlibYakitLog("warn", args)
-	case abi.IDYakitDebug:
-		ret = stdlibYakitLog("debug", args)
-	case abi.IDYakitError:
-		ret = stdlibYakitLog("error", args)
-	case abi.IDSyncNewWaitGroup:
-		ret = stdlibSyncNewWaitGroup(args)
-	case abi.IDSyncNewSizedWaitGroup:
-		ret = stdlibSyncNewSizedWaitGroup(args)
-	case abi.IDSyncNewLock:
-		ret = stdlibSyncNewLock(args)
-	case abi.IDSyncNewMutex:
-		ret = stdlibSyncNewMutex(args)
-	case abi.IDSyncNewRWMutex:
-		ret = stdlibSyncNewRWMutex(args)
-	case abi.IDSyncNewMap:
-		ret = stdlibSyncNewMap(args)
-	case abi.IDSyncNewOnce:
-		ret = stdlibSyncNewOnce(args)
-	case abi.IDSyncNewPool:
-		ret = stdlibSyncNewPool(args)
-	case abi.IDSyncNewCond:
-		ret = stdlibSyncNewCond(args)
-	case abi.IDRuntimeShadowMethod:
-		ret = stdlibRuntimeShadowMethod(args)
-	case abi.IDAppend:
-		ret = stdlibAppend(args)
-	default:
-		ret = 0
-	}
-
-	ctxSetRet(ctx, ret)
-}
-
 func executeInvoke(ctx unsafe.Pointer) {
 	switch ctxLoadWord(ctx, abi.WordKind) {
 	case abi.KindCallable:
 		invokeCallable(ctx)
 	case abi.KindDispatch:
-		invokeDispatch(ctx)
+		executeRuntimeDispatch(ctx)
 	default:
 		// ignore
 	}

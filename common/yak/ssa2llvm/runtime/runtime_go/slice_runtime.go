@@ -6,7 +6,6 @@ package main
 import "C"
 
 import (
-	"fmt"
 	"reflect"
 	"unsafe"
 
@@ -53,32 +52,4 @@ func makeRuntimeSlice(elemKind abi.SliceElemKind, length, capacity int64) any {
 //export yak_runtime_make_slice
 func yak_runtime_make_slice(elemKind int64, length int64, capacity int64) int64 {
 	return int64(uintptr(newStdlibShadow(makeRuntimeSlice(abi.SliceElemKind(elemKind), length, capacity))))
-}
-
-func stdlibAppend(args []uint64) int64 {
-	if len(args) < 1 {
-		return 0
-	}
-
-	base := decodeTaggedArg(args[0])
-	if base == nil {
-		return 0
-	}
-
-	sliceVal := reflect.ValueOf(base)
-	if !sliceVal.IsValid() || sliceVal.Kind() != reflect.Slice {
-		panic(fmt.Errorf("append expects slice, got %T", base))
-	}
-
-	elemType := sliceVal.Type().Elem()
-	elems := make([]reflect.Value, 0, len(args)-1)
-	for _, raw := range args[1:] {
-		elem, err := decodeRuntimeArg(raw, elemType)
-		if err != nil {
-			panic(err)
-		}
-		elems = append(elems, elem)
-	}
-
-	return int64(uintptr(newStdlibShadow(reflect.Append(sliceVal, elems...).Interface())))
 }
