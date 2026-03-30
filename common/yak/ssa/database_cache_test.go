@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -55,10 +56,13 @@ func TestSaveEditorTracksOnlySourceHashInMemory(t *testing.T) {
 	prog.SaveEditor(editor)
 	prog.SaveEditor(editor)
 
-	require.Equal(t, 1, prog.Cache.editorHashCache.Count(), "only the source hash should stay resident")
+	require.Equal(t, 0, prog.Cache.editorHashCache.Count(), "source hash should not be marked persisted before saver ack")
+	require.Equal(t, 1, prog.Cache.editorPendingHashCache.Count(), "duplicate source saves should collapse to one in-flight hash")
 	require.False(t, prog.Cache.editorCache.Has(hash), "source payload should not stay resident in the saver-only cache")
 
 	prog.Cache.editorCache.Close()
+	require.Equal(t, 1, prog.Cache.editorHashCache.Count(), "source hash should be marked persisted after saver ack")
+	require.Equal(t, 0, prog.Cache.editorPendingHashCache.Count(), "pending source hash should clear after saver ack")
 
 	var count int64
 	err := ssadb.GetDB().Model(&ssadb.IrSource{}).
@@ -66,6 +70,26 @@ func TestSaveEditorTracksOnlySourceHashInMemory(t *testing.T) {
 		Count(&count).Error
 	require.NoError(t, err)
 	require.Equal(t, int64(1), count)
+}
+
+func TestReserveSourceHashForSaveRequiresPersistAck(t *testing.T) {
+	cache := &ProgramCache{
+		editorHashCache:        utils.NewSafeMapWithKey[string, struct{}](),
+		editorPendingHashCache: utils.NewSafeMapWithKey[string, struct{}](),
+	}
+
+	require.True(t, cache.reserveSourceHashForSave("hash-a"))
+	require.False(t, cache.reserveSourceHashForSave("hash-a"), "pending source hash should dedupe repeated queue attempts")
+	require.Equal(t, 0, cache.editorHashCache.Count(), "pending source hash should not be treated as persisted")
+	require.Equal(t, 1, cache.editorPendingHashCache.Count())
+
+	cache.clearPendingSourceHashes("hash-a")
+	require.True(t, cache.reserveSourceHashForSave("hash-a"), "failed saves should clear pending state and allow retry")
+
+	cache.markSourceHashesPersisted("hash-a")
+	require.Equal(t, 1, cache.editorHashCache.Count())
+	require.Equal(t, 0, cache.editorPendingHashCache.Count())
+	require.False(t, cache.reserveSourceHashForSave("hash-a"), "persisted source hash should not be requeued")
 }
 
 func TestLazyInstructionSaveAgain(t *testing.T) {
@@ -525,6 +549,35 @@ func TestBasicBlockStaysResidentAfterFunctionFinish(t *testing.T) {
 	resident = prog.Cache.GetInstruction(blockID)
 	require.NotNil(t, resident)
 	require.Equal(t, blockID, resident.GetId())
+}
+
+func TestFunctionScopedInstructionsSpillAfterFinish(t *testing.T) {
+	programName := uuid.NewString()
+	ttl := 20 * time.Millisecond
+
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
+	vf := filesys.NewVirtualFs()
+	prog := newProgramWithTTL(programName, ttl, ProgramCacheDBWrite, vf)
+	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+
+	param := builder.NewParam("cooldown_param")
+	key := builder.EmitConstInst("field")
+	member := builder.NewParameterMember("cooldown_param.field", param, key)
+	captured := builder.EmitUndefined("captured")
+	capturedVariable := builder.CreateVariable("captured")
+	builder.AssignVariable(capturedVariable, captured)
+	freeValue := builder.BuildFreeValue("captured")
+
+	time.Sleep(ttl * 3)
+	require.Nil(t, ssadb.GetIrCodeItemById(ssadb.GetDB(), programName, param.GetId()), "function-scoped parameter should stay resident before finish")
+	require.Nil(t, ssadb.GetIrCodeItemById(ssadb.GetDB(), programName, member.GetId()), "parameter member should stay resident before finish")
+	require.Nil(t, ssadb.GetIrCodeItemById(ssadb.GetDB(), programName, freeValue.GetId()), "free value should stay resident before finish")
+
+	builder.Finish()
+
+	waitInstructionSpilledAfterFinish(t, prog, programName, param.GetId(), ttl)
+	waitInstructionSpilledAfterFinish(t, prog, programName, member.GetId(), ttl)
+	waitInstructionSpilledAfterFinish(t, prog, programName, freeValue.GetId(), ttl)
 }
 
 func waitInstructionSpilledAfterFinish(t *testing.T, prog *Program, programName string, id int64, ttl time.Duration) {

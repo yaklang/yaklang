@@ -30,14 +30,16 @@ type ProgramCache struct {
 	ClassIndex    *SimpleCache[int64]
 	ConstCache    *SimpleCache[int64]
 
-	indexCache      *SimpleCache[*ssadb.IrIndex]
-	offsetCache     *SimpleCache[*ssadb.IrOffset]
-	editorCache     *SimpleCache[*ssadb.IrSource]
-	editorHashCache *utils.SafeMapWithKey[string, struct{}]
+	indexCache             *SimpleCache[*ssadb.IrIndex]
+	offsetCache            *SimpleCache[*ssadb.IrOffset]
+	editorCache            *SimpleCache[*ssadb.IrSource]
+	editorHashCache        *utils.SafeMapWithKey[string, struct{}]
+	editorPendingHashCache *utils.SafeMapWithKey[string, struct{}]
 
 	afterSaveNotify func(int)
 
-	waitGroup *sync.WaitGroup // wait for all goroutines to finish
+	waitGroup    *sync.WaitGroup // wait for all goroutines to finish
+	sourceHashMu sync.Mutex
 
 	instructionCacheMetrics *instructionCacheMetrics
 }
@@ -321,6 +323,45 @@ func (c *ProgramCache) CoolDownFunctionInstructions(function *Function) {
 		ids = append(ids, id)
 	}
 
+	for _, id := range function.Params {
+		addID(id)
+	}
+	for _, id := range function.FreeValues {
+		addID(id)
+	}
+	for _, id := range function.ParameterMembers {
+		addID(id)
+	}
+	for _, id := range function.Throws {
+		addID(id)
+	}
+	for _, id := range function.Return {
+		addID(id)
+	}
+	for _, id := range function.ChildFuncs {
+		addID(id)
+	}
+	addID(function.EnterBlock)
+	addID(function.ExitBlock)
+	addID(function.DeferBlock)
+
+	for _, sideEffect := range function.SideEffects {
+		if sideEffect == nil {
+			continue
+		}
+		addID(sideEffect.Modify)
+		addID(sideEffect.MemberCallKey)
+	}
+	for _, sideEffects := range function.SideEffectsReturn {
+		for _, sideEffect := range sideEffects {
+			if sideEffect == nil {
+				continue
+			}
+			addID(sideEffect.Modify)
+			addID(sideEffect.MemberCallKey)
+		}
+	}
+
 	for _, blockID := range function.Blocks {
 		blockValue, ok := function.GetInstructionById(blockID)
 		if !ok || blockValue == nil {
@@ -343,6 +384,62 @@ func (c *ProgramCache) CoolDownFunctionInstructions(function *Function) {
 		return
 	}
 	c.InstructionCache.Track(ids)
+}
+
+func (c *ProgramCache) reserveSourceHashForSave(hash string) bool {
+	if c == nil || hash == "" {
+		return false
+	}
+	c.sourceHashMu.Lock()
+	defer c.sourceHashMu.Unlock()
+
+	if c.editorHashCache != nil && c.editorHashCache.Have(hash) {
+		return false
+	}
+	if c.editorPendingHashCache != nil && c.editorPendingHashCache.Have(hash) {
+		return false
+	}
+	if c.editorPendingHashCache != nil {
+		c.editorPendingHashCache.Set(hash, struct{}{})
+	}
+	return true
+}
+
+func (c *ProgramCache) markSourceHashesPersisted(hashes ...string) {
+	if c == nil {
+		return
+	}
+	c.sourceHashMu.Lock()
+	defer c.sourceHashMu.Unlock()
+
+	for _, hash := range hashes {
+		if hash == "" {
+			continue
+		}
+		if c.editorPendingHashCache != nil {
+			c.editorPendingHashCache.Delete(hash)
+		}
+		if c.editorHashCache != nil {
+			c.editorHashCache.Set(hash, struct{}{})
+		}
+	}
+}
+
+func (c *ProgramCache) clearPendingSourceHashes(hashes ...string) {
+	if c == nil {
+		return
+	}
+	c.sourceHashMu.Lock()
+	defer c.sourceHashMu.Unlock()
+
+	for _, hash := range hashes {
+		if hash == "" {
+			continue
+		}
+		if c.editorPendingHashCache != nil {
+			c.editorPendingHashCache.Delete(hash)
+		}
+	}
 }
 
 func (c *ProgramCache) IsExistedSourceCodeHash(programName string, hashString string) bool {
