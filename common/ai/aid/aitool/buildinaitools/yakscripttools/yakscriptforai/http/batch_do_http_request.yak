@@ -33,8 +33,8 @@ Required (when packet is empty):
                             If scheme is omitted, https:// is assumed.
 
 Required (for batch operations):
-  paths           (string)  Paths to test, one per line or comma-separated.
-                            Example: "/admin\n/login\n/api/v1/users" or "/admin,/login,/api"
+    paths           (string)  Paths to test, one per line.
+                                                        Example: "/admin\n/login\n/api/v1/users"
                             *** MUST use AITAG if paths span multiple lines ***
 
 Optional:
@@ -82,7 +82,7 @@ Optional:
 ## Quick Reference: Which params go where?
 
   In JSON params (single-line values):
-    base-url, paths (comma-separated), method, content-type, query-params, prefix,
+        base-url, paths (single path or newline-escaped string), method, content-type, query-params, prefix,
     https, timeout, concurrent, delay-seconds, redirect-times,
     keyword, regexp-match, proxy, exclude-code, include-code, exclude-size, max-body-size
 
@@ -107,7 +107,7 @@ User intent: "Check multiple paths on a website"
   "identifier": "batch_path_check",
   "params": {
     "base-url": "https://example.com",
-    "paths": "/admin,/login,/api,/backup,/config",
+        "paths": "/admin\n/login\n/api\n/backup\n/config",
     "concurrent": 3,
     "timeout": 10,
     "exclude-code": "404"
@@ -154,7 +154,7 @@ User intent: "Test API v2 endpoints with prefix"
   "params": {
     "base-url": "https://api.example.com",
     "prefix": "/v2/api/",
-    "paths": "users,posts,comments,settings",
+        "paths": "users\nposts\ncomments\nsettings",
     "concurrent": 5,
     "timeout": 10
   }
@@ -171,7 +171,7 @@ User intent: "Batch request with custom headers"
   "identifier": "batch_with_headers",
   "params": {
     "base-url": "https://api.example.com",
-    "paths": "/user/1,/user/2,/user/3",
+        "paths": "/user/1\n/user/2\n/user/3",
     "concurrent": 3,
     "timeout": 10
   }
@@ -224,7 +224,7 @@ User intent: "Slowly enumerate paths to avoid rate limiting"
   "identifier": "slow_path_enum",
   "params": {
     "base-url": "https://api.example.com",
-    "paths": "/v1/a,/v1/b,/v1/c,/v1/d,/v1/e",
+        "paths": "/v1/a\n/v1/b\n/v1/c\n/v1/d\n/v1/e",
     "delay-seconds": 0.5,
     "timeout": 10
   }
@@ -292,7 +292,7 @@ yakit.AutoInitYakit()
 // --- parse parameters ---
 // URL mode params
 baseUrl = cli.String("base-url", cli.setHelp("base URL or domain for URL mode"), cli.setRequired(false))
-pathsStr = cli.String("paths", cli.setHelp("paths to test, comma-separated or one per line"), cli.setRequired(false))
+pathsStr = cli.String("paths", cli.setHelp("paths to test, one per line"), cli.setRequired(false))
 method = cli.String("method", cli.setHelp("HTTP method"), cli.setDefault("GET"))
 headers = cli.String("headers", cli.setHelp("custom headers, one per line: Key: Value"), cli.setRequired(false))
 body = cli.String("body", cli.setHelp("request body content"), cli.setRequired(false))
@@ -340,18 +340,14 @@ if packet == "" && baseUrl == "" && !hasFullUrls {
 // --- parse paths ---
 paths = make([]string)
 if pathsStr != "" {
-    // Support both newline and comma separation
+    // Split only by line so query strings containing commas stay intact.
     for _, line := range str.SplitAndTrim(pathsStr, "\n") {
         line = str.TrimSpace(line)
         if line == "" {
             continue
         }
-        // Also split by comma within each line
-        for _, p := range str.SplitAndTrim(line, ",") {
-            p = str.TrimSpace(p)
-            if p != "" {
-                paths = append(paths, p)
-            }
+        if line != "" {
+            paths = append(paths, line)
         }
     }
 }

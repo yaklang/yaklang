@@ -77,7 +77,7 @@ func TestBatchDoHTTPRequest_BasicGet(t *testing.T) {
 	tool := getBatchDoHTTPRequestTool(t)
 	stdout, _ := execBatchTool(t, tool, aitool.InvokeParams{
 		"base-url":   "http://" + host + ":" + strconv.Itoa(port),
-		"paths":      "/path1,/path2",
+		"paths":      "/path1\n/path2",
 		"concurrent": 2,
 		"timeout":    10,
 	})
@@ -95,7 +95,7 @@ func TestBatchDoHTTPRequest_Prefix(t *testing.T) {
 	tool := getBatchDoHTTPRequestTool(t)
 	stdout, _ := execBatchTool(t, tool, aitool.InvokeParams{
 		"base-url":   "http://" + host + ":" + strconv.Itoa(port),
-		"paths":      "users,admin",
+		"paths":      "users\nadmin",
 		"prefix":     "/v1/api/",
 		"concurrent": 1,
 		"timeout":    10,
@@ -169,7 +169,7 @@ func TestBatchDoHTTPRequest_ExcludeCodes(t *testing.T) {
 	tool := getBatchDoHTTPRequestTool(t)
 	stdout, _ := execBatchTool(t, tool, aitool.InvokeParams{
 		"base-url":     "http://" + host + ":" + strconv.Itoa(port),
-		"paths":        "/ok,/missing",
+		"paths":        "/ok\n/missing",
 		"exclude-code": "404",
 		"concurrent":   2,
 		"timeout":      10,
@@ -194,7 +194,7 @@ func TestBatchDoHTTPRequest_IncludeCodes(t *testing.T) {
 	tool := getBatchDoHTTPRequestTool(t)
 	stdout, _ := execBatchTool(t, tool, aitool.InvokeParams{
 		"base-url":     "http://" + host + ":" + strconv.Itoa(port),
-		"paths":        "/ok,/created",
+		"paths":        "/ok\n/created",
 		"include-code": "200",
 		"concurrent":   2,
 		"timeout":      10,
@@ -235,7 +235,7 @@ func TestBatchDoHTTPRequest_DelaySequential(t *testing.T) {
 	tool := getBatchDoHTTPRequestTool(t)
 	stdout, _ := execBatchTool(t, tool, aitool.InvokeParams{
 		"base-url":      "http://" + host + ":" + strconv.Itoa(port),
-		"paths":         "/a,/b",
+		"paths":         "/a\n/b",
 		"delay-seconds": 0.1,
 		"concurrent":    5, // Should be overridden to 1
 		"timeout":       10,
@@ -318,7 +318,7 @@ func TestBatchDoHTTPRequest_ConcurrentMode(t *testing.T) {
 	tool := getBatchDoHTTPRequestTool(t)
 	stdout, _ := execBatchTool(t, tool, aitool.InvokeParams{
 		"base-url":   "http://" + host + ":" + strconv.Itoa(port),
-		"paths":      "/a,/b,/c",
+		"paths":      "/a\n/b\n/c",
 		"concurrent": 3,
 		"timeout":    10,
 	})
@@ -371,7 +371,7 @@ func TestBatchDoHTTPRequest_ResultsSummary(t *testing.T) {
 	tool := getBatchDoHTTPRequestTool(t)
 	stdout, _ := execBatchTool(t, tool, aitool.InvokeParams{
 		"base-url":   "http://" + host + ":" + strconv.Itoa(port),
-		"paths":      "/a,/b",
+		"paths":      "/a\n/b",
 		"concurrent": 2,
 		"timeout":    10,
 	})
@@ -441,7 +441,7 @@ func TestBatchDoHTTPRequest_MultiplePaths(t *testing.T) {
 	tool := getBatchDoHTTPRequestTool(t)
 	stdout, _ := execBatchTool(t, tool, aitool.InvokeParams{
 		"base-url":   "http://" + host + ":" + strconv.Itoa(port),
-		"paths":      "/api/users,/api/posts",
+		"paths":      "/api/users\n/api/posts",
 		"concurrent": 2,
 		"timeout":    10,
 	})
@@ -504,7 +504,7 @@ func TestBatchDoHTTPRequest_PacketMode(t *testing.T) {
 
 	stdout, _ := execBatchTool(t, tool, aitool.InvokeParams{
 		"packet":     packet,
-		"paths":      "/pkt_a,/pkt_b",
+		"paths":      "/pkt_a\n/pkt_b",
 		"https":      "no",
 		"concurrent": 1,
 		"timeout":    10,
@@ -524,7 +524,7 @@ func TestBatchDoHTTPRequest_FullUrlsInPaths(t *testing.T) {
 
 	tool := getBatchDoHTTPRequestTool(t)
 	baseAddr := "http://" + host + ":" + strconv.Itoa(port)
-	paths := baseAddr + "/full_a," + baseAddr + "/full_b"
+	paths := baseAddr + "/full_a\n" + baseAddr + "/full_b"
 
 	stdout, _ := execBatchTool(t, tool, aitool.InvokeParams{
 		"paths":      paths,
@@ -568,7 +568,7 @@ func TestBatchDoHTTPRequest_ExcludeSize(t *testing.T) {
 	tool := getBatchDoHTTPRequestTool(t)
 	stdout, _ := execBatchTool(t, tool, aitool.InvokeParams{
 		"base-url":     "http://" + host + ":" + strconv.Itoa(port),
-		"paths":        "/big,/small",
+		"paths":        "/big\n/small",
 		"exclude-size": "400-600",
 		"concurrent":   1,
 		"timeout":      10,
@@ -616,20 +616,25 @@ func TestBatchDoHTTPRequest_MaxBodySize(t *testing.T) {
 	assert.Assert(t, strings.Contains(stdout, "truncated"), "response should be truncated when exceeding max-body-size")
 }
 
-// Test 27: Mixed comma and newline path separator
-func TestBatchDoHTTPRequest_MixedPathSeparators(t *testing.T) {
-	host, port := utils.DebugMockHTTP([]byte("mix_ok"))
+// Test 27: Commas inside a single path must be preserved.
+func TestBatchDoHTTPRequest_PathCommasPreserved(t *testing.T) {
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		w.Write([]byte(r.URL.Path + "?" + r.URL.RawQuery))
+	})
 
 	tool := getBatchDoHTTPRequestTool(t)
 	stdout, _ := execBatchTool(t, tool, aitool.InvokeParams{
 		"base-url":   "http://" + host + ":" + strconv.Itoa(port),
-		"paths":      "/a,/b\n/c,/d\n/e",
+		"paths":      "/user/limit/4/order1?order=id,1,2,3\n/user/limit/4/order2?order=id,4,5,6",
 		"concurrent": 1,
 		"timeout":    10,
 	})
 
-	assert.Assert(t, strings.Contains(stdout, "Total paths to test: 5"), "should parse 5 paths from mixed separators")
-	assert.Assert(t, strings.Contains(stdout, "Success: 5"), "all 5 mixed-separator paths should succeed")
+	assert.Assert(t, strings.Contains(stdout, "Total paths to test: 2"), "should only split paths by newlines")
+	assert.Assert(t, strings.Contains(stdout, "Success: 2"), "both newline-separated requests should succeed")
+	assert.Assert(t, strings.Contains(stdout, "/user/limit/4/order1?order=id,1,2,3"), "comma-containing query should remain intact")
+	assert.Assert(t, strings.Contains(stdout, "/user/limit/4/order2?order=id,4,5,6"), "second comma-containing query should remain intact")
 }
 
 // Test 28: Packet mode with explicit base-host override
@@ -716,7 +721,7 @@ func TestBatchDoHTTPRequest_PrefixWithSlashPaths(t *testing.T) {
 	tool := getBatchDoHTTPRequestTool(t)
 	stdout, _ := execBatchTool(t, tool, aitool.InvokeParams{
 		"base-url":   "http://" + host + ":" + strconv.Itoa(port),
-		"paths":      "/users,admin",
+		"paths":      "/users\nadmin",
 		"prefix":     "api/v2",
 		"concurrent": 1,
 		"timeout":    10,
