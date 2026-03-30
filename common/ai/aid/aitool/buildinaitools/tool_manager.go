@@ -3,6 +3,7 @@ package buildinaitools
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 
@@ -19,7 +20,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
-const defaultRecentToolCacheMaxBytes = 20480 // 20KB
+const defaultRecentToolCacheMaxBytes = 40 * 1024 // 40KB
 
 // RecentToolEntry records a recently used tool for directly_call_tool action.
 type RecentToolEntry struct {
@@ -381,6 +382,10 @@ func (m *AiToolManager) getMaxCacheBytes() int {
 	return defaultRecentToolCacheMaxBytes
 }
 
+func (m *AiToolManager) GetRecentToolCacheMaxBytes() int {
+	return m.getMaxCacheBytes()
+}
+
 func (m *AiToolManager) totalCacheSize() int {
 	total := 0
 	for _, entry := range m.recentToolsCache {
@@ -465,26 +470,88 @@ Direct Params Schema (for directly_call_tool only):
 
 `
 
-const recentToolSummaryFooter = `## How to use directly_call_tool
+const recentToolSummaryFooterTemplate = `## How to use directly_call_tool
 
 The schema shown above is the params-only shape for directly_call_tool.
 Pass it directly as directly_call_tool_params. Do not wrap it with @action, tool, or params.
 
-To call a tool listed above, respond with:
+### JSON-only mode
 {"@action": "directly_call_tool", "directly_call_tool_name": "<name>", "directly_call_identifier": "<snake_case_intent>", "directly_call_expectations": "<timing and fallback>", "directly_call_tool_params": <params object matching the Params Schema>}
+
+### Hybrid mode for block parameters
+Use JSON for simple fields and AITAG blocks for multi-line or escape-heavy fields such as command, body, packet, headers, script, content, query.
+
+Example:
+{"@action": "directly_call_tool", "directly_call_tool_name": "<name>", "directly_call_identifier": "<snake_case_intent>", "directly_call_expectations": "<timing and fallback>", "directly_call_tool_params": {"timeout": 20}}
+<|TOOL_PARAM_command_{{ .Nonce }}|>
+#!/bin/bash
+echo "hello"
+<|TOOL_PARAM_command_END_{{ .Nonce }}|>
+
+AITAG rules:
+- Start tag: <|TOOL_PARAM_{param_name}_{{ .Nonce }}|>
+- End tag: <|TOOL_PARAM_{param_name}_END_{{ .Nonce }}|>
+- Copy the current nonce {{ .Nonce }} exactly. Do not reuse any old nonce.
+- AITAG block values override same-named JSON params.
+- If all params are block-style, directly_call_tool_params may be omitted or left as an empty object.
+{{ if .ParamNames }}
+
+Block-friendly params seen in cached tools:
+{{- range .ParamNames }}
+- {{ . }}
+{{- end }}
+{{ end }}
 `
 
-func renderDirectlyCallParamsSchema(schemaSnippet string) string {
+func extractDirectlyCallParamsSchema(schemaSnippet string) aitool.InvokeParams {
 	if strings.TrimSpace(schemaSnippet) == "" {
-		return schemaSnippet
+		return nil
 	}
 
 	var fullSchema aitool.InvokeParams
 	if err := json.Unmarshal([]byte(schemaSnippet), &fullSchema); err != nil {
-		return schemaSnippet
+		return nil
 	}
 
-	paramsSchema := fullSchema.GetObject("properties").GetObject("params")
+	if paramsSchema := fullSchema.GetObject("properties").GetObject("params"); len(paramsSchema) > 0 {
+		return paramsSchema
+	}
+
+	if fullSchema.GetString("type") == "object" && len(fullSchema.GetObject("properties")) > 0 {
+		return fullSchema
+	}
+
+	return nil
+}
+
+func extractDirectlyCallParamNamesFromSchema(schemaSnippet string) []string {
+	paramsSchema := extractDirectlyCallParamsSchema(schemaSnippet)
+	if len(paramsSchema) == 0 {
+		return nil
+	}
+
+	properties := paramsSchema.GetObject("properties")
+	if len(properties) == 0 {
+		return nil
+	}
+
+	names := make([]string, 0, len(properties))
+	for key := range properties {
+		names = append(names, key)
+	}
+	sort.Strings(names)
+	return names
+}
+
+func renderRecentToolSummaryFooter(nonce string, paramNames []string) string {
+	return utils.MustRenderTemplate(recentToolSummaryFooterTemplate, map[string]any{
+		"Nonce":      nonce,
+		"ParamNames": paramNames,
+	})
+}
+
+func renderDirectlyCallParamsSchema(schemaSnippet string) string {
+	paramsSchema := extractDirectlyCallParamsSchema(schemaSnippet)
 	if len(paramsSchema) == 0 {
 		return schemaSnippet
 	}
@@ -492,7 +559,7 @@ func renderDirectlyCallParamsSchema(schemaSnippet string) string {
 	rendered := omap.NewEmptyOrderedMap[string, any]()
 	rendered.Set("$schema", "http://json-schema.org/draft-07/schema#")
 	rendered.Set("type", "object")
-	rendered.Set("description", "Only for directly_call_tool. Pass this object directly as directly_call_tool_params. Do not include @action, tool, or params wrapper.")
+	rendered.Set("description", "Only for directly_call_tool. Pass this object directly as directly_call_tool_params. Do not include @action, tool, or params wrapper. For multi-line content, use TOOL_PARAM_* AITAG blocks with the current nonce from CACHE_TOOL_CALL.")
 	if properties, ok := paramsSchema["properties"]; ok {
 		rendered.Set("properties", properties)
 	}
@@ -508,6 +575,50 @@ func renderDirectlyCallParamsSchema(schemaSnippet string) string {
 		return schemaSnippet
 	}
 	return string(jsonBytes)
+}
+
+func (m *AiToolManager) GetRecentToolParamNames() []string {
+	m.recentToolsMu.Lock()
+	defer m.recentToolsMu.Unlock()
+	return m.getRecentToolParamNamesLocked()
+}
+
+func (m *AiToolManager) getRecentToolParamNamesLocked() []string {
+	if len(m.recentToolsCache) == 0 {
+		return nil
+	}
+
+	seen := make(map[string]struct{})
+	names := make([]string, 0)
+	for _, entry := range m.recentToolsCache {
+		for _, paramName := range extractDirectlyCallParamNamesFromSchema(entry.SchemaSnippet) {
+			if _, ok := seen[paramName]; ok {
+				continue
+			}
+			seen[paramName] = struct{}{}
+			names = append(names, paramName)
+		}
+	}
+	sort.Strings(names)
+	return names
+}
+
+func (m *AiToolManager) GetRecentToolParamNamesByTool(name string) []string {
+	m.recentToolsMu.Lock()
+	for _, entry := range m.recentToolsCache {
+		if entry.Name == name {
+			paramNames := extractDirectlyCallParamNamesFromSchema(entry.SchemaSnippet)
+			m.recentToolsMu.Unlock()
+			return paramNames
+		}
+	}
+	m.recentToolsMu.Unlock()
+
+	tool, err := m.GetToolByName(name)
+	if err != nil || tool == nil {
+		return nil
+	}
+	return extractDirectlyCallParamNamesFromSchema(tool.ToJSONSchemaString())
 }
 
 // ExportRecentToolCache serializes the recent-tool cache entries to a JSON string
@@ -574,7 +685,8 @@ func (m *AiToolManager) GetRecentToolsSummary(maxBytes int, nonce string) string
 	sb.WriteString("# Recently Used Tools (available for directly_call_tool)\n\n")
 	totalLen := sb.Len()
 	entryWritten := false
-	for i, entry := range m.recentToolsCache {
+	for reverseIndex := len(m.recentToolsCache) - 1; reverseIndex >= 0; reverseIndex-- {
+		entry := m.recentToolsCache[reverseIndex]
 		block := utils.MustRenderTemplate(recentToolEntryTemplate, map[string]interface{}{
 			"Name":                 entry.Name,
 			"Nonce":                nonce,
@@ -582,8 +694,8 @@ func (m *AiToolManager) GetRecentToolsSummary(maxBytes int, nonce string) string
 			"DisplaySchemaSnippet": renderDirectlyCallParamsSchema(entry.SchemaSnippet),
 			"Usage":                entry.Usage,
 		})
-		// always include at least the first entry even if it exceeds maxBytes
-		if i > 0 && maxBytes > 0 && totalLen+len(block) > maxBytes {
+		// Always include the most recent entry even if it exceeds maxBytes.
+		if entryWritten && maxBytes > 0 && totalLen+len(block) > maxBytes {
 			break
 		}
 		sb.WriteString(block)
@@ -593,6 +705,6 @@ func (m *AiToolManager) GetRecentToolsSummary(maxBytes int, nonce string) string
 	if !entryWritten {
 		return ""
 	}
-	sb.WriteString(recentToolSummaryFooter)
+	sb.WriteString(renderRecentToolSummaryFooter(nonce, m.getRecentToolParamNamesLocked()))
 	return sb.String()
 }

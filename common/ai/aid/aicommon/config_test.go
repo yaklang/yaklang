@@ -2,10 +2,12 @@ package aicommon
 
 import (
 	"context"
+	"testing"
+
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/schema"
-	"testing"
 )
 
 func TestConfig_Smoking(t *testing.T) {
@@ -98,4 +100,15 @@ func TestConfig_ToolComposeConcurrencyPropagation(t *testing.T) {
 	parent := NewConfig(context.Background(), WithToolComposeConcurrency(5))
 	child := NewConfig(context.Background(), ConvertConfigToOptions(parent)...)
 	require.Equal(t, 5, child.ToolComposeConcurrency)
+}
+
+func TestConfig_ToolManagerPropagation(t *testing.T) {
+	parent := NewConfig(context.Background())
+	require.NotNil(t, parent.GetAiToolManager())
+
+	parent.GetAiToolManager().AddRecentlyUsedTool(buildinaitools.GetBasicBuildInTools()[0])
+	child := NewConfig(context.Background(), ConvertConfigToOptions(parent)...)
+
+	require.Same(t, parent.GetAiToolManager(), child.GetAiToolManager())
+	require.True(t, child.GetAiToolManager().IsRecentlyUsedTool("now"))
 }

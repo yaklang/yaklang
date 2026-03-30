@@ -108,11 +108,52 @@ func TestDirectlyCallTool_Handler_NormalizesWrappedParamsAndStreamsProgress(t *t
 	assert.Equal(t, 0.1, invoker.withoutRequiredParams.GetFloat("seconds"))
 	assert.Equal(t, "sleep_briefly", invoker.withoutRequiredParams.GetString(aicommon.ReservedKeyIdentifier))
 	assert.Equal(t, "~0.1s, instant", invoker.withoutRequiredParams.GetString(aicommon.ReservedKeyCallExpectations))
-	assert.Contains(t, op.GetFeedback().String(), "Prepared directly_call_tool params for 'sleep_test': 1 fields [seconds]")
+	assert.Contains(t, op.GetFeedback().String(), "Prepared directly_call_tool params for 'sleep_test': 1 fields [seconds: 0.1]")
 
 	timeline := invoker.getTimelineString()
 	assert.Contains(t, timeline, "preparing directly_call_tool params for 'sleep_test'")
 	assert.Contains(t, timeline, "unwrapped legacy params wrapper")
 	assert.Contains(t, timeline, "normalized 1 param fields: seconds")
 
+}
+
+func TestDirectlyCallTool_Handler_MergesAITagParams(t *testing.T) {
+	ctx := context.Background()
+	testTool := mustNewTool(
+		"bash_test",
+		aitool.WithStringParam("command"),
+		aitool.WithNumberParam("timeout"),
+		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+			return "ok", nil
+		}),
+	)
+	cfg := &aicommon.Config{AiToolManager: newToolManagerWithTool(testTool)}
+	cfg.GetAiToolManager().AddRecentlyUsedTool(testTool)
+
+	invoker := &directlyCallTestInvoker{testInvoker: newTestInvoker(ctx)}
+	invoker.toolCallResult = &aitool.ToolResult{Success: true, Data: "ok"}
+	invoker.verifySatisfactionResult = aicommon.NewVerifySatisfactionResult(true, "done", "")
+
+	task := newTestTask(ctx)
+	invoker.currentTask = task
+
+	loop := reactloops.NewMinimalReActLoop(cfg, invoker)
+	loop.SetCurrentTask(task)
+
+	action := buildDirectlyCallAction(`{
+		"@action": "directly_call_tool",
+		"directly_call_tool_name": "bash_test",
+		"directly_call_tool_params": "{\"timeout\":20}"
+	}`)
+	action.ForceSet(aicommon.GetToolParamAITagActionKey("command"), "#!/bin/bash\necho hello")
+
+	require.NoError(t, loopAction_directlyCallTool.ActionVerifier(loop, action))
+	op := reactloops.NewActionHandlerOperator(task)
+	loopAction_directlyCallTool.ActionHandler(loop, action, op)
+
+	assert.Equal(t, "bash_test", invoker.withoutRequiredName)
+	assert.Equal(t, 20.0, invoker.withoutRequiredParams.GetFloat("timeout"))
+	assert.Equal(t, "#!/bin/bash\necho hello", invoker.withoutRequiredParams.GetString("command"))
+	assert.Contains(t, op.GetFeedback().String(), "command(BLOCK)")
+	assert.Contains(t, invoker.getTimelineString(), "merged 1 AITAG block params: command")
 }

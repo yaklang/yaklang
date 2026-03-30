@@ -25,6 +25,33 @@ import (
 
 var toolParamAITagStartRegexp = regexp.MustCompile(`<\|TOOL_PARAM_([A-Za-z0-9_]+)_([A-Za-z0-9]+)\|>`)
 
+const toolParamAITagActionKeyPrefix = "__aitag__"
+
+func GetToolParamAITagActionKey(paramName string) string {
+	return toolParamAITagActionKeyPrefix + paramName
+}
+
+func MergeActionAITagParams(action *Action, invokeParams aitool.InvokeParams, paramNames []string) []string {
+	if action == nil || len(paramNames) == 0 {
+		return nil
+	}
+	if invokeParams == nil {
+		invokeParams = make(aitool.InvokeParams)
+	}
+
+	merged := make([]string, 0, len(paramNames))
+	for _, paramName := range paramNames {
+		if paramName == "" {
+			continue
+		}
+		if aitagValue := action.GetString(GetToolParamAITagActionKey(paramName)); aitagValue != "" {
+			invokeParams.Set(paramName, aitagValue)
+			merged = append(merged, paramName)
+		}
+	}
+	return merged
+}
+
 type toolParamAITagBlock struct {
 	ParamName string
 	Nonce     string
@@ -432,6 +459,17 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 				}
 				pw.WriteString(" → ")
 			}),
+			WithActionFieldStreamHandler([]string{
+				"call_expectations",
+			}, func(key string, r io.Reader) {
+				peekedR := utils.NewPeekableReader(r)
+				_, err := peekedR.Peek(1)
+				if err != nil {
+					return
+				}
+				pw.WriteString(" [note] -> ")
+				io.Copy(pw, peekedR)
+			}),
 		)
 
 		callToolAction, err := ExtractValidActionFromStream(t.config.GetContext(), stream, "call-tool", actionOpts...)
@@ -459,13 +497,9 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 		// Then, merge AITAG params (they take precedence over JSON params)
 		mergedAITagParams := make(map[string]struct{})
 		if promptMeta != nil && len(promptMeta.ParamNames) > 0 {
-			for _, paramName := range promptMeta.ParamNames {
-				aitagKey := fmt.Sprintf("__aitag__%s", paramName)
-				if aitagValue := callToolAction.GetString(aitagKey); aitagValue != "" {
-					invokeParams.Set(paramName, aitagValue)
-					mergedAITagParams[paramName] = struct{}{}
-					log.Debugf("merged AITAG param[%s] for tool[%s]", paramName, tool.Name)
-				}
+			for _, paramName := range MergeActionAITagParams(callToolAction, invokeParams, promptMeta.ParamNames) {
+				mergedAITagParams[paramName] = struct{}{}
+				log.Debugf("merged AITAG param[%s] for tool[%s]", paramName, tool.Name)
 			}
 
 			rawAIResponse = response.String()

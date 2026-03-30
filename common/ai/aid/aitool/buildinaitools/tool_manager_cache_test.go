@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
 	"gotest.tools/v3/assert"
 )
 
@@ -130,6 +131,9 @@ func TestRecentToolCache_Summary(t *testing.T) {
 	assert.Check(t, strings.Contains(summary, "directly_call_identifier"), "footer should reference directly_call_identifier")
 	assert.Check(t, strings.Contains(summary, "directly_call_expectations"), "footer should reference directly_call_expectations")
 	assert.Check(t, strings.Contains(summary, "Do not wrap it with @action, tool, or params."), "footer should clarify params-only usage")
+	assert.Check(t, strings.Contains(summary, "Hybrid mode for block parameters"), "footer should describe hybrid block-param mode")
+	assert.Check(t, strings.Contains(summary, "<|TOOL_PARAM_command_testnonce|>"), "footer should include nonce-aware AITAG example")
+	assert.Check(t, strings.Contains(summary, "AITAG block values override same-named JSON params."), "footer should explain AITAG precedence")
 }
 
 func TestRecentToolCache_SummaryMaxBytes(t *testing.T) {
@@ -146,15 +150,13 @@ func TestRecentToolCache_SummaryMaxBytes(t *testing.T) {
 	// first entry is always included even if it exceeds maxBytes budget
 	summary := mgr.GetRecentToolsSummary(500, "n")
 	assert.Check(t, summary != "", "summary should not be empty when cache has entries")
-	// should contain exactly 1 tool entry (the first surviving one)
-	toolCount := strings.Count(summary, "<|TOOL_")
-	// each tool has open + close tag, so 2 matches per tool
-	assert.Check(t, toolCount == 2, "expected exactly 1 tool entry (2 AITAG matches), got %d", toolCount)
+	toolCount := strings.Count(summary, "## Tool: ")
+	assert.Check(t, toolCount == 1, "expected exactly 1 tool entry, got %d", toolCount)
 
 	// with large budget, all remaining entries should be included
 	largeSummary := mgr.GetRecentToolsSummary(0, "n")
-	largeToolCount := strings.Count(largeSummary, "<|TOOL_")
-	assert.Check(t, largeToolCount > 2, "with unlimited budget, should have multiple tools, got %d tags", largeToolCount)
+	largeToolCount := strings.Count(largeSummary, "## Tool: ")
+	assert.Check(t, largeToolCount > 1, "with unlimited budget, should have multiple tools, got %d entries", largeToolCount)
 }
 
 func TestRecentToolCache_EmptyManager(t *testing.T) {
@@ -219,4 +221,47 @@ func TestRecentToolCache_ReaddMovesToTail(t *testing.T) {
 	assert.Equal(t, len(names), 2)
 	assert.Equal(t, names[0], "beta")
 	assert.Equal(t, names[1], "alpha")
+}
+
+func TestRecentToolCache_SummaryPrefersMostRecentEntries(t *testing.T) {
+	mgr := newManagerWithCache(0)
+
+	oldTool := makeTool("older_tool", "older tool description",
+		aitool.WithStringParam("path"),
+	)
+	newTool := makeTool("newer_tool", strings.Repeat("newer tool description ", 40),
+		aitool.WithStringParam("payload"),
+		aitool.WithUsage(strings.Repeat("usage block ", 80)),
+	)
+
+	mgr.AddRecentlyUsedTool(oldTool)
+	mgr.AddRecentlyUsedTool(newTool)
+
+	summary := mgr.GetRecentToolsSummary(len("# Recently Used Tools (available for directly_call_tool)\n\n")+1, "recent")
+	assert.Check(t, strings.Contains(summary, "newer_tool"), "summary should keep the most recent tool when budget is tight")
+	assert.Check(t, !strings.Contains(summary, "older_tool"), "summary should drop older tools before newer ones")
+}
+
+func TestRecentToolCache_ActualToolSizes(t *testing.T) {
+	loadYakToolMetadata := func(name string, path string) int {
+		embedFS := yakscripttools.GetEmbedFS()
+		content, err := embedFS.ReadFile(path)
+		assert.NilError(t, err)
+
+		aiTool := yakscripttools.LoadYakScriptToAiTools(name, string(content))
+		assert.Assert(t, aiTool != nil, "%s metadata should parse", name)
+		return len(aiTool.Name) + len(aiTool.Description) + len(aiTool.Params) + len(aiTool.Usage)
+	}
+
+	bashSize := loadYakToolMetadata("bash", "yakscriptforai/system/bash.yak")
+	t.Logf("bash metadata-backed cache size=%d", bashSize)
+
+	httpSize := loadYakToolMetadata("do_http_request", "yakscriptforai/http/do_http_request.yak")
+	combinedSize := bashSize + httpSize
+	t.Logf("do_http_request metadata-backed cache size=%d", httpSize)
+	t.Logf("bash+do_http_request metadata-backed cache size=%d", combinedSize)
+
+	assert.Check(t, bashSize > 8*1024, "bash metadata-backed cache size should be substantial")
+	assert.Check(t, httpSize > 8*1024, "do_http_request metadata-backed cache size should be substantial")
+	assert.Check(t, combinedSize < defaultRecentToolCacheMaxBytes, "bash + do_http_request metadata-backed cache size should fit in the new 40KB budget")
 }

@@ -35,43 +35,29 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 	}
 
 	result := &aicommon.VerifySatisfactionResult{}
-	var referenceOnce = new(sync.Once)
-	var nextMovementsReferenceOnce = new(sync.Once)
+	var referenceAnchorOnce sync.Once
+	var referenceAnchorID string
 
-	emitStreamIdReference := func(event *schema.AiOutputEvent) {
-		streamId := event.GetContentJSONPath(`$.event_writer_id`)
-		if streamId == "" {
-			log.Errorf("empty streamId provided for reference emission, origin data: %v", string(event.Content))
+	captureReferenceAnchor := func(event *schema.AiOutputEvent) {
+		if event == nil {
 			return
 		}
-		referenceOnce.Do(func() {
-			_, _ = r.EmitTextReferenceMaterial(streamId, utils.MustRenderTemplate(`<|ORIGINAL_QUERY|>
-{{ .OriginalQuery }}
-<|ORIGINAL_QUERY_END|>
-
-{{ if .IsToolCall }}<|IS_TOOL_CALL|>
-{{ .Payload }}<|IS_TOOL_CALL_END|>
-{{ else }}<|VERIFICATION_PAYLOAD|>
-{{ .Payload }}
-<|VERIFICATION_PAYLOAD_END|>
-{{ end }}
-`, map[string]any{
-				"OriginalQuery": originalQuery,
-				"IsToolCall":    isToolCall,
-				"Payload":       payload,
-			}))
+		streamID := event.GetStreamEventWriterId()
+		if streamID == "" {
+			log.Errorf("empty streamId provided for verification reference anchor, origin data: %v", string(event.Content))
+			return
+		}
+		referenceAnchorOnce.Do(func() {
+			referenceAnchorID = streamID
 		})
 	}
 
-	emitNextMovementsReference := func(event *schema.AiOutputEvent) {
-		streamId := event.GetContentJSONPath(`$.event_writer_id`)
-		if streamId == "" {
-			log.Errorf("empty streamId provided for next_movements reference emission, origin data: %v", string(event.Content))
+	emitVerificationReferenceMaterials := func(rawResponse string) {
+		if strings.TrimSpace(referenceAnchorID) == "" {
+			log.Warnf("skip verification reference materials because no stream anchor was emitted")
 			return
 		}
-		nextMovementsReferenceOnce.Do(func() {
-			_, _ = r.EmitTextReferenceMaterial(streamId, verificationPrompt)
-		})
+		aicommon.EmitAIRequestAndResponseReferenceMaterials(r.Emitter, referenceAnchorID, verificationPrompt, rawResponse)
 	}
 
 	log.Infof("Verifying if user needs are satisfied and formatting results...")
@@ -82,8 +68,6 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 
 			var rawResponse bytes.Buffer
 			stream = io.TeeReader(stream, &rawResponse)
-
-			var eventIds = new(sync.Map)
 
 			createReasonCallback := func(prompt string) func(key string, reader io.Reader) {
 				return func(key string, reader io.Reader) {
@@ -98,15 +82,14 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 						func() {
 							if out.Len() > 0 {
 								r.AddToTimeline("verify", prompt+": "+out.String())
-								emitStreamIdReference(event)
 							}
-							eventIds.Store(event.GetStreamEventWriterId(), struct{}{})
 						},
 					)
 					if err != nil {
 						log.Errorf("failed to emit %s stream event: %v", key, err)
 						return
 					}
+					captureReferenceAnchor(event)
 				}
 			}
 
@@ -132,7 +115,6 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 							func() {
 								if out.Len() > 0 {
 									r.AddToTimeline("human_readable_result", out.String())
-									emitStreamIdReference(event)
 								}
 							},
 						)
@@ -140,7 +122,7 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 							log.Errorf("failed to emit human_readable_result stream event: %v", err)
 							return
 						}
-						eventIds.Store(event.GetStreamEventWriterId(), struct{}{})
+						captureReferenceAnchor(event)
 					},
 				),
 				aicommon.WithActionFieldStreamHandler(
@@ -179,20 +161,13 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 							"next_movements",
 							outputReader,
 							rsp.GetTaskIndex(),
-							func() {
-								if out.Len() > 0 {
-									emitNextMovementsReference(event)
-								}
-							},
+							func() {},
 						)
 						if err != nil {
 							log.Errorf("failed to emit next_movements stream event: %v", err)
 							return
 						}
-						if out.Len() == 0 {
-							return
-						}
-						eventIds.Store(event.GetStreamEventWriterId(), struct{}{})
+						captureReferenceAnchor(event)
 					},
 				),
 			)
@@ -232,16 +207,12 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 					"next_movements_snapshot",
 					outputReader,
 					taskID,
-					func() {
-						if out.Len() > 0 {
-							emitNextMovementsReference(event)
-						}
-					},
+					func() {},
 				)
 				if err != nil {
 					return utils.Errorf("failed to emit next_movements snapshot markdown stream event: %v", err)
 				}
-				eventIds.Store(event.GetStreamEventWriterId(), struct{}{})
+				captureReferenceAnchor(event)
 			}
 
 			deliveryFilesMarkdown := r.RenderVerificationOutputFilesMarkdown(result.OutputFiles)
@@ -256,22 +227,17 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 					func() {
 						if out.Len() > 0 {
 							r.AddToTimeline("delivery_files", out.String())
-							emitStreamIdReference(event)
 						}
 					},
 				)
 				if err != nil {
 					return utils.Errorf("failed to emit delivery files markdown stream event: %v", err)
 				}
-				eventIds.Store(event.GetStreamEventWriterId(), struct{}{})
+				captureReferenceAnchor(event)
 				r.EmitFileArtifactWithExt("delivery_files", ".md", deliveryFilesMarkdown)
 			}
 
-			eventIds.Range(func(k, v interface{}) bool {
-				kString := utils.InterfaceToString(k)
-				r.EmitTextReferenceMaterial(kString, rawResponse.String())
-				return true
-			})
+			emitVerificationReferenceMaterials(rawResponse.String())
 			return nil
 		},
 	)
