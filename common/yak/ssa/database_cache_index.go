@@ -107,21 +107,42 @@ func (s *SimpleCache[T]) SetSaver(f func([]simpleCacheItem[T]), opt ...dbcache.O
 func (c *ProgramCache) initIndex(cfg *ssaconfig.Config, databaseKind ProgramCacheKind, saveSize int) {
 	saveSize = resolveAuxiliarySaveSize(cfg, saveSize)
 	c.editorHashCache = utils.NewSafeMapWithKey[string, struct{}]()
+	c.editorPendingHashCache = utils.NewSafeMapWithKey[string, struct{}]()
 	c.editorCache = NewSimpleCache[*ssadb.IrSource]("EditorCache", false)
 	if databaseKind == ProgramCacheDBWrite {
 		c.editorCache.SetSaver(
 			func(iii []simpleCacheItem[*ssadb.IrSource]) {
+				hashes := make([]string, 0, len(iii))
+				for _, item := range iii {
+					if item.Value == nil {
+						continue
+					}
+					hashes = append(hashes, item.Value.SourceCodeHash)
+				}
 				saveStep := func() error {
 					return utils.GormTransaction(c.DB, func(tx *gorm.DB) error {
 						for _, item := range iii {
+							if item.Value == nil {
+								continue
+							}
 							if err := tx.Save(item.Value).Error; err != nil {
-								log.Errorf("DATABASE: save ir source to database error: %v", err)
+								return err
 							}
 						}
 						return nil
 					})
 				}
-				c.diagnosticsTrack("ssa.Database.SaveIrSourceBatch", saveStep)
+				var saveErr error
+				c.diagnosticsTrack("ssa.Database.SaveIrSourceBatch", func() error {
+					saveErr = saveStep()
+					return saveErr
+				})
+				if saveErr != nil {
+					c.clearPendingSourceHashes(hashes...)
+					log.Errorf("DATABASE: save ir source to database error: %v", saveErr)
+					return
+				}
+				c.markSourceHashesPersisted(hashes...)
 				return
 			},
 			dbcache.WithSaveSize(saveSize),
