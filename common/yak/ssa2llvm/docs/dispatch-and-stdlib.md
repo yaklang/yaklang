@@ -67,7 +67,7 @@ name → builtin ID 的绑定在：
 
 runtime dispatcher 位于：
 
-- `common/yak/ssa2llvm/runtime/runtime_go/invoke.go`
+- `common/yak/ssa2llvm/runtime/runtime_go/runtime_dispatch.go`
 - `common/yak/ssa2llvm/runtime/runtime_go/stdlib.go`
 - `common/yak/ssa2llvm/runtime/runtime_go/sync_runtime.go`
 - `common/yak/ssa2llvm/runtime/runtime_go/slice_runtime.go`
@@ -82,8 +82,10 @@ runtime dispatcher 位于：
 
 1. 从 `ctx.target` 读取 `abi.FuncID`
 2. 从 `ctx.argc` 与参数区读取参数
-3. 在 `switch(id)` 中进入对应 builtin 实现
-4. 把返回值写回 `ctx.ret`
+3. 在 `runtimeDispatchTable` 中找到对应 builtin/runtime handler
+4. 对普通 builtin 走统一的反射参数解码与调用
+5. 对特殊 raw 路径（当前主要是 `IDRuntimeShadowMethod`）走专用 handler
+6. 把返回值写回 `ctx.ret`
 
 当前 builtin 里，`append` 已经是一个真实 runtime builtin，而不是测试 stub 或 CLI 特判。
 
@@ -130,8 +132,8 @@ Yak 自己的 object-factor `a.set()` / `a.get()` 仍然走本地函数调用 lo
 最小步骤：
 
 1. 在 `common/yak/ssa2llvm/runtime/abi/abi.go` 增加稳定 `FuncID`
-2. 在相应 runtime 文件实现逻辑，并在 `invoke.go` 的 dispatcher 中接入
+2. 在相应 runtime 文件实现逻辑，并在 `runtime_dispatch.go` 的 `runtimeDispatchTable` 中接入
 3. 在 `common/yak/ssa2llvm/compiler/externs.go` 增加 name → `DispatchID` 绑定
 4. 如参数需要 tagged pointer，在 `shouldTagStdlibArgPointers` 中补该 ID
 
-如果新增的是 **Go shadow object 方法**，优先复用 `runtime_method.go` 的反射分发，而不是继续在 `invoke.go` 里加类型特判。
+如果新增的是 **Go shadow object 方法**，优先复用 `runtime_method.go` 的反射分发，而不是再为具体类型/方法继续加特判。

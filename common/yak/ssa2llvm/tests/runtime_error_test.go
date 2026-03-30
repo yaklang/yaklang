@@ -30,6 +30,6 @@ func main() {
 }
 `
 	output := runBinaryWithEnv(t, code, "main", nil)
-	require.Contains(t, output, `[yak-runtime] panic: method "aaaUndefine" not found`)
+	require.Contains(t, output, `method "aaaUndefine" not found`)
 	require.Contains(t, output, "1\n")
 }

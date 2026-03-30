@@ -6,26 +6,22 @@ import (
 	"unsafe"
 )
 
-func stdlibRuntimeShadowMethod(args []uint64) int64 {
+func dispatchRuntimeShadowMethod(args []uint64) (int64, error) {
 	if len(args) < 2 {
-		return 0
+		return 0, fmt.Errorf("runtime shadow method expects at least 2 args, got %d", len(args))
 	}
 
 	methodNamePtr := unsafe.Pointer(uintptr(args[1]))
 	if methodNamePtr == nil {
-		return 0
+		return 0, fmt.Errorf("runtime shadow method missing method name")
 	}
 
 	objPtr := unsafe.Pointer(uintptr(args[0]))
 	if objPtr == nil {
-		return 0
+		return 0, fmt.Errorf("runtime shadow method missing receiver")
 	}
 
-	ret, err := callRuntimeShadowMethod(objPtr, cStringToGoString(methodNamePtr), args[2:])
-	if err != nil {
-		panic(err)
-	}
-	return ret
+	return callRuntimeShadowMethod(objPtr, cStringToGoString(methodNamePtr), args[2:])
 }
 
 func resolveRuntimeMethod(obj any, name string) (reflect.Value, error) {
@@ -87,13 +83,46 @@ func decodeRuntimeArg(raw uint64, targetType reflect.Type) (reflect.Value, error
 		if converted, ok := valueForSet(targetType, intValue); ok {
 			return converted, nil
 		}
+		if shadowValue, ok := decodeRuntimeShadowArg(raw, targetType); ok {
+			return shadowValue, nil
+		}
 	}
 
 	return reflect.Value{}, fmt.Errorf("cannot use %T as %s", decoded, targetType)
 }
 
-func decodeRuntimeMethodArgs(method reflect.Value, rawArgs []uint64) ([]reflect.Value, error) {
-	methodType := method.Type()
+func decodeRuntimeShadowArg(raw uint64, targetType reflect.Type) (reflect.Value, bool) {
+	ptr := unsafe.Pointer(uintptr(raw))
+	if ptr == nil {
+		return reflect.Value{}, false
+	}
+
+	handle, ok := handleFromShadow(ptr)
+	if !ok {
+		return reflect.Value{}, false
+	}
+
+	value := reflect.ValueOf(handle.Value())
+	if !value.IsValid() {
+		return reflect.Zero(targetType), true
+	}
+	if value.Type().AssignableTo(targetType) {
+		return value, true
+	}
+	if value.Type().ConvertibleTo(targetType) {
+		return value.Convert(targetType), true
+	}
+	if targetType.Kind() == reflect.Interface && value.Type().Implements(targetType) {
+		return value, true
+	}
+	if targetType.Kind() == reflect.Ptr && value.Kind() != reflect.Ptr && value.CanAddr() && value.Addr().Type().AssignableTo(targetType) {
+		return value.Addr(), true
+	}
+	return reflect.Value{}, false
+}
+
+func decodeRuntimeCallArgs(target reflect.Value, rawArgs []uint64) ([]reflect.Value, error) {
+	methodType := target.Type()
 	if !methodType.IsVariadic() && len(rawArgs) != methodType.NumIn() {
 		return nil, fmt.Errorf("method expects %d args, got %d", methodType.NumIn(), len(rawArgs))
 	}
@@ -103,9 +132,11 @@ func decodeRuntimeMethodArgs(method reflect.Value, rawArgs []uint64) ([]reflect.
 
 	args := make([]reflect.Value, 0, len(rawArgs))
 	for index, raw := range rawArgs {
-		targetType := methodType.In(index)
+		var targetType reflect.Type
 		if methodType.IsVariadic() && index >= methodType.NumIn()-1 {
-			targetType = targetType.Elem()
+			targetType = methodType.In(methodType.NumIn() - 1).Elem()
+		} else {
+			targetType = methodType.In(index)
 		}
 
 		arg, err := decodeRuntimeArg(raw, targetType)
@@ -117,7 +148,7 @@ func decodeRuntimeMethodArgs(method reflect.Value, rawArgs []uint64) ([]reflect.
 	return args, nil
 }
 
-func runtimeMethodReturnValue(results []reflect.Value) int64 {
+func runtimeCallReturnValue(results []reflect.Value) int64 {
 	if len(results) == 0 {
 		return 0
 	}
@@ -131,6 +162,14 @@ func runtimeMethodReturnValue(results []reflect.Value) int64 {
 	return runtimeValueToInt64(results[0])
 }
 
+func callRuntimeValue(target reflect.Value, rawArgs []uint64) (int64, error) {
+	args, err := decodeRuntimeCallArgs(target, rawArgs)
+	if err != nil {
+		return 0, err
+	}
+	return runtimeCallReturnValue(target.Call(args)), nil
+}
+
 func callRuntimeShadowMethod(objPtr unsafe.Pointer, methodName string, rawArgs []uint64) (int64, error) {
 	handle, ok := handleFromShadow(objPtr)
 	if !ok {
@@ -142,10 +181,5 @@ func callRuntimeShadowMethod(objPtr unsafe.Pointer, methodName string, rawArgs [
 		return 0, err
 	}
 
-	args, err := decodeRuntimeMethodArgs(method, rawArgs)
-	if err != nil {
-		return 0, err
-	}
-
-	return runtimeMethodReturnValue(method.Call(args)), nil
+	return callRuntimeValue(method, rawArgs)
 }

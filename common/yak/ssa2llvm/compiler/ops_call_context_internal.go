@@ -168,14 +168,7 @@ func (c *Compiler) lowerResolvedContextCall(spec contextCallSpec) error {
 }
 
 func shouldTagStdlibArgPointers(id abi.FuncID) bool {
-	switch id {
-	case abi.IDPrint, abi.IDPrintf, abi.IDPrintln,
-		abi.IDAppend,
-		abi.IDYakitInfo, abi.IDYakitWarn, abi.IDYakitDebug, abi.IDYakitError:
-		return true
-	default:
-		return false
-	}
+	return id != 0
 }
 
 func ssaArgs(argIDs []int64, tagPointerArgs bool) []contextCallArg {

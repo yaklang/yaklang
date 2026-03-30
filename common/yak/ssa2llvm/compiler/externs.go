@@ -27,9 +27,9 @@ type ExternBinding struct {
 	Params []LLVMExternType
 	Return LLVMExternType
 
-	// DispatchID identifies a stdlib function that should be invoked via the
-	// runtime dispatcher entry (yak_std_call). Keep it opaque to reduce the
-	// number of exported symbols in the final binary.
+	// DispatchID identifies a stdlib/runtime builtin that should be invoked via
+	// the runtime-owned dispatch table. Keep it opaque to reduce the number of
+	// exported symbols in the final binary.
 	DispatchID abi.FuncID
 }
 
