@@ -29,6 +29,7 @@ func TestConvertYPBAIStartParamsToReActConfig(t *testing.T) {
 
 	includeKeywords := []string{uuid.New().String(), uuid.New().String()}
 	aiService := uuid.NewString()
+	presetPrompt := uuid.New().String()
 
 	start := &ypb.AIStartParams{
 		DisallowRequireForUserPrompt: disallowRequire,
@@ -42,6 +43,7 @@ func TestConvertYPBAIStartParamsToReActConfig(t *testing.T) {
 		AIService:                    aiService,
 		DisableAISearchForge:         true, // just to test that this field is ignored, not start embedding server in ci test
 		AICallTokenLimit:             100 * 1024,
+		UserPresetPrompt:             presetPrompt,
 	}
 
 	opts := ConvertYPBAIStartParamsToReActConfig(start)
@@ -63,6 +65,7 @@ func TestConvertYPBAIStartParamsToReActConfig(t *testing.T) {
 	require.Equal(t, start.DisableToolUse, cfg.DisableToolUse)
 	require.ElementsMatch(t, start.IncludeSuggestedToolKeywords, cfg.Keywords)
 	require.Equal(t, start.AICallTokenLimit, cfg.AiCallTokenLimit)
+	require.Equal(t, start.UserPresetPrompt, cfg.UserPresetPrompt)
 	// AiServerName is no longer set from frontend params (WithAIChatInfo deprecated),
 	// it is now auto-detected via ModelInfoCallback during actual AI gateway calls.
 }
