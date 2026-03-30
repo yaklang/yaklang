@@ -13,7 +13,7 @@ import (
 
 var loopAction_toolRequireAndCall = &reactloops.LoopAction{
 	ActionType:  schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL,
-	Description: "申请工具调用，执行这个 @action 会进入工具申请流程，查看工具教程以及文档，来生成参数",
+	Description: "申请工具调用，执行这个 @action 会进入工具申请流程，查看工具教程以及文档，来生成参数。仅当目标工具不在 CACHE_TOOL_CALL 最近缓存中时使用；如果缓存里已经有该工具，优先 directly_call_tool。",
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
 			"tool_require_payload",

@@ -56,6 +56,26 @@ func buildDirectlyCallParamDisplayItems(params aitool.InvokeParams, blockParamNa
 	return items
 }
 
+func buildDirectlyCallParamFeedbackItems(params aitool.InvokeParams, blockParamNames []string) []string {
+	blockSet := make(map[string]struct{}, len(blockParamNames))
+	for _, name := range blockParamNames {
+		blockSet[name] = struct{}{}
+	}
+
+	items := make([]string, 0, len(params))
+	for _, key := range directlyCallParamKeys(params) {
+		if key == aicommon.ReservedKeyIdentifier || key == aicommon.ReservedKeyCallExpectations {
+			continue
+		}
+		if _, ok := blockSet[key]; ok {
+			items = append(items, fmt.Sprintf("%s(BLOCK)", key))
+			continue
+		}
+		items = append(items, key)
+	}
+	return items
+}
+
 func emitDirectlyCallParamProgress(emit func(string), params aitool.InvokeParams, blockParamNames []string) {
 	blockSet := make(map[string]struct{}, len(blockParamNames))
 	for _, name := range blockParamNames {
@@ -358,10 +378,10 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 		}
 
 		paramKeys := directlyCallParamKeys(params)
-		displayItems := buildDirectlyCallParamDisplayItems(params, mergedBlockParams)
+		feedbackItems := buildDirectlyCallParamFeedbackItems(params, mergedBlockParams)
 		emitDirectlyCallParamProgress(emitProgress, params, mergedBlockParams)
 		reportStatus(fmt.Sprintf("normalized %d param fields: %s", len(paramKeys), strings.Join(paramKeys, ", ")))
-		operator.Feedback(fmt.Sprintf("Prepared directly_call_tool params for '%s': %d fields [%s]", toolName, len(displayItems), strings.Join(displayItems, ", ")))
+		operator.Feedback(fmt.Sprintf("Prepared directly_call_tool params for '%s': %d fields [%s]", toolName, len(feedbackItems), strings.Join(feedbackItems, ", ")))
 
 		// 2. inject reserved keys from directly_call_ prefixed fields
 		if id := action.GetString("directly_call_identifier"); id != "" {

@@ -22,6 +22,38 @@ import (
 
 const defaultRecentToolCacheMaxBytes = 40 * 1024 // 40KB
 
+func isSupportedRecentToolAITagParamName(paramName string) bool {
+	if paramName == "" {
+		return false
+	}
+	for _, ch := range paramName {
+		if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_' {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+func filterSupportedRecentToolAITagParamNames(paramNames []string) []string {
+	if len(paramNames) == 0 {
+		return nil
+	}
+	filtered := make([]string, 0, len(paramNames))
+	seen := make(map[string]struct{}, len(paramNames))
+	for _, paramName := range paramNames {
+		if !isSupportedRecentToolAITagParamName(paramName) {
+			continue
+		}
+		if _, ok := seen[paramName]; ok {
+			continue
+		}
+		seen[paramName] = struct{}{}
+		filtered = append(filtered, paramName)
+	}
+	return filtered
+}
+
 // RecentToolEntry records a recently used tool for directly_call_tool action.
 type RecentToolEntry struct {
 	Name          string `json:"name"`
@@ -496,7 +528,7 @@ AITAG rules:
 - If all params are block-style, directly_call_tool_params may be omitted or left as an empty object.
 {{ if .ParamNames }}
 
-Block-friendly params seen in cached tools:
+AITAG-capable params seen in cached tools:
 {{- range .ParamNames }}
 - {{ . }}
 {{- end }}
@@ -546,7 +578,7 @@ func extractDirectlyCallParamNamesFromSchema(schemaSnippet string) []string {
 func renderRecentToolSummaryFooter(nonce string, paramNames []string) string {
 	return utils.MustRenderTemplate(recentToolSummaryFooterTemplate, map[string]any{
 		"Nonce":      nonce,
-		"ParamNames": paramNames,
+		"ParamNames": filterSupportedRecentToolAITagParamNames(paramNames),
 	})
 }
 
