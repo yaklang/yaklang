@@ -4,7 +4,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
 // TestRegisterAction 测试动作注册功能
@@ -116,6 +118,24 @@ func TestLoopAction_BuildSchema(t *testing.T) {
 			t.Errorf("Schema should contain field '%s'", field)
 		}
 	}
+}
+
+func TestSyncRecentToolParamAITagFields_FiltersUnsupportedNames(t *testing.T) {
+	loop := &ReActLoop{
+		aiTagFields: omap.NewEmptyOrderedMap[string, *LoopAITagField](),
+	}
+
+	loop.syncRecentToolParamAITagFields([]string{"command", "raw-content", "timeout", "command", ""})
+
+	require.Equal(t, []string{"TOOL_PARAM_command", "TOOL_PARAM_timeout"}, loop.aiTagFields.Keys())
+
+	commandField, ok := loop.aiTagFields.Get("TOOL_PARAM_command")
+	require.True(t, ok)
+	require.Equal(t, aicommon.GetToolParamAITagActionKey("command"), commandField.VariableName)
+	require.Equal(t, directlyCallToolParamsNodeID, commandField.AINodeId)
+
+	_, ok = loop.aiTagFields.Get("TOOL_PARAM_raw-content")
+	require.False(t, ok)
 }
 
 func TestLoopAction_OutputExample(t *testing.T) {

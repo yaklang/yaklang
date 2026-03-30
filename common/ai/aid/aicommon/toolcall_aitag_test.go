@@ -339,3 +339,17 @@ func TestToolParamsPromptMeta(t *testing.T) {
 	require.Contains(t, meta.ParamNames, "param2")
 	require.Contains(t, meta.ParamNames, "param3")
 }
+
+func TestFilterSupportedToolParamAITagNames(t *testing.T) {
+	filtered := FilterSupportedToolParamAITagNames([]string{
+		"command",
+		"raw-content",
+		"timeout",
+		"command",
+		"script_body",
+		"",
+		"path value",
+	})
+
+	require.Equal(t, []string{"command", "timeout", "script_body"}, filtered)
+}

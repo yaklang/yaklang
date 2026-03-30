@@ -80,6 +80,22 @@ Based on the above information, you need to decide whether to **continue** or **
 
 Please output a JSON object that conforms to the following schema:
 
+- `reason`, `progress_summary`, and `estimated_remaining_time` must be concrete natural-language strings.
+- Do not copy schema metadata such as `{"type":"string"}` or `{"description":"..."}` into those fields.
+- Fill the fields with your actual review result based on the tool output.
+
+Example valid response:
+
+```json
+{
+	"@action": "interval-toolcall-review",
+	"decision": "continue",
+	"reason": "工具仍在稳定输出，未见异常或卡死迹象。",
+	"progress_summary": "已完成网络接口、监听端口与路由配置的采集，正在补充协议与监控指标。",
+	"estimated_remaining_time": "约 20 秒"
+}
+```
+
 ```schema
 {{ .Schema }}
 ```

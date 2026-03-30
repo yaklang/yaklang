@@ -1,10 +1,11 @@
 package aireact
 
 import (
-	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -13,6 +14,35 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+func normalizeIntervalReviewFieldContent(reader io.Reader) (string, bool) {
+	raw, err := io.ReadAll(utils.UTF8Reader(reader))
+	if err != nil {
+		log.Warnf("interval review field read failed: %v", err)
+		return "", false
+	}
+
+	text := strings.TrimSpace(string(raw))
+	if text == "" {
+		return "", false
+	}
+
+	var decoded any
+	if err := json.Unmarshal([]byte(text), &decoded); err == nil {
+		value, ok := decoded.(string)
+		if !ok {
+			log.Warnf("interval review field expected string, got %T: %s", decoded, utils.ShrinkString(text, 160))
+			return "", false
+		}
+		value = strings.TrimSpace(value)
+		if value == "" {
+			return "", false
+		}
+		return value, true
+	}
+
+	return text, true
+}
 
 // _invokeToolCall_IntervalReviewWithContext is called periodically during tool execution to review progress.
 // It returns true if the tool should continue, false if it should be cancelled.
@@ -57,18 +87,21 @@ func (r *ReAct) _invokeToolCall_IntervalReviewWithContext(
 				aicommon.WithActionFieldStreamHandler([]string{
 					"reason", "progress_summary", "estimated_remaining_time",
 				}, func(key string, reader io.Reader) {
-					reader = utils.JSONStringReader(utils.UTF8Reader(reader))
+					content, ok := normalizeIntervalReviewFieldContent(reader)
+					if !ok {
+						return
+					}
 					switch key {
 					case "estimated_remaining_time":
 						r.Emitter.EmitDefaultStreamEvent(
 							"interval-review",
-							io.MultiReader(bytes.NewBufferString("预估时间："), reader),
+							strings.NewReader("预估时间："+content),
 							rsp.GetTaskIndex(),
 						)
 					default:
 						r.Emitter.EmitDefaultStreamEvent(
 							"interval-review",
-							reader,
+							strings.NewReader(content),
 							rsp.GetTaskIndex(),
 						)
 					}
