@@ -8516,7 +8516,8 @@ type AIStartParams struct {
 	// timeline sessionID  用于多轮对话保持上下文
 	TimelineSessionID string `protobuf:"bytes,31,opt,name=TimelineSessionID,proto3" json:"TimelineSessionID,omitempty"`
 	// Token pressure limit, 当 AI 对话的 token 数量超过这个限制时，需要警告
-	AICallTokenLimit int64 `protobuf:"varint,34,opt,name=AICallTokenLimit,proto3" json:"AICallTokenLimit,omitempty"`
+	AICallTokenLimit int64  `protobuf:"varint,34,opt,name=AICallTokenLimit,proto3" json:"AICallTokenLimit,omitempty"`
+	UserPresetPrompt string `protobuf:"bytes,35,opt,name=UserPresetPrompt,proto3" json:"UserPresetPrompt,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -8780,6 +8781,13 @@ func (x *AIStartParams) GetAICallTokenLimit() int64 {
 		return x.AICallTokenLimit
 	}
 	return 0
+}
+
+func (x *AIStartParams) GetUserPresetPrompt() string {
+	if x != nil {
+		return x.UserPresetPrompt
+	}
+	return ""
 }
 
 type AITaskFilter struct {
@@ -68807,7 +68815,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\tMcpConfig\x12\x12\n" +
 	"\x04Type\x18\x01 \x01(\tR\x04Type\x12\x10\n" +
 	"\x03Key\x18\x02 \x01(\tR\x03Key\x12\x10\n" +
-	"\x03Url\x18\x03 \x01(\tR\x03Url\"\xc9\f\n" +
+	"\x03Url\x18\x03 \x01(\tR\x03Url\"\xf5\f\n" +
 	"\rAIStartParams\x12$\n" +
 	"\rCoordinatorId\x18\x11 \x01(\tR\rCoordinatorId\x12\x1a\n" +
 	"\bSequence\x18\x12 \x01(\x03R\bSequence\x12.\n" +
@@ -68844,7 +68852,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x18TimelineContentSizeLimit\x18\x1d \x01(\x03R\x18TimelineContentSizeLimit\x12,\n" +
 	"\x11UserInteractLimit\x18\x1e \x01(\x03R\x11UserInteractLimit\x12,\n" +
 	"\x11TimelineSessionID\x18\x1f \x01(\tR\x11TimelineSessionID\x12*\n" +
-	"\x10AICallTokenLimit\x18\" \x01(\x03R\x10AICallTokenLimit\"\x9e\x01\n" +
+	"\x10AICallTokenLimit\x18\" \x01(\x03R\x10AICallTokenLimit\x12*\n" +
+	"\x10UserPresetPrompt\x18# \x01(\tR\x10UserPresetPrompt\"\x9e\x01\n" +
 	"\fAITaskFilter\x12\x12\n" +
 	"\x04Name\x18\x01 \x03(\tR\x04Name\x12\x18\n" +
 	"\aKeyword\x18\x02 \x03(\tR\aKeyword\x12\x1c\n" +
