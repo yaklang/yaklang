@@ -2,6 +2,9 @@ package loopinfra
 
 import (
 	"encoding/json"
+	"fmt"
+	"sort"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -9,6 +12,173 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+const directlyCallToolParamsNodeID = "directly_call_tool_params"
+
+func getDirectlyCallToolParamPayload(action *aicommon.Action) (string, aitool.InvokeParams) {
+	raw := action.GetString("directly_call_tool_params")
+	obj := action.GetInvokeParams("directly_call_tool_params")
+	if raw != "" || len(obj) > 0 {
+		return raw, obj
+	}
+	nextAction := action.GetInvokeParams("next_action")
+	return nextAction.GetString("directly_call_tool_params"), nextAction.GetObject("directly_call_tool_params")
+}
+
+func normalizeDirectlyCallToolParams(raw string, obj aitool.InvokeParams) (aitool.InvokeParams, []string) {
+	var notes []string
+	if strings.TrimSpace(raw) != "" {
+		params, parseNotes := unwrapDirectlyCallToolParamsValue(raw, 0)
+		notes = append(notes, parseNotes...)
+		if len(params) > 0 {
+			return params, notes
+		}
+		notes = append(notes, "directly_call_tool_params string parse did not yield a usable params object; falling back to structured extraction")
+	}
+	if len(obj) > 0 {
+		params, parseNotes := unwrapDirectlyCallToolParamsValue(obj, 0)
+		notes = append(notes, parseNotes...)
+		if len(params) > 0 {
+			return params, notes
+		}
+	}
+	return nil, notes
+}
+
+func unwrapDirectlyCallToolParamsValue(value any, depth int) (aitool.InvokeParams, []string) {
+	if depth > 4 || value == nil {
+		return nil, nil
+	}
+
+	switch typed := value.(type) {
+	case string:
+		trimmed := strings.TrimSpace(typed)
+		if trimmed == "" {
+			return nil, nil
+		}
+		parsed := make(aitool.InvokeParams)
+		if err := json.Unmarshal([]byte(trimmed), &parsed); err != nil {
+			return nil, []string{fmt.Sprintf("invalid JSON string for directly_call_tool_params: %v", err)}
+		}
+		params, notes := unwrapDirectlyCallToolParamsMap(parsed, depth+1)
+		return params, append([]string{"parsed directly_call_tool_params from JSON string"}, notes...)
+	default:
+		obj := aitool.InvokeParams(utils.InterfaceToGeneralMap(value))
+		if len(obj) == 0 {
+			return nil, nil
+		}
+		return unwrapDirectlyCallToolParamsMap(obj, depth+1)
+	}
+}
+
+func unwrapDirectlyCallToolParamsMap(obj aitool.InvokeParams, depth int) (aitool.InvokeParams, []string) {
+	if depth > 4 || len(obj) == 0 {
+		return nil, nil
+	}
+
+	if nextAction := obj.GetObject("next_action"); len(nextAction) > 0 {
+		params, notes := unwrapDirectlyCallToolParamsMap(nextAction, depth+1)
+		if len(params) > 0 {
+			return params, append([]string{"unwrapped next_action wrapper"}, notes...)
+		}
+	}
+
+	if nested := obj.GetObject("directly_call_tool_params"); len(nested) > 0 {
+		params, notes := unwrapDirectlyCallToolParamsMap(nested, depth+1)
+		if len(params) > 0 {
+			return params, append([]string{"unwrapped nested directly_call_tool_params object"}, notes...)
+		}
+	}
+	if nestedRaw := obj.GetString("directly_call_tool_params"); strings.TrimSpace(nestedRaw) != "" {
+		params, notes := unwrapDirectlyCallToolParamsValue(nestedRaw, depth+1)
+		if len(params) > 0 {
+			return params, append([]string{"unwrapped nested directly_call_tool_params string"}, notes...)
+		}
+	}
+
+	if nestedTool := obj.GetObject("tool"); len(nestedTool) > 0 {
+		if nestedParams := nestedTool.GetObject("params"); len(nestedParams) > 0 {
+			params, notes := unwrapDirectlyCallToolParamsMap(nestedParams, depth+1)
+			if len(params) > 0 {
+				return params, append([]string{"unwrapped legacy tool.params wrapper"}, notes...)
+			}
+		}
+	}
+
+	if nestedParams := obj.GetObject("params"); len(nestedParams) > 0 && looksLikeWrappedDirectlyCallPayload(obj) {
+		params, notes := unwrapDirectlyCallToolParamsMap(nestedParams, depth+1)
+		if len(params) > 0 {
+			return params, append([]string{"unwrapped legacy params wrapper"}, notes...)
+		}
+	}
+
+	dropWrapperKeys := looksLikeWrappedDirectlyCallPayload(obj)
+	cleaned := cleanDirectlyCallToolParams(obj, dropWrapperKeys)
+	if len(cleaned) == 0 {
+		return nil, nil
+	}
+	if dropWrapperKeys {
+		return cleaned, []string{"discarded legacy directly_call_tool wrapper fields"}
+	}
+	return cleaned, []string{"using directly_call_tool_params object as-is"}
+}
+
+func looksLikeWrappedDirectlyCallPayload(params aitool.InvokeParams) bool {
+	if len(params) == 0 {
+		return false
+	}
+	if params.GetString("@action") != "" || params.GetString("tool") != "" || params.GetString("tool_name") != "" {
+		return true
+	}
+	if params.GetString("type") == schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL {
+		return true
+	}
+	if len(params.GetObject("params")) > 0 || len(params.GetObject("tool")) > 0 || len(params.GetObject("next_action")) > 0 {
+		return true
+	}
+	return false
+}
+
+func cleanDirectlyCallToolParams(params aitool.InvokeParams, dropWrapperKeys bool) aitool.InvokeParams {
+	cleaned := make(aitool.InvokeParams)
+	for key, value := range params {
+		if isDirectlyCallInternalKey(key) {
+			continue
+		}
+		if dropWrapperKeys && isDirectlyCallWrapperKey(key) {
+			continue
+		}
+		cleaned[key] = value
+	}
+	return cleaned
+}
+
+func isDirectlyCallInternalKey(key string) bool {
+	switch key {
+	case "__DEFAULT__", "__FALLBACK__", "__[yaklang-raw]__":
+		return true
+	default:
+		return false
+	}
+}
+
+func isDirectlyCallWrapperKey(key string) bool {
+	switch key {
+	case "@action", "tool", "tool_name", "params", "type", "next_action", "directly_call_tool_name", "directly_call_tool_params":
+		return true
+	default:
+		return false
+	}
+}
+
+func directlyCallParamKeys(params aitool.InvokeParams) []string {
+	keys := make([]string, 0, len(params))
+	for key := range params {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
 
 var loopAction_directlyCallTool = &reactloops.LoopAction{
 	ActionType: schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL,
@@ -73,32 +243,37 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 			ctx = t.GetContext()
 		}
 
-		// 1. extract params: try string-based JSON parse first (since the field is WithStringParam),
-		//    then fall back to object extraction.
-		var params aitool.InvokeParams
-
-		raw := action.GetString("directly_call_tool_params")
-		if raw != "" {
-			parsed := make(aitool.InvokeParams)
-			if err := json.Unmarshal([]byte(raw), &parsed); err == nil && len(parsed) > 0 {
-				params = parsed
+		emitStatus := func(string) {}
+		if emitter := loop.GetEmitter(); emitter != nil && operator.GetTask() != nil {
+			pr, pw := utils.NewPipe()
+			emitter.EmitDefaultStreamEvent(directlyCallToolParamsNodeID, pr, operator.GetTask().GetId())
+			defer pw.Close()
+			emitStatus = func(msg string) {
+				pw.WriteString(msg)
+				pw.WriteString("\n")
 			}
 		}
+		reportStatus := func(msg string) {
+			invoker.AddToTimeline("[DIRECT_CALL_PARAMS]", msg)
+			emitStatus(msg)
+		}
 
-		if len(params) == 0 {
-			objParams := action.GetInvokeParams("directly_call_tool_params")
-			delete(objParams, "__DEFAULT__")
-			delete(objParams, "__FALLBACK__")
-			delete(objParams, "__[yaklang-raw]__")
-			if len(objParams) > 0 {
-				params = objParams
-			}
+		reportStatus(fmt.Sprintf("preparing directly_call_tool params for '%s'", toolName))
+		raw, objParams := getDirectlyCallToolParamPayload(action)
+		params, notes := normalizeDirectlyCallToolParams(raw, objParams)
+		for _, note := range notes {
+			reportStatus(note)
 		}
 		if len(params) == 0 {
+			reportStatus("directly_call_tool params extraction failed")
 			operator.Feedback(utils.Error("directly_call_tool: no valid params found"))
 			operator.Continue()
 			return
 		}
+
+		paramKeys := directlyCallParamKeys(params)
+		reportStatus(fmt.Sprintf("normalized %d param fields: %s", len(paramKeys), strings.Join(paramKeys, ", ")))
+		operator.Feedback(fmt.Sprintf("Prepared directly_call_tool params for '%s': %d fields [%s]", toolName, len(paramKeys), strings.Join(paramKeys, ", ")))
 
 		// 2. inject reserved keys from directly_call_ prefixed fields
 		if id := action.GetString("directly_call_identifier"); id != "" {
@@ -107,6 +282,7 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 		if ce := action.GetString("directly_call_expectations"); ce != "" {
 			params[aicommon.ReservedKeyCallExpectations] = ce
 		}
+		reportStatus(fmt.Sprintf("calling cached tool '%s'", toolName))
 
 		// 3. execute
 		result, directly, callErr := invoker.ExecuteToolRequiredAndCallWithoutRequired(ctx, toolName, params)

@@ -109,7 +109,11 @@ func TestRecentToolCache_Summary(t *testing.T) {
 	assert.Check(t, summary != "", "summary should not be empty")
 	assert.Check(t, strings.Contains(summary, "sleep_test"), "summary should contain sleep_test")
 	assert.Check(t, strings.Contains(summary, "read_file"), "summary should contain read_file")
-	assert.Check(t, strings.Contains(summary, "Params Schema:"), "summary should contain schema section")
+	assert.Check(t, strings.Contains(summary, "Direct Params Schema (for directly_call_tool only):"), "summary should contain direct params schema section")
+	assert.Check(t, strings.Contains(summary, `"seconds"`), "summary should contain tool param fields")
+	assert.Check(t, !strings.Contains(summary, `"const": "call-tool"`), "summary should not include wrapped @action schema")
+	assert.Check(t, !strings.Contains(summary, `"tool": {`), "summary should not include wrapped tool schema")
+	assert.Check(t, !strings.Contains(summary, `"params": {`), "summary should not include wrapped params shell")
 
 	// AITAG boundaries
 	assert.Check(t, strings.Contains(summary, "<|TOOL_sleep_test_testnonce|>"), "summary should have AITAG open boundary")
@@ -125,6 +129,7 @@ func TestRecentToolCache_Summary(t *testing.T) {
 	assert.Check(t, strings.Contains(summary, "directly_call_tool_params"), "footer should reference directly_call_tool_params")
 	assert.Check(t, strings.Contains(summary, "directly_call_identifier"), "footer should reference directly_call_identifier")
 	assert.Check(t, strings.Contains(summary, "directly_call_expectations"), "footer should reference directly_call_expectations")
+	assert.Check(t, strings.Contains(summary, "Do not wrap it with @action, tool, or params."), "footer should clarify params-only usage")
 }
 
 func TestRecentToolCache_SummaryMaxBytes(t *testing.T) {

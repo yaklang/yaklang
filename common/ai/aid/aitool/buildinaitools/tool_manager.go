@@ -15,6 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
@@ -457,8 +458,8 @@ func (m *AiToolManager) HasRecentlyUsedTools() bool {
 const recentToolEntryTemplate = `<|TOOL_{{ .Name }}_{{ .Nonce }}|>
 ## Tool: {{ .Name }}
 Description: {{ .Description }}
-Params Schema:
-{{ .SchemaSnippet }}
+Direct Params Schema (for directly_call_tool only):
+{{ .DisplaySchemaSnippet }}
 {{ if .Usage }}__USAGE__: {{ .Usage }}
 {{ end }}<|TOOL_{{ .Name }}_END_{{ .Nonce }}|>
 
@@ -466,9 +467,48 @@ Params Schema:
 
 const recentToolSummaryFooter = `## How to use directly_call_tool
 
+The schema shown above is the params-only shape for directly_call_tool.
+Pass it directly as directly_call_tool_params. Do not wrap it with @action, tool, or params.
+
 To call a tool listed above, respond with:
 {"@action": "directly_call_tool", "directly_call_tool_name": "<name>", "directly_call_identifier": "<snake_case_intent>", "directly_call_expectations": "<timing and fallback>", "directly_call_tool_params": <params object matching the Params Schema>}
 `
+
+func renderDirectlyCallParamsSchema(schemaSnippet string) string {
+	if strings.TrimSpace(schemaSnippet) == "" {
+		return schemaSnippet
+	}
+
+	var fullSchema aitool.InvokeParams
+	if err := json.Unmarshal([]byte(schemaSnippet), &fullSchema); err != nil {
+		return schemaSnippet
+	}
+
+	paramsSchema := fullSchema.GetObject("properties").GetObject("params")
+	if len(paramsSchema) == 0 {
+		return schemaSnippet
+	}
+
+	rendered := omap.NewEmptyOrderedMap[string, any]()
+	rendered.Set("$schema", "http://json-schema.org/draft-07/schema#")
+	rendered.Set("type", "object")
+	rendered.Set("description", "Only for directly_call_tool. Pass this object directly as directly_call_tool_params. Do not include @action, tool, or params wrapper.")
+	if properties, ok := paramsSchema["properties"]; ok {
+		rendered.Set("properties", properties)
+	}
+	if required, ok := paramsSchema["required"]; ok {
+		rendered.Set("required", required)
+	}
+	if additionalProperties, ok := paramsSchema["additionalProperties"]; ok {
+		rendered.Set("additionalProperties", additionalProperties)
+	}
+
+	jsonBytes, err := json.MarshalIndent(rendered, "", "  ")
+	if err != nil {
+		return schemaSnippet
+	}
+	return string(jsonBytes)
+}
 
 // ExportRecentToolCache serializes the recent-tool cache entries to a JSON string
 // for persistent storage (e.g. in AIAgentRuntime.RecentToolsCache).
@@ -536,11 +576,11 @@ func (m *AiToolManager) GetRecentToolsSummary(maxBytes int, nonce string) string
 	entryWritten := false
 	for i, entry := range m.recentToolsCache {
 		block := utils.MustRenderTemplate(recentToolEntryTemplate, map[string]interface{}{
-			"Name":          entry.Name,
-			"Nonce":         nonce,
-			"Description":   entry.Description,
-			"SchemaSnippet": entry.SchemaSnippet,
-			"Usage":         entry.Usage,
+			"Name":                 entry.Name,
+			"Nonce":                nonce,
+			"Description":          entry.Description,
+			"DisplaySchemaSnippet": renderDirectlyCallParamsSchema(entry.SchemaSnippet),
+			"Usage":                entry.Usage,
 		})
 		// always include at least the first entry even if it exceeds maxBytes
 		if i > 0 && maxBytes > 0 && totalLen+len(block) > maxBytes {
