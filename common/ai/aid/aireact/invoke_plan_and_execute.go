@@ -393,16 +393,6 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 			return utils.Errorf("failed to create coordinator for plan execution: %v", err)
 		}
 
-		// Register skip/redo subtask callbacks on ReAct's InputEventManager so
-		// they can be dispatched even after the coordinator's event loop exits
-		// (coordinator event loop dies when planCtx is cancelled).
-		r.config.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_SKIP_SUBTASK_IN_PLAN, cod.HandleSkipSubtaskInPlan)
-		r.config.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_REDO_SUBTASK_IN_PLAN, cod.HandleRedoSubtaskInPlan)
-		defer func() {
-			r.config.InputEventManager.UnRegisterSyncCallback(aicommon.SYNC_TYPE_SKIP_SUBTASK_IN_PLAN)
-			r.config.InputEventManager.UnRegisterSyncCallback(aicommon.SYNC_TYPE_REDO_SUBTASK_IN_PLAN)
-		}()
-
 		done()
 		if err := cod.Run(); err != nil {
 			log.Errorf("Plan execution failed: %v", err)
