@@ -7,7 +7,23 @@ import (
 	"time"
 )
 
+func (s *Scannerx) supportsARP() bool {
+	if s == nil || s.config == nil || s.config.Iface == nil {
+		return false
+	}
+	if s.config.Iface.Flags&net.FlagLoopback != 0 {
+		return false
+	}
+	if s.config.Iface.Flags&net.FlagPointToPoint != 0 {
+		return false
+	}
+	return len(s.config.Iface.HardwareAddr) > 0
+}
+
 func (s *Scannerx) getGatewayMac() (net.HardwareAddr, error) {
+	if !s.supportsARP() {
+		return nil, utils.Errorf("arp is unsupported on iface %s", s.config.Iface.Name)
+	}
 	if s.config.GatewayIP != nil {
 		gateway := s.config.GatewayIP.String()
 		var retry int
@@ -101,6 +117,10 @@ func (s *Scannerx) isInternalAddress(target string) bool {
 }
 
 func (s *Scannerx) arpScan() {
+	if !s.supportsARP() {
+		log.Debugf("skip arp scan on iface %s: arp unsupported", s.config.Iface.Name)
+		return
+	}
 	for target := range s.hosts.Hosts() {
 		s.rateLimit()
 		select {
@@ -114,6 +134,9 @@ func (s *Scannerx) arpScan() {
 	}
 }
 func (s *Scannerx) arp(target string) {
+	if !s.supportsARP() {
+		return
+	}
 	packet, err := s.assemblePacket(target, 0, ARP)
 	if err != nil {
 		log.Errorf("assemble arp packet failed: %v", err)
