@@ -3,6 +3,7 @@ package aiforge
 import (
 	"archive/zip"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -22,6 +23,7 @@ import (
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 // ForgeExportOption customizes export behavior.
@@ -112,17 +114,16 @@ func applyImportOptions(opts ...ForgeImportOption) *forgeImportOptions {
 	return cfg
 }
 
-// ExportAIForgesToZip exports one or more forges (and optional AI tools) into a zip package.
+// ExportAIForgesToZip exports one or more forges matched by explicit names and/or filter
+// (plus optional AI tools) into a zip package.
 // Each forge will be placed in its own directory under the archive.
 // For config/json type, the package layout follows buildinforges (e.g. buildinforge/hostscan).
 // For yak type, only forge_cfg.json and <name>.yak are included.
-func ExportAIForgesToZip(db *gorm.DB, forgeNames []string, toolNames []string, targetPath string, opts ...ForgeExportOption) (string, error) {
+func ExportAIForgesToZip(ctx context.Context, db *gorm.DB, filter *ypb.AIForgeFilter, toolNames []string, targetPath string, opts ...ForgeExportOption) (string, error) {
 	if db == nil {
 		return "", utils.Error("db is required")
 	}
-	if len(forgeNames) == 0 && len(toolNames) == 0 {
-		return "", utils.Error("forge names or tool names are required")
-	}
+
 	opt := applyExportOptions(opts...)
 
 	tmpDir, err := os.MkdirTemp("", "aiforge-export-*")
@@ -138,7 +139,11 @@ func ExportAIForgesToZip(db *gorm.DB, forgeNames []string, toolNames []string, t
 	}
 	progress(0, "start export", "info")
 
-	total := len(forgeNames) + len(toolNames)
+	total, err := yakit.CountAIForges(db, filter)
+	if err != nil {
+		return "", utils.Wrapf(err, "count forges failed")
+	}
+
 	progressStep := func(done int, name string, messageType string) {
 		if total == 0 {
 			return
@@ -150,19 +155,16 @@ func ExportAIForgesToZip(db *gorm.DB, forgeNames []string, toolNames []string, t
 	progressErrorMsg := func(msg string) {
 		progressStep(exported, "[Error]: "+msg, "error")
 	}
-	for _, name := range forgeNames {
-		if strings.TrimSpace(name) == "" {
+	resolveForgeName := []string{}
+
+	for forge := range yakit.YieldAIForges(ctx, db, filter) {
+		if forge == nil {
 			log.Errorf("empty forge name detected")
 			progressErrorMsg("empty forge name detected")
 			continue
 		}
-		forge, err := yakit.GetAIForgeByName(db, name)
-		if err != nil {
-			log.Errorf("failed to get forge %s: %v", name, err)
-			progressErrorMsg(fmt.Sprintf("failed to get forge %s: %v", name, err))
-			continue
-		}
 		effectiveName := forge.ForgeName
+		resolveForgeName = append(resolveForgeName, effectiveName)
 		forgeDir := filepath.Join(tmpDir, effectiveName)
 		if err := dumpForgeToDir(forge, forgeDir, effectiveName); err != nil {
 			log.Errorf("failed to export forge %s: %v", effectiveName, err)
@@ -196,8 +198,8 @@ func ExportAIForgesToZip(db *gorm.DB, forgeNames []string, toolNames []string, t
 	}
 
 	if opt.output == "" {
-		if len(forgeNames) == 1 && len(toolNames) == 0 {
-			opt.output = forgeNames[0]
+		if total == 1 && len(toolNames) == 0 {
+			opt.output = resolveForgeName[0]
 		} else {
 			opt.output = "aiforge-package"
 		}

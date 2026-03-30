@@ -1,6 +1,7 @@
 package aiforge
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"github.com/yaklang/yaklang/embed/testdata"
 )
 
@@ -85,7 +87,9 @@ func TestExportImportYakForge_AllFieldsAndProgress(t *testing.T) {
 	}
 
 	target := filepath.Join(t.TempDir(), "yak.tar.gz")
-	exported, err := ExportAIForgesToZip(db, []string{forge.ForgeName}, nil, target, WithExportProgress(exportProgress))
+	exported, err := ExportAIForgesToZip(context.Background(), db, &ypb.AIForgeFilter{
+		ForgeNames: []string{forge.ForgeName},
+	}, nil, target, WithExportProgress(exportProgress))
 	require.NoError(t, err)
 	require.Equal(t, target, exported)
 	require.NotEmpty(t, progressMsg)
@@ -133,7 +137,9 @@ func TestExportImportConfigForge_WithRenameAndOverwrite(t *testing.T) {
 	require.NoError(t, yakit.CreateAIForge(db, forge))
 
 	target := filepath.Join(t.TempDir(), "config.tar.gz")
-	exported, err := ExportAIForgesToZip(db, []string{forge.ForgeName}, nil, target)
+	exported, err := ExportAIForgesToZip(context.Background(), db, &ypb.AIForgeFilter{
+		ForgeNames: []string{forge.ForgeName},
+	}, nil, target)
 	require.NoError(t, err)
 
 	db.Unscoped().Where("forge_name = ?", forge.ForgeName).Delete(&schema.AIForge{})
@@ -181,7 +187,7 @@ func TestExportImportMultipleForges_WithDBValidation(t *testing.T) {
 	require.NoError(t, yakit.CreateAIForge(db, cfgForge))
 
 	target := filepath.Join(t.TempDir(), "multi.tar.gz")
-	exported, err := ExportAIForgesToZip(db, []string{yakForge.ForgeName, cfgForge.ForgeName}, nil, target)
+	exported, err := ExportAIForgesToZip(context.Background(), db, &ypb.AIForgeFilter{ForgeNames: []string{yakForge.ForgeName, cfgForge.ForgeName}}, nil, target)
 	require.NoError(t, err)
 	require.Equal(t, target, exported)
 
@@ -225,7 +231,9 @@ func TestExportImportForgeWithTools(t *testing.T) {
 	require.NoError(t, err)
 
 	target := filepath.Join(t.TempDir(), "forge-with-tools.tar.gz")
-	exported, err := ExportAIForgesToZip(db, []string{forge.ForgeName}, []string{tool.Name}, target)
+	exported, err := ExportAIForgesToZip(context.Background(), db, &ypb.AIForgeFilter{
+		ForgeNames: []string{forge.ForgeName},
+	}, []string{tool.Name}, target)
 	require.NoError(t, err)
 	require.Equal(t, target, exported)
 

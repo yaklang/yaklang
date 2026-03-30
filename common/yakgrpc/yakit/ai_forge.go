@@ -171,3 +171,17 @@ func YieldAllAIForges(ctx context.Context, db *gorm.DB) chan *schema.AIForge {
 	db = db.Model(&schema.AIForge{})
 	return bizhelper.YieldModel[*schema.AIForge](ctx, db)
 }
+
+func CountAIForges(db *gorm.DB, filter *ypb.AIForgeFilter) (int64, error) {
+	db = FilterAIForge(db, filter)
+	var count int64
+	if db := db.Count(&count); db.Error != nil {
+		return 0, utils.Errorf("count AI Forges failed: %s", db.Error)
+	}
+	return count, nil
+}
+
+func YieldAIForges(ctx context.Context, db *gorm.DB, filter *ypb.AIForgeFilter) chan *schema.AIForge {
+	db = FilterAIForge(db, filter)
+	return bizhelper.YieldModel[*schema.AIForge](ctx, db)
+}
