@@ -43,6 +43,32 @@ func mockedDirectlyCallTool(i aicommon.AICallerConfigIf, req *aicommon.AIRequest
 	return rsp, nil
 }
 
+func mockedDirectlyCallToolLegacyWrapped(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string) (*aicommon.AIResponse, error) {
+	prompt := req.GetPrompt()
+
+	if isPrimaryDecisionPrompt(prompt) {
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(`
+{"@action": "object", "next_action": { "type": "directly_call_tool", "directly_call_tool_name": "` + toolName + `", "directly_call_identifier": "sleep_briefly", "directly_call_expectations": "~0.1s, instant", "directly_call_tool_params": {"@action": "call-tool", "tool": "` + toolName + `", "params": {"seconds": 0.1}} },
+"human_readable_thought": "directly calling cached tool with wrapped params", "cumulative_summary": "..directly-call-summary.."}
+`))
+		rsp.Close()
+		return rsp, nil
+	}
+
+	if isVerifySatisfactionPrompt(prompt) {
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "directly-call-satisfied", "human_readable_result": "done via directly_call_tool"}`))
+		rsp.Close()
+		return rsp, nil
+	}
+
+	rsp := i.NewAIResponse()
+	rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "fallback"}`))
+	rsp.Close()
+	return rsp, nil
+}
+
 // TestReAct_DirectlyCallTool_Basic verifies that directly_call_tool
 // executes the tool without an extra param-generation AI call.
 func TestReAct_DirectlyCallTool_Basic(t *testing.T) {
@@ -111,6 +137,78 @@ LOOP:
 
 	require.True(t, taskCompleted, "task should complete")
 	require.Equal(t, int32(1), atomic.LoadInt32(&toolCallCount), "tool should be called exactly once")
+}
+
+func TestReAct_DirectlyCallTool_LegacyWrappedParams(t *testing.T) {
+	in := make(chan *ypb.AIInputEvent, 10)
+	out := make(chan *ypb.AIOutputEvent, 200)
+
+	var toolCallCount int32
+	var sawParamProgress bool
+	sleepTool, err := aitool.New(
+		"sleep_test",
+		aitool.WithNumberParam("seconds"),
+		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+			atomic.AddInt32(&toolCallCount, 1)
+			return "done", nil
+		}),
+	)
+	require.NoError(t, err)
+
+	react, err := NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			return mockedDirectlyCallToolLegacyWrapped(i, r, "sleep_test")
+		}),
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
+			out <- e.ToGRPC()
+		}),
+		aicommon.WithTools(sleepTool),
+	)
+	require.NoError(t, err)
+
+	react.config.GetAiToolManager().AddRecentlyUsedTool(sleepTool)
+
+	go func() {
+		in <- &ypb.AIInputEvent{
+			IsFreeInput: true,
+			FreeInput:   "test directly call tool with legacy wrapped params",
+		}
+	}()
+
+	timeout := time.After(10 * time.Second)
+	taskCompleted := false
+
+LOOP:
+	for {
+		select {
+		case e := <-out:
+			if e.NodeId == "directly_call_tool_params" {
+				sawParamProgress = true
+			}
+			if e.Type == string(schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE) {
+				iid := utils.InterfaceToString(jsonpath.FindFirst(string(e.Content), "$.id"))
+				in <- &ypb.AIInputEvent{
+					IsInteractiveMessage: true,
+					InteractiveId:        iid,
+					InteractiveJSONInput: `{"suggestion": "continue"}`,
+				}
+			}
+			if e.NodeId == "react_task_status_changed" {
+				result := jsonpath.FindFirst(string(e.Content), "$..react_task_now_status")
+				if utils.InterfaceToString(result) == "completed" {
+					taskCompleted = true
+					break LOOP
+				}
+			}
+		case <-timeout:
+			break LOOP
+		}
+	}
+
+	require.True(t, taskCompleted, "task should complete")
+	require.Equal(t, int32(1), atomic.LoadInt32(&toolCallCount), "tool should be called exactly once")
+	require.True(t, sawParamProgress, "should emit directly_call_tool params progress event")
 }
 
 // TestReAct_DirectlyCallTool_RequireThenDirect uses require_tool first, then directly_call_tool.
