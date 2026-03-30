@@ -54,8 +54,8 @@ pkg_matches_pattern() {
   # 通配符匹配：pattern 以 /... 结尾
   if [[ "$pattern" == */... ]]; then
     local prefix="${pattern%/...}"
-    # 检查 pkg 是否以 prefix/ 开头（子包）或等于 prefix（本身）
-    if [[ "$pkg" == "$prefix" ]] || [[ "$pkg" == "$prefix"/* ]]; then
+    # 检查 pkg 是否位于 prefix 目录树下（任意深度）或等于 prefix
+    if [[ "$pkg" == "$prefix" ]] || [[ "${pkg#"$prefix"/}" != "$pkg" ]]; then
       return 0
     fi
   fi
@@ -72,14 +72,34 @@ pkg_matches_pattern() {
 }
 
 # 找到匹配配置的所有测试二进制
+pkg_matches_any_exclude() {
+  local pkg="$1"
+  local exclude_patterns="$2"
+  local pattern=""
+
+  while IFS= read -r pattern; do
+    [[ -z "$pattern" ]] && continue
+    if pkg_matches_pattern "$pkg" "$pattern"; then
+      return 0
+    fi
+  done <<< "$exclude_patterns"
+
+  return 1
+}
+
 find_matching_tests() {
   local pattern="$1"
+  local exclude_patterns="${2:-}"
   local -a matched_indices=()
   
   for i in "${!ALL_TEST_PKGS[@]}"; do
-    if pkg_matches_pattern "${ALL_TEST_PKGS[$i]}" "$pattern"; then
-      matched_indices+=("$i")
+    if ! pkg_matches_pattern "${ALL_TEST_PKGS[$i]}" "$pattern"; then
+      continue
     fi
+    if pkg_matches_any_exclude "${ALL_TEST_PKGS[$i]}" "$exclude_patterns"; then
+      continue
+    fi
+    matched_indices+=("$i")
   done
   
   # 安全地输出数组（避免 unbound variable 错误）
@@ -268,6 +288,7 @@ if [[ -n "$TEST_CONFIG" && -f "$TEST_CONFIG" ]]; then
     timeout=$(jq -r ".[$idx].timeout // empty" "$TEST_CONFIG")
     run_pattern=$(jq -r ".[$idx].run // empty" "$TEST_CONFIG")
     skip_pattern=$(jq -r ".[$idx].skip // empty" "$TEST_CONFIG")
+    exclude_packages=$(jq -r ".[$idx].exclude_packages[]? // empty" "$TEST_CONFIG")
     parallel=$(jq -r ".[$idx].parallel // empty" "$TEST_CONFIG")
     retry=$(jq -r ".[$idx].retry // empty" "$TEST_CONFIG")
     retry_delay=$(jq -r ".[$idx].retry_delay // empty" "$TEST_CONFIG")
@@ -281,11 +302,12 @@ if [[ -n "$TEST_CONFIG" && -f "$TEST_CONFIG" ]]; then
     [[ "$timeout" != "$TEST_TIMEOUT" ]] && echo "  Timeout: $timeout"
     [[ -n "$run_pattern" ]] && echo "  Run: $run_pattern"
     [[ -n "$skip_pattern" ]] && echo "  Skip: $skip_pattern"
+    [[ -n "$exclude_packages" ]] && echo "  Exclude Packages: $(echo "$exclude_packages" | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
     [[ -n "$parallel" ]] && echo "  Parallel: $parallel"
     [[ -n "$retry" ]] && echo "  Retry: $retry (delay: ${retry_delay:-5}s)"
     
     # 查找匹配的测试
-    matched=$(find_matching_tests "$pattern")
+    matched=$(find_matching_tests "$pattern" "$exclude_packages")
     
     if [[ -z "$matched" ]]; then
       echo "  No matching tests found"
