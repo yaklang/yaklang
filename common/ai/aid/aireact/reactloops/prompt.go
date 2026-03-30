@@ -14,6 +14,19 @@ import (
 
 const directlyCallToolParamsNodeID = "directly_call_tool_params"
 
+func renderRecentToolRoutingHint(nonce string) string {
+	return utils.MustRenderTemplate(`
+<|DIRECT_TOOL_ROUTING_{{ .Nonce }}|>
+# Fast Tool Routing
+- Before using require_tool, check CACHE_TOOL_CALL first.
+- If the exact tool you need is already listed in CACHE_TOOL_CALL, prefer directly_call_tool for faster execution.
+- Use require_tool only when the needed tool is not in the recent cache, or when you still need normal tool discovery.
+<|DIRECT_TOOL_ROUTING_END_{{ .Nonce }}|>
+	`, map[string]any{
+		"Nonce": nonce,
+	})
+}
+
 //go:embed prompts/loop_template.tpl
 var coreTemplate string
 
@@ -168,6 +181,7 @@ func (r *ReActLoop) generateLoopPrompt(
 	// Append CACHE_TOOL_CALL block only when summary is non-empty
 	if tm := r.config.GetAiToolManager(); tm != nil && tm.HasRecentlyUsedTools() {
 		r.syncRecentToolParamAITagFields(tm.GetRecentToolParamNames())
+		reactiveData += renderRecentToolRoutingHint(nonce)
 		if summary := tm.GetRecentToolsSummary(tm.GetRecentToolCacheMaxBytes(), nonce); summary != "" {
 			cacheBlock := utils.MustRenderTemplate(`
 <|CACHE_TOOL_CALL_{{ .Nonce }}>
@@ -202,7 +216,7 @@ func (r *ReActLoop) syncRecentToolParamAITagFields(paramNames []string) {
 	if r.aiTagFields == nil {
 		return
 	}
-	for _, paramName := range paramNames {
+	for _, paramName := range aicommon.FilterSupportedToolParamAITagNames(paramNames) {
 		paramName = strings.TrimSpace(paramName)
 		if paramName == "" {
 			continue
@@ -212,7 +226,7 @@ func (r *ReActLoop) syncRecentToolParamAITagFields(paramNames []string) {
 			TagName:      tagName,
 			VariableName: aicommon.GetToolParamAITagActionKey(paramName),
 			AINodeId:     directlyCallToolParamsNodeID,
-			ContentType:  "text/plain",
+			ContentType:  "default",
 		})
 	}
 }

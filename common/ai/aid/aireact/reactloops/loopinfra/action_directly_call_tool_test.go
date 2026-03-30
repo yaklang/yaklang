@@ -108,7 +108,7 @@ func TestDirectlyCallTool_Handler_NormalizesWrappedParamsAndStreamsProgress(t *t
 	assert.Equal(t, 0.1, invoker.withoutRequiredParams.GetFloat("seconds"))
 	assert.Equal(t, "sleep_briefly", invoker.withoutRequiredParams.GetString(aicommon.ReservedKeyIdentifier))
 	assert.Equal(t, "~0.1s, instant", invoker.withoutRequiredParams.GetString(aicommon.ReservedKeyCallExpectations))
-	assert.Contains(t, op.GetFeedback().String(), "Prepared directly_call_tool params for 'sleep_test': 1 fields [seconds: 0.1]")
+	assert.Contains(t, op.GetFeedback().String(), "Prepared directly_call_tool params for 'sleep_test': 1 fields [seconds]")
 
 	timeline := invoker.getTimelineString()
 	assert.Contains(t, timeline, "preparing directly_call_tool params for 'sleep_test'")
@@ -154,6 +154,6 @@ func TestDirectlyCallTool_Handler_MergesAITagParams(t *testing.T) {
 	assert.Equal(t, "bash_test", invoker.withoutRequiredName)
 	assert.Equal(t, 20.0, invoker.withoutRequiredParams.GetFloat("timeout"))
 	assert.Equal(t, "#!/bin/bash\necho hello", invoker.withoutRequiredParams.GetString("command"))
-	assert.Contains(t, op.GetFeedback().String(), "command(BLOCK)")
+	assert.Contains(t, op.GetFeedback().String(), "Prepared directly_call_tool params for 'bash_test': 2 fields [command(BLOCK), timeout]")
 	assert.Contains(t, invoker.getTimelineString(), "merged 1 AITAG block params: command")
 }

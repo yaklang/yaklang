@@ -31,6 +31,38 @@ func GetToolParamAITagActionKey(paramName string) string {
 	return toolParamAITagActionKeyPrefix + paramName
 }
 
+func IsSupportedToolParamAITagName(paramName string) bool {
+	if paramName == "" {
+		return false
+	}
+	for _, ch := range paramName {
+		if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_' {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+func FilterSupportedToolParamAITagNames(paramNames []string) []string {
+	if len(paramNames) == 0 {
+		return nil
+	}
+	filtered := make([]string, 0, len(paramNames))
+	seen := make(map[string]struct{}, len(paramNames))
+	for _, paramName := range paramNames {
+		if !IsSupportedToolParamAITagName(paramName) {
+			continue
+		}
+		if _, ok := seen[paramName]; ok {
+			continue
+		}
+		seen[paramName] = struct{}{}
+		filtered = append(filtered, paramName)
+	}
+	return filtered
+}
+
 func MergeActionAITagParams(action *Action, invokeParams aitool.InvokeParams, paramNames []string) []string {
 	if action == nil || len(paramNames) == 0 {
 		return nil

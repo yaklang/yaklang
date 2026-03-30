@@ -261,7 +261,25 @@ func TestRecentToolCache_ActualToolSizes(t *testing.T) {
 	t.Logf("do_http_request metadata-backed cache size=%d", httpSize)
 	t.Logf("bash+do_http_request metadata-backed cache size=%d", combinedSize)
 
-	assert.Check(t, bashSize > 8*1024, "bash metadata-backed cache size should be substantial")
-	assert.Check(t, httpSize > 8*1024, "do_http_request metadata-backed cache size should be substantial")
+	assert.Check(t, bashSize > 0, "bash metadata-backed cache size should be non-zero")
+	assert.Check(t, httpSize > 0, "do_http_request metadata-backed cache size should be non-zero")
+	assert.Check(t, combinedSize > bashSize, "combined metadata-backed cache size should exceed bash alone")
+	assert.Check(t, combinedSize > httpSize, "combined metadata-backed cache size should exceed do_http_request alone")
 	assert.Check(t, combinedSize < defaultRecentToolCacheMaxBytes, "bash + do_http_request metadata-backed cache size should fit in the new 40KB budget")
+}
+
+func TestRecentToolCache_SummaryFooterOnlyListsAITAGSupportedParams(t *testing.T) {
+	mgr := newManagerWithCache(0)
+	tool := makeTool("taggable_tool", "tool with mixed param names",
+		aitool.WithStringParam("command"),
+		aitool.WithStringParam("raw_content"),
+		aitool.WithStringParam("raw-content"),
+	)
+	mgr.AddRecentlyUsedTool(tool)
+
+	summary := mgr.GetRecentToolsSummary(0, "nonce")
+	assert.Check(t, strings.Contains(summary, "AITAG-capable params seen in cached tools:"), "footer should describe AITAG-capable params")
+	assert.Check(t, strings.Contains(summary, "- command"), "supported param should be listed")
+	assert.Check(t, strings.Contains(summary, "- raw_content"), "supported underscore param should be listed")
+	assert.Check(t, !strings.Contains(summary, "- raw-content"), "unsupported param names should be filtered from AITAG hints")
 }

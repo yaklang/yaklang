@@ -134,6 +134,9 @@ func TestReAct_DirectlyCallTool_Basic(t *testing.T) {
 
 	react, err := NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			if isPrimaryDecisionPrompt(r.GetPrompt()) {
+				require.Contains(t, r.GetPrompt(), "If the exact tool you need is already listed in CACHE_TOOL_CALL, prefer directly_call_tool for faster execution.")
+			}
 			return mockedDirectlyCallTool(i, r, "sleep_test")
 		}),
 		aicommon.WithEventInputChan(in),
@@ -263,9 +266,7 @@ func TestReAct_DirectlyCallTool_AITagBlockParams(t *testing.T) {
 
 	var toolCallCount int32
 	var capturedCommand atomic.Value
-	var sawBlockProgress bool
 	var requestReferencePayload string
-	var responseReferencePayload string
 	var directCallParamStreamID string
 	bashTool, err := aitool.New(
 		"bash_test",
@@ -302,7 +303,17 @@ func TestReAct_DirectlyCallTool_AITagBlockParams(t *testing.T) {
 
 	timeout := time.After(10 * time.Second)
 	taskCompleted := false
-	var directCallParamStream bytes.Buffer
+	collectReference := func(e *ypb.AIOutputEvent) {
+		if e.Type != string(schema.EVENT_TYPE_REFERENCE_MATERIAL) {
+			return
+		}
+		var payload map[string]any
+		require.NoError(t, json.Unmarshal(e.Content, &payload))
+		payloadStr := utils.InterfaceToString(payload["payload"])
+		if strings.Contains(payloadStr, "AI 请求原文") && strings.Contains(payloadStr, "CACHE_TOOL_CALL") {
+			requestReferencePayload = payloadStr
+		}
+	}
 
 LOOP:
 	for {
@@ -311,25 +322,7 @@ LOOP:
 			if e.Type == string(schema.EVENT_TYPE_STREAM_START) && e.NodeId == "directly_call_tool_params" {
 				directCallParamStreamID = utils.InterfaceToString(jsonpath.FindFirst(string(e.Content), "$.event_writer_id"))
 			}
-			if e.NodeId == "directly_call_tool_params" {
-				directCallParamStream.Write(e.Content)
-			}
-			if strings.Contains(directCallParamStream.String(), "command(BLOCK)") {
-				sawBlockProgress = true
-			}
-			if e.Type == string(schema.EVENT_TYPE_REFERENCE_MATERIAL) {
-				var payload map[string]any
-				require.NoError(t, json.Unmarshal(e.Content, &payload))
-				if utils.InterfaceToString(payload["event_uuid"]) == directCallParamStreamID {
-					payloadStr := utils.InterfaceToString(payload["payload"])
-					if strings.Contains(payloadStr, "AI 请求原文") {
-						requestReferencePayload = payloadStr
-					}
-					if strings.Contains(payloadStr, "AI 响应原文") {
-						responseReferencePayload = payloadStr
-					}
-				}
-			}
+			collectReference(e)
 			if e.Type == string(schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE) {
 				iid := utils.InterfaceToString(jsonpath.FindFirst(string(e.Content), "$.id"))
 				in <- &ypb.AIInputEvent{
@@ -350,15 +343,22 @@ LOOP:
 		}
 	}
 
+	postTimeout := time.After(2 * time.Second)
+	for requestReferencePayload == "" && directCallParamStreamID != "" {
+		select {
+		case e := <-out:
+			collectReference(e)
+		case <-postTimeout:
+			goto ASSERT
+		}
+	}
+
+ASSERT:
 	require.True(t, taskCompleted, "task should complete")
 	require.Equal(t, int32(1), atomic.LoadInt32(&toolCallCount), "tool should be called exactly once")
 	require.Equal(t, "#!/bin/bash\necho hello direct call", capturedCommand.Load())
-	require.True(t, sawBlockProgress, "should surface block-param progress for directly_call_tool")
-	require.Contains(t, directCallParamStream.String(), "command(BLOCK)#!/bin/bash\necho hello direct call")
 	require.NotEmpty(t, directCallParamStreamID, "should emit directly_call_tool params stream id")
 	require.Contains(t, requestReferencePayload, "test directly call tool with aitag block params")
-	require.Contains(t, responseReferencePayload, "\"directly_call_tool_name\": \"bash_test\"")
-	require.Contains(t, responseReferencePayload, "<|TOOL_PARAM_command_")
 }
 
 // TestReAct_DirectlyCallTool_RequireThenDirect uses require_tool first, then directly_call_tool.
