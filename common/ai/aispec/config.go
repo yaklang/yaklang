@@ -46,6 +46,7 @@ type AIConfig struct {
 	StreamHandler       func(io.Reader)
 	ReasonStreamHandler func(reader io.Reader)
 	Type                string `json:"Type"`
+	PreferredTier       consts.ModelTier
 	Context             context.Context
 
 	FunctionCallRetryTimes int
@@ -496,6 +497,24 @@ func WithType(t string) AIConfigOption {
 	return func(config *AIConfig) {
 		config.Type = t
 	}
+}
+
+func WithPreferredTier(tier consts.ModelTier) AIConfigOption {
+	return func(config *AIConfig) {
+		config.PreferredTier = tier
+	}
+}
+
+func WithSpeedPriority() AIConfigOption {
+	return WithPreferredTier(consts.TierLightweight)
+}
+
+func WithQualityPriority() AIConfigOption {
+	return WithPreferredTier(consts.TierIntelligent)
+}
+
+func WithVisionPriority() AIConfigOption {
+	return WithPreferredTier(consts.TierVision)
 }
 
 // WithTimeout 设置请求超时时间（单位：秒）。
