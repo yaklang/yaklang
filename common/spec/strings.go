@@ -25,9 +25,6 @@ const (
 	ServerNodeId   = "palm-server"
 	LogAgentNodeId = "log-agent"
 
-	// RPC Exchange 一定是 Direct
-	CommonRPCExchange = "palm-rpc"
-
 	// 服务器推送数据的交换机
 	CommonServerPushExchange   = "palm-push"
 	CommonServerPushDefaultKey = "palm.nodebase.notification"
@@ -51,7 +48,6 @@ const (
 	API_UnregisterNode = "unregister-palm-node"
 
 	BackendKey_HTTPFlow                           = "http-flow"
-	BackendKey_Scanner                            = "scanner"
 	BackendKey_ProcessInfo                        = "process"
 	BackendKey_ProcessEvent                       = "process-event"
 	BackendKey_ConnectionEvent                    = "connection-event"
@@ -82,10 +78,6 @@ var (
 		HIDS_API_Sleep,
 	}
 )
-
-func GetScriptRuntimeMessageKey(nodeId, taskId string) string {
-	return fmt.Sprintf("palm.nodebase.script.%v.%v", nodeId, taskId)
-}
 
 func GetNodeBaseNotificationQueueByNodeId(id string) string {
 	return fmt.Sprintf("queue.notify-from-server.%v", id)

@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package legion.capability.v1;
+
+import "google/protobuf/timestamp.proto";
+import "legion/node/v1/node.proto";
+
+option go_package = "github.com/yaklang/yaklang/common/legionpb/legion/capability/v1;capabilityv1";
+
+message CapabilityRef {
+  string capability_key = 1;
+  string spec_version = 2;
+}
+
+message ApplyCapabilityCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  CapabilityRef capability = 3;
+  bytes desired_spec_json = 4;
+}
+
+message CapabilityStatus {
+  legion.node.v1.EventMetadata metadata = 1;
+  CapabilityRef capability = 2;
+  string status = 3;
+  string message = 4;
+  google.protobuf.Timestamp observed_at = 5;
+}
+
+message CapabilityAlert {
+  legion.node.v1.EventMetadata metadata = 1;
+  CapabilityRef capability = 2;
+  string severity = 3;
+  string title = 4;
+  bytes detail_json = 5;
+}
+
+message CapabilityFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  CapabilityRef capability = 2;
+  string error_code = 3;
+  string error_message = 4;
+}

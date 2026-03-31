@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -35,12 +36,13 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/cybertunnel"
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
+	"github.com/yaklang/yaklang/common/node"
 	"github.com/yaklang/yaklang/common/spec"
+	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/omap"
@@ -959,20 +961,57 @@ var UtilsCommands = []*cli.Command{
 var DistributionCommands = []*cli.Command{
 	&scannode.DistYakCommand,
 	{
-		Name:   "mq",
-		Usage:  "distributed by private amqp application protocol, execute yak via rabbitmq",
+		Name:   "node",
+		Usage:  "join legion platform, bootstrap node session over HTTP, and consume job commands over NATS",
 		Before: nil,
 		After:  nil,
 		Action: func(c *cli.Context) error {
-			config := spec.LoadAMQPConfigFromCliContext(c)
-			node, err := scannode.NewScanNode(c.String("id"), c.String("server-port"), config)
+			scanNode, err := scannode.NewScanNode(node.BaseConfig{
+				NodeType:           spec.NodeType_Scanner,
+				NodeID:             c.String("id"),
+				EnrollmentToken:    c.String("enrollment-token"),
+				PlatformAPIBaseURL: c.String("api-url"),
+				Version:            c.String("version"),
+				MaxRunningJobs:     uint32(c.Int("max-running-jobs")),
+				HeartbeatInterval:  c.Duration("heartbeat-interval"),
+			})
 			if err != nil {
 				return err
 			}
-			node.Run()
+			scanNode.Run()
 			return nil
 		},
-		Flags: spec.GetCliBasicConfig("scannode"),
+		Flags: []cli.Flag{
+			cli.StringFlag{
+				Name:  "api-url",
+				Usage: "Legion platform HTTP API base URL",
+				Value: "http://127.0.0.1:8080",
+			},
+			cli.StringFlag{
+				Name:  "enrollment-token",
+				Usage: "Legion node enrollment token",
+			},
+			cli.StringFlag{
+				Name:  "id",
+				Usage: "Node ID",
+				Value: fmt.Sprintf("scannode-[%s]", runtime.GOOS+runtime.GOARCH),
+			},
+			cli.StringFlag{
+				Name:  "version",
+				Usage: "Node version reported to Legion",
+				Value: "dev",
+			},
+			cli.IntFlag{
+				Name:  "max-running-jobs",
+				Usage: "Maximum concurrent jobs reported in heartbeat",
+				Value: 1,
+			},
+			cli.DurationFlag{
+				Name:  "heartbeat-interval",
+				Usage: "Interval between node heartbeats",
+				Value: 30 * time.Second,
+			},
+		},
 	},
 	{
 		Name:  "tunnel",
