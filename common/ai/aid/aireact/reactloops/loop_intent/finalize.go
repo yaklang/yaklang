@@ -70,6 +70,7 @@ func generateIntentSummaryViaLiteForge(loop *reactloops.ReActLoop, invoker aicom
 	if searchResults == "" && matchedToolNames == "" && matchedForgeNames == "" && matchedSkillNames == "" {
 		loop.Set("intent_summary", "未识别到可用能力")
 		loop.Set("intent_analysis", "未识别到可用能力")
+		setTaskRetrievalInfo(loop, nil, nil, "")
 		log.Infof("intent finalize: no search results available, setting default analysis")
 		return
 	}
@@ -127,6 +128,16 @@ Skills: {{ .MatchedSkillNames }}
 			aitool.WithStringParam("intent_summary",
 				aitool.WithParam_Description("Concise structured summary of user intent following the template"),
 				aitool.WithParam_Required(true)),
+			aitool.WithStringArrayParamEx("tags",
+				[]aitool.PropertyOption{
+					aitool.WithParam_Description("Task tags for downstream retrieval"),
+				},
+			),
+			aitool.WithStringArrayParamEx("questions",
+				[]aitool.PropertyOption{
+					aitool.WithParam_Description("Key retrieval questions for downstream search"),
+				},
+			),
 			aitool.WithStringArrayParamEx("recommended_capabilities",
 				[]aitool.PropertyOption{
 					aitool.WithParam_Description("List of recommended capability names"),
@@ -152,6 +163,8 @@ Skills: {{ .MatchedSkillNames }}
 
 	intentSummary := strings.TrimSpace(forgeResult.GetString("intent_summary"))
 	intentSummary = reactloops.CompactIntentSummary(intentSummary)
+	tags := forgeResult.GetStringSlice("tags")
+	questions := forgeResult.GetStringSlice("questions")
 	recommendedCaps := VerifyIdentifiers(loop, forgeResult.GetStringSlice("recommended_capabilities"))
 
 	// Merge catalog pre-matched identifiers
@@ -213,6 +226,7 @@ Skills: {{ .MatchedSkillNames }}
 		enrichment.WriteString("\n")
 	}
 	loop.Set("context_enrichment", enrichment.String())
+	setTaskRetrievalInfo(loop, tags, questions, intentSummary)
 
 	log.Infof("intent finalize: LiteForge generated summary successfully, intent_summary=%d bytes", len(intentSummary))
 }
@@ -266,7 +280,74 @@ func buildFallbackIntentAnalysis(loop *reactloops.ReActLoop) {
 		loop.Set("context_enrichment", enrichment.String())
 	}
 
+	setTaskRetrievalInfo(loop,
+		append(
+			append(
+				reactloops.NormalizeCapabilityNames(matchedToolNames),
+				reactloops.NormalizeCapabilityNames(matchedForgeNames)...),
+			reactloops.NormalizeCapabilityNames(matchedSkillNames)...,
+		),
+		normalizeRetrievalInfoItems([]string{
+			strings.TrimSpace(loop.Get("user_query")),
+			strings.TrimSpace(loop.Get("search_query")),
+		}),
+		intentSummary,
+	)
+
 	log.Infof("intent finalize: using fallback analysis from raw search results")
+}
+
+func setTaskRetrievalInfo(loop *reactloops.ReActLoop, tags, questions []string, target string) {
+	if loop == nil {
+		return
+	}
+	existingTags := splitRetrievalInfoItems(loop.Get("task_retrieval_tags"))
+	existingQuestions := splitRetrievalInfoItems(loop.Get("task_retrieval_questions"))
+	existingTarget := strings.TrimSpace(loop.Get("task_retrieval_target"))
+	target = strings.TrimSpace(target)
+	tags = append(existingTags, tags...)
+	questions = append(existingQuestions, questions...)
+	if target == "" {
+		target = existingTarget
+	}
+	tags = normalizeRetrievalInfoItems(tags)
+	questions = normalizeRetrievalInfoItems(questions)
+	if len(tags) == 0 && len(questions) == 0 && target == "" {
+		return
+	}
+	loop.Set("task_retrieval_tags", strings.Join(tags, "\n"))
+	loop.Set("task_retrieval_questions", strings.Join(questions, "\n"))
+	loop.Set("task_retrieval_target", target)
+}
+
+func normalizeRetrievalInfoItems(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	result := make([]string, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		result = append(result, value)
+	}
+	if len(result) == 0 {
+		return nil
+	}
+	return result
+}
+
+func splitRetrievalInfoItems(raw string) []string {
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	return normalizeRetrievalInfoItems(strings.Split(raw, "\n"))
 }
 
 // logFinalIntentSummary logs the final intent recognition summary.
