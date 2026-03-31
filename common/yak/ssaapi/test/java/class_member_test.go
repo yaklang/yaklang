@@ -154,3 +154,40 @@ UNTIL}-> as $result`)
 	}, ssaapi.WithLanguage(ssaconfig.JAVA))
 
 }
+
+func TestJava_FieldOverwriteBeforeSink(t *testing.T) {
+	code := `
+class Obj { String data; }
+public class S11 {
+	void clean(Obj o) { o.data = "safe"; }
+	void test() {
+		Obj o = new Obj();
+		o.data = getSecret();
+		clean(o);
+		sink(o.data);
+	}
+}
+`
+
+	t.Run("sink arg is the side effect after clean", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code, `sink(* as $arg)`, map[string][]string{
+			"arg": {`side-effect("safe", o.data)`},
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
+	})
+
+	t.Run("member view keeps both history and overwritten value", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code, `o.data as $member`, map[string][]string{
+			"member": {
+				`"safe"`,
+				`Undefined-getSecret()`,
+				`side-effect("safe", o.data)`,
+			},
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
+	})
+
+	t.Run("top def from sink resolves to safe", func(t *testing.T) {
+		ssatest.CheckSyntaxFlowContain(t, code, `sink(* #-> as $data)`, map[string][]string{
+			"data": {`"safe"`},
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
+	})
+}

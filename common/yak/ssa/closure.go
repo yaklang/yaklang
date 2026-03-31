@@ -589,6 +589,15 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 				// 	}
 				// }
 
+				// Parameter/Call member side effects are caller-visible updates.
+				// Even if the callee-side variable has a different captured root,
+				// the call-site member must still advance the current lexical version
+				// so later reads like `sink(o.data)` observe the side effect.
+				if se.MemberCallKind == ParameterMemberCall || se.MemberCallKind == CallMemberCall {
+					AddSideEffect()
+					return
+				}
+
 				if bindVariable == nil || find.GetCaptured() == bindVariable.GetCaptured() {
 					AddSideEffect()
 				} else {
