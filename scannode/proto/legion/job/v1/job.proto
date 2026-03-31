@@ -1,0 +1,117 @@
+syntax = "proto3";
+
+package legion.job.v1;
+
+import "google/protobuf/timestamp.proto";
+import "legion/node/v1/node.proto";
+
+option go_package = "github.com/yaklang/yaklang/common/legionpb/legion/job/v1;jobv1";
+
+message JobRef {
+  string job_id = 1;
+  string subtask_id = 2;
+  string attempt_id = 3;
+}
+
+message ScriptVersionRef {
+  string plugin_id = 1;
+  string release_id = 2;
+  string version = 3;
+  string entry_kind = 4;
+  string content_sha256 = 5;
+}
+
+message InlineScript {
+  ScriptVersionRef version = 1;
+  string name = 2;
+  string content = 3;
+}
+
+message DispatchJobCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  JobRef job = 3;
+  reserved 4;
+  string execution_kind = 5;
+  bytes input_json = 6;
+  map<string, string> labels = 7;
+  InlineScript script = 8;
+}
+
+message CancelJobCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  JobRef job = 2;
+  string reason = 3;
+}
+
+message JobClaimed {
+  legion.node.v1.EventMetadata metadata = 1;
+  JobRef job = 2;
+  google.protobuf.Timestamp claimed_at = 3;
+}
+
+message JobStarted {
+  legion.node.v1.EventMetadata metadata = 1;
+  JobRef job = 2;
+  google.protobuf.Timestamp started_at = 3;
+}
+
+message JobProgressed {
+  legion.node.v1.EventMetadata metadata = 1;
+  JobRef job = 2;
+  string stage = 3;
+  string message = 4;
+  uint32 completed_units = 5;
+  uint32 total_units = 6;
+}
+
+message JobAsset {
+  legion.node.v1.EventMetadata metadata = 1;
+  JobRef job = 2;
+  string asset_kind = 3;
+  string title = 4;
+  string target = 5;
+  string identity_key = 6;
+  bytes asset_json = 7;
+}
+
+message JobRisk {
+  legion.node.v1.EventMetadata metadata = 1;
+  JobRef job = 2;
+  string risk_kind = 3;
+  string title = 4;
+  string target = 5;
+  string severity = 6;
+  string dedupe_key = 7;
+  bytes risk_json = 8;
+}
+
+message JobReport {
+  legion.node.v1.EventMetadata metadata = 1;
+  JobRef job = 2;
+  string report_kind = 3;
+  bytes report_json = 4;
+}
+
+message JobSucceeded {
+  legion.node.v1.EventMetadata metadata = 1;
+  JobRef job = 2;
+  google.protobuf.Timestamp finished_at = 3;
+  bytes result_json = 4;
+}
+
+message JobFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  JobRef job = 2;
+  google.protobuf.Timestamp finished_at = 3;
+  string error_code = 4;
+  string error_message = 5;
+  bytes error_detail_json = 6;
+}
+
+message JobCancelled {
+  legion.node.v1.EventMetadata metadata = 1;
+  JobRef job = 2;
+  google.protobuf.Timestamp finished_at = 3;
+  string reason = 4;
+}
