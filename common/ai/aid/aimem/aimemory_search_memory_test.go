@@ -3,10 +3,12 @@ package aimem
 import (
 	"context"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -173,6 +175,77 @@ func TestSearchMemory_EmptyQuery(t *testing.T) {
 	}
 
 	t.Logf("empty query handled correctly: %s", result.SearchSummary)
+}
+
+func TestSearchMemoryWithoutAI_TaskRetrievalInfo(t *testing.T) {
+	sessionID := "search-task-retrieval-test-" + uuid.New().String()
+	defer cleanupEntryTestData(t, sessionID)
+
+	memory, err := CreateTestAIMemory(sessionID,
+		WithInvoker(mock.NewMockInvoker(context.Background())),
+	)
+	if err != nil {
+		t.Fatalf("create AI memory failed: %v", err)
+	}
+	defer memory.Close()
+
+	err = memory.SaveMemoryEntities(
+		&aicommon.MemoryEntity{
+			Id:                 "task-retrieval-memory-1",
+			CreatedAt:          time.Now().Add(-2 * time.Minute),
+			Content:            "Java 反编译代码需要重写和可读性提升。",
+			Tags:               []string{"java", "rewrite"},
+			PotentialQuestions: []string{"哪些 Java 反编译代码需要重写？"},
+			C_Score:            0.8,
+			O_Score:            0.8,
+			R_Score:            0.9,
+			E_Score:            0.4,
+			P_Score:            0.6,
+			A_Score:            0.9,
+			T_Score:            0.7,
+		},
+		&aicommon.MemoryEntity{
+			Id:                 "task-retrieval-memory-2",
+			CreatedAt:          time.Now().Add(-1 * time.Minute),
+			Content:            "Go 并发优化经验记录。",
+			Tags:               []string{"go", "concurrency"},
+			PotentialQuestions: []string{"如何优化 Go 并发？"},
+			C_Score:            0.7,
+			O_Score:            0.7,
+			R_Score:            0.4,
+			E_Score:            0.3,
+			P_Score:            0.5,
+			A_Score:            0.6,
+			T_Score:            0.6,
+		},
+	)
+	if err != nil {
+		t.Fatalf("save memory entities failed: %v", err)
+	}
+
+	task := aicommon.NewStatefulTaskBase("task-1", "请分析并重写 Java 反编译代码", context.Background(), nil, true)
+	task.SetTaskRetrievalInfo(&aicommon.AITaskRetrievalInfo{
+		Tags:      []string{"java", "rewrite"},
+		Questions: []string{"哪些 Java 反编译代码需要重写？"},
+		Target:    "分析 Java 反编译代码并给出重写建议",
+	})
+
+	result, err := memory.SearchMemoryWithoutAI(task, 4096)
+	if err != nil {
+		t.Fatalf("search memory without AI for task failed: %v", err)
+	}
+	if result == nil {
+		t.Fatal("search result is nil")
+	}
+	if len(result.Memories) == 0 {
+		t.Fatal("expected at least one memory for task retrieval info")
+	}
+	if !strings.Contains(result.SearchSummary, "task tags") && !strings.Contains(result.SearchSummary, "task retrieval info") {
+		t.Fatalf("unexpected search summary: %s", result.SearchSummary)
+	}
+	if !strings.Contains(result.TotalContent, "Java 反编译代码需要重写") {
+		t.Fatalf("expected java rewrite memory in total content, got: %s", result.TotalContent)
+	}
 }
 
 func cleanupEntryTestData(t *testing.T, sessionID string) {

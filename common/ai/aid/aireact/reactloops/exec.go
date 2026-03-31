@@ -572,7 +572,7 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 	go func() {
 		if !utils.IsNil(r.memoryTriage) {
 			log.Info("start to handle searching memory for ReActLoop with AI")
-			result, err := r.memoryTriage.SearchMemory(task.GetUserInput(), 5*1024)
+			result, err := r.memoryTriage.SearchMemory(task, 5*1024)
 			if err != nil {
 				log.Warnf("search memory failed: %v", err)
 			}
