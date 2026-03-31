@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"net/http"
 	"sync"
 
 	"github.com/jinzhu/gorm"
@@ -10,11 +11,13 @@ import (
 )
 
 type MCPServer struct {
-	server     *server.MCPServer
-	sseServer  *server.SSEServer
-	grpcClient YakClientInterface
-	profileDB  *gorm.DB
-	projectDB  *gorm.DB
+	server               *server.MCPServer
+	sseServer            *server.SSEServer
+	streamableHTTPServer *server.StreamableHTTPServer
+	httpServer           *http.Server
+	grpcClient           YakClientInterface
+	profileDB            *gorm.DB
+	projectDB            *gorm.DB
 
 	sseMu sync.Mutex
 }
@@ -48,23 +51,55 @@ func (s *MCPServer) ServeSSE(addr, baseURL string) (err error) {
 	s.sseServer = sseServer
 	s.sseMu.Unlock()
 
-	s.grpcClient, err = NewLocalClient(true)
-	if err != nil {
+	if err = s.ensureLocalClient(); err != nil {
 		return err
 	}
 	return sseServer.Start(addr)
 }
 
+func (s *MCPServer) ServeStreamableHTTP(addr, baseURL string) (err error) {
+	s.sseMu.Lock()
+	streamableHTTPServer := server.NewStreamableHTTPServer(s.server, baseURL)
+	s.streamableHTTPServer = streamableHTTPServer
+	s.sseMu.Unlock()
+
+	if err = s.ensureLocalClient(); err != nil {
+		return err
+	}
+	return streamableHTTPServer.Start(addr)
+}
+
+func (s *MCPServer) ServeHTTPCompat(addr, baseURL string) (err error) {
+	s.sseMu.Lock()
+	sseServer := server.NewSSEServer(s.server, baseURL)
+	streamableHTTPServer := server.NewStreamableHTTPServer(s.server, baseURL)
+	mux := http.NewServeMux()
+	sseServer.RegisterHandlers(mux)
+	streamableHTTPServer.RegisterHandlers(mux)
+	httpServer := &http.Server{
+		Addr:    addr,
+		Handler: mux,
+	}
+	s.sseServer = sseServer
+	s.streamableHTTPServer = streamableHTTPServer
+	s.httpServer = httpServer
+	s.sseMu.Unlock()
+
+	if err = s.ensureLocalClient(); err != nil {
+		return err
+	}
+	return httpServer.ListenAndServe()
+}
+
 func (s *MCPServer) ServeStdio() (err error) {
-	s.grpcClient, err = NewLocalClient(true)
-	if err != nil {
+	if err = s.ensureLocalClient(); err != nil {
 		return err
 	}
 	return server.ServeStdio(s.server)
 }
 
 func (s *MCPServer) Close(ctxs ...context.Context) {
-	if s.sseServer == nil {
+	if s.sseServer == nil && s.streamableHTTPServer == nil && s.httpServer == nil {
 		return
 	}
 
@@ -75,8 +110,18 @@ func (s *MCPServer) Close(ctxs ...context.Context) {
 	if len(ctxs) > 0 {
 		ctx = ctxs[0]
 	}
-	s.sseServer.Shutdown(ctx)
-	s.sseServer = nil
+	if s.sseServer != nil {
+		s.sseServer.Shutdown(ctx)
+		s.sseServer = nil
+	}
+	if s.streamableHTTPServer != nil {
+		s.streamableHTTPServer.Shutdown(ctx)
+		s.streamableHTTPServer = nil
+	}
+	if s.httpServer != nil {
+		_ = s.httpServer.Shutdown(ctx)
+		s.httpServer = nil
+	}
 }
 
 func (s *MCPServer) handleNotification(
@@ -84,4 +129,23 @@ func (s *MCPServer) handleNotification(
 	notification mcp.JSONRPCNotification,
 ) {
 	// TODO
+}
+
+func (s *MCPServer) notificationServer(ctx context.Context) *server.MCPServer {
+	if scoped := server.ServerFromContext(ctx); scoped != nil {
+		return scoped
+	}
+	return s.server
+}
+
+func (s *MCPServer) ensureLocalClient() error {
+	if s.grpcClient != nil {
+		return nil
+	}
+	client, err := NewLocalClient(true)
+	if err != nil {
+		return err
+	}
+	s.grpcClient = client
+	return nil
 }

@@ -291,7 +291,7 @@ func handleSavePayload(s *MCPServer) server.ToolHandlerFunc {
 				}
 				break
 			}
-			s.server.SendNotificationToClient("save_payload/progress", map[string]any{
+			s.notificationServer(ctx).SendNotificationToClient("save_payload/progress", map[string]any{
 				"progress":      msg.Progress,
 				"message":       msg.Message,
 				"progressToken": progressToken,

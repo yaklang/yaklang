@@ -179,6 +179,18 @@ func createMCPClient(server *schema.MCPServer) (client.MCPClient, error) {
 			return nil, utils.Errorf("start sse mcp client failed: %v", err)
 		}
 		return sseMcpClient, nil
+	case "streamable_http":
+		streamableHTTPClient, err := client.NewStreamableHTTPMCPClient(
+			server.URL,
+			mapStringAnyToStringMap(server.Headers),
+		)
+		if err != nil {
+			return nil, utils.Errorf(
+				"create streamable http mcp client failed: %v",
+				err,
+			)
+		}
+		return streamableHTTPClient, nil
 
 	default:
 		return nil, utils.Errorf("unsupported server type: %s", server.Type)

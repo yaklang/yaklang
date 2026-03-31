@@ -15,10 +15,13 @@ import (
 // SSEServer implements a Server-Sent Events (SSE) based MCP server.
 // It provides real-time communication capabilities over HTTP using the SSE protocol.
 type SSEServer struct {
-	server   *MCPServer
-	baseURL  string
-	sessions sync.Map
-	srv      *http.Server
+	server         *MCPServer
+	baseURL        string
+	sessions       sync.Map
+	srv            *http.Server
+	dispatchOnce   sync.Once
+	dispatchDone   chan struct{}
+	dispatchCancel func()
 }
 
 // sseSession represents an active SSE connection.
@@ -38,16 +41,54 @@ func (s *sseSession) Close() {
 // NewSSEServer creates a new SSE server instance with the given MCP server and base URL.
 func NewSSEServer(server *MCPServer, baseURL string) *SSEServer {
 	return &SSEServer{
-		server:  server,
-		baseURL: baseURL,
+		server:       server,
+		baseURL:      baseURL,
+		dispatchDone: make(chan struct{}),
 	}
+}
+
+func (s *SSEServer) startNotificationDispatcher() {
+	s.dispatchOnce.Do(func() {
+		notificationCh, unsubscribe := s.server.SubscribeNotifications(100)
+		s.dispatchCancel = unsubscribe
+
+		go func() {
+			defer unsubscribe()
+
+			for {
+				select {
+				case <-s.dispatchDone:
+					return
+				case serverNotification, ok := <-notificationCh:
+					if !ok {
+						return
+					}
+					if serverNotification.Context.SessionID == "" {
+						continue
+					}
+					_ = s.SendEventToSession(
+						serverNotification.Context.SessionID,
+						serverNotification.Notification,
+					)
+				}
+			}
+		}()
+	})
+}
+
+func (s *SSEServer) RegisterHandlers(mux *http.ServeMux) {
+	s.startNotificationDispatcher()
+	mux.HandleFunc("/sse", s.handleSSE)
+	mux.HandleFunc("/message", s.handleMessage)
 }
 
 // NewTestServer creates a test server for testing purposes
 func NewTestServer(server *MCPServer) *httptest.Server {
 	sseServer := &SSEServer{
-		server: server,
+		server:       server,
+		dispatchDone: make(chan struct{}),
 	}
+	sseServer.startNotificationDispatcher()
 
 	testServer := httptest.NewServer(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -70,8 +111,7 @@ func NewTestServer(server *MCPServer) *httptest.Server {
 // It sets up HTTP handlers for SSE and message endpoints.
 func (s *SSEServer) Start(addr string) error {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/sse", s.handleSSE)
-	mux.HandleFunc("/message", s.handleMessage)
+	s.RegisterHandlers(mux)
 
 	s.srv = &http.Server{
 		Addr:    addr,
@@ -84,15 +124,24 @@ func (s *SSEServer) Start(addr string) error {
 // Shutdown gracefully stops the SSE server, closing all active sessions
 // and shutting down the HTTP server.
 func (s *SSEServer) Shutdown(ctx context.Context) error {
-	if s.srv != nil {
-		s.sessions.Range(func(key, value interface{}) bool {
-			if session, ok := value.(*sseSession); ok {
-				session.Close()
-			}
-			s.sessions.Delete(key)
-			return true
-		})
+	select {
+	case <-s.dispatchDone:
+	default:
+		close(s.dispatchDone)
+	}
+	if s.dispatchCancel != nil {
+		s.dispatchCancel()
+		s.dispatchCancel = nil
+	}
+	s.sessions.Range(func(key, value interface{}) bool {
+		if session, ok := value.(*sseSession); ok {
+			session.Close()
+		}
+		s.sessions.Delete(key)
+		return true
+	})
 
+	if s.srv != nil {
 		return s.srv.Shutdown(ctx)
 	}
 	return nil
@@ -127,26 +176,6 @@ func (s *SSEServer) handleSSE(w http.ResponseWriter, r *http.Request) {
 
 	s.sessions.Store(sessionID, session)
 	defer s.sessions.Delete(sessionID)
-
-	// Start notification handler for this session
-	go func() {
-		for {
-			select {
-			case serverNotification := <-s.server.notifications:
-				// Only forward notifications meant for this session
-				if serverNotification.Context.SessionID == sessionID {
-					s.SendEventToSession(
-						sessionID,
-						serverNotification.Notification,
-					)
-				}
-			case <-session.done:
-				return
-			case <-r.Context().Done():
-				return
-			}
-		}
-	}()
 
 	messageEndpoint := fmt.Sprintf(
 		"%s/message?sessionId=%s",

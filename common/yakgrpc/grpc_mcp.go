@@ -160,7 +160,7 @@ func launchMcpServer(ctx context.Context, req *ypb.StartMcpServerRequest, send f
 		return err
 	}
 
-	// 只支持 SSE 传输协议
+	// 默认同时提供 legacy SSE 与 streamable HTTP 传输协议
 	host := req.GetHost()
 	if host == "" {
 		host = "127.0.0.1"
@@ -213,7 +213,7 @@ func launchMcpServer(ctx context.Context, req *ypb.StartMcpServerRequest, send f
 	}()
 
 	// 阻塞运行服务器
-	log.Infof("Starting MCP SSE server on: %s", urlStr)
+	log.Infof("Starting MCP HTTP server on: %s", urlStr)
 	go func() {
 		err := utils.WaitConnect(hostPort, 3)
 		if err != nil {
@@ -223,18 +223,18 @@ func launchMcpServer(ctx context.Context, req *ypb.StartMcpServerRequest, send f
 		// 发送启动状态
 		err = send(&ypb.StartMcpServerResponse{
 			Status:    "running",
-			Message:   fmt.Sprintf("MCP server started with SSE transport on %s", urlStr),
+			Message:   fmt.Sprintf("MCP server started with SSE transport on %s/sse and Streamable HTTP transport on %s/mcp", urlStr, urlStr),
 			ServerUrl: urlStr + "/sse",
 		})
 		if err != nil {
 			log.Errorf("Failed to send running status: %v", err)
 		}
 	}()
-	if err := mcpServer.ServeSSE(hostPort, urlStr); err != nil {
-		log.Errorf("MCP SSE server error: %v", err)
+	if err := mcpServer.ServeHTTPCompat(hostPort, urlStr); err != nil {
+		log.Errorf("MCP HTTP server error: %v", err)
 		send(&ypb.StartMcpServerResponse{
 			Status:  "error",
-			Message: fmt.Sprintf("MCP SSE server error: %v", err),
+			Message: fmt.Sprintf("MCP HTTP server error: %v", err),
 		})
 		return err
 	}
@@ -242,7 +242,7 @@ func launchMcpServer(ctx context.Context, req *ypb.StartMcpServerRequest, send f
 	// 服务器正常停止
 	send(&ypb.StartMcpServerResponse{
 		Status:  "stopped",
-		Message: "MCP SSE server stopped",
+		Message: "MCP HTTP server stopped",
 	})
 
 	return nil

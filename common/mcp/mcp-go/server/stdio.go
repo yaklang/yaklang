@@ -58,10 +58,16 @@ func (s *StdioServer) Listen(
 	reader := bufio.NewReader(stdin)
 
 	// Start notification handler
+	notificationCh, unsubscribe := s.server.SubscribeNotifications(100)
+	defer unsubscribe()
+
 	go func() {
 		for {
 			select {
-			case serverNotification := <-s.server.notifications:
+			case serverNotification, ok := <-notificationCh:
+				if !ok {
+					return
+				}
 				// Only handle notifications for stdio client
 				if serverNotification.Context.ClientID == "stdio" {
 					err := s.writeResponse(

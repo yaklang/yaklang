@@ -111,7 +111,7 @@ func (s *MCPServer) execYakScriptWrapper(toolName, content string) server.ToolHa
 				Type: "text",
 				Text: content,
 			})
-			s.server.SendNotificationToClient(fmt.Sprintf("%s/info", toolName), map[string]any{
+			s.notificationServer(ctx).SendNotificationToClient(fmt.Sprintf("%s/info", toolName), map[string]any{
 				"content":       content,
 				"progress":      exec.Progress,
 				"progressToken": progressToken,

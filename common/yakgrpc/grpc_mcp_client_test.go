@@ -16,6 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mcp"
 	mcpmodel "github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
+	rawserver "github.com/yaklang/yaklang/common/mcp/mcp-go/server"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -112,7 +113,7 @@ func TestMCPServerCRUD(t *testing.T) {
 		resp7, err := server.AddMCPServer(ctx, invalidReq4)
 		require.NoError(t, err)
 		assert.False(t, resp7.GetOk())
-		assert.Contains(t, resp7.GetReason(), "必须是 stdio 或 sse")
+		assert.Contains(t, resp7.GetReason(), "stdio、sse 或 streamable_http")
 	})
 
 	// 测试查询 MCP 服务器
@@ -574,6 +575,37 @@ func TestMCPServerToolsRetrieval(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, tools, 1)
 		assert.Equal(t, "header-tool", tools[0].GetName())
+	})
+
+	t.Run("TestGetMCPServerToolsWithStreamableHTTP", func(t *testing.T) {
+		httpServer := rawserver.NewMCPServer("streamable-test-server", "1.0.0")
+		httpServer.AddTool(
+			mcpmodel.NewTool("streamable-tool", mcpmodel.WithDescription("tool over streamable http")),
+			func(ctx context.Context, request mcpmodel.CallToolRequest) (*mcpmodel.CallToolResult, error) {
+				return &mcpmodel.CallToolResult{
+					Content: []interface{}{
+						mcpmodel.TextContent{Type: "text", Text: "ok"},
+					},
+				}, nil
+			},
+		)
+
+		testServer := rawserver.NewStreamableHTTPTestServer(httpServer)
+		defer testServer.Close()
+
+		mcpServerConfig := &schema.MCPServer{
+			Name: "test-streamable-http-server-for-tools",
+			Type: "streamable_http",
+			URL:  testServer.URL + rawserver.DefaultStreamableHTTPPath,
+		}
+
+		subCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		tools, err := grpcServer.getMCPServerTools(subCtx, mcpServerConfig)
+		require.NoError(t, err)
+		require.Len(t, tools, 1)
+		assert.Equal(t, "streamable-tool", tools[0].GetName())
 	})
 
 	t.Run("TestGetMCPServerToolsWithStdio", func(t *testing.T) {

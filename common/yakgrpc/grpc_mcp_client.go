@@ -49,10 +49,12 @@ func (s *Server) AddMCPServer(ctx context.Context, req *ypb.AddMCPServerRequest)
 	}
 
 	// 验证服务器类型
-	if req.GetType() != "stdio" && req.GetType() != "sse" {
+	if req.GetType() != "stdio" &&
+		req.GetType() != "sse" &&
+		req.GetType() != "streamable_http" {
 		return &ypb.GeneralResponse{
 			Ok:     false,
-			Reason: "服务器类型必须是 stdio 或 sse",
+			Reason: "服务器类型必须是 stdio、sse 或 streamable_http",
 		}, nil
 	}
 
@@ -64,10 +66,10 @@ func (s *Server) AddMCPServer(ctx context.Context, req *ypb.AddMCPServerRequest)
 		}, nil
 	}
 
-	if req.GetType() == "sse" && req.GetURL() == "" {
+	if (req.GetType() == "sse" || req.GetType() == "streamable_http") && req.GetURL() == "" {
 		return &ypb.GeneralResponse{
 			Ok:     false,
-			Reason: "sse 类型服务器必须提供 URL",
+			Reason: "HTTP 类型服务器必须提供 URL",
 		}, nil
 	}
 
@@ -128,10 +130,13 @@ func (s *Server) UpdateMCPServer(ctx context.Context, req *ypb.UpdateMCPServerRe
 	}
 
 	// 验证服务器类型
-	if req.GetType() != "" && req.GetType() != "stdio" && req.GetType() != "sse" {
+	if req.GetType() != "" &&
+		req.GetType() != "stdio" &&
+		req.GetType() != "sse" &&
+		req.GetType() != "streamable_http" {
 		return &ypb.GeneralResponse{
 			Ok:     false,
-			Reason: "服务器类型必须是 stdio 或 sse",
+			Reason: "服务器类型必须是 stdio、sse 或 streamable_http",
 		}, nil
 	}
 
@@ -226,6 +231,18 @@ func (s *Server) getMCPServerTools(ctx context.Context, server *schema.MCPServer
 			return nil, utils.Errorf("start sse mcp client failed: %s", err)
 		}
 		mcpClient = sseMcpClient
+	case "streamable_http":
+		streamableHTTPClient, err := client.NewStreamableHTTPMCPClient(
+			server.URL,
+			mapStringAnyToStringMap(server.Headers),
+		)
+		if err != nil {
+			return nil, utils.Errorf(
+				"create streamable http mcp client failed: %s",
+				err,
+			)
+		}
+		mcpClient = streamableHTTPClient
 	default:
 		return nil, utils.Errorf("unsupported server type: %s", server.Type)
 	}
