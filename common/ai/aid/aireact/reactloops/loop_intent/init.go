@@ -72,6 +72,7 @@ func init() {
 				// Post-iteration hook: ensures finalization always runs on loop exit
 				// (mirrors loop_knowledge_enhance pattern)
 				BuildOnPostIterationHook(r),
+				BuildTaskRetrievalInfoHook(),
 			}
 			preset = append(opts, preset...)
 			return reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_INTENT, r, preset...)

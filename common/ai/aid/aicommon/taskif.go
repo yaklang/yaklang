@@ -30,6 +30,23 @@ type AITask interface {
 	SetSummary(summary string)
 }
 
+type AITaskRetrievalInfo struct {
+	Tags      []string `json:"tags,omitempty"`
+	Questions []string `json:"questions,omitempty"`
+	Target    string   `json:"target,omitempty"`
+}
+
+func (a *AITaskRetrievalInfo) Clone() *AITaskRetrievalInfo {
+	if a == nil {
+		return nil
+	}
+	return &AITaskRetrievalInfo{
+		Tags:      append([]string{}, a.Tags...),
+		Questions: append([]string{}, a.Questions...),
+		Target:    a.Target,
+	}
+}
+
 type AITaskState string
 
 const (
@@ -45,6 +62,8 @@ type AIStatefulTask interface {
 	AITask
 
 	GetId() string
+	GetTaskRetrievalInfo() *AITaskRetrievalInfo
+	SetTaskRetrievalInfo(*AITaskRetrievalInfo)
 	SetAsyncDeferCallback(func(err error))
 	CallAsyncDeferCallback(err error)
 	SetResult(string)
@@ -102,8 +121,9 @@ type AIStatefulTaskBase struct {
 	uuid          string
 	attachedDatas []*AttachedResource
 
-	focusMode     string
-	semanticLabel string
+	focusMode         string
+	semanticLabel     string
+	taskRetrievalInfo *AITaskRetrievalInfo
 
 	asyncDeferCallback func(err error)
 }
@@ -138,6 +158,28 @@ func (s *AIStatefulTaskBase) SetSemanticIdentifier(id string) {
 		return
 	}
 	s.semanticLabel = id
+}
+
+func (s *AIStatefulTaskBase) GetTaskRetrievalInfo() *AITaskRetrievalInfo {
+	if s == nil {
+		return nil
+	}
+	if s.taskMutex != nil {
+		s.taskMutex.Lock()
+		defer s.taskMutex.Unlock()
+	}
+	return s.taskRetrievalInfo.Clone()
+}
+
+func (s *AIStatefulTaskBase) SetTaskRetrievalInfo(info *AITaskRetrievalInfo) {
+	if s == nil {
+		return
+	}
+	if s.taskMutex != nil {
+		s.taskMutex.Lock()
+		defer s.taskMutex.Unlock()
+	}
+	s.taskRetrievalInfo = info.Clone()
 }
 
 func (s *AIStatefulTaskBase) SetFocusMode(mode string) {
