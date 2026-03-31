@@ -963,11 +963,7 @@ func (p *Proxy) handleRequest(conn net.Conn, req *http.Request, ctx *Context) er
 		err := p.resmod.ModifyResponse(res)
 		if err != nil {
 			if errors.Is(err, IsDroppedError) {
-				if p.disableBuiltinPage {
-					res = proxyutil.NewResponseFromOldResponse(200, nil, req, res)
-				} else {
-					res = proxyutil.NewResponseFromOldResponse(200, strings.NewReader(proxyutil.GetPrettyErrorRsp("响应被用户丢弃")), req, res)
-				}
+				res = proxyutil.NewResponseFromOldResponse(200, strings.NewReader(proxyutil.GetPrettyErrorRsp("响应被用户丢弃")), req, res)
 			} else {
 				log.Errorf("mitm: error modifying response: %v", err)
 				proxyutil.Warning(res.Header, err)
