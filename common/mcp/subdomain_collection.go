@@ -78,7 +78,7 @@ func handleSubdomainCollection(s *MCPServer) server.ToolHandlerFunc {
 						Type: "text",
 						Text: content,
 					})
-					s.server.SendNotificationToClient(fmt.Sprintf("%s/info", taskName), map[string]any{
+					s.notificationServer(ctx).SendNotificationToClient(fmt.Sprintf("%s/info", taskName), map[string]any{
 						"content":       content,
 						"progressToken": progressToken,
 					})

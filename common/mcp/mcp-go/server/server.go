@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"sync"
+	"sync/atomic"
 
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 )
@@ -46,6 +48,56 @@ type ServerNotification struct {
 	Notification mcp.JSONRPCNotification
 }
 
+type notificationHub struct {
+	mu          sync.RWMutex
+	nextID      uint64
+	subscribers map[uint64]chan ServerNotification
+}
+
+func newNotificationHub() *notificationHub {
+	return &notificationHub{
+		subscribers: make(map[uint64]chan ServerNotification),
+	}
+}
+
+func (h *notificationHub) subscribe(
+	buffer int,
+) (<-chan ServerNotification, func()) {
+	if buffer <= 0 {
+		buffer = 1
+	}
+
+	id := atomic.AddUint64(&h.nextID, 1)
+	ch := make(chan ServerNotification, buffer)
+
+	h.mu.Lock()
+	h.subscribers[id] = ch
+	h.mu.Unlock()
+
+	return ch, func() {
+		h.mu.Lock()
+		defer h.mu.Unlock()
+
+		if existing, ok := h.subscribers[id]; ok {
+			delete(h.subscribers, id)
+			close(existing)
+		}
+	}
+}
+
+func (h *notificationHub) publish(notification ServerNotification) error {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	for _, ch := range h.subscribers {
+		select {
+		case ch <- notification:
+		default:
+		}
+	}
+	return nil
+}
+
 // NotificationHandlerFunc handles incoming notifications.
 type NotificationHandlerFunc func(ctx context.Context, notification mcp.JSONRPCNotification)
 
@@ -62,9 +114,9 @@ type MCPServer struct {
 	toolHandlers         map[string]ToolHandlerFunc
 	notificationHandlers map[string]NotificationHandlerFunc
 	capabilities         serverCapabilities
-	notifications        chan ServerNotification
 	currentClient        NotificationContext
-	initialized          bool
+	notificationHub      *notificationHub
+	initialized          *atomic.Bool
 }
 
 // serverKey is the context key for storing the server instance
@@ -83,8 +135,18 @@ func (s *MCPServer) WithContext(
 	ctx context.Context,
 	notifCtx NotificationContext,
 ) context.Context {
-	s.currentClient = notifCtx
-	return ctx
+	scoped := *s
+	scoped.currentClient = notifCtx
+	return context.WithValue(ctx, serverKey{}, &scoped)
+}
+
+func (s *MCPServer) SubscribeNotifications(
+	buffer int,
+) (<-chan ServerNotification, func()) {
+	if s.notificationHub == nil {
+		return nil, func() {}
+	}
+	return s.notificationHub.subscribe(buffer)
 }
 
 // SendNotificationToClient sends a notification to the current client
@@ -92,7 +154,7 @@ func (s *MCPServer) SendNotificationToClient(
 	method string,
 	params map[string]interface{},
 ) error {
-	if s.notifications == nil {
+	if s.notificationHub == nil {
 		return fmt.Errorf("notification channel not initialized")
 	}
 
@@ -106,15 +168,10 @@ func (s *MCPServer) SendNotificationToClient(
 		},
 	}
 
-	select {
-	case s.notifications <- ServerNotification{
+	return s.notificationHub.publish(ServerNotification{
 		Context:      s.currentClient,
 		Notification: notification,
-	}:
-		return nil
-	default:
-		return fmt.Errorf("notification channel full or blocked")
-	}
+	})
 }
 
 // serverCapabilities defines the supported features of the MCP server
@@ -176,7 +233,8 @@ func NewMCPServer(
 		name:                 name,
 		version:              version,
 		notificationHandlers: make(map[string]NotificationHandlerFunc),
-		notifications:        make(chan ServerNotification, 100),
+		notificationHub:      newNotificationHub(),
+		initialized:          &atomic.Bool{},
 	}
 
 	for _, opt := range opts {
@@ -191,8 +249,11 @@ func (s *MCPServer) HandleMessage(
 	ctx context.Context,
 	message json.RawMessage,
 ) mcp.JSONRPCMessage {
-	// Add server to context
-	ctx = context.WithValue(ctx, serverKey{}, s)
+	if scoped := ServerFromContext(ctx); scoped != nil {
+		s = scoped
+	} else {
+		ctx = context.WithValue(ctx, serverKey{}, s)
+	}
 
 	var baseMessage struct {
 		JSONRPC string      `json:"jsonrpc"`
@@ -422,7 +483,7 @@ func (s *MCPServer) AddTool(tool *mcp.Tool, handler ToolHandlerFunc) {
 	s.toolHandlers[tool.Name] = handler
 
 	// Send notification if server is already initialized
-	if s.initialized {
+	if s.initialized != nil && s.initialized.Load() {
 		if err := s.SendNotificationToClient("notifications/tools/list_changed", nil); err != nil {
 			// We can't return the error, but in a future version we could log it
 		}
@@ -442,6 +503,18 @@ func (s *MCPServer) handleInitialize(
 	id interface{},
 	request mcp.InitializeRequest,
 ) mcp.JSONRPCMessage {
+	protocolVersion, ok := mcp.NegotiateProtocolVersion(request.Params.ProtocolVersion)
+	if !ok {
+		return createErrorResponse(
+			id,
+			mcp.INVALID_PARAMS,
+			fmt.Sprintf(
+				"Unsupported protocol version: %s",
+				request.Params.ProtocolVersion,
+			),
+		)
+	}
+
 	capabilities := mcp.ServerCapabilities{}
 
 	capabilities.Resources = &struct {
@@ -469,7 +542,7 @@ func (s *MCPServer) handleInitialize(
 	}
 
 	result := mcp.InitializeResult{
-		ProtocolVersion: mcp.LATEST_PROTOCOL_VERSION,
+		ProtocolVersion: protocolVersion,
 		ServerInfo: mcp.Implementation{
 			Name:    s.name,
 			Version: s.version,
@@ -477,7 +550,9 @@ func (s *MCPServer) handleInitialize(
 		Capabilities: capabilities,
 	}
 
-	s.initialized = true
+	if s.initialized != nil {
+		s.initialized.Store(true)
+	}
 	return createResponse(id, result)
 }
 

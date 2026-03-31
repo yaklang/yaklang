@@ -227,13 +227,13 @@ func handlePortScan(s *MCPServer) server.ToolHandlerFunc {
 			typ := gjson.GetBytes(exec.Message, "type").String()
 
 			if typ == "progress" {
-				s.server.SendNotificationToClient("port_scan/progress", map[string]any{
+				s.notificationServer(ctx).SendNotificationToClient("port_scan/progress", map[string]any{
 					"progressToken": progressToken,
 					"title":         msgContent.Get("id").String(),
 					"progress":      msgContent.Get("progress").Float(),
 				})
 			} else {
-				s.server.SendNotificationToClient("port_scan/info", map[string]any{
+				s.notificationServer(ctx).SendNotificationToClient("port_scan/info", map[string]any{
 					"progressToken": progressToken,
 					"content":       content,
 				})

@@ -12,8 +12,8 @@ type MCPServer struct {
 	gorm.Model
 
 	Name    string       `gorm:"index;not null" json:"name"` // 服务器名称
-	Type    string       `gorm:"index;not null" json:"type"` // 服务器类型 (stdio/sse)
-	URL     string       `gorm:"type:text" json:"url"`       // 服务器URL (for sse type)
+	Type    string       `gorm:"index;not null" json:"type"` // 服务器类型 (stdio/sse/streamable_http)
+	URL     string       `gorm:"type:text" json:"url"`       // 服务器URL (for sse/streamable_http type)
 	Command string       `gorm:"type:text" json:"command"`   // 启动命令 (for stdio type)
 	Enable  bool         `gorm:"default:true" json:"enable"` // 是否启用
 	Envs    MapStringAny `gorm:"type:text" json:"env"`       // 环境变量

@@ -158,7 +158,7 @@ func handleHTTPFuzzer(s *MCPServer) server.ToolHandlerFunc {
 					Type: "text",
 					Text: content,
 				})
-				s.server.SendNotificationToClient("http_fuzzer/info", map[string]any{
+				s.notificationServer(ctx).SendNotificationToClient("http_fuzzer/info", map[string]any{
 					"content":       content,
 					"progressToken": progressToken,
 				})

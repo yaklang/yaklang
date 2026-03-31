@@ -280,7 +280,7 @@ func handleExecYakScript(s *MCPServer) server.ToolHandlerFunc {
 				Type: "text",
 				Text: content,
 			})
-			s.server.SendNotificationToClient("exec_yak_script/info", map[string]any{
+			s.notificationServer(ctx).SendNotificationToClient("exec_yak_script/info", map[string]any{
 				"content":       content,
 				"progressToken": progressToken,
 			})
@@ -477,13 +477,13 @@ func handleDownloadOnlinePlugins(s *MCPServer) server.ToolHandlerFunc {
 					Type: "text",
 					Text: msg.Log,
 				})
-				s.server.SendNotificationToClient("download_online_plugins/info", map[string]any{
+				s.notificationServer(ctx).SendNotificationToClient("download_online_plugins/info", map[string]any{
 					"content":       msg.Log,
 					"progressToken": progressToken,
 					"progress":      msg.Progress,
 				})
 			} else if msg.Progress > 0 {
-				s.server.SendNotificationToClient("download_online_plugins/progress", map[string]any{
+				s.notificationServer(ctx).SendNotificationToClient("download_online_plugins/progress", map[string]any{
 					"progressToken": progressToken,
 					"progress":      msg.Progress,
 				})

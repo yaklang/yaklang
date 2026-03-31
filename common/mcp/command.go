@@ -6,10 +6,10 @@ import (
 	"strings"
 
 	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	mcptool "github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
+	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -25,15 +25,15 @@ var MCPCommand = &cli.Command{
 	Name:  "mcp",
 	Usage: MCPCommandUsage,
 	Flags: []cli.Flag{
-		cli.StringFlag{Name: "transport", Usage: "transport protocol, e.g. sse/stdio", Value: "stdio"},
-		cli.StringFlag{Name: "host", Usage: "if transport is sse, listen host", Value: "localhost"},
-		cli.IntFlag{Name: "port", Usage: "if transport is sse, listen port", Value: 11432},
+		cli.StringFlag{Name: "transport", Usage: "transport protocol, e.g. sse/stdio/streamable_http", Value: "stdio"},
+		cli.StringFlag{Name: "host", Usage: "if transport is http-based, listen host", Value: "localhost"},
+		cli.IntFlag{Name: "port", Usage: "if transport is http-based, listen port", Value: 11432},
 		cli.StringFlag{Name: "t,tool", Usage: "enable tool sets, split by ','"},
 		cli.StringFlag{Name: "dt,disable-tool", Usage: "disable tool sets, split by ','"},
 		cli.StringFlag{Name: "r,resource", Usage: "enable resource sets, split by ','"},
 		cli.StringFlag{Name: "dr,disable-resource", Usage: "disable resource sets, split by ','"},
 		cli.StringSliceFlag{Name: "script", Usage: "add the dynamic Yak script as a tool to the MCP server"},
-		cli.StringFlag{Name: "base-url", Usage: "if transport is sse, the base url of the MCP server"},
+		cli.StringFlag{Name: "base-url", Usage: "if transport is http-based, the base url of the MCP server"},
 		cli.BoolFlag{Name: "enable-yak-aitool", Usage: "enable yak ai tool"},
 	},
 	Action: func(c *cli.Context) error {
@@ -129,6 +129,17 @@ var MCPCommand = &cli.Command{
 			log.Infof("start to listen reverse(mcp) on: %s", hostPort)
 			log.Infof("mcp server endpoint: %s", baseURL)
 			err = s.ServeSSE(hostPort, baseURL)
+		case "streamable_http", "streamable-http", "http":
+			if port == 0 {
+				port = utils.GetRandomAvailableTCPPort()
+			}
+			hostPort := utils.HostPort(host, port)
+			if baseURL == "" {
+				baseURL = fmt.Sprintf("http://%s", hostPort)
+			}
+			log.Infof("start to listen streamable http(mcp) on: %s", hostPort)
+			log.Infof("mcp streamable http endpoint: %s/mcp", baseURL)
+			err = s.ServeStreamableHTTP(hostPort, baseURL)
 		default:
 			return utils.Errorf("invalid transport: %v", transport)
 		}
