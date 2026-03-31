@@ -405,11 +405,15 @@ jobs:
                 {"package": "./common/crawler", "timeout": "20s", "run": "TestMUSTPASS_JSHandle"}
               ]
 
-          - name: "Test SFWeb"
+          - name: "Test SFWeb / Integration SyntaxFlow / SFDB / SFVM / SFReport"
             sync_rule: "1"
             test_configs: |
               [
-                {"package": "./common/sfweb/...", "timeout": "4m"}
+                {"package": "./common/sfweb/...", "timeout": "4m"},
+                {"package": "./common/syntaxflow/tests", "timeout": "20s"},
+                {"package": "./common/syntaxflow/sfdb/...", "timeout": "20s"},
+                {"package": "./common/syntaxflow/sfvm/...", "timeout": "20s"},
+                {"package": "./common/yak/ssaapi/sfreport/...", "timeout": "1m"}
               ]
           - name: "Test Utils Infra / Parser / Net in 2min USE gRPC"
             test_configs: |
@@ -436,7 +440,8 @@ jobs:
                 {"package": "./common/pcapx", "timeout": "20s", "run": "^TestSmoking_.*$"},
                 {"package": "./common/netx/mustpass", "timeout": "20s"},
                 {"package": "./common/authhack/...", "timeout": "1m"},
-                {"package": "./common/vulinboxagentclient", "timeout": "1m", "run": "TestMUSTPASS_Ping"}
+                {"package": "./common/vulinboxagentclient", "timeout": "1m", "run": "TestMUSTPASS_Ping"},
+                {"package": "./scannode/...", "timeout": "30s"}
               ]
 
           - name: "Test Utils Common / Yak Tooling in 2min USE gRPC"
@@ -479,17 +484,21 @@ jobs:
                 {"package": "./common/yak/ssaapi/ssaconfig", "timeout": "20s"}
               ]
 
-          - name: "Test SSA Frontend Yak / JS(TS|ES) | PHP | Python | Golang | C | Java"
+          - name: "Test SSA Frontend Java / JS(TS|ES)"
+            test_configs: |
+              [
+                {"package": "./common/yak/java/...", "timeout": "5m"},
+                {"package": "./common/yak/ssaapi/test/java/...", "timeout": "3m"},
+                {"package": "./common/yak/typescript/...", "timeout": "2m"},
+                {"package": "./common/yak/ssaapi/test/javascript/...", "timeout": "1m"}
+              ]
+
+          - name: "Test SSA Frontend Yak / PHP / Python / Golang / C / SSAAPI Other"
             test_configs: |
               [
                 {"package": "./common/yak/yak2ssa/test/...", "timeout": "20s"},
                 {"package": "./common/yak/ssaapi/test/yak/...", "timeout": "1m"},
                 {"package": "./common/yak/antlr4yak/lsp/...", "timeout": "20s"},
-                {"package": "./common/yak/java/...", "timeout": "5m"},
-                {"package": "./common/yak/ssaapi/test/java/...", "timeout": "3m"},
-                {"package": "./common/yak/typescript/frontend/tests/...", "timeout": "1m"},
-                {"package": "./common/yak/typescript/ts2ssa/tests/...", "timeout": "2m"},
-                {"package": "./common/yak/ssaapi/test/javascript/...", "timeout": "1m"},
                 {"package": "./common/yak/php/...", "timeout": "2m"},
                 {"package": "./common/yak/ssaapi/test/php/...", "timeout": "2m"},
                 {"package": "./common/yak/python/...", "timeout": "2m"},
@@ -514,17 +523,7 @@ jobs:
                 {"package": "./common/yak/ssaapi", "timeout": "1m"},
                 {"package": "./common/yak/ssaapi/ssareducer", "timeout": "1m"},
                 {"package": "./common/yak/ssaapi/test/ssatest/...", "timeout": "1m"},
-                {"package": "./common/yak/syntaxflow_scan/...", "timeout": "1m"},
-                {"package": "./common/yak/ssaapi/sfreport/...", "timeout": "1m"},
-                {"package": "./scannode/...", "timeout": "30s"}
-              ]
-
-          - name: "Test Integration SyntaxFlow / SFDB / SFVM"
-            test_configs: |
-              [
-                {"package": "./common/syntaxflow/tests", "timeout": "20s"},
-                {"package": "./common/syntaxflow/sfdb/...", "timeout": "20s"},
-                {"package": "./common/syntaxflow/sfvm/...", "timeout": "20s"}
+                {"package": "./common/yak/syntaxflow_scan/...", "timeout": "1m"}
               ]
 
           - name: "Test AI Aid / React"
@@ -536,12 +535,13 @@ jobs:
           - name: "Test AI Aid / Core / Tool / Memory"
             test_configs: |
               [
-                {"package": "./common/ai/aid/...", "timeout": "12m", "parallel": 1, "exclude_packages": ["./common/ai/aid/aireact/..."]}
+                {"package": "./common/ai/aid/...", "timeout": "12m", "parallel": 1, "exclude_packages": ["./common/ai/aid/aireact/...", "./common/ai/aid/test"]}
               ]
 
-          - name: "Test AI RAG / Forge / AIHTTP"
+          - name: "Test AI Aid Test / RAG / Forge / AIHTTP"
             test_configs: |
               [
+                {"package": "./common/ai/aid/test", "timeout": "12m", "parallel": 1, "retry": 1, "retry_delay": 5},
                 {"package": "./common/ai/rag/pq/...", "timeout": "60s", "parallel": 1},
                 {"package": "./common/ai/rag/hnsw/...", "timeout": "60s", "parallel": 1},
                 {"package": "./common/ai/rag/entityrepos/...", "timeout": "60s", "parallel": 1},
