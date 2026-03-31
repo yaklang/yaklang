@@ -204,6 +204,25 @@ func computeActualVerboseName(c *Call, se *FunctionSideEffect) string {
 	return se.VerboseName
 }
 
+func isCallerVisibleMemberSideEffectKind(kind ParameterMemberCallKind) bool {
+	switch kind {
+	case ParameterMemberCall, CallMemberCall:
+		return true
+	default:
+		return false
+	}
+}
+
+func shouldBindSideEffectInCurrentScope(se *FunctionSideEffect, lexicalVar, bindVariable *Variable) bool {
+	if isCallerVisibleMemberSideEffectKind(se.MemberCallKind) {
+		return true
+	}
+	if lexicalVar == nil || bindVariable == nil {
+		return true
+	}
+	return lexicalVar.GetCaptured() == bindVariable.GetCaptured()
+}
+
 func handleSideEffect(c *Call, funcTyp *FunctionType, buildPointer bool) {
 	currentScope := c.GetBlock().ScopeTable
 	function := c.GetFunc()
@@ -554,7 +573,7 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 			// 计算实际的 VerboseName（使用调用时的实际参数值）
 			actualVerboseName := computeActualVerboseName(c, se)
 
-			AddSideEffect := func() {
+			assignSideEffectInCurrentScope := func() {
 				// TODO: handle side effect in loop scope,
 				// will replace value in scope and create new phi
 				sideEffect = builder.SwitchFreevalueInSideEffect(se.Name, sideEffect)
@@ -566,7 +585,7 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 				c.SideEffectValue[actualVerboseName] = sideEffect.GetId()
 			}
 
-			SetCapturedSideEffect := func() {
+			captureSideEffectForOuterScope := func() {
 				err := variable.Assign(sideEffect)
 				if err != nil {
 					log.Warnf("BUG: variable.Assign error: %v", err)
@@ -580,28 +599,11 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 				function.SideEffects = append(function.SideEffects, se)
 			}
 
-			CheckSideEffect := func(find *Variable) {
-				// Check := func(scope ScopeIF) {
-				// 	if bindScope.IsSameOrSubScope(scope) {
-				// 		AddSideEffect()
-				// 	} else {
-				// 		SetCapturedSideEffect()
-				// 	}
-				// }
-
-				// Parameter/Call member side effects are caller-visible updates.
-				// Even if the callee-side variable has a different captured root,
-				// the call-site member must still advance the current lexical version
-				// so later reads like `sink(o.data)` observe the side effect.
-				if se.MemberCallKind == ParameterMemberCall || se.MemberCallKind == CallMemberCall {
-					AddSideEffect()
-					return
-				}
-
-				if bindVariable == nil || find.GetCaptured() == bindVariable.GetCaptured() {
-					AddSideEffect()
+			applySideEffectByScope := func(find *Variable) {
+				if shouldBindSideEffectInCurrentScope(se, find, bindVariable) {
+					assignSideEffectInCurrentScope()
 				} else {
-					SetCapturedSideEffect()
+					captureSideEffectForOuterScope()
 				}
 			}
 
@@ -628,24 +630,24 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 			}
 
 			if _, ok := modify.(*Parameter); ok {
-				AddSideEffect()
+				assignSideEffectInCurrentScope()
 				continue
 			}
 
 			obj := se.parameterMemberInner
 			if ret := GetScope(currentScope, se.Name, builder); ret != nil {
-				CheckSideEffect(ret)
+				applySideEffectByScope(ret)
 				continue
 			} else if ret := GetScope(currentScope, obj.ObjectName, builder); ret != nil {
-				CheckSideEffect(ret)
+				applySideEffectByScope(ret)
 				continue
 			} else if obj.ObjectName == "this" {
-				AddSideEffect()
+				assignSideEffectInCurrentScope()
 				continue
 			}
 
-			if obj.MemberCallKind == ParameterMemberCall || obj.MemberCallKind == CallMemberCall {
-				AddSideEffect()
+			if isCallerVisibleMemberSideEffectKind(obj.MemberCallKind) {
+				assignSideEffectInCurrentScope()
 				continue
 			}
 
@@ -653,14 +655,14 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 			if block := function.GetBlock(); block != nil {
 				functionScope := block.ScopeTable
 				if ret := GetScope(functionScope, se.Name, builder); ret != nil {
-					CheckSideEffect(ret)
+					applySideEffectByScope(ret)
 					continue
 				} else if obj := se.parameterMemberInner; obj.ObjectName != "" { // 处理object
 					if ret := GetScope(functionScope, obj.ObjectName, builder); ret != nil {
-						CheckSideEffect(ret)
+						applySideEffectByScope(ret)
 						continue
 					} else {
-						AddSideEffect()
+						assignSideEffectInCurrentScope()
 						continue
 					}
 				}
