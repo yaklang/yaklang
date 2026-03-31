@@ -493,6 +493,9 @@ func (m *MITMServer) initConfig() error {
 	m.proxy.SetFindProcessName(m.findProcessName)
 	m.proxy.SetDialer(m.dialer)
 
+	// when CA cert page is disabled, also disable the built-in branded error page
+	m.proxy.SetDisableBuiltinPage(!m.enableMITMCACertPage)
+
 	m.proxy.SetMITM(m.mitmConfig)
 	return nil
 }

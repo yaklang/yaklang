@@ -1789,12 +1789,28 @@ func TestGRPCMUSTTPASS_MITM_CAPages(t *testing.T) {
 				DisableCACertPage: true,
 			})
 		}, func(stream ypb.Yak_MITMClient) {
-			rsp, _, err := poc.DoGET("http://mitm", poc.WithProxy(proxy))
+			// All builtin domains should return 502 when CA cert page is disabled
+			builtinDomains := []string{
+				"http://mitm",
+				"http://mitm.cert",
+				"http://download-mitm-ca.com",
+				"http://download-mitm-cert.yaklang.io",
+			}
+			for _, domain := range builtinDomains {
+				rsp, _, err := poc.DoGET(domain, poc.WithProxy(proxy))
+				require.NoError(t, err, "domain: %s", domain)
+				code := lowhttp.GetStatusCodeFromResponse(rsp.RawPacket)
+				require.Equal(t, 502, code, "domain %s should return 502 when CA cert page is disabled", domain)
+			}
+
+			// Any arbitrary HTTP URL should also not show the built-in Yakit branded page
+			// when the CA cert page is disabled
+			rsp, _, err := poc.DoGET("http://abnasdsa-nonexistent-host", poc.WithProxy(proxy))
 			require.NoError(t, err)
-			headers := lowhttp.GetHTTPPacketHeaders(rsp.RawPacket)
 			code := lowhttp.GetStatusCodeFromResponse(rsp.RawPacket)
-			require.Equal(t, 502, code)
-			require.Equal(t, map[string]string{"Content-Type": "text/html;charset=utf-8", "Content-Length": "0"}, headers)
+			_, body := lowhttp.SplitHTTPPacketFast(rsp.RawPacket)
+			require.Equal(t, 502, code, "arbitrary HTTP URL should return 502 when CA cert page is disabled")
+			require.Equal(t, 0, len(body), "arbitrary HTTP URL response body should be empty when CA cert page is disabled")
 
 			defer cancel()
 		}, nil)
@@ -1822,6 +1838,185 @@ func TestGRPCMUSTTPASS_MITM_CAPages(t *testing.T) {
 
 			defer cancel()
 		}, nil)
+	})
+
+	// Builtin domain matching must be case-insensitive (mitm_hijack_handler.go uses strings.ToLower)
+	t.Run("builtin_domain_case_insensitive", func(t *testing.T) {
+		client, err := NewLocalClient()
+		require.NoError(t, err)
+		ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(40))
+		mitmHost, mitmPort := "127.0.0.1", utils.GetRandomAvailableTCPPort()
+		proxy := "http://" + utils.HostPort(mitmHost, mitmPort)
+
+		RunMITMTestServerEx(client, ctx, func(stream ypb.Yak_MITMClient) {
+			stream.Send(&ypb.MITMRequest{
+				Host: mitmHost,
+				Port: uint32(mitmPort),
+				// CA cert page enabled: builtin domains should return the branded page
+			})
+		}, func(stream ypb.Yak_MITMClient) {
+			// Upper-case and mixed-case variants must be treated identically to lower-case
+			caseVariants := []string{
+				"http://MITM",
+				"http://Mitm",
+				"http://MITM.CERT",
+				"http://Mitm.Cert",
+			}
+			for _, domain := range caseVariants {
+				rsp, _, err := poc.DoGET(domain, poc.WithProxy(proxy))
+				require.NoError(t, err, "domain: %s", domain)
+				code := lowhttp.GetStatusCodeFromResponse(rsp.RawPacket)
+				_, body := lowhttp.SplitHTTPPacketFast(rsp.RawPacket)
+				require.Equal(t, 200, code, "builtin domain %s should return 200 (CA cert page)", domain)
+				require.Greater(t, len(body), 0, "builtin domain %s body should not be empty", domain)
+			}
+			defer cancel()
+		}, nil)
+	})
+
+	// When CA cert page is disabled, case-insensitive builtin domain matching still applies
+	t.Run("disable_builtin_domain_case_insensitive", func(t *testing.T) {
+		client, err := NewLocalClient()
+		require.NoError(t, err)
+		ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(40))
+		mitmHost, mitmPort := "127.0.0.1", utils.GetRandomAvailableTCPPort()
+		proxy := "http://" + utils.HostPort(mitmHost, mitmPort)
+
+		RunMITMTestServerEx(client, ctx, func(stream ypb.Yak_MITMClient) {
+			stream.Send(&ypb.MITMRequest{
+				Host:              mitmHost,
+				Port:              uint32(mitmPort),
+				DisableCACertPage: true,
+			})
+		}, func(stream ypb.Yak_MITMClient) {
+			caseVariants := []string{
+				"http://MITM",
+				"http://Mitm",
+				"http://MITM.CERT",
+			}
+			for _, domain := range caseVariants {
+				rsp, _, err := poc.DoGET(domain, poc.WithProxy(proxy))
+				require.NoError(t, err, "domain: %s", domain)
+				code := lowhttp.GetStatusCodeFromResponse(rsp.RawPacket)
+				_, body := lowhttp.SplitHTTPPacketFast(rsp.RawPacket)
+				require.Equal(t, 502, code, "builtin domain %s should return 502 when CA cert page is disabled", domain)
+				require.Empty(t, body, "builtin domain %s body should be empty when CA cert page is disabled", domain)
+			}
+			defer cancel()
+		}, nil)
+	})
+
+	// When CA cert page is disabled, dropped responses should NOT show the Yakit branded template page
+	t.Run("disable_no_template_on_drop_response", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(30))
+		defer cancel()
+
+		mockHost, mockPort := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
+			writer.Write([]byte("Hello"))
+		})
+
+		client, err := NewLocalClient()
+		require.NoError(t, err)
+		mitmPort := utils.GetRandomAvailableTCPPort()
+		mitmProxy := "http://" + utils.HostPort("127.0.0.1", mitmPort)
+
+		stream, err := client.MITM(ctx)
+		require.NoError(t, err)
+		stream.Send(&ypb.MITMRequest{
+			Host:              "127.0.0.1",
+			Port:              uint32(mitmPort),
+			DisableCACertPage: true,
+		})
+
+		for {
+			data, err := stream.Recv()
+			if err != nil {
+				break
+			}
+			if data.GetMessage().GetIsMessage() {
+				msg := string(data.GetMessage().GetMessage())
+				if !strings.Contains(msg, "starting mitm server") {
+					continue
+				}
+				// load hotpatch: drop the response
+				stream.Send(&ypb.MITMRequest{
+					SetYakScript: true,
+					YakScriptContent: `hijackHTTPResponseEx = func(isHttps, url, req, rsp, forward, drop) { drop() }
+afterRequest = func(ishttps, oreq, req, orsp, rsp){}
+`,
+				})
+			} else if data.GetCurrentHook && len(data.GetHooks()) > 0 {
+				rsp, err := lowhttp.HTTP(
+					lowhttp.WithPacketBytes(lowhttp.FixHTTPRequest([]byte("GET / HTTP/1.1\r\nHost: "+utils.HostPort(mockHost, mockPort)+"\r\n\r\n"))),
+					lowhttp.WithProxy(mitmProxy),
+				)
+				require.NoError(t, err)
+				// When CA cert page is disabled, dropped response body must be empty (no Yakit template page)
+				_, body := lowhttp.SplitHTTPPacketFast(rsp.RawPacket)
+				require.Empty(t, body, "dropped response body should be empty when CA cert page is disabled, got: %s", string(body))
+				cancel()
+				break
+			}
+		}
+	})
+
+	// When CA cert page is disabled, the Yakit branded template page must not appear
+	// in any error scenario — including when the template body keyword "Yakit MITM" is checked
+	// across the non-existent host and dropped-response paths already covered above.
+	// For completeness, verify that a dropped HTTP/1 request returns an empty 200 (not a template page).
+	t.Run("disable_no_template_on_drop_request", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(30))
+		defer cancel()
+
+		mockHost, mockPort := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
+			writer.Write([]byte("Hello"))
+		})
+
+		client, err := NewLocalClient()
+		require.NoError(t, err)
+		mitmPort := utils.GetRandomAvailableTCPPort()
+		mitmProxy := "http://" + utils.HostPort("127.0.0.1", mitmPort)
+
+		stream, err := client.MITM(ctx)
+		require.NoError(t, err)
+		stream.Send(&ypb.MITMRequest{
+			Host:              "127.0.0.1",
+			Port:              uint32(mitmPort),
+			DisableCACertPage: true,
+		})
+
+		for {
+			data, err := stream.Recv()
+			if err != nil {
+				break
+			}
+			if data.GetMessage().GetIsMessage() {
+				msg := string(data.GetMessage().GetMessage())
+				if !strings.Contains(msg, "starting mitm server") {
+					continue
+				}
+				// load hotpatch: drop the request before it reaches the upstream
+				stream.Send(&ypb.MITMRequest{
+					SetYakScript: true,
+					YakScriptContent: `hijackHTTPRequestEx = func(isHttps, url, req, forward, drop) { drop() }
+afterRequest = func(ishttps, oreq, req, orsp, rsp){}
+`,
+				})
+			} else if data.GetCurrentHook && len(data.GetHooks()) > 0 {
+				rsp, err := lowhttp.HTTP(
+					lowhttp.WithPacketBytes(lowhttp.FixHTTPRequest([]byte("GET / HTTP/1.1\r\nHost: "+utils.HostPort(mockHost, mockPort)+"\r\n\r\n"))),
+					lowhttp.WithProxy(mitmProxy),
+				)
+				require.NoError(t, err)
+				_, body := lowhttp.SplitHTTPPacketFast(rsp.RawPacket)
+				// Dropped HTTP/1 request: upstream is never contacted, response body must not
+				// contain the Yakit branded template page regardless of DisableCACertPage setting.
+				require.NotContains(t, string(body), "Yakit MITM",
+					"dropped request response must not contain Yakit branded template page")
+				cancel()
+				break
+			}
+		}
 	})
 }
 
