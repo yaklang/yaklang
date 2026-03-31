@@ -1,12 +1,24 @@
 package main
 
+/*
+#include <stdint.h>
+*/
+import "C"
+
 import (
 	"fmt"
 	"reflect"
 	"unsafe"
 )
 
-func dispatchRuntimeShadowMethod(args []uint64) (int64, error) {
+func runtimeCStringToGoString(ptr unsafe.Pointer) string {
+	if ptr == nil {
+		return ""
+	}
+	return C.GoString((*C.char)(ptr))
+}
+
+func runtimeDispatchShadowMethod(args []uint64) (int64, error) {
 	if len(args) < 2 {
 		return 0, fmt.Errorf("runtime shadow method expects at least 2 args, got %d", len(args))
 	}
@@ -21,10 +33,10 @@ func dispatchRuntimeShadowMethod(args []uint64) (int64, error) {
 		return 0, fmt.Errorf("runtime shadow method missing receiver")
 	}
 
-	return callRuntimeShadowMethod(objPtr, cStringToGoString(methodNamePtr), args[2:])
+	return callRuntimeShadowMethod(objPtr, runtimeCStringToGoString(methodNamePtr), args[2:])
 }
 
-func resolveRuntimeMethod(obj any, name string) (reflect.Value, error) {
+func runtimeResolveMethod(obj any, name string) (reflect.Value, error) {
 	value := reflect.ValueOf(obj)
 	if !value.IsValid() {
 		return reflect.Value{}, fmt.Errorf("invalid object while resolving method %q", name)
@@ -53,7 +65,7 @@ func resolveRuntimeMethod(obj any, name string) (reflect.Value, error) {
 	return reflect.Value{}, fmt.Errorf("method %q not found", name)
 }
 
-func decodeRuntimeArg(raw uint64, targetType reflect.Type) (reflect.Value, error) {
+func runtimeDecodeArg(raw uint64, targetType reflect.Type) (reflect.Value, error) {
 	if targetType == nil {
 		return reflect.Value{}, fmt.Errorf("missing target type")
 	}
@@ -83,7 +95,7 @@ func decodeRuntimeArg(raw uint64, targetType reflect.Type) (reflect.Value, error
 		if converted, ok := valueForSet(targetType, intValue); ok {
 			return converted, nil
 		}
-		if shadowValue, ok := decodeRuntimeShadowArg(raw, targetType); ok {
+		if shadowValue, ok := runtimeDecodeShadowArg(raw, targetType); ok {
 			return shadowValue, nil
 		}
 	}
@@ -91,7 +103,7 @@ func decodeRuntimeArg(raw uint64, targetType reflect.Type) (reflect.Value, error
 	return reflect.Value{}, fmt.Errorf("cannot use %T as %s", decoded, targetType)
 }
 
-func decodeRuntimeShadowArg(raw uint64, targetType reflect.Type) (reflect.Value, bool) {
+func runtimeDecodeShadowArg(raw uint64, targetType reflect.Type) (reflect.Value, bool) {
 	ptr := unsafe.Pointer(uintptr(raw))
 	if ptr == nil {
 		return reflect.Value{}, false
@@ -121,7 +133,7 @@ func decodeRuntimeShadowArg(raw uint64, targetType reflect.Type) (reflect.Value,
 	return reflect.Value{}, false
 }
 
-func decodeRuntimeCallArgs(target reflect.Value, rawArgs []uint64) ([]reflect.Value, error) {
+func runtimeDecodeCallArgs(target reflect.Value, rawArgs []uint64) ([]reflect.Value, error) {
 	methodType := target.Type()
 	if !methodType.IsVariadic() && len(rawArgs) != methodType.NumIn() {
 		return nil, fmt.Errorf("method expects %d args, got %d", methodType.NumIn(), len(rawArgs))
@@ -139,7 +151,7 @@ func decodeRuntimeCallArgs(target reflect.Value, rawArgs []uint64) ([]reflect.Va
 			targetType = methodType.In(index)
 		}
 
-		arg, err := decodeRuntimeArg(raw, targetType)
+		arg, err := runtimeDecodeArg(raw, targetType)
 		if err != nil {
 			return nil, err
 		}
@@ -163,7 +175,7 @@ func runtimeCallReturnValue(results []reflect.Value) int64 {
 }
 
 func callRuntimeValue(target reflect.Value, rawArgs []uint64) (int64, error) {
-	args, err := decodeRuntimeCallArgs(target, rawArgs)
+	args, err := runtimeDecodeCallArgs(target, rawArgs)
 	if err != nil {
 		return 0, err
 	}
@@ -176,7 +188,7 @@ func callRuntimeShadowMethod(objPtr unsafe.Pointer, methodName string, rawArgs [
 		return 0, fmt.Errorf("invalid shadow object for method %q", methodName)
 	}
 
-	method, err := resolveRuntimeMethod(handle.Value(), methodName)
+	method, err := runtimeResolveMethod(handle.Value(), methodName)
 	if err != nil {
 		return 0, err
 	}
