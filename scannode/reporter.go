@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"strconv"
+	"regexp"
 	"strings"
 
 	"github.com/davecgh/go-spew/spew"
@@ -22,13 +22,9 @@ type ScannerAgentReporter struct {
 	SubTaskId string
 	RuntimeId string
 
-	agent *ScanNode
-
-	ssaCollector *SSAArtifactCollector
-	ssaUploadCfg *SSAArtifactUploadConfig
+	executionRef *jobExecutionRef
+	agent        *ScanNode
 }
-
-var streamDebugCount int32
 
 // convertRawToString 将原始数据转换为字符串，处理 JSON 反序列化后的各种数据格式
 func convertRawToString(raw interface{}) string {
@@ -54,34 +50,34 @@ func convertRawToString(raw interface{}) string {
 	}
 }
 
-func NewScannerAgentReporter(taskId string, subTaskId string, runtimeId string, agent *ScanNode) *ScannerAgentReporter {
+func NewScannerAgentReporter(
+	taskId string,
+	subTaskId string,
+	runtimeId string,
+	executionRef *jobExecutionRef,
+	agent *ScanNode,
+) *ScannerAgentReporter {
 	return &ScannerAgentReporter{
-		TaskId:    taskId,
-		SubTaskId: subTaskId,
-		RuntimeId: runtimeId,
-		agent:     agent,
+		TaskId:       taskId,
+		SubTaskId:    subTaskId,
+		RuntimeId:    runtimeId,
+		executionRef: executionRef,
+		agent:        agent,
 	}
 }
 
 func (r *ScannerAgentReporter) Report(record *schema.Report) error {
-	if r.agent != nil {
-		raw, err := json.Marshal(record)
-		if err != nil {
-			return utils.Errorf("marshal report failed: %s", err)
-		}
-		r.agent.feedback(&spec.ScanResult{
-			Type:      spec.ScanResult_Report,
-			Content:   raw,
-			TaskId:    r.TaskId,
-			RuntimeId: r.RuntimeId,
-			SubTaskId: r.SubTaskId,
-		})
+	if r.agent == nil {
+		return nil
 	}
-	return nil
+	raw, err := json.Marshal(record)
+	if err != nil {
+		return utils.Errorf("marshal report failed: %s", err)
+	}
+	return r.publishJobReport(legionReportKindScan, raw)
 }
 
 func (r *ScannerAgentReporter) ReportWeakPassword(result interface{}) error {
-	var s = r.agent
 	switch ret := result.(type) {
 	case *bruteutils.BruteItemResult:
 		host, port, err := utils.ParseStringToHostPort(ret.Target)
@@ -127,8 +123,14 @@ func (r *ScannerAgentReporter) ReportWeakPassword(result interface{}) error {
 		res.RuntimeId = r.RuntimeId
 		res.TaskId = r.TaskId
 		res.SubTaskId = r.SubTaskId
-		s.feedback(res)
-		return nil
+		return r.publishJobRisk(
+			legionRiskKindWeakPassword,
+			weakPasswordTitle(ret),
+			ret.Target,
+			"",
+			weakPasswordDedupeKey(ret),
+			res.Content,
+		)
 	default:
 		return utils.Errorf("unsupported: %v", spew.Sdump(ret))
 	}
@@ -138,7 +140,6 @@ func (r *ScannerAgentReporter) ReportRisk(
 	title string, target string, details interface{},
 	tags ...string,
 ) error {
-	var s = r.agent
 	//details, err := json.Marshal(details)
 	//if err != nil {
 	//	return err
@@ -152,52 +153,7 @@ func (r *ScannerAgentReporter) ReportRisk(
 		TargetType: VulnTargetType_Risk,
 		Plugin:     strings.Join(append([]string{"risk"}, tags...), "/"),
 	}
-	var detailsMap map[string]interface{}
-	switch t := details.(type) {
-	case map[string]interface{}:
-		detailsMap = t
-	case string:
-		rawStr := strings.TrimSpace(t)
-		if rawStr != "" {
-			if strings.HasPrefix(rawStr, "\"") && strings.HasSuffix(rawStr, "\"") {
-				if unq, err := strconv.Unquote(rawStr); err == nil {
-					rawStr = unq
-				}
-			}
-			_ = json.Unmarshal([]byte(rawStr), &detailsMap)
-		}
-	case []byte:
-		rawStr := strings.TrimSpace(string(t))
-		if rawStr != "" {
-			_ = json.Unmarshal([]byte(rawStr), &detailsMap)
-		}
-	case json.RawMessage:
-		rawStr := strings.TrimSpace(string(t))
-		if rawStr != "" {
-			_ = json.Unmarshal([]byte(rawStr), &detailsMap)
-		}
-	}
-
-	if v := detailsMap; v != nil {
-		detailRaw := utils.MapGetFirstRaw(v, "Details", "Detail", "details", "detail")
-		var lib map[string]interface{}
-		switch t := detailRaw.(type) {
-		case map[string]interface{}:
-			lib = t
-		case string:
-			if t != "" {
-				rawStr := t
-				if strings.HasPrefix(rawStr, "\"") && strings.HasSuffix(rawStr, "\"") {
-					if unq, err := strconv.Unquote(rawStr); err == nil {
-						rawStr = unq
-					}
-				}
-				_ = json.Unmarshal([]byte(rawStr), &lib)
-			}
-		}
-		if lib == nil {
-			lib = make(map[string]interface{})
-		}
+	if v, ok := details.(map[string]interface{}); ok {
 		if ip := net.ParseIP(utils.FixForParseIP(utils.MapGetString(v, "IP"))); ip != nil {
 			vul.IPAddr = ip.String()
 			if i, err := utils.IPv4ToUint32(ip.To4()); err == nil {
@@ -210,6 +166,9 @@ func (r *ScannerAgentReporter) ReportRisk(
 		vul.Hash = utils.MapGetString(v, "Hash")
 		vul.FromThreatAnalysisRuntimeId = utils.MapGetString(v, "RuntimeId")
 		vul.FromThreatAnalysisTaskId = r.TaskId
+		Details := utils.MapGetString(v, "Details")
+		var lib map[string]interface{}
+		_ = json.Unmarshal([]byte(Details), &lib)
 		vul.Detail = postgres.Jsonb{RawMessage: utils.Jsonify(lib)}
 		vul.Payload = utils.MapGetString(v, "Payload")
 		vul.RiskTypeVerbose = utils.MapGetString(v, "RiskTypeVerbose")
@@ -237,12 +196,17 @@ func (r *ScannerAgentReporter) ReportRisk(
 	res.RuntimeId = r.RuntimeId
 	res.TaskId = r.TaskId
 	res.SubTaskId = r.SubTaskId
-	s.feedback(res)
-	return nil
+	return r.publishJobRisk(
+		riskKindFromVuln(vul),
+		riskTitle(title, vul),
+		target,
+		normalizeSeverity(vul.Severity),
+		riskDedupeKey(vul, target, title),
+		res.Content,
+	)
 }
 
 func (r *ScannerAgentReporter) ReportVul(i interface{}) error {
-	var s = r.agent
 	switch ret := i.(type) {
 	case *tools.PocVul:
 		var targetType = VulnTargetType_Service
@@ -275,8 +239,15 @@ func (r *ScannerAgentReporter) ReportVul(i interface{}) error {
 		res.RuntimeId = r.RuntimeId
 		res.TaskId = r.TaskId
 		res.SubTaskId = r.SubTaskId
-		s.feedback(res)
-		return nil
+		vulnTitle := firstNonEmpty(ret.TitleName, ret.PocName, ret.CVE)
+		return r.publishJobRisk(
+			legionRiskKindVulnerability,
+			riskTitle(vulnTitle, nil),
+			ret.Target,
+			normalizeSeverity(ret.Severity),
+			pocVulnDedupeKey(ret),
+			res.Content,
+		)
 	case *Vuln:
 		res, err := NewVulnResult(ret)
 		if err != nil {
@@ -285,15 +256,20 @@ func (r *ScannerAgentReporter) ReportVul(i interface{}) error {
 		res.RuntimeId = r.RuntimeId
 		res.TaskId = r.TaskId
 		res.SubTaskId = r.SubTaskId
-		s.feedback(res)
-		return nil
+		return r.publishJobRisk(
+			riskKindFromVuln(ret),
+			riskTitle(ret.Title, ret),
+			ret.Target,
+			normalizeSeverity(ret.Severity),
+			riskDedupeKey(ret, ret.Target, ret.Title),
+			res.Content,
+		)
 	default:
 		return utils.Errorf("unsupported: %s", spew.Sdump(i))
 	}
 }
 
 func (r *ScannerAgentReporter) ReportFingerprint(i interface{}) error {
-	var s = r.agent
 	switch ret := i.(type) {
 	case *fp.MatchResult:
 		res, err := spec.NewScanFingerprintResult(ret)
@@ -303,8 +279,14 @@ func (r *ScannerAgentReporter) ReportFingerprint(i interface{}) error {
 		res.RuntimeId = r.RuntimeId
 		res.TaskId = r.TaskId
 		res.SubTaskId = r.SubTaskId
-		s.feedback(res)
-		return nil
+		target := utils.HostPort(ret.Target, ret.Port)
+		return r.publishJobAsset(
+			legionAssetKindServiceFingerprint,
+			fingerprintTitle(ret),
+			target,
+			fingerprintIdentityKey(ret),
+			res.Content,
+		)
 	default:
 		return utils.Errorf("unsupported: %v", spew.Sdump(i))
 	}
@@ -318,30 +300,10 @@ func (r *ScannerAgentReporter) ReportProcess(process float64) error {
 	res.RuntimeId = r.RuntimeId
 	res.TaskId = r.TaskId
 	res.SubTaskId = r.SubTaskId
-	r.agent.feedback(res)
-	return nil
+	return r.publishJobProgress(process)
 }
 
-// ReportProcessWithSubTask reports a progress update under a different subtask id.
-// This is useful when the script emits multiple progress streams via SetProgressEx(id, ...):
-// we don't want non-"main" progress resets to shrink the overall progress in the UI.
-func (r *ScannerAgentReporter) ReportProcessWithSubTask(subTaskId string, process float64) error {
-	if strings.TrimSpace(subTaskId) == "" {
-		return r.ReportProcess(process)
-	}
-	res, err := spec.NewScanProcessResult(process)
-	if err != nil {
-		return err
-	}
-	res.RuntimeId = r.RuntimeId
-	res.TaskId = r.TaskId
-	res.SubTaskId = subTaskId
-	r.agent.feedback(res)
-	return nil
-}
 func (r *ScannerAgentReporter) ReportTCPOpenPort(host interface{}, port interface{}) error {
-	var s = r.agent
-
 	hostRaw, portInt, err := utils.ParseStringToHostPort(utils.HostPort(fmt.Sprint(host), port))
 	if err != nil {
 		return err
@@ -358,6 +320,182 @@ func (r *ScannerAgentReporter) ReportTCPOpenPort(host interface{}, port interfac
 	res.RuntimeId = r.RuntimeId
 	res.TaskId = r.TaskId
 	res.SubTaskId = r.SubTaskId
-	s.feedback(res)
+	target := utils.HostPort(hostRaw, portInt)
+	return r.publishJobAsset(
+		legionAssetKindTCPOpenPort,
+		target,
+		target,
+		tcpOpenPortIdentityKey(hostRaw, portInt),
+		res.Content,
+	)
+}
+
+func (r *ScannerAgentReporter) ReportStatusCard(_ []byte) error {
 	return nil
+}
+
+var nonIdentifierChars = regexp.MustCompile(`[^a-z0-9]+`)
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
+}
+
+func normalizeSeverity(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "critical":
+		return "critical"
+	case "high":
+		return "high"
+	case "medium", "warning":
+		return "medium"
+	case "low":
+		return "low"
+	default:
+		return ""
+	}
+}
+
+func normalizeIdentifierToken(value string) string {
+	trimmed := strings.ToLower(strings.TrimSpace(value))
+	if trimmed == "" {
+		return ""
+	}
+	normalized := nonIdentifierChars.ReplaceAllString(trimmed, "_")
+	return strings.Trim(normalized, "_")
+}
+
+func weakPasswordTitle(result *bruteutils.BruteItemResult) string {
+	if result == nil {
+		return ""
+	}
+	return fmt.Sprintf(
+		"%s weak password for %s",
+		strings.ToUpper(result.Type),
+		result.Target,
+	)
+}
+
+func weakPasswordDedupeKey(result *bruteutils.BruteItemResult) string {
+	if result == nil {
+		return ""
+	}
+	return utils.CalcSha256(
+		strings.Join(
+			[]string{"weak_password", result.Target, result.Type, result.Username},
+			"|",
+		),
+	)
+}
+
+func riskKindFromVuln(vuln *Vuln) string {
+	if vuln == nil {
+		return legionRiskKindSecurityRisk
+	}
+	if strings.Contains(strings.ToLower(vuln.Plugin), "weakpassword") {
+		return legionRiskKindWeakPassword
+	}
+	if token := normalizeIdentifierToken(vuln.RiskType); token != "" {
+		return token
+	}
+	if vuln.CVE != "" || strings.Contains(strings.ToLower(vuln.Plugin), "poc") {
+		return legionRiskKindVulnerability
+	}
+	return legionRiskKindSecurityRisk
+}
+
+func riskTitle(title string, vuln *Vuln) string {
+	if normalized := firstNonEmpty(
+		title,
+		func() string {
+			if vuln == nil {
+				return ""
+			}
+			return vuln.TitleVerbose
+		}(),
+		func() string {
+			if vuln == nil {
+				return ""
+			}
+			return vuln.Title
+		}(),
+	); normalized != "" {
+		return normalized
+	}
+	if vuln == nil {
+		return ""
+	}
+	return firstNonEmpty(vuln.Plugin, vuln.Target)
+}
+
+func riskDedupeKey(vuln *Vuln, target string, title string) string {
+	if vuln != nil && strings.TrimSpace(vuln.Hash) != "" {
+		return strings.TrimSpace(vuln.Hash)
+	}
+	return utils.CalcSha256(
+		strings.Join(
+			[]string{
+				riskKindFromVuln(vuln),
+				strings.TrimSpace(target),
+				strings.TrimSpace(title),
+				func() string {
+					if vuln == nil {
+						return ""
+					}
+					return strings.TrimSpace(vuln.Plugin)
+				}(),
+			},
+			"|",
+		),
+	)
+}
+
+func pocVulnDedupeKey(vuln *tools.PocVul) string {
+	if vuln == nil {
+		return ""
+	}
+	if token := strings.TrimSpace(vuln.UUID); token != "" {
+		return token
+	}
+	return utils.CalcSha256(
+		strings.Join(
+			[]string{
+				legionRiskKindVulnerability,
+				strings.TrimSpace(vuln.Target),
+				firstNonEmpty(vuln.TitleName, vuln.PocName, vuln.CVE),
+				strings.TrimSpace(vuln.Source),
+			},
+			"|",
+		),
+	)
+}
+
+func fingerprintTitle(result *fp.MatchResult) string {
+	if result == nil {
+		return ""
+	}
+	return firstNonEmpty(
+		result.GetServiceName(),
+		result.GetHtmlTitle(),
+		utils.HostPort(result.Target, result.Port),
+	)
+}
+
+func fingerprintIdentityKey(result *fp.MatchResult) string {
+	if result == nil {
+		return ""
+	}
+	if identifier := strings.TrimSpace(result.Identifier()); identifier != "" {
+		return identifier
+	}
+	return utils.CalcSha256(utils.HostPort(result.Target, result.Port))
+}
+
+func tcpOpenPortIdentityKey(host string, port int) string {
+	return fmt.Sprintf("tcp://%s:%d", host, port)
 }
