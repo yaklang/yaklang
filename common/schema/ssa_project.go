@@ -21,8 +21,9 @@ type SSAProject struct {
 	Language    ssaconfig.Language `json:"language" gorm:"index"`
 	URL         string             `json:"url,omitempty" gorm:"index"`
 	// 配置选项
-	Config []byte `json:"config"`
-	Hash   string `json:"hash" gorm:"unique_index"`
+	Config              []byte `json:"config"`
+	ExecutionPreference []byte `json:"execution_preference" gorm:"column:execution_preference;type:text"`
+	Hash                string `json:"hash" gorm:"unique_index"`
 }
 
 func (p *SSAProject) GetTagsList() []string {
