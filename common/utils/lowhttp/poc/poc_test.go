@@ -12,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
 
 func TestPocWithRandomJA3(t *testing.T) {
@@ -585,4 +586,35 @@ func TestExtractContentLength(t *testing.T) {
 		result := extractContentLength(headerBytes)
 		require.Equal(t, tt.expected, result, "extractContentLength for: %s", tt.header)
 	}
+}
+
+func TestRequestByHttpRequestInstance(t *testing.T) {
+	t.Run("omit default http port", func(t *testing.T) {
+		reqIns, err := lowhttp.ParseBytesToHttpRequest([]byte("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n"))
+		require.NoError(t, err)
+		reqIns.URL.Scheme = "http"
+
+		raw := BuildRequest(reqIns)
+		require.Contains(t, string(raw), "Host: example.com\r\n")
+		require.NotContains(t, string(raw), "Host: example.com:80\r\n")
+	})
+
+	t.Run("omit default https port", func(t *testing.T) {
+		reqIns, err := lowhttp.ParseBytesToHttpRequest([]byte("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n"))
+		require.NoError(t, err)
+		reqIns.URL.Scheme = "https"
+
+		raw := BuildRequest(reqIns)
+		require.Contains(t, string(raw), "Host: example.com\r\n")
+		require.NotContains(t, string(raw), "Host: example.com:443\r\n")
+	})
+
+	t.Run("preserve non default port", func(t *testing.T) {
+		reqIns, err := lowhttp.ParseBytesToHttpRequest([]byte("GET / HTTP/1.1\r\nHost: example.com:8443\r\n\r\n"))
+		require.NoError(t, err)
+		reqIns.URL.Scheme = "https"
+
+		raw := BuildRequest(reqIns)
+		require.Contains(t, string(raw), "Host: example.com:8443\r\n")
+	})
 }
