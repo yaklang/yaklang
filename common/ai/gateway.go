@@ -403,6 +403,14 @@ func GetPrimaryAgent() aispec.AIClient {
 // ```go
 // response = ai.Chat("介绍一下Yakit")~
 // println(response)
+//
+// // 显式使用质量优先模型
+// response = ai.Chat("分析这个漏洞利用链", ai.qualityPriority())~
+// println(response)
+//
+// // 显式使用图片模型
+// response = ai.Chat("分析这张截图", ai.imageFile("/tmp/demo.png"), ai.imageAI())~
+// println(response)
 // ```
 func Chat(msg string, opts ...aispec.AIConfigOption) (string, error) {
 	// Parse options to check if user explicitly specified a type
@@ -411,6 +419,10 @@ func Chat(msg string, opts ...aispec.AIConfigOption) (string, error) {
 	// If user explicitly specified a type, use legacy chat to respect their choice
 	if config.Type != "" {
 		return legacyChat(msg, opts...)
+	}
+
+	if preferredTier, ok := resolvePreferredTier(config); ok {
+		return TieredChatWithTier(preferredTier, msg, opts...)
 	}
 
 	// Check if tiered AI model configuration is enabled
@@ -452,48 +464,24 @@ func legacyChat(msg string, opts ...aispec.AIConfigOption) (string, error) {
 func tieredChat(msg string, opts ...aispec.AIConfigOption) (string, error) {
 	// Get the current routing policy
 	policy := consts.GetTieredAIRoutingPolicy()
-
-	// Select the appropriate tier based on policy
-	var configs []*ypb.AIModelConfig
-	switch policy {
-	case consts.PolicyPerformance:
-		configs = consts.GetIntelligentAIConfigs()
-	case consts.PolicyCost:
-		configs = consts.GetLightweightAIConfigs()
-	case consts.PolicyBalance, consts.PolicyAuto:
-		// Balance mode: use lightweight by default
-		configs = consts.GetLightweightAIConfigs()
-	default:
-		configs = consts.GetLightweightAIConfigs()
-	}
+	configs := getConfigsForPolicy(policy)
 
 	if len(configs) == 0 {
 		log.Warnf("No tiered AI config available for policy %s, falling back to legacy chat", policy)
 		return legacyChat(msg, opts...)
 	}
 
-	// Try each config in order
-	for _, model := range configs {
-		result, err := chatWithModelConfig(msg, model, opts...)
-		if err == nil {
-			return result, nil
-		}
-		if model == nil || model.GetProvider() == nil {
-			log.Debugf("Chat with model config failed: provider is nil, trying next")
-			continue
-		}
-		log.Debugf("Chat with config type=%s failed: %v, trying next", model.GetProvider().GetType(), err)
+	result, err := chatWithConfigs(msg, configs, opts...)
+	if err == nil {
+		return result, nil
 	}
 
 	// Fallback to lightweight if not already using it
 	if policy != consts.PolicyCost && !consts.IsTieredAIFallbackDisabled() {
 		log.Debugf("Falling back to lightweight model")
-		lightweightConfigs := consts.GetLightweightAIConfigs()
-		for _, model := range lightweightConfigs {
-			result, err := chatWithModelConfig(msg, model, opts...)
-			if err == nil {
-				return result, nil
-			}
+		result, err := chatWithConfigs(msg, consts.GetLightweightAIConfigs(), opts...)
+		if err == nil {
+			return result, nil
 		}
 	}
 
@@ -541,14 +529,73 @@ func chatWithModelConfig(msg string, cfg *ypb.AIModelConfig, opts ...aispec.AICo
 	return result, nil
 }
 
+func chatWithConfigs(msg string, configs []*ypb.AIModelConfig, opts ...aispec.AIConfigOption) (string, error) {
+	var lastErr error
+	for _, model := range configs {
+		result, err := chatWithModelConfig(msg, model, opts...)
+		if err == nil {
+			return result, nil
+		}
+		lastErr = err
+		if model == nil || model.GetProvider() == nil {
+			log.Debugf("Chat with model config failed: provider is nil, trying next")
+			continue
+		}
+		log.Debugf("Chat with config type=%s failed: %v, trying next", model.GetProvider().GetType(), err)
+	}
+	if lastErr == nil {
+		lastErr = errors.New("no model configuration available")
+	}
+	return "", lastErr
+}
+
+func resolvePreferredTier(config *aispec.AIConfig) (ModelTier, bool) {
+	if config == nil {
+		return "", false
+	}
+	if config.PreferredTier != "" {
+		return ModelTier(config.PreferredTier), true
+	}
+	if len(config.Images) > 0 {
+		return TierVision, true
+	}
+	return "", false
+}
+
 // TieredChat allows explicit selection of a model tier for chat
-type ModelTier string
+type ModelTier = consts.ModelTier
 
 const (
-	TierIntelligent ModelTier = "intelligent"
-	TierLightweight ModelTier = "lightweight"
-	TierVision      ModelTier = "vision"
+	TierIntelligent ModelTier = consts.TierIntelligent
+	TierLightweight ModelTier = consts.TierLightweight
+	TierVision      ModelTier = consts.TierVision
 )
+
+func getConfigsForPolicy(policy consts.RoutingPolicy) []*ypb.AIModelConfig {
+	switch policy {
+	case consts.PolicyPerformance:
+		return consts.GetIntelligentAIConfigs()
+	case consts.PolicyCost:
+		return consts.GetLightweightAIConfigs()
+	case consts.PolicyBalance, consts.PolicyAuto:
+		return consts.GetLightweightAIConfigs()
+	default:
+		return consts.GetLightweightAIConfigs()
+	}
+}
+
+func getConfigsForTier(tier ModelTier) []*ypb.AIModelConfig {
+	switch tier {
+	case TierIntelligent:
+		return consts.GetIntelligentAIConfigs()
+	case TierLightweight:
+		return consts.GetLightweightAIConfigs()
+	case TierVision:
+		return consts.GetVisionAIConfigs()
+	default:
+		return consts.GetIntelligentAIConfigs()
+	}
+}
 
 // TieredChatWithTier performs chat with a specific model tier
 func TieredChatWithTier(tier ModelTier, msg string, opts ...aispec.AIConfigOption) (string, error) {
@@ -557,25 +604,16 @@ func TieredChatWithTier(tier ModelTier, msg string, opts ...aispec.AIConfigOptio
 		return legacyChat(msg, opts...)
 	}
 
-	var configs []*ypb.AIModelConfig
-	switch tier {
-	case TierIntelligent:
-		configs = consts.GetIntelligentAIConfigs()
-	case TierLightweight:
-		configs = consts.GetLightweightAIConfigs()
-	case TierVision:
-		configs = consts.GetVisionAIConfigs()
-	default:
+	configs := getConfigsForTier(tier)
+	if tier != TierIntelligent && tier != TierLightweight && tier != TierVision {
 		log.Warnf("Unknown tier %s, using intelligent", tier)
-		configs = consts.GetIntelligentAIConfigs()
 	}
 
 	if len(configs) == 0 {
 		return "", errors.New("no configuration available for tier: " + string(tier))
 	}
 
-	// Try the first config
-	return chatWithModelConfig(msg, configs[0], opts...)
+	return chatWithConfigs(msg, configs, opts...)
 }
 
 // IntelligentChat uses the intelligent (high-quality) model
@@ -591,6 +629,149 @@ func LightweightChat(msg string, opts ...aispec.AIConfigOption) (string, error) 
 // VisionChat uses the vision model
 func VisionChat(msg string, opts ...aispec.AIConfigOption) (string, error) {
 	return TieredChatWithTier(TierVision, msg, opts...)
+}
+
+func legacyFunctionCall(input string, funcs any, opts ...aispec.AIConfigOption) (map[string]any, error) {
+	config := aispec.NewDefaultAIConfig(opts...)
+	var responseRsp map[string]any
+	var err error
+	err = tryCreateAIGateway(config.Type, func(typ string, gateway aispec.AIClient) bool {
+		gateway.LoadOption(append([]aispec.AIConfigOption{aispec.WithType(typ)}, opts...)...)
+		if err := gateway.CheckValid(); err != nil {
+			log.Debugf("check valid by %s failed: %s", typ, err)
+			return false
+		}
+		var ok bool
+		for i := 0; i < config.FunctionCallRetryTimes; i++ {
+			responseRsp, err = gateway.ExtractData(input, "", utils.InterfaceToGeneralMap(funcs))
+			if err != nil {
+				log.Warnf("chat by %s failed: %s, retry times: %d", typ, err, i)
+			} else {
+				ok = true
+				break
+			}
+		}
+		if !ok {
+			return false
+		}
+		return true
+	})
+	if err != nil {
+		return nil, err
+	}
+	return responseRsp, nil
+}
+
+func functionCallWithModelConfig(input string, funcs any, cfg *ypb.AIModelConfig, opts ...aispec.AIConfigOption) (map[string]any, error) {
+	if cfg == nil {
+		return nil, errors.New("config is nil")
+	}
+	provider := cfg.GetProvider()
+	if provider == nil {
+		return nil, errors.New("provider config is nil")
+	}
+	providerType := provider.GetType()
+	if providerType == "" {
+		return nil, errors.New("provider type is empty")
+	}
+
+	configOpts := aispec.BuildOptionsFromConfig(cfg)
+	allOpts := append(configOpts, opts...)
+	agent := createAIGateway(providerType)
+	if agent == nil {
+		return nil, errors.New("failed to create AI gateway for type: " + providerType)
+	}
+
+	agent.LoadOption(allOpts...)
+	if err := agent.CheckValid(); err != nil {
+		return nil, err
+	}
+
+	config := aispec.NewDefaultAIConfig(allOpts...)
+	var response map[string]any
+	var err error
+	for i := 0; i < config.FunctionCallRetryTimes; i++ {
+		response, err = agent.ExtractData(input, "", utils.InterfaceToGeneralMap(funcs))
+		if err == nil {
+			return response, nil
+		}
+		log.Warnf("function call by %s failed: %s, retry times: %d", providerType, err, i)
+	}
+	return nil, err
+}
+
+func functionCallWithConfigs(input string, funcs any, configs []*ypb.AIModelConfig, opts ...aispec.AIConfigOption) (map[string]any, error) {
+	var lastErr error
+	for _, model := range configs {
+		result, err := functionCallWithModelConfig(input, funcs, model, opts...)
+		if err == nil {
+			return result, nil
+		}
+		lastErr = err
+		if model == nil || model.GetProvider() == nil {
+			log.Debugf("FunctionCall with model config failed: provider is nil, trying next")
+			continue
+		}
+		log.Debugf("FunctionCall with config type=%s failed: %v, trying next", model.GetProvider().GetType(), err)
+	}
+	if lastErr == nil {
+		lastErr = errors.New("no model configuration available")
+	}
+	return nil, lastErr
+}
+
+func tieredFunctionCall(input string, funcs any, opts ...aispec.AIConfigOption) (map[string]any, error) {
+	policy := consts.GetTieredAIRoutingPolicy()
+	configs := getConfigsForPolicy(policy)
+	if len(configs) == 0 {
+		log.Warnf("No tiered AI config available for policy %s, falling back to legacy function call", policy)
+		return legacyFunctionCall(input, funcs, opts...)
+	}
+
+	result, err := functionCallWithConfigs(input, funcs, configs, opts...)
+	if err == nil {
+		return result, nil
+	}
+
+	if policy != consts.PolicyCost && !consts.IsTieredAIFallbackDisabled() {
+		log.Debugf("Falling back to lightweight model for function call")
+		result, err := functionCallWithConfigs(input, funcs, consts.GetLightweightAIConfigs(), opts...)
+		if err == nil {
+			return result, nil
+		}
+	}
+
+	log.Warnf("All tiered configs failed for function call, falling back to legacy path")
+	return legacyFunctionCall(input, funcs, opts...)
+}
+
+func TieredFunctionCallWithTier(tier ModelTier, input string, funcs any, opts ...aispec.AIConfigOption) (map[string]any, error) {
+	if !consts.IsTieredAIModelConfigEnabled() {
+		log.Debugf("Tiered AI config not enabled, using legacy function call")
+		return legacyFunctionCall(input, funcs, opts...)
+	}
+
+	configs := getConfigsForTier(tier)
+	if tier != TierIntelligent && tier != TierLightweight && tier != TierVision {
+		log.Warnf("Unknown tier %s, using intelligent", tier)
+	}
+	if len(configs) == 0 {
+		return nil, errors.New("no configuration available for tier: " + string(tier))
+	}
+
+	return functionCallWithConfigs(input, funcs, configs, opts...)
+}
+
+func IntelligentFunctionCall(input string, funcs any, opts ...aispec.AIConfigOption) (map[string]any, error) {
+	return TieredFunctionCallWithTier(TierIntelligent, input, funcs, opts...)
+}
+
+func LightweightFunctionCall(input string, funcs any, opts ...aispec.AIConfigOption) (map[string]any, error) {
+	return TieredFunctionCallWithTier(TierLightweight, input, funcs, opts...)
+}
+
+func VisionFunctionCall(input string, funcs any, opts ...aispec.AIConfigOption) (map[string]any, error) {
+	return TieredFunctionCallWithTier(TierVision, input, funcs, opts...)
 }
 
 // StructuredStream 获取结构化的流式输出，支持实时接收 AI 返回的数据。
@@ -745,36 +926,24 @@ func ListModelByProviderType(providerType string, opts ...aispec.AIConfigOption)
 //
 // die(err)
 // dump(result)
+//
+// // 显式使用速度优先模型做函数调用
+// result, err = ai.FunctionCall("快速提取端口参数", funcs, ai.speedPriority())
+// die(err)
+// dump(result)
 // ```
 func FunctionCall(input string, funcs any, opts ...aispec.AIConfigOption) (map[string]any, error) {
 	config := aispec.NewDefaultAIConfig(opts...)
-	var responseRsp map[string]any
-	var err error
-	err = tryCreateAIGateway(config.Type, func(typ string, gateway aispec.AIClient) bool {
-		gateway.LoadOption(append([]aispec.AIConfigOption{aispec.WithType(typ)}, opts...)...)
-		if err := gateway.CheckValid(); err != nil {
-			log.Debugf("check valid by %s failed: %s", typ, err)
-			return false
-		}
-		var ok bool
-		for i := 0; i < config.FunctionCallRetryTimes; i++ {
-			responseRsp, err = gateway.ExtractData(input, "", utils.InterfaceToGeneralMap(funcs))
-			if err != nil {
-				log.Warnf("chat by %s failed: %s, retry times: %d", typ, err, i)
-			} else {
-				ok = true
-				break
-			}
-		}
-		if !ok {
-			return false
-		}
-		return true
-	})
-	if err != nil {
-		return nil, err
+	if config.Type != "" {
+		return legacyFunctionCall(input, funcs, opts...)
 	}
-	return responseRsp, nil
+	if preferredTier, ok := resolvePreferredTier(config); ok {
+		return TieredFunctionCallWithTier(preferredTier, input, funcs, opts...)
+	}
+	if consts.IsTieredAIModelConfigEnabled() {
+		return tieredFunctionCall(input, funcs, opts...)
+	}
+	return legacyFunctionCall(input, funcs, opts...)
 }
 
 func LoadChater(name string, defaultOpts ...aispec.AIConfigOption) (aispec.GeneralChatter, error) {
@@ -813,7 +982,13 @@ var Exports = map[string]any{
 	"Moonshot": Moonshot,
 
 	"Chat":                    Chat,
+	"IntelligentChat":         IntelligentChat,
+	"LightweightChat":         LightweightChat,
+	"VisionChat":              VisionChat,
 	"FunctionCall":            FunctionCall,
+	"IntelligentFunctionCall": IntelligentFunctionCall,
+	"LightweightFunctionCall": LightweightFunctionCall,
+	"VisionFunctionCall":      VisionFunctionCall,
 	"StructuredStream":        StructuredStream,
 	"ListModels":              ListModels,
 	"ListModelByProviderType": ListModelByProviderType,
@@ -831,6 +1006,11 @@ var Exports = map[string]any{
 	"onReasonStream":                 aispec.WithReasonStreamHandler,
 	"debugStream":                    aispec.WithDebugStream,
 	"type":                           aispec.WithType,
+	"preferredTier":                  aispec.WithPreferredTier,
+	"speedPriority":                  aispec.WithSpeedPriority,
+	"qualityPriority":                aispec.WithQualityPriority,
+	"visionPriority":                 aispec.WithVisionPriority,
+	"imageAI":                        aispec.WithVisionPriority,
 	"imageFile":                      aispec.WithImageFile,
 	"imageBase64":                    aispec.WithImageBase64,
 	"imageRaw":                       aispec.WithImageRaw,

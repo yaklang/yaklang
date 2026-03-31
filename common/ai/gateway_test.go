@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"io"
 	"os"
@@ -164,7 +165,9 @@ func (t *TestGateway) StructuredStream(s string, function ...any) (chan *aispec.
 }
 
 func (t *TestGateway) Chat(s string, function ...any) (string, error) {
-	t.config.StreamHandler(nil)
+	if t.config.StreamHandler != nil {
+		t.config.StreamHandler(nil)
+	}
 	return "ok", nil
 }
 
@@ -173,7 +176,10 @@ func (t *TestGateway) ChatStream(s string) (io.Reader, error) {
 }
 
 func (t *TestGateway) ExtractData(data string, desc string, fields map[string]any) (map[string]any, error) {
-	return nil, nil
+	return map[string]any{
+		"provider": t.config.Type,
+		"model":    t.config.Model,
+	}, nil
 }
 
 func (t *TestGateway) LoadOption(opt ...aispec.AIConfigOption) {
@@ -270,4 +276,188 @@ func TestDashscope_Search_StructuredStream(t *testing.T) {
 		wg.Wait()
 	})
 
+}
+
+func TestChatPreferredTierOverridesGlobalPolicy(t *testing.T) {
+	original := consts.GetTieredAIConfig()
+	defer consts.SetTieredAIConfig(original)
+
+	aispec.Register("test-intelligent", func() aispec.AIClient { return &TestGateway{} })
+	aispec.Register("test-lightweight", func() aispec.AIClient { return &TestGateway{} })
+	aispec.Register("test-vision", func() aispec.AIClient { return &TestGateway{} })
+
+	consts.SetTieredAIConfig(&consts.TieredAIConfig{
+		Enabled:       true,
+		RoutingPolicy: consts.PolicyCost,
+		IntelligentConfigs: []*ypb.AIModelConfig{{
+			Provider:  &ypb.ThirdPartyApplicationConfig{Type: "test-intelligent", APIKey: "intelligent-key"},
+			ModelName: "intelligent-model",
+		}},
+		LightweightConfigs: []*ypb.AIModelConfig{{
+			Provider:  &ypb.ThirdPartyApplicationConfig{Type: "test-lightweight", APIKey: "lightweight-key"},
+			ModelName: "lightweight-model",
+		}},
+		VisionConfigs: []*ypb.AIModelConfig{{
+			Provider:  &ypb.ThirdPartyApplicationConfig{Type: "test-vision", APIKey: "vision-key"},
+			ModelName: "vision-model",
+		}},
+	})
+
+	t.Run("quality priority", func(t *testing.T) {
+		var provider, model string
+		_, err := Chat("hello",
+			aispec.WithQualityPriority(),
+			aispec.WithModelInfoCallback(func(p, m string) {
+				provider = p
+				model = m
+			}),
+		)
+		assert.NoError(t, err)
+		assert.Equal(t, "test-intelligent", provider)
+		assert.Equal(t, "intelligent-model", model)
+	})
+
+	t.Run("speed priority", func(t *testing.T) {
+		var provider, model string
+		_, err := Chat("hello",
+			aispec.WithSpeedPriority(),
+			aispec.WithModelInfoCallback(func(p, m string) {
+				provider = p
+				model = m
+			}),
+		)
+		assert.NoError(t, err)
+		assert.Equal(t, "test-lightweight", provider)
+		assert.Equal(t, "lightweight-model", model)
+	})
+
+	t.Run("vision priority", func(t *testing.T) {
+		var provider, model string
+		_, err := Chat("hello",
+			aispec.WithVisionPriority(),
+			aispec.WithModelInfoCallback(func(p, m string) {
+				provider = p
+				model = m
+			}),
+		)
+		assert.NoError(t, err)
+		assert.Equal(t, "test-vision", provider)
+		assert.Equal(t, "vision-model", model)
+	})
+
+	t.Run("image input auto prefers vision", func(t *testing.T) {
+		var provider, model string
+		_, err := Chat("hello",
+			aispec.WithImageRaw([]byte{
+				0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+				0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+				0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+				0x08, 0x04, 0x00, 0x00, 0x00, 0xb5, 0x1c, 0x0c,
+				0x02, 0x00, 0x00, 0x00, 0x0b, 0x49, 0x44, 0x41,
+				0x54, 0x78, 0xda, 0x63, 0xfc, 0xff, 0x1f, 0x00,
+				0x03, 0x03, 0x02, 0x00, 0xef, 0xbf, 0xc7, 0x35,
+				0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44,
+				0xae, 0x42, 0x60, 0x82,
+			}),
+			aispec.WithModelInfoCallback(func(p, m string) {
+				provider = p
+				model = m
+			}),
+		)
+		assert.NoError(t, err)
+		assert.Equal(t, "test-vision", provider)
+		assert.Equal(t, "vision-model", model)
+	})
+}
+
+func TestFunctionCallSupportsPreferredTier(t *testing.T) {
+	original := consts.GetTieredAIConfig()
+	defer consts.SetTieredAIConfig(original)
+
+	aispec.Register("test-intelligent-fc", func() aispec.AIClient { return &TestGateway{} })
+	aispec.Register("test-lightweight-fc", func() aispec.AIClient { return &TestGateway{} })
+	aispec.Register("test-vision-fc", func() aispec.AIClient { return &TestGateway{} })
+	aispec.Register("test-explicit-fc", func() aispec.AIClient { return &TestGateway{} })
+
+	consts.SetTieredAIConfig(&consts.TieredAIConfig{
+		Enabled:       true,
+		RoutingPolicy: consts.PolicyPerformance,
+		IntelligentConfigs: []*ypb.AIModelConfig{{
+			Provider:  &ypb.ThirdPartyApplicationConfig{Type: "test-intelligent-fc", APIKey: "intelligent-key"},
+			ModelName: "intelligent-model",
+		}},
+		LightweightConfigs: []*ypb.AIModelConfig{{
+			Provider:  &ypb.ThirdPartyApplicationConfig{Type: "test-lightweight-fc", APIKey: "lightweight-key"},
+			ModelName: "lightweight-model",
+		}},
+		VisionConfigs: []*ypb.AIModelConfig{{
+			Provider:  &ypb.ThirdPartyApplicationConfig{Type: "test-vision-fc", APIKey: "vision-key"},
+			ModelName: "vision-model",
+		}},
+	})
+
+	funcs := map[string]any{"echo": func(input string) string { return input }}
+
+	t.Run("quality priority", func(t *testing.T) {
+		result, err := FunctionCall("hello", funcs, aispec.WithQualityPriority())
+		assert.NoError(t, err)
+		assert.Equal(t, "test-intelligent-fc", result["provider"])
+		assert.Equal(t, "intelligent-model", result["model"])
+	})
+
+	t.Run("speed priority", func(t *testing.T) {
+		result, err := FunctionCall("hello", funcs, aispec.WithSpeedPriority())
+		assert.NoError(t, err)
+		assert.Equal(t, "test-lightweight-fc", result["provider"])
+		assert.Equal(t, "lightweight-model", result["model"])
+	})
+
+	t.Run("vision convenience", func(t *testing.T) {
+		result, err := VisionFunctionCall("hello", funcs)
+		assert.NoError(t, err)
+		assert.Equal(t, "test-vision-fc", result["provider"])
+		assert.Equal(t, "vision-model", result["model"])
+	})
+
+	t.Run("image input auto prefers vision", func(t *testing.T) {
+		result, err := FunctionCall("hello", funcs,
+			aispec.WithImageRaw([]byte{
+				0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+				0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+				0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+				0x08, 0x04, 0x00, 0x00, 0x00, 0xb5, 0x1c, 0x0c,
+				0x02, 0x00, 0x00, 0x00, 0x0b, 0x49, 0x44, 0x41,
+				0x54, 0x78, 0xda, 0x63, 0xfc, 0xff, 0x1f, 0x00,
+				0x03, 0x03, 0x02, 0x00, 0xef, 0xbf, 0xc7, 0x35,
+				0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44,
+				0xae, 0x42, 0x60, 0x82,
+			}),
+		)
+		assert.NoError(t, err)
+		assert.Equal(t, "test-vision-fc", result["provider"])
+		assert.Equal(t, "vision-model", result["model"])
+	})
+
+	t.Run("explicit type wins", func(t *testing.T) {
+		result, err := FunctionCall("hello", funcs,
+			aispec.WithType("test-explicit-fc"),
+			aispec.WithQualityPriority(),
+		)
+		assert.NoError(t, err)
+		assert.Equal(t, "test-explicit-fc", result["provider"])
+	})
+}
+
+func TestExportsExposeTierHelpers(t *testing.T) {
+	assert.Contains(t, Exports, "IntelligentChat")
+	assert.Contains(t, Exports, "LightweightChat")
+	assert.Contains(t, Exports, "VisionChat")
+	assert.Contains(t, Exports, "IntelligentFunctionCall")
+	assert.Contains(t, Exports, "LightweightFunctionCall")
+	assert.Contains(t, Exports, "VisionFunctionCall")
+	assert.Contains(t, Exports, "preferredTier")
+	assert.Contains(t, Exports, "speedPriority")
+	assert.Contains(t, Exports, "qualityPriority")
+	assert.Contains(t, Exports, "visionPriority")
+	assert.Contains(t, Exports, "imageAI")
 }
