@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package legion.plugin.v1;
+
+import "google/protobuf/timestamp.proto";
+import "legion/node/v1/node.proto";
+
+option go_package = "github.com/yaklang/yaklang/common/legionpb/legion/plugin/v1;pluginv1";
+
+message PluginReleaseRef {
+  string plugin_id = 1;
+  string release_id = 2;
+  string version = 3;
+  string entry_kind = 4;
+}
+
+message PluginArtifactRef {
+  string artifact_uri = 1;
+  string artifact_sha256 = 2;
+  int64 artifact_size_bytes = 3;
+}
+
+message SyncPluginCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  PluginReleaseRef release = 3;
+  PluginArtifactRef artifact = 4;
+}
+
+message PluginSyncStatus {
+  legion.node.v1.EventMetadata metadata = 1;
+  PluginReleaseRef release = 2;
+  string status = 3;
+  string local_path = 4;
+  int64 cached_size_bytes = 5;
+  google.protobuf.Timestamp observed_at = 6;
+}
+
+message PluginSyncFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  PluginReleaseRef release = 2;
+  string error_code = 3;
+  string error_message = 4;
+  google.protobuf.Timestamp observed_at = 5;
+}
