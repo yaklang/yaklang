@@ -2,28 +2,14 @@ package ssadb
 
 import (
 	"context"
-	"os"
 	"strings"
 
 	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/utils/glob"
 )
-
-func searchStackDebugEnabled() bool {
-	return os.Getenv("YAK_SSA_SEARCH_STACK_DEBUG") != ""
-}
-
-func debugSearchStackf(format string, args ...any) {
-	if !searchStackDebugEnabled() {
-		return
-	}
-	log.Warnf(format, args...)
-	utils.PrintCurrentGoroutineRuntimeStack()
-}
 
 func YieldIrCode(DB *gorm.DB, ctx context.Context, progName string) <-chan *IrCode {
 	var ids []int64
@@ -41,7 +27,6 @@ func YieldIrCode(DB *gorm.DB, ctx context.Context, progName string) <-chan *IrCo
 
 func yieldFromIrIndex(DB *gorm.DB, ctx context.Context, progName string) <-chan *IrCode {
 	var ids []int64
-	debugSearchStackf("[ssa-search] yieldFromIrIndex program=%s", progName)
 	if err := DB.Model(&IrIndex{}).Where("program_name = ?", progName).Pluck("DISTINCT value_id", &ids).Error; err != nil {
 		log.Errorf("failed to get ids from index: %v", err)
 		return emptyIrCodeChan()
@@ -118,7 +103,6 @@ func yieldIrCodes(ctx context.Context, progName string, ids []int64) <-chan *IrC
 			if len(idsToLoad) == 0 {
 				return nil
 			}
-			debugSearchStackf("[ssa-search] yieldIrCodes program=%s ids=%d uncached=%d", progName, len(ids), len(idsToLoad))
 
 			// Batch load missing data
 			db := GetDB().Model(&IrCode{}).Where("program_name = ?", progName)
@@ -144,7 +128,6 @@ func SearchVariable(db *gorm.DB, ctx context.Context, progName string, cache *Na
 func SearchVariableWithExcludeFiles(db *gorm.DB, ctx context.Context, progName string, cache *NameCache, compareMode CompareMode, matchMod MatchMode, value string, excludeFiles []string) <-chan *IrCode {
 	var result <-chan *IrCode
 	_ = diagnostics.TrackLow("ssadb.SearchVariableWithExcludeFiles", func() error {
-		debugSearchStackf("[ssa-search] SearchVariableWithExcludeFiles program=%s compare=%d match=%d value=%q exclude_files=%d", progName, compareMode, matchMod, value, len(excludeFiles))
 		result = searchVariableWithExcludeFiles(db, ctx, progName, cache, compareMode, matchMod, value, excludeFiles)
 		return nil
 	})

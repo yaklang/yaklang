@@ -204,7 +204,10 @@ type SSACompileConfig struct {
 	StopOnCliCheck           bool          `json:"stop_on_cli_check"`
 	EnableIncrementalCompile bool          `json:"enable_incremental_compile"`
 	BaseProgramName          string        `json:"base_program_name"`
-	CompileProjectBytes      int64         `json:"-"`
+	// CompileProjectBytes is runtime-only input for adaptive compile IR cache
+	// tuning. It reflects the total source bytes that will enter the compile
+	// stage and is intentionally excluded from JSON persistence.
+	CompileProjectBytes int64 `json:"-"`
 }
 
 // --- 编译配置 Get/Set 方法 ---

@@ -7,7 +7,7 @@ import (
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/asyncdb"
+	"github.com/yaklang/yaklang/common/utils/dbcache"
 )
 
 // StreamImportConfig controls batching behaviour for AsyncStreamImporter.
@@ -27,14 +27,14 @@ func DefaultStreamImportConfig() *StreamImportConfig {
 	}
 }
 
-// AsyncStreamImporter batches file and risk writes using asyncdb.Save.
+// AsyncStreamImporter batches file and risk writes using dbcache.Save.
 type AsyncStreamImporter struct {
 	db          *gorm.DB
 	programName string
 	config      *StreamImportConfig
 
-	fileSaver *asyncdb.Save[*File]
-	riskSaver *asyncdb.Save[*riskWithDataflow]
+	fileSaver *dbcache.Save[*File]
+	riskSaver *dbcache.Save[*riskWithDataflow]
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -65,7 +65,7 @@ func NewAsyncStreamImporter(db *gorm.DB, programName string, config *StreamImpor
 		cancel:      cancel,
 	}
 
-	importer.fileSaver = asyncdb.NewSave(
+	importer.fileSaver = dbcache.NewSave(
 		func(files []*File) {
 			start := time.Now()
 			importer.batchSaveFiles(db, files)
@@ -78,13 +78,13 @@ func NewAsyncStreamImporter(db *gorm.DB, programName string, config *StreamImpor
 					len(files), total, duration, float64(len(files))/duration.Seconds())
 			}
 		},
-		asyncdb.WithContext(ctx),
-		asyncdb.WithSaveSize(config.BatchSize),
-		asyncdb.WithSaveTimeout(config.FlushInterval),
-		asyncdb.WithName("SSAFiles"),
+		dbcache.WithContext(ctx),
+		dbcache.WithSaveSize(config.BatchSize),
+		dbcache.WithSaveTimeout(config.FlushInterval),
+		dbcache.WithName("SSAFiles"),
 	)
 
-	importer.riskSaver = asyncdb.NewSave(
+	importer.riskSaver = dbcache.NewSave(
 		func(risks []*riskWithDataflow) {
 			start := time.Now()
 			importer.batchSaveRisks(db, risks)
@@ -97,10 +97,10 @@ func NewAsyncStreamImporter(db *gorm.DB, programName string, config *StreamImpor
 					len(risks), total, duration, float64(len(risks))/duration.Seconds())
 			}
 		},
-		asyncdb.WithContext(ctx),
-		asyncdb.WithSaveSize(config.BatchSize),
-		asyncdb.WithSaveTimeout(config.FlushInterval),
-		asyncdb.WithName("SSARisks"),
+		dbcache.WithContext(ctx),
+		dbcache.WithSaveSize(config.BatchSize),
+		dbcache.WithSaveTimeout(config.FlushInterval),
+		dbcache.WithName("SSARisks"),
 	)
 
 	return importer
