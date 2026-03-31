@@ -54,9 +54,6 @@ func (p *Proxy) proxyH2(closing chan bool, cc net.Conn, url *url.URL, ctx *Conte
 			return nil, nil, err
 		}
 		if httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_IsDropped) {
-			if p.disableBuiltinPage {
-				return []byte("HTTP/2 200 OK\nContent-Type: text/html\nContent-Length: 0\n\n"), io.NopCloser(bytes.NewReader(nil)), nil
-			}
 			return []byte(`HTTP/2 200 OK
 Content-Type: text/html
 `), io.NopCloser(bytes.NewBufferString(proxyutil.GetPrettyErrorRsp("请求被用户丢弃"))), nil
