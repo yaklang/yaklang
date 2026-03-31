@@ -36,7 +36,7 @@ func TestDefaultConfigUsesSerializableASTOrder(t *testing.T) {
 		WithASTOrder(ssareducer.ReverseOrder),
 	)
 	require.NoError(t, err)
-	require.Equal(t, ssareducer.ReverseOrder, config.astSequence)
+	require.Equal(t, int(ssareducer.ReverseOrder), config.GetCompileASTSequence())
 }
 
 // TestUnifiedFsWithFileSystem 测试使用 WithFileSystem 选项时，fs 被正确转换为 UnifiedFileSys

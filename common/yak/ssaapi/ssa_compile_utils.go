@@ -158,7 +158,7 @@ func (c *Config) GetFileHandler(
 	return ssareducer.FilesHandler(
 		c.ctx, filesystem, preHandlerFiles,
 		parse, initWorker,
-		c.astSequence,
+		ssareducer.ASTSequenceType(c.GetCompileASTSequence()),
 		int(c.GetCompileConcurrency()),
 	)
 }
@@ -192,7 +192,10 @@ type ScanResult struct {
 	Folders         [][]string
 	HandlerTotal    int
 	PreHandlerTotal int
-	HandlerBytes    int64
+	// HandlerBytes is the total source byte size of files that enter the compile
+	// stage. It is used to choose adaptive IR cache defaults for small vs large
+	// projects; it is not persisted as part of user-facing project metadata.
+	HandlerBytes int64
 }
 
 type ScanConfig struct {

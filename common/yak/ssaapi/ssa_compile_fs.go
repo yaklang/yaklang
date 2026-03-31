@@ -170,6 +170,8 @@ func (c *Config) parseProjectWithFS(
 	if err != nil {
 		return nil, err
 	}
+	// Feed the total compile-input bytes into the adaptive IR cache policy.
+	// This is runtime tuning input, not persistent project metadata.
 	c.Config.SetCompileProjectBytes(scanResult.HandlerBytes)
 
 	prog, builder, err := c.init(filesystem, handlerTotal)

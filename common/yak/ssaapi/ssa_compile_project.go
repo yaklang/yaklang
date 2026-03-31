@@ -727,8 +727,17 @@ func createDeleteOnlyProgram(ctx context.Context, programName string, projectID 
 		irProg.ProjectID = projectID
 		ssadb.UpdateProgram(irProg)
 	}
+	cfg, err := ssaconfig.New(
+		ssaconfig.ModeSSACompile,
+		ssaconfig.WithContext(ctx),
+		ssaconfig.WithSetProgramName(programName),
+	)
+	if err != nil {
+		log.Warnf("create delete-only program config failed: %v", err)
+		cfg = nil
+	}
 	ssaProg := ssa.NewProgram(
-		ctx, programName, ssa.ProgramCacheDBWrite, ssadb.Application,
+		cfg, ssa.ProgramCacheDBWrite, ssadb.Application,
 		filesys.NewVirtualFs(), "", 0,
 	)
 	return &Program{

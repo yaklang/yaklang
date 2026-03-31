@@ -58,8 +58,6 @@ type Config struct {
 
 	logLevel string
 
-	astSequence ssareducer.ASTSequenceType
-
 	// diagnostics configuration
 	diagnosticsEnabled  bool
 	diagnosticsRecorder *diagnostics.Recorder
@@ -348,9 +346,8 @@ func DefaultConfig(opts ...ssaconfig.Option) (*Config, error) {
 		excludeFile: func(path string) bool {
 			return false
 		},
-		logLevel:    "error",
-		astSequence: ssareducer.ASTSequenceType(sc.GetCompileASTSequence()),
-		Config:      sc,
+		logLevel: "error",
+		Config:   sc,
 	}
 	if !utils.IsNil(sc.SSACompile) {
 		if exclude := sc.SSACompile.ExcludeFiles; exclude != nil {
