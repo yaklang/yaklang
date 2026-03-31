@@ -934,7 +934,10 @@ func (p *Proxy) handleRequest(conn net.Conn, req *http.Request, ctx *Context) er
 
 	res, err := p.doHTTPRequest(ctx, req)
 	if (err != nil && err != io.EOF) || res == nil {
-		if strings.Contains(err.Error(), "no such host") {
+		if p.disableBuiltinPage {
+			res = proxyutil.NewResponse(502, nil, req)
+			res.Status = "502 Proxy Error"
+		} else if strings.Contains(err.Error(), "no such host") {
 			httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_NOLOG, true)
 			res = proxyutil.NewResponse(200, strings.NewReader(proxyutil.GetPrettyErrorRsp(fmt.Sprintf("Unknown host: %s", req.Host))), req)
 		} else {
@@ -960,7 +963,11 @@ func (p *Proxy) handleRequest(conn net.Conn, req *http.Request, ctx *Context) er
 		err := p.resmod.ModifyResponse(res)
 		if err != nil {
 			if errors.Is(err, IsDroppedError) {
-				res = proxyutil.NewResponseFromOldResponse(200, strings.NewReader(proxyutil.GetPrettyErrorRsp("响应被用户丢弃")), req, res)
+				if p.disableBuiltinPage {
+					res = proxyutil.NewResponseFromOldResponse(200, nil, req, res)
+				} else {
+					res = proxyutil.NewResponseFromOldResponse(200, strings.NewReader(proxyutil.GetPrettyErrorRsp("响应被用户丢弃")), req, res)
+				}
 			} else {
 				log.Errorf("mitm: error modifying response: %v", err)
 				proxyutil.Warning(res.Header, err)

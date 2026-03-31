@@ -91,7 +91,7 @@ func (m *MITMServer) hijackRequestHandler(rootCtx context.Context, wsModifier *W
 	/*
 	 use builtin cert domains
 	*/
-	if utils.StringArrayContains(defaultBuiltinDomains, req.URL.Hostname()) {
+	if utils.StringArrayContains(defaultBuiltinDomains, strings.ToLower(req.URL.Hostname())) {
 		ctx := martian.NewContext(req, m.GetMartianProxy())
 		if ctx != nil {
 			ctx.SkipRoundTrip()
@@ -226,7 +226,7 @@ func (m *MITMServer) hijackResponseHandler(rsp *http.Response) error {
 	/*
 		return the ca certs
 	*/
-	if utils.StringArrayContains(defaultBuiltinDomains, req.URL.Hostname()) {
+	if utils.StringArrayContains(defaultBuiltinDomains, strings.ToLower(req.URL.Hostname())) {
 		if m.enableMITMCACertPage {
 			return handleBuildInMITMDefaultPageResponse(rsp)
 		} else {

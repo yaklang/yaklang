@@ -110,6 +110,10 @@ type Proxy struct {
 
 	// SNI resolver function
 	sniResolver func(host string) *string
+
+	// disableBuiltinPage disables the built-in error/proxy page (navtab/template.html).
+	// When true, proxy errors return plain 502 responses instead of branded HTML pages.
+	disableBuiltinPage bool
 }
 
 func (p *Proxy) MergeExtraIncomingConnectionChannel(ctx context.Context, ch chan *WrapperedConn) {
@@ -488,6 +492,10 @@ func (p *Proxy) getProcessNameCached(session *Session, conn net.Conn) string {
 
 func (p *Proxy) SetDisableSystemProxy(b bool) {
 	p.disableSystemProxy = b
+}
+
+func (p *Proxy) SetDisableBuiltinPage(b bool) {
+	p.disableBuiltinPage = b
 }
 
 // SetConnPool sets the connection pool for remote server connections
