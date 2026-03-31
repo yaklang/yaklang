@@ -19,6 +19,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/regexp-utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"mime"
 	"net/http"
 	"sort"
 	"strconv"
@@ -76,6 +77,82 @@ func FixPacket(packet []byte, isReq bool) (fixed []byte, use bool) {
 	packet = bytes.Replace(packet, []byte("\r\r\n"), []byte("\r\n"), -1)
 
 	return packet, true
+}
+
+func shouldSkipResponseRuleMatch(packet []byte) bool {
+	contentType := lowhttp.GetHTTPPacketContentType(packet)
+	return isBinaryBodyContentType(contentType)
+}
+
+func isBinaryBodyContentType(contentType string) bool {
+	if contentType == "" {
+		return false
+	}
+
+	mediaType, _, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		mediaType = strings.TrimSpace(strings.ToLower(strings.Split(contentType, ";")[0]))
+	}
+	mediaType = strings.ToLower(strings.TrimSpace(mediaType))
+
+	if mediaType == "" {
+		return false
+	}
+
+	if strings.HasPrefix(mediaType, "text/") {
+		return false
+	}
+	if strings.HasSuffix(mediaType, "+json") || strings.HasSuffix(mediaType, "+xml") {
+		return false
+	}
+
+	switch mediaType {
+	case "application/json",
+		"application/xml",
+		"text/xml",
+		"application/javascript",
+		"application/x-javascript",
+		"application/ecmascript",
+		"application/x-www-form-urlencoded",
+		"multipart/form-data",
+		"application/x-ndjson",
+		"application/graphql-response+json":
+		return false
+	}
+
+	if strings.HasPrefix(mediaType, "image/") ||
+		strings.HasPrefix(mediaType, "audio/") ||
+		strings.HasPrefix(mediaType, "video/") ||
+		strings.HasPrefix(mediaType, "font/") {
+		return true
+	}
+
+	switch mediaType {
+	case "application/octet-stream",
+		"application/pdf",
+		"application/zip",
+		"application/gzip",
+		"application/x-gzip",
+		"application/x-rar-compressed",
+		"application/vnd.rar",
+		"application/x-7z-compressed",
+		"application/x-tar",
+		"application/x-bzip",
+		"application/x-bzip2",
+		"application/protobuf",
+		"application/x-protobuf",
+		"application/grpc",
+		"application/wasm",
+		"application/msword",
+		"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+		"application/vnd.ms-excel",
+		"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+		"application/vnd.ms-powerpoint",
+		"application/vnd.openxmlformats-officedocument.presentationml.presentation":
+		return true
+	}
+
+	return false
 }
 
 type MITMReplaceRule struct {
@@ -728,6 +805,8 @@ func (m *MitmReplacer) HookColor(request, response []byte, req *http.Request, fl
 		return nil
 	}
 
+	skipResponseRuleMatch := shouldSkipResponseRuleMatch(response)
+
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("colorize failed: %v", strconv.Quote(string(request)))
@@ -769,7 +848,7 @@ func (m *MitmReplacer) HookColor(request, response []byte, req *http.Request, fl
 			}
 			matchResults = append(matchResults, newMatchResults...)
 		}
-		if rule.EnableForResponse {
+		if rule.EnableForResponse && !skipResponseRuleMatch {
 			_, newMatchResults, err = rule.MatchPacket(response, false)
 			if err != nil && !IsMatchTimeout(err) {
 				log.Errorf("match package failed: %v", err)
@@ -974,6 +1053,9 @@ func (m *MitmReplacer) Hook(isRequest, isResponse bool, url string, origin []byt
 	if m == nil {
 		return matchedRules.MITMContentReplacers(), origin, false
 	}
+	if isResponse && shouldSkipResponseRuleMatch(origin) {
+		return matchedRules.MITMContentReplacers(), origin, false
+	}
 	var rules []*MITMReplaceRule
 
 	rules = m._hijackingRules
@@ -1129,6 +1211,7 @@ func (m *MitmReplacer) HookColorLowhttp(flow *lowhttp.LowhttpResponse) []*schema
 	if m == nil {
 		return nil
 	}
+	skipResponseRuleMatch := shouldSkipResponseRuleMatch(response)
 
 	defer func() {
 		if err := recover(); err != nil {
@@ -1171,7 +1254,7 @@ func (m *MitmReplacer) HookColorLowhttp(flow *lowhttp.LowhttpResponse) []*schema
 			}
 			matchResults = append(matchResults, newMatchResults...)
 		}
-		if rule.EnableForResponse {
+		if rule.EnableForResponse && !skipResponseRuleMatch {
 			_, newMatchResults, err = rule.MatchPacket(response, false)
 			if err != nil && !IsMatchTimeout(err) {
 				log.Errorf("match package failed: %v", err)

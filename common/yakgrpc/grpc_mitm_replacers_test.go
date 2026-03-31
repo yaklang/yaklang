@@ -104,6 +104,43 @@ secret-id:`)
 	}
 }
 
+func TestGRPCMUSTPASS_HookSkipsBinaryResponseBodyByContentType(t *testing.T) {
+	replacer := yakit.NewMITMReplacer()
+	replacer.SetRules(&ypb.MITMContentReplacer{
+		Rule:              `secret-key`,
+		NoReplace:         false,
+		Result:            `masked-key`,
+		EnableForResponse: true,
+		EnableForBody:     true,
+		Index:             0,
+	})
+
+	responseBytes := []byte("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: 10\r\n\r\nsecret-key")
+
+	matchedRules, hookedResponse, dropped := replacer.Hook(false, true, "https://www.baidu.com", responseBytes)
+	require.False(t, dropped)
+	require.Len(t, matchedRules, 0)
+	require.True(t, bytes.Equal(responseBytes, hookedResponse))
+}
+
+func TestGRPCMUSTPASS_HookColorSkipsBinaryResponseBodyByContentType(t *testing.T) {
+	replacer := yakit.NewMITMReplacer()
+	replacer.SetRules(&ypb.MITMContentReplacer{
+		Rule:              `secret-key`,
+		NoReplace:         true,
+		EnableForResponse: true,
+		EnableForBody:     true,
+		Index:             0,
+	})
+
+	responseBytes := []byte("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: 10\r\n\r\nsecret-key")
+	req, err := http.NewRequest("GET", "https://www.baidu.com", nil)
+	require.NoError(t, err)
+
+	extractedData := replacer.HookColor([]byte(""), responseBytes, req, &schema.HTTPFlow{})
+	require.Len(t, extractedData, 0)
+}
+
 // TestMatchScope match scope rule: scope =  opt1 ∩ ( ∪ { opt2s... } ), opt1 ∈ {request, response}, opt2 ∈ {uri, header, body}
 func TestGRPCMUSTPASS_MatchScope(t *testing.T) {
 	const (
