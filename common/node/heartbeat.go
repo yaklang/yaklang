@@ -1,33 +1,48 @@
 package node
 
 import (
-	"encoding/json"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/spec"
-	"github.com/yaklang/yaklang/common/spec/health"
+	"context"
+	"fmt"
+	"time"
 )
 
-func (n *NodeBase) heartbeat() {
-	msg := n.NewBaseMessage(spec.MessageType_SystemMatrix)
-
-	sysMatrix, err := health.NewSystemMatrixBase()
-	sysMatrix.ExternalNetwork = n.ExternalIp
-	if err != nil {
-		log.Error(err)
-		return
+func (n *NodeBase) heartbeat() error {
+	session, ok := n.currentSession()
+	if !ok {
+		return fmt.Errorf("node session not established")
 	}
-	sysMatrix.NodeId = n.NodeId
-	sysMatrix.HealthInfos = n.healthManager.GetHealthInfos()
-	sysMatrix.NodeAliveDuration = uint64(n.healthManager.GetAliveDuration())
+	status := n.runtimeStatus()
 
-	raw, err := json.Marshal(sysMatrix)
-	if err != nil {
-		log.Errorf("marshal system matrix failed: %s, matrix: %v", err, spew.Sdump(sysMatrix))
-		return
+	ctx, cancel := context.WithTimeout(n.rootCtx, n.requestTimeout)
+	defer cancel()
+
+	return n.transport.Heartbeat(ctx, session, HeartbeatRequest{
+		LifecycleState: status.LifecycleState,
+		Version:        n.version,
+		RunningJobs:    status.RunningJobs,
+		MaxRunningJobs: status.MaxRunningJobs,
+		CapabilityKeys: cloneStringSlice(n.capabilityKeys),
+		Labels:         cloneStringMap(n.labels),
+		ObservedAt:     time.Now().UTC(),
+	})
+}
+
+func (n *NodeBase) runtimeStatus() RuntimeStatus {
+	status := RuntimeStatus{
+		LifecycleState: n.lifecycleState,
+		MaxRunningJobs: n.maxRunningJobs,
 	}
-	msg.Content = raw
+	if n.statusProvider == nil {
+		return status
+	}
 
-	//n.Notify(spec.BackendKey_Heartbeat, msg)
-	n.NotifyHeartbeat(spec.BackendKey_Heartbeat, msg)
+	snapshot := n.statusProvider.Snapshot()
+	if snapshot.LifecycleState != "" {
+		status.LifecycleState = snapshot.LifecycleState
+	}
+	status.RunningJobs = snapshot.RunningJobs
+	if snapshot.MaxRunningJobs != 0 || status.MaxRunningJobs == 0 {
+		status.MaxRunningJobs = snapshot.MaxRunningJobs
+	}
+	return status
 }
