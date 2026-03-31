@@ -1,0 +1,7 @@
+version: v2
+
+plugins:
+  - local: protoc-gen-go
+    out: common/legionpb
+    opt:
+      - paths=source_relative

@@ -2,155 +2,90 @@ package node
 
 import (
 	"context"
-	"encoding/json"
-	"github.com/pkg/errors"
-	amqp "github.com/rabbitmq/amqp091-go"
-	"github.com/tevino/abool"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/mq"
-	"github.com/yaklang/yaklang/common/spec"
-	"github.com/yaklang/yaklang/common/utils/healthinfo"
-	"github.com/yaklang/yaklang/common/yak"
+	"errors"
 	"sync"
 	"time"
+
+	"github.com/tevino/abool"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/spec"
 )
 
+const sessionRetryInterval = 3 * time.Second
+
+// NodeBase owns the node lifecycle and session transport.
 type NodeBase struct {
 	rootCtx context.Context
 	cancel  context.CancelFunc
 
-	NodeType      spec.NodeType
-	NodeId        string
-	WebServerPort string
-	ExternalIp    string
-	token         string
+	NodeType spec.NodeType
+	NodeId   string
 
-	healthManager *healthinfo.Manager
+	enrollmentToken string
+	version         string
+	labels          map[string]string
+	capabilityKeys  []string
+	maxRunningJobs  uint32
+	lifecycleState  string
+	requestTimeout  time.Duration
 
-	rpcExchange string
-	rpcServer   *mq.RPCServer
-	publisher   *mq.Publisher
-	rpcClient   *mq.RPCClient
-	broker      *mq.Broker
+	transport         SessionTransport
+	statusProvider    RuntimeStatusProvider
+	heartbeatInterval time.Duration
+	tickerInterval    time.Duration
 
-	// map[string]*tickerFunc
 	tickerFuncs *sync.Map
 
-	// 表示是否注册成功
 	isRegistered *abool.AtomicBool
 
-	// []func()
-	//    当成功注册之后会执行这个函数
-	afterRegisterFuncs []func()
-
-	// 接受通知的处理函数
-	onNotificationComingFuncs []func(msg *amqp.Delivery)
-
-	// 脚本执行引擎
-	ScriptExecutor *yak.ScriptEngine
-
-	//
+	sessionMu sync.RWMutex
+	session   SessionState
 }
 
-func (n *NodeBase) HookOnNotificationComingHandler(f ...func(msg *amqp.Delivery)) {
-	n.onNotificationComingFuncs = append(n.onNotificationComingFuncs, f...)
+// NewNodeBase creates a node with session transport.
+func NewNodeBase(cfg BaseConfig) (*NodeBase, error) {
+	normalized, err := normalizeBaseConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+	transport, err := buildSessionTransport(normalized)
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	node := &NodeBase{
+		rootCtx:           ctx,
+		cancel:            cancel,
+		NodeType:          normalized.NodeType,
+		NodeId:            normalized.NodeID,
+		enrollmentToken:   normalized.EnrollmentToken,
+		version:           normalized.Version,
+		labels:            cloneStringMap(normalized.Labels),
+		capabilityKeys:    cloneStringSlice(normalized.CapabilityKeys),
+		maxRunningJobs:    normalized.MaxRunningJobs,
+		lifecycleState:    normalized.LifecycleState,
+		requestTimeout:    normalized.RequestTimeout,
+		transport:         transport,
+		statusProvider:    normalized.StatusProvider,
+		heartbeatInterval: normalized.HeartbeatInterval,
+		tickerInterval:    normalized.TickerInterval,
+		tickerFuncs:       new(sync.Map),
+		isRegistered:      abool.NewBool(false),
+	}
+	return node, nil
 }
 
 func (n *NodeBase) IsRegistered() bool {
 	return n.isRegistered.IsSet()
 }
 
-func (n *NodeBase) HookAfterRegisteringFinished(fs ...func()) {
-	n.afterRegisterFuncs = append(n.afterRegisterFuncs, fs...)
-}
-
-func (n *NodeBase) GetRPCServer() *mq.RPCServer {
-	return n.rpcServer
-}
-
-func (n *NodeBase) GetRPCClient() *mq.RPCClient {
-	return n.rpcClient
-}
-
 func (n *NodeBase) WithCancelContext() (context.Context, context.CancelFunc) {
 	return context.WithCancel(n.rootCtx)
 }
 
-func NewNodeBase(nodeType spec.NodeType, exchange, id string, token string, configs ...mq.BrokerConfigHandler) (*NodeBase, error) {
-	ctx, cancel := context.WithCancel(context.Background())
-
-	node := &NodeBase{
-		NodeType:       nodeType,
-		rootCtx:        ctx,
-		cancel:         cancel,
-		NodeId:         id,
-		token:          token,
-		rpcExchange:    exchange,
-		tickerFuncs:    new(sync.Map),
-		isRegistered:   abool.NewBool(false),
-		ScriptExecutor: yak.NewScriptEngine(200),
-	}
-
-	//
-	configs = append(configs, node.getSyncConfigMqHandler()...)
-
-	err := node.init(configs...)
-	if err != nil {
-		return nil, errors.Errorf("node init failed: %v", err)
-	}
-
-	return node, nil
-}
-
-func (n *NodeBase) DoConfigure(configs ...mq.BrokerConfigHandler) {
-	n.rpcServer.DoConfigure(configs...)
-}
-
-func (n *NodeBase) init(configs ...mq.BrokerConfigHandler) (err error) {
-	n.healthManager, err = healthinfo.NewHealthInfoManager(10*time.Second, 10*time.Minute)
-	if err != nil {
-		return errors.Errorf("build health manager failed: %v", err)
-	}
-
-	n.rpcServer, err = mq.NewRPCServer(
-		n.rootCtx, n.rpcExchange, n.NodeId,
-		configs...,
-	)
-	if err != nil {
-		return errors.Errorf("build rpc server failed[%v]: %v", n.NodeId, err)
-	}
-
-	n.rpcClient, err = n.rpcServer.GetRPCClient(n.NodeId)
-	if err != nil {
-		return errors.Errorf("build rpc client failed[%v]: %v", n.NodeId, err)
-	}
-
-	n.broker = n.rpcServer.GetBroker()
-	n.publisher = n.broker.GetPublisher()
-
-	n.initScriptEngine()
-	n.HookOnNotificationComingHandler(n.onScriptTask)
-
-	log.Info("start to register basic node manager api service")
-	n.initBasicNodeManagerAPI()
-
-	return nil
-}
-
 func (n *NodeBase) Serve() {
-	go n.rpcServer.Serve()
-
-	for {
-		time.Sleep(500 * time.Millisecond)
-		if n.broker.IsServing() {
-			break
-		}
-	}
-
-	go n.startDaemon()
-	select {
-	case <-n.rootCtx.Done():
-	}
+	n.startDaemon()
 }
 
 func (n *NodeBase) Shutdown() {
@@ -158,87 +93,64 @@ func (n *NodeBase) Shutdown() {
 }
 
 func (n *NodeBase) startDaemon() {
-	tick := time.Tick(10 * time.Second)
-	tick1s := time.Tick(1 * time.Second)
+	if err := n.ensureSession(); err != nil {
+		if !errors.Is(err, context.Canceled) {
+			log.Errorf("establish node session failed: %v", err)
+		}
+		return
+	}
+	n.runDaemonLoop()
+}
 
+func (n *NodeBase) ensureSession() error {
 	for {
-		if err := n.register(); err != nil {
-			log.Errorf("register failed: %v, retry in 3s", err)
-			time.Sleep(3 * time.Second)
-			continue
+		if err := n.bootstrapSession(); err != nil {
+			log.Errorf("bootstrap node session failed: %v", err)
+		} else if err := n.heartbeat(); err != nil {
+			log.Errorf("initial heartbeat failed: %v", err)
 		} else {
-			n.heartbeat()
-			break
+			n.isRegistered.Set()
+			return nil
+		}
+		if err := n.sleepWithContext(sessionRetryInterval); err != nil {
+			return err
 		}
 	}
-	n.isRegistered.Set()
-	for _, f := range n.afterRegisterFuncs {
-		f()
-	}
+}
+
+func (n *NodeBase) runDaemonLoop() {
+	heartbeatTicker := time.NewTicker(n.heartbeatInterval)
+	tickerLoop := time.NewTicker(n.tickerInterval)
+	defer heartbeatTicker.Stop()
+	defer tickerLoop.Stop()
 
 	for {
 		select {
-		case <-tick:
-			n.heartbeat()
-		case <-tick1s:
-			n.WalkTickerFunc(func(name string, f *tickerFunc) {
-				if f.first && !f.firstExecuted.IsSet() {
-					f.firstExecuted.Set()
-					f.F()
+		case <-n.rootCtx.Done():
+			return
+		case <-heartbeatTicker.C:
+			if err := n.heartbeat(); err != nil {
+				log.Errorf("heartbeat failed, rebuilding session: %v", err)
+				n.clearSession()
+				if err := n.ensureSession(); err != nil {
+					if !errors.Is(err, context.Canceled) {
+						log.Errorf("re-establish node session failed: %v", err)
+					}
 					return
 				}
-
-				f.currentMod = (f.currentMod + 1) % f.IntervalSeconds
-				if f.currentMod == 0 {
-					f.F()
-				}
-			})
+			}
+		case <-tickerLoop.C:
+			n.runTickerFuncs()
 		}
-	}
-}
-
-func (n *NodeBase) register() error {
-
-	ctx, _ := context.WithTimeout(n.rootCtx, 5*time.Second)
-	body, err := n.rpcClient.Call(ctx, spec.API_RegisterNode, spec.ServerNodeId,
-		&spec.NodeRegisterRequest{
-			NodeId:    n.NodeId,
-			Token:     n.token,
-			NodeType:  n.NodeType,
-			Timestamp: time.Now().Unix(),
-		})
-	if err != nil {
-		return errors.Errorf("call register failed: %v", err)
-	}
-
-	var rsp spec.NodeRegisterResponse
-	err = json.Unmarshal(body, &rsp)
-	if err != nil {
-		return errors.Errorf("marshal failed: %v", err)
-	}
-
-	if !rsp.Ok {
-		return errors.Errorf("register failed: %v", rsp.Reason)
-	}
-
-	n.token = rsp.Token
-	n.WebServerPort = rsp.WebServerPort
-	log.Infof("nodeid=%v token=%v", n.NodeId, rsp.Token)
-
-	return nil
-}
-
-func (n *NodeBase) NewBaseMessage(typeInfo spec.MessageType) *spec.Message {
-	return &spec.Message{
-		NodeId:    n.NodeId,
-		Token:     n.token,
-		Type:      typeInfo,
-		Timestamp: time.Now().Unix(),
 	}
 }
 
 func (n *NodeBase) GetToken() string {
-	return n.token
+	session, ok := n.currentSession()
+	if !ok {
+		return ""
+	}
+	return session.SessionToken
 }
 
 func (n *NodeBase) GetRootContext() context.Context {

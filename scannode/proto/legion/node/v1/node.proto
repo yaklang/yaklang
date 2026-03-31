@@ -1,0 +1,80 @@
+syntax = "proto3";
+
+package legion.node.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/yaklang/yaklang/common/legionpb/legion/node/v1;nodev1";
+
+message NodeRef {
+  string node_id = 1;
+  string node_session_id = 2;
+}
+
+message CommandMetadata {
+  string command_id = 1;
+  string command_type = 2;
+  string trace_id = 3;
+  google.protobuf.Timestamp issued_at = 4;
+  google.protobuf.Timestamp expire_at = 5;
+}
+
+message EventMetadata {
+  string event_id = 1;
+  string event_type = 2;
+  string causation_id = 3;
+  string correlation_id = 4;
+  google.protobuf.Timestamp emitted_at = 5;
+  NodeRef node = 6;
+}
+
+enum NodeLifecycleState {
+  NODE_LIFECYCLE_STATE_UNSPECIFIED = 0;
+  NODE_LIFECYCLE_STATE_READY = 1;
+  NODE_LIFECYCLE_STATE_DEGRADED = 2;
+  NODE_LIFECYCLE_STATE_DRAINING = 3;
+  NODE_LIFECYCLE_STATE_OFFLINE = 4;
+}
+
+enum LogLevel {
+  LOG_LEVEL_UNSPECIFIED = 0;
+  LOG_LEVEL_DEBUG = 1;
+  LOG_LEVEL_INFO = 2;
+  LOG_LEVEL_WARN = 3;
+  LOG_LEVEL_ERROR = 4;
+}
+
+message BootstrapRequest {
+  string enrollment_token = 1;
+  string node_id = 2;
+  string node_type = 3;
+  string version = 4;
+  map<string, string> labels = 5;
+  repeated string capability_keys = 6;
+}
+
+message BootstrapResponse {
+  string node_session_id = 1;
+  string session_token = 2;
+  string nats_url = 3;
+  string command_subject = 4;
+  string event_subject_prefix = 5;
+  google.protobuf.Timestamp expires_at = 6;
+}
+
+message NodeHeartbeat {
+  EventMetadata metadata = 1;
+  NodeLifecycleState lifecycle_state = 2;
+  string version = 3;
+  uint32 running_jobs = 4;
+  uint32 max_running_jobs = 5;
+  repeated string capability_keys = 6;
+  map<string, string> labels = 7;
+}
+
+message NodeLog {
+  EventMetadata metadata = 1;
+  LogLevel level = 2;
+  string message = 3;
+  map<string, string> attributes = 4;
+}
