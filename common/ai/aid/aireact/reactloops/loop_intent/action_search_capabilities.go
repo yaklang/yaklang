@@ -42,6 +42,19 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 			aitool.WithParam_Description("搜索关键词，从用户输入中提取核心动作词和领域术语 ,空格分割。/ Keywords to search for relevant capabilities, split by space."),
 			aitool.WithParam_Required(true),
 		),
+		aitool.WithStringParam("intent_summary",
+			aitool.WithParam_Description("可选的简短意图标签。如果已经完成意图概括，可直接输出。/ Optional concise intent summary if already known."),
+		),
+		aitool.WithStringArrayParamEx("tags",
+			[]aitool.PropertyOption{
+				aitool.WithParam_Description("可选的检索标签列表。如果已能提炼出领域/动作/能力标签，可直接输出。/ Optional retrieval tags if already known."),
+			},
+		),
+		aitool.WithStringArrayParamEx("questions",
+			[]aitool.PropertyOption{
+				aitool.WithParam_Description("可选的检索问题列表。如果已能提炼出关键问题表达，可直接输出。/ Optional retrieval questions if already known."),
+			},
+		),
 	}
 
 	return reactloops.WithRegisterLoopActionWithStreamField(
@@ -65,7 +78,10 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 			if summary := action.GetString("intent_summary"); summary != "" {
 				loop.Set("intent_summary", reactloops.CompactIntentSummary(summary))
 			}
+			actionTags := action.GetStringSlice("tags")
+			actionQuestions := action.GetStringSlice("questions")
 			query := strings.TrimSpace(action.GetString("search_query"))
+			loop.Set("search_query", query)
 			log.Infof("intent loop: searching capabilities with query: %s", query)
 			keywords := strings.Split(query, " ")
 			var results strings.Builder
@@ -217,6 +233,11 @@ func makeSearchCapabilitiesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 				existingResults += "\n---\n\n"
 			}
 			loop.Set("search_results", existingResults+results.String())
+			setTaskRetrievalInfo(loop,
+				actionTags,
+				actionQuestions,
+				reactloops.CompactIntentSummary(loop.Get("intent_summary")),
+			)
 
 			op.Feedback(results.String())
 			op.Continue()

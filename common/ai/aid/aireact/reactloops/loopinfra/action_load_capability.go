@@ -472,6 +472,9 @@ func handleLoadUnknown(
 	recommendedTools := intentLoop.Get("recommended_tools")
 	recommendedForges := intentLoop.Get("recommended_forges")
 	contextEnrichment := intentLoop.Get("context_enrichment")
+	retrievalTags := intentLoop.Get("task_retrieval_tags")
+	retrievalQuestions := intentLoop.Get("task_retrieval_questions")
+	retrievalTarget := intentLoop.Get("task_retrieval_target")
 	matchedToolNames := intentLoop.Get("matched_tool_names")
 	matchedForgeNames := intentLoop.Get("matched_forge_names")
 	matchedSkillNames := intentLoop.Get("matched_skill_names")
@@ -497,6 +500,7 @@ func handleLoadUnknown(
 	if contextEnrichment != "" {
 		loop.Set("intent_context_enrichment", contextEnrichment)
 	}
+	reactloops.ApplyTaskRetrievalInfoToTask(loop.GetCurrentTask(), retrievalTags, retrievalQuestions, retrievalTarget)
 
 	populateExtraCapabilitiesFromIntent(invoker, loop, matchedToolNames, matchedForgeNames, matchedSkillNames)
 

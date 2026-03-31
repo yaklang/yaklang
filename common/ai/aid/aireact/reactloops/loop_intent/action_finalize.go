@@ -28,6 +28,16 @@ func makeFinalizeEnrichmentAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 				"简短意图标签，只描述用户想做什么，优先保持完整语义。可控制在 20-24 字左右，但不要为了变短而截断关键含义。不要复述原请求，不要写推荐能力，不要解释搜索过程。/ Short intent label only, preferably around 20-24 Chinese characters while preserving complete meaning. Do not repeat the original request, include recommendations, or explain the search process."),
 			aitool.WithParam_Required(true),
 		),
+		aitool.WithStringArrayParamEx("tags",
+			[]aitool.PropertyOption{
+				aitool.WithParam_Description("用于后续检索的任务标签列表。优先输出领域标签、动作标签、能力标签。/ Task tags for downstream retrieval."),
+			},
+		),
+		aitool.WithStringArrayParamEx("questions",
+			[]aitool.PropertyOption{
+				aitool.WithParam_Description("用于后续检索的关键问题列表。优先输出可直接用于知识检索的问题表达。/ Key retrieval questions for downstream search."),
+			},
+		),
 		aitool.WithStringArrayParamEx("recommended_capabilities",
 			[]aitool.PropertyOption{
 				aitool.WithParam_Description("推荐的能力名称列表（工具、蓝图、技能、专注模式的名称）。/ List of recommended capability names (tools, forges, skills, focus modes)."),
@@ -54,6 +64,8 @@ func makeFinalizeEnrichmentAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 		// Handler
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
 			intentSummary := reactloops.CompactIntentSummary(action.GetString("intent_summary"))
+			tags := action.GetStringSlice("tags")
+			questions := action.GetStringSlice("questions")
 			recommendedCaps := action.GetStringSlice("recommended_capabilities")
 
 			// Verify AI-recommended identifiers and merge with catalog pre-matched ones
@@ -137,6 +149,7 @@ func makeFinalizeEnrichmentAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 			loop.Set("recommended_tools", toolRecommendations.String())
 			loop.Set("recommended_forges", forgeRecommendations.String())
 			loop.Set("context_enrichment", enrichment.String())
+			setTaskRetrievalInfo(loop, tags, questions, intentSummary)
 
 			r.AddToTimeline("intent_finalized", fmt.Sprintf("意图识别完成：%s", intentSummary))
 

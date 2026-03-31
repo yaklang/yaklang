@@ -270,6 +270,7 @@ type mockSimpleTask struct {
 	index     string
 	status    aicommon.AITaskState
 	reActLoop aicommon.ReActLoopIF
+	info      *aicommon.AITaskRetrievalInfo
 }
 
 func (s *mockSimpleTask) GetOriginUserInput() string {
@@ -339,6 +340,21 @@ func (m *mockSimpleTask) GetSemanticIdentifier() string {
 }
 
 func (m *mockSimpleTask) SetSemanticIdentifier(id string) {
+}
+
+func (m *mockSimpleTask) GetTaskRetrievalInfo() *aicommon.AITaskRetrievalInfo {
+	if m.info == nil {
+		return nil
+	}
+	return m.info.Clone()
+}
+
+func (m *mockSimpleTask) SetTaskRetrievalInfo(info *aicommon.AITaskRetrievalInfo) {
+	if info == nil {
+		m.info = nil
+		return
+	}
+	m.info = info.Clone()
 }
 
 func (m *mockSimpleTask) GetInput() string {

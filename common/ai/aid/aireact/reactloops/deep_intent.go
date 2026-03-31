@@ -65,6 +65,12 @@ func ExecuteDeepIntentRecognition(r aicommon.AIInvokeRuntime, loop *ReActLoop, t
 		MatchedSkillNames: intentLoop.Get("matched_skill_names"),
 	}
 
+	retrievalTags := intentLoop.Get("task_retrieval_tags")
+	retrievalQuestions := intentLoop.Get("task_retrieval_questions")
+	retrievalTarget := intentLoop.Get("task_retrieval_target")
+
+	ApplyTaskRetrievalInfoToTask(loop.GetCurrentTask(), retrievalTags, retrievalQuestions, retrievalTarget)
+
 	log.Infof("deep intent recognition completed: analysis=%d bytes, tools=%d bytes, forges=%d bytes, enrichment=%d bytes",
 		len(result.IntentAnalysis), len(result.RecommendedTools),
 		len(result.RecommendedForges), len(result.ContextEnrichment))
@@ -190,4 +196,63 @@ func PopulateExtraCapabilitiesFromDeepIntent(r aicommon.AIInvokeRuntime, loop *R
 
 func splitAndTrimNames(s string) []string {
 	return normalizeCapabilityNames(s)
+}
+
+func ApplyTaskRetrievalInfoToTask(task aicommon.AIStatefulTask, tagsRaw, questionsRaw, target string) {
+	if task == nil {
+		return
+	}
+	existing := task.GetTaskRetrievalInfo()
+	var tags []string
+	var questions []string
+	if existing != nil {
+		tags = append(tags, existing.Tags...)
+		questions = append(questions, existing.Questions...)
+		if strings.TrimSpace(target) == "" {
+			target = existing.Target
+		}
+	}
+	tags = append(tags, splitTaskRetrievalItems(tagsRaw)...)
+	questions = append(questions, splitTaskRetrievalItems(questionsRaw)...)
+	tags = deduplicateTaskRetrievalItems(tags)
+	questions = deduplicateTaskRetrievalItems(questions)
+	target = strings.TrimSpace(target)
+	if len(tags) == 0 && len(questions) == 0 && target == "" {
+		return
+	}
+	task.SetTaskRetrievalInfo(&aicommon.AITaskRetrievalInfo{
+		Tags:      tags,
+		Questions: questions,
+		Target:    target,
+	})
+}
+
+func splitTaskRetrievalItems(raw string) []string {
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	return deduplicateTaskRetrievalItems(strings.Split(raw, "\n"))
+}
+
+func deduplicateTaskRetrievalItems(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	result := make([]string, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		result = append(result, value)
+	}
+	if len(result) == 0 {
+		return nil
+	}
+	return result
 }
