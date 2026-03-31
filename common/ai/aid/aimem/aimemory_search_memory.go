@@ -2,6 +2,7 @@ package aimem
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -20,10 +21,97 @@ func (t *AIMemoryTriage) SearchMemoryWithoutAI(origin any, bytesLimit int) (*aic
 	return t.searchMemoryWithAIOption(origin, bytesLimit, true)
 }
 
-// SearchMemory 根据输入内容搜索相关记忆，限制总内容字节数
-func (t *AIMemoryTriage) searchMemoryWithAIOption(origin any, bytesLimit int, disableAI bool) (*aicommon.SearchMemoryResult, error) {
-	// 转换输入为字符串
-	queryText := utils.InterfaceToString(origin)
+func (t *AIMemoryTriage) searchMemoryForAITask(task aicommon.AIStatefulTask, limit int, disableAI bool) (*aicommon.SearchMemoryResult, error) {
+	if task == nil {
+		return nil, errors.New("task is nil")
+	}
+
+	info := task.GetTaskRetrievalInfo()
+	var queryCandidates []string
+	var tags []string
+	if info != nil {
+		tags = append(tags, info.Tags...)
+		queryCandidates = append(queryCandidates, info.Questions...)
+		if strings.TrimSpace(info.Target) != "" {
+			queryCandidates = append(queryCandidates, info.Target)
+		}
+	}
+
+	userInput := strings.TrimSpace(task.GetUserInput())
+	if userInput != "" {
+		queryCandidates = append(queryCandidates, userInput)
+	}
+
+	queryCandidates = deduplicateTrimmedStrings(queryCandidates)
+	tags = deduplicateTrimmedStrings(tags)
+
+	if len(tags) == 0 && len(queryCandidates) == 0 {
+		return t.searchMemoryForText(userInput, limit, disableAI)
+	}
+
+	var allMemories []*aicommon.MemoryEntity
+	var searchSteps []string
+
+	if len(tags) > 0 {
+		tagMemories, err := t.SearchByTags(tags, false, 20)
+		if err != nil {
+			log.Warnf("failed to search task memories by tags: %v", err)
+			searchSteps = append(searchSteps, fmt.Sprintf("task tags search failed: %v", err))
+		} else {
+			allMemories = append(allMemories, tagMemories...)
+			searchSteps = append(searchSteps, fmt.Sprintf("found %d memories by task tags %v", len(tagMemories), tags))
+		}
+	}
+
+	for _, query := range queryCandidates {
+		semanticResults, err := t.SearchBySemantics(query, 15)
+		if err != nil {
+			log.Warnf("failed to search task memories by semantics for query %q: %v", utils.ShrinkString(query, 60), err)
+			searchSteps = append(searchSteps, fmt.Sprintf("semantic search failed for %q", utils.ShrinkString(query, 30)))
+			continue
+		}
+		for _, result := range semanticResults {
+			allMemories = append(allMemories, result.Entity)
+		}
+		searchSteps = append(searchSteps, fmt.Sprintf("found %d memories by semantic query %q", len(semanticResults), utils.ShrinkString(query, 30)))
+	}
+
+	if len(allMemories) == 0 {
+		primaryQuery := userInput
+		if primaryQuery == "" && len(queryCandidates) > 0 {
+			primaryQuery = queryCandidates[0]
+		}
+		result, err := t.searchMemoryForText(primaryQuery, limit, disableAI)
+		if err == nil && result != nil {
+			if result.SearchSummary != "" {
+				result.SearchSummary = strings.Join(append(searchSteps, result.SearchSummary), " -> ")
+			} else if len(searchSteps) > 0 {
+				result.SearchSummary = strings.Join(searchSteps, " -> ")
+			}
+		}
+		return result, err
+	}
+
+	uniqueMemories := t.deduplicateMemories(allMemories)
+	searchSteps = append(searchSteps, fmt.Sprintf("deduplicated to %d unique memories", len(uniqueMemories)))
+
+	rankQuery := strings.Join(append(append([]string{}, tags...), queryCandidates...), " ")
+	rankedMemories := t.rankMemoriesByRelevance(uniqueMemories, rankQuery)
+	searchSteps = append(searchSteps, "ranked memories by task retrieval info")
+
+	selectedMemories, totalContent, contentBytes := t.selectMemoriesByBytesLimit(rankedMemories, limit)
+	searchSteps = append(searchSteps, fmt.Sprintf("selected %d memories within %d bytes limit", len(selectedMemories), limit))
+
+	return &aicommon.SearchMemoryResult{
+		Memories:      selectedMemories,
+		TotalContent:  totalContent,
+		ContentBytes:  contentBytes,
+		SearchSummary: strings.Join(searchSteps, " -> "),
+	}, nil
+}
+
+func (t *AIMemoryTriage) searchMemoryForText(queryText string, bytesLimit int, disableAI bool) (*aicommon.SearchMemoryResult, error) {
+
 	if strings.TrimSpace(queryText) == "" {
 		return &aicommon.SearchMemoryResult{
 			Memories:      []*aicommon.MemoryEntity{},
@@ -102,6 +190,16 @@ func (t *AIMemoryTriage) searchMemoryWithAIOption(origin any, bytesLimit int, di
 		ContentBytes:  contentBytes,
 		SearchSummary: searchSummary,
 	}, nil
+}
+
+// SearchMemory 根据输入内容搜索相关记忆，限制总内容字节数
+func (t *AIMemoryTriage) searchMemoryWithAIOption(origin any, bytesLimit int, disableAI bool) (*aicommon.SearchMemoryResult, error) {
+	// 转换输入为字符串
+	queryText := utils.InterfaceToString(origin)
+	if task, ok := origin.(aicommon.AIStatefulTask); ok {
+		return t.searchMemoryForAITask(task, bytesLimit, disableAI)
+	}
+	return t.searchMemoryForText(queryText, bytesLimit, disableAI)
 }
 
 // deduplicateMemories 去重记忆列表
