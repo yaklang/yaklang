@@ -68,9 +68,11 @@ name → builtin ID 的绑定在：
 runtime dispatcher 位于：
 
 - `common/yak/ssa2llvm/runtime/runtime_go/runtime_dispatch.go`
-- `common/yak/ssa2llvm/runtime/runtime_go/stdlib.go`
-- `common/yak/ssa2llvm/runtime/runtime_go/sync_runtime.go`
-- `common/yak/ssa2llvm/runtime/runtime_go/slice_runtime.go`
+- `common/yak/ssa2llvm/runtime/runtime_go/runtime_builtin.go`
+- `common/yak/ssa2llvm/runtime/runtime_go/runtime_poc.go`
+- `common/yak/ssa2llvm/runtime/runtime_go/runtime_sync.go`
+- `common/yak/ssa2llvm/runtime/runtime_go/runtime_slice.go`
+- `common/yak/ssa2llvm/runtime/runtime_go/runtime_object.go`
 
 其中 sync 构造优先复用：
 
@@ -82,7 +84,7 @@ runtime dispatcher 位于：
 
 1. 从 `ctx.target` 读取 `abi.FuncID`
 2. 从 `ctx.argc` 与参数区读取参数
-3. 在 `runtimeDispatchTable` 中找到对应 builtin/runtime handler
+3. 在 dispatch map 中找到对应 builtin/runtime handler
 4. 对普通 builtin 走统一的反射参数解码与调用
 5. 对特殊 raw 路径（当前主要是 `IDRuntimeShadowMethod`）走专用 handler
 6. 把返回值写回 `ctx.ret`
@@ -99,7 +101,7 @@ Go shadow object 的方法调用与普通 stdlib 不同：
 当前路径是：
 
 - 编译器把这类调用 lowering 为 `abi.IDRuntimeShadowMethod`
-- runtime 在 `runtime_method.go` 中通过反射：
+- runtime 在 `runtime_object.go` 中通过反射：
   - 找 method
   - 解码参数
   - 处理 variadic
@@ -132,8 +134,8 @@ Yak 自己的 object-factor `a.set()` / `a.get()` 仍然走本地函数调用 lo
 最小步骤：
 
 1. 在 `common/yak/ssa2llvm/runtime/abi/abi.go` 增加稳定 `FuncID`
-2. 在相应 runtime 文件实现逻辑，并在 `runtime_dispatch.go` 的 `runtimeDispatchTable` 中接入
+2. 在相应 runtime 文件实现逻辑，并在 `runtime_dispatch.go` 的 dispatch map 中接入
 3. 在 `common/yak/ssa2llvm/compiler/externs.go` 增加 name → `DispatchID` 绑定
 4. 如参数需要 tagged pointer，在 `shouldTagStdlibArgPointers` 中补该 ID
 
-如果新增的是 **Go shadow object 方法**，优先复用 `runtime_method.go` 的反射分发，而不是再为具体类型/方法继续加特判。
+如果新增的是 **Go shadow object 方法**，优先复用 `runtime_object.go` 的反射分发，而不是再为具体类型/方法继续加特判。

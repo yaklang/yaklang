@@ -6,38 +6,38 @@ import (
 
 type runtimeWaitGroup = yaklib.WaitGroupProxy
 
-func stdlibSyncNewWaitGroup() any {
+func runtimeSyncNewWaitGroup() any {
 	return yaklib.NewWaitGroup()
 }
 
-func stdlibSyncNewSizedWaitGroup(size int64) any {
+func runtimeSyncNewSizedWaitGroup(size int64) any {
 	return yaklib.NewSizedWaitGroup(int(size))
 }
 
-func stdlibSyncNewLock() any {
+func runtimeSyncNewLock() any {
 	return yaklib.NewLock()
 }
 
-func stdlibSyncNewMutex() any {
+func runtimeSyncNewMutex() any {
 	return yaklib.NewMutex()
 }
 
-func stdlibSyncNewRWMutex() any {
+func runtimeSyncNewRWMutex() any {
 	return yaklib.NewRWMutex()
 }
 
-func stdlibSyncNewMap() any {
+func runtimeSyncNewMap() any {
 	return yaklib.NewMap()
 }
 
-func stdlibSyncNewOnce() any {
+func runtimeSyncNewOnce() any {
 	return yaklib.NewOnce()
 }
 
-func stdlibSyncNewPool() any {
+func runtimeSyncNewPool() any {
 	return yaklib.NewPool()
 }
 
-func stdlibSyncNewCond() any {
+func runtimeSyncNewCond() any {
 	return yaklib.NewCond()
 }
