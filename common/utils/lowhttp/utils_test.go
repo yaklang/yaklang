@@ -3,6 +3,8 @@ package lowhttp
 import (
 	"bytes"
 	"fmt"
+	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"testing"
@@ -136,6 +138,65 @@ Location: /target`), false)
 		t.FailNow()
 		return
 	}
+}
+
+func TestFixRequestHostAndPort(t *testing.T) {
+	t.Run("omit default http port", func(t *testing.T) {
+		req, err := ParseBytesToHttpRequest([]byte("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n"))
+		assert.NoError(t, err)
+		req.URL.Scheme = "http"
+
+		FixRequestHostAndPort(req)
+
+		assert.Equal(t, "example.com", req.Host)
+		assert.Equal(t, "example.com", req.Header.Get("Host"))
+		assert.Equal(t, "example.com", req.URL.Host)
+	})
+
+	t.Run("omit default https port", func(t *testing.T) {
+		req, err := ParseBytesToHttpRequest([]byte("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n"))
+		assert.NoError(t, err)
+		req.URL.Scheme = "https"
+
+		FixRequestHostAndPort(req)
+
+		assert.Equal(t, "example.com", req.Host)
+		assert.Equal(t, "example.com", req.Header.Get("Host"))
+		assert.Equal(t, "example.com", req.URL.Host)
+	})
+
+	t.Run("preserve non default port", func(t *testing.T) {
+		req, err := ParseBytesToHttpRequest([]byte("GET / HTTP/1.1\r\nHost: example.com:8443\r\n\r\n"))
+		assert.NoError(t, err)
+		req.URL.Scheme = "https"
+
+		FixRequestHostAndPort(req)
+
+		assert.Equal(t, "example.com:8443", req.Host)
+		assert.Equal(t, "example.com:8443", req.Header.Get("Host"))
+		assert.Equal(t, "example.com:8443", req.URL.Host)
+	})
+
+	t.Run("preserve ipv6 default https without port", func(t *testing.T) {
+		req := &http.Request{
+			Method: "GET",
+			URL: &url.URL{
+				Scheme: "https",
+				Host:   "[2001:db8::1]",
+				Path:   "/",
+			},
+			Header: http.Header{
+				"Host": []string{"[2001:db8::1]"},
+			},
+			Host: "[2001:db8::1]",
+		}
+
+		FixRequestHostAndPort(req)
+
+		assert.Equal(t, "[2001:db8::1]", req.Host)
+		assert.Equal(t, "[2001:db8::1]", req.Header.Get("Host"))
+		assert.Equal(t, "[2001:db8::1]", req.URL.Host)
+	})
 }
 
 func TestGetPathSuffix(t *testing.T) {

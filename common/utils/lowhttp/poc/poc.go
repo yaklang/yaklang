@@ -1633,6 +1633,27 @@ func handleUrlAndConfig(urlStr string, opts ...PocConfigOption) (*PocConfig, err
 	return config, nil
 }
 
+func dumpHTTPRequestPacket(i *http.Request) ([]byte, error) {
+	if i == nil {
+		return nil, utils.Error("nil request")
+	}
+
+	req := i.Clone(i.Context())
+	if i.URL != nil {
+		req.URL = new(url.URL)
+		*req.URL = *i.URL
+	}
+	req.Header = i.Header.Clone()
+
+	lowhttp.FixRequestHostAndPort(req)
+
+	raw, err := utils.DumpHTTPRequest(req, true)
+	if err != nil {
+		return nil, utils.Errorf("dump request out failed: %s", err)
+	}
+	return raw, nil
+}
+
 func handleRawPacketAndConfig(i interface{}, opts ...PocConfigOption) ([]byte, *PocConfig, error) {
 	var packet []byte
 	switch ret := i.(type) {
@@ -1641,24 +1662,21 @@ func handleRawPacketAndConfig(i interface{}, opts ...PocConfigOption) ([]byte, *
 	case []byte:
 		packet = ret
 	case http.Request:
-		r := &ret
-		lowhttp.FixRequestHostAndPort(r)
-		raw, err := utils.DumpHTTPRequest(r, true)
+		raw, err := dumpHTTPRequestPacket(&ret)
 		if err != nil {
-			return nil, nil, utils.Errorf("dump request out failed: %s", err)
+			return nil, nil, err
 		}
 		packet = raw
 	case *http.Request:
-		lowhttp.FixRequestHostAndPort(ret)
-		raw, err := utils.DumpHTTPRequest(ret, true)
+		raw, err := dumpHTTPRequestPacket(ret)
 		if err != nil {
-			return nil, nil, utils.Errorf("dump request out failed: %s", err)
+			return nil, nil, err
 		}
 		packet = raw
 	case *http_struct.YakHttpRequest:
-		raw, err := utils.DumpHTTPRequest(ret.Request, true)
+		raw, err := dumpHTTPRequestPacket(ret.Request)
 		if err != nil {
-			return nil, nil, utils.Errorf("dump request out failed: %s", err)
+			return nil, nil, err
 		}
 		packet = raw
 	default:

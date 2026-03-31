@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/textproto"
 	"net/url"
@@ -759,13 +760,64 @@ func FixRequestHostAndPort(r *http.Request) {
 		r.URL.Host = host
 	}
 
-	host, port, err := utils.ParseStringToHostPort(r.URL.String())
+	scheme := strings.ToLower(strings.TrimSpace(r.URL.Scheme))
+	if scheme == "" && r.TLS != nil {
+		scheme = "https"
+	}
+
+	host, port, err := utils.ParseStringToHostPort(formatRequestURLForHostPortFix(r.URL, scheme))
 	if err != nil {
 		return
 	}
-	r.Host = utils.HostPort(host, port)
+
+	r.Host = normalizeRequestHostWithScheme(host, port, scheme)
 	r.Header.Set("Host", r.Host)
 	r.URL.Host = r.Host
+}
+
+func formatRequestURLForHostPortFix(u *url.URL, scheme string) string {
+	if u == nil {
+		return ""
+	}
+	if scheme != "" {
+		clone := new(url.URL)
+		*clone = *u
+		if clone.Scheme == "" {
+			clone.Scheme = scheme
+		}
+		return clone.String()
+	}
+	return u.String()
+}
+
+func normalizeRequestHostWithScheme(host string, port int, scheme string) string {
+	switch scheme {
+	case "http", "ws":
+		if port == 80 {
+			return normalizeHostOnly(host)
+		}
+	case "https", "wss":
+		if port == 443 {
+			return normalizeHostOnly(host)
+		}
+	}
+
+	if port > 0 {
+		return utils.HostPort(host, port)
+	}
+	return normalizeHostOnly(host)
+}
+
+func normalizeHostOnly(host string) string {
+	if host == "" {
+		return ""
+	}
+	if strings.Contains(host, ":") && !strings.HasPrefix(host, "[") {
+		if parsed := net.ParseIP(host); parsed != nil {
+			return "[" + host + "]"
+		}
+	}
+	return host
 }
 
 // IsResp 判断传入的数据是否为 HTTP 响应报文
