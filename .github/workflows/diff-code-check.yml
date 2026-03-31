@@ -264,7 +264,7 @@ jobs:
           yak sync-rule
           
           # 运行扫描并捕获输出
-          SCAN_OUTPUT=$(yak code-scan -t ./fs.zip -l golang --rule-keyword golang --format irify-full -o risk --memory --file-perf-log --rule-perf-log --exclude-file **/vendor/**,vendor/**,**/classes/**,**/target/**,**include/**,**caches/**,**cache/**,**tmp/**,**alipay/**,**includes/**,**temp/**,**zh_cn/**,**zh_en/**,**plugins/**,**PHPExcel/**,*.pb.go,*_test.go,**vulinbox/** 2>&1) || SCAN_EXIT_CODE=$?
+          SCAN_OUTPUT=$(yak code-scan -t ./fs.zip -l golang --rule-keyword golang --format irify-full -o risk --memory --file-perf-log --rule-perf-log --exclude-file **/vendor/**,vendor/**,**/classes/**,**/target/**,**include/**,**caches/**,**cache/**,**tmp/**,**alipay/**,**includes/**,**temp/**,**zh_cn/**,**zh_en/**,**plugins/**,**PHPExcel/**,**/tests/**,**/test/**,*.pb.go,*_test.go,**vulinbox/** 2>&1) || SCAN_EXIT_CODE=$?
           
           if [ ! -z "$SCAN_EXIT_CODE" ] && [ "$SCAN_EXIT_CODE" != "0" ]; then
             echo "$SCAN_OUTPUT"
