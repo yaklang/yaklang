@@ -11,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
@@ -156,7 +157,10 @@ func CompileDiffProgramAndSaveToDB(
 		config.Processf(f, s, a...)
 	})
 	if err != nil {
-		return nil, utils.Wrap(err, "failed to compile diff file system")
+		if !errors.Is(err, ErrNoFoundCompiledFile) || !hasDeleteEntries(fileHashMap) {
+			return nil, utils.Wrap(err, "failed to compile diff file system")
+		}
+		diffProgram = createDeleteOnlyProgram(ctx, config.GetLatestProgramName(), projectID)
 	}
 	if diffProgram == nil {
 		return nil, utils.Errorf("diff file system compilation produced no program")
@@ -706,4 +710,29 @@ func saveOverlayToDatabase(overlay *ProgramOverLay, diffProgram *Program) error 
 	ssadb.UpdateProgram(irProgram)
 
 	return nil
+}
+
+func hasDeleteEntries(fileHashMap map[string]int) bool {
+	for _, v := range fileHashMap {
+		if v == -1 {
+			return true
+		}
+	}
+	return false
+}
+
+func createDeleteOnlyProgram(ctx context.Context, programName string, projectID uint64) *Program {
+	irProg := ssadb.CreateProgram(programName, "", ssadb.Application)
+	if projectID > 0 {
+		irProg.ProjectID = projectID
+		ssadb.UpdateProgram(irProg)
+	}
+	ssaProg := ssa.NewProgram(
+		ctx, programName, ssa.ProgramCacheDBWrite, ssadb.Application,
+		filesys.NewVirtualFs(), "", 0,
+	)
+	return &Program{
+		Program:   ssaProg,
+		irProgram: irProg,
+	}
 }
