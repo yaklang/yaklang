@@ -280,6 +280,7 @@ BooleanAnd       : '&&';
 
 NullCoalescing      : '??';
 NullCoalescingEqual : '??=';
+NullsafeObjectOperator : '?->';
 
 //StartNowDoc: '<<<' [ \t]* (
 //    ({this.startRecordHereDocLabel()}Label{this.endRecordHereDocLabel()}) |

@@ -55,11 +55,8 @@ func (y *builder) VisitNamespaceOnlyUse(raw phpparser.INamespaceDeclarationConte
 		return
 	}
 	usedeclHanlder := func() {
-		for _, statementContext := range i.AllNamespaceStatement() {
-			stmt, ok := statementContext.(*phpparser.NamespaceStatementContext)
-			if ok {
-				y.VisitUseDeclaration(stmt.UseDeclaration())
-			}
+		for _, useDecl := range i.AllUseDeclaration() {
+			y.VisitUseDeclaration(useDecl)
 		}
 	}
 	prog := y.GetProgram().GetApplication() //拿到主app
@@ -108,6 +105,7 @@ func (y *builder) VisitNamespaceDeclaration(raw phpparser.INamespaceDeclarationC
 			y.VisitFunctionDeclaration(i.FunctionDeclaration())
 			y.VisitClassDeclaration(i.ClassDeclaration())
 			y.VisitGlobalConstantDeclaration(i.GlobalConstantDeclaration())
+			y.VisitEnumDeclaration(i.EnumDeclaration())
 		})
 	}
 	//compose child app
@@ -159,6 +157,38 @@ func (y *builder) VisitNamespaceDeclaration(raw phpparser.INamespaceDeclarationC
 	}
 
 	return nil
+}
+
+func (y *builder) VisitNamespaceOnlyUseSemi(raw phpparser.INamespaceDeclarationSemiContext) {
+	if y == nil || raw == nil || y.IsStop() {
+		return
+	}
+	i, _ := raw.(*phpparser.NamespaceDeclarationSemiContext)
+	if i == nil {
+		return
+	}
+	usedeclHanlder := func() {
+		for _, useDecl := range i.AllUseDeclaration() {
+			y.VisitUseDeclaration(useDecl)
+		}
+	}
+	prog := y.GetProgram().GetApplication()
+	nameSpacePath := y.VisitNamespacePath(i.NamespacePath())
+	namespaceName := strings.Join(nameSpacePath, ".")
+	if len(nameSpacePath) == 0 {
+		usedeclHanlder()
+		return
+	}
+	library, b := prog.GetLibrary(namespaceName)
+	if b {
+		functionBuilder := library.GetAndCreateFunctionBuilder(namespaceName, string(ssa.InitFunctionName))
+		currentBuilder := y.FunctionBuilder
+		y.FunctionBuilder = functionBuilder
+		usedeclHanlder()
+		defer func() {
+			y.FunctionBuilder = currentBuilder
+		}()
+	}
 }
 
 func (y *builder) VisitUseDeclaration(raw phpparser.IUseDeclarationContext) interface{} {
@@ -321,6 +351,82 @@ func (y *builder) VisitStatement(raw phpparser.IStatementContext) interface{} {
 		y.VisitInlineHtmlStatement(i.InlineHtmlStatement())
 	} else {
 		log.Infof("unknown statement: %v", i.GetText())
+	}
+
+	return nil
+}
+
+func (y *builder) VisitNamespaceDeclarationSemi(raw phpparser.INamespaceDeclarationSemiContext) interface{} {
+	if y == nil || raw == nil || y.IsStop() {
+		return nil
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+	i, _ := raw.(*phpparser.NamespaceDeclarationSemiContext)
+	if i == nil {
+		return nil
+	}
+	nameSpaceStmt := func(build func(*phpparser.NamespaceStatementContext)) {
+		for _, stmt := range i.AllNamespaceStatement() {
+			if i, ok := stmt.(*phpparser.NamespaceStatementContext); ok {
+				build(i)
+			}
+		}
+	}
+	normalStatement := func() {
+		nameSpaceStmt(func(nsc *phpparser.NamespaceStatementContext) {
+			y.VisitStatement(nsc.Statement())
+		})
+	}
+	declareStatement := func() {
+		nameSpaceStmt(func(i *phpparser.NamespaceStatementContext) {
+			y.VisitFunctionDeclaration(i.FunctionDeclaration())
+			y.VisitClassDeclaration(i.ClassDeclaration())
+			y.VisitGlobalConstantDeclaration(i.GlobalConstantDeclaration())
+			y.VisitEnumDeclaration(i.EnumDeclaration())
+		})
+	}
+	hasName := i.NamespacePath() != nil
+
+	prog := y.GetProgram().GetApplication()
+	nameSpacePath := y.VisitNamespacePath(i.NamespacePath())
+	namespaceName := strings.Join(nameSpacePath, ".")
+	switchToNamespace := func() (*ssa.Program, func()) {
+		library, _ := prog.GetLibrary(namespaceName)
+		if library == nil {
+			library = prog.NewLibrary(namespaceName, []string{prog.Loader.GetBasePath()})
+		}
+		library.PushEditor(prog.GetCurrentEditor())
+		functionBuilder := library.GetAndCreateFunctionBuilder(namespaceName, string(ssa.InitFunctionName))
+		functionBuilder.SetEditor(y.FunctionBuilder.GetEditor())
+		functionBuilder.SetBuildSupport(y.FunctionBuilder)
+		currentBuilder := y.FunctionBuilder
+		y.FunctionBuilder = functionBuilder
+		return library, func() {
+			library.VisitAst(raw)
+			y.FunctionBuilder = currentBuilder
+		}
+	}
+
+	switch {
+	case hasName && y.PreHandler():
+		y.callback(namespaceName, y.FunctionBuilder.GetEditor().GetFilename())
+		_, f := switchToNamespace()
+		defer f()
+		program := y.GetProgram()
+		program.PkgName = namespaceName
+		declareStatement()
+	case hasName && !y.PreHandler():
+		namespace, f := switchToNamespace()
+		f()
+		currentProg := y.GetProgram()
+		y.SetProgram(namespace)
+		normalStatement()
+		y.SetProgram(currentProg)
+	case !hasName && !y.PreHandler():
+		prog.PkgName = namespaceName
+		declareStatement()
+		normalStatement()
 	}
 
 	return nil

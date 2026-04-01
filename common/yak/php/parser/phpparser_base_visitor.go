@@ -55,6 +55,10 @@ func (v *BasePHPParserVisitor) VisitNamespaceDeclaration(ctx *NamespaceDeclarati
 	return v.VisitChildren(ctx)
 }
 
+func (v *BasePHPParserVisitor) VisitNamespaceDeclarationSemi(ctx *NamespaceDeclarationSemiContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BasePHPParserVisitor) VisitNamespaceStatement(ctx *NamespaceStatementContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -255,6 +259,10 @@ func (v *BasePHPParserVisitor) VisitTypeHint(ctx *TypeHintContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
+func (v *BasePHPParserVisitor) VisitTypeHintAtom(ctx *TypeHintAtomContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BasePHPParserVisitor) VisitGlobalStatement(ctx *GlobalStatementContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -411,10 +419,6 @@ func (v *BasePHPParserVisitor) VisitMatchExpression(ctx *MatchExpressionContext)
 	return v.VisitChildren(ctx)
 }
 
-func (v *BasePHPParserVisitor) VisitStaticClassReferenceAssignmentExpression(ctx *StaticClassReferenceAssignmentExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
 func (v *BasePHPParserVisitor) VisitFunctionCallExpression(ctx *FunctionCallExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -444,10 +448,6 @@ func (v *BasePHPParserVisitor) VisitReferenceAssignmentExpression(ctx *Reference
 }
 
 func (v *BasePHPParserVisitor) VisitCloneExpression(ctx *CloneExpressionContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BasePHPParserVisitor) VisitStaticClassMemberCallAssignmentExpression(ctx *StaticClassMemberCallAssignmentExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -744,6 +744,22 @@ func (v *BasePHPParserVisitor) VisitChainList(ctx *ChainListContext) interface{}
 }
 
 func (v *BasePHPParserVisitor) VisitChain(ctx *ChainContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitAssignableChain(ctx *AssignableChainContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitAssignableChainOrigin(ctx *AssignableChainOriginContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitAssignableChainAccess(ctx *AssignableChainAccessContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitStaticMethodCall(ctx *StaticMethodCallContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

@@ -43,6 +43,9 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#namespaceDeclaration.
 	VisitNamespaceDeclaration(ctx *NamespaceDeclarationContext) interface{}
 
+	// Visit a parse tree produced by PHPParser#namespaceDeclarationSemi.
+	VisitNamespaceDeclarationSemi(ctx *NamespaceDeclarationSemiContext) interface{}
+
 	// Visit a parse tree produced by PHPParser#namespaceStatement.
 	VisitNamespaceStatement(ctx *NamespaceStatementContext) interface{}
 
@@ -193,6 +196,9 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#typeHint.
 	VisitTypeHint(ctx *TypeHintContext) interface{}
 
+	// Visit a parse tree produced by PHPParser#typeHintAtom.
+	VisitTypeHintAtom(ctx *TypeHintAtomContext) interface{}
+
 	// Visit a parse tree produced by PHPParser#globalStatement.
 	VisitGlobalStatement(ctx *GlobalStatementContext) interface{}
 
@@ -310,9 +316,6 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#MatchExpression.
 	VisitMatchExpression(ctx *MatchExpressionContext) interface{}
 
-	// Visit a parse tree produced by PHPParser#StaticClassReferenceAssignmentExpression.
-	VisitStaticClassReferenceAssignmentExpression(ctx *StaticClassReferenceAssignmentExpressionContext) interface{}
-
 	// Visit a parse tree produced by PHPParser#FunctionCallExpression.
 	VisitFunctionCallExpression(ctx *FunctionCallExpressionContext) interface{}
 
@@ -336,9 +339,6 @@ type PHPParserVisitor interface {
 
 	// Visit a parse tree produced by PHPParser#CloneExpression.
 	VisitCloneExpression(ctx *CloneExpressionContext) interface{}
-
-	// Visit a parse tree produced by PHPParser#StaticClassMemberCallAssignmentExpression.
-	VisitStaticClassMemberCallAssignmentExpression(ctx *StaticClassMemberCallAssignmentExpressionContext) interface{}
 
 	// Visit a parse tree produced by PHPParser#UnaryOperatorExpression.
 	VisitUnaryOperatorExpression(ctx *UnaryOperatorExpressionContext) interface{}
@@ -561,6 +561,18 @@ type PHPParserVisitor interface {
 
 	// Visit a parse tree produced by PHPParser#chain.
 	VisitChain(ctx *ChainContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#assignableChain.
+	VisitAssignableChain(ctx *AssignableChainContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#assignableChainOrigin.
+	VisitAssignableChainOrigin(ctx *AssignableChainOriginContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#assignableChainAccess.
+	VisitAssignableChainAccess(ctx *AssignableChainAccessContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#staticMethodCall.
+	VisitStaticMethodCall(ctx *StaticMethodCallContext) interface{}
 
 	// Visit a parse tree produced by PHPParser#chainOrigin.
 	VisitChainOrigin(ctx *ChainOriginContext) interface{}

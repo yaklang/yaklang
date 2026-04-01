@@ -81,3 +81,15 @@ func BenchmarkFrontendGravFlexIndexFixture(b *testing.B) {
 func BenchmarkFrontendGravFlexObjectFixture(b *testing.B) {
 	benchmarkFrontendFixture(b, "perfdata/grav/system__src__Grav__Framework__Flex__FlexObject.php.fixture")
 }
+
+func BenchmarkFrontendPrestaShopAdminControllerFixture(b *testing.B) {
+	benchmarkFrontendFixture(b, "perfdata/prestashop/classes__controller__AdminController.php.fixture")
+}
+
+func BenchmarkFrontendPrestaShopMailPreviewVariablesBuilderFixture(b *testing.B) {
+	benchmarkFrontendFixture(b, "perfdata/prestashop/src__Adapter__MailTemplate__MailPreviewVariablesBuilder.php.fixture")
+}
+
+func BenchmarkFrontendPrestaShopCarrierFeatureContextFixture(b *testing.B) {
+	benchmarkFrontendFixture(b, "perfdata/prestashop/tests__Integration__Behaviour__Features__Context__Domain__Carrier__CarrierFeatureContext.php.fixture")
+}
