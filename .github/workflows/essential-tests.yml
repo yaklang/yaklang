@@ -386,23 +386,18 @@ jobs:
                 {"package": "./common/facades/...", "timeout": "30s"}
               ]
 
-          - name: "Test HttpTpl(YakTemplate)"
+          - name: "Test HttpTpl / Crawler / Crawlerx"
             test_configs: |
               [
-                {"package": "./common/yak/httptpl", "timeout": "1m"}
+                {"package": "./common/yak/httptpl", "timeout": "1m"},
+                {"package": "./common/crawlerx/...", "timeout": "5m"},
+                {"package": "./common/crawler", "timeout": "20s", "run": "TestMUSTPASS_JSHandle"}
               ]
 
           - name: "Test MustPass - full yak scripts"
             test_configs: |
               [
                 {"package": "./common/yak/yaktest/mustpass", "timeout": "5m"}
-              ]
-
-          - name: "Test Crawler / Crawlerx (chromium based crawler)"
-            test_configs: |
-              [
-                {"package": "./common/crawlerx/...", "timeout": "5m"},
-                {"package": "./common/crawler", "timeout": "20s", "run": "TestMUSTPASS_JSHandle"}
               ]
 
           - name: "Test SFWeb / Integration SyntaxFlow / SFDB / SFVM / SFReport"
