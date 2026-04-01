@@ -366,6 +366,12 @@ type ParseError struct {
 	Message  string
 }
 
+type phpProjectSlowCandidate struct {
+	Path       string
+	Content    []byte
+	Concurrent time.Duration
+}
+
 func phpProjectASTRoot(t *testing.T) string {
 	t.Helper()
 
@@ -389,6 +395,8 @@ func TestProjectAst(t *testing.T) {
 	}
 
 	errorFiles := make(map[string]*ssareducer.FileContent)
+	var slowFiles []string
+	var slowCandidates []phpProjectSlowCandidate
 
 	fileList := make([]string, 0, 100)
 	fileMap := make(map[string]struct{})
@@ -428,6 +436,13 @@ func TestProjectAst(t *testing.T) {
 
 	for fileContent := range ch {
 		log.Errorf("file parse: %s: size[%s] time: %s", fileContent.Path, ssaapi.Size(len(fileContent.Content)), fileContent.Duration)
+		if budget := phpFixtureParseBudget(); budget > 0 && fileContent.Err == nil && fileContent.Duration > budget {
+			slowCandidates = append(slowCandidates, phpProjectSlowCandidate{
+				Path:       fileContent.Path,
+				Content:    append([]byte(nil), fileContent.Content...),
+				Concurrent: fileContent.Duration,
+			})
+		}
 		if fileContent.Err != nil {
 			errorFiles[fileContent.Path] = fileContent
 		}
@@ -439,6 +454,24 @@ func TestProjectAst(t *testing.T) {
 		failedFiles = append(failedFiles, fname)
 		log.Errorf("Parse file %s failed: %v", fname, fc.Err)
 	}
+	if budget := phpFixtureParseBudget(); budget > 0 {
+		for _, candidate := range slowCandidates {
+			start := time.Now()
+			_, isolatedErr := php2ssa.Frontend(string(candidate.Content), phpTestAntlrCache)
+			isolatedDuration := time.Since(start)
+			if isolatedErr != nil {
+				failedFiles = append(failedFiles, candidate.Path)
+				log.Errorf("isolated parse failed for %s after concurrent slow-path detection: %v", candidate.Path, isolatedErr)
+				continue
+			}
+			if isolatedDuration > budget {
+				slowFiles = append(slowFiles, candidate.Path)
+				log.Errorf("isolated parse exceeded budget for %s: concurrent=%s isolated=%s budget=%s", candidate.Path, candidate.Concurrent, isolatedDuration, budget)
+			}
+		}
+	}
 	sort.Strings(failedFiles)
+	sort.Strings(slowFiles)
 	require.Empty(t, failedFiles, "project AST parse failed for %d files under %s: %v", len(failedFiles), path, failedFiles)
+	require.Empty(t, slowFiles, "project AST parse exceeded budget for %d files under %s: %v", len(slowFiles), path, slowFiles)
 }

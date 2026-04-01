@@ -79,9 +79,10 @@ scriptText
 // PHP
 
 phpBlock
-    : importStatement* (
+    : importStatement* namespaceDeclarationSemi (PHPEnd | PHPEndSingleLineComment)?
+    | importStatement* namespaceDeclaration+ (PHPEnd | PHPEndSingleLineComment)?
+    | importStatement* (
         useDeclaration
-        | namespaceDeclaration
         | functionDeclaration
         | classDeclaration
         | globalConstantDeclaration
@@ -117,17 +118,19 @@ namespacePath
     ;
 
 namespaceDeclaration
-    : Namespace (
-        namespacePath? OpenCurlyBracket namespaceStatement* CloseCurlyBracket
-        | namespacePath SemiColon namespaceStatement*
-    )
+    : Namespace OpenCurlyBracket useDeclaration* namespaceStatement* CloseCurlyBracket
+    | Namespace namespacePath OpenCurlyBracket useDeclaration* namespaceStatement* CloseCurlyBracket
+    ;
+
+namespaceDeclarationSemi
+    : Namespace namespacePath SemiColon useDeclaration* namespaceStatement*
     ;
 
 namespaceStatement
-    : useDeclaration
-    | functionDeclaration
+    : functionDeclaration
     | classDeclaration
     | globalConstantDeclaration
+    | enumDeclaration
     | statement
     ;
 
@@ -381,10 +384,13 @@ formalParameter
     ;
 
 typeHint
+    : typeHintAtom (('|' | '&') typeHintAtom)*
+    ;
+
+typeHintAtom
     : Callable
     | primitiveType
     | qualifiedStaticTypeRef
-    | typeHint '|' typeHint
     ;
 
 globalStatement
@@ -475,6 +481,9 @@ enumDeclaration
 
 enumItem
     : Case identifier (Eq expression)? SemiColon
+    | attributes? memberModifiers? Const typeHint? identifierInitializer (
+        ',' identifierInitializer
+    )* SemiColon
     | memberModifiers? functionDeclaration
     | Use qualifiedNamespaceNameList traitAdaptations
     ;
@@ -532,6 +541,7 @@ expression
     | fullyQualifiedNamespaceExpr                                                       # FullyQualifiedNamespaceExpression
     | Parent_ DoubleColon memberCallKey                                                 # ParentExpression
     | expression ObjectOperator memberCallKey                                           # MemberCallExpression
+    | expression NullsafeObjectOperator memberCallKey                                   # MemberCallExpression
     | expression '[' indexMemberCallKey ']'                                             # IndexCallExpression
     | expression ObjectOperator? OpenCurlyBracket indexMemberCallKey? CloseCurlyBracket # IndexLegacyCallExpression
     | '\\'? staticClassExpr                                                             # StaticClassAccessExpression
@@ -555,12 +565,10 @@ expression
     | matchExpr                                                                         # MatchExpression
     | '(' castOperation ')' expression                                                  # CastExpression
     | expression arguments                                                              # FunctionCallExpression
-    | staticClassExprVariableMember Eq '&' expression                                   # StaticClassReferenceAssignmentExpression
-    | staticClassExprVariableMember assignmentOperator expression                       # StaticClassMemberCallAssignmentExpression
     | ('~' | '@') expression                                                            # UnaryOperatorExpression
     | ('!' | '+' | '-') expression                                                      # UnaryOperatorExpression
-    | ('++' | '--') flexiVariable                                                       # PrefixIncDecExpression
-    | flexiVariable ('++' | '--')                                                       # PostfixIncDecExpression
+    | ('++' | '--') assignableChain                                                     # PrefixIncDecExpression
+    | assignableChain ('++' | '--')                                                     # PostfixIncDecExpression
     | <assoc = right> expression op = '**' expression                                   # ArithmeticExpression
     | expression InstanceOf expression                                                  # InstanceOfExpression
     | expression op = ('*' | Divide | '%') expression                                   # ArithmeticExpression
@@ -577,8 +585,8 @@ expression
     | expression op = '??' expression                                                   # NullCoalescingExpression
     | expression op = '<=>' expression                                                  # SpaceshipExpression
     | leftArrayCreation Eq expression                                                   # ArrayCreationUnpackExpression
-    | flexiVariable Eq '&' expression                                                   # ReferenceAssignmentExpression
-    | flexiVariable assignmentOperator expression                                       # OrdinaryAssignmentExpression
+    | assignableChain Eq '&' expression                                                 # ReferenceAssignmentExpression
+    | assignableChain assignmentOperator expression                                     # OrdinaryAssignmentExpression
     | expression op = LogicalAnd expression                                             # LogicalExpression
     | expression op = LogicalXor expression                                             # LogicalExpression
     | expression op = LogicalOr expression                                              # LogicalExpression
@@ -640,7 +648,7 @@ keyedDestructItem
 
 lambdaFunctionExpr
     : Static? Function_ '&'? '(' formalParameterList ')' lambdaFunctionUseVars? (':' typeHint)? blockStatement
-    | LambdaFn '(' formalParameterList ')' '=>' expression
+    | Static? LambdaFn '(' formalParameterList ')' (':' typeHint)? '=>' expression
     ;
 
 matchExpr
@@ -706,6 +714,7 @@ typeRef
     | primitiveType
     | Static
     | flexiVariable
+    | staticClassExprVariableMember
     | anonymousClass
     ;
 
@@ -828,6 +837,26 @@ chainList
 chain
     : flexiVariable
     | staticClassExprVariableMember
+    ;
+
+assignableChain
+    : flexiVariable
+    | staticClassExprVariableMember
+    | assignableChainOrigin assignableChainAccess+
+    ;
+
+assignableChainOrigin
+    : staticMethodCall
+    | staticClassExprVariableMember
+    ;
+
+assignableChainAccess
+    : memberAccess
+    | squareCurlyExpression
+    ;
+
+staticMethodCall
+    : classConstant actualArguments
     ;
 
 chainOrigin

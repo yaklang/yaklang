@@ -22,6 +22,23 @@ func (y *builder) VisitTypeHint(raw phpparser.ITypeHintContext) ssa.Type {
 	if i == nil {
 		return ssa.CreateAnyType()
 	}
+	if len(i.AllTypeHintAtom()) == 0 {
+		return ssa.CreateAnyType()
+	}
+	return y.VisitTypeHintAtom(i.TypeHintAtom(0))
+}
+
+func (y *builder) VisitTypeHintAtom(raw phpparser.ITypeHintAtomContext) ssa.Type {
+	if y == nil || raw == nil || y.IsStop() {
+		return ssa.CreateAnyType()
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
+	i, _ := raw.(*phpparser.TypeHintAtomContext)
+	if i == nil {
+		return ssa.CreateAnyType()
+	}
 	if r := i.QualifiedStaticTypeRef(); r != nil {
 		//这里类型就行修复
 		className := y.VisitQualifiedStaticTypeRef(r)
@@ -30,13 +47,6 @@ func (y *builder) VisitTypeHint(raw phpparser.ITypeHintContext) ssa.Type {
 		_ = i.Callable().GetText()
 	} else if i.PrimitiveType() != nil {
 		return y.VisitPrimitiveType(i.PrimitiveType())
-	} else if i.Pipe() != nil {
-		//types := lo.Map(i.AllTypeHint(), func(item phpparser.ITypeHintContext, index int) ssa.Type {
-		//	return y.VisitTypeHint(i)
-		//})
-		//_ = types
-		// need a
-		// return ssa.NewUnionType(types)
 	}
 	return ssa.CreateAnyType()
 }
@@ -55,6 +65,9 @@ func (y *builder) VisitTypeRef(raw phpparser.ITypeRefContext) (*ssa.Blueprint, s
 	}
 	if i.FlexiVariable() != nil {
 		//todo: flexivariable
+	}
+	if i.StaticClassExprVariableMember() != nil {
+		return y.CreateBlueprint(raw.GetText()), raw.GetText()
 	}
 	if i.QualifiedNamespaceName() != nil {
 		if bluePrint := y.GetBluePrint(strings.TrimSpace(i.QualifiedNamespaceName().GetText())); bluePrint != nil {

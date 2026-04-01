@@ -15,6 +15,15 @@ func (y *builder) VisitPhpBlock(raw phpparser.IPhpBlockContext) interface{} {
 	if i == nil {
 		return nil
 	}
+	if semi := i.NamespaceDeclarationSemi(); semi != nil {
+		if y.GetProgram().CurrentIncludingStack.Len() <= 0 {
+			if !y.PreHandler() {
+				y.VisitNamespaceOnlyUseSemi(semi)
+			}
+			y.VisitNamespaceDeclarationSemi(semi)
+		}
+		return nil
+	}
 	if y.GetProgram().CurrentIncludingStack.Len() <= 0 {
 		if !y.PreHandler() {
 			for _, context := range i.AllNamespaceDeclaration() {
