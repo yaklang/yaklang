@@ -31,7 +31,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
-	"golang.org/x/exp/slices"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -41,7 +40,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/utils/filesys"
-	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
@@ -302,7 +300,6 @@ use log=info for [ssa.compile.summary] and log=debug for per-phase timings (ssa.
 		configFilePath := c.String("config")
 		databaseFileRaw := c.String("database")
 		databaseDialect := c.String("database-dialect")
-		noOverride := c.Bool("no-override")
 		syntaxFlow := c.String("syntaxflow")
 		dbDebug := c.Bool("database-debug")
 		sfDebug := c.Bool("syntaxflow-debug")
@@ -323,9 +320,8 @@ use log=info for [ssa.compile.summary] and log=debug for per-phase timings (ssa.
 		}
 		// if not set dialect, bind the current process to the target SSA database path
 		if databaseDialect == "" && databaseFileRaw != "" {
-			consts.SetSSADatabaseInfo(databaseFileRaw)
 			if err := consts.SetGormSSAProjectDatabaseByInfo(databaseFileRaw); err != nil {
-				return utils.Errorf("open database failed: %v", err)
+				return utils.Errorf("set database by info %s failed: %v", databaseFileRaw, err)
 			}
 		}
 
@@ -355,39 +351,18 @@ use log=info for [ssa.compile.summary] and log=debug for per-phase timings (ssa.
 		logCompileStageMessage("ssa-compile", compileConfig)
 
 		programName := compileConfig.GetProgramName()
-		reCompile := compileConfig.GetCompileReCompile()
 		targetPath := compileConfig.GetCodeSourceLocalFileOrURL()
-
+		resolvedProgramName, err := prepareCompileTarget(context.Background(), compileConfig)
+		if err != nil {
+			return err
+		}
+		if resolvedProgramName != "" {
+			programName = resolvedProgramName
+		}
 		if programName != "" {
 			defer func() {
 				diagnostics.LogRecorder("compile")
 			}()
-		}
-
-		// check program name duplicate
-		if programName != "" {
-			if prog, err := ssadb.GetProgram(programName, ssa.Application); prog != nil && err == nil {
-				if !reCompile {
-					return utils.Errorf(
-						"program name %v existed in this database, please use `re-compile` flag to re-compile or change program name",
-						programName,
-					)
-				}
-			}
-			if slices.Contains(ssadb.AllProgramNames(ssadb.GetDB()), programName) {
-				if !reCompile {
-					return utils.Errorf(
-						"program name %v existed in other database, please use `re-compile` flag to re-compile or change program name",
-						programName,
-					)
-				}
-			}
-		}
-
-		if !noOverride && programName != "" {
-			ssadb.DeleteProgram(ssadb.GetDB(), programName)
-		} else if noOverride && programName != "" {
-			log.Warnf("no-override flag is set, will not delete existed program: %v", programName)
 		}
 
 		if targetPath != "" {
@@ -1480,6 +1455,10 @@ and exports structured report (sarif/irify).`,
 		log.Infof("[code-scan] scan stage: config-mode=%v report-format=%v output=%q",
 			useConfigMode, config.Format, config.GetOutputFile(),
 		)
+		if _, err := prepareCompileTarget(ctx, config); err != nil {
+			log.Errorf("prepare compile target failed: %s", err)
+			return err
+		}
 
 		var progs []*ssaapi.Program
 		progs, err = getProgram(ctx, config)

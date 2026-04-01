@@ -6,7 +6,10 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/coreplugin"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/yak/cmd/yakcmds"
@@ -20,7 +23,40 @@ func addCommands(app *cli.App, cmds ...*cli.Command) {
 	}
 }
 
+func useTempSSADB(t *testing.T) {
+	t.Helper()
+
+	originDB := consts.GetGormSSAProjectDataBase()
+	tempDB, err := consts.GetTempSSADataBase()
+	require.NoError(t, err)
+	consts.SetGormSSAProjectDatabase(tempDB)
+	require.NoError(t, coreplugin.ForceSyncCorePlugin())
+
+	t.Cleanup(func() {
+		_ = tempDB.Close()
+		consts.SetGormSSAProjectDatabase(originDB)
+	})
+}
+
+func countProgramIrCodes(t *testing.T, programName string) int64 {
+	t.Helper()
+
+	var count int64
+	require.NoError(t, ssadb.GetDB().Model(&ssadb.IrCode{}).Where("program_name = ?", programName).Count(&count).Error)
+	return count
+}
+
+func countProgramIrCodesInDB(t *testing.T, db *gorm.DB, programName string) int64 {
+	t.Helper()
+
+	var count int64
+	require.NoError(t, db.Model(&ssadb.IrCode{}).Where("program_name = ?", programName).Count(&count).Error)
+	return count
+}
+
 func TestRecompileWarn(t *testing.T) {
+	useTempSSADB(t)
+
 	tmpDir := t.TempDir()
 	log.Infof("tmpDir: %s", tmpDir)
 
@@ -52,6 +88,8 @@ func TestRecompileWarn(t *testing.T) {
 }
 
 func TestCompileDefaultProgramNameNoTimestamp(t *testing.T) {
+	useTempSSADB(t)
+
 	root := t.TempDir()
 	programName := uuid.NewString()
 	targetDir := filepath.Join(root, programName)
@@ -68,6 +106,70 @@ func TestCompileDefaultProgramNameNoTimestamp(t *testing.T) {
 	prog, err := ssadb.GetProgram(programName, ssa.Application)
 	require.NoError(t, err)
 	require.NotNil(t, prog, "compiled program should default to target directory name when -p is not set")
+}
+
+func TestCompileDefaultProgramNameRequiresRecompile(t *testing.T) {
+	useTempSSADB(t)
+
+	root := t.TempDir()
+	programName := uuid.NewString()
+	targetDir := filepath.Join(root, programName)
+	require.NoError(t, os.MkdirAll(targetDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(targetDir, "test.yak"), []byte("a = 1\n"), 0o644))
+
+	app := cli.NewApp()
+	addCommands(app, yakcmds.SSACompilerCommands...)
+
+	err := app.Run([]string{"yak", "ssa-compile", "-t", targetDir})
+	require.NoError(t, err)
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
+
+	firstCount := countProgramIrCodes(t, programName)
+	require.Positive(t, firstCount)
+
+	err = app.Run([]string{"yak", "ssa-compile", "-t", targetDir})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "please use `re-compile` flag to re-compile or change program name")
+	require.Equal(t, firstCount, countProgramIrCodes(t, programName))
+
+	err = app.Run([]string{"yak", "ssa-compile", "-t", targetDir, "--re-compile", "--no-override"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "no-override is set")
+	require.Equal(t, firstCount, countProgramIrCodes(t, programName))
+
+	err = app.Run([]string{"yak", "ssa-compile", "-t", targetDir, "--re-compile"})
+	require.NoError(t, err)
+	require.Equal(t, firstCount, countProgramIrCodes(t, programName))
+}
+
+func TestSSACompileDatabaseFlagWritesToSpecifiedDB(t *testing.T) {
+	useTempSSADB(t)
+	defaultDB := consts.GetGormSSAProjectDataBase()
+
+	root := t.TempDir()
+	targetDir := filepath.Join(root, "compile-db-target")
+	require.NoError(t, os.MkdirAll(targetDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(targetDir, "test.yak"), []byte("a = 1\n"), 0o644))
+
+	outputDBPath := filepath.Join(root, "ssa-output.db")
+	programName := "ssa-compile-db-flag"
+
+	app := cli.NewApp()
+	addCommands(app, yakcmds.SSACompilerCommands...)
+
+	err := app.Run([]string{"yak", "ssa-compile", "-t", targetDir, "-p", programName, "--database", outputDBPath})
+	require.NoError(t, err)
+
+	outputDB, err := consts.CreateSSAProjectDatabaseRaw(outputDBPath)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = outputDB.Close()
+	})
+
+	require.Positive(t, countProgramIrCodesInDB(t, outputDB, programName), "compiled program should be saved to the specified database file")
+	require.Zero(t, countProgramIrCodesInDB(t, defaultDB, programName), "original default SSA database should not receive compile output when --database is set")
+
+	defer ssadb.DeleteProgram(outputDB, programName)
 }
 
 func TestSyntaxFlowEvaluate(t *testing.T) {

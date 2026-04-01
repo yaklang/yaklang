@@ -5,12 +5,15 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
 	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssa_compile"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
@@ -44,6 +47,8 @@ type ssaCliConfig struct {
 	preferConfigCompile bool
 	// forceProgramName 为 true 时，编译阶段显式固定 program_name（例如 CLI 指定 --program）。
 	forceProgramName bool
+	// noOverride 为 true 时，禁止覆盖同名数据库 program。
+	noOverride bool
 
 	// {{ should result
 	// OutputWriter is the file to save the result
@@ -281,6 +286,108 @@ func getProgram(ctx context.Context, config *ssaCliConfig) ([]*ssaapi.Program, e
 	return nil, utils.Errorf("get program by parameter fail, please check your command")
 }
 
+func prepareCompileTarget(ctx context.Context, config *ssaCliConfig) (string, error) {
+	if config == nil || config.Config == nil {
+		return "", nil
+	}
+	if strings.TrimSpace(config.GetCodeSourceLocalFileOrURL()) == "" {
+		return strings.TrimSpace(config.GetProgramName()), nil
+	}
+	if config.GetCompileMemory() || config.GetSyntaxFlowMemory() {
+		return effectiveCompileProgramName(config), nil
+	}
+
+	if err := resolveCompileConfigForTarget(ctx, config); err != nil {
+		return "", err
+	}
+
+	programName := effectiveCompileProgramName(config)
+	if programName == "" {
+		return "", utils.Errorf("compile program name is empty")
+	}
+
+	if !programExistsInCurrentDB(programName) {
+		return programName, nil
+	}
+	if !config.GetCompileReCompile() {
+		return "", utils.Errorf(
+			"program name %v existed in this database, please use `re-compile` flag to re-compile or change program name",
+			programName,
+		)
+	}
+	if config.noOverride {
+		return "", utils.Errorf(
+			"program name %v existed in this database, but no-override is set; remove `--no-override` or change program name",
+			programName,
+		)
+	}
+
+	log.Infof("re-compile enabled, delete existing program before compile: %s", programName)
+	ssadb.DeleteProgram(ssadb.GetDB(), programName)
+	return programName, nil
+}
+
+func resolveCompileConfigForTarget(ctx context.Context, config *ssaCliConfig) error {
+	if config == nil || config.Config == nil || config.preferConfigCompile {
+		return nil
+	}
+	targetPath := strings.TrimSpace(config.GetCodeSourceLocalFileOrURL())
+	if targetPath == "" {
+		return nil
+	}
+
+	_, cfg, err := ssa_compile.ProjectAutoDetective(ctx, &ssa_compile.SSADetectConfig{
+		Target:   targetPath,
+		Language: string(config.GetLanguage()),
+		Options:  buildCompileOptionsForDetect(config.Config),
+	})
+	if err != nil {
+		return err
+	}
+
+	config.Config = cfg
+	config.preferConfigCompile = true
+	return nil
+}
+
+func effectiveCompileProgramName(config *ssaCliConfig) string {
+	if config == nil || config.Config == nil {
+		return ""
+	}
+	if config.forceProgramName {
+		if programName := strings.TrimSpace(config.GetProgramName()); programName != "" {
+			return programName
+		}
+	}
+	if projectName := strings.TrimSpace(config.GetProjectName()); projectName != "" {
+		return projectName
+	}
+	if config.forceProgramName {
+		if programName := strings.TrimSpace(config.GetProgramName()); programName != "" {
+			return programName
+		}
+	}
+	if strings.TrimSpace(config.GetCodeSourceLocalFileOrURL()) != "" {
+		// Match the compile plugin fallback when neither an explicit program name
+		// nor a project name is available.
+		return "default"
+	}
+	if programName := strings.TrimSpace(config.GetProgramName()); programName != "" {
+		return programName
+	}
+	return ""
+}
+
+func programExistsInCurrentDB(programName string) bool {
+	if strings.TrimSpace(programName) == "" {
+		return false
+	}
+	if prog, err := ssadb.GetProgram(programName, ssa.Application); prog != nil && err == nil {
+		return true
+	}
+	return slices.Contains(ssadb.AllProgramNames(ssadb.GetDB()), programName)
+}
+
 // parseConfigFileOnlyWithOutputOverride 从配置文件加载配置，并允许 CLI 参数覆盖
 // cliOutputFile 为空时使用配置文件中的设置，非空时优先使用 CLI 参数
 func parseConfigFileWithCliFlagOverride(cliCtx *cli.Context) (res *ssaCliConfig, err error) {
@@ -332,6 +439,7 @@ func parseConfigFileWithCliFlagOverride(cliCtx *cli.Context) (res *ssaCliConfig,
 		Config:              cfg,
 		preferConfigCompile: true,
 		forceProgramName:    strings.TrimSpace(cfg.GetProgramName()) != "",
+		noOverride:          cliCtx.Bool("no-override"),
 	}
 
 	// 设置输出格式
@@ -427,6 +535,7 @@ func parseCompileConfigFromCli(c *cli.Context) (res *ssaCliConfig, err error) {
 		Config:              cfg,
 		preferConfigCompile: false,
 		forceProgramName:    c.IsSet("program") && strings.TrimSpace(c.String("program")) != "",
+		noOverride:          c.Bool("no-override"),
 	}, nil
 }
 
