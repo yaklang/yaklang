@@ -9,6 +9,7 @@ const (
 	SearcherTypeChatGLM   SearcherType = "chatglm"
 	SearcherTypeBocha     SearcherType = "bocha"
 	SearcherTypeUnifuncs  SearcherType = "unifuncs"
+	SearcherTypeQwen      SearcherType = "qwen"
 )
 
 func (s SearcherType) String() string {
@@ -23,6 +24,9 @@ type OmniSearchResult struct {
 	Content    string `json:"content,omitempty"`
 	Source     string `json:"source,omitempty"`
 	Data       any    `json:"data,omitempty"`
+	// Summary is populated when the search engine is AI-driven (e.g. qwen).
+	// It contains the AI's synthesized answer based on the search results.
+	Summary string `json:"summary,omitempty"`
 }
 
 type YakitOmniSearchKeyConfig struct {
@@ -33,6 +37,7 @@ type YakitOmniSearchKeyConfig struct {
 type OmniSearchResultList struct {
 	Results []*OmniSearchResult
 	Total   int
+	Summary string
 }
 
 type SearchClient interface {

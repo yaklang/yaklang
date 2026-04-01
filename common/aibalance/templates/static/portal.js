@@ -5015,11 +5015,13 @@ curl '${metaApiUrl}?name=${modelName}'`;
                 const chatglmTbody = document.getElementById('ws-chatglm-tbody');
                 const bochaTbody = document.getElementById('ws-bocha-tbody');
                 const unifuncsTbody = document.getElementById('ws-unifuncs-tbody');
+                const qwenTbody = document.getElementById('ws-qwen-tbody');
                 if (braveTbody) braveTbody.innerHTML = '<tr><td colspan="10" style="text-align: center; color: #e74c3c; padding: 20px;">加载失败</td></tr>';
                 if (tavilyTbody) tavilyTbody.innerHTML = '<tr><td colspan="10" style="text-align: center; color: #e74c3c; padding: 20px;">加载失败</td></tr>';
                 if (chatglmTbody) chatglmTbody.innerHTML = '<tr><td colspan="10" style="text-align: center; color: #e74c3c; padding: 20px;">加载失败</td></tr>';
                 if (bochaTbody) bochaTbody.innerHTML = '<tr><td colspan="10" style="text-align: center; color: #e74c3c; padding: 20px;">加载失败</td></tr>';
                 if (unifuncsTbody) unifuncsTbody.innerHTML = '<tr><td colspan="10" style="text-align: center; color: #e74c3c; padding: 20px;">加载失败</td></tr>';
+                if (qwenTbody) qwenTbody.innerHTML = '<tr><td colspan="10" style="text-align: center; color: #e74c3c; padding: 20px;">加载失败</td></tr>';
             }
         }
         
@@ -5030,18 +5032,21 @@ curl '${metaApiUrl}?name=${modelName}'`;
             const chatglmKeys = webSearchKeysData.filter(k => k.searcher_type === 'chatglm');
             const bochaKeys = webSearchKeysData.filter(k => k.searcher_type === 'bocha');
             const unifuncsKeys = webSearchKeysData.filter(k => k.searcher_type === 'unifuncs');
+            const qwenKeys = webSearchKeysData.filter(k => k.searcher_type === 'qwen');
             
             const showBrave = !filter || filter === 'brave';
             const showTavily = !filter || filter === 'tavily';
             const showChatglm = !filter || filter === 'chatglm';
             const showBocha = !filter || filter === 'bocha';
             const showUnifuncs = !filter || filter === 'unifuncs';
+            const showQwen = !filter || filter === 'qwen';
             
             renderWebSearchTypeTable('ws-brave-tbody', showBrave ? braveKeys : []);
             renderWebSearchTypeTable('ws-tavily-tbody', showTavily ? tavilyKeys : []);
             renderWebSearchTypeTable('ws-chatglm-tbody', showChatglm ? chatglmKeys : []);
             renderWebSearchTypeTable('ws-bocha-tbody', showBocha ? bochaKeys : []);
             renderWebSearchTypeTable('ws-unifuncs-tbody', showUnifuncs ? unifuncsKeys : []);
+            renderWebSearchTypeTable('ws-qwen-tbody', showQwen ? qwenKeys : []);
             
             // Show/hide table sections based on filter
             const braveSection = document.getElementById('ws-brave-table');
@@ -5049,11 +5054,13 @@ curl '${metaApiUrl}?name=${modelName}'`;
             const chatglmSection = document.getElementById('ws-chatglm-table');
             const bochaSection = document.getElementById('ws-bocha-table');
             const unifuncsSection = document.getElementById('ws-unifuncs-table');
+            const qwenSection = document.getElementById('ws-qwen-table');
             if (braveSection) braveSection.closest('.table-container').style.display = showBrave ? '' : 'none';
             if (tavilySection) tavilySection.closest('.table-container').style.display = showTavily ? '' : 'none';
             if (chatglmSection) chatglmSection.closest('.table-container').style.display = showChatglm ? '' : 'none';
             if (bochaSection) bochaSection.closest('.table-container').style.display = showBocha ? '' : 'none';
             if (unifuncsSection) unifuncsSection.closest('.table-container').style.display = showUnifuncs ? '' : 'none';
+            if (qwenSection) qwenSection.closest('.table-container').style.display = showQwen ? '' : 'none';
             
             // Also show/hide the section headers
             if (braveSection) braveSection.closest('.table-container').previousElementSibling.style.display = showBrave ? '' : 'none';
@@ -5061,6 +5068,7 @@ curl '${metaApiUrl}?name=${modelName}'`;
             if (chatglmSection) chatglmSection.closest('.table-container').previousElementSibling.style.display = showChatglm ? '' : 'none';
             if (bochaSection) bochaSection.closest('.table-container').previousElementSibling.style.display = showBocha ? '' : 'none';
             if (unifuncsSection) unifuncsSection.closest('.table-container').previousElementSibling.style.display = showUnifuncs ? '' : 'none';
+            if (qwenSection) qwenSection.closest('.table-container').previousElementSibling.style.display = showQwen ? '' : 'none';
         }
         
         function renderWebSearchTypeTable(tbodyId, keys) {

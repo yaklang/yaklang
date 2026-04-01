@@ -64,6 +64,7 @@ type AiBalanceSearchResponse struct {
 	Results      []*ostype.OmniSearchResult `json:"results"`
 	Total        int                        `json:"total"`
 	SearcherType string                     `json:"searcher_type"`
+	Summary      string                     `json:"summary,omitempty"`
 }
 
 // AiBalanceErrorResponse represents an error response from the AiBalance server

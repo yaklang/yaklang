@@ -63,5 +63,14 @@ func (c *OmniAiBalanceSearchClient) Search(query string, config *ostype.SearchCo
 		}
 	}
 
+	// Propagate response-level Summary to individual results if they don't have one
+	if response.Summary != "" {
+		for _, result := range response.Results {
+			if result.Summary == "" {
+				result.Summary = response.Summary
+			}
+		}
+	}
+
 	return response.Results, nil
 }

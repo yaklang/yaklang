@@ -21,7 +21,7 @@ import (
 // WebSearchRequest represents the request body for /v1/web-search
 type WebSearchRequest struct {
 	Query        string `json:"query"`
-	SearcherType string `json:"searcher_type"` // "brave", "tavily", "chatglm", "bocha", "unifuncs" or "" (auto-select), default ""
+	SearcherType string `json:"searcher_type"` // "brave", "tavily", "chatglm", "bocha", "unifuncs", "qwen" or "" (auto-select), default ""
 	MaxResults   int    `json:"max_results"`   // default 10
 	Page         int    `json:"page"`          // default 1
 	PageSize     int    `json:"page_size"`     // default 10
@@ -32,6 +32,7 @@ type WebSearchResponse struct {
 	Results      []*ostype.OmniSearchResult `json:"results"`
 	Total        int                        `json:"total"`
 	SearcherType string                     `json:"searcher_type"`
+	Summary      string                     `json:"summary,omitempty"`
 }
 
 // serveWebSearch handles web search relay requests at /v1/web-search
@@ -116,12 +117,12 @@ func (c *ServerConfig) serveWebSearch(conn net.Conn, rawPacket []byte) {
 	}
 
 	// Validate searcher type (empty string means "auto-select")
-	validTypes := map[string]bool{"brave": true, "tavily": true, "chatglm": true, "bocha": true, "unifuncs": true, "": true}
+	validTypes := map[string]bool{"brave": true, "tavily": true, "chatglm": true, "bocha": true, "unifuncs": true, "qwen": true, "": true}
 	if !validTypes[reqBody.SearcherType] {
 		c.logError("invalid searcher type: %s", reqBody.SearcherType)
 		c.writeJSONResponse(conn, http.StatusBadRequest, map[string]interface{}{
 			"error": map[string]string{
-				"message": "searcher_type must be 'brave', 'tavily', 'chatglm', 'bocha', 'unifuncs' or empty (auto-select)",
+				"message": "searcher_type must be 'brave', 'tavily', 'chatglm', 'bocha', 'unifuncs', 'qwen' or empty (auto-select)",
 				"type":    "invalid_request_error",
 			},
 		})
@@ -451,9 +452,22 @@ func (c *ServerConfig) doWebSearch(sk *schema.WebSearchApiKey, req *WebSearchReq
 	case "unifuncs":
 		client := searchers.NewOmniUnifuncsSearchClient()
 		return client.Search(req.Query, config)
+	case "qwen":
+		client := searchers.NewOmniQwenSearchClient()
+		return client.Search(req.Query, config)
 	default:
 		return nil, utils.Errorf("unsupported searcher type: %s", req.SearcherType)
 	}
+}
+
+// extractSummaryFromResults returns the Summary from the first result that has one
+func extractSummaryFromResults(results []*ostype.OmniSearchResult) string {
+	for _, r := range results {
+		if r.Summary != "" {
+			return r.Summary
+		}
+	}
+	return ""
 }
 
 // sendWebSearchResponse sends the web search response and updates API key stats with traffic billing
@@ -462,6 +476,7 @@ func (c *ServerConfig) sendWebSearchResponse(conn net.Conn, results []*ostype.Om
 		Results:      results,
 		Total:        len(results),
 		SearcherType: searcherType,
+		Summary:      extractSummaryFromResults(results),
 	}
 
 	// Update the caller's API key stats asynchronously
@@ -496,6 +511,7 @@ func (c *ServerConfig) sendWebSearchResponseNoBilling(conn net.Conn, results []*
 		Results:      results,
 		Total:        len(results),
 		SearcherType: searcherType,
+		Summary:      extractSummaryFromResults(results),
 	}
 	c.writeJSONResponse(conn, http.StatusOK, resp)
 }
