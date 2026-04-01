@@ -160,7 +160,8 @@ func (base *ScopedVersionedTable[T]) Merge(
 	}
 
 	defer func() {
-		for v, ret := range tmpPhiScope {
+		for _, v := range sortedVersionedKeys(tmpPhiScope) {
+			ret := tmpPhiScope[v]
 			// if v.GetKind() == PointerVariable {
 
 			// } else {
@@ -168,7 +169,8 @@ func (base *ScopedVersionedTable[T]) Merge(
 			base.tryRegisterCapturedVariable(v.GetName(), v)
 			// }
 		}
-		for v, ret := range tmpPhiCapture {
+		for _, v := range sortedVersionedKeys(tmpPhiCapture) {
+			ret := tmpPhiCapture[v]
 			err := v.Assign(ret)
 			if !utils.IsNil(err) {
 				log.Warnf("BUG: variable.Assign error: %v", err)
@@ -189,7 +191,8 @@ func (base *ScopedVersionedTable[T]) Merge(
 		})
 	}
 
-	for ver, m := range tmpVariable {
+	for _, ver := range sortedVersionedKeys(tmpVariable) {
+		m := tmpVariable[ver]
 		generatePhi(ver, m, tmpIsCapture[ver])
 	}
 }
@@ -201,7 +204,8 @@ func (condition *ScopedVersionedTable[T]) Spin(
 ) {
 	condition.spin = false
 	condition.createEmptyPhi = nil
-	for name, ver := range condition.linkIncomingPhi {
+	for _, name := range sortedStringKeys(condition.linkIncomingPhi) {
+		ver := condition.linkIncomingPhi[name]
 		last := latch.ReadValue(name)
 		origin := header.ReadValue(name)
 		if utils.IsNil(last) || utils.IsNil(origin) {

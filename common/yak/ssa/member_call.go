@@ -6,6 +6,9 @@ import (
 
 // get field value
 func (b *FunctionBuilder) getFieldValue(object, key Value, wantFunction bool) Value {
+	if existed, ok := getExistingMemberValue(object, key); ok {
+		return existed
+	}
 	res := checkCanMemberCallExist(object, key, wantFunction)
 	// normal member
 	// use name  peek value
@@ -148,6 +151,9 @@ func (b *FunctionBuilder) createDefaultMember(res checkMemberResult, object, key
 		return un
 	}
 	if para, ok := ToParameter(object); ok {
+		if existed, ok := getExistingMemberValue(object, key); ok {
+			return existed
+		}
 		// if member, ok2 := para.GetStringMember(key.String()); ok2 {
 		// 	return member
 		// }
@@ -158,6 +164,9 @@ func (b *FunctionBuilder) createDefaultMember(res checkMemberResult, object, key
 	}
 	config := b.prog.config
 	if member, ok := ToParameterMember(object); ok {
+		if existed, ok := getExistingMemberValue(object, key); ok {
+			return existed
+		}
 		if !wantFunction || config.isSupportConstMethod {
 			parameterMember := b.NewMoreParameterMember(name, member, key)
 			memberHandler(parameterMember)

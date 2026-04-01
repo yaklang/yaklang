@@ -742,12 +742,17 @@ type parameterMemberInner struct {
 	// 存储被访问成员（字段或方法）对应的 Value ID
 	// 可通过 GetValueById 获取实际的 Value 对象
 	MemberCallKey int64
+
+	// MemberCallKeyStable 是用于复用/去重的稳定 key 签名。
+	// const key 使用语义字面值，dynamic key 优先使用源码范围。
+	MemberCallKeyStable string
 }
 
 func newParameterMember(obj *Parameter, key Value) *parameterMemberInner {
 	new := &parameterMemberInner{
-		ObjectName:    obj.GetName(),
-		MemberCallKey: key.GetId(),
+		ObjectName:          obj.GetName(),
+		MemberCallKey:       key.GetId(),
+		MemberCallKeyStable: buildMemberKeyStableSignature(key),
 	}
 
 	if obj.IsFreeValue {
@@ -762,7 +767,8 @@ func newParameterMember(obj *Parameter, key Value) *parameterMemberInner {
 
 func newMoreParameterMember(member *ParameterMember, key Value) *parameterMemberInner {
 	p := &parameterMemberInner{
-		MemberCallKey:         key.GetId(), // Changed: Use key.GetId()
+		MemberCallKey:         key.GetId(),
+		MemberCallKeyStable:   buildMemberKeyStableSignature(key),
 		MemberCallKind:        MoreParameterMember,
 		MemberCallObjectName:  member.GetName(),
 		MemberCallObjectIndex: member.FormalParameterIndex,

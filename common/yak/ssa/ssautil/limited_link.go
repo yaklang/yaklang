@@ -112,7 +112,8 @@ func (m linkNodeMap[T]) GetHead(key string) VersionedIF[T] {
 }
 
 func (m linkNodeMap[T]) ForEach(handler VariableHandler[T]) {
-	for k, v := range m.val {
+	for _, k := range sortedStringKeys(m.val) {
+		v := m.val[k]
 		handler(k, v.Last())
 	}
 }

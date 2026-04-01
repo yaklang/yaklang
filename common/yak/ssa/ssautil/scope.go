@@ -473,13 +473,15 @@ func (scope *ScopedVersionedTable[T]) GetVariableFromValue(value T) VersionedIF[
 }
 
 func (ps *ScopedVersionedTable[T]) ForEachCapturedVariable(handler VariableHandler[T]) {
-	for name, ver := range ps.linkCaptured {
+	for _, name := range sortedStringKeys(ps.linkCaptured) {
+		ver := ps.linkCaptured[name]
 		handler(name, ver)
 	}
 }
 
 func (ps *ScopedVersionedTable[T]) ForEachCapturedSideEffect(handler func(string, []VersionedIF[T])) {
-	for name, ver := range ps.linkSideEffect {
+	for _, name := range sortedStringKeys(ps.linkSideEffect) {
+		ver := ps.linkSideEffect[name]
 		handler(name, ver)
 	}
 }

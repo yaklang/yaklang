@@ -2,10 +2,208 @@ package ssa
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+func traceMemberND(stage string, object, key Value, detail string) {
+	if os.Getenv("YAK_SSA_TRACE_MEMBER_ND") == "" {
+		return
+	}
+	if utils.IsNil(object) || utils.IsNil(key) {
+		return
+	}
+	if _, ok := ToParameter(object); !ok {
+		if _, ok := ToParameterMember(object); !ok {
+			return
+		}
+	}
+	keyRange := ""
+	if r := key.GetRange(); r != nil {
+		keyRange = r.GetText()
+	}
+	keyStable := buildMemberKeyStableSignature(key)
+	log.Infof("[member-nd] %s obj=%s(id=%d,op=%s) key=%s(id=%d,op=%s) key_verbose=%q key_range=%q detail=%s",
+		stage,
+		object.GetVerboseName(), object.GetId(), object.GetOpcode(),
+		GetKeyString(key), key.GetId(), key.GetOpcode(),
+		key.GetVerboseName(), keyRange, fmt.Sprintf("%s key_stable=%q", detail, keyStable),
+	)
+}
+
+func buildMemberKeyStableSignature(key Value) string {
+	return buildMemberKeyStableSignatureWithVisited(key, make(map[int64]bool))
+}
+
+func buildMemberKeyStableSignatureWithVisited(key Value, visited map[int64]bool) string {
+	if utils.IsNil(key) {
+		return ""
+	}
+	if id := key.GetId(); id > 0 {
+		if visited[id] {
+			return fmt.Sprintf("visited:%d", id)
+		}
+		visited[id] = true
+	}
+	if param, ok := ToParameter(key); ok {
+		if param.IsFreeValue {
+			return fmt.Sprintf("parameter:free:%s", param.GetName())
+		}
+		return fmt.Sprintf("parameter:index:%d:%s", param.FormalParameterIndex, param.GetName())
+	}
+	if pm, ok := ToParameterMember(key); ok {
+		if sig := buildParameterMemberStableSignature(pm, visited); sig != "" {
+			return sig
+		}
+	}
+	if keyConst, ok := ToConstInst(key); ok {
+		switch {
+		case keyConst.IsString():
+			return fmt.Sprintf("const:string:%s", keyConst.VarString())
+		case keyConst.IsNumber():
+			return fmt.Sprintf("const:number:%d", keyConst.Number())
+		case keyConst.IsBoolean():
+			return fmt.Sprintf("const:boolean:%t", keyConst.Boolean())
+		default:
+			raw := keyConst.Const.GetRawValue()
+			return fmt.Sprintf("const:raw:%T:%v", raw, raw)
+		}
+	}
+
+	if r := key.GetRange(); r != nil {
+		if editor := r.GetEditor(); editor != nil {
+			if sourceHash := editor.GetIrSourceHash(); sourceHash != "" {
+				return fmt.Sprintf("dynamic:range:%s:%d:%d", sourceHash, r.GetStartOffset(), r.GetEndOffset())
+			}
+			if filePath := editor.GetFilePath(); filePath != "" {
+				return fmt.Sprintf("dynamic:file:%s:%d:%d", filePath, r.GetStartOffset(), r.GetEndOffset())
+			}
+		}
+		if start, end := r.GetStart(), r.GetEnd(); start != nil && end != nil {
+			return fmt.Sprintf("dynamic:pos:%s:%s", start, end)
+		}
+	}
+
+	if verbose := key.GetVerboseName(); verbose != "" {
+		return fmt.Sprintf("dynamic:verbose:%s", verbose)
+	}
+	if name := key.GetName(); name != "" {
+		return fmt.Sprintf("dynamic:name:%s", name)
+	}
+	return fmt.Sprintf("dynamic:id:%d", key.GetId())
+}
+
+func buildParameterMemberStableSignature(member *ParameterMember, visited map[int64]bool) string {
+	if member == nil {
+		return ""
+	}
+	if object := member.GetObject(); !utils.IsNil(object) {
+		if key := member.GetKey(); !utils.IsNil(key) {
+			objectStable := buildMemberKeyStableSignatureWithVisited(object, visited)
+			keyStable := buildMemberKeyStableSignatureWithVisited(key, visited)
+			if objectStable != "" && keyStable != "" {
+				return fmt.Sprintf("parameter-member:%s->%s", objectStable, keyStable)
+			}
+		}
+	}
+
+	inner := member.parameterMemberInner
+	if inner == nil {
+		return ""
+	}
+
+	keyStable := inner.MemberCallKeyStable
+	if keyStable == "" && inner.MemberCallKey > 0 {
+		if key, ok := member.GetValueById(inner.MemberCallKey); ok && !utils.IsNil(key) {
+			keyStable = buildMemberKeyStableSignatureWithVisited(key, visited)
+		}
+	}
+
+	switch inner.MemberCallKind {
+	case ParameterMemberCall:
+		return fmt.Sprintf("parameter-member:param[%d]->%s", inner.MemberCallObjectIndex, keyStable)
+	case FreeValueMemberCall:
+		return fmt.Sprintf("parameter-member:free[%s]->%s", inner.MemberCallObjectName, keyStable)
+	case MoreParameterMember:
+		if fun := member.GetFunc(); fun != nil && inner.MemberCallObjectIndex >= 0 && inner.MemberCallObjectIndex < len(fun.ParameterMembers) {
+			parentID := fun.ParameterMembers[inner.MemberCallObjectIndex]
+			if parentValue, ok := member.GetValueById(parentID); ok && !utils.IsNil(parentValue) {
+				if parentMember, ok := ToParameterMember(parentValue); ok {
+					parentStable := buildParameterMemberStableSignature(parentMember, visited)
+					if parentStable != "" {
+						return fmt.Sprintf("parameter-member:%s->%s", parentStable, keyStable)
+					}
+				}
+			}
+		}
+		return fmt.Sprintf("parameter-member:member[%d]->%s", inner.MemberCallObjectIndex, keyStable)
+	default:
+		return ""
+	}
+}
+
+func getStoredMemberKeyStableSignature(member Value) string {
+	if utils.IsNil(member) {
+		return ""
+	}
+	if key := member.GetKey(); !utils.IsNil(key) {
+		return buildMemberKeyStableSignature(key)
+	}
+	if pm, ok := ToParameterMember(member); ok && pm.parameterMemberInner != nil {
+		return pm.MemberCallKeyStable
+	}
+	return ""
+}
+
+func sameMemberKey(left, right Value) bool {
+	if utils.IsNil(left) || utils.IsNil(right) {
+		return false
+	}
+	if left.GetId() == right.GetId() {
+		return true
+	}
+	leftStable := buildMemberKeyStableSignature(left)
+	rightStable := buildMemberKeyStableSignature(right)
+	return leftStable != "" && leftStable == rightStable
+}
+
+func getExistingMemberValue(object, key Value) (Value, bool) {
+	if utils.IsNil(object) || utils.IsNil(key) {
+		return nil, false
+	}
+	if existed, ok := object.GetMember(key); ok && !utils.IsNil(existed) {
+		traceMemberND("direct-hit", object, key, fmt.Sprintf("member=%s(id=%d)", existed.GetVerboseName(), existed.GetId()))
+		return existed, true
+	}
+	keyStable := buildMemberKeyStableSignature(key)
+	var found Value
+	foundStable := ""
+	object.ForEachMember(func(memberKey, member Value) bool {
+		switch {
+		case sameMemberKey(memberKey, key):
+			found = member
+			foundStable = buildMemberKeyStableSignature(memberKey)
+			return false
+		case keyStable != "":
+			memberStable := getStoredMemberKeyStableSignature(member)
+			if memberStable == "" || memberStable != keyStable {
+				return true
+			}
+			found = member
+			foundStable = memberStable
+			return false
+		}
+		return true
+	})
+	if utils.IsNil(found) {
+		traceMemberND("semantic-fallback-miss", object, key, fmt.Sprintf("wanted_stable=%q", keyStable))
+		return nil, false
+	}
+	traceMemberND("semantic-fallback-hit", object, key, fmt.Sprintf("member=%s(id=%d) matched_stable=%q", found.GetVerboseName(), found.GetId(), foundStable))
+	return found, true
+}
 
 // value
 func setMemberCallRelationship(obj, key, member Value) {
@@ -37,7 +235,7 @@ func setMemberCallRelationship(obj, key, member Value) {
 			if !ok || edgeValue == nil {
 				continue
 			}
-			if _, ok := edgeValue.GetMember(key); ok { // 避免循环
+			if _, ok := getExistingMemberValue(edgeValue, key); ok { // 避免循环
 				continue
 			}
 			if _, ok := edgeValue.(*Call); ok {
@@ -262,11 +460,7 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 	default:
 	}
 	//保底操作，从val-member中获取
-	if member, exist := value.GetMember(key); exist {
-		ret.typ = member.GetType()
-		return
-	}
-	member, exist := value.GetStringMember(keyText)
+	member, exist := getExistingMemberValue(value, key)
 	if exist {
 		ret.typ = member.GetType()
 		return

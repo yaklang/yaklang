@@ -190,8 +190,9 @@ func handlerReturnType(rs []*Return, functionType *FunctionType) Type {
 							Modify:      value.GetId(),
 							Kind:        NormalSideEffect,
 							parameterMemberInner: &parameterMemberInner{
-								MemberCallKind: CallMemberCall,
-								MemberCallKey:  key.GetId(),
+								MemberCallKind:      CallMemberCall,
+								MemberCallKey:       key.GetId(),
+								MemberCallKeyStable: buildMemberKeyStableSignature(key),
 							},
 						})
 					}

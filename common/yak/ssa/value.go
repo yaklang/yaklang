@@ -48,13 +48,23 @@ func (b *FunctionBuilder) ReadValueByVariable(v *Variable) Value {
 	}
 
 	if para, ok := ToParameter(v.object); ok {
+		if existed, ok := getExistingMemberValue(para, v.key); ok {
+			return existed
+		}
 		res := checkCanMemberCallExist(para, v.key)
+		if existed := b.PeekValueInThisFunction(res.name); !utils.IsNil(existed) {
+			return existed
+		}
 		newParamterMember := b.NewParameterMember(res.name, para, v.key)
 		newParamterMember.SetType(res.typ)
 		setMemberCallRelationship(para, v.key, newParamterMember)
 		setMemberVerboseName(newParamterMember)
+		return newParamterMember
 	}
 	if !utils.IsNil(v.object) {
+		if existed, ok := getExistingMemberValue(v.object, v.key); ok {
+			return existed
+		}
 		ret := checkCanMemberCallExist(v.object, v.key)
 		if val := b.PeekValueInThisFunction(ret.name); !utils.IsNil(val) {
 			return val

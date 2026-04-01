@@ -134,6 +134,9 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 				if se.MemberCallKey > 0 {
 					element["member_call_key"] = se.MemberCallKey
 				}
+				if se.MemberCallKeyStable != "" {
+					element["member_call_key_stable"] = se.MemberCallKeyStable
+				}
 			}
 			sideEffects = append(sideEffects, element)
 		}
@@ -288,6 +291,9 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		if ret.MemberCallKey > 0 {
 			params["member_call_key"] = ret.MemberCallKey
 		}
+		if ret.MemberCallKeyStable != "" {
+			params["member_call_key_stable"] = ret.MemberCallKeyStable
+		}
 		// params["member_call_obj"] = ret.GetObject()
 	case *Phi:
 		params["phi_edges"] = ret.Edge
@@ -436,6 +442,7 @@ func unmarshalExtraInformation(cache *ProgramCache, inst Instruction, ir *ssadb.
 		ret.MemberCallObjectIndex = utils.MapGetInt(params, "member_call_index")
 		ret.MemberCallObjectName = utils.MapGetString(params, "member_call_name")
 		ret.MemberCallKey = utils.MapGetInt64(params, "member_call_key")
+		ret.MemberCallKeyStable = utils.MapGetString(params, "member_call_key_stable")
 	case *Phi:
 		ret.Edge = utils.MapGetInt64Slice(params, "phi_edges")
 		ret.CFGEntryBasicBlock = utils.MapGetInt64(params, "cfg_entry")
@@ -538,6 +545,7 @@ func unmarshalExtraInformation(cache *ProgramCache, inst Instruction, ir *ssadb.
 				if extra["member_call_key"] != nil {
 					ins.MemberCallKey = utils.MapGetInt64(extra, "member_call_key")
 				}
+				ins.MemberCallKeyStable = utils.MapGetString(extra, "member_call_key_stable")
 				se = append(se, ins)
 			})
 			ret.SideEffects = se
