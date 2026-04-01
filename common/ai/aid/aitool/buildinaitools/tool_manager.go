@@ -499,7 +499,6 @@ Direct Params Schema (for directly_call_tool only):
 {{ .DisplaySchemaSnippet }}
 {{ if .Usage }}__USAGE__: {{ .Usage }}
 {{ end }}<|TOOL_{{ .Name }}_END_{{ .Nonce }}|>
-
 `
 
 const recentToolSummaryFooterTemplate = `## How to use directly_call_tool
