@@ -47,6 +47,9 @@ var (
 	// default  http flow save config
 	GLOBAL_HTTP_FLOW_SAVE = utils.NewBool(true)
 
+	// disable httpflow slow query notification
+	GLOBAL_HTTPFLOW_SLOW_QUERY_NOTIFICATION_DISABLED = utils.NewBool(false)
+
 	//control response max content-length
 	GLOBAL_MAXSIZE_CONTENT_LENGTH = atomic.NewUint64(1024 * 1024 * 10)
 

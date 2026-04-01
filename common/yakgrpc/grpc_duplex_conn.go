@@ -77,6 +77,28 @@ func logSlowSQLBroadcastDetails(kind string, items []*yakit.LongSQLDescription) 
 	}
 }
 
+func buildSlowSQLBroadcastPayload(avgCost time.Duration, items []*yakit.LongSQLDescription) *SlowSQLBroadcastPayload {
+	return &SlowSQLBroadcastPayload{
+		AvgCost:            avgCost.String(),
+		AvgCostMs:          avgCost.Milliseconds(),
+		Count:              len(items),
+		Items:              items,
+		DatabasePathGroups: uniqueDatabasePaths(items),
+	}
+}
+
+func broadcastHTTPFlowSlowQuerySQL(avgCost time.Duration, items []*yakit.LongSQLDescription) bool {
+	if consts.GLOBAL_HTTPFLOW_SLOW_QUERY_NOTIFICATION_DISABLED.IsSet() {
+		log.Infof("skip broadcast slow query SQL event to frontend: notification disabled, avg_cost:%v, count:%d", avgCost.String(), len(items))
+		return false
+	}
+
+	log.Infof("broadcast slow query SQL event to frontend: avg_cost:%v, count:%d", avgCost.String(), len(items))
+	logSlowSQLBroadcastDetails("query", items)
+	yakit.BroadcastData(yakit.ServerPushType_SlowQuerySQL, buildSlowSQLBroadcastPayload(avgCost, items))
+	return true
+}
+
 func (s *Server) DuplexConnection(stream ypb.Yak_DuplexConnectionServer) error {
 	id := uuid.New().String()
 	yakit.RegisterServerPushCallback(id, stream)
@@ -186,28 +208,14 @@ func (s *Server) DuplexConnection(stream ypb.Yak_DuplexConnectionServer) error {
 		yakit.RegisterHTTPFlowSlowInsertCallback(func(avgCost time.Duration, items []*yakit.LongSQLDescription) {
 			log.Infof("broadcast slow insert SQL event to frontend: avg_cost:%v, count:%d", avgCost.String(), len(items))
 			logSlowSQLBroadcastDetails("insert", items)
-			yakit.BroadcastData(yakit.ServerPushType_SlowInsertSQL, &SlowSQLBroadcastPayload{
-				AvgCost:            avgCost.String(),
-				AvgCostMs:          avgCost.Milliseconds(),
-				Count:              len(items),
-				Items:              items,
-				DatabasePathGroups: uniqueDatabasePaths(items),
-			})
+			yakit.BroadcastData(yakit.ServerPushType_SlowInsertSQL, buildSlowSQLBroadcastPayload(avgCost, items))
 		})
 	}
 
 	// HTTPFlow slow query SQL monitoring（dbpath 在 items[].database_path，由各创建处按实际使用的 DB 设置）
 	{
 		yakit.RegisterHTTPFlowSlowQueryCallback(func(avgCost time.Duration, items []*yakit.LongSQLDescription) {
-			log.Infof("broadcast slow query SQL event to frontend: avg_cost:%v, count:%d", avgCost.String(), len(items))
-			logSlowSQLBroadcastDetails("query", items)
-			yakit.BroadcastData(yakit.ServerPushType_SlowQuerySQL, &SlowSQLBroadcastPayload{
-				AvgCost:            avgCost.String(),
-				AvgCostMs:          avgCost.Milliseconds(),
-				Count:              len(items),
-				Items:              items,
-				DatabasePathGroups: uniqueDatabasePaths(items),
-			})
+			broadcastHTTPFlowSlowQuerySQL(avgCost, items)
 		})
 	}
 

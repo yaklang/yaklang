@@ -61,6 +61,27 @@ func TestUniqueDatabasePaths(t *testing.T) {
 	})
 }
 
+func TestBroadcastHTTPFlowSlowQuerySQLRespectsGlobalConfig(t *testing.T) {
+	original := consts.GLOBAL_HTTPFLOW_SLOW_QUERY_NOTIFICATION_DISABLED.IsSet()
+	defer consts.GLOBAL_HTTPFLOW_SLOW_QUERY_NOTIFICATION_DISABLED.SetTo(original)
+
+	items := []*yakit.LongSQLDescription{
+		{
+			DatabasePath: "/tmp/project.db",
+			Duration:     3 * time.Second,
+			DurationMs:   3000,
+			DurationStr:  "3s",
+			FuncName:     "test",
+		},
+	}
+
+	consts.GLOBAL_HTTPFLOW_SLOW_QUERY_NOTIFICATION_DISABLED.SetTo(true)
+	require.False(t, broadcastHTTPFlowSlowQuerySQL(3*time.Second, items))
+
+	consts.GLOBAL_HTTPFLOW_SLOW_QUERY_NOTIFICATION_DISABLED.SetTo(false)
+	require.True(t, broadcastHTTPFlowSlowQuerySQL(3*time.Second, items))
+}
+
 func TestDuplexConnection(t *testing.T) {
 	client, err := NewLocalClient(true)
 	require.Nil(t, err, "create local client error")
@@ -319,7 +340,7 @@ func TestGRPCMUSTPASS_MITMSlowRuleHook(t *testing.T) {
 					typeField, ok := item["type"].(string)
 					require.True(t, ok, "type should be string")
 					require.Contains(t, []string{"hook_color", "hook_request", "hook_response"}, typeField, "type should be one of hook_color, hook_request, hook_response")
-					
+
 					// 记录已测试的 Hook 类型
 					if typeField == "hook_color" || typeField == "hook_request" || typeField == "hook_response" {
 						testHookTypes[typeField] = true
@@ -351,14 +372,14 @@ func TestGRPCMUSTPASS_MITMSlowRuleHook(t *testing.T) {
 						testHookTypes[hookType] = true
 					}
 				}
-				
+
 				// 如果已经收到所有三种类型的 Hook，可以返回
 				if testHookTypes["hook_color"] && testHookTypes["hook_request"] && testHookTypes["hook_response"] {
-					t.Logf("received all three hook types: hook_color=%v, hook_request=%v, hook_response=%v", 
+					t.Logf("received all three hook types: hook_color=%v, hook_request=%v, hook_response=%v",
 						testHookTypes["hook_color"], testHookTypes["hook_request"], testHookTypes["hook_response"])
 					return
 				}
-				
+
 				// 如果当前批次中包含了多种类型，继续等待可能还有其他批次
 				if len(hookTypesInItems) >= 2 {
 					t.Logf("received multiple hook types in this batch: %v", hookTypesInItems)
@@ -372,7 +393,7 @@ func TestGRPCMUSTPASS_MITMSlowRuleHook(t *testing.T) {
 	case <-done:
 		// 正常结束
 	case <-time.After(10 * time.Second):
-		t.Logf("test timeout: received hook types: hook_color=%v, hook_request=%v, hook_response=%v", 
+		t.Logf("test timeout: received hook types: hook_color=%v, hook_request=%v, hook_response=%v",
 			testHookTypes["hook_color"], testHookTypes["hook_request"], testHookTypes["hook_response"])
 		// 不直接失败，而是检查是否至少收到了一种类型
 	}
@@ -382,8 +403,8 @@ func TestGRPCMUSTPASS_MITMSlowRuleHook(t *testing.T) {
 	// 验证至少收到了一种 Hook 类型
 	atLeastOneHookType := testHookTypes["hook_color"] || testHookTypes["hook_request"] || testHookTypes["hook_response"]
 	require.True(t, atLeastOneHookType, "should receive at least one hook type")
-	
+
 	// 由于节流机制，可能不会在一次广播中包含所有三种类型，所以只验证至少收到了一种
-	t.Logf("test completed: received hook types - hook_color=%v, hook_request=%v, hook_response=%v", 
+	t.Logf("test completed: received hook types - hook_color=%v, hook_request=%v, hook_response=%v",
 		testHookTypes["hook_color"], testHookTypes["hook_request"], testHookTypes["hook_response"])
 }
