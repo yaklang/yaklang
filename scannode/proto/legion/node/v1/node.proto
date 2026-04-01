@@ -62,6 +62,16 @@ message BootstrapResponse {
   google.protobuf.Timestamp expires_at = 6;
 }
 
+message ActiveAttemptHeartbeat {
+  string attempt_id = 1;
+  string job_id = 2;
+  string subtask_id = 3;
+  string status = 4;
+  uint32 completed_units = 5;
+  uint32 total_units = 6;
+  google.protobuf.Timestamp last_activity_at = 7;
+}
+
 message NodeHeartbeat {
   EventMetadata metadata = 1;
   NodeLifecycleState lifecycle_state = 2;
@@ -70,6 +80,7 @@ message NodeHeartbeat {
   uint32 max_running_jobs = 5;
   repeated string capability_keys = 6;
   map<string, string> labels = 7;
+  repeated ActiveAttemptHeartbeat active_attempts = 8;
 }
 
 message NodeLog {
