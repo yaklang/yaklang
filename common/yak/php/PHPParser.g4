@@ -91,7 +91,7 @@ phpBlock
     ;
 
 importStatement
-    : Import Namespace namespaceNameList SemiColon
+    : Import Namespace namespaceUseDeclaration SemiColon
     ;
 
 topStatement
@@ -109,7 +109,7 @@ useDeclaration
     ;
 
 useDeclarationContentList
-    : '\\'? namespaceNameList (',' '\\'? namespaceNameList)*
+    : namespaceUseDeclaration (',' namespaceUseDeclaration)*
     ;
 
 namespacePath
@@ -502,7 +502,6 @@ staticClassExprFunctionMember
 
 staticClassExprVariableMember
     : staticClass '::' variable
-    | staticClass '::' variable OpenSquareBracket expression? CloseSquareBracket
     ;
 
 staticClass
@@ -601,9 +600,9 @@ defineExpr
     ;
 
 variable
-    : VarName                                               # NormalVariable     // $a=3
-    | Dollar+ VarName                                       # DynamicVariable    // $$a= 1; or $$$a=1;
-    | Dollar+ OpenCurlyBracket expression CloseCurlyBracket # MemberCallVariable // ${ expr }=3
+    : VarName squareCurlyExpression*                                               # NormalVariable     // $a=3
+    | Dollar+ VarName squareCurlyExpression*                                       # DynamicVariable    // $$a= 1; or $$$a=1;
+    | Dollar+ OpenCurlyBracket expression CloseCurlyBracket squareCurlyExpression* # MemberCallVariable // ${ expr }=3
     ;
 
 include
@@ -724,17 +723,21 @@ indirectTypeRef
     ;
 
 qualifiedNamespaceName
-    : Namespace? '\\'? namespaceNameList
+    : Namespace? namespacePath
     ;
 
-namespaceNameList
-    : namespacePath (As identifier)?        # NamespaceIdentifier //这里
-    | namespacePath '\\'? namespaceNameTail # NamespaceListNameTail
-    ;
-
-namespaceNameTail
+namespaceUseDeclaration
     : namespacePath (As identifier)?
-    | OpenCurlyBracket namespaceNameTail (',' namespaceNameTail)* ','? CloseCurlyBracket
+    | namespacePath '\\' namespaceUseTail
+    ;
+
+namespaceUseTail
+    : OpenCurlyBracket namespaceUseClause (',' namespaceUseClause)* ','? CloseCurlyBracket
+    ;
+
+namespaceUseClause
+    : namespacePath (As identifier)?
+    | namespacePath '\\' namespaceUseTail
     ;
 
 qualifiedNamespaceNameList
@@ -913,6 +916,8 @@ key
     | Clone
     | Const
     | Continue
+    | Define
+    | Defined
     | Declare
     | Default
     | Do
@@ -983,7 +988,7 @@ key
     | UintCast
     | UnicodeCast
     | Unset
-    | Use
+    //    | Use
     | Var
     | While
     | Yield
