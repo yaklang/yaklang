@@ -54,6 +54,7 @@ func (s *OmniSearchClient) InitDefaultSearchers() {
 	s.searcherList[ostype.SearcherTypeChatGLM] = searchers.NewOmniChatGLMSearchClient()
 	s.searcherList[ostype.SearcherTypeBocha] = searchers.NewOmniBochaSearchClient()
 	s.searcherList[ostype.SearcherTypeUnifuncs] = searchers.NewOmniUnifuncsSearchClient()
+	s.searcherList[ostype.SearcherTypeQwen] = searchers.NewOmniQwenSearchClient()
 	for _, searcher := range searcherList {
 		s.searcherList[searcher.GetType()] = searcher
 	}
@@ -123,8 +124,15 @@ func (s *OmniSearchClient) Search(query string, options ...ostype.SearchOption) 
 	if err != nil {
 		return nil, err
 	}
-	return &ostype.OmniSearchResultList{
+	resultList := &ostype.OmniSearchResultList{
 		Results: res,
 		Total:   len(res),
-	}, nil
+	}
+	for _, r := range res {
+		if r.Summary != "" {
+			resultList.Summary = r.Summary
+			break
+		}
+	}
+	return resultList, nil
 }
