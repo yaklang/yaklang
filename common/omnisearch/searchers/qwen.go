@@ -20,7 +20,7 @@ type QwenSearchConfig struct {
 	Timeout               float64
 	Proxy                 string
 	SearchStrategy        string // turbo (default), max, agent, agent_max
-	ForcedSearch          bool
+	ForcedSearch          bool   // kept for compatibility; native qwen search always forces联网
 	MaxTokens             int
 	EnableCitation        bool
 	CitationFormat        string
@@ -149,7 +149,7 @@ func (c *QwenSearchClient) Search(query string) (*QwenSearchResponse, error) {
 		EnableSource:          true,
 		EnableCitation:        c.Config.EnableCitation,
 		CitationFormat:        c.Config.CitationFormat,
-		ForcedSearch:          c.Config.ForcedSearch,
+		ForcedSearch:          true,
 		SearchStrategy:        c.Config.SearchStrategy,
 		EnableSearchExtension: c.Config.EnableSearchExtension,
 		Freshness:             c.Config.Freshness,

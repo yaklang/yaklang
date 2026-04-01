@@ -213,6 +213,35 @@ func TestQwenSearch_NativeSearchInfo(t *testing.T) {
 	}
 }
 
+func TestQwenSearch_ForcedSearchCannotBeDisabled(t *testing.T) {
+	baseURL, cleanup := mockQwenServer(t, func(t *testing.T, req *qwenRequest) {
+		if req.Parameters == nil || req.Parameters.SearchOptions == nil {
+			t.Fatal("search_options should not be nil")
+		}
+		if !req.Parameters.SearchOptions.ForcedSearch {
+			t.Fatal("forced_search should remain true even when config requests false")
+		}
+	})
+	defer cleanup()
+
+	client := NewQwenSearchClient(&QwenSearchConfig{
+		APIKey:                "test-key",
+		BaseURL:               baseURL,
+		Model:                 "qwen-plus",
+		Timeout:               10,
+		SearchStrategy:        "max",
+		ForcedSearch:          false,
+		MaxTokens:             256,
+		EnableCitation:        true,
+		CitationFormat:        "[ref_<number>]",
+		EnableSearchExtension: true,
+	})
+
+	if _, err := client.Search("Yaklang 是什么？"); err != nil {
+		t.Fatalf("qwen search failed: %v", err)
+	}
+}
+
 func TestQwenSearch_MissingAPIKey(t *testing.T) {
 	client := NewQwenSearchClient(&QwenSearchConfig{
 		BaseURL: "http://127.0.0.1:1/api/v1/services/aigc/text-generation/generation",
@@ -269,5 +298,29 @@ func TestOmniQwenSearchClient_PaginationAndOfficialContent(t *testing.T) {
 	}
 	if data["display_content"] != "[vertical-search]\n这是官方直接返回的网页正文片段。" {
 		t.Fatalf("unexpected display_content in data: %+v", data)
+	}
+}
+
+func TestOmniQwenSearchClient_ForcedSearchExtraFalseIgnored(t *testing.T) {
+	baseURL, cleanup := mockQwenServer(t, func(t *testing.T, req *qwenRequest) {
+		if req.Parameters == nil || req.Parameters.SearchOptions == nil {
+			t.Fatal("search_options should not be nil")
+		}
+		if !req.Parameters.SearchOptions.ForcedSearch {
+			t.Fatal("forced_search should remain true when omni extra passes false")
+		}
+	})
+	defer cleanup()
+
+	client := NewOmniQwenSearchClient()
+	if _, err := client.Search("Yaklang 是什么？", &ostype.SearchConfig{
+		ApiKey:  "test-key",
+		BaseURL: baseURL,
+		Extra: map[string]any{
+			"model":         "qwen-plus",
+			"forced_search": false,
+		},
+	}); err != nil {
+		t.Fatalf("omni qwen search failed: %v", err)
 	}
 }
