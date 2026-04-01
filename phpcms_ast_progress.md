@@ -175,3 +175,53 @@ Regression rerun after QloApps:
   - total parsed files: `7163`
   - total project parse time: about `1m44.67s`
   - log: `../build/backup/php-project-ast-logs/prestashop-project-ast-rerun-after-qloapps.log`
+
+## 2026-04-01 22:35:46 +08:00
+
+### Bolt
+
+- Status: completed
+- Project path: `/home/wlz/Target/phpcms/bolt`
+
+Changes made:
+
+- Added Bolt regression fixtures under:
+  - `common/yak/php/tests/syntax/bolt/`
+- Copied the 2 initial project blockers into the fixture directory:
+  - `app/bootstrap.php`
+  - `src/Storage/Mapping/MetadataDriver.php`
+- Extended `foreach` grammar support for Bolt-driven forms:
+  - `foreach ($items as &$value)`
+  - `foreach ($items as list(...))`
+  - `foreach ($items as $key => list(...))`
+
+Verification:
+
+- `go test ./common/yak/php/tests -run 'TestAllSyntaxForPHP_G4/syntax file: syntax/bolt/.*' -count=1 -v`
+  - passed
+  - both copied Bolt repro files now parse successfully
+- `YAK_PHP_RUN_PROJECT_AST=1 YAK_PHP_PROJECT_AST_TARGET=/home/wlz/Target/phpcms/bolt YAK_PHP_FIXTURE_PARSE_BUDGET_SEC=30 go test ./common/yak/php/tests -run TestProjectAst -count=1 -v`
+  - passed
+  - total parsed files: `933`
+  - total project parse time: about `22.23s`
+  - no single-file parse exceeded `30s`
+
+Regression rerun after Bolt:
+
+- `grav`
+  - rerun passed
+  - total parsed files: `522`
+  - total project parse time: about `20.83s`
+  - `FlexObject.php`: about `6.09s`
+  - log: `../build/backup/php-project-ast-logs/grav-project-ast-rerun-after-bolt.log`
+- `QloApps`
+  - rerun passed
+  - total parsed files: `3440`
+  - total project parse time: about `1m37.15s`
+  - heaviest observed file remained below `30s`
+  - log: `../build/backup/php-project-ast-logs/qloapps-project-ast-rerun-after-bolt.log`
+- `PrestaShop`
+  - rerun passed
+  - total parsed files: `7163`
+  - total project parse time: about `2m5.48s`
+  - log: `../build/backup/php-project-ast-logs/prestashop-project-ast-rerun-after-bolt.log`

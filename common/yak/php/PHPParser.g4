@@ -338,7 +338,9 @@ foreachStatement
     : Foreach (
         '(' expression As arrayDestructuring ')'
         | '(' chain As '&'? assignable ('=>' '&'? chain)? ')'
-        | '(' expression As assignable ('=>' '&'? chain)? ')'
+        | '(' expression As '&'? assignable ('=>' '&'? chain)? ')'
+        | '(' expression As List '(' assignmentList ')' ')'
+        | '(' expression As '&'? assignable '=>' List '(' assignmentList ')' ')'
         | '(' chain As List '(' assignmentList ')' ')'
     ) (statement | ':' innerStatementList EndForeach SemiColon)
     ;
