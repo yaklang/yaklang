@@ -2,7 +2,9 @@ package scannode
 
 import (
 	"context"
+	"errors"
 	"testing"
+	"time"
 
 	jobv1 "github.com/yaklang/yaklang/common/legionpb/legion/job/v1"
 	nodev1 "github.com/yaklang/yaklang/common/legionpb/legion/node/v1"
@@ -75,6 +77,185 @@ func TestProgressUnits(t *testing.T) {
 				t.Fatalf("unexpected progress units: got=%d want=%d", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestAttemptProgressCheckpointPublishesFirstDuplicateAndSignificantJump(t *testing.T) {
+	t.Parallel()
+
+	var (
+		checkpoint attemptProgressCheckpoint
+		published  []float64
+	)
+	publish := func(process float64) error {
+		published = append(published, process)
+		return nil
+	}
+	base := time.Date(2026, time.April, 1, 10, 0, 0, 0, time.UTC)
+
+	if err := checkpoint.report(0.10, base, publish); err != nil {
+		t.Fatalf("publish first checkpoint: %v", err)
+	}
+	if err := checkpoint.report(0.10, base.Add(500*time.Millisecond), publish); err != nil {
+		t.Fatalf("publish duplicate checkpoint: %v", err)
+	}
+	if err := checkpoint.report(0.16, base.Add(750*time.Millisecond), publish); err != nil {
+		t.Fatalf("publish significant jump checkpoint: %v", err)
+	}
+
+	if got := len(published); got != 2 {
+		t.Fatalf("unexpected publish count: got=%d want=%d", got, 2)
+	}
+	if published[0] != 0.10 || published[1] != 0.16 {
+		t.Fatalf("unexpected published checkpoints: %#v", published)
+	}
+}
+
+func TestAttemptProgressCheckpointSuppressesHighFrequencyMonotonicProgress(t *testing.T) {
+	t.Parallel()
+
+	var (
+		checkpoint attemptProgressCheckpoint
+		published  []float64
+	)
+	publish := func(process float64) error {
+		published = append(published, process)
+		return nil
+	}
+	base := time.Date(2026, time.April, 1, 10, 0, 0, 0, time.UTC)
+
+	if err := checkpoint.report(0.10001, base, publish); err != nil {
+		t.Fatalf("publish first checkpoint: %v", err)
+	}
+	if err := checkpoint.report(0.10004, base.Add(legionProgressCheckpointInterval/2), publish); err != nil {
+		t.Fatalf("publish throttled duplicate checkpoint: %v", err)
+	}
+	if err := checkpoint.report(0.10490, base.Add(700*time.Millisecond), publish); err != nil {
+		t.Fatalf("publish throttled monotonic checkpoint: %v", err)
+	}
+
+	if got := len(published); got != 1 {
+		t.Fatalf("unexpected publish count: got=%d want=%d", got, 1)
+	}
+	if published[0] != 0.10001 {
+		t.Fatalf("unexpected published checkpoints: %#v", published)
+	}
+}
+
+func TestAttemptProgressCheckpointReemitsAfterIntervalForSmallMonotonicGrowth(t *testing.T) {
+	t.Parallel()
+
+	var (
+		checkpoint attemptProgressCheckpoint
+		published  []float64
+	)
+	publish := func(process float64) error {
+		published = append(published, process)
+		return nil
+	}
+	base := time.Date(2026, time.April, 1, 10, 0, 0, 0, time.UTC)
+
+	if err := checkpoint.report(0.20, base, publish); err != nil {
+		t.Fatalf("publish first checkpoint: %v", err)
+	}
+	if err := checkpoint.report(0.20490, base.Add(500*time.Millisecond), publish); err != nil {
+		t.Fatalf("publish throttled monotonic checkpoint: %v", err)
+	}
+	if err := checkpoint.report(0.20490, base.Add(legionProgressCheckpointInterval+100*time.Millisecond), publish); err != nil {
+		t.Fatalf("publish interval checkpoint: %v", err)
+	}
+
+	if got := len(published); got != 2 {
+		t.Fatalf("unexpected publish count: got=%d want=%d", got, 2)
+	}
+	if published[0] != 0.20 || published[1] != 0.20490 {
+		t.Fatalf("unexpected published checkpoints: %#v", published)
+	}
+}
+
+func TestAttemptProgressCheckpointRepublishesTerminalOnce(t *testing.T) {
+	t.Parallel()
+
+	var (
+		checkpoint attemptProgressCheckpoint
+		published  []float64
+	)
+	publish := func(process float64) error {
+		published = append(published, process)
+		return nil
+	}
+	base := time.Date(2026, time.April, 1, 10, 0, 0, 0, time.UTC)
+
+	if err := checkpoint.report(0.99996, base, publish); err != nil {
+		t.Fatalf("publish near-terminal checkpoint: %v", err)
+	}
+	if err := checkpoint.report(1.0, base.Add(100*time.Millisecond), publish); err != nil {
+		t.Fatalf("publish terminal checkpoint: %v", err)
+	}
+	if err := checkpoint.report(1.0, base.Add(legionProgressCheckpointInterval+200*time.Millisecond), publish); err != nil {
+		t.Fatalf("publish duplicate terminal checkpoint: %v", err)
+	}
+
+	if got := len(published); got != 2 {
+		t.Fatalf("unexpected publish count: got=%d want=%d", got, 2)
+	}
+	if published[0] != 0.99996 || published[1] != 1.0 {
+		t.Fatalf("unexpected published checkpoints: %#v", published)
+	}
+}
+
+func TestAttemptProgressCheckpointDoesNotAdvanceStateOnPublishError(t *testing.T) {
+	t.Parallel()
+
+	var checkpoint attemptProgressCheckpoint
+	base := time.Date(2026, time.April, 1, 10, 0, 0, 0, time.UTC)
+	wantErr := errors.New("publish failed")
+
+	if err := checkpoint.report(0.20, base, func(float64) error { return wantErr }); !errors.Is(err, wantErr) {
+		t.Fatalf("unexpected publish error: %v", err)
+	}
+
+	published := 0
+	if err := checkpoint.report(0.20, base.Add(100*time.Millisecond), func(float64) error {
+		published++
+		return nil
+	}); err != nil {
+		t.Fatalf("publish after error: %v", err)
+	}
+
+	if published != 1 {
+		t.Fatalf("expected retry to publish once, got=%d", published)
+	}
+}
+
+func TestAttemptProgressCheckpointFlushesLatestObservedProgress(t *testing.T) {
+	t.Parallel()
+
+	var (
+		checkpoint attemptProgressCheckpoint
+		published  []float64
+	)
+	publish := func(process float64) error {
+		published = append(published, process)
+		return nil
+	}
+	base := time.Date(2026, time.April, 1, 10, 0, 0, 0, time.UTC)
+
+	if err := checkpoint.report(0.20, base, publish); err != nil {
+		t.Fatalf("publish first checkpoint: %v", err)
+	}
+	if err := checkpoint.report(0.24, base.Add(500*time.Millisecond), publish); err != nil {
+		t.Fatalf("observe throttled checkpoint: %v", err)
+	}
+	if err := checkpoint.flushLatest(base.Add(600*time.Millisecond), publish); err != nil {
+		t.Fatalf("flush latest checkpoint: %v", err)
+	}
+
+	if got := len(published); got != 2 {
+		t.Fatalf("unexpected publish count: got=%d want=%d", got, 2)
+	}
+	if published[0] != 0.20 || published[1] != 0.24 {
+		t.Fatalf("unexpected published checkpoints: %#v", published)
 	}
 }
 

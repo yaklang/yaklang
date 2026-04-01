@@ -24,6 +24,8 @@ type ScannerAgentReporter struct {
 
 	executionRef *jobExecutionRef
 	agent        *ScanNode
+
+	progressCheckpoint attemptProgressCheckpoint
 }
 
 // convertRawToString 将原始数据转换为字符串，处理 JSON 反序列化后的各种数据格式
@@ -300,7 +302,8 @@ func (r *ScannerAgentReporter) ReportProcess(process float64) error {
 	res.RuntimeId = r.RuntimeId
 	res.TaskId = r.TaskId
 	res.SubTaskId = r.SubTaskId
-	return r.publishJobProgress(process)
+	r.updateActiveAttemptProgress(process)
+	return r.reportJobProgress(process)
 }
 
 func (r *ScannerAgentReporter) ReportTCPOpenPort(host interface{}, port interface{}) error {
