@@ -125,3 +125,53 @@ Regression note:
   - `TestNamespace2`
   - `TestOOP_static_member`
 - The same subset also fails when run from the checkpoint export of commit `967e081de`, so these are treated as pre-existing baseline failures for this branch rather than a regression introduced by the grav performance fix.
+
+## 2026-04-01 22:17:40 +08:00
+
+### QloApps
+
+- Status: completed
+- Project path: `/home/wlz/Target/phpcms/QloApps`
+
+Changes made:
+
+- Added QloApps regression fixtures under:
+  - `common/yak/php/tests/syntax/qloapps/`
+- Copied the 8 initial project blockers into the fixture directory:
+  - `classes/controller/AdminController.php`
+  - `controllers/admin/AdminNormalProductsController.php`
+  - `controllers/admin/AdminOrdersController.php`
+  - `controllers/admin/AdminProductsController.php`
+  - `tools/mailer/symfony/event-dispatcher/Debug/TraceableEventDispatcher.php`
+  - `tools/mailer/symfony/event-dispatcher/Debug/WrappedListener.php`
+  - `tools/mailer/symfony/event-dispatcher/EventDispatcher.php`
+  - `tools/mailer/symfony/mime/Crypto/SMimeEncrypter.php`
+- Extended the grammar / builder for two QloApps-driven syntax gaps:
+  - static dynamic method calls such as `Validate::{$function}($value)`
+  - PHP 8.1 first-class callable syntax such as `$this->normalizeFilePath(...)`
+
+Verification:
+
+- `go test ./common/yak/php/tests -run 'TestAllSyntaxForPHP_G4/syntax file: syntax/qloapps/.*' -count=1 -v`
+  - passed
+  - all 8 copied QloApps repro files now parse successfully
+- `YAK_PHP_RUN_PROJECT_AST=1 YAK_PHP_PROJECT_AST_TARGET=/home/wlz/Target/phpcms/QloApps YAK_PHP_FIXTURE_PARSE_BUDGET_SEC=30 go test ./common/yak/php/tests -run TestProjectAst -count=1 -v`
+  - passed
+  - total parsed files: `3440`
+  - total project parse time: about `1m19.65s`
+  - no single-file parse exceeded `30s`
+  - observed heavy file example: `tools/tcpdf/tcpdf.php` about `21.47s`
+
+Regression rerun after QloApps:
+
+- `grav`
+  - rerun passed
+  - total parsed files: `522`
+  - total project parse time: about `19.72s`
+  - `FlexObject.php`: about `5.20s`
+  - log: `../build/backup/php-project-ast-logs/grav-project-ast-rerun-after-qloapps.log`
+- `PrestaShop`
+  - rerun passed
+  - total parsed files: `7163`
+  - total project parse time: about `1m44.67s`
+  - log: `../build/backup/php-project-ast-logs/prestashop-project-ast-rerun-after-qloapps.log`

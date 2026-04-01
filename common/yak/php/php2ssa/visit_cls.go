@@ -616,7 +616,15 @@ func (y *builder) VisitStaticClassExprFunctionMember(raw phpparser.IStaticClassE
 		return nil, "'"
 	}
 
-	key := i.Identifier().GetText()
+	var key string
+	if i.MemberCallKey() != nil {
+		if value := y.VisitMemberCallKey(i.MemberCallKey()); value != nil {
+			key = value.String()
+		}
+	}
+	if key == "" {
+		return nil, ""
+	}
 	if i.StaticClass().GetText() == "self" {
 		return y.MarkedThisClassBlueprint, key
 	}
