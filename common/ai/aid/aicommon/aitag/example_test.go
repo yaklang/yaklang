@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -88,26 +89,35 @@ User-Agent: aitag-parser/1.0
 处理完成`
 
 	var results = make(map[string]string)
+	var mu sync.Mutex
 
 	err := Parse(strings.NewReader(complexInput),
 		WithCallback("REQUEST", "req001", func(reader io.Reader) {
 			content, _ := io.ReadAll(reader)
+			mu.Lock()
 			results["request"] = string(content)
+			mu.Unlock()
 			log.Infof("收到完整请求数据")
 		}),
 		WithCallback("HEADERS", "req001", func(reader io.Reader) {
 			content, _ := io.ReadAll(reader)
+			mu.Lock()
 			results["headers"] = string(content)
+			mu.Unlock()
 			log.Infof("收到请求头数据")
 		}),
 		WithCallback("BODY", "req001", func(reader io.Reader) {
 			content, _ := io.ReadAll(reader)
+			mu.Lock()
 			results["body"] = string(content)
+			mu.Unlock()
 			log.Infof("收到请求体数据")
 		}),
 		WithCallback("METADATA", "req001", func(reader io.Reader) {
 			content, _ := io.ReadAll(reader)
+			mu.Lock()
 			results["metadata"] = string(content)
+			mu.Unlock()
 			log.Infof("收到元数据")
 		}),
 	)
