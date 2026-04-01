@@ -199,6 +199,12 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#typeHintAtom.
 	VisitTypeHintAtom(ctx *TypeHintAtomContext) interface{}
 
+	// Visit a parse tree produced by PHPParser#typeHintIntersection.
+	VisitTypeHintIntersection(ctx *TypeHintIntersectionContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#typeHintUnion.
+	VisitTypeHintUnion(ctx *TypeHintUnionContext) interface{}
+
 	// Visit a parse tree produced by PHPParser#globalStatement.
 	VisitGlobalStatement(ctx *GlobalStatementContext) interface{}
 

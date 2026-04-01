@@ -263,6 +263,14 @@ func (v *BasePHPParserVisitor) VisitTypeHintAtom(ctx *TypeHintAtomContext) inter
 	return v.VisitChildren(ctx)
 }
 
+func (v *BasePHPParserVisitor) VisitTypeHintIntersection(ctx *TypeHintIntersectionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitTypeHintUnion(ctx *TypeHintUnionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BasePHPParserVisitor) VisitGlobalStatement(ctx *GlobalStatementContext) interface{} {
 	return v.VisitChildren(ctx)
 }

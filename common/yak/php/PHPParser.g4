@@ -118,12 +118,18 @@ namespacePath
     ;
 
 namespaceDeclaration
-    : Namespace OpenCurlyBracket useDeclaration* namespaceStatement* CloseCurlyBracket
-    | Namespace namespacePath OpenCurlyBracket useDeclaration* namespaceStatement* CloseCurlyBracket
+    : Namespace OpenCurlyBracket CloseCurlyBracket
+    | Namespace OpenCurlyBracket useDeclaration+ namespaceStatement* CloseCurlyBracket
+    | Namespace OpenCurlyBracket namespaceStatement+ CloseCurlyBracket
+    | Namespace namespacePath OpenCurlyBracket CloseCurlyBracket
+    | Namespace namespacePath OpenCurlyBracket useDeclaration+ namespaceStatement* CloseCurlyBracket
+    | Namespace namespacePath OpenCurlyBracket namespaceStatement+ CloseCurlyBracket
     ;
 
 namespaceDeclarationSemi
-    : Namespace namespacePath SemiColon useDeclaration* namespaceStatement*
+    : Namespace namespacePath SemiColon
+    | Namespace namespacePath SemiColon useDeclaration+ namespaceStatement*
+    | Namespace namespacePath SemiColon namespaceStatement+
     ;
 
 namespaceStatement
@@ -384,13 +390,23 @@ formalParameter
     ;
 
 typeHint
-    : typeHintAtom (('|' | '&') typeHintAtom)*
+    : typeHintAtom
+    | typeHintIntersection
+    | typeHintUnion
     ;
 
 typeHintAtom
     : Callable
     | primitiveType
     | qualifiedStaticTypeRef
+    ;
+
+typeHintIntersection
+    : typeHintAtom ('&' typeHintAtom)+
+    ;
+
+typeHintUnion
+    : typeHintAtom ('|' typeHintAtom)+
     ;
 
 globalStatement
