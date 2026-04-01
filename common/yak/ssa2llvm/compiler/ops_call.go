@@ -5,6 +5,7 @@ import (
 
 	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/callframe"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
 )
 
@@ -115,6 +116,10 @@ func (c *Compiler) newRuntimeMethodDispatchSpec(inst *ssa.Call, fn *ssa.Function
 
 // compileCall compiles a ssa.Call instruction to LLVM IR.
 func (c *Compiler) compileCall(inst *ssa.Call) error {
+	if handled, err := c.compileTaggedObfCall(inst); handled || err != nil {
+		return err
+	}
+
 	fn := inst.GetFunc()
 	var calleeVal ssa.Value
 	if fn != nil {
@@ -125,29 +130,49 @@ func (c *Compiler) compileCall(inst *ssa.Call) error {
 		}
 	}
 
-	// YakSSA uses function-typed member values (e.g. object-factor methods) where the
-	// call target is an Undefined MemberCall but the FunctionType.This points at the
-	// actual SSA function implementation. Prefer ID-based resolution to avoid name
-	// collisions (e.g. duplicated "f$1").
-	if calleeVal != nil {
-		if ssaFn, ok := ssa.ToFunction(calleeVal); ok && ssaFn != nil && !ssaFn.IsExtern() {
-			llvmFn, _ := c.getOrDeclareLLVMFunction(ssaFn)
-			spec, err := c.newCallableContextCallSpec(inst, llvmFn, c.callableContextArgs(inst, ssaFn), "yak_call_target")
+	switch c.instructionTag(inst.GetId()) {
+	case callLowerTagInternal:
+		if resolvedCallee, ok := callframe.ResolveDirectCallee(c.Program, fn, inst); ok && resolvedCallee != nil {
+			llvmFn, _ := c.getOrDeclareLLVMFunction(resolvedCallee)
+			spec, err := c.newCallableContextCallSpec(inst, llvmFn, c.callableContextArgs(inst, resolvedCallee), "yak_call_target")
 			if err != nil {
 				return err
 			}
 			return c.lowerResolvedContextCall(spec)
 		}
-		if calleeVal.IsMember() {
-			if ft, ok := calleeVal.GetType().(*ssa.FunctionType); ok && ft != nil && ft.This != nil && !ft.This.IsExtern() {
-				llvmFn, _ := c.getOrDeclareLLVMFunction(ft.This)
-				spec, err := c.newCallableContextCallSpec(inst, llvmFn, c.callableContextArgs(inst, ft.This), "yak_call_target")
-				if err != nil {
-					return err
-				}
-				return c.lowerResolvedContextCall(spec)
+	case callLowerTagDispatch:
+		calleeName := c.resolveCalleeName(fn, inst.Method)
+		binding, ok := c.getExternBinding(calleeName)
+		if ok && binding.DispatchID != 0 {
+			spec, err := c.newDispatchContextCallSpec(inst, binding)
+			if err != nil {
+				return err
 			}
+			return c.lowerResolvedContextCall(spec)
 		}
+	case callLowerTagExtern:
+		calleeName := c.resolveCalleeName(fn, inst.Method)
+		binding, ok := c.getExternBinding(calleeName)
+		if ok && binding.Symbol != "" {
+			if err := validateExternBindingCallABI(calleeName, binding); err != nil {
+				return err
+			}
+			llvmFn := c.getOrDeclareExternCallable(binding.Symbol)
+			spec, err := c.newCallableContextCallSpec(inst, llvmFn, ssaArgs(append([]int64{}, inst.Args...), false), "yak_extern_target")
+			if err != nil {
+				return err
+			}
+			return c.lowerResolvedContextCall(spec)
+		}
+	}
+
+	if resolvedCallee, ok := callframe.ResolveDirectCallee(c.Program, fn, inst); ok && resolvedCallee != nil {
+		llvmFn, _ := c.getOrDeclareLLVMFunction(resolvedCallee)
+		spec, err := c.newCallableContextCallSpec(inst, llvmFn, c.callableContextArgs(inst, resolvedCallee), "yak_call_target")
+		if err != nil {
+			return err
+		}
+		return c.lowerResolvedContextCall(spec)
 	}
 
 	calleeName := c.resolveCalleeName(fn, inst.Method)

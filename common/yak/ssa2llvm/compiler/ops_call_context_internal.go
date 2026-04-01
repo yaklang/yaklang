@@ -43,13 +43,13 @@ func (c *Compiler) emitRuntimeInvoke(ctxI8 llvm.Value) {
 }
 
 func (c *Compiler) resolveContextCallArg(inst *ssa.Call, argID int64, tagPointerArgs bool) (llvm.Value, llvm.Value, error) {
-	argVal, err := c.getValue(inst, argID)
+	argVal, err := c.resolveSSAValueAsInt64(inst, argID, "yak_ctx_fn")
 	if err != nil {
 		return llvm.Value{}, llvm.Value{}, err
 	}
 
 	i64 := c.LLVMCtx.Int64Type()
-	argI64 := c.coerceToInt64(argVal)
+	argI64 := argVal
 	root := llvm.ConstInt(i64, 0, false)
 	if !tagPointerArgs || inst == nil {
 		return argI64, root, nil

@@ -34,6 +34,11 @@ type Compiler struct {
 	// ExternBindings maps source-level function names to runtime symbols/signatures.
 	ExternBindings map[string]ExternBinding
 
+	// InstrTags carries obfuscator-owned instruction tags emitted during SSA
+	// rewriting. The compiler uses them to recognize synthetic operations without
+	// extending the SSA package schema.
+	InstrTags map[int64]string
+
 	function *functionCompileContext
 }
 
@@ -45,6 +50,18 @@ func WithExternBindings(custom map[string]ExternBinding) CompilerOption {
 			return
 		}
 		c.ExternBindings = mergeExternBindings(c.ExternBindings, custom)
+	}
+}
+
+func WithInstructionTags(tags map[int64]string) CompilerOption {
+	return func(c *Compiler) {
+		if len(tags) == 0 {
+			return
+		}
+		c.InstrTags = make(map[int64]string, len(tags))
+		for id, tag := range tags {
+			c.InstrTags[id] = tag
+		}
 	}
 }
 

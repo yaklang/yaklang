@@ -164,7 +164,7 @@ func TestIR_LegacyExternBindingParamsRejected(t *testing.T) {
 			Return: ExternTypeI64,
 		},
 	}
-	_, _, _, err := compileInput("", code, "yak", bindings, nil, nil)
+	_, _, _, err := compileInput("", code, "yak", bindings, "", nil)
 	require.Error(t, err)
 	require.ErrorContains(t, err, "legacy parameter ABI")
 }
@@ -204,8 +204,28 @@ func TestIR_GoStmtCallableUsesAsyncInvoke(t *testing.T) {
 	requireIRAvoidsLegacyCallEntrypoints(t, ir)
 }
 
+func TestIR_InternalCallDoesNotMaterializeShadowMethodsAsFields(t *testing.T) {
+	code := `
+		func worker(mu, value) {
+			mu.Lock()
+			println(value)
+			mu.Unlock()
+		}
+
+		func main() {
+			mu = sync.NewLock()
+			go worker(mu, 1)
+		}
+		`
+	_, _, ir, err := compileToIRFromCodeWithExternBindings(code, "yak", nil)
+	require.NoError(t, err)
+	require.NotContains(t, ir, "@yak_runtime_get_field")
+	require.GreaterOrEqual(t, strings.Count(ir, "call void @yak_runtime_invoke"), 3)
+	requireIRAvoidsLegacyCallEntrypoints(t, ir)
+}
+
 func TestIR_MainWrapperUsesUnifiedInvoke(t *testing.T) {
-	_, comp, _, err := compileInput("", `check = () => { return 42 }`, "yak", nil, nil, nil)
+	_, comp, _, err := compileInput("", `check = () => { return 42 }`, "yak", nil, "", nil)
 	require.NoError(t, err)
 	require.NotNil(t, comp)
 	defer comp.Dispose()

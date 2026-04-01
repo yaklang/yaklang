@@ -1,8 +1,6 @@
 package obfuscation
 
 import (
-	"github.com/yaklang/go-llvm"
-	"github.com/yaklang/yaklang/common/yak/ssa"
 	_ "github.com/yaklang/yaklang/common/yak/ssa2llvm/obfuscation/builtin"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/obfuscation/core"
 )
@@ -10,8 +8,9 @@ import (
 type Stage = core.Stage
 
 const (
-	StageSSA  = core.StageSSA
-	StageLLVM = core.StageLLVM
+	StageSSAPre  = core.StageSSAPre
+	StageSSAPost = core.StageSSAPost
+	StageLLVM    = core.StageLLVM
 )
 
 type Kind = core.Kind
@@ -32,18 +31,8 @@ func Register(obfuscator Obfuscator) {
 	core.Register(obfuscator)
 }
 
-func ApplySSA(program *ssa.Program, entryFunction string, names []string) error {
-	return core.ApplySSA(&core.Context{
-		SSA:           program,
-		EntryFunction: entryFunction,
-	}, names)
-}
-
-func ApplyLLVM(module llvm.Module, entryFunction string, names []string) error {
-	return core.ApplyLLVM(&core.Context{
-		LLVM:          module,
-		EntryFunction: entryFunction,
-	}, names)
+func Apply(ctx *Context, names []string) error {
+	return core.Apply(ctx, names)
 }
 
 func List() []Info {
