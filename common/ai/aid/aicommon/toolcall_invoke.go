@@ -218,7 +218,7 @@ func (a *ToolCaller) invoke(
 				// 处理 risk 消息
 				risk, _ := handleRiskMessage(result)
 				if risk != nil {
-					e.EmitYakitRisk(risk.ID, risk.Title)
+					e.EmitYakitRisk(risk.ID, risk.Title, risk.RuntimeId)
 				}
 				httpFlow, _ := handleHTTPFlowMessage(result)
 				if httpFlow != nil {

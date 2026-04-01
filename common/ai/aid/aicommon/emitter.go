@@ -199,10 +199,11 @@ func (r *Emitter) EmitSyncEventError(id string, err error, syncID string) (*sche
 	}, syncID)
 }
 
-func (r *Emitter) EmitYakitRisk(id uint, title string) (*schema.AiOutputEvent, error) {
+func (r *Emitter) EmitYakitRisk(id uint, title string, runtimeID string) (*schema.AiOutputEvent, error) {
 	return r.EmitJSON(schema.EVENT_TYPE_YAKIT_RISK, "yakit", map[string]any{
-		"risk_id": id,
-		"title":   title,
+		"risk_id":    id,
+		"title":      title,
+		"runtime_id": runtimeID,
 	})
 }
 
