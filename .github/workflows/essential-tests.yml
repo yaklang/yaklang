@@ -802,27 +802,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: "Test Coreplugin AnalyzeMustPASS"
+          - name: "Test Coreplugin Analyze / MITM / Fastjson"
             artifact_name: "essential-tests-coreplugin"
             artifact_file: "essential-tests-coreplugin.tar.gz"
             test_configs: |
               [
-                {"package": "./common/coreplugin", "timeout": "1m", "run": "^(TestAnalyzeMustPASSCorePlugin|TestAnalyzeMustPASSCorePlugin_Debug)$"}
-              ]
-
-          - name: "Test Coreplugin MITM"
-            artifact_name: "essential-tests-coreplugin"
-            artifact_file: "essential-tests-coreplugin.tar.gz"
-            test_configs: |
-              [
-                {"package": "./common/coreplugin", "timeout": "2m", "run": "TestGRPCMUSTPASS_MITM"}
-              ]
-
-          - name: "Test Vulinbox Coreplugin Fastjson"
-            artifact_name: "essential-tests-coreplugin"
-            artifact_file: "essential-tests-coreplugin.tar.gz"
-            test_configs: |
-              [
+                {"package": "./common/coreplugin", "timeout": "1m", "run": "^(TestAnalyzeMustPASSCorePlugin|TestAnalyzeMustPASSCorePlugin_Debug)$"},
+                {"package": "./common/coreplugin", "timeout": "2m", "run": "TestGRPCMUSTPASS_MITM"},
                 {"package": "./common/coreplugin", "timeout": "3m", "run": "TestGRPCMUSTPASS_Fastjson"}
               ]
 
