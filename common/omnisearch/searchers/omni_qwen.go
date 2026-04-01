@@ -77,8 +77,8 @@ func (c *OmniQwenSearchClient) Search(query string, config *ostype.SearchConfig)
 		if strategy, ok := config.Extra["search_strategy"].(string); ok && strategy != "" {
 			qwenConfig.SearchStrategy = strategy
 		}
-		if forced, ok := config.Extra["forced_search"].(bool); ok {
-			qwenConfig.ForcedSearch = forced
+		if forced, ok := config.Extra["forced_search"].(bool); ok && forced {
+			qwenConfig.ForcedSearch = true
 		}
 		if enableCitation, ok := config.Extra["enable_citation"].(bool); ok {
 			qwenConfig.EnableCitation = enableCitation
