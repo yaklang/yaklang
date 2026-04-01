@@ -68,6 +68,15 @@ func TestServer_Cli_YakSript(t *testing.T) {
 			require.True(t, lo.Contains(names, s))
 		}
 	}
+	checkNotContains := func(t *testing.T, scriptRequest *ypb.QueryYakScriptRequest, scriptName string, db *gorm.DB) {
+		_, scripts, err := yakit.QueryYakScript(db, scriptRequest)
+		require.NoError(t, err)
+		var names []string
+		for _, script := range scripts {
+			names = append(names, script.ScriptName)
+		}
+		require.False(t, lo.Contains(names, scriptName))
+	}
 	t.Run("test", func(t *testing.T) {
 		client, err := NewLocalClient()
 		require.NoError(t, err)
@@ -103,6 +112,12 @@ func TestServer_Cli_YakSript(t *testing.T) {
 				Type:       "mitm",
 				Params:     "",
 			},
+				param: false},
+			{script: &schema.YakScript{
+				ScriptName: "test-mitm-empty-array-cli",
+				Type:       "mitm",
+				Params:     "[]",
+			},
 				param: false}}
 		defer func() {
 			lo.ForEach(testcases, func(item *TestCase, index int) {
@@ -115,13 +130,21 @@ func TestServer_Cli_YakSript(t *testing.T) {
 		check(t, &ypb.QueryYakScriptRequest{
 			Type:               "mitm,port-scan,nuclei",
 			IsMITMParamPlugins: 2,
-		}, []string{"test-mitm-no-cli", "test-port-scan-cli", "test-nuclei-cli"}, consts.GetGormProfileDatabase())
+		}, []string{"test-mitm-no-cli", "test-mitm-empty-array-cli", "test-port-scan-cli", "test-nuclei-cli"}, consts.GetGormProfileDatabase())
 
 		check(t, &ypb.QueryYakScriptRequest{
 			Type:               "mitm",
 			IsMITMParamPlugins: 1,
 		},
 			[]string{"test-mitm-cli"}, consts.GetGormProfileDatabase())
+		checkNotContains(t, &ypb.QueryYakScriptRequest{
+			Type:               "mitm",
+			IsMITMParamPlugins: 1,
+		}, "test-mitm-empty-array-cli", consts.GetGormProfileDatabase())
+		checkNotContains(t, &ypb.QueryYakScriptRequest{
+			Type:               "mitm",
+			IsMITMParamPlugins: 1,
+		}, "test-mitm-no-cli", consts.GetGormProfileDatabase())
 
 		check(t, &ypb.QueryYakScriptRequest{
 			Type:               "mitm,port-scan,nuclei",

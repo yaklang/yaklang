@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"github.com/segmentio/ksuid"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
@@ -179,6 +180,7 @@ func TestSetGroup(t *testing.T) {
 
 func TestQueryGroupCount(t *testing.T) {
 	scriptName2, clearFunc, _ := yakit.CreateTemporaryYakScriptEx("mitm", "")
+	scriptName3, clearFunc3, _ := yakit.CreateTemporaryYakScriptEx("mitm", "[]")
 	scriptName1 := "[TMP]-" + "-" + ksuid.New().String()
 	content := "passiveScanning = cli.String(\"passiveScanning\",cli.setHelp(\"填写规则:http://127.0.0.1:8080\"),cli.setRequired(true),cli.setVerboseName(\"被动扫描器地址\"))\nwhitelisthostcli = cli.String(\"whitelisthostcli\",cli.setHelp(\"格式:*.yaklang.com;10.0.0.* 中间用;分割\"),cli.setDefault(\"\"),cli.setVerboseName(\"白名单主机列表\"))\nblacklistcli = cli.String(\"blacklistcli\",cli.setHelp(\"默认:*.gov.cn;*.edu.cn 中间用;分割\"),cli.setDefault(\"*.gov.cn;*.edu.cn\"),cli.setVerboseName(\"黑名单主机列表\"))\nblackmethodcli = cli.StringSlice(\"blackmethodcli\",cli.setMultipleSelect(true),\ncli.setSelectOption(\"GET\", \"GET\"),\ncli.setSelectOption(\"POST\", \"POST\"),\ncli.setSelectOption(\"DELETE\", \"DELETE\"),\ncli.setSelectOption(\"PUT\", \"PUT\"),\ncli.setSelectOption(\"OPTIONS\", \"OPTIONS\"),\ncli.setSelectOption(\"TRACE\", \"TRACE\"),\ncli.setSelectOption(\"COPY\", \"COPY\"),cli.setVerboseName(\"禁用方法\")\n)\ncli.check()\n"
 	prog, err := static_analyzer.SSAParse(content, "mitm")
@@ -198,6 +200,7 @@ func TestQueryGroupCount(t *testing.T) {
 	}
 	group1 := scriptName1 + "-" + "group1"
 	group2 := scriptName2 + "-" + "group2"
+	group3 := scriptName3 + "-" + "group3"
 	saveData1 := &schema.PluginGroup{
 		YakScriptName: scriptName1,
 		Group:         group1,
@@ -208,12 +211,19 @@ func TestQueryGroupCount(t *testing.T) {
 		Group:         group2,
 	}
 	saveData2.Hash = saveData2.CalcHash()
+	saveData3 := &schema.PluginGroup{
+		YakScriptName: scriptName3,
+		Group:         group3,
+	}
+	saveData3.Hash = saveData3.CalcHash()
 	yakit.CreateOrUpdatePluginGroup(consts.GetGormProfileDatabase(), saveData1.Hash, saveData1)
 	yakit.CreateOrUpdatePluginGroup(consts.GetGormProfileDatabase(), saveData2.Hash, saveData2)
+	yakit.CreateOrUpdatePluginGroup(consts.GetGormProfileDatabase(), saveData3.Hash, saveData3)
 
 	defer func() {
 		clearFunc()
-		if err = yakit.DeletePluginGroupByScriptName(consts.GetGormProfileDatabase(), []string{scriptName2, scriptName1}); err != nil {
+		clearFunc3()
+		if err = yakit.DeletePluginGroupByScriptName(consts.GetGormProfileDatabase(), []string{scriptName3, scriptName2, scriptName1}); err != nil {
 			t.Errorf("failed to delete plugin groups: %v", err)
 		}
 		if err = yakit.DeleteYakScriptByName(consts.GetGormProfileDatabase(), scriptName1); err != nil {
@@ -250,30 +260,32 @@ func TestQueryGroupCount(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			req, err := yakit.QueryGroupCount(consts.GetGormProfileDatabase(), tc.excludeType, tc.isMITMParamPlugins)
-			if err != nil {
-				t.Fatal(err)
-			}
-			var expectedValue string
-			var expectedCount int
 			switch tc.isMITMParamPlugins {
 			case 1:
-				expectedValue = group1
-				expectedCount = 1
+				require.NoError(t, err)
+				requireCondition := func(group string, count int) {
+					for _, v := range req {
+						if v.Value == group && v.Count == count {
+							return
+						}
+					}
+					t.Fatalf("expected group %s with count %d was not found for isMITMParamPlugins=%d", group, count, tc.isMITMParamPlugins)
+				}
+				requireCondition(group1, 1)
 			case 2:
-				expectedValue = group2
-				expectedCount = 1
+				require.NoError(t, err)
+				requireCondition := func(group string, count int) {
+					for _, v := range req {
+						if v.Value == group && v.Count == count {
+							return
+						}
+					}
+					t.Fatalf("expected group %s with count %d was not found for isMITMParamPlugins=%d", group, count, tc.isMITMParamPlugins)
+				}
+				requireCondition(group2, 1)
+				requireCondition(group3, 1)
 			default:
 				return
-			}
-			var valueFound bool
-			for _, v := range req {
-				if v.Value == expectedValue && v.Count == expectedCount {
-					valueFound = true
-					break
-				}
-			}
-			if !valueFound {
-				t.Errorf("Expected group %s with count %d was not found for isMITMParamPlugins=%d", expectedValue, expectedCount, tc.isMITMParamPlugins)
 			}
 		})
 
