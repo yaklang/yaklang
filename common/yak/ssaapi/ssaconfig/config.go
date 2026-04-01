@@ -7,19 +7,16 @@ import (
 )
 
 type Config struct {
-	ctx             context.Context        `json:"-"`
-	Mode            Mode                   `json:"Mode,omitempty"` // 配置模式，可以从 JSON 指定
-	BaseInfo        *BaseInfo              `json:"BaseInfo,omitempty"`
-	CodeSource      *CodeSourceInfo        `json:"CodeSource,omitempty"`
-	SSACompile      *SSACompileConfig      `json:"SSACompile,omitempty"`
-	SyntaxFlow      *SyntaxFlowConfig      `json:"SyntaxFlow,omitempty"`
-	SyntaxFlowScan  *SyntaxFlowScanConfig  `json:"SyntaxFlowScan,omitempty"`
-	SyntaxFlowRule  *SyntaxFlowRuleConfig  `json:"SyntaxFlowRule,omitempty"`
-	ScanPolicy      *ScanPolicyConfig      `json:"ScanPolicy,omitempty"`      // 扫描策略配置
-	DetectionTarget *DetectionTargetConfig `json:"DetectionTarget,omitempty"` // 检测目标配置
-	Permission      *PermissionConfig      `json:"Permission,omitempty"`      // 项目权限配置
-	IssueTracker    *IssueTrackerConfig    `json:"IssueTracker,omitempty"`    // 缺陷管理系统配置
-	Output          *OutputConfig          `json:"Output,omitempty"`
+	ctx            context.Context       `json:"-"`
+	Mode           Mode                  `json:"Mode,omitempty"` // 配置模式，可以从 JSON 指定
+	BaseInfo       *BaseInfo             `json:"BaseInfo,omitempty"`
+	CodeSource     *CodeSourceInfo       `json:"CodeSource,omitempty"`
+	SSACompile     *SSACompileConfig     `json:"SSACompile,omitempty"`
+	SyntaxFlow     *SyntaxFlowConfig     `json:"SyntaxFlow,omitempty"`
+	SyntaxFlowScan *SyntaxFlowScanConfig `json:"SyntaxFlowScan,omitempty"`
+	SyntaxFlowRule *SyntaxFlowRuleConfig `json:"SyntaxFlowRule,omitempty"`
+	ScanPolicy     *ScanPolicyConfig     `json:"ScanPolicy,omitempty"` // 扫描策略配置
+	Output         *OutputConfig         `json:"Output,omitempty"`
 
 	// 其他配置项可以在这里添加
 	ExtraInfo map[string][]any `json:"-"` // 用于存储外部传入的其他信息
