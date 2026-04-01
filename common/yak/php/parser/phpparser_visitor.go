@@ -496,14 +496,14 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#qualifiedNamespaceName.
 	VisitQualifiedNamespaceName(ctx *QualifiedNamespaceNameContext) interface{}
 
-	// Visit a parse tree produced by PHPParser#NamespaceIdentifier.
-	VisitNamespaceIdentifier(ctx *NamespaceIdentifierContext) interface{}
+	// Visit a parse tree produced by PHPParser#namespaceUseDeclaration.
+	VisitNamespaceUseDeclaration(ctx *NamespaceUseDeclarationContext) interface{}
 
-	// Visit a parse tree produced by PHPParser#NamespaceListNameTail.
-	VisitNamespaceListNameTail(ctx *NamespaceListNameTailContext) interface{}
+	// Visit a parse tree produced by PHPParser#namespaceUseTail.
+	VisitNamespaceUseTail(ctx *NamespaceUseTailContext) interface{}
 
-	// Visit a parse tree produced by PHPParser#namespaceNameTail.
-	VisitNamespaceNameTail(ctx *NamespaceNameTailContext) interface{}
+	// Visit a parse tree produced by PHPParser#namespaceUseClause.
+	VisitNamespaceUseClause(ctx *NamespaceUseClauseContext) interface{}
 
 	// Visit a parse tree produced by PHPParser#qualifiedNamespaceNameList.
 	VisitQualifiedNamespaceNameList(ctx *QualifiedNamespaceNameListContext) interface{}

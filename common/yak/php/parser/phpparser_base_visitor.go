@@ -659,15 +659,15 @@ func (v *BasePHPParserVisitor) VisitQualifiedNamespaceName(ctx *QualifiedNamespa
 	return v.VisitChildren(ctx)
 }
 
-func (v *BasePHPParserVisitor) VisitNamespaceIdentifier(ctx *NamespaceIdentifierContext) interface{} {
+func (v *BasePHPParserVisitor) VisitNamespaceUseDeclaration(ctx *NamespaceUseDeclarationContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BasePHPParserVisitor) VisitNamespaceListNameTail(ctx *NamespaceListNameTailContext) interface{} {
+func (v *BasePHPParserVisitor) VisitNamespaceUseTail(ctx *NamespaceUseTailContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BasePHPParserVisitor) VisitNamespaceNameTail(ctx *NamespaceNameTailContext) interface{} {
+func (v *BasePHPParserVisitor) VisitNamespaceUseClause(ctx *NamespaceUseClauseContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

@@ -34,83 +34,92 @@ func (y *builder) VisitQualifiedNamespaceName(raw phpparser.IQualifiedNamespaceN
 	if i == nil {
 		return []string{}, ""
 	}
-	var class string
-	list, m := y.VisitNamespaceNameList(i.NamespaceNameList())
-	for key, _ := range m {
-		class = key
-		break
+	path := y.VisitNamespacePath(i.NamespacePath())
+	if len(path) == 0 {
+		return []string{}, ""
 	}
-	return list, class
+	class := path[len(path)-1]
+	if len(path) == 1 {
+		return path, class
+	}
+	return path[:len(path)-1], class
 }
 
-func (y *builder) VisitNamespaceNameList(raw phpparser.INamespaceNameListContext) ([]string, map[string]string) {
+func (y *builder) VisitNamespaceUseDeclaration(raw phpparser.INamespaceUseDeclarationContext) ([]string, map[string]string) {
 	if y == nil || raw == nil || y.IsStop() {
 		return []string{}, nil
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
-	switch ret := raw.(type) {
-	case *phpparser.NamespaceIdentifierContext:
-		var (
-			CurrentName string
-			SplitPath   []string
-			aliasName   string
-		)
-
-		path := y.VisitNamespacePath(ret.NamespacePath())
-		if len(path) > 1 {
-			CurrentName = path[len(path)-1]
-			SplitPath = path[:len(path)-1]
-		} else {
-			CurrentName = path[0]
-			SplitPath = path
-		}
-		aliasName = CurrentName
-		if ret.Identifier() != nil {
-			aliasName = y.VisitIdentifier(ret.Identifier())
-		}
-		return SplitPath, map[string]string{CurrentName: aliasName}
-	case *phpparser.NamespaceListNameTailContext:
-		path := y.VisitNamespacePath(ret.NamespacePath())
-		tail := y.VisitNamespaceNameTail(ret.NamespaceNameTail())
-		return path, tail
+	i, _ := raw.(*phpparser.NamespaceUseDeclarationContext)
+	if i == nil {
+		return nil, nil
 	}
-	return nil, nil
+
+	path := y.VisitNamespacePath(i.NamespacePath())
+	if tail := i.NamespaceUseTail(); tail != nil {
+		return path, y.VisitNamespaceUseTail(tail)
+	}
+	if len(path) == 0 {
+		return nil, nil
+	}
+
+	currentName := path[len(path)-1]
+	splitPath := path
+	if len(path) > 1 {
+		splitPath = path[:len(path)-1]
+	}
+	aliasName := currentName
+	if i.Identifier() != nil {
+		aliasName = y.VisitIdentifier(i.Identifier())
+	}
+	return splitPath, map[string]string{currentName: aliasName}
 }
 
-func (y *builder) VisitNamespaceNameTail(raw phpparser.INamespaceNameTailContext) map[string]string {
+func (y *builder) VisitNamespaceUseTail(raw phpparser.INamespaceUseTailContext) map[string]string {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
-	i, _ := raw.(*phpparser.NamespaceNameTailContext)
+	i, _ := raw.(*phpparser.NamespaceUseTailContext)
 	if i == nil {
 		return nil
 	}
-	switch {
-	case i.NamespacePath() != nil:
-		pathList := y.VisitNamespacePath(i.NamespacePath())
-		path := strings.Join(pathList, "\\")
-
-		if i.Identifier() != nil {
-			alias := y.VisitIdentifier(i.Identifier())
-			return map[string]string{path: alias}
-		} else {
-			return map[string]string{path: path}
-		}
-	case len(i.AllNamespaceNameTail()) != 0:
-		var (
-			_map = make(map[string]string)
-		)
-
-		for _, tail := range i.AllNamespaceNameTail() {
-			m := y.VisitNamespaceNameTail(tail)
-			maps.Copy(m, _map)
-		}
-		return _map
+	ret := make(map[string]string)
+	for _, clause := range i.AllNamespaceUseClause() {
+		m := y.VisitNamespaceUseClause(clause)
+		maps.Copy(ret, m)
 	}
-	return nil
+	return ret
+}
+
+func (y *builder) VisitNamespaceUseClause(raw phpparser.INamespaceUseClauseContext) map[string]string {
+	if y == nil || raw == nil || y.IsStop() {
+		return nil
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+	i, _ := raw.(*phpparser.NamespaceUseClauseContext)
+	if i == nil {
+		return nil
+	}
+
+	pathList := y.VisitNamespacePath(i.NamespacePath())
+	path := strings.Join(pathList, "\\")
+	if tail := i.NamespaceUseTail(); tail != nil {
+		child := y.VisitNamespaceUseTail(tail)
+		ret := make(map[string]string, len(child))
+		for key, value := range child {
+			ret[path+"\\"+key] = value
+		}
+		return ret
+	}
+	if i.Identifier() != nil {
+		alias := y.VisitIdentifier(i.Identifier())
+		return map[string]string{path: alias}
+	}
+	return map[string]string{path: path}
 }
 
 func (y *builder) VisitNamespacePath(raw phpparser.INamespacePathContext) []string {

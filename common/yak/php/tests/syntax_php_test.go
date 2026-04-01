@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -31,6 +32,31 @@ var syntaxFs embed.FS
 var phpTestAntlrCache = func() *ssa.AntlrCache {
 	return php2ssa.CreateBuilder().GetAntlrCache()
 }()
+
+var syntaxNonASTAssets = map[string]struct{}{
+	"syntax/composer.lock": {},
+}
+
+func phpFixtureParseBudget() time.Duration {
+	raw := strings.TrimSpace(os.Getenv("YAK_PHP_FIXTURE_PARSE_BUDGET_SEC"))
+	if raw == "" {
+		return 30 * time.Second
+	}
+	sec, err := strconv.Atoi(raw)
+	if err != nil || sec <= 0 {
+		return 0
+	}
+	return time.Duration(sec) * time.Second
+}
+
+func isSyntaxASTFixture(path string) bool {
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".php", ".inc", ".php1":
+		return true
+	default:
+		return false
+	}
+}
 
 func validateSource(t *testing.T, filename string, src string) {
 	t.Run(fmt.Sprintf("syntax file: %v", filename), func(t *testing.T) {
@@ -81,8 +107,13 @@ func validateSource(t *testing.T, filename string, src string) {
 			t.Fatalf("Lexer failed: %v", errListener.GetErrorString())
 		}
 
+		start := time.Now()
 		_, err := php2ssa.Frontend(src, phpTestAntlrCache)
+		elapsed := time.Since(start)
 		require.Nil(t, err, "parse AST FrontEnd error: %v", err)
+		if budget := phpFixtureParseBudget(); budget > 0 && elapsed > budget {
+			t.Fatalf("parse AST exceeded budget for %s: elapsed=%s budget=%s", filename, elapsed, budget)
+		}
 	})
 }
 
@@ -94,9 +125,7 @@ func TestAllSyntaxForPHP_G4(t *testing.T) {
 		if d.IsDir() {
 			return nil
 		}
-		switch strings.ToLower(filepath.Ext(syntaxPath)) {
-		case ".php", ".inc":
-		default:
+		if !isSyntaxASTFixture(syntaxPath) {
 			return nil
 		}
 		raw, err := syntaxFs.ReadFile(syntaxPath)
@@ -107,6 +136,29 @@ func TestAllSyntaxForPHP_G4(t *testing.T) {
 		return nil
 	})
 	require.NoError(t, err, "walk syntax fixtures")
+}
+
+func TestSyntaxFixtureCoverage(t *testing.T) {
+	var missing []string
+	err := fs.WalkDir(syntaxFs, "syntax", func(syntaxPath string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if isSyntaxASTFixture(syntaxPath) {
+			return nil
+		}
+		if _, ok := syntaxNonASTAssets[syntaxPath]; ok {
+			return nil
+		}
+		missing = append(missing, syntaxPath)
+		return nil
+	})
+	require.NoError(t, err)
+	sort.Strings(missing)
+	require.Empty(t, missing, "syntax directory contains files not covered by AST fixtures or explicit non-AST assets: %v", missing)
 }
 
 func TestSyntax_(t *testing.T) {
@@ -261,6 +313,52 @@ func TestPHPArraySpreadElement(t *testing.T) {
 
 func TestPHPBackQuoteWithEscapedBacktick(t *testing.T) {
 	validateSource(t, "backquote-escaped-backtick", "<?php $key = trim(`KEY=\\`dd count=1 2>/dev/null\\`; echo \\$KEY`);")
+}
+
+func TestPHPUseFunctionDefineDefinedImport(t *testing.T) {
+	validateSource(t, "use-function-define-defined-import", `<?php
+namespace Grav\Common;
+
+use function define;
+use function defined;
+
+if (!defined('GRAV_REQUEST_TIME')) {
+	define('GRAV_REQUEST_TIME', microtime(true));
+}
+`)
+}
+
+func TestPHPDefineMethodAndQualifiedCall(t *testing.T) {
+	validateSource(t, "define-method-and-qualified-call", `<?php
+class YamlUpdater {
+	public function define(string $variable, $value): void {
+	}
+}
+
+\define('GRAV_CLI', true);
+if (\defined('GRAV_CLI')) {
+	$yaml = new YamlUpdater();
+	$yaml->define('twig.autoescape', false);
+}
+`)
+}
+
+func TestPHPStaticPropertyNestedIndexAssignment(t *testing.T) {
+	validateSource(t, "static-property-nested-index-assignment", `<?php
+class NonceStore {
+	protected static $nonces = [];
+
+	public static function getNonce($action, $previousTick = false) {
+		if (isset(static::$nonces[$action][$previousTick])) {
+			return static::$nonces[$action][$previousTick];
+		}
+		$nonce = md5($action);
+		static::$nonces[$action][$previousTick] = $nonce;
+
+		return static::$nonces[$action][$previousTick];
+	}
+}
+`)
 }
 
 type ParseError struct {

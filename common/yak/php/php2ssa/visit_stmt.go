@@ -204,8 +204,8 @@ func (y *builder) VisitUseDeclaration(raw phpparser.IUseDeclarationContext) inte
 			return library
 		}
 	}
-	for _, listContext := range list.AllNamespaceNameList() {
-		path, aliasMap := y.VisitNamespaceNameList(listContext)
+	for _, listContext := range list.AllNamespaceUseDeclaration() {
+		path, aliasMap := y.VisitNamespaceUseDeclaration(listContext)
 		namespace := getOrCreateNamespace(path...)
 		if namespace == nil {
 			log.Warnf("namespace %s not found", path)
