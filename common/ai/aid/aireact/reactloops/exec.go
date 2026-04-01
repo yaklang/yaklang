@@ -277,6 +277,7 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 			)
 			log.Infof("ExtractActionFromStream completed, took %v, error: %v", time.Since(extractStart), actionErr)
 			r.Set("last_ai_decision_prompt", prompt)
+			r.Set("last_ai_decision_nonce", nonce)
 			r.Set("last_ai_decision_response", buf.String())
 
 			if actionErr != nil {

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"regexp"
 	"sort"
 	"strings"
 
@@ -19,9 +18,7 @@ import (
 const directlyCallToolParamsNodeID = "directly_call_tool_params"
 const directlyCallToolPromptLoopKey = "last_ai_decision_prompt"
 const directlyCallToolResponseLoopKey = "last_ai_decision_response"
-
-var directlyCallToolPromptNonceRegexp = regexp.MustCompile(`<\|CACHE_TOOL_CALL_([A-Za-z0-9]+)\s*>|<\|CACHE_TOOL_CALL_([A-Za-z0-9]+)\>`)
-var directlyCallToolResponseNonceRegexp = regexp.MustCompile(`<\|TOOL_PARAM_[A-Za-z0-9_]+_([A-Za-z0-9]+)\|>`)
+const directlyCallToolNonceLoopKey = "last_ai_decision_nonce"
 
 func getDirectlyCallToolParamNames(loop *reactloops.ReActLoop, toolName string) []string {
 	if loop == nil || loop.GetConfig() == nil || loop.GetConfig().GetAiToolManager() == nil {
@@ -72,27 +69,11 @@ func emitDirectlyCallParamProgress(emit func(string), params aitool.InvokeParams
 	}
 }
 
-func extractDirectlyCallToolNonce(prompt, response string) string {
-	if matches := directlyCallToolPromptNonceRegexp.FindStringSubmatch(prompt); len(matches) >= 3 {
-		if matches[1] != "" {
-			return matches[1]
-		}
-		if matches[2] != "" {
-			return matches[2]
-		}
-	}
-	if matches := directlyCallToolResponseNonceRegexp.FindStringSubmatch(response); len(matches) >= 2 {
-		return matches[1]
-	}
-	return ""
-}
-
-func streamDirectlyCallParamProgressFromRawResponse(ctx context.Context, prompt, rawResponse string, paramNames []string, writer io.Writer) error {
+func streamDirectlyCallParamProgressFromRawResponse(ctx context.Context, rawResponse, nonce string, paramNames []string, writer io.Writer) error {
 	if strings.TrimSpace(rawResponse) == "" || writer == nil {
 		return nil
 	}
 
-	nonce := extractDirectlyCallToolNonce(prompt, rawResponse)
 	streamFieldNames := make([]string, 0, len(paramNames)*2+1)
 	var actionOpts []aicommon.ActionMakerOption
 	if nonce != "" {
@@ -415,7 +396,7 @@ Few-shot example 2 (valid directly_call_tool):
 		reportStatus(fmt.Sprintf("preparing directly_call_tool params for '%s'", toolName))
 		emitProgress("[开始处理参数]")
 		if progressWriter != nil {
-			if err := streamDirectlyCallParamProgressFromRawResponse(ctx, loop.Get(directlyCallToolPromptLoopKey), loop.Get(directlyCallToolResponseLoopKey), getDirectlyCallToolParamNames(loop, toolName), progressWriter); err != nil {
+			if err := streamDirectlyCallParamProgressFromRawResponse(ctx, loop.Get(directlyCallToolResponseLoopKey), loop.Get(directlyCallToolNonceLoopKey), getDirectlyCallToolParamNames(loop, toolName), progressWriter); err != nil {
 				reportStatus(fmt.Sprintf("stream directly_call_tool params from raw response failed: %v", err))
 			}
 		}
