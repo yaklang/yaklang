@@ -101,6 +101,7 @@ func TestHTTPTransportHeartbeat(t *testing.T) {
 		wantErr          bool
 		wantRunningJobs  uint32
 		wantObservedTime time.Time
+		wantAttemptID    string
 	}{
 		{
 			name:             "success",
@@ -108,6 +109,7 @@ func TestHTTPTransportHeartbeat(t *testing.T) {
 			wantAuth:         "Bearer token-1",
 			wantRunningJobs:  3,
 			wantObservedTime: time.Date(2026, 3, 27, 10, 0, 0, 0, time.UTC),
+			wantAttemptID:    "attempt-1",
 		},
 		{
 			name:             "expired session",
@@ -116,6 +118,7 @@ func TestHTTPTransportHeartbeat(t *testing.T) {
 			wantAuth:         "Bearer token-1",
 			wantErr:          true,
 			wantObservedTime: time.Date(2026, 3, 27, 10, 0, 0, 0, time.UTC),
+			wantAttemptID:    "attempt-1",
 		},
 	}
 
@@ -142,6 +145,12 @@ func TestHTTPTransportHeartbeat(t *testing.T) {
 				if !request.ObservedAt.Equal(tt.wantObservedTime) {
 					t.Fatalf("unexpected observed_at: %s", request.ObservedAt)
 				}
+				if len(request.ActiveAttempts) != 1 {
+					t.Fatalf("unexpected active_attempt count: %d", len(request.ActiveAttempts))
+				}
+				if request.ActiveAttempts[0].AttemptID != tt.wantAttemptID {
+					t.Fatalf("unexpected active_attempt attempt_id: %s", request.ActiveAttempts[0].AttemptID)
+				}
 
 				w.WriteHeader(tt.status)
 				_, _ = w.Write([]byte(tt.response))
@@ -160,6 +169,17 @@ func TestHTTPTransportHeartbeat(t *testing.T) {
 				LifecycleState: "ready",
 				RunningJobs:    tt.wantRunningJobs,
 				ObservedAt:     tt.wantObservedTime,
+				ActiveAttempts: []ActiveAttemptHeartbeat{
+					{
+						AttemptID:      tt.wantAttemptID,
+						JobID:          "job-1",
+						SubtaskID:      "subtask-1",
+						Status:         "running",
+						CompletedUnits: 3,
+						TotalUnits:     8,
+						LastActivityAt: tt.wantObservedTime,
+					},
+				},
 			})
 			if tt.wantErr {
 				if err == nil {

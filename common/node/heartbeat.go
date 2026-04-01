@@ -24,6 +24,7 @@ func (n *NodeBase) heartbeat() error {
 		CapabilityKeys: cloneStringSlice(n.capabilityKeys),
 		Labels:         cloneStringMap(n.labels),
 		ObservedAt:     time.Now().UTC(),
+		ActiveAttempts: cloneActiveAttemptHeartbeats(status.ActiveAttempts),
 	})
 }
 
@@ -31,6 +32,7 @@ func (n *NodeBase) runtimeStatus() RuntimeStatus {
 	status := RuntimeStatus{
 		LifecycleState: n.lifecycleState,
 		MaxRunningJobs: n.maxRunningJobs,
+		ActiveAttempts: []ActiveAttemptHeartbeat{},
 	}
 	if n.statusProvider == nil {
 		return status
@@ -44,5 +46,6 @@ func (n *NodeBase) runtimeStatus() RuntimeStatus {
 	if snapshot.MaxRunningJobs != 0 || status.MaxRunningJobs == 0 {
 		status.MaxRunningJobs = snapshot.MaxRunningJobs
 	}
+	status.ActiveAttempts = cloneActiveAttemptHeartbeats(snapshot.ActiveAttempts)
 	return status
 }
