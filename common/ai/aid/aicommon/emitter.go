@@ -958,3 +958,7 @@ func (e *Emitter) EmitSessionTitle(title string) (*schema.AiOutputEvent, error) 
 		"title": title,
 	})
 }
+
+func (e *Emitter) EmitPromptProfile(profileData any) (*schema.AiOutputEvent, error) {
+	return e.EmitJSON(schema.EVENT_TYPE_PROMPT_PROFILE, "system", profileData)
+}

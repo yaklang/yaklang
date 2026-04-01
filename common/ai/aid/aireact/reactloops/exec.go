@@ -638,6 +638,7 @@ LOOP:
 		if r.isDebugModeEnabled() {
 			r.savePromptToFile(task, iterationCount, prompt)
 		}
+		r.savePromptObservationToFile(task, iterationCount, r.GetLastPromptObservation())
 
 		streamWg := new(sync.WaitGroup)
 		/* Generate AI Action */
@@ -1069,6 +1070,32 @@ func (r *ReActLoop) savePromptToFile(task aicommon.AIStatefulTask, iteration int
 	}
 	emitter.EmitPinFilename(filePath)
 	log.Infof("saved prompt to file: %s", filePath)
+}
+
+func (r *ReActLoop) savePromptObservationToFile(task aicommon.AIStatefulTask, iteration int, observation *PromptObservation) {
+	if utils.IsNil(r) || utils.IsNil(task) || observation == nil {
+		return
+	}
+	emitter := r.GetEmitter()
+	if emitter == nil {
+		return
+	}
+
+	promptDir := r.GetLoopContentDir("prompts")
+	if promptDir == "" {
+		log.Errorf("failed to get loop content directory for prompt observations")
+		return
+	}
+
+	filename := fmt.Sprintf("iteration_%d_prompt_observation_%d.txt", iteration, time.Now().Unix())
+	filePath := filepath.Join(promptDir, filename)
+	raw := observation.RenderCLIReport(100)
+	if err := os.WriteFile(filePath, []byte(raw), 0644); err != nil {
+		log.Errorf("failed to save prompt observation to file: %v", err)
+		return
+	}
+	emitter.EmitPinFilename(filePath)
+	log.Infof("saved prompt observation to file: %s", filePath)
 }
 
 func (r *ReActLoop) emitActionExecutionRecord(task aicommon.AIStatefulTask, action *aicommon.Action, iteration int, prompt string) {
