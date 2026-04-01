@@ -522,7 +522,7 @@ staticClassExpr
     ;
 
 staticClassExprFunctionMember
-    : staticClass '::' identifier
+    : staticClass '::' memberCallKey
     ;
 
 staticClassExprVariableMember
@@ -770,7 +770,8 @@ qualifiedNamespaceNameList
     ;
 
 arguments
-    : '(' actualArgument? (',' actualArgument)* ','? ')'
+    : '(' Ellipsis ')'
+    | '(' actualArgument? (',' actualArgument)* ','? ')'
     ;
 
 actualArgument

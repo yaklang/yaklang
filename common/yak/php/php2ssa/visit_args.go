@@ -52,6 +52,9 @@ func (y *builder) VisitArguments(raw phpparser.IArgumentsContext) ([]ssa.Value, 
 	var ret []ssa.Value
 
 	var ellipsis bool
+	if i.Ellipsis() != nil {
+		return ret, true
+	}
 	for _, arg := range i.AllActualArgument() {
 		value, b := y.VisitActualArgument(arg)
 		if b {
