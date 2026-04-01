@@ -657,7 +657,14 @@ jobs:
             test_configs: |
               [
                 {"package": "./common/yakgrpc/yakit", "timeout": "1m", "run": "^TestMUSTPASS.*$"},
-                {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "^TestGRPCMUSTPASS_MITM($|_.*|Filter.*)$"},
+                {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "^TestGRPCMUSTPASS_MITM($|_.*|Filter.*)$"}
+              ]
+
+          - name: "Test gRPC MUSTPASS MITMV2 / Slow"
+            artifact_name: "essential-tests-yakgrpc"
+            artifact_file: "essential-tests-yakgrpc.tar.gz"
+            test_configs: |
+              [
                 {"package": "./common/yakgrpc/...", "timeout": "6m", "run": "^TestGRPCMUSTPASS_MITMV2_.*$"},
                 {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_MITMSlowRuleHook"},
                 {"package": "./common/yakgrpc/...", "timeout": "5m", "run": "TestGRPCMUSTPASS_HTTPFlowSlowSQL"}
