@@ -76,6 +76,14 @@ func (c *Config) StartEventLoopEx(ctx context.Context, startCall func(), doneCal
 				}
 
 				select {
+				case <-c.Ctx.Done():
+					log.Infof("config context cancelled for config %s, exiting event loop", c.id)
+					c.drainPendingEvents()
+					return
+				default:
+				}
+
+				select {
 				case <-validator:
 					log.Infof("coordinator validator working, (%v) start", c.id)
 					continue
@@ -106,16 +114,16 @@ func (c *Config) StartEventLoopEx(ctx context.Context, startCall func(), doneCal
 							log.Errorf("ReAct event processing failed: %v", err)
 						}
 					}(event)
-			case <-ticker.C:
-				tickerCallback()
-				continue
-			case <-ctx.Done():
-				log.Infof("event loop context cancelled for config %s, draining pending events", c.id)
-				c.drainPendingEvents()
-				return
+				case <-ticker.C:
+					tickerCallback()
+					continue
+				case <-ctx.Done():
+					log.Infof("event loop context cancelled for config %s, draining pending events", c.id)
+					c.drainPendingEvents()
+					return
+				}
 			}
-		}
-	}()
+		}()
 		select {
 		case validator <- struct{}{}:
 		case <-ctx.Done():

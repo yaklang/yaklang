@@ -85,7 +85,7 @@ func TestMemoryTimelineWithBatchCompression(t *testing.T) {
 	memoryTimeline := aicommon.NewTimeline(&mockedAI{}, nil)
 	config := NewMockedAIConfig(context.Background()).(*MockedAIConfig)
 	config.TimelineContentSizeLimit = 20000 // Set larger content size limit
-	memoryTimeline.BindConfig(config, &mockedAI{})
+	memoryTimeline.SoftBindConfig(config, &mockedAI{})
 
 	// Add items until content size triggers compression
 	for i := 1; i <= 200; i++ { // Add more items to trigger compression
@@ -122,7 +122,7 @@ func TestMemoryTimelineWithReachLimitBatchCompression(t *testing.T) {
 	// 设置合理的内容大小限制以触发压缩
 	config := NewMockedAIConfig(context.Background()).(*MockedAIConfig)
 	config.TimelineContentSizeLimit = 5000 // 设置合适的大小限制
-	memoryTimeline.BindConfig(config, &mockedAI2{})
+	memoryTimeline.SoftBindConfig(config, &mockedAI2{})
 	// Push items with longer content to trigger batch compression by content size
 	for i := 1; i <= 60; i++ {
 		memoryTimeline.PushToolResult(&aitool.ToolResult{
@@ -157,7 +157,7 @@ func TestNoCompression(t *testing.T) {
 	// 创建配置并设置大的内容限制以避免内容大小触发压缩
 	config := NewMockedAIConfig(context.Background()).(*MockedAIConfig)
 	config.TimelineContentSizeLimit = 100000 // 设置很大的限制
-	memoryTimeline.BindConfig(config, &mockedAI{})
+	memoryTimeline.SoftBindConfig(config, &mockedAI{})
 
 	// 添加少量项目，不触发批量压缩 (需要 >= 100 个项目)
 	for i := 1; i <= 50; i++ {
@@ -189,7 +189,7 @@ func TestBinarySearchCompression(t *testing.T) {
 	// 设置合理的内容大小限制以触发压缩
 	config := NewMockedAIConfig(context.Background()).(*MockedAIConfig)
 	config.TimelineContentSizeLimit = 14000 // 设置合适的大小限制
-	memoryTimeline.BindConfig(config, &mockedAI{})
+	memoryTimeline.SoftBindConfig(config, &mockedAI{})
 
 	// 添加足够多的项目来触发压缩
 	for i := 1; i <= 120; i++ {
@@ -224,7 +224,7 @@ func TestCompressionBoundary(t *testing.T) {
 	// 设置合理的内容大小限制以触发压缩
 	config := NewMockedAIConfig(context.Background()).(*MockedAIConfig)
 	config.TimelineContentSizeLimit = 10000 // 设置合适的大小限制
-	memoryTimeline.BindConfig(config, &mockedAI{})
+	memoryTimeline.SoftBindConfig(config, &mockedAI{})
 
 	// 测试边界情况：正好100个项目
 	for i := 1; i <= 100; i++ {
@@ -267,7 +267,7 @@ func TestCompressionWithContentSizeLimit(t *testing.T) {
 
 	config.BaseInteractiveHandler = aicommon.NewBaseInteractiveHandler()
 
-	memoryTimeline.BindConfig(config, &mockedAI{})
+	memoryTimeline.SoftBindConfig(config, &mockedAI{})
 
 	// 添加较少的项目，但内容足够大以触发大小限制
 	for i := 1; i <= 60; i++ {
@@ -298,7 +298,7 @@ func TestCompressionRatio(t *testing.T) {
 	// 设置合理的内容大小限制以触发压缩
 	config := NewMockedAIConfig(context.Background()).(*MockedAIConfig)
 	config.TimelineContentSizeLimit = 20000 // 设置合适的大小限制
-	memoryTimeline.BindConfig(config, &mockedAI{})
+	memoryTimeline.SoftBindConfig(config, &mockedAI{})
 
 	// 添加大量项目
 	for i := 1; i <= 150; i++ {
@@ -335,7 +335,7 @@ func TestNoCompressionUnderThreshold(t *testing.T) {
 	// 设置大的内容限制以避免内容大小触发压缩
 	config := NewMockedAIConfig(context.Background()).(*MockedAIConfig)
 	config.TimelineContentSizeLimit = 1000000 // 设置很大的限制
-	memoryTimeline.BindConfig(config, &mockedAI{})
+	memoryTimeline.SoftBindConfig(config, &mockedAI{})
 
 	// 添加少量项目，不触发批量压缩
 	for i := 1; i <= 99; i++ {
@@ -367,7 +367,7 @@ func TestCompressionWithDifferentSizes(t *testing.T) {
 	// 设置合理的内容大小限制以触发压缩
 	config := NewMockedAIConfig(context.Background()).(*MockedAIConfig)
 	config.TimelineContentSizeLimit = 25000 // 设置合适的大小限制
-	memoryTimeline.BindConfig(config, &mockedAI{})
+	memoryTimeline.SoftBindConfig(config, &mockedAI{})
 
 	// 添加200个项目，应该触发多次压缩
 	for i := 1; i <= 200; i++ {
@@ -402,9 +402,9 @@ func TestCompressionWithDifferentSizes(t *testing.T) {
 func TestTimelineBindConfig(t *testing.T) {
 	memoryTimeline := aicommon.NewTimeline(&mockedAI{}, nil)
 
-	// Test BindConfig
+	// Test SoftBindConfig
 	config := NewMockedAIConfig(context.Background()).(*MockedAIConfig)
-	memoryTimeline.BindConfig(config, &mockedAI{})
+	memoryTimeline.SoftBindConfig(config, &mockedAI{})
 	// This sets internal config, we can test that compression still works
 }
 

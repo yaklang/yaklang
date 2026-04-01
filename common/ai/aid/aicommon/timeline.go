@@ -216,9 +216,11 @@ func (m *Timeline) CreateSubTimeline(ids ...int64) *Timeline {
 	return tl
 }
 
-func (m *Timeline) BindConfig(config AICallerConfigIf, aiCaller AICaller) {
-	m.config = config
-	m.SetTimelineContentLimit(config.GetTimelineContentSizeLimit())
+func (m *Timeline) SoftBindConfig(config AICallerConfigIf, aiCaller AICaller) {
+	if m.config == nil {
+		m.config = config
+		m.SetTimelineContentLimit(config.GetTimelineContentSizeLimit())
+	}
 	if utils.IsNil(m.ai) {
 		m.setAICaller(aiCaller)
 	}

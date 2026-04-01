@@ -113,7 +113,7 @@ func (m *PromptContextProvider) BindCoordinator(c *Coordinator) {
 		return config.Keywords
 	})
 	m.PushPersistentData(config.PersistentMemory...)
-	m.timeline.BindConfig(config, config)
+	m.timeline.SoftBindConfig(config, config)
 }
 
 // user data memory api, user or ai can set and get
