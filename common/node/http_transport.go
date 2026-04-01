@@ -45,13 +45,14 @@ type SessionState struct {
 
 // HeartbeatRequest keeps the node session alive and reports runtime state.
 type HeartbeatRequest struct {
-	LifecycleState string            `json:"lifecycle_state"`
-	Version        string            `json:"version"`
-	RunningJobs    uint32            `json:"running_jobs"`
-	MaxRunningJobs uint32            `json:"max_running_jobs"`
-	CapabilityKeys []string          `json:"capability_keys"`
-	Labels         map[string]string `json:"labels"`
-	ObservedAt     time.Time         `json:"observed_at"`
+	LifecycleState string                   `json:"lifecycle_state"`
+	Version        string                   `json:"version"`
+	RunningJobs    uint32                   `json:"running_jobs"`
+	MaxRunningJobs uint32                   `json:"max_running_jobs"`
+	CapabilityKeys []string                 `json:"capability_keys"`
+	Labels         map[string]string        `json:"labels"`
+	ObservedAt     time.Time                `json:"observed_at"`
+	ActiveAttempts []ActiveAttemptHeartbeat `json:"active_attempts"`
 }
 
 // HTTPTransportConfig configures the platform HTTP transport.

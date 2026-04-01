@@ -104,6 +104,7 @@ func (b *legionJobBridge) handleCancel(raw []byte) error {
 		reason = "platform cancel requested"
 	}
 	task.SetCancelReason(reason)
+	task.MarkCancelRequested()
 	task.Cancel()
 	return nil
 }
