@@ -390,17 +390,8 @@ func (c *Call) handleCalleeFunction() {
 				continue
 			}
 
-			// 如果 key 是一个 Parameter，尝试从调用参数中获取实际值
-			// 这处理了 handlers[event] 这样的场景，其中 event 是函数参数
-			actualKey := key
-			if param, ok := ToParameter(key); ok && !param.IsFreeValue {
-				// 从 c.Args 中获取实际的参数值
-				if param.FormalParameterIndex < len(c.Args) {
-					if argVal, ok := c.GetValueById(c.Args[param.FormalParameterIndex]); ok && argVal != nil {
-						actualKey = argVal
-					}
-				}
-			}
+			// 将 key 递归解析到调用点的实际值，支持 Parameter / ParameterMember / 成员链。
+			actualKey := getActualKeyFromCall(c, key)
 
 			object, ok := p.GetActualParam(c)
 			if !ok {

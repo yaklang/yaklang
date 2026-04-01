@@ -157,11 +157,38 @@ func (s *FunctionType) SetSideEffect(se []*FunctionSideEffect) {
 // getActualKeyFromCall 获取调用时的实际 key 值
 // 如果 key 是一个 Parameter，则从调用参数中获取实际值
 func getActualKeyFromCall(c *Call, key Value) Value {
+	return getActualKeyFromCallWithVisited(c, key, make(map[int64]bool))
+}
+
+func getActualKeyFromCallWithVisited(c *Call, key Value, visited map[int64]bool) Value {
+	if utils.IsNil(c) || utils.IsNil(key) {
+		return key
+	}
+	if id := key.GetId(); id > 0 {
+		if visited[id] {
+			return key
+		}
+		visited[id] = true
+	}
 	if param, ok := ToParameter(key); ok && !param.IsFreeValue {
 		// 从 c.Args 中获取实际的参数值
 		if param.FormalParameterIndex < len(c.Args) {
 			if argVal, ok := c.GetValueById(c.Args[param.FormalParameterIndex]); ok && argVal != nil {
-				return argVal
+				return getActualKeyFromCallWithVisited(c, argVal, visited)
+			}
+		}
+	}
+	if key.IsMember() {
+		actualObject := getActualKeyFromCallWithVisited(c, key.GetObject(), visited)
+		actualMemberKey := getActualKeyFromCallWithVisited(c, key.GetKey(), visited)
+		if !utils.IsNil(actualObject) && !utils.IsNil(actualMemberKey) {
+			if builder := c.GetFunc().builder; builder != nil {
+				if val := builder.ReadMemberCallValueByName(actualObject, actualMemberKey.String()); !utils.IsNil(val) {
+					return val
+				}
+				if val := builder.ReadMemberCallValue(actualObject, actualMemberKey); !utils.IsNil(val) {
+					return val
+				}
 			}
 		}
 	}

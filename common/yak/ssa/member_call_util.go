@@ -58,6 +58,13 @@ func buildMemberKeyStableSignatureWithVisited(key Value, visited map[int64]bool)
 			return sig
 		}
 	}
+	if key.IsMember() {
+		objectStable := buildMemberKeyStableSignatureWithVisited(key.GetObject(), visited)
+		memberKeyStable := buildMemberKeyStableSignatureWithVisited(key.GetKey(), visited)
+		if objectStable != "" && memberKeyStable != "" {
+			return fmt.Sprintf("member:%s->%s", objectStable, memberKeyStable)
+		}
+	}
 	if keyConst, ok := ToConstInst(key); ok {
 		switch {
 		case keyConst.IsString():
