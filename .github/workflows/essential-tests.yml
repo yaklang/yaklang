@@ -197,7 +197,7 @@ jobs:
         run: |
           ARTIFACT_COPY_LIST="$RUNNER_TEMP/yak|yak" \
           ARTIFACT_PATH="$RUNNER_TEMP/essential-tests-yak.tar.gz" \
-          ./scripts/ci/package-artifact.sh
+          ./scripts/ci/artifact-package.sh
 
       - name: Upload yak binary
         id: upload_yak
@@ -212,7 +212,7 @@ jobs:
         run: |
           ARTIFACT_COPY_LIST="$RUNNER_TEMP/go-build-cache|go-build-cache" \
           ARTIFACT_PATH="$RUNNER_TEMP/essential-tests-yak-cache.tar.gz" \
-          ./scripts/ci/package-artifact.sh
+          ./scripts/ci/artifact-package.sh
 
       - name: Upload go build cache
         id: upload_yak_cache
@@ -257,13 +257,13 @@ jobs:
           ARTIFACT_PATH="${{ runner.temp }}/yak-cache-artifact/essential-tests-yak-cache.tar.gz" \
           DEST_DIR="${{ runner.temp }}/shared-go-cache" \
           ARTIFACT_EXPECT_PATHS="go-build-cache" \
-          ./scripts/ci/unpack-artifact.sh
+          ./scripts/ci/artifact-unpackage.sh
           echo "GOCACHE=${{ runner.temp }}/shared-go-cache/go-build-cache" >> $GITHUB_ENV
           echo "GOMODCACHE=$RUNNER_TEMP/go-mod-cache" >> $GITHUB_ENV
 
       - name: Generate prepare config
         run: |
-          cat > /tmp/prepare_yakgrpc_test_config.json <<'CONFIGEOF'
+          cat > "${{ runner.temp }}/prepare_yakgrpc_test_config.json" <<'CONFIGEOF'
           [
             {"package": "./common/yakgrpc/...", "timeout": "10m"}
           ]
@@ -274,25 +274,25 @@ jobs:
           GOCACHE: ${{ env.GOCACHE }}
           GOMODCACHE: ${{ env.GOMODCACHE }}
         run: |
-          export TEST_BIN_DIR=/tmp/test_binaries
-          export TEST_CONFIG=/tmp/prepare_yakgrpc_test_config.json
+          export TEST_BIN_DIR="${{ runner.temp }}/test_binaries"
+          export TEST_CONFIG="${{ runner.temp }}/prepare_yakgrpc_test_config.json"
           export COMPILE_WORKERS=2
           export GO_TEST_P=1
-          ./scripts/ci/compile-tests.sh
+          ./scripts/ci/test-compile.sh
 
       - name: Package shared suite
         run: |
-          ARTIFACT_COPY_LIST="/tmp/test_binaries|test_binaries" \
-          ARTIFACT_REQUIRE_PATHS="/tmp/test_binaries/compiled_tests.txt" \
-          ARTIFACT_PATH=/tmp/essential-tests-yakgrpc.tar.gz \
-          ./scripts/ci/package-artifact.sh
+          ARTIFACT_COPY_LIST="${{ runner.temp }}/test_binaries|test_binaries" \
+          ARTIFACT_REQUIRE_PATHS="${{ runner.temp }}/test_binaries/compiled_tests.txt" \
+          ARTIFACT_PATH="${{ runner.temp }}/essential-tests-yakgrpc.tar.gz" \
+          ./scripts/ci/artifact-package.sh
 
       - name: Upload shared suite
         id: upload_shared_suite
         uses: actions/upload-artifact@v4
         with:
           name: essential-tests-yakgrpc
-          path: /tmp/essential-tests-yakgrpc.tar.gz
+          path: ${{ runner.temp }}/essential-tests-yakgrpc.tar.gz
           retention-days: 1
           compression-level: 0
 
@@ -330,13 +330,13 @@ jobs:
           ARTIFACT_PATH="${{ runner.temp }}/yak-cache-artifact/essential-tests-yak-cache.tar.gz" \
           DEST_DIR="${{ runner.temp }}/shared-go-cache" \
           ARTIFACT_EXPECT_PATHS="go-build-cache" \
-          ./scripts/ci/unpack-artifact.sh
+          ./scripts/ci/artifact-unpackage.sh
           echo "GOCACHE=${{ runner.temp }}/shared-go-cache/go-build-cache" >> $GITHUB_ENV
           echo "GOMODCACHE=$RUNNER_TEMP/go-mod-cache" >> $GITHUB_ENV
 
       - name: Generate prepare config
         run: |
-          cat > /tmp/prepare_coreplugin_test_config.json <<'CONFIGEOF'
+          cat > "${{ runner.temp }}/prepare_coreplugin_test_config.json" <<'CONFIGEOF'
           [
             {"package": "./common/coreplugin", "timeout": "10m"}
           ]
@@ -347,25 +347,25 @@ jobs:
           GOCACHE: ${{ env.GOCACHE }}
           GOMODCACHE: ${{ env.GOMODCACHE }}
         run: |
-          export TEST_BIN_DIR=/tmp/test_binaries
-          export TEST_CONFIG=/tmp/prepare_coreplugin_test_config.json
+          export TEST_BIN_DIR="${{ runner.temp }}/test_binaries"
+          export TEST_CONFIG="${{ runner.temp }}/prepare_coreplugin_test_config.json"
           export COMPILE_WORKERS=1
           export GO_TEST_P=1
-          ./scripts/ci/compile-tests.sh
+          ./scripts/ci/test-compile.sh
 
       - name: Package shared suite
         run: |
-          ARTIFACT_COPY_LIST="/tmp/test_binaries|test_binaries" \
-          ARTIFACT_REQUIRE_PATHS="/tmp/test_binaries/compiled_tests.txt" \
-          ARTIFACT_PATH=/tmp/essential-tests-coreplugin.tar.gz \
-          ./scripts/ci/package-artifact.sh
+          ARTIFACT_COPY_LIST="${{ runner.temp }}/test_binaries|test_binaries" \
+          ARTIFACT_REQUIRE_PATHS="${{ runner.temp }}/test_binaries/compiled_tests.txt" \
+          ARTIFACT_PATH="${{ runner.temp }}/essential-tests-coreplugin.tar.gz" \
+          ./scripts/ci/artifact-package.sh
 
       - name: Upload shared suite
         id: upload_shared_suite
         uses: actions/upload-artifact@v4
         with:
           name: essential-tests-coreplugin
-          path: /tmp/essential-tests-coreplugin.tar.gz
+          path: ${{ runner.temp }}/essential-tests-coreplugin.tar.gz
           retention-days: 1
           compression-level: 0
 
@@ -590,42 +590,42 @@ jobs:
           DEST_DIR="${{ runner.temp }}/shared-yak" \
           ARTIFACT_EXPECT_PATHS="yak" \
           ARTIFACT_EXECUTABLE_PATHS="yak" \
-          ./scripts/ci/unpack-artifact.sh
+          ./scripts/ci/artifact-unpackage.sh
           ARTIFACT_PATH="${{ runner.temp }}/yak-cache-artifact/essential-tests-yak-cache.tar.gz" \
           DEST_DIR="${{ runner.temp }}/shared-go-cache" \
           ARTIFACT_EXPECT_PATHS="go-build-cache" \
-          ./scripts/ci/unpack-artifact.sh
+          ./scripts/ci/artifact-unpackage.sh
           echo "GOCACHE=${{ runner.temp }}/shared-go-cache/go-build-cache" >> $GITHUB_ENV
           echo "GOMODCACHE=$RUNNER_TEMP/go-mod-cache" >> $GITHUB_ENV
 
       - name: Generate test config
         run: |
-          cat > /tmp/test_config.json <<'CONFIGEOF'
+          cat > "${{ runner.temp }}/test_config.json" <<'CONFIGEOF'
           ${{ matrix.test_configs }}
           CONFIGEOF
-          cat /tmp/test_config.json
+          cat "${{ runner.temp }}/test_config.json"
 
       - name: Compile test binaries
         env:
           GOCACHE: ${{ env.GOCACHE }}
           GOMODCACHE: ${{ env.GOMODCACHE }}
         run: |
-          export TEST_BIN_DIR=/tmp/test_binaries
-          export TEST_CONFIG=/tmp/test_config.json
+          export TEST_BIN_DIR="${{ runner.temp }}/test_binaries"
+          export TEST_CONFIG="${{ runner.temp }}/test_config.json"
           export COMPILE_WORKERS=2
           export GO_TEST_P=1
-          ./scripts/ci/compile-tests.sh
+          ./scripts/ci/test-compile.sh
 
       - name: ${{ matrix.name }}
         run: |
           export YAK_BINARY_PATH="${{ runner.temp }}/shared-yak/yak"
-          export TEST_BIN_DIR=/tmp/test_binaries
+          export TEST_BIN_DIR="${{ runner.temp }}/test_binaries"
           export TEST_TIMEOUT="2m"
           export TEST_VERBOSE="1"
-          export TEST_CONFIG=/tmp/test_config.json
+          export TEST_CONFIG="${{ runner.temp }}/test_config.json"
           export SUITE_NAME="${{ matrix.name }}"
           export SUITE_SYNC_RULE="${{ matrix.sync_rule == '1' && '1' || '0' }}"
-          ./scripts/ci/run-test-suite.sh
+          ./scripts/ci/test-run-suite.sh
 
       - name: Generate safe artifact name
         if: failure()
@@ -639,7 +639,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.artifact_name.outputs.name }}
-          path: /tmp/*.log
+          path: ${{ runner.temp }}/test_binaries/*.log
           if-no-files-found: warn
 
   test-prepared-yakgrpc:
@@ -727,10 +727,10 @@ jobs:
 
       - name: Generate test config
         run: |
-          cat > /tmp/test_config.json <<'CONFIGEOF'
+          cat > "${{ runner.temp }}/test_config.json" <<'CONFIGEOF'
           ${{ matrix.test_configs }}
           CONFIGEOF
-          cat /tmp/test_config.json
+          cat "${{ runner.temp }}/test_config.json"
 
       - name: Download prepared suite
         uses: actions/download-artifact@v4
@@ -743,7 +743,7 @@ jobs:
           ARTIFACT_PATH="${{ runner.temp }}/prepared-artifact/${{ matrix.artifact_file }}" \
           DEST_DIR="${{ runner.temp }}/prepared-suite" \
           ARTIFACT_EXPECT_PATHS="test_binaries/compiled_tests.txt" \
-          ./scripts/ci/unpack-artifact.sh
+          ./scripts/ci/artifact-unpackage.sh
 
       - name: Download shared yak binary
         uses: actions/download-artifact@v4
@@ -758,7 +758,7 @@ jobs:
           DEST_DIR="${{ runner.temp }}/shared-yak" \
           ARTIFACT_EXPECT_PATHS="yak" \
           ARTIFACT_EXECUTABLE_PATHS="yak" \
-          ./scripts/ci/unpack-artifact.sh
+          ./scripts/ci/artifact-unpackage.sh
 
       - name: ${{ matrix.name }}
         run: |
@@ -766,10 +766,10 @@ jobs:
           export TEST_BIN_DIR="${{ runner.temp }}/prepared-suite/test_binaries"
           export TEST_TIMEOUT="2m"
           export TEST_VERBOSE="1"
-          export TEST_CONFIG=/tmp/test_config.json
+          export TEST_CONFIG="${{ runner.temp }}/test_config.json"
           export SUITE_NAME="${{ matrix.name }}"
           export SUITE_SYNC_RULE="${{ matrix.sync_rule == '1' && '1' || '0' }}"
-          ./scripts/ci/run-test-suite.sh
+          ./scripts/ci/test-run-suite.sh
 
       - name: Generate safe artifact name
         if: failure()
@@ -783,7 +783,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.artifact_name.outputs.name }}
-          path: /tmp/*.log
+          path: ${{ runner.temp }}/prepared-suite/test_binaries/*.log
           if-no-files-found: warn
 
   test-prepared-coreplugin:
@@ -844,10 +844,10 @@ jobs:
 
       - name: Generate test config
         run: |
-          cat > /tmp/test_config.json <<'CONFIGEOF'
+          cat > "${{ runner.temp }}/test_config.json" <<'CONFIGEOF'
           ${{ matrix.test_configs }}
           CONFIGEOF
-          cat /tmp/test_config.json
+          cat "${{ runner.temp }}/test_config.json"
 
       - name: Download prepared suite
         uses: actions/download-artifact@v4
@@ -860,7 +860,7 @@ jobs:
           ARTIFACT_PATH="${{ runner.temp }}/prepared-artifact/${{ matrix.artifact_file }}" \
           DEST_DIR="${{ runner.temp }}/prepared-suite" \
           ARTIFACT_EXPECT_PATHS="test_binaries/compiled_tests.txt" \
-          ./scripts/ci/unpack-artifact.sh
+          ./scripts/ci/artifact-unpackage.sh
 
       - name: Download shared yak binary
         uses: actions/download-artifact@v4
@@ -875,7 +875,7 @@ jobs:
           DEST_DIR="${{ runner.temp }}/shared-yak" \
           ARTIFACT_EXPECT_PATHS="yak" \
           ARTIFACT_EXECUTABLE_PATHS="yak" \
-          ./scripts/ci/unpack-artifact.sh
+          ./scripts/ci/artifact-unpackage.sh
 
       - name: ${{ matrix.name }}
         run: |
@@ -883,10 +883,10 @@ jobs:
           export TEST_BIN_DIR="${{ runner.temp }}/prepared-suite/test_binaries"
           export TEST_TIMEOUT="2m"
           export TEST_VERBOSE="1"
-          export TEST_CONFIG=/tmp/test_config.json
+          export TEST_CONFIG="${{ runner.temp }}/test_config.json"
           export SUITE_NAME="${{ matrix.name }}"
           export SUITE_SYNC_RULE="${{ matrix.sync_rule == '1' && '1' || '0' }}"
-          ./scripts/ci/run-test-suite.sh
+          ./scripts/ci/test-run-suite.sh
 
       - name: Generate safe artifact name
         if: failure()
@@ -900,7 +900,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.artifact_name.outputs.name }}
-          path: /tmp/*.log
+          path: ${{ runner.temp }}/prepared-suite/test_binaries/*.log
           if-no-files-found: warn
 
   cleanup-yakgrpc-artifact:
@@ -920,7 +920,7 @@ jobs:
           REPOSITORY: ${{ github.repository }}
           ARTIFACT_LABEL: yakgrpc
         run: |
-          ./scripts/ci/delete-artifact.sh
+          ./scripts/ci/artifact-delete.sh
 
   cleanup-coreplugin-artifact:
     needs: [prepare-coreplugin, test-prepared-coreplugin]
@@ -939,7 +939,7 @@ jobs:
           REPOSITORY: ${{ github.repository }}
           ARTIFACT_LABEL: coreplugin
         run: |
-          ./scripts/ci/delete-artifact.sh
+          ./scripts/ci/artifact-delete.sh
 
   cleanup-yak-artifact:
     needs: [prepare-yak, test-local, test-prepared-yakgrpc, test-prepared-coreplugin]
@@ -959,7 +959,7 @@ jobs:
           REPOSITORY: ${{ github.repository }}
         run: |
           for artifact_id in "$YAK_ARTIFACT_ID" "$CACHE_ARTIFACT_ID"; do
-            ARTIFACT_ID="$artifact_id" ARTIFACT_LABEL="shared-yak-or-cache" ./scripts/ci/delete-artifact.sh
+            ARTIFACT_ID="$artifact_id" ARTIFACT_LABEL="shared-yak-or-cache" ./scripts/ci/artifact-delete.sh
           done
 
   post-check:

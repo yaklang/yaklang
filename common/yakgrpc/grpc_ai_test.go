@@ -17,10 +17,15 @@ import (
 )
 
 func TestGRPC_Ai_List_Model(t *testing.T) {
+	if utils.InGithubActions() {
+		t.Skip("skip in github actions")
+	}
 	client, err := NewLocalClient()
 	require.NoError(t, err)
 	config := make(map[string]string)
 	config["api_key"] = "${api_key}"
+
+	//TODO:  Should use baseurl mock 
 	config["proxy"] = "http://127.0.0.1:7890"
 	config["Type"] = "openai"
 	raw, err := json.Marshal(config)

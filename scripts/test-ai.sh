@@ -99,19 +99,19 @@ if [[ -f "./scripts/local/compile-ai-tests.sh" ]]; then
         echo "[ERROR] Compilation failed! See details above."
         exit 1
     fi
-elif [[ -f "./scripts/ci/compile-tests.sh" ]]; then
-    echo "* Using scripts/ci/compile-tests.sh..."
+elif [[ -f "./scripts/ci/test-compile.sh" ]]; then
+    echo "* Using scripts/ci/test-compile.sh..."
     export TEST_BIN_DIR="$TEST_BIN_DIR"
     export TEST_CONFIG="$TEST_CONFIG"
     export JOBS=4  # Parallel compilation
     
-    if ! ./scripts/ci/compile-tests.sh 2>&1 | tee "$COMPILE_LOG"; then
+    if ! ./scripts/ci/test-compile.sh 2>&1 | tee "$COMPILE_LOG"; then
         echo ""
         echo "[ERROR] Compilation failed! See details above."
         exit 1
     fi
 else
-    echo "[WARN] scripts/ci/compile-tests.sh not found, using inline compilation..."
+    echo "[WARN] scripts/ci/test-compile.sh not found, using inline compilation..."
     
     # Inline compilation logic
     packages=$(jq -r '.[].package' "$TEST_CONFIG" | sort -u)
@@ -203,9 +203,9 @@ echo ""
 
 exec_start=$(date +%s)
 
-# Use run-tests.sh if available, otherwise run inline
-if [[ -f "./scripts/ci/run-tests.sh" ]]; then
-    echo "* Using scripts/ci/run-tests.sh..."
+# Use test-run.sh if available, otherwise run inline
+if [[ -f "./scripts/ci/test-run.sh" ]]; then
+    echo "* Using scripts/ci/test-run.sh..."
     export TEST_BIN_DIR="$TEST_BIN_DIR"
     export TEST_CONFIG="$TEST_CONFIG"
     export TEST_VERBOSE="1"
@@ -215,7 +215,7 @@ if [[ -f "./scripts/ci/run-tests.sh" ]]; then
     run_exit_code=0
     
     # Run with enhanced output processing
-    ./scripts/ci/run-tests.sh 2>&1 | while IFS= read -r line; do
+    ./scripts/ci/test-run.sh 2>&1 | while IFS= read -r line; do
         echo "$line"
         
         # Extract test execution info
@@ -233,7 +233,7 @@ if [[ -f "./scripts/ci/run-tests.sh" ]]; then
         exit $run_exit_code
     fi
 else
-    echo "[WARN] scripts/ci/run-tests.sh not found, using inline execution..."
+    echo "[WARN] scripts/ci/test-run.sh not found, using inline execution..."
     
     # Inline execution logic
     manifest="$TEST_BIN_DIR/compiled_tests.txt"

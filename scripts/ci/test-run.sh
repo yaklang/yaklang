@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BIN_DIR="${TEST_BIN_DIR:-/tmp/test_binaries}"
-MANIFEST="${BIN_DIR}/compiled_tests.txt"
+BIN_DIR="${TEST_BIN_DIR:-./test_binaries}"
+TEST_LOG_DIR="${TEST_LOG_DIR:-$BIN_DIR}"
 
 # 过滤：只运行包路径包含该正则的二进制（读取 .package）
 PACKAGE_FILTER_REGEX="${PACKAGE_FILTER_REGEX:-.*}"   # 例如 '^./common/ai/' 只跑 AI
@@ -20,46 +20,18 @@ TEST_CONFIG="${TEST_CONFIG:-}"  # JSON格式的测试配置文件
 declare -a ALL_TEST_BINS=()
 declare -a ALL_TEST_PKGS=()
 
-resolve_manifest_bin_path() {
-  local manifest_path="$1"
-
-  if [[ -e "$manifest_path" ]]; then
-    echo "$manifest_path"
-    return 0
-  fi
-
-  local rebased_by_name="$BIN_DIR/$(basename "$manifest_path")"
-  if [[ -e "$rebased_by_name" ]]; then
-    echo "$rebased_by_name"
-    return 0
-  fi
-
-  if [[ "$manifest_path" != /* ]]; then
-    local rebased_relative="$BIN_DIR/$manifest_path"
-    if [[ -e "$rebased_relative" ]]; then
-      echo "$rebased_relative"
-      return 0
-    fi
-  fi
-
-  return 1
-}
-
 build_package_map() {
   echo "Building package to binary mapping..."
-  local skipped_manifest_entries=0
-  
-  while IFS= read -r manifest_bin; do
-    [[ -z "$manifest_bin" ]] && continue
+  local skipped_entries=0
+  local bin=""
 
-    if ! bin="$(resolve_manifest_bin_path "$manifest_bin")"; then
-      echo "WARNING: Skipping manifest entry because binary is missing: $manifest_bin"
-      ((skipped_manifest_entries++))
+  while IFS= read -r bin; do
+    pkg_file="${bin}.package"
+    if [[ ! -f "$pkg_file" ]]; then
+      echo "WARNING: Skipping binary because package metadata is missing: $(basename "$bin").package"
+      ((skipped_entries++))
       continue
     fi
-
-    pkg_file="${bin}.package"
-    [[ -f "$pkg_file" ]] || continue
     pkg_path="$(cat "$pkg_file")"
     
     # 应用过滤器
@@ -69,11 +41,13 @@ build_package_map() {
     
     ALL_TEST_BINS+=("$bin")
     ALL_TEST_PKGS+=("$pkg_path")
-  done < "$MANIFEST"
+  done < <(
+    find "$BIN_DIR" -maxdepth 1 -type f -name "test_*" ! -name "*.log" ! -name "*.package" ! -name ".*" | sort
+  )
   
   echo "Found ${#ALL_TEST_BINS[@]} test binaries"
-  if [[ $skipped_manifest_entries -gt 0 ]]; then
-    echo "Skipped $skipped_manifest_entries stale manifest entrie(s)"
+  if [[ $skipped_entries -gt 0 ]]; then
+    echo "Skipped $skipped_entries invalid binary entrie(s)"
   fi
 }
 
@@ -144,10 +118,12 @@ find_matching_tests() {
   fi
 }
 
-if [[ ! -f "$MANIFEST" ]]; then
-  echo " Manifest not found: $MANIFEST"
+if [[ ! -d "$BIN_DIR" ]]; then
+  echo " Binary dir not found: $BIN_DIR"
   exit 1
 fi
+
+mkdir -p "$TEST_LOG_DIR"
 
 # 构建包到二进制的映射
 build_package_map
@@ -176,7 +152,7 @@ run_test() {
   local config_source="$9"  # "default" 或 "config:pattern"
   
   local name="$(basename "$bin")"
-  local log="/tmp/${name}.run.log"
+  local log="${TEST_LOG_DIR}/${name}.run.log"
   
   # 默认重试参数
   local max_retries="${retry:-0}"
@@ -425,12 +401,11 @@ else
   echo ""
   echo "Failed tests:"
   # 列出所有包含失败标记的日志
-  for log in /tmp/test_*.run.log; do
-    [[ -f "$log" ]] || continue
+  while IFS= read -r log; do
     if grep -q "^FAIL:" "$log" || grep -q "^--- FAIL:" "$log" || grep -q "^FAIL$" "$log"; then
       echo "  - $(basename "$log" .run.log)"
     fi
-  done
+  done < <(find "$TEST_LOG_DIR" -maxdepth 1 -type f -name "test_*.run.log" | sort)
 fi
 
 exit $rc
