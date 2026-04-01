@@ -48,3 +48,80 @@ Current finding:
 
 - `system/src/Grav/Framework/Flex/FlexObject.php` regressed above the 30s AST budget during grav rerun after the PrestaShop parser work.
 - Work is in progress to recover grav performance before moving to the next project.
+
+## 2026-04-01 20:22:45 +08:00
+
+### Checkpoint
+
+- Commit created: `967e081de`
+- Commit message: `fix(php): checkpoint prestashop ast support`
+
+Saved state:
+
+- `PrestaShop` fixture coverage and project-level AST pass are checkpointed in git.
+- Work after the checkpoint is intentionally left uncommitted while exploring the grav regression.
+
+### Current Exploration
+
+- `PrestaShop`
+  - still passes fixture coverage
+  - project-level AST pass was revalidated before the checkpoint commit
+- `grav`
+  - still blocked by `system/src/Grav/Framework/Flex/FlexObject.php`
+  - recent parser experiments after the checkpoint are uncommitted
+  - current focus is to remove the grav performance regression without losing the PrestaShop support added in the checkpoint
+
+## 2026-04-01 21:37:01 +08:00
+
+### Grav
+
+- Status: completed
+- Project path: `/home/wlz/Target/phpcms/grav`
+
+Changes made:
+
+- Kept the `typeHint` rule split introduced during the grav investigation:
+  - `typeHintAtom`
+  - `typeHintIntersection`
+  - `typeHintUnion`
+- Reworked namespace grammar to remove the repeated `useDeclaration* namespaceStatement*` ambiguity in both bracketed and semicolon namespace forms.
+- Regenerated the PHP parser after the grammar change.
+
+Why this mattered:
+
+- ANTLR diagnostics showed repeated full-context ambiguity in `namespaceDeclarationSemi` for almost every top-level `use ...;` in `system/src/Grav/Framework/Flex/FlexObject.php`.
+- After the namespace grammar split, the grav blocker file dropped from roughly `33s` to about `3.37s` in isolated fixture parsing, bringing it back under the `30s` budget with a large safety margin.
+
+Verification:
+
+- `go test ./common/yak/php/tests -run 'TestAllSyntaxForPHP_G4/syntax file: syntax/grav_slow/system__src__Grav__Framework__Flex__FlexObject.php' -count=1 -v`
+  - passed
+  - `FlexObject.php`: about `3.37s`
+- `go test ./common/yak/php/tests -run 'TestAllSyntaxForPHP_G4/syntax file: syntax/prestashop/.*' -count=1`
+  - passed
+- `YAK_PHP_RUN_PROJECT_AST=1 YAK_PHP_PROJECT_AST_TARGET=/home/wlz/Target/phpcms/grav YAK_PHP_FIXTURE_PARSE_BUDGET_SEC=30 go test ./common/yak/php/tests -run TestProjectAst -count=1 -v`
+  - passed
+  - total parsed files: `522`
+  - total project parse time: about `50.14s`
+  - `system/src/Grav/Framework/Flex/FlexObject.php`: about `15.72s`
+  - isolated slow files over `30s`: `0`
+- `YAK_PHP_RUN_PROJECT_AST=1 YAK_PHP_PROJECT_AST_TARGET=/home/wlz/Target/phpcms/PrestaShop YAK_PHP_FIXTURE_PARSE_BUDGET_SEC=30 go test ./common/yak/php/tests -run TestProjectAst -count=1 -v`
+  - passed
+  - total parsed files: `7163`
+  - total project parse time: about `2m21.03s`
+  - isolated slow files over `30s`: `0`
+
+Regression note:
+
+- A full `go test ./common/yak/php/tests -count=1` run still fails in the exact-IR assertion suite.
+- The failing subset observed after the grav fix is:
+  - `TestAssignVariables`
+  - `TestParseSSA_DeclareConst`
+  - `TestExpression_If1`
+  - `TestExpression_Try`
+  - `TestBlueprintVirtual`
+  - `TestGlobal`
+  - `TestNativeCall_Include`
+  - `TestNamespace2`
+  - `TestOOP_static_member`
+- The same subset also fails when run from the checkpoint export of commit `967e081de`, so these are treated as pre-existing baseline failures for this branch rather than a regression introduced by the grav performance fix.

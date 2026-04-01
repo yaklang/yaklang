@@ -22,10 +22,20 @@ func (y *builder) VisitTypeHint(raw phpparser.ITypeHintContext) ssa.Type {
 	if i == nil {
 		return ssa.CreateAnyType()
 	}
-	if len(i.AllTypeHintAtom()) == 0 {
-		return ssa.CreateAnyType()
+	if atom := i.TypeHintAtom(); atom != nil {
+		return y.VisitTypeHintAtom(atom)
 	}
-	return y.VisitTypeHintAtom(i.TypeHintAtom(0))
+	if intersection := i.TypeHintIntersection(); intersection != nil {
+		if ctx, ok := intersection.(*phpparser.TypeHintIntersectionContext); ok {
+			return y.VisitTypeHintAtom(ctx.TypeHintAtom(0))
+		}
+	}
+	if union := i.TypeHintUnion(); union != nil {
+		if ctx, ok := union.(*phpparser.TypeHintUnionContext); ok {
+			return y.VisitTypeHintAtom(ctx.TypeHintAtom(0))
+		}
+	}
+	return ssa.CreateAnyType()
 }
 
 func (y *builder) VisitTypeHintAtom(raw phpparser.ITypeHintAtomContext) ssa.Type {
