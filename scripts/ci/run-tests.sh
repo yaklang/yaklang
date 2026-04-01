@@ -20,11 +20,44 @@ TEST_CONFIG="${TEST_CONFIG:-}"  # JSON格式的测试配置文件
 declare -a ALL_TEST_BINS=()
 declare -a ALL_TEST_PKGS=()
 
+resolve_manifest_bin_path() {
+  local manifest_path="$1"
+
+  if [[ -e "$manifest_path" ]]; then
+    echo "$manifest_path"
+    return 0
+  fi
+
+  local rebased_by_name="$BIN_DIR/$(basename "$manifest_path")"
+  if [[ -e "$rebased_by_name" ]]; then
+    echo "$rebased_by_name"
+    return 0
+  fi
+
+  if [[ "$manifest_path" != /* ]]; then
+    local rebased_relative="$BIN_DIR/$manifest_path"
+    if [[ -e "$rebased_relative" ]]; then
+      echo "$rebased_relative"
+      return 0
+    fi
+  fi
+
+  return 1
+}
+
 build_package_map() {
   echo "Building package to binary mapping..."
+  local skipped_manifest_entries=0
   
-  while IFS= read -r bin; do
-    [[ -z "$bin" ]] && continue
+  while IFS= read -r manifest_bin; do
+    [[ -z "$manifest_bin" ]] && continue
+
+    if ! bin="$(resolve_manifest_bin_path "$manifest_bin")"; then
+      echo "WARNING: Skipping manifest entry because binary is missing: $manifest_bin"
+      ((skipped_manifest_entries++))
+      continue
+    fi
+
     pkg_file="${bin}.package"
     [[ -f "$pkg_file" ]] || continue
     pkg_path="$(cat "$pkg_file")"
@@ -39,6 +72,9 @@ build_package_map() {
   done < "$MANIFEST"
   
   echo "Found ${#ALL_TEST_BINS[@]} test binaries"
+  if [[ $skipped_manifest_entries -gt 0 ]]; then
+    echo "Skipped $skipped_manifest_entries stale manifest entrie(s)"
+  fi
 }
 
 # 检查包是否匹配配置的包模式
