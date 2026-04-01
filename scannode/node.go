@@ -1,6 +1,8 @@
 package scannode
 
 import (
+	"time"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/node"
 	"github.com/yaklang/yaklang/common/spec"
@@ -62,6 +64,7 @@ func (s *ScanNode) Snapshot() node.RuntimeStatus {
 		LifecycleState: node.DefaultLifecycleState,
 		RunningJobs:    uint32(s.manager.Count()),
 		MaxRunningJobs: s.maxRunningJobs,
+		ActiveAttempts: s.manager.ActiveAttemptHeartbeats(time.Now().UTC()),
 	}
 }
 
