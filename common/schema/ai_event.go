@@ -123,6 +123,7 @@ const (
 
 	EVENT_TYPE_YAKIT_EXEC_RESULT = "yak_exec_result" // yakit exec result event, used to emit the yakit exec result information
 	EVENT_TYPE_YAKIT_RISK        = "yak_risk"        // yakit risk event, used to emit the yakit risk information
+	EVENT_TYPE_YAKIT_HTTPFLOW    = "yak_httpflow"    // yakit httpflow event, used to emit saved httpflow identity information
 
 	// AI 推理过程通用事件类型
 	EVENT_TYPE_THOUGHT     EventType = "thought"     // AI 思考过程（适用于 ReAct、CoT 等推理模式）

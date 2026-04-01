@@ -24,6 +24,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/http_struct"
@@ -41,34 +42,35 @@ var (
 )
 
 type PocConfig struct {
-	Host                 string
-	Port                 int
-	ForceHttps           *bool
-	ForceHttp2           *bool
-	SNI                  *string
-	Timeout              *time.Duration
-	ConnectTimeout       *time.Duration
-	RetryTimes           *int
-	RetryInStatusCode    []int
-	RetryNotInStatusCode []int
-	RetryWaitTime        *time.Duration
-	RetryMaxWaitTime     *time.Duration
-	RedirectTimes        *int
-	NoRedirect           *bool
-	Proxy                []string
-	FuzzParams           map[string][]string
-	NoFixContentLength   *bool
-	JsRedirect           *bool
-	RedirectHandler      func(bool, []byte, []byte) bool
-	Session              interface{} // session的标识符，可以用任意对象
-	SaveHTTPFlow         *bool
-	SaveHTTPFlowHandler  []func(*lowhttp.LowhttpResponse)
-	UseMITMRule          *bool
-	SaveHTTPFlowSync     *bool
-	Source               string
-	Username             *string
-	Password             *string
-	FixQueryEscape       *bool
+	Host                     string
+	Port                     int
+	ForceHttps               *bool
+	ForceHttp2               *bool
+	SNI                      *string
+	Timeout                  *time.Duration
+	ConnectTimeout           *time.Duration
+	RetryTimes               *int
+	RetryInStatusCode        []int
+	RetryNotInStatusCode     []int
+	RetryWaitTime            *time.Duration
+	RetryMaxWaitTime         *time.Duration
+	RedirectTimes            *int
+	NoRedirect               *bool
+	Proxy                    []string
+	FuzzParams               map[string][]string
+	NoFixContentLength       *bool
+	JsRedirect               *bool
+	RedirectHandler          func(bool, []byte, []byte) bool
+	Session                  interface{} // session的标识符，可以用任意对象
+	SaveHTTPFlow             *bool
+	SaveHTTPFlowHandler      []func(*lowhttp.LowhttpResponse)
+	AfterSaveHTTPFlowHandler []func(*schema.HTTPFlow)
+	UseMITMRule              *bool
+	SaveHTTPFlowSync         *bool
+	Source                   string
+	Username                 *string
+	Password                 *string
+	FixQueryEscape           *bool
 
 	// packetHandler
 	PacketHandler []func([]byte) []byte
@@ -190,6 +192,9 @@ func (c *PocConfig) ToLowhttpOptions() []lowhttp.LowhttpOpt {
 	}
 	if c.SaveHTTPFlowHandler != nil {
 		opts = append(opts, lowhttp.WithSaveHTTPFlowHandler(c.SaveHTTPFlowHandler...))
+	}
+	if c.AfterSaveHTTPFlowHandler != nil {
+		opts = append(opts, lowhttp.WithAfterSaveHTTPFlowHandler(c.AfterSaveHTTPFlowHandler...))
 	}
 	if c.UseMITMRule != nil {
 		opts = append(opts, lowhttp.WithUseMITMRule(*c.UseMITMRule))
@@ -843,6 +848,15 @@ func WithSaveHandler(f ...func(response *lowhttp.LowhttpResponse)) PocConfigOpti
 			c.SaveHTTPFlowHandler = make([]func(*lowhttp.LowhttpResponse), 0)
 		}
 		c.SaveHTTPFlowHandler = append(c.SaveHTTPFlowHandler, f...)
+	}
+}
+
+func WithAfterSaveHandler(f ...func(flow *schema.HTTPFlow)) PocConfigOption {
+	return func(c *PocConfig) {
+		if c.AfterSaveHTTPFlowHandler == nil {
+			c.AfterSaveHTTPFlowHandler = make([]func(*schema.HTTPFlow), 0)
+		}
+		c.AfterSaveHTTPFlowHandler = append(c.AfterSaveHTTPFlowHandler, f...)
 	}
 }
 
@@ -2435,6 +2449,7 @@ var PoCExports = map[string]interface{}{
 	"save":                 WithSave,
 	"saveSync":             WithSaveSync,
 	"saveHandler":          WithSaveHandler,
+	"afterSaveHandler":     WithAfterSaveHandler,
 	"useMitmRule":          WithMITMRule,
 	"source":               WithSource,
 	"websocket":            WithWebsocket,

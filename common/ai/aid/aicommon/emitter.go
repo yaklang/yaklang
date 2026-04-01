@@ -206,6 +206,13 @@ func (r *Emitter) EmitYakitRisk(id uint, title string) (*schema.AiOutputEvent, e
 	})
 }
 
+func (r *Emitter) EmitYakitHTTPFlow(runtimeID string, hiddenIndex string) (*schema.AiOutputEvent, error) {
+	return r.EmitJSON(schema.EVENT_TYPE_YAKIT_HTTPFLOW, "yakit", map[string]any{
+		"runtime_id":   runtimeID,
+		"hidden_index": hiddenIndex,
+	})
+}
+
 func (r *Emitter) EmitYakitExecResult(exec *ypb.ExecResult) (*schema.AiOutputEvent, error) {
 	if exec == nil {
 		return nil, utils.Errorf("EmitYakitExecResult is nil")

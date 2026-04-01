@@ -220,6 +220,11 @@ func (a *ToolCaller) invoke(
 				if risk != nil {
 					e.EmitYakitRisk(risk.ID, risk.Title)
 				}
+				httpFlow, _ := handleHTTPFlowMessage(result)
+				if httpFlow != nil {
+					e.EmitYakitHTTPFlow(httpFlow.RuntimeId, httpFlow.HiddenIndex)
+					return nil
+				}
 				// 过滤文件 Stat/Read 等高频消息，避免对前端造成压力
 				if shouldIgnoreExecResultForEmit(result) {
 					return nil
@@ -374,4 +379,42 @@ func handleRiskMessage(result *ypb.ExecResult) (*schema.Risk, error) {
 		return nil, utils.Errorf("unknown log level: %s", logInfo.Level)
 	}
 	return nil, utils.Errorf("unknown message type: %s", msg.Type)
+}
+
+func handleHTTPFlowMessage(result *ypb.ExecResult) (*schema.HTTPFlow, error) {
+	if result == nil || !result.IsMessage || len(result.Message) == 0 {
+		return nil, utils.Errorf("result is not a yakit log message")
+	}
+
+	msg := &yaklib.YakitMessage{}
+	if err := json.Unmarshal(result.Message, msg); err != nil {
+		return nil, err
+	}
+	if msg.Type != "log" {
+		return nil, utils.Errorf("unknown message type: %s", msg.Type)
+	}
+
+	logInfo := &yaklib.YakitLog{}
+	if err := json.Unmarshal(msg.Content, logInfo); err != nil {
+		return nil, utils.Errorf("unmarshal log info failed: %v", err)
+	}
+	if logInfo.Level != "json-httpflow" {
+		return nil, utils.Errorf("unknown log level: %s", logInfo.Level)
+	}
+
+	var flow struct {
+		RuntimeId   string `json:"runtime_id"`
+		HiddenIndex string `json:"hidden_index"`
+	}
+	if err := json.Unmarshal([]byte(logInfo.Data), &flow); err != nil {
+		return nil, utils.Errorf("unmarshal httpflow info failed: %v", err)
+	}
+	if flow.HiddenIndex == "" {
+		return nil, utils.Errorf("httpflow hidden_index is empty")
+	}
+
+	return &schema.HTTPFlow{
+		RuntimeId:   flow.RuntimeId,
+		HiddenIndex: flow.HiddenIndex,
+	}, nil
 }

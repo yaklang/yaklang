@@ -64,7 +64,18 @@ func SaveLowHTTPFlow(r *lowhttp.LowhttpResponse, forceSaveFlowSync bool) {
 	reqIns = r.RequestInstance
 
 	// db := consts.GetGormProjectDatabase()
-	flow, err := CreateHTTPFlowFromHTTPWithBodySavedFromRaw(https, req, rsp, "scan", url, remoteAddr, CreateHTTPFlowWithRequestIns(reqIns), CreateHTTPFlowWithTags(strings.Join(r.Tags, "|")), CreateHTTPFlowWithDuration(duration))
+	flow, err := CreateHTTPFlowFromHTTPWithBodySavedFromRaw(
+		https,
+		req,
+		rsp,
+		"scan",
+		url,
+		remoteAddr,
+		CreateHTTPFlowWithRequestIns(reqIns),
+		CreateHTTPFlowWithTags(strings.Join(r.Tags, "|")),
+		CreateHTTPFlowWithDuration(duration),
+		CreateHTTPFlowWithAfterSave(r.AfterSaveHTTPFlowHandler...),
+	)
 	if err != nil {
 		log.Errorf("create httpflow from lowhttp failed: %s", err)
 		return
@@ -114,6 +125,7 @@ type CreateHTTPFlowConfig struct {
 	tooLargeHeaderFile string
 	tooLargeBodyFile   string
 	fromPlugin         string
+	afterSaveHandlers  []func(*schema.HTTPFlow)
 }
 
 type CreateHTTPFlowOptions func(c *CreateHTTPFlowConfig)
@@ -121,6 +133,15 @@ type CreateHTTPFlowOptions func(c *CreateHTTPFlowConfig)
 func CreateHTTPFlowWithFromPlugin(pluginName string) CreateHTTPFlowOptions {
 	return func(c *CreateHTTPFlowConfig) {
 		c.fromPlugin = pluginName
+	}
+}
+
+func CreateHTTPFlowWithAfterSave(handlers ...func(*schema.HTTPFlow)) CreateHTTPFlowOptions {
+	return func(c *CreateHTTPFlowConfig) {
+		if len(handlers) == 0 {
+			return
+		}
+		c.afterSaveHandlers = append(c.afterSaveHandlers, handlers...)
 	}
 }
 
@@ -333,6 +354,9 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 		TooLargeResponseHeaderFile: tooLargeHeaderFile,
 		FromPlugin:                 fromPlugin,
 	}
+	if len(c.afterSaveHandlers) > 0 {
+		flow.AfterSaveHandlers = append([]func(*schema.HTTPFlow){}, c.afterSaveHandlers...)
+	}
 
 	// 如果设置了 reqIns，则不会再解析 reqRaw
 	if reqIns != nil {
@@ -523,6 +547,7 @@ func InsertHTTPFlow(db *gorm.DB, i *schema.HTTPFlow) (fErr error) {
 	if db = db.Model(&schema.HTTPFlow{}).Save(i); db.Error != nil {
 		return utils.Errorf("insert HTTPFlow failed: %s", db.Error)
 	}
+	callHTTPFlowAfterSaveHandlers(i)
 
 	return nil
 }
@@ -542,6 +567,7 @@ func CreateOrUpdateHTTPFlow(db *gorm.DB, hash string, i *schema.HTTPFlow) (fErr 
 		return utils.Errorf("create/update HTTPFlow failed: %s", db.Error)
 	}
 	i.ID = flowCopy.ID
+	callHTTPFlowAfterSaveHandlers(i)
 	return nil
 }
 
@@ -549,8 +575,28 @@ func SaveHTTPFlow(db *gorm.DB, i *schema.HTTPFlow) error {
 	if db := db.Model(&schema.HTTPFlow{}).Save(i); db.Error != nil {
 		return db.Error
 	}
+	callHTTPFlowAfterSaveHandlers(i)
 
 	return nil
+}
+
+func callHTTPFlowAfterSaveHandlers(flow *schema.HTTPFlow) {
+	if flow == nil || len(flow.AfterSaveHandlers) == 0 {
+		return
+	}
+	for _, handler := range flow.AfterSaveHandlers {
+		if handler == nil {
+			continue
+		}
+		func() {
+			defer func() {
+				if err := recover(); err != nil {
+					log.Errorf("httpflow after-save handler panic: %v", err)
+				}
+			}()
+			handler(flow)
+		}()
+	}
 }
 
 // choose db save mode by const

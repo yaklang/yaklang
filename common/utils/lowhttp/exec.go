@@ -22,6 +22,7 @@ import (
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -279,6 +280,7 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 		saveHTTPFlow            = option.SaveHTTPFlow
 		saveHTTPFlowSync        = option.SaveHTTPFlowSync
 		saveHTTPFlowHandlerList = option.SaveHTTPFlowHandler
+		afterSaveHTTPFlowList   = option.AfterSaveHTTPFlowHandler
 		session                 = option.Session
 		ctx                     = option.Ctx
 		traceInfo               = newLowhttpTraceInfo()
@@ -354,6 +356,9 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 	response.Source = source
 	response.Payloads = payloads
 	response.Tags = tags
+	if len(afterSaveHTTPFlowList) > 0 {
+		response.AfterSaveHTTPFlowHandler = append([]func(*schema.HTTPFlow){}, afterSaveHTTPFlowList...)
+	}
 
 	if option.EnableMaxContentLength && maxContentLength > 0 {
 		httpctx.SetResponseMaxContentLength(reqIns, maxContentLength)

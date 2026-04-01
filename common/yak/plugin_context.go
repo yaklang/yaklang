@@ -3,6 +3,7 @@ package yak
 import (
 	"context"
 	"github.com/yaklang/yaklang/common/filter"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/cli"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -10,12 +11,13 @@ import (
 
 type YakitPluginContext struct {
 	yakit.YakitPluginInfo
-	Proxy       string
-	Ctx         context.Context
-	CliApp      *cli.CliApp
-	Cancel      context.CancelFunc
-	vulFilter   filter.Filterable
-	YakitClient *yaklib.YakitClient
+	Proxy                     string
+	Ctx                       context.Context
+	CliApp                    *cli.CliApp
+	Cancel                    context.CancelFunc
+	vulFilter                 filter.Filterable
+	YakitClient               *yaklib.YakitClient
+	AfterSaveHTTPFlowHandlers []func(*schema.HTTPFlow)
 }
 
 func (y *YakitPluginContext) WithContextCancel(cancel context.CancelFunc) *YakitPluginContext {
@@ -58,6 +60,14 @@ func (y *YakitPluginContext) WithContext(ctx context.Context) *YakitPluginContex
 
 func (y *YakitPluginContext) WithCliApp(cliApp *cli.CliApp) *YakitPluginContext {
 	y.CliApp = cliApp
+	return y
+}
+
+func (y *YakitPluginContext) WithAfterSaveHTTPFlowHandler(handlers ...func(*schema.HTTPFlow)) *YakitPluginContext {
+	if len(handlers) == 0 {
+		return y
+	}
+	y.AfterSaveHTTPFlowHandlers = append(y.AfterSaveHTTPFlowHandlers, handlers...)
 	return y
 }
 

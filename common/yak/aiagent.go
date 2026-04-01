@@ -82,19 +82,34 @@ func YakTool2AITool(aitools []*schema.AIYakTool) []*aitool.Tool {
 				}
 				cliApp := GetHookCliApp(args)
 				engine.RegisterEngineHooks(func(ae *antlr4yak.Engine) error {
+					pluginContext := CreateYakitPluginContext(
+						runtimeId,
+					).WithContext(
+						ctx,
+					).WithContextCancel(
+						cancel,
+					).WithCliApp(
+						cliApp,
+					).WithYakitClient(
+						yakitClient,
+					)
+					if runtimeFeedBacker != nil {
+						pluginContext.WithAfterSaveHTTPFlowHandler(func(flow *schema.HTTPFlow) {
+							if flow == nil {
+								return
+							}
+							level, msg := yaklib.MarshalYakitOutput(flow)
+							if level == "" {
+								return
+							}
+							if err := runtimeFeedBacker(yaklib.NewYakitLogExecResult(level, msg)); err != nil {
+								log.Warnf("emit saved httpflow via runtime feedbacker failed: %v", err)
+							}
+						})
+					}
 					BindYakitPluginContextToEngine(
 						ae,
-						CreateYakitPluginContext(
-							runtimeId,
-						).WithContext(
-							ctx,
-						).WithContextCancel(
-							cancel,
-						).WithCliApp(
-							cliApp,
-						).WithYakitClient(
-							yakitClient,
-						),
+						pluginContext,
 					)
 					return nil
 				})

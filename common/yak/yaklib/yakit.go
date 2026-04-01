@@ -611,6 +611,8 @@ func MarshalYakitOutput(t interface{}) (string, string) {
 			return "", ""
 		}
 		return "json-risk", string(raw)
+	case *schema.HTTPFlow:
+		return "json-httpflow", string(raw)
 	case *YakitTable:
 		return "json-table", string(raw)
 	case *YakitGraph:
