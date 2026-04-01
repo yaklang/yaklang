@@ -296,6 +296,48 @@ yakit.Info("no cli params")
 	require.Len(t, got2.Params, 0, "删除 cli 后 SaveNewYakScript 应清空 Params，数据库应无参数")
 }
 
+func TestSaveYakScript_UpdateAIFields(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	scriptName := uuid.NewString()
+	initial := &schema.YakScript{
+		ScriptName:  scriptName,
+		Type:        "yak",
+		Content:     `yakit.AutoInitYakit()`,
+		EnableForAI: true,
+		AIDesc:      "old ai desc",
+		AIKeywords:  "old,keywords",
+		AIUsage:     "old usage",
+	}
+	require.NoError(t, yakit.CreateOrUpdateYakScriptByName(consts.GetGormProfileDatabase(), scriptName, initial))
+	defer func() {
+		require.NoError(t, yakit.DeleteYakScriptByName(consts.GetGormProfileDatabase(), scriptName))
+	}()
+
+	existing, err := yakit.GetYakScriptByName(consts.GetGormProfileDatabase(), scriptName)
+	require.NoError(t, err)
+
+	_, err = client.SaveYakScript(context.Background(), &ypb.YakScript{
+		Id:          int64(existing.ID),
+		ScriptName:  scriptName,
+		Type:        "yak",
+		Content:     `yakit.AutoInitYakit()`,
+		EnableForAI: false,
+		AIDesc:      "new ai desc",
+		AIKeywords:  "new,keywords",
+		AIUsage:     "new usage",
+	})
+	require.NoError(t, err)
+
+	updated, err := yakit.GetYakScriptByName(consts.GetGormProfileDatabase(), scriptName)
+	require.NoError(t, err)
+	require.False(t, updated.EnableForAI, "SaveYakScript 应允许更新 EnableForAI=false")
+	require.Equal(t, "new ai desc", updated.AIDesc)
+	require.Equal(t, "new,keywords", updated.AIKeywords)
+	require.Equal(t, "new usage", updated.AIUsage)
+}
+
 func TestExportLocalYakScriptStream(t *testing.T) {
 	test := assert.New(t)
 

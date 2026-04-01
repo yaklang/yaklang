@@ -263,44 +263,17 @@ func GRPCYakScriptToYakitScript(script *ypb.YakScript) *schema.YakScript {
 		GeneralModuleVerbose: script.GeneralModuleVerbose,
 		EnablePluginSelector: script.EnablePluginSelector,
 		PluginSelectorTypes:  script.PluginSelectorTypes,
+		EnableForAI:          script.EnableForAI,
+		AIDesc:               script.AIDesc,
+		AIKeywords:           script.AIKeywords,
+		AIUsage:              script.AIUsage,
 	}
 }
 
-func mergeYakScriptAIFields(dst *schema.YakScript, src *schema.YakScript) {
-	if dst == nil || src == nil {
-		return
-	}
-	if !dst.EnableForAI {
-		dst.EnableForAI = src.EnableForAI
-	}
-	if dst.AIDesc == "" {
-		dst.AIDesc = src.AIDesc
-	}
-	if dst.AIKeywords == "" {
-		dst.AIKeywords = src.AIKeywords
-	}
-	if dst.AIUsage == "" {
-		dst.AIUsage = src.AIUsage
-	}
-}
-
-func completeYakScriptAIFieldsOnSave(ctx context.Context, db *gorm.DB, id int64, script *schema.YakScript) {
+func completeYakScriptAIFieldsOnSave(ctx context.Context, _ *gorm.DB, _ int64, script *schema.YakScript) {
 	if script == nil {
 		return
 	}
-
-	var existing *schema.YakScript
-	if id > 0 {
-		if ret, err := yakit.GetYakScript(db, id); err == nil {
-			existing = ret
-		}
-	}
-	if existing == nil && script.ScriptName != "" {
-		if ret, err := yakit.GetYakScriptByName(db, script.ScriptName); err == nil {
-			existing = ret
-		}
-	}
-	mergeYakScriptAIFields(script, existing)
 
 	if !genmetadata.ShouldGenerateYakScriptAIFields(script) {
 		return
@@ -331,6 +304,10 @@ func (s *Server) SaveYakScript(ctx context.Context, script *ypb.YakScript) (*ypb
 	_ = yakit.CreateOrUpdateYakScriptByName(s.GetProfileDatabase(), script.ScriptName, map[string]interface{}{
 		"enable_plugin_selector": script.EnablePluginSelector,
 		"plugin_selector_types":  script.PluginSelectorTypes,
+		"enable_for_ai":          script.EnableForAI,
+		"ai_desc":                script.AIDesc,
+		"ai_keywords":            script.AIKeywords,
+		"ai_usage":               script.AIUsage,
 	})
 
 	res, err := yakit.GetYakScriptByName(s.GetProfileDatabase(), script.ScriptName)
