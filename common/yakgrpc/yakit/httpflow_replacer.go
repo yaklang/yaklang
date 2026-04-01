@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/mimetype"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -19,7 +20,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/regexp-utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"mime"
 	"net/http"
 	"sort"
 	"strconv"
@@ -80,79 +80,7 @@ func FixPacket(packet []byte, isReq bool) (fixed []byte, use bool) {
 }
 
 func shouldSkipResponseRuleMatch(packet []byte) bool {
-	contentType := lowhttp.GetHTTPPacketContentType(packet)
-	return isBinaryBodyContentType(contentType)
-}
-
-func isBinaryBodyContentType(contentType string) bool {
-	if contentType == "" {
-		return false
-	}
-
-	mediaType, _, err := mime.ParseMediaType(contentType)
-	if err != nil {
-		mediaType = strings.TrimSpace(strings.ToLower(strings.Split(contentType, ";")[0]))
-	}
-	mediaType = strings.ToLower(strings.TrimSpace(mediaType))
-
-	if mediaType == "" {
-		return false
-	}
-
-	if strings.HasPrefix(mediaType, "text/") {
-		return false
-	}
-	if strings.HasSuffix(mediaType, "+json") || strings.HasSuffix(mediaType, "+xml") {
-		return false
-	}
-
-	switch mediaType {
-	case "application/json",
-		"application/xml",
-		"text/xml",
-		"application/javascript",
-		"application/x-javascript",
-		"application/ecmascript",
-		"application/x-www-form-urlencoded",
-		"multipart/form-data",
-		"application/x-ndjson",
-		"application/graphql-response+json":
-		return false
-	}
-
-	if strings.HasPrefix(mediaType, "image/") ||
-		strings.HasPrefix(mediaType, "audio/") ||
-		strings.HasPrefix(mediaType, "video/") ||
-		strings.HasPrefix(mediaType, "font/") {
-		return true
-	}
-
-	switch mediaType {
-	case "application/octet-stream",
-		"application/pdf",
-		"application/zip",
-		"application/gzip",
-		"application/x-gzip",
-		"application/x-rar-compressed",
-		"application/vnd.rar",
-		"application/x-7z-compressed",
-		"application/x-tar",
-		"application/x-bzip",
-		"application/x-bzip2",
-		"application/protobuf",
-		"application/x-protobuf",
-		"application/grpc",
-		"application/wasm",
-		"application/msword",
-		"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-		"application/vnd.ms-excel",
-		"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-		"application/vnd.ms-powerpoint",
-		"application/vnd.openxmlformats-officedocument.presentationml.presentation":
-		return true
-	}
-
-	return false
+	return mimetype.DetectResponse(packet).IsBinary()
 }
 
 type MITMReplaceRule struct {
