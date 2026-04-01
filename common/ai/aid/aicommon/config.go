@@ -392,7 +392,7 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 	if config.TimelineDiffer == nil {
 		config.TimelineDiffer = NewTimelineDiffer(config.Timeline)
 	}
-	config.Timeline.BindConfig(config, config)
+	config.Timeline.SoftBindConfig(config, config)
 
 	// init default task
 	config.DefaultTask = NewStatefulTaskBase(
@@ -2651,7 +2651,7 @@ func (c *Config) restorePersistentSession() {
 	}
 
 	// Bind config first so timeline can access it
-	timelineInstance.BindConfig(c, c)
+	timelineInstance.SoftBindConfig(c, c)
 	if !timelineInstance.Valid() {
 		log.Errorf("restored timeline instance is invalid for session [%s]", c.PersistentSessionId)
 		return

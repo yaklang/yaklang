@@ -274,6 +274,12 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 		go func() {
 			switch event.SyncType {
 			case SYNC_TYPE_QUEUE_INFO:
+				log.Infof("Received queue info sync event, ignoring in plan execution mode")
+				return
+			case aicommon.SYNC_TYPE_USER_INTERVENTION: // 临时方案
+				log.Infof("Received user intervention event: %v", event)
+				// warning not mirror user intervention events to timeline to avoid confusion
+				return
 			default:
 				log.Infof("InvokePlanAndExecute: Received AI input event: %v", event)
 			}
