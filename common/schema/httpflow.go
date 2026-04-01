@@ -59,6 +59,10 @@ type HTTPFlow struct {
 	FromPlugin  string         `json:"from_plugin,omitempty"`
 	ProcessName sql.NullString `json:"process_name,omitempty"`
 
+	// AfterSaveHandlers are runtime-only callbacks triggered after the flow is
+	// successfully persisted. They are not stored in the database.
+	AfterSaveHandlers []func(*HTTPFlow) `json:"-" gorm:"-"`
+
 	// friendly for gorm build instance, not for store
 	// 这两个字段不参与数据库存储，但是在序列化的时候，会被覆盖
 	// 主要用来标记用户的 Request 和 Response 是否超大

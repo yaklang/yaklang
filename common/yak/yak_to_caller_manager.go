@@ -1323,6 +1323,7 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 	pluginName = pluginContext.PluginName
 	pluginUUID = pluginContext.PluginUUID
 	proxy = pluginContext.Proxy
+	afterSaveHTTPFlowHandlers := append([]func(*schema.HTTPFlow){}, pluginContext.AfterSaveHTTPFlowHandlers...)
 
 	streamContext := context.Background()
 	if pluginContext.Ctx != nil {
@@ -1366,6 +1367,9 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 				exOption = append(exOption, yakit.CreateHTTPFlowWithSource("scan"))
 				exOption = append(exOption, yakit.CreateHTTPFlowWithRuntimeID(runtimeId))
 				exOption = append(exOption, yakit.CreateHTTPFlowWithFromPlugin(pluginName))
+				if len(afterSaveHTTPFlowHandlers) > 0 {
+					exOption = append(exOption, yakit.CreateHTTPFlowWithAfterSave(afterSaveHTTPFlowHandlers...))
+				}
 				return originFunc(url, req, rsp, exOption...)
 			}
 		}
@@ -1383,6 +1387,9 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 				poc.WithRuntimeId(runtimeId),
 				poc.WithProxy(strings.Split(proxy, ",")...),
 				poc.WithContext(streamContext),
+			}
+			if len(afterSaveHTTPFlowHandlers) > 0 {
+				pocContextOpt = append(pocContextOpt, poc.WithAfterSaveHandler(afterSaveHTTPFlowHandlers...))
 			}
 			index := len(args) - 1 // 获取 option 参数的 index
 			interfaceValue := args[index].Interface()
@@ -1415,6 +1422,9 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 				yakhttp.WithRuntimeID(runtimeId),
 				yakhttp.WithProxy(strings.Split(proxy, ",")...),
 				yakhttp.WithContext(streamContext),
+			}
+			if len(afterSaveHTTPFlowHandlers) > 0 {
+				httpContextOpt = append(httpContextOpt, yakhttp.WithAfterSaveHandler(afterSaveHTTPFlowHandlers...))
 			}
 			index := len(args) - 1 // 获取 option 参数的 index
 			interfaceValue := args[index].Interface()
@@ -1449,6 +1459,9 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 				opts = append(opts, httptpl.WithCustomVulnFilter(pluginContext.vulFilter))
 				opts = append(opts, lowhttp.WithFromPlugin(pluginName))
 				opts = append(opts, lowhttp.WithProxy(strings.Split(proxy, ",")...))
+				if len(afterSaveHTTPFlowHandlers) > 0 {
+					opts = append(opts, lowhttp.WithAfterSaveHTTPFlowHandler(afterSaveHTTPFlowHandlers...))
+				}
 				return originFunc(target, opts...)
 			}
 		}
@@ -1468,6 +1481,9 @@ func BindYakitPluginContextToEngine(nIns *antlr4yak.Engine, pluginContext *Yakit
 				opts = append(opts, httptpl.WithCustomVulnFilter(pluginContext.vulFilter))
 				opts = append(opts, lowhttp.WithFromPlugin(pluginName))
 				opts = append(opts, lowhttp.WithProxy(strings.Split(proxy, ",")...))
+				if len(afterSaveHTTPFlowHandlers) > 0 {
+					opts = append(opts, lowhttp.WithAfterSaveHTTPFlowHandler(afterSaveHTTPFlowHandlers...))
+				}
 				originFunc(target, opts...)
 			}
 		}

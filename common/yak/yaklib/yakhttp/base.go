@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/http_struct"
@@ -469,6 +470,12 @@ func WithRuntimeID(value string) http_struct.HttpOption {
 	}
 }
 
+func WithAfterSaveHandler(f ...func(flow *schema.HTTPFlow)) http_struct.HttpOption {
+	return func(config *http_struct.HTTPConfig) {
+		config.AppendPocOpts(poc.WithAfterSaveHandler(f...))
+	}
+}
+
 // save 是一个请求选项参数，用于指定是否将此次请求的记录保存在数据库中，默认为true即会保存到数据库
 // Example:
 // ```
@@ -731,11 +738,12 @@ var HttpExports = map[string]interface{}{
 	"session": WithSession,
 
 	// context
-	"source":     WithSource,
-	"fromPlugin": WithFromPlugin,
-	"runtimeID":  WithRuntimeID,
-	"save":       WithSave,
-	"context":    WithContext,
+	"source":           WithSource,
+	"fromPlugin":       WithFromPlugin,
+	"runtimeID":        WithRuntimeID,
+	"save":             WithSave,
+	"afterSaveHandler": WithAfterSaveHandler,
+	"context":          WithContext,
 
 	"uarand": _getuarand,
 }

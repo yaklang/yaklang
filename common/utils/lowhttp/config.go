@@ -67,6 +67,7 @@ type LowhttpExecConfig struct {
 	SaveHTTPFlow                     bool
 	SaveHTTPFlowSync                 bool
 	SaveHTTPFlowHandler              []func(*LowhttpResponse)
+	AfterSaveHTTPFlowHandler         []func(*schema.HTTPFlow)
 	UseMITMRule                      bool
 	RequestSource                    string
 	EtcHosts                         map[string]string
@@ -163,6 +164,8 @@ type LowhttpResponse struct {
 
 	// custom tags
 	Tags []string
+
+	AfterSaveHTTPFlowHandler []func(*schema.HTTPFlow)
 
 	IsFixContentType        bool
 	OriginContentType       string
@@ -741,6 +744,15 @@ func WithSaveHTTPFlowHandler(f ...func(*LowhttpResponse)) LowhttpOpt {
 			o.SaveHTTPFlowHandler = make([]func(*LowhttpResponse), 0, 1)
 		}
 		o.SaveHTTPFlowHandler = append(o.SaveHTTPFlowHandler, f...)
+	}
+}
+
+func WithAfterSaveHTTPFlowHandler(f ...func(*schema.HTTPFlow)) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		if o.AfterSaveHTTPFlowHandler == nil {
+			o.AfterSaveHTTPFlowHandler = make([]func(*schema.HTTPFlow), 0, 1)
+		}
+		o.AfterSaveHTTPFlowHandler = append(o.AfterSaveHTTPFlowHandler, f...)
 	}
 }
 

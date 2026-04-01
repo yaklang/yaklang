@@ -163,6 +163,67 @@ func TestQueryFilterHTTPFlow(t *testing.T) {
 	assert.True(t, flag)
 }
 
+func TestCreateOrUpdateHTTPFlow_AfterSaveHandler(t *testing.T) {
+	db := consts.GetGormProjectDatabase()
+	token := uuid.NewString()
+
+	req := lowhttp.FixHTTPRequest([]byte(fmt.Sprintf("GET /%s HTTP/1.1\r\nHost: example.com\r\n\r\n", token)))
+	rsp := []byte("HTTP/1.1 200 OK\r\nContent-Length: 2\r\nContent-Type: text/plain\r\n\r\nok")
+
+	var savedFlow *schema.HTTPFlow
+	flow, err := CreateHTTPFlowFromHTTPWithBodySavedFromRaw(
+		false,
+		req,
+		rsp,
+		"scan",
+		fmt.Sprintf("http://example.com/%s", token),
+		"127.0.0.1:80",
+		CreateHTTPFlowWithAfterSave(func(flow *schema.HTTPFlow) {
+			savedFlow = flow
+		}),
+	)
+	require.NoError(t, err)
+	require.NoError(t, CreateOrUpdateHTTPFlow(db, flow.CalcHash(), flow))
+	require.NotNil(t, savedFlow)
+	require.Equal(t, flow.ID, savedFlow.ID)
+	require.Greater(t, int(savedFlow.ID), 0)
+
+	defer db.Where("id = ?", savedFlow.ID).Delete(&schema.HTTPFlow{})
+}
+
+func TestSaveLowHTTPFlow_AfterSaveHandler(t *testing.T) {
+	db := consts.GetGormProjectDatabase()
+	token := uuid.NewString()
+
+	req := lowhttp.FixHTTPRequest([]byte(fmt.Sprintf("GET /%s HTTP/1.1\r\nHost: example.com\r\n\r\n", token)))
+	rsp := []byte("HTTP/1.1 200 OK\r\nContent-Length: 2\r\nContent-Type: text/plain\r\n\r\nok")
+
+	var savedFlow *schema.HTTPFlow
+	SaveLowHTTPFlow(&lowhttp.LowhttpResponse{
+		RawPacket:  rsp,
+		TraceInfo:  &lowhttp.LowhttpTraceInfo{},
+		Url:        fmt.Sprintf("http://example.com/%s", token),
+		RemoteAddr: "127.0.0.1:80",
+		Https:      false,
+		RawRequest: req,
+		Source:     "scan",
+		RuntimeId:  "runtime-" + token,
+		FromPlugin: "plugin-" + token,
+		AfterSaveHTTPFlowHandler: []func(*schema.HTTPFlow){
+			func(flow *schema.HTTPFlow) {
+				savedFlow = flow
+			},
+		},
+	}, true)
+
+	require.NotNil(t, savedFlow)
+	require.Equal(t, "runtime-"+token, savedFlow.RuntimeId)
+	require.Equal(t, "plugin-"+token, savedFlow.FromPlugin)
+	require.Greater(t, int(savedFlow.ID), 0)
+
+	defer db.Where("id = ?", savedFlow.ID).Delete(&schema.HTTPFlow{})
+}
+
 func TestQueryFilterHTTPFlow_SuffixPrecision(t *testing.T) {
 	// 测试后缀过滤的精确性：过滤 .js 不应该过滤 .json 和 .jsp
 	token := utils.RandString(10)
