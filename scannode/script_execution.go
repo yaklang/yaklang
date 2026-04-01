@@ -37,7 +37,14 @@ func (s *ScanNode) executeScriptTask(
 	taskID := taskIDForSubtask(input.SubTaskID)
 	taskCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	s.manager.Add(taskID, newScriptTask(taskCtx, cancel, taskID))
+	s.manager.Add(taskID, newScriptTask(
+		taskCtx,
+		cancel,
+		taskID,
+		input.TaskID,
+		input.SubTaskID,
+		input.RuntimeID,
+	))
 	defer s.manager.Remove(taskID)
 
 	reporter := NewScannerAgentReporter(
@@ -64,8 +71,10 @@ func (s *ScanNode) executeScriptTask(
 		return nil, utils.Errorf("fetch node path err: %s", err)
 	}
 	if err := s.executeScript(taskCtx, scanNodePath, scriptFile, params, input.RuntimeID); err != nil {
+		logReporterEventError("final progress checkpoint", reporter.flushLatestJobProgress())
 		return nil, s.handleScriptFailure(err, result, taskID)
 	}
+	logReporterEventError("final progress checkpoint", reporter.flushSuccessfulJobProgress())
 	return result, nil
 }
 
@@ -73,12 +82,18 @@ func newScriptTask(
 	ctx context.Context,
 	cancel context.CancelFunc,
 	taskID string,
+	jobID string,
+	subtaskID string,
+	attemptID string,
 ) *Task {
 	return &Task{
-		TaskType: "script-task",
-		TaskId:   taskID,
-		Ctx:      ctx,
-		Cancel:   cancel,
+		TaskType:  "script-task",
+		TaskId:    taskID,
+		JobID:     jobID,
+		SubtaskID: subtaskID,
+		AttemptID: attemptID,
+		Ctx:       ctx,
+		Cancel:    cancel,
 	}
 }
 

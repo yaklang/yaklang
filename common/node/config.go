@@ -20,11 +20,22 @@ const (
 	DefaultLifecycleState = "ready"
 )
 
+type ActiveAttemptHeartbeat struct {
+	AttemptID      string    `json:"attempt_id"`
+	JobID          string    `json:"job_id"`
+	SubtaskID      string    `json:"subtask_id"`
+	Status         string    `json:"status"`
+	CompletedUnits uint32    `json:"completed_units"`
+	TotalUnits     uint32    `json:"total_units"`
+	LastActivityAt time.Time `json:"last_activity_at"`
+}
+
 // RuntimeStatus is the execution snapshot mixed into heartbeat payloads.
 type RuntimeStatus struct {
 	LifecycleState string
 	RunningJobs    uint32
 	MaxRunningJobs uint32
+	ActiveAttempts []ActiveAttemptHeartbeat
 }
 
 // RuntimeStatusProvider lets higher-level runtimes report execution state.
@@ -116,6 +127,16 @@ func cloneStringSlice(input []string) []string {
 	}
 
 	result := make([]string, len(input))
+	copy(result, input)
+	return result
+}
+
+func cloneActiveAttemptHeartbeats(input []ActiveAttemptHeartbeat) []ActiveAttemptHeartbeat {
+	if len(input) == 0 {
+		return []ActiveAttemptHeartbeat{}
+	}
+
+	result := make([]ActiveAttemptHeartbeat, len(input))
 	copy(result, input)
 	return result
 }
