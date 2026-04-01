@@ -442,11 +442,11 @@ func FilterYakScript(db *gorm.DB, params *ypb.QueryYakScriptRequest) *gorm.DB {
 }
 
 func mitmHasParamsCondition(column string) string {
-	return fmt.Sprintf("(%s!='\"null\"' and %s is not null and LENGTH(%s)>0 and TRIM(%s)!='[]')", column, column, column, column)
+	return fmt.Sprintf("(%s!='\"null\"' and %s is not null and LENGTH(%s)>0 and TRIM(%s)!='\"[]\"')", column, column, column, column)
 }
 
 func mitmEmptyParamsCondition(column string) string {
-	return fmt.Sprintf("(%s='\"null\"' or %s is null or LENGTH(%s)<=0 or TRIM(%s)='[]')", column, column, column, column)
+	return fmt.Sprintf("(%s='\"null\"' or %s is null or LENGTH(%s)<=0 or TRIM(%s)='\"[]\"')", column, column, column, column)
 }
 
 func QueryYakScript(db *gorm.DB, params *ypb.QueryYakScriptRequest) (*bizhelper.Paginator, []*schema.YakScript, error) {

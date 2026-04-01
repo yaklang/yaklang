@@ -116,7 +116,7 @@ func TestServer_Cli_YakSript(t *testing.T) {
 			{script: &schema.YakScript{
 				ScriptName: "test-mitm-empty-array-cli",
 				Type:       "mitm",
-				Params:     "[]",
+				Params:     "\"[]\"",
 			},
 				param: false}}
 		defer func() {
