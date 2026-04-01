@@ -219,8 +219,21 @@ func compileInput(
 	if err != nil {
 		return nil, nil, "", utils.Errorf("SSA parse failed: %v", err)
 	}
-	if err := obfuscation.ApplySSA(progBundle.Program, entryFunction, obfuscators); err != nil {
-		return nil, nil, "", utils.Errorf("SSA obfuscation failed: %v", err)
+	obfCtx := &obfuscation.Context{
+		SSA:           progBundle.Program,
+		EntryFunction: entryFunction,
+		InstrTags:     make(map[int64]string),
+	}
+	obfCtx.Stage = obfuscation.StageSSAPre
+	if err := obfuscation.Apply(obfCtx, obfuscators); err != nil {
+		return nil, nil, "", utils.Errorf("SSA pre-obfuscation failed: %v", err)
+	}
+	if err := PrepareCallLoweringTags(progBundle.Program, externBindings, obfCtx.InstrTags); err != nil {
+		return nil, nil, "", utils.Errorf("SSA call lowering preparation failed: %v", err)
+	}
+	obfCtx.Stage = obfuscation.StageSSAPost
+	if err := obfuscation.Apply(obfCtx, obfuscators); err != nil {
+		return nil, nil, "", utils.Errorf("SSA post-obfuscation failed: %v", err)
 	}
 
 	llvm.InitializeNativeTarget()
@@ -228,12 +241,19 @@ func compileInput(
 
 	log.Infof("compiling %s (%s)", sourceLabel, language)
 
-	comp := NewCompiler(ctx, progBundle.Program, WithExternBindings(externBindings))
+	comp := NewCompiler(
+		ctx,
+		progBundle.Program,
+		WithExternBindings(externBindings),
+		WithInstructionTags(obfCtx.InstrTags),
+	)
 	if err := comp.Compile(); err != nil {
 		comp.Dispose()
 		return nil, nil, "", utils.Errorf("LLVM compilation failed: %v", err)
 	}
-	if err := obfuscation.ApplyLLVM(comp.Mod, entryFunction, obfuscators); err != nil {
+	obfCtx.LLVM = comp.Mod
+	obfCtx.Stage = obfuscation.StageLLVM
+	if err := obfuscation.Apply(obfCtx, obfuscators); err != nil {
 		comp.Dispose()
 		return nil, nil, "", utils.Errorf("LLVM obfuscation failed: %v", err)
 	}

@@ -143,7 +143,20 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 		return llvm.Value{}, fmt.Errorf("getValue: compileMemberCall succeeded but value %d not cached", id)
 	}
 
-	// 9. Return error if not found and not a constant
+	// 9. Function values are materialized as i64 function pointers in the
+	// unified InvokeContext representation.
+	if ssaFn, ok := ssa.ToFunction(valObj); ok && ssaFn != nil {
+		llvmFn, _ := c.getOrDeclareLLVMFunction(ssaFn)
+		return c.Builder.CreatePtrToInt(llvmFn, c.LLVMCtx.Int64Type(), "yak_fn_i64"), nil
+	}
+	if param, ok := ssa.ToParameter(valObj); ok && param != nil && param.GetDefault() != nil {
+		if ssaFn, ok := ssa.ToFunction(param.GetDefault()); ok && ssaFn != nil {
+			llvmFn, _ := c.getOrDeclareLLVMFunction(ssaFn)
+			return c.Builder.CreatePtrToInt(llvmFn, c.LLVMCtx.Int64Type(), "yak_fn_i64"), nil
+		}
+	}
+
+	// 10. Return error if not found and not a constant
 	// This usually means we are referencing an instruction that hasn't been compiled yet
 	// (back-edge or dependency order issue) or not implemented.
 	return llvm.Value{}, fmt.Errorf("getValue: value %d (%T) not found (dependency missing?)", id, valObj)

@@ -31,7 +31,7 @@ func (addSubSSAObfuscator) Kind() core.Kind {
 // k is derived from the original instruction id, so the pass is deterministic
 // for the same SSA graph while still breaking the original arithmetic shape.
 func (addSubSSAObfuscator) Apply(ctx *core.Context) error {
-	if ctx == nil || ctx.Stage != core.StageSSA {
+	if ctx == nil || ctx.Stage != core.StageSSAPre {
 		return nil
 	}
 	program := ctx.SSA

@@ -20,7 +20,7 @@ check = () => {
 	require.Contains(t, beforeIR, "add(40, 2)")
 
 	afterIR := obftest.CompileFunctionSSAString(t, code, "yak", "check", func(program *ssa.Program) error {
-		return obfuscation.ApplySSA(program, "check", []string{"addsub"})
+		return obfuscation.Apply(&obfuscation.Context{Stage: obfuscation.StageSSAPre, SSA: program, EntryFunction: "check"}, []string{"addsub"})
 	})
 	require.Contains(t, afterIR, "sub(40,")
 	require.Contains(t, afterIR, "add(2,")
@@ -38,7 +38,7 @@ check = () => {
 	require.Contains(t, beforeIR, "sub(50, 8)")
 
 	afterIR := obftest.CompileFunctionSSAString(t, code, "yak", "check", func(program *ssa.Program) error {
-		return obfuscation.ApplySSA(program, "check", []string{"addsub"})
+		return obfuscation.Apply(&obfuscation.Context{Stage: obfuscation.StageSSAPre, SSA: program, EntryFunction: "check"}, []string{"addsub"})
 	})
 	require.Contains(t, afterIR, "sub(add(50,")
 	require.Contains(t, afterIR, "add(8,")

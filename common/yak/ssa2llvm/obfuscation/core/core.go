@@ -14,7 +14,8 @@ import (
 type Stage int
 
 const (
-	StageSSA Stage = iota
+	StageSSAPre Stage = iota
+	StageSSAPost
 	StageLLVM
 )
 
@@ -48,6 +49,10 @@ type Context struct {
 	// EntryFunction is the user-requested entry function name for the build.
 	// Hybrid obfuscators may use it to decide how to transform whole-program control flow.
 	EntryFunction string
+
+	// InstrTags carries obfuscator-owned instruction markers across SSA and LLVM
+	// stages without extending the SSA IR schema itself.
+	InstrTags map[int64]string
 }
 
 type Obfuscator interface {
@@ -82,19 +87,10 @@ func Register(obfuscator Obfuscator) {
 	Default[name] = obfuscator
 }
 
-func ApplySSA(ctx *Context, names []string) error {
+func Apply(ctx *Context, names []string) error {
 	if ctx == nil {
 		return nil
 	}
-	ctx.Stage = StageSSA
-	return applyStage(ctx, names)
-}
-
-func ApplyLLVM(ctx *Context, names []string) error {
-	if ctx == nil {
-		return nil
-	}
-	ctx.Stage = StageLLVM
 	return applyStage(ctx, names)
 }
 
@@ -131,11 +127,16 @@ func applyStage(ctx *Context, names []string) error {
 		return err
 	}
 
-	if ctx.Stage == StageSSA {
-		// SSA-only first, then hybrid SSA.
+	if ctx.Stage == StageSSAPre {
+		// SSA-only first, then hybrid pre-SSA.
 		if err := applyKinds(ctx, resolved, KindSSA); err != nil {
 			return err
 		}
+		return applyKinds(ctx, resolved, KindHybrid)
+	}
+
+	if ctx.Stage == StageSSAPost {
+		// Post-SSA runs only hybrid obfuscators on the lowered SSA form.
 		return applyKinds(ctx, resolved, KindHybrid)
 	}
 
@@ -164,13 +165,38 @@ func (ctx *Context) StageLabel() string {
 		return "obf"
 	}
 	switch ctx.Stage {
-	case StageSSA:
-		return "ssa"
+	case StageSSAPre:
+		return "ssa-pre"
+	case StageSSAPost:
+		return "ssa-post"
 	case StageLLVM:
 		return "llvm"
 	default:
 		return "obf"
 	}
+}
+
+func (ctx *Context) SetInstructionTag(id int64, tag string) {
+	if ctx == nil || id <= 0 {
+		return
+	}
+	if tag == "" {
+		if ctx.InstrTags != nil {
+			delete(ctx.InstrTags, id)
+		}
+		return
+	}
+	if ctx.InstrTags == nil {
+		ctx.InstrTags = make(map[int64]string)
+	}
+	ctx.InstrTags[id] = tag
+}
+
+func (ctx *Context) InstructionTag(id int64) string {
+	if ctx == nil || id <= 0 || ctx.InstrTags == nil {
+		return ""
+	}
+	return ctx.InstrTags[id]
 }
 
 func NormalizeNames(names []string) []string {

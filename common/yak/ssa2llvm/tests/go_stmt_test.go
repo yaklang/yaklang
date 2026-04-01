@@ -63,6 +63,22 @@ func main() {
 	require.Equal(t, "2\n", output)
 }
 
+func TestInternalCall_RecomputesParameterMembersFromArgs(t *testing.T) {
+	code := `
+func show(values) {
+	println(values[1])
+}
+
+func main() {
+	values = make([]int, 2)
+	values[1] = 42
+	show(values)
+}
+`
+	output := runBinaryWithEnv(t, code, "main", nil)
+	require.Equal(t, "42\n", output)
+}
+
 func TestSync_WaitGroup_GoroutinesComplete(t *testing.T) {
 	code := `
 func worker(wg, value) {

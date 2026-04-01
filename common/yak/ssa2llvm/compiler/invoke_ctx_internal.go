@@ -5,6 +5,7 @@ import (
 
 	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/callframe"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
 )
 
@@ -130,11 +131,11 @@ func (c *Compiler) bindParamsFromContext(fn *ssa.Function) error {
 	}
 
 	freeValueBase := int64(len(fn.Params) + len(fn.ParameterMembers))
-	for i, binding := range orderedFreeValueBindings(fn) {
+	for i, binding := range callframe.OrderedFreeValueBindings(fn) {
 		idx := llvm.ConstInt(i64, uint64(argBase+freeValueBase+int64(i)), false)
 		elemPtr := c.Builder.CreateGEP(i64, ctxPtr, []llvm.Value{idx}, "")
-		val := c.Builder.CreateLoad(i64, elemPtr, fmt.Sprintf("fv_%d", binding.ssaID))
-		c.Values[binding.ssaID] = val
+		val := c.Builder.CreateLoad(i64, elemPtr, fmt.Sprintf("fv_%d", binding.ValueID))
+		c.Values[binding.ValueID] = val
 	}
 
 	return nil
