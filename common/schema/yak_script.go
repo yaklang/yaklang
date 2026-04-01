@@ -228,6 +228,10 @@ func (s *YakScript) ToGRPCModel() *ypb.YakScript {
 		IsCorePlugin:         s.IsCorePlugin,
 		PluginEnvKey:         pluginEnvKey,
 		SkipUpdate:           s.SkipUpdate,
+		EnableForAI:          s.EnableForAI,
+		AIDesc:               s.AIDesc,
+		AIKeywords:           s.AIKeywords,
+		AIUsage:              s.AIUsage,
 	}
 	/*if s.Type == "mitm" {
 		script.Params = mitmPluginDefaultPlugins
