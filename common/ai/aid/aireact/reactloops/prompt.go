@@ -205,9 +205,29 @@ func (r *ReActLoop) generateLoopPrompt(
 	infos["Nonce"] = nonce
 	infos["UserQuery"] = userInput
 	infos["Schema"] = schema
+
+	sections := buildPromptSections(
+		infos,
+		userInput,
+		persistent,
+		skillsContext,
+		reactiveData,
+		memory,
+		schema,
+		outputExample,
+		extraCapabilities,
+	)
 	prompt, err := utils.RenderTemplate(coreTemplate, infos)
 	if err != nil {
 		return "", utils.Wrap(err, "render loop prompt template failed")
+	}
+	observation := buildPromptObservation(r.loopName, nonce, prompt, sections)
+	r.SetLastPromptObservation(observation)
+	status := observation.BuildStatus(120)
+	r.SetLastPromptObservationStatus(status)
+	r.emitPromptObservationStatus(status)
+	if r.isDebugModeEnabled() {
+		log.Infof("prompt section build report:\n%s", observation.RenderCLIReport(120))
 	}
 	return prompt, nil
 }

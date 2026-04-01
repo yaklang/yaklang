@@ -155,6 +155,8 @@ const (
 	EVENT_TYPE_AI_TASK_SWITCHED_TO_ASYNC EventType = "ai_task_switched_to_async" // AI task switched to async execution event
 
 	EVENT_TYPE_REFERENCE_MATERIAL EventType = "reference_material" // 引用材料
+
+	EVENT_TYPE_PROMPT_PROFILE EventType = "prompt_profile" // prompt profile event, used to emit the prompt profile information
 )
 
 type AiOutputEvent struct {
