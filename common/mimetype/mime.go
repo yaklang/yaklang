@@ -38,6 +38,13 @@ func (m *MIME) IsVideo() bool {
 	return strings.HasPrefix(strings.ToLower(m.String()), "video")
 }
 
+func (m *MIME) IsBinary() bool {
+	if m == nil {
+		return false
+	}
+	return IsBinaryContentType(m.String())
+}
+
 func (m *MIME) Charset() string {
 	return m.charset
 }
