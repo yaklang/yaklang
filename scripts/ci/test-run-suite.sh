@@ -9,6 +9,7 @@ SUITE_SYNC_RULE="${SUITE_SYNC_RULE:-0}"
 TEST_TIMEOUT="${TEST_TIMEOUT:-2m}"
 TEST_VERBOSE="${TEST_VERBOSE:-1}"
 SKIP_SYNC_EMBED_RULE_IN_GITHUB="${SKIP_SYNC_EMBED_RULE_IN_GITHUB:-true}"
+TEST_LOG_DIR="${TEST_LOG_DIR:-$TEST_BIN_DIR}"
 
 if [[ -z "$YAK_BINARY_PATH" || -z "$TEST_BIN_DIR" || -z "$TEST_CONFIG" ]]; then
   echo "ERROR: YAK_BINARY_PATH, TEST_BIN_DIR, and TEST_CONFIG must be set"
@@ -35,11 +36,12 @@ stop_grpc() {
 
 trap stop_grpc EXIT
 
-grpc_log="/tmp/grpc_suite.log"
-suite_log="/tmp/suite.log"
+suite_log="${TEST_LOG_DIR}/suite.log"
+grpc_log="${TEST_LOG_DIR}/grpc_suite.log"
 grpc_ready=0
 
-rm -f /tmp/test_*.run.log "$grpc_log" "$suite_log"
+mkdir -p "$TEST_LOG_DIR"
+rm -f "$TEST_LOG_DIR"/test_*.run.log "$grpc_log" "$suite_log"
 
 echo "=== Running suite: ${SUITE_NAME} ==="
 
@@ -67,4 +69,5 @@ if [[ "$SUITE_SYNC_RULE" == "1" ]]; then
   "$YAK_BINARY_PATH" sync-rule 2>&1 | tee -a "$suite_log"
 fi
 
-./scripts/ci/run-tests.sh 2>&1 | tee -a "$suite_log"
+export TEST_LOG_DIR
+./scripts/ci/test-run.sh 2>&1 | tee -a "$suite_log"

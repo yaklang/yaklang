@@ -5,7 +5,7 @@ set -euo pipefail
 DEFAULT_CPUS=$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.ncpu || echo 2)
 COMPILE_WORKERS=${COMPILE_WORKERS:-${JOBS:-$DEFAULT_CPUS}}
 GO_TEST_P=${GO_TEST_P:-1}
-TEST_BIN_DIR="${TEST_BIN_DIR:-/tmp/test_binaries}"
+TEST_BIN_DIR="${TEST_BIN_DIR:-./test_binaries}"
 TEST_CONFIG="${TEST_CONFIG:-}"  # 测试配置文件（JSON格式），必须提供
 RESET_TEST_BIN_DIR="${RESET_TEST_BIN_DIR:-1}"  # 0=保留已有产物并增量编译
 
@@ -221,9 +221,12 @@ echo "Total packages: $total"
 echo "Compiled: $compiled_count"
 echo "Failed: $failed_count"
 
-# 记录编译的测试列表（兼容 macOS）
-find "$TEST_BIN_DIR" -maxdepth 1 -type f -perm +111 2>/dev/null | sort > "$TEST_BIN_DIR/compiled_tests.txt" || \
-  find "$TEST_BIN_DIR" -maxdepth 1 -type f -name "test_*" ! -name "*.log" ! -name "*.package" ! -name ".*" | sort > "$TEST_BIN_DIR/compiled_tests.txt"
+# 记录编译的测试列表：只保存 TEST_BIN_DIR 下的相对文件名，避免 artifact 解包后路径失效
+(
+  cd "$TEST_BIN_DIR"
+  find . -maxdepth 1 -type f -name "test_*" ! -name "*.log" ! -name "*.package" ! -name ".*" \
+    -exec basename {} \; | sort
+) > "$TEST_BIN_DIR/compiled_tests.txt"
 echo "Compiled tests listed in: $TEST_BIN_DIR/compiled_tests.txt"
 
 # 耗时
