@@ -194,9 +194,9 @@ func QueryGroupCount(db *gorm.DB, excludeType []string, isMITMParamPlugins int64
 	db = bizhelper.ExactQueryExcludeStringArrayOr(db, "Y.type", excludeType)
 	switch isMITMParamPlugins {
 	case 1:
-		db = db.Where("Y.params!='\"null\"' and Y.params is not null and LENGTH(Y.params)>0")
+		db = db.Where(mitmHasParamsCondition("Y.params"))
 	case 2:
-		db = db.Where("(Y.params='\"null\"' or Y.params is null or LENGTH(Y.params)<=0) or Y.type!='mitm'")
+		db = db.Where("(" + mitmEmptyParamsCondition("Y.params") + ") or Y.type!='mitm'")
 	}
 	db = db.Group(" `group`,`temporary_id`,`is_poc_built_in` ").Order(`count desc`).Scan(&req)
 	if db.Error != nil {

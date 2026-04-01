@@ -396,9 +396,9 @@ func FilterYakScript(db *gorm.DB, params *ypb.QueryYakScriptRequest) *gorm.DB {
 	}
 	switch params.IsMITMParamPlugins {
 	case 1:
-		db = db.Where("params!='\"null\"' and params is not null and LENGTH(params)>0")
+		db = db.Where(mitmHasParamsCondition("params"))
 	case 2:
-		db = db.Where("(params='\"null\"' or params is null or LENGTH(params)<=0) or type!='mitm'")
+		db = db.Where(fmt.Sprintf("(%s) or type!='mitm'", mitmEmptyParamsCondition("params")))
 	}
 	// 排除 workflow
 	if params.GetExcludeNucleiWorkflow() {
@@ -428,7 +428,6 @@ func FilterYakScript(db *gorm.DB, params *ypb.QueryYakScriptRequest) *gorm.DB {
 	if params.GetUUID() != "" {
 		db = db.Where("uuid = ?", params.GetUUID())
 	}
-
 	if params.Group != nil {
 		if params.Group.UnSetGroup {
 			db = db.Not("script_name IN (SELECT DISTINCT(yak_script_name) FROM plugin_groups)")
@@ -440,6 +439,14 @@ func FilterYakScript(db *gorm.DB, params *ypb.QueryYakScriptRequest) *gorm.DB {
 	}
 	db = bizhelper.ExactQueryExcludeStringArrayOr(db, "type", params.GetExcludeTypes())
 	return db
+}
+
+func mitmHasParamsCondition(column string) string {
+	return fmt.Sprintf("(%s!='\"null\"' and %s is not null and LENGTH(%s)>0 and TRIM(%s)!='[]')", column, column, column, column)
+}
+
+func mitmEmptyParamsCondition(column string) string {
+	return fmt.Sprintf("(%s='\"null\"' or %s is null or LENGTH(%s)<=0 or TRIM(%s)='[]')", column, column, column, column)
 }
 
 func QueryYakScript(db *gorm.DB, params *ypb.QueryYakScriptRequest) (*bizhelper.Paginator, []*schema.YakScript, error) {
