@@ -384,19 +384,20 @@ func LoadGlobalNetworkConfig() {
 
 func GetDefaultNetworkConfig() *ypb.GlobalNetworkConfig {
 	defaultConfig := &ypb.GlobalNetworkConfig{
-		DisableSystemDNS:  false,
-		CustomDNSServers:  nil,
-		DNSFallbackTCP:    false,
-		DNSFallbackDoH:    false,
-		CustomDoHServers:  nil,
-		SkipSaveHTTPFlow:  false,
-		AuthInfos:         make([]*ypb.AuthInfo, 0),
-		DbSaveSync:        false,
-		CallPluginTimeout: float32(consts.GLOBAL_CALLER_CALL_PLUGIN_TIMEOUT.Load()),
-		LoadPluginTimeout: float32(consts.GLOBAL_CALLER_LOAD_PLUGIN_TIMEOUT.Load()),
-		MaxTlsVersion:     tls.VersionTLS13,
-		MinTlsVersion:     tls.VersionSSL30,
-		MaxContentLength:  1024 * 1024 * 10,
+		DisableSystemDNS:                     false,
+		CustomDNSServers:                     nil,
+		DNSFallbackTCP:                       false,
+		DNSFallbackDoH:                       false,
+		CustomDoHServers:                     nil,
+		SkipSaveHTTPFlow:                     false,
+		DisableHTTPFlowSlowQueryNotification: false,
+		AuthInfos:                            make([]*ypb.AuthInfo, 0),
+		DbSaveSync:                           false,
+		CallPluginTimeout:                    float32(consts.GLOBAL_CALLER_CALL_PLUGIN_TIMEOUT.Load()),
+		LoadPluginTimeout:                    float32(consts.GLOBAL_CALLER_LOAD_PLUGIN_TIMEOUT.Load()),
+		MaxTlsVersion:                        tls.VersionTLS13,
+		MinTlsVersion:                        tls.VersionSSL30,
+		MaxContentLength:                     1024 * 1024 * 10,
 	}
 	config := netx.NewBackupInitilizedReliableDNSConfig()
 	defaultConfig.CustomDoHServers = config.SpecificDoH
@@ -479,6 +480,7 @@ func ConfigureNetWork(c *ypb.GlobalNetworkConfig) {
 		Set(consts.GLOBAL_NETWORK_CONFIG, data)
 	}()
 	consts.GLOBAL_HTTP_FLOW_SAVE.SetTo(!c.GetSkipSaveHTTPFlow())
+	consts.GLOBAL_HTTPFLOW_SLOW_QUERY_NOTIFICATION_DISABLED.SetTo(c.GetDisableHTTPFlowSlowQueryNotification())
 	consts.GLOBAL_DB_SAVE_SYNC.SetTo(c.GetDbSaveSync())
 	consts.SetGlobalHTTPAuthInfo(c.GetAuthInfos())
 	consts.SetGlobalMaxContentLength(c.GetMaxContentLength())

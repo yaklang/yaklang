@@ -925,6 +925,29 @@ func TestCallPluginTimeout(t *testing.T) {
 	}
 }
 
+func TestDisableHTTPFlowSlowQueryNotification(t *testing.T) {
+	client, err := NewLocalClientWithTempDatabase(t)
+	require.NoError(t, err, "new local client error")
+
+	config, err := client.GetGlobalNetworkConfig(context.Background(), &ypb.GetGlobalNetworkConfigRequest{})
+	require.NoError(t, err)
+	require.False(t, config.GetDisableHTTPFlowSlowQueryNotification())
+	require.False(t, consts.GLOBAL_HTTPFLOW_SLOW_QUERY_NOTIFICATION_DISABLED.IsSet())
+
+	config.DisableHTTPFlowSlowQueryNotification = true
+	_, err = client.SetGlobalNetworkConfig(context.Background(), config)
+	require.NoError(t, err)
+	require.True(t, consts.GLOBAL_HTTPFLOW_SLOW_QUERY_NOTIFICATION_DISABLED.IsSet())
+
+	config, err = client.GetGlobalNetworkConfig(context.Background(), &ypb.GetGlobalNetworkConfigRequest{})
+	require.NoError(t, err)
+	require.True(t, config.GetDisableHTTPFlowSlowQueryNotification())
+
+	_, err = client.ResetGlobalNetworkConfig(context.Background(), &ypb.ResetGlobalNetworkConfigRequest{})
+	require.NoError(t, err)
+	require.False(t, consts.GLOBAL_HTTPFLOW_SLOW_QUERY_NOTIFICATION_DISABLED.IsSet())
+}
+
 func TestInitNetworkConfig(t *testing.T) {
 	emptyConfig := &ypb.GlobalNetworkConfig{}
 	yakit.InitNetworkConfig(emptyConfig)

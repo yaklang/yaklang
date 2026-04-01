@@ -15109,13 +15109,14 @@ type GlobalNetworkConfig struct {
 	// 插件加载超时配置（秒）
 	LoadPluginTimeout float32 `protobuf:"fixed32,24,opt,name=LoadPluginTimeout,proto3" json:"LoadPluginTimeout,omitempty"`
 	// 是否启用新的配置，这个新的配置项会覆盖之前的 PrimaryAIType 和 AiApiPriority
-	EnableTieredAIModelConfig bool                           `protobuf:"varint,25,opt,name=EnableTieredAIModelConfig,proto3" json:"EnableTieredAIModelConfig,omitempty"`
-	TieredAIModelConfig       *TieredAIModelConfigDescriptor `protobuf:"bytes,225,opt,name=TieredAIModelConfig,proto3" json:"TieredAIModelConfig,omitempty"`
-	IntelligentAIModelConfig  []*ThirdPartyApplicationConfig `protobuf:"bytes,26,rep,name=IntelligentAIModelConfig,proto3" json:"IntelligentAIModelConfig,omitempty"`
-	LightweightAIModelConfig  []*ThirdPartyApplicationConfig `protobuf:"bytes,27,rep,name=LightweightAIModelConfig,proto3" json:"LightweightAIModelConfig,omitempty"`
-	VisionAIModelConfig       []*ThirdPartyApplicationConfig `protobuf:"bytes,29,rep,name=VisionAIModelConfig,proto3" json:"VisionAIModelConfig,omitempty"`
-	unknownFields             protoimpl.UnknownFields
-	sizeCache                 protoimpl.SizeCache
+	EnableTieredAIModelConfig            bool                           `protobuf:"varint,25,opt,name=EnableTieredAIModelConfig,proto3" json:"EnableTieredAIModelConfig,omitempty"`
+	TieredAIModelConfig                  *TieredAIModelConfigDescriptor `protobuf:"bytes,225,opt,name=TieredAIModelConfig,proto3" json:"TieredAIModelConfig,omitempty"`
+	IntelligentAIModelConfig             []*ThirdPartyApplicationConfig `protobuf:"bytes,26,rep,name=IntelligentAIModelConfig,proto3" json:"IntelligentAIModelConfig,omitempty"`
+	LightweightAIModelConfig             []*ThirdPartyApplicationConfig `protobuf:"bytes,27,rep,name=LightweightAIModelConfig,proto3" json:"LightweightAIModelConfig,omitempty"`
+	DisableHTTPFlowSlowQueryNotification bool                           `protobuf:"varint,28,opt,name=DisableHTTPFlowSlowQueryNotification,proto3" json:"DisableHTTPFlowSlowQueryNotification,omitempty"`
+	VisionAIModelConfig                  []*ThirdPartyApplicationConfig `protobuf:"bytes,29,rep,name=VisionAIModelConfig,proto3" json:"VisionAIModelConfig,omitempty"`
+	unknownFields                        protoimpl.UnknownFields
+	sizeCache                            protoimpl.SizeCache
 }
 
 func (x *GlobalNetworkConfig) Reset() {
@@ -15342,6 +15343,13 @@ func (x *GlobalNetworkConfig) GetLightweightAIModelConfig() []*ThirdPartyApplica
 		return x.LightweightAIModelConfig
 	}
 	return nil
+}
+
+func (x *GlobalNetworkConfig) GetDisableHTTPFlowSlowQueryNotification() bool {
+	if x != nil {
+		return x.DisableHTTPFlowSlowQueryNotification
+	}
+	return false
 }
 
 func (x *GlobalNetworkConfig) GetVisionAIModelConfig() []*ThirdPartyApplicationConfig {
@@ -69370,7 +69378,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\vPkcs12Bytes\x18\x01 \x01(\fR\vPkcs12Bytes\x12&\n" +
 	"\x0ePkcs12Password\x18\x02 \x01(\fR\x0ePkcs12Password\"@\n" +
 	"\x18ValidP12PassWordResponse\x12$\n" +
-	"\rIsSetPassWord\x18\x01 \x01(\bR\rIsSetPassWord\"\xfd\v\n" +
+	"\rIsSetPassWord\x18\x01 \x01(\bR\rIsSetPassWord\"\xd1\f\n" +
 	"\x13GlobalNetworkConfig\x12*\n" +
 	"\x10DisableSystemDNS\x18\x01 \x01(\bR\x10DisableSystemDNS\x12*\n" +
 	"\x10CustomDNSServers\x18\x02 \x03(\tR\x10CustomDNSServers\x12&\n" +
@@ -69405,6 +69413,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x13TieredAIModelConfig\x18\xe1\x01 \x01(\v2\".ypb.TieredAIModelConfigDescriptorR\x13TieredAIModelConfig\x12\\\n" +
 	"\x18IntelligentAIModelConfig\x18\x1a \x03(\v2 .ypb.ThirdPartyApplicationConfigR\x18IntelligentAIModelConfig\x12\\\n" +
 	"\x18LightweightAIModelConfig\x18\x1b \x03(\v2 .ypb.ThirdPartyApplicationConfigR\x18LightweightAIModelConfig\x12R\n" +
+	"$DisableHTTPFlowSlowQueryNotification\x18\x1c \x01(\bR$DisableHTTPFlowSlowQueryNotification\x12R\n" +
 	"\x13VisionAIModelConfig\x18\x1d \x03(\v2 .ypb.ThirdPartyApplicationConfigR\x13VisionAIModelConfig\"\x9d\x01\n" +
 	"\x1dTieredAIModelConfigDescriptor\x12.\n" +
 	"\x12ModelRoutingPolicy\x18\x01 \x01(\tR\x12ModelRoutingPolicy\x12L\n" +

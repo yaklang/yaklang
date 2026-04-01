@@ -2745,6 +2745,7 @@ message GlobalNetworkConfig {
   TieredAIModelConfigDescriptor TieredAIModelConfig = 225;
   repeated ThirdPartyApplicationConfig IntelligentAIModelConfig = 26;
   repeated ThirdPartyApplicationConfig LightweightAIModelConfig = 27;
+  bool DisableHTTPFlowSlowQueryNotification = 28;
   repeated ThirdPartyApplicationConfig VisionAIModelConfig = 29;
 }
 
