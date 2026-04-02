@@ -698,19 +698,18 @@ func TestGetThirdPartyAppConfigTemplate(t *testing.T) {
 			break
 		}
 	}
-	for _, template := range openAITmp.GetItems() {
-		fmt.Printf("name: %s, required: %v\n", template.GetName(), template.GetRequired())
-
-	}
-
+	require.NotNil(t, openAITmp)
 	assert.Equal(t, openAITmp.Name, "openai") // openai
 	assert.Equal(t, "api_key", openAITmp.Items[0].Name)
 	assert.Equal(t, true, openAITmp.Items[0].Required)
-	assert.Equal(t, "proxy", openAITmp.Items[4].Name)
-	assert.Equal(t, "代理地址", openAITmp.Items[4].Verbose)
-
 	assert.Equal(t, "model", openAITmp.Items[1].Name)
 	assert.Equal(t, "模型名称", openAITmp.Items[1].Verbose)
+	assert.Equal(t, "base_url", openAITmp.Items[2].Name)
+	assert.Equal(t, "BaseURL", openAITmp.Items[2].Verbose)
+	assert.Equal(t, "api_type", openAITmp.Items[4].Name)
+	assert.Equal(t, "API类型", openAITmp.Items[4].Verbose)
+	assert.Equal(t, "proxy", openAITmp.Items[3].Name)
+	assert.Equal(t, "代理地址", openAITmp.Items[3].Verbose)
 
 	var comateTmp *ypb.GetThirdPartyAppConfigTemplate
 	for _, t := range res.GetTemplates() {
@@ -779,9 +778,9 @@ func TestGenThirdPartyConfigOption(t *testing.T) {
 			check(tmp.Items[0].Name == "api_key")
 			check(tmp.Items[0].Verbose == "ApiKey")
 			check(tmp.Items[1].Name == "model")
-			check(tmp.Items[2].Name == "no_https")
-			check(tmp.Items[3].Name == "domain")
-			check(tmp.Items[4].Name == "proxy")
+			check(tmp.Items[2].Name == "base_url")
+			check(tmp.Items[3].Name == "proxy")
+			check(tmp.Items[4].Name == "api_type")
 		}
 		if tmp.Name == "fofa" {
 			pass[1] = true
