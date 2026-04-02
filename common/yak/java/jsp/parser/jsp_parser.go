@@ -32,26 +32,28 @@ var jspparserParserStaticData struct {
 func jspparserParserInit() {
 	staticData := &jspparserParserStaticData
 	staticData.literalNames = []string{
-		"", "", "", "", "", "'<!DOCTYPE'", "", "", "'<?xml'", "", "", "", "",
-		"", "", "", "", "", "", "", "", "", "", "", "", "'PUBLIC'", "'SYSTEM'",
-		"", "", "", "", "", "':'", "", "", "'/'",
+		"", "", "", "", "", "", "'<!DOCTYPE'", "", "", "", "'<?xml'", "", "",
+		"", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "'PUBLIC'",
+		"'SYSTEM'", "", "", "", "", "", "':'", "", "", "", "'/'",
 	}
 	staticData.symbolicNames = []string{
-		"", "JSP_COMMENT", "JSP_CONDITIONAL_COMMENT", "SCRIPT_OPEN", "STYLE_OPEN",
-		"DTD", "CDATA", "WHITESPACES", "XML_DECLARATION", "WHITESPACE_SKIP",
-		"CLOSE_TAG_BEGIN", "TAG_BEGIN", "DIRECTIVE_BEGIN", "DECLARATION_BEGIN",
-		"ECHO_EXPRESSION_OPEN", "SCRIPTLET_OPEN", "QUOTE", "TAG_END", "EQUALS",
-		"EL_EXPR_START", "JSP_STATIC_CONTENT_CHARS", "JSP_END", "ATTVAL_ATTRIBUTE",
-		"ATTVAL_VALUE", "EL_EXPR_END", "DTD_PUBLIC", "DTD_SYSTEM", "DTD_WHITESPACE_SKIP",
-		"DTD_QUOTED", "DTD_IDENTIFIER", "BLOB_CLOSE", "BLOB_CONTENT", "JSP_JSTL_COLON",
+		"", "JSP_COMMENT", "JSP_SCRIPT_COMMENT", "JSP_CONDITIONAL_COMMENT",
+		"SCRIPT_OPEN", "STYLE_OPEN", "DTD", "CDATA", "JSP_INCLUDE_DIRECTIVE_SKIP",
+		"WHITESPACES", "XML_DECLARATION", "WHITESPACE_SKIP", "CLOSE_TAG_BEGIN",
+		"TAG_BEGIN", "DIRECTIVE_BEGIN", "DECLARATION_BEGIN", "ECHO_EXPRESSION_OPEN",
+		"JSP_IF_BLOCK", "SCRIPTLET_OPEN", "QUOTE", "TAG_END", "EQUALS", "EL_EXPR_START",
+		"JSP_STATIC_CONTENT_CHARS", "JSP_END", "ATTVAL_ATTRIBUTE", "ATTVAL_VALUE",
+		"EL_EXPR_END", "DTD_PUBLIC", "DTD_SYSTEM", "DTD_WHITESPACE_SKIP", "DTD_QUOTED",
+		"DTD_IDENTIFIER", "BLOB_CLOSE", "BLOB_CONTENT", "JSP_JSTL_COLON", "TAG_JSP_IF_FRAGMENT",
 		"TAG_SLASH_END", "TAG_CLOSE", "TAG_SLASH", "DIRECTIVE_END", "TAG_IDENTIFIER",
 		"TAG_WHITESPACE", "SCRIPT_BODY", "SCRIPT_SHORT_BODY", "STYLE_BODY",
-		"STYLE_SHORT_BODY", "ATTVAL_EL_EXPR", "EL_EXPR_CONTENT",
+		"STYLE_SHORT_BODY", "ATTVAL_WHITESPACE_SKIP", "ATTVAL_EL_EXPR", "EL_EXPR_CONTENT",
 	}
 	staticData.ruleNames = []string{
 		"jspDocuments", "jspDocument", "jspStart", "jspElements", "htmlMiscs",
-		"jspScript", "htmlElement", "htmlBegin", "htmlTag", "jspDirective",
-		"htmlContents", "htmlContent", "elExpression", "htmlAttribute", "htmlAttributeName",
+		"jspScript", "htmlElement", "htmlCloseElement", "htmlBegin", "htmlBeginElement",
+		"tagJspFragment", "htmlTag", "jspDirective", "htmlContents", "htmlContent",
+		"jspIfBlock", "elExpression", "htmlAttribute", "htmlAttributeName",
 		"htmlAttributeValue", "htmlAttributeValueElement", "htmlTagName", "htmlChardata",
 		"htmlMisc", "htmlComment", "xhtmlCDATA", "dtd", "dtdElementName", "publicId",
 		"systemId", "xml", "jspScriptlet", "jspExpression", "scriptletStart",
@@ -59,119 +61,150 @@ func jspparserParserInit() {
 	}
 	staticData.predictionContextCache = antlr.NewPredictionContextCache()
 	staticData.serializedATN = []int32{
-		4, 1, 44, 264, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 2, 4, 7,
+		4, 1, 49, 325, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 2, 4, 7,
 		4, 2, 5, 7, 5, 2, 6, 7, 6, 2, 7, 7, 7, 2, 8, 7, 8, 2, 9, 7, 9, 2, 10, 7,
 		10, 2, 11, 7, 11, 2, 12, 7, 12, 2, 13, 7, 13, 2, 14, 7, 14, 2, 15, 7, 15,
 		2, 16, 7, 16, 2, 17, 7, 17, 2, 18, 7, 18, 2, 19, 7, 19, 2, 20, 7, 20, 2,
 		21, 7, 21, 2, 22, 7, 22, 2, 23, 7, 23, 2, 24, 7, 24, 2, 25, 7, 25, 2, 26,
 		7, 26, 2, 27, 7, 27, 2, 28, 7, 28, 2, 29, 7, 29, 2, 30, 7, 30, 2, 31, 7,
-		31, 2, 32, 7, 32, 1, 0, 5, 0, 68, 8, 0, 10, 0, 12, 0, 71, 9, 0, 1, 0, 4,
-		0, 74, 8, 0, 11, 0, 12, 0, 75, 1, 1, 1, 1, 1, 1, 3, 1, 81, 8, 1, 1, 2,
-		1, 2, 3, 2, 85, 8, 2, 1, 3, 1, 3, 1, 3, 1, 3, 1, 3, 1, 3, 3, 3, 93, 8,
-		3, 1, 3, 1, 3, 1, 4, 5, 4, 98, 8, 4, 10, 4, 12, 4, 101, 9, 4, 1, 5, 1,
-		5, 3, 5, 105, 8, 5, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 3, 6, 114,
-		8, 6, 1, 6, 3, 6, 117, 8, 6, 1, 7, 1, 7, 1, 7, 5, 7, 122, 8, 7, 10, 7,
-		12, 7, 125, 9, 7, 1, 8, 1, 8, 1, 8, 3, 8, 130, 8, 8, 1, 9, 1, 9, 1, 9,
-		5, 9, 135, 8, 9, 10, 9, 12, 9, 138, 9, 9, 1, 9, 5, 9, 141, 8, 9, 10, 9,
-		12, 9, 144, 9, 9, 1, 9, 1, 9, 1, 10, 3, 10, 149, 8, 10, 1, 10, 1, 10, 3,
-		10, 153, 8, 10, 5, 10, 155, 8, 10, 10, 10, 12, 10, 158, 9, 10, 1, 11, 1,
-		11, 1, 11, 1, 11, 3, 11, 164, 8, 11, 1, 12, 1, 12, 1, 12, 1, 12, 1, 13,
-		1, 13, 1, 13, 1, 13, 1, 13, 1, 13, 3, 13, 176, 8, 13, 1, 14, 1, 14, 1,
-		15, 3, 15, 181, 8, 15, 1, 15, 5, 15, 184, 8, 15, 10, 15, 12, 15, 187, 9,
-		15, 1, 15, 3, 15, 190, 8, 15, 1, 16, 1, 16, 1, 16, 3, 16, 195, 8, 16, 1,
-		17, 1, 17, 1, 18, 1, 18, 1, 19, 1, 19, 1, 19, 1, 19, 3, 19, 205, 8, 19,
-		1, 20, 1, 20, 1, 21, 1, 21, 1, 22, 1, 22, 1, 22, 1, 22, 5, 22, 215, 8,
-		22, 10, 22, 12, 22, 218, 9, 22, 3, 22, 220, 8, 22, 1, 22, 1, 22, 3, 22,
-		224, 8, 22, 1, 22, 1, 22, 1, 23, 1, 23, 1, 24, 1, 24, 1, 25, 1, 25, 1,
-		26, 1, 26, 1, 26, 5, 26, 237, 8, 26, 10, 26, 12, 26, 240, 9, 26, 1, 26,
-		1, 26, 1, 27, 1, 27, 1, 27, 1, 27, 3, 27, 248, 8, 27, 1, 28, 1, 28, 1,
-		28, 1, 29, 1, 29, 1, 30, 1, 30, 1, 30, 1, 31, 1, 31, 1, 31, 1, 32, 1, 32,
-		1, 32, 1, 32, 2, 136, 238, 0, 33, 0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20,
-		22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 50, 52, 54, 56,
-		58, 60, 62, 64, 0, 5, 2, 0, 7, 7, 20, 20, 1, 0, 1, 2, 2, 0, 13, 13, 15,
-		15, 1, 0, 39, 40, 1, 0, 41, 42, 268, 0, 69, 1, 0, 0, 0, 2, 80, 1, 0, 0,
-		0, 4, 84, 1, 0, 0, 0, 6, 86, 1, 0, 0, 0, 8, 99, 1, 0, 0, 0, 10, 104, 1,
-		0, 0, 0, 12, 106, 1, 0, 0, 0, 14, 118, 1, 0, 0, 0, 16, 126, 1, 0, 0, 0,
-		18, 131, 1, 0, 0, 0, 20, 148, 1, 0, 0, 0, 22, 163, 1, 0, 0, 0, 24, 165,
-		1, 0, 0, 0, 26, 175, 1, 0, 0, 0, 28, 177, 1, 0, 0, 0, 30, 180, 1, 0, 0,
-		0, 32, 194, 1, 0, 0, 0, 34, 196, 1, 0, 0, 0, 36, 198, 1, 0, 0, 0, 38, 204,
-		1, 0, 0, 0, 40, 206, 1, 0, 0, 0, 42, 208, 1, 0, 0, 0, 44, 210, 1, 0, 0,
-		0, 46, 227, 1, 0, 0, 0, 48, 229, 1, 0, 0, 0, 50, 231, 1, 0, 0, 0, 52, 233,
-		1, 0, 0, 0, 54, 247, 1, 0, 0, 0, 56, 249, 1, 0, 0, 0, 58, 252, 1, 0, 0,
-		0, 60, 254, 1, 0, 0, 0, 62, 257, 1, 0, 0, 0, 64, 260, 1, 0, 0, 0, 66, 68,
-		3, 4, 2, 0, 67, 66, 1, 0, 0, 0, 68, 71, 1, 0, 0, 0, 69, 67, 1, 0, 0, 0,
-		69, 70, 1, 0, 0, 0, 70, 73, 1, 0, 0, 0, 71, 69, 1, 0, 0, 0, 72, 74, 3,
-		2, 1, 0, 73, 72, 1, 0, 0, 0, 74, 75, 1, 0, 0, 0, 75, 73, 1, 0, 0, 0, 75,
-		76, 1, 0, 0, 0, 76, 1, 1, 0, 0, 0, 77, 81, 3, 52, 26, 0, 78, 81, 3, 44,
-		22, 0, 79, 81, 3, 6, 3, 0, 80, 77, 1, 0, 0, 0, 80, 78, 1, 0, 0, 0, 80,
-		79, 1, 0, 0, 0, 81, 3, 1, 0, 0, 0, 82, 85, 3, 10, 5, 0, 83, 85, 5, 7, 0,
-		0, 84, 82, 1, 0, 0, 0, 84, 83, 1, 0, 0, 0, 85, 5, 1, 0, 0, 0, 86, 92, 3,
-		8, 4, 0, 87, 93, 3, 12, 6, 0, 88, 93, 3, 10, 5, 0, 89, 93, 3, 56, 28, 0,
-		90, 93, 3, 64, 32, 0, 91, 93, 3, 62, 31, 0, 92, 87, 1, 0, 0, 0, 92, 88,
-		1, 0, 0, 0, 92, 89, 1, 0, 0, 0, 92, 90, 1, 0, 0, 0, 92, 91, 1, 0, 0, 0,
-		93, 94, 1, 0, 0, 0, 94, 95, 3, 8, 4, 0, 95, 7, 1, 0, 0, 0, 96, 98, 3, 38,
-		19, 0, 97, 96, 1, 0, 0, 0, 98, 101, 1, 0, 0, 0, 99, 97, 1, 0, 0, 0, 99,
-		100, 1, 0, 0, 0, 100, 9, 1, 0, 0, 0, 101, 99, 1, 0, 0, 0, 102, 105, 3,
-		18, 9, 0, 103, 105, 3, 54, 27, 0, 104, 102, 1, 0, 0, 0, 104, 103, 1, 0,
-		0, 0, 105, 11, 1, 0, 0, 0, 106, 116, 3, 14, 7, 0, 107, 113, 5, 34, 0, 0,
-		108, 109, 3, 20, 10, 0, 109, 110, 5, 10, 0, 0, 110, 111, 3, 16, 8, 0, 111,
-		112, 5, 34, 0, 0, 112, 114, 1, 0, 0, 0, 113, 108, 1, 0, 0, 0, 113, 114,
-		1, 0, 0, 0, 114, 117, 1, 0, 0, 0, 115, 117, 5, 33, 0, 0, 116, 107, 1, 0,
-		0, 0, 116, 115, 1, 0, 0, 0, 117, 13, 1, 0, 0, 0, 118, 119, 5, 11, 0, 0,
-		119, 123, 3, 16, 8, 0, 120, 122, 3, 26, 13, 0, 121, 120, 1, 0, 0, 0, 122,
-		125, 1, 0, 0, 0, 123, 121, 1, 0, 0, 0, 123, 124, 1, 0, 0, 0, 124, 15, 1,
-		0, 0, 0, 125, 123, 1, 0, 0, 0, 126, 129, 3, 34, 17, 0, 127, 128, 5, 32,
-		0, 0, 128, 130, 3, 34, 17, 0, 129, 127, 1, 0, 0, 0, 129, 130, 1, 0, 0,
-		0, 130, 17, 1, 0, 0, 0, 131, 132, 5, 12, 0, 0, 132, 136, 3, 34, 17, 0,
-		133, 135, 3, 26, 13, 0, 134, 133, 1, 0, 0, 0, 135, 138, 1, 0, 0, 0, 136,
-		137, 1, 0, 0, 0, 136, 134, 1, 0, 0, 0, 137, 142, 1, 0, 0, 0, 138, 136,
-		1, 0, 0, 0, 139, 141, 5, 38, 0, 0, 140, 139, 1, 0, 0, 0, 141, 144, 1, 0,
-		0, 0, 142, 140, 1, 0, 0, 0, 142, 143, 1, 0, 0, 0, 143, 145, 1, 0, 0, 0,
-		144, 142, 1, 0, 0, 0, 145, 146, 5, 36, 0, 0, 146, 19, 1, 0, 0, 0, 147,
-		149, 3, 36, 18, 0, 148, 147, 1, 0, 0, 0, 148, 149, 1, 0, 0, 0, 149, 156,
-		1, 0, 0, 0, 150, 152, 3, 22, 11, 0, 151, 153, 3, 36, 18, 0, 152, 151, 1,
-		0, 0, 0, 152, 153, 1, 0, 0, 0, 153, 155, 1, 0, 0, 0, 154, 150, 1, 0, 0,
-		0, 155, 158, 1, 0, 0, 0, 156, 154, 1, 0, 0, 0, 156, 157, 1, 0, 0, 0, 157,
-		21, 1, 0, 0, 0, 158, 156, 1, 0, 0, 0, 159, 164, 3, 24, 12, 0, 160, 164,
-		3, 6, 3, 0, 161, 164, 3, 42, 21, 0, 162, 164, 3, 40, 20, 0, 163, 159, 1,
-		0, 0, 0, 163, 160, 1, 0, 0, 0, 163, 161, 1, 0, 0, 0, 163, 162, 1, 0, 0,
-		0, 164, 23, 1, 0, 0, 0, 165, 166, 5, 19, 0, 0, 166, 167, 5, 44, 0, 0, 167,
-		168, 5, 24, 0, 0, 168, 25, 1, 0, 0, 0, 169, 170, 3, 28, 14, 0, 170, 171,
-		5, 18, 0, 0, 171, 172, 3, 30, 15, 0, 172, 176, 1, 0, 0, 0, 173, 176, 3,
-		28, 14, 0, 174, 176, 3, 56, 28, 0, 175, 169, 1, 0, 0, 0, 175, 173, 1, 0,
-		0, 0, 175, 174, 1, 0, 0, 0, 176, 27, 1, 0, 0, 0, 177, 178, 5, 37, 0, 0,
-		178, 29, 1, 0, 0, 0, 179, 181, 5, 16, 0, 0, 180, 179, 1, 0, 0, 0, 180,
-		181, 1, 0, 0, 0, 181, 185, 1, 0, 0, 0, 182, 184, 3, 32, 16, 0, 183, 182,
-		1, 0, 0, 0, 184, 187, 1, 0, 0, 0, 185, 183, 1, 0, 0, 0, 185, 186, 1, 0,
-		0, 0, 186, 189, 1, 0, 0, 0, 187, 185, 1, 0, 0, 0, 188, 190, 5, 16, 0, 0,
-		189, 188, 1, 0, 0, 0, 189, 190, 1, 0, 0, 0, 190, 31, 1, 0, 0, 0, 191, 195,
-		5, 22, 0, 0, 192, 195, 3, 24, 12, 0, 193, 195, 3, 56, 28, 0, 194, 191,
-		1, 0, 0, 0, 194, 192, 1, 0, 0, 0, 194, 193, 1, 0, 0, 0, 195, 33, 1, 0,
-		0, 0, 196, 197, 5, 37, 0, 0, 197, 35, 1, 0, 0, 0, 198, 199, 7, 0, 0, 0,
-		199, 37, 1, 0, 0, 0, 200, 205, 3, 40, 20, 0, 201, 205, 3, 24, 12, 0, 202,
-		205, 3, 54, 27, 0, 203, 205, 5, 7, 0, 0, 204, 200, 1, 0, 0, 0, 204, 201,
-		1, 0, 0, 0, 204, 202, 1, 0, 0, 0, 204, 203, 1, 0, 0, 0, 205, 39, 1, 0,
-		0, 0, 206, 207, 7, 1, 0, 0, 207, 41, 1, 0, 0, 0, 208, 209, 5, 6, 0, 0,
-		209, 43, 1, 0, 0, 0, 210, 211, 5, 5, 0, 0, 211, 219, 3, 46, 23, 0, 212,
-		216, 5, 25, 0, 0, 213, 215, 3, 48, 24, 0, 214, 213, 1, 0, 0, 0, 215, 218,
-		1, 0, 0, 0, 216, 214, 1, 0, 0, 0, 216, 217, 1, 0, 0, 0, 217, 220, 1, 0,
-		0, 0, 218, 216, 1, 0, 0, 0, 219, 212, 1, 0, 0, 0, 219, 220, 1, 0, 0, 0,
-		220, 223, 1, 0, 0, 0, 221, 222, 5, 26, 0, 0, 222, 224, 3, 50, 25, 0, 223,
-		221, 1, 0, 0, 0, 223, 224, 1, 0, 0, 0, 224, 225, 1, 0, 0, 0, 225, 226,
-		5, 17, 0, 0, 226, 45, 1, 0, 0, 0, 227, 228, 5, 29, 0, 0, 228, 47, 1, 0,
-		0, 0, 229, 230, 5, 28, 0, 0, 230, 49, 1, 0, 0, 0, 231, 232, 5, 28, 0, 0,
-		232, 51, 1, 0, 0, 0, 233, 234, 5, 8, 0, 0, 234, 238, 3, 34, 17, 0, 235,
-		237, 3, 26, 13, 0, 236, 235, 1, 0, 0, 0, 237, 240, 1, 0, 0, 0, 238, 239,
-		1, 0, 0, 0, 238, 236, 1, 0, 0, 0, 239, 241, 1, 0, 0, 0, 240, 238, 1, 0,
-		0, 0, 241, 242, 5, 17, 0, 0, 242, 53, 1, 0, 0, 0, 243, 244, 3, 58, 29,
-		0, 244, 245, 3, 60, 30, 0, 245, 248, 1, 0, 0, 0, 246, 248, 3, 56, 28, 0,
-		247, 243, 1, 0, 0, 0, 247, 246, 1, 0, 0, 0, 248, 55, 1, 0, 0, 0, 249, 250,
-		5, 14, 0, 0, 250, 251, 3, 60, 30, 0, 251, 57, 1, 0, 0, 0, 252, 253, 7,
-		2, 0, 0, 253, 59, 1, 0, 0, 0, 254, 255, 5, 31, 0, 0, 255, 256, 5, 30, 0,
-		0, 256, 61, 1, 0, 0, 0, 257, 258, 5, 3, 0, 0, 258, 259, 7, 3, 0, 0, 259,
-		63, 1, 0, 0, 0, 260, 261, 5, 4, 0, 0, 261, 262, 7, 4, 0, 0, 262, 65, 1,
-		0, 0, 0, 28, 69, 75, 80, 84, 92, 99, 104, 113, 116, 123, 129, 136, 142,
-		148, 152, 156, 163, 175, 180, 185, 189, 194, 204, 216, 219, 223, 238, 247,
+		31, 2, 32, 7, 32, 2, 33, 7, 33, 2, 34, 7, 34, 2, 35, 7, 35, 2, 36, 7, 36,
+		1, 0, 5, 0, 76, 8, 0, 10, 0, 12, 0, 79, 9, 0, 1, 0, 4, 0, 82, 8, 0, 11,
+		0, 12, 0, 83, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 1, 93, 8, 1,
+		1, 2, 1, 2, 3, 2, 97, 8, 2, 1, 3, 1, 3, 1, 3, 1, 3, 1, 3, 1, 3, 1, 3, 1,
+		3, 3, 3, 107, 8, 3, 1, 3, 1, 3, 1, 4, 5, 4, 112, 8, 4, 10, 4, 12, 4, 115,
+		9, 4, 1, 5, 1, 5, 3, 5, 119, 8, 5, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6,
+		1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6,
+		1, 6, 3, 6, 140, 8, 6, 1, 7, 1, 7, 1, 7, 1, 7, 1, 8, 1, 8, 1, 8, 5, 8,
+		149, 8, 8, 10, 8, 12, 8, 152, 9, 8, 1, 9, 1, 9, 1, 9, 3, 9, 157, 8, 9,
+		1, 10, 1, 10, 1, 11, 1, 11, 1, 11, 3, 11, 164, 8, 11, 1, 12, 1, 12, 1,
+		12, 5, 12, 169, 8, 12, 10, 12, 12, 12, 172, 9, 12, 1, 12, 5, 12, 175, 8,
+		12, 10, 12, 12, 12, 178, 9, 12, 1, 12, 1, 12, 1, 13, 1, 13, 1, 13, 3, 13,
+		185, 8, 13, 5, 13, 187, 8, 13, 10, 13, 12, 13, 190, 9, 13, 1, 13, 1, 13,
+		3, 13, 194, 8, 13, 1, 13, 1, 13, 3, 13, 198, 8, 13, 5, 13, 200, 8, 13,
+		10, 13, 12, 13, 203, 9, 13, 3, 13, 205, 8, 13, 1, 14, 1, 14, 1, 14, 1,
+		14, 1, 14, 1, 14, 3, 14, 213, 8, 14, 1, 15, 1, 15, 1, 16, 1, 16, 1, 16,
+		1, 16, 1, 17, 1, 17, 1, 17, 1, 17, 1, 17, 1, 17, 3, 17, 227, 8, 17, 1,
+		18, 1, 18, 1, 18, 5, 18, 232, 8, 18, 10, 18, 12, 18, 235, 9, 18, 1, 19,
+		3, 19, 238, 8, 19, 1, 19, 5, 19, 241, 8, 19, 10, 19, 12, 19, 244, 9, 19,
+		1, 19, 3, 19, 247, 8, 19, 1, 20, 1, 20, 1, 20, 1, 20, 1, 20, 1, 20, 3,
+		20, 255, 8, 20, 1, 21, 1, 21, 1, 22, 1, 22, 1, 23, 1, 23, 1, 23, 1, 23,
+		1, 23, 3, 23, 266, 8, 23, 1, 24, 1, 24, 1, 25, 1, 25, 1, 26, 1, 26, 1,
+		26, 1, 26, 5, 26, 276, 8, 26, 10, 26, 12, 26, 279, 9, 26, 3, 26, 281, 8,
+		26, 1, 26, 1, 26, 3, 26, 285, 8, 26, 1, 26, 1, 26, 1, 27, 1, 27, 1, 28,
+		1, 28, 1, 29, 1, 29, 1, 30, 1, 30, 1, 30, 5, 30, 298, 8, 30, 10, 30, 12,
+		30, 301, 9, 30, 1, 30, 1, 30, 1, 31, 1, 31, 1, 31, 1, 31, 3, 31, 309, 8,
+		31, 1, 32, 1, 32, 1, 32, 1, 33, 1, 33, 1, 34, 1, 34, 1, 34, 1, 35, 1, 35,
+		1, 35, 1, 36, 1, 36, 1, 36, 1, 36, 2, 170, 299, 0, 37, 0, 2, 4, 6, 8, 10,
+		12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46,
+		48, 50, 52, 54, 56, 58, 60, 62, 64, 66, 68, 70, 72, 0, 5, 2, 0, 9, 9, 23,
+		23, 2, 0, 1, 1, 3, 3, 2, 0, 15, 15, 18, 18, 1, 0, 43, 44, 1, 0, 45, 46,
+		342, 0, 77, 1, 0, 0, 0, 2, 92, 1, 0, 0, 0, 4, 96, 1, 0, 0, 0, 6, 98, 1,
+		0, 0, 0, 8, 113, 1, 0, 0, 0, 10, 118, 1, 0, 0, 0, 12, 139, 1, 0, 0, 0,
+		14, 141, 1, 0, 0, 0, 16, 145, 1, 0, 0, 0, 18, 156, 1, 0, 0, 0, 20, 158,
+		1, 0, 0, 0, 22, 160, 1, 0, 0, 0, 24, 165, 1, 0, 0, 0, 26, 204, 1, 0, 0,
+		0, 28, 212, 1, 0, 0, 0, 30, 214, 1, 0, 0, 0, 32, 216, 1, 0, 0, 0, 34, 226,
+		1, 0, 0, 0, 36, 228, 1, 0, 0, 0, 38, 237, 1, 0, 0, 0, 40, 254, 1, 0, 0,
+		0, 42, 256, 1, 0, 0, 0, 44, 258, 1, 0, 0, 0, 46, 265, 1, 0, 0, 0, 48, 267,
+		1, 0, 0, 0, 50, 269, 1, 0, 0, 0, 52, 271, 1, 0, 0, 0, 54, 288, 1, 0, 0,
+		0, 56, 290, 1, 0, 0, 0, 58, 292, 1, 0, 0, 0, 60, 294, 1, 0, 0, 0, 62, 308,
+		1, 0, 0, 0, 64, 310, 1, 0, 0, 0, 66, 313, 1, 0, 0, 0, 68, 315, 1, 0, 0,
+		0, 70, 318, 1, 0, 0, 0, 72, 321, 1, 0, 0, 0, 74, 76, 3, 4, 2, 0, 75, 74,
+		1, 0, 0, 0, 76, 79, 1, 0, 0, 0, 77, 75, 1, 0, 0, 0, 77, 78, 1, 0, 0, 0,
+		78, 81, 1, 0, 0, 0, 79, 77, 1, 0, 0, 0, 80, 82, 3, 2, 1, 0, 81, 80, 1,
+		0, 0, 0, 82, 83, 1, 0, 0, 0, 83, 81, 1, 0, 0, 0, 83, 84, 1, 0, 0, 0, 84,
+		85, 1, 0, 0, 0, 85, 86, 5, 0, 0, 1, 86, 1, 1, 0, 0, 0, 87, 93, 3, 60, 30,
+		0, 88, 93, 3, 52, 26, 0, 89, 93, 3, 10, 5, 0, 90, 93, 3, 30, 15, 0, 91,
+		93, 3, 6, 3, 0, 92, 87, 1, 0, 0, 0, 92, 88, 1, 0, 0, 0, 92, 89, 1, 0, 0,
+		0, 92, 90, 1, 0, 0, 0, 92, 91, 1, 0, 0, 0, 93, 3, 1, 0, 0, 0, 94, 97, 3,
+		10, 5, 0, 95, 97, 5, 9, 0, 0, 96, 94, 1, 0, 0, 0, 96, 95, 1, 0, 0, 0, 97,
+		5, 1, 0, 0, 0, 98, 106, 3, 8, 4, 0, 99, 107, 3, 12, 6, 0, 100, 107, 3,
+		14, 7, 0, 101, 107, 3, 10, 5, 0, 102, 107, 3, 64, 32, 0, 103, 107, 3, 30,
+		15, 0, 104, 107, 3, 72, 36, 0, 105, 107, 3, 70, 35, 0, 106, 99, 1, 0, 0,
+		0, 106, 100, 1, 0, 0, 0, 106, 101, 1, 0, 0, 0, 106, 102, 1, 0, 0, 0, 106,
+		103, 1, 0, 0, 0, 106, 104, 1, 0, 0, 0, 106, 105, 1, 0, 0, 0, 107, 108,
+		1, 0, 0, 0, 108, 109, 3, 8, 4, 0, 109, 7, 1, 0, 0, 0, 110, 112, 3, 46,
+		23, 0, 111, 110, 1, 0, 0, 0, 112, 115, 1, 0, 0, 0, 113, 111, 1, 0, 0, 0,
+		113, 114, 1, 0, 0, 0, 114, 9, 1, 0, 0, 0, 115, 113, 1, 0, 0, 0, 116, 119,
+		3, 24, 12, 0, 117, 119, 3, 62, 31, 0, 118, 116, 1, 0, 0, 0, 118, 117, 1,
+		0, 0, 0, 119, 11, 1, 0, 0, 0, 120, 121, 3, 16, 8, 0, 121, 122, 5, 38, 0,
+		0, 122, 123, 3, 26, 13, 0, 123, 124, 5, 12, 0, 0, 124, 125, 3, 22, 11,
+		0, 125, 126, 5, 38, 0, 0, 126, 140, 1, 0, 0, 0, 127, 128, 3, 16, 8, 0,
+		128, 129, 5, 38, 0, 0, 129, 130, 5, 12, 0, 0, 130, 131, 3, 22, 11, 0, 131,
+		132, 5, 38, 0, 0, 132, 140, 1, 0, 0, 0, 133, 134, 3, 16, 8, 0, 134, 135,
+		5, 37, 0, 0, 135, 140, 1, 0, 0, 0, 136, 137, 3, 16, 8, 0, 137, 138, 5,
+		38, 0, 0, 138, 140, 1, 0, 0, 0, 139, 120, 1, 0, 0, 0, 139, 127, 1, 0, 0,
+		0, 139, 133, 1, 0, 0, 0, 139, 136, 1, 0, 0, 0, 140, 13, 1, 0, 0, 0, 141,
+		142, 5, 12, 0, 0, 142, 143, 3, 22, 11, 0, 143, 144, 5, 38, 0, 0, 144, 15,
+		1, 0, 0, 0, 145, 146, 5, 13, 0, 0, 146, 150, 3, 22, 11, 0, 147, 149, 3,
+		18, 9, 0, 148, 147, 1, 0, 0, 0, 149, 152, 1, 0, 0, 0, 150, 148, 1, 0, 0,
+		0, 150, 151, 1, 0, 0, 0, 151, 17, 1, 0, 0, 0, 152, 150, 1, 0, 0, 0, 153,
+		157, 3, 34, 17, 0, 154, 157, 3, 20, 10, 0, 155, 157, 3, 62, 31, 0, 156,
+		153, 1, 0, 0, 0, 156, 154, 1, 0, 0, 0, 156, 155, 1, 0, 0, 0, 157, 19, 1,
+		0, 0, 0, 158, 159, 5, 36, 0, 0, 159, 21, 1, 0, 0, 0, 160, 163, 3, 42, 21,
+		0, 161, 162, 5, 35, 0, 0, 162, 164, 3, 42, 21, 0, 163, 161, 1, 0, 0, 0,
+		163, 164, 1, 0, 0, 0, 164, 23, 1, 0, 0, 0, 165, 166, 5, 14, 0, 0, 166,
+		170, 3, 42, 21, 0, 167, 169, 3, 34, 17, 0, 168, 167, 1, 0, 0, 0, 169, 172,
+		1, 0, 0, 0, 170, 171, 1, 0, 0, 0, 170, 168, 1, 0, 0, 0, 171, 176, 1, 0,
+		0, 0, 172, 170, 1, 0, 0, 0, 173, 175, 5, 42, 0, 0, 174, 173, 1, 0, 0, 0,
+		175, 178, 1, 0, 0, 0, 176, 174, 1, 0, 0, 0, 176, 177, 1, 0, 0, 0, 177,
+		179, 1, 0, 0, 0, 178, 176, 1, 0, 0, 0, 179, 180, 5, 40, 0, 0, 180, 25,
+		1, 0, 0, 0, 181, 188, 3, 44, 22, 0, 182, 184, 3, 28, 14, 0, 183, 185, 3,
+		44, 22, 0, 184, 183, 1, 0, 0, 0, 184, 185, 1, 0, 0, 0, 185, 187, 1, 0,
+		0, 0, 186, 182, 1, 0, 0, 0, 187, 190, 1, 0, 0, 0, 188, 186, 1, 0, 0, 0,
+		188, 189, 1, 0, 0, 0, 189, 205, 1, 0, 0, 0, 190, 188, 1, 0, 0, 0, 191,
+		193, 3, 28, 14, 0, 192, 194, 3, 44, 22, 0, 193, 192, 1, 0, 0, 0, 193, 194,
+		1, 0, 0, 0, 194, 201, 1, 0, 0, 0, 195, 197, 3, 28, 14, 0, 196, 198, 3,
+		44, 22, 0, 197, 196, 1, 0, 0, 0, 197, 198, 1, 0, 0, 0, 198, 200, 1, 0,
+		0, 0, 199, 195, 1, 0, 0, 0, 200, 203, 1, 0, 0, 0, 201, 199, 1, 0, 0, 0,
+		201, 202, 1, 0, 0, 0, 202, 205, 1, 0, 0, 0, 203, 201, 1, 0, 0, 0, 204,
+		181, 1, 0, 0, 0, 204, 191, 1, 0, 0, 0, 205, 27, 1, 0, 0, 0, 206, 213, 3,
+		32, 16, 0, 207, 213, 3, 10, 5, 0, 208, 213, 3, 30, 15, 0, 209, 213, 3,
+		6, 3, 0, 210, 213, 3, 50, 25, 0, 211, 213, 3, 48, 24, 0, 212, 206, 1, 0,
+		0, 0, 212, 207, 1, 0, 0, 0, 212, 208, 1, 0, 0, 0, 212, 209, 1, 0, 0, 0,
+		212, 210, 1, 0, 0, 0, 212, 211, 1, 0, 0, 0, 213, 29, 1, 0, 0, 0, 214, 215,
+		5, 17, 0, 0, 215, 31, 1, 0, 0, 0, 216, 217, 5, 22, 0, 0, 217, 218, 5, 49,
+		0, 0, 218, 219, 5, 27, 0, 0, 219, 33, 1, 0, 0, 0, 220, 221, 3, 36, 18,
+		0, 221, 222, 5, 21, 0, 0, 222, 223, 3, 38, 19, 0, 223, 227, 1, 0, 0, 0,
+		224, 227, 3, 36, 18, 0, 225, 227, 3, 64, 32, 0, 226, 220, 1, 0, 0, 0, 226,
+		224, 1, 0, 0, 0, 226, 225, 1, 0, 0, 0, 227, 35, 1, 0, 0, 0, 228, 233, 5,
+		41, 0, 0, 229, 230, 5, 35, 0, 0, 230, 232, 5, 41, 0, 0, 231, 229, 1, 0,
+		0, 0, 232, 235, 1, 0, 0, 0, 233, 231, 1, 0, 0, 0, 233, 234, 1, 0, 0, 0,
+		234, 37, 1, 0, 0, 0, 235, 233, 1, 0, 0, 0, 236, 238, 5, 19, 0, 0, 237,
+		236, 1, 0, 0, 0, 237, 238, 1, 0, 0, 0, 238, 242, 1, 0, 0, 0, 239, 241,
+		3, 40, 20, 0, 240, 239, 1, 0, 0, 0, 241, 244, 1, 0, 0, 0, 242, 240, 1,
+		0, 0, 0, 242, 243, 1, 0, 0, 0, 243, 246, 1, 0, 0, 0, 244, 242, 1, 0, 0,
+		0, 245, 247, 5, 19, 0, 0, 246, 245, 1, 0, 0, 0, 246, 247, 1, 0, 0, 0, 247,
+		39, 1, 0, 0, 0, 248, 255, 5, 25, 0, 0, 249, 255, 3, 32, 16, 0, 250, 255,
+		3, 64, 32, 0, 251, 255, 3, 6, 3, 0, 252, 255, 3, 10, 5, 0, 253, 255, 3,
+		30, 15, 0, 254, 248, 1, 0, 0, 0, 254, 249, 1, 0, 0, 0, 254, 250, 1, 0,
+		0, 0, 254, 251, 1, 0, 0, 0, 254, 252, 1, 0, 0, 0, 254, 253, 1, 0, 0, 0,
+		255, 41, 1, 0, 0, 0, 256, 257, 5, 41, 0, 0, 257, 43, 1, 0, 0, 0, 258, 259,
+		7, 0, 0, 0, 259, 45, 1, 0, 0, 0, 260, 266, 3, 48, 24, 0, 261, 266, 3, 32,
+		16, 0, 262, 266, 3, 10, 5, 0, 263, 266, 3, 62, 31, 0, 264, 266, 5, 9, 0,
+		0, 265, 260, 1, 0, 0, 0, 265, 261, 1, 0, 0, 0, 265, 262, 1, 0, 0, 0, 265,
+		263, 1, 0, 0, 0, 265, 264, 1, 0, 0, 0, 266, 47, 1, 0, 0, 0, 267, 268, 7,
+		1, 0, 0, 268, 49, 1, 0, 0, 0, 269, 270, 5, 7, 0, 0, 270, 51, 1, 0, 0, 0,
+		271, 272, 5, 6, 0, 0, 272, 280, 3, 54, 27, 0, 273, 277, 5, 28, 0, 0, 274,
+		276, 3, 56, 28, 0, 275, 274, 1, 0, 0, 0, 276, 279, 1, 0, 0, 0, 277, 275,
+		1, 0, 0, 0, 277, 278, 1, 0, 0, 0, 278, 281, 1, 0, 0, 0, 279, 277, 1, 0,
+		0, 0, 280, 273, 1, 0, 0, 0, 280, 281, 1, 0, 0, 0, 281, 284, 1, 0, 0, 0,
+		282, 283, 5, 29, 0, 0, 283, 285, 3, 58, 29, 0, 284, 282, 1, 0, 0, 0, 284,
+		285, 1, 0, 0, 0, 285, 286, 1, 0, 0, 0, 286, 287, 5, 20, 0, 0, 287, 53,
+		1, 0, 0, 0, 288, 289, 5, 32, 0, 0, 289, 55, 1, 0, 0, 0, 290, 291, 5, 31,
+		0, 0, 291, 57, 1, 0, 0, 0, 292, 293, 5, 31, 0, 0, 293, 59, 1, 0, 0, 0,
+		294, 295, 5, 10, 0, 0, 295, 299, 3, 42, 21, 0, 296, 298, 3, 34, 17, 0,
+		297, 296, 1, 0, 0, 0, 298, 301, 1, 0, 0, 0, 299, 300, 1, 0, 0, 0, 299,
+		297, 1, 0, 0, 0, 300, 302, 1, 0, 0, 0, 301, 299, 1, 0, 0, 0, 302, 303,
+		5, 20, 0, 0, 303, 61, 1, 0, 0, 0, 304, 305, 3, 66, 33, 0, 305, 306, 3,
+		68, 34, 0, 306, 309, 1, 0, 0, 0, 307, 309, 3, 64, 32, 0, 308, 304, 1, 0,
+		0, 0, 308, 307, 1, 0, 0, 0, 309, 63, 1, 0, 0, 0, 310, 311, 5, 16, 0, 0,
+		311, 312, 3, 68, 34, 0, 312, 65, 1, 0, 0, 0, 313, 314, 7, 2, 0, 0, 314,
+		67, 1, 0, 0, 0, 315, 316, 5, 34, 0, 0, 316, 317, 5, 33, 0, 0, 317, 69,
+		1, 0, 0, 0, 318, 319, 5, 4, 0, 0, 319, 320, 7, 3, 0, 0, 320, 71, 1, 0,
+		0, 0, 321, 322, 5, 5, 0, 0, 322, 323, 7, 4, 0, 0, 323, 73, 1, 0, 0, 0,
+		32, 77, 83, 92, 96, 106, 113, 118, 139, 150, 156, 163, 170, 176, 184, 188,
+		193, 197, 201, 204, 212, 226, 233, 237, 242, 246, 254, 265, 277, 280, 284,
+		299, 308,
 	}
 	deserializer := antlr.NewATNDeserializer(nil)
 	staticData.atn = deserializer.Deserialize(staticData.serializedATN)
@@ -209,51 +242,56 @@ func NewJSPParser(input antlr.TokenStream) *JSPParser {
 
 // JSPParser tokens.
 const (
-	JSPParserEOF                      = antlr.TokenEOF
-	JSPParserJSP_COMMENT              = 1
-	JSPParserJSP_CONDITIONAL_COMMENT  = 2
-	JSPParserSCRIPT_OPEN              = 3
-	JSPParserSTYLE_OPEN               = 4
-	JSPParserDTD                      = 5
-	JSPParserCDATA                    = 6
-	JSPParserWHITESPACES              = 7
-	JSPParserXML_DECLARATION          = 8
-	JSPParserWHITESPACE_SKIP          = 9
-	JSPParserCLOSE_TAG_BEGIN          = 10
-	JSPParserTAG_BEGIN                = 11
-	JSPParserDIRECTIVE_BEGIN          = 12
-	JSPParserDECLARATION_BEGIN        = 13
-	JSPParserECHO_EXPRESSION_OPEN     = 14
-	JSPParserSCRIPTLET_OPEN           = 15
-	JSPParserQUOTE                    = 16
-	JSPParserTAG_END                  = 17
-	JSPParserEQUALS                   = 18
-	JSPParserEL_EXPR_START            = 19
-	JSPParserJSP_STATIC_CONTENT_CHARS = 20
-	JSPParserJSP_END                  = 21
-	JSPParserATTVAL_ATTRIBUTE         = 22
-	JSPParserATTVAL_VALUE             = 23
-	JSPParserEL_EXPR_END              = 24
-	JSPParserDTD_PUBLIC               = 25
-	JSPParserDTD_SYSTEM               = 26
-	JSPParserDTD_WHITESPACE_SKIP      = 27
-	JSPParserDTD_QUOTED               = 28
-	JSPParserDTD_IDENTIFIER           = 29
-	JSPParserBLOB_CLOSE               = 30
-	JSPParserBLOB_CONTENT             = 31
-	JSPParserJSP_JSTL_COLON           = 32
-	JSPParserTAG_SLASH_END            = 33
-	JSPParserTAG_CLOSE                = 34
-	JSPParserTAG_SLASH                = 35
-	JSPParserDIRECTIVE_END            = 36
-	JSPParserTAG_IDENTIFIER           = 37
-	JSPParserTAG_WHITESPACE           = 38
-	JSPParserSCRIPT_BODY              = 39
-	JSPParserSCRIPT_SHORT_BODY        = 40
-	JSPParserSTYLE_BODY               = 41
-	JSPParserSTYLE_SHORT_BODY         = 42
-	JSPParserATTVAL_EL_EXPR           = 43
-	JSPParserEL_EXPR_CONTENT          = 44
+	JSPParserEOF                        = antlr.TokenEOF
+	JSPParserJSP_COMMENT                = 1
+	JSPParserJSP_SCRIPT_COMMENT         = 2
+	JSPParserJSP_CONDITIONAL_COMMENT    = 3
+	JSPParserSCRIPT_OPEN                = 4
+	JSPParserSTYLE_OPEN                 = 5
+	JSPParserDTD                        = 6
+	JSPParserCDATA                      = 7
+	JSPParserJSP_INCLUDE_DIRECTIVE_SKIP = 8
+	JSPParserWHITESPACES                = 9
+	JSPParserXML_DECLARATION            = 10
+	JSPParserWHITESPACE_SKIP            = 11
+	JSPParserCLOSE_TAG_BEGIN            = 12
+	JSPParserTAG_BEGIN                  = 13
+	JSPParserDIRECTIVE_BEGIN            = 14
+	JSPParserDECLARATION_BEGIN          = 15
+	JSPParserECHO_EXPRESSION_OPEN       = 16
+	JSPParserJSP_IF_BLOCK               = 17
+	JSPParserSCRIPTLET_OPEN             = 18
+	JSPParserQUOTE                      = 19
+	JSPParserTAG_END                    = 20
+	JSPParserEQUALS                     = 21
+	JSPParserEL_EXPR_START              = 22
+	JSPParserJSP_STATIC_CONTENT_CHARS   = 23
+	JSPParserJSP_END                    = 24
+	JSPParserATTVAL_ATTRIBUTE           = 25
+	JSPParserATTVAL_VALUE               = 26
+	JSPParserEL_EXPR_END                = 27
+	JSPParserDTD_PUBLIC                 = 28
+	JSPParserDTD_SYSTEM                 = 29
+	JSPParserDTD_WHITESPACE_SKIP        = 30
+	JSPParserDTD_QUOTED                 = 31
+	JSPParserDTD_IDENTIFIER             = 32
+	JSPParserBLOB_CLOSE                 = 33
+	JSPParserBLOB_CONTENT               = 34
+	JSPParserJSP_JSTL_COLON             = 35
+	JSPParserTAG_JSP_IF_FRAGMENT        = 36
+	JSPParserTAG_SLASH_END              = 37
+	JSPParserTAG_CLOSE                  = 38
+	JSPParserTAG_SLASH                  = 39
+	JSPParserDIRECTIVE_END              = 40
+	JSPParserTAG_IDENTIFIER             = 41
+	JSPParserTAG_WHITESPACE             = 42
+	JSPParserSCRIPT_BODY                = 43
+	JSPParserSCRIPT_SHORT_BODY          = 44
+	JSPParserSTYLE_BODY                 = 45
+	JSPParserSTYLE_SHORT_BODY           = 46
+	JSPParserATTVAL_WHITESPACE_SKIP     = 47
+	JSPParserATTVAL_EL_EXPR             = 48
+	JSPParserEL_EXPR_CONTENT            = 49
 )
 
 // JSPParser rules.
@@ -265,32 +303,36 @@ const (
 	JSPParserRULE_htmlMiscs                 = 4
 	JSPParserRULE_jspScript                 = 5
 	JSPParserRULE_htmlElement               = 6
-	JSPParserRULE_htmlBegin                 = 7
-	JSPParserRULE_htmlTag                   = 8
-	JSPParserRULE_jspDirective              = 9
-	JSPParserRULE_htmlContents              = 10
-	JSPParserRULE_htmlContent               = 11
-	JSPParserRULE_elExpression              = 12
-	JSPParserRULE_htmlAttribute             = 13
-	JSPParserRULE_htmlAttributeName         = 14
-	JSPParserRULE_htmlAttributeValue        = 15
-	JSPParserRULE_htmlAttributeValueElement = 16
-	JSPParserRULE_htmlTagName               = 17
-	JSPParserRULE_htmlChardata              = 18
-	JSPParserRULE_htmlMisc                  = 19
-	JSPParserRULE_htmlComment               = 20
-	JSPParserRULE_xhtmlCDATA                = 21
-	JSPParserRULE_dtd                       = 22
-	JSPParserRULE_dtdElementName            = 23
-	JSPParserRULE_publicId                  = 24
-	JSPParserRULE_systemId                  = 25
-	JSPParserRULE_xml                       = 26
-	JSPParserRULE_jspScriptlet              = 27
-	JSPParserRULE_jspExpression             = 28
-	JSPParserRULE_scriptletStart            = 29
-	JSPParserRULE_scriptletContent          = 30
-	JSPParserRULE_javaScript                = 31
-	JSPParserRULE_style                     = 32
+	JSPParserRULE_htmlCloseElement          = 7
+	JSPParserRULE_htmlBegin                 = 8
+	JSPParserRULE_htmlBeginElement          = 9
+	JSPParserRULE_tagJspFragment            = 10
+	JSPParserRULE_htmlTag                   = 11
+	JSPParserRULE_jspDirective              = 12
+	JSPParserRULE_htmlContents              = 13
+	JSPParserRULE_htmlContent               = 14
+	JSPParserRULE_jspIfBlock                = 15
+	JSPParserRULE_elExpression              = 16
+	JSPParserRULE_htmlAttribute             = 17
+	JSPParserRULE_htmlAttributeName         = 18
+	JSPParserRULE_htmlAttributeValue        = 19
+	JSPParserRULE_htmlAttributeValueElement = 20
+	JSPParserRULE_htmlTagName               = 21
+	JSPParserRULE_htmlChardata              = 22
+	JSPParserRULE_htmlMisc                  = 23
+	JSPParserRULE_htmlComment               = 24
+	JSPParserRULE_xhtmlCDATA                = 25
+	JSPParserRULE_dtd                       = 26
+	JSPParserRULE_dtdElementName            = 27
+	JSPParserRULE_publicId                  = 28
+	JSPParserRULE_systemId                  = 29
+	JSPParserRULE_xml                       = 30
+	JSPParserRULE_jspScriptlet              = 31
+	JSPParserRULE_jspExpression             = 32
+	JSPParserRULE_scriptletStart            = 33
+	JSPParserRULE_scriptletContent          = 34
+	JSPParserRULE_javaScript                = 35
+	JSPParserRULE_style                     = 36
 )
 
 // IJspDocumentsContext is an interface to support dynamic dispatch.
@@ -330,6 +372,10 @@ func NewJspDocumentsContext(parser antlr.Parser, parent antlr.ParserRuleContext,
 }
 
 func (s *JspDocumentsContext) GetParser() antlr.Parser { return s.parser }
+
+func (s *JspDocumentsContext) EOF() antlr.TerminalNode {
+	return s.GetToken(JSPParserEOF, 0)
+}
 
 func (s *JspDocumentsContext) AllJspStart() []IJspStartContext {
 	children := s.GetChildren()
@@ -458,35 +504,39 @@ func (p *JSPParser) JspDocuments() (localctx IJspDocumentsContext) {
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
-	p.SetState(69)
+	p.SetState(77)
 	p.GetErrorHandler().Sync(p)
 	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 0, p.GetParserRuleContext())
 
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
-				p.SetState(66)
+				p.SetState(74)
 				p.JspStart()
 			}
 
 		}
-		p.SetState(71)
+		p.SetState(79)
 		p.GetErrorHandler().Sync(p)
 		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 0, p.GetParserRuleContext())
 	}
-	p.SetState(73)
+	p.SetState(81)
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	for ok := true; ok; ok = (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&588222) != 0 {
+	for ok := true; ok; ok = (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&4716154) != 0 {
 		{
-			p.SetState(72)
+			p.SetState(80)
 			p.JspDocument()
 		}
 
-		p.SetState(75)
+		p.SetState(83)
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
+	}
+	{
+		p.SetState(85)
+		p.Match(JSPParserEOF)
 	}
 
 	return localctx
@@ -562,6 +612,38 @@ func (s *JspDocumentContext) Dtd() IDtdContext {
 	return t.(IDtdContext)
 }
 
+func (s *JspDocumentContext) JspScript() IJspScriptContext {
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IJspScriptContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(IJspScriptContext)
+}
+
+func (s *JspDocumentContext) JspIfBlock() IJspIfBlockContext {
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IJspIfBlockContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(IJspIfBlockContext)
+}
+
 func (s *JspDocumentContext) JspElements() IJspElementsContext {
 	var t antlr.RuleContext
 	for _, ctx := range s.GetChildren() {
@@ -619,33 +701,44 @@ func (p *JSPParser) JspDocument() (localctx IJspDocumentContext) {
 		}
 	}()
 
-	p.SetState(80)
+	p.SetState(92)
 	p.GetErrorHandler().Sync(p)
-
-	switch p.GetTokenStream().LA(1) {
-	case JSPParserXML_DECLARATION:
+	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 2, p.GetParserRuleContext()) {
+	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
-			p.SetState(77)
+			p.SetState(87)
 			p.Xml()
 		}
 
-	case JSPParserDTD:
+	case 2:
 		p.EnterOuterAlt(localctx, 2)
 		{
-			p.SetState(78)
+			p.SetState(88)
 			p.Dtd()
 		}
 
-	case JSPParserJSP_COMMENT, JSPParserJSP_CONDITIONAL_COMMENT, JSPParserSCRIPT_OPEN, JSPParserSTYLE_OPEN, JSPParserWHITESPACES, JSPParserTAG_BEGIN, JSPParserDIRECTIVE_BEGIN, JSPParserDECLARATION_BEGIN, JSPParserECHO_EXPRESSION_OPEN, JSPParserSCRIPTLET_OPEN, JSPParserEL_EXPR_START:
+	case 3:
 		p.EnterOuterAlt(localctx, 3)
 		{
-			p.SetState(79)
+			p.SetState(89)
+			p.JspScript()
+		}
+
+	case 4:
+		p.EnterOuterAlt(localctx, 4)
+		{
+			p.SetState(90)
+			p.JspIfBlock()
+		}
+
+	case 5:
+		p.EnterOuterAlt(localctx, 5)
+		{
+			p.SetState(91)
 			p.JspElements()
 		}
 
-	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
 	}
 
 	return localctx
@@ -750,21 +843,21 @@ func (p *JSPParser) JspStart() (localctx IJspStartContext) {
 		}
 	}()
 
-	p.SetState(84)
+	p.SetState(96)
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
 	case JSPParserDIRECTIVE_BEGIN, JSPParserDECLARATION_BEGIN, JSPParserECHO_EXPRESSION_OPEN, JSPParserSCRIPTLET_OPEN:
 		p.EnterOuterAlt(localctx, 1)
 		{
-			p.SetState(82)
+			p.SetState(94)
 			p.JspScript()
 		}
 
 	case JSPParserWHITESPACES:
 		p.EnterOuterAlt(localctx, 2)
 		{
-			p.SetState(83)
+			p.SetState(95)
 			p.Match(JSPParserWHITESPACES)
 		}
 
@@ -892,6 +985,22 @@ func (s *JspElementsContext) HtmlElement() IHtmlElementContext {
 	return t.(IHtmlElementContext)
 }
 
+func (s *JspElementsContext) HtmlCloseElement() IHtmlCloseElementContext {
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IHtmlCloseElementContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(IHtmlCloseElementContext)
+}
+
 func (s *JspElementsContext) JspScript() IJspScriptContext {
 	var t antlr.RuleContext
 	for _, ctx := range s.GetChildren() {
@@ -922,6 +1031,22 @@ func (s *JspElementsContext) JspExpression() IJspExpressionContext {
 	}
 
 	return t.(IJspExpressionContext)
+}
+
+func (s *JspElementsContext) JspIfBlock() IJspIfBlockContext {
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IJspIfBlockContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(IJspIfBlockContext)
 }
 
 func (s *JspElementsContext) Style() IStyleContext {
@@ -999,48 +1124,60 @@ func (p *JSPParser) JspElements() (localctx IJspElementsContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(86)
+		p.SetState(98)
 
 		var _x = p.HtmlMiscs()
 
 		localctx.(*JspElementsContext).beforeContent = _x
 	}
-	p.SetState(92)
+	p.SetState(106)
 	p.GetErrorHandler().Sync(p)
 	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 4, p.GetParserRuleContext()) {
 	case 1:
 		{
-			p.SetState(87)
+			p.SetState(99)
 			p.HtmlElement()
 		}
 
 	case 2:
 		{
-			p.SetState(88)
-			p.JspScript()
+			p.SetState(100)
+			p.HtmlCloseElement()
 		}
 
 	case 3:
 		{
-			p.SetState(89)
-			p.JspExpression()
+			p.SetState(101)
+			p.JspScript()
 		}
 
 	case 4:
 		{
-			p.SetState(90)
-			p.Style()
+			p.SetState(102)
+			p.JspExpression()
 		}
 
 	case 5:
 		{
-			p.SetState(91)
+			p.SetState(103)
+			p.JspIfBlock()
+		}
+
+	case 6:
+		{
+			p.SetState(104)
+			p.Style()
+		}
+
+	case 7:
+		{
+			p.SetState(105)
 			p.JavaScript()
 		}
 
 	}
 	{
-		p.SetState(94)
+		p.SetState(108)
 
 		var _x = p.HtmlMiscs()
 
@@ -1173,19 +1310,19 @@ func (p *JSPParser) HtmlMiscs() (localctx IHtmlMiscsContext) {
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
-	p.SetState(99)
+	p.SetState(113)
 	p.GetErrorHandler().Sync(p)
 	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 5, p.GetParserRuleContext())
 
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
-				p.SetState(96)
+				p.SetState(110)
 				p.HtmlMisc()
 			}
 
 		}
-		p.SetState(101)
+		p.SetState(115)
 		p.GetErrorHandler().Sync(p)
 		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 5, p.GetParserRuleContext())
 	}
@@ -1304,21 +1441,21 @@ func (p *JSPParser) JspScript() (localctx IJspScriptContext) {
 		}
 	}()
 
-	p.SetState(104)
+	p.SetState(118)
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
 	case JSPParserDIRECTIVE_BEGIN:
 		p.EnterOuterAlt(localctx, 1)
 		{
-			p.SetState(102)
+			p.SetState(116)
 			p.JspDirective()
 		}
 
 	case JSPParserDECLARATION_BEGIN, JSPParserECHO_EXPRESSION_OPEN, JSPParserSCRIPTLET_OPEN:
 		p.EnterOuterAlt(localctx, 2)
 		{
-			p.SetState(103)
+			p.SetState(117)
 			p.JspScriptlet()
 		}
 
@@ -1391,10 +1528,6 @@ func (s *HtmlElementContext) TAG_CLOSE(i int) antlr.TerminalNode {
 	return s.GetToken(JSPParserTAG_CLOSE, i)
 }
 
-func (s *HtmlElementContext) TAG_SLASH_END() antlr.TerminalNode {
-	return s.GetToken(JSPParserTAG_SLASH_END, 0)
-}
-
 func (s *HtmlElementContext) HtmlContents() IHtmlContentsContext {
 	var t antlr.RuleContext
 	for _, ctx := range s.GetChildren() {
@@ -1429,6 +1562,10 @@ func (s *HtmlElementContext) HtmlTag() IHtmlTagContext {
 	}
 
 	return t.(IHtmlTagContext)
+}
+
+func (s *HtmlElementContext) TAG_SLASH_END() antlr.TerminalNode {
+	return s.GetToken(JSPParserTAG_SLASH_END, 0)
 }
 
 func (s *HtmlElementContext) GetRuleContext() antlr.RuleContext {
@@ -1472,51 +1609,201 @@ func (p *JSPParser) HtmlElement() (localctx IHtmlElementContext) {
 		}
 	}()
 
-	p.EnterOuterAlt(localctx, 1)
-	{
-		p.SetState(106)
-		p.HtmlBegin()
-	}
-	p.SetState(116)
+	p.SetState(139)
 	p.GetErrorHandler().Sync(p)
-
-	switch p.GetTokenStream().LA(1) {
-	case JSPParserTAG_CLOSE:
+	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 7, p.GetParserRuleContext()) {
+	case 1:
+		p.EnterOuterAlt(localctx, 1)
 		{
-			p.SetState(107)
+			p.SetState(120)
+			p.HtmlBegin()
+		}
+		{
+			p.SetState(121)
 			p.Match(JSPParserTAG_CLOSE)
 		}
-		p.SetState(113)
-		p.GetErrorHandler().Sync(p)
-
-		if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 7, p.GetParserRuleContext()) == 1 {
-			{
-				p.SetState(108)
-				p.HtmlContents()
-			}
-			{
-				p.SetState(109)
-				p.Match(JSPParserCLOSE_TAG_BEGIN)
-			}
-			{
-				p.SetState(110)
-				p.HtmlTag()
-			}
-			{
-				p.SetState(111)
-				p.Match(JSPParserTAG_CLOSE)
-			}
-
+		{
+			p.SetState(122)
+			p.HtmlContents()
+		}
+		{
+			p.SetState(123)
+			p.Match(JSPParserCLOSE_TAG_BEGIN)
+		}
+		{
+			p.SetState(124)
+			p.HtmlTag()
+		}
+		{
+			p.SetState(125)
+			p.Match(JSPParserTAG_CLOSE)
 		}
 
-	case JSPParserTAG_SLASH_END:
+	case 2:
+		p.EnterOuterAlt(localctx, 2)
 		{
-			p.SetState(115)
+			p.SetState(127)
+			p.HtmlBegin()
+		}
+		{
+			p.SetState(128)
+			p.Match(JSPParserTAG_CLOSE)
+		}
+		{
+			p.SetState(129)
+			p.Match(JSPParserCLOSE_TAG_BEGIN)
+		}
+		{
+			p.SetState(130)
+			p.HtmlTag()
+		}
+		{
+			p.SetState(131)
+			p.Match(JSPParserTAG_CLOSE)
+		}
+
+	case 3:
+		p.EnterOuterAlt(localctx, 3)
+		{
+			p.SetState(133)
+			p.HtmlBegin()
+		}
+		{
+			p.SetState(134)
 			p.Match(JSPParserTAG_SLASH_END)
 		}
 
+	case 4:
+		p.EnterOuterAlt(localctx, 4)
+		{
+			p.SetState(136)
+			p.HtmlBegin()
+		}
+		{
+			p.SetState(137)
+			p.Match(JSPParserTAG_CLOSE)
+		}
+
+	}
+
+	return localctx
+}
+
+// IHtmlCloseElementContext is an interface to support dynamic dispatch.
+type IHtmlCloseElementContext interface {
+	antlr.ParserRuleContext
+
+	// GetParser returns the parser.
+	GetParser() antlr.Parser
+
+	// IsHtmlCloseElementContext differentiates from other interfaces.
+	IsHtmlCloseElementContext()
+}
+
+type HtmlCloseElementContext struct {
+	*antlr.BaseParserRuleContext
+	parser antlr.Parser
+}
+
+func NewEmptyHtmlCloseElementContext() *HtmlCloseElementContext {
+	var p = new(HtmlCloseElementContext)
+	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	p.RuleIndex = JSPParserRULE_htmlCloseElement
+	return p
+}
+
+func (*HtmlCloseElementContext) IsHtmlCloseElementContext() {}
+
+func NewHtmlCloseElementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *HtmlCloseElementContext {
+	var p = new(HtmlCloseElementContext)
+
+	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+
+	p.parser = parser
+	p.RuleIndex = JSPParserRULE_htmlCloseElement
+
+	return p
+}
+
+func (s *HtmlCloseElementContext) GetParser() antlr.Parser { return s.parser }
+
+func (s *HtmlCloseElementContext) CLOSE_TAG_BEGIN() antlr.TerminalNode {
+	return s.GetToken(JSPParserCLOSE_TAG_BEGIN, 0)
+}
+
+func (s *HtmlCloseElementContext) HtmlTag() IHtmlTagContext {
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IHtmlTagContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(IHtmlTagContext)
+}
+
+func (s *HtmlCloseElementContext) TAG_CLOSE() antlr.TerminalNode {
+	return s.GetToken(JSPParserTAG_CLOSE, 0)
+}
+
+func (s *HtmlCloseElementContext) GetRuleContext() antlr.RuleContext {
+	return s
+}
+
+func (s *HtmlCloseElementContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
+	return antlr.TreesStringTree(s, ruleNames, recog)
+}
+
+func (s *HtmlCloseElementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
+	switch t := visitor.(type) {
+	case JSPParserVisitor:
+		return t.VisitHtmlCloseElement(s)
+
 	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+		return t.VisitChildren(s)
+	}
+}
+
+func (p *JSPParser) HtmlCloseElement() (localctx IHtmlCloseElementContext) {
+	this := p
+	_ = this
+
+	localctx = NewHtmlCloseElementContext(p, p.GetParserRuleContext(), p.GetState())
+	p.EnterRule(localctx, 14, JSPParserRULE_htmlCloseElement)
+
+	defer func() {
+		p.ExitRule()
+	}()
+
+	defer func() {
+		if err := recover(); err != nil {
+			if v, ok := err.(antlr.RecognitionException); ok {
+				localctx.SetException(v)
+				p.GetErrorHandler().ReportError(p, v)
+				p.GetErrorHandler().Recover(p, v)
+			} else {
+				panic(err)
+			}
+		}
+	}()
+
+	p.EnterOuterAlt(localctx, 1)
+	{
+		p.SetState(141)
+		p.Match(JSPParserCLOSE_TAG_BEGIN)
+	}
+	{
+		p.SetState(142)
+		p.HtmlTag()
+	}
+	{
+		p.SetState(143)
+		p.Match(JSPParserTAG_CLOSE)
 	}
 
 	return localctx
@@ -1580,20 +1867,20 @@ func (s *HtmlBeginContext) HtmlTag() IHtmlTagContext {
 	return t.(IHtmlTagContext)
 }
 
-func (s *HtmlBeginContext) AllHtmlAttribute() []IHtmlAttributeContext {
+func (s *HtmlBeginContext) AllHtmlBeginElement() []IHtmlBeginElementContext {
 	children := s.GetChildren()
 	len := 0
 	for _, ctx := range children {
-		if _, ok := ctx.(IHtmlAttributeContext); ok {
+		if _, ok := ctx.(IHtmlBeginElementContext); ok {
 			len++
 		}
 	}
 
-	tst := make([]IHtmlAttributeContext, len)
+	tst := make([]IHtmlBeginElementContext, len)
 	i := 0
 	for _, ctx := range children {
-		if t, ok := ctx.(IHtmlAttributeContext); ok {
-			tst[i] = t.(IHtmlAttributeContext)
+		if t, ok := ctx.(IHtmlBeginElementContext); ok {
+			tst[i] = t.(IHtmlBeginElementContext)
 			i++
 		}
 	}
@@ -1601,11 +1888,11 @@ func (s *HtmlBeginContext) AllHtmlAttribute() []IHtmlAttributeContext {
 	return tst
 }
 
-func (s *HtmlBeginContext) HtmlAttribute(i int) IHtmlAttributeContext {
+func (s *HtmlBeginContext) HtmlBeginElement(i int) IHtmlBeginElementContext {
 	var t antlr.RuleContext
 	j := 0
 	for _, ctx := range s.GetChildren() {
-		if _, ok := ctx.(IHtmlAttributeContext); ok {
+		if _, ok := ctx.(IHtmlBeginElementContext); ok {
 			if j == i {
 				t = ctx.(antlr.RuleContext)
 				break
@@ -1618,7 +1905,7 @@ func (s *HtmlBeginContext) HtmlAttribute(i int) IHtmlAttributeContext {
 		return nil
 	}
 
-	return t.(IHtmlAttributeContext)
+	return t.(IHtmlBeginElementContext)
 }
 
 func (s *HtmlBeginContext) GetRuleContext() antlr.RuleContext {
@@ -1644,7 +1931,7 @@ func (p *JSPParser) HtmlBegin() (localctx IHtmlBeginContext) {
 	_ = this
 
 	localctx = NewHtmlBeginContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 14, JSPParserRULE_htmlBegin)
+	p.EnterRule(localctx, 16, JSPParserRULE_htmlBegin)
 	var _la int
 
 	defer func() {
@@ -1665,26 +1952,274 @@ func (p *JSPParser) HtmlBegin() (localctx IHtmlBeginContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(118)
+		p.SetState(145)
 		p.Match(JSPParserTAG_BEGIN)
 	}
 	{
-		p.SetState(119)
+		p.SetState(146)
 		p.HtmlTag()
 	}
-	p.SetState(123)
+	p.SetState(150)
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	for _la == JSPParserECHO_EXPRESSION_OPEN || _la == JSPParserTAG_IDENTIFIER {
+	for (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&2267743092736) != 0 {
 		{
-			p.SetState(120)
+			p.SetState(147)
+			p.HtmlBeginElement()
+		}
+
+		p.SetState(152)
+		p.GetErrorHandler().Sync(p)
+		_la = p.GetTokenStream().LA(1)
+	}
+
+	return localctx
+}
+
+// IHtmlBeginElementContext is an interface to support dynamic dispatch.
+type IHtmlBeginElementContext interface {
+	antlr.ParserRuleContext
+
+	// GetParser returns the parser.
+	GetParser() antlr.Parser
+
+	// IsHtmlBeginElementContext differentiates from other interfaces.
+	IsHtmlBeginElementContext()
+}
+
+type HtmlBeginElementContext struct {
+	*antlr.BaseParserRuleContext
+	parser antlr.Parser
+}
+
+func NewEmptyHtmlBeginElementContext() *HtmlBeginElementContext {
+	var p = new(HtmlBeginElementContext)
+	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	p.RuleIndex = JSPParserRULE_htmlBeginElement
+	return p
+}
+
+func (*HtmlBeginElementContext) IsHtmlBeginElementContext() {}
+
+func NewHtmlBeginElementContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *HtmlBeginElementContext {
+	var p = new(HtmlBeginElementContext)
+
+	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+
+	p.parser = parser
+	p.RuleIndex = JSPParserRULE_htmlBeginElement
+
+	return p
+}
+
+func (s *HtmlBeginElementContext) GetParser() antlr.Parser { return s.parser }
+
+func (s *HtmlBeginElementContext) HtmlAttribute() IHtmlAttributeContext {
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IHtmlAttributeContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(IHtmlAttributeContext)
+}
+
+func (s *HtmlBeginElementContext) TagJspFragment() ITagJspFragmentContext {
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(ITagJspFragmentContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(ITagJspFragmentContext)
+}
+
+func (s *HtmlBeginElementContext) JspScriptlet() IJspScriptletContext {
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IJspScriptletContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(IJspScriptletContext)
+}
+
+func (s *HtmlBeginElementContext) GetRuleContext() antlr.RuleContext {
+	return s
+}
+
+func (s *HtmlBeginElementContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
+	return antlr.TreesStringTree(s, ruleNames, recog)
+}
+
+func (s *HtmlBeginElementContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
+	switch t := visitor.(type) {
+	case JSPParserVisitor:
+		return t.VisitHtmlBeginElement(s)
+
+	default:
+		return t.VisitChildren(s)
+	}
+}
+
+func (p *JSPParser) HtmlBeginElement() (localctx IHtmlBeginElementContext) {
+	this := p
+	_ = this
+
+	localctx = NewHtmlBeginElementContext(p, p.GetParserRuleContext(), p.GetState())
+	p.EnterRule(localctx, 18, JSPParserRULE_htmlBeginElement)
+
+	defer func() {
+		p.ExitRule()
+	}()
+
+	defer func() {
+		if err := recover(); err != nil {
+			if v, ok := err.(antlr.RecognitionException); ok {
+				localctx.SetException(v)
+				p.GetErrorHandler().ReportError(p, v)
+				p.GetErrorHandler().Recover(p, v)
+			} else {
+				panic(err)
+			}
+		}
+	}()
+
+	p.SetState(156)
+	p.GetErrorHandler().Sync(p)
+	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 9, p.GetParserRuleContext()) {
+	case 1:
+		p.EnterOuterAlt(localctx, 1)
+		{
+			p.SetState(153)
 			p.HtmlAttribute()
 		}
 
-		p.SetState(125)
-		p.GetErrorHandler().Sync(p)
-		_la = p.GetTokenStream().LA(1)
+	case 2:
+		p.EnterOuterAlt(localctx, 2)
+		{
+			p.SetState(154)
+			p.TagJspFragment()
+		}
+
+	case 3:
+		p.EnterOuterAlt(localctx, 3)
+		{
+			p.SetState(155)
+			p.JspScriptlet()
+		}
+
+	}
+
+	return localctx
+}
+
+// ITagJspFragmentContext is an interface to support dynamic dispatch.
+type ITagJspFragmentContext interface {
+	antlr.ParserRuleContext
+
+	// GetParser returns the parser.
+	GetParser() antlr.Parser
+
+	// IsTagJspFragmentContext differentiates from other interfaces.
+	IsTagJspFragmentContext()
+}
+
+type TagJspFragmentContext struct {
+	*antlr.BaseParserRuleContext
+	parser antlr.Parser
+}
+
+func NewEmptyTagJspFragmentContext() *TagJspFragmentContext {
+	var p = new(TagJspFragmentContext)
+	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	p.RuleIndex = JSPParserRULE_tagJspFragment
+	return p
+}
+
+func (*TagJspFragmentContext) IsTagJspFragmentContext() {}
+
+func NewTagJspFragmentContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *TagJspFragmentContext {
+	var p = new(TagJspFragmentContext)
+
+	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+
+	p.parser = parser
+	p.RuleIndex = JSPParserRULE_tagJspFragment
+
+	return p
+}
+
+func (s *TagJspFragmentContext) GetParser() antlr.Parser { return s.parser }
+
+func (s *TagJspFragmentContext) TAG_JSP_IF_FRAGMENT() antlr.TerminalNode {
+	return s.GetToken(JSPParserTAG_JSP_IF_FRAGMENT, 0)
+}
+
+func (s *TagJspFragmentContext) GetRuleContext() antlr.RuleContext {
+	return s
+}
+
+func (s *TagJspFragmentContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
+	return antlr.TreesStringTree(s, ruleNames, recog)
+}
+
+func (s *TagJspFragmentContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
+	switch t := visitor.(type) {
+	case JSPParserVisitor:
+		return t.VisitTagJspFragment(s)
+
+	default:
+		return t.VisitChildren(s)
+	}
+}
+
+func (p *JSPParser) TagJspFragment() (localctx ITagJspFragmentContext) {
+	this := p
+	_ = this
+
+	localctx = NewTagJspFragmentContext(p, p.GetParserRuleContext(), p.GetState())
+	p.EnterRule(localctx, 20, JSPParserRULE_tagJspFragment)
+
+	defer func() {
+		p.ExitRule()
+	}()
+
+	defer func() {
+		if err := recover(); err != nil {
+			if v, ok := err.(antlr.RecognitionException); ok {
+				localctx.SetException(v)
+				p.GetErrorHandler().ReportError(p, v)
+				p.GetErrorHandler().Recover(p, v)
+			} else {
+				panic(err)
+			}
+		}
+	}()
+
+	p.EnterOuterAlt(localctx, 1)
+	{
+		p.SetState(158)
+		p.Match(JSPParserTAG_JSP_IF_FRAGMENT)
 	}
 
 	return localctx
@@ -1796,7 +2331,7 @@ func (p *JSPParser) HtmlTag() (localctx IHtmlTagContext) {
 	_ = this
 
 	localctx = NewHtmlTagContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 16, JSPParserRULE_htmlTag)
+	p.EnterRule(localctx, 22, JSPParserRULE_htmlTag)
 	var _la int
 
 	defer func() {
@@ -1817,20 +2352,20 @@ func (p *JSPParser) HtmlTag() (localctx IHtmlTagContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(126)
+		p.SetState(160)
 		p.HtmlTagName()
 	}
-	p.SetState(129)
+	p.SetState(163)
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == JSPParserJSP_JSTL_COLON {
 		{
-			p.SetState(127)
+			p.SetState(161)
 			p.Match(JSPParserJSP_JSTL_COLON)
 		}
 		{
-			p.SetState(128)
+			p.SetState(162)
 			p.HtmlTagName()
 		}
 
@@ -1973,7 +2508,7 @@ func (p *JSPParser) JspDirective() (localctx IJspDirectiveContext) {
 	_ = this
 
 	localctx = NewJspDirectiveContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 18, JSPParserRULE_jspDirective)
+	p.EnterRule(localctx, 24, JSPParserRULE_jspDirective)
 	var _la int
 
 	defer func() {
@@ -1996,45 +2531,45 @@ func (p *JSPParser) JspDirective() (localctx IJspDirectiveContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(131)
+		p.SetState(165)
 		p.Match(JSPParserDIRECTIVE_BEGIN)
 	}
 	{
-		p.SetState(132)
+		p.SetState(166)
 		p.HtmlTagName()
 	}
-	p.SetState(136)
+	p.SetState(170)
 	p.GetErrorHandler().Sync(p)
 	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 11, p.GetParserRuleContext())
 
 	for _alt != 1 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1+1 {
 			{
-				p.SetState(133)
+				p.SetState(167)
 				p.HtmlAttribute()
 			}
 
 		}
-		p.SetState(138)
+		p.SetState(172)
 		p.GetErrorHandler().Sync(p)
 		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 11, p.GetParserRuleContext())
 	}
-	p.SetState(142)
+	p.SetState(176)
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == JSPParserTAG_WHITESPACE {
 		{
-			p.SetState(139)
+			p.SetState(173)
 			p.Match(JSPParserTAG_WHITESPACE)
 		}
 
-		p.SetState(144)
+		p.SetState(178)
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 	}
 	{
-		p.SetState(145)
+		p.SetState(179)
 		p.Match(JSPParserDIRECTIVE_END)
 	}
 
@@ -2184,8 +2719,7 @@ func (p *JSPParser) HtmlContents() (localctx IHtmlContentsContext) {
 	_ = this
 
 	localctx = NewHtmlContentsContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 20, JSPParserRULE_htmlContents)
-	var _la int
+	p.EnterRule(localctx, 26, JSPParserRULE_htmlContents)
 
 	defer func() {
 		p.ExitRule()
@@ -2203,40 +2737,87 @@ func (p *JSPParser) HtmlContents() (localctx IHtmlContentsContext) {
 		}
 	}()
 
-	p.EnterOuterAlt(localctx, 1)
-	p.SetState(148)
-	p.GetErrorHandler().Sync(p)
+	var _alt int
 
-	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 13, p.GetParserRuleContext()) == 1 {
+	p.SetState(204)
+	p.GetErrorHandler().Sync(p)
+	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 18, p.GetParserRuleContext()) {
+	case 1:
+		p.EnterOuterAlt(localctx, 1)
 		{
-			p.SetState(147)
+			p.SetState(181)
 			p.HtmlChardata()
 		}
+		p.SetState(188)
+		p.GetErrorHandler().Sync(p)
+		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 14, p.GetParserRuleContext())
 
-	}
-	p.SetState(156)
-	p.GetErrorHandler().Sync(p)
-	_la = p.GetTokenStream().LA(1)
+		for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
+			if _alt == 1 {
+				{
+					p.SetState(182)
+					p.HtmlContent()
+				}
+				p.SetState(184)
+				p.GetErrorHandler().Sync(p)
 
-	for (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&587998) != 0 {
+				if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 13, p.GetParserRuleContext()) == 1 {
+					{
+						p.SetState(183)
+						p.HtmlChardata()
+					}
+
+				}
+
+			}
+			p.SetState(190)
+			p.GetErrorHandler().Sync(p)
+			_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 14, p.GetParserRuleContext())
+		}
+
+	case 2:
+		p.EnterOuterAlt(localctx, 2)
 		{
-			p.SetState(150)
+			p.SetState(191)
 			p.HtmlContent()
 		}
-		p.SetState(152)
+		p.SetState(193)
 		p.GetErrorHandler().Sync(p)
 
-		if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 14, p.GetParserRuleContext()) == 1 {
+		if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 15, p.GetParserRuleContext()) == 1 {
 			{
-				p.SetState(151)
+				p.SetState(192)
 				p.HtmlChardata()
 			}
 
 		}
-
-		p.SetState(158)
+		p.SetState(201)
 		p.GetErrorHandler().Sync(p)
-		_la = p.GetTokenStream().LA(1)
+		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 17, p.GetParserRuleContext())
+
+		for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
+			if _alt == 1 {
+				{
+					p.SetState(195)
+					p.HtmlContent()
+				}
+				p.SetState(197)
+				p.GetErrorHandler().Sync(p)
+
+				if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 16, p.GetParserRuleContext()) == 1 {
+					{
+						p.SetState(196)
+						p.HtmlChardata()
+					}
+
+				}
+
+			}
+			p.SetState(203)
+			p.GetErrorHandler().Sync(p)
+			_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 17, p.GetParserRuleContext())
+		}
+
 	}
 
 	return localctx
@@ -2294,6 +2875,38 @@ func (s *HtmlContentContext) ElExpression() IElExpressionContext {
 	}
 
 	return t.(IElExpressionContext)
+}
+
+func (s *HtmlContentContext) JspScript() IJspScriptContext {
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IJspScriptContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(IJspScriptContext)
+}
+
+func (s *HtmlContentContext) JspIfBlock() IJspIfBlockContext {
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IJspIfBlockContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(IJspIfBlockContext)
 }
 
 func (s *HtmlContentContext) JspElements() IJspElementsContext {
@@ -2367,7 +2980,7 @@ func (p *JSPParser) HtmlContent() (localctx IHtmlContentContext) {
 	_ = this
 
 	localctx = NewHtmlContentContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 22, JSPParserRULE_htmlContent)
+	p.EnterRule(localctx, 28, JSPParserRULE_htmlContent)
 
 	defer func() {
 		p.ExitRule()
@@ -2385,37 +2998,143 @@ func (p *JSPParser) HtmlContent() (localctx IHtmlContentContext) {
 		}
 	}()
 
-	p.SetState(163)
+	p.SetState(212)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 16, p.GetParserRuleContext()) {
+	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 19, p.GetParserRuleContext()) {
 	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
-			p.SetState(159)
+			p.SetState(206)
 			p.ElExpression()
 		}
 
 	case 2:
 		p.EnterOuterAlt(localctx, 2)
 		{
-			p.SetState(160)
-			p.JspElements()
+			p.SetState(207)
+			p.JspScript()
 		}
 
 	case 3:
 		p.EnterOuterAlt(localctx, 3)
 		{
-			p.SetState(161)
-			p.XhtmlCDATA()
+			p.SetState(208)
+			p.JspIfBlock()
 		}
 
 	case 4:
 		p.EnterOuterAlt(localctx, 4)
 		{
-			p.SetState(162)
+			p.SetState(209)
+			p.JspElements()
+		}
+
+	case 5:
+		p.EnterOuterAlt(localctx, 5)
+		{
+			p.SetState(210)
+			p.XhtmlCDATA()
+		}
+
+	case 6:
+		p.EnterOuterAlt(localctx, 6)
+		{
+			p.SetState(211)
 			p.HtmlComment()
 		}
 
+	}
+
+	return localctx
+}
+
+// IJspIfBlockContext is an interface to support dynamic dispatch.
+type IJspIfBlockContext interface {
+	antlr.ParserRuleContext
+
+	// GetParser returns the parser.
+	GetParser() antlr.Parser
+
+	// IsJspIfBlockContext differentiates from other interfaces.
+	IsJspIfBlockContext()
+}
+
+type JspIfBlockContext struct {
+	*antlr.BaseParserRuleContext
+	parser antlr.Parser
+}
+
+func NewEmptyJspIfBlockContext() *JspIfBlockContext {
+	var p = new(JspIfBlockContext)
+	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	p.RuleIndex = JSPParserRULE_jspIfBlock
+	return p
+}
+
+func (*JspIfBlockContext) IsJspIfBlockContext() {}
+
+func NewJspIfBlockContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *JspIfBlockContext {
+	var p = new(JspIfBlockContext)
+
+	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+
+	p.parser = parser
+	p.RuleIndex = JSPParserRULE_jspIfBlock
+
+	return p
+}
+
+func (s *JspIfBlockContext) GetParser() antlr.Parser { return s.parser }
+
+func (s *JspIfBlockContext) JSP_IF_BLOCK() antlr.TerminalNode {
+	return s.GetToken(JSPParserJSP_IF_BLOCK, 0)
+}
+
+func (s *JspIfBlockContext) GetRuleContext() antlr.RuleContext {
+	return s
+}
+
+func (s *JspIfBlockContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
+	return antlr.TreesStringTree(s, ruleNames, recog)
+}
+
+func (s *JspIfBlockContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
+	switch t := visitor.(type) {
+	case JSPParserVisitor:
+		return t.VisitJspIfBlock(s)
+
+	default:
+		return t.VisitChildren(s)
+	}
+}
+
+func (p *JSPParser) JspIfBlock() (localctx IJspIfBlockContext) {
+	this := p
+	_ = this
+
+	localctx = NewJspIfBlockContext(p, p.GetParserRuleContext(), p.GetState())
+	p.EnterRule(localctx, 30, JSPParserRULE_jspIfBlock)
+
+	defer func() {
+		p.ExitRule()
+	}()
+
+	defer func() {
+		if err := recover(); err != nil {
+			if v, ok := err.(antlr.RecognitionException); ok {
+				localctx.SetException(v)
+				p.GetErrorHandler().ReportError(p, v)
+				p.GetErrorHandler().Recover(p, v)
+			} else {
+				panic(err)
+			}
+		}
+	}()
+
+	p.EnterOuterAlt(localctx, 1)
+	{
+		p.SetState(214)
+		p.Match(JSPParserJSP_IF_BLOCK)
 	}
 
 	return localctx
@@ -2494,7 +3213,7 @@ func (p *JSPParser) ElExpression() (localctx IElExpressionContext) {
 	_ = this
 
 	localctx = NewElExpressionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 24, JSPParserRULE_elExpression)
+	p.EnterRule(localctx, 32, JSPParserRULE_elExpression)
 
 	defer func() {
 		p.ExitRule()
@@ -2514,15 +3233,15 @@ func (p *JSPParser) ElExpression() (localctx IElExpressionContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(165)
+		p.SetState(216)
 		p.Match(JSPParserEL_EXPR_START)
 	}
 	{
-		p.SetState(166)
+		p.SetState(217)
 		p.Match(JSPParserEL_EXPR_CONTENT)
 	}
 	{
-		p.SetState(167)
+		p.SetState(218)
 		p.Match(JSPParserEL_EXPR_END)
 	}
 
@@ -2736,7 +3455,7 @@ func (p *JSPParser) HtmlAttribute() (localctx IHtmlAttributeContext) {
 	_ = this
 
 	localctx = NewHtmlAttributeContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 26, JSPParserRULE_htmlAttribute)
+	p.EnterRule(localctx, 34, JSPParserRULE_htmlAttribute)
 
 	defer func() {
 		p.ExitRule()
@@ -2754,22 +3473,22 @@ func (p *JSPParser) HtmlAttribute() (localctx IHtmlAttributeContext) {
 		}
 	}()
 
-	p.SetState(175)
+	p.SetState(226)
 	p.GetErrorHandler().Sync(p)
-	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 17, p.GetParserRuleContext()) {
+	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 20, p.GetParserRuleContext()) {
 	case 1:
 		localctx = NewEqualHTMLAttributeContext(p, localctx)
 		p.EnterOuterAlt(localctx, 1)
 		{
-			p.SetState(169)
+			p.SetState(220)
 			p.HtmlAttributeName()
 		}
 		{
-			p.SetState(170)
+			p.SetState(221)
 			p.Match(JSPParserEQUALS)
 		}
 		{
-			p.SetState(171)
+			p.SetState(222)
 			p.HtmlAttributeValue()
 		}
 
@@ -2777,7 +3496,7 @@ func (p *JSPParser) HtmlAttribute() (localctx IHtmlAttributeContext) {
 		localctx = NewPureHTMLAttributeContext(p, localctx)
 		p.EnterOuterAlt(localctx, 2)
 		{
-			p.SetState(173)
+			p.SetState(224)
 			p.HtmlAttributeName()
 		}
 
@@ -2785,7 +3504,7 @@ func (p *JSPParser) HtmlAttribute() (localctx IHtmlAttributeContext) {
 		localctx = NewJSPExpressionAttributeContext(p, localctx)
 		p.EnterOuterAlt(localctx, 3)
 		{
-			p.SetState(174)
+			p.SetState(225)
 			p.JspExpression()
 		}
 
@@ -2832,8 +3551,20 @@ func NewHtmlAttributeNameContext(parser antlr.Parser, parent antlr.ParserRuleCon
 
 func (s *HtmlAttributeNameContext) GetParser() antlr.Parser { return s.parser }
 
-func (s *HtmlAttributeNameContext) TAG_IDENTIFIER() antlr.TerminalNode {
-	return s.GetToken(JSPParserTAG_IDENTIFIER, 0)
+func (s *HtmlAttributeNameContext) AllTAG_IDENTIFIER() []antlr.TerminalNode {
+	return s.GetTokens(JSPParserTAG_IDENTIFIER)
+}
+
+func (s *HtmlAttributeNameContext) TAG_IDENTIFIER(i int) antlr.TerminalNode {
+	return s.GetToken(JSPParserTAG_IDENTIFIER, i)
+}
+
+func (s *HtmlAttributeNameContext) AllJSP_JSTL_COLON() []antlr.TerminalNode {
+	return s.GetTokens(JSPParserJSP_JSTL_COLON)
+}
+
+func (s *HtmlAttributeNameContext) JSP_JSTL_COLON(i int) antlr.TerminalNode {
+	return s.GetToken(JSPParserJSP_JSTL_COLON, i)
 }
 
 func (s *HtmlAttributeNameContext) GetRuleContext() antlr.RuleContext {
@@ -2859,7 +3590,8 @@ func (p *JSPParser) HtmlAttributeName() (localctx IHtmlAttributeNameContext) {
 	_ = this
 
 	localctx = NewHtmlAttributeNameContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 28, JSPParserRULE_htmlAttributeName)
+	p.EnterRule(localctx, 36, JSPParserRULE_htmlAttributeName)
+	var _la int
 
 	defer func() {
 		p.ExitRule()
@@ -2879,8 +3611,26 @@ func (p *JSPParser) HtmlAttributeName() (localctx IHtmlAttributeNameContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(177)
+		p.SetState(228)
 		p.Match(JSPParserTAG_IDENTIFIER)
+	}
+	p.SetState(233)
+	p.GetErrorHandler().Sync(p)
+	_la = p.GetTokenStream().LA(1)
+
+	for _la == JSPParserJSP_JSTL_COLON {
+		{
+			p.SetState(229)
+			p.Match(JSPParserJSP_JSTL_COLON)
+		}
+		{
+			p.SetState(230)
+			p.Match(JSPParserTAG_IDENTIFIER)
+		}
+
+		p.SetState(235)
+		p.GetErrorHandler().Sync(p)
+		_la = p.GetTokenStream().LA(1)
 	}
 
 	return localctx
@@ -2996,7 +3746,7 @@ func (p *JSPParser) HtmlAttributeValue() (localctx IHtmlAttributeValueContext) {
 	_ = this
 
 	localctx = NewHtmlAttributeValueContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 30, JSPParserRULE_htmlAttributeValue)
+	p.EnterRule(localctx, 38, JSPParserRULE_htmlAttributeValue)
 	var _la int
 
 	defer func() {
@@ -3018,39 +3768,39 @@ func (p *JSPParser) HtmlAttributeValue() (localctx IHtmlAttributeValueContext) {
 	var _alt int
 
 	p.EnterOuterAlt(localctx, 1)
-	p.SetState(180)
+	p.SetState(237)
 	p.GetErrorHandler().Sync(p)
 
-	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 18, p.GetParserRuleContext()) == 1 {
+	if p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 22, p.GetParserRuleContext()) == 1 {
 		{
-			p.SetState(179)
+			p.SetState(236)
 			p.Match(JSPParserQUOTE)
 		}
 
 	}
-	p.SetState(185)
+	p.SetState(242)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 19, p.GetParserRuleContext())
+	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 23, p.GetParserRuleContext())
 
 	for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1 {
 			{
-				p.SetState(182)
+				p.SetState(239)
 				p.HtmlAttributeValueElement()
 			}
 
 		}
-		p.SetState(187)
+		p.SetState(244)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 19, p.GetParserRuleContext())
+		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 23, p.GetParserRuleContext())
 	}
-	p.SetState(189)
+	p.SetState(246)
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == JSPParserQUOTE {
 		{
-			p.SetState(188)
+			p.SetState(245)
 			p.Match(JSPParserQUOTE)
 		}
 
@@ -3133,6 +3883,54 @@ func (s *HtmlAttributeValueElementContext) JspExpression() IJspExpressionContext
 	return t.(IJspExpressionContext)
 }
 
+func (s *HtmlAttributeValueElementContext) JspElements() IJspElementsContext {
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IJspElementsContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(IJspElementsContext)
+}
+
+func (s *HtmlAttributeValueElementContext) JspScript() IJspScriptContext {
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IJspScriptContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(IJspScriptContext)
+}
+
+func (s *HtmlAttributeValueElementContext) JspIfBlock() IJspIfBlockContext {
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IJspIfBlockContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(IJspIfBlockContext)
+}
+
 func (s *HtmlAttributeValueElementContext) GetRuleContext() antlr.RuleContext {
 	return s
 }
@@ -3156,7 +3954,7 @@ func (p *JSPParser) HtmlAttributeValueElement() (localctx IHtmlAttributeValueEle
 	_ = this
 
 	localctx = NewHtmlAttributeValueElementContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 32, JSPParserRULE_htmlAttributeValueElement)
+	p.EnterRule(localctx, 40, JSPParserRULE_htmlAttributeValueElement)
 
 	defer func() {
 		p.ExitRule()
@@ -3174,33 +3972,51 @@ func (p *JSPParser) HtmlAttributeValueElement() (localctx IHtmlAttributeValueEle
 		}
 	}()
 
-	p.SetState(194)
+	p.SetState(254)
 	p.GetErrorHandler().Sync(p)
-
-	switch p.GetTokenStream().LA(1) {
-	case JSPParserATTVAL_ATTRIBUTE:
+	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 25, p.GetParserRuleContext()) {
+	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
-			p.SetState(191)
+			p.SetState(248)
 			p.Match(JSPParserATTVAL_ATTRIBUTE)
 		}
 
-	case JSPParserEL_EXPR_START:
+	case 2:
 		p.EnterOuterAlt(localctx, 2)
 		{
-			p.SetState(192)
+			p.SetState(249)
 			p.ElExpression()
 		}
 
-	case JSPParserECHO_EXPRESSION_OPEN:
+	case 3:
 		p.EnterOuterAlt(localctx, 3)
 		{
-			p.SetState(193)
+			p.SetState(250)
 			p.JspExpression()
 		}
 
-	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
+	case 4:
+		p.EnterOuterAlt(localctx, 4)
+		{
+			p.SetState(251)
+			p.JspElements()
+		}
+
+	case 5:
+		p.EnterOuterAlt(localctx, 5)
+		{
+			p.SetState(252)
+			p.JspScript()
+		}
+
+	case 6:
+		p.EnterOuterAlt(localctx, 6)
+		{
+			p.SetState(253)
+			p.JspIfBlock()
+		}
+
 	}
 
 	return localctx
@@ -3271,7 +4087,7 @@ func (p *JSPParser) HtmlTagName() (localctx IHtmlTagNameContext) {
 	_ = this
 
 	localctx = NewHtmlTagNameContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 34, JSPParserRULE_htmlTagName)
+	p.EnterRule(localctx, 42, JSPParserRULE_htmlTagName)
 
 	defer func() {
 		p.ExitRule()
@@ -3291,7 +4107,7 @@ func (p *JSPParser) HtmlTagName() (localctx IHtmlTagNameContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(196)
+		p.SetState(256)
 		p.Match(JSPParserTAG_IDENTIFIER)
 	}
 
@@ -3367,7 +4183,7 @@ func (p *JSPParser) HtmlChardata() (localctx IHtmlChardataContext) {
 	_ = this
 
 	localctx = NewHtmlChardataContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 36, JSPParserRULE_htmlChardata)
+	p.EnterRule(localctx, 44, JSPParserRULE_htmlChardata)
 	var _la int
 
 	defer func() {
@@ -3388,7 +4204,7 @@ func (p *JSPParser) HtmlChardata() (localctx IHtmlChardataContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(198)
+		p.SetState(258)
 		_la = p.GetTokenStream().LA(1)
 
 		if !(_la == JSPParserWHITESPACES || _la == JSPParserJSP_STATIC_CONTENT_CHARS) {
@@ -3472,6 +4288,22 @@ func (s *HtmlMiscContext) ElExpression() IElExpressionContext {
 	return t.(IElExpressionContext)
 }
 
+func (s *HtmlMiscContext) JspScript() IJspScriptContext {
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IJspScriptContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(IJspScriptContext)
+}
+
 func (s *HtmlMiscContext) JspScriptlet() IJspScriptletContext {
 	var t antlr.RuleContext
 	for _, ctx := range s.GetChildren() {
@@ -3515,7 +4347,7 @@ func (p *JSPParser) HtmlMisc() (localctx IHtmlMiscContext) {
 	_ = this
 
 	localctx = NewHtmlMiscContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 38, JSPParserRULE_htmlMisc)
+	p.EnterRule(localctx, 46, JSPParserRULE_htmlMisc)
 
 	defer func() {
 		p.ExitRule()
@@ -3533,40 +4365,44 @@ func (p *JSPParser) HtmlMisc() (localctx IHtmlMiscContext) {
 		}
 	}()
 
-	p.SetState(204)
+	p.SetState(265)
 	p.GetErrorHandler().Sync(p)
-
-	switch p.GetTokenStream().LA(1) {
-	case JSPParserJSP_COMMENT, JSPParserJSP_CONDITIONAL_COMMENT:
+	switch p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 26, p.GetParserRuleContext()) {
+	case 1:
 		p.EnterOuterAlt(localctx, 1)
 		{
-			p.SetState(200)
+			p.SetState(260)
 			p.HtmlComment()
 		}
 
-	case JSPParserEL_EXPR_START:
+	case 2:
 		p.EnterOuterAlt(localctx, 2)
 		{
-			p.SetState(201)
+			p.SetState(261)
 			p.ElExpression()
 		}
 
-	case JSPParserDECLARATION_BEGIN, JSPParserECHO_EXPRESSION_OPEN, JSPParserSCRIPTLET_OPEN:
+	case 3:
 		p.EnterOuterAlt(localctx, 3)
 		{
-			p.SetState(202)
+			p.SetState(262)
+			p.JspScript()
+		}
+
+	case 4:
+		p.EnterOuterAlt(localctx, 4)
+		{
+			p.SetState(263)
 			p.JspScriptlet()
 		}
 
-	case JSPParserWHITESPACES:
-		p.EnterOuterAlt(localctx, 4)
+	case 5:
+		p.EnterOuterAlt(localctx, 5)
 		{
-			p.SetState(203)
+			p.SetState(264)
 			p.Match(JSPParserWHITESPACES)
 		}
 
-	default:
-		panic(antlr.NewNoViableAltException(p, nil, nil, nil, nil, nil))
 	}
 
 	return localctx
@@ -3641,7 +4477,7 @@ func (p *JSPParser) HtmlComment() (localctx IHtmlCommentContext) {
 	_ = this
 
 	localctx = NewHtmlCommentContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 40, JSPParserRULE_htmlComment)
+	p.EnterRule(localctx, 48, JSPParserRULE_htmlComment)
 	var _la int
 
 	defer func() {
@@ -3662,7 +4498,7 @@ func (p *JSPParser) HtmlComment() (localctx IHtmlCommentContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(206)
+		p.SetState(267)
 		_la = p.GetTokenStream().LA(1)
 
 		if !(_la == JSPParserJSP_COMMENT || _la == JSPParserJSP_CONDITIONAL_COMMENT) {
@@ -3741,7 +4577,7 @@ func (p *JSPParser) XhtmlCDATA() (localctx IXhtmlCDATAContext) {
 	_ = this
 
 	localctx = NewXhtmlCDATAContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 42, JSPParserRULE_xhtmlCDATA)
+	p.EnterRule(localctx, 50, JSPParserRULE_xhtmlCDATA)
 
 	defer func() {
 		p.ExitRule()
@@ -3761,7 +4597,7 @@ func (p *JSPParser) XhtmlCDATA() (localctx IXhtmlCDATAContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(208)
+		p.SetState(269)
 		p.Match(JSPParserCDATA)
 	}
 
@@ -3918,7 +4754,7 @@ func (p *JSPParser) Dtd() (localctx IDtdContext) {
 	_ = this
 
 	localctx = NewDtdContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 44, JSPParserRULE_dtd)
+	p.EnterRule(localctx, 52, JSPParserRULE_dtd)
 	var _la int
 
 	defer func() {
@@ -3939,55 +4775,55 @@ func (p *JSPParser) Dtd() (localctx IDtdContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(210)
+		p.SetState(271)
 		p.Match(JSPParserDTD)
 	}
 	{
-		p.SetState(211)
+		p.SetState(272)
 		p.DtdElementName()
 	}
-	p.SetState(219)
+	p.SetState(280)
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == JSPParserDTD_PUBLIC {
 		{
-			p.SetState(212)
+			p.SetState(273)
 			p.Match(JSPParserDTD_PUBLIC)
 		}
-		p.SetState(216)
+		p.SetState(277)
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
 		for _la == JSPParserDTD_QUOTED {
 			{
-				p.SetState(213)
+				p.SetState(274)
 				p.PublicId()
 			}
 
-			p.SetState(218)
+			p.SetState(279)
 			p.GetErrorHandler().Sync(p)
 			_la = p.GetTokenStream().LA(1)
 		}
 
 	}
-	p.SetState(223)
+	p.SetState(284)
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
 	if _la == JSPParserDTD_SYSTEM {
 		{
-			p.SetState(221)
+			p.SetState(282)
 			p.Match(JSPParserDTD_SYSTEM)
 		}
 		{
-			p.SetState(222)
+			p.SetState(283)
 			p.SystemId()
 		}
 
 	}
 	{
-		p.SetState(225)
+		p.SetState(286)
 		p.Match(JSPParserTAG_END)
 	}
 
@@ -4059,7 +4895,7 @@ func (p *JSPParser) DtdElementName() (localctx IDtdElementNameContext) {
 	_ = this
 
 	localctx = NewDtdElementNameContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 46, JSPParserRULE_dtdElementName)
+	p.EnterRule(localctx, 54, JSPParserRULE_dtdElementName)
 
 	defer func() {
 		p.ExitRule()
@@ -4079,7 +4915,7 @@ func (p *JSPParser) DtdElementName() (localctx IDtdElementNameContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(227)
+		p.SetState(288)
 		p.Match(JSPParserDTD_IDENTIFIER)
 	}
 
@@ -4151,7 +4987,7 @@ func (p *JSPParser) PublicId() (localctx IPublicIdContext) {
 	_ = this
 
 	localctx = NewPublicIdContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 48, JSPParserRULE_publicId)
+	p.EnterRule(localctx, 56, JSPParserRULE_publicId)
 
 	defer func() {
 		p.ExitRule()
@@ -4171,7 +5007,7 @@ func (p *JSPParser) PublicId() (localctx IPublicIdContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(229)
+		p.SetState(290)
 		p.Match(JSPParserDTD_QUOTED)
 	}
 
@@ -4243,7 +5079,7 @@ func (p *JSPParser) SystemId() (localctx ISystemIdContext) {
 	_ = this
 
 	localctx = NewSystemIdContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 50, JSPParserRULE_systemId)
+	p.EnterRule(localctx, 58, JSPParserRULE_systemId)
 
 	defer func() {
 		p.ExitRule()
@@ -4263,7 +5099,7 @@ func (p *JSPParser) SystemId() (localctx ISystemIdContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(231)
+		p.SetState(292)
 		p.Match(JSPParserDTD_QUOTED)
 	}
 
@@ -4429,7 +5265,7 @@ func (p *JSPParser) Xml() (localctx IXmlContext) {
 	_ = this
 
 	localctx = NewXmlContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 52, JSPParserRULE_xml)
+	p.EnterRule(localctx, 60, JSPParserRULE_xml)
 
 	defer func() {
 		p.ExitRule()
@@ -4451,24 +5287,24 @@ func (p *JSPParser) Xml() (localctx IXmlContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(233)
+		p.SetState(294)
 		p.Match(JSPParserXML_DECLARATION)
 	}
 	{
-		p.SetState(234)
+		p.SetState(295)
 
 		var _x = p.HtmlTagName()
 
 		localctx.(*XmlContext).name = _x
 	}
-	p.SetState(238)
+	p.SetState(299)
 	p.GetErrorHandler().Sync(p)
-	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 26, p.GetParserRuleContext())
+	_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 30, p.GetParserRuleContext())
 
 	for _alt != 1 && _alt != antlr.ATNInvalidAltNumber {
 		if _alt == 1+1 {
 			{
-				p.SetState(235)
+				p.SetState(296)
 
 				var _x = p.HtmlAttribute()
 
@@ -4477,12 +5313,12 @@ func (p *JSPParser) Xml() (localctx IXmlContext) {
 			localctx.(*XmlContext).atts = append(localctx.(*XmlContext).atts, localctx.(*XmlContext)._htmlAttribute)
 
 		}
-		p.SetState(240)
+		p.SetState(301)
 		p.GetErrorHandler().Sync(p)
-		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 26, p.GetParserRuleContext())
+		_alt = p.GetInterpreter().AdaptivePredict(p.GetTokenStream(), 30, p.GetParserRuleContext())
 	}
 	{
-		p.SetState(241)
+		p.SetState(302)
 		p.Match(JSPParserTAG_END)
 	}
 
@@ -4598,7 +5434,7 @@ func (p *JSPParser) JspScriptlet() (localctx IJspScriptletContext) {
 	_ = this
 
 	localctx = NewJspScriptletContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 54, JSPParserRULE_jspScriptlet)
+	p.EnterRule(localctx, 62, JSPParserRULE_jspScriptlet)
 
 	defer func() {
 		p.ExitRule()
@@ -4616,25 +5452,25 @@ func (p *JSPParser) JspScriptlet() (localctx IJspScriptletContext) {
 		}
 	}()
 
-	p.SetState(247)
+	p.SetState(308)
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
 	case JSPParserDECLARATION_BEGIN, JSPParserSCRIPTLET_OPEN:
 		p.EnterOuterAlt(localctx, 1)
 		{
-			p.SetState(243)
+			p.SetState(304)
 			p.ScriptletStart()
 		}
 		{
-			p.SetState(244)
+			p.SetState(305)
 			p.ScriptletContent()
 		}
 
 	case JSPParserECHO_EXPRESSION_OPEN:
 		p.EnterOuterAlt(localctx, 2)
 		{
-			p.SetState(246)
+			p.SetState(307)
 			p.JspExpression()
 		}
 
@@ -4726,7 +5562,7 @@ func (p *JSPParser) JspExpression() (localctx IJspExpressionContext) {
 	_ = this
 
 	localctx = NewJspExpressionContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 56, JSPParserRULE_jspExpression)
+	p.EnterRule(localctx, 64, JSPParserRULE_jspExpression)
 
 	defer func() {
 		p.ExitRule()
@@ -4746,11 +5582,11 @@ func (p *JSPParser) JspExpression() (localctx IJspExpressionContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(249)
+		p.SetState(310)
 		p.Match(JSPParserECHO_EXPRESSION_OPEN)
 	}
 	{
-		p.SetState(250)
+		p.SetState(311)
 		p.ScriptletContent()
 	}
 
@@ -4826,7 +5662,7 @@ func (p *JSPParser) ScriptletStart() (localctx IScriptletStartContext) {
 	_ = this
 
 	localctx = NewScriptletStartContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 58, JSPParserRULE_scriptletStart)
+	p.EnterRule(localctx, 66, JSPParserRULE_scriptletStart)
 	var _la int
 
 	defer func() {
@@ -4847,7 +5683,7 @@ func (p *JSPParser) ScriptletStart() (localctx IScriptletStartContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(252)
+		p.SetState(313)
 		_la = p.GetTokenStream().LA(1)
 
 		if !(_la == JSPParserDECLARATION_BEGIN || _la == JSPParserSCRIPTLET_OPEN) {
@@ -4930,7 +5766,7 @@ func (p *JSPParser) ScriptletContent() (localctx IScriptletContentContext) {
 	_ = this
 
 	localctx = NewScriptletContentContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 60, JSPParserRULE_scriptletContent)
+	p.EnterRule(localctx, 68, JSPParserRULE_scriptletContent)
 
 	defer func() {
 		p.ExitRule()
@@ -4950,11 +5786,11 @@ func (p *JSPParser) ScriptletContent() (localctx IScriptletContentContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(254)
+		p.SetState(315)
 		p.Match(JSPParserBLOB_CONTENT)
 	}
 	{
-		p.SetState(255)
+		p.SetState(316)
 		p.Match(JSPParserBLOB_CLOSE)
 	}
 
@@ -5034,7 +5870,7 @@ func (p *JSPParser) JavaScript() (localctx IJavaScriptContext) {
 	_ = this
 
 	localctx = NewJavaScriptContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 62, JSPParserRULE_javaScript)
+	p.EnterRule(localctx, 70, JSPParserRULE_javaScript)
 	var _la int
 
 	defer func() {
@@ -5055,11 +5891,11 @@ func (p *JSPParser) JavaScript() (localctx IJavaScriptContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(257)
+		p.SetState(318)
 		p.Match(JSPParserSCRIPT_OPEN)
 	}
 	{
-		p.SetState(258)
+		p.SetState(319)
 		_la = p.GetTokenStream().LA(1)
 
 		if !(_la == JSPParserSCRIPT_BODY || _la == JSPParserSCRIPT_SHORT_BODY) {
@@ -5146,7 +5982,7 @@ func (p *JSPParser) Style() (localctx IStyleContext) {
 	_ = this
 
 	localctx = NewStyleContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 64, JSPParserRULE_style)
+	p.EnterRule(localctx, 72, JSPParserRULE_style)
 	var _la int
 
 	defer func() {
@@ -5167,11 +6003,11 @@ func (p *JSPParser) Style() (localctx IStyleContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(260)
+		p.SetState(321)
 		p.Match(JSPParserSTYLE_OPEN)
 	}
 	{
-		p.SetState(261)
+		p.SetState(322)
 		_la = p.GetTokenStream().LA(1)
 
 		if !(_la == JSPParserSTYLE_BODY || _la == JSPParserSTYLE_SHORT_BODY) {

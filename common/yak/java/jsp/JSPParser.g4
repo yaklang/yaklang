@@ -3,12 +3,14 @@ parser grammar JSPParser;
 options { tokenVocab=JSPLexer; }
 
 jspDocuments
-    :jspStart* jspDocument+
+    :jspStart* jspDocument+ EOF
     ;
 
 jspDocument
     : xml
     | dtd
+    | jspScript
+    | jspIfBlock
     | jspElements
     ;
 
@@ -18,7 +20,7 @@ jspStart
     ;
 
 jspElements
-    :beforeContent=htmlMiscs (htmlElement|jspScript|jspExpression|style|javaScript) afterContent=htmlMiscs
+    :beforeContent=htmlMiscs (htmlElement|htmlCloseElement|jspScript|jspExpression|jspIfBlock|style|javaScript) afterContent=htmlMiscs
     ;
 
 htmlMiscs
@@ -31,13 +33,28 @@ jspScript
     ;
 
 htmlElement
-    :htmlBegin  (
-        TAG_CLOSE (htmlContents CLOSE_TAG_BEGIN htmlTag TAG_CLOSE)?
-        | TAG_SLASH_END)
+    : htmlBegin TAG_CLOSE htmlContents CLOSE_TAG_BEGIN htmlTag TAG_CLOSE
+    | htmlBegin TAG_CLOSE CLOSE_TAG_BEGIN htmlTag TAG_CLOSE
+    | htmlBegin TAG_SLASH_END
+    | htmlBegin TAG_CLOSE
+    ;
+
+htmlCloseElement
+    : CLOSE_TAG_BEGIN htmlTag TAG_CLOSE
     ;
 
 htmlBegin
-    :TAG_BEGIN htmlTag htmlAttribute*
+    :TAG_BEGIN htmlTag htmlBeginElement*
+    ;
+
+htmlBeginElement
+    : htmlAttribute
+    | tagJspFragment
+    | jspScriptlet
+    ;
+
+tagJspFragment
+    : TAG_JSP_IF_FRAGMENT
     ;
 
 htmlTag
@@ -51,14 +68,21 @@ jspDirective
 
 // html元素中间的内容
 htmlContents
-    : htmlChardata? (htmlContent htmlChardata?)*
+    : htmlChardata (htmlContent htmlChardata?)*
+    | htmlContent htmlChardata? (htmlContent htmlChardata?)*
     ;
 
 htmlContent
     : elExpression
+    | jspScript
+    | jspIfBlock
     | jspElements
     | xhtmlCDATA
     | htmlComment
+    ;
+
+jspIfBlock
+    : JSP_IF_BLOCK
     ;
 
 // EL表达式
@@ -73,7 +97,7 @@ htmlAttribute
     ;
 
 htmlAttributeName
-    : TAG_IDENTIFIER
+    : TAG_IDENTIFIER (JSP_JSTL_COLON TAG_IDENTIFIER)*
     ;
 
 htmlAttributeValue
@@ -84,6 +108,9 @@ htmlAttributeValueElement
     :ATTVAL_ATTRIBUTE
     |elExpression
     |jspExpression
+    |jspElements
+    |jspScript
+    |jspIfBlock
     ;
 
 htmlTagName
@@ -99,6 +126,7 @@ htmlChardata
 htmlMisc
     : htmlComment
     | elExpression
+    | jspScript
     | jspScriptlet
     | WHITESPACES
     ;

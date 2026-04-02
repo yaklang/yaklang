@@ -1,8 +1,6 @@
 package templateLanguage
 
 import (
-	"strings"
-
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 )
@@ -43,8 +41,7 @@ func (i *Interpreter) GetCurrentLine() int {
 	if i == nil || i.template == nil {
 		return 0
 	}
-	s := i.template.String()
-	return len(strings.Split(s, "\n"))
+	return i.template.CurrentLine()
 }
 
 func (i *Interpreter) GetTemplate() TemplateRender {

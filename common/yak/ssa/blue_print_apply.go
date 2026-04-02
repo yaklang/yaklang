@@ -91,7 +91,7 @@ func (c *Blueprint) Apply(obj Value) Type {
 		c.addFullTypeNames(i)
 	}
 
-	if prog != nil || prog.Cache != nil {
+	if prog != nil && prog.Cache != nil {
 		prog.Cache.AddClassInstance(c.Name, obj)
 	}
 

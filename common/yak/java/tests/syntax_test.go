@@ -7,18 +7,58 @@ import (
 	"path"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	"github.com/yaklang/yaklang/common/yak/java/java2ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
-//go:embed code
+const savedJavaFixtureMaxParseDuration = 30 * time.Second
+
+//go:embed all:code
 var codeFs embed.FS
 
-func validateSource(t *testing.T, filename string, src string) {
-	t.Run(fmt.Sprintf("syntax file: %v", filename), func(t *testing.T) {
-		_, err := java2ssa.Frontend(src)
-		require.Nil(t, err, "parse AST FrontEnd error : %v", err)
+func validateSource(t *testing.T, filename string, src string, caches ...*ssa.AntlrCache) {
+	t.Helper()
+
+	name := strings.ReplaceAll(strings.TrimSpace(filename), "\\", "/")
+	if name == "" {
+		name = "inline.java"
+	}
+
+	t.Run(fmt.Sprintf("syntax file: %v", name), func(t *testing.T) {
+		antlr4util.ResetSLLFirstCounters()
+
+		var cache *ssa.AntlrCache
+		if len(caches) > 0 {
+			cache = caches[0]
+		}
+
+		start := time.Now()
+		_, err := java2ssa.Frontend(src, cache)
+		parseDur := time.Since(start)
+		require.NoError(t, err, "parse AST FrontEnd error")
+		require.LessOrEqual(t, parseDur, savedJavaFixtureMaxParseDuration, "parse took too long for %s", name)
+
+		stats := antlr4util.SLLFirstCountersSnapshot()
+		t.Logf("java fixture=%s parse=%s sll_attempts=%d fallbacks=%d cancelled=%d errors=%d", name, parseDur, stats.SLLAttempts, stats.Fallbacks, stats.FallbackCancelled, stats.FallbackError)
+
+		require.NotPanics(t, func() {
+			vf := filesys.NewVirtualFs()
+			vf.AddFile(name, src)
+			progs, err := ssaapi.ParseProjectWithFS(
+				vf,
+				ssaapi.WithLanguage(ssaconfig.JAVA),
+				ssaapi.WithMemory(),
+			)
+			require.NoError(t, err)
+			require.NotEmpty(t, progs)
+		}, "java fixture build panicked for %s", name)
 	})
 }
 
@@ -30,13 +70,24 @@ func mustReadCodeFixture(t *testing.T, codePath string) string {
 }
 
 func TestAllSyntaxForJava_G4(t *testing.T) {
+	builder, ok := java2ssa.CreateBuilder().(*java2ssa.SSABuilder)
+	require.True(t, ok)
+	defer builder.Clearup()
+
+	cache := builder.GetAntlrCache()
+	resetEveryFiles := astMetricResetEveryFiles()
 	found := false
+	fileCount := 0
 	err := fs.WalkDir(codeFs, "code", func(filePath string, d fs.DirEntry, walkErr error) error {
 		require.NoError(t, walkErr)
 		if d.IsDir() || !strings.HasSuffix(filePath, ".java") {
 			return nil
 		}
-		validateSource(t, filePath, mustReadCodeFixture(t, filePath))
+		validateSource(t, filePath, mustReadCodeFixture(t, filePath), cache)
+		fileCount++
+		if cache != nil && resetEveryFiles > 0 && fileCount%resetEveryFiles == 0 {
+			cache.ResetRuntimeCaches()
+		}
 		found = true
 		return nil
 	})
@@ -237,5 +288,21 @@ func TestDecompiledDuplicateAssignmentTemps(t *testing.T) {
 
 func TestDecompiledBareCallablePlaceholder(t *testing.T) {
 	src := mustReadCodeFixture(t, path.Join("code", "decompiled_syntax", "decompiled_bare_callable_placeholder.java"))
+	CheckAllJavaCode(src, t)
+}
+
+func TestJavaUnicodeEscapedBackslashStringLiteral(t *testing.T) {
+	src := `package com.example;
+
+public class Main {
+    public String run() {
+        return "\u005c\u005c";
+    }
+}`
+	CheckAllJavaCode(src, t)
+}
+
+func TestJavaUnicodeEscapeShieldedByBackslashFromCorePropertiesUtil(t *testing.T) {
+	src := mustReadCodeFixture(t, path.Join("code", "project_core", "core__dotCMS__com__liferay__util__PropertiesUtil.java"))
 	CheckAllJavaCode(src, t)
 }

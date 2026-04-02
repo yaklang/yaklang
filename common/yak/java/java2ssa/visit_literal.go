@@ -31,17 +31,10 @@ func (y *singleFileBuilder) VisitLiteral(raw javaparser.ILiteralContext) ssa.Val
 		res = y.VisitFloatLiteral(ret)
 	} else if ret := i.CHAR_LITERAL(); ret != nil {
 		lit := ret.GetText()
-		var s string
-		var err error
-		if lit == "'\\''" {
-			s = "'"
-		} else {
-			lit = strings.ReplaceAll(lit, `"`, `\"`)
-			s, err = strconv.Unquote(fmt.Sprintf("\"%s\"", lit[1:len(lit)-1]))
-			if err != nil {
-				log.Errorf("javaast %s: %s", y.CurrentRange.String(), fmt.Sprintf("unquote error %s", err))
-				return y.EmitConstInst(s)
-			}
+		s, err := yakunquote.Unquote(lit)
+		if err != nil {
+			log.Errorf("javaast %s: %s", y.CurrentRange.String(), fmt.Sprintf("unquote error %s", err))
+			return y.EmitConstInst(s)
 		}
 		runeChar := []rune(s)[0]
 		if runeChar < 256 {

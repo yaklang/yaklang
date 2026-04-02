@@ -85,7 +85,7 @@ func (y *JSPVisitor) VisitJspExpression(raw jspparser.IJspExpressionContext) str
 		return ""
 	}
 	if i.ScriptletContent() != nil {
-		expr := y.VisitScriptletContent(i.ScriptletContent())
+		expr := normalizeJSPEmbeddedJava(y.VisitScriptletContent(i.ScriptletContent()))
 		if expr != "" {
 			y.EmitOutput(expr)
 		}
@@ -103,4 +103,51 @@ func (y *JSPVisitor) VisitScriptletContent(raw jspparser.IScriptletContentContex
 		return ""
 	}
 	return i.BLOB_CONTENT().GetText()
+}
+
+func normalizeJSPEmbeddedJava(code string) string {
+	if code == "" {
+		return code
+	}
+
+	out := make([]byte, 0, len(code))
+	inDouble := false
+	inSingle := false
+	escaped := false
+
+	for i := 0; i < len(code); i++ {
+		ch := code[i]
+
+		if inDouble || inSingle {
+			out = append(out, ch)
+			if escaped {
+				escaped = false
+				continue
+			}
+			if ch == '\\' {
+				escaped = true
+				continue
+			}
+			if inDouble && ch == '"' {
+				inDouble = false
+			} else if inSingle && ch == '\'' {
+				inSingle = false
+			}
+			continue
+		}
+
+		if ch == '\\' && i+1 < len(code) && (code[i+1] == '"' || code[i+1] == '\'') {
+			out = append(out, code[i+1])
+			i++
+			continue
+		}
+
+		out = append(out, ch)
+		if ch == '"' {
+			inDouble = true
+		} else if ch == '\'' {
+			inSingle = true
+		}
+	}
+	return string(out)
 }

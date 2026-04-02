@@ -5,8 +5,12 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	jspparser "github.com/yaklang/yaklang/common/yak/java/jsp/parser"
 	tl "github.com/yaklang/yaklang/common/yak/templateLanguage"
+	"regexp"
 	"strings"
 )
+
+var jspIfBlockPattern = regexp.MustCompile(`(?s)^<c:if\b([^>]*)>(.*)</c:if>$`)
+var jspIfBlockTestAttrPattern = regexp.MustCompile(`(?i)\btest\s*=\s*(?:"([^"]*)"|'([^']*)')`)
 
 type JSPVisitor struct {
 	*tl.Visitor
@@ -35,12 +39,13 @@ func (y *JSPVisitor) VisitJspDocuments(raw jspparser.IJspDocumentsContext) {
 	if i == nil {
 		return
 	}
-	for _, doc := range i.AllJspDocument() {
-		y.VisitJspDocument(doc)
-	}
-
-	for _, start := range i.AllJspStart() {
-		y.VisitJspStart(start)
+	for _, child := range i.GetChildren() {
+		switch ret := child.(type) {
+		case jspparser.IJspStartContext:
+			y.VisitJspStart(ret)
+		case jspparser.IJspDocumentContext:
+			y.VisitJspDocument(ret)
+		}
 	}
 }
 
@@ -59,6 +64,10 @@ func (y *JSPVisitor) VisitJspDocument(raw jspparser.IJspDocumentContext) {
 		return
 	} else if i.Dtd() != nil {
 		return
+	} else if i.JspIfBlock() != nil {
+		y.VisitJspIfBlock(i.JspIfBlock())
+	} else if i.JspScript() != nil {
+		y.VisitJspScript(i.JspScript())
 	} else if i.JspElements() != nil {
 		y.VisitJspElements(i.JspElements())
 	}
@@ -74,7 +83,9 @@ func (y *JSPVisitor) VisitJspStart(raw jspparser.IJspStartContext) {
 	if i == nil {
 		return
 	}
-
+	if i.JspScript() != nil {
+		y.VisitJspScript(i.JspScript())
+	}
 }
 
 func (y *JSPVisitor) VisitJspElements(raw jspparser.IJspElementsContext) {
@@ -94,10 +105,14 @@ func (y *JSPVisitor) VisitJspElements(raw jspparser.IJspElementsContext) {
 
 	if i.HtmlElement() != nil {
 		y.VisitHtmlElement(i.HtmlElement())
+	} else if i.HtmlCloseElement() != nil {
+		y.VisitHtmlCloseElement(i.HtmlCloseElement())
 	} else if i.JspScript() != nil {
 		y.VisitJspScript(i.JspScript())
 	} else if i.JspExpression() != nil {
 		y.VisitJspExpression(i.JspExpression())
+	} else if i.JspIfBlock() != nil {
+		y.VisitJspIfBlock(i.JspIfBlock())
 	} else if i.Style() != nil {
 		return
 	} else if i.JavaScript() != nil {
@@ -107,6 +122,23 @@ func (y *JSPVisitor) VisitJspElements(raw jspparser.IJspElementsContext) {
 	if i.GetAfterContent() != nil {
 		y.VisitHtmlMiscs(i.AllHtmlMiscs()[1])
 	}
+}
+
+func (y *JSPVisitor) VisitHtmlCloseElement(raw jspparser.IHtmlCloseElementContext) {
+	if y == nil || raw == nil {
+		return
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
+	i := raw.(*jspparser.HtmlCloseElementContext)
+	if i == nil || i.CLOSE_TAG_BEGIN() == nil || i.HtmlTag() == nil || i.TAG_CLOSE() == nil {
+		return
+	}
+
+	y.EmitPureText(i.CLOSE_TAG_BEGIN().GetText())
+	y.EmitPureText(i.HtmlTag().GetText())
+	y.EmitPureText(i.TAG_CLOSE().GetText())
 }
 
 func (y *JSPVisitor) VisitHtmlMiscs(raw jspparser.IHtmlMiscsContext) {
@@ -135,6 +167,8 @@ func (y *JSPVisitor) VisitHtmlMisc(raw jspparser.IHtmlMiscContext) {
 	} else if i.ElExpression() != nil {
 		text := y.VisitElExpression(i.ElExpression())
 		y.EmitOutput(text)
+	} else if i.JspScript() != nil {
+		y.VisitJspScript(i.JspScript())
 	} else if i.JspScriptlet() != nil {
 		y.VisitJspScriptlet(i.JspScriptlet())
 	}
@@ -216,9 +250,54 @@ func (y *JSPVisitor) VisitHtmlBegin(raw jspparser.IHtmlBeginContext) {
 	y.AddAttrFunc(func() {
 		y.EmitPureText(i.TAG_BEGIN().GetText() + i.HtmlTag().GetText())
 	})
-	for _, attr := range i.AllHtmlAttribute() {
-		y.VisitAttribute(attr)
+	for _, element := range i.AllHtmlBeginElement() {
+		y.VisitHtmlBeginElement(element)
 	}
+}
+
+func (y *JSPVisitor) VisitHtmlBeginElement(raw jspparser.IHtmlBeginElementContext) {
+	if y == nil || raw == nil {
+		return
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+	i := raw.(*jspparser.HtmlBeginElementContext)
+	if i == nil {
+		return
+	}
+	if i.HtmlAttribute() != nil {
+		y.VisitAttribute(i.HtmlAttribute())
+		return
+	}
+	if i.TagJspFragment() != nil {
+		y.AddAttrFunc(func() {
+			y.VisitTagJspFragment(i.TagJspFragment())
+		})
+		return
+	}
+	if i.JspScriptlet() != nil {
+		y.AddAttrFunc(func() {
+			y.VisitJspScriptlet(i.JspScriptlet())
+		})
+	}
+}
+
+func (y *JSPVisitor) VisitTagJspFragment(raw jspparser.ITagJspFragmentContext) {
+	if y == nil || raw == nil {
+		return
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+	i := raw.(*jspparser.TagJspFragmentContext)
+	if i == nil || i.TAG_JSP_IF_FRAGMENT() == nil {
+		return
+	}
+	ast, err := Front(i.TAG_JSP_IF_FRAGMENT().GetText())
+	if err != nil {
+		log.Errorf("parse embedded jsp fragment error: %v", err)
+		return
+	}
+	y.VisitJspDocuments(ast)
 }
 
 func (y *JSPVisitor) VisitHtmlContents(raw jspparser.IHtmlContentsContext) {
@@ -231,11 +310,13 @@ func (y *JSPVisitor) VisitHtmlContents(raw jspparser.IHtmlContentsContext) {
 	if i == nil {
 		return
 	}
-	for _, data := range i.AllHtmlChardata() {
-		y.VisitHtmlCharData(data)
-	}
-	for _, content := range i.AllHtmlContent() {
-		y.VisitHtmlContent(content)
+	for _, child := range i.GetChildren() {
+		switch current := child.(type) {
+		case jspparser.IHtmlChardataContext:
+			y.VisitHtmlCharData(current)
+		case jspparser.IHtmlContentContext:
+			y.VisitHtmlContent(current)
+		}
 	}
 }
 
@@ -265,6 +346,10 @@ func (y *JSPVisitor) VisitHtmlTag(raw jspparser.IHtmlTagContext) (tagType TagTyp
 	}
 
 	category := strings.ToLower(names[0].GetText())
+	if category == "yak" && strings.EqualFold(names[1].GetText(), "fragment") {
+		tagType = JSP_TAG_SYNTHETIC_FRAGMENT
+		return
+	}
 	// core jstl tag
 	if category == "c" {
 		tagType = y.GetCoreJSTLTag(strings.ToLower(names[1].GetText()))
@@ -332,6 +417,10 @@ func (y *JSPVisitor) VisitHtmlAttributeValueElement(raw jspparser.IHtmlAttribute
 		return y.VisitJspExpression(i.JspExpression())
 	} else if i.ElExpression() != nil {
 		return y.VisitElExpression(i.ElExpression())
+	} else if i.JspElements() != nil || i.JspScript() != nil || i.JspIfBlock() != nil {
+		// For unsupported nested template fragments inside attribute values,
+		// preserve the original text so template2java keeps compiling.
+		return i.GetText()
 	}
 	return ""
 }
@@ -349,6 +438,10 @@ func (y *JSPVisitor) VisitHtmlContent(raw jspparser.IHtmlContentContext) {
 	if i.ElExpression() != nil {
 		text := y.VisitElExpression(i.ElExpression())
 		y.EmitOutput(text)
+	} else if i.JspIfBlock() != nil {
+		y.VisitJspIfBlock(i.JspIfBlock())
+	} else if i.JspScript() != nil {
+		y.VisitJspScript(i.JspScript())
 	} else if i.JspElements() != nil {
 		y.VisitJspElements(i.JspElements())
 	} else if i.XhtmlCDATA() != nil {
@@ -378,4 +471,49 @@ func (y *JSPVisitor) VisitHtmlCharData(raw jspparser.IHtmlChardataContext) {
 func (y *JSPVisitor) EmitPureText(text string) {
 	text = y.replaceElExprInText(text)
 	y.Visitor.EmitPureText(text)
+}
+
+func (y *JSPVisitor) VisitJspIfBlock(raw jspparser.IJspIfBlockContext) {
+	if y == nil || raw == nil {
+		return
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+	i := raw.(*jspparser.JspIfBlockContext)
+	if i == nil || i.JSP_IF_BLOCK() == nil {
+		return
+	}
+	matches := jspIfBlockPattern.FindStringSubmatch(i.JSP_IF_BLOCK().GetText())
+	if len(matches) != 3 {
+		y.EmitPureText(i.JSP_IF_BLOCK().GetText())
+		return
+	}
+	attrText := matches[1]
+	body := matches[2]
+	attrMatches := jspIfBlockTestAttrPattern.FindStringSubmatch(attrText)
+	if len(attrMatches) < 3 {
+		y.EmitPureText(i.JSP_IF_BLOCK().GetText())
+		return
+	}
+	condition := attrMatches[1]
+	if condition == "" {
+		condition = attrMatches[2]
+	}
+	condition = y.appendElParseMethod(condition)
+	y.EmitPureCode("if (" + condition + ") {")
+	if strings.TrimSpace(body) != "" {
+		trimmedBody := strings.TrimSpace(body)
+		if !strings.Contains(trimmedBody, "<") && !strings.Contains(trimmedBody, "${") && !strings.Contains(trimmedBody, "#{") {
+			y.EmitPureText(body)
+		} else {
+			ast, err := Front(body)
+			if err != nil {
+				log.Errorf("parse jsp if body error: %v", err)
+				y.EmitPureText(body)
+			} else {
+				y.VisitJspDocuments(ast)
+			}
+		}
+	}
+	y.EmitPureCode("}")
 }

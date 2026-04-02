@@ -2,6 +2,8 @@ lexer grammar  JSPLexer;
 
 JSP_COMMENT: '<!--' .*? '-->'->skip;
 
+JSP_SCRIPT_COMMENT: '<%--' .*? '--%>' -> skip;
+
 JSP_CONDITIONAL_COMMENT: '<!--[' .*? ']]>'->skip;
 
 SCRIPT_OPEN: '<script' .*? '>' -> pushMode(SCRIPT);
@@ -14,6 +16,10 @@ DTD
 
 CDATA
     : '<![CDATA[' .*? ']]>'
+    ;
+
+JSP_INCLUDE_DIRECTIVE_SKIP
+    : '<%@' [ \t\r\n]* 'include' .*? '%>' -> skip
     ;
 
 WHITESPACES
@@ -46,6 +52,10 @@ DECLARATION_BEGIN
 
 ECHO_EXPRESSION_OPEN
     : ECHO_EXPRESSION_OPEN_TAG -> pushMode(JSP_BLOB)
+    ;
+
+JSP_IF_BLOCK
+    : '<c:if' .*? '</c:if>'
     ;
 
 SCRIPTLET_OPEN
@@ -167,8 +177,11 @@ fragment JSP_END_TAG
     ;
 
 fragment JSP_STATIC_CONTENT_CHAR
-    : ~[<\\$]+
+    : ~[<\\$#]
     | ESCAPED_DOLLAR
+    | '\\'
+    | '$' { this.GetInputStream().LA(1) != '{' }?
+    | '#' { this.GetInputStream().LA(1) != '{' }?
     ;
 
 
@@ -224,6 +237,10 @@ JSP_JSTL_COLON
     : ':'
     ;
 
+TAG_JSP_IF_FRAGMENT
+    : '<c:if' .*? '</c:if>'
+    ;
+
 TAG_SLASH_END
     : EMPTY_ELEMENT_CLOSE -> popMode
     ;
@@ -232,7 +249,7 @@ SUB_TAG_OPEN:
     BEGIN_ELEMENT_OPEN_TAG -> type(TAG_BEGIN),pushMode(TAG);
 
 SUB_END_TAG_OPEN:
-    BEGIN_ELEMENT_OPEN_TAG -> type(CLOSE_TAG_BEGIN),pushMode(TAG);
+    END_ELEMENT_OPEN_TAG -> type(CLOSE_TAG_BEGIN),pushMode(TAG);
 
 
 TAG_CLOSE
@@ -245,6 +262,10 @@ TAG_SLASH
 
 TAG_JSP_EXPRESSION_OPEN
     :ECHO_EXPRESSION_OPEN ->type(ECHO_EXPRESSION_OPEN), pushMode(JSP_BLOB)
+    ;
+
+TAG_SCRIPTLET_OPEN
+    : SCRIPTLET_OPEN_TAG -> type(SCRIPTLET_OPEN), pushMode(JSP_BLOB)
     ;
 
 DIRECTIVE_END
@@ -269,12 +290,14 @@ fragment SINGLE_QUOTE_STRING_CONTENT
     : ~[<'$]
     | '$' ~ '{'
     | ESCAPED_SINGLE_QUOTE
+    | '\\' .
     ;
 
 fragment DOUBLE_QUOTE_STRING_CONTENT
     : ~[<"$]
     | '$' ~ '{'
     | ESCAPED_DOUBLE_QUOTE
+    | '\\' .
     ;
 
 fragment WHITESPACE
@@ -347,6 +370,10 @@ STYLE_SHORT_BODY
 // attribute values
 //
 mode ATTVALUE;
+
+ATTVAL_WHITESPACE_SKIP
+    : WHITESPACE -> skip
+    ;
 
 ATTVAL_END_TAG_OPEN:
     END_ELEMENT_OPEN_TAG -> type(CLOSE_TAG_BEGIN),pushMode(TAG);
@@ -470,7 +497,7 @@ fragment EQUALS_CHAR
     ;
 
 fragment ESCAPED_DOUBLE_QUOTE
-    : '\\\''
+    : '\\"'
     ;
 
 mode EL_EXPR_MODE;
@@ -482,5 +509,3 @@ EL_EXPR_END_EX
 EL_EXPR_CONTENT
     : EL_EXPR_BODY
     ;
-
-
