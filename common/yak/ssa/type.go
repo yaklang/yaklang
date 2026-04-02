@@ -1079,12 +1079,16 @@ func (itype *ObjectType) RawString() string {
 
 // for struct build
 func (s *ObjectType) AddField(key Value, field Type) {
+	if s == nil || utils.IsNil(key) {
+		return
+	}
 	keyTyp := key.GetType()
 	if field == nil {
 		field = CreateAnyType()
 	}
+	keyText := key.String()
 
-	if index, ok := s.keymap[key.String()]; ok {
+	if index, ok := s.keymap[keyText]; ok {
 		s.keyTypes[index] = keyTyp
 		s.Keys[index] = key
 		s.FieldTypes[index] = field
@@ -1095,17 +1099,23 @@ func (s *ObjectType) AddField(key Value, field Type) {
 	s.keyTypes = append(s.keyTypes, keyTyp)
 	s.FieldTypes = append(s.FieldTypes, field)
 
-	s.keymap[key.String()] = len(s.Keys) - 1
+	s.keymap[keyText] = len(s.Keys) - 1
 }
 
 // return (field-type, key-type)
 func (s *ObjectType) GetField(key Value) Type {
+	if s == nil || utils.IsNil(key) {
+		return nil
+	}
+	keyText := key.String()
 	getField := func(o *ObjectType) Type {
-		if index := slices.IndexFunc(o.Keys, func(v Value) bool { return v.String() == key.String() }); index != -1 {
-			return o.FieldTypes[index]
-		} else {
+		if o == nil {
 			return nil
 		}
+		if index, ok := o.keymap[keyText]; ok && index >= 0 && index < len(o.FieldTypes) {
+			return o.FieldTypes[index]
+		}
+		return nil
 	}
 
 	switch s.Kind {

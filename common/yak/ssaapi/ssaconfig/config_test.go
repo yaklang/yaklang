@@ -25,6 +25,14 @@ func TestConfigInitializationByMode(t *testing.T) {
 	require.Equal(t, ModeSyntaxFlowScan, cfg.Mode)
 }
 
+func TestCompileConcurrencyFallsBackToDefault(t *testing.T) {
+	cfg, err := New(ModeSSACompile)
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+
+	require.Equal(t, defaultCompileConcurrency(), cfg.GetCompileConcurrency())
+}
+
 func TestConfigWithOptions(t *testing.T) {
 	cfg, err := New(
 		ModeAll,
@@ -304,7 +312,7 @@ func TestDefaultFactoryFunctions(t *testing.T) {
 		require.Empty(t, config.ExcludeFiles)
 		require.False(t, config.ReCompile)
 		require.False(t, config.MemoryCompile)
-		require.Equal(t, 1, config.Concurrency)
+		require.Equal(t, defaultCompileConcurrency(), config.Concurrency)
 	})
 
 	t.Run("defaultSyntaxFlowConfig", func(t *testing.T) {

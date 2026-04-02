@@ -113,6 +113,10 @@ func ParseASTWithSLLFirst[L antlr.Lexer, P antlr.Parser, T any](
 	setup func(lexer L, parser P),
 	entry func(parser P) T,
 ) (T, error) {
+	statsEnabled := SLLFirstStatsEnabled()
+	shouldLogFallback := func() bool {
+		return statsEnabled || antlrDiagnosticEnabledNow()
+	}
 	run := func(predictionMode int, errHandler antlr.ErrorStrategy) (ast T, parseErr error, cancelled bool, elapsed time.Duration) {
 		start := time.Now()
 		defer func() {
@@ -163,7 +167,6 @@ func ParseASTWithSLLFirst[L antlr.Lexer, P antlr.Parser, T any](
 		return ast, errListener.Error(), cancelled, elapsed
 	}
 
-	statsEnabled := SLLFirstStatsEnabled()
 	if !SLLFirstEnabled() {
 		if statsEnabled {
 			atomic.AddUint64(&sllFirstLLOnly, 1)
@@ -187,15 +190,21 @@ func ParseASTWithSLLFirst[L antlr.Lexer, P antlr.Parser, T any](
 		if statsEnabled {
 			atomic.AddUint64(&sllFirstFallbackCancelled, 1)
 		}
-		log.Infof("[antlr-sll-first] fallback to LL: reason=cancelled src_len=%d sll_elapsed=%s", len(src), sllElapsed)
+		if shouldLogFallback() {
+			log.Infof("[antlr-sll-first] fallback to LL: reason=cancelled src_len=%d sll_elapsed=%s", len(src), sllElapsed)
+		}
 	} else if err != nil {
 		if statsEnabled {
 			atomic.AddUint64(&sllFirstFallbackError, 1)
 		}
-		log.Infof("[antlr-sll-first] fallback to LL: reason=listener_error src_len=%d sll_elapsed=%s", len(src), sllElapsed)
+		if shouldLogFallback() {
+			log.Infof("[antlr-sll-first] fallback to LL: reason=listener_error src_len=%d sll_elapsed=%s", len(src), sllElapsed)
+		}
 	}
 
 	ast, err, _, llElapsed := run(antlr.PredictionModeLL, antlr.NewDefaultErrorStrategy())
-	log.Infof("[antlr-sll-first] LL completed: src_len=%d ll_elapsed=%s", len(src), llElapsed)
+	if shouldLogFallback() {
+		log.Infof("[antlr-sll-first] LL completed: src_len=%d ll_elapsed=%s", len(src), llElapsed)
+	}
 	return ast, err
 }

@@ -42,7 +42,9 @@ func (c *SimpleCache[T]) Add(key string, item T) {
 
 	data, ok := c.cache.Get(key)
 	if !ok {
-		data = make([]T, 0)
+		data = make([]T, 0, 1)
+	} else if len(data) > 0 && data[len(data)-1] == item {
+		return
 	}
 	data = append(data, item)
 	c.cache.Set(key, data)

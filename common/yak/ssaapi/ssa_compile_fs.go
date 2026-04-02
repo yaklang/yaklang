@@ -2,6 +2,9 @@ package ssaapi
 
 import (
 	"fmt"
+	"os"
+	"runtime"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -107,6 +110,30 @@ func (c *Config) parseProjectWithFS(
 	filesystem filesys_interface.FileSystem,
 	processCallback func(float64, string, ...any),
 ) (*Program, error) {
+	if concurrency := c.GetCompileConcurrency(); concurrency > 0 {
+		current := runtime.GOMAXPROCS(0)
+		if current > concurrency {
+			previous := runtime.GOMAXPROCS(concurrency)
+			defer runtime.GOMAXPROCS(previous)
+		}
+	}
+	if os.Getenv("GOMEMLIMIT") == "" {
+		const (
+			perWorkerMemory = int64(3) << 30
+			minMemoryLimit  = int64(4) << 30
+			maxMemoryLimit  = int64(12) << 30
+		)
+		workers := max(c.GetCompileConcurrency(), 1)
+		memoryLimit := int64(workers) * perWorkerMemory
+		if memoryLimit < minMemoryLimit {
+			memoryLimit = minMemoryLimit
+		}
+		if memoryLimit > maxMemoryLimit {
+			memoryLimit = maxMemoryLimit
+		}
+		previous := debug.SetMemoryLimit(memoryLimit)
+		defer debug.SetMemoryLimit(previous)
+	}
 
 	var calculateTime, preHandlerTime, parseTime, saveTime time.Duration
 	defer func() {
