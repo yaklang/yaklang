@@ -840,8 +840,9 @@ func TestLoadThirdPartyConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 	assert.Equal(t, "APIKey", aiConfig.APIKey)
-	assert.Equal(t, "Domain", aiConfig.Domain)
-	assert.Equal(t, true, aiConfig.NoHttps)
+	assert.Equal(t, "", aiConfig.Domain)
+	assert.Equal(t, false, aiConfig.NoHttps)
+	assert.Equal(t, "", aiConfig.BaseURL)
 	assert.Equal(t, "Model", aiConfig.Model)
 	assert.Equal(t, "Proxy", aiConfig.Proxy)
 
