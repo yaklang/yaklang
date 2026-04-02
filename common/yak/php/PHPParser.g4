@@ -118,18 +118,12 @@ namespacePath
     ;
 
 namespaceDeclaration
-    : Namespace OpenCurlyBracket CloseCurlyBracket
-    | Namespace OpenCurlyBracket useDeclaration+ namespaceStatement* CloseCurlyBracket
-    | Namespace OpenCurlyBracket namespaceStatement+ CloseCurlyBracket
-    | Namespace namespacePath OpenCurlyBracket CloseCurlyBracket
-    | Namespace namespacePath OpenCurlyBracket useDeclaration+ namespaceStatement* CloseCurlyBracket
-    | Namespace namespacePath OpenCurlyBracket namespaceStatement+ CloseCurlyBracket
+    : Namespace OpenCurlyBracket useDeclaration* namespaceStatement* CloseCurlyBracket
+    | Namespace namespacePath OpenCurlyBracket useDeclaration* namespaceStatement* CloseCurlyBracket
     ;
 
 namespaceDeclarationSemi
-    : Namespace namespacePath SemiColon
-    | Namespace namespacePath SemiColon useDeclaration+ namespaceStatement*
-    | Namespace namespacePath SemiColon namespaceStatement+
+    : Namespace namespacePath SemiColon useDeclaration* namespaceStatement*
     ;
 
 namespaceStatement
@@ -560,10 +554,25 @@ indexMemberCallKey
     ;
 
 dynamicStaticClassExpr
-    : functionCall '::' memberCallKey
-    | parentheses '::' memberCallKey
-    | functionCall '::' variable
-    | parentheses '::' variable
+    : dynamicStaticReceiver '::' memberCallKey
+    | dynamicStaticReceiver '::' variable
+    ;
+
+dynamicStaticReceiver
+    : staticClassExpr
+    | dynamicStaticReceiverBase dynamicStaticReceiverAccess*
+    ;
+
+dynamicStaticReceiverBase
+    : functionCall
+    | parentheses
+    | flexiVariable
+    ;
+
+dynamicStaticReceiverAccess
+    : ObjectOperator memberCallKey arguments?
+    | NullsafeObjectOperator memberCallKey arguments?
+    | squareCurlyExpression
     ;
 
 // Expressions
@@ -620,8 +629,8 @@ expression
     | expression op = '??' expression                                                   # NullCoalescingExpression
     | expression op = '<=>' expression                                                  # SpaceshipExpression
     | leftArrayCreation Eq expression                                                   # ArrayCreationUnpackExpression
-    | functionCallIndexedAssignable Eq '&' expression                                   # FunctionCallIndexedReferenceAssignmentExpression
-    | functionCallIndexedAssignable assignmentOperator expression                       # FunctionCallIndexedAssignmentExpression
+    | functionCallAssignable Eq '&' expression                                          # FunctionCallAssignableReferenceAssignmentExpression
+    | functionCallAssignable assignmentOperator expression                              # FunctionCallAssignableAssignmentExpression
     | assignableChain Eq '&' expression                                                 # ReferenceAssignmentExpression
     | assignableChain assignmentOperator expression                                     # OrdinaryAssignmentExpression
     | expression op = LogicalAnd expression                                             # LogicalExpression
@@ -692,7 +701,7 @@ matchExpr
     ;
 
 matchItem
-    : expression (',' expression)* '=>' expression
+    : expression (',' expression)* ','? '=>' expression
     ;
 
 newExpr
@@ -882,8 +891,13 @@ assignableChain
     | assignableChainOrigin assignableChainAccess+
     ;
 
-functionCallIndexedAssignable
-    : functionCall squareCurlyExpression+
+functionCallAssignable
+    : functionCall functionCallAssignableAccess+
+    ;
+
+functionCallAssignableAccess
+    : memberAccess
+    | squareCurlyExpression
     ;
 
 assignableChainOrigin
