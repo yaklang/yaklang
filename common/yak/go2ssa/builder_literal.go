@@ -889,6 +889,9 @@ func (b *astbuilder) GetDefaultValue(ityp ssa.Type) ssa.Value {
 		return b.GetDefaultValue(alias.GetType())
 	case ssa.StructTypeKind, ssa.ObjectTypeKind, ssa.InterfaceTypeKind, ssa.SliceTypeKind, ssa.MapTypeKind:
 		return b.EmitMakeBuildWithType(ityp, nil, nil)
+	case ssa.ClassBluePrintTypeKind:
+		// TODO
+		return b.EmitConstInst(0)
 	default:
 		return b.EmitConstInst(0)
 	}

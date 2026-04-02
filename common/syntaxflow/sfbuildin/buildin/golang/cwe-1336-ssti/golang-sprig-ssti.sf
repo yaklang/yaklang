@@ -105,8 +105,7 @@ template?{<fullTypeName>?{have: 'text/template'}} as $template;
 template?{<fullTypeName>?{have: 'html/template'}} as $template;
 
 $template.New as $new;
-$new().Funcs(* #-> as $param);
-$param?{<fullTypeName>?{have: 'sprig'}} as $low;
+$new().Funcs?(* #{until: `* ?{<fullTypeName>?{have: 'sprig'}}`}-> ) as $low;
 
 alert $low for {
 	solution: <<<SOLUTION

@@ -20,6 +20,11 @@ type SSABuilder struct {
 	*ssa.PreHandlerBase
 }
 
+const goInitFunctionName = "init"
+
+// goIotaName is the predeclared identifier for const enumeration (like init for special functions).
+const goIotaName = "iota"
+
 var Builder = &SSABuilder{}
 
 func CreateBuilder() ssa.Builder {
@@ -108,10 +113,10 @@ func (s *SSABuilder) BuildFromAST(raw ssa.FrontAST, builder *ssa.FunctionBuilder
 		"error":      ssa.CreateErrorType(),
 	}
 	SpecialValue := map[string]interface{}{
-		"nil":   nil,
-		"iota":  "iota",
-		"true":  true,
-		"false": false,
+		"nil":        nil,
+		goIotaName: goIotaName,
+		"true":       true,
+		"false":      false,
 	}
 
 	builder.SupportClosure = false

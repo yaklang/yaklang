@@ -43,8 +43,12 @@ func (b *FunctionBuilder) AddGlobalVariable(name string, valueFunc func() Value)
 
 }
 
-func (b *FunctionBuilder) CheckGlobalVariablePhi(l *Variable, r Value) bool {
+func (b *FunctionBuilder) TryUpdateGlobalVariable(l *Variable, r Value) bool {
 	name := l.GetName()
+	return b.TryUpdateGlobalVariableByName(name, r)
+}
+
+func (b *FunctionBuilder) TryUpdateGlobalVariableByName(name string, r Value) bool {
 	prog := b.GetProgram()
 
 	if utils.IsNil(prog.GlobalVariablesBlueprint) {
@@ -56,13 +60,13 @@ func (b *FunctionBuilder) CheckGlobalVariablePhi(l *Variable, r Value) bool {
 		return false
 	}
 
-	for i, _ := range globalVarsContainer.GetAllMember() {
-		if i.String() == name {
-			globalVarsContainer.GetAllMember()[i] = r
-			return true
-		}
+	// Only update when the global already exists in the container
+	if _, ok := globalVarsContainer.GetStringMember(name); !ok {
+		return false
 	}
-	return false
+
+	globalVarsContainer.SetStringMember(name, r)
+	return true
 }
 
 func (b *FunctionBuilder) GetGlobalVariables() map[string]Value {

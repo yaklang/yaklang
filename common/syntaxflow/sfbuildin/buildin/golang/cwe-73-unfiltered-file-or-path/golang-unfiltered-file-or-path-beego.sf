@@ -76,14 +76,18 @@ SOLUTION
 REFERENCE
 )
 
+<include('golang-file-path')> as $path;
 <include('golang-file-read-path-sink')> as $sink;
 <include('golang-file-write-path-sink')> as $sink;
 
-.SaveToFile(* as $sink)
-$sink #-> as $unsafe
+strings.HasPrefix(* as $check);
+$path.Clean(* as $check);
+$path.IsAbs(* as $check);
+$path.Join(* as $check);
+$sink #{include: `* & $check`}-> as $safe;
 
-$unsafe.GetString?{<fullTypeName>?{have: "github.com/beego/beego/v2/server/web"}} as $low;
-$unsafe.GetFile?{<fullTypeName>?{have: "github.com/beego/beego/v2/server/web"}} as $low;
+*.GetString?{<fullTypeName>?{have: "github.com/beego/beego/v2/server/web"}} as $input;
+$sink?{* #{ until: `* & $input - $safe`}-> } as $low
 
 alert $low for {
 	solution: <<<SOLUTION

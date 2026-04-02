@@ -91,8 +91,6 @@ $safe_template.CSS as $high;
 $safe_template.HTMLAttr as $high;
 $safe_template.URL as $high;
 
-$new.Option(* #{until: "* & missingkey=error"}-> ) as  $high;
-
 alert $high for {
 	solution: <<<SOLUTION
 ### 修复建议
