@@ -1,4 +1,4 @@
-__DESC__ = "A unified text file reader that supports line-based and byte-chunk reading modes. Automatically detects binary file formats via mimetype (magic bytes) and redirects to appropriate built-in tools (read_excel_info, query_excel_data, read_word_structure, parse_office_to_text, zip_viewer, analyze_pcap, etc.) or Python scripts."
+__DESC__ = "A unified text file (Absolute File Path) reader that supports line-based and byte-chunk reading modes. Automatically detects binary file formats via mimetype (magic bytes) and redirects to appropriate built-in tools (read_excel_info, query_excel_data, read_word_structure, parse_office_to_text, zip_viewer, analyze_pcap, etc.) or Python scripts."
 __VERBOSE_NAME__ = "Unified File Reader"
 __KEYWORDS__ = "memory management,file reading,large file,file handling,reading,data processing,buffer,performance,offset,chunk size,streaming,line reading,binary detection,mimetype,excel,xlsx,pdf,docx,zip,pcap,office,read_excel_info,query_excel_data,parse_office_to_text"
 
@@ -11,7 +11,9 @@ When mode is omitted and the text file is large, it prefers a 20KB chunk first r
 so the initial browse is smoother and faster.
 
 Required Parameters:
-  file            (string)  The target file path you want to read.
+    file            (string)  The target file ABSOLUTE path you want to read.
+                                                        For AI JSON tool calls, always use an absolute path.
+                                                        Do NOT use relative paths such as "test.txt", "./test.txt", or "../test.txt".
 
 Optional Parameters:
     mode            (string)  Read mode:
@@ -21,6 +23,12 @@ Optional Parameters:
     offset          (int)     Byte offset (mode=chunk) or line offset (mode=lines). Default: 0.
     lines           (int)     Number of lines to read (mode=lines). Default: 200. If omitted, the tool tries to return about 10KB of text for smoother reading.
     line-size       (int)     Max characters per line (mode=lines). Default: 1024.
+
+Path Rules:
+    - Prefer a full absolute filesystem path in every AI tool call.
+    - If you only know a filename or a relative path, first use another tool to locate the file and get its absolute path.
+    - Good: "/Users/alice/project/main.go"
+    - Bad:  "main.go", "./main.go", "../project/main.go"
 
 Binary File Detection:
   Before reading, this tool detects binary formats using the mimetype library
@@ -88,7 +96,7 @@ USAGE_BLOCK
    - lines: 按行分段读取文件内容（支持行偏移量）
 
 2. 通用参数：
-   --file: 指定要读取的文件路径 (必需)
+    --file: 指定要读取的文件绝对路径 (必需；AI 工具调用时必须使用绝对路径)
    --mode: 读取模式，chunk 或 lines (默认: lines)
    --offset: 读取偏移量，chunk 模式为字节偏移，lines 模式为行偏移 (默认: 0)
 
@@ -101,34 +109,34 @@ USAGE_BLOCK
 
 使用示例：
 1. 大文本文件默认优先首读 20KB 字节块；较小文本仍按行读取：
-   yak read_file.yak --file test.txt
+    yak read_file.yak --file /absolute/path/to/test.txt
 
 2. 按行读取文件前 20 行：
-   yak read_file.yak --file test.txt --lines 20
+    yak read_file.yak --file /absolute/path/to/test.txt --lines 20
 
 3. 按字节块读取文件前 20K 字节：
-    yak read_file.yak --file test.txt --mode chunk --chunk-size 20000
+     yak read_file.yak --file /absolute/path/to/test.txt --mode chunk --chunk-size 20000
 
 4. 按行读取文件从第 100 行开始的 20 行：
-   yak read_file.yak --file test.txt --mode lines --offset 100 --lines 20
+    yak read_file.yak --file /absolute/path/to/test.txt --mode lines --offset 100 --lines 20
 
 5. 按行读取文件，限制每行最大 256 字符：
-   yak read_file.yak --file test.txt --mode lines --line-size 256
+    yak read_file.yak --file /absolute/path/to/test.txt --mode lines --line-size 256
 
 6. 测试边界情况 - 超大 chunk-size（会被限制为 30000）：
-   yak read_file.yak --file test.txt --mode chunk --chunk-size 50000
+    yak read_file.yak --file /absolute/path/to/test.txt --mode chunk --chunk-size 50000
 
 7. 测试错误处理 - 无效模式：
-   yak read_file.yak --file test.txt --mode invalid
+    yak read_file.yak --file /absolute/path/to/test.txt --mode invalid
 
 8. 测试错误处理 - 文件不存在：
-   yak read_file.yak --file nonexistent.txt --mode chunk
+    yak read_file.yak --file /absolute/path/to/nonexistent.txt --mode chunk
 
 9. 测试参数验证 - 负数 chunk-size：
-   yak read_file.yak --file test.txt --mode chunk --chunk-size -1
+    yak read_file.yak --file /absolute/path/to/test.txt --mode chunk --chunk-size -1
 
 10. 测试参数验证 - 负数 lines：
-    yak read_file.yak --file test.txt --mode lines --lines -1
+     yak read_file.yak --file /absolute/path/to/test.txt --mode lines --lines -1
 
 注意事项：
 - 未显式指定 mode 且文件较大时，会优先按 chunk 模式首读 20KB，便于快速浏览大文本文件
@@ -151,7 +159,7 @@ defaultLineSize = 1024
 defaultLineTargetBytes = 10240
 defaultLineHardCap = 400
 
-t := cli.String("file", cli.setRequired(true), cli.setHelp("target file you want to read"))
+t := cli.String("file", cli.setRequired(true), cli.setHelp("target file absolute path you want to read; for AI tool calls always use an absolute path"))
 mode := cli.String("mode", cli.setDefault("auto"), cli.setHelp("read mode: 'auto' (default), 'chunk', or 'lines'; auto prefers chunk mode for large text files"))
 chunkSize := cli.Int("chunk-size", cli.setRequired(false), cli.setHelp("size for chunk read when mode=chunk, max: 30000; <=0 uses mode default"), cli.setDefault(0))
 offset := cli.Int("offset", cli.setRequired(false), cli.setDefault(0))
@@ -160,7 +168,7 @@ lineSize := cli.Int("line-size", cli.setRequired(false), cli.setHelp("the max co
 cli.check()
 
 if !file.IsExisted(t) {
-    yakit.Warn("%v is not existed", t)
+    yakit.Warn("%v is not existed. If this is an AI tool call, pass an absolute path such as /abs/path/to/file instead of test.txt or ./test.txt", t)
     return
 }
 
