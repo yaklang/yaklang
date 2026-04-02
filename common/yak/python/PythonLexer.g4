@@ -92,6 +92,7 @@ ELLIPSIS           : '...';
 REVERSE_QUOTE      : '`';
 STAR               : '*';
 COMMA              : ',';
+COLON_ASSIGN       : ':=';
 COLON              : ':';
 SEMI_COLON         : ';';
 POWER              : '**';
@@ -135,7 +136,7 @@ STRING:
     | ([bB] [rR]? | [rR] [bB]) (SHORT_BYTES | LONG_BYTES)
 ;
 
-DECIMAL_INTEGER : [1-9] [0-9]* | '0'+;
+DECIMAL_INTEGER : [0-9] ('_'? [0-9])*;
 OCT_INTEGER     : '0' [oO] [0-7]+;
 HEX_INTEGER     : '0' [xX] [0-9a-fA-F]+;
 BIN_INTEGER     : '0' [bB] [01]+;
@@ -172,7 +173,9 @@ fragment RN: '\r'? '\n';
 
 fragment EXPONENT_OR_POINT_FLOAT: ([0-9]+ | POINT_FLOAT) [eE] [+-]? [0-9]+ | POINT_FLOAT;
 
-fragment POINT_FLOAT: [0-9]* '.' [0-9]+ | [0-9]+ '.';
+fragment DIGIT_PART: [0-9] ('_'? [0-9])*;
+
+fragment POINT_FLOAT: [0-9]* '.' DIGIT_PART | DIGIT_PART '.';
 
 fragment SHORT_BYTES:
     '\'' (SHORT_BYTES_CHAR_NO_SINGLE_QUOTE | BYTES_ESCAPE_SEQ)* '\''

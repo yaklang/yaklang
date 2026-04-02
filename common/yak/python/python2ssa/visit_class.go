@@ -30,6 +30,17 @@ func (b *singleFileBuilder) handleClassInheritance(blueprint *ssa.Blueprint, arg
 				b.GetProgram().SetExportType(parentName, parentBp)
 			}
 			parentBp.SetKind(ssa.BlueprintClass)
+
+			// These relation names are SSA-internal bookkeeping members. Pre-register
+			// them in the blueprint maps so Python class lowering does not rely on
+			// SSA-side missing-member suppression.
+			if parentContainer := parentBp.Container(); parentContainer != nil {
+				blueprint.RegisterNormalMember(string(ssa.BlueprintRelationParents), parentContainer, false)
+			}
+			if childContainer := blueprint.Container(); childContainer != nil {
+				parentBp.RegisterNormalMember(string(ssa.BlueprintRelationInherit), childContainer, false)
+			}
+
 			blueprint.AddParentBlueprint(parentBp)
 		}
 	}
@@ -40,6 +51,10 @@ func (b *singleFileBuilder) visitClassBody(suite pythonparser.ISuiteContext, blu
 	if !ok {
 		return
 	}
+
+	// Python classes are callable even without an explicit __init__. Pre-register
+	// the constructor slot so synthesized constructor storage stays Python-local.
+	b.ensureBlueprintConstructorSlot(blueprint)
 
 	// Register methods synchronously so the constructor is visible to call sites
 	// in the same scope. Method bodies are still compiled lazily (AddLazyBuilder).
@@ -148,6 +163,13 @@ func (b *singleFileBuilder) visitNestedClassdef(classdef *pythonparser.ClassdefC
 	b.GetProgram().SetExportType(className, nestedBp)
 	b.handleClassInheritance(nestedBp, arglist)
 	b.visitClassBody(suite, nestedBp)
+	blueprintValue := nestedBp.Container()
+	if blueprintValue == nil {
+		return
+	}
+	parentBlueprint.RegisterNormalMember(nameCtx.GetText(), blueprintValue, false)
+	parentBlueprint.RegisterStaticMember(nameCtx.GetText(), blueprintValue, false)
+	b.syncBlueprintContainerMember(parentBlueprint, nameCtx.GetText(), blueprintValue)
 }
 
 func (b *singleFileBuilder) visitClassConstant(exprStmt *pythonparser.Expr_stmtContext, blueprint *ssa.Blueprint) {
@@ -164,21 +186,8 @@ func (b *singleFileBuilder) visitClassConstant(exprStmt *pythonparser.Expr_stmtC
 	if !ok {
 		return
 	}
-
-	tests := testlistStar.AllTest()
-	if len(tests) == 0 {
-		return
-	}
-
-	test := tests[0]
-
-	testCtx, ok := test.(*pythonparser.TestContext)
-	if !ok {
-		return
-	}
-
-	varName := b.extractVariableName(testCtx)
-	if varName == "" {
+	targets := b.extractLeftTargets(testlistStar)
+	if len(targets) == 0 {
 		return
 	}
 
@@ -197,10 +206,17 @@ func (b *singleFileBuilder) visitClassConstant(exprStmt *pythonparser.Expr_stmtC
 	}
 
 	if value == nil {
-		value = b.EmitUndefined(varName)
+		value = b.EmitUndefined("class_member")
 	}
 
-	blueprint.RegisterNormalMember(varName, value)
+	for _, target := range targets {
+		if target.memberVar != nil || target.varName == "" {
+			continue
+		}
+		blueprint.RegisterNormalMember(target.varName, value)
+		blueprint.RegisterStaticMember(target.varName, value)
+		b.syncBlueprintContainerMember(blueprint, target.varName, value)
+	}
 }
 
 func (b *singleFileBuilder) visitClassMethod(funcdef *pythonparser.FuncdefContext, blueprint *ssa.Blueprint) {
@@ -226,6 +242,12 @@ func (b *singleFileBuilder) visitClassMethodWithModifier(funcdef *pythonparser.F
 	isStaticMethod := (modifier == "staticmethod")
 	isClassMethod := (modifier == "classmethod")
 
+	if !isConstructor {
+		// Pre-register method names in the class member map so later blueprint
+		// bookkeeping writes do not surface as user-facing invalid-member errors.
+		blueprint.RegisterNormalMember(methodName, newFunc, false)
+	}
+
 	switch {
 	case isConstructor:
 		// Pre-register class name as NormalMember (store=false) so storeField inside
@@ -234,10 +256,13 @@ func (b *singleFileBuilder) visitClassMethodWithModifier(funcdef *pythonparser.F
 		blueprint.RegisterMagicMethod(ssa.Constructor, newFunc)
 	case isStaticMethod:
 		blueprint.RegisterStaticMethod(methodName, newFunc)
+		b.syncBlueprintContainerMember(blueprint, methodName, newFunc)
 	case isClassMethod:
 		blueprint.RegisterStaticMethod(methodName, newFunc)
+		b.syncBlueprintContainerMember(blueprint, methodName, newFunc)
 	default:
 		blueprint.RegisterNormalMethod(methodName, newFunc)
+		b.syncBlueprintContainerMember(blueprint, methodName, newFunc)
 	}
 
 	store := b.StoreFunctionBuilder()

@@ -96,7 +96,7 @@ sink(p.y)`
 		ssatest.CheckSyntaxFlow(t, code,
 			"sink(* as $param)",
 			map[string][]string{
-				"param": {"Undefined-p.x", "Undefined-p.y"},
+				"param": {"Undefined-p.x(valid)", "Undefined-p.y(valid)"},
 			},
 			ssaapi.WithLanguage(ssaconfig.PYTHON))
 	})
@@ -131,7 +131,7 @@ value = Config.MAX`
 		ssatest.CheckSyntaxFlow(t, code,
 			"Config.MAX #-> * as $value",
 			map[string][]string{
-				"value": {"Config"},
+				"value": {"100"},
 			},
 			ssaapi.WithLanguage(ssaconfig.PYTHON))
 	})

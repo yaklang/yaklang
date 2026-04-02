@@ -47,6 +47,10 @@ func (v *BasePythonParserVisitor) VisitWith_stmt(ctx *With_stmtContext) interfac
 	return v.VisitChildren(ctx)
 }
 
+func (v *BasePythonParserVisitor) VisitMatch_stmt(ctx *Match_stmtContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BasePythonParserVisitor) VisitClass_or_func_def_stmt(ctx *Class_or_func_def_stmtContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -75,6 +79,14 @@ func (v *BasePythonParserVisitor) VisitWith_item(ctx *With_itemContext) interfac
 	return v.VisitChildren(ctx)
 }
 
+func (v *BasePythonParserVisitor) VisitCase_clause(ctx *Case_clauseContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePythonParserVisitor) VisitCase_pattern(ctx *Case_patternContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BasePythonParserVisitor) VisitExcept_clause(ctx *Except_clauseContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -84,6 +96,10 @@ func (v *BasePythonParserVisitor) VisitClassdef(ctx *ClassdefContext) interface{
 }
 
 func (v *BasePythonParserVisitor) VisitFuncdef(ctx *FuncdefContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePythonParserVisitor) VisitType_params(ctx *Type_paramsContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -112,6 +128,10 @@ func (v *BasePythonParserVisitor) VisitNamed_parameter(ctx *Named_parameterConte
 }
 
 func (v *BasePythonParserVisitor) VisitSimple_stmt(ctx *Simple_stmtContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePythonParserVisitor) VisitType_stmt(ctx *Type_stmtContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

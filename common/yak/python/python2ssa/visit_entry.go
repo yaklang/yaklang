@@ -52,6 +52,9 @@ func (b *singleFileBuilder) VisitFileInput(raw pythonparser.IFile_inputContext) 
 	stmts := fileInput.AllStmt()
 	for _, stmt := range stmts {
 		b.VisitStmt(stmt)
+		if b.shouldStopStatementWalk() {
+			break
+		}
 	}
 
 	return nil
@@ -145,6 +148,9 @@ func (b *singleFileBuilder) VisitSimpleStmt(raw pythonparser.ISimple_stmtContext
 	// Visit all small_stmt nodes
 	for _, smallStmt := range simpleStmt.AllSmall_stmt() {
 		b.VisitSmallStmt(smallStmt)
+		if b.shouldStopStatementWalk() {
+			break
+		}
 	}
 
 	return nil
@@ -162,6 +168,8 @@ func (b *singleFileBuilder) VisitSmallStmt(raw pythonparser.ISmall_stmtContext) 
 
 	// Use type switch to handle different statement types
 	switch stmt := raw.(type) {
+	case *pythonparser.Type_stmtContext:
+		return b.VisitTypeStmt(stmt)
 	case *pythonparser.Expr_stmtContext:
 		return b.VisitExprStmt(stmt)
 	case *pythonparser.Return_stmtContext:
@@ -219,6 +227,8 @@ func (b *singleFileBuilder) VisitCompoundStmt(raw pythonparser.ICompound_stmtCon
 		return b.VisitTryStmt(stmt)
 	case *pythonparser.With_stmtContext:
 		return b.VisitWithStmt(stmt)
+	case *pythonparser.Match_stmtContext:
+		return b.VisitMatchStmt(stmt)
 	case *pythonparser.Class_or_func_def_stmtContext:
 		return b.VisitClassOrFuncDefStmt(stmt)
 	}

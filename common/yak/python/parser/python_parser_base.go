@@ -21,7 +21,7 @@ type PythonParserBase struct {
 func NewPythonParserBase(input antlr.TokenStream) *PythonParserBase {
 	base := &PythonParserBase{
 		BaseParser: antlr.NewBaseParser(input),
-		Version:     PythonVersionAutodetect,
+		Version:    PythonVersionAutodetect,
 	}
 	return base
 }
@@ -43,3 +43,15 @@ func (p *PythonParserBase) SetVersion(requiredVersion int) {
 	}
 }
 
+// IsSoftKeyword checks whether the current lookahead token is a NAME with the
+// requested text. This is used for Python soft keywords such as match/case.
+func (p *PythonParserBase) IsSoftKeyword(keyword string) bool {
+	if p == nil || p.GetTokenStream() == nil {
+		return false
+	}
+	token := p.GetTokenStream().LT(1)
+	if token == nil {
+		return false
+	}
+	return token.GetText() == keyword
+}

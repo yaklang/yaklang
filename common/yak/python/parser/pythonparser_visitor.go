@@ -37,6 +37,9 @@ type PythonParserVisitor interface {
 	// Visit a parse tree produced by PythonParser#with_stmt.
 	VisitWith_stmt(ctx *With_stmtContext) interface{}
 
+	// Visit a parse tree produced by PythonParser#match_stmt.
+	VisitMatch_stmt(ctx *Match_stmtContext) interface{}
+
 	// Visit a parse tree produced by PythonParser#class_or_func_def_stmt.
 	VisitClass_or_func_def_stmt(ctx *Class_or_func_def_stmtContext) interface{}
 
@@ -58,6 +61,12 @@ type PythonParserVisitor interface {
 	// Visit a parse tree produced by PythonParser#with_item.
 	VisitWith_item(ctx *With_itemContext) interface{}
 
+	// Visit a parse tree produced by PythonParser#case_clause.
+	VisitCase_clause(ctx *Case_clauseContext) interface{}
+
+	// Visit a parse tree produced by PythonParser#case_pattern.
+	VisitCase_pattern(ctx *Case_patternContext) interface{}
+
 	// Visit a parse tree produced by PythonParser#except_clause.
 	VisitExcept_clause(ctx *Except_clauseContext) interface{}
 
@@ -66,6 +75,9 @@ type PythonParserVisitor interface {
 
 	// Visit a parse tree produced by PythonParser#funcdef.
 	VisitFuncdef(ctx *FuncdefContext) interface{}
+
+	// Visit a parse tree produced by PythonParser#type_params.
+	VisitType_params(ctx *Type_paramsContext) interface{}
 
 	// Visit a parse tree produced by PythonParser#typedargslist.
 	VisitTypedargslist(ctx *TypedargslistContext) interface{}
@@ -87,6 +99,9 @@ type PythonParserVisitor interface {
 
 	// Visit a parse tree produced by PythonParser#simple_stmt.
 	VisitSimple_stmt(ctx *Simple_stmtContext) interface{}
+
+	// Visit a parse tree produced by PythonParser#type_stmt.
+	VisitType_stmt(ctx *Type_stmtContext) interface{}
 
 	// Visit a parse tree produced by PythonParser#expr_stmt.
 	VisitExpr_stmt(ctx *Expr_stmtContext) interface{}
