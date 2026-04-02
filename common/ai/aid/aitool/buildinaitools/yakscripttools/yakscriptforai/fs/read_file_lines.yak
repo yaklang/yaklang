@@ -1,4 +1,4 @@
-__DESC__ = "A line-based text file reader with pagination support. Automatically detects binary file formats via mimetype (magic bytes) and redirects to appropriate built-in tools (read_excel_info, read_word_structure, parse_office_to_text, zip_viewer, analyze_pcap, etc.)."
+__DESC__ = "A line-based text file (Absolute File Path) reader with pagination support. Automatically detects binary file formats via mimetype (magic bytes) and redirects to appropriate built-in tools (read_excel_info, read_word_structure, parse_office_to_text, zip_viewer, analyze_pcap, etc.)."
 __VERBOSE_NAME__ = "Line-Based File Reader"
 __KEYWORDS__ = "file reading,line reading,log analysis,text processing,large file,line by line,pagination,streaming read,binary detection,mimetype,read_excel_info,parse_office_to_text"
 
@@ -9,12 +9,20 @@ Reads text files line by line with pagination. Uses mimetype (magic bytes)
 to detect binary files and redirects to appropriate tools.
 
 Required Parameters:
-  file            (string)  The target file path you want to read line by line.
+    file            (string)  The target file ABSOLUTE path you want to read line by line.
+                                                        For AI JSON tool calls, always use an absolute path.
+                                                        Do NOT use relative paths such as "test.txt", "./test.txt", or "../test.txt".
 
 Optional Parameters:
   offset          (int)     Starting line number (1-based). Default: 1.
     lines           (int)     Number of lines to read. Default: 200. If omitted, the tool tries to return about 10KB of text.
     line-size       (int)     Max characters per line (truncated if exceeded). Default: 1024.
+
+Path Rules:
+    - Prefer a full absolute filesystem path in every AI tool call.
+    - If you only know a filename or a relative path, first use another tool to locate the file and get its absolute path.
+    - Good: "/Users/alice/project/main.go"
+    - Bad:  "main.go", "./main.go", "../project/main.go"
 
 Binary File Detection:
   Same as read_file - detects binary formats and recommends built-in tools.
@@ -56,35 +64,35 @@ USAGE_BLOCK
 5. 支持大文件的安全读取，不会一次性加载整个文件到内存
 
 参数说明：
-  --file: 指定要读取的文件路径 (必需)
+    --file: 指定要读取的文件绝对路径 (必需；AI 工具调用时必须使用绝对路径)
   --offset: 起始行号偏移量，从第几行开始读取 (默认: 1，表示从第一行开始)
     --lines: 读取的行数 (默认: 200；未显式指定时会尽量返回约 10KB 文本)
     --line-size: 每行的最大长度限制，超过会被截断 (默认: 1024 字符)
 
 使用示例：
 1. 读取文件首屏内容（默认，约 10KB / 200 行）：
-   yak read_file_lines.yak --file test.txt
+    yak read_file_lines.yak --file /absolute/path/to/test.txt
 
 2. 读取文件前 20 行：
-   yak read_file_lines.yak --file test.txt --lines 20
+    yak read_file_lines.yak --file /absolute/path/to/test.txt --lines 20
 
 3. 从第 100 行开始读取 30 行：
-   yak read_file_lines.yak --file test.txt --offset 100 --lines 30
+    yak read_file_lines.yak --file /absolute/path/to/test.txt --offset 100 --lines 30
 
 4. 读取文件，限制每行最大 256 字符：
-   yak read_file_lines.yak --file test.txt --line-size 256
+    yak read_file_lines.yak --file /absolute/path/to/test.txt --line-size 256
 
 5. 读取日志文件的最后部分（需要先知道总行数）：
-    yak read_file_lines.yak --file app.log --offset 9950 --lines 120
+     yak read_file_lines.yak --file /absolute/path/to/app.log --offset 9950 --lines 120
 
 6. 测试边界情况 - 偏移量超出文件行数：
-   yak read_file_lines.yak --file test.txt --offset 10000
+    yak read_file_lines.yak --file /absolute/path/to/test.txt --offset 10000
 
 7. 测试错误处理 - 文件不存在：
-   yak read_file_lines.yak --file nonexistent.txt
+    yak read_file_lines.yak --file /absolute/path/to/nonexistent.txt
 
 8. 测试参数验证 - 负数行数：
-   yak read_file_lines.yak --file test.txt --lines -1
+    yak read_file_lines.yak --file /absolute/path/to/test.txt --lines -1
 
 注意事项：
 - 默认从第 1 行开始读取，未显式指定时会尽量返回约 10KB 文本，基线为 200 行
@@ -104,7 +112,7 @@ defaultLineTargetBytes = 10240
 defaultLineHardCap = 400
 
 // 解析命令行参数
-filePath := cli.String("file", cli.setRequired(true), cli.setHelp("target file you want to read"))
+filePath := cli.String("file", cli.setRequired(true), cli.setHelp("target file absolute path you want to read; for AI tool calls always use an absolute path"))
 offset := cli.Int("offset", cli.setRequired(false), cli.setDefault(1), cli.setHelp("start line number (1-based), default is 1"))
 lines := cli.Int("lines", cli.setRequired(false), cli.setDefault(0), cli.setHelp("how many lines you want to read; <=0 enables auto sizing"))
 lineSize := cli.Int("line-size", cli.setRequired(false), cli.setDefault(defaultLineSize), cli.setHelp("the max characters in a line, default is 1024"))
@@ -113,7 +121,7 @@ cli.check()
 
 // 检查文件是否存在
 if !file.IsExisted(filePath) {
-    yakit.Error("File does not exist: %v", filePath)
+    yakit.Error("File does not exist: %v. If this is an AI tool call, pass an absolute path such as /abs/path/to/file instead of test.txt or ./test.txt", filePath)
     return
 }
 
