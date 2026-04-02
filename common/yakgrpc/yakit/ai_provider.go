@@ -326,6 +326,7 @@ func providerSignature(cfg *ypb.ThirdPartyApplicationConfig) string {
 		cfg.GetUserSecret(),
 		cfg.GetNamespace(),
 		cfg.GetDomain(),
+		cfg.GetBaseURL(),
 		cfg.GetWebhookURL(),
 		builder.String(),
 		cfg.GetProxy(),

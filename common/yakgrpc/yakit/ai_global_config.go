@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -47,6 +48,7 @@ func GetAIGlobalConfig(db *gorm.DB) (*ypb.AIGlobalConfig, error) {
 		cfg.RoutingPolicy = defaultRoutingPolicy
 	}
 	recoverProvidersFromDeprecatedConfig(db, cfg)
+	persistMigratedAIGlobalConfig(db, cfg)
 	return cfg, nil
 }
 
@@ -67,6 +69,7 @@ func SetAIGlobalConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig) (*ypb.AIGlobalConfi
 	if err := validateModelConfigs(cfg.VisionModels); err != nil {
 		return nil, err
 	}
+	migrateAIGlobalConfigBaseURLs(cfg)
 
 	data, err := json.Marshal(cfg)
 	if err != nil {
@@ -161,8 +164,12 @@ func mergeProviderAndModel(provider *ypb.ThirdPartyApplicationConfig, model *ypb
 		UserSecret:     provider.GetUserSecret(),
 		Namespace:      provider.GetNamespace(),
 		Domain:         provider.GetDomain(),
+		BaseURL:        provider.GetBaseURL(),
 		WebhookURL:     provider.GetWebhookURL(),
 		Disabled:       provider.GetDisabled(),
+		Proxy:          provider.GetProxy(),
+		NoHttps:        provider.GetNoHttps(),
+		APIType:        provider.GetAPIType(),
 	}
 
 	extra := mapFromKVPairs(provider.GetExtraParams())
@@ -227,6 +234,7 @@ func cloneThirdPartyConfig(cfg *ypb.ThirdPartyApplicationConfig) *ypb.ThirdParty
 		UserSecret:     cfg.GetUserSecret(),
 		Namespace:      cfg.GetNamespace(),
 		Domain:         cfg.GetDomain(),
+		BaseURL:        cfg.GetBaseURL(),
 		WebhookURL:     cfg.GetWebhookURL(),
 		Disabled:       cfg.GetDisabled(),
 		Proxy:          cfg.GetProxy(),
@@ -326,5 +334,90 @@ func recoverProvidersFromDeprecatedConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig) 
 	}
 	if err := SetKey(db, consts.AI_GLOBAL_CONFIG_KEY, string(data)); err != nil {
 		log.Debugf("persist recovered ai global config failed: %v", err)
+	}
+}
+
+func persistMigratedAIGlobalConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig) {
+	if db == nil || cfg == nil {
+		return
+	}
+	if !migrateAIGlobalConfigBaseURLs(cfg) {
+		return
+	}
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		log.Debugf("persist migrated ai global config failed: %v", err)
+		return
+	}
+	if err := SetKey(db, consts.AI_GLOBAL_CONFIG_KEY, string(data)); err != nil {
+		log.Debugf("persist migrated ai global config failed: %v", err)
+	}
+}
+
+func migrateAIGlobalConfigBaseURLs(cfg *ypb.AIGlobalConfig) bool {
+	if cfg == nil {
+		return false
+	}
+	changed := false
+	migrateModels := func(models []*ypb.AIModelConfig) {
+		for _, model := range models {
+			if model == nil {
+				continue
+			}
+			if migrateThirdPartyConfigBaseURL(model.Provider) {
+				changed = true
+			}
+		}
+	}
+	migrateModels(cfg.IntelligentModels)
+	migrateModels(cfg.LightweightModels)
+	migrateModels(cfg.VisionModels)
+	return changed
+}
+
+func migrateThirdPartyConfigBaseURL(cfg *ypb.ThirdPartyApplicationConfig) bool {
+	if cfg == nil || strings.TrimSpace(cfg.GetBaseURL()) != "" {
+		return false
+	}
+	rootURL, defaultURI := aiProviderDefaultEndpoint(cfg.GetType())
+	baseURL := aispec.GetBaseURLFromConfig(&aispec.AIConfig{
+		Type:    cfg.GetType(),
+		BaseURL: cfg.GetBaseURL(),
+		Domain:  cfg.GetDomain(),
+		NoHttps: cfg.GetNoHttps(),
+		APIType: cfg.GetAPIType(),
+	}, rootURL, defaultURI)
+	baseURL = strings.TrimSpace(baseURL)
+	if baseURL == "" {
+		return false
+	}
+	cfg.BaseURL = baseURL
+	return true
+}
+
+func aiProviderDefaultEndpoint(providerType string) (string, string) {
+	switch strings.ToLower(strings.TrimSpace(providerType)) {
+	case "deepseek":
+		return "https://api.deepseek.com", "/chat/completions"
+	case "volcengine":
+		return "https://ark.cn-beijing.volces.com", "/api/v3/chat/completions"
+	case "tongyi":
+		return "https://dashscope.aliyuncs.com", "/compatible-mode/v1/chat/completions"
+	case "openrouter":
+		return "https://openrouter.ai", "/api/v1/chat/completions"
+	case "chatglm":
+		return "https://open.bigmodel.cn", "/api/paas/v4/chat/completions"
+	case "ollama":
+		return "http://127.0.0.1:11434", "/v1/chat/completions"
+	case "aibalance":
+		return "https://aibalance.yaklang.com", "/v1/chat/completions"
+	case "moonshot":
+		return "https://api.moonshot.cn", "/v1/chat/completions"
+	case "siliconflow":
+		return "https://api.siliconflow.cn", "/v1/chat/completions"
+	case "openai", "":
+		return "https://api.openai.com", "/v1/chat/completions"
+	default:
+		return "https://api.openai.com", "/v1/chat/completions"
 	}
 }

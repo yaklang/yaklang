@@ -20,7 +20,11 @@ type thirdPartyApplicationConfig struct {
 	UserSecret     string `app:"name:user_secret"`
 	Namespace      string `app:"name:namespace"`
 	Domain         string `app:"name:domain"`
+	BaseURL        string `app:"name:base_url"`
 	WebhookURL     string `app:"name:webhook_url"`
+	Proxy          string `app:"name:proxy"`
+	NoHttps        bool   `app:"name:no_https"`
+	APIType        string `app:"name:api_type"`
 	ExtraParams    map[string]string
 }
 
@@ -32,7 +36,11 @@ func ConvertCompatibleConfig(config *ypb.ThirdPartyApplicationConfig) {
 		UserSecret:     config.UserSecret,
 		Namespace:      config.Namespace,
 		Domain:         config.Domain,
+		BaseURL:        config.BaseURL,
 		WebhookURL:     config.WebhookURL,
+		Proxy:          config.Proxy,
+		NoHttps:        config.NoHttps,
+		APIType:        config.APIType,
 		ExtraParams:    make(map[string]string, len(config.ExtraParams)),
 	}
 	for _, kv := range config.ExtraParams {
@@ -59,7 +67,11 @@ func ConvertCompatibleConfig(config *ypb.ThirdPartyApplicationConfig) {
 	config.UserSecret = c.UserSecret
 	config.Namespace = c.Namespace
 	config.Domain = c.Domain
+	config.BaseURL = c.BaseURL
 	config.WebhookURL = c.WebhookURL
+	config.Proxy = c.Proxy
+	config.NoHttps = c.NoHttps
+	config.APIType = c.APIType
 	config.ExtraParams = nil
 	for k, v := range c.ExtraParams { // ExtraParams will be disordered
 		config.ExtraParams = append(config.ExtraParams, &ypb.KVPair{
@@ -97,7 +109,11 @@ func GetCommonThirdPartyApplicationConfig(t string) (*ypb.ThirdPartyApplicationC
 		config.UserSecret = rawCfg.UserSecret
 		config.Namespace = rawCfg.Namespace
 		config.Domain = rawCfg.Domain
+		config.BaseURL = rawCfg.BaseURL
 		config.WebhookURL = rawCfg.WebhookURL
+		config.Proxy = rawCfg.Proxy
+		config.NoHttps = rawCfg.NoHttps
+		config.APIType = rawCfg.APIType
 		config.Type = t
 		return config, nil
 	}
@@ -136,7 +152,11 @@ func AllThirdPartyApplicationConfig() []*ypb.ThirdPartyApplicationConfig {
 			UserSecret:     rawConfig.UserSecret,
 			Namespace:      rawConfig.Namespace,
 			Domain:         rawConfig.Domain,
+			BaseURL:        rawConfig.BaseURL,
 			WebhookURL:     rawConfig.WebhookURL,
+			Proxy:          rawConfig.Proxy,
+			NoHttps:        rawConfig.NoHttps,
+			APIType:        rawConfig.APIType,
 			ExtraParams:    make([]*ypb.KVPair, 0, len(rawConfig.ExtraParams)),
 		}
 		for k, v := range rawConfig.ExtraParams {
@@ -168,7 +188,11 @@ func UpdateThirdPartyApplicationConfig(config *ypb.ThirdPartyApplicationConfig) 
 		UserSecret:     config.UserSecret,
 		Namespace:      config.Namespace,
 		Domain:         config.Domain,
+		BaseURL:        config.BaseURL,
 		WebhookURL:     config.WebhookURL,
+		Proxy:          config.Proxy,
+		NoHttps:        config.NoHttps,
+		APIType:        config.APIType,
 		ExtraParams:    make(map[string]string, len(config.ExtraParams)),
 	}
 	for _, kv := range config.ExtraParams {

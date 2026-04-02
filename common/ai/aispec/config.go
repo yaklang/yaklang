@@ -28,9 +28,9 @@ type RawHTTPRequestResponseCallback func(requestBytes []byte, responseHeaderByte
 
 type AIConfig struct {
 	// gateway network config
-	BaseURL string
-	Domain  string `json:"domain" app:"name:domain,verbose:第三方加速域名,id:4"`
-	NoHttps bool   `json:"no_https" app:"name:no_https,verbose:NoHttps,desc:是否禁用使用https请求api,id:3"`
+	BaseURL string `json:"base_url" app:"name:base_url,verbose:BaseURL,desc:BaseURL,id:3"`
+	Domain  string `json:"domain"`
+	NoHttps bool   `json:"no_https"`
 
 	// basic model
 	Model    string  `json:"model" app:"name:model,verbose:模型名称,id:2,type:list,required:true"`
@@ -38,8 +38,8 @@ type AIConfig struct {
 	Deadline time.Time
 
 	APIKey  string `json:"api_key" app:"name:api_key,verbose:ApiKey,desc:APIKey / Token,required:true,id:1,type:list"`
-	Proxy   string `json:"proxy" app:"name:proxy,verbose:代理地址,id:5"`
-	APIType string `json:"api_type" app:"name:api_type,verbose:API类型,id:6,required:false,default:chat_completions"`
+	Proxy   string `json:"proxy" app:"name:proxy,verbose:代理地址,id:4"`
+	APIType string `json:"api_type" app:"name:api_type,verbose:API类型,id:5,required:false,default:chat_completions"`
 	Host    string
 	Port    int
 

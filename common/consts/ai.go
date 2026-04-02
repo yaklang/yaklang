@@ -197,8 +197,12 @@ func thirdPartyConfigToModelConfig(cfg *ypb.ThirdPartyApplicationConfig) *ypb.AI
 		UserSecret:     cfg.GetUserSecret(),
 		Namespace:      cfg.GetNamespace(),
 		Domain:         cfg.GetDomain(),
+		BaseURL:        cfg.GetBaseURL(),
 		WebhookURL:     cfg.GetWebhookURL(),
 		Disabled:       cfg.GetDisabled(),
+		Proxy:          cfg.GetProxy(),
+		NoHttps:        cfg.GetNoHttps(),
+		APIType:        cfg.GetAPIType(),
 	}
 
 	return &ypb.AIModelConfig{

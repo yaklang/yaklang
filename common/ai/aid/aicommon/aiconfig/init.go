@@ -219,6 +219,7 @@ func cloneThirdPartyConfig(cfg *ypb.ThirdPartyApplicationConfig) *ypb.ThirdParty
 		UserSecret:     cfg.GetUserSecret(),
 		Namespace:      cfg.GetNamespace(),
 		Domain:         cfg.GetDomain(),
+		BaseURL:        cfg.GetBaseURL(),
 		WebhookURL:     cfg.GetWebhookURL(),
 		Disabled:       cfg.GetDisabled(),
 		Proxy:          cfg.GetProxy(),
