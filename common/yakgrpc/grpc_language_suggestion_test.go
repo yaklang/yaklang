@@ -1395,7 +1395,7 @@ func Test_FuzztagCompletion(t *testing.T) {
 	})
 
 	token := utils.RandStringBytes(10)
-	err = yakit.CreateOrUpdateYakScript(consts.GetGormProfileDatabase(), 0, &schema.YakScript{
+	err = yakit.CreateOrUpdateYakScriptByID(consts.GetGormProfileDatabase(), 0, &schema.YakScript{
 		Type:       "codec",
 		ScriptName: token,
 	})
@@ -1465,7 +1465,7 @@ func Test_NewFuzztagCompletion(t *testing.T) {
 	})
 
 	token := utils.RandStringBytes(10)
-	err = yakit.CreateOrUpdateYakScript(consts.GetGormProfileDatabase(), 0, &schema.YakScript{
+	err = yakit.CreateOrUpdateYakScriptByID(consts.GetGormProfileDatabase(), 0, &schema.YakScript{
 		Type:       "codec",
 		ScriptName: token,
 	})

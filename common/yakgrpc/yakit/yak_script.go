@@ -51,7 +51,15 @@ func normalizeYakScriptUpsertData(i interface{}) interface{} {
 	}
 }
 
-func CreateOrUpdateYakScript(db *gorm.DB, id int64, i interface{}) error {
+func CreateOrUpdateYakScript(db *gorm.DB, script *schema.YakScript) error {
+	if script.ID != 0 {
+		return CreateOrUpdateYakScriptByID(db, int64(script.ID), script)
+	} else {
+		return CreateOrUpdateYakScriptByName(db, script.ScriptName, script)
+	}
+}
+
+func CreateOrUpdateYakScriptByID(db *gorm.DB, id int64, i interface{}) error {
 	yakScriptOpLock.Lock()
 	defer yakScriptOpLock.Unlock()
 
@@ -334,7 +342,7 @@ func IgnoreYakScriptByID(db *gorm.DB, id int64, ignored bool) error {
 	}
 
 	_ = r
-	return CreateOrUpdateYakScript(db, id, map[string]interface{}{
+	return CreateOrUpdateYakScriptByID(db, id, map[string]interface{}{
 		"ignored": ignored,
 	})
 }

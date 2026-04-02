@@ -246,7 +246,7 @@ func GRPCYakScriptToYakitScript(script *ypb.YakScript) *schema.YakScript {
 		script.GeneralModuleKey = script.ScriptName
 		script.GeneralModuleVerbose = script.ScriptName
 	}
-	return &schema.YakScript{
+	out := &schema.YakScript{
 		ScriptName:           script.ScriptName,
 		Type:                 script.Type,
 		Content:              script.Content,
@@ -268,6 +268,9 @@ func GRPCYakScriptToYakitScript(script *ypb.YakScript) *schema.YakScript {
 		AIKeywords:           script.AIKeywords,
 		AIUsage:              script.AIUsage,
 	}
+	out.ID = uint(script.Id)
+
+	return out
 }
 
 func completeYakScriptAIFieldsOnSave(ctx context.Context, _ *gorm.DB, _ int64, script *schema.YakScript) {
@@ -296,7 +299,7 @@ func (s *Server) SaveYakScript(ctx context.Context, script *ypb.YakScript) (*ypb
 	toSave := GRPCYakScriptToYakitScript(script)
 	completeYakScriptAIFieldsOnSave(ctx, s.GetProfileDatabase(), script.GetId(), toSave)
 
-	err := yakit.CreateOrUpdateYakScript(s.GetProfileDatabase(), script.GetId(), toSave)
+	err := yakit.CreateOrUpdateYakScript(s.GetProfileDatabase(), toSave)
 	if err != nil {
 		return nil, utils.Errorf("create or update yakscript failed: %s", err.Error())
 	}
@@ -981,7 +984,7 @@ func (s *Server) SaveNewYakScript(ctx context.Context, request *ypb.SaveNewYakSc
 	isUpdate := script.Id > 0
 	toSave := GRPCYakScriptToYakitScript(script)
 	completeYakScriptAIFieldsOnSave(ctx, s.GetProfileDatabase(), script.GetId(), toSave)
-	err := yakit.CreateOrUpdateYakScript(s.GetProfileDatabase(), script.Id, toSave)
+	err := yakit.CreateOrUpdateYakScriptByID(s.GetProfileDatabase(), script.Id, toSave)
 	if err != nil {
 		if isUpdate {
 			if strings.Contains(err.Error(), "UNIQUE constraint failed: yak_scripts.script_name") {
