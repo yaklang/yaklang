@@ -83,7 +83,7 @@ func TestServer_Cli_YakSript(t *testing.T) {
 		_ = client
 		createHandler := func(scripts ...*TestCase) {
 			for _, script := range scripts {
-				err = yakit.CreateOrUpdateYakScript(consts.GetGormProfileDatabase().Debug(), 0, script.script)
+				err = yakit.CreateOrUpdateYakScriptByID(consts.GetGormProfileDatabase().Debug(), 0, script.script)
 				require.NoError(t, err)
 			}
 		}
@@ -181,7 +181,7 @@ func TestServer_QueryYakSript_ByImportance(t *testing.T) {
 
 	createScript := func(scripts ...*TestCase) {
 		for _, script := range scripts {
-			err := yakit.CreateOrUpdateYakScript(consts.GetGormProfileDatabase(), 0, script.script)
+			err := yakit.CreateOrUpdateYakScriptByID(consts.GetGormProfileDatabase(), 0, script.script)
 			require.NoError(t, err)
 		}
 	}
@@ -412,7 +412,7 @@ func TestQueryYakScript(t *testing.T) {
 	}
 	createScript := func(scripts ...*TestCase) {
 		for _, script := range scripts {
-			err := yakit.CreateOrUpdateYakScript(consts.GetGormProfileDatabase(), 0, script.script)
+			err := yakit.CreateOrUpdateYakScriptByID(consts.GetGormProfileDatabase(), 0, script.script)
 			require.NoError(t, err)
 		}
 	}
@@ -488,7 +488,7 @@ func TestYakScriptDelete(t *testing.T) {
 
 	create := func(corePlugin bool) int64 {
 		name := uuid.NewString()
-		err := yakit.CreateOrUpdateYakScript(consts.GetGormProfileDatabase(), 0, &schema.YakScript{
+		err := yakit.CreateOrUpdateYakScriptByID(consts.GetGormProfileDatabase(), 0, &schema.YakScript{
 			Type:         "mitm",
 			Content:      `target = cli.String("target")`,
 			ScriptName:   name,
@@ -563,7 +563,7 @@ func TestYakScriptSkipUpdate(t *testing.T) {
 
 	createScript := func(scripts ...*TestCase) {
 		for _, script := range scripts {
-			err := yakit.CreateOrUpdateYakScript(consts.GetGormProfileDatabase(), 0, script.script)
+			err := yakit.CreateOrUpdateYakScriptByID(consts.GetGormProfileDatabase(), 0, script.script)
 			require.NoError(t, err)
 		}
 	}

@@ -138,7 +138,7 @@ func TestCreateOrUpdateYakScript_CreatesNewRecordWhenIDMissing(t *testing.T) {
 	db := newYakScriptTestDB(t)
 
 	const scriptName = "create-or-update-by-id"
-	require.NoError(t, CreateOrUpdateYakScript(db, 0, &schema.YakScript{
+	require.NoError(t, CreateOrUpdateYakScriptByID(db, 0, &schema.YakScript{
 		ScriptName: scriptName,
 		Type:       "yak",
 		Content:    "print('created')",
@@ -167,7 +167,7 @@ func TestCreateOrUpdateYakScriptByID_PersistsZeroValues(t *testing.T) {
 	existing, err := GetYakScriptByName(db, scriptName)
 	require.NoError(t, err)
 
-	require.NoError(t, CreateOrUpdateYakScript(db, int64(existing.ID), &schema.YakScript{
+	require.NoError(t, CreateOrUpdateYakScriptByID(db, int64(existing.ID), &schema.YakScript{
 		ScriptName:  scriptName,
 		Type:        "yak",
 		Content:     "",
@@ -201,7 +201,7 @@ func TestCreateOrUpdateYakScript_MapUpdateOnlyTouchesSpecifiedFields(t *testing.
 	existing, err := GetYakScriptByName(db, scriptName)
 	require.NoError(t, err)
 
-	require.NoError(t, CreateOrUpdateYakScript(db, int64(existing.ID), map[string]interface{}{
+	require.NoError(t, CreateOrUpdateYakScriptByID(db, int64(existing.ID), map[string]interface{}{
 		"ignored": true,
 	}))
 
