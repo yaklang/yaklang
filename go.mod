@@ -18,7 +18,7 @@ require (
 	github.com/aliyun/aliyun-oss-go-sdk v2.2.7+incompatible
 	github.com/andybalholm/brotli v1.0.6
 	github.com/antchfx/xmlquery v1.3.1
-	github.com/antchfx/xpath v1.3.2
+	github.com/antchfx/xpath v1.3.6
 	github.com/antlr/antlr4/runtime/Go/antlr/v4 v4.0.0-20220911224424-aa1f1f12a846
 	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d
 	github.com/aymanbagabas/go-pty v0.2.2
@@ -41,7 +41,6 @@ require (
 	github.com/docker/go-connections v0.4.0
 	github.com/dop251/goja v0.0.0-20240220182346-e401ed450204
 	github.com/dop251/goja_nodejs v0.0.0-20240221231712-27eeffc9c235
-	github.com/ebitengine/purego v0.9.1
 	github.com/elastic/go-libaudit v0.4.0
 	github.com/emersion/go-message v0.18.0
 	github.com/fsnotify/fsnotify v1.4.9
@@ -93,6 +92,7 @@ require (
 	github.com/mdlayher/netlink v1.1.1
 	github.com/mfonda/simhash v0.0.0-20151007195837-79f94a1100d6
 	github.com/miekg/dns v1.1.50
+	github.com/minio/minio-go/v7 v7.0.76
 	github.com/mitchellh/go-vnc v0.0.0-20150629162542-723ed9867aed
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826
 	github.com/oklog/ulid v1.3.1
@@ -102,7 +102,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/pkg/sftp v1.11.0
 	github.com/projectdiscovery/gostruct v0.0.0-20230520110439-bbdedaae3c35
-	github.com/quic-go/quic-go v0.48.1
+	github.com/quic-go/quic-go v0.49.1
 	github.com/rabbitmq/amqp091-go v1.9.0
 	github.com/refraction-networking/utls v1.6.7
 	github.com/saintfish/chardet v0.0.0-20120816061221-3af4cd4741ca
@@ -167,6 +167,7 @@ require (
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dop251/base64dec v0.0.0-20231022112746-c6c9f9a96217 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
+	github.com/ebitengine/purego v0.9.1 // indirect
 	github.com/emersion/go-textwrapper v0.0.0-20200911093747-65d896831594 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/erikstmartin/go-testdb v0.0.0-20160219214506-8d10e4a1bae5 // indirect
@@ -206,7 +207,6 @@ require (
 	github.com/mdlayher/ethernet v0.0.0-20190606142754-0394541c37b7 // indirect
 	github.com/mdlayher/raw v0.0.0-20191009151244-50f2db8cc065 // indirect
 	github.com/minio/md5-simd v1.1.2 // indirect
-	github.com/minio/minio-go/v7 v7.0.76 // indirect
 	github.com/moby/term v0.5.0 // indirect
 	github.com/montanaflynn/stats v0.0.0-20171201202039-1bf9dbcd8cbe // indirect
 	github.com/onsi/ginkgo v1.16.5 // indirect
@@ -254,7 +254,7 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.22.0 // indirect
 	go.opentelemetry.io/otel/metric v1.34.0 // indirect
 	go.opentelemetry.io/otel/trace v1.34.0 // indirect
-	go.uber.org/mock v0.4.0 // indirect
+	go.uber.org/mock v0.5.0 // indirect
 	golang.org/x/arch v0.11.0 // indirect
 	golang.org/x/tools v0.23.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20241015192408-796eee8c2d53 // indirect
