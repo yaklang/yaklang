@@ -718,7 +718,7 @@ func WithAutoTieredAICallback(defaultCallback AICallbackType) ConfigOption {
 			// Try to configure tiered callbacks
 			if err := WithTieredAICallback()(c); err == nil {
 				// Also set the original callback if not already set
-				if c.OriginalAICallback == nil && defaultCallback != nil {
+				if defaultCallback != nil { // force set original callback to default if tiered config is enabled, to ensure async tasks have a valid callback
 					c.m.Lock()
 					c.OriginalAICallback = defaultCallback
 					c.m.Unlock()
