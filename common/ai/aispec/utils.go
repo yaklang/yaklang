@@ -196,6 +196,10 @@ func buildOptionsFromProviderAndModel(provider *ypb.ThirdPartyApplicationConfig,
 		opts = append(opts, WithDomain(provider.Domain))
 	}
 
+	if provider.GetBaseURL() != "" {
+		opts = append(opts, WithBaseURL(provider.GetBaseURL()))
+	}
+
 	// Set type
 	if provider.Type != "" {
 		opts = append(opts, WithType(provider.Type))

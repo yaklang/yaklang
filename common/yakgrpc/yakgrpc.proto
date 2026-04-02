@@ -2825,6 +2825,7 @@ message ThirdPartyApplicationConfig {
   string Proxy = 10;
   bool NoHttps = 11;
   string APIType = 12;
+  string BaseURL = 13;
 }
 
 message DiagnoseNetworkRequest {
@@ -8505,6 +8506,8 @@ message AIConfigHealthCheckResponse{
   int32 ResponseStatusCode = 4;
   string ResponseContent = 5;
   string ErrorMessage = 6;
+  string RawResponse = 7;
+  ThirdPartyApplicationConfig RecommendConfig = 8;
 }
 
 message AIProvider {
