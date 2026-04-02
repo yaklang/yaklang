@@ -38,8 +38,8 @@
   {
     "rule_id": "f8b2d4c9-1e5a-4f7b-8c3d-9a6e2b4f8d1c",
     "rule_name": "检测C语言硬编码密码漏洞",
-    "hash": "6a73f2581cbe9aef5c583927ac9d6d3f9089be7c304bb6282c2e478a6c4bbe81",
-    "version": "20251230.0001"
+    "hash": "4fd384750e96fd4f2adf24210ba48514711e8d2dbb8a9a254a32644b96e6f453",
+    "version": "20260402.0001"
   },
   {
     "rule_id": "d3f8c1e7-4b9a-4d2e-8f1c-6a7b5e9d2c4f",
@@ -254,8 +254,8 @@
   {
     "rule_id": "017cae33-9b73-4470-9e98-adbdd10dbc3a",
     "rule_name": "检测Golang中使用Sprig的SSTI漏洞",
-    "hash": "450bc3c7722c74ee02423189ab623f0bf2f66be52e04d3a2e75b7ae3868430b4",
-    "version": "20260326.0001"
+    "hash": "a1302e90f3c9e07f016c981701bc4ce063e4a12d4de160db02761568baa7ca85",
+    "version": "20260402.0001"
   },
   {
     "rule_id": "215e8ad8-2977-4cd4-9446-d0040ffec286",
@@ -308,20 +308,20 @@
   {
     "rule_id": "7b106696-307d-42f3-a41d-3aae2e4233dd",
     "rule_name": "审计Golang数据库硬编码密码",
-    "hash": "1895ae92fd922107419a92e9be853625535caf65a90afe738e37b54a4bf9e475",
-    "version": "20251230.0001"
+    "hash": "883e114ace1859417b2a0ac1559e61ce800d0039b1e2e242de80631d8df4dca2",
+    "version": "20260402.0001"
   },
   {
     "rule_id": "e33342d8-541e-4aa6-b638-f2d0748913f2",
     "rule_name": "审计Golang FTP 硬编码密码",
-    "hash": "048ef938d9aec0b8adfff7b1cca66b700ceb77029a84b63dcabffb16b165df44",
-    "version": "20251230.0001"
+    "hash": "606b055d24521d3f21ec4e6a6273c949c056e03329eed607e229cd14c847b4f1",
+    "version": "20260402.0001"
   },
   {
     "rule_id": "301bcf22-2cbe-484d-a328-2b232146e1da",
     "rule_name": "检测Golang LDAP凭证硬编码漏洞",
-    "hash": "0741c4085176d648315e2f7587adc2504c55f5363a11ec8b1b743fa9ed5afaa3",
-    "version": "20251230.0001"
+    "hash": "f51f3dfc54aa380b41c5f934bc6212207f78a38d6f02f4a6d7b369f42183c5e2",
+    "version": "20260402.0001"
   },
   {
     "rule_id": "e1587647-f746-41ea-8a3d-4d760e1413f8",
@@ -410,8 +410,8 @@
   {
     "rule_id": "e4420d8f-b1f9-4c46-8de7-f4998091d973",
     "rule_name": "检测Golang文件上传漏洞",
-    "hash": "4f6c709a591b7635a70d82e2301c2ada00ba72c083ab1ec3bd2003707166016f",
-    "version": "20251230.0001"
+    "hash": "1b1cd5cd968ce6d3d7e14b9707ed12036bdfada61bd59a9761bbdddc2d329112",
+    "version": "20260402.0001"
   },
   {
     "rule_id": "f34ff7d8-9bbd-4b35-8de2-4178289ce41f",
@@ -464,14 +464,14 @@
   {
     "rule_id": "74414f8f-e984-483c-bfb5-d8bea158ff3a",
     "rule_name": "检测Golang未过滤的文件或路径漏洞",
-    "hash": "327cbd7b019495d9e5cd75bf42597946dc9b6f87e8364455234ce2b191601119",
-    "version": "20260326.0001"
+    "hash": "5986823db33fd3f0989a8b72235dc332eb98fb18db78898c94856e79fd0b0445",
+    "version": "20260402.0001"
   },
   {
     "rule_id": "594bc621-80a3-4f25-81f9-9b7840bdf4f9",
     "rule_name": "检测Golang未过滤文件路径漏洞",
-    "hash": "ca71354b4dc441fc4645452a252dec2982a94218dec2f6800d5ed4abf6738f4d",
-    "version": "20260327.0001"
+    "hash": "b08f9fec7680c8789bd943ef9ea5a5b4877665397ef44152b4abc3407ef9dbda",
+    "version": "20260402.0001"
   },
   {
     "rule_id": "df52ece5-ac58-4cd9-bda0-11ec7f40eea2",
@@ -500,8 +500,8 @@
   {
     "rule_id": "c7872ddf-bab4-4cd5-8e12-d470a889dbd1",
     "rule_name": "检测Golang在Beego框架中的反射型跨站脚本攻击漏洞",
-    "hash": "889880ebefbf8d712714e9a7b799810dce551c65a77a5ce7b81adee95306734f",
-    "version": "20260326.0001"
+    "hash": "fa54b1f2584b39fd6610c3d6071ebcbfdb92f79e5402b4cb8e5fa2fe66d89322",
+    "version": "20260402.0001"
   },
   {
     "rule_id": "4bf06e42-5deb-47fe-bf75-5cadc4a98af2",
@@ -524,8 +524,8 @@
   {
     "rule_id": "f8fd1761-df87-496b-9aef-9a78b1566642",
     "rule_name": "检测到Golang模板引擎中的反射型XSS漏洞",
-    "hash": "24e02f42a9aaa68a2b390b81ef8607ed42a4573d34c927e32f913cae3dbf70db",
-    "version": "20260327.0001"
+    "hash": "1a64bb7971cf58c091f01e606f2e4d4e16d74ca3c8f8064256ae46a62a20825d",
+    "version": "20260402.0001"
   },
   {
     "rule_id": "155bfb0e-379f-485a-a10c-cfec1109de1e",
@@ -536,8 +536,8 @@
   {
     "rule_id": "4cd207df-132f-483f-ac89-328d466a5d3e",
     "rule_name": "检测Go语言硬编码凭证漏洞",
-    "hash": "385963749cd24204cc90c3e39c1a8703d500c3cfcaef0651d09fecd536d4c877",
-    "version": "20260327.0001"
+    "hash": "20e694338e59715f8926af72266e97a3ef268e32d915287e484c045779f341ea",
+    "version": "20260402.0001"
   },
   {
     "rule_id": "e3c91f2a-8b47-5e1d-a012-9f8e7c654321",
@@ -548,8 +548,8 @@
   {
     "rule_id": "838bdd38-5913-46ed-88f7-8eced02db2bd",
     "rule_name": "检测Golang路径穿越漏洞",
-    "hash": "5476e26490af90908b5c1425dfc1b06f299242ee80d3f74bdc4cea193fc7a683",
-    "version": "20260326.0001"
+    "hash": "24c8492c26eb9c483499e2e89db0eb750dd544ffb09b803369bcd5468a294471",
+    "version": "20260402.0001"
   },
   {
     "rule_id": "137a07c6-00e9-443a-9c2c-f892782d5176",
@@ -632,8 +632,8 @@
   {
     "rule_id": "a9f2254c-7a3d-4ea9-9830-6ca98bde8cd8",
     "rule_name": "检测Golang CORS配置错误漏洞(beego)",
-    "hash": "9c0fe27cb55adf88304aa0dc99f82fc21389788d9851bf710981adc0553f7845",
-    "version": "20260326.0001"
+    "hash": "01600580df8321686fa9fd9102dfc9186fdd847ee5541a0fff1a1234ea1d4d7f",
+    "version": "20260402.0001"
   },
   {
     "rule_id": "462d438a-5955-47c7-a0f9-1940a7f387c3",
@@ -794,8 +794,8 @@
   {
     "rule_id": "db7e72fa-79c2-42a8-bcd3-8418ad3136af",
     "rule_name": "审计Golang Database/SQL使用",
-    "hash": "f17c1398c64c858dbc35c2eaf8078b800ec102024f49d0993a60f264ac09478b",
-    "version": "20251230.0001"
+    "hash": "f67dbf3c41e0eabb0f161b13d4be0284ea902ed96e0ed6682c9688a937688d6f",
+    "version": "20260402.0001"
   },
   {
     "rule_id": "b7b4503b-03ff-4c54-a942-155d18621e75",
