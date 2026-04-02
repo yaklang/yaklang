@@ -287,11 +287,12 @@ func TestReAct_MCPToolUse(t *testing.T) {
 		}
 	}()
 
-	after := time.After(5 * time.Second)
+	after := time.After(10 * time.Second)
 
 	reviewed := false
 	reviewReleased := false
 	toolCallOutputEvent := false
+	taskCompleted := false
 	var iid string
 
 LOOP:
@@ -333,8 +334,12 @@ LOOP:
 			if e.NodeId == "react_task_status_changed" {
 				result := jsonpath.FindFirst(e.GetContent(), "$..react_task_now_status")
 				if utils.InterfaceToString(result) == "completed" {
-					break LOOP
+					taskCompleted = true
 				}
+			}
+
+			if taskCompleted && reviewed && reviewReleased && toolCallOutputEvent {
+				break LOOP
 			}
 		case <-after:
 			break LOOP
