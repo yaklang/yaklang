@@ -5,8 +5,10 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 const envAntlrSLLFirst = "YAK_ANTLR_SLL_FIRST"
@@ -111,7 +113,12 @@ func ParseASTWithSLLFirst[L antlr.Lexer, P antlr.Parser, T any](
 	setup func(lexer L, parser P),
 	entry func(parser P) T,
 ) (T, error) {
-	run := func(predictionMode int, errHandler antlr.ErrorStrategy) (ast T, parseErr error, cancelled bool) {
+	run := func(predictionMode int, errHandler antlr.ErrorStrategy) (ast T, parseErr error, cancelled bool, elapsed time.Duration) {
+		start := time.Now()
+		defer func() {
+			elapsed = time.Since(start)
+		}()
+
 		errListener := NewErrorListener()
 		lexer := newLexer(antlr.NewInputStream(src))
 		lexer.RemoveErrorListeners()
@@ -130,6 +137,12 @@ func ParseASTWithSLLFirst[L antlr.Lexer, P antlr.Parser, T any](
 		}
 		parser.RemoveErrorListeners()
 		parser.AddErrorListener(errListener)
+		if antlrDiagnosticEnabledNow() {
+			parser.AddErrorListener(newLoggingDiagnosticErrorListener(antlrDiagnosticExactNow(), antlrDiagnosticLimitNow()))
+			if predictionMode == antlr.PredictionModeLL && antlrDiagnosticExactNow() && parser.GetInterpreter() != nil {
+				parser.GetInterpreter().SetPredictionMode(antlr.PredictionModeLLExactAmbigDetection)
+			}
+		}
 		parser.SetErrorHandler(errHandler)
 
 		func() {
@@ -147,7 +160,7 @@ func ParseASTWithSLLFirst[L antlr.Lexer, P antlr.Parser, T any](
 
 		DetachParserATNSimulatorCaches(parser)
 		DetachLexerTokenSource(lexer)
-		return ast, errListener.Error(), cancelled
+		return ast, errListener.Error(), cancelled, elapsed
 	}
 
 	statsEnabled := SLLFirstStatsEnabled()
@@ -155,14 +168,14 @@ func ParseASTWithSLLFirst[L antlr.Lexer, P antlr.Parser, T any](
 		if statsEnabled {
 			atomic.AddUint64(&sllFirstLLOnly, 1)
 		}
-		ast, err, _ := run(antlr.PredictionModeLL, antlr.NewDefaultErrorStrategy())
+		ast, err, _, _ := run(antlr.PredictionModeLL, antlr.NewDefaultErrorStrategy())
 		return ast, err
 	}
 
 	if statsEnabled {
 		atomic.AddUint64(&sllFirstSLLAttempts, 1)
 	}
-	ast, err, cancelled := run(antlr.PredictionModeSLL, antlr.NewBailErrorStrategy())
+	ast, err, cancelled, sllElapsed := run(antlr.PredictionModeSLL, antlr.NewBailErrorStrategy())
 	if !cancelled && err == nil {
 		return ast, nil
 	}
@@ -174,12 +187,15 @@ func ParseASTWithSLLFirst[L antlr.Lexer, P antlr.Parser, T any](
 		if statsEnabled {
 			atomic.AddUint64(&sllFirstFallbackCancelled, 1)
 		}
+		log.Infof("[antlr-sll-first] fallback to LL: reason=cancelled src_len=%d sll_elapsed=%s", len(src), sllElapsed)
 	} else if err != nil {
 		if statsEnabled {
 			atomic.AddUint64(&sllFirstFallbackError, 1)
 		}
+		log.Infof("[antlr-sll-first] fallback to LL: reason=listener_error src_len=%d sll_elapsed=%s", len(src), sllElapsed)
 	}
 
-	ast, err, _ = run(antlr.PredictionModeLL, antlr.NewDefaultErrorStrategy())
+	ast, err, _, llElapsed := run(antlr.PredictionModeLL, antlr.NewDefaultErrorStrategy())
+	log.Infof("[antlr-sll-first] LL completed: src_len=%d ll_elapsed=%s", len(src), llElapsed)
 	return ast, err
 }
