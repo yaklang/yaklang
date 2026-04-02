@@ -29,9 +29,10 @@ Optional Parameters:
   file-size-max   (int)     Maximum file size in bytes. Files larger than this are skipped entirely.
                             Default: 2000000000 (2GB). Set to a smaller value for faster scans.
   context-buffer  (int)     Number of bytes of surrounding context to show around each match.
-                            Default: 0 (only match position is reported, no surrounding text).
-                            When > 0, the tool extracts [match_start - context_buffer, match_end + context_buffer]
-                            bytes from the file content and includes it in the result.
+                            Default: 0: each result is reported as "filepath:lineNo: full line content"
+                            (standard grep-style output — the entire matching line is always shown).
+                            When > 0, the tool additionally extracts [match_start - context_buffer,
+                            match_end + context_buffer] bytes as a raw snippet around the match.
   exclude         (string)  Comma-separated list of directory/file names to exclude.
                             Each name is checked against EVERY component of the file path.
                             For example, "node_modules,.git" will skip any file whose path contains
@@ -228,8 +229,47 @@ end = false
 // Maximum number of matches to log individually via yakit.Info IPC
 // to avoid flooding the IPC channel (each yakit.Info is a network round-trip).
 maxIPCLogCount = 20
-maxMatchPreviewBytes = 256
 currentOriginalContent = ""
+currentTargetFile = ""
+
+// countLineNumber returns the 1-based line number of the byte at position byteOffset
+// within content (a string). It counts '\n' characters before byteOffset.
+countLineNumber = (content, byteOffset) => {
+    if byteOffset <= 0 {
+        return 1
+    }
+    if byteOffset > len(content) {
+        byteOffset = len(content)
+    }
+    lineNo = 1
+    for i := 0; i < byteOffset; i++ {
+        if content[i] == '\n' {
+            lineNo++
+        }
+    }
+    return lineNo
+}
+
+// extractLine returns the full text of the line that contains byteOffset (without trailing newline).
+extractLine = (content, byteOffset) => {
+    if len(content) == 0 {
+        return ""
+    }
+    if byteOffset >= len(content) {
+        byteOffset = len(content) - 1
+    }
+    // find line start
+    lineStart = byteOffset
+    for lineStart > 0 && content[lineStart-1] != '\n' {
+        lineStart--
+    }
+    // find line end
+    lineEnd = byteOffset
+    for lineEnd < len(content) && content[lineEnd] != '\n' {
+        lineEnd++
+    }
+    return str.TrimRight(content[lineStart:lineEnd], "\r")
+}
 
 collectMatchPreview = (offset, offsetEnd) => {
     if contextBuffer > 0 {
@@ -255,15 +295,14 @@ collectMatchPreview = (offset, offsetEnd) => {
         return
     }
 
-    matchedStr = currentOriginalContent[offset:offsetEnd]
-    if len(matchedStr) > maxMatchPreviewBytes {
-        matchedStr = matchedStr[:maxMatchPreviewBytes] + "..."
-    }
+    lineNo = countLineNumber(currentOriginalContent, offset)
+    lineContent = extractLine(currentOriginalContent, offset)
+    entry = sprintf("%v:%v: %v", currentTargetFile, lineNo, lineContent)
+
     displayCount = count - offsetResultCount
     if displayCount <= maxIPCLogCount {
-        yakit.Info("  match: %#v", matchedStr)
+        yakit.Info("  %v", entry)
     }
-    findRes = append(findRes, matchedStr)
 }
 
 // output uses in-memory rawContent ([]byte) to extract context,
@@ -284,16 +323,16 @@ output = (targetFile, offset, offsetEnd, rawContent) => {
 
     displayCount = count - offsetResultCount
 
-    // Build match info string
+    // Compute line number from byte offset for human-readable output
+    rawStr = string(rawContent)
+    lineNo = countLineNumber(rawStr, offset)
+
+    // Build match info string: "filepath:lineNo: matched line content"
+    lineContent = extractLine(rawStr, offset)
     var msg
-    if multipleFiles {
-        msg = "[file: %v] matched at index:%v-%v" % [targetFile, offset, offsetEnd]
-    } else {
-        msg = "matched in %v at index:%v-%v" % [targetFile, offset, offsetEnd]
-    }
+    msg = "%v:%v: %v" % [targetFile, lineNo, lineContent]
 
     // Only log first N matches via yakit.Info to avoid IPC flood
-    // (each call is a JSON serialize + network send)
     if displayCount <= maxIPCLogCount {
         yakit.Info(msg)
     } else if displayCount == maxIPCLogCount + 1 {
@@ -315,14 +354,21 @@ output = (targetFile, offset, offsetEnd, rawContent) => {
         raw = rawContent[seekStart:seekEnd]
         if len(raw) > 0 {
             contentStr := string(raw)
+            // Prefix context snippet with file:line for orientation
+            contextEntry = sprintf("%v:%v: ...%v...", targetFile, lineNo, str.TrimSpace(contentStr))
             if displayCount <= maxIPCLogCount {
-                yakit.Info("  context: %#v", contentStr)
+                yakit.Info("  context: %v", contextEntry)
             }
-            findRes = append(findRes, contentStr)
+            findRes = append(findRes, contextEntry)
         }
         return
     }
 
+    // contextBuffer == 0: collect the matching line itself into findRes so that
+    // the println summary at the end of the script contains actual match content.
+    // Without this, findRes stays empty and the AI tool framework receives an
+    // uninformative "matches were found but no context text was collected" message.
+    findRes = append(findRes, msg)
 }
 
 isRegexp = str.ToLower(matchMode) in ["regexp", "re", "regex"]
@@ -331,7 +377,7 @@ scanMatches = (patternRe, targetFile, content, rawContent) => {
     searchBase = 0
     for {
         if end { return }
-        if searchBase > len(content) {
+        if searchBase >= len(content) {
             return
         }
 
@@ -347,12 +393,16 @@ scanMatches = (patternRe, targetFile, content, rawContent) => {
         collectMatchPreview(start, finish)
         if end { return }
 
+        // Skip to the start of the next line (bash grep reports each line at most once)
         nextBase = finish
+        for nextBase < len(content) && content[nextBase] != '\n' {
+            nextBase++
+        }
+        if nextBase < len(content) {
+            nextBase++
+        }
         if nextBase <= searchBase {
             nextBase = searchBase + 1
-        }
-        if nextBase > len(content) {
-            return
         }
         searchBase = nextBase
     }
@@ -361,6 +411,10 @@ scanMatches = (patternRe, targetFile, content, rawContent) => {
 handleRegexp = (subpattern, targetFile, content, rawContent) => {
     defer recover()
     currentOriginalContent = content
+    currentTargetFile = targetFile
+    if !str.HasPrefix(subpattern, "(?m)") {
+        subpattern = "(?m)" + subpattern
+    }
     subpatternRe := re.Compile(subpattern)~
     scanMatches(subpatternRe, targetFile, content, rawContent)
 }
@@ -375,6 +429,7 @@ handle = (patternSubstr, targetFile, content, rawContent) => {
 
     defer recover()
     currentOriginalContent = content
+    currentTargetFile = targetFile
     patternRe := re.Compile(re.QuoteMeta(patternSubstr))~
     scanMatches(patternRe, targetFile, workingContent, rawContent)
 }

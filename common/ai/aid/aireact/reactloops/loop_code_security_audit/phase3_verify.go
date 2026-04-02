@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -27,7 +28,7 @@ const phase3ReactiveDataTpl = `## 当前验证进度
 **总计 Findings**: {{ .TotalFindings }} 个
 **已验证**: {{ .VerifiedCount }} 个（confirmed: {{ .ConfirmedCount }}，uncertain: {{ .UncertainCount }}，safe: {{ .SafeCount }}）
 **待验证**: {{ .RemainingCount }} 个
-**当前迭代**: {{ .IterationCount }} / {{ .MaxIter }}
+**当前迭代**: {{ .IterationCount }}
 
 **技术栈**: {{ .TechStack }}
 **入口点**: {{ .EntryPoints }}
@@ -59,21 +60,12 @@ const phase3ReactiveDataTpl = `## 当前验证进度
 {{ if .ShouldForceConclusion }}
 [警告] 迭代次数已超过 80%。立即对当前正在验证的 Finding 调用 conclude_finding（可用 uncertain），然后依次完成剩余 Finding，最后调用 complete_verify。
 {{ end }}
-请从第一个待验证的 Finding 开始，依次调用 read_code（不超过5次/Finding） → trace_data_flow → note_filter（如有） → conclude_finding。全部完成后调用 complete_verify。`
+请从第一个待验证的 Finding 开始，依次调用 read_file/grep（不超过5次/Finding） → trace_data_flow → note_filter（如有） → conclude_finding。全部完成后调用 complete_verify。`
 
 // buildPhase3VerifyLoop 构建 Phase 3 验证 Loop
 // 目标：遍历所有 findings，逐个读取代码、追踪数据流、确认/排除漏洞
 func buildPhase3VerifyLoop(r aicommon.AIInvokeRuntime, state *AuditState, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {
-	// 动态计算最大迭代次数：每个 finding 最多需要 8 次 action（read_file + 多次trace + note_filter + conclude），
-	// 加上 complete_verify，并设置最小值 40
-	findingCount := len(state.GetFindings())
-	maxIter := findingCount*8 + 10
-	if maxIter < 40 {
-		maxIter = 40
-	}
-	if maxIter > 200 {
-		maxIter = 200
-	}
+	maxIter := math.MaxInt32
 
 	preset := []reactloops.ReActLoopOption{
 		reactloops.WithMaxIterations(maxIter),
@@ -82,7 +74,7 @@ func buildPhase3VerifyLoop(r aicommon.AIInvokeRuntime, state *AuditState, opts .
 		reactloops.WithAllowPlanAndExec(false),
 		// 关闭通用 tool call，所有文件读取通过 read_code action 进行
 		// （read_code 内部使用 Yak read_file 工具或降级到内联实现）
-		reactloops.WithAllowToolCall(false),
+		reactloops.WithAllowToolCall(false), // file ops handled by explicit read_file / grep loop actions
 		reactloops.WithAllowUserInteract(false),
 		reactloops.WithEnableSelfReflection(true),
 		reactloops.WithSameActionTypeSpinThreshold(3),
@@ -140,13 +132,12 @@ func buildPhase3VerifyLoop(r aicommon.AIInvokeRuntime, state *AuditState, opts .
 				"PendingFindings":       pendingBuf.String(),
 				"FeedbackMessages":      feedbacker.String(),
 				"IterationCount":        iterCount,
-				"MaxIter":               maxIter,
 				"ReconOutline":          state.GetReconOutline(),
 				"ReconFileHint":         reconFileHint,
 				"TechStack":             state.TechStack,
 				"EntryPoints":           state.EntryPoints,
 				"AuthMechanism":         state.AuthMechanism,
-				"ShouldForceConclusion": iterCount >= maxIter*4/5,
+				"ShouldForceConclusion": false,
 			})
 		}),
 
@@ -168,7 +159,7 @@ func buildPhase3VerifyLoop(r aicommon.AIInvokeRuntime, state *AuditState, opts .
 			op.Continue()
 		}),
 
-		// 文件系统工具（Yak 脚本提供）
+		// 文件系统工具（直接使用 Yak 脚本工具 read_file / grep，不再封装为 read_code）
 		buildFSAction(r, "read_file"),
 		buildFSAction(r, "grep"),
 

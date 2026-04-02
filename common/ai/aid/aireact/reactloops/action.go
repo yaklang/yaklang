@@ -51,6 +51,15 @@ func buildSchema(actions ...*LoopAction) string {
 			aitool.WithParam_Raw("x-@action-rules", actionDesc),
 		),
 		aitool.WithStringParam(
+			"identifier",
+			aitool.WithParam_Description(
+				"REQUIRED. A short snake_case label (lowercase + underscores, <=30 chars) describing the PURPOSE of this action call. "+
+					"Examples: folder_skeleton, read_go_mod, grep_sql_exec, write_dir_structure. "+
+					"This identifier is used in log file paths to help users quickly understand what each action call is doing.",
+			),
+			aitool.WithParam_Required(true),
+		),
+		aitool.WithStringParam(
 			"human_readable_thought",
 			aitool.WithParam_Description(
 				"Optional. Omit this field when @action is 'directly_answer' or when the next step is already obvious. If you do provide it, keep it to one short, action-oriented sentence only (prefer <=12 Chinese characters or <=8 English words).",
@@ -60,6 +69,7 @@ func buildSchema(actions ...*LoopAction) string {
 
 	existed := make(map[string]struct{})
 	existed["@action"] = struct{}{}
+	existed["identifier"] = struct{}{}
 	existed["human_readable_thought"] = struct{}{}
 
 	for _, action := range actions {
@@ -70,8 +80,7 @@ func buildSchema(actions ...*LoopAction) string {
 			continue
 		}
 		for _, opt := range action.Options {
-			var rawOpt = opt
-			opts = append(opts, rawOpt)
+			opts = append(opts, opt)
 		}
 	}
 

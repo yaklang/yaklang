@@ -1,6 +1,6 @@
-__DESC__ = "一个用于查看目录树形结构的工具，支持显示目录下的文件和子目录层级关系，默认排除 .git/node_modules 等噪声目录。支持名称黑白名单和扩展名黑白名单过滤。适用于目录结构分析、项目概览等场景。"
+__DESC__ = "一个用于查看目录树形结构的工具，支持显示目录下的文件和子目录层级关系，默认排除 .git/node_modules 等噪声目录。支持名称黑白名单和扩展名黑白名单过滤。支持 dirs-only 模式只显示目录结构（不显示文件），适用于大型项目的快速结构概览。适用于目录结构分析、项目概览等场景。"
 __VERBOSE_NAME__ = "目录树形结构查看工具"
-__KEYWORDS__ = "directory tree,目录结构,树形结构,文件系统浏览,directory listing,文件夹结构,文件树,file hierarchy,目录浏览,directory navigation,exclude,include,extension filter"
+__KEYWORDS__ = "directory tree,目录结构,树形结构,文件系统浏览,directory listing,文件夹结构,文件树,file hierarchy,目录浏览,directory navigation,exclude,include,extension filter,dirs-only,仅目录"
 
 __USAGE__ = <<<USAGE_BLOCK
 Directory Tree Viewing Tool - Parameter Description for JSON Tool Calls
@@ -10,6 +10,11 @@ Required Parameters:
                             Must point to an existing directory.
 
 Optional Parameters:
+  dirs-only       (bool)    When set to true, only show directories (no files).
+                            This is STRONGLY RECOMMENDED for large or complex projects when you
+                            first want to understand the overall project structure before drilling
+                            down into specific directories. It dramatically reduces output size
+                            and avoids truncation. Default: false.
   exclude         (string)  Comma-separated list of directory/file names to exclude.
                             Each name is matched against EVERY path component individually.
                             For example, "node_modules,.git" will skip any entry whose path
@@ -36,31 +41,52 @@ Optional Parameters:
   max-depth       (int)     Maximum directory depth to recurse into. Entries deeper than this
                             level are not shown. Default: 6.
   max-lines       (int)     Maximum total lines in the output. Once reached, remaining entries
-                            are truncated with a notice. Set to 0 or negative for unlimited.
+                            are truncated. Set to 0 or negative for unlimited.
                             Default: 200.
+  offset          (int)     Skip the first N matching lines before outputting. Combined with
+                            max-lines, this enables paginated browsing of large directories.
+                            Example: offset=0 max-lines=500 gets lines 1-500;
+                                     offset=500 max-lines=500 gets lines 501-1000.
+                            Default: 0 (start from the beginning).
+
+IMPORTANT - When output is truncated:
+  The tool will prepend a TRUNCATION WARNING at the very beginning of the output so you cannot
+  miss it. If you see this warning, you are NOT seeing the complete directory structure.
+  To resolve truncation, you should:
+  1. Use dirs-only=true to get a compact directory-only overview first
+  2. Use offset parameter to page through the remaining entries (e.g. offset=500 to skip first 500 lines)
+  3. Then explore specific subdirectories with targeted tree calls
+  4. Or increase max-lines if you need more entries
 
 Filter Evaluation Order:
-  1. exclude name blacklist (path component exact match)
-  2. include name whitelist (filename substring match, directories pass)
-  3. exclude-ext extension blacklist (file extension match, directories pass)
-  4. include-ext extension whitelist (file extension match, directories pass)
-  5. max-depth check
+  1. dirs-only mode (skip all files if enabled)
+  2. exclude name blacklist (path component exact match)
+  3. include name whitelist (filename substring match, directories pass)
+  4. exclude-ext extension blacklist (file extension match, directories pass)
+  5. include-ext extension whitelist (file extension match, directories pass)
+  6. max-depth check
 USAGE_BLOCK
 
 yakit.AutoInitYakit()
 
 // Parse CLI arguments
 path := cli.String("path", cli.setRequired(true), cli.setHelp("directory path to display tree structure"))
+dirsOnly := cli.Bool("dirs-only", cli.setHelp("only show directories, skip all files; recommended for large projects to get a compact structure overview"))
 excludeRaw := cli.String("exclude", cli.setHelp("comma-separated list of directory/file names to exclude from tree view"), cli.setDefault(".git,.svn,.hg,node_modules,__pycache__,.DS_Store,.idea,.vscode,.next,.nuxt,.cache"))
 includeRaw := cli.String("include", cli.setHelp("comma-separated list of name substrings to include (whitelist, only matching entries shown)"), cli.setDefault(""))
 excludeExtRaw := cli.String("exclude-ext", cli.setHelp("comma-separated list of file extensions to exclude (e.g. '.pyc,.o,.so')"), cli.setDefault(""))
 includeExtRaw := cli.String("include-ext", cli.setHelp("comma-separated list of file extensions to include (whitelist, e.g. '.go,.js,.py')"), cli.setDefault(""))
 maxDepth := cli.Int("max-depth", cli.setHelp("maximum directory depth to display"), cli.setDefault(6))
 maxLines := cli.Int("max-lines", cli.setHelp("maximum number of lines to display"), cli.setDefault(200))
+offset := cli.Int("offset", cli.setHelp("skip the first N matching lines; use with max-lines for paginated browsing"), cli.setDefault(0))
 
 cli.check()
 
-yakit.Info("Viewing directory tree structure: %v", path)
+if dirsOnly {
+    yakit.Info("Viewing directory tree structure (dirs-only mode): %v", path)
+} else {
+    yakit.Info("Viewing directory tree structure: %v", path)
+}
 
 // Check path existence
 if !file.IsExisted(path) {
@@ -130,12 +156,20 @@ if len(excludeExts) > 0 {
 if hasIncludeExtFilter {
     yakit.Info("include-ext: %v", includeExtRaw)
 }
+if dirsOnly {
+    yakit.Info("dirs-only mode enabled: only directories will be shown")
+}
 
 // shouldFilterPath checks whether a path should be filtered out.
 // Returns true if the entry should be EXCLUDED (not shown).
 // isDir: whether this entry is a directory
 // relPath: relative path from root (normalized with /)
 shouldFilterPath = (relPath, entryName, isDir) => {
+    // 0. dirs-only mode: skip all files
+    if dirsOnly && !isDir {
+        return true
+    }
+
     // 1. Check exclude name blacklist (applies to any path component)
     normalized = str.ReplaceAll(relPath, "\\", "/")
     parts = str.Split(normalized, "/")
@@ -178,7 +212,8 @@ shouldFilterPath = (relPath, entryName, isDir) => {
 
 // Collect all tree lines into a buffer for single output
 buf = bufio.NewBuffer()
-lineCount = 0
+totalMatched = 0  // total lines that passed filters (before offset/max-lines windowing)
+lineCount = 0     // lines actually written to output
 dirCount = 0
 fileCount = 0
 truncated = false
@@ -187,10 +222,6 @@ filesys.Recursive(path, filesys.onStat((isDir, pathname, info) => {
     defer func { recover() }
 
     if truncated { return }
-    if maxLines > 0 && lineCount >= maxLines {
-        truncated = true
-        return
-    }
 
     // Get relative path
     relPath = str.TrimPrefix(pathname, path)
@@ -209,6 +240,18 @@ filesys.Recursive(path, filesys.onStat((isDir, pathname, info) => {
 
     // Check depth
     if len(parts) > maxDepth { return }
+
+    // This entry passed all filters
+    totalMatched++
+
+    // Apply offset: skip entries before the offset window
+    if totalMatched <= offset { return }
+
+    // Apply max-lines: stop after the window is full
+    if maxLines > 0 && lineCount >= maxLines {
+        truncated = true
+        return
+    }
 
     lineCount++
     if isDir {
@@ -229,13 +272,46 @@ filesys.Recursive(path, filesys.onStat((isDir, pathname, info) => {
 
 // Build the complete result string
 result = bufio.NewBuffer()
-result.WriteString(sprintf("Directory: %v\n", path))
-result.WriteString("========================\n")
+
+// Put truncation warning at the VERY TOP so AI cannot miss it
+if truncated {
+    nextOffset = offset + lineCount
+    result.WriteString("*** WARNING: OUTPUT IS TRUNCATED ***\n")
+    result.WriteString(sprintf("Showing entries %v-%v (offset=%v, max-lines=%v). More entries exist beyond this window.\n",
+        offset+1, offset+lineCount, offset, maxLines))
+    result.WriteString("You are NOT seeing the full structure. To get the next page:\n")
+    result.WriteString(sprintf("  → Call tree again with offset=%v max-lines=%v (same other params)\n", nextOffset, maxLines))
+    result.WriteString("Other options:\n")
+    result.WriteString("  1. Use dirs-only=true for a compact directory-only overview\n")
+    result.WriteString("  2. Call tree on specific subdirectories to drill down\n")
+    result.WriteString("  3. Increase max-lines to show more entries per page\n")
+    result.WriteString("======================== TRUNCATED OUTPUT BELOW ========================\n")
+} else {
+    if offset > 0 {
+        result.WriteString(sprintf("Directory: %v (offset=%v, showing entries %v-%v)\n", path, offset, offset+1, offset+lineCount))
+    } else if dirsOnly {
+        result.WriteString(sprintf("Directory: %v (dirs-only mode)\n", path))
+    } else {
+        result.WriteString(sprintf("Directory: %v\n", path))
+    }
+    result.WriteString("========================\n")
+}
+
 result.WriteString(buf.String())
 result.WriteString("========================\n")
-result.WriteString(sprintf("%v directories, %v files\n", dirCount, fileCount))
 if truncated {
-    result.WriteString(sprintf("(output truncated at %v lines, use --max-lines to increase)\n", maxLines))
+    nextOffset = offset + lineCount
+    result.WriteString(sprintf("(shown: %v entries in this page — INCOMPLETE, use offset=%v to get next page)\n", lineCount, nextOffset))
+    result.WriteString(sprintf("*** NEXT PAGE: tree(path=\"%v\", offset=%v, max-lines=%v, dirs-only=%v) ***\n", path, nextOffset, maxLines, dirsOnly))
+} else {
+    if dirsOnly {
+        result.WriteString(sprintf("%v directories shown (files hidden by dirs-only mode)\n", dirCount))
+    } else {
+        result.WriteString(sprintf("%v directories, %v files\n", dirCount, fileCount))
+    }
+    if offset > 0 {
+        result.WriteString(sprintf("(page starting at offset=%v, %v entries on this page)\n", offset, lineCount))
+    }
 }
 
 yakit.Info("%s", result.String())

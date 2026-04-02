@@ -8,15 +8,18 @@ File Search Tool - Parameter Description for JSON Tool Calls
 Required Parameters:
   dir             (string)  The root directory to search recursively.
                             Must be an absolute path or a valid relative path.
-  pattern         (string)  A SINGLE pattern string to match against the FULL ABSOLUTE PATH of each file/directory.
-                            The pattern is applied to the complete path string, not just the filename.
-                            IMPORTANT: This is ONE pattern, NOT multiple patterns. Do NOT use "|" as a separator.
+  pattern         (string)  A SINGLE pattern string used to match files.
+                            - In substr/regexp mode: matched against the FULL ABSOLUTE PATH.
+                            - In glob mode: matched against the FILENAME (basename) ONLY.
+                            IMPORTANT: This is ONE pattern, NOT multiple patterns.
+                            Do NOT use "," as a separator (it will be treated as a literal character).
 
 Optional Parameters:
   pattern-type    (string)  How the pattern is interpreted. Accepted values:
                             - "" or "substr" (default): case-insensitive substring match against the full path.
                             - "regexp" / "re" / "regex": Golang-style regular expression match against the full path.
-                            - "glob" / "g": glob-style wildcard match against the full path.
+                            - "glob" / "g": glob-style wildcard match against the FILENAME (basename) only, NOT the full path.
+                                            Use this for simple filename patterns like "go.mod", "*.go", "Makefile".
   max             (int)     Maximum number of results to return. Default: 10.
                             The search stops early once this limit is reached.
   type            (string)  Filter by entry type:
@@ -66,13 +69,15 @@ patterns separated by "|", "," or any other delimiter within the pattern itself.
 2. glob mode:
    - Standard glob wildcards: "*" matches any chars (except "/"), "?" matches one char,
      "[abc]" matches character class.
-   - The glob is matched against the FULL absolute path, so use "**" or leading "*"
-     to match across directory levels.
-         - CORRECT:   {"pattern": "**/*_result_summary.txt", "pattern-type": "glob"}
-     - CORRECT:   {"pattern": "**/*_timeline_diff.txt", "pattern-type": "glob"}
-   - CORRECT:   {"pattern": "*/tool_calls/*.md", "pattern-type": "glob"}
+   - The glob is matched against the FILENAME ONLY (basename), NOT the full path.
+   - This means you can use simple patterns like "go.mod", "*.go", "*.md" directly.
+   - CORRECT:   {"pattern": "go.mod", "pattern-type": "glob"}
+   - CORRECT:   {"pattern": "*.go", "pattern-type": "glob"}
+   - CORRECT:   {"pattern": "*_result_summary.txt", "pattern-type": "glob"}
+   - CORRECT:   {"pattern": "*.md", "pattern-type": "glob"}
    - WRONG:     {"pattern": "*.md|*.txt", "pattern-type": "glob"}
                  ("|" is not glob syntax; this is a single invalid glob)
+   - NOTE: If you need to match multiple filename patterns at once, use regexp mode instead.
 
 3. regexp mode:
    - Golang-style regular expression (re2 syntax).
@@ -87,16 +92,28 @@ patterns separated by "|", "," or any other delimiter within the pattern itself.
 If you need to find files matching several different names or patterns, choose ONE of these strategies:
 
 Strategy A - Use regexp with alternation (recommended for complex OR matching):
+  {"pattern": "(go\\.mod|go\\.work|Makefile|README\\.md)", "pattern-type": "regexp"}
   {"pattern": "(config\\.yaml|README\\.md|setup\\.py)", "pattern-type": "regexp"}
 
-Strategy B - Use include/include-ext for simple filename or extension filtering:
+Strategy B - Use glob for simple single-filename patterns (matched against basename only):
+  {"pattern": "go.mod", "pattern-type": "glob"}
+  {"pattern": "*.go", "pattern-type": "glob"}
+  {"pattern": "Makefile", "pattern-type": "glob"}
+
+Strategy C - Use include/include-ext for extension or name-substring filtering:
   {"pattern": "src/", "pattern-type": "substr", "include-ext": ".go,.js,.py"}
   {"pattern": "config", "pattern-type": "substr", "include": "config,setting"}
 
-Strategy C - Call the tool multiple times, once per pattern (if patterns are very different):
+Strategy D - Call the tool multiple times, once per pattern (if patterns are very different):
         Call 1: {"pattern": "result_summary", "pattern-type": "substr"}
     Call 2: {"pattern": "timeline_diff", "pattern-type": "substr"}
     Call 3: {"pattern": "directly_answer", "pattern-type": "substr", "include-ext": ".md"}
+
+IMPORTANT: Do NOT pass comma-separated multiple filenames as a single pattern value.
+  WRONG: {"pattern": "go.mod,go.work,Makefile", "pattern-type": "glob"}
+         The entire string is treated as ONE pattern, which will never match any filename.
+  FIX A: {"pattern": "(go\\.mod|go\\.work|Makefile)", "pattern-type": "regexp"}
+  FIX B: Make three separate calls, one per filename.
 
 === Common Mistakes to Avoid ===
 
@@ -119,7 +136,7 @@ Filter Evaluation Order:
   4. exclude-ext blacklist (file extension match, directories pass)
   5. include-ext whitelist (file extension match, directories pass)
   6. size filters (min-size, max-size)
-  7. pattern match (substr/regexp/glob against full absolute path)
+  7. pattern match (substr/regexp: against full absolute path; glob: against filename/basename only)
 USAGE_BLOCK
 
 yakit.AutoInitYakit()
@@ -137,6 +154,19 @@ includeExtRaw = cli.String("include-ext", cli.setHelp("comma-separated file exte
 minSize = cli.Int("min-size", cli.setHelp("minimum file size in bytes"))
 maxSize = cli.Int("max-size", cli.setHelp("maximum file size in bytes"))
 cli.check()
+
+if !file.IsExisted(dirname) {
+    errMsg = sprintf("Directory does not exist: %v", dirname)
+    yakit.Error(errMsg)
+    println(errMsg)
+    return
+}
+if !file.IsDir(dirname) {
+    errMsg = sprintf("Path is not a directory: %v", dirname)
+    yakit.Error(errMsg)
+    println(errMsg)
+    return
+}
 
 yakit.Info("Find files in: %v, pattern: %v, pattern-type: %v", dirname, pattern, patternMode)
 
@@ -247,12 +277,14 @@ filesys.Recursive(dirname, filesys.onStat((isDir, name, info) => {
     // Unified name + extension filter
     if shouldFilterPath(name, isDir) { return }
 
-    // Size filters
-    if minSize > 0 && info.Size() < minSize {
-        return
-    }
-    if maxSize > 0 && info.Size() > maxSize {
-        return
+    // Size filters (only apply to files, not directories)
+    if !isDir {
+        if minSize > 0 && info.Size() < minSize {
+            return
+        }
+        if maxSize > 0 && info.Size() > maxSize {
+            return
+        }
     }
 
     // Pattern match against full absolute path
@@ -278,12 +310,18 @@ filesys.Recursive(dirname, filesys.onStat((isDir, name, info) => {
             return
         }
     case "g", "glob", "global":
-        if str.MatchAllOfGlob(name, pattern) {
+        basename = name
+        slashIdx = str.LastIndex(name, "/")
+        if slashIdx >= 0 {
+            basename = name[slashIdx+1:]
+        }
+        if str.MatchAllOfGlob(basename, pattern) {
             count++
             output()
             if count >= limit {
                 end = true
             }
+            return
         }
     default:
         if str.MatchAllOfSubString(name, pattern) {

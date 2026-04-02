@@ -111,9 +111,12 @@ type AuditState struct {
 	// 让后续 agent 知道报告有哪些章节，便于决策是否需要 read_recon_notes
 	ReconOutline string `json:"recon_outline,omitempty"`
 
-	// Phase 1 产出：详细侦察笔记写入磁盘文件，路径存此处
-	// 由 report_generating 子 loop 按大纲写入，内容包含目录结构、路由列表、数据库访问模式等
+	// Phase 1 产出：最终汇总侦察报告文件路径（由 report_generating 子 loop 写入）
 	ReconFilePath string `json:"recon_file_path,omitempty"`
+
+	// Phase 1 中间产出：AI 通过 write_file 写出的侦察笔记文件路径列表
+	// 每次 write_file 成功后追加，complete_recon 时作为 referenceFiles 传给 report_generating
+	ReconNoteFiles []string `json:"recon_note_files,omitempty"`
 
 	// Phase 2 产出：原始 findings 列表
 	Findings []*Finding `json:"findings,omitempty"`
@@ -136,9 +139,10 @@ type AuditState struct {
 
 func NewAuditState() *AuditState {
 	return &AuditState{
-		Phase:         AuditPhaseRecon,
-		Findings:      make([]*Finding, 0),
-		VerifiedVulns: make([]*VerifiedFinding, 0),
+		Phase:          AuditPhaseRecon,
+		Findings:       make([]*Finding, 0),
+		VerifiedVulns:  make([]*VerifiedFinding, 0),
+		ReconNoteFiles: make([]string, 0),
 	}
 }
 
@@ -191,6 +195,27 @@ func (s *AuditState) GetReconFilePath() string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.ReconFilePath
+}
+
+// AddReconNoteFile 记录 AI 通过 write_file 写出的侦察文件路径（由 buildFSActionWithCallback 回调触发）
+func (s *AuditState) AddReconNoteFile(filePath string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, f := range s.ReconNoteFiles {
+		if f == filePath {
+			return // 去重
+		}
+	}
+	s.ReconNoteFiles = append(s.ReconNoteFiles, filePath)
+}
+
+// GetReconNoteFiles 返回已写出的侦察文件路径列表（只读副本）
+func (s *AuditState) GetReconNoteFiles() []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	result := make([]string, len(s.ReconNoteFiles))
+	copy(result, s.ReconNoteFiles)
+	return result
 }
 
 // GetReconFileContent 读取侦察笔记文件内容（供 read_recon_notes action 使用）

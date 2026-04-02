@@ -1,0 +1,229 @@
+## 目录探索输出示例
+
+本阶段的工作模式是**探索 → write_file 写入 → 继续探索 → ... → complete_explore 结束**。
+
+**关键顺序：必须先完成 tree → write_file(dir_structure.md)，然后才能做入口点搜索、技术栈分析等后续步骤。**
+
+---
+
+### 示例 A — 含多个 main 入口的 Go monorepo 项目
+
+**Step 1：获取目录结构（仅目录骨架）— 必须是第一个动作**
+
+```json
+{
+  "@action": "tree",
+  "identifier": "folder_skeleton",
+  "human_readable_thought": "先获取项目完整目录骨架（仅目录），使用 dirs-only=true，max-lines=1000。",
+  "path": "/home/user/yaklang",
+  "max-depth": 4,
+  "dirs-only": true,
+  "max-lines": 1000
+}
+```
+
+**Step 1b（如果被截断）：翻页获取剩余目录**
+
+假设上一步末尾输出了 `*** NEXT PAGE: tree(path="...", offset=1000, ...) ***`，则继续翻页：
+
+```json
+{
+  "@action": "tree",
+  "identifier": "folder_skeleton_page2",
+  "human_readable_thought": "上一步输出被截断，按提示翻到第二页继续获取目录结构。",
+  "path": "/home/user/yaklang",
+  "max-depth": 4,
+  "dirs-only": true,
+  "max-lines": 1000,
+  "offset": 1000
+}
+```
+
+**Step 2：立即将目录结构写入 dir_structure.md — 必须在做其他任何事之前完成**
+
+```json
+{
+  "@action": "write_file",
+  "identifier": "write_dir_structure",
+  "human_readable_thought": "目录树已完整获取，立即写入 dir_structure.md（必须第一个写出的文件）。",
+  "file": "/home/user/aispace/explore_workdir_.../dir_structure.md",
+  "force": true
+}
+```
+
+```
+<|TOOL_PARAM_content_{nonce}|>
+# 目录结构
+
+```
+.
+├── cmd/                    # 所有可执行程序入口
+│   ├── yak/               # 主程序入口（yak 解释器/REPL）
+│   ├── yaklang-server/    # gRPC 服务端
+│   └── tools/             # 辅助工具集合
+├── common/                # 核心库（注意：部分子目录下也有独立入口 func main()）
+│   ├── ai/                # AI 相关功能
+│   │   ├── aibalance/    # AI 负载均衡（含独立服务入口）
+│   │   └── aid/          # AI 决策框架
+│   ├── yak/              # Yak 脚本引擎
+│   ├── yakgrpc/          # gRPC 服务实现
+│   ├── crawlerx/         # 高级爬虫引擎（含独立 cmd 入口）
+│   └── syntaxflow/       # SyntaxFlow 静态分析引擎
+├── scripts/               # 构建 / 代码生成脚本
+└── go.mod                 # Go 模块依赖
+```
+
+**主要目录职责**：
+- `cmd/yak`：Yak 解释器主入口，支持 REPL 和脚本执行
+- `cmd/yaklang-server`：启动 gRPC 服务端，供 Yakit GUI 客户端连接
+- `common/`：核心业务逻辑库，部分子模块有自己的 `cmd/` 入口（如 crawlerx、aibalance）
+- `scripts/`：proto 生成、版本打包等辅助脚本
+<|TOOL_PARAM_content_END_{nonce}|>
+```
+
+**Step 3：查找所有 main 入口点**
+
+注意：Go 入口文件不一定叫 `main.go`，任何 `.go` 文件只要属于 `package main` 且包含 `func main()` 就是入口。先从 `cmd/` 目录搜索，再扩展到其他子目录。
+
+```json
+{
+  "@action": "grep",
+  "identifier": "find_main_funcs_in_cmd",
+  "human_readable_thought": "先在 cmd/ 目录搜索 func main() 入口，缩小范围避免超时。",
+  "pattern": "func main()",
+  "path": "/home/user/yaklang/cmd",
+  "pattern-mode": "substr",
+  "include-ext": ".go",
+  "limit": 50
+}
+```
+
+**Step 4：进一步探索 cmd 目录文件结构**
+
+```json
+{
+  "@action": "tree",
+  "identifier": "cmd_dir_files",
+  "human_readable_thought": "对 cmd 目录做文件级 tree，看每个子命令的文件组织。",
+  "path": "/home/user/yaklang/cmd",
+  "max-depth": 3,
+  "max-lines": 500
+}
+```
+
+**Step 5：将入口点信息写入文件**
+
+```json
+{
+  "@action": "write_file",
+  "identifier": "write_entry_points",
+  "human_readable_thought": "入口点搜索完毕，将所有入口点信息写入 entry_points.md。",
+  "file": "/home/user/aispace/explore/entry_points.md",
+  "force": false
+}
+```
+
+```
+<|TOOL_PARAM_content_{nonce}|>
+# 入口点列表
+
+本项目共有 **5 个可执行程序入口**（含 cmd/ 下和 common/ 子模块中的独立入口）：
+
+## cmd/ 下的主要入口
+
+### 1. cmd/yak/yak.go — Yak 解释器
+- **路径**: `/home/user/yaklang/cmd/yak/yak.go`（注意：文件名不是 main.go，但它属于 package main）
+- **功能**: Yak 脚本解释器 + 交互式 REPL
+- **启动方式**: `./yak [script.yak]` 或 `./yak` 进入 REPL
+
+### 2. cmd/yaklang-server/server.go — gRPC 服务端
+- **路径**: `/home/user/yaklang/cmd/yaklang-server/server.go`
+- **功能**: 启动 gRPC 服务器，供 Yakit GUI 客户端连接
+- **启动方式**: `./yaklang-server --port 8087`
+
+## common/ 下的独立工具入口
+
+### 3. common/crawlerx/cmd/run.go — 爬虫引擎
+- **路径**: `/home/user/yaklang/common/crawlerx/cmd/run.go`
+- **功能**: 高级爬虫引擎独立入口
+
+### 4. common/aibalance/cmd/aibalance.go — AI 负载均衡服务
+- **路径**: `/home/user/yaklang/common/aibalance/cmd/aibalance.go`
+- **功能**: AI 请求负载均衡服务
+
+### 5. common/fp/cmd/scanfp.go — 指纹识别工具
+- **路径**: `/home/user/yaklang/common/fp/cmd/scanfp.go`
+- **功能**: 独立的指纹扫描工具
+
+> **注意**：大量 `_test.go` 和 `_examples/` 下的 `main.go` 为测试/示例代码，不属于生产入口。
+<|TOOL_PARAM_content_END_{nonce}|>
+```
+
+**Step 6：读取 go.mod 了解技术栈**
+
+```json
+{
+  "@action": "read_file",
+  "identifier": "go_mod_deps",
+  "human_readable_thought": "读取 go.mod 了解 Go 版本和主要依赖。",
+  "file": "/home/user/yaklang/go.mod"
+}
+```
+
+**Step 7：将技术栈写入文件**
+
+```json
+{
+  "@action": "write_file",
+  "identifier": "write_tech_stack",
+  "human_readable_thought": "技术栈分析完毕，写入 tech_stack.md。",
+  "file": "/home/user/aispace/explore/tech_stack.md",
+  "force": false
+}
+```
+
+**Step 8：结束探索**
+
+```json
+{
+  "@action": "complete_explore",
+  "human_readable_thought": "已完成目录结构、入口点（5个，含 common/ 下子模块入口）、技术栈、核心模块概览等探索，并写出了 4 个探索文件。现在调用 complete_explore 结束探索。",
+  "target_path": "/home/user/yaklang",
+  "project_name": "yaklang",
+  "tech_stack": "Go 1.21, gRPC/protobuf, Antlr4 (语法解析), SQLite (本地存储)",
+  "entry_points": "cmd/yak/yak.go (Yak解释器); cmd/yaklang-server/server.go (gRPC服务端); common/crawlerx/cmd/run.go (爬虫引擎); common/aibalance/cmd/aibalance.go (AI负载均衡); common/fp/cmd/scanfp.go (指纹扫描)",
+  "modules_summary": "common/yak (Yak引擎), common/yakgrpc (gRPC服务实现), common/syntaxflow (静态分析), common/ai (AI功能框架), common/crawlerx (爬虫), common/fp (指纹识别)"
+}
+```
+
+---
+
+### 示例 B — PHP Web 项目
+
+```json
+{
+  "@action": "complete_explore",
+  "human_readable_thought": "PHP 7.4 Web 应用探索完成。入口文件 index.php / admin.php，无框架，原生 mysqli，已写出 dir_structure.md / entry_points.md / tech_stack.md 共 3 个文件。",
+  "target_path": "/var/www/html/myapp",
+  "project_name": "myapp",
+  "tech_stack": "PHP 7.4, 原生 mysqli, MySQL 5.7, 无框架",
+  "entry_points": "index.php (前台入口), admin.php (后台管理入口), cron/cleanup.php (定时任务脚本)",
+  "modules_summary": "includes/auth.php (认证), includes/db.php (数据库封装), includes/user.php (用户逻辑), templates/ (页面模板)"
+}
+```
+
+---
+
+### 示例 C — Java Spring Boot + 多模块 Maven 项目
+
+```json
+{
+  "@action": "complete_explore",
+  "human_readable_thought": "Spring Boot 多模块 Maven 项目探索完成。共 3 个子模块，2 个含 main 函数。已写出 4 个探索文件。",
+  "target_path": "/home/user/spring-platform",
+  "project_name": "spring-platform",
+  "tech_stack": "Java 11, Spring Boot 2.7.14, MyBatis 3.5, Maven 多模块, MySQL 8.0, Redis 7",
+  "entry_points": "api-gateway/src/main/java/com/example/gateway/GatewayApplication.java (API网关,端口8080), user-service/src/main/java/com/example/user/UserServiceApplication.java (用户微服务,端口8081)",
+  "modules_summary": "api-gateway/ (路由网关), user-service/ (用户CRUD微服务), common-lib/ (共享工具库,无main函数)"
+}
+```

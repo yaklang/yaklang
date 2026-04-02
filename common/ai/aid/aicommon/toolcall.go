@@ -748,9 +748,21 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 			destinationIdentifier = sanitizeIdentifier(utils.InterfaceToString(id))
 			delete(invokeParams, ReservedKeyIdentifier)
 		}
+		if destinationIdentifier == "" {
+			if id, ok := invokeParams["identifier"]; ok {
+				destinationIdentifier = sanitizeIdentifier(utils.InterfaceToString(id))
+				delete(invokeParams, "identifier")
+			}
+		}
 		if ce, ok := invokeParams[ReservedKeyCallExpectations]; ok {
 			t.callExpectations = utils.InterfaceToString(ce)
 			delete(invokeParams, ReservedKeyCallExpectations)
+		}
+		if t.callExpectations == "" {
+			if ce, ok := invokeParams["call_expectations"]; ok {
+				t.callExpectations = utils.InterfaceToString(ce)
+				delete(invokeParams, "call_expectations")
+			}
 		}
 		if destinationIdentifier != "" {
 			t.emitter.EmitInfo("tool[%v] destination identifier: %v", tool.Name, destinationIdentifier)
