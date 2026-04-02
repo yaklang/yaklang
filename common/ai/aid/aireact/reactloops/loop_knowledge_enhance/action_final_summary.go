@@ -3,10 +3,7 @@ package loop_knowledge_enhance
 import (
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
-
-	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
@@ -25,10 +22,19 @@ func makeFinalSummaryAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 			aitool.WithParam_Required(true)),
 	}
 
-	return reactloops.WithRegisterLoopAction(
+	streamFields := []*reactloops.LoopStreamField{
+		{
+			FieldName:   "summary",
+			AINodeId:    "re-act-loop-answer-payload",
+			ContentType: aicommon.TypeTextMarkdown,
+		},
+	}
+
+	return reactloops.WithRegisterLoopActionWithStreamField(
 		"final_summary",
 		desc,
 		toolOpts,
+		streamFields,
 		func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
 			// 验证参数
 			loop.LoadingStatus("验证最终总结参数 - validating final summary parameters")
@@ -42,6 +48,11 @@ func makeFinalSummaryAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 			loop.LoadingStatus("生成最终总结中 - generating final summary")
 
 			summary := action.GetString("summary")
+			if summary == "" {
+				op.Fail("final_summary action requires non-empty summary")
+				return
+			}
+
 			userQuery := loop.Get("user_query")
 			searchHistory := loop.Get("search_history")
 			searchResultsSummary := loop.Get("search_results_summary")
@@ -102,34 +113,9 @@ func makeFinalSummaryAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 				".md",
 				finalReport,
 			)
-
-			result, err := loop.GetInvoker().DirectlyAnswer(
-				loop.GetCurrentTask().GetContext(),
-				finalReport,
-				nil,
-			)
-			directAnswerDelivered := false
-			if result == "" {
-				r.GetConfig().GetEmitter().EmitTextMarkdownStreamEvent(
-					"re-act-loop-answer-payload",
-					strings.NewReader(finalReport),
-					loop.GetCurrentTask().GetId(),
-					func() {},
-				)
-				directAnswerDelivered = true
-			}
-			log.Infof("Final summary direct answer result: %s", utils.ShrinkTextBlock(result, 2048))
-			if err == nil {
-				directAnswerDelivered = true
-			}
-
-			if directAnswerDelivered {
-				markFinalSummaryDirectAnswered(loop)
-				op.Exit()
-				return
-			}
-
-			op.Continue()
+			loop.GetInvoker().EmitResultAfterStream(finalReport)
+			markFinalSummaryDirectAnswered(loop)
+			op.Exit()
 		},
 	)
 }
