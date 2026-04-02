@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/consts"
 	"sync"
 	"time"
 
@@ -10,7 +11,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiconfig"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
-	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 
@@ -72,11 +72,11 @@ func ConvertYPBAIStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.Confi
 	}
 	if i.GetAIService() != "" {
 		serviceName := i.GetAIService()
-		chat, err := ai.LoadChater(serviceName)
+		aiCb, err := aicommon.CreateCallbackFromConfig(aiconfig.GetGlobalManager().GetFirstConfigByTierAndProviderAndModel(consts.TierIntelligent, serviceName, ""))
 		if err != nil {
 			log.Errorf("load ai service failed: %v", err)
 		} else {
-			opts = append(opts, aicommon.WithAICallback(aicommon.AIChatToAICallbackType(chat)))
+			opts = append(opts, aicommon.WithAICallback(aiCb))
 		}
 		log.Warnf("AIStartParams.AIService/AIModelName for WithAIChatInfo is deprecated, " +
 			"model info is now auto-detected from the actual AI gateway call")
