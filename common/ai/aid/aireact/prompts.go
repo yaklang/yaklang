@@ -392,7 +392,6 @@ func (pm *PromptManager) getBasicPromptInfo(tools []*aitool.Tool, profile aicomm
 		}
 	}
 
-	result["ConversationMemory"] = pm.react.cumulativeSummary
 	result["Timeline"] = pm.getPromptTimeline()
 	return basePrompt, result, nil
 }
@@ -677,9 +676,6 @@ func (pm *PromptManager) renderReGenerateToolParamsPromptWithMeta(
 		data.WorkingDirGlance = pm.GetGlanceWorkdir(data.WorkingDir)
 	}
 
-	if pm.react.cumulativeSummary != "" {
-		data.ConversationMemory = pm.react.cumulativeSummary
-	}
 	if t := pm.react.config.GetTimeline(); t != nil {
 		data.Timeline = pm.getPromptTimeline()
 	}
