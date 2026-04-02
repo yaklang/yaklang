@@ -124,6 +124,7 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 	var action *aicommon.Action
 	var emitter = r.emitter
 	var actionNames = r.GetAllActionNames()
+	requestOpts = append(requestOpts, aicommon.WithAIRequest_Source("react_loop:"+r.loopName))
 
 	getNextActionType := func(a *aicommon.Action) string { //legacy support
 		actionType := action.ActionType()

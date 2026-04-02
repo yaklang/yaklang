@@ -253,6 +253,7 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 			return nil
 		},
 		aicommon.WithAIRequest_PromptFallback(promptFallback),
+		aicommon.WithAIRequest_Source("verify_satisfaction"),
 	)
 	if transErr != nil {
 		log.Errorf("AI transaction failed during verification: %v", transErr)

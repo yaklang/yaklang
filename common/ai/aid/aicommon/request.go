@@ -17,6 +17,7 @@ type AIRequest struct {
 	taskIndex              string
 	detachCheckpoint       bool
 	prompt                 string
+	source                 string
 	promptFallback         PromptFallback
 	startTime              time.Time
 	seqId                  int64
@@ -121,6 +122,20 @@ func (r *AIRequest) SetPrompt(prompt string) {
 	r.prompt = prompt
 }
 
+func (r *AIRequest) GetSource() string {
+	if r == nil {
+		return ""
+	}
+	return r.source
+}
+
+func (r *AIRequest) SetSource(source string) {
+	if r == nil {
+		return
+	}
+	r.source = source
+}
+
 func (r *AIRequest) CallOnAcquireSeq(seq int64) {
 	if r == nil || r.onAcquireSeq == nil {
 		return
@@ -160,5 +175,11 @@ func WithAIRequest_ImageData(data *ImageData) AIRequestOption {
 func WithAIRequest_PromptFallback(fallback PromptFallback) AIRequestOption {
 	return func(req *AIRequest) {
 		req.SetPromptFallback(fallback)
+	}
+}
+
+func WithAIRequest_Source(source string) AIRequestOption {
+	return func(req *AIRequest) {
+		req.SetSource(source)
 	}
 }

@@ -437,6 +437,7 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 	if promptMeta != nil && promptMeta.PromptFallback != nil {
 		requestOpts = append(requestOpts, WithAIRequest_PromptFallback(promptMeta.PromptFallback))
 	}
+	requestOpts = append(requestOpts, WithAIRequest_Source(fmt.Sprintf("tool_call_params:%s", tool.Name)))
 
 	err = CallAITransaction(t.config, paramsPrompt, func(request *AIRequest) (*AIResponse, error) {
 		request.SetTaskIndex(t.task.GetIndex())

@@ -163,6 +163,7 @@ func (r *ReAct) DirectlyAnswer(ctx context.Context, query string, tools []*aitoo
 			return nil
 		},
 		aicommon.WithAIRequest_PromptFallback(promptFallback),
+		aicommon.WithAIRequest_Source("directly_answer"),
 	)
 	if finalResult != "" {
 		return finalResult, nil

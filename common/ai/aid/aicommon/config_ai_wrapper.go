@@ -63,11 +63,23 @@ func (c *Config) decoratePrompt(prompt string) string {
 	return prompt
 }
 
+func getAIRequestSourceLabel(request *AIRequest) string {
+	if request == nil {
+		return "unknown"
+	}
+	source := strings.TrimSpace(request.GetSource())
+	if source == "" {
+		return "unknown"
+	}
+	return source
+}
+
 func (c *Config) prepareRequestPrompt(request *AIRequest) (int, error) {
 	if request == nil {
 		return 0, utils.Error("ai request is nil")
 	}
 
+	sourceLabel := getAIRequestSourceLabel(request)
 	selectedPrompt := c.decoratePrompt(request.GetPrompt())
 	selectedTokens := estimateTokens([]byte(selectedPrompt))
 	limit := int(c.AiCallTokenLimit)
@@ -76,6 +88,9 @@ func (c *Config) prepareRequestPrompt(request *AIRequest) (int, error) {
 		request.SetPrompt(selectedPrompt)
 		return selectedTokens, nil
 	}
+
+	c.EmitWarning("ai request prompt exceeded token limit for source=%s (~%d > %d)",
+		sourceLabel, selectedTokens, limit)
 
 	promptFallback := request.GetPromptFallback()
 	if promptFallback == nil {
@@ -104,16 +119,16 @@ func (c *Config) prepareRequestPrompt(request *AIRequest) (int, error) {
 		candidatePrompt := c.decoratePrompt(candidatePromptRaw)
 		candidateTokens := estimateTokens([]byte(candidatePrompt))
 		if candidateTokens <= limit {
-			c.EmitWarning("ai request prompt exceeded token limit (~%d > %d), fallback via promptFallback attempt %d (~%d)",
-				selectedTokens, limit, idx+1, candidateTokens)
+			c.EmitWarning("ai request prompt exceeded token limit for source=%s (~%d > %d), fallback via promptFallback attempt %d (~%d)",
+				sourceLabel, selectedTokens, limit, idx+1, candidateTokens)
 			request.SetPrompt(candidatePrompt)
 			return candidateTokens, nil
 		}
 
 		if candidatePrompt == currentPrompt || candidateTokens >= currentTokens {
 			c.EmitWarning(
-				"ai request prompt exceeded token limit (~%d > %d) and promptFallback did not shrink enough at attempt %d (~%d), trying higher compression level if available",
-				currentTokens, limit, idx+1, candidateTokens,
+				"ai request prompt exceeded token limit for source=%s (~%d > %d) and promptFallback did not shrink enough at attempt %d (~%d), trying higher compression level if available",
+				sourceLabel, currentTokens, limit, idx+1, candidateTokens,
 			)
 			continue
 		}

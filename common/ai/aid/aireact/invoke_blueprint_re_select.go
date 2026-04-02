@@ -129,6 +129,7 @@ func (r *ReAct) invokeBlueprintReviewChangeBlueprint(
 			return nil
 		},
 		aicommon.WithAIRequest_PromptFallback(promptFallback),
+		aicommon.WithAIRequest_Source("blueprint_reselect_params:"+selectedForge.ForgeName),
 	)
 	if err != nil {
 		return nil, nil, false, err

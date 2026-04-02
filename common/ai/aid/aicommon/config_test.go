@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/google/uuid"
@@ -195,4 +196,48 @@ func TestCallAITransaction_RebuildsFallbackPromptOnRetry(t *testing.T) {
 	require.Equal(t, 2, len(capturedPrompts))
 	require.Equal(t, "short prompt", capturedPrompts[0])
 	require.Equal(t, config.RetryPromptBuilder("short prompt", retryErr), capturedPrompts[1])
+}
+
+func TestPrepareRequestPrompt_EmitWarningContainsSource(t *testing.T) {
+	var (
+		messages []string
+		mu       sync.Mutex
+	)
+
+	config := NewTestConfig(
+		context.Background(),
+		WithAiCallTokenLimit(8),
+		WithEventHandler(func(e *schema.AiOutputEvent) {
+			if e == nil || e.GetContentJSONPath("$.level") != "warning" {
+				return
+			}
+			mu.Lock()
+			defer mu.Unlock()
+			messages = append(messages, e.GetContentJSONPath("$.message"))
+		}),
+	)
+
+	req := NewAIRequest(
+		strings.Repeat("a", 80),
+		WithAIRequest_Source("react_loop:test-loop"),
+		WithAIRequest_PromptFallback(func(expectedContextSize int, currentContextSize int, compressionLevel int) (string, error) {
+			return "short prompt", nil
+		}),
+	)
+
+	_, err := config.prepareRequestPrompt(req)
+	require.NoError(t, err)
+
+	mu.Lock()
+	defer mu.Unlock()
+	require.NotEmpty(t, messages)
+
+	found := false
+	for _, msg := range messages {
+		if strings.Contains(msg, "source=react_loop:test-loop") {
+			found = true
+			break
+		}
+	}
+	require.True(t, found, "expected warning message to include request source, got: %v", messages)
 }
