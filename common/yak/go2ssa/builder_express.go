@@ -247,7 +247,8 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 					if key := typ.GetKeybyName(text); key != nil {
 						leftv = b.CreateMemberCallVariable(rv, key)
 						b.ReferenceParameter(leftv.GetName(), p.FormalParameterIndex, ssa.PointerSideEffect)
-						// TODO: 匿名结构体指针使用其他逻辑实现，需要兼容
+						// TODO(go2ssa): model embedded-pointer member writes precisely instead of
+						// reusing the generic parameter side-effect fallback.
 						return
 					}
 				}
@@ -405,7 +406,8 @@ func (b *astbuilder) buildMethodExpression(exp *gol.MethodExprContext, IslValue 
 	_ = typ
 	_ = text
 
-	// TODO
+	// TODO(go2ssa): implement method expressions such as `T.M` and `(*T).M`
+	// as first-class callable values instead of returning a placeholder error.
 	b.NewError(ssa.Error, TAG, ToDo())
 	return b.EmitConstInstPlaceholder(0), b.CreateVariable("")
 }

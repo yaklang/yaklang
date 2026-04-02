@@ -1511,7 +1511,8 @@ func (b *astbuilder) buildSendStmt(stmt *gol.SendStmtContext) []ssa.Value {
 		datav, _ = b.buildExpression(data.(*gol.ExpressionContext), false)
 	}
 
-	// TODO handler "<-"
+	// TODO(go2ssa): lower select send cases and channel send semantics instead of
+	// stopping at a placeholder error.
 	_ = channv
 	_ = datav
 	b.NewError(ssa.Error, TAG, ToDo())
@@ -1930,15 +1931,31 @@ func (b *astbuilder) buildIncDecStmt(stmt *gol.IncDecStmtContext) []ssa.Value {
 	var values []ssa.Value
 
 	if exp := stmt.Expression(); exp != nil {
+		rightv, _ := b.buildExpression(exp.(*gol.ExpressionContext), false)
 		_, leftv := b.buildExpression(exp.(*gol.ExpressionContext), true)
+		// TODO(go2ssa): recover a precise writable lvalue for cases like `(*p)++`
+		// and update the pointed storage instead of silently computing a value-only fallback.
+		baseValue := rightv
+		if leftv != nil {
+			if current := b.ReadValueByVariable(leftv); current != nil {
+				baseValue = current
+			}
+		}
+		if baseValue == nil {
+			baseValue = b.EmitConstInstPlaceholder(0)
+		}
 
 		if stmt.PLUS_PLUS() != nil {
-			value := b.EmitBinOp(ssa.OpAdd, b.ReadValueByVariable(leftv), b.EmitConstInst(1))
-			b.AssignVariable(leftv, value)
+			value := b.EmitBinOp(ssa.OpAdd, baseValue, b.EmitConstInst(1))
+			if leftv != nil {
+				b.AssignVariable(leftv, value)
+			}
 			values = []ssa.Value{value}
 		} else if stmt.MINUS_MINUS() != nil {
-			value := b.EmitBinOp(ssa.OpSub, b.ReadValueByVariable(leftv), b.EmitConstInst(1))
-			b.AssignVariable(leftv, value)
+			value := b.EmitBinOp(ssa.OpSub, baseValue, b.EmitConstInst(1))
+			if leftv != nil {
+				b.AssignVariable(leftv, value)
+			}
 			values = []ssa.Value{value}
 		}
 	}

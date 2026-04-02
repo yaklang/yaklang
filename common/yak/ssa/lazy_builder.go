@@ -64,6 +64,7 @@ func (l *LazyBuilder) Build() {
 
 	defer func() {
 		if r := recover(); r != nil {
+			log.Errorf("lazy builder panic: name=%s panic=%v", l._lazybuild_name, r)
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
