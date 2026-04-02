@@ -21,8 +21,9 @@ type amapTraceIDState struct {
 // Rules:
 //   - Minimum 1 second between any two requests from the same Trace-ID
 type AmapRateLimiter struct {
-	states sync.Map // map[string]*amapTraceIDState
-	stopCh chan struct{}
+	states   sync.Map // map[string]*amapTraceIDState
+	stopCh   chan struct{}
+	stopOnce sync.Once
 }
 
 // NewAmapRateLimiter creates a new rate limiter and starts background cleanup
@@ -122,5 +123,7 @@ func (rl *AmapRateLimiter) cleanupLoop() {
 
 // Stop stops the background cleanup goroutine
 func (rl *AmapRateLimiter) Stop() {
-	close(rl.stopCh)
+	rl.stopOnce.Do(func() {
+		close(rl.stopCh)
+	})
 }

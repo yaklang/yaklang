@@ -89,6 +89,13 @@ func assertNoGoroutineLeak(t *testing.T, name string, fn func()) {
 	checker.Check()
 }
 
+func TestWaitStreamHandlerDone_TimeoutDoesNotLeakWaiter(t *testing.T) {
+	checker := newGoroutineLeakChecker(t, 0, 2*time.Second)
+	neverDone := make(chan struct{})
+	waitStreamHandlerDone(neverDone, nil, 20*time.Millisecond, "unit test timeout")
+	checker.Check()
+}
+
 func buildBasicRequest(host string, port int) []byte {
 	return []byte(fmt.Sprintf("GET / HTTP/1.1\r\nHost: %s\r\n\r\n", utils.HostPort(host, port)))
 }

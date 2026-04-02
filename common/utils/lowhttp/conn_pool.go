@@ -646,22 +646,22 @@ func (pc *persistConn) readLoop() {
 		var mirrorWriter io.Writer = &respBuffer
 
 		// Support BodyStreamReaderHandler in connection pool mode
-		var streamHandlerWg sync.WaitGroup
 		var streamWriter io.WriteCloser
 		var streamBodyReaderCh chan io.ReadCloser
+		var streamHandlerDone chan struct{}
 		if rc.option != nil && rc.option.BodyStreamReaderHandler != nil {
 			streamBodyReaderCh = make(chan io.ReadCloser, 1)
+			streamHandlerDone = make(chan struct{})
 			streamReader, sw := utils.NewBufPipe(nil)
 			streamWriter = sw
 
-			streamHandlerWg.Add(1)
 			go func(reader io.Reader, handler func([]byte, io.ReadCloser)) {
 				defer func() {
+					close(streamHandlerDone)
 					if err := recover(); err != nil {
 						log.Errorf("BodyStreamReaderHandler panic in conn pool: %v", err)
 						utils.PrintCurrentGoroutineRuntimeStack()
 					}
-					streamHandlerWg.Done()
 				}()
 
 				// Parse header and body from stream
@@ -746,7 +746,7 @@ func (pc *persistConn) readLoop() {
 					}
 					firstAuth = false
 					// Wait for stream handler to complete before continuing
-					streamHandlerWg.Wait()
+					waitStreamHandlerDone(streamHandlerDone, streamBodyReaderCh, 2*time.Second, "conn pool auth retry stream handler")
 					continue
 				}
 			}
@@ -786,9 +786,7 @@ func (pc *persistConn) readLoop() {
 
 		// Wait for stream handler to complete before sending response
 		if rc.option != nil && rc.option.BodyStreamReaderHandler != nil {
-			waitStreamHandlerDone(&streamHandlerWg, streamBodyReaderCh, 2*time.Second, "conn pool stream handler")
-		} else {
-			streamHandlerWg.Wait()
+			waitStreamHandlerDone(streamHandlerDone, streamBodyReaderCh, 2*time.Second, "conn pool stream handler")
 		}
 
 		//pc.mu.Lock()
