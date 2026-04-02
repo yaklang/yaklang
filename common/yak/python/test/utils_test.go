@@ -35,6 +35,12 @@ func CheckPythonPrintlnValue(code string, want []string, t *testing.T) {
 	test.CheckPrintlnValue(code, want, t)
 }
 
+// CheckPythonPrintlnValueContain checks println values in Python code with substring containment.
+func CheckPythonPrintlnValueContain(code string, want []string, t *testing.T) {
+	code = CreatePythonProgram(code)
+	test.CheckPrintlnValueContain(code, want, t)
+}
+
 // CheckAllPythonPrintlnValue checks println values in complete Python code.
 func CheckAllPythonPrintlnValue(code string, want []string, t *testing.T) {
 	test.CheckPrintlnValue(code, want, t)
@@ -58,4 +64,3 @@ func CreatePythonProgram(code string) string {
 	// For now, just return the code as-is
 	return code
 }
-

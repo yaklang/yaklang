@@ -71,7 +71,11 @@ compound_stmt
     | WHILE test COLON suite else_clause?                                            # while_stmt
     | ASYNC? FOR exprlist IN testlist COLON suite else_clause?                       # for_stmt
     | TRY COLON suite (except_clause+ else_clause? finally_clause? | finally_clause) # try_stmt
-    | ASYNC? WITH with_item (COMMA with_item)* COLON suite                           # with_stmt
+    | ASYNC? WITH (
+        with_item (COMMA with_item)*
+        | OPEN_PAREN with_item (COMMA with_item)* COMMA? CLOSE_PAREN
+    ) COLON suite                                                                    # with_stmt
+    | {this.IsSoftKeyword("match")}? NAME test COLON LINE_BREAK INDENT case_clause+ DEDENT # match_stmt
     | decorator* (classdef | funcdef)                                                # class_or_func_def_stmt
     ;
 
@@ -101,6 +105,15 @@ with_item
     : test (AS expr)?
     ;
 
+case_clause
+    : {this.IsSoftKeyword("case")}? NAME case_pattern ((OR_OP | COMMA) case_pattern)* (IF test)? COLON suite
+    ;
+
+case_pattern
+    : test
+    | star_expr
+    ;
+
 // Python 2 : EXCEPT test COMMA name
 // Python 3 : EXCEPT test AS name
 except_clause
@@ -113,11 +126,15 @@ except_clause
     ;
 
 classdef
-    : CLASS name (OPEN_PAREN arglist? CLOSE_PAREN)? COLON suite
+    : CLASS name type_params? (OPEN_PAREN arglist? CLOSE_PAREN)? COLON suite
     ;
 
 funcdef
-    : ASYNC? DEF name OPEN_PAREN typedargslist? CLOSE_PAREN (ARROW test)? COLON suite
+    : ASYNC? DEF name type_params? OPEN_PAREN typedargslist? CLOSE_PAREN (ARROW test)? COLON suite
+    ;
+
+type_params
+    : OPEN_BRACKET name (COMMA name)* CLOSE_BRACKET
     ;
 
 // python 3 paramters
@@ -143,6 +160,7 @@ def_parameters
 def_parameter
     : named_parameter (ASSIGN test)?
     | STAR
+    | DIV
     ;
 
 named_parameter
@@ -156,7 +174,8 @@ simple_stmt
 // TODO 1: left part augmented assignment should be `test` only, no stars or lists
 // TODO 2: semantically annotated declaration is not an assignment
 small_stmt
-    : testlist_star_expr assign_part? # expr_stmt
+    : {this.IsSoftKeyword("type")}? NAME name ASSIGN test # type_stmt
+    | testlist_star_expr assign_part? # expr_stmt
     | {this.CheckVersion(2)}? PRINT (
         (test (COMMA test)* COMMA?)
         | RIGHT_SHIFT test ((COMMA test)+ COMMA?)
@@ -211,7 +230,7 @@ assign_part
     ;
 
 exprlist
-    : expr (COMMA expr)* COMMA?
+    : (expr | star_expr) (COMMA (expr | star_expr))* COMMA?
     ;
 
 import_as_names
@@ -240,7 +259,7 @@ dotted_as_name
  */
 // https://docs.python.org/3/reference/expressions.html#operator-precedence
 test
-    : logical_test (IF logical_test ELSE test)?
+    : logical_test (COLON_ASSIGN test)? (IF logical_test ELSE test)?
     | LAMBDA varargslist? COLON test
     ;
 
@@ -261,6 +280,7 @@ vardef_parameters
 vardef_parameter
     : name (ASSIGN test)?
     | STAR
+    | DIV
     ;
 
 varargs
@@ -342,6 +362,8 @@ name
     : NAME
     | TRUE
     | FALSE
+    | PRINT
+    | EXEC
     ;
 
 number

@@ -2,11 +2,294 @@ package python2ssa
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	pythonparser "github.com/yaklang/yaklang/common/yak/python/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
+
+func constStringValue(v ssa.Value) (string, bool) {
+	inst, ok := v.(ssa.Instruction)
+	if !ok {
+		return "", false
+	}
+	constInst, ok := inst.(*ssa.ConstInst)
+	if !ok || !constInst.IsString() {
+		return "", false
+	}
+	return constInst.VarString(), true
+}
+
+func inferLiteralMapKeyType(values []ssa.Value) ssa.Type {
+	if len(values) == 0 {
+		return ssa.CreateAnyType()
+	}
+
+	type typedKey struct {
+		signature string
+		typ       ssa.Type
+	}
+
+	keys := make([]typedKey, 0, len(values))
+	seen := make(map[string]struct{})
+	for _, value := range values {
+		if value == nil || value.GetType() == nil {
+			continue
+		}
+		signature := value.GetType().String()
+		if _, exists := seen[signature]; exists {
+			continue
+		}
+		seen[signature] = struct{}{}
+		keys = append(keys, typedKey{
+			signature: signature,
+			typ:       value.GetType(),
+		})
+	}
+
+	if len(keys) == 0 {
+		return ssa.CreateAnyType()
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		return keys[i].signature < keys[j].signature
+	})
+	if len(keys) == 1 {
+		return keys[0].typ
+	}
+
+	types := make([]ssa.Type, 0, len(keys))
+	for _, key := range keys {
+		types = append(types, key.typ)
+	}
+	return ssa.NewOrType(types...)
+}
+
+func (b *singleFileBuilder) extractStaticIterableItems(value ssa.Value) ([]ssa.Value, bool) {
+	if items, ok := b.extractStaticSequenceValues(value); ok {
+		return items, true
+	}
+	if keys, ok := b.extractStaticMapKeys(value); ok {
+		return keys, true
+	}
+	return nil, false
+}
+
+func collectStaticComprehensionIfs(raw pythonparser.IComp_iterContext) ([]*pythonparser.TestContext, bool) {
+	if raw == nil {
+		return nil, true
+	}
+	iterCtx, ok := raw.(*pythonparser.Comp_iterContext)
+	if !ok || iterCtx == nil {
+		return nil, false
+	}
+	if iterCtx.Comp_for() != nil {
+		return nil, false
+	}
+	testCtx, ok := iterCtx.Test().(*pythonparser.TestContext)
+	if !ok || testCtx == nil {
+		return nil, false
+	}
+	rest, ok := collectStaticComprehensionIfs(iterCtx.Comp_iter())
+	if !ok {
+		return nil, false
+	}
+	return append([]*pythonparser.TestContext{testCtx}, rest...), true
+}
+
+func staticComprehensionFilterPass(value ssa.Value) bool {
+	constant, ok := value.(*ssa.ConstInst)
+	if !ok || constant == nil {
+		return false
+	}
+	switch {
+	case constant.IsBoolean():
+		return constant.Boolean()
+	case constant.IsNumber():
+		return constant.Number() != 0
+	case constant.IsString():
+		return constant.VarString() != ""
+	}
+	return false
+}
+
+type staticComprehensionPlan struct {
+	targets []loopAssignTarget
+	items   []ssa.Value
+	filters []*pythonparser.TestContext
+}
+
+func (b *singleFileBuilder) prepareStaticComprehension(compFor *pythonparser.Comp_forContext) (*staticComprehensionPlan, bool) {
+	if compFor == nil {
+		return nil, false
+	}
+	targets := b.extractLoopTargets(compFor.Exprlist())
+	if len(targets) == 0 {
+		return nil, false
+	}
+	logicalTest, ok := compFor.Logical_test().(*pythonparser.Logical_testContext)
+	if !ok || logicalTest == nil {
+		return nil, false
+	}
+	iterableValue, ok := b.VisitLogicalTest(logicalTest).(ssa.Value)
+	if !ok || iterableValue == nil {
+		return nil, false
+	}
+	items, ok := b.extractStaticIterableItems(iterableValue)
+	if !ok {
+		return nil, false
+	}
+	filters, ok := collectStaticComprehensionIfs(compFor.Comp_iter())
+	if !ok {
+		return nil, false
+	}
+	return &staticComprehensionPlan{targets: targets, items: items, filters: filters}, true
+}
+
+func (b *singleFileBuilder) evaluateStaticComprehension(plan *staticComprehensionPlan, build func() (ssa.Value, bool)) ([]ssa.Value, bool) {
+	if plan == nil {
+		return nil, false
+	}
+	results := make([]ssa.Value, 0, len(plan.items))
+	for _, item := range plan.items {
+		b.assignLoopTargets(plan.targets, item)
+		include := true
+		for _, filter := range plan.filters {
+			filterValue, ok := b.VisitTest(filter).(ssa.Value)
+			if !ok || filterValue == nil {
+				return nil, false
+			}
+			if !staticComprehensionFilterPass(filterValue) {
+				include = false
+				break
+			}
+		}
+		if !include {
+			continue
+		}
+		resultValue, ok := build()
+		if !ok || resultValue == nil {
+			return nil, false
+		}
+		results = append(results, resultValue)
+	}
+	return results, true
+}
+
+func (b *singleFileBuilder) buildStaticComprehensionValues(raw *pythonparser.Testlist_compContext) ([]ssa.Value, bool) {
+	if raw == nil || raw.Comp_for() == nil {
+		return nil, false
+	}
+	tests := raw.AllTest()
+	if len(tests) != 1 {
+		return nil, false
+	}
+	bodyTest, ok := tests[0].(*pythonparser.TestContext)
+	if !ok || bodyTest == nil {
+		return nil, false
+	}
+	compFor, ok := raw.Comp_for().(*pythonparser.Comp_forContext)
+	if !ok || compFor == nil {
+		return nil, false
+	}
+	plan, ok := b.prepareStaticComprehension(compFor)
+	if !ok {
+		return nil, false
+	}
+	return b.evaluateStaticComprehension(plan, func() (ssa.Value, bool) {
+		resultValue, ok := b.VisitTest(bodyTest).(ssa.Value)
+		return resultValue, ok
+	})
+}
+
+func (b *singleFileBuilder) buildStaticListComprehension(raw *pythonparser.Testlist_compContext) ssa.Value {
+	results, ok := b.buildStaticComprehensionValues(raw)
+	if !ok {
+		return nil
+	}
+	return b.buildSliceValueFromValues(results)
+}
+
+func (b *singleFileBuilder) buildStaticDictComprehension(raw *pythonparser.DictorsetmakerContext) ssa.Value {
+	if raw == nil || raw.Comp_for() == nil {
+		return nil
+	}
+	tests := raw.AllTest()
+	if len(tests) != 2 {
+		return nil
+	}
+	keyTest, ok := tests[0].(*pythonparser.TestContext)
+	if !ok || keyTest == nil {
+		return nil
+	}
+	valueTest, ok := tests[1].(*pythonparser.TestContext)
+	if !ok || valueTest == nil {
+		return nil
+	}
+	compFor, ok := raw.Comp_for().(*pythonparser.Comp_forContext)
+	if !ok || compFor == nil {
+		return nil
+	}
+	plan, ok := b.prepareStaticComprehension(compFor)
+	if !ok {
+		return nil
+	}
+
+	type dictEntry struct {
+		key   ssa.Value
+		value ssa.Value
+	}
+	entries := make([]dictEntry, 0, len(plan.items))
+	indexByKey := make(map[string]int)
+	for _, item := range plan.items {
+		b.assignLoopTargets(plan.targets, item)
+		include := true
+		for _, filter := range plan.filters {
+			filterValue, ok := b.VisitTest(filter).(ssa.Value)
+			if !ok || filterValue == nil {
+				return nil
+			}
+			if !staticComprehensionFilterPass(filterValue) {
+				include = false
+				break
+			}
+		}
+		if !include {
+			continue
+		}
+		keyValue, ok := b.VisitTest(keyTest).(ssa.Value)
+		if !ok || keyValue == nil {
+			return nil
+		}
+		valueValue, ok := b.VisitTest(valueTest).(ssa.Value)
+		if !ok || valueValue == nil {
+			return nil
+		}
+		signature := staticValueSortKey(keyValue)
+		if index, exists := indexByKey[signature]; exists {
+			entries[index] = dictEntry{key: keyValue, value: valueValue}
+			continue
+		}
+		indexByKey[signature] = len(entries)
+		entries = append(entries, dictEntry{key: keyValue, value: valueValue})
+	}
+
+	sort.Slice(entries, func(i, j int) bool {
+		return staticValueSortKey(entries[i].key) < staticValueSortKey(entries[j].key)
+	})
+
+	keyValues := make([]ssa.Value, 0, len(entries))
+	for _, entry := range entries {
+		keyValues = append(keyValues, entry.key)
+	}
+
+	dict := b.EmitMakeBuildWithType(ssa.NewMapType(inferLiteralMapKeyType(keyValues), ssa.CreateAnyType()), nil, nil)
+	for _, entry := range entries {
+		member := b.CreateMemberCallVariable(dict, entry.key)
+		b.AssignVariable(member, entry.value)
+	}
+	return dict
+}
 
 // VisitTest visits a test node.
 // This handles expressions.
@@ -17,6 +300,24 @@ func (b *singleFileBuilder) VisitTest(raw *pythonparser.TestContext) interface{}
 
 	recoverRange := b.SetRange(raw)
 	defer recoverRange()
+
+	if raw.COLON_ASSIGN() != nil {
+		tests := raw.AllTest()
+		if len(tests) > 0 {
+			if rhs, ok := tests[0].(*pythonparser.TestContext); ok {
+				result := b.VisitTest(rhs)
+				if value, ok := result.(ssa.Value); ok {
+					if logicalTests := raw.AllLogical_test(); len(logicalTests) > 0 {
+						if name := b.extractVariableNameFromLogicalTest(logicalTests[0]); name != "" {
+							b.AssignVariable(b.createVar(name), value)
+						}
+					}
+					return value
+				}
+				return result
+			}
+		}
+	}
 
 	// Visit logical_test if present
 	logicalTests := raw.AllLogical_test()
@@ -343,9 +644,14 @@ func (b *singleFileBuilder) VisitAtom(raw *pythonparser.AtomContext) interface{}
 	} else if raw.OPEN_BRACKET() != nil && raw.CLOSE_BRACKET() != nil {
 		// list literal: [a, b, c]
 		// For now treat as slice of numbers/any
-		elemValues := make([]ssa.Value, 0)
 		if testlist := raw.Testlist_comp(); testlist != nil {
 			if tlc, ok := testlist.(*pythonparser.Testlist_compContext); ok {
+				if tlc.Comp_for() != nil {
+					if value := b.buildStaticListComprehension(tlc); value != nil {
+						return value
+					}
+				}
+				elemValues := make([]ssa.Value, 0)
 				for _, t := range tlc.AllTest() {
 					if tc, ok := t.(*pythonparser.TestContext); ok {
 						if val, ok := b.VisitTest(tc).(ssa.Value); ok {
@@ -353,30 +659,85 @@ func (b *singleFileBuilder) VisitAtom(raw *pythonparser.AtomContext) interface{}
 						}
 					}
 				}
+				elemType := ssa.CreateAnyType()
+				if len(elemValues) > 0 {
+					if c, ok := elemValues[0].(*ssa.ConstInst); ok && c.IsNumber() {
+						elemType = ssa.CreateNumberType()
+					}
+				}
+				sliceType := ssa.NewSliceType(elemType)
+				lst := b.EmitMakeBuildWithType(sliceType, b.EmitConstInst(int64(len(elemValues))), b.EmitConstInst(int64(len(elemValues))))
+				for idx, val := range elemValues {
+					idxConst := b.EmitConstInst(int64(idx))
+					member := b.CreateMemberCallVariable(lst, idxConst)
+					b.AssignVariable(member, val)
+				}
+				return lst
 			}
 		}
-		elemType := ssa.CreateAnyType()
-		if len(elemValues) > 0 {
-			if c, ok := elemValues[0].(*ssa.ConstInst); ok && c.IsNumber() {
-				elemType = ssa.CreateNumberType()
-			}
-		}
-		sliceType := ssa.NewSliceType(elemType)
-		lst := b.EmitMakeBuildWithType(sliceType, b.EmitConstInst(int64(len(elemValues))), b.EmitConstInst(int64(len(elemValues))))
-		for idx, val := range elemValues {
-			idxConst := b.EmitConstInst(int64(idx))
-			member := b.CreateMemberCallVariable(lst, idxConst)
-			b.AssignVariable(member, val)
-		}
-		return lst
+		return b.buildSliceValueFromValues(nil)
 	} else if raw.OPEN_BRACE() != nil && raw.CLOSE_BRACE() != nil {
-		// dict literal: {"a":1}
+		// dict / set literal
 		if dsm := raw.Dictorsetmaker(); dsm != nil {
 			if dsCtx, ok := dsm.(*pythonparser.DictorsetmakerContext); ok {
+				if !strings.Contains(dsCtx.GetText(), ":") {
+					if testlist := dsCtx.Testlist_comp(); testlist != nil {
+						if tlc, ok := testlist.(*pythonparser.Testlist_compContext); ok && tlc != nil && tlc.Comp_for() == nil {
+							elemValues := make([]ssa.Value, 0, len(tlc.AllTest()))
+							seen := make(map[string]struct{})
+							for _, test := range tlc.AllTest() {
+								testCtx, ok := test.(*pythonparser.TestContext)
+								if !ok || testCtx == nil {
+									continue
+								}
+								val, ok := b.VisitTest(testCtx).(ssa.Value)
+								if !ok || val == nil {
+									continue
+								}
+								sortKey := staticValueSortKey(val)
+								if _, exists := seen[sortKey]; exists {
+									continue
+								}
+								seen[sortKey] = struct{}{}
+								elemValues = append(elemValues, val)
+							}
+							sort.Slice(elemValues, func(i, j int) bool {
+								return staticValueSortKey(elemValues[i]) < staticValueSortKey(elemValues[j])
+							})
+							return b.buildSliceValueFromValues(elemValues)
+						}
+						if tlc, ok := testlist.(*pythonparser.Testlist_compContext); ok && tlc != nil && tlc.Comp_for() != nil {
+							if values, ok := b.buildStaticComprehensionValues(tlc); ok {
+								seen := make(map[string]struct{})
+								filtered := make([]ssa.Value, 0, len(values))
+								for _, value := range values {
+									signature := staticValueSortKey(value)
+									if _, exists := seen[signature]; exists {
+										continue
+									}
+									seen[signature] = struct{}{}
+									filtered = append(filtered, value)
+								}
+								sort.Slice(filtered, func(i, j int) bool {
+									return staticValueSortKey(filtered[i]) < staticValueSortKey(filtered[j])
+								})
+								return b.buildSliceValueFromValues(filtered)
+							}
+						}
+					}
+				}
+				if dsCtx.Comp_for() != nil && strings.Contains(dsCtx.GetText(), ":") {
+					if value := b.buildStaticDictComprehension(dsCtx); value != nil {
+						return value
+					}
+				}
 				tests := dsCtx.AllTest()
 				if len(tests) >= 2 && strings.Contains(dsCtx.GetText(), ":") {
-					mapType := ssa.NewMapType(ssa.CreateStringType(), ssa.CreateAnyType())
-					dict := b.EmitMakeBuildWithType(mapType, nil, nil)
+					keyValues := make([]ssa.Value, 0, len(tests)/2)
+					literalEntries := make([]struct {
+						key ssa.Value
+						val ssa.Value
+					}, 0, len(tests)/2)
 					for i := 0; i+1 < len(tests); i += 2 {
 						keyTest, valTest := tests[i], tests[i+1]
 						keyValRaw := b.VisitTest(keyTest.(*pythonparser.TestContext))
@@ -386,8 +747,20 @@ func (b *singleFileBuilder) VisitAtom(raw *pythonparser.AtomContext) interface{}
 						if !kok || !vok {
 							continue
 						}
-						member := b.CreateMemberCallVariable(dict, keyVal)
-						b.AssignVariable(member, valVal)
+						keyValues = append(keyValues, keyVal)
+						literalEntries = append(literalEntries, struct {
+							key ssa.Value
+							val ssa.Value
+						}{
+							key: keyVal,
+							val: valVal,
+						})
+					}
+					mapType := ssa.NewMapType(inferLiteralMapKeyType(keyValues), ssa.CreateAnyType())
+					dict := b.EmitMakeBuildWithType(mapType, nil, nil)
+					for _, entry := range literalEntries {
+						member := b.CreateMemberCallVariable(dict, entry.key)
+						b.AssignVariable(member, entry.val)
 					}
 					return dict
 				}
@@ -472,8 +845,24 @@ func (b *singleFileBuilder) VisitName(raw *pythonparser.NameContext) interface{}
 		return constVal
 	}
 
-	// Try to read as variable or builtin function
-	// For builtins like println, this will return an extern function
+	// Prefer values already visible in the current function/scope before checking
+	// imports, so local variables continue to shadow imported names.
+	if varVal := b.PeekValueInThisFunction(name); varVal != nil {
+		return varVal
+	}
+	if importValue, ok := b.GetProgram().ReadImportValue(name); ok {
+		return importValue
+	}
+	if importType, ok := b.GetProgram().ReadImportType(name); ok {
+		if blueprint, ok := ssa.ToClassBluePrintType(importType); ok {
+			return blueprint.Container()
+		}
+	}
+	if wildcardValue := b.resolveWildcardImportName(name); wildcardValue != nil {
+		return wildcardValue
+	}
+	// Fall back to the original full lookup path for closure/freevalue resolution,
+	// externs, and undefined placeholders.
 	if varVal := b.ReadValue(name); varVal != nil {
 		return varVal
 	}
@@ -621,14 +1010,138 @@ func (b *singleFileBuilder) VisitTrailer(raw *pythonparser.TrailerContext, obj s
 	if name := raw.Name(); name != nil {
 		if nameCtx, ok := name.(*pythonparser.NameContext); ok {
 			attrName := nameCtx.GetText()
-			memberKey := b.EmitConstInst(attrName)
-			methodVal := b.ReadMemberCallMethod(obj, memberKey)
 			if arguments := raw.Arguments(); arguments != nil {
 				if argCtx, ok := arguments.(*pythonparser.ArgumentsContext); ok {
+					if argCtx.Arglist() == nil && obj.GetType() != nil && obj.GetType().GetTypeKind() == ssa.MapTypeKind {
+						switch attrName {
+						case "keys":
+							if keys, ok := b.extractStaticMapKeys(obj); ok {
+								return b.buildSliceValueFromValues(keys)
+							}
+						case "values":
+							if keys, ok := b.extractStaticMapKeys(obj); ok {
+								values := make([]ssa.Value, 0, len(keys))
+								for _, key := range keys {
+									value := b.ReadMemberCallValue(obj, key)
+									if value == nil {
+										value = b.EmitUndefined("dict_value")
+									}
+									values = append(values, value)
+								}
+								return b.buildSliceValueFromValues(values)
+							}
+						case "items":
+							if keys, ok := b.extractStaticMapKeys(obj); ok {
+								pairs := make([]ssa.Value, 0, len(keys))
+								for _, key := range keys {
+									value := b.ReadMemberCallValue(obj, key)
+									if value == nil {
+										value = b.EmitUndefined("dict_item")
+									}
+									pairs = append(pairs, b.buildSliceValueFromValues([]ssa.Value{key, value}))
+								}
+								return b.buildSliceValueFromValues(pairs)
+							}
+						}
+					}
+					if rawString, ok := constStringValue(obj); ok {
+						switch attrName {
+						case "partition":
+							var separator string
+							if arglist := argCtx.Arglist(); arglist != nil {
+								args := b.VisitArglist(arglist)
+								if len(args) == 1 {
+									if argString, ok := constStringValue(args[0]); ok {
+										separator = argString
+									}
+								}
+							}
+							if separator != "" {
+								before, after, found := strings.Cut(rawString, separator)
+								if !found {
+									return b.buildSliceValueFromValues([]ssa.Value{
+										b.EmitConstInst(rawString),
+										b.EmitConstInst(""),
+										b.EmitConstInst(""),
+									})
+								}
+								return b.buildSliceValueFromValues([]ssa.Value{
+									b.EmitConstInst(before),
+									b.EmitConstInst(separator),
+									b.EmitConstInst(after),
+								})
+							}
+						case "isidentifier":
+							if argCtx.Arglist() == nil {
+								return b.EmitConstInst(isIdentifierString(rawString))
+							}
+						}
+					}
+				}
+			}
+			if obj.GetType() != nil {
+				switch obj.GetType().GetTypeKind() {
+				case ssa.StringTypeKind, ssa.BytesTypeKind:
+					syntheticName := "string." + attrName
+					if obj.GetType().GetTypeKind() == ssa.BytesTypeKind {
+						syntheticName = "bytes." + attrName
+					}
+					if arguments := raw.Arguments(); arguments != nil {
+						if argCtx, ok := arguments.(*pythonparser.ArgumentsContext); ok {
+							return b.VisitArguments(argCtx, b.newDynamicPlaceholder(syntheticName))
+						}
+					}
+					return b.newDynamicPlaceholder(syntheticName)
+				}
+			}
+			memberKey := b.EmitConstInst(attrName)
+			syntheticName := attrName
+			if objName := obj.GetName(); objName != "" {
+				syntheticName = objName + "." + attrName
+			}
+			if obj.GetType() != nil && obj.GetType().GetTypeKind() == ssa.FunctionTypeKind {
+				if stored := b.ReadValue(syntheticName); stored != nil {
+					return b.ensureDynamicValueType(stored)
+				}
+				if arguments := raw.Arguments(); arguments != nil {
+					if argCtx, ok := arguments.(*pythonparser.ArgumentsContext); ok {
+						return b.VisitArguments(argCtx, b.newDynamicPlaceholder(syntheticName))
+					}
+				}
+				return b.newDynamicPlaceholder(syntheticName)
+			}
+			if arguments := raw.Arguments(); arguments != nil {
+				if argCtx, ok := arguments.(*pythonparser.ArgumentsContext); ok {
+					if obj.GetType() != nil && obj.GetType().GetTypeKind() == ssa.ClassBluePrintTypeKind {
+						if blueprint, ok := ssa.ToClassBluePrintType(obj.GetType()); ok && !b.hasBlueprintMemberOrMethod(blueprint, attrName) {
+							return b.VisitArguments(argCtx, b.newDynamicPlaceholder(syntheticName))
+						}
+						b.ensureBlueprintCallableMember(obj, attrName)
+						obj = b.ensureDynamicObjectType(obj)
+						methodVal := b.ensureDynamicValueType(b.ReadMemberCallMethod(obj, memberKey))
+						return b.VisitArguments(argCtx, methodVal)
+					}
+					if b.shouldUseDynamicMemberFallback(obj) {
+						return b.VisitArguments(argCtx, b.newDynamicPlaceholder(syntheticName))
+					}
+					obj = b.ensureDynamicObjectType(obj)
+					methodVal := b.ensureDynamicValueType(b.ReadMemberCallMethod(obj, memberKey))
 					return b.VisitArguments(argCtx, methodVal)
 				}
 			}
-			return methodVal
+			if obj.GetType() != nil && obj.GetType().GetTypeKind() == ssa.ClassBluePrintTypeKind {
+				if blueprint, ok := ssa.ToClassBluePrintType(obj.GetType()); ok && !b.hasBlueprintMemberOrMethod(blueprint, attrName) {
+					return b.newDynamicPlaceholder(syntheticName)
+				}
+				b.ensureBlueprintMember(obj, attrName)
+				obj = b.ensureDynamicObjectType(obj)
+				return b.ensureDynamicValueType(b.ReadMemberCallValue(obj, memberKey))
+			}
+			if b.shouldUseDynamicMemberFallback(obj) {
+				return b.newDynamicPlaceholder(syntheticName)
+			}
+			obj = b.ensureDynamicObjectType(obj)
+			return b.ensureDynamicValueType(b.ReadMemberCallValue(obj, memberKey))
 		}
 	}
 
@@ -662,7 +1175,15 @@ func (b *singleFileBuilder) VisitArguments(raw *pythonparser.ArgumentsContext, o
 					if test := sub.Test(0); test != nil {
 						if testCtx, ok := test.(*pythonparser.TestContext); ok {
 							if idxVal, ok := b.VisitTest(testCtx).(ssa.Value); ok {
-								return b.ReadMemberCallValue(obj, idxVal)
+								if b.shouldUseDynamicMemberFallback(obj) {
+									syntheticName := obj.GetName()
+									if syntheticName == "" {
+										syntheticName = "item"
+									}
+									return b.newDynamicPlaceholder(syntheticName + "[" + idxVal.String() + "]")
+								}
+								obj = b.ensureDynamicObjectType(obj)
+								return b.ensureDynamicValueType(b.ReadMemberCallValue(obj, idxVal))
 							}
 						}
 					}
@@ -678,19 +1199,37 @@ func (b *singleFileBuilder) VisitArguments(raw *pythonparser.ArgumentsContext, o
 		args = b.VisitArglist(arglist)
 	}
 
+	// hasattr(self, "__setup__") is a common Python guard before dynamic method
+	// dispatch. Register the guarded member on blueprint-backed receivers so later
+	// intra-project calls don't fail purely on missing compile-time class metadata.
+	if obj.GetName() == "hasattr" && len(args) == 2 {
+		if attrName, ok := constStringValue(args[1]); ok {
+			if strings.HasPrefix(attrName, "__") && strings.HasSuffix(attrName, "__") {
+				b.ensureBlueprintCallableMember(args[0], attrName)
+			} else {
+				b.ensureBlueprintMember(args[0], attrName)
+			}
+		}
+	}
+
 	// Class instantiation: prepend an Undefined $self placeholder so constructor
 	// formal-parameter indices align with call-site arguments.
 	// Avoid ClassConstructor to prevent spurious destructor generation (Python has no __del__).
 	if blueprint, ok := ssa.ToClassBluePrintType(obj.GetType()); ok {
+		b.ensureBlueprintConstructorSlot(blueprint)
 		selfPlaceholder := b.EmitUndefined(blueprint.Name)
 		selfPlaceholder.SetType(blueprint)
 		callArgs := append([]ssa.Value{selfPlaceholder}, args...)
 		return b.ClassConstructorWithoutDeferDestructor(blueprint, callArgs)
 	}
 
+	for index := range args {
+		args[index] = b.normalizePythonCallArgument(args[index])
+	}
+
 	// Regular function or method call
 	call := b.NewCall(obj, args)
-	return b.EmitCall(call)
+	return b.ensureDynamicValueType(b.EmitCall(call))
 }
 
 // VisitArglist visits an arglist node.
