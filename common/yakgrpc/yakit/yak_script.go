@@ -40,13 +40,24 @@ func RAGSearchPluginIds(db *gorm.DB, pagination *ypb.Paging, key string) (*bizhe
 
 var yakScriptOpLock = new(sync.Mutex)
 
+func normalizeYakScriptUpsertData(i interface{}) interface{} {
+	switch ret := i.(type) {
+	case *schema.YakScript:
+		return ret.ToUpdateMap()
+	case schema.YakScript:
+		return ret.ToUpdateMap()
+	default:
+		return i
+	}
+}
+
 func CreateOrUpdateYakScript(db *gorm.DB, id int64, i interface{}) error {
 	yakScriptOpLock.Lock()
 	defer yakScriptOpLock.Unlock()
 
 	db = db.Model(&schema.YakScript{})
 
-	if db := db.Where("id = ?", id).Assign(i).FirstOrCreate(&schema.YakScript{}); db.Error != nil {
+	if db := db.Where("id = ?", id).Assign(normalizeYakScriptUpsertData(i)).FirstOrCreate(&schema.YakScript{}); db.Error != nil {
 		return utils.Errorf("create/update YakScript failed: %s", db.Error)
 	}
 
@@ -84,7 +95,7 @@ func CreateOrUpdateYakScriptByOnlineId(db *gorm.DB, onlineId int64, i interface{
 	db = db.Model(&schema.YakScript{})
 
 	_ = DeleteYakScriptByOnlineId(db, onlineId)
-	if db := db.Where("online_id = ?", onlineId).Assign(i).FirstOrCreate(&schema.YakScript{}); db.Error != nil {
+	if db := db.Where("online_id = ?", onlineId).Assign(normalizeYakScriptUpsertData(i)).FirstOrCreate(&schema.YakScript{}); db.Error != nil {
 		return utils.Errorf("create/update YakScript failed: %s", db.Error)
 	}
 
@@ -103,18 +114,11 @@ func CreateOrUpdateYakScriptByName(db *gorm.DB, scriptName string, i interface{}
 
 	// 锁住更新步骤，太快容易整体被锁
 	yakScriptOpLock.Lock()
-	if db := db.Where("script_name = ?", scriptName).Assign(i).FirstOrCreate(&schema.YakScript{}); db.Error != nil {
+	if db := db.Where("script_name = ?", scriptName).Assign(normalizeYakScriptUpsertData(i)).FirstOrCreate(&schema.YakScript{}); db.Error != nil {
 		yakScriptOpLock.Unlock()
 		return utils.Errorf("create/update YakScript failed: %s", db.Error)
 	}
 	yakScriptOpLock.Unlock()
-
-	switch ret := i.(type) {
-	case *schema.YakScript:
-		return UpdateGeneralModuleFromByYakScriptName(db, scriptName, ret.IsGeneralModule)
-	case schema.YakScript:
-		return UpdateGeneralModuleFromByYakScriptName(db, scriptName, ret.IsGeneralModule)
-	}
 
 	return nil
 }
@@ -666,7 +670,7 @@ func CreateOrSkipUpdateYakScriptByName(db *gorm.DB, scriptName string, i interfa
 
 	// 锁住更新步骤，太快容易整体被锁
 	yakScriptOpLock.Lock()
-	if db := db.Where("script_name = ?", scriptName).Where("COALESCE(skip_update, false) = false").Assign(i).FirstOrCreate(&schema.YakScript{}); db.Error != nil {
+	if db := db.Where("script_name = ?", scriptName).Where("COALESCE(skip_update, false) = false").Assign(normalizeYakScriptUpsertData(i)).FirstOrCreate(&schema.YakScript{}); db.Error != nil {
 		yakScriptOpLock.Unlock()
 		return utils.Errorf("create/update YakScript failed: %s", db.Error)
 	}
