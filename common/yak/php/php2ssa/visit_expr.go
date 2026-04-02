@@ -396,13 +396,13 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) (v ssa.Value
 			y.AssignVariable(variable, expression) //连接上数据流
 		}
 		return y.EmitConstInstNil()
-	case *phpparser.FunctionCallIndexedReferenceAssignmentExpressionContext:
-		variable := y.VisitFunctionCallIndexedAssignableLeft(ret.FunctionCallIndexedAssignable())
+	case *phpparser.FunctionCallAssignableReferenceAssignmentExpressionContext:
+		variable := y.VisitFunctionCallAssignableLeft(ret.FunctionCallAssignable())
 		rightValue := y.VisitExpression(ret.Expression())
 		y.AssignVariable(variable, rightValue)
 		return rightValue
-	case *phpparser.FunctionCallIndexedAssignmentExpressionContext:
-		variable := y.VisitFunctionCallIndexedAssignableLeft(ret.FunctionCallIndexedAssignable())
+	case *phpparser.FunctionCallAssignableAssignmentExpressionContext:
+		variable := y.VisitFunctionCallAssignableLeft(ret.FunctionCallAssignable())
 		rightValue := y.VisitExpression(ret.Expression())
 		rightValue = y.reduceAssignCalcExpression(ret.AssignmentOperator().GetText(), variable, rightValue)
 		y.AssignVariable(variable, rightValue)
@@ -691,37 +691,25 @@ func (y *builder) VisitStaticMethodCall(raw phpparser.IStaticMethodCallContext) 
 	return y.EmitCall(call)
 }
 
-func (y *builder) VisitFunctionCallIndexedAssignableLeft(raw phpparser.IFunctionCallIndexedAssignableContext) *ssa.Variable {
+func (y *builder) VisitFunctionCallAssignableLeft(raw phpparser.IFunctionCallAssignableContext) *ssa.Variable {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 
-	i, _ := raw.(*phpparser.FunctionCallIndexedAssignableContext)
+	i, _ := raw.(*phpparser.FunctionCallAssignableContext)
 	if i == nil {
 		return nil
 	}
 
 	origin := y.VisitFunctionCall(i.FunctionCall())
-	accesses := i.AllSquareCurlyExpression()
+	accesses := i.AllFunctionCallAssignableAccess()
 	for idx, access := range accesses {
 		if idx == len(accesses)-1 {
-			var key ssa.Value
-			ctx, _ := access.(*phpparser.SquareCurlyExpressionContext)
-			if ctx != nil && ctx.Expression() != nil {
-				key = y.VisitExpression(ctx.Expression())
-			}
-			if key == nil {
-				key = y.EmitConstInstPlaceholder(fmt.Sprintf("append_%s", uuid.NewString()))
-			}
-			return y.CreateMemberCallVariable(origin, key)
+			return y.visitFunctionCallAssignableAccessLeft(origin, access)
 		}
-		key := y.VisitSquareCurlyExpression(access)
-		if key == nil {
-			continue
-		}
-		origin = y.ReadMemberCallValue(origin, key)
+		origin = y.visitFunctionCallAssignableAccessValue(origin, access)
 	}
 	return nil
 }
@@ -738,13 +726,7 @@ func (y *builder) VisitDynamicStaticClassExpr(raw phpparser.IDynamicStaticClassE
 		return y.EmitUndefined("")
 	}
 
-	var target ssa.Value
-	switch {
-	case i.FunctionCall() != nil:
-		target = y.VisitFunctionCall(i.FunctionCall())
-	case i.Parentheses() != nil:
-		target = y.VisitParentheses(i.Parentheses())
-	}
+	target := y.VisitDynamicStaticReceiver(i.DynamicStaticReceiver())
 
 	var blueprint *ssa.Blueprint
 	if target != nil {
@@ -793,6 +775,141 @@ func (y *builder) VisitDynamicStaticClassExpr(raw phpparser.IDynamicStaticClassE
 	}
 
 	return y.EmitUndefined(i.GetText())
+}
+
+func (y *builder) VisitDynamicStaticReceiver(raw phpparser.IDynamicStaticReceiverContext) ssa.Value {
+	if y == nil || raw == nil || y.IsStop() {
+		return nil
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
+	i, _ := raw.(*phpparser.DynamicStaticReceiverContext)
+	if i == nil {
+		return nil
+	}
+
+	if staticExpr := i.StaticClassExpr(); staticExpr != nil {
+		return y.VisitStaticClassExpr(staticExpr)
+	}
+
+	var origin ssa.Value
+	if base := i.DynamicStaticReceiverBase(); base != nil {
+		baseCtx, _ := base.(*phpparser.DynamicStaticReceiverBaseContext)
+		if baseCtx == nil {
+			return nil
+		}
+		switch {
+		case baseCtx.FunctionCall() != nil:
+			origin = y.VisitFunctionCall(baseCtx.FunctionCall())
+		case baseCtx.Parentheses() != nil:
+			origin = y.VisitParentheses(baseCtx.Parentheses())
+		case baseCtx.FlexiVariable() != nil:
+			origin = y.VisitRightValue(baseCtx.FlexiVariable())
+		}
+	}
+
+	for _, access := range i.AllDynamicStaticReceiverAccess() {
+		origin = y.visitDynamicStaticReceiverAccessValue(origin, access)
+	}
+
+	return origin
+}
+
+func (y *builder) visitDynamicStaticReceiverAccessValue(origin ssa.Value, raw phpparser.IDynamicStaticReceiverAccessContext) ssa.Value {
+	if y == nil || raw == nil || y.IsStop() {
+		return origin
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
+	i, _ := raw.(*phpparser.DynamicStaticReceiverAccessContext)
+	if i == nil {
+		return origin
+	}
+
+	if square := i.SquareCurlyExpression(); square != nil {
+		key := y.VisitSquareCurlyExpression(square)
+		if key == nil {
+			return origin
+		}
+		return y.ReadMemberCallValue(origin, key)
+	}
+
+	key := y.VisitMemberCallKey(i.MemberCallKey())
+	if i.Arguments() == nil {
+		return y.ReadMemberCallValue(origin, key)
+	}
+
+	method := y.ReadMemberCallMethod(origin, key)
+	args, ellipsis := y.VisitArguments(i.Arguments())
+	call := y.NewCall(method, args)
+	call.IsEllipsis = ellipsis
+	return y.EmitCall(call)
+}
+
+func (y *builder) visitFunctionCallAssignableAccessValue(origin ssa.Value, raw phpparser.IFunctionCallAssignableAccessContext) ssa.Value {
+	if y == nil || raw == nil || y.IsStop() {
+		return origin
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
+	i, _ := raw.(*phpparser.FunctionCallAssignableAccessContext)
+	if i == nil {
+		return origin
+	}
+
+	if member := i.MemberAccess(); member != nil {
+		return y.VisitMemberAccess(origin, member)
+	}
+	if square := i.SquareCurlyExpression(); square != nil {
+		key := y.VisitSquareCurlyExpression(square)
+		if key == nil {
+			return origin
+		}
+		return y.ReadMemberCallValue(origin, key)
+	}
+	return origin
+}
+
+func (y *builder) visitFunctionCallAssignableAccessLeft(origin ssa.Value, raw phpparser.IFunctionCallAssignableAccessContext) *ssa.Variable {
+	if y == nil || raw == nil || y.IsStop() {
+		return nil
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
+	i, _ := raw.(*phpparser.FunctionCallAssignableAccessContext)
+	if i == nil {
+		return nil
+	}
+
+	if member := i.MemberAccess(); member != nil {
+		ctx, _ := member.(*phpparser.MemberAccessContext)
+		if ctx == nil {
+			return nil
+		}
+		if ctx.ActualArguments() != nil {
+			log.Errorf("unsupported function-call lvalue member call: %s", ctx.GetText())
+			return nil
+		}
+		return y.CreateMemberCallVariable(origin, y.VisitKeyedFieldName(ctx.KeyedFieldName()))
+	}
+
+	if square := i.SquareCurlyExpression(); square != nil {
+		var key ssa.Value
+		ctx, _ := square.(*phpparser.SquareCurlyExpressionContext)
+		if ctx != nil && ctx.Expression() != nil {
+			key = y.VisitExpression(ctx.Expression())
+		}
+		if key == nil {
+			key = y.EmitConstInstPlaceholder(fmt.Sprintf("append_%s", uuid.NewString()))
+		}
+		return y.CreateMemberCallVariable(origin, key)
+	}
+
+	return nil
 }
 
 func (y *builder) visitAssignableChainAccessValue(origin ssa.Value, raw phpparser.IAssignableChainAccessContext) ssa.Value {

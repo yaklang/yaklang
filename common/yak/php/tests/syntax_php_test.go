@@ -37,7 +37,7 @@ var phpTestAntlrCache = func() *ssa.AntlrCache {
 	return php2ssa.CreateBuilder().GetAntlrCache()
 }()
 
-const phpFreshSyntaxCacheMinBytes = 128 * 1024
+const phpFreshSyntaxCacheMinBytes = 64 * 1024
 
 var phpTestCacheResetState = struct {
 	mu          sync.Mutex
@@ -83,6 +83,12 @@ var syntaxNonASTAssets = map[string]struct{}{
 }
 
 var largeProjectSlowFiles = map[string]map[string]struct{}{
+	"filament": {
+		"docs-assets/app/app/Livewire/TablesDemo.php":   {},
+		"tests/src/Forms/Components/SelectTest.php":     {},
+		"tests/src/Tables/ColumnTest.php":               {},
+		"tests/src/Tables/Filters/QueryBuilderTest.php": {},
+	},
 	"PrestaShop": {
 		"classes/controller/AdminController.php": {},
 	},
@@ -127,6 +133,32 @@ func isKnownLargeProjectSlowFile(projectRoot, filePath string) bool {
 	}
 	_, ok = entries[filePath]
 	return ok
+}
+
+func projectFixtureDir(projectRoot string) string {
+	return strings.ToLower(filepath.Base(projectRoot))
+}
+
+func flattenedProjectFixtureName(filePath string) string {
+	return strings.NewReplacer("/", "__", "\\", "__").Replace(filePath)
+}
+
+func hasSavedProjectSyntaxFixture(projectRoot, filePath string) bool {
+	dir := projectFixtureDir(projectRoot)
+	name := flattenedProjectFixtureName(filePath)
+	for _, candidate := range []struct {
+		root fs.FS
+		path string
+	}{
+		{root: syntaxFs, path: filepath.ToSlash(filepath.Join("syntax", dir, name))},
+		{root: syntaxFs, path: filepath.ToSlash(filepath.Join("syntax", dir+"_slow", name))},
+		{root: largeSyntaxFs, path: filepath.ToSlash(filepath.Join("large", dir, name))},
+	} {
+		if _, err := fs.Stat(candidate.root, candidate.path); err == nil {
+			return true
+		}
+	}
+	return false
 }
 
 func isSyntaxASTFixture(path string) bool {
@@ -572,6 +604,10 @@ func TestProjectAst(t *testing.T) {
 	}
 	if budget := phpFixtureParseBudget(); budget > 0 {
 		for _, candidate := range slowCandidates {
+			if hasSavedProjectSyntaxFixture(path, candidate.Path) {
+				log.Infof("skip saved project slow fixture: %s/%s", filepath.Base(path), candidate.Path)
+				continue
+			}
 			start := time.Now()
 			_, isolatedErr := php2ssa.Frontend(string(candidate.Content), newPHPTestAntlrCache())
 			isolatedDuration := time.Since(start)
