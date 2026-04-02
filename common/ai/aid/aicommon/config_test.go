@@ -155,3 +155,44 @@ func TestCallAITransaction_PromptFallbackCompressionLevelResetsPerAttempt(t *tes
 	require.Equal(t, 2, callCount)
 	require.Equal(t, []int{0, 0}, compressionLevels)
 }
+
+func TestCallAITransaction_RebuildsFallbackPromptOnRetry(t *testing.T) {
+	var capturedPrompts []string
+	retryErr := errors.New("retry once")
+
+	config := NewTestConfig(
+		context.Background(),
+		WithAiCallTokenLimit(64),
+		WithAITransactionAutoRetry(2),
+	)
+
+	postHandlerCalls := 0
+	err := CallAITransaction(
+		config,
+		strings.Repeat("long prompt ", 200),
+		func(request *AIRequest) (*AIResponse, error) {
+			_, err := config.prepareRequestPrompt(request)
+			require.NoError(t, err)
+
+			capturedPrompts = append(capturedPrompts, request.GetPrompt())
+
+			rsp := NewUnboundAIResponse()
+			rsp.Close()
+			return rsp, nil
+		},
+		func(rsp *AIResponse) error {
+			postHandlerCalls++
+			if postHandlerCalls == 1 {
+				return retryErr
+			}
+			return nil
+		},
+		WithAIRequest_PromptFallback(func(expectedContextSize int, currentContextSize int, compressionLevel int) (string, error) {
+			return "short prompt", nil
+		}),
+	)
+	require.NoError(t, err)
+	require.Equal(t, 2, len(capturedPrompts))
+	require.Equal(t, "short prompt", capturedPrompts[0])
+	require.Equal(t, config.RetryPromptBuilder("short prompt", retryErr), capturedPrompts[1])
+}
