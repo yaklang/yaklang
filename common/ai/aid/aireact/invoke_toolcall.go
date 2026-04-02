@@ -194,8 +194,9 @@ func (r *ReAct) generateToolParamsPromptWithMeta(tool *aitool.Tool, toolName str
 	}
 
 	return &aicommon.ToolParamsPromptMeta{
-		Prompt:     promptResult.Prompt,
-		Nonce:      promptResult.Nonce,
-		ParamNames: promptResult.ParamNames,
+		Prompt:         promptResult.Prompt,
+		Nonce:          promptResult.Nonce,
+		ParamNames:     promptResult.ParamNames,
+		PromptFallback: promptResult.PromptFallback,
 	}, nil
 }

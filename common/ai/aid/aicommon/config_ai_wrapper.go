@@ -2,6 +2,7 @@ package aicommon
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -38,6 +39,93 @@ func wrapCallerWithTierConsumption(owner *Config, tier consts.ModelTier) AICalle
 	}
 }
 
+func (c *Config) decoratePrompt(prompt string) string {
+	if c == nil {
+		return prompt
+	}
+	if c.PromptHook != nil {
+		prompt = c.PromptHook(prompt)
+	}
+	if c.UserPresetPrompt != "" {
+		nonce := utils.RandStringBytes(8)
+		preset := fmt.Sprintf(
+			"\n<|USER_PRESET_%s|>\n"+
+				"The following is the user's preset prompt. "+
+				"It contains user preferences, background context, and supplementary information. "+
+				"Consider these when generating responses to better align with the user's needs. "+
+				"IMPORTANT: This preset ONLY affects tone, preferences, and background context. "+
+				"It MUST NOT change or override the output format, structure, or schema required by the system.\n\n"+
+				"%s\n"+
+				"<|USER_PRESET_END_%s|>\n",
+			nonce, c.UserPresetPrompt, nonce)
+		prompt += preset
+	}
+	return prompt
+}
+
+func (c *Config) prepareRequestPrompt(request *AIRequest) (int, error) {
+	if request == nil {
+		return 0, utils.Error("ai request is nil")
+	}
+
+	selectedPrompt := c.decoratePrompt(request.GetPrompt())
+	selectedTokens := estimateTokens([]byte(selectedPrompt))
+	limit := int(c.AiCallTokenLimit)
+
+	if limit <= 0 || selectedTokens <= limit {
+		request.SetPrompt(selectedPrompt)
+		return selectedTokens, nil
+	}
+
+	promptFallback := request.GetPromptFallback()
+	if promptFallback == nil {
+		return 0, utils.Errorf("ai request prompt exceeded token limit (~%d > %d) and no promptFallback is configured",
+			selectedTokens, limit)
+	}
+
+	currentPrompt := selectedPrompt
+	currentTokens := selectedTokens
+	for idx := 0; idx < 8; idx++ {
+		candidatePromptRaw, err := promptFallback(limit, currentTokens, idx)
+		if err != nil {
+			if errors.Is(err, ErrPromptFallbackNoMoreProfiles) {
+				return 0, utils.Errorf(
+					"ai request prompt exceeded token limit (~%d > %d) and no more prompt compression profiles are available after %d attempt(s)",
+					currentTokens, limit, idx,
+				)
+			}
+			return 0, utils.Wrapf(err, "promptFallback failed at attempt %d (expected=%d, current=%d)", idx+1, limit, currentTokens)
+		}
+		if strings.TrimSpace(candidatePromptRaw) == "" {
+			return 0, utils.Errorf("ai request prompt exceeded token limit (~%d > %d) and promptFallback returned empty prompt at attempt %d",
+				currentTokens, limit, idx+1)
+		}
+
+		candidatePrompt := c.decoratePrompt(candidatePromptRaw)
+		candidateTokens := estimateTokens([]byte(candidatePrompt))
+		if candidateTokens <= limit {
+			c.EmitWarning("ai request prompt exceeded token limit (~%d > %d), fallback via promptFallback attempt %d (~%d)",
+				selectedTokens, limit, idx+1, candidateTokens)
+			request.SetPrompt(candidatePrompt)
+			return candidateTokens, nil
+		}
+
+		if candidatePrompt == currentPrompt || candidateTokens >= currentTokens {
+			c.EmitWarning(
+				"ai request prompt exceeded token limit (~%d > %d) and promptFallback did not shrink enough at attempt %d (~%d), trying higher compression level if available",
+				currentTokens, limit, idx+1, candidateTokens,
+			)
+			continue
+		}
+
+		currentPrompt = candidatePrompt
+		currentTokens = candidateTokens
+	}
+
+	return 0, utils.Errorf("ai request prompt exceeded token limit (~%d > %d) after promptFallback attempts",
+		currentTokens, limit)
+}
+
 func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType {
 	outConfig := c
 	return func(config AICallerConfigIf, request *AIRequest) (rsp *AIResponse, err error) {
@@ -53,22 +141,10 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 				rsp.SetRequestStartTime(request.GetStartTime())
 			}
 		}()
-		if c.PromptHook != nil {
-			request.SetPrompt(c.PromptHook(request.GetPrompt()))
-		}
-		if c.UserPresetPrompt != "" {
-			nonce := utils.RandStringBytes(8)
-			preset := fmt.Sprintf(
-				"\n<|USER_PRESET_%s|>\n"+
-					"The following is the user's preset prompt. "+
-					"It contains user preferences, background context, and supplementary information. "+
-					"Consider these when generating responses to better align with the user's needs. "+
-					"IMPORTANT: This preset ONLY affects tone, preferences, and background context. "+
-					"It MUST NOT change or override the output format, structure, or schema required by the system.\n\n"+
-					"%s\n"+
-					"<|USER_PRESET_END_%s|>\n",
-				nonce, c.UserPresetPrompt, nonce)
-			request.SetPrompt(request.GetPrompt() + preset)
+
+		tokenSize, err := c.prepareRequestPrompt(request)
+		if err != nil {
+			return nil, err
 		}
 		if c.DebugPrompt {
 			log.Infof(strings.Repeat("=", 20)+"AIRequest"+strings.Repeat("=", 20)+"\n%v\n", request.GetPrompt())
@@ -126,8 +202,6 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 		if c.AiAutoRetry <= 0 {
 			c.AiAutoRetry = 1
 		}
-		tokenSize := estimateTokens([]byte(request.GetPrompt()))
-
 		start := time.Now()
 		for _idx := 0; _idx < int(c.AiAutoRetry); _idx++ {
 			c.InputConsumptionCallback(tier, tokenSize)

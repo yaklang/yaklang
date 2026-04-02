@@ -27,8 +27,13 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 	default:
 	}
 
+	enhanceData := r.DumpCurrentEnhanceData()
+	var enhanceDataList []string
+	if enhanceData != "" {
+		enhanceDataList = []string{enhanceData}
+	}
 	verificationPrompt, nonce := r.generateVerificationPrompt(
-		originalQuery, isToolCall, payload, r.DumpCurrentEnhanceData(),
+		originalQuery, isToolCall, payload, enhanceDataList...,
 	)
 	if r.config.DebugPrompt {
 		log.Infof("Verification prompt: %s", verificationPrompt)
@@ -37,6 +42,13 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 	result := &aicommon.VerifySatisfactionResult{}
 	var referenceAnchorOnce sync.Once
 	var referenceAnchorID string
+	promptFallback := r.promptManager.GenerateVerificationPromptFallback(
+		originalQuery,
+		isToolCall,
+		payload,
+		nonce,
+		enhanceDataList...,
+	)
 
 	captureReferenceAnchor := func(event *schema.AiOutputEvent) {
 		if event == nil {
@@ -240,6 +252,7 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 			emitVerificationReferenceMaterials(rawResponse.String())
 			return nil
 		},
+		aicommon.WithAIRequest_PromptFallback(promptFallback),
 	)
 	if transErr != nil {
 		log.Errorf("AI transaction failed during verification: %v", transErr)

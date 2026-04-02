@@ -9,6 +9,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	_ "github.com/yaklang/yaklang/common/aiforge" // register liteforge callback
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/jsonpath"
@@ -354,4 +355,30 @@ func TestReAct_ExtraCapabilities_Render(t *testing.T) {
 	}
 
 	t.Log("ExtraCapabilities render test passed: all sections and deduplication verified")
+}
+
+func TestReAct_ExtraCapabilities_RenderWithLimits(t *testing.T) {
+	ecm := reactloops.NewExtraCapabilitiesManager()
+	ecm.AddTools(
+		aitool.NewWithoutCallback("tool-one", aitool.WithDescription("tool one")),
+		aitool.NewWithoutCallback("tool-two", aitool.WithDescription("tool two")),
+	)
+	ecm.AddSkills(
+		reactloops.ExtraSkillInfo{Name: "skill-one", Description: "skill one"},
+		reactloops.ExtraSkillInfo{Name: "skill-two", Description: "skill two"},
+	)
+
+	rendered := ecm.RenderWithLimits("limit_nonce", 1, 1)
+	if !strings.Contains(rendered, "tool-one") || !strings.Contains(rendered, "skill-one") {
+		t.Fatalf("limited render should keep the first tool and skill, got: %s", rendered)
+	}
+	if strings.Contains(rendered, "tool-two") || strings.Contains(rendered, "skill-two") {
+		t.Fatalf("limited render should omit entries beyond the limit, got: %s", rendered)
+	}
+	if !strings.Contains(rendered, "more tools omitted from prompt") {
+		t.Fatalf("limited render should mention omitted tools, got: %s", rendered)
+	}
+	if !strings.Contains(rendered, "more skills omitted from prompt") {
+		t.Fatalf("limited render should mention omitted skills, got: %s", rendered)
+	}
 }

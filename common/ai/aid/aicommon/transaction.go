@@ -52,11 +52,24 @@ func CallAITransaction(
 			}
 		})
 
-		rsp, err := callAi(
-			NewAIRequest(
-				finalPrompt,
-				append(requestOpts, WithAIRequest_SeqId(seq))...,
-			))
+		req := NewAIRequest(
+			finalPrompt,
+			append(requestOpts, WithAIRequest_SeqId(seq))...,
+		)
+		if postHandlerErr != nil && req != nil {
+			promptFallback := req.GetPromptFallback()
+			if promptFallback != nil {
+				req.SetPromptFallback(func(expectedContextSize int, currentContextSize int, compressionLevel int) (string, error) {
+					prompt, err := promptFallback(expectedContextSize, currentContextSize, compressionLevel)
+					if err != nil || strings.TrimSpace(prompt) == "" {
+						return prompt, err
+					}
+					return c.RetryPromptBuilder(prompt, postHandlerErr), nil
+				})
+			}
+		}
+
+		rsp, err := callAi(req)
 		if err != nil {
 			lastErr = err
 			lastRsp = rsp

@@ -299,10 +299,11 @@ type Config struct {
 	/*
 		Meta Info
 	*/
-	Keywords  []string // AI task keywords, maybe tools name, maybe task keywords ,help ai's decision
-	ForgeName string   // if current config use in forge , this is the forge name
-	Workdir   string
-	Language  string // Response language preference
+	Keywords         []string // AI task keywords, maybe tools name, maybe task keywords ,help ai's decision
+	ForgeName        string   // if current config use in forge , this is the forge name
+	Workdir          string
+	Language         string            // Response language preference
+	ExtraReActConfig map[string]string // Additional ReAct runtime configs from grpc/frontend
 
 	/*
 		debug config
@@ -472,6 +473,7 @@ func newConfig(ctx context.Context) *Config {
 		AllowRequireForUserInteract:        true,
 		ToolComposeConcurrency:             2,
 		Workdir:                            "",
+		ExtraReActConfig:                   map[string]string{},
 		MemoryPoolSize:                     10 * 1024,
 		MemoryPool:                         omap.NewOrderedMap(make(map[string]*MemoryEntity)),
 		MaxTaskContinue:                    3,
@@ -2937,6 +2939,10 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 
 	if i.UserPresetPrompt != "" {
 		opts = append(opts, WithUserPresetPrompt(i.UserPresetPrompt))
+	}
+
+	if len(i.ExtraReActConfig) > 0 {
+		opts = append(opts, WithExtraReActConfigMap(i.ExtraReActConfig))
 	}
 
 	if i.PersistentSessionId != "" {

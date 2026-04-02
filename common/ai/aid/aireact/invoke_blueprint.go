@@ -145,12 +145,21 @@ func (r *ReAct) invokeBlueprint(forgeName string) (*schema.AIForge, aitool.Invok
 		return nil, nil, utils.Errorf("generate ai json schema from schema ai forge failed: %v", err)
 	}
 
-	prompt, err := r.promptManager.GenerateAIBlueprintForgeParamsPrompt(ins, forgeSchema)
+	nonce := utils.RandStringBytes(4)
+	prompt, err := r.promptManager.renderAIBlueprintForgeParamsPromptEx(
+		ins,
+		forgeSchema,
+		nil,
+		"",
+		nonce,
+		r.promptManager.modelContextProfile(),
+	)
 	if err != nil {
 		r.AddToTimeline("[BLUEPRINT_PROMPT_ERROR]", fmt.Sprintf("Failed to generate prompt for '%s'", forgeName))
 		r.Emitter.EmitError(fmt.Sprintf("Failed to generate prompt for AI Blueprint '%s'", forgeName))
 		return nil, nil, utils.Errorf("generate prompt (for ai-forge) failed: %v", err)
 	}
+	promptFallback := r.promptManager.GenerateAIBlueprintForgeParamsPromptFallback(ins, forgeSchema, nil, "", nonce)
 
 	var forgeParams = make(aitool.InvokeParams)
 	err = aicommon.CallAITransaction(
@@ -217,6 +226,7 @@ func (r *ReAct) invokeBlueprint(forgeName string) (*schema.AIForge, aitool.Invok
 				fmt.Sprintf("Parameters for '%s': %v", forgeName, utils.ShrinkString(utils.InterfaceToString(forgeParams), 200)))
 			return nil
 		},
+		aicommon.WithAIRequest_PromptFallback(promptFallback),
 	)
 	if err != nil {
 		r.Emitter.EmitError(fmt.Sprintf("Failed to prepare AI Blueprint '%s': %v", forgeName, err))

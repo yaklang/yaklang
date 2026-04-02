@@ -1,8 +1,9 @@
 package aicommon
 
 import (
-	"github.com/yaklang/yaklang/common/schema"
 	"time"
+
+	"github.com/yaklang/yaklang/common/schema"
 )
 
 type ImageData struct {
@@ -10,10 +11,13 @@ type ImageData struct {
 	IsBase64 bool
 }
 
+type PromptFallback func(expectedContextSize int, currentContextSize int, compressionLevel int) (string, error)
+
 type AIRequest struct {
 	taskIndex              string
 	detachCheckpoint       bool
 	prompt                 string
+	promptFallback         PromptFallback
 	startTime              time.Time
 	seqId                  int64
 	saveCheckpointCallback func(CheckpointCommitHandler)
@@ -61,6 +65,20 @@ func (a *AIRequest) HaveSaveCheckpointCallback() bool {
 		return false
 	}
 	return a.saveCheckpointCallback != nil
+}
+
+func (a *AIRequest) GetPromptFallback() PromptFallback {
+	if a == nil {
+		return nil
+	}
+	return a.promptFallback
+}
+
+func (a *AIRequest) SetPromptFallback(fallback PromptFallback) {
+	if a == nil {
+		return
+	}
+	a.promptFallback = fallback
 }
 
 func (a *AIRequest) CallSaveCheckpointCallback(handler CheckpointCommitHandler) {
@@ -136,5 +154,11 @@ func WithAIRequest_ImageData(data *ImageData) AIRequestOption {
 			req.imageDataList = make([]*ImageData, 0, 1)
 		}
 		req.imageDataList = append(req.imageDataList, data)
+	}
+}
+
+func WithAIRequest_PromptFallback(fallback PromptFallback) AIRequestOption {
+	return func(req *AIRequest) {
+		req.SetPromptFallback(fallback)
 	}
 }
