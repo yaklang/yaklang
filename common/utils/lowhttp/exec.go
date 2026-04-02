@@ -332,14 +332,11 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 
 	// 用于检查 BodyStreamReaderHandler 是否被正常调用
 	bodyStreamReaderHandled := utils.NewAtomicBool()
-	// 等待 BodyStreamReaderHandler 调用结束
-	waitBodyStreamReaderHandledCallEnd := sync.WaitGroup{}
 	var streamBodyReaderCh chan io.ReadCloser
+	var streamHandlerDone chan struct{}
 	defer func() {
 		if option != nil && option.BodyStreamReaderHandler != nil {
-			waitStreamHandlerDone(&waitBodyStreamReaderHandledCallEnd, streamBodyReaderCh, 2*time.Second, "non-pool stream handler")
-		} else {
-			waitBodyStreamReaderHandledCallEnd.Wait()
+			waitStreamHandlerDone(streamHandlerDone, streamBodyReaderCh, 2*time.Second, "non-pool stream handler")
 		}
 		if option != nil && option.BodyStreamReaderHandler != nil && !bodyStreamReaderHandled.IsSet() {
 			r, w := utils.NewPipe()
@@ -993,6 +990,7 @@ RECONNECT:
 			if streamBodyReaderCh == nil {
 				streamBodyReaderCh = make(chan io.ReadCloser, 1)
 			}
+			streamHandlerDone = make(chan struct{})
 			reader, writer := utils.NewBufPipe(nil)
 			defer func() {
 				utils.Debug(func() {
@@ -1000,7 +998,6 @@ RECONNECT:
 				})
 				writer.Close()
 			}()
-			waitBodyStreamReaderHandledCallEnd.Add(1)
 			//startHandlerStream := time.Now()
 			//onceForHeader := new(sync.Once)
 			//onceForBody := new(sync.Once)
@@ -1012,11 +1009,11 @@ RECONNECT:
 				}
 				defer func() {
 					bodyWriter.Close()
+					close(streamHandlerDone)
 					if err := recover(); err != nil {
 						log.Errorf("BodyStreamReaderHandler panic: %v", err)
 						utils.PrintCurrentGoroutineRuntimeStack()
 					}
-					waitBodyStreamReaderHandledCallEnd.Done()
 				}()
 
 				packetReader := bufio.NewReader(reader)

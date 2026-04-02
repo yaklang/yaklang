@@ -447,8 +447,9 @@ type ServerConfig struct {
 	webSearchRateLimiter *WebSearchRateLimiter
 
 	// Rate limiter for free amap proxy users (Trace-ID based, sleep/wait mode)
-	amapRateLimiter        *AmapRateLimiter
-	amapHealthCheckStopCh  chan struct{}
+	amapRateLimiter       *AmapRateLimiter
+	amapHealthCheckStopCh chan struct{}
+	closeOnce             sync.Once
 }
 
 // NewServerConfig creates a new server configuration
@@ -476,6 +477,24 @@ func NewServerConfig() *ServerConfig {
 	config.amapRateLimiter = NewAmapRateLimiter()
 	config.amapHealthCheckStopCh = make(chan struct{})
 	return config
+}
+
+func (c *ServerConfig) Close() {
+	if c == nil {
+		return
+	}
+
+	c.closeOnce.Do(func() {
+		if c.webSearchRateLimiter != nil {
+			c.webSearchRateLimiter.Stop()
+		}
+		if c.amapRateLimiter != nil {
+			c.amapRateLimiter.Stop()
+		}
+		if c.amapHealthCheckStopCh != nil {
+			close(c.amapHealthCheckStopCh)
+		}
+	})
 }
 
 // logDebug logs a debug message if debug logging is enabled
@@ -998,7 +1017,7 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 				multiplier := GetModelTrafficMultiplier(modelName)
 				totalTraffic := inputBytes + outputBytes
 				adjustedTraffic := int64(float64(totalTraffic) * multiplier)
-				
+
 				if err := UpdateAiApiKeyTrafficUsed(key.Key, adjustedTraffic); err != nil {
 					c.logError("Failed to update traffic usage for key %s: %v", utils.ShrinkString(key.Key, 8), err)
 				} else {
@@ -1284,7 +1303,7 @@ func (c *ServerConfig) serveEmbeddings(conn net.Conn, rawPacket []byte) {
 				multiplier := GetModelTrafficMultiplier(modelName)
 				totalTraffic := inputBytesEmbed + outputBytesEmbed
 				adjustedTraffic := int64(float64(totalTraffic) * multiplier)
-				
+
 				if err := UpdateAiApiKeyTrafficUsed(key.Key, adjustedTraffic); err != nil {
 					c.logError("Failed to update traffic usage for key %s: %v", utils.ShrinkString(key.Key, 8), err)
 				} else {

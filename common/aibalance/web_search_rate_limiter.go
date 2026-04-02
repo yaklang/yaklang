@@ -22,8 +22,9 @@ type traceIDState struct {
 //   - Minimum 1 second between any two requests from the same Trace-ID
 //   - After a successful request, 3 second cooldown before next request is allowed
 type WebSearchRateLimiter struct {
-	states sync.Map // map[string]*traceIDState
-	stopCh chan struct{}
+	states   sync.Map // map[string]*traceIDState
+	stopCh   chan struct{}
+	stopOnce sync.Once
 }
 
 // NewWebSearchRateLimiter creates a new rate limiter and starts background cleanup
@@ -129,5 +130,7 @@ func (rl *WebSearchRateLimiter) cleanupLoop() {
 
 // Stop stops the background cleanup goroutine
 func (rl *WebSearchRateLimiter) Stop() {
-	close(rl.stopCh)
+	rl.stopOnce.Do(func() {
+		close(rl.stopCh)
+	})
 }

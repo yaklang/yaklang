@@ -13,7 +13,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 	"unicode"
 
@@ -153,15 +152,10 @@ func TrimLeftHTTPPacket(raw []byte) []byte {
 	return bytes.TrimLeftFunc(raw, unicode.IsSpace)
 }
 
-func waitStreamHandlerDone(wg *sync.WaitGroup, bodyReaderCh <-chan io.ReadCloser, timeout time.Duration, label string) {
-	if wg == nil {
+func waitStreamHandlerDone(done <-chan struct{}, bodyReaderCh <-chan io.ReadCloser, timeout time.Duration, label string) {
+	if done == nil {
 		return
 	}
-	done := make(chan struct{})
-	go func() {
-		wg.Wait()
-		close(done)
-	}()
 	select {
 	case <-done:
 		return

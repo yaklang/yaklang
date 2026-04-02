@@ -2,6 +2,7 @@ package aibalance
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -318,18 +319,32 @@ func (b *Balancer) run(addr string) error {
 
 // Close closes the balancer and releases resources
 func (b *Balancer) Close() error {
+	if b == nil {
+		return nil
+	}
+
 	b.mutex.Lock()
-	defer b.mutex.Unlock()
+	cancel := b.cancel
+	listener := b.listener
+	config := b.config
+	b.listener = nil
+	b.mutex.Unlock()
 
-	if b.cancel != nil {
-		b.cancel()
+	if cancel != nil {
+		cancel()
+	}
+	if config != nil {
+		config.Close()
+	}
+	if listener == nil {
+		return nil
 	}
 
-	if b.listener != nil {
-		return b.listener.Close()
+	err := listener.Close()
+	if errors.Is(err, net.ErrClosed) {
+		return nil
 	}
-
-	return nil
+	return err
 }
 
 // GetProviders gets all providers
