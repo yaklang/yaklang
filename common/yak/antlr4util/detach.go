@@ -13,6 +13,40 @@ type tokenSourcePairer interface {
 	GetTokenSourceCharStreamPair() *antlr.TokenSourceCharStreamPair
 }
 
+// SetParserBuildParseTrees toggles BaseParser.BuildParseTrees on generated
+// parsers via the embedded *antlr.BaseParser field.
+func SetParserBuildParseTrees(parser antlr.Parser, enabled bool) {
+	if parser == nil {
+		return
+	}
+
+	v := reflect.ValueOf(parser)
+	if v.Kind() != reflect.Ptr || v.IsNil() {
+		return
+	}
+	elem := v.Elem()
+	if elem.Kind() != reflect.Struct {
+		return
+	}
+
+	baseParserField := elem.FieldByName("BaseParser")
+	if !baseParserField.IsValid() || baseParserField.Kind() != reflect.Ptr || baseParserField.IsNil() {
+		return
+	}
+
+	baseParserElem := baseParserField.Elem()
+	if baseParserElem.Kind() != reflect.Struct {
+		return
+	}
+
+	buildParseTreesField := baseParserElem.FieldByName("BuildParseTrees")
+	if !buildParseTreesField.IsValid() || !buildParseTreesField.CanAddr() || buildParseTreesField.Kind() != reflect.Bool {
+		return
+	}
+
+	reflect.NewAt(buildParseTreesField.Type(), unsafe.Pointer(buildParseTreesField.UnsafeAddr())).Elem().SetBool(enabled)
+}
+
 // DetachLexerTokenSource clears the tokenSource reference stored in the
 // TokenSourceCharStreamPair used by lexer-emitted tokens.
 //

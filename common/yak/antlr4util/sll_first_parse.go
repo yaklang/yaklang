@@ -14,6 +14,8 @@ import (
 const envAntlrSLLFirst = "YAK_ANTLR_SLL_FIRST"
 const envAntlrSLLFirstStats = "YAK_ANTLR_SLL_FIRST_STATS"
 
+const sllFirstNoTreeProbeMinBytes = 128 * 1024
+
 // SLLFirstEnabled controls whether ANTLR parsing should try SLL mode first and
 // fallback to LL mode on parse cancellation.
 //
@@ -116,7 +118,7 @@ func ParseASTWithSLLFirst[L antlr.Lexer, P antlr.Parser, T any](
 	statsEnabled := SLLFirstStatsEnabled()
 	diagnosticEnabled := antlrDiagnosticEnabledNow()
 	shouldLogFallback := statsEnabled || diagnosticEnabled
-	run := func(predictionMode int, errHandler antlr.ErrorStrategy) (ast T, parseErr error, cancelled bool, elapsed time.Duration) {
+	run := func(predictionMode int, errHandler antlr.ErrorStrategy, buildParseTrees bool) (ast T, parseErr error, cancelled bool, elapsed time.Duration) {
 		start := time.Now()
 		defer func() {
 			elapsed = time.Since(start)
@@ -135,6 +137,7 @@ func ParseASTWithSLLFirst[L antlr.Lexer, P antlr.Parser, T any](
 		if setup != nil {
 			setup(lexer, parser)
 		}
+		SetParserBuildParseTrees(parser, buildParseTrees)
 		if interpreter := parser.GetInterpreter(); interpreter != nil {
 			interpreter.SetPredictionMode(predictionMode)
 		}
@@ -170,14 +173,18 @@ func ParseASTWithSLLFirst[L antlr.Lexer, P antlr.Parser, T any](
 		if statsEnabled {
 			atomic.AddUint64(&sllFirstLLOnly, 1)
 		}
-		ast, err, _, _ := run(antlr.PredictionModeLL, antlr.NewDefaultErrorStrategy())
+		ast, err, _, _ := run(antlr.PredictionModeLL, antlr.NewDefaultErrorStrategy(), true)
 		return ast, err
 	}
 
 	if statsEnabled {
 		atomic.AddUint64(&sllFirstSLLAttempts, 1)
 	}
-	ast, err, cancelled, sllElapsed := run(antlr.PredictionModeSLL, antlr.NewBailErrorStrategy())
+	largeSourceProbe := len(src) >= sllFirstNoTreeProbeMinBytes
+	ast, err, cancelled, sllElapsed := run(antlr.PredictionModeSLL, antlr.NewBailErrorStrategy(), !largeSourceProbe)
+	if largeSourceProbe && !cancelled && err == nil {
+		ast, err, cancelled, sllElapsed = run(antlr.PredictionModeSLL, antlr.NewBailErrorStrategy(), true)
+	}
 	if !cancelled && err == nil {
 		return ast, nil
 	}
@@ -201,7 +208,7 @@ func ParseASTWithSLLFirst[L antlr.Lexer, P antlr.Parser, T any](
 		}
 	}
 
-	ast, err, _, llElapsed := run(antlr.PredictionModeLL, antlr.NewDefaultErrorStrategy())
+	ast, err, _, llElapsed := run(antlr.PredictionModeLL, antlr.NewDefaultErrorStrategy(), true)
 	if shouldLogFallback {
 		log.Infof("[antlr-sll-first] LL completed: src_len=%d ll_elapsed=%s", len(src), llElapsed)
 	}

@@ -311,7 +311,7 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 		isRef := ret.Ampersand()
 		_ = isRef
 
-		methodName := y.VisitIdentifier(ret.Identifier())
+		methodName := ret.CallableIdentifier().GetText()
 		funcName := fmt.Sprintf("%s_%s", class.Name, methodName)
 		newFunction := y.NewFunc(funcName)
 		newFunction.SetMethodName(methodName)
@@ -616,15 +616,7 @@ func (y *builder) VisitStaticClassExprFunctionMember(raw phpparser.IStaticClassE
 		return nil, "'"
 	}
 
-	var key string
-	if i.MemberCallKey() != nil {
-		if value := y.VisitMemberCallKey(i.MemberCallKey()); value != nil {
-			key = value.String()
-		}
-	}
-	if key == "" {
-		return nil, ""
-	}
+	key := i.MemberCallKey().GetText()
 	if i.StaticClass().GetText() == "self" {
 		return y.MarkedThisClassBlueprint, key
 	}
