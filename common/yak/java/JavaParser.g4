@@ -562,6 +562,7 @@ statementList: statement+;
 
 switchStatement
     : 'switch' parExpression '{' switchBlockStatementGroup* '}'
+    | SWITCH parExpression '{' switchLabeledRule* defaultLabeledRule? '}'
     ;
 
 switchBlockStatementGroup

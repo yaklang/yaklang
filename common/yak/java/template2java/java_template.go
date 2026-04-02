@@ -22,6 +22,7 @@ type JavaTemplate struct {
 
 	classDeclLine int
 	builder       strings.Builder
+	currentLine   int
 }
 
 func (t *JavaTemplate) WriteDeclaration(code string) {
@@ -33,6 +34,7 @@ func (t *JavaTemplate) WriteDeclaration(code string) {
 	t.builder.WriteString(beforeClassDecl)
 	t.builder.WriteString(code + "\r\n")
 	t.builder.WriteString(afterClassDecl)
+	t.recalcCurrentLine()
 }
 
 func (t *JavaTemplate) WriteImport(path string) {
@@ -45,15 +47,16 @@ func (t *JavaTemplate) WriteImport(path string) {
 	t.builder.WriteString("import " + path + ";\r\n")
 	t.builder.WriteString(backUp)
 	t.classDeclLine++
+	t.recalcCurrentLine()
 }
 
 func (t *JavaTemplate) WritePureOut(expression string) {
 	expression = tryUnquote(expression)
-	t.builder.WriteString("\tout.print(" + expression + ");\r\n")
+	t.append("\tout.print(" + expression + ");\r\n")
 }
 
 func (t *JavaTemplate) WritePureCode(code string) {
-	t.builder.WriteString("\t" + code + "\r\n")
+	t.append("\t" + code + "\r\n")
 }
 
 func (t *JavaTemplate) String() string {
@@ -63,28 +66,37 @@ func (t *JavaTemplate) String() string {
 func (t *JavaTemplate) WritePureText(texts string) {
 	texts = tryUnquote(texts)
 	for _, text := range strings.Split(texts, "\n") {
-		t.builder.WriteString(fmt.Sprintf(`	out.write(%q);
-`, text))
+		t.append(fmt.Sprintf("	out.write(%q);\n", text))
 	}
 }
 
 func (t *JavaTemplate) WriteGetAttribute(variable string) {
 	variable = tryUnquote(variable)
-	t.builder.WriteString("\t" + variable + " = request.getAttribute(\"" + variable + "\");\r\n")
+	t.append("\t" + variable + " = request.getAttribute(\"" + variable + "\");\r\n")
 }
 
 func (t *JavaTemplate) WriteOutput(variable string) {
 	variable = tryUnquote(variable)
-	t.builder.WriteString("\tout." + JAVA_UNESCAPE_OUTPUT_PRINT + "(" + variable + ");\r\n")
+	t.append("\tout." + JAVA_UNESCAPE_OUTPUT_PRINT + "(" + variable + ");\r\n")
 }
 
 func (t *JavaTemplate) WriteEscapeOutput(variable string) {
 	variable = tryUnquote(variable)
-	t.builder.WriteString("\tout.printWithEscape(" + variable + ");\r\n")
+	t.append("\tout.printWithEscape(" + variable + ");\r\n")
+}
+
+func (t *JavaTemplate) CurrentLine() int {
+	if t == nil {
+		return 0
+	}
+	if t.currentLine <= 0 {
+		t.recalcCurrentLine()
+	}
+	return t.currentLine
 }
 
 func (t *JavaTemplate) Finish() {
-	t.builder.WriteString("}}")
+	t.append("}}")
 }
 
 func CreateJavaTemplate(filePath string) (*JavaTemplate, error) {
@@ -93,7 +105,8 @@ func CreateJavaTemplate(filePath string) (*JavaTemplate, error) {
 	}
 	var builder strings.Builder
 	t := &JavaTemplate{
-		builder: builder,
+		builder:     builder,
+		currentLine: 1,
 	}
 	t.className = validateClassName(filepath.Base(filePath))
 	t.pkgName = validatePackagePath(filepath.Dir(filePath))
@@ -103,19 +116,28 @@ func CreateJavaTemplate(filePath string) (*JavaTemplate, error) {
 
 func (t *JavaTemplate) generateTemplate() {
 	if t.pkgName != "" {
-		t.builder.WriteString("package " + t.pkgName + ";\r\n")
+		t.append("package " + t.pkgName + ";\r\n")
 	}
-	t.builder.WriteString("import " + JAVA_REQUEST_PATH + ".HttpServletRequest;\r\n")
-	t.builder.WriteString("import " + JAVA_REQUEST_PATH + ".HttpServletResponse;\r\n")
-	t.builder.WriteString("\n")
-	t.builder.WriteString("public class " + t.className + " {\r\n")
+	t.append("import " + JAVA_REQUEST_PATH + ".HttpServletRequest;\r\n")
+	t.append("import " + JAVA_REQUEST_PATH + ".HttpServletResponse;\r\n")
+	t.append("\n")
+	t.append("public class " + t.className + " {\r\n")
 	t.classDeclLine = len(strings.Split(t.builder.String(), "\r\n")) - 1
-	t.builder.WriteString("public void _JavaTemplateService(" + "HttpServletRequest request, HttpServletResponse response" + ") {\r\n")
-	t.builder.WriteString("\tout = response.getWriter(); \r\n")
+	t.append("public void _JavaTemplateService(" + "HttpServletRequest request, HttpServletResponse response" + ") {\r\n")
+	t.append("\tout = response.getWriter(); \r\n")
 }
 
 func tryUnquote(text string) string {
 	text = yakunquote.TryUnquote(text)
 	text = strings.ReplaceAll(text, "\r", "")
 	return text
+}
+
+func (t *JavaTemplate) append(s string) {
+	t.builder.WriteString(s)
+	t.currentLine += strings.Count(s, "\n")
+}
+
+func (t *JavaTemplate) recalcCurrentLine() {
+	t.currentLine = strings.Count(t.builder.String(), "\n") + 1
 }

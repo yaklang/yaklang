@@ -2,13 +2,15 @@ package test
 
 import (
 	"embed"
-	"fmt"
 	"github.com/stretchr/testify/require"
 	tj "github.com/yaklang/yaklang/common/yak/java/template2java"
+	"io/fs"
+	"strings"
 	"testing"
+	"time"
 )
 
-//go:embed testdata/*.ftl
+//go:embed all:testdata
 var testdataFS embed.FS
 
 func TestFreeMarker2Java_Content(t *testing.T) {
@@ -70,8 +72,7 @@ func TestFreeMarker2Java_Content(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, codeInfo)
 		require.NotEqual(t, 0, len(wants))
-		fmt.Print(codeInfo.GetContent())
-		checkJavaFront(t, codeInfo.GetContent())
+		checkJavaFront(t, codeInfo.GetContent(), "test.ftl")
 		for _, want := range wants {
 			require.Contains(t, codeInfo.GetContent(), want, "want: %s", want)
 		}
@@ -83,14 +84,48 @@ func TestFreeMarker2Java_Content(t *testing.T) {
 	}
 }
 
-func TestFreeMarker2Java_MapperFragment(t *testing.T) {
-	raw, err := testdataFS.ReadFile("testdata/mapper_where_clause.ftl")
-	require.NoError(t, err)
-	codeInfo, err := tj.ConvertTemplateToJava(tj.Freemarker, string(raw), "mapper_where_clause.ftl")
+var freemarkerFixtureAssertions = map[string][]string{
+	"testdata/mapper_where_clause.ftl": {
+		`if (prop.name=="createdDate") {`,
+		`if ((prop_index>1)) {`,
+		`} else {`,
+	},
+	"testdata/skyeye_help.ftl": {
+		`if (elExpr.parse("cookieMap?exists&&cookieMap[\"xxljob_adminlte_settings\"]?exists&&\"off\"==cookieMap[\"xxljob_adminlte_settings\"].value")) {`,
+	},
+}
+
+func validateSavedFreeMarkerFixture(t *testing.T, filePath string, content string) {
+	t.Helper()
+
+	start := time.Now()
+	codeInfo, err := tj.ConvertTemplateToJava(tj.Freemarker, content, filePath)
+	convertDur := time.Since(start)
 	require.NoError(t, err)
 	require.NotNil(t, codeInfo)
-	checkJavaFront(t, codeInfo.GetContent())
-	require.Contains(t, codeInfo.GetContent(), `if (prop.name=="createdDate") {`)
-	require.Contains(t, codeInfo.GetContent(), `if ((prop_index>1)) {`)
-	require.Contains(t, codeInfo.GetContent(), `} else {`)
+	require.LessOrEqual(t, convertDur, generatedJavaFixtureMaxParseDuration, "template to java took too long for %s", filePath)
+	checkJavaFront(t, codeInfo.GetContent(), filePath)
+	for _, want := range freemarkerFixtureAssertions[filePath] {
+		require.Contains(t, codeInfo.GetContent(), want, "want: %s", want)
+	}
+}
+
+func TestAllSavedFreeMarkerTemplates(t *testing.T) {
+	found := false
+	err := fs.WalkDir(testdataFS, "testdata", func(filePath string, d fs.DirEntry, walkErr error) error {
+		require.NoError(t, walkErr)
+		if d.IsDir() || !strings.HasSuffix(strings.ToLower(filePath), ".ftl") {
+			return nil
+		}
+
+		raw, err := testdataFS.ReadFile(filePath)
+		require.NoError(t, err)
+		t.Run(filePath, func(t *testing.T) {
+			validateSavedFreeMarkerFixture(t, filePath, string(raw))
+		})
+		found = true
+		return nil
+	})
+	require.NoError(t, err)
+	require.True(t, found, "no saved freemarker templates found")
 }

@@ -28,8 +28,17 @@ type JSPParserVisitor interface {
 	// Visit a parse tree produced by JSPParser#htmlElement.
 	VisitHtmlElement(ctx *HtmlElementContext) interface{}
 
+	// Visit a parse tree produced by JSPParser#htmlCloseElement.
+	VisitHtmlCloseElement(ctx *HtmlCloseElementContext) interface{}
+
 	// Visit a parse tree produced by JSPParser#htmlBegin.
 	VisitHtmlBegin(ctx *HtmlBeginContext) interface{}
+
+	// Visit a parse tree produced by JSPParser#htmlBeginElement.
+	VisitHtmlBeginElement(ctx *HtmlBeginElementContext) interface{}
+
+	// Visit a parse tree produced by JSPParser#tagJspFragment.
+	VisitTagJspFragment(ctx *TagJspFragmentContext) interface{}
 
 	// Visit a parse tree produced by JSPParser#htmlTag.
 	VisitHtmlTag(ctx *HtmlTagContext) interface{}
@@ -42,6 +51,9 @@ type JSPParserVisitor interface {
 
 	// Visit a parse tree produced by JSPParser#htmlContent.
 	VisitHtmlContent(ctx *HtmlContentContext) interface{}
+
+	// Visit a parse tree produced by JSPParser#jspIfBlock.
+	VisitJspIfBlock(ctx *JspIfBlockContext) interface{}
 
 	// Visit a parse tree produced by JSPParser#elExpression.
 	VisitElExpression(ctx *ElExpressionContext) interface{}

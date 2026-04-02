@@ -2,17 +2,61 @@ package test
 
 import (
 	"fmt"
+	"path"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	"github.com/yaklang/yaklang/common/yak/java/java2ssa"
 	"github.com/yaklang/yaklang/common/yak/java/template2java"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
-func checkJavaFront(t *testing.T, code string) {
+const generatedJavaFixtureMaxParseDuration = 30 * time.Second
+
+func checkJavaFront(t *testing.T, code string, fileNames ...string) {
+	t.Helper()
+
+	fileName := "generated.java"
+	if len(fileNames) > 0 {
+		fileName = strings.ReplaceAll(strings.TrimSpace(fileNames[0]), "\\", "/")
+		if fileName == "" {
+			fileName = "generated.java"
+		}
+	}
+	virtualFileName := path.Clean(fileName)
+	if ext := path.Ext(virtualFileName); ext != "" {
+		virtualFileName = strings.TrimSuffix(virtualFileName, ext) + ".java"
+	} else if !strings.HasSuffix(strings.ToLower(virtualFileName), ".java") {
+		virtualFileName += ".java"
+	}
+
+	antlr4util.ResetSLLFirstCounters()
+	start := time.Now()
 	_, err := java2ssa.Frontend(code)
+	parseDur := time.Since(start)
 	require.NoError(t, err)
+	require.LessOrEqual(t, parseDur, generatedJavaFixtureMaxParseDuration, "generated java parse took too long for %s", fileName)
+
+	stats := antlr4util.SLLFirstCountersSnapshot()
+	t.Logf("generated java=%s parse=%s sll_attempts=%d fallbacks=%d cancelled=%d errors=%d", fileName, parseDur, stats.SLLAttempts, stats.Fallbacks, stats.FallbackCancelled, stats.FallbackError)
+
+	require.NotPanics(t, func() {
+		vf := filesys.NewVirtualFs()
+		vf.AddFile(virtualFileName, code)
+		progs, err := ssaapi.ParseProjectWithFS(
+			vf,
+			ssaapi.WithLanguage(ssaconfig.JAVA),
+			ssaapi.WithMemory(),
+		)
+		require.NoError(t, err)
+		require.NotEmpty(t, progs)
+	}, "generated java build panicked for %s", fileName)
 }
 
 func TestCreateJavaTemplate(t *testing.T) {

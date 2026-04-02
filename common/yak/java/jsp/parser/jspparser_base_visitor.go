@@ -35,7 +35,19 @@ func (v *BaseJSPParserVisitor) VisitHtmlElement(ctx *HtmlElementContext) interfa
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseJSPParserVisitor) VisitHtmlCloseElement(ctx *HtmlCloseElementContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseJSPParserVisitor) VisitHtmlBegin(ctx *HtmlBeginContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJSPParserVisitor) VisitHtmlBeginElement(ctx *HtmlBeginElementContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJSPParserVisitor) VisitTagJspFragment(ctx *TagJspFragmentContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -52,6 +64,10 @@ func (v *BaseJSPParserVisitor) VisitHtmlContents(ctx *HtmlContentsContext) inter
 }
 
 func (v *BaseJSPParserVisitor) VisitHtmlContent(ctx *HtmlContentContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseJSPParserVisitor) VisitJspIfBlock(ctx *JspIfBlockContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

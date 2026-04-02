@@ -18,6 +18,7 @@ type TemplateRender interface {
 	WritePureCode(code string)         // Write pure code, usually used to write code in templates
 	WriteImport(path string)           // Write import dependency statement
 	WriteDeclaration(code string)
+	CurrentLine() int
 	String() string
 	Finish()
 }

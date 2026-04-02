@@ -127,7 +127,7 @@ func (y *FreeMarkerVisitor) VisitDirectiveIf(raw freemarkerparser.IDirectiveIfCo
 		return
 	}
 
-	cond := normalizeDirectiveExpr(i.TagExpr().GetText())
+	cond := renderDirectiveIfCondition(i.TagExpr().GetText())
 	y.EmitPureCode("if (" + cond + ") {")
 
 	if i.DirectiveIfTrueElements() != nil {
@@ -136,7 +136,7 @@ func (y *FreeMarkerVisitor) VisitDirectiveIf(raw freemarkerparser.IDirectiveIfCo
 
 	elseIfBodies := i.AllDirectiveIfElseIfElements()
 	for idx, elseIfCond := range i.AllTagExprElseIfs() {
-		y.EmitPureCode("} else if (" + normalizeDirectiveExpr(elseIfCond.GetText()) + ") {")
+		y.EmitPureCode("} else if (" + renderDirectiveIfCondition(elseIfCond.GetText()) + ") {")
 		if idx < len(elseIfBodies) && elseIfBodies[idx] != nil {
 			if body, ok := elseIfBodies[idx].(*freemarkerparser.DirectiveIfElseIfElementsContext); ok && body.Elements() != nil {
 				y.VisitElements(body.Elements())
@@ -151,6 +151,17 @@ func (y *FreeMarkerVisitor) VisitDirectiveIf(raw freemarkerparser.IDirectiveIfCo
 		}
 	}
 	y.EmitPureCode("}")
+}
+
+func renderDirectiveIfCondition(expr string) string {
+	expr = strings.TrimSpace(expr)
+	if expr == "" {
+		return expr
+	}
+	if strings.Contains(expr, "?") || strings.Contains(expr, "[") || strings.Contains(expr, "]") {
+		return "elExpr.parse(" + strconv.Quote(expr) + ")"
+	}
+	return normalizeDirectiveExpr(expr)
 }
 
 func (y *FreeMarkerVisitor) VisitDirectiveIfTrueElements(raw freemarkerparser.IDirectiveIfTrueElementsContext) {

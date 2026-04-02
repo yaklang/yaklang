@@ -16,8 +16,10 @@ type TagType int
 
 const (
 	JSP_TAG_PURE_HTML TagType = 1 + iota
+	JSP_TAG_SYNTHETIC_FRAGMENT
 	// jsp directive tag
 	JSP_DIRECTIVE_PAGE
+	JSP_DIRECTIVE_INCLUDE
 
 	// core tags
 	JSP_TAG_CORE_OUT
@@ -113,6 +115,8 @@ func (y *JSPVisitor) GetDirectiveTag(name string) TagType {
 	switch name {
 	case "page":
 		return JSP_DIRECTIVE_PAGE
+	case "include":
+		return JSP_DIRECTIVE_INCLUDE
 	}
 	return -1
 }
@@ -126,6 +130,8 @@ func (y *JSPVisitor) ParseSingleTag() {
 	switch tagInfo.typ {
 	case JSP_TAG_PURE_HTML:
 		y.EmitAttrFunc()
+	case JSP_TAG_SYNTHETIC_FRAGMENT:
+		return
 	case JSP_DIRECTIVE_PAGE:
 		value, ok := tagInfo.attrs["import"]
 		if ok {
@@ -134,6 +140,9 @@ func (y *JSPVisitor) ParseSingleTag() {
 				y.EmitImport(path)
 			}
 		}
+		return
+	case JSP_DIRECTIVE_INCLUDE:
+		// TODO: expand static include target into the generated output when needed.
 		return
 	case JSP_TAG_CORE_OUT:
 		variable, ok := tagInfo.attrs["value"]
@@ -175,6 +184,8 @@ func (y *JSPVisitor) ParseDoubleTag(endText string, visitContent func()) {
 		y.EmitAttrFunc()
 		visitContent()
 		y.EmitPureText(endText)
+	case JSP_TAG_SYNTHETIC_FRAGMENT:
+		visitContent()
 	case JSP_TAG_CORE_IF:
 		condition, ok := tagInfo.attrs["test"]
 		if !ok {

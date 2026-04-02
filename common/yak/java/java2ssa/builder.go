@@ -5,7 +5,10 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
+	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/yaklang/yaklang/common/javaclassparser"
 	"github.com/yaklang/yaklang/common/log"
@@ -19,6 +22,7 @@ import (
 )
 
 var INNER_CLASS_SPLIT = "$"
+var javaRecordPatternCaseRegexp = regexp.MustCompile(`(?m)(case\s+[A-Za-z_][\w$.<>]*\s*)\(\s*var\s+([A-Za-z_]\w*)(?:\s*,[\s\S]*?)?\)\s*(->)`)
 
 // ========================================== For SSAAPI ==========================================
 
@@ -164,6 +168,8 @@ func Frontend(src string, caches ...*ssa.AntlrCache) (javaparser.ICompilationUni
 	if len(caches) > 0 {
 		cache = caches[0]
 	}
+	src = preprocessJavaUnicodeEscapes(src)
+	src = preprocessJavaRecordPatternSwitchCases(src)
 	src = normalizeDecompiledJava(src)
 	return antlr4util.ParseASTWithSLLFirst(
 		src,
@@ -177,6 +183,66 @@ func Frontend(src string, caches ...*ssa.AntlrCache) (javaparser.ICompilationUni
 			return parser.CompilationUnit()
 		},
 	)
+}
+
+func preprocessJavaRecordPatternSwitchCases(src string) string {
+	if !strings.Contains(src, "case ") || !strings.Contains(src, "->") || !strings.Contains(src, "(var ") {
+		return src
+	}
+	return javaRecordPatternCaseRegexp.ReplaceAllString(src, `$1$2 $3`)
+}
+
+func preprocessJavaUnicodeEscapes(src string) string {
+	if !strings.Contains(src, `\u`) {
+		return src
+	}
+
+	var out strings.Builder
+	out.Grow(len(src))
+	backslashCount := 0
+
+	for i := 0; i < len(src); i++ {
+		if src[i] != '\\' {
+			out.WriteByte(src[i])
+			backslashCount = 0
+			continue
+		}
+
+		if i+1 >= len(src) || src[i+1] != 'u' || backslashCount%2 != 0 {
+			out.WriteByte(src[i])
+			backslashCount++
+			continue
+		}
+
+		j := i + 1
+		for j < len(src) && src[j] == 'u' {
+			j++
+		}
+		if j+4 > len(src) {
+			out.WriteByte(src[i])
+			continue
+		}
+
+		hex := src[j : j+4]
+		code, err := strconv.ParseUint(hex, 16, 32)
+		if err != nil {
+			out.WriteByte(src[i])
+			backslashCount++
+			continue
+		}
+
+		var buf [utf8.UTFMax]byte
+		n := utf8.EncodeRune(buf[:], rune(code))
+		out.Write(buf[:n])
+		if rune(code) == '\\' {
+			backslashCount = 1
+		} else {
+			backslashCount = 0
+		}
+		i = j + 3
+	}
+
+	return out.String()
 }
 
 func (b *singleFileBuilder) AssignConst(name string, value ssa.Value) bool {
