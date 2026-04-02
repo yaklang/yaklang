@@ -296,19 +296,10 @@ func (s *Server) SaveYakScript(ctx context.Context, script *ypb.YakScript) (*ypb
 	toSave := GRPCYakScriptToYakitScript(script)
 	completeYakScriptAIFieldsOnSave(ctx, s.GetProfileDatabase(), script.GetId(), toSave)
 
-	err := yakit.CreateOrUpdateYakScriptByName(s.GetProfileDatabase(), script.ScriptName, toSave)
+	err := yakit.CreateOrUpdateYakScript(s.GetProfileDatabase(), script.GetId(), toSave)
 	if err != nil {
 		return nil, utils.Errorf("create or update yakscript failed: %s", err.Error())
 	}
-
-	_ = yakit.CreateOrUpdateYakScriptByName(s.GetProfileDatabase(), script.ScriptName, map[string]interface{}{
-		"enable_plugin_selector": script.EnablePluginSelector,
-		"plugin_selector_types":  script.PluginSelectorTypes,
-		"enable_for_ai":          script.EnableForAI,
-		"ai_desc":                script.AIDesc,
-		"ai_keywords":            script.AIKeywords,
-		"ai_usage":               script.AIUsage,
-	})
 
 	res, err := yakit.GetYakScriptByName(s.GetProfileDatabase(), script.ScriptName)
 	if err != nil {

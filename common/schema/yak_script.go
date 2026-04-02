@@ -90,6 +90,59 @@ type YakScript struct {
 	SkipUpdate bool `json:"skip_update"`
 }
 
+func (s *YakScript) ToUpdateMap() map[string]interface{} {
+	if s == nil {
+		return nil
+	}
+
+	return map[string]interface{}{
+		"script_name":            s.ScriptName,
+		"type":                   s.Type,
+		"content":                s.Content,
+		"level":                  s.Level,
+		"params":                 s.Params,
+		"help":                   s.Help,
+		"author":                 s.Author,
+		"tags":                   s.Tags,
+		"ignored":                s.Ignored,
+		"from_local":             s.FromLocal,
+		"local_path":             s.LocalPath,
+		"is_history":             s.IsHistory,
+		"force_interactive":      s.ForceInteractive,
+		"from_store":             s.FromStore,
+		"is_general_module":      s.IsGeneralModule,
+		"general_module_verbose": s.GeneralModuleVerbose,
+		"general_module_key":     s.GeneralModuleKey,
+		"from_git":               s.FromGit,
+		"is_batch_script":        s.IsBatchScript,
+		"is_external":            s.IsExternal,
+		"enable_plugin_selector": s.EnablePluginSelector,
+		"plugin_selector_types":  s.PluginSelectorTypes,
+		"online_id":              s.OnlineId,
+		"online_script_name":     s.OnlineScriptName,
+		"online_contributors":    s.OnlineContributors,
+		"online_is_private":      s.OnlineIsPrivate,
+		"user_id":                s.UserId,
+		"uuid":                   s.Uuid,
+		"head_img":               s.HeadImg,
+		"online_base_url":        s.OnlineBaseUrl,
+		"base_online_id":         s.BaseOnlineId,
+		"online_official":        s.OnlineOfficial,
+		"online_group":           s.OnlineGroup,
+		"is_core_plugin":         s.IsCorePlugin,
+		"enable_for_ai":          s.EnableForAI,
+		"ai_desc":                s.AIDesc,
+		"ai_keywords":            s.AIKeywords,
+		"ai_usage":               s.AIUsage,
+		"risk_type":              s.RiskType,
+		"risk_detail":            s.RiskDetail,
+		"risk_annotation":        s.RiskAnnotation,
+		"collaborator_info":      s.CollaboratorInfo,
+		"plugin_env_key":         s.PluginEnvKey,
+		"skip_update":            s.SkipUpdate,
+	}
+}
+
 func (s *YakScript) BeforeSave() error {
 	if s.ScriptName == "" {
 		return utils.Errorf("empty script name is denied")
