@@ -88,6 +88,33 @@ func (prog *Program) TryGetSimilarityKey(name, key string) string {
 	return ret
 }
 
+// externLibFieldWithLazyExports resolves import.member after MemberMap/table, binding from
+// the target library's ExportValue when the dependency package was compiled later than the importer.
+func (b *FunctionBuilder) externLibFieldWithLazyExports(extern *ExternLib, memberName string) Value {
+	if ret := extern.BuildField(memberName); ret != nil {
+		return ret
+	}
+	libKey := extern.LibraryName
+	if libKey == "" {
+		libKey = extern.GetName()
+	}
+	lib, _ := b.GetProgram().GetLibrary(libKey)
+	if utils.IsNil(lib) {
+		return nil
+	}
+	if g := lib.GetExportValue(memberName); !utils.IsNil(g) {
+		if _, exists := extern.MemberMap[memberName]; !exists {
+			extern.Member = append(extern.Member, g.GetId())
+			extern.MemberMap[memberName] = g.GetId()
+		}
+		return g
+	}
+	if g, ok := lib.GetGlobalVariable(memberName); ok {
+		return g
+	}
+	return nil
+}
+
 func (b *FunctionBuilder) TryBuildExternLibValue(extern *ExternLib, key Value) Value {
 	// write to extern Lib
 	name := getExternLibMemberCall(extern, key)
@@ -95,8 +122,8 @@ func (b *FunctionBuilder) TryBuildExternLibValue(extern *ExternLib, key Value) V
 	if ret := ReadVariableFromScopeAndParent(b.CurrentBlock.ScopeTable, name); !utils.IsNil(ret) {
 		return ret.Value
 	}
-	// try build field
-	if ret := extern.BuildField(key.String()); ret != nil {
+	// try build field (including lazy bind when imported lib compiled after this file)
+	if ret := b.externLibFieldWithLazyExports(extern, key.String()); ret != nil {
 		// set program offsetMap for extern value
 		b.GetProgram().SetOffsetValue(ret, b.CurrentRange)
 
@@ -111,16 +138,6 @@ func (b *FunctionBuilder) TryBuildExternLibValue(extern *ExternLib, key Value) V
 		// set member call
 		setMemberCallRelationship(extern, key, ret)
 		return ret
-	}
-
-	if lib, _ := b.GetProgram().GetLibrary(extern.GetName()); !utils.IsNil(lib) {
-		text := key.GetName()
-		if text == "" {
-			text = key.String()
-		}
-		if g, ok := lib.GetGlobalVariable(text); ok {
-			return g
-		}
 	}
 
 	// try build field for phi
@@ -174,7 +191,7 @@ func (b *FunctionBuilder) tryBuildExternFieldForPhi(extern *ExternLib, phiIns *P
 				possibleRet = ret
 			}
 		} else {
-			if ret := extern.BuildField(possibleKey.String()); ret == nil {
+			if ret := b.externLibFieldWithLazyExports(extern, possibleKey.String()); ret == nil {
 				errorNotice(possibleKey)
 				return possibleRet
 			} else {

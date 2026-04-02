@@ -631,6 +631,10 @@ type ExternLib struct {
 	table   map[string]any
 	builder *FunctionBuilder
 
+	// LibraryName is the application library key for the imported package (e.g. "A"),
+	// which may differ from the import local name (e.g. "alias").
+	LibraryName string
+
 	MemberMap map[string]int64 // value
 	Member    []int64          // value
 }

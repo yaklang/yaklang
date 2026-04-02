@@ -9,6 +9,33 @@ import (
 )
 
 func TestSyntaxflow_Rule(t *testing.T) {
+	t.Run("golang-extendlib-gin", func(t *testing.T) {
+		ssatest.CheckSyntaxFlowContain(t, `package main
+
+import "github.com/gin-gonic/gin"
+
+func SetupAPI() *gin.Engine {
+	r := gin.New()
+
+	r.Any("/swagger/*filepath", func(c *gin.Context) {
+		staticServer := http.FileServer(http.FS(swagger))
+		staticServer.ServeHTTP(c.Writer, c.Request)
+	})
+	return r
+}
+`,
+			`
+gin?{<fullTypeName()>?{have: "github.com/gin-gonic/gin"}} as $gin
+$gin.New() as $new
+`,
+			map[string][]string{
+				"gin": {"ExternLib-gin"},
+				"new": {"Undefined-gin.New()"},
+			},
+			ssaapi.WithLanguage(ssaconfig.GO),
+		)
+	})
+
 	t.Run("golang-template-ssti", func(t *testing.T) {
 		ssatest.CheckSyntaxFlowContain(t, `package yakgrpc
 

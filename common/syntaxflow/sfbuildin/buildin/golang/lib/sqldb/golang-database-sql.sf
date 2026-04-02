@@ -113,6 +113,7 @@ REFERENCE
 
 sql?{<fullTypeName>?{have: 'database/sql'}} as $entry;
 $entry.Open <getCall> as $db;
+sql.Open as $db;
 $db <getMembers> as $output;
 
 alert $output for {

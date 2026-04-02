@@ -103,8 +103,8 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 				defer func() {
 					switchHandler()
 				}()
-				b.handleImportPackage()
-				return nil
+				// b.handleImportPackage()
+				return b.EmitConstInst(0)
 			})
 		}
 
@@ -116,6 +116,11 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 				b.SetImportPackage(name, pathl[len(pathl)-1], paths[i], impo.(*gol.ImportDeclContext).ImportSpec(i))
 			}
 		}
+
+		// Ensure imported packages are materialized as ExternLib deterministically.
+		// Previously this ran via a lazy global-variable builder, which could lead to
+		// non-deterministic Undefined vs ExternLib resolution depending on execution order.
+		b.handleImportPackage()
 
 		for _, decl := range ast.AllDeclaration() {
 			if decl, ok := decl.(*gol.DeclarationContext); ok {
@@ -129,9 +134,23 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 			}
 		}
 
+		// AllDeclaration runs first and registers package globals via AddGlobalVariable.
+		// Register Go init() before other functions so init-related lazy builders / symbol
+		// order align with Go semantics (init runs after globals are declared, before
+		// other package-level functions).
 		for _, fun := range ast.AllFunctionDecl() {
-			if fun, ok := fun.(*gol.FunctionDeclContext); ok {
-				b.buildFunctionDeclFront(fun)
+			if funCtx, ok := fun.(*gol.FunctionDeclContext); ok {
+				if functionDeclName(funCtx) == goInitFunctionName {
+					b.buildFunctionDeclFront(funCtx)
+				}
+			}
+		}
+		for _, fun := range ast.AllFunctionDecl() {
+			if funCtx, ok := fun.(*gol.FunctionDeclContext); ok {
+				if functionDeclName(funCtx) == goInitFunctionName {
+					continue
+				}
+				b.buildFunctionDeclFront(funCtx)
 			}
 		}
 
@@ -141,16 +160,6 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 				b.NewError(ssa.Error, TAG, NotCreateBluePrint(n))
 				continue
 			}
-			// if o, ok := s.(*ssa.ObjectType); ok {
-			// 	for pn, _ := range o.AnonymousField {
-			// 		pbp := b.GetBluePrint(pn)
-			// 		if pbp == nil {
-			// 			b.NewError(ssa.Warn, TAG, StructNotFind(n))
-			// 			pbp = b.CreateBlueprint(pn)
-			// 		}
-			// 		bp.AddParentBlueprint(pbp)
-			// 	}
-			// }
 
 			if i, ok := s.(*ssa.InterfaceType); ok {
 				store := b.StoreFunctionBuilder()
@@ -316,6 +325,7 @@ func (b *astbuilder) buildImportPath(importPath *gol.ImportPathContext) string {
 func (b *astbuilder) handleImportPackage() {
 	for id, info := range b.importMap {
 		ex := ssa.NewExternLib(id, b.FunctionBuilder, nil)
+		ex.LibraryName = info.Name
 		ex.SetExtern(true)
 
 		// 手动设置range
@@ -399,7 +409,7 @@ func (b *astbuilder) buildConstSpec(constSpec *gol.ConstSpecContext, defaul ssa.
 			b.NewError(ssa.Error, TAG, MissInitExpr(leftList[0].GetText()))
 		}
 	}
-	if rightvl[0].String() == "iota" {
+	if rightvl[0].String() == goIotaName {
 		rightvl[0] = b.EmitConstInst(0)
 		isiota = true
 	}
@@ -420,89 +430,86 @@ func (b *astbuilder) buildVarSpec(varSpec *gol.VarSpecContext, isglobal bool) {
 	recoverRange := b.SetRange(varSpec.BaseParserRuleContext)
 	defer recoverRange()
 
-	var leftvl []*ssa.Variable
-	var rightvl []ssa.Value
 	var ssaTyp ssa.Type
 
 	if typ := varSpec.Type_(); typ != nil {
 		ssaTyp = b.buildType(typ.(*gol.Type_Context))
 	}
 
-	a := varSpec.ASSIGN()
+	leftList := varSpec.IdentifierList().(*gol.IdentifierListContext).AllIDENTIFIER()
+	hasAssign := varSpec.ASSIGN() != nil
 
-	if isglobal {
-		if a == nil {
-			leftList := varSpec.IdentifierList().(*gol.IdentifierListContext).AllIDENTIFIER()
-			for _, value := range leftList {
-				recoverRange := b.SetRangeFromTerminalNode(value)
-				id := value.GetText()
-				if b.GetFromCmap(id) {
-					b.NewError(ssa.Warn, TAG, CannotAssign())
-				}
-				store := b.StoreFunctionBuilder()
-				b.AddGlobalVariable(id, func() ssa.Value {
-					switchHandler := b.SwitchFunctionBuilder(store)
-					defer func() {
-						switchHandler()
-					}()
-					return b.GetDefaultValue(ssaTyp)
-				})
-				recoverRange()
-			}
-		} else {
-			leftList := varSpec.IdentifierList().(*gol.IdentifierListContext).AllIDENTIFIER()
-			rightList := varSpec.ExpressionList().(*gol.ExpressionListContext).AllExpression()
-			for _, value := range leftList {
-				if b.GetFromCmap(value.GetText()) {
-					b.NewError(ssa.Warn, TAG, CannotAssign())
-				}
-			}
-
-			store := b.StoreFunctionBuilder()
-			for i, value := range rightList {
-				b.AddGlobalVariable(leftList[i].GetText(), func() ssa.Value {
-					switchHandler := b.SwitchFunctionBuilder(store)
-					defer func() {
-						switchHandler()
-					}()
-					rightv, _ := b.buildExpression(value.(*gol.ExpressionContext), false)
-					return rightv
-				})
-			}
-		}
-	} else {
-		if a == nil {
-			leftList := varSpec.IdentifierList().(*gol.IdentifierListContext).AllIDENTIFIER()
-			for _, value := range leftList {
-				recoverRange := b.SetRangeFromTerminalNode(value)
-				id := value.GetText()
-				if b.GetFromCmap(id) {
-					b.NewError(ssa.Warn, TAG, CannotAssign())
-				}
-
-				leftv := b.CreateLocalVariable(id)
-				b.AssignVariable(leftv, b.GetDefaultValue(ssaTyp))
-				leftvl = append(leftvl, leftv)
-				recoverRange()
-			}
-		} else {
-			leftList := varSpec.IdentifierList().(*gol.IdentifierListContext).AllIDENTIFIER()
-			rightList := varSpec.ExpressionList().(*gol.ExpressionListContext).AllExpression()
-			for _, value := range leftList {
-				if b.GetFromCmap(value.GetText()) {
-					b.NewError(ssa.Warn, TAG, CannotAssign())
-				}
-
-				leftv := b.CreateLocalVariable(value.GetText())
-				leftvl = append(leftvl, leftv)
-			}
-			for _, value := range rightList {
-				rightv, _ := b.buildExpression(value.(*gol.ExpressionContext), false)
-				rightvl = append(rightvl, rightv)
-			}
-			b.AssignList(leftvl, rightvl)
+	checkCannotAssign := func(id string) {
+		if b.GetFromCmap(id) {
+			b.NewError(ssa.Warn, TAG, CannotAssign())
 		}
 	}
+
+	if isglobal {
+		// Global vars are registered via blueprint; local SSA assignment is not emitted here.
+		store := b.StoreFunctionBuilder()
+		registerDefault := func(id string) {
+			checkCannotAssign(id)
+			b.AddGlobalVariable(id, func() ssa.Value {
+				switchHandler := b.SwitchFunctionBuilder(store)
+				defer switchHandler()
+				return b.GetDefaultValue(ssaTyp)
+			})
+		}
+		registerExpr := func(id string, expr *gol.ExpressionContext) {
+			checkCannotAssign(id)
+			b.AddGlobalVariable(id, func() ssa.Value {
+				switchHandler := b.SwitchFunctionBuilder(store)
+				defer switchHandler()
+				rightv, _ := b.buildExpression(expr, false)
+				return rightv
+			})
+		}
+
+		if !hasAssign {
+			for _, ident := range leftList {
+				recoverRange := b.SetRangeFromTerminalNode(ident)
+				registerDefault(ident.GetText())
+				recoverRange()
+			}
+			return
+		}
+
+		rightList := varSpec.ExpressionList().(*gol.ExpressionListContext).AllExpression()
+		for i, r := range rightList {
+			registerExpr(leftList[i].GetText(), r.(*gol.ExpressionContext))
+		}
+		return
+	}
+
+	// Local var: create variables and assign default/expression values.
+	var leftvl []*ssa.Variable
+	if !hasAssign {
+		for _, ident := range leftList {
+			recoverRange := b.SetRangeFromTerminalNode(ident)
+			id := ident.GetText()
+			checkCannotAssign(id)
+
+			leftv := b.CreateLocalVariable(id)
+			b.AssignVariable(leftv, b.GetDefaultValue(ssaTyp))
+			leftvl = append(leftvl, leftv)
+			recoverRange()
+		}
+		return
+	}
+
+	rightList := varSpec.ExpressionList().(*gol.ExpressionListContext).AllExpression()
+	var rightvl []ssa.Value
+	for _, ident := range leftList {
+		checkCannotAssign(ident.GetText())
+		leftv := b.CreateLocalVariable(ident.GetText())
+		leftvl = append(leftvl, leftv)
+	}
+	for _, r := range rightList {
+		rightv, _ := b.buildExpression(r.(*gol.ExpressionContext), false)
+		rightvl = append(rightvl, rightv)
+	}
+	b.AssignList(leftvl, rightvl)
 }
 
 func (b *astbuilder) AssignList(leftVariables []*ssa.Variable, rightVariables []ssa.Value) {
@@ -688,6 +695,16 @@ func (b *astbuilder) buildTypeParameterDecl(typ *gol.TypeParameterDeclContext) [
 	return alias
 }
 
+func functionDeclName(fun *gol.FunctionDeclContext) string {
+	if fun == nil {
+		return ""
+	}
+	if id := fun.IDENTIFIER(); id != nil {
+		return id.GetText()
+	}
+	return ""
+}
+
 func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) {
 	recoverRange := b.SetRange(fun.BaseParserRuleContext)
 	defer recoverRange()
@@ -767,6 +784,26 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) {
 		b.FunctionBuilder = b.PopFunction()
 
 	}, false)
+
+	if funcName == goInitFunctionName {
+		if block, ok := fun.Block().(*gol.BlockContext); ok {
+			b.buildBlock(block, true)
+		}
+		if prog := b.GetProgram(); prog != nil && prog.GlobalVariablesBlueprint != nil {
+			prog.GlobalVariablesBlueprint.Build()
+			if c := prog.GlobalVariablesBlueprint.Container(); c != nil {
+				for k := range c.GetAllMember() {
+					name := k.String()
+					if name == "" {
+						continue
+					}
+					if v := b.PeekValueInThisFunction(name); v != nil {
+						_ = b.TryUpdateGlobalVariableByName(name, v)
+					}
+				}
+			}
+		}
+	}
 }
 
 func (b *astbuilder) getReceiver(stmt *gol.ReceiverContext) []string {

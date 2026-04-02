@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
@@ -513,5 +514,198 @@ func TestImport_fulltypename(t *testing.T) {
 			assert.GreaterOrEqual(t, nothave.Len(), 0)
 			return nil
 		}, ssaapi.WithLanguage(ssaconfig.GO))
+	})
+}
+
+func TestImport_golang_global_var_init(t *testing.T) {
+	const sessionsFilesystemStoreGetRule = `
+sessions?{<fullTypeName()>?{have: "github.com/gorilla/sessions"}} as $entry
+
+$entry.NewFilesystemStore() as $a
+$a.Get() as $b
+*.Get() as $c
+`
+	assertStoreGetMatched := func(res *ssaapi.SyntaxFlowResult) {
+		bVals := res.GetValues("b")
+		cVals := res.GetValues("c")
+		res.Show()
+		require.Greater(t, len(cVals), 0, "expected $c to have results")
+		require.Greater(t, len(bVals), 0, "expected $b to have results")
+	}
+
+	t.Run("package_global_initialized_in_init", func(t *testing.T) {
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("src/main/go/go.mod", `
+module github.com/yaklang/yaklang
+
+go 1.20
+`)
+		vf.AddFile("src/main/go/store.go", `
+package main
+
+import (
+	"github.com/gorilla/sessions"
+)
+
+var Store *sessions.FilesystemStore
+
+func init() {
+	Store = sessions.NewFilesystemStore("sessions", []byte("k"))
+}
+`)
+		vf.AddFile("src/main/go/reset.go", `
+package main
+
+import (
+	"net/http"
+	"github.com/gorilla/sessions"
+)
+
+func reset(r *http.Request) {
+	_, _ = Store.Get(r, "GOSESSID")
+}
+`)
+		ssatest.CheckResultWithFS(t, vf, sessionsFilesystemStoreGetRule, assertStoreGetMatched,
+			ssaapi.WithLanguage(ssaconfig.GO))
+	})
+
+	t.Run("package_global_var_inline_initializer", func(t *testing.T) {
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("src/main/go/go.mod", `
+module github.com/yaklang/yaklang
+
+go 1.20
+`)
+		vf.AddFile("src/main/go/store.go", `
+package main
+
+import (
+	"github.com/gorilla/sessions"
+)
+
+var Store *sessions.FilesystemStore = sessions.NewFilesystemStore("sessions", []byte("k"))
+`)
+		vf.AddFile("src/main/go/reset.go", `
+package main
+
+import (
+	"net/http"
+	"github.com/gorilla/sessions"
+)
+
+func reset(r *http.Request) {
+	_, _ = Store.Get(r, "GOSESSID")
+}
+`)
+		ssatest.CheckResultWithFS(t, vf, sessionsFilesystemStoreGetRule, assertStoreGetMatched,
+			ssaapi.WithLanguage(ssaconfig.GO))
+	})
+
+	t.Run("package_global_initialized_in_init_import", func(t *testing.T) {
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("src/main/go/go.mod", `
+module github.com/yaklang/yaklang
+
+go 1.20
+`)
+		vf.AddFile("src/main/go/store.go", `
+package api
+
+import (
+	"github.com/gorilla/sessions"
+)
+
+var Store *sessions.FilesystemStore
+
+func init() {
+	Store = sessions.NewFilesystemStore("sessions", []byte("k"))
+}
+`)
+		vf.AddFile("src/main/go/reset.go", `
+package main
+
+import (
+	"net/http"
+	"github.com/gorilla/sessions"
+	"github.com/yaklang/yaklang/api"
+)
+
+func reset(r *http.Request) {
+	_, _ = api.Store.Get(r, "GOSESSID")
+}
+`)
+		ssatest.CheckResultWithFS(t, vf, sessionsFilesystemStoreGetRule, assertStoreGetMatched,
+			ssaapi.WithLanguage(ssaconfig.GO))
+	})
+
+	t.Run("package_global_var_inline_initializer_import", func(t *testing.T) {
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("src/main/go/go.mod", `
+module github.com/yaklang/yaklang
+
+go 1.20
+`)
+		vf.AddFile("src/main/go/store.go", `
+package api
+
+import (
+	"github.com/gorilla/sessions"
+)
+
+var Store *sessions.FilesystemStore = sessions.NewFilesystemStore("sessions", []byte("k"))
+`)
+		vf.AddFile("src/main/go/reset.go", `
+package main
+
+import (
+	"net/http"
+	"github.com/gorilla/sessions"
+	"github.com/yaklang/yaklang/api"
+)
+
+func reset(r *http.Request) {
+	_, _ = api.Store.Get(r, "GOSESSID")
+}
+`)
+		ssatest.CheckResultWithFS(t, vf, sessionsFilesystemStoreGetRule, assertStoreGetMatched,
+			ssaapi.WithLanguage(ssaconfig.GO))
+	})
+
+	t.Run("package_global_store_get_inside_closure", func(t *testing.T) {
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("src/main/go/go.mod", `
+module github.com/yaklang/yaklang
+
+go 1.20
+`)
+		vf.AddFile("src/main/go/store.go", `
+package main
+
+import (
+	"github.com/gorilla/sessions"
+)
+
+var Store *sessions.FilesystemStore
+
+func init() {
+	Store = sessions.NewFilesystemStore("sessions", []byte("k"))
+}
+`)
+		vf.AddFile("src/main/go/handler.go", `
+package main
+
+import (
+	"net/http"
+	"github.com/gorilla/sessions"
+)
+
+func sessionReader() func(*http.Request) {
+	return func(r *http.Request) {
+		_, _ = Store.Get(r, "GOSESSID")
+	}
+}
+`)
+		ssatest.CheckResultWithFS(t, vf, sessionsFilesystemStoreGetRule, assertStoreGetMatched,
+			ssaapi.WithLanguage(ssaconfig.GO))
 	})
 }

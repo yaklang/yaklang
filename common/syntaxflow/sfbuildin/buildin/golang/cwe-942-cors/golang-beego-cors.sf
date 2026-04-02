@@ -85,10 +85,8 @@ SOLUTION
 .Ctx.Request.Header.Get #-> as $beego 
 $beego?{<fullTypeName>?{have: 'github.com/beego/beego/v2/server/web'}} as $input;
 
-.Ctx.ResponseWriter.Header().Set()?{have: "Access-Control-Allow-Origin"} as $header
-$header<getCallee>(<slice(index=2)>* #-> as $output)
-
-$output & $input as $high
+.Ctx.ResponseWriter.Header().Set?(*<slice(index=1)>?{have: "Access-Control-Allow-Origin"}) as $header
+$header<getCallee>?(*<slice(index=2)> ?{* #{until: `* & $input`}-> }) as $high
 
 alert $high for {
 	type: "vuln",

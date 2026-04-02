@@ -92,14 +92,18 @@ SOLUTION
 REFERENCE
 )
 
-.Ctx.ResponseWriter.Write(* #-> as $sink);
-html.EscapeString(* #-> as $safeOutput);
+.Ctx.ResponseWriter.Header().Set?(*<slice(index=1)>?{have: "Content-Type"} ) as $header
+$header<getCallee()>?(* <slice(index=2)>?{have: "text/html"}) as $xss
 
-$sink<dataflow(
-    exclude: $safeOutput,
-)> as $target;
+html.EscapeString(* #{until: `*.GetString`}-> as $safeOutput);
 
-$target.GetString?{<fullTypeName>?{have: "github.com/beego/beego/v2/server/web"}} as $mid;
+$xss<getCallee()>(*<slice(index=0)> as $sink );
+$sink<getCallee()> -{until: "*.Write"}-> as $func
+$func.Write?(* <slice(index=1)> #{
+	exclude: `$safeOutput`,
+    until: `*.GetString?{<fullTypeName>?{have: "github.com/beego/beego/v2/server/web"}}`
+}->) as $mid
+
 
 alert $mid for {
 	title: "Golang Reflected XSS Vulnerability in Beego Was Detected",
