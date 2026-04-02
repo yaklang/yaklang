@@ -133,24 +133,57 @@ func buildOrchestratorInitTask(r aicommon.AIInvokeRuntime, state *AuditState) fu
 			r.AddToTimeline("[AUDIT_DIR]", "审计输出目录: "+auditDirPath)
 		}
 
-		// ── Phase 1: 项目探索 ──
-		log.Infof("[CodeAudit] Starting Phase 1 (Recon)")
-		r.AddToTimeline("[PHASE1_START]", "开始 Phase 1：项目探索")
-		reconLoop, err := buildPhase1ReconLoop(r, state)
+		// ── Phase 1: 项目探索（委托给 dir_explore loop）──
+		log.Infof("[CodeAudit] Starting Phase 1 (Recon via dir_explore)")
+		r.AddToTimeline("[PHASE1_START]", "开始 Phase 1：项目探索（使用 dir_explore loop）")
+
+		reconFilePath := filepath.Join(auditDirPath, "recon_notes.md")
+		exploreLoop, err := reactloops.CreateLoopByName(
+			schema.AI_REACT_LOOP_NAME_DIR_EXPLORE,
+			r,
+			reactloops.WithVar("output_report_path", reconFilePath),
+			reactloops.WithVar("explore_work_dir", auditDirPath),
+		)
 		if err != nil {
-			log.Errorf("[CodeAudit] Failed to build Phase 1 loop: %v", err)
+			log.Errorf("[CodeAudit] Failed to create dir_explore loop: %v", err)
 			op.Failed(err)
 			return
 		}
-		if err := reconLoop.ExecuteWithExistedTask(newSubTask(task, "phase1")); err != nil {
-			log.Warnf("[CodeAudit] Phase 1 returned error: %v (continuing)", err)
+		if err := exploreLoop.ExecuteWithExistedTask(newSubTask(task, "phase1")); err != nil {
+			log.Warnf("[CodeAudit] Phase 1 (dir_explore) returned error: %v (continuing)", err)
+		}
+
+		// 从 dir_explore loop vars 提取结果回填到 AuditState
+		if projectPath := exploreLoop.Get("result_target_path"); projectPath != "" {
+			projectName := exploreLoop.Get("result_project_name")
+			if projectName == "" {
+				projectName = filepath.Base(projectPath)
+			}
+			state.SetProjectInfo(projectPath, projectName)
+		}
+		techStack := exploreLoop.Get("result_tech_stack")
+		entryPoints := exploreLoop.Get("result_entry_points")
+		if techStack != "" {
+			state.SetReconResult(techStack, entryPoints, "")
+		}
+		if reportPath := exploreLoop.Get("result_report_path"); reportPath != "" {
+			state.SetReconFilePath(reportPath)
+		}
+		// 回填侦察笔记文件列表
+		if noteFilesStr := exploreLoop.Get("result_note_files"); noteFilesStr != "" {
+			for _, f := range strings.Split(noteFilesStr, "\n") {
+				f = strings.TrimSpace(f)
+				if f != "" {
+					state.AddReconNoteFile(f)
+				}
+			}
 		}
 
 		if state.TechStack == "" {
-			log.Warnf("[CodeAudit] Phase 1 ended without calling complete_recon (no tech_stack). " +
+			log.Warnf("[CodeAudit] Phase 1 (dir_explore) ended without producing tech_stack. " +
 				"AI may have exited the loop prematurely. Proceeding with empty recon state.")
 			r.AddToTimeline("[PHASE1_INCOMPLETE]",
-				"警告：Phase 1 未调用 complete_recon 就结束了。侦察笔记未生成，后续扫描将在缺少背景信息的情况下进行。")
+				"警告：Phase 1 (dir_explore) 未完成探索就结束了。侦察笔记未生成，后续扫描将在缺少背景信息的情况下进行。")
 		} else {
 			log.Infof("[CodeAudit] Phase 1 complete. tech=%s recon_file=%s", state.TechStack, state.GetReconFilePath())
 		}

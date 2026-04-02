@@ -59,11 +59,11 @@ overwrite := cli.Bool("force", cli.setRequired(false), cli.setDefault(false), cl
 
 cli.check()
 
-println(sprintf("[write_file] start writing file: %s", filename))
+yakit.Info("[write_file] start writing file: %s", filename)
 
 // 检查文件是否已存在
 if file.IsExisted(filename) && !overwrite {
-    println(sprintf("[write_file] file already exists and force=false: %s", filename))
+    yakit.Info("[write_file] file already exists and force=false: %s", filename)
     return
 }
 
@@ -71,41 +71,41 @@ if file.IsExisted(filename) && !overwrite {
 dir := file.GetDirPath(filename)
 createdDir := false
 if dir != "" && !file.IsExisted(dir) {
-    println(sprintf("[write_file] parent directory does not exist, creating: %s", dir))
+    yakit.Info("[write_file] parent directory does not exist, creating: %s", dir)
     err := file.MkdirAll(dir)
     if err != nil {
-        println(sprintf("[write_file] failed to create parent directory: %s, reason: %v", dir, err))
+        yakit.Info("[write_file] failed to create parent directory: %s, reason: %v", dir, err)
         return
     }
     createdDir = true
-    println(sprintf("[write_file] parent directory created successfully: %s", dir))
+    yakit.Info("[write_file] parent directory created successfully: %s", dir)
 }
 
 // 写入文件内容
 err := file.Save(filename, content)
 if err != nil {
-    println(sprintf("[write_file] failed to write file: %s, reason: %v", filename, err))
+    yakit.Info("[write_file] failed to write file: %s, reason: %v", filename, err)
     if createdDir {
-        println(sprintf("[write_file] attempting rollback by removing created directory: %s", dir))
+        yakit.Info("[write_file] attempting rollback by removing created directory: %s", dir)
         rollbackErr := file.Remove(dir)
         if rollbackErr != nil {
-            println(sprintf("[write_file] rollback failed, could not remove directory: %s, reason: %v", dir, rollbackErr))
+            yakit.Info("[write_file] rollback failed, could not remove directory: %s, reason: %v", dir, rollbackErr)
         } else {
-            println(sprintf("[write_file] rollback success, removed directory: %s", dir))
+            yakit.Info("[write_file] rollback success, removed directory: %s", dir)
         }
     }
     return
 }
 
-println(sprintf("[write_file] write success. file: %s", filename))
-println(sprintf("[write_file] content length: %d bytes", len(content)))
-println(sprintf("[write_file] parent directory: %s", dir))
+yakit.Info("[write_file] write success. file: %s", filename)
+yakit.Info("[write_file] content length: %d bytes", len(content))
+yakit.Info("[write_file] parent directory: %s", dir)
 
 // 获取写入后的文件信息
 info, err := file.Stat(filename)
 if err != nil {
-    println(sprintf("[write_file] file written but failed to stat file: %v", err))
+    yakit.Info("[write_file] file written but failed to stat file: %v", err)
 } else {
-    println(sprintf("[write_file] file stat size: %d, mod_time: %v", info.Size(), info.ModTime()))
+    yakit.Info("[write_file] file stat size: %d, mod_time: %v", info.Size(), info.ModTime())
     yakit.File(filename, yakit.fileWriteAction(len(content), "cover", content))
 }

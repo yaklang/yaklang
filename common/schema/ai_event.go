@@ -59,6 +59,7 @@ const (
 	AI_REACT_LOOP_NAME_INTENT              = "intent"
 	AI_REACT_LOOP_NAME_INTERNET_RESEARCH   = "internet_research"
 	AI_REACT_LOOP_NAME_SMART_QA            = "smart_qa"
+	AI_REACT_LOOP_NAME_DIR_EXPLORE         = "dir_explore"
 )
 
 const (

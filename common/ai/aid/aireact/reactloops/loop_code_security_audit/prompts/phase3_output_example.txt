@@ -4,26 +4,29 @@
 
 ---
 
-### Step 1：read_code 读取 Sink 点上下文（行号准确时）
+### Step 1：read_file 读取 Sink 点上下文（行号准确时）
 
 ```json
 {
-  "@action": "read_code",
-  "human_readable_thought": "先读取 handler/user.go Sink 点（第88行）附近的代码，了解参数来源。",
-  "file_path": "handler/user.go",
-  "start_line": 48,
-  "end_line": 100
+  "@action": "read_file",
+  "identifier": "read_vuln001_sink",
+  "human_readable_thought": "先读取 handler/user.go Sink 点（第88行）附近的代码，了解参数来源。offset 从 Sink 行向前留 40 行窗口。",
+  "file": "/abs/project/handler/user.go",
+  "mode": "lines",
+  "offset": 48,
+  "lines": 60
 }
 ```
 
-### Step 1（备用）：行号不准确时，改用 search_keyword 搜索
+### Step 1（备用）：行号不准确时，改用 grep 搜索 Sink 函数名定位
 
 ```json
 {
-  "@action": "read_code",
-  "human_readable_thought": "Finding 记录的行号26702超出文件实际行数1925，改用 search_keyword 搜索 Sink 函数名 call_user_func 来定位代码。",
-  "file_path": "modules/geshi/geshi.php",
-  "search_keyword": "call_user_func"
+  "@action": "grep",
+  "identifier": "grep_call_user_func_sink",
+  "human_readable_thought": "Finding 记录的行号 26702 超出文件实际行数 1925，改用 grep 搜索 Sink 函数名 call_user_func 来精确定位代码位置。",
+  "pattern": "call_user_func",
+  "path": "/abs/project/modules/geshi/geshi.php"
 }
 ```
 

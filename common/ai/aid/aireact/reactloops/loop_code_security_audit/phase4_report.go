@@ -2,6 +2,7 @@ package loop_code_security_audit
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,7 +19,7 @@ import (
 // 由专用报告写作 loop 完成 Markdown 报告的生成和磁盘写入。
 func buildPhase4ReportLoop(r aicommon.AIInvokeRuntime, state *AuditState, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {
 	preset := []reactloops.ReActLoopOption{
-		reactloops.WithMaxIterations(2),
+		reactloops.WithMaxIterations(math.MaxInt32),
 		reactloops.WithAllowRAG(false),
 		reactloops.WithAllowAIForge(false),
 		reactloops.WithAllowPlanAndExec(false),
@@ -88,7 +89,7 @@ func buildPhase4ReportLoop(r aicommon.AIInvokeRuntime, state *AuditState, opts .
 			reportLoop, err := reactloops.CreateLoopByName(
 				schema.AI_REACT_LOOP_NAME_REPORT_GENERATING,
 				r,
-				reactloops.WithMaxIterations(30),
+				reactloops.WithMaxIterations(math.MaxInt32),
 				reactloops.WithAllowUserInteract(false),
 				reactloops.WithInitTask(func(innerLoop *reactloops.ReActLoop, innerTask aicommon.AIStatefulTask, innerOp *reactloops.InitTaskOperator) {
 					innerLoop.Set("report_filename", reportPath)

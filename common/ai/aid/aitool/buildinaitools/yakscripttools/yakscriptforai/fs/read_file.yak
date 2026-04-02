@@ -5,24 +5,30 @@ __KEYWORDS__ = "memory management,file reading,large file,file handling,reading,
 __USAGE__ = <<<USAGE_BLOCK
 Unified File Reader Tool - Parameter Description for JSON Tool Calls
 
-This tool reads TEXT files safely with two modes: line-based and byte-chunk.
-It uses mimetype (magic bytes) to detect binary file formats automatically.
-When mode is omitted and the text file is large, it prefers a 20KB chunk first read
-so the initial browse is smoother and faster.
+This tool reads TEXT files safely. The default mode always outputs numbered lines
+so the AI can reference exact line numbers for code analysis.
 
 Required Parameters:
     file            (string)  The target file ABSOLUTE path you want to read.
-                                                        For AI JSON tool calls, always use an absolute path.
-                                                        Do NOT use relative paths such as "test.txt", "./test.txt", or "../test.txt".
+                              For AI JSON tool calls, always use an absolute path.
+                              Do NOT use relative paths such as "test.txt", "./test.txt", or "../test.txt".
+                              If the path is wrong or the file does not exist,
+                              use find_file or grep to locate the correct path first.
 
 Optional Parameters:
     mode            (string)  Read mode:
-                                                        - "lines" (default for normal text): read by line segments, for text files.
-                                                        - "chunk": read by byte chunks with offset.
-    chunk-size      (int)     Byte chunk size (mode=chunk). Default/max: 30000. Recommended: 10000-20000 for smooth browsing.
-    offset          (int)     Byte offset (mode=chunk) or line offset (mode=lines). Default: 0.
-    lines           (int)     Number of lines to read (mode=lines). Default: 200. If omitted, the tool tries to return about 10KB of text for smoother reading.
-    line-size       (int)     Max characters per line (mode=lines). Default: 1024.
+                                - "auto" (default): always uses line-based reading with numbered
+                                  output. Recommended for all text/source files.
+                                - "lines": explicit line-based mode, same as auto.
+                                - "chunk": byte-chunk reading by byte offset. Use only when you
+                                  need precise byte-level positioning (e.g. resuming a partial read).
+                                  NOTE: chunk mode does NOT output line numbers.
+    offset          (int)     Line number to start reading from (mode=lines/auto, 1-based).
+                              Byte offset when mode=chunk. Default: 0 (start from beginning).
+    lines           (int)     Number of lines to read (mode=lines/auto). Default: 200.
+                              Set higher (e.g. 300-500) for long files.
+    line-size       (int)     Max characters per line (mode=lines/auto). Default: 1024.
+    chunk-size      (int)     Byte chunk size (mode=chunk only). Default/max: 30000.
 
 Path Rules:
     - Prefer a full absolute filesystem path in every AI tool call.
@@ -168,7 +174,7 @@ lineSize := cli.Int("line-size", cli.setRequired(false), cli.setHelp("the max co
 cli.check()
 
 if !file.IsExisted(t) {
-    yakit.Warn("%v is not existed. If this is an AI tool call, pass an absolute path such as /abs/path/to/file instead of test.txt or ./test.txt", t)
+    yakit.Warn("%v is not existed. Pass an absolute path such as /abs/path/to/file instead of test.txt or ./test.txt. Use find_file or grep to locate the correct path before calling read_file.", t)
     return
 }
 
@@ -436,14 +442,11 @@ if mode != "auto" && mode != "chunk" && mode != "lines" {
 effectiveMode = mode
 effectiveChunkSize = chunkSize
 if effectiveMode == "auto" {
+    // Always use lines mode in auto so the AI always gets numbered lines.
+    // chunk mode is only activated when the caller explicitly sets mode=chunk.
+    effectiveMode = "lines"
     if size > largeTextChunkThreshold {
-        effectiveMode = "chunk"
-        if effectiveChunkSize <= 0 {
-            effectiveChunkSize = preferredLargeTextChunkSize
-        }
-        yakit.Info("large text file detected (%v bytes), prefer chunk mode for first read: %v bytes", size, effectiveChunkSize)
-    } else {
-        effectiveMode = "lines"
+        yakit.Info("large text file detected (%v bytes), using lines mode with extended limit for numbered output", size)
     }
 }
 
@@ -476,7 +479,7 @@ if effectiveMode == "chunk" {
         yakit.Error("MET ERR: %v", err)
     }
     if n > 0 {
-        yakit.Info("CHUNK[Total: %v]: %#v", size, string(raw))
+        yakit.Info("CHUNK[offset: %v, read: %v bytes, total: %v bytes]\n%v", offset, n, size, string(raw))
         yakit.File(t, yakit.fileReadAction(offset, n, "byte", string(raw)))
     }
 } else {
