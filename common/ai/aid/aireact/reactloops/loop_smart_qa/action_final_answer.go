@@ -6,7 +6,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -19,9 +18,17 @@ func makeFinalAnswerAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOptio
 			aitool.WithParam_Required(true)),
 	}
 
-	return reactloops.WithRegisterLoopAction(
+	streamFields := []*reactloops.LoopStreamField{
+		{
+			FieldName:   "answer",
+			AINodeId:    "re-act-loop-answer-payload",
+			ContentType: aicommon.TypeTextMarkdown,
+		},
+	}
+
+	return reactloops.WithRegisterLoopActionWithStreamField(
 		"final_answer",
-		desc, toolOpts,
+		desc, toolOpts, streamFields,
 		func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
 			answer := strings.TrimSpace(action.GetString("answer"))
 			if answer == "" {
@@ -33,24 +40,18 @@ func makeFinalAnswerAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOptio
 			loop.LoadingStatus("preparing final answer")
 
 			answer := strings.TrimSpace(action.GetString("answer"))
-			invoker := loop.GetInvoker()
-			ctx := loop.GetConfig().GetContext()
-			task := loop.GetCurrentTask()
-			if task != nil && !utils.IsNil(task.GetContext()) {
-				ctx = task.GetContext()
+			if answer == "" {
+				op.Fail("final_answer action requires non-empty answer")
+				return
 			}
+
+			invoker := loop.GetInvoker()
 
 			loop.Set("final_answer", answer)
+			invoker.EmitFileArtifactWithExt("smart_qa_final_answer", ".md", answer)
+			invoker.EmitResultAfterStream(answer)
 			invoker.AddToTimeline("smart_qa_final_answer", answer)
-
-			result, err := invoker.DirectlyAnswer(ctx, answer, nil)
-			_ = result
-			log.Infof("smart_qa final answer result: %s", utils.ShrinkTextBlock(result, 512))
-			if err != nil {
-				op.Continue()
-			} else {
-				op.Exit()
-			}
+			op.Exit()
 		},
 	)
 }

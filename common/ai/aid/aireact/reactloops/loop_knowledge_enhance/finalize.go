@@ -1,7 +1,6 @@
 package loop_knowledge_enhance
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -25,15 +24,6 @@ func hasFinalSummaryDirectAnswered(loop *reactloops.ReActLoop) bool {
 	return utils.InterfaceToBoolean(loop.Get(finalSummaryDirectAnsweredKey))
 }
 
-func getDirectAnswerContext(loop *reactloops.ReActLoop) context.Context {
-	ctx := loop.GetConfig().GetContext()
-	task := loop.GetCurrentTask()
-	if task != nil && !utils.IsNil(task.GetContext()) {
-		ctx = task.GetContext()
-	}
-	return ctx
-}
-
 func deliverFinalAnswerFallback(loop *reactloops.ReActLoop, invoker aicommon.AIInvokeRuntime, finalContent string) {
 	finalContent = strings.TrimSpace(finalContent)
 	if finalContent == "" {
@@ -46,14 +36,25 @@ func deliverFinalAnswerFallback(loop *reactloops.ReActLoop, invoker aicommon.AII
 		return
 	}
 
-	result, err := invoker.DirectlyAnswer(getDirectAnswerContext(loop), finalContent, nil)
-	if err != nil {
-		log.Warnf("knowledge enhance finalize: failed to directly answer with final report: %v", err)
-		return
+	taskIndex := ""
+	if task := loop.GetCurrentTask(); task != nil {
+		taskIndex = task.GetId()
 	}
 
+	if emitter := loop.GetEmitter(); emitter != nil {
+		if _, err := emitter.EmitTextMarkdownStreamEvent(
+			"re-act-loop-answer-payload",
+			strings.NewReader(finalContent),
+			taskIndex,
+			func() {},
+		); err != nil {
+			log.Warnf("knowledge enhance finalize: failed to emit markdown stream: %v", err)
+		}
+	}
+
+	invoker.EmitResultAfterStream(finalContent)
 	markFinalSummaryDirectAnswered(loop)
-	log.Infof("knowledge enhance finalize: delivered fallback direct answer, response: %s", utils.ShrinkTextBlock(result, 512))
+	log.Infof("knowledge enhance finalize: delivered fallback final report via markdown stream")
 }
 
 // generateFinalKnowledgeDocument aggregates all compressed knowledge from rounds

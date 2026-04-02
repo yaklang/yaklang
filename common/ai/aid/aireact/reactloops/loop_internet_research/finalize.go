@@ -15,6 +15,48 @@ import (
 )
 
 const maxFinalDocBytes = 50 * 1024
+const finalResearchReportDeliveredKey = "final_research_report_delivered"
+
+func markFinalResearchReportDelivered(loop *reactloops.ReActLoop) {
+	loop.Set(finalResearchReportDeliveredKey, true)
+}
+
+func hasFinalResearchReportDelivered(loop *reactloops.ReActLoop) bool {
+	return utils.InterfaceToBoolean(loop.Get(finalResearchReportDeliveredKey))
+}
+
+func emitFinalResearchReport(loop *reactloops.ReActLoop, invoker aicommon.AIInvokeRuntime, finalContent string) bool {
+	finalContent = strings.TrimSpace(finalContent)
+	if finalContent == "" {
+		log.Infof("internet research finalize: skip final report delivery because content is empty")
+		return false
+	}
+
+	if hasFinalResearchReportDelivered(loop) {
+		log.Infof("internet research finalize: skip final report delivery because content was already delivered")
+		return false
+	}
+
+	taskIndex := ""
+	if task := loop.GetCurrentTask(); task != nil {
+		taskIndex = task.GetId()
+	}
+
+	if emitter := loop.GetEmitter(); emitter != nil {
+		if _, err := emitter.EmitTextMarkdownStreamEvent(
+			"re-act-loop-answer-payload",
+			strings.NewReader(finalContent),
+			taskIndex,
+			func() {},
+		); err != nil {
+			log.Warnf("internet research finalize: failed to emit markdown stream: %v", err)
+		}
+	}
+
+	invoker.EmitResultAfterStream(finalContent)
+	markFinalResearchReportDelivered(loop)
+	return true
+}
 
 func BuildOnPostIterationHook(invoker aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 	return reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, operator *reactloops.OnPostIterationOperator) {
@@ -356,19 +398,8 @@ func generateAndOutputFinalReport(loop *reactloops.ReActLoop, invoker aicommon.A
 		log.Infof("final research report saved to: %s (%d bytes)", finalFilename, len(finalContent))
 	}
 
-	task := loop.GetCurrentTask()
-	var taskCtx context.Context
-	if task != nil && !utils.IsNil(task.GetContext()) {
-		taskCtx = task.GetContext()
-	} else {
-		taskCtx = ctx
-	}
-
-	result, err := invoker.DirectlyAnswer(taskCtx, finalContent, nil)
-	if err != nil {
-		log.Warnf("failed to directly answer with research report: %v", err)
-	} else {
-		log.Infof("research report delivered to user, response: %s", utils.ShrinkTextBlock(result, 512))
+	if emitFinalResearchReport(loop, invoker, finalContent) {
+		log.Infof("research report delivered to user via markdown stream")
 	}
 
 	statusStr := "completed"

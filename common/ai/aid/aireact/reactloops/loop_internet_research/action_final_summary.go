@@ -8,7 +8,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -21,10 +20,19 @@ func makeFinalSummaryAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 			aitool.WithParam_Required(true)),
 	}
 
-	return reactloops.WithRegisterLoopAction(
+	streamFields := []*reactloops.LoopStreamField{
+		{
+			FieldName:   "summary",
+			AINodeId:    "re-act-loop-answer-payload",
+			ContentType: aicommon.TypeTextMarkdown,
+		},
+	}
+
+	return reactloops.WithRegisterLoopActionWithStreamField(
 		"final_summary",
 		desc,
 		toolOpts,
+		streamFields,
 		func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
 			loop.LoadingStatus("validating final summary parameters")
 			summary := action.GetString("summary")
@@ -37,6 +45,11 @@ func makeFinalSummaryAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 			loop.LoadingStatus("generating final research report")
 
 			summary := action.GetString("summary")
+			if summary == "" {
+				op.Fail("final_summary action requires non-empty summary")
+				return
+			}
+
 			userQuery := loop.Get("user_query")
 			searchHistory := loop.Get("search_history")
 			searchResultsSummary := loop.Get("search_results_summary")
@@ -93,19 +106,9 @@ Report Generated: %s
 				".md",
 				finalReport,
 			)
-
-			result, err := loop.GetInvoker().DirectlyAnswer(
-				loop.GetCurrentTask().GetContext(),
-				finalReport,
-				nil,
-			)
-			_ = result
-			log.Infof("final summary direct answer result: %s", utils.ShrinkTextBlock(result, 2048))
-			if err != nil {
-				op.Continue()
-			} else {
-				op.Exit()
-			}
+			loop.GetInvoker().EmitResultAfterStream(finalReport)
+			markFinalResearchReportDelivered(loop)
+			op.Exit()
 		},
 	)
 }
