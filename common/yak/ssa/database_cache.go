@@ -153,21 +153,31 @@ func (c *ProgramCache) AddConst(inst Instruction) {
 	c.ConstCache.Add(inst.GetName(), inst)
 }
 
-func (c *ProgramCache) AddVariable(name string, inst Instruction) {
-	member := ""
-	// field
-	if strings.HasPrefix(name, "#") { // member-call variable contain #, see common/yak/ssa/member_call.go:checkCanMemberCall
-		if _, memberName, ok := strings.Cut(name, "."); ok {
-			member = memberName
+func splitVariableIndexKey(name string) (string, string) {
+	if name == "" {
+		return "", ""
+	}
+	if name[0] == '$' {
+		name = name[1:]
+	}
+	if name == "" || name[0] != '#' {
+		return name, ""
+	}
+	if idx := strings.IndexByte(name, '.'); idx >= 0 && idx+1 < len(name) {
+		return name, name[idx+1:]
+	}
+	if idx := strings.IndexByte(name, '['); idx >= 0 && idx+1 < len(name) {
+		end := len(name)
+		if name[end-1] == ']' {
+			end--
 		}
+		return name, name[idx+1 : end]
+	}
+	return name, ""
+}
 
-		if _, memberKey, ok := strings.Cut(name, "["); ok {
-			member, _ = strings.CutSuffix(memberKey, "]")
-		}
-	}
-	if len(name) > 1 {
-		name = strings.TrimPrefix(name, "$")
-	}
+func (c *ProgramCache) AddVariable(name string, inst Instruction) {
+	name, member := splitVariableIndexKey(name)
 	if member != "" {
 		c.MemberIndex.Add(member, inst)
 	} else {
@@ -176,20 +186,7 @@ func (c *ProgramCache) AddVariable(name string, inst Instruction) {
 }
 
 func (c *ProgramCache) RemoveVariable(name string, inst Instruction) {
-	member := ""
-	// field
-	if strings.HasPrefix(name, "#") { // member-call variable contain #, see common/yak/ssa/member_call.go:checkCanMemberCall
-		if _, memberName, ok := strings.Cut(name, "."); ok {
-			member = memberName
-		}
-
-		if _, memberKey, ok := strings.Cut(name, "["); ok {
-			member, _ = strings.CutSuffix(memberKey, "]")
-		}
-	}
-	if len(name) > 1 {
-		name = strings.TrimPrefix(name, "$")
-	}
+	name, member := splitVariableIndexKey(name)
 	if member != "" {
 		c.MemberIndex.Delete(member, inst)
 	} else {

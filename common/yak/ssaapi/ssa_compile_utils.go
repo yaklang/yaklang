@@ -33,7 +33,9 @@ var (
 
 func antlrCacheResetEveryFiles() int {
 	antlrCacheResetEveryFilesOnce.Do(func() {
-		antlrCacheResetEveryFilesCached = 100
+		// Reuse helps small projects, but large Go projects regress sharply when
+		// DFA/prediction caches accumulate across many files on the same worker.
+		antlrCacheResetEveryFilesCached = 1
 		if raw := strings.TrimSpace(os.Getenv("YAK_ANTLR_CACHE_RESET_FILES")); raw != "" {
 			if v, err := strconv.Atoi(raw); err == nil {
 				antlrCacheResetEveryFilesCached = v
@@ -52,8 +54,8 @@ type antlrWorkerState struct {
 }
 
 type antlrASTParseWorker struct {
-	language     ssa.PreHandlerAnalyzer
-	languageName string
+	language        ssa.PreHandlerAnalyzer
+	languageName    string
 	resetEveryFiles int
 }
 
