@@ -24,7 +24,7 @@ func (y *builder) VisitFunctionDeclaration(raw phpparser.IFunctionDeclarationCon
 	//Ampersand 如果被设置了就是值引用
 	isRef := i.Ampersand() != nil
 	_ = isRef
-	funcName := i.Identifier().GetText()
+	funcName := i.CallableIdentifier().GetText()
 	newFunction := y.NewFunc(funcName)
 	variable := y.CreateVariable(funcName)
 	y.AssignVariable(variable, newFunction)

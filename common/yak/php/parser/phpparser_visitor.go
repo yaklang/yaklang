@@ -73,6 +73,9 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#typeParameterWithDefaultDecl.
 	VisitTypeParameterWithDefaultDecl(ctx *TypeParameterWithDefaultDeclContext) interface{}
 
+	// Visit a parse tree produced by PHPParser#callableIdentifier.
+	VisitCallableIdentifier(ctx *CallableIdentifierContext) interface{}
+
 	// Visit a parse tree produced by PHPParser#attributes.
 	VisitAttributes(ctx *AttributesContext) interface{}
 
@@ -298,6 +301,9 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#indexMemberCallKey.
 	VisitIndexMemberCallKey(ctx *IndexMemberCallKeyContext) interface{}
 
+	// Visit a parse tree produced by PHPParser#dynamicStaticClassExpr.
+	VisitDynamicStaticClassExpr(ctx *DynamicStaticClassExprContext) interface{}
+
 	// Visit a parse tree produced by PHPParser#SpecialWordExpression.
 	VisitSpecialWordExpression(ctx *SpecialWordExpressionContext) interface{}
 
@@ -306,6 +312,9 @@ type PHPParserVisitor interface {
 
 	// Visit a parse tree produced by PHPParser#ArrayCreationExpression.
 	VisitArrayCreationExpression(ctx *ArrayCreationExpressionContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#FunctionCallIndexedAssignmentExpression.
+	VisitFunctionCallIndexedAssignmentExpression(ctx *FunctionCallIndexedAssignmentExpressionContext) interface{}
 
 	// Visit a parse tree produced by PHPParser#BackQuoteStringExpression.
 	VisitBackQuoteStringExpression(ctx *BackQuoteStringExpressionContext) interface{}
@@ -358,6 +367,9 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#ConditionalExpression.
 	VisitConditionalExpression(ctx *ConditionalExpressionContext) interface{}
 
+	// Visit a parse tree produced by PHPParser#DynamicStaticClassAccessExpression.
+	VisitDynamicStaticClassAccessExpression(ctx *DynamicStaticClassAccessExpressionContext) interface{}
+
 	// Visit a parse tree produced by PHPParser#TemplateExpression.
 	VisitTemplateExpression(ctx *TemplateExpressionContext) interface{}
 
@@ -391,6 +403,12 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#OrdinaryAssignmentExpression.
 	VisitOrdinaryAssignmentExpression(ctx *OrdinaryAssignmentExpressionContext) interface{}
 
+	// Visit a parse tree produced by PHPParser#DirectFunctionCallExpression.
+	VisitDirectFunctionCallExpression(ctx *DirectFunctionCallExpressionContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#FunctionCallIndexedReferenceAssignmentExpression.
+	VisitFunctionCallIndexedReferenceAssignmentExpression(ctx *FunctionCallIndexedReferenceAssignmentExpressionContext) interface{}
+
 	// Visit a parse tree produced by PHPParser#CastExpression.
 	VisitCastExpression(ctx *CastExpressionContext) interface{}
 
@@ -409,8 +427,8 @@ type PHPParserVisitor interface {
 	// Visit a parse tree produced by PHPParser#StaticClassAccessExpression.
 	VisitStaticClassAccessExpression(ctx *StaticClassAccessExpressionContext) interface{}
 
-	// Visit a parse tree produced by PHPParser#MemberFunction.
-	VisitMemberFunction(ctx *MemberFunctionContext) interface{}
+	// Visit a parse tree produced by PHPParser#FlexiMemberAccess.
+	VisitFlexiMemberAccess(ctx *FlexiMemberAccessContext) interface{}
 
 	// Visit a parse tree produced by PHPParser#IndexLegacyCallVariable.
 	VisitIndexLegacyCallVariable(ctx *IndexLegacyCallVariableContext) interface{}
@@ -420,9 +438,6 @@ type PHPParserVisitor interface {
 
 	// Visit a parse tree produced by PHPParser#CustomVariable.
 	VisitCustomVariable(ctx *CustomVariableContext) interface{}
-
-	// Visit a parse tree produced by PHPParser#MemberVariable.
-	VisitMemberVariable(ctx *MemberVariableContext) interface{}
 
 	// Visit a parse tree produced by PHPParser#defineExpr.
 	VisitDefineExpr(ctx *DefineExprContext) interface{}
@@ -570,6 +585,9 @@ type PHPParserVisitor interface {
 
 	// Visit a parse tree produced by PHPParser#assignableChain.
 	VisitAssignableChain(ctx *AssignableChainContext) interface{}
+
+	// Visit a parse tree produced by PHPParser#functionCallIndexedAssignable.
+	VisitFunctionCallIndexedAssignable(ctx *FunctionCallIndexedAssignableContext) interface{}
 
 	// Visit a parse tree produced by PHPParser#assignableChainOrigin.
 	VisitAssignableChainOrigin(ctx *AssignableChainOriginContext) interface{}

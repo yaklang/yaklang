@@ -141,7 +141,7 @@ namespaceStatement
     ;
 
 functionDeclaration
-    : attributes? Function_ '&'? identifier /*typeParameterListInBrackets?*/ '(' formalParameterList ')' (
+    : attributes? Function_ '&'? callableIdentifier /*typeParameterListInBrackets?*/ '(' formalParameterList ')' (
         ':' QuestionMark? typeHint
     )? blockStatement
     ;
@@ -184,6 +184,12 @@ typeParameterDecl
 
 typeParameterWithDefaultDecl
     : attributes? identifier Eq (qualifiedStaticTypeRef | primitiveType)
+    ;
+
+callableIdentifier
+    : identifier
+    | Require
+    | RequireOnce
     ;
 
 //genericDynamicArgs
@@ -431,7 +437,7 @@ classStatement
     | attributes? memberModifiers? Const typeHint? identifierInitializer (
         ',' identifierInitializer
     )* SemiColon # Const
-    | attributes? memberModifiers? Function_ '&'? identifier /*typeParameterListInBrackets?*/ '(' formalParameterList ')' (
+    | attributes? memberModifiers? Function_ '&'? callableIdentifier /*typeParameterListInBrackets?*/ '(' formalParameterList ')' (
         baseCtorCall
         | returnTypeDecl
     )? methodBody # Function
@@ -540,6 +546,8 @@ staticClass
 
 memberCallKey
     : identifier
+    | Require
+    | RequireOnce
     | string
     | variable
     | OpenCurlyBracket expression CloseCurlyBracket
@@ -551,13 +559,22 @@ indexMemberCallKey
     | expression
     ;
 
+dynamicStaticClassExpr
+    : functionCall '::' memberCallKey
+    | parentheses '::' memberCallKey
+    | functionCall '::' variable
+    | parentheses '::' variable
+    ;
+
 // Expressions
 // Grouped by priorities: http://php.net/manual/en/language.operators.precedence.php
 expression
     : Clone expression                                                                  # CloneExpression
     | newExpr                                                                           # KeywordNewExpression
+    | functionCall                                                                      # DirectFunctionCallExpression
     | fullyQualifiedNamespaceExpr                                                       # FullyQualifiedNamespaceExpression
     | Parent_ DoubleColon memberCallKey                                                 # ParentExpression
+    | dynamicStaticClassExpr                                                            # DynamicStaticClassAccessExpression
     | expression ObjectOperator memberCallKey                                           # MemberCallExpression
     | expression NullsafeObjectOperator memberCallKey                                   # MemberCallExpression
     | expression '[' indexMemberCallKey ']'                                             # IndexCallExpression
@@ -603,6 +620,8 @@ expression
     | expression op = '??' expression                                                   # NullCoalescingExpression
     | expression op = '<=>' expression                                                  # SpaceshipExpression
     | leftArrayCreation Eq expression                                                   # ArrayCreationUnpackExpression
+    | functionCallIndexedAssignable Eq '&' expression                                   # FunctionCallIndexedReferenceAssignmentExpression
+    | functionCallIndexedAssignable assignmentOperator expression                       # FunctionCallIndexedAssignmentExpression
     | assignableChain Eq '&' expression                                                 # ReferenceAssignmentExpression
     | assignableChain assignmentOperator expression                                     # OrdinaryAssignmentExpression
     | expression op = LogicalAnd expression                                             # LogicalExpression
@@ -616,8 +635,7 @@ flexiVariable
     : variable                                                             # CustomVariable
     | flexiVariable '[' indexMemberCallKey? ']'                            # IndexVariable
     | flexiVariable OpenCurlyBracket indexMemberCallKey? CloseCurlyBracket # IndexLegacyCallVariable
-    | flexiVariable ObjectOperator memberCallKey arguments                 # MemberFunction
-    | flexiVariable ObjectOperator memberCallKey                           # MemberVariable
+    | flexiVariable ObjectOperator memberCallKey arguments?                # FlexiMemberAccess
     ;
 
 defineExpr
@@ -665,8 +683,8 @@ keyedDestructItem
     ;
 
 lambdaFunctionExpr
-    : Static? Function_ '&'? '(' formalParameterList ')' lambdaFunctionUseVars? (':' typeHint)? blockStatement
-    | Static? LambdaFn '(' formalParameterList ')' (':' typeHint)? '=>' expression
+    : Static? Function_ '&'? '(' formalParameterList ')' lambdaFunctionUseVars? (':' QuestionMark? typeHint)? blockStatement
+    | Static? LambdaFn '(' formalParameterList ')' (':' QuestionMark? typeHint)? '=>' expression
     ;
 
 matchExpr
@@ -864,6 +882,10 @@ assignableChain
     | assignableChainOrigin assignableChainAccess+
     ;
 
+functionCallIndexedAssignable
+    : functionCall squareCurlyExpression+
+    ;
+
 assignableChainOrigin
     : staticMethodCall
     | staticClassExprVariableMember
@@ -1022,8 +1044,6 @@ key
     | Protected
     | Public
     | Readonly
-    //    | Require
-    //    | RequireOnce
     | Resource
     | Return
     | Static

@@ -95,6 +95,10 @@ func (v *BasePHPParserVisitor) VisitTypeParameterWithDefaultDecl(ctx *TypeParame
 	return v.VisitChildren(ctx)
 }
 
+func (v *BasePHPParserVisitor) VisitCallableIdentifier(ctx *CallableIdentifierContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BasePHPParserVisitor) VisitAttributes(ctx *AttributesContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -395,6 +399,10 @@ func (v *BasePHPParserVisitor) VisitIndexMemberCallKey(ctx *IndexMemberCallKeyCo
 	return v.VisitChildren(ctx)
 }
 
+func (v *BasePHPParserVisitor) VisitDynamicStaticClassExpr(ctx *DynamicStaticClassExprContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BasePHPParserVisitor) VisitSpecialWordExpression(ctx *SpecialWordExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -404,6 +412,10 @@ func (v *BasePHPParserVisitor) VisitShortQualifiedNameExpression(ctx *ShortQuali
 }
 
 func (v *BasePHPParserVisitor) VisitArrayCreationExpression(ctx *ArrayCreationExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitFunctionCallIndexedAssignmentExpression(ctx *FunctionCallIndexedAssignmentExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -475,6 +487,10 @@ func (v *BasePHPParserVisitor) VisitConditionalExpression(ctx *ConditionalExpres
 	return v.VisitChildren(ctx)
 }
 
+func (v *BasePHPParserVisitor) VisitDynamicStaticClassAccessExpression(ctx *DynamicStaticClassAccessExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BasePHPParserVisitor) VisitTemplateExpression(ctx *TemplateExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -519,6 +535,14 @@ func (v *BasePHPParserVisitor) VisitOrdinaryAssignmentExpression(ctx *OrdinaryAs
 	return v.VisitChildren(ctx)
 }
 
+func (v *BasePHPParserVisitor) VisitDirectFunctionCallExpression(ctx *DirectFunctionCallExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitFunctionCallIndexedReferenceAssignmentExpression(ctx *FunctionCallIndexedReferenceAssignmentExpressionContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BasePHPParserVisitor) VisitCastExpression(ctx *CastExpressionContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -543,7 +567,7 @@ func (v *BasePHPParserVisitor) VisitStaticClassAccessExpression(ctx *StaticClass
 	return v.VisitChildren(ctx)
 }
 
-func (v *BasePHPParserVisitor) VisitMemberFunction(ctx *MemberFunctionContext) interface{} {
+func (v *BasePHPParserVisitor) VisitFlexiMemberAccess(ctx *FlexiMemberAccessContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -556,10 +580,6 @@ func (v *BasePHPParserVisitor) VisitIndexVariable(ctx *IndexVariableContext) int
 }
 
 func (v *BasePHPParserVisitor) VisitCustomVariable(ctx *CustomVariableContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BasePHPParserVisitor) VisitMemberVariable(ctx *MemberVariableContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
@@ -756,6 +776,10 @@ func (v *BasePHPParserVisitor) VisitChain(ctx *ChainContext) interface{} {
 }
 
 func (v *BasePHPParserVisitor) VisitAssignableChain(ctx *AssignableChainContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitFunctionCallIndexedAssignable(ctx *FunctionCallIndexedAssignableContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

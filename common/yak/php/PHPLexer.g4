@@ -366,12 +366,16 @@ CommentEnd              : [\r\n] -> channel(SkipChannel), popMode; // exit from 
 
 mode HereDocIdentifer;
 HereDocIdentiferWhite: [ \r\t] -> skip;
-HereDocIdentiferName: ({this.startRecordHereDocLabel()}NameString{this.endRecordHereDocLabel()}) | ('\'' ({this.startRecordHereDocLabel()}NameString{this.endRecordHereDocLabel()}) '\'');
+HereDocIdentiferName
+    : ({this.startRecordHereDocLabel()}NameString{this.endRecordHereDocLabel()})
+    | ('\'' ({this.startRecordHereDocLabel()}NameString{this.endRecordHereDocLabel()}) '\'')
+    | ('"' ({this.startRecordHereDocLabel()}NameString{this.endRecordHereDocLabel()}) '"')
+    ;
 HereDocIdentifierBreak: '\r'? '\n' -> popMode,pushMode(HereDoc);
 
 mode HereDoc;
-EndDoc: [ \t]* Label ';'? {this.DocIsEnd()}? ->popMode;
-HereDocText: '\n' | (~[\n]+) ;
+EndDoc: [ \t]* NameString {this.DocIsEnd()}? ->popMode;
+HereDocText: '\n' | (~[\n]+) { !this.DocIsEnd() }? ;
 HereDocVariable: '$' Label;
 
 // fragments.

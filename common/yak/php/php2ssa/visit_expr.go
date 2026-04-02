@@ -91,12 +91,16 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) (v ssa.Value
 			}
 		}
 		return y.EmitUndefined("parent")
+	case *phpparser.DynamicStaticClassAccessExpressionContext:
+		return y.VisitDynamicStaticClassExpr(ret.DynamicStaticClassExpr())
 	case *phpparser.MemberCallExpressionContext:
 		obj := y.VisitExpression(ret.Expression())
 		key := y.VisitMemberCallKey(ret.MemberCallKey())
 		return y.ReadMemberCallValue(obj, key)
 	case *phpparser.KeywordNewExpressionContext:
 		return y.VisitNewExpr(ret.NewExpr())
+	case *phpparser.DirectFunctionCallExpressionContext:
+		return y.VisitFunctionCall(ret.FunctionCall())
 	case *phpparser.FullyQualifiedNamespaceExpressionContext:
 		return y.VisitFullyQualifiedNamespaceExpr(ret.FullyQualifiedNamespaceExpr(), false)
 	case *phpparser.IndexCallExpressionContext: // $a[1]
@@ -392,6 +396,17 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) (v ssa.Value
 			y.AssignVariable(variable, expression) //连接上数据流
 		}
 		return y.EmitConstInstNil()
+	case *phpparser.FunctionCallIndexedReferenceAssignmentExpressionContext:
+		variable := y.VisitFunctionCallIndexedAssignableLeft(ret.FunctionCallIndexedAssignable())
+		rightValue := y.VisitExpression(ret.Expression())
+		y.AssignVariable(variable, rightValue)
+		return rightValue
+	case *phpparser.FunctionCallIndexedAssignmentExpressionContext:
+		variable := y.VisitFunctionCallIndexedAssignableLeft(ret.FunctionCallIndexedAssignable())
+		rightValue := y.VisitExpression(ret.Expression())
+		rightValue = y.reduceAssignCalcExpression(ret.AssignmentOperator().GetText(), variable, rightValue)
+		y.AssignVariable(variable, rightValue)
+		return rightValue
 	case *phpparser.ReferenceAssignmentExpressionContext:
 		variable := y.VisitAssignableChainLeft(ret.AssignableChain())
 		rightValue := y.VisitExpression(ret.Expression())
@@ -674,6 +689,110 @@ func (y *builder) VisitStaticMethodCall(raw phpparser.IStaticMethodCallContext) 
 	call := y.NewCall(target, args)
 	call.IsEllipsis = ellipsis
 	return y.EmitCall(call)
+}
+
+func (y *builder) VisitFunctionCallIndexedAssignableLeft(raw phpparser.IFunctionCallIndexedAssignableContext) *ssa.Variable {
+	if y == nil || raw == nil || y.IsStop() {
+		return nil
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
+	i, _ := raw.(*phpparser.FunctionCallIndexedAssignableContext)
+	if i == nil {
+		return nil
+	}
+
+	origin := y.VisitFunctionCall(i.FunctionCall())
+	accesses := i.AllSquareCurlyExpression()
+	for idx, access := range accesses {
+		if idx == len(accesses)-1 {
+			var key ssa.Value
+			ctx, _ := access.(*phpparser.SquareCurlyExpressionContext)
+			if ctx != nil && ctx.Expression() != nil {
+				key = y.VisitExpression(ctx.Expression())
+			}
+			if key == nil {
+				key = y.EmitConstInstPlaceholder(fmt.Sprintf("append_%s", uuid.NewString()))
+			}
+			return y.CreateMemberCallVariable(origin, key)
+		}
+		key := y.VisitSquareCurlyExpression(access)
+		if key == nil {
+			continue
+		}
+		origin = y.ReadMemberCallValue(origin, key)
+	}
+	return nil
+}
+
+func (y *builder) VisitDynamicStaticClassExpr(raw phpparser.IDynamicStaticClassExprContext) ssa.Value {
+	if y == nil || raw == nil || y.IsStop() {
+		return nil
+	}
+	recoverRange := y.SetRange(raw)
+	defer recoverRange()
+
+	i, _ := raw.(*phpparser.DynamicStaticClassExprContext)
+	if i == nil {
+		return y.EmitUndefined("")
+	}
+
+	var target ssa.Value
+	switch {
+	case i.FunctionCall() != nil:
+		target = y.VisitFunctionCall(i.FunctionCall())
+	case i.Parentheses() != nil:
+		target = y.VisitParentheses(i.Parentheses())
+	}
+
+	var blueprint *ssa.Blueprint
+	if target != nil {
+		if bp, ok := ssa.ToClassBluePrintType(target.GetType()); ok {
+			blueprint = bp
+		} else if bp := y.GetBluePrint(target.String()); bp != nil {
+			blueprint = bp
+		}
+	}
+
+	if keyCtx := i.MemberCallKey(); keyCtx != nil {
+		key := y.VisitMemberCallKey(keyCtx)
+		if blueprint != nil {
+			member := y.GetStaticMember(blueprint, key.String())
+			if value := y.PeekValueByVariable(member); !utils.IsNil(value) {
+				return value
+			}
+			if method := blueprint.GetStaticMethod(key.String()); !utils.IsNil(method) {
+				return method
+			}
+			if member := blueprint.GetConstMember(key.String()); !utils.IsNil(member) {
+				return member
+			}
+			undefined := y.EmitUndefined(key.String())
+			blueprint.RegisterStaticMember(key.String(), undefined)
+			return undefined
+		}
+		return y.EmitUndefined(i.GetText())
+	}
+
+	if varCtx := i.Variable(); varCtx != nil {
+		key := yakunquote.TryUnquote(varCtx.GetText())
+		if strings.HasPrefix(key, "$") {
+			key = key[1:]
+		}
+		if blueprint != nil {
+			variable := y.GetStaticMember(blueprint, key)
+			if value := y.PeekValueByVariable(variable); !utils.IsNil(value) {
+				return value
+			}
+			if member := blueprint.GetStaticMember(key); !utils.IsNil(member) {
+				return member
+			}
+		}
+		return y.EmitUndefined(i.GetText())
+	}
+
+	return y.EmitUndefined(i.GetText())
 }
 
 func (y *builder) visitAssignableChainAccessValue(origin ssa.Value, raw phpparser.IAssignableChainAccessContext) ssa.Value {
@@ -1326,7 +1445,10 @@ func (y *builder) VisitLeftVariable(raw phpparser.IFlexiVariableContext) *ssa.Va
 		} else {
 			return y.CreateMemberCallVariable(obj, key)
 		}
-	case *phpparser.MemberVariableContext:
+	case *phpparser.FlexiMemberAccessContext:
+		if i.Arguments() != nil {
+			return nil
+		}
 		value := y.VisitRightValue(i.FlexiVariable())
 		key := y.VisitMemberCallKey(i.MemberCallKey())
 		member := y.CreateMemberCallVariable(value, key)
@@ -1396,13 +1518,12 @@ func (y *builder) VisitRightValue(raw phpparser.IFlexiVariableContext) ssa.Value
 		obj := y.VisitRightValue(i.FlexiVariable())
 		key := y.VisitIndexMemberCallKey(i.IndexMemberCallKey())
 		return y.ReadMemberCallValue(obj, key)
-	case *phpparser.MemberVariableContext:
+	case *phpparser.FlexiMemberAccessContext:
 		obj := y.VisitRightValue(i.FlexiVariable())
 		key := y.VisitMemberCallKey(i.MemberCallKey())
-		return y.ReadMemberCallValue(obj, key)
-	case *phpparser.MemberFunctionContext:
-		obj := y.VisitRightValue(i.FlexiVariable())
-		key := y.VisitMemberCallKey(i.MemberCallKey())
+		if i.Arguments() == nil {
+			return y.ReadMemberCallValue(obj, key)
+		}
 		method := y.ReadMemberCallMethod(obj, key)
 		arguments, _ := y.VisitArguments(i.Arguments())
 		call := y.NewCall(method, arguments)

@@ -3,6 +3,7 @@ package phpparser
 import (
 	"reflect"
 	"strings"
+	"unicode/utf8"
 	"unsafe"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
@@ -191,10 +192,39 @@ func (p *PHPLexerBase) DocIsEnd() bool {
 	}
 
 	text := stream.GetText(start, end)
-	return p.GetHeredocEnd(text) == p._heredocIdentifier
+	return p.isHeredocEndLine(text)
 }
 func (p *PHPLexerBase) GetHeredocEnd(i string) string {
-	return strings.TrimRight(strings.TrimSpace(i), ";")
+	return strings.TrimRight(strings.TrimSpace(i), ";,)]}")
+}
+
+func (p *PHPLexerBase) isHeredocEndLine(i string) bool {
+	if p._heredocIdentifier == "" {
+		return false
+	}
+
+	trimmed := strings.TrimLeft(i, " \t")
+	if !strings.HasPrefix(trimmed, p._heredocIdentifier) {
+		return false
+	}
+
+	rest := trimmed[len(p._heredocIdentifier):]
+	if rest == "" {
+		return true
+	}
+
+	rest = strings.TrimLeft(rest, " \t")
+	if rest == "" {
+		return true
+	}
+
+	r, _ := utf8.DecodeRuneInString(rest)
+	switch r {
+	case ';', ',', ')', ']', '}', '\r', '\n':
+		return true
+	}
+
+	return false
 }
 
 func (p *PHPLexerBase) PushModeOnHtmlClose() {
