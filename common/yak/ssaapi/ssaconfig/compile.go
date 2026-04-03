@@ -316,8 +316,8 @@ func (c *Config) SetCompileMemory(memory bool) {
 }
 
 func (c *Config) GetCompileConcurrency() int {
-	if c == nil || c.SSACompile == nil {
-		return 0
+	if c == nil || c.SSACompile == nil || c.SSACompile.Concurrency <= 0 {
+		return defaultCompileConcurrency()
 	}
 	return c.SSACompile.Concurrency
 }

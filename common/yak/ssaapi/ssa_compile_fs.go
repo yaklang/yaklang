@@ -107,7 +107,6 @@ func (c *Config) parseProjectWithFS(
 	filesystem filesys_interface.FileSystem,
 	processCallback func(float64, string, ...any),
 ) (*Program, error) {
-
 	var calculateTime, preHandlerTime, parseTime, saveTime time.Duration
 	defer func() {
 		log.Debugf("calculate time: %v", calculateTime)

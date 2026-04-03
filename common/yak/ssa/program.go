@@ -109,9 +109,14 @@ func NewTmpProgram(ProgramName string) *Program {
 }
 func (prog *Program) createSubProgram(name string, kind ssadb.ProgramKind, path ...string) *Program {
 	fs := prog.Loader.GetFilesysFileSystem()
-	fullPath := prog.GetCurrentEditor().GetFilename()
-	endPath := fs.Join(path...)
-	programPath, _, _ := strings.Cut(fullPath, endPath)
+	programPath := prog.Loader.GetBasePath()
+	if currentEditor := prog.GetCurrentEditor(); currentEditor != nil {
+		fullPath := currentEditor.GetFilename()
+		endPath := fs.Join(path...)
+		if prefix, _, ok := strings.Cut(fullPath, endPath); ok {
+			programPath = prefix
+		}
+	}
 	subProg := NewProgram(prog.ctx, name, prog.DatabaseKind, kind, fs, programPath, 0)
 	subProg.Application = prog.Application
 	subProg.config = prog.config
@@ -179,6 +184,9 @@ func (prog *Program) GetLibrary(name string) (*Program, bool) {
 	currentEditor := prog.GetCurrentEditor()
 	// this program has current file
 	hasFile := func(p *Program) bool {
+		if currentEditor == nil {
+			return false
+		}
 		if hash, ok := p.FileList[currentEditor.GetUrl()]; ok {
 			if hash == currentEditor.GetIrSourceHash() {
 				return true
@@ -298,6 +306,9 @@ func (prog *Program) EachFunction(handler func(*Function)) {
 }
 
 func (prog *Program) Finish() {
+	if prog == nil || utils.IsNil(prog) {
+		return
+	}
 	// only run once and not wait
 	if prog.finished {
 		return
@@ -312,10 +323,17 @@ func (prog *Program) Finish() {
 	// log.Errorf("BUG!! program %s has not finish ast", prog.Name)
 	prog.LazyBuild() // finish
 	// }
-	prog.UpStream.ForEach(func(i string, v *Program) bool {
-		v.Finish()
+
+	pending := make([]*Program, 0)
+	prog.UpStream.ForEach(func(_ string, v *Program) bool {
+		if v != nil {
+			pending = append(pending, v)
+		}
 		return true
 	})
+	for _, v := range pending {
+		v.Finish()
+	}
 }
 
 func (prog *Program) SearchIndexAndOffsetByOffset(searchOffset int) (index int, offset int) {

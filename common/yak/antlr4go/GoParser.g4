@@ -97,7 +97,7 @@ constSpec
     ;
 
 identifierList
-    : IDENTIFIER (COMMA IDENTIFIER)*
+    : IDENTIFIER (COMMA ws* IDENTIFIER)*
     ;
 
 expressionList
@@ -122,11 +122,11 @@ typeDef
     ;
 
 typeParameters
-    : L_BRACKET typeParameterDecl (COMMA typeParameterDecl)* R_BRACKET
+    : L_BRACKET ws* typeParameterDecl (COMMA ws* typeParameterDecl)* COMMA? ws* R_BRACKET
     ;
 
 typeParameterDecl
-    : identifierList typeElement
+    : identifierList ws* typeElement
     ;
 
 typeElement
@@ -497,6 +497,7 @@ keyedElement
 
 key
     : expression
+    | literalValue
     ;
 
 element

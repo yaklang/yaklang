@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"runtime"
 )
 
 type Config struct {
@@ -116,6 +117,19 @@ func defaultCodeSourceConfig() *CodeSourceInfo {
 	}
 }
 
+func defaultCompileConcurrency() int {
+	concurrency := runtime.GOMAXPROCS(0)
+	if concurrency <= 0 {
+		return 1
+	}
+	// Parser-heavy project scans regress quickly with higher fan-out due to GC
+	// and ANTLR cache churn, so keep the implicit default conservative.
+	if concurrency > 4 {
+		return 4
+	}
+	return concurrency
+}
+
 func defaultSSACompileConfig() *SSACompileConfig {
 	return &SSACompileConfig{
 		StrictMode:               false,
@@ -124,7 +138,7 @@ func defaultSSACompileConfig() *SSACompileConfig {
 		EntryFiles:               []string{},
 		ReCompile:                false,
 		MemoryCompile:            false,
-		Concurrency:              1,
+		Concurrency:              defaultCompileConcurrency(),
 		FilePerformanceLog:       false,
 		StopOnCliCheck:           false,
 		EnableIncrementalCompile: false,

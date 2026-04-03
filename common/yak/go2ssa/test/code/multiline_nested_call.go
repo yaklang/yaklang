@@ -1,0 +1,17 @@
+//go:build ignore
+// +build ignore
+
+package main
+
+type Response struct {
+	Content []byte
+}
+
+func sendResponse(resp *Response) {
+}
+
+func main() {
+	sendResponse(&Response{Content: []byte(
+		"test content",
+	)})
+}

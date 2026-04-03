@@ -482,13 +482,15 @@ func (n *anValue) GetStringMember(key string) (Value, bool) {
 		if !ok {
 			continue
 		}
-		lit, ok := ToConstInst(i)
-		if !ok {
+		lit, ok := i.(*ConstInst)
+		if !ok || lit.Const == nil || lit.Const.str != key {
 			continue
 		}
-		if lit.value == key {
-			return n.GetMember(i)
+		valID, ok := memberMap.Get(keys[index])
+		if !ok {
+			return nil, false
 		}
+		return n.GetValueById(valID)
 	}
 	return nil, false
 }
@@ -505,12 +507,10 @@ func (n *anValue) SetStringMember(key string, v Value) {
 			continue
 		}
 		lit, ok := i.(*ConstInst)
-		if !ok {
+		if !ok || lit.Const == nil || lit.Const.str != key {
 			continue
 		}
-		if lit.value == key {
-			lastMatch = i
-		}
+		lastMatch = i
 	}
 	if lastMatch != nil {
 		n.AddMember(lastMatch, v)
@@ -729,10 +729,20 @@ func (a *anValue) GetAllVariables() map[string]*Variable {
 }
 
 func (a *anValue) AddVariable(v *Variable) {
+	if v == nil {
+		return
+	}
 	name := v.GetName()
 	m := a.getVariablesMap(true)
+	if existing, ok := m.Get(name); ok {
+		if existing == v {
+			return
+		}
+		m.Set(name, v)
+		m.BringKeyToLastOne(name)
+		return
+	}
 	m.Set(name, v)
-	m.BringKeyToLastOne(name)
 }
 
 func (i *anValue) getMaskMap(create ...bool) *omap.OrderedMap[int64, int64] {

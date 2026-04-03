@@ -103,6 +103,37 @@ type keyValue struct {
 	kv    []keyValue
 }
 
+func inferCompositeLiteralElementType(kv keyValue) ssa.Type {
+	if kv.value != nil {
+		return kv.value.GetType()
+	}
+	if len(kv.kv) > 0 {
+		return inferUnknownCompositeLiteralType(kv.kv)
+	}
+	return ssa.CreateAnyType()
+}
+
+func inferUnknownCompositeLiteralType(kvs []keyValue) ssa.Type {
+	if len(kvs) == 0 {
+		return ssa.CreateAnyType()
+	}
+
+	// TODO: when imported composite literal types are unresolved, fall back to
+	// structural inference so build can continue without panicking.
+	if kvs[0].key == nil {
+		return ssa.NewSliceType(inferCompositeLiteralElementType(kvs[0]))
+	}
+
+	objtyp := ssa.NewStructType()
+	for _, kv := range kvs {
+		if kv.key == nil {
+			continue
+		}
+		objtyp.AddField(kv.key, inferCompositeLiteralElementType(kv))
+	}
+	return objtyp
+}
+
 func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 	recoverRange := b.SetRange(exp.BaseParserRuleContext)
 	defer recoverRange()
@@ -156,6 +187,13 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 	typeHandler = func(typ ssa.Type, kvs []keyValue) ssa.Value {
 		var obj ssa.Value
 
+		if typ == nil {
+			if len(kvs) == 0 {
+				return getUndefinedObj()
+			}
+			return typeHandler(inferUnknownCompositeLiteralType(kvs), kvs)
+		}
+
 		if len(kvs) == 0 {
 			return getUndefinedObj()
 		}
@@ -169,13 +207,20 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 			if kvs[0].value != nil {
 				return kvs[0].value
 			}
-			objt := typ.(*ssa.ObjectType)
+			objt, ok := ssa.ToObjectType(typ)
+			if !ok || objt == nil {
+				return getUndefinedObj()
+			}
 			obj = b.InterfaceAddFieldBuild(len(kvs),
 				func(i int) ssa.Value {
 					return b.EmitConstInst(i)
 				},
 				func(i int) ssa.Value {
-					return typeHandler(objt.FieldType, kvs[i].kv)
+					fieldType := objt.FieldType
+					if fieldType == nil {
+						fieldType = inferCompositeLiteralElementType(kvs[i])
+					}
+					return typeHandler(fieldType, kvs[i].kv)
 				})
 		case ssa.MapTypeKind:
 			if len(kvs) == 0 {
@@ -186,16 +231,29 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 			if kvs[0].value != nil {
 				return kvs[0].value
 			}
-			objt := typ.(*ssa.ObjectType)
+			objt, ok := ssa.ToObjectType(typ)
+			if !ok || objt == nil {
+				return getUndefinedObj()
+			}
 			obj = b.InterfaceAddFieldBuild(len(kvs),
 				func(i int) ssa.Value {
-					return kvs[i].key
+					if kvs[i].key != nil {
+						return kvs[i].key
+					}
+					return b.EmitConstInst(i)
 				},
 				func(i int) ssa.Value {
-					return typeHandler(objt.FieldType, kvs[i].kv)
+					fieldType := objt.FieldType
+					if fieldType == nil {
+						fieldType = inferCompositeLiteralElementType(kvs[i])
+					}
+					return typeHandler(fieldType, kvs[i].kv)
 				})
 		case ssa.StructTypeKind:
-			objt := typ.(*ssa.ObjectType)
+			objt, ok := ssa.ToObjectType(typ)
+			if !ok || objt == nil {
+				return getUndefinedObj()
+			}
 
 			fullInit := func() {
 				obj = b.InterfaceAddFieldBuild(len(objt.Keys),
@@ -207,6 +265,9 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 						}
 					},
 					func(i int) ssa.Value {
+						if i >= len(kvs) {
+							return b.GetDefaultValue(objt.FieldTypes[i])
+						}
 						return typeHandler(objt.FieldTypes[i], kvs[i].kv)
 					})
 			}
@@ -218,6 +279,9 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 					},
 					func(i int) ssa.Value {
 						for y, kv := range kvs {
+							if kv.key == nil {
+								continue
+							}
 							if objt.Keys[i].String() == kv.key.String() {
 								return typeHandler(objt.FieldTypes[i], kvs[y].kv)
 							}
@@ -256,10 +320,15 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 			} else { // 部分初始化
 				partInit()
 				for _, kv := range kvs {
+					if kv.key == nil || obj == nil {
+						continue
+					}
 					if a, ok := objt.AnonymousField[kv.key.String()]; ok {
 						newObject := typeHandler(a, kv.kv)
 						variable := b.CreateMemberCallVariable(obj, b.EmitConstInst(kv.key.String()))
-						b.AssignVariable(variable, newObject)
+						if variable != nil && newObject != nil {
+							b.AssignVariable(variable, newObject)
+						}
 					}
 				}
 			}
@@ -270,28 +339,10 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 			alias := typ.(*ssa.AliasType)
 			obj = typeHandler(alias.GetType(), kvs)
 		case ssa.AnyTypeKind: // 对于未知类型，这里选择根据LiteralValue的特征来推测其类型
-			var objtyp ssa.Type
-
 			if kvs[0].value != nil {
 				return kvs[0].value
 			}
-
-			if kvs[0].key == nil && kvs[0].value == nil { // array slice
-				kv := kvs[0].kv
-				objtyp = ssa.NewSliceType(kv[0].value.GetType())
-			} else if kvs[0].key == nil { // any
-				return b.EmitUndefined(typ.String())
-			} else if _, ok := ssa.ToBasicType(kvs[0].key.GetType()); ok { // struct map
-				objtyp = ssa.NewStructType()
-				for _, kv := range kvs {
-					value := kv.kv[0].value
-					objtyp.(*ssa.ObjectType).AddField(kv.key, value.GetType())
-				}
-			} else {
-				return getUndefinedObj()
-			}
-
-			return typeHandler(objtyp, kvs)
+			return typeHandler(inferUnknownCompositeLiteralType(kvs), kvs)
 		case ssa.UndefinedTypeKind:
 			obj = getUndefinedObj()
 		case ssa.NumberTypeKind, ssa.StringTypeKind, ssa.BooleanTypeKind:
@@ -313,6 +364,9 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 	if o, ok := ssa.ToObjectType(typ); ok {
 		// 非指针匿名结构体，需要创建对象
 		for n, a := range o.AnonymousField {
+			if rvalue == nil {
+				continue
+			}
 			isFind := false
 			for k, _ := range rvalue.GetAllMember() {
 				if k.String() == n {
@@ -323,7 +377,9 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 			if !isFind {
 				newObject := typeHandler(a, nil)
 				variable := b.CreateMemberCallVariable(rvalue, b.EmitConstInst(n))
-				b.AssignVariable(variable, newObject)
+				if variable != nil && newObject != nil {
+					b.AssignVariable(variable, newObject)
+				}
 			}
 		}
 
@@ -397,6 +453,12 @@ func (b *astbuilder) buildKey(exp *gol.KeyContext, iscreate bool) ssa.Value {
 			rightv, _ := b.buildExpression(e.(*gol.ExpressionContext), false)
 			return rightv
 		}
+	}
+
+	if lit := exp.LiteralValue(); lit != nil {
+		// TODO(go2ssa): preserve omitted-type composite literal keys structurally instead of
+		// collapsing them to source text; compile stability matters more than exact IR here.
+		return b.EmitConstInst(lit.GetText())
 	}
 
 	b.NewError(ssa.Error, TAG, Unreachable())
@@ -868,7 +930,8 @@ func coverType(ityp, iwantTyp ssa.Type) {
 		})
 	}
 	for n, a := range wantTyp.AnonymousField {
-		// TODO: 匿名结构体可能是一个指针，修改时应该要连带父类一起修改
+		// TODO(go2ssa): if the embedded anonymous field is a pointer, propagate the
+		// updated object graph back to the parent instead of copying only the child metadata.
 		typ.AnonymousField[n] = a
 	}
 	ityp.SetFullTypeNames(iwantTyp.GetFullTypeNames())

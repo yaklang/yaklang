@@ -52,8 +52,8 @@ type antlrWorkerState struct {
 }
 
 type antlrASTParseWorker struct {
-	language     ssa.PreHandlerAnalyzer
-	languageName string
+	language        ssa.PreHandlerAnalyzer
+	languageName    string
 	resetEveryFiles int
 }
 

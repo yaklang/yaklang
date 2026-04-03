@@ -2,6 +2,13 @@ package ssa
 
 import "github.com/yaklang/yaklang/common/utils"
 
+func memberKeyNameForGlobal(key Value) string {
+	if lit, ok := key.(*ConstInst); ok && lit.Const != nil {
+		return lit.Const.str
+	}
+	return key.String()
+}
+
 func initContainer(fb *FunctionBuilder) {
 	container := fb.EmitEmptyContainer()
 
@@ -82,9 +89,10 @@ func (b *FunctionBuilder) GetGlobalVariables() map[string]Value {
 		return variables
 	}
 
-	for i, m := range globalVarsContainer.GetAllMember() {
-		variables[i.String()] = m
-	}
+	globalVarsContainer.ForEachMember(func(i, m Value) bool {
+		variables[memberKeyNameForGlobal(i)] = m
+		return true
+	})
 	return variables
 }
 
@@ -110,10 +118,18 @@ func (b *FunctionBuilder) LoadGlobalVariable() {
 	}
 
 	globalVarsContainer := prog.GlobalVariablesBlueprint.Container()
-	for i, m := range globalVarsContainer.GetAllMember() {
-		variable := b.CreateVariableCross(i.String())
-		b.AssignVariable(variable, m)
-	}
+	scope := b.CurrentBlock.ScopeTable
+	globalVarsContainer.ForEachMember(func(i, m Value) bool {
+		variable := b.CreateVariableCross(memberKeyNameForGlobal(i))
+		if variable == nil {
+			return true
+		}
+		if current := variable.GetValue(); !utils.IsNil(current) && current.GetId() == m.GetId() {
+			return true
+		}
+		scope.AssignVariable(variable, m)
+		return true
+	})
 }
 
 func (p *Program) GetGlobalVariable(name string) (Value, bool) {
