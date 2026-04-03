@@ -1,0 +1,15 @@
+//go:build ignore
+// +build ignore
+
+package main
+
+func testFunc(a int, b string, c []byte) {
+}
+
+func main() {
+	testFunc(
+		1,
+		"test string",
+		[]byte("test bytes"),
+	)
+}

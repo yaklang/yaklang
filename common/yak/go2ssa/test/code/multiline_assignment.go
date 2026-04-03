@@ -1,0 +1,12 @@
+//go:build ignore
+// +build ignore
+
+package main
+
+func parseCert() {
+	var out struct {
+		SignatureAlgorithm int
+	}
+	out.SignatureAlgorithm =
+		getSignatureAlgorithmFromAI(nil)
+}
