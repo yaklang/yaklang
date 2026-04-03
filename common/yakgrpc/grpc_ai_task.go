@@ -8,7 +8,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
-	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/log"
@@ -181,25 +180,8 @@ func buildAIDOption(startParams *ypb.AIStartParams) []aicommon.ConfigOption {
 	//if startParams.GetAllowGenerateReport() {
 	//	aidOption = append(aidOption, aicommon.WithGenerateReport(startParams.GetAllowGenerateReport()))
 	//}
-
-	if startParams.GetUseDefaultAIConfig() {
-		wrapperChat := aicommon.AIChatToAICallbackType(ai.Chat)
-		aidOption = append(aidOption, aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			//fmt.Println(req.GetPrompt())
-			//time.Sleep(100 * time.Millisecond)
-			return wrapperChat(config, req)
-		}))
-	}
-
 	if serviceName := startParams.GetAIService(); serviceName != "" {
-		callback, err := localModelAICallbackByServiceName(serviceName)
-		if err != nil {
-			log.Errorf("load ai service failed: %v", err)
-		} else {
-			aidOption = append(aidOption, aicommon.WithAICallback(callback))
-		}
-		log.Warnf("AIStartParams.AIService for WithAIChatInfo is deprecated, " +
-			"model info is now auto-detected from the actual AI gateway call")
+		aidOption = fixOptionsWithServiceName(serviceName, aidOption...)
 	}
 
 	if mockedAIChat != nil {
@@ -255,16 +237,4 @@ func buildAIDOption(startParams *ypb.AIStartParams) []aicommon.ConfigOption {
 	}
 
 	return aidOption
-}
-
-func localModelAICallbackByServiceName(serviceName string) (func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error), error) {
-	// localmodelManager := localmodel.GetManager()
-	// service, err := localmodelManager.GetServiceStatus(startParams.GetAIService())
-	// if err != nil {
-	// }
-	chat, err := ai.LoadChater(serviceName)
-	if err != nil {
-		return nil, fmt.Errorf("load ai service failed: %v", err)
-	}
-	return aicommon.AIChatToAICallbackType(chat), nil
 }

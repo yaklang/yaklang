@@ -3,10 +3,11 @@ package aiengine
 import (
 	"context"
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiconfig"
+	"github.com/yaklang/yaklang/common/consts"
 	"sync"
 	"time"
 
-	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/rag"
@@ -413,7 +414,7 @@ func buildReActOptions(ctx context.Context, config *AIEngineConfig, outputChan c
 		aicommon.WithBuiltinTools(),
 
 		// AI 服务配置
-		aicommon.WithAICallback(aicommon.AIChatToAICallbackType(ai.Chat)),
+		aicommon.WithTieredAICallback(),
 
 		// 知识库配置
 		aicommon.WithEnhanceKnowledgeManager(rag.NewRagEnhanceKnowledgeManager()),
@@ -498,13 +499,13 @@ func buildReActOptions(ctx context.Context, config *AIEngineConfig, outputChan c
 
 	// AI 服务
 	if config.AICallback != nil {
-		options = append(options, aicommon.WithAICallback(config.AICallback))
+		options = append(options, aicommon.WithAutoTieredAICallback(config.AICallback))
 	} else if config.AIService != "" {
-		chat, err := ai.LoadChater(config.AIService)
+		cb, err := aicommon.CreateCallbackFromConfig(aiconfig.GetGlobalManager().GetFirstConfigByTierAndProviderAndModel(consts.TierIntelligent, config.AIService, ""))
 		if err != nil {
 			log.Errorf("load ai service failed: %v", err)
 		} else {
-			options = append(options, aicommon.WithAICallback(aicommon.AIChatToAICallbackType(chat)))
+			options = append(options, aicommon.WithAutoTieredAICallback(cb))
 		}
 	}
 

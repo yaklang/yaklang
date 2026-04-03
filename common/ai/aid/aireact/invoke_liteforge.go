@@ -36,7 +36,7 @@ func (r *ReAct) invokeLiteForgeWithCallback(cb aicommon.AICallbackType, ctx cont
 	fopts = append(fopts, aiforge.WithLiteForge_Emitter(r.config.Emitter))
 
 	if !utils.IsNil(cb) {
-		fopts = append(fopts, aiforge.WithExtendLiteForge_AIOption(aicommon.WithWrapperedAICallback(cb)))
+		fopts = append(fopts, aiforge.WithExtendLiteForge_AIOption(aicommon.WithFastAICallback(cb)))
 	}
 
 	f, err := aiforge.NewLiteForge(actionName, fopts...)
@@ -49,7 +49,7 @@ func (r *ReAct) invokeLiteForgeWithCallback(cb aicommon.AICallbackType, ctx cont
 	}
 	forgeResult, err := f.Execute(ctx, []*ypb.ExecParamItem{
 		{Key: "query", Value: prompt},
-	}, aicommon.WithAgreeYOLO(), aicommon.WithWrapperedAICallback(execCb), aicommon.WithPersistentSessionId(r.config.PersistentSessionId))
+	}, aicommon.WithAgreeYOLO(), aicommon.WithFastAICallback(execCb), aicommon.WithPersistentSessionId(r.config.PersistentSessionId))
 	if err != nil {
 		return nil, utils.Wrap(err, "invoke liteforge failed")
 	}

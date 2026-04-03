@@ -24,6 +24,18 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+func fixOptionsWithServiceName(serviceName string, opts ...aicommon.ConfigOption) []aicommon.ConfigOption {
+	aiCb, err := aicommon.CreateCallbackFromConfig(aiconfig.GetGlobalManager().GetFirstConfigByTierAndProviderAndModel(consts.TierIntelligent, serviceName, ""))
+	if err != nil {
+		log.Errorf("load ai service failed: %v", err)
+	} else {
+		opts = append(opts, aicommon.WithAutoTieredAICallback(aiCb))
+	}
+	log.Warnf("AIStartParams.AIService/AIModelName for WithAIChatInfo is deprecated, " +
+		"model info is now auto-detected from the actual AI gateway call")
+	return opts
+}
+
 func ConvertYPBAIStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.ConfigOption {
 	opts := make([]aicommon.ConfigOption, 0)
 	if i == nil {
@@ -71,15 +83,7 @@ func ConvertYPBAIStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.Confi
 		opts = append(opts, aicommon.WithKeywords(i.GetIncludeSuggestedToolKeywords()...))
 	}
 	if i.GetAIService() != "" {
-		serviceName := i.GetAIService()
-		aiCb, err := aicommon.CreateCallbackFromConfig(aiconfig.GetGlobalManager().GetFirstConfigByTierAndProviderAndModel(consts.TierIntelligent, serviceName, ""))
-		if err != nil {
-			log.Errorf("load ai service failed: %v", err)
-		} else {
-			opts = append(opts, aicommon.WithAICallback(aiCb))
-		}
-		log.Warnf("AIStartParams.AIService/AIModelName for WithAIChatInfo is deprecated, " +
-			"model info is now auto-detected from the actual AI gateway call")
+		opts = fixOptionsWithServiceName(i.GetAIService(), opts...)
 	}
 
 	if !i.GetDisableAISearchForge() {
