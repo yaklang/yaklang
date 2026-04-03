@@ -2,6 +2,8 @@ package python2ssa
 
 import (
 	"path/filepath"
+	"regexp"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/utils"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
@@ -202,6 +204,11 @@ type tryControl struct {
 	lastRaisedType string
 }
 
+var (
+	pythonSelfMemberPattern = regexp.MustCompile(`\bself\.([A-Za-z_][A-Za-z0-9_]*)`)
+	pythonClsMemberPattern  = regexp.MustCompile(`\bcls\.([A-Za-z_][A-Za-z0-9_]*)`)
+)
+
 func (b *singleFileBuilder) pushStaticLoopControl() *staticLoopControl {
 	control := &staticLoopControl{}
 	b.staticLoopControls = append(b.staticLoopControls, control)
@@ -309,6 +316,7 @@ func (b *singleFileBuilder) shouldUseDynamicMemberFallback(value ssa.Value) bool
 	case ssa.SSAOpcodeParameter,
 		ssa.SSAOpcodeFreeValue,
 		ssa.SSAOpcodeParameterMember,
+		ssa.SSAOpcodePhi,
 		ssa.SSAOpcodeUndefined,
 		ssa.SSAOpcodeConstInst:
 		return true
@@ -332,11 +340,129 @@ func (b *singleFileBuilder) ensureBlueprintConstructorSlot(blueprint *ssa.Bluepr
 		return
 	}
 	if !utils.IsNil(blueprint.GetNormalMember(blueprint.Name)) || !utils.IsNil(blueprint.GetStaticMember(blueprint.Name)) {
-		return
+		if !strings.Contains(blueprint.Name, ".") {
+			return
+		}
 	}
 	constructorSlot := b.newDynamicPlaceholder(blueprint.Name)
-	blueprint.RegisterNormalMember(blueprint.Name, constructorSlot, false)
-	blueprint.RegisterStaticMember(blueprint.Name, constructorSlot, false)
+	if _, exists := blueprint.NormalMember[blueprint.Name]; !exists {
+		blueprint.RegisterNormalMember(blueprint.Name, constructorSlot, false)
+	}
+	if _, exists := blueprint.StaticMember[blueprint.Name]; !exists {
+		blueprint.RegisterStaticMember(blueprint.Name, constructorSlot, false)
+	}
+	if strings.Contains(blueprint.Name, ".") {
+		simpleName := pythonBlueprintSimpleName(blueprint.Name)
+		if simpleName != "" {
+			if _, exists := blueprint.NormalMember[simpleName]; !exists {
+				blueprint.RegisterNormalMember(simpleName, constructorSlot, false)
+			}
+			if _, exists := blueprint.StaticMember[simpleName]; !exists {
+				blueprint.RegisterStaticMember(simpleName, constructorSlot, false)
+			}
+			b.syncBlueprintContainerMember(blueprint, simpleName, constructorSlot)
+		}
+		if blueprint.Constructor == nil {
+			constructor := b.EmitUndefined(blueprint.Name + "-constructor")
+			constructor.SetType(ssa.NewFunctionType(blueprint.Name+"-constructor", []ssa.Type{blueprint}, blueprint, true))
+			blueprint.Constructor = constructor
+			blueprint.MagicMethod[ssa.Constructor] = constructor
+		}
+	}
+}
+
+func (b *singleFileBuilder) preRegisterInheritedBlueprintMembers(child, parent *ssa.Blueprint) {
+	if child == nil || parent == nil {
+		return
+	}
+	for name, value := range parent.NormalMember {
+		if name == "" || value == nil || shouldSkipInheritedBlueprintMember(parent, name) {
+			continue
+		}
+		if _, exists := child.NormalMember[name]; !exists {
+			child.RegisterNormalMember(name, value, false)
+		}
+	}
+	for name, value := range parent.StaticMember {
+		if name == "" || value == nil || shouldSkipInheritedBlueprintMember(parent, name) {
+			continue
+		}
+		if _, exists := child.StaticMember[name]; !exists {
+			child.RegisterStaticMember(name, value, false)
+		}
+	}
+	for name, fn := range parent.NormalMethod {
+		if name == "" || fn == nil {
+			continue
+		}
+		if _, exists := child.NormalMember[name]; !exists {
+			child.RegisterNormalMember(name, fn, false)
+		}
+	}
+	for name, fn := range parent.StaticMethod {
+		if name == "" || fn == nil {
+			continue
+		}
+		if _, exists := child.StaticMember[name]; !exists {
+			child.RegisterStaticMember(name, fn, false)
+		}
+	}
+}
+
+func pythonBlueprintSimpleName(name string) string {
+	if name == "" {
+		return ""
+	}
+	if idx := strings.LastIndex(name, "."); idx >= 0 && idx+1 < len(name) {
+		return name[idx+1:]
+	}
+	return name
+}
+
+func shouldSkipInheritedBlueprintMember(parent *ssa.Blueprint, name string) bool {
+	if parent == nil || name == "" {
+		return false
+	}
+	if name == string(ssa.BlueprintRelationParents) || name == string(ssa.BlueprintRelationInherit) {
+		return true
+	}
+	if name == parent.Name {
+		return true
+	}
+	if simpleName := pythonBlueprintSimpleName(parent.Name); simpleName != "" && name == simpleName {
+		return true
+	}
+	return false
+}
+
+func (b *singleFileBuilder) preRegisterBlueprintMemberHints(blueprint *ssa.Blueprint, text string, static bool) {
+	if blueprint == nil || text == "" {
+		return
+	}
+	pattern := pythonSelfMemberPattern
+	if static {
+		pattern = pythonClsMemberPattern
+	}
+	matches := pattern.FindAllStringSubmatch(text, -1)
+	for _, match := range matches {
+		if len(match) < 2 {
+			continue
+		}
+		name := match[1]
+		if name == "" {
+			continue
+		}
+		value := b.newDynamicPlaceholder(blueprint.Name + "." + name)
+		if static {
+			if _, exists := blueprint.StaticMember[name]; !exists {
+				blueprint.RegisterStaticMember(name, value, false)
+			}
+		} else {
+			if _, exists := blueprint.NormalMember[name]; !exists {
+				blueprint.RegisterNormalMember(name, value, false)
+			}
+		}
+	}
 }
 
 func (b *singleFileBuilder) normalizePythonCallArgument(value ssa.Value) ssa.Value {

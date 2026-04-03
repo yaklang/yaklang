@@ -1987,11 +1987,21 @@ func collectParamNames(paramsCtx *pythonparser.TypedargslistContext) []string {
 
 // registerParam strips the leading "*"/"**" prefix and registers the name as an SSA parameter.
 func (b *singleFileBuilder) registerParam(name string) {
+	rawName := name
 	clean := strings.TrimLeft(name, "*")
 	if clean != "" {
 		param := b.NewParam(clean)
 		if param != nil && param.GetType() == nil {
 			param.SetType(ssa.CreateAnyType())
+		}
+		if strings.HasPrefix(rawName, "**") {
+			// Keep the formal parameter for call-argument alignment, but bind the
+			// in-function variable to a dynamic object so kwargs.pop()/kwargs["k"]
+			// style real-project code does not collapse into a scalar positional value.
+			placeholder := b.newDynamicPlaceholder(clean)
+			if placeholder != nil {
+				b.AssignVariable(b.CreateVariable(clean), placeholder)
+			}
 		}
 	}
 }

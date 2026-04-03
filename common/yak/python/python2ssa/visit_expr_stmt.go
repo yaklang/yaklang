@@ -1242,6 +1242,20 @@ func (b *singleFileBuilder) extractAssignTargetFromExpr(raw pythonparser.IExprCo
 		return assignTarget{}
 	}
 
+	currentObj := obj
+	for _, trailer := range trailers[:len(trailers)-1] {
+		trailerCtx, ok := trailer.(*pythonparser.TrailerContext)
+		if !ok || trailerCtx == nil {
+			return assignTarget{}
+		}
+		nextObj := b.VisitTrailer(trailerCtx, currentObj)
+		if nextObj == nil {
+			return assignTarget{}
+		}
+		currentObj = nextObj
+	}
+	obj = currentObj
+
 	lastTrailer, ok := trailers[len(trailers)-1].(*pythonparser.TrailerContext)
 	if !ok || lastTrailer == nil {
 		return assignTarget{}
@@ -1249,8 +1263,26 @@ func (b *singleFileBuilder) extractAssignTargetFromExpr(raw pythonparser.IExprCo
 
 	if lastTrailer.DOT() != nil && lastTrailer.Name() != nil {
 		attrName := lastTrailer.Name().GetText()
+		syntheticName := attrName
+		if objName := obj.GetName(); objName != "" {
+			syntheticName = objName + "." + attrName
+		}
 		if obj.GetType() != nil && obj.GetType().GetTypeKind() == ssa.FunctionTypeKind {
-			return assignTarget{varName: obj.GetName() + "." + attrName}
+			return assignTarget{varName: syntheticName}
+		}
+		if obj.GetType() != nil {
+			switch obj.GetType().GetTypeKind() {
+			case ssa.SliceTypeKind, ssa.TupleTypeKind:
+				return assignTarget{varName: syntheticName}
+			}
+		}
+		if obj.GetType() != nil && obj.GetType().GetTypeKind() == ssa.ClassBluePrintTypeKind {
+			if blueprint, ok := ssa.ToClassBluePrintType(obj.GetType()); ok && !b.hasBlueprintMemberOrMethod(blueprint, attrName) {
+				return assignTarget{varName: syntheticName}
+			}
+		}
+		if b.shouldUseDynamicMemberFallback(obj) {
+			return assignTarget{varName: syntheticName}
 		}
 		b.ensureBlueprintMember(obj, attrName)
 		obj = b.ensureDynamicObjectType(obj)
@@ -1267,6 +1299,18 @@ func (b *singleFileBuilder) extractAssignTargetFromExpr(raw pythonparser.IExprCo
 						if subCtx, ok := subs[0].(*pythonparser.SubscriptContext); ok {
 							if test := subCtx.Test(0); test != nil {
 								if idxValue, ok := b.VisitTest(test.(*pythonparser.TestContext)).(ssa.Value); ok && idxValue != nil {
+									if obj.GetType() != nil {
+										switch obj.GetType().GetTypeKind() {
+										case ssa.SliceTypeKind, ssa.TupleTypeKind:
+											if idxValue.GetType() != nil && idxValue.GetType().GetTypeKind() == ssa.StringTypeKind {
+												name := obj.GetName()
+												if name == "" {
+													name = "item"
+												}
+												return assignTarget{varName: name + "[" + idxValue.String() + "]"}
+											}
+										}
+									}
 									obj = b.ensureDynamicObjectType(obj)
 									return assignTarget{memberVar: b.CreateMemberCallVariable(obj, idxValue)}
 								}

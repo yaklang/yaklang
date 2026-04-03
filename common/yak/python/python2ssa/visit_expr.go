@@ -1094,11 +1094,22 @@ func (b *singleFileBuilder) VisitTrailer(raw *pythonparser.TrailerContext, obj s
 					return b.newDynamicPlaceholder(syntheticName)
 				}
 			}
-			memberKey := b.EmitConstInst(attrName)
 			syntheticName := attrName
 			if objName := obj.GetName(); objName != "" {
 				syntheticName = objName + "." + attrName
 			}
+			if obj.GetType() != nil {
+				switch obj.GetType().GetTypeKind() {
+				case ssa.SliceTypeKind, ssa.TupleTypeKind:
+					if arguments := raw.Arguments(); arguments != nil {
+						if argCtx, ok := arguments.(*pythonparser.ArgumentsContext); ok {
+							return b.VisitArguments(argCtx, b.newDynamicPlaceholder(syntheticName))
+						}
+					}
+					return b.newDynamicPlaceholder(syntheticName)
+				}
+			}
+			memberKey := b.EmitConstInst(attrName)
 			if obj.GetType() != nil && obj.GetType().GetTypeKind() == ssa.FunctionTypeKind {
 				if stored := b.ReadValue(syntheticName); stored != nil {
 					return b.ensureDynamicValueType(stored)
@@ -1181,6 +1192,18 @@ func (b *singleFileBuilder) VisitArguments(raw *pythonparser.ArgumentsContext, o
 										syntheticName = "item"
 									}
 									return b.newDynamicPlaceholder(syntheticName + "[" + idxVal.String() + "]")
+								}
+								if obj.GetType() != nil {
+									switch obj.GetType().GetTypeKind() {
+									case ssa.SliceTypeKind, ssa.TupleTypeKind:
+										if idxVal.GetType() != nil && idxVal.GetType().GetTypeKind() == ssa.StringTypeKind {
+											syntheticName := obj.GetName()
+											if syntheticName == "" {
+												syntheticName = "item"
+											}
+											return b.newDynamicPlaceholder(syntheticName + "[" + idxVal.String() + "]")
+										}
+									}
 								}
 								obj = b.ensureDynamicObjectType(obj)
 								return b.ensureDynamicValueType(b.ReadMemberCallValue(obj, idxVal))

@@ -41,6 +41,7 @@ func (b *singleFileBuilder) handleClassInheritance(blueprint *ssa.Blueprint, arg
 				parentBp.RegisterNormalMember(string(ssa.BlueprintRelationInherit), childContainer, false)
 			}
 
+			b.preRegisterInheritedBlueprintMembers(blueprint, parentBp)
 			blueprint.AddParentBlueprint(parentBp)
 		}
 	}
@@ -161,6 +162,7 @@ func (b *singleFileBuilder) visitNestedClassdef(classdef *pythonparser.ClassdefC
 	nestedBp := b.CreateBlueprint(className, classdef)
 	nestedBp.SetKind(ssa.BlueprintClass)
 	b.GetProgram().SetExportType(className, nestedBp)
+	b.ensureBlueprintConstructorSlot(nestedBp)
 	b.handleClassInheritance(nestedBp, arglist)
 	b.visitClassBody(suite, nestedBp)
 	blueprintValue := nestedBp.Container()
@@ -241,6 +243,14 @@ func (b *singleFileBuilder) visitClassMethodWithModifier(funcdef *pythonparser.F
 	isConstructor := (methodName == "__init__")
 	isStaticMethod := (modifier == "staticmethod")
 	isClassMethod := (modifier == "classmethod")
+	if suite := funcdef.Suite(); suite != nil {
+		switch {
+		case isClassMethod:
+			b.preRegisterBlueprintMemberHints(blueprint, suite.GetText(), true)
+		case !isStaticMethod:
+			b.preRegisterBlueprintMemberHints(blueprint, suite.GetText(), false)
+		}
+	}
 
 	if !isConstructor {
 		// Pre-register method names in the class member map so later blueprint
