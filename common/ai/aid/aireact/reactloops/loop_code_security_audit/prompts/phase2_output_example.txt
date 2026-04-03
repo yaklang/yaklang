@@ -121,17 +121,15 @@
 ## 典型工作流示例
 
 ```
-1. grep("mysqli_query", group_name="PHP原生查询")  → 50 条命中
-2. submit_hypothesis(title="admin.inc.php:557 拼接", sink_hint="includes/admin.inc.php:557", priority=3)  → H-001
-3. grep("$_POST[", group_name=null)  → source 枚举，发现 includes/admin.inc.php:554 有 $_POST['logins']
-4. submit_hypothesis(title="admin.inc.php:554 POST输入流向557", priority=4)  → 更新 H-001 或创建 H-002
-5. mark_checklist("sources_enumerated")
-6. read_file("includes/admin.inc.php", 530, 570, hypothesis_id="H-001")
-7. add_evidence("H-001", "确认 $logins = $_POST['logins'] 无过滤直接到达 mysqli_query", remaining_unknowns=[])
+1. grep("mysqli_query", output-mode="files_with_matches", path="/abs/project")  → 12 个文件命中
+2. lock_target_files(target_files=[...排除测试文件后的文件列表...], done=false, reason="mysqli_query命中12个文件")
+3. grep("$_POST[", output-mode="files_with_matches", path="/abs/project")  → source 枚举，8 个文件命中
+4. lock_target_files(target_files=[...], done=false, reason="$_POST命中8个文件")
+5. lock_target_files(target_files=[], done=true, reason="搜索完成，共15个文件")
+6. read_file("includes/admin.inc.php", offset=1, lines=100)
+7. ... 分析代码，发现 admin.inc.php:554 有 $logins = $_POST['logins'] 无过滤直接到达 mysqli_query ...
 8. add_finding(...)   ← 提交确认的漏洞
-9. resolve_hypothesis("H-001", "confirmed", "数据流完整，无过滤")
-10. mark_checklist("dataflow_traced")
-11. mark_checklist("sinks_searched")  ← 搜完所有组
-12. mark_checklist("parameterized_checked")
-13. complete_scan(stop_reason="coverage_complete", ...)
+9. mark_file_done(file_path="includes/admin.inc.php", audit_summary="发现SQL注入")
+10. ... 继续审计下一个文件 ...
+11. complete_scan(coverage_summary="已搜索 mysqli_query/$_POST 等关键词，审计15个文件，发现1个SQL注入")
 ```

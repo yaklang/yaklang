@@ -163,7 +163,8 @@ const phase2ReactiveDataTpl = `## 当前扫描任务
 
 {{ if .IsSearchPhase }}
 ### 阶段A：关键词搜索
-目标：根据下方 **Sink 语义提示** 和已知技术栈，自主决定 grep 关键词，每次搜索后立即调用 lock_target_files 追加命中文件。可多次 grep + lock_target_files 累积文件；收集完毕后调用 lock_target_files(done=true) 切换到阶段B。
+目标：根据下方 **Sink 语义提示** 和已知技术栈，自主决定 grep 关键词，**使用 output-mode="files_with_matches" 模式**获取文件列表，每次搜索后立即调用 lock_target_files 追加命中文件。可多次 grep + lock_target_files 累积文件；收集完毕后调用 lock_target_files(done=true) 切换到阶段B。
+**重要**：阶段A的 grep 必须指定 output-mode="files_with_matches"，避免因 limit 限制遗漏大量文件。
 
 **已累积目标文件**: {{ .CollectedFileCount }} 个
 
