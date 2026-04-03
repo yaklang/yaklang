@@ -903,6 +903,7 @@ functionCallAssignableAccess
 assignableChainOrigin
     : staticMethodCall
     | staticClassExprVariableMember
+    | parentheses
     ;
 
 assignableChainAccess
