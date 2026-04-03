@@ -78,6 +78,7 @@ func (r *ReAct) DirectlyAnswer(ctx context.Context, query string, tools []*aitoo
 
 	var finalResult string
 	var referenceOnce = new(sync.Once)
+	promptFallback := r.promptManager.GenerateDirectlyAnswerPromptFallback(query, tools, nonceStr)
 
 	// Helper to emit reference material when stream event is emitted
 	emitReferenceMaterial := func(event *schema.AiOutputEvent) {
@@ -161,6 +162,8 @@ func (r *ReAct) DirectlyAnswer(ctx context.Context, query string, tools []*aitoo
 			finalResult = payload
 			return nil
 		},
+		aicommon.WithAIRequest_PromptFallback(promptFallback),
+		aicommon.WithAIRequest_Source("directly_answer"),
 	)
 	if finalResult != "" {
 		return finalResult, nil

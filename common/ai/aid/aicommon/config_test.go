@@ -2,6 +2,9 @@ package aicommon
 
 import (
 	"context"
+	"errors"
+	"strings"
+	"sync"
 	"testing"
 
 	"github.com/google/uuid"
@@ -111,4 +114,130 @@ func TestConfig_ToolManagerPropagation(t *testing.T) {
 
 	require.Same(t, parent.GetAiToolManager(), child.GetAiToolManager())
 	require.True(t, child.GetAiToolManager().IsRecentlyUsedTool("now"))
+}
+
+func TestCallAITransaction_PromptFallbackCompressionLevelResetsPerAttempt(t *testing.T) {
+	var compressionLevels []int
+	var callCount int
+
+	config := NewTestConfig(
+		context.Background(),
+		WithAiCallTokenLimit(64),
+		WithAITransactionAutoRetry(2),
+	)
+
+	postHandlerCalls := 0
+	err := CallAITransaction(
+		config,
+		strings.Repeat("long prompt ", 200),
+		func(request *AIRequest) (*AIResponse, error) {
+			callCount++
+			_, err := config.prepareRequestPrompt(request)
+			if err != nil {
+				return nil, err
+			}
+			rsp := NewUnboundAIResponse()
+			rsp.Close()
+			return rsp, nil
+		},
+		func(rsp *AIResponse) error {
+			postHandlerCalls++
+			if postHandlerCalls == 1 {
+				return errors.New("retry once")
+			}
+			return nil
+		},
+		WithAIRequest_PromptFallback(func(expectedContextSize int, currentContextSize int, compressionLevel int) (string, error) {
+			compressionLevels = append(compressionLevels, compressionLevel)
+			return "short prompt", nil
+		}),
+	)
+	require.NoError(t, err)
+	require.Equal(t, 2, callCount)
+	require.Equal(t, []int{0, 0}, compressionLevels)
+}
+
+func TestCallAITransaction_RebuildsFallbackPromptOnRetry(t *testing.T) {
+	var capturedPrompts []string
+	retryErr := errors.New("retry once")
+
+	config := NewTestConfig(
+		context.Background(),
+		WithAiCallTokenLimit(64),
+		WithAITransactionAutoRetry(2),
+	)
+
+	postHandlerCalls := 0
+	err := CallAITransaction(
+		config,
+		strings.Repeat("long prompt ", 200),
+		func(request *AIRequest) (*AIResponse, error) {
+			_, err := config.prepareRequestPrompt(request)
+			require.NoError(t, err)
+
+			capturedPrompts = append(capturedPrompts, request.GetPrompt())
+
+			rsp := NewUnboundAIResponse()
+			rsp.Close()
+			return rsp, nil
+		},
+		func(rsp *AIResponse) error {
+			postHandlerCalls++
+			if postHandlerCalls == 1 {
+				return retryErr
+			}
+			return nil
+		},
+		WithAIRequest_PromptFallback(func(expectedContextSize int, currentContextSize int, compressionLevel int) (string, error) {
+			return "short prompt", nil
+		}),
+	)
+	require.NoError(t, err)
+	require.Equal(t, 2, len(capturedPrompts))
+	require.Equal(t, "short prompt", capturedPrompts[0])
+	require.Equal(t, config.RetryPromptBuilder("short prompt", retryErr), capturedPrompts[1])
+}
+
+func TestPrepareRequestPrompt_EmitWarningContainsSource(t *testing.T) {
+	var (
+		messages []string
+		mu       sync.Mutex
+	)
+
+	config := NewTestConfig(
+		context.Background(),
+		WithAiCallTokenLimit(8),
+		WithEventHandler(func(e *schema.AiOutputEvent) {
+			if e == nil || e.GetContentJSONPath("$.level") != "warning" {
+				return
+			}
+			mu.Lock()
+			defer mu.Unlock()
+			messages = append(messages, e.GetContentJSONPath("$.message"))
+		}),
+	)
+
+	req := NewAIRequest(
+		strings.Repeat("a", 80),
+		WithAIRequest_Source("react_loop:test-loop"),
+		WithAIRequest_PromptFallback(func(expectedContextSize int, currentContextSize int, compressionLevel int) (string, error) {
+			return "short prompt", nil
+		}),
+	)
+
+	_, err := config.prepareRequestPrompt(req)
+	require.NoError(t, err)
+
+	mu.Lock()
+	defer mu.Unlock()
+	require.NotEmpty(t, messages)
+
+	found := false
+	for _, msg := range messages {
+		if strings.Contains(msg, "source=react_loop:test-loop") {
+			found = true
+			break
+		}
+	}
+	require.True(t, found, "expected warning message to include request source, got: %v", messages)
 }

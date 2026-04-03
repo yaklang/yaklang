@@ -96,10 +96,19 @@ func (r *ReAct) invokeBlueprintReviewChangeBlueprint(
 		return nil, nil, false, utils.Errorf("generate ai json schema for selected forge failed: %v", err)
 	}
 
-	prompt, err = r.promptManager.GenerateAIBlueprintForgeParamsPrompt(selectedForge, forgeSchema)
+	nonce := utils.RandStringBytes(4)
+	prompt, err = r.promptManager.renderAIBlueprintForgeParamsPromptEx(
+		selectedForge,
+		forgeSchema,
+		nil,
+		"",
+		nonce,
+		r.promptManager.modelContextProfile(),
+	)
 	if err != nil {
 		return nil, nil, false, utils.Errorf("generate prompt for new blueprint failed: %v", err)
 	}
+	promptFallback := r.promptManager.GenerateAIBlueprintForgeParamsPromptFallback(selectedForge, forgeSchema, nil, "", nonce)
 
 	var newParams = make(aitool.InvokeParams)
 	err = aicommon.CallAITransaction(
@@ -119,6 +128,8 @@ func (r *ReAct) invokeBlueprintReviewChangeBlueprint(
 			}
 			return nil
 		},
+		aicommon.WithAIRequest_PromptFallback(promptFallback),
+		aicommon.WithAIRequest_Source("blueprint_reselect_params:"+selectedForge.ForgeName),
 	)
 	if err != nil {
 		return nil, nil, false, err

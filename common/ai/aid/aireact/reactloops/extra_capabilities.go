@@ -179,6 +179,12 @@ func (ecm *ExtraCapabilitiesManager) ListFocusModes() []ExtraFocusModeInfo {
 // Render produces a formatted text block for the extra capabilities section in the prompt.
 // Each category (tools, forges, skills, focus modes) is rendered as a separate subsection.
 func (ecm *ExtraCapabilitiesManager) Render(nonce string) string {
+	return ecm.RenderWithLimits(nonce, 0, 0)
+}
+
+// RenderWithLimits renders extra capabilities with optional tool and skill count limits.
+// When a limit <= 0, that category is rendered without count-based truncation.
+func (ecm *ExtraCapabilitiesManager) RenderWithLimits(nonce string, maxTools, maxSkills int) string {
 	ecm.mu.RLock()
 	defer ecm.mu.RUnlock()
 
@@ -195,8 +201,12 @@ func (ecm *ExtraCapabilitiesManager) Render(nonce string) string {
 
 	// Tools
 	if len(ecm.tools) > 0 {
-		sb.WriteString(fmt.Sprintf("## Additional Tools / 额外工具 (%d/%d)\n", len(ecm.tools), ecm.MaxExtraTools))
-		for _, t := range ecm.tools {
+		visibleTools := len(ecm.tools)
+		if maxTools > 0 && maxTools < visibleTools {
+			visibleTools = maxTools
+		}
+		sb.WriteString(fmt.Sprintf("## Additional Tools / 额外工具 (%d shown, %d total)\n", visibleTools, len(ecm.tools)))
+		for _, t := range ecm.tools[:visibleTools] {
 			desc := t.Description
 			if len(desc) > 150 {
 				desc = desc[:150] + "..."
@@ -206,6 +216,9 @@ func (ecm *ExtraCapabilitiesManager) Render(nonce string) string {
 			} else {
 				sb.WriteString(fmt.Sprintf("* `%s`: %s\n", t.Name, desc))
 			}
+		}
+		if len(ecm.tools) > visibleTools {
+			sb.WriteString(fmt.Sprintf("* ... and %d more tools omitted from prompt.\n", len(ecm.tools)-visibleTools))
 		}
 		sb.WriteString("\n")
 	}
@@ -229,13 +242,20 @@ func (ecm *ExtraCapabilitiesManager) Render(nonce string) string {
 
 	// Skills
 	if len(ecm.skills) > 0 {
-		sb.WriteString("## Skills / 技能\n")
-		for _, s := range ecm.skills {
+		visibleSkills := len(ecm.skills)
+		if maxSkills > 0 && maxSkills < visibleSkills {
+			visibleSkills = maxSkills
+		}
+		sb.WriteString(fmt.Sprintf("## Skills / 技能 (%d shown, %d total)\n", visibleSkills, len(ecm.skills)))
+		for _, s := range ecm.skills[:visibleSkills] {
 			desc := s.Description
 			if len(desc) > 150 {
 				desc = desc[:150] + "..."
 			}
 			sb.WriteString(fmt.Sprintf("* `%s`: %s\n", s.Name, desc))
+		}
+		if len(ecm.skills) > visibleSkills {
+			sb.WriteString(fmt.Sprintf("* ... and %d more skills omitted from prompt.\n", len(ecm.skills)-visibleSkills))
 		}
 		sb.WriteString("\n")
 	}

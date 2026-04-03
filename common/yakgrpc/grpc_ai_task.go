@@ -152,6 +152,10 @@ func buildAIAgentOption(ctx context.Context, CoordinatorId string, agentEventHan
 func buildAIDOption(startParams *ypb.AIStartParams) []aicommon.ConfigOption {
 	aidOption := make([]aicommon.ConfigOption, 0)
 
+	if extra := extractExtraReActConfig(startParams); len(extra) > 0 {
+		aidOption = append(aidOption, aicommon.WithExtraReActConfigMap(extra))
+	}
+
 	if startParams.GetEnableSystemFileSystemOperator() {
 		aidOption = append(aidOption, aicommon.WithSystemFileOperator())
 		aidOption = append(aidOption, aicommon.WithJarOperator())

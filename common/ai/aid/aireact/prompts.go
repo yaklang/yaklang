@@ -265,6 +265,44 @@ func (pm *PromptManager) GetGlanceWorkdir(wd string) string {
 	return pm.glanceWorkdir
 }
 
+func (pm *PromptManager) modelContextProfile() aicommon.ModelContextProfile {
+	return aicommon.ResolveModelContextProfile(pm.react.config)
+}
+
+func (pm *PromptManager) resolvePromptToolCount(total int, profile aicommon.ModelContextProfile) int {
+	if total <= 0 {
+		return 0
+	}
+
+	limit := profile.PromptToolCount
+	if configured := pm.react.config.GetTopToolsCount(); configured > 0 && (limit <= 0 || configured < limit) {
+		limit = configured
+	}
+	if limit <= 0 || limit > total {
+		limit = total
+	}
+	return limit
+}
+
+func (pm *PromptManager) getPromptTopTools(tools []*aitool.Tool, profile aicommon.ModelContextProfile) ([]*aitool.Tool, int) {
+	count := pm.resolvePromptToolCount(len(tools), profile)
+	if count <= 0 {
+		return []*aitool.Tool{}, 0
+	}
+	return pm.react.getPrioritizedTools(tools, count), count
+}
+
+func (pm *PromptManager) getPromptTimeline() string {
+	if timeline := pm.react.config.GetTimeline(); timeline != nil {
+		return timeline.Dump()
+	}
+	return ""
+}
+
+func (pm *PromptManager) buildPromptFallback(render func(profile aicommon.ModelContextProfile) (string, error)) aicommon.PromptFallback {
+	return aicommon.NewGradientPromptFallback(pm.modelContextProfile(), render)
+}
+
 func (pm *PromptManager) GetAvailableAIForgeBlueprints() string {
 	// use getter and nil-check for safety
 	mgr := pm.react.config.GetAIForgeManager()
@@ -285,8 +323,12 @@ func (pm *PromptManager) GetAvailableAIForgeBlueprints() string {
 	return result
 }
 
-func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[string]any, error) {
+func (pm *PromptManager) getBasicPromptInfo(tools []*aitool.Tool, profile aicommon.ModelContextProfile) (string, map[string]any, error) {
 	result := make(map[string]any)
+	modelContextLevel := profile.Level
+	if modelContextLevel == "" {
+		modelContextLevel = aicommon.ResolveModelContextLevel(pm.react.config)
+	}
 	result["CurrentTime"] = time.Now().Format("2006-01-02 15:04:05")
 	result["OSArch"] = fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)
 	result["WorkingDir"] = pm.workdir
@@ -295,6 +337,7 @@ func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[s
 	result["Nonce"] = generatedNonce
 	result["DynamicContext"] = pm.DynamicContextWithNonce(generatedNonce)
 	result["Language"] = pm.react.config.GetLanguage()
+	result["ModelContextLevel"] = modelContextLevel
 
 	taskType := "react"
 	if forgeName := pm.react.config.GetForgeName(); forgeName != "" {
@@ -321,9 +364,10 @@ func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[s
 	if len(tools) > 0 {
 		result["Tools"] = tools
 		result["ToolsCount"] = len(tools)
-		result["TopToolsCount"] = len(tools)
-		result["TopTools"] = tools
-		result["HasMoreTools"] = false
+		topTools, topToolsCount := pm.getPromptTopTools(tools, profile)
+		result["TopToolsCount"] = topToolsCount
+		result["TopTools"] = topTools
+		result["HasMoreTools"] = len(tools) > len(topTools)
 	} else {
 		var err error
 		// use getter for ai tool manager and handle nil
@@ -337,10 +381,9 @@ func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[s
 		}
 		result["Tools"] = tools
 		result["ToolsCount"] = len(tools)
-		result["TopToolsCount"] = pm.react.config.GetTopToolsCount()
-		// Get prioritized tools
+		topTools, topToolsCount := pm.getPromptTopTools(tools, profile)
+		result["TopToolsCount"] = topToolsCount
 		if len(tools) > 0 {
-			topTools := pm.react.getPrioritizedTools(tools, pm.react.config.GetTopToolsCount())
 			result["TopTools"] = topTools
 			result["HasMoreTools"] = len(tools) > len(topTools)
 		} else {
@@ -349,21 +392,25 @@ func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[s
 		}
 	}
 
-	// use timeline getter
-	if t := pm.react.config.GetTimeline(); t != nil {
-		result["Timeline"] = t.Dump()
-	} else {
-		result["Timeline"] = ""
-	}
+	result["Timeline"] = pm.getPromptTimeline()
 	return basePrompt, result, nil
+}
+
+func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[string]any, error) {
+	return pm.getBasicPromptInfo(tools, pm.modelContextProfile())
+}
+
+func (pm *PromptManager) GetBasicPromptInfoWithProfile(tools []*aitool.Tool, profile aicommon.ModelContextProfile) (string, map[string]any, error) {
+	return pm.getBasicPromptInfo(tools, profile)
 }
 
 // ToolParamsPromptResult contains the generated prompt and metadata for AITAG parsing
 type ToolParamsPromptResult struct {
-	Prompt     string
-	Nonce      string
-	ParamNames []string
-	Identifier string // destination identifier extracted from AI response, e.g. "query_large_file", "find_process"
+	Prompt         string
+	Nonce          string
+	ParamNames     []string
+	Identifier     string // destination identifier extracted from AI response, e.g. "query_large_file", "find_process"
+	PromptFallback aicommon.PromptFallback
 }
 
 // GenerateToolParamsPrompt generates tool parameter generation prompt using template
@@ -375,21 +422,17 @@ func (pm *PromptManager) GenerateToolParamsPrompt(tool *aitool.Tool) (string, er
 	return result.Prompt, nil
 }
 
-// GenerateToolParamsPromptWithMeta generates tool parameter generation prompt with metadata for AITAG parsing
-func (pm *PromptManager) GenerateToolParamsPromptWithMeta(tool *aitool.Tool) (*ToolParamsPromptResult, error) {
-	generatedNonce := nonce()
+func (pm *PromptManager) buildToolParamsPromptData(tool *aitool.Tool, generatedNonce string, profile aicommon.ModelContextProfile) *ToolParamsPromptData {
 	data := &ToolParamsPromptData{
 		ToolName:        tool.Name,
 		ToolDescription: tool.Description,
 		ToolUsage:       tool.Usage,
 		DynamicContext:  pm.DynamicContextWithNonce(generatedNonce),
-		Nonce:           generatedNonce, // Generate nonce for AITAG format
+		Nonce:           generatedNonce,
 	}
 
-	// Set tool schema if available
 	if tool.Tool != nil {
 		data.ToolSchema = tool.ToJSONSchemaString()
-		// Extract parameter names for AITAG hints
 		if tool.Tool.InputSchema.Properties != nil {
 			tool.Tool.InputSchema.Properties.ForEach(func(name string, _ any) bool {
 				data.ParamNames = append(data.ParamNames, name)
@@ -398,21 +441,23 @@ func (pm *PromptManager) GenerateToolParamsPromptWithMeta(tool *aitool.Tool) (*T
 		}
 	}
 
-	// Extract context data from memory without lock (assume caller already holds lock)
 	if t := pm.react.config.GetTimeline(); t != nil {
 		if task := pm.react.GetCurrentTask(); task != nil {
 			data.OriginalQuery = task.GetUserInput()
 		}
-		data.Timeline = t.Dump()
+		data.Timeline = pm.getPromptTimeline()
 	}
 	data.CurrentIteration = pm.react.currentIteration
 	data.MaxIterations = int(pm.react.config.GetMaxIterations())
+	return data
+}
 
+func (pm *PromptManager) renderToolParamsPrompt(tool *aitool.Tool, generatedNonce string, profile aicommon.ModelContextProfile) (*ToolParamsPromptResult, error) {
+	data := pm.buildToolParamsPromptData(tool, generatedNonce, profile)
 	prompt, err := pm.executeTemplate("tool-params", toolParamsPromptTemplate, data)
 	if err != nil {
 		return nil, err
 	}
-
 	return &ToolParamsPromptResult{
 		Prompt:     prompt,
 		Nonce:      generatedNonce,
@@ -420,9 +465,31 @@ func (pm *PromptManager) GenerateToolParamsPromptWithMeta(tool *aitool.Tool) (*T
 	}, nil
 }
 
-// GenerateVerificationPrompt generates verification prompt using template
-func (pm *PromptManager) GenerateVerificationPrompt(originalQuery string, isToolResult bool, payload string, enhanceData ...string) (string, string, error) {
-	nonce := nonce()
+// GenerateToolParamsPromptWithMeta generates tool parameter generation prompt with metadata for AITAG parsing
+func (pm *PromptManager) GenerateToolParamsPromptWithMeta(tool *aitool.Tool) (*ToolParamsPromptResult, error) {
+	generatedNonce := nonce()
+	result, err := pm.renderToolParamsPrompt(tool, generatedNonce, pm.modelContextProfile())
+	if err != nil {
+		return nil, err
+	}
+	result.PromptFallback = pm.buildPromptFallback(func(profile aicommon.ModelContextProfile) (string, error) {
+		rendered, err := pm.renderToolParamsPrompt(tool, generatedNonce, profile)
+		if err != nil {
+			return "", err
+		}
+		return rendered.Prompt, nil
+	})
+	return result, nil
+}
+
+func (pm *PromptManager) renderVerificationPrompt(
+	originalQuery string,
+	isToolResult bool,
+	payload string,
+	nonce string,
+	profile aicommon.ModelContextProfile,
+	enhanceData ...string,
+) (string, error) {
 	data := &VerificationPromptData{
 		Nonce:          nonce,
 		OriginalQuery:  originalQuery,
@@ -438,10 +505,22 @@ func (pm *PromptManager) GenerateVerificationPrompt(originalQuery string, isTool
 
 	// Get timeline for context (without lock, assume caller handles it)
 	if t := pm.react.config.GetTimeline(); t != nil {
-		data.Timeline = t.Dump()
+		data.Timeline = pm.getPromptTimeline()
 	}
 
-	promptResult, err := pm.executeTemplate("verification", verificationPromptTemplate, data)
+	return pm.executeTemplate("verification", verificationPromptTemplate, data)
+}
+
+func (pm *PromptManager) GenerateVerificationPromptFallback(originalQuery string, isToolResult bool, payload string, nonce string, enhanceData ...string) aicommon.PromptFallback {
+	return pm.buildPromptFallback(func(profile aicommon.ModelContextProfile) (string, error) {
+		return pm.renderVerificationPrompt(originalQuery, isToolResult, payload, nonce, profile, enhanceData...)
+	})
+}
+
+// GenerateVerificationPrompt generates verification prompt using template
+func (pm *PromptManager) GenerateVerificationPrompt(originalQuery string, isToolResult bool, payload string, enhanceData ...string) (string, string, error) {
+	nonce := nonce()
+	promptResult, err := pm.renderVerificationPrompt(originalQuery, isToolResult, payload, nonce, pm.modelContextProfile(), enhanceData...)
 	return promptResult, nonce, err
 }
 
@@ -465,17 +544,20 @@ func (pm *PromptManager) GenerateAIReviewPrompt(userQuery, toolOrTitle, params s
 
 	// Set timeline memory
 	if t := pm.react.config.GetTimeline(); t != nil {
-		data.Timeline = t.Dump()
+		data.Timeline = pm.getPromptTimeline()
 	}
 
 	return pm.executeTemplate("ai-review", aiReviewPromptTemplate, data)
 }
 
-// GenerateDirectlyAnswerPrompt generates directly answer prompt using template
-func (pm *PromptManager) GenerateDirectlyAnswerPrompt(userQuery string, tools []*aitool.Tool) (string, string, error) {
+func (pm *PromptManager) renderDirectlyAnswerPrompt(
+	userQuery string,
+	tools []*aitool.Tool,
+	nonceString string,
+	profile aicommon.ModelContextProfile,
+) (string, error) {
 	var directlyAnswerSchema = getDirectlyAnswer()
 
-	nonceString := utils.RandStringBytes(4)
 	// Build template data
 	data := &DirectlyAnswerPromptData{
 		AllowPlan:      false,
@@ -487,7 +569,6 @@ func (pm *PromptManager) GenerateDirectlyAnswerPrompt(userQuery string, tools []
 		Schema:         directlyAnswerSchema,
 		Tools:          tools,
 		ToolsCount:     len(tools),
-		TopToolsCount:  pm.react.config.GetTopToolsCount(),
 		DynamicContext: pm.DynamicContextWithNonce(nonceString),
 	}
 
@@ -499,16 +580,29 @@ func (pm *PromptManager) GenerateDirectlyAnswerPrompt(userQuery string, tools []
 
 	// Get prioritized tools
 	if len(tools) > 0 {
-		data.TopTools = pm.react.getPrioritizedTools(tools, pm.react.config.GetTopToolsCount())
+		data.TopTools, data.TopToolsCount = pm.getPromptTopTools(tools, profile)
 		data.HasMoreTools = len(tools) > len(data.TopTools)
 	}
 
 	// Set timeline memory
 	if t := pm.react.config.GetTimeline(); t != nil {
-		data.Timeline = t.Dump()
+		data.Timeline = pm.getPromptTimeline()
 	}
 
 	result, err := pm.executeTemplate("directly-answer", directlyAnswerPromptTemplate, data)
+	return result, err
+}
+
+func (pm *PromptManager) GenerateDirectlyAnswerPromptFallback(userQuery string, tools []*aitool.Tool, nonceString string) aicommon.PromptFallback {
+	return pm.buildPromptFallback(func(profile aicommon.ModelContextProfile) (string, error) {
+		return pm.renderDirectlyAnswerPrompt(userQuery, tools, nonceString, profile)
+	})
+}
+
+// GenerateDirectlyAnswerPrompt generates directly answer prompt using template
+func (pm *PromptManager) GenerateDirectlyAnswerPrompt(userQuery string, tools []*aitool.Tool) (string, string, error) {
+	nonceString := utils.RandStringBytes(4)
+	result, err := pm.renderDirectlyAnswerPrompt(userQuery, tools, nonceString, pm.modelContextProfile())
 	return result, nonceString, err
 }
 
@@ -538,7 +632,7 @@ func (pm *PromptManager) GenerateToolReSelectPrompt(noUserInteract bool, oldTool
 
 	// Set timeline memory
 	if t := pm.react.config.GetTimeline(); t != nil {
-		data.Timeline = t.Dump()
+		data.Timeline = pm.getPromptTimeline()
 	}
 
 	return pm.executeTemplate("wrong-tool", wrongToolPromptTemplate, data)
@@ -553,9 +647,13 @@ func (pm *PromptManager) GenerateReGenerateToolParamsPrompt(userQuery string, ol
 	return result.Prompt, nil
 }
 
-// GenerateReGenerateToolParamsPromptWithMeta generates tool parameter regeneration prompt with AITAG metadata
-func (pm *PromptManager) GenerateReGenerateToolParamsPromptWithMeta(userQuery string, oldParams aitool.InvokeParams, oldTool *aitool.Tool) (*ToolParamsPromptResult, error) {
-	generatedNonce := nonce()
+func (pm *PromptManager) renderReGenerateToolParamsPromptWithMeta(
+	userQuery string,
+	oldParams aitool.InvokeParams,
+	oldTool *aitool.Tool,
+	generatedNonce string,
+	profile aicommon.ModelContextProfile,
+) (*ToolParamsPromptResult, error) {
 	data := &ReGenerateToolParamsPromptData{
 		CurrentTime:    time.Now().Format("2006-01-02 15:04:05"),
 		OSArch:         fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
@@ -566,7 +664,6 @@ func (pm *PromptManager) GenerateReGenerateToolParamsPromptWithMeta(userQuery st
 		DynamicContext: pm.DynamicContextWithNonce(generatedNonce),
 	}
 
-	// Extract parameter names for AITAG hints
 	if oldTool.Tool != nil && oldTool.Tool.InputSchema.Properties != nil {
 		oldTool.Tool.InputSchema.Properties.ForEach(func(name string, _ any) bool {
 			data.ParamNames = append(data.ParamNames, name)
@@ -574,15 +671,13 @@ func (pm *PromptManager) GenerateReGenerateToolParamsPromptWithMeta(userQuery st
 		})
 	}
 
-	// Set working directory
 	data.WorkingDir = pm.workdir
 	if data.WorkingDir != "" {
 		data.WorkingDirGlance = pm.GetGlanceWorkdir(data.WorkingDir)
 	}
 
-	// Set timeline memory
 	if t := pm.react.config.GetTimeline(); t != nil {
-		data.Timeline = t.Dump()
+		data.Timeline = pm.getPromptTimeline()
 	}
 
 	prompt, err := pm.executeTemplate("wrong-params", wrongParamsPromptTemplate, data)
@@ -595,6 +690,23 @@ func (pm *PromptManager) GenerateReGenerateToolParamsPromptWithMeta(userQuery st
 		Nonce:      generatedNonce,
 		ParamNames: data.ParamNames,
 	}, nil
+}
+
+// GenerateReGenerateToolParamsPromptWithMeta generates tool parameter regeneration prompt with AITAG metadata
+func (pm *PromptManager) GenerateReGenerateToolParamsPromptWithMeta(userQuery string, oldParams aitool.InvokeParams, oldTool *aitool.Tool) (*ToolParamsPromptResult, error) {
+	generatedNonce := nonce()
+	result, err := pm.renderReGenerateToolParamsPromptWithMeta(userQuery, oldParams, oldTool, generatedNonce, pm.modelContextProfile())
+	if err != nil {
+		return nil, err
+	}
+	result.PromptFallback = pm.buildPromptFallback(func(profile aicommon.ModelContextProfile) (string, error) {
+		rendered, err := pm.renderReGenerateToolParamsPromptWithMeta(userQuery, oldParams, oldTool, generatedNonce, profile)
+		if err != nil {
+			return "", err
+		}
+		return rendered.Prompt, nil
+	})
+	return result, nil
 }
 
 func (pm *PromptManager) GenerateChangeAIBlueprintPrompt(
@@ -629,7 +741,7 @@ func (pm *PromptManager) GenerateChangeAIBlueprintPrompt(
 
 	// Set timeline memory
 	if t := pm.react.config.GetTimeline(); t != nil {
-		data.Timeline = t.Dump()
+		data.Timeline = pm.getPromptTimeline()
 		if task := pm.react.GetCurrentTask(); task != nil {
 			data.UserQuery = task.GetUserInput()
 		}
@@ -638,11 +750,13 @@ func (pm *PromptManager) GenerateChangeAIBlueprintPrompt(
 	return pm.executeTemplate("change-blueprint", changeBlueprintPromptTemplate, data)
 }
 
-func (pm *PromptManager) GenerateAIBlueprintForgeParamsPromptEx(
+func (pm *PromptManager) renderAIBlueprintForgeParamsPromptEx(
 	ins *schema.AIForge,
 	blueprintSchema string,
 	oldParams aitool.InvokeParams,
 	extraPrompt string,
+	nonce string,
+	profile aicommon.ModelContextProfile,
 ) (string, error) {
 
 	data := &AIBlueprintForgeParamsPromptData{
@@ -651,7 +765,7 @@ func (pm *PromptManager) GenerateAIBlueprintForgeParamsPromptEx(
 		BlueprintSchema:      blueprintSchema,
 		DynamicContext:       "",
 		ExtraPrompt:          extraPrompt,
-		Nonce:                utils.RandStringBytes(4),
+		Nonce:                nonce,
 	}
 	data.DynamicContext = pm.DynamicContextWithNonce(data.Nonce)
 	if utils.IsNil(oldParams) || len(oldParams) <= 0 {
@@ -665,11 +779,39 @@ func (pm *PromptManager) GenerateAIBlueprintForgeParamsPromptEx(
 		if task := pm.react.GetCurrentTask(); task != nil {
 			data.OriginalQuery = task.GetUserInput()
 		}
-		data.Timeline = t.Dump()
+		data.Timeline = pm.getPromptTimeline()
 	}
 	data.CurrentIteration = pm.react.currentIteration
 	data.MaxIterations = int(pm.react.config.GetMaxIterations())
 	return pm.executeTemplate("blueprint-params", blueprintParamsPromptTemplate, data)
+}
+
+func (pm *PromptManager) GenerateAIBlueprintForgeParamsPromptFallback(
+	ins *schema.AIForge,
+	blueprintSchema string,
+	oldParams aitool.InvokeParams,
+	extraPrompt string,
+	nonce string,
+) aicommon.PromptFallback {
+	return pm.buildPromptFallback(func(profile aicommon.ModelContextProfile) (string, error) {
+		return pm.renderAIBlueprintForgeParamsPromptEx(ins, blueprintSchema, oldParams, extraPrompt, nonce, profile)
+	})
+}
+
+func (pm *PromptManager) GenerateAIBlueprintForgeParamsPromptEx(
+	ins *schema.AIForge,
+	blueprintSchema string,
+	oldParams aitool.InvokeParams,
+	extraPrompt string,
+) (string, error) {
+	return pm.renderAIBlueprintForgeParamsPromptEx(
+		ins,
+		blueprintSchema,
+		oldParams,
+		extraPrompt,
+		utils.RandStringBytes(4),
+		pm.modelContextProfile(),
+	)
 }
 
 // GenerateAIBlueprintForgeParamsPrompt generates AI blueprint forge parameter generation prompt using template
@@ -803,7 +945,7 @@ func (pm *PromptManager) GenerateIntervalReviewPromptWithContext(
 
 	// Get task context from timeline (truncated for prompt)
 	if t := pm.react.config.GetTimeline(); t != nil {
-		fullDump := t.Dump()
+		fullDump := pm.getPromptTimeline()
 		data.TaskContext = utils.ShrinkString(fullDump, 2000) // Limit to 2000 chars
 	}
 
