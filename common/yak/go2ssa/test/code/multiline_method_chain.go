@@ -1,0 +1,10 @@
+//go:build ignore
+// +build ignore
+
+package main
+
+func (m Migrator) GetTables() (tableList []string, err error) {
+	err = m.DB.Raw("SELECT TABLE_NAME FROM information_schema.tables where TABLE_SCHEMA=?", m.CurrentDatabase()).
+		Scan(&tableList).Error
+	return
+}

@@ -180,22 +180,27 @@ func handlerReturnType(rs []*Return, functionType *FunctionType) Type {
 					log.Errorf("[BUG]: result type is null,check it: %v  name: %s", result.GetOpcode(), result.GetVerboseName())
 					continue
 				}
-				if result.GetType().GetTypeKind() == ClassBluePrintTypeKind {
-					for key, value := range result.GetAllMember() {
-						variable := value.GetLastVariable()
-						functionType.SideEffects = append(functionType.SideEffects, &FunctionSideEffect{
-							Name:        variable.GetName(),
-							VerboseName: getMemberVerboseName(result, key),
-							Variable:    variable,
-							Modify:      value.GetId(),
-							Kind:        NormalSideEffect,
-							parameterMemberInner: &parameterMemberInner{
-								MemberCallKind: CallMemberCall,
-								MemberCallKey:  key.GetId(),
-							},
-						})
+				result.ForEachMember(func(key, value Value) bool {
+					if utils.IsNil(key) || utils.IsNil(value) {
+						return true
 					}
-				}
+					variable := value.GetLastVariable()
+					if variable == nil {
+						return true
+					}
+					functionType.SideEffects = append(functionType.SideEffects, &FunctionSideEffect{
+						Name:        variable.GetName(),
+						VerboseName: getMemberVerboseName(result, key),
+						Variable:    variable,
+						Modify:      value.GetId(),
+						Kind:        NormalSideEffect,
+						parameterMemberInner: &parameterMemberInner{
+							MemberCallKind: CallMemberCall,
+							MemberCallKey:  key.GetId(),
+						},
+					})
+					return true
+				})
 			}
 		}
 	}

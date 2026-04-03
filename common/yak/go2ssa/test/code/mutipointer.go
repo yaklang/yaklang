@@ -1,0 +1,16 @@
+//go:build ignore
+// +build ignore
+
+package main
+
+import "fmt"
+
+func main() {
+	var a int = 1
+	var p *int = &a
+	var pp **int = &p
+	*p = 2
+	fmt.Println(a)
+	**pp = 3
+	fmt.Println(a)
+}
