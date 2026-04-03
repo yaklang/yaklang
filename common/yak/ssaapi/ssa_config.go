@@ -367,7 +367,7 @@ func DefaultConfig(opts ...ssaconfig.Option) (*Config, error) {
 		}
 	}
 	switch c.databaseKind {
-	case ssa.ProgramCacheNone:
+	case ssa.ProgramCacheKind(0):
 		c.databaseKind = ssa.ProgramCacheMemory
 		if c.GetProgramName() != "" {
 			// if set program name, use db write

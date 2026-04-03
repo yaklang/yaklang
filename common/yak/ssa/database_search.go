@@ -25,7 +25,7 @@ func matchInstructionByOpcodes(ctx context.Context, prog *Program, opcodes ...Op
 	var insts []Instruction
 	switch prog.DatabaseKind {
 	case ProgramCacheMemory:
-		for _, inst := range prog.Cache.InstructionCache.GetAll() {
+		for _, inst := range prog.Cache.residentInstructions() {
 			if slices.Contains(opcodes, inst.GetOpcode()) {
 				insts = append(insts, inst)
 			}
@@ -102,7 +102,7 @@ func MatchInstructionsByVariableWithExcludeFiles(
 			return
 		}
 
-		insts := prog.Cache._getByVariableEx(matchMode, check)
+		insts := prog.Cache.findByVariableEx(matchMode, check)
 		if len(excludeFiles) == 0 {
 			addRes(insts...)
 			return
@@ -179,64 +179,4 @@ func getInstructionFilePath(inst Instruction) string {
 		}
 	}
 	return ""
-}
-
-func (c *ProgramCache) _getByVariableEx(
-	mod ssadb.MatchMode,
-	checkValue func(string) bool,
-) []Instruction {
-	var ins []Instruction
-	appendResolved := func(ids []int64) {
-		for _, id := range ids {
-			if id <= 0 {
-				continue
-			}
-			inst := c.GetInstruction(id)
-			if inst == nil {
-				continue
-			}
-			ins = append(ins, inst)
-		}
-	}
-	if mod&ssadb.ConstType != 0 {
-		c.ConstCache.ForEach(func(_ string, ids []int64) {
-			for _, id := range ids {
-				if id <= 0 {
-					continue
-				}
-				inst := c.GetInstruction(id)
-				if inst == nil {
-					continue
-				}
-				if checkValue(inst.String()) {
-					ins = append(ins, inst)
-				}
-			}
-		})
-		return ins
-	}
-	if mod&ssadb.KeyMatch != 0 {
-		// search all instruction
-		c.MemberIndex.ForEach(func(s string, instructions []int64) {
-			if checkValue(s) {
-				appendResolved(instructions)
-			}
-		})
-	}
-	if mod&ssadb.NameMatch != 0 {
-		// search in variable cache
-		c.VariableIndex.ForEach(func(s string, instruction []int64) {
-			if checkValue(s) {
-				appendResolved(instruction)
-			}
-		})
-
-		// search in class instance
-		c.ClassIndex.ForEach(func(s string, instruction []int64) {
-			if checkValue(s) {
-				appendResolved(instruction)
-			}
-		})
-	}
-	return ins
 }

@@ -52,25 +52,6 @@ func GetSSADataBaseInfo() (string, string) {
 	return SSA_PROJECT_DB_DIALECT, SSA_PROJECT_DB_RAW
 }
 
-// GetSSADataBaseConnString returns the current SSA DB setting in a form that can
-// be passed back into SetSSADatabaseInfo/CreateSSAProjectDatabaseRaw.
-func GetSSADataBaseConnString() string {
-	dialect, raw := GetSSADataBaseInfo()
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return ""
-	}
-	if strings.Contains(raw, "://") {
-		return raw
-	}
-	switch strings.ToLower(strings.TrimSpace(dialect)) {
-	case "", "sqlite", "sqlite3", strings.ToLower(SQLiteExtend):
-		return raw
-	default:
-		return fmt.Sprintf("%s://%s", dialect, raw)
-	}
-}
-
 func parseDatabaseURL(raw string) (string, string) {
 	// mysql://root:password@tcp()/<dbname>?charset=utf8&parseTime=True&loc=Local
 	parts := strings.SplitN(raw, "://", 2)
@@ -112,6 +93,7 @@ func SetSSADatabaseInfo(raw string) {
 }
 
 func SetGormSSAProjectDatabaseByInfo(raw string) error {
+	SetSSADatabaseInfo(raw)
 	db, err := CreateSSAProjectDatabaseRaw(raw)
 	if err != nil {
 		return err

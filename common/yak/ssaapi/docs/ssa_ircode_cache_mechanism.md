@@ -1,121 +1,107 @@
-# SSA Compile IR Cache Mechanism
+# SSA 编译期 IR Cache 机制
 
-## Purpose
+## 目的
 
-When SSA compilation runs in database mode, IR objects do not need to stay in
-memory until the entire compile finishes.
+当 SSA 编译跑在数据库模式时，IR 对象没必要一直常驻内存直到整个编译结束。
 
-The compile IR cache exists to reduce peak memory usage while keeping these
-properties stable:
+编译期 IR cache 的目标，是在降低峰值内存的同时保持下面这些性质不被破坏：
 
-- recently used IR can still be read from memory quickly
-- spilled IR can be reloaded lazily from the SSA database
-- IR is only removed from memory after the corresponding database write is
-  acknowledged
-- delete and writeback semantics stay consistent during both runtime eviction
-  and final close
+- 最近刚访问过的 IR 仍然可以直接从内存快速读取
+- 被 spill 到数据库的 IR 仍然可以按需 lazy reload
+- 只有对应的数据库写入确认成功后，内存里的 IR 才能真正移除
+- 运行时淘汰和最终 close 阶段的 delete / writeback 语义保持一致
 
-## Ownership
+## 分层归属
 
-The mechanism is split across four layers:
+这套机制现在分在四层：
 
 - `ssaconfig.SSACompileConfig`
-  - owns compile-time cache settings
+  - 持有编译期 cache 配置
 - `ssa.ProgramCache`
-  - decides which backend is used and which IR should remain hot
-- `dbcache.Cache`
-  - manages resident entries, eviction, async persistence, and save
-    acknowledgement
+  - 编排 instruction / type / source / index 四个专用 store
+- `database_cache_instruction*` / `database_cache_type` / `database_cache_source` / `database_cache_index`
+  - 负责各自对象的 resident 状态、spill / save / reload 策略，以及与 DB 的桥接
+- `dbcache`
+  - 在真正需要的地方提供 resident cache、spill queue、batch save 等基础能力
 - `ssadb`
-  - stores `IrCode`, `IrSource`, `IrIndex`, `IrOffset`, and reload data
+  - 持久化 `IrCode`、`IrSource`、`IrIndex`、`IrOffset` 和 reload 依赖的数据
 
-`ssaapi.Config` should not keep a second copy of compile IR cache state. Runtime
-code reads the effective values from `ssaconfig.Config`.
+`ssaapi.Config` 不应该再保留一份重复的 compile IR cache 状态。运行期只读取
+`ssaconfig.Config` 里的生效值。
 
-## Configuration
+## 配置项
 
-The user-visible compile IR cache knobs are:
+当前对外暴露的编译期 IR cache 开关是：
 
 - `CompileIrCacheTTL`
 - `CompileIrCacheMax`
 
-Their meaning is:
+它们的含义是：
 
 - `ttl > 0`
-  - resident IR can expire by time
+  - 常驻 IR 可以按时间过期
 - `max > 0`
-  - resident IR can expire by capacity
+  - 常驻 IR 可以按容量过期
 - `ttl = 0 && max = 0`
-  - runtime eviction is disabled and IR stays resident until close
+  - 禁用运行时淘汰，IR 一直保留到 close
 
-### Adaptive defaults
+### 自适应默认值
 
-The cache policy can be adjusted automatically from the size of the compile
-input. The runtime input used for this decision is
-`SSACompileConfig.CompileProjectBytes`.
+cache 策略会根据编译输入规模自动调整。这个判断使用的运行时输入是
+`SSACompileConfig.CompileProjectBytes`。
 
-This value is:
+这个值的定位是：
 
-- calculated from the total source bytes of files that enter the compile stage
-- used only to tune cache defaults for small and large projects
-- not serialized into JSON
-- not part of long-term project metadata
+- 统计进入编译阶段的源码总字节数
+- 只用于给小项目 / 大项目调默认 cache 策略
+- 不序列化到 JSON
+- 不属于长期项目元数据
 
-## Runtime Model
+## 运行时模型
 
-In database mode the instruction cache has three observable states:
+数据库模式下，instruction cache 现在有三个可观察状态：
 
 1. resident
-   - the IR object is still available in memory
+   - IR 还在内存里
 2. pending persist
-   - eviction has started, but the object is still retained until async
-     persistence finishes
+   - 已经开始淘汰，但在异步持久化完成前仍然保留内存副本
 3. persisted and removed
-   - the database write succeeded, and the resident copy can be dropped
+   - 数据库写入成功，内存副本可以删除
 
-This prevents a bad window where memory has already been cleared but the
-database write has not completed yet.
+这样可以避免一种坏窗口：内存已经清掉了，但数据库写入还没完成。
 
-### Save acknowledgement
+### Save 确认
 
-Eviction does not remove resident IR immediately.
+淘汰并不会立刻把 resident IR 从内存删掉。
 
-The flow is:
+当前流程是：
 
-1. mark the resident object as pending
-2. marshal it into database form
-3. batch-save it
-4. remove the resident copy only after save succeeds
+1. 先把 resident 对象标成 pending
+2. marshal 成数据库结构
+3. 批量写入
+4. 只有 save 成功后才删除 resident 副本
 
-If a pending object is read again before save finishes, the runtime can keep
-serving the in-memory copy instead of forcing an early reload from the database.
+如果一个 pending 对象在 save 完成前又被访问到了，运行时仍然可以继续返回内存中的那份对象，而不是提前强制从数据库 reload。
 
-## Function-Finish Gating
+## Function.Finish 保护
 
-Compile-time IR is not treated uniformly during the whole build.
+编译期 IR 在整个构建过程中不是一视同仁的。
 
-Instructions that belong to an unfinished function should not be evicted just
-because a TTL or capacity threshold has been reached. The function still owns
-live build state such as parameters, free values, parameter members, blocks, and
-other function-scoped IR relationships.
+属于未完成函数的 instruction，不能只因为触发了 TTL 或容量阈值就被淘汰。此时函数仍然持有活跃构建状态，比如参数、自由变量、parameter member、block，以及其他函数级 IR 关系。
 
-The current policy is:
+当前策略是：
 
-- unfinished-function IR stays protected from runtime eviction
-- when `Function.Finish()` runs, function-scoped IR is re-armed for eviction
-  tracking
-- hot instructions can still remain resident after finish
+- 未完成函数上的 IR 不参与运行时淘汰
+- 当 `Function.Finish()` 执行后，再把函数级 IR 重新纳入淘汰追踪
+- hot instruction 即使 finish 之后也可以继续常驻
 
-This keeps the build path stable while allowing finished parts of the program to
-participate in memory reduction.
+这样可以一边保持构建过程稳定，一边让已经完成的函数参与降内存。
 
-## Hot Instructions
+## Hot Instruction
 
-Some instructions are intentionally kept hotter than ordinary IR because they
-are frequently revisited or still carry non-reloadable runtime state.
+有一部分 instruction 会被刻意保持得比普通 IR 更热，因为它们会被高频回访，或者仍然持有目前无法可靠 reload 的运行时状态。
 
-The hot-instruction set is defined in `common/yak/ssa/database_cache_utils.go`.
-At the time of writing it includes:
+这份 hot instruction 集合定义在 `common/yak/ssa/database_cache_instruction_policy.go`。当前包括：
 
 - `Function`
 - `BasicBlock`
@@ -123,42 +109,37 @@ At the time of writing it includes:
 - `Undefined`
 - `Make`
 
-This list is a maintenance point. If reload behavior changes, the hot set should
-be reviewed together with the reload guarantees.
+这是一处维护点。如果后续 reload 能力变化，这份 hot 集合需要和 reload 保证一起重新审视。
 
-## Source Persistence
+## Source 持久化
 
-`IrCode` rows can reference `IrSource`, so source persistence needs the same
-acknowledgement discipline as instruction persistence.
+`IrCode` 会引用 `IrSource`，所以 source 的持久化也必须遵循与 instruction 一样的确认语义。
 
-The source-hash flow is:
+source hash 的流程是：
 
-1. reserve a source hash as pending
-2. enqueue the `IrSource` save
-3. move the hash to the persisted set only after the save succeeds
-4. if the save fails, clear the pending reservation so later retries are still
-   allowed
+1. 先把 source hash 预留为 pending
+2. 把 `IrSource` 放进保存队列
+3. save 成功后，才把它从 pending 移到 persisted 集合
+4. 如果 save 失败，要把 pending 预留清掉，后续重试才能继续发生
 
-This avoids treating a source file as already persisted when the database write
-did not actually succeed.
+这样可以避免数据库实际没写进去，但运行时误以为这个 source 已经持久化过。
 
-## Close Semantics
+## Close 语义
 
-Close should reuse the same persistence path as runtime eviction.
+close 阶段需要遵循与运行时淘汰一致的持久化语义，但现在由各个专用 store 各自完成收尾。
 
-The close flow is:
+当前 close 流程是：
 
-- mark resident entries for persistence with delete-style eviction reason
-- let the normal marshal and batch-save pipeline run
-- wait for save acknowledgement
-- clear resident entries only after acknowledgement
+- `type store` 先落 type
+- `index store` 落 `IrIndex` / `IrOffset`
+- `instruction store` 完成 instruction spill / writeback / close flush
+- `source store` 最后补齐仍未落库的 source payload
 
-This avoids maintaining a separate save path with different semantics at the end
-of compile.
+这样可以保持语义一致，同时避免在 `ProgramCache` 里塞一层通用中间 cache 抽象。
 
-## Observability
+## 可观测性
 
-Debug logs are available to inspect cache behavior. Typical log families are:
+现在可以通过 debug 日志观察 cache 行为。常见日志族包括：
 
 - reload
 - save
@@ -167,31 +148,30 @@ Debug logs are available to inspect cache behavior. Typical log families are:
 - saver summary
 - cache summary
 
-These logs are operational aids. They should not be required to understand the
-public API.
+这些日志是运维和调试辅助，不应该成为理解公开 API 的前提。
 
-## Maintenance Notes
+## 维护注意点
 
-When modifying this mechanism, check these invariants:
+后续修改这套机制时，至少要重新检查下面这些不变量：
 
-- compile-time cache settings come from `ssaconfig`
-- unfinished-function IR is not evicted prematurely
-- resident objects are only removed after save acknowledgement
-- failed `IrSource` saves do not poison later retries
-- hot-instruction assumptions still match reload guarantees
+- 编译期 cache 配置必须来自 `ssaconfig`
+- 未完成函数上的 IR 不能被过早淘汰
+- resident 对象只能在 save 确认之后移除
+- `IrSource` save 失败不能污染后续重试
+- hot instruction 的假设必须和 reload 保证一致
 
-## Tests
+## 测试
 
-The main regression coverage lives in:
+当前主要回归测试在：
 
 - `common/utils/dbcache/cache_test.go`
 - `common/yak/ssa/database_cache_test.go`
 - `common/yak/ssa/database_search_test.go`
 
-When the mechanism changes, add or update tests around:
+如果机制继续变化，建议优先补或更新下面这些场景：
 
-- finish-triggered eviction
+- `Function.Finish()` 触发后的淘汰
 - lazy reload
 - dirty writeback
-- source-hash acknowledgement and retry
-- hot-instruction residency
+- source hash 的确认与重试
+- hot instruction 常驻行为
