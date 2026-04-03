@@ -125,6 +125,9 @@ func (v *Value) SetAnchorBitVector(bits *utils.BitVector) {
 
 func (v *Value) ExactMatch(ctx context.Context, mod ssadb.MatchMode, want string) (bool, sfvm.Values, error) {
 	value := _SearchValue(v, mod, func(s string) bool { return s == want }, sfvm.WithAnalysisContext_Label("search-exact:"+want))
+	if v != nil && v.ParentProgram != nil {
+		value = appendPhiLinkedToParameters(ctx, v.ParentProgram, value)
+	}
 	return len(value) > 0, ToSFVMValues(value), nil
 }
 
