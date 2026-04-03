@@ -7,13 +7,20 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 )
 
 func TestConfig_Smoking(t *testing.T) {
+	originalTiered := consts.GetTieredAIConfig()
+	consts.SetTieredAIConfig(nil)
+	t.Cleanup(func() {
+		consts.SetTieredAIConfig(originalTiered)
+	})
+
 	config := NewConfig(context.Background())
 	require.NotNil(t, config)
-	require.NotNil(t, config.OriginalAICallback)
+	require.False(t, config.AICallbackAvailable())
 }
 
 func TestConfig_AIServiceName(t *testing.T) {

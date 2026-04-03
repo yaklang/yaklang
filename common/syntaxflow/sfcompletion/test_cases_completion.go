@@ -4,10 +4,8 @@ import (
 	"context"
 	_ "embed"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"io"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/aiforge"
@@ -53,21 +51,6 @@ func CompleteTestCases(
 		return ruleContent, nil
 	}
 
-	aiCallback := func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-		rsp := config.NewAIResponse()
-		go func() {
-			defer rsp.Close()
-			aiConfig = append(aiConfig, aispec.WithStreamHandler(func(c io.Reader) {
-				rsp.EmitOutputStream(c)
-			}))
-			_, err := ai.Chat(req.GetPrompt(), aiConfig...)
-			if err != nil {
-				log.Errorf("chat error: %v", err)
-			}
-		}()
-		return rsp, nil
-	}
-
 	forgeResult, err := aiforge.ExecuteForge(
 		"sf_test_cases_completion",
 		context.Background(),
@@ -80,7 +63,6 @@ func CompleteTestCases(
 			},
 		},
 		aicommon.WithAgreeYOLO(),
-		aicommon.WithAICallback(aiCallback),
 	)
 	if err != nil {
 		return "", utils.Errorf("complete test cases failed: %v", err)
