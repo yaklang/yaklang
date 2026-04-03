@@ -1,0 +1,110 @@
+desc(
+    title: "Detect Golang Excessive Data Exposure of User Email List"
+    title_zh: "检测Golang过度数据暴露：批量返回用户邮箱列表"
+    type: vuln
+    level: low
+    risk: "敏感信息泄露"
+    desc: <<<DESC
+检测批量查询 user 表邮箱字段（`email`）并输出到 HTTP 响应的实现痕迹，可能导致过度数据暴露。
+DESC
+    solution: <<<SOLUTION
+- 最小化返回字段与范围；按权限分级控制批量接口。
+- 增加分页、速率限制与审计日志。
+SOLUTION
+    reference: <<<REFERENCE
+- https://cwe.mitre.org/data/definitions/200.html
+- https://owasp.org/www-project-api-security/
+REFERENCE
+)
+
+<include('golang-user-input')> as $input
+<include("golang-database-sink")> as $db
+
+$input.JSON?(*<slice(index=2)> #{until: "* & $db"}->) as $low
+
+alert $low for {
+    type: "vuln"
+    level: "low"
+    risk: "敏感信息泄露"
+    title: "Excessive data exposure: user email list"
+    title_zh: "过度数据暴露：用户邮箱列表"
+    message: "检测到查询 user.email 并将结果输出到 HTTP 响应的路径，可能存在过度数据暴露。"
+}
+
+desc(
+	lang: golang
+	alert_low: 1
+	'file://unsafe.go': <<<UNSAFE
+package api
+
+import (
+	"fmt"
+
+	"github.com/gin-gonic/gin"
+)
+
+// emailResponse 定义返回用户信息结构体。
+type emailResponse struct {
+	ID    int    `json:"id"`    //用户id，唯一，自增
+	Email string `json:"email"` //邮箱，唯一
+}
+
+func SqliteConn() *sql.DB {
+	db, err := sql.Open("sqlite3", "sql.db")
+	if err != nil {
+		fmt.Println(err)
+	}
+	return db
+}
+
+// GetUserEmail 获取邮箱信息。
+func GetUserEmail(c *gin.Context) {
+	db := SqliteConn()
+	defer db.Close()
+
+	sql := "SELECT id,email FROM user;"
+	row, err := db.Query(sql)
+	if err != nil {
+		fmt.Println(err.Error())
+		c.JSON(400, gin.H{"code": 400, "msg": "query error!"})
+		return
+	}
+	var emailResponseSlice []emailResponse
+	for row.Next() {
+		var email emailResponse
+		err := row.Scan(&email.ID, &email.Email)
+		if err != nil {
+			fmt.Println(err.Error())
+			c.JSON(400, gin.H{"code": 400, "msg": "scan error!"})
+			return
+		}
+		emailResponseSlice = append(emailResponseSlice, email)
+	}
+
+	c.JSON(200, gin.H{"code": 200, "data": emailResponseSlice})
+}
+
+UNSAFE
+	'safefile://safe.go': <<<SAFE
+package main
+
+import (
+	"database/sql"
+
+	"github.com/gin-gonic/gin"
+	_ "github.com/mattn/go-sqlite3"
+)
+
+func safe(c *gin.Context) {
+	db, _ := sql.Open("sqlite3", "sql.db")
+	defer db.Close()
+
+	// 仅查询当前用户所需数据（示意）
+	userID := 1
+	_ = db.QueryRow("SELECT email FROM user WHERE id = ? LIMIT 1;", userID)
+	c.JSON(200, gin.H{"data": "email"})
+}
+
+SAFE
+)
+

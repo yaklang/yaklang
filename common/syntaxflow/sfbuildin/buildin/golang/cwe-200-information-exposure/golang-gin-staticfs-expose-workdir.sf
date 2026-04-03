@@ -1,0 +1,68 @@
+desc(
+    title: "Detect Gin StaticFS Exposes Workdir"
+    title_zh: "检测Gin StaticFS 暴露工作目录（http.Dir(\".\"/\"./\")）"
+    type: vuln
+    level: high
+    risk: "信息泄露"
+    desc: <<<DESC
+检测 Gin 项目中使用 `StaticFS` 将当前目录（`.` / `./`）直接作为静态目录对外暴露的场景，可能导致源码、配置、数据库文件等被下载。
+DESC
+    solution: <<<SOLUTION
+- 静态目录仅指向专用资源目录（如 `./public`），避免暴露项目根目录/工作目录。
+- 视情况增加访问控制与审计，避免暴露敏感文件。
+SOLUTION
+    reference: <<<REFERENCE
+- https://cwe.mitre.org/data/definitions/200.html
+REFERENCE
+)
+
+gin.New() as $new
+$new.StaticFS as $sink
+$sink?(* <slice(index=2)> #{until: `*?{have: /.\//}`}->) as $high
+
+alert $high for {
+    type: "vuln"
+    level: "high"
+    risk: "信息泄露"
+    title: "Gin StaticFS exposes current directory"
+    title_zh: "Gin StaticFS 暴露当前目录"
+    message: "检测到 Gin StaticFS 使用 http.Dir(\".\"/\"./\") 暴露当前目录，可能导致敏感文件泄露。"
+}
+
+desc(
+	lang: golang
+	alert_high: 1
+	'file://unsafe.go': <<<UNSAFE
+package main
+
+import (
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+)
+
+func main() {
+	r := gin.New()
+	r.StaticFS("/static", http.Dir("./"))
+	_ = r
+}
+
+UNSAFE
+	'safefile://safe.go': <<<SAFE
+package main
+
+import (
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+)
+
+func main() {
+	r := gin.New()
+	r.StaticFS("/static", http.Dir("./public"))
+	_ = r
+}
+
+SAFE
+)
+
