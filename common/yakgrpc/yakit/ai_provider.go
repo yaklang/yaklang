@@ -318,6 +318,16 @@ func providerSignature(cfg *ypb.ThirdPartyApplicationConfig) string {
 		builder.WriteString(extra[k])
 		builder.WriteString(";")
 	}
+	var headerBuilder strings.Builder
+	for _, header := range cfg.GetHeaders() {
+		if header == nil {
+			continue
+		}
+		headerBuilder.WriteString(header.GetKey())
+		headerBuilder.WriteString("=")
+		headerBuilder.WriteString(header.GetValue())
+		headerBuilder.WriteString(";")
+	}
 
 	return utils.CalcSha256(
 		cfg.GetType(),
@@ -327,10 +337,13 @@ func providerSignature(cfg *ypb.ThirdPartyApplicationConfig) string {
 		cfg.GetNamespace(),
 		cfg.GetDomain(),
 		cfg.GetBaseURL(),
+		cfg.GetEndpoint(),
 		cfg.GetWebhookURL(),
 		builder.String(),
+		headerBuilder.String(),
 		cfg.GetProxy(),
 		cfg.GetNoHttps(),
+		cfg.GetEnableEndpoint(),
 	)
 }
 

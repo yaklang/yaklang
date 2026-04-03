@@ -349,6 +349,7 @@ func (d *DashScopeGateway) LoadOption(opt ...aispec.AIConfigOption) {
 
 func (d *DashScopeGateway) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
 	var opts []poc.PocConfigOption
+	opts = aispec.AppendCustomHeadersToPocOptions(opts, aispec.ExtraHeadersToMap(d.config.Headers))
 	if d.config.Context == nil {
 		d.config.Context = context.Background()
 		opts = append(opts, poc.WithContext(d.config.Context))

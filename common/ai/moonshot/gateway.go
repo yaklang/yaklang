@@ -125,6 +125,7 @@ func (g *GatewayClient) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
 			"Authorization": "Bearer " + g.config.APIKey,
 		}),
 	}
+	opts = aispec.AppendCustomHeadersToPocOptions(opts, aispec.ExtraHeadersToMap(g.config.Headers))
 	opts = append(opts, poc.WithTimeout(g.config.Timeout))
 	if g.config.Proxy != "" {
 		opts = append(opts, poc.WithProxy(g.config.Proxy))

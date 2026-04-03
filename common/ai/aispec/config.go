@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
 	"github.com/yaklang/yaklang/common/utils/imageutils"
@@ -28,9 +29,11 @@ type RawHTTPRequestResponseCallback func(requestBytes []byte, responseHeaderByte
 
 type AIConfig struct {
 	// gateway network config
-	BaseURL string `json:"base_url" app:"name:base_url,verbose:BaseURL,desc:BaseURL,id:3"`
-	Domain  string `json:"domain"`
-	NoHttps bool   `json:"no_https"`
+	BaseURL        string `json:"base_url" app:"name:base_url,verbose:BaseURL,desc:BaseURL,id:3"`
+	Endpoint       string `json:"endpoint" app:"name:endpoint,verbose:Endpoint,desc:Endpoint,id:4"`
+	EnableEndpoint bool   `json:"enable_endpoint" app:"name:enable_endpoint,verbose:启用Endpoint,desc:启用Endpoint配置,id:5"`
+	Domain         string `json:"domain"`
+	NoHttps        bool   `json:"no_https"`
 
 	// basic model
 	Model    string  `json:"model" app:"name:model,verbose:模型名称,id:2,type:list,required:true"`
@@ -38,8 +41,8 @@ type AIConfig struct {
 	Deadline time.Time
 
 	APIKey  string `json:"api_key" app:"name:api_key,verbose:ApiKey,desc:APIKey / Token,required:true,id:1,type:list"`
-	Proxy   string `json:"proxy" app:"name:proxy,verbose:代理地址,id:4"`
-	APIType string `json:"api_type" app:"name:api_type,verbose:API类型,id:5,required:false,default:chat_completions"`
+	Proxy   string `json:"proxy" app:"name:proxy,verbose:代理地址,id:6"`
+	APIType string `json:"api_type" app:"name:api_type,verbose:API类型,id:7,required:false,default:chat_completions"`
 	Host    string
 	Port    int
 
@@ -55,7 +58,7 @@ type AIConfig struct {
 
 	Images []*ImageDescription
 
-	Headers             []*ypb.HTTPHeader
+	Headers             []*ypb.KVPair
 	EnableThinking      bool
 	EnableThinkingField string
 	EnableThinkingValue any
@@ -85,19 +88,69 @@ type AIConfig struct {
 	RawHTTPRequestResponseCallback RawHTTPRequestResponseCallback
 }
 
-func WithExtraHeader(headers ...*ypb.HTTPHeader) AIConfigOption {
+func WithExtraHeader(headers map[string]string) AIConfigOption {
 	return func(c *AIConfig) {
-		c.Headers = append(c.Headers, headers...)
+		for key, value := range headers {
+			key = strings.TrimSpace(key)
+			if key == "" {
+				continue
+			}
+			exists := false
+			for _, current := range c.Headers {
+				if current == nil {
+					continue
+				}
+				if current.GetKey() == key && current.GetValue() == value {
+					exists = true
+					break
+				}
+			}
+			if !exists {
+				c.Headers = append(c.Headers, &ypb.KVPair{
+					Key:   key,
+					Value: value,
+				})
+			}
+		}
 	}
 }
 
 func WithExtraHeaderString(key string, value string) AIConfigOption {
 	return func(c *AIConfig) {
-		c.Headers = append(c.Headers, &ypb.HTTPHeader{
-			Header: key,
-			Value:  value,
+		c.Headers = append(c.Headers, &ypb.KVPair{
+			Key:   key,
+			Value: value,
 		})
 	}
+}
+
+func AppendCustomHeadersToPocOptions(opts []poc.PocConfigOption, headers map[string]string) []poc.PocConfigOption {
+	for key, value := range headers {
+		key = strings.TrimSpace(key)
+		if key == "" {
+			continue
+		}
+		opts = append(opts, poc.WithReplaceHttpPacketHeader(key, value))
+	}
+	return opts
+}
+
+func ExtraHeadersToMap(headers []*ypb.KVPair) map[string]string {
+	if len(headers) == 0 {
+		return nil
+	}
+	result := make(map[string]string, len(headers))
+	for _, header := range headers {
+		if header == nil {
+			continue
+		}
+		key := strings.TrimSpace(header.GetKey())
+		if key == "" {
+			continue
+		}
+		result[key] = header.GetValue()
+	}
+	return result
 }
 
 func WithEnableThinkingEx(thinkField string, thinkValue any) AIConfigOption {
@@ -251,6 +304,20 @@ func WithBaseURL(baseURL string) AIConfigOption {
 		if baseURL != "" {
 			c.BaseURL = baseURL
 		}
+	}
+}
+
+func WithEndpoint(endpoint string) AIConfigOption {
+	return func(c *AIConfig) {
+		if endpoint != "" {
+			c.Endpoint = endpoint
+		}
+	}
+}
+
+func WithEnableEndpoint(enable bool) AIConfigOption {
+	return func(c *AIConfig) {
+		c.EnableEndpoint = enable
 	}
 }
 

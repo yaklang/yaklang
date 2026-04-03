@@ -165,11 +165,14 @@ func mergeProviderAndModel(provider *ypb.ThirdPartyApplicationConfig, model *ypb
 		Namespace:      provider.GetNamespace(),
 		Domain:         provider.GetDomain(),
 		BaseURL:        provider.GetBaseURL(),
+		Endpoint:       provider.GetEndpoint(),
+		EnableEndpoint: provider.GetEnableEndpoint(),
 		WebhookURL:     provider.GetWebhookURL(),
 		Disabled:       provider.GetDisabled(),
 		Proxy:          provider.GetProxy(),
 		NoHttps:        provider.GetNoHttps(),
 		APIType:        provider.GetAPIType(),
+		Headers:        cloneHTTPHeaders(provider.GetHeaders()),
 	}
 
 	extra := mapFromKVPairs(provider.GetExtraParams())
@@ -223,6 +226,23 @@ func cloneKVPairs(kvs []*ypb.KVPair) []*ypb.KVPair {
 	return cloned
 }
 
+func cloneHTTPHeaders(headers []*ypb.KVPair) []*ypb.KVPair {
+	if len(headers) == 0 {
+		return nil
+	}
+	cloned := make([]*ypb.KVPair, 0, len(headers))
+	for _, header := range headers {
+		if header == nil {
+			continue
+		}
+		cloned = append(cloned, &ypb.KVPair{
+			Key:   header.GetKey(),
+			Value: header.GetValue(),
+		})
+	}
+	return cloned
+}
+
 func cloneThirdPartyConfig(cfg *ypb.ThirdPartyApplicationConfig) *ypb.ThirdPartyApplicationConfig {
 	if cfg == nil {
 		return nil
@@ -235,11 +255,14 @@ func cloneThirdPartyConfig(cfg *ypb.ThirdPartyApplicationConfig) *ypb.ThirdParty
 		Namespace:      cfg.GetNamespace(),
 		Domain:         cfg.GetDomain(),
 		BaseURL:        cfg.GetBaseURL(),
+		Endpoint:       cfg.GetEndpoint(),
+		EnableEndpoint: cfg.GetEnableEndpoint(),
 		WebhookURL:     cfg.GetWebhookURL(),
 		Disabled:       cfg.GetDisabled(),
 		Proxy:          cfg.GetProxy(),
 		NoHttps:        cfg.GetNoHttps(),
 		APIType:        cfg.GetAPIType(),
+		Headers:        cloneHTTPHeaders(cfg.GetHeaders()),
 		ExtraParams:    cloneKVPairs(cfg.GetExtraParams()),
 	}
 }
@@ -380,12 +403,14 @@ func migrateThirdPartyConfigBaseURL(cfg *ypb.ThirdPartyApplicationConfig) bool {
 		return false
 	}
 	rootURL, defaultURI := aiProviderDefaultEndpoint(cfg.GetType())
-	baseURL := aispec.GetBaseURLFromConfig(&aispec.AIConfig{
-		Type:    cfg.GetType(),
-		BaseURL: cfg.GetBaseURL(),
-		Domain:  cfg.GetDomain(),
-		NoHttps: cfg.GetNoHttps(),
-		APIType: cfg.GetAPIType(),
+	baseURL := aispec.GetBaseURLRootFromConfig(&aispec.AIConfig{
+		Type:           cfg.GetType(),
+		BaseURL:        cfg.GetBaseURL(),
+		Endpoint:       cfg.GetEndpoint(),
+		EnableEndpoint: cfg.GetEnableEndpoint(),
+		Domain:         cfg.GetDomain(),
+		NoHttps:        cfg.GetNoHttps(),
+		APIType:        cfg.GetAPIType(),
 	}, rootURL, defaultURI)
 	baseURL = strings.TrimSpace(baseURL)
 	if baseURL == "" {
