@@ -90,7 +90,12 @@ var largeProjectSlowFiles = map[string]map[string]struct{}{
 		"tests/src/Tables/Filters/QueryBuilderTest.php": {},
 	},
 	"PrestaShop": {
-		"classes/controller/AdminController.php": {},
+		"classes/controller/AdminController.php":                                                  {},
+		"src/PrestaShopBundle/Install/Install.php":                                                {},
+		"tests/Integration/Behaviour/Features/Context/CommonFeatureContext.php":                   {},
+		"tests/Integration/Behaviour/Features/Context/Domain/CartFeatureContext.php":              {},
+		"tests/Integration/Behaviour/Features/Context/Domain/Discount/DiscountFeatureContext.php": {},
+		"tests/Integration/Behaviour/Features/Context/Domain/OrderFeatureContext.php":             {},
 	},
 	"QloApps": {
 		"classes/controller/AdminController.php":              {},
