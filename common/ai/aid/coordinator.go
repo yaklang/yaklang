@@ -143,7 +143,7 @@ func (c *Coordinator) enableTaskAnalyze() {
 				},
 			}
 
-			action, err := ExecuteAIForge(c.Ctx, "task-analyst", param, aicommon.WithAICallback(c.OriginalAICallback))
+			action, err := ExecuteAIForge(c.Ctx, "task-analyst", param, aicommon.WithFastAICallback(c.OriginalAICallback))
 			if err != nil {
 				return
 			}

@@ -5,7 +5,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"time"
 
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -184,19 +183,25 @@ func (c *Config) HandleSyncPlanExecTasksEvent(event *ypb.AIInputEvent) error {
 
 func (c *Config) HandleSyncUpdataConfigEvent(event *ypb.AIInputEvent) error {
 	updateConfig := map[string]interface{}{}
+	var legacyHotpatchEvent *ypb.AIInputEvent
 	if event.Params.GetAIService() != "" {
-		err := c.LoadAIServiceByName(event.Params.GetAIService(), event.Params.GetAIModelName())
-		if err != nil {
-			c.EmitError("load ai service failed: %v", err)
+		legacyHotpatchEvent = &ypb.AIInputEvent{
+			HotpatchType: HotPatchType_AIService,
+			Params: &ypb.AIStartParams{
+				AIService:   event.Params.GetAIService(),
+				AIModelName: event.Params.GetAIModelName(),
+			},
 		}
-		log.Warnf("AIInputEvent.Params.AIService WithAIChatInfo is deprecated, " +
-			"model info is now auto-detected from the actual AI gateway call")
 	}
 	if event.Params.GetReviewPolicy() != "" {
-		c.AgreePolicy = AgreePolicyType(event.Params.GetReviewPolicy())
-		c.HotPatchBroadcaster.Submit(WithAgreePolicy(c.AgreePolicy))
-		updateConfig["review_policy"] = event.Params.GetReviewPolicy()
+		legacyHotpatchEvent = &ypb.AIInputEvent{
+			HotpatchType: HotPatchType_AgreePolicy,
+			Params: &ypb.AIStartParams{
+				ReviewPolicy: event.Params.GetReviewPolicy(),
+			},
+		}
 	}
+	c.ProcessHotPatchMessage(legacyHotpatchEvent)
 	c.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "update_config", updateConfig, event.SyncID)
 	return nil
 }

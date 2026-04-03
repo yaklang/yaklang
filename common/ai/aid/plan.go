@@ -245,7 +245,7 @@ User request: %s`, pr.rawInput)
 		return ""
 	}
 
-	forgeResult, err := aicommon.InvokeLiteForge(prompt, aicommon.WithAICallback(aiCallback))
+	forgeResult, err := pr.cod.InvokeLiteForge(prompt)
 	if err != nil {
 		log.Errorf("fallback plan LiteForge invocation failed: %v", err)
 		return ""
@@ -327,21 +327,13 @@ func (c *Coordinator) generateSemanticIdentifier(name string) string {
 		return strings.TrimRight(truncated, "_")
 	}
 
-	aiCallback := c.SpeedPriorityAICallback
-	if aiCallback == nil {
-		aiCallback = c.OriginalAICallback
-	}
-	if aiCallback == nil {
-		return truncateFallback()
-	}
-
 	prompt := fmt.Sprintf(`Generate a very short identifier (2-6 words, max 20 characters total) for the following task name.
 The identifier should capture the core meaning. Chinese or English are both acceptable.
 Reply with ONLY the JSON: {"@action":"object","identifier":"YOUR_IDENTIFIER"}
 
 Task name: %s`, name)
 
-	forgeResult, err := aicommon.InvokeLiteForge(prompt, aicommon.WithAICallback(aiCallback))
+	forgeResult, err := c.InvokeLiteForge(prompt)
 	if err != nil {
 		log.Debugf("liteforge failed to generate semantic identifier for %q: %v, falling back to truncation", name, err)
 		return truncateFallback()

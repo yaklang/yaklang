@@ -3,12 +3,8 @@ package sfcompletion
 import (
 	"context"
 	_ "embed"
-	"io"
-
-	"github.com/yaklang/yaklang/common/ai"
-	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/utils"
 	_ "github.com/yaklang/yaklang/common/yak" // ensure ExecuteForge callback registered
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -19,20 +15,6 @@ func CompleteRule(
 	fileName, ruleContent string,
 	aiConfig ...aispec.AIConfigOption,
 ) (string, error) {
-	aiCallback := func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-		rsp := config.NewAIResponse()
-		go func() {
-			defer rsp.Close()
-			aiConfig = append(aiConfig, aispec.WithStreamHandler(func(c io.Reader) {
-				rsp.EmitOutputStream(c)
-			}))
-			_, err := ai.Chat(req.GetPrompt(), aiConfig...)
-			if err != nil {
-				log.Errorf("chat error: %v", err)
-			}
-		}()
-		return rsp, nil
-	}
 
 	if fileName == "" {
 		return "", utils.Errorf("complete rule failed: fileName is required")
@@ -48,7 +30,6 @@ func CompleteRule(
 			{Key: "file_content", Value: ruleContent},
 		},
 		aicommon.WithAgreeYOLO(),
-		aicommon.WithAICallback(aiCallback),
 	)
 	if err != nil {
 		return "", utils.Errorf("complete rule failed: %v", err)

@@ -373,14 +373,10 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 	// Initialize endpoint manager
 	config.Epm = NewEndpointManagerContext(ctx)
 	config.Epm.SetConfig(config)
-	if config.QualityPriorityAICallback == nil && config.SpeedPriorityAICallback == nil && config.OriginalAICallback == nil {
-		if config.AiServerName != "" {
-			err := config.LoadAIServiceByName(config.AiServerName, config.AiModelName)
-			if err != nil {
-				log.Errorf("load ai service failed: %v", err)
-			}
-		} else {
-			config.SetAICallback(AIChatToAICallbackType(ai.Chat)) // add default ai call back
+	if config.AICallbackAvailable() {
+		if err := WithTieredAICallback()(config); err != nil || !config.AICallbackAvailable() {
+			log.Errorf("Failed to set AI callback: %v", err)
+			return nil
 		}
 	}
 	// Only create new Timeline if not already set via options (e.g., WithTimeline)
@@ -504,7 +500,7 @@ func newConfig(ctx context.Context) *Config {
 
 	if config.SpeedPriorityAICallback != nil {
 		config.Emitter.SetStreamNodeIdI18nProvider(
-			buildStreamNodeIdI18nProvider(config.SpeedPriorityAICallback),
+			config.buildStreamNodeIdI18nProvider(),
 		)
 	}
 
@@ -558,7 +554,8 @@ func WithPersistentSessionId(sid string) ConfigOption {
 	}
 }
 
-// Callback setters
+// WithAICallback
+// WARNING 粗粒度的ai callback 设置，只可在测试或者功能固定单一的ai模块（如知识库蒸馏）使用，其他位置应该用 WithAutoTieredAICallback
 func WithAICallback(cb AICallbackType) ConfigOption {
 	return func(c *Config) error {
 		if c.m == nil {
@@ -582,7 +579,8 @@ func WithAICallback(cb AICallbackType) ConfigOption {
 	}
 }
 
-func WithWrapperedAICallback(cb AICallbackType) ConfigOption {
+// WithFastAICallback 快速 ai callback 设置, 只做设置，不做任何其他的处理 包括 wrapper：主要使用场景：调用主线无关的liteforge时
+func WithFastAICallback(cb AICallbackType) ConfigOption {
 	return func(c *Config) error {
 		if c.m == nil {
 			c.m = &sync.Mutex{}
@@ -590,27 +588,10 @@ func WithWrapperedAICallback(cb AICallbackType) ConfigOption {
 
 		var qualityCb AICallbackType
 		var speedCb AICallbackType
-		if cb == nil {
-			qualityCb, err := GetIntelligentAIModelCallback()
-			if err != nil {
-				log.Errorf("failed to get intelligent AI model callback: %v, using default chat callback", err)
-			} else {
-				qualityCb = c.wrapper(qualityCb, consts.TierIntelligent)
-			}
-
-			speedCb, err = GetLightweightAIModelCallback()
-			if err != nil {
-				log.Errorf("failed to get lightweight AI model callback: %v, using default chat callback", err)
-			} else {
-				speedCb = c.wrapper(speedCb, consts.TierLightweight)
-			}
-		} else {
-			qualityCb = cb
-			speedCb = cb
-		}
 
 		c.m.Lock()
 		defer c.m.Unlock()
+		c.OriginalAICallback = cb
 		c.QualityPriorityAICallback = qualityCb
 		c.SpeedPriorityAICallback = speedCb
 		return nil
@@ -2725,25 +2706,6 @@ func (c *Config) Wait() {
 	c.wg.Wait()
 }
 
-func (c *Config) SetAICallback(callback AICallbackType) {
-	if c.m == nil {
-		c.m = &sync.Mutex{}
-	}
-
-	// if callback is nil, use default ai.Chat
-	if callback == nil {
-		callback = AIChatToAICallbackType(ai.Chat)
-	}
-
-	qualityCb := c.wrapper(callback, consts.TierIntelligent)
-	speedCb := c.wrapper(callback, consts.TierLightweight)
-	c.m.Lock()
-	defer c.m.Unlock()
-	c.OriginalAICallback = callback
-	c.QualityPriorityAICallback = qualityCb
-	c.SpeedPriorityAICallback = speedCb
-}
-
 func (c *Config) SetContext(ctx context.Context) {
 	if ctx == nil {
 		return
@@ -2965,29 +2927,6 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	return opts
 }
 
-func (c *Config) LoadAIServiceByName(name string, modelName string) error {
-	aiConfig, err := ai.LoadAiGatewayConfig(name)
-	if err != nil {
-		return fmt.Errorf("%s not found", name)
-	}
-	chat, err := ai.LoadChater(name)
-	if err != nil {
-		return err
-	}
-
-	cb := AIChatToAICallbackType(chat)
-	wCb := c.wrapper(cb, consts.TierIntelligent)
-	if modelName == "" {
-		modelName = aiConfig.Model
-	}
-	c.m.Lock()
-	c.OriginalAICallback = cb
-	c.SetQualityPriorityAICallbackInLock(wCb, name, modelName)
-	c.m.Unlock()
-	c.HotPatchBroadcaster.Submit(WithQualityPriorityAICallback(cb))
-	return nil
-}
-
 func (c *Config) GetConsumptionConfig() (*int64, *int64, string) {
 	state := c.ensureConsumptionState()
 	if state == nil {
@@ -3001,13 +2940,20 @@ func (c *Config) OriginOptions() []ConfigOption {
 	return c.originOptions
 }
 
-func (c *Config) SetQualityPriorityAICallbackInLock(callback AICallbackType, service, model string) {
-	c.QualityPriorityAICallback = callback
-	c.AiServerName = service
-	c.AiModelName = model
+func (c *Config) AICallbackAvailable() bool {
+	return !(c.QualityPriorityAICallback == nil && c.SpeedPriorityAICallback == nil && c.OriginalAICallback == nil)
 }
 
-func buildStreamNodeIdI18nProvider(aiCallback AICallbackType) func(nodeId string) *schema.I18n {
+func (c *Config) InvokeLiteForge(prompt string, opts ...any) (*ForgeResult, error) {
+	if c.SpeedPriorityAICallback != nil {
+		opts = append(opts, WithFastAICallback(c.SpeedPriorityAICallback))
+	} else {
+		opts = append(opts, WithFastAICallback(c.QualityPriorityAICallback))
+	}
+	return InvokeLiteForge(prompt, opts...)
+}
+
+func (c *Config) buildStreamNodeIdI18nProvider() func(nodeId string) *schema.I18n {
 	return func(nodeId string) *schema.I18n {
 		prompt := fmt.Sprintf(`You are a UI localization assistant for an AI agent system.
 Translate the following technical stream/node identifier into concise, user-friendly display names.
@@ -3019,14 +2965,11 @@ Requirements:
 - Chinese (zh): A short, natural Chinese phrase (2-6 characters preferred)
 - English (en): A short, capitalized English phrase`, nodeId)
 
-		result, err := InvokeLiteForge(
-			prompt,
+		result, err := c.InvokeLiteForge(prompt,
 			WithLiteForgeOutputSchemaFromAIToolOptions(
 				aitool.WithStringParam("zh", aitool.WithParam_Description("Chinese user-friendly display name")),
 				aitool.WithStringParam("en", aitool.WithParam_Description("English user-friendly display name")),
-			),
-			WithAICallback(aiCallback),
-		)
+			))
 		if err != nil {
 			log.Infof("stream nodeId i18n provider skipped for %q: %v", nodeId, err)
 			return nil

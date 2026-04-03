@@ -295,7 +295,7 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 	baseOpts = append(baseOpts,
 		aicommon.WithID(uid),
 		aicommon.WithTimeline(r.config.Timeline),
-		aicommon.WithAICallback(r.config.OriginalAICallback),
+		aicommon.WithAutoTieredAICallback(r.config.OriginalAICallback), // just inherit original call back , use tier default!!!
 		aicommon.WithAllowPlanUserInteract(true),
 		aicommon.WithEventInputChanx(inputChannel),
 		aicommon.WithHotPatchOptionChan(hotpatchChan),
