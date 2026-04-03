@@ -35,22 +35,28 @@ find_file(dir="/abs/project", pattern="*.php")
 
 ### 阶段A：关键词搜索（可多次 grep 累积）
 
-目标：根据 **ReactiveData 中的 Sink 语义提示** 结合已知技术栈，**自主推导**合适的 grep 关键词，每次 grep 后立即调用 lock_target_files 追加命中文件。可多次 grep + lock_target_files 累积更多目标文件；确认收集完毕后调用一次 lock_target_files(done=true) 切换到阶段B。
+目标：根据 **ReactiveData 中的 Sink 语义提示** 结合已知技术栈，**自主推导**合适的 grep 关键词，**使用 `output-mode=files_with_matches` 模式**先发现哪些文件包含匹配，每次 grep 后立即调用 lock_target_files 追加命中文件。可多次 grep + lock_target_files 累积更多目标文件；确认收集完毕后调用一次 lock_target_files(done=true) 切换到阶段B。
+
+**搜索模式选择（重要）**：
+- **阶段A 必须使用 `output-mode=files_with_matches`**：该模式只返回匹配到的文件路径和匹配数，不返回具体行内容。这样可以在大型代码库中快速发现所有包含 Sink 的文件，避免因 limit 限制而遗漏重要文件。
+- 该模式下 limit 默认为 200（最多返回 200 个文件），足以覆盖大多数项目。
+- **切勿在阶段A使用默认的 content 模式**：content 模式返回具体匹配行，limit 容易被少数文件的大量匹配行耗尽，导致排在目录后面的文件完全不被发现。
 
 **关键词推导原则**：
 - Sink 语义提示中的 Examples 是参考，不是固定关键词——要结合实际技术栈选择最匹配该语言/框架的写法
 - 例如同样是"SQL执行"，PHP 项目应搜 `->query(`，Go 项目应搜 `db.Exec(`，Java 项目应搜 `createNativeQuery`
 - 若 Phase1 侦察到的技术栈或背景报告已列出框架信息，优先使用框架专属写法
 - 不确定时可搜多个备选词（多次 grep），宁多勿少，命中后再人工判断
+- **搜索关键词应尽量简短精准**：例如搜 `Exec(` 而非 `\.Exec\(.*fmt\.Sprintf`，过于复杂的正则容易漏掉跨行调用
 
 ```
-# 第一次搜索（根据技术栈选择对应语言的 Sink 函数名）
-grep(pattern=<根据技术栈选定的sink关键词1>, path=<用户指定的项目根目录绝对路径>)
-lock_target_files(target_files=[...命中文件绝对路径...], done=false, reason="搜索关键词1命中")
+# 第一次搜索（使用 files_with_matches 模式，只获取文件列表）
+grep(pattern=<根据技术栈选定的sink关键词1>, path=<项目根目录绝对路径>, output-mode="files_with_matches")
+lock_target_files(target_files=[...命中文件绝对路径（排除测试文件）...], done=false, reason="搜索关键词1命中N个文件")
 
 # 继续搜索其他关键词或备选写法
-grep(pattern=<sink关键词2>, path=<用户指定的项目根目录绝对路径>)
-lock_target_files(target_files=[...命中文件绝对路径...], done=false, reason="搜索关键词2命中")
+grep(pattern=<sink关键词2>, path=<项目根目录绝对路径>, output-mode="files_with_matches")
+lock_target_files(target_files=[...命中文件绝对路径...], done=false, reason="搜索关键词2命中N个文件")
 
 # 收集完毕，切换到阶段B
 lock_target_files(target_files=[], done=true, reason="搜索完成，共N个文件")
@@ -76,7 +82,7 @@ complete_scan(coverage_summary="...")
 
 | Action | 阶段 | 用途 |
 |--------|------|------|
-| `grep(pattern, path, ...)` | 仅阶段A | 搜索关键词，`path` 为目录绝对路径 |
+| `grep(pattern, path, output-mode?, ...)` | 仅阶段A | 搜索关键词，`path` 为目录绝对路径。**阶段A务必使用 `output-mode="files_with_matches"` 只返回文件列表** |
 | `find_file(dir, pattern, ...)` | 仅阶段A | 按名称/glob 搜索文件，`dir` 为目录绝对路径 |
 | `lock_target_files(target_files, done?, reason?)` | 阶段A | `done=false`（默认）追加文件继续搜索；`done=true` 切换到阶段B |
 | `read_file(file, offset?, lines?)` | 仅阶段B | 读取代码内容，**`file` 为文件完整绝对路径（非 path）** |

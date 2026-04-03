@@ -763,12 +763,23 @@ LOOP:
 		// 记录 action 执行开始时间
 		actionStartTime := time.Now()
 
-		r.loadingStatus("执行动作 " + actionName + " 中 / Executing action " + actionName + "...")
-		handler.ActionHandler(
-			r,
-			actionParams,
-			operator,
-		)
+		// Temporarily sync the invoker's currentTask with this loop's task so that
+		// any tool call made inside the action handler (via ExecuteToolRequiredAndCallWithoutRequired)
+		// writes its log files (saveToolCallFiles) into the sub-task's directory instead of
+		// the top-level orchestrator task's directory.
+		func() {
+			invoker := r.GetInvoker()
+			prevInvokerTask := invoker.GetCurrentTask()
+			invoker.SetCurrentTask(task)
+			defer invoker.SetCurrentTask(prevInvokerTask)
+
+			r.loadingStatus("执行动作 " + actionName + " 中 / Executing action " + actionName + "...")
+			handler.ActionHandler(
+				r,
+				actionParams,
+				operator,
+			)
+		}()
 
 		// 计算 action 执行时间
 		actionExecutionDuration := time.Since(actionStartTime)
