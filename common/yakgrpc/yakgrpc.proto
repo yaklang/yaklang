@@ -2828,6 +2828,9 @@ message ThirdPartyApplicationConfig {
   bool NoHttps = 11;
   string APIType = 12;
   string BaseURL = 13;
+  string Endpoint = 14;
+  bool EnableEndpoint = 15;
+  repeated KVPair Headers = 16;
 }
 
 message DiagnoseNetworkRequest {

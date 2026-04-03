@@ -38,6 +38,9 @@ func (s *Server) ListAiModel(ctx context.Context, req *ypb.ListAiModelRequest) (
 		aispec.WithAPIKey(config.APIKey),
 		aispec.WithType(config.Type),
 		aispec.WithBaseURL(config.BaseURL),
+		aispec.WithEndpoint(config.Endpoint),
+		aispec.WithEnableEndpoint(config.EnableEndpoint),
+		aispec.WithExtraHeader(aispec.ExtraHeadersToMap(config.Headers)),
 		aispec.WithNoHttps(config.NoHttps),
 		aispec.WithDomain(config.Domain),
 		aispec.WithProxy(config.Proxy),
@@ -121,7 +124,322 @@ func executeAIConfigHealthCheck(ctx context.Context, config *ypb.ThirdPartyAppli
 }
 
 func recommendAIHealthCheckConfig(ctx context.Context, original *ypb.ThirdPartyApplicationConfig, content string) *ypb.ThirdPartyApplicationConfig {
-	candidates := buildRecommendedAIConfigs(original)
+	return findFirstWorkingAIConfig(ctx, buildRecommendedAIConfigs(original), content)
+}
+
+func buildRecommendedAIConfigs(original *ypb.ThirdPartyApplicationConfig) []*ypb.ThirdPartyApplicationConfig {
+	if original == nil {
+		return nil
+	}
+	apiTypeCandidates := recommendedAIAPITypes(original.GetAPIType())
+	proxyCandidates := []string{strings.TrimSpace(original.GetProxy())}
+	if proxyCandidates[0] != "" {
+		proxyCandidates = append(proxyCandidates, "")
+	}
+	seen := make(map[string]struct{})
+	var candidates []*ypb.ThirdPartyApplicationConfig
+	addCandidate := func(cfg *ypb.ThirdPartyApplicationConfig) {
+		if cfg == nil {
+			return
+		}
+		rawKey := strings.TrimSpace(cfg.GetBaseURL()) + "|" + strings.TrimSpace(cfg.GetEndpoint()) + "|" + cfg.GetProxy() + "|" + strings.TrimSpace(cfg.GetAPIType()) + "|" + utils.InterfaceToString(cfg.GetEnableEndpoint())
+		if _, ok := seen[rawKey]; ok {
+			return
+		}
+		seen[rawKey] = struct{}{}
+		candidates = append(candidates, cfg)
+	}
+
+	for _, endpoint := range collectAIEndpoints(original) {
+		for _, apiType := range apiTypeCandidates {
+			for _, proxyValue := range proxyCandidates {
+				cfg := cloneThirdPartyApplicationConfig(original)
+				cfg.BaseURL = ""
+				cfg.Endpoint = endpoint
+				cfg.EnableEndpoint = true
+				cfg.Proxy = proxyValue
+				cfg.APIType = apiType
+				cfg.NoHttps = strings.HasPrefix(strings.ToLower(endpoint), "http://")
+				addCandidate(cfg)
+			}
+		}
+	}
+	return candidates
+}
+
+func collectAIBaseRoots(config *ypb.ThirdPartyApplicationConfig) []string {
+	var roots []string
+	for _, raw := range []string{
+		strings.TrimSpace(config.GetBaseURL()),
+		migratedBaseURLForHealthCheck(config),
+		baseURLRootFromEndpoint(strings.TrimSpace(config.GetEndpoint())),
+	} {
+		appendAIBaseRoots(&roots, raw)
+	}
+	for _, raw := range collectAIEndpoints(config) {
+		appendAIBaseRoots(&roots, baseURLRootFromEndpoint(raw))
+	}
+	rootURL, _ := aiProviderDefaultEndpointForHealthCheck(config.GetType())
+	appendAIBaseRoots(&roots, rootURL)
+	return compactStrings(roots)
+}
+
+func collectAIEndpoints(config *ypb.ThirdPartyApplicationConfig) []string {
+	if config == nil {
+		return nil
+	}
+	apiTypeCandidates := recommendedAIAPITypes(config.GetAPIType())
+	schemes := []string{"https", "http"}
+	if strings.TrimSpace(config.GetEndpoint()) != "" {
+		if u, err := url.Parse(strings.TrimSpace(config.GetEndpoint())); err == nil && u.Scheme != "" {
+			schemes = append([]string{u.Scheme}, schemes...)
+		}
+	} else if strings.TrimSpace(config.GetBaseURL()) != "" {
+		if u, err := url.Parse(strings.TrimSpace(config.GetBaseURL())); err == nil && u.Scheme != "" {
+			schemes = append([]string{u.Scheme}, schemes...)
+		}
+	}
+
+	var endpoints []string
+	for _, raw := range []string{
+		strings.TrimSpace(config.GetEndpoint()),
+		strings.TrimSpace(config.GetBaseURL()),
+		migratedEndpointForHealthCheck(config),
+	} {
+		if raw == "" {
+			continue
+		}
+		endpoints = append(endpoints, raw)
+	}
+
+	for _, root := range collectAIBaseRootsWithoutEndpointExpansion(config) {
+		for _, scheme := range schemes {
+			rewrittenRoot := rewriteURLScheme(root, scheme)
+			for _, apiType := range apiTypeCandidates {
+				for _, suffix := range recommendedAISuffixesByAPIType(apiType) {
+					endpoint := joinAIBaseURL(rewrittenRoot, suffix)
+					if endpoint != "" {
+						endpoints = append(endpoints, endpoint)
+					}
+				}
+			}
+		}
+	}
+	return compactStrings(endpoints)
+}
+
+func collectAIBaseRootsWithoutEndpointExpansion(config *ypb.ThirdPartyApplicationConfig) []string {
+	var roots []string
+	for _, raw := range []string{
+		strings.TrimSpace(config.GetBaseURL()),
+		migratedBaseURLForHealthCheck(config),
+		baseURLRootFromEndpoint(strings.TrimSpace(config.GetEndpoint())),
+	} {
+		appendAIBaseRoots(&roots, raw)
+	}
+	rootURL, _ := aiProviderDefaultEndpointForHealthCheck(config.GetType())
+	appendAIBaseRoots(&roots, rootURL)
+	return compactStrings(roots)
+}
+
+func appendAIBaseRoots(roots *[]string, raw string) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return
+	}
+	if !strings.Contains(raw, "://") {
+		raw = "https://" + raw
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" {
+		return
+	}
+	*roots = append(*roots, u.Scheme+"://"+u.Host)
+	cleanPath := normalizeAIBasePath(u.Path)
+	if cleanPath != "" {
+		*roots = append(*roots, u.Scheme+"://"+u.Host+cleanPath)
+	}
+}
+
+func normalizeAIBasePath(rawPath string) string {
+	rawPath = strings.TrimSpace(rawPath)
+	if rawPath == "" || rawPath == "/" {
+		return ""
+	}
+	rawPath = strings.TrimRight(rawPath, "/")
+	for _, suffix := range []string{
+		"/responses",
+		"/v1/responses",
+		"/api/v1/responses",
+		"/chat/completions",
+		"/v1/chat/completions",
+		"/api/v1/chat/completions",
+		"/compatible-mode/v1/chat/completions",
+		"/api/v3/chat/completions",
+		"/api/paas/v4/chat/completions",
+	} {
+		if strings.HasSuffix(rawPath, suffix) {
+			rawPath = strings.TrimSuffix(rawPath, suffix)
+			break
+		}
+	}
+	if rawPath == "" || rawPath == "/" {
+		return ""
+	}
+	return rawPath
+}
+
+func baseURLRootFromEndpoint(endpoint string) string {
+	endpoint = strings.TrimSpace(endpoint)
+	if endpoint == "" {
+		return ""
+	}
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return strings.TrimRight(trimKnownAIEndpointSuffix(endpoint), "/")
+	}
+	u.Path = trimKnownAIEndpointSuffix(u.Path)
+	u.RawPath = ""
+	if u.Path == "/" {
+		u.Path = ""
+	}
+	return strings.TrimRight(u.String(), "/")
+}
+
+func trimKnownAIEndpointSuffix(raw string) string {
+	raw = strings.TrimSpace(raw)
+	raw = strings.TrimRight(raw, "/")
+	for _, suffix := range []string{
+		"/responses",
+		"/v1/responses",
+		"/api/v1/responses",
+		"/chat/completions",
+		"/v1/chat/completions",
+		"/api/v1/chat/completions",
+		"/compatible-mode/v1/chat/completions",
+		"/api/v3/chat/completions",
+		"/api/paas/v4/chat/completions",
+	} {
+		if strings.HasSuffix(raw, suffix) {
+			return strings.TrimSuffix(raw, suffix)
+		}
+	}
+	return raw
+}
+
+func joinAIBaseURL(root string, suffix string) string {
+	root = strings.TrimSpace(root)
+	if root == "" {
+		return ""
+	}
+	if suffix == "" {
+		return strings.TrimRight(root, "/")
+	}
+	u, err := url.Parse(root)
+	if err != nil {
+		return ""
+	}
+	u.Path = path.Join(strings.TrimSuffix(u.Path, "/"), suffix)
+	return u.String()
+}
+
+func rewriteURLScheme(raw string, scheme string) string {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return raw
+	}
+	u.Scheme = scheme
+	return u.String()
+}
+
+func migratedBaseURLForHealthCheck(config *ypb.ThirdPartyApplicationConfig) string {
+	cfg := cloneThirdPartyApplicationConfig(config)
+	if cfg == nil {
+		return ""
+	}
+	return migratedBaseURLForConfig(cfg)
+}
+
+func migratedBaseURLForConfig(config *ypb.ThirdPartyApplicationConfig) string {
+	if config == nil {
+		return ""
+	}
+	if strings.TrimSpace(config.GetBaseURL()) != "" && !config.GetEnableEndpoint() {
+		return strings.TrimSpace(config.GetBaseURL())
+	}
+	rootURL, defaultURI := aiProviderDefaultEndpointForHealthCheck(config.GetType())
+	return strings.TrimSpace(aispec.GetBaseURLRootFromConfig(&aispec.AIConfig{
+		Type:           config.GetType(),
+		BaseURL:        config.GetBaseURL(),
+		Endpoint:       config.GetEndpoint(),
+		EnableEndpoint: config.GetEnableEndpoint(),
+		Domain:         config.GetDomain(),
+		NoHttps:        config.GetNoHttps(),
+		APIType:        config.GetAPIType(),
+	}, rootURL, defaultURI))
+}
+
+func migratedEndpointForHealthCheck(config *ypb.ThirdPartyApplicationConfig) string {
+	if config == nil {
+		return ""
+	}
+	if config.GetEnableEndpoint() && strings.TrimSpace(config.GetEndpoint()) != "" {
+		return strings.TrimSpace(config.GetEndpoint())
+	}
+	rootURL, defaultURI := aiProviderDefaultEndpointForHealthCheck(config.GetType())
+	return strings.TrimSpace(aispec.GetBaseURLFromConfig(&aispec.AIConfig{
+		Type:           config.GetType(),
+		BaseURL:        config.GetBaseURL(),
+		Endpoint:       config.GetEndpoint(),
+		EnableEndpoint: config.GetEnableEndpoint(),
+		Domain:         config.GetDomain(),
+		NoHttps:        config.GetNoHttps(),
+		APIType:        config.GetAPIType(),
+	}, rootURL, defaultURI))
+}
+
+func cloneThirdPartyApplicationConfig(config *ypb.ThirdPartyApplicationConfig) *ypb.ThirdPartyApplicationConfig {
+	if config == nil {
+		return nil
+	}
+	return &ypb.ThirdPartyApplicationConfig{
+		Type:           config.GetType(),
+		APIKey:         config.GetAPIKey(),
+		UserIdentifier: config.GetUserIdentifier(),
+		UserSecret:     config.GetUserSecret(),
+		Namespace:      config.GetNamespace(),
+		Domain:         config.GetDomain(),
+		WebhookURL:     config.GetWebhookURL(),
+		ExtraParams:    append([]*ypb.KVPair(nil), config.GetExtraParams()...),
+		Disabled:       config.GetDisabled(),
+		Proxy:          config.GetProxy(),
+		NoHttps:        config.GetNoHttps(),
+		APIType:        config.GetAPIType(),
+		BaseURL:        config.GetBaseURL(),
+		Endpoint:       config.GetEndpoint(),
+		EnableEndpoint: config.GetEnableEndpoint(),
+		Headers:        cloneHTTPHeaders(config.GetHeaders()),
+	}
+}
+
+func cloneHTTPHeaders(headers []*ypb.KVPair) []*ypb.KVPair {
+	if len(headers) == 0 {
+		return nil
+	}
+	cloned := make([]*ypb.KVPair, 0, len(headers))
+	for _, header := range headers {
+		if header == nil {
+			continue
+		}
+		cloned = append(cloned, &ypb.KVPair{
+			Key:   header.GetKey(),
+			Value: header.GetValue(),
+		})
+	}
+	return cloned
+}
+
+func findFirstWorkingAIConfig(ctx context.Context, candidates []*ypb.ThirdPartyApplicationConfig, content string) *ypb.ThirdPartyApplicationConfig {
 	if len(candidates) == 0 {
 		return nil
 	}
@@ -193,212 +511,6 @@ func recommendAIHealthCheckConfig(ctx context.Context, original *ypb.ThirdPartyA
 		default:
 			return nil
 		}
-	}
-}
-
-func buildRecommendedAIConfigs(original *ypb.ThirdPartyApplicationConfig) []*ypb.ThirdPartyApplicationConfig {
-	if original == nil {
-		return nil
-	}
-	apiTypeCandidates := recommendedAIAPITypes(original.GetAPIType())
-
-	proxyCandidates := []string{strings.TrimSpace(original.GetProxy())}
-	if proxyCandidates[0] != "" {
-		proxyCandidates = append(proxyCandidates, "")
-	}
-
-	schemes := []string{"https", "http"}
-	if strings.TrimSpace(original.GetBaseURL()) != "" {
-		if u, err := url.Parse(strings.TrimSpace(original.GetBaseURL())); err == nil && u.Scheme != "" {
-			schemes = append([]string{u.Scheme}, schemes...)
-		}
-	} else if original.GetNoHttps() {
-		schemes = append([]string{"http"}, schemes...)
-	}
-
-	baseRoots := collectAIBaseRoots(original)
-	seen := make(map[string]struct{})
-	var candidates []*ypb.ThirdPartyApplicationConfig
-	addCandidate := func(cfg *ypb.ThirdPartyApplicationConfig) {
-		if cfg == nil || strings.TrimSpace(cfg.GetBaseURL()) == "" {
-			return
-		}
-		key := cfg.GetBaseURL() + "|" + cfg.GetProxy() + "|" + strings.TrimSpace(cfg.GetAPIType())
-		if _, ok := seen[key]; ok {
-			return
-		}
-		seen[key] = struct{}{}
-		candidates = append(candidates, cfg)
-	}
-
-	for _, exact := range []string{strings.TrimSpace(original.GetBaseURL()), migratedBaseURLForHealthCheck(original)} {
-		if exact == "" {
-			continue
-		}
-		for _, apiType := range apiTypeCandidates {
-			for _, proxyValue := range proxyCandidates {
-				cfg := cloneThirdPartyApplicationConfig(original)
-				cfg.BaseURL = exact
-				cfg.Proxy = proxyValue
-				cfg.APIType = apiType
-				cfg.NoHttps = strings.HasPrefix(strings.ToLower(exact), "http://")
-				addCandidate(cfg)
-			}
-		}
-	}
-
-	for _, root := range baseRoots {
-		for _, scheme := range schemes {
-			rewrittenRoot := rewriteURLScheme(root, scheme)
-			for _, apiType := range apiTypeCandidates {
-				for _, suffix := range recommendedAISuffixesByAPIType(apiType) {
-					baseURL := joinAIBaseURL(rewrittenRoot, suffix)
-					if baseURL == "" {
-						continue
-					}
-					for _, proxyValue := range proxyCandidates {
-						cfg := cloneThirdPartyApplicationConfig(original)
-						cfg.BaseURL = baseURL
-						cfg.Proxy = proxyValue
-						cfg.APIType = apiType
-						cfg.NoHttps = scheme == "http"
-						addCandidate(cfg)
-					}
-				}
-			}
-		}
-	}
-	return candidates
-}
-
-func collectAIBaseRoots(config *ypb.ThirdPartyApplicationConfig) []string {
-	var roots []string
-	for _, raw := range []string{
-		strings.TrimSpace(config.GetBaseURL()),
-		migratedBaseURLForHealthCheck(config),
-	} {
-		appendAIBaseRoots(&roots, raw)
-	}
-	rootURL, _ := aiProviderDefaultEndpointForHealthCheck(config.GetType())
-	appendAIBaseRoots(&roots, rootURL)
-	return compactStrings(roots)
-}
-
-func appendAIBaseRoots(roots *[]string, raw string) {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return
-	}
-	if !strings.Contains(raw, "://") {
-		raw = "https://" + raw
-	}
-	u, err := url.Parse(raw)
-	if err != nil || u.Host == "" {
-		return
-	}
-	*roots = append(*roots, u.Scheme+"://"+u.Host)
-	cleanPath := normalizeAIBasePath(u.Path)
-	if cleanPath != "" {
-		*roots = append(*roots, u.Scheme+"://"+u.Host+cleanPath)
-	}
-}
-
-func normalizeAIBasePath(rawPath string) string {
-	rawPath = strings.TrimSpace(rawPath)
-	if rawPath == "" || rawPath == "/" {
-		return ""
-	}
-	rawPath = strings.TrimRight(rawPath, "/")
-	for _, suffix := range []string{
-		"/responses",
-		"/v1/responses",
-		"/api/v1/responses",
-		"/chat/completions",
-		"/v1/chat/completions",
-		"/api/v1/chat/completions",
-		"/compatible-mode/v1/chat/completions",
-		"/api/v3/chat/completions",
-		"/api/paas/v4/chat/completions",
-	} {
-		if strings.HasSuffix(rawPath, suffix) {
-			rawPath = strings.TrimSuffix(rawPath, suffix)
-			break
-		}
-	}
-	if rawPath == "" || rawPath == "/" {
-		return ""
-	}
-	return rawPath
-}
-
-func joinAIBaseURL(root string, suffix string) string {
-	root = strings.TrimSpace(root)
-	if root == "" {
-		return ""
-	}
-	if suffix == "" {
-		return strings.TrimRight(root, "/")
-	}
-	u, err := url.Parse(root)
-	if err != nil {
-		return ""
-	}
-	u.Path = path.Join(strings.TrimSuffix(u.Path, "/"), suffix)
-	return u.String()
-}
-
-func rewriteURLScheme(raw string, scheme string) string {
-	u, err := url.Parse(raw)
-	if err != nil {
-		return raw
-	}
-	u.Scheme = scheme
-	return u.String()
-}
-
-func migratedBaseURLForHealthCheck(config *ypb.ThirdPartyApplicationConfig) string {
-	cfg := cloneThirdPartyApplicationConfig(config)
-	if cfg == nil {
-		return ""
-	}
-	return migratedBaseURLForConfig(cfg)
-}
-
-func migratedBaseURLForConfig(config *ypb.ThirdPartyApplicationConfig) string {
-	if config == nil {
-		return ""
-	}
-	if strings.TrimSpace(config.GetBaseURL()) != "" {
-		return strings.TrimSpace(config.GetBaseURL())
-	}
-	rootURL, defaultURI := aiProviderDefaultEndpointForHealthCheck(config.GetType())
-	return strings.TrimSpace(aispec.GetBaseURLFromConfig(&aispec.AIConfig{
-		Type:    config.GetType(),
-		BaseURL: config.GetBaseURL(),
-		Domain:  config.GetDomain(),
-		NoHttps: config.GetNoHttps(),
-		APIType: config.GetAPIType(),
-	}, rootURL, defaultURI))
-}
-
-func cloneThirdPartyApplicationConfig(config *ypb.ThirdPartyApplicationConfig) *ypb.ThirdPartyApplicationConfig {
-	if config == nil {
-		return nil
-	}
-	return &ypb.ThirdPartyApplicationConfig{
-		Type:           config.GetType(),
-		APIKey:         config.GetAPIKey(),
-		UserIdentifier: config.GetUserIdentifier(),
-		UserSecret:     config.GetUserSecret(),
-		Namespace:      config.GetNamespace(),
-		Domain:         config.GetDomain(),
-		WebhookURL:     config.GetWebhookURL(),
-		ExtraParams:    append([]*ypb.KVPair(nil), config.GetExtraParams()...),
-		Disabled:       config.GetDisabled(),
-		Proxy:          config.GetProxy(),
-		NoHttps:        config.GetNoHttps(),
-		APIType:        config.GetAPIType(),
-		BaseURL:        config.GetBaseURL(),
 	}
 }
 

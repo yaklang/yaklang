@@ -105,12 +105,12 @@ func TestGetAIGlobalConfig_MigratesLegacyBaseURL(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, loaded.GetIntelligentModels(), 1)
 	require.NotNil(t, loaded.GetIntelligentModels()[0].GetProvider())
-	assert.Equal(t, "http://api.openai.com/v1/chat/completions", loaded.GetIntelligentModels()[0].GetProvider().GetBaseURL())
+	assert.Equal(t, "http://api.openai.com/v1", loaded.GetIntelligentModels()[0].GetProvider().GetBaseURL())
 
 	persisted, err := GetAIGlobalConfig(db)
 	require.NoError(t, err)
 	require.Len(t, persisted.GetIntelligentModels(), 1)
-	assert.Equal(t, "http://api.openai.com/v1/chat/completions", persisted.GetIntelligentModels()[0].GetProvider().GetBaseURL())
+	assert.Equal(t, "http://api.openai.com/v1", persisted.GetIntelligentModels()[0].GetProvider().GetBaseURL())
 }
 
 func TestSetAIGlobalConfig_UpdateProxyNoHttpsDomain(t *testing.T) {

@@ -109,6 +109,7 @@ func (g *GatewayClient) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
 			"Accept":       "application/json",
 		}),
 	}
+	opts = aispec.AppendCustomHeadersToPocOptions(opts, aispec.ExtraHeadersToMap(g.config.Headers))
 	opts = append(opts, poc.WithTimeout(g.config.Timeout))
 	if g.config.Proxy != "" {
 		opts = append(opts, poc.WithProxy(g.config.Proxy))

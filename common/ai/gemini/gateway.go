@@ -223,6 +223,7 @@ func (c *Client) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
 		poc.WithReplaceHttpPacketHeader("Content-Type", "application/json"),
 		poc.WithReplaceHttpPacketHeader("x-goog-api-key", c.config.APIKey),
 	}
+	opts = aispec.AppendCustomHeadersToPocOptions(opts, aispec.ExtraHeadersToMap(c.config.Headers))
 	if c.config.Proxy != "" {
 		log.Debugf("Using proxy: %s", c.config.Proxy)
 		opts = append(opts, poc.WithProxy(c.config.Proxy))
@@ -748,6 +749,7 @@ func (c *Client) GetModelList() ([]*aispec.ModelMeta, error) {
 			"x-goog-api-key": c.config.APIKey,
 		}),
 	}
+	pocOpts = aispec.AppendCustomHeadersToPocOptions(pocOpts, aispec.ExtraHeadersToMap(c.config.Headers))
 	if c.config.Proxy != "" {
 		log.Debugf("GetModelList using proxy: %s", c.config.Proxy)
 		pocOpts = append(pocOpts, poc.WithProxy(c.config.Proxy))

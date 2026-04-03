@@ -164,7 +164,9 @@ func TestRecommendAIHealthCheckConfig(t *testing.T) {
 
 	recommend := recommendAIHealthCheckConfig(context.Background(), cfg, "ping")
 	require.NotNil(t, recommend)
-	assert.Equal(t, server.URL, recommend.GetBaseURL())
+	assert.Empty(t, recommend.GetBaseURL())
+	assert.Equal(t, server.URL+"/api/v1/chat/completions", recommend.GetEndpoint())
+	assert.True(t, recommend.GetEnableEndpoint())
 	assert.Empty(t, recommend.GetProxy())
 	assert.True(t, recommend.GetNoHttps())
 }
@@ -185,7 +187,7 @@ func TestBuildRecommendedAIConfigs_TogglesProxyAndSuffixes(t *testing.T) {
 
 	found := false
 	for _, candidate := range candidates {
-		if candidate.GetBaseURL() == "http://mock.local/api/v1/chat/completions" && candidate.GetProxy() == "" {
+		if candidate.GetEndpoint() == "http://mock.local/api/v1/chat/completions" && candidate.GetProxy() == "" && candidate.GetEnableEndpoint() {
 			found = true
 			break
 		}
@@ -209,7 +211,7 @@ func TestBuildRecommendedAIConfigs_UsesResponsesSuffixesByAPIType(t *testing.T) 
 
 	var foundResponses bool
 	for _, candidate := range candidates {
-		if candidate.GetAPIType() == "responses" && candidate.GetBaseURL() == "https://mock.local/v1/responses" {
+		if candidate.GetAPIType() == "responses" && candidate.GetEndpoint() == "https://mock.local/v1/responses" && candidate.GetEnableEndpoint() {
 			foundResponses = true
 		}
 	}
@@ -233,10 +235,10 @@ func TestBuildRecommendedAIConfigs_IncludesAlternativeAPITypeCandidates(t *testi
 	var foundResponses bool
 	var foundChatCompletions bool
 	for _, candidate := range candidates {
-		if candidate.GetBaseURL() == "https://mock.local" && candidate.GetAPIType() == "responses" {
+		if candidate.GetEndpoint() == "https://mock.local/v1/responses" && candidate.GetAPIType() == "responses" && candidate.GetEnableEndpoint() {
 			foundResponses = true
 		}
-		if candidate.GetBaseURL() == "https://mock.local" && candidate.GetAPIType() == "chat_completions" {
+		if candidate.GetEndpoint() == "https://mock.local/v1/chat/completions" && candidate.GetAPIType() == "chat_completions" && candidate.GetEnableEndpoint() {
 			foundChatCompletions = true
 		}
 	}
@@ -270,7 +272,37 @@ func TestRecommendAIHealthCheckConfig_CanCorrectAPIType(t *testing.T) {
 
 	recommend := recommendAIHealthCheckConfig(context.Background(), cfg, "ping")
 	require.NotNil(t, recommend)
-	assert.Equal(t, server.URL+"/v1/responses", recommend.GetBaseURL())
+	assert.Empty(t, recommend.GetBaseURL())
+	assert.Equal(t, server.URL+"/v1/responses", recommend.GetEndpoint())
+	assert.True(t, recommend.GetEnableEndpoint())
 	assert.Equal(t, "responses", recommend.GetAPIType())
+	assert.True(t, recommend.GetNoHttps())
+}
+
+func TestRecommendAIHealthCheckConfig_FallbackToEndpoint(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/custom/openai/chat/completions" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"ok"}}]}`))
+	}))
+	defer server.Close()
+
+	cfg := &ypb.ThirdPartyApplicationConfig{
+		Type:    "openai",
+		APIKey:  "test-key",
+		BaseURL: server.URL + "/custom/openai/chat/completions",
+		ExtraParams: []*ypb.KVPair{
+			{Key: "model", Value: "mock-model"},
+		},
+	}
+
+	recommend := recommendAIHealthCheckConfig(context.Background(), cfg, "ping")
+	require.NotNil(t, recommend)
+	assert.Empty(t, recommend.GetBaseURL())
+	assert.Equal(t, server.URL+"/custom/openai/chat/completions", recommend.GetEndpoint())
+	assert.True(t, recommend.GetEnableEndpoint())
 	assert.True(t, recommend.GetNoHttps())
 }

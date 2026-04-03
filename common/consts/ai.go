@@ -198,11 +198,14 @@ func thirdPartyConfigToModelConfig(cfg *ypb.ThirdPartyApplicationConfig) *ypb.AI
 		Namespace:      cfg.GetNamespace(),
 		Domain:         cfg.GetDomain(),
 		BaseURL:        cfg.GetBaseURL(),
+		Endpoint:       cfg.GetEndpoint(),
+		EnableEndpoint: cfg.GetEnableEndpoint(),
 		WebhookURL:     cfg.GetWebhookURL(),
 		Disabled:       cfg.GetDisabled(),
 		Proxy:          cfg.GetProxy(),
 		NoHttps:        cfg.GetNoHttps(),
 		APIType:        cfg.GetAPIType(),
+		Headers:        cloneHTTPHeadersForAIConfig(cfg.GetHeaders()),
 	}
 
 	return &ypb.AIModelConfig{
@@ -210,6 +213,23 @@ func thirdPartyConfigToModelConfig(cfg *ypb.ThirdPartyApplicationConfig) *ypb.AI
 		ModelName:   modelName,
 		ExtraParams: extras,
 	}
+}
+
+func cloneHTTPHeadersForAIConfig(headers []*ypb.KVPair) []*ypb.KVPair {
+	if len(headers) == 0 {
+		return nil
+	}
+	cloned := make([]*ypb.KVPair, 0, len(headers))
+	for _, header := range headers {
+		if header == nil {
+			continue
+		}
+		cloned = append(cloned, &ypb.KVPair{
+			Key:   header.GetKey(),
+			Value: header.GetValue(),
+		})
+	}
+	return cloned
 }
 
 const (
