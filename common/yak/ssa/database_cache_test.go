@@ -6,7 +6,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -56,13 +55,14 @@ func TestSaveEditorTracksOnlySourceHashInMemory(t *testing.T) {
 	prog.SaveEditor(editor)
 	prog.SaveEditor(editor)
 
-	require.Equal(t, 0, prog.Cache.editorHashCache.Count(), "source hash should not be marked persisted before saver ack")
-	require.Equal(t, 1, prog.Cache.editorPendingHashCache.Count(), "duplicate source saves should collapse to one in-flight hash")
-	require.False(t, prog.Cache.editorCache.Has(hash), "source payload should not stay resident in the saver-only cache")
+	require.Equal(t, 0, prog.Cache.sources.PersistedCount(), "source hash should not be marked persisted before save ack")
+	require.Equal(t, 0, prog.Cache.sources.PendingCount(), "registered source should not become pending before a save batch reserves it")
+	require.Equal(t, 1, prog.Cache.sources.PayloadCount(), "duplicate source saves should collapse to one registered payload")
 
-	prog.Cache.editorCache.Close()
-	require.Equal(t, 1, prog.Cache.editorHashCache.Count(), "source hash should be marked persisted after saver ack")
-	require.Equal(t, 0, prog.Cache.editorPendingHashCache.Count(), "pending source hash should clear after saver ack")
+	prog.Cache.sources.Close()
+	require.Equal(t, 1, prog.Cache.sources.PersistedCount(), "source hash should be marked persisted after close flush")
+	require.Equal(t, 0, prog.Cache.sources.PendingCount(), "pending source hash should clear after save ack")
+	require.Equal(t, 0, prog.Cache.sources.PayloadCount(), "payload cache should be released after persistence")
 
 	var count int64
 	err := ssadb.GetDB().Model(&ssadb.IrSource{}).
@@ -73,23 +73,26 @@ func TestSaveEditorTracksOnlySourceHashInMemory(t *testing.T) {
 }
 
 func TestReserveSourceHashForSaveRequiresPersistAck(t *testing.T) {
-	cache := &ProgramCache{
-		editorHashCache:        utils.NewSafeMapWithKey[string, struct{}](),
-		editorPendingHashCache: utils.NewSafeMapWithKey[string, struct{}](),
-	}
+	store := newSourceStore(nil, ProgramCacheDBWrite, nil)
+	source := &ssadb.IrSource{SourceCodeHash: "hash-a"}
 
-	require.True(t, cache.reserveSourceHashForSave("hash-a"))
-	require.False(t, cache.reserveSourceHashForSave("hash-a"), "pending source hash should dedupe repeated queue attempts")
-	require.Equal(t, 0, cache.editorHashCache.Count(), "pending source hash should not be treated as persisted")
-	require.Equal(t, 1, cache.editorPendingHashCache.Count())
+	reserved, ok := store.reserve("hash-a", source)
+	require.True(t, ok)
+	require.NotNil(t, reserved)
+	_, ok = store.reserve("hash-a", source)
+	require.False(t, ok, "pending source hash should dedupe repeated reserve attempts")
+	require.Equal(t, 0, store.PersistedCount(), "pending source hash should not be treated as persisted")
+	require.Equal(t, 1, store.PendingCount())
 
-	cache.clearPendingSourceHashes("hash-a")
-	require.True(t, cache.reserveSourceHashForSave("hash-a"), "failed saves should clear pending state and allow retry")
+	store.clearPending("hash-a")
+	_, ok = store.reserve("hash-a", source)
+	require.True(t, ok, "failed saves should clear pending state and allow retry")
 
-	cache.markSourceHashesPersisted("hash-a")
-	require.Equal(t, 1, cache.editorHashCache.Count())
-	require.Equal(t, 0, cache.editorPendingHashCache.Count())
-	require.False(t, cache.reserveSourceHashForSave("hash-a"), "persisted source hash should not be requeued")
+	store.markPersisted("hash-a")
+	require.Equal(t, 1, store.PersistedCount())
+	require.Equal(t, 0, store.PendingCount())
+	_, ok = store.reserve("hash-a", source)
+	require.False(t, ok, "persisted source hash should not be requeued")
 }
 
 func TestLazyInstructionSaveAgain(t *testing.T) {
@@ -258,8 +261,8 @@ func TestLazySaveType(t *testing.T) {
 		lazySaveCalled = true
 		// Simulate type saving logic
 		cache := testValue.getAnValue().getProgramCache()
-		if cache != nil && cache.TypeCache != nil {
-			cache.TypeCache.Set(testType)
+		if cache != nil {
+			cache.rememberType(testType)
 			typeSaved = true
 			savedType = testType
 		}
@@ -345,7 +348,7 @@ func TestGetTypeFromDBFallsBackToResidentTypeCache(t *testing.T) {
 	typeID := testType.GetId()
 	require.Greater(t, typeID, int64(0))
 
-	residentType, ok := prog.Cache.TypeCache.Get(typeID)
+	residentType, ok := prog.Cache.residentType(typeID)
 	require.True(t, ok, "type should remain resident in the memory bridge")
 	require.NotNil(t, residentType)
 	require.Nil(t, ssadb.GetIrTypeById(ssadb.GetDB(), programName, typeID), "type should not be in DB before type cache close")
@@ -378,7 +381,7 @@ func TestInstructionReloadKeepsResidentTypeReachable(t *testing.T) {
 	require.Equal(t, typeID, irCode.TypeID)
 	require.NoError(t, ssadb.GetDB().Save(irCode).Error)
 
-	prog.Cache.InstructionCache.Delete(value.GetId())
+	prog.Cache.deleteInstructionByID(value.GetId())
 
 	reloaded := prog.Cache.GetInstruction(value.GetId())
 	require.NotNil(t, reloaded, "instruction should reload from DB")
@@ -405,9 +408,8 @@ func TestGetStringMemberUsesStringIndexWithoutReloadingConstKey(t *testing.T) {
 	key := builder.EmitConstInstPlaceholder(string(BlueprintRelationParents))
 	object.AddMember(key, member)
 
-	prog.Cache.InstructionCache.Delete(key.GetId())
-	_, ok := prog.Cache.InstructionCache.Get(key.GetId())
-	require.False(t, ok, "const key should no longer be resident")
+	prog.Cache.deleteInstructionByID(key.GetId())
+	require.False(t, prog.Cache.hasResidentInstruction(key.GetId()), "const key should no longer be resident")
 	require.Nil(t, ssadb.GetIrCodeItemById(ssadb.GetDB(), programName, key.GetId()), "const key should not be reloaded from DB in this test")
 
 	got, ok := object.GetStringMember(string(BlueprintRelationParents))
@@ -439,20 +441,20 @@ func TestReloadedObjectGetStringMemberDoesNotReloadConstKeyInstruction(t *testin
 	require.NotNil(t, objectIR)
 	require.NoError(t, ssadb.GetDB().Save(objectIR).Error)
 
-	prog.Cache.InstructionCache.Delete(object.GetId())
-	prog.Cache.InstructionCache.Delete(key.GetId())
+	prog.Cache.deleteInstructionByID(object.GetId())
+	prog.Cache.deleteInstructionByID(key.GetId())
 
 	reloadedObject := prog.Cache.GetInstruction(object.GetId())
 	require.NotNil(t, reloadedObject, "object should reload from DB")
 	reloadedValue, ok := ToValue(reloadedObject)
 	require.True(t, ok)
 
-	countBeforeLookup := prog.Cache.InstructionCache.Count()
+	countBeforeLookup := prog.Cache.CountInstruction()
 	got, ok := reloadedValue.GetStringMember(string(BlueprintRelationParents))
 	require.True(t, ok, "reloaded object should resolve string member without reloading the const key instruction")
 	require.NotNil(t, got)
 	require.Equal(t, member.GetId(), got.GetId())
-	require.Equal(t, countBeforeLookup, prog.Cache.InstructionCache.Count(), "string lookup should not pull the const key instruction back into the cache")
+	require.Equal(t, countBeforeLookup, prog.Cache.CountInstruction(), "string lookup should not pull the const key instruction back into the cache")
 }
 
 func TestDisableInstructionSpillKeepsInstructionResidentUntilFunctionFinish(t *testing.T) {
@@ -586,8 +588,7 @@ func waitInstructionSpilledAfterFinish(t *testing.T, prog *Program, programName 
 		if ssadb.GetIrCodeItemById(ssadb.GetDB(), programName, id) == nil {
 			return false
 		}
-		_, resident := prog.Cache.InstructionCache.GetAll()[id]
-		return !resident
+		return !prog.Cache.hasResidentInstruction(id)
 	}, 3*time.Second, ttl, "instruction %d should be persisted and evicted from resident cache", id)
 }
 
@@ -617,8 +618,8 @@ func TestReloadedInstructionGetBlockUsesResidentHotBasicBlockAfterFinish(t *test
 	builder.Finish()
 
 	waitInstructionPersisted(t, programName, instID, ttl)
-	prog.Cache.InstructionCache.Delete(instID)
-	_, residentBeforeLoad := prog.Cache.InstructionCache.GetAll()[blockID]
+	prog.Cache.deleteInstructionByID(instID)
+	residentBeforeLoad := prog.Cache.hasResidentInstruction(blockID)
 	require.True(t, residentBeforeLoad, "basic block should stay resident as a hot instruction")
 	require.Nil(t, ssadb.GetIrCodeItemById(ssadb.GetDB(), programName, blockID), "hot basic block should not spill during compile")
 
@@ -626,7 +627,7 @@ func TestReloadedInstructionGetBlockUsesResidentHotBasicBlockAfterFinish(t *test
 	require.NotNil(t, reloaded)
 	_, ok := ToLazyInstruction(reloaded)
 	require.True(t, ok, "spilled instruction should reload as LazyInstruction")
-	_, residentAfterInstReload := prog.Cache.InstructionCache.GetAll()[blockID]
+	residentAfterInstReload := prog.Cache.hasResidentInstruction(blockID)
 	require.True(t, residentAfterInstReload, "reloading the instruction should still see the resident hot block")
 
 	block := reloaded.GetBlock()
@@ -668,20 +669,20 @@ func TestInstruction2IrCodeReloadsSpilledBasicBlockAfterFinish(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, blockIR)
 	require.NoError(t, ssadb.GetDB().Save(blockIR).Error)
-	prog.Cache.InstructionCache.Delete(instID)
-	prog.Cache.InstructionCache.Delete(blockID)
+	prog.Cache.deleteInstructionByID(instID)
+	prog.Cache.deleteInstructionByID(blockID)
 
 	reloaded := prog.Cache.GetInstruction(instID)
 	require.NotNil(t, reloaded)
 	_, ok := ToLazyInstruction(reloaded)
 	require.True(t, ok, "spilled instruction should reload as LazyInstruction")
-	_, residentAfterInstReload := prog.Cache.InstructionCache.GetAll()[blockID]
+	residentAfterInstReload := prog.Cache.hasResidentInstruction(blockID)
 	require.False(t, residentAfterInstReload, "reloading the instruction itself should not eagerly reload its block")
 
 	ir := ssadb.EmptyIrCode(programName, instID)
 	require.NoError(t, Instruction2IrCode(reloaded, ir))
 	require.Equal(t, blockID, ir.CurrentBlock, "save path still needs block identity for the reloaded instruction")
-	_, residentAfterMarshal := prog.Cache.InstructionCache.GetAll()[blockID]
+	residentAfterMarshal := prog.Cache.hasResidentInstruction(blockID)
 	require.False(t, residentAfterMarshal, "Instruction2IrCode should not reload the spilled BasicBlock when it only needs CurrentBlock id")
 }
 
@@ -705,7 +706,7 @@ func TestLazyInstructionHasUsersReflectsPersistedUsers(t *testing.T) {
 	require.NoError(t, ssadb.GetDB().Save(leftIR).Error)
 
 	leftID := left.GetId()
-	prog.Cache.InstructionCache.Delete(leftID)
+	prog.Cache.deleteInstructionByID(leftID)
 
 	reloaded := prog.Cache.GetInstruction(leftID)
 	require.NotNil(t, reloaded)
@@ -875,7 +876,7 @@ func TestInstructionCache_TTLWritebackDirtyLazyInstruction(t *testing.T) {
 	reloaded := prog.Cache.GetInstruction(instID)
 	require.NotNil(t, reloaded)
 	reloaded.SetExtern(true)
-	prog.Cache.InstructionCache.CoolDown([]int64{instID}, ttl)
+	prog.Cache.coolDownInstructions([]int64{instID}, ttl)
 
 	require.Eventually(t, func() bool {
 		var ir ssadb.IrCode
@@ -887,8 +888,7 @@ func TestInstructionCache_TTLWritebackDirtyLazyInstruction(t *testing.T) {
 			Where("program_name = ? AND code_id = ?", programName, instID).
 			Order("id DESC").
 			First(&ir).Error
-		_, resident := prog.Cache.InstructionCache.GetAll()[instID]
-		return countErr == nil && count == 1 && err == nil && ir.IsExternal && !resident
+		return countErr == nil && count == 1 && err == nil && ir.IsExternal && !prog.Cache.hasResidentInstruction(instID)
 	}, 3*time.Second, ttl, "dirty lazy instruction should be written back after finish-triggered eviction")
 
 	prog.Finish()

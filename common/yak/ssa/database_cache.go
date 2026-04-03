@@ -2,461 +2,318 @@ package ssa
 
 import (
 	"strings"
-	"sync"
+	"time"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
+	"go.uber.org/atomic"
 )
 
-// Cache : a cache in middle layer of database and application.
-//
-//	application will Get/Set Instruction,
-//
-// and save the data to database when the data is expired,
-// and load the data from database when the data is not in cache.
+type ProgramCacheKind int
+
+const (
+	_ ProgramCacheKind = iota
+	ProgramCacheMemory
+	ProgramCacheDBRead
+	ProgramCacheDBWrite
+)
 
 type ProgramCache struct {
-	program          *Program // mark which program handled
-	ProgramCacheKind ProgramCacheKind
-	DB               *gorm.DB
+	program *Program
+	db      *gorm.DB
 
-	InstructionCache *Cache[Instruction]
-	TypeCache        *Cache[Type]
+	instructions *instructionStore
+	types        *typeStore
+	sources      *sourceStore
+	indexes      *indexStore
 
-	VariableIndex *SimpleCache[int64]
-	MemberIndex   *SimpleCache[int64]
-	ClassIndex    *SimpleCache[int64]
-	ConstCache    *SimpleCache[int64]
-
-	indexCache             *SimpleCache[*ssadb.IrIndex]
-	offsetCache            *SimpleCache[*ssadb.IrOffset]
-	editorCache            *SimpleCache[*ssadb.IrSource]
-	editorHashCache        *utils.SafeMapWithKey[string, struct{}]
-	editorPendingHashCache *utils.SafeMapWithKey[string, struct{}]
-
-	afterSaveNotify func(int)
-
-	waitGroup    *sync.WaitGroup // wait for all goroutines to finish
-	sourceHashMu sync.Mutex
-
-	instructionCacheMetrics *instructionCacheMetrics
+	instructionMetrics *instructionCacheMetrics
 }
 
 func NewDBCache(cfg *ssaconfig.Config, prog *Program, databaseKind ProgramCacheKind, fileSize int) *ProgramCache {
 	cfg = ensureProgramConfig(cfg)
 	cache := &ProgramCache{
-		program:          prog,
-		ProgramCacheKind: databaseKind,
-		waitGroup:        &sync.WaitGroup{},
+		program: prog,
+	}
+
+	var programName string
+	if databaseKind != ProgramCacheMemory {
+		programName = prog.GetApplication().GetProgramName()
+		cache.db = ssadb.GetDB().Where("program_name = ?", programName)
 	}
 	if databaseKind != ProgramCacheMemory && instructionCacheDebugEnabled() {
-		cache.instructionCacheMetrics = newInstructionCacheMetrics()
+		cache.instructionMetrics = newInstructionCacheMetrics()
+		cacheTTL, cacheMax := resolveInstructionCacheSettings(cfg)
+		log.Debugf("[ssa-ir-cache] init: program=%s ttl=%s max=%d kind=%d",
+			programName, cacheTTL, cacheMax, databaseKind,
+		)
 	}
-	var programName string
-	if databaseKind != ProgramCacheMemory { // database write/read
-		programName = prog.GetApplication().GetProgramName()
-		cache.DB = ssadb.GetDB().Where("program_name = ?", programName)
-		if instructionCacheDebugEnabled() {
-			cacheTTL, cacheMax := resolveInstructionCacheSettings(cfg)
-			log.Debugf("[ssa-ir-cache] init: program=%s ttl=%s max=%d kind=%d",
-				programName, cacheTTL, cacheMax, databaseKind,
-			)
-		}
-	}
+
 	saveSize := min(max(fileSize*5, defaultSaveSize), maxSaveSize)
 	log.Debugf("asyncdb Channel: ReSetSize: fileSize(%d) saveSize(%d)", fileSize, saveSize)
-	cache.initIndex(cfg, databaseKind, saveSize/2)
-	cache.afterSaveNotify = func(i int) {}
-	cache.InstructionCache = createInstructionCache(
-		cfg, databaseKind,
-		cache.DB, prog,
-		saveSize,
-		func(size int) {
-			cache.afterSaveNotify(size)
-		},
-	)
-	cache.TypeCache = createTypeCache(
-		cfg, cache.DB, prog,
-		programName, saveSize,
-	)
+
+	cache.sources = newSourceStore(prog, databaseKind, cache.db)
+	cache.indexes = newIndexStore(cfg, prog, databaseKind, cache.db, saveSize/2)
+	cache.types = newTypeStore(cfg, prog, databaseKind, cache.db, programName, saveSize)
+	cache.instructions = newInstructionStore(cfg, prog, databaseKind, cache.db, saveSize, cache.sources, cache.instructionMetrics)
 	return cache
 }
 
 func (c *ProgramCache) HaveDatabaseBackend() bool {
-	return c.DB != nil
+	return c != nil && c.db != nil
+}
+
+func (c *ProgramCache) DebugDB() {
+	if c == nil || c.db == nil {
+		return
+	}
+	c.db = c.db.Debug()
 }
 
 func (c *ProgramCache) DisableInstructionSpill() {
-	if c == nil || c.InstructionCache == nil || !c.HaveDatabaseBackend() {
+	if c == nil || !c.HaveDatabaseBackend() || c.instructions == nil {
 		return
 	}
-	c.InstructionCache.DisableSave()
+	c.instructions.DisableSpill()
 }
 
 func (c *ProgramCache) EnableInstructionSpill() {
-	if c == nil || c.InstructionCache == nil || !c.HaveDatabaseBackend() {
+	if c == nil || !c.HaveDatabaseBackend() || c.instructions == nil {
 		return
 	}
-	c.InstructionCache.EnableSave()
+	c.instructions.EnableSpill()
 }
 
 func (c *ProgramCache) InstructionSpillDisabled() bool {
-	if c == nil || c.InstructionCache == nil || !c.HaveDatabaseBackend() {
+	if c == nil || !c.HaveDatabaseBackend() || c.instructions == nil {
 		return false
 	}
-	return c.InstructionCache.IsSaveDisabled()
+	return c.instructions.SpillDisabled()
 }
 
-// =============================================== Instruction =======================================================
-
-// SetInstruction : set instruction to cache.
 func (c *ProgramCache) SetInstruction(inst Instruction) {
 	if utils.IsNil(inst) {
 		log.Errorf("BUG: SetInstruction called with nil instruction")
 		return
 	}
-	if !utils.IsNil(c.offsetCache) {
-		c.offsetCache.Add("", ConvertValue2Offset(inst))
+	if c != nil && c.indexes != nil {
+		c.indexes.AddInstructionOffsets(inst)
 	}
-	c.InstructionCache.Set(inst)
+	if c != nil && c.instructions != nil {
+		c.instructions.Set(inst)
+	}
 }
 
 func (c *ProgramCache) DeleteInstruction(inst Instruction) {
-	c.InstructionCache.Delete(inst.GetId())
+	if c == nil || c.instructions == nil || utils.IsNil(inst) {
+		return
+	}
+	c.instructions.Delete(inst.GetId())
 }
 
-// GetInstruction : get instruction from cache.
 func (c *ProgramCache) GetInstruction(id int64) Instruction {
-	if id == 0 {
+	if c == nil || c.instructions == nil || id == 0 {
 		return nil
 	}
-	if ret, ok := c.InstructionCache.Get(id); ok {
-		return ret
-	}
-	return nil
-
+	return c.instructions.Get(id)
 }
 
-// PreloadInstructionsByIDsFast fills instruction cache with lazy instructions without neighbor prefetch.
 func (c *ProgramCache) PreloadInstructionsByIDsFast(ids []int64) {
-	if c == nil || c.ProgramCacheKind != ProgramCacheDBRead || c.program == nil {
+	if c == nil || c.instructions == nil {
 		return
 	}
-	if len(ids) == 0 {
-		return
-	}
-	ssadb.PreloadIrCodesByIdsFast(ssadb.GetDB(), c.program.Name, ids)
-	cache := ssadb.GetIrCodeCache(c.program.Name)
-	for _, id := range ids {
-		if id <= 0 {
-			continue
-		}
-		if _, ok := c.InstructionCache.Get(id); ok {
-			continue
-		}
-		if ir, ok := cache.Get(id); ok {
-			if inst, err := NewLazyInstructionFromIrCode(ir, c.program); err == nil {
-				c.InstructionCache.Set(inst)
-			}
-		}
-	}
+	c.instructions.PreloadByIDsFast(ids)
 }
-
-// =============================================== Variable =======================================================
 
 func (c *ProgramCache) AddConst(inst Instruction) {
-	if c == nil || c.ConstCache == nil || utils.IsNil(inst) {
+	if c == nil || c.indexes == nil {
 		return
 	}
-	c.ConstCache.Add(inst.GetName(), inst.GetId())
-}
-
-func splitVariableIndexKey(name string) (string, string) {
-	if name == "" {
-		return "", ""
-	}
-	if len(name) > 1 && name[0] == '$' {
-		name = name[1:]
-	}
-	if name == "" || name[0] != '#' {
-		return name, ""
-	}
-	if idx := strings.IndexByte(name, '.'); idx >= 0 && idx+1 < len(name) {
-		return name, name[idx+1:]
-	}
-	if idx := strings.IndexByte(name, '['); idx >= 0 && idx+1 < len(name) {
-		end := len(name)
-		if name[end-1] == ']' {
-			end--
-		}
-		return name, name[idx+1 : end]
-	}
-	return name, ""
+	c.indexes.AddConst(inst)
 }
 
 func (c *ProgramCache) AddVariable(name string, inst Instruction) {
-	if c == nil || c.VariableIndex == nil || utils.IsNil(inst) {
+	if c == nil || c.indexes == nil {
 		return
 	}
-	name, member := splitVariableIndexKey(name)
-	if member != "" {
-		c.MemberIndex.Add(member, inst.GetId())
-		c.enqueueMemberIndex(member, inst)
-	} else {
-		c.VariableIndex.Add(name, inst.GetId())
-		c.enqueueVariableIndex(name, inst)
-	}
+	c.indexes.AddVariable(name, inst)
 }
 
 func (c *ProgramCache) RemoveVariable(name string, inst Instruction) {
-	if c == nil || utils.IsNil(inst) {
+	if c == nil || c.indexes == nil {
 		return
 	}
-	name, member := splitVariableIndexKey(name)
-	if member != "" {
-		c.MemberIndex.Delete(member, inst.GetId())
-	} else {
-		c.VariableIndex.Delete(name, inst.GetId())
-	}
+	c.indexes.RemoveVariable(name, inst)
 }
 
 func (c *ProgramCache) AddClassInstance(name string, inst Instruction) {
-	if c == nil || c.ClassIndex == nil || utils.IsNil(inst) {
+	if c == nil || c.indexes == nil {
 		return
 	}
-	c.ClassIndex.Add(name, inst.GetId())
-	c.enqueueClassIndex(name, inst)
+	c.indexes.AddClassInstance(name, inst)
 }
-
-// =============================================== Database =======================================================
-// only LazyInstruction and false marshal will not be saved to database
 
 func (c *ProgramCache) SaveToDatabase(cb ...func(int)) {
 	if !c.HaveDatabaseBackend() {
 		return
 	}
-	if len(cb) > 0 {
-		c.afterSaveNotify = cb[0]
+	progress := func(int) {}
+	if len(cb) > 0 && cb[0] != nil {
+		progress = cb[0]
 	}
-	f1 := func() error {
-		c.InstructionCache.Close()
-		log.Infof("Instruction cache closed")
-		return nil
+
+	steps := []func() error{
+		func() error {
+			if c.types != nil {
+				c.types.close()
+				log.Infof("Type Cache closed")
+			}
+			return nil
+		},
+		func() error {
+			if c.indexes != nil {
+				c.indexes.Close()
+			}
+			return nil
+		},
+		func() error {
+			if c.instructions != nil {
+				c.instructions.Close(progress)
+				log.Infof("Instruction cache closed")
+			}
+			return nil
+		},
+		func() error {
+			if c.sources != nil {
+				c.sources.Close()
+			}
+			return nil
+		},
+		func() error {
+			if c.program != nil && c.instructions != nil {
+				stats := c.instructions.Stats()
+				log.Debugf("[ssa-ir-cache-saver] program=%s resident=%d pending=%d pending_max=%d batch_count=%d avg_batch=%.2f max_batch=%d enqueue_block_total=%s enqueue_block_max=%s save_loop_time=%s save_loop_max=%s",
+					c.program.GetProgramName(),
+					stats.ResidentCount,
+					stats.Saver.Pending,
+					stats.Saver.MaxPending,
+					stats.Saver.BatchCount,
+					stats.Saver.AvgBatchSize(),
+					stats.Saver.MaxBatchSize,
+					stats.Saver.EnqueueBlockTotal,
+					stats.Saver.MaxEnqueueBlock,
+					stats.Saver.SaveTimeTotal,
+					stats.Saver.MaxSaveTime,
+				)
+			}
+			if c.instructionMetrics != nil && c.program != nil {
+				c.instructionMetrics.Dump(c.program.GetProgramName())
+			}
+			return nil
+		},
 	}
-	f2 := func() error {
-		c.TypeCache.Close()
-		log.Infof("Type Cache closed")
-		return nil
-	}
-	f3 := func() error {
-		return nil
-	}
-	f4 := func() error {
-		c.VariableIndex.Close()
-		return nil
-	}
-	f5 := func() error {
-		c.MemberIndex.Close()
-		return nil
-	}
-	f6 := func() error {
-		c.ClassIndex.Close()
-		return nil
-	}
-	f7 := func() error {
-		c.ConstCache.Close()
-		return nil
-	}
-	f8 := func() error {
-		c.offsetCache.Close()
-		c.editorCache.Close()
-		c.indexCache.Close()
-		return nil
-	}
-	f10 := func() error {
-		if c.program != nil && c.InstructionCache != nil {
-			stats := c.InstructionCache.Stats()
-			log.Debugf("[ssa-ir-cache-saver] program=%s resident=%d pending=%d pending_max=%d batch_count=%d avg_batch=%.2f max_batch=%d enqueue_block_total=%s enqueue_block_max=%s save_loop_time=%s save_loop_max=%s",
-				c.program.GetProgramName(),
-				stats.ResidentCount,
-				stats.Saver.Pending,
-				stats.Saver.MaxPending,
-				stats.Saver.BatchCount,
-				stats.Saver.AvgBatchSize(),
-				stats.Saver.MaxBatchSize,
-				stats.Saver.EnqueueBlockTotal,
-				stats.Saver.MaxEnqueueBlock,
-				stats.Saver.SaveTimeTotal,
-				stats.Saver.MaxSaveTime,
-			)
-		}
-		if c.instructionCacheMetrics != nil && c.program != nil {
-			c.instructionCacheMetrics.Dump(c.program.GetProgramName())
-		}
-		return nil
-	}
-	steps := []func() error{f1, f2, f3, f4, f5, f6, f7, f8, f10}
 	c.diagnosticsTrack("ssa.ProgramCache.SaveToDatabase", steps...)
 }
 
 func (c *ProgramCache) CountInstruction() int {
-	return c.InstructionCache.Count()
+	if c == nil || c.instructions == nil {
+		return 0
+	}
+	return c.instructions.Count()
 }
 
 func (c *ProgramCache) CoolDownFunctionInstructions(function *Function) {
-	if c == nil || function == nil || !c.HaveDatabaseBackend() || c.ProgramCacheKind != ProgramCacheDBWrite {
+	if c == nil || c.instructions == nil || !c.HaveDatabaseBackend() || c.program == nil || c.program.DatabaseKind != ProgramCacheDBWrite {
 		return
 	}
+	c.instructions.TrackFunctionFinish(function)
+}
 
-	ids := make([]int64, 0, len(function.Blocks)*8)
-	seen := make(map[int64]struct{})
-	addID := func(id int64) {
-		if id <= 0 {
+func (c *ProgramCache) rememberType(typ Type) {
+	if c == nil || c.types == nil || utils.IsNil(typ) {
+		return
+	}
+	c.types.remember(typ)
+}
+
+func (c *ProgramCache) getType(id int64) (Type, bool) {
+	if c == nil || c.types == nil {
+		return nil, false
+	}
+	return c.types.get(id)
+}
+
+func (c *ProgramCache) residentType(id int64) (Type, bool) {
+	if c == nil || c.types == nil || c.types.resident == nil {
+		return nil, false
+	}
+	return c.types.resident.Get(id)
+}
+
+func (c *ProgramCache) coolDownInstructions(ids []int64, ttl time.Duration) {
+	if c == nil || c.instructions == nil {
+		return
+	}
+	c.instructions.CoolDown(ids, ttl)
+}
+
+func (c *ProgramCache) deleteInstructionByID(id int64) {
+	if c == nil || c.instructions == nil {
+		return
+	}
+	c.instructions.Delete(id)
+}
+
+func (c *ProgramCache) residentInstructions() map[int64]Instruction {
+	if c == nil || c.instructions == nil {
+		return nil
+	}
+	return c.instructions.GetAllResident()
+}
+
+func (c *ProgramCache) hasResidentInstruction(id int64) bool {
+	if id <= 0 {
+		return false
+	}
+	_, ok := c.residentInstructions()[id]
+	return ok
+}
+
+func (c *ProgramCache) findByVariableEx(mod ssadb.MatchMode, checkValue func(string) bool) []Instruction {
+	if c == nil || c.indexes == nil {
+		return nil
+	}
+	return c.indexes.FindByVariableEx(mod, checkValue, c.GetInstruction)
+}
+
+func trackAtomicMax(counter *atomic.Int64, value int64) {
+	if counter == nil {
+		return
+	}
+	for {
+		current := counter.Load()
+		if value <= current {
 			return
 		}
-		if _, ok := seen[id]; ok {
+		if counter.CAS(current, value) {
 			return
 		}
-		seen[id] = struct{}{}
-		ids = append(ids, id)
-	}
-
-	for _, id := range function.Params {
-		addID(id)
-	}
-	for _, id := range function.FreeValues {
-		addID(id)
-	}
-	for _, id := range function.ParameterMembers {
-		addID(id)
-	}
-	for _, id := range function.Throws {
-		addID(id)
-	}
-	for _, id := range function.Return {
-		addID(id)
-	}
-	for _, id := range function.ChildFuncs {
-		addID(id)
-	}
-	addID(function.EnterBlock)
-	addID(function.ExitBlock)
-	addID(function.DeferBlock)
-
-	for _, sideEffect := range function.SideEffects {
-		if sideEffect == nil {
-			continue
-		}
-		addID(sideEffect.Modify)
-		addID(sideEffect.MemberCallKey)
-	}
-	for _, sideEffects := range function.SideEffectsReturn {
-		for _, sideEffect := range sideEffects {
-			if sideEffect == nil {
-				continue
-			}
-			addID(sideEffect.Modify)
-			addID(sideEffect.MemberCallKey)
-		}
-	}
-
-	for _, blockID := range function.Blocks {
-		blockValue, ok := function.GetInstructionById(blockID)
-		if !ok || blockValue == nil {
-			continue
-		}
-		block, ok := ToBasicBlock(blockValue)
-		if !ok || block == nil {
-			continue
-		}
-		addID(block.GetId())
-		for _, instID := range block.Insts {
-			addID(instID)
-		}
-		for _, phiID := range block.Phis {
-			addID(phiID)
-		}
-	}
-
-	if len(ids) == 0 {
-		return
-	}
-	c.InstructionCache.Track(ids)
-}
-
-func (c *ProgramCache) reserveSourceHashForSave(hash string) bool {
-	if c == nil || hash == "" {
-		return false
-	}
-	c.sourceHashMu.Lock()
-	defer c.sourceHashMu.Unlock()
-
-	if c.editorHashCache != nil && c.editorHashCache.Have(hash) {
-		return false
-	}
-	if c.editorPendingHashCache != nil && c.editorPendingHashCache.Have(hash) {
-		return false
-	}
-	if c.editorPendingHashCache != nil {
-		c.editorPendingHashCache.Set(hash, struct{}{})
-	}
-	return true
-}
-
-func (c *ProgramCache) markSourceHashesPersisted(hashes ...string) {
-	if c == nil {
-		return
-	}
-	c.sourceHashMu.Lock()
-	defer c.sourceHashMu.Unlock()
-
-	for _, hash := range hashes {
-		if hash == "" {
-			continue
-		}
-		if c.editorPendingHashCache != nil {
-			c.editorPendingHashCache.Delete(hash)
-		}
-		if c.editorHashCache != nil {
-			c.editorHashCache.Set(hash, struct{}{})
-		}
 	}
 }
 
-func (c *ProgramCache) clearPendingSourceHashes(hashes ...string) {
-	if c == nil {
-		return
-	}
-	c.sourceHashMu.Lock()
-	defer c.sourceHashMu.Unlock()
-
-	for _, hash := range hashes {
-		if hash == "" {
-			continue
+func normalizeVariableName(name string) (normalized, member string) {
+	if strings.HasPrefix(name, "#") {
+		if _, memberName, ok := strings.Cut(name, "."); ok {
+			member = memberName
 		}
-		if c.editorPendingHashCache != nil {
-			c.editorPendingHashCache.Delete(hash)
+		if _, memberKey, ok := strings.Cut(name, "["); ok {
+			member, _ = strings.CutSuffix(memberKey, "]")
 		}
 	}
-}
-
-func (c *ProgramCache) IsExistedSourceCodeHash(programName string, hashString string) bool {
-	if programName == "" || !c.HaveDatabaseBackend() {
-		return false
+	if len(name) > 1 {
+		name = strings.TrimPrefix(name, "$")
 	}
-	if c.editorHashCache != nil && c.editorHashCache.Have(hashString) {
-		return true
-	}
-
-	var count int
-	if ret := c.DB.Model(&ssadb.IrSource{}).Where(
-		"source_code_hash = ?", hashString,
-	).Where(
-		"program_name = ?", programName,
-	).Count(&count).Error; ret != nil {
-		log.Warnf("IsExistedSourceCodeHash error: %v", ret)
-	}
-	return count > 0
+	return name, member
 }

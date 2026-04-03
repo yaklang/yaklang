@@ -194,7 +194,9 @@ func (p *Program) DBDebug() {
 	if p == nil || p.Program == nil {
 		return
 	}
-	p.Program.Cache.DB = p.Program.Cache.DB.Debug()
+	if p.Program.Cache != nil {
+		p.Program.Cache.DebugDB()
+	}
 }
 
 func (p *Program) Show() *Program {

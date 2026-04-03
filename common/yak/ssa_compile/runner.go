@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -186,9 +185,6 @@ func compileProjectByPlugin(ctx context.Context, config *ssaconfig.Config, force
 	}
 	compileParam := map[string]string{
 		"config": configJSON,
-	}
-	if databaseRaw := consts.GetSSADataBaseConnString(); databaseRaw != "" {
-		compileParam["database"] = databaseRaw
 	}
 	if forceProgramName {
 		if programName := strings.TrimSpace(config.GetProgramName()); programName != "" {

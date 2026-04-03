@@ -176,15 +176,9 @@ func (a *anInstruction) setLocationIDs(funcID, blockID int64) {
 }
 
 func (a *anInstruction) resolveFunctionByID() *Function {
-	if a.funcId <= 0 || a.prog == nil || a.prog.Cache == nil || a.prog.Cache.InstructionCache == nil {
+	if a.funcId <= 0 || a.prog == nil || a.prog.Cache == nil {
 		return nil
 	}
-	if cachedFunc, ok := a.prog.Cache.InstructionCache.Get(a.funcId); ok {
-		if f, ok := ToFunction(cachedFunc); ok {
-			return f
-		}
-	}
-	// DB-read mode may not have the function in InstructionCache yet.
 	if loaded := a.prog.Cache.GetInstruction(a.funcId); loaded != nil {
 		if f, ok := ToFunction(loaded); ok {
 			return f
@@ -248,15 +242,9 @@ func (a *anInstruction) SetBlock(block *BasicBlock) {
 }
 
 func (a *anInstruction) resolveBlockByID() *BasicBlock {
-	if a.blockId <= 0 || a.prog == nil || a.prog.Cache == nil || a.prog.Cache.InstructionCache == nil {
+	if a.blockId <= 0 || a.prog == nil || a.prog.Cache == nil {
 		return nil
 	}
-	if cachedBlock, ok := a.prog.Cache.InstructionCache.Get(a.blockId); ok {
-		if block, ok := ToBasicBlock(cachedBlock); ok {
-			return block
-		}
-	}
-	// DB-read mode may not have the block in InstructionCache yet.
 	if loaded := a.prog.Cache.GetInstruction(a.blockId); loaded != nil {
 		if block, ok := ToBasicBlock(loaded); ok {
 			return block
@@ -755,12 +743,14 @@ func (n *anValue) cacheType(typ Type) int64 {
 	if typ == nil {
 		return 0
 	}
-	if cache := n.getProgramCache(); cache != nil && cache.TypeCache != nil {
-		cache.TypeCache.Set(typ)
+	if cache := n.getProgramCache(); cache != nil {
+		cache.rememberType(typ)
 	} else {
 		n.SetLazySaveType(func() {
-			n.getProgramCache().TypeCache.Set(typ)
-			n.typId = typ.GetId()
+			if cache := n.getProgramCache(); cache != nil {
+				cache.rememberType(typ)
+				n.typId = typ.GetId()
+			}
 		})
 	}
 	return typ.GetId()
@@ -768,15 +758,9 @@ func (n *anValue) cacheType(typ Type) int64 {
 
 func (n *anValue) lookupTypeById(id int64) Type {
 	cache := n.getProgramCache()
-	if cache != nil && cache.TypeCache != nil {
-		if typ, ok := cache.TypeCache.Get(id); ok && !utils.IsNil(typ) {
+	if cache != nil {
+		if typ, ok := cache.getType(id); ok && !utils.IsNil(typ) {
 			return typ
-		}
-		if cache.HaveDatabaseBackend() {
-			if typ := GetTypeFromDB(cache, id); !utils.IsNil(typ) {
-				cache.TypeCache.Set(typ)
-				return typ
-			}
 		}
 	}
 	return nil
