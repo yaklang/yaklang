@@ -219,8 +219,101 @@ func (p *Program) matchVariableWithExcludeFiles(ctx context.Context, compareMode
 			}
 		},
 	)
+	// values = appendPhiLinkedToParameters(ctx, p, values)
 	// 将 Values 转换为 sfvm.ValueOperator
 	return len(values) > 0, ToSFVMValues(values), nil
+}
+
+// appendPhiLinkedToParameters 在每个匹配到的形式参数上追加与之对应的同名的 phi（同函数、VariableIndex），
+// 以及 EmitPhi/Point 已建立的 GetPointer 链上的 phi，
+// 使 “gin.Context as $input” 能同时覆盖 Parameter 与循环/分支合并后的 phi。
+func appendPhiLinkedToParameters(ctx context.Context, p *Program, values Values) Values {
+	if p == nil || len(values) == 0 {
+		return values
+	}
+	seen := make(map[int64]struct{}, len(values)*2)
+	for _, v := range values {
+		if v != nil {
+			seen[v.GetId()] = struct{}{}
+		}
+	}
+	out := append(Values(nil), values...)
+	addPhi := func(phiInst ssa.Instruction) {
+		if utils.IsNil(phiInst) {
+			return
+		}
+		id := phiInst.GetId()
+		if _, dup := seen[id]; dup {
+			return
+		}
+		phi, ok := ssa.ToPhi(phiInst)
+		if !ok || phi == nil {
+			return
+		}
+		nv, err := p.NewValue(phi)
+		if err != nil || nv == nil {
+			return
+		}
+		seen[id] = struct{}{}
+		out = append(out, nv)
+	}
+	for _, v := range values {
+		if v == nil {
+			continue
+		}
+		paramInst := v.getInstruction()
+		param, ok := ssa.ToParameter(paramInst)
+		if !ok || param == nil {
+			continue
+		}
+		paramID := paramInst.GetId()
+		paramFn := param.GetFunc()
+
+		vname := param.GetName()
+		if ptrSrc, ok := paramInst.(ssa.PointerIF); ok && ptrSrc != nil {
+			for _, ptr := range ptrSrc.GetPointer() {
+				if utils.IsNil(ptr) {
+					continue
+				}
+				phiPtr, ok := ssa.ToPhi(ptr)
+				if !ok || phiPtr == nil {
+					continue
+				}
+				// 仅保留与形参同名的 phi，避免 gin.Context 构造合并等内部 phi 混入 $input
+				if vname != "" && phiPtr.GetName() != vname {
+					continue
+				}
+				ref := ptr.GetReference()
+				if utils.IsNil(ref) || ref.GetId() != paramID {
+					continue
+				}
+				addPhi(ptr)
+			}
+		}
+
+		if vname == "" {
+			continue
+		}
+		for _, inst := range ssa.MatchInstructionsByVariableWithExcludeFiles(
+			ctx, p.Program, ssadb.ExactCompare, ssadb.NameMatch, vname, nil,
+		) {
+			if utils.IsNil(inst) || inst.GetId() == paramID {
+				continue
+			}
+			phiInst, ok := ssa.ToPhi(inst)
+			if !ok || phiInst == nil {
+				continue
+			}
+			if paramFn != nil {
+				pf := phiInst.GetFunc()
+				if pf != nil && pf.GetId() != paramFn.GetId() {
+					continue
+				}
+			}
+			addPhi(inst)
+		}
+	}
+	return out
 }
 
 func (p *Program) ListIndex(i int) (sfvm.ValueOperator, error) {
