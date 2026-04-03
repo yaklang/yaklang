@@ -241,6 +241,168 @@ def build():
 	requirePythonProjectCompileNoErrors(t, vf)
 }
 
+func TestPythonProjectCompile_KwargsPopDoesNotError(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("main.py", `
+def get_model_label(model):
+    if isinstance(model, str):
+        return model
+    return model.__name__
+
+class Field:
+    def __init__(self, **kwargs):
+        if "to" in kwargs.keys():
+            old_to = get_model_label(kwargs.pop("to"))
+        kwargs["to"] = "default.Model"
+
+Field(related_name="test_image", to="tests.Image")
+`)
+
+	requirePythonProjectCompileNoErrors(t, vf)
+}
+
+func TestPythonProjectCompile_ChainedIndexedAttributeAssignDoesNotError(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("main.py", `
+class Field:
+    pass
+
+fields = [Field()]
+docfield = [f for f in fields if True]
+docfield[0].options = "name"
+`)
+
+	requirePythonProjectCompileNoErrors(t, vf)
+}
+
+func TestPythonProjectCompile_StringKeyAssignOnCallResultDoesNotError(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("main.py", `
+def build():
+    return []
+
+event = build()
+event["summary"] = "subject"
+event["status"] = "Open"
+`)
+
+	requirePythonProjectCompileNoErrors(t, vf)
+}
+
+func TestPythonProjectCompile_NestedClassInheritanceDoesNotError(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("main.py", `
+class Panel:
+    class BoundPanel:
+        pass
+
+class CommentPanel:
+    class BoundPanel(Panel.BoundPanel):
+        pass
+
+class FieldPanel:
+    class BoundPanel(Panel.BoundPanel):
+        pass
+`)
+
+	requirePythonProjectCompileNoErrors(t, vf)
+}
+
+func TestPythonProjectCompile_DecoratedNestedClassInheritanceDoesNotError(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("main.py", `
+def register_telepath_adapter(cls):
+    return cls
+
+class Component:
+    pass
+
+class Panel:
+    @register_telepath_adapter
+    class BoundPanel(Component):
+        pass
+
+class CommentPanel(Panel):
+    class BoundPanel(Panel.BoundPanel):
+        pass
+`)
+
+	requirePythonProjectCompileNoErrors(t, vf)
+}
+
+func TestPythonProjectCompile_CrossFileNestedClassInheritanceDoesNotError(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("base.py", `
+def register_telepath_adapter(cls):
+    return cls
+
+class Component:
+    pass
+
+class Panel:
+    @register_telepath_adapter
+    class BoundPanel(Component):
+        pass
+`)
+	vf.AddFile("child.py", `
+from base import Panel
+
+class CommentPanel(Panel):
+    class BoundPanel(Panel.BoundPanel):
+        pass
+`)
+
+	requirePythonProjectCompileNoErrors(t, vf)
+}
+
+func TestPythonProjectCompile_CrossFileNestedMetaInheritanceDoesNotError(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("base.py", `
+class BaseImage:
+    class Meta:
+        abstract = True
+`)
+	vf.AddFile("image.py", `
+from base import BaseImage
+
+class Image(BaseImage):
+    class Meta(BaseImage.Meta):
+        swappable = "FILER_IMAGE_MODEL"
+`)
+
+	requirePythonProjectCompileNoErrors(t, vf)
+}
+
+func TestPythonProjectCompile_DelFieldOnSliceValueDoesNotError(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("main.py", `
+rich_text_block = []
+if hasattr(rich_text_block, "field"):
+    del rich_text_block.field
+`)
+
+	requirePythonProjectCompileNoErrors(t, vf)
+}
+
+func TestPythonProjectCompile_DynamicParentAliasMembersDoNotError(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("main.py", `
+class Case:
+    def __init__(self):
+        self.form_page = []
+
+    def make_form_pages(self, parent=None):
+        if parent is None:
+            parent = self.form_page
+
+        parent.add_child(instance=1)
+        slug = f"form-{parent.locale_id}"
+        return slug
+`)
+
+	requirePythonProjectCompileNoErrors(t, vf)
+}
+
 func requirePythonProjectCompileNoErrors(t *testing.T, fs *filesys.VirtualFS) {
 	t.Helper()
 

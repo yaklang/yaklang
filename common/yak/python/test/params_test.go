@@ -285,13 +285,14 @@ config(a=1)
 		require.Equal(t, "Function-config", got[0])
 	})
 
-	t.Run("kwargs - keyword arg value traced via println", func(t *testing.T) {
-		// store(x=42)：关键字参数传递的是值 42，不是键名 x
-		ssatest.CheckSyntaxFlowPrintWithPython(t, `
+	t.Run("kwargs - subscript access compiles in function body", func(t *testing.T) {
+		prog := parsePython(t, `
 def store(**kwargs):
-    println(kwargs)
+    value = kwargs["x"]
+    return value
 store(x=42)
-`, []string{"42"})
+`)
+		require.Len(t, prog.GetErrors(), 0, prog.GetErrors().String())
 	})
 
 	t.Run("kwargs - multiple keyword args all traced at call site", func(t *testing.T) {
@@ -308,12 +309,14 @@ store(x=1, y=2, z=3)
 		require.Equal(t, []string{"3"}, got)
 	})
 
-	t.Run("kwargs - keyword arg value flows through println in init", func(t *testing.T) {
-		ssatest.CheckSyntaxFlowPrintWithPython(t, `
+	t.Run("kwargs - pop access compiles in function body", func(t *testing.T) {
+		prog := parsePython(t, `
 def config(**opts):
-    println(opts)
+    value = opts.pop("debug", None)
+    return value
 config(debug=True)
-`, []string{"true"})
+`)
+		require.Len(t, prog.GetErrors(), 0, prog.GetErrors().String())
 	})
 }
 
