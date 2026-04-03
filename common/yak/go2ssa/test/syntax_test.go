@@ -29,17 +29,13 @@ var goTestAntlrCache = func() *ssa.AntlrCache {
 }()
 
 func isGoSyntaxASTFixture(fixturePath string) bool {
-	ext := strings.ToLower(filepath.Ext(fixturePath))
-	return ext == "" || ext == ".go"
+	return strings.EqualFold(filepath.Ext(fixturePath), ".go")
 }
 
 func goFixtureVirtualPath(filename string) string {
 	trimmed := strings.TrimPrefix(filepath.ToSlash(filename), "code/")
 	if trimmed == "" {
 		trimmed = "fixture"
-	}
-	if filepath.Ext(trimmed) == "" {
-		trimmed += ".go"
 	}
 	return path.Join("fixture", trimmed)
 }
