@@ -72,6 +72,9 @@ func GetBaseURLFromConfig(config *AIConfig, defaultRootUrl, defaultUri string) s
 
 func GetBaseURLFromConfigEx(config *AIConfig, defaultRootUrl, defaultUri string, openaiMode bool) string {
 	fixDomain(config)
+	if config.EnableEndpoint && strings.TrimSpace(config.Endpoint) != "" {
+		return strings.TrimSpace(config.Endpoint)
+	}
 	normalizedDefaultURI := defaultUri
 	if normalizedDefaultURI == "" {
 		normalizedDefaultURI = "/"
@@ -81,7 +84,7 @@ func GetBaseURLFromConfigEx(config *AIConfig, defaultRootUrl, defaultUri string,
 
 	keepDefaultSuffix := func(s string) string {
 		trimSlash := strings.TrimRight(s, "/")
-		if !strings.HasSuffix(trimSlash, normalizedDefaultURI) && !strings.Contains(trimSlash, "chat/completions") {
+		if !strings.HasSuffix(trimSlash, normalizedDefaultURI) && !hasKnownEndpointSuffix(trimSlash) {
 			pathSegments := strings.Split(strings.Trim(normalizedDefaultURI, "/"), "/")
 			for i := len(pathSegments) - 1; i > 0; i-- {
 				overlap := "/" + strings.Join(pathSegments[:i], "/")
@@ -129,6 +132,23 @@ func GetBaseURLFromConfigEx(config *AIConfig, defaultRootUrl, defaultUri string,
 	return urlPath
 }
 
+func GetBaseURLRootFromConfig(config *AIConfig, defaultRootUrl, defaultUri string) string {
+	endpoint := strings.TrimSpace(GetBaseURLFromConfig(config, defaultRootUrl, defaultUri))
+	if endpoint == "" {
+		return ""
+	}
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return strings.TrimRight(trimKnownEndpointSuffix(endpoint), "/")
+	}
+	u.Path = trimKnownEndpointSuffix(u.Path)
+	u.RawPath = ""
+	if u.Path == "/" {
+		u.Path = ""
+	}
+	return strings.TrimRight(u.String(), "/")
+}
+
 // fixDomain 修复不规范的domain配置
 func fixDomain(c *AIConfig) {
 	// 修复domain配置
@@ -171,6 +191,41 @@ func fixDomain(c *AIConfig) {
 	}
 }
 
+func hasKnownEndpointSuffix(raw string) bool {
+	raw = strings.TrimSpace(raw)
+	for _, suffix := range knownAIEndpointSuffixes() {
+		if strings.HasSuffix(raw, suffix) {
+			return true
+		}
+	}
+	return false
+}
+
+func trimKnownEndpointSuffix(raw string) string {
+	raw = strings.TrimSpace(raw)
+	raw = strings.TrimRight(raw, "/")
+	for _, suffix := range knownAIEndpointSuffixes() {
+		if strings.HasSuffix(raw, suffix) {
+			return strings.TrimSuffix(raw, suffix)
+		}
+	}
+	return raw
+}
+
+func knownAIEndpointSuffixes() []string {
+	return []string{
+		"/responses",
+		"/v1/responses",
+		"/api/v1/responses",
+		"/chat/completions",
+		"/v1/chat/completions",
+		"/api/v1/chat/completions",
+		"/compatible-mode/v1/chat/completions",
+		"/api/v3/chat/completions",
+		"/api/paas/v4/chat/completions",
+	}
+}
+
 // BuildOptionsFromConfig builds aispec.AIConfigOption slice from AIModelConfig.
 func BuildOptionsFromConfig(config *ypb.AIModelConfig) []AIConfigOption {
 	if config == nil {
@@ -194,6 +249,22 @@ func buildOptionsFromProviderAndModel(provider *ypb.ThirdPartyApplicationConfig,
 	// Set domain
 	if provider.Domain != "" {
 		opts = append(opts, WithDomain(provider.Domain))
+	}
+
+	if provider.GetBaseURL() != "" {
+		opts = append(opts, WithBaseURL(provider.GetBaseURL()))
+	}
+
+	if provider.GetEndpoint() != "" {
+		opts = append(opts, WithEndpoint(provider.GetEndpoint()))
+	}
+
+	if provider.GetEnableEndpoint() {
+		opts = append(opts, WithEnableEndpoint(provider.GetEnableEndpoint()))
+	}
+
+	if len(provider.GetHeaders()) > 0 {
+		opts = append(opts, WithExtraHeader(ExtraHeadersToMap(provider.GetHeaders())))
 	}
 
 	// Set type

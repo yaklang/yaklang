@@ -24,6 +24,9 @@ type AIThirdPartyConfig struct {
 	UserSecret     string          `json:"user_secret"`
 	Namespace      string          `json:"namespace"`
 	Domain         string          `json:"domain"`
+	BaseURL        string          `json:"base_url"`
+	Endpoint       string          `json:"endpoint"`
+	EnableEndpoint bool            `json:"enable_endpoint" gorm:"default:false"`
 	WebhookURL     string          `json:"webhook_url"`
 	ExtraParams    MapStringString `json:"extra_params" gorm:"type:text"`
 	APIType        string          `json:"api_type"`
@@ -55,10 +58,13 @@ func (c *AIThirdPartyConfig) CalcHash() string {
 		c.UserSecret,
 		c.Namespace,
 		c.Domain,
+		c.BaseURL,
+		c.Endpoint,
 		c.WebhookURL,
 		builder.String(),
 		c.Proxy,
 		c.NoHttps,
+		c.EnableEndpoint,
 	)
 }
 
@@ -82,6 +88,9 @@ func (c *AIThirdPartyConfig) ToThirdPartyConfig() *ypb.ThirdPartyApplicationConf
 		UserSecret:     c.UserSecret,
 		Namespace:      c.Namespace,
 		Domain:         c.Domain,
+		BaseURL:        c.BaseURL,
+		Endpoint:       c.Endpoint,
+		EnableEndpoint: c.EnableEndpoint,
 		WebhookURL:     c.WebhookURL,
 		Disabled:       c.Disabled,
 		Proxy:          c.Proxy,
@@ -128,6 +137,9 @@ func AIThirdPartyConfigFromGRPC(cfg *ypb.ThirdPartyApplicationConfig) *AIThirdPa
 		UserSecret:     cfg.GetUserSecret(),
 		Namespace:      cfg.GetNamespace(),
 		Domain:         cfg.GetDomain(),
+		BaseURL:        cfg.GetBaseURL(),
+		Endpoint:       cfg.GetEndpoint(),
+		EnableEndpoint: cfg.GetEnableEndpoint(),
 		WebhookURL:     cfg.GetWebhookURL(),
 		ExtraParams:    extra,
 		Disabled:       cfg.GetDisabled(),

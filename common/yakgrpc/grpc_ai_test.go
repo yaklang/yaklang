@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -25,7 +27,7 @@ func TestGRPC_Ai_List_Model(t *testing.T) {
 	config := make(map[string]string)
 	config["api_key"] = "${api_key}"
 
-	//TODO:  Should use baseurl mock 
+	//TODO:  Should use baseurl mock
 	config["proxy"] = "http://127.0.0.1:7890"
 	config["Type"] = "openai"
 	raw, err := json.Marshal(config)
@@ -130,7 +132,177 @@ func TestGRPC_Ai_Config_Health_Check(t *testing.T) {
 	assert.GreaterOrEqual(t, rsp.GetFirstByteCostMs(), int64(1))
 	assert.GreaterOrEqual(t, rsp.GetTotalCostMs(), rsp.GetFirstByteCostMs())
 	assert.Contains(t, rsp.GetRawRequest(), "POST /v1/chat/completions HTTP/1.1")
+	assert.Contains(t, rsp.GetRawResponse(), "HTTP/1.1 200 OK")
+	assert.Contains(t, rsp.GetRawResponse(), `"mock-response"`)
 	assert.Equal(t, int32(200), rsp.GetResponseStatusCode())
 	assert.Equal(t, "mock-response", rsp.GetResponseContent())
 	assert.Empty(t, rsp.GetErrorMessage())
+}
+
+func TestRecommendAIHealthCheckConfig(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/chat/completions" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"ok"}}]}`))
+	}))
+	defer server.Close()
+
+	cfg := &ypb.ThirdPartyApplicationConfig{
+		Type:    "openrouter",
+		APIKey:  "test-key",
+		BaseURL: server.URL + "/bad",
+		ExtraParams: []*ypb.KVPair{
+			{Key: "model", Value: "mock-model"},
+		},
+	}
+
+	initial := executeAIConfigHealthCheck(context.Background(), cfg, "ping")
+	assert.NotEmpty(t, initial.GetErrorMessage())
+
+	recommend := recommendAIHealthCheckConfig(context.Background(), cfg, "ping")
+	require.NotNil(t, recommend)
+	assert.Empty(t, recommend.GetBaseURL())
+	assert.Equal(t, server.URL+"/api/v1/chat/completions", recommend.GetEndpoint())
+	assert.True(t, recommend.GetEnableEndpoint())
+	assert.Empty(t, recommend.GetProxy())
+	assert.True(t, recommend.GetNoHttps())
+}
+
+func TestBuildRecommendedAIConfigs_TogglesProxyAndSuffixes(t *testing.T) {
+	cfg := &ypb.ThirdPartyApplicationConfig{
+		Type:    "openrouter",
+		APIKey:  "test-key",
+		BaseURL: "http://mock.local",
+		Proxy:   "http://127.0.0.1:8080",
+		ExtraParams: []*ypb.KVPair{
+			{Key: "model", Value: "mock-model"},
+		},
+	}
+
+	candidates := buildRecommendedAIConfigs(cfg)
+	require.NotEmpty(t, candidates)
+
+	found := false
+	for _, candidate := range candidates {
+		if candidate.GetEndpoint() == "http://mock.local/api/v1/chat/completions" && candidate.GetProxy() == "" && candidate.GetEnableEndpoint() {
+			found = true
+			break
+		}
+	}
+	assert.True(t, found)
+}
+
+func TestBuildRecommendedAIConfigs_UsesResponsesSuffixesByAPIType(t *testing.T) {
+	cfg := &ypb.ThirdPartyApplicationConfig{
+		Type:    "openai",
+		APIKey:  "test-key",
+		BaseURL: "https://mock.local",
+		APIType: "responses",
+		ExtraParams: []*ypb.KVPair{
+			{Key: "model", Value: "mock-model"},
+		},
+	}
+
+	candidates := buildRecommendedAIConfigs(cfg)
+	require.NotEmpty(t, candidates)
+
+	var foundResponses bool
+	for _, candidate := range candidates {
+		if candidate.GetAPIType() == "responses" && candidate.GetEndpoint() == "https://mock.local/v1/responses" && candidate.GetEnableEndpoint() {
+			foundResponses = true
+		}
+	}
+	assert.True(t, foundResponses)
+}
+
+func TestBuildRecommendedAIConfigs_IncludesAlternativeAPITypeCandidates(t *testing.T) {
+	cfg := &ypb.ThirdPartyApplicationConfig{
+		Type:    "openai",
+		APIKey:  "test-key",
+		BaseURL: "https://mock.local",
+		APIType: "responses",
+		ExtraParams: []*ypb.KVPair{
+			{Key: "model", Value: "mock-model"},
+		},
+	}
+
+	candidates := buildRecommendedAIConfigs(cfg)
+	require.NotEmpty(t, candidates)
+
+	var foundResponses bool
+	var foundChatCompletions bool
+	for _, candidate := range candidates {
+		if candidate.GetEndpoint() == "https://mock.local/v1/responses" && candidate.GetAPIType() == "responses" && candidate.GetEnableEndpoint() {
+			foundResponses = true
+		}
+		if candidate.GetEndpoint() == "https://mock.local/v1/chat/completions" && candidate.GetAPIType() == "chat_completions" && candidate.GetEnableEndpoint() {
+			foundChatCompletions = true
+		}
+	}
+	assert.True(t, foundResponses)
+	assert.True(t, foundChatCompletions)
+}
+
+func TestRecommendAIHealthCheckConfig_CanCorrectAPIType(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/responses" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"output":[{"type":"message","content":[{"type":"output_text","text":"ok"}]}],"output_text":"ok"}`))
+	}))
+	defer server.Close()
+
+	cfg := &ypb.ThirdPartyApplicationConfig{
+		Type:    "openai",
+		APIKey:  "test-key",
+		BaseURL: server.URL,
+		APIType: "chat_completions",
+		ExtraParams: []*ypb.KVPair{
+			{Key: "model", Value: "mock-model"},
+		},
+	}
+
+	initial := executeAIConfigHealthCheck(context.Background(), cfg, "ping")
+	assert.NotEmpty(t, initial.GetErrorMessage())
+
+	recommend := recommendAIHealthCheckConfig(context.Background(), cfg, "ping")
+	require.NotNil(t, recommend)
+	assert.Empty(t, recommend.GetBaseURL())
+	assert.Equal(t, server.URL+"/v1/responses", recommend.GetEndpoint())
+	assert.True(t, recommend.GetEnableEndpoint())
+	assert.Equal(t, "responses", recommend.GetAPIType())
+	assert.True(t, recommend.GetNoHttps())
+}
+
+func TestRecommendAIHealthCheckConfig_FallbackToEndpoint(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/custom/openai/chat/completions" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"ok"}}]}`))
+	}))
+	defer server.Close()
+
+	cfg := &ypb.ThirdPartyApplicationConfig{
+		Type:    "openai",
+		APIKey:  "test-key",
+		BaseURL: server.URL + "/custom/openai/chat/completions",
+		ExtraParams: []*ypb.KVPair{
+			{Key: "model", Value: "mock-model"},
+		},
+	}
+
+	recommend := recommendAIHealthCheckConfig(context.Background(), cfg, "ping")
+	require.NotNil(t, recommend)
+	assert.Empty(t, recommend.GetBaseURL())
+	assert.Equal(t, server.URL+"/custom/openai/chat/completions", recommend.GetEndpoint())
+	assert.True(t, recommend.GetEnableEndpoint())
+	assert.True(t, recommend.GetNoHttps())
 }

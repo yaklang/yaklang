@@ -78,6 +78,41 @@ func TestSetAndGetAIGlobalConfig(t *testing.T) {
 	assert.Len(t, providers, 2)
 }
 
+func TestGetAIGlobalConfig_MigratesLegacyBaseURL(t *testing.T) {
+	db := setupAIGlobalConfigTestDB(t)
+	defer db.Close()
+
+	cfg := &ypb.AIGlobalConfig{
+		Enabled:       true,
+		RoutingPolicy: "balance",
+		IntelligentModels: []*ypb.AIModelConfig{
+			{
+				ModelName: "gpt-4o",
+				Provider: &ypb.ThirdPartyApplicationConfig{
+					Type:    "openai",
+					APIKey:  "key-1",
+					Domain:  "api.openai.com",
+					NoHttps: true,
+				},
+			},
+		},
+	}
+	raw, err := json.Marshal(cfg)
+	require.NoError(t, err)
+	require.NoError(t, SetKey(db, consts.AI_GLOBAL_CONFIG_KEY, string(raw)))
+
+	loaded, err := GetAIGlobalConfig(db)
+	require.NoError(t, err)
+	require.Len(t, loaded.GetIntelligentModels(), 1)
+	require.NotNil(t, loaded.GetIntelligentModels()[0].GetProvider())
+	assert.Equal(t, "http://api.openai.com/v1", loaded.GetIntelligentModels()[0].GetProvider().GetBaseURL())
+
+	persisted, err := GetAIGlobalConfig(db)
+	require.NoError(t, err)
+	require.Len(t, persisted.GetIntelligentModels(), 1)
+	assert.Equal(t, "http://api.openai.com/v1", persisted.GetIntelligentModels()[0].GetProvider().GetBaseURL())
+}
+
 func TestSetAIGlobalConfig_UpdateProxyNoHttpsDomain(t *testing.T) {
 	db := setupAIGlobalConfigTestDB(t)
 	defer db.Close()

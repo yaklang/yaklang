@@ -108,6 +108,7 @@ func (g *GLMClient) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
 			"Authorization": k,
 		}),
 	}
+	opts = aispec.AppendCustomHeadersToPocOptions(opts, aispec.ExtraHeadersToMap(g.config.Headers))
 	opts = append(opts, poc.WithTimeout(g.config.Timeout))
 	if g.config.Proxy != "" {
 		opts = append(opts, poc.WithProxy(g.config.Proxy))

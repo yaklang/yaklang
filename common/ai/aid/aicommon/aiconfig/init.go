@@ -219,11 +219,15 @@ func cloneThirdPartyConfig(cfg *ypb.ThirdPartyApplicationConfig) *ypb.ThirdParty
 		UserSecret:     cfg.GetUserSecret(),
 		Namespace:      cfg.GetNamespace(),
 		Domain:         cfg.GetDomain(),
+		BaseURL:        cfg.GetBaseURL(),
+		Endpoint:       cfg.GetEndpoint(),
+		EnableEndpoint: cfg.GetEnableEndpoint(),
 		WebhookURL:     cfg.GetWebhookURL(),
 		Disabled:       cfg.GetDisabled(),
 		Proxy:          cfg.GetProxy(),
 		NoHttps:        cfg.GetNoHttps(),
 		APIType:        cfg.GetAPIType(),
+		Headers:        cloneHTTPHeaders(cfg.GetHeaders()),
 		ExtraParams:    cloneKVPairs(cfg.GetExtraParams()),
 	}
 }
@@ -238,6 +242,23 @@ func cloneKVPairs(kvs []*ypb.KVPair) []*ypb.KVPair {
 			continue
 		}
 		cloned = append(cloned, &ypb.KVPair{Key: kv.GetKey(), Value: kv.GetValue()})
+	}
+	return cloned
+}
+
+func cloneHTTPHeaders(headers []*ypb.KVPair) []*ypb.KVPair {
+	if len(headers) == 0 {
+		return nil
+	}
+	cloned := make([]*ypb.KVPair, 0, len(headers))
+	for _, header := range headers {
+		if header == nil {
+			continue
+		}
+		cloned = append(cloned, &ypb.KVPair{
+			Key:   header.GetKey(),
+			Value: header.GetValue(),
+		})
 	}
 	return cloned
 }
