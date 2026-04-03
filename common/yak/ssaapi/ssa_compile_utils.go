@@ -33,9 +33,7 @@ var (
 
 func antlrCacheResetEveryFiles() int {
 	antlrCacheResetEveryFilesOnce.Do(func() {
-		// Reuse helps small projects, but large Go projects regress sharply when
-		// DFA/prediction caches accumulate across many files on the same worker.
-		antlrCacheResetEveryFilesCached = 1
+		antlrCacheResetEveryFilesCached = 100
 		if raw := strings.TrimSpace(os.Getenv("YAK_ANTLR_CACHE_RESET_FILES")); raw != "" {
 			if v, err := strconv.Atoi(raw); err == nil {
 				antlrCacheResetEveryFilesCached = v
