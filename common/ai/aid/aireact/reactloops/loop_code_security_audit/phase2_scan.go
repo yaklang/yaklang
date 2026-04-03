@@ -203,7 +203,7 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *AuditState, 
 		reactloops.WithAllowRAG(false),
 		reactloops.WithAllowAIForge(false),
 		reactloops.WithAllowPlanAndExec(false),
-		reactloops.WithAllowToolCall(false),
+		reactloops.WithAllowToolCall(true),
 		reactloops.WithAllowUserInteract(false),
 		reactloops.WithEnableSelfReflection(true),
 		reactloops.WithSameActionTypeSpinThreshold(len(category.SinkHints)*2 + 5),
@@ -277,11 +277,6 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *AuditState, 
 			log.Infof("[CodeAudit/Phase2] Category '%s' scan started", category.ID)
 			op.Continue()
 		}),
-
-		// 文件系统工具（Yak 脚本，与 Phase1 保持一致）
-		buildFSAction(r, "grep"),
-		buildFSAction(r, "read_file"),
-		buildFSAction(r, "find_file"),
 
 		// ─── lock_target_files：每次 grep 后调用追加文件，done=true 时切换阶段B ───
 		reactloops.WithRegisterLoopAction(

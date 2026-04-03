@@ -72,9 +72,7 @@ func buildPhase3VerifyLoop(r aicommon.AIInvokeRuntime, state *AuditState, opts .
 		reactloops.WithAllowRAG(false),
 		reactloops.WithAllowAIForge(false),
 		reactloops.WithAllowPlanAndExec(false),
-		// 关闭通用 tool call，所有文件读取通过 read_code action 进行
-		// （read_code 内部使用 Yak read_file 工具或降级到内联实现）
-		reactloops.WithAllowToolCall(false), // file ops handled by explicit read_file / grep loop actions
+		reactloops.WithAllowToolCall(true),
 		reactloops.WithAllowUserInteract(false),
 		reactloops.WithEnableSelfReflection(true),
 		reactloops.WithSameActionTypeSpinThreshold(3),
@@ -158,10 +156,6 @@ func buildPhase3VerifyLoop(r aicommon.AIInvokeRuntime, state *AuditState, opts .
 				len(findings), string(findingsJSON)))
 			op.Continue()
 		}),
-
-		// 文件系统工具（直接使用 Yak 脚本工具 read_file / grep，不再封装为 read_code）
-		buildFSAction(r, "read_file"),
-		buildFSAction(r, "grep"),
 
 		// trace_data_flow: 记录数据流追踪节点
 		reactloops.WithRegisterLoopAction(
