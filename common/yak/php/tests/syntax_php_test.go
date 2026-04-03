@@ -573,6 +573,7 @@ func TestProjectAst(t *testing.T) {
 	config, err := ssaapi.DefaultConfig(
 		ssaapi.WithFileSystem(refFs),
 		ssaapi.WithLanguage(ssaconfig.PHP),
+		ssaapi.WithConcurrency(1),
 	)
 	require.NoError(t, err)
 	require.NotNil(t, config)

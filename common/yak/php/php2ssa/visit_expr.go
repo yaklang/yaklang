@@ -667,6 +667,8 @@ func (y *builder) VisitAssignableChainOrigin(raw phpparser.IAssignableChainOrigi
 		return y.VisitStaticMethodCall(ret)
 	} else if ret := i.StaticClassExprVariableMember(); ret != nil {
 		return y.visitStaticClassExprVariableMemberValue(ret)
+	} else if ret := i.Parentheses(); ret != nil {
+		return y.VisitParentheses(ret)
 	}
 	log.Errorf("BUG: unknown assignable chain origin: %v", i.GetText())
 	return y.EmitUndefined(i.GetText())
