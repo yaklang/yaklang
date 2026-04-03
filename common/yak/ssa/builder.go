@@ -237,6 +237,36 @@ func (b FunctionBuilder) HandlerEllipsis() {
 	b.hasEllipsis = true
 }
 
+// linkPhiToFormalParamByName 在 phi 边上未直接出现形式参数时（例如循环头合并 phi），
+// 按变量名与同名的形式参数建立 Point。
+func (f *FunctionBuilder) linkPhiToFormalParamByName(phi *Phi, varName string) {
+	if f == nil || f.Function == nil || phi == nil || varName == "" {
+		return
+	}
+	if !utils.IsNil(phi.GetReference()) {
+		return
+	}
+	prog := f.GetProgram()
+	if prog == nil {
+		return
+	}
+	for _, paramID := range f.Params {
+		inst, ok := prog.GetInstructionById(paramID)
+		if !ok || utils.IsNil(inst) {
+			continue
+		}
+		param, ok := ToParameter(inst)
+		if !ok || param == nil || param.IsFreeValue {
+			continue
+		}
+		if param.GetName() != varName {
+			continue
+		}
+		Point(phi, param)
+		return
+	}
+}
+
 func (b *FunctionBuilder) EmitDefer(instruction Instruction) {
 	deferBlock := b.GetDeferBlock()
 	endBlock := b.CurrentBlock

@@ -587,6 +587,20 @@ func (f *FunctionBuilder) EmitPhi(name string, vs Values) *Phi {
 	for _, v := range vs {
 		v.AddOccultation(p)
 	}
+	// 将 phi 与首个非 FreeValue 的形式参数关联：Point 建立 reference + 反向 GetPointer，
+	// 便于 SyntaxFlow 从 Parameter 与 phi 两侧统一做成员键（如 .JSON）查找。
+	for _, v := range vs {
+		if utils.IsNil(v) {
+			continue
+		}
+		if param, ok := ToParameter(v); ok && param != nil && !param.IsFreeValue {
+			Point(p, param)
+			break
+		}
+	}
+	if utils.IsNil(p.GetReference()) {
+		f.linkPhiToFormalParamByName(p, name)
+	}
 	return p
 }
 
