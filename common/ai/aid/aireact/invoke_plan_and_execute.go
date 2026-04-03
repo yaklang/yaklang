@@ -22,6 +22,11 @@ import (
 
 const recoveryTaskIDPrefix = "react-recovery-"
 
+var (
+	newCoordinatorContextForPlanExec = aid.NewCoordinatorContext
+	runCoordinatorForPlanExec        = func(c *aid.Coordinator) error { return c.Run() }
+)
+
 func formatRecoveryTaskID(coordinatorID string) string {
 	return recoveryTaskIDPrefix + sanitizeForTaskId(coordinatorID) + uuid.New().String()
 }
@@ -393,14 +398,14 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 		r.config.HotPatchBroadcaster.Unsubscribe(hotpatchChan)
 		return nil
 	} else {
-		cod, err := aid.NewCoordinatorContext(planCtx, planPayload, baseOpts...)
+		cod, err := newCoordinatorContextForPlanExec(planCtx, planPayload, baseOpts...)
 		if err != nil {
 			log.Errorf("Failed to create coordinator for plan execution: %v", err)
 			return utils.Errorf("failed to create coordinator for plan execution: %v", err)
 		}
 
 		done()
-		if err := cod.Run(); err != nil {
+		if err := runCoordinatorForPlanExec(cod); err != nil {
 			log.Errorf("Plan execution failed: %v", err)
 			return utils.Errorf("plan execution failed: %v", err)
 		}
