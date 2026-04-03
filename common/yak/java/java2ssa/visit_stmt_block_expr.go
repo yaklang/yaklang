@@ -2182,6 +2182,54 @@ func (y *singleFileBuilder) VisitSwitchStatement(raw javaparser.ISwitchStatement
 		recoverRange()
 	}
 
+	switchLabels := i.AllSwitchLabeledRule()
+	if len(switchLabels) > 0 || i.DefaultLabeledRule() != nil {
+		getCaseValue := func(index int) []ssa.Value {
+			switchStmt := switchLabels[index].(*javaparser.SwitchLabeledRuleContext)
+			if switchStmt.ExpressionList() != nil {
+				return y.VisitExpressionList(switchStmt.ExpressionList())
+			} else if switchStmt.NULL_LITERAL() != nil {
+				return []ssa.Value{y.EmitConstInstNil()}
+			} else if switchStmt.GuardedPattern() != nil {
+				return []ssa.Value{y.EmitConstInstNil()}
+			}
+			return nil
+		}
+
+		SwitchBuilder.BuildCaseSize(len(switchLabels))
+		SwitchBuilder.SetCase(func(index int) []ssa.Value {
+			return getCaseValue(index)
+		})
+		SwitchBuilder.BuildBody(func(index int) {
+			switchStmt := switchLabels[index].(*javaparser.SwitchLabeledRuleContext)
+			if switchRuleOutcome := switchStmt.SwitchRuleOutcome(); switchRuleOutcome != nil {
+				outcome := switchRuleOutcome.(*javaparser.SwitchRuleOutcomeContext)
+				if outcome.Block() != nil {
+					y.VisitBlock(outcome.Block())
+				}
+				for _, stmt := range outcome.AllBlockStatement() {
+					y.VisitBlockStatement(stmt)
+				}
+			}
+		})
+		if i.DefaultLabeledRule() != nil {
+			SwitchBuilder.BuildDefault(func() {
+				defaultStmt := i.DefaultLabeledRule().(*javaparser.DefaultLabeledRuleContext)
+				if switchRuleOutcome := defaultStmt.SwitchRuleOutcome(); switchRuleOutcome != nil {
+					outcome := switchRuleOutcome.(*javaparser.SwitchRuleOutcomeContext)
+					if outcome.Block() != nil {
+						y.VisitBlock(outcome.Block())
+					}
+					for _, stmt := range outcome.AllBlockStatement() {
+						y.VisitBlockStatement(stmt)
+					}
+				}
+			})
+		}
+		SwitchBuilder.Finish()
+		return
+	}
+
 	var defaultStatement func()
 	caseLen := 0
 	caseValueMap := make(map[int]func() ssa.Values)

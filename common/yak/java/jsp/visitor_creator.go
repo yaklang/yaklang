@@ -144,8 +144,11 @@ func canBypassDirectiveOnlyJSP(src string) bool {
 	if src == "" {
 		return true
 	}
-	trimmed := directiveOnlyJSPPattern.ReplaceAllString(src, "")
-	return !strings.Contains(trimmed, "<%")
+	trimmed := strings.TrimSpace(directiveOnlyJSPPattern.ReplaceAllString(src, ""))
+	if trimmed == "" {
+		return true
+	}
+	return canBypassFullJSPFront(trimmed)
 }
 
 func canUseLinearScriptletJSPFastPath(src string) bool {
