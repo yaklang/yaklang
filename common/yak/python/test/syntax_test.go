@@ -1,10 +1,8 @@
 package test
 
 import (
-	"embed"
 	"fmt"
 	"os"
-	"path"
 	"strconv"
 	"strings"
 	"testing"
@@ -14,9 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/python/python2ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
-
-//go:embed code
-var codeFs embed.FS
 
 var pythonTestAntlrCache = func() *ssa.AntlrCache {
 	builder, ok := python2ssa.CreateBuilder().(*python2ssa.SSABuilder)
@@ -51,24 +46,22 @@ func validateSource(t *testing.T, filename string, src string) {
 }
 
 func TestAllSyntaxForPython_G4(t *testing.T) {
-	entry, err := codeFs.ReadDir("code")
-	if err != nil {
-		t.Fatalf("no embed syntax files found: %v", err)
+	embeddedFiles, err := collectPythonSyntaxFixtureFiles(projectSyntaxFS, pythonSyntaxFixtureRoot)
+	require.NoError(t, err)
+	require.NotEmpty(t, embeddedFiles, "no embedded python syntax files found")
+
+	diskFiles, err := collectPythonSyntaxFixtureFilesFromDisk(pythonSyntaxFixtureRoot)
+	require.NoError(t, err)
+	require.Equal(t, diskFiles, embeddedFiles, "embedded syntax fixtures must match python files on disk")
+
+	testedFiles := 0
+	for _, filePath := range embeddedFiles {
+		raw, err := projectSyntaxFS.ReadFile(filePath)
+		require.NoError(t, err)
+		validateSource(t, filePath, string(raw))
+		testedFiles++
 	}
-	for _, f := range entry {
-		if f.IsDir() {
-			continue
-		}
-		codePath := path.Join("code", f.Name())
-		if !strings.HasSuffix(codePath, ".py") {
-			continue
-		}
-		raw, err := codeFs.ReadFile(codePath)
-		if err != nil {
-			t.Fatalf("cannot found syntax fs: %v", codePath)
-		}
-		validateSource(t, codePath, string(raw))
-	}
+	require.Equal(t, len(diskFiles), testedFiles, "tested python syntax file count must match merged syntax fixture count")
 }
 
 func TestBasicPythonSyntax(t *testing.T) {
