@@ -39,7 +39,17 @@ func (c *Coordinator) ExecuteLoopTask(taskTypeName string, task aicommon.AIState
 	baseOpts := aicommon.ConvertConfigToOptions(c.Config)
 	baseOpts = append(baseOpts,
 		aicommon.WithID(c.Config.Id), // pe -> react should use same id
-		aicommon.WithAutoTieredAICallback(c.OriginalAICallback),
+		func(cfg *aicommon.Config) error {
+			// Preserve the parent's full callback set for delegated PE-task loops.
+			// Falling back to OriginalAICallback here would make child ReAct loops
+			// route all AI calls through the original/legacy model.
+			cfg.OriginalAICallback = c.OriginalAICallback
+			cfg.QualityPriorityAICallback = c.QualityPriorityAICallback
+			cfg.SpeedPriorityAICallback = c.SpeedPriorityAICallback
+			cfg.AiServerName = c.AiServerName
+			cfg.AiModelName = c.AiModelName
+			return nil
+		},
 		aicommon.WithAllowPlanUserInteract(true),
 		aicommon.WithEventInputChanx(inputChannel),
 		aicommon.WithContext(ctx),

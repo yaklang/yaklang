@@ -295,7 +295,17 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 	baseOpts = append(baseOpts,
 		aicommon.WithID(uid),
 		aicommon.WithTimeline(r.config.Timeline),
-		aicommon.WithAICallback(r.config.OriginalAICallback),
+		func(cfg *aicommon.Config) error {
+			// Preserve the parent's full callback set for delegated plan/forge execution.
+			// Using only WithAICallback(original) would collapse quality/speed routing
+			// into a single callback and can make delegated tasks drift to a different model.
+			cfg.OriginalAICallback = r.config.OriginalAICallback
+			cfg.QualityPriorityAICallback = r.config.QualityPriorityAICallback
+			cfg.SpeedPriorityAICallback = r.config.SpeedPriorityAICallback
+			cfg.AiServerName = r.config.AiServerName
+			cfg.AiModelName = r.config.AiModelName
+			return nil
+		},
 		aicommon.WithAllowPlanUserInteract(true),
 		aicommon.WithEventInputChanx(inputChannel),
 		aicommon.WithHotPatchOptionChan(hotpatchChan),
