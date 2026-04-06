@@ -1,0 +1,24 @@
+## Recon session (nonce={{ .Nonce }})
+
+### Seed & workdir
+- **Seed URL**: {{ .SeedURL }}
+- **Scope hosts**: {{ .ScopeHosts }}
+- **Workdir**: {{ .WorkDir }}
+- **Pool file**: `recon_api_pool.json`
+
+### API pool summary
+- **Total entries**: {{ .PoolTotal }}
+- **Verified (probed)**: {{ .PoolVerified }}
+- **Unverified**: {{ .PoolUnverified }}
+- **By source**: {{ .PoolBySource }}
+
+### Knowledge / RAG snippet
+{{ .EnhanceData }}
+
+### Recent tool recon log (truncated)
+```
+{{ .ReconLogTail }}
+```
+
+### Feedback
+{{ .FeedbackMessages }}

@@ -60,6 +60,7 @@ const (
 	AI_REACT_LOOP_NAME_INTERNET_RESEARCH   = "internet_research"
 	AI_REACT_LOOP_NAME_SMART_QA            = "smart_qa"
 	AI_REACT_LOOP_NAME_DIR_EXPLORE         = "dir_explore"
+	AI_REACT_LOOP_NAME_INFOSEC_RECON       = "infosec_recon"
 )
 
 const (

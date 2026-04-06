@@ -1,0 +1,4 @@
+{
+  "@action": "recon_register_seed",
+  "human_readable_thought": "User provided an authorized target; I register the seed URL and scope before crawling."
+}

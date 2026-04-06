@@ -1,0 +1,1052 @@
+// JS/TS 静态分析：正则提取 → liteforge 轻量智能体（与内置 forge 同源，CLI 可直接跑）并发分析 → 落盘合并 → 擦除上下文 → 分块补漏 → 最终 API 列表。
+// 说明：`aiagent.ExecuteForge` 依赖 Yakit 库中已注册的 forge 名；本脚本使用 `liteforge.Execute` 达到同等「结构化智能体」能力且不依赖库。
+//
+// 用法:
+//   yak scripts/js-static-extract-ai.yak --file ./app.js
+//   yak scripts/js-static-extract-ai.yak --files "./a.js,./b.js" --output ./out.json
+//   yak scripts/js-static-extract-ai.yak --dir ./downloaded_js   # 递归收集 .js/.mjs/.cjs；短文件合并、超大文件按字节分块再跑管线
+//   yak scripts/js-static-extract-ai.yak --files "http://host/a.js,http://host/b.js" --file-concurrent 2
+//
+// 说明：运行过程中可能有 Yakit/AI 日志混在标准输出。final_report / --output 为精简 JSON（含 apis_* 与统计摘要，不含整段源码）。
+// 其它选项: --skip-jsref-ai 仅正则提取 .js 引用不写 AI；--jsref-ai-max 限制懒加载路径 AI 判定条数。
+// AI：厂商与 API Key 使用 Yakit 全局配置；本脚本默认只覆盖模型名（可按需改 --ai-model；传空则连模型也不覆盖）。
+
+__DESC__ = "从 JavaScript/TypeScript 源码中静态挖掘 HTTP API 候选：正则提取、AI 研判与 liteforge 分块补漏，输出可合并的端点列表。支持本地目录（递归 .js/.mjs/.cjs）、多文件与 http(s) URL。"
+__VERBOSE_NAME__ = "JS 静态 API 提取（js-static-extract-ai）"
+__KEYWORDS__ = "javascript,静态分析,API,接口,liteforge,recon,安全,js-static-extract-ai,信息搜集"
+__USAGE__ = "专注模式 infosec_recon：Loop 动作 js-static-extract-ai；参数可用 --dir（单目录）、--files 或 --paths（逗号分隔多条目，与提示词中的 paths 一致）、--file。完整管线含多轮 AI，大目录可能耗时数十分钟。"
+
+log.setLevel("warn")
+
+filePathSingle = cli.String("file", cli.setDefault(""), cli.setHelp("单个 JS/TS 本地路径或 http(s) URL"), cli.setVerboseName("文件路径"))
+filesCSV = cli.String("files", cli.setDefault(""), cli.setHelp("逗号分隔多个路径或 URL"))
+pathsCSV = cli.String("paths", cli.setDefault(""), cli.setHelp("与提示词约定一致：逗号分隔多条目（目录/本地文件/http(s) URL），与 --files 合并解析"))
+dirInput = cli.String("dir", cli.setDefault(""), cli.setHelp("本地目录：递归收集 .js/.mjs/.cjs；小文件合并、大文件分块（可与 --file / --files / --paths 同时使用）"))
+mergeSmallUnder = cli.Int("merge-small-under", cli.setDefault(51200), cli.setHelp("不超过该字节数的本地文件参与合并批次（UTF-8 字节）"))
+mergeBatchMax = cli.Int("merge-batch-max", cli.setDefault(196608), cli.setHelp("合并批次中文本总字节上限（避免单次过大）"))
+largeSplitAt = cli.Int("large-split-at", cli.setDefault(393216), cli.setHelp("超过该字节数的本地文件按块切分后分别分析（384KB 默认）"))
+largeChunkOverlap = cli.Int("large-chunk-overlap", cli.setDefault(4096), cli.setHelp("大文件分块重叠字节数，减轻断句切裂 API 特征"))
+fileConcurrent = cli.Int("file-concurrent", cli.setDefault(4), cli.setHelp("多工作单元时并发上限（每单元可能为合并包或单文件切片）"))
+concurrent = cli.Int("concurrent", cli.setDefault(8), cli.setHelp("liteforge 并发上限"))
+ctxChars = cli.Int("context-chars", cli.setDefault(100), cli.setHelp("每个 API 命中点前后各取多少字符作为 Phase1 上下文（按 UTF-8 字节切片，与 len(content) 一致）"))
+chunkChars = cli.Int("chunk-chars", cli.setDefault(3000), cli.setHelp("擦除后源码 Phase2 分块字符数（Unicode 码点，与 len(str) 一致）"))
+threshold = cli.Float("threshold", cli.setDefault(0.72), cli.setHelp("正则条目 ai.FunctionCall 可信阈值（用于敏感信息摘要）"))
+workDir = cli.String("work-dir", cli.setDefault(""), cli.setHelp("智能体中间 JSON 目录，空则使用系统临时目录子目录"))
+outJson = cli.String("output", cli.setDefault(""), cli.setHelp("可选：最终汇总写入该 JSON 路径"))
+skipPhase2 = cli.Bool("skip-phase2", cli.setHelp("只做阶段一+合并，不做分块补漏"))
+skipJsRefAI = cli.Bool("skip-jsref-ai", cli.setHelp("跳过对 .js 引用串的 AI 判定，仅保留正则命中"))
+jsRefAiMax = cli.Int("jsref-ai-max", cli.setDefault(80), cli.setHelp("参与 AI 判定的 .js 引用条数上限"))
+
+aiStream = cli.Bool("ai-stream", cli.setDefault(true), cli.setHelp("AI 流式日志（默认开启；显式不传 flag 亦为开启）"))
+aiModel = cli.String("ai-model", cli.setDefault("qwen3.5-27b-free"), cli.setHelp("仅覆盖模型名；留空字符串表示不覆盖（完全跟 Yakit 全局）"))
+aiDomain = cli.String("ai-domain", cli.setDefault(""), cli.setHelp("可选：覆盖 Yakit 里的网关域"))
+aiProxy = cli.String("ai-proxy", cli.setDefault(""), cli.setHelp("AI 请求走代理，如 http://127.0.0.1:7890 或 socks5://127.0.0.1:1080（与全局 yak --netx-proxy 不同，仅作用于 ai.* 调用）"))
+
+cli.check()
+
+loadRawFromRef = (ref) => {
+    s = str.TrimSpace(ref)
+    if s == "" {
+        die("empty path or url")
+    }
+    if str.HasPrefix(s, "http://") || str.HasPrefix(s, "https://") {
+        rsp, _, err = poc.Get(s, poc.timeout(120))
+        if err != nil {
+            die(sprintf("HTTP GET %v failed: %v", s, err))
+        }
+        return string(rsp.GetBody())
+    }
+    return string(file.ReadFile(s)~)
+}
+
+buildInputList = () => {
+    list = []
+    fs = str.TrimSpace(filesCSV)
+    ps = str.TrimSpace(pathsCSV)
+    f1 = str.TrimSpace(filePathSingle)
+    d1 = str.TrimSpace(dirInput)
+    pushCsv = s => {
+        if s == "" {
+            return
+        }
+        for _, part := range str.Split(s, ",") {
+            p = str.TrimSpace(part)
+            if p != "" {
+                list.Push(p)
+            }
+        }
+    }
+    if d1 != "" {
+        list.Push(d1)
+    }
+    pushCsv(ps)
+    pushCsv(fs)
+    if f1 != "" {
+        list.Push(f1)
+    }
+    if len(list) == 0 {
+        die("请指定 --file、--files、--paths 或 --dir（本地路径或 http(s) URL）")
+    }
+    return list
+}
+
+isRemoteRef = s => {
+    s = str.TrimSpace(s)
+    return str.HasPrefix(s, "http://") || str.HasPrefix(s, "https://")
+}
+
+isJsishUnderDir = p => {
+    lb = str.ToLower(str.TrimSpace(p))
+    return str.HasSuffix(lb, ".js") || str.HasSuffix(lb, ".mjs") || str.HasSuffix(lb, ".cjs")
+}
+
+collectJsFilesUnderDir = root => {
+    out = []
+    try {
+        infos = file.ReadFileInfoInDirectory(root)~
+        for _, info := range infos {
+            if info.IsDir {
+                continue
+            }
+            p = info.Path
+            if isJsishUnderDir(p) {
+                out.Push(p)
+            }
+        }
+    } catch e {
+        log.warn("collectJsFilesUnderDir %v: %v", root, e)
+    }
+    return out
+}
+
+localFileSize = p => {
+    try {
+        st = file.Stat(p)~
+        return parseInt(sprint(st.Size()))
+    } catch e {
+        return 0
+    }
+}
+
+expandInputsToItems = rawInputs => {
+    expanded = []
+    for _, x := range rawInputs {
+        x = str.TrimSpace(x)
+        if x == "" {
+            continue
+        }
+        if isRemoteRef(x) {
+            expanded.Push({"kind": "remote", "path": x})
+            continue
+        }
+        if !file.IsExisted(x) {
+            log.warn("路径不存在，跳过: %v", x)
+            continue
+        }
+        if file.IsDir(x) {
+            for _, p := range collectJsFilesUnderDir(x) {
+                expanded.Push({"kind": "local", "path": p})
+            }
+            continue
+        }
+        expanded.Push({"kind": "local", "path": x})
+    }
+    return expanded
+}
+
+buildWorkUnits = items => {
+    units = []
+    smallPaths = []
+    smallBufSize = 0
+    msu = mergeSmallUnder
+    if msu <= 0 {
+        msu = 51200
+    }
+    mbMax = mergeBatchMax
+    if mbMax <= 0 {
+        mbMax = 196608
+    }
+    lsplit = largeSplitAt
+    if lsplit <= 0 {
+        lsplit = 393216
+    }
+    ov = largeChunkOverlap
+    if ov < 0 {
+        ov = 0
+    }
+    if msu > mbMax {
+        msu = mbMax / 2
+    }
+
+    flushSmall = () => {
+        if len(smallPaths) == 0 {
+            return
+        }
+        sep = "\n\n/* ---- yak-js-bundle: %s ---- */\n\n"
+        merged = ""
+        for _, sp := range smallPaths {
+            chunkBody = string(file.ReadFile(sp)~)
+            merged = merged + sprintf(sep, sp) + chunkBody
+        }
+        label = sprintf("bundle://%s", str.Join(smallPaths, "|"))
+        units.Push({"label": label, "preloaded": merged})
+        smallPaths = []
+        smallBufSize = 0
+    }
+
+    for _, it := range items {
+        if it.kind == "remote" {
+            flushSmall()
+            units.Push({"label": it.path, "preloaded": ""})
+            continue
+        }
+        p = it.path
+        sz = localFileSize(p)
+        if sz <= 0 {
+            try {
+                sz = len(string(file.ReadFile(p)~))
+            } catch e {
+                log.warn("无法读取: %v", p)
+                continue
+            }
+        }
+        if sz <= msu {
+            if smallBufSize + sz > mbMax && len(smallPaths) > 0 {
+                flushSmall()
+            }
+            smallPaths.Push(p)
+            smallBufSize = smallBufSize + sz
+            if smallBufSize >= mbMax {
+                flushSmall()
+            }
+            continue
+        }
+        flushSmall()
+        raw = ""
+        try {
+            raw = string(file.ReadFile(p)~)
+        } catch e2 {
+            log.warn("读取失败: %v", p)
+            continue
+        }
+        n = len(raw)
+        if n <= lsplit {
+            units.Push({"label": p, "preloaded": raw})
+            continue
+        }
+        pos = 0
+        part = 0
+        step = lsplit
+        for pos < n {
+            end = pos + step
+            if end > n {
+                end = n
+            }
+            chunk = raw[pos:end]
+            units.Push({"label": sprintf("%s#part%d", p, part), "preloaded": chunk})
+            part = part + 1
+            if end >= n {
+                break
+            }
+            pos = end - ov
+            if pos >= end {
+                pos = end
+            }
+        }
+    }
+    flushSmall()
+    return units
+}
+
+runOneFilePipeline = (fp, preloaded) => {
+    filePath = fp
+    pl = ""
+    if preloaded != nil {
+        pl = sprint(preloaded)
+    }
+    // 避免块作用域导致预加载内容丢失；不把 nil/空/占位串当作有效源码。
+    content = ""
+    pl = str.TrimSpace(pl)
+    if pl != "" && pl != "undefined" && pl != "<nil>" {
+        content = pl
+    } else {
+        content = loadRawFromRef(fp)
+    }
+    allLines = str.Split(content, "\n")
+    nLines = len(allLines)
+
+lineFromByte = (pos) => {
+    if pos <= 0 {
+        return 1
+    }
+    nB = len(content)
+    if pos >= nB {
+        if nB <= 0 {
+            return 1
+        }
+        pos = nB - 1
+    }
+    prefix = content[:pos]
+    return str.Count(prefix, "\n") + 1
+}
+
+// 以命中字节偏移为中心，前后各 ctxChars 字符（闭开区间切片 [lo, hi)）
+contextWindowByByte = byteCenter => {
+    nB = len(content)
+    if nB <= 0 {
+        return {
+            "text": "",
+            "byte_lo": 0,
+            "byte_hi": 0,
+            "line_lo": 1,
+            "line_hi": 1,
+        }
+    }
+    if byteCenter < 0 {
+        byteCenter = 0
+    }
+    if byteCenter > nB {
+        byteCenter = nB
+    }
+    lo = byteCenter - ctxChars
+    if lo < 0 {
+        lo = 0
+    }
+    hi = byteCenter + ctxChars
+    if hi > nB {
+        hi = nB
+    }
+    txt = ""
+    if hi > lo {
+        txt = content[lo:hi]
+    }
+    lnLo = lineFromByte(lo)
+    if hi <= lo {
+        lnHi = lnLo
+    } else {
+        lnHi = lineFromByte(hi - 1)
+    }
+    return {
+        "text": txt,
+        "byte_lo": lo,
+        "byte_hi": hi,
+        "line_lo": lnLo,
+        "line_hi": lnHi,
+    }
+}
+
+seenGlobal = {}
+dedupePush = (arr, kind, value, byteStart, fullLine) => {
+    if value == "" {
+        return
+    }
+    key = sprintf("%s\x00%s", kind, value)
+    if seenGlobal[key] {
+        return
+    }
+    seenGlobal[key] = true
+    ln = lineFromByte(byteStart)
+    arr.Push({
+        "kind": kind,
+        "value": value,
+        "byte_start": byteStart,
+        "line": ln,
+        "source_line": fullLine,
+    })
+}
+
+applyPattern = (arr, kind, pattern, groupValue) => {
+    rows = re.FindSubmatchAll(content, pattern)
+    idxs = re.FindSubmatchAllIndex(content, pattern)
+    if len(rows) != len(idxs) {
+        log.warn("pattern length mismatch kind=%v", kind)
+    }
+    for idx, row := range rows {
+        if idx >= len(idxs) {
+            break
+        }
+        pair = idxs[idx]
+        if len(pair) < 2 {
+            continue
+        }
+        bs = pair[0]
+        var val = ""
+        if groupValue > 0 && len(row) > groupValue {
+            val = row[groupValue]
+        } else {
+            val = row[0]
+        }
+        ln = lineFromByte(bs)
+        fullLine = ""
+        if ln >= 1 && ln <= nLines {
+            fullLine = allLines[ln-1]
+        }
+        dedupePush(arr, kind, val, bs, fullLine)
+    }
+}
+
+baseURLs = []
+creds = []
+frameworks = []
+apis = []
+jsRefs = []
+
+applyPattern(baseURLs, "base_url", `(?i)(?:baseURL|BASE_URL|baseUrl|apiUrl|API_URL|rootUrl|publicPath)\s*[:=]\s*["'\x60]([^"'\x60\n]+)["'\x60]`, 1)
+applyPattern(baseURLs, "base_url", `(?i)axios\.create\s*\(\s*\{[\s\S]{0,400}?baseURL\s*:\s*["'\x60]([^"'\x60]+)["'\x60]`, 1)
+applyPattern(baseURLs, "base_url", `https?://[\w\.\-]+(?::\d+)?(?:/[\w\.\-/?#&=%]*)?`, 0)
+
+applyPattern(creds, "credential", `(?i)(?:api[_-]?key|apikey|client_secret|clientSecret|secret[_-]?key|access[_-]?key|private[_-]?key|password|passwd|token|auth[_-]?token)\s*[:=]\s*["'\x60]([^"'\x60]{6,256})["'\x60]`, 1)
+applyPattern(creds, "credential", `(?i)bearer\s+([a-zA-Z0-9\-_.]{20,})`, 1)
+applyPattern(creds, "credential", `(?i)(?:sk_live_|pk_live_|sk_test_|AKIA)[0-9A-Za-z/_+=\-]{8,}`, 0)
+
+applyPattern(frameworks, "framework", `(?i)(?:from|import)\s+["']react(?:/dom)?["']`, 0)
+applyPattern(frameworks, "framework", `(?i)(?:from|import)\s+["']vue["']`, 0)
+applyPattern(frameworks, "framework", `(?i)(?:from|import)\s+["']@angular/core["']`, 0)
+applyPattern(frameworks, "framework", `(?i)(?:from|import)\s+["']svelte[\w/-]*["']`, 0)
+applyPattern(frameworks, "framework", `__NEXT_DATA__|next/font|next/image`, 0)
+applyPattern(frameworks, "framework", `(?i)createRoot\s*\(|React\.createElement\s*\(`, 0)
+applyPattern(frameworks, "framework", `(?i)new\s+Vue\s*\(|createApp\s*\(`, 0)
+
+applyPattern(apis, "api", `(?i)(?:axios\.(?:get|post|put|delete|patch|request)|fetch)\s*\(\s*["'\x60]([^"'\x60]{1,400})["'\x60]`, 1)
+applyPattern(apis, "api", `(?i)\$\.(?:get|post|ajax)\s*\(\s*["']([^"']{1,400})["']`, 1)
+// AngularJS $http / $resource
+applyPattern(apis, "api", `(?i)\$http\.(?:get|post|put|delete|patch|head|jsonp)\s*\(\s*["']([^"']{1,400})["']`, 1)
+applyPattern(apis, "api", `(?i)\$resource\s*\(\s*["']([^"']{1,400})["']`, 1)
+// 压缩后别名实例：xxx.get/post(...) ，如 axios 封装 ye、h、api 等
+applyPattern(apis, "api", `(?i)\.(?:get|post|put|delete|patch|request)\s*\(\s*["'\x60]([^"'\x60]{1,400})["'\x60]`, 1)
+// 引号内 /api/… 含仅「/api/」根路径（原 {3,200} 会漏）
+applyPattern(apis, "api", `["'\x60](/api/[a-zA-Z0-9_\-/?#&=.%]{0,400})["'\x60]`, 1)
+
+// 动态 import / 静态 from 等 .js 模块引用（Vite/Webpack 懒加载 chunk）
+applyPattern(jsRefs, "js_ref", `(?i)import\s*\(\s*["']([^"']+\.js[^"']*)["']`, 1)
+applyPattern(jsRefs, "js_ref", `(?i)import\s+[^;]*?from\s*["']([^"']+\.js[^"']*)["']`, 1)
+applyPattern(jsRefs, "js_ref", `(?i)(?:require\s*\(|ensureChunk\s*\(|loadChunk\s*\()\s*["']([^"']+\.js[^"']*)["']`, 1)
+
+grouped = {
+    "base_url": baseURLs,
+    "credential": creds,
+    "framework": frameworks,
+    "api": apis,
+    "js_ref": jsRefs,
+}
+
+
+maskSecret = s => {
+    s = string(s)
+    if len(s) <= 6 {
+        return "***"
+    }
+    return s[:3] + "***" + s[len(s)-2:]
+}
+
+kindLabel = kind => {
+    if kind == "base_url" {
+        return "BaseURL/根地址"
+    }
+    if kind == "credential" {
+        return "硬编码凭证"
+    }
+    if kind == "framework" {
+        return "前端框架特征"
+    }
+    return "接口特征"
+}
+
+buildCredPrompt = finding => {
+    return sprintf(`你是安全审计专家。判断下列从 JS 中正则提取的条目是否可信（真实配置/密钥/接口迹象）。
+
+类型: %s
+提取值: %s
+行: %s
+
+输出 credibility 0~1、level 取 high/medium/low、reason 一句中文。`, kindLabel(finding.kind), finding.value, finding.source_line)
+}
+
+credSchema = {
+    "credibility": "(类型：浮点数) 0-1",
+    "level": "(类型：字符串) high medium low",
+    "reason": "(类型：字符串)",
+}
+
+var aiOpts = [ai.funcCallRetryTimes(2)]
+if aiProxy != "" {
+    aiOpts = append(aiOpts, ai.proxy(aiProxy))
+}
+if aiStream {
+    aiOpts = append(aiOpts, ai.debugStream(true))
+}
+if aiModel != "" {
+    aiOpts = append(aiOpts, ai.model(aiModel))
+}
+if aiDomain != "" {
+    aiOpts = append(aiOpts, ai.domain(aiDomain))
+}
+
+validateCredAI = obj => {
+    if obj == nil {
+        return false
+    }
+    if typeof(obj["credibility"]) != float && typeof(obj["credibility"]) != int {
+        return false
+    }
+    lv = obj["level"]
+    if typeof(lv) != string {
+        return false
+    }
+    if lv != "high" && lv != "medium" && lv != "low" {
+        return false
+    }
+    return true
+}
+
+isHighCred = obj => {
+    if obj["level"] == "high" {
+        return true
+    }
+    return float(obj["credibility"]) >= threshold
+}
+
+credCheckOne = finding => {
+    for in 3 {
+        try {
+            v = ai.FunctionCall(buildCredPrompt(finding), credSchema, aiOpts...)~
+            if validateCredAI(v) && isHighCred(v) {
+                return true
+            }
+        } catch e {
+        }
+    }
+    return false
+}
+
+trustedBaseVals = []
+for _, b := range baseURLs {
+    if credCheckOne(b) {
+        trustedBaseVals.Push(b.value)
+    }
+}
+redactedCreds = []
+for _, c := range creds {
+    redactedCreds.Push({
+        "hint": c.kind,
+        "redacted": maskSecret(c.value),
+        "line": c.line,
+    })
+}
+frameworkVals = []
+for _, f := range frameworks {
+    frameworkVals.Push(f.value)
+}
+
+baseUrlsAll = []
+for _, b := range baseURLs {
+    baseUrlsAll.Push(b.value)
+}
+
+buildJsPathPrompt = finding => {
+    return sprintf(`你是前端工程与供应链安全助手。下面字符串来自 JS 打包产物中正则提取，可能出现在 dynamic import(\'...\')、import from \'...\'、Vue/React 路由懒加载 component: () => import("...") 等场景。
+
+判断它是否指向**浏览器可加载的 JavaScript 模块文件路径或 chunk 文件名**（通常含 .js，可为相对路径如 ./Foo-hash.js、../chunk.js，或 /assets/x.js），而不是：
+- HTTP(S) API 路径
+- 普通文案、CSS、图片、字体、wasm 等非 JS 资源（若仅 .js 则优先认作 JS）
+- 明显无效的随机串
+
+提取值: %s
+所在行缩略: %s
+
+请输出：
+- is_js_path: 布尔，true 表示可认定为 JS 模块/ chunk 路径引用
+- kind: 字符串，取值 lazy_import | static_from | require_like | ambiguous
+- confidence: 0.0～1.0
+- reason: 一句中文理由`, finding.value, finding.source_line)
+}
+
+jsPathSchema = {
+    "is_js_path": "(类型：布尔值) 是否为 JS 模块/chunk 路径",
+    "kind": "(类型：字符串) lazy_import static_from require_like ambiguous",
+    "confidence": "(类型：浮点数) 0-1",
+    "reason": "(类型：字符串)",
+}
+
+validateJsPathAI = obj => {
+    if obj == nil {
+        return false
+    }
+    if typeof(obj["confidence"]) != float && typeof(obj["confidence"]) != int {
+        return false
+    }
+    if typeof(obj["reason"]) != string {
+        return false
+    }
+    k = obj["kind"]
+    if typeof(k) != string {
+        return false
+    }
+    ip = obj["is_js_path"]
+    if ip != true && ip != false {
+        return false
+    }
+    return true
+}
+
+jsRefOk = (verdict) => {
+    if verdict["is_js_path"] != true {
+        return false
+    }
+    if float(verdict["confidence"]) < 0.55 {
+        return false
+    }
+    return true
+}
+
+lazyJsRaw = []
+for _, jr := range jsRefs {
+    lazyJsRaw.Push({
+        "path_hint": jr.value,
+        "line": jr.line,
+        "source_line": jr.source_line,
+    })
+}
+
+lazyJsVerified = []
+lazyJsAiDetails = []
+
+if !skipJsRefAI && len(jsRefs) > 0 {
+    jsRefLimit = jsRefAiMax
+    if jsRefLimit <= 0 {
+        jsRefLimit = len(jsRefs)
+    }
+    if jsRefLimit > len(jsRefs) {
+        jsRefLimit = len(jsRefs)
+    }
+    swgJs = sync.NewSizedWaitGroup(concurrent)
+    jsMu = sync.NewMutex()
+    for idx = 0; idx < jsRefLimit; idx++ {
+        swgJs.Add()
+        go func(jff) {
+            defer swgJs.Done()
+            verdict = nil
+            for in 3 {
+                try {
+                    verdict = ai.FunctionCall(buildJsPathPrompt(jff), jsPathSchema, aiOpts...)~
+                    if validateJsPathAI(verdict) {
+                        break
+                    }
+                } catch e {
+                }
+                verdict = nil
+            }
+            row = {
+                "path_hint": jff.value,
+                "line": jff.line,
+                "source_line": jff.source_line,
+                "ai": verdict,
+            }
+            jsMu.Lock()
+            lazyJsAiDetails.Push(row)
+            if verdict != nil && jsRefOk(verdict) {
+                lazyJsVerified.Push({
+                    "path": jff.value,
+                    "kind": verdict["kind"],
+                    "confidence": verdict["confidence"],
+                    "reason": verdict["reason"],
+                    "line": jff.line,
+                })
+            }
+            jsMu.Unlock()
+        }(jsRefs[idx])
+    }
+    swgJs.Wait()
+} else {
+    for _, jr := range jsRefs {
+        lazyJsVerified.Push({
+            "path": jr.value,
+            "kind": "regex_only",
+            "confidence": 0,
+            "reason": "跳过 AI 或未配置",
+            "line": jr.line,
+        })
+    }
+}
+
+sensitiveCtx = {
+    "base_urls_trusted": trustedBaseVals,
+    "base_urls_all": baseUrlsAll,
+    "credentials_redacted": redactedCreds,
+    "framework_signatures": frameworkVals,
+    "lazy_js_raw": lazyJsRaw,
+    "lazy_js_verified": lazyJsVerified,
+    "lazy_js_ai_details": lazyJsAiDetails,
+    "source_file": filePath,
+}
+
+apiCandidates = []
+for _, a := range apis {
+    win = contextWindowByByte(a.byte_start)
+    apiCandidates.Push({
+        "hit": a,
+        "context": win["text"],
+        "byte_lo": win["byte_lo"],
+        "byte_hi": win["byte_hi"],
+        "line_lo": win["line_lo"],
+        "line_hi": win["line_hi"],
+    })
+}
+
+tmpRoot = workDir
+if tmpRoot == "" {
+    tmpRoot = file.Join(os.TempDir(), sprintf("yak-js-api-%d", time.Now().Unix()))
+}
+try {
+    file.MkdirAll(tmpRoot)
+} catch e {
+    die(sprintf("无法创建工作目录: %v %v", tmpRoot, e))
+}
+
+apiSchema = jsonschema.ActionObject(
+    jsonschema.paramObjectArray("apis",
+        jsonschema.title("API 列表"),
+        jsonschema.required(),
+        jsonschema.paramString("full_url", jsonschema.description("完整 URL（结合已知 baseURL 拼出绝对地址；仅 path 时也要写出可拼接形式）"), jsonschema.required()),
+        jsonschema.paramString("http_method", jsonschema.description("GET POST PUT DELETE PATCH OPTIONS 等大写"), jsonschema.required()),
+        jsonschema.paramString("path_only", jsonschema.description("仅 path，无可留空")),
+        jsonschema.paramString("request_fields", jsonschema.description("推断的查询/Body 字段名，逗号分隔")),
+        jsonschema.paramString("request_data_hint", jsonschema.description("请求体或参数结构的自然语言说明")),
+        jsonschema.paramString("evidence", jsonschema.description("一句中文依据")),
+    ),
+)
+
+forgeOptsBase = [liteforge.speedPriority()]
+for _, o := range aiOpts {
+    forgeOptsBase = append(forgeOptsBase, o)
+}
+
+accApis = {}
+apiDedupeKeys = {}
+mergeMu = sync.NewMutex()
+
+mergeApisFromRecord = (rec, acc, phaseTag, dedupeSet) => {
+    if rec == nil || rec["apis"] == nil {
+        return
+    }
+    apisArr = rec["apis"]
+    n = len(apisArr)
+    for i = 0; i < n; i++ {
+        it = apisArr[i]
+        if it == nil {
+            continue
+        }
+        fu = str.TrimSpace(sprint(it["full_url"]))
+        hm = str.TrimSpace(str.ToUpper(sprint(it["http_method"])))
+        if fu == "" || hm == "" {
+            continue
+        }
+        k = sprintf("%s|%s", hm, fu)
+        if dedupeSet[k] {
+            continue
+        }
+        dedupeSet[k] = true
+        acc[k] = {
+            "full_url": fu,
+            "http_method": hm,
+            "path_only": sprint(it["path_only"]),
+            "request_fields": sprint(it["request_fields"]),
+            "request_data_hint": sprint(it["request_data_hint"]),
+            "evidence": sprint(it["evidence"]),
+            "phase": phaseTag,
+        }
+    }
+}
+
+phase1Prompt = (cand, outPath) => {
+    return sprintf(`你是资深前后端安全审计智能体。根据「代码上下文」推断真实 HTTP API。
+【重要】宿主已将你本次结构化输出的落盘路径约定为（由宿主负责写入磁盘，你只需按 schema 返回即可）：
+  %s
+
+【此前正则/静态阶段发现的敏感上下文（务必考虑 baseURL 拼接）】
+%s
+
+【当前疑似 API 的代码上下文】
+%s
+
+规则：
+1. 结合 base_urls 将相对路径补为完整 URL；若无法确定 host，在 full_url 中写清相对路径并可在 evidence 说明依赖的 base。
+2. sensitive_context 中的 lazy_js_verified / lazy_js_raw 为同包内其它 .js chunk 引用，可辅助推断业务模块与潜在更多接口（非 HTTP URL）。
+3. 从 axios/fetch/$.ajax 等方法推断 http_method；仅 path 且无动词时可用 GET 并说明。
+4. request_fields / request_data_hint 尽量从对象字面量、URL 查询串推断；无则留空。
+5. 若无有效 API，返回 apis 空数组。`, outPath, json.dumps(sensitiveCtx), cand.context)
+}
+
+runPhase1Worker = (idx, cand) => {
+    outPath = file.Join(tmpRoot, sprintf("phase1_ctx_%04d.json", idx))
+    prompt = phase1Prompt(cand, outPath)
+    opts = [liteforge.output(apiSchema), liteforge.id(sprintf("js-p1-%d", idx))]
+    for _, o := range forgeOptsBase {
+        opts = append(opts, o)
+    }
+    apisOut = []
+    errText = ""
+    try {
+        res = liteforge.Execute(prompt, opts...)~
+        apisOut = res.GetInvokeParamsArray("apis")
+        if apisOut == nil {
+            apisOut = []
+        }
+    } catch e {
+        errText = sprint(e)
+        log.warn("phase1 liteforge failed idx=%v: %v", idx, e)
+    }
+    rec = {
+        "phase": 1,
+        "index": idx,
+        "output_path": outPath,
+        "regex_hint": cand.hit.value,
+        "line": cand.hit.line,
+        "apis": apisOut,
+        "error": errText,
+    }
+    file.SaveJson(outPath, rec)
+    mergeMu.Lock()
+    mergeApisFromRecord(rec, accApis, "phase1", apiDedupeKeys)
+    mergeMu.Unlock()
+}
+
+swg1 = sync.NewSizedWaitGroup(concurrent)
+for idx, cand := range apiCandidates {
+    cand := cand
+    idx := idx
+    swg1.Add()
+    go func {
+        defer swg1.Done()
+        runPhase1Worker(idx, cand)
+    }
+}
+swg1.Wait()
+
+stripSet = {}
+for _, cand := range apiCandidates {
+    // map 字段读出为 interface{}，先 sprint 再 parseInt（勿用 codec.Atoi，CodecExports 未包含）
+    lnLo = parseInt(sprint(cand["line_lo"]))
+    lnHi = parseInt(sprint(cand["line_hi"]))
+    for l := lnLo; l <= lnHi; l++ {
+        stripSet[sprint(l)] = true
+    }
+}
+strippedLines = []
+for i := 0; i < nLines; i++ {
+    if stripSet[sprint(i+1)] {
+        strippedLines.Push("")
+    } else {
+        strippedLines.Push(allLines[i])
+    }
+}
+strippedContent = str.Join(strippedLines, "\n")
+
+if !skipPhase2 {
+    chunkMax = chunkChars
+    if chunkMax <= 0 {
+        chunkMax = 3000
+    }
+    totalRunes = len(strippedContent)
+    chunks = []
+    pos = 0
+    for pos < totalRunes {
+        end = pos + chunkMax
+        if end > totalRunes {
+            end = totalRunes
+        }
+        chunks.Push(strippedContent[pos:end])
+        pos = end
+    }
+
+    phase2Prompt = (chunkText, ci, outPath) => {
+        return sprintf(`你是 API 挖掘智能体。下面 JS 片段来自「已删除已分析上下文」后的剩余源码，请补全可能遗漏的 HTTP API。
+【结构化结果落盘路径（宿主写入）】%s
+【敏感/基址上下文】%s
+【源码片段 chunk=%d】
+%s
+上下文中的 lazy_js_verified 为其它 JS chunk 路径线索（由正则+AI 判定），可用于联想业务面，但勿把 .js 路径当作 HTTP API。
+若无新 API，apis 为空数组。`, outPath, json.dumps(sensitiveCtx), ci, chunkText)
+    }
+
+    swg2 = sync.NewSizedWaitGroup(concurrent)
+    for ci, ch := range chunks {
+        ch = ch
+        ci = ci
+        if str.TrimSpace(ch) == "" {
+            continue
+        }
+        swg2.Add()
+        go func {
+            defer swg2.Done()
+            outPath = file.Join(tmpRoot, sprintf("phase2_chunk_%04d.json", ci))
+            prompt = phase2Prompt(ch, ci, outPath)
+            opts = [liteforge.output(apiSchema), liteforge.id(sprintf("js-p2-%d", ci))]
+            for _, o := range forgeOptsBase {
+                opts = append(opts, o)
+            }
+            apisOut = []
+            errText = ""
+            try {
+                res = liteforge.Execute(prompt, opts...)~
+                apisOut = res.GetInvokeParamsArray("apis")
+                if apisOut == nil {
+                    apisOut = []
+                }
+            } catch e {
+                errText = sprint(e)
+                log.warn("phase2 liteforge failed ci=%v: %v", ci, e)
+            }
+            rec = {
+                "phase": 2,
+                "chunk_index": ci,
+                "output_path": outPath,
+                "apis": apisOut,
+                "error": errText,
+            }
+            file.SaveJson(outPath, rec)
+            mergeMu.Lock()
+            mergeApisFromRecord(rec, accApis, "phase2", apiDedupeKeys)
+            mergeMu.Unlock()
+        }
+    }
+    swg2.Wait()
+}
+
+finalList = []
+for _, v := range accApis {
+    finalList.Push(v)
+}
+
+reportPath = file.Join(tmpRoot, "final_report.json")
+regexHitsSummary = {
+    "base_url": len(baseURLs),
+    "credential": len(creds),
+    "framework": len(frameworks),
+    "api": len(apis),
+    "js_ref": len(jsRefs),
+}
+contextSummary = {
+    "source_ref": filePath,
+    "trusted_base_urls_count": len(trustedBaseVals),
+    "base_urls_all_count": len(baseUrlsAll),
+    "credentials_redacted_count": len(redactedCreds),
+    "framework_signatures_count": len(frameworkVals),
+    "lazy_js_raw_count": len(lazyJsRaw),
+    "lazy_js_verified_count": len(lazyJsVerified),
+}
+finalOut = {
+    "source": filePath,
+    "work_dir": tmpRoot,
+    "report_path": reportPath,
+    "api_candidate_count": len(apiCandidates),
+    "apis_merged_map": accApis,
+    "apis_final": finalList,
+    "regex_hits_summary": regexHitsSummary,
+    "context_summary": contextSummary,
+}
+
+file.SaveJson(reportPath, finalOut)
+return finalOut
+}
+
+rawInputList = buildInputList()
+expandedItems = expandInputsToItems(rawInputList)
+if len(expandedItems) == 0 {
+    die("没有可分析的输入（目录下无 .js/.mjs/.cjs 或路径无效）")
+}
+workUnits = buildWorkUnits(expandedItems)
+if len(workUnits) == 0 {
+    die("未生成分析任务单元")
+}
+unitLabels = []
+for _, uw := range workUnits {
+    unitLabels.Push(uw.label)
+}
+finalMerged = nil
+if len(workUnits) == 1 {
+    u0 = workUnits[0]
+    finalMerged = runOneFilePipeline(u0.label, u0.preloaded)
+} else {
+    perResults = []
+    resultMu = sync.NewMutex()
+    swgFiles = sync.NewSizedWaitGroup(fileConcurrent)
+    for _, uw := range workUnits {
+        uLab = uw.label
+        uPre = uw.preloaded
+        swgFiles.Add()
+        go func(lab, pre) {
+            defer swgFiles.Done()
+            try {
+                one = runOneFilePipeline(lab, pre)
+                resultMu.Lock()
+                perResults.Push(one)
+                resultMu.Unlock()
+            } catch e {
+                log.warn("runOneFilePipeline failed for %v: %v", lab, e)
+            }
+        }(uLab, uPre)
+    }
+    swgFiles.Wait()
+    if len(perResults) == 0 {
+        die("多单元分析全部失败，请检查日志")
+    }
+    combinedDedupe = {}
+    combinedApisMap = {}
+    combinedFinal = []
+    mergedSources = []
+    primaryWd = ""
+    for _, one := range perResults {
+        if one == nil {
+            continue
+        }
+        mergedSources.Push(sprint(one["source"]))
+        if primaryWd == "" {
+            primaryWd = sprint(one["work_dir"])
+        }
+        apisArr = one["apis_final"]
+        if apisArr == nil {
+            continue
+        }
+        for _, item := range apisArr {
+            if item == nil {
+                continue
+            }
+            fu = str.TrimSpace(sprint(item["full_url"]))
+            hm = str.TrimSpace(str.ToUpper(sprint(item["http_method"])))
+            if fu == "" || hm == "" {
+                continue
+            }
+            k = sprintf("%s|%s", hm, fu)
+            if combinedDedupe[k] {
+                continue
+            }
+            combinedDedupe[k] = true
+            combinedFinal.Push(item)
+            combinedApisMap[k] = item
+        }
+    }
+    mergedReportPath = file.Join(primaryWd, "merged_final_report.json")
+    finalMerged = {
+        "multi_source": true,
+        "sources": unitLabels,
+        "raw_input": rawInputList,
+        "source": str.Join(mergedSources, ","),
+        "work_dir": primaryWd,
+        "report_path": mergedReportPath,
+        "per_source_reports": perResults,
+        "api_candidate_count": len(combinedFinal),
+        "apis_merged_map": combinedApisMap,
+        "apis_final": combinedFinal,
+    }
+    try {
+        file.SaveJson(mergedReportPath, finalMerged)
+    } catch e3 {
+        log.warn("save merged report: %v", e3)
+    }
+}
+
+if outJson != "" {
+    file.SaveJson(outJson, finalMerged)
+}
+println(string(json.dumps(finalMerged, json.withIndent("  "))))

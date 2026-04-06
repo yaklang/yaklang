@@ -36,4 +36,7 @@ func TestYak_GetAIReActLoopMetadata(t *testing.T) {
 	require.NotEmpty(t, yaklangMeta.GetDescription())
 	require.NotEmpty(t, yaklangMeta.GetDescriptionZh())
 	require.NotEmpty(t, yaklangMeta.GetUsagePrompt())
+
+	require.Contains(t, names, schema.AI_REACT_LOOP_NAME_INFOSEC_RECON,
+		"infosec_recon 专注模式须随 reactinit 注册并出现在 QueryAIFocus 中")
 }
