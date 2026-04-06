@@ -409,8 +409,8 @@ func TestNewContextProviderManager(t *testing.T) {
 		t.Fatal("NewContextProviderManager should return a non-nil instance")
 	}
 
-	if cpm.maxBytes != 10*1024 { // 默认 10KB
-		t.Fatalf("Expected maxBytes to be 10240, got %d", cpm.maxBytes)
+	if cpm.maxBytes != 48*1024 { // 默认 48KB
+		t.Fatalf("Expected maxBytes to be 49152, got %d", cpm.maxBytes)
 	}
 
 	if cpm.callback == nil {
