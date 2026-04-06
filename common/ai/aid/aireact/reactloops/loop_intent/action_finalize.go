@@ -86,6 +86,8 @@ func makeFinalizeEnrichmentAction(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 				}
 			}
 
+			recommendedCaps = reactloops.ApplyScriptEditExecutionPolicy(loop, recommendedCaps)
+
 			log.Infof("intent loop: finalizing enrichment - summary: %s, verified caps: %v",
 				utils.ShrinkString(intentSummary, 200), recommendedCaps)
 

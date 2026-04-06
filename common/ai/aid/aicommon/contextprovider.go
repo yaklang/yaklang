@@ -591,7 +591,7 @@ const maxInlineKnowledgeBaseBytes = 2 * 1024 // 8KB
 
 func NewContextProviderManager() *ContextProviderManager {
 	return &ContextProviderManager{
-		maxBytes: 10 * 1024, // 10KB
+		maxBytes: 48 * 1024, // 48KB
 		callback: omap.NewOrderedMap(make(map[string]ContextProvider)),
 	}
 }
@@ -718,7 +718,7 @@ func (r *ContextProviderManager) Execute(config AICallerConfigIf, emitter *Emitt
 	result := buf.String()
 	if len(result) > r.maxBytes {
 		shrinkSize := int(float64(r.maxBytes) * 0.8)
-		result = utils.ShrinkString(result, shrinkSize)
+		result = utils.ShrinkTextBlock(result, shrinkSize)
 		log.Warnf("context provider result exceeded maxBytes (%d), shrunk to %d characters", r.maxBytes, shrinkSize)
 	}
 

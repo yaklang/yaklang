@@ -155,8 +155,39 @@ func TestContextProviderManager_ExecuteWithShrink(t *testing.T) {
 	}
 }
 
+func TestContextProviderManager_ExecuteWithShrinkPreservesNewlines(t *testing.T) {
+	cpm := &ContextProviderManager{
+		maxBytes: 120,
+		callback: omap.NewOrderedMap(make(map[string]ContextProvider)),
+	}
+
+	multilineProvider := func(config AICallerConfigIf, emitter *Emitter, key string) (string, error) {
+		return strings.Repeat("line-1\nline-2\nline-3\nline-4\n", 10), nil
+	}
+
+	cpm.Register("multiline_provider", multilineProvider)
+
+	result := cpm.Execute(nil, nil)
+
+	if !strings.Contains(result, "\n") {
+		t.Fatalf("Compressed result should preserve newlines: %q", result)
+	}
+
+	if !strings.Contains(result, "line-3") {
+		t.Fatalf("Compressed result should retain visible multiline content: %q", result)
+	}
+
+	if strings.Contains(result, `\\n`) {
+		t.Fatalf("Compressed result should not escape newlines into literal backslash-n sequences: %q", result)
+	}
+
+	if !strings.Contains(result, "...") {
+		t.Fatalf("Compressed result should contain shrink marker: %q", result)
+	}
+}
+
 func TestContextProviderManager_ExecuteWithoutShrink(t *testing.T) {
-	cpm := NewContextProviderManager() // 使用默认的 maxBytes (10KB)
+	cpm := NewContextProviderManager() // 使用默认的 maxBytes (48KB)
 
 	// 注册一个短输出的 provider
 	shortProvider := func(config AICallerConfigIf, emitter *Emitter, key string) (string, error) {
