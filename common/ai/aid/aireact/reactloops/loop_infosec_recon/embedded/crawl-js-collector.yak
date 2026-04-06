@@ -1,0 +1,1015 @@
+// crawl-js-collector：简易爬虫抓取页面 → 丢弃 CSS/图片等资源页体 → 将 HTML 等文本按行分块 → 并发 ai.FunctionCall（非 agent）抽取 JS URL → 合并去重 → HTTP 验证 → 输出 JSON。
+// 可选 --workdir：在工作目录写入 crawl-js-collector-result.json，并创建「目标名_crawl-js-collector_Unix 时间戳」子目录下载已验证 JS；默认标准输出仅打印摘要，完整 JSON 见结果文件。
+// 可选 --deep-js：对首轮已验证的 JS 拉取正文，在正文中用 .js/.mjs 启发式定位 → 截取前后约 N 字上下文 → 建任务表 → 并发 AI 研判并拼接完整 URL → 函数内 GET 校验 200 → 多轮直至无新增或触顶。
+//
+// 用法:
+//   yak scripts/crawl-js-collector.yak --url https://example.com/
+//   yak scripts/crawl-js-collector.yak --url https://example.com/ --output ./js-list.json
+//   yak scripts/crawl-js-collector.yak --url https://example.com/ --workdir ./out
+//   yak scripts/crawl-js-collector.yak --url https://example.com/ --deep-js
+//
+// 环境: AI 使用 Yakit 全局配置；可用 --ai-model / --ai-proxy 覆盖。
+
+__DESC__ = "内置工具 crawl-js-collector：从授权站点轻量爬取页面，过滤静态资源后按文本块调用 AI 提取 JavaScript URL，校验可访问性；可选 deep-js 在已验证脚本内继续发现引用。结果写入 JSON 与工作目录下已验证 JS 文件。"
+__VERBOSE_NAME__ = "crawl-js-collector（JS 资源收集）"
+__KEYWORDS__ = "recon,爬虫,javascript,静态资源,ai.FunctionCall,信息搜集,crawl-js-collector,deep-js"
+__USAGE__ = "在专注模式 infosec_recon 中通过 Loop 动作 crawl_js_collector 调用（与 js-static-extract-ai 同为工具链路，勿向模型暴露 .yak 文件路径）。需本机可用 yak 可执行文件；输出见会话 workdir 下 crawl-js-collector-result.json 与 artifacts.verified_js_dir。"
+
+log.setLevel("warn")
+
+targetUrl = cli.String("url", cli.setRequired(true), cli.setHelp("起始 URL（https?://）"))
+maxDepth = cli.Int("max-depth", cli.setDefault(2), cli.setHelp("爬虫深度"))
+urlsMax = cli.Int("urls-max", cli.setDefault(80), cli.setHelp("最多访问 URL 数"))
+reqsMax = cli.Int("reqs-max", cli.setDefault(200), cli.setHelp("最大请求数；0 表示使用爬虫内部默认"))
+crawlConcurrent = cli.Int("crawl-concurrent", cli.setDefault(8), cli.setHelp("爬虫并发"))
+chunkLines = cli.Int("chunk-lines", cli.setDefault(5), cli.setHelp("每个 AI 分块的行数"))
+maxBodyKB = cli.Int("max-body-kb", cli.setDefault(512), cli.setHelp("单页响应体截断上限（KB）"))
+maxChunksPage = cli.Int("max-chunks-per-page", cli.setDefault(120), cli.setHelp("单页最多送入 AI 的块数"))
+maxTotalChunks = cli.Int("max-total-chunks", cli.setDefault(400), cli.setHelp("全局 AI 分块上限"))
+aiConcurrent = cli.Int("concurrent", cli.setDefault(4), cli.setHelp("AI FunctionCall 并发上限"))
+verifyConcurrent = cli.Int("verify-concurrent", cli.setDefault(8), cli.setHelp("JS URL HTTP 验证并发"))
+timeoutSec = cli.Int("timeout", cli.setDefault(10), cli.setHelp("爬虫单次连接超时（秒）"))
+verifyTimeoutSec = cli.Int("verify-timeout", cli.setDefault(15), cli.setHelp("验证请求超时（秒）"))
+skipAI = cli.Bool("skip-ai", cli.setHelp("跳过 AI，仅使用正则从 HTML 提取 script src 等"))
+deepJs = cli.Bool("deep-js", cli.setHelp("递归：扫描已验证 JS 内 .js/.mjs 锚点上下文，并发 AI 研判拼接 URL 并 GET 校验 200"))
+deepJsMaxRounds = cli.Int("deep-js-max-rounds", cli.setDefault(15), cli.setHelp("deep-js 最大轮次（每轮处理上一轮新验证通过的 JS）"))
+deepJsMaxFiles = cli.Int("deep-js-max-files", cli.setDefault(150), cli.setHelp("deep-js 最多拉取分析的 distinct JS 次数"))
+deepJsMaxBodyKB = cli.Int("deep-js-max-body-kb", cli.setDefault(2048), cli.setHelp("deep-js 单文件正文截断上限（KB）"))
+deepJsContext = cli.Int("deep-js-context", cli.setDefault(200), cli.setHelp("deep-js 每个锚点前后各取多少字送入 AI"))
+deepJsAiMaxPerFile = cli.Int("deep-js-ai-max-per-file", cli.setDefault(150), cli.setHelp("单个来源 JS 文件最多生成多少个上下文任务（防止特大文件爆量）"))
+deepJsAiConcurrent = cli.Int("deep-js-ai-concurrent", cli.setDefault(4), cli.setHelp("deep-js AI+校验 任务并发上限"))
+deepFetchConcurrent = cli.Int("deep-fetch-concurrent", cli.setDefault(6), cli.setHelp("deep-js 拉取 JS 正文的并发上限"))
+outputPath = cli.String("output", cli.setDefault(""), cli.setHelp("将 JSON 结果写入该路径（可与 --workdir 同时用）"))
+workDir = cli.String("workdir", cli.setDefault(""), cli.setHelp("工作目录：写入 crawl-js-collector-result.json，并创建「目标名_crawl-js-collector_时间戳」子目录保存已验证 JS 正文"))
+stdoutFullJson = cli.Bool("stdout-full-json", cli.setHelp("将完整结果 JSON 打到标准输出；未指定时若已使用 --workdir 则 stdout 仅为摘要（完整内容见结果文件）"))
+debugDeep = cli.Bool("debug-deep", cli.setHelp("打印 deep-js 每文件命中数、每轮待验证条数（排障用）"))
+
+aiStream = cli.Bool("ai-stream", cli.setHelp("AI 调试流式日志"))
+aiModel = cli.String("ai-model", cli.setDefault(""), cli.setHelp("覆盖模型名；留空则跟随全局"))
+aiDomain = cli.String("ai-domain", cli.setDefault(""), cli.setHelp("可选覆盖网关域"))
+aiProxy = cli.String("ai-proxy", cli.setDefault(""), cli.setHelp("仅作用于 ai.* 的代理"))
+
+cli.check()
+
+assetSuffix = ",.css,.scss,.less,.sass,.map,.png,.jpg,.jpeg,.gif,.svg,.ico,.webp,.bmp,.avif,.woff,.woff2,.ttf,.eot,.otf,.mp4,.webm,.mp3,.wav,.pdf,.zip,"
+
+shouldSkipByURL = u => {
+    u = str.TrimSpace(u)
+    if u == "" {
+        return true
+    }
+    lu = str.ToLower(u)
+    q = str.LastIndex(lu, "?")
+    if q >= 0 {
+        lu = lu[:q]
+    }
+    h = str.LastIndex(lu, "#")
+    if h >= 0 {
+        lu = lu[:h]
+    }
+    dot = str.LastIndex(lu, ".")
+    if dot < 0 {
+        return false
+    }
+    suf = lu[dot:]
+    if str.Contains(assetSuffix, "," + suf + ",") {
+        return true
+    }
+    return false
+}
+
+// re.FindSubmatch 签名为 (data, regexp)，见 docs/re.yakdoc.yaml
+getOrigin = u => {
+    m = re.FindSubmatch(u, `^(https?://[^/]+)`)
+    if m != nil && len(m) > 0 {
+        return m[0]
+    }
+    return ""
+}
+
+parentDirURL = u => {
+    u = str.TrimRight(u, "/")
+    if u == "" {
+        return u
+    }
+    slash = str.LastIndex(u, "/")
+    if slash <= 8 {
+        return u + "/"
+    }
+    return u[:slash+1]
+}
+
+resolveRef = (rootUrl, pageUrl, ref) => {
+    ref = str.TrimSpace(ref)
+    if ref == "" || ref == "#" {
+        return ""
+    }
+    if str.HasPrefix(ref, "data:") || str.HasPrefix(ref, "javascript:") || str.HasPrefix(ref, "vbscript:") {
+        return ""
+    }
+    if str.HasPrefix(ref, "http://") || str.HasPrefix(ref, "https://") {
+        return ref
+    }
+    origin = getOrigin(pageUrl)
+    if origin == "" {
+        origin = getOrigin(rootUrl)
+    }
+    if str.HasPrefix(ref, "//") {
+        if str.HasPrefix(str.ToLower(rootUrl), "https:") {
+            return "https:" + ref
+        }
+        return "http:" + ref
+    }
+    if str.HasPrefix(ref, "/") {
+        if origin != "" {
+            return origin + ref
+        }
+        return ref
+    }
+    base = parentDirURL(pageUrl)
+    if base == "" {
+        base = rootUrl
+    }
+    if !str.HasSuffix(base, "/") {
+        base = base + "/"
+    }
+    return base + ref
+}
+
+// 打包产物内字符串：无 ./ ../ 且非绝对路径时，多相对「站点根」（rootUrl）而非当前 JS 文件目录（避免 /app/config.js + app/services/x.js → /app/app/...）
+resolveJsRefFromBundle = (rootUrl, fromJsUrl, ref) => {
+    ref = str.TrimSpace(ref)
+    if ref == "" {
+        return ""
+    }
+    if str.HasPrefix(ref, "./") || str.HasPrefix(ref, "../") {
+        return resolveRef(rootUrl, fromJsUrl, ref)
+    }
+    if str.HasPrefix(ref, "http://") || str.HasPrefix(ref, "https://") || str.HasPrefix(ref, "//") || str.HasPrefix(ref, "/") {
+        return resolveRef(rootUrl, fromJsUrl, ref)
+    }
+    return resolveRef(rootUrl, rootUrl, ref)
+}
+
+looksLikeHTML = body => {
+    if len(body) < 20 {
+        return false
+    }
+    hi = 8000
+    if len(body) < hi {
+        hi = len(body)
+    }
+    lb = str.ToLower(body[:hi])
+    return str.Contains(lb, "<html") || str.Contains(lb, "<!doctype") || str.Contains(lb, "<script") || str.Contains(lb, "<head")
+}
+
+regexCollectRefs = (body, rootUrl, pageUrl) => {
+    out = []
+    seen = {}
+    // script src= ；re.FindSubmatchAll(data, regexp)，见 docs/re.yakdoc.yaml
+    pat = `(?i)<script[^>]*\ssrc\s*=\s*["']([^"'\s>]+)["']`
+    rows = re.FindSubmatchAll(body, pat)
+    if rows == nil {
+        rows = []
+    }
+    for _, row := range rows {
+        if len(row) < 2 {
+            continue
+        }
+        raw = str.TrimSpace(row[1])
+        abs = resolveRef(rootUrl, pageUrl, raw)
+        if abs != "" && !seen[abs] {
+            seen[abs] = true
+            out.Push(abs)
+        }
+    }
+    pat2 = `(?i)<link[^>]*rel\s*=\s*["']modulepreload["'][^>]*href\s*=\s*["']([^"']+)["']`
+    rows2 = re.FindSubmatchAll(body, pat2)
+    if rows2 == nil {
+        rows2 = []
+    }
+    for _, row := range rows2 {
+        if len(row) < 2 {
+            continue
+        }
+        raw = str.TrimSpace(row[1])
+        abs = resolveRef(rootUrl, pageUrl, raw)
+        if abs != "" && !seen[abs] {
+            lu = str.ToLower(abs)
+            if str.Contains(lu, ".js") || str.Contains(lu, ".mjs") {
+                seen[abs] = true
+                out.Push(abs)
+            }
+        }
+    }
+    return out
+}
+
+normalizeCandidate = u => {
+    u = str.TrimSpace(u)
+    if u == "" {
+        return ""
+    }
+    h = str.Index(u, "#")
+    if h >= 0 {
+        u = u[:h]
+    }
+    return u
+}
+
+isLikelyJSURL = u => {
+    lu = str.ToLower(u)
+    if str.Contains(lu, ".js?") || str.HasSuffix(lu, ".js") {
+        return true
+    }
+    if str.HasSuffix(lu, ".mjs") || str.Contains(lu, ".mjs?") {
+        return true
+    }
+    // re.Match(regexpPattern, content)，见 docs/re.yakdoc.yaml
+    if re.Match(`(?i)[/_-]chunk`, u) && str.Contains(lu, ".js") {
+        return true
+    }
+    return false
+}
+
+// 须定义在 normalizeCandidate / isLikelyJSURL 之后：Yak 中先引用未赋值标识会导致运行期失败，deep 命中会被 try/catch 吞掉，表现为 deep-js 零新增且 ai_calls=0
+tryProgrammaticJsUrl = (rootUrl, fromJsUrl, rawV) => {
+    a = normalizeCandidate(resolveJsRefFromBundle(rootUrl, fromJsUrl, rawV))
+    if a != "" && isLikelyJSURL(a) {
+        return a
+    }
+    a = normalizeCandidate(resolveRef(rootUrl, fromJsUrl, rawV))
+    if a != "" && isLikelyJSURL(a) {
+        return a
+    }
+    return ""
+}
+
+contextAround = (body, center, half) => {
+    n = len(body)
+    if n <= 0 {
+        return ""
+    }
+    if center < 0 {
+        center = 0
+    }
+    if center > n {
+        center = n
+    }
+    lo = center - half
+    hi = center + half
+    if lo < 0 {
+        lo = 0
+    }
+    if hi > n {
+        hi = n
+    }
+    if hi <= lo {
+        return ""
+    }
+    return body[lo:hi]
+}
+
+// deep-js：不用整文件大正则（Yak 下对大 body 易失效），改为字节扫描 .mjs / .js 锚点并截取上下文
+extractDeepJsSnippetJobs = (body, fromURL, halfCtx, maxPerFile) => {
+    jobs = []
+    seenBucket = {}
+    capN = maxPerFile
+    if capN <= 0 {
+        capN = 150
+    }
+    if body == nil || body == undefined {
+        return jobs
+    }
+    body = string(body)
+    n = len(body)
+    searchFrom = 0
+    big = n + 999999
+    for len(jobs) < capN && searchFrom < n {
+        subn = n - searchFrom
+        if subn <= 0 {
+            break
+        }
+        sub = body[searchFrom:searchFrom+subn]
+        ij = str.Index(sub, ".js")
+        im = str.Index(sub, ".mjs")
+        if ij == nil || ij == undefined || ij < 0 {
+            ij = -1
+        }
+        if im == nil || im == undefined || im < 0 {
+            im = -1
+        }
+        dij = big
+        dim = big
+        if ij >= 0 {
+            dij = searchFrom + ij
+        }
+        if im >= 0 {
+            dim = searchFrom + im
+        }
+        // Yak 中 if/else 块内赋值可能不提升到外层，须在分支前先声明，否则块外 absPick 为 undefined
+        absPick = -1
+        extl = 3
+        if dim < dij {
+            absPick = dim
+            extl = 4
+        } else {
+            if dij >= big {
+                break
+            }
+            absPick = dij
+            extl = 3
+        }
+        if absPick == nil || absPick == undefined || absPick < 0 {
+            break
+        }
+        bk = absPick / 48
+        kb = sprint(bk)
+        if seenBucket[kb] {
+            searchFrom = absPick + extl
+            continue
+        }
+        seenBucket[kb] = true
+        cen = absPick + 1
+        snip = contextAround(body, cen, halfCtx)
+        if str.TrimSpace(snip) != "" {
+            jobs.Push({"from_url": fromURL, "snippet": snip})
+        }
+        searchFrom = absPick + extl
+    }
+    return jobs
+}
+
+deepJsHitSchema = {
+    "is_independent_js": "(bool) 若该片段表示浏览器可通过 HTTP 向当前站点请求的独立 .js/.mjs 脚本资源（含 ocLazyLoad、Webpack 懒加载等），而非 npm 裸包名（如 toaster）或纯 API 路径，则为 true",
+    "path_or_url": "(string) 片段中的原始路径或完整 URL，须与源码一致、勿编造；否则空",
+    "resolved_full_url": "(string) 仅当 is_independent_js 为 true 时必填：由你根据下面规则拼出的完整 http(s) URL；否则空。",
+}
+
+buildDeepJsPrompt = (rootUrl, fromJsUrl, halfCtx, snippet) => {
+    return sprintf(`你是前端静态资源分析助手，负责从源码片段判断是否为可 GET 的独立 JS，并**拼接出完整 URL**。
+
+【根路径（站点入口，用于取 origin）】%s
+【本段代码所在已下载文件 URL】%s
+
+【源码局部（前后约各 %d 字）】
+%s
+
+规则（必须在心里完成再输出 JSON）：
+0) 这是 **deep-js 并发任务**中的主判定：务必判断是否为可下载的独立脚本，并在 is_independent_js=true 时给出可用的 **resolved_full_url**（供程序随后 GET 校验）。
+1) is_independent_js=false：npm/AMD 裸模块名（仅一个词、无路径分隔，如 toaster、ui.select）、非 .js/.mjs 的 URL、纯接口路径。
+2) is_independent_js=true：含路径的 *.js/*.mjs、或以 / 开头的脚本路径、或完整 http(s) 脚本 URL（含 Angular ocLazyLoad、require 列表里的脚本路径）。
+3) **拼接 resolved_full_url**（必须由你输出，不要只给相对路径）：
+   - 取根路径的 origin（scheme://host:port）。
+   - 片段里以 / 开头的路径 → origin + 该路径（例如 /app/x.js → http(s)://host/app/x.js）。
+   - 片段里为 app/、js/ 等**且不以 ./ ../ 开头** → 通常相对**站点根**：origin + "/" + 路径（例如 app/services/x.js → origin/app/services/x.js）。**禁止**用「来源文件」所在目录拼这段，否则会多出一层目录（错误示例：来源 .../app/config.router.js 时不要把 app/services × 拼成 .../app/app/services/...）。
+   - 仅以 ./ 或 ../ 开头 → 相对**来源文件 URL** 的目录解析（与浏览器一致）。
+   - 已是 http:// 或 https:// → 可原样写入（同站优先不改域名）。
+4) path_or_url：填片段中出现的原文路径字符串；resolved_full_url：填最终完整 URL。
+5) 忽略并列的 .css 等非 JS；只针对当前片段中心这条疑似脚本。`, rootUrl, fromJsUrl, halfCtx, snippet)
+}
+
+// deep-js：单任务 AI 研判 → 拼接 URL → 本函数内 GET；返回 map 含 ok/url/ai_used/status/err
+deepJsAiResolveSnippetAndFetch = (rootUrl, fromURL, snippet, halfCtx, verifyTO, aiOpts) => {
+    pr = buildDeepJsPrompt(rootUrl, fromURL, halfCtx, snippet)
+    aiUsed = 0
+    for in 2 {
+        try {
+            vr = ai.FunctionCall(pr, deepJsHitSchema, aiOpts...)~
+            aiUsed++
+            if vr == nil || vr["is_independent_js"] != true {
+                return {"ok": false, "url": "", "ai_used": aiUsed, "status": 0, "err": ""}
+            }
+            absU = normalizeCandidate(str.TrimSpace(sprint(vr["resolved_full_url"])))
+            if absU == "" || !isLikelyJSURL(absU) {
+                po = str.TrimSpace(sprint(vr["path_or_url"]))
+                if po == "" {
+                    return {"ok": false, "url": "", "ai_used": aiUsed, "status": 0, "err": "no_path"}
+                }
+                absU = tryProgrammaticJsUrl(rootUrl, fromURL, po)
+            }
+            if absU == "" || !isLikelyJSURL(absU) {
+                return {"ok": false, "url": "", "ai_used": aiUsed, "status": 0, "err": "bad_url"}
+            }
+            rsp, _, e = poc.Get(absU, poc.timeout(verifyTO))
+            if e != nil {
+                return {"ok": false, "url": absU, "ai_used": aiUsed, "status": 0, "err": sprint(e)}
+            }
+            code = poc.GetStatusCodeFromResponse(rsp.RawPacket)
+            if code >= 200 && code < 300 {
+                return {"ok": true, "url": absU, "ai_used": aiUsed, "status": code, "err": ""}
+            }
+            return {"ok": false, "url": absU, "ai_used": aiUsed, "status": code, "err": "http"}
+        } catch ex {
+        }
+    }
+    return {"ok": false, "url": "", "ai_used": aiUsed, "status": 0, "err": "ai_fail"}
+}
+
+// 返回本批新验证通过的 URL 列表（targets 建议已去重；已存在于 verifiedSet 的会跳过）
+verifyUrlList = (targets, verifyTO, verifiedOut, failedOut, verifiedSet) => {
+    newly = []
+    lwg = sync.NewSizedWaitGroup(verifyConcurrent)
+    lMu = sync.NewMutex()
+    for _, ju := range targets {
+        u = ju
+        if verifiedSet[u] {
+            continue
+        }
+        lwg.Add()
+        go func(target) {
+            defer lwg.Done()
+            try {
+                rsp, _, e = poc.Get(target, poc.timeout(verifyTO))
+                if e != nil {
+                    lMu.Lock()
+                    failedOut.Push({"url": target, "status": 0, "error": sprint(e)})
+                    lMu.Unlock()
+                    return
+                }
+                code = poc.GetStatusCodeFromResponse(rsp.RawPacket)
+                if code >= 200 && code < 300 {
+                    lMu.Lock()
+                    verifiedOut.Push(target)
+                    verifiedSet[target] = true
+                    newly.Push(target)
+                    lMu.Unlock()
+                } else {
+                    lMu.Lock()
+                    failedOut.Push({"url": target, "status": code, "error": sprintf("HTTP %v", code)})
+                    lMu.Unlock()
+                }
+            } catch ex {
+                lMu.Lock()
+                failedOut.Push({"url": target, "status": 0, "error": sprint(ex)})
+                lMu.Unlock()
+            }
+        }(u)
+    }
+    lwg.Wait()
+    return newly
+}
+
+slugTargetForWorkdir = rootU => {
+    s = str.TrimSpace(rootU)
+    s = str.TrimPrefix(s, "https://")
+    s = str.TrimPrefix(s, "http://")
+    s = str.TrimRight(s, "/")
+    if s == "" {
+        return "target"
+    }
+    s = str.ReplaceAll(s, "\\", "_")
+    s = str.ReplaceAll(s, "/", "_")
+    s = str.ReplaceAll(s, ":", "_")
+    s = str.ReplaceAll(s, "?", "_")
+    s = str.ReplaceAll(s, "&", "_")
+    s = str.ReplaceAll(s, "=", "_")
+    s = str.ReplaceAll(s, "%", "_")
+    s = str.ReplaceAll(s, "*", "_")
+    s = str.ReplaceAll(s, "|", "_")
+    s = str.ReplaceAll(s, "<", "_")
+    s = str.ReplaceAll(s, ">", "_")
+    s = str.ReplaceAll(s, "\"", "_")
+    if len(s) > 100 {
+        s = s[:100]
+    }
+    return s
+}
+
+safeLeafNameForJsUrl = (u, seq) => {
+    p = normalizeCandidate(u)
+    q = str.Index(p, "?")
+    if q >= 0 {
+        p = p[:q]
+    }
+    base = p
+    slash = str.LastIndex(p, "/")
+    if slash >= 0 && slash < len(p)-1 {
+        base = p[slash+1:]
+    }
+    base = str.TrimSpace(base)
+    if base == "" {
+        base = "script.js"
+    }
+    base = str.ReplaceAll(str.ReplaceAll(base, "..", "_"), "\\", "_")
+    if len(base) > 180 {
+        base = base[:180]
+    }
+    lb = str.ToLower(base)
+    if !str.HasSuffix(lb, ".js") && !str.HasSuffix(lb, ".mjs") {
+        base = base + ".js"
+    }
+    return sprintf("%04d_%s", seq, base)
+}
+
+saveVerifiedJsFilesToDir = (urls, destDir, verifyTO, conc) => {
+    if destDir == "" || urls == nil || len(urls) == 0 {
+        return
+    }
+    try {
+        file.MkdirAll(destDir)
+    } catch emk {
+        log.warn("workdir 创建 JS 目录失败: %v", emk)
+        return
+    }
+    if conc <= 0 {
+        conc = 8
+    }
+    wg = sync.NewSizedWaitGroup(conc)
+    for idx, ju := range urls {
+        uOne = ju
+        nseq = idx + 1
+        wg.Add()
+        go func(u, seq) {
+            defer wg.Done()
+            try {
+                rsp, _, e = poc.Get(u, poc.timeout(verifyTO))
+                if e != nil {
+                    return
+                }
+                code = poc.GetStatusCodeFromResponse(rsp.RawPacket)
+                if code < 200 || code >= 300 {
+                    return
+                }
+                leaf = safeLeafNameForJsUrl(u, seq)
+                outP = file.Join(destDir, leaf)
+                rawB = rsp.GetBody()
+                if rawB == nil {
+                    file.Save(outP, "")
+                } else {
+                    file.Save(outP, rawB)
+                }
+            } catch exs {
+            }
+        }(uOne, nseq)
+    }
+    wg.Wait()
+}
+
+chunkSchema = {
+    "js_urls": "(类型：字符串数组) 本段文本中出现的、可浏览器加载的 JavaScript 完整 http(s) URL；无则 []",
+}
+
+buildChunkPrompt = (rootUrl, pageUrl, chunkIdx, chunkTotal, chunkText) => {
+    return sprintf(`你是前端资源分析助手。任务分两步（你必须在心里完成这两步再输出）：
+第一步：从下列 HTML/文本片段中提取所有与 JavaScript 相关的引用（例如 <script src="...">、modulepreload、动态 import 路径等）。忽略 CSS、图片、字体。
+第二步：结合「根路径」与「当前页面 URL」把相对路径解析为可在浏览器中访问的完整 http(s) URL（与根/页同域优先）。
+
+根路径: %s
+当前页面 URL: %s
+分块: %d / %d
+
+【片段】
+%s
+
+只输出 JSON 中要求的 js_urls 数组元素，每项必须是完整 URL，且一般应指向 .js 或 .mjs；不要输出说明文字。`, rootUrl, pageUrl, chunkIdx+1, chunkTotal, chunkText)
+}
+
+validateChunkAI = obj => {
+    if obj == nil {
+        return false
+    }
+    arr = obj["js_urls"]
+    if arr == nil {
+        return true
+    }
+    return true
+}
+
+var aiOpts = [ai.funcCallRetryTimes(2)]
+if aiProxy != "" {
+    aiOpts = append(aiOpts, ai.proxy(aiProxy))
+}
+if aiStream {
+    aiOpts = append(aiOpts, ai.debugStream(true))
+}
+if aiModel != "" {
+    aiOpts = append(aiOpts, ai.model(aiModel))
+}
+if aiDomain != "" {
+    aiOpts = append(aiOpts, ai.domain(aiDomain))
+}
+
+maxBodyBytes = maxBodyKB * 1024
+if maxBodyBytes <= 0 {
+    maxBodyBytes = 524288
+}
+
+rootUrl = str.TrimSpace(targetUrl)
+if !str.HasPrefix(rootUrl, "http://") && !str.HasPrefix(rootUrl, "https://") {
+    die("url 必须以 http:// 或 https:// 开头")
+}
+
+crawlOpts = []
+crawlOpts = append(crawlOpts, crawler.maxDepth(maxDepth))
+if crawlConcurrent > 0 {
+    crawlOpts = append(crawlOpts, crawler.concurrent(crawlConcurrent))
+}
+if urlsMax > 0 {
+    crawlOpts = append(crawlOpts, crawler.maxUrls(urlsMax))
+}
+if reqsMax > 0 {
+    crawlOpts = append(crawlOpts, crawler.maxRequest(reqsMax))
+}
+if timeoutSec > 0 {
+    crawlOpts = append(crawlOpts, crawler.connectTimeout(timeoutSec))
+}
+// crawler.disallowSuffix 接受 []string，见 docs/crawler.yakdoc.yaml
+crawlOpts = append(crawlOpts, crawler.disallowSuffix(
+    [".css", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".webp", ".woff", ".woff2", ".ttf", ".eot", ".map", ".mp4", ".pdf"],
+))
+
+reqCh, err := crawler.Start(rootUrl, crawlOpts...)
+if err != nil {
+    die(sprintf("crawler.Start: %v", err))
+}
+
+crawledCount = 0
+filteredResources = 0
+allChunks = []
+chunkMeta = []
+
+for result in reqCh {
+    pageUrl = result.Url()
+    crawledCount++
+    if shouldSkipByURL(pageUrl) {
+        filteredResources++
+        continue
+    }
+    bodyB = result.ResponseBody()
+    if bodyB == nil || len(bodyB) == 0 {
+        continue
+    }
+    if len(bodyB) > maxBodyBytes {
+        bodyB = bodyB[:maxBodyBytes]
+    }
+    body = string(bodyB)
+    if !looksLikeHTML(body) {
+        filteredResources++
+        continue
+    }
+    lines = str.Split(body, "\n")
+    cur = []
+    pageChunks = 0
+    for _, ln := range lines {
+        cur.Push(ln)
+        if len(cur) >= chunkLines {
+            txt = str.Join(cur, "\n")
+            if str.TrimSpace(txt) != "" {
+                allChunks.Push(txt)
+                chunkMeta.Push({"page_url": pageUrl})
+                pageChunks++
+                if pageChunks >= maxChunksPage {
+                    break
+                }
+            }
+            cur = []
+        }
+    }
+    if len(cur) > 0 && pageChunks < maxChunksPage {
+        txt = str.Join(cur, "\n")
+        if str.TrimSpace(txt) != "" {
+            allChunks.Push(txt)
+            chunkMeta.Push({"page_url": pageUrl})
+        }
+    }
+    if len(allChunks) >= maxTotalChunks {
+        break
+    }
+}
+
+if len(allChunks) > maxTotalChunks {
+    allChunks = allChunks[:maxTotalChunks]
+    chunkMeta = chunkMeta[:maxTotalChunks]
+}
+
+candidateSeen = {}
+candidateList = []
+candidateMu = sync.NewMutex()
+addCandidates = urls => {
+    if urls == nil {
+        return
+    }
+    for _, u := range urls {
+        nu = normalizeCandidate(sprint(u))
+        if nu == "" {
+            continue
+        }
+        if !isLikelyJSURL(nu) {
+            continue
+        }
+        candidateMu.Lock()
+        if !candidateSeen[nu] {
+            candidateSeen[nu] = true
+            candidateList.Push(nu)
+        }
+        candidateMu.Unlock()
+    }
+}
+
+// 正则先行：每页全量 body 在分块前已拆 lines，这里对整页再扫一遍成本高；改为对每个 chunk 同源页 URL 在收集 chunk 时保存 pageUrl
+// 在构建 chunk 时无法简单关联——chunkMeta 已含 page_url
+
+// 对已收集页面的 body 无法在循环外保留，因此对每个 chunk 只做 AI；正则从每个 chunk 文本抽（chunk 仍含 script 标签行）
+for i := 0; i < len(allChunks); i++ {
+    pu = rootUrl
+    if i < len(chunkMeta) && chunkMeta[i]["page_url"] != nil {
+        pu = sprint(chunkMeta[i]["page_url"])
+    }
+    for _, ru := range regexCollectRefs(allChunks[i], pu, pu) {
+        addCandidates([ru])
+    }
+}
+
+if !skipAI && len(allChunks) > 0 {
+    swg = sync.NewSizedWaitGroup(aiConcurrent)
+    nchunk = len(allChunks)
+    for ci := 0; ci < nchunk; ci++ {
+        if len(allChunks) >= maxTotalChunks && ci >= maxTotalChunks {
+            break
+        }
+        chText = allChunks[ci]
+        pu = rootUrl
+        if ci < len(chunkMeta) && chunkMeta[ci]["page_url"] != nil {
+            pu = sprint(chunkMeta[ci]["page_url"])
+        }
+        swg.Add()
+        go func(ct, idx, purl) {
+            defer swg.Done()
+            prompt = buildChunkPrompt(rootUrl, purl, idx, nchunk, ct)
+            for in 3 {
+                try {
+                    v = ai.FunctionCall(prompt, chunkSchema, aiOpts...)~
+                    if validateChunkAI(v) && v["js_urls"] != nil {
+                        arr = v["js_urls"]
+                        addCandidates(arr)
+                        return
+                    }
+                } catch e {
+                }
+            }
+        }(chText, ci, pu)
+    }
+    swg.Wait()
+}
+
+verified = []
+failed = []
+
+vwg = sync.NewSizedWaitGroup(verifyConcurrent)
+vMu = sync.NewMutex()
+verifyTO = verifyTimeoutSec
+if verifyTO <= 0 {
+    verifyTO = 15
+}
+
+for _, ju := range candidateList {
+    u = ju
+    vwg.Add()
+    go func(target) {
+        defer vwg.Done()
+        try {
+            rsp, _, e = poc.Get(target, poc.timeout(verifyTO))
+            if e != nil {
+                vMu.Lock()
+                failed.Push({"url": target, "status": 0, "error": sprint(e)})
+                vMu.Unlock()
+                return
+            }
+            code = poc.GetStatusCodeFromResponse(rsp.RawPacket)
+            if code >= 200 && code < 300 {
+                vMu.Lock()
+                verified.Push(target)
+                vMu.Unlock()
+            } else {
+                vMu.Lock()
+                failed.Push({"url": target, "status": code, "error": sprintf("HTTP %v", code)})
+                vMu.Unlock()
+            }
+        } catch ex {
+            vMu.Lock()
+            failed.Push({"url": target, "status": 0, "error": sprint(ex)})
+            vMu.Unlock()
+        }
+    }(u)
+}
+vwg.Wait()
+
+verifiedSet = {}
+for _, vu := range verified {
+    verifiedSet[vu] = true
+}
+
+deepJsMaxBodyBytes = deepJsMaxBodyKB * 1024
+if deepJsMaxBodyBytes <= 0 {
+    deepJsMaxBodyBytes = 2097152
+}
+halfDeepCtx = deepJsContext
+if halfDeepCtx <= 0 {
+    halfDeepCtx = 200
+}
+deepRoundsRun = 0
+deepFilesScanned = 0
+deepAiCalls = 0
+internallyScanned = {}
+deepQueue = []
+if deepJs {
+    for _, xu := range verified {
+        deepQueue.Push(xu)
+    }
+}
+
+for deepJs && deepRoundsRun < deepJsMaxRounds && len(deepQueue) > 0 && deepFilesScanned < deepJsMaxFiles {
+    deepRoundsRun++
+    thisRound = deepQueue
+    deepQueue = []
+    allJobs = []
+    jobsMu = sync.NewMutex()
+    fetchWg = sync.NewSizedWaitGroup(deepFetchConcurrent)
+    scanNumMu = sync.NewMutex()
+
+    for _, jsU := range thisRound {
+        juRef = jsU
+        fetchWg.Add()
+        go func(fromURL) {
+            defer fetchWg.Done()
+            scanNumMu.Lock()
+            if internallyScanned[fromURL] {
+                scanNumMu.Unlock()
+                return
+            }
+            if deepFilesScanned >= deepJsMaxFiles {
+                scanNumMu.Unlock()
+                return
+            }
+            internallyScanned[fromURL] = true
+            deepFilesScanned++
+            scanNumMu.Unlock()
+
+            bd = ""
+            try {
+                rsp2, _, e2 = poc.Get(fromURL, poc.timeout(verifyTO))
+                if e2 != nil {
+                    return
+                }
+                c2 = poc.GetStatusCodeFromResponse(rsp2.RawPacket)
+                if c2 < 200 || c2 >= 300 {
+                    return
+                }
+                bd = string(rsp2.GetBody())
+            } catch ex2 {
+                return
+            }
+            if len(bd) > deepJsMaxBodyBytes {
+                bd = bd[:deepJsMaxBodyBytes]
+            }
+            fjobs = extractDeepJsSnippetJobs(bd, fromURL, halfDeepCtx, deepJsAiMaxPerFile)
+            if debugDeep {
+                println(sprintf("[deep-js-debug] fromURL=%v snippet_jobs=%v body_len=%v", fromURL, len(fjobs), len(bd)))
+            }
+            jobsMu.Lock()
+            for _, fj := range fjobs {
+                allJobs.Push(fj)
+            }
+            jobsMu.Unlock()
+        }(juRef)
+    }
+    fetchWg.Wait()
+
+    jobSeen = {}
+    dedupJobs = []
+    for _, jb := range allJobs {
+        jk = sprint(jb["from_url"]) + "\x00" + sprint(jb["snippet"])
+        if jobSeen[jk] {
+            continue
+        }
+        jobSeen[jk] = true
+        dedupJobs.Push(jb)
+    }
+    if debugDeep {
+        println(sprintf("[deep-js-debug] round=%v jobs_raw=%v jobs_dedup=%v", deepRoundsRun, len(allJobs), len(dedupJobs)))
+    }
+    if len(dedupJobs) == 0 {
+        break
+    }
+
+    aiConc = deepJsAiConcurrent
+    if aiConc <= 0 {
+        aiConc = 4
+    }
+    aiWg = sync.NewSizedWaitGroup(aiConc)
+    resultMu = sync.NewMutex()
+    roundNext = []
+
+    for _, job := range dedupJobs {
+        jB = job
+        aiWg.Add()
+        go func(jref) {
+            defer aiWg.Done()
+            fu = sprint(jref["from_url"])
+            sn = sprint(jref["snippet"])
+            try {
+                res = deepJsAiResolveSnippetAndFetch(rootUrl, fu, sn, halfDeepCtx, verifyTO, aiOpts)
+                resultMu.Lock()
+                incAi = res["ai_used"]
+                if incAi != nil {
+                    deepAiCalls = deepAiCalls + parseInt(sprint(incAi))
+                }
+                if res["ok"] == true {
+                    uOk = normalizeCandidate(str.TrimSpace(sprint(res["url"])))
+                    if uOk != "" && !verifiedSet[uOk] {
+                        verifiedSet[uOk] = true
+                        verified.Push(uOk)
+                        if !internallyScanned[uOk] {
+                            roundNext.Push(uOk)
+                        }
+                    }
+                } else {
+                    uFail = str.TrimSpace(sprint(res["url"]))
+                    if uFail != "" {
+                        st = 0
+                        if res["status"] != nil {
+                            st = res["status"]
+                        }
+                        failed.Push({"url": uFail, "status": st, "error": sprint(res["err"])})
+                    }
+                }
+                resultMu.Unlock()
+            } catch exJob {
+            }
+        }(jB)
+    }
+    aiWg.Wait()
+
+    for _, nu := range roundNext {
+        deepQueue.Push(nu)
+    }
+    if len(roundNext) == 0 {
+        break
+    }
+}
+
+report = {
+    "root_url": rootUrl,
+    "crawled_requests": crawledCount,
+    "filtered_resource_like_pages": filteredResources,
+    "ai_chunks_processed": len(allChunks),
+    "js_candidates_before_verify": len(candidateList),
+    "verified_js_urls": verified,
+    "failed_js_urls": failed,
+    "deep_js": {
+        "enabled": deepJs,
+        "rounds_run": deepRoundsRun,
+        "files_scanned": deepFilesScanned,
+        "ai_calls": deepAiCalls,
+    },
+}
+
+workDirTrim = str.TrimSpace(workDir)
+if workDirTrim != "" {
+    jsonOut = file.Join(workDirTrim, "crawl-js-collector-result.json")
+    slugW = slugTargetForWorkdir(rootUrl)
+    jsSub = file.Join(workDirTrim, sprintf("%s_crawl-js-collector_%d", slugW, time.Now().Unix()))
+    report["artifacts"] = {
+        "workdir": workDirTrim,
+        "result_json": jsonOut,
+        "verified_js_dir": jsSub,
+    }
+    try {
+        file.MkdirAll(workDirTrim)
+        file.SaveJson(jsonOut, report)
+        saveVerifiedJsFilesToDir(verified, jsSub, verifyTO, verifyConcurrent)
+    } catch ew {
+        log.warn("workdir 输出失败: %v", ew)
+    }
+}
+
+if outputPath != "" {
+    try {
+        file.SaveJson(outputPath, report)
+    } catch e2 {
+        log.warn("save output: %v", e2)
+    }
+}
+
+stdoutDoc = report
+if workDirTrim != "" && !stdoutFullJson {
+    art = report["artifacts"]
+    if art == nil {
+        art = {}
+    }
+    stdoutDoc = {
+        "stdout_mode": "summary",
+        "root_url": rootUrl,
+        "artifacts": art,
+        "verified_count": len(verified),
+        "failed_count": len(failed),
+        "crawled_requests": crawledCount,
+        "filtered_resource_like_pages": filteredResources,
+        "ai_chunks_processed": len(allChunks),
+        "js_candidates_before_verify": len(candidateList),
+        "deep_js": report["deep_js"],
+    }
+}
+println(string(json.dumps(stdoutDoc, json.withIndent("  "))))
+return report

@@ -6,6 +6,7 @@ import (
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_dir_explore"
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_http_flow_analyze"
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_http_fuzztest"
+	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_infosec_recon"
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_intent"
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_internet_research"
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_java_decompiler"
