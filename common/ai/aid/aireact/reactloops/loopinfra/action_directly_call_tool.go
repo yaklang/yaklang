@@ -309,9 +309,7 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 		if mgr == nil || !mgr.IsRecentlyUsedTool(toolName) {
 			return utils.Errorf("tool '%s' is not in the recently-used cache; use require_tool instead", toolName)
 		}
-		if reactloops.ShouldBlockBashUntilEdit(loop, toolName) {
-			return utils.Error(reactloops.BuildEditBeforeExecutionFeedback(loop))
-		}
+		reactloops.MaybeWarnBashBeforeEdit(loop, toolName)
 
 		loop.Set("directly_call_tool_name", toolName)
 		return nil

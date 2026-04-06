@@ -183,6 +183,7 @@ Skills: {{ .MatchedSkillNames }}
 		}
 	}
 	recommendedCaps = reactloops.ApplyScriptEditExecutionPolicy(loop, recommendedCaps)
+	reactloops.PreloadSingleRecommendedTool(loop, recommendedCaps)
 
 	// Build and set intent_analysis
 	if intentSummary == "" {
@@ -259,6 +260,7 @@ func buildFallbackIntentAnalysis(loop *reactloops.ReActLoop) {
 	loop.Set("intent_analysis", intentSummary)
 
 	recommendedCaps := reactloops.ApplyScriptEditExecutionPolicy(loop, nil)
+	reactloops.PreloadSingleRecommendedTool(loop, recommendedCaps)
 
 	if matchedToolNames != "" {
 		loop.Set("recommended_tools", "Matched tools: "+matchedToolNames)

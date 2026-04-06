@@ -1,9 +1,15 @@
 package reactloops
 
 import (
+	"context"
+	"io"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
@@ -47,4 +53,39 @@ func TestMarkEditBeforeExecutionCompletedIgnoresNonEditTools(t *testing.T) {
 
 	MarkEditBeforeExecutionCompleted(loop, "write_file")
 	require.Equal(t, "true", loop.Get(LoopStateEditBeforeExecutionCompleted))
+}
+
+func TestBuildEditBeforeExecutionFeedback_IsSoftWarning(t *testing.T) {
+	loop := newScriptPolicyTestLoop("修改这个脚本并重新执行")
+	feedback := BuildEditBeforeExecutionFeedback(loop)
+
+	require.Contains(t, feedback, "这是路由提示，不是强制限制")
+	require.Contains(t, feedback, "如果你继续使用 bash 也可以")
+	require.NotContains(t, feedback, "暂时禁止")
+}
+
+func TestPreloadSingleRecommendedTool(t *testing.T) {
+	ctx := context.Background()
+	tool, err := aitool.New(
+		"modify_file",
+		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+			return "ok", nil
+		}),
+	)
+	require.NoError(t, err)
+	toolManager := buildinaitools.NewToolManagerByToolGetter(
+		func() []*aitool.Tool { return []*aitool.Tool{tool} },
+		buildinaitools.WithExtendTools([]*aitool.Tool{tool}, true),
+	)
+	loop := &ReActLoop{
+		config:  &aicommon.Config{AiToolManager: toolManager},
+		invoker: mock.NewMockInvoker(ctx),
+		vars:    omap.NewEmptyOrderedMap[string, any](),
+	}
+
+	require.False(t, toolManager.IsRecentlyUsedTool("modify_file"))
+	require.True(t, PreloadSingleRecommendedTool(loop, []string{"modify_file"}))
+	require.True(t, toolManager.IsRecentlyUsedTool("modify_file"))
+	require.False(t, PreloadSingleRecommendedTool(loop, []string{"modify_file"}))
+	require.False(t, PreloadSingleRecommendedTool(loop, []string{"modify_file", "bash"}))
 }
