@@ -197,6 +197,11 @@ func (s *SSEServer) handleMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := validateJSONContentType(r.Header.Get("Content-Type")); err != nil {
+		s.writeJSONRPCError(w, nil, mcp.INVALID_REQUEST, err.Error())
+		return
+	}
+
 	sessionID := r.URL.Query().Get("sessionId")
 	if sessionID == "" {
 		s.writeJSONRPCError(w, nil, mcp.INVALID_PARAMS, "Missing sessionId")
@@ -204,7 +209,8 @@ func (s *SSEServer) handleMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Set the client context in the server before handling the message
-	ctx := s.server.WithContext(r.Context(), NotificationContext{
+	ctx := withTransportContext(r.Context(), legacySSETransport)
+	ctx = s.server.WithContext(ctx, NotificationContext{
 		ClientID:  sessionID,
 		SessionID: sessionID,
 	})
