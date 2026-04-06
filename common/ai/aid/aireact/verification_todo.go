@@ -395,7 +395,6 @@ func renderVerificationOutputFilesMarkdown(outputFiles []string) string {
 	}
 
 	lines := make([]string, 0, len(normalized)+3)
-	lines = append(lines, "## 交付文件", "")
 	for _, filePath := range normalized {
 		lines = append(lines, fmt.Sprintf("- %s", filePath))
 	}
