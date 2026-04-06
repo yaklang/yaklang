@@ -251,6 +251,66 @@ func TestMCPServer_HandleNotifications(t *testing.T) {
 	assert.True(t, notificationReceived)
 }
 
+func TestMCPServer_LegacySSERestrictedTools(t *testing.T) {
+	server := NewMCPServer("test-server", "1.0.0")
+	server.AddTool(mcp.NewTool("safe_tool"), func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return &mcp.CallToolResult{Content: []any{mcp.TextContent{Type: "text", Text: "ok"}}}, nil
+	})
+	server.AddTool(mcp.NewTool("exec_yak_script"), func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return &mcp.CallToolResult{Content: []any{mcp.TextContent{Type: "text", Text: "exec"}}}, nil
+	})
+	server.AddTool(mcp.NewTool("dynamic_add_tool"), func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return &mcp.CallToolResult{Content: []any{mcp.TextContent{Type: "text", Text: "dynamic"}}}, nil
+	})
+
+	t.Run("filters restricted tools from list", func(t *testing.T) {
+		message := []byte(`{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}`)
+		response := server.HandleMessage(withTransportContext(context.Background(), legacySSETransport), message)
+
+		resp, ok := response.(mcp.JSONRPCResponse)
+		assert.True(t, ok)
+
+		listResult, ok := resp.Result.(mcp.ListToolsResult)
+		assert.True(t, ok)
+		assert.Len(t, listResult.Tools, 1)
+		assert.Equal(t, "safe_tool", listResult.Tools[0].Name)
+	})
+
+	t.Run("rejects restricted tool call", func(t *testing.T) {
+		message := []byte(`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"exec_yak_script","arguments":{}}}`)
+		response := server.HandleMessage(withTransportContext(context.Background(), legacySSETransport), message)
+
+		errResp, ok := response.(mcp.JSONRPCError)
+		assert.True(t, ok)
+		assert.Equal(t, mcp.INVALID_PARAMS, errResp.Error.Code)
+		assert.Contains(t, errResp.Error.Message, "legacy SSE transport")
+	})
+
+	t.Run("keeps restricted tools available on streamable http", func(t *testing.T) {
+		message := []byte(`{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}`)
+		response := server.HandleMessage(withTransportContext(context.Background(), streamableHTTPTransport), message)
+
+		resp, ok := response.(mcp.JSONRPCResponse)
+		assert.True(t, ok)
+
+		listResult, ok := resp.Result.(mcp.ListToolsResult)
+		assert.True(t, ok)
+		assert.Len(t, listResult.Tools, 3)
+	})
+
+	t.Run("keeps restricted tools available without transport context", func(t *testing.T) {
+		message := []byte(`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"exec_yak_script","arguments":{}}}`)
+		response := server.HandleMessage(context.Background(), message)
+
+		resp, ok := response.(mcp.JSONRPCResponse)
+		assert.True(t, ok)
+
+		result, ok := resp.Result.(*mcp.CallToolResult)
+		assert.True(t, ok)
+		assert.Len(t, result.Content, 1)
+	})
+}
+
 func TestMCPServer_PromptHandling(t *testing.T) {
 	server := NewMCPServer("test-server", "1.0.0",
 		WithPromptCapabilities(true),

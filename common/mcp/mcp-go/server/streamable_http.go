@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -283,6 +284,11 @@ func (s *StreamableHTTPServer) handlePost(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
+	if err := validateJSONContentType(r.Header.Get("Content-Type")); err != nil {
+		s.writeJSONRPCError(w, nil, mcp.INVALID_REQUEST, err.Error())
+		return
+	}
+
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		s.writeJSONRPCError(w, nil, mcp.PARSE_ERROR, "Parse error")
@@ -337,7 +343,7 @@ func (s *StreamableHTTPServer) handlePost(
 		}
 	}
 
-	ctx := r.Context()
+	ctx := withTransportContext(r.Context(), streamableHTTPTransport)
 	if hasSession {
 		ctx = s.server.WithContext(ctx, NotificationContext{
 			ClientID:  sessionID,
@@ -426,6 +432,19 @@ func (s *StreamableHTTPServer) writeJSONRPCError(
 
 func acceptsSSE(accept string) bool {
 	return strings.Contains(accept, "text/event-stream")
+}
+
+func validateJSONContentType(contentType string) error {
+	if strings.TrimSpace(contentType) == "" {
+		return fmt.Errorf("Content-Type must be application/json")
+	}
+
+	mediaType, _, err := mime.ParseMediaType(contentType)
+	if err != nil || mediaType != "application/json" {
+		return fmt.Errorf("Content-Type must be application/json")
+	}
+
+	return nil
 }
 
 func sessionIDFromHeader(header http.Header) string {
