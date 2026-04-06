@@ -13,7 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/workflowdag"
 )
 
-const taskDependencyGraphNodeID = "任务依赖图"
+const taskDependencyGraphNodeID = "task-dependency"
 
 type taskGraphNode struct {
 	task *AiTask
@@ -277,23 +277,38 @@ func (c *Coordinator) buildTaskDependencyGraphMarkdown(root *AiTask, reason stri
 }
 
 func (c *Coordinator) emitTaskDependencyGraph(root *AiTask, reason string) error {
-	if c == nil || root == nil {
+	if c == nil || root == nil || c.Emitter == nil {
 		return nil
 	}
+
 	markdown, err := c.buildTaskDependencyGraphMarkdown(root, reason)
 	if err != nil {
 		return err
 	}
+
+	updated := false
+	if reason != "" {
+		updated = true
+		event, err := c.Emitter.EmitDefaultStreamEvent(taskDependencyGraphNodeID, strings.NewReader(reason), root.Index)
+		if err != nil {
+			return err
+		}
+		event.GetStreamEventWriterId()
+		_, _ = c.Emitter.EmitTextReferenceMaterial("task-dependency-graph", markdown)
+	}
+
 	artifactName := fmt.Sprintf("task_dependency_graph_%s", strings.ReplaceAll(root.Index, "-", "_"))
 	artifactPath := c.emitTaskGraphArtifact(artifactName, markdown)
 	if artifactPath != "" {
 		markdown = markdown + fmt.Sprintf("\n图文件：%s\n", artifactPath)
 	}
-	if c.Emitter != nil {
-		_, err = c.Emitter.EmitTextMarkdownStreamEvent(taskDependencyGraphNodeID, strings.NewReader(markdown), root.Index)
-		if err != nil {
-			return err
-		}
+
+	if updated {
+		return nil
+	}
+	_, err = c.Emitter.EmitDefaultStreamEvent(taskDependencyGraphNodeID, strings.NewReader(markdown), root.Index)
+	if err != nil {
+		return err
 	}
 	return nil
 }

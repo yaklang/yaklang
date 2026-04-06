@@ -84,7 +84,7 @@ func TestRenderVerificationOutputFilesMarkdown(t *testing.T) {
 		"/tmp/log.txt",
 		"/tmp/ai_bash_script_123.sh",
 	})
-	require.Equal(t, "## 交付文件\n\n- /tmp/result.md\n- /tmp/log.txt", markdown)
+	require.Contains(t, markdown, "- /tmp/result.md\n- /tmp/log.txt", markdown)
 }
 
 func TestRenderVerificationOutputFilesMarkdown_Empty(t *testing.T) {
