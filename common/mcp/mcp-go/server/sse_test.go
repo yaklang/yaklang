@@ -97,6 +97,11 @@ func doSSEInitializeRequest(t *testing.T, messageURL, contentType string, id int
 
 func doSSEJSONRequest(t *testing.T, messageURL, contentType string, payload map[string]interface{}) *http.Response {
 	t.Helper()
+	return doSSEJSONRequestWithHeaders(t, messageURL, contentType, payload, nil)
+}
+
+func doSSEJSONRequestWithHeaders(t *testing.T, messageURL, contentType string, payload map[string]interface{}, headers map[string]string) *http.Response {
+	t.Helper()
 
 	body, err := json.Marshal(payload)
 	if err != nil {
@@ -113,6 +118,9 @@ func doSSEJSONRequest(t *testing.T, messageURL, contentType string, payload map[
 	}
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
+	}
+	for key, value := range headers {
+		req.Header.Set(key, value)
 	}
 	req.Close = true
 
@@ -268,6 +276,199 @@ func TestSSEServer(t *testing.T) {
 
 		if resp.Header.Get("Access-Control-Allow-Origin") != "*" {
 			t.Fatalf("Expected wildcard CORS header, got %q", resp.Header.Get("Access-Control-Allow-Origin"))
+		}
+	})
+
+	t.Run("Allows localhost origin on message endpoint", func(t *testing.T) {
+		mcpServer := NewMCPServer("test", "1.0.0", WithResourceCapabilities(true, true))
+		testServer := NewTestServer(mcpServer)
+		defer testServer.Close()
+
+		sseResp, messageURL := openSSESession(t, testServer)
+		defer sseResp.Body.Close()
+		resp := doSSEJSONRequestWithHeaders(t, messageURL, "application/json", map[string]interface{}{
+			"jsonrpc": "2.0",
+			"id":      1,
+			"method":  "initialize",
+			"params": map[string]interface{}{
+				"protocolVersion": "2024-11-05",
+				"clientInfo": map[string]interface{}{
+					"name":    "test-client",
+					"version": "1.0.0",
+				},
+			},
+		}, map[string]string{"Origin": "http://localhost:3000"})
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusAccepted {
+			t.Fatalf("Expected status 202, got %d", resp.StatusCode)
+		}
+		if resp.Header.Get("Access-Control-Allow-Origin") != "http://localhost:3000" {
+			t.Fatalf("Expected localhost origin to be echoed, got %q", resp.Header.Get("Access-Control-Allow-Origin"))
+		}
+	})
+
+	t.Run("Allows extension origin on message endpoint", func(t *testing.T) {
+		mcpServer := NewMCPServer("test", "1.0.0", WithResourceCapabilities(true, true))
+		testServer := NewTestServer(mcpServer)
+		defer testServer.Close()
+
+		sseResp, messageURL := openSSESession(t, testServer)
+		defer sseResp.Body.Close()
+		resp := doSSEJSONRequestWithHeaders(t, messageURL, "application/json", map[string]interface{}{
+			"jsonrpc": "2.0",
+			"id":      1,
+			"method":  "initialize",
+			"params": map[string]interface{}{
+				"protocolVersion": "2024-11-05",
+				"clientInfo": map[string]interface{}{
+					"name":    "test-client",
+					"version": "1.0.0",
+				},
+			},
+		}, map[string]string{"Origin": "chrome-extension://abcdefghijklmnop"})
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusAccepted {
+			t.Fatalf("Expected status 202, got %d", resp.StatusCode)
+		}
+		if resp.Header.Get("Access-Control-Allow-Origin") != "chrome-extension://abcdefghijklmnop" {
+			t.Fatalf("Expected extension origin to be echoed, got %q", resp.Header.Get("Access-Control-Allow-Origin"))
+		}
+	})
+
+	t.Run("Allows message request without origin header", func(t *testing.T) {
+		mcpServer := NewMCPServer("test", "1.0.0", WithResourceCapabilities(true, true))
+		testServer := NewTestServer(mcpServer)
+		defer testServer.Close()
+
+		sseResp, messageURL := openSSESession(t, testServer)
+		defer sseResp.Body.Close()
+		resp := doSSEJSONRequestWithHeaders(t, messageURL, "application/json", map[string]interface{}{
+			"jsonrpc": "2.0",
+			"id":      1,
+			"method":  "initialize",
+			"params": map[string]interface{}{
+				"protocolVersion": "2024-11-05",
+				"clientInfo": map[string]interface{}{
+					"name":    "test-client",
+					"version": "1.0.0",
+				},
+			},
+		}, map[string]string{})
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusAccepted {
+			t.Fatalf("Expected status 202, got %d", resp.StatusCode)
+		}
+		if origin := resp.Header.Get("Access-Control-Allow-Origin"); origin != "" {
+			t.Fatalf("Expected no CORS echo for requests without Origin, got %q", origin)
+		}
+
+		var response map[string]interface{}
+		if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+			t.Fatalf("Failed to decode response: %v", err)
+		}
+		if response["jsonrpc"] != "2.0" {
+			t.Fatalf("Expected jsonrpc 2.0, got %v", response["jsonrpc"])
+		}
+	})
+
+	t.Run("Rejects remote website origin on message endpoint", func(t *testing.T) {
+		mcpServer := NewMCPServer("test", "1.0.0", WithResourceCapabilities(true, true))
+		testServer := NewTestServer(mcpServer)
+		defer testServer.Close()
+
+		sseResp, messageURL := openSSESession(t, testServer)
+		defer sseResp.Body.Close()
+		resp := doSSEJSONRequestWithHeaders(t, messageURL, "application/json", map[string]interface{}{
+			"jsonrpc": "2.0",
+			"id":      1,
+			"method":  "initialize",
+			"params": map[string]interface{}{
+				"protocolVersion": "2024-11-05",
+				"clientInfo": map[string]interface{}{
+					"name":    "test-client",
+					"version": "1.0.0",
+				},
+			},
+		}, map[string]string{"Origin": "https://evil.example"})
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusForbidden {
+			t.Fatalf("Expected status 403, got %d", resp.StatusCode)
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatalf("Failed to read response body: %v", err)
+		}
+		if !strings.Contains(string(body), "Forbidden origin") {
+			t.Fatalf("Expected forbidden origin response, got %s", string(body))
+		}
+	})
+
+	t.Run("Allows preflight for localhost origin", func(t *testing.T) {
+		mcpServer := NewMCPServer("test", "1.0.0")
+		testServer := NewTestServer(mcpServer)
+		defer testServer.Close()
+
+		sseResp, messageURL := openSSESession(t, testServer)
+		defer sseResp.Body.Close()
+
+		req, err := http.NewRequest(http.MethodOptions, messageURL, nil)
+		if err != nil {
+			t.Fatalf("Failed to build preflight request: %v", err)
+		}
+		req.Header.Set("Origin", "http://127.0.0.1:5173")
+		req.Header.Set("Access-Control-Request-Method", "POST")
+		req.Header.Set("Access-Control-Request-Headers", "Content-Type")
+		req.Close = true
+
+		resp, err := newTestHTTPClient().Do(req)
+		if err != nil {
+			t.Fatalf("Failed to send preflight request: %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusNoContent {
+			t.Fatalf("Expected status 204, got %d", resp.StatusCode)
+		}
+		if resp.Header.Get("Access-Control-Allow-Origin") != "http://127.0.0.1:5173" {
+			t.Fatalf("Expected localhost origin in preflight response, got %q", resp.Header.Get("Access-Control-Allow-Origin"))
+		}
+		if resp.Header.Get("Access-Control-Allow-Methods") != "POST, OPTIONS" {
+			t.Fatalf("Expected allow methods header, got %q", resp.Header.Get("Access-Control-Allow-Methods"))
+		}
+		if resp.Header.Get("Access-Control-Allow-Headers") != "Content-Type" {
+			t.Fatalf("Expected allow headers header, got %q", resp.Header.Get("Access-Control-Allow-Headers"))
+		}
+	})
+
+	t.Run("Rejects preflight for remote website origin", func(t *testing.T) {
+		mcpServer := NewMCPServer("test", "1.0.0")
+		testServer := NewTestServer(mcpServer)
+		defer testServer.Close()
+
+		sseResp, messageURL := openSSESession(t, testServer)
+		defer sseResp.Body.Close()
+
+		req, err := http.NewRequest(http.MethodOptions, messageURL, nil)
+		if err != nil {
+			t.Fatalf("Failed to build preflight request: %v", err)
+		}
+		req.Header.Set("Origin", "https://evil.example")
+		req.Header.Set("Access-Control-Request-Method", "POST")
+		req.Close = true
+
+		resp, err := newTestHTTPClient().Do(req)
+		if err != nil {
+			t.Fatalf("Failed to send preflight request: %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusForbidden {
+			t.Fatalf("Expected status 403, got %d", resp.StatusCode)
 		}
 	})
 
