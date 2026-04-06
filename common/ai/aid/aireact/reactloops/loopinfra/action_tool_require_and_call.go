@@ -28,9 +28,7 @@ var loopAction_toolRequireAndCall = &reactloops.LoopAction{
 		if payload == "" {
 			return utils.Error("tool_require_payload is required for ActionRequireTool but empty")
 		}
-		if reactloops.ShouldBlockBashUntilEdit(loop, payload) {
-			return utils.Error(reactloops.BuildEditBeforeExecutionFeedback(loop))
-		}
+		reactloops.MaybeWarnBashBeforeEdit(loop, payload)
 		loop.Set("tool_require_payload", payload)
 		return nil
 	},

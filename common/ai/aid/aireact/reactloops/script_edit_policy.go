@@ -1,6 +1,11 @@
 package reactloops
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+)
 
 const (
 	LoopStateRequireEditBeforeExecution   = "require_edit_before_execution"
@@ -115,12 +120,50 @@ func BuildEditBeforeExecutionFeedback(loop *ReActLoop) string {
 		query = "当前任务要求先修改已有脚本，再执行。"
 	}
 
-	return "当前任务命中了“先编辑后执行”的强制路由策略，暂时禁止直接使用 bash 覆盖或重写脚本。\n" +
-		"先使用 modify_file（优先）或 write_file 完成文件编辑，确认编辑步骤成功后，才能使用 bash 执行脚本。\n" +
+	return "当前任务更偏向‘先编辑已有脚本，再执行’。这是路由提示，不是强制限制。\n" +
+		"如果你继续使用 bash 也可以，但应优先避免用 here-doc 或整段 write_file 直接覆盖已有脚本；更合适的是先用 modify_file 做增量修改，再执行。\n" +
 		"用户请求: " + query + "\n\n" +
-		"正确顺序示例:\n" +
+		"推荐顺序示例:\n" +
 		"1. {\"@action\":\"require_tool\",\"tool_require_payload\":\"modify_file\"}\n" +
 		"2. 编辑完成后再调用 {\"@action\":\"require_tool\",\"tool_require_payload\":\"bash\"} 执行脚本"
+}
+
+func MaybeWarnBashBeforeEdit(loop *ReActLoop, toolName string) bool {
+	if !ShouldBlockBashUntilEdit(loop, toolName) {
+		return false
+	}
+	if loop == nil || loop.GetInvoker() == nil {
+		return false
+	}
+	loop.GetInvoker().AddToTimeline("tool_routing_warning", BuildEditBeforeExecutionFeedback(loop))
+	return true
+}
+
+func PreloadSingleRecommendedTool(loop *ReActLoop, recommendedCaps []string) bool {
+	if loop == nil || loop.GetConfig() == nil || loop.GetConfig().GetAiToolManager() == nil {
+		return false
+	}
+	recommendedCaps = dedupeCapabilityNames(recommendedCaps)
+	if len(recommendedCaps) != 1 {
+		return false
+	}
+	toolName := recommendedCaps[0]
+	mgr := loop.GetConfig().GetAiToolManager()
+	if mgr.IsRecentlyUsedTool(toolName) {
+		return false
+	}
+	tool, err := mgr.GetToolByName(toolName)
+	if err != nil || tool == nil {
+		return false
+	}
+	mgr.AddRecentlyUsedTool(tool)
+	if realCfg, ok := loop.GetConfig().(*aicommon.Config); ok {
+		realCfg.SaveRecentToolCache()
+	}
+	if invoker := loop.GetInvoker(); invoker != nil {
+		invoker.AddToTimeline("recent_tool_preloaded", fmt.Sprintf("精准推荐仅命中一个工具，已自动加入最近工具缓存: %s", toolName))
+	}
+	return true
 }
 
 func containsAnyFold(text string, terms ...string) bool {
