@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,6 +18,70 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+// infosecRejectUnsafeArgv blocks control characters that must never appear in OS argv
+// or in values parsed from AI/tool parameters before invoking yak as a subprocess.
+func infosecRejectUnsafeArgv(s string) error {
+	if strings.ContainsAny(s, "\x00\n\r") {
+		return utils.Error("argument contains NUL or newline characters")
+	}
+	return nil
+}
+
+func infosecValidateHTTPURL(raw string) error {
+	raw = strings.TrimSpace(raw)
+	if err := infosecRejectUnsafeArgv(raw); err != nil {
+		return err
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		return err
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return utils.Errorf("URL must use http or https, got scheme %q", u.Scheme)
+	}
+	if u.Host == "" {
+		return utils.Error("URL missing host")
+	}
+	return nil
+}
+
+// infosecResolveLocalPathForExec returns an absolute, existing path for use as a yak CLI argument.
+func infosecResolveLocalPathForExec(p, baseWd string) (abs string, err error) {
+	p = strings.TrimSpace(p)
+	if p == "" {
+		return "", utils.Error("empty path")
+	}
+	if err := infosecRejectUnsafeArgv(p); err != nil {
+		return "", err
+	}
+	clean := filepath.Clean(p)
+	if !filepath.IsAbs(clean) {
+		clean = filepath.Join(baseWd, clean)
+	}
+	abs, err = filepath.Abs(clean)
+	if err != nil {
+		return "", err
+	}
+	if _, err := os.Lstat(abs); err != nil {
+		return "", utils.Errorf("path not accessible: %v", err)
+	}
+	return abs, nil
+}
+
+func infosecAbsScriptPath(script string) (string, error) {
+	if err := infosecRejectUnsafeArgv(script); err != nil {
+		return "", err
+	}
+	abs, err := filepath.Abs(script)
+	if err != nil {
+		return "", err
+	}
+	if _, err := os.Stat(abs); err != nil {
+		return "", err
+	}
+	return abs, nil
+}
 
 func registerSeedAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 	return reactloops.WithRegisterLoopAction(
@@ -210,9 +275,25 @@ func crawlJsCollectorAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 				op.Continue()
 				return
 			}
+			if err := infosecRejectUnsafeArgv(yakBin); err != nil {
+				op.Feedback(fmt.Sprintf("invalid yak binary path: %v", err))
+				op.Continue()
+				return
+			}
 			script := resolveCrawlJsCollectorScriptPath(wd)
 			if script == "" {
 				op.Feedback("crawl-js-collector.yak not found (set YAKLANG_crawl-js-collector).")
+				op.Continue()
+				return
+			}
+			scriptAbs, err := infosecAbsScriptPath(script)
+			if err != nil {
+				op.Feedback(fmt.Sprintf("resolve crawl-js-collector script: %v", err))
+				op.Continue()
+				return
+			}
+			if err := infosecValidateHTTPURL(seed); err != nil {
+				op.Feedback(fmt.Sprintf("crawl-js-collector: invalid start_url / seed (require http/https): %v", err))
 				op.Continue()
 				return
 			}
@@ -223,7 +304,7 @@ func crawlJsCollectorAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 				return
 			}
 			args := []string{
-				script,
+				scriptAbs,
 				"--url", seed,
 				"--workdir", jobRoot,
 				"--max-depth", fmt.Sprintf("%d", action.GetInt("max_depth")),
@@ -301,9 +382,20 @@ func runJsStaticAnalysisAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopO
 				op.Continue()
 				return
 			}
+			if err := infosecRejectUnsafeArgv(yakBin); err != nil {
+				op.Feedback(fmt.Sprintf("invalid yak binary path: %v", err))
+				op.Continue()
+				return
+			}
 			script := resolveJsStaticScriptPath(wd)
 			if script == "" {
 				op.Feedback("js-static-extract-ai.yak not found (set YAKLANG_JS_STATIC_SCRIPT or run from a repo checkout).")
+				op.Continue()
+				return
+			}
+			scriptAbs, err := infosecAbsScriptPath(script)
+			if err != nil {
+				op.Feedback(fmt.Sprintf("resolve js-static-extract-ai script: %v", err))
 				op.Continue()
 				return
 			}
@@ -321,6 +413,27 @@ func runJsStaticAnalysisAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopO
 				op.Continue()
 				return
 			}
+			var normPaths []string
+			for _, p := range paths {
+				lp := strings.ToLower(p)
+				if strings.HasPrefix(lp, "http://") || strings.HasPrefix(lp, "https://") {
+					if err := infosecValidateHTTPURL(p); err != nil {
+						op.Feedback(fmt.Sprintf("invalid URL in paths: %v", err))
+						op.Continue()
+						return
+					}
+					normPaths = append(normPaths, p)
+					continue
+				}
+				absLocal, err := infosecResolveLocalPathForExec(p, wd)
+				if err != nil {
+					op.Feedback(fmt.Sprintf("invalid local path %q: %v", p, err))
+					op.Continue()
+					return
+				}
+				normPaths = append(normPaths, absLocal)
+			}
+			paths = normPaths
 			conc := action.GetInt("concurrent")
 			if conc < 1 {
 				conc = 2
@@ -336,9 +449,9 @@ func runJsStaticAnalysisAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopO
 			outPath := filepath.Join(wd, fmt.Sprintf("js_static_report_%d.json", time.Now().UnixNano()))
 			var args []string
 			if len(paths) == 1 && utils.IsDir(paths[0]) {
-				args = []string{script, "--dir", paths[0], "--output", outPath, "--concurrent", strconv.Itoa(conc)}
+				args = []string{scriptAbs, "--dir", paths[0], "--output", outPath, "--concurrent", strconv.Itoa(conc)}
 			} else {
-				args = []string{script, "--files", strings.Join(paths, ","), "--output", outPath, "--concurrent", strconv.Itoa(conc)}
+				args = []string{scriptAbs, "--files", strings.Join(paths, ","), "--output", outPath, "--concurrent", strconv.Itoa(conc)}
 			}
 			if skipP2 {
 				args = append(args, "--skip-phase2")
