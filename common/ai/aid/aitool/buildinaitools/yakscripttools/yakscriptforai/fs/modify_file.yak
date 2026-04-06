@@ -1,9 +1,18 @@
-__DESC__ = "一个用于修改现有文件内容的工具，支持在指定行号位置插入或替换内容。适用于文件内容编辑、配置修改等场景。"
+__DESC__ = "一个用于增量修改现有文件内容的工具，是修改已有文件时优先于 write_file 的首选方案。支持按行号精准插入或替换内容，content 参数支持多行文本，适用于增加注释、修复 bug、插入代码块、调整配置项等高效编辑场景。"
 __VERBOSE_NAME__ = "文件内容修改工具"
-__KEYWORDS__ = "file modify,文件修改,文件编辑,file editing,content modification,行编辑,line editing,字符串替换,string replacement,文件处理,text processing,insert content,replace content"
+__KEYWORDS__ = "file modify,文件修改,文件编辑,file editing,content modification,行编辑,line editing,字符串替换,string replacement,文件处理,text processing,insert content,replace content,add comments,增加注释,代码注释,edit existing file,修改现有文件,incremental edit,增量编辑"
 
 __USAGE__ = <<<USAGE_BLOCK
 File Content Modification Tool - Parameter Description for JSON Tool Calls
+
+When to use this tool:
+    - Prefer this tool when you need to edit an existing file incrementally.
+    - Use it with line numbers shown in output_file context for precise edits.
+    - It is usually more efficient than write_file for partial updates.
+
+When to use write_file instead:
+    - Creating a brand new file.
+    - Replacing the entire file content intentionally.
 
 Required Parameters:
   file            (string)  The target file path you want to modify.
@@ -20,6 +29,32 @@ Optional Parameters:
                               line number with the provided content.
                             - "insert": inserts the content as a new line after the specified
                               line number. The original line is preserved.
+
+IMPORTANT - Use AITAG for the `content` parameter when content is multi-line:
+    The `content` parameter often contains multi-line code, comments, JSON, YAML,
+    or other structured text. Use AITAG to avoid JSON escaping errors and preserve
+    newlines exactly.
+
+    Example:
+    {
+        "@action": "call-tool",
+        "tool": "modify_file",
+        "identifier": "insert_comment_block",
+        "params": {
+            "file": "/path/to/app.py",
+            "line-number": 12,
+            "mode": "insert"
+        }
+    }
+
+    <|TOOL_PARAM_content_{nonce}|>
+    # Explain why this block exists
+    # Keep the original behavior unchanged
+    <|TOOL_PARAM_content_END_{nonce}|>
+
+Multi-line examples:
+    - Insert several comment lines after an existing function signature.
+    - Replace a single line with a multi-line block that expands the implementation.
 USAGE_BLOCK
 
 /*
@@ -51,12 +86,16 @@ USAGE_BLOCK
 3. 替换第10行的内容（默认模式）：
    yak modify_file.yak --file test.txt --line-number 10 --content "新的内容"
 
+4. 在函数上方插入多行注释块：
+    yak modify_file.yak --file app.py --line-number 20 --mode insert --content "# 说明: 这里处理输入\n# 保持输出结构稳定"
+
 注意事项：
 - 行号从1开始计数，第一行是第1行
 - 如果指定的行号超出文件行数，会在文件末尾添加内容
 - insert模式会在指定行后插入内容
 - replace模式会完全替换指定行的内容
 - 支持多行内容的插入和替换
+- 优先用于已有文件的局部修改，避免使用 write_file 全量覆写整个文件
 - 修改操作会直接保存到原文件，请谨慎使用
 - 使用 memeditor 进行高效的文本编辑操作
 */

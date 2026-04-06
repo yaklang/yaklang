@@ -182,6 +182,7 @@ Skills: {{ .MatchedSkillNames }}
 			}
 		}
 	}
+	recommendedCaps = reactloops.ApplyScriptEditExecutionPolicy(loop, recommendedCaps)
 
 	// Build and set intent_analysis
 	if intentSummary == "" {
@@ -257,8 +258,18 @@ func buildFallbackIntentAnalysis(loop *reactloops.ReActLoop) {
 	loop.Set("intent_summary", intentSummary)
 	loop.Set("intent_analysis", intentSummary)
 
+	recommendedCaps := reactloops.ApplyScriptEditExecutionPolicy(loop, nil)
+
 	if matchedToolNames != "" {
 		loop.Set("recommended_tools", "Matched tools: "+matchedToolNames)
+	}
+	if len(recommendedCaps) > 0 {
+		recommendedTools := loop.Get("recommended_tools")
+		if recommendedTools != "" {
+			recommendedTools += "\n"
+		}
+		recommendedTools += "AI recommended: " + strings.Join(recommendedCaps, ", ")
+		loop.Set("recommended_tools", recommendedTools)
 	}
 	if matchedForgeNames != "" {
 		loop.Set("recommended_forges", "Matched forges: "+matchedForgeNames)

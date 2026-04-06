@@ -62,6 +62,10 @@ func handleToolCallResult(
 		return
 	}
 
+	if result.Success {
+		reactloops.MarkEditBeforeExecutionCompleted(loop, toolPayload)
+	}
+
 	if result.Error != "" {
 		invoker.AddToTimeline("call["+toolPayload+"] error", result.Error)
 	}

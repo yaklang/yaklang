@@ -20,6 +20,7 @@ func (r *ReAct) getPrioritizedTools(tools []*aitool.Tool, maxCount int) []*aitoo
 		"grep",
 		"read_file",
 		"write_file",
+		"modify_file",
 		"find_file",
 		"tree",
 		"bash",
