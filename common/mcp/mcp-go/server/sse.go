@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"strings"
 	"sync"
 
 	"github.com/google/uuid"
@@ -30,6 +32,18 @@ type sseSession struct {
 	flusher   http.Flusher
 	closeOnce sync.Once
 	done      chan struct{}
+}
+
+var allowedMessageOriginExtensionSchemes = map[string]struct{}{
+	"chrome-extension":      {},
+	"moz-extension":         {},
+	"safari-web-extension":  {},
+}
+
+var allowedMessageOriginLocalHosts = map[string]struct{}{
+	"127.0.0.1": {},
+	"::1":       {},
+	"localhost": {},
 }
 
 func (s *sseSession) Close() {
@@ -192,8 +206,25 @@ func (s *SSEServer) handleSSE(w http.ResponseWriter, r *http.Request) {
 // handleMessage processes incoming JSON-RPC messages from clients and sends responses
 // back through both the SSE connection and HTTP response.
 func (s *SSEServer) handleMessage(w http.ResponseWriter, r *http.Request) {
+	origin := r.Header.Get("Origin")
+	if r.Method == http.MethodOptions {
+		s.handleMessagePreflight(w, r, origin)
+		return
+	}
+
 	if r.Method != http.MethodPost {
 		s.writeJSONRPCError(w, nil, mcp.INVALID_REQUEST, "Method not allowed")
+		return
+	}
+
+	if !isAllowedMessageOrigin(origin) {
+		s.writeJSONRPCErrorWithStatus(w, nil, mcp.INVALID_REQUEST, "Forbidden origin", http.StatusForbidden)
+		return
+	}
+	setAllowedMessageOriginHeaders(w, origin)
+
+	if err := validateJSONContentType(r.Header.Get("Content-Type")); err != nil {
+		s.writeJSONRPCError(w, nil, mcp.INVALID_REQUEST, err.Error())
 		return
 	}
 
@@ -204,7 +235,8 @@ func (s *SSEServer) handleMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Set the client context in the server before handling the message
-	ctx := s.server.WithContext(r.Context(), NotificationContext{
+	ctx := withTransportContext(r.Context(), legacySSETransport)
+	ctx = s.server.WithContext(ctx, NotificationContext{
 		ClientID:  sessionID,
 		SessionID: sessionID,
 	})
@@ -249,10 +281,66 @@ func (s *SSEServer) writeJSONRPCError(
 	code int,
 	message string,
 ) {
+	s.writeJSONRPCErrorWithStatus(w, id, code, message, http.StatusBadRequest)
+}
+
+func (s *SSEServer) writeJSONRPCErrorWithStatus(
+	w http.ResponseWriter,
+	id interface{},
+	code int,
+	message string,
+	status int,
+) {
 	response := createErrorResponse(id, code, message)
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusBadRequest)
+	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(response)
+}
+
+func (s *SSEServer) handleMessagePreflight(w http.ResponseWriter, r *http.Request, origin string) {
+	if !isAllowedMessageOrigin(origin) {
+		http.Error(w, "Forbidden origin", http.StatusForbidden)
+		return
+	}
+
+	setAllowedMessageOriginHeaders(w, origin)
+	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func setAllowedMessageOriginHeaders(w http.ResponseWriter, origin string) {
+	if origin == "" {
+		return
+	}
+	w.Header().Set("Access-Control-Allow-Origin", origin)
+	w.Header().Set("Vary", "Origin")
+}
+
+func isAllowedMessageOrigin(origin string) bool {
+	origin = strings.TrimSpace(origin)
+	if origin == "" {
+		return true
+	}
+	if origin == "null" {
+		return false
+	}
+
+	parsed, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+
+	if _, ok := allowedMessageOriginExtensionSchemes[parsed.Scheme]; ok {
+		return parsed.Host != ""
+	}
+
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return false
+	}
+
+	_, ok := allowedMessageOriginLocalHosts[parsed.Hostname()]
+	return ok
 }
 
 // SendEventToSession sends an event to a specific SSE session identified by sessionID.

@@ -54,6 +54,16 @@ type notificationHub struct {
 	subscribers map[uint64]chan ServerNotification
 }
 
+const (
+	legacySSETransport      = "legacy_sse"
+	streamableHTTPTransport = "streamable_http"
+)
+
+var legacySSERestrictedTools = map[string]struct{}{
+	"dynamic_add_tool": {},
+	"exec_yak_script":  {},
+}
+
 func newNotificationHub() *notificationHub {
 	return &notificationHub{
 		subscribers: make(map[uint64]chan ServerNotification),
@@ -122,12 +132,47 @@ type MCPServer struct {
 // serverKey is the context key for storing the server instance
 type serverKey struct{}
 
+type transportKey struct{}
+
 // ServerFromContext retrieves the MCPServer instance from a context
 func ServerFromContext(ctx context.Context) *MCPServer {
 	if srv, ok := ctx.Value(serverKey{}).(*MCPServer); ok {
 		return srv
 	}
 	return nil
+}
+
+func withTransportContext(ctx context.Context, transport string) context.Context {
+	return context.WithValue(ctx, transportKey{}, transport)
+}
+
+func transportFromContext(ctx context.Context) string {
+	if transport, ok := ctx.Value(transportKey{}).(string); ok {
+		return transport
+	}
+	return ""
+}
+
+func toolAllowedForContext(ctx context.Context, toolName string) bool {
+	if transportFromContext(ctx) != legacySSETransport {
+		return true
+	}
+	_, blocked := legacySSERestrictedTools[toolName]
+	return !blocked
+}
+
+func filterToolsForContext(ctx context.Context, tools []*mcp.Tool) []*mcp.Tool {
+	if transportFromContext(ctx) != legacySSETransport {
+		return tools
+	}
+
+	filtered := make([]*mcp.Tool, 0, len(tools))
+	for _, tool := range tools {
+		if toolAllowedForContext(ctx, tool.Name) {
+			filtered = append(filtered, tool)
+		}
+	}
+	return filtered
 }
 
 // WithContext sets the current client context and returns the provided context
@@ -704,6 +749,7 @@ func (s *MCPServer) handleListTools(
 	for name := range s.tools {
 		tools = append(tools, s.tools[name])
 	}
+	tools = filterToolsForContext(ctx, tools)
 
 	result := mcp.ListToolsResult{
 		Tools: tools,
@@ -719,6 +765,17 @@ func (s *MCPServer) handleToolCall(
 	id interface{},
 	request mcp.CallToolRequest,
 ) mcp.JSONRPCMessage {
+	if !toolAllowedForContext(ctx, request.Params.Name) {
+		return createErrorResponse(
+			id,
+			mcp.INVALID_PARAMS,
+			fmt.Sprintf(
+				"Tool not available over legacy SSE transport: %s",
+				request.Params.Name,
+			),
+		)
+	}
+
 	handler, ok := s.toolHandlers[request.Params.Name]
 	if !ok {
 		return createErrorResponse(
