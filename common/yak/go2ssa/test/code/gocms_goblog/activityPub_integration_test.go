@@ -1,4 +1,5 @@
-//go:build !skipIntegration
+//go:build ignore && !skipIntegration
+// +build ignore,!skipIntegration
 
 package main
 
