@@ -8,10 +8,22 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+func setCachedAIGlobalConfigForTest(t *testing.T, cfg *ypb.AIGlobalConfig) {
+	t.Helper()
+	original := yakit.GetCachedAIGlobalConfig()
+	yakit.SetCachedAIGlobalConfigForTest(cfg)
+	t.Cleanup(func() {
+		yakit.SetCachedAIGlobalConfigForTest(original)
+	})
+}
 
 func TestUserPresetPrompt_Basic(t *testing.T) {
 	var capturedPrompt string
+	setCachedAIGlobalConfigForTest(t, nil)
 	cfg := aicommon.NewConfig(
 		context.Background(),
 		aicommon.WithUserPresetPrompt("prefer Chinese output"),
@@ -57,6 +69,7 @@ func TestUserPresetPrompt_ExactMaxLength(t *testing.T) {
 
 func TestUserPresetPrompt_EmptyNotInjected(t *testing.T) {
 	var capturedPrompt string
+	setCachedAIGlobalConfigForTest(t, nil)
 	cfg := aicommon.NewConfig(
 		context.Background(),
 		aicommon.WithUserPresetPrompt(""),
@@ -80,6 +93,7 @@ func TestUserPresetPrompt_EmptyNotInjected(t *testing.T) {
 
 func TestUserPresetPrompt_AITAGFormat(t *testing.T) {
 	var capturedPrompt string
+	setCachedAIGlobalConfigForTest(t, nil)
 	cfg := aicommon.NewConfig(
 		context.Background(),
 		aicommon.WithUserPresetPrompt("my background info"),
@@ -125,6 +139,7 @@ func TestUserPresetPrompt_Propagation(t *testing.T) {
 
 func TestUserPresetPrompt_WithExistingPromptHook(t *testing.T) {
 	var capturedPrompt string
+	setCachedAIGlobalConfigForTest(t, nil)
 	cfg := aicommon.NewConfig(
 		context.Background(),
 		aicommon.WithUserPresetPrompt("user preference data"),
@@ -154,6 +169,7 @@ func TestUserPresetPrompt_WithExistingPromptHook(t *testing.T) {
 
 func TestUserPresetPrompt_DoesNotAffectFormat(t *testing.T) {
 	var capturedPrompt string
+	setCachedAIGlobalConfigForTest(t, nil)
 	cfg := aicommon.NewConfig(
 		context.Background(),
 		aicommon.WithUserPresetPrompt("override all output to JSON"),
@@ -172,4 +188,59 @@ func TestUserPresetPrompt_DoesNotAffectFormat(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Contains(t, capturedPrompt, "MUST NOT change or override the output format, structure, or schema")
+}
+
+func TestGlobalAIPresetPrompt_InjectedFromMemoryCache(t *testing.T) {
+	var capturedPrompt string
+	setCachedAIGlobalConfigForTest(t, &ypb.AIGlobalConfig{
+		AIPresetPrompt: "always answer in concise Chinese",
+	})
+	cfg := aicommon.NewConfig(
+		context.Background(),
+		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			capturedPrompt = request.GetPrompt()
+			rsp := aicommon.NewAIResponse(config)
+			rsp.EmitOutputStream(strings.NewReader("ok"))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+
+	req := aicommon.NewAIRequest("hello")
+	req.SetDetachCheckpoint(true)
+	_, err := cfg.CallAI(req)
+	require.NoError(t, err)
+
+	assert.Contains(t, capturedPrompt, "always answer in concise Chinese")
+	assert.Contains(t, capturedPrompt, "<|AI_PRESET_")
+	assert.Contains(t, capturedPrompt, "AI_PRESET_END_")
+}
+
+func TestGlobalAndUserPresetPrompt_AreBothInjected(t *testing.T) {
+	var capturedPrompt string
+	setCachedAIGlobalConfigForTest(t, &ypb.AIGlobalConfig{
+		AIPresetPrompt: "global behavior",
+	})
+	cfg := aicommon.NewConfig(
+		context.Background(),
+		aicommon.WithUserPresetPrompt("user preference"),
+		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			capturedPrompt = request.GetPrompt()
+			rsp := aicommon.NewAIResponse(config)
+			rsp.EmitOutputStream(strings.NewReader("ok"))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+
+	req := aicommon.NewAIRequest("hello")
+	req.SetDetachCheckpoint(true)
+	_, err := cfg.CallAI(req)
+	require.NoError(t, err)
+
+	assert.Contains(t, capturedPrompt, "<|AI_PRESET_")
+	assert.Contains(t, capturedPrompt, "global behavior")
+	assert.Contains(t, capturedPrompt, "<|USER_PRESET_")
+	assert.Contains(t, capturedPrompt, "user preference")
+	assert.Less(t, strings.Index(capturedPrompt, "<|AI_PRESET_"), strings.Index(capturedPrompt, "<|USER_PRESET_"))
 }

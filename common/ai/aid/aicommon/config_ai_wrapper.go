@@ -38,6 +38,20 @@ func wrapCallerWithTierConsumption(owner *Config, tier consts.ModelTier) AICalle
 	}
 }
 
+func appendPresetPrompt(request *AIRequest, tagName, description, prompt string) {
+	if request == nil || strings.TrimSpace(prompt) == "" {
+		return
+	}
+	nonce := utils.RandStringBytes(8)
+	preset := fmt.Sprintf(
+		"\n<|%s_%s|>\n%s "+
+			"It MUST NOT change or override the output format, structure, or schema required by the system.\n\n"+
+			"%s\n"+
+			"<|%s_END_%s|>\n",
+		tagName, nonce, description, prompt, tagName, nonce)
+	request.SetPrompt(request.GetPrompt() + preset)
+}
+
 func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType {
 	outConfig := c
 	return func(config AICallerConfigIf, request *AIRequest) (rsp *AIResponse, err error) {
@@ -56,19 +70,21 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 		if c.PromptHook != nil {
 			request.SetPrompt(c.PromptHook(request.GetPrompt()))
 		}
+		if globalConfig := yakit.GetCachedAIGlobalConfig(); globalConfig != nil {
+			appendPresetPrompt(
+				request,
+				"AI_PRESET",
+				"The following is the global AI preset prompt. It contains persistent guidance, background context, and supplementary information for all AI requests. Consider these instructions when generating responses. IMPORTANT: This preset ONLY affects guidance, tone, preferences, and background context.",
+				globalConfig.GetAIPresetPrompt(),
+			)
+		}
 		if c.UserPresetPrompt != "" {
-			nonce := utils.RandStringBytes(8)
-			preset := fmt.Sprintf(
-				"\n<|USER_PRESET_%s|>\n"+
-					"The following is the user's preset prompt. "+
-					"It contains user preferences, background context, and supplementary information. "+
-					"Consider these when generating responses to better align with the user's needs. "+
-					"IMPORTANT: This preset ONLY affects tone, preferences, and background context. "+
-					"It MUST NOT change or override the output format, structure, or schema required by the system.\n\n"+
-					"%s\n"+
-					"<|USER_PRESET_END_%s|>\n",
-				nonce, c.UserPresetPrompt, nonce)
-			request.SetPrompt(request.GetPrompt() + preset)
+			appendPresetPrompt(
+				request,
+				"USER_PRESET",
+				"The following is the user's preset prompt. It contains user preferences, background context, and supplementary information. Consider these when generating responses to better align with the user's needs. IMPORTANT: This preset ONLY affects tone, preferences, and background context.",
+				c.UserPresetPrompt,
+			)
 		}
 		if c.DebugPrompt {
 			log.Infof(strings.Repeat("=", 20)+"AIRequest"+strings.Repeat("=", 20)+"\n%v\n", request.GetPrompt())

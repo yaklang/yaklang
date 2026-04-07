@@ -195,7 +195,7 @@ type Config struct {
 	ShowForgeListInPrompt  bool // Whether to show forge list in base prompt (default false, forges discoverable via search_capabilities)
 	AiForgeManager         AIForgeFactory
 	ContextProviderManager *ContextProviderManager
-	UserPresetPrompt       string // max 4000 chars, appended to every AI request via AITAG, affects preferences only
+	UserPresetPrompt       string // max 4000 chars, retained for request-scoped compatibility; global guidance comes from AIGlobalConfig.AIPresetPrompt
 
 	/*
 		AI Tool
