@@ -10,14 +10,15 @@ import (
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/pipeline"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
-type ASTSequenceType int
+type ASTSequenceType = ssaconfig.ASTSequenceType
 
 const (
-	OutOfOrder ASTSequenceType = iota
-	Order
-	ReverseOrder
+	OutOfOrder   = ssaconfig.OutOfOrder
+	Order        = ssaconfig.Order
+	ReverseOrder = ssaconfig.ReverseOrder
 )
 
 const maxFileSize = 5 * 1024 * 1024 // 5MB

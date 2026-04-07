@@ -28,8 +28,6 @@ type ProgramCache struct {
 	types        *typeStore
 	sources      *sourceStore
 	indexes      *indexStore
-
-	instructionMetrics *instructionCacheMetrics
 }
 
 func NewDBCache(cfg *ssaconfig.Config, prog *Program, databaseKind ProgramCacheKind, fileSize int) *ProgramCache {
@@ -44,7 +42,6 @@ func NewDBCache(cfg *ssaconfig.Config, prog *Program, databaseKind ProgramCacheK
 		cache.db = ssadb.GetDB().Where("program_name = ?", programName)
 	}
 	if databaseKind != ProgramCacheMemory && instructionCacheDebugEnabled() {
-		cache.instructionMetrics = newInstructionCacheMetrics()
 		cacheTTL, cacheMax := resolveInstructionCacheSettings(cfg)
 		log.Debugf("[ssa-ir-cache] init: program=%s ttl=%s max=%d kind=%d",
 			programName, cacheTTL, cacheMax, databaseKind,
@@ -57,7 +54,7 @@ func NewDBCache(cfg *ssaconfig.Config, prog *Program, databaseKind ProgramCacheK
 	cache.sources = newSourceStore(prog, databaseKind, cache.db)
 	cache.indexes = newIndexStore(cfg, prog, databaseKind, cache.db, saveSize/2)
 	cache.types = newTypeStore(cfg, prog, databaseKind, cache.db, programName, saveSize)
-	cache.instructions = newInstructionStore(cfg, prog, databaseKind, cache.db, saveSize, cache.sources, cache.instructionMetrics)
+	cache.instructions = newInstructionStore(cfg, prog, databaseKind, cache.db, saveSize, cache.sources)
 	return cache
 }
 
@@ -194,22 +191,7 @@ func (c *ProgramCache) SaveToDatabase(cb ...func(int)) {
 		func() error {
 			if c.program != nil && c.instructions != nil {
 				stats := c.instructions.Stats()
-				log.Debugf("[ssa-ir-cache-saver] program=%s resident=%d pending=%d pending_max=%d batch_count=%d avg_batch=%.2f max_batch=%d enqueue_block_total=%s enqueue_block_max=%s save_loop_time=%s save_loop_max=%s",
-					c.program.GetProgramName(),
-					stats.ResidentCount,
-					stats.Saver.Pending,
-					stats.Saver.MaxPending,
-					stats.Saver.BatchCount,
-					stats.Saver.AvgBatchSize(),
-					stats.Saver.MaxBatchSize,
-					stats.Saver.EnqueueBlockTotal,
-					stats.Saver.MaxEnqueueBlock,
-					stats.Saver.SaveTimeTotal,
-					stats.Saver.MaxSaveTime,
-				)
-			}
-			if c.instructionMetrics != nil && c.program != nil {
-				c.instructionMetrics.Dump(c.program.GetProgramName())
+				log.Debugf("[ssa-ir-cache-saver] program=%s %s", c.program.GetProgramName(), stats.Show())
 			}
 			return nil
 		},

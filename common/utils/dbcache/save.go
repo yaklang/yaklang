@@ -2,6 +2,7 @@ package dbcache
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -46,6 +47,21 @@ func (s SaveStats) AvgBatchSize() float64 {
 		return 0
 	}
 	return float64(s.BatchItemsTotal) / float64(s.BatchCount)
+}
+
+func (s SaveStats) Show() string {
+	return fmt.Sprintf(
+		"pending=%d pending_max=%d batch_count=%d avg_batch=%.2f max_batch=%d enqueue_block_total=%s enqueue_block_max=%s save_loop_time=%s save_loop_max=%s",
+		s.Pending,
+		s.MaxPending,
+		s.BatchCount,
+		s.AvgBatchSize(),
+		s.MaxBatchSize,
+		s.EnqueueBlockTotal,
+		s.MaxEnqueueBlock,
+		s.SaveTimeTotal,
+		s.MaxSaveTime,
+	)
 }
 
 type saveMetrics struct {

@@ -18,6 +18,14 @@ type BaseInfo struct {
 	Tags               []string `json:"tags"`
 }
 
+type ASTSequenceType int
+
+const (
+	OutOfOrder ASTSequenceType = iota
+	Order
+	ReverseOrder
+)
+
 // --- 基础信息配置 Get/Set 方法 ---
 
 func (c *Config) GetProjectID() uint64 {
@@ -190,20 +198,20 @@ func WithProjectLanguage(language Language) Option {
 
 // SSACompileConfig 编译配置
 type SSACompileConfig struct {
-	StrictMode               bool          `json:"strict_mode"`
-	PeepholeSize             int           `json:"peephole_size"`
-	ExcludeFiles             []string      `json:"exclude_files"`
-	EntryFiles               []string      `json:"entry_files,omitempty"`
-	ReCompile                bool          `json:"re_compile"`
-	MemoryCompile            bool          `json:"memory_compile"`
-	Concurrency              int           `json:"compile_concurrency"`
-	ASTSequence              int           `json:"ast_sequence"`
-	CompileIrCacheTTL        time.Duration `json:"compile_ir_cache_ttl"`
-	CompileIrCacheMax        int           `json:"compile_ir_cache_max"`
-	FilePerformanceLog       bool          `json:"file_performance_log"`
-	StopOnCliCheck           bool          `json:"stop_on_cli_check"`
-	EnableIncrementalCompile bool          `json:"enable_incremental_compile"`
-	BaseProgramName          string        `json:"base_program_name"`
+	StrictMode               bool            `json:"strict_mode"`
+	PeepholeSize             int             `json:"peephole_size"`
+	ExcludeFiles             []string        `json:"exclude_files"`
+	EntryFiles               []string        `json:"entry_files,omitempty"`
+	ReCompile                bool            `json:"re_compile"`
+	MemoryCompile            bool            `json:"memory_compile"`
+	Concurrency              int             `json:"compile_concurrency"`
+	ASTSequence              ASTSequenceType `json:"ast_sequence"`
+	CompileIrCacheTTL        time.Duration   `json:"compile_ir_cache_ttl"`
+	CompileIrCacheMax        int             `json:"compile_ir_cache_max"`
+	FilePerformanceLog       bool            `json:"file_performance_log"`
+	StopOnCliCheck           bool            `json:"stop_on_cli_check"`
+	EnableIncrementalCompile bool            `json:"enable_incremental_compile"`
+	BaseProgramName          string          `json:"base_program_name"`
 	// CompileProjectBytes is runtime-only input for adaptive compile IR cache
 	// tuning. It reflects the total source bytes that will enter the compile
 	// stage and is intentionally excluded from JSON persistence.
@@ -338,14 +346,14 @@ func (c *Config) SetCompileConcurrency(concurrency int) {
 	c.SSACompile.Concurrency = concurrency
 }
 
-func (c *Config) GetCompileASTSequence() int {
+func (c *Config) GetCompileASTSequence() ASTSequenceType {
 	if c == nil || c.SSACompile == nil {
-		return 0
+		return OutOfOrder
 	}
 	return c.SSACompile.ASTSequence
 }
 
-func (c *Config) SetCompileASTSequence(sequence int) {
+func (c *Config) SetCompileASTSequence(sequence ASTSequenceType) {
 	if c == nil {
 		return
 	}
@@ -513,7 +521,7 @@ func WithCompileConcurrency(concurrency int) Option {
 	}
 }
 
-func WithCompileASTSequence(sequence int) Option {
+func WithCompileASTSequence(sequence ASTSequenceType) Option {
 	return func(c *Config) error {
 		if err := c.ensureSSACompile("Compile AST Sequence"); err != nil {
 			return err

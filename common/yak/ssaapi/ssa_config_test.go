@@ -15,7 +15,6 @@ import (
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
 )
 
 func TestDefaultProcess(t *testing.T) {
@@ -33,10 +32,10 @@ func TestDefaultConfigUsesSerializableASTOrder(t *testing.T) {
 	config, err := DefaultConfig(
 		WithFileSystem(filesys.NewLocalFs()),
 		WithLanguage(ssaconfig.JAVA),
-		WithASTOrder(ssareducer.ReverseOrder),
+		WithASTOrder(ssaconfig.ReverseOrder),
 	)
 	require.NoError(t, err)
-	require.Equal(t, int(ssareducer.ReverseOrder), config.GetCompileASTSequence())
+	require.Equal(t, ssaconfig.ReverseOrder, config.GetCompileASTSequence())
 }
 
 // TestUnifiedFsWithFileSystem 测试使用 WithFileSystem 选项时，fs 被正确转换为 UnifiedFileSys

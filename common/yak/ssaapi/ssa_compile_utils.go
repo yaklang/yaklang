@@ -158,7 +158,7 @@ func (c *Config) GetFileHandler(
 	return ssareducer.FilesHandler(
 		c.ctx, filesystem, preHandlerFiles,
 		parse, initWorker,
-		ssareducer.ASTSequenceType(c.GetCompileASTSequence()),
+		c.GetCompileASTSequence(),
 		int(c.GetCompileConcurrency()),
 	)
 }

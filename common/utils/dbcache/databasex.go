@@ -2,6 +2,7 @@ package dbcache
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -24,6 +25,10 @@ type saveTask[D any] struct {
 type CacheStats struct {
 	ResidentCount int
 	Saver         SaveStats
+}
+
+func (s CacheStats) Show() string {
+	return fmt.Sprintf("resident=%d %s", s.ResidentCount, s.Saver.Show())
 }
 
 type Cache[T MemoryItem, D any] struct {
