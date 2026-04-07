@@ -220,7 +220,7 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 				var out bytes.Buffer
 				var outputReader = io.TeeReader(strings.NewReader(deliveryFilesMarkdown), &out)
 				var event *schema.AiOutputEvent
-				event, err = r.Emitter.EmitTextMarkdownStreamEvent(
+				event, err = r.Emitter.EmitDefaultStreamEvent(
 					"delivery_files_snapshot",
 					outputReader,
 					taskID,

@@ -69,6 +69,10 @@ func saveNodeIdI18nToDB(nodeId string, i18n *I18n) {
 }
 
 var nodeIdMapper = map[string]*I18n{
+	"task-dependency": {
+		Zh: "任务依赖",
+		En: "Task Dependency",
+	},
 	"directly_call_tool_params": {
 		Zh: "快速工具调用",
 		En: "Direct Tool Call",

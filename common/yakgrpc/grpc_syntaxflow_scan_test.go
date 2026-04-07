@@ -199,6 +199,7 @@ type GRPCCancelScanTestConfig struct {
 	CancelAtProcess       float64            // 在哪个进度时取消（0.5 表示50%时取消）
 	ExpectedHasProcess    bool               // 是否预期有进度更新
 	ExpectedFinishProcess float64            // 预期的完成进度（应该小于1.0）
+	Concurrency           uint32             // 扫描并发度（0 表示使用默认值）
 	Language              ssaconfig.Language // 编译语言
 	ProgramFileSystem     map[string]string  // 程序文件系统
 }
@@ -221,7 +222,7 @@ func checkGRPCCancelScanTest(t *testing.T, client ypb.YakClient, config GRPCCanc
 
 	// 启动扫描
 	log.Infof("[checkGRPCCancelScanTest] Step 2: Starting scan")
-	id, stream := startScan(client, t, progID, ctx)
+	id, stream := startScanWithConcurrency(client, t, progID, ctx, config.Concurrency)
 	log.Infof("[checkGRPCCancelScanTest] Step 2: Scan started, task ID: %s", id)
 
 	// 检查扫描消息并在指定进度取消
@@ -348,6 +349,10 @@ func checkSfScanRecvMsg(t *testing.T, stream ypb.Yak_SyntaxFlowScanClient, handl
 }
 
 func startScan(client ypb.YakClient, t *testing.T, progID string, ctx context.Context, filters ...*ypb.SyntaxFlowRuleFilter) (string, ypb.Yak_SyntaxFlowScanClient) {
+	return startScanWithConcurrency(client, t, progID, ctx, 0, filters...)
+}
+
+func startScanWithConcurrency(client ypb.YakClient, t *testing.T, progID string, ctx context.Context, concurrency uint32, filters ...*ypb.SyntaxFlowRuleFilter) (string, ypb.Yak_SyntaxFlowScanClient) {
 	filter := &ypb.SyntaxFlowRuleFilter{}
 	if len(filters) > 0 {
 		filter = filters[0]
@@ -358,6 +363,7 @@ func startScan(client ypb.YakClient, t *testing.T, progID string, ctx context.Co
 	stream.Send(&ypb.SyntaxFlowScanRequest{
 		ControlMode: "start",
 		Filter:      filter,
+		Concurrency: concurrency,
 		ProgramName: []string{
 			progID,
 		},
@@ -403,6 +409,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Scan_Cancel(t *testing.T) {
 		CancelAtProcess:       0.5,
 		ExpectedHasProcess:    true,
 		ExpectedFinishProcess: 1.0,
+		Concurrency:           1,
 		Language:              ssaconfig.JAVA,
 	}
 
@@ -418,7 +425,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Scan_Cancel_Multiple(t *testing.T) {
 	defer f()
 
 	ctx, cancel := context.WithCancel(context.Background())
-	id1, stream1 := startScan(client, t, progID, ctx)
+	id1, stream1 := startScanWithConcurrency(client, t, progID, ctx, 1)
 	id2, stream2 := startScan(client, t, progID, context.Background())
 	_ = id1
 	_ = id2
