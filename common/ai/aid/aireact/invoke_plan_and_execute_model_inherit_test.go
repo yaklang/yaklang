@@ -116,7 +116,7 @@ func TestReAct_RequestPlanAndExecution_PreservesQualityModelInsideAid(t *testing
 
 	_, err = NewTestReAct(
 		aicommon.WithAICallback(fastCallback),
-		aicommon.WithQualityPriorityAICallback(qualityCallback),
+		aicommon.WithAutoTieredAICallback(qualityCallback),
 		aicommon.WithEventInputChan(in),
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
 			out <- e
@@ -133,14 +133,14 @@ func TestReAct_RequestPlanAndExecution_PreservesQualityModelInsideAid(t *testing
 	}
 
 	var (
-		mu                        sync.Mutex
-		modelsBeforePlanStart     []string
-		modelsAfterPlanStart      []string
-		planStarted               bool
-		reactTaskCompleted        bool
-		sawQualityBeforePlan      bool
-		sawQualityAfterPlanStart  bool
-		sawFastAfterPlanStarted   bool
+		mu                       sync.Mutex
+		modelsBeforePlanStart    []string
+		modelsAfterPlanStart     []string
+		planStarted              bool
+		reactTaskCompleted       bool
+		sawQualityBeforePlan     bool
+		sawQualityAfterPlanStart bool
+		sawFastAfterPlanStarted  bool
 	)
 
 	timeout := time.After(20 * time.Second)
