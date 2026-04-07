@@ -83,8 +83,8 @@ func (c *Compiler) newRuntimeMethodDispatchSpec(inst *ssa.Call, fn *ssa.Function
 		return contextCallSpec{}, false, nil
 	}
 
-	obj := mc.GetObject()
-	key := mc.GetKey()
+	obj := ssa.GetLatestObject(calleeVal)
+	key := ssa.GetLatestKey(calleeVal)
 	if obj == nil || key == nil {
 		return contextCallSpec{}, false, nil
 	}

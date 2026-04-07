@@ -1277,7 +1277,7 @@ func (b *singleFileBuilder) extractAssignTargetFromExpr(raw pythonparser.IExprCo
 			}
 		}
 		if obj.GetType() != nil && obj.GetType().GetTypeKind() == ssa.ClassBluePrintTypeKind {
-			if blueprint, ok := ssa.ToClassBluePrintType(obj.GetType()); ok && !b.hasBlueprintMemberOrMethod(blueprint, attrName) {
+			if blueprint, ok := ssa.ToBluePrintType(obj.GetType()); ok && !b.hasBlueprintMemberOrMethod(blueprint, attrName) {
 				return assignTarget{varName: syntheticName}
 			}
 		}

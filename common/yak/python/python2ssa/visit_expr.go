@@ -854,7 +854,7 @@ func (b *singleFileBuilder) VisitName(raw *pythonparser.NameContext) interface{}
 		return importValue
 	}
 	if importType, ok := b.GetProgram().ReadImportType(name); ok {
-		if blueprint, ok := ssa.ToClassBluePrintType(importType); ok {
+		if blueprint, ok := ssa.ToBluePrintType(importType); ok {
 			return blueprint.Container()
 		}
 	}
@@ -1124,7 +1124,7 @@ func (b *singleFileBuilder) VisitTrailer(raw *pythonparser.TrailerContext, obj s
 			if arguments := raw.Arguments(); arguments != nil {
 				if argCtx, ok := arguments.(*pythonparser.ArgumentsContext); ok {
 					if obj.GetType() != nil && obj.GetType().GetTypeKind() == ssa.ClassBluePrintTypeKind {
-						if blueprint, ok := ssa.ToClassBluePrintType(obj.GetType()); ok && !b.hasBlueprintMemberOrMethod(blueprint, attrName) {
+						if blueprint, ok := ssa.ToBluePrintType(obj.GetType()); ok && !b.hasBlueprintMemberOrMethod(blueprint, attrName) {
 							return b.VisitArguments(argCtx, b.newDynamicPlaceholder(syntheticName))
 						}
 						b.ensureBlueprintCallableMember(obj, attrName)
@@ -1141,7 +1141,7 @@ func (b *singleFileBuilder) VisitTrailer(raw *pythonparser.TrailerContext, obj s
 				}
 			}
 			if obj.GetType() != nil && obj.GetType().GetTypeKind() == ssa.ClassBluePrintTypeKind {
-				if blueprint, ok := ssa.ToClassBluePrintType(obj.GetType()); ok && !b.hasBlueprintMemberOrMethod(blueprint, attrName) {
+				if blueprint, ok := ssa.ToBluePrintType(obj.GetType()); ok && !b.hasBlueprintMemberOrMethod(blueprint, attrName) {
 					return b.newDynamicPlaceholder(syntheticName)
 				}
 				b.ensureBlueprintMember(obj, attrName)

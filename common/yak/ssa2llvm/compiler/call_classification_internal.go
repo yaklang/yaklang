@@ -122,8 +122,8 @@ func resolveSSAValueName(fn *ssa.Function, val ssa.Value) string {
 		}
 	}
 	if mc, ok := val.(ssa.MemberCall); ok && mc.IsMember() {
-		objName := resolveSSAMemberObjectName(fn, mc.GetObject())
-		keyName := resolveSSAMemberKeyString(mc.GetKey())
+		objName := resolveSSAMemberObjectName(fn, ssa.GetLatestObject(val))
+		keyName := resolveSSAMemberKeyString(ssa.GetLatestKey(val))
 		switch {
 		case objName != "" && keyName != "":
 			return objName + "." + keyName

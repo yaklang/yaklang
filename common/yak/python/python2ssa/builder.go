@@ -376,19 +376,27 @@ func (b *singleFileBuilder) preRegisterInheritedBlueprintMembers(child, parent *
 		return
 	}
 	for name, value := range parent.NormalMember {
-		if name == "" || value == nil || shouldSkipInheritedBlueprintMember(parent, name) {
+		if name == "" || len(value) == 0 || shouldSkipInheritedBlueprintMember(parent, name) {
 			continue
 		}
 		if _, exists := child.NormalMember[name]; !exists {
-			child.RegisterNormalMember(name, value, false)
+			for _, member := range value {
+				if member != nil {
+					child.RegisterNormalMember(name, member, false)
+				}
+			}
 		}
 	}
 	for name, value := range parent.StaticMember {
-		if name == "" || value == nil || shouldSkipInheritedBlueprintMember(parent, name) {
+		if name == "" || len(value) == 0 || shouldSkipInheritedBlueprintMember(parent, name) {
 			continue
 		}
 		if _, exists := child.StaticMember[name]; !exists {
-			child.RegisterStaticMember(name, value, false)
+			for _, member := range value {
+				if member != nil {
+					child.RegisterStaticMember(name, member, false)
+				}
+			}
 		}
 	}
 	for name, fn := range parent.NormalMethod {
@@ -502,7 +510,7 @@ func (b *singleFileBuilder) ensureBlueprintMember(obj ssa.Value, name string) {
 	if obj == nil || name == "" || obj.GetType() == nil {
 		return
 	}
-	blueprint, ok := ssa.ToClassBluePrintType(obj.GetType())
+	blueprint, ok := ssa.ToBluePrintType(obj.GetType())
 	if !ok || blueprint == nil {
 		return
 	}
@@ -516,7 +524,7 @@ func (b *singleFileBuilder) ensureBlueprintCallableMember(obj ssa.Value, name st
 	if obj == nil || name == "" || obj.GetType() == nil {
 		return
 	}
-	blueprint, ok := ssa.ToClassBluePrintType(obj.GetType())
+	blueprint, ok := ssa.ToBluePrintType(obj.GetType())
 	if !ok || blueprint == nil {
 		return
 	}
