@@ -46,7 +46,7 @@ func TestConfigWithOptions(t *testing.T) {
 		WithCompileReCompile(true),
 		WithCompileMemoryCompile(true),
 		WithCompileConcurrency(17),
-		WithCompileASTSequence(2),
+		WithCompileASTSequence(ReverseOrder),
 		WithCodeSourceKind(CodeSourceGit),
 		WithCodeSourceLocalFile("/tmp/yak"),
 		WithCodeSourceURL("https://example.com/yak.git"),
@@ -81,7 +81,7 @@ func TestConfigWithOptions(t *testing.T) {
 	require.True(t, cfg.GetCompileReCompile())
 	require.True(t, cfg.GetCompileMemory())
 	require.Equal(t, int(17), cfg.GetCompileConcurrency())
-	require.Equal(t, 2, cfg.GetCompileASTSequence())
+	require.Equal(t, ReverseOrder, cfg.GetCompileASTSequence())
 
 	require.Equal(t, CodeSourceGit, cfg.GetCodeSourceKind())
 	require.Equal(t, "/tmp/yak", cfg.GetCodeSourceLocalFile())
@@ -116,7 +116,7 @@ func TestCompileASTSequenceJSONRoundTrip(t *testing.T) {
 	cfg, err := New(
 		ModeAll,
 		WithProjectLanguage(JAVA),
-		WithCompileASTSequence(1),
+		WithCompileASTSequence(Order),
 	)
 	require.NoError(t, err)
 
@@ -125,7 +125,7 @@ func TestCompileASTSequenceJSONRoundTrip(t *testing.T) {
 
 	cloned, err := NewCLIScanConfig(WithJsonRawConfig(raw))
 	require.NoError(t, err)
-	require.Equal(t, 1, cloned.GetCompileASTSequence())
+	require.Equal(t, Order, cloned.GetCompileASTSequence())
 }
 
 func TestWithScanRaw(t *testing.T) {

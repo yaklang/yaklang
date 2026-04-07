@@ -1,10 +1,10 @@
+yakit.AutoInitYakit()
+
 configJSON := cli.Text("config", cli.setRequired(true), cli.setVerboseName("SSA 配置"), cli.setHelp("SSA 项目的配置 JSON 字符串"))
 programNameFromParam := cli.Text("program_name", cli.setVerboseName("程序名称（可选）"), cli.setHelp("显式指定程序名称；不填则自动生成时间戳程序名"))
 disableTimestampProgramName := cli.Bool("disable_timestamp_program_name", cli.setVerboseName("禁用程序名称时间戳（可选）"), cli.setHelp("默认 false；为 true 时不附加时间戳"))
 
 cli.check()
-
-yakit.AutoInitYakit()
 
 yakit.Info("开始编译 SSA 项目")
 

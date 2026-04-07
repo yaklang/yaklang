@@ -19,7 +19,6 @@ type instructionStore struct {
 	program *Program
 	db      *gorm.DB
 	sources *sourceStore
-	metrics *instructionCacheMetrics
 
 	nextID *atomic.Int64
 
@@ -49,7 +48,6 @@ func newInstructionStore(
 	db *gorm.DB,
 	saveSize int,
 	sources *sourceStore,
-	metrics *instructionCacheMetrics,
 ) *instructionStore {
 	cfg = ensureProgramConfig(cfg)
 	saveSize = min(max(saveSize, defaultSaveSize), maxSaveSize)
@@ -59,7 +57,6 @@ func newInstructionStore(
 		program:    prog,
 		db:         db,
 		sources:    sources,
-		metrics:    metrics,
 		nextID:     atomic.NewInt64(0),
 		progressFn: func(int) {},
 	}
@@ -349,9 +346,6 @@ func (s *instructionStore) loadInstruction(id int64) (Instruction, error) {
 	if err != nil {
 		return nil, err
 	}
-	if s.metrics != nil {
-		s.metrics.RecordReload(inst.GetOpcode(), time.Since(start))
-	}
 	if instructionCacheEventDebugEnabled() {
 		log.Debugf("[ssa-ir-cache] reload: program=%s id=%d opcode=%s cost=%s",
 			s.program.GetProgramName(), id, inst.GetOpcode().String(), time.Since(start),
@@ -385,9 +379,6 @@ func (s *instructionStore) marshalInstructionRecord(inst Instruction, reason uti
 				inst.GetOpcode().String(),
 				evictionReasonName(reason),
 			)
-		}
-		if s.metrics != nil {
-			s.metrics.RecordEvict(reason, inst.GetOpcode())
 		}
 		return nil, nil
 	}
@@ -462,20 +453,10 @@ func (s *instructionStore) saveInstructionPersistRecords() dbcache.SaveFunc[*ins
 		}
 
 		s.notifyProgress(len(records))
-		if s.metrics != nil {
-			s.metrics.RecordSourceSave(sourceAttempts, len(sources))
-		}
+		_ = sourceAttempts
 		for _, record := range records {
 			if record == nil {
 				continue
-			}
-			if s.metrics != nil {
-				s.metrics.RecordEvict(record.Reason, record.Opcode)
-				if record.Writeback {
-					s.metrics.RecordWriteback(record.Reason, record.Opcode, perItemCost)
-				} else {
-					s.metrics.RecordSave(record.Reason, record.Opcode, perItemCost)
-				}
 			}
 			if record.Writeback {
 				if instructionCacheEventDebugEnabled() {
@@ -588,4 +569,17 @@ func instructionEditor(inst Instruction) *memedit.MemEditor {
 		}
 	}
 	return nil
+}
+
+func evictionReasonName(reason utils.EvictionReason) string {
+	switch reason {
+	case utils.EvictionReasonDeleted:
+		return "deleted"
+	case utils.EvictionReasonCapacityReached:
+		return "capacity"
+	case utils.EvictionReasonExpired:
+		return "expired"
+	default:
+		return "unknown"
+	}
 }
