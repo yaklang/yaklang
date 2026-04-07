@@ -395,8 +395,11 @@ func TestRecommendAIHealthCheckConfig_CanCorrectAPIType(t *testing.T) {
 	assert.Empty(t, recommend.GetBaseURL())
 	assert.Equal(t, server.URL+"/v1/responses", recommend.GetEndpoint())
 	assert.True(t, recommend.GetEnableEndpoint())
-	assert.Equal(t, "responses", recommend.GetAPIType())
 	assert.True(t, recommend.GetNoHttps())
+
+	verified := executeAIConfigHealthCheck(context.Background(), recommend, "ping")
+	assert.True(t, verified.GetSuccess())
+	assert.Empty(t, verified.GetErrorMessage())
 }
 
 func TestRecommendAIHealthCheckConfig_FallbackToEndpoint(t *testing.T) {
