@@ -45,7 +45,8 @@ var fuzzMethodAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 			fuzzResult := fuzzReq.FuzzMethod(methods...)
 
 			// Execute and compare
-			diffResult, verifyResult, err := executeFuzzAndCompare(loop, fuzzResult, "fuzz_method")
+			paramSummary := fmt.Sprintf("methods=%v; reason=%s", methods, reason)
+			diffResult, verifyResult, err := executeFuzzAndCompare(loop, fuzzResult, "fuzz_method", paramSummary)
 			if err != nil {
 				operator.Fail(err)
 				return

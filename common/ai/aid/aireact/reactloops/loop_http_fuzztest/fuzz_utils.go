@@ -185,7 +185,7 @@ func getFuzzRequest(loop *reactloops.ReActLoop) (*mutate.FuzzHTTPRequest, error)
 
 // executeFuzzAndCompare executes the fuzz request, keeps the full request/response archive,
 // emits compact user-visible summaries, and asks AI whether fuzzing should continue.
-func executeFuzzAndCompare(loop *reactloops.ReActLoop, fuzzResult mutate.FuzzHTTPRequestIf, actionName string) (string, *aicommon.VerifySatisfactionResult, error) {
+func executeFuzzAndCompare(loop *reactloops.ReActLoop, fuzzResult mutate.FuzzHTTPRequestIf, actionName string, paramSummary string) (string, *aicommon.VerifySatisfactionResult, error) {
 	isHttpsStr := loop.Get("is_https")
 	isHttps := isHttpsStr == "true"
 	task := loop.GetCurrentTask()
@@ -239,6 +239,8 @@ func executeFuzzAndCompare(loop *reactloops.ReActLoop, fuzzResult mutate.FuzzHTT
 	representativeRequest := ""
 	representativeResponse := ""
 	representativeHiddenIndex := ""
+	collectedPayloads := make([]string, 0)
+	representativeStatus := ""
 
 	for result := range resultCh {
 		resultCount++
@@ -255,6 +257,7 @@ func executeFuzzAndCompare(loop *reactloops.ReActLoop, fuzzResult mutate.FuzzHTT
 		responseRaw := string(result.ResponseRaw)
 		requestURL, requestStreamSummary := buildHTTPRequestStreamSummary(requestRaw, isHttps)
 		responseStreamSummary := buildHTTPResponseStreamSummary(responseRaw, requestURL)
+		collectedPayloads = append(collectedPayloads, result.Payloads...)
 
 		if streamTaskID != "" {
 			emitPacketSummary(loop, streamTaskID, actionName, resultCount, "request", requestStreamSummary)
@@ -285,6 +288,7 @@ func executeFuzzAndCompare(loop *reactloops.ReActLoop, fuzzResult mutate.FuzzHTT
 			representativeRequest = requestRaw
 			representativeResponse = responseRaw
 			representativeHiddenIndex = hiddenIndex
+			representativeStatus = getStatusFromResponse(responseRaw)
 			loop.Set("representative_request", representativeRequest)
 			loop.Set("representative_response", representativeResponse)
 			loop.Set("representative_httpflow_hidden_index", representativeHiddenIndex)
@@ -355,6 +359,15 @@ func executeFuzzAndCompare(loop *reactloops.ReActLoop, fuzzResult mutate.FuzzHTT
 		feedbackResult += "\n\n" + verificationText
 		loop.Set("verification_result", verificationText)
 	}
+
+	actionResultSummary := fmt.Sprintf("共执行 %d 次测试，保存 %d 条 HTTPFlow。代表性响应状态：%s", resultCount, savedFlowCount, strings.TrimSpace(representativeStatus))
+	if strings.TrimSpace(representativeStatus) == "" {
+		actionResultSummary = fmt.Sprintf("共执行 %d 次测试，保存 %d 条 HTTPFlow。", resultCount, savedFlowCount)
+	}
+	verificationSummary := buildLoopHTTPFuzzVerificationSummary(verifyResult)
+	actionRecord := recordLoopHTTPFuzzAction(loop, actionName, paramSummary, actionResultSummary, verificationSummary, representativeHiddenIndex, collectedPayloads)
+	actionFeedback := buildLoopHTTPFuzzActionFeedback(actionRecord)
+	feedbackResult = actionFeedback + "\n\n" + feedbackResult
 
 	loop.Set("diff_result", feedbackResult)
 	persistLoopHTTPFuzzSessionContext(loop, actionName)
@@ -488,6 +501,7 @@ func buildFuzzTimelineSummary(summary string) string {
 }
 
 func applyFuzzVerificationOutcome(loop *reactloops.ReActLoop, operator *reactloops.LoopActionHandlerOperator, diffResult string, verifyResult *aicommon.VerifySatisfactionResult) {
+	markLoopHTTPFuzzLastAction(loop, getLoopHTTPFuzzLastAction(loop))
 	if verifyResult == nil {
 		operator.Feedback(diffResult)
 		return
@@ -507,6 +521,20 @@ func applyFuzzVerificationOutcome(loop *reactloops.ReActLoop, operator *reactloo
 
 	operator.Feedback(diffResult)
 	operator.Continue()
+}
+
+func buildLoopHTTPFuzzVerificationSummary(verifyResult *aicommon.VerifySatisfactionResult) string {
+	if verifyResult == nil {
+		return ""
+	}
+	state := "未达到当前目标"
+	if verifyResult.Satisfied {
+		state = "已达到当前目标"
+	}
+	if strings.TrimSpace(verifyResult.Reasoning) == "" {
+		return state
+	}
+	return fmt.Sprintf("%s；%s", state, strings.TrimSpace(verifyResult.Reasoning))
 }
 
 // compareRequests compares two HTTP requests and returns the differences

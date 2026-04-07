@@ -59,6 +59,13 @@ var loopActionDirectlyAnswerHTTPFuzztest = &reactloops.LoopAction{
 			return
 		}
 
+		recordLoopHTTPFuzzMetaAction(
+			loop,
+			"directly_answer",
+			"回答当前测试过程问题或总结当前阶段进展",
+			utils.ShrinkTextBlock(payload, 240),
+		)
+		markLoopHTTPFuzzDirectlyAnswered(loop)
 		persistLoopHTTPFuzzSessionContext(loop, "directly_answer")
 		invoker.EmitFileArtifactWithExt("directly_answer", ".md", payload)
 		invoker.EmitResultAfterStream(payload)

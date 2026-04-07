@@ -51,6 +51,21 @@
 <|VERIFICATION_RESULT_END_{{ .Nonce }}|>
 {{ end }}
 
+{{ if .RecentActionsSummary }}
+### Recent Action History
+<|RECENT_ACTIONS_{{ .Nonce }}|>
+{{ .RecentActionsSummary }}
+<|RECENT_ACTIONS_END_{{ .Nonce }}|>
+{{ end }}
+
+{{ if .TestedPayloadSummary }}
+### Tested Payload History
+以下 payload 已经按 action 维度测试过。规划下一步时优先避免重复，除非你有明确的新验证目的。
+<|TESTED_PAYLOADS_{{ .Nonce }}|>
+{{ .TestedPayloadSummary }}
+<|TESTED_PAYLOADS_END_{{ .Nonce }}|>
+{{ end }}
+
 {{ if .RepresentativeRequest }}
 ### Representative Packet For Follow-Up Testing
 {{ if .RepresentativeHiddenIndex }}
@@ -79,5 +94,6 @@ Based on the above context and security knowledge, decide your next vulnerabilit
 2. Should you answer a short testing-process question with directly_answer before doing more actions?
 3. Which representative packet or current effective packet should be reused or adapted next?
 4. What attack surface remains untested?
-5. How can the next step validate the suspected vulnerability safely without destructive behavior?
+5. Which payloads have already been tested for this action, and how will you avoid repeating them unless you need confirmation?
+6. How can the next step validate the suspected vulnerability safely without destructive behavior?
 

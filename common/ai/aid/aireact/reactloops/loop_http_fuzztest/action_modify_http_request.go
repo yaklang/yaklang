@@ -75,7 +75,14 @@ var modifyHTTPRequestAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActL
 					feedback += compareRequests(previousRequest, string(fixedPacket))
 					feedback += "\n审核结果："
 					feedback += buildReviewDecisionLabel(reviewDecision)
-					operator.Feedback(feedback)
+					record := recordLoopHTTPFuzzMetaAction(
+						loop,
+						"modify_http_request",
+						fmt.Sprintf("modification_target=%s; modification_reason=%s; require_manual_review=%v", modificationTarget, modificationReason, requireManualReview),
+						utils.ShrinkTextBlock(feedback, 240),
+					)
+					persistLoopHTTPFuzzSessionContext(loop, "modify_http_request_rejected")
+					operator.Feedback(buildLoopHTTPFuzzActionFeedback(record) + "\n\n" + feedback)
 					return
 				}
 			}
@@ -94,12 +101,18 @@ var modifyHTTPRequestAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActL
 			loop.Set("request_modification_reason", modificationReason)
 			loop.Set("request_review_decision", buildReviewDecisionLabel(reviewDecision))
 			loop.Set("bootstrap_source", "modify_http_request")
-			persistLoopHTTPFuzzSessionContext(loop, "modify_http_request")
 
 			feedback := buildRequestModificationFeedback([]byte(previousRequest), fixedPacket, isHTTPS, modificationReason, buildReviewDecisionLabel(reviewDecision))
+			record := recordLoopHTTPFuzzMetaAction(
+				loop,
+				"modify_http_request",
+				fmt.Sprintf("modification_target=%s; modification_reason=%s; require_manual_review=%v", modificationTarget, modificationReason, requireManualReview),
+				utils.ShrinkTextBlock(compareRequests(previousRequest, string(fixedPacket)), 240),
+			)
+			persistLoopHTTPFuzzSessionContext(loop, "modify_http_request")
 			log.Infof("modify_http_request action: target=%s, reason=%s, review=%v", modificationTarget, modificationReason, requireManualReview)
 			r.AddToTimeline("modify_http_request", fmt.Sprintf("Modified current HTTP request: %s\n%s", modificationTarget, buildFuzzTimelineSummary(feedback)))
-			operator.Feedback(feedback)
+			operator.Feedback(buildLoopHTTPFuzzActionFeedback(record) + "\n\n" + feedback)
 		},
 	)
 }

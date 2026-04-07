@@ -51,7 +51,8 @@ var fuzzHeaderAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 			fuzzResult := fuzzReq.FuzzHTTPHeader(headerName, headerValues)
 
 			// Execute and compare
-			diffResult, verifyResult, err := executeFuzzAndCompare(loop, fuzzResult, "fuzz_header")
+			paramSummary := fmt.Sprintf("header_name=%s; header_values=%v; reason=%s", headerName, headerValues, reason)
+			diffResult, verifyResult, err := executeFuzzAndCompare(loop, fuzzResult, "fuzz_header", paramSummary)
 			if err != nil {
 				operator.Fail(err)
 				return
