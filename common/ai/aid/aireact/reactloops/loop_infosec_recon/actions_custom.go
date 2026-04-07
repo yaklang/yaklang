@@ -6,9 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -19,8 +17,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// infosecRejectUnsafeArgv blocks control characters that must never appear in OS argv
-// or in values parsed from AI/tool parameters before invoking yak as a subprocess.
+// infosecRejectUnsafeArgv blocks control characters that must never appear in tool parameters.
 func infosecRejectUnsafeArgv(s string) error {
 	if strings.ContainsAny(s, "\x00\n\r") {
 		return utils.Error("argument contains NUL or newline characters")
@@ -65,20 +62,6 @@ func infosecResolveLocalPathForExec(p, baseWd string) (abs string, err error) {
 	}
 	if _, err := os.Lstat(abs); err != nil {
 		return "", utils.Errorf("path not accessible: %v", err)
-	}
-	return abs, nil
-}
-
-func infosecAbsScriptPath(script string) (string, error) {
-	if err := infosecRejectUnsafeArgv(script); err != nil {
-		return "", err
-	}
-	abs, err := filepath.Abs(script)
-	if err != nil {
-		return "", err
-	}
-	if _, err := os.Stat(abs); err != nil {
-		return "", err
 	}
 	return abs, nil
 }
@@ -183,7 +166,8 @@ func apiPoolMergeAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 			for _, f := range findings {
 				merged = append(merged, f)
 			}
-			added, mergeErrs := MergeFindings(pool, seed, merged)
+			scopeHosts := loop.Get(keyScopeHosts)
+			added, mergeErrs := MergeFindings(pool, seed, merged, scopeHosts)
 			if len(mergeErrs) > 0 {
 				log.Warnf("api_pool_merge partial errors: %v", mergeErrs)
 			}
@@ -199,58 +183,25 @@ func apiPoolMergeAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 	)
 }
 
-func resolveJsStaticScriptPath(workDir string) string {
-	if p := strings.TrimSpace(os.Getenv("YAKLANG_JS_STATIC_SCRIPT")); p != "" {
-		if _, err := os.Stat(p); err == nil {
-			return p
-		}
+func infosecInvokerContext(loop *reactloops.ReActLoop) (aicommon.AIInvokeRuntime, context.Context) {
+	invoker := loop.GetInvoker()
+	ctx := invoker.GetConfig().GetContext()
+	task := loop.GetCurrentTask()
+	if task != nil && !utils.IsNil(task.GetContext()) {
+		ctx = task.GetContext()
 	}
-	dir := workDir
-	for i := 0; i < 14 && dir != "" && dir != "/" && dir != "."; i++ {
-		cand := filepath.Join(dir, "scripts", "js-static-extract-ai")
-		if _, err := os.Stat(cand); err == nil {
-			return cand
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			break
-		}
-		dir = parent
-	}
-	return ""
-}
-
-func resolveCrawlJsCollectorScriptPath(workDir string) string {
-	if p := strings.TrimSpace(os.Getenv("YAKLANG_crawl-js-collector")); p != "" {
-		if _, err := os.Stat(p); err == nil {
-			return p
-		}
-	}
-	dir := workDir
-	for i := 0; i < 14 && dir != "" && dir != "/" && dir != "."; i++ {
-		cand := filepath.Join(dir, "scripts", "crawl-js-collector.yak")
-		if _, err := os.Stat(cand); err == nil {
-			return cand
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			break
-		}
-		dir = parent
-	}
-	return ""
+	return invoker, ctx
 }
 
 func crawlJsCollectorAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 	return reactloops.WithRegisterLoopAction(
-		"crawl-js-collector",
-		"Run crawl-js-collector: lightweight crawl from seed URL, collect and verify JS URLs, write crawl-js-collector-result.json under workdir and save downloaded scripts in a timestamped folder. "+
-			"Then run js-static-extract-ai once with paths= the absolute verified_js_dir path from that JSON. "+
-			"Requires `yak` on PATH. Set YAKLANG_crawl-js-collector to the .yak file if not found beside the repo.",
+		ToolCrawlJsCollector,
+		"Run registered tool "+ToolCrawlJsCollector+": crawl from seed URL, verify JS URLs, write crawl-js-collector-result.json under the job workdir. "+
+			"Then pass artifacts.verified_js_dir from that JSON to "+ToolJsStaticExtractAI+" (paths).",
 		[]aitool.ToolOption{
 			aitool.WithStringParam("start_url", aitool.WithParam_Description("Crawl entry URL; defaults to recon_register_seed seed_url.")),
 			aitool.WithBoolParam("deep_js", aitool.WithParam_Default(false)),
-			aitool.WithBoolParam("skip_crawl_ai", aitool.WithParam_Default(false), aitool.WithParam_Description("If true, passes --skip-ai to the collector (HTML regex only).")),
+			aitool.WithBoolParam("skip_crawl_ai", aitool.WithParam_Default(false), aitool.WithParam_Description("If true, skip AI in the collector (HTML regex only).")),
 			aitool.WithIntegerParam("max_depth", aitool.WithParam_Default(2)),
 			aitool.WithIntegerParam("urls_max", aitool.WithParam_Default(80)),
 		},
@@ -265,74 +216,43 @@ func crawlJsCollectorAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 				seed = loop.Get(keySeedURL)
 			}
 			if seed == "" {
-				op.Feedback("crawl-js-collector: set start_url or run recon_register_seed first.")
-				op.Continue()
-				return
-			}
-			yakBin, err := exec.LookPath("yak")
-			if err != nil {
-				op.Feedback("yak binary not found on PATH; cannot run crawl-js-collector.yak")
-				op.Continue()
-				return
-			}
-			if err := infosecRejectUnsafeArgv(yakBin); err != nil {
-				op.Feedback(fmt.Sprintf("invalid yak binary path: %v", err))
-				op.Continue()
-				return
-			}
-			script := resolveCrawlJsCollectorScriptPath(wd)
-			if script == "" {
-				op.Feedback("crawl-js-collector.yak not found (set YAKLANG_crawl-js-collector).")
-				op.Continue()
-				return
-			}
-			scriptAbs, err := infosecAbsScriptPath(script)
-			if err != nil {
-				op.Feedback(fmt.Sprintf("resolve crawl-js-collector script: %v", err))
+				op.Feedback(ToolCrawlJsCollector + ": set start_url or run recon_register_seed first.")
 				op.Continue()
 				return
 			}
 			if err := infosecValidateHTTPURL(seed); err != nil {
-				op.Feedback(fmt.Sprintf("crawl-js-collector: invalid start_url / seed (require http/https): %v", err))
+				op.Feedback(fmt.Sprintf("%s: invalid start_url / seed (require http/https): %v", ToolCrawlJsCollector, err))
 				op.Continue()
 				return
 			}
-			jobRoot := filepath.Join(wd, "crawl-js-collector", fmt.Sprintf("job_%d", time.Now().Unix()))
+			jobRoot := filepath.Join(wd, ToolCrawlJsCollector, fmt.Sprintf("job_%d", time.Now().Unix()))
 			if err := os.MkdirAll(jobRoot, 0755); err != nil {
 				op.Feedback(fmt.Sprintf("mkdir crawl job: %v", err))
 				op.Continue()
 				return
 			}
-			args := []string{
-				scriptAbs,
-				"--url", seed,
-				"--workdir", jobRoot,
-				"--max-depth", fmt.Sprintf("%d", action.GetInt("max_depth")),
-				"--urls-max", fmt.Sprintf("%d", action.GetInt("urls_max")),
+			params := aitool.InvokeParams{
+				"url":       seed,
+				"workdir":   jobRoot,
+				"max-depth": action.GetInt("max_depth"),
+				"urls-max":  action.GetInt("urls_max"),
 			}
 			if action.GetBool("deep_js") {
-				args = append(args, "--deep-js")
+				params["deep-js"] = true
 			}
 			if action.GetBool("skip_crawl_ai") {
-				args = append(args, "--skip-ai")
+				params["skip-ai"] = true
 			}
-			ctx := context.Background()
-			if task := loop.GetCurrentTask(); task != nil && task.GetContext() != nil {
-				ctx = task.GetContext()
-			}
-			cmd := exec.CommandContext(ctx, yakBin, args...)
-			cmd.Dir = wd
-			out, runErr := cmd.CombinedOutput()
-			outTrim := utils.ShrinkString(string(out), 4000)
+			invoker, ctx := infosecInvokerContext(loop)
+			_, _, runErr := invoker.ExecuteToolRequiredAndCallWithoutRequired(ctx, ToolCrawlJsCollector, params)
 			var b strings.Builder
 			reportPath := filepath.Join(jobRoot, "crawl-js-collector-result.json")
-			b.WriteString(fmt.Sprintf("crawl-js-collector job dir: %s\n", jobRoot))
+			b.WriteString(fmt.Sprintf("%s job dir: %s\n", ToolCrawlJsCollector, jobRoot))
 			b.WriteString(fmt.Sprintf("JSON report: %s\n", reportPath))
 			if runErr != nil {
-				log.Warnf("crawl-js-collector: %v: %s", runErr, utils.ShrinkString(string(out), 600))
-				r.AddToTimeline("crawl-js-collector_err", runErr.Error())
+				log.Warnf("%s: %v", ToolCrawlJsCollector, runErr)
+				r.AddToTimeline(ToolCrawlJsCollector+"_err", runErr.Error())
 				b.WriteString(fmt.Sprintf("ERROR: %v\n", runErr))
-				b.WriteString(outTrim)
 				op.Feedback(b.String())
 				op.Continue()
 				return
@@ -345,14 +265,13 @@ func crawlJsCollectorAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 					Verified []any `json:"verified_js_urls"`
 				}
 				if json.Unmarshal(data, &rep) == nil && rep.Artifacts != nil {
-					b.WriteString(fmt.Sprintf("Pass this directory to js-static-extract-ai paths: %s\n", rep.Artifacts.VerifiedJsDir))
+					b.WriteString(fmt.Sprintf("Pass this directory to %s paths: %s\n", ToolJsStaticExtractAI, rep.Artifacts.VerifiedJsDir))
 				}
 				b.WriteString(fmt.Sprintf("Verified JS URLs in report: %d\n", len(rep.Verified)))
 			}
-			b.WriteString(outTrim)
 			summary := b.String()
-			r.AddToTimeline("crawl-js-collector_done", utils.ShrinkString(summary, 4096))
-			appendInfosecReconLog(loop, "=== crawl-js-collector ===\n"+summary)
+			r.AddToTimeline(ToolCrawlJsCollector+"_done", utils.ShrinkString(summary, 4096))
+			appendInfosecReconLog(loop, "=== "+ToolCrawlJsCollector+" ===\n"+summary)
 			op.Feedback(summary)
 			op.Continue()
 		},
@@ -361,12 +280,11 @@ func crawlJsCollectorAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 
 func runJsStaticAnalysisAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 	return reactloops.WithRegisterLoopAction(
-		"js-static-extract-ai",
-		"Run js-static-extract-ai once per invocation: merges small JS, splits huge files, recurses directories. "+
-			"If paths contains exactly one local directory, passes --dir (all .js/.mjs/.cjs under it); otherwise passes --files as a comma-separated list (files and/or http(s) URLs). "+
-			"Set YAKLANG_JS_STATIC_SCRIPT to override script path. Requires `yak` on PATH. Default skip_phase2=true.",
+		ToolJsStaticExtractAI,
+		"Run registered tool "+ToolJsStaticExtractAI+" once: static JS API extraction; output JSON is merged into the API pool. "+
+			"If paths is exactly one local directory, passes dir=; otherwise passes files= (comma-separated). Default skip_phase2=true.",
 		[]aitool.ToolOption{
-			aitool.WithStringParam("paths", aitool.WithParam_Required(true), aitool.WithParam_Description("Comma-separated: one local directory (recursive .js/.mjs/.cjs) and/or files and/or http(s) JS URLs. After crawl-js-collector, pass artifacts.verified_js_dir from crawl-js-collector-result.json.")),
+			aitool.WithStringParam("paths", aitool.WithParam_Required(true), aitool.WithParam_Description("Comma-separated: directory and/or files and/or http(s) URLs. After "+ToolCrawlJsCollector+", use artifacts.verified_js_dir from crawl-js-collector-result.json.")),
 			aitool.WithIntegerParam("concurrent", aitool.WithParam_Default(2)),
 			aitool.WithBoolParam("skip_phase2", aitool.WithParam_Default(true)),
 		},
@@ -375,29 +293,6 @@ func runJsStaticAnalysisAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopO
 			wd := loop.Get(keyWorkDir)
 			if wd == "" {
 				wd = workDirFromInvoker(r)
-			}
-			yakBin, err := exec.LookPath("yak")
-			if err != nil {
-				op.Feedback("yak binary not found on PATH; cannot run js-static-extract-ai.yak")
-				op.Continue()
-				return
-			}
-			if err := infosecRejectUnsafeArgv(yakBin); err != nil {
-				op.Feedback(fmt.Sprintf("invalid yak binary path: %v", err))
-				op.Continue()
-				return
-			}
-			script := resolveJsStaticScriptPath(wd)
-			if script == "" {
-				op.Feedback("js-static-extract-ai.yak not found (set YAKLANG_JS_STATIC_SCRIPT or run from a repo checkout).")
-				op.Continue()
-				return
-			}
-			scriptAbs, err := infosecAbsScriptPath(script)
-			if err != nil {
-				op.Feedback(fmt.Sprintf("resolve js-static-extract-ai script: %v", err))
-				op.Continue()
-				return
 			}
 			pathsStr := action.GetString("paths")
 			parts := strings.Split(pathsStr, ",")
@@ -440,6 +335,7 @@ func runJsStaticAnalysisAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopO
 			}
 			skipP2 := action.GetBool("skip_phase2", true)
 			seed := loop.Get(keySeedURL)
+			scopeHosts := loop.Get(keyScopeHosts)
 			pool, lerr := LoadAPIPool(wd)
 			if lerr != nil {
 				op.Feedback(fmt.Sprintf("load pool: %v", lerr))
@@ -447,32 +343,30 @@ func runJsStaticAnalysisAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopO
 				return
 			}
 			outPath := filepath.Join(wd, fmt.Sprintf("js_static_report_%d.json", time.Now().UnixNano()))
-			var args []string
-			if len(paths) == 1 && utils.IsDir(paths[0]) {
-				args = []string{scriptAbs, "--dir", paths[0], "--output", outPath, "--concurrent", strconv.Itoa(conc)}
-			} else {
-				args = []string{scriptAbs, "--files", strings.Join(paths, ","), "--output", outPath, "--concurrent", strconv.Itoa(conc)}
+			params := aitool.InvokeParams{
+				"output":     outPath,
+				"concurrent": conc,
 			}
 			if skipP2 {
-				args = append(args, "--skip-phase2")
+				params["skip-phase2"] = true
 			}
-			ctx := context.Background()
-			if task := loop.GetCurrentTask(); task != nil && task.GetContext() != nil {
-				ctx = task.GetContext()
+			if len(paths) == 1 && utils.IsDir(paths[0]) {
+				params["dir"] = paths[0]
+			} else {
+				params["files"] = strings.Join(paths, ",")
 			}
-			cmd := exec.CommandContext(ctx, yakBin, args...)
-			cmd.Dir = wd
-			out, err := cmd.CombinedOutput()
+			invoker, ctx := infosecInvokerContext(loop)
+			_, _, err := invoker.ExecuteToolRequiredAndCallWithoutRequired(ctx, ToolJsStaticExtractAI, params)
 			totalAdded := 0
 			if err != nil {
-				log.Warnf("js-static-extract-ai: %v: %s", err, utils.ShrinkString(string(out), 800))
-				r.AddToTimeline("js-static-extract-ai_err", fmt.Sprintf("%v", err))
-				op.Feedback(fmt.Sprintf("js-static-extract-ai failed: %v\n%s", err, utils.ShrinkString(string(out), 2000)))
+				log.Warnf("%s: %v", ToolJsStaticExtractAI, err)
+				r.AddToTimeline(ToolJsStaticExtractAI+"_err", fmt.Sprintf("%v", err))
+				op.Feedback(fmt.Sprintf("%s failed: %v", ToolJsStaticExtractAI, err))
 			} else {
 				data, rerr := os.ReadFile(outPath)
 				if rerr != nil {
-					r.AddToTimeline("js-static-extract-ai_read", rerr.Error())
-					op.Feedback(fmt.Sprintf("js-static output read failed: %v", rerr))
+					r.AddToTimeline(ToolJsStaticExtractAI+"_read", rerr.Error())
+					op.Feedback(fmt.Sprintf("js static output read failed: %v", rerr))
 				} else {
 					extracted := ExtractFromJSReport(data)
 					var merged []struct {
@@ -490,7 +384,7 @@ func runJsStaticAnalysisAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopO
 						}{URL: e.URL, Method: e.Method, Source: e.Source + ":" + tag, Evidence: e.Evidence, Confidence: e.Confidence})
 					}
 					var add int
-					add, _ = MergeFindings(pool, seed, merged)
+					add, _ = MergeFindings(pool, seed, merged, scopeHosts)
 					totalAdded = add
 				}
 			}
@@ -499,9 +393,9 @@ func runJsStaticAnalysisAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopO
 				op.Continue()
 				return
 			}
-			r.AddToTimeline("js-static-extract-ai_done", fmt.Sprintf("added %d from js static", totalAdded))
+			r.AddToTimeline(ToolJsStaticExtractAI+"_done", fmt.Sprintf("added %d from js static", totalAdded))
 			op.Feedback(fmt.Sprintf("JS static pass done: +%d pool entries (total %d).", totalAdded, len(pool.Entries)))
-			op.Feedback("[Next] js-static-extract-ai 已完成。请根据 Reactive Data 中的 API 池摘要（总量、按 source 分布）、ReconLog 与本轮反馈，简要解读新增的接口线索与来源，并决定下一步（例如 probe_api_candidates、继续爬取或合并发现）；勿对已成功分析的 paths 无意义重复调用。")
+			op.Feedback("[Next] " + ToolJsStaticExtractAI + " 已完成。请根据 API 池摘要、ReconLog 与本轮反馈决定下一步（如 probe_api_candidates）；勿对已成功分析的 paths 无意义重复调用。")
 			op.Continue()
 		},
 	)
@@ -542,7 +436,8 @@ func probeAPICandidatesAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOp
 				op.Continue()
 				return
 			}
-			n := ProbePoolHTTP(pool, limit, conc, useHead, to)
+			allowed := ParseScopeHostSet(loop.Get(keyScopeHosts))
+			n := ProbePoolHTTP(pool, limit, conc, useHead, to, allowed)
 			if err := SaveAPIPool(wd, pool); err != nil {
 				op.Feedback(fmt.Sprintf("save pool: %v", err))
 				op.Continue()

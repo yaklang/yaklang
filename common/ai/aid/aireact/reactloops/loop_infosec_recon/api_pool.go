@@ -2,6 +2,7 @@ package loop_infosec_recon
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"os"
@@ -106,16 +107,45 @@ func SaveAPIPool(workDir string, p *APIPool) error {
 	return os.WriteFile(path, data, 0644)
 }
 
+// ParseScopeHostSet parses comma-separated hostnames (lowercase) for authorized-scope checks.
+func ParseScopeHostSet(scopeCSV string) map[string]bool {
+	m := make(map[string]bool)
+	for _, p := range strings.Split(scopeCSV, ",") {
+		h := strings.ToLower(strings.TrimSpace(p))
+		if h != "" {
+			m[h] = true
+		}
+	}
+	return m
+}
+
+func entryHostInScope(normalizedURL string, allowed map[string]bool) bool {
+	if len(allowed) == 0 {
+		return true
+	}
+	u, err := url.Parse(normalizedURL)
+	if err != nil {
+		return false
+	}
+	h := strings.ToLower(u.Hostname())
+	return allowed[h]
+}
+
 // MergeFindings merges new rows into an in-memory pool (dedupe by method+normalized URL).
+// If scopeHostsCSV is non-empty, entries whose host is not in the set are skipped.
 func MergeFindings(p *APIPool, seedURL string, findings []struct {
 	URL        string
 	Method     string
 	Source     string
 	Evidence   string
 	Confidence float64
-}) (added int, errs []string) {
+}, scopeHostsCSV ...string) (added int, errs []string) {
 	if p == nil {
 		return 0, []string{"nil pool"}
+	}
+	var allowed map[string]bool
+	if len(scopeHostsCSV) > 0 && strings.TrimSpace(scopeHostsCSV[0]) != "" {
+		allowed = ParseScopeHostSet(scopeHostsCSV[0])
 	}
 	seen := make(map[string]struct{}, len(p.Entries))
 	for _, e := range p.Entries {
@@ -125,6 +155,9 @@ func MergeFindings(p *APIPool, seedURL string, findings []struct {
 		norm, err := NormalizeURL(f.URL, seedURL)
 		if err != nil {
 			errs = append(errs, err.Error())
+			continue
+		}
+		if !entryHostInScope(norm, allowed) {
 			continue
 		}
 		m := strings.TrimSpace(f.Method)
@@ -167,7 +200,8 @@ func PoolStats(p *APIPool) (total, verified, unverified int, bySource map[string
 }
 
 // ProbePoolHTTP issues HEAD or GET for unverified entries (limited).
-func ProbePoolHTTP(p *APIPool, limit, concurrency int, useHead bool, timeout time.Duration) int {
+// If allowedHosts is non-empty, only entries whose URL host is in the set are probed.
+func ProbePoolHTTP(p *APIPool, limit, concurrency int, useHead bool, timeout time.Duration, allowedHosts map[string]bool) int {
 	if p == nil || limit <= 0 {
 		return 0
 	}
@@ -178,6 +212,9 @@ func ProbePoolHTTP(p *APIPool, limit, concurrency int, useHead bool, timeout tim
 			continue
 		}
 		if !strings.HasPrefix(strings.ToLower(p.Entries[i].NormalizedURL), "http") {
+			continue
+		}
+		if !entryHostInScope(p.Entries[i].NormalizedURL, allowedHosts) {
 			continue
 		}
 		targets = append(targets, &p.Entries[i])
@@ -215,15 +252,24 @@ func ProbePoolHTTP(p *APIPool, limit, concurrency int, useHead bool, timeout tim
 			}
 			_ = resp.Body.Close()
 			e.StatusCode = resp.StatusCode
-			e.Verified = resp.StatusCode > 0
-			e.ProbeError = ""
+			if resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusBadRequest {
+				e.Verified = true
+				e.ProbeError = ""
+			} else {
+				e.Verified = false
+				if resp.Status != "" {
+					e.ProbeError = resp.Status
+				} else {
+					e.ProbeError = fmt.Sprintf("HTTP %d", resp.StatusCode)
+				}
+			}
 		}()
 	}
 	wg.Wait()
 	return len(targets)
 }
 
-// ExtractFromJSReport parses js-static-extract-ai.yak final_report.json for API rows.
+// ExtractFromJSReport parses js_static_extract_ai tool final_report.json for API rows.
 func ExtractFromJSReport(data []byte) []struct {
 	URL, Method, Evidence, Source string
 	Confidence                    float64

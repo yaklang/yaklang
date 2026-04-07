@@ -7,12 +7,12 @@
 **主线有三步，顺序固定、缺一不可**：完成授权范围内的 recon 时，**必须**依次做到 **JS 获取 → JS 分析 → 报告输出**。不得在未获取/未分析 JS 的情况下用猜测或纯页面阅读代替接口发现，也不得在仅跑完前两步后省略最终总结。
 
 1. **JS 获取（第一步）**  
-   - **工具**：`crawl-js-collector`（注册种子后的**默认首选**；它会自行抓页与发现 JS，**不要**把「先 `simple_crawler` 再拉 JS」当作默认顺序）。  
-   - **产出**：从反馈或 **`crawl-js-collector-result.json`** 读取 **`artifacts.verified_js_dir`**（本机绝对路径），作为下一步唯一可信的 JS 工件来源。  
-   - 若用户已提供**可直接分析的本地 JS 目录或多条 URL**，可在一轮中合并进 **`js-static-extract-ai` 的 `paths`**，但仍须**真实完成一次「拉到可分析工件」**（禁止凭空手搓路径跳过采集）。
+   - **工具**：`crawl_js_collector`（注册种子后的**默认首选**；它会自行抓页与发现 JS，**不要**把「先 `simple_crawler` 再拉 JS」当作默认顺序）。  
+   - **产出**：从反馈或 **`crawl-js-collector-result.json`**（工作目录下结果文件名固定）读取 **`artifacts.verified_js_dir`**（本机绝对路径），作为下一步唯一可信的 JS 工件来源。  
+   - 若用户已提供**可直接分析的本地 JS 目录或多条 URL**，可在一轮中合并进 **`js_static_extract_ai` 的 `paths`**，但仍须**真实完成一次「拉到可分析工件」**（禁止凭空手搓路径跳过采集）。
 
 2. **JS 分析（第二步，且必须在第 1 步完成之后）**  
-   - **工具**：**`js-static-extract-ai`**，`paths`（或等价参数）指向上一步的 **`verified_js_dir`** 或已验证条目；**在未拿到第 1 步结果前不得调用**。  
+   - **工具**：**`js_static_extract_ai`**，`paths`（或等价参数）指向上一步的 **`verified_js_dir`** 或已验证条目；**在未拿到第 1 步结果前不得调用**。  
    - 混淆/打包源码**必须**交给该工具；禁止用 `read_file` 自行解析 JS 路由。  
    - 合并进池、探活等见下文「辅助步骤」，**不能代替**本步。
 
@@ -25,7 +25,7 @@
 
 ### 工具耗时与等待（重要）
 
-- **执行时间**：许多工具（尤其 `crawl-js-collector`、`js-static-extract-ai`、带 AI 的爬测与探活）可能 **持续数分钟到数十分钟**，属正常现象。
+- **执行时间**：许多工具（尤其 `crawl_js_collector`、`js_static_extract_ai`、带 AI 的爬测与探活）可能 **持续数分钟到数十分钟**，属正常现象。
 - **不要因「长时间无输出」而判定失败或重复调用**：应 **等待当前工具彻底结束**（本轮 action 返回反馈）后，再根据结果决定下一步。
 - **宿主行为**：专注模式下工具调用使用 **无任务级截止** 的上下文，**不会因会话 task 的超时而中途取消工具**；你必须保持耐心直到流程走完。
 - **例外**：单条 HTTP 探针类操作仍可能带有「单次请求」超时（如 `probe_api_candidates` 的 `timeout_seconds`），那是**单次网络 IO**，与「整轮工具运行多久」不同。
@@ -35,15 +35,15 @@
 - **注册与范围**：**`recon_register_seed`** — `seed_url`，可选 `scope_hosts`、爬深、探活并发等。
 - **聚合写入池**：**`api_pool_merge`** — `findings_json` 为 JSON 数组，每项含 `url`、`method`（可省略，默认 GET）、`source`、`evidence`。可在 JS 链路产出后与其它发现合并。
 - **被动 / 网络（按需）**：`web_search`、`dig`、`subdomain_scan`、`network_space_search`（需密钥）、`scan_port`、`banner_grab`。通常**不妨碍**在注册后优先执行 **JS 获取**。
-- **探活**：**`probe_api_candidates`** — 对池中未验证的 `http(s)` URL 限额并发 HEAD/GET；**放在 JS 分析之后、最终报告之前或报告中体现结果**即可。
+- **探活**：**`probe_api_candidates`** — 对池中未验证的 `http(s)` URL 限额并发 HEAD/GET；尊重 `scope_hosts`；**放在 JS 分析之后、最终报告之前或报告中体现结果**即可。
 - **Web 面补充（可选）**：仅当需要**与 JS 主链路无关**的页面/文档线索时，再考虑 `simple_crawler`、`url_content_summary`、`do_http_request`；**不要**把它当作注册种子后的默认第二步（默认第二步是 **JS 获取**）。
 
-### `crawl-js-collector` 细节
+### `crawl_js_collector` 细节
 
 - 宿主实现为**效果优先**：固定开启 **deep-js**（站内 JS 内再挖脚本）、**不**对爬虫关 AI（等价始终要跑 HTML 分块 AI 提取）；模型侧**无**关闭这些能力的参数。
-- 该工具在工作目录写入 **`crawl-js-collector-result.json`**，并把**已验证的脚本正文**保存到带时间戳的子目录；**`artifacts.verified_js_dir`** 供 **`js-static-extract-ai`** 使用。
+- 该工具在工作目录写入 **`crawl-js-collector-result.json`**，并把**已验证的脚本正文**保存到带时间戳的子目录；**`artifacts.verified_js_dir`** 供 **`js_static_extract_ai`** 使用。
 
-### `js-static-extract-ai` 细节
+### `js_static_extract_ai` 细节
 
 - 宿主实现为**完整管线（含 phase2 AI 分块补漏）**，不提供关闭 phase2 的 action 参数。
 - **并发与解析调参（仅此专注模式）**：调用时**不要**自行填写 `concurrent`、`file-concurrent`、`ai-stream`、`threshold`、`context-chars`、`chunk-chars`；优先只传业务参数（如 `dir` / `paths` / `files`、`output`、`work-dir`）。若工具 schema 要求上述键不能缺省，则**仅允许**：`concurrent`=8、`file-concurrent`=4、`ai-stream`=true、`threshold`=0.72、`context-chars`=100、`chunk-chars`=3000。
@@ -55,5 +55,5 @@
 - 遵守 `scope_hosts` 与用户给定的范围；控制爬虫深度与 `probe_api_candidates` 的 `limit`。
 - 以磁盘上的 `recon_api_pool.json` 为真源，不要仅凭对话记忆维护端点列表。
 - 需要更多工具时可用 **search_capabilities** / **loading_skills** / **load_capability**。
-- **JS 禁令**：禁止自行解析 JS 源码找路由；应 **`crawl-js-collector` → `js-static-extract-ai`**（顺序见上文），或将已知 URL/路径**一次**传入 `paths`。
-- **工具与脚本**：**`crawl-js-collector`** 与 **`js-static-extract-ai`** 在本模式中与 Yakit 里注册的 **AI 工具名一致**（横杠命名）；**不要**向用户索要 `.yak` 文件路径，也不要把「执行某 .yak」当作必要步骤描述。
+- **JS 禁令**：禁止自行解析 JS 源码找路由；应 **`crawl_js_collector` → `js_static_extract_ai`**（顺序见上文），或将已知 URL/路径**一次**传入 `paths`。
+- **工具命名**：**`crawl_js_collector`** 与 **`js_static_extract_ai`** 为 Yakit profile 中注册的 **AI 工具 id**（与 Loop 动作名一致）；**不要**向用户索要 `.yak` 路径或按「执行某脚本文件」来描述步骤。

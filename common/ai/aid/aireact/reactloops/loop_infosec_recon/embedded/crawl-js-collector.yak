@@ -10,10 +10,10 @@
 //
 // 环境: AI 使用 Yakit 全局配置；可用 --ai-model / --ai-proxy 覆盖。
 
-__DESC__ = "内置工具 crawl-js-collector：从授权站点轻量爬取页面，过滤静态资源后按文本块调用 AI 提取 JavaScript URL，校验可访问性；可选 deep-js 在已验证脚本内继续发现引用。结果写入 JSON 与工作目录下已验证 JS 文件。"
-__VERBOSE_NAME__ = "crawl-js-collector（JS 资源收集）"
-__KEYWORDS__ = "recon,爬虫,javascript,静态资源,ai.FunctionCall,信息搜集,crawl-js-collector,deep-js"
-__USAGE__ = "在专注模式 infosec_recon 中通过 Loop 动作 crawl_js_collector 调用（与 js-static-extract-ai 同为工具链路，勿向模型暴露 .yak 文件路径）。需本机可用 yak 可执行文件；输出见会话 workdir 下 crawl-js-collector-result.json 与 artifacts.verified_js_dir。"
+__DESC__ = "内置工具 crawl_js_collector：从授权站点轻量爬取页面，过滤静态资源后按文本块调用 AI 提取 JavaScript URL，校验可访问性；可选 deep-js 在已验证脚本内继续发现引用。结果写入 JSON 与工作目录下已验证 JS 文件。"
+__VERBOSE_NAME__ = "crawl_js_collector"
+__KEYWORDS__ = "recon,爬虫,javascript,静态资源,ai.FunctionCall,信息搜集,crawl_js_collector,deep-js,infosec_recon"
+__USAGE__ = "在专注模式 infosec_recon 中通过已注册工具 crawl_js_collector 调用（与 js_static_extract_ai 同为工具链路）。输出见 workdir 下 crawl-js-collector-result.json 与 artifacts.verified_js_dir。"
 
 log.setLevel("warn")
 
