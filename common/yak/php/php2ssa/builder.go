@@ -199,6 +199,9 @@ func Frontend(src string, caches ...*ssa.AntlrCache) (phpparser.IHtmlDocumentCon
 	if len(caches) > 0 {
 		cache = caches[0]
 	}
+	if rewritten, ok := rewriteSingleSemicolonNamespaceUseBlock(src); ok {
+		src = rewritten
+	}
 	return antlr4util.ParseASTWithSLLFirst(
 		src,
 		phpparser.NewPHPLexer,

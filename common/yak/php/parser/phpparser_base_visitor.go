@@ -63,6 +63,14 @@ func (v *BasePHPParserVisitor) VisitNamespaceStatement(ctx *NamespaceStatementCo
 	return v.VisitChildren(ctx)
 }
 
+func (v *BasePHPParserVisitor) VisitNamespaceDeclarationBody(ctx *NamespaceDeclarationBodyContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BasePHPParserVisitor) VisitNamespaceUseDeclarations(ctx *NamespaceUseDeclarationsContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BasePHPParserVisitor) VisitFunctionDeclaration(ctx *FunctionDeclarationContext) interface{} {
 	return v.VisitChildren(ctx)
 }

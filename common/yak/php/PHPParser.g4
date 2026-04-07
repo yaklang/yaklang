@@ -118,12 +118,13 @@ namespacePath
     ;
 
 namespaceDeclaration
-    : Namespace OpenCurlyBracket useDeclaration* namespaceStatement* CloseCurlyBracket
-    | Namespace namespacePath OpenCurlyBracket useDeclaration* namespaceStatement* CloseCurlyBracket
+    : Namespace OpenCurlyBracket namespaceDeclarationBody CloseCurlyBracket
+    | Namespace namespacePath OpenCurlyBracket namespaceDeclarationBody CloseCurlyBracket
     ;
 
 namespaceDeclarationSemi
-    : Namespace namespacePath SemiColon useDeclaration* namespaceStatement*
+    : Namespace namespacePath SemiColon {p.GetTokenStream().LA(1) == PHPParserUse}? namespaceUseDeclarations namespaceStatement*
+    | Namespace namespacePath SemiColon namespaceStatement*
     ;
 
 namespaceStatement
@@ -132,6 +133,15 @@ namespaceStatement
     | globalConstantDeclaration
     | enumDeclaration
     | statement
+    ;
+
+namespaceDeclarationBody
+    : {p.GetTokenStream().LA(1) == PHPParserUse}? namespaceUseDeclarations namespaceStatement*
+    | namespaceStatement*
+    ;
+
+namespaceUseDeclarations
+    : useDeclaration ({p.GetTokenStream().LA(1) == PHPParserUse}? namespaceUseDeclarations)?
     ;
 
 functionDeclaration
