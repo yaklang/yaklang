@@ -203,6 +203,8 @@ func (s *StreamableHTTPServer) handleTransport(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
 	switch r.Method {
 	case http.MethodGet:
 		s.handleGet(w, r)

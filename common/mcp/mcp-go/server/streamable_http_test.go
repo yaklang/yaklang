@@ -65,6 +65,7 @@ func TestStreamableHTTPServerInitialize(t *testing.T) {
 		mcp.LATEST_PROTOCOL_VERSION,
 		resp.Header.Get(mcp.HeaderProtocolVersion),
 	)
+	require.Equal(t, "*", resp.Header.Get("Access-Control-Allow-Origin"))
 
 	var response map[string]interface{}
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&response))
