@@ -53,6 +53,7 @@ func TestAIGlobalConfig_GRPC_Local(t *testing.T) {
 		DisableFallback: true,
 		DefaultModelId:  "default-model",
 		GlobalWeight:    0.88,
+		AIPresetPrompt:  "respond in markdown when suitable",
 		IntelligentModels: []*ypb.AIModelConfig{
 			{
 				ModelName: "gpt-4o",
@@ -87,6 +88,7 @@ func TestAIGlobalConfig_GRPC_Local(t *testing.T) {
 	assert.True(t, got.DisableFallback)
 	assert.Equal(t, "default-model", got.DefaultModelId)
 	assert.Equal(t, 0.88, got.GlobalWeight)
+	assert.Equal(t, "respond in markdown when suitable", got.GetAIPresetPrompt())
 	require.Len(t, got.IntelligentModels, 1)
 	assert.NotNil(t, got.IntelligentModels[0].Provider)
 

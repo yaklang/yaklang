@@ -51091,13 +51091,11 @@ type MITMContentReplacer struct {
 	// 只有替换数据
 	ExtraRepeat bool `protobuf:"varint,16,opt,name=ExtraRepeat,proto3" json:"ExtraRepeat,omitempty"`
 	// 匹配掉之后直接丢包
-	Drop         bool    `protobuf:"varint,17,opt,name=Drop,proto3" json:"Drop,omitempty"`
-	EffectiveURL string  `protobuf:"bytes,18,opt,name=EffectiveURL,proto3" json:"EffectiveURL,omitempty"`
-	RegexpGroups []int64 `protobuf:"varint,19,rep,packed,name=RegexpGroups,proto3" json:"RegexpGroups,omitempty"`
-	// 规则级后缀白名单：这些后缀下规则不生效
-	ExcludeSuffix []string `protobuf:"bytes,20,rep,name=ExcludeSuffix,proto3" json:"ExcludeSuffix,omitempty"`
-	// 正则捕获组输出模板，支持 $1、\1、{1} 等格式，如 "$1个$3"
-	RegexpResultTemplate string `protobuf:"bytes,21,opt,name=RegexpResultTemplate,proto3" json:"RegexpResultTemplate,omitempty"`
+	Drop                 bool     `protobuf:"varint,17,opt,name=Drop,proto3" json:"Drop,omitempty"`
+	EffectiveURL         string   `protobuf:"bytes,18,opt,name=EffectiveURL,proto3" json:"EffectiveURL,omitempty"`
+	RegexpGroups         []int64  `protobuf:"varint,19,rep,packed,name=RegexpGroups,proto3" json:"RegexpGroups,omitempty"`
+	ExcludeSuffix        []string `protobuf:"bytes,20,rep,name=ExcludeSuffix,proto3" json:"ExcludeSuffix,omitempty"`
+	RegexpResultTemplate string   `protobuf:"bytes,21,opt,name=RegexpResultTemplate,proto3" json:"RegexpResultTemplate,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -64864,6 +64862,7 @@ type AIGlobalConfig struct {
 	IntelligentModels []*AIModelConfig       `protobuf:"bytes,6,rep,name=IntelligentModels,proto3" json:"IntelligentModels,omitempty"`
 	LightweightModels []*AIModelConfig       `protobuf:"bytes,7,rep,name=LightweightModels,proto3" json:"LightweightModels,omitempty"`
 	VisionModels      []*AIModelConfig       `protobuf:"bytes,8,rep,name=VisionModels,proto3" json:"VisionModels,omitempty"`
+	AIPresetPrompt    string                 `protobuf:"bytes,9,opt,name=AIPresetPrompt,proto3" json:"AIPresetPrompt,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -64952,6 +64951,13 @@ func (x *AIGlobalConfig) GetVisionModels() []*AIModelConfig {
 		return x.VisionModels
 	}
 	return nil
+}
+
+func (x *AIGlobalConfig) GetAIPresetPrompt() string {
+	if x != nil {
+		return x.AIPresetPrompt
+	}
+	return ""
 }
 
 // Local Model Messages
@@ -73792,7 +73798,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"ProviderId\x12<\n" +
 	"\bProvider\x18\x02 \x01(\v2 .ypb.ThirdPartyApplicationConfigR\bProvider\x12\x1c\n" +
 	"\tModelName\x18\x03 \x01(\tR\tModelName\x12-\n" +
-	"\vExtraParams\x18\x04 \x03(\v2\v.ypb.KVPairR\vExtraParams\"\x82\x03\n" +
+	"\vExtraParams\x18\x04 \x03(\v2\v.ypb.KVPairR\vExtraParams\"\xaa\x03\n" +
 	"\x0eAIGlobalConfig\x12\x18\n" +
 	"\aEnabled\x18\x01 \x01(\bR\aEnabled\x12$\n" +
 	"\rRoutingPolicy\x18\x02 \x01(\tR\rRoutingPolicy\x12(\n" +
@@ -73801,7 +73807,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\fGlobalWeight\x18\x05 \x01(\x01R\fGlobalWeight\x12@\n" +
 	"\x11IntelligentModels\x18\x06 \x03(\v2\x12.ypb.AIModelConfigR\x11IntelligentModels\x12@\n" +
 	"\x11LightweightModels\x18\a \x03(\v2\x12.ypb.AIModelConfigR\x11LightweightModels\x126\n" +
-	"\fVisionModels\x18\b \x03(\v2\x12.ypb.AIModelConfigR\fVisionModels\"D\n" +
+	"\fVisionModels\x18\b \x03(\v2\x12.ypb.AIModelConfigR\fVisionModels\x12&\n" +
+	"\x0eAIPresetPrompt\x18\t \x01(\tR\x0eAIPresetPrompt\"D\n" +
 	"\x1aIsLlamaServerReadyResponse\x12\x0e\n" +
 	"\x02Ok\x18\x01 \x01(\bR\x02Ok\x12\x16\n" +
 	"\x06Reason\x18\x02 \x01(\tR\x06Reason\"8\n" +

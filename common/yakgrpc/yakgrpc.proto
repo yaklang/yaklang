@@ -8573,6 +8573,7 @@ message AIGlobalConfig {
   repeated AIModelConfig IntelligentModels = 6;
   repeated AIModelConfig LightweightModels = 7;
   repeated AIModelConfig VisionModels = 8;
+  string AIPresetPrompt = 9;
 }
 
 // Local Model Messages
