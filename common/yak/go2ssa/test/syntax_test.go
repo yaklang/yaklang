@@ -32,6 +32,22 @@ func isGoSyntaxASTFixture(fixturePath string) bool {
 	return strings.EqualFold(filepath.Ext(fixturePath), ".go")
 }
 
+func goFixtureBuildConstraint(src string) string {
+	for _, line := range strings.Split(src, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		return trimmed
+	}
+	return ""
+}
+
+func goFixtureHasIgnoreBuildTag(src string) bool {
+	line := goFixtureBuildConstraint(src)
+	return line == "//go:build ignore"
+}
+
 func goFixtureVirtualPath(filename string) string {
 	trimmed := strings.TrimPrefix(filepath.ToSlash(filename), "code/")
 	if trimmed == "" {
@@ -98,4 +114,25 @@ func TestAllSyntaxForGo_G4(t *testing.T) {
 		return nil
 	})
 	require.NoError(t, err, "walk go syntax fixtures")
+}
+
+func TestGoSyntaxFixturesUseIgnoreBuildTags(t *testing.T) {
+	err := fs.WalkDir(codeFs, "code", func(codePath string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || !isGoSyntaxASTFixture(codePath) {
+			return nil
+		}
+
+		raw, err := codeFs.ReadFile(codePath)
+		if err != nil {
+			return fmt.Errorf("cannot found syntax fs %s: %w", codePath, err)
+		}
+		if !goFixtureHasIgnoreBuildTag(string(raw)) {
+			return fmt.Errorf("fixture %s must start with exactly //go:build ignore", codePath)
+		}
+		return nil
+	})
+	require.NoError(t, err, "all go syntax fixtures must use ignore build tags")
 }
