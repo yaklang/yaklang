@@ -165,12 +165,33 @@ func (r *runtime) NextStep() (*AiTask, bool) {
 	return task, false
 }
 
-func (r *runtime) Invoke(task *AiTask) (retErr error) {
+func (r *runtime) locateStartTaskCursor(startTaskIndex string) error {
+	startTaskIndex = strings.TrimSpace(startTaskIndex)
+	if startTaskIndex == "" {
+		r.cursor = 0
+		return nil
+	}
+	for i := 0; i < r.TaskLink.Len(); i++ {
+		task, ok := r.TaskLink.Get(i)
+		if !ok || task == nil {
+			continue
+		}
+		if task.Index == startTaskIndex {
+			r.cursor = i
+			return nil
+		}
+	}
+	return utils.Errorf("runtime: start task %q not found", startTaskIndex)
+}
+
+func (r *runtime) Invoke(task *AiTask, startTaskIndex string) (retErr error) {
 	if r.RootTask == nil {
 		r.RootTask = task
 	}
 	r.updateTaskLink()
-	r.cursor = 0
+	if err := r.locateStartTaskCursor(startTaskIndex); err != nil {
+		return err
+	}
 
 	// Calculate total tasks for progress display
 	totalTasks := r.TaskLink.Len()

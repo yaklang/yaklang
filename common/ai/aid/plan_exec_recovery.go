@@ -6,6 +6,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
@@ -22,25 +23,25 @@ type recoveredTask struct {
 	Subtasks      []*recoveredTask `json:"subtasks,omitempty"`
 }
 
-func (c *Coordinator) tryRecoverPlanAndExec() (*AiTask, *PlanAndExecProgress, bool) {
+func (c *Coordinator) tryRecoverPlanAndExec(startTaskIndex string) (*AiTask, *PlanAndExecProgress, bool, error) {
 	if c == nil {
-		return nil, nil, false
+		return nil, nil, false, nil
 	}
 	coordinatorID := c.GetRuntimeId()
 	if coordinatorID == "" {
-		return nil, nil, false
+		return nil, nil, false, nil
 	}
 	db := c.GetDB()
 	if db == nil {
-		return nil, nil, false
+		return nil, nil, false, nil
 	}
 
 	record, err := yakit.GetAISessionPlanAndExecByCoordinatorID(db, coordinatorID)
 	if err != nil || record == nil {
-		return nil, nil, false
+		return nil, nil, false, nil
 	}
 	if strings.TrimSpace(record.TaskTree) == "" {
-		return nil, nil, false
+		return nil, nil, false, nil
 	}
 
 	var progress PlanAndExecProgress
@@ -50,20 +51,23 @@ func (c *Coordinator) tryRecoverPlanAndExec() (*AiTask, *PlanAndExecProgress, bo
 		}
 	}
 	if strings.EqualFold(strings.TrimSpace(progress.Phase), "completed") {
-		return nil, &progress, false
+		return nil, &progress, false, nil
 	}
 
 	var rootRecovered recoveredTask
 	if err := json.Unmarshal([]byte(record.TaskTree), &rootRecovered); err != nil {
 		log.Warnf("recover plan-exec task tree parse failed: %v", err)
-		return nil, &progress, false
+		return nil, &progress, false, nil
 	}
 
 	root := c.buildRecoveredTaskTree(&rootRecovered, nil)
 	if root == nil {
-		return nil, &progress, false
+		return nil, &progress, false, nil
 	}
-	return root, &progress, true
+	if err := prepareRecoveryStartTask(root, startTaskIndex); err != nil {
+		return nil, &progress, true, err
+	}
+	return root, &progress, true, nil
 }
 
 func (c *Coordinator) buildRecoveredTaskTree(src *recoveredTask, parent *AiTask) *AiTask {
@@ -110,4 +114,52 @@ func (c *Coordinator) buildRecoveredTaskTree(src *recoveredTask, parent *AiTask)
 		}
 	}
 	return task
+}
+
+func prepareRecoveryStartTask(root *AiTask, startTaskIndex string) error {
+	startTaskIndex = strings.TrimSpace(startTaskIndex)
+	if root == nil || startTaskIndex == "" {
+		return nil
+	}
+	if findTaskByIndex(root, startTaskIndex) == nil {
+		return utils.Errorf("recovery start task %q not found", startTaskIndex)
+	}
+
+	taskLink := DFSOrderAiTask(root)
+	for i := 0; i < taskLink.Len(); i++ {
+		task, ok := taskLink.Get(i)
+		if !ok || task == nil {
+			continue
+		}
+		if task.Index == startTaskIndex {
+			return nil
+		}
+		if isAncestorTaskIndex(task.Index, startTaskIndex) {
+			continue
+		}
+		markTaskTreeSkippedForRecovery(task)
+	}
+	return nil
+}
+
+func isAncestorTaskIndex(ancestorIndex, taskIndex string) bool {
+	ancestorIndex = strings.TrimSpace(ancestorIndex)
+	taskIndex = strings.TrimSpace(taskIndex)
+	if ancestorIndex == "" || taskIndex == "" || ancestorIndex == taskIndex {
+		return false
+	}
+	return strings.HasPrefix(taskIndex, ancestorIndex+"-")
+}
+
+func markTaskTreeSkippedForRecovery(task *AiTask) {
+	if task == nil {
+		return
+	}
+	for _, sub := range task.Subtasks {
+		markTaskTreeSkippedForRecovery(sub)
+	}
+	if task.executed() || task.GetStatus() == aicommon.AITaskState_Skipped {
+		return
+	}
+	task.AIStatefulTaskBase.RestoreStatus(aicommon.AITaskState_Skipped)
 }

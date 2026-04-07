@@ -167,3 +167,38 @@ func TestPlanExecTaskAbortedRoundTrip(t *testing.T) {
 	require.Equal(t, aicommon.AITaskState_Aborted, recRoot.Subtasks[0].GetStatus())
 	require.Equal(t, "aborted-summary", recRoot.Subtasks[0].TaskSummary)
 }
+
+func TestPrepareRecoveryStartTask(t *testing.T) {
+	c := newTestCoordinator(t)
+
+	root := c.generateAITaskWithName("root", "root-goal")
+	sub1 := c.generateAITaskWithName("s1", "g1")
+	sub2 := c.generateAITaskWithName("s2", "g2")
+	sub2a := c.generateAITaskWithName("s2a", "g2a")
+	sub3 := c.generateAITaskWithName("s3", "g3")
+
+	sub1.ParentTask = root
+	sub2.ParentTask = root
+	sub3.ParentTask = root
+	sub2a.ParentTask = sub2
+	root.Subtasks = []*AiTask{sub1, sub2, sub3}
+	sub2.Subtasks = []*AiTask{sub2a}
+
+	root.GenerateIndex()
+
+	require.NoError(t, prepareRecoveryStartTask(root, sub2a.Index))
+	require.Equal(t, aicommon.AITaskState_Skipped, sub1.GetStatus())
+	require.NotEqual(t, aicommon.AITaskState_Skipped, sub2.GetStatus(), "ancestor task should stay resumable")
+	require.NotEqual(t, aicommon.AITaskState_Skipped, sub2a.GetStatus(), "start task should not be skipped")
+	require.NotEqual(t, aicommon.AITaskState_Skipped, sub3.GetStatus(), "tasks after start task should not be touched")
+}
+
+func TestPrepareRecoveryStartTaskNotFound(t *testing.T) {
+	c := newTestCoordinator(t)
+	root := c.generateAITaskWithName("root", "root-goal")
+	root.GenerateIndex()
+
+	err := prepareRecoveryStartTask(root, "1-99")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "not found")
+}
