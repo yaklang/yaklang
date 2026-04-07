@@ -508,6 +508,7 @@ const (
 	TypeCodeYaklang        = "code/yaklang"
 	TypeCodePython         = "code/python"
 	TypeCodeHTTPRequest    = "code/http-request"
+	TypeCodeHTTPResponse   = "code/http-response"
 )
 
 // EmitToolCallStd emits throttled stream events for tool stdout and stderr.

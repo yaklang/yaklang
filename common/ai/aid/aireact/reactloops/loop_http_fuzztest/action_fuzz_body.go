@@ -11,14 +11,21 @@ import (
 )
 
 var fuzzBodyAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
-	return reactloops.WithRegisterLoopAction(
+	return reactloops.WithRegisterLoopActionWithStreamField(
 		"fuzz_body",
 		"Fuzz HTTP request body. Use this to test POST parameters, JSON body, or raw body content for various attacks.",
 		[]aitool.ToolOption{
 			aitool.WithStringParam("body_type", aitool.WithParam_Description("Type of body fuzzing: 'raw' (replace entire body), 'post_params' (fuzz form parameters), 'json_params' (fuzz JSON fields)"), aitool.WithParam_Required(true)),
 			aitool.WithStringParam("param_name", aitool.WithParam_Description("Parameter name to fuzz (required for post_params and json_params types)")),
 			aitool.WithStringArrayParam("param_values", aitool.WithParam_Description("Values to test"), aitool.WithParam_Required(true)),
-			aitool.WithStringParam("reason", aitool.WithParam_Description("Explain why you want to test these values")),
+			aitool.WithStringParam("reason", aitool.WithParam_Description("请用中文说明为什么要测试这些 Body 值、怀疑的漏洞类型以及安全测试边界。")),
+		},
+		[]*reactloops.LoopStreamField{
+			{FieldName: "fuzz_body", AINodeId: "thought"},
+			{FieldName: "body_type", AINodeId: "thought"},
+			{FieldName: "param_name", AINodeId: "thought"},
+			{FieldName: "reason", AINodeId: "thought"},
+			{FieldName: "param_values", AINodeId: "thought"},
 		},
 		func(l *reactloops.ReActLoop, action *aicommon.Action) error {
 			bodyType := action.GetString("body_type")
@@ -70,15 +77,14 @@ var fuzzBodyAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption
 			}
 
 			// Execute and compare
-			diffResult, err := executeFuzzAndCompare(loop, fuzzResult, "fuzz_body")
+			diffResult, verifyResult, err := executeFuzzAndCompare(loop, fuzzResult, "fuzz_body")
 			if err != nil {
 				operator.Fail(err)
 				return
 			}
 
-			r.AddToTimeline("fuzz_body", fmt.Sprintf("Tested body (%s) param %s with values: %v\n%s", bodyType, paramName, paramValues, diffResult))
-			operator.Feedback(diffResult)
+			r.AddToTimeline("fuzz_body", fmt.Sprintf("Tested body (%s) param %s with values: %v\n%s", bodyType, paramName, paramValues, buildFuzzTimelineSummary(diffResult)))
+			applyFuzzVerificationOutcome(loop, operator, diffResult, verifyResult)
 		},
 	)
 }
-

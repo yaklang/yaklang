@@ -1,5 +1,10 @@
 ## Current HTTP Fuzzing Context
 
+{{ if .OriginalRequestSummary }}
+### Initial Request Summary
+{{ .OriginalRequestSummary }}
+{{ end }}
+
 <|ORIGINAL_REQUEST_{{ .Nonce }}|>
 {{ .OriginalRequest }}
 <|ORIGINAL_REQUEST_END_{{ .Nonce }}|>
@@ -11,25 +16,33 @@
 <|SECURITY_KNOWLEDGE_END_{{ .Nonce }}|>
 {{ end }}
 
-{{ if .LastRequest }}
-### Last Fuzzed Request
-<|LAST_REQUEST_{{ .Nonce }}|>
-{{ .LastRequest }}
-<|LAST_REQUEST_END_{{ .Nonce }}|>
-{{ end }}
-
-{{ if .LastResponse }}
-### Last Response
-<|LAST_RESPONSE_{{ .Nonce }}|>
-{{ .LastResponse }}
-<|LAST_RESPONSE_END_{{ .Nonce }}|>
-{{ end }}
-
 {{ if .DiffResult }}
-### Diff Analysis Results
+### Vulnerability Analysis Summary
 <|DIFF_RESULT_{{ .Nonce }}|>
 {{ .DiffResult }}
 <|DIFF_RESULT_END_{{ .Nonce }}|>
+{{ end }}
+
+{{ if .VerificationResult }}
+### Verification Result
+<|VERIFICATION_RESULT_{{ .Nonce }}|>
+{{ .VerificationResult }}
+<|VERIFICATION_RESULT_END_{{ .Nonce }}|>
+{{ end }}
+
+{{ if .RepresentativeRequest }}
+### Representative Packet For Follow-Up Testing
+{{ if .RepresentativeHiddenIndex }}
+HTTPFlow: {{ .RepresentativeHiddenIndex }}
+{{ end }}
+<|REPRESENTATIVE_REQUEST_{{ .Nonce }}|>
+{{ .RepresentativeRequest }}
+<|REPRESENTATIVE_REQUEST_END_{{ .Nonce }}|>
+{{ if .RepresentativeResponse }}
+<|REPRESENTATIVE_RESPONSE_{{ .Nonce }}|>
+{{ .RepresentativeResponse }}
+<|REPRESENTATIVE_RESPONSE_END_{{ .Nonce }}|>
+{{ end }}
 {{ end }}
 
 {{ if .FeedbackMessages }}
@@ -40,9 +53,9 @@
 {{ end }}
 
 ---
-Based on the above context and security knowledge, decide your next fuzzing action. Consider:
-1. What parameters have not been tested yet?
-2. What patterns emerged from previous tests?
-3. What payloads are recommended by the security knowledge base?
-4. Should you try different payload types based on observed responses?
+Based on the above context and security knowledge, decide your next vulnerability-testing action. Prioritize:
+1. What vulnerability signals have already appeared?
+2. Which representative packet should be reused or adapted next?
+3. What attack surface remains untested?
+4. How can the next step validate the suspected vulnerability safely without destructive behavior?
 

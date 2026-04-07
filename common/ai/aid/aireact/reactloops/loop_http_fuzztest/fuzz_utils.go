@@ -1,20 +1,79 @@
 package loop_http_fuzztest
 
 import (
+	"bytes"
+	"context"
 	"fmt"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
 
+const (
+	loopHTTPFuzzCompressionThreshold = 40 * 1024
+	loopHTTPFuzzCompressionTarget    = 20 * 1024
+	loopHTTPFuzzTimelinePreviewSize  = 8 * 1024
+)
+
+func newLoopFuzzRequest(taskCtx context.Context, runtime aicommon.AIInvokeRuntime, rawPacket []byte, isHTTPS bool) (*mutate.FuzzHTTPRequest, error) {
+	opts := []mutate.BuildFuzzHTTPRequestOption{
+		mutate.OptHTTPS(isHTTPS),
+		mutate.OptSource(loopHTTPFuzztestHTTPSource),
+	}
+	if runtime != nil {
+		if cfg := runtime.GetConfig(); cfg != nil {
+			if runtimeID := cfg.GetRuntimeId(); runtimeID != "" {
+				opts = append(opts, mutate.OptRuntimeId(runtimeID))
+			}
+		}
+	}
+	if taskCtx != nil {
+		opts = append(opts, mutate.OptContext(taskCtx))
+	}
+	return mutate.NewFuzzHTTPRequest(rawPacket, opts...)
+}
+
+func storeLoopFuzzRequestState(loop *reactloops.ReActLoop, fuzzReq *mutate.FuzzHTTPRequest, requestRaw []byte, isHTTPS bool) {
+	_, originalSummary := buildHTTPRequestStreamSummary(string(requestRaw), isHTTPS)
+	loop.Set("fuzz_request", fuzzReq)
+	loop.Set("original_request", string(requestRaw))
+	loop.Set("original_request_summary", originalSummary)
+	loop.Set("is_https", utils.InterfaceToString(isHTTPS))
+	loop.Set("bootstrap_source", "")
+	loop.Set("last_request", "")
+	loop.Set("last_request_summary", "")
+	loop.Set("last_response", "")
+	loop.Set("last_response_summary", "")
+	loop.Set("last_httpflow_hidden_index", "")
+	loop.Set("representative_request", "")
+	loop.Set("representative_response", "")
+	loop.Set("representative_httpflow_hidden_index", "")
+	loop.Set("diff_result", "")
+	loop.Set("diff_result_full", "")
+	loop.Set("diff_result_compressed", "")
+	loop.Set("verification_result", "")
+}
+
+func getLoopTaskContext(loop *reactloops.ReActLoop) context.Context {
+	if loop == nil {
+		return nil
+	}
+	task := loop.GetCurrentTask()
+	if task == nil {
+		return nil
+	}
+	return task.GetContext()
+}
+
 // getFuzzRequest retrieves the FuzzHTTPRequest from loop context
 func getFuzzRequest(loop *reactloops.ReActLoop) (*mutate.FuzzHTTPRequest, error) {
 	fuzzReqAny := loop.GetVariable("fuzz_request")
 	if fuzzReqAny == nil {
-		return nil, utils.Error("fuzz_request not found in loop context")
+		return nil, utils.Error("fuzz_request not found in loop context. Auto bootstrap from user input may have failed; provide a URL/raw HTTP packet or call set_http_request first")
 	}
 	fuzzReq, ok := fuzzReqAny.(*mutate.FuzzHTTPRequest)
 	if !ok {
@@ -23,62 +82,330 @@ func getFuzzRequest(loop *reactloops.ReActLoop) (*mutate.FuzzHTTPRequest, error)
 	return fuzzReq, nil
 }
 
-// executeFuzzAndCompare executes the fuzz request and compares the response with the original
-func executeFuzzAndCompare(loop *reactloops.ReActLoop, fuzzResult mutate.FuzzHTTPRequestIf, actionName string) (string, error) {
+// executeFuzzAndCompare executes the fuzz request, keeps the full request/response archive,
+// emits compact user-visible summaries, and asks AI whether fuzzing should continue.
+func executeFuzzAndCompare(loop *reactloops.ReActLoop, fuzzResult mutate.FuzzHTTPRequestIf, actionName string) (string, *aicommon.VerifySatisfactionResult, error) {
 	isHttpsStr := loop.Get("is_https")
 	isHttps := isHttpsStr == "true"
-
-	// Execute the fuzz request
-	resultCh, err := fuzzResult.Exec(mutate.WithPoolOpt_Https(isHttps))
-	if err != nil {
-		return "", utils.Errorf("failed to execute fuzz request: %v", err)
+	task := loop.GetCurrentTask()
+	taskID := ""
+	streamTaskID := ""
+	var taskCtx context.Context
+	if task != nil {
+		taskID = task.GetId()
+		streamTaskID = taskID
+		if streamTaskID == "" {
+			streamTaskID = task.GetIndex()
+		}
+		taskCtx = task.GetContext()
+	}
+	runtimeID := ""
+	invoker := loop.GetInvoker()
+	if invoker != nil {
+		if cfg := invoker.GetConfig(); cfg != nil {
+			runtimeID = cfg.GetRuntimeId()
+		}
+	}
+	if taskCtx == nil {
+		taskCtx = context.Background()
 	}
 
-	var results []string
+	emitFuzzStage(loop, streamTaskID, fmt.Sprintf("开始执行 %s，HTTPFlow 会落库并保留完整请求/响应。", actionName))
+
+	// Execute the fuzz request
+	execOpts := []mutate.HttpPoolConfigOption{
+		mutate.WithPoolOpt_Https(isHttps),
+		mutate.WithPoolOpt_RuntimeId(runtimeID),
+		mutate.WithPoolOpt_Source(loopHTTPFuzztestHTTPSource),
+		mutate.WithPoolOpt_SaveHTTPFlow(true),
+	}
+	if taskCtx != nil {
+		execOpts = append(execOpts, mutate.WithPoolOpt_Context(taskCtx))
+	}
+	resultCh, err := fuzzResult.Exec(execOpts...)
+	if err != nil {
+		return "", nil, utils.Errorf("failed to execute fuzz request: %v", err)
+	}
+
 	var diffSummary strings.Builder
 	diffSummary.WriteString(fmt.Sprintf("=== Fuzz Results for %s ===\n", actionName))
+	var analysisSummary strings.Builder
+	analysisSummary.WriteString(fmt.Sprintf("=== 漏洞测试分析：%s ===\n", actionName))
 
 	originalRequest := loop.Get("original_request")
-	count := 0
-	maxResults := 10 // Limit results to prevent overwhelming output
+	resultCount := 0
+	savedFlowCount := 0
+	representativeRequest := ""
+	representativeResponse := ""
+	representativeHiddenIndex := ""
 
 	for result := range resultCh {
-		if count >= maxResults {
-			diffSummary.WriteString(fmt.Sprintf("\n... (more results truncated, showing first %d)\n", maxResults))
-			break
-		}
-
+		resultCount++
 		if result.Error != nil {
-			diffSummary.WriteString(fmt.Sprintf("\n[%d] Error: %v\n", count+1, result.Error))
-			count++
+			errMsg := fmt.Sprintf("\n--- Result %d ---\nError: %v\n", resultCount, result.Error)
+			diffSummary.WriteString(errMsg)
+			analysisSummary.WriteString(errMsg)
+			emitFuzzStage(loop, streamTaskID, fmt.Sprintf("%s 第 %d 个测试请求执行失败：%v", actionName, resultCount, result.Error))
 			continue
 		}
 
 		// Get request and response
 		requestRaw := string(result.RequestRaw)
 		responseRaw := string(result.ResponseRaw)
+		requestURL, requestStreamSummary := buildHTTPRequestStreamSummary(requestRaw, isHttps)
+		responseStreamSummary := buildHTTPResponseStreamSummary(responseRaw, requestURL)
+
+		if streamTaskID != "" {
+			emitPacketSummary(loop, streamTaskID, actionName, resultCount, "request", requestStreamSummary)
+			emitPacketSummary(loop, streamTaskID, actionName, resultCount, "response", responseStreamSummary)
+		}
+
+		hiddenIndex := ""
+		if result.LowhttpResponse != nil {
+			hiddenIndex = strings.TrimSpace(result.LowhttpResponse.HiddenIndex)
+			if hiddenIndex != "" {
+				savedFlowCount++
+				loop.Set("last_httpflow_hidden_index", hiddenIndex)
+				if runtimeID != "" {
+					loop.GetEmitter().EmitYakitHTTPFlow(runtimeID, hiddenIndex)
+				}
+			}
+		}
 
 		// Compare request differences
 		requestDiff := compareRequests(originalRequest, requestRaw)
 		responseSummary := summarizeResponse(responseRaw)
-
-		diffSummary.WriteString(fmt.Sprintf("\n--- Result %d ---\n", count+1))
-		diffSummary.WriteString(fmt.Sprintf("Payload: %v\n", result.Payloads))
-		diffSummary.WriteString(fmt.Sprintf("Request Changes:\n%s\n", requestDiff))
-		diffSummary.WriteString(fmt.Sprintf("Response Summary:\n%s\n", responseSummary))
-
-		// Store last request and response
 		loop.Set("last_request", requestRaw)
+		loop.Set("last_request_summary", requestStreamSummary)
 		loop.Set("last_response", responseRaw)
+		loop.Set("last_response_summary", responseStreamSummary)
 
-		results = append(results, fmt.Sprintf("Payload: %v, Status: %s", result.Payloads, getStatusFromResponse(responseRaw)))
-		count++
+		if representativeRequest == "" {
+			representativeRequest = requestRaw
+			representativeResponse = responseRaw
+			representativeHiddenIndex = hiddenIndex
+			loop.Set("representative_request", representativeRequest)
+			loop.Set("representative_response", representativeResponse)
+			loop.Set("representative_httpflow_hidden_index", representativeHiddenIndex)
+		}
+
+		diffSummary.WriteString(fmt.Sprintf("\n--- Result %d ---\n", resultCount))
+		analysisSummary.WriteString(fmt.Sprintf("\n--- Result %d ---\n", resultCount))
+		diffSummary.WriteString(fmt.Sprintf("Payload: %v\n", result.Payloads))
+		analysisSummary.WriteString(fmt.Sprintf("Payload: %v\n", result.Payloads))
+		diffSummary.WriteString(fmt.Sprintf("Duration: %d ms\n", result.DurationMs))
+		analysisSummary.WriteString(fmt.Sprintf("Duration: %d ms\n", result.DurationMs))
+		diffSummary.WriteString(fmt.Sprintf("Status: %s\n", getStatusFromResponse(responseRaw)))
+		analysisSummary.WriteString(fmt.Sprintf("Status: %s\n", getStatusFromResponse(responseRaw)))
+		diffSummary.WriteString(fmt.Sprintf("Request Summary: %s\n", requestStreamSummary))
+		analysisSummary.WriteString(fmt.Sprintf("Request Summary: %s\n", requestStreamSummary))
+		diffSummary.WriteString(fmt.Sprintf("Response Summary: %s\n", responseStreamSummary))
+		analysisSummary.WriteString(fmt.Sprintf("Response Summary: %s\n", responseStreamSummary))
+		if hiddenIndex != "" {
+			diffSummary.WriteString(fmt.Sprintf("Saved HTTPFlow: %s\n", hiddenIndex))
+			analysisSummary.WriteString(fmt.Sprintf("Saved HTTPFlow: %s\n", hiddenIndex))
+		}
+		diffSummary.WriteString(fmt.Sprintf("Request Changes:\n%s\n", requestDiff))
+		analysisSummary.WriteString(fmt.Sprintf("Request Changes:\n%s\n", requestDiff))
+		diffSummary.WriteString(fmt.Sprintf("Response Summary:\n%s\n", responseSummary))
+		analysisSummary.WriteString(fmt.Sprintf("Response Summary:\n%s\n", responseSummary))
+		diffSummary.WriteString("Request Packet:\n")
+		diffSummary.WriteString(requestRaw)
+		diffSummary.WriteString("\nResponse Packet:\n")
+		diffSummary.WriteString(responseRaw)
+		diffSummary.WriteRune('\n')
 	}
 
-	diffResult := diffSummary.String()
-	loop.Set("diff_result", diffResult)
+	if resultCount == 0 {
+		diffSummary.WriteString("\n(no results returned by the fuzz execution)\n")
+		analysisSummary.WriteString("\n(no results returned by the fuzz execution)\n")
+	}
+	if savedFlowCount > 0 {
+		diffSummary.WriteString(fmt.Sprintf("\nSaved %d HTTP flow records to database and linked them to the current AI runtime/task event context.\n", savedFlowCount))
+		analysisSummary.WriteString(fmt.Sprintf("\nSaved %d HTTP flow records to database and linked them to the current AI runtime/task event context.\n", savedFlowCount))
+	}
 
-	return diffResult, nil
+	fullDiffResult := diffSummary.String()
+	analysisResult := analysisSummary.String()
+	loop.Set("diff_result_full", fullDiffResult)
+	loop.Set("diff_result_compressed", analysisResult)
+
+	feedbackResult := analysisResult
+	compressedResult := ""
+	if len(fullDiffResult) > loopHTTPFuzzCompressionThreshold && invoker != nil {
+		emitFuzzStage(loop, streamTaskID, fmt.Sprintf("%s 结果超过 40KB，开始生成压缩报告并检查所有数据包。", actionName))
+		compressionTarget := buildFuzzCompressionTarget(loop, actionName)
+		compressed, compressErr := invoker.CompressLongTextWithDestination(taskCtx, fullDiffResult, compressionTarget, loopHTTPFuzzCompressionTarget)
+		if compressErr != nil {
+			emitFuzzStage(loop, streamTaskID, fmt.Sprintf("%s 压缩报告失败，回退到原始测试结果。", actionName))
+		} else {
+			compressedResult = compressed
+			feedbackResult = buildCompressedFeedbackReport(compressed, representativeRequest, representativeResponse, representativeHiddenIndex)
+			loop.Set("diff_result_compressed", compressed)
+			emitFuzzStage(loop, streamTaskID, fmt.Sprintf("%s 压缩报告完成，准备验证是否达到安全测试目标。", actionName))
+		}
+	}
+
+	verifyResult, verificationText, err := verifyFuzzCompletion(loop, taskCtx, streamTaskID, actionName, feedbackResult, compressedResult, representativeRequest, representativeResponse, representativeHiddenIndex)
+	if err != nil {
+		return "", nil, err
+	}
+	if verificationText != "" {
+		feedbackResult += "\n\n" + verificationText
+		loop.Set("verification_result", verificationText)
+	}
+
+	loop.Set("diff_result", feedbackResult)
+	persistLoopHTTPFuzzSessionContext(loop, actionName)
+
+	return feedbackResult, verifyResult, nil
+}
+
+func buildFuzzCompressionTarget(loop *reactloops.ReActLoop, actionName string) string {
+	task := loop.GetCurrentTask()
+	userInput := ""
+	if task != nil {
+		userInput = strings.TrimSpace(task.GetUserInput())
+	}
+	if userInput == "" {
+		userInput = "HTTP 安全模糊测试"
+	}
+	return fmt.Sprintf("用户正在执行 HTTP 安全模糊测试，当前步骤是 %s。你的核心目标是分析漏洞，而不是复述数据包。请覆盖所有请求/响应对，重点归纳疑似漏洞类型、触发依据、差异模式、可复现代表性数据包、以及下一步验证动作。原始目标：%s", actionName, userInput)
+}
+
+func buildCompressedFeedbackReport(compressed, representativeRequest, representativeResponse, representativeHiddenIndex string) string {
+	var out strings.Builder
+	out.WriteString("=== Compressed Fuzz Report ===\n")
+	out.WriteString(compressed)
+	if representativeRequest != "" || representativeResponse != "" {
+		out.WriteString("\n\n=== Representative Packet For Follow-Up Testing ===\n")
+		if representativeHiddenIndex != "" {
+			out.WriteString(fmt.Sprintf("HTTPFlow: %s\n", representativeHiddenIndex))
+		}
+		if representativeRequest != "" {
+			out.WriteString("Request:\n")
+			out.WriteString(representativeRequest)
+			out.WriteRune('\n')
+		}
+		if representativeResponse != "" {
+			out.WriteString("Response:\n")
+			out.WriteString(representativeResponse)
+		}
+	}
+	return out.String()
+}
+
+func verifyFuzzCompletion(loop *reactloops.ReActLoop, taskCtx context.Context, streamTaskID, actionName, feedbackResult, compressedResult, representativeRequest, representativeResponse, representativeHiddenIndex string) (*aicommon.VerifySatisfactionResult, string, error) {
+	invoker := loop.GetInvoker()
+	task := loop.GetCurrentTask()
+	if invoker == nil || task == nil {
+		return nil, "", nil
+	}
+
+	payload := feedbackResult
+	if compressedResult != "" {
+		payload = buildCompressedFeedbackReport(compressedResult, representativeRequest, representativeResponse, representativeHiddenIndex)
+	}
+
+	emitFuzzStage(loop, streamTaskID, fmt.Sprintf("%s 测试结果已准备完成，开始验证是否达到当前安全测试目标。", actionName))
+	verifyResult, err := invoker.VerifyUserSatisfaction(taskCtx, task.GetUserInput(), true, payload)
+	if err != nil {
+		return nil, "", utils.Wrap(err, "verify fuzz completion")
+	}
+
+	var verifySummary strings.Builder
+	verifySummary.WriteString("=== Verification ===\n")
+	verifySummary.WriteString(fmt.Sprintf("Satisfied: %v\n", verifyResult.Satisfied))
+	verifySummary.WriteString(fmt.Sprintf("Reasoning: %s\n", verifyResult.Reasoning))
+	if next := aicommon.FormatVerifyNextMovementsSummary(verifyResult.NextMovements); next != "" {
+		verifySummary.WriteString(fmt.Sprintf("Next Steps: %s\n", next))
+	}
+	if representativeHiddenIndex != "" {
+		verifySummary.WriteString(fmt.Sprintf("Representative HTTPFlow: %s\n", representativeHiddenIndex))
+	}
+
+	state := "未完成，需要继续测试。"
+	if verifyResult.Satisfied {
+		state = "已达到当前安全测试目标。"
+	}
+	emitFuzzStage(loop, streamTaskID, fmt.Sprintf("%s 目标验证完成：%s", actionName, state))
+
+	return verifyResult, verifySummary.String(), nil
+}
+
+func emitFuzzStage(loop *reactloops.ReActLoop, taskID, msg string) {
+	if loop == nil || taskID == "" || loop.GetEmitter() == nil || strings.TrimSpace(msg) == "" {
+		return
+	}
+	_, _ = loop.GetEmitter().EmitDefaultStreamEvent("thought", bytes.NewBufferString(msg), taskID)
+}
+
+func emitPacketSummary(loop *reactloops.ReActLoop, taskID, actionName string, index int, stage, summary string) {
+	if loop == nil || taskID == "" || loop.GetEmitter() == nil || strings.TrimSpace(summary) == "" {
+		return
+	}
+	message := fmt.Sprintf("[%s #%d][%s] %s", actionName, index, stage, summary)
+	_, _ = loop.GetEmitter().EmitDefaultStreamEvent("http_flow", bytes.NewBufferString(message), taskID)
+}
+
+func buildHTTPRequestStreamSummary(requestRaw string, isHTTPS bool) (string, string) {
+	requestURL := extractRequestURL(requestRaw, isHTTPS)
+	_, body := lowhttp.SplitHTTPPacketFast([]byte(requestRaw))
+	return requestURL, fmt.Sprintf("URL: %s BODY: [(%d) bytes]", requestURL, len(body))
+}
+
+func buildHTTPResponseStreamSummary(responseRaw, requestURL string) string {
+	status := strings.TrimSpace(getStatusFromResponse(responseRaw))
+	_, body := lowhttp.SplitHTTPPacketFast([]byte(responseRaw))
+	if status == "" {
+		return fmt.Sprintf("URL: %s BODY: [(%d) bytes]", requestURL, len(body))
+	}
+	return fmt.Sprintf("URL: %s STATUS: %s BODY: [(%d) bytes]", requestURL, status, len(body))
+}
+
+func extractRequestURL(requestRaw string, isHTTPS bool) string {
+	urlObj, err := lowhttp.ExtractURLFromHTTPRequestRaw([]byte(requestRaw), isHTTPS)
+	if err == nil && urlObj != nil && urlObj.String() != "" {
+		return urlObj.String()
+	}
+
+	scheme := "http"
+	if isHTTPS {
+		scheme = "https"
+	}
+	if fallback := strings.TrimSpace(lowhttp.GetUrlFromHTTPRequest(scheme, []byte(requestRaw))); fallback != "" {
+		return fallback
+	}
+	return "(unknown url)"
+}
+
+func buildFuzzTimelineSummary(summary string) string {
+	if len(summary) <= loopHTTPFuzzTimelinePreviewSize {
+		return summary
+	}
+	return utils.ShrinkTextBlock(summary, loopHTTPFuzzTimelinePreviewSize)
+}
+
+func applyFuzzVerificationOutcome(loop *reactloops.ReActLoop, operator *reactloops.LoopActionHandlerOperator, diffResult string, verifyResult *aicommon.VerifySatisfactionResult) {
+	if verifyResult == nil {
+		operator.Feedback(diffResult)
+		return
+	}
+
+	loop.PushSatisfactionRecordWithCompletedTaskIndex(
+		verifyResult.Satisfied,
+		verifyResult.Reasoning,
+		verifyResult.CompletedTaskIndex,
+		verifyResult.NextMovements,
+	)
+
+	if verifyResult.Satisfied {
+		operator.Exit()
+		return
+	}
+
+	operator.Feedback(diffResult)
+	operator.Continue()
 }
 
 // compareRequests compares two HTTP requests and returns the differences
