@@ -1,0 +1,9 @@
+// Pure arithmetic and branching.
+check = () => {
+	a = 40 + 2
+	b = 50 - 8
+	if a > b {
+		return a
+	}
+	return b
+}

@@ -1,0 +1,11 @@
+// Complex nested computation with multiple operators.
+compute = (a, b, c) => {
+	x = a * b + c
+	y = (x - a) * (b + c)
+	z = y / (a + 1)
+	return z
+}
+
+check = () => {
+	return compute(3, 4, 5)
+}

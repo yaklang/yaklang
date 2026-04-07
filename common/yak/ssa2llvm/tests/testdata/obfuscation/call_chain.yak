@@ -1,0 +1,8 @@
+// Multi-level function chain.
+leaf = () => { return 7 }
+mid = () => { return leaf() + 8 }
+top = () => { return mid() + leaf() }
+
+check = () => {
+	return top() + mid()
+}

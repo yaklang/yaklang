@@ -1,0 +1,14 @@
+// Loop with accumulation.
+sum = (n) => {
+	result = 0
+	i = 1
+	for i <= n {
+		result = result + i
+		i = i + 1
+	}
+	return result
+}
+
+check = () => {
+	return sum(10)
+}
