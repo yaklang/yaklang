@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/url"
 	"path"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -75,7 +77,7 @@ func (s *Server) AIConfigHealthCheck(ctx context.Context, req *ypb.AIConfigHealt
 	}
 
 	resp := executeAIConfigHealthCheck(ctx, req.GetConfig(), req.GetContent())
-	if resp.GetResponseStatusCode() != 200 {
+	if !isAIConfigHealthCheckPassed(resp) {
 		if recommend := recommendAIHealthCheckConfig(ctx, req.GetConfig(), req.GetContent()); recommend != nil {
 			resp.RecommendConfig = recommend
 		}
@@ -112,15 +114,76 @@ func executeAIConfigHealthCheck(ctx context.Context, config *ypb.ThirdPartyAppli
 		}),
 	)
 
-	result, err := ai.Chat(content, opts...)
+	result, err := ai.Chat(buildAIHealthCheckPrompt(content), opts...)
 	resp.TotalCostMs = time.Since(start).Milliseconds()
-	resp.ResponseContent = result
 	if err != nil {
 		resp.ErrorMessage = err.Error()
 	} else if resp.GetResponseStatusCode() >= 400 {
 		resp.ErrorMessage = utils.Errorf("ai health check failed with status code %d", resp.GetResponseStatusCode()).Error()
+	} else if _, actionErr := parseAIHealthCheckCallToolAction(result, content); actionErr != nil {
+		resp.ErrorMessage = actionErr.Error()
 	}
+	resp.ResponseContent = result
+	resp.Success = resp.GetResponseStatusCode() < 400 && strings.TrimSpace(resp.GetErrorMessage()) == ""
 	return resp
+}
+
+const aiHealthCheckToolName = "ai_config_health_check"
+
+func buildAIHealthCheckPrompt(content string) string {
+	return fmt.Sprintf(`You are running an AI provider health check.
+Return only one JSON object in this exact action style:
+{"@action":"call-tool","tool":"%s","identifier":"health_check","params":{"content":"user input","summary":"brief summary"}}
+
+Requirements:
+1. "@action" must be "call-tool"
+2. "tool" must be %q
+3. "identifier" must be a short snake_case string
+4. "params.content" must exactly equal the user input after trimming leading and trailing whitespace
+5. "params.summary" must be a non-empty short summary
+6. Do not output markdown, explanations, or any extra text
+
+User input:
+%s`, aiHealthCheckToolName, aiHealthCheckToolName, content)
+}
+
+func parseAIHealthCheckCallToolAction(raw string, fallbackContent string) (*aicommon.Action, error) {
+	action, err := aicommon.ExtractAction(raw, "call-tool")
+	if err != nil {
+		return nil, utils.Wrap(err, "ai health check failed: parse call-tool action")
+	}
+	if strings.TrimSpace(action.GetString("tool")) != aiHealthCheckToolName {
+		return nil, utils.Errorf("ai health check failed: unexpected tool %q", action.GetString("tool"))
+	}
+	if strings.TrimSpace(action.GetString("identifier")) == "" {
+		return nil, utils.Error("ai health check failed: call-tool identifier is empty")
+	}
+	params := action.GetInvokeParams("params")
+	if params == nil {
+		return nil, utils.Error("ai health check failed: call-tool params are empty")
+	}
+	expectedContent := strings.TrimSpace(fallbackContent)
+	content := strings.TrimSpace(params.GetString("content"))
+	if content == "" {
+		return nil, utils.Error("ai health check failed: parsed call-tool content is empty")
+	}
+	if expectedContent == "" {
+		return nil, utils.Error("ai health check failed: original content is empty after trim")
+	}
+	if content != expectedContent {
+		return nil, utils.Errorf("ai health check failed: parsed call-tool content mismatch, want %q got %q", expectedContent, content)
+	}
+	if strings.TrimSpace(params.GetString("summary")) == "" {
+		return nil, utils.Error("ai health check failed: parsed call-tool summary is empty")
+	}
+	return action, nil
+}
+
+func isAIConfigHealthCheckPassed(resp *ypb.AIConfigHealthCheckResponse) bool {
+	if resp == nil {
+		return false
+	}
+	return resp.GetSuccess()
 }
 
 func sanitizeAIConfigHealthCheckResponse(resp *ypb.AIConfigHealthCheckResponse) *ypb.AIConfigHealthCheckResponse {
@@ -487,7 +550,7 @@ func findFirstWorkingAIConfig(ctx context.Context, candidates []*ypb.ThirdPartyA
 					tryCtx, tryCancel := context.WithTimeout(ctx, 8*time.Second)
 					resp := executeAIConfigHealthCheck(tryCtx, candidate, content)
 					tryCancel()
-					if resp.GetResponseStatusCode() == 200 {
+					if isAIConfigHealthCheckPassed(resp) {
 						select {
 						case resultCh <- candidate:
 							cancel()

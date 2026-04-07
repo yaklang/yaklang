@@ -64296,6 +64296,7 @@ type AIConfigHealthCheckResponse struct {
 	ErrorMessage       string                       `protobuf:"bytes,6,opt,name=ErrorMessage,proto3" json:"ErrorMessage,omitempty"`
 	RawResponse        string                       `protobuf:"bytes,7,opt,name=RawResponse,proto3" json:"RawResponse,omitempty"`
 	RecommendConfig    *ThirdPartyApplicationConfig `protobuf:"bytes,8,opt,name=RecommendConfig,proto3" json:"RecommendConfig,omitempty"`
+	Success            bool                         `protobuf:"varint,9,opt,name=Success,proto3" json:"Success,omitempty"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -64384,6 +64385,13 @@ func (x *AIConfigHealthCheckResponse) GetRecommendConfig() *ThirdPartyApplicatio
 		return x.RecommendConfig
 	}
 	return nil
+}
+
+func (x *AIConfigHealthCheckResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
 }
 
 type AIProvider struct {
@@ -73739,7 +73747,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\tModelName\x18\x01 \x03(\tR\tModelName\"p\n" +
 	"\x1aAIConfigHealthCheckRequest\x128\n" +
 	"\x06Config\x18\x01 \x01(\v2 .ypb.ThirdPartyApplicationConfigR\x06Config\x12\x18\n" +
-	"\aContent\x18\x02 \x01(\tR\aContent\"\xf5\x02\n" +
+	"\aContent\x18\x02 \x01(\tR\aContent\"\x8f\x03\n" +
 	"\x1bAIConfigHealthCheckResponse\x12(\n" +
 	"\x0fFirstByteCostMs\x18\x01 \x01(\x03R\x0fFirstByteCostMs\x12 \n" +
 	"\vTotalCostMs\x18\x02 \x01(\x03R\vTotalCostMs\x12\x1e\n" +
@@ -73750,7 +73758,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x0fResponseContent\x18\x05 \x01(\tR\x0fResponseContent\x12\"\n" +
 	"\fErrorMessage\x18\x06 \x01(\tR\fErrorMessage\x12 \n" +
 	"\vRawResponse\x18\a \x01(\tR\vRawResponse\x12J\n" +
-	"\x0fRecommendConfig\x18\b \x01(\v2 .ypb.ThirdPartyApplicationConfigR\x0fRecommendConfig\"V\n" +
+	"\x0fRecommendConfig\x18\b \x01(\v2 .ypb.ThirdPartyApplicationConfigR\x0fRecommendConfig\x12\x18\n" +
+	"\aSuccess\x18\t \x01(\bR\aSuccess\"V\n" +
 	"\n" +
 	"AIProvider\x12\x0e\n" +
 	"\x02Id\x18\x01 \x01(\x03R\x02Id\x128\n" +

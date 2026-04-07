@@ -50,6 +50,7 @@ type testAIModelClient struct {
 	rawResponse []byte
 	bodyPreview []byte
 	chatErr     error
+	noToolCall  bool
 }
 
 func (c *testAIModelClient) LoadOption(opts ...aispec.AIConfigOption) {
@@ -68,7 +69,7 @@ func (c *testAIModelClient) GetConfig() *aispec.AIConfig {
 	return c.config
 }
 
-func (c *testAIModelClient) Chat(_ string, _ ...any) (string, error) {
+func (c *testAIModelClient) Chat(prompt string, _ ...any) (string, error) {
 	if c.config == nil {
 		return "", utils.Error("config is nil")
 	}
@@ -98,6 +99,12 @@ func (c *testAIModelClient) Chat(_ string, _ ...any) (string, error) {
 	}
 	if c.config.StreamHandler != nil {
 		c.config.StreamHandler(strings.NewReader(c.response))
+	}
+	if strings.Contains(prompt, `"@action":"call-tool"`) || strings.Contains(prompt, `"@action": "call-tool"`) {
+		if c.noToolCall {
+			return c.response, c.chatErr
+		}
+		return `{"@action":"call-tool","tool":"` + aiHealthCheckToolName + `","identifier":"health_check","params":{"content":"ping","summary":"ok"}}`, c.chatErr
 	}
 	time.Sleep(20 * time.Millisecond)
 	return c.response, c.chatErr
@@ -152,7 +159,8 @@ func TestGRPC_Ai_Config_Health_Check(t *testing.T) {
 	assert.Contains(t, rsp.GetRawResponse(), "HTTP/1.1 200 OK")
 	assert.Contains(t, rsp.GetRawResponse(), `"mock-response"`)
 	assert.Equal(t, int32(200), rsp.GetResponseStatusCode())
-	assert.Equal(t, "mock-response", rsp.GetResponseContent())
+	assert.Contains(t, rsp.GetResponseContent(), "content: ping")
+	assert.True(t, rsp.GetSuccess())
 	assert.Empty(t, rsp.GetErrorMessage())
 }
 
@@ -185,7 +193,37 @@ func TestGRPC_Ai_Config_Health_Check_EscapesInvalidUTF8(t *testing.T) {
 	assert.True(t, utf8.ValidString(rsp.GetRawRequest()))
 	assert.True(t, utf8.ValidString(rsp.GetRawResponse()))
 	assert.True(t, utf8.ValidString(rsp.GetResponseContent()))
+	assert.True(t, rsp.GetSuccess())
 	assert.Empty(t, rsp.GetErrorMessage())
+}
+
+func TestGRPC_Ai_Config_Health_Check_RequiresParsableCallToolAction(t *testing.T) {
+	const providerType = "grpc-ai-model-test-provider-no-call-tool"
+	aispec.Register(providerType, func() aispec.AIClient {
+		return &testAIModelClient{
+			response:   "mock-response",
+			noToolCall: true,
+		}
+	})
+
+	client, err := NewLocalClientWithTempDatabase(t)
+	require.NoError(t, err)
+
+	rsp, err := client.AIConfigHealthCheck(context.Background(), &ypb.AIConfigHealthCheckRequest{
+		Config: &ypb.ThirdPartyApplicationConfig{
+			Type:   providerType,
+			APIKey: "test-key",
+			ExtraParams: []*ypb.KVPair{
+				{Key: "model", Value: "mock-model"},
+			},
+		},
+		Content: "ping",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, rsp)
+	assert.Equal(t, int32(200), rsp.GetResponseStatusCode())
+	assert.False(t, rsp.GetSuccess())
+	assert.Contains(t, rsp.GetErrorMessage(), "parse call-tool action")
 }
 
 func TestSanitizeAIConfigHealthCheckResponse_EscapesInvalidUTF8(t *testing.T) {
@@ -203,6 +241,24 @@ func TestSanitizeAIConfigHealthCheckResponse_EscapesInvalidUTF8(t *testing.T) {
 	assert.True(t, utf8.ValidString(resp.GetErrorMessage()))
 }
 
+func TestParseAIHealthCheckCallToolAction(t *testing.T) {
+	action, err := parseAIHealthCheckCallToolAction(`{"@action":"call-tool","tool":"ai_config_health_check","identifier":"health_check","params":{"content":"ping","summary":"ok"}}`, "fallback")
+	require.Error(t, err)
+	assert.Nil(t, action)
+
+	action, err = parseAIHealthCheckCallToolAction(`{"@action":"call-tool","tool":"ai_config_health_check","identifier":"health_check","params":{"content":"ping","summary":"ok"}}`, "ping")
+	require.NoError(t, err)
+	require.NotNil(t, action)
+	assert.Equal(t, "ping", action.GetInvokeParams("params").GetString("content"))
+}
+
+func TestParseAIHealthCheckCallToolAction_RejectsWrongParams(t *testing.T) {
+	action, err := parseAIHealthCheckCallToolAction(`{"@action":"call-tool","tool":"ai_config_health_check","identifier":"health_check","params":{"content":"pong","summary":"ok"}}`, "ping")
+	require.Error(t, err)
+	assert.Nil(t, action)
+	assert.Contains(t, err.Error(), "content mismatch")
+}
+
 func TestRecommendAIHealthCheckConfig(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/v1/chat/completions" {
@@ -210,7 +266,7 @@ func TestRecommendAIHealthCheckConfig(t *testing.T) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"ok"}}]}`))
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"{\"@action\":\"call-tool\",\"tool\":\"ai_config_health_check\",\"identifier\":\"health_check\",\"params\":{\"content\":\"ping\",\"summary\":\"ok\"}}"},"finish_reason":"stop"}]}`))
 	}))
 	defer server.Close()
 
@@ -317,7 +373,7 @@ func TestRecommendAIHealthCheckConfig_CanCorrectAPIType(t *testing.T) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"output":[{"type":"message","content":[{"type":"output_text","text":"ok"}]}],"output_text":"ok"}`))
+		_, _ = w.Write([]byte(`{"output":[{"type":"message","content":[{"type":"output_text","text":"{\"@action\":\"call-tool\",\"tool\":\"ai_config_health_check\",\"identifier\":\"health_check\",\"params\":{\"content\":\"ping\",\"summary\":\"ok\"}}"}]}],"output_text":"{\"@action\":\"call-tool\",\"tool\":\"ai_config_health_check\",\"identifier\":\"health_check\",\"params\":{\"content\":\"ping\",\"summary\":\"ok\"}}"}`))
 	}))
 	defer server.Close()
 
@@ -350,7 +406,7 @@ func TestRecommendAIHealthCheckConfig_FallbackToEndpoint(t *testing.T) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"ok"}}]}`))
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"{\"@action\":\"call-tool\",\"tool\":\"ai_config_health_check\",\"identifier\":\"health_check\",\"params\":{\"content\":\"ping\",\"summary\":\"ok\"}}"},"finish_reason":"stop"}]}`))
 	}))
 	defer server.Close()
 
