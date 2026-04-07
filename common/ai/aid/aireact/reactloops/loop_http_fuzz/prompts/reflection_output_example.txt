@@ -1,0 +1,106 @@
+{
+  "@action": "load_http_request",
+  "identifier": "load_login_packet",
+  "human_readable_thought": "先加载并分析请求",
+  "http_request": "POST /api/login HTTP/1.1\r\nHost: example.com\r\nContent-Type: application/json\r\n\r\n{\"username\":\"admin\",\"password\":\"admin\"}",
+  "is_https": true,
+  "reason": "加载待测登录请求"
+}
+
+{
+  "@action": "inspect_request_surface",
+  "identifier": "inspect_credentials",
+  "human_readable_thought": "确认高价值参数",
+  "focus": ["credential", "identifier"],
+  "reason": "识别登录和 ID 字段"
+}
+
+{
+  "@action": "mutate_target",
+  "identifier": "prepare_id_sqli",
+  "human_readable_thought": "准备对 id 做基础注入",
+  "target_ref": "query:id",
+  "mutation_mode": "replace",
+  "payloads": ["1", "1'", "1 OR 1=1", "{{urlenc(1' OR '1'='1)}}"],
+  "use_fuzztag": true,
+  "encoding_policy": "preserve",
+  "disable_auto_encode": false,
+  "reason": "对 id 做基础 SQL 注入探测"
+}
+
+{
+  "@action": "execute_test_batch",
+  "identifier": "exec_id_sqli_batch",
+  "human_readable_thought": "执行上一批 payload",
+  "scenario": "sqli",
+  "variant_source": "last_mutation",
+  "max_requests": 12,
+  "reason": "执行基础 SQL 注入批次"
+}
+
+{
+  "@action": "run_generic_vuln_test",
+  "identifier": "search_xss_probe",
+  "human_readable_thought": "对搜索参数做 XSS 测试",
+  "scenario": "xss",
+  "target_refs": ["query:q"],
+  "profile": "xss_html",
+  "depth": "medium",
+  "prefer_fuzztag": true,
+  "reason": "搜索参数很可能回显"
+}
+
+{
+  "@action": "run_weak_password_test",
+  "identifier": "weakpass_login_probe",
+  "human_readable_thought": "测试登录弱口令",
+  "username_targets": ["json:$.username"],
+  "password_targets": ["json:$.password"],
+  "username_strategy": "dictionary",
+  "password_strategy": "top_weak",
+  "max_pairs": 20,
+  "prefer_fuzztag": true,
+  "reason": "登录接口需要弱口令验证"
+}
+
+{
+  "@action": "run_identifier_enumeration",
+  "identifier": "enum_order_id",
+  "human_readable_thought": "枚举订单号",
+  "target_ref": "path:block:3",
+  "strategy": "zero_padded",
+  "range_template": "{{int(1-50|4)}}",
+  "max_requests": 15,
+  "reason": "订单详情路径中存在可疑 ID"
+}
+
+{
+  "@action": "run_sensitive_info_exposure_test",
+  "identifier": "probe_debug_paths",
+  "human_readable_thought": "检查调试与备份路径",
+  "mode": "path_probe",
+  "path_profile": "debug_leak_probe",
+  "max_requests": 12,
+  "reason": "先做低成本敏感路径探测"
+}
+
+{
+  "@action": "run_encoding_bypass_test",
+  "identifier": "encode_traversal_probe",
+  "human_readable_thought": "生成编码绕过变体",
+  "target_ref": "query:file",
+  "base_payload": "../etc/passwd",
+  "encodings": ["url", "double_url", "unicode", "hex"],
+  "mixed_case": false,
+  "reason": "测试路径遍历编码绕过"
+}
+
+{
+  "@action": "commit_finding",
+  "identifier": "commit_sqli_signal",
+  "human_readable_thought": "把异常收敛成 finding",
+  "candidate_ids": ["a1710000000000"],
+  "category": "sqli",
+  "severity": "high",
+  "reason": "时间延迟和错误特征都稳定出现"
+}

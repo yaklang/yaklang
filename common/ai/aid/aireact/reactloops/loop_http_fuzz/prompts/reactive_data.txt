@@ -1,0 +1,38 @@
+User Goal:
+{{ .UserGoal }}
+
+Request Profile:
+{{ .RequestProfile }}
+
+Parameter Inventory:
+{{ .ParameterInventory }}
+
+High Value Targets:
+{{ .HighValueTargets }}
+
+Current Test Plan:
+{{ .TestPlan }}
+
+Baseline Fingerprint:
+{{ .BaselineFingerprint }}
+
+Coverage Map:
+{{ .CoverageMap }}
+
+Last Prepared Mutation:
+{{ .LastMutation }}
+
+Recent Batch Results:
+{{ .LastBatchResults }}
+
+Anomaly Candidates:
+{{ .AnomalyCandidates }}
+
+Confirmed Findings:
+{{ .ConfirmedFindings }}
+
+Next Recommended Actions:
+{{ .NextRecommendedActions }}
+
+Action Feedback:
+{{ .FeedbackMessages }}
