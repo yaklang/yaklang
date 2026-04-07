@@ -39,8 +39,8 @@ func init() {
 			preset := []reactloops.ReActLoopOption{
 				reactloops.WithAllowRAG(false),
 				reactloops.WithAllowToolCall(true),
-				reactloops.WithAITagField("GEN_PACKET", generatedPacketContentField),
-				reactloops.WithAITagField("GEN_MODIFIED_PACKET", modifiedPacketContentField),
+				reactloops.WithAITagFieldWithAINodeId("GEN_PACKET", generatedPacketContentField, "http_flow", aicommon.TypeCodeHTTPRequest),
+				reactloops.WithAITagFieldWithAINodeId("GEN_MODIFIED_PACKET", modifiedPacketContentField, "http_flow", aicommon.TypeCodeHTTPRequest),
 				reactloops.WithOverrideLoopAction(loopActionDirectlyAnswerHTTPFuzztest),
 				reactloops.WithInitTask(buildInitTask(r)),
 				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
@@ -204,6 +204,9 @@ func tryBootstrapFuzzRequestFromUserInput(r aicommon.AIInvokeRuntime, loop *reac
 			aitool.WithStringParam("method", aitool.WithParam_Description("提取到的 HTTP 方法，默认 GET")),
 			aitool.WithStringParam("reason", aitool.WithParam_Description("说明提取依据和置信度")),
 		},
+		aicommon.WithGeneralConfigStreamableFieldWithNodeId("http_flow", "raw_http_request"),
+		aicommon.WithGeneralConfigStreamableFieldWithNodeId("thought", "url"),
+		aicommon.WithGeneralConfigStreamableFieldWithNodeId("thought", "reason"),
 	)
 	if err != nil {
 		log.Warnf("failed to extract HTTP request from user input: %v", err)
