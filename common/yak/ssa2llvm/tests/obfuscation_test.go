@@ -76,3 +76,61 @@ func TestSSAObfuscationUnknownName(t *testing.T) {
 		t.Fatal("expected unknown obfuscator error")
 	}
 }
+
+// --- Phase 3: New Layer 1 obfuscation passes ---
+
+func TestLLVMObfuscationMBA(t *testing.T) {
+	code := `
+one = () => { return 40 }
+two = () => { return 2 }
+three = () => { return 50 }
+four = () => { return 8 }
+check = () => {
+	left = one() + two()
+	right = three() - four()
+	return left + right
+}
+`
+	checkBinaryEx(t, code, "check", "yak", 84)
+	checkBinaryExWithOptions(t, code, "check", "yak", 84, withCompileObfuscators("mba"))
+}
+
+func TestLLVMObfuscationOpaque(t *testing.T) {
+	code := `
+one = () => { return 40 }
+two = () => { return 2 }
+check = () => {
+	return one() + two()
+}
+`
+	checkBinaryEx(t, code, "check", "yak", 42)
+	checkBinaryExWithOptions(t, code, "check", "yak", 42, withCompileObfuscators("opaque"))
+}
+
+func TestLLVMObfuscationOpaqueWithBranch(t *testing.T) {
+	code := `
+check = () => {
+	a = 40 + 2
+	b = 50 - 8
+	if a > b {
+		return a
+	}
+	return b
+}
+`
+	checkBinaryEx(t, code, "check", "yak", 42)
+	checkBinaryExWithOptions(t, code, "check", "yak", 42, withCompileObfuscators("opaque"))
+}
+
+func TestLLVMObfuscationCombined(t *testing.T) {
+	code := `
+one = () => { return 40 }
+two = () => { return 2 }
+check = () => {
+	return one() + two()
+}
+`
+	// Test combining multiple obfuscation passes.
+	checkBinaryExWithOptions(t, code, "check", "yak", 42, withCompileObfuscators("addsub", "xor"))
+	checkBinaryExWithOptions(t, code, "check", "yak", 42, withCompileObfuscators("mba", "opaque"))
+}

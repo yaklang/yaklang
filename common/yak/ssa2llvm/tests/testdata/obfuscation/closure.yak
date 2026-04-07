@@ -1,0 +1,13 @@
+// Closure with free variable capture.
+makeAdder = (x) => {
+	inner = (y) => {
+		return x + y
+	}
+	return inner
+}
+
+check = () => {
+	add5 = makeAdder(5)
+	add10 = makeAdder(10)
+	return add5(7) + add10(3)
+}
