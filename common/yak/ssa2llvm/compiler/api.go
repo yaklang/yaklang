@@ -12,6 +12,9 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/obfuscation"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/obfuscation/policy"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/obfuscation/resolver"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/obfuscation/virtualize"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/embed"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/trace"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -42,6 +45,27 @@ type CompileConfig struct {
 	PrintEntryResult  bool
 	Obfuscators       []string
 	StdlibCompile     bool
+	ProfileName       string
+	LLVMPluginPath    string
+	LLVMPluginKind    string
+	LLVMPasses        []string
+	LLVMPack          string
+	LLVMOptBinary     string
+	ObfPolicyFile     string
+	// ObfArchives holds paths to obfuscation runtime archives that the
+	// linker must include alongside libyak.a. Populated automatically
+	// by the compile pipeline from runtime deps declared by active obfuscators.
+	ObfArchives []string
+
+	// BuildSeed is an optional 32-byte seed for build diversification.
+	// When set, obfuscators may use it to vary their output per build.
+	// Derived from the profile's SeedPolicy or supplied by the user.
+	BuildSeed []byte
+
+	// profilePolicy is populated by applyCompileProfile when a profile has
+	// DefaultEntries and no explicit --obf-policy file is set. It is used
+	// internally as an inline policy for the resolver.
+	profilePolicy *policy.Policy
 
 	// CacheEnabled uses a deterministic work dir under $TMP and reuses existing artifacts.
 	CacheEnabled bool
@@ -150,6 +174,36 @@ func WithCompileObfuscators(names ...string) CompileOption {
 	}
 }
 
+func WithCompileProfile(name string) CompileOption {
+	return func(c *CompileConfig) { c.ProfileName = strings.TrimSpace(name) }
+}
+
+func WithCompileLLVMPlugin(path string) CompileOption {
+	return func(c *CompileConfig) { c.LLVMPluginPath = strings.TrimSpace(path) }
+}
+
+func WithCompileLLVMPluginKind(kind string) CompileOption {
+	return func(c *CompileConfig) { c.LLVMPluginKind = strings.TrimSpace(kind) }
+}
+
+func WithCompileLLVMPasses(passes ...string) CompileOption {
+	return func(c *CompileConfig) {
+		c.LLVMPasses = appendNormalizedCSV(c.LLVMPasses, passes...)
+	}
+}
+
+func WithCompileLLVMPack(packRef string) CompileOption {
+	return func(c *CompileConfig) { c.LLVMPack = strings.TrimSpace(packRef) }
+}
+
+func WithCompileLLVMOptBinary(path string) CompileOption {
+	return func(c *CompileConfig) { c.LLVMOptBinary = strings.TrimSpace(path) }
+}
+
+func WithCompileObfPolicyFile(path string) CompileOption {
+	return func(c *CompileConfig) { c.ObfPolicyFile = strings.TrimSpace(path) }
+}
+
 func WithCompileStdlibCompile(enabled bool) CompileOption {
 	return func(c *CompileConfig) { c.StdlibCompile = enabled }
 }
@@ -185,6 +239,13 @@ func WithCompileConfig(cfg CompileConfig) CompileOption {
 		c.PrintEntryResult = cfg.PrintEntryResult
 		c.Obfuscators = append(c.Obfuscators, cfg.Obfuscators...)
 		c.StdlibCompile = cfg.StdlibCompile
+		c.ProfileName = cfg.ProfileName
+		c.LLVMPluginPath = cfg.LLVMPluginPath
+		c.LLVMPluginKind = cfg.LLVMPluginKind
+		c.LLVMPasses = append(c.LLVMPasses, cfg.LLVMPasses...)
+		c.LLVMPack = cfg.LLVMPack
+		c.LLVMOptBinary = cfg.LLVMOptBinary
+		c.ObfPolicyFile = cfg.ObfPolicyFile
 		c.CacheEnabled = cfg.CacheEnabled
 		c.Force = cfg.Force
 		c.Trace = cfg.Trace
@@ -208,7 +269,23 @@ func compileInput(
 	entryFunction string,
 	obfuscators []string,
 ) (*ssaapi.Program, *Compiler, string, error) {
-	code, sourceLabel, language, err := resolveCompileInput(sourceFile, sourceCode, language)
+	cfg := newCompileConfig(
+		WithCompileSourceFile(sourceFile),
+		WithCompileSourceCode(sourceCode),
+		WithCompileLanguage(language),
+		WithCompileEntryFunction(entryFunction),
+		WithCompileExternBindings(externBindings),
+		WithCompileObfuscators(obfuscators...),
+	)
+	return compileInputWithConfig(cfg)
+}
+
+func compileInputWithConfig(cfg *CompileConfig) (*ssaapi.Program, *Compiler, string, error) {
+	if cfg == nil {
+		return nil, nil, "", utils.Errorf("compile failed: nil config")
+	}
+
+	code, sourceLabel, language, err := resolveCompileInput(cfg.SourceFile, cfg.SourceCode, cfg.Language)
 	if err != nil {
 		return nil, nil, "", err
 	}
@@ -221,18 +298,46 @@ func compileInput(
 	}
 	obfCtx := &obfuscation.Context{
 		SSA:           progBundle.Program,
-		EntryFunction: entryFunction,
+		EntryFunction: cfg.EntryFunctionName,
 		InstrTags:     make(map[int64]string),
+		BuildSeed:     cfg.BuildSeed,
 	}
+
+	// Resolve obf policy selections.
+	// Priority: explicit --obf-policy file > profile's DefaultEntries > none.
+	var pol *policy.Policy
+	if cfg.ObfPolicyFile != "" {
+		var err error
+		pol, err = policy.LoadFile(cfg.ObfPolicyFile)
+		if err != nil {
+			return nil, nil, "", utils.Errorf("load obf policy: %v", err)
+		}
+	} else if cfg.profilePolicy != nil {
+		pol = cfg.profilePolicy
+	}
+
+	if pol != nil {
+		inv := resolver.BuildFromSSA(progBundle.Program, cfg.EntryFunctionName)
+		resolution, err := resolver.Resolve(pol, inv)
+		if err != nil {
+			return nil, nil, "", utils.Errorf("resolve obf policy: %v", err)
+		}
+		obfCtx.Selections = resolution.Selections
+		policyNames := pol.ObfuscatorNames()
+		if len(policyNames) > 0 {
+			cfg.Obfuscators = mergeObfuscatorNames(cfg.Obfuscators, policyNames)
+		}
+	}
+
 	obfCtx.Stage = obfuscation.StageSSAPre
-	if err := obfuscation.Apply(obfCtx, obfuscators); err != nil {
+	if err := obfuscation.Apply(obfCtx, cfg.Obfuscators); err != nil {
 		return nil, nil, "", utils.Errorf("SSA pre-obfuscation failed: %v", err)
 	}
-	if err := PrepareCallLoweringTags(progBundle.Program, externBindings, obfCtx.InstrTags); err != nil {
+	if err := PrepareCallLoweringTags(progBundle.Program, cfg.ExternBindings, obfCtx.InstrTags); err != nil {
 		return nil, nil, "", utils.Errorf("SSA call lowering preparation failed: %v", err)
 	}
 	obfCtx.Stage = obfuscation.StageSSAPost
-	if err := obfuscation.Apply(obfCtx, obfuscators); err != nil {
+	if err := obfuscation.Apply(obfCtx, cfg.Obfuscators); err != nil {
 		return nil, nil, "", utils.Errorf("SSA post-obfuscation failed: %v", err)
 	}
 
@@ -241,11 +346,32 @@ func compileInput(
 
 	log.Infof("compiling %s (%s)", sourceLabel, language)
 
+	// Extract virtualize plan (if SSAPre produced one) and convert to
+	// compiler-level VirtualizeWrapper map so the compiler emits VM stubs.
+	var compilerOpts []CompilerOption
+	compilerOpts = append(compilerOpts,
+		WithExternBindings(cfg.ExternBindings),
+		WithInstructionTags(obfCtx.InstrTags),
+	)
+	if raw, ok := obfCtx.GetObfData(virtualize.ObfDataKey); ok {
+		if plan, ok := raw.(*virtualize.Plan); ok && plan != nil {
+			wrappers := make(map[string]*VirtualizeWrapper, len(plan.ByName))
+			for name := range plan.ByName {
+				wrappers[name] = &VirtualizeWrapper{
+					FuncName:        name,
+					BlobHex:         plan.BlobHex,
+					SeedHex:         plan.SeedHex,
+					HostBindingSpec: plan.HostBindingSpec,
+				}
+			}
+			compilerOpts = append(compilerOpts, WithVirtualizedFuncs(wrappers))
+		}
+	}
+
 	comp := NewCompiler(
 		ctx,
 		progBundle.Program,
-		WithExternBindings(externBindings),
-		WithInstructionTags(obfCtx.InstrTags),
+		compilerOpts...,
 	)
 	if err := comp.Compile(); err != nil {
 		comp.Dispose()
@@ -253,7 +379,7 @@ func compileInput(
 	}
 	obfCtx.LLVM = comp.Mod
 	obfCtx.Stage = obfuscation.StageLLVM
-	if err := obfuscation.Apply(obfCtx, obfuscators); err != nil {
+	if err := obfuscation.Apply(obfCtx, cfg.Obfuscators); err != nil {
 		comp.Dispose()
 		return nil, nil, "", utils.Errorf("LLVM obfuscation failed: %v", err)
 	}
@@ -374,6 +500,9 @@ func compileWithConfig(cfg *CompileConfig) (CompileResult, error) {
 	if cfg == nil {
 		return CompileResult{}, utils.Errorf("compile failed: nil config")
 	}
+	if err := prepareCompileConfig(cfg); err != nil {
+		return CompileResult{}, err
+	}
 
 	// If requested, enable go-build-like trace for WORK and command lines.
 	trace.SetEnabled(cfg.Trace)
@@ -461,18 +590,17 @@ func compileWithConfig(cfg *CompileConfig) (CompileResult, error) {
 	}
 	cfg.ExtraLinkArgs = extraLinkArgs
 
-	_, comp, ir, err := compileInput(
-		cfg.SourceFile,
-		cfg.SourceCode,
-		cfg.Language,
-		cfg.ExternBindings,
-		cfg.EntryFunctionName,
-		cfg.Obfuscators,
-	)
+	_, comp, ir, err := compileInputWithConfig(cfg)
 	if err != nil {
 		return CompileResult{}, err
 	}
 	defer comp.Dispose()
+
+	// Collect obf runtime deps for linking.
+	if len(cfg.Obfuscators) > 0 {
+		deps := obfuscation.CollectRuntimeDeps(cfg.Obfuscators)
+		cfg.ObfArchives = obfuscation.ExtraRuntimeArchivePaths(deps, cfg.WorkDir)
+	}
 
 	entryFunc, _, err := resolveEntryFunction(comp.Mod, cfg.EntryFunctionName)
 	if err != nil {
@@ -492,8 +620,36 @@ func compileWithConfig(cfg *CompileConfig) (CompileResult, error) {
 	// Regenerate IR because we modified the module (renamed function + wrapper).
 	ir = comp.Mod.String()
 
+	tmpLL, err := os.CreateTemp(cfg.WorkDir, "ssa2llvm-*.ll")
+	if err != nil {
+		return CompileResult{}, utils.Errorf("failed to create temp file: %v", err)
+	}
+	defer os.Remove(tmpLL.Name())
+
+	if _, err := tmpLL.Write([]byte(ir)); err != nil {
+		return CompileResult{}, utils.Errorf("failed to write temp IR: %v", err)
+	}
+	tmpLL.Close()
+
+	finalLL := tmpLL.Name()
+	interopTemps := []string{}
+	if llAfterInterop, temps, err := applyLLVMInterop(cfg, tmpLL.Name()); err != nil {
+		return CompileResult{}, err
+	} else {
+		finalLL = llAfterInterop
+		interopTemps = temps
+	}
+	for _, p := range interopTemps {
+		path := p
+		defer os.Remove(path)
+	}
+
 	if cfg.PrintIR {
-		fmt.Println(ir)
+		data, err := os.ReadFile(finalLL)
+		if err != nil {
+			return CompileResult{}, utils.Errorf("failed to read final LLVM IR: %v", err)
+		}
+		fmt.Println(string(data))
 	}
 
 	outputFile := cfg.OutputFile
@@ -510,7 +666,11 @@ func compileWithConfig(cfg *CompileConfig) (CompileResult, error) {
 		} else {
 			outputFile = replaceExt(cfg.SourceFile, ".ll")
 		}
-		if err := os.WriteFile(outputFile, []byte(ir), 0644); err != nil {
+		data, err := os.ReadFile(finalLL)
+		if err != nil {
+			return CompileResult{}, utils.Errorf("failed to read final LLVM IR: %v", err)
+		}
+		if err := os.WriteFile(outputFile, data, 0644); err != nil {
 			return CompileResult{}, utils.Errorf("failed to write LLVM IR: %v", err)
 		}
 		log.Infof("LLVM IR written to: %s", outputFile)
@@ -522,23 +682,12 @@ func compileWithConfig(cfg *CompileConfig) (CompileResult, error) {
 		return CompileResult{WorkDir: cfg.WorkDir, Artifact: outputFile, CacheHit: false}, nil
 	}
 
-	tmpLL, err := os.CreateTemp(cfg.WorkDir, "ssa2llvm-*.ll")
-	if err != nil {
-		return CompileResult{}, utils.Errorf("failed to create temp file: %v", err)
-	}
-	defer os.Remove(tmpLL.Name())
-
-	if _, err := tmpLL.Write([]byte(ir)); err != nil {
-		return CompileResult{}, utils.Errorf("failed to write temp IR: %v", err)
-	}
-	tmpLL.Close()
-
 	if cfg.EmitAsm {
 		if outputFile == cfg.OutputFile && outputFile != "" {
 		} else {
 			outputFile = replaceExt(cfg.SourceFile, ".s")
 		}
-		if err := CompileLLVMToAsm(tmpLL.Name(), outputFile); err != nil {
+		if err := CompileLLVMToAsm(finalLL, outputFile); err != nil {
 			return CompileResult{}, err
 		}
 		log.Infof("Assembly written to: %s", outputFile)
@@ -555,7 +704,7 @@ func compileWithConfig(cfg *CompileConfig) (CompileResult, error) {
 		} else {
 			outputFile = replaceExt(cfg.SourceFile, ".o")
 		}
-		if err := CompileLLVMToObject(tmpLL.Name(), outputFile); err != nil {
+		if err := CompileLLVMToObject(finalLL, outputFile); err != nil {
 			return CompileResult{}, err
 		}
 		log.Infof("Object file written to: %s", outputFile)
@@ -567,7 +716,7 @@ func compileWithConfig(cfg *CompileConfig) (CompileResult, error) {
 		return CompileResult{WorkDir: cfg.WorkDir, Artifact: outputFile, CacheHit: false}, nil
 	}
 
-	if err := CompileLLVMToBinary(tmpLL.Name(), outputFile, !cfg.SkipRuntimeLink, cfg.RuntimeArchive, cfg.ExtraLinkArgs...); err != nil {
+	if err := CompileLLVMToBinary(finalLL, outputFile, !cfg.SkipRuntimeLink, cfg.RuntimeArchive, cfg.ObfArchives, cfg.ExtraLinkArgs...); err != nil {
 		return CompileResult{}, err
 	}
 
@@ -690,4 +839,41 @@ func buildSSAOptions(language string) []ssaconfig.Option {
 
 func appendObfuscatorNames(dst []string, names ...string) []string {
 	return append(dst, obfuscation.NormalizeNames(names)...)
+}
+
+func appendNormalizedCSV(dst []string, items ...string) []string {
+	for _, item := range items {
+		for _, part := range strings.Split(item, ",") {
+			part = strings.TrimSpace(part)
+			if part == "" {
+				continue
+			}
+			dst = append(dst, part)
+		}
+	}
+	return dst
+}
+
+func (cfg *CompileConfig) workDirForTemps() string {
+	if cfg == nil || strings.TrimSpace(cfg.WorkDir) == "" {
+		return os.TempDir()
+	}
+	return cfg.WorkDir
+}
+
+// mergeObfuscatorNames adds names from extra into base, deduplicating.
+func mergeObfuscatorNames(base, extra []string) []string {
+	seen := make(map[string]struct{}, len(base))
+	for _, n := range base {
+		seen[n] = struct{}{}
+	}
+	merged := append([]string{}, base...)
+	for _, n := range extra {
+		if _, ok := seen[n]; ok {
+			continue
+		}
+		seen[n] = struct{}{}
+		merged = append(merged, n)
+	}
+	return merged
 }
