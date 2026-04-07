@@ -163,6 +163,10 @@ type OnlinePlugin struct {
 	IsCorePlugin         bool                      `json:"isCorePlugin"`
 	CollaboratorInfo     []*OnlineCollaboratorInfo `json:"collaborator"`
 	PluginEnvKey         []string                  `json:"pluginEnvKey"`
+	EnableForAI          bool                      `json:"enableForAI"`
+	AIDesc               string                    `json:"aiDesc"`
+	AIKeywords           string                    `json:"aiKeywords"`
+	AIUsage              string                    `json:"aiUsage"`
 }
 
 type SaveYakScriptOnlineRequest struct {
@@ -180,6 +184,10 @@ type SaveYakScriptOnlineRequest struct {
 	IsCorePlugin         bool                 `json:"isCorePlugin"`
 	PluginSupplement     string               `json:"pluginSupplement"`
 	PluginEnvKey         []string             `json:"pluginEnvKey"`
+	EnableForAI          bool                 `json:"enableForAI"`
+	AIDesc               string               `json:"aiDesc"`
+	AIKeywords           string               `json:"aiKeywords"`
+	AIUsage              string               `json:"aiUsage"`
 }
 
 type OnlinePluginItem struct {
@@ -497,6 +505,10 @@ func (s *OnlineClient) Save(db *gorm.DB, plugins ...*OnlinePlugin) error {
 			//OnlineGroup:          strings.Join(onlineGroup, ","),
 			IsCorePlugin: i.IsCorePlugin,
 			PluginEnvKey: getMarshalRaw(i.PluginEnvKey),
+			EnableForAI:  i.EnableForAI,
+			AIDesc:       i.AIDesc,
+			AIKeywords:   i.AIKeywords,
+			AIUsage:      i.AIUsage,
 		}
 		var riskDetail []*ypb.YakRiskInfo
 		for _, riskDetailInstance := range i.RiskInfo {
@@ -773,6 +785,10 @@ func (s *OnlineClient) SaveToOnline(ctx context.Context, req *ypb.SaveYakScriptT
 		plugin.IsCorePlugin,
 		req.PluginSupplement,
 		plugin.PluginEnvKey,
+		plugin.EnableForAI,
+		plugin.AIDesc,
+		plugin.AIKeywords,
+		plugin.AIUsage,
 	)
 	if err != nil {
 		log.Errorf("save yakScript to online failed: %s", err.Error())
@@ -783,7 +799,9 @@ func (s *OnlineClient) SaveToOnline(ctx context.Context, req *ypb.SaveYakScriptT
 }
 
 func (s *OnlineClient) SaveYakScriptToOnline(ctx context.Context,
-	token string, scriptName string, pluginType, content, params, help, tags string, enablePluginSelector bool, pluginSelectorTypes string, isGeneralModule, isPrivate bool, riskDetail string, isCorePlugin bool, pluginSupplement, pluginEnvKey string) error {
+	token string, scriptName string, pluginType, content, params, help, tags string, enablePluginSelector bool, pluginSelectorTypes string, isGeneralModule, isPrivate bool,
+	riskDetail string, isCorePlugin bool, pluginSupplement, pluginEnvKey string,
+	enableForAI bool, aiDesc, aiKeywords, aiUsage string) error {
 	var (
 		riskDetailJson   []*OnlineRiskDetail
 		paramsJson       []*OnlinePluginParam
@@ -826,6 +844,10 @@ func (s *OnlineClient) SaveYakScriptToOnline(ctx context.Context,
 		IsCorePlugin:         isCorePlugin,
 		PluginSupplement:     pluginSupplement,
 		PluginEnvKey:         pluginEnvKeyJson,
+		EnableForAI:          enableForAI,
+		AIDesc:               aiDesc,
+		AIKeywords:           aiKeywords,
+		AIUsage:              aiUsage,
 	})
 
 	if err != nil {
