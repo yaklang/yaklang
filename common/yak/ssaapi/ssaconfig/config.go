@@ -122,10 +122,9 @@ func defaultCompileConcurrency() int {
 	if concurrency <= 0 {
 		return 1
 	}
-	// Parser-heavy project scans regress quickly with higher fan-out due to GC
-	// and ANTLR cache churn, so keep the implicit default conservative.
-	if concurrency > 4 {
-		return 4
+	concurrency /= 2
+	if concurrency <= 0 {
+		return 1
 	}
 	return concurrency
 }

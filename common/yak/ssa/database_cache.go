@@ -157,7 +157,7 @@ func splitVariableIndexKey(name string) (string, string) {
 	if name == "" {
 		return "", ""
 	}
-	if name[0] == '$' {
+	if len(name) > 1 && name[0] == '$' {
 		name = name[1:]
 	}
 	if name == "" || name[0] != '#' {

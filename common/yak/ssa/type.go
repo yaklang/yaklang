@@ -1082,6 +1082,9 @@ func (s *ObjectType) AddField(key Value, field Type) {
 	if s == nil || utils.IsNil(key) {
 		return
 	}
+	if s.keymap == nil {
+		s.keymap = make(map[string]int)
+	}
 	keyTyp := key.GetType()
 	if field == nil {
 		field = CreateAnyType()
@@ -1102,6 +1105,26 @@ func (s *ObjectType) AddField(key Value, field Type) {
 	s.keymap[keyText] = len(s.Keys) - 1
 }
 
+func (s *ObjectType) getFieldIndexByKeyText(keyText string) (int, bool) {
+	if s == nil {
+		return -1, false
+	}
+	if index, ok := s.keymap[keyText]; ok && index >= 0 && index < len(s.FieldTypes) {
+		return index, true
+	}
+	index := slices.IndexFunc(s.Keys, func(v Value) bool {
+		return !utils.IsNil(v) && v.String() == keyText
+	})
+	if index == -1 || index >= len(s.FieldTypes) {
+		return -1, false
+	}
+	if s.keymap == nil {
+		s.keymap = make(map[string]int)
+	}
+	s.keymap[keyText] = index
+	return index, true
+}
+
 // return (field-type, key-type)
 func (s *ObjectType) GetField(key Value) Type {
 	if s == nil || utils.IsNil(key) {
@@ -1112,7 +1135,7 @@ func (s *ObjectType) GetField(key Value) Type {
 		if o == nil {
 			return nil
 		}
-		if index, ok := o.keymap[keyText]; ok && index >= 0 && index < len(o.FieldTypes) {
+		if index, ok := o.getFieldIndexByKeyText(keyText); ok {
 			return o.FieldTypes[index]
 		}
 		return nil

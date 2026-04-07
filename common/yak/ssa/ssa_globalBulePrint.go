@@ -3,7 +3,7 @@ package ssa
 import "github.com/yaklang/yaklang/common/utils"
 
 func memberKeyNameForGlobal(key Value) string {
-	if lit, ok := key.(*ConstInst); ok && lit.Const != nil {
+	if lit, ok := ToConstInst(key); ok && lit.Const != nil {
 		return lit.Const.str
 	}
 	return key.String()

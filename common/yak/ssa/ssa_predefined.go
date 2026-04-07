@@ -482,7 +482,7 @@ func (n *anValue) GetStringMember(key string) (Value, bool) {
 		if !ok {
 			continue
 		}
-		lit, ok := i.(*ConstInst)
+		lit, ok := ToConstInst(i)
 		if !ok || lit.Const == nil || lit.Const.str != key {
 			continue
 		}
@@ -506,7 +506,7 @@ func (n *anValue) SetStringMember(key string, v Value) {
 		if !ok {
 			continue
 		}
-		lit, ok := i.(*ConstInst)
+		lit, ok := ToConstInst(i)
 		if !ok || lit.Const == nil || lit.Const.str != key {
 			continue
 		}
