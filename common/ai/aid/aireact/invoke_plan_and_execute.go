@@ -27,6 +27,58 @@ var (
 	runCoordinatorForPlanExec        = func(c *aid.Coordinator) error { return c.Run() }
 )
 
+type invokePlanAndExecuteOptions struct {
+	task           aicommon.AIStatefulTask
+	planPayload    string
+	forgeName      string
+	forgeParams    any
+	coordinatorID  string
+	startTaskIndex string
+}
+
+type InvokePlanAndExecuteOption func(*invokePlanAndExecuteOptions)
+
+func WithInvokePlanAndExecuteTask(task aicommon.AIStatefulTask) InvokePlanAndExecuteOption {
+	return func(cfg *invokePlanAndExecuteOptions) {
+		cfg.task = task
+	}
+}
+
+func WithInvokePlanAndExecutePlanPayload(planPayload string) InvokePlanAndExecuteOption {
+	return func(cfg *invokePlanAndExecuteOptions) {
+		cfg.planPayload = planPayload
+	}
+}
+
+func WithInvokePlanAndExecuteForge(name string, params any) InvokePlanAndExecuteOption {
+	return func(cfg *invokePlanAndExecuteOptions) {
+		cfg.forgeName = name
+		cfg.forgeParams = params
+	}
+}
+
+func WithInvokePlanAndExecuteCoordinatorID(coordinatorID string) InvokePlanAndExecuteOption {
+	return func(cfg *invokePlanAndExecuteOptions) {
+		cfg.coordinatorID = coordinatorID
+	}
+}
+
+func WithInvokePlanAndExecuteStartTaskIndex(startTaskIndex string) InvokePlanAndExecuteOption {
+	return func(cfg *invokePlanAndExecuteOptions) {
+		cfg.startTaskIndex = startTaskIndex
+	}
+}
+
+func newInvokePlanAndExecuteOptions(opts ...InvokePlanAndExecuteOption) *invokePlanAndExecuteOptions {
+	cfg := &invokePlanAndExecuteOptions{}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(cfg)
+		}
+	}
+	return cfg
+}
+
 func formatRecoveryTaskID(coordinatorID string) string {
 	return recoveryTaskIDPrefix + sanitizeForTaskId(coordinatorID) + uuid.New().String()
 }
@@ -108,7 +160,10 @@ func (r *ReAct) RequireAIForgeAndAsyncExecute(
 			r.emitArtifactsSummaryToTimeline()
 			done(finalError)
 		}()
-		finalError = r.invokePlanAndExecute(taskDone, ctx, r.GetCurrentTask(), "", forgeName, forgeParams, "")
+		finalError = r.invokePlanAndExecute(taskDone, ctx,
+			WithInvokePlanAndExecuteTask(r.GetCurrentTask()),
+			WithInvokePlanAndExecuteForge(forgeName, forgeParams),
+		)
 		if finalError != nil {
 			log.Errorf("AsyncPlanAndExecute error: %v", finalError)
 		}
@@ -137,7 +192,10 @@ func (r *ReAct) AsyncPlanAndExecute(ctx context.Context, planPayload string, onF
 				onFinished(finalError)
 			}
 		}()
-		finalError = r.invokePlanAndExecute(taskDone, ctx, r.GetCurrentTask(), planPayload, "", nil, "")
+		finalError = r.invokePlanAndExecute(taskDone, ctx,
+			WithInvokePlanAndExecuteTask(r.GetCurrentTask()),
+			WithInvokePlanAndExecutePlanPayload(planPayload),
+		)
 		if finalError != nil {
 			log.Errorf("AsyncPlanAndExecute error: %v", finalError)
 		}
@@ -149,7 +207,7 @@ func (r *ReAct) AsyncPlanAndExecute(ctx context.Context, planPayload string, onF
 	}
 }
 
-func (r *ReAct) AsyncRecoverPlanAndExecute(ctx context.Context, coordinatorID string, onFinished func(error)) {
+func (r *ReAct) AsyncRecoverPlanAndExecute(ctx context.Context, coordinatorID string, startTaskIndex string, onFinished func(error)) {
 	cb := utils.NewCondBarrierContext(ctx)
 	startupBarrier := cb.CreateBarrier("startup")
 
@@ -169,7 +227,11 @@ func (r *ReAct) AsyncRecoverPlanAndExecute(ctx context.Context, coordinatorID st
 				onFinished(finalError)
 			}
 		}()
-		finalError = r.invokePlanAndExecute(taskDone, recoveryTask.GetContext(), recoveryTask, "", "", nil, coordinatorID)
+		finalError = r.invokePlanAndExecute(taskDone, recoveryTask.GetContext(),
+			WithInvokePlanAndExecuteTask(recoveryTask),
+			WithInvokePlanAndExecuteCoordinatorID(coordinatorID),
+			WithInvokePlanAndExecuteStartTaskIndex(startTaskIndex),
+		)
 		if finalError != nil {
 			log.Errorf("AsyncRecoverPlanAndExecute error: %v", finalError)
 			recoveryTask.SetStatus(aicommon.AITaskState_Aborted)
@@ -186,7 +248,15 @@ func (r *ReAct) AsyncRecoverPlanAndExecute(ctx context.Context, coordinatorID st
 	}
 }
 
-func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Context, task aicommon.AIStatefulTask, planPayload string, forgeName string, forgeParams any, coordinatorID string) (finalErr error) {
+func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Context, opts ...InvokePlanAndExecuteOption) (finalErr error) {
+	cfg := newInvokePlanAndExecuteOptions(opts...)
+	task := cfg.task
+	planPayload := cfg.planPayload
+	forgeName := cfg.forgeName
+	forgeParams := cfg.forgeParams
+	coordinatorID := cfg.coordinatorID
+	startTaskIndex := cfg.startTaskIndex
+
 	doneOnce := new(sync.Once)
 	done := func() {
 		doneOnce.Do(func() {
@@ -216,9 +286,10 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 		reactTaskID = task.GetId()
 	}
 	params := map[string]any{
-		"re-act_id":      r.config.Id,
-		"re-act_task":    reactTaskID,
-		"coordinator_id": uid,
+		"re-act_id":        r.config.Id,
+		"re-act_task":      reactTaskID,
+		"coordinator_id":   uid,
+		"start_task_index": startTaskIndex,
 	}
 	r.EmitJSON(schema.EVENT_TYPE_START_PLAN_AND_EXECUTION, r.config.Id, params)
 	defer func() {
@@ -310,6 +381,9 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 			r.config.EventHandler(e)
 		}),
 	)
+	if startTaskIndex != "" {
+		baseOpts = append(baseOpts, aid.WithRecoveryStartTaskIndex(startTaskIndex))
+	}
 
 	if forgeName != "" {
 		var opts = make([]aicommon.ConfigOption, len(baseOpts))
