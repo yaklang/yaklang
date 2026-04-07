@@ -64,6 +64,13 @@ func cachedWorkKeyFromConfig(cfg *CompileConfig) (string, error) {
 	write(fmt.Sprintf("printEntryResult=%t", cfg.PrintEntryResult))
 	write(fmt.Sprintf("skipRuntimeLink=%t", cfg.SkipRuntimeLink))
 	write(fmt.Sprintf("stdlibCompile=%t", cfg.StdlibCompile))
+	write("profile=" + strings.TrimSpace(cfg.ProfileName))
+	write("llvmPlugin=" + strings.TrimSpace(cfg.LLVMPluginPath))
+	write("llvmPluginKind=" + strings.TrimSpace(cfg.LLVMPluginKind))
+	write("llvmPasses=" + strings.Join(cfg.LLVMPasses, ","))
+	write("llvmPack=" + strings.TrimSpace(cfg.LLVMPack))
+	write("llvmOpt=" + strings.TrimSpace(cfg.LLVMOptBinary))
+	write("obfPolicyFile=" + strings.TrimSpace(cfg.ObfPolicyFile))
 	needClang := !cfg.EmitLLVM && !cfg.EmitAsm && !cfg.CompileOnly
 	needLLC := cfg.EmitAsm || cfg.CompileOnly
 	if needClang {
@@ -71,6 +78,9 @@ func cachedWorkKeyFromConfig(cfg *CompileConfig) (string, error) {
 	}
 	if needLLC {
 		write("llc=" + llvmToolVersionKey("llc"))
+	}
+	if strings.TrimSpace(cfg.LLVMPluginPath) != "" || strings.TrimSpace(cfg.LLVMPack) != "" {
+		write("opt=" + llvmToolVersionKey("opt"))
 	}
 	if cfg.StdlibCompile {
 		write("goTool=" + goToolVersionKey())
