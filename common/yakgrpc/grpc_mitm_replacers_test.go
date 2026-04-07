@@ -1307,6 +1307,52 @@ xy`,
 	}
 }
 
+func TestMITMReplaceRule_SecondaryRegexp_GlobalJoin(t *testing.T) {
+	rule := &yakit.MITMReplaceRule{
+		MITMContentReplacer: &ypb.MITMContentReplacer{
+			Rule:                         `(foo)(\d+)`,
+			EnableForResponse:            true,
+			EnableForBody:                true,
+			EnableForRequest:             false,
+			EnableForHeader:              false,
+			EnableForURI:                 false,
+			RegexpResultTemplate:         `$1:$2`,
+			SecondaryRegexp:              `foo:(\d+)`,
+			SecondaryRegexpResultTemplate: `$1`,
+			SecondaryJoiner:              `,`,
+		},
+	}
+	_, results, err := rule.MatchPacket([]byte(`HTTP/1.1 200 OK
+Content-Type: text/plain
+Content-Length: 9
+
+foo1 foo2`), false)
+	require.NoError(t, err)
+	require.Len(t, results, 2)
+	require.Equal(t, "1", results[0].MatchResult)
+	require.Equal(t, "2", results[1].MatchResult)
+}
+
+func TestMITMReplaceRule_SecondaryRegexp_Disabled_BackCompat(t *testing.T) {
+	rule := &yakit.MITMReplaceRule{
+		MITMContentReplacer: &ypb.MITMContentReplacer{
+			Rule:                 `(foo)(\d+)`,
+			EnableForResponse:    true,
+			EnableForBody:        true,
+			RegexpResultTemplate: `$1:$2`,
+		},
+	}
+	_, results, err := rule.MatchPacket([]byte(`HTTP/1.1 200 OK
+Content-Type: text/plain
+Content-Length: 9
+
+foo1 foo2`), false)
+	require.NoError(t, err)
+	require.Len(t, results, 2)
+	require.Equal(t, "foo:1", results[0].MatchResult)
+	require.Equal(t, "foo:2", results[1].MatchResult)
+}
+
 func TestGRPCMUSTPASS_HookColorWithRegexpGroup(t *testing.T) {
 	replacer := yakit.NewMITMReplacer()
 	replacer.SetRules(&ypb.MITMContentReplacer{

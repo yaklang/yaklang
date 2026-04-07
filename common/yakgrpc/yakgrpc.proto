@@ -7083,6 +7083,14 @@ message MITMContentReplacer {
   repeated string ExcludeSuffix = 20;
 
   string RegexpResultTemplate = 21;
+
+  // Secondary stage: run regex on the joined RegexpResultTemplate outputs (global mode).
+  // When empty, secondary stage is disabled and behavior is unchanged.
+  string SecondaryRegexp = 22;
+  // Secondary regex output template, supports $1、\1、{1}. When empty, defaults to group(1) if present, else whole match.
+  string SecondaryRegexpResultTemplate = 23;
+  // Joiner for concatenating primary outputs before secondary regex (default: "\n" when empty).
+  string SecondaryJoiner = 24;
 }
 
 message RemoveHookParams {
