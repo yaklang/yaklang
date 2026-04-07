@@ -1,68 +1,106 @@
-## HTTP Differ Output Examples
+## HTTP 安全模糊测试输出示例
 
-### Example 1: Fuzz GET Parameter for SQL Injection
+### 测试原则
+
+1. reason 必须优先使用中文，说明测试目的、怀疑的漏洞类型和安全边界。
+2. 所有 payload 都应以漏洞验证为目标，不使用 DROP、DELETE、SHUTDOWN、rm -rf 等破坏性命令。
+3. 优先选择无状态、可回滚、对真实业务影响最小的验证方式。
+4. 如果需要继续测试，必须保留至少一个代表性数据包供后续复用。
+
+### 示例 1：测试 GET 参数的 SQL 注入线索
 ```json
 {
   "@action": "fuzz_get_params",
-  "human_readable_thought": "Testing the 'id' parameter for SQL injection vulnerabilities",
   "param_name": "id",
-  "param_values": ["1", "1'", "1\"", "1 OR 1=1", "1' OR '1'='1", "1; DROP TABLE users--"],
-  "reason": "The id parameter appears to be used in database queries, testing for SQL injection"
+  "param_values": ["1", "1'", "1\"", "1 and 1=2", "1 and 1=1", "1 union select 1,2,3"],
+  "reason": "参数 id 看起来会进入数据库查询，先用无破坏性的布尔注入和 UNION 探测验证是否存在 SQL 注入。"
 }
 ```
 
-### Example 2: Fuzz HTTP Header
+### 示例 2：测试请求头信任问题
 ```json
 {
   "@action": "fuzz_header",
-  "human_readable_thought": "Testing X-Forwarded-For header for IP spoofing",
   "header_name": "X-Forwarded-For",
-  "header_values": ["127.0.0.1", "localhost", "192.168.1.1", "10.0.0.1"],
-  "reason": "Testing if the application trusts X-Forwarded-For header for access control"
+  "header_values": ["127.0.0.1", "localhost", "10.0.0.1", "::1"],
+  "reason": "怀疑目标服务会错误信任代理头做访问控制，这里先用常见内网和本机地址验证是否存在请求头绕过。"
 }
 ```
 
-### Example 3: Fuzz Path for Directory Traversal
+### 示例 3：测试路径与备份端点
 ```json
 {
   "@action": "fuzz_path",
-  "human_readable_thought": "Testing path traversal to access sensitive files",
-  "paths": ["../etc/passwd", "....//....//etc/passwd", "/admin", "/backup"],
+  "paths": ["/admin", "/backup", "/.git/config", "../etc/passwd"],
   "append_mode": false,
-  "reason": "Testing for path traversal vulnerabilities to access system files"
+  "reason": "先验证管理端点暴露、备份文件泄露和基础目录穿越线索，不做任何破坏性写入。"
 }
 ```
 
-### Example 4: Fuzz Request Body
+### 示例 4：测试 JSON Body 的模板注入
 ```json
 {
   "@action": "fuzz_body",
-  "human_readable_thought": "Testing JSON body parameter for template injection",
   "body_type": "json_params",
   "param_name": "username",
-  "param_values": ["{{"{{7*7}}"}}", "${7*7}", "<%= 7*7 %>", "#{7*7}"],
-  "reason": "Testing for server-side template injection in JSON body"
+  "param_values": ["{{7*7}}", "${7*7}", "<%= 7*7 %>", "#{7*7}"],
+  "reason": "这个 JSON 字段可能会被模板引擎解析，先验证是否存在服务器端模板注入。"
 }
 ```
 
-### Example 5: Fuzz Cookie
+### 示例 5：测试 Cookie 会话操控
 ```json
 {
   "@action": "fuzz_cookie",
-  "human_readable_thought": "Testing session cookie manipulation",
   "cookie_name": "session",
-  "cookie_values": ["admin", "root", "' OR '1'='1", "{{"{{constructor.constructor('return this')()}}"}}"],
+  "cookie_values": ["guest", "admin", "' or '1'='1", "{{7*7}}"],
   "raw_mode": false,
-  "reason": "Testing session cookie for privilege escalation and injection"
+  "reason": "会话 Cookie 可能影响权限判断，先验证是否存在会话固定、越权或注入线索。"
 }
 ```
 
-### Example 6: Fuzz HTTP Method
+### 示例 6：测试 HTTP 方法差异
 ```json
 {
   "@action": "fuzz_method",
-  "human_readable_thought": "Testing different HTTP methods to find hidden functionality",
-  "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "TRACE"],
-  "reason": "Checking if the endpoint responds differently to various HTTP methods"
+  "methods": ["GET", "POST", "PUT", "PATCH", "OPTIONS", "TRACE"],
+  "reason": "怀疑同一路径在不同 HTTP 方法下会走不同逻辑，先观察状态码、响应长度和报错差异。"
 }
 ```
+
+### 示例 7：直接生成完整原始数据包并发送
+```json
+{
+  "@action": "generate_and_send_packet",
+  "packet_type": "mutation",
+  "target_purpose": "验证登录接口是否存在 SQL 注入",
+  "generation_reason": "当前请求已具备登录上下文，希望 AI 直接生成一个完整原始数据包，针对 username 参数做无破坏性的 SQL 注入验证。"
+}
+```
+
+<|GEN_PACKET_{{ .Nonce }}|>
+POST /login HTTP/1.1
+Host: vulnerable-app.local
+Content-Type: application/x-www-form-urlencoded
+Cookie: session=guest
+
+username=admin%27%20or%20%271%27=%271&password=test
+<|GEN_PACKET_END_{{ .Nonce }}|>
+
+### 示例 8：完全新建原始数据包做模板注入探测
+```json
+{
+  "@action": "generate_and_send_packet",
+  "packet_type": "synthetic",
+  "target_purpose": "验证配置上传接口是否存在模板注入",
+  "generation_reason": "当前需要直接构造完整 JSON 请求来验证模板表达式是否会被服务端解析，整个测试必须保持只读和无破坏。"
+}
+```
+
+<|GEN_PACKET_{{ .Nonce }}|>
+POST /api/config/render HTTP/1.1
+Host: target.internal
+Content-Type: application/json
+
+{"name":"tester","template":"{{7*7}}","preview":true}
+<|GEN_PACKET_END_{{ .Nonce }}|>

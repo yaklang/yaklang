@@ -11,14 +11,20 @@ import (
 )
 
 var fuzzGetParamsAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
-	return reactloops.WithRegisterLoopAction(
+	return reactloops.WithRegisterLoopActionWithStreamField(
 		"fuzz_get_params",
 		"Fuzz GET query parameters. Use this to test SQL injection, XSS, or other parameter-based attacks on URL query string.",
 		[]aitool.ToolOption{
 			aitool.WithStringParam("param_name", aitool.WithParam_Description("The GET parameter name to fuzz. If empty, will add new parameters"), aitool.WithParam_Required(true)),
 			aitool.WithStringArrayParam("param_values", aitool.WithParam_Description("Values to test for the parameter, e.g., [\"' OR '1'='1\", '<script>alert(1)</script>', '{{7*7}}']"), aitool.WithParam_Required(true)),
 			aitool.WithBoolParam("raw_mode", aitool.WithParam_Description("If true, replace the entire query string with the provided values")),
-			aitool.WithStringParam("reason", aitool.WithParam_Description("Explain why you want to test these values")),
+			aitool.WithStringParam("reason", aitool.WithParam_Description("请用中文说明为什么要测试这些参数值、怀疑的漏洞类型以及安全测试边界。")),
+		},
+		[]*reactloops.LoopStreamField{
+			{FieldName: "fuzz_get_params", AINodeId: "thought"},
+			{FieldName: "param_name", AINodeId: "thought"},
+			{FieldName: "reason", AINodeId: "thought"},
+			{FieldName: "param_values", AINodeId: "thought"},
 		},
 		func(l *reactloops.ReActLoop, action *aicommon.Action) error {
 			paramName := action.GetString("param_name")
@@ -56,7 +62,7 @@ var fuzzGetParamsAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopO
 			}
 
 			// Execute and compare
-			diffResult, err := executeFuzzAndCompare(loop, fuzzResult, "fuzz_get_params")
+			diffResult, verifyResult, err := executeFuzzAndCompare(loop, fuzzResult, "fuzz_get_params")
 			if err != nil {
 				operator.Fail(err)
 				return
@@ -66,9 +72,8 @@ var fuzzGetParamsAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopO
 			if rawMode {
 				mode = "raw"
 			}
-			r.AddToTimeline("fuzz_get_params", fmt.Sprintf("Tested GET param %s (%s mode) with values: %v\n%s", paramName, mode, paramValues, diffResult))
-			operator.Feedback(diffResult)
+			r.AddToTimeline("fuzz_get_params", fmt.Sprintf("Tested GET param %s (%s mode) with values: %v\n%s", paramName, mode, paramValues, buildFuzzTimelineSummary(diffResult)))
+			applyFuzzVerificationOutcome(loop, operator, diffResult, verifyResult)
 		},
 	)
 }
-

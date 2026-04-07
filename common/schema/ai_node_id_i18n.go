@@ -73,6 +73,10 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "任务依赖",
 		En: "Task Dependency",
 	},
+	"http_flow": {
+		Zh: "HTTP 数据包",
+		En: "HTTP Flow",
+	},
 	"directly_call_tool_params": {
 		Zh: "快速工具调用",
 		En: "Direct Tool Call",
@@ -182,7 +186,7 @@ var nodeIdMapper = map[string]*I18n{
 		En: "Tool Compose",
 	},
 	"knowledge-compress": {
-		Zh: "知识压缩",
+		Zh: "压缩精炼",
 		En: "Knowledge Compress",
 	},
 	"reference_material": {
