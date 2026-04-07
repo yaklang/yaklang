@@ -1,0 +1,103 @@
+desc(
+	title: "Audit WebFlux Path Pattern Security Matching"
+	title_zh: "审计WebFlux路径模式授权匹配"
+	type: audit
+	risk: "WebFlux路径授权"
+	desc: <<<DESC
+### 规则说明
+本规则用于审计 WebFlux 安全匹配器中，直接基于 `pathWithinApplication()` 和 `PathPattern` 进行授权判断的实现。
+
+当路径模式匹配、通配符语义和应用相对路径边界没有统一验证时，可能出现匹配歧义或路径授权绕过。
+DESC
+	rule_id: "2886eb15-a1fa-4ece-8412-baf86f1fa1c5"
+	solution: <<<SOLUTION
+### 审计建议
+- 复核 `pathWithinApplication()` 的语义是否与安全策略期望完全一致。
+- 对通配符、尾部匹配和路径提取逻辑做单独安全验证。
+- 不要默认认为 WebFlux 路径模式匹配结果就能直接作为授权结论。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-863: Incorrect Authorization](https://cwe.mitre.org/data/definitions/863.html)
+REFERENCE
+)
+
+pathWithinApplication() as $pathWithinApplication;
+parse(* as $patternArg);
+matchAndExtract(* as $matchAndExtract);
+
+$pathWithinApplication + $patternArg + $matchAndExtract as $risk;
+check $risk;
+
+alert $risk for {
+	title: "Audit WebFlux Path Pattern Security Matching",
+	title_zh: "审计WebFlux路径模式授权匹配",
+	level: "middle",
+	message: "发现基于 WebFlux pathWithinApplication 和 PathPattern 的授权匹配实现，需复核通配符和路径边界语义。",
+	risk: "WebFlux路径授权",
+	name: "risk",
+	desc: <<<DESC
+### 规则说明
+本规则用于审计 WebFlux 安全匹配器中，直接基于 `pathWithinApplication()` 和 `PathPattern` 进行授权判断的实现。
+
+当路径模式匹配、通配符语义和应用相对路径边界没有统一验证时，可能出现匹配歧义或路径授权绕过。
+DESC
+	solution: <<<SOLUTION
+### 审计建议
+- 复核 `pathWithinApplication()` 的语义是否与安全策略期望完全一致。
+- 对通配符、尾部匹配和路径提取逻辑做单独安全验证。
+- 不要默认认为 WebFlux 路径模式匹配结果就能直接作为授权结论。
+SOLUTION
+}
+
+desc(
+	lang: java
+	alert_min: 1
+	'file://webflux-path-pattern-security-matcher.java': <<<CODE
+class PathPatternParserServerWebExchangeMatcher {
+    private static final PathPatternParser DEFAULT_PATTERN_PARSER = new PathPatternParser();
+    private final PathPattern pattern;
+
+    PathPatternParserServerWebExchangeMatcher(String sourcePattern) {
+        this.pattern = DEFAULT_PATTERN_PARSER.parse(sourcePattern);
+    }
+
+    MatchResult matches(ServerWebExchange exchange) {
+        PathContainer path = exchange.getRequest().getPath().pathWithinApplication();
+        if (!this.pattern.matches(path)) {
+            return MatchResult.notMatch();
+        }
+        this.pattern.matchAndExtract(path);
+        return MatchResult.match();
+    }
+}
+
+class PathPatternParser {
+    PathPattern parse(String s) { return new PathPattern(); }
+}
+
+class PathPattern {
+    boolean matches(PathContainer c) { return true; }
+    Object matchAndExtract(PathContainer c) { return new Object(); }
+}
+
+class PathContainer {
+}
+
+class MatchResult {
+    static MatchResult notMatch() { return new MatchResult(); }
+    static MatchResult match() { return new MatchResult(); }
+}
+
+interface ServerWebExchange {
+    ServerHttpRequest getRequest();
+}
+
+interface ServerHttpRequest {
+    RequestPath getPath();
+}
+
+interface RequestPath {
+    PathContainer pathWithinApplication();
+}
+CODE
+)

@@ -1,0 +1,77 @@
+desc(
+	title: "Audit Authorization Filter Dispatcher Coverage"
+	title_zh: "审计授权过滤器Dispatcher覆盖"
+	type: audit
+	risk: "Dispatcher授权控制"
+	desc: <<<DESC
+### 规则说明
+本规则用于审计授权过滤器对不同 dispatcher type 的覆盖逻辑。
+
+当过滤器只围绕 async/error dispatch 做开关控制，而 forward/include 等分派路径没有统一纳入授权检查时，可能导致授权策略在某些请求分派场景下被绕过。
+DESC
+	rule_id: "a83071d3-8a3d-4dd0-bfc6-d579e8ef8e6e"
+	solution: <<<SOLUTION
+### 审计建议
+- 明确审查授权过滤器对 REQUEST、FORWARD、INCLUDE、ERROR、ASYNC 的处理一致性。
+- 不要只针对 async/error 分派做授权控制开关，而忽略其他分派路径。
+- 在安全过滤器中统一定义 dispatcher type 语义，避免 once-per-request 或局部开关造成绕过。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-863: Incorrect Authorization](https://cwe.mitre.org/data/definitions/863.html)
+REFERENCE
+)
+
+e"AuthorizationManager" as $authorizationManager;
+e"shouldFilterAllDispatcherTypes" as $dispatcherToggle;
+e"shouldNotFilterAsyncDispatch" as $asyncDispatch;
+e"shouldNotFilterErrorDispatch" as $errorDispatch;
+
+$authorizationManager + $dispatcherToggle + $asyncDispatch + $errorDispatch as $risk;
+check $risk;
+
+alert $risk for {
+	title: "Audit Authorization Filter Dispatcher Coverage",
+	title_zh: "审计授权过滤器Dispatcher覆盖",
+	level: "middle",
+	message: "发现授权过滤器只对部分 dispatcher type 做开关控制，需复核 forward/include 等分派路径是否被一致纳入授权检查。",
+	risk: "Dispatcher授权控制",
+	name: "risk",
+	desc: <<<DESC
+### 规则说明
+本规则用于审计授权过滤器对不同 dispatcher type 的覆盖逻辑。
+
+当过滤器只围绕 async/error dispatch 做开关控制，而 forward/include 等分派路径没有统一纳入授权检查时，可能导致授权策略在某些请求分派场景下被绕过。
+DESC
+	solution: <<<SOLUTION
+### 审计建议
+- 明确审查授权过滤器对 REQUEST、FORWARD、INCLUDE、ERROR、ASYNC 的处理一致性。
+- 不要只针对 async/error 分派做授权控制开关，而忽略其他分派路径。
+- 在安全过滤器中统一定义 dispatcher type 语义，避免 once-per-request 或局部开关造成绕过。
+SOLUTION
+}
+
+desc(
+	lang: java
+	alert_min: 1
+	'file://authorization-filter-dispatcher-coverage.java': <<<CODE
+class AuthorizationFilter {
+    private final AuthorizationManager authorizationManager;
+    private boolean shouldFilterAllDispatcherTypes = false;
+
+    AuthorizationFilter(AuthorizationManager authorizationManager) {
+        this.authorizationManager = authorizationManager;
+    }
+
+    protected boolean shouldNotFilterAsyncDispatch() {
+        return !this.shouldFilterAllDispatcherTypes;
+    }
+
+    protected boolean shouldNotFilterErrorDispatch() {
+        return !this.shouldFilterAllDispatcherTypes;
+    }
+}
+
+interface AuthorizationManager {
+}
+CODE
+)
