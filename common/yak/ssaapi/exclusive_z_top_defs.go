@@ -3,6 +3,7 @@ package ssaapi
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
@@ -147,7 +148,14 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		var ret Values
 		obj, key, member := actx.getCurrentObject()
 		if obj != nil && i.IsObject() && i.GetId() != obj.GetId() {
-			for i, m := range i.GetMember(key) {
+			members := i.GetMember(key)
+			if len(members) == 0 {
+				if raw, ok := key.GetConstValue().(string); ok && strings.HasPrefix(raw, "$") {
+					normalizedKey := i.NewValue(ssa.NewConst(strings.TrimPrefix(raw, "$")))
+					members = i.GetMember(normalizedKey)
+				}
+			}
+			for i, m := range members {
 				if i == 0 {
 					actx.popObject()
 				}
@@ -181,6 +189,11 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 				}
 
 				results := obj.getTopDefs(actx, opt...)
+				if len(results) > 1 {
+					results = lo.Filter(results, func(item *Value, _ int) bool {
+						return !ValueCompare(item, obj)
+					})
+				}
 				if len(results) == 0 && !ValueCompare(i, actx.Self) {
 					results = append(results, i)
 				}
