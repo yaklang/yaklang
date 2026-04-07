@@ -18,24 +18,29 @@ import (
 const loopHTTPFuzzSessionContextMarker = "[HTTP_FUZZ_SESSION_CONTEXT]"
 
 type loopHTTPFuzzSessionContext struct {
-	Version                   int       `json:"version"`
-	OriginalRequest           string    `json:"original_request"`
-	OriginalRequestSummary    string    `json:"original_request_summary,omitempty"`
-	CurrentRequest            string    `json:"current_request,omitempty"`
-	CurrentRequestSummary     string    `json:"current_request_summary,omitempty"`
-	PreviousRequest           string    `json:"previous_request,omitempty"`
-	PreviousRequestSummary    string    `json:"previous_request_summary,omitempty"`
-	RequestChangeSummary      string    `json:"request_change_summary,omitempty"`
-	RequestModificationReason string    `json:"request_modification_reason,omitempty"`
-	RequestReviewDecision     string    `json:"request_review_decision,omitempty"`
-	IsHTTPS                   bool      `json:"is_https"`
-	BootstrapSource           string    `json:"bootstrap_source,omitempty"`
-	RepresentativeRequest     string    `json:"representative_request,omitempty"`
-	RepresentativeResponse    string    `json:"representative_response,omitempty"`
-	RepresentativeHiddenIndex string    `json:"representative_hidden_index,omitempty"`
-	AnalysisSummary           string    `json:"analysis_summary,omitempty"`
-	VerificationResult        string    `json:"verification_result,omitempty"`
-	UpdatedAt                 time.Time `json:"updated_at"`
+	Version                   int                        `json:"version"`
+	OriginalRequest           string                     `json:"original_request"`
+	OriginalRequestSummary    string                     `json:"original_request_summary,omitempty"`
+	CurrentRequest            string                     `json:"current_request,omitempty"`
+	CurrentRequestSummary     string                     `json:"current_request_summary,omitempty"`
+	PreviousRequest           string                     `json:"previous_request,omitempty"`
+	PreviousRequestSummary    string                     `json:"previous_request_summary,omitempty"`
+	RequestChangeSummary      string                     `json:"request_change_summary,omitempty"`
+	RequestModificationReason string                     `json:"request_modification_reason,omitempty"`
+	RequestReviewDecision     string                     `json:"request_review_decision,omitempty"`
+	IsHTTPS                   bool                       `json:"is_https"`
+	BootstrapSource           string                     `json:"bootstrap_source,omitempty"`
+	RepresentativeRequest     string                     `json:"representative_request,omitempty"`
+	RepresentativeResponse    string                     `json:"representative_response,omitempty"`
+	RepresentativeHiddenIndex string                     `json:"representative_hidden_index,omitempty"`
+	AnalysisSummary           string                     `json:"analysis_summary,omitempty"`
+	VerificationResult        string                     `json:"verification_result,omitempty"`
+	RecentActions             []loopHTTPFuzzActionRecord `json:"recent_actions,omitempty"`
+	TestedPayloadsByAction    map[string][]string        `json:"tested_payloads_by_action,omitempty"`
+	LastActionType            string                     `json:"last_action_type,omitempty"`
+	DirectlyAnswered          bool                       `json:"directly_answered,omitempty"`
+	FinalAnswerDelivered      bool                       `json:"final_answer_delivered,omitempty"`
+	UpdatedAt                 time.Time                  `json:"updated_at"`
 }
 
 func getLoopPersistentConfig(loop *reactloops.ReActLoop) *aicommon.Config {
@@ -61,7 +66,7 @@ func captureLoopHTTPFuzzSessionContext(loop *reactloops.ReActLoop, source string
 	}
 
 	ctx := &loopHTTPFuzzSessionContext{
-		Version:                   2,
+		Version:                   3,
 		OriginalRequest:           originalRequest,
 		OriginalRequestSummary:    strings.TrimSpace(loop.Get("original_request_summary")),
 		CurrentRequest:            strings.TrimSpace(loop.Get("current_request")),
@@ -78,6 +83,11 @@ func captureLoopHTTPFuzzSessionContext(loop *reactloops.ReActLoop, source string
 		RepresentativeHiddenIndex: strings.TrimSpace(loop.Get("representative_httpflow_hidden_index")),
 		AnalysisSummary:           analysisSummary,
 		VerificationResult:        strings.TrimSpace(loop.Get("verification_result")),
+		RecentActions:             getLoopHTTPFuzzRecentActions(loop),
+		TestedPayloadsByAction:    getLoopHTTPFuzzTestedPayloads(loop),
+		LastActionType:            getLoopHTTPFuzzLastAction(loop),
+		DirectlyAnswered:          hasLoopHTTPFuzzDirectlyAnswered(loop),
+		FinalAnswerDelivered:      hasLoopHTTPFuzzFinalAnswerDelivered(loop),
 		UpdatedAt:                 time.Now(),
 	}
 
@@ -117,8 +127,7 @@ func persistLoopHTTPFuzzSessionContext(loop *reactloops.ReActLoop, source string
 	payload := string(payloadBytes)
 
 	if lastCtx, ok := extractLatestLoopHTTPFuzzSessionContext(cfg.GetUserInputHistory()); ok {
-		lastBytes, _ := json.Marshal(lastCtx)
-		if string(lastBytes) == payload {
+		if sameLoopHTTPFuzzSessionContext(lastCtx, ctx) {
 			return
 		}
 	}
@@ -165,6 +174,13 @@ func restoreLoopHTTPFuzzSessionContext(loop *reactloops.ReActLoop, runtime aicom
 	if !ok || ctx == nil || strings.TrimSpace(ctx.OriginalRequest) == "" {
 		return false
 	}
+	return applyLoopHTTPFuzzSessionContext(loop, runtime, ctx)
+}
+
+func applyLoopHTTPFuzzSessionContext(loop *reactloops.ReActLoop, runtime aicommon.AIInvokeRuntime, ctx *loopHTTPFuzzSessionContext) bool {
+	if ctx == nil || strings.TrimSpace(ctx.OriginalRequest) == "" {
+		return false
+	}
 
 	restoreRequest := strings.TrimSpace(ctx.CurrentRequest)
 	if restoreRequest == "" {
@@ -194,6 +210,11 @@ func restoreLoopHTTPFuzzSessionContext(loop *reactloops.ReActLoop, runtime aicom
 	loop.Set("diff_result", ctx.AnalysisSummary)
 	loop.Set("diff_result_compressed", ctx.AnalysisSummary)
 	loop.Set("verification_result", ctx.VerificationResult)
+	setLoopHTTPFuzzRecentActions(loop, ctx.RecentActions)
+	setLoopHTTPFuzzTestedPayloads(loop, ctx.TestedPayloadsByAction)
+	loop.Set(loopHTTPFuzzLastActionTypeKey, strings.TrimSpace(ctx.LastActionType))
+	loop.Set(loopHTTPFuzzDirectlyAnsweredKey, ctx.DirectlyAnswered)
+	loop.Set(loopHTTPFuzzFinalAnswerDeliveredKey, ctx.FinalAnswerDelivered)
 	if ctx.RepresentativeHiddenIndex != "" {
 		loop.Set("last_httpflow_hidden_index", ctx.RepresentativeHiddenIndex)
 	}
@@ -237,4 +258,17 @@ func extractLatestLoopHTTPFuzzSessionContext(history []schema.AIAgentUserInputRe
 		return &ctx, true
 	}
 	return nil, false
+}
+
+func sameLoopHTTPFuzzSessionContext(left, right *loopHTTPFuzzSessionContext) bool {
+	if left == nil || right == nil {
+		return left == right
+	}
+	leftCopy := *left
+	rightCopy := *right
+	leftCopy.UpdatedAt = time.Time{}
+	rightCopy.UpdatedAt = time.Time{}
+	leftBytes, _ := json.Marshal(leftCopy)
+	rightBytes, _ := json.Marshal(rightCopy)
+	return string(leftBytes) == string(rightBytes)
 }

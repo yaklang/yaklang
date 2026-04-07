@@ -82,7 +82,8 @@ var generateAndSendPacketAction = func(r aicommon.AIInvokeRuntime) reactloops.Re
 
 			log.Infof("generate_and_send_packet action: packet_type=%s, target=%s, reason=%s", packetType, targetPurpose, generationReason)
 
-			diffResult, verifyResult, err := executeFuzzAndCompare(loop, fuzzReq.Repeat(1), "generate_and_send_packet")
+			paramSummary := fmt.Sprintf("packet_type=%s; target_purpose=%s; generation_reason=%s", packetType, targetPurpose, generationReason)
+			diffResult, verifyResult, err := executeFuzzAndCompare(loop, fuzzReq.Repeat(1), "generate_and_send_packet", paramSummary)
 			if err != nil {
 				operator.Fail(err)
 				return

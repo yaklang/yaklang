@@ -62,7 +62,8 @@ var fuzzGetParamsAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopO
 			}
 
 			// Execute and compare
-			diffResult, verifyResult, err := executeFuzzAndCompare(loop, fuzzResult, "fuzz_get_params")
+			paramSummary := fmt.Sprintf("param_name=%s; param_values=%v; raw_mode=%v; reason=%s", paramName, paramValues, rawMode, reason)
+			diffResult, verifyResult, err := executeFuzzAndCompare(loop, fuzzResult, "fuzz_get_params", paramSummary)
 			if err != nil {
 				operator.Fail(err)
 				return

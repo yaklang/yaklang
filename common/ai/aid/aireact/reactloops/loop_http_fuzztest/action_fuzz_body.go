@@ -77,7 +77,8 @@ var fuzzBodyAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption
 			}
 
 			// Execute and compare
-			diffResult, verifyResult, err := executeFuzzAndCompare(loop, fuzzResult, "fuzz_body")
+			paramSummary := fmt.Sprintf("body_type=%s; param_name=%s; param_values=%v; reason=%s", bodyType, paramName, paramValues, reason)
+			diffResult, verifyResult, err := executeFuzzAndCompare(loop, fuzzResult, "fuzz_body", paramSummary)
 			if err != nil {
 				operator.Fail(err)
 				return

@@ -43,6 +43,7 @@ func init() {
 				reactloops.WithAITagFieldWithAINodeId("GEN_MODIFIED_PACKET", modifiedPacketContentField, "http_flow", aicommon.TypeCodeHTTPRequest),
 				reactloops.WithOverrideLoopAction(loopActionDirectlyAnswerHTTPFuzztest),
 				reactloops.WithInitTask(buildInitTask(r)),
+				BuildOnPostIterationHook(r),
 				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 				reactloops.WithPersistentInstruction(instruction),
@@ -61,6 +62,8 @@ func init() {
 					diffResult := loop.Get("diff_result")
 					verificationResult := loop.Get("verification_result")
 					securityKnowledge := loop.Get("security_knowledge")
+					recentActionsSummary := buildLoopHTTPFuzzRecentActionsPrompt(loop)
+					testedPayloadSummary := buildLoopHTTPFuzzTestedPayloadPrompt(loop)
 
 					renderMap := map[string]any{
 						"OriginalRequest":           originalRequest,
@@ -76,6 +79,8 @@ func init() {
 						"DiffResult":                diffResult,
 						"VerificationResult":        verificationResult,
 						"SecurityKnowledge":         securityKnowledge,
+						"RecentActionsSummary":      recentActionsSummary,
+						"TestedPayloadSummary":      testedPayloadSummary,
 						"Nonce":                     nonce,
 						"FeedbackMessages":          feedbacker.String(),
 					}
