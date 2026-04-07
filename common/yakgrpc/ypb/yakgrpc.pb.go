@@ -51105,8 +51105,20 @@ type MITMContentReplacer struct {
 	RegexpGroups         []int64  `protobuf:"varint,19,rep,packed,name=RegexpGroups,proto3" json:"RegexpGroups,omitempty"`
 	ExcludeSuffix        []string `protobuf:"bytes,20,rep,name=ExcludeSuffix,proto3" json:"ExcludeSuffix,omitempty"`
 	RegexpResultTemplate string   `protobuf:"bytes,21,opt,name=RegexpResultTemplate,proto3" json:"RegexpResultTemplate,omitempty"`
+<<<<<<< HEAD
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
+=======
+	// Secondary stage: run regex on the joined RegexpResultTemplate outputs (global mode).
+	// When empty, secondary stage is disabled and behavior is unchanged.
+	SecondaryRegexp string `protobuf:"bytes,22,opt,name=SecondaryRegexp,proto3" json:"SecondaryRegexp,omitempty"`
+	// Secondary regex output template, supports $1、\1、{1}. When empty, defaults to group(1) if present, else whole match.
+	SecondaryRegexpResultTemplate string `protobuf:"bytes,23,opt,name=SecondaryRegexpResultTemplate,proto3" json:"SecondaryRegexpResultTemplate,omitempty"`
+	// Joiner for concatenating primary outputs before secondary regex (default: "\n" when empty).
+	SecondaryJoiner string `protobuf:"bytes,24,opt,name=SecondaryJoiner,proto3" json:"SecondaryJoiner,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+>>>>>>> 706d3a54f (feat(yakit): add secondary regex output stage)
 }
 
 func (x *MITMContentReplacer) Reset() {
@@ -51282,6 +51294,27 @@ func (x *MITMContentReplacer) GetExcludeSuffix() []string {
 func (x *MITMContentReplacer) GetRegexpResultTemplate() string {
 	if x != nil {
 		return x.RegexpResultTemplate
+	}
+	return ""
+}
+
+func (x *MITMContentReplacer) GetSecondaryRegexp() string {
+	if x != nil {
+		return x.SecondaryRegexp
+	}
+	return ""
+}
+
+func (x *MITMContentReplacer) GetSecondaryRegexpResultTemplate() string {
+	if x != nil {
+		return x.SecondaryRegexpResultTemplate
+	}
+	return ""
+}
+
+func (x *MITMContentReplacer) GetSecondaryJoiner() string {
+	if x != nil {
+		return x.SecondaryJoiner
 	}
 	return ""
 }
@@ -72692,7 +72725,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x0eCaCertificates\x18\x03 \x03(\fR\x0eCaCertificates\x12 \n" +
 	"\vPkcs12Bytes\x18\x04 \x01(\fR\vPkcs12Bytes\x12&\n" +
 	"\x0ePkcs12Password\x18\x05 \x01(\fR\x0ePkcs12Password\x12\x12\n" +
-	"\x04Host\x18\x06 \x01(\tR\x04Host\"\xfc\x05\n" +
+	"\x04Host\x18\x06 \x01(\tR\x04Host\"\x96\a\n" +
 	"\x13MITMContentReplacer\x12\x12\n" +
 	"\x04Rule\x18\x01 \x01(\tR\x04Rule\x12\x1c\n" +
 	"\tNoReplace\x18\x02 \x01(\bR\tNoReplace\x12\x16\n" +
@@ -72715,7 +72748,10 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\fEffectiveURL\x18\x12 \x01(\tR\fEffectiveURL\x12\"\n" +
 	"\fRegexpGroups\x18\x13 \x03(\x03R\fRegexpGroups\x12$\n" +
 	"\rExcludeSuffix\x18\x14 \x03(\tR\rExcludeSuffix\x122\n" +
-	"\x14RegexpResultTemplate\x18\x15 \x01(\tR\x14RegexpResultTemplate\"n\n" +
+	"\x14RegexpResultTemplate\x18\x15 \x01(\tR\x14RegexpResultTemplate\x12(\n" +
+	"\x0fSecondaryRegexp\x18\x16 \x01(\tR\x0fSecondaryRegexp\x12D\n" +
+	"\x1dSecondaryRegexpResultTemplate\x18\x17 \x01(\tR\x1dSecondaryRegexpResultTemplate\x12(\n" +
+	"\x0fSecondaryJoiner\x18\x18 \x01(\tR\x0fSecondaryJoiner\"n\n" +
 	"\x10RemoveHookParams\x12\x1a\n" +
 	"\bClearAll\x18\x01 \x01(\bR\bClearAll\x12\x1a\n" +
 	"\bHookName\x18\x02 \x03(\tR\bHookName\x12\"\n" +

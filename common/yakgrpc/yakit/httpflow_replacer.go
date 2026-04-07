@@ -159,6 +159,7 @@ func (m *MITMReplaceRule) MatchByHTTPFlow(rsp string) ([]*MatchResult, error) {
 		return nil, nil
 	}
 	var res []*MatchResult
+	var primaryRets []string
 	var ret string
 	for ; err == nil && match != nil; match, err = r.FindNextMatch(match) {
 		if match.GroupCount() > 1 {
@@ -192,6 +193,7 @@ func (m *MITMReplaceRule) MatchByHTTPFlow(rsp string) ([]*MatchResult, error) {
 		if ret == "" {
 			continue
 		}
+		primaryRets = append(primaryRets, ret)
 		res = append(res, &MatchResult{
 			Match:          match,
 			IsMatchRequest: false,
@@ -202,7 +204,64 @@ func (m *MITMReplaceRule) MatchByHTTPFlow(rsp string) ([]*MatchResult, error) {
 			},
 		})
 	}
-	return res, nil
+
+	secondaryRe := strings.TrimSpace(m.GetSecondaryRegexp())
+	if secondaryRe == "" {
+		return res, nil
+	}
+	joiner := m.GetSecondaryJoiner()
+	if joiner == "" {
+		joiner = "\n"
+	}
+	joined := strings.Join(primaryRets, joiner)
+
+	sec, err := regexp2.Compile(secondaryRe, regexp2.None)
+	if err != nil {
+		return nil, err
+	}
+	secMatch, err := sec.FindStringMatch(joined)
+	if err != nil {
+		return nil, err
+	}
+	if secMatch == nil {
+		return nil, nil
+	}
+	var out []*MatchResult
+	var outStr string
+	for ; err == nil && secMatch != nil; secMatch, err = sec.FindNextMatch(secMatch) {
+		tpl := m.GetSecondaryRegexpResultTemplate()
+		if tpl != "" {
+			outStr = FormatRegexpGroups(tpl, func(n int) string {
+				g := secMatch.GroupByNumber(n)
+				if g != nil {
+					return g.String()
+				}
+				return ""
+			})
+		} else if secMatch.GroupCount() > 1 {
+			g := secMatch.GroupByNumber(1)
+			if g != nil {
+				outStr = g.String()
+			} else {
+				outStr = secMatch.String()
+			}
+		} else {
+			outStr = secMatch.String()
+		}
+		if outStr == "" {
+			continue
+		}
+		out = append(out, &MatchResult{
+			Match:          secMatch,
+			IsMatchRequest: false,
+			MatchResult:    outStr,
+			MetaInfo: &MatchMetaInfo{
+				Raw:    []byte(joined),
+				Offset: 0,
+			},
+		})
+	}
+	return out, nil
 }
 
 func (m *MITMReplaceRule) MatchByPacketInfo(info *PacketInfo) ([]*MatchResult, error) {
@@ -258,6 +317,7 @@ func (m *MITMReplaceRule) MatchByPacketInfo(info *PacketInfo) ([]*MatchResult, e
 		})
 	}
 	var res []*MatchResult
+	var primaryRets []string
 	for _, item := range items {
 		match, err := r.FindStringMatch(string(item.Raw))
 		if err != nil {
@@ -300,6 +360,7 @@ func (m *MITMReplaceRule) MatchByPacketInfo(info *PacketInfo) ([]*MatchResult, e
 			if ret == "" {
 				continue
 			}
+			primaryRets = append(primaryRets, ret)
 			res = append(res, &MatchResult{
 				Match:          match,
 				IsMatchRequest: info.IsRequest,
@@ -308,7 +369,64 @@ func (m *MITMReplaceRule) MatchByPacketInfo(info *PacketInfo) ([]*MatchResult, e
 			})
 		}
 	}
-	return res, nil
+
+	secondaryRe := strings.TrimSpace(m.GetSecondaryRegexp())
+	if secondaryRe == "" {
+		return res, nil
+	}
+	joiner := m.GetSecondaryJoiner()
+	if joiner == "" {
+		joiner = "\n"
+	}
+	joined := strings.Join(primaryRets, joiner)
+
+	sec, err := regexp2.Compile(secondaryRe, regexp2.None)
+	if err != nil {
+		return nil, err
+	}
+	secMatch, err := sec.FindStringMatch(joined)
+	if err != nil {
+		return nil, err
+	}
+	if secMatch == nil {
+		return nil, nil
+	}
+	var out []*MatchResult
+	var outStr string
+	for ; err == nil && secMatch != nil; secMatch, err = sec.FindNextMatch(secMatch) {
+		tpl := m.GetSecondaryRegexpResultTemplate()
+		if tpl != "" {
+			outStr = FormatRegexpGroups(tpl, func(n int) string {
+				g := secMatch.GroupByNumber(n)
+				if g != nil {
+					return g.String()
+				}
+				return ""
+			})
+		} else if secMatch.GroupCount() > 1 {
+			g := secMatch.GroupByNumber(1)
+			if g != nil {
+				outStr = g.String()
+			} else {
+				outStr = secMatch.String()
+			}
+		} else {
+			outStr = secMatch.String()
+		}
+		if outStr == "" {
+			continue
+		}
+		out = append(out, &MatchResult{
+			Match:          secMatch,
+			IsMatchRequest: info.IsRequest,
+			MatchResult:    outStr,
+			MetaInfo: &MatchMetaInfo{
+				Raw:    []byte(joined),
+				Offset: 0,
+			},
+		})
+	}
+	return out, nil
 }
 
 func (m *MITMReplaceRule) SplitPacket(packet []byte) (*PacketInfo, error) {
