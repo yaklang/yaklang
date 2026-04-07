@@ -9,12 +9,14 @@ import (
 )
 
 func TestWithAICallback_WrapsTieredCallbacks(t *testing.T) {
-	cfg := newConfig(context.Background())
+	cfg := NewTestConfig(context.Background())
 
 	seen := make(map[string]AICallerConfigIf)
 	cb := func(i AICallerConfigIf, req *AIRequest) (*AIResponse, error) {
 		seen[req.GetPrompt()] = i
-		return NewUnboundAIResponse(), nil
+		rsp := NewAIResponse(i)
+		rsp.Close()
+		return rsp, nil
 	}
 
 	require.NoError(t, WithAICallback(cb)(cfg))
@@ -43,12 +45,14 @@ func TestWithAICallback_WrapsTieredCallbacks(t *testing.T) {
 }
 
 func TestWithFastAICallback_OnlySetsOriginal(t *testing.T) {
-	cfg := newConfig(context.Background())
+	cfg := NewTestConfig(context.Background())
 
 	var gotConfig AICallerConfigIf
 	cb := func(i AICallerConfigIf, req *AIRequest) (*AIResponse, error) {
 		gotConfig = i
-		return NewUnboundAIResponse(), nil
+		rsp := NewAIResponse(gotConfig)
+		rsp.Close()
+		return rsp, nil
 	}
 
 	require.NoError(t, WithFastAICallback(cb)(cfg))
@@ -70,12 +74,14 @@ func TestWithAutoTieredAICallback_FallbackWhenTieredDisabled(t *testing.T) {
 		consts.SetTieredAIConfig(originalTiered)
 	})
 
-	cfg := newConfig(context.Background())
+	cfg := NewTestConfig(context.Background())
 
 	seen := make(map[string]AICallerConfigIf)
 	cb := func(i AICallerConfigIf, req *AIRequest) (*AIResponse, error) {
 		seen[req.GetPrompt()] = i
-		return NewUnboundAIResponse(), nil
+		rsp := NewAIResponse(i)
+		rsp.Close()
+		return rsp, nil
 	}
 
 	require.NoError(t, WithAutoTieredAICallback(cb)(cfg))
