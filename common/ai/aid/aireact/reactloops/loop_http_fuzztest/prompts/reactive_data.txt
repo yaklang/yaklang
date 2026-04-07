@@ -5,6 +5,27 @@
 {{ .OriginalRequestSummary }}
 {{ end }}
 
+{{ if .CurrentRequestSummary }}
+### Current Effective Request Summary
+{{ .CurrentRequestSummary }}
+{{ end }}
+
+{{ if .RequestChangeSummary }}
+### Latest Request Merge Summary
+{{ .RequestChangeSummary }}
+{{ if .RequestModificationReason }}
+修改原因：{{ .RequestModificationReason }}
+{{ end }}
+{{ if .RequestReviewDecision }}
+审核结果：{{ .RequestReviewDecision }}
+{{ end }}
+{{ end }}
+
+{{ if .PreviousRequestSummary }}
+### Previous Request Summary
+{{ .PreviousRequestSummary }}
+{{ end }}
+
 <|ORIGINAL_REQUEST_{{ .Nonce }}|>
 {{ .OriginalRequest }}
 <|ORIGINAL_REQUEST_END_{{ .Nonce }}|>
@@ -55,7 +76,8 @@ HTTPFlow: {{ .RepresentativeHiddenIndex }}
 ---
 Based on the above context and security knowledge, decide your next vulnerability-testing action. Prioritize:
 1. What vulnerability signals have already appeared?
-2. Which representative packet should be reused or adapted next?
-3. What attack surface remains untested?
-4. How can the next step validate the suspected vulnerability safely without destructive behavior?
+2. Should you answer a short testing-process question with directly_answer before doing more actions?
+3. Which representative packet or current effective packet should be reused or adapted next?
+4. What attack surface remains untested?
+5. How can the next step validate the suspected vulnerability safely without destructive behavior?
 
