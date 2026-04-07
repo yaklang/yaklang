@@ -30,6 +30,8 @@ var generateAndSendPacketAction = func(r aicommon.AIInvokeRuntime) reactloops.Re
 			{FieldName: "generation_reason", AINodeId: "thought"},
 		},
 		func(l *reactloops.ReActLoop, action *aicommon.Action) error {
+			action.WaitStream(l.GetCurrentTask().GetContext())
+
 			packetType := strings.TrimSpace(action.GetString("packet_type"))
 			if packetType != "mutation" && packetType != "synthetic" {
 				return fmt.Errorf("packet_type must be one of: mutation, synthetic")
