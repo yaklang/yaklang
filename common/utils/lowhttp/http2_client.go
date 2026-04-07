@@ -211,9 +211,20 @@ func (h2Conn *http2ClientConn) preface() error {
 		{ID: http2.SettingMaxConcurrentStreams, Val: defaultMaxConcurrentStreamSize},
 		{ID: http2.SettingMaxHeaderListSize, Val: defaultMaxHeaderListSize},
 	}...)
+	if err != nil {
+		h2Conn.frWriteMutex.Unlock()
+		return utils.Wrapf(err, "write h2 setting failed")
+	}
+	// Increase connection-level flow control window from default 65535 to our desired size.
+	// RFC 7540 Section 6.9.2: SETTINGS only affects stream-level windows.
+	// Connection window must be increased via WINDOW_UPDATE.
+	connWindowIncrease := defaultStreamReceiveWindowSize - 65535
+	if connWindowIncrease > 0 {
+		err = h2Conn.fr.WriteWindowUpdate(0, uint32(connWindowIncrease))
+	}
 	h2Conn.frWriteMutex.Unlock()
 	if err != nil {
-		return utils.Wrapf(err, "write h2 setting failed")
+		return utils.Wrapf(err, "write h2 connection window update failed")
 	}
 	h2Conn.setPreface()
 	return nil
@@ -269,10 +280,9 @@ func (h2Conn *http2ClientConn) newStream(req *http.Request, packet []byte, optio
 		return nil, CreateStreamAfterGoAwayErr
 	}
 
-	newStreamID := h2Conn.getNewStreamID()
 	cs := h2Conn.http2StreamPool.Get().(*http2ClientStream)
 	cs.h2Conn = h2Conn
-	cs.ID = newStreamID
+	cs.ID = 0 // assigned later in doRequest under frWriteMutex to guarantee wire order
 	cs.resp = new(http.Response)
 	cs.resp.ProtoMajor = 2
 	cs.streamWindowControl = newControl(int64(h2Conn.initialWindowSize))
@@ -303,13 +313,6 @@ func (h2Conn *http2ClientConn) newStream(req *http.Request, packet []byte, optio
 		}
 	}
 
-	h2Conn.mu.Lock()
-	h2Conn.streams[newStreamID] = cs
-	h2Conn.mu.Unlock()
-
-	if (cs.ID/2)+1 >= h2Conn.maxStreamsCount {
-		h2Conn.full = true
-	}
 	return cs, nil
 }
 
@@ -348,14 +351,16 @@ func (h2Conn *http2ClientConn) readLoop() {
 			}
 			return
 		}
-		if !h2Conn.clientPrefaceOk.IsSet() { // check start read frame after preface
-			if _, ok := frame.(*http2.SettingsFrame); !ok {
-				log.Errorf("http2: Transport received non-SETTINGS frame before SETTINGS: %v", frame)
+		if !h2Conn.clientPrefaceOk.IsSet() {
+			// readLoop may start before preface() sets clientPrefaceOk.
+			// The first frame from server must be SETTINGS; process it and continue.
+			if sf, ok := frame.(*http2.SettingsFrame); ok {
+				rl.processSettings(sf)
+				continue
 			}
+			log.Errorf("http2: Transport received non-SETTINGS frame before SETTINGS: %v", frame)
 			return
 		}
-
-		// log.Infof("h2 stream-id %v found frame: %v", frame.Header().StreamID, frame)
 
 		switch f := frame.(type) {
 		case *http2.HeadersFrame:
@@ -494,6 +499,19 @@ func (cs *http2ClientStream) doRequest() error {
 		cs.h2Conn.frWriteMutex.Unlock()
 		return utils.Error("h2 connection closed during write")
 	}
+	if cs.h2Conn.readGoAway {
+		cs.h2Conn.frWriteMutex.Unlock()
+		return CreateStreamAfterGoAwayErr
+	}
+	// Assign stream ID under frWriteMutex to guarantee wire-order matches ID order.
+	// RFC 7540 Section 5.1.1: stream IDs must be strictly increasing on the wire.
+	cs.ID = cs.h2Conn.getNewStreamID()
+	cs.h2Conn.mu.Lock()
+	cs.h2Conn.streams[cs.ID] = cs
+	cs.h2Conn.mu.Unlock()
+	if (cs.ID/2)+1 >= cs.h2Conn.maxStreamsCount {
+		cs.h2Conn.full = true
+	}
 	err := h2HeaderWriter(fr, cs.ID, false, cs.h2Conn.maxFrameSize, hPackBuf.Bytes())
 	cs.h2Conn.frWriteMutex.Unlock()
 	if err != nil {
@@ -506,7 +524,11 @@ func (cs *http2ClientStream) doRequest() error {
 	}
 	cs.sentHeaders = true
 	if len(body) > 0 {
-		chunks := funk.Chunk(body, defaultMaxFrameSize).([][]byte)
+		maxFrame := int(cs.h2Conn.maxFrameSize)
+		if maxFrame <= 0 {
+			maxFrame = defaultMaxFrameSize
+		}
+		chunks := funk.Chunk(body, maxFrame).([][]byte)
 		for index, dataFrameBytes := range chunks {
 			dataLen := len(dataFrameBytes)
 
@@ -719,14 +741,34 @@ func (rl *http2ClientConnReadLoop) processSettings(f *http2.SettingsFrame) {
 	}
 
 	f.ForeachSetting(func(setting http2.Setting) error {
-		// log.Infof("h2 stream found server setting: %v", setting.String())
 		switch setting.ID {
 		case http2.SettingMaxHeaderListSize:
 			rl.h2Conn.headerListMaxSize = setting.Val
+		case http2.SettingMaxConcurrentStreams:
+			rl.h2Conn.maxStreamsCount = setting.Val
+		case http2.SettingMaxFrameSize:
+			if setting.Val >= 1<<14 && setting.Val <= 1<<24-1 {
+				rl.h2Conn.maxFrameSize = setting.Val
+			}
+		case http2.SettingInitialWindowSize:
+			if setting.Val > 1<<31-1 {
+				return nil
+			}
+			delta := int64(setting.Val) - int64(rl.h2Conn.initialWindowSize)
+			rl.h2Conn.initialWindowSize = setting.Val
+			rl.h2Conn.mu.Lock()
+			for _, cs := range rl.h2Conn.streams {
+				if cs.streamWindowControl != nil {
+					cs.streamWindowControl.adjustWindowSize(delta)
+				}
+			}
+			rl.h2Conn.mu.Unlock()
+		case http2.SettingHeaderTableSize:
+			rl.h2Conn.hDec.SetMaxDynamicTableSize(setting.Val)
 		}
 		return nil
 	})
-	// write settings ack
+
 	rl.h2Conn.frWriteMutex.Lock()
 	err := rl.h2Conn.fr.WriteSettingsAck()
 	rl.h2Conn.frWriteMutex.Unlock()
@@ -734,7 +776,6 @@ func (rl *http2ClientConnReadLoop) processSettings(f *http2.SettingsFrame) {
 		log.Errorf("h2 client write settings ack error: %v", err)
 		return
 	}
-	return
 }
 
 func (rl *http2ClientConnReadLoop) processWindowUpdate(f *http2.WindowUpdateFrame) {
@@ -775,9 +816,17 @@ func (rl *http2ClientConnReadLoop) processResetStream(f *http2.RSTStreamFrame) {
 
 func (rl *http2ClientConnReadLoop) processGoAway(f *http2.GoAwayFrame) {
 	flow := fmt.Sprintf("%v->%v", rl.h2Conn.conn.LocalAddr(), rl.h2Conn.conn.RemoteAddr())
-	log.Infof("connection: %s is going away by %v", flow, f.ErrCode.String())
-	log.Infof("flow: %v last stream id: %v", flow, f.LastStreamID)
+	log.Infof("connection: %s is going away by %v, lastStreamID=%v", flow, f.ErrCode.String(), f.LastStreamID)
 	rl.h2Conn.readGoAway = true
 	rl.h2Conn.lastStreamID = f.LastStreamID
-	return
+
+	// Notify streams with ID > lastStreamID that they will never receive a response.
+	// The server will not process these streams.
+	rl.h2Conn.mu.Lock()
+	for id, cs := range rl.h2Conn.streams {
+		if id > f.LastStreamID {
+			cs.setEndStream()
+		}
+	}
+	rl.h2Conn.mu.Unlock()
 }

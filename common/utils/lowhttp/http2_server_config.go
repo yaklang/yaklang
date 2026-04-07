@@ -26,11 +26,26 @@ type http2ConnectionConfig struct {
 
 	wg *sync.WaitGroup
 
-	*windowSizeControl
+	connWindowControl     *windowSizeControl
+	peerInitialWindowSize uint32
+	streamWindows         sync.Map // streamID (uint32) -> *windowSizeControl
 }
 
 func (c *http2ConnectionConfig) close() error {
 	return c.conn.Close()
+}
+
+func (c *http2ConnectionConfig) getStreamWindow(streamID uint32) *windowSizeControl {
+	if v, ok := c.streamWindows.Load(streamID); ok {
+		return v.(*windowSizeControl)
+	}
+	w := newControl(int64(c.peerInitialWindowSize))
+	actual, _ := c.streamWindows.LoadOrStore(streamID, w)
+	return actual.(*windowSizeControl)
+}
+
+func (c *http2ConnectionConfig) removeStreamWindow(streamID uint32) {
+	c.streamWindows.Delete(streamID)
 }
 
 func (c *http2ConnectionConfig) writer(wrapper *h2RequestState, header []byte, body io.ReadCloser) error {
@@ -88,16 +103,17 @@ func (c *http2ConnectionConfig) writer(wrapper *h2RequestState, header []byte, b
 	c.hencMutex.Unlock()
 
 	results, err := io.ReadAll(body)
-	//log.Infof("start to write data{%v} to stream-id: %v", len(results), streamId)
+	streamWindow := c.getStreamWindow(uint32(streamId))
+	defer c.removeStreamWindow(uint32(streamId))
+
 	if len(results) > 0 {
 		chunks := funk.Chunk(results, defaultMaxFrameSize).([][]byte)
-		first = true
 		for index, dataFrameBytes := range chunks {
-			dataLen := len(dataFrameBytes)
+			dataLen := int64(len(dataFrameBytes))
 
-			// control by window size
-			c.decreaseWindowSize(int64(dataLen))
-			// log.Infof("window size decrease %v to %v", dataLen, c.windowSize)
+			streamWindow.decreaseWindowSize(dataLen)
+			c.connWindowControl.decreaseWindowSize(dataLen)
+
 			frWriteMutex.Lock()
 			dataFrameErr := frame.WriteData(uint32(streamId), index == len(chunks)-1, dataFrameBytes)
 			frWriteMutex.Unlock()
