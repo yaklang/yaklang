@@ -1,0 +1,79 @@
+desc(
+	title: "Audit Implicit Request Matcher Selection"
+	title_zh: "审计隐式请求匹配器选择"
+	type: audit
+	risk: "请求匹配器语义"
+	desc: <<<DESC
+### 规则说明
+本规则用于审计基于字符串路径模式、再由框架在运行时隐式选择具体请求匹配器实现的授权配置逻辑。
+
+当安全框架根据类路径、上下文或 MVC 组件可用性，在 MVC matcher 和 Ant matcher 之间自动切换时，可能引入与开发者预期不一致的授权语义。
+DESC
+	rule_id: "4bd297fe-ad94-4402-8f51-9463da15fa8e"
+	solution: <<<SOLUTION
+### 审计建议
+- 对授权规则尽量使用显式的 `RequestMatcher` 实现，而不是仅传入字符串模式。
+- 在多 servlet / 多上下文环境下显式绑定 matcher 语义和 servletPath。
+- 不要让类路径或容器环境决定授权匹配器的行为差异。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-863: Incorrect Authorization](https://cwe.mitre.org/data/definitions/863.html)
+REFERENCE
+)
+
+createMvcMatchers(* as $mvcPatterns);
+antMatchers(* as $antPatterns);
+
+$mvcPatterns + $antPatterns as $risk;
+check $risk;
+
+alert $risk for {
+	title: "Audit Implicit Request Matcher Selection",
+	title_zh: "审计隐式请求匹配器选择",
+	level: "middle",
+	message: "发现字符串模式授权配置会在不同 RequestMatcher 实现间隐式切换，需复核 matcher 语义是否与预期一致。",
+	risk: "请求匹配器语义",
+	name: "risk",
+	desc: <<<DESC
+### 规则说明
+本规则用于审计基于字符串路径模式、再由框架在运行时隐式选择具体请求匹配器实现的授权配置逻辑。
+
+当安全框架根据类路径、上下文或 MVC 组件可用性，在 MVC matcher 和 Ant matcher 之间自动切换时，可能引入与开发者预期不一致的授权语义。
+DESC
+	solution: <<<SOLUTION
+### 审计建议
+- 对授权规则尽量使用显式的 `RequestMatcher` 实现，而不是仅传入字符串模式。
+- 在多 servlet / 多上下文环境下显式绑定 matcher 语义和 servletPath。
+- 不要让类路径或容器环境决定授权匹配器的行为差异。
+SOLUTION
+}
+
+desc(
+	lang: java
+	alert_min: 1
+	'file://implicit-request-matcher-selection.java': <<<CODE
+class AbstractRequestMatcherRegistry {
+    private static final boolean mvcPresent = true;
+
+    java.util.List<Object> createMvcMatchers(String... patterns) {
+        return java.util.List.of(new HandlerMappingIntrospector(), patterns);
+    }
+
+    Object requestMatchers(String... patterns) {
+        if (mvcPresent) {
+            return createMvcMatchers(patterns);
+        }
+        return RequestMatchers.antMatchers(patterns);
+    }
+}
+
+class HandlerMappingIntrospector {
+}
+
+class RequestMatchers {
+    static Object antMatchers(String... patterns) {
+        return patterns;
+    }
+}
+CODE
+)
