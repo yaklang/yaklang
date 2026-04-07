@@ -39,7 +39,21 @@ type Compiler struct {
 	// extending the SSA package schema.
 	InstrTags map[int64]string
 
+	// virtualizedFuncs maps function name → VirtualizeWrapper info.
+	// When set, CompileFunction emits a runtime invoke wrapper instead of
+	// compiling the SSA function body.
+	virtualizedFuncs map[string]*VirtualizeWrapper
+
 	function *functionCompileContext
+}
+
+// VirtualizeWrapper holds the data needed to emit an LLVM stub that delegates
+// to the VM runtime instead of compiling the original function body.
+type VirtualizeWrapper struct {
+	FuncName        string
+	BlobHex         string
+	SeedHex         string
+	HostBindingSpec string
 }
 
 type CompilerOption func(*Compiler)
@@ -62,6 +76,17 @@ func WithInstructionTags(tags map[int64]string) CompilerOption {
 		for id, tag := range tags {
 			c.InstrTags[id] = tag
 		}
+	}
+}
+
+// WithVirtualizedFuncs sets the virtualize wrapper map. Functions listed here
+// will have their bodies replaced with a VM runtime invoke stub.
+func WithVirtualizedFuncs(wrappers map[string]*VirtualizeWrapper) CompilerOption {
+	return func(c *Compiler) {
+		if len(wrappers) == 0 {
+			return
+		}
+		c.virtualizedFuncs = wrappers
 	}
 }
 
@@ -119,6 +144,11 @@ func (c *Compiler) Compile() error {
 
 // CompileFunction compiles a single YakSSA function to LLVM IR.
 func (c *Compiler) CompileFunction(fn *ssa.Function) error {
+	// Check if this function is virtualized; if so, emit a VM wrapper stub.
+	if w, ok := c.virtualizedFuncs[fn.GetName()]; ok && w != nil {
+		return c.compileVirtualizedFunction(fn, w)
+	}
+
 	c.function = newFunctionCompileContext(fn)
 	defer func() {
 		c.function = nil
@@ -322,5 +352,47 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 		c.Builder.CreateRetVoid()
 	}
 
+	return nil
+}
+
+const runtimeInvokeVirtualizedSymbol = "yak_runtime_invoke_vm"
+
+// compileVirtualizedFunction emits a minimal LLVM stub that delegates to the
+// VM runtime. The original function body is NOT compiled.
+func (c *Compiler) compileVirtualizedFunction(fn *ssa.Function, w *VirtualizeWrapper) error {
+	llvmFn, _ := c.getOrDeclareLLVMFunction(fn)
+	entry := c.LLVMCtx.AddBasicBlock(llvmFn, "entry")
+	c.Builder.SetInsertPointAtEnd(entry)
+
+	if llvmFn.ParamsCount() < 1 {
+		return fmt.Errorf("compileVirtualizedFunction: missing invoke context parameter for function %s", fn.GetName())
+	}
+	ctxParam := llvmFn.Param(0)
+	ctxParam.SetName(fmt.Sprintf("ctx_%d", fn.GetId()))
+
+	// Declare the runtime invoke symbol if not yet present.
+	runtimeFn := c.Mod.NamedFunction(runtimeInvokeVirtualizedSymbol)
+	i8Ptr := llvm.PointerType(c.LLVMCtx.Int8Type(), 0)
+	fnType := llvm.FunctionType(
+		c.LLVMCtx.VoidType(),
+		[]llvm.Type{i8Ptr, i8Ptr, i8Ptr, i8Ptr, i8Ptr},
+		false,
+	)
+	if runtimeFn.IsNil() {
+		runtimeFn = llvm.AddFunction(c.Mod, runtimeInvokeVirtualizedSymbol, fnType)
+	}
+
+	blobPtr := c.Builder.CreateGlobalStringPtr(w.BlobHex,
+		fmt.Sprintf("yak_virt_blob_%s", w.FuncName))
+	seedPtr := c.Builder.CreateGlobalStringPtr(w.SeedHex,
+		fmt.Sprintf("yak_virt_seed_%s", w.FuncName))
+	namePtr := c.Builder.CreateGlobalStringPtr(w.FuncName,
+		fmt.Sprintf("yak_virt_name_%s", w.FuncName))
+	hostBindingSpecPtr := c.Builder.CreateGlobalStringPtr(w.HostBindingSpec,
+		fmt.Sprintf("yak_virt_hosts_%s", w.FuncName))
+
+	c.Builder.CreateCall(fnType, runtimeFn,
+		[]llvm.Value{ctxParam, blobPtr, seedPtr, namePtr, hostBindingSpecPtr}, "")
+	c.Builder.CreateRetVoid()
 	return nil
 }

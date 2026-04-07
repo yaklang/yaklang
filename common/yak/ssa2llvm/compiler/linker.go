@@ -16,7 +16,8 @@ var runtimeLinkArgsCache sync.Map
 
 // CompileLLVMToBinary compiles an LLVM IR file to a native executable.
 // When linkRuntime is true, it links against the default yak runtime archive.
-func CompileLLVMToBinary(llFile, binFile string, linkRuntime bool, runtimeArchiveOverride string, extraArgs ...string) error {
+// obfArchives, when non-empty, are additional static archives to link (obf runtime deps).
+func CompileLLVMToBinary(llFile, binFile string, linkRuntime bool, runtimeArchiveOverride string, obfArchives []string, extraArgs ...string) error {
 	clangPath, err := findLLVMTool("clang")
 	if err != nil {
 		return err
@@ -42,6 +43,10 @@ func CompileLLVMToBinary(llFile, binFile string, linkRuntime bool, runtimeArchiv
 		args = append(args,
 			runtimeArchive,
 		)
+		// Append extra obf runtime archives (e.g. libyakobf_virtualize.a).
+		for _, obfArchive := range obfArchives {
+			args = append(args, obfArchive)
+		}
 		args = appendUniqueLinkArgs(args, runtimeLinkArgs...)
 		args = appendUniqueLinkArgs(args,
 			"-lgc",

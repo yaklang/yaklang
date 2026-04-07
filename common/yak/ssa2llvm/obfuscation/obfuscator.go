@@ -24,6 +24,7 @@ const (
 type Context = core.Context
 type Obfuscator = core.Obfuscator
 type Info = core.Info
+type RuntimeDep = core.RuntimeDep
 
 var Default = core.Default
 
@@ -44,3 +45,13 @@ func ListByKind(kind Kind) []string {
 }
 
 func NormalizeNames(names []string) []string { return core.NormalizeNames(names) }
+
+func CollectRuntimeDeps(names []string) []*RuntimeDep {
+	return core.CollectRuntimeDeps(names)
+}
+
+func ExtraRuntimeArchivePaths(deps []*RuntimeDep, archiveDir string) []string {
+	return core.ExtraRuntimeArchivePaths(deps, archiveDir)
+}
+
+func AllRuntimeSymbols() []string { return core.AllRuntimeSymbols() }
