@@ -77,6 +77,16 @@ func newFuzzFinalizeTestLoop(t *testing.T, invoker *fuzzFinalizeTestInvoker) *re
 	return loop
 }
 
+func collectMarkdownStreamContent(events []*schema.AiOutputEvent) string {
+	var out strings.Builder
+	for _, event := range events {
+		if event.NodeId == "re-act-loop-answer-payload" && event.IsStream && len(event.StreamDelta) > 0 {
+			out.Write(event.StreamDelta)
+		}
+	}
+	return out.String()
+}
+
 func TestLoopHTTPFuzztestFinalize_DeliversFallbackSummary(t *testing.T) {
 	invoker := newFuzzFinalizeTestInvoker(t)
 	loop := newFuzzFinalizeTestLoop(t, invoker)
@@ -131,6 +141,109 @@ func TestLoopHTTPFuzztestFinalize_SkipsWhenAlreadyDirectlyAnswered(t *testing.T)
 
 	if len(invoker.resultPayloads) != 0 {
 		t.Fatalf("expected no fallback payload after directly_answer, got %d", len(invoker.resultPayloads))
+	}
+}
+
+func TestLoopHTTPFuzztestFinalize_PreservesComplexMarkdown(t *testing.T) {
+	invoker := newFuzzFinalizeTestInvoker(t)
+	loop := newFuzzFinalizeTestLoop(t, invoker)
+
+	finalContent := strings.TrimSpace("# HTTP Fuzz Test 阶段总结\n\n" +
+		"## 当前发现\n\n" +
+		"> 目前没有直接报错型注入证据，但对象切换和回显差异值得继续追。\n\n" +
+		"| 观察项 | 现象 | 含义 |\n" +
+		"| --- | --- | --- |\n" +
+		"| 状态码 | 始终 200 | 需要依赖内容差异继续判断 |\n" +
+		"| 订单号遍历 | 返回不同用户摘要 | 疑似 IDOR |\n\n" +
+		"## 下一步建议\n\n" +
+		"1. 扩大对象编号遍历范围。\n" +
+		"2. 切换 Cookie 和 Authorization 头验证权限边界。\n\n" +
+		"## 代表性命令\n\n" +
+		"```http\n" +
+		"GET /orders?id=1002 HTTP/1.1\n" +
+		"Host: example.com\n" +
+		"Cookie: role=user\n" +
+		"```")
+
+	deliverLoopHTTPFuzzFinalizeSummary(loop, invoker, finalContent)
+	if emitter := loop.GetEmitter(); emitter != nil {
+		emitter.WaitForStream()
+	}
+
+	if len(invoker.resultPayloads) != 1 {
+		t.Fatalf("expected one finalize payload, got %d", len(invoker.resultPayloads))
+	}
+	if got := strings.TrimSpace(invoker.resultPayloads[0]); got != finalContent {
+		t.Fatalf("expected finalize payload to preserve markdown exactly\nexpected:\n%s\n\ngot:\n%s", finalContent, got)
+	}
+	streamed := strings.TrimSpace(collectMarkdownStreamContent(invoker.events))
+	if streamed != finalContent {
+		t.Fatalf("expected markdown stream to preserve content exactly\nexpected:\n%s\n\ngot:\n%s", finalContent, streamed)
+	}
+	var sawMarkdownStream bool
+	for _, event := range invoker.events {
+		if event.NodeId == "re-act-loop-answer-payload" && event.IsStream && event.ContentType == aicommon.TypeTextMarkdown {
+			sawMarkdownStream = true
+			break
+		}
+	}
+	if !sawMarkdownStream {
+		t.Fatal("expected complex finalize summary to emit markdown stream events")
+	}
+}
+
+func TestLoopHTTPFuzztestFinalize_PostIterationHookDeliversSummary(t *testing.T) {
+	invoker := newHTTPFuzztestAICallbackInvoker(t, func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(strings.NewReader(`{"@action":"finish","identifier":"stop_now","answer":"结束当前轮次"}`))
+		rsp.Close()
+		return rsp, nil
+	})
+	loop, err := reactloops.CreateLoopByName(
+		LoopHTTPFuzztestName,
+		invoker,
+		reactloops.WithAllowRAG(false),
+		reactloops.WithAllowAIForge(false),
+		reactloops.WithAllowPlanAndExec(false),
+		reactloops.WithAllowUserInteract(false),
+		reactloops.WithInitTask(func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
+			operator.Continue()
+		}),
+	)
+	if err != nil {
+		t.Fatalf("create loop with finalize hook: %v", err)
+	}
+
+	loop.Set("current_request_summary", "URL: http://example.com/orders?id=1002 BODY: [(0) bytes]")
+	loop.Set("diff_result_compressed", "订单号切换后返回了不同用户摘要，存在越权读取线索。")
+	loop.Set("verification_result", "Satisfied: false\nReasoning: 仍需确认是否可以稳定越权读取")
+	recordLoopHTTPFuzzAction(loop, "fuzz_get_params", "param_name=id", "共执行 3 次测试，保存 3 条 HTTPFlow。代表性响应状态：HTTP/1.1 200 OK", "未达到当前目标；继续测试", "flow-789", []string{"1001", "1002", "1003"})
+
+	err = loop.Execute("http-fuzztest-hook-task", context.Background(), "帮我继续验证订单接口是否存在越权")
+	if err != nil {
+		t.Fatalf("execute loop with finalize hook: %v", err)
+	}
+	if emitter := loop.GetEmitter(); emitter != nil {
+		emitter.WaitForStream()
+	}
+
+	if len(invoker.resultPayloads) != 1 {
+		t.Fatalf("expected finalize hook to emit one payload, got %d", len(invoker.resultPayloads))
+	}
+	if !strings.Contains(invoker.resultPayloads[0], "# HTTP Fuzz Test 阶段总结") {
+		t.Fatalf("expected finalize hook payload to include heading, got: %s", invoker.resultPayloads[0])
+	}
+	if !strings.Contains(invoker.resultPayloads[0], "帮我继续验证订单接口是否存在越权") {
+		t.Fatalf("expected finalize hook payload to include user goal, got: %s", invoker.resultPayloads[0])
+	}
+	if !strings.Contains(invoker.resultPayloads[0], "订单号切换后返回了不同用户摘要") {
+		t.Fatalf("expected finalize hook payload to include current findings, got: %s", invoker.resultPayloads[0])
+	}
+	if !hasLoopHTTPFuzzFinalAnswerDelivered(loop) {
+		t.Fatal("expected finalize hook to mark final answer delivered")
+	}
+	if getLoopHTTPFuzzLastAction(loop) != "finalize_summary" {
+		t.Fatalf("expected finalize hook to record finalize_summary, got %q", getLoopHTTPFuzzLastAction(loop))
 	}
 }
 
