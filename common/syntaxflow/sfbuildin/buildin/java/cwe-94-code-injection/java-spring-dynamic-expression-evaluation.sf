@@ -1,0 +1,111 @@
+desc(
+	title: "Detect Dynamic Spring Expression Evaluation"
+	title_zh: "检测Java动态Spring表达式求值"
+	type: vuln
+	risk: "表达式注入"
+	desc: <<<DESC
+### 漏洞描述
+当代码将动态字符串传入 Spring Expression 相关的解析或求值入口时，如果该字符串可以被外部输入影响，就可能造成 SpEL 注入、JSON Patch SpEL 路径注入，或表达式滥用导致的拒绝服务。
+
+本规则关注以下通用危险模式：
+- `parseExpression(dynamicExpr)`
+- `pathToExpression(dynamicPath)`
+- `evaluateExpression(dynamicExpr)`
+
+它不依赖具体 CVE 或项目名，而是直接识别“动态表达式/路径进入 Spring 表达式求值”的代码模式。
+DESC
+	rule_id: "a4a0c7a9-2cbb-4e57-8ea2-78d2e7845f41"
+	solution: <<<SOLUTION
+### 修复建议
+- 不要直接解析或执行外部可控的表达式字符串。
+- 对路径或表达式做白名单约束，而不是字符串拼接后交给表达式引擎。
+- 优先使用 `SimpleEvaluationContext` 或等价的受限上下文。
+- 对 JSON Patch / 查询占位符这类“先替换再求值”的流程，先做严格约束和转义。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-94: Improper Control of Generation of Code](https://cwe.mitre.org/data/definitions/94.html)
+REFERENCE
+)
+
+parseExpression(,* as $parseExprArg);
+pathToExpression(,* as $pathExprArg);
+evaluateExpression(,* as $evalExprArg);
+*?{<typeName>?{have:'org.springframework.expression.Expression'}}.setValue(,* as $exprSetArg) as $exprSetCall;
+*?{<typeName>?{have:'org.springframework.expression.Expression'}}.getValue(,* as $exprGetArg) as $exprGetCall;
+
+$parseExprArg?{!opcode: const} as $dynamicParseExpr;
+$pathExprArg?{!opcode: const} as $dynamicPathExpr;
+$evalExprArg?{!opcode: const} as $dynamicEvalExpr;
+
+$dynamicParseExpr + $dynamicPathExpr + $dynamicEvalExpr + $exprSetCall + $exprGetCall as $risk;
+
+alert $risk for {
+	title: "Detect Dynamic Spring Expression Evaluation",
+	title_zh: "检测Java动态Spring表达式求值",
+	level: "high",
+	message: "发现动态字符串进入 Spring 表达式解析或求值入口，可能导致表达式注入或表达式滥用。",
+	risk: "表达式注入",
+	name: "risk",
+	desc: <<<DESC
+### 漏洞描述
+当代码将动态字符串传入 Spring Expression 相关的解析或求值入口时，如果该字符串可以被外部输入影响，就可能造成 SpEL 注入、JSON Patch SpEL 路径注入，或表达式滥用导致的拒绝服务。
+
+本规则关注以下通用危险模式：
+- `parseExpression(dynamicExpr)`
+- `pathToExpression(dynamicPath)`
+- `evaluateExpression(dynamicExpr)`
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 不要直接解析或执行外部可控的表达式字符串。
+- 对路径或表达式做白名单约束，而不是字符串拼接后交给表达式引擎。
+- 优先使用 `SimpleEvaluationContext` 或等价的受限上下文。
+- 对 JSON Patch / 查询占位符这类“先替换再求值”的流程，先做严格约束和转义。
+SOLUTION
+}
+
+desc(
+	lang: java
+	alert_min: 2
+	'file://dynamic-parse.java': <<<CODE
+import org.springframework.expression.ExpressionParser;
+import org.springframework.expression.spel.standard.SpelExpressionParser;
+
+class DynamicParseExpression {
+    Object bad(String expression, Object root) {
+        ExpressionParser parser = new SpelExpressionParser();
+        return parser.parseExpression(expression).getValue(root);
+    }
+}
+CODE
+	'file://dynamic-path.java': <<<CODE
+import org.springframework.expression.Expression;
+
+class DynamicPatchPathExpression {
+    private final Expression spelExpression;
+
+    DynamicPatchPathExpression(String path) {
+        this.spelExpression = pathToExpression(path);
+    }
+
+    private Expression pathToExpression(String path) {
+        return null;
+    }
+
+    void apply(Object target, Object value) {
+        this.spelExpression.setValue(target, value);
+    }
+}
+CODE
+	"safefile://safe-parse.java": <<<CODE
+import org.springframework.expression.ExpressionParser;
+import org.springframework.expression.spel.standard.SpelExpressionParser;
+
+class SafeParseExpression {
+    Object safe(Object root) {
+        ExpressionParser parser = new SpelExpressionParser();
+        return parser.parseExpression("'static'").getValue(root);
+    }
+}
+CODE
+)

@@ -1,0 +1,71 @@
+desc(
+	title: "Audit Dangerous Bean Meta Property Exposure"
+	title_zh: "审计危险Bean元属性暴露"
+	type: audit
+	risk: "动态属性绑定"
+	desc: <<<DESC
+### 规则说明
+本规则用于审计 Bean 属性描述符遍历中是否显式出现危险元属性名称，如 `classLoader` 和 `protectionDomain`。
+
+当框架或组件允许动态属性绑定，而属性描述符过滤仅依赖局部条件或过滤不完整时，危险元属性可能被保留下来，进而为后续的元对象访问或属性链利用打开入口。
+DESC
+	rule_id: "cd3b9d73-cc6d-47ca-80ab-6d7e411665e4"
+	solution: <<<SOLUTION
+### 审计建议
+- 检查动态属性绑定是否会暴露 `classLoader`、`protectionDomain` 等危险元属性。
+- 检查危险属性过滤是否只覆盖了局部类型分支，而不是统一生效。
+- 对可绑定属性建立白名单，而不是仅靠黑名单补洞。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-915: Improperly Controlled Modification of Dynamically-Determined Object Attributes](https://cwe.mitre.org/data/definitions/915.html)
+REFERENCE
+)
+
+e"classLoader" as $classLoader;
+e"protectionDomain" as $protectionDomain;
+e"getPropertyDescriptors" as $descriptorWalk;
+
+$classLoader + $protectionDomain + $descriptorWalk as $risk;
+
+alert $risk for {
+	title: "Audit Dangerous Bean Meta Property Exposure",
+	title_zh: "审计危险Bean元属性暴露",
+	level: "middle",
+	message: "发现属性描述符遍历中出现危险 Bean 元属性标识，需复核动态属性绑定是否暴露元对象访问入口。",
+	risk: "动态属性绑定",
+	name: "risk",
+	desc: <<<DESC
+### 规则说明
+本规则用于审计 Bean 属性描述符遍历中是否显式出现危险元属性名称，如 `classLoader` 和 `protectionDomain`。
+
+当框架或组件允许动态属性绑定，而属性描述符过滤仅依赖局部条件或过滤不完整时，危险元属性可能被保留下来，进而为后续的元对象访问或属性链利用打开入口。
+DESC
+	solution: <<<SOLUTION
+### 审计建议
+- 检查动态属性绑定是否会暴露 `classLoader`、`protectionDomain` 等危险元属性。
+- 检查危险属性过滤是否只覆盖了局部类型分支，而不是统一生效。
+- 对可绑定属性建立白名单，而不是仅靠黑名单补洞。
+SOLUTION
+}
+
+desc(
+	lang: java
+	alert_min: 2
+	'file://dangerous-meta-property.java': <<<CODE
+class DangerousMetaPropertyExposure {
+    void bad(Object beanInfo, Class<?> beanClass) {
+        PropertyDescriptor[] pds = beanInfo.getPropertyDescriptors();
+        for (PropertyDescriptor pd : pds) {
+            if (Class.class == beanClass &&
+                    ("classLoader".equals(pd.getName()) || "protectionDomain".equals(pd.getName()))) {
+                continue;
+            }
+        }
+    }
+
+    private static class PropertyDescriptor {
+        String getName() { return ""; }
+    }
+}
+CODE
+)

@@ -1,0 +1,80 @@
+desc(
+	title: "Detect Resource createRelative Path Traversal Risk"
+	title_zh: "检测Resource createRelative 路径穿越风险"
+	type: vuln
+	risk: "路径穿越"
+	desc: <<<DESC
+### 漏洞描述
+当代码把动态相对路径直接传给 `Resource.createRelative(...)` 这类资源解析入口时，如果没有先做 canonical containment、标准化或白名单校验，就可能导致路径穿越或越界资源访问。
+
+该模式在静态资源路由、文件系统资源映射和模板资源解析中都较常见。
+DESC
+	rule_id: "f07e45c5-a252-4caa-8b9b-33cf1b45f11c"
+	solution: <<<SOLUTION
+### 修复建议
+- 对相对路径先做规范化，再校验是否仍位于允许目录内。
+- 避免将用户或路由可控路径直接交给 `createRelative(...)`。
+- 优先使用具备 containment 检查的安全资源查找流程。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-22: Path Traversal](https://cwe.mitre.org/data/definitions/22.html)
+REFERENCE
+)
+
+Resource?{<typeName>?{have:'org.springframework.core.io'}}.createRelative(,* as $relativePath);
+
+$relativePath?{!opcode: const} as $risk;
+
+alert $risk for {
+	title: "Detect Resource createRelative Path Traversal Risk",
+	title_zh: "检测Resource createRelative 路径穿越风险",
+	level: "high",
+	message: "发现动态相对路径直接进入 Resource.createRelative(...)，可能导致路径穿越或越界资源访问。",
+	risk: "路径穿越",
+	name: "risk",
+	desc: <<<DESC
+### 漏洞描述
+当代码把动态相对路径直接传给 `Resource.createRelative(...)` 这类资源解析入口时，如果没有先做 canonical containment、标准化或白名单校验，就可能导致路径穿越或越界资源访问。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 对相对路径先做规范化，再校验是否仍位于允许目录内。
+- 避免将用户或路由可控路径直接交给 `createRelative(...)`。
+- 优先使用具备 containment 检查的安全资源查找流程。
+SOLUTION
+}
+
+desc(
+	lang: java
+	alert_num: 1
+	'file://dynamic-relative.java': <<<CODE
+import org.springframework.core.io.Resource;
+
+class DynamicRelativeLookup {
+    private final Resource delegate;
+
+    DynamicRelativeLookup(Resource delegate) {
+        this.delegate = delegate;
+    }
+
+    Resource bad(String relativePath) throws Exception {
+        return this.delegate.createRelative(relativePath);
+    }
+}
+CODE
+	"safefile://safe-relative.java": <<<CODE
+import org.springframework.core.io.Resource;
+
+class SafeRelativeLookup {
+    private final Resource delegate;
+
+    SafeRelativeLookup(Resource delegate) {
+        this.delegate = delegate;
+    }
+
+    Resource safe() throws Exception {
+        return this.delegate.createRelative("index.html");
+    }
+}
+CODE
+)

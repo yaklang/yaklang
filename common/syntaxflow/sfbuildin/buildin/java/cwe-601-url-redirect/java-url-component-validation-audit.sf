@@ -1,0 +1,71 @@
+desc(
+	title: "Audit URL Component Validation Logic"
+	title_zh: "审计URL组件校验逻辑"
+	type: audit
+	risk: "URL信任决策"
+	desc: <<<DESC
+### 规则说明
+本规则用于审计 URL 解析或信任判断中，对单个组件进行合法性校验的实现路径。
+
+当代码在 `host`、`userInfo`、`query`、`fragment` 等组件上逐段做字符级校验时，如果后续安全决策依赖这些解析结果，仍可能出现 authority 混淆、开放重定向或 SSRF 绕过。此规则用于标记这类需要重点复核的 URL 组件校验逻辑。
+DESC
+	rule_id: "15f96b0f-1b8a-414b-b550-3e307f0d664c"
+	solution: <<<SOLUTION
+### 审计建议
+- 检查 host/userInfo 是否在统一规范化前就被分别校验。
+- 检查是否考虑了 `@`、编码、IPv6 bracket、重编码等 authority 歧义。
+- 不要将“字符合法性校验”视为“安全可信性校验”。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-601: URL Redirection to Untrusted Site](https://cwe.mitre.org/data/definitions/601.html)
+[CWE-918: Server-Side Request Forgery](https://cwe.mitre.org/data/definitions/918.html)
+REFERENCE
+)
+
+verifyUriComponent(,* as $componentArg);
+check $componentArg;
+
+alert $componentArg for {
+	title: "Audit URL Component Validation Logic",
+	title_zh: "审计URL组件校验逻辑",
+	level: "middle",
+	message: "发现 URL 组件逐段校验逻辑，若后续基于解析结果做信任判断，需复核是否存在 authority 混淆绕过。",
+	risk: "URL信任决策",
+	name: "componentArg",
+	desc: <<<DESC
+### 规则说明
+本规则用于审计 URL 解析或信任判断中，对单个组件进行合法性校验的实现路径。
+
+当代码在 `host`、`userInfo`、`query`、`fragment` 等组件上逐段做字符级校验时，如果后续安全决策依赖这些解析结果，仍可能出现 authority 混淆、开放重定向或 SSRF 绕过。此规则用于标记这类需要重点复核的 URL 组件校验逻辑。
+DESC
+	solution: <<<SOLUTION
+### 审计建议
+- 检查 host/userInfo 是否在统一规范化前就被分别校验。
+- 检查是否考虑了 `@`、编码、IPv6 bracket、重编码等 authority 歧义。
+- 不要将“字符合法性校验”视为“安全可信性校验”。
+SOLUTION
+}
+
+desc(
+	lang: java
+	alert_min: 2
+	'file://url-component-validation.java': <<<CODE
+class UrlComponentValidator {
+    private String userInfo;
+    private String host;
+
+    void verify() {
+        verifyUriComponent(this.userInfo, Type.USER_INFO);
+        verifyUriComponent(this.host, Type.HOST_IPV4);
+    }
+
+    private void verifyUriComponent(String source, Object type) {
+    }
+
+    private static final class Type {
+        private static final Type USER_INFO = new Type();
+        private static final Type HOST_IPV4 = new Type();
+    }
+}
+CODE
+)
