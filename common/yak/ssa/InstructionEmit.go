@@ -598,9 +598,7 @@ func (f *FunctionBuilder) EmitPhi(name string, vs Values) *Phi {
 			break
 		}
 	}
-	if utils.IsNil(p.GetReference()) {
-		f.linkPhiToFormalParamByName(p, name)
-	}
+	f.linkPhiToFormalParamByName(p, name)
 	return p
 }
 

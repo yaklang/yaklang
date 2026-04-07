@@ -269,6 +269,23 @@ func SearchWithValue(value *Value, mod ssadb.MatchMode, compare func(string) boo
 		for _, ov := range inst.FlatOccultation() {
 			searchMembersFromInst(value, ov, check, add)
 		}
+
+		// Phi 经 Point(reference=形参) 后：除自身 member（含 EmitPhi 从形参镜像的键）外，
+		// 再在「形参」与各前驱边值上查成员，合并出循环/分支下多处的 .JSON 等（不依赖 *.JSON）。
+		if phi, ok := ssa.ToPhi(inst); ok && phi != nil {
+			if ref := phi.GetReference(); ref != nil {
+				if param, ok := ssa.ToParameter(ref); ok && param != nil {
+					searchMembersFromInst(value, param, check, add)
+				}
+			}
+			for _, edgeID := range phi.Edge {
+				ev, ok := phi.GetValueById(edgeID)
+				if !ok || utils.IsNil(ev) {
+					continue
+				}
+				searchMembersFromInst(value, ev, check, add)
+			}
+		}
 	}
 
 	return newValue

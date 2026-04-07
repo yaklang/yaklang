@@ -121,11 +121,6 @@ func SpinHandle(name string, phiValue, header, latch Value) map[string]Value {
 			}
 		}
 
-		if header == latch {
-			ret[name] = header
-			return
-		}
-
 		// step 3
 		if headerID := header.GetId(); !slices.Contains(phi.Edge, headerID) {
 			phi.Edge = append(phi.Edge, headerID)
