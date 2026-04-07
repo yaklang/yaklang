@@ -99,9 +99,14 @@ func applySSAPost(ctx *core.Context) error {
 
 	// Collect only current-program Yak functions. Imported/upstream libraries and
 	// runtime/extern targets intentionally stay out of v1 callret.
+	// Functions claimed by a body-replace obfuscator (e.g. virtualize) are
+	// treated as opaque — their blocks are NOT merged into the entry function.
 	internal := make(map[int64]*ssa.Function)
 	program.EachFunction(func(fn *ssa.Function) {
 		if fn == nil || fn.IsExtern() || fn.GetProgram() != program {
+			return
+		}
+		if ctx.IsBodyReplaced(fn.GetName()) {
 			return
 		}
 		internal[fn.GetId()] = fn
@@ -129,8 +134,20 @@ func applySSAPost(ctx *core.Context) error {
 		}
 	}
 
-	// Ensure the compiler only emits the obfuscated entry function.
-	// Nested functions are compiled via EachFunction recursion on ChildFuncs, so clear them too.
+	// Collect body-replaced functions from the FULL function tree (before
+	// cleanup) so we can re-add them to program.Funcs afterwards. These
+	// functions may have been child functions of @main or other parent scopes
+	// that callret removes — without this, the compiler cannot visit them.
+	var bodyReplacedFuncs []*ssa.Function
+	program.EachFunction(func(fn *ssa.Function) {
+		if fn != nil && ctx.IsBodyReplaced(fn.GetName()) {
+			bodyReplacedFuncs = append(bodyReplacedFuncs, fn)
+		}
+	})
+
+	// Ensure the compiler emits the rewritten entry function after flattening.
+	// Preserve body-replaced functions (e.g. virtualized) — only remove
+	// non-entry functions that were merged into the entry.
 	if program.Funcs != nil {
 		var keys []string
 		program.Funcs.ForEach(func(name string, _ *ssa.Function) bool {
@@ -138,9 +155,16 @@ func applySSAPost(ctx *core.Context) error {
 			return true
 		})
 		for _, key := range keys {
+			if ctx.IsBodyReplaced(key) {
+				continue
+			}
 			program.Funcs.Delete(key)
 		}
 		program.Funcs.Set(entryFunc.GetName(), entryFunc)
+	}
+	// Re-add body-replaced functions so the compiler can emit VM stubs.
+	for _, fn := range bodyReplacedFuncs {
+		program.Funcs.Set(fn.GetName(), fn)
 	}
 	entryFunc.ChildFuncs = nil
 
@@ -212,7 +236,7 @@ func applySSAPost(ctx *core.Context) error {
 					continue
 				}
 
-				resolvedCallee, ok := resolveCallretTargetFunction(program, candidate, internal)
+				resolvedCallee, ok := resolveCallretTargetFunction(ctx, program, candidate, internal)
 				if !ok || resolvedCallee == nil {
 					continue
 				}
@@ -469,7 +493,7 @@ func isSupportedCallretInvokeCall(ctx *core.Context, call *ssa.Call) bool {
 	return true
 }
 
-func resolveCallretTargetFunction(program *ssa.Program, call *ssa.Call, internal map[int64]*ssa.Function) (*ssa.Function, bool) {
+func resolveCallretTargetFunction(ctx *core.Context, program *ssa.Program, call *ssa.Call, internal map[int64]*ssa.Function) (*ssa.Function, bool) {
 	if program == nil || call == nil {
 		return nil, false
 	}
@@ -481,7 +505,7 @@ func resolveCallretTargetFunction(program *ssa.Program, call *ssa.Call, internal
 	if fn, ok := internal[resolved.GetId()]; ok && fn != nil {
 		return fn, true
 	}
-	return resolved, resolved.GetProgram() == program
+	return nil, false
 }
 
 func rewriteFunctionInputs(ctx *core.Context, builder *ssa.FunctionBuilder, fn *ssa.Function, vsPopTarget ssa.Value) error {

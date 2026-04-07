@@ -53,6 +53,90 @@ type Context struct {
 	// InstrTags carries obfuscator-owned instruction markers across SSA and LLVM
 	// stages without extending the SSA IR schema itself.
 	InstrTags map[int64]string
+
+	// Selections maps obfuscator name → set of function names resolved from the
+	// obf policy. When nil (no policy), obfuscators use their default behaviour
+	// (typically all functions). When non-nil, an obfuscator should only operate
+	// on the functions listed for its name; an absent key means "no functions".
+	Selections map[string]map[string]struct{}
+
+	// ObfData is a generic cross-stage data bag for obfuscators that need to
+	// pass state between SSAPre/SSAPost/LLVM stages. Each obfuscator should
+	// store data under its own name key.
+	ObfData map[string]any
+
+	// BodyReplacedFuncs tracks functions whose bodies have been claimed by a
+	// body-replace obfuscator (e.g. virtualize).  Map key is the function name,
+	// value is the obfuscator that owns it.  Other obfuscators (e.g. callret)
+	// must treat these functions as opaque and not attempt to inline or
+	// flatten them.
+	BodyReplacedFuncs map[string]string
+
+	// BuildSeed is an optional build-level seed for diversification.
+	// When non-nil, obfuscators may use it to vary their output per build.
+	// Populated from the profile's SeedPolicy.
+	BuildSeed []byte
+}
+
+// IsSelected returns true if funcName is selected for the given obfuscator.
+// When Selections is nil (no policy), always returns true (backward compat).
+// When Selections is set but the obfuscator has no entry, returns false.
+func (ctx *Context) IsSelected(obfName, funcName string) bool {
+	if ctx == nil || ctx.Selections == nil {
+		return true
+	}
+	funcs, ok := ctx.Selections[obfName]
+	if !ok {
+		return false
+	}
+	_, selected := funcs[funcName]
+	return selected
+}
+
+// HasSelections returns true if policy-based selections are active.
+func (ctx *Context) HasSelections() bool {
+	return ctx != nil && ctx.Selections != nil
+}
+
+// SetObfData stores obfuscator-specific cross-stage data under the given key.
+func (ctx *Context) SetObfData(key string, value any) {
+	if ctx == nil {
+		return
+	}
+	if ctx.ObfData == nil {
+		ctx.ObfData = make(map[string]any)
+	}
+	ctx.ObfData[key] = value
+}
+
+// GetObfData retrieves obfuscator-specific cross-stage data.
+func (ctx *Context) GetObfData(key string) (any, bool) {
+	if ctx == nil || ctx.ObfData == nil {
+		return nil, false
+	}
+	v, ok := ctx.ObfData[key]
+	return v, ok
+}
+
+// MarkBodyReplaced records that obfName has claimed funcName via body replacement.
+func (ctx *Context) MarkBodyReplaced(obfName, funcName string) {
+	if ctx == nil {
+		return
+	}
+	if ctx.BodyReplacedFuncs == nil {
+		ctx.BodyReplacedFuncs = make(map[string]string)
+	}
+	ctx.BodyReplacedFuncs[funcName] = obfName
+}
+
+// IsBodyReplaced returns true if funcName has been claimed by a body-replace
+// obfuscator. Other obfuscators should treat such functions as opaque.
+func (ctx *Context) IsBodyReplaced(funcName string) bool {
+	if ctx == nil || ctx.BodyReplacedFuncs == nil {
+		return false
+	}
+	_, ok := ctx.BodyReplacedFuncs[funcName]
+	return ok
 }
 
 type Obfuscator interface {
