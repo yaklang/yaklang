@@ -490,121 +490,147 @@ func Test_PhiType(t *testing.T) {
 }
 
 func TestPhi_in_loop(t *testing.T) {
-	rule := `
+	ruleNewJSON := `
 new() as $f
 $f.JSON as $a
 *.JSON as $b
-`
-
-	code1 := `package api
-
-func GetUserEmail() {
-	f := new()
-
-	if err != nil {
-		f.JSON(1)
-		return
-	}
-	for row.Next() {
-		if err != nil {
-			f.JSON(2)
-		}
-	}
-
-	f.JSON(3)
-}
-`
-	t.Run("If return", func(t *testing.T) {
-		prog, err := ssaapi.Parse(code1, ssaapi.WithLanguage(ssaconfig.GO))
-		require.NoError(t, err)
-		require.NotNil(t, prog)
-		res, err := prog.SyntaxFlowWithError(rule, ssaapi.QueryWithEnableDebug())
-		res.Show()
-		require.NoError(t, err)
-		require.Len(t, res.GetValues("f"), 1)
-		require.Len(t, res.GetValues("a"), 2)
-		require.Len(t, res.GetValues("b"), 2)
-	})
-
-	code2 := `package api
-
-	func GetUserEmail() {
-		f := new()
-	
-		if err != nil {
-			f.JSON(1)
-			return
-		}
-		for row.Next() {
-			if err != nil {
-				f.JSON(2)
-				return
-			}
-		}
-	
-		f.JSON(3)
-	}
 	`
-	t.Run("If return inside loop", func(t *testing.T) {
-		prog, err := ssaapi.Parse(code2, ssaapi.WithLanguage(ssaconfig.GO))
-		require.NoError(t, err)
-		require.NotNil(t, prog)
-		res, err := prog.SyntaxFlowWithError(rule, ssaapi.QueryWithEnableDebug())
-		res.Show()
-		require.NoError(t, err)
-		require.Len(t, res.GetValues("f"), 1)
-		require.Len(t, res.GetValues("a"), 1)
-		require.Len(t, res.GetValues("b"), 3)
-	})
-
-	rule2 := `
+	ruleGinJSON := `
 gin.Context as $f
 $f.JSON as $a
 *.JSON as $b
 `
+	// want: SyntaxFlow 捕获变量名 -> 预期匹配数量
+	cases := []struct {
+		name string
+		code string
+		rule string
+		want map[string]int
+	}{
+		{
+			name: "If return",
+			code: `package api
 
-	code3 := `package api
+		func GetUserEmail() {
+			f := new()
 
-	import (
-		"github.com/gin-gonic/gin"
-	)
+			if err != nil {
+				f.JSON(1)
+				return
+			}
+			for row.Next() {
+				if err != nil {
+					f.JSON(2)
+				}
+			}
 
-	func GetUserEmail(f *gin.Context) {
+			f.JSON(3)
+		}
+		`,
+			rule: ruleNewJSON,
+			// 这里没有 phi，f 只有一个值（return 对 call 类型有特殊处理）
+			want: map[string]int{"f": 1, "a": 2, "b": 2},
+		},
+		{
+			name: "If return inside loop",
+			code: `package api
+
+		func GetUserEmail() {
+			f := new()
+
+			if err != nil {
+				f.JSON(1)
+				return
+			}
+			for row.Next() {
+				if err != nil {
+					f.JSON(2)
+					return
+				}
+			}
+
+			f.JSON(3)
+		}
+		`,
+			rule: ruleNewJSON,
+			want: map[string]int{"f": 1, "a": 1, "b": 3},
+		},
+		{
+			name: "If return in param",
+			code: `package api
+
+import (
+	"github.com/gin-gonic/gin"
+)
+
+func GetUserEmail(f *gin.Context) {
+	if err != nil {
+		f.JSON(1)
+		return
+	}
+
+	f.JSON(2)
+	for row.Next() {
 		if err != nil {
-			f.JSON(1)
+			f.JSON(3)
+		}
+	}
+
+	f.JSON(4)
+}
+`,
+			rule: ruleGinJSON,
+			want: map[string]int{"f": 3, "a": 4, "b": 4},
+		},
+		{
+			name: "If return inside loop in param",
+			code: `package api
+
+import (
+	"github.com/gin-gonic/gin"
+)
+
+func GetUserEmail(f *gin.Context) {
+	if err != nil {
+		f.JSON(1)
+		return
+	}
+
+	f.JSON(2)
+	for row.Next() {
+		if err != nil {
+			f.JSON(3)
 			return
 		}
-		for row.Next() {
-			if err != nil {
-				f.JSON(2)
-			}
-		}
-	
-		f.JSON(3)
 	}
-	`
-	t.Run("If return inside loop in param", func(t *testing.T) {
-		prog, err := ssaapi.Parse(code3, ssaapi.WithLanguage(ssaconfig.GO))
-		require.NoError(t, err)
-		require.NotNil(t, prog)
-		res, err := prog.SyntaxFlowWithError(rule2, ssaapi.QueryWithEnableDebug())
-		res.Show()
-		require.NoError(t, err)
-		require.Len(t, res.GetValues("f"), 2)
-		require.Len(t, res.GetValues("a"), 2)
-		require.Len(t, res.GetValues("b"), 3)
-	})
 
+	f.JSON(4)
+}
+`,
+			rule: ruleGinJSON,
+			want: map[string]int{"f": 3, "a": 4, "b": 4},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ssatest.CheckResult(t, tc.code, tc.rule, func(res *ssaapi.SyntaxFlowResult) {
+				res.Show()
+				for varName, wantLen := range tc.want {
+					require.Len(t, res.GetValues(varName), wantLen, varName)
+				}
+			}, nil, []ssaconfig.Option{ssaapi.WithLanguage(ssaconfig.GO)})
+		})
+	}
 }
 
-func TestPhi_in_if_and_loop(t *testing.T) {
+func TestPhi_in_loop_real(t *testing.T) {
 	rule := `
 gin.Context as $input
 $input.JSON as $a
 *.JSON as $b
 `
-
-	code1 := `package api
+	emailAPIPreamble := `package api
 
 import (
 	"database/sql"
@@ -626,7 +652,16 @@ func SqliteConn() *sql.DB {
 	return db
 }
 
-func GetUserEmail(c *gin.Context) {
+`
+
+	cases := []struct {
+		name string
+		code string
+		want map[string]int
+	}{
+		{
+			name: "If",
+			code: emailAPIPreamble + `func GetUserEmail(c *gin.Context) {
 	db := SqliteConn()
 	defer db.Close()
 
@@ -641,43 +676,12 @@ func GetUserEmail(c *gin.Context) {
 
 	c.JSON(200, gin.H{"code": 200, "data": emailResponseSlice})
 }
-`
-
-	t.Run("If", func(t *testing.T) {
-		prog, err := ssaapi.Parse(code1, ssaapi.WithLanguage(ssaconfig.GO))
-		require.NoError(t, err)
-		require.NotNil(t, prog)
-		res, err := prog.SyntaxFlowWithError(rule, ssaapi.QueryWithEnableDebug())
-		res.Show()
-		require.NoError(t, err)
-		require.Len(t, res.GetValues("input"), 2)
-		require.Len(t, res.GetValues("a"), 2)
-		require.Len(t, res.GetValues("b"), 2)
-	})
-
-	code2 := `package api
-
-import (
-	"database/sql"
-	"fmt"
-
-	"github.com/gin-gonic/gin"
-)
-
-type emailResponse struct {
-	ID    int
-	Email string
-}
-
-func SqliteConn() *sql.DB {
-	db, err := sql.Open("sqlite3", "sql.db")
-	if err != nil {
-		fmt.Println(err)
-	}
-	return db
-}
-
-func GetUserEmail(c *gin.Context) {
+`,
+			want: map[string]int{"input": 2, "a": 2, "b": 2},
+		},
+		{
+			name: "If-For",
+			code: emailAPIPreamble + `func GetUserEmail(c *gin.Context) {
 	db := SqliteConn()
 	defer db.Close()
 
@@ -701,17 +705,19 @@ func GetUserEmail(c *gin.Context) {
 
 	c.JSON(200, gin.H{"code": 200, "data": emailResponseSlice})
 }
-`
+`,
+			want: map[string]int{"input": 3, "a": 3, "b": 3},
+		},
+	}
 
-	t.Run("If-For", func(t *testing.T) {
-		prog, err := ssaapi.Parse(code2, ssaapi.WithLanguage(ssaconfig.GO))
-		require.NoError(t, err)
-		require.NotNil(t, prog)
-		res, err := prog.SyntaxFlowWithError(rule, ssaapi.QueryWithEnableDebug())
-		res.Show()
-		require.NoError(t, err)
-		require.Len(t, res.GetValues("input"), 2)
-		require.Len(t, res.GetValues("a"), 2)
-		require.Len(t, res.GetValues("b"), 3)
-	})
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ssatest.CheckResult(t, tc.code, rule, func(res *ssaapi.SyntaxFlowResult) {
+				res.Show()
+				for varName, wantLen := range tc.want {
+					require.Len(t, res.GetValues(varName), wantLen, varName)
+				}
+			}, nil, []ssaconfig.Option{ssaapi.WithLanguage(ssaconfig.GO)})
+		})
+	}
 }

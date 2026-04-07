@@ -126,7 +126,7 @@ func (v *Value) SetAnchorBitVector(bits *utils.BitVector) {
 func (v *Value) ExactMatch(ctx context.Context, mod ssadb.MatchMode, want string) (bool, sfvm.Values, error) {
 	value := _SearchValue(v, mod, func(s string) bool { return s == want }, sfvm.WithAnalysisContext_Label("search-exact:"+want))
 	if v != nil && v.ParentProgram != nil {
-		value = appendPhiLinkedToParameters(ctx, v.ParentProgram, value)
+		value = appendPointerLinkedPhisFromParameters(v.ParentProgram, value)
 	}
 	return len(value) > 0, ToSFVMValues(value), nil
 }
@@ -135,6 +135,9 @@ func (v *Value) GlobMatch(ctx context.Context, mod ssadb.MatchMode, g string) (b
 	value := _SearchValue(v, mod, func(s string) bool {
 		return glob.MustCompile(g).Match(s)
 	}, sfvm.WithAnalysisContext_Label("search-glob:"+g))
+	if v != nil && v.ParentProgram != nil {
+		value = appendPointerLinkedPhisFromParameters(v.ParentProgram, value)
+	}
 	return len(value) > 0, ToSFVMValues(value), nil
 }
 
@@ -142,6 +145,9 @@ func (v *Value) RegexpMatch(ctx context.Context, mod ssadb.MatchMode, re string)
 	value := _SearchValue(v, mod, func(s string) bool {
 		return regexp.MustCompile(re).MatchString(s)
 	}, sfvm.WithAnalysisContext_Label("search-regexp:"+re))
+	if v != nil && v.ParentProgram != nil {
+		value = appendPointerLinkedPhisFromParameters(v.ParentProgram, value)
+	}
 	return len(value) > 0, ToSFVMValues(value), nil
 }
 
@@ -152,7 +158,15 @@ func (v *Value) CompareString(items *sfvm.StringComparator) (sfvm.Values, []bool
 
 	names := getValueNames(v)
 	names = append(names, yakunquote.TryUnquote(v.String()))
-	return sfvm.ValuesOf(v), []bool{items.Matches(names...)}
+	if !items.Matches(names...) {
+		return sfvm.ValuesOf(v), []bool{false}
+	}
+	out := Values{v}
+	if v.ParentProgram != nil {
+		out = appendPointerLinkedPhisFromParameters(v.ParentProgram, Values{v})
+	}
+	// 单条 true：pickCandidateByMask 在 len(cond)!=len(candidate) 且 anyTrue(cond) 时保留全部展开值
+	return ToSFVMValues(out), []bool{true}
 }
 
 func (v *Value) CompareConst(comparator *sfvm.ConstComparator) bool {
