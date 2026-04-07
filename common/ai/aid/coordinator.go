@@ -25,6 +25,7 @@ import (
 // PlanExecutingLoadingStatusKey is the key used to emit loading status events for plan execution
 // Similar to ReActLoadingStatusKey in reactloops, this allows UI to show current execution phase
 const PlanExecutingLoadingStatusKey = "plan-executing-loading-status-key"
+const RecoveryStartTaskIndexConfigKey = "recovery_start_task_index"
 
 // CoordinatorOption 定义配置 Coordinator 的选项接口
 type CoordinatorOption func(c *Coordinator)
@@ -64,6 +65,16 @@ func WithResultHandler(h func(c *Coordinator)) aicommon.ConfigOption {
 func WithPlanMocker(i func(coordinator *Coordinator) *PlanResponse) aicommon.ConfigOption {
 	return func(config *aicommon.Config) error {
 		return aicommon.WithAppendOtherOption(WithCoordinatorPlanMocker(i))(config)
+	}
+}
+
+func WithRecoveryStartTaskIndex(index string) aicommon.ConfigOption {
+	return func(config *aicommon.Config) error {
+		if config == nil {
+			return nil
+		}
+		config.SetConfig(RecoveryStartTaskIndexConfigKey, strings.TrimSpace(index))
+		return nil
 	}
 }
 
@@ -195,6 +206,13 @@ func (c *Coordinator) planLoadingStatus(status string) {
 
 func (c *Coordinator) GetContextProvider() *PromptContextProvider {
 	return c.ContextProvider
+}
+
+func (c *Coordinator) getRecoveryStartTaskIndex() string {
+	if c == nil || c.Config == nil {
+		return ""
+	}
+	return strings.TrimSpace(c.GetConfigString(RecoveryStartTaskIndexConfigKey))
 }
 
 func (c *Coordinator) getCurrentTaskPlan() *AiTask {
@@ -337,13 +355,13 @@ func (c *Coordinator) Run() error {
 	c.registerPEModeInputEventCallback()
 	c.EmitCurrentConfigInfo()
 
-	executeRoot := func(root *AiTask) error {
+	executeRoot := func(root *AiTask, startTaskIndex string) error {
 		// Phase 6: Executing tasks
 		c.planLoadingStatus("执行任务中 / Executing Tasks...")
 		c.EmitInfo("start to create runtime")
 		rt := c.createRuntime()
 		c.runtime = rt
-		err := rt.Invoke(root)
+		err := rt.Invoke(root, startTaskIndex)
 		if err != nil {
 			c.planLoadingStatus("任务执行失败 / Task Execution Failed")
 			return err
@@ -353,7 +371,13 @@ func (c *Coordinator) Run() error {
 
 	// Recovery: try resume from persisted plan-exec state
 	recovered := false
-	if recoveredRoot, _, ok := c.tryRecoverPlanAndExec(); ok {
+	recoveryStartTaskIndex := c.getRecoveryStartTaskIndex()
+	if recoveredRoot, _, ok, err := c.tryRecoverPlanAndExec(recoveryStartTaskIndex); ok {
+		if err != nil {
+			c.planLoadingStatus("恢复执行失败 / Recovery Failed")
+			c.EmitError("recover plan-and-exec failed: %v", err)
+			return utils.Errorf("coordinator: recover plan-and-exec failed: %v", err)
+		}
 		c.planLoadingStatus("恢复执行 / Recovering Execution...")
 		c.rootTask = recoveredRoot
 		c.ContextProvider.StoreRootTask(recoveredRoot)
@@ -362,7 +386,7 @@ func (c *Coordinator) Run() error {
 			c.EmitError("no subtasks found in recovered task tree")
 			return utils.Errorf("coordinator: no subtasks found in recovered task tree")
 		}
-		if err := executeRoot(recoveredRoot); err != nil {
+		if err := executeRoot(recoveredRoot, recoveryStartTaskIndex); err != nil {
 			return err
 		}
 		recovered = true
@@ -443,7 +467,7 @@ func (c *Coordinator) Run() error {
 			log.Warnf("coordinator: no tools enable")
 		}
 
-		if err := executeRoot(root); err != nil {
+		if err := executeRoot(root, ""); err != nil {
 			return err
 		}
 	}
