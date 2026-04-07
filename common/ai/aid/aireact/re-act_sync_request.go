@@ -96,6 +96,7 @@ func (r *ReAct) HandleSyncTypeKnowledgeEvent(event *ypb.AIInputEvent) error {
 func (r *ReAct) HandleSyncTypeRecoveryPlanAndExecEvent(event *ypb.AIInputEvent) error {
 	sessionID := r.config.PersistentSessionId
 	coordinatorID := ""
+	startTaskIndex := ""
 	if event.SyncJsonInput != "" {
 		var params map[string]interface{}
 		if err := json.Unmarshal([]byte(event.SyncJsonInput), &params); err != nil {
@@ -107,6 +108,9 @@ func (r *ReAct) HandleSyncTypeRecoveryPlanAndExecEvent(event *ypb.AIInputEvent) 
 		}
 		if cid, ok := params["coordinator_id"].(string); ok && cid != "" {
 			coordinatorID = cid
+		}
+		if idx, ok := params["start_task_index"].(string); ok && idx != "" {
+			startTaskIndex = idx
 		}
 	}
 	if coordinatorID == "" {
@@ -127,12 +131,13 @@ func (r *ReAct) HandleSyncTypeRecoveryPlanAndExecEvent(event *ypb.AIInputEvent) 
 		return nil
 	}
 	r.EmitSyncEvent("recover_plan_and_exec", map[string]interface{}{
-		"started":        true,
-		"session_id":     sessionID,
-		"coordinator_id": coordinatorID,
+		"started":          true,
+		"session_id":       sessionID,
+		"coordinator_id":   coordinatorID,
+		"start_task_index": startTaskIndex,
 	}, event.SyncID)
 
-	go r.AsyncRecoverPlanAndExecute(r.config.Ctx, coordinatorID, func(err error) {
+	go r.AsyncRecoverPlanAndExecute(r.config.Ctx, coordinatorID, startTaskIndex, func(err error) {
 		if err != nil {
 			log.Errorf("recover plan-and-exec failed: %v", err)
 		}
