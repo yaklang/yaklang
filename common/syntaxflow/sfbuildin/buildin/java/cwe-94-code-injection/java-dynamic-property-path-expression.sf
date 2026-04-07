@@ -1,0 +1,91 @@
+desc(
+	title: "Detect Dynamic Property Path Expression Access"
+	title_zh: "检测Java动态属性路径表达式访问"
+	type: vuln
+	risk: "表达式注入"
+	desc: <<<DESC
+### 漏洞描述
+当代码先将动态属性路径解析为框架内部的属性路径对象，再将该路径交给表达式对象执行 `setValue` / `getValue` 一类读写操作时，如果路径来源于外部输入，就可能造成动态属性访问、路径注入，甚至进一步演变为表达式注入或越权字段写入。
+
+该规则关注的通用危险模式是：
+- `PropertyPath.from(dynamicPath, ...)`
+- 动态路径分段处理，例如 `path.split(...)`
+- 随后调用表达式对象的 `setValue(...)` / `getValue(...)`
+DESC
+	rule_id: "45f0d5c0-9b90-46b2-a8e8-82a5f4f7ce67"
+	solution: <<<SOLUTION
+### 修复建议
+- 不要将外部可控路径直接转换为可执行的属性路径或表达式访问路径。
+- 对可访问字段做白名单约束，不要依赖字符串路径拼接。
+- 对补丁/动态字段更新场景，显式限制可写字段集合。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-94: Improper Control of Generation of Code](https://cwe.mitre.org/data/definitions/94.html)
+REFERENCE
+)
+
+PropertyPath.from(,* as $propertyPathArg);
+split(,* as $pathSplitArg);
+setValue(,* as $exprWriteArg);
+getValue(,* as $exprReadArg);
+
+$exprWriteArg + $exprReadArg as $exprAccess;
+check $propertyPathArg;
+check $pathSplitArg;
+check $exprAccess;
+
+$propertyPathArg + $pathSplitArg + $exprAccess as $risk;
+
+alert $risk for {
+	title: "Detect Dynamic Property Path Expression Access",
+	title_zh: "检测Java动态属性路径表达式访问",
+	level: "high",
+	message: "发现动态属性路径解析后又进入表达式对象读写，可能导致路径注入、表达式注入或越权字段访问。",
+	risk: "表达式注入",
+	name: "risk",
+	desc: <<<DESC
+### 漏洞描述
+当代码先将动态属性路径解析为框架内部的属性路径对象，再将该路径交给表达式对象执行 `setValue` / `getValue` 一类读写操作时，如果路径来源于外部输入，就可能造成动态属性访问、路径注入，甚至进一步演变为表达式注入或越权字段写入。
+
+该规则关注的通用危险模式是：
+- `PropertyPath.from(dynamicPath, ...)`
+- 动态路径分段处理，例如 `path.split(...)`
+- 随后调用表达式对象的 `setValue(...)` / `getValue(...)`
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 不要将外部可控路径直接转换为可执行的属性路径或表达式访问路径。
+- 对可访问字段做白名单约束，不要依赖字符串路径拼接。
+- 对补丁/动态字段更新场景，显式限制可写字段集合。
+SOLUTION
+}
+
+desc(
+	lang: java
+	alert_min: 4
+	'file://dynamic-property-path.java': <<<CODE
+import org.springframework.data.mapping.PropertyPath;
+import org.springframework.expression.Expression;
+
+class DynamicPropertyPathPatch {
+    private final String path = "/name";
+    private final Expression spelExpression = null;
+
+    void bad(Object target, Object value) {
+        String pathSource = path.split("/")[1];
+        PropertyPath.from(pathSource, Object.class);
+        spelExpression.setValue(target, value);
+        spelExpression.getValue(target);
+    }
+}
+CODE
+	'safefile://safe-property-path.java': <<<CODE
+import org.springframework.data.mapping.PropertyPath;
+
+class SafePropertyPathPatch {
+    void safe() {
+        PropertyPath.from("name", Object.class);
+    }
+}
+CODE
+)
