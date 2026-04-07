@@ -12,11 +12,11 @@ import (
 
 var loopActionDirectlyAnswerHTTPFuzztest = &reactloops.LoopAction{
 	ActionType:  "directly_answer",
-	Description: "只用于回答 HTTP 安全测试过程中的简短问题，例如当前发现、下一步计划、为何怀疑某漏洞、为何需要人工审核。回答前会保留当前会话中的原始包、当前生效包和 merge 摘要。",
+	Description: "用于回答 HTTP 安全测试过程中的阶段性结论或简短问题。短答案可用 answer_payload；需要 Markdown 分段、列表、表格或更复杂展示时，使用 FINAL_ANSWER AITAG。回答前会保留当前会话中的原始包、当前生效包和 merge 摘要。",
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
 			"answer_payload",
-			aitool.WithParam_Description(`仅在回答简短测试过程问答时使用。短答案可放 answer_payload；长答案请使用 <|FINAL_ANSWER_...|> 标签。不要把 fuzz、改包或整包生成动作伪装成 directly_answer。`),
+			aitool.WithParam_Description(`仅在回答简短测试过程问答时使用。若答案较长、包含多段 Markdown、列表、表格或复杂结构，请留空此字段并改用 <|FINAL_ANSWER_...|> 标签。answer_payload 与 <|FINAL_ANSWER_...|> 互斥，不要同时使用。不要把 fuzz、改包或整包生成动作伪装成 directly_answer。`),
 		),
 	},
 	AITagStreamFields: []*reactloops.LoopAITagField{
@@ -39,11 +39,15 @@ var loopActionDirectlyAnswerHTTPFuzztest = &reactloops.LoopAction{
 		if payload == "" {
 			payload = strings.TrimSpace(action.GetInvokeParams("next_action").GetString("answer_payload"))
 		}
-		if payload == "" {
-			payload = strings.TrimSpace(loop.Get("tag_final_answer"))
+		tagPayload := strings.TrimSpace(loop.Get("tag_final_answer"))
+		if payload != "" && tagPayload != "" {
+			return utils.Error("directly_answer requires exactly one of answer_payload or FINAL_ANSWER tag, but both were provided")
 		}
 		if payload == "" {
-			return utils.Error("answer_payload is required for directly_answer but empty")
+			payload = tagPayload
+		}
+		if payload == "" {
+			return utils.Error("directly_answer requires answer_payload or FINAL_ANSWER tag, but both are empty")
 		}
 		loop.Set("directly_answer_payload", payload)
 		return nil

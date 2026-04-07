@@ -163,6 +163,10 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 2. 请求头里有一个 User-Agent 字段，可以尝试在这个字段里进行模糊测试，比如注入恶意 payload 来测试服务器对 User-Agent 的处理。
 3. 如果请求里有 Cookie，Cookie 也是一个重要的模糊测试目标，可以尝试修改 Cookie 的值来测试会话管理和权限控制等方面的安全性。
 4. 如果请求里有 JSON 或者其他结构化的 body，可以针对这些参数进行模糊测试，尝试注入特殊字符、超长字符串、边界值等来测试服务器的健壮性和安全性。
+5. 如果参数名像 id、uid、userId、orderId、file、path、tenant、account 这一类对象标识符，要考虑参数遍历、对象切换、资源编号枚举，验证是否存在 IDOR、越权读取或信息泄漏。
+6. 如果响应里可能包含用户名、邮箱、手机号、路径、版本号、调试报错、SQL 报错、模板报错等内容，也要把信息泄漏当作漏洞方向，而不是只盯着 SQL 注入和 XSS。
+7. 如果当前数据包明显不合理，例如缺失 Host、User-Agent、Accept、Content-Type，或者 method/path/body 组合明显不匹配，先考虑修复数据包再测，尽量让请求更像真实客户端流量。
+8. 如果需要修复数据包，可以优先补齐 User-Agent、Accept、Accept-Language、Connection、Referer、Origin 等常见头部，并保持与当前接口语义一致，再继续做 fuzz。
 
 `, []aitool.ToolOption{
 			aitool.WithStringParam("thought", aitool.WithParam_Description("针对这个 HTTP 请求的模糊测试要点和灵感提示")),
