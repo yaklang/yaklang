@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loopinfra"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -42,8 +43,8 @@ func newFuzzFinalizeTestInvoker(t *testing.T) *fuzzFinalizeTestInvoker {
 
 func (i *fuzzFinalizeTestInvoker) EmitResultAfterStream(result any) {
 	i.mu.Lock()
-	defer i.mu.Unlock()
 	i.resultPayloads = append(i.resultPayloads, strings.TrimSpace(utils.InterfaceToString(result)))
+	i.mu.Unlock()
 	if cfg, ok := i.GetConfig().(*mock.MockedAIConfig); ok && cfg.Emitter != nil {
 		_, _ = cfg.Emitter.EmitResultAfterStream("result", result, false)
 	}
@@ -90,6 +91,9 @@ func TestLoopHTTPFuzztestFinalize_DeliversFallbackSummary(t *testing.T) {
 
 	finalContent := generateLoopHTTPFuzzFinalizeSummary(loop, context.DeadlineExceeded)
 	deliverLoopHTTPFuzzFinalizeSummary(loop, invoker, finalContent)
+	if emitter := loop.GetEmitter(); emitter != nil {
+		emitter.WaitForStream()
+	}
 
 	if len(invoker.resultPayloads) != 1 {
 		t.Fatalf("expected one fallback result payload, got %d", len(invoker.resultPayloads))
