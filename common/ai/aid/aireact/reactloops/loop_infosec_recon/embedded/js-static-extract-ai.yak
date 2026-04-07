@@ -12,9 +12,9 @@
 // AI：厂商与 API Key 使用 Yakit 全局配置；本脚本默认只覆盖模型名（可按需改 --ai-model；传空则连模型也不覆盖）。
 
 __DESC__ = "从 JavaScript/TypeScript 源码中静态挖掘 HTTP API 候选：正则提取、AI 研判与 liteforge 分块补漏，输出可合并的端点列表。支持本地目录（递归 .js/.mjs/.cjs）、多文件与 http(s) URL。"
-__VERBOSE_NAME__ = "JS 静态 API 提取（js-static-extract-ai）"
-__KEYWORDS__ = "javascript,静态分析,API,接口,liteforge,recon,安全,js-static-extract-ai,信息搜集"
-__USAGE__ = "专注模式 infosec_recon：Loop 动作 js-static-extract-ai；参数可用 --dir（单目录）、--files 或 --paths（逗号分隔多条目，与提示词中的 paths 一致）、--file。完整管线含多轮 AI，大目录可能耗时数十分钟。"
+__VERBOSE_NAME__ = "js_static_extract_ai"
+__KEYWORDS__ = "javascript,静态分析,API,接口,liteforge,recon,安全,js_static_extract_ai,信息搜集,infosec_recon"
+__USAGE__ = "专注模式 infosec_recon：已注册工具 js_static_extract_ai；参数可用 --dir（单目录）、--files 或 --paths（逗号分隔多条目，与提示词中的 paths 一致）、--file。完整管线含多轮 AI，大目录可能耗时数十分钟。"
 
 log.setLevel("warn")
 

@@ -3,6 +3,7 @@ package loop_infosec_recon
 import (
 	"bytes"
 	_ "embed"
+	"sort"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -25,7 +26,8 @@ func init() {
 	err := reactloops.RegisterLoopFactory(
 		schema.AI_REACT_LOOP_NAME_INFOSEC_RECON,
 		func(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {
-			allowed := []string{
+			// meta/schema-level loop actions vs toolkit-style names (see names.go for embedded tools).
+			metaActions := []string{
 				schema.AI_REACT_LOOP_ACTION_DIRECTLY_ANSWER,
 				"finish",
 				schema.AI_REACT_LOOP_ACTION_KNOWLEDGE_ENHANCE,
@@ -36,9 +38,11 @@ func init() {
 				schema.AI_REACT_LOOP_ACTION_CHANGE_SKILL_VIEW_OFFSET,
 				"recon_register_seed",
 				"api_pool_merge",
-				"crawl-js-collector",
-				"js-static-extract-ai",
+				ToolCrawlJsCollector,
+				ToolJsStaticExtractAI,
 				"probe_api_candidates",
+			}
+			toolActions := []string{
 				"web_search",
 				"scan_port",
 				"simple_crawler",
@@ -54,6 +58,7 @@ func init() {
 				"network_space_search",
 				"search_knowledge",
 			}
+			allowed := append(append([]string{}, metaActions...), toolActions...)
 			if r.GetConfig().GetAllowUserInteraction() {
 				allowed = append(allowed, schema.AI_REACT_LOOP_ACTION_ASK_FOR_CLARIFICATION)
 			}
@@ -88,9 +93,14 @@ func init() {
 					}
 					pool, _ := LoadAPIPool(wd)
 					tot, ver, unver, bySrc := PoolStats(pool)
+					srcKeys := make([]string, 0, len(bySrc))
+					for k := range bySrc {
+						srcKeys = append(srcKeys, k)
+					}
+					sort.Strings(srcKeys)
 					var srcParts []string
-					for k, v := range bySrc {
-						srcParts = append(srcParts, k+":"+utils.InterfaceToString(v))
+					for _, k := range srcKeys {
+						srcParts = append(srcParts, k+":"+utils.InterfaceToString(bySrc[k]))
 					}
 					reconLog := loop.Get(keyReconLog)
 					if len(reconLog) > 6000 {
@@ -135,9 +145,9 @@ func init() {
 			return reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_INFOSEC_RECON, r, preset...)
 		},
 		reactloops.WithLoopDescription("Focused information gathering and API endpoint discovery for authorized penetration tests. "+
-			"Merges candidates into a shared on-disk pool, supports JS static extraction via yak script, and optional HTTP probing."),
-		reactloops.WithLoopUsagePrompt("Use when the user needs structured web/API recon on an authorized target: crawl-js-collector (save verified JS), "+
-			"js-static-extract-ai with the downloaded JS directory or URLs, api_pool_merge, probe_api_candidates, plus DNS/ports/crawl as needed."),
+			"Merges candidates into a shared on-disk pool; JS pipeline uses registered tools "+ToolCrawlJsCollector+" and "+ToolJsStaticExtractAI+"; optional HTTP probing."),
+		reactloops.WithLoopUsagePrompt("Use when the user needs structured web/API recon on an authorized target: "+ToolCrawlJsCollector+" (save verified JS), "+
+			ToolJsStaticExtractAI+" with the downloaded JS directory or URLs, api_pool_merge, probe_api_candidates, plus DNS/ports/crawl as needed."),
 		reactloops.WithLoopOutputExample(reflectionOutputExample),
 		reactloops.WithVerboseName("Infosec/API Surface Recon"),
 		reactloops.WithVerboseNameZh("信息搜集与 API 发现"),

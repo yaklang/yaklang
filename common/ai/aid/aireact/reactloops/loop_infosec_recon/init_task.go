@@ -60,7 +60,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 
 		embeddedInfosecYakTools()
 
-		r.AddToTimeline("infosec_recon_init", "API surface recon loop ready. recon_register_seed → crawl-js-collector (optional deep_js) → js-static-extract-ai(paths= verified JS dir) → api_pool_merge / probe_api_candidates as needed.")
+		r.AddToTimeline("infosec_recon_init", "API surface recon loop ready. recon_register_seed → "+ToolCrawlJsCollector+" (optional deep_js) → "+ToolJsStaticExtractAI+"(paths / verified JS dir) → api_pool_merge / probe_api_candidates as needed.")
 		operator.Continue()
 	}
 }
@@ -83,12 +83,12 @@ func ensureEmbeddedAIYakTool(name, script string) {
 		log.Warnf("infosec_recon: register %s tool failed: %v", name, err)
 		return
 	}
-	log.Infof("infosec_recon: auto-registered %s yak tool from embedded script", name)
+	log.Infof("infosec_recon: auto-registered AI tool %s from embedded script source", name)
 }
 
 func embeddedInfosecYakTools() {
-	ensureEmbeddedAIYakTool("js-static-extract-ai", embeddedJsStaticExtractAiScript)
-	ensureEmbeddedAIYakTool("crawl-js-collector", embeddedCrawlJsCollectorScript)
+	ensureEmbeddedAIYakTool(ToolJsStaticExtractAI, embeddedJsStaticExtractAiScript)
+	ensureEmbeddedAIYakTool(ToolCrawlJsCollector, embeddedCrawlJsCollectorScript)
 }
 
 func ensurePoolFile(workDir string) error {
