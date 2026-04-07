@@ -80,7 +80,7 @@ func (s *Server) AIConfigHealthCheck(ctx context.Context, req *ypb.AIConfigHealt
 			resp.RecommendConfig = recommend
 		}
 	}
-	return resp, nil
+	return sanitizeAIConfigHealthCheckResponse(resp), nil
 }
 
 func executeAIConfigHealthCheck(ctx context.Context, config *ypb.ThirdPartyApplicationConfig, content string) *ypb.AIConfigHealthCheckResponse {
@@ -121,6 +121,24 @@ func executeAIConfigHealthCheck(ctx context.Context, config *ypb.ThirdPartyAppli
 		resp.ErrorMessage = utils.Errorf("ai health check failed with status code %d", resp.GetResponseStatusCode()).Error()
 	}
 	return resp
+}
+
+func sanitizeAIConfigHealthCheckResponse(resp *ypb.AIConfigHealthCheckResponse) *ypb.AIConfigHealthCheckResponse {
+	if resp == nil {
+		return nil
+	}
+	resp.RawRequest = sanitizeAIHealthCheckString(resp.GetRawRequest())
+	resp.ResponseContent = sanitizeAIHealthCheckString(resp.GetResponseContent())
+	resp.ErrorMessage = sanitizeAIHealthCheckString(resp.GetErrorMessage())
+	resp.RawResponse = sanitizeAIHealthCheckString(resp.GetRawResponse())
+	return resp
+}
+
+func sanitizeAIHealthCheckString(raw string) string {
+	if raw == "" {
+		return ""
+	}
+	return utils.EscapeInvalidUTF8Byte([]byte(raw))
 }
 
 func recommendAIHealthCheckConfig(ctx context.Context, original *ypb.ThirdPartyApplicationConfig, content string) *ypb.ThirdPartyApplicationConfig {

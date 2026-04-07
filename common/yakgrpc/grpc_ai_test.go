@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -43,8 +44,12 @@ func TestGRPC_Ai_List_Model(t *testing.T) {
 }
 
 type testAIModelClient struct {
-	config   *aispec.AIConfig
-	response string
+	config      *aispec.AIConfig
+	response    string
+	rawRequest  []byte
+	rawResponse []byte
+	bodyPreview []byte
+	chatErr     error
 }
 
 func (c *testAIModelClient) LoadOption(opts ...aispec.AIConfigOption) {
@@ -70,10 +75,22 @@ func (c *testAIModelClient) Chat(_ string, _ ...any) (string, error) {
 
 	time.Sleep(20 * time.Millisecond)
 	if c.config.RawHTTPRequestResponseCallback != nil {
+		rawRequest := c.rawRequest
+		if len(rawRequest) == 0 {
+			rawRequest = []byte("POST /v1/chat/completions HTTP/1.1\r\nHost: mock.local\r\nContent-Type: application/json\r\nAccept: application/json\r\n\r\n{\"content\":\"ping\"}")
+		}
+		rawResponse := c.rawResponse
+		if len(rawResponse) == 0 {
+			rawResponse = []byte("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n")
+		}
+		bodyPreview := c.bodyPreview
+		if len(bodyPreview) == 0 {
+			bodyPreview = []byte(`{"choices":[{"message":{"content":"mock-response"}}]}`)
+		}
 		c.config.RawHTTPRequestResponseCallback(
-			[]byte("POST /v1/chat/completions HTTP/1.1\r\nHost: mock.local\r\nContent-Type: application/json\r\nAccept: application/json\r\n\r\n{\"content\":\"ping\"}"),
-			[]byte("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n"),
-			[]byte(`{"choices":[{"message":{"content":"mock-response"}}]}`),
+			rawRequest,
+			rawResponse,
+			bodyPreview,
 		)
 	}
 	if c.config.ReasonStreamHandler != nil {
@@ -83,7 +100,7 @@ func (c *testAIModelClient) Chat(_ string, _ ...any) (string, error) {
 		c.config.StreamHandler(strings.NewReader(c.response))
 	}
 	time.Sleep(20 * time.Millisecond)
-	return c.response, nil
+	return c.response, c.chatErr
 }
 
 func (c *testAIModelClient) ChatStream(_ string) (io.Reader, error) {
@@ -137,6 +154,53 @@ func TestGRPC_Ai_Config_Health_Check(t *testing.T) {
 	assert.Equal(t, int32(200), rsp.GetResponseStatusCode())
 	assert.Equal(t, "mock-response", rsp.GetResponseContent())
 	assert.Empty(t, rsp.GetErrorMessage())
+}
+
+func TestGRPC_Ai_Config_Health_Check_EscapesInvalidUTF8(t *testing.T) {
+	const providerType = "grpc-ai-model-test-provider-invalid-utf8"
+	aispec.Register(providerType, func() aispec.AIClient {
+		return &testAIModelClient{
+			response:    string([]byte{'o', 'k', 0xff}),
+			rawRequest:  []byte{'P', 'O', 'S', 'T', ' ', 0xff},
+			rawResponse: []byte("HTTP/1.1 200 OK\r\n\r\n"),
+			bodyPreview: []byte{'b', 'a', 'd', 0xff},
+		}
+	})
+
+	client, err := NewLocalClientWithTempDatabase(t)
+	require.NoError(t, err)
+
+	rsp, err := client.AIConfigHealthCheck(context.Background(), &ypb.AIConfigHealthCheckRequest{
+		Config: &ypb.ThirdPartyApplicationConfig{
+			Type:   providerType,
+			APIKey: "test-key",
+			ExtraParams: []*ypb.KVPair{
+				{Key: "model", Value: "mock-model"},
+			},
+		},
+		Content: "ping",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, rsp)
+	assert.True(t, utf8.ValidString(rsp.GetRawRequest()))
+	assert.True(t, utf8.ValidString(rsp.GetRawResponse()))
+	assert.True(t, utf8.ValidString(rsp.GetResponseContent()))
+	assert.Empty(t, rsp.GetErrorMessage())
+}
+
+func TestSanitizeAIConfigHealthCheckResponse_EscapesInvalidUTF8(t *testing.T) {
+	resp := sanitizeAIConfigHealthCheckResponse(&ypb.AIConfigHealthCheckResponse{
+		RawRequest:      string([]byte{'r', 'e', 'q', 0xff}),
+		ResponseContent: string([]byte{'o', 'k', 0xff}),
+		ErrorMessage:    string([]byte{'e', 'r', 'r', 0xff}),
+		RawResponse:     string([]byte{'r', 's', 'p', 0xff}),
+	})
+
+	require.NotNil(t, resp)
+	assert.True(t, utf8.ValidString(resp.GetRawRequest()))
+	assert.True(t, utf8.ValidString(resp.GetRawResponse()))
+	assert.True(t, utf8.ValidString(resp.GetResponseContent()))
+	assert.True(t, utf8.ValidString(resp.GetErrorMessage()))
 }
 
 func TestRecommendAIHealthCheckConfig(t *testing.T) {
