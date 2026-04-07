@@ -218,15 +218,15 @@ func (b *singleFileBuilder) extractStaticMapKeys(value ssa.Value) ([]ssa.Value, 
 	if value == nil || value.GetType() == nil || value.GetType().GetTypeKind() != ssa.MapTypeKind {
 		return nil, false
 	}
-	members := value.GetAllMember()
+	members := ssa.GetLastWinsMemberPairs(value)
 	if len(members) == 0 {
 		return nil, false
 	}
 
 	keys := make([]ssa.Value, 0, len(members))
-	for key := range members {
-		if key != nil {
-			keys = append(keys, key)
+	for _, pair := range members {
+		if pair.Key != nil {
+			keys = append(keys, pair.Key)
 		}
 	}
 	if len(keys) == 0 {
