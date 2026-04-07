@@ -572,12 +572,12 @@ func (y *builder) VisitChain(raw phpparser.IChainContext) ssa.Value {
 	}
 	member, key := y.VisitStaticClassExprVariableMember(i.StaticClassExprVariableMember())
 	if member != nil {
+		if staticMember := member.GetStaticMember(key); !utils.IsNil(staticMember) {
+			return staticMember
+		}
 		variable := y.GetStaticMember(member, key)
 		if value := y.PeekValueByVariable(variable); !utils.IsNil(value) {
 			return value
-		}
-		if staticMember := member.GetStaticMember(key); !utils.IsNil(staticMember) {
-			return staticMember
 		}
 	}
 	return y.EmitUndefined(key)
@@ -586,12 +586,12 @@ func (y *builder) VisitChain(raw phpparser.IChainContext) ssa.Value {
 func (y *builder) visitStaticClassExprVariableMemberValue(raw phpparser.IStaticClassExprVariableMemberContext) ssa.Value {
 	member, key := y.VisitStaticClassExprVariableMember(raw)
 	if member != nil {
+		if staticMember := member.GetStaticMember(key); !utils.IsNil(staticMember) {
+			return staticMember
+		}
 		variable := y.GetStaticMember(member, key)
 		if value := y.PeekValueByVariable(variable); !utils.IsNil(value) {
 			return value
-		}
-		if staticMember := member.GetStaticMember(key); !utils.IsNil(staticMember) {
-			return staticMember
 		}
 	}
 	return y.EmitUndefined(raw.GetText())
@@ -742,15 +742,18 @@ func (y *builder) VisitDynamicStaticClassExpr(raw phpparser.IDynamicStaticClassE
 	if keyCtx := i.MemberCallKey(); keyCtx != nil {
 		key := y.VisitMemberCallKey(keyCtx)
 		if blueprint != nil {
-			member := y.GetStaticMember(blueprint, key.String())
-			if value := y.PeekValueByVariable(member); !utils.IsNil(value) {
-				return value
-			}
 			if method := blueprint.GetStaticMethod(key.String()); !utils.IsNil(method) {
 				return method
 			}
+			if member := blueprint.GetStaticMember(key.String()); !utils.IsNil(member) {
+				return member
+			}
 			if member := blueprint.GetConstMember(key.String()); !utils.IsNil(member) {
 				return member
+			}
+			member := y.GetStaticMember(blueprint, key.String())
+			if value := y.PeekValueByVariable(member); !utils.IsNil(value) {
+				return value
 			}
 			undefined := y.EmitUndefined(key.String())
 			blueprint.RegisterStaticMember(key.String(), undefined)
@@ -765,12 +768,12 @@ func (y *builder) VisitDynamicStaticClassExpr(raw phpparser.IDynamicStaticClassE
 			key = key[1:]
 		}
 		if blueprint != nil {
+			if member := blueprint.GetStaticMember(key); !utils.IsNil(member) {
+				return member
+			}
 			variable := y.GetStaticMember(blueprint, key)
 			if value := y.PeekValueByVariable(variable); !utils.IsNil(value) {
 				return value
-			}
-			if member := blueprint.GetStaticMember(key); !utils.IsNil(member) {
-				return member
 			}
 		}
 		return y.EmitUndefined(i.GetText())
@@ -1142,6 +1145,9 @@ func (y *builder) VisitFunctionCall(raw phpparser.IFunctionCallContext) ssa.Valu
 	v := y.VisitFunctionCallName(i.FunctionCallName())
 	var c *ssa.Call
 	args, ellipsis := y.VisitActualArguments(i.ActualArguments())
+	if utils.IsNil(v) {
+		v = y.EmitUndefined(i.GetText())
+	}
 	if _, exit := y.GetProgram().ExternInstance[strings.ToLower(v.String())]; exit {
 		c = y.NewCall(y.EmitConstInstPlaceholder(strings.ToLower(v.String())), args)
 	} else {
@@ -1164,9 +1170,17 @@ func (y *builder) VisitFunctionCallName(raw phpparser.IFunctionCallNameContext) 
 	}
 
 	if ret := i.QualifiedNamespaceName(); ret != nil {
+		rawName := strings.TrimSpace(ret.GetText())
+		if funcx, ok := y.GetFunc(rawName, ""); ok {
+			return funcx
+		}
 		name, s := y.VisitQualifiedNamespaceName(ret)
-		_, _ = name, s
-		//return y.ReadValue(text)
+		if funcx, ok := y.GetFunc(s, strings.Join(name, ".")); ok {
+			return funcx
+		}
+		if value := y.ReadValue(rawName); !utils.IsNil(value) {
+			return value
+		}
 	} else if ret := i.ChainBase(); ret != nil {
 		return y.VisitChainBase(ret)
 	} else if ret := i.ClassConstant(); ret != nil {

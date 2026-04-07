@@ -544,9 +544,69 @@ func (y *builder) VisitClassConstant(raw phpparser.IClassConstantContext) ssa.Va
 		return nil
 	}
 
-	log.Errorf("Class constant todo")
+	var (
+		blueprint *ssa.Blueprint
+		key       string
+	)
 
-	return nil
+	switch {
+	case i.Parent_() != nil:
+		if y.MarkedThisClassBlueprint != nil {
+			blueprint = y.MarkedThisClassBlueprint.GetSuperBlueprint()
+		}
+	case i.Class() != nil:
+		blueprint = y.MarkedThisClassBlueprint
+	case i.QualifiedStaticTypeRef() != nil:
+		blueprint = y.VisitQualifiedStaticTypeRef(i.QualifiedStaticTypeRef())
+	case len(i.AllKeyedVariable()) > 0:
+		receiver := y.VisitKeyedVariable(i.KeyedVariable(0))
+		if bp, ok := ssa.ToClassBluePrintType(receiver.GetType()); ok {
+			blueprint = bp
+		} else if bp := y.GetBluePrint(receiver.String()); bp != nil {
+			blueprint = bp
+		}
+	case i.String_() != nil:
+		className := yakunquote.TryUnquote(i.String_().GetText())
+		if bp := y.GetBluePrint(className); bp != nil {
+			blueprint = bp
+		}
+	}
+
+	switch {
+	case i.Identifier() != nil:
+		key = i.Identifier().GetText()
+	case i.Constructor() != nil:
+		key = i.Constructor().GetText()
+	case i.Get() != nil:
+		key = i.Get().GetText()
+	case i.Set() != nil:
+		key = i.Set().GetText()
+	default:
+		keyedVariables := i.AllKeyedVariable()
+		if len(keyedVariables) > 1 {
+			key = yakunquote.TryUnquote(keyedVariables[len(keyedVariables)-1].GetText())
+			key = strings.TrimPrefix(key, "$")
+		}
+	}
+
+	if blueprint == nil || key == "" {
+		return y.EmitUndefined(i.GetText())
+	}
+
+	member := y.GetStaticMember(blueprint, key)
+	if value := y.PeekValueByVariable(member); !utils.IsNil(value) {
+		return value
+	}
+	if method := blueprint.GetStaticMethod(key); !utils.IsNil(method) {
+		return method
+	}
+	if member := blueprint.GetConstMember(key); !utils.IsNil(member) {
+		return member
+	}
+
+	undefined := y.EmitUndefined(i.GetText())
+	blueprint.RegisterStaticMember(key, undefined)
+	return undefined
 }
 
 func (y *builder) VisitStaticClass(raw phpparser.IStaticClassContext) *ssa.Blueprint {

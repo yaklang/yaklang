@@ -83,11 +83,35 @@ var syntaxNonASTAssets = map[string]struct{}{
 }
 
 var largeProjectSlowFiles = map[string]map[string]struct{}{
+	"cms": {
+		"src/Assets/Asset.php":    {},
+		"src/Fieldtypes/Bard.php": {},
+		"src/Http/Controllers/CP/Collections/CollectionsController.php": {},
+		"src/Modifiers/CoreModifiers.php":                               {},
+		"src/Providers/AddonServiceProvider.php":                        {},
+		"tests/Assets/AssetContainerTest.php":                           {},
+		"tests/CP/Navigation/NavPreferencesTest.php":                    {},
+		"tests/Data/Entries/CollectionTest.php":                         {},
+		"tests/Data/Entries/EntryTest.php":                              {},
+		"tests/Data/Taxonomies/TermQueryBuilderTest.php":                {},
+		"tests/FrontendTest.php":                                        {},
+	},
 	"filament": {
-		"docs-assets/app/app/Livewire/TablesDemo.php":   {},
-		"tests/src/Forms/Components/SelectTest.php":     {},
-		"tests/src/Tables/ColumnTest.php":               {},
-		"tests/src/Tables/Filters/QueryBuilderTest.php": {},
+		"docs-assets/app/app/Livewire/TablesDemo.php":                 {},
+		"packages/actions/src/Action.php":                             {},
+		"packages/actions/src/ActionGroup.php":                        {},
+		"packages/actions/src/Concerns/InteractsWithActions.php":      {},
+		"packages/forms/src/Components/Builder.php":                   {},
+		"packages/forms/src/Components/Concerns/CanBeValidated.php":   {},
+		"packages/forms/src/Components/ModalTableSelect.php":          {},
+		"packages/infolists/src/Components/TextEntry.php":             {},
+		"packages/panels/src/Commands/MakePageCommand.php":            {},
+		"packages/panels/src/Commands/MakeRelationManagerCommand.php": {},
+		"packages/tables/src/Columns/SelectColumn.php":                {},
+		"tests/src/Forms/Components/SelectTest.php":                   {},
+		"tests/src/Tables/ColumnTest.php":                             {},
+		"tests/src/Tables/Filters/QueryBuilderTest.php":               {},
+		"tests/src/Tables/Filters/SelectFilterTest.php":               {},
 	},
 	"PrestaShop": {
 		"classes/controller/AdminController.php":                                                  {},
@@ -104,6 +128,9 @@ var largeProjectSlowFiles = map[string]map[string]struct{}{
 		"controllers/admin/AdminOrdersController.php":         {},
 		"controllers/admin/AdminProductsController.php":       {},
 		"tools/tcpdf/tcpdf.php":                               {},
+	},
+	"twill": {
+		"src/Http/Controllers/Admin/ModuleController.php": {},
 	},
 }
 
@@ -240,6 +267,21 @@ func validateSource(t *testing.T, filename string, src string) {
 	validateSourceWithBudget(t, filename, src, phpFixtureParseBudget())
 }
 
+func validateProjectBuild(t *testing.T, filename string, src string) {
+	t.Run(fmt.Sprintf("build file: %v", filename), func(t *testing.T) {
+		vf := filesys.NewVirtualFs()
+		vf.AddFile(filepath.ToSlash(filepath.Join("fixture", filename)), src)
+
+		prog, err := ssaapi.ParseProjectWithFS(
+			vf,
+			ssaapi.WithLanguage(ssaconfig.PHP),
+			ssaapi.WithConcurrency(1),
+		)
+		require.NoError(t, err, "parse/build fixture %s", filename)
+		require.NotNil(t, prog, "nil program for %s", filename)
+	})
+}
+
 func TestAllSyntaxForPHP_G4(t *testing.T) {
 	err := fs.WalkDir(syntaxFs, "syntax", func(syntaxPath string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -259,6 +301,31 @@ func TestAllSyntaxForPHP_G4(t *testing.T) {
 		return nil
 	})
 	require.NoError(t, err, "walk syntax fixtures")
+}
+
+func TestAllSyntaxProjectBuildForPHP(t *testing.T) {
+	if os.Getenv("YAK_PHP_RUN_BUILD_FIXTURES") == "" {
+		t.Skip("set YAK_PHP_RUN_BUILD_FIXTURES=1 to run PHP syntax fixture project-build checks")
+	}
+
+	err := fs.WalkDir(syntaxFs, "syntax", func(syntaxPath string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if !isSyntaxASTFixture(syntaxPath) {
+			return nil
+		}
+		raw, err := syntaxFs.ReadFile(syntaxPath)
+		if err != nil {
+			return fmt.Errorf("cannot found syntax fs %s: %w", syntaxPath, err)
+		}
+		validateProjectBuild(t, syntaxPath, string(raw))
+		return nil
+	})
+	require.NoError(t, err, "walk syntax fixtures for project build")
 }
 
 func TestAllLargeSyntaxForPHP_G4(t *testing.T) {
@@ -284,6 +351,34 @@ func TestAllLargeSyntaxForPHP_G4(t *testing.T) {
 		return nil
 	})
 	require.NoError(t, err, "walk large syntax fixtures")
+}
+
+func TestAllLargeSyntaxProjectBuildForPHP(t *testing.T) {
+	if os.Getenv("YAK_PHP_RUN_BUILD_FIXTURES") == "" {
+		t.Skip("set YAK_PHP_RUN_BUILD_FIXTURES=1 to run PHP large syntax fixture project-build checks")
+	}
+	if os.Getenv("YAK_PHP_RUN_LARGE_FIXTURES") == "" {
+		t.Skip("set YAK_PHP_RUN_LARGE_FIXTURES=1 to run deferred large PHP syntax fixtures")
+	}
+
+	err := fs.WalkDir(largeSyntaxFs, "large", func(syntaxPath string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if !isSyntaxASTFixture(syntaxPath) {
+			return nil
+		}
+		raw, err := largeSyntaxFs.ReadFile(syntaxPath)
+		if err != nil {
+			return fmt.Errorf("cannot found large syntax fs %s: %w", syntaxPath, err)
+		}
+		validateProjectBuild(t, syntaxPath, string(raw))
+		return nil
+	})
+	require.NoError(t, err, "walk large syntax fixtures for project build")
 }
 
 func TestSyntaxFixtureCoverage(t *testing.T) {
@@ -516,7 +611,6 @@ type ParseError struct {
 
 type phpProjectSlowCandidate struct {
 	Path       string
-	Content    []byte
 	Concurrent time.Duration
 }
 
@@ -593,7 +687,6 @@ func TestProjectAst(t *testing.T) {
 		if budget := phpFixtureParseBudget(); budget > 0 && fileContent.Err == nil && fileContent.Duration > budget {
 			slowCandidates = append(slowCandidates, phpProjectSlowCandidate{
 				Path:       fileContent.Path,
-				Content:    append([]byte(nil), fileContent.Content...),
 				Concurrent: fileContent.Duration,
 			})
 		}
@@ -609,27 +702,37 @@ func TestProjectAst(t *testing.T) {
 		log.Errorf("Parse file %s failed: %v", fname, fc.Err)
 	}
 	if budget := phpFixtureParseBudget(); budget > 0 {
+		recheckPaths := make([]string, 0, len(slowCandidates))
+		recheckFileMap := make(map[string]struct{}, len(slowCandidates))
+		recheckCandidate := make(map[string]phpProjectSlowCandidate, len(slowCandidates))
 		for _, candidate := range slowCandidates {
 			if hasSavedProjectSyntaxFixture(path, candidate.Path) {
 				log.Infof("skip saved project slow fixture: %s/%s", filepath.Base(path), candidate.Path)
 				continue
 			}
-			start := time.Now()
-			_, isolatedErr := php2ssa.Frontend(string(candidate.Content), newPHPTestAntlrCache())
-			isolatedDuration := time.Since(start)
-			if isolatedErr != nil {
-				failedFiles = append(failedFiles, candidate.Path)
-				log.Errorf("isolated parse failed for %s after concurrent slow-path detection: %v", candidate.Path, isolatedErr)
+			recheckPaths = append(recheckPaths, candidate.Path)
+			recheckFileMap[candidate.Path] = struct{}{}
+			recheckCandidate[candidate.Path] = candidate
+		}
+		sort.Strings(recheckPaths)
+		for fileContent := range config.GetFileHandler(refFs, recheckPaths, recheckFileMap) {
+			candidate, ok := recheckCandidate[fileContent.Path]
+			if !ok {
 				continue
 			}
-			if isolatedDuration > budget {
-				if isKnownLargeProjectSlowFile(path, candidate.Path) {
-					deferredSlowFiles = append(deferredSlowFiles, candidate.Path)
-					log.Warnf("deferred large-file budget miss for %s: concurrent=%s isolated=%s budget=%s", candidate.Path, candidate.Concurrent, isolatedDuration, budget)
+			if fileContent.Err != nil {
+				failedFiles = append(failedFiles, fileContent.Path)
+				log.Errorf("isolated parse failed for %s after concurrent slow-path detection: %v", fileContent.Path, fileContent.Err)
+				continue
+			}
+			if fileContent.Duration > budget {
+				if isKnownLargeProjectSlowFile(path, fileContent.Path) {
+					deferredSlowFiles = append(deferredSlowFiles, fileContent.Path)
+					log.Warnf("deferred large-file budget miss for %s: concurrent=%s isolated=%s budget=%s", fileContent.Path, candidate.Concurrent, fileContent.Duration, budget)
 					continue
 				}
-				slowFiles = append(slowFiles, candidate.Path)
-				log.Errorf("isolated parse exceeded budget for %s: concurrent=%s isolated=%s budget=%s", candidate.Path, candidate.Concurrent, isolatedDuration, budget)
+				slowFiles = append(slowFiles, fileContent.Path)
+				log.Errorf("isolated parse exceeded budget for %s: concurrent=%s isolated=%s budget=%s", fileContent.Path, candidate.Concurrent, fileContent.Duration, budget)
 			}
 		}
 	}

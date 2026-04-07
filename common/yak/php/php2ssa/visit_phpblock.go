@@ -25,12 +25,10 @@ func (y *builder) VisitPhpBlock(raw phpparser.IPhpBlockContext) interface{} {
 		return nil
 	}
 	if y.GetProgram().CurrentIncludingStack.Len() <= 0 {
-		if !y.PreHandler() {
-			for _, context := range i.AllNamespaceDeclaration() {
-				y.VisitNamespaceOnlyUse(context)
-			}
-		}
 		for _, namespace := range i.AllNamespaceDeclaration() {
+			if !y.PreHandler() {
+				y.VisitNamespaceOnlyUse(namespace)
+			}
 			y.VisitNamespaceDeclaration(namespace)
 		}
 	}

@@ -1,6 +1,7 @@
 package antlr4util
 
 import (
+	"errors"
 	"os"
 	"strings"
 	"sync"
@@ -115,15 +116,30 @@ func ParseASTWithSLLFirst[L antlr.Lexer, P antlr.Parser, T any](
 	setup func(lexer L, parser P),
 	entry func(parser P) T,
 ) (T, error) {
+	combineErrors := func(errs ...error) error {
+		parts := make([]string, 0, len(errs))
+		seen := make(map[string]struct{}, len(errs))
+		for _, err := range errs {
+			if err == nil {
+				continue
+			}
+			msg := err.Error()
+			if _, ok := seen[msg]; ok {
+				continue
+			}
+			seen[msg] = struct{}{}
+			parts = append(parts, msg)
+		}
+		if len(parts) == 0 {
+			return nil
+		}
+		return errors.New(strings.Join(parts, "\n"))
+	}
 	statsEnabled := SLLFirstStatsEnabled()
 	diagnosticEnabled := antlrDiagnosticEnabledNow()
 	shouldLogFallback := statsEnabled || diagnosticEnabled
-	run := func(predictionMode int, errHandler antlr.ErrorStrategy, buildParseTrees bool) (ast T, parseErr error, cancelled bool, elapsed time.Duration) {
-		start := time.Now()
-		defer func() {
-			elapsed = time.Since(start)
-		}()
 
+	prepare := func() (L, *antlr.CommonTokenStream, *ErrorListener) {
 		errListener := NewErrorListener()
 		lexer := newLexer(antlr.NewInputStream(src))
 		lexer.RemoveErrorListeners()
@@ -133,6 +149,20 @@ func ParseASTWithSLLFirst[L antlr.Lexer, P antlr.Parser, T any](
 		if decorateTokenSource != nil {
 			tokenStream.SetTokenSource(decorateTokenSource(lexer))
 		}
+		return lexer, tokenStream, errListener
+	}
+
+	run := func(lexer L, tokenStream *antlr.CommonTokenStream, lexerErrListener *ErrorListener, predictionMode int, errHandler antlr.ErrorStrategy, buildParseTrees bool) (ast T, parseErr error, cancelled bool, elapsed time.Duration) {
+		start := time.Now()
+		defer func() {
+			elapsed = time.Since(start)
+		}()
+
+		if tokenStream != nil {
+			tokenStream.Seek(0)
+		}
+
+		errListener := NewErrorListener()
 		parser := newParser(tokenStream)
 		if setup != nil {
 			setup(lexer, parser)
@@ -165,25 +195,28 @@ func ParseASTWithSLLFirst[L antlr.Lexer, P antlr.Parser, T any](
 		}()
 
 		DetachParserATNSimulatorCaches(parser)
-		DetachLexerTokenSource(lexer)
-		return ast, errListener.Error(), cancelled, elapsed
+		return ast, combineErrors(lexerErrListener.Error(), errListener.Error()), cancelled, elapsed
 	}
 
 	if !SLLFirstEnabled() {
 		if statsEnabled {
 			atomic.AddUint64(&sllFirstLLOnly, 1)
 		}
-		ast, err, _, _ := run(antlr.PredictionModeLL, antlr.NewDefaultErrorStrategy(), true)
+		lexer, tokenStream, lexerErrListener := prepare()
+		defer DetachLexerTokenSource(lexer)
+		ast, err, _, _ := run(lexer, tokenStream, lexerErrListener, antlr.PredictionModeLL, antlr.NewDefaultErrorStrategy(), true)
 		return ast, err
 	}
 
 	if statsEnabled {
 		atomic.AddUint64(&sllFirstSLLAttempts, 1)
 	}
+	lexer, tokenStream, lexerErrListener := prepare()
+	defer DetachLexerTokenSource(lexer)
 	largeSourceProbe := len(src) >= sllFirstNoTreeProbeMinBytes
-	ast, err, cancelled, sllElapsed := run(antlr.PredictionModeSLL, antlr.NewBailErrorStrategy(), !largeSourceProbe)
+	ast, err, cancelled, sllElapsed := run(lexer, tokenStream, lexerErrListener, antlr.PredictionModeSLL, antlr.NewBailErrorStrategy(), !largeSourceProbe)
 	if largeSourceProbe && !cancelled && err == nil {
-		ast, err, cancelled, sllElapsed = run(antlr.PredictionModeSLL, antlr.NewBailErrorStrategy(), true)
+		ast, err, cancelled, sllElapsed = run(lexer, tokenStream, lexerErrListener, antlr.PredictionModeSLL, antlr.NewBailErrorStrategy(), true)
 	}
 	if !cancelled && err == nil {
 		return ast, nil
@@ -208,7 +241,7 @@ func ParseASTWithSLLFirst[L antlr.Lexer, P antlr.Parser, T any](
 		}
 	}
 
-	ast, err, _, llElapsed := run(antlr.PredictionModeLL, antlr.NewDefaultErrorStrategy(), true)
+	ast, err, _, llElapsed := run(lexer, tokenStream, lexerErrListener, antlr.PredictionModeLL, antlr.NewDefaultErrorStrategy(), true)
 	if shouldLogFallback {
 		log.Infof("[antlr-sll-first] LL completed: src_len=%d ll_elapsed=%s", len(src), llElapsed)
 	}
