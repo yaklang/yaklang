@@ -43,7 +43,7 @@
   "@action": "fuzz_body",
   "body_type": "json_params",
   "param_name": "username",
-  "param_values": ["{{7*7}}", "${7*7}", "<%= 7*7 %>", "#{7*7}"],
+  "param_values": ["{{ "{{7*7}}" }}", "${7*7}", "<%= 7*7 %>", "#{7*7}"],
   "reason": "这个 JSON 字段可能会被模板引擎解析，先验证是否存在服务器端模板注入。"
 }
 ```
@@ -53,7 +53,7 @@
 {
   "@action": "fuzz_cookie",
   "cookie_name": "session",
-  "cookie_values": ["guest", "admin", "' or '1'='1", "{{7*7}}"],
+  "cookie_values": ["guest", "admin", "' or '1'='1", "{{ "{{7*7}}" }}"],
   "raw_mode": false,
   "reason": "会话 Cookie 可能影响权限判断，先验证是否存在会话固定、越权或注入线索。"
 }
@@ -68,7 +68,33 @@
 }
 ```
 
-### 示例 7：直接生成完整原始数据包并发送
+### 示例 7：修改当前数据包并要求人工审核
+```json
+{
+  "@action": "modify_http_request",
+  "modification_target": "把当前请求中的 id 参数改成时间盲注探测载荷，并保留其他头部与 Cookie 不变",
+  "modification_reason": "当前已经有基础 SQL 注入线索，需要把当前生效数据包改成时间延迟探测版本，并把 merge 结果展示给用户确认。",
+  "require_manual_review": true
+}
+```
+
+<|GEN_MODIFIED_PACKET_{{ .Nonce }}|>
+GET /user?id=1%20AND%20SLEEP(1) HTTP/1.1
+Host: 127.0.0.1:8787
+Accept-Encoding: gzip, deflate, br
+Cookie: session=guest
+
+<|GEN_MODIFIED_PACKET_END_{{ .Nonce }}|>
+
+### 示例 8：测试过程中的简短问答
+```json
+{
+  "@action": "directly_answer",
+  "answer_payload": "当前更怀疑 SQL 注入，因为相同请求在布尔条件变化后出现了稳定的状态码和响应长度差异。下一步我会先保留这个代表性数据包，再做时间延迟探测。"
+}
+```
+
+### 示例 9：直接生成完整原始数据包并发送
 ```json
 {
   "@action": "generate_and_send_packet",
@@ -87,7 +113,7 @@ Cookie: session=guest
 username=admin%27%20or%20%271%27=%271&password=test
 <|GEN_PACKET_END_{{ .Nonce }}|>
 
-### 示例 8：完全新建原始数据包做模板注入探测
+### 示例 10：完全新建原始数据包做模板注入探测
 ```json
 {
   "@action": "generate_and_send_packet",
@@ -102,5 +128,5 @@ POST /api/config/render HTTP/1.1
 Host: target.internal
 Content-Type: application/json
 
-{"name":"tester","template":"{{7*7}}","preview":true}
+{"name":"tester","template":"{{ "{{7*7}}" }}","preview":true}
 <|GEN_PACKET_END_{{ .Nonce }}|>

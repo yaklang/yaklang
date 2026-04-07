@@ -40,6 +40,8 @@ func init() {
 				reactloops.WithAllowRAG(false),
 				reactloops.WithAllowToolCall(true),
 				reactloops.WithAITagField("GEN_PACKET", generatedPacketContentField),
+				reactloops.WithAITagField("GEN_MODIFIED_PACKET", modifiedPacketContentField),
+				reactloops.WithOverrideLoopAction(loopActionDirectlyAnswerHTTPFuzztest),
 				reactloops.WithInitTask(buildInitTask(r)),
 				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
@@ -48,6 +50,11 @@ func init() {
 				reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
 					originalRequest := loop.Get("original_request")
 					originalRequestSummary := loop.Get("original_request_summary")
+					currentRequestSummary := getCurrentRequestSummary(loop)
+					previousRequestSummary := loop.Get("previous_request_summary")
+					requestChangeSummary := loop.Get("request_change_summary")
+					requestModificationReason := loop.Get("request_modification_reason")
+					requestReviewDecision := loop.Get("request_review_decision")
 					representativeRequest := loop.Get("representative_request")
 					representativeResponse := loop.Get("representative_response")
 					representativeHiddenIndex := loop.Get("representative_httpflow_hidden_index")
@@ -58,6 +65,11 @@ func init() {
 					renderMap := map[string]any{
 						"OriginalRequest":           originalRequest,
 						"OriginalRequestSummary":    originalRequestSummary,
+						"CurrentRequestSummary":     currentRequestSummary,
+						"PreviousRequestSummary":    previousRequestSummary,
+						"RequestChangeSummary":      requestChangeSummary,
+						"RequestModificationReason": requestModificationReason,
+						"RequestReviewDecision":     requestReviewDecision,
 						"RepresentativeRequest":     representativeRequest,
 						"RepresentativeResponse":    representativeResponse,
 						"RepresentativeHiddenIndex": representativeHiddenIndex,
@@ -71,6 +83,7 @@ func init() {
 				}),
 				// Register set_http_request action (must be called first)
 				setHTTPRequestAction(r),
+				modifyHTTPRequestAction(r),
 				// Register fuzz actions
 				fuzzMethodAction(r),
 				fuzzPathAction(r),
@@ -87,7 +100,7 @@ func init() {
 		reactloops.WithLoopDescriptionZh("HTTP 安全模糊测试模式：对 HTTP 请求进行变异、发送和响应差异分析，用于发现潜在安全问题。"),
 		reactloops.WithVerboseName("HTTP Fuzz Test"),
 		reactloops.WithVerboseNameZh("HTTP 安全模糊测试"),
-		reactloops.WithLoopUsagePrompt("Use when user wants to fuzz HTTP requests and analyze security-relevant response differences. First use 'set_http_request' to set the target request, then use fuzz actions (fuzz_method, fuzz_path, fuzz_header, fuzz_get_params, fuzz_body, fuzz_cookie) or 'generate_and_send_packet' when a complete raw packet must be constructed and sent."),
+		reactloops.WithLoopUsagePrompt("Use when user wants to fuzz HTTP requests and analyze security-relevant response differences. First use 'set_http_request' to set the target request, then use fuzz actions (fuzz_method, fuzz_path, fuzz_header, fuzz_get_params, fuzz_body, fuzz_cookie), 'modify_http_request' when the current packet must be revised with visible merge details, 'generate_and_send_packet' when a complete raw packet must be constructed and sent, or 'directly_answer' for short testing-process Q&A."),
 		reactloops.WithLoopOutputExample(`
 * When user requests to fuzz HTTP request:
   {"@action": "http_fuzztest", "human_readable_thought": "I need to fuzz HTTP request parameters to find vulnerabilities"}

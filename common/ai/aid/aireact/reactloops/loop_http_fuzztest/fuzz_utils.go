@@ -17,6 +17,7 @@ const (
 	loopHTTPFuzzCompressionThreshold = 40 * 1024
 	loopHTTPFuzzCompressionTarget    = 20 * 1024
 	loopHTTPFuzzTimelinePreviewSize  = 8 * 1024
+	modifiedPacketContentField       = "modified_packet_content"
 )
 
 func newLoopFuzzRequest(taskCtx context.Context, runtime aicommon.AIInvokeRuntime, rawPacket []byte, isHTTPS bool) (*mutate.FuzzHTTPRequest, error) {
@@ -42,6 +43,13 @@ func storeLoopFuzzRequestState(loop *reactloops.ReActLoop, fuzzReq *mutate.FuzzH
 	loop.Set("fuzz_request", fuzzReq)
 	loop.Set("original_request", string(requestRaw))
 	loop.Set("original_request_summary", originalSummary)
+	loop.Set("current_request", string(requestRaw))
+	loop.Set("current_request_summary", originalSummary)
+	loop.Set("previous_request", "")
+	loop.Set("previous_request_summary", "")
+	loop.Set("request_change_summary", "")
+	loop.Set("request_modification_reason", "")
+	loop.Set("request_review_decision", "")
 	loop.Set("is_https", utils.InterfaceToString(isHTTPS))
 	loop.Set("bootstrap_source", "")
 	loop.Set("last_request", "")
@@ -56,6 +64,99 @@ func storeLoopFuzzRequestState(loop *reactloops.ReActLoop, fuzzReq *mutate.FuzzH
 	loop.Set("diff_result_full", "")
 	loop.Set("diff_result_compressed", "")
 	loop.Set("verification_result", "")
+}
+
+func getCurrentRequestRaw(loop *reactloops.ReActLoop) string {
+	if loop == nil {
+		return ""
+	}
+	currentRequest := strings.TrimSpace(loop.Get("current_request"))
+	if currentRequest != "" {
+		return currentRequest
+	}
+	return strings.TrimSpace(loop.Get("original_request"))
+}
+
+func getCurrentRequestSummary(loop *reactloops.ReActLoop) string {
+	if loop == nil {
+		return ""
+	}
+	summary := strings.TrimSpace(loop.Get("current_request_summary"))
+	if summary != "" {
+		return summary
+	}
+	return strings.TrimSpace(loop.Get("original_request_summary"))
+}
+
+func setLoopCurrentRequestState(loop *reactloops.ReActLoop, fuzzReq *mutate.FuzzHTTPRequest, requestRaw []byte, isHTTPS bool) {
+	if loop == nil {
+		return
+	}
+	_, summary := buildHTTPRequestStreamSummary(string(requestRaw), isHTTPS)
+	loop.Set("fuzz_request", fuzzReq)
+	loop.Set("current_request", string(requestRaw))
+	loop.Set("current_request_summary", summary)
+	loop.Set("is_https", utils.InterfaceToString(isHTTPS))
+}
+
+func buildRequestModificationFeedback(previousRequest, modifiedRequest []byte, isHTTPS bool, reason, reviewDecision string) string {
+	previousSummary := "(none)"
+	modifiedSummary := "(none)"
+	if len(previousRequest) > 0 {
+		_, previousSummary = buildHTTPRequestStreamSummary(string(previousRequest), isHTTPS)
+	}
+	if len(modifiedRequest) > 0 {
+		_, modifiedSummary = buildHTTPRequestStreamSummary(string(modifiedRequest), isHTTPS)
+	}
+
+	var out strings.Builder
+	out.WriteString("HTTP 数据包修改完成。\n\n")
+	if strings.TrimSpace(reason) != "" {
+		out.WriteString("=== 修改原因 ===\n")
+		out.WriteString(strings.TrimSpace(reason))
+		out.WriteString("\n\n")
+	}
+	out.WriteString("=== 审核结果 ===\n")
+	if strings.TrimSpace(reviewDecision) == "" {
+		reviewDecision = "auto_applied"
+	}
+	out.WriteString(reviewDecision)
+	out.WriteString("\n\n")
+	out.WriteString("=== 修改前摘要 ===\n")
+	out.WriteString(previousSummary)
+	out.WriteString("\n\n")
+	out.WriteString("=== 修改后摘要 ===\n")
+	out.WriteString(modifiedSummary)
+	out.WriteString("\n\n")
+	out.WriteString("=== Merge 变化 ===\n")
+	out.WriteString(compareRequests(string(previousRequest), string(modifiedRequest)))
+	out.WriteString("\n")
+	out.WriteString("\n=== 当前生效数据包 ===\n")
+	out.WriteString(string(modifiedRequest))
+	out.WriteString("\n")
+	return out.String()
+}
+
+func buildReviewDecisionLabel(decision string) string {
+	switch strings.TrimSpace(strings.ToLower(decision)) {
+	case "approved_by_user":
+		return "已人工确认并应用新数据包"
+	case "rejected_by_user":
+		return "人工审核拒绝，保留旧数据包"
+	default:
+		return "无需人工审核，已直接应用新数据包"
+	}
+}
+
+func reviewSuggestionApproved(suggestion string) bool {
+	s := strings.TrimSpace(strings.ToLower(suggestion))
+	if s == "" {
+		return false
+	}
+	if strings.Contains(s, "reject") || strings.Contains(s, "拒绝") || strings.Contains(s, "保留旧") {
+		return false
+	}
+	return strings.Contains(s, "accept") || strings.Contains(s, "approve") || strings.Contains(s, "同意") || strings.Contains(s, "确认") || strings.Contains(s, "使用新") || strings.Contains(s, "应用新")
 }
 
 func getLoopTaskContext(loop *reactloops.ReActLoop) context.Context {
@@ -132,7 +233,7 @@ func executeFuzzAndCompare(loop *reactloops.ReActLoop, fuzzResult mutate.FuzzHTT
 	var analysisSummary strings.Builder
 	analysisSummary.WriteString(fmt.Sprintf("=== 漏洞测试分析：%s ===\n", actionName))
 
-	originalRequest := loop.Get("original_request")
+	originalRequest := getCurrentRequestRaw(loop)
 	resultCount := 0
 	savedFlowCount := 0
 	representativeRequest := ""

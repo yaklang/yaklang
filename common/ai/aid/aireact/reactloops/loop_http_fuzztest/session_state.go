@@ -21,6 +21,13 @@ type loopHTTPFuzzSessionContext struct {
 	Version                   int       `json:"version"`
 	OriginalRequest           string    `json:"original_request"`
 	OriginalRequestSummary    string    `json:"original_request_summary,omitempty"`
+	CurrentRequest            string    `json:"current_request,omitempty"`
+	CurrentRequestSummary     string    `json:"current_request_summary,omitempty"`
+	PreviousRequest           string    `json:"previous_request,omitempty"`
+	PreviousRequestSummary    string    `json:"previous_request_summary,omitempty"`
+	RequestChangeSummary      string    `json:"request_change_summary,omitempty"`
+	RequestModificationReason string    `json:"request_modification_reason,omitempty"`
+	RequestReviewDecision     string    `json:"request_review_decision,omitempty"`
 	IsHTTPS                   bool      `json:"is_https"`
 	BootstrapSource           string    `json:"bootstrap_source,omitempty"`
 	RepresentativeRequest     string    `json:"representative_request,omitempty"`
@@ -54,9 +61,16 @@ func captureLoopHTTPFuzzSessionContext(loop *reactloops.ReActLoop, source string
 	}
 
 	ctx := &loopHTTPFuzzSessionContext{
-		Version:                   1,
+		Version:                   2,
 		OriginalRequest:           originalRequest,
 		OriginalRequestSummary:    strings.TrimSpace(loop.Get("original_request_summary")),
+		CurrentRequest:            strings.TrimSpace(loop.Get("current_request")),
+		CurrentRequestSummary:     strings.TrimSpace(loop.Get("current_request_summary")),
+		PreviousRequest:           strings.TrimSpace(loop.Get("previous_request")),
+		PreviousRequestSummary:    strings.TrimSpace(loop.Get("previous_request_summary")),
+		RequestChangeSummary:      strings.TrimSpace(loop.Get("request_change_summary")),
+		RequestModificationReason: strings.TrimSpace(loop.Get("request_modification_reason")),
+		RequestReviewDecision:     strings.TrimSpace(loop.Get("request_review_decision")),
 		IsHTTPS:                   strings.EqualFold(loop.Get("is_https"), "true"),
 		BootstrapSource:           strings.TrimSpace(source),
 		RepresentativeRequest:     strings.TrimSpace(loop.Get("representative_request")),
@@ -70,6 +84,17 @@ func captureLoopHTTPFuzzSessionContext(loop *reactloops.ReActLoop, source string
 	if ctx.OriginalRequestSummary == "" {
 		_, summary := buildHTTPRequestStreamSummary(ctx.OriginalRequest, ctx.IsHTTPS)
 		ctx.OriginalRequestSummary = summary
+	}
+	if ctx.CurrentRequest == "" {
+		ctx.CurrentRequest = ctx.OriginalRequest
+	}
+	if ctx.CurrentRequestSummary == "" {
+		_, summary := buildHTTPRequestStreamSummary(ctx.CurrentRequest, ctx.IsHTTPS)
+		ctx.CurrentRequestSummary = summary
+	}
+	if ctx.PreviousRequest != "" && ctx.PreviousRequestSummary == "" {
+		_, summary := buildHTTPRequestStreamSummary(ctx.PreviousRequest, ctx.IsHTTPS)
+		ctx.PreviousRequestSummary = summary
 	}
 	return ctx
 }
@@ -109,9 +134,13 @@ func persistLoopHTTPFuzzSessionContext(loop *reactloops.ReActLoop, source string
 	}
 
 	if loop != nil && loop.GetInvoker() != nil {
+		currentSummary := ctx.CurrentRequestSummary
+		if currentSummary == "" {
+			currentSummary = ctx.OriginalRequestSummary
+		}
 		loop.GetInvoker().AddToTimeline(
 			"http_fuzztest_session_context",
-			fmt.Sprintf("Persisted HTTP fuzz session context (%s): %s", source, utils.ShrinkTextBlock(ctx.OriginalRequestSummary, 200)),
+			fmt.Sprintf("Persisted HTTP fuzz session context (%s): %s", source, utils.ShrinkTextBlock(currentSummary, 200)),
 		)
 	}
 	persistLoopHTTPFuzzTimeline(cfg)
@@ -137,7 +166,11 @@ func restoreLoopHTTPFuzzSessionContext(loop *reactloops.ReActLoop, runtime aicom
 		return false
 	}
 
-	originalRaw := []byte(ctx.OriginalRequest)
+	restoreRequest := strings.TrimSpace(ctx.CurrentRequest)
+	if restoreRequest == "" {
+		restoreRequest = strings.TrimSpace(ctx.OriginalRequest)
+	}
+	originalRaw := []byte(restoreRequest)
 	fuzzReq, err := newLoopFuzzRequest(getLoopTaskContext(loop), runtime, originalRaw, ctx.IsHTTPS)
 	if err != nil {
 		log.Warnf("http_fuzztest: restore session fuzz request failed: %v", err)
@@ -145,7 +178,15 @@ func restoreLoopHTTPFuzzSessionContext(loop *reactloops.ReActLoop, runtime aicom
 	}
 
 	storeLoopFuzzRequestState(loop, fuzzReq, originalRaw, ctx.IsHTTPS)
+	loop.Set("original_request", ctx.OriginalRequest)
 	loop.Set("original_request_summary", ctx.OriginalRequestSummary)
+	loop.Set("current_request", restoreRequest)
+	loop.Set("current_request_summary", ctx.CurrentRequestSummary)
+	loop.Set("previous_request", ctx.PreviousRequest)
+	loop.Set("previous_request_summary", ctx.PreviousRequestSummary)
+	loop.Set("request_change_summary", ctx.RequestChangeSummary)
+	loop.Set("request_modification_reason", ctx.RequestModificationReason)
+	loop.Set("request_review_decision", ctx.RequestReviewDecision)
 	loop.Set("bootstrap_source", ctx.BootstrapSource)
 	loop.Set("representative_request", ctx.RepresentativeRequest)
 	loop.Set("representative_response", ctx.RepresentativeResponse)
