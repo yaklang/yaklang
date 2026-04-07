@@ -3,6 +3,7 @@ package yakit
 import (
 	"encoding/json"
 	"strings"
+	"sync"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
@@ -20,6 +21,29 @@ const (
 	defaultRoutingPolicy     = routingPolicyBalance
 	modelExtraParamKey       = "model"
 )
+
+var (
+	cachedAIGlobalConfig     *ypb.AIGlobalConfig
+	cachedAIGlobalConfigLock sync.RWMutex
+)
+
+func setCachedAIGlobalConfig(cfg *ypb.AIGlobalConfig) {
+	cachedAIGlobalConfigLock.Lock()
+	defer cachedAIGlobalConfigLock.Unlock()
+	cachedAIGlobalConfig = cloneAIGlobalConfig(cfg)
+}
+
+func GetCachedAIGlobalConfig() *ypb.AIGlobalConfig {
+	cachedAIGlobalConfigLock.RLock()
+	defer cachedAIGlobalConfigLock.RUnlock()
+	return cloneAIGlobalConfig(cachedAIGlobalConfig)
+}
+
+// SetCachedAIGlobalConfigForTest overrides the in-memory AI global config cache.
+// For testing only.
+func SetCachedAIGlobalConfigForTest(cfg *ypb.AIGlobalConfig) {
+	setCachedAIGlobalConfig(cfg)
+}
 
 func HasAIGlobalConfig(db *gorm.DB) bool {
 	if db == nil {
@@ -80,6 +104,7 @@ func SetAIGlobalConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig) (*ypb.AIGlobalConfi
 
 func ApplyAIGlobalConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig) error {
 	if cfg == nil {
+		setCachedAIGlobalConfig(nil)
 		consts.SetTieredAIConfig(nil)
 		return nil
 	}
@@ -131,8 +156,45 @@ func ApplyAIGlobalConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig) error {
 	tiered.LightweightConfigs = buildModels(cfg.LightweightModels)
 	tiered.VisionConfigs = buildModels(cfg.VisionModels)
 
+	setCachedAIGlobalConfig(cfg)
 	consts.SetTieredAIConfig(tiered)
 	return nil
+}
+
+func cloneAIGlobalConfig(cfg *ypb.AIGlobalConfig) *ypb.AIGlobalConfig {
+	if cfg == nil {
+		return nil
+	}
+	return &ypb.AIGlobalConfig{
+		Enabled:           cfg.GetEnabled(),
+		RoutingPolicy:     cfg.GetRoutingPolicy(),
+		DisableFallback:   cfg.GetDisableFallback(),
+		DefaultModelId:    cfg.GetDefaultModelId(),
+		GlobalWeight:      cfg.GetGlobalWeight(),
+		IntelligentModels: cloneAIModelConfigs(cfg.GetIntelligentModels()),
+		LightweightModels: cloneAIModelConfigs(cfg.GetLightweightModels()),
+		VisionModels:      cloneAIModelConfigs(cfg.GetVisionModels()),
+		AIPresetPrompt:    cfg.GetAIPresetPrompt(),
+	}
+}
+
+func cloneAIModelConfigs(models []*ypb.AIModelConfig) []*ypb.AIModelConfig {
+	if len(models) == 0 {
+		return nil
+	}
+	cloned := make([]*ypb.AIModelConfig, 0, len(models))
+	for _, model := range models {
+		if model == nil {
+			continue
+		}
+		cloned = append(cloned, &ypb.AIModelConfig{
+			ProviderId:  model.GetProviderId(),
+			Provider:    cloneThirdPartyConfig(model.GetProvider()),
+			ModelName:   model.GetModelName(),
+			ExtraParams: cloneKVPairs(model.GetExtraParams()),
+		})
+	}
+	return cloned
 }
 
 func validateModelConfigs(models []*ypb.AIModelConfig) error {
