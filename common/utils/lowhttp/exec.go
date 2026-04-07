@@ -847,7 +847,11 @@ RECONNECT:
 
 			currentRPS.Add(1)
 			if err := h2Stream.doRequest(); err != nil {
-				if h2Stream.ID == 1 { // first stream
+				if err == CreateStreamAfterGoAwayErr {
+					pc.closeConn(err)
+					goto RECONNECT
+				}
+				if h2Stream.ID <= 1 { // first stream or ID not yet assigned
 					return nil, err
 				} else {
 					pc.closeConn(err) // close old connection to avoid goroutine leak

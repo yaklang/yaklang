@@ -133,7 +133,8 @@ func serveH2(r io.Reader, conn net.Conn, opt ...h2Option) error {
 		{SettingInitialWindowSize, uint32(sc.srv.initialStreamRecvWindowSize())},
 	*/
 	// init window
-	config.windowSizeControl = newControl(defaultStreamReceiveWindowSize)
+	config.connWindowControl = newControl(defaultStreamReceiveWindowSize)
+	config.peerInitialWindowSize = 65535
 
 	frWriteMutex.Lock()
 	err = frame.WriteSettings(
@@ -142,9 +143,17 @@ func serveH2(r io.Reader, conn net.Conn, opt ...h2Option) error {
 		http2.Setting{ID: http2.SettingMaxConcurrentStreams, Val: defaultMaxConcurrentStreamSize},
 		http2.Setting{ID: http2.SettingMaxHeaderListSize, Val: defaultMaxHeaderListSize},
 	)
+	if err != nil {
+		frWriteMutex.Unlock()
+		return utils.Errorf("h2 server write settings error: %v", err)
+	}
+	connWindowIncrease := defaultStreamReceiveWindowSize - 65535
+	if connWindowIncrease > 0 {
+		err = frame.WriteWindowUpdate(0, uint32(connWindowIncrease))
+	}
 	frWriteMutex.Unlock()
 	if err != nil {
-		return utils.Errorf("h2 server write settings error: %v", err)
+		return utils.Errorf("h2 server write connection window update error: %v", err)
 	}
 
 	var (
@@ -223,14 +232,23 @@ func serveH2(r io.Reader, conn net.Conn, opt ...h2Option) error {
 			}
 
 			ret.ForeachSetting(func(setting http2.Setting) error {
-				log.Debugf("h2 stream found client setting: %v", setting.String())
 				switch setting.ID {
-				case http2.SettingMaxFrameSize:
-				case http2.SettingMaxConcurrentStreams:
+				case http2.SettingInitialWindowSize:
+					if setting.Val <= 1<<31-1 {
+						oldVal := config.peerInitialWindowSize
+						config.peerInitialWindowSize = setting.Val
+						delta := int64(setting.Val) - int64(oldVal)
+						config.streamWindows.Range(func(key, value any) bool {
+							if wc, ok := value.(*windowSizeControl); ok {
+								wc.adjustWindowSize(delta)
+							}
+							return true
+						})
+					}
 				}
 				return nil
 			})
-			// write settings ack
+
 			frWriteMutex.Lock()
 			err := frame.WriteSettingsAck()
 			frWriteMutex.Unlock()
@@ -238,9 +256,12 @@ func serveH2(r io.Reader, conn net.Conn, opt ...h2Option) error {
 				return utils.Errorf("h2 server write settings ack error: %v", err)
 			}
 		case *http2.WindowUpdateFrame:
-			// update window
-			log.Debugf("h2(WINDOW_UPDATE) client allow server to (inc) %v bytes", ret.Increment)
-			config.increaseWindowSize(int64(ret.Increment))
+			if ret.StreamID == 0 {
+				config.connWindowControl.increaseWindowSize(int64(ret.Increment))
+			} else {
+				sw := config.getStreamWindow(ret.StreamID)
+				sw.increaseWindowSize(int64(ret.Increment))
+			}
 		case *http2.HeadersFrame:
 			// build request
 			// log.Infof("h2 stream-id fetch header: %v", ret.StreamID)
@@ -330,6 +351,10 @@ func serveH2(r io.Reader, conn net.Conn, opt ...h2Option) error {
 				conn.Close()
 			})
 			return nil
+		case *http2.PriorityFrame:
+			// PRIORITY frames (RFC 7540 Section 6.3) are advisory hints from the browser
+			// about stream scheduling preference. Safe to ignore — HTTP/3 has already
+			// deprecated this mechanism in favor of the Extensible Priorities scheme.
 		default:
 			log.Warnf("h2 server unknown frame type: %T", ret)
 			log.Infof("unhandled frame: %v", ret)

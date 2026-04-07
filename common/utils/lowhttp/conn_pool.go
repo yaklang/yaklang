@@ -482,8 +482,8 @@ func newPersistConn(key *connectKey, pool *LowHttpConnPool, opt ...netx.DialXOpt
 		}
 
 		pc.h2Conn()
-		go pc.alt.readLoop()
 		if err = pc.alt.preface(); err == nil {
+			go pc.alt.readLoop()
 			err = pool.putIdleConn(pc)
 			if err != nil {
 				log.Errorf("h2 conn put idle conn failed: %v", err) // not care h2 conn put idle conn failed
