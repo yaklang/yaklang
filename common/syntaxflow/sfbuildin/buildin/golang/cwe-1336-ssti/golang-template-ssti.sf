@@ -92,10 +92,10 @@ template?{<fullTypeName>?{have: 'text/template'}} as $temptext;
 $temptext.New().Parse() as $target;
 $temptext.ParseFiles().* -> as $target;
 
-$target #{
+$target?{ * #{ 
     include: "* & $new",
 	exclude: `*?{opcode:const}`,
-}-> as $high;
+}->} as $high;
 
 
 alert $high for {
