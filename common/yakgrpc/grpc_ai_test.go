@@ -159,7 +159,8 @@ func TestGRPC_Ai_Config_Health_Check(t *testing.T) {
 	assert.Contains(t, rsp.GetRawResponse(), "HTTP/1.1 200 OK")
 	assert.Contains(t, rsp.GetRawResponse(), `"mock-response"`)
 	assert.Equal(t, int32(200), rsp.GetResponseStatusCode())
-	assert.Contains(t, rsp.GetResponseContent(), "content: ping")
+	assert.Contains(t, rsp.GetResponseContent(), `"tool":"`+aiHealthCheckToolName+`"`)
+	assert.Contains(t, rsp.GetResponseContent(), `"content":"ping"`)
 	assert.True(t, rsp.GetSuccess())
 	assert.Empty(t, rsp.GetErrorMessage())
 }
