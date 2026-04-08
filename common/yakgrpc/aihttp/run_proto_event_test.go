@@ -32,7 +32,7 @@ func newInternalTestGateway(t *testing.T, opts ...GatewayOption) *AIAgentHTTPGat
 func TestHandlePushEventRespondsWithAIOutputEvent(t *testing.T) {
 	gw := newInternalTestGateway(t)
 	runID := "run-push-accepted"
-	gw.runManager.Create(runID, nil, nil)
+	gw.runManager.Create(runID, nil)
 
 	body, err := protojson.MarshalOptions{UseProtoNames: true}.Marshal(&ypb.AIInputEvent{
 		IsFreeInput: true,
@@ -59,7 +59,7 @@ func TestHandlePushEventRespondsWithAIOutputEvent(t *testing.T) {
 func TestHandlePushEventRejectsLegacyPayload(t *testing.T) {
 	gw := newInternalTestGateway(t)
 	runID := "run-push-legacy"
-	gw.runManager.Create(runID, nil, nil)
+	gw.runManager.Create(runID, nil)
 
 	legacyBody := []byte(`{"type":"free_input","free_input":"hello"}`)
 	req := httptest.NewRequest(http.MethodPost, "/agent/run/"+runID+"/events/push", bytes.NewReader(legacyBody))
@@ -73,7 +73,7 @@ func TestHandlePushEventRejectsLegacyPayload(t *testing.T) {
 func TestHandleCancelRunRespondsWithAIOutputEvent(t *testing.T) {
 	gw := newInternalTestGateway(t)
 	runID := "run-cancelled"
-	gw.runManager.Create(runID, nil, nil)
+	gw.runManager.Create(runID, nil)
 
 	body, err := protojson.MarshalOptions{UseProtoNames: true}.Marshal(&ypb.AIInputEvent{})
 	require.NoError(t, err)
@@ -96,7 +96,7 @@ func TestHandleCancelRunRespondsWithAIOutputEvent(t *testing.T) {
 func TestHandleSSEEventsRespondsWithAIOutputEvent(t *testing.T) {
 	gw := newInternalTestGateway(t)
 	runID := "run-sse-completed"
-	session := gw.runManager.Create(runID, nil, nil)
+	session := gw.runManager.Create(runID, nil)
 	session.Complete(nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/agent/run/"+runID+"/events", nil)

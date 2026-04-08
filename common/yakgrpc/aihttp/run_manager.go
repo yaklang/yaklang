@@ -12,10 +12,9 @@ import (
 )
 
 type RunSession struct {
-	RunID              string
-	Status             RunStatus
-	StartParams        *ypb.AIStartParams
-	StartAttachedFiles []string
+	RunID       string
+	Status      RunStatus
+	StartParams *ypb.AIInputEvent
 
 	subscribers   map[string]chan *ypb.AIOutputEvent
 	subscribersMu sync.RWMutex
@@ -33,21 +32,20 @@ type RunSession struct {
 	Error      string
 }
 
-func NewRunSession(parentCtx context.Context, runID string, startParams *ypb.AIStartParams, startAttachedFiles []string) *RunSession {
+func NewRunSession(parentCtx context.Context, runID string, startParams *ypb.AIInputEvent) *RunSession {
 	ctx, cancel := context.WithCancel(parentCtx)
 	if runID == "" {
 		runID = uuid.NewString()
 	}
 	return &RunSession{
-		RunID:              runID,
-		Status:             RunStatusPending,
-		StartParams:        startParams,
-		StartAttachedFiles: append([]string(nil), startAttachedFiles...),
-		subscribers:        make(map[string]chan *ypb.AIOutputEvent),
-		inputChan:          chanx.NewUnlimitedChan[*ypb.AIInputEvent](ctx, 10),
-		ctx:                ctx,
-		cancel:             cancel,
-		CreatedAt:          time.Now(),
+		RunID:       runID,
+		Status:      RunStatusPending,
+		StartParams: startParams,
+		subscribers: make(map[string]chan *ypb.AIOutputEvent),
+		inputChan:   chanx.NewUnlimitedChan[*ypb.AIInputEvent](ctx, 10),
+		ctx:         ctx,
+		cancel:      cancel,
+		CreatedAt:   time.Now(),
 	}
 }
 
@@ -147,8 +145,8 @@ func NewRunManager(ctx context.Context) *RunManager {
 	}
 }
 
-func (rm *RunManager) Create(runID string, startParams *ypb.AIStartParams, startAttachedFiles []string) *RunSession {
-	session := NewRunSession(rm.ctx, runID, startParams, startAttachedFiles)
+func (rm *RunManager) Create(runID string, startParams *ypb.AIInputEvent) *RunSession {
+	session := NewRunSession(rm.ctx, runID, startParams)
 
 	rm.mu.Lock()
 	rm.sessions[session.RunID] = session
