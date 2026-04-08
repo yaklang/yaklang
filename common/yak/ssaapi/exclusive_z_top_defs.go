@@ -189,7 +189,11 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 				}
 
 				results := obj.getTopDefs(actx, opt...)
-				if len(results) > 1 {
+				isStaticPropertyCarrier := false
+				if raw, ok := key.GetConstValue().(string); ok && strings.HasPrefix(raw, "$") {
+					isStaticPropertyCarrier = true
+				}
+				if isStaticPropertyCarrier && len(results) > 1 {
 					results = lo.Filter(results, func(item *Value, _ int) bool {
 						return !ValueCompare(item, obj)
 					})

@@ -104,18 +104,22 @@ func namespaceNeedsDeclare(raw []*phpparser.NamespaceStatementContext, prog *ssa
 	return false
 }
 
-func visitNamespaceUseDeclarations(raw phpparser.INamespaceUseDeclarationsContext, visit func(phpparser.IUseDeclarationContext) interface{}) {
-	if raw == nil || visit == nil {
+func visitNamespaceUseDeclarations(raw []phpparser.INamespaceStatementContext, visit func(phpparser.IUseDeclarationContext) interface{}) {
+	if len(raw) == 0 || visit == nil {
 		return
 	}
-	i, _ := raw.(*phpparser.NamespaceUseDeclarationsContext)
-	if i == nil {
-		return
+	for _, stmt := range raw {
+		if stmt == nil {
+			continue
+		}
+		ctx, ok := stmt.(*phpparser.NamespaceStatementContext)
+		if !ok {
+			continue
+		}
+		if decl := ctx.UseDeclaration(); decl != nil {
+			visit(decl)
+		}
 	}
-	if decl := i.UseDeclaration(); decl != nil {
-		visit(decl)
-	}
-	visitNamespaceUseDeclarations(i.NamespaceUseDeclarations(), visit)
 }
 
 func (y *builder) VisitNamespaceOnlyUse(raw phpparser.INamespaceDeclarationContext) {
@@ -127,9 +131,7 @@ func (y *builder) VisitNamespaceOnlyUse(raw phpparser.INamespaceDeclarationConte
 		return
 	}
 	usedeclHanlder := func() {
-		if body, ok := i.NamespaceDeclarationBody().(*phpparser.NamespaceDeclarationBodyContext); ok {
-			visitNamespaceUseDeclarations(body.NamespaceUseDeclarations(), y.VisitUseDeclaration)
-		}
+		visitNamespaceUseDeclarations(i.AllNamespaceStatement(), y.VisitUseDeclaration)
 	}
 	prog := y.GetProgram().GetApplication() //拿到主app
 	nameSpacePath := y.VisitNamespacePath(i.NamespacePath())
@@ -160,22 +162,11 @@ func (y *builder) VisitNamespaceDeclaration(raw phpparser.INamespaceDeclarationC
 	if i == nil {
 		return nil
 	}
-	body, _ := i.NamespaceDeclarationBody().(*phpparser.NamespaceDeclarationBodyContext)
-	namespaceDecls := func() []*phpparser.NamespaceStatementContext {
-		if body == nil {
-			return nil
-		}
-		ret := make([]*phpparser.NamespaceStatementContext, 0, len(body.AllNamespaceStatement()))
-		for _, stmt := range body.AllNamespaceStatement() {
-			if i, ok := stmt.(*phpparser.NamespaceStatementContext); ok {
-				ret = append(ret, i)
-			}
-		}
-		return ret
-	}
 	nameSpaceStmt := func(build func(*phpparser.NamespaceStatementContext)) {
-		for _, stmt := range namespaceDecls() {
-			build(stmt)
+		for _, stmt := range i.AllNamespaceStatement() {
+			if i, ok := stmt.(*phpparser.NamespaceStatementContext); ok {
+				build(i)
+			}
 		}
 	}
 	normalStatement := func() {
@@ -227,9 +218,6 @@ func (y *builder) VisitNamespaceDeclaration(raw phpparser.INamespaceDeclarationC
 	case hasName && !y.PreHandler():
 		// this statenment should effect on outter
 		namespace, f := switchToNamespace()
-		if namespaceNeedsDeclare(namespaceDecls(), namespace) {
-			declareStatement()
-		}
 		f()
 		currentProg := y.GetProgram()
 		y.SetProgram(namespace)
@@ -254,7 +242,7 @@ func (y *builder) VisitNamespaceOnlyUseSemi(raw phpparser.INamespaceDeclarationS
 		return
 	}
 	usedeclHanlder := func() {
-		visitNamespaceUseDeclarations(i.NamespaceUseDeclarations(), y.VisitUseDeclaration)
+		visitNamespaceUseDeclarations(i.AllNamespaceStatement(), y.VisitUseDeclaration)
 	}
 	prog := y.GetProgram().GetApplication()
 	nameSpacePath := y.VisitNamespacePath(i.NamespacePath())

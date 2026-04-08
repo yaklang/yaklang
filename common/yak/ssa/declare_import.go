@@ -151,6 +151,14 @@ func (p *Program) ImportValueFromLib(lib *Program, names ...string) error {
 	for _, name := range names {
 		value := fakeImportValue(lib, name)
 		pkg.val[name] = value
+		p.fixImportCallback = append(p.fixImportCallback, func() {
+			if real := lib.GetExportValue(name); real != nil {
+				if value != nil && value != real {
+					ReplaceAllValue(value, real)
+				}
+				pkg.val[name] = real
+			}
+		})
 	}
 	return err
 }

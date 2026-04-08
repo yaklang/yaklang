@@ -2,6 +2,7 @@ package tests
 
 import (
 	"embed"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -277,6 +278,16 @@ func validateProjectBuild(t *testing.T, filename string, src string) {
 			ssaapi.WithLanguage(ssaconfig.PHP),
 			ssaapi.WithConcurrency(1),
 		)
+		if errors.Is(err, ssaapi.ErrNoFoundCompiledFile) {
+			singleProg, singleErr := ssaapi.Parse(
+				src,
+				ssaapi.WithLanguage(ssaconfig.PHP),
+				ssaapi.WithProgramName("fixture-"+flattenedProjectFixtureName(filename)),
+			)
+			require.NoError(t, singleErr, "parse/build single-file fixture %s", filename)
+			require.NotNil(t, singleProg, "nil single-file program for %s", filename)
+			return
+		}
 		require.NoError(t, err, "parse/build fixture %s", filename)
 		require.NotNil(t, prog, "nil program for %s", filename)
 	})
