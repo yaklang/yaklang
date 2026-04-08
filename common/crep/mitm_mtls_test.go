@@ -238,6 +238,7 @@ func TestGMMTLS_MITM_GENERATE_CERTS(t *testing.T) {
 }
 
 func TestMTLS_MITM_StartLongServer(t *testing.T) {
+	t.Skip("local debug")
 	uid := uuid.New().String()
 	println(uid)
 	println("Start Long mtls server")
@@ -251,6 +252,7 @@ func TestMTLS_MITM_StartLongServer(t *testing.T) {
 }
 
 func TestGMMTLS_MITM_StartLongServer(t *testing.T) {
+	t.Skip("local debug")
 	uid := uuid.New().String()
 	println(uid)
 	println("Start Long GM mTLS server")

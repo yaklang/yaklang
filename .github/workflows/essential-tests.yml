@@ -398,6 +398,7 @@ jobs:
             test_configs: |
               [
                 {"package": "./common/yak/yaktest/mustpass", "timeout": "5m"}
+                {"package": ".common/crep/...", "timeout": "5m"}
               ]
 
           - name: "Test SFWeb / Integration SyntaxFlow / SFDB / SFVM / SFReport"

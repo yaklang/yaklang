@@ -4,11 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"golang.org/x/net/http2"
-	"golang.org/x/net/http2/hpack"
 	"io"
 	"net"
 	"net/http"
@@ -16,6 +11,12 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/hpack"
 )
 
 const transportDefaultConnFlow = 1 << 30
