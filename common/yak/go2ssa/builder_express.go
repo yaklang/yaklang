@@ -559,11 +559,26 @@ func (b *astbuilder) buildOperandNameR(name *gol.OperandNameContext) ssa.Value {
 			b.NewError(ssa.Warn, TAG, "cannot use _ as value")
 		}
 
+		checkExternLib := func() ssa.Value {
+			if v := b.PeekExternInRoot(text); !utils.IsNil(v) {
+				if ex, ok := ssa.ToExternLib(v); ok {
+					return ex
+				}
+			}
+			return nil
+		}
+
 		if c, ok := b.CheckSpecialValueByStr(text); ok {
 			return b.EmitConstInstPlaceholder(c)
 		}
 
 		if v := b.PeekValue(text); !utils.IsNil(v) {
+			if p, ok := ssa.ToParameter(v); ok && p.IsFreeValue {
+				if ex := checkExternLib(); ex != nil {
+					return ex
+				}
+			}
+
 			return v
 		}
 
@@ -575,10 +590,8 @@ func (b *astbuilder) buildOperandNameR(name *gol.OperandNameContext) ssa.Value {
 			return f
 		}
 
-		if v := b.PeekExternInRoot(text); !utils.IsNil(v) {
-			if ex, ok := ssa.ToExternLib(v); ok {
-				return ex
-			}
+		if ex := checkExternLib(); ex != nil {
+			return ex
 		}
 
 		b.NewError(ssa.Warn, TAG, fmt.Sprintf("not find variable %s in current scope", text))
