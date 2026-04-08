@@ -287,6 +287,22 @@ func completeYakScriptAIFieldsOnSave(ctx context.Context, _ *gorm.DB, _ int64, s
 	}
 }
 
+func isYakScriptNameDuplicateErr(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	msg := strings.ToLower(err.Error())
+	if !strings.Contains(msg, "script_name") {
+		return false
+	}
+
+	return strings.Contains(msg, "unique constraint failed") ||
+		strings.Contains(msg, "duplicate entry") ||
+		strings.Contains(msg, "violates unique constraint") ||
+		strings.Contains(msg, "error 1062")
+}
+
 func (s *Server) SaveYakScript(ctx context.Context, script *ypb.YakScript) (*ypb.YakScript, error) {
 	switch script.Type {
 	case "yak", "mitm", "port-scan":
@@ -301,6 +317,9 @@ func (s *Server) SaveYakScript(ctx context.Context, script *ypb.YakScript) (*ypb
 
 	err := yakit.CreateOrUpdateYakScriptByID(s.GetProfileDatabase(), script.GetId(), toSave)
 	if err != nil {
+		if isYakScriptNameDuplicateErr(err) {
+			return nil, utils.Errorf("保存失败：插件名 [%s] 已存在，请修改后重试", script.GetScriptName())
+		}
 		return nil, utils.Errorf("create or update yakscript failed: %s", err.Error())
 	}
 
