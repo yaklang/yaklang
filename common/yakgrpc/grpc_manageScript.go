@@ -299,7 +299,7 @@ func (s *Server) SaveYakScript(ctx context.Context, script *ypb.YakScript) (*ypb
 	toSave := GRPCYakScriptToYakitScript(script)
 	completeYakScriptAIFieldsOnSave(ctx, s.GetProfileDatabase(), script.GetId(), toSave)
 
-	err := yakit.CreateOrUpdateYakScript(s.GetProfileDatabase(), toSave)
+	err := yakit.CreateOrUpdateYakScriptByID(s.GetProfileDatabase(), script.GetId(), toSave)
 	if err != nil {
 		return nil, utils.Errorf("create or update yakscript failed: %s", err.Error())
 	}
