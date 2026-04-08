@@ -76,26 +76,15 @@ SOLUTION
 REFERENCE
 )
 
+<include("golang-user-input")> as $input
+
 template?{<fullTypeName>?{have: 'text/template'}} as $template;
 template?{<fullTypeName>?{have: 'html/template'}} as $template;
 $template.New() as $new
+$template.Must()?{.Execute} as $must
 
-$new.Must() as $tmpl
-$new.ParseFiles().* as $tmpl
-$template.Must() as $tmpl
-$template.ParseFiles().* as $tmpl
-$tmpl.Execute(* #-> as $target);
-$tmpl.ExecuteTemplate(*<slice(index=3)> #-> as $target);
-
-template?{<fullTypeName>?{have: 'text/template'}} as $temptext;
-*temp*?{<fullTypeName>?{have: 'text/template'}} as $temptext;
-$temptext.New().Parse() as $target;
-$temptext.ParseFiles().* -> as $target;
-
-$target?{ * #{ 
-    include: "* & $new",
-	exclude: `*?{opcode:const}`,
-}->} as $high;
+$must<getCallee()>?(* #{until: `* & $new`}-> as $sink) 
+$sink.Parse?(* #{until: `* & $input`}-> ) as $high
 
 
 alert $high for {
