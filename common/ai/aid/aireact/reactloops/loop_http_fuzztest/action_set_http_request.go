@@ -45,6 +45,7 @@ var setHTTPRequestAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoop
 			storeLoopFuzzRequestState(loop, fuzzReq, []byte(httpRequest), isHttps)
 			clearLoopHTTPFuzzActionTracking(loop)
 			loop.Set("bootstrap_source", "set_http_request")
+			emitLoopHTTPFuzzEditablePacket(loop, operator.GetTask(), httpRequest)
 			record := recordLoopHTTPFuzzMetaAction(loop, "set_http_request", fmt.Sprintf("is_https=%v; reason=%s", isHttps, reason), utils.ShrinkTextBlock(httpRequest, 240))
 			persistLoopHTTPFuzzSessionContext(loop, "set_http_request")
 

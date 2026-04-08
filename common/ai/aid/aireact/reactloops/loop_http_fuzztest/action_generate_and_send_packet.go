@@ -1,7 +1,6 @@
 package loop_http_fuzztest
 
 import (
-	"bytes"
 	"fmt"
 	"strings"
 
@@ -9,7 +8,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
 
@@ -73,12 +71,8 @@ var generateAndSendPacketAction = func(r aicommon.AIInvokeRuntime) reactloops.Re
 
 			storeLoopFuzzRequestState(loop, fuzzReq, []byte(rawPacket), isHTTPS)
 			loop.Set("bootstrap_source", "generated_packet_action")
+			emitLoopHTTPFuzzEditablePacket(loop, operator.GetTask(), rawPacket)
 			persistLoopHTTPFuzzSessionContext(loop, "generated_packet_action")
-
-			taskID := currentLoopStreamTaskID(loop)
-			if taskID != "" && loop.GetEmitter() != nil {
-				_, _ = loop.GetEmitter().EmitStreamEventWithContentType("http_flow", bytes.NewBufferString(rawPacket), taskID, aicommon.TypeCodeHTTPRequest)
-			}
 
 			log.Infof("generate_and_send_packet action: packet_type=%s, target=%s, reason=%s", packetType, targetPurpose, generationReason)
 
@@ -112,18 +106,4 @@ func inferGeneratedPacketHTTPS(loop *reactloops.ReActLoop, rawPacket string) boo
 		return strings.EqualFold(urlObj.Scheme, "https")
 	}
 	return false
-}
-
-func currentLoopStreamTaskID(loop *reactloops.ReActLoop) string {
-	if loop == nil {
-		return ""
-	}
-	task := loop.GetCurrentTask()
-	if task == nil {
-		return ""
-	}
-	if task.GetId() != "" {
-		return task.GetId()
-	}
-	return utils.InterfaceToString(task.GetIndex())
 }

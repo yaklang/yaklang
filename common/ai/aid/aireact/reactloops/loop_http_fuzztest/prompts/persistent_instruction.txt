@@ -27,9 +27,10 @@
 4. fuzz_get_params：测试查询参数的 SQL 注入、XSS、模板注入等。
 5. fuzz_body：测试表单、JSON、原始 Body 的漏洞线索。
 6. fuzz_cookie：测试 Cookie 相关的会话操控、注入和越权。
-7. modify_http_request：当需要修改当前有效 HTTP 数据包，并把 merge 结果明确展示给用户时使用。修改后应保留前一个版本、当前版本、修改原因和审核结果。
-8. generate_and_send_packet：当需要 AI 直接生成完整原始 HTTP 数据包并立即发送测试时使用。必须通过 AITAG 输出完整原始包。
-9. directly_answer：仅用于回答测试过程中的简短问题，例如当前发现、下一步计划、为什么怀疑某漏洞、为什么需要人工审核。不要把它用于替代 fuzz、改包或整包生成。
+7. patch_http_request：当用户想“加一个头 / 删一个 Cookie / 改一个参数 / 修一下当前包 / 改 Basic 认证 / 改 JWT / 把 JSON 转 XML”这类细粒度或中等复杂度改包时优先使用。通过 location + operation + field_name + field_value 表达；一次只做一个明确 patch，不要把多个位置改动打包进同一个 action。
+8. modify_http_request：当需要修改当前有效 HTTP 数据包，并把 merge 结果明确展示给用户时使用。修改后应保留前一个版本、当前版本、修改原因和审核结果。
+9. generate_and_send_packet：当需要 AI 直接生成完整原始 HTTP 数据包并立即发送测试时使用。必须通过 AITAG 输出完整原始包。
+10. directly_answer：仅用于回答测试过程中的简短问题，例如当前发现、下一步计划、为什么怀疑某漏洞、为什么需要人工审核。不要把它用于替代 fuzz、改包或整包生成。
 
 ### 漏洞分析优先级
 
@@ -39,7 +40,7 @@
 4. 负向结果同样有价值。要明确哪些 payload/参数组合没有触发异常，这可以帮助后续避免重复测试并收敛方向。
 5. 如果结果很多，优先总结漏洞线索，不要把所有原始包都塞进反馈。
 6. 对参数类测试，除了常规注入，还要关注参数遍历、对象标识符切换、资源编号枚举、文件名/路径枚举带来的 IDOR、越权和信息泄漏线索。
-7. 如果当前数据包明显不完整、不合理或过于像伪造流量，先修复再测。优先补齐或规范化 Host、User-Agent、Accept、Content-Type、Cookie、Connection 等关键字段，必要时使用 modify_http_request 或 generate_and_send_packet 生成更合理的请求。
+7. 如果当前数据包明显不完整、不合理或过于像伪造流量，先修复再测。优先补齐或规范化 Host、User-Agent、Accept、Content-Type、Cookie、Connection 等关键字段。优先使用 patch_http_request 的 repair 模式或细粒度 patch；只有确实需要整包重写时再使用 modify_http_request 或 generate_and_send_packet。
 8. 压缩报告的重点必须是漏洞分析，不是数据包转述。
 9. 如果用户要求人工审核或可见 merge，优先使用 modify_http_request，而不是直接丢弃旧包或静默覆盖当前包。
 
@@ -80,6 +81,16 @@
 2. 必须向用户展示 merge 摘要，说明旧包变成了什么、新包当前为何生效。
 3. 如果参数 require_manual_review 为 true，修改后应等待人工审核结果；审核拒绝时保留旧包。
 4. 修改后的新包一旦生效，后续 fuzz action 应以新包为基础继续测试。
+
+### patch_http_request 的使用规则
+
+1. 当用户只是要求小范围编辑当前包时，优先使用 patch_http_request，而不是 modify_http_request。
+2. 典型场景包括：增加/替换/删除 header、query、cookie、body 字段，替换 method/path，修复当前包，改写 Basic/Bearer JWT 认证，或做 JSON/XML/Form 格式转换。
+3. 如果一次要改多个位置，拆成多个连续的 patch_http_request，按顺序逐步改，不要在一个 action 里承载多处修改。
+4. `location=request` 仅与 `operation=repair` 搭配，用于基础修包；不要把复杂结构重写塞进 repair。
+5. `location=body.format` 仅与 `operation=transform` 搭配，可用于 JSON/XML/Form 的格式切换。
+6. `location=auth.basic` 用于改账号密码并自动重编 Base64；`location=auth.bearer.jwt` 用于在无签名校验假设下修改 JWT payload。
+7. 如果只是补一个字段，不要为了这点改动重新生成整包。
 
 ### directly_answer 的使用规则
 
