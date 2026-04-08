@@ -260,8 +260,8 @@
   {
     "rule_id": "215e8ad8-2977-4cd4-9446-d0040ffec286",
     "rule_name": "检测Golang服务器端模板注入漏洞",
-    "hash": "6618470d6a2ce4742720da05be74e099ddbc8b604743c45b7c214ee471cb7442",
-    "version": "20260326.0001"
+    "hash": "9d01317777437ed5530541581f2f8c50f3f7bd33504b5d81e11e027b0cbd26f1",
+    "version": "20260408.0001"
   },
   {
     "rule_id": "e6f7a8b9-c0d1-42e3-f4a5-b6c7d8e9f0a1",
