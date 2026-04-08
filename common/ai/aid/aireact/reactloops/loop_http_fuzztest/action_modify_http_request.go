@@ -101,6 +101,7 @@ var modifyHTTPRequestAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActL
 			loop.Set("request_modification_reason", modificationReason)
 			loop.Set("request_review_decision", buildReviewDecisionLabel(reviewDecision))
 			loop.Set("bootstrap_source", "modify_http_request")
+			emitLoopHTTPFuzzEditablePacket(loop, operator.GetTask(), string(fixedPacket))
 
 			feedback := buildRequestModificationFeedback([]byte(previousRequest), fixedPacket, isHTTPS, modificationReason, buildReviewDecisionLabel(reviewDecision))
 			record := recordLoopHTTPFuzzMetaAction(
