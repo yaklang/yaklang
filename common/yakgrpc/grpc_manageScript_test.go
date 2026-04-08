@@ -361,6 +361,148 @@ func TestSaveYakScript_UpdateAIFields(t *testing.T) {
 	require.Equal(t, "new usage", updated.AIUsage)
 }
 
+func TestSaveYakScript_PreserveProtectedMetadataFields(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	db := consts.GetGormProfileDatabase()
+	scriptName := uuid.NewString()
+	origin := &schema.YakScript{
+		ScriptName:         scriptName,
+		Type:               "yak",
+		Content:            `yakit.AutoInitYakit()`,
+		Params:             "\"[]\"",
+		Help:               "old help",
+		Tags:               "old-tag",
+		Author:             "keep-author",
+		FromLocal:          true,
+		LocalPath:          "/tmp/local/plugin.yak",
+		ForceInteractive:   true,
+		FromStore:          true,
+		IsBatchScript:      true,
+		IsExternal:         true,
+		OnlineId:           9527,
+		OnlineScriptName:   "online-script",
+		OnlineContributors: "alice,bob",
+		OnlineIsPrivate:    true,
+		UserId:             1024,
+		Uuid:               uuid.NewString(),
+		HeadImg:            "https://example.com/avatar.png",
+		OnlineBaseUrl:      "https://example.com/plugins",
+		BaseOnlineId:       8848,
+		OnlineOfficial:     true,
+		OnlineGroup:        "official",
+		CollaboratorInfo:   "[]",
+		SkipUpdate:         true,
+	}
+	require.NoError(t, db.Create(origin).Error)
+	t.Cleanup(func() {
+		require.NoError(t, yakit.DeleteYakScriptByName(db, scriptName))
+	})
+
+	_, err = client.SaveYakScript(context.Background(), &ypb.YakScript{
+		Id:         int64(origin.ID),
+		ScriptName: scriptName,
+		Type:       "yak",
+		Content: `yakit.AutoInitYakit()
+yakit.Info("updated")
+`,
+		Help: "new help",
+		Tags: "new-tag",
+	})
+	require.NoError(t, err)
+
+	updated, err := yakit.GetYakScript(db, int64(origin.ID))
+	require.NoError(t, err)
+	require.Equal(t, "new help", updated.Help)
+	require.Equal(t, "new-tag", updated.Tags)
+	require.Contains(t, updated.Content, "updated")
+
+	require.Equal(t, origin.Author, updated.Author)
+	require.Equal(t, origin.FromLocal, updated.FromLocal)
+	require.Equal(t, origin.LocalPath, updated.LocalPath)
+	require.Equal(t, origin.ForceInteractive, updated.ForceInteractive)
+	require.Equal(t, origin.FromStore, updated.FromStore)
+	require.Equal(t, origin.IsBatchScript, updated.IsBatchScript)
+	require.Equal(t, origin.IsExternal, updated.IsExternal)
+	require.Equal(t, origin.OnlineId, updated.OnlineId)
+	require.Equal(t, origin.OnlineScriptName, updated.OnlineScriptName)
+	require.Equal(t, origin.OnlineContributors, updated.OnlineContributors)
+	require.Equal(t, origin.OnlineIsPrivate, updated.OnlineIsPrivate)
+	require.Equal(t, origin.UserId, updated.UserId)
+	require.Equal(t, origin.Uuid, updated.Uuid)
+	require.Equal(t, origin.HeadImg, updated.HeadImg)
+	require.Equal(t, origin.OnlineBaseUrl, updated.OnlineBaseUrl)
+	require.Equal(t, origin.BaseOnlineId, updated.BaseOnlineId)
+	require.Equal(t, origin.OnlineOfficial, updated.OnlineOfficial)
+	require.Equal(t, origin.OnlineGroup, updated.OnlineGroup)
+	require.Equal(t, origin.CollaboratorInfo, updated.CollaboratorInfo)
+	require.Equal(t, origin.SkipUpdate, updated.SkipUpdate)
+}
+
+func TestSaveYakScript_RejectDuplicateScriptNameOnCreateAndUpdate(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	db := consts.GetGormProfileDatabase()
+	existingName := uuid.NewString()
+	anotherName := uuid.NewString()
+
+	require.NoError(t, yakit.CreateOrUpdateYakScriptByName(db, existingName, &schema.YakScript{
+		ScriptName: existingName,
+		Type:       "yak",
+		Content:    `yakit.AutoInitYakit()`,
+		Help:       "existing-help",
+	}))
+	require.NoError(t, yakit.CreateOrUpdateYakScriptByName(db, anotherName, &schema.YakScript{
+		ScriptName: anotherName,
+		Type:       "yak",
+		Content:    `yakit.AutoInitYakit()`,
+		Help:       "another-help",
+	}))
+	t.Cleanup(func() {
+		require.NoError(t, yakit.DeleteYakScriptByName(db, existingName))
+		require.NoError(t, yakit.DeleteYakScriptByName(db, anotherName))
+	})
+
+	existing, err := yakit.GetYakScriptByName(db, existingName)
+	require.NoError(t, err)
+	another, err := yakit.GetYakScriptByName(db, anotherName)
+	require.NoError(t, err)
+
+	t.Run("create_should_fail_when_script_name_exists", func(t *testing.T) {
+		_, err := client.SaveYakScript(context.Background(), &ypb.YakScript{
+			Id:         0,
+			ScriptName: existingName,
+			Type:       "yak",
+			Content:    `yakit.AutoInitYakit()`,
+			Help:       "should-not-create",
+		})
+		require.Error(t, err)
+	})
+
+	t.Run("update_should_fail_when_renaming_to_existing_script_name", func(t *testing.T) {
+		_, err := client.SaveYakScript(context.Background(), &ypb.YakScript{
+			Id:         int64(another.ID),
+			ScriptName: existingName,
+			Type:       "yak",
+			Content:    `yakit.AutoInitYakit()`,
+			Help:       "should-not-update",
+		})
+		require.Error(t, err)
+
+		stillExisting, getErr := yakit.GetYakScript(db, int64(existing.ID))
+		require.NoError(t, getErr)
+		require.Equal(t, existingName, stillExisting.ScriptName)
+		require.Equal(t, "existing-help", stillExisting.Help)
+
+		stillAnother, getErr := yakit.GetYakScript(db, int64(another.ID))
+		require.NoError(t, getErr)
+		require.Equal(t, anotherName, stillAnother.ScriptName)
+		require.Equal(t, "another-help", stillAnother.Help)
+	})
+}
+
 func TestExportLocalYakScriptStream(t *testing.T) {
 	test := assert.New(t)
 
