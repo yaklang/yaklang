@@ -36,9 +36,9 @@ func (gw *AIAgentHTTPGateway) handleCreateSession(w http.ResponseWriter, r *http
 		writeError(w, http.StatusInternalServerError, "load setting failed: "+err.Error())
 		return
 	}
-	params := mergeParams(req.Params, setting)
-
-	session := gw.runManager.Create(runID, ConvertAIParamsToYPB(params, runID), params.AttachedFiles)
+	session := gw.runManager.Create(runID, &ypb.AIInputEvent{
+		Params: cloneStartParams(mergeStartParams(nil, setting, runID), runID),
+	})
 	if db := gw.getDB(); db != nil {
 		if _, err := yakit.EnsureAISessionMeta(db, runID); err != nil {
 			log.Warnf("ensure ai session meta failed for %s: %v", runID, err)
@@ -76,13 +76,13 @@ func (gw *AIAgentHTTPGateway) handleStreamInput(w http.ResponseWriter, r *http.R
 
 	startOnly := allowStart && event.GetIsStart() && !hasInputPayload(event)
 
-	if allowStart && event.GetParams() != nil {
+	if allowStart {
 		setting, err := gw.GetSettingFromDB()
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "load setting failed: "+err.Error())
 			return
 		}
-		session.StartParams = mergeStartParams(event.GetParams(), setting, runID)
+		session.StartParams = mergeStartInputEvent(event, mergeStartParams(event.GetParams(), setting, runID), runID)
 	}
 
 	if !startOnly && !hasInputPayload(event) {
@@ -95,6 +95,10 @@ func (gw *AIAgentHTTPGateway) handleStreamInput(w http.ResponseWriter, r *http.R
 	}
 
 	if !startOnly {
+		if allowStart && event.GetIsStart() {
+			writeProtoJSON(w, http.StatusOK, newResultOutputEvent("accepted"))
+			return
+		}
 		if event.GetIsStart() {
 			cloned := proto.Clone(event).(*ypb.AIInputEvent)
 			cloned.IsStart = false
@@ -127,78 +131,6 @@ func (gw *AIAgentHTTPGateway) handleCancelRun(w http.ResponseWriter, r *http.Req
 	session.Cancel()
 
 	writeProtoJSON(w, http.StatusOK, newResultOutputEvent(string(RunStatusCancelled)))
-}
-
-func mergeParams(req AIParams, defaults aiAgentChatSettingPayload) AIParams {
-	if req.UseDefaultAI || defaults.UseDefaultAIConfig {
-		req.UseDefaultAI = true
-		if req.AIService == "" {
-			req.AIService = defaults.AIService
-		}
-		if req.AIModelName == "" {
-			req.AIModelName = defaults.AIModelName
-		}
-		if req.ForgeName == "" {
-			req.ForgeName = defaults.ForgeName
-		}
-		if req.ReviewPolicy == "" {
-			req.ReviewPolicy = defaults.ReviewPolicy
-		}
-		if req.ReActMaxIteration == 0 {
-			req.ReActMaxIteration = defaults.ReActMaxIteration
-		}
-		if req.MaxIteration == 0 {
-			if defaults.ReActMaxIteration > 0 {
-				req.MaxIteration = int32(defaults.ReActMaxIteration)
-			}
-		}
-		if !req.DisableToolUse {
-			req.DisableToolUse = defaults.DisableToolUse
-		}
-		if !req.EnableSystemFileSystemOperator {
-			req.EnableSystemFileSystemOperator = defaults.EnableSystemFileSystemOperator
-		}
-		if !req.DisallowRequireForUserPrompt {
-			req.DisallowRequireForUserPrompt = defaults.DisallowRequireForUserPrompt
-		}
-		if req.AIReviewRiskControlScore == 0 {
-			req.AIReviewRiskControlScore = defaults.AIReviewRiskControlScore
-		}
-		if req.AICallAutoRetry == 0 {
-			req.AICallAutoRetry = defaults.AICallAutoRetry
-		}
-		if req.AITransactionRetry == 0 {
-			req.AITransactionRetry = defaults.AITransactionRetry
-		}
-		if !req.EnableAISearchTool {
-			req.EnableAISearchTool = defaults.EnableAISearchTool
-		}
-		if !req.EnableAISearchInternet {
-			req.EnableAISearchInternet = defaults.EnableAISearchInternet
-		}
-		if !req.EnableQwenNoThinkMode {
-			req.EnableQwenNoThinkMode = defaults.EnableQwenNoThinkMode
-		}
-		if !req.AllowPlanUserInteract {
-			req.AllowPlanUserInteract = defaults.AllowPlanUserInteract
-		}
-		if req.PlanUserInteractMaxCount == 0 {
-			req.PlanUserInteractMaxCount = defaults.PlanUserInteractMaxCount
-		}
-		if req.TimelineItemLimit == 0 {
-			req.TimelineItemLimit = defaults.TimelineItemLimit
-		}
-		if req.TimelineContentSizeLimit == 0 {
-			req.TimelineContentSizeLimit = defaults.TimelineContentSizeLimit
-		}
-		if req.UserInteractLimit == 0 {
-			req.UserInteractLimit = defaults.UserInteractLimit
-		}
-		if req.TimelineSessionID == "" {
-			req.TimelineSessionID = defaults.TimelineSessionID
-		}
-	}
-	return req
 }
 
 func mergeStartParams(req *ypb.AIStartParams, defaults aiAgentChatSettingPayload, runID string) *ypb.AIStartParams {
@@ -280,6 +212,21 @@ func cloneStartParams(params *ypb.AIStartParams, runID string) *ypb.AIStartParam
 	return cloned
 }
 
+func cloneStartInputEvent(event *ypb.AIInputEvent, runID string) *ypb.AIInputEvent {
+	if event == nil {
+		return &ypb.AIInputEvent{Params: cloneStartParams(nil, runID)}
+	}
+	cloned := proto.Clone(event).(*ypb.AIInputEvent)
+	cloned.Params = cloneStartParams(cloned.GetParams(), runID)
+	return cloned
+}
+
+func mergeStartInputEvent(event *ypb.AIInputEvent, params *ypb.AIStartParams, runID string) *ypb.AIInputEvent {
+	cloned := cloneStartInputEvent(event, runID)
+	cloned.Params = cloneStartParams(params, runID)
+	return cloned
+}
+
 func (gw *AIAgentHTTPGateway) runGRPCStream(session *RunSession) {
 	session.Status = RunStatusRunning
 
@@ -290,11 +237,8 @@ func (gw *AIAgentHTTPGateway) runGRPCStream(session *RunSession) {
 		return
 	}
 
-	startMsg := &ypb.AIInputEvent{
-		IsStart:          true,
-		Params:           cloneStartParams(session.StartParams, session.RunID),
-		AttachedFilePath: append([]string(nil), session.StartAttachedFiles...),
-	}
+	startMsg := cloneStartInputEvent(session.StartParams, session.RunID)
+	startMsg.IsStart = true
 	if err := stream.Send(startMsg); err != nil {
 		log.Errorf("send start message failed for run %s: %v", session.RunID, err)
 		session.Complete(err)
@@ -337,44 +281,4 @@ func (gw *AIAgentHTTPGateway) runGRPCStream(session *RunSession) {
 
 		session.AddEvent(normalizeOutputEvent(resp))
 	}
-}
-
-func ConvertAIParamsToYPB(p AIParams, runID string) *ypb.AIStartParams {
-	params := &ypb.AIStartParams{
-		EnableSystemFileSystemOperator: p.EnableSystemFileSystemOperator,
-		UseDefaultAIConfig:             p.UseDefaultAI,
-		DisallowRequireForUserPrompt:   p.DisallowRequireForUserPrompt,
-		ReviewPolicy:                   p.ReviewPolicy,
-		AIReviewRiskControlScore:       p.AIReviewRiskControlScore,
-		DisableToolUse:                 p.DisableToolUse,
-		AICallAutoRetry:                p.AICallAutoRetry,
-		AITransactionRetry:             p.AITransactionRetry,
-		EnableAISearchTool:             p.EnableAISearchTool,
-		EnableAISearchInternet:         p.EnableAISearchInternet,
-		EnableQwenNoThinkMode:          p.EnableQwenNoThinkMode,
-		AllowPlanUserInteract:          p.AllowPlanUserInteract,
-		PlanUserInteractMaxCount:       p.PlanUserInteractMaxCount,
-		AIService:                      p.AIService,
-		AIModelName:                    p.AIModelName,
-		TimelineItemLimit:              p.TimelineItemLimit,
-		UserInteractLimit:              p.UserInteractLimit,
-		TimelineSessionID:              runID,
-		DisableToolIntervalReview:      p.DisableToolIntervalReview,
-	}
-
-	if p.ForgeName != "" {
-		params.ForgeName = p.ForgeName
-	}
-	if p.ReActMaxIteration > 0 {
-		params.ReActMaxIteration = p.ReActMaxIteration
-	} else if p.MaxIteration > 0 {
-		params.ReActMaxIteration = int64(p.MaxIteration)
-	}
-	if p.TimelineContentSizeLimit > 0 {
-		params.TimelineContentSizeLimit = p.TimelineContentSizeLimit * 1024
-	}
-	if p.TimelineSessionID != "" {
-		params.TimelineSessionID = p.TimelineSessionID
-	}
-	return params
 }

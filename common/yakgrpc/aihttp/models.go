@@ -12,36 +12,8 @@ const (
 	RunStatusFailed    RunStatus = "failed"
 )
 
-type AIParams struct {
-	ForgeName                      string   `json:"forge_name,omitempty"`
-	ReviewPolicy                   string   `json:"review_policy,omitempty"`
-	AIService                      string   `json:"ai_service,omitempty"`
-	AIModelName                    string   `json:"ai_model_name,omitempty"`
-	MaxIteration                   int32    `json:"max_iteration,omitempty"` // legacy alias of ReActMaxIteration
-	ReActMaxIteration              int64    `json:"react_max_iteration,omitempty"`
-	DisableToolUse                 bool     `json:"disable_tool_use,omitempty"`
-	UseDefaultAI                   bool     `json:"use_default_ai,omitempty"`
-	AttachedFiles                  []string `json:"attached_files,omitempty"`
-	EnableSystemFileSystemOperator bool     `json:"enable_system_file_system_operator,omitempty"`
-	DisallowRequireForUserPrompt   bool     `json:"disallow_require_for_user_prompt,omitempty"`
-	AIReviewRiskControlScore       float64  `json:"ai_review_risk_control_score,omitempty"`
-	AICallAutoRetry                int64    `json:"ai_call_auto_retry,omitempty"`
-	AITransactionRetry             int64    `json:"ai_transaction_retry,omitempty"`
-	EnableAISearchTool             bool     `json:"enable_ai_search_tool,omitempty"`
-	EnableAISearchInternet         bool     `json:"enable_ai_search_internet,omitempty"`
-	EnableQwenNoThinkMode          bool     `json:"enable_qwen_no_think_mode,omitempty"`
-	AllowPlanUserInteract          bool     `json:"allow_plan_user_interact,omitempty"`
-	PlanUserInteractMaxCount       int64    `json:"plan_user_interact_max_count,omitempty"`
-	TimelineItemLimit              int64    `json:"timeline_item_limit,omitempty"`
-	TimelineContentSizeLimit       int64    `json:"timeline_content_size_limit,omitempty"` // KB in HTTP setting
-	UserInteractLimit              int64    `json:"user_interact_limit,omitempty"`
-	TimelineSessionID              string   `json:"timeline_session_id,omitempty"`
-	DisableToolIntervalReview      bool     `json:"disable_tool_interval_review,omitempty"`
-}
-
 type CreateSessionRequest struct {
-	RunID  string   `json:"run_id,omitempty"`
-	Params AIParams `json:"params,omitempty"`
+	RunID string `json:"run_id,omitempty"`
 }
 
 type CreateSessionResponse struct {

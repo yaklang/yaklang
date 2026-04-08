@@ -52,6 +52,17 @@ func readProtoJSON(r *http.Request, msg proto.Message) error {
 	return readProtoJSONBytes(data, msg)
 }
 
+func readOptionalProtoJSON(r *http.Request, msg proto.Message) error {
+	data, err := readOptionalRawBody(r)
+	if err != nil {
+		return err
+	}
+	if len(data) == 0 {
+		return nil
+	}
+	return readProtoJSONBytes(data, msg)
+}
+
 func readRawBody(r *http.Request) ([]byte, error) {
 	data, err := readOptionalRawBody(r)
 	if err != nil {

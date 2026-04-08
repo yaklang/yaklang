@@ -25,9 +25,19 @@ func (gw *AIAgentHTTPGateway) registerRoutes() {
 
 	sub.HandleFunc("/setting/aimodels/get", gw.handleListAIModels).Methods("POST", "OPTIONS")
 	sub.HandleFunc("/setting/providers/get", gw.handleListAIProviders).Methods("POST", "OPTIONS")
+	sub.HandleFunc("/setting/providers/query", gw.handleQueryAIProviders).Methods("POST", "OPTIONS")
 	sub.HandleFunc("/setting/aifocus/get", gw.handleQueryAIFocus).Methods("POST", "OPTIONS")
 
+	sub.HandleFunc("/forge/create", gw.handleCreateAIForge).Methods("POST", "OPTIONS")
+	sub.HandleFunc("/forge/update", gw.handleUpdateAIForge).Methods("POST", "OPTIONS")
+	sub.HandleFunc("/forge/delete", gw.handleDeleteAIForge).Methods("POST", "OPTIONS")
+	sub.HandleFunc("/forge/query", gw.handleQueryAIForge).Methods("POST", "OPTIONS")
+	sub.HandleFunc("/forge/get", gw.handleGetAIForge).Methods("POST", "OPTIONS")
+	sub.HandleFunc("/forge/export", gw.handleExportAIForge).Methods("POST", "OPTIONS")
+	sub.HandleFunc("/forge/import", gw.handleImportAIForge).Methods("POST", "OPTIONS")
+
 	sub.HandleFunc("/session", gw.handleCreateSession).Methods("POST", "OPTIONS")
+	sub.HandleFunc("/session/del", gw.handleDeleteSession).Methods("POST", "OPTIONS")
 	sub.HandleFunc("/session/all", gw.handleListAllSessions).Methods("GET", "OPTIONS")
 	sub.HandleFunc("/session/{run_id}/title", gw.handleUpdateSessionTitle).Methods("POST", "OPTIONS")
 

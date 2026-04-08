@@ -1,11 +1,14 @@
 package aihttp
 
 import (
+	"fmt"
 	"net/http"
 	"sort"
 
 	"github.com/gorilla/mux"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func (gw *AIAgentHTTPGateway) handleListAllSessions(w http.ResponseWriter, r *http.Request) {
@@ -90,4 +93,94 @@ func (gw *AIAgentHTTPGateway) handleUpdateSessionTitle(w http.ResponseWriter, r 
 		"title":  req.Title,
 		"status": "updated",
 	})
+}
+
+func (gw *AIAgentHTTPGateway) handleDeleteSession(w http.ResponseWriter, r *http.Request) {
+	if gw.yakClient == nil {
+		writeError(w, http.StatusServiceUnavailable, "grpc client is unavailable")
+		return
+	}
+
+	req, err := readOptionalDeleteAISessionRequest(r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if req == nil {
+		writeError(w, http.StatusBadRequest, "request body is empty")
+		return
+	}
+	if !req.GetDeleteAll() && !hasDeleteAISessionFilterCondition(req.GetFilter()) {
+		writeError(w, http.StatusBadRequest, "at least one delete filter condition is required")
+		return
+	}
+
+	gw.cancelAndRemoveDeletedSessions(req)
+
+	resp, err := gw.yakClient.DeleteAISession(r.Context(), req)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, "delete session failed: "+err.Error())
+		return
+	}
+
+	writeProtoJSON(w, http.StatusOK, resp)
+}
+
+func readOptionalDeleteAISessionRequest(r *http.Request) (*ypb.DeleteAISessionRequest, error) {
+	body, err := readOptionalRawBody(r)
+	if err != nil {
+		return nil, err
+	}
+	if len(body) == 0 {
+		return nil, nil
+	}
+
+	var req ypb.DeleteAISessionRequest
+	if err := readProtoJSONBytes(body, &req); err == nil {
+		return &req, nil
+	} else {
+		var filter ypb.DeleteAISessionFilter
+		if filterErr := readProtoJSONBytes(body, &filter); filterErr == nil {
+			return &ypb.DeleteAISessionRequest{Filter: &filter}, nil
+		} else {
+			return nil, fmt.Errorf("invalid request body: request=%v; filter=%v", err, filterErr)
+		}
+	}
+}
+
+func hasDeleteAISessionFilterCondition(filter *ypb.DeleteAISessionFilter) bool {
+	if filter == nil {
+		return false
+	}
+	return len(filter.GetSessionID()) > 0 || filter.GetAfterTimestamp() > 0 || filter.GetBeforeTimestamp() > 0
+}
+
+func (gw *AIAgentHTTPGateway) cancelAndRemoveDeletedSessions(req *ypb.DeleteAISessionRequest) {
+	if req == nil {
+		return
+	}
+
+	targets := make([]string, 0)
+	switch {
+	case req.GetDeleteAll():
+		for _, item := range gw.runManager.ListAll() {
+			targets = append(targets, item.RunID)
+		}
+	case req.GetFilter() != nil && (req.GetFilter().GetAfterTimestamp() > 0 || req.GetFilter().GetBeforeTimestamp() > 0):
+		db := consts.GetGormProjectDatabase()
+		if db != nil {
+			if sessionIDs, err := yakit.QueryAISessionIDsForDelete(db, req.GetFilter(), false); err == nil {
+				targets = append(targets, sessionIDs...)
+			}
+		}
+	default:
+		targets = append(targets, req.GetFilter().GetSessionID()...)
+	}
+
+	for _, sessionID := range targets {
+		if session, ok := gw.runManager.Get(sessionID); ok {
+			session.Cancel()
+			gw.runManager.Remove(sessionID)
+		}
+	}
 }

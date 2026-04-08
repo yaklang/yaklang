@@ -11,8 +11,9 @@
   - `/run/*`：运行时执行与事件流
   - `/session/*`：会话元数据与管理
   - `/setting/*`：聊天设置、模型 / Provider / Focus 选项
+  - `/forge/*`：AI Forge 管理与导入导出
 
-说明：本文仅覆盖当前对外提供的 `/run/*`、`/session/*`、`/setting/*` 三组 HTTP 接口；底层运行逻辑会桥接到 gRPC `StartAIReAct` 等能力。
+说明：本文仅覆盖当前对外提供的 `/run/*`、`/session/*`、`/setting/*`、`/forge/*` 四组 HTTP 接口；底层运行逻辑会桥接到 gRPC `StartAIReAct` 等能力。
 
 该网关支持：
 
@@ -80,38 +81,15 @@
 
 ## 4. 数据模型（面向前端）
 
-## 4.1 `AIParams`
+## 4.1 `CreateSessionRequest`
 
-用于 `POST /session` 的 `params` 字段。
+用于 `POST /session`。
 
-说明：运行时输入事件里的 `Params` 字段类型是 `ypb.AIStartParams`，不是这里的 `AIParams`。
-`AIParams` 是 `aihttp` 在“创建会话”阶段额外封装的一层 HTTP JSON 结构。
+说明：创建会话阶段只需要 `run_id`。运行时配置请通过 `POST /run/{run_id}` 的 `ypb.AIInputEvent.Params` 传入。
 
 ```json
 {
-  "forge_name": "optional",
-  "review_policy": "manual|auto|ai|ai-auto",
-  "ai_service": "openai|aibalance|...",
-  "ai_model_name": "model-name",
-  "max_iteration": 100,
-  "react_max_iteration": 100,
-  "disable_tool_use": false,
-  "use_default_ai": true,
-  "attached_files": ["/path/a", "/path/b"],
-  "enable_system_file_system_operator": true,
-  "disallow_require_for_user_prompt": true,
-  "ai_review_risk_control_score": 0.5,
-  "ai_call_auto_retry": 3,
-  "ai_transaction_retry": 5,
-  "enable_ai_search_tool": true,
-  "enable_ai_search_internet": false,
-  "enable_qwen_no_think_mode": false,
-  "allow_plan_user_interact": true,
-  "plan_user_interact_max_count": 3,
-  "timeline_item_limit": 100,
-  "timeline_content_size_limit": 20,
-  "user_interact_limit": 0,
-  "timeline_session_id": "optional"
+  "run_id": "optional-custom-id"
 }
 ```
 
@@ -325,6 +303,12 @@
 }
 ```
 
+### `POST /setting/providers/query`
+
+- 用途：分页查询 AI Provider
+- 请求体：透传 gRPC `QueryAIProvidersRequest`
+- 响应：透传 gRPC `QueryAIProvidersResponse`
+
 ### `POST /setting/aimodels/get`
 
 - 用途：根据 provider 配置获取模型列表
@@ -389,7 +373,61 @@
 
 ---
 
-## 5.2 会话类 API
+## 5.2 Forge 类 API
+
+### `POST /forge/create`
+
+- 用途：创建 AI Forge
+- 请求体：透传 gRPC `AIForge`
+- 响应：透传 gRPC `DbOperateMessage`
+
+### `POST /forge/update`
+
+- 用途：更新 AI Forge
+- 请求体：透传 gRPC `AIForge`
+- 响应：透传 gRPC `DbOperateMessage`
+
+### `POST /forge/delete`
+
+- 用途：删除 AI Forge
+- 请求体：透传 gRPC `AIForgeFilter`
+- 响应：透传 gRPC `DbOperateMessage`
+
+### `POST /forge/query`
+
+- 用途：分页查询 AI Forge
+- 请求体：透传 gRPC `QueryAIForgeRequest`
+- 响应：透传 gRPC `QueryAIForgeResponse`
+
+### `POST /forge/get`
+
+- 用途：按名称或 ID 获取单个 AI Forge
+- 请求体：透传 gRPC `GetAIForgeRequest`
+- 响应：透传 gRPC `AIForge`
+
+### `POST /forge/export`
+
+- 用途：导出一个或多个 AI Forge
+- 请求体：透传 gRPC `ExportAIForgeRequest`
+- 响应：SSE 流，逐条透传 gRPC `GeneralProgress`
+
+SSE 示例：
+
+```text
+data: {"Percent":0,"Message":"start export","MessageType":"info"}
+
+data: {"Percent":100,"Message":"export completed","MessageType":"success"}
+```
+
+### `POST /forge/import`
+
+- 用途：导入 AI Forge 压缩包
+- 请求体：透传 gRPC `ImportAIForgeRequest`
+- 响应：SSE 流，逐条透传 gRPC `GeneralProgress`
+
+---
+
+## 5.3 会话类 API
 
 ### `POST /session`
 
@@ -398,8 +436,7 @@
 
 ```json
 {
-  "run_id": "optional-custom-id",
-  "params": { "...AIParams" }
+  "run_id": "optional-custom-id"
 }
 ```
 
@@ -450,9 +487,41 @@
 }
 ```
 
+### `POST /session/del`
+
+- 用途：删除会话
+- 行为：会先取消内存中的运行，再透传调用 gRPC `DeleteAISession`
+- 请求：
+  - 必须从 body 传删除参数
+  - 支持直接透传 `DeleteAISessionRequest`
+  - 也兼容直接传 `DeleteAISessionFilter`
+- 示例：
+
+```json
+{
+  "Filter": {
+    "SessionID": ["uuid"],
+    "AfterTimestamp": 1700000000,
+    "BeforeTimestamp": 1800000000
+  },
+  "DeleteAll": false
+}
+```
+
+- 响应：
+
+```json
+{
+  "TableName": "ai_sessions_v1",
+  "Operation": "delete",
+  "EffectRows": 0,
+  "ExtraMessage": "deleted_sessions=1 deleted_runtimes=0 deleted_events=0"
+}
+```
+
 ---
 
-## 5.3 运行类 API
+## 5.4 运行类 API
 
 ### `POST /run/{run_id}`
 
