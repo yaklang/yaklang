@@ -23,29 +23,18 @@ func (gw *AIAgentHTTPGateway) handleCreateSession(w http.ResponseWriter, r *http
 		runID = uuid.NewString()
 	}
 
-	if exist, ok := gw.runManager.Get(runID); ok {
-		writeJSON(w, http.StatusOK, CreateSessionResponse{
-			RunID:  exist.RunID,
-			Status: exist.Status,
-		})
-		return
-	}
-
-	setting, err := gw.GetSettingFromDB()
+	session, created, err := gw.ensureReusableSession(runID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "load setting failed: "+err.Error())
 		return
 	}
-	session := gw.runManager.Create(runID, &ypb.AIInputEvent{
-		Params: cloneStartParams(mergeStartParams(nil, setting, runID), runID),
-	})
-	if db := gw.getDB(); db != nil {
-		if _, err := yakit.EnsureAISessionMeta(db, runID); err != nil {
-			log.Warnf("ensure ai session meta failed for %s: %v", runID, err)
-		}
+
+	statusCode := http.StatusCreated
+	if !created {
+		statusCode = http.StatusOK
 	}
 
-	writeJSON(w, http.StatusCreated, CreateSessionResponse{
+	writeJSON(w, statusCode, CreateSessionResponse{
 		RunID:  session.RunID,
 		Status: session.Status,
 	})
@@ -62,12 +51,6 @@ func (gw *AIAgentHTTPGateway) handleStreamInput(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	session, ok := gw.runManager.Get(runID)
-	if !ok {
-		writeError(w, http.StatusNotFound, "run not found: "+runID)
-		return
-	}
-
 	event, err := readAIInputEventRequest(r)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
@@ -76,6 +59,24 @@ func (gw *AIAgentHTTPGateway) handleStreamInput(w http.ResponseWriter, r *http.R
 
 	startOnly := allowStart && event.GetIsStart() && !hasInputPayload(event)
 
+	if !startOnly && !hasInputPayload(event) {
+		writeError(w, http.StatusBadRequest, "input event is empty")
+		return
+	}
+
+	session, ok := gw.runManager.Get(runID)
+	if !ok {
+		if !allowStart {
+			writeError(w, http.StatusNotFound, "run not found: "+runID)
+			return
+		}
+		session, _, err = gw.ensureReusableSession(runID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "load setting failed: "+err.Error())
+			return
+		}
+	}
+
 	if allowStart {
 		setting, err := gw.GetSettingFromDB()
 		if err != nil {
@@ -83,11 +84,6 @@ func (gw *AIAgentHTTPGateway) handleStreamInput(w http.ResponseWriter, r *http.R
 			return
 		}
 		session.StartParams = mergeStartInputEvent(event, mergeStartParams(event.GetParams(), setting, runID), runID)
-	}
-
-	if !startOnly && !hasInputPayload(event) {
-		writeError(w, http.StatusBadRequest, "input event is empty")
-		return
 	}
 
 	if allowStart && session.MarkStreamStarted() {
@@ -129,8 +125,39 @@ func (gw *AIAgentHTTPGateway) handleCancelRun(w http.ResponseWriter, r *http.Req
 	}
 
 	session.Cancel()
+	gw.runManager.Remove(runID)
 
 	writeProtoJSON(w, http.StatusOK, newResultOutputEvent(string(RunStatusCancelled)))
+}
+
+func (gw *AIAgentHTTPGateway) ensureReusableSession(runID string) (*RunSession, bool, error) {
+	if session, ok := gw.runManager.Get(runID); ok {
+		if session.ctx.Err() == nil {
+			return session, false, nil
+		}
+		gw.runManager.Remove(runID)
+	}
+
+	setting, err := gw.GetSettingFromDB()
+	if err != nil {
+		return nil, false, err
+	}
+
+	session, created := gw.runManager.GetOrCreate(runID, func() *RunSession {
+		return NewRunSession(gw.runManager.ctx, runID, &ypb.AIInputEvent{
+			Params: cloneStartParams(mergeStartParams(nil, setting, runID), runID),
+		})
+	})
+
+	if created {
+		if db := gw.getDB(); db != nil {
+			if _, err := yakit.EnsureAISessionMeta(db, runID); err != nil {
+				log.Warnf("ensure ai session meta failed for %s: %v", runID, err)
+			}
+		}
+	}
+
+	return session, created, nil
 }
 
 func mergeStartParams(req *ypb.AIStartParams, defaults aiAgentChatSettingPayload, runID string) *ypb.AIStartParams {

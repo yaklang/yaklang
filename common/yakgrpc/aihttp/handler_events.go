@@ -29,9 +29,9 @@ func (gw *AIAgentHTTPGateway) handleQueryAIEvent(w http.ResponseWriter, r *http.
 func (gw *AIAgentHTTPGateway) handleSSEEvents(w http.ResponseWriter, r *http.Request) {
 	runID := mux.Vars(r)["run_id"]
 
-	session, ok := gw.runManager.Get(runID)
-	if !ok {
-		writeError(w, http.StatusNotFound, "run not found: "+runID)
+	session, _, err := gw.ensureReusableSession(runID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "load setting failed: "+err.Error())
 		return
 	}
 
@@ -60,13 +60,6 @@ func (gw *AIAgentHTTPGateway) handleSSEEvents(w http.ResponseWriter, r *http.Req
 
 	if err := writeProtoSSEData(w, newSystemOutputEvent("listener_ready")); err != nil {
 		log.Errorf("marshal listener_ready event: %v", err)
-		return
-	}
-
-	if session.Status == RunStatusCompleted || session.Status == RunStatusFailed || session.Status == RunStatusCancelled {
-		if err := writeProtoSSEData(w, buildTerminalRunEvent(session.Status, session.Error)); err != nil {
-			log.Errorf("marshal terminal event: %v", err)
-		}
 		return
 	}
 

@@ -110,6 +110,5 @@ func printStartupInfo(c *cli.Context, gw *aihttp.AIAgentHTTPGateway) {
 		fmt.Printf("  Current:   %s\n", code)
 	}
 
-	fmt.Printf("  Web UI:  http://%s/\n", gw.GetAddr())
 	fmt.Println()
 }

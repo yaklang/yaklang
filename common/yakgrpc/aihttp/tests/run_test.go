@@ -19,14 +19,14 @@ func TestGetRunNotFound(t *testing.T) {
 	require.Equal(t, http.StatusMethodNotAllowed, w.Code)
 }
 
-func TestRunNotFound(t *testing.T) {
+func TestRunAutoCreateWhenMissing(t *testing.T) {
 	gw := newTestGateway(t)
 
-	body, _ := json.Marshal(&ypb.AIInputEvent{IsFreeInput: true, FreeInput: "hello"})
+	body, _ := json.Marshal(&ypb.AIInputEvent{IsStart: true})
 	req := httptest.NewRequest("POST", "/agent/run/nonexistent-id", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := performRequest(gw, req)
-	require.Equal(t, http.StatusNotFound, w.Code)
+	require.Equal(t, http.StatusOK, w.Code)
 }
 
 func TestPushEventNotFound(t *testing.T) {

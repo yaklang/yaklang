@@ -155,6 +155,19 @@ func (rm *RunManager) Create(runID string, startParams *ypb.AIInputEvent) *RunSe
 	return session
 }
 
+func (rm *RunManager) GetOrCreate(runID string, factory func() *RunSession) (*RunSession, bool) {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+
+	if session, ok := rm.sessions[runID]; ok {
+		return session, false
+	}
+
+	session := factory()
+	rm.sessions[session.RunID] = session
+	return session, true
+}
+
 func (rm *RunManager) Get(runID string) (*RunSession, bool) {
 	rm.mu.RLock()
 	defer rm.mu.RUnlock()

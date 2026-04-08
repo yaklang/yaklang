@@ -91,6 +91,22 @@ func TestHandleCancelRunRespondsWithAIOutputEvent(t *testing.T) {
 	require.True(t, resp.GetIsSystem())
 	require.True(t, resp.GetIsResult())
 	require.NotZero(t, resp.GetTimestamp())
+	_, ok := gw.runManager.Get(runID)
+	require.False(t, ok)
+}
+
+func TestEnsureReusableSessionRecreatesCancelledSession(t *testing.T) {
+	gw := newInternalTestGateway(t)
+	runID := "run-recreate-after-cancel"
+
+	original := gw.runManager.Create(runID, nil)
+	original.Cancel()
+
+	recreated, created, err := gw.ensureReusableSession(runID)
+	require.NoError(t, err)
+	require.True(t, created)
+	require.NotSame(t, original, recreated)
+	require.NoError(t, recreated.ctx.Err())
 }
 
 func TestHandleSSEEventsRespondsWithAIOutputEvent(t *testing.T) {
