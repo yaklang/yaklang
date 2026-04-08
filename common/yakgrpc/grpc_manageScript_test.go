@@ -479,6 +479,8 @@ func TestSaveYakScript_RejectDuplicateScriptNameOnCreateAndUpdate(t *testing.T) 
 			Help:       "should-not-create",
 		})
 		require.Error(t, err)
+		require.Contains(t, err.Error(), "保存失败：插件名")
+		require.Contains(t, err.Error(), existingName)
 	})
 
 	t.Run("update_should_fail_when_renaming_to_existing_script_name", func(t *testing.T) {
@@ -490,6 +492,8 @@ func TestSaveYakScript_RejectDuplicateScriptNameOnCreateAndUpdate(t *testing.T) 
 			Help:       "should-not-update",
 		})
 		require.Error(t, err)
+		require.Contains(t, err.Error(), "保存失败：插件名")
+		require.Contains(t, err.Error(), existingName)
 
 		stillExisting, getErr := yakit.GetYakScript(db, int64(existing.ID))
 		require.NoError(t, getErr)
