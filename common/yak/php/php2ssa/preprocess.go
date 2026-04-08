@@ -18,7 +18,7 @@ import (
 //	}
 //
 // It is intentionally narrow:
-// - only one `namespace` keyword token is allowed
+// - only one declaration-like `namespace` keyword token is allowed
 // - the namespace must use the semicolon form
 // - the first token after the namespace semicolon must be `use`
 func rewriteSingleSemicolonNamespaceUseBlock(src string) (string, bool) {
@@ -45,6 +45,12 @@ func rewriteSingleSemicolonNamespaceUseBlock(src string) (string, bool) {
 	for i, tok := range tokens {
 		if tok.GetTokenType() != phpparser.PHPLexerNamespace {
 			continue
+		}
+		if i > 0 {
+			switch tokens[i-1].GetTokenType() {
+			case phpparser.PHPLexerObjectOperator, phpparser.PHPLexerNullsafeObjectOperator, phpparser.PHPLexerDoubleColon:
+				continue
+			}
 		}
 		if namespaceIndex >= 0 {
 			return src, false

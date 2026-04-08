@@ -281,6 +281,7 @@ func (y *builder) VisitClassStatement(raw phpparser.IClassStatementContext, clas
 				value = y.EmitUndefined(name)
 			}
 			if isStatic {
+				value.SetVerboseName(fmt.Sprintf("%s.%s", class.Name, name))
 				class.RegisterStaticMember(name, value)
 				variable := y.GetStaticMember(class, name)
 				y.AssignVariable(variable, value)
@@ -546,28 +547,34 @@ func (y *builder) VisitClassConstant(raw phpparser.IClassConstantContext) ssa.Va
 
 	var (
 		blueprint *ssa.Blueprint
+		display   string
 		key       string
 	)
 
 	switch {
 	case i.Parent_() != nil:
+		display = "parent"
 		if y.MarkedThisClassBlueprint != nil {
 			blueprint = y.MarkedThisClassBlueprint.GetSuperBlueprint()
 		}
 	case i.Class() != nil:
+		display = "self"
 		blueprint = y.MarkedThisClassBlueprint
 	case i.QualifiedStaticTypeRef() != nil:
+		display = strings.TrimPrefix(i.QualifiedStaticTypeRef().GetText(), `\`)
 		blueprint = y.VisitQualifiedStaticTypeRef(i.QualifiedStaticTypeRef())
 	case len(i.AllKeyedVariable()) > 0:
 		receiver := y.VisitKeyedVariable(i.KeyedVariable(0))
+		display = yakunquote.TryUnquote(strings.TrimPrefix(receiver.String(), "$"))
 		if bp, ok := ssa.ToClassBluePrintType(receiver.GetType()); ok {
 			blueprint = bp
-		} else if bp := y.GetBluePrint(receiver.String()); bp != nil {
+		} else if bp := y.findBlueprint(display); bp != nil {
 			blueprint = bp
 		}
 	case i.String_() != nil:
 		className := yakunquote.TryUnquote(i.String_().GetText())
-		if bp := y.GetBluePrint(className); bp != nil {
+		display = className
+		if bp := y.findBlueprint(className); bp != nil {
 			blueprint = bp
 		}
 	}
@@ -589,24 +596,37 @@ func (y *builder) VisitClassConstant(raw phpparser.IClassConstantContext) ssa.Va
 		}
 	}
 
-	if blueprint == nil || key == "" {
+	if blueprint != nil {
+		blueprint.Build()
+		if display == "" {
+			display = blueprint.Name
+		}
+	}
+
+	if key == "" {
 		return y.EmitUndefined(i.GetText())
 	}
+	if blueprint != nil {
+		member := y.GetStaticMember(blueprint, key)
+		if value := y.PeekValueByVariable(member); !utils.IsNil(value) {
+			return value
+		}
+		if method := blueprint.GetStaticMethod(key); !utils.IsNil(method) {
+			return method
+		}
+		if member := blueprint.GetConstMember(key); !utils.IsNil(member) {
+			return member
+		}
+	}
 
-	member := y.GetStaticMember(blueprint, key)
-	if value := y.PeekValueByVariable(member); !utils.IsNil(value) {
-		return value
+	if display == "" {
+		return y.EmitUndefined(i.GetText())
 	}
-	if method := blueprint.GetStaticMethod(key); !utils.IsNil(method) {
-		return method
+	classValue := y.EmitUndefined(display)
+	if blueprint != nil {
+		classValue.SetType(blueprint)
 	}
-	if member := blueprint.GetConstMember(key); !utils.IsNil(member) {
-		return member
-	}
-
-	undefined := y.EmitUndefined(i.GetText())
-	blueprint.RegisterStaticMember(key, undefined)
-	return undefined
+	return y.ReadMemberCallValue(classValue, y.EmitConstInstPlaceholder(key))
 }
 
 func (y *builder) VisitStaticClass(raw phpparser.IStaticClassContext) *ssa.Blueprint {
@@ -644,6 +664,11 @@ func (y *builder) VisitStaticClass(raw phpparser.IStaticClassContext) *ssa.Bluep
 			if blueprint != nil {
 				return blueprint
 			}
+			if app := y.GetProgram().GetApplication(); app != nil {
+				if blueprint = app.GetBluePrint(className); blueprint != nil {
+					return blueprint
+				}
+			}
 			blueprint = y.CreateBlueprint(className)
 			return blueprint
 		}
@@ -655,14 +680,49 @@ func (y *builder) VisitStaticClass(raw phpparser.IStaticClassContext) *ssa.Bluep
 		if bp, ok := ssa.ToClassBluePrintType(value.GetType()); ok {
 			return bp
 		}
-		if bp := y.GetBluePrint(value.String()); bp != nil {
+		if bp := y.findBlueprint(value.String()); bp != nil {
 			return bp
 		}
 	}
 	if className != "" {
-		return y.GetBluePrint(className)
+		return y.findBlueprint(className)
 	}
 	return nil
+}
+
+func (y *builder) findBlueprint(name string) *ssa.Blueprint {
+	if y == nil || name == "" {
+		return nil
+	}
+	if bp := y.GetBluePrint(name); bp != nil {
+		return bp
+	}
+	prog := y.GetProgram()
+	if prog == nil {
+		return nil
+	}
+	if bp := prog.GetBluePrint(name); bp != nil {
+		return bp
+	}
+	app := prog.GetApplication()
+	if app == nil {
+		return nil
+	}
+	if bp := app.GetBluePrint(name); bp != nil {
+		return bp
+	}
+	var found *ssa.Blueprint
+	app.UpStream.ForEach(func(_ string, lib *ssa.Program) bool {
+		if lib == nil {
+			return true
+		}
+		if bp := lib.GetBluePrint(name); bp != nil {
+			found = bp
+			return false
+		}
+		return true
+	})
+	return found
 }
 
 func (y *builder) VisitStaticClassExprFunctionMember(raw phpparser.IStaticClassExprFunctionMemberContext) (*ssa.Blueprint, string) {
@@ -676,7 +736,14 @@ func (y *builder) VisitStaticClassExprFunctionMember(raw phpparser.IStaticClassE
 		return nil, "'"
 	}
 
-	key := i.MemberCallKey().GetText()
+	key := ""
+	if memberKey := i.MemberCallKey(); memberKey != nil {
+		if value := y.VisitMemberCallKey(memberKey); !utils.IsNil(value) {
+			key = strings.TrimPrefix(value.String(), "$")
+		} else {
+			key = strings.TrimPrefix(yakunquote.TryUnquote(memberKey.GetText()), "$")
+		}
+	}
 	if i.StaticClass().GetText() == "self" {
 		return y.MarkedThisClassBlueprint, key
 	}
@@ -711,9 +778,13 @@ func (y *builder) VisitStaticClassExpr(raw phpparser.IStaticClassExprContext) ss
 	if i, ok := raw.(*phpparser.StaticClassExprContext); ok {
 		if i.StaticClassExprFunctionMember() != nil {
 			if bluePrint, key := y.VisitStaticClassExprFunctionMember(i.StaticClassExprFunctionMember()); bluePrint != nil {
+				bluePrint.Build()
 				member := y.GetStaticMember(bluePrint, key)
 				if value := y.PeekValueByVariable(member); !utils.IsNil(value) {
 					return value
+				}
+				if member := bluePrint.GetStaticMember(key); !utils.IsNil(member) {
+					return member
 				}
 				if method := bluePrint.GetStaticMethod(key); !utils.IsNil(method) {
 					return method
@@ -727,6 +798,7 @@ func (y *builder) VisitStaticClassExpr(raw phpparser.IStaticClassExprContext) ss
 		}
 		if i.StaticClassExprVariableMember() != nil {
 			if bluePrint, key := y.VisitStaticClassExprVariableMember(i.StaticClassExprVariableMember()); bluePrint != nil {
+				bluePrint.Build()
 				variable := y.GetStaticMember(bluePrint, key)
 				if val := y.PeekValueByVariable(variable); !utils.IsNil(val) {
 					return val

@@ -185,17 +185,31 @@ func (y *builder) VisitQualifiedStaticTypeRef(raw phpparser.IQualifiedStaticType
 	if i == nil {
 		return nil
 	}
+	switch strings.ToLower(strings.TrimSpace(raw.GetText())) {
+	case "self", "static":
+		if y.MarkedThisClassBlueprint != nil {
+			return y.MarkedThisClassBlueprint
+		}
+	case "parent":
+		if y.MarkedThisClassBlueprint != nil {
+			return y.MarkedThisClassBlueprint.GetSuperBlueprint()
+		}
+	}
 	if i.QualifiedNamespaceName() != nil {
 		path, name := y.VisitQualifiedNamespaceName(i.QualifiedNamespaceName())
 		if library, _ := y.GetProgram().GetLibrary(strings.Join(path, ".")); !utils.IsNil(library) {
 			if cls := library.GetBluePrint(name); cls != nil {
 				return cls
 			}
-		} else {
-			if bluePrint := y.GetProgram().GetBluePrint(name); !utils.IsNil(bluePrint) {
-				return bluePrint
-			}
 		}
+		if bluePrint := y.findBlueprint(name); !utils.IsNil(bluePrint) {
+			return bluePrint
+		}
+		bluePrint := y.CreateBlueprint(name, raw)
+		if len(path) > 0 && !(len(path) == 1 && path[0] == name) {
+			bluePrint.SetFullTypeNames(path)
+		}
+		return bluePrint
 	}
 	log.Warnf("classBlue print not found: %s", raw.GetText())
 	return y.CreateBlueprint(yakunquote.TryUnquote(raw.GetText()), raw)

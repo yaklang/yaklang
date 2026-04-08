@@ -79,10 +79,9 @@ scriptText
 // PHP
 
 phpBlock
-    : importStatement* namespaceDeclarationSemi (PHPEnd | PHPEndSingleLineComment)?
-    | importStatement* namespaceDeclaration+ (PHPEnd | PHPEndSingleLineComment)?
-    | importStatement* (
+    : importStatement* (
         useDeclaration
+        | namespaceDeclaration
         | functionDeclaration
         | classDeclaration
         | globalConstantDeclaration
@@ -118,17 +117,19 @@ namespacePath
     ;
 
 namespaceDeclaration
-    : Namespace OpenCurlyBracket namespaceDeclarationBody CloseCurlyBracket
-    | Namespace namespacePath OpenCurlyBracket namespaceDeclarationBody CloseCurlyBracket
+    : Namespace (
+        namespacePath? OpenCurlyBracket namespaceStatement* CloseCurlyBracket
+        | namespacePath SemiColon namespaceStatement*
+    )
     ;
 
 namespaceDeclarationSemi
-    : Namespace namespacePath SemiColon {p.GetTokenStream().LA(1) == PHPParserUse}? namespaceUseDeclarations namespaceStatement*
-    | Namespace namespacePath SemiColon namespaceStatement*
+    : Namespace namespacePath SemiColon namespaceStatement*
     ;
 
 namespaceStatement
-    : functionDeclaration
+    : useDeclaration
+    | functionDeclaration
     | classDeclaration
     | globalConstantDeclaration
     | enumDeclaration
@@ -136,12 +137,11 @@ namespaceStatement
     ;
 
 namespaceDeclarationBody
-    : {p.GetTokenStream().LA(1) == PHPParserUse}? namespaceUseDeclarations namespaceStatement*
-    | namespaceStatement*
+    : namespaceStatement*
     ;
 
 namespaceUseDeclarations
-    : useDeclaration ({p.GetTokenStream().LA(1) == PHPParserUse}? namespaceUseDeclarations)?
+    : useDeclaration+
     ;
 
 functionDeclaration

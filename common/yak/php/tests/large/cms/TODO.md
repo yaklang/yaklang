@@ -2,6 +2,9 @@
 
 - `src__Assets__Asset.php`
   - Current status: AST is correct, but isolated parse still lands around `1m04s`.
+- `src__Fields__Blueprint.php`
+  - Current status: AST is correct, but isolated parse still lands around `1m34.69s`.
+  - Why deferred: this fixture is about `23.7KB`, above the `20KB` large-fixture threshold, and the current hotspot is the arrow-function form used in `resetFieldsCache()`.
 - `src__Fieldtypes__Bard.php`
   - Current status: AST is correct, but isolated parse still lands around `53.20s`.
 - `src__Http__Controllers__CP__Collections__CollectionsController.php`
