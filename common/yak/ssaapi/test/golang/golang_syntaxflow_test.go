@@ -3,6 +3,7 @@ package ssaapi
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -301,4 +302,33 @@ $param #{
 			ssaapi.WithLanguage(ssaconfig.GO),
 		)
 	})
+}
+
+func TestSyntaxFlow_OsReadDirArg_NotExtern(t *testing.T) {
+	code := `package main
+
+import "os"
+
+func f(path string) {
+	_, _ = os.ReadDir(path)
+}
+`
+
+	// 验证：$path 捕获 ReadDir 实参对应的 SSA 形式参数（Parameter-path），且非 extern。
+	rule := `
+os?{<fullTypeName()>?{have: "os"}} as $os
+$os.ReadDir(* as $path)
+`
+
+	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+		res, err := prog.SyntaxFlowWithError(rule, ssaapi.QueryWithEnableDebug())
+		require.NoError(t, err)
+		paths := res.GetValues("path")
+		require.NotEmpty(t, paths)
+		for _, v := range paths {
+			require.Contains(t, v.String(), "Parameter-path", "ReadDir arg should be formal param path")
+			require.False(t, v.IsExtern(), "os.ReadDir arg should not be extern: %s", v.String())
+		}
+		return nil
+	}, ssaapi.WithLanguage(ssaconfig.GO))
 }
