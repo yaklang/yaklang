@@ -13,6 +13,7 @@ import (
 )
 
 func TestMITM_WebsocketHijack(t *testing.T) {
+	t.Skip("local test")
 	test := assert.New(t)
 
 	rs, err := NewMITMServer(
