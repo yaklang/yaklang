@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -16,6 +17,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -51,6 +53,7 @@ type testAIModelClient struct {
 	bodyPreview []byte
 	chatErr     error
 	noToolCall  bool
+	onChat      func()
 }
 
 func (c *testAIModelClient) LoadOption(opts ...aispec.AIConfigOption) {
@@ -72,6 +75,9 @@ func (c *testAIModelClient) GetConfig() *aispec.AIConfig {
 func (c *testAIModelClient) Chat(prompt string, _ ...any) (string, error) {
 	if c.config == nil {
 		return "", utils.Error("config is nil")
+	}
+	if c.onChat != nil {
+		c.onChat()
 	}
 
 	time.Sleep(20 * time.Millisecond)
@@ -225,6 +231,60 @@ func TestGRPC_Ai_Config_Health_Check_RequiresParsableCallToolAction(t *testing.T
 	assert.Equal(t, int32(200), rsp.GetResponseStatusCode())
 	assert.False(t, rsp.GetSuccess())
 	assert.Contains(t, rsp.GetErrorMessage(), "parse call-tool action")
+}
+
+func TestExecuteAIConfigHealthCheck_DoesNotFallbackToOtherProviders(t *testing.T) {
+	const badProviderType = "grpc-ai-health-check-bad-provider"
+	const goodProviderType = "grpc-ai-health-check-good-provider"
+
+	var badCalls int
+	var goodCalls int
+
+	aispec.Register(badProviderType, func() aispec.AIClient {
+		return &testAIModelClient{
+			chatErr:     errors.New("bad provider failed"),
+			rawRequest:  []byte("POST /v1/chat/completions HTTP/1.1\r\nHost: bad.local\r\n\r\n"),
+			rawResponse: []byte("HTTP/1.1 500 Internal Server Error\r\n\r\n"),
+			bodyPreview: []byte(`{"error":"bad provider failed"}`),
+			onChat: func() {
+				badCalls++
+			},
+		}
+	})
+	aispec.Register(goodProviderType, func() aispec.AIClient {
+		return &testAIModelClient{
+			response: `{"@action":"call-tool","tool":"` + aiHealthCheckToolName + `","identifier":"health_check","params":{"content":"ping","summary":"ok"}}`,
+			onChat: func() {
+				goodCalls++
+			},
+		}
+	})
+
+	originalNetworkConfig := yakit.GetNetworkConfig()
+	backupPriority := append([]string(nil), originalNetworkConfig.GetAiApiPriority()...)
+	defer func() {
+		restored := yakit.GetNetworkConfig()
+		restored.AiApiPriority = backupPriority
+		yakit.ConfigureNetWork(restored)
+	}()
+
+	cfg := yakit.GetNetworkConfig()
+	cfg.AiApiPriority = []string{goodProviderType, badProviderType}
+	yakit.ConfigureNetWork(cfg)
+
+	resp := executeAIConfigHealthCheck(context.Background(), &ypb.ThirdPartyApplicationConfig{
+		Type:   badProviderType,
+		APIKey: "test-key",
+		ExtraParams: []*ypb.KVPair{
+			{Key: "model", Value: "mock-model"},
+		},
+	}, "ping")
+
+	require.NotNil(t, resp)
+	assert.False(t, resp.GetSuccess())
+	assert.Contains(t, resp.GetErrorMessage(), "bad provider failed")
+	assert.Equal(t, 1, badCalls)
+	assert.Equal(t, 0, goodCalls)
 }
 
 func TestSanitizeAIConfigHealthCheckResponse_EscapesInvalidUTF8(t *testing.T) {

@@ -46,11 +46,12 @@ type AIConfig struct {
 	Host    string
 	Port    int
 
-	StreamHandler       func(io.Reader)
-	ReasonStreamHandler func(reader io.Reader)
-	Type                string `json:"Type"`
-	PreferredTier       consts.ModelTier
-	Context             context.Context
+	StreamHandler           func(io.Reader)
+	ReasonStreamHandler     func(reader io.Reader)
+	Type                    string `json:"Type"`
+	PreferredTier           consts.ModelTier
+	DisableProviderFallback bool
+	Context                 context.Context
 
 	FunctionCallRetryTimes int
 
@@ -569,6 +570,12 @@ func WithType(t string) AIConfigOption {
 func WithPreferredTier(tier consts.ModelTier) AIConfigOption {
 	return func(config *AIConfig) {
 		config.PreferredTier = tier
+	}
+}
+
+func WithDisableProviderFallback(disable bool) AIConfigOption {
+	return func(config *AIConfig) {
+		config.DisableProviderFallback = disable
 	}
 }
 
