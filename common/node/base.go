@@ -40,6 +40,8 @@ type NodeBase struct {
 
 	sessionMu sync.RWMutex
 	session   SessionState
+
+	instanceLock *nodeInstanceLock
 }
 
 // NewNodeBase creates a node with session transport.
@@ -49,6 +51,10 @@ func NewNodeBase(cfg BaseConfig) (*NodeBase, error) {
 		return nil, err
 	}
 	transport, err := buildSessionTransport(normalized)
+	if err != nil {
+		return nil, err
+	}
+	instanceLock, err := acquireNodeInstanceLock(normalized.NodeID)
 	if err != nil {
 		return nil, err
 	}
@@ -72,6 +78,7 @@ func NewNodeBase(cfg BaseConfig) (*NodeBase, error) {
 		tickerInterval:    normalized.TickerInterval,
 		tickerFuncs:       new(sync.Map),
 		isRegistered:      abool.NewBool(false),
+		instanceLock:      instanceLock,
 	}
 	return node, nil
 }
@@ -89,7 +96,27 @@ func (n *NodeBase) Serve() {
 }
 
 func (n *NodeBase) Shutdown() {
+	defer n.releaseInstanceLock()
+
+	session, ok := n.currentSession()
+
 	n.cancel()
+	n.clearSession()
+	if !ok {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), n.requestTimeout)
+	defer cancel()
+
+	err := n.transport.Shutdown(ctx, session, ShutdownRequest{
+		ObservedAt: time.Now().UTC(),
+	})
+	if err != nil && !errors.Is(err, context.Canceled) {
+		log.Errorf("shutdown node session failed: node_id=%s session_id=%s err=%v", n.NodeId, session.SessionID, err)
+		return
+	}
+	log.Infof("node session ended: node_id=%s session_id=%s", n.NodeId, session.SessionID)
 }
 
 func (n *NodeBase) startDaemon() {
@@ -130,7 +157,7 @@ func (n *NodeBase) runDaemonLoop() {
 			return
 		case <-heartbeatTicker.C:
 			if err := n.heartbeat(); err != nil {
-				log.Errorf("heartbeat failed, rebuilding session: %v", err)
+				n.logHeartbeatFailure(err)
 				n.clearSession()
 				if err := n.ensureSession(); err != nil {
 					if !errors.Is(err, context.Canceled) {
@@ -155,4 +182,36 @@ func (n *NodeBase) GetToken() string {
 
 func (n *NodeBase) GetRootContext() context.Context {
 	return n.rootCtx
+}
+
+func (n *NodeBase) releaseInstanceLock() {
+	if n == nil || n.instanceLock == nil {
+		return
+	}
+
+	if err := n.instanceLock.Release(); err != nil {
+		log.Errorf("release node instance lock failed: node_id=%s err=%v", n.NodeId, err)
+	}
+	n.instanceLock = nil
+}
+
+func (n *NodeBase) logHeartbeatFailure(err error) {
+	session, _ := n.currentSession()
+	if IsSessionInactiveTransportError(err) {
+		log.Errorf(
+			"heartbeat rejected because node session is no longer active: node_id=%s session_id=%s err=%v diagnosis=%q",
+			n.NodeId,
+			session.SessionID,
+			err,
+			"another process may be running with the same node_id and replaced this session",
+		)
+		return
+	}
+
+	log.Errorf(
+		"heartbeat failed, rebuilding session: node_id=%s session_id=%s err=%v",
+		n.NodeId,
+		session.SessionID,
+		err,
+	)
 }
