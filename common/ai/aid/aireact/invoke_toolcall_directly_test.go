@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
-	"regexp"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -72,23 +71,11 @@ func mockedDirectlyCallToolLegacyWrapped(i aicommon.AICallerConfigIf, req *aicom
 	return rsp, nil
 }
 
-func extractCacheToolNonce(prompt string) string {
-	re := regexp.MustCompile(`<\|CACHE_TOOL_CALL_([A-Za-z0-9]+)\s*>|<\|CACHE_TOOL_CALL_([A-Za-z0-9]+)\>`)
-	matches := re.FindStringSubmatch(prompt)
-	if len(matches) >= 3 {
-		if matches[1] != "" {
-			return matches[1]
-		}
-		return matches[2]
-	}
-	return ""
-}
-
 func mockedDirectlyCallToolWithAITag(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
 
 	if isPrimaryDecisionPrompt(prompt) {
-		nonce := extractCacheToolNonce(prompt)
+		nonce := extractPromptNonce(prompt, "CACHE_TOOL_CALL")
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "directly_call_tool", "directly_call_tool_name": "` + toolName + `", "directly_call_identifier": "run_script", "directly_call_expectations": "~0.1s, instant", "directly_call_tool_params": {"timeout": 20} },

@@ -3,7 +3,6 @@ package aireact
 import (
 	"bytes"
 	"fmt"
-	"regexp"
 	"strings"
 	"testing"
 
@@ -60,18 +59,7 @@ func TestReAct_AnswerWithKnowledge_FullFlow_AITAG_ANSWER(t *testing.T) {
 			if !utils.MatchAllOfSubString(prompt, token) {
 				return nil, utils.Errorf("knowledge token should not appear in the final answer prompt")
 			}
-			// extract aitag from prompt <|FINAL_ANSWER_(\w{4})|>
-			// INSERT_YOUR_CODE
-			// extract nonce from prompt using regex <|FINAL_ANSWER_(\w{4})|>
-			var aitagNonce string
-			nonceRe := regexp.MustCompile(`<\|FINAL_ANSWER_(\w{4})\|>`)
-			matches := nonceRe.FindStringSubmatch(prompt)
-			if len(matches) == 2 {
-				aitagNonce = matches[1]
-			} else {
-				aitagNonce = "" // Not found
-			}
-			// You can use aitagNonce below if needed
+			aitagNonce := mustExtractPromptNonce(t, prompt, "FINAL_ANSWER")
 
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`
