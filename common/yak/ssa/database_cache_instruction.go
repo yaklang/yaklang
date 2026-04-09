@@ -532,6 +532,20 @@ func instructionLocationIDs(inst Instruction) (funcID, blockID int64) {
 	if utils.IsNil(inst) {
 		return 0, 0
 	}
+	if inst.GetOpcode() == SSAOpcodeBasicBlock && inst.GetId() > 0 {
+		if lz, ok := ToLazyInstruction(inst); ok && lz != nil && lz.ir != nil {
+			return lz.ir.CurrentFunction, inst.GetId()
+		}
+		if inner := inst.getAnInstruction(); inner != nil {
+			funcID = inner.funcId
+		}
+		if funcID <= 0 {
+			if fn := inst.GetFunc(); fn != nil {
+				funcID = fn.GetId()
+			}
+		}
+		return funcID, inst.GetId()
+	}
 	if lz, ok := ToLazyInstruction(inst); ok && lz != nil && lz.ir != nil {
 		return lz.ir.CurrentFunction, lz.ir.CurrentBlock
 	}

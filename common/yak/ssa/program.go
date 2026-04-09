@@ -178,6 +178,9 @@ func cloneProgramConfig(base *ssaconfig.Config, programName string) *ssaconfig.C
 	if err != nil {
 		return ensureProgramConfig(base)
 	}
+	if base != nil {
+		ret.SetCompileProjectBytes(base.GetCompileProjectBytes())
+	}
 	return ret
 }
 func (prog *Program) IsVirtualImport() bool {
