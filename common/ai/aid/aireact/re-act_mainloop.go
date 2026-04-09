@@ -478,6 +478,7 @@ func (r *ReAct) ensureWorkDirectory(userInput string) {
 		if meta, err := yakit.GetAISessionMetaBySessionID(cfg.GetDB(), r.config.PersistentSessionId); err == nil {
 			if existing := strings.TrimSpace(meta.Title); existing != "" {
 				cfg.SetConfig("session_title", existing)
+				cfg.SetSessionTitle(existing)
 				cfg.SetConfig(sessionTitleGeneratedKey, true)
 				r.Emitter.EmitSessionTitle(existing)
 			}
@@ -521,11 +522,13 @@ func (r *ReAct) ensureWorkDirectory(userInput string) {
 		}
 		if updated {
 			cfg.SetConfig("session_title", sessionTitle)
+			cfg.SetSessionTitle(sessionTitle)
 			cfg.SetConfig(sessionTitleGeneratedKey, true)
 			r.Emitter.EmitSessionTitle(sessionTitle)
 		}
 	} else if sessionTitle != "" {
 		cfg.SetConfig("session_title", sessionTitle)
+		cfg.SetSessionTitle(sessionTitle)
 		cfg.SetConfig(sessionTitleGeneratedKey, true)
 		r.Emitter.EmitSessionTitle(sessionTitle)
 	}
@@ -598,6 +601,7 @@ func (r *ReAct) ensureSessionTitle(userInput string) {
 			}
 		}
 		cfg.SetConfig("session_title", sessionTitle)
+		r.config.SetSessionTitle(sessionTitle)
 		r.Emitter.EmitSessionTitle(sessionTitle)
 	}()
 }

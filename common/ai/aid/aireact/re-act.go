@@ -223,6 +223,7 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 			log.Warnf("ensure ai session meta failed for %s: %v", cfg.PersistentSessionId, err)
 		} else if meta != nil && strings.TrimSpace(meta.Title) != "" {
 			cfg.SetConfig("session_title", meta.Title)
+			cfg.SetSessionTitle(meta.Title)
 			cfg.SetConfig(sessionTitleGeneratedKey, true)
 			react.Emitter.EmitSessionTitle(meta.Title)
 		}

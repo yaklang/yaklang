@@ -140,10 +140,9 @@ type Config struct {
 	SeqIdProvider *utils.AtomicInt64IDProvider
 
 	// session id
-	PersistentSessionId  string
-	SessionTitle         string
-	PrevSessionUserInput string // last FreeInput restored from the previous persistent session round
-	UserInputHistory     []schema.AIAgentUserInputRecord
+	PersistentSessionId string
+	SessionTitle        string
+	SessionPromptState  *SessionPromptState
 
 	// memory triage id
 	MemoryTriageId string
@@ -481,6 +480,7 @@ func newConfig(ctx context.Context) *Config {
 		m:                                  new(sync.Mutex),
 		InitStatus:                         initStatus,
 		AiCallTokenLimit:                   40 * 1024, // Default to 40 k
+		SessionPromptState:                 NewSessionPromptState(),
 	}
 	config.AiToolManagerOption = append(config.AiToolManagerOption,
 		buildinaitools.WithNoToolsCache(),
@@ -553,6 +553,27 @@ func WithPersistentSessionId(sid string) ConfigOption {
 		}
 		c.m.Lock()
 		c.PersistentSessionId = sid
+		c.m.Unlock()
+		return nil
+	}
+}
+
+func WithSessionPromptState(state *SessionPromptState) ConfigOption {
+	return func(c *Config) error {
+		if state != nil {
+			c.SessionPromptState = state
+		}
+		return nil
+	}
+}
+
+func WithSessionTitle(title string) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		c.SessionTitle = title
 		c.m.Unlock()
 		return nil
 	}
@@ -2285,36 +2306,49 @@ func (c *Config) AcquireId() int64 {
 	return c.SeqIdProvider.NewID()
 }
 
-func (c *Config) GetUserInputHistory() []schema.AIAgentUserInputRecord {
-	if len(c.UserInputHistory) == 0 {
+func (c *Config) GetSessionPromptState() *SessionPromptState {
+	if c == nil {
 		return nil
 	}
-	history := make([]schema.AIAgentUserInputRecord, len(c.UserInputHistory))
-	copy(history, c.UserInputHistory)
-	return history
+	if c.SessionPromptState == nil {
+		c.SessionPromptState = NewSessionPromptState()
+	}
+	return c.SessionPromptState
+}
+
+func (c *Config) GetSessionTitle() string {
+	if c == nil {
+		return ""
+	}
+	return c.SessionTitle
+}
+
+func (c *Config) SetSessionTitle(title string) {
+	if c == nil {
+		return
+	}
+	if c.m == nil {
+		c.m = &sync.Mutex{}
+	}
+	c.m.Lock()
+	c.SessionTitle = title
+	c.m.Unlock()
+}
+
+func (c *Config) GetPrevSessionUserInput() string {
+	return c.GetSessionPromptState().GetPrevSessionUserInput()
+}
+
+func (c *Config) GetUserInputHistory() []schema.AIAgentUserInputRecord {
+	return c.GetSessionPromptState().GetUserInputHistory()
 }
 
 func (c *Config) SetUserInputHistory(history []schema.AIAgentUserInputRecord) {
-	if len(history) == 0 {
-		c.UserInputHistory = nil
-		c.PrevSessionUserInput = ""
-		return
-	}
-	cloned := make([]schema.AIAgentUserInputRecord, len(history))
-	copy(cloned, history)
-	c.UserInputHistory = cloned
-	c.PrevSessionUserInput = cloned[len(cloned)-1].UserInput
+	c.GetSessionPromptState().SetUserInputHistory(history)
 }
 
 func (c *Config) AppendUserInputHistory(userInput string, timestamp time.Time) (string, error) {
-	history := c.GetUserInputHistory()
-	history = append(history, schema.AIAgentUserInputRecord{
-		Round:     len(history) + 1,
-		Timestamp: timestamp,
-		UserInput: userInput,
-	})
-	c.SetUserInputHistory(history)
-	return schema.QuoteUserInputHistory(history)
+	return c.GetSessionPromptState().AppendUserInputHistory(userInput, timestamp)
 }
 
 func (c *Config) FormatUserInputHistory() string {
@@ -2697,7 +2731,7 @@ func (c *Config) restorePersistentSession() {
 	if history := runtime.GetUserInputHistory(); len(history) > 0 {
 		c.SetUserInputHistory(history)
 		log.Infof("restored %d user input history entries from session [%s], latest: %.80s",
-			len(history), c.PersistentSessionId, c.PrevSessionUserInput)
+			len(history), c.PersistentSessionId, c.GetPrevSessionUserInput())
 	}
 
 	// Restore recent-tool cache from previous session
@@ -2941,6 +2975,12 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 
 	if i.PersistentSessionId != "" {
 		opts = append(opts, WithPersistentSessionId(i.PersistentSessionId))
+	}
+	if i.SessionTitle != "" {
+		opts = append(opts, WithSessionTitle(i.SessionTitle))
+	}
+	if i.SessionPromptState != nil {
+		opts = append(opts, WithSessionPromptState(i.SessionPromptState))
 	}
 
 	if i.Seq > 0 {

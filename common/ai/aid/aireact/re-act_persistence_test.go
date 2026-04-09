@@ -513,7 +513,7 @@ func TestReAct_PersistentSession_FreeInput(t *testing.T) {
 	assert.Equal(t, 1, history2Before[0].Round)
 	assert.Equal(t, round1Input, history2Before[0].UserInput)
 	assert.False(t, history2Before[0].Timestamp.IsZero())
-	assert.Equal(t, round1Input, ins2.config.PrevSessionUserInput)
+	assert.Equal(t, round1Input, ins2.config.GetPrevSessionUserInput())
 
 	dynamic2 := ins2.promptManager.DynamicContext()
 	assert.Contains(t, dynamic2, "Session User Input History")
@@ -540,7 +540,7 @@ func TestReAct_PersistentSession_FreeInput(t *testing.T) {
 	assert.Equal(t, 2, history3[1].Round)
 	assert.Equal(t, round2Input, history3[1].UserInput)
 	assert.False(t, history3[1].Timestamp.IsZero())
-	assert.Equal(t, round2Input, ins3.config.PrevSessionUserInput)
+	assert.Equal(t, round2Input, ins3.config.GetPrevSessionUserInput())
 
 	dynamic3 := ins3.promptManager.DynamicContext()
 	assert.Contains(t, dynamic3, "Session User Input History")
