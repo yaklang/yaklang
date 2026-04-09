@@ -397,7 +397,7 @@ jobs:
           - name: "Test MustPass - full yak scripts"
             test_configs: |
               [
-                {"package": "./common/yak/yaktest/mustpass", "timeout": "5m"}
+                {"package": "./common/yak/yaktest/mustpass", "timeout": "5m"},
                 {"package": ".common/crep/...", "timeout": "5m"}
               ]
 
