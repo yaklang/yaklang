@@ -1,0 +1,39 @@
+desc(
+	title: "Detect Golang Beego ORM Filter Injection Risk"
+	title_zh: "检测Golang Beego ORM动态过滤查询风险"
+	type: audit
+	level: high
+	risk: "SQL注入"
+	rule_id: "2ed31e6b-e189-47c9-9907-477b7b6257d1"
+	solution: <<<SOLUTION
+### 修复建议
+1. 不要直接把外部输入拼接进 ORM 过滤值或动态查询片段。
+2. 对标识符、路径片段、ID 等输入先做严格的类型或格式校验，再传入查询。
+3. 能使用精确匹配时不要使用动态 `contains`/模糊条件拼接。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-89](https://cwe.mitre.org/data/definitions/89.html)
+REFERENCE
+)
+
+orm?{<fullTypeName>?{have: 'github.com/beego/beego/v2/client/orm'}} as $orm;
+$orm.NewOrm() as $db;
+orm.NewOrm() as $db;
+$db.QueryTable() as $qs;
+*.QueryTable() as $qs;
+
+*.Filter(*<slice(index=1)> #{
+	until: `*?{opcode:add}`,
+}-> as $highDirect);
+*.Filter(*<slice(index=2)> #{
+	until: `*?{opcode:add}`,
+}-> as $highDirect);
+*.Filter(*<slice(index=1)> #{
+	until: `*?{have: ".Sprintf"}`,
+}-> as $highFmtDirect);
+*.Filter(*<slice(index=2)> #{
+	until: `*?{have: ".Sprintf"}`,
+}-> as $highFmtDirect);
+
+alert $highDirect
+alert $highFmtDirect

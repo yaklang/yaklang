@@ -1,0 +1,46 @@
+desc(
+	title: "Detect Goldmark Attribute Or Title Rendering XSS"
+	title_zh: "检测Goldmark属性或标题渲染中的XSS风险"
+	type: audit
+	level: high
+	risk: "跨站脚本（XSS）"
+	rule_id: "89ad5372-f73b-47a7-81fe-0fd80a57532a"
+	solution: <<<SOLUTION
+### 修复建议
+1. 在把 Markdown AST 的 `Title`、原始文本或属性值写入 HTML 属性前做 HTML 转义。
+2. 对进入 `Writer.Write` / `RawWrite` 的动态标题和属性值优先使用 `util.EscapeHTML` 等安全 API。
+3. 对 renderer fallback 路径和自定义 hook 路径分别加回归测试，避免修复只覆盖一个分支。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-79](https://cwe.mitre.org/data/definitions/79.html)
+REFERENCE
+)
+
+util.EscapeHTML(* as $safe);
+html.EscapeString(* as $safe);
+
+*.Writer.Write(*<slice(index=2)> as $param);
+*.Writer.RawWrite(*<slice(index=2)> as $param);
+
+$param #{
+	include: `*?{have: ".Title"}`,
+	exclude: `* & $safe`,
+	exclude: `*?{have: ".EscapeHTML"}`,
+	exclude: `*?{have: ".EscapeString"}`,
+}-> as $high;
+
+alert $high for {
+	type: "vuln",
+	level: "high",
+	name: "high",
+	title: "Markdown Attribute Value Written To HTML Without Escaping",
+	title_zh: "检测到未转义写入HTML的Markdown属性值",
+	message: "Markdown AST 的标题或属性值直接进入 HTML writer，未看到显式转义，存在属性型 XSS 风险。",
+	risk: "跨站脚本（XSS）",
+	desc: <<<DESC
+该规则用于检测 Goldmark/Hugo 一类 Markdown renderer 中，把 `n.Title` 等属性值直接写入 HTML writer 的模式。若这些值来自可控 Markdown 内容且未经过属性上下文转义，容易形成 XSS。
+DESC
+	solution: <<<SOLUTION
+将写入 HTML 属性或标签上下文的动态值先交给 `util.EscapeHTML`、`html.EscapeString` 或等价安全 API，再进入 writer。
+SOLUTION
+}
