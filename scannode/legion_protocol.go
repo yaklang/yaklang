@@ -15,6 +15,7 @@ const (
 	legionEventAsset            = "job.asset"
 	legionEventRisk             = "job.risk"
 	legionEventReport           = "job.report"
+	legionEventArtifactReady    = "job.artifact_ready"
 	legionEventSucceeded        = "job.succeeded"
 	legionEventFailed           = "job.failed"
 	legionEventCancelled        = "job.cancelled"
@@ -24,6 +25,7 @@ const (
 
 	legionAssetKindTCPOpenPort        = "tcp_open_port"
 	legionAssetKindServiceFingerprint = "service_fingerprint"
+	legionArtifactKindSSAResultV1     = "ssa_result_v1"
 
 	legionRiskKindVulnerability = "vulnerability"
 	legionRiskKindWeakPassword  = "weak_password"
