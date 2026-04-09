@@ -69,3 +69,4 @@ common/yak/ssa2llvm/runtime/embed/ssa2llvm-runtime/
 
 # local build artifacts
 /ssa2llvm
+.serena/
