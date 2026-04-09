@@ -1,0 +1,118 @@
+desc(
+	title: "Audit Spring PATCH Read-only Field Exposure"
+	title_zh: "审计Spring PATCH只读字段暴露"
+	type: vuln
+	risk: "动态属性绑定"
+	desc: <<<DESC
+### 漏洞描述
+本规则检测 Spring 风格 PATCH / JSON Patch 处理链中，只按 property-level writability 判定字段可写性，或在构造 patch converter 时未提供额外 bind context 的实现。
+
+这类实现可能让本应隐藏、忽略或后端只读的字段仍然进入 PATCH 路径绑定或对象合并流程，导致意外字段暴露或可修改性扩大。
+DESC
+	rule_id: "cec2f27b-d32d-45c2-8253-fe4883be49da"
+	solution: <<<SOLUTION
+### 修复建议
+- 对 PATCH 可写字段使用 field-level / exposure-aware 判定，而不是仅凭 property writability。
+- 在 JSON Patch 路径绑定时传入明确的 bind context，确保隐藏字段和忽略字段不会被遍历。
+- 对后端只读、忽略、隐藏字段建立统一的 PATCH 过滤逻辑。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-915: Improperly Controlled Modification of Dynamically-Determined Object Attributes](https://cwe.mitre.org/data/definitions/915.html)
+REFERENCE
+)
+
+.isWritableProperty(* as $fieldNameArg) as $propertyWritableCheck;
+JsonPatchPatchConverter(*<slice(index=1)> as $patchMapper) as $patchConverterCtor;
+JsonPatchPatchConverter(*<slice(index=2)> as $patchContext) as $patchConverterCtor;
+
+$patchConverterCtor - $patchContext as $converterWithoutContext;
+$propertyWritableCheck + $converterWithoutContext as $risk;
+
+alert $risk for {
+	title: "Audit Spring PATCH Read-only Field Exposure",
+	title_zh: "审计Spring PATCH只读字段暴露",
+	level: "middle",
+	message: "发现 PATCH / JSON Patch 处理链使用 property-level writability 判定或缺少 bind context，需复核只读/隐藏字段是否可能被暴露或修改。",
+	risk: "动态属性绑定",
+	name: "risk",
+	desc: <<<DESC
+### 规则说明
+本规则用于识别 PATCH 字段过滤和路径绑定中，两类容易导致隐藏字段暴露的实现：
+
+- `mappedProperties.isWritableProperty(fieldName)` 这类仅按 property-level 判定字段可写性的逻辑
+- `new JsonPatchPatchConverter(mapper)` 这类未显式传入 bind context 的 JSON Patch converter 构造
+
+它们都意味着 PATCH 路径与字段暴露边界可能不一致。
+DESC
+	solution: <<<SOLUTION
+### 审计建议
+- 检查隐藏字段、`@JsonIgnoreProperties`、后端只读字段是否会被 PATCH/merge patch 路径覆盖。
+- 对 JSON Patch converter 和路径绑定器统一引入可见性/可写性上下文。
+- 对 PATCH 字段过滤逻辑做 field-level 审计，而不是只依赖通用 property 写入能力。
+SOLUTION
+}
+
+desc(
+	lang: java
+	alert_min: 1
+	'file://risk-property-check.java': <<<CODE
+package risk.property;
+
+class DomainObjectReaderRisk {
+    void merge(MappedProperties mappedProperties, String fieldName) {
+        if (!mappedProperties.isWritableProperty(fieldName)) {
+            return;
+        }
+    }
+}
+
+interface MappedProperties {
+    boolean isWritableProperty(String fieldName);
+}
+CODE
+	'file://risk-patch-converter.java': <<<CODE
+package risk.patch;
+
+class JsonPatchHandlerRisk {
+    Object convert(ObjectMapper mapper, Object source) {
+        return new JsonPatchPatchConverter(mapper).convert(source);
+    }
+}
+
+class JsonPatchPatchConverter {
+    JsonPatchPatchConverter(ObjectMapper mapper) {}
+    Object convert(Object source) { return source; }
+}
+
+interface ObjectMapper {}
+CODE
+	'safefile://safe.java': <<<CODE
+package safe.patch;
+
+class DomainObjectReaderSafe {
+    void merge(MappedProperties mappedProperties, String fieldName) {
+        if (!mappedProperties.isWritableField(fieldName)) {
+            return;
+        }
+    }
+}
+
+class JsonPatchHandlerSafe {
+    Object convert(ObjectMapper mapper, Object source, BindContext context) {
+        return new JsonPatchPatchConverter(mapper, context).convert(source);
+    }
+}
+
+interface MappedProperties {
+    boolean isWritableField(String fieldName);
+}
+
+class JsonPatchPatchConverter {
+    JsonPatchPatchConverter(ObjectMapper mapper, BindContext context) {}
+    Object convert(Object source) { return source; }
+}
+
+interface ObjectMapper {}
+interface BindContext {}
+CODE
+)

@@ -1,0 +1,101 @@
+desc(
+	title: "Detect JPA LIKE Parameter Without Escape"
+	title_zh: "检测JPA LIKE参数未转义"
+	type: vuln
+	risk: "查询语义越界"
+	desc: <<<DESC
+### 漏洞描述
+本规则检测 JPA 派生查询参数预处理逻辑中，直接把用户值拼进 `LIKE` 模式串而不做 wildcard 转义的实现。
+
+常见危险形态包括：
+- `String.format("%s%%", value.toString())`
+- `String.format("%%%s", value.toString())`
+- `String.format("%%%s%%", value.toString())`
+
+如果 `%`、`_` 等通配符没有先被 escape，攻击者就可能扩大查询范围，得到超出预期的数据。
+DESC
+	rule_id: "30bb70aa-8f37-4fff-a979-db2a84bf63af"
+	solution: <<<SOLUTION
+### 修复建议
+- 在拼装 `LIKE` 参数前先对输入执行 escape 逻辑。
+- 将 escape 字符统一放入查询基础设施，不要在各个派生查询分支里直接拼 `%`。
+- 对 `STARTING_WITH` / `ENDING_WITH` / `CONTAINING` 这类模式统一复用同一套 escape 实现。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-89: Improper Neutralization of Special Elements used in an SQL Command](https://cwe.mitre.org/data/definitions/89.html)
+REFERENCE
+)
+
+String.format("%s%%", *<slice(index=1)> as $startingArg) as $wildcardFormat;
+String.format("%%%s", *<slice(index=1)> as $endingArg) as $wildcardFormat;
+String.format("%%%s%%", *<slice(index=1)> as $containingArg) as $wildcardFormat;
+escape(* as $escapeArg) as $escapeCall;
+
+$wildcardFormat<getFunc> as $formatFunc;
+$escapeCall<getFunc> as $escapeFunc;
+
+$formatFunc?{<name>?{have:'prepare'}} as $prepareFunc;
+$prepareFunc - $escapeFunc as $unguardedFunc;
+$wildcardFormat?{<getFunc> & $unguardedFunc} as $risk;
+
+alert $risk for {
+	title: "Detect JPA LIKE Parameter Without Escape",
+	title_zh: "检测JPA LIKE参数未转义",
+	level: "middle",
+	message: "发现 JPA LIKE 参数直接拼接 wildcard 与用户值，且当前函数内未看到显式的 escape 调用。",
+	risk: "查询语义越界",
+	name: "risk",
+	desc: <<<DESC
+### 规则说明
+本规则用于审计派生查询参数准备逻辑中，直接构造 `%value%` / `value%` / `%value` 形式 `LIKE` 参数的实现。
+
+如果同一函数内没有看到类似 `escape.escape(...)` 的转义步骤，输入中的 wildcard 就可能改变原始查询语义。
+DESC
+	solution: <<<SOLUTION
+### 审计建议
+- 将 `LIKE` 参数拼接与 wildcard escape 封装为统一方法。
+- 不要直接对原始 `value.toString()` 做 `String.format("%%%s%%", ...)`。
+- 对通配符语义做最小暴露，必要时按业务白名单限制。
+SOLUTION
+}
+
+desc(
+	lang: java
+	alert_min: 1
+	'file://risk.java': <<<CODE
+class ParameterMetadataProviderRisk {
+    Object prepare(Object value, String type) {
+        switch (type) {
+            case "STARTING_WITH":
+                return String.format("%s%%", value.toString());
+            case "ENDING_WITH":
+                return String.format("%%%s", value.toString());
+            case "CONTAINING":
+                return String.format("%%%s%%", value.toString());
+            default:
+                return value;
+        }
+    }
+}
+CODE
+	'safefile://safe.java': <<<CODE
+class ParameterMetadataProviderSafe {
+    Object prepare(Object value, String type, Escape escape) {
+        switch (type) {
+            case "STARTING_WITH":
+                return String.format("%s%%", escape.escape(value.toString()));
+            case "ENDING_WITH":
+                return String.format("%%%s", escape.escape(value.toString()));
+            case "CONTAINING":
+                return String.format("%%%s%%", escape.escape(value.toString()));
+            default:
+                return value;
+        }
+    }
+}
+
+interface Escape {
+    String escape(String value);
+}
+CODE
+)

@@ -1,0 +1,96 @@
+desc(
+	title: "Detect JPA Dynamic ORDER BY Sort Property Injection"
+	title_zh: "检测JPA动态ORDER BY排序属性注入"
+	type: vuln
+	risk: "SQL注入"
+	desc: <<<DESC
+### 漏洞描述
+本规则检测 JPA / JPQL 查询构造中，将 `Sort.Order.getProperty()` 返回值直接拼入 `ORDER BY` 子句的代码模式。
+
+如果排序属性来自外部调用者，而查询构造逻辑只做字符串拼接、不做白名单校验或危险字符拒绝，就可能允许函数调用、表达式片段或其他 JPQL 片段进入最终查询。
+
+这类问题常见于框架级查询工具方法、Repository 字符串查询增强逻辑以及动态排序辅助函数中。
+DESC
+	rule_id: "53917c3a-c468-4090-ac9d-dcf87a706769"
+	solution: <<<SOLUTION
+### 修复建议
+- 对排序字段建立白名单，不要直接信任 `Sort.Order.getProperty()` 的原始值。
+- 对函数调用、括号、空白和标点等危险模式做显式拒绝。
+- 如果确有需要暴露函数排序能力，应单独走受控白名单接口，而不是默认开放任意表达式。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-89: Improper Neutralization of Special Elements used in an SQL Command](https://cwe.mitre.org/data/definitions/89.html)
+REFERENCE
+)
+
+.getProperty?{<getObject><typeName>?{have:'org.springframework.data.domain.Sort.Order' || have:'Order'}}() as $sortProperty;
+String.format(*?{have:'%s.%s' || have:'%s %s'} as $formatArg) as $formatCall;
+checkSortExpression(* as $guardArg) as $guardCall;
+
+$sortProperty<getFunc> as $sortFunc;
+$formatCall<getFunc> as $formatFunc;
+$guardCall<getFunc> as $guardFunc;
+
+$sortFunc?{<self> & $formatFunc} as $candidateFunc;
+$candidateFunc - $guardFunc as $unguardedFunc;
+$sortProperty?{<getFunc> & $unguardedFunc} as $risk;
+
+alert $risk for {
+	title: "Detect JPA Dynamic ORDER BY Sort Property Injection",
+	title_zh: "检测JPA动态ORDER BY排序属性注入",
+	level: "middle",
+	message: "发现排序属性直接参与 JPA / JPQL ORDER BY 子句拼接，且当前函数内未看到显式的排序表达式校验。",
+	risk: "SQL注入",
+	name: "risk",
+	desc: <<<DESC
+### 规则说明
+本规则用于审计 `Sort.Order.getProperty()` 返回值直接参与 `String.format("%s.%s", ...)`、`String.format("%s %s", ...)` 这类 ORDER BY 子句构造的实现。
+
+如果同一函数内没有看到类似 `checkSortExpression(order)` 的显式校验，这通常意味着调用者可控的排序字段可能直接进入 JPQL / HQL 字符串。
+DESC
+	solution: <<<SOLUTION
+### 审计建议
+- 检查排序字段是否只允许固定实体属性名，而不是任意表达式。
+- 对括号、函数名、空白、标点等危险模式做显式拒绝。
+- 对字符串查询上的动态排序能力单独分级，不要默认继承通用排序接口。
+SOLUTION
+}
+
+desc(
+	lang: java
+	alert_min: 1
+	'file://risk.java': <<<CODE
+class QueryUtilsRisk {
+    String getOrderClause(Order order, String alias) {
+        String property = order.getProperty();
+        boolean qualifyReference = !property.contains("(");
+        String reference = qualifyReference ? String.format("%s.%s", alias, property) : property;
+        return String.format("%s %s", reference, order.getDirection());
+    }
+}
+
+interface Order {
+    String getProperty();
+    String getDirection();
+}
+CODE
+	'safefile://safe.java': <<<CODE
+class QueryUtilsSafe {
+    String getOrderClause(Order order, String alias) {
+        String property = order.getProperty();
+        checkSortExpression(order);
+        boolean qualifyReference = !property.contains("(");
+        String reference = qualifyReference ? String.format("%s.%s", alias, property) : property;
+        return String.format("%s %s", reference, order.getDirection());
+    }
+
+    void checkSortExpression(Order order) {
+    }
+}
+
+interface Order {
+    String getProperty();
+    String getDirection();
+}
+CODE
+)

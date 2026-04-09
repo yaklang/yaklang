@@ -1,0 +1,101 @@
+desc(
+	title: "Detect Recursive Property-Path Parsing Without Depth Limit"
+	title_zh: "检测递归属性路径解析缺少深度限制"
+	type: audit
+	risk: "拒绝服务"
+	desc: <<<DESC
+### 规则说明
+当代码使用递归方式解析属性路径或字段链，并结合 camel-case / 分段拆分不断重试更深层路径时，如果没有明确的深度上限，攻击者可以构造超长路径触发 CPU 或内存耗尽。
+
+本规则关注的通用模式是：
+- 递归 `create(...)` / parser helper
+- 同函数内存在 `Pattern.compile(...)` + `matcher(...)` 的路径拆分逻辑
+- 缺少基于 `base.size()` / 深度计数器的显式上限保护
+DESC
+	rule_id: "9bd8356a-bdf5-4a74-b0d8-a22a7e5199b9"
+	solution: <<<SOLUTION
+### 修复建议
+- 为递归属性路径解析增加明确的深度上限。
+- 对外部输入的属性路径长度和分段数量同时做限制。
+- 对 parser fallback / retry 路径设置 fail-fast 保护，避免无限深度或过深递归。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-400: Uncontrolled Resource Consumption](https://cwe.mitre.org/data/definitions/400.html)
+REFERENCE
+)
+
+Pattern.compile(* as $splitPattern) as $patternCall;
+matcher(* as $matcherSource) as $matcherCall;
+create(*, *, *, * as $recursiveBase) as $recursiveCall;
+size() as $depthSizeCall;
+IllegalArgumentException(* as $depthGuardThrow);
+
+$recursiveCall<getFunc>?{<name>?{have:'create'}} as $recursiveFunc;
+$patternCall<getFunc> as $patternFunc;
+$matcherCall<getFunc> as $matcherFunc;
+$depthSizeCall<getFunc> as $sizeFunc;
+$depthGuardThrow<getFunc> as $throwFunc;
+
+$recursiveFunc & $patternFunc & $matcherFunc as $candidateFunc;
+$sizeFunc & $throwFunc as $guardedFunc;
+$candidateFunc - $guardedFunc as $unguardedFunc;
+$recursiveCall?{<getFunc> & $unguardedFunc} as $risk;
+
+alert $risk for {
+	title: "Detect Recursive Property-Path Parsing Without Depth Limit",
+	title_zh: "检测递归属性路径解析缺少深度限制",
+	level: "middle",
+	message: "发现递归属性路径解析依赖路径拆分重试但缺少深度上限，可能导致拒绝服务。",
+	risk: "拒绝服务",
+	name: "risk",
+	desc: <<<DESC
+### 规则说明
+当代码使用递归方式解析属性路径或字段链，并结合 camel-case / 分段拆分不断重试更深层路径时，如果没有明确的深度上限，攻击者可以构造超长路径触发 CPU 或内存耗尽。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 为递归属性路径解析增加明确的深度上限。
+- 对外部输入的属性路径长度和分段数量同时做限制。
+- 对 parser fallback / retry 路径设置 fail-fast 保护，避免无限深度或过深递归。
+SOLUTION
+}
+
+desc(
+	lang: java
+	alert_min: 1
+	'file://unsafe-property-path-depth.java': <<<CODE
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+class PropertyPathParser {
+    static Object create(String source, Object type, String addTail, List<Object> base) {
+        Pattern pattern = Pattern.compile("\\p{Lu}+\\p{Ll}*$");
+        Matcher matcher = pattern.matcher(source);
+        if (matcher.find()) {
+            return create("head", type, "tail" + addTail, base);
+        }
+        return source;
+    }
+}
+CODE
+	'safefile://safe-property-path-depth.java': <<<CODE
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+class PropertyPathParser {
+    static Object create(String source, Object type, String addTail, List<Object> base) {
+        if (base.size() > 1000) {
+            throw new IllegalArgumentException("depth exceeded");
+        }
+        Pattern pattern = Pattern.compile("\\p{Lu}+\\p{Ll}*$");
+        Matcher matcher = pattern.matcher(source);
+        if (matcher.find()) {
+            return create("head", type, "tail" + addTail, base);
+        }
+        return source;
+    }
+}
+CODE
+)

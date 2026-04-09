@@ -1,0 +1,129 @@
+desc(
+	title: "Audit Native Header-Derived Spring Expression Parsing"
+	title_zh: "审计Native Header派生的Spring表达式解析"
+	type: audit
+	risk: "表达式注入"
+	desc: <<<DESC
+### 规则说明
+当代码先从 STOMP Native Header 或其它消息元数据中取出运行时字符串，再将其交给 Spring Expression 解析器执行 `parseExpression(...)` 时，后续如果配合宽松的求值上下文，就可能演变成表达式注入或消息路由层的远程代码执行。
+
+本规则聚焦的通用模式是：
+- `getFirstNativeHeader(...) -> parseExpression(...)`
+
+它不绑定具体项目或 CVE，只标记“native header / message metadata 派生字符串被当作 Spring 表达式解析”的高风险实现路径。
+DESC
+	rule_id: "bfed985c-f5af-4bf5-a7bf-4fdbf87dbb8c"
+	solution: <<<SOLUTION
+### 审计建议
+- 不要直接把消息头里的字符串当作 Spring 表达式解析。
+- 如果业务确实需要表达式能力，使用受限的 `SimpleEvaluationContext`，并对允许的语法、属性、方法做白名单限制。
+- 对 selector、filter、routing 这类头字段优先使用固定语法或枚举配置，而不是开放式 SpEL。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-94: Improper Control of Generation of Code](https://cwe.mitre.org/data/definitions/94.html)
+REFERENCE
+)
+
+getFirstNativeHeader(*, * as $headerExprSource);
+
+ExpressionParser?{<typeName>?{have:'org.springframework.expression'}}.parseExpression(* as $parseArg);
+SpelExpressionParser?{<typeName>?{have:'org.springframework.expression.spel'}}.parseExpression(* as $parseArg);
+
+$headerExprSource<getFunc> as $headerFunc;
+$parseArg<getFunc>?{<name>?{!have:'getExpression' && !have:'parseExpression'}} as $parseFunc;
+$headerFunc & $parseFunc as $riskFunc;
+$parseArg?{<getFunc> & $riskFunc} as $risk;
+
+alert $risk for {
+	title: "Audit Native Header-Derived Spring Expression Parsing",
+	title_zh: "审计Native Header派生的Spring表达式解析",
+	level: "middle",
+	message: "发现 native header 或消息元数据派生的字符串进入 Spring parseExpression(...)，需复核是否存在表达式注入或宽松求值上下文。",
+	risk: "表达式注入",
+	name: "risk",
+	desc: <<<DESC
+### 规则说明
+当代码先从 STOMP Native Header 或其它消息元数据中取出运行时字符串，再将其交给 Spring Expression 解析器执行 `parseExpression(...)` 时，后续如果配合宽松的求值上下文，就可能演变成表达式注入或消息路由层的远程代码执行。
+
+本规则聚焦的通用模式是：
+- `getFirstNativeHeader(...) -> parseExpression(...)`
+DESC
+	solution: <<<SOLUTION
+### 审计建议
+- 不要直接把消息头里的字符串当作 Spring 表达式解析。
+- 如果业务确实需要表达式能力，使用受限的 `SimpleEvaluationContext`，并对允许的语法、属性、方法做白名单限制。
+- 对 selector、filter、routing 这类头字段优先使用固定语法或枚举配置，而不是开放式 SpEL。
+SOLUTION
+}
+
+desc(
+	lang: java
+	alert_min: 2
+	'file://native-selector-expression.java': <<<CODE
+import org.springframework.expression.Expression;
+import org.springframework.expression.spel.standard.SpelExpressionParser;
+
+class MessageHeaders {
+}
+
+class NativeMessageHeaderAccessor {
+    static String getFirstNativeHeader(String name, MessageHeaders headers) {
+        return null;
+    }
+}
+
+class SelectorExpressionRegistry {
+    private final SpelExpressionParser expressionParser = new SpelExpressionParser();
+
+    Expression bad(MessageHeaders headers, String selectorHeaderName) {
+        String selector = NativeMessageHeaderAccessor.getFirstNativeHeader(selectorHeaderName, headers);
+        return this.expressionParser.parseExpression(selector);
+    }
+}
+CODE
+	'file://native-selector-forwarding.java': <<<CODE
+import org.springframework.expression.Expression;
+import org.springframework.expression.ExpressionParser;
+import org.springframework.expression.spel.standard.SpelExpressionParser;
+
+class MessageHeaders {
+}
+
+class NativeMessageHeaderAccessor {
+    static String getFirstNativeHeader(String name, MessageHeaders headers) {
+        return null;
+    }
+}
+
+class NativeHeaderExpressionController {
+    private final ExpressionParser parser = new SpelExpressionParser();
+
+    Expression bad(MessageHeaders headers, String selectorHeaderName) {
+        String expression = NativeMessageHeaderAccessor.getFirstNativeHeader(selectorHeaderName, headers);
+        return this.parser.parseExpression(expression);
+    }
+}
+CODE
+	"safefile://fixed-expression.java": <<<CODE
+import org.springframework.expression.Expression;
+import org.springframework.expression.spel.standard.SpelExpressionParser;
+
+class FixedExpressionRegistry {
+    private final SpelExpressionParser expressionParser = new SpelExpressionParser();
+
+    Expression safe() {
+        return this.expressionParser.parseExpression("headers.foo == 'bar'");
+    }
+}
+CODE
+	"safefile://header-read-without-parse.java": <<<CODE
+class MessageHeaders {
+}
+
+class HeaderReadOnly {
+    String safe(MessageHeaders headers) {
+        return null;
+    }
+}
+CODE
+)

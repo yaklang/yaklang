@@ -1,0 +1,70 @@
+desc(
+	title: "Audit XMLBeam Projector Unsafe XML Input"
+	title_zh: "审计XMLBeam投影器不安全XML输入"
+	type: audit
+	risk: "XML外部实体（XXE）"
+	desc: <<<DESC
+### 规则说明
+本规则用于审计 XMLBeam `XBProjector` 直接对不可信 XML 输入流执行投影读取的实现。
+
+当应用直接使用 `XBProjector.io().stream(...).read(...)` 处理外部请求体，而没有显式安全配置或隔离时，底层 XML 解析可能受到外部实体、DTD 或其他危险 XML 特性的影响。
+DESC
+	rule_id: "8ee44f15-e05f-4b54-9cf1-5a9a4cdc7c0a"
+	solution: <<<SOLUTION
+### 审计建议
+- 不要直接将外部 XML 请求体交给默认配置的 XMLBeam 投影器。
+- 确认 XMLBeam 底层解析器已显式禁用外部实体和危险 DTD 特性。
+- 对 XML 投影输入增加可信源约束、白名单或独立安全解析层。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-611: Improper Restriction of XML External Entity Reference](https://cwe.mitre.org/data/definitions/611.html)
+REFERENCE
+)
+
+XBProjector?{<typeName>?{have:'org.xmlbeam.XBProjector'}} as $projector;
+$projector.io().stream(* as $xmlStream).read(* as $projectionType) as $xmlbeamRead;
+
+alert $xmlbeamRead for {
+	title: "Audit XMLBeam Projector Unsafe XML Input",
+	title_zh: "审计XMLBeam投影器不安全XML输入",
+	level: "middle",
+	message: "发现 XMLBeam 投影器直接读取外部 XML 输入流，需复核底层 XML 解析安全配置是否足以防止 XXE。",
+	risk: "XML外部实体（XXE）",
+	name: "xmlbeamRead",
+	desc: <<<DESC
+### 规则说明
+本规则用于审计 XMLBeam `XBProjector` 直接对不可信 XML 输入流执行投影读取的实现。
+
+当应用直接使用 `XBProjector.io().stream(...).read(...)` 处理外部请求体，而没有显式安全配置或隔离时，底层 XML 解析可能受到外部实体、DTD 或其他危险 XML 特性的影响。
+DESC
+	solution: <<<SOLUTION
+### 审计建议
+- 不要直接将外部 XML 请求体交给默认配置的 XMLBeam 投影器。
+- 确认 XMLBeam 底层解析器已显式禁用外部实体和危险 DTD 特性。
+- 对 XML 投影输入增加可信源约束、白名单或独立安全解析层。
+SOLUTION
+}
+
+desc(
+	lang: java
+	alert_min: 1
+	'file://xmlbeam-projector-unsafe.java': <<<CODE
+import java.io.InputStream;
+import org.xmlbeam.XBProjector;
+
+class XmlBeamProjectorUnsafe {
+    private final XBProjector projectionFactory = new XBProjector();
+
+    Object bad(InputStream body, Class<?> clazz) {
+        return projectionFactory.io().stream(body).read(clazz);
+    }
+}
+CODE
+	"safefile://xmlbeam-projector-safe.java": <<<CODE
+class XmlBeamProjectorSafe {
+    Object safe(String body) {
+        return body;
+    }
+}
+CODE
+)

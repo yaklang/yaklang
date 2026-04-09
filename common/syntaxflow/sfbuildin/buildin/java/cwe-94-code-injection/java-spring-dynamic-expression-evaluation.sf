@@ -12,7 +12,7 @@ desc(
 - `pathToExpression(dynamicPath)`
 - `evaluateExpression(dynamicExpr)`
 
-它不依赖具体 CVE 或项目名，而是直接识别“动态表达式/路径进入 Spring 表达式求值”的代码模式。
+它不依赖具体 CVE 或项目名，而是直接识别“方法实参中的运行时参数进入 Spring 表达式求值”的代码模式。
 DESC
 	rule_id: "a4a0c7a9-2cbb-4e57-8ea2-78d2e7845f41"
 	solution: <<<SOLUTION
@@ -27,17 +27,11 @@ SOLUTION
 REFERENCE
 )
 
-parseExpression(,* as $parseExprArg);
-pathToExpression(,* as $pathExprArg);
-evaluateExpression(,* as $evalExprArg);
-*?{<typeName>?{have:'org.springframework.expression.Expression'}}.setValue(,* as $exprSetArg) as $exprSetCall;
-*?{<typeName>?{have:'org.springframework.expression.Expression'}}.getValue(,* as $exprGetArg) as $exprGetCall;
+parseExpression(*<slice(start=1)>?{opcode:param && !have:this} as $dynamicParseExpr);
+pathToExpression(*?{opcode:param && !have:this} as $dynamicPathExpr);
+evaluateExpression(*?{opcode:param && !have:this} as $dynamicEvalExpr);
 
-$parseExprArg?{!opcode: const} as $dynamicParseExpr;
-$pathExprArg?{!opcode: const} as $dynamicPathExpr;
-$evalExprArg?{!opcode: const} as $dynamicEvalExpr;
-
-$dynamicParseExpr + $dynamicPathExpr + $dynamicEvalExpr + $exprSetCall + $exprGetCall as $risk;
+$dynamicParseExpr + $dynamicPathExpr + $dynamicEvalExpr as $risk;
 
 alert $risk for {
 	title: "Detect Dynamic Spring Expression Evaluation",
@@ -54,6 +48,8 @@ alert $risk for {
 - `parseExpression(dynamicExpr)`
 - `pathToExpression(dynamicPath)`
 - `evaluateExpression(dynamicExpr)`
+
+并且这些动态表达式/路径必须直接来自方法实参，而不是解析器对象本身、静态注解或固定模板。
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
@@ -94,6 +90,25 @@ class DynamicPatchPathExpression {
 
     void apply(Object target, Object value) {
         this.spelExpression.setValue(target, value);
+    }
+}
+CODE
+	"safefile://annotation-expression.java": <<<CODE
+import java.lang.reflect.Method;
+import org.springframework.expression.ExpressionParser;
+import org.springframework.expression.spel.standard.SpelExpressionParser;
+
+class ValueAnnotation {
+    String value() {
+        return "#{target.name}";
+    }
+}
+
+class AnnotationBackedExpression {
+    Object safe(Method method) {
+        ExpressionParser parser = new SpelExpressionParser();
+        ValueAnnotation value = new ValueAnnotation();
+        return parser.parseExpression(value.value()).getValue(method);
     }
 }
 CODE
