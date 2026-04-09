@@ -50,8 +50,15 @@ func buildMidtermRecallQuery(react *ReAct) string {
 		return ""
 	}
 
-	parts := make([]string, 0, 6)
+	parts := make([]string, 0, 12)
 	if task := react.GetCurrentTask(); task != nil {
+		parts = append(parts,
+			task.GetIndex(),
+			task.GetName(),
+			task.GetOriginUserInput(),
+			task.GetUserInput(),
+			task.GetSummary(),
+		)
 		parts = append(parts, task.GetUserInput())
 		if info := task.GetTaskRetrievalInfo(); info != nil {
 			parts = append(parts, info.Target)
