@@ -190,7 +190,7 @@ func TestGRPCMUSTPASS_HybridScan_new(t *testing.T) {
 }
 
 func TestGRPCMUSTPASS_HybridScan_HTTPFlow_At_Least(t *testing.T) {
-	scriptName, clearFunc, err := yakit.CreateTemporaryYakScriptEx("mitm", "")
+	scriptName, clearFunc, err := yakit.CreateAndClearTemporaryYakScript("mitm", "")
 	require.NoError(t, err)
 	defer clearFunc()
 	target := utils.HostPort(utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\nContent-Length: 12\r\n\r\nHello, World!")))
@@ -329,7 +329,7 @@ mirrorHTTPFlow = func(isHttps , url , req , rsp , body) {
 func TestGRPCMUSTPASS_HybridScan_HttpflowID(t *testing.T) {
 	token := utils.RandSecret(10)
 	checkString := ksuid.New().String()
-	scriptName, clearFunc, err := yakit.CreateTemporaryYakScriptEx("mitm", fmt.Sprintf(`
+	scriptName, clearFunc, err := yakit.CreateAndClearTemporaryYakScript("mitm", fmt.Sprintf(`
 mirrorHTTPFlow = func(isHttps , url , req , rsp , body) { 
 	dump(req)
 	if str.Contains(string(req),"%s"){

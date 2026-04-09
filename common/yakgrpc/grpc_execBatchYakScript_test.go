@@ -24,7 +24,7 @@ func TestGRPCMUSTPASS_LANGUAGE_EXEC_YAK_SCRIPT(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	name, clearFunc, err := yakit.CreateTemporaryYakScriptEx("nuclei", `id: CNVD-2020-46552
+	name, clearFunc, err := yakit.CreateAndClearTemporaryYakScript("nuclei", `id: CNVD-2020-46552
 
 info:
   name: Sangfor EDR - Remote Code Execution
@@ -82,7 +82,7 @@ func TestGRPCMUSTPASS_LANGUAGE_NesureProxyValidInExecBatchYakScript(t *testing.T
 	if err != nil {
 		panic(err)
 	}
-	name, clearFunc, err := yakit.CreateTemporaryYakScriptEx("mitm", `
+	name, clearFunc, err := yakit.CreateAndClearTemporaryYakScript("mitm", `
 mirrorHTTPFlow = func(isHttps, url , req , rsp , body ) {
     	poc.HTTP(req,poc.https(isHttps),poc.replaceQueryParam("key", "1"))
 }

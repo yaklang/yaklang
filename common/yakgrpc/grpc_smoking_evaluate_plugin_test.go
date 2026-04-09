@@ -25,7 +25,7 @@ func TestGRPCMUSTPASS_LANGUAGE_SMOKING_EVALUATE_PLUGIN(t *testing.T) {
 	}
 	TestSmokingEvaluatePlugin := func(t *testing.T, tc testCase) {
 		t.Helper()
-		name, clearFunc, err := yakit.CreateTemporaryYakScriptEx(tc.codeTyp, tc.code)
+		name, clearFunc, err := yakit.CreateAndClearTemporaryYakScript(tc.codeTyp, tc.code)
 		require.NoError(t, err)
 		defer clearFunc()
 		rsp, err := client.SmokingEvaluatePlugin(context.Background(), &ypb.SmokingEvaluatePluginRequest{

@@ -179,8 +179,8 @@ func TestSetGroup(t *testing.T) {
 }
 
 func TestQueryGroupCount(t *testing.T) {
-	scriptName2, clearFunc, _ := yakit.CreateTemporaryYakScriptEx("mitm", "")
-	scriptName3, clearFunc3, _ := yakit.CreateTemporaryYakScriptEx("mitm", "\"[]\"")
+	scriptName2, clearFunc, _ := yakit.CreateAndClearTemporaryYakScript("mitm", "")
+	scriptName3, clearFunc3, _ := yakit.CreateAndClearTemporaryYakScript("mitm", "\"[]\"")
 	scriptName1 := "[TMP]-" + "-" + ksuid.New().String()
 	content := "passiveScanning = cli.String(\"passiveScanning\",cli.setHelp(\"填写规则:http://127.0.0.1:8080\"),cli.setRequired(true),cli.setVerboseName(\"被动扫描器地址\"))\nwhitelisthostcli = cli.String(\"whitelisthostcli\",cli.setHelp(\"格式:*.yaklang.com;10.0.0.* 中间用;分割\"),cli.setDefault(\"\"),cli.setVerboseName(\"白名单主机列表\"))\nblacklistcli = cli.String(\"blacklistcli\",cli.setHelp(\"默认:*.gov.cn;*.edu.cn 中间用;分割\"),cli.setDefault(\"*.gov.cn;*.edu.cn\"),cli.setVerboseName(\"黑名单主机列表\"))\nblackmethodcli = cli.StringSlice(\"blackmethodcli\",cli.setMultipleSelect(true),\ncli.setSelectOption(\"GET\", \"GET\"),\ncli.setSelectOption(\"POST\", \"POST\"),\ncli.setSelectOption(\"DELETE\", \"DELETE\"),\ncli.setSelectOption(\"PUT\", \"PUT\"),\ncli.setSelectOption(\"OPTIONS\", \"OPTIONS\"),\ncli.setSelectOption(\"TRACE\", \"TRACE\"),\ncli.setSelectOption(\"COPY\", \"COPY\"),cli.setVerboseName(\"禁用方法\")\n)\ncli.check()\n"
 	prog, err := static_analyzer.SSAParse(content, "mitm")

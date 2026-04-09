@@ -34,7 +34,7 @@ func TestGRPCMUSTPASS_LANGUAGE_SMOKING_EVALUATE_PLUGIN_BATCH(t *testing.T) {
 			if typ == "" {
 				typ = "port-scan"
 			}
-			name, clearFunc, err := yakit.CreateTemporaryYakScriptEx(typ, c.src)
+			name, clearFunc, err := yakit.CreateAndClearTemporaryYakScript(typ, c.src)
 			require.NoError(t, err)
 			clearFuncs = append(clearFuncs, clearFunc)
 			names = append(names, name)
@@ -124,7 +124,7 @@ handle = func(data) {
 		names := make([]string, 0, len(testScripts))
 		clearFuncs := make([]func(), 0, len(testScripts))
 		for _, c := range testScripts {
-			name, clearFunc, err := yakit.CreateTemporaryYakScriptEx(c.typ, c.src)
+			name, clearFunc, err := yakit.CreateAndClearTemporaryYakScript(c.typ, c.src)
 			require.NoError(t, err)
 			clearFuncs = append(clearFuncs, clearFunc)
 			names = append(names, name)
@@ -198,7 +198,7 @@ undefined_variable_error
 		names := make([]string, 0, len(testScripts))
 		clearFuncs := make([]func(), 0, len(testScripts))
 		for _, c := range testScripts {
-			name, clearFunc, err := yakit.CreateTemporaryYakScriptEx(c.typ, c.src)
+			name, clearFunc, err := yakit.CreateAndClearTemporaryYakScript(c.typ, c.src)
 			require.NoError(t, err)
 			clearFuncs = append(clearFuncs, clearFunc)
 			names = append(names, name)
@@ -272,7 +272,7 @@ handle = func(data) {
 		clearFuncs := make([]func(), 0, len(testScripts))
 
 		for _, script := range testScripts {
-			name, clearFunc, err := yakit.CreateTemporaryYakScriptEx(script.typ, script.src)
+			name, clearFunc, err := yakit.CreateAndClearTemporaryYakScript(script.typ, script.src)
 			require.NoError(t, err)
 			clearFuncs = append(clearFuncs, clearFunc)
 			names = append(names, name)
@@ -349,7 +349,7 @@ handle = func(result) {
 		names := make([]string, 0, scriptCount)
 		clearFuncs := make([]func(), 0, scriptCount)
 		for _, c := range scripts {
-			name, clearFunc, err := yakit.CreateTemporaryYakScriptEx(c.typ, c.src)
+			name, clearFunc, err := yakit.CreateAndClearTemporaryYakScript(c.typ, c.src)
 			require.NoError(t, err)
 			clearFuncs = append(clearFuncs, clearFunc)
 			names = append(names, name)

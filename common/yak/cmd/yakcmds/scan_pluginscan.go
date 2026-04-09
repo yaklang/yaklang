@@ -14,11 +14,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/olekukonko/tablewriter"
 	"github.com/segmentio/ksuid"
-	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/filter"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/utils/omap"
@@ -195,7 +195,7 @@ var hybridScanCommand = &cli.Command{
 		clearFuncs := make([]func(), 0, len(templatesCodes))
 		if len(templatesCodes) > 0 {
 			for _, temp := range templatesCodes {
-				pluginName, clearFunc, err := yakit.CreateTemporaryYakScriptEx(`nuclei`, temp, uid)
+				pluginName, clearFunc, err := yakit.CreateAndClearTemporaryYakScript(`nuclei`, temp, uid)
 				if err != nil {
 					return utils.Errorf("create temporary nuclei template failed: %s", err)
 				}

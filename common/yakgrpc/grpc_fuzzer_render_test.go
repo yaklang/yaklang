@@ -22,7 +22,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_RenderDangerousFuzztag(t *testing.T) {
 	require.NoError(t, err)
 	// create a codec script to test
 	token2 := utils.RandStringBytes(16)
-	scriptName, clearFunc, err := yakit.CreateTemporaryYakScriptEx("codec", fmt.Sprintf(`
+	scriptName, clearFunc, err := yakit.CreateAndClearTemporaryYakScript("codec", fmt.Sprintf(`
 	handle = func(origin)  {
 		return "%s"
 	}`, token2))
