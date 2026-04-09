@@ -146,7 +146,7 @@ func NewGateway() *Gateway {
 	return &Gateway{}
 }
 
-func tryCreateAIGateway(t string, cb func(string, aispec.AIClient) bool) error {
+func tryCreateAIGateway(t string, disableProviderFallback bool, cb func(string, aispec.AIClient) (bool, error)) error {
 	createAIGatewayByType := func(typ string) aispec.AIClient {
 		gw, ok := aispec.Lookup(typ)
 		if !ok {
@@ -159,10 +159,20 @@ func tryCreateAIGateway(t string, cb func(string, aispec.AIClient) bool) error {
 	if utils.StringArrayContains(total, t) {
 		gw := createAIGatewayByType(t)
 		if gw != nil {
-			if cb(t, gw) {
+			ok, err := cb(t, gw)
+			if ok {
 				return nil
 			}
+			if disableProviderFallback {
+				if err != nil {
+					return err
+				}
+				return errors.New("specified ai provider failed and provider fallback is disabled")
+			}
 		}
+	}
+	if disableProviderFallback && t != "" {
+		return fmt.Errorf("unsupported ai type: %s", t)
 	}
 	if t != "" {
 		log.Warnf("unsupported ai type: %s, use default config ai type", t)
@@ -195,7 +205,8 @@ func tryCreateAIGateway(t string, cb func(string, aispec.AIClient) bool) error {
 	for _, typ := range cfg.AiApiPriority {
 		agent := createAIGatewayByType(typ)
 		if agent != nil {
-			if cb(typ, agent) {
+			ok, _ := cb(typ, agent)
+			if ok {
 				return nil
 			}
 		} else {
@@ -438,21 +449,21 @@ func legacyChat(msg string, opts ...aispec.AIConfigOption) (string, error) {
 	config := aispec.NewDefaultAIConfig(opts...)
 	var responseRsp string
 	var err error
-	err = tryCreateAIGateway(config.Type, func(typ string, gateway aispec.AIClient) bool {
+	err = tryCreateAIGateway(config.Type, config.DisableProviderFallback, func(typ string, gateway aispec.AIClient) (bool, error) {
 		gateway.LoadOption(append([]aispec.AIConfigOption{aispec.WithType(typ)}, opts...)...)
 		if err := gateway.CheckValid(); err != nil {
 			log.Debugf("check valid by %s failed: %s", typ, err)
-			return false
+			return false, err
 		}
 		invokeModelInfoCallback(gateway, typ)
 		log.Infof("start to chat completions by %v", typ)
 		responseRsp, err = gateway.Chat(msg)
 		if err != nil {
 			log.Warnf("chat by %s failed: %s", typ, err)
-			return false
+			return false, err
 		}
 		invokeModelInfoConfirmCallback(gateway, typ)
-		return true
+		return true, nil
 	})
 	if err != nil {
 		return "", err
@@ -635,11 +646,11 @@ func legacyFunctionCall(input string, funcs any, opts ...aispec.AIConfigOption) 
 	config := aispec.NewDefaultAIConfig(opts...)
 	var responseRsp map[string]any
 	var err error
-	err = tryCreateAIGateway(config.Type, func(typ string, gateway aispec.AIClient) bool {
+	err = tryCreateAIGateway(config.Type, config.DisableProviderFallback, func(typ string, gateway aispec.AIClient) (bool, error) {
 		gateway.LoadOption(append([]aispec.AIConfigOption{aispec.WithType(typ)}, opts...)...)
 		if err := gateway.CheckValid(); err != nil {
 			log.Debugf("check valid by %s failed: %s", typ, err)
-			return false
+			return false, err
 		}
 		var ok bool
 		for i := 0; i < config.FunctionCallRetryTimes; i++ {
@@ -652,9 +663,9 @@ func legacyFunctionCall(input string, funcs any, opts ...aispec.AIConfigOption) 
 			}
 		}
 		if !ok {
-			return false
+			return false, err
 		}
-		return true
+		return true, nil
 	})
 	if err != nil {
 		return nil, err
@@ -807,17 +818,17 @@ func VisionFunctionCall(input string, funcs any, opts ...aispec.AIConfigOption) 
 func StructuredStream(input string, opts ...aispec.AIConfigOption) (chan *aispec.StructuredData, error) {
 	config := aispec.NewDefaultAIConfig(opts...)
 	var selectedGateway aispec.AIClient
-	tryCreateAIGateway(config.Type, func(typ string, gateway aispec.AIClient) bool {
+	tryCreateAIGateway(config.Type, config.DisableProviderFallback, func(typ string, gateway aispec.AIClient) (bool, error) {
 		gateway.LoadOption(append([]aispec.AIConfigOption{aispec.WithType(typ)}, opts...)...)
 		if err := gateway.CheckValid(); err != nil {
 			log.Debugf("check valid by %s failed: %s", typ, err)
-			return false
+			return false, err
 		}
 
 		if gateway.SupportedStructuredStream() {
 			selectedGateway = gateway
 		}
-		return true
+		return true, nil
 	})
 	if selectedGateway == nil {
 		return nil, errors.New("not found valid ai agent")

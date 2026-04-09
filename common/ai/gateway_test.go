@@ -3,14 +3,15 @@ package ai
 import (
 	"context"
 	_ "embed"
+	"errors"
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io"
 	"os"
 	"path/filepath"
@@ -196,6 +197,61 @@ func (t *TestGateway) CheckValid() error {
 
 var _ aispec.AIClient = &TestGateway{}
 
+type fallbackControlGateway struct {
+	config  *aispec.AIConfig
+	valid   bool
+	chatErr error
+	onChat  func()
+}
+
+func (t *fallbackControlGateway) GetConfig() *aispec.AIConfig {
+	return t.config
+}
+
+func (t *fallbackControlGateway) GetModelList() ([]*aispec.ModelMeta, error) {
+	return nil, nil
+}
+
+func (t *fallbackControlGateway) SupportedStructuredStream() bool {
+	return false
+}
+
+func (t *fallbackControlGateway) StructuredStream(string, ...any) (chan *aispec.StructuredData, error) {
+	return nil, errors.New("unsupported")
+}
+
+func (t *fallbackControlGateway) Chat(string, ...any) (string, error) {
+	if t.onChat != nil {
+		t.onChat()
+	}
+	return "ok", t.chatErr
+}
+
+func (t *fallbackControlGateway) ChatStream(string) (io.Reader, error) {
+	return nil, nil
+}
+
+func (t *fallbackControlGateway) ExtractData(string, string, map[string]any) (map[string]any, error) {
+	return nil, errors.New("unsupported")
+}
+
+func (t *fallbackControlGateway) LoadOption(opt ...aispec.AIConfigOption) {
+	t.config = aispec.NewDefaultAIConfig(opt...)
+}
+
+func (t *fallbackControlGateway) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
+	return nil, nil
+}
+
+func (t *fallbackControlGateway) CheckValid() error {
+	if t.valid {
+		return nil
+	}
+	return errors.New("invalid")
+}
+
+var _ aispec.AIClient = &fallbackControlGateway{}
+
 func TestClientStreamExtInfo(t *testing.T) {
 	cfg := yakit.GetNetworkConfig()
 	if cfg == nil {
@@ -221,6 +277,54 @@ func TestClientStreamExtInfo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestChat_DisableProviderFallback(t *testing.T) {
+	cfg := yakit.GetNetworkConfig()
+	if cfg == nil {
+		t.Fail()
+	}
+	bak := append([]string(nil), cfg.AiApiPriority...)
+	defer func() {
+		cfg := yakit.GetNetworkConfig()
+		cfg.AiApiPriority = bak
+		yakit.ConfigureNetWork(cfg)
+	}()
+
+	const badProvider = "test-disable-fallback-bad"
+	const goodProvider = "test-disable-fallback-good"
+
+	var badCalls int
+	var goodCalls int
+
+	aispec.Register(badProvider, func() aispec.AIClient {
+		return &fallbackControlGateway{
+			valid:   true,
+			chatErr: errors.New("bad provider failed"),
+			onChat: func() {
+				badCalls++
+			},
+		}
+	})
+	aispec.Register(goodProvider, func() aispec.AIClient {
+		return &fallbackControlGateway{
+			valid: true,
+			onChat: func() {
+				goodCalls++
+			},
+		}
+	})
+
+	cfg.AiApiPriority = []string{goodProvider, badProvider}
+	yakit.ConfigureNetWork(cfg)
+
+	_, err := Chat("hello",
+		aispec.WithType(badProvider),
+		aispec.WithDisableProviderFallback(true),
+	)
+	assert.ErrorContains(t, err, "bad provider failed")
+	assert.Equal(t, 1, badCalls)
+	assert.Equal(t, 0, goodCalls)
 }
 
 func TestDashscope_Search_StructuredStream(t *testing.T) {

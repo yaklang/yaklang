@@ -105,6 +105,7 @@ func executeAIConfigHealthCheck(ctx context.Context, config *ypb.ThirdPartyAppli
 	})
 	opts = append(opts,
 		aispec.WithContext(ctx),
+		aispec.WithDisableProviderFallback(true),
 		aispec.WithStreamHandler(markFirstByte),
 		aispec.WithReasonStreamHandler(markFirstByte),
 		aispec.WithRawHTTPRequestResponseCallback(func(requestBytes []byte, responseHeaderBytes []byte, bodyPreview []byte) {
