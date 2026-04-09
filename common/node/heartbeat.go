@@ -17,14 +17,15 @@ func (n *NodeBase) heartbeat() error {
 	defer cancel()
 
 	return n.transport.Heartbeat(ctx, session, HeartbeatRequest{
-		LifecycleState: status.LifecycleState,
-		Version:        n.version,
-		RunningJobs:    status.RunningJobs,
-		MaxRunningJobs: status.MaxRunningJobs,
-		CapabilityKeys: cloneStringSlice(n.capabilityKeys),
-		Labels:         cloneStringMap(n.labels),
-		ObservedAt:     time.Now().UTC(),
-		ActiveAttempts: cloneActiveAttemptHeartbeats(status.ActiveAttempts),
+		LifecycleState:           status.LifecycleState,
+		Version:                  n.version,
+		RunningJobs:              status.RunningJobs,
+		MaxRunningJobs:           status.MaxRunningJobs,
+		CapabilityKeys:           cloneStringSlice(n.capabilityKeys),
+		Labels:                   cloneStringMap(n.labels),
+		ObservedAt:               time.Now().UTC(),
+		HeartbeatIntervalSeconds: durationToWholeSeconds(n.heartbeatInterval),
+		ActiveAttempts:           cloneActiveAttemptHeartbeats(status.ActiveAttempts),
 	})
 }
 

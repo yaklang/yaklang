@@ -12,11 +12,13 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"regexp"
 	"runtime"
 	"sort"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
@@ -978,7 +980,23 @@ var DistributionCommands = []*cli.Command{
 			if err != nil {
 				return err
 			}
-			scanNode.Run()
+
+			ctx, stop := signal.NotifyContext(
+				context.Background(),
+				syscall.SIGINT,
+				syscall.SIGTERM,
+			)
+			defer stop()
+
+			done := make(chan struct{})
+			go func() {
+				defer close(done)
+				scanNode.Run()
+			}()
+
+			<-ctx.Done()
+			scanNode.Shutdown()
+			<-done
 			return nil
 		},
 		Flags: []cli.Flag{

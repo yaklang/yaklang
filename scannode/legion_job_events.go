@@ -12,10 +12,10 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	jobv1 "github.com/yaklang/yaklang/common/legionpb/legion/job/v1"
-	nodev1 "github.com/yaklang/yaklang/common/legionpb/legion/node/v1"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/node"
+	jobv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/job/v1"
+	nodev1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/node/v1"
 )
 
 type jobExecutionRef struct {
@@ -133,6 +133,31 @@ func (p *jobEventPublisher) PublishReport(
 		Job:        p.jobRef(ref),
 		ReportKind: reportKind,
 		ReportJson: cloneBytes(reportJSON),
+	})
+}
+
+func (p *jobEventPublisher) PublishArtifactReady(
+	ctx context.Context,
+	ref jobExecutionRef,
+	artifactKind string,
+	artifactFormat string,
+	objectKey string,
+	codec string,
+	sha256 string,
+	rawSizeBytes uint64,
+	storedSizeBytes uint64,
+	metricsJSON []byte,
+) error {
+	return p.publish(ctx, legionEventArtifactReady, ref, uuid.NewString(), &jobv1.JobArtifactReady{
+		Job:             p.jobRef(ref),
+		ArtifactKind:    artifactKind,
+		ArtifactFormat:  artifactFormat,
+		ObjectKey:       objectKey,
+		Codec:           codec,
+		Sha256:          sha256,
+		RawSizeBytes:    rawSizeBytes,
+		StoredSizeBytes: storedSizeBytes,
+		MetricsJson:     cloneBytes(metricsJSON),
 	})
 }
 
@@ -292,6 +317,8 @@ func attachEventMetadata(message proto.Message, metadata *nodev1.EventMetadata) 
 	case *jobv1.JobRisk:
 		value.Metadata = metadata
 	case *jobv1.JobReport:
+		value.Metadata = metadata
+	case *jobv1.JobArtifactReady:
 		value.Metadata = metadata
 	case *jobv1.JobSucceeded:
 		value.Metadata = metadata

@@ -6,8 +6,9 @@ import (
 	"testing"
 	"time"
 
-	jobv1 "github.com/yaklang/yaklang/common/legionpb/legion/job/v1"
-	nodev1 "github.com/yaklang/yaklang/common/legionpb/legion/node/v1"
+	"github.com/nats-io/nats.go"
+	jobv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/job/v1"
+	nodev1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/node/v1"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -165,6 +166,20 @@ func TestConsumerNameForNode(t *testing.T) {
 	}
 	if strings.ContainsAny(got, " /") {
 		t.Fatalf("consumer name still contains invalid characters: %s", got)
+	}
+}
+
+func TestIsCommandConsumerResetError(t *testing.T) {
+	t.Parallel()
+
+	if !isCommandConsumerResetError(nats.ErrConsumerDeleted) {
+		t.Fatal("expected ErrConsumerDeleted to reset consumer")
+	}
+	if !isCommandConsumerResetError(nats.ErrNoResponders) {
+		t.Fatal("expected ErrNoResponders to reset consumer")
+	}
+	if isCommandConsumerResetError(nats.ErrTimeout) {
+		t.Fatal("did not expect ErrTimeout to reset consumer")
 	}
 }
 

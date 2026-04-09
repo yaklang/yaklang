@@ -8,7 +8,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	capabilityv1 "github.com/yaklang/yaklang/common/legionpb/legion/capability/v1"
+	capabilityv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/capability/v1"
 )
 
 type capabilityCommandRef struct {

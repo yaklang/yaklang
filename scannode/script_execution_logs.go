@@ -48,6 +48,8 @@ func (s *ScanNode) createLogHandler(
 			s.handleJSONLog(result, info)
 		case "feature-status-card-data":
 			s.handleStatusCardLog(reporter, info)
+		case "ssa-stream":
+			s.handleSSAStreamLog(reporter, info)
 		}
 	}
 }
@@ -166,5 +168,17 @@ func (s *ScanNode) handleStatusCardLog(
 ) {
 	if utils.InDebugMode() {
 		log.Infof("skip feature-status-card-data for legion event projection: %s", info)
+	}
+}
+
+func (s *ScanNode) handleSSAStreamLog(
+	reporter *ScannerAgentReporter,
+	info string,
+) {
+	if reporter == nil || reporter.ssaCollector == nil {
+		return
+	}
+	if err := reporter.ssaCollector.AddStreamPayload(info); err != nil {
+		log.Errorf("collect ssa stream payload failed: %v", err)
 	}
 }

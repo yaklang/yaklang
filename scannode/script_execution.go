@@ -54,6 +54,12 @@ func (s *ScanNode) executeScriptTask(
 		legionJobExecutionRefFromContext(taskCtx),
 		s,
 	)
+	keyValues := s.parseScriptParams(input.ScriptJSONParam)
+	reporter.ssaUploadCfg = extractSSAArtifactUploadConfig(keyValues)
+	reporter.ssaCollector = NewSSAArtifactCollector(input.TaskID, input.RuntimeID, input.SubTaskID)
+	if reporter.ssaCollector != nil {
+		defer reporter.ssaCollector.Cleanup()
+	}
 	result := &ScriptExecutionResult{}
 	yakitServer := s.createYakitServer(reporter, result)
 	yakitServer.Start()
@@ -65,7 +71,7 @@ func (s *ScanNode) executeScriptTask(
 	}
 	defer os.RemoveAll(scriptFile)
 
-	params := s.buildScriptParams(yakitServer.Addr(), input)
+	params := s.buildScriptParams(yakitServer.Addr(), input.RuntimeID, keyValues)
 	scanNodePath, err := os.Executable()
 	if err != nil {
 		return nil, utils.Errorf("fetch node path err: %s", err)
@@ -75,6 +81,9 @@ func (s *ScanNode) executeScriptTask(
 		return nil, s.handleScriptFailure(err, result, taskID)
 	}
 	logReporterEventError("final progress checkpoint", reporter.flushSuccessfulJobProgress())
+	if err := s.finalizeSSAArtifactUpload(reporter, result); err != nil {
+		return nil, err
+	}
 	return result, nil
 }
 
@@ -99,10 +108,10 @@ func newScriptTask(
 
 func (s *ScanNode) buildScriptParams(
 	webhookAddr string,
-	input ScriptExecutionRequest,
+	runtimeID string,
+	keyValues map[string]any,
 ) []string {
-	params := buildScriptBaseParams(webhookAddr, input.RuntimeID)
-	keyValues := s.parseScriptParams(input.ScriptJSONParam)
+	params := buildScriptBaseParams(webhookAddr, runtimeID)
 	s.syncRulesIfNeeded(keyValues)
 	return s.appendKeyValueParams(params, keyValues)
 }
@@ -201,6 +210,9 @@ func buildScriptBaseParams(webhookAddr string, runtimeID string) []string {
 
 func (s *ScanNode) appendKeyValueParams(params []string, keyValues map[string]any) []string {
 	for key, value := range keyValues {
+		if strings.HasPrefix(strings.TrimSpace(key), scannodeInternalParamPrefix) {
+			continue
+		}
 		name := strings.TrimLeft(key, "-")
 		params = append(params, "--"+name, utils.InterfaceToString(value))
 	}
@@ -238,4 +250,94 @@ func (s *ScanNode) executeScript(
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
+}
+
+func (s *ScanNode) finalizeSSAArtifactUpload(
+	reporter *ScannerAgentReporter,
+	result *ScriptExecutionResult,
+) error {
+	if reporter == nil || reporter.ssaCollector == nil {
+		return nil
+	}
+
+	meta := parseSSAResultMeta(result)
+	cfg := reporter.ssaUploadCfg
+	if cfg == nil {
+		if reporter.ssaCollector.HasData() {
+			return utils.Errorf("ssa artifact upload config missing")
+		}
+		return nil
+	}
+
+	build, err := reporter.ssaCollector.FinalizeUpload(cfg)
+	if err != nil {
+		return err
+	}
+	if build == nil {
+		return nil
+	}
+	if build.ProgramName == "" {
+		build.ProgramName = meta.ProgramName
+	}
+
+	event := reporter.ssaCollector.BuildReadyEvent(build, meta.TotalLines, meta.RiskCount)
+	if event == nil {
+		return nil
+	}
+	if err := reporter.PublishSSAArtifactReady(event); err != nil {
+		return err
+	}
+
+	log.Infof(
+		"ssa artifact uploaded task=%s key=%s codec=%s raw=%d stored=%d risks=%d files=%d flows=%d",
+		reporter.TaskId,
+		build.ObjectKey,
+		build.Codec,
+		build.UncompressedSize,
+		build.CompressedSize,
+		event.RiskCount,
+		event.FileCount,
+		event.FlowCount,
+	)
+	return nil
+}
+
+type ssaResultMeta struct {
+	ProgramName string
+	TotalLines  int64
+	RiskCount   int64
+}
+
+func parseSSAResultMeta(result *ScriptExecutionResult) ssaResultMeta {
+	meta := ssaResultMeta{}
+	if result == nil || result.Data == nil {
+		return meta
+	}
+
+	dataMap, ok := result.Data.(map[string]any)
+	if !ok || dataMap == nil {
+		return meta
+	}
+
+	meta.ProgramName = strings.TrimSpace(utils.InterfaceToString(
+		utils.MapGetFirstRaw(dataMap, "program_name", "programName", "ProgramName"),
+	))
+	meta.TotalLines = int64(utils.InterfaceToFloat64(
+		utils.MapGetFirstRaw(dataMap, "total_lines", "totalLines", "TotalLines"),
+	))
+	meta.RiskCount = int64(utils.InterfaceToFloat64(
+		utils.MapGetFirstRaw(dataMap, "risk_count", "riskCount", "RiskCount"),
+	))
+	return meta
+}
+
+func buildSSAArtifactMetricsPayload(event *SSAArtifactReadyEvent) ([]byte, error) {
+	if event == nil {
+		return json.Marshal(map[string]int64{})
+	}
+	return json.Marshal(map[string]int64{
+		"risk_count":     event.RiskCount,
+		"file_count":     event.FileCount,
+		"dataflow_count": event.FlowCount,
+	})
 }

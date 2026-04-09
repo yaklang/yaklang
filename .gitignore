@@ -51,6 +51,10 @@ tmp_build/
 *.mmdb
 .vscode/*
 gen
+!scannode/gen/
+scannode/gen/*
+!scannode/gen/legionpb/
+!scannode/gen/legionpb/**
 .antlr/
 common/xlic/*.gzip
 .go-version
