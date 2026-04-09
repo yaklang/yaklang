@@ -137,7 +137,23 @@ func (b *legionJobBridge) consumeLoop(ctx context.Context, consumer *commandCons
 			if errors.Is(err, nats.ErrTimeout) || ctx.Err() != nil {
 				continue
 			}
-			log.Errorf("fetch legion commands failed: %v", err)
+			if isCommandConsumerResetError(err) {
+				log.Errorf(
+					"legion command consumer became invalid: node_id=%s session_id=%s err=%v diagnosis=%q",
+					b.agent.node.NodeId,
+					consumer.sessionID,
+					err,
+					"another process may be running with the same node_id, or the platform session/consumer was replaced",
+				)
+				b.stopConsumer()
+				return
+			}
+			log.Errorf(
+				"fetch legion commands failed: node_id=%s session_id=%s err=%v",
+				b.agent.node.NodeId,
+				consumer.sessionID,
+				err,
+			)
 			continue
 		}
 		for _, message := range messages {
@@ -149,6 +165,15 @@ func (b *legionJobBridge) consumeLoop(ctx context.Context, consumer *commandCons
 			_ = message.Ack()
 		}
 	}
+}
+
+func isCommandConsumerResetError(err error) bool {
+	return errors.Is(err, nats.ErrConsumerDeleted) ||
+		errors.Is(err, nats.ErrNoResponders) ||
+		errors.Is(err, nats.ErrConnectionClosed) ||
+		errors.Is(err, nats.ErrDisconnected) ||
+		errors.Is(err, nats.ErrBadSubscription) ||
+		errors.Is(err, nats.ErrSubscriptionClosed)
 }
 
 func (b *legionJobBridge) handleMessage(

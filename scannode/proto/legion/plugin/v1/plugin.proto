@@ -5,7 +5,7 @@ package legion.plugin.v1;
 import "google/protobuf/timestamp.proto";
 import "legion/node/v1/node.proto";
 
-option go_package = "github.com/yaklang/yaklang/common/legionpb/legion/plugin/v1;pluginv1";
+option go_package = "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/plugin/v1;pluginv1";
 
 message PluginReleaseRef {
   string plugin_id = 1;
