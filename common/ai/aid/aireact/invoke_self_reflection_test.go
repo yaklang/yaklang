@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -28,48 +27,29 @@ var iterationCount int
 var verifyCount int
 var iterationMutex sync.Mutex
 
-// extractNonceFromPrompt extracts nonce from prompt patterns like <background_{nonce}>, <schema_{nonce}>, <|SCHEMA_{nonce}|>, etc.
-func extractNonceFromPrompt(prompt string) string {
-	// Pattern 1: <background_{nonce}> or <schema_{nonce}> (liteforge style)
-	patterns := []string{
-		`<background_([a-zA-Z0-9]+)>`,
-		`<schema_([a-zA-Z0-9]+)>`,
-		`<timeline_([a-zA-Z0-9]+)>`,
-		`<params_([a-zA-Z0-9]+)>`,
-		// Pattern 2: <|SCHEMA_{nonce}|> or <|USER_QUERY_{nonce}|> (ReAct loop style)
-		`<\|SCHEMA_([A-Za-z0-9]+)\|>`,
-		`<\|USER_QUERY_([A-Za-z0-9]+)\|>`,
-		`<\|REFLECTION_([A-Za-z0-9]+)\|>`,
-		`<\|PERSISTENT_([A-Za-z0-9]+)\|>`,
-		// Pattern 3: <|USER_INPUT_{nonce}|> (task init style)
-		`<\|USER_INPUT_([A-Za-z0-9]+)\|>`,
-		// Pattern 4: <|SELF_REFLECTION_TASK_{nonce}|> (self-reflection prompt style)
-		`<\|SELF_REFLECTION_TASK_([A-Za-z0-9]+)\|>`,
-		`<\|ACTION_DETAILS_([A-Za-z0-9]+)\|>`,
-		`<\|ENVIRONMENTAL_IMPACT_([A-Za-z0-9]+)\|>`,
-		`<\|RELEVANT_MEMORIES_([A-Za-z0-9]+)\|>`,
-		`<\|PREVIOUS_REFLECTIONS_([A-Za-z0-9]+)\|>`,
-		`<\|ANALYSIS_REQUIREMENTS_([A-Za-z0-9]+)\|>`,
-	}
-
-	for _, pattern := range patterns {
-		re := regexp.MustCompile(pattern)
-		if matches := re.FindStringSubmatch(prompt); len(matches) > 1 {
-			if matches[1] != "" {
-				return matches[1] // Return first captured group (nonce)
-			}
-		}
-	}
-
-	return "" // No nonce found
-}
-
 // mockedSelfReflectionToolCalling mocks AI responses for self-reflection test
 func mockedSelfReflectionToolCalling(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
 
 	// Extract nonce from prompt (if available)
-	nonce := extractNonceFromPrompt(prompt)
+	nonce := extractPromptNonce(
+		prompt,
+		"background",
+		"schema",
+		"timeline",
+		"params",
+		"SCHEMA",
+		"USER_QUERY",
+		"REFLECTION",
+		"PERSISTENT",
+		"USER_INPUT",
+		"SELF_REFLECTION_TASK",
+		"ACTION_DETAILS",
+		"ENVIRONMENTAL_IMPACT",
+		"RELEVANT_MEMORIES",
+		"PREVIOUS_REFLECTIONS",
+		"ANALYSIS_REQUIREMENTS",
+	)
 	if nonce == "" {
 		// Use default nonce for mock responses when extraction fails
 		nonce = "test123"

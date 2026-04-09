@@ -3,7 +3,6 @@ package aireact
 import (
 	"bytes"
 	"context"
-	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -33,14 +32,10 @@ func TestReAct_DirectlyAnswer_RetryIncludesLastErrorAndAITAGHint(t *testing.T) {
 			case 1, 2:
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action":"directly_answer"}`))
 			case 3:
-				nonceRe := regexp.MustCompile(`<\|FINAL_ANSWER_(\w{4})\|>`)
-				matches := nonceRe.FindStringSubmatch(req.GetPrompt())
-				if len(matches) != 2 {
-					t.Fatalf("expected FINAL_ANSWER nonce in prompt, got: %s", req.GetPrompt())
-				}
+				nonce := mustExtractPromptNonce(t, req.GetPrompt(), "FINAL_ANSWER")
 				rsp.EmitOutputStream(bytes.NewBufferString(
 					`{"@action":"directly_answer"}` + "\n" +
-						"<|FINAL_ANSWER_" + matches[1] + "|>third time lucky<|FINAL_ANSWER_END_" + matches[1] + "|>",
+						"<|FINAL_ANSWER_" + nonce + "|>third time lucky<|FINAL_ANSWER_END_" + nonce + "|>",
 				))
 			default:
 				t.Fatalf("unexpected retry attempt: %d", attempt)
