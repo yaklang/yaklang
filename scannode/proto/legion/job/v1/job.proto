@@ -5,7 +5,7 @@ package legion.job.v1;
 import "google/protobuf/timestamp.proto";
 import "legion/node/v1/node.proto";
 
-option go_package = "github.com/yaklang/yaklang/common/legionpb/legion/job/v1;jobv1";
+option go_package = "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/job/v1;jobv1";
 
 message JobRef {
   string job_id = 1;
@@ -91,6 +91,19 @@ message JobReport {
   JobRef job = 2;
   string report_kind = 3;
   bytes report_json = 4;
+}
+
+message JobArtifactReady {
+  legion.node.v1.EventMetadata metadata = 1;
+  JobRef job = 2;
+  string artifact_kind = 3;
+  string artifact_format = 4;
+  string object_key = 5;
+  string codec = 6;
+  string sha256 = 7;
+  uint64 raw_size_bytes = 8;
+  uint64 stored_size_bytes = 9;
+  bytes metrics_json = 10;
 }
 
 message JobSucceeded {

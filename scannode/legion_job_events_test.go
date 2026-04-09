@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	jobv1 "github.com/yaklang/yaklang/common/legionpb/legion/job/v1"
-	nodev1 "github.com/yaklang/yaklang/common/legionpb/legion/node/v1"
+	jobv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/job/v1"
+	nodev1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/node/v1"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
@@ -26,6 +26,7 @@ func TestAttachEventMetadata(t *testing.T) {
 		{name: "asset", message: &jobv1.JobAsset{}},
 		{name: "risk", message: &jobv1.JobRisk{}},
 		{name: "report", message: &jobv1.JobReport{}},
+		{name: "artifact_ready", message: &jobv1.JobArtifactReady{}},
 		{name: "succeeded", message: &jobv1.JobSucceeded{}},
 		{name: "failed", message: &jobv1.JobFailed{}},
 		{name: "cancelled", message: &jobv1.JobCancelled{}},
@@ -301,6 +302,8 @@ func eventMetadataFromMessage(message proto.Message) *nodev1.EventMetadata {
 	case *jobv1.JobRisk:
 		return value.Metadata
 	case *jobv1.JobReport:
+		return value.Metadata
+	case *jobv1.JobArtifactReady:
 		return value.Metadata
 	case *jobv1.JobSucceeded:
 		return value.Metadata
