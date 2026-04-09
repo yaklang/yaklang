@@ -246,7 +246,9 @@ type Config struct {
 
 	// triage
 	MemoryTriage         MemoryTriage
-	MemoryPoolSize       int64 // in tokens
+
+	TimelineArchiveStore TimelineArchiveStore
+	MemoryPoolSize       int64
 	MemoryPool           *omap.OrderedMap[string, *MemoryEntity]
 	EnableSelfReflection bool
 
@@ -2225,6 +2227,29 @@ func WithMemoryTriageId(id string) ConfigOption {
 	}
 }
 
+func WithTimelineArchiveStore(store TimelineArchiveStore) ConfigOption {
+	return func(c *Config) error {
+		c.m.Lock()
+		c.TimelineArchiveStore = store
+		c.m.Unlock()
+		return nil
+	}
+}
+
+func (c *Config) GetTimelineArchiveStore() TimelineArchiveStore {
+	if c == nil {
+		return nil
+	}
+	return c.TimelineArchiveStore
+}
+
+func (c *Config) GetPersistentSessionID() string {
+	if c == nil {
+		return ""
+	}
+	return c.PersistentSessionId
+}
+
 func WithForges(forge ...*schema.AIForge) ConfigOption {
 	return func(c *Config) error {
 		c.m.Lock()
@@ -2916,6 +2941,9 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	}
 	if i.MemoryTriage != nil {
 		opts = append(opts, WithMemoryTriage(i.MemoryTriage))
+	}
+	if i.TimelineArchiveStore != nil {
+		opts = append(opts, WithTimelineArchiveStore(i.TimelineArchiveStore))
 	}
 
 	// Misc

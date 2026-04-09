@@ -3,6 +3,7 @@ package aicommon
 import (
 	"bytes"
 	"cmp"
+	"context"
 	_ "embed"
 	"fmt"
 	"io"
@@ -35,6 +36,7 @@ type Timeline struct {
 	idToTimelineItem *omap.OrderedMap[int64, *TimelineItem]
 	summary          *omap.OrderedMap[int64, *linktable.LinkTable[*TimelineItem]]
 	reducers         *omap.OrderedMap[int64, *linktable.LinkTable[string]]
+	archiveRefs      *omap.OrderedMap[int64, *TimelineArchiveRef]
 
 	// this limit is used to limit the timeline dump content size (in tokens).
 	perDumpContentLimit   int64
@@ -164,6 +166,7 @@ func (m *Timeline) CopyReducibleTimelineWithMemory() *Timeline {
 		idToTimelineItem:      m.idToTimelineItem.Copy(),
 		summary:               m.summary.Copy(),
 		reducers:              m.reducers.Copy(),
+		archiveRefs:           m.archiveRefs.Copy(),
 		perDumpContentLimit:   m.perDumpContentLimit,
 		totalDumpContentLimit: m.totalDumpContentLimit,
 		compressing:           utils.NewOnce(),
@@ -218,11 +221,11 @@ func (m *Timeline) CreateSubTimeline(ids ...int64) *Timeline {
 }
 
 func (m *Timeline) SoftBindConfig(config AICallerConfigIf, aiCaller AICaller) {
-	if m.config == nil {
+	if config != nil {
 		m.config = config
 		m.SetTimelineContentLimit(config.GetTimelineContentSizeLimit())
 	}
-	if utils.IsNil(m.ai) {
+	if !utils.IsNil(aiCaller) {
 		m.setAICaller(aiCaller)
 	}
 }
@@ -236,6 +239,7 @@ func NewTimeline(ai AICaller, extraMetaInfo func() string) *Timeline {
 		idToTs:           omap.NewOrderedMap(map[int64]int64{}),
 		summary:          omap.NewOrderedMap(map[int64]*linktable.LinkTable[*TimelineItem]{}),
 		reducers:         omap.NewOrderedMap(map[int64]*linktable.LinkTable[string]{}),
+		archiveRefs:      omap.NewOrderedMap(map[int64]*TimelineArchiveRef{}),
 		compressing:      utils.NewOnce(),
 	}
 }
@@ -488,6 +492,13 @@ func (m *Timeline) batchCompressByTargetSize(targetSize int) {
 	} else {
 		m.reducers.Set(lastCompressedId, linktable.NewUnlimitedStringLinkTable(compressedMemory))
 	}
+	m.attachArchiveRef(lastCompressedId, m.archiveForgottenBatch(
+		TimelineArchiveReasonBatchCompress,
+		lastCompressedId,
+		idsToRemove,
+		itemsToCompress,
+		compressedMemory,
+	))
 	log.Infof("batch compressed %d items into reducer at id: %v", len(itemsToCompress), lastCompressedId)
 
 	// 删除被压缩的 items
@@ -605,6 +616,10 @@ func (m *Timeline) emergencyCompress(targetSize int) {
 	// Keep removing oldest items until we're under target size
 	// We need to keep at least 1 item
 	removedCount := 0
+	var removedIDs []int64
+	var removedItems []*TimelineItem
+	var emergencySummaries []string
+	var lastRemovedID int64
 	for len(itemIDs) > 1 && currentSize > targetSize {
 		// Remove the oldest item (first in the list)
 		oldestID := itemIDs[0]
@@ -618,6 +633,12 @@ func (m *Timeline) emergencyCompress(targetSize int) {
 
 		// Create a brief summary of what was removed (without AI)
 		briefSummary := m.createEmergencySummary(item, oldestID)
+		removedIDs = append(removedIDs, oldestID)
+		removedItems = append(removedItems, item)
+		if briefSummary != "" {
+			emergencySummaries = append(emergencySummaries, briefSummary)
+		}
+		lastRemovedID = oldestID
 
 		// Remove from all maps
 		if ts, ok := m.idToTs.Get(oldestID); ok {
@@ -646,6 +667,15 @@ func (m *Timeline) emergencyCompress(targetSize int) {
 			}
 			currentSize = len(tlstr)
 		}
+	}
+	if len(removedIDs) > 0 {
+		m.attachArchiveRef(lastRemovedID, m.archiveForgottenBatch(
+			TimelineArchiveReasonEmergencyCompress,
+			lastRemovedID,
+			removedIDs,
+			removedItems,
+			strings.Join(emergencySummaries, "\n"),
+		))
 	}
 
 	// Final size check
@@ -891,6 +921,18 @@ func (m *Timeline) DumpBefore(beforeId int64) string {
 
 	shrinkStartId, _, _ := m.summary.Last()
 	reduceredStartId, _, _ := m.reducers.Last()
+	archiveStartId, archiveRef, _ := m.archiveRefs.Last()
+
+	if archiveStartId > 0 && archiveRef != nil {
+		initOnce.Do(func() {
+			buf.WriteString("timeline:\n")
+		})
+		archiveTimeStr := archiveRef.CreatedAt.Format(utils.DefaultTimeFormat3)
+		if archiveTimeStr == "" || archiveRef.CreatedAt.IsZero() {
+			archiveTimeStr = time.Now().Format(utils.DefaultTimeFormat3)
+		}
+		buf.WriteString(fmt.Sprintf("--[%s] id: %v archive-memory: %s\n", archiveTimeStr, archiveStartId, archiveRef.String()))
+	}
 
 	// If we have reducers, show them first
 	if reduceredStartId > 0 {
@@ -951,6 +993,103 @@ func (m *Timeline) DumpBefore(beforeId int64) string {
 
 	buf.WriteString("no timeline generated in DumpBefore\n")
 	return buf.String()
+}
+
+func (m *Timeline) attachArchiveRef(reducerKeyID int64, ref *TimelineArchiveRef) {
+	if reducerKeyID <= 0 || ref == nil {
+		return
+	}
+	if m.archiveRefs == nil {
+		m.archiveRefs = omap.NewOrderedMap(map[int64]*TimelineArchiveRef{})
+	}
+	m.archiveRefs.Set(reducerKeyID, ref)
+}
+
+func (m *Timeline) archiveForgottenBatch(reason TimelineArchiveReason, reducerKeyID int64, ids []int64, items []*TimelineItem, summary string) *TimelineArchiveRef {
+	store := m.timelineArchiveStore()
+	if store == nil || len(ids) == 0 || len(items) == 0 {
+		return nil
+	}
+
+	startID := ids[0]
+	endID := ids[len(ids)-1]
+	refID := utils.CalcSha256(
+		fmt.Sprintf("%s", reason),
+		strconv.FormatInt(reducerKeyID, 10),
+		strconv.FormatInt(startID, 10),
+		strconv.FormatInt(endID, 10),
+		strings.TrimSpace(summary),
+	)
+
+	batch := &TimelineArchiveBatch{
+		ArchiveID:           "timeline-archive-" + refID[:16],
+		PersistentSessionID: m.timelinePersistentSessionID(),
+		Reason:              reason,
+		Summary:             strings.TrimSpace(summary),
+		ReducerKeyID:        reducerKeyID,
+		SourceStartID:       startID,
+		SourceEndID:         endID,
+		ItemCount:           len(ids),
+		RepresentativeSnips: timelineArchiveRepresentativeSnippets(items, 3),
+		Tags: []string{
+			"timeline_midterm",
+			fmt.Sprintf("timeline_range_%d_%d", startID, endID),
+			fmt.Sprintf("timeline_reason_%s", reason),
+		},
+	}
+
+	if len(items) > 0 {
+		batch.SourceStartAt = items[0].createdAt
+		batch.SourceEndAt = items[len(items)-1].createdAt
+	}
+
+	ref, err := store.ArchiveCompressedBatch(context.Background(), batch)
+	if err != nil {
+		log.Warnf("archive forgotten timeline batch failed: %v", err)
+		return nil
+	}
+	return ref
+}
+
+func timelineArchiveRepresentativeSnippets(items []*TimelineItem, limit int) []string {
+	if limit <= 0 {
+		limit = 3
+	}
+	result := make([]string, 0, limit)
+	for _, item := range items {
+		if item == nil {
+			continue
+		}
+		snippet := strings.TrimSpace(utils.ShrinkString(item.String(), 240))
+		if snippet == "" {
+			continue
+		}
+		result = append(result, snippet)
+		if len(result) >= limit {
+			break
+		}
+	}
+	return result
+}
+
+func (m *Timeline) timelineArchiveStore() TimelineArchiveStore {
+	if m == nil || m.config == nil {
+		return nil
+	}
+	if provider, ok := m.config.(interface{ GetTimelineArchiveStore() TimelineArchiveStore }); ok {
+		return provider.GetTimelineArchiveStore()
+	}
+	return nil
+}
+
+func (m *Timeline) timelinePersistentSessionID() string {
+	if m == nil || m.config == nil {
+		return ""
+	}
+	if provider, ok := m.config.(interface{ GetPersistentSessionID() string }); ok {
+		return provider.GetPersistentSessionID()
+	}
+	return ""
 }
 
 //go:embed prompts/timeline/tool_result_history.txt

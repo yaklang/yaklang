@@ -161,3 +161,32 @@ func TestConfig_SessionPromptStatePropagation(t *testing.T) {
 	require.Len(t, history, 2)
 	require.Equal(t, "round-2", parent.GetPrevSessionUserInput())
 }
+
+func TestConfig_ConvertConfigToOptions_RebindsTimelineConfigForArchiveStore(t *testing.T) {
+	parent := NewConfig(context.Background())
+	require.NotNil(t, parent.Timeline)
+	require.Nil(t, parent.TimelineArchiveStore)
+
+	child := NewConfig(context.Background(), ConvertConfigToOptions(parent)...)
+	require.Same(t, parent.Timeline, child.Timeline)
+
+	store := &mockTimelineArchiveStore{}
+	child.TimelineArchiveStore = store
+
+	got := child.Timeline.timelineArchiveStore()
+	require.NotNil(t, got)
+	require.True(t, got == store)
+}
+
+func TestConfig_ConvertConfigToOptions_PropagatesTimelineArchiveStore(t *testing.T) {
+	parent := NewConfig(context.Background())
+	store := &mockTimelineArchiveStore{}
+	parent.TimelineArchiveStore = store
+
+	child := NewConfig(context.Background(), ConvertConfigToOptions(parent)...)
+
+	require.Same(t, store, child.TimelineArchiveStore)
+	got := child.Timeline.timelineArchiveStore()
+	require.NotNil(t, got)
+	require.True(t, got == store)
+}
