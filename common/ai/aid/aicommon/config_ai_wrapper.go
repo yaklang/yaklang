@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aiddb"
-	ytokenizer "github.com/yaklang/yaklang/common/ai/tokenizer"
+	"github.com/yaklang/yaklang/common/ai/ytoken"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -127,7 +127,7 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 		if c.AiAutoRetry <= 0 {
 			c.AiAutoRetry = 1
 		}
-		tokenSize := ytokenizer.CalcTokenCount(request.GetPrompt())
+		tokenSize := ytoken.CalcTokenCount(request.GetPrompt())
 
 		start := time.Now()
 		for _idx := 0; _idx < int(c.AiAutoRetry); _idx++ {

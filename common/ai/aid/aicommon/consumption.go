@@ -6,7 +6,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	ytokenizer "github.com/yaklang/yaklang/common/ai/tokenizer"
+	"github.com/yaklang/yaklang/common/ai/ytoken"
 )
 
 // CreateConsumptionReader creates a Reader that periodically reports accumulated token count via callback.
@@ -37,7 +37,7 @@ type consumptionReader struct {
 
 // estimateTokens calculates token count using Qwen BPE vocabulary.
 func estimateTokens(data []byte) int {
-	return ytokenizer.CalcTokenCount(string(data))
+	return ytoken.CalcTokenCount(string(data))
 }
 
 func (t *consumptionReader) Read(p []byte) (n int, err error) {

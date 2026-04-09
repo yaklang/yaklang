@@ -1,4 +1,4 @@
-package ytokenizer
+package ytoken
 
 import (
 	"bufio"
@@ -69,12 +69,12 @@ func initSpecialTokens() {
 func decompressBpeData() []byte {
 	gr, err := gzip.NewReader(bytes.NewReader(qwenBpeDataGz))
 	if err != nil {
-		panic("ytokenizer: gzip open: " + err.Error())
+		panic("ytoken: gzip open: " + err.Error())
 	}
 	defer gr.Close()
 	data, err := io.ReadAll(gr)
 	if err != nil {
-		panic("ytokenizer: gzip decompress: " + err.Error())
+		panic("ytoken: gzip decompress: " + err.Error())
 	}
 	return data
 }
@@ -91,20 +91,20 @@ func initMergeableRanks() {
 		}
 		sp := strings.LastIndex(line, " ")
 		if sp < 0 {
-			panic("ytokenizer: malformed BPE line: " + line)
+			panic("ytoken: malformed BPE line: " + line)
 		}
 		tokBytes, err := base64.StdEncoding.DecodeString(line[:sp])
 		if err != nil {
-			panic("ytokenizer: base64 decode: " + err.Error())
+			panic("ytoken: base64 decode: " + err.Error())
 		}
 		rank, err := strconv.Atoi(line[sp+1:])
 		if err != nil {
-			panic("ytokenizer: rank parse: " + err.Error())
+			panic("ytoken: rank parse: " + err.Error())
 		}
 		mergeableRanks[string(tokBytes)] = rank
 	}
 	if err := scanner.Err(); err != nil {
-		panic("ytokenizer: scanner: " + err.Error())
+		panic("ytoken: scanner: " + err.Error())
 	}
 }
 

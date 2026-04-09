@@ -1,4 +1,4 @@
-package ytokenizer
+package ytoken
 
 import (
 	"fmt"

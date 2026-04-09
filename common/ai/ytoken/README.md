@@ -1,30 +1,30 @@
-# ytokenizer - Qwen BPE Token Estimator
+# ytoken - Qwen BPE Token Estimator
 
-Qwen 模型的本地 BPE (Byte Pair Encoding) 分词器，用于精确估算 token 数量。
+import "github.com/yaklang/yaklang/common/ai/ytoken"
 
 ## 核心特性
-
+count := ytoken.CalcTokenCount("你好，世界！")
 - **精确计数**：使用 Qwen 官方 BPE 词表（151,643 mergeable + 208 special = 151,851 tokens），与 Qwen/Qwen2/Qwen3 系列模型完全一致
 - **零外部依赖**：不引入新的 `go.mod` 依赖，仅使用项目已有的 `dlclark/regexp2`
-- **纯本地运行**：词表通过 `go:embed` 内嵌（gzip 压缩，1.1MB），无运行时文件依赖
+count := ytoken.CalcOrdinaryTokenCount("普通文本")
 - **延迟初始化**：`sync.Once` 保证首次调用时解压加载词表，后续调用零开销
 
-## 使用方式
+ids := ytoken.Encode("<|im_start|>user\n你好<|im_end|>")
 
 ```go
-import "github.com/yaklang/yaklang/common/ai/tokenizer"
+text := ytoken.Decode(ids)
 
 // 计算 token 数量（含 special token 处理）
-count := ytokenizer.CalcTokenCount("你好，世界！")
+count := ytoken.CalcTokenCount("你好，世界！")
 
 // 不处理 special token 的计数
-count := ytokenizer.CalcOrdinaryTokenCount("普通文本")
+count := ytoken.CalcOrdinaryTokenCount("普通文本")
 
 // 获取 token ID 列表
-ids := ytokenizer.Encode("<|im_start|>user\n你好<|im_end|>")
+ids := ytoken.Encode("<|im_start|>user\n你好<|im_end|>")
 
 // token ID 还原为文本
-text := ytokenizer.Decode(ids)
+text := ytoken.Decode(ids)
 ```
 
 ## API
@@ -121,10 +121,10 @@ Token ID 列表
 
 ```bash
 # 运行全部测试（含比率分析报告）
-go test -v ./common/ai/tokenizer/
+go test -v ./common/ai/ytoken/
 
 # 运行 benchmark
-go test -bench=. -benchmem ./common/ai/tokenizer/
+go test -bench=. -benchmem ./common/ai/ytoken/
 ```
 
 测试覆盖：
@@ -141,9 +141,9 @@ go test -bench=. -benchmem ./common/ai/tokenizer/
 ## 文件结构
 
 ```
-common/ai/tokenizer/
+common/ai/ytoken/
   qwen.tiktoken.gz      -- gzip 压缩的 BPE 词表 (1.1MB, embed 到二进制)
-  ytokenizer.go          -- 实现: 词表加载 + BPE 算法 + 公共 API
-  ytokenizer_test.go     -- 测试: 正确性 + 比率分析 + 稳定性 + benchmark
+  ytoken.go             -- 实现: 词表加载 + BPE 算法 + 公共 API
+  ytoken_test.go        -- 测试: 正确性 + 比率分析 + 稳定性 + benchmark
   README.md              -- 本文档
 ```
