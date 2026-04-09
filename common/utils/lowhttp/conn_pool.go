@@ -249,7 +249,7 @@ func (l *LowHttpConnPool) putIdleConn(pc *persistConn) error {
 		}
 	}
 
-	if l.connCount >= l.maxIdleConn { // if conn pool is full, remove oldest
+	if l.maxIdleConn > 0 && l.connCount >= l.maxIdleConn { // if conn pool is full, remove oldest
 		oldPconn := l.idleLRU.removeOldest()
 		err := l.removeConnLocked(oldPconn, !oldPconn.IsH2Conn())
 		if err != nil {

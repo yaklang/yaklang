@@ -550,8 +550,8 @@ func (m *MITMServer) ServerListener(ctx context.Context, lis net.Listener) error
 
 	// Create connection pool with cancellable context
 	m.connPoolCtx, m.connPoolCancel = context.WithCancel(ctx)
-	m.connPool = lowhttp.NewHttpConnPool(m.connPoolCtx, 100, 2)
-	m.strongHostConnPool = lowhttp.NewHttpConnPool(m.connPoolCtx, 100, 2)
+	m.connPool = lowhttp.NewHttpConnPool(m.connPoolCtx, 0, 2)
+	m.strongHostConnPool = lowhttp.NewHttpConnPool(m.connPoolCtx, 0, 2)
 	m.proxy.SetConnPool(m.connPool)
 	m.proxy.SetStrongHostConnPool(m.strongHostConnPool)
 
