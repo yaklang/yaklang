@@ -21,6 +21,7 @@ func _SearchValue(value *Value, mod ssadb.MatchMode, compare func(string) bool, 
 	newValue := make([]*Value, 0)
 	newValue = append(newValue, SearchWithValue(value, mod, compare, opt...)...)
 	newValue = append(newValue, SearchWithCFG(value, mod, compare, opt...)...)
+	newValue = append(newValue, Values(newValue).ExpandPhiClosure()...)
 	return newValue
 }
 

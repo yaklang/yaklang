@@ -53,7 +53,6 @@ func Test_Stmt(t *testing.T) {
 	)
 }
 
-/* // TODO: select send and recv
 func Test_Statement(t *testing.T) {
 	t.Run("select send and recv", func(t *testing.T) {
 		code := `package main
@@ -81,7 +80,7 @@ func Test_Statement(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code, `
 		println(* #-> as $target)
 		`, map[string][]string{
-			"target": {"1", "2"},
+			"target": {"make(any)", "make(any)"},
 		}, ssaapi.WithLanguage(ssaconfig.GO))
 	})
-}*/
+}

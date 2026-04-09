@@ -205,105 +205,68 @@ func (p *Program) matchVariable(ctx context.Context, compareMode ssadb.CompareMo
 	return p.matchVariableWithExcludeFiles(ctx, compareMode, mod, pattern, nil)
 }
 
-// valueTransitivelyMergesFormalParam 判断 SSA 值（含嵌套 phi）是否在数据流上合并了给定形式参数。
-func valueTransitivelyMergesFormalParam(ir *ssa.Program, val ssa.Value, paramID int64, visited map[int64]struct{}) bool {
-	if utils.IsNil(val) {
-		return false
+// appendPointerClosurePhisFromValue 从任意 SSA 值出发，沿 GetPointer() 做闭包展开补齐嵌套 phi。
+//
+// 为避免结果污染，默认约束在“同名 + 同函数”的 phi 集合内；起点没有 name/func 时则只做最小化过滤。
+func appendPointerClosurePhisFromValue(p *Program, start ssa.Value, seen map[int64]struct{}, out *Values) {
+	if p == nil || p.Program == nil || utils.IsNil(start) {
+		return
 	}
-	id := val.GetId()
-	if _, ok := visited[id]; ok {
-		return false
-	}
-	visited[id] = struct{}{}
-	if pv, ok := ssa.ToParameter(val); ok && pv != nil && pv.GetId() == paramID {
-		return true
-	}
-	phi, ok := ssa.ToPhi(val)
-	if !ok || phi == nil {
-		return false
-	}
-	for _, eid := range phi.Edge {
-		v, ok := ir.GetInstructionById(eid)
-		if !ok {
-			continue
-		}
-		ev, ok := ssa.ToValue(v)
-		if !ok {
-			continue
-		}
-		if valueTransitivelyMergesFormalParam(ir, ev, paramID, visited) {
-			return true
-		}
-	}
-	return false
-}
 
-// appendSameFuncPhisMergingFormalParameter 在同函数内扫描 phi：与形式参数同名且边上（递归）出现该参数时，视为同一变量合并点。
-// 用于循环等场景下 Point 反向链不完整、GetPointer 为空时的补全（不沿 GetUsers 做 BFS）。
-func appendSameFuncPhisMergingFormalParameter(p *Program, param *ssa.Parameter, pname string, paramID int64, seen map[int64]struct{}, out *Values) {
-	ir := p.Program
-	if ir == nil || param == nil || pname == "" {
-		return
+	startName := start.GetName()
+	startFn := start.GetFunc()
+	startFnID := int64(0)
+	if startFn != nil {
+		startFnID = startFn.GetId()
 	}
-	fn := param.GetFunc()
-	if fn == nil {
-		return
-	}
-	paramFnID := fn.GetId()
-	for _, bid := range fn.Blocks {
-		block, ok := fn.GetBasicBlockByID(bid)
-		if !ok || block == nil {
+
+	queue := []ssa.PointerIF{start}
+	queued := make(map[int64]struct{}, 8)
+	queued[start.GetId()] = struct{}{}
+
+	for qi := 0; qi < len(queue); qi++ {
+		cur := queue[qi]
+		if cur == nil {
 			continue
 		}
-		for _, phiID := range block.Phis {
-			inst, ok := ir.GetInstructionById(phiID)
-			if !ok {
+		for _, ptr := range cur.GetPointer() {
+			if utils.IsNil(ptr) {
 				continue
 			}
-			phi, ok := ssa.ToPhi(inst)
-			if !ok || phi == nil || phi.GetName() != pname {
+			phi, ok := ssa.ToPhi(ptr)
+			if !ok || phi == nil {
 				continue
 			}
-			pf := phi.GetFunc()
-			if pf == nil || pf.GetId() != paramFnID {
+			if startName != "" && phi.GetName() != startName {
 				continue
+			}
+			if startFnID != 0 {
+				pf := phi.GetFunc()
+				if pf == nil || pf.GetId() != startFnID {
+					continue
+				}
 			}
 			pid := phi.GetId()
-			if _, dup := seen[pid]; dup {
-				continue
-			}
-			merged := false
-			for _, eid := range phi.Edge {
-				v, ok := ir.GetInstructionById(eid)
-				if !ok {
-					continue
-				}
-				ev, ok := ssa.ToValue(v)
-				if !ok {
-					continue
-				}
-				if valueTransitivelyMergesFormalParam(ir, ev, paramID, make(map[int64]struct{})) {
-					merged = true
-					break
+			if _, dup := seen[pid]; !dup {
+				nv, err := p.NewValue(phi)
+				if err == nil && nv != nil {
+					seen[pid] = struct{}{}
+					*out = append(*out, nv)
 				}
 			}
-			if !merged {
+			if _, ok := queued[pid]; ok {
 				continue
 			}
-			nv, err := p.NewValue(phi)
-			if err != nil || nv == nil {
-				continue
-			}
-			seen[pid] = struct{}{}
-			*out = append(*out, nv)
+			queued[pid] = struct{}{}
+			queue = append(queue, phi)
 		}
 	}
+
 }
 
 // appendPointerLinkedPhisFromParameters 对每个匹配到的形式参数：
-// 1) 追加 GetPointer() 上 reference 指向该形参的 phi（Point 语义）；
-// 2) 再按「同函数、同名 phi、边上合并该参数」补全循环等场景下未出现在 GetPointer 的 phi。
-func appendPointerLinkedPhisFromParameters(p *Program, values Values) Values {
+// 沿 GetPointer() 做闭包展开补齐嵌套 phi（不扫描全函数，也不沿 GetUsers BFS）。
+func (p *Program) appendPointerLinkedPhisFromParameters(values Values) Values {
 	if p == nil || len(values) == 0 {
 		return values
 	}
@@ -318,43 +281,12 @@ func appendPointerLinkedPhisFromParameters(p *Program, values Values) Values {
 		if v == nil {
 			continue
 		}
-		paramInst := v.getInstruction()
-		param, ok := ssa.ToParameter(paramInst)
-		if !ok || param == nil || param.IsFreeValue {
+		inst := v.getInstruction()
+		start, ok := ssa.ToValue(inst)
+		if !ok || utils.IsNil(start) {
 			continue
 		}
-		paramID := paramInst.GetId()
-		pname := param.GetName()
-		ptrSrc, ok := paramInst.(ssa.PointerIF)
-		if ok && ptrSrc != nil {
-			for _, ptr := range ptrSrc.GetPointer() {
-				if utils.IsNil(ptr) {
-					continue
-				}
-				phiInst, ok := ssa.ToPhi(ptr)
-				if !ok || phiInst == nil {
-					continue
-				}
-				ref := ptr.GetReference()
-				if utils.IsNil(ref) || ref.GetId() != paramID {
-					continue
-				}
-				if pname != "" && phiInst.GetName() != pname {
-					continue
-				}
-				pid := ptr.GetId()
-				if _, dup := seen[pid]; dup {
-					continue
-				}
-				nv, err := p.NewValue(phiInst)
-				if err != nil || nv == nil {
-					continue
-				}
-				seen[pid] = struct{}{}
-				out = append(out, nv)
-			}
-		}
-		appendSameFuncPhisMergingFormalParameter(p, param, pname, paramID, seen, &out)
+		appendPointerClosurePhisFromValue(p, start, seen, &out)
 	}
 	return out
 }
@@ -373,7 +305,7 @@ func (p *Program) matchVariableWithExcludeFiles(ctx context.Context, compareMode
 			}
 		},
 	)
-	values = appendPointerLinkedPhisFromParameters(p, values)
+	// values = values.ExpandPhiClosure()
 	// 将 Values 转换为 sfvm.ValueOperator
 	return len(values) > 0, ToSFVMValues(values), nil
 }

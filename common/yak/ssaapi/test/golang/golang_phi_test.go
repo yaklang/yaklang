@@ -494,7 +494,7 @@ func TestPhi_in_loop(t *testing.T) {
 new() as $f
 $f.JSON as $a
 *.JSON as $b
-	`
+`
 	ruleGinJSON := `
 gin.Context as $f
 $f.JSON as $a
@@ -556,6 +556,31 @@ $f.JSON as $a
 			want: map[string]int{"f": 1, "a": 1, "b": 3},
 		},
 		{
+			name: "If phi inside loop",
+			code: `package api
+
+		func GetUserEmail() {
+			f := new()
+
+			if err != nil {
+				f.JSON(1)
+				f = new2()
+			}
+
+			f.JSON(2)
+			for row.Next() {
+				if err != nil {
+					f.JSON(3)
+				}
+			}
+
+			f.JSON(4)
+		}
+		`,
+			rule: ruleNewJSON,
+			want: map[string]int{"f": 1, "a": 2, "b": 2},
+		},
+		{
 			name: "If return in param",
 			code: `package api
 
@@ -608,7 +633,7 @@ func GetUserEmail(f *gin.Context) {
 }
 `,
 			rule: ruleGinJSON,
-			want: map[string]int{"f": 3, "a": 4, "b": 4},
+			want: map[string]int{"f": 2, "a": 2, "b": 4},
 		},
 	}
 
