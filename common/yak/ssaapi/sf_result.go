@@ -108,8 +108,21 @@ func (r *SyntaxFlowResult) setMemoryResult(res *sfvm.SFFrameResult) {
 	r.memResult = res
 	size := 0
 	sortFunc := func(vo sfvm.Values) sfvm.Values {
-		values := FromSFVMValues(vo)
-		size += len(values)
+		// Preserve non-*Value synthetic carriers (e.g. cfg ctx / structured guards),
+		// but only sort concrete *Value instances by source location.
+		values := make(Values, 0)
+		others := make([]sfvm.ValueOperator, 0)
+		for _, op := range vo {
+			if utils.IsNil(op) || op.IsEmpty() {
+				continue
+			}
+			if v, ok := op.(*Value); ok {
+				values = append(values, v)
+				continue
+			}
+			others = append(others, op)
+		}
+		size += len(values) + len(others)
 		sort.Slice(values, func(i, j int) bool {
 			// sort by file
 			valueI := values[i]
@@ -134,7 +147,15 @@ func (r *SyntaxFlowResult) setMemoryResult(res *sfvm.SFFrameResult) {
 			}
 			return i < j // all same just by index
 		})
-		return ToSFVMValues(values)
+		sorted := make([]sfvm.ValueOperator, 0, len(values)+len(others))
+		for _, v := range values {
+			if v == nil || v.IsEmpty() {
+				continue
+			}
+			sorted = append(sorted, v)
+		}
+		sorted = append(sorted, others...)
+		return sfvm.NewValues(sorted)
 	}
 	res.SymbolTable = res.SymbolTable.Map(func(s string, vo sfvm.Values) (string, sfvm.Values, error) {
 		return s, sortFunc(vo), nil

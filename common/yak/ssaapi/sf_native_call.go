@@ -1564,7 +1564,8 @@ func haveResult(operator sfvm.Values) bool {
 	}
 	haveResultFlag := false
 	_ = operator.Recursive(func(operator sfvm.ValueOperator) error {
-		if _, ok := operator.(*Value); ok {
+		switch operator.(type) {
+		case *Value, *CfgCtxValue, *GuardPredicateValue:
 			haveResultFlag = true
 			return utils.Error("abort")
 		}

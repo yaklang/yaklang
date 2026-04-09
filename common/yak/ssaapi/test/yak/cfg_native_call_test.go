@@ -74,8 +74,32 @@ $arg<getCfg> as $sinkCfg
 $sinkCfg<cfgGuards> as $guards
 `, ssaapi.QueryWithEnableDebug())
 		require.NoError(t, err)
-		require.Greater(t, res.GetValues("guards").Count(), 0)
+		require.Contains(t, res.String(), "guard(kind=earlyReturn")
 		return nil
 	}, ssaapi.WithLanguage(ssaconfig.Yak))
 }
 
+func TestNativeCall_CFGReachable_ICFG_CallIntoCallee(t *testing.T) {
+	code := `
+func foo() {
+    println("infoo")
+}
+
+foo()
+println("after")
+`
+	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+		res, err := prog.SyntaxFlowWithError(`
+println(*?{have: "after"} #-> as $afterArg)
+println(*?{have: "infoo"} #-> as $infooArg)
+
+$afterArg<getCfg> as $callerCfg
+$infooArg<getCfg> as $calleeCfg
+
+$callerCfg<cfgReachable(target="$calleeCfg")> as $reach
+`, ssaapi.QueryWithEnableDebug())
+		require.NoError(t, err)
+		require.Contains(t, res.GetValues("reach").String(), "true")
+		return nil
+	}, ssaapi.WithLanguage(ssaconfig.Yak))
+}
