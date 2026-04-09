@@ -237,53 +237,6 @@ func (b FunctionBuilder) HandlerEllipsis() {
 	b.hasEllipsis = true
 }
 
-// linkPhiToFormalParamByName 在 phi 边上未直接出现形式参数时（例如循环头合并 phi），
-// 按变量名与同名的形式参数建立 Point（pointer.SetReference(形参)、形参.AddPointer(phi)）。
-// 若 phi 已由 SpinHandle 等对其它 SSA 值建立了 reference，只要不是已指向该同名形式参数，
-// 仍改为指向形式参数，使 Parameter.GetPointer() 能覆盖嵌套合并产生的多层 phi，
-// SyntaxFlow 无需在 ssaapi 层再拼接 phi。
-func (f *FunctionBuilder) linkPhiToFormalParamByName(phi *Phi, varName string) {
-	if f == nil || f.Function == nil || phi == nil || varName == "" {
-		return
-	}
-	prog := f.GetProgram()
-	if prog == nil {
-		return
-	}
-	var matchParam *Parameter
-	for _, paramID := range f.Params {
-		inst, ok := prog.GetInstructionById(paramID)
-		if !ok || utils.IsNil(inst) {
-			continue
-		}
-		param, ok := ToParameter(inst)
-		if !ok || param == nil || param.IsFreeValue {
-			continue
-		}
-		if param.GetName() != varName {
-			continue
-		}
-		matchParam = param
-		break
-	}
-	if matchParam == nil {
-		return
-	}
-	if ref := phi.GetReference(); ref != nil {
-		if p, ok := ToParameter(ref); ok && p != nil && p.GetId() == matchParam.GetId() {
-			return
-		}
-		// 仅覆盖 reference 仍为 phi 合并链、或循环/未定义占位边（Undefined）的情形，避免破坏 SpinHandle
-		// 等对其它具体 SSA 值的 Point。
-		_, isPhi := ToPhi(ref)
-		_, isUnd := ToUndefined(ref)
-		if !isPhi && !isUnd {
-			return
-		}
-	}
-	Point(phi, matchParam)
-}
-
 func (b *FunctionBuilder) EmitDefer(instruction Instruction) {
 	deferBlock := b.GetDeferBlock()
 	endBlock := b.CurrentBlock

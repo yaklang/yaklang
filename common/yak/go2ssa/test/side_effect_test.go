@@ -417,7 +417,7 @@ func Test_SideEffect_Object(t *testing.T) {
 			f1()
 			println(o.a)
 		}
-		`, []string{"Undefined-o.a(valid)"}, t)
+		`, []string{"ParameterMember-freeValue-o.a"}, t)
 	})
 }
 
