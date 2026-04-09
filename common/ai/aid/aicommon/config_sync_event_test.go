@@ -67,6 +67,10 @@ func TestHandleSyncUserIntervention(t *testing.T) {
 		require.Len(t, entries, 1)
 		require.Equal(t, "text", entries[0].Type)
 		require.Equal(t, "[User Intervention] "+content, entries[0].Content)
+		history := c.GetUserInputHistory()
+		require.Len(t, history, 1)
+		require.Equal(t, content, history[0].UserInput)
+		require.Equal(t, content, c.GetPrevSessionUserInput())
 	})
 
 	t.Run("emits error when content is empty", func(t *testing.T) {
@@ -123,4 +127,8 @@ func TestProcessInputEvent_SyncUserIntervention(t *testing.T) {
 		entries := c.Timeline.ToTimelineItemOutputLastN(1)
 		return len(entries) == 1 && entries[0].Content == "[User Intervention] "+content
 	}, time.Second, 20*time.Millisecond)
+
+	history := c.GetUserInputHistory()
+	require.Len(t, history, 1)
+	require.Equal(t, content, history[0].UserInput)
 }

@@ -3,6 +3,7 @@ package aicommon
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -111,4 +112,23 @@ func TestConfig_ToolManagerPropagation(t *testing.T) {
 
 	require.Same(t, parent.GetAiToolManager(), child.GetAiToolManager())
 	require.True(t, child.GetAiToolManager().IsRecentlyUsedTool("now"))
+}
+
+func TestConfig_SessionPromptStatePropagation(t *testing.T) {
+	parent := NewConfig(context.Background())
+	parent.SetSessionTitle("shared-title")
+	_, err := parent.AppendUserInputHistory("round-1", time.Now())
+	require.NoError(t, err)
+
+	child := NewConfig(context.Background(), ConvertConfigToOptions(parent)...)
+	require.Same(t, parent.GetSessionPromptState(), child.GetSessionPromptState())
+	require.Equal(t, "shared-title", child.GetSessionTitle())
+	require.Equal(t, "round-1", child.GetPrevSessionUserInput())
+
+	_, err = child.AppendUserInputHistory("round-2", time.Now())
+	require.NoError(t, err)
+
+	history := parent.GetUserInputHistory()
+	require.Len(t, history, 2)
+	require.Equal(t, "round-2", parent.GetPrevSessionUserInput())
 }
