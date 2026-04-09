@@ -30,6 +30,7 @@ type Save[T any] struct {
 	metrics saveMetrics
 }
 
+// SaveStats is a compact debug snapshot of the async saver state.
 type SaveStats struct {
 	Pending           int64
 	MaxPending        int64
@@ -49,7 +50,7 @@ func (s SaveStats) AvgBatchSize() float64 {
 	return float64(s.BatchItemsTotal) / float64(s.BatchCount)
 }
 
-func (s SaveStats) Show() string {
+func (s SaveStats) String() string {
 	return fmt.Sprintf(
 		"pending=%d pending_max=%d batch_count=%d avg_batch=%.2f max_batch=%d enqueue_block_total=%s enqueue_block_max=%s save_loop_time=%s save_loop_max=%s",
 		s.Pending,
@@ -78,10 +79,10 @@ type saveMetrics struct {
 
 func (m *saveMetrics) recordEnqueue(blockCost time.Duration) {
 	pending := m.pending.Add(1)
-	updateAtomicMaxInt64(&m.maxPending, pending)
+	setAtomicMaxIfGreater(&m.maxPending, pending)
 	if blockCost > 0 {
 		m.enqueueBlockTotal.Add(int64(blockCost))
-		updateAtomicMaxInt64(&m.maxEnqueueBlock, int64(blockCost))
+		setAtomicMaxIfGreater(&m.maxEnqueueBlock, int64(blockCost))
 	}
 }
 
@@ -92,10 +93,10 @@ func (m *saveMetrics) recordBatch(size int, saveCost time.Duration) {
 	m.pending.Add(-int64(size))
 	m.batchCount.Add(1)
 	m.batchItemsTotal.Add(uint64(size))
-	updateAtomicMaxInt64(&m.maxBatchSize, int64(size))
+	setAtomicMaxIfGreater(&m.maxBatchSize, int64(size))
 	if saveCost > 0 {
 		m.saveTimeTotal.Add(int64(saveCost))
-		updateAtomicMaxInt64(&m.maxSaveTime, int64(saveCost))
+		setAtomicMaxIfGreater(&m.maxSaveTime, int64(saveCost))
 	}
 }
 
@@ -113,7 +114,9 @@ func (m *saveMetrics) snapshot() SaveStats {
 	}
 }
 
-func updateAtomicMaxInt64(target *atomic.Int64, value int64) {
+// setAtomicMaxIfGreater updates the atomic counter only when the new value is
+// larger than the current one.
+func setAtomicMaxIfGreater(target *atomic.Int64, value int64) {
 	for {
 		current := target.Load()
 		if value <= current {

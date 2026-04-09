@@ -54,7 +54,7 @@ func NewDBCache(cfg *ssaconfig.Config, prog *Program, databaseKind ProgramCacheK
 	cache.sources = newSourceStore(prog, databaseKind, cache.db)
 	cache.indexes = newIndexStore(cfg, prog, databaseKind, cache.db, saveSize/2)
 	cache.types = newTypeStore(cfg, prog, databaseKind, cache.db, programName, saveSize)
-	cache.instructions = newInstructionStore(cfg, prog, databaseKind, cache.db, saveSize, cache.sources)
+	cache.instructions = newInstructionStore(cfg, prog, databaseKind, cache.db, saveSize)
 	return cache
 }
 
@@ -83,11 +83,11 @@ func (c *ProgramCache) EnableInstructionSpill() {
 	c.instructions.EnableSpill()
 }
 
-func (c *ProgramCache) InstructionSpillDisabled() bool {
+func (c *ProgramCache) IsInstructionSpillDisabled() bool {
 	if c == nil || !c.HaveDatabaseBackend() || c.instructions == nil {
 		return false
 	}
-	return c.instructions.SpillDisabled()
+	return c.instructions.IsSpillDisabled()
 }
 
 func (c *ProgramCache) SetInstruction(inst Instruction) {
@@ -191,7 +191,7 @@ func (c *ProgramCache) SaveToDatabase(cb ...func(int)) {
 		func() error {
 			if c.program != nil && c.instructions != nil {
 				stats := c.instructions.Stats()
-				log.Debugf("[ssa-ir-cache-saver] program=%s %s", c.program.GetProgramName(), stats.Show())
+				log.Debugf("[ssa-ir-cache-saver] program=%s %s", c.program.GetProgramName(), stats)
 			}
 			return nil
 		},
@@ -270,7 +270,9 @@ func (c *ProgramCache) findByVariableEx(mod ssadb.MatchMode, checkValue func(str
 	return c.indexes.FindByVariableEx(mod, checkValue, c.GetInstruction)
 }
 
-func trackAtomicMax(counter *atomic.Int64, value int64) {
+// setAtomicMaxIfGreater updates the atomic counter only when the new value is
+// larger than the current one.
+func setAtomicMaxIfGreater(counter *atomic.Int64, value int64) {
 	if counter == nil {
 		return
 	}

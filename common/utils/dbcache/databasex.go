@@ -22,15 +22,18 @@ type saveTask[D any] struct {
 	data    D
 }
 
+// CacheStats is a compact debug snapshot of the residency cache and saver.
 type CacheStats struct {
 	ResidentCount int
 	Saver         SaveStats
 }
 
-func (s CacheStats) Show() string {
-	return fmt.Sprintf("resident=%d %s", s.ResidentCount, s.Saver.Show())
+func (s CacheStats) String() string {
+	return fmt.Sprintf("resident=%d %s", s.ResidentCount, s.Saver)
 }
 
+// Cache combines the residency cache with the marshal/save pipeline used by
+// database-backed modes.
 type Cache[T MemoryItem, D any] struct {
 	resident     *ResidencyCacheWithKey[int64, T]
 	marshalPipe  *pipeline.Pipe[evictionRequest, *saveTask[D]]

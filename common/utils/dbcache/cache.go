@@ -25,6 +25,9 @@ type PersistRequest[K comparable] struct {
 	Reason     utils.EvictionReason
 }
 
+// ResidencyCacheWithKey keeps the live in-memory copy of items and coordinates
+// eviction with the async persistence pipeline. A queued item remains resident
+// until FinishPersist or RejectPersist settles the matching generation.
 type ResidencyCacheWithKey[K comparable, T any] struct {
 	mu sync.RWMutex
 

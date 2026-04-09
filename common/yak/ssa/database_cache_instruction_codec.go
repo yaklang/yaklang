@@ -19,7 +19,8 @@ func marshalInstruction(inst Instruction, irCode *ssadb.IrCode) bool {
 
 	// all instruction from database will be lazy instruction
 	if lz, ok := ToLazyInstruction(inst); ok {
-		// we just check if this lazy-instruction should be saved again?
+		// Reloaded instructions are not persisted again unless the lazy wrapper
+		// was materialized and marked dirty.
 		if !lz.ShouldSave() {
 			return false
 		}
