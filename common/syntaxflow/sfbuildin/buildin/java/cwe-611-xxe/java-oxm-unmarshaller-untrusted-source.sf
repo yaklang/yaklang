@@ -1,0 +1,114 @@
+desc(
+	title: "Detect OXM Unmarshaller On Untrusted XML Source"
+	title_zh: "检测OXM Unmarshaller处理不可信XML源"
+	type: audit
+	risk: "XXE"
+	desc: <<<DESC
+### 规则说明
+当代码把运行时生成的 XML `Source` 直接交给 OXM `Unmarshaller.unmarshal(...)` 处理，而上游来源可以是外部字符串、文件、输入流或通用 `SourceFactory` 转换时，如果底层 XML 解析器未禁用外部实体或 DTD，就可能触发 XXE。
+
+本规则关注的通用模式是：
+- `StringSource(...)`
+- `StreamSource(...)`
+- `SourceFactory.createSource(...)`
+- 以上 `Source` 进入 `Unmarshaller.unmarshal(...)`
+DESC
+	rule_id: "146e6ef8-0530-4b48-9339-79cfb1f26db8"
+	solution: <<<SOLUTION
+### 修复建议
+- 不要把不可信 XML 字符串、文件或流直接交给通用 `Unmarshaller`。
+- 在底层 XML 解析器中显式禁用外部实体和 DTD。
+- 优先在进入 `unmarshal(...)` 前完成 XML 安全预处理和白名单限制。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-611: Improper Restriction of XML External Entity Reference](https://cwe.mitre.org/data/definitions/611.html)
+REFERENCE
+)
+
+StringSource?{<typeName>?{have:'StringSource' || have:'org.springframework.xml.transform.StringSource'}}(* as $stringSourceInput) as $entryStringSource;
+StreamSource?{<typeName>?{have:'StreamSource' || have:'javax.xml.transform.stream.StreamSource'}}(* as $streamSourceInput) as $entryStreamSource;
+createSource?{<getObject><typeName>?{have:'SourceFactory' || have:'org.springframework.integration.xml.source.SourceFactory'}}(* as $entryFactorySourceInput) as $entryFactorySource;
+
+$entryStringSource + $entryStreamSource + $entryFactorySource as $entryXmlSource;
+.unmarshal?{<getObject><typeName>?{have:'Unmarshaller' || have:'org.springframework.oxm.Unmarshaller'}}(*?{* #{until:`* & $entryXmlSource`}->} as $risk) as $riskCall;
+
+alert $risk for {
+	title: "Detect OXM Unmarshaller On Untrusted XML Source",
+	title_zh: "检测OXM Unmarshaller处理不可信XML源",
+	level: "middle",
+	message: "发现运行时 XML Source 直接进入 OXM Unmarshaller.unmarshal(...)，需复核底层解析器是否存在 XXE 风险。",
+	risk: "XXE",
+	name: "risk",
+	desc: <<<DESC
+### 规则说明
+当代码把运行时生成的 XML `Source` 直接交给 OXM `Unmarshaller.unmarshal(...)` 处理，而上游来源可以是外部字符串、文件、输入流或通用 `SourceFactory` 转换时，如果底层 XML 解析器未禁用外部实体或 DTD，就可能触发 XXE。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 不要把不可信 XML 字符串、文件或流直接交给通用 `Unmarshaller`。
+- 在底层 XML 解析器中显式禁用外部实体和 DTD。
+- 优先在进入 `unmarshal(...)` 前完成 XML 安全预处理和白名单限制。
+SOLUTION
+}
+
+desc(
+	lang: java
+	alert_min: 1
+	'file://unsafe-unmarshaller-source.java': <<<CODE
+class StringSource {
+    StringSource(String payload) {
+    }
+}
+
+interface Unmarshaller {
+    Object unmarshal(Object source) throws java.io.IOException;
+}
+
+class UnmarshallingTransformer {
+    private final Unmarshaller unmarshaller = null;
+
+    Object transformPayload(String payload) throws Exception {
+        Object source = new StringSource(payload);
+        return this.unmarshaller.unmarshal(source);
+    }
+}
+CODE
+	'file://unsafe-unmarshaller-factory-source.java': <<<CODE
+interface SourceFactory {
+    Object createSource(Object payload);
+}
+
+interface Unmarshaller {
+    Object unmarshal(Object source) throws java.io.IOException;
+}
+
+class RuntimeSourceTransformer {
+    private final Unmarshaller unmarshaller = null;
+    private final SourceFactory sourceFactory = null;
+
+    Object transformPayload(Object payload) throws Exception {
+        Object source = this.sourceFactory.createSource(payload);
+        return this.unmarshaller.unmarshal(source);
+    }
+}
+CODE
+	"safefile://safe-unmarshaller-dom.java": <<<CODE
+class DOMSource {
+    DOMSource(Object document) {
+    }
+}
+
+interface Unmarshaller {
+    Object unmarshal(Object source) throws java.io.IOException;
+}
+
+class SafeTransformer {
+    private final Unmarshaller unmarshaller = null;
+
+    Object transformPayload() throws Exception {
+        Object source = new DOMSource(new Object());
+        return this.unmarshaller.unmarshal(source);
+    }
+}
+CODE
+)

@@ -1,0 +1,88 @@
+desc(
+	title: "Detect Sensitive HTTP Header Token Output"
+	title_zh: "检测敏感HTTP头令牌输出"
+	type: vuln
+	risk: "敏感认证信息泄露"
+	desc: <<<DESC
+### 漏洞描述
+本规则检测从敏感 HTTP 头部读取的认证或会话标识，被直接输出到标准输出或控制台的代码模式。
+
+重点关注的头部名称包括：
+- `Authorization`
+- `Cookie`
+- `X-Auth-Token`
+- `Authentication-Info`
+- 以及其他包含 `auth` / `token` / `session` 语义的头部
+
+这类输出会把会话标识、访问令牌或认证凭据暴露给控制台采集器、终端回显或运维平台。
+DESC
+	rule_id: "7904f9b7-5e8f-4283-bd88-79047c501a62"
+	solution: <<<SOLUTION
+### 修复建议
+- 不要直接输出认证头、会话头、Cookie 或 Token 值到 stdout 或控制台。
+- 若必须记录调试信息，只记录头部存在性、长度或经过脱敏/哈希后的值。
+- 对控制台输出统一执行敏感字段脱敏。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-532: Insertion of Sensitive Information into Log File](https://cwe.mitre.org/data/definitions/532.html)
+REFERENCE
+)
+
+getHeader(*?{have:'Authorization' || have:'Cookie' || have:'Auth' || have:'Token' || have:'Session'} as $headerName) as $headerValue;
+
+System.out.println(*?{* #{until:`* & $headerValue`}->} as $risk);
+System.out.print(*?{* #{until:`* & $headerValue`}->} as $risk);
+System.out.printf(*?{* #{until:`* & $headerValue`}->} as $risk);
+
+alert $risk for {
+	title: "Detect Sensitive HTTP Header Token Output",
+	title_zh: "检测敏感HTTP头令牌输出",
+	level: "middle",
+	message: "发现敏感 HTTP 头部值被直接输出到 stdout 或控制台，需复核是否泄露了会话标识、访问令牌或认证凭据。",
+	risk: "敏感认证信息泄露",
+	name: "risk",
+	desc: <<<DESC
+### 规则说明
+本规则用于识别认证/会话相关 HTTP 头部值流向标准输出或控制台接口的实现。
+
+如果这些头部值包含会话 ID、Bearer Token、Cookie 或其他认证凭据，控制台采集系统或终端旁观者就可能据此进行会话劫持或凭据滥用。
+DESC
+	solution: <<<SOLUTION
+### 审计建议
+- 控制台输出中不要直接打印敏感 HTTP 头部值。
+- 必须记录时只输出固定掩码、长度、哈希值或前后缀摘要。
+- 对 stdout 做统一敏感字段治理，避免临时调试语句进入发布版本。
+SOLUTION
+}
+
+desc(
+	lang: java
+	alert_min: 2
+	'file://sensitive-header-stdout.java': <<<CODE
+import java.util.List;
+
+interface HttpServletRequest {
+    String getHeader(String name);
+}
+
+class HeaderHttpSessionIdResolver {
+    List<String> resolveSessionIds(HttpServletRequest request) {
+        String headerValue = request.getHeader("X-Auth-Token");
+        System.out.println(headerValue);
+        return java.util.Collections.singletonList(headerValue);
+    }
+}
+CODE
+	'file://authorization-header-stdout.java': <<<CODE
+interface HttpServletRequest {
+    String getHeader(String name);
+}
+
+class AuthorizationPrinter {
+    void bad(HttpServletRequest request) {
+        String auth = request.getHeader("Authorization");
+        System.out.println("authorization=" + auth);
+    }
+}
+CODE
+)

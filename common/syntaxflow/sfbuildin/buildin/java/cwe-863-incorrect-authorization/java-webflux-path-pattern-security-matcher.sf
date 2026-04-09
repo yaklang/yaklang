@@ -22,19 +22,20 @@ REFERENCE
 )
 
 pathWithinApplication() as $pathWithinApplication;
-parse(* as $patternArg);
+parse(* as $patternArg) as $parseCall;
 matchAndExtract(* as $matchAndExtract);
 
-$pathWithinApplication + $patternArg + $matchAndExtract as $risk;
-check $risk;
+check $pathWithinApplication;
+check $parseCall;
+check $matchAndExtract;
 
-alert $risk for {
+alert $matchAndExtract for {
 	title: "Audit WebFlux Path Pattern Security Matching",
 	title_zh: "审计WebFlux路径模式授权匹配",
 	level: "middle",
 	message: "发现基于 WebFlux pathWithinApplication 和 PathPattern 的授权匹配实现，需复核通配符和路径边界语义。",
 	risk: "WebFlux路径授权",
-	name: "risk",
+	name: "matchAndExtract",
 	desc: <<<DESC
 ### 规则说明
 本规则用于审计 WebFlux 安全匹配器中，直接基于 `pathWithinApplication()` 和 `PathPattern` 进行授权判断的实现。

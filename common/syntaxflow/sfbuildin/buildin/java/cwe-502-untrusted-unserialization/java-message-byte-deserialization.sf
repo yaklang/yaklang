@@ -1,0 +1,129 @@
+desc(
+	title: "Detect Message/Header Byte Deserialization"
+	title_zh: "检测消息体或头部字节驱动的反序列化"
+	type: vuln
+	risk: "反序列化漏洞"
+	desc: <<<DESC
+### 漏洞描述
+本规则检测框架或中间件内部，将消息体或消息头字节直接送入 Java 原生反序列化入口的代码模式，包括：
+- 对消息体字节构造 `ByteArrayInputStream` 再创建 `ObjectInputStream`
+- 对头部字节构造 `ByteArrayInputStream` 再创建 `ObjectInputStream`
+- 将消息体或头部字节直接交给 `SerializationUtils.deserialize`
+- 通过 `createObjectInputStream`、`CodebaseAwareObjectInputStream` 这类工厂/包装入口恢复对象
+
+这类模式常见于消息队列、事件总线或异常头恢复逻辑中，容易演变为反序列化 RCE、DoS 或危险对象恢复。
+DESC
+	rule_id: "d22f58cf-4761-4b7e-b55e-6227c09a6890"
+	solution: <<<SOLUTION
+### 修复建议
+- 不要对消息体或消息头中的原始字节直接使用 Java 原生反序列化。
+- 对允许反序列化的类型建立明确 allowlist，并限制为稳定、安全的数据结构。
+- 优先使用 JSON、Protobuf 等无对象图执行语义的安全序列化格式。
+- 不要通过异常头、元数据头等旁路恢复复杂对象。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-502: Deserialization of Untrusted Data](https://cwe.mitre.org/data/definitions/502.html)
+REFERENCE
+)
+
+.getBody?{<getObject><typeName>?{have:'org.springframework.amqp.core.Message' || have:'Message'}}() as $messageBody;
+.value?{<getObject><typeName>?{have:'org.apache.kafka.common.header.Header' || have:'Header'}}() as $headerBytes;
+
+ByteArrayInputStream(*?{* #{until:`* & $messageBody`}->} as $bodyByteSource) as $bodyByteStream;
+ByteArrayInputStream(*?{* #{until:`* & $headerBytes`}->} as $headerByteSource) as $headerByteStream;
+
+ObjectInputStream(*?{* #{until:`* & $bodyByteStream`}->} as $bodyObjectInputArg) as $bodyObjectInput;
+ObjectInputStream(*?{* #{until:`* & $headerByteStream`}->} as $headerObjectInputArg) as $headerObjectInput;
+CodebaseAwareObjectInputStream(*?{* #{until:`* & $bodyByteStream`}->} as $codebaseObjectInputArg) as $codebaseObjectInput;
+createObjectInputStream(*?{* #{until:`* & $bodyByteStream`}->} as $factoryObjectInputArg) as $factoryObjectInput;
+SerializationUtils.deserialize(*?{* #{until:`* & $messageBody`}->} as $deserializeFromBodyArg) as $deserializeFromBody;
+SerializationUtils.deserialize(*?{* #{until:`* & $headerBytes`}->} as $deserializeFromHeaderArg) as $deserializeFromHeader;
+
+$bodyObjectInput + $headerObjectInput + $codebaseObjectInput + $factoryObjectInput + $deserializeFromBody + $deserializeFromHeader as $risk;
+
+alert $risk for {
+	title: "Detect Message/Header Byte Deserialization",
+	title_zh: "检测消息体或头部字节驱动的反序列化",
+	level: "high",
+	message: "发现消息体或头部字节直接进入 Java 原生/框架反序列化入口，需复核是否可能恢复不可信对象。",
+	risk: "反序列化漏洞",
+	name: "risk",
+	desc: <<<DESC
+### 规则说明
+本规则用于识别消息中原始字节直接进入反序列化入口的实现，包括消息体 `getBody()`、头部 `Header.value()` 等来源。
+
+如果这些字节来自外部生产者、攻击者可控消息、异常头或其他不可信边界，就可能触发危险对象恢复、远程代码执行或拒绝服务。
+DESC
+	solution: <<<SOLUTION
+### 审计建议
+- 检查消息体或消息头中的对象恢复逻辑是否建立了显式类型白名单。
+- 优先改为 JSON / Protobuf 等安全格式，避免使用 Java 原生对象流。
+- 对异常头、诊断头中的对象恢复逻辑做单独禁用或降级处理。
+SOLUTION
+}
+
+desc(
+	lang: java
+	alert_min: 3
+	'file://message-body-framework-deserialize.java': <<<CODE
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.io.ObjectInputStream;
+
+class SerializationUtils {
+    static Object deserialize(Object input) {
+        return input;
+    }
+}
+
+class CodebaseAwareObjectInputStream extends ObjectInputStream {
+    CodebaseAwareObjectInputStream(InputStream in) throws java.io.IOException {
+        super(in);
+    }
+}
+
+interface Message {
+    byte[] getBody();
+}
+
+class VulnerableMessageDeserializer {
+    Object fromMessage(Message message) throws Exception {
+        return SerializationUtils.deserialize(
+            createObjectInputStream(new ByteArrayInputStream(message.getBody()))
+        );
+    }
+
+    ObjectInputStream createObjectInputStream(InputStream input) throws Exception {
+        return new CodebaseAwareObjectInputStream(input);
+    }
+}
+CODE
+	'file://header-byte-native-deserialize.java': <<<CODE
+import java.io.ByteArrayInputStream;
+import java.io.ObjectInputStream;
+
+interface Header {
+    byte[] value();
+}
+
+class VulnerableHeaderDeserializer {
+    Object fromHeader(Header header) throws Exception {
+        ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(header.value()));
+        return ois.readObject();
+    }
+}
+CODE
+	'safefile://message-json-read.java': <<<CODE
+import java.nio.charset.StandardCharsets;
+
+interface Message {
+    byte[] getBody();
+}
+
+class SafeMessageReader {
+    String fromMessage(Message message) {
+        return new String(message.getBody(), StandardCharsets.UTF_8);
+    }
+}
+CODE
+)

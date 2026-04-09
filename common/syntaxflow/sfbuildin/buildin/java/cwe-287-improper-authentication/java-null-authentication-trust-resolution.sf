@@ -21,21 +21,46 @@ SOLUTION
 REFERENCE
 )
 
+e"isFullyAuthenticated" as $fullyAuthenticated;
 isAnonymous(* as $anonymousAuth);
 isRememberMe(* as $rememberAuth);
 e"anonymousClass" as $anonymousClass;
 e"rememberMeClass" as $rememberMeClass;
 
-$anonymousAuth + $rememberAuth + $anonymousClass + $rememberMeClass as $risk;
-check $risk;
+check $anonymousAuth;
+check $rememberAuth;
 
-alert $risk for {
+alert $fullyAuthenticated for {
 	title: "Audit Null Authentication Trust Resolution",
 	title_zh: "审计空认证信任判定",
 	level: "middle",
 	message: "发现通过“非匿名且非 remember-me”推导完全认证的逻辑，需复核空认证输入是否会被误判为已完全认证。",
 	risk: "认证状态判定",
-	name: "risk",
+	name: "fullyAuthenticated",
+	desc: <<<DESC
+### 规则说明
+本规则用于审计认证信任解析中，将“完全认证”简单定义为“既非匿名也非 remember-me”的实现。
+
+如果该判断路径没有对 `null` 认证对象做显式约束，或者上层调用可能传入空认证，就可能把未认证状态错误地当成完全认证状态处理。
+DESC
+	solution: <<<SOLUTION
+### 审计建议
+- 对认证状态判定首先做显式的 `null` 检查。
+- 不要把“不是匿名”与“不是 remember-me”直接等价为“完全认证”。
+- 将认证状态解析与授权决策的空值语义统一下来，避免默认放行。
+SOLUTION
+}
+
+check $anonymousClass;
+check $rememberMeClass;
+
+alert $anonymousClass for {
+	title: "Audit Null Authentication Trust Resolution",
+	title_zh: "审计空认证信任判定",
+	level: "middle",
+	message: "发现通过“非匿名且非 remember-me”推导完全认证的逻辑，需复核空认证输入是否会被误判为已完全认证。",
+	risk: "认证状态判定",
+	name: "anonymousClass",
 	desc: <<<DESC
 ### 规则说明
 本规则用于审计认证信任解析中，将“完全认证”简单定义为“既非匿名也非 remember-me”的实现。
@@ -60,6 +85,29 @@ interface AuthenticationTrustResolver {
 
     default boolean isFullyAuthenticated(Authentication authentication) {
         return !isAnonymous(authentication) && !isRememberMe(authentication);
+    }
+}
+
+interface Authentication {
+}
+CODE
+	'file://null-authentication-trust-resolution-impl.java': <<<CODE
+class AuthenticationTrustResolverImpl {
+    private Class<?> anonymousClass = Object.class;
+    private Class<?> rememberMeClass = Object.class;
+
+    public boolean isAnonymous(Authentication authentication) {
+        if (this.anonymousClass == null || authentication == null) {
+            return false;
+        }
+        return this.anonymousClass.isAssignableFrom(authentication.getClass());
+    }
+
+    public boolean isRememberMe(Authentication authentication) {
+        if (this.rememberMeClass == null || authentication == null) {
+            return false;
+        }
+        return this.rememberMeClass.isAssignableFrom(authentication.getClass());
     }
 }
 

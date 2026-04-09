@@ -1,0 +1,116 @@
+desc(
+	title: "Detect Expression-Driven Array Construction Without Size Limit"
+	title_zh: "检测表达式驱动的数组构造缺少大小限制"
+	type: audit
+	risk: "拒绝服务"
+	desc: <<<DESC
+### 规则说明
+当表达式引擎或脚本解释器把运行时表达式结果转换为数组维度，再直接交给 `Array.newInstance(...)` 构造数组，而没有在同一逻辑路径上做元素总量限制时，攻击者可能借此触发超大数组分配，导致拒绝服务。
+
+本规则关注的通用模式是：
+- `ExpressionUtils.toInt(...)` 等运行时尺寸换算
+- `Array.newInstance(...)`
+- 同一函数内缺少 `checkNumElements(...)` 或等价上限检查
+DESC
+	rule_id: "5ce72e50-ef75-4b0e-b8c8-33e0c8a6b37b"
+	solution: <<<SOLUTION
+### 修复建议
+- 对数组维度或元素总数设置明确上限。
+- 在执行 `Array.newInstance(...)` 之前先验证单维和总元素数量。
+- 对表达式驱动的数组构造优先使用小而固定的安全阈值。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-400: Uncontrolled Resource Consumption](https://cwe.mitre.org/data/definitions/400.html)
+REFERENCE
+)
+
+ExpressionUtils.toInt(* as $sizeValue);
+Array.newInstance(*, * as $arraySizeArg);
+checkNumElements(* as $guardArg);
+findType(* as $typeLookupArg);
+
+$sizeValue<getFunc> as $sizeFunc;
+$arraySizeArg<getFunc> as $arrayFunc;
+$guardArg<getFunc> as $guardFunc;
+$typeLookupArg<getFunc> as $typeLookupFunc;
+$arrayFunc?{<name>?{have:'createArray'}} as $createArrayFunc;
+
+$sizeFunc & $arrayFunc as $candidateFunc;
+$candidateFunc & $typeLookupFunc as $spelArrayFunc;
+$spelArrayFunc & $createArrayFunc as $targetFunc;
+$targetFunc - $guardFunc as $unguardedFunc;
+$arraySizeArg?{<getFunc> & $unguardedFunc} as $risk;
+
+alert $risk for {
+	title: "Detect Expression-Driven Array Construction Without Size Limit",
+	title_zh: "检测表达式驱动的数组构造缺少大小限制",
+	level: "middle",
+	message: "发现表达式计算出的数组维度直接进入 Array.newInstance(...)，且同一函数内缺少元素数量上限检查，可能导致拒绝服务。",
+	risk: "拒绝服务",
+	name: "risk",
+	desc: <<<DESC
+### 规则说明
+当表达式引擎或脚本解释器把运行时表达式结果转换为数组维度，再直接交给 `Array.newInstance(...)` 构造数组，而没有在同一逻辑路径上做元素总量限制时，攻击者可能借此触发超大数组分配，导致拒绝服务。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 对数组维度或元素总数设置明确上限。
+- 在执行 `Array.newInstance(...)` 之前先验证单维和总元素数量。
+- 对表达式驱动的数组构造优先使用小而固定的安全阈值。
+SOLUTION
+}
+
+desc(
+	lang: java
+	alert_min: 1
+	'file://unsafe-array-construction.java': <<<CODE
+import java.lang.reflect.Array;
+
+class ExpressionUtils {
+    static int toInt(Object converter, Object value) {
+        return 0;
+    }
+}
+
+class State {
+    Class<?> findType(String type) {
+        return Object.class;
+    }
+}
+
+class UnsafeArrayConstructor {
+    Object createArray(State state, Object converter, Object value, String type) {
+        int arraySize = ExpressionUtils.toInt(converter, value);
+        Class<?> componentType = state.findType(type);
+        return Array.newInstance(componentType, arraySize);
+    }
+}
+CODE
+	"safefile://checked-array-construction.java": <<<CODE
+import java.lang.reflect.Array;
+
+class ExpressionUtils {
+    static int toInt(Object converter, Object value) {
+        return 0;
+    }
+}
+
+class State {
+    Class<?> findType(String type) {
+        return Object.class;
+    }
+}
+
+class SafeArrayConstructor {
+    Object createArray(State state, Object converter, Object value, String type) {
+        int arraySize = ExpressionUtils.toInt(converter, value);
+        Class<?> componentType = state.findType(type);
+        checkNumElements(arraySize);
+        return Array.newInstance(componentType, arraySize);
+    }
+
+    void checkNumElements(int arraySize) {
+    }
+}
+CODE
+)

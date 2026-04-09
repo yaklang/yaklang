@@ -1,0 +1,128 @@
+desc(
+	title: "Detect JPA LIKE Wildcard Without Escape"
+	title_zh: "检测JPA LIKE通配符未转义"
+	type: vuln
+	risk: "查询语义越界"
+	desc: <<<DESC
+### 漏洞描述
+本规则检测 JPA Query-by-Example 或类似查询构造逻辑中，直接把用户值拼进 `LIKE` 模式串而不做 wildcard 转义的实现。
+
+常见危险形态包括：
+- `"%" + value + "%"`
+- `value + "%"`
+- `"%" + value`
+
+如果输入中的 `%`、`_` 等通配符没有被显式 escape，攻击者就可能扩大匹配范围，导致超出预期的数据返回。
+DESC
+	rule_id: "3cf3b820-f0bf-45b1-b9b6-8b68f221583a"
+	solution: <<<SOLUTION
+### 修复建议
+- 对进入 `LIKE` 查询的用户值统一调用 escape 逻辑，而不是直接拼 `%`。
+- 将 escape 字符作为显式参数传给 `cb.like(...)` 或对应查询 API。
+- 不要把 wildcard 语义直接暴露给外部输入；需要模糊匹配时，先做字符转义再拼接前后缀。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-89: Improper Neutralization of Special Elements used in an SQL Command](https://cwe.mitre.org/data/definitions/89.html)
+REFERENCE
+)
+
+getStringMatcherForPath(* as $matcherArg) as $matcherCall;
+like(*<slice(index=2)>?{have:'%'} as $likePatternArg) as $likeCall;
+escape(* as $escapeArg) as $escapeCall;
+
+$matcherCall<getFunc> as $matcherFunc;
+$likeCall<getFunc> as $likeFunc;
+$escapeCall<getFunc> as $escapeFunc;
+
+$likeFunc?{<self> & $matcherFunc} as $candidateFunc;
+$candidateFunc - $escapeFunc as $unguardedFunc;
+$likeCall?{<getFunc> & $unguardedFunc} as $risk;
+
+alert $risk for {
+	title: "Detect JPA LIKE Wildcard Without Escape",
+	title_zh: "检测JPA LIKE通配符未转义",
+	level: "middle",
+	message: "发现 JPA LIKE 模式串直接拼接 wildcard 与用户值，且当前函数内未看到显式的 escape 调用。",
+	risk: "查询语义越界",
+	name: "risk",
+	desc: <<<DESC
+### 规则说明
+本规则用于审计 Query-by-Example / Criteria 查询构造中，`LIKE` 模式串直接拼接 `%` 与用户值的实现。
+
+如果同一函数内没有看到类似 `escapeCharacter.escape(...)` 的转义步骤，输入中的 `%`、`_` 等通配符就可能扩大匹配范围，导致超出预期的数据返回。
+DESC
+	solution: <<<SOLUTION
+### 审计建议
+- 在拼接 `%` 前先对用户值执行 wildcard escape。
+- 对 `CONTAINING` / `STARTING` / `ENDING` 这类模糊匹配策略单独做输入转义。
+- 将 escape 字符和 escape 逻辑作为统一的查询构造基础设施，而不是每处分散实现。
+SOLUTION
+}
+
+desc(
+	lang: java
+	alert_min: 1
+	'file://risk.java': <<<CODE
+class QueryByExamplePredicateBuilderRisk {
+    void addLike(CriteriaBuilder cb, Expression expression, Object attributeValue, ExampleMatcherAccessor exampleAccessor, String currentPath) {
+        switch (exampleAccessor.getStringMatcherForPath(currentPath)) {
+            case CONTAINING:
+                cb.like(expression, "%" + attributeValue + "%");
+                break;
+            case STARTING:
+                cb.like(expression, attributeValue + "%");
+                break;
+            case ENDING:
+                cb.like(expression, "%" + attributeValue);
+                break;
+            default:
+                break;
+        }
+    }
+}
+
+interface CriteriaBuilder {
+    void like(Object expression, Object pattern);
+}
+
+interface Expression {}
+
+interface ExampleMatcherAccessor {
+    String getStringMatcherForPath(String currentPath);
+}
+CODE
+	'safefile://safe.java': <<<CODE
+class QueryByExamplePredicateBuilderSafe {
+    void addLike(CriteriaBuilder cb, Expression expression, Object attributeValue, ExampleMatcherAccessor exampleAccessor, String currentPath, EscapeCharacter escapeCharacter) {
+        switch (exampleAccessor.getStringMatcherForPath(currentPath)) {
+            case CONTAINING:
+                cb.like(expression, "%" + escapeCharacter.escape(attributeValue.toString()) + "%", escapeCharacter.getEscapeCharacter());
+                break;
+            case STARTING:
+                cb.like(expression, escapeCharacter.escape(attributeValue.toString()) + "%", escapeCharacter.getEscapeCharacter());
+                break;
+            case ENDING:
+                cb.like(expression, "%" + escapeCharacter.escape(attributeValue.toString()), escapeCharacter.getEscapeCharacter());
+                break;
+            default:
+                break;
+        }
+    }
+}
+
+interface CriteriaBuilder {
+    void like(Object expression, Object pattern, Object escapeChar);
+}
+
+interface Expression {}
+
+interface ExampleMatcherAccessor {
+    String getStringMatcherForPath(String currentPath);
+}
+
+interface EscapeCharacter {
+    String escape(String value);
+    Object getEscapeCharacter();
+}
+CODE
+)

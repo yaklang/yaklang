@@ -8,8 +8,6 @@ desc(
 本规则检测框架内部常见的高风险反序列化模式：
 - 启用 Jackson 默认类型信息，如 `enableDefaultTyping`
 - 将不可信数据直接交给 `SerializationUtils.deserialize`
-- 根据 `classId` / `typeId` 之类的动态类型标识反射加载类型
-- 将异常对象序列化进消息头，后续再从头部恢复
 
 这些模式常见于消息框架、HTTP 序列化或安全模块中，容易演变为反序列化 RCE、类型欺骗或头部驱动的危险对象恢复。
 DESC
@@ -18,8 +16,6 @@ DESC
 ### 修复建议
 - 避免启用 Jackson 默认类型机制。
 - 不要对不可信字节流直接使用通用反序列化入口。
-- 不要根据外部提供的 `classId` / `typeId` 动态反射加载类型。
-- 禁止将异常对象或任意对象序列化进消息头部。
 - 使用显式 allowlist，并绑定到确定的目标类型。
 SOLUTION
 	reference: <<<REFERENCE
@@ -27,17 +23,11 @@ SOLUTION
 REFERENCE
 )
 
-ObjectMapper?{<typeName>?{have:'com.fasterxml.jackson.databind.ObjectMapper'}}.enableDefaultTyping(,* as $defaultTypingArg);
-ObjectMapper?{<typeName>?{have:'com.fasterxml.jackson.databind.ObjectMapper'}}.activateDefaultTyping(,* as $defaultTypingArg);
-SerializationUtils.deserialize(,* as $deserializeArg);
-deserializationException/<getCall><show> as $headerExceptionCall;
-forName/<getCall><show> as $forNameCall;
-/^(classId|typeId|typeIdHeader)$/ as $dynamicTypeMarker;
-/^deserializationException$/ as $headerExceptionMarker;
+enableDefaultTyping(,* as $defaultTypingArg) as $defaultTypingCall;
+activateDefaultTyping(,* as $defaultTypingArg) as $defaultTypingCall;
+SerializationUtils.deserialize(,* as $deserializeArg) as $deserializeCall;
 
-$headerExceptionCall?{have:'deserializationException'} + $headerExceptionMarker as $headerArg;
-$forNameCall?{have:'classId' || have:'typeId'} + $dynamicTypeMarker as $dynamicTypeResolution;
-$defaultTypingArg + $deserializeArg + $headerArg + $dynamicTypeResolution as $risk;
+$defaultTypingCall + $deserializeCall as $risk;
 
 alert $risk for {
 	title: "Detect Framework Untrusted Deserialization Patterns",
@@ -51,22 +41,18 @@ alert $risk for {
 本规则检测框架内部常见的高风险反序列化模式：
 - 启用 Jackson 默认类型信息，如 `enableDefaultTyping`
 - 将不可信数据直接交给 `SerializationUtils.deserialize`
-- 根据 `classId` / `typeId` 之类的动态类型标识反射加载类型
-- 将异常对象序列化进消息头，后续再从头部恢复
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
 - 避免启用 Jackson 默认类型机制。
 - 不要对不可信字节流直接使用通用反序列化入口。
-- 不要根据外部提供的 `classId` / `typeId` 动态反射加载类型。
-- 禁止将异常对象或任意对象序列化进消息头部。
 - 使用显式 allowlist，并绑定到确定的目标类型。
 SOLUTION
 }
 
 desc(
 	lang: java
-	alert_min: 4
+	alert_min: 2
 	'file://default-typing.java': <<<CODE
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -87,24 +73,6 @@ class DeserializeRisk {
     }
 }
 CODE
-	'file://type-id-resolution.java': <<<CODE
-import org.springframework.util.ClassUtils;
-
-class TypeIdResolutionRisk {
-    Class<?> bad(String classId) throws Exception {
-        return ClassUtils.forName(classId, getClass().getClassLoader());
-    }
-}
-CODE
-	'file://header-exception.java': <<<CODE
-import org.springframework.util.SerializationUtils;
-
-class HeaderExceptionSerializationRisk {
-    void bad(Object headers, byte[] data, Exception e) {
-        SerializationUtils.deserializationException(headers, data, e, true);
-    }
-}
-CODE
 	"safefile://safe-jackson.java": <<<CODE
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -112,6 +80,13 @@ class SafeJacksonUsage {
     Object safe(String json) throws Exception {
         ObjectMapper mapper = new ObjectMapper();
         return mapper.readTree(json);
+    }
+}
+
+class SafeClassIdValue {
+    void safe(Object object) {
+        Long classId = object.hashCode() + 1;
+        System.out.println(classId);
     }
 }
 CODE

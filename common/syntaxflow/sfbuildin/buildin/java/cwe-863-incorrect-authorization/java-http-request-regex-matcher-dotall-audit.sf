@@ -21,22 +21,25 @@ SOLUTION
 REFERENCE
 )
 
-e"servletPath" as $servletPath;
-e"pathInfo" as $pathInfo;
-e"queryString" as $queryString;
-e"Pattern" as $pattern;
-e"CASE_INSENSITIVE" as $caseInsensitive;
+Pattern.compile(,* as $compilePatternArg);
+Pattern?{<typeName>?{have:'java.util.regex.Pattern'}}.matcher(* as $matcherInput) as $matcherCall;
+getServletPath() as $servletPath;
+getPathInfo() as $pathInfo;
+getQueryString() as $queryString;
 
-$servletPath + $pathInfo + $queryString + $pattern + $caseInsensitive as $risk;
-check $risk;
+check $compilePatternArg;
+check $matcherCall;
+check $servletPath;
+check $pathInfo;
+check $queryString;
 
-alert $risk for {
+alert $matcherCall for {
 	title: "Audit HTTP Request Regex Authorization Matching",
 	title_zh: "审计HTTP请求正则授权匹配",
 	level: "middle",
 	message: "发现基于 servletPath/pathInfo/queryString 拼接结果的正则授权匹配逻辑，需复核路径归一化和换行符处理是否完备。",
 	risk: "授权路径匹配",
-	name: "risk",
+	name: "matcherCall",
 	desc: <<<DESC
 ### 规则说明
 本规则用于审计基于 HTTP 请求路径进行正则安全匹配的实现。
@@ -56,6 +59,7 @@ desc(
 	alert_min: 1
 	'file://http-request-regex-authz.java': <<<CODE
 import java.util.regex.Pattern;
+import javax.servlet.http.HttpServletRequest;
 
 class RegexRequestMatcher {
     private Pattern pattern;
@@ -65,7 +69,7 @@ class RegexRequestMatcher {
         this.pattern = Pattern.compile(sourcePattern, caseInsensitive ? Pattern.CASE_INSENSITIVE : 0);
     }
 
-    boolean matches(Request request) {
+    boolean matches(HttpServletRequest request) {
         String url = request.getServletPath();
         String pathInfo = request.getPathInfo();
         String queryString = request.getQueryString();
@@ -78,11 +82,36 @@ class RegexRequestMatcher {
         return this.pattern.matcher(url).matches();
     }
 }
+CODE
+	'safefile://non-regex-request-matcher.java': <<<CODE
+import javax.servlet.http.HttpServletRequest;
 
-interface Request {
-    String getServletPath();
-    String getPathInfo();
-    String getQueryString();
+class NonRegexRequestMatcher {
+    private final CustomMatcher matcher = new CustomMatcher();
+
+    boolean matches(HttpServletRequest request) {
+        String url = request.getServletPath() + request.getPathInfo() + request.getQueryString();
+        return matcher.matcher(url);
+    }
+}
+
+class CustomMatcher {
+    boolean matcher(String input) {
+        return input != null;
+    }
+}
+CODE
+	'safefile://regex-non-request-input.java': <<<CODE
+import java.util.regex.Pattern;
+import javax.servlet.http.HttpServletRequest;
+
+class RegexButNotRequestPath {
+    private final Pattern pattern = Pattern.compile("safe");
+
+    boolean matches(HttpServletRequest request, String candidate) {
+        String url = request.getServletPath();
+        return this.pattern.matcher(candidate).matches();
+    }
 }
 CODE
 )

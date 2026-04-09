@@ -1,0 +1,94 @@
+desc(
+	title: "Audit Spring Global Handler Path Prefix Registration"
+	title_zh: "审计Spring全局Handler路径前缀注册"
+	type: vuln
+	risk: "请求映射暴露"
+	desc: <<<DESC
+### 漏洞描述
+本规则检测 Spring `RequestMappingHandlerMapping` 派生类中，将配置化 base path 直接通过 `setPathPrefixes(...)` 注册为全局路径前缀的实现。
+
+如果该前缀对所有控制器统一生效，而不是只在预期的控制器/映射范围内追加，就可能暴露额外 URI、绕过既有安全配置或造成意外的路由注册。
+DESC
+	rule_id: "6bc446f2-dced-4313-99af-b01ce5a69b4d"
+	solution: <<<SOLUTION
+### 修复建议
+- 不要把 base path 作为全局 `setPathPrefixes(...)` 注册给所有 handler。
+- 只在明确的控制器或映射信息上追加路径前缀。
+- 对新增路由前缀与现有安全匹配器的关系做显式复核。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-863: Incorrect Authorization](https://cwe.mitre.org/data/definitions/863.html)
+REFERENCE
+)
+
+getBasePath().toString() as $baseUri;
+setPathPrefixes(*?{* #{until:`* & $baseUri`}->} as $prefixArg) as $risk;
+
+alert $risk for {
+	title: "Audit Spring Global Handler Path Prefix Registration",
+	title_zh: "审计Spring全局Handler路径前缀注册",
+	level: "middle",
+	message: "发现配置化 base path 被直接注册为全局 handler 路径前缀，需复核是否会暴露额外 URI 或绕过既有安全边界。",
+	risk: "请求映射暴露",
+	name: "risk",
+	desc: <<<DESC
+### 规则说明
+本规则用于识别 `RequestMappingHandlerMapping` 派生类中，把 `RepositoryRestConfiguration.getBasePath()` 之类配置值直接喂给 `setPathPrefixes(...)` 的实现。
+
+这通常意味着路径前缀对 handler 选择是全局生效的，而不是按控制器或方法级别精确追加。
+DESC
+	solution: <<<SOLUTION
+### 审计建议
+- 检查路径前缀是否只对目标控制器生效，而不是无差别影响全部 handler。
+- 对 base path 追加逻辑和安全匹配器/暴露策略做联合审计。
+- 优先在 `RequestMappingInfo` 级别组合路径，而不是依赖全局前缀映射。
+SOLUTION
+}
+
+desc(
+	lang: java
+	alert_min: 1
+	'file://risk.java': <<<CODE
+import java.util.HashMap;
+import java.util.Map;
+import java.util.function.Predicate;
+
+class BasePathAwareHandlerMapping extends RequestMappingHandlerMapping {
+    BasePathAwareHandlerMapping(RepositoryRestConfiguration configuration) {
+        String baseUri = configuration.getBasePath().toString();
+        Map<String, Predicate<Class<?>>> prefixes = new HashMap<>();
+        prefixes.put(baseUri, it -> true);
+        this.setPathPrefixes(prefixes);
+    }
+}
+
+class RequestMappingHandlerMapping {
+    void setPathPrefixes(Object prefixes) {
+    }
+}
+
+interface RepositoryRestConfiguration {
+    Object getBasePath();
+}
+CODE
+	'safefile://safe.java': <<<CODE
+class BasePathAwareHandlerMappingSafe extends RequestMappingHandlerMapping {
+    BasePathAwareHandlerMappingSafe(RepositoryRestConfiguration configuration) {
+        String baseUri = configuration.getBasePath().toString();
+        appendPathPrefix(baseUri);
+    }
+
+    void appendPathPrefix(String baseUri) {
+    }
+}
+
+class RequestMappingHandlerMapping {
+    void setPathPrefixes(Object prefixes) {
+    }
+}
+
+interface RepositoryRestConfiguration {
+    Object getBasePath();
+}
+CODE
+)

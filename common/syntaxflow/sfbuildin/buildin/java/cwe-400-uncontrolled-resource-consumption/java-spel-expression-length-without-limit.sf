@@ -1,0 +1,91 @@
+desc(
+	title: "Detect SpEL Parsing Without Expression Length Limit"
+	title_zh: "检测SpEL解析缺少表达式长度限制"
+	type: audit
+	risk: "拒绝服务"
+	desc: <<<DESC
+### 规则说明
+当表达式解析器直接接收运行时表达式字符串并进入 tokenization / parse 流程，而同一解析入口没有先做表达式长度限制时，攻击者可能构造超长表达式触发拒绝服务。
+
+本规则关注的通用模式是：
+- `doParseExpression(String expressionString, ...)`
+- 同一函数内存在基于 `expressionString` 的 tokenizer / parse 入口
+- 同一函数内缺少 `checkExpressionLength(expressionString)` 或等价长度检查
+DESC
+	rule_id: "89e33fbc-aa95-420f-ac82-e75d31f9ed70"
+	solution: <<<SOLUTION
+### 修复建议
+- 在进入 tokenizer / parser 之前先校验表达式长度。
+- 为表达式长度设置明确上限，并在超限时直接拒绝。
+- 不要把超长表达式限制依赖到后续 token 或 AST 阶段才处理。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-400: Uncontrolled Resource Consumption](https://cwe.mitre.org/data/definitions/400.html)
+REFERENCE
+)
+
+/doParseExpression/<getFormalParams>?{!have:this && opcode:param} as $parseParam;
+checkExpressionLength(* as $guardArg);
+Tokenizer(* as $tokenizerArg);
+
+$parseParam<getFunc> as $parseFunc;
+$guardArg<getFunc> as $guardFunc;
+$tokenizerArg<getFunc> as $tokenizerFunc;
+
+$parseFunc & $tokenizerFunc as $candidateFunc;
+$candidateFunc - $guardFunc as $unguardedFunc;
+$parseParam?{<getFunc> & $unguardedFunc} as $risk;
+
+alert $risk for {
+	title: "Detect SpEL Parsing Without Expression Length Limit",
+	title_zh: "检测SpEL解析缺少表达式长度限制",
+	level: "middle",
+	message: "发现 SpEL 解析入口直接消费表达式字符串且缺少长度限制，可能导致拒绝服务。",
+	risk: "拒绝服务",
+	name: "risk",
+	desc: <<<DESC
+### 规则说明
+当表达式解析器直接接收运行时表达式字符串并进入 tokenization / parse 流程，而同一解析入口没有先做表达式长度限制时，攻击者可能构造超长表达式触发拒绝服务。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 在进入 tokenizer / parser 之前先校验表达式长度。
+- 为表达式长度设置明确上限，并在超限时直接拒绝。
+- 不要把超长表达式限制依赖到后续 token 或 AST 阶段才处理。
+SOLUTION
+}
+
+desc(
+	lang: java
+	alert_min: 1
+	'file://unsafe-spel-parse-length.java': <<<CODE
+class Tokenizer {
+    Tokenizer(String expressionString) {
+    }
+}
+
+class InternalSpelExpressionParser {
+    Object doParseExpression(String expressionString, Object context) {
+        Tokenizer tokenizer = new Tokenizer(expressionString);
+        return tokenizer;
+    }
+}
+CODE
+	"safefile://safe-spel-parse-length.java": <<<CODE
+class Tokenizer {
+    Tokenizer(String expressionString) {
+    }
+}
+
+class InternalSpelExpressionParser {
+    Object doParseExpression(String expressionString, Object context) {
+        checkExpressionLength(expressionString);
+        Tokenizer tokenizer = new Tokenizer(expressionString);
+        return tokenizer;
+    }
+
+    void checkExpressionLength(String expressionString) {
+    }
+}
+CODE
+)
