@@ -30,5 +30,5 @@ requests:
 			handler(name)
 		}
 	}()
-	return yakit.CreateTemporaryYakScriptEx("nuclei", raw)
+	return yakit.CreateAndClearTemporaryYakScript("nuclei", raw)
 }

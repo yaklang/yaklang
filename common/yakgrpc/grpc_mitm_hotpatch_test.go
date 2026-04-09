@@ -228,7 +228,7 @@ func TestGRPCMUSTPASS_MITM_HotPatch_Dangerous_FuzzTag(t *testing.T) {
 	fileName = strings.ReplaceAll(fileName, "\\", "\\\\")
 	// create a codec script to test
 	token2 := utils.RandStringBytes(16)
-	scriptName, clearFunc, err := yakit.CreateTemporaryYakScriptEx("codec", fmt.Sprintf(`
+	scriptName, clearFunc, err := yakit.CreateAndClearTemporaryYakScript("codec", fmt.Sprintf(`
 	handle = func(origin)  {
 		return "%s"
 	}`, token2))

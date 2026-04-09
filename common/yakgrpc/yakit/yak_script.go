@@ -144,17 +144,25 @@ func CreateTemporaryYakScript(t string, code string, suffix ...string) (string, 
 	return name, nil
 }
 
-func CreateTemporaryYakScriptEx(t string, code string, suffix ...string) (name string, clear func(), err error) {
-	script, err := NewTemporaryYakScript(t, code, suffix...)
+func CreateAndClearTemporaryYakScript(t string, code string, suffix ...string) (name string, clear func(), err error) {
+	script, clearFunc, err := CreateAndClearTemporaryYakScriptEx(t, code, suffix...)
 	if err != nil {
 		return "", nil, err
 	}
-	name = script.ScriptName
+	return script.ScriptName, clearFunc, err
+}
+
+func CreateAndClearTemporaryYakScriptEx(t string, code string, suffix ...string) (script *schema.YakScript, clear func(), err error) {
+	script, err = NewTemporaryYakScript(t, code, suffix...)
+	if err != nil {
+		return nil, nil, err
+	}
+	name := script.ScriptName
 	err = CreateOrUpdateYakScriptByName(consts.GetGormProfileDatabase(), name, script)
 	if err != nil {
-		return "", nil, err
+		return nil, nil, err
 	}
-	return name, func() {
+	return script, func() {
 		DeleteYakScriptByName(consts.GetGormProfileDatabase(), name)
 	}, nil
 }

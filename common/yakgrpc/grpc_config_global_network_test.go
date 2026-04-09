@@ -630,7 +630,7 @@ func TestPluginScanLists(t *testing.T) {
 	require.Nil(t, err, "new mix plugin caller error")
 
 	token := utils.RandStringBytes(100)
-	tmpName, clearFunc, err := yakit.CreateTemporaryYakScriptEx("mitm", fmt.Sprintf(`
+	tmpName, clearFunc, err := yakit.CreateAndClearTemporaryYakScript("mitm", fmt.Sprintf(`
 mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
 	risk.NewRisk(%#v, risk.description("test"), risk.solution("test solution"))
 }

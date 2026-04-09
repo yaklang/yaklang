@@ -530,7 +530,7 @@ func TestExportLocalYakScriptStream(t *testing.T) {
 }
 
 func TestTempYakScriptQuery(t *testing.T) {
-	scriptName, clearFunc, err := yakit.CreateTemporaryYakScriptEx("yak", "")
+	scriptName, clearFunc, err := yakit.CreateAndClearTemporaryYakScript("yak", "")
 	require.NoError(t, err)
 	defer clearFunc()
 

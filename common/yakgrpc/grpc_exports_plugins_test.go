@@ -23,10 +23,10 @@ func TestServerExportsPlugins(t *testing.T) {
 	client, _ := NewLocalClient()
 	uid := uuid.New().String()
 
-	name1, clearFunc, err := yakit.CreateTemporaryYakScriptEx("yak", "hello 1; "+uid, uid)
+	name1, clearFunc, err := yakit.CreateAndClearTemporaryYakScript("yak", "hello 1; "+uid, uid)
 	require.NoError(t, err)
 	defer clearFunc()
-	name2, clearFunc2, err := yakit.CreateTemporaryYakScriptEx("yak", "hello 2; "+uid, uid)
+	name2, clearFunc2, err := yakit.CreateAndClearTemporaryYakScript("yak", "hello 2; "+uid, uid)
 	require.NoError(t, err)
 	defer clearFunc2()
 	stream, err := client.ExportYakScriptStream(
@@ -93,10 +93,10 @@ func TestServerExportsPlugins_Enc(t *testing.T) {
 	client, _ := NewLocalClient()
 	uid := uuid.New().String()
 
-	name1, clearFunc, err := yakit.CreateTemporaryYakScriptEx("yak", "hello 1; "+uid, uid)
+	name1, clearFunc, err := yakit.CreateAndClearTemporaryYakScript("yak", "hello 1; "+uid, uid)
 	require.NoError(t, err)
 	defer clearFunc()
-	name2, clearFunc2, err := yakit.CreateTemporaryYakScriptEx("yak", "hello 2; "+uid, uid)
+	name2, clearFunc2, err := yakit.CreateAndClearTemporaryYakScript("yak", "hello 2; "+uid, uid)
 	require.NoError(t, err)
 	defer clearFunc2()
 	assert.NotEmpty(t, name1)
@@ -170,7 +170,7 @@ func TestServerImportsPlugins(t *testing.T) {
 	client, _ := NewLocalClient()
 
 	content := "hello 1; " + uuid.NewString()
-	name, clearFunc, err := yakit.CreateTemporaryYakScriptEx("yak", content)
+	name, clearFunc, err := yakit.CreateAndClearTemporaryYakScript("yak", content)
 	t.Cleanup(clearFunc)
 
 	createYakOutputZip := func() (string, string) {

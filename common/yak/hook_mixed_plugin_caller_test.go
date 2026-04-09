@@ -25,7 +25,7 @@ func TestMixCaller_load_Plugin_Timeout(t *testing.T) {
 	<- ch
 `
 	consts.GetGormProjectDatabase()
-	tempName, clearFunc, err := yakit.CreateTemporaryYakScriptEx("mitm", code)
+	tempName, clearFunc, err := yakit.CreateAndClearTemporaryYakScript("mitm", code)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +61,7 @@ func TestMixCaller_call_Plugin_Timeout(t *testing.T) {
 	
 `
 	consts.GetGormProjectDatabase()
-	tempName, clearFunc, err := yakit.CreateTemporaryYakScriptEx("mitm", code)
+	tempName, clearFunc, err := yakit.CreateAndClearTemporaryYakScript("mitm", code)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,7 +110,7 @@ handle = result => {
 }
 `
 	consts.GetGormProjectDatabase()
-	tempName, clearFunc, err := yakit.CreateTemporaryYakScriptEx("port-scan", code)
+	tempName, clearFunc, err := yakit.CreateAndClearTemporaryYakScript("port-scan", code)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,7 +152,7 @@ handle = result => {
 }
 `
 	consts.GetGormProjectDatabase()
-	tempName, clearFunc, err := yakit.CreateTemporaryYakScriptEx("port-scan", code)
+	tempName, clearFunc, err := yakit.CreateAndClearTemporaryYakScript("port-scan", code)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,7 +187,7 @@ func TestMixCaller_load_Plugin_Timeout_effect_call(t *testing.T) {
 	
 `
 	consts.GetGormProjectDatabase()
-	tempName, clearFunc, err := yakit.CreateTemporaryYakScriptEx("mitm", code)
+	tempName, clearFunc, err := yakit.CreateAndClearTemporaryYakScript("mitm", code)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -228,7 +228,7 @@ func TestMixCaller_Wait(t *testing.T) {
 	
 `
 	consts.GetGormProjectDatabase()
-	tempName, clearFunc, err := yakit.CreateTemporaryYakScriptEx("mitm", code)
+	tempName, clearFunc, err := yakit.CreateAndClearTemporaryYakScript("mitm", code)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -455,7 +455,7 @@ handle = (result) => {
 	lock.Unlock()
 }
 	`
-	tempName, clearFunc, err := yakit.CreateTemporaryYakScriptEx("port-scan", code)
+	tempName, clearFunc, err := yakit.CreateAndClearTemporaryYakScript("port-scan", code)
 	if err != nil {
 		t.Fatal(err)
 	}

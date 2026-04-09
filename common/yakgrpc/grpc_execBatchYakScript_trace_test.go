@@ -30,7 +30,7 @@ func TestGRPCMUSTPASS_LANGUAGE_EXEC_YAK_SCRIPT_TRACEFLOW(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	name, clearFunc, err := yakit.CreateTemporaryYakScriptEx("nuclei", `id: CNVD-2020-46552
+	name, clearFunc, err := yakit.CreateAndClearTemporaryYakScript("nuclei", `id: CNVD-2020-46552
 
 info:
   name: Sangfor EDR - Remote Code Execution

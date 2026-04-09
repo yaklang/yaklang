@@ -831,11 +831,14 @@ func TestGRPCMUSTPASS_LANGUAGE_GetCliGRPC(t *testing.T) {
 	}
 
 	check := func(code string, param []*ypb.YakScriptParam, want string, t *testing.T) {
-		name, clearFunc, err := yakit.CreateTemporaryYakScriptEx("test", code)
+		script, clearFunc, err := yakit.CreateAndClearTemporaryYakScriptEx("test", code)
 		require.NoError(t, err)
 		defer clearFunc()
+		name := script.ScriptName
+		id := script.ID
 
 		_, err = local.SaveYakScript(context.Background(), &ypb.YakScript{
+			Id: int64(id),
 			ScriptName: name,
 			Content:    code,
 			Type:       "yak",

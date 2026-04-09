@@ -700,10 +700,10 @@ aaacccaaabbb`))
 	host, port := utils.DebugMockHTTP(rspRaw)
 	log.Infof("start to debug mock http on: %v", utils.HostPort(host, port))
 
-	tempName1, clearFunc, err := yakit.CreateTemporaryYakScriptEx("mitm", "test")
+	tempName1, clearFunc, err := yakit.CreateAndClearTemporaryYakScript("mitm", "test")
 	require.NoError(t, err)
 	defer clearFunc()
-	tempName2, clearFunc2, err := yakit.CreateTemporaryYakScriptEx("mitm", "test")
+	tempName2, clearFunc2, err := yakit.CreateAndClearTemporaryYakScript("mitm", "test")
 	require.NoError(t, err)
 	defer clearFunc2()
 	// println(string(raw))
@@ -950,7 +950,7 @@ func TestGRPCMUSTPASS_HTTP_DebugPlugin_SaveHTTPFlow_HOOK(t *testing.T) {
 	client, err := NewLocalClient(true)
 	require.NoError(t, err)
 	code := `db.SaveHTTPFlowFromRawWithOption("http://www.yak.com", "abc", "bca")`
-	tempName, clearFunc, err := yakit.CreateTemporaryYakScriptEx("yak", code)
+	tempName, clearFunc, err := yakit.CreateAndClearTemporaryYakScript("yak", code)
 	require.NoError(t, err)
 	defer clearFunc()
 
