@@ -1479,6 +1479,15 @@ func init() {
 		}),
 		nc_desc(`搜索输入指令的调用指令，输入可以是任何指令，但是会尽可能搜索到调用这个指令的调用指令`),
 	)
+
+	// ---- CFG helpers (intra-procedural, stage-1) ----
+	registerNativeCall(NativeCall_GetCFG, nc_func(nativeCallGetCFG), nc_desc(`获取输入命中点的 CFG 上下文（函数/基本块/指令定位），供 cfg* 系列 native call 使用。`))
+	registerNativeCall(NativeCall_CFGGuards, nc_func(nativeCallCFGGuards), nc_desc(`提取 early-return guard（如 if(cond) return）在当前命中点处的路径约束（最小实现）。`))
+	registerNativeCall(NativeCall_CFGDominates, nc_func(nativeCallCFGRel("cfgDominates", dominates)), nc_desc(`CFG 支配关系：当前 cfg 是否支配 target cfg（同函数内）。参数：target=$var。`))
+	registerNativeCall(NativeCall_CFGPostDom, nc_func(nativeCallCFGRel("cfgPostDominates", postDominates)), nc_desc(`CFG 后支配关系：当前 cfg 是否后支配 target cfg（同函数内，最小虚拟出口）。参数：target=$var。`))
+	registerNativeCall(NativeCall_CFGReachable, nc_func(nativeCallCFGRel("cfgReachable", reachable)), nc_desc(`CFG 可达性：当前 cfg 是否可达 target cfg（同函数内）。参数：target=$var。`))
+	registerNativeCall(NativeCall_CFGBlockInfo, nc_func(nativeCallCFGBlock), nc_desc(`输出 cfg 的函数/基本块定位信息（用于证据与调试）。`))
+	registerNativeCall(NativeCall_CFGInstInfo, nc_func(nativeCallCFGInst), nc_desc(`输出 cfg 的函数/基本块/指令定位信息（用于证据与调试）。`))
 }
 
 func fetchProgram(v any) (*Program, error) {
