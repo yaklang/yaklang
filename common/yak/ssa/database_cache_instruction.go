@@ -7,38 +7,46 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/dbcache"
-	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"go.uber.org/atomic"
 )
 
+// instructionStore owns instruction residency for exactly one mode.
+// Keeping the three concrete backends visible here is intentional: only one is
+// active at a time, and a local interface layer would just mirror the same
+// mode-specific operations without simplifying the control flow.
 type instructionStore struct {
 	mode ProgramCacheKind
 
 	program *Program
 	db      *gorm.DB
-	sources *sourceStore
 
 	nextID *atomic.Int64
 
-	resident  *utils.SafeMapWithKey[int64, Instruction]
-	reader    *dbcache.ResidencyCacheWithKey[int64, Instruction]
-	writer    *dbcache.Cache[Instruction, *instructionPersistRecord]
-	closeOnly bool
-	saveSize  int
+	// resident is used by pure-memory mode and the DB-write fast path that keeps
+	// everything resident until Close flushes the final snapshot.
+	resident *utils.SafeMapWithKey[int64, Instruction]
+	// reader is used by DB-read mode with lazy reload and bounded residency.
+	reader *dbcache.ResidencyCacheWithKey[int64, Instruction]
+	// writer is used by DB-write mode with async marshal + save.
+	writer *dbcache.Cache[Instruction, *instructionPersistRecord]
+
+	flushResidentOnClose bool
+	saveSize             int
 
 	progressMu sync.RWMutex
 	progressFn func(int)
 }
 
+// instructionPersistRecord is the persisted form of a single instruction save
+// request, including the editor/source linkage needed by IrCode rows.
 type instructionPersistRecord struct {
-	IrCode    *ssadb.IrCode
-	Opcode    Opcode
-	Reason    utils.EvictionReason
-	Writeback bool
-	Editor    *memedit.MemEditor
-	CodeID    int64
+	IrCode         *ssadb.IrCode
+	Opcode         Opcode
+	Reason         utils.EvictionReason
+	UpdateExisting bool
+	CodeID         int64
 }
 
 func newInstructionStore(
@@ -47,7 +55,6 @@ func newInstructionStore(
 	mode ProgramCacheKind,
 	db *gorm.DB,
 	saveSize int,
-	sources *sourceStore,
 ) *instructionStore {
 	cfg = ensureProgramConfig(cfg)
 	saveSize = min(max(saveSize, defaultSaveSize), maxSaveSize)
@@ -56,7 +63,6 @@ func newInstructionStore(
 		mode:       mode,
 		program:    prog,
 		db:         db,
-		sources:    sources,
 		nextID:     atomic.NewInt64(0),
 		progressFn: func(int) {},
 	}
@@ -83,7 +89,7 @@ func newInstructionStore(
 	case ProgramCacheDBWrite:
 		if useAdaptiveInstructionFastPath(cfg) {
 			store.resident = utils.NewSafeMapWithKey[int64, Instruction]()
-			store.closeOnly = true
+			store.flushResidentOnClose = true
 			store.saveSize = min(max(saveSize*20, 5000), maxSaveSize)
 			return store
 		}
@@ -94,7 +100,7 @@ func newInstructionStore(
 			cacheTTL,
 			cacheMax,
 			store.marshalInstructionRecord,
-			store.saveInstructionPersistRecords(),
+			store.saveInstructionPersistRecords,
 			store.loadInstruction,
 			dbcache.WithContext(cfg.GetContext()),
 			dbcache.WithSaveSize(instructionSaveSize),
@@ -118,7 +124,7 @@ func (s *instructionStore) Set(inst Instruction) {
 		id = s.nextID.Inc()
 		inst.SetId(id)
 	} else {
-		trackAtomicMax(s.nextID, id)
+		setAtomicMaxIfGreater(s.nextID, id)
 	}
 
 	switch {
@@ -247,7 +253,7 @@ func (s *instructionStore) EnableSpill() {
 	s.writer.EnableSave()
 }
 
-func (s *instructionStore) SpillDisabled() bool {
+func (s *instructionStore) IsSpillDisabled() bool {
 	if s == nil || s.writer == nil {
 		return false
 	}
@@ -279,12 +285,12 @@ func (s *instructionStore) Close(progress func(int)) {
 	switch {
 	case s.writer != nil:
 		s.writer.Close()
-	case s.closeOnly:
-		s.closeCloseOnlyResident()
+	case s.flushResidentOnClose:
+		s.flushResidentOnCloseOnly()
 	}
 }
 
-func (s *instructionStore) closeCloseOnlyResident() {
+func (s *instructionStore) flushResidentOnCloseOnly() {
 	if s == nil || s.resident == nil || s.db == nil {
 		return
 	}
@@ -366,9 +372,12 @@ func (s *instructionStore) marshalInstructionRecord(inst Instruction, reason uti
 		return nil, err
 	}
 
-	writeback := false
+	updateExisting := false
 	if lz, ok := ToLazyInstruction(inst); ok && lz != nil {
-		writeback = lz.ShouldSave()
+		// Dirty lazy instructions already have a DB row keyed by
+		// (program_name, code_id), so eviction must update that row instead of
+		// inserting a second copy.
+		updateExisting = lz.ShouldSave()
 	}
 
 	if irCode == nil {
@@ -384,94 +393,76 @@ func (s *instructionStore) marshalInstructionRecord(inst Instruction, reason uti
 	}
 
 	return &instructionPersistRecord{
-		IrCode:    irCode,
-		Opcode:    inst.GetOpcode(),
-		Reason:    reason,
-		Writeback: writeback,
-		Editor:    instructionEditor(inst),
-		CodeID:    inst.GetId(),
+		IrCode:         irCode,
+		Opcode:         inst.GetOpcode(),
+		Reason:         reason,
+		UpdateExisting: updateExisting,
+		CodeID:         inst.GetId(),
 	}, nil
 }
 
-func (s *instructionStore) saveInstructionPersistRecords() dbcache.SaveFunc[*instructionPersistRecord] {
-	return func(records []*instructionPersistRecord) error {
-		if len(records) == 0 {
-			return nil
-		}
+func (s *instructionStore) saveInstructionPersistRecords(records []*instructionPersistRecord) error {
+	if len(records) == 0 {
+		return nil
+	}
 
-		start := time.Now()
-		sources, hashes, sourceAttempts := s.sources.collectInstructionSources(records)
-
-		var saveErr error
-		saveStep := func() error {
-			saveErr = utils.GormTransaction(s.db, func(tx *gorm.DB) error {
-				for _, source := range sources {
-					if source == nil {
-						continue
-					}
-					if err := tx.Save(source).Error; err != nil {
+	start := time.Now()
+	var saveErr error
+	saveStep := func() error {
+		saveErr = utils.GormTransaction(s.db, func(tx *gorm.DB) error {
+			for _, record := range records {
+				if record == nil || record.IrCode == nil {
+					continue
+				}
+				if record.UpdateExisting {
+					if err := ssadb.UpsertIrCode(tx, record.IrCode); err != nil {
 						return err
 					}
+					continue
 				}
-				for _, record := range records {
-					if record == nil || record.IrCode == nil {
-						continue
-					}
-					if record.Writeback {
-						if err := ssadb.UpsertIrCode(tx, record.IrCode); err != nil {
-							return err
-						}
-						continue
-					}
-					if err := tx.Save(record.IrCode).Error; err != nil {
-						return err
-					}
+				if err := tx.Save(record.IrCode).Error; err != nil {
+					return err
 				}
-				return nil
-			})
-			return saveErr
-		}
-		if s.program != nil {
-			s.program.DiagnosticsTrack("ssa.Database.SaveIrCodeBatch", saveStep)
-		} else {
-			saveStep()
-		}
-		if saveErr != nil {
-			if s.sources != nil {
-				s.sources.clearPending(hashes...)
 			}
-			return saveErr
-		}
-		if s.sources != nil {
-			s.sources.markPersisted(hashes...)
-		}
+			return nil
+		})
+		return saveErr
+	}
+	if s.program != nil {
+		s.program.DiagnosticsTrack("ssa.Database.SaveIrCodeBatch", saveStep)
+	} else {
+		saveStep()
+	}
+	if saveErr != nil {
+		return saveErr
+	}
 
-		cost := time.Since(start)
-		perItemCost := cost / time.Duration(len(records))
-		if perItemCost <= 0 {
-			perItemCost = cost
-		}
+	cost := time.Since(start)
+	perItemCost := cost / time.Duration(len(records))
+	if perItemCost <= 0 {
+		perItemCost = cost
+	}
 
-		s.notifyProgress(len(records))
-		_ = sourceAttempts
+	s.notifyProgress(len(records))
+	if instructionCacheEventDebugEnabled() {
+		programName := ""
+		if s.program != nil {
+			programName = s.program.GetProgramName()
+		}
 		for _, record := range records {
 			if record == nil {
 				continue
 			}
-			if record.Writeback {
-				if instructionCacheEventDebugEnabled() {
-					log.Debugf("[ssa-ir-cache] writeback: program=%s id=%d opcode=%s reason=%s cost=%s",
-						s.program.GetProgramName(), record.CodeID, record.Opcode.String(), evictionReasonName(record.Reason), perItemCost,
-					)
-				}
-			} else if instructionCacheEventDebugEnabled() {
-				log.Debugf("[ssa-ir-cache] save: program=%s id=%d opcode=%s reason=%s cost=%s",
-					s.program.GetProgramName(), record.CodeID, record.Opcode.String(), evictionReasonName(record.Reason), perItemCost,
-				)
+			action := "save"
+			if record.UpdateExisting {
+				action = "upsert"
 			}
+			log.Debugf("[ssa-ir-cache] %s: program=%s id=%d opcode=%s reason=%s cost=%s",
+				action, programName, record.CodeID, record.Opcode.String(), evictionReasonName(record.Reason), perItemCost,
+			)
 		}
-		return nil
 	}
+	return nil
 }
 
 func (s *instructionStore) setProgress(fn func(int)) {
@@ -561,28 +552,6 @@ func marshalIrCode(inst Instruction) (*ssadb.IrCode, error) {
 		return nil, nil
 	}
 	return ret, nil
-}
-
-func instructionEditor(inst Instruction) *memedit.MemEditor {
-	if inst == nil {
-		return nil
-	}
-	if r := inst.GetRange(); r != nil {
-		if editor := r.GetEditor(); editor != nil {
-			return editor
-		}
-	}
-	if block := inst.GetBlock(); block != nil && block.GetRange() != nil {
-		if editor := block.GetRange().GetEditor(); editor != nil {
-			return editor
-		}
-	}
-	if fn := inst.GetFunc(); fn != nil && fn.GetRange() != nil {
-		if editor := fn.GetRange().GetEditor(); editor != nil {
-			return editor
-		}
-	}
-	return nil
 }
 
 func evictionReasonName(reason utils.EvictionReason) string {

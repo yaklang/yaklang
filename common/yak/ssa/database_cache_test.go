@@ -91,12 +91,10 @@ func TestSaveEditorTracksOnlySourceHashInMemory(t *testing.T) {
 	prog.SaveEditor(editor)
 
 	require.Equal(t, 0, prog.Cache.sources.PersistedCount(), "source hash should not be marked persisted before save ack")
-	require.Equal(t, 0, prog.Cache.sources.PendingCount(), "registered source should not become pending before a save batch reserves it")
 	require.Equal(t, 1, prog.Cache.sources.PayloadCount(), "duplicate source saves should collapse to one registered payload")
 
 	prog.Cache.sources.Close()
 	require.Equal(t, 1, prog.Cache.sources.PersistedCount(), "source hash should be marked persisted after close flush")
-	require.Equal(t, 0, prog.Cache.sources.PendingCount(), "pending source hash should clear after save ack")
 	require.Equal(t, 0, prog.Cache.sources.PayloadCount(), "payload cache should be released after persistence")
 
 	var count int64
@@ -105,29 +103,6 @@ func TestSaveEditorTracksOnlySourceHashInMemory(t *testing.T) {
 		Count(&count).Error
 	require.NoError(t, err)
 	require.Equal(t, int64(1), count)
-}
-
-func TestReserveSourceHashForSaveRequiresPersistAck(t *testing.T) {
-	store := newSourceStore(nil, ProgramCacheDBWrite, nil)
-	source := &ssadb.IrSource{SourceCodeHash: "hash-a"}
-
-	reserved, ok := store.reserve("hash-a", source)
-	require.True(t, ok)
-	require.NotNil(t, reserved)
-	_, ok = store.reserve("hash-a", source)
-	require.False(t, ok, "pending source hash should dedupe repeated reserve attempts")
-	require.Equal(t, 0, store.PersistedCount(), "pending source hash should not be treated as persisted")
-	require.Equal(t, 1, store.PendingCount())
-
-	store.clearPending("hash-a")
-	_, ok = store.reserve("hash-a", source)
-	require.True(t, ok, "failed saves should clear pending state and allow retry")
-
-	store.markPersisted("hash-a")
-	require.Equal(t, 1, store.PersistedCount())
-	require.Equal(t, 0, store.PendingCount())
-	_, ok = store.reserve("hash-a", source)
-	require.False(t, ok, "persisted source hash should not be requeued")
 }
 
 func TestLazyInstructionSaveAgain(t *testing.T) {
@@ -508,7 +483,7 @@ func TestDisableInstructionSpillKeepsInstructionResidentUntilFunctionFinish(t *t
 	require.Greater(t, instID, int64(0))
 
 	prog.Cache.DisableInstructionSpill()
-	require.True(t, prog.Cache.InstructionSpillDisabled())
+	require.True(t, prog.Cache.IsInstructionSpillDisabled())
 
 	time.Sleep(ttl * 3)
 	require.Nil(t, ssadb.GetIrCodeItemById(ssadb.GetDB(), programName, instID), "instruction should not spill while spill is disabled")
@@ -518,7 +493,7 @@ func TestDisableInstructionSpillKeepsInstructionResidentUntilFunctionFinish(t *t
 	require.Equal(t, instID, resident.GetId())
 
 	prog.Cache.EnableInstructionSpill()
-	require.False(t, prog.Cache.InstructionSpillDisabled())
+	require.False(t, prog.Cache.IsInstructionSpillDisabled())
 
 	time.Sleep(ttl * 3)
 	require.Nil(t, ssadb.GetIrCodeItemById(ssadb.GetDB(), programName, instID), "instruction should still stay resident before function finish")
@@ -892,7 +867,7 @@ func TestInstructionCache_DeleteDoesNotPersist(t *testing.T) {
 	require.Nil(t, ir, "DeleteInstruction should drop the instruction without saving it")
 }
 
-func TestInstructionCache_TTLWritebackDirtyLazyInstruction(t *testing.T) {
+func TestInstructionCache_TTLUpsertsDirtyLazyInstruction(t *testing.T) {
 	programName := uuid.NewString()
 	ttl := 80 * time.Millisecond
 

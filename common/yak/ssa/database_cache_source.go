@@ -43,6 +43,8 @@ func (p *Program) SaveFolder(folderPath []string) {
 	p.Cache.sources.RegisterFolder(folderPath)
 }
 
+// sourceStore only tracks source payload registration and the final flush of
+// IrSource rows. Instruction persistence never coordinates source saves.
 type sourceStore struct {
 	mode        ProgramCacheKind
 	programName string
@@ -51,7 +53,6 @@ type sourceStore struct {
 	mu        sync.Mutex
 	payloads  map[string]*ssadb.IrSource
 	persisted map[string]struct{}
-	pending   map[string]struct{}
 }
 
 func newSourceStore(prog *Program, mode ProgramCacheKind, db *gorm.DB) *sourceStore {
@@ -65,7 +66,6 @@ func newSourceStore(prog *Program, mode ProgramCacheKind, db *gorm.DB) *sourceSt
 		db:          db,
 		payloads:    make(map[string]*ssadb.IrSource),
 		persisted:   make(map[string]struct{}),
-		pending:     make(map[string]struct{}),
 	}
 }
 
@@ -139,59 +139,6 @@ func (s *sourceStore) isPersisted(hash string) bool {
 	return true
 }
 
-func (s *sourceStore) reserve(hash string, fallback *ssadb.IrSource) (*ssadb.IrSource, bool) {
-	if s == nil || hash == "" {
-		return nil, false
-	}
-	if s.isPersisted(hash) {
-		return nil, false
-	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if _, ok := s.persisted[hash]; ok {
-		return nil, false
-	}
-	if _, ok := s.pending[hash]; ok {
-		return nil, false
-	}
-	if _, ok := s.payloads[hash]; !ok {
-		if fallback == nil {
-			return nil, false
-		}
-		s.payloads[hash] = fallback
-	}
-	s.pending[hash] = struct{}{}
-	return s.payloads[hash], true
-}
-
-func (s *sourceStore) collectInstructionSources(records []*instructionPersistRecord) ([]*ssadb.IrSource, []string, int) {
-	if s == nil || s.mode != ProgramCacheDBWrite {
-		return nil, nil, 0
-	}
-
-	sources := make([]*ssadb.IrSource, 0, len(records))
-	hashes := make([]string, 0, len(records))
-	attempts := 0
-
-	for _, record := range records {
-		if record == nil || record.IrCode == nil || record.IrCode.SourceCodeHash == "" || record.Editor == nil {
-			continue
-		}
-		attempts++
-		hash := record.IrCode.SourceCodeHash
-		fallback := ssadb.MarshalFile(record.Editor, hash)
-		source, ok := s.reserve(hash, fallback)
-		if !ok || source == nil {
-			continue
-		}
-		sources = append(sources, source)
-		hashes = append(hashes, hash)
-	}
-	return sources, hashes, attempts
-}
-
 func (s *sourceStore) markPersisted(hashes ...string) {
 	if s == nil {
 		return
@@ -203,24 +150,8 @@ func (s *sourceStore) markPersisted(hashes ...string) {
 		if hash == "" {
 			continue
 		}
-		delete(s.pending, hash)
 		delete(s.payloads, hash)
 		s.persisted[hash] = struct{}{}
-	}
-}
-
-func (s *sourceStore) clearPending(hashes ...string) {
-	if s == nil {
-		return
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	for _, hash := range hashes {
-		if hash == "" {
-			continue
-		}
-		delete(s.pending, hash)
 	}
 }
 
@@ -229,7 +160,7 @@ func (s *sourceStore) Close() {
 		return
 	}
 
-	sources, hashes := s.reserveRemaining()
+	sources, hashes := s.collectRegisteredSources()
 	if len(sources) == 0 {
 		return
 	}
@@ -246,14 +177,13 @@ func (s *sourceStore) Close() {
 		return nil
 	})
 	if saveErr != nil {
-		s.clearPending(hashes...)
 		log.Errorf("DATABASE: save ir source to database error: %v", saveErr)
 		return
 	}
 	s.markPersisted(hashes...)
 }
 
-func (s *sourceStore) reserveRemaining() ([]*ssadb.IrSource, []string) {
+func (s *sourceStore) collectRegisteredSources() ([]*ssadb.IrSource, []string) {
 	if s == nil {
 		return nil, nil
 	}
@@ -270,23 +200,10 @@ func (s *sourceStore) reserveRemaining() ([]*ssadb.IrSource, []string) {
 		if _, ok := s.persisted[hash]; ok {
 			continue
 		}
-		if _, ok := s.pending[hash]; ok {
-			continue
-		}
-		s.pending[hash] = struct{}{}
 		sources = append(sources, source)
 		hashes = append(hashes, hash)
 	}
 	return sources, hashes
-}
-
-func (s *sourceStore) PendingCount() int {
-	if s == nil {
-		return 0
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return len(s.pending)
 }
 
 func (s *sourceStore) PersistedCount() int {

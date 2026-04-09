@@ -48,7 +48,7 @@ func (s *typeStore) remember(typ Type) Type {
 		id = s.nextID.Inc()
 		typ.SetId(id)
 	} else {
-		trackAtomicMax(s.nextID, id)
+		setAtomicMaxIfGreater(s.nextID, id)
 	}
 	s.resident.Set(id, typ)
 	return typ
