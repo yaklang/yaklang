@@ -1,6 +1,7 @@
 package httpctx
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"net/http"
@@ -66,7 +67,38 @@ func GetContextStringInfoFromRequest(r *http.Request, key string) string {
 	if !ok {
 		return ""
 	}
+	if raw, ok := v.([]byte); ok {
+		return string(raw)
+	}
 	return codec.AnyToString(v)
+}
+
+func GetContextBytesInfoFromRequest(r *http.Request, key string) []byte {
+	infoMap := GetContextInfoMap(r)
+	v, ok := infoMap.Load(key)
+	if !ok {
+		return nil
+	}
+	switch ret := v.(type) {
+	case []byte:
+		return ret
+	case string:
+		return []byte(ret)
+	default:
+		raw := codec.AnyToString(v)
+		if raw == "" {
+			return nil
+		}
+		return []byte(raw)
+	}
+}
+
+func SetContextBytesInfoFromRequest(r *http.Request, key string, value []byte) {
+	if value == nil {
+		SetContextValueInfoFromRequest(r, key, []byte(nil))
+		return
+	}
+	SetContextValueInfoFromRequest(r, key, bytes.Clone(value))
 }
 
 func GetRequestBytes(r *http.Request) []byte {
@@ -187,7 +219,7 @@ func SetBareRequestBytes(r *http.Request, bytes []byte) {
 	//	log.Debug("SetBareRequestBytes: bare request bytes already set, ignore")
 	//	return
 	//}
-	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_RequestBareBytes, string(bytes))
+	SetContextBytesInfoFromRequest(r, REQUEST_CONTEXT_KEY_RequestBareBytes, bytes)
 }
 
 func GetNoBodyBuffer(r *http.Request) bool {
@@ -199,27 +231,27 @@ func SetNoBodyBuffer(r *http.Request, b bool) {
 }
 
 func GetBareRequestBytes(r *http.Request) []byte {
-	return []byte(GetContextStringInfoFromRequest(r, REQUEST_CONTEXT_KEY_RequestBareBytes))
+	return GetContextBytesInfoFromRequest(r, REQUEST_CONTEXT_KEY_RequestBareBytes)
 }
 
 func SetPlainRequestBytes(r *http.Request, bytes []byte) {
-	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_RequestPlainBytes, string(bytes))
+	SetContextBytesInfoFromRequest(r, REQUEST_CONTEXT_KEY_RequestPlainBytes, bytes)
 }
 
 func SetHijackedRequestBytes(r *http.Request, bytes []byte) {
-	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_RequestHijackedBytes, string(bytes))
+	SetContextBytesInfoFromRequest(r, REQUEST_CONTEXT_KEY_RequestHijackedBytes, bytes)
 }
 
 func GetHijackedRequestBytes(r *http.Request) []byte {
-	return []byte(GetContextStringInfoFromRequest(r, REQUEST_CONTEXT_KEY_RequestHijackedBytes))
+	return GetContextBytesInfoFromRequest(r, REQUEST_CONTEXT_KEY_RequestHijackedBytes)
 }
 
 func SetHijackedResponseBytes(r *http.Request, bytes []byte) {
-	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_ResponseHijackedBytes, string(bytes))
+	SetContextBytesInfoFromRequest(r, REQUEST_CONTEXT_KEY_ResponseHijackedBytes, bytes)
 }
 
 func GetHijackedResponseBytes(r *http.Request) []byte {
-	return []byte(GetContextStringInfoFromRequest(r, REQUEST_CONTEXT_KEY_ResponseHijackedBytes))
+	return GetContextBytesInfoFromRequest(r, REQUEST_CONTEXT_KEY_ResponseHijackedBytes)
 }
 
 func SetRemoteAddr(r *http.Request, addr string) {
@@ -234,19 +266,19 @@ func GetRemoteAddr(r *http.Request) string {
 }
 
 func GetPlainRequestBytes(r *http.Request) []byte {
-	return []byte(GetContextStringInfoFromRequest(r, REQUEST_CONTEXT_KEY_RequestPlainBytes))
+	return GetContextBytesInfoFromRequest(r, REQUEST_CONTEXT_KEY_RequestPlainBytes)
 }
 
 func GetBareResponseBytes(r *http.Request) []byte {
-	return []byte(GetContextStringInfoFromRequest(r, REQUEST_CONTEXT_KEY_ResponseBareBytes))
+	return GetContextBytesInfoFromRequest(r, REQUEST_CONTEXT_KEY_ResponseBareBytes)
 }
 
 func GetPlainResponseBytes(r *http.Request) []byte {
-	return []byte(GetContextStringInfoFromRequest(r, REQUEST_CONTEXT_KEY_ResponsePlainBytes))
+	return GetContextBytesInfoFromRequest(r, REQUEST_CONTEXT_KEY_ResponsePlainBytes)
 }
 
 func SetPlainResponseBytes(r *http.Request, bytes []byte) {
-	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_ResponsePlainBytes, string(bytes))
+	SetContextBytesInfoFromRequest(r, REQUEST_CONTEXT_KEY_ResponsePlainBytes, bytes)
 }
 
 func SetBareResponseBytes(r *http.Request, bytes []byte) {
@@ -254,11 +286,11 @@ func SetBareResponseBytes(r *http.Request, bytes []byte) {
 		log.Debug("SetBareResponseBytes: bare response bytes already set, ignore")
 		return
 	}
-	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_ResponseBareBytes, string(bytes))
+	SetContextBytesInfoFromRequest(r, REQUEST_CONTEXT_KEY_ResponseBareBytes, bytes)
 }
 
 func SetBareResponseBytesForce(r *http.Request, bytes []byte) {
-	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_ResponseBareBytes, string(bytes))
+	SetContextBytesInfoFromRequest(r, REQUEST_CONTEXT_KEY_ResponseBareBytes, bytes)
 }
 
 const REQUEST_CONTEXT_INFOMAP = "InfoMap"
@@ -759,12 +791,12 @@ func GetIsStrongHostMode(r *http.Request) bool {
 // SetMockResponseBytes sets the mock HTTP response bytes in httpctx
 // This is used by mockHTTPRequest to skip real network request and return mock response
 func SetMockResponseBytes(r *http.Request, bytes []byte) {
-	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_MockResponseBytes, string(bytes))
+	SetContextBytesInfoFromRequest(r, REQUEST_CONTEXT_KEY_MockResponseBytes, bytes)
 }
 
 // GetMockResponseBytes gets the mock HTTP response bytes from httpctx
 func GetMockResponseBytes(r *http.Request) []byte {
-	return []byte(GetContextStringInfoFromRequest(r, REQUEST_CONTEXT_KEY_MockResponseBytes))
+	return GetContextBytesInfoFromRequest(r, REQUEST_CONTEXT_KEY_MockResponseBytes)
 }
 
 // SetShouldMockResponse sets the flag to indicate mock response should be used

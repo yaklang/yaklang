@@ -56,3 +56,33 @@ func TestGetRequestHTTPSWithFallback(t *testing.T) {
 		require.True(t, GetRequestHTTPSWithFallback(req))
 	})
 }
+
+func TestContextBytesStorage(t *testing.T) {
+	t.Run("request and response bytes are stored as cloned byte slices", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "http://example.com/", nil)
+		requestRaw := []byte("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
+		responseRaw := []byte("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok")
+
+		SetBareRequestBytes(req, requestRaw)
+		SetBareResponseBytesForce(req, responseRaw)
+
+		requestRaw[0] = 'X'
+		responseRaw[0] = 'X'
+
+		require.Equal(t, "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n", string(GetBareRequestBytes(req)))
+		require.Equal(t, "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok", string(GetBareResponseBytes(req)))
+		require.Equal(t, "GET / HTTP/1.1\r\nHost: example.com\r\n\r\n", GetContextStringInfoFromRequest(req, REQUEST_CONTEXT_KEY_RequestBareBytes))
+		require.Equal(t, "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok", GetContextStringInfoFromRequest(req, REQUEST_CONTEXT_KEY_ResponseBareBytes))
+	})
+
+	t.Run("legacy string-backed values remain readable as bytes", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "http://example.com/", nil)
+		SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_RequestPlainBytes, "legacy-request")
+		SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_ResponsePlainBytes, "legacy-response")
+		SetContextValueInfoFromRequest(req, REQUEST_CONTEXT_KEY_MockResponseBytes, "legacy-mock")
+
+		require.Equal(t, []byte("legacy-request"), GetPlainRequestBytes(req))
+		require.Equal(t, []byte("legacy-response"), GetPlainResponseBytes(req))
+		require.Equal(t, []byte("legacy-mock"), GetMockResponseBytes(req))
+	})
+}

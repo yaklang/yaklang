@@ -165,7 +165,9 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		} else {
 			plainResponse = httpctx.GetPlainResponseBytes(req)
 			if len(plainResponse) <= 0 {
-				plainResponse = lowhttp.DeletePacketEncoding(httpctx.GetBareResponseBytes(req))
+				decoded := lowhttp.DeletePacketEncoding(httpctx.GetBareResponseBytes(req))
+				httpctx.SetPlainResponseBytes(req, decoded)
+				plainResponse = decoded
 			}
 		}
 		return plainResponse

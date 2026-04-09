@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 	"net/url"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,6 +20,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -222,6 +225,88 @@ func TestSaveLowHTTPFlow_AfterSaveHandler(t *testing.T) {
 	require.Greater(t, int(savedFlow.ID), 0)
 
 	defer db.Where("id = ?", savedFlow.ID).Delete(&schema.HTTPFlow{})
+}
+
+func TestCreateHTTPFlowFromHTTPWithBodySaved_TooLargeResponseUsesPlaceholder(t *testing.T) {
+	reqRaw := lowhttp.FixHTTPRequest([]byte("GET /large HTTP/1.1\r\nHost: example.com\r\n\r\n"))
+	reqInst, err := lowhttp.ParseBytesToHttpRequest(reqRaw)
+	require.NoError(t, err)
+
+	body := strings.Repeat("a", 4096)
+	headerOnly := []byte("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 4096\r\n\r\n")
+	fullResponse := lowhttp.ReplaceHTTPPacketBodyFast(headerOnly, []byte(body))
+	rspInst, err := lowhttp.ParseBytesToHTTPResponse(fullResponse)
+	require.NoError(t, err)
+
+	httpctx.SetResponseTooLarge(reqInst, true)
+	httpctx.SetResponseTooLargeSize(reqInst, int64(len(body)))
+	httpctx.SetBareResponseBytesForce(reqInst, headerOnly)
+
+	headerFile := t.TempDir() + "/response-header.txt"
+	bodyFile := t.TempDir() + "/response-body.txt"
+	httpctx.SetResponseTooLargeHeaderFile(reqInst, headerFile)
+	httpctx.SetResponseTooLargeBodyFile(reqInst, bodyFile)
+
+	flow, err := CreateHTTPFlowFromHTTPWithBodySaved(
+		false,
+		reqInst,
+		rspInst,
+		"mitm",
+		"http://example.com/large",
+		"127.0.0.1:80",
+	)
+	require.NoError(t, err)
+	require.True(t, flow.IsTooLargeResponse)
+	require.Equal(t, int64(len(body)), flow.BodyLength)
+	require.Equal(t, headerFile, flow.TooLargeResponseHeaderFile)
+	require.Equal(t, bodyFile, flow.TooLargeResponseBodyFile)
+
+	storedResponse, err := strconv.Unquote(flow.Response)
+	require.NoError(t, err)
+	require.Contains(t, storedResponse, "[[response too large(")
+	require.NotContains(t, storedResponse, strings.Repeat("a", 128))
+	require.Less(t, len(storedResponse), len(fullResponse))
+}
+
+func TestCreateHTTPFlowFromHTTPWithBodySaved_ReadTooSlowResponseUsesPlaceholder(t *testing.T) {
+	reqRaw := lowhttp.FixHTTPRequest([]byte("GET /slow HTTP/1.1\r\nHost: example.com\r\n\r\n"))
+	reqInst, err := lowhttp.ParseBytesToHttpRequest(reqRaw)
+	require.NoError(t, err)
+
+	body := strings.Repeat("b", 2048)
+	headerOnly := []byte("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 2048\r\n\r\n")
+	fullResponse := lowhttp.ReplaceHTTPPacketBodyFast(headerOnly, []byte(body))
+	rspInst, err := lowhttp.ParseBytesToHTTPResponse(fullResponse)
+	require.NoError(t, err)
+
+	httpctx.SetResponseReadTooSlow(reqInst, true)
+	httpctx.SetResponseTooLargeSize(reqInst, int64(len(body)))
+	httpctx.SetBareResponseBytesForce(reqInst, headerOnly)
+
+	headerFile := t.TempDir() + "/slow-response-header.txt"
+	bodyFile := t.TempDir() + "/slow-response-body.txt"
+	httpctx.SetResponseTooLargeHeaderFile(reqInst, headerFile)
+	httpctx.SetResponseTooLargeBodyFile(reqInst, bodyFile)
+
+	flow, err := CreateHTTPFlowFromHTTPWithBodySaved(
+		false,
+		reqInst,
+		rspInst,
+		"mitm",
+		"http://example.com/slow",
+		"127.0.0.1:80",
+	)
+	require.NoError(t, err)
+	require.True(t, flow.IsReadTooSlowResponse)
+	require.Equal(t, int64(len(body)), flow.BodyLength)
+	require.Equal(t, headerFile, flow.TooLargeResponseHeaderFile)
+	require.Equal(t, bodyFile, flow.TooLargeResponseBodyFile)
+
+	storedResponse, err := strconv.Unquote(flow.Response)
+	require.NoError(t, err)
+	require.Contains(t, storedResponse, "[[response read too slow, truncated]]")
+	require.NotContains(t, storedResponse, strings.Repeat("b", 128))
+	require.Less(t, len(storedResponse), len(fullResponse))
 }
 
 func TestQueryFilterHTTPFlow_SuffixPrecision(t *testing.T) {

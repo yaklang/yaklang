@@ -1,11 +1,15 @@
 package utils
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -195,4 +199,94 @@ func TestHTTPResponseReaderWithBareBytes_4_obsolete_line_folding(t *testing.T) {
 	spew.Dump(httpctx.GetBareResponseBytes(req))
 	fmt.Println(rsp.Header.Get("Content-Security-Policy"))
 	require.Equal(t, rsp.Header.Get("Accept-Ranges"), "bytes", "Accept-Ranges should be bytes")
+}
+
+func TestHTTPResponseReaderWithBareBytes_TooLargeContentLengthSpoolsBody(t *testing.T) {
+	req := new(http.Request)
+	body := "abcdefghijklmnopqrstuvwxyz"
+	packet := []byte(`HTTP/1.1 200 OK` + CRLF +
+		`Content-Type: text/plain` + CRLF +
+		`Content-Length: 26` + CRLF + CRLF + body)
+
+	headerBytes, bodyBytes, found := bytes.Cut(packet, []byte(CRLF+CRLF))
+	require.True(t, found)
+	headerBytes = append(bytes.Clone(headerBytes), []byte(CRLF+CRLF)...)
+
+	httpctx.SetResponseMaxContentLength(req, 8)
+	registerTempFileOpenerForTest(t)
+
+	rsp, err := ReadHTTPResponseFromBufioReader(bytes.NewReader(packet), req)
+	require.NoError(t, err)
+
+	require.True(t, httpctx.GetResponseTooLarge(req))
+	require.EqualValues(t, len(bodyBytes), httpctx.GetResponseTooLargeSize(req))
+	require.Equal(t, headerBytes, httpctx.GetBareResponseBytes(req))
+
+	headerFile := httpctx.GetResponseTooLargeHeaderFile(req)
+	bodyFile := httpctx.GetResponseTooLargeBodyFile(req)
+	require.NotEmpty(t, headerFile)
+	require.NotEmpty(t, bodyFile)
+
+	storedHeader, err := os.ReadFile(headerFile)
+	require.NoError(t, err)
+	require.Equal(t, headerBytes, storedHeader)
+
+	storedBody, err := os.ReadFile(bodyFile)
+	require.NoError(t, err)
+	require.Equal(t, bodyBytes, storedBody)
+
+	rawBody, err := io.ReadAll(rsp.Body)
+	require.NoError(t, err)
+	require.Empty(t, rawBody)
+}
+
+func TestHTTPResponseReaderWithBareBytes_TooLargeChunkedSpoolsBody(t *testing.T) {
+	req := new(http.Request)
+	chunkedBody := "3\r\nabc\r\n4;foo=bar\r\ndefg\r\n3\r\nhij\r\n0\r\n\r\n"
+	packet := []byte(`HTTP/1.1 200 OK` + CRLF +
+		`Transfer-Encoding: chunked` + CRLF +
+		`Content-Type: text/plain` + CRLF + CRLF + chunkedBody)
+
+	headerBytes, bodyBytes, found := bytes.Cut(packet, []byte(CRLF+CRLF))
+	require.True(t, found)
+	headerBytes = append(bytes.Clone(headerBytes), []byte(CRLF+CRLF)...)
+
+	httpctx.SetResponseMaxContentLength(req, 8)
+	registerTempFileOpenerForTest(t)
+
+	rsp, err := ReadHTTPResponseFromBufioReader(bytes.NewReader(packet), req)
+	require.NoError(t, err)
+
+	require.True(t, httpctx.GetResponseTooLarge(req))
+	require.EqualValues(t, len(bodyBytes), httpctx.GetResponseTooLargeSize(req))
+	require.Equal(t, headerBytes, httpctx.GetBareResponseBytes(req))
+
+	headerFile := httpctx.GetResponseTooLargeHeaderFile(req)
+	bodyFile := httpctx.GetResponseTooLargeBodyFile(req)
+	require.NotEmpty(t, headerFile)
+	require.NotEmpty(t, bodyFile)
+
+	storedHeader, err := os.ReadFile(headerFile)
+	require.NoError(t, err)
+	require.Equal(t, headerBytes, storedHeader)
+
+	storedBody, err := os.ReadFile(bodyFile)
+	require.NoError(t, err)
+	require.Equal(t, bodyBytes, storedBody)
+
+	rawBody, err := io.ReadAll(rsp.Body)
+	require.NoError(t, err)
+	require.Empty(t, rawBody)
+}
+
+func registerTempFileOpenerForTest(t *testing.T) {
+	t.Helper()
+
+	tempDir := t.TempDir()
+	RegisterTempFileOpener(func(name string) (*os.File, error) {
+		return os.OpenFile(filepath.Join(tempDir, name), os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
+	})
+	t.Cleanup(func() {
+		RegisterTempFileOpener(nil)
+	})
 }
