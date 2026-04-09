@@ -8,7 +8,6 @@ import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
@@ -69,6 +68,32 @@ func getBlockByID(fn *ssa.Function, blockID int64) (*ssa.BasicBlock, error) {
 		return nil, utils.Errorf("block id %d not found", blockID)
 	}
 	return b, nil
+}
+
+// isExitLikeBlock reports whether a basic block should be treated as a function-exit terminator
+// for stage-1/2 CFG queries. This is intentionally conservative.
+func isExitLikeBlock(fn *ssa.Function, blockID int64) bool {
+	if fn == nil || blockID <= 0 {
+		return false
+	}
+	blk, ok := fn.GetBasicBlockByID(blockID)
+	if !ok || blk == nil {
+		return false
+	}
+	if fn.ExitBlock > 0 && blockID == fn.ExitBlock {
+		return true
+	}
+	// No successors usually means return-like termination in Yak SSA CFG.
+	if len(blk.Succs) == 0 {
+		return true
+	}
+	// Explicit return terminator.
+	if last := blk.LastInst(); last != nil {
+		if _, ok := ssa.ToReturn(last); ok {
+			return true
+		}
+	}
+	return false
 }
 
 // computeDominators computes immediate dominators for all reachable blocks (block-level).
@@ -391,38 +416,70 @@ func reachable(p *Program, a, b *CfgCtxValue) bool {
 	if a == nil || b == nil || a.IsEmpty() || b.IsEmpty() {
 		return false
 	}
-	if a.FuncID != b.FuncID {
-		return false
+
+	type state struct {
+		funcID  int64
+		blockID int64
 	}
-	fn, err := getFunctionByID(p, a.FuncID)
-	if err != nil {
-		return false
-	}
-	start, err := getBlockByID(fn, a.BlockID)
-	if err != nil || start == nil {
-		return false
-	}
-	target := b.BlockID
-	seen := map[int64]struct{}{start.GetId(): {}}
-	queue := []int64{start.GetId()}
+	start := state{funcID: a.FuncID, blockID: a.BlockID}
+	target := state{funcID: b.FuncID, blockID: b.BlockID}
+
+	seen := map[state]struct{}{start: {}}
+	queue := []state{start}
+
 	for len(queue) > 0 {
 		cur := queue[0]
 		queue = queue[1:]
 		if cur == target {
 			return true
 		}
-		blk, _ := fn.GetBasicBlockByID(cur)
+		fn, err := getFunctionByID(p, cur.funcID)
+		if err != nil || fn == nil {
+			continue
+		}
+		blk, _ := fn.GetBasicBlockByID(cur.blockID)
 		if blk == nil {
 			continue
 		}
+
+		// Intra-procedural CFG edges.
 		for _, s := range blk.Succs {
-			if _, ok := seen[s]; ok {
+			nxt := state{funcID: cur.funcID, blockID: s}
+			if _, ok := seen[nxt]; ok {
 				continue
 			}
-			seen[s] = struct{}{}
-			queue = append(queue, s)
+			seen[nxt] = struct{}{}
+			queue = append(queue, nxt)
+		}
+
+		// Minimal ICFG extension (stage-2): call -> callee entry.
+		// We only support direct callee functions (method value is a *ssa.Function).
+		for _, instID := range blk.Insts {
+			ins, ok := blk.GetInstructionById(instID)
+			if !ok || ins == nil {
+				continue
+			}
+			call, ok := ssa.ToCall(ins)
+			if !ok || call == nil {
+				continue
+			}
+			method, ok := call.GetValueById(call.Method)
+			if !ok || method == nil {
+				continue
+			}
+			calleeFn, ok := ssa.ToFunction(method)
+			if !ok || calleeFn == nil || calleeFn.EnterBlock <= 0 {
+				continue
+			}
+			nxt := state{funcID: calleeFn.GetId(), blockID: calleeFn.EnterBlock}
+			if _, ok := seen[nxt]; ok {
+				continue
+			}
+			seen[nxt] = struct{}{}
+			queue = append(queue, nxt)
 		}
 	}
+
 	return false
 }
 
@@ -605,7 +662,7 @@ func nativeCallCFGGuards(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.Native
 		// precompute dom cache for dominates checks
 		_ = getOrBuildDomCache(prog, ctx.FuncID)
 
-		guards := make([]string, 0, 4)
+		guards := make([]*GuardPredicateValue, 0, 4)
 		for _, bid := range fn.Blocks {
 			b, _ := fn.GetBasicBlockByID(bid)
 			if b == nil || len(b.Insts) == 0 {
@@ -619,25 +676,16 @@ func nativeCallCFGGuards(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.Native
 
 			// Prefer structured IfInstruction, but allow Yak lowering variants where the
 			// terminator isn't directly an IfInstruction (fallback: 2-way succs).
-			condText := ""
 			instID := last.GetId()
+			condValueID := int64(0)
 			var tBranch, fBranch int64
 			if ok && ifInst != nil {
 				instID = ifInst.GetId()
 				tBranch, fBranch = ifInst.True, ifInst.False
 
-				condVal, _ := fn.GetValueById(ifInst.Cond)
-				if condVal != nil {
-					if r := condVal.GetRange(); r != nil {
-						condText = r.GetTextContext(0)
-					}
-				}
-				if condText == "" {
-					condText = fmt.Sprintf("cond@%d", ifInst.Cond)
-				}
+				condValueID = ifInst.Cond
 			} else if len(b.Succs) == 2 {
 				tBranch, fBranch = b.Succs[0], b.Succs[1]
-				condText = fmt.Sprintf("cond@block%d", b.GetId())
 			} else {
 				continue
 			}
@@ -667,27 +715,8 @@ func nativeCallCFGGuards(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.Native
 				continue
 			}
 
-			isExitLike := func(bid int64) bool {
-				if bid <= 0 {
-					return false
-				}
-				blk, _ := fn.GetBasicBlockByID(bid)
-				if blk == nil {
-					return false
-				}
-				if len(blk.Succs) == 0 {
-					return true
-				}
-				if last := blk.LastInst(); last != nil {
-					if _, ok := ssa.ToReturn(last); ok {
-						return true
-					}
-				}
-				return false
-			}
-
-			tExit := isExitLike(tBranch)
-			fExit := isExitLike(fBranch)
+			tExit := isExitLikeBlock(fn, tBranch)
+			fExit := isExitLikeBlock(fn, fBranch)
 			if exitCtx != nil {
 				tExit = tExit || tBranch == exitID || reachable(prog, tCtx, exitCtx)
 				fExit = fExit || fBranch == exitID || reachable(prog, fCtx, exitCtx)
@@ -695,13 +724,46 @@ func nativeCallCFGGuards(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.Native
 
 			// guard pattern: if (cond) return; => fallthrough requires !cond (when cond branch exits)
 			if tExit && fReach {
-				guards = append(guards, fmt.Sprintf("not(%s)", condText))
+				guards = append(guards, &GuardPredicateValue{
+					prog:        prog,
+					FuncID:      ctx.FuncID,
+					GuardBlockID: b.GetId(),
+					SinkBlockID:  ctx.BlockID,
+					CondInstID:   instID,
+					CondValueID:  condValueID,
+					Polarity:     false,
+					Kind:         "earlyReturn",
+					Text:         "",
+				})
 			} else if fExit && tReach {
-				guards = append(guards, condText)
+				guards = append(guards, &GuardPredicateValue{
+					prog:        prog,
+					FuncID:      ctx.FuncID,
+					GuardBlockID: b.GetId(),
+					SinkBlockID:  ctx.BlockID,
+					CondInstID:   instID,
+					CondValueID:  condValueID,
+					Polarity:     true,
+					Kind:         "earlyReturn",
+					Text:         "",
+				})
 			}
 		}
-		for _, g := range lo.Uniq(guards) {
-			out = append(out, prog.NewConstValue(g, (*memedit.Range)(nil)))
+		// de-dup by Hash() where possible
+		for _, g := range lo.UniqBy(guards, func(v *GuardPredicateValue) string {
+			if v == nil {
+				return ""
+			}
+			if h, ok := v.Hash(); ok {
+				return h
+			}
+			return v.String()
+		}) {
+			if g == nil || g.IsEmpty() {
+				continue
+			}
+			g.SetAnchorBitVector(op.GetAnchorBitVector())
+			out = append(out, g)
 		}
 		return nil
 	})
