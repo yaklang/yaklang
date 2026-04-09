@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aiddb"
+	ytokenizer "github.com/yaklang/yaklang/common/ai/tokenizer"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -142,7 +143,7 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 		if c.AiAutoRetry <= 0 {
 			c.AiAutoRetry = 1
 		}
-		tokenSize := estimateTokens([]byte(request.GetPrompt()))
+		tokenSize := ytokenizer.CalcTokenCount(request.GetPrompt())
 
 		start := time.Now()
 		for _idx := 0; _idx < int(c.AiAutoRetry); _idx++ {
@@ -214,6 +215,7 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 				provider := origRsp.GetProviderName()
 				model := origRsp.GetModelName()
 				outputBytes := origRsp.GetTotalOutputBytes()
+				outputTokens := origRsp.GetTotalOutputTokens()
 				firstByteTime := origRsp.GetFirstOutputByteTime()
 				var outputDuration time.Duration
 				if !firstByteTime.IsZero() {
@@ -221,19 +223,20 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 				}
 				tokenRate := float64(0)
 				if outputDuration.Seconds() > 0 {
-					tokenRate = float64(outputBytes/4) / outputDuration.Seconds()
+					tokenRate = float64(outputTokens) / outputDuration.Seconds()
 				}
-				c.EmitInfo("ai response from %v:%v cost: %v, output duration: %v, estimated %.1f token/s",
+				c.EmitInfo("ai response from %v:%v cost: %v, output duration: %v, %.1f token/s",
 					provider, model, du, outputDuration, tokenRate)
 				c.EmitJSON(schema.EVENT_TYPE_AI_TOTAL_COST_MS, "system", map[string]any{
-					"ms":                 du.Milliseconds(),
-					"second":             du.Seconds(),
-					"model_name":         model,
-					"provider_name":      provider,
-					"model_tier":         string(tier),
-					"token_rate":         tokenRate,
-					"output_bytes":       outputBytes,
-					"output_duration_ms": outputDuration.Milliseconds(),
+					"ms":                      du.Milliseconds(),
+					"second":                  du.Seconds(),
+					"model_name":              model,
+					"provider_name":           provider,
+					"model_tier":              string(tier),
+					"token_rate":              tokenRate,
+					"output_bytes":            outputBytes,
+					"estimated_output_tokens": outputTokens,
+					"output_duration_ms":      outputDuration.Milliseconds(),
 				})
 				firstByteCostMs := int64(0)
 				if !firstByteTime.IsZero() {
@@ -246,7 +249,7 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 					"first_byte_cost_ms":      firstByteCostMs,
 					"total_cost_ms":           du.Milliseconds(),
 					"output_bytes":            outputBytes,
-					"estimated_output_tokens": outputBytes / 4,
+					"estimated_output_tokens": outputTokens,
 					"token_rate":              tokenRate,
 					"output_duration_ms":      outputDuration.Milliseconds(),
 					"input_token_size":        tokenSize,

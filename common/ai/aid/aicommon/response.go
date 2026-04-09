@@ -50,6 +50,7 @@ type AIResponse struct {
 
 	firstOutputByteTime time.Time
 	totalOutputBytes    atomic.Int64
+	totalOutputTokens   atomic.Int64
 
 	rawHTTPResponseHeaderMu sync.Mutex
 	rawHTTPResponseHeader   []byte
@@ -162,6 +163,13 @@ func (a *AIResponse) GetTotalOutputBytes() int64 {
 		return 0
 	}
 	return a.totalOutputBytes.Load()
+}
+
+func (a *AIResponse) GetTotalOutputTokens() int64 {
+	if a == nil {
+		return 0
+	}
+	return a.totalOutputTokens.Load()
 }
 
 func (a *AIResponse) GetTaskIndex() string {
@@ -327,7 +335,7 @@ func (a *AIResponse) GetOutputStreamReader(nodeId string, system bool, emitter *
 func (r *AIResponse) EmitOutputStream(reader io.Reader) {
 	counted := &byteCountingReader{reader: reader, counter: &r.totalOutputBytes}
 	r.ch.SafeFeed(&AIResponseOutputStream{
-		out: CreateConsumptionReader(counted, r.consumptionCallback),
+		out: CreateConsumptionReader(counted, r.consumptionCallback, &r.totalOutputTokens),
 	})
 }
 
@@ -335,7 +343,7 @@ func (r *AIResponse) EmitReasonStream(reader io.Reader) {
 	counted := &byteCountingReader{reader: reader, counter: &r.totalOutputBytes}
 	r.ch.SafeFeed(&AIResponseOutputStream{
 		IsReason: true,
-		out:      CreateConsumptionReader(counted, r.consumptionCallback),
+		out:      CreateConsumptionReader(counted, r.consumptionCallback, &r.totalOutputTokens),
 	})
 }
 
@@ -418,6 +426,9 @@ func TeeAIResponse(
 		srcBytes := src.totalOutputBytes.Load()
 		first.totalOutputBytes.Store(srcBytes)
 		second.totalOutputBytes.Store(srcBytes)
+		srcTokens := src.totalOutputTokens.Load()
+		first.totalOutputTokens.Store(srcTokens)
+		second.totalOutputTokens.Store(srcTokens)
 	}
 
 	reasonReader, outputReader := src.GetUnboundStreamReaderEx(func() {
