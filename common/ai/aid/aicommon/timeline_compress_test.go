@@ -1,12 +1,35 @@
 package aicommon
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils/linktable"
 )
+
+type mockTimelineArchiveStore struct {
+	batches []*TimelineArchiveBatch
+}
+
+func (m *mockTimelineArchiveStore) ArchiveCompressedBatch(ctx context.Context, batch *TimelineArchiveBatch) (*TimelineArchiveRef, error) {
+	_ = ctx
+	m.batches = append(m.batches, batch)
+	return &TimelineArchiveRef{
+		ArchiveID:      batch.ArchiveID,
+		Reason:         batch.Reason,
+		SummaryPreview: batch.Summary,
+		ReducerKeyID:   batch.ReducerKeyID,
+		SourceStartID:  batch.SourceStartID,
+		SourceEndID:    batch.SourceEndID,
+		ItemCount:      batch.ItemCount,
+	}, nil
+}
+
+func (m *mockTimelineArchiveStore) SearchArchivedBatches(context.Context, *TimelineArchiveSearchQuery) (*TimelineArchiveSearchResult, error) {
+	return &TimelineArchiveSearchResult{}, nil
+}
 
 // TestTimelineCompress_ItemsRemoved 测试压缩后条目被正确删除
 func TestTimelineCompress_ItemsRemoved(t *testing.T) {
@@ -420,4 +443,65 @@ func TestTimelineCompress_SerializationSize(t *testing.T) {
 
 	// 压缩后的序列化应该显著更小（考虑额外开销，放宽到 60%）
 	require.Less(t, compressedSize, uncompressedSize*6/10, "Compressed serialization should be significantly smaller")
+}
+
+func TestTimelineCompress_EmergencyArchiveWritesMidtermStore(t *testing.T) {
+	timeline := NewTimeline(nil, nil)
+	store := &mockTimelineArchiveStore{}
+	cfg := &Config{
+		PersistentSessionId:  "persistent-session-1",
+		TimelineArchiveStore: store,
+	}
+	timeline.SoftBindConfig(cfg, nil)
+
+	largeData := make([]byte, 1024)
+	for i := range largeData {
+		largeData[i] = 'B'
+	}
+
+	for i := 1; i <= 12; i++ {
+		timeline.PushToolResult(&aitool.ToolResult{
+			ID:          int64(i),
+			Name:        "tool",
+			Description: "test tool",
+			Success:     true,
+			Data:        string(largeData),
+		})
+	}
+
+	timeline.emergencyCompress(2 * 1024)
+
+	require.Len(t, store.batches, 1)
+	batch := store.batches[0]
+	require.Equal(t, TimelineArchiveReasonEmergencyCompress, batch.Reason)
+	require.Equal(t, "persistent-session-1", batch.PersistentSessionID)
+	require.Greater(t, batch.ItemCount, 0)
+	require.NotEmpty(t, batch.Summary)
+	require.Len(t, timeline.archiveRefs.Values(), 1)
+}
+
+func TestTimelineCompress_SerializationPreservesArchiveRefs(t *testing.T) {
+	timeline := NewTimeline(nil, nil)
+	ref := &TimelineArchiveRef{
+		ArchiveID:      "timeline-archive-1",
+		Reason:         TimelineArchiveReasonBatchCompress,
+		SummaryPreview: "compressed old tool outputs",
+		ReducerKeyID:   42,
+		SourceStartID:  1,
+		SourceEndID:    42,
+		ItemCount:      42,
+	}
+	timeline.attachArchiveRef(42, ref)
+
+	serialized, err := MarshalTimeline(timeline)
+	require.NoError(t, err)
+
+	restored, err := UnmarshalTimeline(serialized)
+	require.NoError(t, err)
+
+	got, ok := restored.archiveRefs.Get(42)
+	require.True(t, ok)
+	require.Equal(t, ref.ArchiveID, got.ArchiveID)
+	require.Equal(t, ref.SummaryPreview, got.SummaryPreview)
+	require.Equal(t, ref.ItemCount, got.ItemCount)
 }

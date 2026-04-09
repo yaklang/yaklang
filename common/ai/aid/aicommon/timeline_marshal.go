@@ -12,13 +12,14 @@ import (
 
 // timelineSerializable 用于序列化的 Timeline 结构体
 type timelineSerializable struct {
-	IdToTs                map[string]int64         `json:"id_to_ts"`
-	TsToTimelineItem      map[string]*TimelineItem `json:"ts_to_timeline_item"`
-	IdToTimelineItem      map[string]*TimelineItem `json:"id_to_timeline_item"`
-	Summary               map[string]*TimelineItem `json:"summary"`  // 只保留最后一个值
-	Reducers              map[string]string        `json:"reducers"` // 只保留最后一个值
-	PerDumpContentLimit   int64                    `json:"per_dump_content_limit"`
-	TotalDumpContentLimit int64                    `json:"total_dump_content_limit"`
+	IdToTs                map[string]int64               `json:"id_to_ts"`
+	TsToTimelineItem      map[string]*TimelineItem       `json:"ts_to_timeline_item"`
+	IdToTimelineItem      map[string]*TimelineItem       `json:"id_to_timeline_item"`
+	Summary               map[string]*TimelineItem       `json:"summary"`  // 只保留最后一个值
+	Reducers              map[string]string              `json:"reducers"` // 只保留最后一个值
+	ArchiveRefs           map[string]*TimelineArchiveRef `json:"archive_refs"`
+	PerDumpContentLimit   int64                          `json:"per_dump_content_limit"`
+	TotalDumpContentLimit int64                          `json:"total_dump_content_limit"`
 }
 
 // MarshalTimeline serializes a Timeline into a string.
@@ -60,12 +61,19 @@ func MarshalTimeline(i *Timeline) (string, error) {
 		return true
 	})
 
+	archiveRefsMap := make(map[string]*TimelineArchiveRef)
+	i.archiveRefs.ForEach(func(id int64, ref *TimelineArchiveRef) bool {
+		archiveRefsMap[fmt.Sprintf("%d", id)] = ref
+		return true
+	})
+
 	serializable := &timelineSerializable{
 		IdToTs:                idToTsMap,
 		TsToTimelineItem:      tsToTimelineItemMap,
 		IdToTimelineItem:      idToTimelineItemMap,
 		Summary:               summaryMap,
 		Reducers:              reducersMap,
+		ArchiveRefs:           archiveRefsMap,
 		PerDumpContentLimit:   i.perDumpContentLimit,
 		TotalDumpContentLimit: i.totalDumpContentLimit,
 	}
@@ -148,6 +156,15 @@ func UnmarshalTimeline(s string) (*Timeline, error) {
 		// 从单个值重建 LinkTable
 		lt := linktable.NewUnlimitedStringLinkTable(value)
 		timeline.reducers.Set(id, lt)
+	}
+
+	timeline.archiveRefs = omap.NewOrderedMap(map[int64]*TimelineArchiveRef{})
+	for key, value := range serializable.ArchiveRefs {
+		id, err := strconv.ParseInt(key, 10, 64)
+		if err != nil || value == nil {
+			continue
+		}
+		timeline.archiveRefs.Set(id, value)
 	}
 
 	return timeline, nil
