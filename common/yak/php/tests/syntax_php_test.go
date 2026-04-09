@@ -15,14 +15,12 @@ import (
 	"time"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/php/php2ssa"
@@ -83,58 +81,6 @@ var syntaxNonASTAssets = map[string]struct{}{
 	"syntax/composer.lock": {},
 }
 
-var largeProjectSlowFiles = map[string]map[string]struct{}{
-	"cms": {
-		"src/Assets/Asset.php":    {},
-		"src/Fieldtypes/Bard.php": {},
-		"src/Http/Controllers/CP/Collections/CollectionsController.php": {},
-		"src/Modifiers/CoreModifiers.php":                               {},
-		"src/Providers/AddonServiceProvider.php":                        {},
-		"tests/Assets/AssetContainerTest.php":                           {},
-		"tests/CP/Navigation/NavPreferencesTest.php":                    {},
-		"tests/Data/Entries/CollectionTest.php":                         {},
-		"tests/Data/Entries/EntryTest.php":                              {},
-		"tests/Data/Taxonomies/TermQueryBuilderTest.php":                {},
-		"tests/FrontendTest.php":                                        {},
-	},
-	"filament": {
-		"docs-assets/app/app/Livewire/TablesDemo.php":                 {},
-		"packages/actions/src/Action.php":                             {},
-		"packages/actions/src/ActionGroup.php":                        {},
-		"packages/actions/src/Concerns/InteractsWithActions.php":      {},
-		"packages/forms/src/Components/Builder.php":                   {},
-		"packages/forms/src/Components/Concerns/CanBeValidated.php":   {},
-		"packages/forms/src/Components/ModalTableSelect.php":          {},
-		"packages/infolists/src/Components/TextEntry.php":             {},
-		"packages/panels/src/Commands/MakePageCommand.php":            {},
-		"packages/panels/src/Commands/MakeRelationManagerCommand.php": {},
-		"packages/tables/src/Columns/SelectColumn.php":                {},
-		"tests/src/Forms/Components/SelectTest.php":                   {},
-		"tests/src/Tables/ColumnTest.php":                             {},
-		"tests/src/Tables/Filters/QueryBuilderTest.php":               {},
-		"tests/src/Tables/Filters/SelectFilterTest.php":               {},
-	},
-	"PrestaShop": {
-		"classes/controller/AdminController.php":                                                  {},
-		"src/PrestaShopBundle/Install/Install.php":                                                {},
-		"tests/Integration/Behaviour/Features/Context/CommonFeatureContext.php":                   {},
-		"tests/Integration/Behaviour/Features/Context/Domain/CartFeatureContext.php":              {},
-		"tests/Integration/Behaviour/Features/Context/Domain/Discount/DiscountFeatureContext.php": {},
-		"tests/Integration/Behaviour/Features/Context/Domain/OrderFeatureContext.php":             {},
-	},
-	"QloApps": {
-		"classes/controller/AdminController.php":              {},
-		"controllers/admin/AdminImportController.php":         {},
-		"controllers/admin/AdminNormalProductsController.php": {},
-		"controllers/admin/AdminOrdersController.php":         {},
-		"controllers/admin/AdminProductsController.php":       {},
-		"tools/tcpdf/tcpdf.php":                               {},
-	},
-	"twill": {
-		"src/Http/Controllers/Admin/ModuleController.php": {},
-	},
-}
-
 func phpFixtureParseBudget() time.Duration {
 	raw := strings.TrimSpace(os.Getenv("YAK_PHP_FIXTURE_PARSE_BUDGET_SEC"))
 	if raw == "" {
@@ -159,39 +105,8 @@ func phpLargeFixtureParseBudget() time.Duration {
 	return time.Duration(sec) * time.Second
 }
 
-func isKnownLargeProjectSlowFile(projectRoot, filePath string) bool {
-	entries, ok := largeProjectSlowFiles[filepath.Base(projectRoot)]
-	if !ok {
-		return false
-	}
-	_, ok = entries[filePath]
-	return ok
-}
-
-func projectFixtureDir(projectRoot string) string {
-	return strings.ToLower(filepath.Base(projectRoot))
-}
-
 func flattenedProjectFixtureName(filePath string) string {
 	return strings.NewReplacer("/", "__", "\\", "__").Replace(filePath)
-}
-
-func hasSavedProjectSyntaxFixture(projectRoot, filePath string) bool {
-	dir := projectFixtureDir(projectRoot)
-	name := flattenedProjectFixtureName(filePath)
-	for _, candidate := range []struct {
-		root fs.FS
-		path string
-	}{
-		{root: syntaxFs, path: filepath.ToSlash(filepath.Join("syntax", dir, name))},
-		{root: syntaxFs, path: filepath.ToSlash(filepath.Join("syntax", dir+"_slow", name))},
-		{root: largeSyntaxFs, path: filepath.ToSlash(filepath.Join("large", dir, name))},
-	} {
-		if _, err := fs.Stat(candidate.root, candidate.path); err == nil {
-			return true
-		}
-	}
-	return false
 }
 
 func isSyntaxASTFixture(path string) bool {
@@ -315,10 +230,6 @@ func TestAllSyntaxForPHP_G4(t *testing.T) {
 }
 
 func TestAllSyntaxProjectBuildForPHP(t *testing.T) {
-	if os.Getenv("YAK_PHP_RUN_BUILD_FIXTURES") == "" {
-		t.Skip("set YAK_PHP_RUN_BUILD_FIXTURES=1 to run PHP syntax fixture project-build checks")
-	}
-
 	err := fs.WalkDir(syntaxFs, "syntax", func(syntaxPath string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -613,146 +524,4 @@ class NonceStore {
 	}
 }
 `)
-}
-
-type ParseError struct {
-	Duration time.Duration
-	Message  string
-}
-
-type phpProjectSlowCandidate struct {
-	Path       string
-	Concurrent time.Duration
-}
-
-func phpProjectASTRoot(t *testing.T) string {
-	t.Helper()
-
-	if root := os.Getenv("YAK_PHP_PROJECT_AST_TARGET"); root != "" {
-		return root
-	}
-
-	home, err := os.UserHomeDir()
-	require.NoError(t, err)
-	return filepath.Join(home, "Target", "pfsense")
-}
-
-func TestProjectAst(t *testing.T) {
-	if os.Getenv("YAK_PHP_RUN_PROJECT_AST") == "" {
-		t.Skip("set YAK_PHP_RUN_PROJECT_AST=1 to run local pfsense project AST integration")
-	}
-
-	path := phpProjectASTRoot(t)
-	if _, err := os.Stat(path); err != nil {
-		t.Fatalf("project ast target unavailable: %s: %v", path, err)
-	}
-
-	errorFiles := make(map[string]*ssareducer.FileContent)
-	var slowFiles []string
-	var deferredSlowFiles []string
-	var slowCandidates []phpProjectSlowCandidate
-
-	fileList := make([]string, 0, 100)
-	fileMap := make(map[string]struct{})
-
-	refFs := filesys.NewRelLocalFs(path)
-	filesys.Recursive(".",
-		filesys.WithFileSystem(refFs),
-		filesys.WithDirStat(func(s string, fi fs.FileInfo) error {
-			if s == ".git" {
-				return fs.SkipDir
-			}
-			return nil
-		}),
-		filesys.WithFileStat(func(filePath string, fi fs.FileInfo) error {
-			extern := filepath.Ext(filePath)
-			if extern == ".php" || extern == ".inc" {
-				if isKnownLargeProjectSlowFile(path, filePath) {
-					log.Warnf("skip deferred large project file: %s/%s", filepath.Base(path), filePath)
-					return nil
-				}
-				fileList = append(fileList, filePath)
-				fileMap[filePath] = struct{}{}
-				return nil
-			}
-			return nil
-		}),
-	)
-	log.Infof("project AST files queued under %s: %d", path, len(fileList))
-
-	config, err := ssaapi.DefaultConfig(
-		ssaapi.WithFileSystem(refFs),
-		ssaapi.WithLanguage(ssaconfig.PHP),
-		ssaapi.WithConcurrency(1),
-	)
-	require.NoError(t, err)
-	require.NotNil(t, config)
-
-	start := time.Now()
-	ch := config.GetFileHandler(
-		refFs, fileList, fileMap,
-	)
-
-	for fileContent := range ch {
-		log.Errorf("file parse: %s: size[%s] time: %s", fileContent.Path, ssaapi.Size(len(fileContent.Content)), fileContent.Duration)
-		if budget := phpFixtureParseBudget(); budget > 0 && fileContent.Err == nil && fileContent.Duration > budget {
-			slowCandidates = append(slowCandidates, phpProjectSlowCandidate{
-				Path:       fileContent.Path,
-				Concurrent: fileContent.Duration,
-			})
-		}
-		if fileContent.Err != nil {
-			errorFiles[fileContent.Path] = fileContent
-		}
-	}
-	end := time.Since(start)
-	log.Infof("Total parse %d files cost: %v", len(fileMap), end)
-	failedFiles := make([]string, 0, len(errorFiles))
-	for fname, fc := range errorFiles {
-		failedFiles = append(failedFiles, fname)
-		log.Errorf("Parse file %s failed: %v", fname, fc.Err)
-	}
-	if budget := phpFixtureParseBudget(); budget > 0 {
-		recheckPaths := make([]string, 0, len(slowCandidates))
-		recheckFileMap := make(map[string]struct{}, len(slowCandidates))
-		recheckCandidate := make(map[string]phpProjectSlowCandidate, len(slowCandidates))
-		for _, candidate := range slowCandidates {
-			if hasSavedProjectSyntaxFixture(path, candidate.Path) {
-				log.Infof("skip saved project slow fixture: %s/%s", filepath.Base(path), candidate.Path)
-				continue
-			}
-			recheckPaths = append(recheckPaths, candidate.Path)
-			recheckFileMap[candidate.Path] = struct{}{}
-			recheckCandidate[candidate.Path] = candidate
-		}
-		sort.Strings(recheckPaths)
-		for fileContent := range config.GetFileHandler(refFs, recheckPaths, recheckFileMap) {
-			candidate, ok := recheckCandidate[fileContent.Path]
-			if !ok {
-				continue
-			}
-			if fileContent.Err != nil {
-				failedFiles = append(failedFiles, fileContent.Path)
-				log.Errorf("isolated parse failed for %s after concurrent slow-path detection: %v", fileContent.Path, fileContent.Err)
-				continue
-			}
-			if fileContent.Duration > budget {
-				if isKnownLargeProjectSlowFile(path, fileContent.Path) {
-					deferredSlowFiles = append(deferredSlowFiles, fileContent.Path)
-					log.Warnf("deferred large-file budget miss for %s: concurrent=%s isolated=%s budget=%s", fileContent.Path, candidate.Concurrent, fileContent.Duration, budget)
-					continue
-				}
-				slowFiles = append(slowFiles, fileContent.Path)
-				log.Errorf("isolated parse exceeded budget for %s: concurrent=%s isolated=%s budget=%s", fileContent.Path, candidate.Concurrent, fileContent.Duration, budget)
-			}
-		}
-	}
-	sort.Strings(failedFiles)
-	sort.Strings(deferredSlowFiles)
-	sort.Strings(slowFiles)
-	if len(deferredSlowFiles) > 0 {
-		log.Warnf("deferred large slow files for %s: %v", path, deferredSlowFiles)
-	}
-	require.Empty(t, failedFiles, "project AST parse failed for %d files under %s: %v", len(failedFiles), path, failedFiles)
-	require.Empty(t, slowFiles, "project AST parse exceeded budget for %d files under %s: %v", len(slowFiles), path, slowFiles)
 }
