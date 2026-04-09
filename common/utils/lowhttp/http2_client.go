@@ -693,7 +693,8 @@ func (rl *http2ClientConnReadLoop) processContinuation(f *http2.ContinuationFram
 func (rl *http2ClientConnReadLoop) processData(f *http2.DataFrame) {
 	cs := rl.h2Conn.streamByID(f.StreamID) // get stream by id
 	if err := streamAliveCheck(cs, f.StreamID); err != nil {
-		log.Errorf("h2 stream-id %v processData error: %v", f.StreamID, err)
+		// Server sent DATA after END_STREAM — protocol violation, silently ignore.
+		log.Warnf("h2 stream-id %v processData ignored: %v", f.StreamID, err)
 		return
 	}
 
@@ -704,25 +705,22 @@ func (rl *http2ClientConnReadLoop) processData(f *http2.DataFrame) {
 
 	fr := cs.h2Conn.fr
 
-	if f.StreamEnded() { // end stream flag
-		cs.setEndStream()
-	}
+	// Process data before marking END_STREAM so the body bytes are captured
+	// and WINDOW_UPDATE is sent even when END_STREAM is set on the same frame.
 	if dataLen := len(f.Data()); dataLen > 0 {
-		if !cs.readEndStream {
-			cs.h2Conn.frWriteMutex.Lock()
-			err := fr.WriteWindowUpdate(0, uint32(dataLen))
-			cs.h2Conn.frWriteMutex.Unlock()
-			if err != nil {
-				log.Errorf("h2 stream-id %v write window update(connect level) error: %v", f.StreamID, err)
-				return
-			}
-			cs.h2Conn.frWriteMutex.Lock()
-			err = fr.WriteWindowUpdate(f.StreamID, uint32(dataLen))
-			cs.h2Conn.frWriteMutex.Unlock()
-			if err != nil {
-				log.Errorf("h2 server write window update(stream level) error: %v", err)
-				return
-			}
+		cs.h2Conn.frWriteMutex.Lock()
+		err := fr.WriteWindowUpdate(0, uint32(dataLen))
+		cs.h2Conn.frWriteMutex.Unlock()
+		if err != nil {
+			log.Errorf("h2 stream-id %v write window update(connect level) error: %v", f.StreamID, err)
+			return
+		}
+		cs.h2Conn.frWriteMutex.Lock()
+		err = fr.WriteWindowUpdate(f.StreamID, uint32(dataLen))
+		cs.h2Conn.frWriteMutex.Unlock()
+		if err != nil {
+			log.Errorf("h2 server write window update(stream level) error: %v", err)
+			return
 		}
 		if cs.bodyStreamWriter != nil {
 			_, _ = cs.bodyStreamWriter.Write(f.Data())
@@ -730,6 +728,10 @@ func (rl *http2ClientConnReadLoop) processData(f *http2.DataFrame) {
 		if !cs.noBodyBuffer {
 			cs.bodyBuffer.Write(f.Data())
 		}
+	}
+
+	if f.StreamEnded() { // end stream flag, must come after body is written
+		cs.setEndStream()
 	}
 
 	return
