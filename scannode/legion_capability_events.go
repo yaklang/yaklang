@@ -10,10 +10,10 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	capabilityv1 "github.com/yaklang/yaklang/common/legionpb/legion/capability/v1"
-	nodev1 "github.com/yaklang/yaklang/common/legionpb/legion/node/v1"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/node"
+	capabilityv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/capability/v1"
+	nodev1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/node/v1"
 )
 
 type capabilityEventPublisher struct {

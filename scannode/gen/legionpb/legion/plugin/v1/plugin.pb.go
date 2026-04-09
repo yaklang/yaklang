@@ -7,7 +7,7 @@
 package pluginv1
 
 import (
-	v1 "github.com/yaklang/yaklang/common/legionpb/legion/node/v1"
+	v1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/node/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
@@ -416,7 +416,7 @@ const file_legion_plugin_v1_plugin_proto_rawDesc = "" +
 	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
 	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\x12;\n" +
 	"\vobserved_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"observedAtBFZDgithub.com/yaklang/yaklang/common/legionpb/legion/plugin/v1;pluginv1b\x06proto3"
+	"observedAtBLZJgithub.com/yaklang/yaklang/scannode/gen/legionpb/legion/plugin/v1;pluginv1b\x06proto3"
 
 var (
 	file_legion_plugin_v1_plugin_proto_rawDescOnce sync.Once
