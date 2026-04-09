@@ -7,7 +7,7 @@
 package jobv1
 
 import (
-	v1 "github.com/yaklang/yaklang/common/legionpb/legion/node/v1"
+	v1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/node/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
@@ -835,6 +835,122 @@ func (x *JobReport) GetReportJson() []byte {
 	return nil
 }
 
+type JobArtifactReady struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Metadata        *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Job             *JobRef                `protobuf:"bytes,2,opt,name=job,proto3" json:"job,omitempty"`
+	ArtifactKind    string                 `protobuf:"bytes,3,opt,name=artifact_kind,json=artifactKind,proto3" json:"artifact_kind,omitempty"`
+	ArtifactFormat  string                 `protobuf:"bytes,4,opt,name=artifact_format,json=artifactFormat,proto3" json:"artifact_format,omitempty"`
+	ObjectKey       string                 `protobuf:"bytes,5,opt,name=object_key,json=objectKey,proto3" json:"object_key,omitempty"`
+	Codec           string                 `protobuf:"bytes,6,opt,name=codec,proto3" json:"codec,omitempty"`
+	Sha256          string                 `protobuf:"bytes,7,opt,name=sha256,proto3" json:"sha256,omitempty"`
+	RawSizeBytes    uint64                 `protobuf:"varint,8,opt,name=raw_size_bytes,json=rawSizeBytes,proto3" json:"raw_size_bytes,omitempty"`
+	StoredSizeBytes uint64                 `protobuf:"varint,9,opt,name=stored_size_bytes,json=storedSizeBytes,proto3" json:"stored_size_bytes,omitempty"`
+	MetricsJson     []byte                 `protobuf:"bytes,10,opt,name=metrics_json,json=metricsJson,proto3" json:"metrics_json,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *JobArtifactReady) Reset() {
+	*x = JobArtifactReady{}
+	mi := &file_legion_job_v1_job_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *JobArtifactReady) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*JobArtifactReady) ProtoMessage() {}
+
+func (x *JobArtifactReady) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_job_v1_job_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use JobArtifactReady.ProtoReflect.Descriptor instead.
+func (*JobArtifactReady) Descriptor() ([]byte, []int) {
+	return file_legion_job_v1_job_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *JobArtifactReady) GetMetadata() *v1.EventMetadata {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+func (x *JobArtifactReady) GetJob() *JobRef {
+	if x != nil {
+		return x.Job
+	}
+	return nil
+}
+
+func (x *JobArtifactReady) GetArtifactKind() string {
+	if x != nil {
+		return x.ArtifactKind
+	}
+	return ""
+}
+
+func (x *JobArtifactReady) GetArtifactFormat() string {
+	if x != nil {
+		return x.ArtifactFormat
+	}
+	return ""
+}
+
+func (x *JobArtifactReady) GetObjectKey() string {
+	if x != nil {
+		return x.ObjectKey
+	}
+	return ""
+}
+
+func (x *JobArtifactReady) GetCodec() string {
+	if x != nil {
+		return x.Codec
+	}
+	return ""
+}
+
+func (x *JobArtifactReady) GetSha256() string {
+	if x != nil {
+		return x.Sha256
+	}
+	return ""
+}
+
+func (x *JobArtifactReady) GetRawSizeBytes() uint64 {
+	if x != nil {
+		return x.RawSizeBytes
+	}
+	return 0
+}
+
+func (x *JobArtifactReady) GetStoredSizeBytes() uint64 {
+	if x != nil {
+		return x.StoredSizeBytes
+	}
+	return 0
+}
+
+func (x *JobArtifactReady) GetMetricsJson() []byte {
+	if x != nil {
+		return x.MetricsJson
+	}
+	return nil
+}
+
 type JobSucceeded struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Metadata      *v1.EventMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
@@ -847,7 +963,7 @@ type JobSucceeded struct {
 
 func (x *JobSucceeded) Reset() {
 	*x = JobSucceeded{}
-	mi := &file_legion_job_v1_job_proto_msgTypes[11]
+	mi := &file_legion_job_v1_job_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -859,7 +975,7 @@ func (x *JobSucceeded) String() string {
 func (*JobSucceeded) ProtoMessage() {}
 
 func (x *JobSucceeded) ProtoReflect() protoreflect.Message {
-	mi := &file_legion_job_v1_job_proto_msgTypes[11]
+	mi := &file_legion_job_v1_job_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -872,7 +988,7 @@ func (x *JobSucceeded) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use JobSucceeded.ProtoReflect.Descriptor instead.
 func (*JobSucceeded) Descriptor() ([]byte, []int) {
-	return file_legion_job_v1_job_proto_rawDescGZIP(), []int{11}
+	return file_legion_job_v1_job_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *JobSucceeded) GetMetadata() *v1.EventMetadata {
@@ -917,7 +1033,7 @@ type JobFailed struct {
 
 func (x *JobFailed) Reset() {
 	*x = JobFailed{}
-	mi := &file_legion_job_v1_job_proto_msgTypes[12]
+	mi := &file_legion_job_v1_job_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -929,7 +1045,7 @@ func (x *JobFailed) String() string {
 func (*JobFailed) ProtoMessage() {}
 
 func (x *JobFailed) ProtoReflect() protoreflect.Message {
-	mi := &file_legion_job_v1_job_proto_msgTypes[12]
+	mi := &file_legion_job_v1_job_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -942,7 +1058,7 @@ func (x *JobFailed) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use JobFailed.ProtoReflect.Descriptor instead.
 func (*JobFailed) Descriptor() ([]byte, []int) {
-	return file_legion_job_v1_job_proto_rawDescGZIP(), []int{12}
+	return file_legion_job_v1_job_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *JobFailed) GetMetadata() *v1.EventMetadata {
@@ -999,7 +1115,7 @@ type JobCancelled struct {
 
 func (x *JobCancelled) Reset() {
 	*x = JobCancelled{}
-	mi := &file_legion_job_v1_job_proto_msgTypes[13]
+	mi := &file_legion_job_v1_job_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1011,7 +1127,7 @@ func (x *JobCancelled) String() string {
 func (*JobCancelled) ProtoMessage() {}
 
 func (x *JobCancelled) ProtoReflect() protoreflect.Message {
-	mi := &file_legion_job_v1_job_proto_msgTypes[13]
+	mi := &file_legion_job_v1_job_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1024,7 +1140,7 @@ func (x *JobCancelled) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use JobCancelled.ProtoReflect.Descriptor instead.
 func (*JobCancelled) Descriptor() ([]byte, []int) {
-	return file_legion_job_v1_job_proto_rawDescGZIP(), []int{13}
+	return file_legion_job_v1_job_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *JobCancelled) GetMetadata() *v1.EventMetadata {
@@ -1140,7 +1256,20 @@ const file_legion_job_v1_job_proto_rawDesc = "" +
 	"\vreport_kind\x18\x03 \x01(\tR\n" +
 	"reportKind\x12\x1f\n" +
 	"\vreport_json\x18\x04 \x01(\fR\n" +
-	"reportJson\"\xd0\x01\n" +
+	"reportJson\"\x86\x03\n" +
+	"\x10JobArtifactReady\x129\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12'\n" +
+	"\x03job\x18\x02 \x01(\v2\x15.legion.job.v1.JobRefR\x03job\x12#\n" +
+	"\rartifact_kind\x18\x03 \x01(\tR\fartifactKind\x12'\n" +
+	"\x0fartifact_format\x18\x04 \x01(\tR\x0eartifactFormat\x12\x1d\n" +
+	"\n" +
+	"object_key\x18\x05 \x01(\tR\tobjectKey\x12\x14\n" +
+	"\x05codec\x18\x06 \x01(\tR\x05codec\x12\x16\n" +
+	"\x06sha256\x18\a \x01(\tR\x06sha256\x12$\n" +
+	"\x0eraw_size_bytes\x18\b \x01(\x04R\frawSizeBytes\x12*\n" +
+	"\x11stored_size_bytes\x18\t \x01(\x04R\x0fstoredSizeBytes\x12!\n" +
+	"\fmetrics_json\x18\n" +
+	" \x01(\fR\vmetricsJson\"\xd0\x01\n" +
 	"\fJobSucceeded\x129\n" +
 	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12'\n" +
 	"\x03job\x18\x02 \x01(\v2\x15.legion.job.v1.JobRefR\x03job\x12;\n" +
@@ -1162,7 +1291,7 @@ const file_legion_job_v1_job_proto_rawDesc = "" +
 	"\x03job\x18\x02 \x01(\v2\x15.legion.job.v1.JobRefR\x03job\x12;\n" +
 	"\vfinished_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"finishedAt\x12\x16\n" +
-	"\x06reason\x18\x04 \x01(\tR\x06reasonB@Z>github.com/yaklang/yaklang/common/legionpb/legion/job/v1;jobv1b\x06proto3"
+	"\x06reason\x18\x04 \x01(\tR\x06reasonBFZDgithub.com/yaklang/yaklang/scannode/gen/legionpb/legion/job/v1;jobv1b\x06proto3"
 
 var (
 	file_legion_job_v1_job_proto_rawDescOnce sync.Once
@@ -1176,7 +1305,7 @@ func file_legion_job_v1_job_proto_rawDescGZIP() []byte {
 	return file_legion_job_v1_job_proto_rawDescData
 }
 
-var file_legion_job_v1_job_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
+var file_legion_job_v1_job_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
 var file_legion_job_v1_job_proto_goTypes = []any{
 	(*JobRef)(nil),                // 0: legion.job.v1.JobRef
 	(*ScriptVersionRef)(nil),      // 1: legion.job.v1.ScriptVersionRef
@@ -1189,50 +1318,53 @@ var file_legion_job_v1_job_proto_goTypes = []any{
 	(*JobAsset)(nil),              // 8: legion.job.v1.JobAsset
 	(*JobRisk)(nil),               // 9: legion.job.v1.JobRisk
 	(*JobReport)(nil),             // 10: legion.job.v1.JobReport
-	(*JobSucceeded)(nil),          // 11: legion.job.v1.JobSucceeded
-	(*JobFailed)(nil),             // 12: legion.job.v1.JobFailed
-	(*JobCancelled)(nil),          // 13: legion.job.v1.JobCancelled
-	nil,                           // 14: legion.job.v1.DispatchJobCommand.LabelsEntry
-	(*v1.CommandMetadata)(nil),    // 15: legion.node.v1.CommandMetadata
-	(*v1.EventMetadata)(nil),      // 16: legion.node.v1.EventMetadata
-	(*timestamppb.Timestamp)(nil), // 17: google.protobuf.Timestamp
+	(*JobArtifactReady)(nil),      // 11: legion.job.v1.JobArtifactReady
+	(*JobSucceeded)(nil),          // 12: legion.job.v1.JobSucceeded
+	(*JobFailed)(nil),             // 13: legion.job.v1.JobFailed
+	(*JobCancelled)(nil),          // 14: legion.job.v1.JobCancelled
+	nil,                           // 15: legion.job.v1.DispatchJobCommand.LabelsEntry
+	(*v1.CommandMetadata)(nil),    // 16: legion.node.v1.CommandMetadata
+	(*v1.EventMetadata)(nil),      // 17: legion.node.v1.EventMetadata
+	(*timestamppb.Timestamp)(nil), // 18: google.protobuf.Timestamp
 }
 var file_legion_job_v1_job_proto_depIdxs = []int32{
 	1,  // 0: legion.job.v1.InlineScript.version:type_name -> legion.job.v1.ScriptVersionRef
-	15, // 1: legion.job.v1.DispatchJobCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	16, // 1: legion.job.v1.DispatchJobCommand.metadata:type_name -> legion.node.v1.CommandMetadata
 	0,  // 2: legion.job.v1.DispatchJobCommand.job:type_name -> legion.job.v1.JobRef
-	14, // 3: legion.job.v1.DispatchJobCommand.labels:type_name -> legion.job.v1.DispatchJobCommand.LabelsEntry
+	15, // 3: legion.job.v1.DispatchJobCommand.labels:type_name -> legion.job.v1.DispatchJobCommand.LabelsEntry
 	2,  // 4: legion.job.v1.DispatchJobCommand.script:type_name -> legion.job.v1.InlineScript
-	15, // 5: legion.job.v1.CancelJobCommand.metadata:type_name -> legion.node.v1.CommandMetadata
+	16, // 5: legion.job.v1.CancelJobCommand.metadata:type_name -> legion.node.v1.CommandMetadata
 	0,  // 6: legion.job.v1.CancelJobCommand.job:type_name -> legion.job.v1.JobRef
-	16, // 7: legion.job.v1.JobClaimed.metadata:type_name -> legion.node.v1.EventMetadata
+	17, // 7: legion.job.v1.JobClaimed.metadata:type_name -> legion.node.v1.EventMetadata
 	0,  // 8: legion.job.v1.JobClaimed.job:type_name -> legion.job.v1.JobRef
-	17, // 9: legion.job.v1.JobClaimed.claimed_at:type_name -> google.protobuf.Timestamp
-	16, // 10: legion.job.v1.JobStarted.metadata:type_name -> legion.node.v1.EventMetadata
+	18, // 9: legion.job.v1.JobClaimed.claimed_at:type_name -> google.protobuf.Timestamp
+	17, // 10: legion.job.v1.JobStarted.metadata:type_name -> legion.node.v1.EventMetadata
 	0,  // 11: legion.job.v1.JobStarted.job:type_name -> legion.job.v1.JobRef
-	17, // 12: legion.job.v1.JobStarted.started_at:type_name -> google.protobuf.Timestamp
-	16, // 13: legion.job.v1.JobProgressed.metadata:type_name -> legion.node.v1.EventMetadata
+	18, // 12: legion.job.v1.JobStarted.started_at:type_name -> google.protobuf.Timestamp
+	17, // 13: legion.job.v1.JobProgressed.metadata:type_name -> legion.node.v1.EventMetadata
 	0,  // 14: legion.job.v1.JobProgressed.job:type_name -> legion.job.v1.JobRef
-	16, // 15: legion.job.v1.JobAsset.metadata:type_name -> legion.node.v1.EventMetadata
+	17, // 15: legion.job.v1.JobAsset.metadata:type_name -> legion.node.v1.EventMetadata
 	0,  // 16: legion.job.v1.JobAsset.job:type_name -> legion.job.v1.JobRef
-	16, // 17: legion.job.v1.JobRisk.metadata:type_name -> legion.node.v1.EventMetadata
+	17, // 17: legion.job.v1.JobRisk.metadata:type_name -> legion.node.v1.EventMetadata
 	0,  // 18: legion.job.v1.JobRisk.job:type_name -> legion.job.v1.JobRef
-	16, // 19: legion.job.v1.JobReport.metadata:type_name -> legion.node.v1.EventMetadata
+	17, // 19: legion.job.v1.JobReport.metadata:type_name -> legion.node.v1.EventMetadata
 	0,  // 20: legion.job.v1.JobReport.job:type_name -> legion.job.v1.JobRef
-	16, // 21: legion.job.v1.JobSucceeded.metadata:type_name -> legion.node.v1.EventMetadata
-	0,  // 22: legion.job.v1.JobSucceeded.job:type_name -> legion.job.v1.JobRef
-	17, // 23: legion.job.v1.JobSucceeded.finished_at:type_name -> google.protobuf.Timestamp
-	16, // 24: legion.job.v1.JobFailed.metadata:type_name -> legion.node.v1.EventMetadata
-	0,  // 25: legion.job.v1.JobFailed.job:type_name -> legion.job.v1.JobRef
-	17, // 26: legion.job.v1.JobFailed.finished_at:type_name -> google.protobuf.Timestamp
-	16, // 27: legion.job.v1.JobCancelled.metadata:type_name -> legion.node.v1.EventMetadata
-	0,  // 28: legion.job.v1.JobCancelled.job:type_name -> legion.job.v1.JobRef
-	17, // 29: legion.job.v1.JobCancelled.finished_at:type_name -> google.protobuf.Timestamp
-	30, // [30:30] is the sub-list for method output_type
-	30, // [30:30] is the sub-list for method input_type
-	30, // [30:30] is the sub-list for extension type_name
-	30, // [30:30] is the sub-list for extension extendee
-	0,  // [0:30] is the sub-list for field type_name
+	17, // 21: legion.job.v1.JobArtifactReady.metadata:type_name -> legion.node.v1.EventMetadata
+	0,  // 22: legion.job.v1.JobArtifactReady.job:type_name -> legion.job.v1.JobRef
+	17, // 23: legion.job.v1.JobSucceeded.metadata:type_name -> legion.node.v1.EventMetadata
+	0,  // 24: legion.job.v1.JobSucceeded.job:type_name -> legion.job.v1.JobRef
+	18, // 25: legion.job.v1.JobSucceeded.finished_at:type_name -> google.protobuf.Timestamp
+	17, // 26: legion.job.v1.JobFailed.metadata:type_name -> legion.node.v1.EventMetadata
+	0,  // 27: legion.job.v1.JobFailed.job:type_name -> legion.job.v1.JobRef
+	18, // 28: legion.job.v1.JobFailed.finished_at:type_name -> google.protobuf.Timestamp
+	17, // 29: legion.job.v1.JobCancelled.metadata:type_name -> legion.node.v1.EventMetadata
+	0,  // 30: legion.job.v1.JobCancelled.job:type_name -> legion.job.v1.JobRef
+	18, // 31: legion.job.v1.JobCancelled.finished_at:type_name -> google.protobuf.Timestamp
+	32, // [32:32] is the sub-list for method output_type
+	32, // [32:32] is the sub-list for method input_type
+	32, // [32:32] is the sub-list for extension type_name
+	32, // [32:32] is the sub-list for extension extendee
+	0,  // [0:32] is the sub-list for field type_name
 }
 
 func init() { file_legion_job_v1_job_proto_init() }
@@ -1246,7 +1378,7 @@ func file_legion_job_v1_job_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_legion_job_v1_job_proto_rawDesc), len(file_legion_job_v1_job_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   15,
+			NumMessages:   16,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
