@@ -8,8 +8,8 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	jobv1 "github.com/yaklang/yaklang/common/legionpb/legion/job/v1"
 	"github.com/yaklang/yaklang/common/log"
+	jobv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/job/v1"
 )
 
 func (b *legionJobBridge) handleDispatch(

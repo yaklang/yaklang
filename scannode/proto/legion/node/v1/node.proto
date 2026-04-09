@@ -4,7 +4,7 @@ package legion.node.v1;
 
 import "google/protobuf/timestamp.proto";
 
-option go_package = "github.com/yaklang/yaklang/common/legionpb/legion/node/v1;nodev1";
+option go_package = "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/node/v1;nodev1";
 
 message NodeRef {
   string node_id = 1;

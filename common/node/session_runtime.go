@@ -2,6 +2,7 @@ package node
 
 import (
 	"context"
+	"math"
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -22,12 +23,13 @@ func (n *NodeBase) bootstrapSession() error {
 	defer cancel()
 
 	session, err := n.transport.Bootstrap(ctx, BootstrapRequest{
-		EnrollmentToken: n.enrollmentToken,
-		NodeID:          n.NodeId,
-		NodeType:        string(n.NodeType),
-		Version:         n.version,
-		Labels:          cloneStringMap(n.labels),
-		CapabilityKeys:  cloneStringSlice(n.capabilityKeys),
+		EnrollmentToken:          n.enrollmentToken,
+		NodeID:                   n.NodeId,
+		NodeType:                 string(n.NodeType),
+		Version:                  n.version,
+		Labels:                   cloneStringMap(n.labels),
+		CapabilityKeys:           cloneStringSlice(n.capabilityKeys),
+		HeartbeatIntervalSeconds: durationToWholeSeconds(n.heartbeatInterval),
 	})
 	if err != nil {
 		return err
@@ -85,4 +87,16 @@ func (n *NodeBase) clearSession() {
 	n.session = SessionState{}
 	n.sessionMu.Unlock()
 	n.isRegistered.UnSet()
+}
+
+func durationToWholeSeconds(value time.Duration) uint32 {
+	if value <= 0 {
+		return 0
+	}
+
+	seconds := uint32(math.Ceil(value.Seconds()))
+	if seconds == 0 {
+		return 1
+	}
+	return seconds
 }

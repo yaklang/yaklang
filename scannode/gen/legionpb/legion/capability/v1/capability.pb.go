@@ -7,7 +7,7 @@
 package capabilityv1
 
 import (
-	v1 "github.com/yaklang/yaklang/common/legionpb/legion/node/v1"
+	v1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/node/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
@@ -403,7 +403,7 @@ const file_legion_capability_v1_capability_proto_rawDesc = "" +
 	"capability\x12\x1d\n" +
 	"\n" +
 	"error_code\x18\x03 \x01(\tR\terrorCode\x12#\n" +
-	"\rerror_message\x18\x04 \x01(\tR\ferrorMessageBNZLgithub.com/yaklang/yaklang/common/legionpb/legion/capability/v1;capabilityv1b\x06proto3"
+	"\rerror_message\x18\x04 \x01(\tR\ferrorMessageBTZRgithub.com/yaklang/yaklang/scannode/gen/legionpb/legion/capability/v1;capabilityv1b\x06proto3"
 
 var (
 	file_legion_capability_v1_capability_proto_rawDescOnce sync.Once

@@ -270,6 +270,37 @@ func (r *ScannerAgentReporter) publishJobReport(
 	)
 }
 
+func (r *ScannerAgentReporter) PublishSSAArtifactReady(
+	event *SSAArtifactReadyEvent,
+) error {
+	if event == nil {
+		return nil
+	}
+
+	metricsJSON, err := buildSSAArtifactMetricsPayload(event)
+	if err != nil {
+		return fmt.Errorf("marshal ssa artifact metrics: %w", err)
+	}
+
+	publisher, ref, ok, err := r.legionPublisher()
+	if err != nil || !ok {
+		return err
+	}
+	r.touchActiveAttempt()
+	return publisher.PublishArtifactReady(
+		r.agent.node.GetRootContext(),
+		*ref,
+		legionArtifactKindSSAResultV1,
+		event.ArtifactFormat,
+		event.ObjectKey,
+		event.Codec,
+		event.SHA256,
+		ssaSizeToUint64(event.UncompressedSize),
+		ssaSizeToUint64(event.CompressedSize),
+		metricsJSON,
+	)
+}
+
 func (r *ScannerAgentReporter) legionPublisher() (
 	*jobEventPublisher,
 	*jobExecutionRef,
@@ -305,6 +336,13 @@ func logReporterEventError(action string, err error) {
 		return
 	}
 	log.Errorf("report legion %s failed: %v", action, err)
+}
+
+func ssaSizeToUint64(value int64) uint64 {
+	if value <= 0 {
+		return 0
+	}
+	return uint64(value)
 }
 
 func (r *ScannerAgentReporter) touchActiveAttempt() {
