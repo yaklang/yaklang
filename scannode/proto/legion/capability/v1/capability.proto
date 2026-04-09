@@ -5,7 +5,7 @@ package legion.capability.v1;
 import "google/protobuf/timestamp.proto";
 import "legion/node/v1/node.proto";
 
-option go_package = "github.com/yaklang/yaklang/common/legionpb/legion/capability/v1;capabilityv1";
+option go_package = "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/capability/v1;capabilityv1";
 
 message CapabilityRef {
   string capability_key = 1;

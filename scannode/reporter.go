@@ -26,6 +26,8 @@ type ScannerAgentReporter struct {
 	agent        *ScanNode
 
 	progressCheckpoint attemptProgressCheckpoint
+	ssaCollector       *SSAArtifactCollector
+	ssaUploadCfg       *SSAArtifactUploadConfig
 }
 
 // convertRawToString 将原始数据转换为字符串，处理 JSON 反序列化后的各种数据格式

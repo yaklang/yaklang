@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -15,22 +16,25 @@ import (
 const (
 	bootstrapEndpointPath = "/v1/nodes/bootstrap"
 	heartbeatEndpointFmt  = "/v1/node-sessions/%s/heartbeats"
+	shutdownEndpointFmt   = "/v1/node-sessions/%s/shutdown"
 )
 
 // SessionTransport defines how a node acquires and renews a platform session.
 type SessionTransport interface {
 	Bootstrap(context.Context, BootstrapRequest) (SessionState, error)
 	Heartbeat(context.Context, SessionState, HeartbeatRequest) error
+	Shutdown(context.Context, SessionState, ShutdownRequest) error
 }
 
 // BootstrapRequest is sent once to create a short-lived node session.
 type BootstrapRequest struct {
-	EnrollmentToken string            `json:"enrollment_token"`
-	NodeID          string            `json:"node_id"`
-	NodeType        string            `json:"node_type"`
-	Version         string            `json:"version"`
-	Labels          map[string]string `json:"labels"`
-	CapabilityKeys  []string          `json:"capability_keys"`
+	EnrollmentToken          string            `json:"enrollment_token"`
+	NodeID                   string            `json:"node_id"`
+	NodeType                 string            `json:"node_type"`
+	Version                  string            `json:"version"`
+	Labels                   map[string]string `json:"labels"`
+	CapabilityKeys           []string          `json:"capability_keys"`
+	HeartbeatIntervalSeconds uint32            `json:"heartbeat_interval_seconds"`
 }
 
 // SessionState is the session material returned by the platform.
@@ -45,14 +49,20 @@ type SessionState struct {
 
 // HeartbeatRequest keeps the node session alive and reports runtime state.
 type HeartbeatRequest struct {
-	LifecycleState string                   `json:"lifecycle_state"`
-	Version        string                   `json:"version"`
-	RunningJobs    uint32                   `json:"running_jobs"`
-	MaxRunningJobs uint32                   `json:"max_running_jobs"`
-	CapabilityKeys []string                 `json:"capability_keys"`
-	Labels         map[string]string        `json:"labels"`
-	ObservedAt     time.Time                `json:"observed_at"`
-	ActiveAttempts []ActiveAttemptHeartbeat `json:"active_attempts"`
+	LifecycleState           string                   `json:"lifecycle_state"`
+	Version                  string                   `json:"version"`
+	RunningJobs              uint32                   `json:"running_jobs"`
+	MaxRunningJobs           uint32                   `json:"max_running_jobs"`
+	CapabilityKeys           []string                 `json:"capability_keys"`
+	Labels                   map[string]string        `json:"labels"`
+	ObservedAt               time.Time                `json:"observed_at"`
+	HeartbeatIntervalSeconds uint32                   `json:"heartbeat_interval_seconds"`
+	ActiveAttempts           []ActiveAttemptHeartbeat `json:"active_attempts"`
+}
+
+// ShutdownRequest marks a node session inactive immediately on graceful exit.
+type ShutdownRequest struct {
+	ObservedAt time.Time `json:"observed_at"`
 }
 
 // HTTPTransportConfig configures the platform HTTP transport.
@@ -64,6 +74,40 @@ type HTTPTransportConfig struct {
 type httpTransport struct {
 	baseURL string
 	client  *http.Client
+}
+
+type HTTPStatusError struct {
+	StatusCode int
+	Message    string
+	Body       string
+}
+
+func (e *HTTPStatusError) Error() string {
+	if e == nil {
+		return "transport status=0"
+	}
+	if e.Message != "" {
+		return fmt.Sprintf("transport status=%d error=%s", e.StatusCode, e.Message)
+	}
+	if e.Body != "" {
+		return fmt.Sprintf("transport status=%d body=%s", e.StatusCode, e.Body)
+	}
+	return fmt.Sprintf("transport status=%d", e.StatusCode)
+}
+
+func IsSessionInactiveTransportError(err error) bool {
+	var statusErr *HTTPStatusError
+	if !errors.As(err, &statusErr) {
+		return false
+	}
+	if statusErr.StatusCode != http.StatusConflict {
+		return false
+	}
+
+	message := strings.ToLower(strings.TrimSpace(statusErr.Message))
+	body := strings.ToLower(strings.TrimSpace(statusErr.Body))
+	return strings.Contains(message, "node session is not active") ||
+		strings.Contains(body, "node session is not active")
 }
 
 // NewHTTPTransport creates the default HTTP session transport.
@@ -122,6 +166,15 @@ func (t *httpTransport) Heartbeat(
 	return t.postJSON(ctx, endpoint, session.SessionToken, request, nil)
 }
 
+func (t *httpTransport) Shutdown(
+	ctx context.Context,
+	session SessionState,
+	request ShutdownRequest,
+) error {
+	endpoint := fmt.Sprintf(shutdownEndpointFmt, url.PathEscape(session.SessionID))
+	return t.postJSON(ctx, endpoint, session.SessionToken, request, nil)
+}
+
 func (t *httpTransport) postJSON(
 	ctx context.Context,
 	path string,
@@ -174,7 +227,21 @@ func readHTTPError(response *http.Response) error {
 
 	trimmed := strings.TrimSpace(string(body))
 	if trimmed == "" {
-		return fmt.Errorf("transport status=%d", response.StatusCode)
+		return &HTTPStatusError{StatusCode: response.StatusCode}
 	}
-	return fmt.Errorf("transport status=%d body=%s", response.StatusCode, trimmed)
+
+	var payload struct {
+		Error string `json:"error"`
+	}
+	if err := json.Unmarshal(body, &payload); err == nil && strings.TrimSpace(payload.Error) != "" {
+		return &HTTPStatusError{
+			StatusCode: response.StatusCode,
+			Message:    strings.TrimSpace(payload.Error),
+			Body:       trimmed,
+		}
+	}
+	return &HTTPStatusError{
+		StatusCode: response.StatusCode,
+		Body:       trimmed,
+	}
 }

@@ -858,7 +858,7 @@ const file_legion_node_v1_node_proto_rawDesc = "" +
 	"\x0fLOG_LEVEL_DEBUG\x10\x01\x12\x12\n" +
 	"\x0eLOG_LEVEL_INFO\x10\x02\x12\x12\n" +
 	"\x0eLOG_LEVEL_WARN\x10\x03\x12\x13\n" +
-	"\x0fLOG_LEVEL_ERROR\x10\x04BBZ@github.com/yaklang/yaklang/common/legionpb/legion/node/v1;nodev1b\x06proto3"
+	"\x0fLOG_LEVEL_ERROR\x10\x04BHZFgithub.com/yaklang/yaklang/scannode/gen/legionpb/legion/node/v1;nodev1b\x06proto3"
 
 var (
 	file_legion_node_v1_node_proto_rawDescOnce sync.Once

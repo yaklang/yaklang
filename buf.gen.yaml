@@ -2,6 +2,6 @@ version: v2
 
 plugins:
   - local: protoc-gen-go
-    out: common/legionpb
+    out: scannode/gen/legionpb
     opt:
       - paths=source_relative
