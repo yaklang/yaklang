@@ -43,6 +43,41 @@ func TestResolveInstructionCacheSettings(t *testing.T) {
 	require.Equal(t, largeProjectCacheMax, maxEntries)
 }
 
+func TestMarshalBasicBlockUsesOwnCurrentBlockID(t *testing.T) {
+	programName := uuid.NewString()
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
+
+	vf := filesys.NewVirtualFs()
+	prog := newProgramWithTTL(programName, 0, ProgramCacheDBWrite, vf)
+	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+
+	block := builder.Function.NewBasicBlock("self")
+	require.Greater(t, block.GetId(), int64(0))
+
+	irCode, err := marshalIrCode(block)
+	require.NoError(t, err)
+	require.NotNil(t, irCode)
+	require.Equal(t, block.GetId(), irCode.CurrentBlock, "basic block rows should persist their own block id")
+}
+
+func TestCloneProgramConfigKeepsCompileProjectBytes(t *testing.T) {
+	cfg, err := ssaconfig.New(
+		ssaconfig.ModeSSACompile,
+		ssaconfig.WithSetProgramName("root"),
+		ssaconfig.WithCompileIrCacheTTL(123*time.Millisecond),
+		ssaconfig.WithCompileIrCacheMax(77),
+	)
+	require.NoError(t, err)
+	cfg.SetCompileProjectBytes(largeProjectByteThreshold + 1024)
+
+	cloned := cloneProgramConfig(cfg, "child")
+	require.NotNil(t, cloned)
+	require.Equal(t, cfg.GetCompileIrCacheTTL(), cloned.GetCompileIrCacheTTL())
+	require.Equal(t, cfg.GetCompileIrCacheMax(), cloned.GetCompileIrCacheMax())
+	require.Equal(t, cfg.GetCompileProjectBytes(), cloned.GetCompileProjectBytes())
+	require.Equal(t, "child", cloned.GetProgramName())
+}
+
 func TestSaveEditorTracksOnlySourceHashInMemory(t *testing.T) {
 	programName := uuid.NewString()
 	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
