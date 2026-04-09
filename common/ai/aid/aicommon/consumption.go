@@ -5,60 +5,39 @@ import (
 	"io"
 	"sync/atomic"
 	"time"
+
+	ytokenizer "github.com/yaklang/yaklang/common/ai/tokenizer"
 )
 
-// CreateConsumptionReader 创建一个新的 Reader，每秒回调当前的 token 数量
-func CreateConsumptionReader(r io.Reader, callback func(current int)) io.Reader {
-	return &consumptionReader{
+// CreateConsumptionReader creates a Reader that periodically reports accumulated token count via callback.
+// An optional externalTokenCounter can be provided to also accumulate tokens into a shared atomic counter
+// (useful when multiple streams feed into a single total).
+func CreateConsumptionReader(r io.Reader, callback func(current int), externalTokenCounter ...*atomic.Int64) io.Reader {
+	cr := &consumptionReader{
 		reader:   r,
 		callback: callback,
 		ctx:      context.Background(),
 		cancel:   func() {},
 	}
+	if len(externalTokenCounter) > 0 {
+		cr.externalTokenCounter = externalTokenCounter[0]
+	}
+	return cr
 }
 
 type consumptionReader struct {
-	reader   io.Reader
-	callback func(current int)
-	count    atomic.Int64
-	once     atomic.Bool
-	ctx      context.Context
-	cancel   context.CancelFunc
+	reader               io.Reader
+	callback             func(current int)
+	count                atomic.Int64
+	once                 atomic.Bool
+	ctx                  context.Context
+	cancel               context.CancelFunc
+	externalTokenCounter *atomic.Int64
 }
 
-// estimateTokens 估算内容的 token 数量
+// estimateTokens calculates token count using Qwen BPE vocabulary.
 func estimateTokens(data []byte) int {
-	tokens := 0
-	isASCII := true
-	asciiCount := 0
-
-	for _, b := range data {
-		if b >= 128 {
-			// 非 ASCII 字符（如中文），每个字节都计算
-			isASCII = false
-			tokens++
-		} else {
-			if isASCII {
-				// ASCII 字符，每 4 个字符算一个 token
-				asciiCount++
-				if asciiCount >= 4 {
-					tokens++
-					asciiCount = 0
-				}
-			} else {
-				// 重置状态
-				isASCII = true
-				asciiCount = 1
-			}
-		}
-	}
-
-	// 处理剩余的 ASCII 字符
-	if asciiCount > 0 {
-		tokens++
-	}
-
-	return tokens
+	return ytokenizer.CalcTokenCount(string(data))
 }
 
 func (t *consumptionReader) Read(p []byte) (n int, err error) {
@@ -71,9 +50,11 @@ func (t *consumptionReader) Read(p []byte) (n int, err error) {
 	// 读取数据
 	n, err = t.reader.Read(p)
 	if n > 0 {
-		// 估算 token 数量并累加
-		tokens := estimateTokens(p[:n])
-		t.count.Add(int64(tokens))
+		tokens := int64(estimateTokens(p[:n]))
+		t.count.Add(tokens)
+		if t.externalTokenCounter != nil {
+			t.externalTokenCounter.Add(tokens)
+		}
 	}
 
 	// 如果读取结束或出错，取消计数器

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/jinzhu/gorm"
+	ytokenizer "github.com/yaklang/yaklang/common/ai/tokenizer"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
@@ -565,12 +566,12 @@ func (m *SkillsContextManager) estimateContextSize() int {
 }
 
 // measureSize returns the size of a rendered string using the token estimator if available,
-// otherwise falls back to byte length.
+// otherwise falls back to Qwen BPE token count.
 func (m *SkillsContextManager) measureSize(rendered string) int {
 	if m.tokenEstimator != nil {
 		return m.tokenEstimator(rendered)
 	}
-	return len(rendered)
+	return ytokenizer.CalcTokenCount(rendered)
 }
 
 func buildKeywordsString(meta *SkillMeta) string {
