@@ -566,7 +566,7 @@ func (y *builder) VisitClassConstant(raw phpparser.IClassConstantContext) ssa.Va
 	case len(i.AllKeyedVariable()) > 0:
 		receiver := y.VisitKeyedVariable(i.KeyedVariable(0))
 		display = yakunquote.TryUnquote(strings.TrimPrefix(receiver.String(), "$"))
-		if bp, ok := ssa.ToClassBluePrintType(receiver.GetType()); ok {
+		if bp, ok := ssa.ToBluePrintType(receiver.GetType()); ok {
 			blueprint = bp
 		} else if bp := y.findBlueprint(display); bp != nil {
 			blueprint = bp

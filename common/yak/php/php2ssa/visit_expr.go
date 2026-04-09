@@ -750,7 +750,7 @@ func (y *builder) VisitDynamicStaticClassExpr(raw phpparser.IDynamicStaticClassE
 
 	var blueprint *ssa.Blueprint
 	if target != nil {
-		if bp, ok := ssa.ToClassBluePrintType(target.GetType()); ok {
+		if bp, ok := ssa.ToBluePrintType(target.GetType()); ok {
 			blueprint = bp
 		} else if bp := y.GetBluePrint(target.String()); bp != nil {
 			blueprint = bp
