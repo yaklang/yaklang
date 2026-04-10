@@ -533,8 +533,7 @@ func TestSkillsContextManager_FoldingOnOverflow(t *testing.T) {
 	loader, _ := NewFSSkillLoader(vfs)
 	mgr := NewSkillsContextManager(loader)
 
-	// Set a very small limit to force folding
-	mgr.SetMaxTokens(500)
+	mgr.SetMaxTokens(50)
 
 	if err := mgr.LoadSkill("deploy-app"); err != nil {
 		t.Fatalf("LoadSkill failed: %v", err)
