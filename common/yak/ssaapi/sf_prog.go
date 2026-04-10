@@ -511,12 +511,11 @@ func (p *Program) getEditor(filename, hash string) (*memedit.MemEditor, error) {
 		return nil, utils.Errorf("get editor by filename %s not found", filename)
 	}
 	// if have database, get source code from database
-	if editor, err := ssadb.GetEditorByHash(hash); err != nil {
-		return nil, utils.Errorf("get ir source from hash error: %s", err)
-	} else {
+	if editor, ok := p.Program.GetEditorByHash(hash); ok {
 		p.Program.SetEditor(filename, editor)
 		return editor, nil
 	}
+	return nil, utils.Errorf("get ir source from hash error: %s", hash)
 }
 
 func (p *Program) ForEachExtraFile(callBack func(string, *memedit.MemEditor) bool) {

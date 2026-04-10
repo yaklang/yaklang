@@ -42,7 +42,6 @@ func NewProgram(
 		Blueprint:               omap.NewEmptyOrderedMap[string, *Blueprint](),
 		BlueprintStack:          utils.NewStack[*Blueprint](),
 		editorStack:             omap.NewOrderedMap(make(map[string]*memedit.MemEditor)),
-		editorMap:               omap.NewOrderedMap(make(map[string]*memedit.MemEditor)),
 		FileList:                make(map[string]string),
 		LineCount:               0,
 		cacheExternInstance:     make(map[string]Value),
@@ -92,7 +91,6 @@ func NewTmpProgram(ProgramName string) *Program {
 		Blueprint:               omap.NewEmptyOrderedMap[string, *Blueprint](),
 		BlueprintStack:          utils.NewStack[*Blueprint](),
 		editorStack:             omap.NewOrderedMap(make(map[string]*memedit.MemEditor)),
-		editorMap:               omap.NewOrderedMap(make(map[string]*memedit.MemEditor)),
 		FileList:                make(map[string]string),
 		LineCount:               0,
 		cacheExternInstance:     make(map[string]Value),
@@ -401,22 +399,78 @@ func (prog *Program) GetFrontValueByOffset(searchOffset int) (offset int, value 
 }
 
 func (p *Program) ShouldVisit(path string) bool {
-	return p.editorMap.Have(path)
+	if p == nil {
+		return false
+	}
+	if _, ok := p.GetEditor(path); ok {
+		return true
+	}
+	return false
 }
 
 func (p *Program) GetEditor(url string) (*memedit.MemEditor, bool) {
-	return p.editorMap.Get(url)
+	if p == nil {
+		return nil, false
+	}
+	if url == "" {
+		if editor := p.GetCurrentEditor(); editor != nil {
+			return editor, true
+		}
+	}
+	if p.Cache != nil && p.Cache.sources != nil {
+		if editor, ok := p.Cache.sources.GetEditorByURL(url); ok {
+			return editor, true
+		}
+	}
+	if editor := p.GetCurrentEditor(); editor != nil && editor.GetUrl() == url {
+		return editor, true
+	}
+	return nil, false
+}
+
+func (p *Program) GetEditorByHash(hash string) (*memedit.MemEditor, bool) {
+	if p == nil || hash == "" {
+		return nil, false
+	}
+	if editor := p.GetCurrentEditor(); editor != nil && editor.GetIrSourceHash() == hash {
+		return editor, true
+	}
+	if p.Cache != nil && p.Cache.sources != nil {
+		if editor, ok := p.Cache.sources.GetEditorByHash(hash); ok {
+			return editor, true
+		}
+	}
+	editor, err := ssadb.GetEditorByHash(hash)
+	if err != nil || editor == nil {
+		return nil, false
+	}
+	p.SetEditor(editor.GetUrl(), editor)
+	return editor, true
 }
 
 func (p *Program) SetEditor(url string, me *memedit.MemEditor) {
-	p.editorMap.Set(url, me)
+	if p != nil && p.Cache != nil && p.Cache.sources != nil {
+		p.Cache.sources.rememberEditor(url, me)
+	}
 }
 
 func (p *Program) GetIncludeFiles() []string {
-	return p.editorMap.Keys()
+	if p != nil && p.Cache != nil && p.Cache.sources != nil {
+		return p.Cache.sources.EditorURLs()
+	}
+	if editor := p.GetCurrentEditor(); editor != nil && editor.GetUrl() != "" {
+		return []string{editor.GetUrl()}
+	}
+	return nil
 }
 func (p *Program) GetIncludeFileNum() int {
-	return p.editorMap.Len()
+	if p != nil && p.Cache != nil && p.Cache.sources != nil {
+		return len(p.Cache.sources.EditorURLs())
+	}
+	if editor := p.GetCurrentEditor(); editor != nil && editor.GetUrl() != "" {
+		return 1
+	}
+	return 0
 }
 
 func (p *Program) PushEditor(e *memedit.MemEditor) {

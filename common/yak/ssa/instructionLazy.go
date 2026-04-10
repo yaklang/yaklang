@@ -459,7 +459,7 @@ func (lz *LazyInstruction) getRange(inst Instruction) *memedit.Range {
 		return nil
 	}
 	if inst.GetRange() == nil {
-		editor, start, end, err := lz.ir.GetStartAndEndPositions()
+		editor, start, end, err := getIRCodeRange(lz.prog, lz.ir)
 		if err != nil {
 			switch ret := inst.(type) {
 			case *BasicBlock:

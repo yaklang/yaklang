@@ -386,7 +386,12 @@ func (p *Program) NewValueFromAuditNode(db *gorm.DB, nodeID string) *Value {
 		var rangeIf *memedit.Range
 		var memEditor *memedit.MemEditor
 		if auditNode.TmpValueFileHash != "" {
-			memEditor, err = ssadb.GetEditorByHash(auditNode.TmpValueFileHash)
+			if editor, found := p.Program.GetEditorByHash(auditNode.TmpValueFileHash); !found {
+				err = utils.Errorf("get editor by hash failed: %s", auditNode.TmpValueFileHash)
+			} else {
+				memEditor = editor
+				err = nil
+			}
 			if err != nil {
 				log.Errorf("NewValueFromDB: get ir source from hash failed: %v", err)
 			} else {
