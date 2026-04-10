@@ -1,0 +1,141 @@
+desc(
+	title: "Audit OAuth2 Authorization Request Session Accumulation"
+	title_zh: "审计OAuth2授权请求会话累积"
+	type: audit
+	risk: "拒绝服务"
+	desc: <<<DESC
+### 规则说明
+当 `saveAuthorizationRequest(...)` 在同一会话里把 `authorizationRequests.put(...)` 的结果整张写回 `HttpSession` 或 `WebSession` attribute 时，攻击者可以通过大量 state 参数让会话中累积多个授权请求对象，造成会话膨胀和拒绝服务。
+DESC
+	rule_id: "bd9fec9f-5713-4177-a8d8-f2fcf7d1a77c"
+	solution: <<<SOLUTION
+### 修复建议
+- 默认只保存单个最新的授权请求，而不是按 state 在 session 中累积多个请求。
+- 如确需并存多个请求，增加数量上限、过期清理和淘汰策略。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-400: Uncontrolled Resource Consumption](https://cwe.mitre.org/data/definitions/400.html)
+REFERENCE
+)
+
+/saveAuthorizationRequest/<sourceCode(context=40)>?{have:'authorizationRequests.put(' && (have:'setAttribute(this.sessionAttributeName, authorizationRequests)' || have:'sessionAttrs.put(this.sessionAttributeName, authorizationRequests)')} as $risk;
+
+alert $risk for {
+	title: "Audit OAuth2 Authorization Request Session Accumulation",
+	title_zh: "审计OAuth2授权请求会话累积",
+	level: "middle",
+	message: "发现 OAuth2 授权请求按 state 持续累积到 session 中，需复核是否存在会话膨胀和拒绝服务风险。",
+	risk: "拒绝服务",
+	name: "risk",
+	desc: <<<DESC
+### 规则说明
+当 `saveAuthorizationRequest(...)` 在同一会话里把 `authorizationRequests.put(...)` 的结果整张写回 `HttpSession` 或 `WebSession` attribute 时，攻击者可以通过大量 state 参数让会话中累积多个授权请求对象，造成会话膨胀和拒绝服务。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 默认只保存单个最新的授权请求，而不是按 state 在 session 中累积多个请求。
+- 如确需并存多个请求，增加数量上限、过期清理和淘汰策略。
+SOLUTION
+}
+
+desc(
+	lang: java
+	alert_min: 1
+	'file://unsafe-httpsession-oauth2-request-accumulation.java': <<<CODE
+import java.util.HashMap;
+import java.util.Map;
+
+class OAuth2AuthorizationRequest {
+    String getState() { return "state"; }
+}
+
+interface HttpSession {
+    void setAttribute(String name, Object value);
+}
+
+interface HttpServletRequest {
+    HttpSession getSession();
+}
+
+interface HttpServletResponse {
+}
+
+class AuthorizationRequestRepository {
+    private final String sessionAttributeName = "authz";
+
+    Map<String, OAuth2AuthorizationRequest> getAuthorizationRequests(HttpServletRequest request) {
+        return new HashMap<>();
+    }
+
+    void saveAuthorizationRequest(OAuth2AuthorizationRequest authorizationRequest, HttpServletRequest request,
+            HttpServletResponse response) {
+        String state = authorizationRequest.getState();
+        Map<String, OAuth2AuthorizationRequest> authorizationRequests = this.getAuthorizationRequests(request);
+        authorizationRequests.put(state, authorizationRequest);
+        request.getSession().setAttribute(this.sessionAttributeName, authorizationRequests);
+    }
+}
+CODE
+	'file://unsafe-websession-oauth2-request-accumulation.java': <<<CODE
+import java.util.HashMap;
+import java.util.Map;
+
+class OAuth2AuthorizationRequest {
+    String getState() { return "state"; }
+}
+
+class Mono<T> {
+    Mono<T> doOnNext(java.util.function.Consumer<T> c) { return this; }
+    Mono<Void> then() { return new Mono<Void>(); }
+}
+
+class ServerWebExchange {
+}
+
+class AuthorizationRequestRepository {
+    private final String sessionAttributeName = "authz";
+
+    Mono<Map<String, Object>> getSessionAttributes(ServerWebExchange exchange) {
+        return new Mono<Map<String, Object>>();
+    }
+
+    Map<String, OAuth2AuthorizationRequest> getAuthorizationRequests(Map<String, Object> sessionAttrs) {
+        return new HashMap<>();
+    }
+
+    Mono<Void> saveAuthorizationRequest(OAuth2AuthorizationRequest authorizationRequest, ServerWebExchange exchange) {
+        return getSessionAttributes(exchange)
+                .doOnNext((sessionAttrs) -> {
+                    Map<String, OAuth2AuthorizationRequest> authorizationRequests = this.getAuthorizationRequests(sessionAttrs);
+                    authorizationRequests.put(authorizationRequest.getState(), authorizationRequest);
+                    sessionAttrs.put(this.sessionAttributeName, authorizationRequests);
+                })
+                .then();
+    }
+}
+CODE
+	"safefile://safe-single-oauth2-request.java": <<<CODE
+class OAuth2AuthorizationRequest {
+}
+
+interface HttpSession {
+    void setAttribute(String name, Object value);
+}
+
+interface HttpServletRequest {
+    HttpSession getSession();
+}
+
+interface HttpServletResponse {
+}
+
+class AuthorizationRequestRepository {
+    private final String sessionAttributeName = "authz";
+
+    void saveAuthorizationRequest(OAuth2AuthorizationRequest authorizationRequest, HttpServletRequest request,
+            HttpServletResponse response) {
+        request.getSession().setAttribute(this.sessionAttributeName, authorizationRequest);
+    }
+}
+CODE
+)
