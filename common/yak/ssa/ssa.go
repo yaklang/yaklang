@@ -274,7 +274,6 @@ type Program struct {
 	LineCount   int
 
 	LibraryFile           map[string][]string //library and file relation
-	editorMap             *omap.OrderedMap[string, *memedit.MemEditor]
 	CurrentIncludingStack *utils.Stack[string]
 
 	Cache *ProgramCache

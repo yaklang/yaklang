@@ -183,7 +183,7 @@ func instructionFromIrCode(inst Instruction, ir *ssadb.IrCode) {
 			inst.SetBlock(block)
 		}
 	}
-	editor, start, end, err := ir.GetStartAndEndPositions()
+	editor, start, end, err := getIRCodeRange(inst.GetProgram(), ir)
 	if err == nil {
 		inst.SetRange(editor.GetRangeByPosition(start, end))
 	}
@@ -193,6 +193,20 @@ func instructionFromIrCode(inst Instruction, ir *ssadb.IrCode) {
 
 func setInstructionLocationIDs(inst Instruction, funcID, blockID int64) {
 	inst.getAnInstruction().setLocationIDs(funcID, blockID)
+}
+
+func getIRCodeRange(prog *Program, ir *ssadb.IrCode) (*memedit.MemEditor, *memedit.Position, *memedit.Position, error) {
+	if ir == nil {
+		return nil, nil, nil, nil
+	}
+	if prog != nil {
+		if editor, ok := prog.GetEditorByHash(ir.SourceCodeHash); ok && editor != nil {
+			start := editor.GetPositionByOffset(int(ir.SourceCodeStartOffset))
+			end := editor.GetPositionByOffset(int(ir.SourceCodeEndOffset))
+			return editor, start, end, nil
+		}
+	}
+	return ir.GetStartAndEndPositions()
 }
 
 func value2IrCode(inst Instruction, ir *ssadb.IrCode) {

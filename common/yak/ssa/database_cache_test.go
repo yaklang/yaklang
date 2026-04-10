@@ -78,7 +78,7 @@ func TestCloneProgramConfigKeepsCompileProjectBytes(t *testing.T) {
 	require.Equal(t, "child", cloned.GetProgramName())
 }
 
-func TestSaveEditorTracksOnlySourceHashInMemory(t *testing.T) {
+func TestSaveEditorRegistersEditorBeforeClose(t *testing.T) {
 	programName := uuid.NewString()
 	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
 
@@ -90,12 +90,17 @@ func TestSaveEditorTracksOnlySourceHashInMemory(t *testing.T) {
 	prog.SaveEditor(editor)
 	prog.SaveEditor(editor)
 
-	require.Equal(t, 0, prog.Cache.sources.PersistedCount(), "source hash should not be marked persisted before save ack")
 	require.Equal(t, 1, prog.Cache.sources.PayloadCount(), "duplicate source saves should collapse to one registered payload")
+	require.Equal(t, 1, prog.Cache.sources.EditorCount(), "registered editors should stay resident in source store")
+
+	got, ok := prog.GetEditorByHash(hash)
+	require.True(t, ok, "editor lookup should hit program cache before source flush")
+	require.NotNil(t, got)
+	require.Equal(t, editor.GetIrSourceHash(), got.GetIrSourceHash())
+	require.Equal(t, editor.GetSourceCode(), got.GetSourceCode())
 
 	prog.Cache.sources.Close()
-	require.Equal(t, 1, prog.Cache.sources.PersistedCount(), "source hash should be marked persisted after close flush")
-	require.Equal(t, 0, prog.Cache.sources.PayloadCount(), "payload cache should be released after persistence")
+	require.Equal(t, 0, prog.Cache.sources.EditorCount(), "registered editors should be released after source flush")
 
 	var count int64
 	err := ssadb.GetDB().Model(&ssadb.IrSource{}).
@@ -103,6 +108,30 @@ func TestSaveEditorTracksOnlySourceHashInMemory(t *testing.T) {
 		Count(&count).Error
 	require.NoError(t, err)
 	require.Equal(t, int64(1), count)
+}
+
+func TestSourceStoreCloseDoesNotDuplicateRows(t *testing.T) {
+	programName := uuid.NewString()
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
+
+	vf := filesys.NewVirtualFs()
+	prog := newProgramWithTTL(programName, 0, ProgramCacheDBWrite, vf)
+	editor := prog.CreateEditor([]byte("class Demo {}"), "/src/Demo.java", false)
+	hash := editor.GetIrSourceHash()
+	require.NoError(t, ssadb.GetDB().Save(ssadb.MarshalFile(editor, hash)).Error)
+
+	prog.SaveEditor(editor)
+	prog.SaveEditor(editor)
+
+	prog.Cache.sources.Close()
+
+	var count int64
+	err := ssadb.GetDB().Model(&ssadb.IrSource{}).
+		Where("program_name = ? AND source_code_hash = ?", programName, hash).
+		Count(&count).Error
+	require.NoError(t, err)
+	require.Equal(t, int64(1), count, "close should not duplicate an explicitly persisted source")
+	require.Equal(t, 0, prog.Cache.sources.EditorCount(), "close should release resident editors even when the row already exists")
 }
 
 func TestLazyInstructionSaveAgain(t *testing.T) {

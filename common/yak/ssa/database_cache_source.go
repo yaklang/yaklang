@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"path"
+	"sort"
 	"sync"
 
 	"github.com/jinzhu/gorm"
@@ -43,16 +44,18 @@ func (p *Program) SaveFolder(folderPath []string) {
 	p.Cache.sources.RegisterFolder(folderPath)
 }
 
-// sourceStore only tracks source payload registration and the final flush of
-// IrSource rows. Instruction persistence never coordinates source saves.
+// sourceStore keeps editor/source payloads resident until source rows are
+// flushed so async lookups can still resolve hashes before the final DB write.
 type sourceStore struct {
 	mode        ProgramCacheKind
 	programName string
 	db          *gorm.DB
 
-	mu        sync.Mutex
-	payloads  map[string]*ssadb.IrSource
-	persisted map[string]struct{}
+	mu           sync.Mutex
+	payloads     map[string]*ssadb.IrSource
+	persisted    map[string]struct{}
+	editors      map[string]*memedit.MemEditor
+	editorsByURL map[string]*memedit.MemEditor
 }
 
 func newSourceStore(prog *Program, mode ProgramCacheKind, db *gorm.DB) *sourceStore {
@@ -61,11 +64,13 @@ func newSourceStore(prog *Program, mode ProgramCacheKind, db *gorm.DB) *sourceSt
 		programName = prog.GetProgramName()
 	}
 	return &sourceStore{
-		mode:        mode,
-		programName: programName,
-		db:          db,
-		payloads:    make(map[string]*ssadb.IrSource),
-		persisted:   make(map[string]struct{}),
+		mode:         mode,
+		programName:  programName,
+		db:           db,
+		payloads:     make(map[string]*ssadb.IrSource),
+		persisted:    make(map[string]struct{}),
+		editors:      make(map[string]*memedit.MemEditor),
+		editorsByURL: make(map[string]*memedit.MemEditor),
 	}
 }
 
@@ -74,8 +79,33 @@ func (s *sourceStore) RegisterEditor(editor *memedit.MemEditor) {
 		return
 	}
 	hash := editor.GetIrSourceHash()
+	if hash == "" {
+		return
+	}
+
 	log.Debugf("SaveEditor: program=%s, path=%s, hash=%s", editor.GetProgramName(), editor.GetFolderPath()+editor.GetFilename(), hash)
+	s.rememberEditor(editor.GetUrl(), editor)
 	s.registerSource(hash, ssadb.MarshalFile(editor, hash))
+}
+
+func (s *sourceStore) rememberEditor(url string, editor *memedit.MemEditor) {
+	if s == nil || editor == nil {
+		return
+	}
+	hash := editor.GetIrSourceHash()
+	if hash == "" {
+		return
+	}
+	if url == "" {
+		url = editor.GetUrl()
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.editors[hash] = editor
+	if url != "" {
+		s.editorsByURL[url] = editor
+	}
 }
 
 func (s *sourceStore) RegisterFolder(folderPath []string) {
@@ -83,14 +113,14 @@ func (s *sourceStore) RegisterFolder(folderPath []string) {
 		return
 	}
 	ir := ssadb.MarshalFolder(folderPath)
+	if ir == nil {
+		return
+	}
 	s.registerSource(ir.SourceCodeHash, ir)
 }
 
 func (s *sourceStore) registerSource(hash string, source *ssadb.IrSource) {
 	if s == nil || s.mode != ProgramCacheDBWrite || s.db == nil || hash == "" || source == nil {
-		return
-	}
-	if s.isPersisted(hash) {
 		return
 	}
 
@@ -104,39 +134,6 @@ func (s *sourceStore) registerSource(hash string, source *ssadb.IrSource) {
 		return
 	}
 	s.payloads[hash] = source
-}
-
-func (s *sourceStore) isPersisted(hash string) bool {
-	if s == nil || hash == "" {
-		return false
-	}
-
-	s.mu.Lock()
-	if _, ok := s.persisted[hash]; ok {
-		s.mu.Unlock()
-		return true
-	}
-	db := s.db
-	programName := s.programName
-	s.mu.Unlock()
-
-	if db == nil || programName == "" {
-		return false
-	}
-
-	var count int
-	if err := db.Model(&ssadb.IrSource{}).
-		Where("source_code_hash = ?", hash).
-		Where("program_name = ?", programName).
-		Count(&count).Error; err != nil {
-		log.Warnf("IsExistedSourceCodeHash error: %v", err)
-		return false
-	}
-	if count <= 0 {
-		return false
-	}
-	s.markPersisted(hash)
-	return true
 }
 
 func (s *sourceStore) markPersisted(hashes ...string) {
@@ -159,14 +156,46 @@ func (s *sourceStore) Close() {
 	if s == nil || s.mode != ProgramCacheDBWrite || s.db == nil {
 		return
 	}
+	defer s.releaseEditors()
 
 	sources, hashes := s.collectRegisteredSources()
 	if len(sources) == 0 {
 		return
 	}
 
+	existing, err := s.lookupPersistedHashes(hashes)
+	if err != nil {
+		log.Errorf("DATABASE: lookup ir source in database error: %v", err)
+		return
+	}
+	if len(existing) > 0 {
+		s.markPersisted(existing...)
+	}
+
+	existingSet := make(map[string]struct{}, len(existing))
+	for _, hash := range existing {
+		existingSet[hash] = struct{}{}
+	}
+
+	toSave := make([]*ssadb.IrSource, 0, len(sources))
+	savedHashes := make([]string, 0, len(sources))
+	for idx, source := range sources {
+		if source == nil {
+			continue
+		}
+		hash := hashes[idx]
+		if _, ok := existingSet[hash]; ok {
+			continue
+		}
+		toSave = append(toSave, source)
+		savedHashes = append(savedHashes, hash)
+	}
+	if len(toSave) == 0 {
+		return
+	}
+
 	saveErr := utils.GormTransaction(s.db, func(tx *gorm.DB) error {
-		for _, source := range sources {
+		for _, source := range toSave {
 			if source == nil {
 				continue
 			}
@@ -180,7 +209,7 @@ func (s *sourceStore) Close() {
 		log.Errorf("DATABASE: save ir source to database error: %v", saveErr)
 		return
 	}
-	s.markPersisted(hashes...)
+	s.markPersisted(savedHashes...)
 }
 
 func (s *sourceStore) collectRegisteredSources() ([]*ssadb.IrSource, []string) {
@@ -206,6 +235,31 @@ func (s *sourceStore) collectRegisteredSources() ([]*ssadb.IrSource, []string) {
 	return sources, hashes
 }
 
+func (s *sourceStore) lookupPersistedHashes(hashes []string) ([]string, error) {
+	if s == nil || s.db == nil || len(hashes) == 0 {
+		return nil, nil
+	}
+
+	var existing []string
+	query := s.db.Model(&ssadb.IrSource{}).
+		Where("program_name = ?", s.programName).
+		Where("source_code_hash IN (?)", hashes)
+	if err := query.Pluck("source_code_hash", &existing).Error; err != nil {
+		return nil, err
+	}
+	return existing, nil
+}
+
+func (s *sourceStore) releaseEditors() {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	clear(s.editors)
+	clear(s.editorsByURL)
+}
+
 func (s *sourceStore) PersistedCount() int {
 	if s == nil {
 		return 0
@@ -222,4 +276,57 @@ func (s *sourceStore) PayloadCount() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return len(s.payloads)
+}
+
+func (s *sourceStore) EditorCount() int {
+	if s == nil {
+		return 0
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.editors)
+}
+
+func (s *sourceStore) GetEditorByHash(hash string) (*memedit.MemEditor, bool) {
+	if s == nil || hash == "" {
+		return nil, false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	editor, ok := s.editors[hash]
+	return editor, ok
+}
+
+func (s *sourceStore) GetEditorByURL(url string) (*memedit.MemEditor, bool) {
+	if s == nil {
+		return nil, false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	editor, ok := s.editorsByURL[url]
+	return editor, ok
+}
+
+func (s *sourceStore) HasEditorURL(url string) bool {
+	if s == nil {
+		return false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, ok := s.editorsByURL[url]
+	return ok
+}
+
+func (s *sourceStore) EditorURLs() []string {
+	if s == nil {
+		return nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	ret := make([]string, 0, len(s.editorsByURL))
+	for url := range s.editorsByURL {
+		ret = append(ret, url)
+	}
+	sort.Strings(ret)
+	return ret
 }
