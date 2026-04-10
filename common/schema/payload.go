@@ -61,6 +61,12 @@ func (p *Payload) BeforeCreate() error {
 }
 
 func (p *Payload) GetContent() string {
+	content := p.GetContentRaw()
+	content = strings.TrimRightFunc(content, TrimWhitespaceExceptSpace)
+	return content
+}
+
+func (p *Payload) GetContentRaw() string {
 	if p == nil || p.Content == nil {
 		return ""
 	}
@@ -69,7 +75,6 @@ func (p *Payload) GetContent() string {
 	if err == nil {
 		content = unquoted
 	}
-	content = strings.TrimRightFunc(content, TrimWhitespaceExceptSpace)
 	return content
 }
 

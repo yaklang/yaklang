@@ -60,6 +60,13 @@ type FuzzTagDescription struct {
 	ArgumentTypes         []*FuzztagArgumentType
 }
 
+type payloadRenderMode int
+
+const (
+	payloadRenderModeLine payloadRenderMode = iota
+	payloadRenderModeFull
+)
+
 func AddFuzzTagDescriptionToMap(methodMap map[string]*parser.TagMethod, f *FuzzTagDescription) {
 	if f == nil {
 		return
@@ -139,6 +146,137 @@ func AddFuzzTagDescriptionToMap(methodMap map[string]*parser.TagMethod, f *FuzzT
 	for _, a := range alias {
 		methodMap[a] = methodMap[name]
 	}
+}
+
+func decodePayloadGroupFileContent(raw []byte) (string, bool) {
+	if len(raw) == 0 {
+		return "", true
+	}
+
+	normalized := strings.ReplaceAll(string(raw), "\r\n", "\n")
+	normalized = strings.ReplaceAll(normalized, "\r", "\n")
+	lines := strings.Split(normalized, "\n")
+	if len(lines) > 0 && lines[len(lines)-1] == "" {
+		lines = lines[:len(lines)-1]
+	}
+
+	decoded := make([]string, 0, len(lines))
+	for _, line := range lines {
+		unquoted, err := strconv.Unquote(line)
+		if err != nil {
+			return "", false
+		}
+		decoded = append(decoded, unquoted)
+	}
+	return strings.Join(decoded, "\n"), true
+}
+
+func readPayloadFileValue(filePath string, mode payloadRenderMode) (string, error) {
+	if mode == payloadRenderModeFull {
+		raw, err := os.ReadFile(filePath)
+		if err != nil {
+			return "", err
+		}
+		if decoded, ok := decodePayloadGroupFileContent(raw); ok {
+			return decoded, nil
+		}
+		return string(raw), nil
+	}
+	return "", nil
+}
+
+func yieldPayloadTag(ctx context.Context, s string, mode payloadRenderMode, dedup bool, yield func(res *parser.FuzzResult)) error {
+	db := consts.GetGormProfileDatabase()
+	if db == nil {
+		return tryYield(ctx, yield, s)
+	}
+
+	for _, s := range utils.PrettifyListFromStringSplited(s, ",") {
+		group, folder := "", ""
+		ss := strings.Split(s, "/")
+		if len(ss) == 2 {
+			folder = ss[0]
+			group = ss[1]
+			if group == "*" {
+				group = ""
+			}
+		} else {
+			group = ss[0]
+		}
+
+		if group != "" && folder != "" {
+			db = db.Or("`group` = ? AND `folder` = ?", group, folder)
+		} else if group != "" {
+			db = db.Or("`group` = ?", group)
+		} else if folder != "" {
+			db = db.Or("`folder` = ?", folder)
+		}
+	}
+
+	ch := bizhelper.YieldModel[*schema.Payload](ctx, db.Select("content, is_file").Order("hit_count desc"))
+
+	var valueFilter filter.Filterable
+	if dedup {
+		valueFilter = filter.NewBigFilter()
+		defer valueFilter.Close()
+	}
+
+	yieldValue := func(value string) error {
+		if valueFilter != nil {
+			if valueFilter.Exist(value) {
+				return nil
+			}
+			valueFilter.Insert(value)
+		}
+		return tryYield(ctx, yield, value)
+	}
+
+	for payload := range ch {
+		if payload.Content == nil || payload.IsFile == nil {
+			continue
+		}
+
+		if payload.GetIsFile() {
+			payloadPath := payload.GetContent()
+			if mode == payloadRenderModeFull {
+				payloadRaw, err := readPayloadFileValue(payloadPath, mode)
+				if err != nil {
+					log.Errorf("read payload err: %v", err)
+					continue
+				}
+				if err := yieldValue(payloadRaw); err != nil {
+					return err
+				}
+				continue
+			}
+
+			ch, err := utils.FileLineReaderWithContext(payloadPath, ctx)
+			if err != nil {
+				log.Errorf("read payload err: %v", err)
+				continue
+			}
+			for line := range ch {
+				lineStr := string(line)
+				raw, err := strconv.Unquote(lineStr)
+				if err == nil {
+					lineStr = raw
+				}
+				if err := yieldValue(lineStr); err != nil {
+					return err
+				}
+			}
+			continue
+		}
+
+		payloadRaw := payload.GetContent()
+		if mode == payloadRenderModeFull {
+			payloadRaw = payload.GetContentRaw()
+		}
+		if err := yieldValue(payloadRaw); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 var (
@@ -711,78 +849,31 @@ func init() {
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "payload",
 		HandlerAndYield: func(ctx context.Context, s string, yield func(res *parser.FuzzResult)) error {
-			db := consts.GetGormProfileDatabase()
-			if db == nil {
-				return tryYield(ctx, yield, s)
-			}
-			for _, s := range utils.PrettifyListFromStringSplited(s, ",") {
-				group, folder := "", ""
-				ss := strings.Split(s, "/")
-				if len(ss) == 2 {
-					folder = ss[0]
-					group = ss[1]
-					if group == "*" {
-						group = ""
-					}
-				} else {
-					group = ss[0]
-				}
-
-				if group != "" && folder != "" {
-					db = db.Or("`group` = ? AND `folder` = ?", group, folder)
-				} else if group != "" {
-					db = db.Or("`group` = ?", group)
-				} else if folder != "" {
-					db = db.Or("`folder` = ?", folder)
-				}
-			}
-
-			ch := bizhelper.YieldModel[*schema.Payload](ctx, db.Select("content, is_file").Order("hit_count desc"))
-
-			f := filter.NewBigFilter()
-			defer f.Close()
-			for payload := range ch {
-				if payload.Content == nil || payload.IsFile == nil {
-					continue
-				}
-
-				payloadRaw, isFile := payload.GetContent(), payload.GetIsFile()
-
-				if isFile {
-					ch, err := utils.FileLineReaderWithContext(payloadRaw, ctx)
-					if err != nil {
-						log.Errorf("read payload err: %v", err)
-						continue
-					}
-					for line := range ch {
-						lineStr := string(line)
-						raw, err := strconv.Unquote(lineStr)
-						if err == nil {
-							lineStr = raw
-						}
-						if f.Exist(lineStr) {
-							continue
-						}
-						f.Insert(lineStr)
-						if err := tryYield(ctx, yield, lineStr); err != nil {
-							return err
-						}
-					}
-				} else {
-					if f.Exist(payloadRaw) {
-						continue
-					}
-					f.Insert(payloadRaw)
-					if err := tryYield(ctx, yield, payloadRaw); err != nil {
-						return err
-					}
-				}
-			}
-			return nil
+			return yieldPayloadTag(ctx, s, payloadRenderModeLine, true, yield)
 		},
 		Alias:               []string{"x"},
-		Description:         "从数据库加载 Payload, 可以指定payload组或文件夹, `{{payload(groupName)}}`, `{{payload(folder/*)}}`",
+		Description:         "从数据库加载 Payload，默认按行展开并去重，可以指定payload组或文件夹, `{{payload(groupName)}}`, `{{payload(folder/*)}}`",
 		TagNameVerbose:      "加载Payload",
+		ArgumentDescription: "{{string_split(groupName:组名或文件夹名)}}",
+	})
+
+	AddFuzzTagToGlobal(&FuzzTagDescription{
+		TagName: "payload:nodup",
+		HandlerAndYield: func(ctx context.Context, s string, yield func(res *parser.FuzzResult)) error {
+			return yieldPayloadTag(ctx, s, payloadRenderModeLine, false, yield)
+		},
+		Description:         "从数据库加载 Payload，按行展开且不去重，可以指定payload组或文件夹, `{{payload:nodup(groupName)}}`, `{{payload:nodup(folder/*)}}`",
+		TagNameVerbose:      "加载Payload(按行不去重)",
+		ArgumentDescription: "{{string_split(groupName:组名或文件夹名)}}",
+	})
+
+	AddFuzzTagToGlobal(&FuzzTagDescription{
+		TagName: "payload:full",
+		HandlerAndYield: func(ctx context.Context, s string, yield func(res *parser.FuzzResult)) error {
+			return yieldPayloadTag(ctx, s, payloadRenderModeFull, false, yield)
+		},
+		Description:         "从数据库加载 Payload，整块返回且不拆行、不去重，可以指定payload组或文件夹, `{{payload:full(groupName)}}`, `{{payload:full(folder/*)}}`",
+		TagNameVerbose:      "加载Payload(整块)",
 		ArgumentDescription: "{{string_split(groupName:组名或文件夹名)}}",
 	})
 
