@@ -44,8 +44,8 @@ func TestOutputFileInfo_IsSafeSize(t *testing.T) {
 	}{
 		{"zero", 0, true},
 		{"small", 1024, true},
-		{"exactly_limit", MaxOutputFileBytes, true},
-		{"one_over", MaxOutputFileBytes + 1, false},
+		{"exactly_limit", MaxOutputFileTokens, true},
+		{"one_over", MaxOutputFileTokens + 1, false},
 		{"large", 100 * 1024, false},
 	}
 
@@ -88,14 +88,14 @@ func TestReadOutputFileFromPath_Truncation(t *testing.T) {
 	dir := t.TempDir()
 	filePath := filepath.Join(dir, "large_file.txt")
 
-	largeContent := strings.Repeat("x", int(MaxOutputFileBytes)+1024)
+	largeContent := strings.Repeat("x", int(MaxOutputFileTokens)+1024)
 	err := os.WriteFile(filePath, []byte(largeContent), 0644)
 	require.NoError(t, err)
 
 	info, err := ReadOutputFileFromPath(filePath)
 	require.NoError(t, err)
 	require.Equal(t, int64(len(largeContent)), info.Size)
-	require.Equal(t, int(MaxOutputFileBytes), len(info.Content))
+	require.Equal(t, int(MaxOutputFileTokens), len(info.Content))
 	require.False(t, info.IsSafeSize())
 }
 
@@ -103,13 +103,13 @@ func TestReadOutputFileFromPath_ExactlyMaxSize(t *testing.T) {
 	dir := t.TempDir()
 	filePath := filepath.Join(dir, "exact_file.txt")
 
-	exactContent := strings.Repeat("y", int(MaxOutputFileBytes))
+	exactContent := strings.Repeat("y", int(MaxOutputFileTokens))
 	err := os.WriteFile(filePath, []byte(exactContent), 0644)
 	require.NoError(t, err)
 
 	info, err := ReadOutputFileFromPath(filePath)
 	require.NoError(t, err)
-	require.Equal(t, int64(MaxOutputFileBytes), info.Size)
+	require.Equal(t, int64(MaxOutputFileTokens), info.Size)
 	require.Equal(t, exactContent, info.Content)
 	require.True(t, info.IsSafeSize())
 }

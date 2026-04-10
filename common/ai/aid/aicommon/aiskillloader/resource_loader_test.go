@@ -782,8 +782,8 @@ func TestSkillsContextManager_ExpandedLimits(t *testing.T) {
 		t.Error("rendered should contain large-skill")
 	}
 
-	if len(rendered) > SkillsContextMaxBytes+1024 {
-		t.Errorf("rendered size %d should be within expanded limit %d", len(rendered), SkillsContextMaxBytes)
+	if len(rendered) > SkillsContextMaxTokens+1024 {
+		t.Errorf("rendered size %d should be within expanded limit %d", len(rendered), SkillsContextMaxTokens)
 	}
 }
 

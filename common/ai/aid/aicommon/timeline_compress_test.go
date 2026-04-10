@@ -155,10 +155,9 @@ func TestTimelineCompress_SizeReduction(t *testing.T) {
 
 	require.Equal(t, 100, timeline.idToTimelineItem.Len())
 
-	// 计算压缩前的大小
 	beforeSize := timeline.calculateActualContentSize()
-	t.Logf("Timeline size before compression: %d bytes", beforeSize)
-	require.Greater(t, beforeSize, int64(50*1024), "Should be > 50KB")
+	t.Logf("Timeline size before compression: %d tokens", beforeSize)
+	require.Greater(t, beforeSize, int64(10*1024), "Should be > 10K tokens")
 
 	// 模拟压缩：删除一半
 	var idsToRemove []int64

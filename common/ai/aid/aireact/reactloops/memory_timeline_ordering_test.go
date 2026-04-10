@@ -110,9 +110,9 @@ func TestReActLoop_MemorySearchTimelineOrdering(t *testing.T) {
 
 	// 测试搜索功能
 	searchQuery := "ReAct"
-	bytesLimit := 5000
+	tokenLimit := 5000
 
-	result, err := memory.SearchMemory(searchQuery, bytesLimit)
+	result, err := memory.SearchMemory(searchQuery, tokenLimit)
 	require.NoError(t, err, "搜索记忆失败")
 	require.NotNil(t, result, "搜索结果不应为 nil")
 

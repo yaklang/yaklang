@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/ai/ytoken"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
@@ -17,12 +18,11 @@ import (
 )
 
 const (
-	// SkillsContextMaxBytes is the total size limit for all skills context.
-	SkillsContextMaxBytes = 64 * 1024 // 64KB
+	// SkillsContextMaxTokens is the total size limit (in tokens) for all skills context.
+	SkillsContextMaxTokens = 32 * 1024 // 32k tokens
 
-	// MetadataListMaxBytes caps the metadata listing in the prompt when no skills are loaded.
-	// Prevents unbounded context growth as the number of registered skills increases.
-	MetadataListMaxBytes = 4 * 1024 // 4KB
+	// MetadataListMaxTokens caps the metadata listing (in tokens) in the prompt when no skills are loaded.
+	MetadataListMaxTokens = 8 * 1024 // 8k tokens
 )
 
 // skillContextState tracks the display state of a loaded skill.
@@ -59,18 +59,17 @@ func WithManagerSearchAICallback(cb SkillSearchAICallback) ManagerOption {
 	}
 }
 
-// WithManagerMaxBytes sets context max bytes at initialization.
-func WithManagerMaxBytes(maxBytes int) ManagerOption {
+// WithManagerMaxTokens sets the context max size (in tokens) at initialization.
+func WithManagerMaxTokens(maxTokens int) ManagerOption {
 	return func(m *SkillsContextManager) {
-		if maxBytes > 0 {
-			m.maxBytes = maxBytes
+		if maxTokens > 0 {
+			m.maxTokens = maxTokens
 		}
 	}
 }
 
 // WithManagerTokenEstimator sets an optional token estimator function.
-// When provided, context size limits are enforced in estimated tokens instead of raw bytes.
-// For mixed CJK/ASCII text, a simple approximation is: func(s string) int { return len([]rune(s)) }
+// When nil (default), ytoken.CalcTokenCount is used.
 func WithManagerTokenEstimator(estimator func(string) int) ManagerOption {
 	return func(m *SkillsContextManager) {
 		m.tokenEstimator = estimator
@@ -90,17 +89,16 @@ type SkillsContextManager struct {
 	// Ordering is by load time (oldest first).
 	loadedSkills *omap.OrderedMap[string, *skillContextState]
 
-	// maxBytes is the total size limit for the skills context.
-	maxBytes int
+	// maxTokens is the total size limit (in tokens) for the skills context.
+	maxTokens int
 
 	// cachedContextSize stores the last computed context size to avoid repeated rendering.
 	// Invalidated by setting contextSizeDirty to true when skills are loaded/folded/changed.
 	cachedContextSize int
 	contextSizeDirty  bool
 
-	// tokenEstimator is an optional function that estimates token count from a string.
-	// When set, context limits are enforced in tokens rather than bytes.
-	// A simple approximation: len([]rune(s)) works for mixed CJK/ASCII text.
+	// tokenEstimator overrides the default ytoken.CalcTokenCount for measuring size.
+	// When nil, the built-in ytoken.CalcTokenCount is used.
 	tokenEstimator func(string) int
 
 	// Optional DB and AI callback for manager-level search capabilities.
@@ -113,7 +111,7 @@ func NewSkillsContextManager(loader SkillLoader, opts ...ManagerOption) *SkillsC
 	m := &SkillsContextManager{
 		loader:           loader,
 		loadedSkills:     omap.NewOrderedMap[string, *skillContextState](map[string]*skillContextState{}),
-		maxBytes:         SkillsContextMaxBytes,
+		maxTokens:        SkillsContextMaxTokens,
 		contextSizeDirty: true,
 	}
 	for _, opt := range opts {
@@ -133,11 +131,11 @@ func (m *SkillsContextManager) initializeSkillSearchPersistence() {
 	}
 }
 
-// SetMaxBytes sets the total context size limit.
-func (m *SkillsContextManager) SetMaxBytes(maxBytes int) {
+// SetMaxTokens sets the total context size limit (in tokens).
+func (m *SkillsContextManager) SetMaxTokens(maxTokens int) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.maxBytes = maxBytes
+	m.maxTokens = maxTokens
 }
 
 // HasRegisteredSkills returns true if the loader has any skills available.
@@ -410,7 +408,7 @@ func (m *SkillsContextManager) Render(nonce string) string {
 			listed := 0
 			for _, s := range skills {
 				line := fmt.Sprintf("  - %s: %s\n", s.Name, s.Description)
-				if buf.Len()+len(line) > MetadataListMaxBytes {
+				if m.measureSize(buf.String())+m.measureSize(line) > MetadataListMaxTokens {
 					remaining := len(skills) - listed
 					buf.WriteString(fmt.Sprintf("  ... and %d more skills. Use search_capabilities to find specific skills.\n", remaining))
 					break
@@ -510,7 +508,7 @@ func DetectCrossSkillReferences(content string, currentSkillName string) []strin
 func (m *SkillsContextManager) ensureContextFits() {
 	for {
 		totalSize := m.estimateContextSize()
-		if totalSize <= m.maxBytes {
+		if totalSize <= m.maxTokens {
 			return
 		}
 
@@ -527,14 +525,14 @@ func (m *SkillsContextManager) ensureContextFits() {
 		})
 
 		if lruName == "" {
-			log.Warnf("all skills are folded but context still exceeds limit (total: %d, limit: %d)", totalSize, m.maxBytes)
+			log.Warnf("all skills are folded but context still exceeds limit (total: %d, limit: %d)", totalSize, m.maxTokens)
 			return
 		}
 
 		if state, ok := m.loadedSkills.Get(lruName); ok {
 			state.IsFolded = true
 			m.contextSizeDirty = true
-			log.Infof("folded LRU skill %q to fit context limit (total: %d, limit: %d)", lruName, totalSize, m.maxBytes)
+			log.Infof("folded LRU skill %q to fit context limit (total: %d, limit: %d)", lruName, totalSize, m.maxTokens)
 		}
 	}
 }
@@ -564,14 +562,13 @@ func (m *SkillsContextManager) estimateContextSize() int {
 	return total
 }
 
-// measureSize returns the size of a rendered string.
-// By default the manager enforces raw byte limits to preserve SetMaxBytes semantics.
-// When a token estimator is configured, the limit is enforced in estimated tokens instead.
+// measureSize returns the size of a rendered string in tokens.
+// Uses the custom tokenEstimator if set, otherwise falls back to ytoken.CalcTokenCount.
 func (m *SkillsContextManager) measureSize(rendered string) int {
 	if m.tokenEstimator != nil {
 		return m.tokenEstimator(rendered)
 	}
-	return len(rendered)
+	return ytoken.CalcTokenCount(rendered)
 }
 
 func buildKeywordsString(meta *SkillMeta) string {

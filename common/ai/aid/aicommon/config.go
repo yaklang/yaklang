@@ -15,6 +15,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai"
+	"github.com/yaklang/yaklang/common/ai/ytoken"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
@@ -238,12 +239,12 @@ type Config struct {
 	// timeline
 	Timeline                  *Timeline
 	TimelineDiffer            *TimelineDiffer
-	TimelineContentSizeLimit  int
-	TimelineTotalContentLimit int
+	TimelineContentSizeLimit  int   // in tokens
+	TimelineTotalContentLimit int   // in tokens
 
 	// triage
 	MemoryTriage         MemoryTriage
-	MemoryPoolSize       int64
+	MemoryPoolSize       int64 // in tokens
 	MemoryPool           *omap.OrderedMap[string, *MemoryEntity]
 	EnableSelfReflection bool
 
@@ -460,14 +461,14 @@ func newConfig(ctx context.Context) *Config {
 		ContextProviderManager:             NewContextProviderManager(),
 		AiAutoRetry:                        5,
 		AiTransactionAutoRetry:             5,
-		TimelineContentSizeLimit:           50 * 1024, // Default limit for 50k
+		TimelineContentSizeLimit:           50 * 1024, // Default limit for 50k tokens
 		Guardian:                           NewAsyncGuardian(ctx, id),
 		PerTaskUserInteractiveLimitedTimes: 3, // Default to 3 times
 		EnablePlanAndExec:                  true,
 		AllowRequireForUserInteract:        true,
 		ToolComposeConcurrency:             2,
 		Workdir:                            "",
-		MemoryPoolSize:                     10 * 1024,
+		MemoryPoolSize:                     10 * 1024, // 10k tokens
 		MemoryPool:                         omap.NewOrderedMap(make(map[string]*MemoryEntity)),
 		MaxTaskContinue:                    3,
 		GenerateReport:                     true,
@@ -787,12 +788,13 @@ func WithPromptHook(hook func(string) string) ConfigOption {
 	}
 }
 
+// UserPresetPromptMaxLength is the maximum size of user preset prompt in tokens.
 const UserPresetPromptMaxLength = 4000
 
 func WithUserPresetPrompt(prompt string) ConfigOption {
 	return func(c *Config) error {
-		if len(prompt) > UserPresetPromptMaxLength {
-			prompt = prompt[:UserPresetPromptMaxLength]
+		if MeasureTokens(prompt) > UserPresetPromptMaxLength {
+			prompt = ShrinkByTokens(prompt, UserPresetPromptMaxLength)
 		}
 		c.UserPresetPrompt = prompt
 		return nil
@@ -2346,8 +2348,8 @@ func (c *Config) FormatUserInputHistory() string {
 	return builder.String()
 }
 
-func (c *Config) FormatUserInputHistoryAITag(nonce string, maxBytes int) string {
-	body := c.formatUserInputHistoryForPrompt(maxBytes)
+func (c *Config) FormatUserInputHistoryAITag(nonce string, maxTokens int) string {
+	body := c.formatUserInputHistoryForPrompt(maxTokens)
 	if body == "" || strings.TrimSpace(nonce) == "" {
 		return body
 	}
@@ -2370,42 +2372,48 @@ func (c *Config) formatUserInputHistoryEntries() []string {
 	return entries
 }
 
-func (c *Config) formatUserInputHistoryForPrompt(maxBytes int) string {
+func (c *Config) formatUserInputHistoryForPrompt(maxTokens int) string {
 	entries := c.formatUserInputHistoryEntries()
 	if len(entries) == 0 {
 		return ""
 	}
 	header := "# Session User Input History\n"
-	if maxBytes <= 0 {
+	if maxTokens <= 0 {
 		return header + strings.Join(entries, "")
 	}
 
 	marker := "[TRUNCATED_HEAD]\n"
-	remaining := maxBytes - len(header)
+	remaining := maxTokens - MeasureTokens(header)
 	if remaining <= 0 {
 		return header
 	}
 
+	markerTokens := MeasureTokens(marker)
 	selected := make([]string, 0, len(entries))
 	truncated := false
 	for i := len(entries) - 1; i >= 0; i-- {
 		entry := entries[i]
-		needed := len(entry)
+		needed := MeasureTokens(entry)
 		if truncated {
-			needed += len(marker)
+			needed += markerTokens
 		}
 		if needed <= remaining {
 			selected = append([]string{entry}, selected...)
-			remaining -= len(entry)
+			remaining -= MeasureTokens(entry)
 			continue
 		}
 
 		keep := remaining
 		if !truncated {
-			keep -= len(marker)
+			keep -= markerTokens
 		}
 		if keep > 0 {
-			entry = marker + entry[len(entry)-keep:]
+			// Keep the tail of the entry (most recent content is more relevant)
+			tokens := ytoken.Encode(entry)
+			if len(tokens) > keep {
+				tokens = tokens[len(tokens)-keep:]
+			}
+			entry = marker + ytoken.Decode(tokens)
 			selected = append([]string{entry}, selected...)
 		}
 		truncated = true

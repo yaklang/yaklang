@@ -24,10 +24,10 @@ type MemoryTriage interface {
 	HandleMemory(i any) error
 
 	// SearchMemory 根据输入内容搜索相关记忆，限制总内容字节数
-	SearchMemory(origin any, bytesLimit int) (*SearchMemoryResult, error)
+	SearchMemory(origin any, tokenLimit int) (*SearchMemoryResult, error)
 
 	// SearchMemoryWithoutAI 不使用AI的关键词搜索，直接基于关键词匹配
-	SearchMemoryWithoutAI(origin any, bytesLimit int) (*SearchMemoryResult, error)
+	SearchMemoryWithoutAI(origin any, tokenLimit int) (*SearchMemoryResult, error)
 
 	Close() error
 

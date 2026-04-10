@@ -8,6 +8,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/ai/ytoken"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -103,9 +104,9 @@ func init() {
 						srcParts = append(srcParts, k+":"+utils.InterfaceToString(bySrc[k]))
 					}
 					reconLog := loop.Get(keyReconLog)
-					if len(reconLog) > 6000 {
-						reconLog = reconLog[len(reconLog)-6000:]
-					}
+				if ytoken.CalcTokenCount(reconLog) > 6000 {
+					reconLog = reconLog[len(reconLog)-6000:]
+				}
 					renderMap := map[string]any{
 						"Nonce":            nonce,
 						"SeedURL":          loop.Get(keySeedURL),

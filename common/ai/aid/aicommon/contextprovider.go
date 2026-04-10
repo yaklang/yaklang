@@ -232,8 +232,8 @@ func OutputFileContextProvider(filePath string) ContextProvider {
 		}
 		var buf strings.Builder
 		buf.WriteString(fmt.Sprintf("## Output File: %s (%s)\n", filePath, formatFileSize(info.Size)))
-		if info.Size > aitool.MaxOutputFileBytes {
-			buf.WriteString(fmt.Sprintf("Note: file truncated to first %d bytes (original: %d bytes)\n", aitool.MaxOutputFileBytes, info.Size))
+		if info.Size > aitool.MaxOutputFileTokens {
+			buf.WriteString(fmt.Sprintf("Note: file truncated to first %d bytes (original: %d bytes)\n", aitool.MaxOutputFileTokens, info.Size))
 		}
 		buf.WriteString("```\n")
 		buf.WriteString(info.LineNumberedContent())
@@ -415,7 +415,7 @@ func KnowledgeBaseSystemFlagContextProvider(flag string, userPrompt ...string) C
 			}
 
 			content := detailBuilder.String()
-			if len(content) > maxInlineKnowledgeBaseBytes {
+			if MeasureTokens(content) > maxInlineKnowledgeBaseTokens {
 				filePath := consts.TempAIFileFast("knowledge-bases-*.txt", content)
 				if emitter != nil && filePath != "" {
 					emitter.EmitPinFilename(filePath)
@@ -423,7 +423,7 @@ func KnowledgeBaseSystemFlagContextProvider(flag string, userPrompt ...string) C
 
 				var previewBuilder strings.Builder
 				previewBuilder.WriteString(baseInfo)
-				previewBuilder.WriteString(fmt.Sprintf("All knowledge base info is large (%d bytes). Saved to file: %s\n", len(content), filePath))
+				previewBuilder.WriteString(fmt.Sprintf("All knowledge base info is large (%d tokens). Saved to file: %s\n", MeasureTokens(content), filePath))
 				previewBuilder.WriteString("Knowledge Base Names:\n")
 				for _, kb := range knowledgeBases {
 					previewBuilder.WriteString(fmt.Sprintf("- %s\n", kb.KnowledgeBaseName))
@@ -438,9 +438,8 @@ func KnowledgeBaseSystemFlagContextProvider(flag string, userPrompt ...string) C
 	}
 }
 
-// ArtifactsContextMaxBytes is the maximum size (in bytes) for the artifacts context output.
-// This limits the artifacts summary injected into every prompt to 8KB.
-const ArtifactsContextMaxBytes = 8 * 1024
+// ArtifactsContextMaxTokens is the maximum size (in tokens) for the artifacts context output.
+const ArtifactsContextMaxTokens = 8 * 1024
 
 // artifactFileEntry holds metadata for a single file in the artifacts directory.
 type artifactFileEntry struct {
@@ -453,7 +452,7 @@ type artifactFileEntry struct {
 // a structured summary of all task output files. This provider is registered once and executed
 // on every prompt build, ensuring all subsequent AI turns can see the artifacts filesystem.
 //
-// The output is limited to ArtifactsContextMaxBytes (8KB) using utils.ShrinkTextBlock.
+// The output is limited to ArtifactsContextMaxTokens using token-based shrinking.
 func ArtifactsContextProvider(config AICallerConfigIf, emitter *Emitter, key string) (string, error) {
 	workDir := config.GetOrCreateWorkDir()
 	if workDir == "" {
@@ -563,8 +562,8 @@ func ArtifactsContextProvider(config AICallerConfigIf, emitter *Emitter, key str
 	}
 
 	result := sb.String()
-	if len(result) > ArtifactsContextMaxBytes {
-		result = utils.ShrinkTextBlock(result, ArtifactsContextMaxBytes)
+	if MeasureTokens(result) > ArtifactsContextMaxTokens {
+		result = ShrinkTextBlockByTokens(result, ArtifactsContextMaxTokens)
 	}
 	return result, nil
 }
@@ -582,17 +581,17 @@ func formatFileSize(size int64) string {
 }
 
 type ContextProviderManager struct {
-	maxBytes int
-	m        sync.RWMutex
-	callback *omap.OrderedMap[string, ContextProvider]
+	maxTokens int
+	m         sync.RWMutex
+	callback  *omap.OrderedMap[string, ContextProvider]
 }
 
-const maxInlineKnowledgeBaseBytes = 2 * 1024 // 8KB
+const maxInlineKnowledgeBaseTokens = 2 * 1024
 
 func NewContextProviderManager() *ContextProviderManager {
 	return &ContextProviderManager{
-		maxBytes: 48 * 1024, // 48KB
-		callback: omap.NewOrderedMap(make(map[string]ContextProvider)),
+		maxTokens: 48 * 1024, // 48k tokens
+		callback:  omap.NewOrderedMap(make(map[string]ContextProvider)),
 	}
 }
 
@@ -716,10 +715,10 @@ func (r *ContextProviderManager) Execute(config AICallerConfigIf, emitter *Emitt
 	})
 
 	result := buf.String()
-	if len(result) > r.maxBytes {
-		shrinkSize := int(float64(r.maxBytes) * 0.8)
-		result = utils.ShrinkTextBlock(result, shrinkSize)
-		log.Warnf("context provider result exceeded maxBytes (%d), shrunk to %d characters", r.maxBytes, shrinkSize)
+	if MeasureTokens(result) > r.maxTokens {
+		shrinkSize := int(float64(r.maxTokens) * 0.8)
+		result = ShrinkTextBlockByTokens(result, shrinkSize)
+		log.Warnf("context provider result exceeded maxTokens (%d), shrunk to %d tokens", r.maxTokens, shrinkSize)
 	}
 
 	return result

@@ -54,8 +54,8 @@ func (r *ReActLoop) _fastLoadSearchMemoryWithoutAI(input string) {
 		aicommon.TypeWriterWrite(pw, "... 快速检索失败，Reason: "+err.Error(), 300)
 	} else {
 		var size int
-		if !utils.IsNil(searchResult) && searchResult.ContentBytes > 0 {
-			size = searchResult.ContentBytes
+		if !utils.IsNil(searchResult) && searchResult.ContentTokens > 0 {
+			size = searchResult.ContentTokens
 		}
 		if size > 0 {
 			aicommon.TypeWriterWrite(pw, "... 快速记忆检索结束，匹配到记忆大小为："+utils.ByteSize(uint64(size)), 300)

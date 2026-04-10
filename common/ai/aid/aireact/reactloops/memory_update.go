@@ -2,6 +2,7 @@ package reactloops
 
 import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/ytoken"
 	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -10,7 +11,7 @@ import (
 func (r *ReActLoop) currentMemorySize() int {
 	var size = 0
 	for _, i := range r.currentMemories.Values() {
-		size += len(i.Content)
+		size += ytoken.CalcTokenCount(i.Content)
 	}
 	return size
 }

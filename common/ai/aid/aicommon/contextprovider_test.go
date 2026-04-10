@@ -127,16 +127,15 @@ func TestContextProviderManager_ExecuteWithErrors(t *testing.T) {
 }
 
 func TestContextProviderManager_ExecuteWithShrink(t *testing.T) {
-	// 创建一个小的 maxBytes 来测试压缩功能
 	cpm := &ContextProviderManager{
-		maxBytes: 100, // 设置一个小的限制
-		callback: omap.NewOrderedMap(make(map[string]ContextProvider)),
+		maxTokens: 100,
+		callback:  omap.NewOrderedMap(make(map[string]ContextProvider)),
 	}
 
 	// 注册一个会产生长输出的 provider
 	longProvider := func(config AICallerConfigIf, emitter *Emitter, key string) (string, error) {
 		// 生成一个很长的字符串
-		longString := strings.Repeat("This is a very long context string that should exceed the maxBytes limit. ", 10)
+		longString := strings.Repeat("This is a very long context string that should exceed the maxTokens limit. ", 10)
 		return longString, nil
 	}
 
@@ -145,8 +144,8 @@ func TestContextProviderManager_ExecuteWithShrink(t *testing.T) {
 	result := cpm.Execute(nil, nil)
 
 	// 验证结果被压缩了
-	if len(result) >= 100 {
-		t.Fatalf("Result should be compressed, length %d should be less than maxBytes 100", len(result))
+	if MeasureTokens(result) >= 100 {
+		t.Fatalf("Result should be compressed, token count %d should be less than maxTokens 100", MeasureTokens(result))
 	}
 
 	// 验证压缩后的结果包含 "..." (ShrinkString 的特征)
@@ -157,8 +156,8 @@ func TestContextProviderManager_ExecuteWithShrink(t *testing.T) {
 
 func TestContextProviderManager_ExecuteWithShrinkPreservesNewlines(t *testing.T) {
 	cpm := &ContextProviderManager{
-		maxBytes: 120,
-		callback: omap.NewOrderedMap(make(map[string]ContextProvider)),
+		maxTokens: 120,
+		callback:  omap.NewOrderedMap(make(map[string]ContextProvider)),
 	}
 
 	multilineProvider := func(config AICallerConfigIf, emitter *Emitter, key string) (string, error) {
@@ -187,7 +186,7 @@ func TestContextProviderManager_ExecuteWithShrinkPreservesNewlines(t *testing.T)
 }
 
 func TestContextProviderManager_ExecuteWithoutShrink(t *testing.T) {
-	cpm := NewContextProviderManager() // 使用默认的 maxBytes (48KB)
+	cpm := NewContextProviderManager() // default 48k tokens
 
 	// 注册一个短输出的 provider
 	shortProvider := func(config AICallerConfigIf, emitter *Emitter, key string) (string, error) {
@@ -409,8 +408,8 @@ func TestNewContextProviderManager(t *testing.T) {
 		t.Fatal("NewContextProviderManager should return a non-nil instance")
 	}
 
-	if cpm.maxBytes != 48*1024 { // 默认 48KB
-		t.Fatalf("Expected maxBytes to be 49152, got %d", cpm.maxBytes)
+	if cpm.maxTokens != 48*1024 {
+		t.Fatalf("Expected maxTokens to be 49152, got %d", cpm.maxTokens)
 	}
 
 	if cpm.callback == nil {
@@ -418,25 +417,24 @@ func TestNewContextProviderManager(t *testing.T) {
 	}
 }
 
-func TestContextProviderManager_MaxBytesConfiguration(t *testing.T) {
-	// 测试不同的 maxBytes 配置
+func TestContextProviderManager_MaxTokensConfiguration(t *testing.T) {
 	testCases := []struct {
-		name         string
-		maxBytes     int
+		name      string
+		maxTokens int
 		input        string
 		expectShrink bool
 	}{
 		{"Normal size", 1000, "short string", false},
-		{"Exact limit", 50, strings.Repeat("x", 50), false},
-		{"Over limit", 50, strings.Repeat("x", 100), true},
-		{"Large over limit", 100, strings.Repeat("x", 1000), true},
+		{"Exact limit", 500, strings.Repeat("word ", 50), false},
+		{"Over limit", 30, strings.Repeat("This is a distinct word for token counting. ", 20), true},
+		{"Large over limit", 50, strings.Repeat("Each unique word generates separate tokens in BPE encoding. ", 30), true},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			cpm := &ContextProviderManager{
-				maxBytes: tc.maxBytes,
-				callback: omap.NewOrderedMap(make(map[string]ContextProvider)),
+				maxTokens: tc.maxTokens,
+				callback:  omap.NewOrderedMap(make(map[string]ContextProvider)),
 			}
 
 			provider := func(config AICallerConfigIf, emitter *Emitter, key string) (string, error) {
@@ -450,11 +448,11 @@ func TestContextProviderManager_MaxBytesConfiguration(t *testing.T) {
 				if !strings.Contains(result, "...") {
 					t.Fatalf("Expected result to be shrunk for case %s", tc.name)
 				}
-				if len(result) >= tc.maxBytes {
-					t.Fatalf("Result length %d should be less than maxBytes %d", len(result), tc.maxBytes)
+				if MeasureTokens(result) >= tc.maxTokens {
+					t.Fatalf("Result token count %d should be less than maxTokens %d", MeasureTokens(result), tc.maxTokens)
 				}
 			} else {
-				if len(result) > tc.maxBytes && !strings.Contains(result, "...") {
+				if MeasureTokens(result) > tc.maxTokens && !strings.Contains(result, "...") {
 					t.Fatalf("Result should not be shrunk for case %s", tc.name)
 				}
 			}
@@ -743,11 +741,10 @@ func TestContextProviderManager_RegisterTracedContent_ConcurrentAccess(t *testin
 	countsMutex.Unlock()
 }
 
-func TestContextProviderManager_RegisterTracedContent_WithMaxBytesShrink(t *testing.T) {
-	// 创建一个小的 maxBytes 来测试 traced content 的压缩
+func TestContextProviderManager_RegisterTracedContent_WithMaxTokensShrink(t *testing.T) {
 	cpm := &ContextProviderManager{
-		maxBytes: 200, // 设置一个小的限制
-		callback: omap.NewOrderedMap(make(map[string]ContextProvider)),
+		maxTokens: 200,
+		callback:  omap.NewOrderedMap(make(map[string]ContextProvider)),
 	}
 
 	callCount := 0
@@ -763,8 +760,7 @@ func TestContextProviderManager_RegisterTracedContent_WithMaxBytesShrink(t *test
 	// 执行多次以积累差异信息
 	for i := 0; i < 3; i++ {
 		result := cpm.Execute(nil, nil)
-		if len(result) > 200 {
-			// 如果结果超过 maxBytes，验证它被压缩了
+		if MeasureTokens(result) > 200 {
 			if !strings.Contains(result, "...") {
 				t.Fatalf("Long result should be compressed, but no '...' found in: %s", result)
 			}

@@ -310,7 +310,7 @@ func (r *ReAct) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTas
 							}
 
 							if len(searchResult.Memories) > 0 {
-								log.Infof("found %d relevant memories for completed task %s (total: %d bytes)", len(searchResult.Memories), task.GetId(), searchResult.ContentBytes)
+								log.Infof("found %d relevant memories for completed task %s (total: %d tokens)", len(searchResult.Memories), task.GetId(), searchResult.ContentTokens)
 								if r.config.DebugEvent {
 									log.Infof("memory search summary: %s", searchResult.SearchSummary)
 								}

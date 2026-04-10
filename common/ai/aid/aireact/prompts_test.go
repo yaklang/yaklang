@@ -278,8 +278,13 @@ func TestPromptManager_DynamicContextWithNonce_TruncatesPrevUserInputHistoryTo20
 		t.Fatalf("Failed to create ReAct instance: %v", err)
 	}
 
-	oldPayload := "_old_marker" + strings.Repeat("A", 18000)
-	newPayload := strings.Repeat("B", 9000) + "_new_marker"
+	// Each "word_NNN " produces ~2 tokens. Need total > 20K tokens across both entries.
+	var oldParts []string
+	for i := 0; i < 15000; i++ {
+		oldParts = append(oldParts, fmt.Sprintf("old_%d", i))
+	}
+	oldPayload := "_old_marker " + strings.Join(oldParts, " ")
+	newPayload := strings.Repeat("B", 500) + " _new_marker"
 	react.config.SetUserInputHistory([]schema.AIAgentUserInputRecord{
 		{Round: 1, Timestamp: time.Date(2026, 3, 26, 10, 0, 0, 0, time.Local), UserInput: oldPayload},
 		{Round: 2, Timestamp: time.Date(2026, 3, 26, 10, 5, 0, 0, time.Local), UserInput: newPayload},

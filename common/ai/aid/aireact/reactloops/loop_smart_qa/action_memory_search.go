@@ -8,11 +8,12 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/ytoken"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-const memoryMaxBytesLimit = 10240
+const memoryMaxTokenLimit = 10240
 
 func makeMemorySearchAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 	desc := "Search the AI persistent memory system bound to the current session. " +
@@ -30,7 +31,7 @@ func makeMemorySearchAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 			aitool.WithParam_Description("Maximum number of results. Default: 10."),
 			aitool.WithParam_Default(10)),
 		aitool.WithIntegerParam("bytes_limit",
-			aitool.WithParam_Description("Maximum content size in bytes (max 10240). Default: 4096."),
+			aitool.WithParam_Description("Maximum content size in tokens (max 10240). Default: 4096."),
 			aitool.WithParam_Default(4096)),
 	}
 
@@ -53,12 +54,12 @@ func makeMemorySearchAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 			if limit <= 0 {
 				limit = 10
 			}
-			bytesLimit := int(action.GetInt("bytes_limit"))
-			if bytesLimit <= 0 {
-				bytesLimit = 4096
+			tokenLimit := int(action.GetInt("bytes_limit"))
+			if tokenLimit <= 0 {
+				tokenLimit = 4096
 			}
-			if bytesLimit > memoryMaxBytesLimit {
-				bytesLimit = memoryMaxBytesLimit
+			if tokenLimit > memoryMaxTokenLimit {
+				tokenLimit = memoryMaxTokenLimit
 			}
 
 			invoker := loop.GetInvoker()
@@ -75,10 +76,10 @@ func makeMemorySearchAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 			var err error
 
 			if triage, ok := memTriage.(*aimem.AIMemoryTriage); ok {
-				content, err = doMemorySearch(triage, query, searchMode, limit, bytesLimit)
+				content, err = doMemorySearch(triage, query, searchMode, limit, tokenLimit)
 			} else {
 				var result *aicommon.SearchMemoryResult
-				result, err = memTriage.SearchMemoryWithoutAI(query, bytesLimit)
+				result, err = memTriage.SearchMemoryWithoutAI(query, tokenLimit)
 				if err == nil && result != nil {
 					content = result.TotalContent
 				}
@@ -107,23 +108,23 @@ func makeMemorySearchAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 	)
 }
 
-func doMemorySearch(triage *aimem.AIMemoryTriage, query, searchMode string, limit, bytesLimit int) (string, error) {
+func doMemorySearch(triage *aimem.AIMemoryTriage, query, searchMode string, limit, tokenLimit int) (string, error) {
 	switch searchMode {
 	case "semantic":
 		results, err := triage.SearchBySemantics(query, limit)
 		if err != nil {
 			return "", err
 		}
-		return fmtSearchResults(results, bytesLimit, "semantic"), nil
+		return fmtSearchResults(results, tokenLimit, "semantic"), nil
 	case "bm25":
-		result, err := triage.SearchMemoryWithoutAI(query, bytesLimit)
+		result, err := triage.SearchMemoryWithoutAI(query, tokenLimit)
 		if err != nil {
 			return "", err
 		}
 		if result == nil || len(result.Memories) == 0 {
 			return "", nil
 		}
-		return fmtMemoryEntities(result.Memories, bytesLimit, "bm25"), nil
+		return fmtMemoryEntities(result.Memories, tokenLimit, "bm25"), nil
 	case "keyword":
 		keywords := strings.Fields(query)
 		if len(keywords) == 0 {
@@ -133,24 +134,24 @@ func doMemorySearch(triage *aimem.AIMemoryTriage, query, searchMode string, limi
 		if err != nil {
 			return "", err
 		}
-		return fmtMemoryEntities(entities, bytesLimit, "keyword"), nil
+		return fmtMemoryEntities(entities, tokenLimit, "keyword"), nil
 	default:
-		result, err := triage.SearchMemoryWithoutAI(query, bytesLimit)
+		result, err := triage.SearchMemoryWithoutAI(query, tokenLimit)
 		if err != nil {
 			return "", err
 		}
 		if result == nil || len(result.Memories) == 0 {
 			return "", nil
 		}
-		return fmtMemoryEntities(result.Memories, bytesLimit, "all"), nil
+		return fmtMemoryEntities(result.Memories, tokenLimit, "all"), nil
 	}
 }
 
-func fmtSearchResults(results []*aicommon.SearchResult, bytesLimit int, mode string) string {
+func fmtSearchResults(results []*aicommon.SearchResult, tokenLimit int, mode string) string {
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("=== Memory Search (mode: %s) ===\n\n", mode))
 
-	totalBytes := 0
+	totalTokens := 0
 	count := 0
 	for _, r := range results {
 		if r == nil || r.Entity == nil {
@@ -159,23 +160,23 @@ func fmtSearchResults(results []*aicommon.SearchResult, bytesLimit int, mode str
 		entry := fmt.Sprintf("- [%s] (score: %.3f)\n  %s\n\n",
 			r.Entity.CreatedAt.Format("2006-01-02 15:04:05"),
 			r.Score, r.Entity.Content)
-		entryBytes := len([]byte(entry))
-		if totalBytes+entryBytes > bytesLimit {
+		entryTokens := ytoken.CalcTokenCount(entry)
+		if totalTokens+entryTokens > tokenLimit {
 			break
 		}
 		sb.WriteString(entry)
-		totalBytes += entryBytes
+		totalTokens += entryTokens
 		count++
 	}
-	sb.WriteString(fmt.Sprintf("--- %d memories, %d bytes ---\n", count, totalBytes))
+	sb.WriteString(fmt.Sprintf("--- %d memories, %d tokens ---\n", count, totalTokens))
 	return sb.String()
 }
 
-func fmtMemoryEntities(entities []*aicommon.MemoryEntity, bytesLimit int, mode string) string {
+func fmtMemoryEntities(entities []*aicommon.MemoryEntity, tokenLimit int, mode string) string {
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("=== Memory Search (mode: %s) ===\n\n", mode))
 
-	totalBytes := 0
+	totalTokens := 0
 	count := 0
 	for _, e := range entities {
 		if e == nil {
@@ -188,15 +189,15 @@ func fmtMemoryEntities(entities []*aicommon.MemoryEntity, bytesLimit int, mode s
 			}
 		}
 		entry += "\n  " + e.Content + "\n\n"
-		entryBytes := len([]byte(entry))
-		if totalBytes+entryBytes > bytesLimit {
+		entryTokens := ytoken.CalcTokenCount(entry)
+		if totalTokens+entryTokens > tokenLimit {
 			break
 		}
 		sb.WriteString(entry)
-		totalBytes += entryBytes
+		totalTokens += entryTokens
 		count++
 	}
-	sb.WriteString(fmt.Sprintf("--- %d memories, %d bytes ---\n", count, totalBytes))
+	sb.WriteString(fmt.Sprintf("--- %d memories, %d tokens ---\n", count, totalTokens))
 	return sb.String()
 }
 
