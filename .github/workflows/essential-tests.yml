@@ -273,11 +273,11 @@ jobs:
         env:
           GOCACHE: ${{ env.GOCACHE }}
           GOMODCACHE: ${{ env.GOMODCACHE }}
+          COMPILE_WORKERS: "2"
+          GO_TEST_P: "1"
         run: |
           export TEST_BIN_DIR="${{ runner.temp }}/test_binaries"
           export TEST_CONFIG="${{ runner.temp }}/prepare_yakgrpc_test_config.json"
-          export COMPILE_WORKERS=2
-          export GO_TEST_P=1
           ./scripts/ci/test-compile.sh
 
       - name: Package shared suite
@@ -346,11 +346,11 @@ jobs:
         env:
           GOCACHE: ${{ env.GOCACHE }}
           GOMODCACHE: ${{ env.GOMODCACHE }}
+          COMPILE_WORKERS: "1"
+          GO_TEST_P: "1"
         run: |
           export TEST_BIN_DIR="${{ runner.temp }}/test_binaries"
           export TEST_CONFIG="${{ runner.temp }}/prepare_coreplugin_test_config.json"
-          export COMPILE_WORKERS=1
-          export GO_TEST_P=1
           ./scripts/ci/test-compile.sh
 
       - name: Package shared suite
@@ -401,16 +401,6 @@ jobs:
                 {"package": ".common/crep/...", "timeout": "5m"}
               ]
 
-          - name: "Test SFWeb / Integration SyntaxFlow / SFDB / SFVM / SFReport"
-            sync_rule: "1"
-            test_configs: |
-              [
-                {"package": "./common/sfweb/...", "timeout": "4m"},
-                {"package": "./common/syntaxflow/tests", "timeout": "20s"},
-                {"package": "./common/syntaxflow/sfdb/...", "timeout": "20s"},
-                {"package": "./common/syntaxflow/sfvm/...", "timeout": "20s"},
-                {"package": "./common/yak/ssaapi/sfreport/...", "timeout": "1m"}
-              ]
           - name: "Test Utils Infra / Parser / Net in 2min USE gRPC"
             test_configs: |
               [
@@ -480,46 +470,59 @@ jobs:
                 {"package": "./common/yak/ssaapi/ssaconfig", "timeout": "20s"}
               ]
 
-          - name: "Test SSA Frontend Java / JS(TS|ES)"
+          - name: "Test SSA Frontend Java / JS(TS|ES) / Yak / Python / Golang / C"
+            compile_workers: "3"
+            go_test_p: "1"
             test_configs: |
               [
-                {"package": "./common/yak/java/...", "timeout": "5m"},
-                {"package": "./common/yak/ssaapi/test/java/...", "timeout": "3m"},
+                {"package": "./common/yak/java/...", "timeout": "8m"},
+                {"package": "./common/yak/ssaapi/test/java/...", "timeout": "4m"},
                 {"package": "./common/yak/typescript/...", "timeout": "2m"},
-                {"package": "./common/yak/ssaapi/test/javascript/...", "timeout": "1m"}
-              ]
-
-          - name: "Test SSA Frontend Yak / PHP / Python / Golang / C / SSAAPI Other"
-            test_configs: |
-              [
+                {"package": "./common/yak/ssaapi/test/javascript/...", "timeout": "1m"},
                 {"package": "./common/yak/yak2ssa/test/...", "timeout": "20s"},
                 {"package": "./common/yak/ssaapi/test/yak/...", "timeout": "1m"},
                 {"package": "./common/yak/antlr4yak/lsp/...", "timeout": "20s"},
-                {"package": "./common/yak/php/...", "timeout": "5m"},
-                {"package": "./common/yak/ssaapi/test/php/...", "timeout": "2m"},
-                {"package": "./common/yak/python/...", "timeout": "2m"},
-                {"package": "./common/yak/ssaapi/test/python/...", "timeout": "1m"},
+                {"package": "./common/yak/python/...", "timeout": "4m"},
+                {"package": "./common/yak/ssaapi/test/python/...", "timeout": "2m"},
                 {"package": "./common/yak/go2ssa/...", "timeout": "3m"},
-                {"package": "./common/yak/antlr4go/...", "timeout": "30s"},
-                {"package": "./common/yak/ssaapi/test/golang/...", "timeout": "2m"},
+                {"package": "./common/yak/antlr4go/...", "timeout": "2m"},
+                {"package": "./common/yak/ssaapi/test/golang/...", "timeout": "3m"},
                 {"package": "./common/yak/c2ssa/...", "timeout": "30s"},
                 {"package": "./common/yak/antlr4c/...", "timeout": "30s"},
-                {"package": "./common/yak/ssaapi/test/c/...", "timeout": "2m"},
-                {"package": "./common/yak/ssaapi/test/...", "timeout": "2m", "exclude_packages": ["./common/yak/ssaapi/test/yak/...", "./common/yak/ssaapi/test/java/...", "./common/yak/ssaapi/test/javascript/...", "./common/yak/ssaapi/test/php/...", "./common/yak/ssaapi/test/python/...", "./common/yak/ssaapi/test/golang/...", "./common/yak/ssaapi/test/c/...", "./common/yak/ssaapi/test/syntaxflow/...", "./common/yak/ssaapi/test/ssatest/..."]}
+                {"package": "./common/yak/ssaapi/test/c/...", "timeout": "2m"}
               ]
 
-          - name: "Test StaticAnalyze / Builtin SyntaxFlow Rule / SSA / SSA-API / SF Scan"
+          - name: "Test SSA / SSAAPI Core / SyntaxFlow / StaticAnalyze / SFDB / SFVM"
+            sync_rule: "1"
+            compile_workers: "3"
+            go_test_p: "1"
             test_configs: |
               [
-                {"package": "./common/yak/static_analyzer/test/...", "timeout": "20s"},
-                {"package": "./common/syntaxflow/sfbuildin/...", "timeout": "5m"},
-                {"package": "./common/yak/ssaapi/test/syntaxflow/...", "timeout": "1m"},
-                {"package": "./common/syntaxflow/sfanalysis/...", "timeout": "20s"},
                 {"package": "./common/yak/ssa/...", "timeout": "20s"},
                 {"package": "./common/yak/ssaapi", "timeout": "1m"},
                 {"package": "./common/yak/ssaapi/ssareducer", "timeout": "1m"},
                 {"package": "./common/yak/ssaapi/test/ssatest/...", "timeout": "1m"},
+                {"package": "./common/yak/ssaapi/test/...", "timeout": "2m", "exclude_packages": ["./common/yak/ssaapi/test/yak/...", "./common/yak/ssaapi/test/java/...", "./common/yak/ssaapi/test/javascript/...", "./common/yak/ssaapi/test/php/...", "./common/yak/ssaapi/test/python/...", "./common/yak/ssaapi/test/golang/...", "./common/yak/ssaapi/test/c/...", "./common/yak/ssaapi/test/syntaxflow/...", "./common/yak/ssaapi/test/ssatest/..."]},
+                {"package": "./common/syntaxflow/tests", "timeout": "20s"},
+                {"package": "./common/syntaxflow/sfdb/...", "timeout": "20s"},
+                {"package": "./common/syntaxflow/sfvm/...", "timeout": "20s"},
+                {"package": "./common/syntaxflow/sfbuildin/...", "timeout": "5m"},
+                {"package": "./common/yak/ssaapi/test/syntaxflow/...", "timeout": "1m"},
+                {"package": "./common/syntaxflow/sfanalysis/...", "timeout": "20s"},
+                {"package": "./common/yak/static_analyzer/test/...", "timeout": "20s"},
                 {"package": "./common/yak/syntaxflow_scan/...", "timeout": "1m"}
+              ]
+
+          - name: "Test SSA PHP / SSAAPI PHP / SFWeb / SFReport"
+            sync_rule: "1"
+            compile_workers: "3"
+            go_test_p: "1"
+            test_configs: |
+              [
+                {"package": "./common/yak/php/...", "timeout": "5m"},
+                {"package": "./common/yak/ssaapi/test/php/...", "timeout": "3m"},
+                {"package": "./common/sfweb/...", "timeout": "4m"},
+                {"package": "./common/yak/ssaapi/sfreport/...", "timeout": "1m"}
               ]
 
           - name: "Test AI Aid / React"
@@ -605,11 +608,11 @@ jobs:
         env:
           GOCACHE: ${{ env.GOCACHE }}
           GOMODCACHE: ${{ env.GOMODCACHE }}
+          COMPILE_WORKERS: ${{ matrix.compile_workers || '' }}
+          GO_TEST_P: ${{ matrix.go_test_p || '' }}
         run: |
           export TEST_BIN_DIR="${{ runner.temp }}/test_binaries"
           export TEST_CONFIG="${{ runner.temp }}/test_config.json"
-          export COMPILE_WORKERS=2
-          export GO_TEST_P=1
           ./scripts/ci/test-compile.sh
 
       - name: ${{ matrix.name }}
