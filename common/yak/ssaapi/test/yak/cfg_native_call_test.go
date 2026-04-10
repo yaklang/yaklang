@@ -151,3 +151,127 @@ $callerCfg<cfgReachable(target="$calleeCfg")> as $reach
 		return nil
 	}, ssaapi.WithLanguage(ssaconfig.Yak))
 }
+
+func TestNativeCall_CFGReachable_ConfigFormat_ICFG(t *testing.T) {
+	code := `
+func foo() {
+    println("infoo")
+}
+
+foo()
+println("after")
+`
+	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+		res, err := prog.SyntaxFlowWithError(`
+println(*?{have: "after"} #-> as $afterArg)
+println(*?{have: "infoo"} #-> as $infooArg)
+
+$afterArg<getCfg> as $callerCfg
+$infooArg<getCfg> as $calleeCfg
+
+$callerCfg<cfgReachable(target: "$calleeCfg", icfg: true, max_depth: 4, max_nodes: 8000)> as $reach
+`, ssaapi.QueryWithEnableDebug())
+		require.NoError(t, err)
+		require.Contains(t, res.GetValues("reach").String(), "true")
+		return nil
+	}, ssaapi.WithLanguage(ssaconfig.Yak))
+}
+
+func TestNativeCall_CFGReachPath_ConfigFormat_ICFG(t *testing.T) {
+	code := `
+func foo() {
+    println("infoo")
+}
+
+foo()
+println("after")
+`
+	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+		res, err := prog.SyntaxFlowWithError(`
+println(*?{have: "after"} #-> as $afterArg)
+println(*?{have: "infoo"} #-> as $infooArg)
+
+$afterArg<getCfg> as $callerCfg
+$infooArg<getCfg> as $calleeCfg
+
+$callerCfg<cfgReachPath(target: "$calleeCfg", icfg: true, max_depth: 4, max_nodes: 8000)> as $path
+`, ssaapi.QueryWithEnableDebug())
+		require.NoError(t, err)
+		require.Contains(t, res.GetValues("path").String(), "->")
+		return nil
+	}, ssaapi.WithLanguage(ssaconfig.Yak))
+}
+
+func TestNativeCall_CFGReachPath_ConfigFormat_IntraProcUnreachable(t *testing.T) {
+	code := `
+func foo() {
+    println("infoo")
+}
+
+foo()
+println("after")
+`
+	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+		res, err := prog.SyntaxFlowWithError(`
+println(*?{have: "after"} #-> as $afterArg)
+println(*?{have: "infoo"} #-> as $infooArg)
+
+$afterArg<getCfg> as $callerCfg
+$infooArg<getCfg> as $calleeCfg
+
+$callerCfg<cfgReachable(target: "$calleeCfg", icfg: false)> as $reach
+$callerCfg<cfgReachPath(target: "$calleeCfg", icfg: false)> as $path
+`, ssaapi.QueryWithEnableDebug())
+		require.NoError(t, err)
+		require.Contains(t, res.GetValues("reach").String(), "false")
+		require.NotContains(t, res.GetValues("path").String(), "->")
+		return nil
+	}, ssaapi.WithLanguage(ssaconfig.Yak))
+}
+
+func TestNativeCall_CFGCondition_ConfigFormat(t *testing.T) {
+	code := `
+a = 1
+if (a) {
+    x = "yes"
+} else {
+    x = "no"
+}
+println(x)
+`
+	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+		res, err := prog.SyntaxFlowWithError(`
+println(* #-> as $arg)
+$arg<getCfg> as $cfg
+$cfg<cfgCondition()> as $cond
+`, ssaapi.QueryWithEnableDebug())
+		require.NoError(t, err)
+		condText := res.GetValues("cond").String()
+		require.Contains(t, condText, "cond(func=")
+		require.Contains(t, condText, "values=")
+		return nil
+	}, ssaapi.WithLanguage(ssaconfig.Yak))
+}
+
+func TestNativeCall_CFGConditionValues_ConfigFormat(t *testing.T) {
+	code := `
+a = 1
+if (a) {
+    x = "yes"
+} else {
+    x = "no"
+}
+println(x)
+`
+	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+		res, err := prog.SyntaxFlowWithError(`
+a as $cond
+$cond<getCfg> as $cfg
+$cfg<cfgConditionValues()> as $conds
+$conds as $condVals
+`, ssaapi.QueryWithEnableDebug())
+		require.NoError(t, err)
+		require.GreaterOrEqual(t, res.GetValueCount("condVals"), 0)
+		return nil
+	}, ssaapi.WithLanguage(ssaconfig.Yak))
+}

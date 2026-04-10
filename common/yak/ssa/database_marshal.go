@@ -164,6 +164,15 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		params["block_preds"] = fetchIds(ret.Preds)
 		params["block_succs"] = fetchIds(ret.Succs)
 		params["block_can_be_reached"] = ret.canBeReached
+		if ret.ConditionInst > 0 {
+			params["block_condition_inst"] = ret.ConditionInst
+		}
+		if len(ret.ConditionValues) > 0 {
+			params["block_condition_values"] = fetchIds(ret.ConditionValues)
+		}
+		if len(ret.ConditionMeta) > 0 {
+			params["block_condition_meta"] = ret.ConditionMeta
+		}
 		if ret.Condition > 0 {
 			if ret.Condition > 0 {
 				params["block_condition"] = ret.Condition
@@ -329,7 +338,22 @@ func unmarshalExtraInformation(cache *ProgramCache, inst Instruction, ir *ssadb.
 	case *BasicBlock:
 		ret.Preds = utils.MapGetInt64Slice(params, "block_preds")
 		ret.Succs = utils.MapGetInt64Slice(params, "block_succs")
+		ret.ConditionInst = utils.MapGetInt64(params, "block_condition_inst")
+		ret.ConditionValues = utils.MapGetInt64Slice(params, "block_condition_values")
+		ret.ConditionMeta = utils.MapGetMapRaw(params, "block_condition_meta")
 		ret.Condition = utils.MapGetInt64(params, "block_condition")
+		if len(ret.ConditionValues) == 0 && ret.Condition > 0 {
+			ret.ConditionValues = []int64{ret.Condition}
+		}
+		if ret.ConditionInst <= 0 && ret.Condition > 0 {
+			ret.ConditionInst = ret.Condition
+		}
+		if ret.ConditionMeta == nil {
+			ret.ConditionMeta = map[string]any{}
+		}
+		if _, ok := ret.ConditionMeta["schema_version"]; !ok {
+			ret.ConditionMeta["schema_version"] = 1
+		}
 		ret.canBeReached = BasicBlockReachableKind(utils.MapGetInt(params, "block_can_be_reached"))
 		ret.Insts = utils.MapGetInt64Slice(params, "block_insts")
 		ret.Phis = utils.MapGetInt64Slice(params, "block_phis")

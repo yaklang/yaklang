@@ -484,6 +484,13 @@ type BasicBlock struct {
 	*/
 	canBeReached BasicBlockReachableKind
 	Condition    int64 // value
+	// ConditionInst stores the direct instruction id that contributes branch condition
+	// semantics for this block (typically If/Switch/Loop terminator).
+	ConditionInst int64
+	// ConditionValues stores normalized condition value ids derived at build time.
+	ConditionValues []int64
+	// ConditionMeta stores lightweight metadata for condition extraction/versioning.
+	ConditionMeta map[string]any
 
 	// instruction list
 	Insts []int64 // instruction
@@ -495,6 +502,15 @@ type BasicBlock struct {
 	// for build
 	ScopeTable ScopeIF
 	finish     bool // if emitJump finish!
+}
+
+// BlockConditionSummary is a readonly condition projection for CFG/native-call usage.
+type BlockConditionSummary struct {
+	FuncID      int64
+	BlockID     int64
+	CondInstID  int64
+	CondValueID []int64
+	Meta        map[string]any
 }
 
 func (b *BasicBlock) SetReachable(boolean bool) {
