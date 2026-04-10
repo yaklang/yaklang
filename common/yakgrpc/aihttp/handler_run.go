@@ -277,6 +277,7 @@ func ConvertAIParamsToYPB(p AIParams, runID string) *ypb.AIStartParams {
 		TimelineItemLimit:              p.TimelineItemLimit,
 		UserInteractLimit:              p.UserInteractLimit,
 		TimelineSessionID:              runID,
+		DisableToolIntervalReview:      p.DisableToolIntervalReview,
 	}
 
 	if p.ForgeName != "" {

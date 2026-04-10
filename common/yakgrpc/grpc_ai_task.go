@@ -218,6 +218,10 @@ func buildAIDOption(startParams *ypb.AIStartParams) []aicommon.ConfigOption {
 		aidOption = append(aidOption, aicommon.WithAIAutoRetry(startParams.GetAICallAutoRetry()))
 	}
 
+	if startParams.GetDisableToolIntervalReview() {
+		aidOption = append(aidOption, aicommon.WithDisableToolCallerIntervalReview(true))
+	}
+
 	if startParams.GetAITransactionRetry() > 0 {
 		aidOption = append(aidOption, aicommon.WithAITransactionRetry(startParams.GetAITransactionRetry()))
 	}

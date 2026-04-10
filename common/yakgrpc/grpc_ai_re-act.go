@@ -90,6 +90,10 @@ func ConvertYPBAIStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.Confi
 		opts = append(opts, aicommon.WithAiCallTokenLimit(int64(i.GetAICallTokenLimit())))
 	}
 
+	if i.GetDisableToolIntervalReview() {
+		opts = append(opts, aicommon.WithDisableToolCallerIntervalReview(true))
+	}
+
 	if i.GetUserPresetPrompt() != "" {
 		opts = append(opts, aicommon.WithUserPresetPrompt(i.GetUserPresetPrompt()))
 	}
