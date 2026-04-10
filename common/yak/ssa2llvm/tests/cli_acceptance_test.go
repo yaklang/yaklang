@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/yak/ssa2llvm/obfuscation/policy"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/profile"
 )
 
 func TestSSA2LLVMCLICompileAndRunNativeArtifact(t *testing.T) {
@@ -102,51 +102,51 @@ check = () => {
 }
 
 // ---------------------------------------------------------------------------
-// Obf-policy, virtualize, profile, and removed-flag acceptance tests
+// Profile-file, virtualize, profile, and flag acceptance tests
 // ---------------------------------------------------------------------------
 
-func TestSSA2LLVMCLIObfPolicyCallretCompileAndRun(t *testing.T) {
+func TestSSA2LLVMCLIProfileCallretCompileAndRun(t *testing.T) {
 	source := writeYakSourceFile(t, `
 leaf = () => { return 7 }
 mid = () => { return leaf() + 8 }
-check = () => {
-	println("policy callret ok")
+	check = () => {
+	println("profile file callret ok")
 	return mid() + leaf()
 }
 `)
-	pol := writePolicyFile(t, &policy.Policy{
-		Seed: 42,
-		Obfuscators: []policy.ObfEntry{
-			{Name: "callret", Category: policy.CategoryCallflow},
+	profPath := writeProfileFile(t, &profile.Profile{
+		SelectionSeed: 42,
+		Obfuscators: []profile.ObfEntry{
+			{Name: "callret", Category: profile.CategoryCallflow, Selector: profile.Selector{AllowEntry: true}},
 		},
 	})
-	bin := filepath.Join(t.TempDir(), "policy-callret.bin")
+	bin := filepath.Join(t.TempDir(), "profile-file-callret.bin")
 
 	compile := runSSA2LLVMCLI(t, "compile", source, "-o", bin, "-f", "check",
-		"--obf-policy", pol)
+		"--profile", profPath)
 	require.Equal(t, 0, compile.ExitCode, compile.Output)
 
 	run := runProcess(t, bin, nil)
 	require.Equal(t, 22, run.ExitCode, run.Output)
-	require.Contains(t, run.Output, "policy callret ok")
+	require.Contains(t, run.Output, "profile file callret ok")
 }
 
-func TestSSA2LLVMCLIObfPolicyEmitLLVM(t *testing.T) {
+func TestSSA2LLVMCLIProfileEmitLLVM(t *testing.T) {
 	source := writeYakSourceFile(t, `
 leaf = () => { return 7 }
 mid = () => { return leaf() + 8 }
 check = () => { return mid() + leaf() }
 `)
-	pol := writePolicyFile(t, &policy.Policy{
-		Seed: 42,
-		Obfuscators: []policy.ObfEntry{
-			{Name: "callret", Category: policy.CategoryCallflow},
+	profPath := writeProfileFile(t, &profile.Profile{
+		SelectionSeed: 42,
+		Obfuscators: []profile.ObfEntry{
+			{Name: "callret", Category: profile.CategoryCallflow, Selector: profile.Selector{AllowEntry: true}},
 		},
 	})
-	ll := filepath.Join(t.TempDir(), "policy.ll")
+	ll := filepath.Join(t.TempDir(), "profile-file.ll")
 
 	compile := runSSA2LLVMCLI(t, "compile", source, "-o", ll, "-f", "check",
-		"--emit-llvm", "--obf-policy", pol)
+		"--emit-llvm", "--profile", profPath)
 	require.Equal(t, 0, compile.ExitCode, compile.Output)
 
 	data, err := os.ReadFile(ll)
@@ -177,8 +177,8 @@ check = () => { return compute() }
 	text := string(data)
 	require.Contains(t, text, "yak_runtime_invoke_vm",
 		"virtualized stub should call the VM runtime")
-	require.Contains(t, text, "yak_virt_blob_",
-		"virtualized stub should embed blob constant")
+	require.Contains(t, text, "yak_virtualize_payload_",
+		"virtualized stub should embed payload constants")
 }
 
 func TestSSA2LLVMCLIVirtualizeCallretEmitLLVM(t *testing.T) {
@@ -272,17 +272,42 @@ func TestSSA2LLVMCLIRemovedProtectFlags(t *testing.T) {
 	require.NotContains(t, help.Output, "protect-all",
 		"--protect-all should not appear in CLI help")
 
-	// Verify --obf-policy IS present.
-	require.Contains(t, help.Output, "obf-policy",
-		"--obf-policy should appear in CLI help")
+	// Verify --profile is the only profile/config flag exposed.
+	require.Contains(t, help.Output, "profile",
+		"--profile should appear in CLI help")
+	require.NotContains(t, help.Output, "obf-policy",
+		"--obf-policy should not appear in CLI help")
+	require.Contains(t, help.Output, "built-in profile name or load a profile JSON file",
+		"--profile help should describe both built-in names and file paths")
 }
 
-// writePolicyFile serialises a policy to a temp JSON file and returns its path.
-func writePolicyFile(t *testing.T, pol *policy.Policy) string {
+func TestSSA2LLVMCLIProfileBuiltinNameWinsOverLocalFile(t *testing.T) {
+	dir := t.TempDir()
+	source := filepath.Join(dir, "input.yak")
+	require.NoError(t, os.WriteFile(source, []byte(`
+leaf = () => { return 20 }
+check = () => {
+	println("builtin profile wins")
+	return leaf() + 22
+}
+`), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "resilience-lite"), []byte(`not-json`), 0o644))
+
+	bin := filepath.Join(dir, "builtin-priority.bin")
+	compile := runSSA2LLVMCLIInDir(t, dir, "compile", source, "-o", bin, "-f", "check", "--profile", "resilience-lite")
+	require.Equal(t, 0, compile.ExitCode, compile.Output)
+
+	run := runProcess(t, bin, nil)
+	require.Equal(t, 42, run.ExitCode, run.Output)
+	require.Contains(t, run.Output, "builtin profile wins")
+}
+
+// writeProfileFile serialises a profile to a temp JSON file and returns its path.
+func writeProfileFile(t *testing.T, prof *profile.Profile) string {
 	t.Helper()
-	data, err := json.Marshal(pol)
+	data, err := json.Marshal(prof)
 	require.NoError(t, err)
-	p := filepath.Join(t.TempDir(), "policy.json")
+	p := filepath.Join(t.TempDir(), "profile.json")
 	require.NoError(t, os.WriteFile(p, data, 0o644))
 	return p
 }

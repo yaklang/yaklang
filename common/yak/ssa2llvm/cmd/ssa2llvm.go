@@ -47,7 +47,6 @@ type buildCommandConfig struct {
 	printIR    bool
 	obf        []string
 	profile    string
-	obfPolicy  string
 	stdlibComp bool
 	trace      bool
 	force      bool
@@ -83,7 +82,7 @@ func sharedBuildFlags() []cli.Flag {
 		},
 		cli.StringFlag{
 			Name:  "profile",
-			Usage: fmt.Sprintf("Apply a built-in compile profile (%s)", strings.Join(profile.Names(), ", ")),
+			Usage: fmt.Sprintf("Apply a built-in profile name or load a profile JSON file (%s)", strings.Join(profile.Names(), ", ")),
 		},
 		cli.StringFlag{
 			Name:  "llvm-plugin",
@@ -102,10 +101,6 @@ func sharedBuildFlags() []cli.Flag {
 		cli.StringFlag{
 			Name:  "llvm-pack",
 			Usage: "Path to an LLVM pack manifest JSON file",
-		},
-		cli.StringFlag{
-			Name:  "obf-policy",
-			Usage: "Path to a JSON obfuscation policy file (per-obfuscator selectors, ratios, seeds)",
 		},
 		cli.BoolFlag{
 			Name:  "stdlib-compile",
@@ -192,7 +187,6 @@ func compileAction(c *cli.Context) error {
 		compiler.WithCompileLLVMPluginKind(cfg.llvmKind),
 		compiler.WithCompileLLVMPasses(cfg.llvmPasses...),
 		compiler.WithCompileLLVMPack(cfg.llvmPack),
-		compiler.WithCompileObfPolicyFile(cfg.obfPolicy),
 		compiler.WithCompileStdlibCompile(cfg.stdlibComp),
 		compiler.WithCompileCacheEnabled(true),
 		compiler.WithCompileTrace(cfg.trace),
@@ -222,7 +216,6 @@ func runAction(c *cli.Context) error {
 		compiler.WithCompileLLVMPluginKind(cfg.llvmKind),
 		compiler.WithCompileLLVMPasses(cfg.llvmPasses...),
 		compiler.WithCompileLLVMPack(cfg.llvmPack),
-		compiler.WithCompileObfPolicyFile(cfg.obfPolicy),
 		compiler.WithCompileStdlibCompile(cfg.stdlibComp),
 		compiler.WithCompileCacheEnabled(true),
 		compiler.WithCompileTrace(cfg.trace),
@@ -302,7 +295,6 @@ func newBuildCommandConfig(c *cli.Context) (*buildCommandConfig, error) {
 		llvmKind:   c.String("llvm-plugin-kind"),
 		llvmPasses: splitCSVStrings(c.StringSlice("llvm-passes")),
 		llvmPack:   c.String("llvm-pack"),
-		obfPolicy:  c.String("obf-policy"),
 	}, nil
 }
 

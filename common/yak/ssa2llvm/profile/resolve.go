@@ -1,22 +1,18 @@
-package resolver
+package profile
 
 import (
 	"fmt"
 	"math/rand"
 	"path"
 	"sort"
-
-	"github.com/yaklang/yaklang/common/yak/ssa2llvm/obfuscation/policy"
 )
 
 // Resolution holds the per-obfuscator function assignments produced by Resolve.
 type Resolution struct {
-	// Selections maps obfuscator name → set of selected function names.
 	Selections map[string]map[string]struct{}
 }
 
 // FuncsFor returns the set of function names assigned to the given obfuscator.
-// Returns nil if the obfuscator has no entry (meaning "use all" semantics).
 func (r *Resolution) FuncsFor(name string) map[string]struct{} {
 	if r == nil {
 		return nil
@@ -24,36 +20,29 @@ func (r *Resolution) FuncsFor(name string) map[string]struct{} {
 	return r.Selections[name]
 }
 
-// Resolve evaluates a Policy against an Inventory and returns concrete
-// per-obfuscator function selections. It enforces:
-//   - Selector filters (include/exclude globs, min_blocks, min_insts, allow_entry)
-//   - Ratio / count random selection (deterministic when seed != 0)
-//   - body-replace exclusivity (at most one body-replace obf per function)
-func Resolve(pol *policy.Policy, inv *Inventory) (*Resolution, error) {
-	if pol == nil || inv == nil {
+// Resolve evaluates a Profile against an Inventory and returns concrete
+// per-obfuscator function selections.
+func Resolve(prof *Profile, inv *Inventory) (*Resolution, error) {
+	if prof == nil || inv == nil {
 		return &Resolution{Selections: map[string]map[string]struct{}{}}, nil
 	}
 
 	res := &Resolution{
-		Selections: make(map[string]map[string]struct{}, len(pol.Obfuscators)),
+		Selections: make(map[string]map[string]struct{}, len(prof.Obfuscators)),
 	}
 
-	// Track body-replace ownership: funcName → obfuscator that owns it.
 	bodyOwner := make(map[string]string)
-
-	for _, entry := range pol.Obfuscators {
+	for _, entry := range prof.Obfuscators {
 		candidates := filterCandidates(inv, &entry)
+		selected := applySelection(candidates, &entry.Selector, prof.SelectionSeed)
 
-		selected := applySelection(candidates, &entry.Selector, pol.Seed)
-
-		// Enforce body-replace exclusivity.
-		if entry.Category == policy.CategoryBodyReplace {
+		if entry.EffectiveCategory() == CategoryBodyReplace {
 			for name := range selected {
 				if owner, ok := bodyOwner[name]; ok {
 					return nil, fmt.Errorf(
-						"conflict: function %q claimed by body-replace obfuscator %q, "+
-							"cannot also be claimed by %q",
-						name, owner, entry.Name)
+						"conflict: function %q claimed by body-replace obfuscator %q, cannot also be claimed by %q",
+						name, owner, entry.Name,
+					)
 				}
 				bodyOwner[name] = entry.Name
 			}
@@ -65,8 +54,7 @@ func Resolve(pol *policy.Policy, inv *Inventory) (*Resolution, error) {
 	return res, nil
 }
 
-// filterCandidates applies include/exclude globs and size thresholds.
-func filterCandidates(inv *Inventory, entry *policy.ObfEntry) []string {
+func filterCandidates(inv *Inventory, entry *ObfEntry) []string {
 	sel := &entry.Selector
 	var out []string
 	for _, fi := range inv.Funcs {
@@ -87,20 +75,16 @@ func filterCandidates(inv *Inventory, entry *policy.ObfEntry) []string {
 		}
 		out = append(out, fi.Name)
 	}
-	sort.Strings(out) // deterministic ordering before selection
+	sort.Strings(out)
 	return out
 }
 
-// matchIncludeExclude returns true if name matches the include/exclude rules.
-// Empty include means "match all". Exclude overrides include.
 func matchIncludeExclude(name string, include, exclude []string) bool {
-	// Check exclude first.
 	for _, pat := range exclude {
 		if matched, _ := path.Match(pat, name); matched {
 			return false
 		}
 	}
-	// Empty include means "all".
 	if len(include) == 0 {
 		return true
 	}
@@ -112,12 +96,10 @@ func matchIncludeExclude(name string, include, exclude []string) bool {
 	return false
 }
 
-// applySelection applies ratio or count selection to the sorted candidate list.
-func applySelection(candidates []string, sel *policy.Selector, globalSeed int64) map[string]struct{} {
+func applySelection(candidates []string, sel *Selector, globalSeed int64) map[string]struct{} {
 	result := make(map[string]struct{}, len(candidates))
 
 	if sel.Ratio == nil && sel.Count == nil {
-		// No selection constraint → all candidates.
 		for _, name := range candidates {
 			result[name] = struct{}{}
 		}
@@ -142,7 +124,6 @@ func applySelection(candidates []string, sel *policy.Selector, globalSeed int64)
 		return result
 	}
 
-	// Ratio selection.
 	ratio := *sel.Ratio
 	if ratio >= 1.0 {
 		for _, name := range candidates {
@@ -153,9 +134,10 @@ func applySelection(candidates []string, sel *policy.Selector, globalSeed int64)
 	if ratio <= 0.0 {
 		return result
 	}
+
 	count := int(float64(len(candidates)) * ratio)
 	if count < 1 {
-		count = 1 // select at least 1 if ratio > 0
+		count = 1
 	}
 	picked := pickN(candidates, count, combineSeed(globalSeed, sel.Seed))
 	for _, name := range picked {
@@ -164,19 +146,17 @@ func applySelection(candidates []string, sel *policy.Selector, globalSeed int64)
 	return result
 }
 
-func combineSeed(global int64, local int64) int64 {
+func combineSeed(global, local int64) int64 {
 	if local != 0 {
 		return local
 	}
 	return global
 }
 
-// pickN selects n items from a sorted slice using a deterministic shuffle.
 func pickN(sorted []string, n int, seed int64) []string {
 	if n >= len(sorted) {
 		return sorted
 	}
-	// Fisher-Yates partial shuffle.
 	rng := rand.New(rand.NewSource(seed))
 	work := make([]string, len(sorted))
 	copy(work, sorted)
@@ -185,6 +165,6 @@ func pickN(sorted []string, n int, seed int64) []string {
 		work[i], work[j] = work[j], work[i]
 	}
 	picked := work[:n]
-	sort.Strings(picked) // return in deterministic order
+	sort.Strings(picked)
 	return picked
 }

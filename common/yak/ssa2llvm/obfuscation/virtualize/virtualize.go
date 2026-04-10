@@ -22,10 +22,6 @@ import (
 
 const obfName = "virtualize"
 
-// ObfDataKey is the key under which the virtualize plan is stored in
-// core.Context.ObfData. The compiler reads this to emit VM wrapper stubs.
-const ObfDataKey = "virtualize:plan"
-
 func init() {
 	core.Register(virtualizeObfuscator{})
 }
@@ -33,7 +29,7 @@ func init() {
 type virtualizeObfuscator struct{}
 
 func (virtualizeObfuscator) Name() string    { return obfName }
-func (virtualizeObfuscator) Kind() core.Kind { return core.KindHybrid }
+func (virtualizeObfuscator) Kind() core.Kind { return core.KindSSA }
 
 func (v virtualizeObfuscator) Apply(ctx *core.Context) error {
 	if ctx == nil {
@@ -45,22 +41,6 @@ func (v virtualizeObfuscator) Apply(ctx *core.Context) error {
 	default:
 		return nil
 	}
-}
-
-// ---------- plan types ----------
-
-// Plan holds the result of virtualization lowering, stored in ObfData.
-type Plan struct {
-	BlobHex         string
-	SeedHex         string
-	HostBindingSpec string
-	ByName          map[string]*VirtualizedFunc
-}
-
-// VirtualizedFunc describes a single virtualized function.
-type VirtualizedFunc struct {
-	Name  string
-	Index int
 }
 
 // ---------- SSA Pre stage ----------
@@ -108,23 +88,18 @@ func (virtualizeObfuscator) applySSAPre(ctx *core.Context) error {
 		return fmt.Errorf("virtualize: encode failed: %w", err)
 	}
 
-	// Build plan.
-	plan := &Plan{
-		BlobHex:         hex.EncodeToString(blob),
-		SeedHex:         hex.EncodeToString(seed.Raw[:]),
-		HostBindingSpec: buildHostBindingSpec(pirRegion.HostSymbols),
-		ByName:          make(map[string]*VirtualizedFunc, len(pirRegion.Functions)),
-	}
-	for i, fn := range pirRegion.Functions {
-		plan.ByName[fn.Name] = &VirtualizedFunc{Name: fn.Name, Index: i}
-	}
-
-	ctx.SetObfData(ObfDataKey, plan)
-
-	// Mark all virtualized functions as body-replaced so downstream obfuscators
-	// (e.g. callret) treat them as opaque and do not attempt to inline them.
-	for name := range plan.ByName {
-		ctx.MarkBodyReplaced(obfName, name)
+	blobHex := hex.EncodeToString(blob)
+	seedHex := hex.EncodeToString(seed.Raw[:])
+	hostBindingSpec := buildHostBindingSpec(pirRegion.HostSymbols)
+	for _, fn := range pirRegion.Functions {
+		if err := ctx.RegisterFunctionWrapper(&core.FunctionWrapper{
+			Owner:         obfName,
+			FuncName:      fn.Name,
+			RuntimeSymbol: "yak_runtime_invoke_vm",
+			Payload:       []string{blobHex, seedHex, fn.Name, hostBindingSpec},
+		}); err != nil {
+			return fmt.Errorf("virtualize: register wrapper for %q: %w", fn.Name, err)
+		}
 	}
 
 	return nil
@@ -147,7 +122,7 @@ func collectCandidates(ctx *core.Context) []region.Candidate {
 		candidates = append(candidates, region.Candidate{
 			Func:   fn,
 			Name:   name,
-			Reason: "policy",
+			Reason: "profile-selection",
 		})
 	})
 	return candidates

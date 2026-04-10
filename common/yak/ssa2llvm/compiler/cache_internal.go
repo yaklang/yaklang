@@ -3,6 +3,7 @@ package compiler
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -65,12 +66,18 @@ func cachedWorkKeyFromConfig(cfg *CompileConfig) (string, error) {
 	write(fmt.Sprintf("skipRuntimeLink=%t", cfg.SkipRuntimeLink))
 	write(fmt.Sprintf("stdlibCompile=%t", cfg.StdlibCompile))
 	write("profile=" + strings.TrimSpace(cfg.ProfileName))
+	if cfg.resolvedProfile != nil {
+		if data, err := json.Marshal(cfg.resolvedProfile); err != nil {
+			write("profileConfig=error:" + err.Error())
+		} else {
+			write("profileConfig=" + string(data))
+		}
+	}
 	write("llvmPlugin=" + strings.TrimSpace(cfg.LLVMPluginPath))
 	write("llvmPluginKind=" + strings.TrimSpace(cfg.LLVMPluginKind))
 	write("llvmPasses=" + strings.Join(cfg.LLVMPasses, ","))
 	write("llvmPack=" + strings.TrimSpace(cfg.LLVMPack))
 	write("llvmOpt=" + strings.TrimSpace(cfg.LLVMOptBinary))
-	write("obfPolicyFile=" + strings.TrimSpace(cfg.ObfPolicyFile))
 	needClang := !cfg.EmitLLVM && !cfg.EmitAsm && !cfg.CompileOnly
 	needLLC := cfg.EmitAsm || cfg.CompileOnly
 	if needClang {

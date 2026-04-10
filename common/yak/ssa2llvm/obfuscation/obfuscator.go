@@ -25,6 +25,7 @@ type Context = core.Context
 type Obfuscator = core.Obfuscator
 type Info = core.Info
 type RuntimeDep = core.RuntimeDep
+type FunctionWrapper = core.FunctionWrapper
 
 var Default = core.Default
 

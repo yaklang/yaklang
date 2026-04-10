@@ -12,9 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/obfuscation"
-	"github.com/yaklang/yaklang/common/yak/ssa2llvm/obfuscation/policy"
-	"github.com/yaklang/yaklang/common/yak/ssa2llvm/obfuscation/resolver"
-	"github.com/yaklang/yaklang/common/yak/ssa2llvm/obfuscation/virtualize"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/profile"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/embed"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/trace"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -51,7 +49,6 @@ type CompileConfig struct {
 	LLVMPasses        []string
 	LLVMPack          string
 	LLVMOptBinary     string
-	ObfPolicyFile     string
 	// ObfArchives holds paths to obfuscation runtime archives that the
 	// linker must include alongside libyak.a. Populated automatically
 	// by the compile pipeline from runtime deps declared by active obfuscators.
@@ -62,10 +59,9 @@ type CompileConfig struct {
 	// Derived from the profile's SeedPolicy or supplied by the user.
 	BuildSeed []byte
 
-	// profilePolicy is populated by applyCompileProfile when a profile has
-	// DefaultEntries and no explicit --obf-policy file is set. It is used
-	// internally as an inline policy for the resolver.
-	profilePolicy *policy.Policy
+	// resolvedProfile is populated by prepareCompileConfig from the --profile ref.
+	// It drives function selection and cache keys.
+	resolvedProfile *profile.Profile
 
 	// CacheEnabled uses a deterministic work dir under $TMP and reuses existing artifacts.
 	CacheEnabled bool
@@ -200,10 +196,6 @@ func WithCompileLLVMOptBinary(path string) CompileOption {
 	return func(c *CompileConfig) { c.LLVMOptBinary = strings.TrimSpace(path) }
 }
 
-func WithCompileObfPolicyFile(path string) CompileOption {
-	return func(c *CompileConfig) { c.ObfPolicyFile = strings.TrimSpace(path) }
-}
-
 func WithCompileStdlibCompile(enabled bool) CompileOption {
 	return func(c *CompileConfig) { c.StdlibCompile = enabled }
 }
@@ -245,10 +237,13 @@ func WithCompileConfig(cfg CompileConfig) CompileOption {
 		c.LLVMPasses = append(c.LLVMPasses, cfg.LLVMPasses...)
 		c.LLVMPack = cfg.LLVMPack
 		c.LLVMOptBinary = cfg.LLVMOptBinary
-		c.ObfPolicyFile = cfg.ObfPolicyFile
 		c.CacheEnabled = cfg.CacheEnabled
 		c.Force = cfg.Force
 		c.Trace = cfg.Trace
+		c.BuildSeed = append([]byte{}, cfg.BuildSeed...)
+		if cfg.resolvedProfile != nil {
+			c.resolvedProfile = cfg.resolvedProfile.Clone()
+		}
 		if len(cfg.ExtraLinkArgs) > 0 {
 			c.ExtraLinkArgs = append(c.ExtraLinkArgs, cfg.ExtraLinkArgs...)
 		}
@@ -303,30 +298,13 @@ func compileInputWithConfig(cfg *CompileConfig) (*ssaapi.Program, *Compiler, str
 		BuildSeed:     cfg.BuildSeed,
 	}
 
-	// Resolve obf policy selections.
-	// Priority: explicit --obf-policy file > profile's DefaultEntries > none.
-	var pol *policy.Policy
-	if cfg.ObfPolicyFile != "" {
-		var err error
-		pol, err = policy.LoadFile(cfg.ObfPolicyFile)
+	if cfg.resolvedProfile != nil {
+		inv := profile.BuildInventoryFromSSA(progBundle.Program, cfg.EntryFunctionName)
+		resolution, err := profile.Resolve(cfg.resolvedProfile, inv)
 		if err != nil {
-			return nil, nil, "", utils.Errorf("load obf policy: %v", err)
-		}
-	} else if cfg.profilePolicy != nil {
-		pol = cfg.profilePolicy
-	}
-
-	if pol != nil {
-		inv := resolver.BuildFromSSA(progBundle.Program, cfg.EntryFunctionName)
-		resolution, err := resolver.Resolve(pol, inv)
-		if err != nil {
-			return nil, nil, "", utils.Errorf("resolve obf policy: %v", err)
+			return nil, nil, "", utils.Errorf("resolve compile profile: %v", err)
 		}
 		obfCtx.Selections = resolution.Selections
-		policyNames := pol.ObfuscatorNames()
-		if len(policyNames) > 0 {
-			cfg.Obfuscators = mergeObfuscatorNames(cfg.Obfuscators, policyNames)
-		}
 	}
 
 	obfCtx.Stage = obfuscation.StageSSAPre
@@ -346,26 +324,13 @@ func compileInputWithConfig(cfg *CompileConfig) (*ssaapi.Program, *Compiler, str
 
 	log.Infof("compiling %s (%s)", sourceLabel, language)
 
-	// Extract virtualize plan (if SSAPre produced one) and convert to
-	// compiler-level VirtualizeWrapper map so the compiler emits VM stubs.
 	var compilerOpts []CompilerOption
 	compilerOpts = append(compilerOpts,
 		WithExternBindings(cfg.ExternBindings),
 		WithInstructionTags(obfCtx.InstrTags),
 	)
-	if raw, ok := obfCtx.GetObfData(virtualize.ObfDataKey); ok {
-		if plan, ok := raw.(*virtualize.Plan); ok && plan != nil {
-			wrappers := make(map[string]*VirtualizeWrapper, len(plan.ByName))
-			for name := range plan.ByName {
-				wrappers[name] = &VirtualizeWrapper{
-					FuncName:        name,
-					BlobHex:         plan.BlobHex,
-					SeedHex:         plan.SeedHex,
-					HostBindingSpec: plan.HostBindingSpec,
-				}
-			}
-			compilerOpts = append(compilerOpts, WithVirtualizedFuncs(wrappers))
-		}
+	if len(obfCtx.FunctionWrappers) > 0 {
+		compilerOpts = append(compilerOpts, WithFunctionWrappers(obfCtx.FunctionWrappers))
 	}
 
 	comp := NewCompiler(
