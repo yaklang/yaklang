@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -110,10 +111,20 @@ func (c *testAIModelClient) Chat(prompt string, _ ...any) (string, error) {
 		if c.noToolCall {
 			return c.response, c.chatErr
 		}
-		return `{"@action":"call-tool","tool":"` + aiHealthCheckToolName + `","identifier":"health_check","params":{"content":"ping","summary":"ok"}}`, c.chatErr
+		content := extractHealthCheckPromptInput(prompt)
+		return fmt.Sprintf(`{"@action":"call-tool","tool":"%s","identifier":"health_check","params":{"content":%q,"summary":"ok"}}`, aiHealthCheckToolName, content), c.chatErr
 	}
 	time.Sleep(20 * time.Millisecond)
 	return c.response, c.chatErr
+}
+
+func extractHealthCheckPromptInput(prompt string) string {
+	const marker = "User input:\n"
+	index := strings.LastIndex(prompt, marker)
+	if index == -1 {
+		return "ping"
+	}
+	return strings.TrimSpace(prompt[index+len(marker):])
 }
 
 func (c *testAIModelClient) ChatStream(_ string) (io.Reader, error) {
