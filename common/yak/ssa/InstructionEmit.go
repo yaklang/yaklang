@@ -297,6 +297,8 @@ func (f *FunctionBuilder) EmitLoop(body, exit *BasicBlock, cond Value) *Loop {
 	}
 	l := NewLoop(cond)
 	f.emit(l)
+	f.CurrentBlock.SetConditionInstID(l.GetId())
+	f.CurrentBlock.SetConditionFromValue(cond, "loop")
 	l.Body = body.GetId()
 	l.Exit = exit.GetId()
 	f.CurrentBlock.AddSucc(body)
@@ -311,6 +313,8 @@ func (f *FunctionBuilder) EmitSwitch(cond Value, defaultb *BasicBlock, label []S
 	}
 	sw := NewSwitch(cond, defaultb, label)
 	f.emit(sw)
+	f.CurrentBlock.SetConditionInstID(sw.GetId())
+	f.CurrentBlock.SetConditionFromValue(cond, "switch")
 	f.CurrentBlock.finish = true
 	return sw
 }

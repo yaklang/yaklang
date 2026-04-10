@@ -261,6 +261,10 @@ func NewSideEffect(variable string, call *Call, value Value) *SideEffect {
 
 func (i *If) SetCondition(t Value) {
 	i.Cond = t.GetId()
+	if b := i.GetBlock(); b != nil {
+		b.SetConditionInstID(i.GetId())
+		b.SetConditionFromValue(t, "if")
+	}
 	fixupUseChain(i)
 }
 

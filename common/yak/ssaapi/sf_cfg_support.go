@@ -12,17 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-const (
-	NativeCall_GetCFG       = "getCfg"
-	NativeCall_CFGGuards    = "cfgGuards"
-	NativeCall_CFGDominates = "cfgDominates"
-	NativeCall_CFGPostDom   = "cfgPostDominates"
-	NativeCall_CFGReachable = "cfgReachable"
-	NativeCall_CFGReachPath = "cfgReachPath"
-	NativeCall_CFGBlockInfo = "cfgBlock"
-	NativeCall_CFGInstInfo  = "cfgInst"
-)
-
 // ---- CFG cache (intra-procedural) ----
 
 type cfgCacheKey struct {
@@ -662,6 +651,52 @@ func cfgCtxForValueMemo(p *Program, v *Value, memo map[int64]*CfgCtxValue) *CfgC
 	return ctx
 }
 
+func cfgConditionForValueMemo(p *Program, v *Value, cfgMemo map[int64]*CfgCtxValue, condMemo map[int64]*ssa.BlockConditionSummary) *ssa.BlockConditionSummary {
+	if p == nil || v == nil {
+		return nil
+	}
+	id := v.GetId()
+	if condMemo != nil && id > 0 {
+		if c, ok := condMemo[id]; ok {
+			return c
+		}
+	}
+	cfg := cfgCtxForValueMemo(p, v, cfgMemo)
+	if cfg == nil || cfg.IsEmpty() {
+		if condMemo != nil && id > 0 {
+			condMemo[id] = nil
+		}
+		return nil
+	}
+	summary, _ := getBlockConditionSummaryByCfgCtx(p, cfg)
+	if condMemo != nil && id > 0 {
+		condMemo[id] = summary
+	}
+	return summary
+}
+
+func getBlockConditionSummaryByCfgCtx(prog *Program, ctx *CfgCtxValue) (*ssa.BlockConditionSummary, error) {
+	if prog == nil || ctx == nil || ctx.IsEmpty() {
+		return nil, utils.Error("invalid cfg ctx")
+	}
+	fn, err := getFunctionByID(prog, ctx.FuncID)
+	if err != nil {
+		return nil, err
+	}
+	blk, err := getBlockByID(fn, ctx.BlockID)
+	if err != nil {
+		return nil, err
+	}
+	s := blk.BlockConditionSummary()
+	if s.FuncID <= 0 {
+		s.FuncID = ctx.FuncID
+	}
+	if s.BlockID <= 0 {
+		s.BlockID = ctx.BlockID
+	}
+	return &s, nil
+}
+
 // reachableOptsFromParams applies icfg/max_depth/max_nodes only when meaningful:
 // - intra-proc (icfg false): no depth/node caps (zeros = unlimited).
 // - icfg: unset (-1 from GetInt) gets plan defaults max_depth=3, max_nodes=5000; explicit 0 disables that cap.
@@ -793,6 +828,78 @@ func nativeCallCFGInst(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCa
 	})
 	if len(out) == 0 {
 		return false, nil, utils.Error("no inst info")
+	}
+	return true, sfvm.NewValues(out), nil
+}
+
+func nativeCallCFGCondition(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
+	prog, err := fetchProgramFromCfgValues(v)
+	if err != nil {
+		return false, nil, err
+	}
+	var out []sfvm.ValueOperator
+	_ = v.Recursive(func(op sfvm.ValueOperator) error {
+		ctx, ok := extractCfgCtx(op)
+		if !ok || ctx.IsEmpty() {
+			return nil
+		}
+		summary, err := getBlockConditionSummaryByCfgCtx(prog, ctx)
+		if err != nil || summary == nil {
+			return nil
+		}
+		source := ""
+		schemaVersion := ""
+		if summary.Meta != nil {
+			source = fmt.Sprintf("%v", summary.Meta["source"])
+			schemaVersion = fmt.Sprintf("%v", summary.Meta["schema_version"])
+		}
+		text := fmt.Sprintf("cond(func=%d,block=%d,inst=%d,values=%v,source=%s,schema=%s)",
+			summary.FuncID, summary.BlockID, summary.CondInstID, summary.CondValueID, source, schemaVersion)
+		out = append(out, prog.NewConstValue(text))
+		return nil
+	})
+	if len(out) == 0 {
+		return false, nil, utils.Error("cfgCondition: no condition info")
+	}
+	return true, sfvm.NewValues(out), nil
+}
+
+func nativeCallCFGConditionValues(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
+	prog, err := fetchProgramFromCfgValues(v)
+	if err != nil {
+		return false, nil, err
+	}
+	var out []sfvm.ValueOperator
+	_ = v.Recursive(func(op sfvm.ValueOperator) error {
+		ctx, ok := extractCfgCtx(op)
+		if !ok || ctx.IsEmpty() {
+			return nil
+		}
+		summary, err := getBlockConditionSummaryByCfgCtx(prog, ctx)
+		if err != nil || summary == nil {
+			return nil
+		}
+		for _, id := range summary.CondValueID {
+			ins, ok := prog.Program.GetInstructionById(id)
+			if !ok || ins == nil {
+				continue
+			}
+			// Prefer cached API values; fallback to wrapping instruction directly.
+			val, err := prog.GetValueById(id)
+			if err != nil || val == nil {
+				val, err = prog.NewValue(ins)
+			}
+			if err != nil || val == nil {
+				// Keep evidence availability even when a condition node is not materialized as Value.
+				out = append(out, prog.NewConstValue(id))
+				continue
+			}
+			out = append(out, val)
+		}
+		return nil
+	})
+	if len(out) == 0 {
+		return false, nil, utils.Error("cfgConditionValues: no condition values")
 	}
 	return true, sfvm.NewValues(out), nil
 }
@@ -960,12 +1067,22 @@ func nativeCallCFGGuards(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.Native
 			// terminator isn't directly an IfInstruction (fallback: 2-way succs).
 			instID := last.GetId()
 			condValueID := int64(0)
+			// Prefer block-level condition summary when available.
+			if summary := b.BlockConditionSummary(); summary.CondInstID > 0 || len(summary.CondValueID) > 0 {
+				if summary.CondInstID > 0 {
+					instID = summary.CondInstID
+				}
+				if len(summary.CondValueID) > 0 {
+					condValueID = summary.CondValueID[0]
+				}
+			}
 			var tBranch, fBranch int64
 			if ok && ifInst != nil {
 				instID = ifInst.GetId()
 				tBranch, fBranch = ifInst.True, ifInst.False
-
-				condValueID = ifInst.Cond
+				if condValueID <= 0 {
+					condValueID = ifInst.Cond
+				}
 			} else if len(b.Succs) == 2 {
 				tBranch, fBranch = b.Succs[0], b.Succs[1]
 			} else {
@@ -1007,8 +1124,8 @@ func nativeCallCFGGuards(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.Native
 			// guard pattern: if (cond) return; => fallthrough requires !cond (when cond branch exits)
 			if tExit && fReach {
 				guards = append(guards, &GuardPredicateValue{
-					prog:        prog,
-					FuncID:      ctx.FuncID,
+					prog:         prog,
+					FuncID:       ctx.FuncID,
 					GuardBlockID: b.GetId(),
 					SinkBlockID:  ctx.BlockID,
 					CondInstID:   instID,
@@ -1019,8 +1136,8 @@ func nativeCallCFGGuards(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.Native
 				})
 			} else if fExit && tReach {
 				guards = append(guards, &GuardPredicateValue{
-					prog:        prog,
-					FuncID:      ctx.FuncID,
+					prog:         prog,
+					FuncID:       ctx.FuncID,
 					GuardBlockID: b.GetId(),
 					SinkBlockID:  ctx.BlockID,
 					CondInstID:   instID,

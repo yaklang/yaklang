@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	sf "github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
@@ -305,7 +306,10 @@ func dataFlowFilter(
 	var enumeratePaths func(v *Value) []Values
 	if pathReach != nil && pathReach.prog != nil && pathReach.targetCfg != nil && !pathReach.targetCfg.IsEmpty() {
 		memo := make(map[int64]*CfgCtxValue)
+		condMemo := make(map[int64]*ssa.BlockConditionSummary)
 		edgeFilter := func(from, to *Value) bool {
+			// Prefer block-level condition summary extraction on path nodes.
+			_ = cfgConditionForValueMemo(pathReach.prog, to, memo, condMemo)
 			cfgTo := cfgCtxForValueMemo(pathReach.prog, to, memo)
 			if cfgTo == nil || cfgTo.IsEmpty() {
 				return false
