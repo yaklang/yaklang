@@ -1,0 +1,73 @@
+desc(
+	title: "Detect Neo4j Filter Key Without Identifier Sanitization"
+	title_zh: "检测Neo4j过滤键缺少标识符净化"
+	type: audit
+	risk: "查询注入"
+	desc: <<<DESC
+### 规则说明
+当过滤表达式转换器把运行时 metadata key 直接嵌入 Cypher 标识符，而只做简单替换或去引号、没有调用图数据库提供的 identifier sanitizer 时，可能造成 Cypher 注入或查询语义篡改。
+DESC
+	rule_id: "73a06af4-c6f9-4ff8-b06c-8213491f53d8"
+	solution: <<<SOLUTION
+### 修复建议
+- 不要把运行时 key 直接拼到 Cypher 标识符中。
+- 优先使用 `SchemaNames.sanitize(...)` 或等价的标识符净化 API。
+- 对空 key、非法字符和转义边界做显式拒绝。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-74: Improper Neutralization of Special Elements in Output Used by a Downstream Component](https://cwe.mitre.org/data/definitions/74.html)
+REFERENCE
+)
+
+/doKey/<sourceCode(context=80)>?{have:'context.append("node.")' && have:'key.key().replace' && !have:'SchemaNames.sanitize('} as $risk;
+
+alert $risk for {
+	title: "Detect Neo4j Filter Key Without Identifier Sanitization",
+	title_zh: "检测Neo4j过滤键缺少标识符净化",
+	level: "middle",
+	message: "发现运行时过滤 key 直接嵌入 Neo4j 标识符且未调用 sanitizer，需复核是否存在 Cypher 注入。",
+	risk: "查询注入",
+	name: "risk",
+	desc: <<<DESC
+### 规则说明
+当过滤表达式转换器把运行时 metadata key 直接嵌入 Cypher 标识符，而只做简单替换或去引号、没有调用图数据库提供的 identifier sanitizer 时，可能造成 Cypher 注入或查询语义篡改。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 不要把运行时 key 直接拼到 Cypher 标识符中。
+- 优先使用 `SchemaNames.sanitize(...)` 或等价的标识符净化 API。
+- 对空 key、非法字符和转义边界做显式拒绝。
+SOLUTION
+}
+
+desc(
+	lang: java
+	alert_min: 1
+	'file://unsafe-neo4j-filter-key.java': <<<CODE
+class Key {
+    String key() { return null; }
+}
+
+class Neo4jVectorFilterExpressionConverter {
+    protected void doKey(Key key, StringBuilder context) {
+        context.append("node.").append("`metadata.").append(key.key().replace("\"", "")).append("`");
+    }
+}
+CODE
+	'safefile://safe-neo4j-filter-key.java': <<<CODE
+class Key {
+    String key() { return null; }
+}
+
+class SchemaNames {
+    static String sanitize(String value, boolean flag) { return value; }
+}
+
+class Neo4jVectorFilterExpressionConverter {
+    protected void doKey(Key key, StringBuilder context) {
+        String sanitized = SchemaNames.sanitize("metadata." + key.key(), true);
+        context.append("node.").append(sanitized);
+    }
+}
+CODE
+)

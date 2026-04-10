@@ -1,0 +1,74 @@
+desc(
+	title: "Audit CloudFoundry Base Path Matcher Without Catch-All"
+	title_zh: "审计CloudFoundry基础路径匹配缺少兜底覆盖"
+	type: audit
+	risk: "授权绕过"
+	desc: <<<DESC
+### 规则说明
+当 Cloud Foundry Actuator 安全匹配器只围绕已发现 endpoint paths 构造精确匹配，而没有显式纳入基础路径下的 catch-all 子路径时，未知或未建模的子路径可能绕过预期的 Cloud Foundry 安全处理。
+DESC
+	rule_id: "50cbfa3b-3026-4adc-8b9e-782623a7ff3e"
+	solution: <<<SOLUTION
+### 修复建议
+- 对 Cloud Foundry 基础路径显式增加 `BASE_PATH + "/**"` 覆盖。
+- 若 handler mapping 只注册已知端点，也应添加拒绝未知子路径的兜底处理。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-863: Incorrect Authorization](https://cwe.mitre.org/data/definitions/863.html)
+REFERENCE
+)
+
+/getRequestMatcher/<sourceCode(context=160)>?{have:'PathMappedEndpoints' && have:'getAllPaths().forEach' && have:'pathMatcher(BASE_PATH)' && !have:'pathMatcher(BASE_PATH + "/**")'} as $risk;
+
+alert $risk for {
+	title: "Audit CloudFoundry Base Path Matcher Without Catch-All",
+	title_zh: "审计CloudFoundry基础路径匹配缺少兜底覆盖",
+	level: "middle",
+	message: "发现 Cloud Foundry 安全匹配器未显式覆盖基础路径下的 catch-all 子路径，需复核是否存在未授权子路径访问。",
+	risk: "授权绕过",
+	name: "risk",
+	desc: <<<DESC
+### 规则说明
+当 Cloud Foundry Actuator 安全匹配器只围绕已发现 endpoint paths 构造精确匹配，而没有显式纳入基础路径下的 catch-all 子路径时，未知或未建模的子路径可能绕过预期的 Cloud Foundry 安全处理。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 对 Cloud Foundry 基础路径显式增加 `BASE_PATH + "/**"` 覆盖。
+- 若 handler mapping 只注册已知端点，也应添加拒绝未知子路径的兜底处理。
+SOLUTION
+}
+
+desc(
+	lang: java
+	alert_min: 1
+	'file://unsafe-cloudfoundry-base-path-matcher.java': <<<CODE
+class PathMappedEndpoints {
+    void getAllPaths() {
+    }
+}
+
+class Config {
+    static final String BASE_PATH = "/cfApplication";
+
+    Object pathMatcher(String path) { return null; }
+
+    Object getRequestMatcher(PathMappedEndpoints endpoints) {
+        endpoints.getAllPaths().forEach((path) -> pathMatcher(path + "/**"));
+        pathMatcher(BASE_PATH);
+        pathMatcher(BASE_PATH + "/");
+        return null;
+    }
+}
+CODE
+	'safefile://safe-cloudfoundry-base-path-matcher.java': <<<CODE
+class Config {
+    static final String BASE_PATH = "/cfApplication";
+
+    Object pathMatcher(String path) { return null; }
+
+    Object getRequestMatcher() {
+        return pathMatcher(BASE_PATH + "/**");
+    }
+}
+CODE
+)

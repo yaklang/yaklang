@@ -1,0 +1,84 @@
+desc(
+	title: "Detect SAML Response Validation Without Signature Consistency Check"
+	title_zh: "检测SAML响应校验缺少签名一致性检查"
+	type: audit
+	risk: "签名校验绕过"
+	desc: <<<DESC
+### 规则说明
+当 SAML 响应校验逻辑先根据 `hasValidSignature(response)` 得出 `responseSigned`，随后把 `!responseSigned` 作为 assertion 校验开关传递，但没有显式检查“响应已签名或每个 assertion 都已签名”的一致性约束时，攻击者可能借助 assertion wrapping / 混签场景绕过预期校验。
+DESC
+	rule_id: "5866ab9f-d92f-43a3-af8c-9b775514f0f1"
+	solution: <<<SOLUTION
+### 修复建议
+- 在处理 assertions 前，显式要求“response 已签名”或“所有 assertion 均已签名”。
+- 不要只把 `responseSigned` 作为布尔开关向下游透传，而缺少整体签名一致性约束。
+- 统一在 response 层和 assertion 层建立 trust engine / profile validator。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-347: Improper Verification of Cryptographic Signature](https://cwe.mitre.org/data/definitions/347.html)
+REFERENCE
+)
+
+/validateSaml2Response/<sourceCode(context=220)>?{have:'boolean responseSigned = hasValidSignature(' && have:'samlResponse.getAssertions()' && have:'validateAssertion(' && have:'!responseSigned' && !have:'isSigned(response, assertions)' && !have:'Either the response or one of the assertions is unsigned'} as $risk;
+
+alert $risk for {
+	title: "Detect SAML Response Validation Without Signature Consistency Check",
+	title_zh: "检测SAML响应校验缺少签名一致性检查",
+	level: "high",
+	message: "发现 SAML 响应校验把 response 签名状态直接下传给 assertion 校验，但未看到整体签名一致性检查，需复核是否存在 wrapping / 混签绕过。",
+	risk: "签名校验绕过",
+	name: "risk",
+	desc: <<<DESC
+### 规则说明
+当 SAML 响应校验逻辑先根据 `hasValidSignature(response)` 得出 `responseSigned`，随后把 `!responseSigned` 作为 assertion 校验开关传递，但没有显式检查“响应已签名或每个 assertion 都已签名”的一致性约束时，攻击者可能借助 assertion wrapping / 混签场景绕过预期校验。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 在处理 assertions 前，显式要求“response 已签名”或“所有 assertion 均已签名”。
+- 不要只把 `responseSigned` 作为布尔开关向下游透传，而缺少整体签名一致性约束。
+- 统一在 response 层和 assertion 层建立 trust engine / profile validator。
+SOLUTION
+}
+
+desc(
+	lang: java
+	alert_min: 1
+	'file://unsafe-saml-response-validation.java': <<<CODE
+class Saml2AuthenticationToken {
+}
+
+class Assertion {
+}
+
+class Response {
+    java.util.List<Assertion> getAssertions() { return null; }
+}
+
+class Provider {
+    Assertion validateSaml2Response(Saml2AuthenticationToken token, String recipient, Response samlResponse) {
+        boolean responseSigned = hasValidSignature(samlResponse, token);
+        for (Assertion a : samlResponse.getAssertions()) {
+            validateAssertion(recipient, a, token, !responseSigned);
+            return a;
+        }
+        return null;
+    }
+
+    boolean hasValidSignature(Response response, Saml2AuthenticationToken token) { return false; }
+
+    void validateAssertion(String recipient, Assertion assertion, Saml2AuthenticationToken token,
+            boolean signatureRequired) {
+    }
+}
+CODE
+	'safefile://safe-saml-response-validation.java': <<<CODE
+class Provider {
+    java.util.List<Object> validateResponse(Object token, Object response) {
+        isSigned(response, java.util.List.of());
+        return java.util.List.of();
+    }
+
+    boolean isSigned(Object response, java.util.List<Object> assertions) { return true; }
+}
+CODE
+)
