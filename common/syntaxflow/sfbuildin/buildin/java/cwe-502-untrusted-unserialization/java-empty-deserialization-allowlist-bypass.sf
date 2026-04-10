@@ -1,0 +1,124 @@
+desc(
+	title: "Detect Empty Deserialization Allowlist Bypass"
+	title_zh: "检测空反序列化白名单直接放行"
+	type: audit
+	risk: "反序列化漏洞"
+	desc: <<<DESC
+### 规则说明
+当反序列化 allowlist / allowed-list 校验逻辑把“白名单为空”直接视为允许全部类型时，攻击者可以绕过预期的类型限制，反序列化任意类。
+
+本规则关注的通用模式是：
+- `checkAllowedList(...)` 或同类 allowlist 校验函数
+- `ObjectUtils.isEmpty(patterns)` 直接触发放行
+- 同一函数内仍存在 `PatternMatchUtils.simpleMatch(...)` 和 `SecurityException` 这类正常拒绝分支
+DESC
+	rule_id: "a1f3416c-99c6-4975-a97a-d92ea90ca0e6"
+	solution: <<<SOLUTION
+### 修复建议
+- 不要把空 allowlist 解释为“信任全部类型”。
+- 如确需放宽限制，应通过显式的安全开关或受控配置启用，而不是把空配置当作默认放行。
+- 对反序列化类名匹配保持 deny-by-default。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-502: Deserialization of Untrusted Data](https://cwe.mitre.org/data/definitions/502.html)
+REFERENCE
+)
+
+/checkAllowedList/<getFormalParams>?{!have:this && opcode:param} as $allowlistParam;
+ObjectUtils.isEmpty(* as $emptyPatternsArg) as $emptyCheck;
+PatternMatchUtils.simpleMatch(* as $simpleMatchPattern, * as $simpleMatchClass) as $simpleMatchCall;
+SecurityException(* as $securityExceptionMessage) as $securityExceptionCall;
+
+$allowlistParam<getFunc> as $allowlistFunc;
+$simpleMatchCall<getFunc> as $matchFunc;
+$securityExceptionCall<getFunc> as $securityFunc;
+$emptyCheck<getFunc> as $emptyFunc;
+
+$allowlistFunc & $emptyFunc & $matchFunc & $securityFunc as $riskFunc;
+$emptyCheck?{<getFunc> & $riskFunc} as $risk;
+
+alert $risk for {
+	title: "Detect Empty Deserialization Allowlist Bypass",
+	title_zh: "检测空反序列化白名单直接放行",
+	level: "high",
+	message: "发现反序列化白名单校验把空 patterns 直接当作允许全部类型，可能导致 allowlist 绕过。",
+	risk: "反序列化漏洞",
+	name: "risk",
+	desc: <<<DESC
+### 规则说明
+当反序列化 allowlist / allowed-list 校验逻辑把“白名单为空”直接视为允许全部类型时，攻击者可以绕过预期的类型限制，反序列化任意类。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 不要把空 allowlist 解释为“信任全部类型”。
+- 如确需放宽限制，应通过显式的安全开关或受控配置启用，而不是把空配置当作默认放行。
+- 对反序列化类名匹配保持 deny-by-default。
+SOLUTION
+}
+
+desc(
+	lang: java
+	alert_min: 1
+	'file://unsafe-empty-allowlist.java': <<<CODE
+import java.util.Set;
+
+class ObjectUtils {
+    static boolean isEmpty(Object value) { return value == null; }
+}
+
+class PatternMatchUtils {
+    static boolean simpleMatch(String pattern, String className) { return false; }
+}
+
+class SecurityException extends RuntimeException {
+    SecurityException(String message) { super(message); }
+}
+
+class AllowlistVerifier {
+    static void checkAllowedList(Class<?> clazz, Set<String> patterns) {
+        if (ObjectUtils.isEmpty(patterns)) {
+            return;
+        }
+        String className = clazz.getName();
+        for (String pattern : patterns) {
+            if (PatternMatchUtils.simpleMatch(pattern, className)) {
+                return;
+            }
+        }
+        throw new SecurityException("Attempt to deserialize unauthorized " + clazz);
+    }
+}
+CODE
+	'safefile://guarded-empty-allowlist.java': <<<CODE
+import java.util.Set;
+
+class ObjectUtils {
+    static boolean isEmpty(Object value) { return value == null; }
+}
+
+class PatternMatchUtils {
+    static boolean simpleMatch(String pattern, String className) { return false; }
+}
+
+class SecurityException extends RuntimeException {
+    SecurityException(String message) { super(message); }
+}
+
+class AllowlistVerifier {
+    private static final boolean TRUST_ALL = false;
+
+    static void checkAllowedList(Class<?> clazz, Set<String> patterns) {
+        if (TRUST_ALL && ObjectUtils.isEmpty(patterns)) {
+            return;
+        }
+        String className = clazz.getName();
+        for (String pattern : patterns) {
+            if (PatternMatchUtils.simpleMatch(pattern, className)) {
+                return;
+            }
+        }
+        throw new SecurityException("Attempt to deserialize unauthorized " + clazz);
+    }
+}
+CODE
+)

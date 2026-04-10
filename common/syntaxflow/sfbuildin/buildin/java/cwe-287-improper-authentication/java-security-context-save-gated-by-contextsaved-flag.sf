@@ -1,0 +1,91 @@
+desc(
+	title: "Audit SecurityContext Save Gated By Saved-Flag Check"
+	title_zh: "审计被已保存标志门控的SecurityContext持久化"
+	type: audit
+	risk: "认证状态持久化"
+	desc: <<<DESC
+### 规则说明
+当安全上下文持久化逻辑在调用 `saveContext(...)` 之前，先依据 `isContextSaved()` 之类的一次性标志跳过保存时，后续请求内发生的认证上下文切换可能无法再次写回会话或响应包装器，造成认证状态与预期不一致。
+
+本规则关注的通用模式是：
+- `responseWrapper.isContextSaved()`
+- 同一函数内调用 `responseWrapper.saveContext(...)`
+- 保存操作被“已保存”标志短路
+DESC
+	rule_id: "08cc1b52-dff8-467e-8bf9-e8d9e15afc7b"
+	solution: <<<SOLUTION
+### 修复建议
+- 不要把 `saveContext(...)` 永久门控到一次性的 `isContextSaved()` 检查上。
+- 将幂等控制放到真正的上下文变更判断逻辑中，而不是简单地“已保存过一次就不再保存”。
+- 对请求内可能发生的上下文替换、impersonation、sendError/sendRedirect 提前保存等场景做回归测试。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-287: Improper Authentication](https://cwe.mitre.org/data/definitions/287.html)
+REFERENCE
+)
+
+isContextSaved() as $contextSavedCheck;
+saveContext(* as $contextSaveArg) as $contextSaveCall;
+
+$contextSavedCheck<getFunc> as $checkFunc;
+$contextSaveCall<getFunc> as $saveFunc;
+
+$checkFunc & $saveFunc as $riskFunc;
+$contextSavedCheck?{<getFunc> & $riskFunc} as $risk;
+
+alert $risk for {
+	title: "Audit SecurityContext Save Gated By Saved-Flag Check",
+	title_zh: "审计被已保存标志门控的SecurityContext持久化",
+	level: "middle",
+	message: "发现 SecurityContext 保存逻辑先受 isContextSaved() 等标志门控，需复核后续上下文更新是否会被错误跳过。",
+	risk: "认证状态持久化",
+	name: "risk",
+	desc: <<<DESC
+### 规则说明
+当安全上下文持久化逻辑在调用 `saveContext(...)` 之前，先依据 `isContextSaved()` 之类的一次性标志跳过保存时，后续请求内发生的认证上下文切换可能无法再次写回会话或响应包装器，造成认证状态与预期不一致。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 不要把 `saveContext(...)` 永久门控到一次性的 `isContextSaved()` 检查上。
+- 将幂等控制放到真正的上下文变更判断逻辑中，而不是简单地“已保存过一次就不再保存”。
+- 对请求内可能发生的上下文替换、impersonation、sendError/sendRedirect 提前保存等场景做回归测试。
+SOLUTION
+}
+
+desc(
+	lang: java
+	alert_min: 1
+	'file://unsafe-security-context-save-wrapper.java': <<<CODE
+class SecurityContext {
+}
+
+class SaveContextOnUpdateOrErrorResponseWrapper {
+    boolean isContextSaved() { return false; }
+    void saveContext(SecurityContext context) {
+    }
+}
+
+class Repository {
+    void saveContext(SecurityContext context, SaveContextOnUpdateOrErrorResponseWrapper responseWrapper) {
+        if (!responseWrapper.isContextSaved()) {
+            responseWrapper.saveContext(context);
+        }
+    }
+}
+CODE
+	'safefile://safe-security-context-save-wrapper.java': <<<CODE
+class SecurityContext {
+}
+
+class SaveContextOnUpdateOrErrorResponseWrapper {
+    void saveContext(SecurityContext context) {
+    }
+}
+
+class Repository {
+    void saveContext(SecurityContext context, SaveContextOnUpdateOrErrorResponseWrapper responseWrapper) {
+        responseWrapper.saveContext(context);
+    }
+}
+CODE
+)
