@@ -225,7 +225,7 @@ func (m *Timeline) SoftBindConfig(config AICallerConfigIf, aiCaller AICaller) {
 		m.config = config
 		m.SetTimelineContentLimit(config.GetTimelineContentSizeLimit())
 	}
-	if !utils.IsNil(aiCaller) {
+	if utils.IsNil(m.ai) && !utils.IsNil(aiCaller) {
 		m.setAICaller(aiCaller)
 	}
 }
