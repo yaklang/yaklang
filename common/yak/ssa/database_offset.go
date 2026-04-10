@@ -30,26 +30,20 @@ func ConvertValue2Offset(inst Instruction) *ssadb.IrOffset {
 	return irOffset
 }
 
-func ConvertVariable2Offset(v *Variable, variableName string, valueID int64) []*ssadb.IrOffset {
-	if utils.IsNil(v) || v.GetId() == -1 {
+func CreateVariableOffset(v *Variable, rng *memedit.Range) *ssadb.IrOffset {
+	if utils.IsNil(v) || utils.IsNil(rng) || utils.IsNil(rng.GetEditor()) {
 		return nil
 	}
-	ret := make([]*ssadb.IrOffset, 0, 10)
-	createOffset := func(rng *memedit.Range) {
-		if utils.IsNil(rng) || utils.IsNil(rng.GetEditor()) {
-			return
-		}
-		irOffset := ssadb.CreateOffset(rng, v.GetProgram().GetApplication().GetProgramName())
-		// program name \ file name \ offset
-		// variable name
-		irOffset.VariableName = variableName
-		irOffset.ValueID = valueID
-		ret = append(ret, irOffset)
+	value := v.GetValue()
+	if utils.IsNil(value) || value.GetId() == -1 {
+		return nil
 	}
-
-	createOffset(v.DefRange)
-	v.ForEachUseRange(func(r *memedit.Range) {
-		createOffset(r)
-	})
-	return ret
+	prog := value.GetProgram()
+	if utils.IsNil(prog) || utils.IsNil(prog.GetApplication()) {
+		return nil
+	}
+	irOffset := ssadb.CreateOffset(rng, prog.GetApplication().GetProgramName())
+	irOffset.VariableName = v.GetName()
+	irOffset.ValueID = value.GetId()
+	return irOffset
 }

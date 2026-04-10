@@ -64,7 +64,11 @@ func (variable *Variable) Assign(value Value) error {
 			objTyp.AddField(key, value.GetType())
 		}
 	}
-	return variable.Versioned.Assign(value)
+	if err := variable.Versioned.Assign(value); err != nil {
+		return err
+	}
+	variable.persistAllOffsets()
+	return nil
 }
 
 func (v *Variable) SetMemberCall(obj, key Value) {
@@ -98,6 +102,7 @@ func (v *Variable) SetDefRange(r *memedit.Range) {
 	}
 	v.DefRange = r
 	v.verboseName = r.GetText()
+	v.persistOffset(r)
 }
 
 func (v *Variable) AddRange(r *memedit.Range, force bool) {
@@ -113,7 +118,31 @@ func (v *Variable) AddRange(r *memedit.Range, force bool) {
 
 	if force || isPhi || r.GetText() == v.verboseName {
 		v.UseRange.Set(r, struct{}{})
+		v.persistOffset(r)
 	}
+}
+
+func (v *Variable) persistAllOffsets() {
+	if v == nil {
+		return
+	}
+	if v.DefRange != nil {
+		v.persistOffset(v.DefRange)
+	}
+	v.ForEachUseRange(func(r *memedit.Range) {
+		v.persistOffset(r)
+	})
+}
+
+func (v *Variable) persistOffset(r *memedit.Range) {
+	if v == nil || utils.IsNil(r) {
+		return
+	}
+	prog := v.GetProgram()
+	if utils.IsNil(prog) || utils.IsNil(prog.Cache) || utils.IsNil(prog.Cache.indexes) {
+		return
+	}
+	prog.Cache.indexes.SaveVariableOffset(v, r)
 }
 
 func (v *Variable) NewError(kind ErrorKind, tag ErrorTag, msg string) {
