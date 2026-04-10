@@ -29,10 +29,14 @@ func (gw *AIAgentHTTPGateway) handleQueryAIEvent(w http.ResponseWriter, r *http.
 func (gw *AIAgentHTTPGateway) handleSSEEvents(w http.ResponseWriter, r *http.Request) {
 	runID := mux.Vars(r)["run_id"]
 
-	session, _, err := gw.ensureReusableSession(runID)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "load setting failed: "+err.Error())
-		return
+	session, ok := gw.runManager.Get(runID)
+	if !ok {
+		var err error
+		session, _, err = gw.ensureReusableSession(runID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "load setting failed: "+err.Error())
+			return
+		}
 	}
 
 	// var since int64
