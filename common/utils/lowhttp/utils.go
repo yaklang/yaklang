@@ -352,7 +352,7 @@ func SplitHTTPHeader(i string) (string, string) {
 	if ret := strings.Index(i, ":"); ret < 0 {
 		return i, ""
 	} else {
-		key := i[:ret]
+		key := strings.TrimSpace(i[:ret])
 		value := strings.TrimSpace(i[ret+1:])
 		return key, value
 	}

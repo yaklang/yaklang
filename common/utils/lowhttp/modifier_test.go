@@ -256,6 +256,15 @@ HOST: www.example.com`,
 			whites:      []string{"HOST: new.example.com"},
 			expectKeyIn: "HOST",
 		},
+		{
+			packet: `GET / HTTP/1.1
+ Host : www.example.com`,
+			key:         "Host",
+			value:       "new.example.com",
+			black:       "www.example.com",
+			whites:      []string{"Host: new.example.com"},
+			expectKeyIn: "Host",
+		},
 	}
 
 	for _, c := range testcases {
@@ -276,6 +285,14 @@ HOST: www.example.com`,
 			}
 		}
 	}
+
+	t.Run("replace header with extra whitespace without appending", func(t *testing.T) {
+		packet := []byte("GET / HTTP/1.1\r\n Host : example.com\r\n\r\n")
+		result := ReplaceHTTPPacketHeader(packet, "Host", "new.example.com")
+
+		require.Equal(t, 1, strings.Count(string(result), "Host: new.example.com"))
+		require.NotContains(t, string(result), " Host : example.com")
+	})
 }
 
 func TestDeleteHTTPPacketHeader(t *testing.T) {
