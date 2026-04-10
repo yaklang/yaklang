@@ -1397,6 +1397,89 @@ foo1 foo2`), false)
 	require.Equal(t, "foo:2", results[1].MatchResult)
 }
 
+type secondaryOnlyMatchPrimaryOutputTestConfig struct {
+	name            string
+	primaryTemplate string
+	secondaryStages []*ypb.RegexOutputStage
+	expectResults   []string
+}
+
+func TestMITMReplaceRule_SecondaryStages_OnlyMatchPrimaryOutput(t *testing.T) {
+	packet := []byte(`GET /content-search.xml HTTP/1.1
+Host: www.baidu.com
+Connection: keep-alive
+Cookie: BIDUPSID=170D1DAFEA666C9C1F1ED82C7C181F8D; PSTM=1775801484; BAIDUID=170D1DAFEA666C9C2475921E80607EA4:FG=1; BD_HOME=1;
+
+`)
+
+	// Primary regex extracts only the prefix (up to PSTM=...;) so later cookie keys are excluded.
+	const primaryRule = `Cookie: (.*?; PSTM=\d+;)`
+	const extractedCookiePrefix = `BIDUPSID=170D1DAFEA666C9C1F1ED82C7C181F8D; PSTM=1775801484;`
+
+	for _, cfg := range []secondaryOnlyMatchPrimaryOutputTestConfig{
+		{
+			name:            "secondary_enabled__primary_template_enabled",
+			primaryTemplate: `D=$1`,
+			secondaryStages: []*ypb.RegexOutputStage{
+				{
+					Regexp:         `D=.*?BIDUPSID=([^;]+);`,
+					ResultTemplate: ``,
+					Joiner:         ``,
+				},
+			},
+			expectResults: []string{"170D1DAFEA666C9C1F1ED82C7C181F8D"},
+		},
+		{
+			name:            "secondary_enabled__primary_template_disabled",
+			primaryTemplate: ``,
+			secondaryStages: []*ypb.RegexOutputStage{
+				{
+					Regexp:         `BIDUPSID=([^;]+);`,
+					ResultTemplate: ``,
+					Joiner:         ``,
+				},
+			},
+			expectResults: []string{"170D1DAFEA666C9C1F1ED82C7C181F8D"},
+		},
+		{
+			name:            "secondary_disabled__primary_template_enabled",
+			primaryTemplate: `D=$1`,
+			secondaryStages: nil,
+			expectResults:   []string{"D=" + extractedCookiePrefix},
+		},
+		{
+			name:            "secondary_disabled__primary_template_disabled",
+			primaryTemplate: ``,
+			secondaryStages: nil,
+			expectResults:   []string{extractedCookiePrefix},
+		},
+	} {
+		t.Run(cfg.name, func(t *testing.T) {
+			replacer := &ypb.MITMContentReplacer{
+				Rule:              primaryRule,
+				EnableForRequest:  true,
+				EnableForHeader:   true,
+				EnableForBody:     false,
+				EnableForResponse: false,
+				EnableForURI:      false,
+			}
+
+			replacer.RegexpResultTemplate = cfg.primaryTemplate
+			replacer.SecondaryStages = cfg.secondaryStages
+
+			rule := &yakit.MITMReplaceRule{MITMContentReplacer: replacer}
+			_, results, err := rule.MatchPacket(packet, true)
+			require.NoError(t, err)
+			require.Len(t, results, len(cfg.expectResults))
+			for i, want := range cfg.expectResults {
+				require.Equal(t, want, results[i].MatchResult)
+				require.NotContains(t, results[i].MatchResult, "BAIDUID=170D1DAFEA666C9C2475921E80607EA4")
+				require.NotContains(t, results[i].MatchResult, "BD_HOME=1")
+			}
+		})
+	}
+}
+
 func TestGRPCMUSTPASS_HookColorWithRegexpGroup(t *testing.T) {
 	replacer := yakit.NewMITMReplacer()
 	replacer.SetRules(&ypb.MITMContentReplacer{
