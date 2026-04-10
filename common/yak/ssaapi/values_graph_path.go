@@ -36,31 +36,80 @@ func (v *Value) GetDataflowPath(end ...*Value) []Values {
 }
 
 func (v *Value) GetEffectOnPath(end ...*Value) []Values {
-	return v.getPathWithDirection(
-		func(node *Value) Values {
-			return node.GetEffectOn()
-		},
-		end...,
-	)
+	return v.getPathWithDirection(nil, func(node *Value) Values {
+		return node.GetEffectOn()
+	}, end...)
 }
 
 func (v *Value) GetDependOnPath(end ...*Value) []Values {
-	return v.getPathWithDirection(
-		func(node *Value) Values {
-			return node.GetDependOn()
-		},
-		end...,
-	)
+	return v.getPathWithDirection(nil, func(node *Value) Values {
+		return node.GetDependOn()
+	}, end...)
 }
 
-func (this *Value) getPathWithDirection(next func(*Value) Values, end ...*Value) []Values {
+// GetEffectOnPathWithEdgeFilter is like [GetEffectOnPath] but drops edges (from→to) when
+// edgeFilter returns false. A nil edgeFilter disables filtering.
+func (v *Value) GetEffectOnPathWithEdgeFilter(edgeFilter func(from, to *Value) bool, end ...*Value) []Values {
+	return v.getPathWithDirection(edgeFilter, func(node *Value) Values {
+		return node.GetEffectOn()
+	}, end...)
+}
+
+// GetDependOnPathWithEdgeFilter is like [GetDependOnPath] but drops edges when edgeFilter returns false.
+func (v *Value) GetDependOnPathWithEdgeFilter(edgeFilter func(from, to *Value) bool, end ...*Value) []Values {
+	return v.getPathWithDirection(edgeFilter, func(node *Value) Values {
+		return node.GetDependOn()
+	}, end...)
+}
+
+func (v *Value) GetDataflowPathWithEdgeFilter(edgeFilter func(from, to *Value) bool, end ...*Value) []Values {
+	var paths []Values
+	effectPath := v.GetEffectOnPathWithEdgeFilter(edgeFilter, end...)
+	dependPath := v.GetDependOnPathWithEdgeFilter(edgeFilter, end...)
+	addPath := func(effect, depend Values) {
+		path := make(Values, 0, len(effect)+len(depend)+1)
+		path = append(path, effect...)
+		path = append(path, v)
+		path = append(path, depend...)
+		paths = append(paths, path)
+	}
+
+	if len(effectPath) == 0 {
+		for _, depend := range dependPath {
+			addPath(Values{}, depend)
+		}
+	}
+	if len(dependPath) == 0 {
+		for _, effect := range effectPath {
+			addPath(effect, Values{})
+		}
+	}
+	for _, effect := range effectPath {
+		for _, depend := range dependPath {
+			addPath(effect, depend)
+		}
+	}
+	return paths
+}
+
+func (this *Value) getPathWithDirection(edgeFilter func(from, to *Value) bool, next func(*Value) Values, end ...*Value) []Values {
 	ret := graph.GraphPathWithKey[int64, *Value](
 		this,
 		func(node *Value) []*Value { // next
 			if ValueContain(node, end...) {
 				return nil
 			}
-			return next(node) // todo: handler endValue in here
+			neighbors := next(node)
+			if edgeFilter == nil {
+				return neighbors
+			}
+			out := make([]*Value, 0, len(neighbors))
+			for _, succ := range neighbors {
+				if succ != nil && edgeFilter(node, succ) {
+					out = append(out, succ)
+				}
+			}
+			return out
 		},
 		func(node *Value) int64 { // getKey
 			return node.GetId()

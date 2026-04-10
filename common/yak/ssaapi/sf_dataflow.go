@@ -99,7 +99,7 @@ func DataFlowWithSFConfig(
 	// dataflow analysis
 	ret := dataflowRecursiveFunc(options...)
 	// filter the result
-	ret = dataFlowFilter(ret, sfResult, config, nil, filterCondition...)
+	ret = dataFlowFilter(ret, sfResult, config, nil, nil, filterCondition...)
 	// set predecessor label on the explicit sfvm.Values container
 	retValue := ToSFVMValues(ret)
 	retValue.AppendPredecessor(value, sf.WithAnalysisContext_Label(DataFlowLabel(analysisType)))
@@ -145,15 +145,23 @@ var nativeCallDataFlow sfvm.NativeCallFunc = func(v sfvm.Values, frame *sfvm.SFF
 	if len(exclude) != 0 {
 		condition = append(condition, withFilterExcludeCondition(exclude))
 	}
-	ret = dataFlowFilter(ret, contextResult, frame.GetVM().GetConfig(), end, condition...)
 
-	// Phase-3: optional CFG reachability filter (lightweight, post-filtering).
-	// only_reachable expects a cfg ctx variable name (e.g. "$sinkCfg") produced by <getCfg>.
 	onlyReachVar := params.GetString("only_reachable", "onlyReachable", "only-reachable")
 	onlyReachVar = codec.AnyToString(onlyReachVar)
 	onlyReachVar = strings.TrimSpace(onlyReachVar)
 	onlyReachVar = strings.TrimPrefix(onlyReachVar, "$")
-	if onlyReachVar != "" {
+
+	mode := strings.ToLower(strings.TrimSpace(params.GetString("only_reachable_mode", "onlyReachableMode")))
+	if mode == "" {
+		if parseBoolParam(params, "strict", false) {
+			mode = "path"
+		} else {
+			mode = "post"
+		}
+	}
+
+	var pathReach *dataflowPathReachFilter
+	if onlyReachVar != "" && mode == "path" {
 		targetOp, ok := frame.GetSymbolByName(onlyReachVar)
 		if ok && targetOp != nil {
 			var targetCfg *CfgCtxValue
@@ -165,7 +173,30 @@ var nativeCallDataFlow sfvm.NativeCallFunc = func(v sfvm.Values, frame *sfvm.SFF
 				return nil
 			})
 			if targetCfg != nil {
-				// Resolve program from current values.
+				if prog, err := fetchProgram(ToSFVMValues(vs)); err == nil && prog != nil {
+					icfg := parseBoolParam(params, "icfg", false)
+					opt := reachableOptsFromParams(params, icfg)
+					pathReach = &dataflowPathReachFilter{prog: prog, targetCfg: targetCfg, opt: opt}
+				}
+			}
+		}
+	}
+
+	ret = dataFlowFilter(ret, contextResult, frame.GetVM().GetConfig(), end, pathReach, condition...)
+
+	// Phase-3/4: post-filter only in default post mode; path mode applies CFG during path enumeration.
+	if onlyReachVar != "" && mode == "post" {
+		targetOp, ok := frame.GetSymbolByName(onlyReachVar)
+		if ok && targetOp != nil {
+			var targetCfg *CfgCtxValue
+			_ = targetOp.Recursive(func(operator sfvm.ValueOperator) error {
+				if c, ok := operator.(*CfgCtxValue); ok && c != nil && !c.IsEmpty() {
+					targetCfg = c
+					return utils.Error("abort")
+				}
+				return nil
+			})
+			if targetCfg != nil {
 				prog, err := fetchProgram(ToSFVMValues(ret))
 				if err == nil && prog != nil {
 					icfg := parseBoolParam(params, "icfg", false)
@@ -176,7 +207,6 @@ var nativeCallDataFlow sfvm.NativeCallFunc = func(v sfvm.Values, frame *sfvm.SFF
 						if item == nil || item.IsEmpty() {
 							continue
 						}
-						// Compute CFG ctx for the candidate.
 						ok, got, _ := nativeCallGetCFG(sfvm.ValuesOf(item), frame, sfvm.NewNativeCallActualParams())
 						if !ok || got == nil || got.IsEmpty() {
 							continue
@@ -192,8 +222,6 @@ var nativeCallDataFlow sfvm.NativeCallFunc = func(v sfvm.Values, frame *sfvm.SFF
 						if candCfg == nil {
 							continue
 						}
-
-						// Keep only values whose CFG can reach the target CFG.
 						if reachableWithOptions(prog, candCfg, targetCfg, opt) {
 							filtered = append(filtered, item)
 						}
@@ -233,10 +261,19 @@ func withFilterCondition(key sfvm.RecursiveConfigKey, code string) *filterCondit
 		code:      code,
 	}
 }
+
+// dataflowPathReachFilter applies only_reachable during path enumeration (Phase 4 "path" mode).
+type dataflowPathReachFilter struct {
+	prog      *Program
+	targetCfg *CfgCtxValue
+	opt       reachableOptions
+}
+
 func dataFlowFilter(
 	vs Values,
 	contextResult *sf.SFFrameResult, config *sf.Config,
 	end sfvm.Values,
+	pathReach *dataflowPathReachFilter,
 	condition ...*filterCondition,
 ) Values {
 	// for _, f := range condition {
@@ -264,22 +301,45 @@ func dataFlowFilter(
 	checkMatch := func(path Values) bool {
 		return pathCheck.CheckMatch(ToSFVMValues(path))
 	}
+
+	var enumeratePaths func(v *Value) []Values
+	if pathReach != nil && pathReach.prog != nil && pathReach.targetCfg != nil && !pathReach.targetCfg.IsEmpty() {
+		memo := make(map[int64]*CfgCtxValue)
+		edgeFilter := func(from, to *Value) bool {
+			cfgTo := cfgCtxForValueMemo(pathReach.prog, to, memo)
+			if cfgTo == nil || cfgTo.IsEmpty() {
+				return false
+			}
+			return reachableWithOptions(pathReach.prog, cfgTo, pathReach.targetCfg, pathReach.opt)
+		}
+		enumeratePaths = func(v *Value) []Values {
+			if end != nil {
+				return v.GetDataflowPathWithEdgeFilter(edgeFilter, FromSFVMValues(end)...)
+			}
+			return v.GetDataflowPathWithEdgeFilter(edgeFilter)
+		}
+	} else {
+		enumeratePaths = func(v *Value) []Values {
+			if end != nil {
+				return v.GetDataflowPath(FromSFVMValues(end)...)
+			}
+			return v.GetDataflowPath()
+		}
+	}
+
 	var ret []*Value
 	all := make(map[*Value]struct{})
 	for _, v := range vs {
 		all[v] = struct{}{}
 	}
 	if end != nil {
-		endValues := FromSFVMValues(end)
 		for _, v := range vs {
 			flag := false
-			paths := v.GetDataflowPath(endValues...)
-			for _, path := range paths {
+			for _, path := range enumeratePaths(v) {
 				if checkMatch(path) {
 					flag = true
 					break
 				}
-				continue
 			}
 			if flag {
 				ret = append(ret, v)
@@ -288,14 +348,11 @@ func dataFlowFilter(
 	} else {
 		for _, v := range vs {
 			flag := false
-			dataflowPaths := v.GetDataflowPath()
-			for _, path := range dataflowPaths {
-				//if match one dataflowPath break
+			for _, path := range enumeratePaths(v) {
 				if checkMatch(path) {
 					flag = true
 					break
 				}
-				continue
 			}
 			if flag {
 				ret = append(ret, v)
