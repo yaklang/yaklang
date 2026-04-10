@@ -36,6 +36,7 @@ type AIParams struct {
 	TimelineContentSizeLimit       int64    `json:"timeline_content_size_limit,omitempty"` // KB in HTTP setting
 	UserInteractLimit              int64    `json:"user_interact_limit,omitempty"`
 	TimelineSessionID              string   `json:"timeline_session_id,omitempty"`
+	DisableToolIntervalReview      bool     `json:"disable_tool_interval_review,omitempty"`
 }
 
 type CreateSessionRequest struct {
