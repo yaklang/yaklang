@@ -205,58 +205,81 @@ func (m *MITMReplaceRule) MatchByHTTPFlow(rsp string) ([]*MatchResult, error) {
 		})
 	}
 
-	secondaryRe := strings.TrimSpace(m.GetSecondaryRegexp())
-	if secondaryRe == "" {
+	stages := m.GetSecondaryStages()
+	if len(stages) == 0 {
 		return res, nil
 	}
-	joiner := m.GetSecondaryJoiner()
-	if joiner == "" {
-		joiner = "\n"
-	}
-	joined := strings.Join(primaryRets, joiner)
 
-	sec, err := regexp2.Compile(secondaryRe, regexp2.None)
-	if err != nil {
-		return nil, err
-	}
-	secMatch, err := sec.FindStringMatch(joined)
-	if err != nil {
-		return nil, err
-	}
-	if secMatch == nil {
-		return nil, nil
-	}
-	var out []*MatchResult
-	var outStr string
-	for ; err == nil && secMatch != nil; secMatch, err = sec.FindNextMatch(secMatch) {
-		tpl := m.GetSecondaryRegexpResultTemplate()
-		if tpl != "" {
-			outStr = FormatRegexpGroups(tpl, func(n int) string {
-				g := secMatch.GroupByNumber(n)
-				if g != nil {
-					return g.String()
-				}
-				return ""
-			})
-		} else if secMatch.GroupCount() > 1 {
-			g := secMatch.GroupByNumber(1)
-			if g != nil {
-				outStr = g.String()
-			} else {
-				outStr = secMatch.String()
-			}
-		} else {
-			outStr = secMatch.String()
-		}
-		if outStr == "" {
+	inputs := primaryRets
+	for _, st := range stages {
+		if st == nil {
 			continue
 		}
+		reStr := strings.TrimSpace(st.GetRegexp())
+		if reStr == "" {
+			continue
+		}
+		joiner := st.GetJoiner()
+		if joiner == "" {
+			joiner = "\n"
+		}
+		joined := strings.Join(inputs, joiner)
+
+		re, err := regexp2.Compile(reStr, regexp2.None)
+		if err != nil {
+			return nil, err
+		}
+		mm, err := re.FindStringMatch(joined)
+		if err != nil {
+			return nil, err
+		}
+		if mm == nil {
+			return nil, nil
+		}
+		var next []string
+		tpl := st.GetResultTemplate()
+		for ; err == nil && mm != nil; mm, err = re.FindNextMatch(mm) {
+			var outStr string
+			if tpl != "" {
+				outStr = FormatRegexpGroups(tpl, func(n int) string {
+					g := mm.GroupByNumber(n)
+					if g != nil {
+						return g.String()
+					}
+					return ""
+				})
+			} else if mm.GroupCount() > 1 {
+				g := mm.GroupByNumber(1)
+				if g != nil {
+					outStr = g.String()
+				} else {
+					outStr = mm.String()
+				}
+			} else {
+				outStr = mm.String()
+			}
+			if outStr == "" {
+				continue
+			}
+			next = append(next, outStr)
+		}
+		inputs = next
+	}
+
+	if len(inputs) == 0 {
+		return nil, nil
+	}
+	// Final stage outputs are returned as MatchResults; Raw is the final joined string for debugging.
+	// We keep Offset=0 because mapping back to original packet offsets is not supported for staged outputs.
+	finalJoined := strings.Join(inputs, "\n")
+	out := make([]*MatchResult, 0, len(inputs))
+	for _, s := range inputs {
 		out = append(out, &MatchResult{
-			Match:          secMatch,
+			Match:          nil,
 			IsMatchRequest: false,
-			MatchResult:    outStr,
+			MatchResult:    s,
 			MetaInfo: &MatchMetaInfo{
-				Raw:    []byte(joined),
+				Raw:    []byte(finalJoined),
 				Offset: 0,
 			},
 		})
@@ -370,58 +393,79 @@ func (m *MITMReplaceRule) MatchByPacketInfo(info *PacketInfo) ([]*MatchResult, e
 		}
 	}
 
-	secondaryRe := strings.TrimSpace(m.GetSecondaryRegexp())
-	if secondaryRe == "" {
+	stages := m.GetSecondaryStages()
+	if len(stages) == 0 {
 		return res, nil
 	}
-	joiner := m.GetSecondaryJoiner()
-	if joiner == "" {
-		joiner = "\n"
-	}
-	joined := strings.Join(primaryRets, joiner)
 
-	sec, err := regexp2.Compile(secondaryRe, regexp2.None)
-	if err != nil {
-		return nil, err
-	}
-	secMatch, err := sec.FindStringMatch(joined)
-	if err != nil {
-		return nil, err
-	}
-	if secMatch == nil {
-		return nil, nil
-	}
-	var out []*MatchResult
-	var outStr string
-	for ; err == nil && secMatch != nil; secMatch, err = sec.FindNextMatch(secMatch) {
-		tpl := m.GetSecondaryRegexpResultTemplate()
-		if tpl != "" {
-			outStr = FormatRegexpGroups(tpl, func(n int) string {
-				g := secMatch.GroupByNumber(n)
-				if g != nil {
-					return g.String()
-				}
-				return ""
-			})
-		} else if secMatch.GroupCount() > 1 {
-			g := secMatch.GroupByNumber(1)
-			if g != nil {
-				outStr = g.String()
-			} else {
-				outStr = secMatch.String()
-			}
-		} else {
-			outStr = secMatch.String()
-		}
-		if outStr == "" {
+	inputs := primaryRets
+	for _, st := range stages {
+		if st == nil {
 			continue
 		}
+		reStr := strings.TrimSpace(st.GetRegexp())
+		if reStr == "" {
+			continue
+		}
+		joiner := st.GetJoiner()
+		if joiner == "" {
+			joiner = "\n"
+		}
+		joined := strings.Join(inputs, joiner)
+
+		re, err := regexp2.Compile(reStr, regexp2.None)
+		if err != nil {
+			return nil, err
+		}
+		mm, err := re.FindStringMatch(joined)
+		if err != nil {
+			return nil, err
+		}
+		if mm == nil {
+			return nil, nil
+		}
+		var next []string
+		tpl := st.GetResultTemplate()
+		for ; err == nil && mm != nil; mm, err = re.FindNextMatch(mm) {
+			var outStr string
+			if tpl != "" {
+				outStr = FormatRegexpGroups(tpl, func(n int) string {
+					g := mm.GroupByNumber(n)
+					if g != nil {
+						return g.String()
+					}
+					return ""
+				})
+			} else if mm.GroupCount() > 1 {
+				g := mm.GroupByNumber(1)
+				if g != nil {
+					outStr = g.String()
+				} else {
+					outStr = mm.String()
+				}
+			} else {
+				outStr = mm.String()
+			}
+			if outStr == "" {
+				continue
+			}
+			next = append(next, outStr)
+		}
+		inputs = next
+	}
+
+	if len(inputs) == 0 {
+		return nil, nil
+	}
+	finalJoined := strings.Join(inputs, "\n")
+	out := make([]*MatchResult, 0, len(inputs))
+	for _, s := range inputs {
 		out = append(out, &MatchResult{
-			Match:          secMatch,
+			Match:          nil,
 			IsMatchRequest: info.IsRequest,
-			MatchResult:    outStr,
+			MatchResult:    s,
 			MetaInfo: &MatchMetaInfo{
-				Raw:    []byte(joined),
+				Raw:    []byte(finalJoined),
 				Offset: 0,
 			},
 		})
