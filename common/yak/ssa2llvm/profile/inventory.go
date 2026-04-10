@@ -1,12 +1,8 @@
-// Package resolver resolves obfuscation policy selectors into concrete
-// per-obfuscator function assignments.
-package resolver
+package profile
 
-import (
-	"github.com/yaklang/yaklang/common/yak/ssa"
-)
+import "github.com/yaklang/yaklang/common/yak/ssa"
 
-// FuncInfo describes a single function in the compilation unit.
+// FuncInfo describes one function in the current compilation unit.
 type FuncInfo struct {
 	Name       string
 	SSAID      int64
@@ -16,13 +12,14 @@ type FuncInfo struct {
 	IsEntry    bool
 }
 
-// Inventory is the complete set of functions available for obfuscation.
+// Inventory is the full set of functions available for profile-driven
+// obfuscation selection.
 type Inventory struct {
 	Funcs  []FuncInfo
 	byName map[string]*FuncInfo
 }
 
-// Lookup returns the FuncInfo for the given name, or nil.
+// Lookup returns the FuncInfo for the given function name, or nil.
 func (inv *Inventory) Lookup(name string) *FuncInfo {
 	if inv == nil {
 		return nil
@@ -42,9 +39,9 @@ func NewInventory(funcs []FuncInfo) *Inventory {
 	return inv
 }
 
-// BuildFromSSA enumerates all internal functions in the SSA program and
-// returns an Inventory. External functions are recorded but flagged.
-func BuildFromSSA(program *ssa.Program, entryName string) *Inventory {
+// BuildInventoryFromSSA enumerates functions in the SSA program and returns an
+// inventory for profile selection.
+func BuildInventoryFromSSA(program *ssa.Program, entryName string) *Inventory {
 	if program == nil {
 		return NewInventory(nil)
 	}

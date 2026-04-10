@@ -55,7 +55,7 @@ type Context struct {
 	InstrTags map[int64]string
 
 	// Selections maps obfuscator name → set of function names resolved from the
-	// obf policy. When nil (no policy), obfuscators use their default behaviour
+	// active profile. When nil (no profile-driven selection), obfuscators use their default behaviour
 	// (typically all functions). When non-nil, an obfuscator should only operate
 	// on the functions listed for its name; an absent key means "no functions".
 	Selections map[string]map[string]struct{}
@@ -72,6 +72,10 @@ type Context struct {
 	// flatten them.
 	BodyReplacedFuncs map[string]string
 
+	// FunctionWrappers describes functions whose bodies are replaced by a
+	// generic runtime wrapper emitted by an obfuscator.
+	FunctionWrappers map[string]*FunctionWrapper
+
 	// BuildSeed is an optional build-level seed for diversification.
 	// When non-nil, obfuscators may use it to vary their output per build.
 	// Populated from the profile's SeedPolicy.
@@ -79,7 +83,7 @@ type Context struct {
 }
 
 // IsSelected returns true if funcName is selected for the given obfuscator.
-// When Selections is nil (no policy), always returns true (backward compat).
+// When Selections is nil (no profile-driven selection), always returns true.
 // When Selections is set but the obfuscator has no entry, returns false.
 func (ctx *Context) IsSelected(obfName, funcName string) bool {
 	if ctx == nil || ctx.Selections == nil {
@@ -93,7 +97,7 @@ func (ctx *Context) IsSelected(obfName, funcName string) bool {
 	return selected
 }
 
-// HasSelections returns true if policy-based selections are active.
+// HasSelections returns true if profile-driven selections are active.
 func (ctx *Context) HasSelections() bool {
 	return ctx != nil && ctx.Selections != nil
 }
@@ -139,10 +143,54 @@ func (ctx *Context) IsBodyReplaced(funcName string) bool {
 	return ok
 }
 
+// RegisterFunctionWrapper records that a function is compiled as an obf-owned
+// runtime wrapper rather than through the normal SSA body lowering path.
+func (ctx *Context) RegisterFunctionWrapper(wrapper *FunctionWrapper) error {
+	if ctx == nil || wrapper == nil {
+		return nil
+	}
+	if strings.TrimSpace(wrapper.Owner) == "" {
+		return fmt.Errorf("register function wrapper: empty owner for %q", wrapper.FuncName)
+	}
+	if strings.TrimSpace(wrapper.FuncName) == "" {
+		return fmt.Errorf("register function wrapper: empty function name")
+	}
+	if strings.TrimSpace(wrapper.RuntimeSymbol) == "" {
+		return fmt.Errorf("register function wrapper: empty runtime symbol for %q", wrapper.FuncName)
+	}
+
+	if existingOwner := ctx.BodyReplacedFuncs[wrapper.FuncName]; existingOwner != "" && existingOwner != wrapper.Owner {
+		return fmt.Errorf("register function wrapper: function %q already owned by %q", wrapper.FuncName, existingOwner)
+	}
+	if ctx.FunctionWrappers == nil {
+		ctx.FunctionWrappers = make(map[string]*FunctionWrapper)
+	}
+	if existing := ctx.FunctionWrappers[wrapper.FuncName]; existing != nil {
+		return fmt.Errorf("register function wrapper: duplicate wrapper for %q by %q", wrapper.FuncName, existing.Owner)
+	}
+
+	clone := *wrapper
+	if len(wrapper.Payload) > 0 {
+		clone.Payload = append([]string{}, wrapper.Payload...)
+	}
+	ctx.FunctionWrappers[clone.FuncName] = &clone
+	ctx.MarkBodyReplaced(clone.Owner, clone.FuncName)
+	return nil
+}
+
 type Obfuscator interface {
 	Name() string
 	Kind() Kind
 	Apply(*Context) error
+}
+
+// FunctionWrapper is the generic compiler bridge for obfuscators that replace
+// a function body with a runtime call.
+type FunctionWrapper struct {
+	Owner         string
+	FuncName      string
+	RuntimeSymbol string
+	Payload       []string
 }
 
 type Info struct {
