@@ -1,0 +1,73 @@
+desc(
+	title: "Detect Raw Filter Converter String Serialization"
+	title_zh: "检测过滤器转换器直接序列化原始字符串"
+	type: audit
+	risk: "查询注入"
+	desc: <<<DESC
+### 规则说明
+当通用过滤表达式转换器把字符串值直接拼进后端查询语法，而没有调用专门的 JSON / Lucene / backend escape helper 时，下游 JSONPath、查询 DSL 或其它解释器可能被注入。
+
+本规则关注的通用模式是：
+- `doSingleValue(...)`
+- 字符串值直接 `String.format(...)` 或 `context.append(value)`
+- 同一实现里没有看到 `emitJsonValue(...)` / `emitLuceneString(...)`
+DESC
+	rule_id: "b7e4eec4-4db5-4c12-b9db-6c1b3f2cb4e7"
+	solution: <<<SOLUTION
+### 修复建议
+- 不要把字符串原值直接写入查询 / 过滤语法。
+- 统一通过 JSON、Lucene 或后端专用 escape helper 输出字符串。
+- 在抽象基类层面提供默认安全序列化能力，避免子类各自重复实现。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-74: Improper Neutralization of Special Elements in Output Used by a Downstream Component](https://cwe.mitre.org/data/definitions/74.html)
+REFERENCE
+)
+
+/doSingleValue/<sourceCode(context=8)>?{have:'value instanceof String' && have:'String.format("\\\"%s\\\"", value)' && have:'context.append(value)' && !have:'emitJsonValue(' && !have:'emitLuceneString(' && !have:'value instanceof Date'} as $risk;
+
+alert $risk for {
+	title: "Detect Raw Filter Converter String Serialization",
+	title_zh: "检测过滤器转换器直接序列化原始字符串",
+	level: "middle",
+	message: "发现过滤器转换器直接把字符串拼进下游查询语法，且未看到专门 escape helper，需复核是否存在 JSONPath / 查询 DSL 注入。",
+	risk: "查询注入",
+	name: "risk",
+	desc: <<<DESC
+### 规则说明
+当通用过滤表达式转换器把字符串值直接拼进后端查询语法，而没有调用专门的 JSON / Lucene / backend escape helper 时，下游 JSONPath、查询 DSL 或其它解释器可能被注入。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 不要把字符串原值直接写入查询 / 过滤语法。
+- 统一通过 JSON、Lucene 或后端专用 escape helper 输出字符串。
+- 在抽象基类层面提供默认安全序列化能力，避免子类各自重复实现。
+SOLUTION
+}
+
+desc(
+	lang: java
+	alert_min: 1
+	'file://unsafe-filter-converter.java': <<<CODE
+abstract class AbstractFilterExpressionConverter {
+    protected void doSingleValue(Object value, StringBuilder context) {
+        if (value instanceof String) {
+            context.append(String.format("\"%s\"", value));
+        }
+        else {
+            context.append(value);
+        }
+    }
+}
+CODE
+	'safefile://safe-filter-converter.java': <<<CODE
+abstract class AbstractFilterExpressionConverter {
+    protected static void emitJsonValue(Object value, StringBuilder context) {
+    }
+
+    protected void doSingleValue(Object value, StringBuilder context) {
+        emitJsonValue(value, context);
+    }
+}
+CODE
+)

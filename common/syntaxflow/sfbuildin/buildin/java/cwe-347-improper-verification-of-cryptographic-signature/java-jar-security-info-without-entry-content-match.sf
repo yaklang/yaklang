@@ -1,0 +1,94 @@
+desc(
+	title: "Detect Jar Security Info Loading Without Entry Content Match"
+	title_zh: "检测Jar安全信息加载缺少条目内容匹配"
+	type: audit
+	risk: "签名校验绕过"
+	desc: <<<DESC
+### 规则说明
+当 Jar 安全信息加载逻辑通过 `JarInputStream` 遍历条目后直接读取证书 / 签名人，并把结果关联到同名条目，但没有校验流中读到的实际内容与目标条目内容、压缩方式和目录属性是否一致时，可能导致签名信息被错误映射到其他条目。
+DESC
+	rule_id: "cf774af7-94cb-449d-8eb2-ac8c4d4af0d5"
+	solution: <<<SOLUTION
+### 修复建议
+- 在把证书 / signer 关联到目标条目前，校验条目名、目录属性、压缩方式和实际内容是否一致。
+- 优先使用显式的 entry stream helper，在读取安全信息时同步完成内容匹配。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-347: Improper Verification of Cryptographic Signature](https://cwe.mitre.org/data/definitions/347.html)
+REFERENCE
+)
+
+/load/<sourceCode(context=180)>?{have:'JarInputStream' && have:'getCertificates()' && have:'getCodeSigners()' && have:'content.getEntry(' && !have:'JarEntriesStream' && !have:'.matches('} as $risk;
+
+alert $risk for {
+	title: "Detect Jar Security Info Loading Without Entry Content Match",
+	title_zh: "检测Jar安全信息加载缺少条目内容匹配",
+	level: "high",
+	message: "发现 Jar 安全信息加载把 signer / certificate 直接关联到同名条目，但未校验条目内容一致性，需复核是否存在签名映射绕过。",
+	risk: "签名校验绕过",
+	name: "risk",
+	desc: <<<DESC
+### 规则说明
+当 Jar 安全信息加载逻辑通过 `JarInputStream` 遍历条目后直接读取证书 / 签名人，并把结果关联到同名条目，但没有校验流中读到的实际内容与目标条目内容、压缩方式和目录属性是否一致时，可能导致签名信息被错误映射到其他条目。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 在把证书 / signer 关联到目标条目前，校验条目名、目录属性、压缩方式和实际内容是否一致。
+- 优先使用显式的 entry stream helper，在读取安全信息时同步完成内容匹配。
+SOLUTION
+}
+
+desc(
+	lang: java
+	alert_min: 1
+	'file://unsafe-jar-security-info.java': <<<CODE
+class ZipContent {
+    int size() { return 0; }
+    Entry getEntry(String name) { return null; }
+    Object openRawZipData() { return null; }
+
+    static class Entry {
+        int getLookupIndex() { return 0; }
+    }
+}
+
+class JarInputStream {
+    JarInputStream(Object in) {
+    }
+}
+
+class JarEntry {
+    Object[] getCertificates() { return null; }
+    Object[] getCodeSigners() { return null; }
+    String getName() { return ""; }
+}
+
+class SecurityInfo {
+    private static Object load(ZipContent content) throws Exception {
+        try (JarInputStream in = new JarInputStream(content.openRawZipData())) {
+            JarEntry jarEntry = null;
+            Object[] certificates = jarEntry.getCertificates();
+            Object[] codeSigners = jarEntry.getCodeSigners();
+            ZipContent.Entry contentEntry = content.getEntry(jarEntry.getName());
+            return contentEntry;
+        }
+    }
+}
+CODE
+	'safefile://safe-jar-security-info.java': <<<CODE
+class JarEntriesStream {
+    JarEntriesStream(Object in) {
+    }
+
+    boolean matches(boolean directory, int size, int compressionMethod, Object supplier) { return true; }
+}
+
+class SecurityInfo {
+    private static Object load(Object content) throws Exception {
+        JarEntriesStream entries = new JarEntriesStream(content);
+        entries.matches(false, 0, 0, null);
+        return entries;
+    }
+}
+CODE
+)

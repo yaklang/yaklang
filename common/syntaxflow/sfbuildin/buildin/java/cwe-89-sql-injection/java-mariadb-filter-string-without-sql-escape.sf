@@ -1,0 +1,73 @@
+desc(
+	title: "Detect MariaDB Filter String Without SQL Escaping"
+	title_zh: "检测MariaDB过滤字符串缺少SQL转义"
+	type: audit
+	risk: "SQL注入"
+	desc: <<<DESC
+### 规则说明
+当过滤表达式转换器把运行时字符串直接包进 SQL 单引号字面量，而没有调用专门的 SQL escape helper 时，攻击者可以借助引号、反斜杠或控制字符破坏最终查询。
+DESC
+	rule_id: "4d93f643-b0f4-4f5b-af0d-7c63b3276cf1"
+	solution: <<<SOLUTION
+### 修复建议
+- 不要直接 `String.format(...)` 拼装 SQL 字符串字面量。
+- 统一调用专门的 SQL escape helper，或改用参数化查询。
+- 对控制字符、引号和反斜杠做一致的数据库方言转义。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-89: Improper Neutralization of Special Elements used in an SQL Command](https://cwe.mitre.org/data/definitions/89.html)
+REFERENCE
+)
+
+/doSingleValue/<sourceCode(context=40)>?{have:'class MariaDBFilterExpressionConverter' && have:'value instanceof String' && have:'context.append(String.format(' && !have:'emitSqlString('} as $risk;
+
+alert $risk for {
+	title: "Detect MariaDB Filter String Without SQL Escaping",
+	title_zh: "检测MariaDB过滤字符串缺少SQL转义",
+	level: "high",
+	message: "发现运行时字符串直接拼进 MariaDB 查询字面量且未调用 escape helper，需复核是否存在 SQL 注入。",
+	risk: "SQL注入",
+	name: "risk",
+	desc: <<<DESC
+### 规则说明
+当过滤表达式转换器把运行时字符串直接包进 SQL 单引号字面量，而没有调用专门的 SQL escape helper 时，攻击者可以借助引号、反斜杠或控制字符破坏最终查询。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 不要直接 `String.format(...)` 拼装 SQL 字符串字面量。
+- 统一调用专门的 SQL escape helper，或改用参数化查询。
+- 对控制字符、引号和反斜杠做一致的数据库方言转义。
+SOLUTION
+}
+
+desc(
+	lang: java
+	alert_min: 1
+	'file://unsafe-mariadb-filter-string.java': <<<CODE
+class MariaDBFilterExpressionConverter {
+    protected void doSingleValue(Object value, StringBuilder context) {
+        if (value instanceof String) {
+            context.append(String.format("\'%s\'", value));
+        }
+        else {
+            context.append(value);
+        }
+    }
+}
+CODE
+	'safefile://safe-mariadb-filter-string.java': <<<CODE
+class MariaDBFilterExpressionConverter {
+    protected static void emitSqlString(String value, StringBuilder context) {
+    }
+
+    protected void doSingleValue(Object value, StringBuilder context) {
+        if (value instanceof String stringValue) {
+            emitSqlString(stringValue, context);
+        }
+        else {
+            context.append(value);
+        }
+    }
+}
+CODE
+)

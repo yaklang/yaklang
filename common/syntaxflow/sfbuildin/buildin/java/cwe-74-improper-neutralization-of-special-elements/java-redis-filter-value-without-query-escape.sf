@@ -1,0 +1,99 @@
+desc(
+	title: "Detect Redis Filter Value Without Query Escaping"
+	title_zh: "检测Redis过滤值缺少查询转义"
+	type: audit
+	risk: "查询注入"
+	desc: <<<DESC
+### 规则说明
+当过滤表达式转换器把 TAG / TEXT 类型的运行时值直接拼进 RediSearch 查询子句，而没有做 TAG 特殊字符转义或 `escapeQuery(...)` 处理时，攻击者可以借助分隔符和控制字符注入额外查询条件。
+DESC
+	rule_id: "1b8d59c1-8f3f-4f76-8d81-2d310d8d0687"
+	solution: <<<SOLUTION
+### 修复建议
+- 对 TAG 值使用专门的 TAG escape 逻辑。
+- 对 TEXT 值调用查询库提供的 escape API。
+- 不要把 `value.value()` 的原始字符串或列表直接拼入 RediSearch 语法。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-74: Improper Neutralization of Special Elements in Output Used by a Downstream Component](https://cwe.mitre.org/data/definitions/74.html)
+REFERENCE
+)
+
+/stringValue/<sourceCode(context=120)>?{have:'value.value() instanceof List<?>' && have:'String.join(delimiter, list.stream().map(String::valueOf).toList())' && have:'return value.value();' && !have:'escapeTagValue(' && !have:'RediSearchUtil.escapeQuery('} as $risk;
+
+alert $risk for {
+	title: "Detect Redis Filter Value Without Query Escaping",
+	title_zh: "检测Redis过滤值缺少查询转义",
+	level: "middle",
+	message: "发现 Redis 过滤值直接拼入查询语法且未做 TAG / TEXT escape，需复核是否存在 RediSearch 注入。",
+	risk: "查询注入",
+	name: "risk",
+	desc: <<<DESC
+### 规则说明
+当过滤表达式转换器把 TAG / TEXT 类型的运行时值直接拼进 RediSearch 查询子句，而没有做 TAG 特殊字符转义或 `escapeQuery(...)` 处理时，攻击者可以借助分隔符和控制字符注入额外查询条件。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 对 TAG 值使用专门的 TAG escape 逻辑。
+- 对 TEXT 值调用查询库提供的 escape API。
+- 不要把 `value.value()` 的原始字符串或列表直接拼入 RediSearch 语法。
+SOLUTION
+}
+
+desc(
+	lang: java
+	alert_min: 1
+	'file://unsafe-redis-filter-value.java': <<<CODE
+import java.util.List;
+
+class Expression {
+}
+
+class Value {
+    Object value() { return null; }
+}
+
+class RedisFilterExpressionConverter {
+    private Object stringValue(Expression expression, Value value) {
+        String delimiter = " | ";
+        if (value.value() instanceof List<?> list) {
+            return String.join(delimiter, list.stream().map(String::valueOf).toList());
+        }
+        return value.value();
+    }
+}
+CODE
+	'safefile://safe-redis-filter-value.java': <<<CODE
+import java.util.List;
+
+class Expression {
+}
+
+class Value {
+    Object value() { return null; }
+}
+
+class RediSearchUtil {
+    static String escapeQuery(String value) { return value; }
+}
+
+class RedisFilterExpressionConverter {
+    private String escapeTagValue(String value) { return value; }
+
+    private String tagStringValue(Expression expression, Value value) {
+        String delimiter = " | ";
+        if (value.value() instanceof List<?> list) {
+            return list.stream().map(String::valueOf).map(this::escapeTagValue).toList().toString();
+        }
+        return escapeTagValue(String.valueOf(value.value()));
+    }
+
+    private String textStringValue(Expression expression, Value value) {
+        if (value.value() instanceof List<?> list) {
+            return list.stream().map(String::valueOf).map(RediSearchUtil::escapeQuery).toList().toString();
+        }
+        return RediSearchUtil.escapeQuery(String.valueOf(value.value()));
+    }
+}
+CODE
+)

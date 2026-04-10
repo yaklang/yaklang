@@ -1,0 +1,138 @@
+desc(
+	title: "Detect DocumentBuilderFactory Parsing Without XXE Hardening"
+	title_zh: "检测DocumentBuilderFactory解析缺少XXE加固"
+	type: audit
+	risk: "XXE"
+	desc: <<<DESC
+### 规则说明
+当代码通过 `DocumentBuilderFactory.newInstance()` 或 `DocumentBuilderFactoryUtils.newInstance()` 创建 XML 解析工厂，并直接进入 `newDocumentBuilder().parse(...)`，但未显式设置 `setFeature(...)`、`setXIncludeAware(...)`、`setExpandEntityReferences(...)` 等安全选项时，可能触发 XXE。
+DESC
+	rule_id: "7bd3a9c4-a457-4d91-8830-8fb357ab7bde"
+	solution: <<<SOLUTION
+### 修复建议
+- 在 `newDocumentBuilder().parse(...)` 之前显式关闭外部实体和 DTD。
+- 对 `DocumentBuilderFactoryUtils.newInstance()` 这类封装创建也不要默认信任，仍需补安全特性。
+- 统一封装安全的 XML parser 工厂，避免业务代码各自创建。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-611: Improper Restriction of XML External Entity Reference](https://cwe.mitre.org/data/definitions/611.html)
+REFERENCE
+)
+
+/getDocumentBuilder/<sourceCode(context=260)>?{have:'DocumentBuilderFactoryUtils.newInstance()' && have:'newDocumentBuilder()' && have:'object instanceof String' && have:'object instanceof InputStream' && have:'object instanceof byte[]' && !have:'setFeature(' && !have:'setXIncludeAware(' && !have:'setExpandEntityReferences('} as $risk;
+
+alert $risk for {
+	title: "Detect DocumentBuilderFactory Parsing Without XXE Hardening",
+	title_zh: "检测DocumentBuilderFactory解析缺少XXE加固",
+	level: "high",
+	message: "发现 DocumentBuilderFactory 直接进入 parse(...) 且未看到 XXE 安全特性设置，需复核是否存在外部实体注入。",
+	risk: "XXE",
+	name: "risk",
+	desc: <<<DESC
+### 规则说明
+当代码通过 `DocumentBuilderFactory.newInstance()` 或 `DocumentBuilderFactoryUtils.newInstance()` 创建 XML 解析工厂，并直接进入 `newDocumentBuilder().parse(...)`，但未显式设置 `setFeature(...)`、`setXIncludeAware(...)`、`setExpandEntityReferences(...)` 等安全选项时，可能触发 XXE。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 在 `newDocumentBuilder().parse(...)` 之前显式关闭外部实体和 DTD。
+- 对 `DocumentBuilderFactoryUtils.newInstance()` 这类封装创建也不要默认信任，仍需补安全特性。
+- 统一封装安全的 XML parser 工厂，避免业务代码各自创建。
+SOLUTION
+}
+
+desc(
+	lang: java
+	alert_min: 1
+	'file://unsafe-document-builder-utils.java': <<<CODE
+class DocumentBuilderFactoryUtils {
+    static Factory newInstance() { return null; }
+}
+
+class InputStream {
+}
+
+class Factory {
+    Builder newDocumentBuilder() { return null; }
+}
+
+class Builder {
+    Object parse(Object input) { return null; }
+}
+
+class DefaultXmlPayloadConverter {
+    private final Factory documentBuilderFactory = DocumentBuilderFactoryUtils.newInstance();
+
+    Builder getDocumentBuilder() {
+        return this.documentBuilderFactory.newDocumentBuilder();
+    }
+
+    Object sourceToInputSource(Object source) { return source; }
+
+    Object convertToDocument(Object input) {
+        Object object = input;
+        if (object instanceof String) {
+            return getDocumentBuilder().parse(object);
+        }
+        else if (object instanceof InputStream) {
+            return getDocumentBuilder().parse(object);
+        }
+        else if (object instanceof byte[]) {
+            return getDocumentBuilder().parse(object);
+        }
+        return getDocumentBuilder().parse(sourceToInputSource(object));
+    }
+}
+CODE
+	'safefile://safe-document-builder-utils.java': <<<CODE
+class DocumentBuilderFactoryUtils {
+    static Factory newInstance() { return null; }
+}
+
+class InputStream {
+}
+
+class Factory {
+    Builder newDocumentBuilder() { return null; }
+}
+
+class Builder {
+    Object parse(Object input) { return null; }
+}
+
+class SafeXmlPayloadConverter {
+    private final Factory documentBuilderFactory = DocumentBuilderFactoryUtils.newInstance();
+
+    Builder getDocumentBuilder() {
+        setFeature("disallow-doctype-decl", true);
+        setXIncludeAware(false);
+        setExpandEntityReferences(false);
+        return this.documentBuilderFactory.newDocumentBuilder();
+    }
+
+    void setFeature(String feature, boolean flag) {
+    }
+
+    void setXIncludeAware(boolean flag) {
+    }
+
+    void setExpandEntityReferences(boolean flag) {
+    }
+
+    Object sourceToInputSource(Object source) { return source; }
+
+    Object convertToDocument(Object input) {
+        Object object = input;
+        if (object instanceof String) {
+            return getDocumentBuilder().parse(object);
+        }
+        else if (object instanceof InputStream) {
+            return getDocumentBuilder().parse(object);
+        }
+        else if (object instanceof byte[]) {
+            return getDocumentBuilder().parse(object);
+        }
+        return getDocumentBuilder().parse(sourceToInputSource(object));
+    }
+}
+CODE
+)

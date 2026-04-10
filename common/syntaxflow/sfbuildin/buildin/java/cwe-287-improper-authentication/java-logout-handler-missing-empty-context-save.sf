@@ -1,0 +1,97 @@
+desc(
+	title: "Detect Logout Handler Missing Empty Context Persistence"
+	title_zh: "检测登出处理器缺少空安全上下文持久化"
+	type: audit
+	risk: "认证状态残留"
+	desc: <<<DESC
+### 规则说明
+当登出处理器清空 `SecurityContextHolder` 并移除 `Authentication`，但没有把新的空安全上下文写回 `SecurityContextRepository` 时，序列化 session 或组合 repository 场景下可能残留旧认证状态。
+DESC
+	rule_id: "6bca328e-c75a-432d-8f60-620703f35ff8"
+	solution: <<<SOLUTION
+### 修复建议
+- 在 logout 流程中，清空 holder 后把新的 empty context 持久化到实际使用的 `SecurityContextRepository`。
+- 组合 repository / serialized session 场景下，确认登出流程不会只清理线程态而漏掉持久层状态。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-287: Improper Authentication](https://cwe.mitre.org/data/definitions/287.html)
+REFERENCE
+)
+
+/logout/<sourceCode(context=140)>?{have:'securityContextHolderStrategy.clearContext()' && have:'context.setAuthentication(null)' && !have:'securityContextRepository.saveContext('} as $risk;
+
+alert $risk for {
+	title: "Detect Logout Handler Missing Empty Context Persistence",
+	title_zh: "检测登出处理器缺少空安全上下文持久化",
+	level: "middle",
+	message: "发现 logout 流程只清空线程态安全上下文而未持久化空 context，需复核是否会残留认证状态。",
+	risk: "认证状态残留",
+	name: "risk",
+	desc: <<<DESC
+### 规则说明
+当登出处理器清空 `SecurityContextHolder` 并移除 `Authentication`，但没有把新的空安全上下文写回 `SecurityContextRepository` 时，序列化 session 或组合 repository 场景下可能残留旧认证状态。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 在 logout 流程中，清空 holder 后把新的 empty context 持久化到实际使用的 `SecurityContextRepository`。
+- 组合 repository / serialized session 场景下，确认登出流程不会只清理线程态而漏掉持久层状态。
+SOLUTION
+}
+
+desc(
+	lang: java
+	alert_min: 1
+	'file://unsafe-logout-handler.java': <<<CODE
+class SecurityContext {
+    void setAuthentication(Object authentication) {
+    }
+}
+
+class SecurityContextHolderStrategy {
+    SecurityContext getContext() { return null; }
+    void clearContext() {
+    }
+}
+
+class SecurityContextLogoutHandler {
+    private final SecurityContextHolderStrategy securityContextHolderStrategy = new SecurityContextHolderStrategy();
+
+    void logout() {
+        SecurityContext context = this.securityContextHolderStrategy.getContext();
+        this.securityContextHolderStrategy.clearContext();
+        context.setAuthentication(null);
+    }
+}
+CODE
+	'safefile://safe-logout-handler.java': <<<CODE
+class SecurityContext {
+    void setAuthentication(Object authentication) {
+    }
+}
+
+class SecurityContextRepository {
+    void saveContext(SecurityContext context, Object request, Object response) {
+    }
+}
+
+class SecurityContextHolderStrategy {
+    SecurityContext getContext() { return null; }
+    SecurityContext createEmptyContext() { return null; }
+    void clearContext() {
+    }
+}
+
+class SecurityContextLogoutHandler {
+    private final SecurityContextHolderStrategy securityContextHolderStrategy = new SecurityContextHolderStrategy();
+    private final SecurityContextRepository securityContextRepository = new SecurityContextRepository();
+
+    void logout(Object request, Object response) {
+        SecurityContext context = this.securityContextHolderStrategy.getContext();
+        this.securityContextHolderStrategy.clearContext();
+        context.setAuthentication(null);
+        SecurityContext emptyContext = this.securityContextHolderStrategy.createEmptyContext();
+        this.securityContextRepository.saveContext(emptyContext, request, response);
+    }
+}
+CODE
+)

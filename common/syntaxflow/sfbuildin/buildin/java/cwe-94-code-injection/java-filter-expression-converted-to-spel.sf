@@ -1,0 +1,105 @@
+desc(
+	title: "Detect Filter Expression Converted To SpEL"
+	title_zh: "检测过滤表达式被转换为SpEL执行"
+	type: audit
+	risk: "表达式注入"
+	desc: <<<DESC
+### 规则说明
+当代码先把结构化 filter AST 转成 SpEL 字符串，再交给 `parseExpression(...)` 求值时，攻击者可能通过 key / value / 语法边界突破表达式上下文，造成表达式注入或越权过滤。
+
+本规则关注的通用模式是：
+- `filterExpressionConverter.convertExpression(...)`
+- `expressionParser.parseExpression(...)`
+- `getValue(context, Boolean.class)`
+- 同一实现里未改为直接解释 AST / evaluator 模式
+DESC
+	rule_id: "8758b64f-f88d-4cd7-a422-3d679deba1d5"
+	solution: <<<SOLUTION
+### 修复建议
+- 不要把结构化 filter 再降级成 SpEL 字符串执行。
+- 优先直接解释 AST，或使用受限 evaluator。
+- 如必须拼装表达式，严格限制 key / value 语法并使用安全上下文。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-94: Improper Control of Generation of Code](https://cwe.mitre.org/data/definitions/94.html)
+REFERENCE
+)
+
+/doFilterPredicate/<sourceCode(context=160)>?{have:'convertExpression(' && have:'parseExpression(' && have:'Boolean.class' && !have:'filterExpressionEvaluator.evaluate('} as $risk;
+
+alert $risk for {
+	title: "Detect Filter Expression Converted To SpEL",
+	title_zh: "检测过滤表达式被转换为SpEL执行",
+	level: "high",
+	message: "发现结构化过滤表达式被转换为 SpEL 字符串后再执行，需复核是否存在表达式注入。",
+	risk: "表达式注入",
+	name: "risk",
+	desc: <<<DESC
+### 规则说明
+当代码先把结构化 filter AST 转成 SpEL 字符串，再交给 `parseExpression(...)` 求值时，攻击者可能通过 key / value / 语法边界突破表达式上下文，造成表达式注入或越权过滤。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 不要把结构化 filter 再降级成 SpEL 字符串执行。
+- 优先直接解释 AST，或使用受限 evaluator。
+- 如必须拼装表达式，严格限制 key / value 语法并使用安全上下文。
+SOLUTION
+}
+
+desc(
+	lang: java
+	alert_min: 1
+	'file://unsafe-filter-to-spel.java': <<<CODE
+class SearchRequest {
+    boolean hasFilterExpression() { return true; }
+    Object getFilterExpression() { return null; }
+}
+
+class StandardEvaluationContext {
+    void setVariable(String name, Object value) {
+    }
+}
+
+class Parser {
+    Parsed parseExpression(String expression) { return null; }
+}
+
+class Parsed {
+    Boolean getValue(StandardEvaluationContext context, Class<Boolean> clazz) { return Boolean.TRUE; }
+}
+
+class Converter {
+    String convertExpression(Object expression) { return ""; }
+}
+
+class SimpleVectorStore {
+    private final Parser expressionParser = new Parser();
+    private final Converter filterExpressionConverter = new Converter();
+
+    boolean doFilterPredicate(SearchRequest request, Object metadata) {
+        StandardEvaluationContext context = new StandardEvaluationContext();
+        context.setVariable("metadata", metadata);
+        return this.expressionParser
+                .parseExpression(this.filterExpressionConverter.convertExpression(request.getFilterExpression()))
+                .getValue(context, Boolean.class);
+    }
+}
+CODE
+	'safefile://safe-filter-evaluator.java': <<<CODE
+class SearchRequest {
+    Object getFilterExpression() { return null; }
+}
+
+class Evaluator {
+    boolean evaluate(Object expression, Object metadata) { return true; }
+}
+
+class SimpleVectorStore {
+    private final Evaluator filterExpressionEvaluator = new Evaluator();
+
+    boolean doFilterPredicate(SearchRequest request, Object metadata) {
+        return this.filterExpressionEvaluator.evaluate(request.getFilterExpression(), metadata);
+    }
+}
+CODE
+)

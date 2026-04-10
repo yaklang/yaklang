@@ -1,0 +1,95 @@
+desc(
+	title: "Audit Regex-Based ETag Header Parsing"
+	title_zh: "审计基于正则的ETag头解析"
+	type: audit
+	risk: "拒绝服务"
+	desc: <<<DESC
+### 规则说明
+当条件请求头里的 ETag 列表通过正则 `matcher.find()` 循环解析，而不是交给更明确的专用 parser 时，复杂或超长头部可能带来额外的解析开销和资源消耗风险。
+DESC
+	rule_id: "e9fefdf9-3f88-4f3d-b3a6-68d6abedf144"
+	solution: <<<SOLUTION
+### 修复建议
+- 对 `If-Match` / `If-None-Match` 使用专门的 ETag parser，而不是在请求路径上直接做正则循环匹配。
+- 对 header 长度、tag 数量和异常输入做显式限制。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-400: Uncontrolled Resource Consumption](https://cwe.mitre.org/data/definitions/400.html)
+REFERENCE
+)
+
+/matchRequestedETags/<sourceCode(context=120)>?{have:'ETAG_HEADER_VALUE_PATTERN.matcher(' && have:'while (etagMatcher.find())' && !have:'ETag.parse('} as $riskMatch;
+
+/getETagValuesAsList/<sourceCode(context=120)>?{have:'ETAG_HEADER_VALUE_PATTERN.matcher(' && have:'while (matcher.find())' && !have:'ETag.parse('} as $riskList;
+
+$riskMatch + $riskList as $risk;
+
+alert $risk for {
+	title: "Audit Regex-Based ETag Header Parsing",
+	title_zh: "审计基于正则的ETag头解析",
+	level: "middle",
+	message: "发现条件请求头里的 ETag 列表通过正则循环解析，需复核是否存在高成本解析或异常输入消耗风险。",
+	risk: "拒绝服务",
+	name: "risk",
+	desc: <<<DESC
+### 规则说明
+当条件请求头里的 ETag 列表通过正则 `matcher.find()` 循环解析，而不是交给更明确的专用 parser 时，复杂或超长头部可能带来额外的解析开销和资源消耗风险。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 对 `If-Match` / `If-None-Match` 使用专门的 ETag parser，而不是在请求路径上直接做正则循环匹配。
+- 对 header 长度、tag 数量和异常输入做显式限制。
+SOLUTION
+}
+
+desc(
+	lang: java
+	alert_min: 2
+	'file://unsafe-etag-parsing.java': <<<CODE
+class Matcher {
+    boolean find() { return false; }
+}
+
+class Pattern {
+    Matcher matcher(String value) { return null; }
+}
+
+class HttpHeaders {
+    private static final Pattern ETAG_HEADER_VALUE_PATTERN = new Pattern();
+
+    void getETagValuesAsList(String value) {
+        Matcher matcher = ETAG_HEADER_VALUE_PATTERN.matcher(value);
+        while (matcher.find()) {
+        }
+    }
+}
+
+class ServletWebRequest {
+    private static final Pattern ETAG_HEADER_VALUE_PATTERN = new Pattern();
+
+    void matchRequestedETags(String value) {
+        Matcher etagMatcher = ETAG_HEADER_VALUE_PATTERN.matcher(value);
+        while (etagMatcher.find()) {
+        }
+    }
+}
+CODE
+	'safefile://safe-etag-parse.java': <<<CODE
+class ETag {
+    static void parse(String value) {
+    }
+}
+
+class HttpHeaders {
+    void getETagValuesAsList(String value) {
+        ETag.parse(value);
+    }
+}
+
+class ServletWebRequest {
+    void matchRequestedETags(String value) {
+        ETag.parse(value);
+    }
+}
+CODE
+)
