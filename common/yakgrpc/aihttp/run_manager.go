@@ -99,7 +99,7 @@ func (rs *RunSession) MarkStreamStarted() bool {
 }
 
 func (rs *RunSession) Complete(err error) {
-	if rs.Status == RunStatusCancelled {
+	if rs.Status == RunStatusCompleted || rs.Status == RunStatusFailed || rs.Status == RunStatusCancelled {
 		return
 	}
 
@@ -114,9 +114,11 @@ func (rs *RunSession) Complete(err error) {
 
 	if err != nil {
 		rs.AddEvent(newFailedOutputEvent(err))
+		rs.cancel()
 		return
 	}
 	rs.AddEvent(newResultOutputEvent(string(RunStatusCompleted)))
+	rs.cancel()
 }
 
 func (rs *RunSession) Cancel() {
