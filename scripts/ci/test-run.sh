@@ -29,7 +29,7 @@ build_package_map() {
     pkg_file="${bin}.package"
     if [[ ! -f "$pkg_file" ]]; then
       echo "WARNING: Skipping binary because package metadata is missing: $(basename "$bin").package"
-      ((skipped_entries++))
+      ((++skipped_entries))
       continue
     fi
     pkg_path="$(cat "$pkg_file")"
@@ -243,6 +243,10 @@ run_test() {
       echo "✅ Completed in ${final_mins}m${final_secs}s"
     else
       echo "❌ Failed after ${final_mins}m${final_secs}s (exit code: $code)"
+      {
+        echo "FAIL: $name (exit=$code, attempt=$((attempt + 1))/$((max_retries + 1)))"
+        echo "FAIL_ELAPSED: ${final_mins}m${final_secs}s"
+      } >> "$log"
     fi
     
     exec 3>&-  # 关闭文件描述符
@@ -258,11 +262,11 @@ run_test() {
       # 如果还有重试机会，显示详细日志摘要
       if [[ $attempt -lt $max_retries ]]; then
         echo "失败日志摘要："
-        grep -E "(FAIL|--- FAIL|panic:|test timed out|TLS handshake error)" "$log" | head -20 | sed 's/^/  /'
+        grep -aE "(FAIL|--- FAIL|panic:|test timed out|TLS handshake error)" "$log" | head -20 | sed 's/^/  /'
       fi
     fi
     
-    ((attempt++))
+    ((++attempt))
   done
   
   if [[ $success -eq 0 ]]; then
@@ -359,7 +363,7 @@ if [[ -n "$TEST_CONFIG" && -f "$TEST_CONFIG" ]]; then
     done
     
     if [[ $is_processed -eq 0 ]]; then
-      ((uncovered_count++))
+      ((++uncovered_count))
       uncovered_tests+=("${ALL_TEST_PKGS[$i]}")
     fi
   done
@@ -394,6 +398,102 @@ echo ""
 echo "=== Test Summary ==="
 echo "Total tests: ${#ALL_TEST_BINS[@]}"
 
+extract_failed_test_names() {
+  local log="$1"
+  grep -aE '^--- FAIL: ' "$log" | sed -E 's/^--- FAIL: ([^ ]+).*/\1/' | sort -u | paste -sd ', ' - || true
+}
+
+extract_failure_reason() {
+  local log="$1"
+  local reason=""
+
+  reason=$(grep -am1 -E 'test timed out|panic:|Error:[[:space:]]|should have|first record does not look like a TLS handshake|connection reset by peer|context deadline exceeded|testing:|flag provided but not defined|invalid value|Usage of ' "$log" || true)
+  if [[ -z "$reason" ]]; then
+    reason=$(grep -am1 -E '^--- FAIL: ' "$log" || true)
+  fi
+  if [[ -z "$reason" ]]; then
+    reason=$(grep -am1 -E '^FAIL: ' "$log" || true)
+  fi
+  if [[ -z "$reason" ]]; then
+    reason=$(grep -am1 -v -E '^(Command:|Test:|Config:|Retry:|----|[[:space:]]*$)' "$log" || true)
+  fi
+
+  printf '%s\n' "$reason" | sed -E 's/^[[:space:]]+//'
+}
+
+extract_failure_elapsed() {
+  local log="$1"
+  grep -am1 '^FAIL_ELAPSED: ' "$log" | sed -E 's/^FAIL_ELAPSED: //' || true
+}
+
+extract_timeout_running_tests() {
+  local log="$1"
+  awk '
+    /running tests:/ { capture=1; next }
+    capture {
+      line=$0
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", line)
+      if (line == "") {
+        next
+      }
+      if (line ~ /^goroutine / || line ~ /^created by / || line ~ /^\//) {
+        exit
+      }
+      print line
+    }
+  ' "$log" | head -20
+}
+
+extract_failed_case_details() {
+  local log="$1"
+  awk '
+    function trim(s) {
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", s)
+      return s
+    }
+    {
+      lines[NR] = $0
+    }
+    /^--- FAIL: / {
+      name = $3
+      sub(/\(.*/, "", name)
+      if (!(name in seen)) {
+        seen[name] = 1
+        order[++count] = name
+      }
+    }
+    END {
+      for (i = 1; i <= count; i++) {
+        name = order[i]
+        reason = ""
+        fail_line = 0
+
+        for (j = 1; j <= NR; j++) {
+          if (lines[j] ~ ("^--- FAIL: " name "([[:space:]]|$)")) {
+            fail_line = j
+            break
+          }
+        }
+
+        if (fail_line > 0) {
+          start = fail_line - 20
+          if (start < 1) {
+            start = 1
+          }
+          for (j = fail_line - 1; j >= start; j--) {
+            if (lines[j] ~ /panic:|Error:[[:space:]]*|Received unexpected error|should have|not greater than|testing:|flag provided but not defined|invalid value|context deadline exceeded|first record does not look like a TLS handshake|connection reset by peer/) {
+              reason = trim(lines[j])
+              break
+            }
+          }
+        }
+
+        print name "|" reason
+      }
+    }
+  ' "$log"
+}
+
 if [[ $rc -eq 0 ]]; then
   echo "Result: ALL PASSED"
 else
@@ -402,8 +502,46 @@ else
   echo "Failed tests:"
   # 列出所有包含失败标记的日志
   while IFS= read -r log; do
-    if grep -q "^FAIL:" "$log" || grep -q "^--- FAIL:" "$log" || grep -q "^FAIL$" "$log"; then
-      echo "  - $(basename "$log" .run.log)"
+    if grep -aEq "^FAIL:|^--- FAIL:|^FAIL$|test timed out|^panic:" "$log"; then
+      test_name="$(basename "$log" .run.log)"
+      failed_cases="$(extract_failed_test_names "$log")"
+      failure_reason="$(extract_failure_reason "$log")"
+      failure_elapsed="$(extract_failure_elapsed "$log")"
+
+      if grep -aEq 'test timed out' "$log"; then
+        echo "  - ${test_name}"
+        [[ -n "$failure_reason" ]] && echo "    reason: ${failure_reason}"
+        [[ -n "$failure_elapsed" ]] && echo "    elapsed: ${failure_elapsed}"
+        printed_running_tests=0
+        while IFS= read -r running_test; do
+          [[ -z "$running_test" ]] && continue
+          if [[ $printed_running_tests -ne 1 ]]; then
+            echo "    running tests:"
+            printed_running_tests=1
+          fi
+          echo "      ${running_test}"
+        done < <(extract_timeout_running_tests "$log")
+        printed_running_tests=0
+        continue
+      fi
+
+      emitted_case_details=0
+      while IFS='|' read -r failed_case case_reason; do
+        [[ -z "$failed_case" ]] && continue
+        emitted_case_details=1
+        echo "  - ${test_name} :: ${failed_case}"
+        [[ -n "$case_reason" ]] && echo "    reason: ${case_reason}"
+      done < <(extract_failed_case_details "$log")
+
+      if [[ $emitted_case_details -eq 1 ]]; then
+        [[ -n "$failure_elapsed" ]] && echo "    elapsed: ${failure_elapsed}"
+        continue
+      fi
+
+      echo "  - ${test_name}"
+      [[ -n "$failed_cases" ]] && echo "    failed cases: ${failed_cases}"
+      [[ -n "$failure_reason" ]] && echo "    reason: ${failure_reason}"
+      [[ -n "$failure_elapsed" ]] && echo "    elapsed: ${failure_elapsed}"
     fi
   done < <(find "$TEST_LOG_DIR" -maxdepth 1 -type f -name "test_*.run.log" | sort)
 fi

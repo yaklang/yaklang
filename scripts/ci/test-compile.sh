@@ -4,7 +4,7 @@ set -euo pipefail
 # 可覆写：编译 worker 数、go test -p、输出目录、测试配置
 DEFAULT_CPUS=$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.ncpu || echo 2)
 COMPILE_WORKERS=${COMPILE_WORKERS:-${JOBS:-$DEFAULT_CPUS}}
-GO_TEST_P=${GO_TEST_P:-1}
+GO_TEST_P="${GO_TEST_P:-}"
 TEST_BIN_DIR="${TEST_BIN_DIR:-./test_binaries}"
 TEST_CONFIG="${TEST_CONFIG:-}"  # 测试配置文件（JSON格式），必须提供
 RESET_TEST_BIN_DIR="${RESET_TEST_BIN_DIR:-1}"  # 0=保留已有产物并增量编译
@@ -26,7 +26,11 @@ fi
 
 echo "=== Compile Tests from Config ==="
 echo "COMPILE_WORKERS=$COMPILE_WORKERS"
-echo "GO_TEST_P=$GO_TEST_P"
+if [[ -n "$GO_TEST_P" ]]; then
+  echo "GO_TEST_P=$GO_TEST_P"
+else
+  echo "GO_TEST_P=<go default>"
+fi
 echo "BIN_DIR=$TEST_BIN_DIR"
 echo "CONFIG=$TEST_CONFIG"
 echo "RESET_TEST_BIN_DIR=$RESET_TEST_BIN_DIR"
@@ -176,8 +180,12 @@ compile_one() {
   fi
 
   # 构建编译参数
-  local compile_args=("-p=$GO_TEST_P" "-c" "-o" "$bin")
+  local compile_args=("-c" "-o" "$bin")
   local enable_race_for_pkg=0
+
+  if [[ -n "$GO_TEST_P" ]]; then
+    compile_args=("-p=$GO_TEST_P" "${compile_args[@]}")
+  fi
   
   # 检查该包是否需要启用race检测
   if should_enable_race "$pkg"; then
