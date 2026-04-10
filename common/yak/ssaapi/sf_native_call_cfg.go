@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 
@@ -17,6 +18,7 @@ const (
 	NativeCall_CFGDominates = "cfgDominates"
 	NativeCall_CFGPostDom   = "cfgPostDominates"
 	NativeCall_CFGReachable = "cfgReachable"
+	NativeCall_CFGReachPath = "cfgReachPath"
 	NativeCall_CFGBlockInfo = "cfgBlock"
 	NativeCall_CFGInstInfo  = "cfgInst"
 )
@@ -87,9 +89,27 @@ func isExitLikeBlock(fn *ssa.Function, blockID int64) bool {
 	if len(blk.Succs) == 0 {
 		return true
 	}
-	// Explicit return terminator.
+	// Explicit return (Yak lowering may not place Return as the sole LastInst).
 	if last := blk.LastInst(); last != nil {
 		if _, ok := ssa.ToReturn(last); ok {
+			return true
+		}
+	}
+	for _, iid := range blk.Insts {
+		ins, ok := blk.GetInstructionById(iid)
+		if !ok || ins == nil {
+			continue
+		}
+		if _, ok := ssa.ToReturn(ins); ok {
+			return true
+		}
+	}
+	// Straight-line lowering: jump / fall-through to the unique exit block.
+	if fn.ExitBlock > 0 && len(blk.Succs) == 1 && blk.Succs[0] == fn.ExitBlock {
+		return true
+	}
+	if last := blk.LastInst(); last != nil {
+		if j, ok := ssa.ToJump(last); ok && j != nil && fn.ExitBlock > 0 && j.To == fn.ExitBlock {
 			return true
 		}
 	}
@@ -418,6 +438,230 @@ type reachableOptions struct {
 	maxNodes int
 }
 
+// reachState is a BFS position for cfgReachable / cfgReachPath (includes inter-procedural depth).
+type reachState struct {
+	funcID  int64
+	blockID int64
+	depth   int
+}
+
+// icfgReturnSuccessors lists (callerFunc, succBlock) pairs: context-insensitive return from callee
+// to the intra-procedural successors of any block that contains a direct call to callee.
+func icfgReturnSuccessors(p *Program, calleeID int64) []reachState {
+	if p == nil || p.Program == nil || calleeID <= 0 {
+		return nil
+	}
+	targetFn, _ := getFunctionByID(p, calleeID)
+	seen := make(map[reachState]struct{})
+	var out []reachState
+	p.Program.EachFunction(func(fn *ssa.Function) {
+		if fn == nil {
+			return
+		}
+		callerID := fn.GetId()
+		for _, bid := range fn.Blocks {
+			blk, ok := fn.GetBasicBlockByID(bid)
+			if !ok || blk == nil {
+				continue
+			}
+			for _, instID := range blk.Insts {
+				ins, ok := blk.GetInstructionById(instID)
+				if !ok || ins == nil {
+					continue
+				}
+				call, ok := ssa.ToCall(ins)
+				if !ok || call == nil {
+					continue
+				}
+				method, ok := call.GetValueById(call.Method)
+				if !ok || method == nil {
+					continue
+				}
+				calleeFn, ok := ssa.ToFunction(method)
+				matchesCallee := call.Method == calleeID
+				if !matchesCallee && ok && calleeFn != nil {
+					matchesCallee = calleeFn.GetId() == calleeID
+					if !matchesCallee && targetFn != nil && calleeFn.GetName() == targetFn.GetName() {
+						matchesCallee = true
+					}
+				}
+				if !matchesCallee {
+					continue
+				}
+				// Resume in the same block (call and continuation may share one BB).
+				stSame := reachState{funcID: callerID, blockID: blk.GetId(), depth: 0}
+				if _, dup := seen[stSame]; !dup {
+					seen[stSame] = struct{}{}
+					out = append(out, stSame)
+				}
+				for _, s := range blk.Succs {
+					st := reachState{funcID: callerID, blockID: s, depth: 0}
+					if _, dup := seen[st]; dup {
+						continue
+					}
+					seen[st] = struct{}{}
+					out = append(out, st)
+				}
+			}
+		}
+	})
+	return out
+}
+
+func reachabilitySearch(p *Program, a, b *CfgCtxValue, opt reachableOptions, recordPred bool) (found bool, pred map[reachState]reachState, end reachState) {
+	if a == nil || b == nil || a.IsEmpty() || b.IsEmpty() {
+		return false, nil, reachState{}
+	}
+	start := reachState{funcID: a.FuncID, blockID: a.BlockID, depth: 0}
+	targetFuncID, targetBlockID := b.FuncID, b.BlockID
+
+	seen := map[reachState]struct{}{start: {}}
+	var predMap map[reachState]reachState
+	if recordPred {
+		predMap = make(map[reachState]reachState)
+	}
+	queue := []reachState{start}
+
+	tryAdd := func(cur, nxt reachState) {
+		if _, ok := seen[nxt]; ok {
+			return
+		}
+		seen[nxt] = struct{}{}
+		if predMap != nil {
+			predMap[nxt] = cur
+		}
+		queue = append(queue, nxt)
+	}
+
+	for len(queue) > 0 {
+		cur := queue[0]
+		queue = queue[1:]
+		if cur.funcID == targetFuncID && cur.blockID == targetBlockID {
+			return true, predMap, cur
+		}
+		if opt.maxNodes > 0 && len(seen) > opt.maxNodes {
+			return false, nil, reachState{}
+		}
+		fn, err := getFunctionByID(p, cur.funcID)
+		if err != nil || fn == nil {
+			continue
+		}
+		blk, _ := fn.GetBasicBlockByID(cur.blockID)
+		if blk == nil {
+			continue
+		}
+
+		for _, s := range blk.Succs {
+			tryAdd(cur, reachState{funcID: cur.funcID, blockID: s, depth: cur.depth})
+		}
+
+		if !opt.icfg {
+			continue
+		}
+		if opt.maxDepth > 0 && cur.depth >= opt.maxDepth {
+			continue
+		}
+
+		for _, instID := range blk.Insts {
+			ins, ok := blk.GetInstructionById(instID)
+			if !ok || ins == nil {
+				continue
+			}
+			call, ok := ssa.ToCall(ins)
+			if !ok || call == nil {
+				continue
+			}
+			method, ok := call.GetValueById(call.Method)
+			if !ok || method == nil {
+				continue
+			}
+			calleeFn, ok := ssa.ToFunction(method)
+			if !ok || calleeFn == nil || calleeFn.EnterBlock <= 0 {
+				continue
+			}
+			tryAdd(cur, reachState{funcID: calleeFn.GetId(), blockID: calleeFn.EnterBlock, depth: cur.depth + 1})
+		}
+
+		if isExitLikeBlock(fn, cur.blockID) {
+			for _, ret := range icfgReturnSuccessors(p, cur.funcID) {
+				tryAdd(cur, reachState{funcID: ret.funcID, blockID: ret.blockID, depth: cur.depth + 1})
+			}
+		}
+	}
+	return false, nil, reachState{}
+}
+
+func formatReachStateLabel(p *Program, st reachState) string {
+	fnName := "?"
+	if p != nil {
+		if fn, err := getFunctionByID(p, st.funcID); err == nil && fn != nil {
+			fnName = fn.GetName()
+		}
+	}
+	return fmt.Sprintf("%s[f=%d,b=%d]", fnName, st.funcID, st.blockID)
+}
+
+func cfgReachShortestPathString(p *Program, a, b *CfgCtxValue, opt reachableOptions) string {
+	ok, pred, end := reachabilitySearch(p, a, b, opt, true)
+	if !ok || pred == nil {
+		return ""
+	}
+	start := reachState{funcID: a.FuncID, blockID: a.BlockID, depth: 0}
+	var chain []string
+	cur := end
+	for {
+		chain = append(chain, formatReachStateLabel(p, cur))
+		if cur.funcID == start.funcID && cur.blockID == start.blockID {
+			break
+		}
+		pr, ok := pred[cur]
+		if !ok {
+			return ""
+		}
+		cur = pr
+	}
+	slices.Reverse(chain)
+	return strings.Join(chain, " -> ")
+}
+
+// cfgCtxForValueMemo maps a dataflow [Value] program point to [CfgCtxValue] with optional memoization.
+func cfgCtxForValueMemo(p *Program, v *Value, memo map[int64]*CfgCtxValue) *CfgCtxValue {
+	if p == nil || v == nil {
+		return nil
+	}
+	id := v.GetId()
+	if memo != nil && id > 0 {
+		if c, ok := memo[id]; ok {
+			return c
+		}
+	}
+	inst := v.getInstruction()
+	if inst == nil {
+		if memo != nil && id > 0 {
+			memo[id] = nil
+		}
+		return nil
+	}
+	fn := inst.GetFunc()
+	blk := inst.GetBlock()
+	if fn == nil || blk == nil {
+		if memo != nil && id > 0 {
+			memo[id] = nil
+		}
+		return nil
+	}
+	ctx := &CfgCtxValue{
+		prog:    p,
+		FuncID:  fn.GetId(),
+		BlockID: blk.GetId(),
+		InstID:  inst.GetId(),
+	}
+	if memo != nil && id > 0 {
+		memo[id] = ctx
+	}
+	return ctx
+}
+
 // reachableOptsFromParams applies icfg/max_depth/max_nodes only when meaningful:
 // - intra-proc (icfg false): no depth/node caps (zeros = unlimited).
 // - icfg: unset (-1 from GetInt) gets plan defaults max_depth=3, max_nodes=5000; explicit 0 disables that cap.
@@ -437,84 +681,8 @@ func reachableOptsFromParams(params *sfvm.NativeCallActualParams, icfg bool) rea
 }
 
 func reachableWithOptions(p *Program, a, b *CfgCtxValue, opt reachableOptions) bool {
-	if a == nil || b == nil || a.IsEmpty() || b.IsEmpty() {
-		return false
-	}
-
-	type state struct {
-		funcID  int64
-		blockID int64
-		depth   int
-	}
-	start := state{funcID: a.FuncID, blockID: a.BlockID, depth: 0}
-	targetFuncID := b.FuncID
-	targetBlockID := b.BlockID
-
-	seen := map[state]struct{}{start: {}}
-	queue := []state{start}
-
-	for len(queue) > 0 {
-		cur := queue[0]
-		queue = queue[1:]
-		if cur.funcID == targetFuncID && cur.blockID == targetBlockID {
-			return true
-		}
-		if opt.maxNodes > 0 && len(seen) > opt.maxNodes {
-			return false
-		}
-		fn, err := getFunctionByID(p, cur.funcID)
-		if err != nil || fn == nil {
-			continue
-		}
-		blk, _ := fn.GetBasicBlockByID(cur.blockID)
-		if blk == nil {
-			continue
-		}
-
-		// Intra-procedural CFG edges.
-		for _, s := range blk.Succs {
-			nxt := state{funcID: cur.funcID, blockID: s, depth: cur.depth}
-			if _, ok := seen[nxt]; ok {
-				continue
-			}
-			seen[nxt] = struct{}{}
-			queue = append(queue, nxt)
-		}
-
-		if opt.icfg {
-			// Minimal ICFG extension: call -> callee entry.
-			// We only support direct callee functions (method value is a *ssa.Function).
-			if opt.maxDepth > 0 && cur.depth >= opt.maxDepth {
-				continue
-			}
-			for _, instID := range blk.Insts {
-				ins, ok := blk.GetInstructionById(instID)
-				if !ok || ins == nil {
-					continue
-				}
-				call, ok := ssa.ToCall(ins)
-				if !ok || call == nil {
-					continue
-				}
-				method, ok := call.GetValueById(call.Method)
-				if !ok || method == nil {
-					continue
-				}
-				calleeFn, ok := ssa.ToFunction(method)
-				if !ok || calleeFn == nil || calleeFn.EnterBlock <= 0 {
-					continue
-				}
-				nxt := state{funcID: calleeFn.GetId(), blockID: calleeFn.EnterBlock, depth: cur.depth + 1}
-				if _, ok := seen[nxt]; ok {
-					continue
-				}
-				seen[nxt] = struct{}{}
-				queue = append(queue, nxt)
-			}
-		}
-	}
-
-	return false
+	ok, _, _ := reachabilitySearch(p, a, b, opt, false)
+	return ok
 }
 
 func reachable(p *Program, a, b *CfgCtxValue) bool {
@@ -724,6 +892,34 @@ func nativeCallCFGReachable(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.Nat
 	})
 	if len(out) == 0 {
 		return false, nil, utils.Errorf("cfgReachable: no cfg ctx values")
+	}
+	return true, sfvm.NewValues(out), nil
+}
+
+func nativeCallCFGReachPath(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
+	prog, err := fetchProgramFromCfgValues(v)
+	if err != nil {
+		return false, nil, err
+	}
+	b, err := resolveCfgTargetFromFrame(frame, params)
+	if err != nil {
+		return false, nil, utils.Wrap(err, "cfgReachPath")
+	}
+	icfg := parseBoolParam(params, "icfg", false)
+	opt := reachableOptsFromParams(params, icfg)
+
+	var out []sfvm.ValueOperator
+	_ = v.Recursive(func(op sfvm.ValueOperator) error {
+		a, ok := extractCfgCtx(op)
+		if !ok || a.IsEmpty() {
+			return nil
+		}
+		s := cfgReachShortestPathString(prog, a, b, opt)
+		out = append(out, prog.NewConstValue(s))
+		return nil
+	})
+	if len(out) == 0 {
+		return false, nil, utils.Errorf("cfgReachPath: no cfg ctx values")
 	}
 	return true, sfvm.NewValues(out), nil
 }

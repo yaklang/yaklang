@@ -210,6 +210,34 @@ b(cc)
 	})
 }
 
+func TestDataflow_OnlyReachable_ModePathAndStrict(t *testing.T) {
+	code := `
+func foo() {
+    return "a"
+}
+x = foo()
+println(x)
+`
+
+	ssatest.CheckSyntaxFlow(t, code, `
+println(* as $sink)
+$sink<getCfg> as $sinkCfg
+
+$sink #-> as $df
+
+$df<dataflow(<<<CODE
+    * ?{opcode: const} as $viaMode
+CODE, only_reachable="$sinkCfg", only_reachable_mode="path")>
+
+$df<dataflow(<<<CODE
+    * ?{opcode: const} as $viaStrict
+CODE, only_reachable="$sinkCfg", strict=true)>
+`, map[string][]string{
+		"viaMode":  {`"a"`},
+		"viaStrict": {`"a"`},
+	}, ssaapi.WithLanguage(ssaconfig.Yak))
+}
+
 func TestDataflow_OnlyReachable_CFG(t *testing.T) {
 	code := `
 func foo() {
