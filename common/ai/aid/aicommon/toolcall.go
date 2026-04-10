@@ -871,6 +871,7 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 	pluginInvokeDuration = 0
 	t.m.Unlock()
 
+	t.emitter.EmitToolCallParam(callToolId, invokeParams)
 	toolResult, err = t.invoke(
 		tool, invokeParams, handleUserCancel, handleError,
 		stdoutMultiWriter, stderrMultiWriter,

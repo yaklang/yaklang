@@ -2,8 +2,10 @@ package aireact
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -248,4 +250,170 @@ LOOP:
 		t.Fatal("timeline does not contain Regenerating parameters for tool: sleep")
 	}
 	fmt.Println("--------------------------------------")
+}
+
+func TestReAct_ToolUse_EmitFinalInvokeParams(t *testing.T) {
+	in := make(chan *ypb.AIInputEvent, 10)
+	out := make(chan *ypb.AIOutputEvent, 32)
+	toolName := "echo_" + ksuid.New().String()
+	expectedInput := "param_" + ksuid.New().String()
+
+	var invokedParams aitool.InvokeParams
+	var toolCalled bool
+	echoTool, err := aitool.New(
+		toolName,
+		aitool.WithStringParam("input"),
+		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+			toolCalled = true
+			invokedParams = make(aitool.InvokeParams)
+			for k, v := range params {
+				if k == "runtime_id" {
+					continue
+				}
+				invokedParams[k] = v
+			}
+			return params.GetAnyToString("input"), nil
+		}),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			prompt := r.GetPrompt()
+			if isPrimaryDecisionPrompt(prompt) {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`
+{"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `" },
+"human_readable_thought": "mocked thought for final param emit", "cumulative_summary": "..cumulative-mocked for final param emit.."}
+`))
+				rsp.Close()
+				return rsp, nil
+			}
+
+			if isToolParamGenerationPrompt(prompt, toolName) {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "call-tool", "params": { "input" : "` + expectedInput + `" }}`))
+				rsp.Close()
+				return rsp, nil
+			}
+
+			if isVerifySatisfactionPrompt(prompt) {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "final invoke params captured"}`))
+				rsp.Close()
+				return rsp, nil
+			}
+
+			if isDirectAnswerPrompt(prompt) {
+				rsp := i.NewAIResponse()
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "done"}`))
+				rsp.Close()
+				return rsp, nil
+			}
+
+			return nil, utils.Errorf("unexpected prompt: %s", prompt)
+		}),
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
+			out <- e.ToGRPC()
+		}),
+		aicommon.WithTools(echoTool),
+		aicommon.WithAgreeYOLO(true),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	go func() {
+		in <- &ypb.AIInputEvent{
+			IsFreeInput: true,
+			FreeInput:   "abc",
+		}
+	}()
+
+	du := time.Duration(10)
+	if utils.InGithubActions() {
+		du = time.Duration(5)
+	}
+	after := time.After(du * time.Second)
+
+	var paramEventCount int
+	var paramEventCallToolID string
+	var startEventCallToolID string
+	var resultEventCallToolID string
+	var eventParams aitool.InvokeParams
+	var taskCompleted bool
+
+LOOP:
+	for {
+		select {
+		case e := <-out:
+			if e.Type == string(schema.EVENT_TOOL_CALL_PARAM) {
+				paramEventCount++
+				paramEventCallToolID = utils.InterfaceToString(jsonpath.FindFirst(string(e.Content), "$.call_tool_id"))
+				var payload struct {
+					Params aitool.InvokeParams `json:"params"`
+				}
+				if err := json.Unmarshal(e.Content, &payload); err != nil {
+					t.Fatalf("failed to unmarshal tool_call_param event: %v", err)
+				}
+				eventParams = payload.Params
+			}
+
+			if e.Type == string(schema.EVENT_TOOL_CALL_START) {
+				startEventCallToolID = utils.InterfaceToString(jsonpath.FindFirst(string(e.Content), "$.call_tool_id"))
+			}
+
+			if e.Type == string(schema.EVENT_TOOL_CALL_RESULT) {
+				resultEventCallToolID = utils.InterfaceToString(jsonpath.FindFirst(string(e.Content), "$.call_tool_id"))
+			}
+
+			if e.NodeId == "react_task_status_changed" {
+				result := jsonpath.FindFirst(e.GetContent(), "$..react_task_now_status")
+				if utils.InterfaceToString(result) == "completed" {
+					taskCompleted = true
+					break LOOP
+				}
+			}
+		case <-after:
+			break LOOP
+		}
+	}
+	close(in)
+
+	if !toolCalled {
+		t.Fatal("expected final tool invocation, but tool was not called")
+	}
+	if !taskCompleted {
+		t.Fatal("expected react task to complete")
+	}
+	if paramEventCount != 1 {
+		t.Fatalf("expected exactly 1 tool_call_param event for final invoke, got %d", paramEventCount)
+	}
+	if paramEventCallToolID == "" {
+		t.Fatal("expected tool_call_param event to carry call tool id")
+	}
+	if startEventCallToolID == "" {
+		t.Fatal("expected tool_call_start event to carry call tool id")
+	}
+	if resultEventCallToolID == "" {
+		t.Fatal("expected tool_call_result event to carry call tool id")
+	}
+	if paramEventCallToolID != startEventCallToolID || paramEventCallToolID != resultEventCallToolID {
+		t.Fatalf("tool_call_param call_tool_id mismatch: param=%s start=%s result=%s", paramEventCallToolID, startEventCallToolID, resultEventCallToolID)
+	}
+	if eventParams == nil {
+		t.Fatal("expected tool_call_param event to contain params")
+	}
+	if invokedParams == nil {
+		t.Fatal("expected tool callback to receive invoke params")
+	}
+	if !reflect.DeepEqual(map[string]any(eventParams), map[string]any(invokedParams)) {
+		t.Fatalf("tool_call_param params mismatch: event=%v invoked=%v", eventParams, invokedParams)
+	}
+	if eventParams.GetString("input") != expectedInput {
+		t.Fatalf("expected tool_call_param to emit random final input %q, got %q", expectedInput, eventParams.GetString("input"))
+	}
 }

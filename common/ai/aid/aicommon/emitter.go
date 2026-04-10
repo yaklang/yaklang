@@ -493,6 +493,13 @@ func (r *Emitter) EmitToolCallResult(callToolId string, result any) (*schema.AiO
 	})
 }
 
+func (r *Emitter) EmitToolCallParam(callToolId string, params aitool.InvokeParams) (*schema.AiOutputEvent, error) {
+	return r.EmitJSON(schema.EVENT_TOOL_CALL_PARAM, callToolId, map[string]any{
+		"call_tool_id": callToolId,
+		"params":       params,
+	})
+}
+
 func (r *Emitter) EmitToolCallLogDir(callToolId string, dirPath string) (*schema.AiOutputEvent, error) {
 	return r.EmitJSON(schema.EVENT_TOOL_CALL_LOG_DIR, callToolId, map[string]any{
 		"call_tool_id": callToolId,
