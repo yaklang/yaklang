@@ -4,6 +4,7 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/dbcache"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
@@ -124,20 +125,6 @@ func (s *indexStore) AddVariable(name string, inst Instruction) {
 	if s.indexSaver != nil {
 		s.indexSaver.Save(CreateVariableIndexByName(name, inst))
 	}
-	if s.offsetSaver == nil {
-		return
-	}
-	value, ok := inst.(Value)
-	if !ok {
-		return
-	}
-	variable := value.GetVariable(name)
-	if utils.IsNil(variable) {
-		return
-	}
-	for _, offset := range ConvertVariable2Offset(variable, name, value.GetId()) {
-		s.offsetSaver.Save(offset)
-	}
 }
 
 func (s *indexStore) RemoveVariable(name string, inst Instruction) {
@@ -232,6 +219,15 @@ func (s *indexStore) diagnosticsTrack(name string, steps ...func() error) {
 		return
 	}
 	s.program.DiagnosticsTrack(name, steps...)
+}
+
+func (s *indexStore) SaveVariableOffset(variable *Variable, rng *memedit.Range) {
+	if s == nil || s.offsetSaver == nil || utils.IsNil(variable) || utils.IsNil(rng) {
+		return
+	}
+	if offset := CreateVariableOffset(variable, rng); offset != nil {
+		s.offsetSaver.Save(offset)
+	}
 }
 
 func appendResidentIndex(index *utils.SafeMapWithKey[string, []int64], key string, id int64) {
