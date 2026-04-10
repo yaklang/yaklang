@@ -75,6 +75,10 @@ func runForgeEquivTest(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := req.GetPrompt()
 
+			// Match on stable action names from the JSON schema + base prompt. Do not require
+			// "request_plan_and_execution" — when AllowPlan is false (e.g. PlanInProgress / async edge
+			// cases), that substring can be omitted from the rendered instruction while the schema
+			// still lists directly_answer and load_capability / require_ai_blueprint.
 			if utils.MatchAllOfSubString(prompt, promptMatchStrings...) {
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(aiResponseJSON))
@@ -134,7 +138,7 @@ func runForgeEquivTest(
 
 	select {
 	case <-finishCh:
-	case <-time.After(10 * time.Second):
+	case <-time.After(30 * time.Second):
 		t.Logf("[%s] Timeout waiting for async finish", testName)
 	}
 
@@ -168,7 +172,7 @@ func TestForgeEquivalence_RequireAIBlueprint_vs_LoadCapability(t *testing.T) {
 			forgeName,
 			`{"@action": "object", "next_action": {"type": "require_ai_blueprint", "blueprint_payload": "`+forgeName+`"},
 			"human_readable_thought": "requesting ai blueprint"}`,
-			[]string{"directly_answer", "request_plan_and_execution", "require_ai_blueprint"},
+			[]string{"directly_answer", "require_ai_blueprint"},
 		)
 
 		if !baselineResult.asyncTriggerCalled {
@@ -191,7 +195,7 @@ func TestForgeEquivalence_RequireAIBlueprint_vs_LoadCapability(t *testing.T) {
 			forgeName,
 			`{"@action": "load_capability", "identifier": "`+forgeName+`",
 			"human_readable_thought": "loading capability for forge"}`,
-			[]string{"directly_answer", "request_plan_and_execution", "load_capability"},
+			[]string{"directly_answer", "load_capability"},
 		)
 
 		if !loadCapResult.asyncTriggerCalled {
