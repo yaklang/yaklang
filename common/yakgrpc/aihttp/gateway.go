@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -22,6 +24,7 @@ type AIAgentHTTPGateway struct {
 	port        int
 	routePrefix string
 	debug       bool
+	uploadDir   string
 
 	enableJWT  bool
 	jwtSecret  string
@@ -50,6 +53,7 @@ func NewAIAgentHTTPGateway(opts ...GatewayOption) (*AIAgentHTTPGateway, error) {
 		host:        "0.0.0.0",
 		port:        8089,
 		routePrefix: "/agent",
+		uploadDir:   filepath.Join(consts.GetDefaultYakitBaseDir(), "aihttp-uploads"),
 		ctx:         ctx,
 		cancel:      cancel,
 	}
@@ -64,6 +68,10 @@ func NewAIAgentHTTPGateway(opts ...GatewayOption) (*AIAgentHTTPGateway, error) {
 	if gw.db == nil {
 		cancel()
 		return nil, fmt.Errorf("profile database is unavailable")
+	}
+	if err := gw.ensureUploadDir(); err != nil {
+		cancel()
+		return nil, fmt.Errorf("init upload dir failed: %w", err)
 	}
 	gw.runManager = NewRunManager(ctx)
 
@@ -154,6 +162,7 @@ func (gw *AIAgentHTTPGateway) Start() error {
 	if gw.enableTOTP {
 		log.Infof("TOTP authentication enabled")
 	}
+	log.Infof("Upload directory: %s", gw.uploadDir)
 
 	if err := gw.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		return fmt.Errorf("HTTP server error: %w", err)
@@ -218,6 +227,10 @@ func (gw *AIAgentHTTPGateway) GetRoutePrefix() string {
 	return gw.routePrefix
 }
 
+func (gw *AIAgentHTTPGateway) GetUploadDir() string {
+	return gw.uploadDir
+}
+
 func (gw *AIAgentHTTPGateway) IsJWTEnabled() bool {
 	return gw.enableJWT
 }
@@ -255,4 +268,12 @@ func (gw *AIAgentHTTPGateway) applySettingToRuntime(s aiAgentChatSettingPayload)
 		VisionConfigs:      modelConfigs,
 	})
 	log.Infof("applied AI config from DB: service=%s model=%s policy=%s", s.AIService, s.AIModelName, s.ReviewPolicy)
+}
+
+func (gw *AIAgentHTTPGateway) ensureUploadDir() error {
+	if gw.uploadDir == "" {
+		gw.uploadDir = filepath.Join(consts.GetDefaultYakitBaseDir(), "aihttp-uploads")
+	}
+	gw.uploadDir = filepath.Clean(gw.uploadDir)
+	return os.MkdirAll(gw.uploadDir, 0o755)
 }
