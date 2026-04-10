@@ -6,12 +6,13 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
@@ -1130,13 +1131,13 @@ secret-key: x`
 
 // hookColorModifiedPacketTestConfig 对修改后的包生效测试配置
 type hookColorModifiedPacketTestConfig struct {
-	name           string
-	replaceRule    string // 规则1：替换匹配内容
-	replaceResult  string // 替换结果
-	mirrorRule     string // 规则2：mirror 规则匹配（修改后才会出现的内容）
-	mirrorTag      string // mirror 规则的 ExtraTag
-	originalBody   string // 原始请求 body 中的内容
-	expectExtract  string // 期望 HookColor 提取的数据（来自修改后的包）
+	name          string
+	replaceRule   string // 规则1：替换匹配内容
+	replaceResult string // 替换结果
+	mirrorRule    string // 规则2：mirror 规则匹配（修改后才会出现的内容）
+	mirrorTag     string // mirror 规则的 ExtraTag
+	originalBody  string // 原始请求 body 中的内容
+	expectExtract string // 期望 HookColor 提取的数据（来自修改后的包）
 }
 
 func TestHookColorUsesModifiedPacket_Config(t *testing.T) {
@@ -1207,61 +1208,61 @@ Host: example.com
 
 // regexpResultTemplateTestConfig 模板格式 $1/\1/{1} 测试配置
 type regexpResultTemplateTestConfig struct {
-	name           string
-	rule           string
-	template       string
-	packetBody     string
-	expectResult   string
+	name            string
+	rule            string
+	template        string
+	packetBody      string
+	expectResult    string
 	testMatchPacket bool // true 测试 MatchPacket，false 测试 HookColor
 }
 
 func TestMITMReplaceRule_RegexpResultTemplate_Config(t *testing.T) {
 	for _, cfg := range []regexpResultTemplateTestConfig{
 		{
-			name:             "match_packet_dollar_syntax",
-			rule:             `(\w+)-(\w+)-(\w+)`,
-			template:         `$1个$2和$3`,
-			packetBody:       `HTTP/1.1 200 OK
+			name:     "match_packet_dollar_syntax",
+			rule:     `(\w+)-(\w+)-(\w+)`,
+			template: `$1个$2和$3`,
+			packetBody: `HTTP/1.1 200 OK
 Content-Type: text/plain
 Content-Length: 11
 
 abc-def-ghi`,
-			expectResult:     "abc个def和ghi",
-			testMatchPacket:  true,
+			expectResult:    "abc个def和ghi",
+			testMatchPacket: true,
 		},
 		{
-			name:             "match_packet_brace_syntax",
-			rule:             `(\d+):(\d+)`,
-			template:         `{1}时{2}分`,
-			packetBody:       `HTTP/1.1 200 OK
+			name:     "match_packet_brace_syntax",
+			rule:     `(\d+):(\d+)`,
+			template: `{1}时{2}分`,
+			packetBody: `HTTP/1.1 200 OK
 Content-Length: 5
 
 12:30`,
-			expectResult:     "12时30分",
-			testMatchPacket:  true,
+			expectResult:    "12时30分",
+			testMatchPacket: true,
 		},
 		{
-			name:             "hook_color_dollar_syntax",
-			rule:             `(a)(b)(c)`,
-			template:         `$1个$2和$3`,
-			packetBody:       `HTTP/1.1 200 OK
+			name:     "hook_color_dollar_syntax",
+			rule:     `(a)(b)(c)`,
+			template: `$1个$2和$3`,
+			packetBody: `HTTP/1.1 200 OK
 Content-Type: application/json
 Content-Length: 3
 
 abc`,
-			expectResult:     "a个b和c",
-			testMatchPacket:  false,
+			expectResult:    "a个b和c",
+			testMatchPacket: false,
 		},
 		{
-			name:             "hook_color_backslash_syntax",
-			rule:             `(x)(y)`,
-			template:         `\1-\2`,
-			packetBody:       `HTTP/1.1 200 OK
+			name:     "hook_color_backslash_syntax",
+			rule:     `(x)(y)`,
+			template: `\1-\2`,
+			packetBody: `HTTP/1.1 200 OK
 Content-Length: 2
 
 xy`,
-			expectResult:     "x-y",
-			testMatchPacket:  false,
+			expectResult:    "x-y",
+			testMatchPacket: false,
 		},
 	} {
 		t.Run(cfg.name, func(t *testing.T) {
@@ -1310,16 +1311,20 @@ xy`,
 func TestMITMReplaceRule_SecondaryRegexp_GlobalJoin(t *testing.T) {
 	rule := &yakit.MITMReplaceRule{
 		MITMContentReplacer: &ypb.MITMContentReplacer{
-			Rule:                         `(foo)(\d+)`,
-			EnableForResponse:            true,
-			EnableForBody:                true,
-			EnableForRequest:             false,
-			EnableForHeader:              false,
-			EnableForURI:                 false,
-			RegexpResultTemplate:         `$1:$2`,
-			SecondaryRegexp:              `foo:(\d+)`,
-			SecondaryRegexpResultTemplate: `$1`,
-			SecondaryJoiner:              `,`,
+			Rule:                 `(foo)(\d+)`,
+			EnableForResponse:    true,
+			EnableForBody:        true,
+			EnableForRequest:     false,
+			EnableForHeader:      false,
+			EnableForURI:         false,
+			RegexpResultTemplate: `$1:$2`,
+			SecondaryStages: []*ypb.RegexOutputStage{
+				{
+					Regexp:         `foo:(\d+)`,
+					ResultTemplate: `$1`,
+					Joiner:         `,`,
+				},
+			},
 		},
 	}
 	_, results, err := rule.MatchPacket([]byte(`HTTP/1.1 200 OK
@@ -1331,6 +1336,45 @@ foo1 foo2`), false)
 	require.Len(t, results, 2)
 	require.Equal(t, "1", results[0].MatchResult)
 	require.Equal(t, "2", results[1].MatchResult)
+}
+
+func TestMITMReplaceRule_SecondaryStages_ThreeStages(t *testing.T) {
+	rule := &yakit.MITMReplaceRule{
+		MITMContentReplacer: &ypb.MITMContentReplacer{
+			Rule:                 `(foo)(\d+)`,
+			EnableForResponse:    true,
+			EnableForBody:        true,
+			EnableForRequest:     false,
+			EnableForHeader:      false,
+			EnableForURI:         false,
+			RegexpResultTemplate: `$1:$2`,
+			SecondaryStages: []*ypb.RegexOutputStage{
+				{
+					Regexp:         `foo:(\d+)`,
+					ResultTemplate: `$1`,
+					Joiner:         `,`,
+				},
+				{
+					Regexp:         `(\d+)`,
+					ResultTemplate: `num=$1`,
+					Joiner:         `|`,
+				},
+				{
+					Regexp:         `num=(2)`,
+					ResultTemplate: `only$1`,
+					Joiner:         `,`,
+				},
+			},
+		},
+	}
+	_, results, err := rule.MatchPacket([]byte(`HTTP/1.1 200 OK
+Content-Type: text/plain
+Content-Length: 9
+
+foo1 foo2`), false)
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	require.Equal(t, "only2", results[0].MatchResult)
 }
 
 func TestMITMReplaceRule_SecondaryRegexp_Disabled_BackCompat(t *testing.T) {
