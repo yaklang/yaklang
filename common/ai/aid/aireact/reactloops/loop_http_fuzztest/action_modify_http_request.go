@@ -87,30 +87,30 @@ var modifyHTTPRequestAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActL
 				}
 			}
 
-			fuzzReq, err := newLoopFuzzRequest(getLoopTaskContext(loop), r, fixedPacket, isHTTPS)
+			result, err := applyLoopHTTPFuzzRequestChange(loop, r, &loopHTTPFuzzRequestChange{
+				RawRequest:         string(fixedPacket),
+				IsHTTPS:            isHTTPS,
+				SourceAction:       "modify_http_request",
+				ChangeReason:       modificationReason,
+				ReviewDecision:     buildReviewDecisionLabel(reviewDecision),
+				EventOp:            loopHTTPFuzzRequestEventOpReplace,
+				EmitEvent:          true,
+				EmitEditablePacket: true,
+				PersistSession:     true,
+				Task:               operator.GetTask(),
+			})
 			if err != nil {
-				operator.Fail(fmt.Errorf("failed to create modified FuzzHTTPRequest: %v", err))
+				operator.Fail(fmt.Errorf("failed to apply modified HTTP request: %v", err))
 				return
 			}
 
-			previousSummary := getCurrentRequestSummary(loop)
-			setLoopCurrentRequestState(loop, fuzzReq, fixedPacket, isHTTPS)
-			loop.Set("previous_request", previousRequest)
-			loop.Set("previous_request_summary", previousSummary)
-			loop.Set("request_change_summary", compareRequests(previousRequest, string(fixedPacket)))
-			loop.Set("request_modification_reason", modificationReason)
-			loop.Set("request_review_decision", buildReviewDecisionLabel(reviewDecision))
-			loop.Set("bootstrap_source", "modify_http_request")
-			emitLoopHTTPFuzzEditablePacket(loop, operator.GetTask(), string(fixedPacket))
-
-			feedback := buildRequestModificationFeedback([]byte(previousRequest), fixedPacket, isHTTPS, modificationReason, buildReviewDecisionLabel(reviewDecision))
+			feedback := buildRequestModificationFeedback([]byte(previousRequest), []byte(result.CurrentState.RawRequest), isHTTPS, modificationReason, buildReviewDecisionLabel(reviewDecision))
 			record := recordLoopHTTPFuzzMetaAction(
 				loop,
 				"modify_http_request",
 				fmt.Sprintf("modification_target=%s; modification_reason=%s; require_manual_review=%v", modificationTarget, modificationReason, requireManualReview),
-				utils.ShrinkTextBlock(compareRequests(previousRequest, string(fixedPacket)), 240),
+				utils.ShrinkTextBlock(result.Diff, 240),
 			)
-			persistLoopHTTPFuzzSessionContext(loop, "modify_http_request")
 			log.Infof("modify_http_request action: target=%s, reason=%s, review=%v", modificationTarget, modificationReason, requireManualReview)
 			r.AddToTimeline("modify_http_request", fmt.Sprintf("Modified current HTTP request: %s\n%s", modificationTarget, buildFuzzTimelineSummary(feedback)))
 			operator.Feedback(buildLoopHTTPFuzzActionFeedback(record) + "\n\n" + feedback)

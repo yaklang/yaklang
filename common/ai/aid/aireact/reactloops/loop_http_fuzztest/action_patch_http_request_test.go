@@ -252,6 +252,23 @@ func collectHTTPPacketStreamContent(events []*schema.AiOutputEvent) string {
 	return out.String()
 }
 
+func collectLatestRequestChangeEvent(t *testing.T, events []*schema.AiOutputEvent) loopHTTPFuzzRequestChangeEvent {
+	t.Helper()
+	for i := len(events) - 1; i >= 0; i-- {
+		event := events[i]
+		if event.Type != schema.EVENT_TYPE_HTTP_FUZZ_REQUEST_CHANGE || event.NodeId != loopHTTPFuzzRequestChangeEventNode {
+			continue
+		}
+		var payload loopHTTPFuzzRequestChangeEvent
+		if err := json.Unmarshal(event.Content, &payload); err != nil {
+			t.Fatalf("unmarshal request change event: %v", err)
+		}
+		return payload
+	}
+	t.Fatal("expected request change event")
+	return loopHTTPFuzzRequestChangeEvent{}
+}
+
 func TestPatchHTTPRequestAction_EmitsPatchedPacketToUser(t *testing.T) {
 	invoker := newPatchActionTestInvoker(t)
 	loop, err := reactloops.CreateLoopByName(
@@ -304,5 +321,64 @@ func TestPatchHTTPRequestAction_EmitsPatchedPacketToUser(t *testing.T) {
 	}
 	if !strings.Contains(utils.InterfaceToString(loop.Get("current_request")), "X-Debug-Case: visible") {
 		t.Fatalf("expected current_request to keep patched packet, got:\n%s", loop.Get("current_request"))
+	}
+}
+
+func TestPatchHTTPRequestAction_EmitsVersionedRequestChangeEvent(t *testing.T) {
+	invoker := newPatchActionTestInvoker(t)
+	loop, err := reactloops.CreateLoopByName(
+		LoopHTTPFuzztestName,
+		invoker,
+		reactloops.WithAllowRAG(false),
+		reactloops.WithAllowAIForge(false),
+		reactloops.WithAllowPlanAndExec(false),
+		reactloops.WithAllowUserInteract(false),
+		reactloops.WithInitTask(func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
+			operator.Continue()
+		}),
+	)
+	if err != nil {
+		t.Fatalf("create loop: %v", err)
+	}
+
+	rawRequest := "GET /orders?id=1 HTTP/1.1\r\nHost: example.com\r\n\r\n"
+	fuzzReq, err := newLoopFuzzRequest(context.Background(), invoker, []byte(rawRequest), false)
+	if err != nil {
+		t.Fatalf("new fuzz request: %v", err)
+	}
+	storeLoopFuzzRequestState(loop, fuzzReq, []byte(rawRequest), false)
+	loop.Set(loopHTTPFuzzRequestStateKey, loopHTTPFuzzRequestState{
+		RawRequest:   rawRequest,
+		IsHTTPS:      false,
+		Summary:      getCurrentRequestSummary(loop),
+		Version:      1,
+		SourceAction: "set_http_request",
+	})
+	loop.Set(loopHTTPFuzzRequestVersionKey, 1)
+
+	executeHTTPPatchAction(t, loop, map[string]any{
+		"location":    "header",
+		"operation":   "add",
+		"field_name":  "X-Versioned",
+		"field_value": "2",
+		"reason":      "验证补丁事件只广播最新版请求。",
+	})
+
+	if emitter := loop.GetEmitter(); emitter != nil {
+		emitter.WaitForStream()
+	}
+
+	payload := collectLatestRequestChangeEvent(t, invoker.events)
+	if payload.Op != loopHTTPFuzzRequestEventOpPatch {
+		t.Fatalf("expected patch event op %q, got %q", loopHTTPFuzzRequestEventOpPatch, payload.Op)
+	}
+	if payload.Request.Version != 2 {
+		t.Fatalf("expected request version 2, got %d", payload.Request.Version)
+	}
+	if payload.SourceAction != "patch_http_request" {
+		t.Fatalf("expected source action patch_http_request, got %q", payload.SourceAction)
+	}
+	if !strings.Contains(payload.Request.Raw, "X-Versioned: 2") {
+		t.Fatalf("expected event request raw to contain patched header, got:\n%s", payload.Request.Raw)
 	}
 }
