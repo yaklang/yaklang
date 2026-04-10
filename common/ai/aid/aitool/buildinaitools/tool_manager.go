@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/searchtools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
+	"github.com/yaklang/yaklang/common/ai/ytoken"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -20,7 +21,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
-const defaultRecentToolCacheMaxBytes = 40 * 1024 // 40KB
+const defaultRecentToolCacheMaxTokens = 30 * 1024
 
 func isSupportedRecentToolAITagParamName(paramName string) bool {
 	if paramName == "" {
@@ -79,7 +80,7 @@ type AiToolManager struct {
 
 	recentToolsCache []*RecentToolEntry
 	recentToolsMu    sync.Mutex
-	maxCacheBytes    int
+	maxCacheTokens   int
 }
 
 // ToolManagerOption 定义工具管理器的配置选项
@@ -418,15 +419,15 @@ func (m *AiToolManager) EnableAIForgeSearch(searcher searchtools.AISearcher[*sch
 	return nil
 }
 
-func (m *AiToolManager) getMaxCacheBytes() int {
-	if m.maxCacheBytes > 0 {
-		return m.maxCacheBytes
+func (m *AiToolManager) getMaxCacheTokens() int {
+	if m.maxCacheTokens > 0 {
+		return m.maxCacheTokens
 	}
-	return defaultRecentToolCacheMaxBytes
+	return defaultRecentToolCacheMaxTokens
 }
 
-func (m *AiToolManager) GetRecentToolCacheMaxBytes() int {
-	return m.getMaxCacheBytes()
+func (m *AiToolManager) GetRecentToolCacheMaxTokens() int {
+	return m.getMaxCacheTokens()
 }
 
 func (m *AiToolManager) totalCacheSize() int {
@@ -450,7 +451,7 @@ func (m *AiToolManager) AddRecentlyUsedTool(tool *aitool.Tool) {
 	desc := tool.GetDescription()
 	schemaStr := tool.ToJSONSchemaString()
 	usage := tool.GetUsage()
-	entrySize := len(name) + len(desc) + len(schemaStr) + len(usage)
+	entrySize := ytoken.CalcTokenCount(name) + ytoken.CalcTokenCount(desc) + ytoken.CalcTokenCount(schemaStr) + ytoken.CalcTokenCount(usage)
 
 	// remove existing entry with same name (will be re-appended at tail)
 	filtered := make([]*RecentToolEntry, 0, len(m.recentToolsCache))
@@ -470,8 +471,8 @@ func (m *AiToolManager) AddRecentlyUsedTool(tool *aitool.Tool) {
 	}
 	m.recentToolsCache = append(m.recentToolsCache, newEntry)
 
-	maxBytes := m.getMaxCacheBytes()
-	for m.totalCacheSize() > maxBytes && len(m.recentToolsCache) > 1 {
+	maxTokens := m.getMaxCacheTokens()
+	for m.totalCacheSize() > maxTokens && len(m.recentToolsCache) > 1 {
 		m.recentToolsCache = m.recentToolsCache[1:]
 	}
 }
@@ -707,15 +708,15 @@ func (m *AiToolManager) ImportRecentToolCache(jsonStr string) {
 		existing[entry.Name] = struct{}{}
 	}
 
-	maxBytes := m.getMaxCacheBytes()
-	for m.totalCacheSize() > maxBytes && len(m.recentToolsCache) > 1 {
+	maxTokens := m.getMaxCacheTokens()
+	for m.totalCacheSize() > maxTokens && len(m.recentToolsCache) > 1 {
 		m.recentToolsCache = m.recentToolsCache[1:]
 	}
 }
 
-// GetRecentToolsSummary builds a prompt-friendly summary of cached tools within maxBytes.
+// GetRecentToolsSummary builds a prompt-friendly summary of cached tools within maxTokens.
 // Each tool is wrapped in AITAG boundaries <|TOOL_{name}_{nonce}|> to prevent confusion.
-func (m *AiToolManager) GetRecentToolsSummary(maxBytes int, nonce string) string {
+func (m *AiToolManager) GetRecentToolsSummary(maxTokens int, nonce string) string {
 	m.recentToolsMu.Lock()
 	defer m.recentToolsMu.Unlock()
 
@@ -725,7 +726,7 @@ func (m *AiToolManager) GetRecentToolsSummary(maxBytes int, nonce string) string
 
 	var sb strings.Builder
 	sb.WriteString("# Recently Used Tools (available for directly_call_tool)\n\n")
-	totalLen := sb.Len()
+	totalTokens := ytoken.CalcTokenCount(sb.String())
 	entryWritten := false
 	for reverseIndex := len(m.recentToolsCache) - 1; reverseIndex >= 0; reverseIndex-- {
 		entry := m.recentToolsCache[reverseIndex]
@@ -736,12 +737,12 @@ func (m *AiToolManager) GetRecentToolsSummary(maxBytes int, nonce string) string
 			"DisplaySchemaSnippet": renderDirectlyCallParamsSchema(entry.SchemaSnippet),
 			"Usage":                entry.Usage,
 		})
-		// Always include the most recent entry even if it exceeds maxBytes.
-		if entryWritten && maxBytes > 0 && totalLen+len(block) > maxBytes {
+		// Always include the most recent entry even if it exceeds maxTokens.
+		if entryWritten && maxTokens > 0 && totalTokens+ytoken.CalcTokenCount(block) > maxTokens {
 			break
 		}
 		sb.WriteString(block)
-		totalLen += len(block)
+		totalTokens += ytoken.CalcTokenCount(block)
 		entryWritten = true
 	}
 	if !entryWritten {

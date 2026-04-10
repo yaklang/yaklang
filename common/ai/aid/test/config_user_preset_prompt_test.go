@@ -49,21 +49,27 @@ func TestUserPresetPrompt_Basic(t *testing.T) {
 }
 
 func TestUserPresetPrompt_MaxLength(t *testing.T) {
-	longPrompt := strings.Repeat("a", 5000)
+	// Each "word_N " produces ~2 tokens; 6000 words => ~12000 tokens, well above 4000 limit
+	var parts []string
+	for i := 0; i < 6000; i++ {
+		parts = append(parts, "word")
+	}
+	longPrompt := strings.Join(parts, " ")
 	cfg := aicommon.NewConfig(
 		context.Background(),
 		aicommon.WithUserPresetPrompt(longPrompt),
 	)
-	assert.Equal(t, aicommon.UserPresetPromptMaxLength, len(cfg.UserPresetPrompt))
+	assert.LessOrEqual(t, aicommon.MeasureTokens(cfg.UserPresetPrompt), aicommon.UserPresetPromptMaxLength)
 }
 
 func TestUserPresetPrompt_ExactMaxLength(t *testing.T) {
-	exactPrompt := strings.Repeat("b", aicommon.UserPresetPromptMaxLength)
+	// A prompt that is under the token limit should be preserved as-is
+	exactPrompt := strings.Repeat("b", 100)
 	cfg := aicommon.NewConfig(
 		context.Background(),
 		aicommon.WithUserPresetPrompt(exactPrompt),
 	)
-	assert.Equal(t, aicommon.UserPresetPromptMaxLength, len(cfg.UserPresetPrompt))
+	assert.Equal(t, exactPrompt, cfg.UserPresetPrompt)
 	assert.Equal(t, exactPrompt, cfg.UserPresetPrompt)
 }
 

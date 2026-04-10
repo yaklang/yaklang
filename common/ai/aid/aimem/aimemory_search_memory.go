@@ -8,17 +8,18 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/ytoken"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func (t *AIMemoryTriage) SearchMemory(origin any, bytesLimit int) (*aicommon.SearchMemoryResult, error) {
-	return t.searchMemoryWithAIOption(origin, bytesLimit, false)
+func (t *AIMemoryTriage) SearchMemory(origin any, tokenLimit int) (*aicommon.SearchMemoryResult, error) {
+	return t.searchMemoryWithAIOption(origin, tokenLimit, false)
 }
 
-func (t *AIMemoryTriage) SearchMemoryWithoutAI(origin any, bytesLimit int) (*aicommon.SearchMemoryResult, error) {
-	return t.searchMemoryWithAIOption(origin, bytesLimit, true)
+func (t *AIMemoryTriage) SearchMemoryWithoutAI(origin any, tokenLimit int) (*aicommon.SearchMemoryResult, error) {
+	return t.searchMemoryWithAIOption(origin, tokenLimit, true)
 }
 
 func (t *AIMemoryTriage) searchMemoryForAITask(task aicommon.AIStatefulTask, limit int, disableAI bool) (*aicommon.SearchMemoryResult, error) {
@@ -99,30 +100,30 @@ func (t *AIMemoryTriage) searchMemoryForAITask(task aicommon.AIStatefulTask, lim
 	rankedMemories := t.rankMemoriesByRelevance(uniqueMemories, rankQuery)
 	searchSteps = append(searchSteps, "ranked memories by task retrieval info")
 
-	selectedMemories, totalContent, contentBytes := t.selectMemoriesByBytesLimit(rankedMemories, limit)
-	searchSteps = append(searchSteps, fmt.Sprintf("selected %d memories within %d bytes limit", len(selectedMemories), limit))
+	selectedMemories, totalContent, contentTokens := t.selectMemoriesByTokenLimit(rankedMemories, limit)
+	searchSteps = append(searchSteps, fmt.Sprintf("selected %d memories within %d token limit", len(selectedMemories), limit))
 
 	return &aicommon.SearchMemoryResult{
 		Memories:      selectedMemories,
 		TotalContent:  totalContent,
-		ContentBytes:  contentBytes,
+		ContentTokens: contentTokens,
 		SearchSummary: strings.Join(searchSteps, " -> "),
 	}, nil
 }
 
-func (t *AIMemoryTriage) searchMemoryForText(queryText string, bytesLimit int, disableAI bool) (*aicommon.SearchMemoryResult, error) {
+func (t *AIMemoryTriage) searchMemoryForText(queryText string, tokenLimit int, disableAI bool) (*aicommon.SearchMemoryResult, error) {
 
 	if strings.TrimSpace(queryText) == "" {
 		return &aicommon.SearchMemoryResult{
 			Memories:      []*aicommon.MemoryEntity{},
 			TotalContent:  "",
-			ContentBytes:  0,
+			ContentTokens: 0,
 			SearchSummary: "empty query provided",
 		}, nil
 	}
 
-	log.Infof("searching memories for query: %s (bytes limit: %d)",
-		utils.ShrinkString(queryText, 100), bytesLimit)
+	log.Infof("searching memories for query: %s (token limit: %d)",
+		utils.ShrinkString(queryText, 100), tokenLimit)
 
 	var allMemories []*aicommon.MemoryEntity
 	var searchSteps []string
@@ -172,34 +173,28 @@ func (t *AIMemoryTriage) searchMemoryForText(queryText string, bytesLimit int, d
 	rankedMemories := t.rankMemoriesByRelevance(uniqueMemories, queryText)
 	searchSteps = append(searchSteps, "ranked memories by C.O.R.E. P.A.C.T. relevance")
 
-	// 6. 根据字节限制选择记忆
-	selectedMemories, totalContent, contentBytes := t.selectMemoriesByBytesLimit(rankedMemories, bytesLimit)
-	searchSteps = append(searchSteps, fmt.Sprintf("selected %d memories within %d bytes limit", len(selectedMemories), bytesLimit))
+	// 6. select memories within token limit
+	selectedMemories, totalContent, contentTokens := t.selectMemoriesByTokenLimit(rankedMemories, tokenLimit)
+	searchSteps = append(searchSteps, fmt.Sprintf("selected %d memories within %d token limit", len(selectedMemories), tokenLimit))
 
 	searchSummary := strings.Join(searchSteps, " -> ")
 
-	log.Infof("memory search completed: %d memories, %d bytes content", len(selectedMemories), contentBytes)
-
-	// if len(selectedMemories) > 0 {
-	// 	log.Infof("fetched memories: \n%v", utils.PrefixLines(utils.ShrinkTextBlock(totalContent, 512), "Memory> "))
-	// }
+	log.Infof("memory search completed: %d memories, %d tokens content", len(selectedMemories), contentTokens)
 
 	return &aicommon.SearchMemoryResult{
 		Memories:      selectedMemories,
 		TotalContent:  totalContent,
-		ContentBytes:  contentBytes,
+		ContentTokens: contentTokens,
 		SearchSummary: searchSummary,
 	}, nil
 }
 
-// SearchMemory 根据输入内容搜索相关记忆，限制总内容字节数
-func (t *AIMemoryTriage) searchMemoryWithAIOption(origin any, bytesLimit int, disableAI bool) (*aicommon.SearchMemoryResult, error) {
-	// 转换输入为字符串
+func (t *AIMemoryTriage) searchMemoryWithAIOption(origin any, tokenLimit int, disableAI bool) (*aicommon.SearchMemoryResult, error) {
 	queryText := utils.InterfaceToString(origin)
 	if task, ok := origin.(aicommon.AIStatefulTask); ok {
-		return t.searchMemoryForAITask(task, bytesLimit, disableAI)
+		return t.searchMemoryForAITask(task, tokenLimit, disableAI)
 	}
-	return t.searchMemoryForText(queryText, bytesLimit, disableAI)
+	return t.searchMemoryForText(queryText, tokenLimit, disableAI)
 }
 
 // deduplicateMemories 去重记忆列表
@@ -346,18 +341,17 @@ func (t *AIMemoryTriage) calculateKeywordBonus(memory *aicommon.MemoryEntity, qu
 	return contentBonus
 }
 
-// selectMemoriesByBytesLimit 根据字节限制选择记忆
-func (t *AIMemoryTriage) selectMemoriesByBytesLimit(memories []*aicommon.MemoryEntity, bytesLimit int) ([]*aicommon.MemoryEntity, string, int) {
-	if bytesLimit <= 0 {
+// selectMemoriesByTokenLimit selects memories that fit within the given token limit.
+func (t *AIMemoryTriage) selectMemoriesByTokenLimit(memories []*aicommon.MemoryEntity, tokenLimit int) ([]*aicommon.MemoryEntity, string, int) {
+	if tokenLimit <= 0 {
 		return []*aicommon.MemoryEntity{}, "", 0
 	}
 
 	var selectedMemories []*aicommon.MemoryEntity
 	memoryTextMap := make(map[string]string)
-	totalBytes := 0
+	totalTokens := 0
 
 	for _, memory := range memories {
-		// 构建 Timeline 格式的记忆文本表示
 		var tagsBuilder strings.Builder
 		if len(memory.Tags) > 0 {
 			tagsBuilder.WriteString(" ")
@@ -373,23 +367,20 @@ func (t *AIMemoryTriage) selectMemoriesByBytesLimit(memories []*aicommon.MemoryE
 			tagsBuilder.String(),
 			memory.Content)
 
-		memoryBytes := len([]byte(memoryText))
+		memoryTokens := ytoken.CalcTokenCount(memoryText)
 
-		// 检查是否超过限制
-		if totalBytes+memoryBytes > bytesLimit {
-			// 如果是第一个记忆就超过限制，尝试截断
-			if len(selectedMemories) == 0 && memoryBytes > bytesLimit {
-				// 截断内容以适应限制
+		if totalTokens+memoryTokens > tokenLimit {
+			if len(selectedMemories) == 0 && memoryTokens > tokenLimit {
 				headerText := fmt.Sprintf("- %s%s\n\n  ",
 					memory.CreatedAt.Format("2006-01-02 15:04:05"),
 					tagsBuilder.String())
-				availableBytes := bytesLimit - len([]byte(headerText))
-				if availableBytes > 20 { // 至少保留20字节的内容
-					truncatedContent := string([]byte(memory.Content)[:availableBytes-10]) + "..."
+				availableTokens := tokenLimit - ytoken.CalcTokenCount(headerText)
+				if availableTokens > 10 {
+					truncatedContent := aicommon.ShrinkByTokens(memory.Content, availableTokens-5) + "..."
 					memoryText = headerText + truncatedContent + "\n\n"
 					selectedMemories = append(selectedMemories, memory)
 					memoryTextMap[memory.Id] = memoryText
-					totalBytes = len([]byte(memoryText))
+					totalTokens = ytoken.CalcTokenCount(memoryText)
 				}
 			}
 			break
@@ -397,15 +388,13 @@ func (t *AIMemoryTriage) selectMemoriesByBytesLimit(memories []*aicommon.MemoryE
 
 		selectedMemories = append(selectedMemories, memory)
 		memoryTextMap[memory.Id] = memoryText
-		totalBytes += memoryBytes
+		totalTokens += memoryTokens
 	}
 
-	// 对选中的记忆按时间排序 (Timeline: Oldest -> Newest)
 	sort.Slice(selectedMemories, func(i, j int) bool {
 		return selectedMemories[i].CreatedAt.Before(selectedMemories[j].CreatedAt)
 	})
 
-	// 重新构建内容字符串，确保顺序正确
 	var sortedContentParts []string
 	for _, memory := range selectedMemories {
 		if text, ok := memoryTextMap[memory.Id]; ok {
@@ -414,5 +403,5 @@ func (t *AIMemoryTriage) selectMemoriesByBytesLimit(memories []*aicommon.MemoryE
 	}
 
 	totalContent := strings.Join(sortedContentParts, "")
-	return selectedMemories, totalContent, totalBytes
+	return selectedMemories, totalContent, totalTokens
 }

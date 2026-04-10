@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/ytoken"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -78,10 +79,10 @@ var readReferenceFileAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActL
 			}
 
 			// 限制内容大小，避免过大
-			const maxContentSize = 50 * 1024 // 50KB
-			if len(resultContent) > maxContentSize {
-				resultContent = resultContent[:maxContentSize] + "\n\n[... content truncated, file too large ...]"
-				log.Warnf("read_reference_file: content truncated to %d bytes", maxContentSize)
+			const maxContentTokens = 50 * 1024
+			if ytoken.CalcTokenCount(resultContent) > maxContentTokens {
+				resultContent = resultContent[:maxContentTokens] + "\n\n[... content truncated, file too large ...]"
+				log.Warnf("read_reference_file: content truncated to %d tokens", maxContentTokens)
 			}
 
 			// 将读取的内容添加到已收集的参考资料中

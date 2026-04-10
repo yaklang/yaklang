@@ -21,7 +21,7 @@ func newManagerWithCache(maxBytes int) *AiToolManager {
 		toolEnabled: make(map[string]bool),
 	}
 	if maxBytes > 0 {
-		m.maxCacheBytes = maxBytes
+		m.maxCacheTokens = maxBytes
 	}
 	return m
 }
@@ -89,8 +89,8 @@ func TestRecentToolCache_SizeLimit(t *testing.T) {
 	mgr.recentToolsMu.Lock()
 	total := mgr.totalCacheSize()
 	mgr.recentToolsMu.Unlock()
-	assert.Check(t, total <= mgr.getMaxCacheBytes(),
-		"total cache size %d should not exceed max %d", total, mgr.getMaxCacheBytes())
+	assert.Check(t, total <= mgr.getMaxCacheTokens(),
+		"total cache size %d should not exceed max %d", total, mgr.getMaxCacheTokens())
 }
 
 func TestRecentToolCache_Summary(t *testing.T) {
@@ -265,7 +265,7 @@ func TestRecentToolCache_ActualToolSizes(t *testing.T) {
 	assert.Check(t, httpSize > 0, "do_http_request metadata-backed cache size should be non-zero")
 	assert.Check(t, combinedSize > bashSize, "combined metadata-backed cache size should exceed bash alone")
 	assert.Check(t, combinedSize > httpSize, "combined metadata-backed cache size should exceed do_http_request alone")
-	assert.Check(t, combinedSize < defaultRecentToolCacheMaxBytes, "bash + do_http_request metadata-backed cache size should fit in the new 40KB budget")
+	assert.Check(t, combinedSize < defaultRecentToolCacheMaxTokens, "bash + do_http_request metadata-backed cache size should fit in the token budget")
 }
 
 func TestRecentToolCache_SummaryFooterOnlyListsAITAGSupportedParams(t *testing.T) {

@@ -204,8 +204,7 @@ func TestSkillsContextManager_FoldingPreservesPromptIntegrity(t *testing.T) {
 	loader, _ := aiskillloader.NewFSSkillLoader(vfs)
 	mgr := aiskillloader.NewSkillsContextManager(loader)
 
-	// Use a very small max bytes to force folding
-	mgr.SetMaxBytes(300)
+	mgr.SetMaxTokens(50)
 
 	_ = mgr.LoadSkill("deploy-app")
 	_ = mgr.LoadSkill("code-review")
@@ -231,13 +230,12 @@ func TestSkillsContextManager_UnfoldByReload(t *testing.T) {
 	loader, _ := aiskillloader.NewFSSkillLoader(vfs)
 	mgr := aiskillloader.NewSkillsContextManager(loader)
 
-	// Force folding with small limit
-	mgr.SetMaxBytes(400)
+	mgr.SetMaxTokens(50)
 	_ = mgr.LoadSkill("deploy-app")
 	_ = mgr.LoadSkill("code-review")
 
 	// Now increase limit and reload the folded skill
-	mgr.SetMaxBytes(aiskillloader.SkillsContextMaxBytes)
+	mgr.SetMaxTokens(aiskillloader.SkillsContextMaxTokens)
 	// Reloading a folded skill should unfold it
 	_ = mgr.LoadSkill("deploy-app")
 

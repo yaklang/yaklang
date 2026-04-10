@@ -46,9 +46,9 @@ func TestSearchMemory_Basic(t *testing.T) {
 
 	// 测试搜索功能
 	searchQuery := "编程语言"
-	bytesLimit := 1000
+	tokenLimit := 1000
 
-	result, err := memory.SearchMemory(searchQuery, bytesLimit)
+	result, err := memory.SearchMemory(searchQuery, tokenLimit)
 	if err != nil {
 		t.Fatalf("search memory failed: %v", err)
 	}
@@ -60,12 +60,12 @@ func TestSearchMemory_Basic(t *testing.T) {
 
 	t.Logf("search results for '%s':", searchQuery)
 	t.Logf("  found %d memories", len(result.Memories))
-	t.Logf("  total content bytes: %d (limit: %d)", result.ContentBytes, bytesLimit)
+	t.Logf("  total content tokens: %d (limit: %d)", result.ContentTokens, tokenLimit)
 	t.Logf("  search summary: %s", result.SearchSummary)
 
-	// 验证字节限制
-	if result.ContentBytes > bytesLimit {
-		t.Errorf("content bytes %d exceeds limit %d", result.ContentBytes, bytesLimit)
+	// 验证 token 限制
+	if result.ContentTokens > tokenLimit {
+		t.Errorf("content tokens %d exceeds limit %d", result.ContentTokens, tokenLimit)
 	}
 
 	// 验证内容不为空（如果找到了记忆）
@@ -81,7 +81,7 @@ func TestSearchMemory_Basic(t *testing.T) {
 	}
 }
 
-func TestSearchMemory_BytesLimit(t *testing.T) {
+func TestSearchMemory_TokenLimit(t *testing.T) {
 	sessionID := "search-bytes-limit-test-" + uuid.New().String()
 	defer cleanupEntryTestData(t, sessionID)
 
@@ -123,17 +123,17 @@ func TestSearchMemory_BytesLimit(t *testing.T) {
 			t.Fatalf("search memory failed with limit %d: %v", limit, err)
 		}
 
-		t.Logf("bytes limit %d: found %d memories, actual bytes: %d",
-			limit, len(result.Memories), result.ContentBytes)
+		t.Logf("token limit %d: found %d memories, actual tokens: %d",
+			limit, len(result.Memories), result.ContentTokens)
 
-		// 验证字节限制
-		if result.ContentBytes > limit {
-			t.Errorf("content bytes %d exceeds limit %d", result.ContentBytes, limit)
+		// 验证 token 限制
+		if result.ContentTokens > limit {
+			t.Errorf("content tokens %d exceeds limit %d", result.ContentTokens, limit)
 		}
 
 		// 验证随着限制增加，内容应该不减少
-		if limit > 200 && result.ContentBytes == 0 {
-			t.Errorf("expected some content with limit %d, got 0 bytes", limit)
+		if limit > 200 && result.ContentTokens == 0 {
+			t.Errorf("expected some content with limit %d, got 0 tokens", limit)
 		}
 	}
 }
@@ -166,8 +166,8 @@ func TestSearchMemory_EmptyQuery(t *testing.T) {
 		t.Errorf("expected no memories for empty query, got %d", len(result.Memories))
 	}
 
-	if result.ContentBytes != 0 {
-		t.Errorf("expected 0 content bytes for empty query, got %d", result.ContentBytes)
+	if result.ContentTokens != 0 {
+		t.Errorf("expected 0 content tokens for empty query, got %d", result.ContentTokens)
 	}
 
 	if result.TotalContent != "" {

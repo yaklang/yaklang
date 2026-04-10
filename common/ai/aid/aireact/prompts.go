@@ -19,7 +19,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-const prevUserInputTagMaxBytes = 20 * 1024
+const prevUserInputTagMaxTokens = 20 * 1024
 
 func nonce() string {
 	return utils.RandAlphaNumStringBytes(5)
@@ -715,7 +715,7 @@ func (pm *PromptManager) DynamicContext() string {
 
 func (pm *PromptManager) DynamicContextWithNonce(nonce string) string {
 	baseContext := pm.cpm.Execute(pm.react.config, pm.react.config.Emitter)
-	historyContext := pm.react.config.FormatUserInputHistoryAITag(nonce, prevUserInputTagMaxBytes)
+	historyContext := pm.react.config.FormatUserInputHistoryAITag(nonce, prevUserInputTagMaxTokens)
 	switch {
 	case strings.TrimSpace(baseContext) == "":
 		return historyContext

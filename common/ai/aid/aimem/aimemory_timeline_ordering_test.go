@@ -67,9 +67,9 @@ func TestSearchMemory_TimelineOrdering(t *testing.T) {
 
 	// 搜索所有Go相关的记忆
 	searchQuery := "Go语言"
-	bytesLimit := 5000 // 足够大的限制，确保能返回所有记忆
+	tokenLimit := 5000 // 足够大的限制，确保能返回所有记忆
 
-	result, err := memory.SearchMemory(searchQuery, bytesLimit)
+	result, err := memory.SearchMemory(searchQuery, tokenLimit)
 	require.NoError(t, err, "搜索记忆失败")
 	require.NotNil(t, result, "搜索结果不应为nil")
 
@@ -146,9 +146,9 @@ func TestSearchMemoryWithoutAI_TimelineOrdering(t *testing.T) {
 
 	// 使用 SearchMemoryWithoutAI 搜索
 	searchQuery := "技术栈"
-	bytesLimit := 3000
+	tokenLimit := 3000
 
-	result, err := memory.SearchMemoryWithoutAI(searchQuery, bytesLimit)
+	result, err := memory.SearchMemoryWithoutAI(searchQuery, tokenLimit)
 	require.NoError(t, err, "无AI搜索失败")
 	require.NotNil(t, result, "搜索结果不应为nil")
 

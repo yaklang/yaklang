@@ -113,20 +113,20 @@ func (m *MockMemoryTriageForBuildMemory) HandleMemory(i any) error {
 	return err
 }
 
-func (m *MockMemoryTriageForBuildMemory) SearchMemory(origin any, bytesLimit int) (*aicommon.SearchMemoryResult, error) {
+func (m *MockMemoryTriageForBuildMemory) SearchMemory(origin any, tokenLimit int) (*aicommon.SearchMemoryResult, error) {
 	return &aicommon.SearchMemoryResult{
 		Memories:      []*aicommon.MemoryEntity{},
 		TotalContent:  "",
-		ContentBytes:  0,
+		ContentTokens: 0,
 		SearchSummary: "Mock search completed",
 	}, nil
 }
 
-func (m *MockMemoryTriageForBuildMemory) SearchMemoryWithoutAI(origin any, bytesLimit int) (*aicommon.SearchMemoryResult, error) {
+func (m *MockMemoryTriageForBuildMemory) SearchMemoryWithoutAI(origin any, tokenLimit int) (*aicommon.SearchMemoryResult, error) {
 	return &aicommon.SearchMemoryResult{
 		Memories:      []*aicommon.MemoryEntity{},
 		TotalContent:  "",
-		ContentBytes:  0,
+		ContentTokens: 0,
 		SearchSummary: "Mock keyword search completed",
 	}, nil
 }

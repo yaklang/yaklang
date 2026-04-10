@@ -182,7 +182,7 @@ func (r *ReActLoop) generateLoopPrompt(
 	if tm := r.config.GetAiToolManager(); tm != nil && tm.HasRecentlyUsedTools() {
 		r.syncRecentToolParamAITagFields(tm.GetRecentToolParamNames())
 		reactiveData += renderRecentToolRoutingHint(nonce)
-		if summary := tm.GetRecentToolsSummary(tm.GetRecentToolCacheMaxBytes(), nonce); summary != "" {
+		if summary := tm.GetRecentToolsSummary(tm.GetRecentToolCacheMaxTokens(), nonce); summary != "" {
 			cacheBlock := utils.MustRenderTemplate(`
 <|CACHE_TOOL_CALL_{{ .Nonce }}>
 {{ .Summary }}

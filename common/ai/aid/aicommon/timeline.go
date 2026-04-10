@@ -22,6 +22,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/omap"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/ytoken"
 )
 
 type Timeline struct {
@@ -35,7 +36,7 @@ type Timeline struct {
 	summary          *omap.OrderedMap[int64, *linktable.LinkTable[*TimelineItem]]
 	reducers         *omap.OrderedMap[int64, *linktable.LinkTable[string]]
 
-	// this limit is used to limit the timeline dump string size.
+	// this limit is used to limit the timeline dump content size (in tokens).
 	perDumpContentLimit   int64
 	totalDumpContentLimit int64
 
@@ -50,8 +51,8 @@ func (m *Timeline) OrderInsertTs(ts int64, item *TimelineItem) {
 	m.tsToTimelineItem.OrderInsert(ts, item, cmp.Less[int64])
 }
 
-// MaxTimelineSaveSize is the maximum size (100KB) for timeline data when saving to database
-const MaxTimelineSaveSize = 100 * 1024
+// MaxTimelineSaveSize is the maximum size (1.5MB storage limit) for timeline data when saving to database
+const MaxTimelineSaveSize = 1536 * 1024
 
 func (m *Timeline) Save(db *gorm.DB, persistentId string) {
 	if utils.IsNil(m) {
@@ -539,7 +540,7 @@ func (m *Timeline) calculateActualContentSize() int64 {
 		return true
 	})
 	if count > 0 {
-		return int64(len(buf.String()))
+		return int64(ytoken.CalcTokenCount(buf.String()))
 	}
 	return 0
 }
@@ -743,8 +744,8 @@ func (m *Timeline) compressForSizeLimit() {
 	}()
 }
 
-// MaxBatchCompressPromptSize is the maximum size (80KB) for batch compress prompt
-// This leaves room for the template overhead while keeping under 100KB total
+// MaxBatchCompressPromptSize is the maximum size (in tokens) for batch compress prompt
+// This leaves room for the template overhead while keeping under the total token budget
 const MaxBatchCompressPromptSize = 80 * 1024
 
 //go:embed prompts/timeline/batch_compress.txt

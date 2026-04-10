@@ -6,9 +6,11 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/ytoken"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+// verificationTodoSnapshotLimit is measured in tokens (not bytes).
 const verificationTodoSnapshotLimit = 10 * 1024
 
 type verificationTodoStatus string
@@ -111,24 +113,24 @@ func renderVerificationTodoSnapshot(history []*aicommon.VerifySatisfactionResult
 		lines = append(lines, formatVerificationTodoLine(closed[index]))
 	}
 
-	note := "- NOTE: TODO history exceeded 10KB; older closed items were truncated because this ReAct chain is too long. Prioritize finishing or dropping stale TODOs."
-	if len(strings.Join(lines, "\n")) <= verificationTodoSnapshotLimit {
+	note := "- NOTE: TODO history exceeded 10K tokens; older closed items were truncated because this ReAct chain is too long. Prioritize finishing or dropping stale TODOs."
+	if ytoken.CalcTokenCount(strings.Join(lines, "\n")) <= verificationTodoSnapshotLimit {
 		return strings.Join(lines, "\n")
 	}
 
 	truncated := make([]string, 0, len(lines))
-	currentBytes := 0
+	currentTokens := 0
 	for _, line := range lines {
-		lineBytes := len(line)
-		separatorBytes := 0
+		lineTokens := ytoken.CalcTokenCount(line)
+		separatorTokens := 0
 		if len(truncated) > 0 {
-			separatorBytes = 1
+			separatorTokens = 1
 		}
-		if currentBytes+separatorBytes+lineBytes > verificationTodoSnapshotLimit-len(note)-1 {
+		if currentTokens+separatorTokens+lineTokens > verificationTodoSnapshotLimit-ytoken.CalcTokenCount(note)-1 {
 			break
 		}
 		truncated = append(truncated, line)
-		currentBytes += separatorBytes + lineBytes
+		currentTokens += separatorTokens + lineTokens
 	}
 	truncated = append(truncated, note)
 	return strings.Join(truncated, "\n")
@@ -207,24 +209,24 @@ func renderVerificationTodoMarkdownSnapshot(history []*aicommon.VerifySatisfacti
 	lines = append(lines, deleted...)
 	lines = append(lines, skipped...)
 
-	note := "- [x] (truncated) TODO snapshot exceeded 10KB; older items were omitted to keep the view stable."
-	if len(strings.Join(lines, "\n")) <= verificationTodoSnapshotLimit {
+	note := "- [x] (truncated) TODO snapshot exceeded 10K tokens; older items were omitted to keep the view stable."
+	if ytoken.CalcTokenCount(strings.Join(lines, "\n")) <= verificationTodoSnapshotLimit {
 		return strings.Join(lines, "\n")
 	}
 
 	truncated := make([]string, 0, len(lines))
-	currentBytes := 0
+	currentTokens := 0
 	for _, line := range lines {
-		lineBytes := len(line)
-		separatorBytes := 0
+		lineTokens := ytoken.CalcTokenCount(line)
+		separatorTokens := 0
 		if len(truncated) > 0 {
-			separatorBytes = 1
+			separatorTokens = 1
 		}
-		if currentBytes+separatorBytes+lineBytes > verificationTodoSnapshotLimit-len(note)-1 {
+		if currentTokens+separatorTokens+lineTokens > verificationTodoSnapshotLimit-ytoken.CalcTokenCount(note)-1 {
 			break
 		}
 		truncated = append(truncated, line)
-		currentBytes += separatorBytes + lineBytes
+		currentTokens += separatorTokens + lineTokens
 	}
 	truncated = append(truncated, note)
 	return strings.Join(truncated, "\n")

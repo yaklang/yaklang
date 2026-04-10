@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/ytoken"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -75,10 +76,10 @@ var searchKnowledgeAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoo
 			resultContent := resultBuilder.String()
 
 			// 限制内容大小
-			const maxContentSize = 30 * 1024 // 30KB
-			if len(resultContent) > maxContentSize {
-				resultContent = resultContent[:maxContentSize] + "\n\n[... results truncated ...]"
-				log.Warnf("search_knowledge: results truncated to %d bytes", maxContentSize)
+			const maxContentTokens = 30 * 1024
+			if ytoken.CalcTokenCount(resultContent) > maxContentTokens {
+				resultContent = resultContent[:maxContentTokens] + "\n\n[... results truncated ...]"
+				log.Warnf("search_knowledge: results truncated to %d tokens", maxContentTokens)
 			}
 
 			// 将搜索结果添加到已收集的参考资料中

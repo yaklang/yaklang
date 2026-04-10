@@ -195,8 +195,7 @@ func (m *MockMemoryTriage) HandleMemory(i any) error {
 	return nil
 }
 
-func (m *MockMemoryTriage) SearchMemory(origin any, bytesLimit int) (*aicommon.SearchMemoryResult, error) {
-	// Mock实现：返回一个简单的搜索结果
+func (m *MockMemoryTriage) SearchMemory(origin any, tokenLimit int) (*aicommon.SearchMemoryResult, error) {
 	entity := &aicommon.MemoryEntity{
 		Id:                 "mock-search-id",
 		CreatedAt:          time.Now(),
@@ -217,12 +216,12 @@ func (m *MockMemoryTriage) SearchMemory(origin any, bytesLimit int) (*aicommon.S
 	return &aicommon.SearchMemoryResult{
 		Memories:      []*aicommon.MemoryEntity{entity},
 		TotalContent:  content,
-		ContentBytes:  len([]byte(content)),
+		ContentTokens: aicommon.MeasureTokens(content),
 		SearchSummary: "Mock search completed",
 	}, nil
 }
 
-func (m *MockMemoryTriage) SearchMemoryWithoutAI(origin any, bytesLimit int) (*aicommon.SearchMemoryResult, error) {
+func (m *MockMemoryTriage) SearchMemoryWithoutAI(origin any, tokenLimit int) (*aicommon.SearchMemoryResult, error) {
 	// Mock实现：无AI版本，直接基于关键词匹配
 	entity := &aicommon.MemoryEntity{
 		Id:                 "mock-search-no-ai-id",
@@ -267,7 +266,7 @@ func (m *MockMemoryTriage) SearchMemoryWithoutAI(origin any, bytesLimit int) (*a
 	return &aicommon.SearchMemoryResult{
 		Memories:      results,
 		TotalContent:  content,
-		ContentBytes:  len([]byte(content)),
+		ContentTokens: aicommon.MeasureTokens(content),
 		SearchSummary: "Mock keyword-based search completed (without AI)",
 	}, nil
 }

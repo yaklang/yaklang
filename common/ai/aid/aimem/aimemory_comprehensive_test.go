@@ -651,8 +651,8 @@ func TestAIMemoryTriage_SearchMemory(t *testing.T) {
 			t.Fatalf("search result should not be nil")
 		}
 
-		if result.ContentBytes > 500 {
-			t.Errorf("content bytes %d exceeds limit 500", result.ContentBytes)
+		if result.ContentTokens > 500 {
+			t.Errorf("content tokens %d exceeds limit 500", result.ContentTokens)
 		}
 
 		if result.SearchSummary == "" {

@@ -444,7 +444,7 @@ LOOP:
 		t.Fatal("Expected SearchMemory to return a result, but got nil")
 	}
 	fmt.Printf("SearchMemory found %d memories\n", len(memorySearchResults.Memories))
-	fmt.Printf("Total content bytes: %d\n", memorySearchResults.ContentBytes)
+	fmt.Printf("Total content tokens: %d\n", memorySearchResults.ContentTokens)
 	fmt.Printf("Search summary: %s\n", memorySearchResults.SearchSummary)
 	for _, mem := range memorySearchResults.Memories {
 		fmt.Printf("  - Memory: %s\n", mem.Content[:min(len(mem.Content), 100)])
@@ -460,7 +460,7 @@ LOOP:
 		t.Fatal("Expected SearchMemoryWithoutAI to return a result, but got nil")
 	}
 	fmt.Printf("SearchMemoryWithoutAI found %d memories\n", len(noAIResults.Memories))
-	fmt.Printf("Total content bytes: %d\n", noAIResults.ContentBytes)
+	fmt.Printf("Total content tokens: %d\n", noAIResults.ContentTokens)
 	fmt.Printf("Search summary: %s\n", noAIResults.SearchSummary)
 	for _, mem := range noAIResults.Memories {
 		fmt.Printf("  - Memory: %s\n", mem.Content[:min(len(mem.Content), 100)])

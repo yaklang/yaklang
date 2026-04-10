@@ -8,7 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-const MaxOutputFileBytes int64 = 40 * 1024
+const MaxOutputFileTokens int64 = 40 * 1024
 
 type OutputFileInfo struct {
 	Path    string `json:"path"`
@@ -24,7 +24,7 @@ func (o *OutputFileInfo) LineNumberedContent() string {
 }
 
 func (o *OutputFileInfo) IsSafeSize() bool {
-	return o.Size <= MaxOutputFileBytes
+	return o.Size <= MaxOutputFileTokens
 }
 
 func ReadOutputFileFromPath(path string) (*OutputFileInfo, error) {
@@ -48,8 +48,8 @@ func ReadOutputFileFromPath(path string) (*OutputFileInfo, error) {
 	}
 	defer f.Close()
 
-	if fi.Size() > MaxOutputFileBytes {
-		buf := make([]byte, MaxOutputFileBytes)
+	if fi.Size() > MaxOutputFileTokens {
+		buf := make([]byte, MaxOutputFileTokens)
 		n, err := io.ReadFull(f, buf)
 		if err != nil && err != io.ErrUnexpectedEOF {
 			return nil, utils.Errorf("read output file %s failed: %v", path, err)

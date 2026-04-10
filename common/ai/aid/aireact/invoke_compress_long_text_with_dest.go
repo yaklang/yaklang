@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/ytoken"
 	"github.com/yaklang/yaklang/common/aireducer"
 	"github.com/yaklang/yaklang/common/chunkmaker"
 	"github.com/yaklang/yaklang/common/jsonextractor"
@@ -58,10 +59,10 @@ func (r *ReAct) CompressLongTextWithDestination(
 	ctx context.Context,
 	i any,
 	destination string,
-	targetByteSize int64,
+	targetTokenSize int64,
 ) (string, error) {
-	if targetByteSize <= 1024 {
-		targetByteSize = 10 * 1024
+	if targetTokenSize <= 1024 {
+		targetTokenSize = 10 * 1024
 	}
 	var rawText string
 	switch ret := i.(type) {
@@ -76,11 +77,11 @@ func (r *ReAct) CompressLongTextWithDestination(
 		return "", utils.Error("cannot compress empty text")
 	}
 
-	if int64(len(rawText)) < (targetByteSize / 2) {
+	if int64(ytoken.CalcTokenCount(rawText)) < (targetTokenSize / 2) {
 		return rawText, nil
 	}
 
-	var emergencyLimit = targetByteSize / 2
+	var emergencyLimit = targetTokenSize / 2
 	fallbackResult := utils.ShrinkTextBlock(rawText, int(emergencyLimit))
 
 	// For large content (>30KB), use chunked processing
@@ -172,7 +173,7 @@ func (r *ReAct) CompressLongTextWithDestination(
 	var result strings.Builder
 	result.WriteString(fmt.Sprintf("【AI 智能筛选】从 %d 字节内容中提取的 %d 个最相关知识片段：\n\n", len(rawText), len(allScoredRanges)))
 
-	totalExtractedBytes := 0
+	totalExtractedTokens := 0
 
 	for i, item := range allScoredRanges {
 		text := editor.GetTextFromPositionInt(item.StartLine, 1, item.EndLine+1, 1)
@@ -180,9 +181,9 @@ func (r *ReAct) CompressLongTextWithDestination(
 			continue
 		}
 
-		textBytes := len(text)
-		if totalExtractedBytes+textBytes > int(targetByteSize) {
-			result.WriteString(fmt.Sprintf("\n[... 已达到 %d 字节限制，剩余 %d 个片段未展示 ...]\n", targetByteSize, len(allScoredRanges)-i))
+		textTokens := ytoken.CalcTokenCount(text)
+		if totalExtractedTokens+textTokens > int(targetTokenSize) {
+			result.WriteString(fmt.Sprintf("\n[... 已达到 %d token 限制，剩余 %d 个片段未展示 ...]\n", targetTokenSize, len(allScoredRanges)-i))
 			break
 		}
 
@@ -190,7 +191,7 @@ func (r *ReAct) CompressLongTextWithDestination(
 		result.WriteString(text)
 		result.WriteString("\n\n")
 
-		totalExtractedBytes += textBytes
+		totalExtractedTokens += textTokens
 	}
 
 	finalResult := result.String()

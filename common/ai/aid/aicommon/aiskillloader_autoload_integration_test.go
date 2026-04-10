@@ -130,8 +130,7 @@ func TestAutoSkillLoader_Integration_FoldingWithManySkills(t *testing.T) {
 	)
 	mgr := aiskillloader.NewSkillsContextManager(loader)
 
-	// Use small limit to force folding
-	mgr.SetMaxBytes(500)
+	mgr.SetMaxTokens(100)
 
 	_ = mgr.LoadSkill("deploy-app")
 	_ = mgr.LoadSkill("vuln-scan")

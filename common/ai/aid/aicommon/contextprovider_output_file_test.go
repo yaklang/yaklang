@@ -40,7 +40,7 @@ func TestOutputFileContextProvider_NotExist(t *testing.T) {
 func TestOutputFileContextProvider_Truncated(t *testing.T) {
 	dir := t.TempDir()
 	filePath := filepath.Join(dir, "large.py")
-	largeContent := strings.Repeat("x = 1\n", int(aitool.MaxOutputFileBytes)/6+100)
+	largeContent := strings.Repeat("x = 1\n", int(aitool.MaxOutputFileTokens)/6+100)
 	err := os.WriteFile(filePath, []byte(largeContent), 0644)
 	require.NoError(t, err)
 

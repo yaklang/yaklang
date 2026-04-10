@@ -70,10 +70,10 @@ func (r *MemoryEntity) String() string {
 	return buf.String()
 }
 
-// SearchMemoryResult 搜索记忆的结果
+// SearchMemoryResult holds the result of a memory search.
 type SearchMemoryResult struct {
 	Memories      []*MemoryEntity `json:"memories"`
 	TotalContent  string          `json:"total_content"`
-	ContentBytes  int             `json:"content_bytes"`
+	ContentTokens int             `json:"content_tokens"`
 	SearchSummary string          `json:"search_summary"`
 }

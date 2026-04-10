@@ -117,10 +117,10 @@ func TestArtifactsContextProvider_8KBLimit(t *testing.T) {
 	result, err := ArtifactsContextProvider(cfg, nil, "session_artifacts")
 	require.NoError(t, err)
 
-	// Verify the output is within the 8KB limit
-	assert.LessOrEqual(t, len(result), ArtifactsContextMaxBytes,
-		"artifacts context should not exceed %d bytes, got %d bytes", ArtifactsContextMaxBytes, len(result))
-	t.Logf("artifacts context size: %d bytes (limit: %d)", len(result), ArtifactsContextMaxBytes)
+	// Verify the output is within the token limit
+	assert.LessOrEqual(t, MeasureTokens(result), ArtifactsContextMaxTokens,
+		"artifacts context should not exceed %d tokens, got %d tokens", ArtifactsContextMaxTokens, MeasureTokens(result))
+	t.Logf("artifacts context size: %d tokens (limit: %d)", MeasureTokens(result), ArtifactsContextMaxTokens)
 }
 
 func TestArtifactsContextProvider_FileModificationTime(t *testing.T) {
