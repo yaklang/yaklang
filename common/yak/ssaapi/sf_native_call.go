@@ -864,7 +864,7 @@ func init() {
 		})
 		return true, sfvm.NewValues(results), nil
 	}))
-	registerNativeCall(NativeCall_DataFlow, nc_func(nativeCallDataFlow))
+	registerNativeCall(NativeCall_DataFlow, nc_func(nativeCallDataFlow), nc_desc(`数据流路径过滤（include/exclude 子规则）。可选 only_reachable="$cfgVar"：对结果按 CFG 点对点可达性过滤；可与 icfg/max_depth/max_nodes 同用（icfg 打开时护栏默认生效）。`))
 	registerNativeCall(NativeCall_Self, nc_func(func(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
 		return true, v, nil
 	}))
@@ -1485,7 +1485,7 @@ func init() {
 	registerNativeCall(NativeCall_CFGGuards, nc_func(nativeCallCFGGuards), nc_desc(`提取 early-return guard（如 if(cond) return）在当前命中点处的路径约束（最小实现）。`))
 	registerNativeCall(NativeCall_CFGDominates, nc_func(nativeCallCFGRel("cfgDominates", dominates)), nc_desc(`CFG 支配关系：当前 cfg 是否支配 target cfg（同函数内）。参数：target=$var。`))
 	registerNativeCall(NativeCall_CFGPostDom, nc_func(nativeCallCFGRel("cfgPostDominates", postDominates)), nc_desc(`CFG 后支配关系：当前 cfg 是否后支配 target cfg（同函数内，最小虚拟出口）。参数：target=$var。`))
-	registerNativeCall(NativeCall_CFGReachable, nc_func(nativeCallCFGRel("cfgReachable", reachable)), nc_desc(`CFG 可达性：当前 cfg 是否可达 target cfg（同函数内）。参数：target=$var。`))
+	registerNativeCall(NativeCall_CFGReachable, nc_func(nativeCallCFGReachable), nc_desc(`CFG 可达性：当前 cfg 是否可达 target cfg。参数：target=$var；可选 icfg=true 开启最小跨函数（call→callee entry）；可选 max_depth/max_nodes 用于护栏。`))
 	registerNativeCall(NativeCall_CFGBlockInfo, nc_func(nativeCallCFGBlock), nc_desc(`输出 cfg 的函数/基本块定位信息（用于证据与调试）。`))
 	registerNativeCall(NativeCall_CFGInstInfo, nc_func(nativeCallCFGInst), nc_desc(`输出 cfg 的函数/基本块/指令定位信息（用于证据与调试）。`))
 }
