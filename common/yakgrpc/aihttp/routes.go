@@ -40,6 +40,7 @@ func (gw *AIAgentHTTPGateway) registerRoutes() {
 	sub.HandleFunc("/session/del", gw.handleDeleteSession).Methods("POST", "OPTIONS")
 	sub.HandleFunc("/session/all", gw.handleListAllSessions).Methods("GET", "OPTIONS")
 	sub.HandleFunc("/session/{run_id}/title", gw.handleUpdateSessionTitle).Methods("POST", "OPTIONS")
+	sub.HandleFunc("/upload", gw.handleUploadFile).Methods("POST", "OPTIONS")
 
 	sub.HandleFunc("/run/{run_id}", gw.handleRun).Methods("POST", "OPTIONS")
 	sub.HandleFunc("/run/{run_id}/events", gw.handleSSEEvents).Methods("GET", "OPTIONS")

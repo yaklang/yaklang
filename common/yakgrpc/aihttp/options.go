@@ -57,3 +57,11 @@ func WithDatabase(db *gorm.DB) GatewayOption {
 		g.db = db
 	}
 }
+
+func WithUploadDir(dir string) GatewayOption {
+	return func(g *AIAgentHTTPGateway) {
+		if dir != "" {
+			g.uploadDir = dir
+		}
+	}
+}
