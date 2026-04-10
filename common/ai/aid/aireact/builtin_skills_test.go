@@ -198,6 +198,69 @@ func TestExtractBuiltinSkills_PreservesExistingFile(t *testing.T) {
 	}
 }
 
+func TestExtractBuiltinSkills_DoesNotReExtractAfterUserDeletesFile(t *testing.T) {
+	useTempBuiltinSkillReleaseDB(t)
+	tmpDir := t.TempDir()
+	relPath := strings.TrimPrefix(allBuiltinSkills[0].fsPath, "skills/")
+	targetPath := filepath.Join(tmpDir, "builtin", relPath)
+
+	if err := ExtractBuiltinSkillsToDir(tmpDir); err != nil {
+		t.Fatalf("first ExtractBuiltinSkillsToDir failed: %v", err)
+	}
+	if _, err := os.Stat(targetPath); err != nil {
+		t.Fatalf("expected extracted file: %v", err)
+	}
+
+	if err := os.Remove(targetPath); err != nil {
+		t.Fatalf("failed to remove skill file: %v", err)
+	}
+
+	if err := ExtractBuiltinSkillsToDir(tmpDir); err != nil {
+		t.Fatalf("second ExtractBuiltinSkillsToDir failed: %v", err)
+	}
+	if _, err := os.Stat(targetPath); !os.IsNotExist(err) {
+		t.Fatalf("expected file to remain deleted, stat err=%v", err)
+	}
+	if !isBuiltinSkillSuppressed(relPath) {
+		t.Fatal("expected suppression record after user deleted a previously extracted builtin skill")
+	}
+
+	if err := ExtractBuiltinSkillsToDir(tmpDir); err != nil {
+		t.Fatalf("third ExtractBuiltinSkillsToDir failed: %v", err)
+	}
+	if _, err := os.Stat(targetPath); !os.IsNotExist(err) {
+		t.Fatal("expected file to stay absent on subsequent extracts")
+	}
+}
+
+func TestExtractBuiltinSkills_ReExtractsAfterSuppressionCleared(t *testing.T) {
+	useTempBuiltinSkillReleaseDB(t)
+	tmpDir := t.TempDir()
+	relPath := strings.TrimPrefix(allBuiltinSkills[0].fsPath, "skills/")
+	targetPath := filepath.Join(tmpDir, "builtin", relPath)
+
+	if err := ExtractBuiltinSkillsToDir(tmpDir); err != nil {
+		t.Fatalf("first ExtractBuiltinSkillsToDir failed: %v", err)
+	}
+	if err := os.Remove(targetPath); err != nil {
+		t.Fatalf("failed to remove skill file: %v", err)
+	}
+	if err := ExtractBuiltinSkillsToDir(tmpDir); err != nil {
+		t.Fatalf("second ExtractBuiltinSkillsToDir failed: %v", err)
+	}
+	if !isBuiltinSkillSuppressed(relPath) {
+		t.Fatal("expected suppression record")
+	}
+
+	yakit.DelKey(builtinSkillReleaseDB(), builtinSkillSuppressedKey(relPath))
+	if err := ExtractBuiltinSkillsToDir(tmpDir); err != nil {
+		t.Fatalf("third ExtractBuiltinSkillsToDir failed: %v", err)
+	}
+	if _, err := os.Stat(targetPath); err != nil {
+		t.Fatalf("expected builtin skill file to be re-extracted after clearing suppression: %v", err)
+	}
+}
+
 func TestExtractBuiltinSkills_PreservesModifiedFileAfterRelease(t *testing.T) {
 	useTempBuiltinSkillReleaseDB(t)
 	tmpDir := t.TempDir()

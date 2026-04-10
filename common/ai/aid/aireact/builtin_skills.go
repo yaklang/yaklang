@@ -20,7 +20,10 @@ import (
 
 var builtinSkillsFS fi.FileSystem
 
-const builtinSkillReleaseTimeKeyPrefix = "ai.builtin_skills.release_time"
+const (
+	builtinSkillReleaseTimeKeyPrefix = "ai.builtin_skills.release_time"
+	builtinSkillSuppressedKeyPrefix  = "ai.builtin_skills.suppressed"
+)
 
 var builtinSkillReleaseDB = func() *gorm.DB {
 	return consts.GetGormProfileDatabase()
@@ -44,7 +47,12 @@ func GetBuiltinSkillsFS() fi.FileSystem {
 //
 // Only files that do not already exist are written. Existing local files are
 // always preserved so users can freely customize built-in skills without their
-// changes being overwritten by later runs. The embedded FS layout is
+// changes being overwritten by later runs. If a file was previously written by
+// this extractor (tracked in the profile DB) and the user later deletes it from
+// disk, that removal is recorded and the file will not be re-created on future
+// runs. To get the default file back, delete the corresponding
+// "ai.builtin_skills.suppressed:..." key in the profile database (or clear
+// suppression for that path). The embedded FS layout is
 // "skills/<skill-name>/SKILL.md"; the "skills/" prefix is stripped and
 // "builtin/" is prepended, so the output becomes
 // "<targetDir>/builtin/<skill-name>/SKILL.md".
@@ -79,6 +87,18 @@ func ExtractBuiltinSkillsToDir(targetDir string) error {
 				return nil
 			} else if !os.IsNotExist(err) {
 				log.Warnf("failed to inspect existing skill file %s: %v", targetPath, err)
+				return nil
+			}
+
+			// File is missing on disk: do not re-extract if the user explicitly removed it.
+			if isBuiltinSkillSuppressed(relPath) {
+				log.Infof("skipping builtin skill (user removed, not re-extracting): %s", targetPath)
+				return nil
+			}
+			if _, hadPriorExtract := getBuiltinSkillReleaseTime(relPath); hadPriorExtract {
+				// We had shipped this file before; absence means a deliberate delete.
+				markBuiltinSkillUserRemoved(relPath)
+				log.Infof("builtin skill removed by user, will not re-extract: %s", targetPath)
 				return nil
 			}
 
@@ -117,6 +137,33 @@ func ExtractBuiltinSkillsToDir(targetDir string) error {
 func builtinSkillReleaseKey(relPath string) string {
 	normalizedPath := filepath.ToSlash(filepath.Join("builtin", relPath))
 	return builtinSkillReleaseTimeKeyPrefix + ":" + normalizedPath
+}
+
+func builtinSkillSuppressedKey(relPath string) string {
+	normalizedPath := filepath.ToSlash(filepath.Join("builtin", relPath))
+	return builtinSkillSuppressedKeyPrefix + ":" + normalizedPath
+}
+
+func isBuiltinSkillSuppressed(relPath string) bool {
+	db := builtinSkillReleaseDB()
+	if db == nil {
+		return false
+	}
+	return strings.TrimSpace(yakit.GetKey(db, builtinSkillSuppressedKey(relPath))) != ""
+}
+
+// markBuiltinSkillUserRemoved records that the user deleted a previously extracted
+// builtin skill and clears the release-time key so a later "restore" (clearing
+// suppression) can re-extract without being mistaken for another deletion.
+func markBuiltinSkillUserRemoved(relPath string) {
+	db := builtinSkillReleaseDB()
+	if db == nil {
+		return
+	}
+	if err := yakit.SetKey(db, builtinSkillSuppressedKey(relPath), "1"); err != nil {
+		log.Warnf("failed to persist builtin skill suppression for %s: %v", relPath, err)
+	}
+	yakit.DelKey(db, builtinSkillReleaseKey(relPath))
 }
 
 func getBuiltinSkillReleaseTime(relPath string) (time.Time, bool) {
