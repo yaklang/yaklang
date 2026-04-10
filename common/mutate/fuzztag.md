@@ -36,7 +36,9 @@
 |`null`|`nullbyte`|生成一个空字节，如果指定了数量，将生成指定数量的空字节 {{null(5)}} 表示生成 5 个空字节|
 |`padding:null`|`nullpadding, np`|使用 \x00 来填充补偿字符串长度不足的问题，{{nullpadding(abc&#124;5)}} 表示将 abc 填充到长度为 5 的字符串（\x00\x00abc），{{nullpadding(abc&#124;-5)}} 表示将 abc 填充到长度为 5 的字符串，并且在右边填充 (abc\x00\x00)|
 |`padding:zero`|`zeropadding, zp`|使用0来填充补偿字符串长度不足的问题，{{zeropadding(abc&#124;5)}} 表示将 abc 填充到长度为 5 的字符串（00abc），{{zeropadding(abc&#124;-5)}} 表示将 abc 填充到长度为 5 的字符串，并且在右边填充 (abc00)|
-|`payload`|`x`|从数据库加载 Payload, `{{payload(pass_top25)}}`|
+|`payload`|`x`|从数据库加载 Payload，默认按行展开并去重，`{{payload(pass_top25)}}`|
+|`payload:full`|  |从数据库加载 Payload，整块返回且不拆行、不去重，`{{payload:full(pass_top25)}}`|
+|`payload:nodup`|  |从数据库加载 Payload，按行展开且不去重，`{{payload:nodup(pass_top25)}}`|
 |`png`|  |生成 PNG 文件头|
 |`punctuation`|`punc`|生成所有标点符号|
 |`quote`|  |strconv.Quote 转化|
