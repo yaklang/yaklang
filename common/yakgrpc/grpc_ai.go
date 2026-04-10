@@ -58,12 +58,14 @@ func (s *Server) ListAiModel(ctx context.Context, req *ypb.ListAiModelRequest) (
 }
 
 func (s *Server) AIConfigHealthCheck(ctx context.Context, req *ypb.AIConfigHealthCheckRequest) (*ypb.AIConfigHealthCheckResponse, error) {
-	req.Content = "测试成功"
 	if req == nil {
 		return nil, utils.Error("request is nil")
 	}
 	if req.GetConfig() == nil {
 		return nil, utils.Error("config is nil")
+	}
+	if strings.TrimSpace(req.GetContent()) == "" {
+		req.Content = "测试成功"
 	}
 	if strings.TrimSpace(req.GetContent()) == "" {
 		return nil, utils.Error("content is empty")
