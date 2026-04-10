@@ -1,6 +1,8 @@
 package ssaapi
 
 import (
+	"strings"
+
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	sf "github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
@@ -144,6 +146,63 @@ var nativeCallDataFlow sfvm.NativeCallFunc = func(v sfvm.Values, frame *sfvm.SFF
 		condition = append(condition, withFilterExcludeCondition(exclude))
 	}
 	ret = dataFlowFilter(ret, contextResult, frame.GetVM().GetConfig(), end, condition...)
+
+	// Phase-3: optional CFG reachability filter (lightweight, post-filtering).
+	// only_reachable expects a cfg ctx variable name (e.g. "$sinkCfg") produced by <getCfg>.
+	onlyReachVar := params.GetString("only_reachable", "onlyReachable", "only-reachable")
+	onlyReachVar = codec.AnyToString(onlyReachVar)
+	onlyReachVar = strings.TrimSpace(onlyReachVar)
+	onlyReachVar = strings.TrimPrefix(onlyReachVar, "$")
+	if onlyReachVar != "" {
+		targetOp, ok := frame.GetSymbolByName(onlyReachVar)
+		if ok && targetOp != nil {
+			var targetCfg *CfgCtxValue
+			_ = targetOp.Recursive(func(operator sfvm.ValueOperator) error {
+				if c, ok := operator.(*CfgCtxValue); ok && c != nil && !c.IsEmpty() {
+					targetCfg = c
+					return utils.Error("abort")
+				}
+				return nil
+			})
+			if targetCfg != nil {
+				// Resolve program from current values.
+				prog, err := fetchProgram(ToSFVMValues(ret))
+				if err == nil && prog != nil {
+					icfg := parseBoolParam(params, "icfg", false)
+					opt := reachableOptsFromParams(params, icfg)
+
+					filtered := make(Values, 0, len(ret))
+					for _, item := range ret {
+						if item == nil || item.IsEmpty() {
+							continue
+						}
+						// Compute CFG ctx for the candidate.
+						ok, got, _ := nativeCallGetCFG(sfvm.ValuesOf(item), frame, sfvm.NewNativeCallActualParams())
+						if !ok || got == nil || got.IsEmpty() {
+							continue
+						}
+						var candCfg *CfgCtxValue
+						_ = got.Recursive(func(op sfvm.ValueOperator) error {
+							if c, ok := op.(*CfgCtxValue); ok && c != nil && !c.IsEmpty() {
+								candCfg = c
+								return utils.Error("abort")
+							}
+							return nil
+						})
+						if candCfg == nil {
+							continue
+						}
+
+						// Keep only values whose CFG can reach the target CFG.
+						if reachableWithOptions(prog, candCfg, targetCfg, opt) {
+							filtered = append(filtered, item)
+						}
+					}
+					ret = filtered
+				}
+			}
+		}
+	}
 
 	if len(ret) > 0 {
 		return true, ToSFVMValues(ret), nil

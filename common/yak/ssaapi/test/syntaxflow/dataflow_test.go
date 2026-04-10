@@ -209,3 +209,36 @@ b(cc)
 		}, ssaapi.WithLanguage(ssaconfig.Yak))
 	})
 }
+
+func TestDataflow_OnlyReachable_CFG(t *testing.T) {
+	code := `
+func foo() {
+    return "a"
+}
+x = foo()
+println(x)
+`
+
+	ssatest.CheckSyntaxFlow(t, code, `
+println(* as $sink)
+$sink<getCfg> as $sinkCfg
+
+$sink #-> as $df
+
+$df<dataflow(<<<CODE
+    * ?{opcode: const} as $all
+CODE)>
+
+$df<dataflow(<<<CODE
+    * ?{opcode: const} as $reach
+CODE, only_reachable="$sinkCfg")>
+
+$df<dataflow(<<<CODE
+    * ?{opcode: const} as $reachIcfg
+CODE, only_reachable="$sinkCfg", icfg=true)>
+`, map[string][]string{
+		"all":      {`"a"`},
+		"reach":    {`"a"`},
+		"reachIcfg": {`"a"`},
+	}, ssaapi.WithLanguage(ssaconfig.Yak))
+}

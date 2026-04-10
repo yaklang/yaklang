@@ -412,7 +412,31 @@ func postDominates(p *Program, a, b *CfgCtxValue) bool {
 	return cur == a.BlockID
 }
 
-func reachable(p *Program, a, b *CfgCtxValue) bool {
+type reachableOptions struct {
+	icfg     bool
+	maxDepth int
+	maxNodes int
+}
+
+// reachableOptsFromParams applies icfg/max_depth/max_nodes only when meaningful:
+// - intra-proc (icfg false): no depth/node caps (zeros = unlimited).
+// - icfg: unset (-1 from GetInt) gets plan defaults max_depth=3, max_nodes=5000; explicit 0 disables that cap.
+func reachableOptsFromParams(params *sfvm.NativeCallActualParams, icfg bool) reachableOptions {
+	if params == nil || !icfg {
+		return reachableOptions{icfg: icfg, maxDepth: 0, maxNodes: 0}
+	}
+	maxDepth := params.GetInt("max_depth", "maxDepth", "depth")
+	if maxDepth < 0 {
+		maxDepth = 3
+	}
+	maxNodes := params.GetInt("max_nodes", "maxNodes", "nodes")
+	if maxNodes < 0 {
+		maxNodes = 5000
+	}
+	return reachableOptions{icfg: true, maxDepth: maxDepth, maxNodes: maxNodes}
+}
+
+func reachableWithOptions(p *Program, a, b *CfgCtxValue, opt reachableOptions) bool {
 	if a == nil || b == nil || a.IsEmpty() || b.IsEmpty() {
 		return false
 	}
@@ -420,9 +444,11 @@ func reachable(p *Program, a, b *CfgCtxValue) bool {
 	type state struct {
 		funcID  int64
 		blockID int64
+		depth   int
 	}
-	start := state{funcID: a.FuncID, blockID: a.BlockID}
-	target := state{funcID: b.FuncID, blockID: b.BlockID}
+	start := state{funcID: a.FuncID, blockID: a.BlockID, depth: 0}
+	targetFuncID := b.FuncID
+	targetBlockID := b.BlockID
 
 	seen := map[state]struct{}{start: {}}
 	queue := []state{start}
@@ -430,8 +456,11 @@ func reachable(p *Program, a, b *CfgCtxValue) bool {
 	for len(queue) > 0 {
 		cur := queue[0]
 		queue = queue[1:]
-		if cur == target {
+		if cur.funcID == targetFuncID && cur.blockID == targetBlockID {
 			return true
+		}
+		if opt.maxNodes > 0 && len(seen) > opt.maxNodes {
+			return false
 		}
 		fn, err := getFunctionByID(p, cur.funcID)
 		if err != nil || fn == nil {
@@ -444,7 +473,7 @@ func reachable(p *Program, a, b *CfgCtxValue) bool {
 
 		// Intra-procedural CFG edges.
 		for _, s := range blk.Succs {
-			nxt := state{funcID: cur.funcID, blockID: s}
+			nxt := state{funcID: cur.funcID, blockID: s, depth: cur.depth}
 			if _, ok := seen[nxt]; ok {
 				continue
 			}
@@ -452,35 +481,46 @@ func reachable(p *Program, a, b *CfgCtxValue) bool {
 			queue = append(queue, nxt)
 		}
 
-		// Minimal ICFG extension (stage-2): call -> callee entry.
-		// We only support direct callee functions (method value is a *ssa.Function).
-		for _, instID := range blk.Insts {
-			ins, ok := blk.GetInstructionById(instID)
-			if !ok || ins == nil {
+		if opt.icfg {
+			// Minimal ICFG extension: call -> callee entry.
+			// We only support direct callee functions (method value is a *ssa.Function).
+			if opt.maxDepth > 0 && cur.depth >= opt.maxDepth {
 				continue
 			}
-			call, ok := ssa.ToCall(ins)
-			if !ok || call == nil {
-				continue
+			for _, instID := range blk.Insts {
+				ins, ok := blk.GetInstructionById(instID)
+				if !ok || ins == nil {
+					continue
+				}
+				call, ok := ssa.ToCall(ins)
+				if !ok || call == nil {
+					continue
+				}
+				method, ok := call.GetValueById(call.Method)
+				if !ok || method == nil {
+					continue
+				}
+				calleeFn, ok := ssa.ToFunction(method)
+				if !ok || calleeFn == nil || calleeFn.EnterBlock <= 0 {
+					continue
+				}
+				nxt := state{funcID: calleeFn.GetId(), blockID: calleeFn.EnterBlock, depth: cur.depth + 1}
+				if _, ok := seen[nxt]; ok {
+					continue
+				}
+				seen[nxt] = struct{}{}
+				queue = append(queue, nxt)
 			}
-			method, ok := call.GetValueById(call.Method)
-			if !ok || method == nil {
-				continue
-			}
-			calleeFn, ok := ssa.ToFunction(method)
-			if !ok || calleeFn == nil || calleeFn.EnterBlock <= 0 {
-				continue
-			}
-			nxt := state{funcID: calleeFn.GetId(), blockID: calleeFn.EnterBlock}
-			if _, ok := seen[nxt]; ok {
-				continue
-			}
-			seen[nxt] = struct{}{}
-			queue = append(queue, nxt)
 		}
 	}
 
 	return false
+}
+
+func reachable(p *Program, a, b *CfgCtxValue) bool {
+	// Backward-compatible helper; Phase-3 switches cfgReachable native call default to intra-proc,
+	// so this helper remains conservative.
+	return reachableWithOptions(p, a, b, reachableOptions{icfg: false, maxDepth: 0, maxNodes: 0})
 }
 
 // ---- native calls ----
@@ -640,6 +680,52 @@ func nativeCallCFGRel(opName string, rel func(p *Program, a, b *CfgCtxValue) boo
 		}
 		return true, sfvm.NewValues(out), nil
 	})
+}
+
+func parseBoolParam(params *sfvm.NativeCallActualParams, key string, defaultValue bool) bool {
+	if params == nil {
+		return defaultValue
+	}
+	raw := strings.TrimSpace(params.GetString(key))
+	if raw == "" {
+		return defaultValue
+	}
+	switch strings.ToLower(raw) {
+	case "1", "t", "true", "y", "yes", "on":
+		return true
+	case "0", "f", "false", "n", "no", "off":
+		return false
+	default:
+		return defaultValue
+	}
+}
+
+func nativeCallCFGReachable(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
+	prog, err := fetchProgramFromCfgValues(v)
+	if err != nil {
+		return false, nil, err
+	}
+	b, err := resolveCfgTargetFromFrame(frame, params)
+	if err != nil {
+		return false, nil, utils.Wrap(err, "cfgReachable")
+	}
+
+	icfg := parseBoolParam(params, "icfg", false)
+	opt := reachableOptsFromParams(params, icfg)
+
+	var out []sfvm.ValueOperator
+	_ = v.Recursive(func(op sfvm.ValueOperator) error {
+		a, ok := extractCfgCtx(op)
+		if !ok || a.IsEmpty() {
+			return nil
+		}
+		out = append(out, prog.NewConstValue(reachableWithOptions(prog, a, b, opt)))
+		return nil
+	})
+	if len(out) == 0 {
+		return false, nil, utils.Errorf("cfgReachable: no cfg ctx values")
+	}
+	return true, sfvm.NewValues(out), nil
 }
 
 // minimal guard extraction: detect if-in-block dominates sink block and one branch goes to exit.

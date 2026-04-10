@@ -79,7 +79,55 @@ $sinkCfg<cfgGuards> as $guards
 	}, ssaapi.WithLanguage(ssaconfig.Yak))
 }
 
+func TestNativeCall_CFGGuards_GetFields_Filter(t *testing.T) {
+	code := `
+a = 1
+if (a) {
+    return
+}
+println("ok")
+`
+	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+		res, err := prog.SyntaxFlowWithError(`
+println(* #-> as $arg)
+$arg<getCfg> as $sinkCfg
+$sinkCfg<cfgGuards> as $guards
+
+$guards.kind as $kind
+$kind?{have: "earlyReturn"} as $hit
+`, ssaapi.QueryWithEnableDebug())
+		require.NoError(t, err)
+		require.Greater(t, res.GetValueCount("hit"), 0)
+		return nil
+	}, ssaapi.WithLanguage(ssaconfig.Yak))
+}
+
 func TestNativeCall_CFGReachable_ICFG_CallIntoCallee(t *testing.T) {
+	code := `
+func foo() {
+    println("infoo")
+}
+
+foo()
+println("after")
+`
+	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
+		res, err := prog.SyntaxFlowWithError(`
+println(*?{have: "after"} #-> as $afterArg)
+println(*?{have: "infoo"} #-> as $infooArg)
+
+$afterArg<getCfg> as $callerCfg
+$infooArg<getCfg> as $calleeCfg
+
+$callerCfg<cfgReachable(target="$calleeCfg", icfg=true)> as $reach
+`, ssaapi.QueryWithEnableDebug())
+		require.NoError(t, err)
+		require.Contains(t, res.GetValues("reach").String(), "true")
+		return nil
+	}, ssaapi.WithLanguage(ssaconfig.Yak))
+}
+
+func TestNativeCall_CFGReachable_IntraProc_Default(t *testing.T) {
 	code := `
 func foo() {
     println("infoo")
@@ -99,7 +147,7 @@ $infooArg<getCfg> as $calleeCfg
 $callerCfg<cfgReachable(target="$calleeCfg")> as $reach
 `, ssaapi.QueryWithEnableDebug())
 		require.NoError(t, err)
-		require.Contains(t, res.GetValues("reach").String(), "true")
+		require.Contains(t, res.GetValues("reach").String(), "false")
 		return nil
 	}, ssaapi.WithLanguage(ssaconfig.Yak))
 }
