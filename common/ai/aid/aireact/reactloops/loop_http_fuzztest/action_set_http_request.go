@@ -34,20 +34,25 @@ var setHTTPRequestAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoop
 
 			log.Infof("set_http_request action: setting HTTP request, is_https: %v, reason: %s", isHttps, reason)
 
-			// Create FuzzHTTPRequest object
-			fuzzReq, err := newLoopFuzzRequest(getLoopTaskContext(loop), r, []byte(httpRequest), isHttps)
+			result, err := applyLoopHTTPFuzzRequestChange(loop, r, &loopHTTPFuzzRequestChange{
+				RawRequest:          httpRequest,
+				IsHTTPS:             isHttps,
+				SourceAction:        "set_http_request",
+				ChangeReason:        reason,
+				EventOp:             loopHTTPFuzzRequestEventOpReplace,
+				ResetBaseline:       true,
+				ClearActionTracking: true,
+				EmitEvent:           true,
+				EmitEditablePacket:  true,
+				PersistSession:      true,
+				Task:                operator.GetTask(),
+			})
 			if err != nil {
-				operator.Fail(fmt.Errorf("failed to create FuzzHTTPRequest: %v", err))
+				operator.Fail(fmt.Errorf("failed to apply HTTP request: %v", err))
 				return
 			}
 
-			// Store the fuzz request in loop context
-			storeLoopFuzzRequestState(loop, fuzzReq, []byte(httpRequest), isHttps)
-			clearLoopHTTPFuzzActionTracking(loop)
-			loop.Set("bootstrap_source", "set_http_request")
-			emitLoopHTTPFuzzEditablePacket(loop, operator.GetTask(), httpRequest)
 			record := recordLoopHTTPFuzzMetaAction(loop, "set_http_request", fmt.Sprintf("is_https=%v; reason=%s", isHttps, reason), utils.ShrinkTextBlock(httpRequest, 240))
-			persistLoopHTTPFuzzSessionContext(loop, "set_http_request")
 
 			r.AddToTimeline("set_http_request", fmt.Sprintf("HTTP request set successfully, is_https: %v", isHttps))
 
@@ -55,7 +60,7 @@ var setHTTPRequestAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoop
 			var feedback strings.Builder
 			feedback.WriteString("HTTP request set successfully.\n\n")
 			feedback.WriteString("=== Request Summary ===\n")
-			feedback.WriteString(utils.ShrinkTextBlock(httpRequest, 500))
+			feedback.WriteString(utils.ShrinkTextBlock(result.CurrentState.RawRequest, 500))
 			feedback.WriteString("\n\n")
 			feedback.WriteString("The request will be executed with HTTP flow persistence enabled, so each fuzz result can be traced in the system by runtime and task context.\n\n")
 			feedback.WriteString("You can now use fuzz actions (fuzz_method, fuzz_path, fuzz_header, fuzz_get_params, fuzz_body, fuzz_cookie) to test this request.")

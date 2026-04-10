@@ -63,16 +63,27 @@ var generateAndSendPacketAction = func(r aicommon.AIInvokeRuntime) reactloops.Re
 			}
 
 			isHTTPS := inferGeneratedPacketHTTPS(loop, rawPacket)
-			fuzzReq, err := newLoopFuzzRequest(getLoopTaskContext(loop), r, []byte(rawPacket), isHTTPS)
+			result, err := applyLoopHTTPFuzzRequestChange(loop, r, &loopHTTPFuzzRequestChange{
+				RawRequest:         rawPacket,
+				IsHTTPS:            isHTTPS,
+				SourceAction:       "generate_and_send_packet",
+				ChangeReason:       generationReason,
+				EventOp:            loopHTTPFuzzRequestEventOpReplace,
+				ResetBaseline:      strings.TrimSpace(getCurrentRequestRaw(loop)) == "",
+				EmitEvent:          true,
+				EmitEditablePacket: true,
+				PersistSession:     true,
+				Task:               operator.GetTask(),
+			})
 			if err != nil {
-				operator.Fail(fmt.Errorf("failed to create generated packet request: %v", err))
+				operator.Fail(fmt.Errorf("failed to apply generated packet request: %v", err))
 				return
 			}
-
-			storeLoopFuzzRequestState(loop, fuzzReq, []byte(rawPacket), isHTTPS)
-			loop.Set("bootstrap_source", "generated_packet_action")
-			emitLoopHTTPFuzzEditablePacket(loop, operator.GetTask(), rawPacket)
-			persistLoopHTTPFuzzSessionContext(loop, "generated_packet_action")
+			fuzzReq, err := getFuzzRequest(loop)
+			if err != nil {
+				operator.Fail(err)
+				return
+			}
 
 			log.Infof("generate_and_send_packet action: packet_type=%s, target=%s, reason=%s", packetType, targetPurpose, generationReason)
 
@@ -85,7 +96,7 @@ var generateAndSendPacketAction = func(r aicommon.AIInvokeRuntime) reactloops.Re
 
 			r.AddToTimeline(
 				"generate_and_send_packet",
-				fmt.Sprintf("Sent generated packet (%s): %s\n%s", packetType, targetPurpose, buildFuzzTimelineSummary(diffResult)),
+				fmt.Sprintf("Sent generated packet (%s): %s\n%s", packetType, targetPurpose, buildFuzzTimelineSummary(firstNonEmptyString(diffResult, result.Diff))),
 			)
 			applyFuzzVerificationOutcome(loop, operator, diffResult, verifyResult)
 		},

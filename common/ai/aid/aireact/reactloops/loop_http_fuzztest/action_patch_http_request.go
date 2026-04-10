@@ -62,38 +62,36 @@ var patchHTTPRequestAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLo
 				operator.Fail(err)
 				return
 			}
-			patchedPacket = lowhttp.FixHTTPRequest(patchedPacket)
 
 			paramSummary := buildHTTPRequestPatchParamSummary(spec)
-			diffSummary := compareRequests(previousRequest, string(patchedPacket))
 
 			log.Infof("patch_http_request action: %s", paramSummary)
 
-			fuzzReq, err := newLoopFuzzRequest(getLoopTaskContext(loop), r, patchedPacket, isHTTPS)
+			result, err := applyLoopHTTPFuzzRequestChange(loop, r, &loopHTTPFuzzRequestChange{
+				RawRequest:         string(patchedPacket),
+				IsHTTPS:            isHTTPS,
+				SourceAction:       "patch_http_request",
+				ChangeReason:       spec.Reason,
+				ReviewDecision:     buildReviewDecisionLabel("auto_applied"),
+				EventOp:            loopHTTPFuzzRequestEventOpPatch,
+				EmitEvent:          true,
+				EmitEditablePacket: true,
+				PersistSession:     true,
+				Task:               operator.GetTask(),
+			})
 			if err != nil {
-				operator.Fail(fmt.Errorf("failed to create patched FuzzHTTPRequest: %v", err))
+				operator.Fail(fmt.Errorf("failed to apply patched HTTP request: %v", err))
 				return
 			}
 
-			previousSummary := getCurrentRequestSummary(loop)
-			setLoopCurrentRequestState(loop, fuzzReq, patchedPacket, isHTTPS)
-			loop.Set("previous_request", previousRequest)
-			loop.Set("previous_request_summary", previousSummary)
-			loop.Set("request_change_summary", diffSummary)
-			loop.Set("request_modification_reason", spec.Reason)
-			loop.Set("request_review_decision", buildReviewDecisionLabel("auto_applied"))
-			loop.Set("bootstrap_source", "patch_http_request")
-
-			emitLoopHTTPFuzzEditablePacket(loop, operator.GetTask(), string(patchedPacket))
-			feedback := buildHTTPRequestPatchAppliedFeedback(previousRequest, patchedPacket, isHTTPS, spec, diffSummary)
+			feedback := buildHTTPRequestPatchAppliedFeedback(previousRequest, []byte(result.CurrentState.RawRequest), isHTTPS, spec, result.Diff)
 			record := recordLoopHTTPFuzzMetaAction(
 				loop,
 				"patch_http_request",
 				paramSummary,
-				utils.ShrinkTextBlock(diffSummary, 240),
+				utils.ShrinkTextBlock(result.Diff, 240),
 			)
-			persistLoopHTTPFuzzSessionContext(loop, "patch_http_request")
-			r.AddToTimeline("patch_http_request", fmt.Sprintf("Patched current HTTP request: %s\n%s", summarizeHTTPRequestPatchSpec(spec), buildFuzzTimelineSummary(diffSummary)))
+			r.AddToTimeline("patch_http_request", fmt.Sprintf("Patched current HTTP request: %s\n%s", summarizeHTTPRequestPatchSpec(spec), buildFuzzTimelineSummary(result.Diff)))
 			operator.Feedback(buildLoopHTTPFuzzActionFeedback(record) + "\n\n" + feedback)
 		},
 	)
@@ -368,18 +366,4 @@ func getRequestSummaryWithFallback(request string, isHTTPS bool) string {
 	}
 	_, summary := buildHTTPRequestStreamSummary(request, isHTTPS)
 	return summary
-}
-
-func emitLoopHTTPFuzzEditablePacket(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, rawPacket string) {
-	if loop == nil || task == nil || loop.GetEmitter() == nil || strings.TrimSpace(rawPacket) == "" {
-		return
-	}
-	taskID := task.GetId()
-	if taskID == "" {
-		taskID = utils.InterfaceToString(task.GetIndex())
-	}
-	if taskID == "" {
-		return
-	}
-	_, _ = loop.GetEmitter().EmitHTTPRequestStreamEvent("http_flow", strings.NewReader(rawPacket), taskID)
 }

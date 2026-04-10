@@ -136,11 +136,9 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 			switch bootstrapResult {
 			case "raw":
 				loop.Set("bootstrap_source", "user_input_raw")
-				persistLoopHTTPFuzzSessionContext(loop, "user_input_raw")
 				emitter.EmitThoughtStream(task.GetIndex(), "Initialized fuzz request from extracted HTTP packet in user input.")
 			case "url":
 				loop.Set("bootstrap_source", "user_input_url")
-				persistLoopHTTPFuzzSessionContext(loop, "user_input_url")
 				emitter.EmitThoughtStream(task.GetIndex(), "No raw packet found. Initialized fuzz request from extracted URL.")
 			default:
 				if restoreLoopHTTPFuzzSessionContext(loop, r) {
@@ -264,14 +262,22 @@ func tryBootstrapFuzzRequestFromUserInput(r aicommon.AIInvokeRuntime, loop *reac
 }
 
 func initFuzzRequestFromRaw(loop *reactloops.ReActLoop, runtime aicommon.AIInvokeRuntime, rawPacket string, isHTTPS bool) bool {
-	fixed := lowhttp.FixHTTPRequest([]byte(rawPacket))
-	fuzzReq, err := newLoopFuzzRequest(getLoopTaskContext(loop), runtime, fixed, isHTTPS)
+	_, err := applyLoopHTTPFuzzRequestChange(loop, runtime, &loopHTTPFuzzRequestChange{
+		RawRequest:          rawPacket,
+		IsHTTPS:             isHTTPS,
+		SourceAction:        "user_input_raw",
+		EventOp:             loopHTTPFuzzRequestEventOpReplace,
+		ResetBaseline:       true,
+		ClearActionTracking: true,
+		EmitEvent:           true,
+		EmitEditablePacket:  true,
+		PersistSession:      true,
+		Task:                loop.GetCurrentTask(),
+	})
 	if err != nil {
 		log.Warnf("failed to build fuzz request from extracted raw packet: %v", err)
 		return false
 	}
-
-	storeLoopFuzzRequestState(loop, fuzzReq, fixed, isHTTPS)
 	return true
 }
 
@@ -282,13 +288,22 @@ func initFuzzRequestFromURL(loop *reactloops.ReActLoop, runtime aicommon.AIInvok
 		return false
 	}
 
-	fuzzReq, err := newLoopFuzzRequest(getLoopTaskContext(loop), runtime, packet, isHTTPS)
+	_, err = applyLoopHTTPFuzzRequestChange(loop, runtime, &loopHTTPFuzzRequestChange{
+		RawRequest:          string(packet),
+		IsHTTPS:             isHTTPS,
+		SourceAction:        "user_input_url",
+		EventOp:             loopHTTPFuzzRequestEventOpReplace,
+		ResetBaseline:       true,
+		ClearActionTracking: true,
+		EmitEvent:           true,
+		EmitEditablePacket:  true,
+		PersistSession:      true,
+		Task:                loop.GetCurrentTask(),
+	})
 	if err != nil {
 		log.Warnf("failed to build fuzz request from URL packet: %v", err)
 		return false
 	}
-
-	storeLoopFuzzRequestState(loop, fuzzReq, packet, isHTTPS)
 	return true
 }
 

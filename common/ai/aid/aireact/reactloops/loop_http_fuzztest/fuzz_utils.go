@@ -40,7 +40,17 @@ func newLoopFuzzRequest(taskCtx context.Context, runtime aicommon.AIInvokeRuntim
 
 func storeLoopFuzzRequestState(loop *reactloops.ReActLoop, fuzzReq *mutate.FuzzHTTPRequest, requestRaw []byte, isHTTPS bool) {
 	_, originalSummary := buildHTTPRequestStreamSummary(string(requestRaw), isHTTPS)
+	state := loopHTTPFuzzRequestState{
+		RawRequest: string(requestRaw),
+		IsHTTPS:    isHTTPS,
+		Summary:    originalSummary,
+		Version:    1,
+	}
 	loop.Set("fuzz_request", fuzzReq)
+	loop.Set(loopHTTPFuzzRequestStateKey, state)
+	loop.Set(loopHTTPFuzzRequestVersionKey, state.Version)
+	loop.Set(loopHTTPFuzzRequestSourceActionKey, "")
+	loop.Set(loopHTTPFuzzRequestChangeReasonKey, "")
 	loop.Set("original_request", string(requestRaw))
 	loop.Set("original_request_summary", originalSummary)
 	loop.Set("current_request", string(requestRaw))
@@ -52,23 +62,15 @@ func storeLoopFuzzRequestState(loop *reactloops.ReActLoop, fuzzReq *mutate.FuzzH
 	loop.Set("request_review_decision", "")
 	loop.Set("is_https", utils.InterfaceToString(isHTTPS))
 	loop.Set("bootstrap_source", "")
-	loop.Set("last_request", "")
-	loop.Set("last_request_summary", "")
-	loop.Set("last_response", "")
-	loop.Set("last_response_summary", "")
-	loop.Set("last_httpflow_hidden_index", "")
-	loop.Set("representative_request", "")
-	loop.Set("representative_response", "")
-	loop.Set("representative_httpflow_hidden_index", "")
-	loop.Set("diff_result", "")
-	loop.Set("diff_result_full", "")
-	loop.Set("diff_result_compressed", "")
-	loop.Set("verification_result", "")
+	resetLoopHTTPFuzzExecutionState(loop)
 }
 
 func getCurrentRequestRaw(loop *reactloops.ReActLoop) string {
 	if loop == nil {
 		return ""
+	}
+	if state := getLoopHTTPFuzzRequestState(loop); state != nil && strings.TrimSpace(state.RawRequest) != "" {
+		return state.RawRequest
 	}
 	currentRequest := strings.TrimSpace(loop.Get("current_request"))
 	if currentRequest != "" {
@@ -80,6 +82,9 @@ func getCurrentRequestRaw(loop *reactloops.ReActLoop) string {
 func getCurrentRequestSummary(loop *reactloops.ReActLoop) string {
 	if loop == nil {
 		return ""
+	}
+	if state := getLoopHTTPFuzzRequestState(loop); state != nil && strings.TrimSpace(state.Summary) != "" {
+		return state.Summary
 	}
 	summary := strings.TrimSpace(loop.Get("current_request_summary"))
 	if summary != "" {
@@ -93,7 +98,21 @@ func setLoopCurrentRequestState(loop *reactloops.ReActLoop, fuzzReq *mutate.Fuzz
 		return
 	}
 	_, summary := buildHTTPRequestStreamSummary(string(requestRaw), isHTTPS)
+	version := 1
+	if currentState := getLoopHTTPFuzzRequestState(loop); currentState != nil {
+		version = max(currentState.Version, 1)
+	}
 	loop.Set("fuzz_request", fuzzReq)
+	state := loopHTTPFuzzRequestState{
+		RawRequest:   string(requestRaw),
+		IsHTTPS:      isHTTPS,
+		Summary:      summary,
+		Version:      version,
+		SourceAction: loop.Get(loopHTTPFuzzRequestSourceActionKey),
+		ChangeReason: loop.Get(loopHTTPFuzzRequestChangeReasonKey),
+	}
+	loop.Set(loopHTTPFuzzRequestStateKey, state)
+	loop.Set(loopHTTPFuzzRequestVersionKey, state.Version)
 	loop.Set("current_request", string(requestRaw))
 	loop.Set("current_request_summary", summary)
 	loop.Set("is_https", utils.InterfaceToString(isHTTPS))
