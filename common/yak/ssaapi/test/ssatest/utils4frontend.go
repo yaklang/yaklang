@@ -2,6 +2,7 @@ package ssatest
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 	"testing"
@@ -129,6 +130,13 @@ func CheckPrintlnValueContain(code string, want []string, t *testing.T) {
 	}, true)
 }
 
+func CheckPrintlnValueRegexp(code string, want []string, t *testing.T) {
+	CheckPrintfRegexp(t, TestCase{
+		Code: code,
+		Want: want,
+	})
+}
+
 func CheckPrintf(t *testing.T, tc TestCase, contains ...bool) {
 	contain := false
 	if len(contains) > 0 {
@@ -175,6 +183,36 @@ func CheckPrintf(t *testing.T, tc TestCase, contains ...bool) {
 		}
 
 		equalSlices(want, got)
+	}
+	CheckTestCase(t, tc)
+}
+
+func CheckPrintfRegexp(t *testing.T, tc TestCase) {
+	tc.Check = func(prog *ssaapi.Program, want []string) {
+		println := prog.Ref("println").ShowWithSource()
+		got := lo.Map(
+			println.GetUsers().ShowWithSource().Flat(func(v *ssaapi.Value) ssaapi.Values {
+				return ssaapi.Values{v.GetOperand(1)}
+			}),
+			func(v *ssaapi.Value, _ int) string {
+				return v.String()
+			},
+		)
+		log.Info("got :", got)
+		log.Info("want regex :", want)
+
+		for _, pattern := range want {
+			re, err := regexp.Compile(pattern)
+			require.NoError(t, err)
+			match := false
+			for _, g := range got {
+				if re.MatchString(g) {
+					match = true
+					break
+				}
+			}
+			require.Truef(t, match, "pattern %q not found in got %v", pattern, got)
+		}
 	}
 	CheckTestCase(t, tc)
 }
