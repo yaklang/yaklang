@@ -44,6 +44,44 @@ func TestWithAICallback_WrapsTieredCallbacks(t *testing.T) {
 	require.Equal(t, consts.TierLightweight, speedCfg.tier)
 }
 
+func TestWithAICallback_WithAICallbackNegative(t *testing.T) {
+	consts.SetTieredAIConfig(&consts.TieredAIConfig{
+		Enabled:       true,
+		RoutingPolicy: consts.PolicyPerformance,
+	})
+	seen := make(map[string]AICallerConfigIf)
+	cfg := NewConfig(context.Background(), WithDisableDynamicPlanning(true),
+		WithAICallback(func(i AICallerConfigIf, req *AIRequest) (*AIResponse, error) {
+			seen[req.GetPrompt()] = i
+			rsp := NewAIResponse(i)
+			rsp.Close()
+			return rsp, nil
+		}))
+
+	require.NotNil(t, cfg.OriginalAICallback)
+	require.NotNil(t, cfg.QualityPriorityAICallback)
+	require.NotNil(t, cfg.SpeedPriorityAICallback)
+
+	_, err := cfg.OriginalAICallback(cfg, NewAIRequest("original"))
+	require.NoError(t, err)
+	_, err = cfg.QualityPriorityAICallback(cfg, NewAIRequest("quality"))
+	require.NoError(t, err)
+	_, err = cfg.SpeedPriorityAICallback(cfg, NewAIRequest("speed"))
+	require.NoError(t, err)
+
+	origCfg, ok := seen["original"].(*Config)
+	require.True(t, ok)
+	require.Same(t, cfg, origCfg)
+
+	qualityCfg, ok := seen["quality"].(*tierAwareConsumptionCaller)
+	require.True(t, ok)
+	require.Equal(t, consts.TierIntelligent, qualityCfg.tier)
+
+	speedCfg, ok := seen["speed"].(*tierAwareConsumptionCaller)
+	require.True(t, ok)
+	require.Equal(t, consts.TierLightweight, speedCfg.tier)
+}
+
 func TestWithFastAICallback_OnlySetsOriginal(t *testing.T) {
 	cfg := NewTestConfig(context.Background())
 

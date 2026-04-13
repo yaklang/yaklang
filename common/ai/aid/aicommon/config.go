@@ -15,12 +15,12 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai"
-	"github.com/yaklang/yaklang/common/ai/ytoken"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/fstools"
 	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/ai/ytoken"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -239,8 +239,8 @@ type Config struct {
 	// timeline
 	Timeline                  *Timeline
 	TimelineDiffer            *TimelineDiffer
-	TimelineContentSizeLimit  int   // in tokens
-	TimelineTotalContentLimit int   // in tokens
+	TimelineContentSizeLimit  int // in tokens
+	TimelineTotalContentLimit int // in tokens
 
 	// triage
 	MemoryTriage         MemoryTriage
@@ -373,7 +373,7 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 	// Initialize endpoint manager
 	config.Epm = NewEndpointManagerContext(ctx)
 	config.Epm.SetConfig(config)
-	if config.AICallbackAvailable() {
+	if !config.AICallbackAvailable() {
 		if err := WithTieredAICallback()(config); err != nil || !config.AICallbackAvailable() {
 			log.Errorf("Failed to set AI callback: %v", err)
 			return nil
