@@ -83,6 +83,9 @@ func (pr *planRequest) CallQualityPriorityAI(request *aicommon.AIRequest) (*aico
 
 type PlanResponse struct {
 	RootTask *AiTask `json:"root_task"`
+	// Facts is a read-only field populated by loop_plan's output_facts action.
+	// It contains all concrete factual evidence gathered during planning, in Markdown format.
+	Facts string `json:"facts,omitempty"`
 }
 
 func (p *PlanResponse) recursiveMergeSubtask(subtask *AiTask, callback func(i *AiTask) error, stopped *utils.AtomicBool) {
@@ -95,7 +98,7 @@ func (p *PlanResponse) recursiveMergeSubtask(subtask *AiTask, callback func(i *A
 		stopped.Set()
 		return
 	}
-	if subtask.Subtasks == nil || len(subtask.Subtasks) <= 0 {
+	if len(subtask.Subtasks) <= 0 {
 		return
 	}
 	for _, st := range subtask.Subtasks {
@@ -141,6 +144,7 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 	}
 
 	var rootTask = pr.cod.generateAITaskWithName("root-default", "root-default")
+	var planFacts string
 
 	planTask := aicommon.NewStatefulTaskBase(
 		"plan-task",
@@ -216,13 +220,29 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 				if rootTask.Name == "" {
 					log.Errorf("plan action missing main_task")
 				}
+
+				// Collect facts accumulated via output_facts action during planning
+				if facts := loop.Get(loop_plan.PLAN_FACTS_KEY); facts != "" {
+					planFacts = facts
+					pr.cod.ContextProvider.SetPersistentData("plan_facts", facts)
+				}
 			}
 		}))
 	if err != nil {
 		return nil, err
 	}
 	pr.cod.standardizeTaskTreeAndNotify(rootTask, "initial plan generated")
-	return pr.cod.newPlanResponse(rootTask), nil
+
+	// Inject FACTS as a prefix block in the root task's user input so every
+	// subtask can see it through the parent-task chain in GetUserInput().
+	if planFacts != "" {
+		existingInput := rootTask.AIStatefulTaskBase.GetUserInput()
+		rootTask.SetUserInput(prependPlanFactsToRenderedPlan(existingInput, planFacts))
+	}
+
+	resp := pr.cod.newPlanResponse(rootTask)
+	resp.Facts = planFacts
+	return resp, nil
 }
 
 func (pr *planRequest) generateFallbackPlan(loop *reactloops.ReActLoop) string {

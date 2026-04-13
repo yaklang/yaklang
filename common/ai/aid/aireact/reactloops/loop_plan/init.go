@@ -40,6 +40,7 @@ var PLAN_PROMPT_KEY = "plan_prompt"
 var PLAN_FILE_RESULTS_KEY = "plan_file_results"
 var PLAN_WEB_RESULTS_KEY = "plan_web_results"
 var PLAN_RECON_RESULTS_KEY = "plan_recon_results"
+var PLAN_FACTS_KEY = "plan_facts"
 
 const PlanMaxIterations = 8
 
@@ -68,6 +69,7 @@ func init() {
 				"plan", "search_knowledge",
 				"read_file", "find_files", "grep_text",
 				"web_search", "scan_port", "simple_crawler",
+				"output_facts",
 				schema.AI_REACT_LOOP_ACTION_LOADING_SKILLS,
 			}
 			if r.GetConfig().GetAllowUserInteraction() {
@@ -78,8 +80,8 @@ func init() {
 				reactloops.WithAllowToolCall(false),
 				reactloops.WithAllowAIForge(false),
 				reactloops.WithAllowPlanAndExec(false),
+				reactloops.WithAITagFieldWithAINodeId(PlanFactsAITagName, PlanFactsFieldName, PlanFactsAINodeID, aicommon.TypeTextMarkdown),
 				reactloops.WithInitTask(buildPlanInitTask(r)),
-				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
 				reactloops.WithMaxIterations(PlanMaxIterations),
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 				reactloops.WithActionFilter(func(action *reactloops.LoopAction) bool {
@@ -121,11 +123,14 @@ func init() {
 						"FileResults":     fileResults,
 						"WebResults":      webResults,
 						"ReconResults":    reconResults,
+						"Facts":           loop.Get(PLAN_FACTS_KEY),
 						"IsLastIteration": isLastIteration,
 					}
 					return utils.RenderTemplate(reactiveData, renderMap)
 				}),
+				buildPlanPostIterationHook(r),
 				generate(r),
+				outputFactsAction(r),
 				searchKnowledge(r),
 				readFileAction(r),
 				findFilesAction(r),
