@@ -264,8 +264,6 @@ func collectAIBaseRoots(config *ypb.ThirdPartyApplicationConfig) []string {
 	for _, raw := range collectAIEndpoints(config) {
 		appendAIBaseRoots(&roots, baseURLRootFromEndpoint(raw))
 	}
-	rootURL, _ := aiProviderDefaultEndpointForHealthCheck(config.GetType())
-	appendAIBaseRoots(&roots, rootURL)
 	return compactStrings(roots)
 }
 
@@ -322,8 +320,6 @@ func collectAIBaseRootsWithoutEndpointExpansion(config *ypb.ThirdPartyApplicatio
 	} {
 		appendAIBaseRoots(&roots, raw)
 	}
-	rootURL, _ := aiProviderDefaultEndpointForHealthCheck(config.GetType())
-	appendAIBaseRoots(&roots, rootURL)
 	return compactStrings(roots)
 }
 
@@ -359,9 +355,9 @@ func normalizeAIBasePath(rawPath string) string {
 		"/chat/completions",
 		"/v1/chat/completions",
 		"/api/v1/chat/completions",
-		"/compatible-mode/v1/chat/completions",
-		"/api/v3/chat/completions",
-		"/api/paas/v4/chat/completions",
+		// "/compatible-mode/v1/chat/completions",
+		// "/api/v3/chat/completions",
+		// "/api/paas/v4/chat/completions",
 	} {
 		if strings.HasSuffix(rawPath, suffix) {
 			rawPath = strings.TrimSuffix(rawPath, suffix)
@@ -452,7 +448,10 @@ func migratedBaseURLForConfig(config *ypb.ThirdPartyApplicationConfig) string {
 	if strings.TrimSpace(config.GetBaseURL()) != "" && !config.GetEnableEndpoint() {
 		return strings.TrimSpace(config.GetBaseURL())
 	}
-	rootURL, defaultURI := aiProviderDefaultEndpointForHealthCheck(config.GetType())
+	if strings.TrimSpace(config.GetBaseURL()) == "" && strings.TrimSpace(config.GetEndpoint()) == "" && strings.TrimSpace(config.GetDomain()) == "" {
+		return ""
+	}
+	defaultURI := aiProviderDefaultURIForHealthCheck(config.GetType())
 	return strings.TrimSpace(aispec.GetBaseURLRootFromConfig(&aispec.AIConfig{
 		Type:           config.GetType(),
 		BaseURL:        config.GetBaseURL(),
@@ -461,7 +460,7 @@ func migratedBaseURLForConfig(config *ypb.ThirdPartyApplicationConfig) string {
 		Domain:         config.GetDomain(),
 		NoHttps:        config.GetNoHttps(),
 		APIType:        config.GetAPIType(),
-	}, rootURL, defaultURI))
+	}, "", defaultURI))
 }
 
 func migratedEndpointForHealthCheck(config *ypb.ThirdPartyApplicationConfig) string {
@@ -471,7 +470,10 @@ func migratedEndpointForHealthCheck(config *ypb.ThirdPartyApplicationConfig) str
 	if config.GetEnableEndpoint() && strings.TrimSpace(config.GetEndpoint()) != "" {
 		return strings.TrimSpace(config.GetEndpoint())
 	}
-	rootURL, defaultURI := aiProviderDefaultEndpointForHealthCheck(config.GetType())
+	if strings.TrimSpace(config.GetBaseURL()) == "" && strings.TrimSpace(config.GetEndpoint()) == "" && strings.TrimSpace(config.GetDomain()) == "" {
+		return ""
+	}
+	defaultURI := aiProviderDefaultURIForHealthCheck(config.GetType())
 	return strings.TrimSpace(aispec.GetBaseURLFromConfig(&aispec.AIConfig{
 		Type:           config.GetType(),
 		BaseURL:        config.GetBaseURL(),
@@ -480,7 +482,7 @@ func migratedEndpointForHealthCheck(config *ypb.ThirdPartyApplicationConfig) str
 		Domain:         config.GetDomain(),
 		NoHttps:        config.GetNoHttps(),
 		APIType:        config.GetAPIType(),
-	}, rootURL, defaultURI))
+	}, "", defaultURI))
 }
 
 func cloneThirdPartyApplicationConfig(config *ypb.ThirdPartyApplicationConfig) *ypb.ThirdPartyApplicationConfig {
@@ -599,30 +601,30 @@ func findFirstWorkingAIConfig(ctx context.Context, candidates []*ypb.ThirdPartyA
 	}
 }
 
-func aiProviderDefaultEndpointForHealthCheck(providerType string) (string, string) {
+func aiProviderDefaultURIForHealthCheck(providerType string) string {
 	switch strings.ToLower(strings.TrimSpace(providerType)) {
 	case "deepseek":
-		return "https://api.deepseek.com", "/chat/completions"
+		return "/chat/completions"
 	case "volcengine":
-		return "https://ark.cn-beijing.volces.com", "/api/v3/chat/completions"
+		return "/api/v3/chat/completions"
 	case "tongyi":
-		return "https://dashscope.aliyuncs.com", "/compatible-mode/v1/chat/completions"
+		return "/compatible-mode/v1/chat/completions"
 	case "openrouter":
-		return "https://openrouter.ai", "/api/v1/chat/completions"
+		return "/api/v1/chat/completions"
 	case "chatglm":
-		return "https://open.bigmodel.cn", "/api/paas/v4/chat/completions"
+		return "/api/paas/v4/chat/completions"
 	case "ollama":
-		return "http://127.0.0.1:11434", "/v1/chat/completions"
+		return "/v1/chat/completions"
 	case "aibalance":
-		return "https://aibalance.yaklang.com", "/v1/chat/completions"
+		return "/v1/chat/completions"
 	case "moonshot":
-		return "https://api.moonshot.cn", "/v1/chat/completions"
+		return "/v1/chat/completions"
 	case "siliconflow":
-		return "https://api.siliconflow.cn", "/v1/chat/completions"
+		return "/v1/chat/completions"
 	case "openai", "":
-		return "https://api.openai.com", "/v1/chat/completions"
+		return "/v1/chat/completions"
 	default:
-		return "https://api.openai.com", "/v1/chat/completions"
+		return "/v1/chat/completions"
 	}
 }
 

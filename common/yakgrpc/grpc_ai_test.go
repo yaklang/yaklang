@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -55,6 +56,7 @@ type testAIModelClient struct {
 	chatErr     error
 	noToolCall  bool
 	onChat      func()
+	onRawCallback func()
 }
 
 func (c *testAIModelClient) LoadOption(opts ...aispec.AIConfigOption) {
@@ -83,6 +85,9 @@ func (c *testAIModelClient) Chat(prompt string, _ ...any) (string, error) {
 
 	time.Sleep(20 * time.Millisecond)
 	if c.config.RawHTTPRequestResponseCallback != nil {
+		if c.onRawCallback != nil {
+			c.onRawCallback()
+		}
 		rawRequest := c.rawRequest
 		if len(rawRequest) == 0 {
 			rawRequest = []byte("POST /v1/chat/completions HTTP/1.1\r\nHost: mock.local\r\nContent-Type: application/json\r\nAccept: application/json\r\n\r\n{\"content\":\"ping\"}")
@@ -298,6 +303,67 @@ func TestExecuteAIConfigHealthCheck_DoesNotFallbackToOtherProviders(t *testing.T
 	assert.Equal(t, 0, goodCalls)
 }
 
+func TestExecuteAIConfigHealthCheck_DisableProviderFallback_OnlyTriggersRawCallbackOnce(t *testing.T) {
+	const badProviderType = "grpc-ai-health-check-bad-provider-raw-callback"
+	const goodProviderType = "grpc-ai-health-check-good-provider-raw-callback"
+
+	var badCalls int
+	var goodCalls int
+	var rawCallbackCalls int
+
+	aispec.Register(badProviderType, func() aispec.AIClient {
+		return &testAIModelClient{
+			chatErr:     errors.New("bad provider failed"),
+			rawRequest:  []byte("POST /v1/chat/completions HTTP/1.1\r\nHost: bad.local\r\n\r\n"),
+			rawResponse: []byte("HTTP/1.1 500 Internal Server Error\r\n\r\n"),
+			bodyPreview: []byte(`{"error":"bad provider failed"}`),
+			onChat: func() {
+				badCalls++
+			},
+			onRawCallback: func() {
+				rawCallbackCalls++
+			},
+		}
+	})
+	aispec.Register(goodProviderType, func() aispec.AIClient {
+		return &testAIModelClient{
+			response: `{"@action":"call-tool","tool":"` + aiHealthCheckToolName + `","identifier":"health_check","params":{"content":"ping","summary":"ok"}}`,
+			onChat: func() {
+				goodCalls++
+			},
+		}
+	})
+
+	originalNetworkConfig := yakit.GetNetworkConfig()
+	backupPriority := append([]string(nil), originalNetworkConfig.GetAiApiPriority()...)
+	defer func() {
+		restored := yakit.GetNetworkConfig()
+		restored.AiApiPriority = backupPriority
+		yakit.ConfigureNetWork(restored)
+	}()
+
+	cfg := yakit.GetNetworkConfig()
+	cfg.AiApiPriority = []string{goodProviderType, badProviderType}
+	yakit.ConfigureNetWork(cfg)
+
+	resp := executeAIConfigHealthCheck(context.Background(), &ypb.ThirdPartyApplicationConfig{
+		Type:   badProviderType,
+		APIKey: "test-key",
+		ExtraParams: []*ypb.KVPair{
+			{Key: "model", Value: "mock-model"},
+		},
+	}, "ping")
+
+	require.NotNil(t, resp)
+	assert.False(t, resp.GetSuccess())
+	assert.Contains(t, resp.GetErrorMessage(), "bad provider failed")
+	assert.Equal(t, 1, badCalls)
+	assert.Equal(t, 0, goodCalls)
+	assert.Equal(t, 1, rawCallbackCalls)
+	assert.Contains(t, resp.GetRawRequest(), "Host: bad.local")
+	assert.Contains(t, resp.GetRawResponse(), `{"error":"bad provider failed"}`)
+}
+
 func TestSanitizeAIConfigHealthCheckResponse_EscapesInvalidUTF8(t *testing.T) {
 	resp := sanitizeAIConfigHealthCheckResponse(&ypb.AIConfigHealthCheckResponse{
 		RawRequest:      string([]byte{'r', 'e', 'q', 0xff}),
@@ -385,6 +451,82 @@ func TestBuildRecommendedAIConfigs_TogglesProxyAndSuffixes(t *testing.T) {
 		}
 	}
 	assert.True(t, found)
+}
+
+func TestBuildRecommendedAIConfigs_DoesNotChangeHost(t *testing.T) {
+	cfg := &ypb.ThirdPartyApplicationConfig{
+		Type:    "openrouter",
+		APIKey:  "test-key",
+		BaseURL: "http://127.0.0.1:18080/bad",
+		ExtraParams: []*ypb.KVPair{
+			{Key: "model", Value: "mock-model"},
+		},
+	}
+
+	candidates := buildRecommendedAIConfigs(cfg)
+	require.NotEmpty(t, candidates)
+
+	for _, candidate := range candidates {
+		endpoint := candidate.GetEndpoint()
+		require.NotEmpty(t, endpoint)
+		u, err := url.Parse(endpoint)
+		require.NoError(t, err)
+		assert.Equal(t, "127.0.0.1:18080", u.Host, "unexpected endpoint host: %s", endpoint)
+	}
+}
+
+func TestBuildRecommendedAIConfigs_ExpandsSchemelessBaseURLToHTTPAndHTTPS(t *testing.T) {
+	cfg := &ypb.ThirdPartyApplicationConfig{
+		Type:    "openai",
+		APIKey:  "test-key",
+		BaseURL: "127.0.0.1:18080/v1",
+		ExtraParams: []*ypb.KVPair{
+			{Key: "model", Value: "mock-model"},
+		},
+	}
+
+	candidates := buildRecommendedAIConfigs(cfg)
+	require.NotEmpty(t, candidates)
+
+	var foundHTTP bool
+	var foundHTTPS bool
+	for _, candidate := range candidates {
+		if candidate.GetEndpoint() == "http://127.0.0.1:18080/v1/chat/completions" && candidate.GetEnableEndpoint() {
+			foundHTTP = true
+		}
+		if candidate.GetEndpoint() == "https://127.0.0.1:18080/v1/chat/completions" && candidate.GetEnableEndpoint() {
+			foundHTTPS = true
+		}
+	}
+	assert.True(t, foundHTTP)
+	assert.True(t, foundHTTPS)
+}
+
+func TestBuildRecommendedAIConfigs_ExpandsSchemelessEndpointToHTTPAndHTTPS(t *testing.T) {
+	cfg := &ypb.ThirdPartyApplicationConfig{
+		Type:     "openai",
+		APIKey:   "test-key",
+		Endpoint: "127.0.0.1:18080/v1",
+		ExtraParams: []*ypb.KVPair{
+			{Key: "model", Value: "mock-model"},
+		},
+	}
+
+	candidates := buildRecommendedAIConfigs(cfg)
+	require.NotEmpty(t, candidates)
+
+	var foundHTTP bool
+	var foundHTTPS bool
+	for _, candidate := range candidates {
+		if candidate.GetEndpoint() == "http://127.0.0.1:18080/v1/chat/completions" && candidate.GetEnableEndpoint() {
+			foundHTTP = true
+		}
+		if candidate.GetEndpoint() == "https://127.0.0.1:18080/v1/chat/completions" && candidate.GetEnableEndpoint() {
+			foundHTTPS = true
+		}
+	}
+	assert.True(t, foundHTTP)
+	assert.True(t, foundHTTPS)
 }
 
 func TestBuildRecommendedAIConfigs_UsesResponsesSuffixesByAPIType(t *testing.T) {
@@ -500,4 +642,18 @@ func TestRecommendAIHealthCheckConfig_FallbackToEndpoint(t *testing.T) {
 	assert.Equal(t, server.URL+"/custom/openai/chat/completions", recommend.GetEndpoint())
 	assert.True(t, recommend.GetEnableEndpoint())
 	assert.True(t, recommend.GetNoHttps())
+}
+
+func TestRecommendAIHealthCheckConfig_DoesNotFallbackToDifferentHost(t *testing.T) {
+	cfg := &ypb.ThirdPartyApplicationConfig{
+		Type:    "openai",
+		APIKey:  "test-key",
+		BaseURL: "http://127.0.0.1:1/bad",
+		ExtraParams: []*ypb.KVPair{
+			{Key: "model", Value: "mock-model"},
+		},
+	}
+
+	recommend := recommendAIHealthCheckConfig(context.Background(), cfg, "ping")
+	assert.Nil(t, recommend)
 }
