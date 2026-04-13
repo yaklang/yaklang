@@ -49,11 +49,11 @@ func TestCurrentMemorySize_SingleMemory(t *testing.T) {
 	loop.currentMemories.Set("mem-1", entity)
 	size := loop.currentMemorySize()
 
-	expectedSize := len(content)
+	expectedSize := aicommon.MeasureTokens(content)
 	if size != expectedSize {
 		t.Errorf("expected size %d, got %d", expectedSize, size)
 	}
-	log.Infof("Single memory size test passed: size=%d, content_length=%d", size, len(content))
+	log.Infof("Single memory size test passed: size=%d tokens, content_length=%d", size, len(content))
 }
 
 // TestCurrentMemorySize_MultipleMemories 测试多个记忆的大小
@@ -78,7 +78,7 @@ func TestCurrentMemorySize_MultipleMemories(t *testing.T) {
 			Content: c.content,
 		}
 		loop.currentMemories.Set(c.id, entity)
-		expectedSize += len(c.content)
+		expectedSize += aicommon.MeasureTokens(c.content)
 	}
 
 	actualSize := loop.currentMemorySize()
@@ -192,7 +192,7 @@ func TestMemorySize_DirectAccess(t *testing.T) {
 	expectedSize := 0
 	for _, e := range entities {
 		loop.currentMemories.Set(e.Id, e)
-		expectedSize += len(e.Content)
+		expectedSize += aicommon.MeasureTokens(e.Content)
 	}
 
 	actualSize := loop.currentMemorySize()
@@ -248,10 +248,10 @@ func TestMemorySize_Accuracy(t *testing.T) {
 		expected int
 	}{
 		{"empty", "", 0},
-		{"single_char", "A", 1},
-		{"number", "12345", 5},
-		{"chinese", "你好世界", 12},  // UTF-8: 3 bytes per character
-		{"mixed", "Hello世界", 11}, // "Hello" = 5 bytes, "世界" = 6 bytes
+		{"single_char", "A", aicommon.MeasureTokens("A")},
+		{"number", "12345", aicommon.MeasureTokens("12345")},
+		{"chinese", "你好世界", aicommon.MeasureTokens("你好世界")},
+		{"mixed", "Hello世界", aicommon.MeasureTokens("Hello世界")},
 	}
 
 	for _, tc := range testCases {
@@ -264,10 +264,10 @@ func TestMemorySize_Accuracy(t *testing.T) {
 		})
 
 		actualSize := loop.currentMemorySize()
-		expectedSize := len([]byte(tc.content))
+		expectedSize := tc.expected
 
 		if actualSize != expectedSize {
-			t.Errorf("testcase %s: expected %d bytes, got %d bytes", tc.id, expectedSize, actualSize)
+			t.Errorf("testcase %s: expected %d tokens, got %d tokens", tc.id, expectedSize, actualSize)
 		}
 	}
 

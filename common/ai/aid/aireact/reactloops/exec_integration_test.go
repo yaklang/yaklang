@@ -954,7 +954,7 @@ func TestMemorySize_CalculationCorrectness(t *testing.T) {
 	expectedSize := 0
 	for _, entity := range entities {
 		loop.currentMemories.Set(entity.Id, entity)
-		expectedSize += len(entity.Content)
+		expectedSize += aicommon.MeasureTokens(entity.Content)
 	}
 
 	actualSize := loop.currentMemorySize()
@@ -969,13 +969,13 @@ func TestMemorySize_CalculationCorrectness(t *testing.T) {
 func TestMemoryEviction_Correctness(t *testing.T) {
 	loop := &ReActLoop{
 		currentMemories: omap.NewEmptyOrderedMap[string, *aicommon.MemoryEntity](),
-		memorySizeLimit: 40, // 限制为 40 字节
+		memorySizeLimit: 6, // 限制为 6 tokens
 	}
 
-	// 添加第一个内存（15 字节）
+	// 添加第一个内存（约 2 tokens）
 	result1 := &aicommon.SearchMemoryResult{
 		Memories: []*aicommon.MemoryEntity{
-			{Id: "mem-1", Content: "First memory "}, // 13 bytes
+			{Id: "mem-1", Content: "First memory "},
 		},
 	}
 	loop.PushMemory(result1)
@@ -983,10 +983,10 @@ func TestMemoryEviction_Correctness(t *testing.T) {
 	size1 := loop.currentMemorySize()
 	log.Infof("After first push: size=%d", size1)
 
-	// 添加第二个内存（20 字节）
+	// 添加第二个内存（约 3 tokens）
 	result2 := &aicommon.SearchMemoryResult{
 		Memories: []*aicommon.MemoryEntity{
-			{Id: "mem-2", Content: "Second memory content"}, // 21 bytes
+			{Id: "mem-2", Content: "Second memory content"},
 		},
 	}
 	loop.PushMemory(result2)

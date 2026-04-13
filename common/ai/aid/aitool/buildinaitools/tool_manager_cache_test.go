@@ -16,12 +16,12 @@ func makeTool(name, desc string, params ...aitool.ToolOption) *aitool.Tool {
 	return aitool.NewWithoutCallback(name, opts...)
 }
 
-func newManagerWithCache(maxBytes int) *AiToolManager {
+func newManagerWithCache(maxTokens int) *AiToolManager {
 	m := &AiToolManager{
 		toolEnabled: make(map[string]bool),
 	}
-	if maxBytes > 0 {
-		m.maxCacheTokens = maxBytes
+	if maxTokens > 0 {
+		m.maxCacheTokens = maxTokens
 	}
 	return m
 }
@@ -63,11 +63,11 @@ func TestRecentToolCache_SizeLimit(t *testing.T) {
 	probeMgr := newManagerWithCache(0)
 	probeMgr.AddRecentlyUsedTool(probe)
 	singleSize := probeMgr.totalCacheSize()
-	t.Logf("single entry size: %d bytes", singleSize)
+	t.Logf("single entry size: %d tokens", singleSize)
 
 	// set limit to hold at most 2 entries
-	maxBytes := singleSize*2 + 10
-	mgr := newManagerWithCache(maxBytes)
+	maxTokens := singleSize*2 + 10
+	mgr := newManagerWithCache(maxTokens)
 
 	t1 := makeTool("tool_aaa", "probe description",
 		aitool.WithStringParam("x", aitool.WithParam_Description("dummy")),
@@ -136,7 +136,7 @@ func TestRecentToolCache_Summary(t *testing.T) {
 	assert.Check(t, strings.Contains(summary, "AITAG block values override same-named JSON params."), "footer should explain AITAG precedence")
 }
 
-func TestRecentToolCache_SummaryMaxBytes(t *testing.T) {
+func TestRecentToolCache_SummaryMaxTokens(t *testing.T) {
 	mgr := newManagerWithCache(0)
 
 	for i := 0; i < 20; i++ {
@@ -147,8 +147,8 @@ func TestRecentToolCache_SummaryMaxBytes(t *testing.T) {
 		mgr.AddRecentlyUsedTool(tool)
 	}
 
-	// first entry is always included even if it exceeds maxBytes budget
-	summary := mgr.GetRecentToolsSummary(500, "n")
+	// first entry is always included even if it exceeds token budget
+	summary := mgr.GetRecentToolsSummary(200, "n")
 	assert.Check(t, summary != "", "summary should not be empty when cache has entries")
 	toolCount := strings.Count(summary, "## Tool: ")
 	assert.Check(t, toolCount == 1, "expected exactly 1 tool entry, got %d", toolCount)

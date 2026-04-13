@@ -743,7 +743,7 @@ func TestGenerateVerificationPrompt_TruncatesLongTodoSnapshotButKeepsFocus(t *te
 		prompt,
 		"# TODO:",
 		"active_focus",
-		"TODO history exceeded 10KB",
+		"TODO history exceeded 10K tokens",
 	) {
 		t.Fatalf("verification prompt should truncate long TODO history but keep latest focus item. Got:\n%s", prompt)
 	}

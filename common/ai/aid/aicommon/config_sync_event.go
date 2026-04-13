@@ -254,7 +254,7 @@ func (c *Config) HandleSyncMemoryContextEvent(event *ypb.AIInputEvent) error {
 					"potential_questions":  memoryEntity.PotentialQuestions,
 				}
 				memoryInfos = append(memoryInfos, memoryInfo)
-				totalSize += len(memoryEntity.Content)
+				totalSize += MeasureTokens(memoryEntity.Content)
 
 				// 统计超过 0.7 分的各维度
 				if memoryEntity.C_Score > scoreThreshold {
