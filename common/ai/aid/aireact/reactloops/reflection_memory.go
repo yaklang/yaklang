@@ -82,7 +82,30 @@ func (r *ReActLoop) cacheReflection(reflection *ActionReflection) {
 	// 只保留最近 3 条用于 prompt 上下文
 	reflections = append(reflections, reflection)
 	if len(reflections) > 3 {
-		reflections = reflections[len(reflections)-3:]
+		tail := reflections[len(reflections)-3:]
+		hasSpin := false
+		for _, item := range tail {
+			if item != nil && item.IsSpinning {
+				hasSpin = true
+				break
+			}
+		}
+		if hasSpin {
+			reflections = tail
+		} else {
+			var recentSpin *ActionReflection
+			for i := len(reflections) - 4; i >= 0; i-- {
+				if reflections[i] != nil && reflections[i].IsSpinning {
+					recentSpin = reflections[i]
+					break
+				}
+			}
+			if recentSpin != nil {
+				reflections = []*ActionReflection{recentSpin, tail[1], tail[2]}
+			} else {
+				reflections = tail
+			}
+		}
 	}
 
 	r.Set("self_reflections", reflections)

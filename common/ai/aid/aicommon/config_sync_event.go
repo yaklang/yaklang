@@ -234,7 +234,28 @@ func (c *Config) HandleSyncMemoryContextEvent(event *ypb.AIInputEvent) error {
 	const scoreThreshold = 0.7
 
 	if c.MemoryPool != nil {
-		for _, memoryEntity := range c.MemoryPool.Values() {
+		selected := make([]*MemoryEntity, 0)
+		remaining := int(c.MemoryPoolSize)
+		values := c.MemoryPool.Values()
+		for i := len(values) - 1; i >= 0; i-- {
+			memoryEntity := values[i]
+			if memoryEntity == nil {
+				continue
+			}
+			entityTokens := MeasureTokens(memoryEntity.Content)
+			if entityTokens <= 0 {
+				selected = append(selected, memoryEntity)
+				continue
+			}
+			if c.MemoryPoolSize > 0 && entityTokens > remaining {
+				continue
+			}
+			selected = append(selected, memoryEntity)
+			remaining -= entityTokens
+		}
+
+		for i := len(selected) - 1; i >= 0; i-- {
+			memoryEntity := selected[i]
 			if memoryEntity != nil {
 				// 构建带有 created_at_timestamp 的 memory 信息
 				memoryInfo := map[string]interface{}{

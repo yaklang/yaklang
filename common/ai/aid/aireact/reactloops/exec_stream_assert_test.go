@@ -8,7 +8,6 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 )
@@ -35,13 +34,13 @@ func TestActionStreamHandler(t *testing.T) {
 		}),
 	)
 
-	action.GetString("key")
+	action.WaitParse(context.Background())
+	action.WaitStream(context.Background())
+	assert.Equal(t, "value", action.GetString("key"))
 	if _, ok := keys["key"]; !ok {
 		t.Errorf("expected key 'key' to be handled")
 	}
-
-	action.WaitStream(context.Background())
-
-	spew.Dump(action.GetString("key1"))
-	spew.Dump(action.GetString("a"))
+	assert.Equal(t, int64(1), atomic.LoadInt64(count))
+	assert.Equal(t, "", action.GetString("key1"))
+	assert.Equal(t, "", action.GetString("a"))
 }
