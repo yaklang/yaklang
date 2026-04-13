@@ -395,6 +395,192 @@ func TestRecovery_StartFromSpecifiedTask(t *testing.T) {
 	require.Greater(t, aiLastCalls, 0, "tasks after the specified start task should trigger AI calls")
 }
 
+func TestRecovery_StartEarlierThanPreviousCursorResetsCompletedTasks(t *testing.T) {
+	sessionID := uuid.NewString()
+
+	root := newRawTaskForRecovery("root", "root-goal")
+	firstMarker := uuid.NewString()
+	secondMarker := uuid.NewString()
+	thirdMarker := uuid.NewString()
+	fourthMarker := uuid.NewString()
+	lastMarker := uuid.NewString()
+
+	firstTask := newRawTaskForRecovery("first-task-"+firstMarker, "first-goal-"+firstMarker)
+	secondTask := newRawTaskForRecovery("second-task-"+secondMarker, "second-goal-"+secondMarker)
+	thirdTask := newRawTaskForRecovery("third-task-"+thirdMarker, "third-goal-"+thirdMarker)
+	fourthTask := newRawTaskForRecovery("fourth-task-"+fourthMarker, "fourth-goal-"+fourthMarker)
+	lastTask := newRawTaskForRecovery("last-task-"+lastMarker, "last-goal-"+lastMarker)
+
+	firstTask.ParentTask = root
+	secondTask.ParentTask = root
+	thirdTask.ParentTask = root
+	fourthTask.ParentTask = root
+	lastTask.ParentTask = root
+	root.Subtasks = []*aid.AiTask{firstTask, secondTask, thirdTask, fourthTask, lastTask}
+	root.GenerateIndex()
+
+	firstTask.SetStatus(aicommon.AITaskState_Completed)
+	secondTask.SetStatus(aicommon.AITaskState_Completed)
+	thirdTask.SetStatus(aicommon.AITaskState_Completed)
+	fourthTask.SetStatus(aicommon.AITaskState_Aborted)
+
+	db := consts.GetGormProjectDatabase()
+	require.NoError(t, db.AutoMigrate(&schema.AISessionPlanAndExec{}).Error)
+	t.Cleanup(func() {
+		_ = db.Unscoped().
+			Where("session_id = ?", sessionID).
+			Delete(&schema.AISessionPlanAndExec{}).Error
+	})
+
+	coordinatorID := uuid.NewString()
+	record := &schema.AISessionPlanAndExec{
+		SessionID:     sessionID,
+		CoordinatorID: coordinatorID,
+		TaskTree:      string(utils.Jsonify(root)),
+		TaskProgress: string(utils.Jsonify(&aid.PlanAndExecProgress{
+			Phase:            "executing",
+			CurrentTaskIndex: fourthTask.Index,
+		})),
+	}
+	require.NoError(t, yakit.CreateOrUpdateAISessionPlanAndExec(db, record))
+
+	var (
+		mu                    sync.Mutex
+		pushed                = make(map[string]int)
+		popped                = make(map[string]int)
+		firstPlanTaskProgress map[string]string
+		firstPlanRecorded     bool
+		aiFirstCalls          int
+		aiSecondCalls         int
+		aiThirdCalls          int
+		aiFourthCalls         int
+		aiLastCalls           int
+	)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	ins, err := aid.NewCoordinator(
+		"recovery-start-earlier-than-previous-cursor",
+		aicommon.WithContext(ctx),
+		aicommon.WithID(coordinatorID),
+		aicommon.WithDisableIntentRecognition(true),
+		aicommon.WithPersistentSessionId(sessionID),
+		aicommon.WithGenerateReport(false),
+		aicommon.WithDisableAutoSkills(true),
+		aicommon.WithAgreePolicy(aicommon.AgreePolicyYOLO),
+		aid.WithRecoveryStartTaskIndex(secondTask.Index),
+		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
+			if event == nil {
+				return
+			}
+			if event.Type == schema.EVENT_TYPE_PLAN {
+				var payload map[string]any
+				if err := json.Unmarshal(event.Content, &payload); err != nil {
+					return
+				}
+				rootTask, _ := payload["root_task"].(map[string]any)
+				if rootTask == nil {
+					return
+				}
+				mu.Lock()
+				if !firstPlanRecorded {
+					firstPlanTaskProgress = make(map[string]string)
+					collectTaskProgressByIndex(rootTask, firstPlanTaskProgress)
+					firstPlanRecorded = true
+				}
+				mu.Unlock()
+				return
+			}
+
+			if event.Type != schema.EVENT_TYPE_STRUCTURED {
+				return
+			}
+			var payload map[string]any
+			if err := json.Unmarshal(event.Content, &payload); err != nil {
+				return
+			}
+			eventType := utils.InterfaceToString(payload["type"])
+			if eventType != "push_task" && eventType != "pop_task" {
+				return
+			}
+			taskRaw, ok := payload["task"]
+			if !ok {
+				return
+			}
+			taskMap, ok := taskRaw.(map[string]any)
+			if !ok {
+				return
+			}
+			idx := utils.InterfaceToString(taskMap["index"])
+			if idx == "" {
+				return
+			}
+			mu.Lock()
+			if eventType == "push_task" {
+				pushed[idx]++
+			} else {
+				popped[idx]++
+			}
+			mu.Unlock()
+		}),
+		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			block := extractCurrentTaskContent(request.GetPrompt())
+			mu.Lock()
+			switch {
+			case strings.Contains(block, firstMarker):
+				aiFirstCalls++
+			case strings.Contains(block, secondMarker):
+				aiSecondCalls++
+			case strings.Contains(block, thirdMarker):
+				aiThirdCalls++
+			case strings.Contains(block, fourthMarker):
+				aiFourthCalls++
+			case strings.Contains(block, lastMarker):
+				aiLastCalls++
+			}
+			mu.Unlock()
+
+			rsp := config.NewAIResponse()
+			if utils.MatchAllOfSubString(request.GetPrompt(), "status_summary", "task_long_summary", "task_short_summary") {
+				rsp.EmitOutputStream(strings.NewReader(`{
+    "@action": "summary",
+    "status_summary": "ok",
+    "task_short_summary": "ok",
+    "task_long_summary": "ok"
+}`))
+			} else {
+				rsp.EmitOutputStream(strings.NewReader(`{
+    "@action": "directly_answer",
+    "answer_payload": "ok"
+}`))
+			}
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	require.NoError(t, err)
+
+	require.NoError(t, ins.Run())
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	require.Equal(t, 0, pushed[firstTask.Index], "tasks before the new start should not execute")
+	require.Equal(t, 1, pushed[secondTask.Index], "new start task should rerun even if it was previously completed")
+	require.Equal(t, 1, pushed[thirdTask.Index], "completed tasks between new start and previous cursor should rerun")
+	require.Equal(t, 1, pushed[fourthTask.Index], "previous aborted task should still rerun")
+	require.Equal(t, 1, pushed[lastTask.Index], "tasks after the previous cursor should continue executing")
+	require.Equal(t, "", firstPlanTaskProgress[secondTask.Index], "new start task should be reset to a pending state in recovered tree")
+	require.Equal(t, "", firstPlanTaskProgress[thirdTask.Index], "completed intermediate tasks should be reset to a pending state in recovered tree")
+	require.Equal(t, "", firstPlanTaskProgress[fourthTask.Index], "tasks after the new start should be reset to a pending state in recovered tree")
+	require.Equal(t, 0, aiFirstCalls, "tasks before the new start should not trigger AI calls")
+	require.Greater(t, aiSecondCalls, 0, "new start task should trigger AI calls after reset")
+	require.Greater(t, aiThirdCalls, 0, "completed intermediate tasks should trigger AI calls after reset")
+	require.Greater(t, aiFourthCalls, 0, "failed tasks after the new start should also trigger AI calls after reset")
+	require.Greater(t, aiLastCalls, 0, "tasks after the boundary should still trigger AI calls")
+}
+
 func TestRecovery_CancelledTaskPersistsAbortedState(t *testing.T) {
 	sessionID := uuid.NewString()
 	coordinatorID := uuid.NewString()

@@ -188,9 +188,37 @@ func TestPrepareRecoveryStartTask(t *testing.T) {
 
 	require.NoError(t, prepareRecoveryStartTask(root, sub2a.Index))
 	require.Equal(t, aicommon.AITaskState_Skipped, sub1.GetStatus())
-	require.NotEqual(t, aicommon.AITaskState_Skipped, sub2.GetStatus(), "ancestor task should stay resumable")
-	require.NotEqual(t, aicommon.AITaskState_Skipped, sub2a.GetStatus(), "start task should not be skipped")
-	require.NotEqual(t, aicommon.AITaskState_Skipped, sub3.GetStatus(), "tasks after start task should not be touched")
+	require.Equal(t, aicommon.AITaskState_Skipped, sub2.GetStatus(), "tasks before start should be marked skipped")
+	require.Equal(t, aicommon.AITaskState_Created, sub2a.GetStatus(), "start task should be reset to pending")
+	require.Equal(t, aicommon.AITaskState_Created, sub3.GetStatus(), "tasks after start task should be reset to pending")
+}
+
+func TestPrepareRecoveryStartTaskResetsCompletedRangeForEarlierStart(t *testing.T) {
+	c := newTestCoordinator(t)
+
+	root := c.generateAITaskWithName("root", "root-goal")
+	sub1 := c.generateAITaskWithName("s1", "g1")
+	sub2 := c.generateAITaskWithName("s2", "g2")
+	sub3 := c.generateAITaskWithName("s3", "g3")
+	sub4 := c.generateAITaskWithName("s4", "g4")
+
+	sub1.ParentTask = root
+	sub2.ParentTask = root
+	sub3.ParentTask = root
+	sub4.ParentTask = root
+	root.Subtasks = []*AiTask{sub1, sub2, sub3, sub4}
+	root.GenerateIndex()
+
+	sub1.SetStatus(aicommon.AITaskState_Completed)
+	sub2.SetStatus(aicommon.AITaskState_Completed)
+	sub3.SetStatus(aicommon.AITaskState_Completed)
+
+	require.NoError(t, prepareRecoveryStartTask(root, sub2.Index))
+
+	require.Equal(t, aicommon.AITaskState_Completed, sub1.GetStatus(), "tasks before the new start should keep their completed status")
+	require.Equal(t, aicommon.AITaskState_Created, sub2.GetStatus(), "new start task should be reset so recovery can rerun it")
+	require.Equal(t, aicommon.AITaskState_Created, sub3.GetStatus(), "completed tasks between new start and previous cursor should be reset")
+	require.Equal(t, aicommon.AITaskState_Created, sub4.GetStatus(), "previous current task boundary should not be reset by range rewind")
 }
 
 func TestPrepareRecoveryStartTaskNotFound(t *testing.T) {
