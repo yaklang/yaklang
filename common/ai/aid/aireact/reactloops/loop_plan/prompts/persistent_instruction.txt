@@ -70,7 +70,79 @@
 4. 用 `loading_skills` 加载相关技能获取专业指导
 5. **需要主机端口/服务暴露面事实时**（见上文 **A**），在规划前用 `scan_port` 实际扫描；窄范围 Web 信息任务（见上文 **B**）不要为扫而扫
 6. **需要页面与 URL/API 入口事实时**，在规划前用 `simple_crawler` 实际爬取或按任务仅需时再用；与第 5 条搭配时按任务实际需要选择，不必两条同时满足
-7. 综合所有真实数据后，输出基于事实的任务规划
+7. **每次信息收集后**，立即调用 `output_facts` 记录本轮新增事实；即使你漏掉了，系统也会在 post-action hook 中自动补一次 facts
+8. 综合所有真实数据后，输出基于事实的任务规划
+
+## 事实记录工具：output_facts（重要）
+
+**调用时机**：每次信息收集操作（`read_file`、`find_files`、`grep_text`、`web_search`、`scan_port`、`simple_crawler`、`search_knowledge` 等）获取到有价值的数据后，**必须**在下一步调用 `output_facts` 将其记录为可验证事实。
+
+**调用规则**：
+- 每次调用只需要提供**本轮新增事实**，系统会自动与已有 FACTS 合并并累积展示
+- 使用 **Markdown 格式**，用 `##` 标题按类别组织，例如：`## 目标信息`、`## 开放端口与服务`、`## 发现的文件`、`## 技术栈`、`## URL 与入口点`
+- 每条事实以 bullet point 列出**具体值**：端口号、URL 路径、文件路径、版本号、配置项键值、函数名、类名等
+- **严禁**使用"等"、"其他"、"类似"、"若干"、"相关"、"一些"等模糊代称；每条必须精确到实际数值或路径
+- 只记录已经观察到的真实数据，不写假设和推断
+- 优先使用 AITag 形式输出，这样界面可以直接流式看到 markdown：
+
+```json
+{"@action": "output_facts"}
+```
+
+```markdown
+<|FACTS_{{ .Nonce }}|>
+## 本轮新增事实
+
+- ...
+<|FACTS_END_{{ .Nonce }}|>
+```
+
+**示例**（scan_port 后调用）：
+```json
+{"@action": "output_facts"}
+```
+
+```markdown
+<|FACTS_{{ .Nonce }}|>
+## 目标主机
+
+- IP: 192.168.1.100
+- 主机名: prod-server-01
+
+## 开放端口与服务
+
+- 22/TCP: OpenSSH 8.9p1 Ubuntu
+- 80/TCP: nginx/1.18.0 (HTTP)
+- 443/TCP: nginx/1.18.0 (HTTPS, 证书域名: example.com)
+- 3306/TCP: MySQL 8.0.32
+- 6379/TCP: Redis 7.0.5 (无认证)
+<|FACTS_END_{{ .Nonce }}|>
+```
+
+**示例**（find_files + read_file 后调用）：
+```json
+{"@action": "output_facts"}
+```
+
+```markdown
+<|FACTS_{{ .Nonce }}|>
+## 项目结构
+
+- 根目录: /app
+- 构建文件: /app/package.json (Node.js 18.x, npm)
+- 入口: /app/src/index.ts
+- 配置: /app/.env.example
+
+## 技术栈
+
+- 运行时: Node.js 18.12.0
+- 框架: Express 4.18.2
+- ORM: Prisma 5.1.0, 数据库适配: PostgreSQL
+- 测试框架: Jest 29.5.0
+<|FACTS_END_{{ .Nonce }}|>
+```
+
+累积的事实会通过 `FACTS` 区块在后续每个子任务执行时自动可见，并且在计划的渲染展示中也会被前置追加，是整个计划的事实基础。
 
 **何时应该先探索而非直接规划：**
 - 不清楚目标系统的技术栈、架构或暴露面 -> 先用工具探测

@@ -20,6 +20,15 @@
 这些工具的执行结果将作为你后续制定具体计划的事实依据。**不要把 scan_port 和 simple_crawler 放到计划的 subtask 中，而是现在就调用它们。**
 {{ end }}{{ end }}{{ end }}{{ end }}{{ end }}{{/*
 
+*/}}{{if .Facts}}## 规划事实库（FACTS）
+
+以下是当前已累积的 FACTS。它们会在每次 `output_facts` 或自动 facts hook 后持续累积，生成计划时必须基于这些事实：
+
+<|FACTS_{{ .Nonce }}|>
+{{ .Facts }}
+<|FACTS_END_{{ .Nonce }}|>
+{{end}}{{/*
+
 */}}{{ if .Plan }}## 现有计划区块
 * 现有的计划会在下面做展示，你在生成计划的时候可以参考
 <|CURRENT_PLAN_{{ .Nonce }}|>
