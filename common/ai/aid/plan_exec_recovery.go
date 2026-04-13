@@ -116,50 +116,48 @@ func (c *Coordinator) buildRecoveredTaskTree(src *recoveredTask, parent *AiTask)
 	return task
 }
 
+// prepareRecoveryStartTask 会把恢复后的任务树整理成“从指定起点重新执行”的状态。
+// 规则很直接：
+// 1. 起点之前：已经完成的任务保留 completed，未完成的任务统一标记为 skipped，避免执行器再次进入。
+// 2. 起点及之后：无论之前是 completed、aborted 还是 skipped，全部重置为 created，确保会重新执行。
 func prepareRecoveryStartTask(root *AiTask, startTaskIndex string) error {
 	startTaskIndex = strings.TrimSpace(startTaskIndex)
 	if root == nil || startTaskIndex == "" {
 		return nil
 	}
-	if findTaskByIndex(root, startTaskIndex) == nil {
-		return utils.Errorf("recovery start task %q not found", startTaskIndex)
-	}
 
 	taskLink := DFSOrderAiTask(root)
+	foundStart := false
 	for i := 0; i < taskLink.Len(); i++ {
 		task, ok := taskLink.Get(i)
 		if !ok || task == nil {
 			continue
 		}
 		if task.Index == startTaskIndex {
-			return nil
-		}
-		if isAncestorTaskIndex(task.Index, startTaskIndex) {
+			// 命中恢复起点后，当前任务和后续任务都按“待重新执行”处理。
+			foundStart = true
+			resetTaskForRecovery(task)
 			continue
 		}
-		markTaskTreeSkippedForRecovery(task)
+		if foundStart {
+			resetTaskForRecovery(task)
+			continue
+		}
+		if task.executed() {
+			continue
+		}
+		task.AIStatefulTaskBase.RestoreStatus(aicommon.AITaskState_Skipped)
+	}
+	if !foundStart {
+		return utils.Errorf("recovery start task %q not found", startTaskIndex)
 	}
 	return nil
 }
 
-func isAncestorTaskIndex(ancestorIndex, taskIndex string) bool {
-	ancestorIndex = strings.TrimSpace(ancestorIndex)
-	taskIndex = strings.TrimSpace(taskIndex)
-	if ancestorIndex == "" || taskIndex == "" || ancestorIndex == taskIndex {
-		return false
-	}
-	return strings.HasPrefix(taskIndex, ancestorIndex+"-")
-}
-
-func markTaskTreeSkippedForRecovery(task *AiTask) {
+// resetTaskForRecovery 会把任务恢复成未完成状态，让 runtime 不会因为旧状态而跳过它。
+func resetTaskForRecovery(task *AiTask) {
 	if task == nil {
 		return
 	}
-	for _, sub := range task.Subtasks {
-		markTaskTreeSkippedForRecovery(sub)
-	}
-	if task.executed() || task.GetStatus() == aicommon.AITaskState_Skipped {
-		return
-	}
-	task.AIStatefulTaskBase.RestoreStatus(aicommon.AITaskState_Skipped)
+	task.AIStatefulTaskBase.RestoreStatus(aicommon.AITaskState_Created)
 }
