@@ -239,6 +239,7 @@ func handleLoadForge(
 	op.RequestAsyncMode()
 
 	task = op.GetTask()
+	task.SetAsyncMode(true)
 	taskCtx := task.GetContext()
 	invoker.RequireAIForgeAndAsyncExecute(taskCtx, identifier, func(err error) {
 		loop.FinishAsyncTask(task, err)
