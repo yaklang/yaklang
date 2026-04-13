@@ -2,6 +2,8 @@ package aimem
 
 import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/log"
+
 	"time"
 
 	"github.com/google/uuid"
@@ -48,6 +50,7 @@ func (r *AIMemoryTriage) AddRawText(i string) ([]*aicommon.MemoryEntity, error) 
 		return nil, err
 	}
 
+	log.Info("start to use speed priority lite forge to analyze memory")
 	ac, err := r.invoker.InvokeSpeedPriorityLiteForge(r.ctx, "memory-triage", promptResult, []aitool.ToolOption{
 		aitool.WithStructArrayParam(
 			"memory_entities",
