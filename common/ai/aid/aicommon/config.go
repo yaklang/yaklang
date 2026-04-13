@@ -376,7 +376,6 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 	if !config.AICallbackAvailable() {
 		if err := WithTieredAICallback()(config); err != nil || !config.AICallbackAvailable() {
 			log.Errorf("Failed to set AI callback: %v", err)
-			return nil
 		}
 	}
 	// Only create new Timeline if not already set via options (e.g., WithTimeline)
