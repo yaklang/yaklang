@@ -203,7 +203,7 @@ func staticValueSortKey(value ssa.Value) string {
 		case constant.IsString():
 			return "s:" + constant.VarString()
 		case constant.IsNumber():
-			return fmt.Sprintf("n:%020f", constant.Number())
+			return fmt.Sprintf("n:%020d", constant.Number())
 		case constant.IsBoolean():
 			if constant.Boolean() {
 				return "b:1"
