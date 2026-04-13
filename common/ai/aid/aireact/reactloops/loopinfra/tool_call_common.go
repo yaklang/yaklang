@@ -93,7 +93,7 @@ func handleToolCallResult(
 
 	loop.PushSatisfactionRecordWithCompletedTaskIndex(
 		verifyResult.Satisfied, verifyResult.Reasoning,
-		verifyResult.CompletedTaskIndex, verifyResult.NextMovements,
+		verifyResult.CompletedTaskIndex, verifyResult.NextMovements, verifyResult.Evidence,
 	)
 
 	if verifyResult.Satisfied {

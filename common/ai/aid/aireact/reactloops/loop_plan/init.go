@@ -41,6 +41,7 @@ var PLAN_FILE_RESULTS_KEY = "plan_file_results"
 var PLAN_WEB_RESULTS_KEY = "plan_web_results"
 var PLAN_RECON_RESULTS_KEY = "plan_recon_results"
 var PLAN_FACTS_KEY = "plan_facts"
+var PLAN_EVIDENCE_KEY = "plan_evidence"
 
 const PlanMaxIterations = 8
 
@@ -124,6 +125,7 @@ func init() {
 						"WebResults":      webResults,
 						"ReconResults":    reconResults,
 						"Facts":           loop.Get(PLAN_FACTS_KEY),
+						"Evidence":        getLoopTaskEvidenceDocument(loop),
 						"IsLastIteration": isLastIteration,
 					}
 					return utils.RenderTemplate(reactiveData, renderMap)

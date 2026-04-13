@@ -2,6 +2,7 @@ package loop_plan
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -28,6 +29,39 @@ type factsSection struct {
 func normalizeFactsDocument(content string) string {
 	content = strings.ReplaceAll(content, "\r\n", "\n")
 	return strings.TrimSpace(content)
+}
+
+var planEvidenceBlockPatterns = []*regexp.Regexp{
+	regexp.MustCompile(`(?s)<\|EVIDENCE_[^|]+\|>\s*(.*?)\s*<\|EVIDENCE_END_[^|]+\|>`),
+	regexp.MustCompile(`(?s)<\|PLAN_EVIDENCE_[^|]+\|>\s*(.*?)\s*<\|PLAN_EVIDENCE_END_[^|]+\|>`),
+}
+
+func extractEvidenceDocument(content string) string {
+	content = strings.TrimSpace(content)
+	if content == "" {
+		return ""
+	}
+	for _, pattern := range planEvidenceBlockPatterns {
+		matched := pattern.FindStringSubmatch(content)
+		if len(matched) > 1 {
+			return strings.TrimSpace(matched[1])
+		}
+	}
+	return ""
+}
+
+func getLoopTaskEvidenceDocument(loop *reactloops.ReActLoop) string {
+	if loop == nil {
+		return ""
+	}
+	if evidence := strings.TrimSpace(loop.Get(PLAN_EVIDENCE_KEY)); evidence != "" {
+		return evidence
+	}
+	task := loop.GetCurrentTask()
+	if task == nil {
+		return ""
+	}
+	return extractEvidenceDocument(task.GetUserInput())
 }
 
 func parseFactsSections(content string) []*factsSection {
