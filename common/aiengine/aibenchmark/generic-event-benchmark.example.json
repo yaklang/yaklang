@@ -1,0 +1,39 @@
+{
+  "defaults": {
+    "timeout": 300,
+    "maxIteration": 12,
+    "language": "zh",
+    "yoloMode": true,
+    "allowUserInteract": false
+  },
+  "cases": [
+    {
+      "name": "report-file-created",
+      "description": "让模型生成一份 markdown 报告，并在事件中捕获生成文件路径",
+      "focus": "report_generating",
+      "input": "请基于 /Users/rookie/Code/yaklang/README.md 生成一份简短的 Yaklang 项目介绍报告，输出为 markdown 文件。",
+      "pass": {
+        "eventTypes": [
+          "filesystem_pin_filename"
+        ],
+        "containsAny": [
+          ".md"
+        ]
+      }
+    },
+    {
+      "name": "python-script-created",
+      "description": "让模型写一个 Python 脚本，并在事件中捕获 .py 文件路径",
+      "focus": "write_python_script",
+      "input": "请生成一个 Python 脚本，使用 argparse 接收 URL 参数，对目标执行 HTTP GET 并打印状态码与响应长度。",
+      "pass": {
+        "eventTypes": [
+          "filesystem_pin_filename"
+        ],
+        "containsAny": [
+          ".py"
+        ]
+      }
+    }
+  ]
+}
