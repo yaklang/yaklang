@@ -11,6 +11,7 @@
 - 只评估 `<|CURRENT_TASK_...|>` 中定义的**任务目标**是否达成
 - `<|PARENT_TASK_...|>` 中的信息仅作为上下文参考，**不是你的判断目标**
 - 后续子任务会由系统自动调度，你无需担心
+- 如果存在 `<|CURRENT_TASK_GOAL_...|>`，优先使用其中的 `待测列表` 与 `验收标准` 作为完成判定依据
 
 **常见错误**（必须避免）：
 - 错误：当前任务是"获取操作系统类型"，返回了 darwin，但判断为 false 因为"还需要检查端口、进程等"
@@ -21,6 +22,13 @@
 <|USER_ORIGINAL_QUERY_{{.Nonce}}|>
 {{ .OriginalQuery }}
 <|USER_ORIGINAL_QUERY_END_{{.Nonce}}|>
+
+{{ if .CurrentTaskGoal }}<|CURRENT_TASK_GOAL_{{.Nonce}}|>
+当前任务名称: {{ .CurrentTaskName }}
+当前任务 goal:
+{{ .CurrentTaskGoal }}
+<|CURRENT_TASK_GOAL_END_{{.Nonce}}|>
+{{ end }}
 
 <|INPUT_{{.Nonce}}|>{{ if .IsToolCall }}
 # Tool Execution Context
@@ -120,9 +128,14 @@ User Raw INPUT/ReAction Thought/Observation:
     - 例如：URL 内容提取工具返回了页面全部文本只有 11 字，工具日志显示"content extraction complete"——这说明页面确实只有这么多内容，不是提取失败
 7.  **执行型安全任务必须有外部证据**：如果当前任务目标包含 SQL 注入、XSS、命令注入、SSTI、SSRF、认证绕过等漏洞的“执行/验证/复现/确认”，则至少需要一种外部证据才能判定完成：真实工具请求、响应差异、浏览器执行结果、插件扫描结果、或真实写入的证据文件。仅靠技能加载和 directly_answer 不足以完成这类任务。
 8.  **区分“设计完成”和“验证完成”**：如果当前任务名称或目标包含“制定、规划、设计、清单、优先级”，那么文本交付可以视为完成；如果包含“执行、验证、发包、复现、确认漏洞、利用方案”，则文本交付只能算中间产物。
+9.  **存在待测列表时必须逐项判断**：如果当前任务 goal 中显式列出了 `待测列表`、目标清单、接口清单、参数清单或其他逐项对象，你必须逐项检查本轮是否已经拿到对应证据。只完成其中一部分时，必须返回 `user_satisfied: false`。
+10. **存在验收标准时必须逐项满足**：如果当前任务 goal 中显式列出了 `验收标准`、验证要求或完成标准，你必须逐条判断这些要求是否都已满足。只要还有一条没有满足，就必须返回 `user_satisfied: false`。
+11. **分组任务只能按本组完成**：如果当前任务 goal 中出现“第 X 组”“当前分组”“本组范围”“本组目标”等信息，只允许按本组目标判断是否完成；不得跨组合并结果，也不得只测本组 1 项就判整组完成。
 9.  **next_movements 只输出增量，不回放全量 TODO**：系统会基于历史记录重建 TODO 列表并展示给你。你只能输出本轮需要“新增”或“关闭”的增量动作；不要重复输出已经存在且未变化的 TODO。
 10.  **TODO 必须保持聚焦且与整体任务对齐**：新增 TODO 时，必须优先服务于当前子任务或当前主任务目标，避免生成偏题、过远期或无执行价值的事项。优先输出能直接推动下一步执行的短链路 TODO。
 11.  **TODO 链路不能过长**：当前 TODO 展示存在 10KB 预算限制。若系统已提示链路过长或 TODO 很多，你应避免继续堆积无关项，优先 `done` 关闭旧项，必要时保持 `next_movements: []`。
+12. **doing 也必须具体，不得推进模糊 TODO**：`doing` 只能用于一个已经足够具体、可以立刻执行的 TODO。若某个已有 TODO 含有“等”“相关”“若干”“剩余接口”“继续测试多个目标”等模糊范围词，不要直接把它标记为 `doing`；应先拆成 1 到 3 个具体 TODO，再推进其中一个。
+13. **TODO 内容必须是原子动作**：无论是新增 TODO，还是被 `doing` 推进的 TODO，其内容都必须写清楚本轮到底要处理哪些具体目标、参数或文件。避免“继续测试剩余接口”“继续分析相关问题”等宽泛表达。
 
 RESPONSE FORMAT: Respond with a JSON object following the schema below:
 
@@ -140,15 +153,15 @@ IMPORTANT GUIDELINES:
     - `{"op": "add", "id": "stable_id", "content": "新增一个短链路 TODO"}`
     - `{"op": "doing", "id": "stable_id"}`
     - `{"op": "done", "id": "stable_id"}`
-    - `{"op": "delete", "id": "stable_id"}`
     - `doing` 用于标记某个已有 TODO 当前正在进行中，通常只需要 `id`。
     - 如果某个 TODO 已经存在，而你只是要表达“现在开始做它”或“正在推进它”，优先使用 `doing`，不要重复用 `add` 再创建一次。
+    - 但前提是这个已有 TODO 本身已经足够具体；如果它写成“测试 A、B 等剩余接口”这类范围过大的描述，先把它拆成新的具体 TODO，再推进其中一个。
     - `done` 用于关闭已存在 TODO，表示该事项已经完成，`content` 可省略。
-    - `delete` 用于标记某个已有 TODO 不再需要，表示删除而非完成，`content` 可省略。
     - `add` 必须提供 `content`，且内容要与当前任务直接对齐。
     - 如果本轮没有必要增减 TODO，输出 `[]`。
     - 不要把整套执行计划、风险分析、长段说明重新塞进 `next_movements`。
     - 只保留 1 到 3 个真正必要的增量动作，避免 TODO 膨胀。
+    - 禁止在 TODO 内容里使用“等”“相关”“若干”“剩余接口”来省略具体对象。
 - 当 `user_satisfied` 为 true 的时候：
     - `next_movements` 必须输出 `[]`。
     - 系统会自动把剩余未关闭 TODO 标记为 `SKIPPED`，你不需要手动输出 skipped 状态。
@@ -158,6 +171,8 @@ IMPORTANT GUIDELINES:
     - 目标达成：用户要求的代码修改已成功实施并验证
     - 知识不足：检索结果不完整，需要调用外部工具获取实时信息
     - 回答准确：基于充分知识支撑，完全满足用户的查询需求
+- 当任务存在明确的 `待测列表` 或 `验收标准` 时，你的 `reasoning` 必须直接说明“还差什么”或“为什么已经全部完成”，不要给空泛结论。
+- 如果当前任务 goal 写的是一个明确清单，那么只有当清单中的对象都被完成、且验收标准全部满足时，才能把 `user_satisfied` 设为 true。
 
 ## completed_task_index 任务完成标记（重要）
 
@@ -273,6 +288,17 @@ IMPORTANT GUIDELINES:
 {"@action": "verify-satisfaction", "user_satisfied": false, "completed_task_index": "", "reasoning": "阶段推进：开始处理现有待办", "next_movements": [{"op": "add", "id": "verify_http_400_cause", "content": "分析 HTTP 400 错误原因"}]}
 ```
 错误原因：`verify_http_400_cause` 已经存在时，重复 `add` 会造成 TODO 语义膨胀；此时应使用 `doing`。
+
+**错误示例：不要推进模糊 TODO**
+```json
+{"@action": "verify-satisfaction", "user_satisfied": false, "completed_task_index": "", "reasoning": "阶段推进：继续测试剩余接口", "next_movements": [{"op": "doing", "id": "test_remaining_endpoints"}]}
+```
+错误原因：如果 `test_remaining_endpoints` 对应的 TODO 内容是“继续测试 /user/name, /user/by-id-safe 等剩余接口”，那么这个 TODO 仍然过宽、过模糊，不应直接 `doing`。
+
+**正确示例：先拆成具体 TODO，再推进其中一个**
+```json
+{"@action": "verify-satisfaction", "user_satisfied": false, "completed_task_index": "", "reasoning": "任务未完成：仍有具体接口未验证", "next_movements": [{"op": "add", "id": "test_user_name_sqli", "content": "验证 GET /user/name?name=[payload] 的 SQL 注入表现并记录证据"}, {"op": "add", "id": "test_user_by_id_safe_sqli", "content": "验证 GET /user/by-id-safe?id=[payload] 的 SQL 注入表现并记录证据"}, {"op": "doing", "id": "test_user_name_sqli"}]}
+```
 
 **关闭已有 TODO 时：**
 ```json

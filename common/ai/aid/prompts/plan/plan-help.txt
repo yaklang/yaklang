@@ -8,4 +8,8 @@
 关键词如下：
 {{ .ContextProvider.ToolsKeywords }}
 {{else}}{{end}}
+{{ if .ContextProvider.TaskOutputInventoryContext }}
+## 共享测试资产库存
+{{ .ContextProvider.TaskOutputInventoryContext }}
+{{else}}{{end}}
 

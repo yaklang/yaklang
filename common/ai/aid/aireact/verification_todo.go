@@ -46,10 +46,14 @@ func (r *ReAct) AppendVerificationHistory(result *aicommon.VerifySatisfactionRes
 	r.verificationHistoryMutex.Lock()
 	defer r.verificationHistoryMutex.Unlock()
 	cloned := &aicommon.VerifySatisfactionResult{
-		Satisfied:          result.Satisfied,
-		Reasoning:          result.Reasoning,
-		CompletedTaskIndex: result.CompletedTaskIndex,
-		NextMovements:      append([]aicommon.VerifyNextMovement(nil), result.NextMovements...),
+		Satisfied:             result.Satisfied,
+		Reasoning:             result.Reasoning,
+		CompletedTaskIndex:    result.CompletedTaskIndex,
+		NextMovements:         append([]aicommon.VerifyNextMovement(nil), result.NextMovements...),
+		CoveredTargets:        append([]string(nil), result.CoveredTargets...),
+		MissingTargets:        append([]string(nil), result.MissingTargets...),
+		SatisfiedRequirements: append([]string(nil), result.SatisfiedRequirements...),
+		MissingRequirements:   append([]string(nil), result.MissingRequirements...),
 	}
 	r.verificationHistory = append(r.verificationHistory, cloned)
 }
@@ -79,6 +83,13 @@ func (r *ReAct) RenderVerificationOutputFilesMarkdown(outputFiles []string) stri
 		return ""
 	}
 	return renderVerificationOutputFilesMarkdown(outputFiles)
+}
+
+func (r *ReAct) RenderVerificationCoverageMarkdown(result *aicommon.VerifySatisfactionResult) string {
+	if r == nil || result == nil {
+		return ""
+	}
+	return renderVerificationCoverageMarkdown(result)
 }
 
 func renderVerificationTodoSnapshot(history []*aicommon.VerifySatisfactionResult) string {
@@ -134,6 +145,28 @@ func renderVerificationTodoSnapshot(history []*aicommon.VerifySatisfactionResult
 	}
 	truncated = append(truncated, note)
 	return strings.Join(truncated, "\n")
+}
+
+func renderVerificationCoverageMarkdown(result *aicommon.VerifySatisfactionResult) string {
+	if result == nil {
+		return ""
+	}
+	coveredTargets := aicommon.FormatVerificationCoverageSummary(result.CoveredTargets, nil, nil, nil)
+	_ = coveredTargets
+	sections := make([]string, 0, 4)
+	if len(result.CoveredTargets) > 0 {
+		sections = append(sections, "### Covered Targets\n- "+strings.Join(result.CoveredTargets, "\n- "))
+	}
+	if len(result.MissingTargets) > 0 {
+		sections = append(sections, "### Missing Targets\n- "+strings.Join(result.MissingTargets, "\n- "))
+	}
+	if len(result.SatisfiedRequirements) > 0 {
+		sections = append(sections, "### Satisfied Requirements\n- "+strings.Join(result.SatisfiedRequirements, "\n- "))
+	}
+	if len(result.MissingRequirements) > 0 {
+		sections = append(sections, "### Missing Requirements\n- "+strings.Join(result.MissingRequirements, "\n- "))
+	}
+	return strings.Join(sections, "\n\n")
 }
 
 func renderVerificationTodoMarkdownSnapshot(history []*aicommon.VerifySatisfactionResult, current *aicommon.VerifySatisfactionResult) string {

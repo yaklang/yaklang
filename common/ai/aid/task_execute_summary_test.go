@@ -21,7 +21,7 @@ func TestSaveResultSummary_DeduplicatesEquivalentSummarySections(t *testing.T) {
 		Goal:               "avoid duplicate summary sections",
 	}
 
-	err := task.saveResultSummary(taskDir, "", "", "same summary", "same summary", "same summary", "same summary")
+	err := task.saveResultSummary(taskDir, "", "", "", "same summary", "same summary", "same summary", "same summary")
 	require.NoError(t, err)
 
 	content, err := os.ReadFile(filepath.Join(taskDir, aicommon.BuildTaskResultSummaryFilename(task.Index, task.GetSemanticIdentifier())))

@@ -131,6 +131,8 @@ type ToolParamsPromptData struct {
 type VerificationPromptData struct {
 	Nonce          string
 	OriginalQuery  string
+	CurrentTaskName string
+	CurrentTaskGoal string
 	IsToolCall     bool
 	Payload        string
 	Timeline       string
@@ -434,6 +436,12 @@ func (pm *PromptManager) GenerateVerificationPrompt(originalQuery string, isTool
 		Schema:         verificationSchemaJSON,
 		DynamicContext: pm.DynamicContextWithNonce(nonce),
 		EnhanceData:    enhanceData,
+	}
+	if task := pm.react.GetCurrentTask(); task != nil {
+		data.CurrentTaskName = task.GetName()
+		if provider, ok := task.(interface{ GetGoal() string }); ok {
+			data.CurrentTaskGoal = provider.GetGoal()
+		}
 	}
 
 	// Get timeline for context (without lock, assume caller handles it)

@@ -16,11 +16,15 @@ type VerifyNextMovement struct {
 
 // VerifySatisfactionResult represents the result of user satisfaction verification
 type VerifySatisfactionResult struct {
-	Satisfied          bool                 `json:"satisfied"`            // Whether the user is satisfied
-	Reasoning          string               `json:"reasoning"`            // The reasoning for the satisfaction status
-	CompletedTaskIndex string               `json:"completed_task_index"` // Index of completed task(s), e.g., "1-1" or "1-1,1-2"
-	NextMovements      []VerifyNextMovement `json:"next_movements"`       // AI's next action plan for in-progress status tracking
-	OutputFiles        []string             `json:"output_files"`         // File paths created/modified by tool execution, extracted by verify AI
+	Satisfied             bool                 `json:"satisfied"`            // Whether the user is satisfied
+	Reasoning             string               `json:"reasoning"`            // The reasoning for the satisfaction status
+	CompletedTaskIndex    string               `json:"completed_task_index"` // Index of completed task(s), e.g., "1-1" or "1-1,1-2"
+	NextMovements         []VerifyNextMovement `json:"next_movements"`       // AI's next action plan for in-progress status tracking
+	OutputFiles           []string             `json:"output_files"`         // File paths created/modified by tool execution, extracted by verify AI
+	CoveredTargets        []string             `json:"covered_targets"`
+	MissingTargets        []string             `json:"missing_targets"`
+	SatisfiedRequirements []string             `json:"satisfied_requirements"`
+	MissingRequirements   []string             `json:"missing_requirements"`
 }
 
 // NewVerifySatisfactionResult creates a new VerifySatisfactionResult
@@ -40,6 +44,69 @@ func NewVerifySatisfactionResultWithNextMovements(satisfied bool, reasoning stri
 		CompletedTaskIndex: completedTaskIndex,
 		NextMovements:      nextMovements,
 	}
+}
+
+func normalizeVerificationItems(items []string) []string {
+	if len(items) == 0 {
+		return nil
+	}
+	seen := make(map[string]struct{}, len(items))
+	result := make([]string, 0, len(items))
+	for _, item := range items {
+		trimmed := strings.TrimSpace(item)
+		if trimmed == "" {
+			continue
+		}
+		if _, ok := seen[trimmed]; ok {
+			continue
+		}
+		seen[trimmed] = struct{}{}
+		result = append(result, trimmed)
+	}
+	if len(result) == 0 {
+		return nil
+	}
+	return result
+}
+
+func HasOutstandingVerificationCoverage(missingTargets, missingRequirements []string) bool {
+	return len(normalizeVerificationItems(missingTargets)) > 0 || len(normalizeVerificationItems(missingRequirements)) > 0
+}
+
+func FormatVerificationCoverageSummary(coveredTargets, missingTargets, satisfiedRequirements, missingRequirements []string) string {
+	coveredTargets = normalizeVerificationItems(coveredTargets)
+	missingTargets = normalizeVerificationItems(missingTargets)
+	satisfiedRequirements = normalizeVerificationItems(satisfiedRequirements)
+	missingRequirements = normalizeVerificationItems(missingRequirements)
+
+	parts := make([]string, 0, 4)
+	if len(coveredTargets) > 0 {
+		parts = append(parts, "covered_targets="+strings.Join(coveredTargets, ", "))
+	}
+	if len(missingTargets) > 0 {
+		parts = append(parts, "missing_targets="+strings.Join(missingTargets, ", "))
+	}
+	if len(satisfiedRequirements) > 0 {
+		parts = append(parts, "satisfied_requirements="+strings.Join(satisfiedRequirements, ", "))
+	}
+	if len(missingRequirements) > 0 {
+		parts = append(parts, "missing_requirements="+strings.Join(missingRequirements, ", "))
+	}
+	return strings.Join(parts, "; ")
+}
+
+func (r *VerifySatisfactionResult) HasOutstandingCoverage() bool {
+	if r == nil {
+		return false
+	}
+	return HasOutstandingVerificationCoverage(r.MissingTargets, r.MissingRequirements)
+}
+
+func (r *VerifySatisfactionResult) CoverageSummary() string {
+	if r == nil {
+		return ""
+	}
+	return FormatVerificationCoverageSummary(r.CoveredTargets, r.MissingTargets, r.SatisfiedRequirements, r.MissingRequirements)
 }
 
 func FormatVerifyNextMovementsSummary(nextMovements []VerifyNextMovement) string {

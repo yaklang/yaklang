@@ -91,10 +91,7 @@ func handleToolCallResult(
 		}
 	}
 
-	loop.PushSatisfactionRecordWithCompletedTaskIndex(
-		verifyResult.Satisfied, verifyResult.Reasoning,
-		verifyResult.CompletedTaskIndex, verifyResult.NextMovements,
-	)
+	loop.PushSatisfactionRecordFromVerifyResult(verifyResult)
 
 	if verifyResult.Satisfied {
 		operator.Exit()

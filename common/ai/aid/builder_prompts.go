@@ -17,9 +17,6 @@ var __prompt_ToolResultToDecisionPromptTemplate string
 //go:embed prompts/task/task-summary.txt
 var __prompt_TaskSummary string
 
-//go:embed prompts/report-finished.txt
-var __prompt_ReportFinished string
-
 //go:embed prompts/plan/dynamic-plan.txt
 var __prompt_DynamicPlan string
 

@@ -167,6 +167,13 @@ func (t *AiTask) GetUserInput() string {
 	})
 }
 
+func (t *AiTask) GetGoal() string {
+	if t == nil {
+		return ""
+	}
+	return t.Goal
+}
+
 func (t *AiTask) executed() bool {
 	if len(t.Subtasks) > 0 {
 		for _, subtask := range t.Subtasks {

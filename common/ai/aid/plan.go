@@ -221,7 +221,8 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	pr.cod.standardizeTaskTreeAndNotify(rootTask, "initial plan generated")
+	rootTask = pr.cod.standardizeTaskTreeAndNotify(rootTask, "initial plan generated")
+	rootTask = pr.improvePlanQuality(rootTask)
 	return pr.cod.newPlanResponse(rootTask), nil
 }
 

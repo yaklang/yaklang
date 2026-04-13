@@ -168,10 +168,7 @@ func handleLoadTool(
 		op.Fail(err)
 		return
 	}
-	loop.PushSatisfactionRecordWithCompletedTaskIndex(
-		verifyResult.Satisfied, verifyResult.Reasoning,
-		verifyResult.CompletedTaskIndex, verifyResult.NextMovements,
-	)
+	loop.PushSatisfactionRecordFromVerifyResult(verifyResult)
 	if verifyResult.Satisfied {
 		op.Exit()
 		return

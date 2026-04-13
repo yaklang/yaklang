@@ -128,6 +128,29 @@ func TestSatisfactionRecordWithCompletedTaskIndex(t *testing.T) {
 			Content: "use chmod 600 to fix file permissions",
 		}}, record.NextMovements)
 	})
+
+	t.Run("CoverageFieldsAreStored", func(t *testing.T) {
+		loop, err := reactloops.NewReActLoop("test-loop", invoker)
+		assert.NoError(t, err)
+
+		loop.PushSatisfactionRecordFromVerifyResult(&aicommon.VerifySatisfactionResult{
+			Satisfied:             false,
+			Reasoning:             "still missing targets",
+			CompletedTaskIndex:    "1-1",
+			CoveredTargets:        []string{"/user/id?id=1"},
+			MissingTargets:        []string{"/user/name?name=admin"},
+			SatisfiedRequirements: []string{"布尔盲注验证"},
+			MissingRequirements:   []string{"时间盲注验证"},
+		})
+
+		record := loop.GetLastSatisfactionRecordFull()
+		assert.NotNil(t, record)
+		assert.Equal(t, []string{"/user/id?id=1"}, record.CoveredTargets)
+		assert.Equal(t, []string{"/user/name?name=admin"}, record.MissingTargets)
+		assert.Equal(t, []string{"布尔盲注验证"}, record.SatisfiedRequirements)
+		assert.Equal(t, []string{"时间盲注验证"}, record.MissingRequirements)
+		assert.True(t, aicommon.HasOutstandingVerificationCoverage(record.MissingTargets, record.MissingRequirements))
+	})
 }
 
 // TestCompletedTaskIndexParsing tests the parsing logic for completed task index

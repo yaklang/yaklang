@@ -526,12 +526,7 @@ func applyFuzzVerificationOutcome(loop *reactloops.ReActLoop, operator *reactloo
 		return
 	}
 
-	loop.PushSatisfactionRecordWithCompletedTaskIndex(
-		verifyResult.Satisfied,
-		verifyResult.Reasoning,
-		verifyResult.CompletedTaskIndex,
-		verifyResult.NextMovements,
-	)
+	loop.PushSatisfactionRecordFromVerifyResult(verifyResult)
 
 	if verifyResult.Satisfied {
 		operator.Exit()

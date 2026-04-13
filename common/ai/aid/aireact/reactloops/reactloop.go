@@ -27,10 +27,14 @@ type FeedbackProviderFunc func(loop *ReActLoop, feedback *bytes.Buffer, nonce st
 
 // SatisfactionRecord 记录满意度验证的结果，包含验证状态、原因、已完成任务索引和下一步行动计划
 type SatisfactionRecord struct {
-	Satisfactory       bool                          `json:"satisfactory"`         // 是否满足用户需求
-	Reason             string                        `json:"reason"`               // 满意/不满意的原因分析
-	CompletedTaskIndex string                        `json:"completed_task_index"` // AI 判断已完成的任务索引，如 "1-1" 或 "1-1,1-2"
-	NextMovements      []aicommon.VerifyNextMovement `json:"next_movements"`       // AI 下一步行动计划，用于任务执行中状态追踪
+	Satisfactory          bool                          `json:"satisfactory"`         // 是否满足用户需求
+	Reason                string                        `json:"reason"`               // 满意/不满意的原因分析
+	CompletedTaskIndex    string                        `json:"completed_task_index"` // AI 判断已完成的任务索引，如 "1-1" 或 "1-1,1-2"
+	NextMovements         []aicommon.VerifyNextMovement `json:"next_movements"`       // AI 下一步行动计划，用于任务执行中状态追踪
+	CoveredTargets        []string                      `json:"covered_targets"`
+	MissingTargets        []string                      `json:"missing_targets"`
+	SatisfiedRequirements []string                      `json:"satisfied_requirements"`
+	MissingRequirements   []string                      `json:"missing_requirements"`
 }
 
 // ActionRecord 记录每次迭代执行的 Action 信息
@@ -169,6 +173,22 @@ func (r *ReActLoop) PushSatisfactionRecordWithCompletedTaskIndex(satisfactory bo
 		Reason:             reason,
 		CompletedTaskIndex: completedTaskIndex,
 		NextMovements:      nextMovements,
+	})
+}
+
+func (r *ReActLoop) PushSatisfactionRecordFromVerifyResult(result *aicommon.VerifySatisfactionResult) {
+	if result == nil {
+		return
+	}
+	r.historySatisfactionReasons = append(r.historySatisfactionReasons, &SatisfactionRecord{
+		Satisfactory:          result.Satisfied,
+		Reason:                result.Reasoning,
+		CompletedTaskIndex:    result.CompletedTaskIndex,
+		NextMovements:         append([]aicommon.VerifyNextMovement(nil), result.NextMovements...),
+		CoveredTargets:        append([]string(nil), result.CoveredTargets...),
+		MissingTargets:        append([]string(nil), result.MissingTargets...),
+		SatisfiedRequirements: append([]string(nil), result.SatisfiedRequirements...),
+		MissingRequirements:   append([]string(nil), result.MissingRequirements...),
 	})
 }
 

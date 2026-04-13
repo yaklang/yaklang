@@ -179,6 +179,10 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 			result.Reasoning = action.GetString("reasoning")
 			result.CompletedTaskIndex = action.GetString("completed_task_index")
 			result.OutputFiles = action.GetStringSlice("output_files")
+			result.CoveredTargets = action.GetStringSlice("covered_targets")
+			result.MissingTargets = action.GetStringSlice("missing_targets")
+			result.SatisfiedRequirements = action.GetStringSlice("satisfied_requirements")
+			result.MissingRequirements = action.GetStringSlice("missing_requirements")
 
 			nextMovements := normalizeVerifyNextMovements(action)
 			// Store next_movements in result for status tracking
@@ -211,6 +215,27 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 				)
 				if err != nil {
 					return utils.Errorf("failed to emit next_movements snapshot markdown stream event: %v", err)
+				}
+				captureReferenceAnchor(event)
+			}
+
+			coverageMarkdown := r.RenderVerificationCoverageMarkdown(result)
+			if strings.TrimSpace(coverageMarkdown) != "" {
+				var out bytes.Buffer
+				var outputReader = io.TeeReader(strings.NewReader(coverageMarkdown), &out)
+				var event *schema.AiOutputEvent
+				event, err = r.Emitter.EmitDefaultStreamEvent(
+					"verification_coverage_snapshot",
+					outputReader,
+					taskID,
+					func() {
+						if out.Len() > 0 {
+							r.AddToTimeline("verification_coverage", out.String())
+						}
+					},
+				)
+				if err != nil {
+					return utils.Errorf("failed to emit verification coverage markdown stream event: %v", err)
 				}
 				captureReferenceAnchor(event)
 			}

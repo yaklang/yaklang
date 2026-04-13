@@ -2,6 +2,7 @@ package aireact
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -14,6 +15,18 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+type promptGoalTask struct {
+	*aicommon.AIStatefulTaskBase
+	goal string
+}
+
+func (t *promptGoalTask) GetGoal() string {
+	if t == nil {
+		return ""
+	}
+	return t.goal
+}
 
 func TestPromptManagerWithDynamicContextProvider(t *testing.T) {
 	// Track if the provider was called
@@ -652,8 +665,9 @@ func TestGenerateVerificationPrompt_RendersTodoSnapshot(t *testing.T) {
 		"- [x]: [id: rename_file]: 将临时文件改名为最终文件名",
 		"next_movements 只输出增量",
 		"{\"op\": \"doing\", \"id\": \"stable_id\"}",
-		"{\"op\": \"delete\", \"id\": \"stable_id\"}",
 		"{\"op\": \"add\", \"id\": \"stable_id\", \"content\": \"新增一个短链路 TODO\"}",
+		"doing 也必须具体，不得推进模糊 TODO",
+		"禁止在 TODO 内容里使用“等”“相关”“若干”“剩余接口”来省略具体对象",
 	) {
 		t.Fatalf("verification prompt should contain structured TODO snapshot and incremental instructions. Got:\n%s", prompt)
 	}
@@ -746,6 +760,42 @@ func TestGenerateVerificationPrompt_TruncatesLongTodoSnapshotButKeepsFocus(t *te
 		"TODO history exceeded 10K tokens",
 	) {
 		t.Fatalf("verification prompt should truncate long TODO history but keep latest focus item. Got:\n%s", prompt)
+	}
+}
+
+func TestGenerateVerificationPrompt_IncludesCurrentTaskGoal(t *testing.T) {
+	react, err := NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create ReAct instance: %v", err)
+	}
+
+	task := &promptGoalTask{
+		AIStatefulTaskBase: aicommon.NewStatefulTaskBase("verify-goal-task", "当前任务输入", context.Background(), react.Emitter, true),
+		goal: "待测列表：\n- /api/user/1\n- /api/user/2\n验收标准：\n- 逐条记录执行结果\n- 给出明确结论",
+	}
+	task.SetName("验证用户接口")
+	react.SetCurrentTask(task)
+
+	prompt, _, err := react.promptManager.GenerateVerificationPrompt("请继续推进当前任务", true, "tool executed: continue")
+	if err != nil {
+		t.Fatalf("Failed to generate verification prompt: %v", err)
+	}
+
+	if !utils.MatchAllOfSubString(
+		prompt,
+		"<|CURRENT_TASK_GOAL_",
+		"当前任务名称: 验证用户接口",
+		"待测列表：",
+		"验收标准：",
+	) {
+		t.Fatalf("verification prompt should include current task goal. Got:\n%s", prompt)
 	}
 }
 

@@ -79,34 +79,25 @@ func (t *AiTask) execute() error {
 			// Check if completed_task_index indicates this task should be marked as done
 			// This provides an additional mechanism to end tasks beyond just isDone
 			lastRecord := loop.GetLastSatisfactionRecordFull()
-			var summary, completedTaskIndex, nextMovements string
+			var summary, completedTaskIndex, nextMovements, coverageSummary string
 			if lastRecord != nil {
 				summary = lastRecord.Reason
 				completedTaskIndex = lastRecord.CompletedTaskIndex
 				nextMovements = aicommon.FormatVerifyNextMovementsSummary(lastRecord.NextMovements)
+				coverageSummary = aicommon.FormatVerificationCoverageSummary(lastRecord.CoveredTargets, lastRecord.MissingTargets, lastRecord.SatisfiedRequirements, lastRecord.MissingRequirements)
 			}
 
-			// Check if current task index is in the completed_task_index list
-			shouldComplete := isDone
-			if !shouldComplete && completedTaskIndex != "" {
-				// completed_task_index can be a single index like "1-1" or multiple like "1-1,1-2"
-				completedIndexes := strings.Split(completedTaskIndex, ",")
-				for _, idx := range completedIndexes {
-					trimmedIdx := strings.TrimSpace(idx)
-					if trimmedIdx == t.Index {
-						log.Infof("task %s marked as completed via completed_task_index: %s", t.Name, completedTaskIndex)
-						t.EmitInfo("Task %s completed via completed_task_index mechanism", t.Name)
-						shouldComplete = true
-						break
-					}
-				}
+			shouldComplete := shouldCompleteCurrentTask(t.Index, isDone, completedTaskIndex, lastRecord)
+			if shouldComplete && completedTaskIndex != "" {
+				log.Infof("task %s marked as completed via completed_task_index: %s", t.Name, completedTaskIndex)
+				t.EmitInfo("Task %s completed via completed_task_index mechanism", t.Name)
 			}
 
 			if shouldComplete {
 				// Emit task completing status
 				t.planLoadingStatus(fmt.Sprintf("任务 [%s] 正在总结 / Task [%s] Generating Summary...", t.Index, t.Index))
 
-				err := t.generateTaskSummary(summary, nextMovements)
+				err := t.generateTaskSummary(summary, nextMovements, coverageSummary)
 				if err != nil {
 					log.Errorf("iteration task summary failed: %v", err)
 					t.planLoadingStatus(fmt.Sprintf("任务 [%s] 总结失败 / Task [%s] Summary Failed", t.Index, t.Index))
@@ -122,7 +113,7 @@ func (t *AiTask) execute() error {
 
 				// Combine summary (reasoning) and next_movements as Processing status
 				// This ensures both are captured in StatusSummary to avoid context loss
-				t.updateProcessingStatus(summary, nextMovements)
+				t.updateProcessingStatus(summary, nextMovements, coverageSummary)
 
 				if t.Coordinator != nil && summary != "" {
 					timelineMsg := fmt.Sprintf(
@@ -131,6 +122,9 @@ func (t *AiTask) execute() error {
 					)
 					if nextMovements != "" {
 						timelineMsg += fmt.Sprintf(" | Suggested next steps: %s", nextMovements)
+					}
+					if coverageSummary != "" {
+						timelineMsg += fmt.Sprintf(" | Coverage: %s", coverageSummary)
 					}
 					t.Coordinator.Timeline.PushText(
 						t.Coordinator.AcquireId(),
@@ -147,6 +141,9 @@ func (t *AiTask) execute() error {
 				lastVerificationInfo = fmt.Sprintf("satisfied=%v, reasoning=%s", lastRecord.Satisfactory, lastRecord.Reason)
 				if summary := aicommon.FormatVerifyNextMovementsSummary(lastRecord.NextMovements); summary != "" {
 					lastVerificationInfo += fmt.Sprintf(", next_movements=%s", summary)
+				}
+				if summary := aicommon.FormatVerificationCoverageSummary(lastRecord.CoveredTargets, lastRecord.MissingTargets, lastRecord.SatisfiedRequirements, lastRecord.MissingRequirements); summary != "" {
+					lastVerificationInfo += fmt.Sprintf(", coverage=%s", summary)
 				}
 			}
 
@@ -301,7 +298,26 @@ func (t *AiTask) executeTask() error {
 	return nil
 }
 
-func (t *AiTask) generateTaskSummary(summary, nextMovements string) error {
+func shouldCompleteCurrentTask(currentTaskIndex string, isDone bool, completedTaskIndex string, lastRecord *reactloops.SatisfactionRecord) bool {
+	if lastRecord != nil && aicommon.HasOutstandingVerificationCoverage(lastRecord.MissingTargets, lastRecord.MissingRequirements) {
+		return false
+	}
+	if isDone {
+		return true
+	}
+	if completedTaskIndex == "" {
+		return false
+	}
+	completedIndexes := strings.Split(completedTaskIndex, ",")
+	for _, idx := range completedIndexes {
+		if strings.TrimSpace(idx) == currentTaskIndex {
+			return true
+		}
+	}
+	return false
+}
+
+func (t *AiTask) generateTaskSummary(summary, nextMovements, coverageSummary string) error {
 	t.planLoadingStatus(fmt.Sprintf("任务 [%s] 生成总结提示 / Task [%s] Generating Summary Prompt...", t.Index, t.Index))
 
 	summaryPromptWellFormed, err := t.GenerateTaskSummaryPrompt()
@@ -422,7 +438,7 @@ func (t *AiTask) generateTaskSummary(summary, nextMovements string) error {
 	t.planLoadingStatus(fmt.Sprintf("任务 [%s] 总结完成 / Task [%s] Summary Completed", t.Index, t.Index))
 
 	// Save timeline diff and result summary artifacts
-	if err := t.saveTaskArtifacts(summary, nextMovements, statusSummary, taskSummary, shortSummary, longSummary); err != nil {
+	if err := t.saveTaskArtifacts(summary, nextMovements, coverageSummary, statusSummary, taskSummary, shortSummary, longSummary); err != nil {
 		log.Warnf("failed to save task artifacts for task %s: %v", t.Index, err)
 		// Don't return error, as summary generation is already successful
 	}
@@ -451,7 +467,7 @@ func selectTaskSummaries(statusSummary, shortSummary, longSummary string) (conci
 }
 
 // saveTaskArtifacts saves timeline diff and result summary to files in the task directory
-func (t *AiTask) saveTaskArtifacts(summary, nextMovements, statusSummary, taskSummary, shortSummary, longSummary string) error {
+func (t *AiTask) saveTaskArtifacts(summary, nextMovements, coverageSummary, statusSummary, taskSummary, shortSummary, longSummary string) error {
 	// Get workdir
 	workdir := ""
 	if t.Coordinator != nil && t.Coordinator.Workdir != "" {
@@ -482,8 +498,13 @@ func (t *AiTask) saveTaskArtifacts(summary, nextMovements, statusSummary, taskSu
 	}
 
 	// Save result summary
-	if err := t.saveResultSummary(taskDir, summary, nextMovements, statusSummary, taskSummary, shortSummary, longSummary); err != nil {
+	if err := t.saveResultSummary(taskDir, summary, nextMovements, coverageSummary, statusSummary, taskSummary, shortSummary, longSummary); err != nil {
 		log.Warnf("failed to save result summary for task %s: %v", t.Index, err)
+	}
+
+	if t.Coordinator != nil && t.Coordinator.ContextProvider != nil {
+		resultSummaryPath := buildTaskResultSummaryPath(taskDir, t)
+		t.Coordinator.ContextProvider.RegisterTaskOutputSnapshot(t, taskDir, resultSummaryPath)
 	}
 
 	return nil
@@ -562,7 +583,7 @@ func (t *AiTask) saveTimelineDiff(taskDir string) error {
 }
 
 // saveResultSummary saves the result summary to task_{{index}}_{{semantic_identifier}}_result_summary.txt
-func (t *AiTask) saveResultSummary(taskDir string, summary, nextMovements, statusSummary, taskSummary, shortSummary, longSummary string) error {
+func (t *AiTask) saveResultSummary(taskDir string, summary, nextMovements, coverageSummary, statusSummary, taskSummary, shortSummary, longSummary string) error {
 	// Get task index for filename
 	taskIndex := t.Index
 	if taskIndex == "" {
@@ -652,6 +673,12 @@ func (t *AiTask) saveResultSummary(taskDir string, summary, nextMovements, statu
 	if nextMovements != "" {
 		contentBuilder.WriteString("### Next Movements\n")
 		contentBuilder.WriteString(nextMovements)
+		contentBuilder.WriteString("\n\n")
+		hasContent = true
+	}
+	if coverageSummary != "" {
+		contentBuilder.WriteString("### Verification Coverage\n")
+		contentBuilder.WriteString(coverageSummary)
 		contentBuilder.WriteString("\n\n")
 		hasContent = true
 	}
@@ -749,8 +776,8 @@ func SelectSummary(task *AiTask, callResult *aitool.ToolResult) string {
 // updateProcessingStatus combines summary (reasoning) and next_movements into StatusSummary
 // This ensures both the current status analysis and next action plan are preserved
 // to avoid context loss when timeline becomes too long
-func (t *AiTask) updateProcessingStatus(summary string, nextMovements string) {
-	if summary == "" && nextMovements == "" {
+func (t *AiTask) updateProcessingStatus(summary string, nextMovements string, coverageSummary string) {
+	if summary == "" && nextMovements == "" && coverageSummary == "" {
 		return
 	}
 
@@ -765,9 +792,12 @@ func (t *AiTask) updateProcessingStatus(summary string, nextMovements string) {
 	if nextMovements != "" {
 		statusParts = append(statusParts, fmt.Sprintf("【下一步计划】%s", nextMovements))
 	}
+	if coverageSummary != "" {
+		statusParts = append(statusParts, fmt.Sprintf("【覆盖情况】%s", coverageSummary))
+	}
 
 	// Combine both parts into StatusSummary
 	t.StatusSummary = strings.Join(statusParts, "\n")
 
-	log.Infof("task %s processing status updated: summary=%q, nextMovements=%q", t.Index, summary, nextMovements)
+	log.Infof("task %s processing status updated: summary=%q, nextMovements=%q, coverageSummary=%q", t.Index, summary, nextMovements, coverageSummary)
 }
