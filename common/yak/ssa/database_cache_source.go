@@ -56,6 +56,7 @@ type sourceStore struct {
 	persisted    map[string]struct{}
 	editors      map[string]*memedit.MemEditor
 	editorsByURL map[string]*memedit.MemEditor
+	visitedURLs  map[string]*memedit.MemEditor
 }
 
 func newSourceStore(prog *Program, mode ProgramCacheKind, db *gorm.DB) *sourceStore {
@@ -71,6 +72,7 @@ func newSourceStore(prog *Program, mode ProgramCacheKind, db *gorm.DB) *sourceSt
 		persisted:    make(map[string]struct{}),
 		editors:      make(map[string]*memedit.MemEditor),
 		editorsByURL: make(map[string]*memedit.MemEditor),
+		visitedURLs:  make(map[string]*memedit.MemEditor),
 	}
 }
 
@@ -105,6 +107,22 @@ func (s *sourceStore) rememberEditor(url string, editor *memedit.MemEditor) {
 	s.editors[hash] = editor
 	if url != "" {
 		s.editorsByURL[url] = editor
+	}
+}
+
+func (s *sourceStore) markVisitedEditor(url string, editor *memedit.MemEditor) {
+	if s == nil || editor == nil {
+		return
+	}
+	if url == "" {
+		url = editor.GetUrl()
+	}
+	s.rememberEditor(url, editor)
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if url != "" {
+		s.visitedURLs[url] = editor
 	}
 }
 
@@ -258,6 +276,7 @@ func (s *sourceStore) releaseEditors() {
 	defer s.mu.Unlock()
 	clear(s.editors)
 	clear(s.editorsByURL)
+	clear(s.visitedURLs)
 }
 
 func (s *sourceStore) PersistedCount() int {
@@ -307,6 +326,16 @@ func (s *sourceStore) GetEditorByURL(url string) (*memedit.MemEditor, bool) {
 	return editor, ok
 }
 
+func (s *sourceStore) GetVisitedEditorByURL(url string) (*memedit.MemEditor, bool) {
+	if s == nil {
+		return nil, false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	editor, ok := s.visitedURLs[url]
+	return editor, ok
+}
+
 func (s *sourceStore) HasEditorURL(url string) bool {
 	if s == nil {
 		return false
@@ -317,14 +346,24 @@ func (s *sourceStore) HasEditorURL(url string) bool {
 	return ok
 }
 
+func (s *sourceStore) HasVisitedURL(url string) bool {
+	if s == nil {
+		return false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, ok := s.visitedURLs[url]
+	return ok
+}
+
 func (s *sourceStore) EditorURLs() []string {
 	if s == nil {
 		return nil
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	ret := make([]string, 0, len(s.editorsByURL))
-	for url := range s.editorsByURL {
+	ret := make([]string, 0, len(s.visitedURLs))
+	for url := range s.visitedURLs {
 		ret = append(ret, url)
 	}
 	sort.Strings(ret)

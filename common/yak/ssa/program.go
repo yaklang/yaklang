@@ -402,8 +402,8 @@ func (p *Program) ShouldVisit(path string) bool {
 	if p == nil {
 		return false
 	}
-	if _, ok := p.GetEditor(path); ok {
-		return true
+	if p.Cache != nil && p.Cache.sources != nil {
+		return p.Cache.sources.HasVisitedURL(path)
 	}
 	return false
 }
@@ -418,6 +418,9 @@ func (p *Program) GetEditor(url string) (*memedit.MemEditor, bool) {
 		}
 	}
 	if p.Cache != nil && p.Cache.sources != nil {
+		if editor, ok := p.Cache.sources.GetVisitedEditorByURL(url); ok {
+			return editor, true
+		}
 		if editor, ok := p.Cache.sources.GetEditorByURL(url); ok {
 			return editor, true
 		}
@@ -450,7 +453,7 @@ func (p *Program) GetEditorByHash(hash string) (*memedit.MemEditor, bool) {
 
 func (p *Program) SetEditor(url string, me *memedit.MemEditor) {
 	if p != nil && p.Cache != nil && p.Cache.sources != nil {
-		p.Cache.sources.rememberEditor(url, me)
+		p.Cache.sources.markVisitedEditor(url, me)
 	}
 }
 
