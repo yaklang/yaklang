@@ -123,6 +123,7 @@ User Raw INPUT/ReAction Thought/Observation:
 9.  **next_movements 只输出增量，不回放全量 TODO**：系统会基于历史记录重建 TODO 列表并展示给你。你只能输出本轮需要“新增”或“关闭”的增量动作；不要重复输出已经存在且未变化的 TODO。
 10.  **TODO 必须保持聚焦且与整体任务对齐**：新增 TODO 时，必须优先服务于当前子任务或当前主任务目标，避免生成偏题、过远期或无执行价值的事项。优先输出能直接推动下一步执行的短链路 TODO。
 11.  **TODO 链路不能过长**：当前 TODO 展示存在 10KB 预算限制。若系统已提示链路过长或 TODO 很多，你应避免继续堆积无关项，优先 `done` 关闭旧项，必要时保持 `next_movements: []`。
+12.  **Evidence 只记录新增外部证据**：当当前场景是 Plan-Task 模式，且本轮执行发现了对后续执行或重规划有价值的新证据时，在 `evidence` 字段输出 Markdown。只写本轮新增证据，不要重复已有内容；内容必须来自真实执行结果、响应、文件、日志或验证观察，而不是泛化结论。
 
 RESPONSE FORMAT: Respond with a JSON object following the schema below:
 
@@ -149,6 +150,11 @@ IMPORTANT GUIDELINES:
     - 如果本轮没有必要增减 TODO，输出 `[]`。
     - 不要把整套执行计划、风险分析、长段说明重新塞进 `next_movements`。
     - 只保留 1 到 3 个真正必要的增量动作，避免 TODO 膨胀。
+- 关于 `evidence` 的设置：
+    - 仅在本轮出现了新的、可复用的执行证据时填写。
+    - 使用 Markdown，按主题组织，例如 `## HTTP 观察`、`## 文件变更`、`## 环境确认`。
+    - 只写新增证据，不要回放已有 EVIDENCE 全文。
+    - 没有新增证据时输出空字符串 `""`。
 - 当 `user_satisfied` 为 true 的时候：
     - `next_movements` 必须输出 `[]`。
     - 系统会自动把剩余未关闭 TODO 标记为 `SKIPPED`，你不需要手动输出 skipped 状态。
@@ -250,12 +256,12 @@ IMPORTANT GUIDELINES:
 
 **任务完成时（必须设置 completed_task_index）：**
 ```json
-{"@action": "verify-satisfaction", "user_satisfied": true, "completed_task_index": "任务索引", "reasoning": "简明扼要分析", "next_movements": [], "output_files": ["/abs/path/to/result.md"]}
+{"@action": "verify-satisfaction", "user_satisfied": true, "completed_task_index": "任务索引", "reasoning": "简明扼要分析", "next_movements": [], "evidence": "## 本轮新增证据\n- ...", "output_files": ["/abs/path/to/result.md"]}
 ```
 
 **任务未完成时（completed_task_index 为空）：**
 ```json
-{"@action": "verify-satisfaction", "user_satisfied": false, "completed_task_index": "", "reasoning": "简明扼要分析", "next_movements": [{"op": "add", "id": "next_step_id", "content": "下一步计划"}], "output_files": []}
+{"@action": "verify-satisfaction", "user_satisfied": false, "completed_task_index": "", "reasoning": "简明扼要分析", "next_movements": [{"op": "add", "id": "next_step_id", "content": "下一步计划"}], "evidence": "", "output_files": []}
 ```
 
 **标记已有 TODO 正在推进时：**

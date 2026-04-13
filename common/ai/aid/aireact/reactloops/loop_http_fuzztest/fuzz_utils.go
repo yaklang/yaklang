@@ -531,6 +531,7 @@ func applyFuzzVerificationOutcome(loop *reactloops.ReActLoop, operator *reactloo
 		verifyResult.Reasoning,
 		verifyResult.CompletedTaskIndex,
 		verifyResult.NextMovements,
+		verifyResult.Evidence,
 	)
 
 	if verifyResult.Satisfied {

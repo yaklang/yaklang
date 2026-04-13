@@ -79,11 +79,17 @@ func (t *AiTask) execute() error {
 			// Check if completed_task_index indicates this task should be marked as done
 			// This provides an additional mechanism to end tasks beyond just isDone
 			lastRecord := loop.GetLastSatisfactionRecordFull()
-			var summary, completedTaskIndex, nextMovements string
+			var summary, completedTaskIndex, nextMovements, evidence string
 			if lastRecord != nil {
 				summary = lastRecord.Reason
 				completedTaskIndex = lastRecord.CompletedTaskIndex
 				nextMovements = aicommon.FormatVerifyNextMovementsSummary(lastRecord.NextMovements)
+				evidence = strings.TrimSpace(lastRecord.Evidence)
+				if evidence != "" {
+					if merged, changed := appendTaskPlanEvidence(t, evidence); changed {
+						log.Infof("task %s appended plan evidence, length=%d", t.Index, len(merged))
+					}
+				}
 			}
 
 			// Check if current task index is in the completed_task_index list
@@ -224,6 +230,7 @@ func (t *AiTask) execute() error {
 
 			return reactiveData, nil
 		}),
+		outputEvidenceAction(t),
 	)
 	if err != nil {
 		if t.GetStatus() == aicommon.AITaskState_Processing {

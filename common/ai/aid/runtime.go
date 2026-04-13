@@ -132,7 +132,7 @@ func (t *AiTask) Progress() string {
 	}
 	var buf bytes.Buffer
 	t.dumpProgress(0, &buf)
-	return prependPlanFactsToRenderedPlan(buf.String(), getTaskPlanFacts(t))
+	return prependPlanContextDocsToRenderedPlan(buf.String(), getTaskPlanFacts(t), getTaskPlanEvidence(t))
 }
 
 func (t *AiTask) ProgressWithDetail() string {
@@ -141,7 +141,7 @@ func (t *AiTask) ProgressWithDetail() string {
 	}
 	var buf bytes.Buffer
 	t.dumpProgressEx(0, &buf, true)
-	return prependPlanFactsToRenderedPlan(buf.String(), getTaskPlanFacts(t))
+	return prependPlanContextDocsToRenderedPlan(buf.String(), getTaskPlanFacts(t), getTaskPlanEvidence(t))
 }
 
 func (r *runtime) Progress() string {
@@ -153,7 +153,7 @@ func (r *runtime) Progress() string {
 	}
 	var buf bytes.Buffer
 	r.RootTask.dumpProgress(0, &buf)
-	return prependPlanFactsToRenderedPlan(buf.String(), getTaskPlanFacts(r.RootTask))
+	return prependPlanContextDocsToRenderedPlan(buf.String(), getTaskPlanFacts(r.RootTask), getTaskPlanEvidence(r.RootTask))
 }
 
 func (r *runtime) NextStep() (*AiTask, bool) {

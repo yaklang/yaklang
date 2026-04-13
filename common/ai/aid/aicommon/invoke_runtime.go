@@ -20,6 +20,7 @@ type VerifySatisfactionResult struct {
 	Reasoning          string               `json:"reasoning"`            // The reasoning for the satisfaction status
 	CompletedTaskIndex string               `json:"completed_task_index"` // Index of completed task(s), e.g., "1-1" or "1-1,1-2"
 	NextMovements      []VerifyNextMovement `json:"next_movements"`       // AI's next action plan for in-progress status tracking
+	Evidence           string               `json:"evidence"`             // Incremental markdown evidence discovered during execution/verification
 	OutputFiles        []string             `json:"output_files"`         // File paths created/modified by tool execution, extracted by verify AI
 }
 

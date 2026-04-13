@@ -29,6 +29,15 @@
 <|FACTS_END_{{ .Nonce }}|>
 {{end}}{{/*
 
+*/}}{{if .Evidence}}## 运行证据库（EVIDENCE）
+
+以下是执行阶段累积的 EVIDENCE。它们来自真实执行、验证、文件、响应或环境观察，在重规划时必须优先参考这些运行期证据：
+
+<|EVIDENCE_{{ .Nonce }}|>
+{{ .Evidence }}
+<|EVIDENCE_END_{{ .Nonce }}|>
+{{end}}{{/*
+
 */}}{{ if .Plan }}## 现有计划区块
 * 现有的计划会在下面做展示，你在生成计划的时候可以参考
 <|CURRENT_PLAN_{{ .Nonce }}|>

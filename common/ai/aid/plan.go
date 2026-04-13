@@ -86,6 +86,9 @@ type PlanResponse struct {
 	// Facts is a read-only field populated by loop_plan's output_facts action.
 	// It contains all concrete factual evidence gathered during planning, in Markdown format.
 	Facts string `json:"facts,omitempty"`
+	// Evidence is a read-only field populated during plan execution.
+	// It contains runtime discoveries accumulated from verification and output_evidence.
+	Evidence string `json:"evidence,omitempty"`
 }
 
 func (p *PlanResponse) recursiveMergeSubtask(subtask *AiTask, callback func(i *AiTask) error, stopped *utils.AtomicBool) {
@@ -233,15 +236,19 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 	}
 	pr.cod.standardizeTaskTreeAndNotify(rootTask, "initial plan generated")
 
-	// Inject FACTS as a prefix block in the root task's user input so every
-	// subtask can see it through the parent-task chain in GetUserInput().
+	if planFacts != "" && rootTask.Coordinator != nil && rootTask.Coordinator.ContextProvider != nil {
+		rootTask.Coordinator.ContextProvider.SetPersistentData(planFactsPersistentKey, planFacts)
+	}
+
+	// Inject PLAN context docs as prefix blocks in the root task's user input so
+	// every subtask can see them through the parent-task chain in GetUserInput().
 	if planFacts != "" {
-		existingInput := rootTask.AIStatefulTaskBase.GetUserInput()
-		rootTask.SetUserInput(prependPlanFactsToRenderedPlan(existingInput, planFacts))
+		syncRootTaskPlanContextDocs(rootTask)
 	}
 
 	resp := pr.cod.newPlanResponse(rootTask)
 	resp.Facts = planFacts
+	resp.Evidence = getTaskPlanEvidence(rootTask)
 	return resp, nil
 }
 
