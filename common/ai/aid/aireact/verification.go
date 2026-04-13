@@ -130,30 +130,6 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 					createReasonCallback("Reasoning"),
 				),
 				aicommon.WithActionFieldStreamHandler(
-					[]string{"evidence"},
-					func(key string, read io.Reader) {
-						var out bytes.Buffer
-						var outputReader = io.TeeReader(utils.JSONStringReader(utils.UTF8Reader(read)), &out)
-						var event *schema.AiOutputEvent
-						var err error
-						event, err = r.Emitter.EmitTextMarkdownStreamEvent(
-							"plan-evidence",
-							outputReader,
-							taskID,
-							func() {
-								if out.Len() > 0 {
-									r.AddToTimeline("verification_evidence", out.String())
-								}
-							},
-						)
-						if err != nil {
-							log.Errorf("failed to emit verification evidence stream event: %v", err)
-							return
-						}
-						captureReferenceAnchor(event)
-					},
-				),
-				aicommon.WithActionFieldStreamHandler(
 					[]string{"next_movements"},
 					func(key string, rd io.Reader) {
 						trimmedReader := utils.NewTrimLeftReader(utils.UTF8Reader(rd))
@@ -202,7 +178,12 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 			result.Satisfied = action.GetBool("user_satisfied")
 			result.Reasoning = action.GetString("reasoning")
 			result.CompletedTaskIndex = action.GetString("completed_task_index")
-			result.Evidence = strings.TrimSpace(action.GetString("evidence"))
+			result.Evidence, err = aicommon.NormalizeConcreteEvidenceMarkdown(action.GetString("evidence"))
+			if err != nil {
+				log.Warnf("verification evidence rejected: %v", err)
+				r.AddToTimeline("verification_evidence_rejected", err.Error())
+				result.Evidence = ""
+			}
 			result.OutputFiles = action.GetStringSlice("output_files")
 
 			nextMovements := normalizeVerifyNextMovements(action)
@@ -236,6 +217,26 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 				)
 				if err != nil {
 					return utils.Errorf("failed to emit next_movements snapshot markdown stream event: %v", err)
+				}
+				captureReferenceAnchor(event)
+			}
+
+			if strings.TrimSpace(result.Evidence) != "" {
+				var out bytes.Buffer
+				var outputReader = io.TeeReader(strings.NewReader(result.Evidence), &out)
+				var event *schema.AiOutputEvent
+				event, err = r.Emitter.EmitTextMarkdownStreamEvent(
+					"plan-evidence",
+					outputReader,
+					taskID,
+					func() {
+						if out.Len() > 0 {
+							r.AddToTimeline("verification_evidence", out.String())
+						}
+					},
+				)
+				if err != nil {
+					return utils.Errorf("failed to emit validated verification evidence markdown stream event: %v", err)
 				}
 				captureReferenceAnchor(event)
 			}
