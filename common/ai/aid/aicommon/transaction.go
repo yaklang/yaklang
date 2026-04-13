@@ -52,11 +52,11 @@ func CallAITransaction(
 			}
 		})
 
-		rsp, err := callAi(
-			NewAIRequest(
-				finalPrompt,
-				append(requestOpts, WithAIRequest_SeqId(seq))...,
-			))
+		aiReq := NewAIRequest(
+			finalPrompt,
+			append(requestOpts, WithAIRequest_SeqId(seq))...,
+		)
+		rsp, err := callAi(aiReq)
 		if err != nil {
 			lastErr = err
 			lastRsp = rsp

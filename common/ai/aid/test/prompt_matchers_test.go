@@ -21,7 +21,20 @@ func isMemorySummaryPrompt(prompt string) bool {
 		utils.MatchAllOfSubString(prompt, `"const": "memory-triage"`, `"memory_entities"`)
 }
 
+func isPlanFactsHookPrompt(prompt string) bool {
+	return strings.Contains(prompt, `"const": "plan_facts_hook"`) ||
+		utils.MatchAllOfSubString(prompt, `"@action"`, `plan_facts_hook`, `"facts"`)
+}
+
+func isCapabilityCatalogMatchPrompt(prompt string) bool {
+	return utils.MatchAllOfSubString(prompt, `"const": "capability-catalog-match"`, "matched_identifiers")
+}
+
 func isPlanPrompt(prompt string) bool {
+	if isPlanFactsHookPrompt(prompt) {
+		return false
+	}
+
 	if strings.Contains(prompt, "plan: when user needs to create or refine a plan for a specific task") {
 		return true
 	}

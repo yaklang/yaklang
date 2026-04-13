@@ -134,6 +134,7 @@ func (r *ReAct) processReActTask(task aicommon.AIStatefulTask) {
 	// 从任务中提取用户输入
 	userInput := task.GetUserInput()
 
+	log.Info("start to handle ensure work directory and session title for ReAct task")
 	r.ensureWorkDirectory(userInput) // must be first: creates artifact dir + session title
 	r.ensureSessionTitle(userInput)  // will skip if already done by ensureWorkDirectory
 
@@ -577,6 +578,7 @@ func (r *ReAct) ensureSessionTitle(userInput string) {
 			return
 		}
 
+		log.Info("start to handle session-title-generator,  using speed-priority LiteForge for session title generation")
 		action, err := r.InvokeSpeedPriorityLiteForge(cfg.GetContext(), "session-title-generator", prompt, []aitool.ToolOption{
 			aitool.WithStringParam("session_title", aitool.WithParam_Description("Concise session title"), aitool.WithParam_MaxLength(50), aitool.WithParam_Required(true)),
 		})

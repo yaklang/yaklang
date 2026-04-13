@@ -42,6 +42,16 @@ func mockedToolCalling(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, too
 		return rsp, nil
 	}
 
+	if isCapabilityCatalogMatchPrompt(prompt) {
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "capability-catalog-match", "matched_identifiers": []}`))
+		return rsp, nil
+	}
+
+	if isPlanFactsHookPrompt(prompt) {
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "plan_facts_hook", "facts": ""}`))
+		return rsp, nil
+	}
+
 	if isPlanPrompt(prompt) {
 
 		rsp.EmitOutputStream(strings.NewReader(`

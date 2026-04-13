@@ -667,7 +667,7 @@ func WithTieredAICallback() ConfigOption {
 
 		// Check if tiered AI config is enabled
 		if !consts.IsTieredAIModelConfigEnabled() {
-			log.Debugf("Tiered AI config not enabled, skipping tiered callback configuration")
+			log.Error("BUG: Tiered AI config not enabled, skipping tiered callback configuration, this is not should happen!")
 			return nil
 		}
 
@@ -715,8 +715,11 @@ func WithAutoTieredAICallback(defaultCallback AICallbackType) ConfigOption {
 			c.m = &sync.Mutex{}
 		}
 
+		log.Info("start to execute auto tiered ai callback")
+
 		// Check if tiered AI config is enabled
 		if consts.IsTieredAIModelConfigEnabled() {
+			log.Infof("enable tiered AI callback with default callback: %v", defaultCallback != nil)
 			// Try to configure tiered callbacks
 			if err := WithTieredAICallback()(c); err == nil {
 				// Also set the original callback if not already set
@@ -2241,12 +2244,17 @@ func (c *Config) CallQualityPriorityAI(request *AIRequest) (*AIResponse, error) 
 }
 
 func (c *Config) CallSpeedPriorityAI(request *AIRequest) (*AIResponse, error) {
-	for _, cb := range []AICallbackType{
+	for idx, cb := range []AICallbackType{
 		c.SpeedPriorityAICallback,
 		c.OriginalAICallback,
 	} {
 		if cb == nil {
 			continue
+		}
+		if idx == 0 {
+			log.Info("start to call speed priority ai")
+		} else {
+			log.Warn("fallback to call original ai-callback")
 		}
 		return cb(c, request)
 	}
