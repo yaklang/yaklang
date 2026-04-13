@@ -377,88 +377,23 @@ func (m *PromptContextProvider) CurrentTaskInfo() string {
 	return results
 }
 
-func findTaskByIndex(root *AiTask, index string) *AiTask {
-	if root == nil || index == "" {
-		return nil
-	}
-	if root.Index == index {
-		return root
-	}
-	for _, sub := range root.Subtasks {
-		if found := findTaskByIndex(sub, index); found != nil {
-			return found
-		}
-	}
-	return nil
-}
-
-func (m *PromptContextProvider) getRootTask() *AiTask {
-	if m.RootTask != nil {
-		return m.RootTask
-	}
-	if m.CurrentTask != nil && m.CurrentTask.Coordinator != nil {
-		return m.CurrentTask.rootTask
-	}
-	return nil
-}
-
-// PredecessorTasksContext collects summaries from predecessor tasks (completed siblings
-// and DependsOn dependencies) so the current task can review what has already been delivered.
-func (m *PromptContextProvider) PredecessorTasksContext() string {
+func (m *PromptContextProvider) SharedEvidenceContext() string {
 	if m.CurrentTask == nil {
 		return ""
 	}
 
-	seen := make(map[string]bool)
-	var predecessors []*AiTask
-
-	if m.CurrentTask.ParentTask != nil {
-		for _, sibling := range m.CurrentTask.ParentTask.Subtasks {
-			if sibling.Index == m.CurrentTask.Index {
-				break
-			}
-			if sibling.executed() {
-				predecessors = append(predecessors, sibling)
-				seen[sibling.Index] = true
-			}
-		}
-	}
-
-	if len(m.CurrentTask.DependsOn) > 0 {
-		root := m.getRootTask()
-		if root != nil {
-			for _, depIndex := range m.CurrentTask.DependsOn {
-				if seen[depIndex] {
-					continue
-				}
-				if depTask := findTaskByIndex(root, depIndex); depTask != nil && depTask.executed() {
-					predecessors = append(predecessors, depTask)
-					seen[depIndex] = true
-				}
-			}
-		}
-	}
-
-	if len(predecessors) == 0 {
+	evidence := strings.TrimSpace(getTaskPlanEvidence(m.CurrentTask))
+	if evidence == "" {
 		return ""
 	}
 
-	var buf bytes.Buffer
-	for _, pred := range predecessors {
-		summary := pred.GetSummary()
-		runes := []rune(summary)
-		if len(runes) > 200 {
-			summary = string(runes[:200]) + "..."
-		}
-		if summary == "" {
-			summary = "(no summary available)"
-		}
-		buf.WriteString(fmt.Sprintf("- [%s] %s: %s\n", pred.Index, pred.Name, summary))
-		safeIndex := strings.ReplaceAll(pred.Index, "-", "_")
-		buf.WriteString(fmt.Sprintf("  artifact hint: task_%s_*_result_summary.txt\n", safeIndex))
+	const maxEvidenceRunes = 1600
+	runes := []rune(evidence)
+	if len(runes) <= maxEvidenceRunes {
+		return evidence
 	}
 
-	return buf.String()
+	return string(runes[:maxEvidenceRunes]) + "\n\n..."
 }
 
 func (m *PromptContextProvider) PersistentMemory() string {

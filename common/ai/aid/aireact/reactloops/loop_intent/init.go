@@ -31,7 +31,7 @@ func init() {
 				reactloops.WithAllowPlanAndExec(false),
 				reactloops.WithAllowToolCall(false),
 				reactloops.WithAllowUserInteract(false),
-				reactloops.WithUseSpeedPriorityAICallback(),
+				reactloops.WithUseSpeedPriorityAICallback(true),
 				reactloops.WithInitTask(buildInitTask(r)),
 				reactloops.WithMaxIterations(1),
 				reactloops.WithPersistentInstruction(instruction),

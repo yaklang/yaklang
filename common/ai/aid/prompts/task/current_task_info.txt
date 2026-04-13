@@ -8,12 +8,12 @@
 
 {{ if .ContextProvider.CurrentTask.SingleLineStatusSummary }}任务状态：{{ .ContextProvider.CurrentTask.SingleLineStatusSummary }}{{end}}
 
-{{ if .ContextProvider.PredecessorTasksContext }}
---- 前序任务交付索引 ---
-{{ .ContextProvider.PredecessorTasksContext }}
+{{ if .ContextProvider.SharedEvidenceContext }}
+--- 共享执行证据 ---
+{{ .ContextProvider.SharedEvidenceContext }}
 {{end}}
 --- 先决条件检查 ---
 在开始执行当前任务前，请先判断：
-- 当前任务依赖哪些前序任务交付的文件、常量、路径或关键配置
-- 使用 find_file、grep、read_file 工具先确认这些内容确实存在于工作目录中
-- 不要依赖记忆假设前序结果，始终以工具读取为准
+- 优先阅读当前任务输入中的 FACTS 或 EVIDENCE 区块，以及上面的共享执行证据
+- 如果 evidence 中提到文件、路径、接口、参数或配置，使用 find_file、grep、read_file 工具先确认这些内容确实存在于工作目录中
+- 不要依赖前序任务 summary 或记忆假设，始终以工具读取和 EVIDENCE 为准

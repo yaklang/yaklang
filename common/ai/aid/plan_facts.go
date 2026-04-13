@@ -3,6 +3,7 @@ package aid
 import (
 	"fmt"
 	"io"
+	"regexp"
 	"strings"
 	"sync"
 	"unicode"
@@ -21,6 +22,7 @@ const (
 var (
 	planFactsAITags    = []string{"FACTS", "PLAN_FACTS"}
 	planEvidenceAITags = []string{"EVIDENCE", "PLAN_EVIDENCE"}
+	planContextGapRE   = regexp.MustCompile(`\n{3,}`)
 )
 
 type discoveredAITagBlock struct {
@@ -136,7 +138,8 @@ func stripPlanContextBlocks(content string) string {
 	if last < len(content) {
 		builder.WriteString(content[last:])
 	}
-	return strings.TrimSpace(builder.String())
+	cleaned := strings.TrimSpace(builder.String())
+	return planContextGapRE.ReplaceAllString(cleaned, "\n\n")
 }
 
 func discoverAITagBlocks(content string, tagNames ...string) []discoveredAITagBlock {
