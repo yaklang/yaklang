@@ -2,10 +2,13 @@ package loop_plan
 
 import (
 	"fmt"
-	"regexp"
+	"io"
 	"strings"
+	"sync"
+	"unicode"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aitag"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
@@ -31,23 +34,108 @@ func normalizeFactsDocument(content string) string {
 	return strings.TrimSpace(content)
 }
 
-var planEvidenceBlockPatterns = []*regexp.Regexp{
-	regexp.MustCompile(`(?s)<\|EVIDENCE_[^|]+\|>\s*(.*?)\s*<\|EVIDENCE_END_[^|]+\|>`),
-	regexp.MustCompile(`(?s)<\|PLAN_EVIDENCE_[^|]+\|>\s*(.*?)\s*<\|PLAN_EVIDENCE_END_[^|]+\|>`),
-}
-
 func extractEvidenceDocument(content string) string {
 	content = strings.TrimSpace(content)
 	if content == "" {
 		return ""
 	}
-	for _, pattern := range planEvidenceBlockPatterns {
-		matched := pattern.FindStringSubmatch(content)
-		if len(matched) > 1 {
-			return strings.TrimSpace(matched[1])
+	blocks := discoverEvidenceAITagBlocks(content, "EVIDENCE", "PLAN_EVIDENCE")
+	if len(blocks) == 0 {
+		return ""
+	}
+
+	results := make([]string, len(blocks))
+	options := make([]aitag.ParseOption, 0, len(blocks))
+	var mu sync.Mutex
+	for index, block := range blocks {
+		index := index
+		block := block
+		options = append(options, aitag.WithCallback(block.TagName, block.Nonce, func(reader io.Reader) {
+			contentBytes, err := io.ReadAll(reader)
+			if err != nil {
+				return
+			}
+			mu.Lock()
+			results[index] = strings.TrimSpace(string(contentBytes))
+			mu.Unlock()
+		}))
+	}
+	if err := aitag.Parse(strings.NewReader(content), options...); err != nil {
+		return ""
+	}
+	for _, result := range results {
+		if result != "" {
+			return result
 		}
 	}
 	return ""
+}
+
+type discoveredEvidenceAITagBlock struct {
+	TagName string
+	Nonce   string
+}
+
+func discoverEvidenceAITagBlocks(content string, tagNames ...string) []discoveredEvidenceAITagBlock {
+	if content == "" || len(tagNames) == 0 {
+		return nil
+	}
+	allowedTags := make(map[string]struct{}, len(tagNames))
+	for _, tagName := range tagNames {
+		if tagName == "" {
+			continue
+		}
+		allowedTags[tagName] = struct{}{}
+	}
+
+	blocks := make([]discoveredEvidenceAITagBlock, 0, 2)
+	for offset := 0; offset < len(content); {
+		startOffset := strings.Index(content[offset:], "<|")
+		if startOffset < 0 {
+			break
+		}
+		start := offset + startOffset
+		tagCloseOffset := strings.Index(content[start:], "|>")
+		if tagCloseOffset < 0 {
+			break
+		}
+		tagClose := start + tagCloseOffset + 2
+		tagName, nonce, ok := parseEvidenceAITagStartToken(content[start+2 : tagClose-2])
+		if !ok {
+			offset = tagClose
+			continue
+		}
+		if _, exists := allowedTags[tagName]; !exists {
+			offset = tagClose
+			continue
+		}
+		endTag := fmt.Sprintf("<|%s_END_%s|>", tagName, nonce)
+		if endOffset := strings.Index(content[tagClose:], endTag); endOffset >= 0 {
+			blocks = append(blocks, discoveredEvidenceAITagBlock{TagName: tagName, Nonce: nonce})
+			offset = tagClose + endOffset + len(endTag)
+			continue
+		}
+		offset = tagClose
+	}
+	return blocks
+}
+
+func parseEvidenceAITagStartToken(token string) (string, string, bool) {
+	if token == "" || strings.Contains(token, "_END_") {
+		return "", "", false
+	}
+	underscore := strings.LastIndex(token, "_")
+	if underscore <= 0 || underscore >= len(token)-1 {
+		return "", "", false
+	}
+	tagName := token[:underscore]
+	nonce := token[underscore+1:]
+	for _, ch := range tagName {
+		if !unicode.IsLetter(ch) && !unicode.IsDigit(ch) && ch != '_' {
+			return "", "", false
+		}
+	}
+	return tagName, nonce, true
 }
 
 func getLoopTaskEvidenceDocument(loop *reactloops.ReActLoop) string {
