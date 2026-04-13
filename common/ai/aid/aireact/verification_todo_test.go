@@ -1,6 +1,7 @@
 package aireact
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -39,13 +40,13 @@ func TestRenderVerificationTodoSnapshot_AggregatesStatuses(t *testing.T) {
 
 func TestRenderVerificationTodoSnapshot_PrioritizesActiveItemsUnderLimit(t *testing.T) {
 	history := []*aicommon.VerifySatisfactionResult{}
-	for index := 0; index < 80; index++ {
+	for index := 0; index < 400; index++ {
 		history = append(history, &aicommon.VerifySatisfactionResult{
 			Satisfied: false,
 			NextMovements: []aicommon.VerifyNextMovement{
 				{
 					Op:      "add",
-					ID:      strings.Join([]string{"todo", strings.Repeat("x", 20), string(rune('a' + (index % 26))), strings.Repeat("z", 20)}, "-"),
+					ID:      fmt.Sprintf("todo-%03d-%s-%c-%s", index, strings.Repeat("x", 20), rune('a'+(index%26)), strings.Repeat("z", 20)),
 					Content: strings.Repeat("非常长的待办描述", 30),
 				},
 			},
@@ -59,9 +60,9 @@ func TestRenderVerificationTodoSnapshot_PrioritizesActiveItemsUnderLimit(t *test
 	})
 
 	snapshot := renderVerificationTodoSnapshot(history)
-	require.LessOrEqual(t, len(snapshot), verificationTodoSnapshotLimit)
+	require.LessOrEqual(t, aicommon.MeasureTokens(snapshot), verificationTodoSnapshotLimit)
 	require.Contains(t, snapshot, "active_focus")
-	require.Contains(t, snapshot, "TODO history exceeded 10KB")
+	require.Contains(t, snapshot, "TODO history exceeded 10K tokens")
 }
 
 func TestBuildVerificationTodoItems_DoneKeepsLatestContent(t *testing.T) {

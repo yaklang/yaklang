@@ -58,7 +58,7 @@ func (r *ReActLoop) _fastLoadSearchMemoryWithoutAI(input string) {
 			size = searchResult.ContentTokens
 		}
 		if size > 0 {
-			aicommon.TypeWriterWrite(pw, "... 快速记忆检索结束，匹配到记忆大小为："+utils.ByteSize(uint64(size)), 300)
+			aicommon.TypeWriterWrite(pw, "... 快速记忆检索结束，匹配到记忆大小为："+utils.InterfaceToString(size)+" tokens", 300)
 		} else {
 			aicommon.TypeWriterWrite(pw, "... 快速记忆检索结束，没能找到合适的过往记忆。", 300)
 		}
