@@ -3,147 +3,114 @@ __VERBOSE_NAME__ = "Powerful HTTP Request Tool (curl-like)"
 __KEYWORDS__ = "http request,curl,web,network,packet,raw request,http response,url,post,get,https,proxy,redirect,header,body,api,http tool,web debug,traffic"
 
 __USAGE__ = <<<USAGE_BLOCK
-Powerful HTTP Request Tool - Usage Guide for AI Parameter Generation
+Powerful HTTP Request Tool - AI Usage Guide
 
-This tool supports two modes of operation:
-  1. URL Mode: Provide a URL with optional method, headers, body, and params.
-  2. Packet Mode: Provide a raw HTTP request packet string.
+Modes:
+    1. URL Mode: use "url" plus optional method, headers, body, query-params, and post-params.
+    2. Packet Mode: use "packet" to send an exact raw HTTP request.
 
-If "packet" is provided, the tool uses Packet Mode. Otherwise, "url" is required
-for URL Mode. Both modes share the common parameters below.
-
-##############################################################################
-# CRITICAL RULE: AITAG IS MANDATORY FOR "packet", "body", AND "headers"     #
-##############################################################################
-
-*** YOU MUST USE AITAG FOR THESE PARAMETERS - NEVER PUT THEM IN JSON params ***
-
-The "packet", "body", and "headers" parameters contain multi-line text, raw HTTP
-protocol content, or structured payloads (JSON, XML, form data, etc.).
-
-Putting them directly in JSON params causes BROKEN requests because:
-  - Line breaks become literal "\n" strings instead of real CRLF
-  - Quotes and backslashes need double-escaping which is error-prone
-  - HTTP packet structure (request line + headers + blank line + body) is destroyed
-  - Binary or special characters get corrupted
-
-RULE: If a parameter value contains ANY newline, OR is a raw HTTP packet,
-      OR is a structured payload (JSON/XML/HTML body), you MUST use AITAG.
-      Do NOT put it in the JSON "params" object. Instead, omit it from "params"
-      and attach it after the JSON block using AITAG tags.
-
-WRONG (packet in JSON - WILL PRODUCE MALFORMED REQUEST):
-```json
-{
-  "params": {
-    "packet": "GET / HTTP/1.1\nHost: example.com\nUser-Agent: Mozilla/5.0\n\n"
-  }
-}
-```
-
-CORRECT (packet via AITAG - preserves exact HTTP format):
-```json
-{
-  "params": { "https": "auto", "timeout": 10 }
-}
-```
-<|TOOL_PARAM_packet_{NONCE}|>
-GET / HTTP/1.1
-Host: example.com
-User-Agent: Mozilla/5.0
-
-<|TOOL_PARAM_packet_END_{NONCE}|>
-
-Similarly for "body":
-
-WRONG (body in JSON - escaping issues):
-```json
-{
-  "params": {
-    "url": "https://api.example.com",
-    "method": "POST",
-    "body": "{\"key\":\"value\",\"nested\":{\"a\":1}}"
-  }
-}
-```
-
-CORRECT (body via AITAG):
-```json
-{
-  "params": { "url": "https://api.example.com", "method": "POST", "content-type": "application/json", "timeout": 10 }
-}
-```
-<|TOOL_PARAM_body_{NONCE}|>
-{"key": "value", "nested": {"a": 1}}
-<|TOOL_PARAM_body_END_{NONCE}|>
+If "packet" is present, Packet Mode is used. Otherwise "url" is required.
+Use Packet Mode only when you need full wire-level control. If you are testing a
+specific GET or POST parameter, prefer URL Mode with "query-params" or "post-params".
 
 ##############################################################################
+# HARD RULES FOR AI PARAMETER GENERATION                                     #
+##############################################################################
 
-## Parameters
+1. AITAG is mandatory for multi-line or structured content.
+     Use AITAG for:
+         - packet
+         - body
+         - headers when multiple header lines are provided
 
---- URL Mode Parameters ---
-Required (when packet is empty):
-  url             (string)  The full target URL. Example: "https://example.com/api/v1/users".
+     Never put a raw HTTP packet or multi-line body directly into JSON params.
+     Keep them outside JSON using AITAG blocks so line breaks and raw HTTP format stay intact.
 
-Optional:
-  method          (string)  HTTP method. Default: "GET".
-  headers         (string)  Custom headers, one per line: "Key: Value\nKey2: Value2".
-                            *** MUST use AITAG if multiple headers ***
-  body            (string)  Request body content (for POST/PUT/PATCH).
-                            *** MUST use AITAG - NEVER put body in JSON params ***
-  content-type    (string)  Content-Type header value. Example: "application/json".
-                            (This is a simple single-line value, OK in JSON params)
-  query-params    (string)  URL query parameters: "k1=v1&k2=v2".
-                            (Simple single-line value, OK in JSON params)
-  post-params     (string)  POST form parameters (application/x-www-form-urlencoded): "k1=v1&k2=v2".
-                            (Simple single-line value, OK in JSON params)
+2. Prefer structured params when testing specific parameters.
+     Safer choices:
+         - "query-params" for GET query values
+         - "post-params" for application/x-www-form-urlencoded POST values
 
---- Packet Mode Parameters ---
-Required (when url is empty):
-  packet          (string)  Complete raw HTTP request packet to send.
-                            *** MUST use AITAG - NEVER put packet in JSON params ***
-                            The packet includes request line, headers, blank line, and body.
-                            AITAG preserves the exact HTTP wire format.
+     These are safer than hand-writing the request line because the tool patches the
+     request and applies normal parameter encoding for query/form values.
 
---- Common Parameters (all OK in JSON params - single-line values) ---
-Optional:
-  https           (string)  Force HTTPS transport: "yes"/"no"/"auto". Default: "auto"
-                            (auto-detect from URL scheme or packet Host header).
-  timeout         (int)     Request timeout in seconds. Default: 10.
-  redirect-times  (int)     Maximum redirects to follow. 0 disables redirects. Default: 3.
-  keyword         (string)  Highlight and print context around this keyword in the response.
-  regexp-match    (string)  Regular expression to search in the response.
-  show-request    (string)  Display the full request packet: "yes"/"no". Default: "no".
-  proxy           (string)  Proxy URL. Example: "http://127.0.0.1:8080" or "socks5://127.0.0.1:1080".
+3. Packet Mode requires already-encoded request targets.
+     In Packet Mode, the request line is treated as raw HTTP text. If the path or
+     query contains spaces or special characters, you must encode them yourself.
 
-## Quick Reference: Which params go where?
+     WRONG:
+         GET /admin.php?id=1 or xxx HTTP/1.1
 
-  In JSON params (single-line values):
+     CORRECT:
+         GET /admin.php?id=1%20or%20xxx HTTP/1.1
+
+     ALSO OK in many form-style cases:
+         GET /admin.php?id=1+or+xxx HTTP/1.1
+
+     Unencoded spaces in packet mode often trigger 400 responses from servers or proxies.
+
+4. If you replay a captured packet, preserve the exact bytes unless you intentionally edit it.
+     If you edit GET parameters inside the packet, keep the request target URI-encoded.
+
+## Quick placement rules
+
+Use JSON params for single-line values:
     url, method, content-type, query-params, post-params,
     https, timeout, redirect-times, keyword, regexp-match, show-request, proxy
 
-  Via AITAG (multi-line / structured content):
+Use AITAG for multi-line or structured content:
     packet  -> <|TOOL_PARAM_packet_{NONCE}|> ... <|TOOL_PARAM_packet_END_{NONCE}|>
     body    -> <|TOOL_PARAM_body_{NONCE}|> ... <|TOOL_PARAM_body_END_{NONCE}|>
     headers -> <|TOOL_PARAM_headers_{NONCE}|> ... <|TOOL_PARAM_headers_END_{NONCE}|>
+
+## Parameters
+
+--- URL Mode ---
+Required:
+    url             (string)  Full target URL. Example: "https://example.com/api/v1/users".
+
+Optional:
+    method          (string)  HTTP method. Default: "GET".
+    headers         (string)  Custom headers. Use AITAG when providing multiple lines.
+    body            (string)  Request body content. Use AITAG.
+    content-type    (string)  Content-Type header value.
+    query-params    (string)  Query parameters like "k1=v1&k2=v2". Preferred for GET param testing.
+    post-params     (string)  Form parameters like "k1=v1&k2=v2". Preferred for form POST testing.
+
+--- Packet Mode ---
+Required when not using URL Mode:
+    packet          (string)  Complete raw HTTP request packet. Use AITAG.
+                                                        The request line, query string, and body must already be valid raw HTTP content.
+
+--- Common ---
+Optional:
+    https           (string)  Force HTTPS transport: "yes"/"no"/"auto". Default: "auto".
+    timeout         (int)     Request timeout in seconds. Default: 10.
+    redirect-times  (int)     Maximum redirects to follow. 0 disables redirects. Default: 3.
+    keyword         (string)  Keyword to search in the response.
+    regexp-match    (string)  Regular expression to search in the response.
+    show-request    (string)  Display and save the full request packet: "yes"/"no". Default: "no".
+    proxy           (string)  Proxy URL. Example: "http://127.0.0.1:8080" or "socks5://127.0.0.1:1080".
 
 ## Few-Shot Examples
 
 Replace {NONCE} with the actual nonce from the response format section.
 
-### Example 1: Simple GET request (URL mode, no multi-line params needed)
+### Example 1: Test a GET parameter safely (URL mode, preferred)
 
-User intent: "Fetch the homepage of example.com"
+User intent: "Test the id parameter with a payload containing spaces"
 
 ```json
 {
-  "@action": "call-tool",
-  "tool": "do_http_request",
-  "identifier": "fetch_homepage",
-  "params": {
-    "url": "https://example.com",
-    "timeout": 10
-  }
+    "@action": "call-tool",
+    "tool": "do_http_request",
+    "identifier": "test_get_param_safely",
+    "params": {
+        "url": "https://target.example.com/admin.php",
+        "query-params": "id=1 or xxx",
+        "timeout": 10,
+        "show-request": "yes"
+    }
 }
 ```
 
@@ -153,77 +120,71 @@ User intent: "Send a JSON POST to an API endpoint"
 
 ```json
 {
-  "@action": "call-tool",
-  "tool": "do_http_request",
-  "identifier": "post_json_api",
-  "params": {
-    "url": "https://api.example.com/v1/users",
-    "method": "POST",
-    "content-type": "application/json",
-    "timeout": 15
-  }
+    "@action": "call-tool",
+    "tool": "do_http_request",
+    "identifier": "post_json_api",
+    "params": {
+        "url": "https://api.example.com/v1/users",
+        "method": "POST",
+        "content-type": "application/json",
+        "timeout": 15
+    }
 }
 ```
 
 <|TOOL_PARAM_body_{NONCE}|>
 {
-  "username": "admin",
-  "email": "admin@example.com",
-  "role": "administrator"
+    "username": "admin",
+    "email": "admin@example.com",
+    "role": "administrator"
 }
 <|TOOL_PARAM_body_END_{NONCE}|>
 
-### Example 3: Send complete raw HTTP packet (Packet mode, AITAG for packet)
+### Example 3: Raw packet with an already-encoded query (Packet mode)
 
-User intent: "Send a crafted HTTP request with custom headers and body"
-
-This is the most powerful mode. The entire HTTP request (request line + headers +
-blank line + body) is written naturally in AITAG, exactly as it appears on the wire.
+User intent: "Send a crafted HTTP request and control the exact raw packet"
 
 ```json
 {
-  "@action": "call-tool",
-  "tool": "do_http_request",
-  "identifier": "raw_packet_request",
-  "params": {
-    "https": "yes",
-    "timeout": 15,
-    "keyword": "success"
-  }
+    "@action": "call-tool",
+    "tool": "do_http_request",
+    "identifier": "raw_packet_request",
+    "params": {
+        "https": "yes",
+        "timeout": 15,
+        "keyword": "success"
+    }
 }
 ```
 
 <|TOOL_PARAM_packet_{NONCE}|>
-POST /api/v1/login HTTP/1.1
-Host: api.example.com
-Content-Type: application/json
-Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
+GET /admin.php?id=1%20or%20xxx HTTP/1.1
+Host: target.example.com
 User-Agent: Mozilla/5.0
-Accept: application/json
+Accept: text/html,application/xhtml+xml
 
-{"username":"admin","password":"P@ssw0rd"}
 <|TOOL_PARAM_packet_END_{NONCE}|>
 
-### Example 4: Replay a captured proxy request (Packet mode, AITAG)
+### Example 4: Replay a captured proxy request and keep query encoding valid
 
 User intent: "Replay this HTTP request I captured"
 
 ```json
 {
-  "@action": "call-tool",
-  "tool": "do_http_request",
-  "identifier": "replay_captured_request",
-  "params": {
-    "https": "auto",
-    "timeout": 10,
-    "redirect-times": 0,
-    "show-request": "yes"
-  }
+    "@action": "call-tool",
+    "tool": "do_http_request",
+    "identifier": "replay_captured_request",
+    "params": {
+        "https": "auto",
+        "timeout": 10,
+        "redirect-times": 0,
+        "show-request": "yes"
+    }
 }
 ```
 
 <|TOOL_PARAM_packet_{NONCE}|>
-GET /admin/dashboard HTTP/1.1
+GET /admin.php?id=1%20or%20xxx HTTP/1.1
 Host: target.example.com
 Cookie: session=abc123; token=xyz789
 Referer: https://target.example.com/login
@@ -237,15 +198,15 @@ User intent: "Search the API and look for 'error' in response"
 
 ```json
 {
-  "@action": "call-tool",
-  "tool": "do_http_request",
-  "identifier": "api_search_check",
-  "params": {
-    "url": "https://api.example.com/search",
-    "query-params": "q=test&page=1&limit=10",
-    "keyword": "error",
-    "timeout": 10
-  }
+    "@action": "call-tool",
+    "tool": "do_http_request",
+    "identifier": "api_search_check",
+    "params": {
+        "url": "https://api.example.com/search",
+        "query-params": "q=test&page=1&limit=10",
+        "keyword": "error",
+        "timeout": 10
+    }
 }
 ```
 USAGE_BLOCK
@@ -259,11 +220,11 @@ method = cli.String("method", cli.setHelp("HTTP method"), cli.setDefault("GET"))
 headers = cli.String("headers", cli.setHelp("custom headers, one per line: Key: Value"), cli.setRequired(false))
 body = cli.String("body", cli.setHelp("request body content"), cli.setRequired(false))
 contentType = cli.String("content-type", cli.setHelp("Content-Type header"), cli.setRequired(false))
-queryParams = cli.String("query-params", cli.setHelp("URL query params: k1=v1&k2=v2"), cli.setRequired(false))
-postParams = cli.String("post-params", cli.setHelp("POST form params: k1=v1&k2=v2"), cli.setRequired(false))
+queryParams = cli.String("query-params", cli.setHelp("URL query params: k1=v1&k2=v2; preferred for testing GET params because values are patched/encoded safely"), cli.setRequired(false))
+postParams = cli.String("post-params", cli.setHelp("POST form params: k1=v1&k2=v2; preferred for form parameter testing"), cli.setRequired(false))
 
 // Packet mode params
-packet = cli.String("packet", cli.setHelp("raw HTTP request packet for Packet mode"), cli.setRequired(false))
+packet = cli.String("packet", cli.setHelp("raw HTTP request packet for Packet mode; request target/query must already be encoded"), cli.setRequired(false))
 
 // Common params
 httpsMode = cli.String("https", cli.setHelp("force HTTPS: yes/no/auto"), cli.setDefault("auto"))

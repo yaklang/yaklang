@@ -3,134 +3,145 @@ __VERBOSE_NAME__ = "Batch HTTP Request Tool / 批量HTTP请求工具"
 __KEYWORDS__ = "batch http,request multiple,concurrent,batch request,multi path,path scan,batch url,parallel request,mass request,http flood,path enumeration,directory scan,batch get,batch post,api endpoint validation,endpoint probing,api batch testing,request replay,template replay,unauthorized access check,authorization bypass verification,idor validation,horizontal privilege check,batch interface check,批量请求,并发请求,批量HTTP,多路径探测,路径枚举,目录扫描,接口批量验证,API批量测试,接口探测,端点探测,未授权访问验证,越权验证,水平越权验证,IDOR验证,批量验证接口,请求重放,模板请求,多接口测试"
 
 __USAGE__ = <<<USAGE_BLOCK
-Batch HTTP Request Tool - Usage Guide for AI Parameter Generation
+Batch HTTP Request Tool - AI Usage Guide
 
-This tool supports two modes of operation:
-  1. URL Mode: Specify a base URL and multiple paths to test concurrently.
-  2. Packet Mode: Provide a raw HTTP request template with {{PATH}} placeholder.
+Modes:
+    1. URL Mode: use "base-url" plus multiple "paths".
+    2. Packet Mode: use a raw "packet" template with {{PATH}} placeholder.
 
-Both modes share common parameters for timeout, concurrency, and result handling.
+Prefer URL Mode when you are testing the same parameter across many endpoints.
+Use Packet Mode only when you need raw headers, a custom wire format, or an exact replay template.
 
 ##############################################################################
-# CRITICAL RULE: AITAG IS MANDATORY FOR "packet", "body", AND "headers"     #
+# HARD RULES FOR AI PARAMETER GENERATION                                     #
 ##############################################################################
 
-*** YOU MUST USE AITAG FOR THESE PARAMETERS - NEVER PUT THEM IN JSON params ***
+1. AITAG is mandatory for multi-line or structured content.
+     Use AITAG for:
+         - packet
+         - body
+         - headers when multiple lines are provided
+         - paths when you provide multiple lines
 
-The "packet", "body", and "headers" parameters contain multi-line text, raw HTTP
-protocol content, or structured payloads (JSON, XML, form data, etc.).
+2. Prefer structured params for parameter testing.
+     If you want to test a GET parameter across many requests, prefer:
+         - "base-url"
+         - "paths"
+         - "query-params"
 
-RULE: If a parameter value contains ANY newline, OR is a raw HTTP packet,
-      OR is a structured payload (JSON/XML/HTML body), you MUST use AITAG.
-      Do NOT put it in the JSON "params" object. Instead, omit it from "params"
-      and attach it after the JSON block using AITAG tags.
+     This is safer than manually embedding query strings into raw packets because the
+     tool patches query/form parameters using structured parameter handling.
 
-## Parameters
+3. Packet Mode requires pre-encoded paths and queries.
+     In Packet Mode, both the raw "packet" and each substituted "{{PATH}}" entry are
+     treated as already-formed HTTP request text. If a path contains spaces or special
+     characters in the query string, encode them yourself before placing them into {{PATH}}.
 
---- URL Mode Parameters ---
-Required (when packet is empty):
-  base-url        (string)  Base URL or domain. Example: "https://example.com" or "example.com"
-                            If scheme is omitted, https:// is assumed.
+     WRONG path:
+         /admin.php?id=1 or xxx
 
-Required (for batch operations):
-    paths           (string)  Paths to test, one per line.
-                                                        Example: "/admin\n/login\n/api/v1/users"
-                            *** MUST use AITAG if paths span multiple lines ***
+     CORRECT path:
+         /admin.php?id=1%20or%20xxx
 
-Optional:
-  method          (string)  HTTP method for all requests. Default: "GET".
-  headers         (string)  Custom headers applied to all requests, one per line: "Key: Value".
-                            *** MUST use AITAG if multiple headers ***
-                            This is the PREFERRED way to set custom headers.
-  body            (string)  Request body content (for POST/PUT/PATCH). Applied to all requests.
-                            *** MUST use AITAG - NEVER put body in JSON params ***
-  content-type    (string)  Content-Type header value. Example: "application/json".
-  query-params    (string)  URL query parameters appended to all requests: "k1=v1&k2=v2".
-  prefix          (string)  Path prefix to prepend to all paths. Example: "/v1/" or "/api/v2/".
-                            If paths already start with /, prefix is still prepended.
-                            Useful for API versioning like /v1/users, /v1/admin.
+     ALSO OK in many form-style cases:
+         /admin.php?id=1+or+xxx
 
---- Packet Mode Parameters ---
-Required (to use Packet mode instead of URL mode):
-  packet          (string)  Raw HTTP request template with {{PATH}} placeholder.
-                            The {{PATH}} will be replaced with each path from "paths".
-                            *** MUST use AITAG - NEVER put packet in JSON params ***
-Optional:
-  base-host       (string)  Override Host header value (auto-extracted from packet if not provided).
+     Unencoded spaces in packet mode often cause 400 responses.
 
---- Common Parameters (all OK in JSON params - single-line values) ---
-Optional:
-  https           (string)  Force HTTPS transport: "yes"/"no"/"auto". Default: "auto".
-  timeout         (int)     Request timeout in seconds. Default: 10.
-  concurrent      (int)     Number of concurrent requests. Default: 5.
-                            Set to 1 for sequential requests with delay.
-  delay-seconds   (float)   Delay between requests in seconds. Default: 0.
-                            If > 0, concurrent is automatically set to 1.
-  redirect-times  (int)     Maximum redirects to follow. 0 disables redirects. Default: 3.
-  keyword         (string)  Keyword to search in responses (highlights matches).
-  regexp-match    (string)  Regular expression to search in responses.
-  proxy           (string)  Proxy URL. Example: "http://127.0.0.1:8080".
-  exclude-code    (string)  Exclude responses with these status codes (comma-separated).
-                            Example: "404,403,500"
-  include-code    (string)  Only include responses with these status codes (comma-separated).
-                            Example: "200,301,302"
-  exclude-size    (string)  Exclude responses with Content-Length in these ranges.
-                            Example: "0,100-200" (excludes 0 bytes and 100-200 bytes)
-  max-body-size   (int)     Maximum response size to display per request (bytes). Default: 4096.
-                            Responses (headers + body) larger than this will be truncated in output.
+## Quick placement rules
 
-## Quick Reference: Which params go where?
-
-  In JSON params (single-line values):
-        base-url, paths (single path or newline-escaped string), method, content-type, query-params, prefix,
+Use JSON params for single-line values:
+    base-url, method, content-type, query-params, prefix, base-host,
     https, timeout, concurrent, delay-seconds, redirect-times,
     keyword, regexp-match, proxy, exclude-code, include-code, exclude-size, max-body-size
 
-  Via AITAG (multi-line / structured content):
+Use AITAG for multi-line or structured content:
     packet  -> <|TOOL_PARAM_packet_{NONCE}|> ... <|TOOL_PARAM_packet_END_{NONCE}|>
     body    -> <|TOOL_PARAM_body_{NONCE}|> ... <|TOOL_PARAM_body_END_{NONCE}|>
     headers -> <|TOOL_PARAM_headers_{NONCE}|> ... <|TOOL_PARAM_headers_END_{NONCE}|>
-    paths   -> <|TOOL_PARAM_paths_{NONCE}|> ... <|TOOL_PARAM_paths_END_{NONCE}|>  (if multi-line)
+    paths   -> <|TOOL_PARAM_paths_{NONCE}|> ... <|TOOL_PARAM_paths_END_{NONCE}|>
+
+## Parameters
+
+--- URL Mode ---
+Required when not using packet mode:
+    base-url        (string)  Base URL or domain. Example: "https://example.com" or "example.com".
+    paths           (string)  Paths to test. Use AITAG when providing multiple lines.
+
+Optional:
+    method          (string)  HTTP method for all requests. Default: "GET".
+    headers         (string)  Custom headers applied to all requests. Use AITAG for multiple lines.
+    body            (string)  Request body content applied to all requests. Use AITAG.
+    content-type    (string)  Content-Type header value.
+    query-params    (string)  Query parameters appended to all requests. Preferred for GET parameter testing.
+    prefix          (string)  Path prefix to prepend to all paths.
+
+--- Packet Mode ---
+Required:
+    packet          (string)  Raw HTTP request template with {{PATH}} placeholder. Use AITAG.
+                                                        Both the request template and the substituted path must already be valid raw HTTP text.
+
+Optional:
+    base-host       (string)  Override Host header value.
+
+--- Common ---
+Optional:
+    https           (string)  Force HTTPS transport: "yes"/"no"/"auto". Default: "auto".
+    timeout         (int)     Request timeout in seconds. Default: 10.
+    concurrent      (int)     Number of concurrent requests. Default: 5.
+    delay-seconds   (float)   Delay between requests in seconds. If > 0, requests are sent sequentially.
+    redirect-times  (int)     Maximum redirects to follow. 0 disables redirects. Default: 3.
+    keyword         (string)  Keyword to search in responses.
+    regexp-match    (string)  Regular expression to search in responses.
+    proxy           (string)  Proxy URL.
+    exclude-code    (string)  Exclude responses with these status codes.
+    include-code    (string)  Only include responses with these status codes.
+    exclude-size    (string)  Exclude responses with these body-size ranges.
+    max-body-size   (int)     Maximum response size to display per request. Default: 4096.
 
 ## Few-Shot Examples
 
 Replace {NONCE} with the actual nonce from the response format section.
 
-### Example 1: Batch GET requests to multiple paths (URL mode)
+### Example 1: Test one GET parameter across multiple paths (preferred)
 
-User intent: "Check multiple paths on a website"
+User intent: "Probe several endpoints with the same id payload"
 
 ```json
 {
-  "@action": "call-tool",
-  "tool": "batch_do_http_request",
-  "identifier": "batch_path_check",
-  "params": {
-    "base-url": "https://example.com",
-        "paths": "/admin\n/login\n/api\n/backup\n/config",
-    "concurrent": 3,
-    "timeout": 10,
-    "exclude-code": "404"
-  }
+    "@action": "call-tool",
+    "tool": "batch_do_http_request",
+    "identifier": "batch_query_param_test",
+    "params": {
+        "base-url": "https://target.example.com",
+        "query-params": "id=1 or xxx",
+        "concurrent": 3,
+        "timeout": 10
+    }
 }
 ```
+<|TOOL_PARAM_paths_{NONCE}|>
+/admin.php
+/report.php
+/api/user.php
+<|TOOL_PARAM_paths_END_{NONCE}|>
 
-### Example 2: Batch POST requests with JSON body (URL mode, body via AITAG)
+### Example 2: Batch POST requests with JSON body
 
 User intent: "Test multiple API endpoints with the same POST body"
 
 ```json
 {
-  "@action": "call-tool",
-  "tool": "batch_do_http_request",
-  "identifier": "batch_api_test",
-  "params": {
-    "base-url": "https://api.example.com",
-    "method": "POST",
-    "content-type": "application/json",
-    "concurrent": 2,
-    "timeout": 15
-  }
+    "@action": "call-tool",
+    "tool": "batch_do_http_request",
+    "identifier": "batch_api_test",
+    "params": {
+        "base-url": "https://api.example.com",
+        "method": "POST",
+        "content-type": "application/json",
+        "concurrent": 2,
+        "timeout": 15
+    }
 }
 ```
 <|TOOL_PARAM_paths_{NONCE}|>
@@ -142,60 +153,20 @@ User intent: "Test multiple API endpoints with the same POST body"
 {"action": "test", "source": "batch_tool"}
 <|TOOL_PARAM_body_END_{NONCE}|>
 
-### Example 3: Using prefix for API versioning
+### Example 3: Batch raw packet requests with encoded paths (Packet mode)
 
-User intent: "Test API v2 endpoints with prefix"
-
-```json
-{
-  "@action": "call-tool",
-  "tool": "batch_do_http_request",
-  "identifier": "api_v2_check",
-  "params": {
-    "base-url": "https://api.example.com",
-    "prefix": "/v2/api/",
-        "paths": "users\nposts\ncomments\nsettings",
-    "concurrent": 5,
-    "timeout": 10
-  }
-}
-```
-
-### Example 4: Batch request with custom headers (via AITAG)
-User intent: "Batch request with custom headers"
+User intent: "Send crafted HTTP requests to multiple paths using a raw template"
 
 ```json
 {
-  "@action": "call-tool",
-  "tool": "batch_do_http_request",
-  "identifier": "batch_with_headers",
-  "params": {
-    "base-url": "https://api.example.com",
-        "paths": "/user/1\n/user/2\n/user/3",
-    "concurrent": 3,
-    "timeout": 10
-  }
-}
-```
-<|TOOL_PARAM_headers_{NONCE}|>
-Authorization: Bearer token123
-X-Custom-Header: value
-<|TOOL_PARAM_headers_END_{NONCE}|>
-
-### Example 5: Batch raw packet requests with path substitution ( Packet mode)
-
-User intent: "Send crafted HTTP requests to multiple paths using a template"
-
-```json
-{
-  "@action": "call-tool",
-  "tool": "batch_do_http_request",
-  "identifier": "batch_packet_test",
-  "params": {
-    "concurrent": 3,
-    "timeout": 10,
-    "keyword": "success"
-  }
+    "@action": "call-tool",
+    "tool": "batch_do_http_request",
+    "identifier": "batch_packet_test",
+    "params": {
+        "concurrent": 3,
+        "timeout": 10,
+        "keyword": "success"
+    }
 }
 ```
 <|TOOL_PARAM_packet_{NONCE}|>
@@ -207,83 +178,58 @@ Accept: */*
 
 <|TOOL_PARAM_packet_END_{NONCE}|>
 <|TOOL_PARAM_paths_{NONCE}|>
-/admin
+/admin.php?id=1%20or%20xxx
 /dashboard
 /settings
-/profile
 <|TOOL_PARAM_paths_END_{NONCE}|>
 
-### Example 6: Sequential requests with delay ( for rate-limited targets)
+### Example 4: Batch request with custom headers
+
+User intent: "Batch request with custom headers"
+
+```json
+{
+    "@action": "call-tool",
+    "tool": "batch_do_http_request",
+    "identifier": "batch_with_headers",
+    "params": {
+        "base-url": "https://api.example.com",
+        "concurrent": 3,
+        "timeout": 10
+    }
+}
+```
+<|TOOL_PARAM_paths_{NONCE}|>
+/user/1
+/user/2
+/user/3
+<|TOOL_PARAM_paths_END_{NONCE}|>
+<|TOOL_PARAM_headers_{NONCE}|>
+Authorization: Bearer token123
+X-Custom-Header: value
+<|TOOL_PARAM_headers_END_{NONCE}|>
+
+### Example 5: Sequential requests with delay
 
 User intent: "Slowly enumerate paths to avoid rate limiting"
 
 ```json
 {
-  "@action": "call-tool",
-  "tool": "batch_do_http_request",
-  "identifier": "slow_path_enum",
-  "params": {
-    "base-url": "https://api.example.com",
-        "paths": "/v1/a\n/v1/b\n/v1/c\n/v1/d\n/v1/e",
-    "delay-seconds": 0.5,
-    "timeout": 10
-  }
-}
-```
-
-### Example 7: Multiple targets with same paths (using full URLs in paths)
-
-User intent: "Check the same path across multiple domains"
-
-Note: When paths contain full URLs, base-url is not needed.
-
-```json
-{
-  "@action": "call-tool",
-  "tool": "batch_do_http_request",
-  "identifier": "multi_target_check",
-  "params": {
-    "method": "GET",
-    "concurrent": 5,
-    "timeout": 10
-  }
+    "@action": "call-tool",
+    "tool": "batch_do_http_request",
+    "identifier": "slow_path_enum",
+    "params": {
+        "base-url": "https://api.example.com",
+        "delay-seconds": 0.5,
+        "timeout": 10
+    }
 }
 ```
 <|TOOL_PARAM_paths_{NONCE}|>
-https://site1.com/admin
-https://site2.com/admin
-https://site3.com/admin
-http://site4.local/admin
-<|TOOL_PARAM_paths_END_{NONCE}|>
-
-### Example 8: Directory enumeration with filtering
-
-User intent: "Enumerate directories and filter out 404s and small responses"
-
-```json
-{
-  "@action": "call-tool",
-  "tool": "batch_do_http_request",
-  "identifier": "dir_enum_filtered",
-  "params": {
-    "base-url": "https://target.example.com",
-    "concurrent": 10,
-    "timeout": 8,
-    "exclude-code": "404",
-    "exclude-size": "0",
-    "keyword": "index"
-  }
-}
-```
-<|TOOL_PARAM_paths_{NONCE}|>
-/admin
-/backup
-/config
-/data
-/uploads
-/images
-/js
-/css
+/v1/a
+/v1/b
+/v1/c
+/v1/d
 <|TOOL_PARAM_paths_END_{NONCE}|>
 USAGE_BLOCK
 
@@ -292,17 +238,17 @@ yakit.AutoInitYakit()
 // --- parse parameters ---
 // URL mode params
 baseUrl = cli.String("base-url", cli.setHelp("base URL or domain for URL mode"), cli.setRequired(false))
-pathsStr = cli.String("paths", cli.setHelp("paths to test, one per line"), cli.setRequired(false))
+pathsStr = cli.String("paths", cli.setHelp("paths to test, one per line; in Packet mode any query string inside a path must already be encoded"), cli.setRequired(false))
 method = cli.String("method", cli.setHelp("HTTP method"), cli.setDefault("GET"))
 headers = cli.String("headers", cli.setHelp("custom headers, one per line: Key: Value"), cli.setRequired(false))
 body = cli.String("body", cli.setHelp("request body content"), cli.setRequired(false))
 contentType = cli.String("content-type", cli.setHelp("Content-Type header"), cli.setRequired(false))
-queryParams = cli.String("query-params", cli.setHelp("URL query params: k1=v1&k2=v2"), cli.setRequired(false))
+queryParams = cli.String("query-params", cli.setHelp("URL query params: k1=v1&k2=v2; preferred for testing GET params across many paths"), cli.setRequired(false))
 prefix = cli.String("prefix", cli.setHelp("path prefix to prepend to all paths, e.g. /v1/ or /api/v2/"), cli.setRequired(false))
 curlHeaders = cli.StringSlice("H", cli.setHelp("curl-style headers, can be used multiple times: -H 'Content-Type: application/json' -H 'Authorization: Bearer token'"), cli.setRequired(false))
 
 // Packet mode params
-packet = cli.String("packet", cli.setHelp("raw HTTP request template with {{PATH}} placeholder"), cli.setRequired(false))
+packet = cli.String("packet", cli.setHelp("raw HTTP request template with {{PATH}} placeholder; substituted path/query must already be encoded"), cli.setRequired(false))
 baseHost = cli.String("base-host", cli.setHelp("host header value for packet mode"), cli.setRequired(false))
 
 // Common params
