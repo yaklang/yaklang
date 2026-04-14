@@ -219,16 +219,25 @@ func serializeTaskParams(tasks []aitool.InvokeParams) []map[string]any {
 		if subtask.GetString("subtask_name") == "" {
 			continue
 		}
+		taskName := subtask.GetString("subtask_name")
 		item := map[string]any{
-			"subtask_name": subtask.GetString("subtask_name"),
+			"subtask_name": taskName,
 			"subtask_goal": subtask.GetString("subtask_goal"),
 			"depends_on":   subtask.GetStringSlice("depends_on"),
 		}
 		if identifier := subtask.GetString("subtask_identifier"); identifier != "" {
 			item["subtask_identifier"] = identifier
 		}
-		if subTasks := subtask.GetObjectArray("sub_subtasks"); len(subTasks) > 0 {
-			item["tasks"] = serializeTaskParams(subTasks)
+		subTasks := subtask.GetObjectArray("sub_subtasks")
+		if len(subTasks) > 0 {
+			log.Infof("plan serialize: task %q has %d sub_subtasks", taskName, len(subTasks))
+			item["sub_subtasks"] = serializeTaskParams(subTasks)
+		} else {
+			var keys []string
+			for k := range subtask {
+				keys = append(keys, k)
+			}
+			log.Infof("plan serialize: task %q has no sub_subtasks (available keys: %v)", taskName, keys)
 		}
 		result = append(result, item)
 	}

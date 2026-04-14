@@ -261,7 +261,8 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 }
 
 func (c *Coordinator) generateAITask(params aitool.InvokeParams) *AiTask {
-	task := c.generateAITaskWithName(params.GetAnyToString("subtask_name"), params.GetAnyToString("subtask_goal"))
+	taskName := params.GetAnyToString("subtask_name")
+	task := c.generateAITaskWithName(taskName, params.GetAnyToString("subtask_goal"))
 	if params.Has("depends_on") {
 		deps := params.GetStringSlice("depends_on")
 		if deps == nil {
@@ -272,7 +273,11 @@ func (c *Coordinator) generateAITask(params aitool.InvokeParams) *AiTask {
 	if identifier := params.GetAnyToString("subtask_identifier"); identifier != "" {
 		task.SemanticIdentifier = identifier
 	}
-	for _, subParams := range params.GetObjectArray("tasks") {
+	nestedTasks := params.GetObjectArray("sub_subtasks")
+	if len(nestedTasks) > 0 {
+		log.Infof("plan convert: task %q has %d nested subtasks from 'sub_subtasks' key", taskName, len(nestedTasks))
+	}
+	for _, subParams := range nestedTasks {
 		if subParams.GetAnyToString("subtask_name") == "" {
 			continue
 		}
