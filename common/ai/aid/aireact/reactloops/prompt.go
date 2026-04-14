@@ -240,7 +240,7 @@ func (r *ReActLoop) generateLoopPrompt(
 	}
 	observation := buildPromptObservation(r.loopName, nonce, prompt, sections)
 	r.SetLastPromptObservation(observation)
-	status := observation.BuildStatus(120)
+	status := observation.BuildStatus(1 * 1024)
 	r.SetLastPromptObservationStatus(status)
 	r.emitPromptObservationStatus(status)
 	if r.isDebugModeEnabled() {
