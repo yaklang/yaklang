@@ -33,6 +33,7 @@ var Exports = map[string]interface{}{
 	"onEvent":               WithOnEvent,
 	"onStream":              WithOnStream,
 	"onStreamEnd":           WithOnStreamEnd,
+	"onStreamContent":       WithOnStreamContent,
 	"onData":                WithOnData,
 	"onFinished":            WithOnFinished,
 	"onInputRequiredRaw":    WithOnInputRequiredRaw,
