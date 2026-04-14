@@ -3,19 +3,17 @@
 // 功能:
 // 1. 接受 JSON 配置中的 cases
 // 2. 使用 aim.InvokeReAct 执行 benchmark
-// 3. 在 aim.onEvent 中按事件类型 + 特征字符串判定 case 是否通过
+// 3. 在 aim.onEvent / aim.onStream 中按文本匹配判定 case 是否通过
 // 4. 将完整 JSON 报告和 Markdown 摘要落地到本地
 // =============================================================================
 
-configFile = cli.String("config", cli.setDefault(""), cli.setHelp("Benchmark 配置文件路径。支持根对象 { defaults, cases }，也支持根为 case JSON list"))
+configFile = cli.String("config", cli.setDefault(""), cli.setHelp("Benchmark 配置文件路径。支持根对象 { cases }，也支持根为 case JSON list"))
 outputDir = cli.String("output-dir", cli.setDefault("./benchmark-reports"), cli.setHelp("报告输出目录"))
 reportPrefix = cli.String("report-prefix", cli.setDefault("aim-benchmark"), cli.setHelp("报告文件名前缀"))
-runLabel = cli.String("run-label", cli.setDefault("default-config"), cli.setHelp("报告中用于标识当前默认 AI 配置的标签"))
 
-timeoutOverride = cli.Int("timeout", cli.setDefault(0), cli.setHelp("覆盖所有 case 的 timeout（秒）"))
-maxIterationOverride = cli.Int("max-iteration", cli.setDefault(0), cli.setHelp("覆盖所有 case 的 maxIteration"))
-focusOverride = cli.String("focus", cli.setDefault(""), cli.setHelp("覆盖所有 case 的 focus"))
-languageOverride = cli.String("language", cli.setDefault(""), cli.setHelp("覆盖所有 case 的 language"))
+timeoutSec = cli.Int("timeout", cli.setDefault(60*20), cli.setHelp("所有 case 的超时时间（秒）,默认20分钟"))
+maxIteration = cli.Int("max-iteration", cli.setDefault(12), cli.setHelp("所有 case 的最大迭代次数"))
+language = cli.String("language", cli.setDefault("zh"), cli.setHelp("所有 case 的语言"))
 
 varParams = cli.StringSlice("var", cli.setHelp("设置变量，格式: key=value，可多次使用，用于替换配置中的 {{key}} 占位符"))
 
@@ -39,28 +37,6 @@ func truncateText(raw, limit) {
         return text
     }
     return text[:limit] + "..."
-}
-
-func safeString(value) {
-    if isNil(value) {
-        return ""
-    }
-    return sprintf("%v", value)
-}
-
-func toStringSlice(value) {
-    result = []
-    if isNil(value) {
-        return result
-    }
-
-    for item in value {
-        itemStr = str.TrimSpace(sprintf("%v", item))
-        if itemStr != "" {
-            result = append(result, itemStr)
-        }
-    }
-    return result
 }
 
 func parseGlobalVars() {
@@ -94,145 +70,61 @@ func replaceVariables(text) {
     return result
 }
 
-func getMapValue(data, key) {
-    if isNil(data) {
-        return nil
+func toCleanString(value) {
+    if isNil(value) {
+        return ""
     }
-    return data[key]
+    return str.TrimSpace(sprintf("%v", value))
 }
 
-func getStringWithDefault(primary, fallback, defaultValue) {
-    if !isNil(primary) {
-        text = str.TrimSpace(sprintf("%v", primary))
-        if text != "" {
-            return text
-        }
-    }
-    if !isNil(fallback) {
-        text = str.TrimSpace(sprintf("%v", fallback))
-        if text != "" {
-            return text
-        }
-    }
-    return defaultValue
-}
-
-func getIntWithDefault(primary, fallback, defaultValue) {
-    if !isNil(primary) {
-        return int(primary)
-    }
-    if !isNil(fallback) {
-        return int(fallback)
-    }
-    return defaultValue
-}
-
-func getBoolWithDefault(primary, fallback, defaultValue) {
-    if !isNil(primary) {
-        return bool(primary)
-    }
-    if !isNil(fallback) {
-        return bool(fallback)
-    }
-    return defaultValue
-}
-
-func normalizePassConfig(defaultPassConfig, casePassConfig) {
-    containsAny = toStringSlice(nil)
-    containsAll = toStringSlice(nil)
-    eventTypes = toStringSlice(nil)
-    ignoreCase = true
-
-    defaultContainsAny = nil
-    defaultContainsAll = nil
-    defaultEventTypes = nil
-    defaultIgnoreCase = nil
-
-    if !isNil(defaultPassConfig) {
-        defaultContainsAny = defaultPassConfig["containsAny"]
-        if isNil(defaultContainsAny) {
-            defaultContainsAny = defaultPassConfig["featureStrings"]
-        }
-        if isNil(defaultContainsAny) {
-            defaultContainsAny = defaultPassConfig["featureString"]
-        }
-        defaultContainsAll = defaultPassConfig["containsAll"]
-        defaultEventTypes = defaultPassConfig["eventTypes"]
-        defaultIgnoreCase = defaultPassConfig["ignoreCase"]
-    }
-
-    caseContainsAny = nil
-    caseContainsAll = nil
-    caseEventTypes = nil
-    caseIgnoreCase = nil
-
-    if !isNil(casePassConfig) {
-        caseContainsAny = casePassConfig["containsAny"]
-        if isNil(caseContainsAny) {
-            caseContainsAny = casePassConfig["featureStrings"]
-        }
-        if isNil(caseContainsAny) {
-            caseContainsAny = casePassConfig["featureString"]
-        }
-        caseContainsAll = casePassConfig["containsAll"]
-        caseEventTypes = casePassConfig["eventTypes"]
-        caseIgnoreCase = casePassConfig["ignoreCase"]
-    }
-
-    containsAny = toStringSlice(!isNil(caseContainsAny) ? caseContainsAny : defaultContainsAny)
-    containsAll = toStringSlice(!isNil(caseContainsAll) ? caseContainsAll : defaultContainsAll)
-    eventTypes = toStringSlice(!isNil(caseEventTypes) ? caseEventTypes : defaultEventTypes)
-    ignoreCase = getBoolWithDefault(caseIgnoreCase, defaultIgnoreCase, true)
-
+func normalizePassConfig(casePassConfig) {
     return {
-        "containsAny": containsAny,
-        "containsAll": containsAll,
-        "eventTypes": eventTypes,
-        "ignoreCase": ignoreCase,
+        "eventMatch": toCleanString(casePassConfig["eventMatch"]),
+        "streamMatch": toCleanString(casePassConfig["streamMatch"]),
     }
 }
 
-func normalizeCase(caseConfig, defaults, index) {
+func normalizeCase(caseConfig, index) {
     if isNil(caseConfig) {
         die(sprintf("Invalid case at index %d: each case must be a JSON object", index))
     }
 
-    caseName = getStringWithDefault(caseConfig["name"], getMapValue(defaults, "name"), sprintf("case-%d", index + 1))
-    inputText = getStringWithDefault(caseConfig["input"], getMapValue(defaults, "input"), "")
+    caseName = toCleanString(caseConfig["name"])
+    if caseName == "" {
+        caseName = sprintf("case-%d", index + 1)
+    }
+
+    inputText = toCleanString(caseConfig["input"])
     if inputText == "" {
-        inputText = getStringWithDefault(caseConfig["initialInput"], getMapValue(defaults, "initialInput"), "")
+        inputText = toCleanString(caseConfig["initialInput"])
     }
     if inputText == "" {
-        inputText = getStringWithDefault(caseConfig["target"], getMapValue(defaults, "target"), "")
+        inputText = toCleanString(caseConfig["target"])
     }
     if inputText == "" {
-        inputText = getStringWithDefault(caseConfig["goal"], getMapValue(defaults, "goal"), "")
+        inputText = toCleanString(caseConfig["goal"])
     }
     if inputText == "" {
-        inputText = getStringWithDefault(caseConfig["prompt"], getMapValue(defaults, "prompt"), "")
+        inputText = toCleanString(caseConfig["prompt"])
     }
     if inputText == "" {
-        inputText = getStringWithDefault(caseConfig["taskPrompt"], getMapValue(defaults, "taskPrompt"), "")
+        inputText = toCleanString(caseConfig["taskPrompt"])
     }
     if inputText == "" {
         die(sprintf("Case %s is missing input/prompt/taskPrompt", caseName))
     }
 
-    passConfig = normalizePassConfig(getMapValue(defaults, "pass"), caseConfig["pass"])
-    if len(passConfig["containsAny"]) == 0 && len(passConfig["containsAll"]) == 0 {
-        die(sprintf("Case %s must define pass.containsAny or pass.containsAll", caseName))
+    passConfig = normalizePassConfig(caseConfig["pass"])
+    hasEventPass = passConfig["eventMatch"] != ""
+    hasStreamPass = passConfig["streamMatch"] != ""
+    if !hasEventPass && !hasStreamPass {
+        die(sprintf("Case %s must define pass.eventMatch or pass.streamMatch", caseName))
     }
 
     return {
         "name": caseName,
-        "description": getStringWithDefault(caseConfig["description"], getMapValue(defaults, "description"), ""),
+        "description": toCleanString(caseConfig["description"]),
         "input": inputText,
-        "focus": getStringWithDefault(caseConfig["focus"], getMapValue(defaults, "focus"), ""),
-        "timeout": getIntWithDefault(caseConfig["timeout"], getMapValue(defaults, "timeout"), 300),
-        "maxIteration": getIntWithDefault(caseConfig["maxIteration"], getMapValue(defaults, "maxIteration"), 12),
-        "language": getStringWithDefault(caseConfig["language"], getMapValue(defaults, "language"), "zh"),
-        "yoloMode": getBoolWithDefault(caseConfig["yoloMode"], getMapValue(defaults, "yoloMode"), true),
-        "allowUserInteract": getBoolWithDefault(caseConfig["allowUserInteract"], getMapValue(defaults, "allowUserInteract"), false),
         "pass": passConfig,
     }
 }
@@ -251,23 +143,7 @@ func loadConfiguration() {
         content = replaceVariables(content)
     }
 
-    rawConfig = json.loads(content)
-    if isNil(rawConfig) {
-        die("Failed to parse config JSON")
-    }
-
-    defaults = {}
-    rawCases = rawConfig["cases"]
-    defaults = getMapValue(rawConfig, "defaults")
-    if isNil(rawCases) {
-        rawCases = rawConfig["testConfigs"]
-    }
-    if isNil(rawCases) {
-        rawCases = rawConfig
-    }
-    if !isNil(rawConfig["aiConfigs"]) {
-        log.warn("Config field aiConfigs is ignored. This runner uses the default aim config.")
-    }
+    rawCases = json.loads(content)
 
     if isNil(rawCases) || len(rawCases) == 0 {
         die("No cases found in config. Please provide cases or a root JSON list.")
@@ -276,93 +152,27 @@ func loadConfiguration() {
     normalizedCases = []
     idx := 0
     for caseConfig in rawCases {
-        normalizedCases = append(normalizedCases, normalizeCase(caseConfig, defaults, idx))
+        normalizedCases = append(normalizedCases, normalizeCase(caseConfig, idx))
         idx++
-    }
-
-    if timeoutOverride > 0 || maxIterationOverride > 0 || focusOverride != "" || languageOverride != "" {
-        for idx, item in normalizedCases {
-            if timeoutOverride > 0 {
-                normalizedCases[idx]["timeout"] = timeoutOverride
-            }
-            if maxIterationOverride > 0 {
-                normalizedCases[idx]["maxIteration"] = maxIterationOverride
-            }
-            if focusOverride != "" {
-                normalizedCases[idx]["focus"] = focusOverride
-            }
-            if languageOverride != "" {
-                normalizedCases[idx]["language"] = languageOverride
-            }
-        }
     }
 
     return normalizedCases
 }
 
-func eventTypeMatched(expectEventTypes, currentEventType) {
-    if len(expectEventTypes) == 0 {
-        return true
+func matchEvent(passConfig, contentText) {
+    token = passConfig["eventMatch"]
+    if token == "" {
+        return false
     }
-
-    for expectType in expectEventTypes {
-        if expectType == "*" || expectType == currentEventType {
-            return true
-        }
-    }
-    return false
+    return str.Contains(contentText, token)
 }
 
-func matchEvent(passConfig, eventType, contentText) {
-    if !eventTypeMatched(passConfig["eventTypes"], eventType) {
-        return false, {}
+func matchStream(passConfig, contentText) {
+    token = passConfig["streamMatch"]
+    if token == "" {
+        return false
     }
-
-    textForMatch = contentText
-    containsAny = passConfig["containsAny"]
-    containsAll = passConfig["containsAll"]
-    matchedAny = []
-    matchedAll = []
-
-    if passConfig["ignoreCase"] {
-        textForMatch = str.ToLower(contentText)
-    }
-
-    if len(containsAny) > 0 {
-        anyMatched = false
-        for token in containsAny {
-            tokenForMatch = token
-            if passConfig["ignoreCase"] {
-                tokenForMatch = str.ToLower(token)
-            }
-            if str.Contains(textForMatch, tokenForMatch) {
-                anyMatched = true
-                matchedAny = append(matchedAny, token)
-            }
-        }
-        if !anyMatched {
-            return false, {}
-        }
-    }
-
-    if len(containsAll) > 0 {
-        for token in containsAll {
-            tokenForMatch = token
-            if passConfig["ignoreCase"] {
-                tokenForMatch = str.ToLower(token)
-            }
-            if !str.Contains(textForMatch, tokenForMatch) {
-                return false, {}
-            }
-            matchedAll = append(matchedAll, token)
-        }
-    }
-
-    return true, {
-        "eventType": eventType,
-        "matchedAny": matchedAny,
-        "matchedAll": matchedAll,
-    }
+    return str.Contains(contentText, token)
 }
 
 func appendRecentEvent(result, eventInfo) {
@@ -375,21 +185,19 @@ func appendRecentEvent(result, eventInfo) {
 }
 
 func runSingleCase(caseConfig) {
-    runID = sprintf("%s-%s-%d", runLabel, caseConfig["name"], time.Now().UnixNano())
+    runID = sprintf("%s-%d", caseConfig["name"], time.Now().UnixNano())
     startAt = time.Now()
 
     result = {
         "runId": runID,
-        "runLabel": runLabel,
         "caseName": caseConfig["name"],
         "caseDescription": caseConfig["description"],
         "input": caseConfig["input"],
-        "focus": caseConfig["focus"],
-        "timeout": caseConfig["timeout"],
-        "maxIteration": caseConfig["maxIteration"],
-        "language": caseConfig["language"],
-        "yoloMode": caseConfig["yoloMode"],
-        "allowUserInteract": caseConfig["allowUserInteract"],
+        "timeout": timeoutSec,
+        "maxIteration": maxIteration,
+        "language": language,
+        "yoloMode": true,
+        "allowUserInteract": false,
         "passConfig": caseConfig["pass"],
         "success": false,
         "conditionMatched": false,
@@ -398,6 +206,8 @@ func runSingleCase(caseConfig) {
         "eventCount": 0,
         "matchedEventCount": 0,
         "matchedEvents": [],
+        "matchedStreamCount": 0,
+        "matchedStreams": [],
         "recentEvents": [],
         "startTime": startAt.Format("2006-01-02 15:04:05"),
         "startUnix": startAt.Unix(),
@@ -408,20 +218,36 @@ func runSingleCase(caseConfig) {
 
     opts = []
     opts = append(opts, aim.sessionID(str.RandStr(12)))
-    opts = append(opts, aim.timeout(caseConfig["timeout"]))
-    opts = append(opts, aim.maxIteration(caseConfig["maxIteration"]))
+    opts = append(opts, aim.timeout(timeoutSec))
+    opts = append(opts, aim.maxIteration(maxIteration))
 
-    if caseConfig["focus"] != "" {
-        opts = append(opts, aim.focus(caseConfig["focus"]))
+    if language != "" {
+        opts = append(opts, aim.language(language))
     }
-    if caseConfig["language"] != "" {
-        opts = append(opts, aim.language(caseConfig["language"]))
-    }
-    if caseConfig["yoloMode"] {
-        opts = append(opts, aim.yoloMode())
-    }
+    opts = append(opts, aim.yoloMode())
+    opts = append(opts, aim.allowUserInteract(false))
 
-    opts = append(opts, aim.allowUserInteract(caseConfig["allowUserInteract"]))
+    opts = append(opts, aim.onStreamContent(func(react, event, nodeId, data) {
+        if len(data) == 0 {
+            return
+        }
+
+        contentText = string(data)
+        if result["matchedStreamCount"] > 0 {
+            return
+        }
+
+        matched = matchStream(caseConfig["pass"], contentText)
+        if matched {
+            result["conditionMatched"] = true
+            result["matchedStreamCount"]++
+            matchedRecord = {
+                "contentPreview": truncateText(contentText, 600),
+            }
+            result["matchedStreams"] = append(result["matchedStreams"], matchedRecord)
+            log.info("Matched case=%s stream", caseConfig["name"])
+        }
+    }))
 
     opts = append(opts, aim.onEvent(func(react, event) {
         eventType = string(event.Type)
@@ -436,7 +262,7 @@ func runSingleCase(caseConfig) {
         }
         appendRecentEvent(result, eventInfo)
 
-        matched, matchedInfo = matchEvent(caseConfig["pass"], eventType, contentText)
+        matched = matchEvent(caseConfig["pass"], contentText)
         if matched {
             result["conditionMatched"] = true
             result["matchedEventCount"]++
@@ -444,16 +270,14 @@ func runSingleCase(caseConfig) {
                 "index": result["eventCount"],
                 "type": eventType,
                 "contentPreview": truncateText(contentText, 600),
-                "matchedAny": matchedInfo["matchedAny"],
-                "matchedAll": matchedInfo["matchedAll"],
             }
             result["matchedEvents"] = append(result["matchedEvents"], matchedRecord)
-            log.info("Matched case=%s run=%s event=%s", caseConfig["name"], runLabel, eventType)
+            log.info("Matched case=%s event=%s", caseConfig["name"], eventType)
         }
     }))
 
-    log.info("Running case=%s run=%s", caseConfig["name"], runLabel)
-    log.info("  focus=%s timeout=%d maxIteration=%d", caseConfig["focus"], caseConfig["timeout"], caseConfig["maxIteration"])
+    log.info("Running case=%s", caseConfig["name"])
+    log.info("  timeout=%d maxIteration=%d", timeoutSec, maxIteration)
 
     err = aim.InvokeReAct(caseConfig["input"], opts...)
     if err != nil {
@@ -468,9 +292,8 @@ func runSingleCase(caseConfig) {
     result["durationSec"] = endAt.Unix() - startAt.Unix()
     result["passed"] = result["success"] && result["conditionMatched"]
 
-    log.info("Completed case=%s run=%s success=%v matched=%v passed=%v events=%d",
+    log.info("Completed case=%s success=%v matched=%v passed=%v events=%d",
         caseConfig["name"],
-        runLabel,
         result["success"],
         result["conditionMatched"],
         result["passed"],
@@ -491,7 +314,6 @@ func buildSummary(results) {
     passCount = 0
     totalDuration = 0
 
-    modelSummaryMap = {}
     caseSummaryMap = {}
 
     for result in results {
@@ -505,27 +327,6 @@ func buildSummary(results) {
             passCount++
         }
         totalDuration += result["durationSec"]
-
-        modelKey = result["runLabel"]
-        if isNil(modelSummaryMap[modelKey]) {
-            modelSummaryMap[modelKey] = {
-                "runLabel": result["runLabel"],
-                "totalRuns": 0,
-                "successCount": 0,
-                "conditionMatchedCount": 0,
-                "passCount": 0,
-            }
-        }
-        modelSummaryMap[modelKey]["totalRuns"]++
-        if result["success"] {
-            modelSummaryMap[modelKey]["successCount"]++
-        }
-        if result["conditionMatched"] {
-            modelSummaryMap[modelKey]["conditionMatchedCount"]++
-        }
-        if result["passed"] {
-            modelSummaryMap[modelKey]["passCount"]++
-        }
 
         caseKey = result["caseName"]
         if isNil(caseSummaryMap[caseKey]) {
@@ -547,18 +348,6 @@ func buildSummary(results) {
         if result["passed"] {
             caseSummaryMap[caseKey]["passCount"]++
         }
-    }
-
-    modelSummary = []
-    for _, item in modelSummaryMap {
-        if item["totalRuns"] > 0 {
-            item["passRate"] = float(item["passCount"]) / float(item["totalRuns"]) * 100
-            item["successRate"] = float(item["successCount"]) / float(item["totalRuns"]) * 100
-        } else {
-            item["passRate"] = 0.0
-            item["successRate"] = 0.0
-        }
-        modelSummary = append(modelSummary, item)
     }
 
     caseSummary = []
@@ -597,7 +386,6 @@ func buildSummary(results) {
         "successRate": successRate,
         "conditionMatchedRate": conditionMatchedRate,
         "passRate": passRate,
-        "runs": modelSummary,
         "cases": caseSummary,
     }
 }
@@ -616,7 +404,6 @@ func saveReports(cases, results) {
         "reportType": "aim-event-benchmark",
         "generatedAt": time.Now().Format("2006-01-02 15:04:05"),
         "configFile": configFile,
-        "runLabel": runLabel,
         "summary": buildSummary(results),
         "cases": cases,
         "results": results,
@@ -640,34 +427,20 @@ func saveReports(cases, results) {
     markdown += sprintf("- Avg Duration: %.1fs\n\n", summary["avgDurationSec"])
 
     markdown += "## Results\n\n"
-    markdown += "| Case | Run Label | Success | Matched | Passed | Events | Matched Events | Duration(s) | Error |\n"
-    markdown += "| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n"
+    markdown += "| Case | Success | Matched | Passed | Events | Match Hits | Duration(s) | Error |\n"
+    markdown += "| --- | --- | --- | --- | --- | --- | --- | --- |\n"
     for result in results {
         errorText = str.ReplaceAll(truncateText(result["error"], 80), "|", "/")
-        markdown += sprintf("| %s | %s | %v | %v | %v | %d | %d | %d | %s |\n",
+        matchHits = result["matchedEventCount"] + result["matchedStreamCount"]
+        markdown += sprintf("| %s | %v | %v | %v | %d | %d | %d | %s |\n",
             str.ReplaceAll(result["caseName"], "|", "/"),
-            str.ReplaceAll(result["runLabel"], "|", "/"),
             result["success"],
             result["conditionMatched"],
             result["passed"],
             result["eventCount"],
-            result["matchedEventCount"],
+            matchHits,
             result["durationSec"],
             errorText,
-        )
-    }
-
-    markdown += "\n## Run Summary\n\n"
-    markdown += "| Run Label | Total | Success | Matched | Passed | Pass Rate |\n"
-    markdown += "| --- | --- | --- | --- | --- | --- |\n"
-    for item in summary["runs"] {
-        markdown += sprintf("| %s | %d | %d | %d | %d | %.1f%% |\n",
-            str.ReplaceAll(item["runLabel"], "|", "/"),
-            item["totalRuns"],
-            item["successCount"],
-            item["conditionMatchedCount"],
-            item["passCount"],
-            item["passRate"],
         )
     }
 
@@ -710,7 +483,7 @@ parseGlobalVars()
 cases = loadConfiguration()
 
 log.info("Loaded %d cases", len(cases))
-log.info("Using default aim config with run-label=%s", runLabel)
+log.info("Using default aim config")
 
 results = []
 totalRuns = len(cases)
