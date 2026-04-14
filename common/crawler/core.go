@@ -588,20 +588,15 @@ func (c *Crawler) handleReqResult(r *Req) {
 		}),
 		WithFetcher_HtmlTag(func(s string, node *html.Node) {
 			if s == "script" {
-				// skip js
 				return
 			}
 
-			// form
-			if s == "form" {
-				return
-			}
-
-			// meta
-			// [href] / [src]
 			for _, attr := range node.Attr {
 				switch strings.ToLower(attr.Key) {
-				case "href", "src":
+				case "href", "src", "action":
+					if attr.Val == "" {
+						continue
+					}
 					reqHttps, reqBytes, err := NewHTTPRequest(r.IsHttps(), r.requestRaw, r.responseBody, attr.Val)
 					if err != nil {
 						log.Errorf("new request error: %s", err.Error())

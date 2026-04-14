@@ -8,31 +8,44 @@ Simple Crawler Tool - Parameter Description for JSON Tool Calls
 This crawler is tuned to get results quickly: it minimizes retries and can
 automatically fall back to HTTP when an HTTPS start URL yields no crawl results.
 
+IMPORTANT: The default settings are optimized for broad coverage. If the target
+site has many pages/endpoints (e.g., 50+), do NOT set reqs-max too low.
+A value of 100 will likely miss most endpoints on a large site.
+
 Required Parameters:
   urls            (string)  Start URL(s) for crawling. Multiple URLs can be provided
                             using comma-separated format.
 
 Optional Parameters:
   reqs-max        (int)     Maximum number of outbound HTTP requests allowed.
-                            If not set, crawler uses internal default behavior.
-    max-retry       (int)     Maximum retry count per request. Default: 1.
+                            Default: 1200. Do NOT set below 500 for sites with
+                            many endpoints, or most pages will be missed.
+  max-retry       (int)     Maximum retry count per request. Default: 3.
   forbid-for-parent-path (string)  Whether to forbid crawling parent paths.
-                            Accepted values: "yes"/"no".
+                            Accepted values: "yes"/"no". Default: "no".
+                            Tip: Keep default "no" for better coverage. Only set
+                            "yes" when crawling a specific subdirectory.
   user-agent      (string)  Custom User-Agent header for crawler requests.
   urls-max        (int)     Maximum number of unique URLs to visit.
-  max-depth       (int)     Crawl depth limit from the start URL. Default: 2.
+  max-depth       (int)     Crawl depth limit from the start URL. Default: 5.
   timeout         (int)     Per-request timeout in seconds. Default: 10.
-    https-fallback  (bool)    Whether to retry with HTTP when an HTTPS crawl yields no results. Default: true.
+  https-fallback  (bool)    Whether to retry with HTTP when an HTTPS crawl yields
+                            no results. Default: true.
+
+Scenario Guidance:
+  - Standard web app scan: use defaults (max-depth=5, reqs-max=1200)
+  - Quick surface check:   set reqs-max=300, max-depth=2
+  - Single directory only: set forbid-for-parent-path=yes
 USAGE_BLOCK
 
 startUrl := cli.String("urls", cli.setHelp("开始简单爬虫的起始页面"), cli.setRequired(true))
 // startUrl = "https://www.example.com,http://127.0.0.1:8787"
-reqsLimit := cli.Int("reqs-max", cli.setHelp("最多对外发送多少请求？"))
-maxRetry := cli.Int("max-retry", cli.setHelp("单个请求最多重试多少次？"), cli.setDefault(1))
+reqsLimit := cli.Int("reqs-max", cli.setHelp("最多对外发送多少请求？"), cli.setDefault(1200))
+maxRetry := cli.Int("max-retry", cli.setHelp("单个请求最多重试多少次？"), cli.setDefault(3))
 noParent := cli.String("forbid-for-parent-path", cli.setHelp("禁止访问夫目录，使用[yes/no]来控制"))
 ua = cli.String("user-agent", cli.setHelp("手动设置User-Agent"))
 maxUrls = cli.Int("urls-max", cli.setHelp("最多访问多少URL？"))
-maxDepth := cli.Int("max-depth", cli.setHelp("爬虫访问逻辑深度"), cli.setDefault(2))
+maxDepth := cli.Int("max-depth", cli.setHelp("爬虫访问逻辑深度"), cli.setDefault(5))
 timeoutSecond := cli.Int("timeout", cli.setHelp("设置超时秒数(单次请求的秒数)"), cli.setDefault(10))
 httpsFallback := cli.Bool("https-fallback", cli.setHelp("HTTPS 失败时是否自动切回 HTTP"), cli.setDefault(true))
 cli.check()
@@ -87,27 +100,14 @@ for currentStartUrl in targetCandidates {
         totalResults++
         urlstr := result.Url()
         req, _ := http.dump(result.Request())
-        reqfile = ""
-        try {
-            reqfile = file.TempFileName("crawler-req-*.txt")~
-            file.Save(reqfile, string(req))
-        } catch {}
+        method := poc.GetHTTPRequestMethod(req)
         var rspdesc = ""
-        var rspfile = ""
         try {
             rsp, _ := http.dump(result.Response()[0])
             rspdesc = str.Join(poc.GetHTTPPacketFirstLine(rsp), " ")
-            rspfile = file.TempFileName("crawler-req-*.txt")~
-            file.Save(rspfile, string(rsp))
         } catch {}
 
-        line := "[%v] [%v]: %v%v%v" % [
-            poc.GetHTTPRequestMethod(req),
-            rspdesc != "" ? (" " + rspdesc) : "",
-            urlstr,
-            reqfile != "" ? (" req in " + reqfile + " ") : "",
-            rspfile != "" ? (" rsp in " + rspfile + " ") : "",
-        ]
+        line := "[%v] [%v]: %v" % [method, rspdesc, urlstr]
         buf.WriteString(line)
         buf.WriteString("\n")
         yakit.Output(line)

@@ -89,6 +89,10 @@ type PlanResponse struct {
 	// Evidence is a read-only field populated during plan execution.
 	// It contains runtime discoveries accumulated from verification and output_evidence.
 	Evidence string `json:"evidence,omitempty"`
+	// Document is the guidance document generated at the end of the planning loop,
+	// organized using cybernetics & scientific methodology frameworks.
+	// It serves as the foundational reference for all subtask execution.
+	Document string `json:"document,omitempty"`
 }
 
 func (p *PlanResponse) recursiveMergeSubtask(subtask *AiTask, callback func(i *AiTask) error, stopped *utils.AtomicBool) {
@@ -148,6 +152,7 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 
 	var rootTask = pr.cod.generateAITaskWithName("root-default", "root-default")
 	var planFacts string
+	var planDocument string
 
 	planTask := aicommon.NewStatefulTaskBase(
 		"plan-task",
@@ -166,69 +171,68 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 	err := pr.cod.ExecuteLoopTask(
 		schema.AI_REACT_LOOP_NAME_PLAN,
 		planTask,
-		reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, _ *reactloops.OnPostIterationOperator) {
+		reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, operator *reactloops.OnPostIterationOperator) {
 			if isDone {
-				planData := loop.Get(loop_plan.PLAN_DATA_KEY)
+				operator.DeferAfterCallbacks(func() {
+					planData := loop.Get(loop_plan.PLAN_DATA_KEY)
 
-				if planData == "" {
-					log.Warnf("plan loop finished without producing plan data (iteration=%d), attempting fallback plan generation", iteration)
-					fallbackPlan := pr.generateFallbackPlan(loop)
-					if fallbackPlan != "" {
-						planData = fallbackPlan
-						loop.Set(loop_plan.PLAN_DATA_KEY, planData)
-					} else {
-						log.Errorf("fallback plan generation also failed, plan will be incomplete")
+					if planData == "" {
+						log.Errorf("plan loop finished without producing plan data (iteration=%d), plan will be incomplete", iteration)
 						return
 					}
-				}
 
-				action, err := aicommon.ExtractAction(planData, "plan", "plan")
-				if err != nil {
-					log.Errorf("extract action from plan data failed: %v", err)
-					return
-				}
-				rootTask = pr.cod.generateAITaskWithName(action.GetAnyToString("main_task"), action.GetAnyToString("main_task_goal"))
-
-				if identifier := action.GetAnyToString("main_task_identifier"); identifier != "" {
-					sanitized := aicommon.SanitizeTaskName(identifier)
-					if sanitized != "" {
-						rootTask.SetSemanticIdentifier(sanitized)
+					action, err := aicommon.ExtractAction(planData, "plan", "plan")
+					if err != nil {
+						log.Errorf("extract action from plan data failed: %v", err)
+						return
 					}
-				}
+					rootTask = pr.cod.generateAITaskWithName(action.GetAnyToString("main_task"), action.GetAnyToString("main_task_goal"))
 
-				if !strings.Contains(rootTask.GetUserInput(), pr.rawInput) {
-					nonce := utils.RandStringBytes(4)
-					taskInput := rootTask.GetUserInput()
-					i := utils.MustRenderTemplate(`
+					if identifier := action.GetAnyToString("main_task_identifier"); identifier != "" {
+						sanitized := aicommon.SanitizeTaskName(identifier)
+						if sanitized != "" {
+							rootTask.SetSemanticIdentifier(sanitized)
+						}
+					}
+
+					if !strings.Contains(rootTask.GetUserInput(), pr.rawInput) {
+						nonce := utils.RandStringBytes(4)
+						taskInput := rootTask.GetUserInput()
+						i := utils.MustRenderTemplate(`
 <|用户原始需求_{{.nonce}}|>
 {{ .RawUserInput }}
 <|用户原始需求_END_{{.nonce}}|>
 --- 
 {{ .Origin }}
 `,
-						map[string]any{
-							"nonce":        nonce,
-							"RawUserInput": pr.rawInput,
-							"Origin":       taskInput,
-						})
-					rootTask.SetUserInput(i)
-				}
-
-				for _, subtask := range action.GetInvokeParamsArray("tasks") {
-					if subtask.GetAnyToString("subtask_name") == "" {
-						continue
+							map[string]any{
+								"nonce":        nonce,
+								"RawUserInput": pr.rawInput,
+								"Origin":       taskInput,
+							})
+						rootTask.SetUserInput(i)
 					}
-					rootTask.Subtasks = append(rootTask.Subtasks, pr.cod.generateAITask(subtask))
-				}
-				if rootTask.Name == "" {
-					log.Errorf("plan action missing main_task")
-				}
 
-				// Collect facts accumulated via output_facts action during planning
-				if facts := loop.Get(loop_plan.PLAN_FACTS_KEY); facts != "" {
-					planFacts = facts
-					pr.cod.ContextProvider.SetPersistentData("plan_facts", facts)
-				}
+					for _, subtask := range action.GetInvokeParamsArray("tasks") {
+						if subtask.GetAnyToString("subtask_name") == "" {
+							continue
+						}
+						rootTask.Subtasks = append(rootTask.Subtasks, pr.cod.generateAITask(subtask))
+					}
+					if rootTask.Name == "" {
+						log.Errorf("plan action missing main_task")
+					}
+
+					if facts := loop.Get(loop_plan.PLAN_FACTS_KEY); facts != "" {
+						planFacts = facts
+						pr.cod.ContextProvider.SetPersistentData(planFactsPersistentKey, facts)
+					}
+
+					if doc := loop.Get(loop_plan.PLAN_DOCUMENT_KEY); doc != "" {
+						planDocument = doc
+						pr.cod.ContextProvider.SetPersistentData(planDocumentPersistentKey, doc)
+					}
+				})
 			}
 		}))
 	if err != nil {
@@ -239,52 +243,21 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 	if planFacts != "" && rootTask.Coordinator != nil && rootTask.Coordinator.ContextProvider != nil {
 		rootTask.Coordinator.ContextProvider.SetPersistentData(planFactsPersistentKey, planFacts)
 	}
+	if planDocument != "" && rootTask.Coordinator != nil && rootTask.Coordinator.ContextProvider != nil {
+		rootTask.Coordinator.ContextProvider.SetPersistentData(planDocumentPersistentKey, planDocument)
+	}
 
-	// Inject PLAN context docs as prefix blocks in the root task's user input so
-	// every subtask can see them through the parent-task chain in GetUserInput().
-	if planFacts != "" {
+	// Inject PLAN context docs (FACTS + DOCUMENT + EVIDENCE) as prefix blocks
+	// in the root task's user input so every subtask can see them.
+	if planFacts != "" || planDocument != "" {
 		syncRootTaskPlanContextDocs(rootTask)
 	}
 
 	resp := pr.cod.newPlanResponse(rootTask)
 	resp.Facts = planFacts
+	resp.Document = planDocument
 	resp.Evidence = getTaskPlanEvidence(rootTask)
 	return resp, nil
-}
-
-func (pr *planRequest) generateFallbackPlan(loop *reactloops.ReActLoop) string {
-	enhance := loop.Get(loop_plan.PLAN_ENHANCE_KEY)
-	prompt := fmt.Sprintf(`You must generate a task plan based on the user's original request. 
-Reply with ONLY valid JSON in this exact format:
-{"@action":"plan","main_task":"<task name>","main_task_goal":"<goal>","tasks":[{"subtask_name":"<name>","subtask_goal":"<goal>","depends_on":[]}]}
-
-User request: %s`, pr.rawInput)
-	if enhance != "" {
-		prompt += fmt.Sprintf("\n\nAdditional context gathered:\n%s", enhance)
-	}
-
-	aiCallback := pr.cod.SpeedPriorityAICallback
-	if aiCallback == nil {
-		aiCallback = pr.cod.OriginalAICallback
-	}
-	if aiCallback == nil {
-		log.Errorf("no AI callback available for fallback plan generation")
-		return ""
-	}
-
-	forgeResult, err := pr.cod.InvokeLiteForge(prompt)
-	if err != nil {
-		log.Errorf("fallback plan LiteForge invocation failed: %v", err)
-		return ""
-	}
-	if forgeResult == nil || forgeResult.Action == nil {
-		log.Errorf("fallback plan LiteForge returned nil result")
-		return ""
-	}
-
-	result := string(utils.Jsonify(forgeResult.Action.GetParams()))
-	log.Infof("fallback plan generated successfully via LiteForge")
-	return result
 }
 
 func (c *Coordinator) generateAITask(params aitool.InvokeParams) *AiTask {
@@ -298,6 +271,14 @@ func (c *Coordinator) generateAITask(params aitool.InvokeParams) *AiTask {
 	}
 	if identifier := params.GetAnyToString("subtask_identifier"); identifier != "" {
 		task.SemanticIdentifier = identifier
+	}
+	for _, subParams := range params.GetObjectArray("tasks") {
+		if subParams.GetAnyToString("subtask_name") == "" {
+			continue
+		}
+		subTask := c.generateAITask(subParams)
+		subTask.ParentTask = task
+		task.Subtasks = append(task.Subtasks, subTask)
 	}
 	return task
 }

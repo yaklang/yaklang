@@ -17,12 +17,14 @@ import (
 const (
 	planFactsPersistentKey    = "plan_facts"
 	planEvidencePersistentKey = "plan_evidence"
+	planDocumentPersistentKey = "plan_document"
 	planEvidenceTokenBudget   = 15000
 )
 
 var (
 	planFactsAITags    = []string{"FACTS", "PLAN_FACTS"}
 	planEvidenceAITags = []string{"EVIDENCE", "PLAN_EVIDENCE"}
+	planDocumentAITags = []string{"DOCUMENT", "PLAN_DOCUMENT"}
 	planContextGapRE   = regexp.MustCompile(`\n{3,}`)
 )
 
@@ -41,6 +43,10 @@ func buildEvidenceBlock(evidence string) string {
 	return buildPlanContextBlock("EVIDENCE", evidence)
 }
 
+func buildDocumentBlock(document string) string {
+	return buildPlanContextBlock("DOCUMENT", document)
+}
+
 func buildPlanContextBlock(tag string, content string) string {
 	content = strings.TrimSpace(content)
 	if content == "" {
@@ -51,18 +57,22 @@ func buildPlanContextBlock(tag string, content string) string {
 }
 
 func prependPlanFactsToRenderedPlan(base string, facts string) string {
-	return prependPlanContextDocsToRenderedPlan(base, facts, "")
+	return prependPlanContextDocsToRenderedPlan(base, facts, "", "")
 }
 
-func prependPlanContextDocsToRenderedPlan(base string, facts string, evidence string) string {
+func prependPlanContextDocsToRenderedPlan(base string, facts string, document string, evidence string) string {
 	facts = strings.TrimSpace(facts)
+	document = strings.TrimSpace(document)
 	evidence = strings.TrimSpace(evidence)
-	if facts == "" && evidence == "" {
+	if facts == "" && document == "" && evidence == "" {
 		return base
 	}
-	blocks := make([]string, 0, 2)
+	blocks := make([]string, 0, 3)
 	if facts != "" {
 		blocks = append(blocks, buildFactsBlock(facts))
+	}
+	if document != "" {
+		blocks = append(blocks, buildDocumentBlock(document))
 	}
 	if evidence != "" {
 		blocks = append(blocks, buildEvidenceBlock(evidence))
@@ -80,6 +90,10 @@ func extractPlanFactsFromText(content string) string {
 
 func extractPlanEvidenceFromText(content string) string {
 	return extractPlanContextFromText(content, planEvidenceAITags...)
+}
+
+func extractPlanDocumentFromText(content string) string {
+	return extractPlanContextFromText(content, planDocumentAITags...)
 }
 
 func extractPlanContextFromText(content string, tagNames ...string) string {
@@ -121,7 +135,11 @@ func extractPlanContextFromText(content string, tagNames ...string) string {
 
 func stripPlanContextBlocks(content string) string {
 	content = strings.TrimSpace(content)
-	blocks := discoverAITagBlocks(content, append(planFactsAITags, planEvidenceAITags...)...)
+	allTags := make([]string, 0, len(planFactsAITags)+len(planDocumentAITags)+len(planEvidenceAITags))
+	allTags = append(allTags, planFactsAITags...)
+	allTags = append(allTags, planDocumentAITags...)
+	allTags = append(allTags, planEvidenceAITags...)
+	blocks := discoverAITagBlocks(content, allTags...)
 	if len(blocks) == 0 {
 		return content
 	}
@@ -222,6 +240,10 @@ func getTaskPlanFacts(task *AiTask) string {
 
 func getTaskPlanEvidence(task *AiTask) string {
 	return getTaskPlanPersistentMarkdown(task, planEvidencePersistentKey, extractPlanEvidenceFromText)
+}
+
+func getTaskPlanDocument(task *AiTask) string {
+	return getTaskPlanPersistentMarkdown(task, planDocumentPersistentKey, extractPlanDocumentFromText)
 }
 
 func getTaskPlanPersistentMarkdown(task *AiTask, key string, extractor func(string) string) string {
@@ -383,5 +405,5 @@ func syncRootTaskPlanContextDocs(task *AiTask) {
 		return
 	}
 	base := stripPlanContextBlocks(root.AIStatefulTaskBase.GetUserInput())
-	root.SetUserInput(prependPlanContextDocsToRenderedPlan(base, getTaskPlanFacts(root), getTaskPlanEvidence(root)))
+	root.SetUserInput(prependPlanContextDocsToRenderedPlan(base, getTaskPlanFacts(root), getTaskPlanDocument(root), getTaskPlanEvidence(root)))
 }

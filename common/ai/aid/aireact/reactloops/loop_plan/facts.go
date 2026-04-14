@@ -276,26 +276,75 @@ func emitFactsMarkdown(loop *reactloops.ReActLoop, facts string) {
 	}
 }
 
+const contextTokenBudget = 15000
+
 func getLoopTaskContext(loop *reactloops.ReActLoop) string {
+	type contextEntry struct {
+		Title    string
+		Key      string
+		Value    string
+		Priority int // lower = higher priority
+	}
+
+	entries := []contextEntry{
+		{Title: "已有事实", Key: "facts", Value: loop.Get(PLAN_FACTS_KEY), Priority: 0},
+		{Title: "侦查结果", Key: "recon", Value: loop.Get(PLAN_RECON_RESULTS_KEY), Priority: 1},
+		{Title: "文件结果", Key: "file", Value: loop.Get(PLAN_FILE_RESULTS_KEY), Priority: 2},
+		{Title: "已有计划", Key: "plan", Value: loop.Get(PLAN_DATA_KEY), Priority: 3},
+		{Title: "补充知识", Key: "enhance", Value: loop.Get(PLAN_ENHANCE_KEY), Priority: 4},
+		{Title: "互联网结果", Key: "web", Value: loop.Get(PLAN_WEB_RESULTS_KEY), Priority: 5},
+	}
+
 	var parts []string
-	for _, kv := range []struct {
-		Title string
-		Value string
-	}{
-		{Title: "已有事实", Value: loop.Get(PLAN_FACTS_KEY)},
-		{Title: "已有计划", Value: loop.Get(PLAN_DATA_KEY)},
-		{Title: "补充知识", Value: loop.Get(PLAN_ENHANCE_KEY)},
-		{Title: "文件结果", Value: loop.Get(PLAN_FILE_RESULTS_KEY)},
-		{Title: "互联网结果", Value: loop.Get(PLAN_WEB_RESULTS_KEY)},
-		{Title: "侦查结果", Value: loop.Get(PLAN_RECON_RESULTS_KEY)},
-	} {
-		value := strings.TrimSpace(kv.Value)
+	usedTokens := 0
+
+	for _, entry := range entries {
+		value := strings.TrimSpace(entry.Value)
 		if value == "" {
 			continue
 		}
-		parts = append(parts, fmt.Sprintf("## %s\n%s", kv.Title, utils.ShrinkString(value, 12000)))
+
+		sectionHeader := fmt.Sprintf("## %s\n", entry.Title)
+		headerTokens := aicommon.MeasureTokens(sectionHeader)
+		remaining := contextTokenBudget - usedTokens - headerTokens
+		if remaining <= 100 {
+			break
+		}
+
+		valueTokens := aicommon.MeasureTokens(value)
+		if valueTokens <= remaining {
+			part := sectionHeader + value
+			parts = append(parts, part)
+			usedTokens += headerTokens + valueTokens
+		} else {
+			artifactPath := saveContextToArtifact(loop, entry.Key, entry.Title, value)
+			summary := aicommon.ShrinkTextBlockByTokens(value, remaining-100)
+			var part string
+			if artifactPath != "" {
+				part = fmt.Sprintf("%s%s\n\n> 以上为摘要，完整内容(%d tokens)已保存至: %s，可通过 read_file 查看", sectionHeader, summary, valueTokens, artifactPath)
+			} else {
+				part = sectionHeader + summary
+			}
+			partTokens := aicommon.MeasureTokens(part)
+			parts = append(parts, part)
+			usedTokens += partTokens
+		}
 	}
 	return strings.Join(parts, "\n\n")
+}
+
+func saveContextToArtifact(loop *reactloops.ReActLoop, key string, title string, content string) string {
+	invoker := loop.GetInvoker()
+	if invoker == nil {
+		return ""
+	}
+	filename := fmt.Sprintf("plan_context_%s", key)
+	fullContent := fmt.Sprintf("# %s\n\n%s", title, content)
+	path := invoker.EmitFileArtifactWithExt(filename, ".md", fullContent)
+	if path != "" {
+		log.Infof("plan loop: context section %q saved to artifact: %s", title, path)
+	}
+	return path
 }
 
 func autoGenerateFacts(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, mode string, lastAction *reactloops.ActionRecord) string {
@@ -343,6 +392,12 @@ func autoGenerateFacts(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask,
 %s
 `, mode, instruction, userInput, lastActionText, getLoopTaskContext(loop))
 
+	taskIndex := ""
+	if task != nil {
+		taskIndex = task.GetId()
+	}
+	emitter := loop.GetEmitter()
+
 	action, err := invoker.InvokeSpeedPriorityLiteForge(
 		ctx,
 		"plan_facts_hook",
@@ -350,6 +405,17 @@ func autoGenerateFacts(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask,
 		[]aitool.ToolOption{
 			aitool.WithStringParam(PlanFactsFieldName, aitool.WithParam_Description("增量 facts markdown；没有新增事实时返回空字符串")),
 		},
+		aicommon.WithGeneralConfigStreamableFieldCallback(
+			[]string{PlanFactsFieldName},
+			func(key string, r io.Reader) {
+				r = utils.JSONStringReader(r)
+				if emitter == nil {
+					io.Copy(io.Discard, r)
+					return
+				}
+				emitter.EmitTextMarkdownStreamEvent(PlanFactsAINodeID, r, taskIndex)
+			},
+		),
 	)
 	if err != nil {
 		log.Warnf("plan loop: auto generate facts failed: %v", err)
@@ -371,91 +437,6 @@ func hasValidPlan(loop *reactloops.ReActLoop) bool {
 		return false
 	}
 	return action.GetString("main_task") != "" && action.GetString("main_task_goal") != "" && len(action.GetInvokeParamsArray("tasks")) > 0
-}
-
-func generateFallbackPlan(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask) string {
-	invoker := loop.GetInvoker()
-	ctx := invoker.GetConfig().GetContext()
-	if task != nil && !utils.IsNil(task.GetContext()) {
-		ctx = task.GetContext()
-	}
-
-	userInput := ""
-	if task != nil {
-		userInput = task.GetUserInput()
-	}
-
-	prompt := fmt.Sprintf(`你必须补全一个缺失的任务计划。
-
-输出要求：
-- 生成一个完整 plan
-- main_task / main_task_goal 不能为空
-- tasks 至少包含 1 个子任务
-- 每个子任务都要有 subtask_name / subtask_goal / depends_on
-- 只能基于已知上下文，不要编造不存在的环境信息
-
-## 用户输入
-%s
-
-## 当前上下文
-%s
-`, userInput, getLoopTaskContext(loop))
-
-	action, err := invoker.InvokeSpeedPriorityLiteForge(
-		ctx,
-		"plan_auto_fallback",
-		prompt,
-		[]aitool.ToolOption{
-			aitool.WithStringParam("main_task", aitool.WithParam_Required(true)),
-			aitool.WithStringParam("main_task_identifier"),
-			aitool.WithStringParam("main_task_goal", aitool.WithParam_Required(true)),
-			aitool.WithStructArrayParam(
-				"tasks",
-				nil,
-				nil,
-				aitool.WithStringParam("subtask_name", aitool.WithParam_Required(true)),
-				aitool.WithStringParam("subtask_identifier"),
-				aitool.WithStringParam("subtask_goal", aitool.WithParam_Required(true)),
-				aitool.WithStringArrayParam("depends_on"),
-			),
-		},
-	)
-	if err != nil {
-		log.Warnf("plan loop: fallback plan generation failed: %v", err)
-		return ""
-	}
-	if action == nil {
-		return ""
-	}
-
-	tasks := action.GetInvokeParamsArray("tasks")
-	if action.GetString("main_task") == "" || action.GetString("main_task_goal") == "" || len(tasks) == 0 {
-		return ""
-	}
-
-	taskPayload := make([]map[string]any, 0, len(tasks))
-	for _, subtask := range tasks {
-		item := map[string]any{
-			"subtask_name": subtask.GetString("subtask_name"),
-			"subtask_goal": subtask.GetString("subtask_goal"),
-			"depends_on":   subtask.GetStringSlice("depends_on"),
-		}
-		if identifier := subtask.GetString("subtask_identifier"); identifier != "" {
-			item["subtask_identifier"] = identifier
-		}
-		taskPayload = append(taskPayload, item)
-	}
-
-	payload := map[string]any{
-		"@action":        "plan",
-		"main_task":      action.GetString("main_task"),
-		"main_task_goal": action.GetString("main_task_goal"),
-		"tasks":          taskPayload,
-	}
-	if identifier := action.GetString("main_task_identifier"); identifier != "" {
-		payload["main_task_identifier"] = identifier
-	}
-	return string(utils.Jsonify(payload))
 }
 
 func shouldAutoFactsForAction(actionType string) bool {
@@ -489,8 +470,7 @@ func buildPlanPostIterationHook(r aicommon.AIInvokeRuntime) reactloops.ReActLoop
 			if incoming == "" {
 				incoming = autoGenerateFacts(loop, task, "incremental", lastAction)
 			}
-			if merged, changed := appendPlanFacts(loop, incoming); changed {
-				emitFactsMarkdown(loop, merged)
+			if _, changed := appendPlanFacts(loop, incoming); changed {
 				log.Infof("plan loop: post-action facts hook merged facts after action=%s iteration=%d", lastAction.ActionType, iteration)
 			}
 		}
@@ -501,17 +481,22 @@ func buildPlanPostIterationHook(r aicommon.AIInvokeRuntime) reactloops.ReActLoop
 
 		if strings.TrimSpace(loop.Get(PLAN_FACTS_KEY)) == "" {
 			bootstrapFacts := autoGenerateFacts(loop, task, "bootstrap", lastAction)
-			if merged, changed := appendPlanFacts(loop, bootstrapFacts); changed {
-				emitFactsMarkdown(loop, merged)
+			if _, changed := appendPlanFacts(loop, bootstrapFacts); changed {
 				log.Infof("plan loop: generated bootstrap facts at finalization")
 			}
 		}
 
+		document := generateGuidanceDocument(loop, task)
+		if document != "" {
+			loop.Set(PLAN_DOCUMENT_KEY, document)
+			log.Infof("plan loop: generated guidance document at finalization")
+		}
+
 		if !hasValidPlan(loop) {
-			fallbackPlan := generateFallbackPlan(loop, task)
-			if fallbackPlan != "" {
-				loop.Set(PLAN_DATA_KEY, fallbackPlan)
-				log.Infof("plan loop: generated fallback plan at finalization")
+			planData := generatePlanFromDocument(loop, task)
+			if planData != "" {
+				loop.Set(PLAN_DATA_KEY, planData)
+				log.Infof("plan loop: generated plan from document at finalization")
 			}
 		}
 

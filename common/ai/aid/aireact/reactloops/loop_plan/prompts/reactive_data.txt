@@ -1,6 +1,6 @@
-{{ if not .Plan }}{{ if not .FileResults }}{{ if not .WebResults }}{{ if not .Enhance }}{{ if not .ReconResults }}## 探索优先提示
+{{ if not .FileResults }}{{ if not .WebResults }}{{ if not .Enhance }}{{ if not .ReconResults }}## 探索优先提示
 
-当前尚未收集到任何事实数据（无文件信息、无搜索结果、无补充知识、无网络侦查结果）。**禁止**在此阶段直接输出计划——没有事实数据的计划只会是空泛的模板。
+当前尚未收集到任何事实数据（无文件信息、无搜索结果、无补充知识、无网络侦查结果）。**禁止**在此阶段直接调用 `finish_exploration`——没有事实数据支撑的计划只会是空泛的模板。
 
 **你必须先使用信息收集工具进行探索**。根据任务类型选择合适的工具：
 
@@ -17,12 +17,12 @@
 - **`scan_port`** — 扫描目标主机端口，获取真实的开放服务和指纹信息
 - **`simple_crawler`** — 爬取目标 Web 应用，获取真实的 URL 结构、页面和入口点
 
-这些工具的执行结果将作为你后续制定具体计划的事实依据。**不要把 scan_port 和 simple_crawler 放到计划的 subtask 中，而是现在就调用它们。**
-{{ end }}{{ end }}{{ end }}{{ end }}{{ end }}{{/*
+这些工具的执行结果将作为后续自动生成计划的事实依据。
+{{ end }}{{ end }}{{ end }}{{ end }}{{/*
 
 */}}{{if .Facts}}## 规划事实库（FACTS）
 
-以下是当前已累积的 FACTS。它们会在每次 `output_facts` 或自动 facts hook 后持续累积，生成计划时必须基于这些事实：
+以下是当前已累积的 FACTS。它们会在每次 `output_facts` 或自动 facts hook 后持续累积，是后续自动生成指导性文档和计划的核心依据：
 
 <|FACTS_{{ .Nonce }}|>
 {{ .Facts }}
@@ -31,23 +31,17 @@
 
 */}}{{if .Evidence}}## 运行证据库（EVIDENCE）
 
-以下是执行阶段累积的 EVIDENCE。它们来自真实执行、验证、文件、响应或环境观察，在重规划时必须优先参考这些运行期证据：
+以下是执行阶段累积的 EVIDENCE。它们来自真实执行、验证、文件、响应或环境观察：
 
 <|EVIDENCE_{{ .Nonce }}|>
 {{ .Evidence }}
 <|EVIDENCE_END_{{ .Nonce }}|>
 {{end}}{{/*
 
-*/}}{{ if .Plan }}## 现有计划区块
-* 现有的计划会在下面做展示，你在生成计划的时候可以参考
-<|CURRENT_PLAN_{{ .Nonce }}|>
-{{ .Plan }}
-<|CURRENT_PLAN_END_{{ .Nonce }}|>{{ end }}{{/*
-
 */}}{{if .Help }}
 ## 规划任务帮助信息
 
-这是用户在开始规划之前提供的一些帮助信息，以下信息可以帮助你进行任务的规划和执行。
+这是用户在开始规划之前提供的一些帮助信息，以下信息可以帮助你进行探索和信息收集。
 
 <|PLAN_HELP_{{ .Nonce }}|>
 {{ .Help }}
@@ -56,7 +50,7 @@
 */}}{{if .Enhance }}
 ## 增强补充知识
 
-这是一些可以帮助你更好地完成任务规划的补充知识信息 , 是在执行任务规划循环的途中通过工具获取到的有价值的信息
+这是一些可以帮助你更好地完成探索的补充知识信息，是在执行规划循环的途中通过工具获取到的有价值的信息
 
 <|ENHANCE_KNOWLEDGE_{{ .Nonce }}|>
 {{ .Enhance }}
@@ -65,7 +59,7 @@
 */}}{{if .FileResults }}
 ## 文件与代码信息
 
-以下是通过 read_file / find_files / grep_text 等工具收集到的项目文件和代码信息，请基于这些事实数据来辅助任务规划（白帽思维）。
+以下是通过 read_file / find_files / grep_text 等工具收集到的项目文件和代码信息（白帽思维）。
 
 <|FILE_RESULTS_{{ .Nonce }}|>
 {{ .FileResults }}
@@ -74,7 +68,7 @@
 */}}{{if .WebResults }}
 ## 互联网搜索结果
 
-以下是通过 web_search 工具从互联网获取到的外部信息，包含最佳实践、技术文档或行业知识，请结合这些信息来优化任务规划。
+以下是通过 web_search 工具从互联网获取到的外部信息，包含最佳实践、技术文档或行业知识。
 
 <|WEB_RESULTS_{{ .Nonce }}|>
 {{ .WebResults }}
@@ -83,7 +77,7 @@
 */}}{{if .ReconResults }}
 ## 网络侦查结果
 
-以下是通过 scan_port / simple_crawler 等侦查工具收集到的目标网络和 Web 应用信息，包含开放端口、服务指纹、URL 结构和入口点等，请基于这些真实的侦查数据来设计更具针对性的任务规划。
+以下是通过 scan_port / simple_crawler 等侦查工具收集到的目标网络和 Web 应用信息，包含开放端口、服务指纹、URL 结构和入口点等。
 
 <|RECON_RESULTS_{{ .Nonce }}|>
 {{ .ReconResults }}
@@ -92,9 +86,7 @@
 */}}{{ if .IsLastIteration }}
 ## **重要：最后一轮迭代**
 
-这是规划循环的最后一轮迭代。你**必须**在本轮输出一个完整的 plan，不可以再执行任何信息收集操作（search_knowledge、read_file、find_files、grep_text、web_search、scan_port、simple_crawler、loading_skills 均已移除）。
-请基于当前已有的所有信息（包括用户诉求、已有计划、增强补充知识、文件信息、互联网搜索结果、网络侦查结果等）直接输出最终的任务计划。
-即使信息不够完整，也要尽最大努力生成一个可执行的计划。
-
-运用 SWOT 分析总结当前态势：在 Strengths 中列出已收集到的有价值信息，在 Weaknesses 中标注信息缺口，在规划中通过子任务来弥补不足。
+这是规划循环的最后一轮迭代。你**必须**在本轮调用 `finish_exploration` 结束探索阶段，不可以再执行任何信息收集操作（search_knowledge、read_file、find_files、grep_text、web_search、scan_port、simple_crawler、loading_skills 均已移除）。
+系统将在探索结束后基于当前已有的所有信息自动生成指导性文档和执行计划。
+即使信息收集不够完整，系统也会尽最大努力基于已有 FACTS 生成可执行的计划。
 {{ end }}
