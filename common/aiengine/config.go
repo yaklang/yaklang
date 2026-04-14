@@ -49,13 +49,14 @@ type AIEngineConfig struct {
 	DebugMode bool // 调试模式
 
 	// 事件处理回调
-	OnEvent            func(react aicommon.AIEngineOperator, event *schema.AiOutputEvent)                             // 事件回调
-	OnStream           func(react aicommon.AIEngineOperator, event *schema.AiOutputEvent, NodeId string, data []byte) // 流式输出回调
-	OnStreamEnd        func(react aicommon.AIEngineOperator, event *schema.AiOutputEvent, NodeId string)              // 流式输出结束
-	OnData             func(react aicommon.AIEngineOperator, event *schema.AiOutputEvent, NodeId string, data []byte) // 数据回调
-	OnFinished         func(react aicommon.AIEngineOperator)                                                          // 完成回调, 不返回结果
-	OnInputRequiredRaw func(react aicommon.AIEngineOperator, event *schema.AiOutputEvent, question string) string     // 需要用户输入回调
-	OnInputRequired    func(react aicommon.AIEngineOperator, question string) string                                  // 需要用户输入回调
+	OnEvent              func(react aicommon.AIEngineOperator, event *schema.AiOutputEvent)                                     // 事件回调
+	OnStream             func(react aicommon.AIEngineOperator, event *schema.AiOutputEvent, NodeId string, data []byte)         // 流式输出回调
+	OnStreamEnd          func(react aicommon.AIEngineOperator, event *schema.AiOutputEvent, NodeId string)                      // 流式输出结束
+	OnStreamEndWithTotal func(react aicommon.AIEngineOperator, event *schema.AiOutputEvent, NodeId string, totalContent []byte) // 流式输出结束，带重组后的完整内容
+	OnData               func(react aicommon.AIEngineOperator, event *schema.AiOutputEvent, NodeId string, data []byte)         // 数据回调
+	OnFinished           func(react aicommon.AIEngineOperator)                                                                  // 完成回调, 不返回结果
+	OnInputRequiredRaw   func(react aicommon.AIEngineOperator, event *schema.AiOutputEvent, question string) string             // 需要用户输入回调
+	OnInputRequired      func(react aicommon.AIEngineOperator, question string) string                                          // 需要用户输入回调
 
 	// 高级配置
 	Focus    string // 焦点，用于聚焦某个任务，如 yaklang_code
@@ -83,6 +84,8 @@ func NewAIEngineConfig(options ...AIEngineConfigOption) *AIEngineConfig {
 		EnableForgeSearchTool: true,
 		OnEvent:               func(aicommon.AIEngineOperator, *schema.AiOutputEvent) {},
 		OnStream:              func(aicommon.AIEngineOperator, *schema.AiOutputEvent, string, []byte) {},
+		OnStreamEnd:           func(aicommon.AIEngineOperator, *schema.AiOutputEvent, string) {},
+		OnStreamEndWithTotal:  func(aicommon.AIEngineOperator, *schema.AiOutputEvent, string, []byte) {},
 		OnData:                func(aicommon.AIEngineOperator, *schema.AiOutputEvent, string, []byte) {},
 		OnFinished:            func(aicommon.AIEngineOperator) {},
 		OnInputRequiredRaw:    func(aicommon.AIEngineOperator, *schema.AiOutputEvent, string) string { return "" },
@@ -274,6 +277,13 @@ func WithOnStream(callback func(react aicommon.AIEngineOperator, event *schema.A
 func WithOnStreamEnd(callback func(react aicommon.AIEngineOperator, event *schema.AiOutputEvent, NodeId string)) AIEngineConfigOption {
 	return func(c *AIEngineConfig) {
 		c.OnStreamEnd = callback
+	}
+}
+
+// WithOnStreamContent 设置流式输出结束回调，并返回重组后的完整流内容
+func WithOnStreamContent(callback func(react aicommon.AIEngineOperator, event *schema.AiOutputEvent, NodeId string, totalContent []byte)) AIEngineConfigOption {
+	return func(c *AIEngineConfig) {
+		c.OnStreamEndWithTotal = callback
 	}
 }
 

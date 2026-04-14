@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -319,6 +320,9 @@ func (e *AIEngine) handleOutputEvents() {
 // processOutputEvent 处理单个输出事件
 func (e *AIEngine) processOutputEvent(event *schema.AiOutputEvent) {
 	if event.Type == schema.EVENT_TYPE_STRUCTURED {
+		if event.NodeId == "stream-finished" {
+			e.handleStreamFinishedEvent(event)
+		}
 		if event.NodeId == "react_task_created" {
 			taskInfo := map[string]string{}
 			err := json.Unmarshal(event.Content, &taskInfo)
@@ -399,11 +403,35 @@ func (e *AIEngine) processOutputEvent(event *schema.AiOutputEvent) {
 	case schema.EVENT_TYPE_STREAM:
 		e.config.OnStream(e.operator, event, event.NodeId, event.StreamDelta)
 	default:
+
 		// 记录其他事件类型
 		if event.Type == "error" {
 			log.Errorf("AI Engine error: %s", string(event.Content))
 		}
 	}
+}
+
+func (e *AIEngine) handleStreamFinishedEvent(event *schema.AiOutputEvent) {
+	streamWriterID := event.GetStreamEventWriterId()
+	if streamWriterID == "" {
+		return
+	}
+
+	streamEvents, err := yakit.QueryAIEvent(consts.GetGormProjectDatabase(), &ypb.AIEventFilter{
+		EventUUIDS: []string{streamWriterID},
+	})
+	if err != nil {
+		log.Errorf("query stream event failed: event_uuid=%s err=%v", streamWriterID, err)
+		return
+	}
+	if len(streamEvents) == 0 || streamEvents[0] == nil {
+		log.Warnf("stream event not found after stream-finished: event_uuid=%s", streamWriterID)
+		return
+	}
+
+	streamEvent := streamEvents[0]
+	e.config.OnStreamEnd(e.operator, streamEvent, streamEvent.NodeId)
+	e.config.OnStreamEndWithTotal(e.operator, streamEvent, streamEvent.NodeId, streamEvent.StreamDelta)
 }
 
 // buildReActOptions 构建 ReAct 配置选项
