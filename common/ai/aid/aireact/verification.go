@@ -27,9 +27,12 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 	default:
 	}
 
-	verificationPrompt, nonce := r.generateVerificationPrompt(
+	verificationPrompt, nonce, err := r.promptManager.GenerateVerificationPrompt(
 		originalQuery, isToolCall, payload, r.DumpCurrentEnhanceData(),
 	)
+	if err != nil {
+		return nil, utils.Errorf("generate verification prompt failed: %v", err)
+	}
 	if r.config.DebugPrompt {
 		log.Infof("Verification prompt: %s", verificationPrompt)
 	}
@@ -98,32 +101,43 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 				taskID = r.GetCurrentTask().GetId()
 			}
 
+			emitMarkdownField := func(nodeID string, timelineType string) func(key string, read io.Reader) {
+				return func(key string, read io.Reader) {
+					var out bytes.Buffer
+					var outputReader = io.TeeReader(utils.JSONStringReader(utils.UTF8Reader(read)), &out)
+					var event *schema.AiOutputEvent
+					var err error
+					event, err = r.Emitter.EmitTextMarkdownStreamEvent(
+						nodeID,
+						outputReader,
+						taskID,
+						func() {
+							if out.Len() > 0 {
+								r.AddToTimeline(timelineType, out.String())
+							}
+						},
+					)
+					if err != nil {
+						log.Errorf("failed to emit %s stream event: %v", key, err)
+						return
+					}
+					captureReferenceAnchor(event)
+				}
+			}
+
 			action, err := aicommon.ExtractValidActionFromStream(
 				ctx,
 				stream, "verify-satisfaction",
 				aicommon.WithActionNonce(nonce),
 				aicommon.WithActionTagToKey("HUMAN_READABLE_RESULT", "human_readable_result"),
+				aicommon.WithActionTagToKey("EVIDENCE", "evidence"),
 				aicommon.WithActionFieldStreamHandler(
 					[]string{"human_readable_result"},
-					func(key string, read io.Reader) {
-						var out bytes.Buffer
-						var outputReader = io.TeeReader(utils.JSONStringReader(utils.UTF8Reader(read)), &out)
-						var event *schema.AiOutputEvent
-						var err error
-						event, err = r.Emitter.EmitTextMarkdownStreamEvent(
-							"human_readable_result", outputReader, taskID,
-							func() {
-								if out.Len() > 0 {
-									r.AddToTimeline("human_readable_result", out.String())
-								}
-							},
-						)
-						if err != nil {
-							log.Errorf("failed to emit human_readable_result stream event: %v", err)
-							return
-						}
-						captureReferenceAnchor(event)
-					},
+					emitMarkdownField("human_readable_result", "human_readable_result"),
+				),
+				aicommon.WithActionFieldStreamHandler(
+					[]string{"evidence"},
+					emitMarkdownField("plan-evidence", "verification_evidence"),
 				),
 				aicommon.WithActionFieldStreamHandler(
 					[]string{"reasoning"},
@@ -178,12 +192,7 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 			result.Satisfied = action.GetBool("user_satisfied")
 			result.Reasoning = action.GetString("reasoning")
 			result.CompletedTaskIndex = action.GetString("completed_task_index")
-			result.Evidence, err = aicommon.NormalizeConcreteEvidenceMarkdown(action.GetString("evidence"))
-			if err != nil {
-				log.Warnf("verification evidence rejected: %v", err)
-				r.AddToTimeline("verification_evidence_rejected", err.Error())
-				result.Evidence = ""
-			}
+			result.Evidence = aicommon.NormalizeConcreteEvidenceMarkdown(action.GetString("evidence"))
 			result.OutputFiles = action.GetStringSlice("output_files")
 
 			nextMovements := normalizeVerifyNextMovements(action)
@@ -217,26 +226,6 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 				)
 				if err != nil {
 					return utils.Errorf("failed to emit next_movements snapshot markdown stream event: %v", err)
-				}
-				captureReferenceAnchor(event)
-			}
-
-			if strings.TrimSpace(result.Evidence) != "" {
-				var out bytes.Buffer
-				var outputReader = io.TeeReader(strings.NewReader(result.Evidence), &out)
-				var event *schema.AiOutputEvent
-				event, err = r.Emitter.EmitTextMarkdownStreamEvent(
-					"plan-evidence",
-					outputReader,
-					taskID,
-					func() {
-						if out.Len() > 0 {
-							r.AddToTimeline("verification_evidence", out.String())
-						}
-					},
-				)
-				if err != nil {
-					return utils.Errorf("failed to emit validated verification evidence markdown stream event: %v", err)
 				}
 				captureReferenceAnchor(event)
 			}
@@ -403,16 +392,4 @@ func normalizeVerifyNextMovements(action *aicommon.Action) []aicommon.VerifyNext
 		ID:      "legacy_next_movements",
 		Content: legacy,
 	}}
-}
-
-// generateVerificationPrompt generates a prompt for verifying user satisfaction
-func (r *ReAct) generateVerificationPrompt(originalQuery string, isToolCall bool, payload string, enhanceData ...string) (string, string) {
-	// Use the prompt manager to generate the prompt
-	prompt, nonce, err := r.promptManager.GenerateVerificationPrompt(originalQuery, isToolCall, payload, enhanceData...)
-	if err != nil {
-		// Fallback to basic prompt if template fails
-		log.Errorf("Failed to generate verification prompt from template: %v", err)
-		return "Verify if the tool execution satisfied the user request.", nonce
-	}
-	return prompt, nonce
 }

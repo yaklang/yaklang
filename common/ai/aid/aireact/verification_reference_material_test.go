@@ -90,3 +90,29 @@ func TestVerifyUserSatisfaction_EmitsRequestAndResponseReferenceMaterials(t *tes
 	require.True(t, streamStartIDs[requestEventID], "request reference should attach to a valid stream event")
 	require.True(t, streamStartIDs[responseEventID], "response reference should attach to a valid stream event")
 }
+
+func TestVerifyUserSatisfaction_AcceptsEvidenceAITag(t *testing.T) {
+	ins, err := NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			nonce := mustExtractPromptNonce(t, req.GetPrompt(), "EVIDENCE")
+			rawResponse := `{"@action":"verify-satisfaction","user_satisfied":false,"reasoning":"still verifying","evidence":""}
+
+<|EVIDENCE_` + nonce + `|>
+## 某一个事实发现
+1. 主体: 接口 GET /api/users
+发现: 当前返回 401，需要补充认证头后复测。
+<|EVIDENCE_END_` + nonce + `|>`
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(rawResponse))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	require.NoError(t, err)
+
+	result, err := ins.VerifyUserSatisfaction(context.Background(), "verify evidence aitag", true, "tool executed: continue")
+	require.NoError(t, err)
+	require.False(t, result.Satisfied)
+	require.Contains(t, result.Evidence, "主体: 接口 GET /api/users")
+	require.Contains(t, result.Evidence, "发现: 当前返回 401")
+}

@@ -7,14 +7,14 @@ import (
 )
 
 func TestNormalizeConcreteEvidenceMarkdown(t *testing.T) {
-	t.Run("accepts concrete evidence", func(t *testing.T) {
-		content, err := NormalizeConcreteEvidenceMarkdown("## 攻击面\n- SQL 注入端点: /user/id, /user/post/name\n- XSS 端点: /xss/echo, /xss/js/in-str")
-		require.NoError(t, err)
+	t.Run("normalizes line endings and trims", func(t *testing.T) {
+		content := NormalizeConcreteEvidenceMarkdown("\r\n## 攻击面\r\n- SQL 注入端点: /user/id, /user/post/name\r\n")
 		require.Contains(t, content, "/user/id")
+		require.NotContains(t, content, "\r")
 	})
 
-	t.Run("rejects vague evidence wording", func(t *testing.T) {
-		_, err := NormalizeConcreteEvidenceMarkdown("## 攻击面\n- SQL 注入端点: /user/id, /user/post/name 等")
-		require.Error(t, err)
+	t.Run("preserves original evidence wording", func(t *testing.T) {
+		content := NormalizeConcreteEvidenceMarkdown("## 攻击面\n- SQL 注入端点: /user/id, /user/post/name 等")
+		require.Contains(t, content, "等")
 	})
 }
