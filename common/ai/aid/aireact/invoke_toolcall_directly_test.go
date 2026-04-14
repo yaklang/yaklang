@@ -34,7 +34,7 @@ func mockedDirectlyCallTool(i aicommon.AICallerConfigIf, req *aicommon.AIRequest
 
 	if isVerifySatisfactionPrompt(prompt) {
 		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "directly-call-satisfied", "human_readable_result": "done via directly_call_tool"}`))
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "directly-call-satisfied"}`))
 		rsp.Close()
 		return rsp, nil
 	}
@@ -60,7 +60,7 @@ func mockedDirectlyCallToolLegacyWrapped(i aicommon.AICallerConfigIf, req *aicom
 
 	if isVerifySatisfactionPrompt(prompt) {
 		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "directly-call-satisfied", "human_readable_result": "done via directly_call_tool"}`))
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "directly-call-satisfied"}`))
 		rsp.Close()
 		return rsp, nil
 	}
@@ -91,7 +91,7 @@ echo hello direct call
 
 	if isVerifySatisfactionPrompt(prompt) {
 		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "directly-call-satisfied", "human_readable_result": "done via directly_call_tool"}`))
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "directly-call-satisfied"}`))
 		rsp.Close()
 		return rsp, nil
 	}
@@ -401,9 +401,9 @@ func TestReAct_DirectlyCallTool_RequireThenDirect(t *testing.T) {
 				count := atomic.AddInt32(&verifyCount, 1)
 				rsp := i.NewAIResponse()
 				if count <= 1 {
-					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": false, "reasoning": "need one more call", "human_readable_result": "not done"}`))
+					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": false, "reasoning": "need one more call"}`))
 				} else {
-					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "all done", "human_readable_result": "complete"}`))
+					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "all done"}`))
 				}
 				rsp.Close()
 				return rsp, nil

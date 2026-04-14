@@ -42,7 +42,7 @@ func mockedToolCallingWithCallExpectations(i aicommon.AICallerConfigIf, req *aic
 
 	if isVerifySatisfactionPrompt(prompt) {
 		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "abc-mocked-reason", "human_readable_result": "mocked thought for verification"}`))
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "abc-mocked-reason"}`))
 		rsp.Close()
 		return rsp, nil
 	}

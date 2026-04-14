@@ -51,7 +51,7 @@ func mockedToolCalling(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, too
 
 	if isVerifySatisfactionPrompt(prompt) {
 		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "abc-mocked-reason", "human_readable_result": "mocked thought for verification"}`))
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "abc-mocked-reason"}`))
 		rsp.Close()
 		return rsp, nil
 	}
@@ -634,9 +634,9 @@ func TestReAct_ToolUse_WithNoToolsCache(t *testing.T) {
 			rsp := i.NewAIResponse()
 			// Return satisfied only if tool execution succeeded
 			if toolExecutionSucceeded.IsSet() {
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "tool executed successfully", "human_readable_result": "mocked thought for verification"}`))
+					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "tool executed successfully"}`))
 			} else {
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": false, "reasoning": "tool execution failed, need to retry", "human_readable_result": "tool not found"}`))
+					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": false, "reasoning": "tool execution failed, need to retry"}`))
 			}
 			rsp.Close()
 			return rsp, nil

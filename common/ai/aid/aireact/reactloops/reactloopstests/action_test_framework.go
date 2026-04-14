@@ -72,7 +72,7 @@ func NewActionTestFrameworkEx(
 			prompt := req.GetPrompt()
 			if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
 				// Return verification response
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "Test completed successfully", "human_readable_result": "Test result"}`))
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "Test completed successfully"}`))
 				rsp.Close()
 				return rsp, nil
 			}

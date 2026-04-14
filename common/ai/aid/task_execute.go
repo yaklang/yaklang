@@ -80,14 +80,18 @@ func (t *AiTask) execute() error {
 			// This provides an additional mechanism to end tasks beyond just isDone
 			lastRecord := loop.GetLastSatisfactionRecordFull()
 			var summary, completedTaskIndex, nextMovements, evidence string
+			var outputFiles []string
 			if lastRecord != nil {
 				summary = lastRecord.Reason
 				completedTaskIndex = lastRecord.CompletedTaskIndex
 				nextMovements = aicommon.FormatVerifyNextMovementsSummary(lastRecord.NextMovements)
 				evidence = strings.TrimSpace(lastRecord.Evidence)
-				if evidence != "" {
-					if merged, changed := appendTaskPlanEvidence(t, evidence); changed {
-						log.Infof("task %s appended plan evidence, length=%d", t.Index, len(merged))
+				outputFiles = append(outputFiles, lastRecord.OutputFiles...)
+				carryover := buildTaskPlanVerificationCarryoverMarkdown(t, summary, outputFiles)
+				combinedEvidence := mergePlanContextDocuments(evidence, carryover)
+				if combinedEvidence != "" {
+					if merged, changed := appendTaskPlanEvidence(t, combinedEvidence); changed {
+						log.Infof("task %s appended verification carryover into plan evidence, length=%d", t.Index, len(merged))
 					}
 				}
 			}
@@ -424,6 +428,16 @@ func (t *AiTask) generateTaskSummary(summary, nextMovements string) error {
 		t.LongSummary = longSummary
 	} else if taskSummary != "" {
 		t.LongSummary = taskSummary
+	}
+
+	displaySummary := strings.TrimSpace(longSummary)
+	if displaySummary == "" {
+		displaySummary = strings.TrimSpace(taskSummary)
+	}
+	if displaySummary != "" {
+		if merged, changed := appendTaskPlanEvidence(t, buildTaskPlanSummaryCarryoverMarkdown(t, displaySummary)); changed {
+			log.Infof("task %s appended task summary into plan evidence, length=%d", t.Index, len(merged))
+		}
 	}
 
 	t.planLoadingStatus(fmt.Sprintf("任务 [%s] 总结完成 / Task [%s] Summary Completed", t.Index, t.Index))

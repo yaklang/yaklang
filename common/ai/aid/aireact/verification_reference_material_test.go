@@ -22,7 +22,7 @@ func TestVerifyUserSatisfaction_EmitsRequestAndResponseReferenceMaterials(t *tes
 
 	queryToken := "verify-query-" + utils.RandStringBytes(8)
 	payloadToken := "verify-payload-" + utils.RandStringBytes(8)
-	rawResponse := `{"@action":"verify-satisfaction","user_satisfied":true,"reasoning":"verified","human_readable_result":"验证完成"}`
+	rawResponse := `{"@action":"verify-satisfaction","user_satisfied":true,"reasoning":"verified"}`
 
 	ins, err := NewTestReAct(
 		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
