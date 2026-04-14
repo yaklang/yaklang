@@ -266,12 +266,8 @@ func mergePlanContextDocuments(existing string, incoming string) string {
 }
 
 func appendTaskPlanEvidence(task *AiTask, incoming string) (string, bool) {
-	var err error
-	incoming, err = aicommon.NormalizeConcreteEvidenceMarkdown(incoming)
+	incoming = aicommon.NormalizeConcreteEvidenceMarkdown(incoming)
 	if task == nil || incoming == "" {
-		return getTaskPlanEvidence(task), false
-	}
-	if err != nil {
 		return getTaskPlanEvidence(task), false
 	}
 	existing := getTaskPlanEvidence(task)

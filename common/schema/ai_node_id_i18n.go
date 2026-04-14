@@ -210,11 +210,11 @@ var nodeIdMapper = map[string]*I18n{
 		En: "Delivery Files",
 	},
 	"plan-facts": {
-		Zh: "规划事实",
+		Zh: "事实",
 		En: "Plan Facts",
 	},
 	"plan-evidence": {
-		Zh: "运行证据",
+		Zh: "证据",
 		En: "Plan Evidence",
 	},
 	"self-reflection-suggestions": {

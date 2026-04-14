@@ -16,10 +16,10 @@ const (
 func outputEvidenceAction(task *AiTask) reactloops.ReActLoopOption {
 	return reactloops.WithRegisterLoopActionWithStreamField(
 		"output_evidence",
-		"Append newly verified runtime evidence into the shared EVIDENCE document. Evidence must be incremental Markdown derived from real execution or validation results, and must enumerate concrete items explicitly without vague wording like 等/其他/若干.",
+		"Append key newly verified runtime evidence into the shared EVIDENCE document. Evidence is optional in normal verification, but this action is for deliberate evidence delivery when you have reusable findings worth preserving.",
 		[]aitool.ToolOption{
 			aitool.WithStringParam(planEvidenceFieldName,
-				aitool.WithParam_Description("本轮新增的 evidence Markdown。系统会自动与历史 EVIDENCE 合并并执行 token 裁剪。必须逐项列出具体路径、接口、文件、参数或现象，严禁使用“等”“其他”“若干”。"),
+				aitool.WithParam_Description("本轮新增的 evidence Markdown。系统会自动与历史 EVIDENCE 合并并执行 token 裁剪。建议优先写关键新增发现，可使用 `## 新增待测试列表`、`## 某一个事实发现` 等小节；每条至少写清楚主体是谁、发现了什么。"),
 			),
 		},
 		[]*reactloops.LoopStreamField{{
@@ -28,22 +28,14 @@ func outputEvidenceAction(task *AiTask) reactloops.ReActLoopOption {
 			ContentType: aicommon.TypeTextMarkdown,
 		}},
 		func(_ *reactloops.ReActLoop, action *aicommon.Action) error {
-			evidence, err := aicommon.NormalizeConcreteEvidenceMarkdown(action.GetString(planEvidenceFieldName))
-			if err != nil {
-				return utils.Wrap(err, "output_evidence")
-			}
+			evidence := aicommon.NormalizeConcreteEvidenceMarkdown(action.GetString(planEvidenceFieldName))
 			if evidence == "" {
 				return utils.Error("output_evidence: evidence content is required")
 			}
 			return nil
 		},
 		func(_ *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
-			evidence, err := aicommon.NormalizeConcreteEvidenceMarkdown(action.GetString(planEvidenceFieldName))
-			if err != nil {
-				log.Warnf("task loop: output_evidence rejected vague evidence: %v", err)
-				op.Continue()
-				return
-			}
+			evidence := aicommon.NormalizeConcreteEvidenceMarkdown(action.GetString(planEvidenceFieldName))
 			merged, changed := appendTaskPlanEvidence(task, evidence)
 			if changed {
 				log.Infof("task loop: output_evidence merged, length=%d", len(merged))
