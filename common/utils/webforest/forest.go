@@ -4,10 +4,12 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"sort"
+	"strings"
+
 	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/utils"
 	"net/url"
-	"strings"
 )
 
 type WebsiteNode struct {
@@ -132,7 +134,11 @@ func (w *WebsiteForest) AddNode(u string) error {
 	if rootNode.Uuid == "" {
 		rootNode.Uuid = uuid.New().String()
 	}
-	websiteNode, err := rootNode.getOrCreateNode(urlobj.Path)
+	pathStr := urlobj.Path
+	if pathStr == "" {
+		pathStr = "/"
+	}
+	websiteNode, err := rootNode.getOrCreateNode(pathStr)
 	if err != nil {
 		return utils.Errorf("create or get website node failed: %s", urlobj.Path)
 	}
@@ -202,6 +208,83 @@ func (w *WebsiteNode) getOrCreateChildByNodeName(nodeName string, path string) *
 	}
 	w.Children[nodeName] = node
 	return node
+}
+
+func (n *WebsiteNode) countUrls() int {
+	total := len(n.Urls)
+	for _, child := range n.Children {
+		total += child.countUrls()
+	}
+	return total
+}
+
+func (w *WebsiteForest) CountUrls() int {
+	total := 0
+	for _, root := range w.Roots {
+		total += root.countUrls()
+	}
+	return total
+}
+
+func (n *WebsiteNode) sortedChildKeys() []string {
+	keys := make([]string, 0, len(n.Children))
+	for k := range n.Children {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func (n *WebsiteNode) writeTree(buf *bytes.Buffer, prefix string, isLast bool, isRoot bool) {
+	if !isRoot {
+		if isLast {
+			buf.WriteString(prefix + "└── " + n.Path)
+		} else {
+			buf.WriteString(prefix + "├── " + n.Path)
+		}
+		if len(n.Urls) > 1 {
+			buf.WriteString(fmt.Sprintf(" (%d urls)", len(n.Urls)))
+		}
+		buf.WriteByte('\n')
+	}
+
+	childKeys := n.sortedChildKeys()
+	for i, key := range childKeys {
+		child := n.Children[key]
+		childIsLast := i == len(childKeys)-1
+		var childPrefix string
+		if isRoot {
+			childPrefix = prefix
+		} else if isLast {
+			childPrefix = prefix + "    "
+		} else {
+			childPrefix = prefix + "│   "
+		}
+		child.writeTree(buf, childPrefix, childIsLast, false)
+	}
+}
+
+func (w *WebsiteForest) Output() string {
+	var buf bytes.Buffer
+
+	totalUrls := w.CountUrls()
+	buf.WriteString(fmt.Sprintf("Website Forest: %d site(s), %d URL(s)\n", len(w.Roots), totalUrls))
+
+	rootKeys := make([]string, 0, len(w.Roots))
+	for k := range w.Roots {
+		rootKeys = append(rootKeys, k)
+	}
+	sort.Strings(rootKeys)
+
+	for _, rootKey := range rootKeys {
+		root := w.Roots[rootKey]
+		buf.WriteByte('\n')
+		urlCount := root.countUrls()
+		buf.WriteString(fmt.Sprintf("[%s] (%d urls)\n", root.NodeName, urlCount))
+		root.writeTree(&buf, "", false, true)
+	}
+
+	return buf.String()
 }
 
 func pathToBlocks(path string) []string {
