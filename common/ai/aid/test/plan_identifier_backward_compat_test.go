@@ -565,3 +565,299 @@ func TestExtractTaskFromRawResponse_MultipleDependencies(t *testing.T) {
 	assert.Equal(t, []string{"1-1"}, task.Subtasks[1].DependsOn)
 	assert.Equal(t, []string{"基础任务A", "基础任务B"}, task.Subtasks[2].DependsOn)
 }
+
+func TestExtractTaskFromRawResponse_WithNestedSubSubtasks(t *testing.T) {
+	c := newMinimalCoordinator(t, "test nested sub_subtasks")
+	raw := `{
+		"@action": "plan",
+		"main_task": "SQL注入漏洞深度验证",
+		"main_task_goal": "对所有SQL注入点进行系统性测试",
+		"tasks": [
+			{
+				"subtask_name": "参数型SQL注入测试",
+				"subtask_goal": "对各类参数型SQL注入点进行Payload测试",
+				"depends_on": [],
+				"sub_subtasks": [
+					{
+						"subtask_name": "数字型参数SQL注入测试",
+						"subtask_goal": "针对数字型参数发送数值型Payload",
+						"depends_on": []
+					},
+					{
+						"subtask_name": "字符型参数SQL注入测试",
+						"subtask_goal": "针对字符型参数发送字符串Payload",
+						"depends_on": ["数字型参数SQL注入测试"]
+					}
+				]
+			},
+			{
+				"subtask_name": "XSS漏洞验证",
+				"subtask_goal": "对XSS注入点进行测试",
+				"depends_on": ["参数型SQL注入测试"]
+			}
+		]
+	}`
+
+	task, err := aid.ExtractTaskFromRawResponse(c, raw)
+	require.NoError(t, err)
+	require.NotNil(t, task)
+
+	assert.Equal(t, "SQL注入漏洞深度验证", task.Name)
+	assert.Equal(t, "对所有SQL注入点进行系统性测试", task.Goal)
+	require.Len(t, task.Subtasks, 2)
+
+	sqlTask := task.Subtasks[0]
+	assert.Equal(t, "参数型SQL注入测试", sqlTask.Name)
+	require.Len(t, sqlTask.Subtasks, 2, "SQL task should have 2 nested subtasks via sub_subtasks")
+
+	numericTask := sqlTask.Subtasks[0]
+	assert.Equal(t, "数字型参数SQL注入测试", numericTask.Name)
+	assert.Equal(t, "针对数字型参数发送数值型Payload", numericTask.Goal)
+	assert.Equal(t, sqlTask, numericTask.ParentTask, "nested subtask parent should be the SQL task")
+
+	stringTask := sqlTask.Subtasks[1]
+	assert.Equal(t, "字符型参数SQL注入测试", stringTask.Name)
+	assert.Equal(t, sqlTask, stringTask.ParentTask)
+	assert.Contains(t, stringTask.DependsOn, "数字型参数SQL注入测试")
+
+	xssTask := task.Subtasks[1]
+	assert.Equal(t, "XSS漏洞验证", xssTask.Name)
+	assert.Len(t, xssTask.Subtasks, 0, "XSS task should have no nested subtasks")
+}
+
+func TestExtractPlan_WithNestedSubSubtasks(t *testing.T) {
+	c := newMinimalCoordinator(t, "test ExtractPlan nested")
+	raw := `{
+		"@action": "plan",
+		"main_task": "Web安全测试",
+		"main_task_goal": "系统性安全评估",
+		"tasks": [
+			{
+				"subtask_name": "SQL注入验证",
+				"subtask_goal": "对SQL注入点进行测试",
+				"depends_on": [],
+				"sub_subtasks": [
+					{
+						"subtask_name": "数字型参数测试",
+						"subtask_goal": "针对数字型参数发送Payload",
+						"depends_on": []
+					},
+					{
+						"subtask_name": "字符型参数测试",
+						"subtask_goal": "针对字符型参数发送Payload",
+						"depends_on": []
+					}
+				]
+			},
+			{
+				"subtask_name": "XSS验证",
+				"subtask_goal": "对XSS注入点进行测试",
+				"depends_on": ["SQL注入验证"]
+			}
+		]
+	}`
+
+	planResp, err := aid.ExtractPlan(c, raw)
+	require.NoError(t, err)
+	require.NotNil(t, planResp)
+	require.NotNil(t, planResp.RootTask)
+
+	root := planResp.RootTask
+	assert.Equal(t, "Web安全测试", root.Name)
+	assert.Equal(t, "1", root.Index)
+	require.Len(t, root.Subtasks, 2)
+
+	sqlTask := root.Subtasks[0]
+	assert.Equal(t, "SQL注入验证", sqlTask.Name)
+	assert.Equal(t, "1-1", sqlTask.Index)
+	require.Len(t, sqlTask.Subtasks, 2)
+
+	assert.Equal(t, "数字型参数测试", sqlTask.Subtasks[0].Name)
+	assert.Equal(t, "1-1-1", sqlTask.Subtasks[0].Index)
+	assert.Equal(t, "字符型参数测试", sqlTask.Subtasks[1].Name)
+	assert.Equal(t, "1-1-2", sqlTask.Subtasks[1].Index)
+
+	xssTask := root.Subtasks[1]
+	assert.Equal(t, "XSS验证", xssTask.Name)
+	assert.Equal(t, "1-2", xssTask.Index)
+	assert.Len(t, xssTask.Subtasks, 0, "XSS task should have no nested subtasks")
+}
+
+func TestExtractTaskFromRawResponse_NestedWithIdentifierAndDependsOn(t *testing.T) {
+	c := newMinimalCoordinator(t, "test nested identifier and depends_on")
+	raw := `{
+		"@action": "plan",
+		"main_task": "安全评估任务",
+		"main_task_identifier": "sec_assessment",
+		"main_task_goal": "完整的安全评估",
+		"tasks": [
+			{
+				"subtask_name": "信息收集",
+				"subtask_identifier": "recon",
+				"subtask_goal": "收集目标信息",
+				"depends_on": [],
+				"sub_subtasks": [
+					{
+						"subtask_name": "端口扫描",
+						"subtask_identifier": "port_scan",
+						"subtask_goal": "扫描目标开放端口",
+						"depends_on": []
+					},
+					{
+						"subtask_name": "服务识别",
+						"subtask_identifier": "svc_detect",
+						"subtask_goal": "识别端口上运行的服务",
+						"depends_on": ["端口扫描"]
+					}
+				]
+			},
+			{
+				"subtask_name": "漏洞利用",
+				"subtask_identifier": "exploit",
+				"subtask_goal": "尝试利用发现的漏洞",
+				"depends_on": ["信息收集"]
+			}
+		]
+	}`
+
+	task, err := aid.ExtractTaskFromRawResponse(c, raw)
+	require.NoError(t, err)
+	require.NotNil(t, task)
+	require.Len(t, task.Subtasks, 2)
+
+	reconTask := task.Subtasks[0]
+	assert.Equal(t, "信息收集", reconTask.Name)
+	assert.Equal(t, "recon", reconTask.SemanticIdentifier)
+	require.Len(t, reconTask.Subtasks, 2)
+
+	portScan := reconTask.Subtasks[0]
+	assert.Equal(t, "端口扫描", portScan.Name)
+	assert.Equal(t, "port_scan", portScan.SemanticIdentifier)
+
+	svcDetect := reconTask.Subtasks[1]
+	assert.Equal(t, "服务识别", svcDetect.Name)
+	assert.Equal(t, "svc_detect", svcDetect.SemanticIdentifier)
+	assert.Contains(t, svcDetect.DependsOn, "端口扫描")
+
+	exploitTask := task.Subtasks[1]
+	assert.Equal(t, "漏洞利用", exploitTask.Name)
+	assert.Equal(t, "exploit", exploitTask.SemanticIdentifier)
+	assert.Contains(t, exploitTask.DependsOn, "信息收集")
+}
+
+func TestExtractTaskFromRawResponse_LoopPlanSerializedFormat(t *testing.T) {
+	c := newMinimalCoordinator(t, "test loop_plan serialized format")
+	raw := `{
+		"@action": "plan",
+		"main_task": "Web应用渗透测试",
+		"main_task_goal": "全面评估Web应用安全性",
+		"main_task_identifier": "web_pentest",
+		"tasks": [
+			{
+				"subtask_name": "目标侦察",
+				"subtask_goal": "收集目标Web应用信息",
+				"subtask_identifier": "target_recon",
+				"depends_on": [],
+				"sub_subtasks": [
+					{
+						"subtask_name": "目录枚举",
+						"subtask_goal": "枚举Web应用目录结构",
+						"subtask_identifier": "dir_enum",
+						"depends_on": []
+					},
+					{
+						"subtask_name": "技术栈识别",
+						"subtask_goal": "识别Web应用使用的技术栈",
+						"subtask_identifier": "tech_detect",
+						"depends_on": []
+					}
+				]
+			},
+			{
+				"subtask_name": "漏洞验证",
+				"subtask_goal": "对发现的潜在漏洞进行验证",
+				"subtask_identifier": "vuln_verify",
+				"depends_on": ["目标侦察"],
+				"sub_subtasks": [
+					{
+						"subtask_name": "SQL注入测试",
+						"subtask_goal": "验证SQL注入漏洞",
+						"subtask_identifier": "sqli_test",
+						"depends_on": []
+					},
+					{
+						"subtask_name": "XSS测试",
+						"subtask_goal": "验证跨站脚本漏洞",
+						"subtask_identifier": "xss_test",
+						"depends_on": []
+					},
+					{
+						"subtask_name": "SSRF测试",
+						"subtask_goal": "验证服务端请求伪造漏洞",
+						"subtask_identifier": "ssrf_test",
+						"depends_on": ["SQL注入测试"]
+					}
+				]
+			},
+			{
+				"subtask_name": "报告生成",
+				"subtask_goal": "生成渗透测试报告",
+				"subtask_identifier": "report_gen",
+				"depends_on": ["目标侦察", "漏洞验证"]
+			}
+		]
+	}`
+
+	task, err := aid.ExtractTaskFromRawResponse(c, raw)
+	require.NoError(t, err)
+	require.NotNil(t, task)
+
+	assert.Equal(t, "Web应用渗透测试", task.Name)
+	assert.Equal(t, "全面评估Web应用安全性", task.Goal)
+	assert.Equal(t, "1", task.Index)
+	require.Len(t, task.Subtasks, 3)
+
+	reconTask := task.Subtasks[0]
+	assert.Equal(t, "目标侦察", reconTask.Name)
+	assert.Equal(t, "target_recon", reconTask.SemanticIdentifier)
+	assert.Equal(t, "1-1", reconTask.Index)
+	require.Len(t, reconTask.Subtasks, 2)
+	assert.Equal(t, "目录枚举", reconTask.Subtasks[0].Name)
+	assert.Equal(t, "1-1-1", reconTask.Subtasks[0].Index)
+	assert.Equal(t, "dir_enum", reconTask.Subtasks[0].SemanticIdentifier)
+	assert.Equal(t, reconTask, reconTask.Subtasks[0].ParentTask)
+	assert.Equal(t, "技术栈识别", reconTask.Subtasks[1].Name)
+	assert.Equal(t, "1-1-2", reconTask.Subtasks[1].Index)
+	assert.Equal(t, reconTask, reconTask.Subtasks[1].ParentTask)
+
+	vulnTask := task.Subtasks[1]
+	assert.Equal(t, "漏洞验证", vulnTask.Name)
+	assert.Equal(t, "vuln_verify", vulnTask.SemanticIdentifier)
+	assert.Equal(t, "1-2", vulnTask.Index)
+	assert.Contains(t, vulnTask.DependsOn, "目标侦察")
+	require.Len(t, vulnTask.Subtasks, 3)
+
+	assert.Equal(t, "SQL注入测试", vulnTask.Subtasks[0].Name)
+	assert.Equal(t, "1-2-1", vulnTask.Subtasks[0].Index)
+	assert.Equal(t, "sqli_test", vulnTask.Subtasks[0].SemanticIdentifier)
+	assert.Equal(t, vulnTask, vulnTask.Subtasks[0].ParentTask)
+
+	assert.Equal(t, "XSS测试", vulnTask.Subtasks[1].Name)
+	assert.Equal(t, "1-2-2", vulnTask.Subtasks[1].Index)
+	assert.Equal(t, vulnTask, vulnTask.Subtasks[1].ParentTask)
+
+	ssrfTask := vulnTask.Subtasks[2]
+	assert.Equal(t, "SSRF测试", ssrfTask.Name)
+	assert.Equal(t, "1-2-3", ssrfTask.Index)
+	assert.Equal(t, "ssrf_test", ssrfTask.SemanticIdentifier)
+	assert.Contains(t, ssrfTask.DependsOn, "SQL注入测试")
+	assert.Equal(t, vulnTask, ssrfTask.ParentTask)
+
+	reportTask := task.Subtasks[2]
+	assert.Equal(t, "报告生成", reportTask.Name)
+	assert.Equal(t, "report_gen", reportTask.SemanticIdentifier)
+	assert.Equal(t, "1-3", reportTask.Index)
+	assert.Contains(t, reportTask.DependsOn, "目标侦察")
+	assert.Contains(t, reportTask.DependsOn, "漏洞验证")
+	assert.Len(t, reportTask.Subtasks, 0)
+}

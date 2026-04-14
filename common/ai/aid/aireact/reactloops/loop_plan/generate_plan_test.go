@@ -67,7 +67,7 @@ func runWithTimeout(t *testing.T, input string, timeout time.Duration) (string, 
 func TestPlanTasksStreamHandler_NormalOrder(t *testing.T) {
 	input := `[{"subtask_name":"design_survey","subtask_goal":"Design a user research survey","depends_on":[]}]`
 	output := runPlanTasksStreamHandler(t, input)
-	assert.Contains(t, output, "[design_survey]")
+	assert.Contains(t, output, "- [ ] design_survey")
 	assert.Contains(t, output, ": Design a user research survey")
 	assert.NotContains(t, output, "(depends:")
 }
@@ -75,7 +75,7 @@ func TestPlanTasksStreamHandler_NormalOrder(t *testing.T) {
 func TestPlanTasksStreamHandler_WithDeps(t *testing.T) {
 	input := `[{"subtask_name":"deploy_env","subtask_goal":"Deploy test environment","depends_on":["setup_tools"]}]`
 	output := runPlanTasksStreamHandler(t, input)
-	assert.Contains(t, output, "[deploy_env]")
+	assert.Contains(t, output, "- [ ] deploy_env")
 	assert.Contains(t, output, ": Deploy test environment")
 	assert.Contains(t, output, "(depends: setup_tools)")
 }
@@ -83,7 +83,7 @@ func TestPlanTasksStreamHandler_WithDeps(t *testing.T) {
 func TestPlanTasksStreamHandler_WithIdentifier(t *testing.T) {
 	input := `[{"subtask_name":"setup_env","subtask_identifier":"setup_dev_env","subtask_goal":"Setup development environment","depends_on":[]}]`
 	output := runPlanTasksStreamHandler(t, input)
-	assert.Contains(t, output, "[setup_env]")
+	assert.Contains(t, output, "- [ ] setup_env")
 	assert.Contains(t, output, "#setup_dev_env")
 	assert.Contains(t, output, ": Setup development environment")
 }
@@ -91,7 +91,7 @@ func TestPlanTasksStreamHandler_WithIdentifier(t *testing.T) {
 func TestPlanTasksStreamHandler_FullFields(t *testing.T) {
 	input := `[{"subtask_name":"write_tests","subtask_identifier":"write_unit_tests","subtask_goal":"Write unit tests for core modules","depends_on":["setup_env"]}]`
 	output := runPlanTasksStreamHandler(t, input)
-	assert.Contains(t, output, "[write_tests]")
+	assert.Contains(t, output, "- [ ] write_tests")
 	assert.Contains(t, output, "#write_unit_tests")
 	assert.Contains(t, output, ": Write unit tests for core modules")
 	assert.Contains(t, output, "(depends: setup_env)")
@@ -108,15 +108,15 @@ func TestPlanTasksStreamHandler_MultipleSubtasks(t *testing.T) {
 	sections := splitTaskSections(output)
 	require.Len(t, sections, 3, "expected 3 task sections, got: %q", output)
 
-	assert.Contains(t, sections[0], "[task_a]")
+	assert.Contains(t, sections[0], "- [ ] task_a")
 	assert.Contains(t, sections[0], "Goal for task A")
 	assert.NotContains(t, sections[0], "(depends:")
 
-	assert.Contains(t, sections[1], "[task_b]")
+	assert.Contains(t, sections[1], "- [ ] task_b")
 	assert.Contains(t, sections[1], "Goal for task B")
 	assert.Contains(t, sections[1], "(depends: task_a)")
 
-	assert.Contains(t, sections[2], "[task_c]")
+	assert.Contains(t, sections[2], "- [ ] task_c")
 	assert.Contains(t, sections[2], "Goal for task C")
 	assert.Contains(t, sections[2], "(depends: task_a, task_b)")
 }
@@ -125,7 +125,7 @@ func TestPlanTasksStreamHandler_MissingDependsOn(t *testing.T) {
 	input := `[{"subtask_name":"standalone","subtask_goal":"A standalone task"}]`
 	output, ok := runWithTimeout(t, input, 5*time.Second)
 	require.True(t, ok, "handler should not block when depends_on is missing")
-	assert.Contains(t, output, "[standalone]")
+	assert.Contains(t, output, "- [ ] standalone")
 	assert.Contains(t, output, "A standalone task")
 }
 
@@ -192,7 +192,7 @@ func TestPlanTasksStreamHandler_ByteByByteInput(t *testing.T) {
 	}
 
 	output := buf.String()
-	assert.Contains(t, output, "[slow_task]")
+	assert.Contains(t, output, "- [ ] slow_task")
 	assert.Contains(t, output, "A slowly streamed goal")
 	assert.Contains(t, output, "(depends: dep1)")
 }
@@ -228,7 +228,7 @@ func TestPlanTasksStreamHandler_ChunkedInput(t *testing.T) {
 	}
 
 	output := buf.String()
-	assert.Contains(t, output, "[chunked]")
+	assert.Contains(t, output, "- [ ] chunked")
 	assert.Contains(t, output, "This is a chunked goal that arrives in pieces")
 	assert.Contains(t, output, "(depends: pre_task)")
 }
@@ -260,7 +260,7 @@ func TestPlanTasksStreamHandler_StreamInterruption(t *testing.T) {
 func TestPlanTasksStreamHandler_GoalWithEscapedChars(t *testing.T) {
 	input := `[{"subtask_name":"escape_test","subtask_goal":"Goal with \"quotes\" and \\backslashes\\","depends_on":[]}]`
 	output := runPlanTasksStreamHandler(t, input)
-	assert.Contains(t, output, "[escape_test]")
+	assert.Contains(t, output, "- [ ] escape_test")
 	assert.Contains(t, output, `"quotes"`)
 	assert.Contains(t, output, `\backslashes\`)
 }
@@ -268,7 +268,7 @@ func TestPlanTasksStreamHandler_GoalWithEscapedChars(t *testing.T) {
 func TestPlanTasksStreamHandler_EmptySubtaskGoal(t *testing.T) {
 	input := `[{"subtask_name":"empty_goal","subtask_goal":"","depends_on":[]}]`
 	output := runPlanTasksStreamHandler(t, input)
-	assert.Contains(t, output, "[empty_goal]")
+	assert.Contains(t, output, "- [ ] empty_goal")
 }
 
 func TestPlanTasksStreamHandler_OnlyDependsOn(t *testing.T) {
@@ -281,7 +281,7 @@ func TestPlanTasksStreamHandler_InvalidDependsOnType(t *testing.T) {
 	input := `[{"subtask_name":"bad_deps","subtask_goal":"Goal here","depends_on":"not_an_array"}]`
 	output, ok := runWithTimeout(t, input, 5*time.Second)
 	require.True(t, ok, "handler should not block on invalid depends_on type")
-	assert.Contains(t, output, "[bad_deps]")
+	assert.Contains(t, output, "- [ ] bad_deps")
 	assert.Contains(t, output, "Goal here")
 }
 
@@ -304,7 +304,7 @@ func TestPlanTasksStreamHandler_LargeNumberOfSubtasks(t *testing.T) {
 	output, ok := runWithTimeout(t, sb.String(), 30*time.Second)
 	require.True(t, ok, "handler blocked with large number of subtasks")
 	for i := 0; i < count; i++ {
-		assert.Contains(t, output, "[task_"+string(rune('A'+i%26))+"]")
+		assert.Contains(t, output, "- [ ] task_"+string(rune('A'+i%26)))
 	}
 }
 
@@ -315,8 +315,8 @@ func TestPlanTasksStreamHandler_SequentialOutput(t *testing.T) {
 	]`
 	output := runPlanTasksStreamHandler(t, input)
 
-	firstIdx := strings.Index(output, "[first]")
-	secondIdx := strings.Index(output, "[second]")
+	firstIdx := strings.Index(output, "- [ ] first")
+	secondIdx := strings.Index(output, "- [ ] second")
 	require.Greater(t, firstIdx, -1, "first subtask not found in output")
 	require.Greater(t, secondIdx, -1, "second subtask not found in output")
 	assert.Less(t, firstIdx, secondIdx, "first subtask should appear before second in output")
@@ -329,11 +329,11 @@ func TestPlanTasksStreamHandler_WithIdentifierAndDeps(t *testing.T) {
 	]`
 	output := runPlanTasksStreamHandler(t, input)
 
-	assert.Contains(t, output, "[setup]")
+	assert.Contains(t, output, "- [ ] setup")
 	assert.Contains(t, output, "#setup_env")
 	assert.Contains(t, output, ": Setup environment")
 
-	assert.Contains(t, output, "[build]")
+	assert.Contains(t, output, "- [ ] build")
 	assert.Contains(t, output, "#build_project")
 	assert.Contains(t, output, ": Build the project")
 	assert.Contains(t, output, "(depends: setup)")
@@ -350,22 +350,22 @@ func TestPlanTasksStreamHandler_BackwardCompat_OldFormatWithoutNewFields(t *test
 	sections := splitTaskSections(output)
 	require.Len(t, sections, 3, "expected 3 task sections for 3 subtasks without new fields, got: %q", output)
 
-	assert.Contains(t, sections[0], "[配置工具]")
+	assert.Contains(t, sections[0], "- [ ] 配置工具")
 	assert.Contains(t, sections[0], "安装并配置静态代码分析工具")
 	assert.NotContains(t, sections[0], "#")
 	assert.NotContains(t, sections[0], "(depends:")
 
-	assert.Contains(t, sections[1], "[集成CI]")
+	assert.Contains(t, sections[1], "- [ ] 集成CI")
 	assert.NotContains(t, sections[1], "#")
 
-	assert.Contains(t, sections[2], "[编写文档]")
+	assert.Contains(t, sections[2], "- [ ] 编写文档")
 }
 
 func TestPlanTasksStreamHandler_BackwardCompat_SingleTaskNoNewFields(t *testing.T) {
 	input := `[{"subtask_name":"simple_task","subtask_goal":"A simple goal without depends_on or identifier"}]`
 	output, ok := runWithTimeout(t, input, 5*time.Second)
 	require.True(t, ok, "should complete without blocking")
-	assert.Contains(t, output, "[simple_task]")
+	assert.Contains(t, output, "- [ ] simple_task")
 	assert.Contains(t, output, "A simple goal without depends_on or identifier")
 	assert.NotContains(t, output, "#")
 }
@@ -373,8 +373,8 @@ func TestPlanTasksStreamHandler_BackwardCompat_SingleTaskNoNewFields(t *testing.
 func TestPlanTasksStreamHandler_OldFormatSimulatingRealAIOutput(t *testing.T) {
 	input := `[{"subtask_name":"扫描目录结构","subtask_goal":"递归遍历目录下所有文件，记录每个文件的位置和占用空间"},{"subtask_name":"计算文件大小","subtask_goal":"遍历所有文件，计算每个文件的大小"}]`
 	output := runPlanTasksStreamHandler(t, input)
-	assert.Contains(t, output, "[扫描目录结构]")
-	assert.Contains(t, output, "[计算文件大小]")
+	assert.Contains(t, output, "- [ ] 扫描目录结构")
+	assert.Contains(t, output, "- [ ] 计算文件大小")
 	assert.NotContains(t, output, "#")
 	assert.NotContains(t, output, "(depends:")
 }
@@ -390,16 +390,16 @@ func TestPlanTasksStreamHandler_NewFormat_FullExample(t *testing.T) {
 	sections := splitTaskSections(output)
 	require.Len(t, sections, 3, "expected 3 task sections, got: %q", output)
 
-	assert.Contains(t, sections[0], "[配置静态代码分析工具]")
+	assert.Contains(t, sections[0], "- [ ] 配置静态代码分析工具")
 	assert.Contains(t, sections[0], "#setup_static_analysis")
 	assert.Contains(t, sections[0], "安装并配置静态代码分析工具")
 	assert.NotContains(t, sections[0], "(depends:")
 
-	assert.Contains(t, sections[1], "[集成到CI/CD流程]")
+	assert.Contains(t, sections[1], "- [ ] 集成到CI/CD流程")
 	assert.Contains(t, sections[1], "#integrate_cicd")
 	assert.Contains(t, sections[1], "(depends: 配置静态代码分析工具)")
 
-	assert.Contains(t, sections[2], "[编写检查结果处理文档]")
+	assert.Contains(t, sections[2], "- [ ] 编写检查结果处理文档")
 	assert.Contains(t, sections[2], "#write_check_docs")
 	assert.Contains(t, sections[2], "(depends: 集成到CI/CD流程)")
 }
@@ -411,13 +411,13 @@ func TestPlanTasksStreamHandler_MixedFormat_SomeWithSomeWithout(t *testing.T) {
 		{"subtask_name":"task_minimal","subtask_goal":"minimal old format"}
 	]`
 	output := runPlanTasksStreamHandler(t, input)
-	assert.Contains(t, output, "[task_with_all]")
+	assert.Contains(t, output, "- [ ] task_with_all")
 	assert.Contains(t, output, "#full_task")
 	assert.Contains(t, output, "(depends: some_dep)")
 
-	assert.Contains(t, output, "[task_without_id]")
+	assert.Contains(t, output, "- [ ] task_without_id")
 	assert.Contains(t, output, "no identifier field")
 
-	assert.Contains(t, output, "[task_minimal]")
+	assert.Contains(t, output, "- [ ] task_minimal")
 	assert.Contains(t, output, "minimal old format")
 }

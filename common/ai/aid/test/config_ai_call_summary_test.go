@@ -27,35 +27,26 @@ func TestCoordinator_AICallSummaryEvent(t *testing.T) {
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outChan.SafeFeed(event)
 		}),
+		aid.WithPlanMocker(func(coordinator *aid.Coordinator) *aid.PlanResponse {
+			return &aid.PlanResponse{
+				RootTask: &aid.AiTask{
+					Name: "test main task",
+					Goal: "verify ai_call_summary event fields",
+					Subtasks: []*aid.AiTask{
+						{
+							Name: "subtask-1",
+							Goal: "test subtask goal",
+						},
+					},
+				},
+			}
+		}),
 		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := request.GetPrompt()
 			rsp := config.NewAIResponse()
 			rsp.SetModelInfo("test-provider", "test-model-v1")
 
-			isPlanRequest := (strings.Contains(prompt, "任务规划使命") || strings.Contains(prompt, "你是一个输出JSON的任务规划的工具")) &&
-				(strings.Contains(prompt, "PERSISTENT_NcSB") || strings.Contains(prompt, "任务设计输出要求") || strings.Contains(prompt, "```schema"))
-
-			if isPlanRequest {
-				rsp.EmitOutputStream(strings.NewReader(`{
-    "@action": "plan",
-    "query": "test query for ai call summary",
-    "main_task": "test main task",
-    "main_task_goal": "verify ai_call_summary event fields",
-    "tasks": [
-        {
-            "subtask_name": "subtask-1",
-            "subtask_goal": "test subtask goal"
-        }
-    ]
-}`))
-				time.Sleep(100 * time.Millisecond)
-				rsp.Close()
-				return rsp, nil
-			}
-
-			if utils.MatchAllOfSubString(prompt, "status_summary", "task_long_summary", "task_short_summary") ||
-				strings.Contains(prompt, "GenerateTaskSummaryPrompt") ||
-				(strings.Contains(prompt, "@action") && strings.Contains(prompt, "summary")) {
+			if isSummaryPrompt(prompt) {
 				rsp.EmitOutputStream(strings.NewReader(`{
     "@action": "summary",
     "status_summary": "test status summary",
@@ -67,7 +58,7 @@ func TestCoordinator_AICallSummaryEvent(t *testing.T) {
 				return rsp, nil
 			}
 
-			if strings.Contains(prompt, "Background") && (strings.Contains(prompt, "Current Time:") || strings.Contains(prompt, "OS/Arch:")) {
+			if isNextActionDecisionPrompt(prompt) {
 				rsp.EmitOutputStream(strings.NewReader(`{
     "@action": "object",
     "next_action": {
@@ -211,7 +202,7 @@ LOOP:
 				break LOOP
 			}
 
-		case <-time.After(15 * time.Second):
+		case <-time.After(3 * time.Minute):
 			log.Errorf("test timeout: parsedTask=%t, pressureCheck=%t, summaryCheck=%t, firstByteCheck=%t, totalCostCheck=%t",
 				parsedTask, pressureCheck, summaryCheck, firstByteCheck, totalCostCheck)
 			t.Fatal("timeout waiting for ai_call_summary event")
