@@ -1,39 +1,18 @@
-{
-  "defaults": {
-    "timeout": 300,
-    "maxIteration": 12,
-    "language": "zh",
-    "yoloMode": true,
-    "allowUserInteract": false
-  },
-  "cases": [
-    {
-      "name": "report-file-created",
-      "description": "让模型生成一份 markdown 报告，并在事件中捕获生成文件路径",
-      "focus": "report_generating",
-      "input": "请基于 /Users/rookie/Code/yaklang/README.md 生成一份简短的 Yaklang 项目介绍报告，输出为 markdown 文件。",
-      "pass": {
-        "eventTypes": [
-          "filesystem_pin_filename"
-        ],
-        "containsAny": [
-          ".md"
-        ]
-      }
-    },
-    {
-      "name": "python-script-created",
-      "description": "让模型写一个 Python 脚本，并在事件中捕获 .py 文件路径",
-      "focus": "write_python_script",
-      "input": "请生成一个 Python 脚本，使用 argparse 接收 URL 参数，对目标执行 HTTP GET 并打印状态码与响应长度。",
-      "pass": {
-        "eventTypes": [
-          "filesystem_pin_filename"
-        ],
-        "containsAny": [
-          ".py"
-        ]
-      }
+[
+  {
+    "name": "report-file-created",
+    "description": "让模型生成一份 markdown 文件，并在事件中捕获生成文件路径",
+    "input": "请生成一份简短的测试markdown ，要求保存为 benchmark.md 文件。",
+    "pass": {
+      "eventMatch": "benchmark.md"
     }
-  ]
-}
+  },
+  {
+    "name": "simple-stream-answer",
+    "description": "要求模型直接输出特定字符串，通过 stream 内容匹配判定通过",
+    "input": "请只输出字符串 STREAM_MATCH_OK，不要输出其他任何内容。",
+    "pass": {
+      "streamMatch": "STREAM_MATCH_OK"
+    }
+  }
+]
