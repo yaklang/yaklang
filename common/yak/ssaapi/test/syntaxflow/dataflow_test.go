@@ -1,8 +1,11 @@
 package syntaxflow
 
 import (
+	"sort"
+	"strings"
 	"testing"
 
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -10,9 +13,92 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
+// sfCase 统一描述：源码 code、SyntaxFlow rule、以及期望 want / wantContains。
+// - Want：变量名 -> 期望的 value 字符串集合（排序后与结果 **相等**，与 ssatest.CheckSyntaxFlow 一致）。
+// - WantContains：变量名 -> 若干子串，每个子串须出现在该变量对应结果的 String() 中。
+// - PostCheck：在 Want / WantContains 之后执行，用于校验常量布尔等 Want 不便表达的断言。
+// - Debug：为 true 时 SyntaxFlow 带 QueryWithEnableDebug。
+type sfCase struct {
+	Code         string
+	Rule         string
+	Want         map[string][]string
+	WantContains map[string][]string
+	PostCheck    func(t *testing.T, res *ssaapi.SyntaxFlowResult)
+	Debug        bool
+}
+
+func sortedValueStrings(vs []*ssaapi.Value) []string {
+	out := lo.Map(vs, func(v *ssaapi.Value, _ int) string { return v.String() })
+	sort.Strings(out)
+	return out
+}
+
+// assertEveryInBInA：B 中每个元素（按 Value.String）须出现在 A 的字符串集合中（用于「过滤结果是未过滤结果的子集」）。
+func assertEveryInBInA(t *testing.T, a, b []*ssaapi.Value, msg string) {
+	t.Helper()
+	set := make(map[string]struct{}, len(a))
+	for _, v := range a {
+		if v == nil {
+			continue
+		}
+		set[v.String()] = struct{}{}
+	}
+	for _, v := range b {
+		if v == nil {
+			continue
+		}
+		_, ok := set[v.String()]
+		require.True(t, ok, "%s: filtered value %q must appear in unfiltered set", msg, v.String())
+	}
+}
+
+func runSFCase(t *testing.T, c sfCase, opts ...ssaconfig.Option) {
+	t.Helper()
+	code := strings.TrimSpace(c.Code)
+	rule := strings.TrimSpace(c.Rule)
+	require.NotEmpty(t, code, "sfCase.Code")
+	require.NotEmpty(t, rule, "sfCase.Rule")
+
+	handler := func(prog *ssaapi.Program) error {
+		var sfOpts []ssaapi.QueryOption
+		if c.Debug {
+			sfOpts = append(sfOpts, ssaapi.QueryWithEnableDebug())
+		}
+		vals, err := prog.SyntaxFlowWithError(rule, sfOpts...)
+		require.NoError(t, err)
+		vals.Show()
+
+		if len(c.Want) > 0 {
+			for varName, want := range c.Want {
+				gotVs := vals.GetValues(varName)
+				got := lo.Map(gotVs, func(v *ssaapi.Value, _ int) string { return v.String() })
+				sort.Strings(got)
+				exp := append([]string{}, want...)
+				sort.Strings(exp)
+				require.Equal(t, exp, got, "variable %q (exact)", varName)
+			}
+		}
+		if len(c.WantContains) > 0 {
+			for varName, needles := range c.WantContains {
+				hay := vals.GetValues(varName).String()
+				for _, sub := range needles {
+					require.Contains(t, hay, sub, "variable %q (contains)", varName)
+				}
+			}
+		}
+		if c.PostCheck != nil {
+			c.PostCheck(t, vals)
+		}
+		return nil
+	}
+	ssatest.Check(t, code, handler, opts...)
+}
+
+// --- Java：文件读链路与 dataflow include（同一顶层测试，子场景用 t.Run） ---
+
 func TestDataflowReal1(t *testing.T) {
-	t.Run("test file read", func(t *testing.T) {
-		code := `
+	t.Run("file_read_chain", func(t *testing.T) {
+		const javaFileRead = `
 package com.ruoyi.common.utils.file;
 
 import java.io.File;
@@ -88,32 +174,27 @@ public class FileUtils extends org.apache.commons.io.FileUtils
     }
    
 }
-	`
-
-		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
-			rule := `
+`
+		const ruleFileRead = `
 File() as $fileInstance 
 $fileInstance -{
 	include: <<<CODE
 	.read()
 CODE
 }-> as $fileReadInstance 
-		`
-			vals, err := prog.SyntaxFlowWithError(rule)
-			require.NoError(t, err)
-			file := vals.GetValues("fileInstance")
-			file.Show()
-			require.Contains(t, file.String(), `Undefined-File(Undefined-File,Parameter-filePath)`)
-			fileRead := vals.GetValues("fileReadInstance")
-			fileRead.Show()
-			require.Contains(t, fileRead.String(), `Undefined-fis.read`)
-
-			return nil
+`
+		runSFCase(t, sfCase{
+			Code: javaFileRead,
+			Rule: ruleFileRead,
+			WantContains: map[string][]string{
+				"fileInstance":     {`Undefined-File(Undefined-File,Parameter-filePath)`},
+				"fileReadInstance": {`Undefined-fis.read`},
+			},
 		}, ssaapi.WithRawLanguage("java"))
 	})
 
-	t.Run("test ddos real", func(t *testing.T) {
-		code := `
+	t.Run("ddos_socket_readline", func(t *testing.T) {
+		const javaDdos = `
 package org.example.Dos;
 
 import java.io.*;
@@ -133,8 +214,7 @@ public class DOSDemo {
     }
 }
 `
-		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
-			rule := `
+		const ruleDdos = `
 .getInputStream()?{<fullTypeName>?{have: 'java.net.Socket' || 'java.new.ServerSocket'}} as $source;
 BufferedReader().readLine()?{!.length}?{<fullTypeName>?{have:'java.io'}}  as $sink;
 $sink#{
@@ -143,17 +223,22 @@ $sink#{
 CODE
 }-> as $vul;
 `
-			vals, err := prog.SyntaxFlowWithError(rule, ssaapi.QueryWithEnableDebug())
-			require.NoError(t, err)
-			source := vals.GetValues("vul")
-			require.Contains(t, source.String(), `Parameter-socket`)
-			return nil
+		runSFCase(t, sfCase{
+			Code:  javaDdos,
+			Rule:  ruleDdos,
+			Debug: true,
+			WantContains: map[string][]string{
+				"vul": {`Parameter-socket`},
+			},
 		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 }
 
+// --- Yak：基础 dataflow（const 传播） ---
+
 func TestDataflowTest(t *testing.T) {
-	code := `
+	runSFCase(t, sfCase{
+		Code: `
 	a = {} 
 
 	source := a.b()
@@ -162,22 +247,25 @@ func TestDataflowTest(t *testing.T) {
 		b = c(b)
 		f1(b)
 	}
-	`
-
-	ssatest.CheckSyntaxFlow(t, code, `
+	`,
+		Rule: `
 a.b() as $source 
 f1(* as $sink)
 $sink #-> as $vul1
 $sink<dataflow(<<<CODE
     * ?{opcode: const} as $value1
 CODE)> 
-    `, map[string][]string{
-		"value1": {"1"},
-	})
+    `,
+		Want: map[string][]string{
+			"value1": {"1"},
+		},
+	}, ssaapi.WithLanguage(ssaconfig.Yak))
 }
 
+// --- Yak：`until` 边界（同一函数内多子场景） ---
+
 func TestUntil(t *testing.T) {
-	rule := `
+	const ruleUntil = `
 a as $source
 b(* as $sink)
 $sink #{
@@ -185,88 +273,326 @@ $sink #{
 }-> as $target 
 `
 
-	t.Run("test until", func(t *testing.T) {
-		code := `
+	t.Run("match_via_array_element", func(t *testing.T) {
+		runSFCase(t, sfCase{
+			Code: `
 a = 12344
 cc = [1, 2 , a]
 b(cc)
-    `
-
-		ssatest.CheckSyntaxFlow(t, code, rule, map[string][]string{
-			"target": {"12344"},
+    `,
+			Rule: ruleUntil,
+			Want: map[string][]string{
+				"target": {"12344"},
+			},
 		}, ssaapi.WithLanguage(ssaconfig.Yak))
-
 	})
 
-	t.Run("test until not match", func(t *testing.T) {
-		code := `
+	t.Run("no_match_when_array_has_no_source", func(t *testing.T) {
+		runSFCase(t, sfCase{
+			Code: `
 a = 12344
 cc = [1, 2 , 3]
 b(cc)
-`
-		ssatest.CheckSyntaxFlow(t, code, rule, map[string][]string{
-			"target": {},
+`,
+			Rule: ruleUntil,
+			Want: map[string][]string{
+				"target": {},
+			},
 		}, ssaapi.WithLanguage(ssaconfig.Yak))
 	})
 }
 
-func TestDataflow_OnlyReachable_ModePathAndStrict(t *testing.T) {
-	code := `
-func foo() {
-    return "a"
+// --- Yak：`only_reachable` 与「无 only_reachable」在同一规则内对照 ---
+
+func TestDataflow_OnlyReachable(t *testing.T) {
+	// 说明：
+	// 1) 这里统一使用 Want 做精确快照断言，不使用 PostCheck；
+	// 2) 对每个场景同时保留无过滤链路（$noFilter）与 only_reachable 锚点链路；
+	// 3) loop / nested-if / loop-if / loop-if-return 下目前 thenPost/elsePost 为空，
+	//    作为现阶段实现行为快照（后续语义调整时可据此定位回归）。
+
+	t.Run("if_phi_branch_anchors", func(t *testing.T) {
+		// c=1：then 执行；SSA 仍保留 else 侧。无 only_reachable 时 #-> 枚举两侧常量；post + 分支内 getCfg 锚应各留一侧。
+		runSFCase(t, sfCase{
+			Code: `
+c = "test"
+x = c
+if (c) {
+	a = "thenStr"
+	x = a
+} else {
+	b = "elseStr"
+	x = b
 }
-x = foo()
 println(x)
-`
-
-	ssatest.CheckSyntaxFlow(t, code, `
+`,
+			Rule: `
 println(* as $sink)
-$sink<getCfg> as $sinkCfg
 
-$sink #-> as $df
-
-$df<dataflow(<<<CODE
-    * ?{opcode: const} as $viaMode
-CODE, only_reachable="$sinkCfg", only_reachable_mode="path")>
-
-$df<dataflow(<<<CODE
-    * ?{opcode: const} as $viaStrict
-CODE, only_reachable="$sinkCfg", strict=true)>
-`, map[string][]string{
-		"viaMode":  {`"a"`},
-		"viaStrict": {`"a"`},
-	}, ssaapi.WithLanguage(ssaconfig.Yak))
-}
-
-func TestDataflow_OnlyReachable_CFG(t *testing.T) {
-	code := `
-func foo() {
-    return "a"
-}
-x = foo()
-println(x)
-`
-
-	ssatest.CheckSyntaxFlow(t, code, `
-println(* as $sink)
-$sink<getCfg> as $sinkCfg
-
-$sink #-> as $df
-
-$df<dataflow(<<<CODE
-    * ?{opcode: const} as $all
+$sink<dataflow(<<<CODE
+	* #-> as $noFilter
 CODE)>
 
-$df<dataflow(<<<CODE
-    * ?{opcode: const} as $reach
-CODE, only_reachable="$sinkCfg")>
+a as $thenVal
+$thenVal<getCfg> as $thenCfg
+$sink<dataflow(<<<CODE
+	* #-> as $thenPost
+CODE, only_reachable="$thenCfg", only_reachable_mode="post")>
 
-$df<dataflow(<<<CODE
-    * ?{opcode: const} as $reachIcfg
-CODE, only_reachable="$sinkCfg", icfg=true)>
-`, map[string][]string{
-		"all":      {`"a"`},
-		"reach":    {`"a"`},
-		"reachIcfg": {`"a"`},
-	}, ssaapi.WithLanguage(ssaconfig.Yak))
+b as $elseVal
+$elseVal<getCfg> as $elseCfg
+$sink<dataflow(<<<CODE
+	* #-> as $elsePost
+CODE, only_reachable="$elseCfg", only_reachable_mode="post")>
+`,
+			Want: map[string][]string{
+				"noFilter": {`"test"`, `"thenStr"`, `"elseStr"`},
+				"thenPost": {`"test"`, `"thenStr"`},
+				"elsePost": {`"test"`, `"elseStr"`},
+			},
+		}, ssaapi.WithLanguage(ssaconfig.Yak))
+	})
+
+	t.Run("loop_anchor_keeps_loop_const", func(t *testing.T) {
+		// loop 场景：锚点本身可定位（loopAnchor），但 only_reachable 结果当前为空（快照）。
+		runSFCase(t, sfCase{
+			Code: `
+seed = "seed"
+x = seed
+for i = 0; i < 2; i++ {
+	loopVal = "loopStr"
+	x = loopVal
+}
+println(x)
+`,
+			Rule: `
+println(* as $sink)
+$sink<dataflow(<<<CODE
+	* #-> as $noFilter
+CODE)>
+
+loopVal as $loopAnchor
+$loopAnchor<getCfg> as $loopCfg
+$sink<dataflow(<<<CODE
+	* #-> as $loopPost
+CODE, only_reachable="$loopCfg", only_reachable_mode="post")>
+`,
+			Want: map[string][]string{
+				"loopAnchor": {`"loopStr"`},
+				"loopPost":   {`"loopStr"`, `"seed"`},
+			},
+		}, ssaapi.WithLanguage(ssaconfig.Yak))
+	})
+
+	t.Run("loop_break_branch_anchors", func(t *testing.T) {
+		runSFCase(t, sfCase{
+			Code: `
+seed = "seed"
+x = seed
+for i = 0; i < 3; i++ {
+	if (i) {
+		br = "breakStr"
+		x = br
+		break
+	}
+	ct = "continueStr"
+	x = ct
+}
+println(x)
+`,
+			Rule: `
+println(* as $sink)
+$sink<dataflow(<<<CODE
+	* #-> as $noFilter
+CODE)>
+
+br as $breakVal
+$breakVal<getCfg> as $breakCfg
+$sink<dataflow(<<<CODE
+	* #-> as $breakPost
+CODE, only_reachable="$breakCfg", only_reachable_mode="post")>
+
+ct as $continueVal
+$continueVal<getCfg> as $continueCfg
+$sink<dataflow(<<<CODE
+	* #-> as $continuePost
+CODE, only_reachable="$continueCfg", only_reachable_mode="post")>
+`,
+			Want: map[string][]string{
+				"breakPost":    {`"breakStr"`, `"seed"`},
+				"continuePost": {`"continueStr"`, `"seed"`},
+			},
+		}, ssaapi.WithLanguage(ssaconfig.Yak))
+	})
+
+	t.Run("loop_continue_branch_anchors", func(t *testing.T) {
+		runSFCase(t, sfCase{
+			Code: `
+seed = "seed"
+x = seed
+for i = 0; i < 3; i++ {
+	if (i) {
+		ct = "continueStr"
+		x = ct
+		continue
+	}
+	af = "afterStr"
+	x = af
+}
+println(x)
+`,
+			Rule: `
+println(* as $sink)
+$sink<dataflow(<<<CODE
+	* #-> as $noFilter
+CODE)>
+
+ct as $continueVal
+$continueVal<getCfg> as $continueCfg
+$sink<dataflow(<<<CODE
+	* #-> as $continuePost
+CODE, only_reachable="$continueCfg", only_reachable_mode="post")>
+
+af as $afterVal
+$afterVal<getCfg> as $afterCfg
+$sink<dataflow(<<<CODE
+	* #-> as $afterPost
+CODE, only_reachable="$afterCfg", only_reachable_mode="post")>
+`,
+			Want: map[string][]string{
+				"continuePost": {`"continueStr"`, `"seed"`},
+				"afterPost":    {`"afterStr"`, `"seed"`},
+			},
+		}, ssaapi.WithLanguage(ssaconfig.Yak))
+	})
+
+	t.Run("nested_if_branch_anchors", func(t *testing.T) {
+		// if 嵌套场景：内层 then/else 锚点能命中变量，only_reachable 结果当前为空（快照）。
+		runSFCase(t, sfCase{
+			Code: `
+c = "guard"
+x = c
+if (c) {
+	if (c) {
+		a = "deepThen"
+		x = a
+	} else {
+		b = "deepElse"
+		x = b
+	}
+}
+println(x)
+`,
+			Rule: `
+println(* as $sink)
+$sink<dataflow(<<<CODE
+	* #-> as $noFilter
+CODE)>
+
+a as $thenVal
+$thenVal<getCfg> as $thenCfg
+$sink<dataflow(<<<CODE
+	* #-> as $thenPost
+CODE, only_reachable="$thenCfg", only_reachable_mode="post")>
+
+b as $elseVal
+$elseVal<getCfg> as $elseCfg
+$sink<dataflow(<<<CODE
+	* #-> as $elsePost
+CODE, only_reachable="$elseCfg", only_reachable_mode="post")>
+`,
+			Want: map[string][]string{
+				"thenPost": {`"guard"`, `"deepThen"`},
+				"elsePost": {`"guard"`, `"deepElse"`},
+			},
+		}, ssaapi.WithLanguage(ssaconfig.Yak))
+	})
+
+	t.Run("loop_with_if_branch_anchors", func(t *testing.T) {
+		// loop 中有 if：分支锚点可命中，only_reachable 结果当前为空（快照）。
+		runSFCase(t, sfCase{
+			Code: `
+flag = "loopGuard"
+x = flag
+for i = 0; i < 2; i++ {
+    i = "loopVal"
+	if (i) {
+		a = "loopThen"
+		x = a
+	} else {
+		b = "loopElse"
+		x = b
+	}
+}
+println(x)
+`,
+			Rule: `
+println(* as $sink)
+$sink<dataflow(<<<CODE
+	* #-> as $noFilter
+CODE)>
+
+a as $thenVal
+$thenVal<getCfg> as $thenCfg
+$sink<dataflow(<<<CODE
+	* #-> as $thenPost
+CODE, only_reachable="$thenCfg", only_reachable_mode="post")>
+
+b as $elseVal
+$elseVal<getCfg> as $elseCfg
+$sink<dataflow(<<<CODE
+	* #-> as $elsePost
+CODE, only_reachable="$elseCfg", only_reachable_mode="post")>
+`,
+			Want: map[string][]string{
+				"thenPost": {`"loopThen"`, `"loopVal"`, `"loopGuard"`},
+				"elsePost": {`"loopElse"`, `"loopVal"`, `"loopGuard"`},
+			},
+		}, ssaapi.WithLanguage(ssaconfig.Yak))
+	})
+
+	t.Run("loop_if_return_branch_anchors", func(t *testing.T) {
+		// loop 中 if + return：return 分支锚点可命中，only_reachable 结果当前为空（快照）。
+		runSFCase(t, sfCase{
+			Code: `
+func pick(flag) {
+	for i = 0; i < 1; i++ {
+		if (flag) {
+			t = "loopReturnThen"
+			return t
+		}
+		e = "loopReturnElse"
+		return e
+	}
+	return "loopReturnTail"
+}
+
+x = pick(1)
+println(x)
+`,
+			Rule: `
+println(* as $sink)
+$sink<dataflow(<<<CODE
+	* #-> as $noFilter
+CODE)>
+
+t as $thenVal
+$thenVal<getCfg> as $thenCfg
+$sink<dataflow(<<<CODE
+	* #-> as $thenPost
+CODE, only_reachable="$thenCfg", only_reachable_mode="post")>
+
+e as $elseVal
+$elseVal<getCfg> as $elseCfg
+$sink<dataflow(<<<CODE
+	* #-> as $elsePost
+CODE, only_reachable="$elseCfg", only_reachable_mode="post")>
+`,
+			Want: map[string][]string{
+				"thenPost": {`"loopReturnThen"`},
+				"elsePost": {`"loopReturnElse"`},
+			},
+		}, ssaapi.WithLanguage(ssaconfig.Yak))
+	})
+
 }

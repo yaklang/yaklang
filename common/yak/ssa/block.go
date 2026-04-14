@@ -177,7 +177,11 @@ func (b *BasicBlock) SetConditionFromValue(v Value, source string) {
 	if b == nil || utils.IsNil(v) {
 		return
 	}
-	b.Condition = v.GetId()
+	// Do not assign b.Condition here: that field is owned by ssa4analyze.BlockCondition
+	// (merged reachability formula). Early ids break getCondition(), which ANDs edgeCond
+	// with GetValueById(from.Condition) and can call NewBinOp with a nil operand when the
+	// id is not yet a resolvable Value. Use ConditionValues / ConditionInst / ConditionMeta
+	// for CFG and block condition summaries instead.
 	b.ConditionValues = []int64{v.GetId()}
 	if b.ConditionMeta == nil {
 		b.ConditionMeta = map[string]any{}

@@ -12,6 +12,14 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
+// GuardKind* are stable strings for GuardPredicateValue.Kind / <cfgGuards> output.
+const (
+	GuardKindEarlyReturn   = "earlyReturn"
+	GuardKindEarlyPanic    = "earlyPanic"
+	GuardKindEarlyBreak    = "earlyBreak"
+	GuardKindEarlyContinue = "earlyContinue"
+)
+
 // GuardFieldValue is a synthetic member carrier used by GuardPredicateValue.GetFields().
 //
 // It matches by member-key (ssadb.KeyMatch) on FieldKey, and delegates const/string
@@ -179,7 +187,8 @@ type GuardPredicateValue struct {
 	// Polarity describes the required truth value to reach the sink path.
 	Polarity bool
 
-	// Kind is a short classifier, e.g. "earlyReturn".
+	// Kind is a short classifier; use GuardKind* constants (earlyReturn / earlyPanic /
+	// earlyBreak / earlyContinue).
 	Kind string
 
 	// Text is optional evidence for humans; do not rely on it for matching.

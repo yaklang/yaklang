@@ -227,7 +227,12 @@ func (a *SyntaxFlowAction) GetResultBySFResult(
 	case index == -1:
 		// "syntaxflow://program_id/variable_name"
 		// response: variable values
-		valueLen := result.GetValueCount(variable)
+		vs := result.GetValues(variable)
+		valueLen := len(vs)
+		if valueLen == 0 {
+			// Fallback for legacy/stale metadata paths where only count is available.
+			valueLen = result.GetValueCount(variable)
+		}
 		finish = false
 		if params.PageSize <= 0 {
 			params.PageSize = int64(valueLen)
@@ -238,8 +243,21 @@ func (a *SyntaxFlowAction) GetResultBySFResult(
 				finish = true
 				break
 			}
-			v, err := result.GetValue(variable, index)
+			var (
+				v   *ssaapi.Value
+				err error
+			)
+			if len(vs) > int(index) {
+				v = vs[index]
+			} else {
+				v, err = result.GetValue(variable, index)
+			}
 			if v == nil || err != nil {
+				// Keep noisy out-of-range metadata mismatches from spamming logs.
+				if err != nil && strings.Contains(strings.ToLower(err.Error()), "index out of range") {
+					finish = true
+					break
+				}
 				log.Errorf("Get Value By SSA URL Faild:%v", err)
 				continue
 			}
@@ -247,10 +265,13 @@ func (a *SyntaxFlowAction) GetResultBySFResult(
 			if query.haveRange && codeRange.URL == "" {
 				continue
 			}
-			extraData := []extra{
-				{"index", index},
-				{"code_range", codeRange},
-				{"source", source}}
+			extraData := []extra{{"index", index}}
+			// Avoid exporting empty code-range payloads; some clients treat empty URL
+			// as "undefined" file path and spam file-content fetch errors.
+			if codeRange != nil && codeRange.URL != "" {
+				extraData = append(extraData, extra{"code_range", codeRange})
+				extraData = append(extraData, extra{"source", source})
+			}
 			if hash := result.GetRiskHash(variable, int(index)); hash != "" {
 				extraData = append(extraData, extra{"risk_hash", hash})
 			}
@@ -262,6 +283,15 @@ func (a *SyntaxFlowAction) GetResultBySFResult(
 			} else {
 				res.ResourceName = v.String()
 			}
+			// <getCfg> / CfgCtxValue bridges to a string const with no source range; expose as message so
+			// clients do not treat the row as a file-backed SSA value (avoids endless load / bad fetches).
+			if s, ok := v.GetConstValue().(string); ok && ssaapi.IsCfgCtxURLDisplayString(s) {
+				if codeRange == nil || codeRange.URL == "" {
+					res.ResourceType = "message"
+					res.VerboseType = "cfg_ctx"
+					res.ResourceName = s
+				}
+			}
 			resources = append(resources, res)
 		}
 
@@ -272,10 +302,16 @@ func (a *SyntaxFlowAction) GetResultBySFResult(
 		// "syntaxflow://program_id/variable_name/index"
 		// response: variable value
 		vs := result.GetValues(variable)
-		if int(index) >= len(vs) {
-			return nil, utils.Errorf("index out of range: %d", index)
+		var value *ssaapi.Value
+		if int(index) >= 0 && int(index) < len(vs) {
+			value = vs[index]
+		} else {
+			var gerr error
+			value, gerr = result.GetValue(variable, int(index))
+			if gerr != nil || value == nil {
+				return nil, utils.Errorf("index out of range: %d", index)
+			}
 		}
-		value := vs[index]
 		msg, _ := result.GetAlertMsg(variable)
 		res := Value2Response(programName, value, msg, url)
 		resources = append(resources, res)
@@ -412,6 +448,16 @@ func Variable2Response(result *ssaapi.SyntaxFlowResult, url *ypb.YakURL) []*ypb.
 }
 
 func Value2Response(programName string, value *ssaapi.Value, msg string, url *ypb.YakURL) *ypb.YakURLResource {
+	if s, ok := value.GetConstValue().(string); ok && ssaapi.IsCfgCtxURLDisplayString(s) {
+		cr, _ := ssaapi.CoverCodeRange(value.GetRange())
+		if cr == nil || cr.URL == "" {
+			res := createNewRes(url, 0, []extra{{"message", msg}})
+			res.ResourceType = "message"
+			res.VerboseType = "cfg_ctx"
+			res.ResourceName = s
+			return res
+		}
+	}
 	graphInfo := value.GetGraphInfo()
 	res := createNewRes(url, 0, []extra{
 		{"node_id", graphInfo.NodeID},

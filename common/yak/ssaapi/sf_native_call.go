@@ -1494,9 +1494,9 @@ func init() {
 
 	// ---- CFG helpers (intra-procedural, stage-1) ----
 	registerNativeCall(NativeCall_GetCFG, nc_func(nativeCallGetCFG), nc_desc(`获取输入命中点的 CFG 上下文（函数/基本块/指令定位），供 cfg* 系列 native call 使用。`))
-	registerNativeCall(NativeCall_CFGGuards, nc_func(nativeCallCFGGuards), nc_desc(`CFG guard 摘要：提取 early-return guard（如 if(cond) return）在当前命中点处的路径约束（最小实现）。`))
-	registerNativeCall(NativeCall_CFGDominates, nc_func(nativeCallCFGRel("cfgDominates", dominates)), nc_desc(`CFG 支配关系：当前 cfg 是否支配 target cfg（同函数内）。config 参数：target="$var"。`))
-	registerNativeCall(NativeCall_CFGPostDom, nc_func(nativeCallCFGRel("cfgPostDominates", postDominates)), nc_desc(`CFG 后支配关系：当前 cfg 是否后支配 target cfg（同函数内，最小虚拟出口）。config 参数：target="$var"。`))
+	registerNativeCall(NativeCall_CFGGuards, nc_func(nativeCallCFGGuards), nc_desc(`CFG guard：链上 cfg 为 sink；同函数内扫两路分支，分支块须可达 sink，且一侧出口化、另一侧可达 sink 时输出 GuardPredicateValue。polarity 表示沿 sink 路径所需条件真值；kind 为截断侧分类（GuardKind*）。条件 ID 优先 BlockConditionSummary。无 config；无命中时报错。详见 control_flow_limitations.md cfgGuards 一节。`))
+	registerNativeCall(NativeCall_CFGDominates, nc_func(nativeCallCFGDominates), nc_desc(`CFG 支配（必经 target）：从函数入口沿控制流到当前 cfg 是否必经 target cfg；等价于图论上 target 支配当前点（同函数内）。同基本块且当前点与 target 的 InstID 均落在该块 Insts 中时按指令序细化。config 参数：target="$var"。`))
+	registerNativeCall(NativeCall_CFGPostDom, nc_func(nativeCallCFGPostDominates), nc_desc(`CFG 后支配（必经 target）：从当前 cfg 沿控制流走向函数出口是否必经 target cfg；等价于图论上 target 后支配当前点（同函数内，最小虚拟出口）。同基本块且当前点与 target 的 InstID 均落在该块 Insts 中时按指令序细化。config 参数：target="$var"。`))
 	registerNativeCall(NativeCall_CFGReachable, nc_func(nativeCallCFGReachable), nc_desc(`CFG 可达性：当前 cfg 是否可达 target cfg。config 参数：target="$var"；可选 icfg=true；可选 max_depth/max_nodes。`))
 	registerNativeCall(NativeCall_CFGReachPath, nc_func(nativeCallCFGReachPath), nc_desc(`CFG 最短路径证据：从当前 cfg 到 target 的 (函数,块) 链；不可达返回空字符串。config 参数同 cfgReachable。`))
 	registerNativeCall(NativeCall_CFGCondition, nc_func(nativeCallCFGCondition), nc_desc(`CFG 条件摘要：返回当前 block 的条件证据（inst/value/source/schema）。config 参数：无。`))

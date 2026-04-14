@@ -1,39 +1,11 @@
 package ssaapi
 
 import (
-	"fmt"
-	"slices"
 	"strings"
-	"sync"
 
-	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
-
-// ---- CFG cache (intra-procedural) ----
-
-type cfgCacheKey struct {
-	progName string
-	funcID   int64
-}
-
-type domCache struct {
-	// idom[blockID] = immediate dominator blockID, 0 for entry or unknown
-	idom map[int64]int64
-	// postIDom[blockID] = immediate post-dominator blockID (virtual exit supported)
-	postIDom map[int64]int64
-}
-
-var cfgDomCache sync.Map // map[cfgCacheKey]*domCache
-
-func getProgNameForCache(p *Program) string {
-	if p == nil || p.Program == nil {
-		return ""
-	}
-	return p.Program.GetProgramName()
-}
 
 func getFunctionByID(p *Program, funcID int64) (*ssa.Function, error) {
 	if p == nil || p.Program == nil || funcID <= 0 {
@@ -105,1070 +77,113 @@ func isExitLikeBlock(fn *ssa.Function, blockID int64) bool {
 	return false
 }
 
-// computeDominators computes immediate dominators for all reachable blocks (block-level).
-// Algorithm: classic iterative dataflow on sets, then derive idom.
-func computeDominators(fn *ssa.Function) map[int64]int64 {
-	if fn == nil || fn.EnterBlock <= 0 {
-		return nil
+// cfgGuardsLoopLatchFromLoop returns the latch block id for a for-loop (body fall-through target),
+// used to recognize continue (jump-to-latch) vs break (jump-to-loop.Exit).
+func cfgGuardsLoopLatchFromLoop(fn *ssa.Function, l *ssa.Loop) int64 {
+	if fn == nil || l == nil {
+		return 0
 	}
-
-	blocks := fn.Blocks
-	if len(blocks) == 0 {
-		return nil
+	body, ok := fn.GetBasicBlockByID(l.Body)
+	if !ok || body == nil {
+		return 0
 	}
-
-	entry := fn.EnterBlock
-	all := make(map[int64]struct{}, len(blocks))
-	for _, bid := range blocks {
-		all[bid] = struct{}{}
-	}
-
-	// dom[n] as set
-	dom := make(map[int64]map[int64]struct{}, len(blocks))
-	for _, n := range blocks {
-		dom[n] = make(map[int64]struct{}, len(all))
-		if n == entry {
-			dom[n][entry] = struct{}{}
-		} else {
-			for k := range all {
-				dom[n][k] = struct{}{}
-			}
+	for _, s := range body.Succs {
+		if s > 0 && s != l.Exit {
+			return s
 		}
 	}
-
-	changed := true
-	for changed {
-		changed = false
-		for _, n := range blocks {
-			if n == entry {
-				continue
-			}
-			b, ok := fn.GetBasicBlockByID(n)
-			if !ok || b == nil {
-				continue
-			}
-			// newDom = {n} U (intersection of dom[p] for all preds)
-			newDom := make(map[int64]struct{}, len(all))
-			newDom[n] = struct{}{}
-
-			// start intersection with first pred that exists
-			first := true
-			var inter map[int64]struct{}
-			for _, pid := range b.Preds {
-				if _, ok := dom[pid]; !ok {
-					continue
-				}
-				if first {
-					inter = make(map[int64]struct{}, len(dom[pid]))
-					for k := range dom[pid] {
-						inter[k] = struct{}{}
-					}
-					first = false
-					continue
-				}
-				// inter = inter ∩ dom[pid]
-				for k := range inter {
-					if _, ok := dom[pid][k]; !ok {
-						delete(inter, k)
-					}
-				}
-			}
-			for k := range inter {
-				newDom[k] = struct{}{}
-			}
-
-			// compare
-			if len(newDom) != len(dom[n]) {
-				dom[n] = newDom
-				changed = true
-				continue
-			}
-			for k := range newDom {
-				if _, ok := dom[n][k]; !ok {
-					dom[n] = newDom
-					changed = true
-					break
-				}
-			}
-		}
-	}
-
-	// derive idom: idom(entry)=0; for n!=entry choose d in dom[n]\{n} that is not dominated by any other in dom[n]\{n}.
-	idom := make(map[int64]int64, len(blocks))
-	idom[entry] = 0
-	for _, n := range blocks {
-		if n == entry {
-			continue
-		}
-		var cands []int64
-		for d := range dom[n] {
-			if d == n {
-				continue
-			}
-			cands = append(cands, d)
-		}
-		// pick the closest: a candidate d such that no other candidate d2 (d2!=d) dominates d.
-		var best int64
-		for _, d := range cands {
-			isBest := true
-			for _, d2 := range cands {
-				if d2 == d {
-					continue
-				}
-				// d2 dominates d ?
-				if _, ok := dom[d][d2]; ok {
-					// if d2 in dom[d], then d2 dominates d
-					isBest = false
-					break
-				}
-			}
-			if isBest {
-				best = d
-				break
-			}
-		}
-		idom[n] = best
-	}
-	return idom
+	return 0
 }
 
-// computePostDominators: minimal block-level post-dominators using virtual exit.
-func computePostDominators(fn *ssa.Function) map[int64]int64 {
-	if fn == nil || fn.EnterBlock <= 0 {
-		return nil
+// cfgGuardsLoopBreakContinueTargets collects Loop.Exit (break) and latch (continue) block ids.
+func cfgGuardsLoopBreakContinueTargets(fn *ssa.Function) (loopExits, loopLatches map[int64]struct{}) {
+	loopExits = make(map[int64]struct{})
+	loopLatches = make(map[int64]struct{})
+	if fn == nil {
+		return loopExits, loopLatches
 	}
-	blocks := fn.Blocks
-	if len(blocks) == 0 {
-		return nil
-	}
-
-	// virtual exit node id: -1
-	const vExit int64 = -1
-
-	all := make(map[int64]struct{}, len(blocks)+1)
-	for _, bid := range blocks {
-		all[bid] = struct{}{}
-	}
-	all[vExit] = struct{}{}
-
-	// build reverse preds (postdom uses succs in forward graph; we'll intersect over succs)
-	getSuccs := func(bid int64) []int64 {
-		if bid == vExit {
-			return nil
-		}
+	for _, bid := range fn.Blocks {
 		b, ok := fn.GetBasicBlockByID(bid)
 		if !ok || b == nil {
-			return nil
-		}
-		// Treat blocks with no succs as exiting to vExit.
-		if len(b.Succs) == 0 {
-			return []int64{vExit}
-		}
-		return b.Succs
-	}
-
-	// pdom[n] as set
-	pdom := make(map[int64]map[int64]struct{}, len(blocks)+1)
-	for k := range all {
-		pdom[k] = make(map[int64]struct{}, len(all))
-		if k == vExit {
-			pdom[k][vExit] = struct{}{}
-		} else {
-			for a := range all {
-				pdom[k][a] = struct{}{}
-			}
-		}
-	}
-
-	changed := true
-	for changed {
-		changed = false
-		for _, n := range blocks {
-			succs := getSuccs(n)
-			newSet := make(map[int64]struct{}, len(all))
-			newSet[n] = struct{}{}
-			first := true
-			var inter map[int64]struct{}
-			for _, s := range succs {
-				if _, ok := pdom[s]; !ok {
-					continue
-				}
-				if first {
-					inter = make(map[int64]struct{}, len(pdom[s]))
-					for k := range pdom[s] {
-						inter[k] = struct{}{}
-					}
-					first = false
-					continue
-				}
-				for k := range inter {
-					if _, ok := pdom[s][k]; !ok {
-						delete(inter, k)
-					}
-				}
-			}
-			for k := range inter {
-				newSet[k] = struct{}{}
-			}
-
-			if len(newSet) != len(pdom[n]) {
-				pdom[n] = newSet
-				changed = true
-				continue
-			}
-			for k := range newSet {
-				if _, ok := pdom[n][k]; !ok {
-					pdom[n] = newSet
-					changed = true
-					break
-				}
-			}
-		}
-	}
-
-	// derive immediate post-dominator (ipdom) from pdom sets (exclude self).
-	ipdom := make(map[int64]int64, len(blocks))
-	for _, n := range blocks {
-		var cands []int64
-		for d := range pdom[n] {
-			if d == n {
-				continue
-			}
-			cands = append(cands, d)
-		}
-		// pick closest: d such that no other candidate d2 is post-dominated by d (mirror of idom derivation)
-		var best int64
-		for _, d := range cands {
-			isBest := true
-			for _, d2 := range cands {
-				if d2 == d {
-					continue
-				}
-				// d2 post-dominates d ? equivalently d2 in pdom[d]
-				if _, ok := pdom[d][d2]; ok {
-					isBest = false
-					break
-				}
-			}
-			if isBest {
-				best = d
-				break
-			}
-		}
-		// ignore virtual exit in result mapping
-		if best == vExit {
-			ipdom[n] = 0
-		} else {
-			ipdom[n] = best
-		}
-	}
-	return ipdom
-}
-
-func getOrBuildDomCache(p *Program, funcID int64) *domCache {
-	key := cfgCacheKey{progName: getProgNameForCache(p), funcID: funcID}
-	if v, ok := cfgDomCache.Load(key); ok {
-		if c, ok := v.(*domCache); ok {
-			return c
-		}
-	}
-	fn, err := getFunctionByID(p, funcID)
-	if err != nil {
-		return &domCache{idom: map[int64]int64{}, postIDom: map[int64]int64{}}
-	}
-	c := &domCache{
-		idom:     computeDominators(fn),
-		postIDom: computePostDominators(fn),
-	}
-	cfgDomCache.Store(key, c)
-	return c
-}
-
-func dominates(p *Program, a, b *CfgCtxValue) bool {
-	if a == nil || b == nil || a.IsEmpty() || b.IsEmpty() {
-		return false
-	}
-	if a.FuncID != b.FuncID {
-		return false
-	}
-	cache := getOrBuildDomCache(p, a.FuncID)
-	if cache == nil || cache.idom == nil {
-		return false
-	}
-	// walk from b up to entry
-	cur := b.BlockID
-	for cur != 0 && cur != a.BlockID {
-		cur = cache.idom[cur]
-	}
-	return cur == a.BlockID
-}
-
-func postDominates(p *Program, a, b *CfgCtxValue) bool {
-	if a == nil || b == nil || a.IsEmpty() || b.IsEmpty() {
-		return false
-	}
-	if a.FuncID != b.FuncID {
-		return false
-	}
-	cache := getOrBuildDomCache(p, a.FuncID)
-	if cache == nil || cache.postIDom == nil {
-		return false
-	}
-	cur := b.BlockID
-	for cur != 0 && cur != a.BlockID {
-		cur = cache.postIDom[cur]
-	}
-	return cur == a.BlockID
-}
-
-type reachableOptions struct {
-	icfg     bool
-	maxDepth int
-	maxNodes int
-}
-
-// reachState is a BFS position for cfgReachable / cfgReachPath (includes inter-procedural depth).
-type reachState struct {
-	funcID  int64
-	blockID int64
-	depth   int
-}
-
-// icfgReturnSuccessors lists (callerFunc, succBlock) pairs: context-insensitive return from callee
-// to the intra-procedural successors of any block that contains a direct call to callee.
-func icfgReturnSuccessors(p *Program, calleeID int64) []reachState {
-	if p == nil || p.Program == nil || calleeID <= 0 {
-		return nil
-	}
-	targetFn, _ := getFunctionByID(p, calleeID)
-	seen := make(map[reachState]struct{})
-	var out []reachState
-	p.Program.EachFunction(func(fn *ssa.Function) {
-		if fn == nil {
-			return
-		}
-		callerID := fn.GetId()
-		for _, bid := range fn.Blocks {
-			blk, ok := fn.GetBasicBlockByID(bid)
-			if !ok || blk == nil {
-				continue
-			}
-			for _, instID := range blk.Insts {
-				ins, ok := blk.GetInstructionById(instID)
-				if !ok || ins == nil {
-					continue
-				}
-				call, ok := ssa.ToCall(ins)
-				if !ok || call == nil {
-					continue
-				}
-				method, ok := call.GetValueById(call.Method)
-				if !ok || method == nil {
-					continue
-				}
-				calleeFn, ok := ssa.ToFunction(method)
-				matchesCallee := call.Method == calleeID
-				if !matchesCallee && ok && calleeFn != nil {
-					matchesCallee = calleeFn.GetId() == calleeID
-					if !matchesCallee && targetFn != nil && calleeFn.GetName() == targetFn.GetName() {
-						matchesCallee = true
-					}
-				}
-				if !matchesCallee {
-					continue
-				}
-				// Resume in the same block (call and continuation may share one BB).
-				stSame := reachState{funcID: callerID, blockID: blk.GetId(), depth: 0}
-				if _, dup := seen[stSame]; !dup {
-					seen[stSame] = struct{}{}
-					out = append(out, stSame)
-				}
-				for _, s := range blk.Succs {
-					st := reachState{funcID: callerID, blockID: s, depth: 0}
-					if _, dup := seen[st]; dup {
-						continue
-					}
-					seen[st] = struct{}{}
-					out = append(out, st)
-				}
-			}
-		}
-	})
-	return out
-}
-
-func reachabilitySearch(p *Program, a, b *CfgCtxValue, opt reachableOptions, recordPred bool) (found bool, pred map[reachState]reachState, end reachState) {
-	if a == nil || b == nil || a.IsEmpty() || b.IsEmpty() {
-		return false, nil, reachState{}
-	}
-	start := reachState{funcID: a.FuncID, blockID: a.BlockID, depth: 0}
-	targetFuncID, targetBlockID := b.FuncID, b.BlockID
-
-	seen := map[reachState]struct{}{start: {}}
-	var predMap map[reachState]reachState
-	if recordPred {
-		predMap = make(map[reachState]reachState)
-	}
-	queue := []reachState{start}
-
-	tryAdd := func(cur, nxt reachState) {
-		if _, ok := seen[nxt]; ok {
-			return
-		}
-		seen[nxt] = struct{}{}
-		if predMap != nil {
-			predMap[nxt] = cur
-		}
-		queue = append(queue, nxt)
-	}
-
-	for len(queue) > 0 {
-		cur := queue[0]
-		queue = queue[1:]
-		if cur.funcID == targetFuncID && cur.blockID == targetBlockID {
-			return true, predMap, cur
-		}
-		if opt.maxNodes > 0 && len(seen) > opt.maxNodes {
-			return false, nil, reachState{}
-		}
-		fn, err := getFunctionByID(p, cur.funcID)
-		if err != nil || fn == nil {
 			continue
 		}
-		blk, _ := fn.GetBasicBlockByID(cur.blockID)
-		if blk == nil {
-			continue
+		// Name-based (Yak for: addToBlocks renames to "loop.exit-N" / "loop.latch-N").
+		if n := b.GetName(); n != "" {
+			if strings.Contains(n, ssa.LoopExit) {
+				loopExits[bid] = struct{}{}
+			}
+			if strings.Contains(n, ssa.LoopLatch) {
+				loopLatches[bid] = struct{}{}
+			}
 		}
-
-		for _, s := range blk.Succs {
-			tryAdd(cur, reachState{funcID: cur.funcID, blockID: s, depth: cur.depth})
-		}
-
-		if !opt.icfg {
-			continue
-		}
-		if opt.maxDepth > 0 && cur.depth >= opt.maxDepth {
-			continue
-		}
-
-		for _, instID := range blk.Insts {
-			ins, ok := blk.GetInstructionById(instID)
+		for _, iid := range b.Insts {
+			ins, ok := b.GetInstructionById(iid)
 			if !ok || ins == nil {
 				continue
 			}
-			call, ok := ssa.ToCall(ins)
-			if !ok || call == nil {
+			if lz, ok := ssa.ToLazyInstruction(ins); ok && lz != nil {
+				ins = lz.Self()
+			}
+			loop, ok := ins.(*ssa.Loop)
+			if !ok || loop == nil {
 				continue
 			}
-			method, ok := call.GetValueById(call.Method)
-			if !ok || method == nil {
-				continue
+			if loop.Exit > 0 {
+				loopExits[loop.Exit] = struct{}{}
 			}
-			calleeFn, ok := ssa.ToFunction(method)
-			if !ok || calleeFn == nil || calleeFn.EnterBlock <= 0 {
-				continue
-			}
-			tryAdd(cur, reachState{funcID: calleeFn.GetId(), blockID: calleeFn.EnterBlock, depth: cur.depth + 1})
-		}
-
-		if isExitLikeBlock(fn, cur.blockID) {
-			for _, ret := range icfgReturnSuccessors(p, cur.funcID) {
-				tryAdd(cur, reachState{funcID: ret.funcID, blockID: ret.blockID, depth: cur.depth + 1})
+			if lid := cfgGuardsLoopLatchFromLoop(fn, loop); lid > 0 {
+				loopLatches[lid] = struct{}{}
 			}
 		}
 	}
-	return false, nil, reachState{}
+	return loopExits, loopLatches
 }
 
-func formatReachStateLabel(p *Program, st reachState) string {
-	fnName := "?"
-	if p != nil {
-		if fn, err := getFunctionByID(p, st.funcID); err == nil && fn != nil {
-			fnName = fn.GetName()
+// cfgGuardsAbortBranchKind classifies the exiting side of an if/two-way guard for <cfgGuards>.
+// Priority: Panic → GuardKindEarlyPanic; Return → GuardKindEarlyReturn; Jump to loop exit/latch
+// → GuardKindEarlyBreak / GuardKindEarlyContinue; else GuardKindEarlyReturn.
+func cfgGuardsAbortBranchKind(fn *ssa.Function, branchBlockID int64, loopExits, loopLatches map[int64]struct{}) string {
+	if fn == nil || branchBlockID <= 0 {
+		return GuardKindEarlyReturn
+	}
+	blk, ok := fn.GetBasicBlockByID(branchBlockID)
+	if !ok || blk == nil {
+		return GuardKindEarlyReturn
+	}
+	for _, iid := range blk.Insts {
+		ins, ok := blk.GetInstructionById(iid)
+		if !ok || ins == nil {
+			continue
+		}
+		if lz, ok := ssa.ToLazyInstruction(ins); ok && lz != nil {
+			ins = lz.Self()
+		}
+		if ins == nil {
+			continue
+		}
+		if _, ok := ins.(*ssa.Panic); ok {
+			return GuardKindEarlyPanic
+		}
+		if _, ok := ssa.ToReturn(ins); ok {
+			return GuardKindEarlyReturn
 		}
 	}
-	return fmt.Sprintf("%s[f=%d,b=%d]", fnName, st.funcID, st.blockID)
-}
-
-func cfgReachShortestPathString(p *Program, a, b *CfgCtxValue, opt reachableOptions) string {
-	ok, pred, end := reachabilitySearch(p, a, b, opt, true)
-	if !ok || pred == nil {
-		return ""
+	var last ssa.Instruction
+	if len(blk.Insts) > 0 {
+		last = blk.LastInst()
 	}
-	start := reachState{funcID: a.FuncID, blockID: a.BlockID, depth: 0}
-	var chain []string
-	cur := end
-	for {
-		chain = append(chain, formatReachStateLabel(p, cur))
-		if cur.funcID == start.funcID && cur.blockID == start.blockID {
-			break
+	if last != nil {
+		if lz, ok := ssa.ToLazyInstruction(last); ok && lz != nil {
+			last = lz.Self()
 		}
-		pr, ok := pred[cur]
-		if !ok {
-			return ""
-		}
-		cur = pr
-	}
-	slices.Reverse(chain)
-	return strings.Join(chain, " -> ")
-}
-
-// cfgCtxForValueMemo maps a dataflow [Value] program point to [CfgCtxValue] with optional memoization.
-func cfgCtxForValueMemo(p *Program, v *Value, memo map[int64]*CfgCtxValue) *CfgCtxValue {
-	if p == nil || v == nil {
-		return nil
-	}
-	id := v.GetId()
-	if memo != nil && id > 0 {
-		if c, ok := memo[id]; ok {
-			return c
-		}
-	}
-	inst := v.getInstruction()
-	if inst == nil {
-		if memo != nil && id > 0 {
-			memo[id] = nil
-		}
-		return nil
-	}
-	fn := inst.GetFunc()
-	blk := inst.GetBlock()
-	if fn == nil || blk == nil {
-		if memo != nil && id > 0 {
-			memo[id] = nil
-		}
-		return nil
-	}
-	ctx := &CfgCtxValue{
-		prog:    p,
-		FuncID:  fn.GetId(),
-		BlockID: blk.GetId(),
-		InstID:  inst.GetId(),
-	}
-	if memo != nil && id > 0 {
-		memo[id] = ctx
-	}
-	return ctx
-}
-
-func cfgConditionForValueMemo(p *Program, v *Value, cfgMemo map[int64]*CfgCtxValue, condMemo map[int64]*ssa.BlockConditionSummary) *ssa.BlockConditionSummary {
-	if p == nil || v == nil {
-		return nil
-	}
-	id := v.GetId()
-	if condMemo != nil && id > 0 {
-		if c, ok := condMemo[id]; ok {
-			return c
-		}
-	}
-	cfg := cfgCtxForValueMemo(p, v, cfgMemo)
-	if cfg == nil || cfg.IsEmpty() {
-		if condMemo != nil && id > 0 {
-			condMemo[id] = nil
-		}
-		return nil
-	}
-	summary, _ := getBlockConditionSummaryByCfgCtx(p, cfg)
-	if condMemo != nil && id > 0 {
-		condMemo[id] = summary
-	}
-	return summary
-}
-
-func getBlockConditionSummaryByCfgCtx(prog *Program, ctx *CfgCtxValue) (*ssa.BlockConditionSummary, error) {
-	if prog == nil || ctx == nil || ctx.IsEmpty() {
-		return nil, utils.Error("invalid cfg ctx")
-	}
-	fn, err := getFunctionByID(prog, ctx.FuncID)
-	if err != nil {
-		return nil, err
-	}
-	blk, err := getBlockByID(fn, ctx.BlockID)
-	if err != nil {
-		return nil, err
-	}
-	s := blk.BlockConditionSummary()
-	if s.FuncID <= 0 {
-		s.FuncID = ctx.FuncID
-	}
-	if s.BlockID <= 0 {
-		s.BlockID = ctx.BlockID
-	}
-	return &s, nil
-}
-
-// reachableOptsFromParams applies icfg/max_depth/max_nodes only when meaningful:
-// - intra-proc (icfg false): no depth/node caps (zeros = unlimited).
-// - icfg: unset (-1 from GetInt) gets plan defaults max_depth=3, max_nodes=5000; explicit 0 disables that cap.
-func reachableOptsFromParams(params *sfvm.NativeCallActualParams, icfg bool) reachableOptions {
-	if params == nil || !icfg {
-		return reachableOptions{icfg: icfg, maxDepth: 0, maxNodes: 0}
-	}
-	maxDepth := params.GetInt("max_depth", "maxDepth", "depth")
-	if maxDepth < 0 {
-		maxDepth = 3
-	}
-	maxNodes := params.GetInt("max_nodes", "maxNodes", "nodes")
-	if maxNodes < 0 {
-		maxNodes = 5000
-	}
-	return reachableOptions{icfg: true, maxDepth: maxDepth, maxNodes: maxNodes}
-}
-
-func reachableWithOptions(p *Program, a, b *CfgCtxValue, opt reachableOptions) bool {
-	ok, _, _ := reachabilitySearch(p, a, b, opt, false)
-	return ok
-}
-
-func reachable(p *Program, a, b *CfgCtxValue) bool {
-	// Backward-compatible helper; Phase-3 switches cfgReachable native call default to intra-proc,
-	// so this helper remains conservative.
-	return reachableWithOptions(p, a, b, reachableOptions{icfg: false, maxDepth: 0, maxNodes: 0})
-}
-
-// ---- native calls ----
-
-func extractCfgCtx(v sfvm.ValueOperator) (*CfgCtxValue, bool) {
-	c, ok := v.(*CfgCtxValue)
-	return c, ok
-}
-
-func fetchProgramFromCfgValues(v sfvm.Values) (*Program, error) {
-	// Prefer existing program resolution for normal SSA Values.
-	if p, err := fetchProgram(v); err == nil && p != nil {
-		return p, nil
-	}
-	// Fallback: resolve from cfg ctx carrier.
-	var prog *Program
-	_ = v.Recursive(func(op sfvm.ValueOperator) error {
-		if c, ok := op.(*CfgCtxValue); ok && c != nil && c.prog != nil {
-			prog = c.prog
-			return utils.Error("abort")
-		}
-		return nil
-	})
-	if prog != nil {
-		return prog, nil
-	}
-	return nil, utils.Error("no parent program found")
-}
-
-func nativeCallGetCFG(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
-	prog, err := fetchProgram(v)
-	if err != nil {
-		return false, nil, err
-	}
-	var out []sfvm.ValueOperator
-	_ = v.Recursive(func(op sfvm.ValueOperator) error {
-		val, ok := op.(*Value)
-		if !ok || val == nil || val.IsNil() {
-			return nil
-		}
-		inst := val.getInstruction()
-		if inst == nil {
-			return nil
-		}
-		fn := inst.GetFunc()
-		blk := inst.GetBlock()
-		if fn == nil || blk == nil {
-			return nil
-		}
-		ctx := &CfgCtxValue{
-			prog:    prog,
-			FuncID:  fn.GetId(),
-			BlockID: blk.GetId(),
-			InstID:  inst.GetId(),
-		}
-		// propagate anchor bits
-		ctx.SetAnchorBitVector(op.GetAnchorBitVector())
-		out = append(out, ctx)
-		return nil
-	})
-	if len(out) == 0 {
-		return false, nil, utils.Error("no cfg ctx produced")
-	}
-	return true, sfvm.NewValues(out), nil
-}
-
-func nativeCallCFGBlock(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
-	prog, err := fetchProgramFromCfgValues(v)
-	if err != nil {
-		return false, nil, err
-	}
-	var out []sfvm.ValueOperator
-	_ = v.Recursive(func(op sfvm.ValueOperator) error {
-		ctx, ok := extractCfgCtx(op)
-		if !ok || ctx.IsEmpty() {
-			return nil
-		}
-		s := fmt.Sprintf("func=%d block=%d", ctx.FuncID, ctx.BlockID)
-		out = append(out, prog.NewConstValue(s))
-		return nil
-	})
-	if len(out) == 0 {
-		return false, nil, utils.Error("no block info")
-	}
-	return true, sfvm.NewValues(out), nil
-}
-
-func nativeCallCFGInst(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
-	prog, err := fetchProgramFromCfgValues(v)
-	if err != nil {
-		return false, nil, err
-	}
-	var out []sfvm.ValueOperator
-	_ = v.Recursive(func(op sfvm.ValueOperator) error {
-		ctx, ok := extractCfgCtx(op)
-		if !ok || ctx.IsEmpty() {
-			return nil
-		}
-		s := fmt.Sprintf("func=%d block=%d inst=%d", ctx.FuncID, ctx.BlockID, ctx.InstID)
-		out = append(out, prog.NewConstValue(s))
-		return nil
-	})
-	if len(out) == 0 {
-		return false, nil, utils.Error("no inst info")
-	}
-	return true, sfvm.NewValues(out), nil
-}
-
-func nativeCallCFGCondition(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
-	prog, err := fetchProgramFromCfgValues(v)
-	if err != nil {
-		return false, nil, err
-	}
-	var out []sfvm.ValueOperator
-	_ = v.Recursive(func(op sfvm.ValueOperator) error {
-		ctx, ok := extractCfgCtx(op)
-		if !ok || ctx.IsEmpty() {
-			return nil
-		}
-		summary, err := getBlockConditionSummaryByCfgCtx(prog, ctx)
-		if err != nil || summary == nil {
-			return nil
-		}
-		source := ""
-		schemaVersion := ""
-		if summary.Meta != nil {
-			source = fmt.Sprintf("%v", summary.Meta["source"])
-			schemaVersion = fmt.Sprintf("%v", summary.Meta["schema_version"])
-		}
-		text := fmt.Sprintf("cond(func=%d,block=%d,inst=%d,values=%v,source=%s,schema=%s)",
-			summary.FuncID, summary.BlockID, summary.CondInstID, summary.CondValueID, source, schemaVersion)
-		out = append(out, prog.NewConstValue(text))
-		return nil
-	})
-	if len(out) == 0 {
-		return false, nil, utils.Error("cfgCondition: no condition info")
-	}
-	return true, sfvm.NewValues(out), nil
-}
-
-func nativeCallCFGConditionValues(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
-	prog, err := fetchProgramFromCfgValues(v)
-	if err != nil {
-		return false, nil, err
-	}
-	var out []sfvm.ValueOperator
-	_ = v.Recursive(func(op sfvm.ValueOperator) error {
-		ctx, ok := extractCfgCtx(op)
-		if !ok || ctx.IsEmpty() {
-			return nil
-		}
-		summary, err := getBlockConditionSummaryByCfgCtx(prog, ctx)
-		if err != nil || summary == nil {
-			return nil
-		}
-		for _, id := range summary.CondValueID {
-			ins, ok := prog.Program.GetInstructionById(id)
-			if !ok || ins == nil {
-				continue
+		if j, ok := ssa.ToJump(last); ok && j != nil && j.To > 0 {
+			if _, ok := loopExits[j.To]; ok {
+				return GuardKindEarlyBreak
 			}
-			// Prefer cached API values; fallback to wrapping instruction directly.
-			val, err := prog.GetValueById(id)
-			if err != nil || val == nil {
-				val, err = prog.NewValue(ins)
-			}
-			if err != nil || val == nil {
-				// Keep evidence availability even when a condition node is not materialized as Value.
-				out = append(out, prog.NewConstValue(id))
-				continue
-			}
-			out = append(out, val)
-		}
-		return nil
-	})
-	if len(out) == 0 {
-		return false, nil, utils.Error("cfgConditionValues: no condition values")
-	}
-	return true, sfvm.NewValues(out), nil
-}
-
-func resolveCfgTargetFromFrame(frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (*CfgCtxValue, error) {
-	if frame == nil {
-		return nil, utils.Error("cfg*: frame is nil")
-	}
-	targetVar := params.GetString(0, "target", "var", "against")
-	if targetVar == "" {
-		return nil, utils.Error("cfg*: 'target' parameter is required (e.g. target=$sinkCfg)")
-	}
-	targetVar = strings.TrimPrefix(targetVar, "$")
-	targetOp, ok := frame.GetSymbolByName(targetVar)
-	if !ok || targetOp == nil {
-		return nil, utils.Errorf("cfg*: variable '$%s' not found in current frame", targetVar)
-	}
-	var first *CfgCtxValue
-	_ = targetOp.Recursive(func(operator sfvm.ValueOperator) error {
-		if c, ok := operator.(*CfgCtxValue); ok && c != nil && !c.IsEmpty() {
-			first = c
-			return utils.Error("abort")
-		}
-		return nil
-	})
-	if first == nil {
-		return nil, utils.Errorf("cfg*: variable '$%s' contains no cfg ctx value (did you call <getCfg>?)", targetVar)
-	}
-	return first, nil
-}
-
-func nativeCallCFGRel(opName string, rel func(p *Program, a, b *CfgCtxValue) bool) sfvm.NativeCallFunc {
-	return sfvm.NativeCallFunc(func(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
-		prog, err := fetchProgramFromCfgValues(v)
-		if err != nil {
-			return false, nil, err
-		}
-		b, err := resolveCfgTargetFromFrame(frame, params)
-		if err != nil {
-			return false, nil, utils.Wrap(err, opName)
-		}
-		var out []sfvm.ValueOperator
-		_ = v.Recursive(func(op sfvm.ValueOperator) error {
-			a, ok := extractCfgCtx(op)
-			if !ok || a.IsEmpty() {
-				return nil
-			}
-			out = append(out, prog.NewConstValue(rel(prog, a, b)))
-			return nil
-		})
-		if len(out) == 0 {
-			return false, nil, utils.Errorf("%s: no cfg ctx values", opName)
-		}
-		return true, sfvm.NewValues(out), nil
-	})
-}
-
-func parseBoolParam(params *sfvm.NativeCallActualParams, key string, defaultValue bool) bool {
-	if params == nil {
-		return defaultValue
-	}
-	raw := strings.TrimSpace(params.GetString(key))
-	if raw == "" {
-		return defaultValue
-	}
-	switch strings.ToLower(raw) {
-	case "1", "t", "true", "y", "yes", "on":
-		return true
-	case "0", "f", "false", "n", "no", "off":
-		return false
-	default:
-		return defaultValue
-	}
-}
-
-func nativeCallCFGReachable(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
-	prog, err := fetchProgramFromCfgValues(v)
-	if err != nil {
-		return false, nil, err
-	}
-	b, err := resolveCfgTargetFromFrame(frame, params)
-	if err != nil {
-		return false, nil, utils.Wrap(err, "cfgReachable")
-	}
-
-	icfg := parseBoolParam(params, "icfg", false)
-	opt := reachableOptsFromParams(params, icfg)
-
-	var out []sfvm.ValueOperator
-	_ = v.Recursive(func(op sfvm.ValueOperator) error {
-		a, ok := extractCfgCtx(op)
-		if !ok || a.IsEmpty() {
-			return nil
-		}
-		out = append(out, prog.NewConstValue(reachableWithOptions(prog, a, b, opt)))
-		return nil
-	})
-	if len(out) == 0 {
-		return false, nil, utils.Errorf("cfgReachable: no cfg ctx values")
-	}
-	return true, sfvm.NewValues(out), nil
-}
-
-func nativeCallCFGReachPath(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
-	prog, err := fetchProgramFromCfgValues(v)
-	if err != nil {
-		return false, nil, err
-	}
-	b, err := resolveCfgTargetFromFrame(frame, params)
-	if err != nil {
-		return false, nil, utils.Wrap(err, "cfgReachPath")
-	}
-	icfg := parseBoolParam(params, "icfg", false)
-	opt := reachableOptsFromParams(params, icfg)
-
-	var out []sfvm.ValueOperator
-	_ = v.Recursive(func(op sfvm.ValueOperator) error {
-		a, ok := extractCfgCtx(op)
-		if !ok || a.IsEmpty() {
-			return nil
-		}
-		s := cfgReachShortestPathString(prog, a, b, opt)
-		out = append(out, prog.NewConstValue(s))
-		return nil
-	})
-	if len(out) == 0 {
-		return false, nil, utils.Errorf("cfgReachPath: no cfg ctx values")
-	}
-	return true, sfvm.NewValues(out), nil
-}
-
-// minimal guard extraction: detect if-in-block dominates sink block and one branch goes to exit.
-func nativeCallCFGGuards(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
-	prog, err := fetchProgramFromCfgValues(v)
-	if err != nil {
-		return false, nil, err
-	}
-	var out []sfvm.ValueOperator
-	_ = v.Recursive(func(op sfvm.ValueOperator) error {
-		ctx, ok := extractCfgCtx(op)
-		if !ok || ctx.IsEmpty() {
-			return nil
-		}
-		fn, err := getFunctionByID(prog, ctx.FuncID)
-		if err != nil || fn == nil {
-			return nil
-		}
-
-		// precompute dom cache for dominates checks
-		_ = getOrBuildDomCache(prog, ctx.FuncID)
-
-		guards := make([]*GuardPredicateValue, 0, 4)
-		for _, bid := range fn.Blocks {
-			b, _ := fn.GetBasicBlockByID(bid)
-			if b == nil || len(b.Insts) == 0 {
-				continue
-			}
-			last := b.LastInst()
-			if last == nil {
-				continue
-			}
-			ifInst, ok := ssa.ToIfInstruction(last)
-
-			// Prefer structured IfInstruction, but allow Yak lowering variants where the
-			// terminator isn't directly an IfInstruction (fallback: 2-way succs).
-			instID := last.GetId()
-			condValueID := int64(0)
-			// Prefer block-level condition summary when available.
-			if summary := b.BlockConditionSummary(); summary.CondInstID > 0 || len(summary.CondValueID) > 0 {
-				if summary.CondInstID > 0 {
-					instID = summary.CondInstID
-				}
-				if len(summary.CondValueID) > 0 {
-					condValueID = summary.CondValueID[0]
-				}
-			}
-			var tBranch, fBranch int64
-			if ok && ifInst != nil {
-				instID = ifInst.GetId()
-				tBranch, fBranch = ifInst.True, ifInst.False
-				if condValueID <= 0 {
-					condValueID = ifInst.Cond
-				}
-			} else if len(b.Succs) == 2 {
-				tBranch, fBranch = b.Succs[0], b.Succs[1]
-			} else {
-				continue
-			}
-
-			// Minimal phase-1 heuristic: only require the branch block can reach the target block.
-			// (Dominance can be added later when CFG termination/exit semantics are standardized.)
-			branchCtx := &CfgCtxValue{prog: prog, FuncID: ctx.FuncID, BlockID: b.GetId(), InstID: instID}
-			if !reachable(prog, branchCtx, ctx) {
-				continue
-			}
-
-			// if one branch is exit block (or reaches no succ), other branch reaches target
-			exitID := fn.ExitBlock
-			var exitCtx *CfgCtxValue
-			if exitID > 0 {
-				exitCtx = &CfgCtxValue{prog: prog, FuncID: ctx.FuncID, BlockID: exitID}
-			}
-
-			// Determine which branch can reach target.
-			tCtx := &CfgCtxValue{prog: prog, FuncID: ctx.FuncID, BlockID: tBranch}
-			fCtx := &CfgCtxValue{prog: prog, FuncID: ctx.FuncID, BlockID: fBranch}
-			targetCtx := &CfgCtxValue{prog: prog, FuncID: ctx.FuncID, BlockID: ctx.BlockID}
-
-			tReach := reachable(prog, tCtx, targetCtx)
-			fReach := reachable(prog, fCtx, targetCtx)
-			if !tReach && !fReach {
-				continue
-			}
-
-			tExit := isExitLikeBlock(fn, tBranch)
-			fExit := isExitLikeBlock(fn, fBranch)
-			if exitCtx != nil {
-				tExit = tExit || tBranch == exitID || reachable(prog, tCtx, exitCtx)
-				fExit = fExit || fBranch == exitID || reachable(prog, fCtx, exitCtx)
-			}
-
-			// guard pattern: if (cond) return; => fallthrough requires !cond (when cond branch exits)
-			if tExit && fReach {
-				guards = append(guards, &GuardPredicateValue{
-					prog:         prog,
-					FuncID:       ctx.FuncID,
-					GuardBlockID: b.GetId(),
-					SinkBlockID:  ctx.BlockID,
-					CondInstID:   instID,
-					CondValueID:  condValueID,
-					Polarity:     false,
-					Kind:         "earlyReturn",
-					Text:         "",
-				})
-			} else if fExit && tReach {
-				guards = append(guards, &GuardPredicateValue{
-					prog:         prog,
-					FuncID:       ctx.FuncID,
-					GuardBlockID: b.GetId(),
-					SinkBlockID:  ctx.BlockID,
-					CondInstID:   instID,
-					CondValueID:  condValueID,
-					Polarity:     true,
-					Kind:         "earlyReturn",
-					Text:         "",
-				})
+			if _, ok := loopLatches[j.To]; ok {
+				return GuardKindEarlyContinue
 			}
 		}
-		// de-dup by Hash() where possible
-		for _, g := range lo.UniqBy(guards, func(v *GuardPredicateValue) string {
-			if v == nil {
-				return ""
-			}
-			if h, ok := v.Hash(); ok {
-				return h
-			}
-			return v.String()
-		}) {
-			if g == nil || g.IsEmpty() {
-				continue
-			}
-			g.SetAnchorBitVector(op.GetAnchorBitVector())
-			out = append(out, g)
-		}
-		return nil
-	})
-
-	if len(out) == 0 {
-		return false, nil, utils.Error("no guards found")
 	}
-	return true, sfvm.NewValues(out), nil
+	return GuardKindEarlyReturn
 }
