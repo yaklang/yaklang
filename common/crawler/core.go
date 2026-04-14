@@ -558,6 +558,9 @@ func (c *Crawler) handleReqResult(r *Req) {
 			log.Errorf("create request from bytes error: %s", err.Error())
 			return
 		}
+		if config.onUrlFound != nil {
+			config.onUrlFound(req.Url())
+		}
 		if ret, err := url.Parse(req.Url()); err != nil {
 			if !config.CheckShouldBeHandledURL(ret) {
 				return

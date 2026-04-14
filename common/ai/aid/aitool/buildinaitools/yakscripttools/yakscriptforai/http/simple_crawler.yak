@@ -8,9 +8,12 @@ Simple Crawler Tool - Parameter Description for JSON Tool Calls
 This crawler is tuned to get results quickly: it minimizes retries and can
 automatically fall back to HTTP when an HTTPS start URL yields no crawl results.
 
-IMPORTANT: The default settings are optimized for broad coverage. If the target
-site has many pages/endpoints (e.g., 50+), do NOT set reqs-max too low.
-A value of 100 will likely miss most endpoints on a large site.
+Output includes:
+  1. Crawl summary (requests made, total URLs discovered, pending URLs)
+  2. Website forest: a tree structure showing the full site hierarchy,
+     including URLs discovered in responses but NOT yet requested.
+     This gives a broad view of the site structure even with limited requests.
+  3. Requested URL list with HTTP method and response status.
 
 Required Parameters:
   urls            (string)  Start URL(s) for crawling. Multiple URLs can be provided
@@ -18,9 +21,10 @@ Required Parameters:
 
 Optional Parameters:
   reqs-max        (int)     Maximum number of outbound HTTP requests allowed.
-                            Default: 1200. Do NOT set below 500 for sites with
-                            many endpoints, or most pages will be missed.
-  max-retry       (int)     Maximum retry count per request. Default: 3.
+                            Default: 300. The crawler discovers many more URLs than
+                            it requests; all discovered URLs appear in the website
+                            forest output even if not requested.
+  max-retry       (int)     Maximum retry count per request. Default: 1.
   forbid-for-parent-path (string)  Whether to forbid crawling parent paths.
                             Accepted values: "yes"/"no". Default: "no".
                             Tip: Keep default "no" for better coverage. Only set
@@ -33,22 +37,27 @@ Optional Parameters:
                             no results. Default: true.
 
 Scenario Guidance:
-  - Standard web app scan: use defaults (max-depth=5, reqs-max=1200)
-  - Quick surface check:   set reqs-max=300, max-depth=2
-  - Single directory only: set forbid-for-parent-path=yes
+  - Standard web app scan: use defaults (max-depth=5, reqs-max=300)
+  - Deep crawl large site:  set reqs-max=1000, max-depth=8
+  - Quick surface check:    set reqs-max=50, max-depth=2
+  - Single directory only:  set forbid-for-parent-path=yes
 USAGE_BLOCK
 
 startUrl := cli.String("urls", cli.setHelp("开始简单爬虫的起始页面"), cli.setRequired(true))
-// startUrl = "https://www.example.com,http://127.0.0.1:8787"
-reqsLimit := cli.Int("reqs-max", cli.setHelp("最多对外发送多少请求？"), cli.setDefault(1200))
-maxRetry := cli.Int("max-retry", cli.setHelp("单个请求最多重试多少次？"), cli.setDefault(3))
-noParent := cli.String("forbid-for-parent-path", cli.setHelp("禁止访问夫目录，使用[yes/no]来控制"))
+reqsLimit := cli.Int("reqs-max", cli.setHelp("最多对外发送多少请求？"), cli.setDefault(300))
+maxRetry := cli.Int("max-retry", cli.setHelp("单个请求最多重试多少次？"), cli.setDefault(1))
+noParent := cli.String("forbid-for-parent-path", cli.setHelp("禁止访问父目录，使用[yes/no]来控制"))
 ua = cli.String("user-agent", cli.setHelp("手动设置User-Agent"))
 maxUrls = cli.Int("urls-max", cli.setHelp("最多访问多少URL？"))
 maxDepth := cli.Int("max-depth", cli.setHelp("爬虫访问逻辑深度"), cli.setDefault(5))
 timeoutSecond := cli.Int("timeout", cli.setHelp("设置超时秒数(单次请求的秒数)"), cli.setDefault(10))
 httpsFallback := cli.Bool("https-fallback", cli.setHelp("HTTPS 失败时是否自动切回 HTTP"), cli.setDefault(true))
 cli.check()
+
+forest = webforest.New(50)
+discoveredUrls = sync.NewLock()
+discoveredUrlSet = {}
+requestedUrlSet = {}
 
 opts = []
 if reqsLimit > 0 {
@@ -69,10 +78,19 @@ if maxUrls > 0 {
 if maxDepth > 0 {
     opts.Append(crawler.maxDepth(maxDepth))
 }
-
 if timeoutSecond > 0 {
     opts.Append(crawler.connectTimeout(timeoutSecond))
 }
+
+opts.Append(crawler.onUrlFound(func(urlStr) {
+    discoveredUrls.Lock()
+    defer discoveredUrls.Unlock()
+    if urlStr in discoveredUrlSet {
+        return
+    }
+    discoveredUrlSet[urlStr] = true
+    try { forest.AddNode(urlStr) } catch {}
+}))
 
 targetCandidates = [startUrl]
 if httpsFallback {
@@ -82,7 +100,7 @@ if httpsFallback {
     }
 }
 
-buf = bufio.NewBuffer()
+requestLines = []
 totalResults = 0
 lastErr = ""
 usedFallback = false
@@ -99,6 +117,15 @@ for currentStartUrl in targetCandidates {
         currentResults++
         totalResults++
         urlstr := result.Url()
+
+        discoveredUrls.Lock()
+        requestedUrlSet[urlstr] = true
+        if !(urlstr in discoveredUrlSet) {
+            discoveredUrlSet[urlstr] = true
+            try { forest.AddNode(urlstr) } catch {}
+        }
+        discoveredUrls.Unlock()
+
         req, _ := http.dump(result.Request())
         method := poc.GetHTTPRequestMethod(req)
         var rspdesc = ""
@@ -107,10 +134,7 @@ for currentStartUrl in targetCandidates {
             rspdesc = str.Join(poc.GetHTTPPacketFirstLine(rsp), " ")
         } catch {}
 
-        line := "[%v] [%v]: %v" % [method, rspdesc, urlstr]
-        buf.WriteString(line)
-        buf.WriteString("\n")
-        yakit.Output(line)
+        requestLines.Append(sprintf("[%v] [%v] %v", method, rspdesc, urlstr))
     }
 
     if currentResults > 0 {
@@ -131,13 +155,34 @@ if totalResults == 0 && lastErr != "" {
 if usedFallback {
     yakit.Info("HTTP fallback succeeded after the HTTPS crawl returned no results")
 }
-if len(buf.String()) <= 30000 {
-    yakit.Info(string(buf.String()))
+
+discoveredCount = len(discoveredUrlSet)
+requestedCount = len(requestedUrlSet)
+
+output = bufio.NewBuffer()
+
+output.WriteString("=== Crawl Summary ===\n")
+output.WriteString(sprintf("Requests sent:   %v\n", requestedCount))
+output.WriteString(sprintf("URLs discovered: %v (includes URLs found in responses but not yet requested)\n", discoveredCount))
+output.WriteString(sprintf("Pending:         %v\n", discoveredCount - requestedCount))
+
+output.WriteString("\n")
+output.WriteString(forest.Output())
+
+output.WriteString("\n=== Requested URLs ===\n")
+for line in requestLines {
+    output.WriteString(line)
+    output.WriteString("\n")
+}
+
+result = string(output.String())
+if len(result) <= 30000 {
+    yakit.Info(result)
 } else {
-    yakit.Info(string(buf.String())[:30000] + "... (truncated)")
+    yakit.Info(result[:30000] + "... (truncated)")
 }
 try {
     name := file.TempFileName(`crawler-result-*.txt`)~
-    file.Save(name, string(buf.String()))~
-    yakit.Info("crawler result log saved: %v (size: %v)", name, len(buf.String()))
+    file.Save(name, result)~
+    yakit.Info("crawler result log saved: %v (size: %v)", name, len(result))
 } catch {}

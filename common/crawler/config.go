@@ -125,8 +125,9 @@ type Config struct {
 	headers []*header
 	cookie  []*cookie
 
-	onRequest func(req *Req)
-	onLogin   func(req *Req)
+	onRequest  func(req *Req)
+	onLogin    func(req *Req)
+	onUrlFound func(url string)
 
 	extractionRules func(*Req) []interface{}
 	// appended links
@@ -586,6 +587,17 @@ func WithFixedCookie(k, v string) ConfigOpt {
 func WithOnRequest(f func(req *Req)) ConfigOpt {
 	return func(c *Config) {
 		c.onRequest = f
+	}
+}
+
+// onUrlFound 是一个选项函数，用于在爬虫发现新URL时触发回调（包括未实际发出请求的URL）
+// Example:
+// ```
+// crawler.Start("https://example.com", crawler.onUrlFound(func(url) { println(url) }))
+// ```
+func WithOnUrlFound(f func(string)) ConfigOpt {
+	return func(c *Config) {
+		c.onUrlFound = f
 	}
 }
 

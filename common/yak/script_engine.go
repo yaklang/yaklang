@@ -61,6 +61,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/crawler"
 	"github.com/yaklang/yaklang/common/crawlerx"
+	"github.com/yaklang/yaklang/common/utils/webforest"
 	"github.com/yaklang/yaklang/common/cve"
 	"github.com/yaklang/yaklang/common/facades"
 	"github.com/yaklang/yaklang/common/hids"
@@ -170,6 +171,7 @@ func initYaklangLib() {
 	yaklang.Import("mmdb", yaklib.MmdbExports)
 
 	yaklang.Import("crawler", crawler.Exports)
+	yaklang.Import("webforest", webforest.Exports)
 	yaklang.Import("mitm", yaklib.MitmExports)
 	yaklang.Import("tls", yaklib.TlsExports)
 
