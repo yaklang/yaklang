@@ -65,6 +65,8 @@ func init() {
 					securityKnowledge := loop.Get("security_knowledge")
 					recentActionsSummary := buildLoopHTTPFuzzRecentActionsPrompt(loop)
 					testedPayloadSummary := buildLoopHTTPFuzzTestedPayloadPrompt(loop)
+					fuzztagReference := loop.Get(loopHTTPFuzzFuzztagReferenceKey)
+					payloadGroupsReference := loop.Get(loopHTTPFuzzPayloadGroupsReferenceKey)
 
 					renderMap := map[string]any{
 						"OriginalRequest":           originalRequest,
@@ -82,6 +84,8 @@ func init() {
 						"SecurityKnowledge":         securityKnowledge,
 						"RecentActionsSummary":      recentActionsSummary,
 						"TestedPayloadSummary":      testedPayloadSummary,
+						"FuzztagReference":          fuzztagReference,
+						"PayloadGroupsReference":    payloadGroupsReference,
 						"Nonce":                     nonce,
 						"FeedbackMessages":          feedbacker.String(),
 					}
@@ -125,9 +129,9 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
 		emitter := r.GetConfig().GetEmitter()
 		config := r.GetConfig()
-		_ = config
 
 		invoker := loop.GetInvoker()
+		bootstrapLoopHTTPFuzzFuzztagContext(loop, config.GetDB())
 
 		// TBD: 检查是否已经有 fuzz_request 了（可能是用户之前的交互设置的），如果有就直接继续
 		haveReq := loop.Get("fuzz_request") // Just to ensure the key exists in the loop state

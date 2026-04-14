@@ -30,6 +30,22 @@
 {{ .OriginalRequest }}
 <|ORIGINAL_REQUEST_END_{{ .Nonce }}|>
 
+{{ if .FuzztagReference }}
+### Fuzztag Reference
+下面是当前可直接使用的 fuzztag 手册。规划下一步时，凡是需要批量生成 header、query、body、cookie、path、认证材料或字典型值时，优先参考这里，而不是手写展开后的长列表。
+<|FUZZTAG_REFERENCE_{{ .Nonce }}|>
+{{ .FuzztagReference }}
+<|FUZZTAG_REFERENCE_END_{{ .Nonce }}|>
+{{ end }}
+
+{{ if .PayloadGroupsReference }}
+### Available Payload Groups
+下面是当前数据库中可直接被 `payload(...)` 系列 fuzztag 引用的 group 名单。
+<|AVAILABLE_PAYLOAD_GROUPS_{{ .Nonce }}|>
+{{ .PayloadGroupsReference }}
+<|AVAILABLE_PAYLOAD_GROUPS_END_{{ .Nonce }}|>
+{{ end }}
+
 {{ if .SecurityKnowledge }}
 ### Security Knowledge Base Results
 <|SECURITY_KNOWLEDGE_{{ .Nonce }}|>
@@ -96,4 +112,3 @@ Based on the above context and security knowledge, decide your next vulnerabilit
 4. What attack surface remains untested?
 5. Which payloads have already been tested for this action, and how will you avoid repeating them unless you need confirmation?
 6. How can the next step validate the suspected vulnerability safely without destructive behavior?
-
