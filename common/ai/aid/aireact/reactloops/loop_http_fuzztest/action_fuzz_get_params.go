@@ -16,7 +16,7 @@ var fuzzGetParamsAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopO
 		"Fuzz GET query parameters. Use this to test SQL injection, XSS, or other parameter-based attacks on URL query string.",
 		[]aitool.ToolOption{
 			aitool.WithStringParam("param_name", aitool.WithParam_Description("The GET parameter name to fuzz. If empty, will add new parameters"), aitool.WithParam_Required(true)),
-			aitool.WithStringArrayParam("param_values", aitool.WithParam_Description("Values to test for the parameter, e.g., [\"' OR '1'='1\", '<script>alert(1)</script>', '{{7*7}}']"), aitool.WithParam_Required(true)),
+			aitool.WithStringArrayParam("param_values", aitool.WithParam_Description("Values to test for the parameter. Supports arbitrary fuzztag; see the FUZZTAG_REFERENCE and AVAILABLE_PAYLOAD_GROUPS context blocks for the current full tag manual and payload dictionary groups. For brute-force or dictionary-style testing, prefer concise fuzztag rules over long handwritten lists."), aitool.WithParam_Required(true)),
 			aitool.WithBoolParam("raw_mode", aitool.WithParam_Description("If true, replace the entire query string with the provided values")),
 			aitool.WithStringParam("reason", aitool.WithParam_Description("请用中文说明为什么要测试这些参数值、怀疑的漏洞类型以及安全测试边界。")),
 		},

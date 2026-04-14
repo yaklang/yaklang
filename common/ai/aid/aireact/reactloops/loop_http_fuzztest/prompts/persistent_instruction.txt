@@ -54,6 +54,16 @@
 - IDOR/参数遍历：连续数字 ID、UUID、订单号、用户名、租户编号、文件编号、资源路径枚举。
 - 信息泄漏：备份文件、调试端点、错误栈、版本信息、目录索引、越权读取返回中的敏感字段。
 
+### fuzztag 使用规则
+
+1. 当前 fuzz 接口支持 fuzztag。`param_values`、`header_values`、`cookie_values`、`paths` 等字符串值里可以直接写 `{{ "{{...}}" }}` 标签，由底层展开成大量测试数据。
+2. 每轮决策前，优先参考上下文中的 `FUZZTAG_REFERENCE` 和 `AVAILABLE_PAYLOAD_GROUPS` 区块。前者说明当前可用的完整 fuzztag 手册，后者说明当前数据库里有哪些 payload group 可以被 `payload(...)` 系列标签直接引用。
+3. 你的职责是决定“生成策略”，不是把所有爆破 payload 或所有批量枚举值全部展开写出来。需要大批量生成时，优先写 fuzztag 规则。
+4. 当目标是密码爆破、用户名枚举、对象编号遍历、常见弱口令尝试、批量字典测试、头部批量构造、编码组合或认证材料批量变形时，优先使用 fuzztag，不要手写几十上百个 payload。
+5. 你可以使用 `FUZZTAG_REFERENCE` 中任何合适的标签，不只限于少数示例。比如 `{{ "{{fuzz:password}}" }}`、`{{ "{{fuzz:username}}" }}`、`{{ "{{payload(pass_top25)}}" }}`、`{{ "{{int(1000-1010)}}" }}` 只是常见写法，不是能力边界。
+6. 如果只是少量高价值探测，例如 3 到 6 个布尔型 SQL 注入或上下文明确的 XSS payload，可以直接写具体值；不要为了很小的测试强行改成 fuzztag。
+7. 使用 fuzztag 时，reason 里要明确说明这是“批量枚举/爆破/字典型验证”，并说明为什么选择该标签或 payload group，而不是手写列表。
+
 ### generate_and_send_packet 的 AITAG 规则
 
 当使用 generate_and_send_packet 时，必须输出完整原始 HTTP 数据包，并使用以下格式：

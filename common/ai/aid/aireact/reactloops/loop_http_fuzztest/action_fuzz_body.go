@@ -17,7 +17,7 @@ var fuzzBodyAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption
 		[]aitool.ToolOption{
 			aitool.WithStringParam("body_type", aitool.WithParam_Description("Type of body fuzzing: 'raw' (replace entire body), 'post_params' (fuzz form parameters), 'json_params' (fuzz JSON fields)"), aitool.WithParam_Required(true)),
 			aitool.WithStringParam("param_name", aitool.WithParam_Description("Parameter name to fuzz (required for post_params and json_params types)")),
-			aitool.WithStringArrayParam("param_values", aitool.WithParam_Description("Values to test"), aitool.WithParam_Required(true)),
+			aitool.WithStringArrayParam("param_values", aitool.WithParam_Description("Values to test. Supports arbitrary fuzztag; see the FUZZTAG_REFERENCE and AVAILABLE_PAYLOAD_GROUPS context blocks for the current full tag manual and payload dictionary groups. For brute-force or dictionary-style testing, prefer concise fuzztag rules over long handwritten lists."), aitool.WithParam_Required(true)),
 			aitool.WithStringParam("reason", aitool.WithParam_Description("请用中文说明为什么要测试这些 Body 值、怀疑的漏洞类型以及安全测试边界。")),
 		},
 		[]*reactloops.LoopStreamField{

@@ -16,7 +16,7 @@ var fuzzCookieAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 		"Fuzz HTTP cookies. Use this to test session manipulation, cookie injection, or authentication bypass attacks.",
 		[]aitool.ToolOption{
 			aitool.WithStringParam("cookie_name", aitool.WithParam_Description("The cookie name to fuzz. If empty and raw_mode is true, will replace entire Cookie header")),
-			aitool.WithStringArrayParam("cookie_values", aitool.WithParam_Description("Values to test for the cookie"), aitool.WithParam_Required(true)),
+			aitool.WithStringArrayParam("cookie_values", aitool.WithParam_Description("Values to test for the cookie. Supports arbitrary fuzztag; see the FUZZTAG_REFERENCE and AVAILABLE_PAYLOAD_GROUPS context blocks for the current full tag manual and payload dictionary groups. For brute-force or dictionary-style testing, prefer concise fuzztag rules over long handwritten lists."), aitool.WithParam_Required(true)),
 			aitool.WithBoolParam("raw_mode", aitool.WithParam_Description("If true, replace entire Cookie header with the provided values")),
 			aitool.WithStringParam("reason", aitool.WithParam_Description("请用中文说明为什么要测试这些 Cookie 值、怀疑的漏洞类型以及安全测试边界。")),
 		},

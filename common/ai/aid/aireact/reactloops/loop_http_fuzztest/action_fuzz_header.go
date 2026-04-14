@@ -15,7 +15,7 @@ var fuzzHeaderAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpti
 		"Fuzz HTTP request headers. Use this to test header injection, authentication bypass, or header-based attacks.",
 		[]aitool.ToolOption{
 			aitool.WithStringParam("header_name", aitool.WithParam_Description("The header name to fuzz, e.g., 'X-Forwarded-For', 'Authorization', 'User-Agent'"), aitool.WithParam_Required(true)),
-			aitool.WithStringArrayParam("header_values", aitool.WithParam_Description("Values to test for the header"), aitool.WithParam_Required(true)),
+			aitool.WithStringArrayParam("header_values", aitool.WithParam_Description("Values to test for the header. Supports arbitrary fuzztag; see the FUZZTAG_REFERENCE and AVAILABLE_PAYLOAD_GROUPS context blocks for the current full tag manual and payload dictionary groups. When batch generation is needed, prefer concise fuzztag rules over long handwritten lists."), aitool.WithParam_Required(true)),
 			aitool.WithStringParam("reason", aitool.WithParam_Description("请用中文说明为什么要测试这个请求头、怀疑的漏洞类型以及安全测试边界。")),
 		},
 		[]*reactloops.LoopStreamField{

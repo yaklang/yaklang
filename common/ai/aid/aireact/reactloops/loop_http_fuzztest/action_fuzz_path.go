@@ -15,7 +15,7 @@ var fuzzPathAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption
 		"fuzz_path",
 		"Fuzz the HTTP request path. Use this to test path traversal, different endpoints, or path-based attacks.",
 		[]aitool.ToolOption{
-			aitool.WithStringArrayParam("paths", aitool.WithParam_Description("Paths to test, e.g., ['/admin', '/api/v2', '../etc/passwd', '/backup']"), aitool.WithParam_Required(true)),
+			aitool.WithStringArrayParam("paths", aitool.WithParam_Description("Paths to test, e.g., ['/admin', '/api/v2', '../etc/passwd', '/backup']. Supports arbitrary fuzztag; see the FUZZTAG_REFERENCE and AVAILABLE_PAYLOAD_GROUPS context blocks for the current full tag manual and payload dictionary groups. When path enumeration is needed, prefer concise fuzztag rules over long handwritten lists."), aitool.WithParam_Required(true)),
 			aitool.WithBoolParam("append_mode", aitool.WithParam_Description("If true, append paths to existing path instead of replacing. Default is false (replace mode)")),
 			aitool.WithStringParam("reason", aitool.WithParam_Description("请用中文说明为什么要测试这些路径、怀疑的漏洞类型以及安全测试边界。")),
 		},
