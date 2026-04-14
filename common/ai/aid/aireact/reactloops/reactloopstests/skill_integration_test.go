@@ -84,7 +84,7 @@ func classifyPrompt(prompt string) promptType {
 func makeVerifySatisfactionResponse(i aicommon.AICallerConfigIf) (*aicommon.AIResponse, error) {
 	rsp := i.NewAIResponse()
 	rsp.EmitOutputStream(bytes.NewBufferString(
-		`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "OK", "human_readable_result": "done"}`,
+		`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "OK"}`,
 	))
 	rsp.Close()
 	return rsp, nil

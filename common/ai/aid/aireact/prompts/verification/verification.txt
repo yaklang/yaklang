@@ -162,8 +162,12 @@ IMPORTANT GUIDELINES:
     - `发现: ...`
     - 每一条至少说明两个要素：主体是谁，发现了什么内容。
     - 只写本轮新增证据，不要回放已有 EVIDENCE 全文。
-    - evidence 中已经写过的关键新增发现，不必再在 summary、reasoning 或 human_readable_result 中大段重复。
+    - evidence 中已经写过的关键新增发现，不必再在 summary 或 reasoning 中大段重复。
     - 若 evidence Markdown 较长，鼓励使用 AITAG block 输出，而不只是 JSON 字段。
+- 关于 `output_files` 的设置：
+    - 只填写真实创建或修改过、且可以落盘感知的交付文件路径。
+    - `output_files` 不只是 UI 展示；系统会把它像 EVIDENCE 一样沉淀到共享执行上下文，供后续任务继续引用。
+    - 因此不要遗漏真实交付物，也不要把只在回答里提到、但没有工具证据的路径写进去。
 
 ### Evidence AITAG（可选，长内容时优先）
 

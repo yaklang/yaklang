@@ -129,12 +129,7 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 				ctx,
 				stream, "verify-satisfaction",
 				aicommon.WithActionNonce(nonce),
-				aicommon.WithActionTagToKey("HUMAN_READABLE_RESULT", "human_readable_result"),
 				aicommon.WithActionTagToKey("EVIDENCE", "evidence"),
-				aicommon.WithActionFieldStreamHandler(
-					[]string{"human_readable_result"},
-					emitMarkdownField("human_readable_result", "human_readable_result"),
-				),
 				aicommon.WithActionFieldStreamHandler(
 					[]string{"evidence"},
 					emitMarkdownField("plan-evidence", "verification_evidence"),

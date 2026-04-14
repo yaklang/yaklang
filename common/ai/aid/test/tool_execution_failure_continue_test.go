@@ -52,9 +52,9 @@ func TestReActLoop_ToolNotFound_ShouldContinue(t *testing.T) {
 			// Verify satisfaction - exit when success
 			if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
 				if successToolCalled {
-					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "done", "human_readable_result": "ok"}`))
+					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "done"}`))
 				} else {
-					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": false, "reasoning": "retry", "human_readable_result": "failed"}`))
+					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": false, "reasoning": "retry"}`))
 				}
 				rsp.Close()
 				return rsp, nil
@@ -158,9 +158,9 @@ func TestReActLoop_ToolExecutionError_ShouldContinue(t *testing.T) {
 			// Verify satisfaction
 			if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
 				if successToolCalled {
-					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "done", "human_readable_result": "ok"}`))
+					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "done"}`))
 				} else {
-					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": false, "reasoning": "retry", "human_readable_result": "failed"}`))
+					rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": false, "reasoning": "retry"}`))
 				}
 				rsp.Close()
 				return rsp, nil

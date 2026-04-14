@@ -47,9 +47,9 @@ func mockedToolCallingMultiple(i aicommon.AICallerConfigIf, req *aicommon.AIRequ
 		rsp := i.NewAIResponse()
 		// 如果调用次数少于2次，继续调用工具
 		if *callCount < 2 {
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": false, "reasoning": "need more calls", "human_readable_result": "need to call tool again"}`))
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": false, "reasoning": "need more calls"}`))
 		} else {
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "done", "human_readable_result": "completed"}`))
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "done"}`))
 		}
 		rsp.Close()
 		return rsp, nil

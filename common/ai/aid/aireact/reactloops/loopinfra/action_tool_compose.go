@@ -299,6 +299,7 @@ Example - Sequential file operations(With AI-Tag tags):
 				verifyResult.CompletedTaskIndex,
 				verifyResult.NextMovements,
 				verifyResult.Evidence,
+				verifyResult.OutputFiles,
 			)
 
 			if verifyResult.Satisfied {

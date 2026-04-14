@@ -126,7 +126,7 @@ func TestIsInSameLogicSpinWithAI(t *testing.T) {
 
 		// 检查是否是验证调用
 		if strings.Contains(prompt, "verify-satisfaction") || strings.Contains(prompt, "user_satisfied") {
-			actionJSON := `{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "Test completed successfully", "human_readable_result": "Test result"}`
+			actionJSON := `{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "Test completed successfully"}`
 			rsp.EmitOutputStream(strings.NewReader(actionJSON))
 			rsp.Close()
 			return rsp, nil
@@ -256,7 +256,7 @@ func TestSpinDetectionWithDifferentActions(t *testing.T) {
 
 		// 检查是否是验证调用
 		if strings.Contains(prompt, "verify-satisfaction") || strings.Contains(prompt, "user_satisfied") {
-			actionJSON := `{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "Test completed successfully", "human_readable_result": "Test result"}`
+			actionJSON := `{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "Test completed successfully"}`
 			rsp.EmitOutputStream(strings.NewReader(actionJSON))
 			rsp.Close()
 			return rsp, nil
@@ -397,7 +397,7 @@ func TestSelfReflectionInvoked(t *testing.T) {
 
 		// 检查是否是验证调用
 		if strings.Contains(prompt, "verify-satisfaction") || strings.Contains(prompt, "user_satisfied") {
-			actionJSON := `{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "Test completed successfully", "human_readable_result": "Test result"}`
+			actionJSON := `{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "Test completed successfully"}`
 			rsp.EmitOutputStream(strings.NewReader(actionJSON))
 			rsp.Close()
 			return rsp, nil
@@ -519,7 +519,7 @@ func TestIsInSpinTrustsAINotSpinning(t *testing.T) {
 
 		// 验证调用
 		if strings.Contains(prompt, "verify-satisfaction") || strings.Contains(prompt, "user_satisfied") {
-			rsp.EmitOutputStream(strings.NewReader(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "ok", "human_readable_result": "ok"}`))
+			rsp.EmitOutputStream(strings.NewReader(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "ok"}`))
 			rsp.Close()
 			return rsp, nil
 		}
@@ -686,7 +686,7 @@ func TestIsTaskProgressingResetsSpinCounter(t *testing.T) {
 
 		// 验证调用
 		if strings.Contains(prompt, "verify-satisfaction") || strings.Contains(prompt, "user_satisfied") {
-			rsp.EmitOutputStream(strings.NewReader(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "ok", "human_readable_result": "ok"}`))
+			rsp.EmitOutputStream(strings.NewReader(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "ok"}`))
 			rsp.Close()
 			return rsp, nil
 		}
@@ -810,7 +810,7 @@ func TestSpinThresholdNoLongerForcesExit(t *testing.T) {
 
 		// 验证调用
 		if strings.Contains(prompt, "verify-satisfaction") || strings.Contains(prompt, "user_satisfied") {
-			rsp.EmitOutputStream(strings.NewReader(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "ok", "human_readable_result": "ok"}`))
+			rsp.EmitOutputStream(strings.NewReader(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "ok"}`))
 			rsp.Close()
 			return rsp, nil
 		}
@@ -963,7 +963,7 @@ func TestSelfReflectionThenSpin(t *testing.T) {
 		// 检查是否是验证调用
 		if strings.Contains(prompt, "verify-satisfaction") || strings.Contains(prompt, "user_satisfied") {
 			rsp := i.NewAIResponse()
-			actionJSON := `{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "Test completed successfully", "human_readable_result": "Test result"}`
+			actionJSON := `{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "Test completed successfully"}`
 			rsp.EmitOutputStream(strings.NewReader(actionJSON))
 			rsp.Close()
 			return rsp, nil

@@ -45,7 +45,7 @@ func TestSatisfactionRecordWithCompletedTaskIndex(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Push a satisfaction record with completed task index and next movements
-		loop.PushSatisfactionRecordWithCompletedTaskIndex(true, "task completed", "1-1", nil, "")
+		loop.PushSatisfactionRecordWithCompletedTaskIndex(true, "task completed", "1-1", nil, "", nil)
 
 		// Get the last satisfaction record using the new struct-based API
 		record := loop.GetLastSatisfactionRecordFull()
@@ -65,8 +65,8 @@ func TestSatisfactionRecordWithCompletedTaskIndex(t *testing.T) {
 			Op:      "add",
 			ID:      "check_file_permissions",
 			Content: "next step: check file permissions",
-		}}, "")
-		loop.PushSatisfactionRecordWithCompletedTaskIndex(true, "done", "1-2", nil, "")
+		}}, "", nil)
+		loop.PushSatisfactionRecordWithCompletedTaskIndex(true, "done", "1-2", nil, "", nil)
 
 		// Should get the last one
 		record := loop.GetLastSatisfactionRecordFull()
@@ -114,7 +114,7 @@ func TestSatisfactionRecordWithCompletedTaskIndex(t *testing.T) {
 			Op:      "add",
 			ID:      "fix_file_permission",
 			Content: "use chmod 600 to fix file permissions",
-		}}, "")
+		}}, "", nil)
 
 		// Get the last satisfaction record
 		record := loop.GetLastSatisfactionRecordFull()
