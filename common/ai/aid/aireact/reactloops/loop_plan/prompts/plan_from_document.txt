@@ -1,0 +1,170 @@
+Current Time: {{ .CurrentTime }}  OS/Arch: {{ .OSArch }}
+{{ if .WorkingDir }}Working Dir: {{ .WorkingDir }}{{ end }}
+
+You are generating a structured execution plan based on a guidance document and verified facts.
+
+## Language Rule
+
+Observe the language used in the Timeline and user input below. ALL plan output (main_task, main_task_goal, subtask_name, subtask_goal) MUST use the SAME language as the user. If the user writes in Chinese, output in Chinese. If the user writes in English, output in English.
+
+<|INPUT_{{ .Nonce }}|>
+{{ if .Timeline }}## Timeline Memory
+
+{{ .Timeline }}
+{{ end }}
+## User Input
+
+{{ .UserInput }}
+
+{{ if .Document }}## Guidance Document
+
+{{ .Document }}
+{{ end }}
+{{ if .Facts }}## Verified Facts (FACTS)
+
+{{ .Facts }}
+{{ end }}
+{{ if .Context }}## Exploration Context
+
+{{ .Context }}
+{{ end }}
+<|INPUT_{{ .Nonce }}|>
+
+# Output Requirements
+
+## Plan Structure
+
+- main_task: A concise name describing the overall task
+- main_task_goal: A clear statement of what the entire plan achieves
+- main_task_identifier: English snake_case semantic identifier for the main task
+- tasks: An array of subtasks, each with the fields described below
+
+## Subtask Fields
+
+Each subtask MUST contain:
+
+- subtask_name: A concise action-oriented name (use tool categories or method descriptions, NEVER write internal tool function names)
+- subtask_identifier: English snake_case semantic identifier for directory naming
+- subtask_goal: A DETAILED description that MUST include ALL three of the following sections:
+  1. **Objective**: What specifically to do — list EVERY exact target, parameter, file path, URL, or configuration involved. If FACTS lists N targets, the Objective must reference ALL N targets, not a subset.
+  2. **Acceptance Criteria**: A checklist of concrete verification items. Each item MUST specify:
+     - The exact test case or input (specific Payload, parameter value, request body)
+     - The expected response or behavior (HTTP status code, response body keyword, timing difference, row count change)
+     - The pass/fail judgment rule (e.g., "if response contains 'syntax error' near quote character, SQL injection confirmed")
+  3. **Completion Condition**: An explicit enumeration of ALL test points that must be verified before this subtask is considered done. Format: "All N test points verified: [list each point]. Subtask is done when all points have a definitive pass/fail result."
+- depends_on: Array of subtask_name values this task depends on (empty array if no dependencies)
+
+## Hierarchical Task Structure (2-Level Subtasks)
+
+Subtasks can contain `sub_subtasks` for finer-grained decomposition:
+- Use sub_subtasks when a subtask naturally decomposes into 2 or more distinct steps targeting different specific inputs
+- sub_subtasks follow the SAME field requirements as subtasks (subtask_name, subtask_identifier, subtask_goal with Objective/Acceptance Criteria/Completion Condition, depends_on)
+- Maximum nesting depth: 2 levels (subtask -> sub_subtask). Do NOT nest deeper.
+- sub_subtasks inherit their parent subtask's depends_on context
+- When sub_subtasks are present, the parent subtask_goal should be a high-level summary; detailed Acceptance Criteria go into each sub_subtask
+
+## Subtask Granularity
+
+- Each subtask (or sub_subtask at leaf level) should focus on ONE specific target or verification dimension
+- The number of subtasks MUST be proportional to the number of distinct targets/endpoints/parameters discovered in FACTS
+- Do NOT merge unrelated targets into a single subtask — if FACTS lists 3 SQL injection test points, create 3 sub_subtasks (one per test point), not 1 combined subtask
+- If a single target requires multiple distinct verification steps (e.g., different payload types), use sub_subtasks to decompose
+
+## Coverage Completeness (Critical)
+
+The plan MUST cover ALL targets, endpoints, parameters, and test vectors discovered in FACTS and the Guidance Document:
+- Count every distinct target/endpoint/parameter mentioned in FACTS
+- Ensure EVERY one appears in at least one subtask's or sub_subtask's Objective
+- If a discovered target is omitted from the plan, the plan is INCOMPLETE
+- For security testing: each (endpoint x vulnerability_type) combination that FACTS data suggests is testable MUST have a corresponding subtask or sub_subtask
+- For development tasks: each file/module/component mentioned in FACTS that requires changes MUST appear in a subtask
+
+## Strict Prohibitions
+
+- NEVER use vague words: "etc.", "and so on", "several", "some", "related", "similar", "various", "other", "and more" or their equivalents in any language (Chinese: "等", "其他", "若干", "一些", "相关", "类似", "各种")
+- NEVER write generic goals like "test for vulnerabilities" or "verify security" — specify EXACTLY which vulnerability type, which endpoint, which parameter
+- NEVER fabricate information not present in the guidance document, FACTS, or context above
+- Every claim in subtask_goal must be traceable to a specific fact or document section
+- NEVER collapse multiple distinct test points into one vague Acceptance Criteria item
+
+## Dependency Rules
+
+- Use depends_on to express execution order
+- Tasks with no dependencies can run in parallel
+- Avoid unnecessary sequential dependencies — maximize parallelism where safe
+
+## Few-Shot Example: Security Testing with Hierarchical Tasks
+
+```json
+{
+  "main_task": "Web应用安全测试",
+  "main_task_goal": "对目标 127.0.0.1:8080 的所有已发现端点进行系统性安全评估，覆盖SQL注入、XSS、命令注入漏洞类型",
+  "main_task_identifier": "web_security_test",
+  "tasks": [
+    {
+      "subtask_name": "SQL注入漏洞验证",
+      "subtask_identifier": "sql_injection",
+      "subtask_goal": "**Objective**: 对FACTS中发现的3个注入点 `/user/id?id=1`(数字型), `/user/name?name=admin`(字符型), `/user/cookie-id`(Cookie型) 进行SQL注入测试。",
+      "depends_on": [],
+      "sub_subtasks": [
+        {
+          "subtask_name": "数字型参数SQL注入测试",
+          "subtask_identifier": "numeric_sqli",
+          "subtask_goal": "**Objective**: 针对 `/user/id?id=1` (数字型参数) 发送SQL注入Payload (如 `1 OR 1=1--`, `1 AND 1=1`, `1 UNION SELECT null--`)。  **Acceptance Criteria**: 1. 发送 Payload `id=1 OR 1=1--`，响应中包含数据库错误信息(如 `syntax error`, `near`, `ORA-`)或返回数据行数异常增加 2. 发送 `id=1 AND 1=2--`，响应与正常 `id=1` 的响应有明显差异(页面内容缺失或为空) 3. 基于时间的检测: 发送 `id=1 AND SLEEP(3)--`，响应延迟超过3秒。  **Completion Condition**: 3个Payload测试全部完成，每个均有明确的pass/fail结果。至少确认一个端点存在可利用的SQL注入，或确认所有Payload均被有效过滤。",
+          "depends_on": []
+        },
+        {
+          "subtask_name": "字符型参数SQL注入测试",
+          "subtask_identifier": "string_sqli",
+          "subtask_goal": "**Objective**: 针对 `/user/name?name=admin` (字符型参数) 发送SQL注入Payload (如 `admin' OR '1'='1`, `admin' AND '1'='2`, `admin' UNION SELECT null--'`)。  **Acceptance Criteria**: 1. 发送 `name=admin' OR '1'='1`，响应包含数据库错误信息或返回数据行数异常 2. 对比 `name=admin' AND '1'='1` 与 `name=admin' AND '1'='2` 的响应差异。  **Completion Condition**: 所有字符型Payload测试完毕，确认注入是否存在。",
+          "depends_on": []
+        },
+        {
+          "subtask_name": "Cookie型SQL注入测试",
+          "subtask_identifier": "cookie_sqli",
+          "subtask_goal": "**Objective**: 针对 `/user/cookie-id` (Cookie中的参数) 在Cookie头中注入SQL Payload。  **Acceptance Criteria**: 1. 修改Cookie `id=1 OR 1=1--`，检查响应变化 2. 对比正常Cookie与注入Cookie的响应差异。  **Completion Condition**: Cookie注入测试完毕，确认是否存在注入点。",
+          "depends_on": []
+        }
+      ]
+    },
+    {
+      "subtask_name": "反射型XSS漏洞验证",
+      "subtask_identifier": "reflected_xss",
+      "subtask_goal": "**Objective**: 对FACTS中发现的输入点 `/search?q=`, `/user/name?name=` 进行反射型XSS测试。  **Acceptance Criteria**: 1. 发送 `<script>alert(1)</script>` 作为参数值，检查响应体是否原样包含该脚本标签(未编码) 2. 发送 `\"><img src=x onerror=alert(1)>`，检查响应是否包含未转义的HTML标签 3. 检查响应头 Content-Type 是否为 text/html。  **Completion Condition**: 2个端点各2个Payload共4个测试点全部完成，确认XSS是否存在。",
+      "depends_on": []
+    }
+  ]
+}
+```
+
+## Few-Shot Example: Development Task with Hierarchical Tasks
+
+```json
+{
+  "main_task": "重构用户认证模块",
+  "main_task_goal": "将现有Session认证迁移为JWT认证，涉及3个文件的修改",
+  "main_task_identifier": "refactor_auth",
+  "tasks": [
+    {
+      "subtask_name": "实现JWT Token生成与验证",
+      "subtask_identifier": "jwt_implementation",
+      "subtask_goal": "**Objective**: 在 `auth/jwt.go` 中实现JWT token的签发和验证逻辑。",
+      "depends_on": [],
+      "sub_subtasks": [
+        {
+          "subtask_name": "实现Token签发函数",
+          "subtask_identifier": "jwt_sign",
+          "subtask_goal": "**Objective**: 在 `auth/jwt.go` 中实现 `GenerateToken(userID int64, role string) (string, error)` 函数，使用HS256算法签名，token有效期24小时。  **Acceptance Criteria**: 1. 函数返回合法JWT字符串(3段base64用.分隔) 2. token payload包含 `user_id`, `role`, `exp` 字段 3. 使用配置的密钥签名，`jwt.Parse` 可正确验证。  **Completion Condition**: 函数实现完成且单元测试通过。",
+          "depends_on": []
+        },
+        {
+          "subtask_name": "实现Token验证中间件",
+          "subtask_identifier": "jwt_middleware",
+          "subtask_goal": "**Objective**: 在 `middleware/auth.go` 中实现JWT验证中间件，替换原有Session检查。  **Acceptance Criteria**: 1. 无Token请求返回401 2. 过期Token请求返回401 3. 有效Token请求正常放行并在context中注入user信息。  **Completion Condition**: 3个测试场景全部通过。",
+          "depends_on": ["实现Token签发函数"]
+        }
+      ]
+    }
+  ]
+}
+```

@@ -11,6 +11,25 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func splitTaskSections(output string) []string {
+	trimmed := strings.TrimSpace(output)
+	if trimmed == "" {
+		return nil
+	}
+	raw := strings.Split(trimmed, "\n\n")
+	var result []string
+	for _, s := range raw {
+		s = strings.TrimSpace(s)
+		if s != "" {
+			result = append(result, s)
+		}
+	}
+	if len(result) == 0 && trimmed != "" {
+		result = append(result, trimmed)
+	}
+	return result
+}
+
 func runPlanTasksStreamHandler(t *testing.T, input string) string {
 	t.Helper()
 	pr, pw := io.Pipe()
@@ -86,20 +105,20 @@ func TestPlanTasksStreamHandler_MultipleSubtasks(t *testing.T) {
 	]`
 	output := runPlanTasksStreamHandler(t, input)
 
-	lines := strings.Split(strings.TrimRight(output, "\n"), "\n")
-	require.Len(t, lines, 3, "expected 3 lines, got: %q", output)
+	sections := splitTaskSections(output)
+	require.Len(t, sections, 3, "expected 3 task sections, got: %q", output)
 
-	assert.Contains(t, lines[0], "[task_a]")
-	assert.Contains(t, lines[0], "Goal for task A")
-	assert.NotContains(t, lines[0], "(depends:")
+	assert.Contains(t, sections[0], "[task_a]")
+	assert.Contains(t, sections[0], "Goal for task A")
+	assert.NotContains(t, sections[0], "(depends:")
 
-	assert.Contains(t, lines[1], "[task_b]")
-	assert.Contains(t, lines[1], "Goal for task B")
-	assert.Contains(t, lines[1], "(depends: task_a)")
+	assert.Contains(t, sections[1], "[task_b]")
+	assert.Contains(t, sections[1], "Goal for task B")
+	assert.Contains(t, sections[1], "(depends: task_a)")
 
-	assert.Contains(t, lines[2], "[task_c]")
-	assert.Contains(t, lines[2], "Goal for task C")
-	assert.Contains(t, lines[2], "(depends: task_a, task_b)")
+	assert.Contains(t, sections[2], "[task_c]")
+	assert.Contains(t, sections[2], "Goal for task C")
+	assert.Contains(t, sections[2], "(depends: task_a, task_b)")
 }
 
 func TestPlanTasksStreamHandler_MissingDependsOn(t *testing.T) {
@@ -328,18 +347,18 @@ func TestPlanTasksStreamHandler_BackwardCompat_OldFormatWithoutNewFields(t *test
 	]`
 	output := runPlanTasksStreamHandler(t, input)
 
-	lines := strings.Split(strings.TrimRight(output, "\n"), "\n")
-	require.Len(t, lines, 3, "expected 3 lines for 3 subtasks without new fields, got: %q", output)
+	sections := splitTaskSections(output)
+	require.Len(t, sections, 3, "expected 3 task sections for 3 subtasks without new fields, got: %q", output)
 
-	assert.Contains(t, lines[0], "[配置工具]")
-	assert.Contains(t, lines[0], "安装并配置静态代码分析工具")
-	assert.NotContains(t, lines[0], "#")
-	assert.NotContains(t, lines[0], "(depends:")
+	assert.Contains(t, sections[0], "[配置工具]")
+	assert.Contains(t, sections[0], "安装并配置静态代码分析工具")
+	assert.NotContains(t, sections[0], "#")
+	assert.NotContains(t, sections[0], "(depends:")
 
-	assert.Contains(t, lines[1], "[集成CI]")
-	assert.NotContains(t, lines[1], "#")
+	assert.Contains(t, sections[1], "[集成CI]")
+	assert.NotContains(t, sections[1], "#")
 
-	assert.Contains(t, lines[2], "[编写文档]")
+	assert.Contains(t, sections[2], "[编写文档]")
 }
 
 func TestPlanTasksStreamHandler_BackwardCompat_SingleTaskNoNewFields(t *testing.T) {
@@ -368,21 +387,21 @@ func TestPlanTasksStreamHandler_NewFormat_FullExample(t *testing.T) {
 	]`
 	output := runPlanTasksStreamHandler(t, input)
 
-	lines := strings.Split(strings.TrimRight(output, "\n"), "\n")
-	require.Len(t, lines, 3, "expected 3 lines, got: %q", output)
+	sections := splitTaskSections(output)
+	require.Len(t, sections, 3, "expected 3 task sections, got: %q", output)
 
-	assert.Contains(t, lines[0], "[配置静态代码分析工具]")
-	assert.Contains(t, lines[0], "#setup_static_analysis")
-	assert.Contains(t, lines[0], "安装并配置静态代码分析工具")
-	assert.NotContains(t, lines[0], "(depends:")
+	assert.Contains(t, sections[0], "[配置静态代码分析工具]")
+	assert.Contains(t, sections[0], "#setup_static_analysis")
+	assert.Contains(t, sections[0], "安装并配置静态代码分析工具")
+	assert.NotContains(t, sections[0], "(depends:")
 
-	assert.Contains(t, lines[1], "[集成到CI/CD流程]")
-	assert.Contains(t, lines[1], "#integrate_cicd")
-	assert.Contains(t, lines[1], "(depends: 配置静态代码分析工具)")
+	assert.Contains(t, sections[1], "[集成到CI/CD流程]")
+	assert.Contains(t, sections[1], "#integrate_cicd")
+	assert.Contains(t, sections[1], "(depends: 配置静态代码分析工具)")
 
-	assert.Contains(t, lines[2], "[编写检查结果处理文档]")
-	assert.Contains(t, lines[2], "#write_check_docs")
-	assert.Contains(t, lines[2], "(depends: 集成到CI/CD流程)")
+	assert.Contains(t, sections[2], "[编写检查结果处理文档]")
+	assert.Contains(t, sections[2], "#write_check_docs")
+	assert.Contains(t, sections[2], "(depends: 集成到CI/CD流程)")
 }
 
 func TestPlanTasksStreamHandler_MixedFormat_SomeWithSomeWithout(t *testing.T) {

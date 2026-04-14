@@ -2,7 +2,10 @@ package reactloops
 
 import (
 	"bytes"
+	"fmt"
+	"runtime"
 	"sync"
+	"time"
 
 	"github.com/yaklang/yaklang/common/log"
 
@@ -298,6 +301,28 @@ func (r *ReActLoop) GetSkillsContextManager() *aiskillloader.SkillsContextManage
 // GetExtraCapabilities returns the extra capabilities manager for dynamically discovered capabilities.
 func (r *ReActLoop) GetExtraCapabilities() *ExtraCapabilitiesManager {
 	return r.extraCapabilities
+}
+
+// GetBaseFrameContext returns foundational context (time, OS, working directory, timeline)
+// for use in prompt templates that need environmental awareness.
+func (r *ReActLoop) GetBaseFrameContext() map[string]any {
+	result := map[string]any{
+		"CurrentTime": time.Now().Format("2006-01-02 15:04:05"),
+		"OSArch":      fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
+	}
+	cfg := r.GetConfig()
+	if cfg == nil {
+		return result
+	}
+	if configImpl, ok := cfg.(*aicommon.Config); ok {
+		if configImpl.Workdir != "" {
+			result["WorkingDir"] = configImpl.Workdir
+		}
+		if t := configImpl.GetTimeline(); t != nil {
+			result["Timeline"] = t.Dump()
+		}
+	}
+	return result
 }
 
 // NewMinimalReActLoop creates a lightweight ReActLoop for unit testing action handlers.
