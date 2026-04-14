@@ -1,6 +1,8 @@
 package ssaapi
 
 import (
+	"strings"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
@@ -54,14 +56,40 @@ func ToSFVMValues(values Values) sfvm.Values {
 	return sfvm.NewValues(list)
 }
 
+// valueOperatorToSSAValue maps SFVM carriers (including <getCfg>'s *CfgCtxValue) into *ssaapi.Value so
+// SyntaxFlowResult.GetValues, persistence, and yakurl listings see a normal value row (string const, no range).
+func valueOperatorToSSAValue(value sfvm.ValueOperator) (*Value, bool) {
+	if utils.IsNil(value) {
+		return nil, false
+	}
+	if ret, ok := value.(*Value); ok {
+		return ret, true
+	}
+	if c, ok := value.(*CfgCtxValue); ok {
+		if c == nil || c.IsEmpty() {
+			return nil, true
+		}
+		prog := c.prog
+		if prog == nil {
+			prog = NewTmpProgram("")
+		}
+		return prog.NewConstValue(c.String(), nil), true
+	}
+	return nil, false
+}
+
+// IsCfgCtxURLDisplayString matches the stable text form of [CfgCtxValue.String] (used when bridging to const).
+func IsCfgCtxURLDisplayString(s string) bool {
+	return strings.HasPrefix(s, "cfg(func=")
+}
+
 func FromSFVMValues(values sfvm.Values) Values {
 	var rets Values
 	for _, value := range values {
-		if utils.IsNil(value) {
-			continue
-		}
-		if ret, ok := value.(*Value); ok {
-			rets = append(rets, ret)
+		if v, ok := valueOperatorToSSAValue(value); ok {
+			if v != nil {
+				rets = append(rets, v)
+			}
 			continue
 		}
 		log.Warnf("cannot handle type: %T", value)
@@ -73,11 +101,10 @@ func FromSFVMValues(values sfvm.Values) Values {
 func SyntaxFlowVariableToValues(vs ...sfvm.ValueOperator) Values {
 	var rets Values
 	for _, v := range vs {
-		if utils.IsNil(v) {
-			continue
-		}
-		if ret, ok := v.(*Value); ok {
-			rets = append(rets, ret)
+		if val, ok := valueOperatorToSSAValue(v); ok {
+			if val != nil {
+				rets = append(rets, val)
+			}
 			continue
 		}
 		log.Warnf("cannot handle type: %T", v)

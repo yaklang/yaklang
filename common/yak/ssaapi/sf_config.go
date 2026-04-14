@@ -14,6 +14,11 @@ type sfCheck struct {
 
 	matchItem []*checkItem
 	untilItem []*checkItem
+
+	// beforeMergeHook runs on a child SFFrameResult before MergeByResult (e.g. dataflow
+	// only_reachable post-mode pruning include-rule captures). parent is the accumulated
+	// context result before this child merge.
+	beforeMergeHook func(parent *sf.SFFrameResult, child *sf.SFFrameResult)
 }
 
 type checkItem struct {
@@ -41,6 +46,10 @@ func CreateCheck(
 
 func (c *sfCheck) Empty() bool {
 	return len(c.matchItem) == 0 && len(c.untilItem) == 0
+}
+
+func (c *sfCheck) SetBeforeMergeHook(f func(parent *sf.SFFrameResult, child *sf.SFFrameResult)) {
+	c.beforeMergeHook = f
 }
 
 func (c *sfCheck) AppendItems(items ...*sf.RecursiveConfigItem) {
@@ -200,9 +209,30 @@ func (r *sfCheck) clearup(sfres *sf.SFFrameResult) {
 	if sfres == nil {
 		return
 	}
+	r.sanitizeChildResult(sfres)
+	r.runBeforeMergeHook(sfres)
+	r.mergeChildResult(sfres)
+}
+
+func (r *sfCheck) sanitizeChildResult(sfres *sf.SFFrameResult) {
 	r.config.Mutex.Lock()
 	sfres.AlertSymbolTable.Delete(sf.RecursiveMagicVariable)
 	sfres.SymbolTable.Delete(sf.RecursiveMagicVariable)
+	r.config.Mutex.Unlock()
+}
+
+func (r *sfCheck) runBeforeMergeHook(sfres *sf.SFFrameResult) {
+	if r.beforeMergeHook == nil {
+		return
+	}
+	// Run hook outside config lock:
+	// hook logic may trigger CFG/reachability helpers that re-enter VM/config paths and
+	// attempt to lock the same mutex again. Holding the lock here can deadlock (non-reentrant mutex).
+	r.beforeMergeHook(r.contextResult, sfres)
+}
+
+func (r *sfCheck) mergeChildResult(sfres *sf.SFFrameResult) {
+	r.config.Mutex.Lock()
 	r.contextResult.MergeByResult(sfres)
 	r.config.Mutex.Unlock()
 }
