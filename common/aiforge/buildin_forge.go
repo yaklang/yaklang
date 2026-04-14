@@ -44,6 +44,8 @@ var generateMetadataPrompt = `
 `
 
 func GenerateForgeMetadata(forgeContent string) (*GenerateMetadataResult, error) {
+	fallback := generateForgeMetadataFallback(forgeContent)
+
 	var lfopts []LiteForgeOption
 	lfopts = append(lfopts,
 		WithLiteForge_Prompt(generateMetadataPrompt))
@@ -64,11 +66,13 @@ func GenerateForgeMetadata(forgeContent string) (*GenerateMetadataResult, error)
 		},
 	})
 	if err != nil {
-		return nil, err
+		log.Warnf("generate forge metadata via ai failed, fallback to heuristic metadata: %v", err)
+		return fallback, nil
 	}
 
 	if result.Action == nil {
-		return nil, fmt.Errorf("extract action failed")
+		log.Warn("generate forge metadata got nil action, fallback to heuristic metadata")
+		return fallback, nil
 	}
 
 	// Extract the result
@@ -76,12 +80,87 @@ func GenerateForgeMetadata(forgeContent string) (*GenerateMetadataResult, error)
 	language := params.GetString("language")
 	description := params.GetString("description")
 	keywords := params.GetStringSlice("keywords")
+	if description == "" && len(keywords) == 0 {
+		log.Warn("generate forge metadata returned empty description and keywords, fallback to heuristic metadata")
+		return fallback, nil
+	}
 
 	return &GenerateMetadataResult{
 		Language:    language,
 		Description: description,
 		Keywords:    keywords,
 	}, nil
+}
+
+func generateForgeMetadataFallback(forgeContent string) *GenerateMetadataResult {
+	result := &GenerateMetadataResult{
+		Language:    "chinese",
+		Description: "根据输入参数执行自动化处理任务并输出结果。",
+		Keywords:    []string{"自动化", "yak", "forge"},
+	}
+
+	if parsed, err := metadata.ParseYakScriptMetadata("forge", forgeContent); err == nil {
+		if parsed.Description != "" {
+			result.Description = parsed.Description
+		}
+		if len(parsed.Keywords) > 0 {
+			result.Keywords = normalizeForgeMetadataKeywords(parsed.Keywords)
+		}
+		if result.Description != "" && len(result.Keywords) > 0 {
+			return result
+		}
+	}
+
+	lowerContent := strings.ToLower(forgeContent)
+	keywords := append([]string{}, result.Keywords...)
+
+	switch {
+	case strings.Contains(lowerContent, "synscan.synscan"):
+		result.Description = "根据输入的主机和端口执行 SYN 扫描，并输出扫描结果。"
+		keywords = append(keywords, "syn扫描", "端口扫描", "主机探测", "网络扫描")
+	case strings.Contains(lowerContent, "do_http_request") || strings.Contains(lowerContent, "send_http_request"):
+		result.Description = "根据输入构造并发送 HTTP 请求，分析返回结果。"
+		keywords = append(keywords, "http请求", "网络测试", "响应分析")
+	case strings.Contains(lowerContent, "simple_crawler"):
+		result.Description = "对目标站点进行基础爬取，收集页面和链接信息。"
+		keywords = append(keywords, "网页爬取", "链接收集", "站点分析")
+	case strings.Contains(lowerContent, "subdomain"):
+		result.Description = "围绕目标域名执行子域名枚举和结果整理。"
+		keywords = append(keywords, "子域名", "信息收集", "域名枚举")
+	}
+
+	if strings.Contains(lowerContent, `cli.string("host")`) || strings.Contains(lowerContent, `cli.string('host')`) {
+		keywords = append(keywords, "主机")
+	}
+	if strings.Contains(lowerContent, `cli.stringslice("ports")`) || strings.Contains(lowerContent, `cli.stringslice('ports')`) {
+		keywords = append(keywords, "端口")
+	}
+
+	result.Keywords = normalizeForgeMetadataKeywords(keywords)
+	return result
+}
+
+func normalizeForgeMetadataKeywords(keywords []string) []string {
+	seen := make(map[string]struct{})
+	result := make([]string, 0, len(keywords))
+	for _, keyword := range keywords {
+		trimmed := strings.TrimSpace(keyword)
+		if trimmed == "" {
+			continue
+		}
+		if _, ok := seen[trimmed]; ok {
+			continue
+		}
+		seen[trimmed] = struct{}{}
+		result = append(result, trimmed)
+		if len(result) >= 10 {
+			break
+		}
+	}
+	if len(result) == 0 {
+		return []string{"自动化", "yak", "forge"}
+	}
+	return result
 }
 
 type GenerateMetadataResult struct {
