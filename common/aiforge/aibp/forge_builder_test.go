@@ -46,7 +46,78 @@ var finishJson = `{
   "summary_tool_call_result": ""
 }`
 
+var planFromDocumentJSON = `{
+	"@action": "plan_from_document",
+	"main_task": "计算1+1的值",
+	"main_task_goal": "计算1+1的值",
+	"tasks": [
+		{
+			"subtask_name": "计算1+1的值",
+			"subtask_goal": "计算1+1的值"
+		}
+	]
+}`
+
 var summaryJson = `result is 2`
+
+func isPlanExplorationPrompt(prompt string) bool {
+	return strings.Contains(prompt, "任务规划使命") &&
+		strings.Contains(prompt, "finish_exploration")
+}
+
+func isPlanFactsHookLiteForge(prompt string) bool {
+	return strings.Contains(prompt, "数据处理和总结提示小助手") &&
+		strings.Contains(prompt, `"const": "plan_facts_hook"`)
+}
+
+func isPlanGuidanceDocLiteForge(prompt string) bool {
+	return strings.Contains(prompt, "数据处理和总结提示小助手") &&
+		strings.Contains(prompt, `"const": "plan_guidance_document"`)
+}
+
+func isPlanFromDocLiteForge(prompt string) bool {
+	return strings.Contains(prompt, "数据处理和总结提示小助手") &&
+		strings.Contains(prompt, `"const": "plan_from_document"`)
+}
+
+func tryHandleNewPlanFlowPrompt(t *testing.T, config aicommon.AICallerConfigIf, prompt string, initFlag, planFlag string) (*aicommon.AIResponse, bool) {
+	if isPlanExplorationPrompt(prompt) {
+		if initFlag != "" && !strings.Contains(prompt, initFlag) {
+			t.Fatalf("init flag not found in prompt: %s", prompt)
+		}
+		if planFlag != "" && !strings.Contains(prompt, planFlag) {
+			t.Fatalf("plan flag not found in prompt: %s", prompt)
+		}
+
+		rsp := config.NewAIResponse()
+		rsp.EmitOutputStream(strings.NewReader(`{"@action": "finish_exploration", "human_readable_thought": "Ready to generate plan"}`))
+		rsp.Close()
+		return rsp, true
+	}
+
+	if isPlanFactsHookLiteForge(prompt) {
+		rsp := config.NewAIResponse()
+		rsp.EmitOutputStream(strings.NewReader(`{"@action": "plan_facts_hook", "facts": ""}`))
+		rsp.Close()
+		return rsp, true
+	}
+
+	if isPlanGuidanceDocLiteForge(prompt) {
+		rsp := config.NewAIResponse()
+		rsp.EmitOutputStream(strings.NewReader(`{"@action": "plan_guidance_document", "document": "Mock guidance document for testing."}`))
+		rsp.Close()
+		return rsp, true
+	}
+
+	if isPlanFromDocLiteForge(prompt) {
+		rsp := config.NewAIResponse()
+		rsp.EmitOutputStream(strings.NewReader(planFromDocumentJSON))
+		rsp.Close()
+		return rsp, true
+	}
+
+	return nil, false
+}
 
 func MockAICallback(t *testing.T, initFlag, persistentFlag, planFlag string) aicommon.AICallbackType {
 	return func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
@@ -54,8 +125,18 @@ func MockAICallback(t *testing.T, initFlag, persistentFlag, planFlag string) aic
 		rsp := i.NewAIResponse()
 		defer rsp.Close()
 
+		if handledRsp, handled := tryHandleNewPlanFlowPrompt(t, i, prompt, initFlag, planFlag); handled {
+			return handledRsp, nil
+		}
+
 		if strings.Contains(prompt, "意图识别与上下文增强系统") {
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finalize_enrichment", "intent_summary": "mocked intent analysis", "recommended_capabilities": "", "context_notes": ""}`))
+			return rsp, nil
+		}
+
+		if utils.MatchAllOfSubString(prompt, "capability matcher", "matched_identifiers") ||
+			utils.MatchAllOfSubString(prompt, `"const": "capability-catalog-match"`, "matched_identifiers") {
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "capability-catalog-match", "matched_identifiers": []}`))
 			return rsp, nil
 		}
 
