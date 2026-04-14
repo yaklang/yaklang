@@ -73,6 +73,11 @@ func mockedToolCalling(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, too
 		return rsp, nil
 	}
 
+	if isPlanReviewLiteForgePrompt(prompt) {
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "plan_review", "suggestion": "continue", "reason": "继续执行。"}`))
+		return rsp, nil
+	}
+
 	if isNextActionDecisionPrompt(prompt) && strings.Contains(prompt, "require_tool") {
 		rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "require_tool", "tool_require_payload": "` + toolName + `" },

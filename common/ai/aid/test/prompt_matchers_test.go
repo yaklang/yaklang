@@ -195,6 +195,11 @@ func isSummaryPrompt(prompt string) bool {
 	return utils.MatchAllOfSubString(prompt, "status_summary", "task_long_summary", "task_short_summary")
 }
 
+func isPlanReviewLiteForgePrompt(prompt string) bool {
+	return strings.Contains(prompt, "Plan Review AI") &&
+		strings.Contains(prompt, `"const": "plan_review"`)
+}
+
 func isWrongToolReviewPrompt(prompt string) bool {
 	return strings.Contains(prompt, "abandon") &&
 		(strings.Contains(prompt, "require-tool") || strings.Contains(prompt, "require_tool"))
