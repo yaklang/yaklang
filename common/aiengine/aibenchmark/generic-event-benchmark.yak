@@ -217,6 +217,10 @@ func runSingleCase(caseConfig) {
     }
 
     opts = []
+
+    // AI 执行基础参数配置区。
+    // 如果要统一调整 benchmark 运行时行为，例如超时、最大迭代次数、语言、
+    // 是否允许交互、审批模式等，就在这里增删对应的 aim.xxx 选项。
     opts = append(opts, aim.sessionID(str.RandStr(12)))
     opts = append(opts, aim.timeout(timeoutSec))
     opts = append(opts, aim.maxIteration(maxIteration))
@@ -227,6 +231,10 @@ func runSingleCase(caseConfig) {
     opts = append(opts, aim.yoloMode())
     opts = append(opts, aim.allowUserInteract(false))
 
+    // Stream 回调配置区。
+    // 这里处理的是流式输出内容，当前使用 aim.onStreamContent，
+    // 直接拿回调传入的 data 做 streamMatch 判定。
+    // 如果之后需要改成更复杂的 stream 解析、累积、调试打印，都从这里扩展。
     opts = append(opts, aim.onStreamContent(func(react, event, nodeId, data) {
         if len(data) == 0 {
             return
@@ -249,6 +257,9 @@ func runSingleCase(caseConfig) {
         }
     }))
 
+    // Event 回调配置区。
+    // 这里处理的是普通事件内容，直接用 event.Content 做 eventMatch 判定。
+    // 如果以后要增加更多基于事件内容的 benchmark 逻辑，也优先在这里扩展。
     opts = append(opts, aim.onEvent(func(react, event) {
         eventType = string(event.Type)
         contentText = string(event.Content)
@@ -279,6 +290,10 @@ func runSingleCase(caseConfig) {
     log.info("Running case=%s", caseConfig["name"])
     log.info("  timeout=%d maxIteration=%d", timeoutSec, maxIteration)
 
+    // Prompt 入口。
+    // 当前 benchmark 直接把 caseConfig["input"] 作为初始提示词传给 AI。
+    // 如果后续需要统一追加帮助信息、约束提示、前缀模板，或者对输入做包装，
+    // 就在 InvokeReAct 之前先构造一个新的 prompt，再传入。
     err = aim.InvokeReAct(caseConfig["input"], opts...)
     if err != nil {
         result["error"] = sprintf("%v", err)
