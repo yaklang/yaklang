@@ -76,9 +76,8 @@ func planTasksStreamHandler(fieldReader io.Reader, emitWriter io.Writer) {
 					buf.WriteString("\n\n")
 				}
 			}
-			buf.WriteString("[")
+			buf.WriteString("- [ ] ")
 			io.Copy(&buf, reader)
-			buf.WriteString("]")
 		case "subtask_goal":
 			buf.WriteString(": ")
 			io.Copy(&buf, reader)
