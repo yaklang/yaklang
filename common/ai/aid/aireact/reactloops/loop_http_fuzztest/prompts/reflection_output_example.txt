@@ -48,7 +48,28 @@
 }
 ```
 
-### 示例 5：测试 Cookie 会话操控
+### 示例 5：使用 fuzztag 做登录口密码爆破
+```json
+{
+  "@action": "fuzz_body",
+  "body_type": "post_params",
+  "param_name": "password",
+  "param_values": ["{{ "{{fuzz:password(admin)}}" }}", "{{ "{{payload(pass_top25)}}" }}"],
+  "reason": "这是登录接口，password 字段适合做弱口令和字典型爆破验证。这里优先使用 fuzztag 表达批量生成规则，而不是手写大量密码列表。整个测试保持只读，不包含任何破坏性 payload。"
+}
+```
+
+### 示例 6：使用 fuzztag 做用户名枚举或对象遍历
+```json
+{
+  "@action": "fuzz_get_params",
+  "param_name": "username",
+  "param_values": ["{{ "{{fuzz:username(admin)}}" }}"],
+  "reason": "当前接口疑似登录或找回密码场景，username 参数适合做批量用户名枚举。这里让底层通过 fuzztag 自动展开常见用户名，而不是手写长列表。"
+}
+```
+
+### 示例 7：测试 Cookie 会话操控
 ```json
 {
   "@action": "fuzz_cookie",
@@ -59,7 +80,7 @@
 }
 ```
 
-### 示例 6：测试 HTTP 方法差异
+### 示例 8：测试 HTTP 方法差异
 ```json
 {
   "@action": "fuzz_method",
@@ -68,7 +89,7 @@
 }
 ```
 
-### 示例 7：修改当前数据包并要求人工审核
+### 示例 9：修改当前数据包并要求人工审核
 ```json
 {
   "@action": "modify_http_request",
@@ -86,7 +107,7 @@ Cookie: session=guest
 
 <|GEN_MODIFIED_PACKET_END_{{ .Nonce }}|>
 
-### 示例 8：测试过程中的简短问答
+### 示例 10：测试过程中的简短问答
 ```json
 {
   "@action": "directly_answer",
@@ -94,7 +115,7 @@ Cookie: session=guest
 }
 ```
 
-### 示例 9：使用 FINAL_ANSWER 输出更复杂的阶段结论
+### 示例 11：使用 FINAL_ANSWER 输出更复杂的阶段结论
 ```json
 {
   "@action": "directly_answer"
@@ -129,7 +150,7 @@ Cookie: session=guest
 3. 观察是否能通过调试信息、模板报错或搜索结果差异挖到信息泄漏。
 <|FINAL_ANSWER_END_{{ .Nonce }}|>
 
-### 示例 10：使用 FINAL_ANSWER 输出 IDOR/信息泄漏方向
+### 示例 12：使用 FINAL_ANSWER 输出 IDOR/信息泄漏方向
 ```json
 {
   "@action": "directly_answer"
@@ -157,7 +178,7 @@ Cookie: session=guest
 3. 再看详情接口、导出接口、文件下载接口是否复用了同一对象访问控制缺陷。
 <|FINAL_ANSWER_END_{{ .Nonce }}|>
 
-### 示例 11：直接生成完整原始数据包并发送
+### 示例 13：直接生成完整原始数据包并发送
 ```json
 {
   "@action": "generate_and_send_packet",
@@ -176,7 +197,7 @@ Cookie: session=guest
 username=admin%27%20or%20%271%27=%271&password=test
 <|GEN_PACKET_END_{{ .Nonce }}|>
 
-### 示例 12：完全新建原始数据包做模板注入探测
+### 示例 14：完全新建原始数据包做模板注入探测
 ```json
 {
   "@action": "generate_and_send_packet",
