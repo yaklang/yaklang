@@ -39,8 +39,11 @@ func TestAITaskCallToolStdOut_VerifyUserQuery(t *testing.T) {
 			outputChan <- event
 		}),
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			if !strings.Contains(r.GetPrompt(), userRawInput) {
-				prompt := r.GetPrompt()
+			prompt := r.GetPrompt()
+			if rsp, err := tryHandleNewPlanFlowPrompt(i, prompt, mockedToolCallingPlanJSON); rsp != nil {
+				return rsp, err
+			}
+			if !strings.Contains(prompt, userRawInput) {
 				fmt.Println(prompt)
 				t.Fatal("no user raw input found in prompt")
 			}
@@ -131,6 +134,10 @@ func TestAITaskCallToolStdOut_VerifyTimelineAndUserQuery(t *testing.T) {
 		}),
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := r.GetPrompt()
+
+			if rsp, err := tryHandleNewPlanFlowPrompt(i, prompt, mockedToolCallingPlanJSON); rsp != nil {
+				return rsp, err
+			}
 
 			if isPlanFactsHookPrompt(prompt) {
 				return mockedToolCalling(i, r, "print", fmt.Sprintf(`{"@action": "call-tool", "tool": "print", "params": {"output": "%s","err":"%s"}}`, outputToken, errToken))

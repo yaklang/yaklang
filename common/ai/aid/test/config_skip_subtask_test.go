@@ -76,17 +76,9 @@ func TestCoordinator_SkipSubtaskInPlan(t *testing.T) {
 		}),
 		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := request.GetPrompt()
-			rsp := config.NewAIResponse()
-			defer rsp.Close()
 
-			// 处理 plan 请求
-			isPlanRequest := (strings.Contains(prompt, "任务规划使命") || strings.Contains(prompt, "你是一个输出JSON的任务规划的工具")) &&
-				(strings.Contains(prompt, "PERSISTENT_") || strings.Contains(prompt, "任务设计输出要求") || strings.Contains(prompt, "```schema"))
-
-			if isPlanRequest {
-				rsp.EmitOutputStream(strings.NewReader(`{
-    "@action": "plan",
-    "query": "测试跳过子任务",
+			skipSubtaskPlanJSON := `{
+    "@action": "plan_from_document",
     "main_task": "测试跳过子任务功能",
     "main_task_goal": "验证 skip_subtask_in_plan 功能正常工作",
     "tasks": [
@@ -94,11 +86,14 @@ func TestCoordinator_SkipSubtaskInPlan(t *testing.T) {
         {"subtask_name": "第二个任务-需要跳过", "subtask_goal": "这个任务需要被跳过"},
         {"subtask_name": "第三个任务", "subtask_goal": "执行第三个任务"}
     ]
-}`))
-				return rsp, nil
+}`
+			if rsp, err := tryHandleNewPlanFlowPrompt(config, prompt, skipSubtaskPlanJSON); rsp != nil {
+				return rsp, err
 			}
 
-			// 处理 summary 请求
+			rsp := config.NewAIResponse()
+			defer rsp.Close()
+
 			if utils.MatchAllOfSubString(prompt, "status_summary", "task_long_summary", "task_short_summary") {
 				rsp.EmitOutputStream(strings.NewReader(`{"@action": "summary", "status_summary": "s", "task_short_summary": "s", "task_long_summary": "s"}`))
 				return rsp, nil
@@ -203,22 +198,19 @@ func TestCoordinator_SkipSubtaskInPlan_NotFound(t *testing.T) {
 		}),
 		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := request.GetPrompt()
-			rsp := config.NewAIResponse()
-			defer rsp.Close()
 
-			isPlanRequest := (strings.Contains(prompt, "任务规划使命") || strings.Contains(prompt, "你是一个输出JSON的任务规划的工具")) &&
-				(strings.Contains(prompt, "PERSISTENT_") || strings.Contains(prompt, "任务设计输出要求") || strings.Contains(prompt, "```schema"))
-
-			if isPlanRequest {
-				rsp.EmitOutputStream(strings.NewReader(`{
-    "@action": "plan",
-    "query": "测试跳过不存在的子任务",
+			notFoundPlanJSON := `{
+    "@action": "plan_from_document",
     "main_task": "测试错误处理",
     "main_task_goal": "验证跳过不存在的子任务时的错误处理",
     "tasks": [{"subtask_name": "唯一任务", "subtask_goal": "执行唯一任务"}]
-}`))
-				return rsp, nil
+}`
+			if rsp, err := tryHandleNewPlanFlowPrompt(config, prompt, notFoundPlanJSON); rsp != nil {
+				return rsp, err
 			}
+
+			rsp := config.NewAIResponse()
+			defer rsp.Close()
 
 			if utils.MatchAllOfSubString(prompt, "status_summary", "task_long_summary", "task_short_summary") {
 				rsp.EmitOutputStream(strings.NewReader(`{"@action": "summary", "status_summary": "s", "task_short_summary": "s", "task_long_summary": "s"}`))
@@ -322,16 +314,9 @@ func TestCoordinator_FindSubtaskByIndex(t *testing.T) {
 		}),
 		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := request.GetPrompt()
-			rsp := config.NewAIResponse()
-			defer rsp.Close()
 
-			isPlanRequest := (strings.Contains(prompt, "任务规划使命") || strings.Contains(prompt, "你是一个输出JSON的任务规划的工具")) &&
-				(strings.Contains(prompt, "PERSISTENT_") || strings.Contains(prompt, "任务设计输出要求") || strings.Contains(prompt, "```schema"))
-
-			if isPlanRequest {
-				rsp.EmitOutputStream(strings.NewReader(`{
-    "@action": "plan",
-    "query": "测试查找子任务",
+			findSubtaskPlanJSON := `{
+    "@action": "plan_from_document",
     "main_task": "主任务",
     "main_task_goal": "测试 FindSubtaskByIndex",
     "tasks": [
@@ -339,9 +324,13 @@ func TestCoordinator_FindSubtaskByIndex(t *testing.T) {
         {"subtask_name": "子任务B", "subtask_goal": "目标B"},
         {"subtask_name": "子任务C", "subtask_goal": "目标C"}
     ]
-}`))
-				return rsp, nil
+}`
+			if rsp, err := tryHandleNewPlanFlowPrompt(config, prompt, findSubtaskPlanJSON); rsp != nil {
+				return rsp, err
 			}
+
+			rsp := config.NewAIResponse()
+			defer rsp.Close()
 
 			if utils.MatchAllOfSubString(prompt, "status_summary", "task_long_summary", "task_short_summary") {
 				rsp.EmitOutputStream(strings.NewReader(`{"@action": "summary", "status_summary": "s", "task_short_summary": "s", "task_long_summary": "s"}`))
@@ -449,25 +438,22 @@ func TestCoordinator_SkipSubtaskInPlan_WithReason(t *testing.T) {
 		}),
 		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := request.GetPrompt()
-			rsp := config.NewAIResponse()
-			defer rsp.Close()
 
-			isPlanRequest := (strings.Contains(prompt, "任务规划使命") || strings.Contains(prompt, "你是一个输出JSON的任务规划的工具")) &&
-				(strings.Contains(prompt, "PERSISTENT_") || strings.Contains(prompt, "任务设计输出要求") || strings.Contains(prompt, "```schema"))
-
-			if isPlanRequest {
-				rsp.EmitOutputStream(strings.NewReader(`{
-    "@action": "plan",
-    "query": "测试跳过子任务并提供理由",
+			withReasonPlanJSON := `{
+    "@action": "plan_from_document",
     "main_task": "测试理由功能",
     "main_task_goal": "验证跳过任务时理由被正确记录",
     "tasks": [
         {"subtask_name": "任务一", "subtask_goal": "目标一"},
         {"subtask_name": "任务二", "subtask_goal": "目标二"}
     ]
-}`))
-				return rsp, nil
+}`
+			if rsp, err := tryHandleNewPlanFlowPrompt(config, prompt, withReasonPlanJSON); rsp != nil {
+				return rsp, err
 			}
+
+			rsp := config.NewAIResponse()
+			defer rsp.Close()
 
 			if utils.MatchAllOfSubString(prompt, "status_summary", "task_long_summary", "task_short_summary") {
 				rsp.EmitOutputStream(strings.NewReader(`{"@action": "summary", "status_summary": "s", "task_short_summary": "s", "task_long_summary": "s"}`))
@@ -571,22 +557,19 @@ func TestCoordinator_SkipSubtaskInPlan_CancelSkipsReview(t *testing.T) {
 		}),
 		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := request.GetPrompt()
-			rsp := config.NewAIResponse()
-			defer rsp.Close()
 
-			isPlanRequest := (strings.Contains(prompt, "任务规划使命") || strings.Contains(prompt, "你是一个输出JSON的任务规划的工具")) &&
-				(strings.Contains(prompt, "PERSISTENT_") || strings.Contains(prompt, "任务设计输出要求") || strings.Contains(prompt, "```schema"))
-
-			if isPlanRequest {
-				rsp.EmitOutputStream(strings.NewReader(`{
-    "@action": "plan",
-    "query": "测试取消后跳过审查逻辑",
+			cancelSkipPlanJSON := `{
+    "@action": "plan_from_document",
     "main_task": "测试取消后跳过审查逻辑",
     "main_task_goal": "验证 cancel 后不会进入任务审查逻辑",
     "tasks": [{"subtask_name": "任务一", "subtask_goal": "这个任务会被取消并跳过审查"}]
-}`))
-				return rsp, nil
+}`
+			if rsp, err := tryHandleNewPlanFlowPrompt(config, prompt, cancelSkipPlanJSON); rsp != nil {
+				return rsp, err
 			}
+
+			rsp := config.NewAIResponse()
+			defer rsp.Close()
 
 			if utils.MatchAllOfSubString(prompt, "status_summary", "task_long_summary", "task_short_summary") {
 				rsp.EmitOutputStream(strings.NewReader(`{"@action": "summary", "status_summary": "s", "task_short_summary": "s", "task_long_summary": "s"}`))
@@ -769,25 +752,21 @@ func runSkipAndContinueTest(t *testing.T, useCurrentFlag bool) bool {
 		}),
 		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := request.GetPrompt()
-			rsp := config.NewAIResponse()
 
-			isPlanRequest := (strings.Contains(prompt, "任务规划使命") || strings.Contains(prompt, "你是一个输出JSON的任务规划的工具")) &&
-				(strings.Contains(prompt, "PERSISTENT_") || strings.Contains(prompt, "任务设计输出要求") || strings.Contains(prompt, "```schema"))
-
-			if isPlanRequest {
-				defer rsp.Close()
-				rsp.EmitOutputStream(strings.NewReader(`{
-    "@action": "plan",
-    "query": "测试跳过后继续",
+			skipContinuePlanJSON := `{
+    "@action": "plan_from_document",
     "main_task": "测试跳过子任务后立即执行下一个任务",
     "main_task_goal": "验证 skip 1-1 后 1-2 立即开始执行",
     "tasks": [
         {"subtask_name": "任务1-1", "subtask_goal": "这个任务会被跳过"},
         {"subtask_name": "任务1-2", "subtask_goal": "这个任务应该在1-1被跳过后立即执行"}
     ]
-}`))
-				return rsp, nil
+}`
+			if rsp, err := tryHandleNewPlanFlowPrompt(config, prompt, skipContinuePlanJSON); rsp != nil {
+				return rsp, err
 			}
+
+			rsp := config.NewAIResponse()
 
 			if utils.MatchAllOfSubString(prompt, "status_summary", "task_long_summary", "task_short_summary") {
 				defer rsp.Close()
@@ -972,22 +951,19 @@ func TestCoordinator_RedoSubtaskInPlan_MissingUserMessage(t *testing.T) {
 		}),
 		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := request.GetPrompt()
-			rsp := config.NewAIResponse()
-			defer rsp.Close()
 
-			isPlanRequest := (strings.Contains(prompt, "任务规划使命") || strings.Contains(prompt, "你是一个输出JSON的任务规划的工具")) &&
-				(strings.Contains(prompt, "PERSISTENT_") || strings.Contains(prompt, "任务设计输出要求") || strings.Contains(prompt, "```schema"))
-
-			if isPlanRequest {
-				rsp.EmitOutputStream(strings.NewReader(`{
-    "@action": "plan",
-    "query": "测试",
+			redoPlanJSON := `{
+    "@action": "plan_from_document",
     "main_task": "测试",
     "main_task_goal": "测试",
     "tasks": [{"subtask_name": "任务", "subtask_goal": "目标"}]
-}`))
-				return rsp, nil
+}`
+			if rsp, err := tryHandleNewPlanFlowPrompt(config, prompt, redoPlanJSON); rsp != nil {
+				return rsp, err
 			}
+
+			rsp := config.NewAIResponse()
+			defer rsp.Close()
 
 			if utils.MatchAllOfSubString(prompt, "status_summary", "task_long_summary", "task_short_summary") {
 				rsp.EmitOutputStream(strings.NewReader(`{"@action": "summary", "status_summary": "s", "task_short_summary": "s", "task_long_summary": "s"}`))

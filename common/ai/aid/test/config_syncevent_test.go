@@ -26,31 +26,15 @@ func TestCoordinator_SyncPing(t *testing.T) {
 			outputChan <- event
 		}),
 		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			prompt := request.GetPrompt()
+
+			if rsp, err := tryHandleNewPlanFlowPrompt(config, prompt, defaultTestPlanFromDocJSON); rsp != nil {
+				return rsp, err
+			}
+
 			rsp := config.NewAIResponse()
-			rsp.EmitOutputStream(strings.NewReader(`
-{
-    "@action": "plan",
-    "query": "找出 /Users/v1ll4n/Projects/yaklang 目录中最大的文件",
-    "main_task": "在指定目录中找到最大的文件",
-    "main_task_goal": "明确 /Users/v1ll4n/Projects/yaklang 目录下哪个文件占用空间最大，并输出该文件的路径和大小",
-    "tasks": [
-        {
-            "subtask_name": "遍历目标目录",
-            "subtask_goal": "递归扫描 /Users/v1ll4n/Projects/yaklang 目录，获取所有文件的路径和大小"
-        },
-        {
-            "subtask_name": "筛选最大文件",
-            "subtask_goal": "根据文件大小比较，确定目录中占用空间最大的文件"
-        },
-        {
-            "subtask_name": "输出结果",
-            "subtask_goal": "将最大文件的路径和大小以可读格式输出"
-        }
-    ]
-}
-			`))
-			time.Sleep(100 * time.Millisecond)
-			rsp.Close()
+			defer rsp.Close()
+			rsp.EmitOutputStream(strings.NewReader(`{"@action": "finish", "human_readable_thought": "ok"}`))
 			return rsp, nil
 		}),
 	)

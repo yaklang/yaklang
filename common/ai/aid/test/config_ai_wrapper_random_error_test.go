@@ -75,11 +75,6 @@ func SyncInputEventEx(syncType string, SyncID string) *ypb.AIInputEvent {
 	}
 }
 
-func isPlanRequestForCoordinatorTest(prompt string) bool {
-	return (strings.Contains(prompt, "任务规划使命") || strings.Contains(prompt, "你是一个输出JSON的任务规划的工具")) &&
-		(strings.Contains(prompt, "PERSISTENT_NcSB") || strings.Contains(prompt, "任务设计输出要求") || strings.Contains(prompt, "```schema"))
-}
-
 func TestCoordinator_RandomAICallbackError(t *testing.T) {
 	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 10)
 	outputChan := make(chan *schema.AiOutputEvent)
@@ -109,72 +104,44 @@ func TestCoordinator_RandomAICallbackError(t *testing.T) {
 			countInt64 := atomic.AddInt64(count, 1)
 			if countInt64 <= errLimit {
 				return nil, utils.Errorf("mock, unknown err[%v]", count)
-			} else if isPlanRequestForCoordinatorTest(prompt) {
-				count = new(int64)
-			} else {
-				count = new(int64)
-				rsp := aicommon.NewAIResponse(config)
-				defer rsp.Close()
+			}
 
-				if utils.MatchAllOfSubString(prompt, "capability matcher", "matched_identifiers") ||
-					utils.MatchAllOfSubString(prompt, `"const": "capability-catalog-match"`, "matched_identifiers") {
-					rsp.EmitOutputStream(strings.NewReader(`{"@action": "capability-catalog-match", "matched_identifiers": []}`))
-					return rsp, nil
-				}
+			count = new(int64)
 
-				if isTaskSummaryPrompt(prompt) {
-					rsp.EmitOutputStream(strings.NewReader(`{"@action": "summary", "status_summary": "ok", "task_short_summary": "ok", "task_long_summary": "ok"}`))
-					return rsp, nil
-				}
-
-				if strings.Contains(prompt, "Background") && (strings.Contains(prompt, "Current Time:") || strings.Contains(prompt, "OS/Arch:")) {
-					rsp.EmitOutputStream(strings.NewReader(`{"@action": "object", "next_action": {"type": "finish", "answer_payload": "ok"}, "cumulative_summary": "ok", "human_readable_thought": "ok"}`))
-					return rsp, nil
-				}
-
-				if strings.Contains(prompt, "tag-selection") {
-					rsp.EmitOutputStream(strings.NewReader(`{"@action": "tag-selection", "tags": ["test"]}`))
-					return rsp, nil
-				}
-
-				if strings.Contains(prompt, "memory-triage") {
-					rsp.EmitOutputStream(strings.NewReader(`{"@action": "memory-triage", "memory_entities": []}`))
-					return rsp, nil
-				}
-
-				if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
-					rsp.EmitOutputStream(strings.NewReader(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "ok"}`))
-					return rsp, nil
-				}
-
-				rsp.EmitOutputStream(strings.NewReader(`{"@action": "finish", "human_readable_thought": "ok"}`))
-				return rsp, nil
+			if rsp, err := tryHandleNewPlanFlowPrompt(config, prompt, defaultTestPlanFromDocJSON); rsp != nil {
+				return rsp, err
 			}
 
 			rsp := aicommon.NewAIResponse(config)
-			rsp.EmitOutputStream(strings.NewReader(`
-{
-    "@action": "plan",
-    "query": "找出 /Users/v1ll4n/Projects/yaklang 目录中最大的文件",
-    "main_task": "在指定目录中找到最大的文件",
-    "main_task_goal": "明确 /Users/v1ll4n/Projects/yaklang 目录下哪个文件占用空间最大，并输出该文件的路径和大小",
-    "tasks": [
-        {
-            "subtask_name": "遍历目标目录",
-            "subtask_goal": "递归扫描 /Users/v1ll4n/Projects/yaklang 目录，获取所有文件的路径和大小"
-        },
-        {
-            "subtask_name": "筛选最大文件",
-            "subtask_goal": "根据文件大小比较，确定目录中占用空间最大的文件"
-        },
-        {
-            "subtask_name": "输出结果",
-            "subtask_goal": "将最大文件的路径和大小以可读格式输出"
-        }
-    ]
-}
-			`))
-			rsp.Close()
+			defer rsp.Close()
+
+			if utils.MatchAllOfSubString(prompt, "capability matcher", "matched_identifiers") ||
+				utils.MatchAllOfSubString(prompt, `"const": "capability-catalog-match"`, "matched_identifiers") {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "capability-catalog-match", "matched_identifiers": []}`))
+				return rsp, nil
+			}
+
+			if isTaskSummaryPrompt(prompt) {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "summary", "status_summary": "ok", "task_short_summary": "ok", "task_long_summary": "ok"}`))
+				return rsp, nil
+			}
+
+			if strings.Contains(prompt, "tag-selection") {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "tag-selection", "tags": ["test"]}`))
+				return rsp, nil
+			}
+
+			if strings.Contains(prompt, "memory-triage") {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "memory-triage", "memory_entities": []}`))
+				return rsp, nil
+			}
+
+			if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "ok"}`))
+				return rsp, nil
+			}
+
+			rsp.EmitOutputStream(strings.NewReader(`{"@action": "finish", "human_readable_thought": "ok"}`))
 			return rsp, nil
 		}),
 	)
