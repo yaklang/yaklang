@@ -20,11 +20,32 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+var mockedToolCallingPlanJSON = `{
+    "@action": "plan_from_document",
+    "main_task": "在给定路径下寻找体积最大的文件",
+    "main_task_goal": "识别 /Users/v1ll4n/Projects/yaklang 目录中占用存储空间最多的文件，并展示其完整路径与大小信息",
+    "tasks": [
+        {
+            "subtask_name": "扫描目录结构",
+            "subtask_goal": "递归遍历 /Users/v1ll4n/Projects/yaklang 目录下所有文件，记录每个文件的位置和占用空间"
+        },
+        {
+            "subtask_name": "计算文件大小",
+            "subtask_goal": "遍历所有文件，计算每个文件的大小"
+        }
+    ]
+}`
+
 func mockedToolCalling(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string, params string) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
+	fmt.Println("===========" + "request:" + "===========\n" + req.GetPrompt())
+
+	if rsp, err := tryHandleNewPlanFlowPrompt(i, prompt, mockedToolCallingPlanJSON); rsp != nil {
+		return rsp, err
+	}
+
 	rsp := i.NewAIResponse()
 	defer rsp.Close()
-	fmt.Println("===========" + "request:" + "===========\n" + req.GetPrompt())
 
 	if isIntentEnrichmentPrompt(prompt) {
 		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finalize_enrichment", "intent_summary": "mocked intent analysis", "recommended_capabilities": "", "context_notes": ""}`))
@@ -49,29 +70,6 @@ func mockedToolCalling(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, too
 
 	if isPlanFactsHookPrompt(prompt) {
 		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "plan_facts_hook", "facts": ""}`))
-		return rsp, nil
-	}
-
-	if isPlanPrompt(prompt) {
-
-		rsp.EmitOutputStream(strings.NewReader(`
-{
-    "@action": "plan",
-    "query": "找出 /Users/v1ll4n/Projects/yaklang 目录中最大的文件",
-    "main_task": "在给定路径下寻找体积最大的文件",
-    "main_task_goal": "识别 /Users/v1ll4n/Projects/yaklang 目录中占用存储空间最多的文件，并展示其完整路径与大小信息",
-    "tasks": [
-        {
-            "subtask_name": "扫描目录结构",
-            "subtask_goal": "递归遍历 /Users/v1ll4n/Projects/yaklang 目录下所有文件，记录每个文件的位置和占用空间"
-        },
-        {
-            "subtask_name": "计算文件大小",
-            "subtask_goal": "遍历所有文件，计算每个文件的大小"
-        }
-    ]
-}
-			`))
 		return rsp, nil
 	}
 

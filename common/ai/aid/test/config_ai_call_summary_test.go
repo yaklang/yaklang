@@ -27,22 +27,19 @@ func TestCoordinator_AICallSummaryEvent(t *testing.T) {
 		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
 			outChan.SafeFeed(event)
 		}),
-		aid.WithPlanMocker(func(coordinator *aid.Coordinator) *aid.PlanResponse {
-			return &aid.PlanResponse{
-				RootTask: &aid.AiTask{
-					Name: "test main task",
-					Goal: "verify ai_call_summary event fields",
-					Subtasks: []*aid.AiTask{
-						{
-							Name: "subtask-1",
-							Goal: "test subtask goal",
-						},
-					},
-				},
-			}
-		}),
 		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := request.GetPrompt()
+
+			summaryTestPlanJSON := `{
+    "@action": "plan_from_document",
+    "main_task": "test main task",
+    "main_task_goal": "verify ai_call_summary event fields",
+    "tasks": [{"subtask_name": "subtask-1", "subtask_goal": "test subtask goal"}]
+}`
+			if rsp, err := tryHandleNewPlanFlowPrompt(config, prompt, summaryTestPlanJSON); rsp != nil {
+				return rsp, err
+			}
+
 			rsp := config.NewAIResponse()
 			rsp.SetModelInfo("test-provider", "test-model-v1")
 
