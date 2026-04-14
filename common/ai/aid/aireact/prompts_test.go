@@ -770,7 +770,8 @@ func TestGenerateVerificationPrompt_IncludesOptionalEvidenceAndAITAGGuidance(t *
 	if !utils.MatchAllOfSubString(
 		prompt,
 		"`evidence` 不是必填字段",
-		"每一条至少说明两个要素：主体是谁，发现了什么内容",
+		"每一条至少写清楚四个要素",
+		"主体、动作、观测、控制含义",
 		"鼓励使用 AITAG block 输出，而不只是 JSON 字段",
 		"<|EVIDENCE_"+nonce+"|>",
 		"<|EVIDENCE_END_"+nonce+"|>",
