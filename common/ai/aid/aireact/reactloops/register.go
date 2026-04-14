@@ -1,15 +1,14 @@
 package reactloops
 
 import (
-	"sync"
-
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
-var loops = new(sync.Map)
-var loopMetadata = new(sync.Map) // stores *LoopMetadata by loop name
-var actions = new(sync.Map)
+var loops = omap.NewEmptyOrderedMap[string, LoopFactory]()
+var loopMetadata = omap.NewEmptyOrderedMap[string, *LoopMetadata]() // stores *LoopMetadata by loop name
+var actions = omap.NewEmptyOrderedMap[string, *LoopAction]()
 
 // LoopMetadata stores metadata about a loop for AI understanding
 type LoopMetadata struct {
@@ -76,19 +75,11 @@ func WithVerboseNameZh(name string) LoopMetadataOption {
 }
 
 func RegisterAction(action *LoopAction) {
-	actions.Store(action.ActionType, action)
+	actions.Set(action.ActionType, action)
 }
 
 func GetLoopAction(name string) (*LoopAction, bool) {
-	action, ok := actions.Load(name)
-	if !ok {
-		return nil, false
-	}
-	actionObj, ok := action.(*LoopAction)
-	if !ok {
-		return nil, false
-	}
-	return actionObj, true
+	return actions.Get(name)
 }
 
 type LoopFactory func(r aicommon.AIInvokeRuntime, opts ...ReActLoopOption) (*ReActLoop, error)
@@ -98,11 +89,11 @@ func RegisterLoopFactory(
 	creator LoopFactory,
 	opts ...LoopMetadataOption,
 ) error {
-	_, ok := loops.Load(name)
+	_, ok := loops.Get(name)
 	if ok {
 		return utils.Errorf("reactloop[%v] already exists", name)
 	}
-	loops.Store(name, creator)
+	loops.Set(name, creator)
 
 	// Store metadata if provided
 	if len(opts) > 0 {
@@ -110,20 +101,16 @@ func RegisterLoopFactory(
 		for _, opt := range opts {
 			opt(meta)
 		}
-		loopMetadata.Store(name, meta)
+		loopMetadata.Set(name, meta)
 	}
 
 	return nil
 }
 
 func CreateLoopByName(name string, invoker aicommon.AIInvokeRuntime, opts ...ReActLoopOption) (*ReActLoop, error) {
-	factory, ok := loops.Load(name)
+	factoryCreator, ok := loops.Get(name)
 	if !ok {
 		return nil, utils.Errorf("reactloop[%v] not found", name)
-	}
-	factoryCreator, ok := factory.(LoopFactory)
-	if !ok {
-		return nil, utils.Errorf("reactloop[%v] type assert error", name)
 	}
 	loopIns, err := factoryCreator(invoker, opts...)
 	if err != nil {
@@ -136,28 +123,12 @@ func CreateLoopByName(name string, invoker aicommon.AIInvokeRuntime, opts ...ReA
 }
 
 func GetLoopFactory(name string) (LoopFactory, bool) {
-	factory, ok := loops.Load(name)
-	if !ok {
-		return nil, false
-	}
-	factoryCreator, ok := factory.(LoopFactory)
-	if !ok {
-		return nil, false
-	}
-	return factoryCreator, true
+	return loops.Get(name)
 }
 
 // GetLoopMetadata retrieves metadata for a registered loop
 func GetLoopMetadata(name string) (*LoopMetadata, bool) {
-	meta, ok := loopMetadata.Load(name)
-	if !ok {
-		return nil, false
-	}
-	metaObj, ok := meta.(*LoopMetadata)
-	if !ok {
-		return nil, false
-	}
-	return metaObj, true
+	return loopMetadata.Get(name)
 }
 
 func (m *LoopMetadata) GetDescriptionZh() string {
@@ -170,10 +141,8 @@ func (m *LoopMetadata) GetDescriptionZh() string {
 // GetAllLoopMetadata returns all registered loop metadata
 func GetAllLoopMetadata() []*LoopMetadata {
 	var result []*LoopMetadata
-	loopMetadata.Range(func(key, value interface{}) bool {
-		if meta, ok := value.(*LoopMetadata); ok {
-			result = append(result, meta)
-		}
+	loopMetadata.ForEach(func(_ string, meta *LoopMetadata) bool {
+		result = append(result, meta)
 		return true
 	})
 	return result
