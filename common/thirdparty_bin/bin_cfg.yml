@@ -43,6 +43,12 @@ binaries:
       linux-amd64:
         url: "/vulinbox/latest/vulinbox_linux_amd64"
         bin_path: "vulinbox"
+      linux-sw64:
+        url: "/vulinbox/latest/vulinbox_linux_sw64"
+        bin_path: "vulinbox"
+      linux-sw_64:
+        url: "/vulinbox/latest/vulinbox_linux_sw64"
+        bin_path: "vulinbox"
       "darwin-*":  # 使用glob模式匹配所有macOS平台 (darwin-amd64, darwin-arm64等)
         url: "/vulinbox/latest/vulinbox_darwin_amd64"
         bin_path: "vulinbox"
