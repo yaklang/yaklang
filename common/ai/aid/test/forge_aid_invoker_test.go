@@ -514,42 +514,30 @@ func TestCoordinator_PlanPrompt_OnlyInPlanPhase(t *testing.T) {
 
 			// Determine phase by checking if PLAN_REVIEW has been received
 			if !planReviewReceived.IsSet() {
-				// Before plan review - this is Plan phase
 				beforePlanReviewPromptCount++
 				if hasPlanPromptMarker {
 					planPromptFoundBeforePlanReview = true
-					log.Infof("✓ PlanPrompt marker found BEFORE plan review (prompt #%d)", beforePlanReviewPromptCount)
+					log.Infof("PlanPrompt marker found BEFORE plan review (prompt #%d)", beforePlanReviewPromptCount)
 				}
 			} else {
-				// After plan review - this is Task execution phase
 				afterPlanReviewPromptCount++
 				if hasPlanPromptMarker {
 					planPromptFoundAfterPlanReview = true
-					log.Warnf("✗ PlanPrompt marker found AFTER plan review (prompt #%d) - should NOT happen",
+					log.Warnf("PlanPrompt marker found AFTER plan review (prompt #%d) - should NOT happen",
 						afterPlanReviewPromptCount)
 				}
 			}
 
-			// Check if this is Plan phase (by prompt content)
-			isPlanPhase := strings.Contains(prompt, "任务规划使命")
-
-			// Handle Plan phase - return a simple plan
-			if isPlanPhase {
-				rsp := i.NewAIResponse()
-				rsp.EmitOutputStream(strings.NewReader(`{
-  "@action": "plan",
-  "query": "Test plan",
-  "main_task": "Test Main Task",
-  "main_task_goal": "Complete the test",
-  "tasks": [
-    {"subtask_name": "Test Step", "subtask_goal": "Execute test step"}
-  ]
-}`))
-				rsp.Close()
-				return rsp, nil
+			planJSON := `{
+    "@action": "plan_from_document",
+    "main_task": "Test Main Task",
+    "main_task_goal": "Complete the test",
+    "tasks": [{"subtask_name": "Test Step", "subtask_goal": "Execute test step"}]
+}`
+			if rsp, err := tryHandleNewPlanFlowPrompt(i, prompt, planJSON); rsp != nil {
+				return rsp, err
 			}
 
-			// Default response for task execution
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "Task completed"}`))
 			rsp.Close()
