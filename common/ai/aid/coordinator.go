@@ -370,27 +370,27 @@ func (c *Coordinator) Run() error {
 
 	if !recovered {
 		// Phase 1: Creating plan
-		c.planLoadingStatus("创建任务计划 / Creating Plan...")
+		c.planLoadingStatus("创建任务规划 / Creating Plan...")
 		c.EmitInfo("start to create plan request")
 		planReq, err := c.createPlanRequest(c.userInput)
 		if err != nil {
-			c.planLoadingStatus("计划创建失败 / Plan Creation Failed")
+			c.planLoadingStatus("任务规划创建失败 / Plan Creation Failed")
 			c.EmitError("create planRequest failed: %v", err)
 			return utils.Errorf("coordinator: create planRequest failed: %v", err)
 		}
 
 		// Phase 2: Invoking plan (AI generating plan)
-		c.planLoadingStatus("等待 AI 生成计划 / Waiting AI to Generate Plan...")
+		c.planLoadingStatus("任务规划中... / Waiting AI to Generate Plan...")
 		c.EmitInfo("start to invoke plan request")
 		rsp, err := planReq.Invoke()
 		if err != nil {
-			c.planLoadingStatus("计划生成失败 / Plan Generation Failed")
+			c.planLoadingStatus("任务规划失败 / Plan Generation Failed")
 			c.EmitError("invoke planRequest failed(first): %v", err)
 			return utils.Errorf("coordinator: invoke planRequest failed: %v", err)
 		}
 
 		// Phase 3: Waiting for user review
-		c.planLoadingStatus("等待用户审查计划 / Waiting User to Review Plan...")
+		c.planLoadingStatus("任务规划等待用户审查 / Waiting User to Review Plan...")
 		ep := c.Epm.CreateEndpointWithEventType(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE)
 		ep.SetDefaultSuggestionContinue()
 
