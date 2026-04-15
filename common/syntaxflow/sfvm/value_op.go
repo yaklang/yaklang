@@ -27,6 +27,11 @@ const (
 	RecursiveConfig_Until = "until"
 	// RecursiveConfig_Hook 会对匹配到的每个Value执行配置项的sfRule，但是不会影响最终结果，其数据流会持续流动。
 	RecursiveConfig_Hook = "hook"
+	// RecursiveConfig_OnlyReachable / IncludeReachable / ExcludeReachable: CFG anchor by symbol (e.g. `` `$cfg` `` from <getCfg>),
+	// composable with until / include / exclude / hook. Positive keys keep defs whose SSA site can reach the anchor; exclude_reachable inverts.
+	RecursiveConfig_OnlyReachable     = "only_reachable"
+	RecursiveConfig_IncludeReachable  = "include_reachable"
+	RecursiveConfig_ExcludeReachable  = "exclude_reachable"
 	// un-used now
 	RecursiveConfig_Filter = "filter"
 )
@@ -47,6 +52,12 @@ func FormatRecursiveConfigKey(i string) RecursiveConfigKey {
 		return RecursiveConfig_Hook
 	case "include":
 		return RecursiveConfig_Include
+	case "only_reachable", "onlyreachable", "only-reachable":
+		return RecursiveConfig_OnlyReachable
+	case "include_reachable", "includereachable", "include-reachable":
+		return RecursiveConfig_IncludeReachable
+	case "exclude_reachable", "excludereachable", "exclude-reachable":
+		return RecursiveConfig_ExcludeReachable
 	default:
 		log.Warnf("unknown recursive config key: %s", i)
 	}

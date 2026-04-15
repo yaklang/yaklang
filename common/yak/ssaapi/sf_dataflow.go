@@ -119,8 +119,137 @@ func valueIdentity(v *Value) string {
 // cannot reach the only_reachable anchor. Include-rule captures (e.g. `as $x` in dataflow CODE)
 // are merged via clearup; without this, post-mode only_reachable would only filter dataflow
 // roots, not the captured path values.
-func filterSfFrameResultByOnlyReachable(parent *sf.SFFrameResult, sfres *sf.SFFrameResult, prog *Program, targetCfg *CfgCtxValue, opt reachableOptions) {
-	if sfres == nil || prog == nil || targetCfg == nil || targetCfg.IsEmpty() {
+// topDefReachConstraint is one CFG anchor clause inside `# { ... } ->` (only_reachable / include_reachable / exclude_reachable).
+type topDefReachConstraint struct {
+	symbol  string
+	exclude bool // exclude_reachable: drop values whose site *can* reach the anchor
+}
+
+func normalizeTopDefReachSymbol(raw string) string {
+	s := strings.TrimSpace(codec.AnyToString(raw))
+	s = strings.TrimPrefix(s, "$")
+	return s
+}
+
+// parseTopDefReachSymbolFromItem reads the value from a RecursiveConfigItem (plain identifier or `` `$cfg` `` filter text).
+func parseTopDefReachSymbolFromItem(item *sf.RecursiveConfigItem) string {
+	if item == nil {
+		return ""
+	}
+	s := strings.TrimSpace(item.Value)
+	if i := strings.IndexAny(s, ";\r\n"); i >= 0 {
+		s = strings.TrimSpace(s[:i])
+	}
+	return normalizeTopDefReachSymbol(s)
+}
+
+type resolvedTopDefReach struct {
+	cfg     *CfgCtxValue
+	exclude bool
+}
+
+// --- dataflow() native: only_reachable / mode / icfg (aligned with include|exclude param style) ---
+
+func dataflowNativeReachMode(params *sfvm.NativeCallActualParams) string {
+	if params == nil {
+		return "post"
+	}
+	mode := strings.ToLower(strings.TrimSpace(params.GetString(
+		NativeCall_DataflowParamOnlyReachableMode,
+		NativeCall_DataflowParamOnlyReachableModeCamel,
+	)))
+	if mode != "" {
+		return mode
+	}
+	if parseBoolParam(params, NativeCall_DataflowParamStrict, false) {
+		return "path"
+	}
+	return "post"
+}
+
+func dataflowNativeReachOpts(params *sfvm.NativeCallActualParams) reachableOptions {
+	icfg := parseBoolParam(params, NativeCall_DataflowParamIcfg, false)
+	opt := reachableOptsFromParams(params, icfg)
+	opt.skipLoopBackedge = true
+	return opt
+}
+
+// resolveDataflowOnlyReachTarget resolves a frame symbol (e.g. from <getCfg>) to a CFG anchor for dataflow().
+func resolveDataflowOnlyReachTarget(frame *sfvm.SFFrame, prog *Program, symbol string) *CfgCtxValue {
+	if frame == nil || prog == nil || symbol == "" {
+		return nil
+	}
+	targetOp, ok := frame.GetSymbolByName(symbol)
+	if !ok || targetOp == nil || targetOp.IsEmpty() {
+		return nil
+	}
+	cfg := cfgCtxFromOnlyReachTargetOp(prog, targetOp)
+	if cfg == nil || cfg.IsEmpty() {
+		return nil
+	}
+	return cfg
+}
+
+// buildOnlyReachableMergeHookForResolved is the merge hook for dataflow(..., only_reachable=..., mode=post).
+func buildOnlyReachableMergeHookForResolved(
+	inputProg *Program,
+	inputProgErr error,
+	anchor *CfgCtxValue,
+	opt reachableOptions,
+) func(parent *sf.SFFrameResult, child *sf.SFFrameResult) {
+	if inputProgErr != nil || inputProg == nil || anchor == nil || anchor.IsEmpty() {
+		return nil
+	}
+	return func(parent *sf.SFFrameResult, child *sf.SFFrameResult) {
+		filterSfFrameResultByOnlyReachable(parent, child, inputProg, anchor, opt)
+	}
+}
+
+func resolveTopDefReachAnchors(sfResult *sf.SFFrameResult, prog *Program, parsed []topDefReachConstraint) []resolvedTopDefReach {
+	if sfResult == nil || prog == nil || len(parsed) == 0 {
+		return nil
+	}
+	var out []resolvedTopDefReach
+	for _, p := range parsed {
+		if p.symbol == "" {
+			continue
+		}
+		vals, ok := sfResult.SymbolTable.Get(p.symbol)
+		if !ok || vals == nil || vals.IsEmpty() {
+			continue
+		}
+		cfg := cfgCtxFromOnlyReachTargetOp(prog, vals)
+		if cfg == nil || cfg.IsEmpty() {
+			continue
+		}
+		out = append(out, resolvedTopDefReach{cfg: cfg, exclude: p.exclude})
+	}
+	return out
+}
+
+func valueSatisfiesTopDefReachAnchors(v *Value, prog *Program, resolved []resolvedTopDefReach, opt reachableOptions) bool {
+	if v == nil || v.IsEmpty() || prog == nil {
+		return len(resolved) == 0
+	}
+	for _, r := range resolved {
+		pass := valuePassesCFGReach(v, prog, r.cfg, opt)
+		if r.exclude {
+			if pass {
+				return false
+			}
+		} else {
+			if !pass {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func filterSfFrameResultByTopDefReachAnchors(
+	parent *sf.SFFrameResult, sfres *sf.SFFrameResult, prog *Program, resolved []resolvedTopDefReach, opt reachableOptions,
+) {
+	if sfres == nil || prog == nil || len(resolved) == 0 {
 		return
 	}
 	var keys []string
@@ -153,13 +282,11 @@ func filterSfFrameResultByOnlyReachable(parent *sf.SFFrameResult, sfres *sf.SFFr
 				out = append(out, op)
 				return nil
 			}
-			// Values inherited from parent context should keep default behavior and
-			// must not be retroactively filtered by this only_reachable anchor.
 			if _, inherited := parentSet[valueIdentity(item)]; inherited {
 				out = append(out, item)
 				return nil
 			}
-			if valuePassesCFGReach(item, prog, targetCfg, opt) {
+			if valueSatisfiesTopDefReachAnchors(item, prog, resolved, opt) {
 				out = append(out, item)
 			}
 			return nil
@@ -168,34 +295,47 @@ func filterSfFrameResultByOnlyReachable(parent *sf.SFFrameResult, sfres *sf.SFFr
 	}
 }
 
-func buildOnlyReachableBeforeMergeHook(
-	frame *sfvm.SFFrame,
-	onlyReachVar string,
-	mode string,
+func buildTopDefReachMergeHook(
+	sfResult *sf.SFFrameResult,
 	inputProg *Program,
 	inputProgErr error,
-	params *sfvm.NativeCallActualParams,
+	resolved []resolvedTopDefReach,
+	opt reachableOptions,
 ) func(parent *sf.SFFrameResult, child *sf.SFFrameResult) {
-	if onlyReachVar == "" || mode != "post" || inputProgErr != nil || inputProg == nil {
+	if len(resolved) == 0 || inputProgErr != nil || inputProg == nil || sfResult == nil {
 		return nil
 	}
-	if frame == nil {
-		return nil
-	}
-	targetOp, ok := frame.GetSymbolByName(onlyReachVar)
-	if !ok || targetOp == nil || targetOp.IsEmpty() {
-		return nil
-	}
-	targetCfg := cfgCtxFromOnlyReachTargetOp(inputProg, targetOp)
-	if targetCfg == nil {
-		return nil
-	}
-	icfg := parseBoolParam(params, "icfg", false)
-	opt := reachableOptsFromParams(params, icfg)
 	opt.skipLoopBackedge = true
 	return func(parent *sf.SFFrameResult, child *sf.SFFrameResult) {
-		filterSfFrameResultByOnlyReachable(parent, child, inputProg, targetCfg, opt)
+		filterSfFrameResultByTopDefReachAnchors(parent, child, inputProg, resolved, opt)
 	}
+}
+
+func filterTopDefResultsByReachAnchors(ret Values, resolved []resolvedTopDefReach, opt reachableOptions) Values {
+	if len(ret) == 0 || len(resolved) == 0 {
+		return ret
+	}
+	prog, err := fetchProgram(ToSFVMValues(ret))
+	if err != nil || prog == nil {
+		return ret
+	}
+	filtered := make(Values, 0, len(ret))
+	for _, item := range ret {
+		if item == nil || item.IsEmpty() {
+			continue
+		}
+		if valueSatisfiesTopDefReachAnchors(item, prog, resolved, opt) {
+			filtered = append(filtered, item)
+		}
+	}
+	return filtered
+}
+
+func filterSfFrameResultByOnlyReachable(parent *sf.SFFrameResult, sfres *sf.SFFrameResult, prog *Program, targetCfg *CfgCtxValue, opt reachableOptions) {
+	if sfres == nil || prog == nil || targetCfg == nil || targetCfg.IsEmpty() {
+		return
+	}
+	filterSfFrameResultByTopDefReachAnchors(parent, sfres, prog, []resolvedTopDefReach{{cfg: targetCfg, exclude: false}}, opt)
 }
 
 func DataFlowLabel(analysisType AnalysisType) string {
@@ -227,6 +367,8 @@ func DataFlowWithSFConfig(
 	untilCheck := CreateCheck(sfResult, config)
 	hookRunner := CreateCheck(sfResult, config)
 
+	var topDefReachParsed []topDefReachConstraint
+
 	for _, opt := range config.RuntimeOptions {
 		if item, ok := opt.(OperationOption); ok {
 			options = append(options, item)
@@ -255,6 +397,14 @@ func DataFlowWithSFConfig(
 			addHandler(sf.RecursiveConfig_Exclude, item.Value)
 		case sf.RecursiveConfig_Include:
 			addHandler(sf.RecursiveConfig_Include, item.Value)
+		case sf.RecursiveConfig_OnlyReachable, sf.RecursiveConfig_IncludeReachable:
+			if sym := parseTopDefReachSymbolFromItem(item); sym != "" {
+				topDefReachParsed = append(topDefReachParsed, topDefReachConstraint{symbol: sym, exclude: false})
+			}
+		case sf.RecursiveConfig_ExcludeReachable:
+			if sym := parseTopDefReachSymbolFromItem(item); sym != "" {
+				topDefReachParsed = append(topDefReachParsed, topDefReachConstraint{symbol: sym, exclude: true})
+			}
 		}
 	}
 
@@ -282,8 +432,17 @@ func DataFlowWithSFConfig(
 
 	// dataflow analysis
 	ret := dataflowRecursiveFunc(options...)
-	// filter the result
-	ret = dataFlowFilter(ret, sfResult, config, nil, nil, nil, filterCondition...)
+
+	inputProg, inputProgErr := fetchProgram(ToSFVMValues(ret))
+	reachOpt := reachableOptions{icfg: false, maxDepth: 0, maxNodes: 0, skipLoopBackedge: true}
+	resolvedReach := resolveTopDefReachAnchors(sfResult, inputProg, topDefReachParsed)
+	reachMergeHook := buildTopDefReachMergeHook(sfResult, inputProg, inputProgErr, resolvedReach, reachOpt)
+
+	ret = dataFlowFilter(ret, sfResult, config, nil, nil, reachMergeHook, filterCondition...)
+	if len(resolvedReach) > 0 {
+		ret = filterTopDefResultsByReachAnchors(ret, resolvedReach, reachOpt)
+	}
+
 	// set predecessor label on the explicit sfvm.Values container
 	retValue := ToSFVMValues(ret)
 	retValue.AppendPredecessor(value, sf.WithAnalysisContext_Label(DataFlowLabel(analysisType)))
@@ -296,13 +455,17 @@ var nativeCallDataFlow sfvm.NativeCallFunc = func(v sfvm.Values, frame *sfvm.SFF
 		return false, nil, err
 	}
 
-	include := params.GetString(0, "code", "include")
-	exclude := params.GetString("exclude")
+	include := params.GetString(0, NativeCall_DataflowParamCode, NativeCall_DataflowParamInclude)
+	exclude := params.GetString(NativeCall_DataflowParamExclude)
 	if len(exclude) == 0 && len(include) == 0 {
 		return false, nil, utils.Errorf("exclude and include can't be empty")
 	}
 	var end sfvm.Values
-	endName := params.GetString("end", "dest", "destination")
+	endName := params.GetString(
+		NativeCall_DataflowParamEnd,
+		NativeCall_DataflowParamDest,
+		NativeCall_DataflowParamDestination,
+	)
 	if endName != "" {
 		var ok bool
 		end, ok = frame.GetSymbolByName(endName)
@@ -330,68 +493,37 @@ var nativeCallDataFlow sfvm.NativeCallFunc = func(v sfvm.Values, frame *sfvm.SFF
 		condition = append(condition, withFilterCondition(sf.RecursiveConfig_Exclude, exclude))
 	}
 
-	onlyReachVar := params.GetString("only_reachable", "onlyReachable", "only-reachable")
-	onlyReachVar = codec.AnyToString(onlyReachVar)
-	onlyReachVar = strings.TrimSpace(onlyReachVar)
-	onlyReachVar = strings.TrimPrefix(onlyReachVar, "$")
+	reachSym := normalizeTopDefReachSymbol(params.GetString(
+		NativeCall_DataflowParamOnlyReachable,
+		NativeCall_DataflowParamOnlyReachableCamel,
+		NativeCall_DataflowParamOnlyReachableKebab,
+	))
+	reachMode := dataflowNativeReachMode(params)
+	reachOpt := dataflowNativeReachOpts(params)
 
-	// only_reachable_mode: "post" = filter dataflow results after include/exclude; "path" = require each
-	// enumerated path step's cfg to reach the anchor (see dataflowPathReachFilter). When mode omitted,
-	// strict=true is treated as "path" (alias); otherwise default "post".
-	mode := strings.ToLower(strings.TrimSpace(params.GetString("only_reachable_mode", "onlyReachableMode")))
-	if mode == "" {
-		if parseBoolParam(params, "strict", false) {
-			mode = "path"
-		} else {
-			mode = "post"
-		}
-	}
-
-	// Program for path-mode CFG: resolve from input values (path steps share the same closure as vs).
 	inputProg, inputProgErr := fetchProgram(ToSFVMValues(vs))
 
 	var pathReach *dataflowPathReachFilter
-	if onlyReachVar != "" && mode == "path" && inputProgErr == nil && inputProg != nil {
-		targetOp, ok := frame.GetSymbolByName(onlyReachVar)
-		if ok && targetOp != nil && !targetOp.IsEmpty() {
-			if targetCfg := cfgCtxFromOnlyReachTargetOp(inputProg, targetOp); targetCfg != nil {
-				icfg := parseBoolParam(params, "icfg", false)
-				opt := reachableOptsFromParams(params, icfg)
-				opt.skipLoopBackedge = true
-				pathReach = &dataflowPathReachFilter{prog: inputProg, targetCfg: targetCfg, opt: opt}
+	var reachMergeHook func(parent *sf.SFFrameResult, child *sf.SFFrameResult)
+	if len(reachSym) > 0 && inputProgErr == nil && inputProg != nil {
+		if anchor := resolveDataflowOnlyReachTarget(frame, inputProg, reachSym); anchor != nil {
+			switch reachMode {
+			case "path":
+				pathReach = &dataflowPathReachFilter{prog: inputProg, targetCfg: anchor, opt: reachOpt}
+			case "post":
+				reachMergeHook = buildOnlyReachableMergeHookForResolved(inputProg, inputProgErr, anchor, reachOpt)
 			}
 		}
 	}
 
-	onlyReachableBeforeMergeHook := buildOnlyReachableBeforeMergeHook(frame, onlyReachVar, mode, inputProg, inputProgErr, params)
+	ret = dataFlowFilter(ret, contextResult, frame.GetVM().GetConfig(), end, pathReach, reachMergeHook, condition...)
 
-	ret = dataFlowFilter(ret, contextResult, frame.GetVM().GetConfig(), end, pathReach, onlyReachableBeforeMergeHook, condition...)
-
-	// Phase-3/4: post-filter only in default post mode; path mode applies CFG during path enumeration.
-	// Post-filter must resolve Program from filtered results: dataflow leaves may carry ParentProgram
-	// where the native-call input chain does not, so do not reuse inputProg here.
-	if onlyReachVar != "" && mode == "post" {
-		targetOp, ok := frame.GetSymbolByName(onlyReachVar)
-		if ok && targetOp != nil && !targetOp.IsEmpty() {
-			prog, err := fetchProgram(ToSFVMValues(ret))
-			if err == nil && prog != nil {
-				targetCfg := cfgCtxFromOnlyReachTargetOp(prog, targetOp)
-				if targetCfg != nil {
-					icfg := parseBoolParam(params, "icfg", false)
-					opt := reachableOptsFromParams(params, icfg)
-					opt.skipLoopBackedge = true
-
-					filtered := make(Values, 0, len(ret))
-					for _, item := range ret {
-						if item == nil || item.IsEmpty() {
-							continue
-						}
-						if valuePassesCFGReach(item, prog, targetCfg, opt) {
-							filtered = append(filtered, item)
-						}
-					}
-					ret = filtered
-				}
+	// Post-mode: same anchor pipeline as # { only_reachable: `$cfg` } -> (resolveTopDefReachAnchors + filterTopDefResultsByReachAnchors).
+	if len(reachSym) > 0 && reachMode == "post" {
+		if prog, err := fetchProgram(ToSFVMValues(ret)); err == nil && prog != nil {
+			resolved := resolveTopDefReachAnchors(contextResult, prog, []topDefReachConstraint{{symbol: reachSym, exclude: false}})
+			if len(resolved) > 0 {
+				ret = filterTopDefResultsByReachAnchors(ret, resolved, reachOpt)
 			}
 		}
 	}

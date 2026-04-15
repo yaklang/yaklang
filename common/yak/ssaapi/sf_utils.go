@@ -75,6 +75,16 @@ func valueOperatorToSSAValue(value sfvm.ValueOperator) (*Value, bool) {
 		}
 		return prog.NewConstValue(c.String(), nil), true
 	}
+	if g, ok := value.(*GuardPredicateValue); ok {
+		if g == nil || g.IsEmpty() {
+			return nil, true
+		}
+		prog := g.prog
+		if prog == nil {
+			prog = NewTmpProgram("")
+		}
+		return prog.NewConstValue(g.String(), nil), true
+	}
 	return nil, false
 }
 
