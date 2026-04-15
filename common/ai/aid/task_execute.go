@@ -93,6 +93,15 @@ func (t *AiTask) execute() error {
 				if len(allOps) > 0 {
 					if merged, changed := applyTaskPlanEvidenceOps(t, allOps); changed {
 						log.Infof("task %s applied evidence operations, length=%d", t.Index, len(merged))
+						if trimmed := strings.TrimSpace(merged); trimmed != "" {
+							if _, emitErr := t.EmitTextMarkdownStreamEvent(
+								"plan-evidence",
+								strings.NewReader(trimmed),
+								t.GetIndex(),
+							); emitErr != nil {
+								log.Warnf("failed to emit evidence snapshot: %v", emitErr)
+							}
+						}
 					}
 				}
 			}
@@ -440,6 +449,15 @@ func (t *AiTask) generateTaskSummary(summary, nextMovements string) error {
 		if len(summaryOps) > 0 {
 			if merged, changed := applyTaskPlanEvidenceOps(t, summaryOps); changed {
 				log.Infof("task %s applied summary evidence ops, length=%d", t.Index, len(merged))
+				if trimmed := strings.TrimSpace(merged); trimmed != "" {
+					if _, emitErr := t.EmitTextMarkdownStreamEvent(
+						"plan-evidence",
+						strings.NewReader(trimmed),
+						t.GetIndex(),
+					); emitErr != nil {
+						log.Warnf("failed to emit summary evidence snapshot: %v", emitErr)
+					}
+				}
 			}
 		}
 	}

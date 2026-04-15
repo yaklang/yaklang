@@ -19,7 +19,7 @@ func outputEvidenceAction(task *AiTask) reactloops.ReActLoopOption {
 		"Append key newly verified runtime evidence into the shared EVIDENCE document. Evidence is optional in normal verification, but this action is for deliberate evidence delivery when you have reusable findings worth preserving.",
 		[]aitool.ToolOption{
 			aitool.WithStringParam(planEvidenceFieldName,
-				aitool.WithParam_Description("本轮新增的 evidence Markdown。系统会自动与历史 EVIDENCE 合并并执行 token 裁剪。建议优先写关键新增发现，可使用 `## 新增待测试列表`、`## 某一个事实发现` 等小节；每条至少写清楚主体是谁、发现了什么。"),
+				aitool.WithParam_Description("新增的 evidence Markdown。系统会自动与历史 EVIDENCE 合并并执行 token 裁剪。建议优先写关键新增发现，可使用 `## 新增待测试列表`、`## 某一个事实发现` 等小节；每条至少写清楚主体是谁、发现了什么。"),
 			),
 		},
 		[]*reactloops.LoopStreamField{{

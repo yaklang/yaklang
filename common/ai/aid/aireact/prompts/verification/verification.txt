@@ -120,10 +120,10 @@ User Raw INPUT/ReAction Thought/Observation:
     - 例如：URL 内容提取工具返回了页面全部文本只有 11 字，工具日志显示"content extraction complete"——这说明页面确实只有这么多内容，不是提取失败
 7.  **执行型安全任务必须有外部证据**：如果当前任务目标包含 SQL 注入、XSS、命令注入、SSTI、SSRF、认证绕过等漏洞的“执行/验证/复现/确认”，则至少需要一种外部证据才能判定完成：真实工具请求、响应差异、浏览器执行结果、插件扫描结果、或真实写入的证据文件。仅靠技能加载和 directly_answer 不足以完成这类任务。
 8.  **区分“设计完成”和“验证完成”**：如果当前任务名称或目标包含“制定、规划、设计、清单、优先级”，那么文本交付可以视为完成；如果包含“执行、验证、发包、复现、确认漏洞、利用方案”，则文本交付只能算中间产物。
-9.  **next_movements 只输出增量，不回放全量 TODO**：系统会基于历史记录重建 TODO 列表并展示给你。你只能输出本轮需要“新增”或“关闭”的增量动作；不要重复输出已经存在且未变化的 TODO。
+9.  **next_movements 只输出增量，不回放全量 TODO**：系统会基于历史记录重建 TODO 列表并展示给你。你只能输出需要“新增”或“关闭”的增量动作；不要重复输出已经存在且未变化的 TODO。
 10.  **TODO 必须保持聚焦且与整体任务对齐**：新增 TODO 时，必须优先服务于当前子任务或当前主任务目标，避免生成偏题、过远期或无执行价值的事项。优先输出能直接推动下一步执行的短链路 TODO。
 11.  **TODO 链路不能过长**：当前 TODO 展示存在 10KB 预算限制。若系统已提示链路过长或 TODO 很多，你应避免继续堆积无关项，优先 `done` 关闭旧项，必要时保持 `next_movements: []`。
-12.  **Evidence 是可选的，只记录关键新增状态观测**：只有当当前场景是 Plan-Task 模式，且本轮执行产生了会改变后续动作选择、任务边界判断或重规划方向的新增状态观测时，才填写 `evidence`。把它当作控制回路里的“观测量记录”，不是 summary，也不是计划。试错过程、空跑、没有形成稳定观测、没有新增约束的信息可以不写。
+12.  **Evidence 是可选的，只记录关键新增状态观测**：只有当当前场景是 Plan-Task 模式，且当前执行产生了会改变后续动作选择、任务边界判断或重规划方向的新增状态观测时，才填写 `evidence`。把它当作控制回路里的“观测量记录”，不是 summary，也不是计划。试错过程、空跑、没有形成稳定观测、没有新增约束的信息可以不写。
 13.  **已确认漏洞的后续处理建议**：当 evidence 中记录了已确认的安全漏洞发现（如 SQL 注入、XSS、命令注入等，且有真实请求/响应差异作为证据），可以考虑在 `next_movements` 中建议使用 `cybersecurity-risk` 工具保存漏洞记录，以免测试结果丢失。这不影响当前子任务的完成判定。
 
 RESPONSE FORMAT: Respond with a JSON object following the schema below:
@@ -148,65 +148,29 @@ IMPORTANT GUIDELINES:
     - `done` 用于关闭已存在 TODO，表示该事项已经完成，`content` 可省略。
     - `delete` 用于标记某个已有 TODO 不再需要，表示删除而非完成，`content` 可省略。
     - `add` 必须提供 `content`，且内容要与当前任务直接对齐。
-    - 如果本轮没有必要增减 TODO，输出 `[]`。
+    - 如果没有必要增减 TODO，输出 `[]`。
     - 不要把整套执行计划、风险分析、长段说明重新塞进 `next_movements`。
     - 只保留 1 到 3 个真正必要的增量动作，避免 TODO 膨胀。
 - 关于 `evidence` 的设置：
     - `evidence` 不是必填字段，是一个 JSON 对象数组（与 `next_movements` 格式类似）。没有关键新增发现时，输出空数组 `[]`。
-    - `evidence` 的目标是记录“本轮动作作用于哪个主体，观测到了什么状态，这个状态对下一轮控制意味着什么”。
+    - `evidence` 的目标是记录“动作作用于哪个主体，观测到了什么状态，这个状态对控制意味着什么”。
     - 优先记录“值得后续复用”的新增状态观测，而不是把 summary 再复述一遍。
-    - 使用 Markdown，优先采用如下固定结构，不要自行发明章节名：
-    - `## 本轮新增待验证对象`
-    - `1. 主体: ...`
-    - `动作: ...`
-    - `观测: ...`
-    - `控制含义: ...`
-    - `## 本轮新增事实`
-    - `1. 主体: ...`
-    - `动作: ...`
-    - `观测: ...`
-    - `控制含义: ...`
-    - 每一条至少写清楚四个要素：主体、动作、观测、控制含义。缺少其中任意一项时，这条内容通常不应该进入 `evidence`。
+    - 每个对象包含 `op`（`add`/`update`/`delete`）、`id`（稳定标识符）、`content`（证据内容）。
+    - `op=add` 新增一条证据；`op=update` 更新已有 id 的证据内容；`op=delete` 删除已有 id 的证据。
+    - `content` 中至少写清楚四个要素：主体、动作、观测、控制含义。缺少其中任意一项时，这条内容通常不应该进入 `evidence`。
     - `主体` 必须具体，可直接指向接口、URL、文件、进程、主机、账号、请求参数位置、响应字段、日志文件中的一个对象。
-    - `动作` 必须写本轮真实执行过的操作，包含请求方法、payload、命令、读取动作、比较动作中的一种，不允许写成“继续测试”“进一步分析”。
+    - `动作` 必须写真实执行过的操作，包含请求方法、payload、命令、读取动作、比较动作中的一种，不允许写成“继续测试”“进一步分析”。
     - `观测` 必须写可见事实，优先写响应码、响应体片段、报错文本、字段差异、文件内容变化、日志关键行、工具返回值中的一种。
     - `控制含义` 必须写这条观测如何影响下一步动作，例如“进入差异复测”“切换认证上下文”“停止沿此路径继续尝试”“可以把某文件视为阶段性交付物”。
     - 如果写不出 `动作` 和 `观测`，说明这不是 evidence，而是猜测、计划或摘要，此时不要输出到 `evidence`。
     - 禁止使用“等”“等等”“相关内容”“类似问题”“存在风险”“需要进一步测试”这类没有观测支撑的收缩表达；要把对象、输入和结果写完整。
-    - 只写本轮新增证据，不要回放已有 EVIDENCE 全文。
+    - 只写新增证据，不要回放已有 EVIDENCE 全文。
     - evidence 中已经写过的关键新增发现，不必再在 summary 或 reasoning 中大段重复。
-    - 若 evidence Markdown 较长，鼓励使用 AITAG block 输出，而不只是 JSON 字段。
 - 关于 `output_files` 的设置：
     - 只填写真实创建或修改过、且可以落盘感知的交付文件路径。
     - `output_files` 不只是 UI 展示；系统会把它像 EVIDENCE 一样沉淀到共享执行上下文，供后续任务继续引用。
     - 因此不要遗漏真实交付物，也不要把只在回答里提到、但没有工具证据的路径写进去。
 
-### Evidence AITAG（可选，长内容时优先）
-
-当 evidence 是多行 Markdown、包含较长列表或希望稳定流式输出时，可以使用 AITAG：
-
-```json
-{"@action": "verify-satisfaction", "user_satisfied": false, "reasoning": "任务未完成：仍需继续验证"}
-```
-
-<|EVIDENCE_{{ .Nonce }}|>
-## 本轮新增待验证对象
-1. 主体: 接口 GET /api/users
-动作: 发送未携带 Authorization 头的请求。
-观测: 响应状态码为 401，响应体包含 `missing bearer token`。
-控制含义: 下一轮必须补充认证头后再做业务逻辑验证；当前不应继续把 401 误判为接口不可用。
-
-## 本轮新增事实
-1. 主体: 文件 /tmp/report.md
-动作: 读取本轮生成的报告文件。
-观测: 文件已生成，内容包含 JWT 测试结论，但缺少 SSRF 复测结论章节。
-控制含义: 该文件可以作为阶段性产物继续复用，但后续需要补充 SSRF 复测结果后再作为完整交付物。
-<|EVIDENCE_END_{{ .Nonce }}|>
-
-AITAG 规则：
-- 必须原样复制当前 nonce `{{ .Nonce }}`。
-- AITAG 中的 evidence 内容会覆盖同名 JSON 字段。
-- Few-Shot 中只要 evidence 是多行 Markdown，就优先写成“JSON + AITAG”两段式，不要把多行 evidence 塞进 JSON 转义字符串。
 - 不必每次都输出 evidence；只有真的有关键新增发现时再写。
 - 当 `user_satisfied` 为 true 的时候：
     - `next_movements` 必须输出 `[]`。
@@ -306,10 +270,10 @@ AITAG 规则：
 ```
 
 ### 示例8：Evidence 只在关键新增发现时填写
-**场景**：本轮只是尝试了一个 payload，但没有形成值得后续复用的新结论**
+**场景**：只是尝试了一个 payload，但没有形成值得后续复用的新结论**
 
 ```json
-{"@action": "verify-satisfaction", "user_satisfied": false, "completed_task_index": "", "reasoning": "任务未完成：本轮仅完成试错，仍需继续验证", "evidence": ""}
+{"@action": "verify-satisfaction", "user_satisfied": false, "completed_task_index": "", "reasoning": "任务未完成：仅完成试错，仍需继续验证", "evidence": []}
 ```
 
 ### 示例9：Evidence 不能只写结论，必须写“主体 + 动作 + 观测 + 控制含义”
@@ -324,47 +288,20 @@ AITAG 规则：
 **正确写法**：
 
 ```json
-{"@action": "verify-satisfaction", "user_satisfied": false, "completed_task_index": "", "reasoning": "任务未完成：已识别新增测试入口，仍需逐个验证", "next_movements": []}
+{"@action": "verify-satisfaction", "user_satisfied": false, "completed_task_index": "", "reasoning": "任务未完成：已识别新增测试入口，仍需逐个验证", "next_movements": [], "evidence": [{"op": "add", "id": "sqli_user_id", "content": "主体: 接口 GET /user/id\n动作: 发送参数 id=1' 的请求并与基线响应对比\n观测: 基线请求返回 200；注入请求返回 500，响应体包含 SQL syntax error near\n控制含义: 该入口应进入 SQL 注入差异复测链路，优先测试闭合与注释变体"}, {"op": "add", "id": "xss_echo_reflect", "content": "主体: 接口 GET /xss/echo\n动作: 发送参数 q=<svg/onload=alert(1)> 的请求并读取响应体\n观测: 响应状态码为 200，响应体原样回显 <svg/onload=alert(1)>\n控制含义: 该入口应进入反射型 XSS 复测链路，优先做浏览器执行验证"}, {"op": "add", "id": "jwt_alg_none", "content": "主体: 接口 POST /jwt/unsafe-login1\n动作: 使用 alg=none 的 JWT 发起登录请求\n观测: 响应状态码为 200，服务端返回带用户信息的登录成功结果\n控制含义: 当前存在可继续利用的不安全 JWT 登录路径，应核验是否可以稳定伪造不同身份"}]}
 ```
-
-<|EVIDENCE_{{ .Nonce }}|>
-## 本轮新增待验证对象
-1. 主体: 接口 GET /user/id
-动作: 发送参数 `id=1'` 的请求并与基线响应对比。
-观测: 基线请求返回 200；注入请求返回 500，响应体包含 `SQL syntax error near`。
-控制含义: 该入口应进入 SQL 注入差异复测链路，下一轮优先测试闭合与注释变体。
-
-2. 主体: 接口 GET /xss/echo
-动作: 发送参数 `q=<svg/onload=alert(1)>` 的请求并读取响应体。
-观测: 响应状态码为 200，响应体原样回显 `<svg/onload=alert(1)>`。
-控制含义: 该入口应进入反射型 XSS 复测链路，下一轮优先做浏览器执行验证。
-
-## 本轮新增事实
-1. 主体: 接口 POST /jwt/unsafe-login1
-动作: 使用 `alg=none` 的 JWT 发起登录请求。
-观测: 响应状态码为 200，服务端返回带用户信息的登录成功结果。
-控制含义: 当前存在可继续利用的不安全 JWT 登录路径，下一轮应核验是否可以稳定伪造不同身份。
-<|EVIDENCE_END_{{ .Nonce }}|>
 
 ## 典型响应格式
 
 **任务完成时（必须设置 completed_task_index）：**
 ```json
-{"@action": "verify-satisfaction", "user_satisfied": true, "completed_task_index": "任务索引", "reasoning": "简明扼要分析", "next_movements": [], "evidence": "", "output_files": ["/abs/path/to/result.md"]}
+{"@action": "verify-satisfaction", "user_satisfied": true, "completed_task_index": "任务索引", "reasoning": "简明扼要分析", "next_movements": [], "evidence": [], "output_files": ["/abs/path/to/result.md"]}
 ```
 
 **任务未完成时（completed_task_index 为空）：**
 ```json
-{"@action": "verify-satisfaction", "user_satisfied": false, "completed_task_index": "", "reasoning": "简明扼要分析", "next_movements": [{"op": "add", "id": "next_step_id", "content": "下一步计划"}], "output_files": []}
+{"@action": "verify-satisfaction", "user_satisfied": false, "completed_task_index": "", "reasoning": "简明扼要分析", "next_movements": [{"op": "add", "id": "next_step_id", "content": "下一步计划"}], "evidence": [{"op": "add", "id": "health_403", "content": "主体: 接口 GET /health\n动作: 发送未带认证头的健康检查请求\n观测: 响应状态码为 403，响应头包含 x-auth-required: true\n控制含义: 应切换为携带认证头的请求，不再沿无认证分支重复测试"}], "output_files": []}
 ```
-
-<|EVIDENCE_{{ .Nonce }}|>
-## 本轮新增待验证对象
-1. 主体: 接口 GET /health
-动作: 发送未带认证头的健康检查请求。
-观测: 响应状态码为 403，响应头包含 `x-auth-required: true`。
-控制含义: 下一轮应切换为携带认证头的请求；当前不再沿无认证分支重复测试。
-<|EVIDENCE_END_{{ .Nonce }}|>
 
 **标记已有 TODO 正在推进时：**
 ```json

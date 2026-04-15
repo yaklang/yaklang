@@ -749,7 +749,7 @@ func TestGenerateVerificationPrompt_TruncatesLongTodoSnapshotButKeepsFocus(t *te
 	}
 }
 
-func TestGenerateVerificationPrompt_IncludesOptionalEvidenceAndAITAGGuidance(t *testing.T) {
+func TestGenerateVerificationPrompt_IncludesEvidenceJSONArrayGuidance(t *testing.T) {
 	react, err := NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
@@ -762,7 +762,7 @@ func TestGenerateVerificationPrompt_IncludesOptionalEvidenceAndAITAGGuidance(t *
 		t.Fatalf("Failed to create ReAct instance: %v", err)
 	}
 
-	prompt, nonce, err := react.promptManager.GenerateVerificationPrompt("请继续验证接口行为", true, "tool executed: continue")
+	prompt, _, err := react.promptManager.GenerateVerificationPrompt("请继续验证接口行为", true, "tool executed: continue")
 	if err != nil {
 		t.Fatalf("Failed to generate verification prompt: %v", err)
 	}
@@ -770,13 +770,16 @@ func TestGenerateVerificationPrompt_IncludesOptionalEvidenceAndAITAGGuidance(t *
 	if !utils.MatchAllOfSubString(
 		prompt,
 		"`evidence` 不是必填字段",
-		"每一条至少写清楚四个要素",
-		"主体、动作、观测、控制含义",
-		"鼓励使用 AITAG block 输出，而不只是 JSON 字段",
-		"<|EVIDENCE_"+nonce+"|>",
-		"<|EVIDENCE_END_"+nonce+"|>",
+		"JSON 对象数组",
+		"`op`",
+		"`id`",
+		"`content`",
 	) {
-		t.Fatalf("verification prompt should contain optional evidence and AITAG guidance. Got:\n%s", prompt)
+		t.Fatalf("verification prompt should contain evidence JSON array guidance. Got:\n%s", prompt)
+	}
+
+	if strings.Contains(prompt, "<|EVIDENCE_") {
+		t.Fatalf("verification prompt should NOT contain AITAG EVIDENCE blocks anymore. Got:\n%s", prompt)
 	}
 }
 
