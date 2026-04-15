@@ -403,27 +403,176 @@ extract_failed_test_names() {
   grep -aE '^--- FAIL: ' "$log" | sed -E 's/^--- FAIL: ([^ ]+).*/\1/' | sort -u | paste -sd ', ' - || true
 }
 
+sanitize_summary_line() {
+  local line="$1"
+  printf '%s\n' "$line" \
+    | sed -E 's/\x1B\[[0-9;]*[[:alpha:]]//g; s/^[[:space:]]+//; s/[[:space:]]+$//'
+}
+
+truncate_summary_line() {
+  local line="$1"
+  local max_len="${2:-240}"
+
+  if [[ ${#line} -le $max_len ]]; then
+    printf '%s\n' "$line"
+    return 0
+  fi
+
+  printf '%s...\n' "${line:0:max_len-3}"
+}
+
+reason_is_low_signal() {
+  local reason="$1"
+
+  if [[ -z "$reason" ]]; then
+    return 0
+  fi
+
+  if [[ "$reason" =~ ^FAIL:\  || "$reason" =~ ^---\ FAIL: ]]; then
+    return 0
+  fi
+
+  if [[ "$reason" == *"RequestQuotedJson:"* || "$reason" == *"ResponseQuotedJson:"* || "$reason" == *"&{Model:"* ]]; then
+    return 0
+  fi
+
+  return 1
+}
+
+extract_panic_reason() {
+  local log="$1"
+  grep -aom1 -E 'panic:.*|fatal error:.*' "$log" | sed -E 's/.*(panic:.*|fatal error:.*)/\1/' || true
+}
+
+extract_panic_test_name() {
+  local log="$1"
+  grep -aom1 -E 'panic: .* after [^ ]+ has completed' "$log" | sed -E 's/.* after ([^ ]+) has completed/\1/' || true
+}
+
+extract_panic_location() {
+  local log="$1"
+  awk '
+    /panic:|fatal error:/ { capture=1; next }
+    capture {
+      line=$0
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", line)
+      if (line == "") {
+        next
+      }
+      if (line ~ /\/testing\/testing\.go:/ || line ~ /github\.com\/stretchr\/testify\//) {
+        next
+      }
+      if (line ~ /\.go:[0-9]+/) {
+        print line
+        exit
+      }
+      if (line ~ /^created by /) {
+        exit
+      }
+    }
+  ' "$log" || true
+}
+
 extract_failure_reason() {
   local log="$1"
   local reason=""
 
-  reason=$(grep -am1 -E 'test timed out|panic:|Error:[[:space:]]|should have|first record does not look like a TLS handshake|connection reset by peer|context deadline exceeded|testing:|flag provided but not defined|invalid value|Usage of ' "$log" || true)
+  reason=$(extract_panic_reason "$log")
   if [[ -z "$reason" ]]; then
-    reason=$(grep -am1 -E '^--- FAIL: ' "$log" || true)
+    reason=$(grep -aE 'test timed out|Error:[[:space:]].*|should have.*|first record does not look like a TLS handshake.*|connection reset by peer.*|context deadline exceeded.*|testing:.*|flag provided but not defined.*|invalid value.*|Usage of .*' "$log" | tail -n 1 || true)
   fi
   if [[ -z "$reason" ]]; then
-    reason=$(grep -am1 -E '^FAIL: ' "$log" || true)
+    reason=$(grep -aE '^--- FAIL: .*' "$log" | tail -n 1 || true)
   fi
   if [[ -z "$reason" ]]; then
-    reason=$(grep -am1 -v -E '^(Command:|Test:|Config:|Retry:|----|[[:space:]]*$)' "$log" || true)
+    reason=$(grep -aE '^FAIL: .*' "$log" | tail -n 1 || true)
+  fi
+  if [[ -z "$reason" ]]; then
+    reason=$(grep -aE '^[[:space:]]*[[:alnum:]_.-]+_test\.go:[0-9]+: .*' "$log" | tail -n 1 || true)
+  fi
+  if [[ -z "$reason" ]]; then
+    reason=$(grep -aE '^> .+' "$log" | tail -n 1 || true)
+  fi
+  if [[ -z "$reason" ]]; then
+    reason=$(awk '
+      function trim(s) {
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", s)
+        return s
+      }
+      {
+        lines[NR] = $0
+      }
+      END {
+        for (i = NR; i >= 1; i--) {
+          line = lines[i]
+          gsub(/\x1B\[[0-9;]*[[:alpha:]]/, "", line)
+          line = trim(line)
+          if (line == "" || line ~ /^(Command:|Test:|Config:|Retry:|----|PASS$|FAIL$|FAIL: |FAIL_ELAPSED:|完整日志:|测试失败，已尝试|失败日志摘要：|重试测试|[[:space:]]*$)/) {
+            continue
+          }
+          print line
+          exit
+        }
+      }
+    ' "$log" || true)
   fi
 
-  printf '%s\n' "$reason" | sed -E 's/^[[:space:]]+//'
+  reason="$(sanitize_summary_line "$reason")"
+  truncate_summary_line "$reason" 240
+}
+
+extract_failure_context() {
+  local log="$1"
+  awk '
+    function trim(s) {
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", s)
+      return s
+    }
+    function ignored(s) {
+      return s == "" ||
+        s ~ /^(Command:|Test:|Config:|Retry:|----|PASS$|FAIL$|FAIL: |FAIL_ELAPSED:|完整日志:|测试失败，已尝试|失败日志摘要：|重试测试|preparing for end iteration|cumulative_summary:|@action: object|Result: SOME FAILED|Failed tests:|=== Test Summary ===|Total tests:|Verifying test coverage\.\.\.|All tests are covered by config rules|<<+|-{5,}|━━━━━━━━|⏱|✅|❌)/
+    }
+    {
+      lines[NR] = $0
+      if ($0 ~ /^FAIL$/ || $0 ~ /^FAIL: /) {
+        fail_line = NR
+      }
+    }
+    END {
+      if (fail_line == 0) {
+        fail_line = NR + 1
+      }
+      start = fail_line - 20
+      if (start < 1) {
+        start = 1
+      }
+      count = 0
+      for (i = start; i < fail_line; i++) {
+        line = lines[i]
+        gsub(/\x1B\[[0-9;]*[[:alpha:]]/, "", line)
+        line = trim(line)
+        if (ignored(line)) {
+          continue
+        }
+        if (line ~ /^--- PASS:/ || line ~ /^PASS: /) {
+          continue
+        }
+        candidates[++count] = line
+      }
+      begin = count - 2
+      if (begin < 1) {
+        begin = 1
+      }
+      for (i = begin; i <= count; i++) {
+        print candidates[i]
+      }
+    }
+  ' "$log" || true
 }
 
 extract_failure_elapsed() {
   local log="$1"
-  grep -am1 '^FAIL_ELAPSED: ' "$log" | sed -E 's/^FAIL_ELAPSED: //' || true
+  grep -aom1 -E '^FAIL_ELAPSED: .*' "$log" | sed -E 's/^FAIL_ELAPSED: //' || true
 }
 
 extract_timeout_running_tests() {
@@ -502,11 +651,27 @@ else
   echo "Failed tests:"
   # 列出所有包含失败标记的日志
   while IFS= read -r log; do
-    if grep -aEq "^FAIL:|^--- FAIL:|^FAIL$|test timed out|^panic:" "$log"; then
+    if grep -aEq "^FAIL:|^--- FAIL:|^FAIL$|test timed out|panic:|fatal error:" "$log"; then
       test_name="$(basename "$log" .run.log)"
       failed_cases="$(extract_failed_test_names "$log")"
       failure_reason="$(extract_failure_reason "$log")"
+      failure_context="$(extract_failure_context "$log")"
       failure_elapsed="$(extract_failure_elapsed "$log")"
+      panic_reason="$(extract_panic_reason "$log")"
+
+      if [[ -n "$panic_reason" ]]; then
+        panic_case="$(extract_panic_test_name "$log")"
+        panic_location="$(extract_panic_location "$log")"
+        if [[ -n "$panic_case" ]]; then
+          echo "  - ${test_name} :: ${panic_case}"
+        else
+          echo "  - ${test_name}"
+        fi
+        echo "    reason: ${panic_reason}"
+        [[ -n "$panic_location" ]] && echo "    location: ${panic_location}"
+        [[ -n "$failure_elapsed" ]] && echo "    elapsed: ${failure_elapsed}"
+        continue
+      fi
 
       if grep -aEq 'test timed out' "$log"; then
         echo "  - ${test_name}"
@@ -540,7 +705,21 @@ else
 
       echo "  - ${test_name}"
       [[ -n "$failed_cases" ]] && echo "    failed cases: ${failed_cases}"
-      [[ -n "$failure_reason" ]] && echo "    reason: ${failure_reason}"
+      if ! reason_is_low_signal "$failure_reason"; then
+        echo "    reason: ${failure_reason}"
+      fi
+      printed_context=0
+      while IFS= read -r context_line; do
+        [[ -z "$context_line" ]] && continue
+        context_line="$(truncate_summary_line "$(sanitize_summary_line "$context_line")" 180)"
+        [[ -z "$context_line" ]] && continue
+        [[ "$context_line" == "$failure_reason" ]] && continue
+        if [[ $printed_context -ne 1 ]]; then
+          echo "    context:"
+          printed_context=1
+        fi
+        echo "      ${context_line}"
+      done < <(printf '%s\n' "$failure_context")
       [[ -n "$failure_elapsed" ]] && echo "    elapsed: ${failure_elapsed}"
     fi
   done < <(find "$TEST_LOG_DIR" -maxdepth 1 -type f -name "test_*.run.log" | sort)
