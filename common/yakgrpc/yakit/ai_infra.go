@@ -132,7 +132,7 @@ func GetLatestAIAgentRuntimeByPersistentSession(db *gorm.DB, sessionId string) (
 	}()
 
 	var runtime schema.AIAgentRuntime
-	if err := db.Where("persistent_session = ?", sessionId).Order("updated_at DESC").First(&runtime).Error; err != nil {
+	if err := db.Where("persistent_session = ?", sessionId).Order("id DESC").First(&runtime).Error; err != nil {
 		return nil, err
 	}
 	return &runtime, nil
