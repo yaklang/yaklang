@@ -8,10 +8,6 @@ import (
 
 func TestBuildLoopHTTPFuzzAggregateReport_SummarizesLargeRuns(t *testing.T) {
 	stats := newLoopHTTPFuzzAggregateStats()
-	stats.observeSuccess(200, 120, 24, true)
-	stats.observeSuccess(401, 1450, 0, true)
-	stats.markDetailedResultWritten()
-	stats.markDetailedResultOmitted()
 	baselineSample := loopHTTPFuzzInterestingSample{
 		Index:          1,
 		Score:          5,
@@ -23,7 +19,6 @@ func TestBuildLoopHTTPFuzzAggregateReport_SummarizesLargeRuns(t *testing.T) {
 		ResponseRaw:    "HTTP/1.1 200 OK\r\nContent-Length: 24\r\n\r\nhello user",
 		ResponseDigest: "  Status Code: 200\n  Content-Length: 24 bytes\n",
 	}
-	stats.observeResponseLengthGroup(baselineSample)
 	sample := loopHTTPFuzzInterestingSample{
 		Index:           2,
 		Score:           70,
@@ -38,21 +33,29 @@ func TestBuildLoopHTTPFuzzAggregateReport_SummarizesLargeRuns(t *testing.T) {
 		ResponseDigest:  "  Status Code: 401\n  Content-Length: 0 bytes\n",
 		ResponseRaw:     "HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\n\r\n",
 	}
+
+	for i := 0; i < 9; i++ {
+		stats.observeSuccess(200, 120, 24, true)
+		stats.observeResponseLengthGroup(baselineSample)
+	}
+	for i := 0; i < 4; i++ {
+		stats.observeSuccess(401, 1450, 0, true)
+		stats.observeResponseLengthGroup(sample)
+	}
 	stats.considerInterestingSample(sample)
-	stats.observeResponseLengthGroup(sample)
-	finalizeLoopHTTPFuzzResponseLengthGroups(stats)
+	stats.finalizeResponseLengthGroups()
 
 	report := buildLoopHTTPFuzzAggregateReport("fuzz_body", stats)
 	require.Contains(t, report, "=== Aggregate Summary for fuzz_body ===")
-	require.Contains(t, report, "Total Requests: 2")
-	require.Contains(t, report, "Saved HTTPFlows: 2")
-	require.Contains(t, report, "Detailed Results Shown: 1 (omitted 1 additional detailed entries; full traffic remains stored in HTTPFlow)")
+	require.Contains(t, report, "Total Requests: 13")
+	require.Contains(t, report, "Saved HTTPFlows: 13")
+	require.Contains(t, report, "Frontend Detail Omitted: 1 results (detail output is limited to the first 12 results; full traffic remains stored in HTTPFlow)")
 	require.Contains(t, report, "Status Distribution:")
-	require.Contains(t, report, "401: 1")
+	require.Contains(t, report, "401: 4")
 	require.Contains(t, report, "Response Length Groups:")
-	require.Contains(t, report, "- 24 bytes: 1 responses [baseline] (statuses: 200=1)")
-	require.Contains(t, report, "Baseline group selected by dominant body length: 24 bytes (1 responses).")
-	require.Contains(t, report, "- 0 bytes: 1 responses (statuses: 401=1)")
+	require.Contains(t, report, "- 24 bytes: 9 responses [baseline] (statuses: 200=9)")
+	require.Contains(t, report, "Baseline group selected by dominant body length: 24 bytes (9 responses).")
+	require.Contains(t, report, "- 0 bytes: 4 responses (statuses: 401=4)")
 	require.Contains(t, report, "Sample HTTPFlow: flow-2")
 	require.Contains(t, report, "Sample Diff From Baseline:")
 	require.Contains(t, report, "Interesting Samples:")
@@ -79,6 +82,8 @@ func TestBuildLoopHTTPFuzzProgressSnapshot_SummarizesCurrentProgress(t *testing.
 	stats := newLoopHTTPFuzzAggregateStats()
 	stats.observeSuccess(200, 120, 24, true)
 	stats.observeSuccess(401, 1450, 0, true)
+	stats.observeSuccess(401, 1200, 0, true)
+	stats.observeSuccess(401, 1300, 0, true)
 	stats.observeError()
 	sample := loopHTTPFuzzInterestingSample{
 		Index:      2,
@@ -96,12 +101,12 @@ func TestBuildLoopHTTPFuzzProgressSnapshot_SummarizesCurrentProgress(t *testing.
 	stats.observeResponseLengthGroup(sample)
 
 	snapshot := buildLoopHTTPFuzzProgressSnapshot("fuzz_body", stats, 401, false)
-	require.Contains(t, snapshot, "执行进度：fuzz_body 已处理 3 个请求")
-	require.Contains(t, snapshot, "成功 2，失败 1")
-	require.Contains(t, snapshot, "已落库 2 条 HTTPFlow")
+	require.Contains(t, snapshot, "执行进度：fuzz_body 已处理 5 个请求")
+	require.Contains(t, snapshot, "成功 4，失败 1")
+	require.Contains(t, snapshot, "已落库 4 条 HTTPFlow")
 	require.Contains(t, snapshot, "最近状态 401")
-	require.Contains(t, snapshot, "状态分布 200=1, 401=1")
-	require.Contains(t, snapshot, "长度分布 0B=1, 24B=1")
+	require.Contains(t, snapshot, "状态分布 401=3, 200=1")
+	require.NotContains(t, snapshot, "长度分布")
 	require.Contains(t, snapshot, "可疑样本 1 个")
 }
 
@@ -129,11 +134,25 @@ func TestFinalizeLoopHTTPFuzzResponseLengthGroups_UsesDominantLengthAsBaseline(t
 		ResponseRaw: "HTTP/1.1 401 Unauthorized\r\nContent-Length: 5\r\n\r\nadmin",
 	})
 
-	finalizeLoopHTTPFuzzResponseLengthGroups(stats)
+	stats.finalizeResponseLengthGroups()
 
 	require.Equal(t, 10, stats.BaselineBodyLength)
 	require.True(t, stats.ResponseLengthGroups[10].IsBaseline)
 	require.Contains(t, stats.ResponseLengthGroups[10].Sample.ResponseDiff, "baseline representative response")
 	require.False(t, stats.ResponseLengthGroups[5].IsBaseline)
 	require.NotEmpty(t, stats.ResponseLengthGroups[5].Sample.ResponseDiff)
+}
+
+func TestBuildLoopHTTPFuzzAggregateReport_SkipsLengthAnalysisForSmallRuns(t *testing.T) {
+	stats := newLoopHTTPFuzzAggregateStats()
+	stats.observeSuccess(200, 100, 12, true)
+	stats.observeSuccess(200, 110, 18, true)
+	stats.observeSuccess(200, 120, 27, true)
+	stats.observeResponseLengthGroup(loopHTTPFuzzInterestingSample{BodyLength: 12, StatusCode: 200, ResponseRaw: "HTTP/1.1 200 OK\r\n\r\na"})
+	stats.observeResponseLengthGroup(loopHTTPFuzzInterestingSample{BodyLength: 18, StatusCode: 200, ResponseRaw: "HTTP/1.1 200 OK\r\n\r\nbb"})
+	stats.observeResponseLengthGroup(loopHTTPFuzzInterestingSample{BodyLength: 27, StatusCode: 200, ResponseRaw: "HTTP/1.1 200 OK\r\n\r\nccc"})
+	stats.finalizeResponseLengthGroups()
+
+	report := buildLoopHTTPFuzzAggregateReport("fuzz_get_params", stats)
+	require.NotContains(t, report, "Response Length Groups:")
 }
