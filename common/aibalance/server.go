@@ -449,7 +449,12 @@ type ServerConfig struct {
 	// Rate limiter for free amap proxy users (Trace-ID based, sleep/wait mode)
 	amapRateLimiter       *AmapRateLimiter
 	amapHealthCheckStopCh chan struct{}
-	closeOnce             sync.Once
+
+	// RPM rate limiter for chat completions (per API key, with per-model overrides)
+	chatRateLimiter    *ChatRateLimiter
+	freeUserDelaySec   int64 // cached from DB; actual delay is N~2N seconds random
+
+	closeOnce sync.Once
 }
 
 // NewServerConfig creates a new server configuration
@@ -476,6 +481,9 @@ func NewServerConfig() *ServerConfig {
 	// Initialize amap rate limiter and health check stop channel
 	config.amapRateLimiter = NewAmapRateLimiter()
 	config.amapHealthCheckStopCh = make(chan struct{})
+	// Initialize chat RPM rate limiter
+	config.chatRateLimiter = NewChatRateLimiter()
+	config.freeUserDelaySec = 3
 	return config
 }
 
@@ -493,6 +501,9 @@ func (c *ServerConfig) Close() {
 		}
 		if c.amapHealthCheckStopCh != nil {
 			close(c.amapHealthCheckStopCh)
+		}
+		if c.chatRateLimiter != nil {
+			c.chatRateLimiter.Stop()
 		}
 	})
 }
@@ -537,7 +548,14 @@ func (c *ServerConfig) getKeyFromRawRequest(req []byte) *Key {
 
 func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 	atomic.AddInt64(&c.concurrentChatRequests, 1)
-	defer atomic.AddInt64(&c.concurrentChatRequests, -1)
+	concurrentReleased := false
+	releaseConcurrent := func() {
+		if !concurrentReleased {
+			concurrentReleased = true
+			atomic.AddInt64(&c.concurrentChatRequests, -1)
+		}
+	}
+	defer releaseConcurrent()
 	c.logInfo("Starting to handle new chat completion request")
 	// handle ai request
 	auth := ""
@@ -662,6 +680,17 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 			}
 			c.logError("Key[%v] requested model %s is not in allowed list (including glob patterns), allowed models/patterns: %v", key.Key, modelName, allowedModelKeys)
 			conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+			return
+		}
+	}
+
+	// RPM rate limit check (per API key, with per-model overrides)
+	if c.chatRateLimiter != nil {
+		allowed, queueLen := c.chatRateLimiter.CheckRateLimit(apiKeyForStat, modelName)
+		if !allowed {
+			c.logWarn("RPM rate limit exceeded for key=%s model=%s, queue_length=%d",
+				utils.ShrinkString(apiKeyForStat, 8), modelName, queueLen)
+			c.writeRateLimitResponse(conn, queueLen)
 			return
 		}
 	}
@@ -1043,6 +1072,17 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		runtime.ReadMemStats(&ms)
 		log.Warnf("[REQUEST_SUCCESS] model=%s provider=%s bytes=%d duration=%v goroutines=%d heap_mb=%d",
 			modelName, successfulProvider.TypeName, total, endDuration, runtime.NumGoroutine(), ms.HeapAlloc/1024/1024)
+
+		// Free user cooldown: release concurrent capacity first, then sleep
+		// so other API keys are not blocked during the cooldown period.
+		if isFreeModel && c.freeUserDelaySec > 0 {
+			releaseConcurrent()
+			base := c.freeUserDelaySec
+			jitter := time.Duration(base+int64(time.Now().UnixNano()%base)) * time.Second
+			c.logInfo("free user cooldown: sleeping %v for model %s (concurrent slot released)", jitter, modelName)
+			time.Sleep(jitter)
+		}
+
 		break // 成功处理，退出循环
 	}
 
@@ -1858,6 +1898,21 @@ func (c *ServerConfig) serveRequest(conn net.Conn, request *http.Request, should
 		c.writeResponse(conn, "HTTP/1.1 404 Not Found\r\n\r\n", shouldClose)
 		return
 	}
+}
+
+// writeRateLimitResponse sends a 429 response with X-AIBalance-Info header containing the queue length.
+func (c *ServerConfig) writeRateLimitResponse(conn net.Conn, queueLength int64) {
+	body := fmt.Sprintf(`{"error":{"message":"Rate limit exceeded. You are in queue position %d. Please retry after 10 seconds.","type":"rate_limit_exceeded","queue_length":%d}}`, queueLength, queueLength)
+	header := fmt.Sprintf(
+		"HTTP/1.1 429 Too Many Requests\r\n"+
+			"Content-Type: application/json; charset=utf-8\r\n"+
+			"X-AIBalance-Info: %d\r\n"+
+			"Retry-After: 10\r\n"+
+			"Content-Length: %d\r\n"+
+			"\r\n",
+		queueLength, len(body))
+	conn.Write([]byte(header))
+	conn.Write([]byte(body))
 }
 
 // writeResponse writes a response with appropriate Connection header for keep-alive support

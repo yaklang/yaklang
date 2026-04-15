@@ -149,6 +149,12 @@ func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reas
 		}
 	}()
 
+	// 429 rate limit: read body for rawResponseCallback then return early
+	if statusCode == 429 {
+		io.Copy(&mirrorResponse, closer)
+		return
+	}
+
 	var reader io.Reader = closer
 	ioReader := reader
 	ioReader = io.TeeReader(ioReader, &mirrorResponse)
@@ -499,6 +505,11 @@ func processAIResponseForResponses(r []byte, closer io.ReadCloser, outWriter io.
 			rawResponseCallback(r, bodyPreview)
 		}
 	}()
+
+	if statusCode == 429 {
+		io.Copy(&mirrorResponse, closer)
+		return
+	}
 
 	var reader io.Reader = io.TeeReader(closer, &mirrorResponse)
 	if chunked {

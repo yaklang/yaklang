@@ -189,6 +189,17 @@ func LoadProvidersFromDatabase(config *ServerConfig) error {
 		log.Warnf("Failed to ensure Amap API key table exists: %v", err)
 	}
 
+	// Ensure rate limit config table exists and load config
+	if err := EnsureRateLimitConfigTable(); err != nil {
+		log.Warnf("Failed to ensure RateLimitConfig table exists: %v", err)
+	}
+	if rlConfig, err := GetRateLimitConfig(); err != nil {
+		log.Warnf("Failed to load RateLimitConfig: %v", err)
+	} else {
+		config.applyRateLimitConfig(rlConfig)
+		log.Infof("Loaded rate limit config: default_rpm=%d, free_user_delay=%ds", rlConfig.DefaultRPM, rlConfig.FreeUserDelaySec)
+	}
+
 	// Start amap health check scheduler (checks every 1 hour)
 	StartAmapHealthCheckScheduler(config.amapHealthCheckStopCh)
 

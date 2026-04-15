@@ -28,6 +28,7 @@ type PublicStatsResponse struct {
 	TotalTrafficBytes  int64               `json:"total_traffic_bytes"`
 	EstimatedTokens    string              `json:"estimated_tokens"`
 	ConcurrentRequests int64               `json:"concurrent_requests"`
+	QueueCount         int64               `json:"queue_count"`
 	WebSearchCount     int64               `json:"web_search_count"`
 	AmapCount          int64               `json:"amap_count"`
 	MemoryMB           uint64                        `json:"memory_mb"`
@@ -197,6 +198,11 @@ func (c *ServerConfig) computePublicStats() *PublicStatsResponse {
 	chatReqs := atomic.LoadInt64(&c.concurrentChatRequests)
 	embeddingReqs := atomic.LoadInt64(&c.concurrentEmbeddingRequests)
 	data.ConcurrentRequests = chatReqs + embeddingReqs
+
+	// Step 3.5: Queue count from rate limiter
+	if c.chatRateLimiter != nil {
+		data.QueueCount = c.chatRateLimiter.GetQueueCount()
+	}
 
 	// Step 4: Web search / Amap counts
 	func() {
