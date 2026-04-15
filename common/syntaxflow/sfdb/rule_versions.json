@@ -104,98 +104,98 @@
   {
     "rule_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567891",
     "rule_name": "Electron webSecurity 被禁用",
-    "hash": "aaeafa28b7b781e13e1b935b837be6444e813bf64a40862e8d1b92a211ced8b2",
-    "version": "20260306.0001"
+    "hash": "48f16da7adc1890a73a77951a77936286a98b370fda79890d2866306cefb23f9",
+    "version": "20260415.0001"
   },
   {
     "rule_id": "b2c3d4e5-f6a7-8901-bcde-f12345678902",
     "rule_name": "Electron allowRunningInsecureContent 被启用",
-    "hash": "6ccff9f4721c01f9cfc7f7797c4281c5994ac662be50d9fee4902c97dd8a04fa",
-    "version": "20260306.0001"
+    "hash": "9cd2568354d15bac097670c10f1a0e317f7d555bf4401b0f31c85597cf0ed324",
+    "version": "20260415.0001"
   },
   {
     "rule_id": "c3d4e5f6-a7b8-9012-cdef-345678901234",
     "rule_name": "用户可控输入流入代码执行函数导致代码注入",
-    "hash": "674f941c455544df364d49c7b83cc9a6c6a7fcbbebc5b410b48ee4eb371b0d18",
-    "version": "20260306.0001"
+    "hash": "67be48525139053d818b27576fc4a02846db4d40e08ee4ca58ade999b2672e12",
+    "version": "20260415.0001"
   },
   {
     "rule_id": "a1b2c3d4-e5f6-7890-abcd-094000000003",
     "rule_name": "用户可控对象传入模板引擎导致模板对象注入",
-    "hash": "e0604d8a5a21e46c4cb3ee4284b370a61a956d4c983c3c18a5e2aad86456b889",
-    "version": "20260306.0001"
+    "hash": "0fc419633c2683b451f35ee7508032b8910617babbe199edf7c417a1624f6811",
+    "version": "20260415.0001"
   },
   {
     "rule_id": "a7e3f21b-5c8d-4e9a-b6f2-1d4c7e0a3f95",
     "rule_name": "Express.js 中间件使用区分大小写的正则表达式路径",
-    "hash": "e0b0c1fd50a3ec6a24b5bcc42ce93d0f7f91f0c6abf5556f172c08e7aea02fcc",
-    "version": "20260306.0001"
+    "hash": "630ff66494a46cd249bf8943406b057de22bdb28ace05d17abfff966405216a1",
+    "version": "20260415.0001"
   },
   {
     "rule_id": "d8f4a22b-9c1e-4b37-8e5d-7f3a901c2e84",
     "rule_name": "压缩包解压时未验证文件路径导致目录穿越（Zip Slip）",
-    "hash": "d040c3d7539e4eb0e9aeee29a2e463cecce73fc4570b285345f7109f3a419c7b",
-    "version": "20260306.0001"
+    "hash": "4b9fc074342df43cd23c0765f26f75f302383b5d5dc122873f26a95144f0137f",
+    "version": "20260415.0001"
   },
   {
     "rule_id": "c3d4e5f6-a7b8-9012-cdef-326000000001",
     "rule_name": "使用密钥长度不足的加密密钥",
-    "hash": "750ebf5b058ce094908765325c95b92e55185a9e7c1db485c2750107fc589ab5",
-    "version": "20260306.0001"
+    "hash": "9a281fa75bfef8f917365cfb188b8e398a7e3a6874bf324826ad2332b5eccf3f",
+    "version": "20260415.0001"
   },
   {
     "rule_id": "b2c3d4e5-f6a7-8901-bcde-327000000001",
     "rule_name": "使用已破解或弱加密算法",
-    "hash": "abd77fcd8f6cf2f256ee72831eadfd3658b4d7a14140f248e009be44a6283bdc",
-    "version": "20260306.0001"
+    "hash": "287c53dd24c5c02fb95c1587fd6ce83a4561d4f1d5872cd319427ba6aa29cd08",
+    "version": "20260415.0001"
   },
   {
     "rule_id": "a1b2c3d4-e5f6-7890-abcd-338000000001",
     "rule_name": "安全敏感场景中使用了不安全的伪随机数生成器",
-    "hash": "b00a0d2b6fae2513c2c228266f95ba394d4b33d5876edc12767e5e7e5bb8af9e",
-    "version": "20260306.0001"
+    "hash": "0e8776b876777e9d54d479d3d4aace87c94247515814edf49c876bce6eada2a8",
+    "version": "20260415.0001"
   },
   {
     "rule_id": "c3d4e5f6-a7b8-9012-cdef-456789012345",
     "rule_name": "JWT 验证未使用加密密钥（None 算法绕过）",
-    "hash": "d19776f741f6425c7c89b63f5653e40554f4bbcc003b4c37f2b9ec1e9d15d870",
-    "version": "20260306.0001"
+    "hash": "468084b7eba3daf2ce35e7af88852147d6186f16d35ee648f7394546e92fcd2f",
+    "version": "20260415.0001"
   },
   {
     "rule_id": "f6a7b8c9-d0e1-2345-f012-345678901234",
     "rule_name": "用户可控数据流入不安全反序列化函数",
-    "hash": "a5d12e6a3fecf8bb66bf4daacc93af06e4a204ffea859a7ab6a34f1d9c1f53bb",
-    "version": "20260306.0001"
+    "hash": "f3f6bf6ae45230b5190677451b46c64c9c6e3f6ae603867f104829d744019e9b",
+    "version": "20260415.0001"
   },
   {
     "rule_id": "c5d6e7f8-a9b0-1234-cdef-598000000001",
     "rule_name": "GET 请求中读取敏感数据",
-    "hash": "f6be1de5a36a27480d706a6dd721307cd4f8c7053fbde483ec7860af57f6c502",
-    "version": "20260306.0001"
+    "hash": "08cf74ddd49572b215b2b1f19840ea790c3ab9012755528ce55ccf02e1a0f4c8",
+    "version": "20260415.0001"
   },
   {
     "rule_id": "e5f6a7b8-c9d0-1234-efab-601000000001",
     "rule_name": "服务端未验证的 URL 重定向（开放重定向）",
-    "hash": "ebb0df6b0b2e9a37e976d547185bd171cc88bfa759216dfe0cca078aecebc877",
-    "version": "20260306.0001"
+    "hash": "9a96f34a077a35df34d5b8ad55b241471164951b272b91cec9181e81a53b0d0b",
+    "version": "20260415.0001"
   },
   {
     "rule_id": "f3c8b2a1-7e4d-4f92-a5b6-0c1d9e3f7a28",
     "rule_name": "Cookie 未设置 Secure 标志，可能被明文传输",
-    "hash": "f51521ccfca3fce6314fcd381cf416b37205b04d6aeec4483e5449a9e49ec014",
-    "version": "20260306.0001"
+    "hash": "05c69396a3ad8e8234462fe2ccabc9ea7a24be99fa8f389dcc574f2ec80f4c98",
+    "version": "20260415.0001"
   },
   {
     "rule_id": "c7d8e9f0-a1b2-3456-cdef-789012345678",
     "rule_name": "用户可控输入构建的数据库查询（SQL/NoSQL 注入）",
-    "hash": "91f8d2aa50803348b0a63c24dab192e2c4f7b503b20decc086c80bc289aaddbe",
-    "version": "20260306.0001"
+    "hash": "fde98bb7f2e96b2ee454d1e04b820d1bd78b035d4eaeee8536b76b2388219786",
+    "version": "20260415.0001"
   },
   {
     "rule_id": "d4e5f6a7-b8c9-0123-defa-918000000002",
     "rule_name": "服务端请求伪造（SSRF）",
-    "hash": "eb8cc0b3c86653272dd2892c3c2cb88bfdc8814a9878bbd7408e9664dc009f66",
-    "version": "20260306.0001"
+    "hash": "b392a549abd333f1e7e356f7d2f34bbd856f502f8c40ef743ab8fb74c865bb54",
+    "version": "20260415.0001"
   },
   {
     "rule_id": "b2c3d4e5-f6a7-8901-bcde-f23456789012",
@@ -1220,8 +1220,8 @@
   {
     "rule_id": "56a91b23-787c-4c35-a4b9-dcf51521c20f",
     "rule_name": "检测Java URL重定向漏洞",
-    "hash": "9f886e3141a142529883b7f9f6bf31380cacf754899635d078ace26d6f48c218",
-    "version": "20251230.0001"
+    "hash": "1858c3c98ac3c41a4acc441886d19e0b36349116517938be5752ec2431095d7c",
+    "version": "20260415.0001"
   },
   {
     "rule_id": "e6095554-52ef-4935-abc4-f9b9774d0671",
@@ -1274,8 +1274,8 @@
   {
     "rule_id": "9f04beb1-fc2d-40b3-b75f-9ea63e9a4338",
     "rule_name": "检测Java XPath注入漏洞",
-    "hash": "75eebb65c957e03bd38f712f4cab180b70d8a524c8d4f60fa6438cddaac796bf",
-    "version": "20251230.0001"
+    "hash": "5966e27f47bf7a097babd80f712709fefbd96352639b5aa88c788d25ea4a86ea",
+    "version": "20260415.0001"
   },
   {
     "rule_id": "44c752d4-9249-49af-8d0a-e6ad3d767e07",
@@ -1448,8 +1448,8 @@
   {
     "rule_id": "cbf59495-e46c-45aa-9a10-e7c90559a17c",
     "rule_name": "检测Java LDAP注入漏洞",
-    "hash": "ff1c1e318806142d9f9cb2583c03f0e2d6e298d98bfdb480857cd25171e39ae4",
-    "version": "20251230.0001"
+    "hash": "2ded071544aa123071d40fa94570b02037878c3e231e1f708bf100474861c52d",
+    "version": "20260415.0001"
   },
   {
     "rule_id": "0539f4d4-14b9-4b9d-8a7b-8c72decdf400",
