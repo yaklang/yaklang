@@ -124,6 +124,7 @@ User Raw INPUT/ReAction Thought/Observation:
 10.  **TODO 必须保持聚焦且与整体任务对齐**：新增 TODO 时，必须优先服务于当前子任务或当前主任务目标，避免生成偏题、过远期或无执行价值的事项。优先输出能直接推动下一步执行的短链路 TODO。
 11.  **TODO 链路不能过长**：当前 TODO 展示存在 10KB 预算限制。若系统已提示链路过长或 TODO 很多，你应避免继续堆积无关项，优先 `done` 关闭旧项，必要时保持 `next_movements: []`。
 12.  **Evidence 是可选的，只记录关键新增状态观测**：只有当当前场景是 Plan-Task 模式，且本轮执行产生了会改变后续动作选择、任务边界判断或重规划方向的新增状态观测时，才填写 `evidence`。把它当作控制回路里的“观测量记录”，不是 summary，也不是计划。试错过程、空跑、没有形成稳定观测、没有新增约束的信息可以不写。
+13.  **已确认漏洞的后续处理建议**：当 evidence 中记录了已确认的安全漏洞发现（如 SQL 注入、XSS、命令注入等，且有真实请求/响应差异作为证据），可以考虑在 `next_movements` 中建议使用 `cybersecurity-risk` 工具保存漏洞记录，以免测试结果丢失。这不影响当前子任务的完成判定。
 
 RESPONSE FORMAT: Respond with a JSON object following the schema below:
 
