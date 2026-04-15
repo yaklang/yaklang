@@ -34,11 +34,13 @@ func outputEvidenceAction(task *AiTask) reactloops.ReActLoopOption {
 			}
 			return nil
 		},
-		func(_ *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
+		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
 			evidence := aicommon.NormalizeConcreteEvidenceMarkdown(action.GetString(planEvidenceFieldName))
 			merged, changed := appendTaskPlanEvidence(task, evidence)
 			if changed {
 				log.Infof("task loop: output_evidence merged, length=%d", len(merged))
+				loop.GetInvoker().AddToTimeline("evidence_appended",
+					"EVIDENCE appended successfully. Consider whether confirmed vulnerabilities need to be saved via cybersecurity-risk tool.")
 			} else {
 				log.Infof("task loop: output_evidence received no new evidence")
 			}
