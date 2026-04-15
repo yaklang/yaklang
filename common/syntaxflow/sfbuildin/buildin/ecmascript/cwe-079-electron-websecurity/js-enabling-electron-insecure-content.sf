@@ -3,7 +3,7 @@ desc(
 	title_zh: "Electron allowRunningInsecureContent 被启用"
 	type: vuln
 	level: error
-	risk_type: "insecure-content"
+	risk: "不安全内容加载"
 	desc: <<<DESC
 ### 漏洞描述
 

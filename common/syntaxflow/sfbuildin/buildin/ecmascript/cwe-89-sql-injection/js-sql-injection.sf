@@ -3,7 +3,7 @@ desc(
 	title_zh: "用户可控输入构建的数据库查询（SQL/NoSQL 注入）"
 	type: vuln
 	level: high
-	risk_type: "sql-injection"
+	risk: "SQL注入"
 	desc: <<<DESC
 ### 漏洞描述
 

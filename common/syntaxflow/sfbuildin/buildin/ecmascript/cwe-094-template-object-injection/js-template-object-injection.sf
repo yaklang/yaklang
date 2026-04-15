@@ -2,7 +2,7 @@ desc(
 	title: "Template Object Injection via User-Controlled Data"
 	title_zh: "用户可控对象传入模板引擎导致模板对象注入"
 	type: vuln
-	risk_type: "template-object-injection"
+	risk: "模板对象注入"
 	level: high
 	desc: <<<DESC
 ### 漏洞描述

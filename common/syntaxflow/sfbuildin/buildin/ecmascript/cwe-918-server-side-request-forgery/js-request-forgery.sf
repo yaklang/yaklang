@@ -3,7 +3,7 @@ desc(
 	title_zh: "服务端请求伪造（SSRF）"
 	type: vuln
 	level: high
-	risk_type: "ssrf"
+	risk: "服务端请求伪造（SSRF）"
 	desc: <<<DESC
 ### 漏洞描述
 

@@ -2,7 +2,7 @@ desc(
 	title: "Check Java LDAP Injection Vulnerability"
 	title_zh: "检测Java LDAP注入漏洞"
 	type: vuln
-	risk_type: "ldap-injection"
+	risk: "LDAP注入"
 	desc: <<<DESC
 ### 漏洞描述
 

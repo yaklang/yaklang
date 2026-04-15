@@ -3,7 +3,7 @@ desc(
 	title_zh: "服务端未验证的 URL 重定向（开放重定向）"
 	type: vuln
 	level: mid
-	risk_type: "open-redirect"
+	risk: "开放重定向"
 	desc: <<<DESC
 ### 漏洞描述
 

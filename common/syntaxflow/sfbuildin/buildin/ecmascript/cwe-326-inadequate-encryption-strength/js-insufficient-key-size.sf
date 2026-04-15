@@ -3,7 +3,7 @@ desc(
 	title_zh: "使用密钥长度不足的加密密钥"
 	type: vuln
 	level: low
-	risk_type: "insufficient-key-size"
+	risk: "密钥长度不足"
 	desc: <<<DESC
 ### 漏洞描述
 

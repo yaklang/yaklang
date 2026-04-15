@@ -3,7 +3,7 @@ desc(
 	title_zh: "用户可控数据流入不安全反序列化函数"
 	type: vuln
 	level: high
-	risk_type: "unsafe-deserialization"
+	risk: "不安全反序列化"
 	desc: <<<DESC
 ### 漏洞描述
 
