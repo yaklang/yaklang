@@ -3,7 +3,7 @@ desc(
 	title_zh: "压缩包解压时未验证文件路径导致目录穿越（Zip Slip）"
 	type: vuln
 	level: high
-	risk_type: "path-traversal"
+	risk: "路径遍历"
 	desc: <<<DESC
 ### 漏洞描述
 

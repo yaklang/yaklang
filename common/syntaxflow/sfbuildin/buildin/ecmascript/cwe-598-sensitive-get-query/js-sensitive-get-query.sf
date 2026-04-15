@@ -2,7 +2,7 @@ desc(
 	title: "Sensitive Data Read from GET Request"
 	title_zh: "GET 请求中读取敏感数据"
 	type: vuln
-	risk_type: "sensitive-get-query"
+	risk: "敏感信息GET泄露"
 	level: low
 	desc: <<<DESC
 ### 漏洞描述

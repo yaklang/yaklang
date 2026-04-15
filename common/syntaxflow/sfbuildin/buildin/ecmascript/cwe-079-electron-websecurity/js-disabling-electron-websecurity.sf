@@ -3,7 +3,7 @@ desc(
 	title_zh: "Electron webSecurity 被禁用"
 	type: vuln
 	level: warning
-	risk_type: "xss"
+	risk: "跨站脚本（XSS）"
 	desc: <<<DESC
 ### 漏洞描述
 

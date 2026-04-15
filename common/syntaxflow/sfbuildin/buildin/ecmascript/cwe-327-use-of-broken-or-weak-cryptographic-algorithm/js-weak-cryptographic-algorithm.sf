@@ -3,7 +3,7 @@ desc(
 	title_zh: "使用已破解或弱加密算法"
 	type: vuln
 	level: low
-	risk_type: "weak-cryptographic-algorithm"
+	risk: "弱加密算法"
 	desc: <<<DESC
 ### 漏洞描述
 

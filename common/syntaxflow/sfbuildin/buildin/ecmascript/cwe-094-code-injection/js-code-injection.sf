@@ -3,7 +3,7 @@ desc(
 	title_zh: "用户可控输入流入代码执行函数导致代码注入"
 	type: vuln
 	level: high
-	risk_type: "code-injection"
+	risk: "代码注入"
 	desc: <<<DESC
 ### 漏洞描述
 

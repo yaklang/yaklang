@@ -3,7 +3,7 @@ desc(
 	title_zh: "安全敏感场景中使用了不安全的伪随机数生成器"
 	type: vuln
 	level: low
-	risk_type: "insecure-randomness"
+	risk: "弱随机数"
 	desc: <<<DESC
 ### 漏洞描述
 

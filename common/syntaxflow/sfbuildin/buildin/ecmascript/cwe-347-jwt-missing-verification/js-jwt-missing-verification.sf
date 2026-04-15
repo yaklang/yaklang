@@ -3,7 +3,7 @@ desc(
 	title_zh: "JWT 验证未使用加密密钥（None 算法绕过）"
 	type: vuln
 	level: warning
-	risk_type: "authentication-bypass"
+	risk: "认证绕过"
 	desc: <<<DESC
 ### 漏洞描述
 
