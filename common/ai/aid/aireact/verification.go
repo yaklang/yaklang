@@ -420,52 +420,7 @@ func writeEvidenceDisplayStream(reader io.Reader, writer io.Writer) error {
 }
 
 func formatEvidenceOperationDisplayLine(op aicommon.EvidenceOperation) string {
-	id := strings.TrimSpace(op.ID)
-	content := strings.TrimSpace(op.Content)
-	opStr := strings.ToUpper(strings.TrimSpace(op.Op))
-	if opStr == "" {
-		opStr = "?"
-	}
-	switch strings.ToLower(strings.TrimSpace(op.Op)) {
-	case "add":
-		if id == "" && content == "" {
-			return ""
-		}
-		if id == "" {
-			return fmt.Sprintf("- [+EVIDENCE]: %s", content)
-		}
-		if content == "" {
-			return fmt.Sprintf("- [+EVIDENCE]: [id: %s]", id)
-		}
-		firstLine := strings.SplitN(content, "\n", 2)[0]
-		return fmt.Sprintf("- [+EVIDENCE]: [id: %s]: %s", id, firstLine)
-	case "update":
-		if id == "" {
-			return ""
-		}
-		if content == "" {
-			return fmt.Sprintf("- [~EVIDENCE]: [id: %s]", id)
-		}
-		firstLine := strings.SplitN(content, "\n", 2)[0]
-		return fmt.Sprintf("- [~EVIDENCE]: [id: %s]: %s", id, firstLine)
-	case "delete":
-		if id == "" {
-			return ""
-		}
-		return fmt.Sprintf("- [-EVIDENCE]: [id: %s]", id)
-	default:
-		if id == "" && content == "" {
-			return ""
-		}
-		if id == "" {
-			return fmt.Sprintf("- [%s EVIDENCE]: %s", opStr, content)
-		}
-		if content == "" {
-			return fmt.Sprintf("- [%s EVIDENCE]: [id: %s]", opStr, id)
-		}
-		firstLine := strings.SplitN(content, "\n", 2)[0]
-		return fmt.Sprintf("- [%s EVIDENCE]: [id: %s]: %s", opStr, id, firstLine)
-	}
+	return aicommon.FormatEvidenceOpLine(op, "")
 }
 
 func normalizeEvidenceOperations(action *aicommon.Action) []aicommon.EvidenceOperation {

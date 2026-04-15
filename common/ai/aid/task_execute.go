@@ -91,15 +91,15 @@ func (t *AiTask) execute() error {
 				allOps = append(allOps, lastRecord.EvidenceOps...)
 				allOps = append(allOps, buildVerificationCarryoverEvidenceOps(t, summary, outputFiles)...)
 				if len(allOps) > 0 {
-					if merged, changed := applyTaskPlanEvidenceOps(t, allOps); changed {
-						log.Infof("task %s applied evidence operations, length=%d", t.Index, len(merged))
-						if trimmed := strings.TrimSpace(merged); trimmed != "" {
+					if _, changed := applyTaskPlanEvidenceOps(t, allOps); changed {
+						log.Infof("task %s applied evidence operations, count=%d", t.Index, len(allOps))
+						if incremental := aicommon.FormatEvidenceOpsLines(allOps, t.GetLanguage()); incremental != "" {
 							if _, emitErr := t.EmitTextMarkdownStreamEvent(
 								"plan-evidence",
-								strings.NewReader(trimmed),
+								strings.NewReader(incremental),
 								t.GetIndex(),
 							); emitErr != nil {
-								log.Warnf("failed to emit evidence snapshot: %v", emitErr)
+								log.Warnf("failed to emit evidence incremental: %v", emitErr)
 							}
 						}
 					}
@@ -447,15 +447,15 @@ func (t *AiTask) generateTaskSummary(summary, nextMovements string) error {
 	if displaySummary != "" {
 		summaryOps := buildSummaryEvidenceOps(t, displaySummary)
 		if len(summaryOps) > 0 {
-			if merged, changed := applyTaskPlanEvidenceOps(t, summaryOps); changed {
-				log.Infof("task %s applied summary evidence ops, length=%d", t.Index, len(merged))
-				if trimmed := strings.TrimSpace(merged); trimmed != "" {
+			if _, changed := applyTaskPlanEvidenceOps(t, summaryOps); changed {
+				log.Infof("task %s applied summary evidence ops, count=%d", t.Index, len(summaryOps))
+				if incremental := aicommon.FormatEvidenceOpsLines(summaryOps, t.GetLanguage()); incremental != "" {
 					if _, emitErr := t.EmitTextMarkdownStreamEvent(
 						"plan-evidence",
-						strings.NewReader(trimmed),
+						strings.NewReader(incremental),
 						t.GetIndex(),
 					); emitErr != nil {
-						log.Warnf("failed to emit summary evidence snapshot: %v", emitErr)
+						log.Warnf("failed to emit summary evidence incremental: %v", emitErr)
 					}
 				}
 			}
