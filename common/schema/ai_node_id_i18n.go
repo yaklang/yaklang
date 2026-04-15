@@ -795,6 +795,18 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "HTTP 流量分析",
 		En: "HTTP Flow Analyze",
 	},
+	"ai-error": {
+		Zh: "AI 调用错误",
+		En: "AI Invocation Error",
+	},
+	"rate-limit": {
+		Zh: "请求限频",
+		En: "Rate Limited",
+	},
+	"notify": {
+		Zh: "系统通知",
+		En: "System Notification",
+	},
 }
 
 var eventTypeMapper = map[EventType]*I18n{

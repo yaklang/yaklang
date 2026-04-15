@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"math/rand"
+	"strconv"
 	"strings"
 	"time"
 
@@ -53,27 +55,71 @@ func appendPresetPrompt(request *AIRequest, tagName, description, prompt string)
 	request.SetPrompt(request.GetPrompt() + preset)
 }
 
-const rateLimitSleepDuration = 10 * time.Second
-
-// handle429RateLimit checks the AI response for a 429 status code and emits
-// the appropriate user-facing message. Returns true if a 429 was detected.
-func (c *Config) handle429RateLimit(rsp *AIResponse) bool {
+// handle429RateLimit checks the AI response for a 429 status code, emits the
+// appropriate user-facing message, and waits for the correct duration using a
+// context-aware select so the wait can be interrupted by context cancellation.
+//
+// Returns:
+//   - is429:   true if a 429 was detected
+//   - ctxDone: true if the context was cancelled during the wait
+//
+// Two cases:
+//  1. AIBalance 429 (X-AIBalance-Info header present): parse queue count,
+//     show warm notification, wait queueCount*3 seconds.
+//  2. Generic 429: show generic rate-limit message, wait random 5-15 seconds.
+func (c *Config) handle429RateLimit(rsp *AIResponse) (is429 bool, ctxDone bool) {
 	if rsp == nil {
-		return false
+		return false, false
 	}
-	statusCode := rsp.GetHTTPStatusCode()
-	if statusCode != 429 {
-		return false
+
+	if !rsp.WaitForHTTPHeaders(c.Ctx) {
+		return false, true
 	}
-	queueInfo := rsp.GetHTTPHeader("X-AIBalance-Info")
+
+	if rsp.GetHTTPStatusCode() != 429 {
+		return false, false
+	}
+
+	var waitDuration time.Duration
+	queueInfo := strings.TrimSpace(rsp.GetHTTPHeader("X-AIBalance-Info"))
 	if queueInfo != "" {
-		c.EmitDefaultStreamEvent("rate-limit",
-			strings.NewReader(fmt.Sprintf("当前系统繁忙，正在排队等待，当前有 %s 位。", queueInfo)), "")
+		queueCount, parseErr := strconv.Atoi(queueInfo)
+		if parseErr == nil && queueCount > 0 {
+			waitSec := queueCount * 3
+			if waitSec < 5 {
+				waitSec = 5
+			}
+			msg := fmt.Sprintf(
+				"此刻有 %d 位用户正在与我深度对话中\n"+
+					"您的任务同样重要，我不想敷衍任何一位\n"+
+					"预计等待约 %d 秒，感谢您的耐心",
+				queueCount, waitSec)
+			c.EmitDefaultStreamEvent("notify", strings.NewReader(msg), "")
+			log.Infof("AIBalance 429: queue=%d, waiting %ds", queueCount, waitSec)
+			waitDuration = time.Duration(waitSec) * time.Second
+		} else {
+			msg := "当前有大量用户正在与我深度对话中\n" +
+				"您的任务同样重要，我不想敷衍任何一位\n" +
+				"预计等待一段时间后自动请求，感谢您的耐心"
+			c.EmitDefaultStreamEvent("notify", strings.NewReader(msg), "")
+			log.Infof("AIBalance 429: queue info unparseable (%q), waiting 15s", queueInfo)
+			waitDuration = 15 * time.Second
+		}
 	} else {
-		c.EmitDefaultStreamEvent("rate-limit",
-			strings.NewReader("429 限频，稍后重新发起访问"), "")
+		msg := "当前遇到 429 服务器访问人数过多，稍后自动重试\n" +
+			"Current request was rate-limited (HTTP 429), retrying shortly..."
+		c.EmitDefaultStreamEvent("rate-limit", strings.NewReader(msg), "")
+		sleepSec := 5 + rand.Intn(11)
+		log.Infof("generic 429 rate limit, waiting %ds", sleepSec)
+		waitDuration = time.Duration(sleepSec) * time.Second
 	}
-	return true
+
+	select {
+	case <-c.Ctx.Done():
+		return true, true
+	case <-time.After(waitDuration):
+		return true, false
+	}
 }
 
 func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType {
@@ -116,25 +162,31 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 
 		// 不需要 checkpoint 的请求直接执行就好
 		if request.IsDetachedCheckpoint() {
-			if c.AiAutoRetry <= 0 {
-				c.AiAutoRetry = 1
-			}
-			for _idx := 0; _idx < int(c.AiAutoRetry); _idx++ {
-				rsp, err = i(wrapCallerWithTierConsumption(outConfig, tier), request)
-				if c.handle429RateLimit(rsp) {
-					log.Warnf("429 rate limit detected (detached, attempt %d), sleeping %v", _idx+1, rateLimitSleepDuration)
-					time.Sleep(rateLimitSleepDuration)
-					continue
+		if c.AiAutoRetry <= 0 {
+			c.AiAutoRetry = 1
+		}
+		for _idx := 0; _idx < int(c.AiAutoRetry); {
+			rsp, err = i(wrapCallerWithTierConsumption(outConfig, tier), request)
+			if is429, done := c.handle429RateLimit(rsp); is429 {
+				if done {
+					return nil, c.Ctx.Err()
 				}
-				if err != nil || rsp == nil {
-					c.EmitWarning("ai request err: %v, retry auto time: [%v]", err, _idx+1)
-					time.Sleep(500 * time.Millisecond)
-					continue
-				}
-				rsp.SetTaskIndex(request.GetTaskIndex())
-				return rsp, err
+				continue
 			}
-			return nil, utils.Errorf("ai request err with max retry: %v", err)
+			if err != nil || rsp == nil {
+				_idx++
+				c.EmitWarning("ai request err: %v, retry auto time: [%v]", err, _idx)
+				select {
+				case <-c.Ctx.Done():
+					return nil, c.Ctx.Err()
+				case <-time.After(500 * time.Millisecond):
+				}
+				continue
+			}
+			rsp.SetTaskIndex(request.GetTaskIndex())
+			return rsp, err
+		}
+		return nil, utils.Errorf("ai request err with max retry: %v", err)
 		}
 
 		var seq = request.GetSeqId()
@@ -174,17 +226,23 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 		tokenSize := ytoken.CalcTokenCount(request.GetPrompt())
 
 		start := time.Now()
-		for _idx := 0; _idx < int(c.AiAutoRetry); _idx++ {
+		for _idx := 0; _idx < int(c.AiAutoRetry); {
 			c.InputConsumptionCallback(tier, tokenSize)
 			rsp, err = i(wrapCallerWithTierConsumption(outConfig, tier), request)
-			if c.handle429RateLimit(rsp) {
-				log.Warnf("429 rate limit detected (checkpoint, attempt %d), sleeping %v", _idx+1, rateLimitSleepDuration)
-				time.Sleep(rateLimitSleepDuration)
+			if is429, done := c.handle429RateLimit(rsp); is429 {
+				if done {
+					return nil, c.Ctx.Err()
+				}
 				continue
 			}
 			if err != nil || rsp == nil {
-				c.EmitWarning("ai request err: %v, retry auto time: [%v]", err, _idx+1)
-				time.Sleep(500 * time.Millisecond)
+				_idx++
+				c.EmitWarning("ai request err: %v, retry auto time: [%v]", err, _idx)
+				select {
+				case <-c.Ctx.Done():
+					return nil, c.Ctx.Err()
+				case <-time.After(500 * time.Millisecond):
+				}
 				continue
 			}
 			rsp.SetTaskIndex(request.GetTaskIndex())

@@ -95,14 +95,17 @@ func (rl *ChatRateLimiter) getEffectiveRPM(modelName string) int64 {
 // CheckRateLimit checks whether a request from apiKey for modelName is allowed.
 // Returns (allowed, currentQueueLength).
 // If allowed, the request is automatically recorded in the sliding window.
+// The rate-limit bucket is keyed by (apiKey, modelName) so that per-model RPM
+// overrides are enforced independently instead of sharing a single bucket.
 func (rl *ChatRateLimiter) CheckRateLimit(apiKey string, modelName string) (bool, int64) {
 	now := time.Now()
 	rpm := rl.getEffectiveRPM(modelName)
 
+	bucketKey := apiKey + "|" + modelName
 	newState := &keyRPMState{
 		requests: []time.Time{now},
 	}
-	val, loaded := rl.states.LoadOrStore(apiKey, newState)
+	val, loaded := rl.states.LoadOrStore(bucketKey, newState)
 	if !loaded {
 		return true, rl.queueCount.Load()
 	}
