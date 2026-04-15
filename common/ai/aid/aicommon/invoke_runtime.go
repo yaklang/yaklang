@@ -2,6 +2,7 @@ package aicommon
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -74,6 +75,89 @@ func FormatVerifyNextMovementsSummary(nextMovements []VerifyNextMovement) string
 		}
 	}
 	return strings.Join(parts, "; ")
+}
+
+func FormatEvidenceOpLine(op EvidenceOperation, language string) string {
+	id := strings.TrimSpace(op.ID)
+	content := strings.TrimSpace(op.Content)
+	firstLine := ""
+	if content != "" {
+		firstLine = strings.SplitN(content, "\n", 2)[0]
+	}
+
+	isCN := strings.Contains(strings.ToLower(language), "zh") ||
+		strings.Contains(strings.ToLower(language), "chinese")
+
+	switch strings.ToLower(strings.TrimSpace(op.Op)) {
+	case "add":
+		if id == "" && content == "" {
+			return ""
+		}
+		if isCN {
+			if id != "" && firstLine != "" {
+				return fmt.Sprintf("- **新发现**: %s `#%s`", firstLine, id)
+			}
+			if firstLine != "" {
+				return fmt.Sprintf("- **新发现**: %s", firstLine)
+			}
+			return fmt.Sprintf("- **新发现**: `#%s`", id)
+		}
+		if id != "" && firstLine != "" {
+			return fmt.Sprintf("- **New finding**: %s `#%s`", firstLine, id)
+		}
+		if firstLine != "" {
+			return fmt.Sprintf("- **New finding**: %s", firstLine)
+		}
+		return fmt.Sprintf("- **New finding**: `#%s`", id)
+	case "update":
+		if id == "" {
+			return ""
+		}
+		if isCN {
+			if firstLine != "" {
+				return fmt.Sprintf("- **更新证据**: %s `#%s`", firstLine, id)
+			}
+			return fmt.Sprintf("- **更新证据**: `#%s`", id)
+		}
+		if firstLine != "" {
+			return fmt.Sprintf("- **Updated**: %s `#%s`", firstLine, id)
+		}
+		return fmt.Sprintf("- **Updated**: `#%s`", id)
+	case "delete":
+		if id == "" {
+			return ""
+		}
+		if isCN {
+			return fmt.Sprintf("- **移除过时信息**: `#%s`", id)
+		}
+		return fmt.Sprintf("- **Removed outdated**: `#%s`", id)
+	default:
+		if id == "" && content == "" {
+			return ""
+		}
+		label := strings.ToUpper(strings.TrimSpace(op.Op))
+		if label == "" {
+			label = "?"
+		}
+		if id != "" && firstLine != "" {
+			return fmt.Sprintf("- **%s**: %s `#%s`", label, firstLine, id)
+		}
+		if firstLine != "" {
+			return fmt.Sprintf("- **%s**: %s", label, firstLine)
+		}
+		return fmt.Sprintf("- **%s**: `#%s`", label, id)
+	}
+}
+
+func FormatEvidenceOpsLines(ops []EvidenceOperation, language string) string {
+	var lines []string
+	for _, op := range ops {
+		line := FormatEvidenceOpLine(op, language)
+		if strings.TrimSpace(line) != "" {
+			lines = append(lines, line)
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 // SelectedKnowledgeBaseResult represents the result of knowledge base selection
