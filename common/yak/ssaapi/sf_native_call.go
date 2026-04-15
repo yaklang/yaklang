@@ -135,6 +135,23 @@ const (
 	// CODE)>
 	NativeCall_DataFlow = "dataflow"
 
+	// NativeCall_DataflowParam* are actual-parameter keys for <dataflow(...)> and matching keys on scan-style natives.
+	NativeCall_DataflowParamCode        = "code"
+	NativeCall_DataflowParamInclude     = "include"
+	NativeCall_DataflowParamExclude     = "exclude"
+	NativeCall_DataflowParamHook        = "hook"
+	NativeCall_DataflowParamUntil       = "until"
+	NativeCall_DataflowParamEnd         = "end"
+	NativeCall_DataflowParamDest        = "dest"
+	NativeCall_DataflowParamDestination = "destination"
+	NativeCall_DataflowParamOnlyReachable      = "only_reachable"
+	NativeCall_DataflowParamOnlyReachableCamel = "onlyReachable"
+	NativeCall_DataflowParamOnlyReachableKebab = "only-reachable"
+	NativeCall_DataflowParamOnlyReachableMode       = "only_reachable_mode"
+	NativeCall_DataflowParamOnlyReachableModeCamel = "onlyReachableMode"
+	NativeCall_DataflowParamStrict = "strict"
+	NativeCall_DataflowParamIcfg   = "icfg"
+
 	// CFG native calls
 	NativeCall_GetCFG             = "getCfg"
 	NativeCall_CFGGuards          = "cfgGuards"
