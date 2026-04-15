@@ -110,47 +110,60 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 					[]string{"reasoning"},
 					createReasonCallback("Reasoning"),
 				),
-				aicommon.WithActionFieldStreamHandler(
-					[]string{"evidence"},
-					func(key string, rd io.Reader) {
-						trimmedReader := utils.NewTrimLeftReader(utils.UTF8Reader(rd))
-						peekedReader := utils.NewPeekableReader(trimmedReader)
-						firstByte, err := peekedReader.Peek(1)
-						if err != nil && len(firstByte) == 0 {
-							log.Infof("no evidence provided in verification result, skipping evidence stream handling")
+			aicommon.WithActionFieldStreamHandler(
+				[]string{"evidence"},
+				func(key string, rd io.Reader) {
+					trimmedReader := utils.NewTrimLeftReader(utils.UTF8Reader(rd))
+					peekedReader := utils.NewPeekableReader(trimmedReader)
+					firstByte, err := peekedReader.Peek(1)
+					if err != nil && len(firstByte) == 0 {
+						log.Infof("no evidence provided in verification result, skipping evidence stream handling")
+						return
+					}
+
+					var displayReader io.Reader
+					if len(firstByte) > 0 && firstByte[0] == '[' {
+						pr, pw := utils.NewBufPipe(nil)
+						go func() {
+							defer pw.Close()
+							if err := writeEvidenceDisplayStream(peekedReader, pw); err != nil {
+								log.Errorf("failed to stream evidence display: %v", err)
+							}
+						}()
+						displayReader = pr
+					} else {
+						var buf bytes.Buffer
+						io.Copy(&buf, peekedReader)
+						content := strings.TrimSpace(buf.String())
+						if content == "" {
+							log.Infof("evidence content is empty after trim, skipping emit")
 							return
 						}
-
-						var displayReader io.Reader
-						if len(firstByte) > 0 && firstByte[0] == '[' {
-							pr, pw := utils.NewBufPipe(nil)
-							go func() {
-								defer pw.Close()
-								if err := writeEvidenceDisplayStream(peekedReader, pw); err != nil {
-									log.Errorf("failed to stream evidence display: %v", err)
-								}
-							}()
-							displayReader = pr
-						} else {
-							displayReader = peekedReader
-						}
-
-						var out bytes.Buffer
-						var outputReader = io.TeeReader(displayReader, &out)
-						var event *schema.AiOutputEvent
-						event, err = r.Emitter.EmitDefaultStreamEvent(
-							"evidence",
-							outputReader,
-							rsp.GetTaskIndex(),
-							func() {},
-						)
-						if err != nil {
-							log.Errorf("failed to emit evidence stream event: %v", err)
+						formatted := formatEvidenceOperationDisplayLine(aicommon.EvidenceOperation{
+							Op: "add", ID: "default", Content: content,
+						})
+						if strings.TrimSpace(formatted) == "" {
 							return
 						}
-						captureReferenceAnchor(event)
-					},
-				),
+						displayReader = strings.NewReader(formatted)
+					}
+
+					var out bytes.Buffer
+					var outputReader = io.TeeReader(displayReader, &out)
+					var event *schema.AiOutputEvent
+					event, err = r.Emitter.EmitDefaultStreamEvent(
+						"plan-evidence",
+						outputReader,
+						rsp.GetTaskIndex(),
+						func() {},
+					)
+					if err != nil {
+						log.Errorf("failed to emit evidence stream event: %v", err)
+						return
+					}
+					captureReferenceAnchor(event)
+				},
+			),
 				aicommon.WithActionFieldStreamHandler(
 					[]string{"next_movements"},
 					func(key string, rd io.Reader) {
@@ -466,7 +479,7 @@ func normalizeEvidenceOperations(action *aicommon.Action) []aicommon.EvidenceOpe
 			return nil
 		}
 		return []aicommon.EvidenceOperation{{
-			ID:      "legacy_evidence",
+			ID:      "default",
 			Op:      "add",
 			Content: legacy,
 		}}
