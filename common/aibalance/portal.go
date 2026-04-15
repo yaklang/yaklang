@@ -509,6 +509,12 @@ func (c *ServerConfig) HandlePortalRequest(conn net.Conn, request *http.Request,
 
 	// ========== Public Routes (No Auth Required) ==========
 
+	// Serve login page (GET) without authentication
+	if uriIns.Path == "/portal/login" && request.Method == "GET" {
+		c.serveLoginPage(conn)
+		return
+	}
+
 	// Process login POST request
 	if uriIns.Path == "/portal/login" && request.Method == "POST" {
 		c.processLogin(conn, request)
@@ -530,10 +536,19 @@ func (c *ServerConfig) HandlePortalRequest(conn net.Conn, request *http.Request,
 		c.logDebug("Auth: user=%s, role=%s, path=%s", authInfo.Username, authInfo.Role, uriIns.Path)
 	}
 
-	// If not authenticated, redirect to login page
+	// If not authenticated, serve login page only for known page paths (GET),
+	// return 401 JSON for everything else (API endpoints, mutations, etc.)
 	if !authInfo.Authenticated {
-		c.logInfo("Unauthenticated request to %s, redirecting to login", uriIns.Path)
-		c.serveLoginPage(conn)
+		isPagePath := (request.Method == "GET" || request.Method == "HEAD") && isPortalPagePath(uriIns.Path)
+		if isPagePath {
+			c.logInfo("Unauthenticated page request to %s, serving login page", uriIns.Path)
+			c.serveLoginPage(conn)
+			return
+		}
+		c.logWarn("Unauthenticated request blocked: %s %s, returning 401", request.Method, uriIns.Path)
+		c.writeJSONResponse(conn, http.StatusUnauthorized, map[string]string{
+			"error": "Unauthorized",
+		})
 		return
 	}
 
@@ -683,6 +698,14 @@ func (c *ServerConfig) HandlePortalRequest(conn net.Conn, request *http.Request,
 	case uriIns.Path == "/portal/get-totp-code":
 		c.handleGetTOTPCode(conn, request)
 
+	// ========== Rate Limit Config Routes ==========
+	case uriIns.Path == "/portal/api/rate-limit-config" && request.Method == "GET":
+		c.handleGetRateLimitConfig(conn, request)
+	case uriIns.Path == "/portal/api/rate-limit-config" && request.Method == "POST":
+		c.handleSetRateLimitConfig(conn, request)
+	case uriIns.Path == "/portal/api/rate-limit-status" && request.Method == "GET":
+		c.handleGetRateLimitStatus(conn, request)
+
 	// ========== Portal Data API Routes ==========
 	case uriIns.Path == "/portal/api/data":
 		c.servePortalDataAPI(conn, request)
@@ -762,10 +785,19 @@ func (c *ServerConfig) HandleOpsPortalRequest(conn net.Conn, request *http.Reque
 		c.logDebug("OPS Auth: user=%s, role=%s, path=%s", authInfo.Username, authInfo.Role, uriIns.Path)
 	}
 
-	// If not authenticated, redirect to OPS login page
+	// If not authenticated, serve login page only for known OPS page paths (GET),
+	// return 401 JSON for everything else (API endpoints, mutations, etc.)
 	if !authInfo.Authenticated {
-		c.logInfo("Unauthenticated OPS request to %s, redirecting to login", uriIns.Path)
-		c.serveOpsLoginPage(conn)
+		isPagePath := (request.Method == "GET" || request.Method == "HEAD") && isOpsPagePath(uriIns.Path)
+		if isPagePath {
+			c.logInfo("Unauthenticated OPS page request to %s, serving login page", uriIns.Path)
+			c.serveOpsLoginPage(conn)
+			return
+		}
+		c.logWarn("Unauthenticated OPS request blocked: %s %s, returning 401", request.Method, uriIns.Path)
+		c.writeJSONResponse(conn, http.StatusUnauthorized, map[string]string{
+			"error": "Unauthorized",
+		})
 		return
 	}
 
@@ -934,6 +966,36 @@ func (c *ServerConfig) serveOpsPortal(conn net.Conn) {
 
 	conn.Write([]byte(header))
 	conn.Write(htmlContent)
+}
+
+// portalPagePaths lists paths that render HTML pages (not JSON APIs) under /portal.
+// Only these paths will serve a login page for unauthenticated GET requests;
+// all other paths return 401 JSON.
+var portalPagePaths = map[string]bool{
+	"/portal":              true,
+	"/portal/":             true,
+	"/portal/add-ai-provider": true,
+	"/portal/api-keys":     true,
+	"/portal/totp-settings": true,
+	"/portal/autocomplete": true,
+	"/portal/get-totp-code": true,
+	"/portal/logout":       true,
+}
+
+func isPortalPagePath(path string) bool {
+	return portalPagePaths[path]
+}
+
+// opsPagePaths lists paths that render HTML pages (not JSON APIs) under /ops.
+var opsPagePaths = map[string]bool{
+	"/ops":           true,
+	"/ops/":          true,
+	"/ops/dashboard": true,
+	"/ops/logout":    true,
+}
+
+func isOpsPagePath(path string) bool {
+	return opsPagePaths[path]
 }
 
 // handleOpsLogout handles OPS user logout

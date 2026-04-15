@@ -53,6 +53,29 @@ func appendPresetPrompt(request *AIRequest, tagName, description, prompt string)
 	request.SetPrompt(request.GetPrompt() + preset)
 }
 
+const rateLimitSleepDuration = 10 * time.Second
+
+// handle429RateLimit checks the AI response for a 429 status code and emits
+// the appropriate user-facing message. Returns true if a 429 was detected.
+func (c *Config) handle429RateLimit(rsp *AIResponse) bool {
+	if rsp == nil {
+		return false
+	}
+	statusCode := rsp.GetHTTPStatusCode()
+	if statusCode != 429 {
+		return false
+	}
+	queueInfo := rsp.GetHTTPHeader("X-AIBalance-Info")
+	if queueInfo != "" {
+		c.EmitDefaultStreamEvent("rate-limit",
+			strings.NewReader(fmt.Sprintf("当前系统繁忙，正在排队等待，当前有 %s 位。", queueInfo)), "")
+	} else {
+		c.EmitDefaultStreamEvent("rate-limit",
+			strings.NewReader("429 限频，稍后重新发起访问"), "")
+	}
+	return true
+}
+
 func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType {
 	outConfig := c
 	return func(config AICallerConfigIf, request *AIRequest) (rsp *AIResponse, err error) {
@@ -98,6 +121,11 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 			}
 			for _idx := 0; _idx < int(c.AiAutoRetry); _idx++ {
 				rsp, err = i(wrapCallerWithTierConsumption(outConfig, tier), request)
+				if c.handle429RateLimit(rsp) {
+					log.Warnf("429 rate limit detected (detached, attempt %d), sleeping %v", _idx+1, rateLimitSleepDuration)
+					time.Sleep(rateLimitSleepDuration)
+					continue
+				}
 				if err != nil || rsp == nil {
 					c.EmitWarning("ai request err: %v, retry auto time: [%v]", err, _idx+1)
 					time.Sleep(500 * time.Millisecond)
@@ -149,6 +177,11 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 		for _idx := 0; _idx < int(c.AiAutoRetry); _idx++ {
 			c.InputConsumptionCallback(tier, tokenSize)
 			rsp, err = i(wrapCallerWithTierConsumption(outConfig, tier), request)
+			if c.handle429RateLimit(rsp) {
+				log.Warnf("429 rate limit detected (checkpoint, attempt %d), sleeping %v", _idx+1, rateLimitSleepDuration)
+				time.Sleep(rateLimitSleepDuration)
+				continue
+			}
 			if err != nil || rsp == nil {
 				c.EmitWarning("ai request err: %v, retry auto time: [%v]", err, _idx+1)
 				time.Sleep(500 * time.Millisecond)

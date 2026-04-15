@@ -91,6 +91,7 @@
                 <div class="tab" data-tab="amap">高德</div>
                 <div class="tab" data-tab="ops-users">运营用户</div>
                 <div class="tab" data-tab="ops-logs">操作日志</div>
+                <div class="tab" data-tab="rate-limit">限流配置</div>
             </div>
         </div>
         
@@ -799,6 +800,79 @@
                 
                 <div id="ops-logs-pagination" style="display: flex; justify-content: center; gap: 10px; margin-top: 20px;">
                     <!-- Pagination will be rendered here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Rate Limit Config Tab -->
+        <div id="rate-limit" class="tab-content">
+            <div class="card">
+                <h3>限流配置</h3>
+                <p style="color: #666; margin-bottom: 20px;">
+                    配置 Chat Completions 接口的 RPM (Requests Per Minute) 限制和免费用户冷却延迟。
+                </p>
+
+                <!-- Real-time status -->
+                <div style="background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+                    <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
+                        <span style="font-weight: bold; color: #2e7d32;">实时状态:</span>
+                        <span>当前排队数: <strong id="rl-queue-count">--</strong></span>
+                        <span>生效 RPM: <strong id="rl-effective-rpm">--</strong></span>
+                        <button class="btn" onclick="loadRateLimitStatus()" style="height: 32px; font-size: 12px;">刷新状态</button>
+                    </div>
+                </div>
+
+                <!-- Default RPM -->
+                <div style="margin-bottom: 20px;">
+                    <h4 style="margin-bottom: 10px;">全局默认 RPM</h4>
+                    <div style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
+                        <div class="form-group" style="margin-bottom: 0; flex: 0 0 200px;">
+                            <label>每 API Key 每分钟请求数:</label>
+                            <input type="number" id="rl-default-rpm" class="form-control" value="600" min="1" style="font-family: monospace; font-size: 13px;">
+                        </div>
+                    </div>
+                    <small style="color: #888; margin-top: 8px; display: block;">
+                        每个 API Key 在一分钟内允许的最大请求数量。默认 600。
+                    </small>
+                    <div style="background: #fff3e0; border: 1px solid #ffcc80; border-radius: 6px; padding: 10px; margin-top: 10px;">
+                        <small style="color: #e65100;">
+                            <strong>注意:</strong> 所有免费 AI 用户（-free 模型）共用同一个 RPM 桶（key = "free-user"），而非每个用户独立计数。
+                        </small>
+                    </div>
+                </div>
+
+                <!-- Free user delay -->
+                <div style="margin-bottom: 20px;">
+                    <h4 style="margin-bottom: 10px;">免费用户冷却延迟</h4>
+                    <div style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
+                        <div class="form-group" style="margin-bottom: 0; flex: 0 0 200px;">
+                            <label>延迟基础值 (秒):</label>
+                            <input type="number" id="rl-free-user-delay" class="form-control" value="3" min="0" style="font-family: monospace; font-size: 13px;">
+                        </div>
+                    </div>
+                    <small style="color: #888; margin-top: 8px; display: block;">
+                        免费用户每次请求结束后，服务端会 sleep N~2N 秒（N 为配置值）。设为 0 则不延迟。
+                        <br>Sleep 期间不占用并发容量，会及时释放给其他 API Key 使用。
+                    </small>
+                </div>
+
+                <!-- Model RPM overrides -->
+                <div style="margin-bottom: 20px;">
+                    <h4 style="margin-bottom: 10px;">模型级 RPM 覆盖</h4>
+                    <small style="color: #888; margin-bottom: 10px; display: block;">
+                        为特定模型单独配置 RPM 限制，优先级高于全局默认值。留空则使用全局默认。
+                        <br><strong style="color: #d84315;">模型名称请填写对外名称（如 memfit-standard-free），而非转发后的内部名称。</strong>
+                    </small>
+                    <div id="rl-model-overrides-list" style="margin-bottom: 10px;">
+                        <!-- Dynamic rows -->
+                    </div>
+                    <button class="btn" onclick="addModelRPMOverride()" style="font-size: 12px;">+ 添加模型覆盖</button>
+                </div>
+
+                <div style="border-top: 1px solid #eee; padding-top: 15px;">
+                    <button class="btn btn-primary" onclick="saveRateLimitConfig()" style="height: 36px;">
+                        保存配置
+                    </button>
                 </div>
             </div>
         </div>

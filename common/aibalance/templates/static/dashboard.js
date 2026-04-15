@@ -321,6 +321,15 @@
         showHideCard('kpi-amap', data.amap_count > 0);
         setKPI('kpi-amap', formatNumber(data.amap_count), '');
 
+        var queueCount = data.queue_count || 0;
+        setKPI('kpi-queue', String(queueCount), queueCount > 0 ? 'waiting requests' : 'no queue');
+        var queueHeatBar = document.getElementById('queue-heat-bar');
+        if (queueHeatBar) {
+            var heatPct = Math.min(queueCount * 10, 100);
+            queueHeatBar.style.width = heatPct + '%';
+            queueHeatBar.className = 'health-bar-fill ' + (queueCount === 0 ? 'good' : queueCount < 5 ? 'warn' : 'bad');
+        }
+
         renderModels(data.models, data.latency_history);
 
         var uptimeSection = document.getElementById('uptime-section');

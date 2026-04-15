@@ -273,6 +273,19 @@ type OpsActionLog struct {
 	IPAddress    string `json:"ip_address"`                 // Client IP address
 }
 
+// AiBalanceRateLimitConfig stores global rate-limit configuration for AIBalance (singleton row, ID=1)
+type AiBalanceRateLimitConfig struct {
+	gorm.Model
+
+	DefaultRPM        int64  `json:"default_rpm" gorm:"default:600"`  // Global default RPM per API key, default 600
+	FreeUserDelaySec  int64  `json:"free_user_delay_sec" gorm:"default:3"` // Free user cooldown delay in seconds, actual delay is N~2N random
+	ModelRPMOverrides string `json:"model_rpm_overrides" gorm:"type:text"` // JSON map: {"model-name": rpm_int, ...}
+}
+
+func (a *AiBalanceRateLimitConfig) TableName() string {
+	return "ai_balance_rate_limit_configs"
+}
+
 // WebSearchConfig stores global configuration for web search (singleton row, ID=1)
 type WebSearchConfig struct {
 	gorm.Model

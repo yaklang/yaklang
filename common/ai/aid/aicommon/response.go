@@ -13,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/chanx"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 )
 
 type byteCountingReader struct {
@@ -142,6 +143,34 @@ func (a *AIResponse) GetRawHTTPResponseDump() string {
 		buf.Write(a.rawHTTPResponseBody)
 	}
 	return buf.String()
+}
+
+// GetHTTPStatusCode extracts the HTTP status code from the raw response header.
+func (a *AIResponse) GetHTTPStatusCode() int {
+	if a == nil {
+		return 0
+	}
+	a.rawHTTPResponseHeaderMu.Lock()
+	header := a.rawHTTPResponseHeader
+	a.rawHTTPResponseHeaderMu.Unlock()
+	if len(header) == 0 {
+		return 0
+	}
+	return lowhttp.GetStatusCodeFromResponse(header)
+}
+
+// GetHTTPHeader extracts a specific header value from the raw response header.
+func (a *AIResponse) GetHTTPHeader(name string) string {
+	if a == nil {
+		return ""
+	}
+	a.rawHTTPResponseHeaderMu.Lock()
+	header := a.rawHTTPResponseHeader
+	a.rawHTTPResponseHeaderMu.Unlock()
+	if len(header) == 0 {
+		return ""
+	}
+	return lowhttp.GetHTTPPacketHeader(header, name)
 }
 
 func (a *AIResponse) SetFirstOutputByteTime(t time.Time) {
