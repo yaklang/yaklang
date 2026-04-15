@@ -1,0 +1,134 @@
+desc(
+	title: "Check Go Zip Slip Vulnerability"
+	title_zh: "检测Go语言Zip解压路径遍历漏洞（Zip Slip）"
+	type: audit
+	level: low
+	risk: ""
+	desc: <<<DESC
+该规则用于检测Go语言程序中存在Zip解压路径遍历漏洞（Zip Slip），攻击者可利用此漏洞通过构造恶意压缩包，将文件写入任意系统路径，从而导致任意文件覆盖、权限提升或远程代码执行。漏洞通常出现在未对Zip文件中的路径进行严格校验的情况下，例如使用`archive/zip`库解压时，若未对解压路径做清理或白名单过滤，攻击者可通过包含`../`等路径穿越序列，将文件写入敏感目录（如`/etc/passwd`、`C:\Windows\system32\`等）。本规则通过分析代码中对`archive/zip`的调用，结合`path.Clean`和`path.Join`等路径处理函数，识别是否存在路径校验缺失或不充分的问题，重点关注`$entry.OpenReader(* #{until: `* & $input - $safe`}->)`这一关键操作点。
+DESC
+	rule_id: "41d74731-3d19-47c5-b227-c377893d5ca7"
+	title_zh: "检测Go语言Zip解压路径遍历漏洞（Zip Slip）"
+	solution: <<<SOLUTION
+1. 在解压前对Zip文件中每个条目（entry）的路径进行严格校验：
+   - 使用`path.Clean()`标准化路径，移除`.`与`..`等相对路径；
+   - 显式检查路径是否以预期根目录开头（如`/tmp/`、`./`），或使用白名单机制限制允许的路径范围；
+   - 禁止在解压过程中使用`path.Join()`直接拼接用户输入的路径。
+2. 建议采用安全的解压模式，如先将所有条目路径解析为绝对路径后，再验证其是否位于指定的安全目录内；
+3. 若可能，改用更安全的第三方库（如`golang.org/x/archive/zip`的封装实现）并启用内置路径防护；
+4. 对于必须支持用户上传Zip的场景，应设置最大解压深度限制，并记录异常行为日志；
+5. 部署时建议配置容器或沙箱隔离环境，防止攻击者通过本地文件系统造成进一步危害。
+SOLUTION
+	reference: <<<REFERENCE
+https://cwe.mitre.org/data/definitions/22.html
+https://owasp.org/www-community/attacks/Zip_Slip
+https://github.com/golang/go/issues/36720
+REFERENCE
+)
+
+<include('golang-user-input')> as $input
+<include('golang-file-path')> as $path;
+
+strings.HasPrefix(* as $check);
+$path.Clean(* as $check);
+$path.IsAbs(* as $check);
+$path.Join(* as $check);
+$sink #{include: `* & $check`}-> as $safe;
+
+zip?{<fullTypeName()>?{have: "archive/zip"}} as $entry
+
+$entry.OpenReader(* #{until: `* & $input - $safe`}->) as $low
+
+alert $low for {
+	type: "vuln",
+	title: "Zip Slip Vulnerability",
+	title_zh: "ZIP 路径遍历漏洞",
+	level: "low",
+	risk: "路径遍历",
+	message: "解压 ZIP 文件时未校验文件路径，存在路径遍历风险",
+	solution: <<<SOLUTION
+在解压前应对文件路径调用 filepath.Clean 或 filepath.Join 进行规范化处理，并确保最终路径不超出预期解压目录范围；建议使用 zip.OpenReader 的 WithFilter 参数限制文件路径，或显式验证路径是否为合法子路径。
+SOLUTION
+	desc: <<<DESC
+在解压 ZIP 文件时，若未对文件路径进行充分校验，攻击者可构造包含向上路径（如 '../'）的文件名，导致文件被写入到预期目录之外的任意位置，从而实现任意文件写入或覆盖系统关键文件。本规则检测 Golang 中使用 archive/zip 包解压时未对文件路径进行安全检查的场景。
+DESC
+	name: "low",
+}
+
+desc(
+	lang: golang
+	alert_low: 1
+	'file://unsafe.go': <<<UNSAFE
+package controllers
+
+import (
+	"archive/zip"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"time"
+
+	beego "github.com/beego/beego/v2/server/web"
+)
+
+type ZipSlipVuln1Controller struct {
+	beego.Controller
+}
+
+func (c *ZipSlipVuln1Controller) Get() {
+	c.TplName = "fileUpload.tpl"
+}
+
+func (c *ZipSlipVuln1Controller) Post() {
+	_, h, err := c.GetFile("file")
+	if err != nil {
+		panic(err)
+	}
+	timestamp := fmt.Sprint(time.Now().Unix())
+	savePath := "static/upload/" + timestamp + h.Filename
+	c.SaveToFile("file", savePath)
+	unzipPath := "static/unzip/" + timestamp + h.Filename
+	r, err := zip.OpenReader(savePath)
+	if err != nil {
+		panic(err)
+	}
+	for _, f := range r.File {
+		fpath := filepath.Join(unzipPath, f.Name)
+		if f.FileInfo().IsDir() {
+			// Make Folder
+			os.MkdirAll(fpath, os.ModePerm)
+			continue
+		}
+
+		// Make File
+		if err = os.MkdirAll(filepath.Dir(fpath), os.ModePerm); err != nil {
+			panic(err)
+		}
+
+		outFile, err := os.OpenFile(fpath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+		if err != nil {
+			panic(err)
+		}
+
+		rc, err := f.Open()
+		if err != nil {
+			panic(err)
+		}
+
+		_, err = io.Copy(outFile, rc)
+
+		// Close the file without defer to close before next iteration of loop
+		outFile.Close()
+		rc.Close()
+
+		if err != nil {
+			panic(err)
+		}
+	}
+	c.Data["savePath"] = unzipPath
+	c.TplName = "fileUpload.tpl"
+}
+
+UNSAFE
+)

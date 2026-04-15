@@ -1,0 +1,105 @@
+desc(
+	title: "Check Golang IDOR Vulnerability in Database Update"
+	title_zh: "检测Golang数据库更新中的越权访问漏洞"
+	type: vuln
+	level: mid
+	risk: ""
+	desc: <<<DESC
+该规则旨在检测Golang应用中存在的水平越权访问（IDOR）漏洞。当应用程序直接使用用户可控的输入（如HTTP请求参数中的`user_id`或`uid`）作为数据库查询或更新的条件，且未在服务端进行严格的权限校验时，存在安全风险。攻击者可以通过篡改请求中的标识符，非法访问或修改其他用户的敏感数据。在本例中，`UpdateProfile`函数直接将传入的`uid`参数用于SQL语句的`WHERE`子句执行更新操作，缺乏对当前会话用户身份与目标资源归属一致性的验证，导致严重的数据完整性与机密性风险。
+DESC
+	rule_id: "e598f0eb-d248-4d01-9fdc-659d8922986d"
+	solution: <<<SOLUTION
+建议在处理涉及用户敏感数据的数据库操作前，实施严格的访问控制检查。具体修复方案包括：1. 避免直接使用客户端传来的用户标识符作为查询条件，应从经过认证的服务端会话（Session）或上下文（Context）中获取当前登录用户的ID。2. 在执行数据库更新或查询前，强制比对会话中的用户ID与请求操作的目标ID是否一致。3. 确保所有敏感操作都经过统一的权限中间件或逻辑层校验，遵循“默认拒绝”的安全原则，防止未授权访问。
+SOLUTION
+	reference: <<<REFERENCE
+https://owasp.org/www-community/attacks/Insecure_Direct_Object_Reference
+REFERENCE
+)
+
+<include("golang-database-sink")> as $db
+<include("golang-user-input")> as $input
+
+$db.Prepare?(*<slice(index=1)> #{until: `*?{have:/(?i)\bwhere\s+(id|user_id|user)\b/}`}->) as $func
+
+$func<getMembers()>.Exec(*<slice(index=4)> as $sink) 
+$sink?{* #{until: `* & $input`}-> } as $mid
+
+alert $mid for {
+	type: "vuln",
+	level: "mid",
+	name: "mid",
+	title: "Golang IDOR Vulnerability in Database Update",
+	title_zh: "Golang数据库更新中的越权访问漏洞",
+	message: "检测到数据库更新操作使用了未经验证的用户输入作为权限控制依据，存在越权访问风险。",
+	risk: "越权访问",
+	desc: <<<DESC
+该规则检测到Golang应用中存在水平越权访问（IDOR）漏洞。在`UpdateProfile`函数中，应用程序直接使用用户可控的输入参数`uid`作为SQL更新语句的条件（`where user_id=?`），而未在服务端验证当前会话用户与目标资源所有者的一致性。攻击者可以通过篡改请求中的`uid`参数，非法更新其他用户的敏感信息（如姓名、城市、电话号码），导致严重的数据完整性破坏和隐私泄露风险。
+DESC
+	solution: <<<SOLUTION
+建议在处理涉及用户敏感数据的数据库操作前，实施严格的访问控制检查。具体修复方案包括：1. 不要直接使用客户端传来的用户标识符（如`uid`）作为查询或更新条件，而应从经过认证的服务端会话（Session）或上下文（Context）中获取当前登录用户的ID。2. 在执行数据库更新前，比对会话中的用户ID与请求操作的目标ID是否一致，若不一致则拒绝操作。3. 确保所有敏感操作都经过统一的权限中间件或逻辑层校验，遵循“默认拒绝”的安全原则。
+SOLUTION
+}
+
+desc(
+	lang: golang
+	alert_mid: 1
+	'file://unsafe.go': <<<UNSAFE
+package idor
+
+import (
+	"database/sql"
+	"html"
+	"regexp"
+
+	"github.com/govwa/util/database"
+)
+
+var DB *sql.DB
+var err error
+
+/*func init(){
+	DB, err = database.Connect()
+	if err != nil{
+		log.Println(err.Error())
+	}
+}*/
+
+type Profile struct {
+	Uid         int
+	Name        string
+	City        string
+	PhoneNumber string
+}
+
+func NewProfile() *Profile {
+	return &Profile{}
+}
+
+func (p *Profile) UpdateProfile(name, city, phoneNumber, uid string) error {
+	DB, err = sql.Open("mysql", dsn)
+	const (
+		sql = `UPDATE Profile 
+		set full_name=?, 
+		city=?, 
+		phone_number=? 
+		where user_id=?`
+	)
+
+	stmt, err := DB.Prepare(sql)
+	if err != nil {
+		return err
+	}
+	res, err := stmt.Exec(name, city, phoneNumber, uid)
+	if err != nil {
+		return err
+	}
+	_, err = res.RowsAffected()
+
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+UNSAFE
+)

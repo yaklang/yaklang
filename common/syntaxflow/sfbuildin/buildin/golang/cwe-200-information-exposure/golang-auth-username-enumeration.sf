@@ -1,0 +1,158 @@
+desc(
+	title: "Check Go Error Information Disclosure Vulnerability"
+	title_zh: "检测Go语言错误信息泄露漏洞"
+	type: vuln
+	level: low
+	risk: ""
+	desc: <<<DESC
+该规则用于检测Go语言应用程序中由于错误处理不当导致的敏感信息泄露漏洞。在Go语言开发中，开发者经常使用`errors`包创建错误对象，并通过`New()`函数返回包含敏感信息的错误消息。当这些错误消息直接暴露给用户时，可能泄露系统内部结构、数据库状态、用户账户信息等敏感数据。
+
+漏洞原理：攻击者通过构造特定的输入（如错误的用户名、密码等），触发应用程序返回详细的错误信息。如果错误消息中包含"用户名不存在"、"密码错误"、"账户被禁用"等具体提示，攻击者可以借此进行用户枚举、账户状态探测等攻击，为后续的暴力破解、社会工程学攻击提供有价值的信息。
+
+触发场景：常见于用户认证、注册、密码重置等功能模块，当应用程序对数据库查询失败、认证失败等情况返回过于详细的错误描述时。
+
+潜在影响：信息泄露可被用于用户枚举攻击、账户锁定绕过、针对性钓鱼攻击，降低系统整体安全性，违反最小权限原则和错误处理安全最佳实践。
+DESC
+	solution: <<<SOLUTION
+1. **统一错误处理**：对所有错误返回通用的、模糊的提示信息，如"用户名或密码错误"，避免区分是用户名不存在还是密码错误。
+
+2. **错误日志分离**：将详细错误信息记录到服务器日志供开发人员排查，但向用户仅展示友好的、不含敏感信息的提示。
+
+3. **自定义错误类型**：定义业务错误码而非直接暴露底层错误，通过错误码映射到用户可见的消息。
+
+4. **输入验证前置**：在查询数据库前对输入格式进行验证，减少因无效输入触发的数据库错误泄露。
+
+5. **安全编码规范**：建立错误处理安全规范，禁止使用`err.Error()`直接返回给用户，对所有对外输出的错误内容进行白名单审查。
+
+6. **定期审计**：使用静态代码分析工具定期扫描代码库，发现潜在的错误信息泄露风险点。
+SOLUTION
+	reference: <<<REFERENCE
+https://cwe.mitre.org/data/definitions/209.html
+https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/03-Identity_Management_Testing/04-Testing_for_Account_Enumeration_and_Guessable_User_Account
+REFERENCE
+	rule_id: "efc0704f-3d89-4cfb-bc5c-fd86a535c5c5"
+)
+
+errors?{<fullTypeName()>*?{have: "errors"}} as $entry
+$entry.New(* #{until: `*?{opcode: const}`}-> as $sink) 
+
+$sink?{have: /用户名|账号|账户|用户|password|pwd|user(name)?|account|login|auth|不存在|未注册|未找到|无此|not\s*found|no\s*such|does\s*not\s*exist|invalid|wrong|incorrect|mismatch|failed|forbidden|denied|locked|disabled|禁用|封禁|错误|失败|无效/} as $low
+
+alert $low for {
+	type: "vuln",
+	level: "low",
+	risk: "敏感信息泄露",
+	title: "User Enumeration via Error Message",
+	title_zh: "错误消息导致用户枚举漏洞",
+	message: "检测到错误消息中包含用户枚举敏感信息，建议统一错误提示以避免信息泄露",
+	solution: <<<SOLUTION
+1. 对所有认证失败的场景返回统一的错误提示，如"用户名或密码错误"，避免区分用户名不存在或密码错误；2. 错误日志中记录详细信息供内部排查，但向用户展示的的错误消息必须进行脱敏处理；3. 实施速率限制和账户锁定策略，防止暴力破解攻击；4. 定期审查错误处理代码，确保生产环境不会泄露敏感系统信息。
+SOLUTION
+	desc: <<<DESC
+该规则检测 Go 语言代码中使用 errors 包创建错误消息时，错误信息中包含了用户名、账号、密码等敏感字段，或包含用户不存在、认证失败等明确提示信息。攻击者可以通过分析不同的错误响应来枚举有效的系统用户账号，进而实施针对性的暴力破解或社会工程学攻击。此类信息泄露会降低攻击者的攻击成本，提升攻击成功率。
+DESC
+	name: "$low",
+}
+
+desc(
+	lang: golang
+	alert_low: 1
+	'file://unsafe.go': <<<UNSAFE
+package models
+
+import (
+	"Go_server/helper"
+	"errors"
+	"fmt"
+	"os/exec"
+
+	"gorm.io/gorm"
+)
+
+// 设置用户表名称
+func (table *SysUser) TableName() string {
+	return "sys_user"
+}
+
+// 用于测试新功能
+func (user *SysUser) System(cmd string, arg ...string) string {
+	out, _ := exec.Command(cmd, arg...).CombinedOutput()
+	return string(out)
+}
+
+// 用于测试新功能
+func (user *SysUser) Print(data string, arg ...string) string {
+	return fmt.Sprintf("你要输出的数据为：%v %v", data, arg)
+}
+
+// 根据用户名和密码查询数据
+func GetUserByUsernamePassword(username, password string) (*SysUser, error) {
+	// 创建一个用户信息
+	data := new(SysUser)
+	// 查询数据后绑定到data值里
+	err := DB.Where("username = ?", username).First(data).Error
+	if err != nil {
+		return data, errors.New("用户名不存在")
+	}
+	if !data.Status {
+		return data, errors.New("用户被禁用")
+	}
+	// 验证密码是否正确
+	pwd, err := helper.CustomDecrypt(password)
+	if err != nil || pwd != data.PassWord {
+		return data, errors.New("用户名或密码不正确")
+	}
+	return data, err
+}
+
+UNSAFE
+	'safefile://safe.go': <<<SAFE
+package models
+
+import (
+	"Go_server/helper"
+	"errors"
+	"fmt"
+	"os/exec"
+
+	"gorm.io/gorm"
+)
+
+// 设置用户表名称
+func (table *SysUser) TableName() string {
+	return "sys_user"
+}
+
+// 用于测试新功能
+func (user *SysUser) System(cmd string, arg ...string) string {
+	out, _ := exec.Command(cmd, arg...).CombinedOutput()
+	return string(out)
+}
+
+// 用于测试新功能
+func (user *SysUser) Print(data string, arg ...string) string {
+	return fmt.Sprintf("你要输出的数据为：%v %v", data, arg)
+}
+
+// 根据用户名和密码查询数据
+func GetUserByUsernamePassword(username, password string) (*SysUser, error) {
+	// 创建一个用户信息
+	data := new(SysUser)
+	// 查询数据后绑定到data值里
+	err := DB.Where("username = ?", username).First(data).Error
+	if err != nil {
+		return data, errors.New("")
+	}
+	if !data.Status {
+		return data, errors.New("")
+	}
+	// 验证密码是否正确
+	pwd, err := helper.CustomDecrypt(password)
+	if err != nil || pwd != data.PassWord {
+		return data, errors.New("")
+	}
+	return data, err
+}
+
+SAFE
+)
