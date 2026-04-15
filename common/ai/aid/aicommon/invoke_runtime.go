@@ -14,13 +14,20 @@ type VerifyNextMovement struct {
 	ID      string `json:"id"`
 }
 
+type EvidenceOperation struct {
+	ID      string `json:"id"`
+	Op      string `json:"op"`
+	Content string `json:"content,omitempty"`
+}
+
 // VerifySatisfactionResult represents the result of user satisfaction verification
 type VerifySatisfactionResult struct {
 	Satisfied          bool                 `json:"satisfied"`            // Whether the user is satisfied
 	Reasoning          string               `json:"reasoning"`            // The reasoning for the satisfaction status
 	CompletedTaskIndex string               `json:"completed_task_index"` // Index of completed task(s), e.g., "1-1" or "1-1,1-2"
 	NextMovements      []VerifyNextMovement `json:"next_movements"`       // AI's next action plan for in-progress status tracking
-	Evidence           string               `json:"evidence"`             // Incremental markdown evidence discovered during execution/verification
+	Evidence           string               `json:"evidence"`             // Legacy: markdown evidence string
+	EvidenceOps        []EvidenceOperation  `json:"evidence_ops"`         // Structured evidence incremental operations
 	OutputFiles        []string             `json:"output_files"`         // File paths created/modified by tool execution, extracted by verify AI
 }
 

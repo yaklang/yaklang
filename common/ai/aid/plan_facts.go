@@ -407,3 +407,129 @@ func syncRootTaskPlanContextDocs(task *AiTask) {
 	base := stripPlanContextBlocks(root.AIStatefulTaskBase.GetUserInput())
 	root.SetUserInput(prependPlanContextDocsToRenderedPlan(base, getTaskPlanFacts(root), getTaskPlanDocument(root), getTaskPlanEvidence(root)))
 }
+
+func buildVerificationCarryoverEvidenceOps(task *AiTask, reasoning string, outputFiles []string) []aicommon.EvidenceOperation {
+	var ops []aicommon.EvidenceOperation
+	taskLabel := formatTaskPlanEvidenceLabel(task)
+
+	reasoning = strings.TrimSpace(reasoning)
+	if reasoning != "" {
+		ops = append(ops, aicommon.EvidenceOperation{
+			Op:      "add",
+			ID:      fmt.Sprintf("verify-%s", task.GetIndex()),
+			Content: fmt.Sprintf("[%s] 核实: %s", taskLabel, reasoning),
+		})
+	}
+
+	normalizedFiles := normalizeTaskPlanOutputFiles(outputFiles)
+	if len(normalizedFiles) > 0 {
+		fileList := strings.Join(normalizedFiles, ", ")
+		ops = append(ops, aicommon.EvidenceOperation{
+			Op:      "add",
+			ID:      fmt.Sprintf("files-%s", task.GetIndex()),
+			Content: fmt.Sprintf("[%s] 交付文件: %s", taskLabel, fileList),
+		})
+	}
+	return ops
+}
+
+func buildSummaryEvidenceOps(task *AiTask, summary string) []aicommon.EvidenceOperation {
+	summary = strings.TrimSpace(summary)
+	if summary == "" {
+		return nil
+	}
+	taskLabel := formatTaskPlanEvidenceLabel(task)
+	return []aicommon.EvidenceOperation{
+		{
+			Op:      "add",
+			ID:      fmt.Sprintf("summary-%s", task.GetIndex()),
+			Content: fmt.Sprintf("[%s] 总结: %s", taskLabel, summary),
+		},
+	}
+}
+
+func applyTaskPlanEvidenceOps(task *AiTask, ops []aicommon.EvidenceOperation) (string, bool) {
+	if task == nil || len(ops) == 0 {
+		return getTaskPlanEvidence(task), false
+	}
+
+	existing := getTaskPlanEvidence(task)
+	lines := parseEvidenceLines(existing)
+
+	for _, op := range ops {
+		id := strings.TrimSpace(op.ID)
+		content := strings.TrimSpace(op.Content)
+		switch strings.ToLower(strings.TrimSpace(op.Op)) {
+		case "add":
+			if content == "" {
+				continue
+			}
+			if id != "" {
+				if idx := findEvidenceLineByID(lines, id); idx >= 0 {
+					lines[idx] = formatEvidenceLine(id, content)
+					continue
+				}
+			}
+			lines = append(lines, formatEvidenceLine(id, content))
+		case "update":
+			if id == "" || content == "" {
+				continue
+			}
+			if idx := findEvidenceLineByID(lines, id); idx >= 0 {
+				lines[idx] = formatEvidenceLine(id, content)
+			} else {
+				lines = append(lines, formatEvidenceLine(id, content))
+			}
+		case "delete":
+			if id == "" {
+				continue
+			}
+			if idx := findEvidenceLineByID(lines, id); idx >= 0 {
+				lines = append(lines[:idx], lines[idx+1:]...)
+			}
+		}
+	}
+
+	merged := strings.TrimSpace(strings.Join(lines, "\n"))
+	merged = strings.TrimSpace(aicommon.ShrinkTextBlockByTokens(merged, planEvidenceTokenBudget))
+	if merged == existing {
+		return merged, false
+	}
+	if task.Coordinator != nil && task.Coordinator.ContextProvider != nil {
+		task.Coordinator.ContextProvider.SetPersistentData(planEvidencePersistentKey, merged)
+	}
+	syncRootTaskPlanContextDocs(task)
+	return merged, true
+}
+
+func parseEvidenceLines(content string) []string {
+	content = strings.TrimSpace(content)
+	if content == "" {
+		return nil
+	}
+	raw := strings.Split(content, "\n")
+	lines := make([]string, 0, len(raw))
+	for _, line := range raw {
+		if trimmed := strings.TrimSpace(line); trimmed != "" {
+			lines = append(lines, trimmed)
+		}
+	}
+	return lines
+}
+
+func findEvidenceLineByID(lines []string, id string) int {
+	prefix := fmt.Sprintf("- [%s] ", id)
+	for i, line := range lines {
+		if strings.HasPrefix(line, prefix) {
+			return i
+		}
+	}
+	return -1
+}
+
+func formatEvidenceLine(id, content string) string {
+	if id == "" {
+		return "- " + content
+	}
+	return fmt.Sprintf("- [%s] %s", id, content)
+}
