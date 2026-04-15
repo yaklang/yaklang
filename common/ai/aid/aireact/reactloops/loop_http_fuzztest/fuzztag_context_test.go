@@ -14,7 +14,7 @@ import (
 func TestGetLoopHTTPFuzzFuzztagReference_LoadsSourceDocument(t *testing.T) {
 	ref := getLoopHTTPFuzzFuzztagReference()
 	require.NotEmpty(t, ref)
-	require.Contains(t, ref, "common/mutate/fuzztag.md")
+	require.Contains(t, ref, "This is the current built-in fuzztag reference.")
 	require.Contains(t, ref, "## fuzztag 可用标签一览")
 	require.Contains(t, ref, "`fuzz:password`")
 	require.Contains(t, ref, "{{payload(pass_top25)}}")
