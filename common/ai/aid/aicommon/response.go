@@ -56,6 +56,9 @@ type AIResponse struct {
 	rawHTTPResponseHeaderMu sync.Mutex
 	rawHTTPResponseHeader   []byte
 	rawHTTPResponseBody     []byte
+
+	httpHeaderReady     chan struct{}
+	httpHeaderReadyOnce sync.Once
 }
 
 func (a *AIResponse) SetResponseStartTime(t time.Time) {
@@ -116,14 +119,41 @@ func (a *AIResponse) GetModelVerboseName() string {
 	return a.modelVerboseName
 }
 
+// WaitForHTTPHeaders blocks until the raw HTTP response headers have been set
+// (via SetRawHTTPResponseData) or the context is cancelled. Returns true if
+// headers arrived, false if the context was cancelled or the response was closed
+// before headers could be set.
+func (a *AIResponse) WaitForHTTPHeaders(ctx context.Context) bool {
+	if a == nil || a.httpHeaderReady == nil {
+		return false
+	}
+	select {
+	case <-a.httpHeaderReady:
+		return true
+	default:
+	}
+	select {
+	case <-a.httpHeaderReady:
+		return true
+	case <-ctx.Done():
+		return false
+	}
+}
+
 func (a *AIResponse) SetRawHTTPResponseData(header []byte, body []byte) {
 	if a == nil {
 		return
 	}
 	a.rawHTTPResponseHeaderMu.Lock()
-	defer a.rawHTTPResponseHeaderMu.Unlock()
 	a.rawHTTPResponseHeader = header
 	a.rawHTTPResponseBody = body
+	a.rawHTTPResponseHeaderMu.Unlock()
+
+	a.httpHeaderReadyOnce.Do(func() {
+		if a.httpHeaderReady != nil {
+			close(a.httpHeaderReady)
+		}
+	})
 }
 
 func (a *AIResponse) GetRawHTTPResponseDump() string {
@@ -399,12 +429,16 @@ func (r *AIResponse) Close() {
 
 	defer func() {
 		if err := recover(); err != nil {
-			// Handle panic if necessary, e.g., log it
 			log.Errorf("recover from panic when closing AIResponse: %v", err)
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
 
+	r.httpHeaderReadyOnce.Do(func() {
+		if r.httpHeaderReady != nil {
+			close(r.httpHeaderReady)
+		}
+	})
 	r.ch.Close()
 }
 
@@ -423,6 +457,7 @@ func NewAIResponse(caller AICallerConfigIf) *AIResponse {
 			}
 			caller.CallAIResponseOutputFinishedCallback(s)
 		},
+		httpHeaderReady: make(chan struct{}),
 	}
 }
 
@@ -526,5 +561,6 @@ func newUnboundAIResponse() *AIResponse {
 		ch:                  chanx.NewUnlimitedChan[*AIResponseOutputStream](context.TODO(), 2),
 		consumptionCallback: func(current int) {},
 		onOutputFinished:    func(s string) {},
+		httpHeaderReady:     make(chan struct{}),
 	}
 }

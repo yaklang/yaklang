@@ -150,26 +150,43 @@ func TestRPM_UsesExternalModelName(t *testing.T) {
 	assert.True(t, allowed4, "internal model name should use default RPM, not memfit override")
 }
 
-// TestRPM_FreeUsersShareBucket verifies that all free users share one RPM bucket
-// under the "free-user" key.
-func TestRPM_FreeUsersShareBucket(t *testing.T) {
+// TestRPM_FreeUsersPerModelBucket verifies that free users have independent
+// RPM buckets per model so that a high-RPM model does not block a low-RPM model.
+func TestRPM_FreeUsersPerModelBucket(t *testing.T) {
 	rl := NewChatRateLimiter()
 	defer rl.Stop()
 	rl.SetDefaultRPM(3)
 
-	// All free users share apiKeyForStat = "free-user"
 	freeKey := "free-user"
 
-	allowed1, _ := rl.CheckRateLimit(freeKey, "model-a-free")
-	assert.True(t, allowed1)
+	for i := 0; i < 3; i++ {
+		allowed, _ := rl.CheckRateLimit(freeKey, "model-a-free")
+		assert.True(t, allowed, "model-a-free request %d should be allowed", i+1)
+	}
 
-	allowed2, _ := rl.CheckRateLimit(freeKey, "model-b-free")
-	assert.True(t, allowed2)
+	denied, _ := rl.CheckRateLimit(freeKey, "model-a-free")
+	assert.False(t, denied, "model-a-free 4th request should be denied (RPM=3)")
 
-	allowed3, _ := rl.CheckRateLimit(freeKey, "model-c-free")
-	assert.True(t, allowed3)
+	allowed, _ := rl.CheckRateLimit(freeKey, "model-b-free")
+	assert.True(t, allowed, "model-b-free should have its own bucket and still be allowed")
+}
 
-	// 4th request from ANY free model should be denied (shared bucket, RPM=3)
-	allowed4, _ := rl.CheckRateLimit(freeKey, "model-a-free")
-	assert.False(t, allowed4, "4th free user request should be denied (shared RPM=3)")
+// TestRPM_HighRPMModelDoesNotBlockLowRPM reproduces the original bug:
+// a high-RPM model filling the shared bucket would permanently block a low-RPM model.
+func TestRPM_HighRPMModelDoesNotBlockLowRPM(t *testing.T) {
+	rl := NewChatRateLimiter()
+	defer rl.Stop()
+	rl.SetDefaultRPM(100)
+	rl.SetModelRPM("light-free", 999999)
+	rl.SetModelRPM("q1-free", 3)
+
+	freeKey := "free-user"
+
+	for i := 0; i < 50; i++ {
+		allowed, _ := rl.CheckRateLimit(freeKey, "light-free")
+		assert.True(t, allowed, "light-free request %d should be allowed", i+1)
+	}
+
+	allowed, _ := rl.CheckRateLimit(freeKey, "q1-free")
+	assert.True(t, allowed, "q1-free should not be blocked by light-free requests")
 }

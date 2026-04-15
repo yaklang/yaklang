@@ -115,23 +115,25 @@ func TestChatCompletion_FreeUser_RPM2_ThirdDenied(t *testing.T) {
 	assert.Contains(t, resp3, "429", "third request should be 429 (RPM=2 exceeded)")
 }
 
-func TestChatCompletion_FreeUser_DifferentModels_ShareKey(t *testing.T) {
-	persistDBRateLimitRPM(t, 2)
+func TestChatCompletion_FreeUser_DifferentModels_IndependentBucket(t *testing.T) {
+	persistDBRateLimitRPM(t, 1)
 	defer resetDBRateLimitRPM(t)
 
 	cfg := NewServerConfig()
 	defer cfg.Close()
-	cfg.chatRateLimiter.SetDefaultRPM(2)
+	cfg.chatRateLimiter.SetDefaultRPM(1)
 
 	rawA := buildFreeModelRawHTTP("model-a-free")
 	rawB := buildFreeModelRawHTTP("model-b-free")
 
-	// Free users share the "free-user" API key stat, so both models count toward the same RPM
-	_ = sendChatCompletionDirect(t, cfg, rawA)
-	_ = sendChatCompletionDirect(t, cfg, rawB)
+	resp1 := sendChatCompletionDirect(t, cfg, rawA)
+	assert.NotContains(t, resp1, "429", "model-a-free first request should pass")
 
-	resp3 := sendChatCompletionDirect(t, cfg, rawA)
-	assert.Contains(t, resp3, "429", "third free-user request should be 429 (shared RPM bucket)")
+	resp2 := sendChatCompletionDirect(t, cfg, rawA)
+	assert.Contains(t, resp2, "429", "model-a-free second request should be 429 (RPM=1)")
+
+	resp3 := sendChatCompletionDirect(t, cfg, rawB)
+	assert.NotContains(t, resp3, "429", "model-b-free should have independent bucket and pass")
 }
 
 // ==================== Unit: Rate limiter per-key independence (no I/O) ====================

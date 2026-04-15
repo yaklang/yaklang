@@ -1,12 +1,21 @@
 package aicommon
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+func is429Response(ctx context.Context, rsp *AIResponse) bool {
+	if rsp == nil {
+		return false
+	}
+	rsp.WaitForHTTPHeaders(ctx)
+	return rsp.GetHTTPStatusCode() == 429
+}
 
 func CallAITransaction(
 	c AICallerConfigIf,
@@ -38,7 +47,7 @@ func CallAITransaction(
 			saver = handler
 		}))
 
-	for i := int64(0); i < trcRetry; i++ {
+	for i := int64(0); i < trcRetry; {
 		if c.IsCtxDone() {
 			return utils.Errorf("context is done, cannot continue transaction")
 		}
@@ -60,12 +69,24 @@ func CallAITransaction(
 		if err != nil {
 			lastErr = err
 			lastRsp = rsp
-			emitter.EmitError("call ai api error (attempt %d/%d): %v", i+1, trcRetry, err)
+
+			if is429Response(c.GetContext(), rsp) {
+				emitter.EmitWarning("429 rate limit detected in transaction layer (seq=%d), will retry without counting attempt", seq)
+				select {
+				case <-c.GetContext().Done():
+					return err
+				case <-time.After(5 * time.Second):
+					continue
+				}
+			}
+
+			i++
+			emitter.EmitError("call ai api error (attempt %d/%d): %v", i, trcRetry, err)
 			select {
 			case <-c.GetContext().Done():
 				return err
 			case <-time.After(100 * time.Millisecond):
-				emitter.EmitWarning("call ai transaction retry (attempt %d/%d)", i+1, trcRetry)
+				emitter.EmitWarning("call ai transaction retry (attempt %d/%d)", i, trcRetry)
 				continue
 			}
 		}
@@ -76,12 +97,13 @@ func CallAITransaction(
 		postHandlerErr = postHandler(rsp)
 		if postHandlerErr != nil {
 			lastErr = postHandlerErr
-			emitter.EmitError("ai transaction postHandler error (attempt %d/%d): %v", i+1, trcRetry, postHandlerErr)
+			i++
+			emitter.EmitError("ai transaction postHandler error (attempt %d/%d): %v", i, trcRetry, postHandlerErr)
 			select {
 			case <-c.GetContext().Done():
 				return postHandlerErr
 			case <-time.After(100 * time.Millisecond):
-				emitter.EmitWarning("call ai transaction retry (attempt %d/%d)", i+1, trcRetry)
+				emitter.EmitWarning("call ai transaction retry (attempt %d/%d)", i, trcRetry)
 				continue
 			}
 		}
