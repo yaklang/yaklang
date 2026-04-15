@@ -171,6 +171,7 @@ func handleLoadTool(
 	loop.PushSatisfactionRecordWithCompletedTaskIndex(
 		verifyResult.Satisfied, verifyResult.Reasoning,
 		verifyResult.CompletedTaskIndex, verifyResult.NextMovements, verifyResult.Evidence, verifyResult.OutputFiles,
+		verifyResult.EvidenceOps,
 	)
 	if verifyResult.Satisfied {
 		op.Exit()

@@ -300,6 +300,7 @@ Example - Sequential file operations(With AI-Tag tags):
 				verifyResult.NextMovements,
 				verifyResult.Evidence,
 				verifyResult.OutputFiles,
+				verifyResult.EvidenceOps,
 			)
 
 			if verifyResult.Satisfied {

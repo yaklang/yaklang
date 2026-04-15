@@ -101,42 +101,55 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 				taskID = r.GetCurrentTask().GetId()
 			}
 
-			emitMarkdownField := func(nodeID string, timelineType string) func(key string, read io.Reader) {
-				return func(key string, read io.Reader) {
-					var out bytes.Buffer
-					var outputReader = io.TeeReader(utils.JSONStringReader(utils.UTF8Reader(read)), &out)
-					var event *schema.AiOutputEvent
-					var err error
-					event, err = r.Emitter.EmitTextMarkdownStreamEvent(
-						nodeID,
-						outputReader,
-						taskID,
-						func() {
-							if out.Len() > 0 {
-								r.AddToTimeline(timelineType, out.String())
-							}
-						},
-					)
-					if err != nil {
-						log.Errorf("failed to emit %s stream event: %v", key, err)
-						return
-					}
-					captureReferenceAnchor(event)
-				}
-			}
-
-			action, err := aicommon.ExtractValidActionFromStream(
+		action, err := aicommon.ExtractValidActionFromStream(
 				ctx,
 				stream, "verify-satisfaction",
 				aicommon.WithActionNonce(nonce),
 				aicommon.WithActionTagToKey("EVIDENCE", "evidence"),
 				aicommon.WithActionFieldStreamHandler(
-					[]string{"evidence"},
-					emitMarkdownField("plan-evidence", "verification_evidence"),
-				),
-				aicommon.WithActionFieldStreamHandler(
 					[]string{"reasoning"},
 					createReasonCallback("Reasoning"),
+				),
+				aicommon.WithActionFieldStreamHandler(
+					[]string{"evidence"},
+					func(key string, rd io.Reader) {
+						trimmedReader := utils.NewTrimLeftReader(utils.UTF8Reader(rd))
+						peekedReader := utils.NewPeekableReader(trimmedReader)
+						firstByte, err := peekedReader.Peek(1)
+						if err != nil && len(firstByte) == 0 {
+							log.Infof("no evidence provided in verification result, skipping evidence stream handling")
+							return
+						}
+
+						var displayReader io.Reader
+						if len(firstByte) > 0 && firstByte[0] == '[' {
+							pr, pw := utils.NewBufPipe(nil)
+							go func() {
+								defer pw.Close()
+								if err := writeEvidenceDisplayStream(peekedReader, pw); err != nil {
+									log.Errorf("failed to stream evidence display: %v", err)
+								}
+							}()
+							displayReader = pr
+						} else {
+							displayReader = peekedReader
+						}
+
+						var out bytes.Buffer
+						var outputReader = io.TeeReader(displayReader, &out)
+						var event *schema.AiOutputEvent
+						event, err = r.Emitter.EmitDefaultStreamEvent(
+							"evidence",
+							outputReader,
+							rsp.GetTaskIndex(),
+							func() {},
+						)
+						if err != nil {
+							log.Errorf("failed to emit evidence stream event: %v", err)
+							return
+						}
+						captureReferenceAnchor(event)
+					},
 				),
 				aicommon.WithActionFieldStreamHandler(
 					[]string{"next_movements"},
@@ -187,8 +200,17 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 			result.Satisfied = action.GetBool("user_satisfied")
 			result.Reasoning = action.GetString("reasoning")
 			result.CompletedTaskIndex = action.GetString("completed_task_index")
-			result.Evidence = aicommon.NormalizeConcreteEvidenceMarkdown(action.GetString("evidence"))
+			result.Evidence = strings.TrimSpace(action.GetString("evidence"))
+			result.EvidenceOps = normalizeEvidenceOperations(action)
 			result.OutputFiles = action.GetStringSlice("output_files")
+
+			if len(result.EvidenceOps) > 0 {
+				var opSummary []string
+				for _, eop := range result.EvidenceOps {
+					opSummary = append(opSummary, fmt.Sprintf("%s[%s]", strings.ToUpper(eop.Op), eop.ID))
+				}
+				r.AddToTimeline("evidence_ops", strings.Join(opSummary, "; "))
+			}
 
 			nextMovements := normalizeVerifyNextMovements(action)
 			// Store next_movements in result for status tracking
@@ -347,6 +369,126 @@ func formatNextMovementDisplayLine(movement aicommon.VerifyNextMovement) string 
 		}
 		return fmt.Sprintf("- [%s]: [id: %s]: %s", label, id, content)
 	}
+}
+
+func writeEvidenceDisplayStream(reader io.Reader, writer io.Writer) error {
+	decoder := json.NewDecoder(reader)
+	token, err := decoder.Token()
+	if err != nil {
+		return err
+	}
+	delim, ok := token.(json.Delim)
+	if !ok || delim != '[' {
+		return utils.Errorf("evidence is not a JSON array")
+	}
+
+	firstLine := true
+	for decoder.More() {
+		var op aicommon.EvidenceOperation
+		if err := decoder.Decode(&op); err != nil {
+			return err
+		}
+		line := formatEvidenceOperationDisplayLine(op)
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		if !firstLine {
+			if _, err := writer.Write([]byte("\n")); err != nil {
+				return err
+			}
+		}
+		firstLine = false
+		if _, err := io.WriteString(writer, line); err != nil {
+			return err
+		}
+	}
+	_, err = decoder.Token()
+	return err
+}
+
+func formatEvidenceOperationDisplayLine(op aicommon.EvidenceOperation) string {
+	id := strings.TrimSpace(op.ID)
+	content := strings.TrimSpace(op.Content)
+	opStr := strings.ToUpper(strings.TrimSpace(op.Op))
+	if opStr == "" {
+		opStr = "?"
+	}
+	switch strings.ToLower(strings.TrimSpace(op.Op)) {
+	case "add":
+		if id == "" && content == "" {
+			return ""
+		}
+		if id == "" {
+			return fmt.Sprintf("- [+EVIDENCE]: %s", content)
+		}
+		if content == "" {
+			return fmt.Sprintf("- [+EVIDENCE]: [id: %s]", id)
+		}
+		firstLine := strings.SplitN(content, "\n", 2)[0]
+		return fmt.Sprintf("- [+EVIDENCE]: [id: %s]: %s", id, firstLine)
+	case "update":
+		if id == "" {
+			return ""
+		}
+		if content == "" {
+			return fmt.Sprintf("- [~EVIDENCE]: [id: %s]", id)
+		}
+		firstLine := strings.SplitN(content, "\n", 2)[0]
+		return fmt.Sprintf("- [~EVIDENCE]: [id: %s]: %s", id, firstLine)
+	case "delete":
+		if id == "" {
+			return ""
+		}
+		return fmt.Sprintf("- [-EVIDENCE]: [id: %s]", id)
+	default:
+		if id == "" && content == "" {
+			return ""
+		}
+		if id == "" {
+			return fmt.Sprintf("- [%s EVIDENCE]: %s", opStr, content)
+		}
+		if content == "" {
+			return fmt.Sprintf("- [%s EVIDENCE]: [id: %s]", opStr, id)
+		}
+		firstLine := strings.SplitN(content, "\n", 2)[0]
+		return fmt.Sprintf("- [%s EVIDENCE]: [id: %s]: %s", opStr, id, firstLine)
+	}
+}
+
+func normalizeEvidenceOperations(action *aicommon.Action) []aicommon.EvidenceOperation {
+	if action == nil {
+		return nil
+	}
+	evidenceArray := action.GetInvokeParamsArray("evidence")
+	if len(evidenceArray) == 0 {
+		legacy := strings.TrimSpace(action.GetString("evidence"))
+		if legacy == "" {
+			return nil
+		}
+		return []aicommon.EvidenceOperation{{
+			ID:      "legacy_evidence",
+			Op:      "add",
+			Content: legacy,
+		}}
+	}
+	ops := make([]aicommon.EvidenceOperation, 0, len(evidenceArray))
+	for _, item := range evidenceArray {
+		if item == nil {
+			continue
+		}
+		op := strings.ToLower(strings.TrimSpace(item.GetString("op")))
+		id := strings.TrimSpace(item.GetString("id"))
+		content := strings.TrimSpace(item.GetString("content"))
+		if op == "" || id == "" {
+			continue
+		}
+		ops = append(ops, aicommon.EvidenceOperation{
+			ID:      id,
+			Op:      op,
+			Content: content,
+		})
+	}
+	return ops
 }
 
 func normalizeVerifyNextMovements(action *aicommon.Action) []aicommon.VerifyNextMovement {

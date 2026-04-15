@@ -79,19 +79,20 @@ func (t *AiTask) execute() error {
 			// Check if completed_task_index indicates this task should be marked as done
 			// This provides an additional mechanism to end tasks beyond just isDone
 			lastRecord := loop.GetLastSatisfactionRecordFull()
-			var summary, completedTaskIndex, nextMovements, evidence string
+			var summary, completedTaskIndex, nextMovements string
 			var outputFiles []string
 			if lastRecord != nil {
 				summary = lastRecord.Reason
 				completedTaskIndex = lastRecord.CompletedTaskIndex
 				nextMovements = aicommon.FormatVerifyNextMovementsSummary(lastRecord.NextMovements)
-				evidence = strings.TrimSpace(lastRecord.Evidence)
 				outputFiles = append(outputFiles, lastRecord.OutputFiles...)
-				carryover := buildTaskPlanVerificationCarryoverMarkdown(t, summary, outputFiles)
-				combinedEvidence := mergePlanContextDocuments(evidence, carryover)
-				if combinedEvidence != "" {
-					if merged, changed := appendTaskPlanEvidence(t, combinedEvidence); changed {
-						log.Infof("task %s appended verification carryover into plan evidence, length=%d", t.Index, len(merged))
+
+				var allOps []aicommon.EvidenceOperation
+				allOps = append(allOps, lastRecord.EvidenceOps...)
+				allOps = append(allOps, buildVerificationCarryoverEvidenceOps(t, summary, outputFiles)...)
+				if len(allOps) > 0 {
+					if merged, changed := applyTaskPlanEvidenceOps(t, allOps); changed {
+						log.Infof("task %s applied evidence operations, length=%d", t.Index, len(merged))
 					}
 				}
 			}
@@ -435,8 +436,11 @@ func (t *AiTask) generateTaskSummary(summary, nextMovements string) error {
 		displaySummary = strings.TrimSpace(taskSummary)
 	}
 	if displaySummary != "" {
-		if merged, changed := appendTaskPlanEvidence(t, buildTaskPlanSummaryCarryoverMarkdown(t, displaySummary)); changed {
-			log.Infof("task %s appended task summary into plan evidence, length=%d", t.Index, len(merged))
+		summaryOps := buildSummaryEvidenceOps(t, displaySummary)
+		if len(summaryOps) > 0 {
+			if merged, changed := applyTaskPlanEvidenceOps(t, summaryOps); changed {
+				log.Infof("task %s applied summary evidence ops, length=%d", t.Index, len(merged))
+			}
 		}
 	}
 
