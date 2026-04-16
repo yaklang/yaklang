@@ -26,6 +26,7 @@ func (n *NodeBase) heartbeat() error {
 		ObservedAt:               time.Now().UTC(),
 		HeartbeatIntervalSeconds: durationToWholeSeconds(n.heartbeatInterval),
 		ActiveAttempts:           cloneActiveAttemptHeartbeats(status.ActiveAttempts),
+		HostInfo:                 n.hostInfoSnapshot(),
 	})
 }
 
