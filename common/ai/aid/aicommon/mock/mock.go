@@ -90,6 +90,8 @@ func (m *MockedAIConfig) GetContextProviderManager() *aicommon.ContextProviderMa
 	return aicommon.NewContextProviderManager()
 }
 
+func (m *MockedAIConfig) AppendRelatedRuntimeID(string) {}
+
 func (m *MockedAIConfig) GetSessionEvidenceRendered() string {
 	return ""
 }

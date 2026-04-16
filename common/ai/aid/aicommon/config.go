@@ -428,6 +428,7 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 		}
 	}
 	config.loadSkillMDForgesIntoSkillLoader()
+	config.AppendRelatedRuntimeID(config.GetRuntimeId())
 
 	return config
 }
@@ -985,6 +986,19 @@ func (c *Config) SaveRecentToolCache() {
 	cacheJSON := tm.ExportRecentToolCache()
 	if err := yakit.UpdateAIAgentRuntimeRecentToolsCache(db, c.PersistentSessionId, cacheJSON); err != nil {
 		log.Warnf("failed to save recent tool cache for session [%s]: %v", c.PersistentSessionId, err)
+	}
+}
+
+func (c *Config) AppendRelatedRuntimeID(runtimeID string) {
+	if c == nil || c.PersistentSessionId == "" {
+		return
+	}
+	db := c.GetDB()
+	if db == nil {
+		return
+	}
+	if err := yakit.AppendAISessionMetaRelatedRuntimeID(db, c.PersistentSessionId, runtimeID); err != nil {
+		log.Warnf("failed to append related runtime id for session [%s]: %v", c.PersistentSessionId, err)
 	}
 }
 

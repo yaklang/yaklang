@@ -19,10 +19,10 @@ type transactionTestConfig struct {
 	*KeyValueConfig
 	*BaseInteractiveHandler
 	*BaseCheckpointableStorage
-	ctx       context.Context
-	emitter   *Emitter
-	idSeq     int64
-	retryMax  int64
+	ctx      context.Context
+	emitter  *Emitter
+	idSeq    int64
+	retryMax int64
 }
 
 var _ AICallerConfigIf = (*transactionTestConfig)(nil)
@@ -41,11 +41,15 @@ func newTransactionTestConfig(ctx context.Context) *transactionTestConfig {
 	}
 }
 
-func (t *transactionTestConfig) CallAI(req *AIRequest) (*AIResponse, error)                { panic("unused") }
-func (t *transactionTestConfig) CallSpeedPriorityAI(req *AIRequest) (*AIResponse, error)   { return t.CallAI(req) }
-func (t *transactionTestConfig) CallQualityPriorityAI(req *AIRequest) (*AIResponse, error) { return t.CallAI(req) }
-func (t *transactionTestConfig) AcquireId() int64                     { return atomic.AddInt64(&t.idSeq, 1) }
-func (t *transactionTestConfig) GetRuntimeId() string                 { return "txn-test-runtime" }
+func (t *transactionTestConfig) CallAI(req *AIRequest) (*AIResponse, error) { panic("unused") }
+func (t *transactionTestConfig) CallSpeedPriorityAI(req *AIRequest) (*AIResponse, error) {
+	return t.CallAI(req)
+}
+func (t *transactionTestConfig) CallQualityPriorityAI(req *AIRequest) (*AIResponse, error) {
+	return t.CallAI(req)
+}
+func (t *transactionTestConfig) AcquireId() int64     { return atomic.AddInt64(&t.idSeq, 1) }
+func (t *transactionTestConfig) GetRuntimeId() string { return "txn-test-runtime" }
 func (t *transactionTestConfig) IsCtxDone() bool {
 	select {
 	case <-t.ctx.Done():
@@ -70,10 +74,11 @@ func (t *transactionTestConfig) RetryPromptBuilder(prompt string, err error) str
 }
 func (t *transactionTestConfig) GetEmitter() *Emitter                            { return t.emitter }
 func (t *transactionTestConfig) NewAIResponse() *AIResponse                      { return NewAIResponse(t) }
-func (t *transactionTestConfig) CallAIResponseOutputFinishedCallback(string)      {}
-func (t *transactionTestConfig) GetAiToolManager() *buildinaitools.AiToolManager  { return nil }
-func (t *transactionTestConfig) OriginOptions() []ConfigOption                    { return nil }
-func (t *transactionTestConfig) GetOrCreateWorkDir() string                       { return "" }
+func (t *transactionTestConfig) CallAIResponseOutputFinishedCallback(string)     {}
+func (t *transactionTestConfig) GetAiToolManager() *buildinaitools.AiToolManager { return nil }
+func (t *transactionTestConfig) OriginOptions() []ConfigOption                   { return nil }
+func (t *transactionTestConfig) GetOrCreateWorkDir() string                      { return "" }
+func (t *transactionTestConfig) AppendRelatedRuntimeID(string)                   {}
 func (t *transactionTestConfig) GetContextProviderManager() *ContextProviderManager {
 	return NewContextProviderManager()
 }

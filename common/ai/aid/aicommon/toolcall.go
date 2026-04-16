@@ -652,6 +652,7 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 	}
 
 	callToolId := t.callToolId
+	t.config.AppendRelatedRuntimeID(callToolId)
 
 	toolResult := &aitool.ToolResult{}
 	defer t.emitter.EmitToolCallSummary(t.callToolId, SummaryRank(t.task, toolResult))
