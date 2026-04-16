@@ -13,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/yakgit/yakdiff"
 )
 
 const (
@@ -37,7 +38,7 @@ type loopHTTPFuzzInterestingSample struct {
 	RequestSummary  string
 	ResponseSummary string
 	RequestDiff     string
-	ResponseDigest  string
+	ResponsePreview string
 	ResponseRaw     string
 	ResponseDiff    string
 }
@@ -59,7 +60,7 @@ type loopHTTPFuzzProcessedResult struct {
 	RequestSummary  string
 	ResponseSummary string
 	RequestDiff     string
-	ResponseDigest  string
+	ResponsePreview string
 	HiddenIndex     string
 	StatusCode      int
 	BodyLength      int
@@ -222,13 +223,19 @@ func (r *loopHTTPFuzzReportData) observeDetailedResult(resultIndex int, processe
 
 // buildLoopHTTPFuzzOverviewReport 负责渲染固定概况段。
 // 这部分内容不会参与压缩，避免每次压缩都重复处理稳定的概况信息。
-func buildLoopHTTPFuzzOverviewReport(actionName string, stats *loopHTTPFuzzOverviewStats) string {
+// 除了固定统计外，这里也补充本轮 fuzz 的关键参数，方便直接看出“测了谁、怎么测的”。
+func buildLoopHTTPFuzzOverviewReport(actionName string, paramSummary string, stats *loopHTTPFuzzOverviewStats) string {
 	if stats == nil {
 		return ""
 	}
 
 	var out strings.Builder
 	out.WriteString(fmt.Sprintf("=== Fuzz Overview for %s ===\n", actionName))
+	if strings.TrimSpace(paramSummary) != "" {
+		out.WriteString("Fuzz Parameters:\n")
+		out.WriteString(utils.PrefixLines(utils.ShrinkTextBlock(strings.TrimSpace(paramSummary), 600), "- "))
+		out.WriteByte('\n')
+	}
 	out.WriteString(fmt.Sprintf("Total Requests: %d\n", stats.TotalRequests))
 	out.WriteString(fmt.Sprintf("Failed Requests: %d\n", stats.FailedRequests))
 	out.WriteString(fmt.Sprintf("Saved HTTPFlows: %d\n", stats.SavedHTTPFlowCount))
@@ -274,7 +281,7 @@ func buildLoopHTTPFuzzLargeRunAnalysisReport(stats *loopHTTPFuzzOverviewStats) s
 	var out strings.Builder
 	out.WriteString("=== Large-Run Analysis ===\n")
 	wroteContent := false
-	if stats.shouldUseResponseLengthAnalysis() && len(stats.ResponseLengthGroups) > 0 {
+	if len(stats.ResponseLengthGroups) > 0 {
 		wroteContent = true
 		out.WriteString("Response Length Groups:\n")
 		for _, group := range stats.sortedResponseLengthGroups() {
@@ -299,8 +306,17 @@ func buildLoopHTTPFuzzLargeRunAnalysisReport(stats *loopHTTPFuzzOverviewStats) s
 				if group.IsBaseline && strings.TrimSpace(group.BaselineLabel) != "" {
 					out.WriteString(fmt.Sprintf("  %s\n", group.BaselineLabel))
 				}
+				if group.IsBaseline && strings.TrimSpace(group.Sample.ResponseRaw) != "" {
+					out.WriteString("  Baseline Response Packet:\n")
+					out.WriteString(utils.PrefixLines(utils.ShrinkTextBlock(group.Sample.ResponseRaw, 600), "    "))
+					out.WriteByte('\n')
+				}
 				if strings.TrimSpace(group.Sample.ResponseDiff) != "" {
-					out.WriteString("  Sample Diff From Baseline:\n")
+					if group.IsBaseline {
+						out.WriteString("  Baseline Representative Response:\n")
+					} else {
+						out.WriteString("  Sample Diff From Baseline:\n")
+					}
 					out.WriteString(utils.PrefixLines(utils.ShrinkTextBlock(group.Sample.ResponseDiff, 400), "    "))
 					out.WriteByte('\n')
 				}
@@ -333,9 +349,9 @@ func buildLoopHTTPFuzzLargeRunAnalysisReport(stats *loopHTTPFuzzOverviewStats) s
 				out.WriteString(utils.PrefixLines(utils.ShrinkTextBlock(sample.RequestDiff, 240), "     "))
 				out.WriteByte('\n')
 			}
-			if sample.ResponseDigest != "" {
+			if sample.ResponsePreview != "" {
 				out.WriteString("   Response Digest:\n")
-				out.WriteString(utils.PrefixLines(utils.ShrinkTextBlock(sample.ResponseDigest, 240), "     "))
+				out.WriteString(utils.PrefixLines(utils.ShrinkTextBlock(sample.ResponsePreview, 240), "     "))
 				out.WriteByte('\n')
 			}
 		}
@@ -382,7 +398,7 @@ func appendLoopHTTPFuzzRenderedDetailedResult(out *strings.Builder, resultIndex 
 		out.WriteString(fmt.Sprintf("Saved HTTPFlow: %s\n", processed.HiddenIndex))
 	}
 	out.WriteString(fmt.Sprintf("Request Changes:\n%s\n", processed.RequestDiff))
-	out.WriteString(fmt.Sprintf("Response Summary:\n%s\n", processed.ResponseDigest))
+	out.WriteString(fmt.Sprintf("Response Summary:\n%s\n", processed.ResponsePreview))
 	out.WriteString("Request Packet:\n")
 	out.WriteString(processed.RequestRaw)
 	out.WriteString("\nResponse Packet:\n")
@@ -506,7 +522,7 @@ func (s *loopHTTPFuzzOverviewStats) finalizeResponseLengthGroups() {
 		if group.IsBaseline {
 			group.BaselineLabel = fmt.Sprintf("Baseline group selected by dominant body length: %d bytes (%d responses).", group.BodyLength, group.Count)
 			s.BaselineBodyLength = group.BodyLength
-			group.Sample.ResponseDiff = "  (baseline representative response)"
+			group.Sample.ResponseDiff = "  (representative baseline response)"
 			continue
 		}
 		group.Sample.ResponseDiff = buildLoopHTTPFuzzResponseDiffFromBaseline(baselineGroup.Sample.ResponseRaw, group.Sample.ResponseRaw)
@@ -573,10 +589,8 @@ func buildLoopHTTPFuzzProgressSnapshot(actionName string, stats *loopHTTPFuzzOve
 	if statusPreview := formatLoopHTTPFuzzTopStatusCounts(stats.StatusCounts, 3); statusPreview != "" {
 		out.WriteString(fmt.Sprintf("，状态分布 %s", statusPreview))
 	}
-	if stats.shouldUseResponseLengthAnalysis() {
-		if lengthPreview := stats.responseLengthPreview(3); lengthPreview != "" {
-			out.WriteString(fmt.Sprintf("，长度分布 %s", lengthPreview))
-		}
+	if lengthPreview := stats.responseLengthPreview(3); lengthPreview != "" {
+		out.WriteString(fmt.Sprintf("，长度分布 %s", lengthPreview))
 	}
 	if len(stats.InterestingSamples) > 0 {
 		out.WriteString(fmt.Sprintf("，可疑样本 %d 个", len(stats.InterestingSamples)))
@@ -606,7 +620,7 @@ func buildLoopHTTPFuzzProcessedResult(resultIndex int, result *mutate.HttpResult
 	requestURL, requestSummary := buildHTTPRequestStreamSummary(requestRaw, result.Request.TLS != nil)
 	responseSummary := buildHTTPResponseStreamSummary(responseRaw, requestURL)
 	requestDiff := compareRequests(originalRequest, requestRaw)
-	responseDigest := summarizeResponse(responseRaw)
+	responsePreview := summarizeResponse(responseRaw)
 	statusCode := getStatusFromResponse(responseRaw)
 	_, responseBody := lowhttp.SplitHTTPPacketFast([]byte(responseRaw))
 	bodyLength := len(responseBody)
@@ -622,7 +636,7 @@ func buildLoopHTTPFuzzProcessedResult(resultIndex int, result *mutate.HttpResult
 		RequestSummary:  requestSummary,
 		ResponseSummary: responseSummary,
 		RequestDiff:     requestDiff,
-		ResponseDigest:  responseDigest,
+		ResponsePreview: responsePreview,
 		HiddenIndex:     hiddenIndex,
 		StatusCode:      statusCode,
 		BodyLength:      bodyLength,
@@ -639,7 +653,7 @@ func buildLoopHTTPFuzzProcessedResult(resultIndex int, result *mutate.HttpResult
 			RequestSummary:  requestSummary,
 			ResponseSummary: responseSummary,
 			RequestDiff:     requestDiff,
-			ResponseDigest:  responseDigest,
+			ResponsePreview: responsePreview,
 			ResponseRaw:     responseRaw,
 		},
 	}
@@ -965,7 +979,7 @@ func executeFuzzAndCompare(loop *reactloops.ReActLoop, fuzzResult mutate.FuzzHTT
 		loop.Set("representative_httpflow_hidden_index", representativeHiddenIndex)
 	}
 
-	overviewReport := buildLoopHTTPFuzzOverviewReport(actionName, overview)
+	overviewReport := buildLoopHTTPFuzzOverviewReport(actionName, paramSummary, overview)
 	analysisSection := buildLoopHTTPFuzzAnalysisSection(overview, reportData)
 
 	loop.Set("diff_result_compressed", "")
@@ -1178,36 +1192,15 @@ func buildLoopHTTPFuzzVerificationSummary(verifyResult *aicommon.VerifySatisfact
 
 // compareRequests 用于对比两个 HTTP 请求，返回逐行差异。
 func compareRequests(original, modified string) string {
-	originalLines := strings.Split(strings.TrimSpace(original), "\n")
-	modifiedLines := strings.Split(strings.TrimSpace(modified), "\n")
-
-	var diff strings.Builder
-	maxLines := max(len(originalLines), len(modifiedLines))
-
-	for i := 0; i < maxLines; i++ {
-		origLine := ""
-		modLine := ""
-		if i < len(originalLines) {
-			origLine = strings.TrimSpace(originalLines[i])
-		}
-		if i < len(modifiedLines) {
-			modLine = strings.TrimSpace(modifiedLines[i])
-		}
-
-		if origLine != modLine {
-			if origLine != "" {
-				diff.WriteString(fmt.Sprintf("  - %s\n", origLine))
-			}
-			if modLine != "" {
-				diff.WriteString(fmt.Sprintf("  + %s\n", modLine))
-			}
-		}
+	diffText, err := yakdiff.Diff(original, modified)
+	if err != nil {
+		return fmt.Sprintf("  (diff failed: %v)", err)
 	}
-
-	if diff.Len() == 0 {
+	diffText = strings.TrimSpace(diffText)
+	if diffText == "" {
 		return "  (no changes)"
 	}
-	return diff.String()
+	return diffText
 }
 
 func max(a, b int) int {
