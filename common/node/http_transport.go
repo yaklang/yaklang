@@ -35,6 +35,7 @@ type BootstrapRequest struct {
 	Labels                   map[string]string `json:"labels"`
 	CapabilityKeys           []string          `json:"capability_keys"`
 	HeartbeatIntervalSeconds uint32            `json:"heartbeat_interval_seconds"`
+	HostInfo
 }
 
 // SessionState is the session material returned by the platform.
@@ -58,6 +59,7 @@ type HeartbeatRequest struct {
 	ObservedAt               time.Time                `json:"observed_at"`
 	HeartbeatIntervalSeconds uint32                   `json:"heartbeat_interval_seconds"`
 	ActiveAttempts           []ActiveAttemptHeartbeat `json:"active_attempts"`
+	HostInfo
 }
 
 // ShutdownRequest marks a node session inactive immediately on graceful exit.

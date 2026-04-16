@@ -30,6 +30,7 @@ func (n *NodeBase) bootstrapSession() error {
 		Labels:                   cloneStringMap(n.labels),
 		CapabilityKeys:           cloneStringSlice(n.capabilityKeys),
 		HeartbeatIntervalSeconds: durationToWholeSeconds(n.heartbeatInterval),
+		HostInfo:                 n.hostInfoSnapshot(),
 	})
 	if err != nil {
 		return err
@@ -40,6 +41,13 @@ func (n *NodeBase) bootstrapSession() error {
 	n.sessionMu.Unlock()
 	log.Infof("node session established: node_id=%s session_id=%s", n.NodeId, session.SessionID)
 	return nil
+}
+
+func (n *NodeBase) hostInfoSnapshot() HostInfo {
+	if n == nil || n.hostInfoProvider == nil {
+		return HostInfo{}
+	}
+	return normalizeHostInfo(n.hostInfoProvider.Snapshot())
 }
 
 func (n *NodeBase) sleepWithContext(duration time.Duration) error {

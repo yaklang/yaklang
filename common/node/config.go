@@ -30,6 +30,18 @@ type ActiveAttemptHeartbeat struct {
 	LastActivityAt time.Time `json:"last_activity_at"`
 }
 
+type HostInfo struct {
+	Hostname        string   `json:"hostname"`
+	PrimaryIP       string   `json:"primary_ip"`
+	IPAddresses     []string `json:"ip_addresses"`
+	OperatingSystem string   `json:"operating_system"`
+	Architecture    string   `json:"architecture"`
+}
+
+type HostInfoProvider interface {
+	Snapshot() HostInfo
+}
+
 // RuntimeStatus is the execution snapshot mixed into heartbeat payloads.
 type RuntimeStatus struct {
 	LifecycleState string
@@ -59,6 +71,7 @@ type BaseConfig struct {
 	MaxRunningJobs     uint32
 	TransportClient    SessionTransport
 	StatusProvider     RuntimeStatusProvider
+	HostInfoProvider   HostInfoProvider
 	HTTPClient         *http.Client
 }
 
@@ -82,6 +95,9 @@ func normalizeBaseConfig(cfg BaseConfig) (BaseConfig, error) {
 	}
 	if normalized.LifecycleState == "" {
 		normalized.LifecycleState = DefaultLifecycleState
+	}
+	if normalized.HostInfoProvider == nil {
+		normalized.HostInfoProvider = systemHostInfoProvider{}
 	}
 
 	normalized.NodeID = strings.TrimSpace(normalized.NodeID)
@@ -139,4 +155,14 @@ func cloneActiveAttemptHeartbeats(input []ActiveAttemptHeartbeat) []ActiveAttemp
 	result := make([]ActiveAttemptHeartbeat, len(input))
 	copy(result, input)
 	return result
+}
+
+func cloneHostInfo(input HostInfo) HostInfo {
+	return HostInfo{
+		Hostname:        input.Hostname,
+		PrimaryIP:       input.PrimaryIP,
+		IPAddresses:     cloneStringSlice(input.IPAddresses),
+		OperatingSystem: input.OperatingSystem,
+		Architecture:    input.Architecture,
+	}
 }
