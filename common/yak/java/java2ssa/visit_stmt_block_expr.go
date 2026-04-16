@@ -666,7 +666,9 @@ func (y *singleFileBuilder) VisitMethodCall(raw javaparser.IMethodCallContext, o
 
 	if utils.IsNil(object) {
 		var v ssa.Value
+		callName := ""
 		if ret := i.Identifier(); ret != nil {
+			callName = ret.GetText()
 			_, v = y.VisitIdentifier(ret)
 		} else if ret := i.THIS(); ret != nil {
 			recover := y.SetRangeFromTerminalNode(ret)
@@ -681,6 +683,18 @@ func (y *singleFileBuilder) VisitMethodCall(raw javaparser.IMethodCallContext, o
 		var args []ssa.Value
 		if argument := i.Arguments(); argument != nil {
 			args = y.VisitArguments(i.Arguments())
+			if thisArg := y.PeekValue("this"); thisArg != nil && y.MarkedThisClassBlueprint != nil && callName != "" {
+				if y.MarkedThisClassBlueprint.GetStaticMethod(callName) == nil && y.MarkedThisClassBlueprint.GetNormalMethod(callName) != nil {
+					memberKey := y.EmitConstInstPlaceholder(callName)
+					methodCall := y.ReadMemberCallMethod(thisArg, memberKey)
+					c := y.EmitCall(y.NewCall(methodCall, args))
+					y.HookMemberCallMethod(thisArg, memberKey, args...)
+					if c != nil {
+						return c
+					}
+					return y.EmitUndefined(raw.GetText())
+				}
+			}
 			c := y.NewCall(v, args)
 			return y.EmitCall(c)
 		}

@@ -2,12 +2,13 @@ package java
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 func Test_CrossClass_SideEffect_Exec_Case(t *testing.T) {
@@ -188,6 +189,80 @@ public class S11 {
 	t.Run("top def from sink resolves to safe", func(t *testing.T) {
 		ssatest.CheckSyntaxFlowContain(t, code, `sink(* #-> as $data)`, map[string][]string{
 			"data": {`"safe"`},
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
+	})
+}
+
+// TestJava_ThisFieldOverwriteBeforeSink：与 TestJava_FieldOverwriteBeforeSink 对称，
+// 覆盖「实例方法通过 this 写字段、再 sink(this.data)」路径；用于放宽/校验 this 上的 SideEffect 传播。
+func TestJava_ThisFieldOverwriteBeforeSink(t *testing.T) {
+	code := `
+public class A02 {
+	String data;
+
+	void setClean() {
+		this.data = "clean";
+	}
+
+	void test() {
+		this.data = getSecret();
+		setClean();
+		sink(this.data);
+	}
+}
+`
+
+	t.Run("sink arg is the side effect after setClean on this", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code, `sink(* as $arg)`, map[string][]string{
+			"arg": {`side-effect("clean", this.data)`},
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
+	})
+
+	t.Run("member view on this.data keeps history and overwritten value", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code, `this.data as $member`, map[string][]string{
+			"member": {
+				`"clean"`,
+				`Undefined-getSecret()`,
+				`side-effect("clean", this.data)`,
+			},
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
+	})
+
+	t.Run("top def from sink resolves to clean literal", func(t *testing.T) {
+		ssatest.CheckSyntaxFlowContain(t, code, `sink(* #-> as $data)`, map[string][]string{
+			"data": {`"clean"`},
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
+	})
+}
+
+// TestJava_StaticMethodCallWithoutPrefix_ShouldNotInjectThis:
+// 无前缀调用 static 方法时，不应走 this 成员方法调用路径，也不应把 this.data 误判为被覆盖。
+func TestJava_StaticMethodCallWithoutPrefix_ShouldNotInjectThis(t *testing.T) {
+	code := `
+public class A03 {
+	String data;
+
+	static String setClean(String in) {
+		return "clean";
+	}
+
+	void test() {
+		this.data = getSecret();
+		setClean(this.data);
+		sink(this.data);
+	}
+}
+`
+
+	t.Run("sink arg keeps original taint from getSecret", func(t *testing.T) {
+		ssatest.CheckSyntaxFlow(t, code, `sink(* as $arg)`, map[string][]string{
+			"arg": {`Undefined-getSecret()`},
+		}, ssaapi.WithLanguage(ssaconfig.JAVA))
+	})
+
+	t.Run("top def still resolves to getSecret source", func(t *testing.T) {
+		ssatest.CheckSyntaxFlowContain(t, code, `sink(* #-> as $data)`, map[string][]string{
+			"data": {`Undefined-getSecret`},
 		}, ssaapi.WithLanguage(ssaconfig.JAVA))
 	})
 }
