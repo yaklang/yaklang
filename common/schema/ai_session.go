@@ -9,6 +9,9 @@ type AISession struct {
 	SessionID        string `json:"session_id" gorm:"unique_index;not null"`
 	Title            string `json:"title" gorm:"type:text"`
 	TitleInitialized bool   `json:"title_initialized" gorm:"index;default:false"`
+
+	// RelatedRuntimeIDS stores a JSON-encoded string array of related runtime UUIDs.
+	RelatedRuntimeIDS string `json:"related_runtime_ids" gorm:"column:related_runtime_ids;type:text"`
 }
 
 func (a *AISession) TableName() string {

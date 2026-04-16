@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/jinzhu/gorm"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -13,6 +14,7 @@ import (
 
 const aiSessionMetaMigrationKey = "yakit.ai_session_meta.migrated.v1"
 const defaultAISessionTitle = "<未命名>"
+const emptyRelatedRuntimeIDsJSON = "[]"
 
 func CreateOrUpdateAISessionMeta(db *gorm.DB, sessionID, title string) (*schema.AISession, error) {
 	if db == nil {
@@ -25,6 +27,9 @@ func CreateOrUpdateAISessionMeta(db *gorm.DB, sessionID, title string) (*schema.
 
 	record := &schema.AISession{SessionID: sessionID}
 	title = strings.TrimSpace(title)
+	attrs := map[string]any{
+		"related_runtime_ids": emptyRelatedRuntimeIDsJSON,
+	}
 	assignments := map[string]any{}
 	if title != "" {
 		assignments["title"] = title
@@ -32,6 +37,7 @@ func CreateOrUpdateAISessionMeta(db *gorm.DB, sessionID, title string) (*schema.
 	}
 	result := db.Model(&schema.AISession{}).
 		Where("session_id = ?", sessionID).
+		Attrs(attrs).
 		Assign(assignments).
 		FirstOrCreate(record)
 	if result.Error != nil {
@@ -98,6 +104,47 @@ func UpdateAISessionMetaTitle(db *gorm.DB, sessionID, title string) (int64, erro
 	return result.RowsAffected, result.Error
 }
 
+func AppendAISessionMetaRelatedRuntimeID(db *gorm.DB, sessionID, runtimeID string) error {
+	if db == nil {
+		return utils.Errorf("database is nil")
+	}
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return utils.Errorf("session_id is empty")
+	}
+	runtimeID = strings.TrimSpace(runtimeID)
+	if runtimeID == "" {
+		return nil
+	}
+
+	var meta schema.AISession
+	if err := db.Model(&schema.AISession{}).Where("session_id = ?", sessionID).First(&meta).Error; err != nil {
+		if gorm.IsRecordNotFoundError(err) {
+			return nil
+		}
+		return err
+	}
+
+	var runtimeIDs []string
+	if strings.TrimSpace(meta.RelatedRuntimeIDS) != "" {
+		if err := json.Unmarshal([]byte(meta.RelatedRuntimeIDS), &runtimeIDs); err != nil {
+			return utils.Errorf("unmarshal related_runtime_ids failed: %v", err)
+		}
+	}
+
+
+	normalized := lo.Uniq(append(runtimeIDs, runtimeID))
+
+	raw, err := json.Marshal(normalized)
+	if err != nil {
+		return utils.Errorf("marshal related_runtime_ids failed: %v", err)
+	}
+
+	return db.Model(&schema.AISession{}).
+		Where("session_id = ?", sessionID).
+		UpdateColumn("related_runtime_ids", string(raw)).Error
+}
+
 func EnsureAISessionMeta(db *gorm.DB, sessionID string) (*schema.AISession, error) {
 	if db == nil {
 		return nil, utils.Errorf("database is nil")
@@ -111,8 +158,9 @@ func EnsureAISessionMeta(db *gorm.DB, sessionID string) (*schema.AISession, erro
 	result := db.Model(&schema.AISession{}).
 		Where("session_id = ?", sessionID).
 		Attrs(map[string]any{
-			"title":             defaultAISessionTitle,
-			"title_initialized": false,
+			"title":               defaultAISessionTitle,
+			"title_initialized":   false,
+			"related_runtime_ids": emptyRelatedRuntimeIDsJSON,
 		}).
 		FirstOrCreate(record)
 	if result.Error != nil {

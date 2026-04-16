@@ -2014,6 +2014,7 @@ message AISession {
   bool TitleInitialized = 4;
   int64 CreatedAt = 5;
   int64 UpdatedAt = 6;
+  repeated string RelatedRuntimeIDs = 7;
 }
 
 message QueryAISessionRequest {
