@@ -97,6 +97,9 @@ func handleToolCallResult(
 		verifyResult.EvidenceOps,
 	)
 
+	// T2: perception after verification (async, non-blocking)
+	loop.MaybeTriggerPerceptionAfterVerification()
+
 	if verifyResult.Satisfied {
 		operator.Exit()
 		return

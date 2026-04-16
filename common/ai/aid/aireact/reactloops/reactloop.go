@@ -143,6 +143,11 @@ type ReActLoop struct {
 	extraCapabilities *ExtraCapabilitiesManager
 
 	noEndLoadingStatus bool
+
+	// Perception layer: continuous awareness of what the user is doing,
+	// producing Topics/Keywords/Summary that dynamically adjust the
+	// possibility space throughout the loop lifecycle.
+	perception *perceptionController
 }
 
 func (r *ReActLoop) IncrementSpinWarning() {
@@ -372,6 +377,7 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		sameLogicSpinThreshold:      3, // 默认连续 3 次相同逻辑触发 AI 检测
 		maxConsecutiveSpinWarnings:  3, // 默认连续 3 次 SPIN 警告后强制退出
 		extraCapabilities:           NewExtraCapabilitiesManager(),
+		perception:                  newPerceptionController(),
 	}
 
 	for _, action := range []*LoopAction{

@@ -109,6 +109,10 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "加载技能",
 		En: "Loading Skills",
 	},
+	"perception": {
+		Zh: "意图感知",
+		En: "Perception",
+	},
 	"intent": {
 		Zh: "意图识别",
 		En: "Intent Recognition",

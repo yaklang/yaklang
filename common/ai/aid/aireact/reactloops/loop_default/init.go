@@ -94,5 +94,10 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 			}
 		}
 		// === End intent recognition phase ===
+
+		// Register the perception layer ContextProvider so that ongoing
+		// awareness signals (topics, keywords, summary) are injected into
+		// every subsequent prompt via the ContextProviderManager.
+		loop.RegisterPerceptionContextProvider()
 	}
 }
