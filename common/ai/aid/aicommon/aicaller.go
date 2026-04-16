@@ -44,6 +44,7 @@ type AICallerConfigIf interface {
 	OriginOptions() []ConfigOption
 	GetOrCreateWorkDir() string
 	GetContextProviderManager() *ContextProviderManager
+	AppendRelatedRuntimeID(runtimeID string)
 	GetSessionEvidenceRendered() string
 	ApplySessionEvidenceOps(ops []EvidenceOperation)
 }
