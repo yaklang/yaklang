@@ -3,7 +3,6 @@ package aireact
 import (
 	"context"
 	"encoding/json"
-	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -22,19 +21,15 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func extractCurrentTaskContentFromPrompt(prompt string) string {
+func extractCurrentTaskContentFromPrompt(t *testing.T, prompt string) string {
 	if idx := strings.LastIndex(prompt, "--- CURRENT_TASK ---"); idx >= 0 {
 		rest := prompt[idx+len("--- CURRENT_TASK ---"):]
 		if end := strings.Index(rest, "--- CURRENT_TASK_END ---"); end >= 0 {
 			return strings.TrimSpace(rest[:end])
 		}
 	}
-	re := regexp.MustCompile(`(?s)<\\|CURRENT_TASK\\|>\\s*(.*?)\\s*<\\|CURRENT_TASK_END\\|>`)
-	matches := re.FindStringSubmatch(prompt)
-	if len(matches) >= 2 {
-		return matches[1]
-	}
-	return ""
+	block := mustExtractAITagBlock(t, prompt, "CURRENT_TASK")
+	return strings.TrimSpace(block.Body)
 }
 
 func newRecoveryTaskForReAct(name, goal string) *aid.AiTask {
@@ -133,7 +128,7 @@ func TestReAct_RecoveryPlanAndExec_SkipCompletedTasks(t *testing.T) {
 			}
 
 			if !handledByIndex {
-				current := extractCurrentTaskContentFromPrompt(prompt)
+				current := extractCurrentTaskContentFromPrompt(t, prompt)
 				if strings.Contains(current, doneMarker) {
 					mu.Lock()
 					doneCalls++
@@ -309,7 +304,7 @@ func TestReAct_RecoveryPlanAndExec_StartFromSpecifiedTask(t *testing.T) {
 			case lastTask.Index:
 				lastCalls++
 			default:
-				current := extractCurrentTaskContentFromPrompt(prompt)
+				current := extractCurrentTaskContentFromPrompt(t, prompt)
 				switch {
 				case strings.Contains(current, firstMarker):
 					firstCalls++
