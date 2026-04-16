@@ -7,10 +7,26 @@ import (
 	"time"
 
 	"github.com/jinzhu/gorm"
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
 )
+
+type mockMidtermArchiveStore struct {
+	result *aicommon.TimelineArchiveSearchResult
+}
+
+func (m *mockMidtermArchiveStore) ArchiveCompressedBatch(context.Context, *aicommon.TimelineArchiveBatch) (*aicommon.TimelineArchiveRef, error) {
+	return nil, nil
+}
+
+func (m *mockMidtermArchiveStore) SearchArchivedBatches(context.Context, *aicommon.TimelineArchiveSearchQuery) (*aicommon.TimelineArchiveSearchResult, error) {
+	if m.result == nil {
+		return &aicommon.TimelineArchiveSearchResult{}, nil
+	}
+	return m.result, nil
+}
 
 type midtermQueryTestTask struct {
 	id        string
@@ -109,4 +125,36 @@ func TestBuildMidtermRecallQuery_IncludesCurrentTaskDetails(t *testing.T) {
 			t.Fatalf("expected query to contain %q, got: %s", expected, query)
 		}
 	}
+}
+
+func TestBuildTimelineDumpWithMidtermMemory_PrependsMidtermMemory(t *testing.T) {
+	cfg := aicommon.NewConfig(context.Background())
+	cfg.TimelineArchiveStore = &mockMidtermArchiveStore{
+		result: &aicommon.TimelineArchiveSearchResult{
+			TotalContent: "important archived clue\nsecond line",
+		},
+	}
+
+	timeline := aicommon.NewTimeline(nil, nil)
+	timeline.PushText(1, "live timeline item")
+	cfg.Timeline = timeline
+
+	react := &ReAct{config: cfg}
+	react.setCurrentTask(&midtermQueryTestTask{
+		id:        "task-1",
+		index:     "1-2",
+		name:      "verify http flow",
+		userInput: "focus on malformed headers",
+		origin:    "collect and verify malformed header behavior",
+		summary:   "need reproduce with retry",
+	})
+
+	dump := buildTimelineDumpWithMidtermMemory(react, timeline)
+
+	require.True(t, strings.HasPrefix(dump, "timeline:\n--["))
+	require.Contains(t, dump, "midterm-memory:")
+	require.Contains(t, dump, "search-query:")
+	require.Contains(t, dump, "important archived clue")
+	require.Contains(t, dump, "live timeline item")
+	require.Less(t, strings.Index(dump, "midterm-memory:"), strings.Index(dump, "live timeline item"))
 }

@@ -261,10 +261,6 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 			log.Infof("timeline archive store ready for persistent session %s", cfg.PersistentSessionId)
 		}
 	}
-	if cfg.TimelineArchiveStore != nil {
-		cfg.ContextProviderManager.Register("midterm_session_memory", NewMidtermSessionMemoryContextProvider(react))
-	}
-
 	cfg.EnhanceKnowledgeManager.SetEmitter(cfg.Emitter)
 	if cfg.Timeline == nil {
 		cfg.Timeline = aicommon.NewTimeline(cfg, nil)
