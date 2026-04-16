@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -40,6 +41,10 @@ func (s *Server) QueryAISession(ctx context.Context, req *ypb.QueryAISessionRequ
 		if item == nil {
 			continue
 		}
+		var runtimeIDs []string
+		if strings.TrimSpace(item.RelatedRuntimeIDS) != "" {
+			json.Unmarshal([]byte(item.RelatedRuntimeIDS), &runtimeIDs)
+		}
 		respData = append(respData, &ypb.AISession{
 			Id:               int64(item.ID),
 			SessionID:        item.SessionID,
@@ -47,6 +52,7 @@ func (s *Server) QueryAISession(ctx context.Context, req *ypb.QueryAISessionRequ
 			TitleInitialized: item.TitleInitialized,
 			CreatedAt:        item.CreatedAt.Unix(),
 			UpdatedAt:        item.UpdatedAt.Unix(),
+			RelatedRuntimeIDs: runtimeIDs,
 		})
 	}
 
