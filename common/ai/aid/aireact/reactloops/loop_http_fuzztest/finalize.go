@@ -58,13 +58,7 @@ func generateLoopHTTPFuzzFinalizeSummary(loop *reactloops.ReActLoop, reason any)
 		out.WriteString("\n\n")
 	}
 
-	if diffResult := strings.TrimSpace(loop.Get("diff_result_compressed")); diffResult == "" {
-		if diffResult = strings.TrimSpace(loop.Get("diff_result")); diffResult != "" {
-			out.WriteString("## 当前发现\n\n")
-			out.WriteString(utils.ShrinkTextBlock(diffResult, 2000))
-			out.WriteString("\n\n")
-		}
-	} else {
+	if diffResult := firstNonEmptyString(loop.Get("diff_result_compressed"), loop.Get("diff_result_analysis"), loop.Get("diff_result")); diffResult != "" {
 		out.WriteString("## 当前发现\n\n")
 		out.WriteString(utils.ShrinkTextBlock(diffResult, 2000))
 		out.WriteString("\n\n")
