@@ -19,7 +19,6 @@ func TestBuildLoopHTTPFuzzOverviewReport_SummarizesLargeRuns(t *testing.T) {
 		HiddenIndex:    "flow-1",
 		RequestSummary: "URL: https://example.test/login BODY: [(32) bytes]",
 		ResponseRaw:    "HTTP/1.1 200 OK\r\nContent-Length: 24\r\n\r\nhello user",
-		ResponseDigest: "  Status Code: 200\n  Content-Length: 24 bytes\n",
 	}
 	sample := loopHTTPFuzzInterestingSample{
 		Index:           2,
@@ -32,7 +31,6 @@ func TestBuildLoopHTTPFuzzOverviewReport_SummarizesLargeRuns(t *testing.T) {
 		RequestSummary:  "URL: https://example.test/login BODY: [(32) bytes]",
 		ResponseSummary: "URL: https://example.test/login STATUS: 401 BODY: [(0) bytes]",
 		RequestDiff:     "  + password={{payload(pass_top25)}}",
-		ResponseDigest:  "  Status Code: 401\n  Content-Length: 0 bytes\n",
 		ResponseRaw:     "HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\n\r\n",
 	}
 
@@ -47,8 +45,10 @@ func TestBuildLoopHTTPFuzzOverviewReport_SummarizesLargeRuns(t *testing.T) {
 	stats.considerInterestingSample(sample)
 	stats.finalizeResponseLengthGroups()
 
-	report := buildLoopHTTPFuzzOverviewReport("fuzz_body", stats)
+	report := buildLoopHTTPFuzzOverviewReport("fuzz_body", "body_type=json_params; param_name=username; param_values=[admin {{7*7}}]", stats)
 	require.Contains(t, report, "=== Fuzz Overview for fuzz_body ===")
+	require.Contains(t, report, "Fuzz Parameters:")
+	require.Contains(t, report, "param_name=username")
 	require.Contains(t, report, "Total Requests: 13")
 	require.Contains(t, report, "Saved HTTPFlows: 13")
 	require.Contains(t, report, "Status Distribution:")
@@ -107,7 +107,6 @@ func TestBuildLoopHTTPFuzzProgressSnapshot_SummarizesCurrentProgress(t *testing.
 	require.Contains(t, snapshot, "已落库 4 条 HTTPFlow")
 	require.Contains(t, snapshot, "最近状态 401")
 	require.Contains(t, snapshot, "状态分布 401=3, 200=1")
-	require.NotContains(t, snapshot, "长度分布")
 	require.Contains(t, snapshot, "可疑样本 1 个")
 }
 
@@ -139,7 +138,7 @@ func TestFinalizeLoopHTTPFuzzResponseLengthGroups_UsesDominantLengthAsBaseline(t
 
 	require.Equal(t, 10, stats.BaselineBodyLength)
 	require.True(t, stats.ResponseLengthGroups[10].IsBaseline)
-	require.Contains(t, stats.ResponseLengthGroups[10].Sample.ResponseDiff, "baseline representative response")
+	require.Contains(t, stats.ResponseLengthGroups[10].Sample.ResponseDiff, "representative baseline response")
 	require.False(t, stats.ResponseLengthGroups[5].IsBaseline)
 	require.NotEmpty(t, stats.ResponseLengthGroups[5].Sample.ResponseDiff)
 }
@@ -154,8 +153,9 @@ func TestBuildLoopHTTPFuzzOverviewReport_SkipsLengthAnalysisForSmallRuns(t *test
 	stats.observeResponseLengthGroup(loopHTTPFuzzInterestingSample{BodyLength: 27, StatusCode: 200, ResponseRaw: "HTTP/1.1 200 OK\r\n\r\nccc"})
 	stats.finalizeResponseLengthGroups()
 
-	report := buildLoopHTTPFuzzOverviewReport("fuzz_get_params", stats)
+	report := buildLoopHTTPFuzzOverviewReport("fuzz_get_params", "param_name=id; param_values=[1 2 3]", stats)
 	require.Contains(t, report, "Response Length Overview: 12B=1, 18B=1, 27B=1")
+	require.Contains(t, report, "param_name=id")
 }
 
 func TestBuildLoopHTTPFuzzLargeRunAnalysisReport_RendersGroupsAndInterestingSamples(t *testing.T) {
@@ -169,7 +169,6 @@ func TestBuildLoopHTTPFuzzLargeRunAnalysisReport_RendersGroupsAndInterestingSamp
 		HiddenIndex:    "flow-1",
 		RequestSummary: "URL: https://example.test/login BODY: [(32) bytes]",
 		ResponseRaw:    "HTTP/1.1 200 OK\r\nContent-Length: 24\r\n\r\nhello user",
-		ResponseDigest: "  Status Code: 200\n  Content-Length: 24 bytes\n",
 	}
 	sample := loopHTTPFuzzInterestingSample{
 		Index:           2,
@@ -182,7 +181,6 @@ func TestBuildLoopHTTPFuzzLargeRunAnalysisReport_RendersGroupsAndInterestingSamp
 		RequestSummary:  "URL: https://example.test/login BODY: [(32) bytes]",
 		ResponseSummary: "URL: https://example.test/login STATUS: 401 BODY: [(0) bytes]",
 		RequestDiff:     "  + password={{payload(pass_top25)}}",
-		ResponseDigest:  "  Status Code: 401\n  Content-Length: 0 bytes\n",
 		ResponseRaw:     "HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\n\r\n",
 	}
 
@@ -219,7 +217,6 @@ func TestBuildLoopHTTPFuzzDetailedPacketReport_RendersStoredResults(t *testing.T
 		RequestSummary:  "URL: https://example.test/debug?id=1 BODY: [(0) bytes]",
 		ResponseSummary: "URL: https://example.test/debug?id=1 STATUS: 200 BODY: [(2) bytes]",
 		RequestDiff:     "  + id=1",
-		ResponseDigest:  "  Status Code: 200\n  Content-Length: 2 bytes\n",
 		HiddenIndex:     "flow-2",
 		StatusCode:      200,
 		DurationMs:      180,

@@ -2,6 +2,7 @@ package loop_http_fuzztest
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils"
 	"sort"
 	"strings"
 
@@ -130,10 +131,7 @@ func summarizeResponse(response string) string {
 	summary.WriteString(fmt.Sprintf("  Content-Length: %d bytes\n", contentLength))
 
 	if contentLength > 0 {
-		bodyPreview := string(body)
-		if len(bodyPreview) > 200 {
-			bodyPreview = bodyPreview[:200] + "..."
-		}
+		bodyPreview := utils.ShrinkString(string(body), 200)
 		bodyPreview = strings.ReplaceAll(bodyPreview, "\n", " ")
 		summary.WriteString(fmt.Sprintf("  Body Preview: %s\n", bodyPreview))
 	}
