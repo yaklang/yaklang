@@ -211,6 +211,21 @@ func TestTimelineCompress_SizeReduction(t *testing.T) {
 	require.Equal(t, 50, timeline.idToTimelineItem.Len(), "Should have 50 items left")
 }
 
+func TestTimelineArchiveMergedContent_IncludesTimelineDetails(t *testing.T) {
+	timeline := NewTimeline(nil, nil)
+	timeline.PushText(1, "first timeline note")
+	timeline.PushUserInteraction(UserInteractionStage_Review, 2, "system prompt", "user answer")
+
+	items := timeline.idToTimelineItem.Values()
+	merged := timelineArchiveMergedContent(items)
+
+	require.Contains(t, merged, "id=1")
+	require.Contains(t, merged, "first timeline note")
+	require.Contains(t, merged, "id=2")
+	require.Contains(t, merged, "system prompt")
+	require.Contains(t, merged, "user answer")
+}
+
 // TestTimelineCompress_MultipleCompressions 测试多次压缩
 func TestTimelineCompress_MultipleCompressions(t *testing.T) {
 	timeline := NewTimeline(nil, nil)

@@ -19,6 +19,7 @@ type TimelineArchiveBatch struct {
 	PersistentSessionID string
 	Reason              TimelineArchiveReason
 	Summary             string
+	MergedContent       string
 	ReducerKeyID        int64
 	SourceStartID       int64
 	SourceEndID         int64
