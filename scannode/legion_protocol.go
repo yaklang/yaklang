@@ -4,10 +4,12 @@ import "strings"
 
 const (
 	legionCommandStream = "LEGION_COMMANDS"
+	legionHIDSPrefix    = "legion.hids"
 
 	legionCommandDispatch        = "job.dispatch"
 	legionCommandCancel          = "job.cancel"
 	legionCommandCapabilityApply = "capability.apply"
+	legionCommandSSARuleSyncExport = "ssa.rule_sync.export"
 
 	legionEventClaimed          = "job.claimed"
 	legionEventStarted          = "job.started"
@@ -22,6 +24,9 @@ const (
 	legionEventCapabilityStatus = "capability.status"
 	legionEventCapabilityAlert  = "capability.alert"
 	legionEventCapabilityFailed = "capability.failed"
+	legionEventHIDSObservation  = "hids.observation"
+	legionEventSSARuleSyncReady = "ssa.rule_sync.ready"
+	legionEventSSARuleSyncFailed = "ssa.rule_sync.failed"
 
 	legionAssetKindTCPOpenPort        = "tcp_open_port"
 	legionAssetKindServiceFingerprint = "service_fingerprint"
@@ -40,6 +45,14 @@ func commandSubjectWildcard(base string) string {
 
 func jobEventSubject(prefix, eventType string) string {
 	return trimSubject(prefix) + "." + strings.TrimPrefix(eventType, ".")
+}
+
+func capabilityEventSubject(prefix, eventType string) string {
+	normalizedEventType := strings.TrimPrefix(strings.TrimSpace(eventType), ".")
+	if normalizedEventType == legionEventHIDSObservation {
+		return legionHIDSPrefix + ".observation"
+	}
+	return jobEventSubject(prefix, normalizedEventType)
 }
 
 func trimSubject(value string) string {
