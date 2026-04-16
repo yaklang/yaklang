@@ -20,6 +20,7 @@ type ScriptExecutionRequest struct {
 	SubTaskID       string
 	ScriptContent   string
 	ScriptJSONParam string
+	ScriptLabels    map[string]string
 }
 
 type ScriptExecutionResult struct {
@@ -64,6 +65,8 @@ func (s *ScanNode) executeScriptTask(
 	yakitServer := s.createYakitServer(reporter, result)
 	yakitServer.Start()
 	defer yakitServer.Shutdown()
+
+	s.syncRulesIfNeeded(taskCtx, keyValues, input.ScriptLabels)
 
 	scriptFile, err := s.createTempScriptFile(input.ScriptContent)
 	if err != nil {
@@ -112,7 +115,6 @@ func (s *ScanNode) buildScriptParams(
 	keyValues map[string]any,
 ) []string {
 	params := buildScriptBaseParams(webhookAddr, runtimeID)
-	s.syncRulesIfNeeded(keyValues)
 	return s.appendKeyValueParams(params, keyValues)
 }
 
@@ -180,24 +182,39 @@ func (s *ScanNode) parseScriptParams(jsonParam string) map[string]any {
 	return params
 }
 
-func (s *ScanNode) syncRulesIfNeeded(params map[string]any) {
-	ruleSetHash, ok := params["ruleset-hash"].(string)
-	if !ok || ruleSetHash == "" {
+func (s *ScanNode) syncRulesIfNeeded(
+	ctx context.Context,
+	params map[string]any,
+	labels map[string]string,
+) {
+	snapshotID := resolveRuleSyncSnapshotID(params, labels)
+	if snapshotID == "" {
 		return
 	}
 
-	client := GetRuleSyncClient()
-	if client == nil || client.HasLocalSnapshot(ruleSetHash) {
+	if s == nil || s.ruleSyncClient == nil || s.ruleSyncClient.HasLocalSnapshot(snapshotID) {
 		return
 	}
 
-	log.Infof("auto-syncing rules for hash: %s", ruleSetHash)
-	ruleCount, err := client.SyncForHash(ruleSetHash)
+	log.Infof("auto-syncing rules for snapshot: %s", snapshotID)
+	ruleCount, err := s.ruleSyncClient.SyncSnapshot(ctx, snapshotID)
 	if err != nil {
 		log.Warnf("auto-sync rules failed: %v, will continue with local rules", err)
 		return
 	}
-	log.Infof("auto-synced %d rules from snapshot %s", ruleCount, ruleSetHash)
+	log.Infof("auto-synced %d rules from snapshot %s", ruleCount, snapshotID)
+}
+
+func resolveRuleSyncSnapshotID(params map[string]any, labels map[string]string) string {
+	if labels != nil {
+		if snapshotID := strings.TrimSpace(labels["rule_snapshot_id"]); snapshotID != "" {
+			return snapshotID
+		}
+	}
+	if snapshotID, ok := params["rule_snapshot_id"].(string); ok {
+		return strings.TrimSpace(snapshotID)
+	}
+	return ""
 }
 
 func buildScriptBaseParams(webhookAddr string, runtimeID string) []string {
