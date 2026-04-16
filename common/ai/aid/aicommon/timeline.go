@@ -1026,6 +1026,7 @@ func (m *Timeline) archiveForgottenBatch(reason TimelineArchiveReason, reducerKe
 		PersistentSessionID: m.timelinePersistentSessionID(),
 		Reason:              reason,
 		Summary:             strings.TrimSpace(summary),
+		MergedContent:       strings.TrimSpace(timelineArchiveMergedContent(items)),
 		ReducerKeyID:        reducerKeyID,
 		SourceStartID:       startID,
 		SourceEndID:         endID,
@@ -1070,6 +1071,44 @@ func timelineArchiveRepresentativeSnippets(items []*TimelineItem, limit int) []s
 		}
 	}
 	return result
+}
+
+func timelineArchiveMergedContent(items []*TimelineItem) string {
+	if len(items) == 0 {
+		return ""
+	}
+
+	var buf strings.Builder
+	for _, item := range items {
+		if item == nil || item.deleted {
+			continue
+		}
+
+		if !item.createdAt.IsZero() {
+			buf.WriteString("[")
+			buf.WriteString(item.createdAt.Format(time.RFC3339))
+			buf.WriteString("] ")
+		}
+		buf.WriteString("id=")
+		buf.WriteString(strconv.FormatInt(item.GetID(), 10))
+		buf.WriteString("\n")
+
+		raw := strings.TrimSpace(item.String())
+		if raw != "" {
+			for _, line := range utils.ParseStringToRawLines(raw) {
+				line = strings.TrimSpace(line)
+				if line == "" {
+					continue
+				}
+				buf.WriteString("- ")
+				buf.WriteString(line)
+				buf.WriteString("\n")
+			}
+		}
+		buf.WriteString("\n")
+	}
+
+	return strings.TrimSpace(buf.String())
 }
 
 func (m *Timeline) timelineArchiveStore() TimelineArchiveStore {
