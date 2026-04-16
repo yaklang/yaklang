@@ -9576,15 +9576,16 @@ func (x *AISessionFilter) GetKeyword() string {
 }
 
 type AISession struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	Id               int64                  `protobuf:"varint,1,opt,name=Id,proto3" json:"Id,omitempty"`
-	SessionID        string                 `protobuf:"bytes,2,opt,name=SessionID,proto3" json:"SessionID,omitempty"`
-	Title            string                 `protobuf:"bytes,3,opt,name=Title,proto3" json:"Title,omitempty"`
-	TitleInitialized bool                   `protobuf:"varint,4,opt,name=TitleInitialized,proto3" json:"TitleInitialized,omitempty"`
-	CreatedAt        int64                  `protobuf:"varint,5,opt,name=CreatedAt,proto3" json:"CreatedAt,omitempty"`
-	UpdatedAt        int64                  `protobuf:"varint,6,opt,name=UpdatedAt,proto3" json:"UpdatedAt,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	Id                int64                  `protobuf:"varint,1,opt,name=Id,proto3" json:"Id,omitempty"`
+	SessionID         string                 `protobuf:"bytes,2,opt,name=SessionID,proto3" json:"SessionID,omitempty"`
+	Title             string                 `protobuf:"bytes,3,opt,name=Title,proto3" json:"Title,omitempty"`
+	TitleInitialized  bool                   `protobuf:"varint,4,opt,name=TitleInitialized,proto3" json:"TitleInitialized,omitempty"`
+	CreatedAt         int64                  `protobuf:"varint,5,opt,name=CreatedAt,proto3" json:"CreatedAt,omitempty"`
+	UpdatedAt         int64                  `protobuf:"varint,6,opt,name=UpdatedAt,proto3" json:"UpdatedAt,omitempty"`
+	RelatedRuntimeIDs []string               `protobuf:"bytes,7,rep,name=RelatedRuntimeIDs,proto3" json:"RelatedRuntimeIDs,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *AISession) Reset() {
@@ -9657,6 +9658,13 @@ func (x *AISession) GetUpdatedAt() int64 {
 		return x.UpdatedAt
 	}
 	return 0
+}
+
+func (x *AISession) GetRelatedRuntimeIDs() []string {
+	if x != nil {
+		return x.RelatedRuntimeIDs
+	}
+	return nil
 }
 
 type QueryAISessionRequest struct {
@@ -34996,13 +35004,13 @@ type StartBruteParams struct {
 	Concurrent int64 `protobuf:"varint,8,opt,name=Concurrent,proto3" json:"Concurrent,omitempty"`
 	Retry      int64 `protobuf:"varint,9,opt,name=Retry,proto3" json:"Retry,omitempty"`
 	// 目标任务内并发
-	TargetTaskConcurrent int64  `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
-	OkToStop             bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
-	DelayMin             int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
-	DelayMax             int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
-	PluginScriptName     string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	TargetTaskConcurrent int64 `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
+	OkToStop         bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
+	DelayMin         int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
+	DelayMax         int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
+	PluginScriptName string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *StartBruteParams) Reset() {
@@ -44583,8 +44591,8 @@ type ExecHistoryRecord struct {
 	// Uid
 	Id string `protobuf:"bytes,9,opt,name=Id,proto3" json:"Id,omitempty"`
 	// 展示界面内容
-	Stdout        []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
-	Stderr        []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
+	Stdout []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
+	Stderr []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
 	RuntimeId     string `protobuf:"bytes,12,opt,name=RuntimeId,proto3" json:"RuntimeId,omitempty"`
 	FromYakModule string `protobuf:"bytes,13,opt,name=FromYakModule,proto3" json:"FromYakModule,omitempty"`
 	StdoutLen     int64  `protobuf:"varint,14,opt,name=StdoutLen,proto3" json:"StdoutLen,omitempty"`
@@ -69488,14 +69496,15 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\tForgeName\x18\x05 \x01(\tR\tForgeName\"I\n" +
 	"\x0fAISessionFilter\x12\x1c\n" +
 	"\tSessionID\x18\x01 \x03(\tR\tSessionID\x12\x18\n" +
-	"\aKeyword\x18\x02 \x01(\tR\aKeyword\"\xb7\x01\n" +
+	"\aKeyword\x18\x02 \x01(\tR\aKeyword\"\xe5\x01\n" +
 	"\tAISession\x12\x0e\n" +
 	"\x02Id\x18\x01 \x01(\x03R\x02Id\x12\x1c\n" +
 	"\tSessionID\x18\x02 \x01(\tR\tSessionID\x12\x14\n" +
 	"\x05Title\x18\x03 \x01(\tR\x05Title\x12*\n" +
 	"\x10TitleInitialized\x18\x04 \x01(\bR\x10TitleInitialized\x12\x1c\n" +
 	"\tCreatedAt\x18\x05 \x01(\x03R\tCreatedAt\x12\x1c\n" +
-	"\tUpdatedAt\x18\x06 \x01(\x03R\tUpdatedAt\"r\n" +
+	"\tUpdatedAt\x18\x06 \x01(\x03R\tUpdatedAt\x12,\n" +
+	"\x11RelatedRuntimeIDs\x18\a \x03(\tR\x11RelatedRuntimeIDs\"r\n" +
 	"\x15QueryAISessionRequest\x12+\n" +
 	"\n" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +

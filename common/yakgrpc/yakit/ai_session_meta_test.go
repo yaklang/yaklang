@@ -3,6 +3,7 @@ package yakit
 import (
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
@@ -27,6 +28,7 @@ func TestAISessionMetaCRUD(t *testing.T) {
 	got, err := GetAISessionMetaBySessionID(db, "sess-1")
 	require.NoError(t, err)
 	require.Equal(t, "updated title", got.Title)
+	require.Equal(t, emptyRelatedRuntimeIDsJSON, got.RelatedRuntimeIDS)
 
 	list, err := QueryAISessionMeta(db, "updated", 10, 0)
 	require.NoError(t, err)
@@ -58,6 +60,7 @@ func TestEnsureAISessionMetaDefaultTitle(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, defaultAISessionTitle, got.Title)
 	require.False(t, got.TitleInitialized)
+	require.Equal(t, emptyRelatedRuntimeIDsJSON, got.RelatedRuntimeIDS)
 }
 
 func TestEnsureAISessionMetaNotOverrideExistingTitle(t *testing.T) {
@@ -75,6 +78,72 @@ func TestEnsureAISessionMetaNotOverrideExistingTitle(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "自定义标题", got.Title)
 	require.True(t, got.TitleInitialized)
+	require.Equal(t, emptyRelatedRuntimeIDsJSON, got.RelatedRuntimeIDS)
+}
+
+func TestAppendAISessionMetaRelatedRuntimeID(t *testing.T) {
+	db, err := utils.CreateTempTestDatabaseInMemory()
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&schema.AISession{}).Error)
+
+	sessionID := "sess-runtime-ids"
+	runtimeID1 := "runtime-a"
+	runtimeID2 := "runtime-b"
+	_, err = CreateOrUpdateAISessionMeta(db, sessionID, "title")
+	require.NoError(t, err)
+
+	err = AppendAISessionMetaRelatedRuntimeID(db, sessionID, runtimeID1)
+	require.NoError(t, err)
+	err = AppendAISessionMetaRelatedRuntimeID(db, sessionID, " "+runtimeID1+" ")
+	require.NoError(t, err)
+	err = AppendAISessionMetaRelatedRuntimeID(db, sessionID, runtimeID2)
+	require.NoError(t, err)
+
+	got, err := GetAISessionMetaBySessionID(db, sessionID)
+	require.NoError(t, err)
+	require.Equal(t, `["`+runtimeID1+`","`+runtimeID2+`"]`, got.RelatedRuntimeIDS)
+}
+
+func TestAppendAISessionMetaRelatedRuntimeID_NotFoundIgnored(t *testing.T) {
+	db, err := utils.CreateTempTestDatabaseInMemory()
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&schema.AISession{}).Error)
+
+	err = AppendAISessionMetaRelatedRuntimeID(db, "missing-session", uuid.NewString())
+	require.NoError(t, err)
+}
+
+func TestAppendAISessionMetaRelatedRuntimeID_InvalidStoredJSON(t *testing.T) {
+	db, err := utils.CreateTempTestDatabaseInMemory()
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&schema.AISession{}).Error)
+
+	sessionID := "sess-invalid-runtime-json"
+	_, err = CreateOrUpdateAISessionMeta(db, sessionID, "title")
+	require.NoError(t, err)
+	require.NoError(t, db.Model(&schema.AISession{}).
+		Where("session_id = ?", sessionID).
+		UpdateColumn("related_runtime_ids", `{invalid-json}`).Error)
+
+	err = AppendAISessionMetaRelatedRuntimeID(db, sessionID, uuid.NewString())
+	require.Error(t, err)
+}
+
+func TestAppendAISessionMetaRelatedRuntimeID_PlainString(t *testing.T) {
+	db, err := utils.CreateTempTestDatabaseInMemory()
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&schema.AISession{}).Error)
+
+	sessionID := "sess-plain-runtime-id"
+	_, err = CreateOrUpdateAISessionMeta(db, sessionID, "title")
+	require.NoError(t, err)
+
+	err = AppendAISessionMetaRelatedRuntimeID(db, sessionID, "not-a-uuid")
+	require.NoError(t, err)
+
+	got, err := GetAISessionMetaBySessionID(db, sessionID)
+	require.NoError(t, err)
+	require.Equal(t, `["not-a-uuid"]`, got.RelatedRuntimeIDS)
 }
 
 func TestMigrateAISessionMetaFromEvents(t *testing.T) {
