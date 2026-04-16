@@ -471,3 +471,17 @@ func WithExtraCapabilities(ecm *ExtraCapabilitiesManager) ReActLoopOption {
 	}
 }
 
+// WithEnablePerception enables the perception layer for the loop.
+// When enabled, perception evaluations run asynchronously after actions
+// and produce Topics/Keywords/Summary that are injected into prompts.
+// Perception is disabled by default to avoid interference in test environments.
+func WithEnablePerception(enable ...bool) ReActLoopOption {
+	return func(r *ReActLoop) {
+		if len(enable) > 0 && !enable[0] {
+			r.perception = nil
+			return
+		}
+		r.perception = newPerceptionController()
+	}
+}
+
