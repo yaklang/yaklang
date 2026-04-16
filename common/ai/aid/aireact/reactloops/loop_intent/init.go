@@ -26,6 +26,7 @@ func init() {
 		schema.AI_REACT_LOOP_NAME_INTENT,
 		func(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {
 			preset := []reactloops.ReActLoopOption{
+				reactloops.WithDisableLoopPerception(true),
 				reactloops.WithAllowRAG(false),
 				reactloops.WithAllowAIForge(false),
 				reactloops.WithAllowPlanAndExec(false),

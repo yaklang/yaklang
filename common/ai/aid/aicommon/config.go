@@ -294,6 +294,7 @@ type Config struct {
 	EnhanceKnowledgeManager            *EnhanceKnowledgeManager
 	DisableEnhanceDirectlyAnswer       bool
 	DisableIntentRecognition           bool // 禁用意图识别（用于测试环境，避免子循环消耗 mock 响应）
+	DisablePerception                  bool // 禁用感知层（用于测试环境，避免异步 AI 调用干扰 mock 回调）
 	PerTaskUserInteractiveLimitedTimes int64
 
 	/*
@@ -1724,6 +1725,23 @@ func WithDisableIntentRecognition(disable bool) ConfigOption {
 	}
 }
 
+// WithDisablePerception disables the perception layer in all loops created from this config.
+// When disabled, no perception AI evaluations are triggered and the perception ContextProvider
+// is not registered. This is primarily used in test environments where async perception calls
+// would interfere with mocked AI callbacks.
+func WithDisablePerception(disable bool) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		c.DisablePerception = disable
+		c.m.Unlock()
+		c.SetConfig("DisablePerception", disable)
+		return nil
+	}
+}
+
 // WithDisableSessionTitleGeneration disables the automatic session title generation in ReAct
 func WithDisableSessionTitleGeneration(disable bool) ConfigOption {
 	return func(c *Config) error {
@@ -2964,6 +2982,11 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	// do not accidentally run deep intent recognition in test environments.
 	if i.DisableIntentRecognition {
 		opts = append(opts, WithDisableIntentRecognition(true))
+	}
+
+	// Propagate perception disable flag so sub-loops inherit the setting.
+	if i.DisablePerception {
+		opts = append(opts, WithDisablePerception(true))
 	}
 
 	// once init config flag

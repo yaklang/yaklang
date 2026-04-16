@@ -433,6 +433,11 @@ func (r *ReActLoop) GetPerceptionSummary() string {
 	return state.OneLinerSummary
 }
 
+// IsPerceptionEnabled returns true if the perception controller is active.
+func (r *ReActLoop) IsPerceptionEnabled() bool {
+	return r.perception != nil
+}
+
 // GetPerceptionState returns the full current perception state.
 func (r *ReActLoop) GetPerceptionState() *PerceptionState {
 	if r.perception == nil {

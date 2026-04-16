@@ -72,6 +72,7 @@ func NewTestReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 		aicommon.WithDisallowMCPServers(true),
 		aicommon.WithDisableSessionTitleGeneration(true),
 		aicommon.WithDisableIntentRecognition(true),
+		aicommon.WithDisablePerception(true),
 		aicommon.WithDisableAutoSkills(true),
 		aicommon.WithGenerateReport(false),
 		aicommon.WithDisableDynamicPlanning(true),

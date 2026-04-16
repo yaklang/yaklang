@@ -471,17 +471,16 @@ func WithExtraCapabilities(ecm *ExtraCapabilitiesManager) ReActLoopOption {
 	}
 }
 
-// WithEnablePerception enables the perception layer for the loop.
-// When enabled, perception evaluations run asynchronously after actions
-// and produce Topics/Keywords/Summary that are injected into prompts.
-// Perception is disabled by default to avoid interference in test environments.
-func WithEnablePerception(enable ...bool) ReActLoopOption {
+// WithDisableLoopPerception disables the perception layer for this specific loop instance.
+// This is used by lightweight sub-loops (e.g. loop_intent) that should never run
+// perception evaluations regardless of the config-level setting.
+// For config-level (global) control, use aicommon.WithDisablePerception instead.
+func WithDisableLoopPerception(disable ...bool) ReActLoopOption {
 	return func(r *ReActLoop) {
-		if len(enable) > 0 && !enable[0] {
-			r.perception = nil
+		if len(disable) > 0 && !disable[0] {
 			return
 		}
-		r.perception = newPerceptionController()
+		r.perception = nil
 	}
 }
 
