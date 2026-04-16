@@ -417,17 +417,12 @@ func TestLoadCapability_Handler_FocusMode_NotOk(t *testing.T) {
 	assert.Contains(t, op.GetFeedback().String(), "SUCCESSFULLY", "err==nil means sync focus completed; ok=false (IsAsyncMode) is not failure")
 }
 
-// --- Handler Tests: Unknown -> Intent Fallback ---
+// --- Handler Tests: Unknown -> Capability Search Fallback ---
 
-func TestLoadCapability_Handler_Unknown_IntentFallback(t *testing.T) {
+func TestLoadCapability_Handler_Unknown_CapabilitySearchFallback(t *testing.T) {
 	ctx := context.Background()
 	cfg := &aicommon.Config{}
 	invoker := newTestInvoker(ctx)
-	invoker.executeLoopResult = true
-	invoker.executeLoopCallback = func(loopName string, task aicommon.AIStatefulTask) (bool, error) {
-		assert.Equal(t, schema.AI_REACT_LOOP_NAME_INTENT, loopName, "should invoke intent loop")
-		return true, nil
-	}
 	task := newTestTask(ctx)
 	invoker.currentTask = task
 
@@ -440,19 +435,17 @@ func TestLoadCapability_Handler_Unknown_IntentFallback(t *testing.T) {
 	action := buildAction("totally-unknown-thing")
 	loopAction_LoadCapability.ActionHandler(loop, action, op)
 
-	assert.True(t, invoker.executeLoopCalled, "intent loop should be invoked as fallback")
-	assert.Equal(t, schema.AI_REACT_LOOP_NAME_INTENT, invoker.executeLoopName)
-	assert.True(t, op.IsContinued(), "should continue after intent fallback")
+	assert.False(t, invoker.executeLoopCalled, "intent loop should not be invoked as fallback")
+	assert.True(t, op.IsContinued(), "should continue after capability search fallback")
 	feedback := op.GetFeedback().String()
 	assert.Contains(t, feedback, "totally-unknown-thing")
 	assert.Contains(t, feedback, "was NOT found")
 }
 
-func TestLoadCapability_Handler_Unknown_IntentFallback_Error(t *testing.T) {
+func TestLoadCapability_Handler_Unknown_CapabilitySearchFallback_NoResults(t *testing.T) {
 	ctx := context.Background()
 	cfg := &aicommon.Config{}
 	invoker := newTestInvoker(ctx)
-	invoker.executeLoopErr = fmt.Errorf("intent loop failed")
 	task := newTestTask(ctx)
 	invoker.currentTask = task
 
@@ -465,9 +458,10 @@ func TestLoadCapability_Handler_Unknown_IntentFallback_Error(t *testing.T) {
 	action := buildAction("unknown-thing")
 	loopAction_LoadCapability.ActionHandler(loop, action, op)
 
-	assert.True(t, invoker.executeLoopCalled)
-	assert.True(t, op.IsContinued(), "should continue on intent fallback failure")
-	assert.Contains(t, op.GetFeedback().String(), "intent recognition FAILED")
+	assert.False(t, invoker.executeLoopCalled)
+	assert.True(t, op.IsContinued(), "should continue after capability search fallback")
+	assert.Contains(t, op.GetFeedback().String(), "unknown-thing")
+	assert.Contains(t, op.GetFeedback().String(), "was NOT found")
 }
 
 // --- Handler Tests: Empty Identifier ---
@@ -592,8 +586,7 @@ func TestLoadCapability_E2E_UnknownFallbackFlow(t *testing.T) {
 	op := reactloops.NewActionHandlerOperator(task)
 	loopAction_LoadCapability.ActionHandler(loop, action, op)
 
-	assert.True(t, invoker.executeLoopCalled, "intent loop should be invoked")
-	assert.Equal(t, schema.AI_REACT_LOOP_NAME_INTENT, invoker.executeLoopName)
+	assert.False(t, invoker.executeLoopCalled, "intent loop should not be invoked")
 	assert.True(t, op.IsContinued(), "should continue after fallback")
 	assert.False(t, op.IsAsyncModeRequested(), "unknown fallback should not be async")
 }
@@ -840,8 +833,8 @@ func TestLoadCapability_Handler_Unknown_BlockedOnRepeat(t *testing.T) {
 	action := buildAction("repeat-unknown")
 	loopAction_LoadCapability.ActionHandler(loop, action, op1)
 
-	assert.True(t, invoker.executeLoopCalled,
-		"first attempt should trigger intent recognition")
+	assert.False(t, invoker.executeLoopCalled,
+		"first attempt should use capability search without intent recognition")
 
 	invoker.mu.Lock()
 	invoker.executeLoopCalled = false
