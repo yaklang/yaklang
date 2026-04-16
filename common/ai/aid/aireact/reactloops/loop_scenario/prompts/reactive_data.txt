@@ -1,0 +1,82 @@
+## 当前情景识别状态 / Current Scenario Recognition State
+
+### 用户输入 / User Query
+{{ .UserQuery }}
+
+{{ if .OriginUserInput }}
+### 原始用户输入 / Original User Query
+{{ .OriginUserInput }}
+{{ end }}
+
+{{ if .TaskSummary }}
+### 当前任务摘要 / Task Summary
+{{ .TaskSummary }}
+{{ end }}
+
+{{ if .TaskFocusMode }}
+### 当前 Focus Mode
+{{ .TaskFocusMode }}
+{{ end }}
+
+{{ if .TaskRetrievalTarget }}
+### 已有检索目标 / Existing Retrieval Target
+{{ .TaskRetrievalTarget }}
+{{ end }}
+
+{{ if .TaskRetrievalTags }}
+### 已有检索标签 / Existing Retrieval Tags
+{{ .TaskRetrievalTags }}
+{{ end }}
+
+{{ if .TaskRetrievalQuestions }}
+### 已有检索问题 / Existing Retrieval Questions
+{{ .TaskRetrievalQuestions }}
+{{ end }}
+
+{{ if .AttachedResources }}
+### 附加资源 / Attached Resources
+{{ .AttachedResources }}
+{{ end }}
+
+{{ if .CurrentMemories }}
+### 当前记忆 / Current Memories
+{{ .CurrentMemories }}
+{{ end }}
+
+{{ if .UpstreamIntentAnalysis }}
+### 既有意图识别 / Existing Intent Analysis
+{{ .UpstreamIntentAnalysis }}
+{{ end }}
+
+{{ if .UpstreamContextEnrichment }}
+### 既有上下文增强 / Existing Context Enrichment
+{{ .UpstreamContextEnrichment }}
+{{ end }}
+
+{{ if .UpstreamRecommendedTools }}
+### 既有推荐工具 / Existing Recommended Tools
+{{ .UpstreamRecommendedTools }}
+{{ end }}
+
+{{ if .UpstreamRecommendedForges }}
+### 既有推荐蓝图 / Existing Recommended Forges
+{{ .UpstreamRecommendedForges }}
+{{ end }}
+
+{{ if .TimelineSnapshot }}
+### 时间线快照 / Timeline Snapshot
+{{ .TimelineSnapshot }}
+{{ end }}
+
+{{ if .UserInputHistory }}
+### 用户输入历史 / User Input History
+{{ .UserInputHistory }}
+{{ end }}
+
+{{ if .ScenarioAnalysis }}
+### 当前情景分析进度 / Existing Scenario Analysis
+{{ .ScenarioAnalysis }}
+{{ else }}
+### 当前情景分析进度 / Existing Scenario Analysis
+{{ if eq .Language "zh" }}尚未完成情景识别。{{ else }}Scenario recognition has not been completed yet.{{ end }}
+{{ end }}
