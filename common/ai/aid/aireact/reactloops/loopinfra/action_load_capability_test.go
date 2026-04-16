@@ -152,7 +152,7 @@ func newTestTask(ctx context.Context) *aicommon.AIStatefulTaskBase {
 
 func buildAction(identifier string) *aicommon.Action {
 	action, _ := aicommon.ExtractAction(
-		fmt.Sprintf(`{"@action": "load_capability", "identifier": "%s"}`, identifier),
+		fmt.Sprintf(`{"@action": "load_capability", "capability_identifier": "%s"}`, identifier),
 		"load_capability",
 	)
 	return action

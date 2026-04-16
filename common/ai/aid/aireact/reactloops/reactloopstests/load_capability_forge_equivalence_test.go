@@ -193,7 +193,7 @@ func TestForgeEquivalence_RequireAIBlueprint_vs_LoadCapability(t *testing.T) {
 			t,
 			"load-cap-forge",
 			forgeName,
-			`{"@action": "load_capability", "identifier": "`+forgeName+`",
+			`{"@action": "load_capability", "capability_identifier": "`+forgeName+`",
 			"human_readable_thought": "loading capability for forge"}`,
 			[]string{"directly_answer", "load_capability"},
 		)
