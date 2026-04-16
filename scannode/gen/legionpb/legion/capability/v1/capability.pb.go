@@ -150,6 +150,7 @@ type CapabilityStatus struct {
 	Status        string                 `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`
 	Message       string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
 	ObservedAt    *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=observed_at,json=observedAt,proto3" json:"observed_at,omitempty"`
+	DetailJson    []byte                 `protobuf:"bytes,6,opt,name=detail_json,json=detailJson,proto3" json:"detail_json,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -215,6 +216,13 @@ func (x *CapabilityStatus) GetMessage() string {
 func (x *CapabilityStatus) GetObservedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.ObservedAt
+	}
+	return nil
+}
+
+func (x *CapabilityStatus) GetDetailJson() []byte {
+	if x != nil {
+		return x.DetailJson
 	}
 	return nil
 }
@@ -377,7 +385,7 @@ const file_legion_capability_v1_capability_proto_rawDesc = "" +
 	"\n" +
 	"capability\x18\x03 \x01(\v2#.legion.capability.v1.CapabilityRefR\n" +
 	"capability\x12*\n" +
-	"\x11desired_spec_json\x18\x04 \x01(\fR\x0fdesiredSpecJson\"\x81\x02\n" +
+	"\x11desired_spec_json\x18\x04 \x01(\fR\x0fdesiredSpecJson\"\xa2\x02\n" +
 	"\x10CapabilityStatus\x129\n" +
 	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12C\n" +
 	"\n" +
@@ -386,7 +394,9 @@ const file_legion_capability_v1_capability_proto_rawDesc = "" +
 	"\x06status\x18\x03 \x01(\tR\x06status\x12\x18\n" +
 	"\amessage\x18\x04 \x01(\tR\amessage\x12;\n" +
 	"\vobserved_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"observedAt\"\xe4\x01\n" +
+	"observedAt\x12\x1f\n" +
+	"\vdetail_json\x18\x06 \x01(\fR\n" +
+	"detailJson\"\xe4\x01\n" +
 	"\x0fCapabilityAlert\x129\n" +
 	"\bmetadata\x18\x01 \x01(\v2\x1d.legion.node.v1.EventMetadataR\bmetadata\x12C\n" +
 	"\n" +
