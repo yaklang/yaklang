@@ -16,12 +16,12 @@ import (
 )
 
 type httpFuzztestTestInvoker struct {
-	base        *mock.MockInvoker
-	config      aicommon.AICallerConfigIf
-	currentTask aicommon.AIStatefulTask
+	base           *mock.MockInvoker
+	config         aicommon.AICallerConfigIf
+	currentTask    aicommon.AIStatefulTask
 	resultPayloads []string
 	timelineEvents []string
-	mu          sync.Mutex
+	mu             sync.Mutex
 }
 
 func newHTTPFuzztestAICallbackInvoker(t *testing.T, cb aicommon.AICallbackType) *httpFuzztestTestInvoker {
@@ -229,26 +229,26 @@ func TestLoopHTTPFuzztestDirectlyAnswerVerifier_RejectsPayloadAndTagTogether(t *
 func TestLoopHTTPFuzztestExecute_DirectlyAnswerWithFinalAnswerAITag(t *testing.T) {
 	var prompts []string
 	invoker := newHTTPFuzztestAICallbackInvoker(t, func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			prompts = append(prompts, req.GetPrompt())
-			nonceRe := regexp.MustCompile(`<\|FINAL_ANSWER_(\w{4})\|>`)
-			matches := nonceRe.FindStringSubmatch(req.GetPrompt())
-			if len(matches) != 2 {
-				t.Fatalf("expected FINAL_ANSWER nonce in prompt, got: %s", req.GetPrompt())
-			}
+		prompts = append(prompts, req.GetPrompt())
+		nonceRe := regexp.MustCompile(`<\|FINAL_ANSWER_(\w{4})\|>`)
+		matches := nonceRe.FindStringSubmatch(req.GetPrompt())
+		if len(matches) != 2 {
+			t.Fatalf("expected FINAL_ANSWER nonce in prompt, got: %s", req.GetPrompt())
+		}
 
-			rsp := i.NewAIResponse()
-			rsp.EmitOutputStream(bytes.NewBufferString(
-				`{"@action":"directly_answer","identifier":"phase_status"}` + "\n" +
-					"<|FINAL_ANSWER_" + matches[1] + "|>\n" +
-					"## 当前阶段结论\n\n" +
-					"### 已测试方面\n- 已测试 q 参数的基础注入。\n\n" +
-					"### 结果与发现\n- 暂未发现直接报错回显。\n\n" +
-					"### 下一步建议\n1. 继续做上下文打断测试。\n" +
-					"<|FINAL_ANSWER_END_" + matches[1] + "|>",
-			))
-			rsp.Close()
-			return rsp, nil
-		})
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(
+			`{"@action":"directly_answer","identifier":"phase_status"}` + "\n" +
+				"<|FINAL_ANSWER_" + matches[1] + "|>\n" +
+				"## 当前阶段结论\n\n" +
+				"### 已测试方面\n- 已测试 q 参数的基础注入。\n\n" +
+				"### 结果与发现\n- 暂未发现直接报错回显。\n\n" +
+				"### 下一步建议\n1. 继续做上下文打断测试。\n" +
+				"<|FINAL_ANSWER_END_" + matches[1] + "|>",
+		))
+		rsp.Close()
+		return rsp, nil
+	})
 
 	loop, err := reactloops.CreateLoopByName(
 		LoopHTTPFuzztestName,

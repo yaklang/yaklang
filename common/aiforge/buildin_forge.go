@@ -182,6 +182,7 @@ func syncBuildInForgeInternal() error {
 	registerBuildInForge("ssa_vulnerability_analyzer")
 	registerBuildInForge("alert_denoising")
 	registerBuildInForge("sf_rule_completion")
+	registerBuildInForge("sf_project_scan_check")
 	cleanupRemovedBuildInForges()
 	return nil
 }
