@@ -26,12 +26,17 @@ func (b *legionJobBridge) Run(ctx context.Context) {
 	defer b.stopConsumer()
 	defer b.publisher.Close()
 	defer b.capabilityPublisher.Close()
+	defer b.ruleSyncPublisher.Close()
+
+	go b.forwardCapabilityAlerts(ctx)
+	go b.forwardCapabilityObservations(ctx)
 
 	for {
 		if ctx.Err() != nil {
 			return
 		}
 		b.syncConsumer(ctx)
+		b.syncCapabilityStatuses(ctx)
 
 		select {
 		case <-ctx.Done():
@@ -41,10 +46,81 @@ func (b *legionJobBridge) Run(ctx context.Context) {
 	}
 }
 
+func (b *legionJobBridge) forwardCapabilityAlerts(ctx context.Context) {
+	if b == nil || b.agent == nil || b.agent.capabilityManager == nil {
+		return
+	}
+
+	alerts := b.agent.capabilityManager.Alerts()
+	if alerts == nil {
+		return
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case alert, ok := <-alerts:
+			if !ok {
+				return
+			}
+			if err := b.capabilityPublisher.PublishAlert(ctx, alert); err != nil {
+				log.Errorf(
+					"publish capability alert failed: node_id=%s capability=%s rule_id=%s err=%v",
+					b.agent.node.NodeId,
+					alert.CapabilityKey,
+					alert.RuleID,
+					err,
+				)
+			}
+		}
+	}
+}
+
+func (b *legionJobBridge) forwardCapabilityObservations(ctx context.Context) {
+	if b == nil || b.agent == nil || b.agent.capabilityManager == nil {
+		return
+	}
+
+	observations := b.agent.capabilityManager.Observations()
+	if observations == nil {
+		return
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case observation, ok := <-observations:
+			if !ok {
+				return
+			}
+			if err := b.capabilityPublisher.PublishObservation(ctx, observation); err != nil {
+				if isCapabilityObservationSessionUnavailable(err) {
+					b.noteSuppressedObservationDrop()
+					continue
+				}
+				log.Errorf(
+					"publish hids observation failed: node_id=%s capability=%s type=%s err=%v",
+					b.agent.node.NodeId,
+					observation.CapabilityKey,
+					observation.EventType,
+					err,
+				)
+			}
+		}
+	}
+}
+
+func isCapabilityObservationSessionUnavailable(err error) bool {
+	return errors.Is(err, ErrNodeSessionNotReady)
+}
+
 func (b *legionJobBridge) syncConsumer(parent context.Context) {
 	session, ok := b.agent.node.GetSessionState()
 	if !ok {
 		b.stopConsumer()
+		b.resetCapabilityStatusSync()
 		return
 	}
 
@@ -187,6 +263,8 @@ func (b *legionJobBridge) handleMessage(
 		return b.handleCancel(message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandCapabilityApply):
 		return b.handleCapabilityApply(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandSSARuleSyncExport):
+		return b.handleSSARuleSyncExport(ctx, message.Data)
 	default:
 		return fmt.Errorf("unsupported legion command subject: %s", message.Subject)
 	}

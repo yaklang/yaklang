@@ -62,6 +62,12 @@ func TestHTTPTransportBootstrap(t *testing.T) {
 						request.HeartbeatIntervalSeconds,
 					)
 				}
+				if request.Hostname != "host-a" {
+					t.Fatalf("unexpected hostname: %q", request.Hostname)
+				}
+				if request.PrimaryIP != "10.0.0.5" {
+					t.Fatalf("unexpected primary_ip: %q", request.PrimaryIP)
+				}
 
 				w.WriteHeader(tt.status)
 				_, _ = w.Write([]byte(tt.response))
@@ -78,6 +84,13 @@ func TestHTTPTransportBootstrap(t *testing.T) {
 				NodeID:                   "node-1",
 				NodeType:                 "scanner-agent",
 				HeartbeatIntervalSeconds: 30,
+				HostInfo: HostInfo{
+					Hostname:        "host-a",
+					PrimaryIP:       "10.0.0.5",
+					IPAddresses:     []string{"10.0.0.5", "192.168.1.7"},
+					OperatingSystem: "linux",
+					Architecture:    "amd64",
+				},
 			})
 			if tt.wantErr {
 				if err == nil {
@@ -165,6 +178,15 @@ func TestHTTPTransportHeartbeat(t *testing.T) {
 				if len(request.ActiveAttempts) != 1 {
 					t.Fatalf("unexpected active_attempt count: %d", len(request.ActiveAttempts))
 				}
+				if request.Hostname != "host-a" {
+					t.Fatalf("unexpected hostname: %q", request.Hostname)
+				}
+				if request.PrimaryIP != "10.0.0.5" {
+					t.Fatalf("unexpected primary_ip: %q", request.PrimaryIP)
+				}
+				if request.OperatingSystem != "linux" {
+					t.Fatalf("unexpected operating_system: %q", request.OperatingSystem)
+				}
 				if request.ActiveAttempts[0].AttemptID != tt.wantAttemptID {
 					t.Fatalf("unexpected active_attempt attempt_id: %s", request.ActiveAttempts[0].AttemptID)
 				}
@@ -187,6 +209,13 @@ func TestHTTPTransportHeartbeat(t *testing.T) {
 				RunningJobs:              tt.wantRunningJobs,
 				ObservedAt:               tt.wantObservedTime,
 				HeartbeatIntervalSeconds: tt.wantInterval,
+				HostInfo: HostInfo{
+					Hostname:        "host-a",
+					PrimaryIP:       "10.0.0.5",
+					IPAddresses:     []string{"10.0.0.5", "192.168.1.7"},
+					OperatingSystem: "linux",
+					Architecture:    "amd64",
+				},
 				ActiveAttempts: []ActiveAttemptHeartbeat{
 					{
 						AttemptID:      tt.wantAttemptID,
