@@ -60,13 +60,16 @@ func captureLoopHTTPFuzzSessionContext(loop *reactloops.ReActLoop, source string
 		return nil
 	}
 
-	analysisSummary := strings.TrimSpace(loop.Get("diff_result_compressed"))
+	analysisSummary := strings.TrimSpace(loop.Get("diff_result_analysis"))
+	if analysisSummary == "" {
+		analysisSummary = strings.TrimSpace(loop.Get("diff_result_compressed"))
+	}
 	if analysisSummary == "" {
 		analysisSummary = strings.TrimSpace(loop.Get("diff_result"))
 	}
 
 	ctx := &loopHTTPFuzzSessionContext{
-		Version:                   3,
+		Version:                   4,
 		OriginalRequest:           originalRequest,
 		OriginalRequestSummary:    strings.TrimSpace(loop.Get("original_request_summary")),
 		CurrentRequest:            strings.TrimSpace(loop.Get("current_request")),
@@ -208,7 +211,8 @@ func applyLoopHTTPFuzzSessionContext(loop *reactloops.ReActLoop, runtime aicommo
 	loop.Set("representative_response", ctx.RepresentativeResponse)
 	loop.Set("representative_httpflow_hidden_index", ctx.RepresentativeHiddenIndex)
 	loop.Set("diff_result", ctx.AnalysisSummary)
-	loop.Set("diff_result_compressed", ctx.AnalysisSummary)
+	loop.Set("diff_result_analysis", ctx.AnalysisSummary)
+	loop.Set("diff_result_compressed", "")
 	loop.Set("verification_result", ctx.VerificationResult)
 	setLoopHTTPFuzzRecentActions(loop, ctx.RecentActions)
 	setLoopHTTPFuzzTestedPayloads(loop, ctx.TestedPayloadsByAction)

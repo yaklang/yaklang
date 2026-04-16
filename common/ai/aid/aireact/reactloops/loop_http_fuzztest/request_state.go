@@ -283,6 +283,7 @@ func resetLoopHTTPFuzzExecutionState(loop *reactloops.ReActLoop) {
 	loop.Set("representative_httpflow_hidden_index", "")
 	loop.Set("diff_result", "")
 	loop.Set("diff_result_full", "")
+	loop.Set("diff_result_analysis", "")
 	loop.Set("diff_result_compressed", "")
 	loop.Set("verification_result", "")
 }

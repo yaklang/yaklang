@@ -132,6 +132,25 @@ func TestLoopHTTPFuzztestFinalize_DeliversFallbackSummary(t *testing.T) {
 	}
 }
 
+func TestGenerateLoopHTTPFuzzFinalizeSummary_PrefersCompressedResultOverAnalysis(t *testing.T) {
+	invoker := newFuzzFinalizeTestInvoker(t)
+	loop := newFuzzFinalizeTestLoop(t, invoker)
+
+	loop.Set("original_request", "GET /health HTTP/1.1\r\nHost: example.com\r\n\r\n")
+	loop.Set("original_request_summary", "URL: http://example.com/health BODY: [(0) bytes]")
+	loop.Set("current_request_summary", "URL: http://example.com/health BODY: [(0) bytes]")
+	loop.Set("diff_result_analysis", "analysis-only result")
+	loop.Set("diff_result_compressed", "compressed result")
+
+	finalContent := generateLoopHTTPFuzzFinalizeSummary(loop, "done")
+	if !strings.Contains(finalContent, "compressed result") {
+		t.Fatalf("expected finalize summary to include compressed result, got: %s", finalContent)
+	}
+	if strings.Contains(finalContent, "analysis-only result") {
+		t.Fatalf("expected finalize summary to prefer compressed result over analysis result, got: %s", finalContent)
+	}
+}
+
 func TestLoopHTTPFuzztestFinalize_SkipsWhenAlreadyDirectlyAnswered(t *testing.T) {
 	invoker := newFuzzFinalizeTestInvoker(t)
 	loop := newFuzzFinalizeTestLoop(t, invoker)
