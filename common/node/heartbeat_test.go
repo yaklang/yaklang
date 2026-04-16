@@ -14,6 +14,14 @@ func (s stubRuntimeStatusProvider) Snapshot() RuntimeStatus {
 	return s.snapshot
 }
 
+type stubHostInfoProvider struct {
+	info HostInfo
+}
+
+func (s stubHostInfoProvider) Snapshot() HostInfo {
+	return s.info
+}
+
 type stubSessionTransport struct {
 	heartbeatSession SessionState
 	heartbeatRequest HeartbeatRequest
@@ -69,16 +77,23 @@ func TestNodeBaseHeartbeatBuildsRequestFromRuntimeStatus(t *testing.T) {
 	}
 	transport := &stubSessionTransport{}
 	node := &NodeBase{
-		rootCtx:           context.Background(),
-		NodeId:            "node-1",
-		version:           "dev",
-		labels:            map[string]string{"zone": "cn"},
-		capabilityKeys:    []string{"yak.execute"},
-		maxRunningJobs:    8,
-		lifecycleState:    DefaultLifecycleState,
-		requestTimeout:    time.Second,
-		transport:         transport,
-		statusProvider:    stubRuntimeStatusProvider{snapshot: RuntimeStatus{RunningJobs: 2, ActiveAttempts: activeAttempts}},
+		rootCtx:        context.Background(),
+		NodeId:         "node-1",
+		version:        "dev",
+		labels:         map[string]string{"zone": "cn"},
+		capabilityKeys: []string{"yak.execute"},
+		maxRunningJobs: 8,
+		lifecycleState: DefaultLifecycleState,
+		requestTimeout: time.Second,
+		transport:      transport,
+		statusProvider: stubRuntimeStatusProvider{snapshot: RuntimeStatus{RunningJobs: 2, ActiveAttempts: activeAttempts}},
+		hostInfoProvider: stubHostInfoProvider{info: HostInfo{
+			Hostname:        "host-a",
+			PrimaryIP:       "10.0.0.5",
+			IPAddresses:     []string{"10.0.0.5", "192.168.1.7"},
+			OperatingSystem: "linux",
+			Architecture:    "amd64",
+		}},
 		heartbeatInterval: 1500 * time.Millisecond,
 		session: SessionState{
 			SessionID:    "session-1",
@@ -120,6 +135,15 @@ func TestNodeBaseHeartbeatBuildsRequestFromRuntimeStatus(t *testing.T) {
 		transport.heartbeatRequest.ObservedAt.After(after) {
 		t.Fatalf("unexpected observed_at: %s", transport.heartbeatRequest.ObservedAt)
 	}
+	if transport.heartbeatRequest.Hostname != "host-a" {
+		t.Fatalf("unexpected hostname: %q", transport.heartbeatRequest.Hostname)
+	}
+	if transport.heartbeatRequest.PrimaryIP != "10.0.0.5" {
+		t.Fatalf("unexpected primary ip: %q", transport.heartbeatRequest.PrimaryIP)
+	}
+	if len(transport.heartbeatRequest.IPAddresses) != 2 {
+		t.Fatalf("unexpected ip_addresses: %#v", transport.heartbeatRequest.IPAddresses)
+	}
 	if len(transport.heartbeatRequest.ActiveAttempts) != 1 {
 		t.Fatalf("unexpected active_attempt count: %d", len(transport.heartbeatRequest.ActiveAttempts))
 	}
@@ -133,6 +157,13 @@ func TestNodeBaseHeartbeatBuildsRequestFromRuntimeStatus(t *testing.T) {
 	node.labels["zone"] = "us"
 	node.capabilityKeys[0] = "mutated"
 	activeAttempts[0].AttemptID = "changed"
+	node.hostInfoProvider = stubHostInfoProvider{info: HostInfo{
+		Hostname:        "changed",
+		PrimaryIP:       "127.0.0.1",
+		IPAddresses:     []string{"127.0.0.1"},
+		OperatingSystem: "changed",
+		Architecture:    "changed",
+	}}
 
 	if transport.heartbeatRequest.Labels["zone"] != "cn" {
 		t.Fatalf("heartbeat labels were not cloned: %v", transport.heartbeatRequest.Labels)
@@ -148,6 +179,9 @@ func TestNodeBaseHeartbeatBuildsRequestFromRuntimeStatus(t *testing.T) {
 			"heartbeat active_attempts were not cloned: %s",
 			transport.heartbeatRequest.ActiveAttempts[0].AttemptID,
 		)
+	}
+	if transport.heartbeatRequest.Hostname != "host-a" || transport.heartbeatRequest.PrimaryIP != "10.0.0.5" {
+		t.Fatalf("heartbeat host info was not cloned: %+v", transport.heartbeatRequest.HostInfo)
 	}
 }
 

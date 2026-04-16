@@ -31,6 +31,7 @@ type NodeBase struct {
 
 	transport         SessionTransport
 	statusProvider    RuntimeStatusProvider
+	hostInfoProvider  HostInfoProvider
 	heartbeatInterval time.Duration
 	tickerInterval    time.Duration
 
@@ -74,6 +75,7 @@ func NewNodeBase(cfg BaseConfig) (*NodeBase, error) {
 		requestTimeout:    normalized.RequestTimeout,
 		transport:         transport,
 		statusProvider:    normalized.StatusProvider,
+		hostInfoProvider:  normalized.HostInfoProvider,
 		heartbeatInterval: normalized.HeartbeatInterval,
 		tickerInterval:    normalized.TickerInterval,
 		tickerFuncs:       new(sync.Map),

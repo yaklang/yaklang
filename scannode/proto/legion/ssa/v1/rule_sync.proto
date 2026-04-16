@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package legion.ssa.v1;
+
+import "google/protobuf/timestamp.proto";
+import "legion/node/v1/node.proto";
+
+option go_package = "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/ssa/v1;ssav1";
+
+message ExportRuleCatalogCommand {
+  legion.node.v1.CommandMetadata metadata = 1;
+  string target_node_id = 2;
+  string object_store_bucket = 3;
+  string object_store_key = 4;
+  bool activate_snapshot = 5;
+}
+
+message RuleCatalogExportReady {
+  legion.node.v1.EventMetadata metadata = 1;
+  string object_store_bucket = 2;
+  string object_store_key = 3;
+  string archive_format = 4;
+  string content_sha256 = 5;
+  uint64 raw_size_bytes = 6;
+  uint32 rule_count = 7;
+  uint32 group_count = 8;
+  uint32 risk_type_count = 9;
+  google.protobuf.Timestamp exported_at = 10;
+  bool activate_snapshot = 11;
+}
+
+message RuleCatalogExportFailed {
+  legion.node.v1.EventMetadata metadata = 1;
+  string error_code = 2;
+  string error_message = 3;
+}

@@ -25,6 +25,7 @@ message CapabilityStatus {
   string status = 3;
   string message = 4;
   google.protobuf.Timestamp observed_at = 5;
+  bytes detail_json = 6;
 }
 
 message CapabilityAlert {
