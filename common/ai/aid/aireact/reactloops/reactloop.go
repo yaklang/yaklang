@@ -377,6 +377,7 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		sameLogicSpinThreshold:      3, // 默认连续 3 次相同逻辑触发 AI 检测
 		maxConsecutiveSpinWarnings:  3, // 默认连续 3 次 SPIN 警告后强制退出
 		extraCapabilities:           NewExtraCapabilitiesManager(),
+		perception:                  newPerceptionController(),
 	}
 
 	for _, action := range []*LoopAction{
@@ -398,6 +399,14 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 	for _, opt := range options {
 		opt(r)
 	}
+
+	// Config-level perception disable (e.g. test environments via WithDisablePerception)
+	if config.GetConfigBool("DisablePerception") {
+		r.perception = nil
+	}
+
+	// Auto-register perception context provider (nil-safe, skips if perception disabled)
+	r.RegisterPerceptionContextProvider()
 
 	// Auto-apply skillLoader from config if not already set via options
 	// This allows users to configure skills via aicommon.WithSkillsLocalDir etc.

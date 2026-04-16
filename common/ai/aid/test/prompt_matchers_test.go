@@ -205,6 +205,28 @@ func isWrongToolReviewPrompt(prompt string) bool {
 		(strings.Contains(prompt, "require-tool") || strings.Contains(prompt, "require_tool"))
 }
 
+func isPerceptionPrompt(prompt string) bool {
+	return strings.Contains(prompt, "感知模块") &&
+		utils.MatchAllOfSubString(prompt, "summary", "topics", "keywords", "changed", "confidence")
+}
+
+func tryHandlePerceptionPrompt(config aicommon.AICallerConfigIf, prompt string) (*aicommon.AIResponse, error) {
+	if !isPerceptionPrompt(prompt) {
+		return nil, nil
+	}
+	rsp := config.NewAIResponse()
+	rsp.EmitOutputStream(strings.NewReader(`{
+		"@action": "perception",
+		"summary": "User is testing perception functionality",
+		"topics": ["perception testing", "AI loop"],
+		"keywords": ["perception", "test", "loop"],
+		"changed": true,
+		"confidence": 0.85
+	}`))
+	rsp.Close()
+	return rsp, nil
+}
+
 func unexpectedPromptError(prompt string) error {
 	return utils.Errorf("unexpected prompt: %s", utils.ShrinkString(prompt, 400))
 }
