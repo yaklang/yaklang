@@ -828,7 +828,13 @@ LOOP:
 			r.executeReflection(handler, actionParams, operator, reflectionLevel, iterationCount, actionExecutionDuration)
 		}
 
+		// T1: perception after action execution (async, non-blocking)
+		r.MaybeTriggerPerceptionAfterAction(iterationCount)
+
 		if r.ShouldForceExitDueToSpin() {
+			// T3: force perception update on SPIN detection
+			r.TriggerPerceptionOnSpin()
+
 			log.Warnf("ReactLoop[%v] spin threshold reached (%d consecutive warnings), adding timeline pressure instead of force-exiting",
 				r.loopName, r.consecutiveSpinWarnings)
 			r.GetInvoker().AddToTimeline("spin_pressure",
@@ -838,7 +844,6 @@ LOOP:
 					"The task remains incomplete and requires a new direction. "+
 					"Continuing with the same approach will not help.", r.consecutiveSpinWarnings))
 			r.ResetSpinWarning()
-			// 不强制退出 loop，仅通过 timeline 施压，由 max_iterations 上限兜底
 		}
 
 		// 检查 operator 状态
