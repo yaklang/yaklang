@@ -54,4 +54,6 @@ var Exports = map[string]any{
 	},
 	"QuerySyntaxFlowRules":   QuerySyntaxFlowRules,
 	"MergeCompletionResults": MergeCompletionResultsForYak,
+	// 扫描任务 / 项目核对导出统一收敛到高层聚合入口。
+	"RunSyntaxFlowProjectScanCheck": RunSyntaxFlowProjectScanCheck,
 }
