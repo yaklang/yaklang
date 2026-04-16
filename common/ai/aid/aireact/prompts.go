@@ -350,11 +350,7 @@ func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[s
 	}
 
 	// use timeline getter
-	if t := pm.react.config.GetTimeline(); t != nil {
-		result["Timeline"] = t.Dump()
-	} else {
-		result["Timeline"] = ""
-	}
+	result["Timeline"] = pm.timelineDumpForPrompt()
 	return basePrompt, result, nil
 }
 
@@ -399,11 +395,11 @@ func (pm *PromptManager) GenerateToolParamsPromptWithMeta(tool *aitool.Tool) (*T
 	}
 
 	// Extract context data from memory without lock (assume caller already holds lock)
-	if t := pm.react.config.GetTimeline(); t != nil {
+	if pm.react.config.GetTimeline() != nil {
 		if task := pm.react.GetCurrentTask(); task != nil {
 			data.OriginalQuery = task.GetUserInput()
 		}
-		data.Timeline = t.Dump()
+		data.Timeline = pm.timelineDumpForPrompt()
 	}
 	data.CurrentIteration = pm.react.currentIteration
 	data.MaxIterations = int(pm.react.config.GetMaxIterations())
@@ -437,9 +433,7 @@ func (pm *PromptManager) GenerateVerificationPrompt(originalQuery string, isTool
 	}
 
 	// Get timeline for context (without lock, assume caller handles it)
-	if t := pm.react.config.GetTimeline(); t != nil {
-		data.Timeline = t.Dump()
-	}
+	data.Timeline = pm.timelineDumpForPrompt()
 
 	promptResult, err := pm.executeTemplate("verification", verificationPromptTemplate, data)
 	return promptResult, nonce, err
@@ -464,9 +458,7 @@ func (pm *PromptManager) GenerateAIReviewPrompt(userQuery, toolOrTitle, params s
 	}
 
 	// Set timeline memory
-	if t := pm.react.config.GetTimeline(); t != nil {
-		data.Timeline = t.Dump()
-	}
+	data.Timeline = pm.timelineDumpForPrompt()
 
 	return pm.executeTemplate("ai-review", aiReviewPromptTemplate, data)
 }
@@ -504,9 +496,7 @@ func (pm *PromptManager) GenerateDirectlyAnswerPrompt(userQuery string, tools []
 	}
 
 	// Set timeline memory
-	if t := pm.react.config.GetTimeline(); t != nil {
-		data.Timeline = t.Dump()
-	}
+	data.Timeline = pm.timelineDumpForPrompt()
 
 	result, err := pm.executeTemplate("directly-answer", directlyAnswerPromptTemplate, data)
 	return result, nonceString, err
@@ -537,9 +527,7 @@ func (pm *PromptManager) GenerateToolReSelectPrompt(noUserInteract bool, oldTool
 	}
 
 	// Set timeline memory
-	if t := pm.react.config.GetTimeline(); t != nil {
-		data.Timeline = t.Dump()
-	}
+	data.Timeline = pm.timelineDumpForPrompt()
 
 	return pm.executeTemplate("wrong-tool", wrongToolPromptTemplate, data)
 }
@@ -581,9 +569,7 @@ func (pm *PromptManager) GenerateReGenerateToolParamsPromptWithMeta(userQuery st
 	}
 
 	// Set timeline memory
-	if t := pm.react.config.GetTimeline(); t != nil {
-		data.Timeline = t.Dump()
-	}
+	data.Timeline = pm.timelineDumpForPrompt()
 
 	prompt, err := pm.executeTemplate("wrong-params", wrongParamsPromptTemplate, data)
 	if err != nil {
@@ -628,8 +614,8 @@ func (pm *PromptManager) GenerateChangeAIBlueprintPrompt(
 	}
 
 	// Set timeline memory
-	if t := pm.react.config.GetTimeline(); t != nil {
-		data.Timeline = t.Dump()
+	if pm.react.config.GetTimeline() != nil {
+		data.Timeline = pm.timelineDumpForPrompt()
 		if task := pm.react.GetCurrentTask(); task != nil {
 			data.UserQuery = task.GetUserInput()
 		}
@@ -661,11 +647,11 @@ func (pm *PromptManager) GenerateAIBlueprintForgeParamsPromptEx(
 	}
 
 	// Extract context data from memory without lock (assume caller already holds lock)
-	if t := pm.react.config.GetTimeline(); t != nil {
+	if pm.react.config.GetTimeline() != nil {
 		if task := pm.react.GetCurrentTask(); task != nil {
 			data.OriginalQuery = task.GetUserInput()
 		}
-		data.Timeline = t.Dump()
+		data.Timeline = pm.timelineDumpForPrompt()
 	}
 	data.CurrentIteration = pm.react.currentIteration
 	data.MaxIterations = int(pm.react.config.GetMaxIterations())
@@ -699,6 +685,17 @@ func (pm *PromptManager) executeTemplate(name, templateContent string, data inte
 	}
 
 	return buf.String(), nil
+}
+
+func (pm *PromptManager) timelineDumpForPrompt() string {
+	if pm == nil || pm.react == nil || pm.react.config == nil {
+		return ""
+	}
+	timeline := pm.react.config.GetTimeline()
+	if timeline == nil {
+		return ""
+	}
+	return buildTimelineDumpWithMidtermMemory(pm.react, timeline)
 }
 
 func (pm *PromptManager) DynamicContext() string {
@@ -802,8 +799,8 @@ func (pm *PromptManager) GenerateIntervalReviewPromptWithContext(
 	}
 
 	// Get task context from timeline (truncated for prompt)
-	if t := pm.react.config.GetTimeline(); t != nil {
-		fullDump := t.Dump()
+	if pm.react.config.GetTimeline() != nil {
+		fullDump := pm.timelineDumpForPrompt()
 		data.TaskContext = utils.ShrinkString(fullDump, 2000) // Limit to 2000 chars
 	}
 

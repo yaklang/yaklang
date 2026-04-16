@@ -3,6 +3,7 @@ package aireact
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/utils"
@@ -10,39 +11,63 @@ import (
 
 const midtermContextBytesLimit = 3 * 1024
 
-func NewMidtermSessionMemoryContextProvider(react *ReAct) aicommon.ContextProvider {
-	return func(config aicommon.AICallerConfigIf, emitter *aicommon.Emitter, key string) (string, error) {
-		_ = emitter
-		_ = key
-		if react == nil || react.config == nil || react.config.TimelineArchiveStore == nil {
-			return "", nil
-		}
-
-		query := strings.TrimSpace(buildMidtermRecallQuery(react))
-		if query == "" {
-			return "", nil
-		}
-
-		result, err := react.config.TimelineArchiveStore.SearchArchivedBatches(
-			config.GetContext(),
-			&aicommon.TimelineArchiveSearchQuery{
-				Query:      query,
-				BytesLimit: midtermContextBytesLimit,
-			},
-		)
-		if err != nil {
-			return "", err
-		}
-		if result == nil || strings.TrimSpace(result.TotalContent) == "" {
-			return "", nil
-		}
-
-		return fmt.Sprintf(
-			"## Midterm Session Memory\nSearch query: %s\n%s",
-			utils.ShrinkString(query, 240),
-			strings.TrimSpace(result.TotalContent),
-		), nil
+func buildTimelineDumpWithMidtermMemory(react *ReAct, timeline *aicommon.Timeline) string {
+	baseTimeline := ""
+	if timeline != nil {
+		baseTimeline = timeline.Dump()
 	}
+	midtermPrefix, err := buildMidtermTimelinePrefix(react)
+	if err != nil {
+		return baseTimeline
+	}
+	if midtermPrefix == "" {
+		return baseTimeline
+	}
+	if strings.TrimSpace(baseTimeline) == "" {
+		return "timeline:\n" + midtermPrefix
+	}
+	body := strings.TrimPrefix(baseTimeline, "timeline:\n")
+	return "timeline:\n" + midtermPrefix + body
+}
+
+func buildMidtermTimelinePrefix(react *ReAct) (string, error) {
+	if react == nil || react.config == nil || react.config.TimelineArchiveStore == nil {
+		return "", nil
+	}
+
+	query := strings.TrimSpace(buildMidtermRecallQuery(react))
+	if query == "" {
+		return "", nil
+	}
+
+	result, err := react.config.TimelineArchiveStore.SearchArchivedBatches(
+		react.config.GetContext(),
+		&aicommon.TimelineArchiveSearchQuery{
+			Query:      query,
+			BytesLimit: midtermContextBytesLimit,
+		},
+	)
+	if err != nil {
+		return "", err
+	}
+	if result == nil || strings.TrimSpace(result.TotalContent) == "" {
+		return "", nil
+	}
+
+	var buf strings.Builder
+	nowStr := time.Now().Format(utils.DefaultTimeFormat3)
+	buf.WriteString(fmt.Sprintf("--[%s] midterm-memory:\n", nowStr))
+	buf.WriteString(fmt.Sprintf("     search-query: %s\n", utils.ShrinkString(query, 240)))
+	for _, line := range utils.ParseStringToRawLines(strings.TrimSpace(result.TotalContent)) {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		buf.WriteString("     ")
+		buf.WriteString(line)
+		buf.WriteString("\n")
+	}
+	return buf.String(), nil
 }
 
 func buildMidtermRecallQuery(react *ReAct) string {
