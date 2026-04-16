@@ -1,0 +1,5 @@
+{{ if eq .Language "zh" }}
+{"@action": "finalize_scenario", "scenario_summary": "Java 反编译结果重构场景", "tool_search_queries": ["Java 反编译代码重构工具", "反编译结果可读性优化"], "knowledge_search_queries": ["Java 反编译代码修复方法", "反编译结果结构化重建经验"], "memory_search_queries": ["Java 反编译重构历史经验", "类似反编译代码清理案例"], "tags": ["java", "decompile", "refactor"], "questions": ["如何重构 Java 反编译代码？", "有哪些处理反编译结果的经验？"]}
+{{ else }}
+{"@action": "finalize_scenario", "scenario_summary": "Refactoring decompiled Java output", "tool_search_queries": ["tools for refactoring decompiled Java code", "improving readability of decompiler output"], "knowledge_search_queries": ["how to repair decompiled Java code structure", "best practices for reconstructing decompiler output"], "memory_search_queries": ["previous experience refactoring decompiled Java", "similar cases of cleaning decompiled code"], "tags": ["java", "decompile", "refactor"], "questions": ["How should decompiled Java output be refactored?", "What past experience is relevant to decompiler cleanup?"]}
+{{ end }}
