@@ -14,14 +14,25 @@ import (
 )
 
 type mockMidtermArchiveStore struct {
-	result *aicommon.TimelineArchiveSearchResult
+	result  *aicommon.TimelineArchiveSearchResult
+	results map[string]*aicommon.TimelineArchiveSearchResult
+	queries []string
 }
 
 func (m *mockMidtermArchiveStore) ArchiveCompressedBatch(context.Context, *aicommon.TimelineArchiveBatch) (*aicommon.TimelineArchiveRef, error) {
 	return nil, nil
 }
 
-func (m *mockMidtermArchiveStore) SearchArchivedBatches(context.Context, *aicommon.TimelineArchiveSearchQuery) (*aicommon.TimelineArchiveSearchResult, error) {
+func (m *mockMidtermArchiveStore) SearchArchivedBatches(ctx context.Context, query *aicommon.TimelineArchiveSearchQuery) (*aicommon.TimelineArchiveSearchResult, error) {
+	_ = ctx
+	if query != nil {
+		m.queries = append(m.queries, query.Query)
+		if m.results != nil {
+			if result, ok := m.results[query.Query]; ok {
+				return result, nil
+			}
+		}
+	}
 	if m.result == nil {
 		return &aicommon.TimelineArchiveSearchResult{}, nil
 	}
@@ -110,11 +121,9 @@ func TestBuildMidtermRecallQuery_IncludesCurrentTaskDetails(t *testing.T) {
 	query := buildMidtermRecallQuery(react)
 
 	for _, expected := range []string{
-		"1-2",
 		"verify http flow",
 		"collect and verify malformed header behavior",
 		"focus on malformed headers",
-		"need reproduce with retry",
 		"http fuzz regression",
 		"which malformed headers failed",
 		"http",
@@ -153,8 +162,54 @@ func TestBuildTimelineDumpWithMidtermMemory_PrependsMidtermMemory(t *testing.T) 
 
 	require.True(t, strings.HasPrefix(dump, "timeline:\n--["))
 	require.Contains(t, dump, "midterm-memory:")
-	require.Contains(t, dump, "search-query:")
+	require.Contains(t, dump, "search-queries:")
 	require.Contains(t, dump, "important archived clue")
 	require.Contains(t, dump, "live timeline item")
 	require.Less(t, strings.Index(dump, "midterm-memory:"), strings.Index(dump, "live timeline item"))
+}
+
+func TestBuildMidtermTimelinePrefix_SearchesEachQueryPartOnce(t *testing.T) {
+	store := &mockMidtermArchiveStore{
+		results: map[string]*aicommon.TimelineArchiveSearchResult{
+			"verify http flow": {
+				ArchiveRefs:  []*aicommon.TimelineArchiveRef{{ArchiveID: "archive-1"}},
+				TotalContent: "memory from task name",
+				SelectedMemory: []*aicommon.MemoryEntity{{
+					Id:      "memory-1",
+					Content: "memory from task name",
+				}},
+			},
+			"http fuzz regression": {
+				ArchiveRefs:  []*aicommon.TimelineArchiveRef{{ArchiveID: "archive-2"}},
+				TotalContent: "memory from retrieval target",
+				SelectedMemory: []*aicommon.MemoryEntity{{
+					Id:      "memory-2",
+					Content: "memory from retrieval target",
+				}},
+			},
+		},
+	}
+
+	cfg := aicommon.NewConfig(context.Background())
+	cfg.TimelineArchiveStore = store
+
+	react := &ReAct{config: cfg}
+	react.setCurrentTask(&midtermQueryTestTask{
+		id:     "task-1",
+		name:   "verify http flow",
+		origin: "collect and verify malformed header behavior",
+		info: &aicommon.AITaskRetrievalInfo{
+			Target: "http fuzz regression",
+		},
+	})
+
+	prefix, err := buildMidtermTimelinePrefix(react)
+	require.NoError(t, err)
+	require.Contains(t, prefix, "search-queries:")
+	require.Contains(t, prefix, "verify http flow")
+	require.Contains(t, prefix, "http fuzz regression")
+	require.Contains(t, prefix, "memory from task name")
+	require.Contains(t, prefix, "memory from retrieval target")
+	require.Contains(t, store.queries, "verify http flow")
+	require.Contains(t, store.queries, "http fuzz regression")
 }

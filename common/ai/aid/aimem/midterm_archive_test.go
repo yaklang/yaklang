@@ -86,7 +86,7 @@ func TestBuildTimelineArchiveSearchResult_DeduplicatesArchiveRefs(t *testing.T) 
 			},
 		},
 		TotalContent:  "chunk 1\nchunk 2\nchunk 3",
-		ContentBytes:  len("chunk 1\nchunk 2\nchunk 3"),
+		ContentTokens: len("chunk 1\nchunk 2\nchunk 3"),
 		SearchSummary: "ok",
 	})
 

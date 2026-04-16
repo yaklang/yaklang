@@ -86,7 +86,7 @@ func buildTimelineArchiveSearchResult(result *aicommon.SearchMemoryResult) *aico
 	return &aicommon.TimelineArchiveSearchResult{
 		ArchiveRefs:    archiveRefs,
 		TotalContent:   result.TotalContent,
-		ContentBytes:   result.ContentBytes,
+		ContentBytes:   len([]byte(result.TotalContent)),
 		SearchSummary:  result.SearchSummary,
 		SelectedMemory: result.Memories,
 	}
