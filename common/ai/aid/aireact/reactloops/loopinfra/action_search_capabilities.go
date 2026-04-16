@@ -48,84 +48,45 @@ var loopAction_SearchCapabilities = &reactloops.LoopAction{
 		}
 
 		invoker := loop.GetInvoker()
-		cfg := invoker.GetConfig()
-		ctx := cfg.GetContext()
-		task := loop.GetCurrentTask()
-		if task != nil {
-			ctx = task.GetContext()
-		}
 
-		log.Infof("search_capabilities action: running intent loop for query: %s", utils.ShrinkString(query, 200))
+		log.Infof("search_capabilities action: running capability search for query: %s", utils.ShrinkString(query, 200))
 		invoker.AddToTimeline("search_capabilities_start", fmt.Sprintf("开始搜索能力：%s", reactloops.CompactIntentSummary(query)))
 
-		intentTask := aicommon.NewStatefulTaskBase(
-			invoker.GetCurrentTaskId()+"_search_cap",
-			query,
-			ctx,
-			cfg.GetEmitter(),
-		)
-
-		originOptions := cfg.OriginOptions()
-		var opts []any
-		for _, option := range originOptions {
-			opts = append(opts, option)
-		}
-
-		var intentLoop *reactloops.ReActLoop
-		opts = append(opts, reactloops.WithOnLoopInstanceCreated(func(l *reactloops.ReActLoop) {
-			intentLoop = l
-		}))
-
-		_, err := invoker.ExecuteLoopTaskIF(schema.AI_REACT_LOOP_NAME_INTENT, intentTask, opts...)
+		searchResult, err := reactloops.SearchCapabilities(invoker, loop, reactloops.CapabilitySearchInput{
+			Query:               query,
+			IncludeCatalogMatch: true,
+		})
 		if err != nil {
-			log.Warnf("search_capabilities action: intent loop failed: %v", err)
+			log.Warnf("search_capabilities action: capability search failed: %v", err)
 			operator.Feedback(fmt.Sprintf("Capability search failed: %v. Try a different query or proceed with currently available tools.", err))
 			operator.Continue()
 			return
 		}
-
-		if intentLoop == nil {
-			log.Warnf("search_capabilities action: intent loop reference is nil")
+		if searchResult == nil {
 			operator.Feedback("Capability search completed but no results could be extracted.")
 			operator.Continue()
 			return
 		}
+		reactloops.ApplyCapabilitySearchResult(invoker, loop, searchResult)
 
-		intentAnalysis := intentLoop.Get("intent_analysis")
-		recommendedTools := intentLoop.Get("recommended_tools")
-		recommendedForges := intentLoop.Get("recommended_forges")
-		contextEnrichment := intentLoop.Get("context_enrichment")
-		retrievalTags := intentLoop.Get("task_retrieval_tags")
-		retrievalQuestions := intentLoop.Get("task_retrieval_questions")
-		retrievalTarget := intentLoop.Get("task_retrieval_target")
-		matchedToolNames := intentLoop.Get("matched_tool_names")
-		matchedForgeNames := intentLoop.Get("matched_forge_names")
-		matchedSkillNames := intentLoop.Get("matched_skill_names")
-
-		log.Infof("search_capabilities action: intent loop completed, analysis=%d bytes, tools=%s, forges=%s, skills=%s",
-			len(intentAnalysis), matchedToolNames, matchedForgeNames, matchedSkillNames)
-
-		compactIntent := reactloops.CompactIntentSummary(intentAnalysis)
-		if compactIntent == "" {
-			compactIntent = reactloops.CompactIntentSummary(query)
-		}
-
-		if intentAnalysis != "" {
-			loop.Set("intent_analysis", compactIntent)
-			invoker.AddToTimeline("search_capabilities_analysis", fmt.Sprintf("意图识别：%s", compactIntent))
-		}
-		if recommendedTools != "" {
+		compactIntent := reactloops.CompactIntentSummary(query)
+		loop.Set("intent_analysis", compactIntent)
+		if recommendedTools := renderCapabilityToolRecommendations(searchResult); recommendedTools != "" {
 			loop.Set("intent_recommended_tools", recommendedTools)
 		}
-		if recommendedForges != "" {
+		if recommendedForges := renderCapabilityForgeRecommendations(searchResult); recommendedForges != "" {
 			loop.Set("intent_recommended_forges", recommendedForges)
 		}
-		if contextEnrichment != "" {
-			loop.Set("intent_context_enrichment", contextEnrichment)
+		if searchResult != nil && searchResult.ContextEnrichment != "" {
+			loop.Set("intent_context_enrichment", searchResult.ContextEnrichment)
 		}
-		reactloops.ApplyTaskRetrievalInfoToTask(task, retrievalTags, retrievalQuestions, retrievalTarget)
 
-		populateExtraCapabilitiesFromIntent(invoker, loop, matchedToolNames, matchedForgeNames, matchedSkillNames)
+		matchedToolNames := strings.Join(searchResult.MatchedToolNames, ",")
+		matchedForgeNames := strings.Join(searchResult.MatchedForgeNames, ",")
+		matchedSkillNames := strings.Join(searchResult.MatchedSkillNames, ",")
+
+		log.Infof("search_capabilities action: capability search completed, tools=%s, forges=%s, skills=%s",
+			matchedToolNames, matchedForgeNames, matchedSkillNames)
 
 		var summary strings.Builder
 		summary.WriteString("能力搜索已完成\n")
@@ -153,6 +114,36 @@ var loopAction_SearchCapabilities = &reactloops.LoopAction{
 		operator.Feedback(summary.String())
 		operator.Continue()
 	},
+}
+
+func renderCapabilityToolRecommendations(result *reactloops.CapabilitySearchResult) string {
+	if result == nil {
+		return ""
+	}
+	var builder strings.Builder
+	if len(result.MatchedToolNames) > 0 {
+		builder.WriteString("匹配工具 / Matched tools: " + strings.Join(result.MatchedToolNames, ","))
+	}
+	if len(result.MatchedSkillNames) > 0 {
+		if builder.Len() > 0 {
+			builder.WriteString("\n")
+		}
+		builder.WriteString("匹配技能 / Matched skills: " + strings.Join(result.MatchedSkillNames, ","))
+	}
+	if len(result.RecommendedCapabilities) > 0 {
+		if builder.Len() > 0 {
+			builder.WriteString("\n")
+		}
+		builder.WriteString("推荐能力 / Recommended capabilities: " + strings.Join(result.RecommendedCapabilities, ","))
+	}
+	return builder.String()
+}
+
+func renderCapabilityForgeRecommendations(result *reactloops.CapabilitySearchResult) string {
+	if result == nil || len(result.MatchedForgeNames) == 0 {
+		return ""
+	}
+	return "匹配蓝图 / Matched forges: " + strings.Join(result.MatchedForgeNames, ",")
 }
 
 func populateExtraCapabilitiesFromIntent(

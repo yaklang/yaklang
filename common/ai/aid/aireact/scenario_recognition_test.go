@@ -1,13 +1,14 @@
-package loop_scenario
+package aireact
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 )
 
-func TestMergeScenarioSearchQueries_DeduplicatesAndPreservesOrder(t *testing.T) {
-	merged := mergeScenarioSearchQueries(
+func TestScenarioRecognition_MergeQueriesDeduplicatesAndPreservesOrder(t *testing.T) {
+	merged := reactloops.MergeScenarioSearchQueries(
 		[]string{"query a", "query b"},
 		[]string{"query b", "query c"},
 		[]string{"query a", "query d"},
@@ -16,13 +17,11 @@ func TestMergeScenarioSearchQueries_DeduplicatesAndPreservesOrder(t *testing.T) 
 	require.Equal(t, []string{"query a", "query b", "query c", "query d"}, merged)
 }
 
-func TestBuildFallbackScenarioQueries_ProducesThreeQueryGroups(t *testing.T) {
-	loop := &fakeScenarioLoop{values: map[string]string{
+func TestScenarioRecognition_FallbackQueriesProduceThreeGroups(t *testing.T) {
+	toolQueries, knowledgeQueries, memoryQueries := reactloops.BuildFallbackScenarioQueries(&fakeScenarioGetter{values: map[string]string{
 		"user_query":               "修复 Java 反编译代码",
 		"upstream_intent_analysis": "重构反编译后的 Java 代码",
-	}}
-
-	toolQueries, knowledgeQueries, memoryQueries := buildFallbackScenarioQueries(loop, "Java 反编译重构场景")
+	}}, "Java 反编译重构场景")
 
 	require.NotEmpty(t, toolQueries)
 	require.NotEmpty(t, knowledgeQueries)
@@ -32,10 +31,10 @@ func TestBuildFallbackScenarioQueries_ProducesThreeQueryGroups(t *testing.T) {
 	require.Contains(t, memoryQueries[0], "Java 反编译重构场景")
 }
 
-type fakeScenarioLoop struct {
+type fakeScenarioGetter struct {
 	values map[string]string
 }
 
-func (f *fakeScenarioLoop) Get(key string) string {
+func (f *fakeScenarioGetter) Get(key string) string {
 	return f.values[key]
 }
