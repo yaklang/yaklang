@@ -71,7 +71,7 @@ func TestReActLoop_LoadCapability_ToolEquivalence(t *testing.T) {
 				// THE KEY DIFFERENCE: use load_capability instead of require_tool
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "load_capability", "identifier": "` + toolName + `",
+{"@action": "load_capability", "capability_identifier": "` + toolName + `",
 "human_readable_thought": "mocked thought for tool calling via load_capability"}
 `))
 				rsp.Close()
@@ -155,7 +155,7 @@ func TestReActLoop_LoadCapability_MaxIterationsLimit(t *testing.T) {
 				// THE KEY DIFFERENCE: use load_capability instead of require_tool
 				rsp := i.NewAIResponse()
 				rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "load_capability", "identifier": "` + toolName + `",
+{"@action": "load_capability", "capability_identifier": "` + toolName + `",
 "human_readable_thought": "mocked thought for tool calling via load_capability"}
 `))
 				rsp.Close()

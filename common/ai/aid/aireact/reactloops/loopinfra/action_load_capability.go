@@ -17,13 +17,13 @@ var loopAction_LoadCapability = &reactloops.LoopAction{
 	Description: "自动加载一些外部能力，这个外部能力可以被自动检测类型，并且加载。可以出现工具调用(tool)，专注模式(focus_mode)，技能(skill)或者模版/蓝图（forge/blueprint）",
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
-			"identifier",
+			"capability_identifier",
 			aitool.WithParam_Description(`只对 {"@action":"load_capability" ...} 时生效，这个标识符会被自动检测是 skill/tool/forge/focus_mode/filename, 然后自动加载`),
 		),
 	},
 	StreamFields: []*reactloops.LoopStreamField{
 		{
-			FieldName: "identifier",
+			FieldName: "capability_identifier",
 			AINodeId:  "load_capability",
 		},
 	},
@@ -32,9 +32,9 @@ var loopAction_LoadCapability = &reactloops.LoopAction{
 }
 
 func loadCapabilityVerifier(loop *reactloops.ReActLoop, action *aicommon.Action) error {
-	identifier := strings.TrimSpace(action.GetString("identifier"))
+	identifier := strings.TrimSpace(action.GetString("capability_identifier"))
 	if identifier == "" {
-		identifier = strings.TrimSpace(action.GetInvokeParams("next_action").GetString("identifier"))
+		identifier = strings.TrimSpace(action.GetInvokeParams("next_action").GetString("capability_identifier"))
 	}
 	if identifier == "" {
 		return utils.Error("load_capability action requires 'identifier' parameter")
