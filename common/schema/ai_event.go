@@ -393,6 +393,7 @@ func (e *AiOutputEvent) ToExecResult() *ypb.ExecResult {
 
 func (e *AiOutputEvent) ToGRPC() *ypb.AIOutputEvent {
 	return &ypb.AIOutputEvent{
+		ID:                 int64(e.ID),
 		CoordinatorId:      e.CoordinatorId,
 		Type:               string(e.Type),
 		NodeId:             utils.EscapeInvalidUTF8Byte([]byte(e.NodeId)),
