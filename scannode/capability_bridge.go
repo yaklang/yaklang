@@ -8,6 +8,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
+	"github.com/yaklang/yaklang/common/log"
 	capabilityv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/capability/v1"
 )
 
@@ -51,6 +52,15 @@ func (b *legionJobBridge) handleCapabilityApply(
 	}
 
 	code, message := mapCapabilityApplyError(err)
+	log.Errorf(
+		"apply capability failed: node_id=%s capability=%s spec_version=%s command_id=%s code=%s err=%v",
+		ref.NodeID,
+		ref.CapabilityKey,
+		ref.SpecVersion,
+		ref.CommandID,
+		code,
+		err,
+	)
 	return b.capabilityPublisher.PublishFailed(
 		b.agent.node.GetRootContext(),
 		ref,
@@ -110,6 +120,12 @@ func mapCapabilityApplyError(err error) (string, string) {
 		return "invalid_capability_key", err.Error()
 	case errors.Is(err, ErrInvalidCapabilitySpec):
 		return "invalid_desired_spec", err.Error()
+	case errors.Is(err, ErrInvalidHIDSCapabilitySpec):
+		return "invalid_desired_spec", err.Error()
+	case errors.Is(err, ErrHIDSCapabilityNotCompiled):
+		return "capability_not_compiled", err.Error()
+	case errors.Is(err, ErrHIDSCapabilityUnsupportedPlatform):
+		return "capability_unsupported_platform", err.Error()
 	default:
 		return "capability_apply_failed", err.Error()
 	}

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/node"
 	"github.com/yaklang/yaklang/common/spec"
 )
@@ -12,6 +13,7 @@ type ScanNode struct {
 	node              *node.NodeBase
 	manager           *TaskManager
 	capabilityManager *CapabilityManager
+	ruleSyncClient    ruleSyncer
 	maxRunningJobs    uint32
 	bridge            *legionJobBridge
 }
@@ -24,9 +26,7 @@ func NewScanNode(cfg node.BaseConfig) (*ScanNode, error) {
 	if cfg.NodeType == "" {
 		cfg.NodeType = spec.NodeType_Scanner
 	}
-	if len(cfg.CapabilityKeys) == 0 {
-		cfg.CapabilityKeys = []string{"yak.execute"}
-	}
+	cfg.CapabilityKeys = normalizeScanNodeCapabilityKeys(cfg.CapabilityKeys)
 	if cfg.StatusProvider == nil {
 		cfg.StatusProvider = agent
 	}
@@ -38,8 +38,14 @@ func NewScanNode(cfg node.BaseConfig) (*ScanNode, error) {
 
 	agent.node = base
 	agent.capabilityManager = newCapabilityManager(CapabilityManagerConfig{
-		NodeID:  base.NodeId,
-		BaseDir: consts.GetDefaultYakitBaseDir(),
+		NodeID:      base.NodeId,
+		BaseDir:     consts.GetDefaultYakitBaseDir(),
+		RootContext: base.GetRootContext(),
+	})
+	agent.ruleSyncClient = NewRuleSyncClient(&RuleSyncConfig{
+		ServerURL:   cfg.PlatformAPIBaseURL,
+		SyncEnabled: true,
+		Client:      cfg.HTTPClient,
 	})
 	agent.bridge = newLegionJobBridge(agent)
 	return agent, nil
@@ -56,6 +62,11 @@ func (s *ScanNode) Shutdown() {
 	if s == nil || s.node == nil {
 		return
 	}
+	if s.capabilityManager != nil {
+		if err := s.capabilityManager.Close(); err != nil {
+			log.Errorf("shutdown capability manager failed: %v", err)
+		}
+	}
 	s.node.Shutdown()
 }
 
@@ -66,12 +77,4 @@ func (s *ScanNode) Snapshot() node.RuntimeStatus {
 		MaxRunningJobs: s.maxRunningJobs,
 		ActiveAttempts: s.manager.ActiveAttemptHeartbeats(time.Now().UTC()),
 	}
-}
-
-// RuleSyncClient 规则同步客户端（当前 session transport 重构阶段默认不初始化）。
-var globalRuleSyncClient *RuleSyncClient
-
-// GetRuleSyncClient 获取规则同步客户端
-func GetRuleSyncClient() *RuleSyncClient {
-	return globalRuleSyncClient
 }

@@ -55,6 +55,7 @@ func (b *legionJobBridge) executeDispatch(
 			SubTaskID:       ref.SubtaskID,
 			ScriptContent:   command.GetScript().GetContent(),
 			ScriptJSONParam: normalizeInputJSON(command.GetInputJson()),
+			ScriptLabels:    command.GetLabels(),
 		},
 	)
 	if err == nil {

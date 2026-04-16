@@ -50,8 +50,8 @@ import (
 
 	"github.com/yaklang/yaklang/common/openapi"
 
-	"github.com/yaklang/yaklang/common/browser"
 	"github.com/yaklang/yaklang/common/binx"
+	"github.com/yaklang/yaklang/common/browser"
 	"github.com/yaklang/yaklang/common/utils/yakgit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
@@ -64,7 +64,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/webforest"
 	"github.com/yaklang/yaklang/common/cve"
 	"github.com/yaklang/yaklang/common/facades"
-	"github.com/yaklang/yaklang/common/hids"
 	"github.com/yaklang/yaklang/common/iiop"
 	"github.com/yaklang/yaklang/common/ja3"
 	"github.com/yaklang/yaklang/common/log"
@@ -164,7 +163,7 @@ func initYaklangLib() {
 	yaklang.Import("codec", yaklib.CodecExports) // 编码解码
 	yaklang.Import("log", yaklib.LogExports)
 	// yaklang.Import("net", yaklib.Ne)
-	yaklang.Import("hids", hids.Exports)
+	initHIDSLib()
 	yaklang.Import("systemd", systemd.Exports)
 
 	// yaklang.Import("geojson", yaklib.GeoJsonExports)

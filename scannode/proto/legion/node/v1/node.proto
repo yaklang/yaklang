@@ -44,6 +44,14 @@ enum LogLevel {
   LOG_LEVEL_ERROR = 4;
 }
 
+message NodeHostFacts {
+  string hostname = 1;
+  string primary_ip = 2;
+  repeated string ip_addresses = 3;
+  string operating_system = 4;
+  string architecture = 5;
+}
+
 message BootstrapRequest {
   string enrollment_token = 1;
   string node_id = 2;
@@ -51,6 +59,8 @@ message BootstrapRequest {
   string version = 4;
   map<string, string> labels = 5;
   repeated string capability_keys = 6;
+  uint32 heartbeat_interval_seconds = 7;
+  NodeHostFacts host_facts = 8;
 }
 
 message BootstrapResponse {
@@ -81,6 +91,9 @@ message NodeHeartbeat {
   repeated string capability_keys = 6;
   map<string, string> labels = 7;
   repeated ActiveAttemptHeartbeat active_attempts = 8;
+  google.protobuf.Timestamp observed_at = 9;
+  uint32 heartbeat_interval_seconds = 10;
+  NodeHostFacts host_facts = 11;
 }
 
 message NodeLog {

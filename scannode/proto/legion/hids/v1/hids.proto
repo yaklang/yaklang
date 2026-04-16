@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package legion.hids.v1;
+
+import "google/protobuf/timestamp.proto";
+import "legion/capability/v1/capability.proto";
+import "legion/node/v1/node.proto";
+
+option go_package = "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/hids/v1;hidsv1";
+
+message HIDSObservation {
+  legion.node.v1.EventMetadata metadata = 1;
+  legion.capability.v1.CapabilityRef capability = 2;
+  string hids_event_type = 3;
+  google.protobuf.Timestamp observed_at = 4;
+  bytes event_json = 5;
+}
