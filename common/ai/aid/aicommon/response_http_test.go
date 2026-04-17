@@ -1,7 +1,9 @@
 package aicommon
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -136,4 +138,26 @@ func TestAIResponse_ConcurrentSetAndGet(t *testing.T) {
 		resp.GetRawHTTPResponseDump()
 	}
 	<-done
+}
+
+func TestAIResponse_WaitForHTTPHeaders_WithHeaderOnly(t *testing.T) {
+	resp := NewUnboundAIResponse()
+	header := "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n"
+	resultCh := make(chan bool, 1)
+
+	go func() {
+		resultCh <- resp.WaitForHTTPHeaders(context.Background())
+	}()
+
+	resp.SetRawHTTPResponseHeader([]byte(header))
+
+	select {
+	case ok := <-resultCh:
+		assert.True(t, ok)
+	case <-time.After(time.Second):
+		t.Fatal("WaitForHTTPHeaders did not return after header was set")
+	}
+
+	assert.Equal(t, 200, resp.GetHTTPStatusCode())
+	assert.Equal(t, header, resp.GetRawHTTPResponseDump())
 }
