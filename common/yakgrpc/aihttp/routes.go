@@ -21,6 +21,7 @@ func (gw *AIAgentHTTPGateway) registerRoutes() {
 	sub.HandleFunc("/setting/global", gw.handleUpdateGlobalSetting).Methods("POST", "OPTIONS")
 	sub.HandleFunc("/setting/aiconfig", gw.handleGetAIGlobalConfig).Methods("GET", "OPTIONS")
 	sub.HandleFunc("/setting/aiconfig", gw.handleUpdateAIGlobalConfig).Methods("POST", "OPTIONS")
+	sub.HandleFunc("/setting/aiconfig/healthcheck", gw.handleAIConfigHealthCheck).Methods("POST", "OPTIONS")
 	sub.HandleFunc("/setting/appconfigs/template/get", gw.handleGetThirdPartyAppConfigTemplate).Methods("POST", "OPTIONS")
 
 	sub.HandleFunc("/setting/aimodels/get", gw.handleListAIModels).Methods("POST", "OPTIONS")
@@ -40,7 +41,6 @@ func (gw *AIAgentHTTPGateway) registerRoutes() {
 	sub.HandleFunc("/session/del", gw.handleDeleteSession).Methods("POST", "OPTIONS")
 	sub.HandleFunc("/session/all", gw.handleListAllSessions).Methods("GET", "OPTIONS")
 	sub.HandleFunc("/session/{run_id}/title", gw.handleUpdateSessionTitle).Methods("POST", "OPTIONS")
-	sub.HandleFunc("/upload", gw.handleUploadFile).Methods("POST", "OPTIONS")
 
 	sub.HandleFunc("/run/{run_id}", gw.handleRun).Methods("POST", "OPTIONS")
 	sub.HandleFunc("/run/{run_id}/events", gw.handleSSEEvents).Methods("GET", "OPTIONS")

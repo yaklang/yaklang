@@ -21,14 +21,6 @@ type CreateSessionResponse struct {
 	Status RunStatus `json:"status"`
 }
 
-type UploadFileResponse struct {
-	Path         string `json:"path"`
-	Filename     string `json:"filename"`
-	OriginalName string `json:"original_name"`
-	Size         int64  `json:"size"`
-	ContentType  string `json:"content_type,omitempty"`
-}
-
 type SessionItem struct {
 	RunID     string    `json:"run_id"`
 	Title     string    `json:"title,omitempty"`

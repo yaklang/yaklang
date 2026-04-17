@@ -260,6 +260,25 @@
 - 请求体：`AIGlobalConfig`
 - 响应：保存后的同一份配置对象
 
+### `POST /setting/aiconfig/healthcheck`
+
+- 用途：执行 AI 配置健康检查（透传 gRPC `AIConfigHealthCheck`）
+- 请求体：`AIConfigHealthCheckRequest`
+- 响应：透传 gRPC `AIConfigHealthCheckResponse`
+
+请求示例：
+
+```json
+{
+  "Config": {
+    "Type": "openai",
+    "APIKey": "sk-***",
+    "Domain": "api.openai.com"
+  },
+  "Content": "ping"
+}
+```
+
 ---
 
 ### `POST /setting/appconfigs/template/get`
