@@ -13,7 +13,6 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/hpcloud/tail"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/sys/windows"
@@ -68,6 +67,52 @@ func isPrivilegedFallback() bool {
 	}
 	fp.Close()
 	return true
+}
+
+func startWindowsElevatedBatch(ctx context.Context, batName string, waitForExit bool) (*exec.Cmd, error) {
+	args := []string{
+		"-NoProfile",
+		"-NonInteractive",
+		"Start-Process",
+		"-FilePath", batName,
+		"-Verb", "RunAs",
+		"-WindowStyle", "Hidden",
+		"-ErrorAction", "Stop",
+	}
+	if waitForExit {
+		args = append(args, "-Wait")
+	}
+
+	psCmd := exec.CommandContext(ctx, "powershell.exe", args...)
+	if err := psCmd.Start(); err != nil {
+		return nil, err
+	}
+	return psCmd, nil
+}
+
+func readWindowsTempFile(path string) ([]byte, error) {
+	if path == "" {
+		return nil, nil
+	}
+
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return raw, nil
+}
+
+func cleanupWindowsTempFile(path string) {
+	if path == "" {
+		return
+	}
+
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		log.Warnf("failed to remove temporary Windows UAC file %s: %v", path, err)
+	}
 }
 
 type Executor struct {
@@ -144,31 +189,34 @@ func (p *Executor) Execute(ctx context.Context, cmd string, opts ...ExecuteOptio
 	token := utils.RandStringBytes(20)
 	batName := filepath.Join(tempFileDir, fmt.Sprintf("windows-uac-prompt-%v.bat", token))
 
-	stdoutFile := filepath.Join(tempFileDir, "stdout-"+token+".txt")
-	stderrFile := filepath.Join(tempFileDir, "stderr-"+token+".txt")
-	exitCodeFile := filepath.Join(tempFileDir, "exitcode-"+token+".txt")
+	waitForExit := !config.DiscardStdoutStderr
+	stdoutTarget := "NUL"
+	stderrTarget := "NUL"
+
+	var stdoutFile string
+	var stderrFile string
+	var exitCodeFile string
+	if waitForExit {
+		stdoutFile = filepath.Join(tempFileDir, "stdout-"+token+".txt")
+		stderrFile = filepath.Join(tempFileDir, "stderr-"+token+".txt")
+		exitCodeFile = filepath.Join(tempFileDir, "exitcode-"+token+".txt")
+		stdoutTarget = strconv.Quote(stdoutFile)
+		stderrTarget = strconv.Quote(stderrFile)
+	}
 
 	// 确保清理临时文件
+	cleanupBatchOnReturn := true
 	defer func() {
-		os.RemoveAll(stdoutFile)
-		os.RemoveAll(stderrFile)
-		os.RemoveAll(exitCodeFile)
-		os.RemoveAll(batName)
+		cleanupWindowsTempFile(stdoutFile)
+		cleanupWindowsTempFile(stderrFile)
+		cleanupWindowsTempFile(exitCodeFile)
+		if cleanupBatchOnReturn {
+			cleanupWindowsTempFile(batName)
+		}
 	}()
 
 	// 构建批处理脚本
-	var batLines []string
-	batLines = append(batLines, "@echo off")
-
-	// 添加命令和输出重定向
-	batLines = append(batLines, "")
-	batLines = append(batLines, fmt.Sprintf("call :sub > %v 2> %v", strconv.Quote(stdoutFile), strconv.Quote(stderrFile)))
-	batLines = append(batLines, `exit /b`)
-	batLines = append(batLines, "")
-	batLines = append(batLines, ":sub")
-	batLines = append(batLines, cmd)
-	batLines = append(batLines, "echo %errorlevel% > "+exitCodeFile)
-	batLines = append(batLines, "exit /b")
+	batLines := buildWindowsUACBatchLines(cmd, stdoutTarget, stderrTarget, exitCodeFile, waitForExit, !waitForExit)
 
 	// 写入批处理文件
 	fp, err := os.OpenFile(batName, os.O_RDWR|os.O_CREATE, os.ModePerm)
@@ -184,12 +232,10 @@ func (p *Executor) Execute(ctx context.Context, cmd string, opts ...ExecuteOptio
 	log.Infof("execute privileged command via UAC: %s", utils.ShrinkString(cmd, 100))
 
 	// 使用 PowerShell 的 Start-Process 以管理员身份运行批处理文件
-	// -Verb RunAs 会触发 UAC 提示
-	psCmd := exec.CommandContext(ctx, "powershell.exe", "start-process", "-verb", "runas",
-		"-windowstyle", "hidden", batName)
-
-	// 启动 PowerShell 命令
-	if err := psCmd.Start(); err != nil {
+	// 在需要收集输出时使用 -Wait 等待真实子进程退出；
+	// 对于丢弃输出的常驻特权进程，保留快速返回语义，避免阻塞调用方。
+	psCmd, err := startWindowsElevatedBatch(ctx, batName, waitForExit)
+	if err != nil {
 		return nil, utils.Wrapf(err, "failed to start UAC prompt")
 	}
 
@@ -199,72 +245,47 @@ func (p *Executor) Execute(ctx context.Context, cmd string, opts ...ExecuteOptio
 		config.BeforePrivilegedProcessExecute()
 	}
 
-	// 等待 PowerShell 命令完成（这只是等待 UAC 对话框关闭）
-	_ = psCmd.Wait()
+	waitErr := psCmd.Wait()
 
 	// 如果不需要收集输出，直接返回
 	if config.DiscardStdoutStderr {
+		if waitErr != nil {
+			return nil, utils.Wrapf(waitErr, "failed to complete UAC prompt")
+		}
+		cleanupBatchOnReturn = false
 		// 给一些时间让批处理文件执行完成
 		time.Sleep(500 * time.Millisecond)
 		return nil, nil
 	}
 
-	// 收集输出
-	// 使用 tail 来读取输出文件，因为批处理可能还在执行
-	var stdoutBuf bytes.Buffer
-	var stderrBuf bytes.Buffer
-
-	// 等待输出文件创建并读取内容
-	// 最多等待 30 秒
-	deadline := time.Now().Add(30 * time.Second)
-	for time.Now().Before(deadline) {
-		// 检查退出码文件是否存在，表示命令已完成
-		if exists, _ := utils.PathExists(exitCodeFile); exists {
-			break
-		}
-		time.Sleep(100 * time.Millisecond)
+	stdoutRaw, err := readWindowsTempFile(stdoutFile)
+	if err != nil {
+		return nil, utils.Wrapf(err, "failed to read stdout temp file")
+	}
+	stderrRaw, err := readWindowsTempFile(stderrFile)
+	if err != nil {
+		return nil, utils.Wrapf(err, "failed to read stderr temp file")
 	}
 
-	// 读取 stdout
-	if exists, _ := utils.PathExists(stdoutFile); exists {
-		t, err := tail.TailFile(stdoutFile, tail.Config{Follow: false})
-		if err == nil {
-			for line := range t.Lines {
-				if line.Text != "" {
-					stdoutBuf.WriteString(line.Text)
-					stdoutBuf.WriteByte('\n')
-				}
-			}
-		}
-	}
-
-	// 读取 stderr
-	if exists, _ := utils.PathExists(stderrFile); exists {
-		t, err := tail.TailFile(stderrFile, tail.Config{Follow: false})
-		if err == nil {
-			for line := range t.Lines {
-				if line.Text != "" {
-					stderrBuf.WriteString(line.Text)
-					stderrBuf.WriteByte('\n')
-				}
-			}
-		}
-	}
-
-	// 合并输出
 	var combinedOutput bytes.Buffer
-	combinedOutput.Write(stdoutBuf.Bytes())
-	combinedOutput.Write(stderrBuf.Bytes())
+	combinedOutput.Write(stdoutRaw)
+	combinedOutput.Write(stderrRaw)
+
+	if waitErr != nil {
+		return combinedOutput.Bytes(), utils.Wrapf(waitErr, "failed to complete UAC prompt")
+	}
 
 	// 检查退出码
-	if exists, _ := utils.PathExists(exitCodeFile); exists {
-		exitCodeData, _ := os.ReadFile(exitCodeFile)
-		if exitCodeData != nil {
-			exitCode, _ := strconv.Atoi(strings.TrimSpace(string(exitCodeData)))
-			if exitCode != 0 {
-				return combinedOutput.Bytes(), utils.Errorf("command exited with code %d", exitCode)
-			}
-		}
+	exitCodeData, err := readWindowsTempFile(exitCodeFile)
+	if err != nil {
+		return combinedOutput.Bytes(), utils.Wrapf(err, "failed to read exit code temp file")
+	}
+	if len(bytes.TrimSpace(exitCodeData)) == 0 {
+		return combinedOutput.Bytes(), utils.Errorf("privileged command finished without exit code")
+	}
+	exitCode, _ := strconv.Atoi(strings.TrimSpace(string(exitCodeData)))
+	if exitCode != 0 {
+		return combinedOutput.Bytes(), utils.Errorf("command exited with code %d", exitCode)
 	}
 
 	return combinedOutput.Bytes(), nil
