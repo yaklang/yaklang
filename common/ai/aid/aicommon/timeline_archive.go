@@ -20,6 +20,7 @@ type TimelineArchiveBatch struct {
 	Reason              TimelineArchiveReason
 	Summary             string
 	MergedContent       string
+	SourceChunks        []string
 	ReducerKeyID        int64
 	SourceStartID       int64
 	SourceEndID         int64

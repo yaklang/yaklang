@@ -1,6 +1,7 @@
 package aimem
 
 import (
+	"errors"
 	"strconv"
 	"strings"
 	"testing"
@@ -49,6 +50,35 @@ func TestBuildTimelineArchiveMemoryEntities_SplitsIntoChunkedMemories(t *testing
 		require.Contains(t, entity.Tags, midtermTagChunkTotal+strconv.Itoa(len(entities)))
 		require.NotEmpty(t, entity.PotentialQuestions)
 	}
+}
+
+func TestBuildTimelineArchiveChunks_FallbackUsesPreMergeSourceChunks(t *testing.T) {
+	originSplitter := timelineArchiveSplitText
+	t.Cleanup(func() {
+		timelineArchiveSplitText = originSplitter
+	})
+
+	timelineArchiveSplitText = func(text string, maxLength int, opts ...any) ([]string, error) {
+		return nil, errors.New("liteforge unavailable")
+	}
+
+	batch := &aicommon.TimelineArchiveBatch{
+		ArchiveID:     "timeline-archive-fallback",
+		Summary:       "fallback summary",
+		MergedContent: "MERGED_CONTENT_SHOULD_NOT_BE_USED",
+		SourceChunks: []string{
+			strings.Repeat("A", midtermArchiveChunkLimit+200),
+			"second source item",
+		},
+	}
+
+	chunks, err := buildTimelineArchiveChunks(batch, batch.Summary)
+	require.NoError(t, err)
+	require.Len(t, chunks, 2)
+	require.LessOrEqual(t, len([]rune(chunks[0])), midtermArchiveChunkLimit)
+	require.Equal(t, midtermArchiveChunkLimit, len([]rune(chunks[0])))
+	require.Equal(t, "second source item", chunks[1])
+	require.NotContains(t, strings.Join(chunks, "\n"), "MERGED_CONTENT_SHOULD_NOT_BE_USED")
 }
 
 func TestBuildTimelineArchiveSearchResult_DeduplicatesArchiveRefs(t *testing.T) {

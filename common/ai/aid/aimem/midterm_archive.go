@@ -9,6 +9,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/aiforge"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -168,10 +169,11 @@ func buildTimelineArchiveChunks(batch *aicommon.TimelineArchiveBatch, summary st
 
 	chunks, err := timelineArchiveSplitText(input, midtermArchiveChunkContentLimit)
 	if err != nil {
-		return nil, utils.Errorf("split timeline archive content failed: %v", err)
+		log.Warnf("split timeline archive content failed, fallback to pre-merge source chunks: %v", err)
+		return fallbackTimelineArchiveSourceChunks(batch, summary), nil
 	}
 	if len(chunks) == 0 {
-		chunks = []string{input}
+		return fallbackTimelineArchiveSourceChunks(batch, summary), nil
 	}
 
 	result := make([]string, 0, len(chunks))
@@ -192,6 +194,40 @@ func buildTimelineArchiveChunks(batch *aicommon.TimelineArchiveBatch, summary st
 		result = []string{utils.ShrinkString(input, midtermArchiveChunkContentLimit)}
 	}
 	return result, nil
+}
+
+func fallbackTimelineArchiveSourceChunks(batch *aicommon.TimelineArchiveBatch, summary string) []string {
+	if batch == nil {
+		return nil
+	}
+	result := make([]string, 0, len(batch.SourceChunks))
+	for _, chunk := range batch.SourceChunks {
+		chunk = strings.TrimSpace(chunk)
+		if chunk == "" {
+			continue
+		}
+		result = append(result, shrinkRunes(chunk, midtermArchiveChunkLimit))
+	}
+	if len(result) > 0 {
+		return result
+	}
+	summary = strings.TrimSpace(summary)
+	if summary == "" {
+		summary = "timeline archive without summary"
+	}
+	return []string{shrinkRunes(summary, midtermArchiveChunkLimit)}
+}
+
+func shrinkRunes(input string, limit int) string {
+	input = strings.TrimSpace(input)
+	if input == "" || limit <= 0 {
+		return ""
+	}
+	runes := []rune(input)
+	if len(runes) <= limit {
+		return input
+	}
+	return strings.TrimSpace(string(runes[:limit]))
 }
 
 func buildTimelineArchiveChunkContent(batch *aicommon.TimelineArchiveBatch, summary string, chunk string, chunkIndex int, chunkTotal int) string {
