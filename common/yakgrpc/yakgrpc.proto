@@ -1950,6 +1950,8 @@ message AIEventFilter {
   string ProcessID = 7;
 
   repeated string NodeId = 8;
+
+  bool UseOR = 9; // 默认是 AND 关系，也就是多条件同时满足，如果 UseOR 是 true，那么就是满足任一条件即可
 }
 
 message AIEventQueryRequest {

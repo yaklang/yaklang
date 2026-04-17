@@ -378,6 +378,66 @@ func TestServer_QueryAIEvent_Filter_SessionAndNodeId(t *testing.T) {
 	assertSortedByIDAsc(t, rsp)
 }
 
+func TestServer_QueryAIEvent_Filter_UseOR(t *testing.T) {
+	db := consts.GetGormProjectDatabase()
+	typeName := uuid.NewString()
+
+	session1 := "session-" + uuid.NewString()
+	session2 := "session-" + uuid.NewString()
+	node1 := "node-" + uuid.NewString()
+	node2 := "node-" + uuid.NewString()
+	node3 := "node-" + uuid.NewString()
+
+	a := uuid.NewString()
+	b := uuid.NewString()
+	c := uuid.NewString()
+	d := uuid.NewString()
+
+	events := []*schema.AiOutputEvent{
+		{EventUUID: a, Type: schema.EventType(typeName), SessionId: session1, NodeId: node1},
+		{EventUUID: b, Type: schema.EventType(typeName), SessionId: session1, NodeId: node2},
+		{EventUUID: c, Type: schema.EventType(typeName), SessionId: session2, NodeId: node1},
+		{EventUUID: d, Type: schema.EventType(typeName), SessionId: session2, NodeId: node3},
+	}
+	for _, event := range events {
+		require.NoError(t, yakit.CreateOrUpdateAIOutputEvent(db, event))
+	}
+	defer func() {
+		db.Where("event_uuid IN (?)", []string{a, b, c, d}).Delete(&schema.AiOutputEvent{})
+		db.Where("event_id IN (?)", []string{a, b, c, d}).Delete(&schema.AiProcessAndAiEvent{})
+	}()
+
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	assertEventUUIDs := func(t *testing.T, rsp *ypb.AIEventQueryResponse, want ...string) {
+		t.Helper()
+		got := make([]string, 0, len(rsp.GetEvents()))
+		for _, e := range rsp.GetEvents() {
+			got = append(got, e.GetEventUUID())
+		}
+		require.ElementsMatch(t, want, got)
+	}
+
+	rsp, err := client.QueryAIEvent(ctx, &ypb.AIEventQueryRequest{
+		Filter: &ypb.AIEventFilter{
+			SessionID: session2,
+			NodeId:    []string{node2},
+			UseOR:     true,
+		},
+		Pagination: &ypb.Paging{
+			Page:    1,
+			Limit:   10,
+			OrderBy: "id",
+			Order:   "asc",
+		},
+	})
+	require.NoError(t, err)
+	assertEventUUIDs(t, rsp, b, c, d)
+}
+
 func TestServer_QueryAIEvent_OrderByID_AscDesc(t *testing.T) {
 	db := consts.GetGormProjectDatabase()
 	typeName := uuid.NewString()
