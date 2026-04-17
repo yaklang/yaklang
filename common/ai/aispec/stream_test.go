@@ -5,6 +5,7 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 )
@@ -19,7 +20,7 @@ func TestProcessNonStreamResponse(t *testing.T) {
 	outBuffer := &bytes.Buffer{}
 	reasonBuffer := &bytes.Buffer{}
 
-	processAIResponse(mockResponse, mockCloser, outBuffer, reasonBuffer, nil, nil)
+	processAIResponse(mockResponse, mockCloser, outBuffer, reasonBuffer, nil, nil, nil)
 
 	expectedContent := "Hello World"
 	expectedReason := "This is my reasoning process"
@@ -49,7 +50,7 @@ data: [DONE]`
 	outBuffer := &bytes.Buffer{}
 	reasonBuffer := &bytes.Buffer{}
 
-	processAIResponse(mockResponse, mockCloser, outBuffer, reasonBuffer, nil, nil)
+	processAIResponse(mockResponse, mockCloser, outBuffer, reasonBuffer, nil, nil, nil)
 
 	t.Logf("流式内容输出: %s", outBuffer.String())
 	t.Logf("流式推理输出: %s", reasonBuffer.String())
@@ -57,7 +58,7 @@ data: [DONE]`
 
 func TestAppendStreamHandlerPoCOptionEx(t *testing.T) {
 	// 测试流式和非流式选项创建
-	outReader, reasonReader, opts, cancel := appendStreamHandlerPoCOptionEx(true, []poc.PocConfigOption{}, nil, nil)
+	outReader, reasonReader, opts, cancel := appendStreamHandlerPoCOptionEx(true, []poc.PocConfigOption{}, nil, nil, nil)
 	defer cancel()
 
 	if outReader == nil || reasonReader == nil {
@@ -69,7 +70,7 @@ func TestAppendStreamHandlerPoCOptionEx(t *testing.T) {
 	}
 
 	// 测试非流式
-	outReader2, reasonReader2, opts2, cancel2 := appendStreamHandlerPoCOptionEx(false, []poc.PocConfigOption{}, nil, nil)
+	outReader2, reasonReader2, opts2, cancel2 := appendStreamHandlerPoCOptionEx(false, []poc.PocConfigOption{}, nil, nil, nil)
 	defer cancel2()
 
 	if outReader2 == nil || reasonReader2 == nil {
@@ -78,5 +79,55 @@ func TestAppendStreamHandlerPoCOptionEx(t *testing.T) {
 
 	if len(opts2) == 0 {
 		t.Error("非流式应该添加了处理选项")
+	}
+}
+
+func TestProcessAIResponse_HeaderCallbackBeforeBodyRead(t *testing.T) {
+	nonStreamData := `{"choices":[{"message":{"content":"Hello World"}}]}`
+	mockResponse := []byte("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n")
+
+	pr, pw := io.Pipe()
+	outBuffer := &bytes.Buffer{}
+	reasonBuffer := &bytes.Buffer{}
+	headerCh := make(chan []byte, 1)
+	done := make(chan struct{})
+
+	go func() {
+		defer close(done)
+		processAIResponse(mockResponse, pr, outBuffer, reasonBuffer, nil, func(header []byte) {
+			headerCh <- append([]byte(nil), header...)
+		}, nil)
+	}()
+
+	select {
+	case header := <-headerCh:
+		if string(header) != string(mockResponse) {
+			t.Fatalf("header callback mismatch, want %q got %q", string(mockResponse), string(header))
+		}
+	case <-time.After(time.Second):
+		t.Fatal("header callback not triggered before body read")
+	}
+
+	select {
+	case <-done:
+		t.Fatal("response processing finished before body was written")
+	default:
+	}
+
+	if _, err := pw.Write([]byte(nonStreamData)); err != nil {
+		t.Fatalf("write body failed: %v", err)
+	}
+	if err := pw.Close(); err != nil {
+		t.Fatalf("close body writer failed: %v", err)
+	}
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("response processing did not finish after body write")
+	}
+
+	if outBuffer.String() != "Hello World" {
+		t.Fatalf("content output mismatch, got %q", outBuffer.String())
 	}
 }
