@@ -26,6 +26,7 @@ import (
 // The response is exposed as header bytes plus a body preview because streaming responses
 // may not be fully buffered in memory.
 type RawHTTPRequestResponseCallback func(requestBytes []byte, responseHeaderBytes []byte, bodyPreview []byte)
+type RawHTTPResponseHeaderCallback func(headerBytes []byte)
 
 type AIConfig struct {
 	// gateway network config
@@ -84,6 +85,9 @@ type AIConfig struct {
 	// RawHTTPResponseCallback is called with the raw HTTP response header and body preview
 	// when an AI response completes. Used for debugging AI call failures.
 	RawHTTPResponseCallback func(headerBytes []byte, bodyPreview []byte)
+	// RawHTTPResponseHeaderCallback is called as soon as the raw HTTP response header
+	// has been fully received, before the response body is consumed.
+	RawHTTPResponseHeaderCallback RawHTTPResponseHeaderCallback
 	// RawHTTPRequestResponseCallback is called with the raw HTTP request bytes and
 	// response debug data when an AI response completes.
 	RawHTTPRequestResponseCallback RawHTTPRequestResponseCallback
@@ -960,6 +964,12 @@ func WithModelInfoConfirmCallback(cb func(provider, model string)) AIConfigOptio
 func WithRawHTTPResponseCallback(cb func(headerBytes []byte, bodyPreview []byte)) AIConfigOption {
 	return func(c *AIConfig) {
 		c.RawHTTPResponseCallback = cb
+	}
+}
+
+func WithRawHTTPResponseHeaderCallback(cb RawHTTPResponseHeaderCallback) AIConfigOption {
+	return func(c *AIConfig) {
+		c.RawHTTPResponseHeaderCallback = cb
 	}
 }
 
