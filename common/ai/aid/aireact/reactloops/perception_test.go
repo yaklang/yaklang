@@ -15,7 +15,9 @@ import (
 
 type perceptionMidtermSchedulerTestInvoker struct {
 	*mockcfg.MockInvoker
-	scheduledSummary string
+	scheduledSummary  string
+	scheduledTopics   []string
+	scheduledKeywords []string
 }
 
 func (i *perceptionMidtermSchedulerTestInvoker) InvokeSpeedPriorityLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
@@ -34,8 +36,10 @@ func (i *perceptionMidtermSchedulerTestInvoker) InvokeSpeedPriorityLiteForge(ctx
 	}`, "perception")
 }
 
-func (i *perceptionMidtermSchedulerTestInvoker) ScheduleMidtermTimelineRecall(summary string) {
+func (i *perceptionMidtermSchedulerTestInvoker) ScheduleMidtermTimelineRecallFromPerception(summary string, topics []string, keywords []string) {
 	i.scheduledSummary = summary
+	i.scheduledTopics = append([]string{}, topics...)
+	i.scheduledKeywords = append([]string{}, keywords...)
 }
 
 func TestTriggerPerception_SchedulesMidtermRecallSummary(t *testing.T) {
@@ -54,6 +58,8 @@ func TestTriggerPerception_SchedulesMidtermRecallSummary(t *testing.T) {
 	require.NotNil(t, state)
 	require.Equal(t, "focused summary from perception", state.OneLinerSummary)
 	require.Equal(t, "focused summary from perception", invoker.scheduledSummary)
+	require.Equal(t, []string{"http fuzzing"}, invoker.scheduledTopics)
+	require.Equal(t, []string{"header", "malformed"}, invoker.scheduledKeywords)
 }
 
 func TestHashTopics_DeterministicAndOrderIndependent(t *testing.T) {

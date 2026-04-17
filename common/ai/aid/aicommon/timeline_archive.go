@@ -59,8 +59,9 @@ func (r *TimelineArchiveRef) String() string {
 }
 
 type TimelineArchiveSearchQuery struct {
-	Query      string
-	BytesLimit int
+	Query                 string
+	BytesLimit            int
+	DisableSemanticSearch bool
 }
 
 type TimelineArchiveSearchResult struct {

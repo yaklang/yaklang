@@ -11,7 +11,9 @@ import (
 	"github.com/yaklang/yaklang/common/ai/ytoken"
 
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
 )
 
 func (t *AIMemoryTriage) SearchMemory(origin any, tokenLimit int) (*aicommon.SearchMemoryResult, error) {
@@ -20,6 +22,14 @@ func (t *AIMemoryTriage) SearchMemory(origin any, tokenLimit int) (*aicommon.Sea
 
 func (t *AIMemoryTriage) SearchMemoryWithoutAI(origin any, tokenLimit int) (*aicommon.SearchMemoryResult, error) {
 	return t.searchMemoryWithAIOption(origin, tokenLimit, true)
+}
+
+func (t *AIMemoryTriage) SearchMemoryWithoutAIAndSemantics(origin any, tokenLimit int) (*aicommon.SearchMemoryResult, error) {
+	queryText := utils.InterfaceToString(origin)
+	if task, ok := origin.(aicommon.AIStatefulTask); ok {
+		queryText = strings.TrimSpace(task.GetUserInput())
+	}
+	return t.searchMemoryKeywordOnly(queryText, tokenLimit)
 }
 
 func (t *AIMemoryTriage) searchMemoryForAITask(task aicommon.AIStatefulTask, limit int, disableAI bool) (*aicommon.SearchMemoryResult, error) {
@@ -187,6 +197,72 @@ func (t *AIMemoryTriage) searchMemoryForText(queryText string, tokenLimit int, d
 		ContentTokens: contentTokens,
 		SearchSummary: searchSummary,
 	}, nil
+}
+
+func (t *AIMemoryTriage) searchMemoryKeywordOnly(queryText string, tokenLimit int) (*aicommon.SearchMemoryResult, error) {
+	queryText = strings.TrimSpace(queryText)
+	if queryText == "" {
+		return &aicommon.SearchMemoryResult{
+			Memories:      []*aicommon.MemoryEntity{},
+			TotalContent:  "",
+			ContentTokens: 0,
+			SearchSummary: "empty query provided",
+		}, nil
+	}
+
+	db := t.GetDB()
+	if db == nil {
+		return nil, utils.Errorf("database connection is nil")
+	}
+
+	query := db.Model(&schema.AIMemoryEntity{}).Where("session_id = ?", t.sessionID)
+	query = bizhelper.FuzzSearchEx(query, []string{"content", "tags", "potential_questions"}, queryText, false)
+
+	var dbEntities []schema.AIMemoryEntity
+	if err := query.Order("created_at DESC").Limit(30).Find(&dbEntities).Error; err != nil {
+		return nil, utils.Errorf("keyword-only memory query failed: %v", err)
+	}
+
+	allMemories := make([]*aicommon.MemoryEntity, 0, len(dbEntities))
+	for _, dbEntity := range dbEntities {
+		allMemories = append(allMemories, memoryEntityFromDBEntity(dbEntity))
+	}
+
+	searchSteps := []string{
+		fmt.Sprintf("found %d memories by keyword-only LIKE query", len(allMemories)),
+		"semantic search disabled",
+	}
+
+	rankedMemories := t.rankMemoriesByRelevance(allMemories, queryText)
+	searchSteps = append(searchSteps, "ranked memories by keyword relevance")
+
+	selectedMemories, totalContent, contentTokens := t.selectMemoriesByTokenLimit(rankedMemories, tokenLimit)
+	searchSteps = append(searchSteps, fmt.Sprintf("selected %d memories within %d token limit", len(selectedMemories), tokenLimit))
+
+	return &aicommon.SearchMemoryResult{
+		Memories:      selectedMemories,
+		TotalContent:  totalContent,
+		ContentTokens: contentTokens,
+		SearchSummary: strings.Join(searchSteps, " -> "),
+	}, nil
+}
+
+func memoryEntityFromDBEntity(dbEntity schema.AIMemoryEntity) *aicommon.MemoryEntity {
+	return &aicommon.MemoryEntity{
+		Id:                 dbEntity.MemoryID,
+		CreatedAt:          dbEntity.CreatedAt,
+		Content:            dbEntity.Content,
+		Tags:               []string(dbEntity.Tags),
+		PotentialQuestions: []string(dbEntity.PotentialQuestions),
+		C_Score:            dbEntity.C_Score,
+		O_Score:            dbEntity.O_Score,
+		R_Score:            dbEntity.R_Score,
+		E_Score:            dbEntity.E_Score,
+		P_Score:            dbEntity.P_Score,
+		A_Score:            dbEntity.A_Score,
+		T_Score:            dbEntity.T_Score,
+		CorePactVector:     []float32(dbEntity.CorePactVector),
+	}
 }
 
 func (t *AIMemoryTriage) searchMemoryWithAIOption(origin any, tokenLimit int, disableAI bool) (*aicommon.SearchMemoryResult, error) {

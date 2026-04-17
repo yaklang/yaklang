@@ -58,7 +58,15 @@ func (r *AIMemoryTriage) SearchArchivedBatches(ctx context.Context, query *aicom
 	if query == nil {
 		query = &aicommon.TimelineArchiveSearchQuery{}
 	}
-	result, err := r.SearchMemoryWithoutAI(query.Query, query.BytesLimit)
+	var (
+		result *aicommon.SearchMemoryResult
+		err    error
+	)
+	if query.DisableSemanticSearch {
+		result, err = r.SearchMemoryWithoutAIAndSemantics(query.Query, query.BytesLimit)
+	} else {
+		result, err = r.SearchMemoryWithoutAI(query.Query, query.BytesLimit)
+	}
 	if err != nil {
 		return nil, err
 	}

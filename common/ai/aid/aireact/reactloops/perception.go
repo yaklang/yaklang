@@ -114,7 +114,7 @@ type perceptionController struct {
 }
 
 type midtermTimelineRecallScheduler interface {
-	ScheduleMidtermTimelineRecall(summary string)
+	ScheduleMidtermTimelineRecallFromPerception(summary string, topics []string, keywords []string)
 }
 
 func newPerceptionController() *perceptionController {
@@ -398,7 +398,7 @@ func (r *ReActLoop) TriggerPerception(reason string, force bool) *PerceptionStat
 				summaryForMidterm = strings.TrimSpace(current.OneLinerSummary)
 			}
 		}
-		scheduler.ScheduleMidtermTimelineRecall(summaryForMidterm)
+		scheduler.ScheduleMidtermTimelineRecallFromPerception(summaryForMidterm, parsed.Topics, parsed.Keywords)
 	}
 
 	invoker.AddToTimeline("perception",
