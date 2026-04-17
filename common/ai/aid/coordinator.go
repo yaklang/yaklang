@@ -718,6 +718,7 @@ func (c *Coordinator) HandleSkipSubtaskInPlan(event *ypb.AIInputEvent) error {
 
 	// 幂等检查：如果任务已经是 Skipped 状态，不重复处理
 	if task.GetStatus() == aicommon.AITaskState_Skipped {
+		sendFailResponse("subtask already skipped: " + subtaskIndex)
 		return nil
 	}
 

@@ -179,6 +179,168 @@ LOOP:
 	require.True(t, skipSuccess, "skip should succeed")
 }
 
+func TestCoordinator_SkipSubtaskInPlan_AlreadySkipped(t *testing.T) {
+	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 100)
+	outputChan := make(chan *schema.AiOutputEvent, 100)
+
+	task1Started := make(chan struct{}, 1)
+	firstSkipDone := make(chan struct{})
+
+	ins, err := aid.NewCoordinator(
+		"测试重复跳过已跳过的子任务",
+		aicommon.WithAgreeYOLO(),
+		aicommon.WithMemoryTriage(aimem.NewMockMemoryTriage()),
+		aicommon.WithDisableIntentRecognition(true),
+		aicommon.WithEnableSelfReflection(false),
+		aicommon.WithDisableAutoSkills(true),
+		aicommon.WithDisableSessionTitleGeneration(true),
+		aicommon.WithGenerateReport(false),
+		aicommon.WithEventInputChanx(inputChan),
+		aicommon.WithEventHandler(func(event *schema.AiOutputEvent) {
+			outputChan <- event
+		}),
+		aicommon.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			prompt := request.GetPrompt()
+
+			skipPlanJSON := `{
+    "@action": "plan_from_document",
+    "main_task": "测试重复跳过",
+    "main_task_goal": "验证对已跳过子任务再次跳过时会返回错误",
+    "tasks": [
+        {"subtask_name": "第一个任务", "subtask_goal": "先被成功跳过"}
+    ]
+}`
+			if rsp, err := tryHandleNewPlanFlowPrompt(config, prompt, skipPlanJSON); rsp != nil {
+				return rsp, err
+			}
+
+			rsp := config.NewAIResponse()
+			defer rsp.Close()
+
+			if utils.MatchAllOfSubString(prompt, "status_summary", "task_long_summary", "task_short_summary") {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "summary", "status_summary": "s", "task_short_summary": "s", "task_long_summary": "s"}`))
+				return rsp, nil
+			}
+
+			if utils.MatchAllOfSubString(prompt, "directly_answer", "require_tool") {
+				if isCurrentTask(prompt, "第一个任务") {
+					select {
+					case task1Started <- struct{}{}:
+					default:
+					}
+
+					select {
+					case <-firstSkipDone:
+					case <-time.After(3 * time.Second):
+					}
+				}
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "finish", "answer_payload": "完成"}}`))
+				return rsp, nil
+			}
+
+			if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "完成"}`))
+				return rsp, nil
+			}
+
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish"}`))
+			return rsp, nil
+		}),
+	)
+	require.NoError(t, err)
+
+	go func() {
+		ins.Run()
+	}()
+
+	firstSkipSent := false
+	secondSkipSent := false
+	firstSkipSuccess := false
+	secondSkipError := false
+	runFinished := false
+	firstSyncID := uuid.New().String()
+	secondSyncID := uuid.New().String()
+	ctx := utils.TimeoutContextSeconds(15)
+
+LOOP:
+	for {
+		select {
+		case <-task1Started:
+			if !firstSkipSent {
+				firstSkipSent = true
+				inputChan.SafeFeed(SyncInputEventWithJSON(
+					aicommon.SYNC_TYPE_SKIP_SUBTASK_IN_PLAN,
+					firstSyncID,
+					map[string]any{
+						"subtask_index": "1-1",
+						"reason":        "先正常跳过一次",
+					},
+				))
+			}
+
+		case result := <-outputChan:
+			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
+				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
+				continue
+			}
+
+			if result.Type == schema.EVENT_TYPE_TASK_REVIEW_REQUIRE || result.Type == schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE {
+				inputChan.SafeFeed(ContinueSuggestionInputEvent(result.GetInteractiveId()))
+				continue
+			}
+
+			if result.Type == schema.EVENT_TYPE_STRUCTURED && result.SyncID == firstSyncID {
+				var data map[string]any
+				if err := json.Unmarshal([]byte(result.Content), &data); err == nil {
+					if success, ok := data["success"].(bool); ok && success {
+						firstSkipSuccess = true
+						if !secondSkipSent {
+							secondSkipSent = true
+							inputChan.SafeFeed(SyncInputEventWithJSON(
+								aicommon.SYNC_TYPE_SKIP_SUBTASK_IN_PLAN,
+								secondSyncID,
+								map[string]any{
+									"subtask_index": "1-1",
+									"reason":        "再次跳过同一个子任务",
+								},
+							))
+						}
+					}
+				}
+			}
+
+			if result.Type == schema.EVENT_TYPE_STRUCTURED && result.SyncID == secondSyncID {
+				var data map[string]any
+				if err := json.Unmarshal([]byte(result.Content), &data); err == nil {
+					if success, ok := data["success"].(bool); ok && !success {
+						if errMsg, ok := data["error"].(string); ok {
+							require.Contains(t, errMsg, "subtask already skipped")
+							require.Contains(t, errMsg, "1-1")
+							secondSkipError = true
+							close(firstSkipDone)
+						}
+					}
+				}
+			}
+
+			if result.Type == schema.EVENT_TYPE_STRUCTURED && strings.Contains(string(result.Content), "coordinator run finished") {
+				runFinished = true
+				break LOOP
+			}
+
+		case <-ctx.Done():
+			t.Fatalf("timeout: firstSkipSent=%v, firstSkipSuccess=%v, secondSkipSent=%v, secondSkipError=%v",
+				firstSkipSent, firstSkipSuccess, secondSkipSent, secondSkipError)
+		}
+	}
+
+	require.True(t, firstSkipSent, "first skip request should be sent")
+	require.True(t, firstSkipSuccess, "first skip should succeed")
+	require.True(t, secondSkipSent, "second skip request should be sent")
+	require.True(t, secondSkipError, "second skip should fail with already skipped error")
+	require.True(t, runFinished, "coordinator should finish normally")
+}
+
 func TestCoordinator_SkipSubtaskInPlan_NotFound(t *testing.T) {
 	inputChan := chanx.NewUnlimitedChan[*ypb.AIInputEvent](context.Background(), 100)
 	outputChan := make(chan *schema.AiOutputEvent, 100)
