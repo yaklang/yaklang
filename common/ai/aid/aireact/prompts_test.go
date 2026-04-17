@@ -826,7 +826,7 @@ func TestGenerateIntervalReviewPrompt_IncludesConcreteStringGuidance(t *testing.
 }
 
 func TestGenerateIntervalReviewPrompt_WithExtraPrompt(t *testing.T) {
-	const extraPrompt = "If the tool stops producing new output for two rounds, prefer cancel."
+	extraPrompt := "interval-review-extra-" + utils.RandStringBytes(24)
 
 	react, err := NewTestReAct(
 		aicommon.WithToolCallIntervalReviewExtraPrompt(extraPrompt),
@@ -859,8 +859,9 @@ func TestGenerateIntervalReviewPrompt_WithExtraPrompt(t *testing.T) {
 		t.Fatalf("Failed to generate interval review prompt: %v", err)
 	}
 
-	if !strings.Contains(prompt, extraPrompt) {
-		t.Fatalf("interval review prompt should contain extra prompt. Got:\n%s", prompt)
+	extraPromptBlock := mustExtractAITagBlock(t, prompt, "EXTRA_PROMPT")
+	if extraPromptBlock.Body != extraPrompt {
+		t.Fatalf("interval review prompt should wrap extra prompt in EXTRA_PROMPT AITAG. Got:\n%s", prompt)
 	}
 }
 

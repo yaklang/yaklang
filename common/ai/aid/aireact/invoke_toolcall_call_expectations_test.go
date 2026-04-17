@@ -218,7 +218,7 @@ func TestReAct_ToolUse_IntervalReviewExtraPrompt(t *testing.T) {
 	in := make(chan *ypb.AIInputEvent, 10)
 	out := make(chan *ypb.AIOutputEvent, 10)
 
-	const extraPrompt = "Cancel if there is no meaningful delta across two interval reviews."
+	extraPrompt := "interval-review-extra-" + utils.RandStringBytes(24)
 
 	toolCalled := false
 	sleepTool, err := aitool.New(
@@ -236,8 +236,20 @@ func TestReAct_ToolUse_IntervalReviewExtraPrompt(t *testing.T) {
 	_, err = NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := r.GetPrompt()
-			if utils.MatchAllOfSubString(prompt, "Interval Review") && strings.Contains(prompt, extraPrompt) {
-				intervalReviewPromptContainsExtraPrompt = true
+			if utils.MatchAllOfSubString(prompt, "Interval Review") {
+				nonce := extractPromptNonce(prompt, "EXTRA_PROMPT")
+				if nonce != "" {
+					startMarker := "<|EXTRA_PROMPT_" + nonce + "|>"
+					endMarker := "<|EXTRA_PROMPT_END_" + nonce + "|>"
+					startIndex := strings.Index(prompt, startMarker)
+					endIndex := strings.Index(prompt, endMarker)
+					if startIndex != -1 && endIndex != -1 {
+						body := strings.TrimSpace(prompt[startIndex+len(startMarker) : endIndex])
+						if body == extraPrompt {
+							intervalReviewPromptContainsExtraPrompt = true
+						}
+					}
+				}
 			}
 			return mockedToolCallingWithCallExpectations(i, r, "sleep_test")
 		}),
