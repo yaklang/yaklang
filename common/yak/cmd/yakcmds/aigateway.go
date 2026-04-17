@@ -44,10 +44,6 @@ var AIHTTPGatewayCommand = &cli.Command{
 			Name:  "home",
 			Usage: "home directory for gateway",
 		},
-		cli.StringFlag{
-			Name:  "upload-dir",
-			Usage: "directory used to store files uploaded through aihttp",
-		},
 		cli.BoolFlag{
 			Name:  "debug",
 			Usage: "enable debug logging",
@@ -67,9 +63,6 @@ var AIHTTPGatewayCommand = &cli.Command{
 			aihttp.WithDebug(c.Bool("debug")),
 			aihttp.WithDatabase(consts.GetGormProjectDatabase()),
 		)
-		if uploadDir := c.String("upload-dir"); uploadDir != "" {
-			opts = append(opts, aihttp.WithUploadDir(uploadDir))
-		}
 
 		if secret := c.String("jwt-secret"); secret != "" {
 			opts = append(opts, aihttp.WithJWTAuth(secret))
@@ -102,7 +95,6 @@ func printStartupInfo(c *cli.Context, gw *aihttp.AIAgentHTTPGateway) {
 	fmt.Println("╚══════════════════════════════════════════════╝")
 	fmt.Printf("  Listening: http://%s\n", gw.GetAddr())
 	fmt.Printf("  Prefix:    %s\n", gw.GetRoutePrefix())
-	fmt.Printf("  Uploads:   %s\n", gw.GetUploadDir())
 	fmt.Println()
 
 	if gw.IsJWTEnabled() {
