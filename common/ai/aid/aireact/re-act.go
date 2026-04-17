@@ -99,7 +99,7 @@ type ReAct struct {
 
 	midtermRecallMutex           sync.Mutex
 	pendingMidtermTimelineRecall bool
-	pendingMidtermTimelineQuery  string
+	pendingMidtermPerception     *midtermPerceptionSnapshot
 
 	pureInvokerMode bool // 纯调用者模式，不启动事件循环和队列处理器
 }

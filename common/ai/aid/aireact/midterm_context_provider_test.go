@@ -14,9 +14,10 @@ import (
 )
 
 type mockMidtermArchiveStore struct {
-	result  *aicommon.TimelineArchiveSearchResult
-	results map[string]*aicommon.TimelineArchiveSearchResult
-	queries []string
+	result        *aicommon.TimelineArchiveSearchResult
+	results       map[string]*aicommon.TimelineArchiveSearchResult
+	queries       []string
+	searchQueries []*aicommon.TimelineArchiveSearchQuery
 }
 
 func (m *mockMidtermArchiveStore) ArchiveCompressedBatch(context.Context, *aicommon.TimelineArchiveBatch) (*aicommon.TimelineArchiveRef, error) {
@@ -27,6 +28,8 @@ func (m *mockMidtermArchiveStore) SearchArchivedBatches(ctx context.Context, que
 	_ = ctx
 	if query != nil {
 		m.queries = append(m.queries, query.Query)
+		cloned := *query
+		m.searchQueries = append(m.searchQueries, &cloned)
 		if m.results != nil {
 			if result, ok := m.results[query.Query]; ok {
 				return result, nil
@@ -143,6 +146,15 @@ func TestBuildTimelineDumpWithMidtermMemory_UsesPendingPerceptionSummaryOnce(t *
 			"perception summary about malformed headers": {
 				TotalContent: "important archived clue\nsecond line",
 			},
+			"http fuzzing malformed headers": {
+				TotalContent: "topic based memory",
+			},
+			"header": {
+				TotalContent: "keyword based memory from header",
+			},
+			"malformed": {
+				TotalContent: "keyword based memory from malformed",
+			},
 		},
 	}
 	cfg.TimelineArchiveStore = store
@@ -165,23 +177,44 @@ func TestBuildTimelineDumpWithMidtermMemory_UsesPendingPerceptionSummaryOnce(t *
 	require.Equal(t, timeline.Dump(), dumpWithoutPerception)
 	require.Empty(t, store.queries)
 
-	react.ScheduleMidtermTimelineRecall("perception summary about malformed headers")
+	react.ScheduleMidtermTimelineRecallFromPerception(
+		"perception summary about malformed headers",
+		[]string{"http fuzzing", "malformed headers"},
+		[]string{"header", "malformed"},
+	)
 	dump := buildTimelineDumpWithMidtermMemory(react, timeline)
 
 	require.True(t, strings.HasPrefix(dump, "timeline:\n--["))
 	require.Contains(t, dump, "midterm-memory:")
-	require.Contains(t, dump, "search-query: perception summary about malformed headers")
+	require.Contains(t, dump, "search-queries:")
+	require.Contains(t, dump, "perception summary about malformed headers")
+	require.Contains(t, dump, "http fuzzing malformed headers")
+	require.Contains(t, dump, "header")
+	require.Contains(t, dump, "malformed")
+	require.Contains(t, dump, "topic based memory")
+	require.Contains(t, dump, "keyword based memory from header")
+	require.Contains(t, dump, "keyword based memory from malformed")
 	require.Contains(t, dump, "important archived clue")
 	require.Contains(t, dump, "live timeline item")
 	require.Less(t, strings.Index(dump, "midterm-memory:"), strings.Index(dump, "live timeline item"))
-	require.Equal(t, []string{"perception summary about malformed headers"}, store.queries)
+	require.Equal(t, []string{
+		"perception summary about malformed headers",
+		"http fuzzing malformed headers",
+		"header",
+		"malformed",
+	}, store.queries)
+	require.Len(t, store.searchQueries, 4)
+	require.False(t, store.searchQueries[0].DisableSemanticSearch)
+	require.False(t, store.searchQueries[1].DisableSemanticSearch)
+	require.True(t, store.searchQueries[2].DisableSemanticSearch)
+	require.True(t, store.searchQueries[3].DisableSemanticSearch)
 
 	dumpAfterConsumption := buildTimelineDumpWithMidtermMemory(react, timeline)
 	require.Equal(t, timeline.Dump(), dumpAfterConsumption)
-	require.Equal(t, []string{"perception summary about malformed headers"}, store.queries)
+	require.Len(t, store.queries, 4)
 }
 
-func TestBuildMidtermTimelinePrefix_UsesPerceptionSummaryQuery(t *testing.T) {
+func TestBuildMidtermTimelinePrefix_UsesPerceptionQueries(t *testing.T) {
 	store := &mockMidtermArchiveStore{
 		results: map[string]*aicommon.TimelineArchiveSearchResult{
 			"perception summary about malformed headers": {
@@ -190,6 +223,30 @@ func TestBuildMidtermTimelinePrefix_UsesPerceptionSummaryQuery(t *testing.T) {
 				SelectedMemory: []*aicommon.MemoryEntity{{
 					Id:      "memory-1",
 					Content: "memory from perception summary",
+				}},
+			},
+			"http fuzzing malformed headers": {
+				ArchiveRefs:  []*aicommon.TimelineArchiveRef{{ArchiveID: "archive-2"}},
+				TotalContent: "memory from topics",
+				SelectedMemory: []*aicommon.MemoryEntity{{
+					Id:      "memory-2",
+					Content: "memory from topics",
+				}},
+			},
+			"header": {
+				ArchiveRefs:  []*aicommon.TimelineArchiveRef{{ArchiveID: "archive-3"}},
+				TotalContent: "memory from keyword header",
+				SelectedMemory: []*aicommon.MemoryEntity{{
+					Id:      "memory-3",
+					Content: "memory from keyword header",
+				}},
+			},
+			"malformed": {
+				ArchiveRefs:  []*aicommon.TimelineArchiveRef{{ArchiveID: "archive-4"}},
+				TotalContent: "memory from keyword malformed",
+				SelectedMemory: []*aicommon.MemoryEntity{{
+					Id:      "memory-4",
+					Content: "memory from keyword malformed",
 				}},
 			},
 		},
@@ -205,9 +262,29 @@ func TestBuildMidtermTimelinePrefix_UsesPerceptionSummaryQuery(t *testing.T) {
 		origin: "collect and verify malformed header behavior",
 	})
 
-	prefix, err := buildMidtermTimelinePrefix(react, []string{"perception summary about malformed headers"})
+	prefix, err := buildMidtermTimelinePrefix(react, []midtermTimelineSearchQuery{
+		{Query: "perception summary about malformed headers"},
+		{Query: "http fuzzing malformed headers"},
+		{Query: "header", DisableSemanticSearch: true},
+		{Query: "malformed", DisableSemanticSearch: true},
+	})
 	require.NoError(t, err)
-	require.Contains(t, prefix, "search-query: perception summary about malformed headers")
+	require.Contains(t, prefix, "search-queries:")
+	require.Contains(t, prefix, "perception summary about malformed headers")
+	require.Contains(t, prefix, "http fuzzing malformed headers")
+	require.Contains(t, prefix, "header")
+	require.Contains(t, prefix, "malformed")
 	require.Contains(t, prefix, "memory from perception summary")
-	require.Equal(t, []string{"perception summary about malformed headers"}, store.queries)
+	require.Contains(t, prefix, "memory from topics")
+	require.Contains(t, prefix, "memory from keyword header")
+	require.Contains(t, prefix, "memory from keyword malformed")
+	require.Equal(t, []string{
+		"perception summary about malformed headers",
+		"http fuzzing malformed headers",
+		"header",
+		"malformed",
+	}, store.queries)
+	require.Len(t, store.searchQueries, 4)
+	require.True(t, store.searchQueries[2].DisableSemanticSearch)
+	require.True(t, store.searchQueries[3].DisableSemanticSearch)
 }

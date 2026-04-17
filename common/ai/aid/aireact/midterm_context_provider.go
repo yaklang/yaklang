@@ -12,6 +12,17 @@ import (
 
 const midtermContextBytesLimit = 3 * 1024
 
+type midtermPerceptionSnapshot struct {
+	Summary  string
+	Topics   []string
+	Keywords []string
+}
+
+type midtermTimelineSearchQuery struct {
+	Query                 string
+	DisableSemanticSearch bool
+}
+
 func buildTimelineDumpWithMidtermMemory(react *ReAct, timeline *aicommon.Timeline) string {
 	baseTimeline := ""
 	if timeline != nil {
@@ -37,25 +48,35 @@ func buildTimelineDumpWithMidtermMemory(react *ReAct, timeline *aicommon.Timelin
 }
 
 func (r *ReAct) ScheduleMidtermTimelineRecall(summary string) {
+	r.ScheduleMidtermTimelineRecallFromPerception(summary, nil, nil)
+}
+
+func (r *ReAct) ScheduleMidtermTimelineRecallFromPerception(summary string, topics []string, keywords []string) {
 	if r == nil {
 		return
 	}
 
 	summary = strings.TrimSpace(summary)
+	topics = deduplicateMidtermQueryParts(topics)
+	keywords = deduplicateMidtermQueryParts(keywords)
 	r.midtermRecallMutex.Lock()
 	defer r.midtermRecallMutex.Unlock()
 
-	if summary == "" {
+	if summary == "" && len(topics) == 0 && len(keywords) == 0 {
 		r.pendingMidtermTimelineRecall = false
-		r.pendingMidtermTimelineQuery = ""
+		r.pendingMidtermPerception = nil
 		return
 	}
 
 	r.pendingMidtermTimelineRecall = true
-	r.pendingMidtermTimelineQuery = summary
+	r.pendingMidtermPerception = &midtermPerceptionSnapshot{
+		Summary:  summary,
+		Topics:   append([]string{}, topics...),
+		Keywords: append([]string{}, keywords...),
+	}
 }
 
-func (r *ReAct) consumePendingMidtermTimelineQueries() []string {
+func (r *ReAct) consumePendingMidtermTimelineQueries() []midtermTimelineSearchQuery {
 	if r == nil {
 		return nil
 	}
@@ -67,21 +88,53 @@ func (r *ReAct) consumePendingMidtermTimelineQueries() []string {
 		return nil
 	}
 
-	query := strings.TrimSpace(r.pendingMidtermTimelineQuery)
+	snapshot := r.pendingMidtermPerception
 	r.pendingMidtermTimelineRecall = false
-	r.pendingMidtermTimelineQuery = ""
-	if query == "" {
+	r.pendingMidtermPerception = nil
+	if snapshot == nil {
 		return nil
 	}
-	return []string{query}
+
+	return buildMidtermRecallQueries(snapshot)
 }
 
-func buildMidtermTimelinePrefix(react *ReAct, queries []string) (string, error) {
+func buildMidtermRecallQueries(snapshot *midtermPerceptionSnapshot) []midtermTimelineSearchQuery {
+	if snapshot == nil {
+		return nil
+	}
+
+	seen := make(map[string]struct{})
+	result := make([]midtermTimelineSearchQuery, 0, 2+len(snapshot.Keywords))
+	appendQuery := func(query string, disableSemantic bool) {
+		query = strings.TrimSpace(query)
+		if query == "" {
+			return
+		}
+		key := fmt.Sprintf("%t:%s", disableSemantic, query)
+		if _, ok := seen[key]; ok {
+			return
+		}
+		seen[key] = struct{}{}
+		result = append(result, midtermTimelineSearchQuery{
+			Query:                 query,
+			DisableSemanticSearch: disableSemantic,
+		})
+	}
+
+	appendQuery(snapshot.Summary, false)
+	appendQuery(strings.Join(deduplicateMidtermQueryParts(snapshot.Topics), " "), false)
+	for _, keyword := range deduplicateMidtermQueryParts(snapshot.Keywords) {
+		appendQuery(keyword, true)
+	}
+	return result
+}
+
+func buildMidtermTimelinePrefix(react *ReAct, queries []midtermTimelineSearchQuery) (string, error) {
 	if react == nil || react.config == nil || react.config.TimelineArchiveStore == nil {
 		return "", nil
 	}
 
-	queries = deduplicateMidtermQueryParts(queries)
+	queries = deduplicateMidtermSearchQueries(queries)
 	if len(queries) == 0 {
 		return "", nil
 	}
@@ -98,11 +151,11 @@ func buildMidtermTimelinePrefix(react *ReAct, queries []string) (string, error) 
 	nowStr := time.Now().Format(utils.DefaultTimeFormat3)
 	buf.WriteString(fmt.Sprintf("--[%s] midterm-memory:\n", nowStr))
 	if len(queries) == 1 {
-		buf.WriteString(fmt.Sprintf("     search-query: %s\n", utils.ShrinkString(queries[0], 240)))
+		buf.WriteString(fmt.Sprintf("     search-query: %s\n", utils.ShrinkString(queries[0].Query, 240)))
 	} else {
 		buf.WriteString("     search-queries:\n")
 		for _, query := range queries {
-			buf.WriteString(fmt.Sprintf("       - %s\n", utils.ShrinkString(query, 240)))
+			buf.WriteString(fmt.Sprintf("       - %s\n", utils.ShrinkString(query.Query, 240)))
 		}
 	}
 	for _, line := range utils.ParseStringToRawLines(strings.TrimSpace(result.TotalContent)) {
@@ -151,7 +204,7 @@ func buildMidtermRecallQueryParts(react *ReAct) []string {
 	return deduplicateMidtermQueryParts(parts)
 }
 
-func searchMidtermTimelineQueries(react *ReAct, queries []string) (finalResult *aicommon.TimelineArchiveSearchResult, finalErr error) {
+func searchMidtermTimelineQueries(react *ReAct, queries []midtermTimelineSearchQuery) (finalResult *aicommon.TimelineArchiveSearchResult, finalErr error) {
 	if react == nil || react.config == nil || react.config.TimelineArchiveStore == nil || len(queries) == 0 {
 		return nil, nil
 	}
@@ -174,8 +227,8 @@ func searchMidtermTimelineQueries(react *ReAct, queries []string) (finalResult *
 	}()
 
 	for _, query := range queries {
-		query = strings.TrimSpace(query)
-		if query == "" {
+		query.Query = strings.TrimSpace(query.Query)
+		if query.Query == "" {
 			continue
 		}
 		searchedQueryCount++
@@ -183,15 +236,16 @@ func searchMidtermTimelineQueries(react *ReAct, queries []string) (finalResult *
 		result, err := react.config.TimelineArchiveStore.SearchArchivedBatches(
 			react.config.GetContext(),
 			&aicommon.TimelineArchiveSearchQuery{
-				Query:      query,
-				BytesLimit: midtermContextBytesLimit,
+				Query:                 query.Query,
+				BytesLimit:            midtermContextBytesLimit,
+				DisableSemanticSearch: query.DisableSemanticSearch,
 			},
 		)
 		if err != nil {
-			log.Debugf("midterm timeline search query failed: query=%q duration=%s err=%v", utils.ShrinkString(query, 240), time.Since(queryStartedAt), err)
+			log.Debugf("midterm timeline search query failed: query=%q disable_semantic=%v duration=%s err=%v", utils.ShrinkString(query.Query, 240), query.DisableSemanticSearch, time.Since(queryStartedAt), err)
 			return nil, err
 		}
-		log.Debugf("midterm timeline search query finished: query=%q duration=%s", utils.ShrinkString(query, 240), time.Since(queryStartedAt))
+		log.Debugf("midterm timeline search query finished: query=%q disable_semantic=%v duration=%s", utils.ShrinkString(query.Query, 240), query.DisableSemanticSearch, time.Since(queryStartedAt))
 		if result == nil {
 			continue
 		}
@@ -288,6 +342,24 @@ func deduplicateMidtermQueryParts(parts []string) []string {
 		}
 		seen[part] = struct{}{}
 		result = append(result, part)
+	}
+	return result
+}
+
+func deduplicateMidtermSearchQueries(queries []midtermTimelineSearchQuery) []midtermTimelineSearchQuery {
+	seen := make(map[string]struct{})
+	result := make([]midtermTimelineSearchQuery, 0, len(queries))
+	for _, query := range queries {
+		query.Query = strings.TrimSpace(query.Query)
+		if query.Query == "" {
+			continue
+		}
+		key := fmt.Sprintf("%t:%s", query.DisableSemanticSearch, query.Query)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		result = append(result, query)
 	}
 	return result
 }
