@@ -1,4 +1,4 @@
-package reactloops
+package reactloops_test
 
 import (
 	"context"
