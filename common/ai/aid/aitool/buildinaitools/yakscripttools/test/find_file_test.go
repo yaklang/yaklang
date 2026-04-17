@@ -119,6 +119,25 @@ func TestFindFile_GlobWildcard(t *testing.T) {
 	assert.Assert(t, !strings.Contains(stdout, "data.json"), "*.go glob must NOT match data.json")
 }
 
+// TestFindFile_DefaultModeIsGlob verifies that omitting pattern-type now defaults to glob mode.
+func TestFindFile_DefaultModeIsGlob(t *testing.T) {
+	tool := getFindFileTool(t)
+	root := buildFindTestDir(t)
+
+	stdout := execFindFileTool(t, tool, aitool.InvokeParams{
+		"dir":     root,
+		"pattern": "*.go",
+		"type":    "f",
+		"max":     20,
+	})
+	t.Logf("stdout:\n%s", stdout)
+
+	assert.Assert(t, strings.Contains(stdout, "main.go"), "default mode should treat *.go as glob and match main.go")
+	assert.Assert(t, strings.Contains(stdout, "helper.go"), "default mode should treat *.go as glob and match helper.go")
+	assert.Assert(t, strings.Contains(stdout, "helper_test.go"), "default mode should treat *.go as glob and match helper_test.go")
+	assert.Assert(t, !strings.Contains(stdout, "go.mod"), "default glob mode should not match go.mod for *.go")
+}
+
 // TestFindFile_GlobMultipleFilenamesCommaSeparatedFails documents the known wrong usage:
 // passing comma-separated filenames as a single glob pattern must NOT accidentally match
 // individual filenames (the whole comma string is one invalid pattern → 0 matches).
@@ -159,16 +178,17 @@ func TestFindFile_RegexpMultipleFilenames(t *testing.T) {
 	assert.Assert(t, strings.Contains(stdout, "matched: 3"), "should report exactly 3 matches")
 }
 
-// TestFindFile_SubstrMode verifies the default substr mode works correctly.
+// TestFindFile_SubstrMode verifies explicit substr mode still works correctly.
 func TestFindFile_SubstrMode(t *testing.T) {
 	tool := getFindFileTool(t)
 	root := buildFindTestDir(t)
 
 	stdout := execFindFileTool(t, tool, aitool.InvokeParams{
-		"dir":     root,
-		"pattern": "helper",
-		"type":    "f",
-		"max":     20,
+		"dir":          root,
+		"pattern":      "helper",
+		"pattern-type": "substr",
+		"type":         "f",
+		"max":          20,
 	})
 	t.Logf("stdout:\n%s", stdout)
 

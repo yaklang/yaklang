@@ -16,10 +16,10 @@ Required Parameters:
 
 Optional Parameters:
   pattern-type    (string)  How the pattern is interpreted. Accepted values:
-                            - "" or "substr" (default): case-insensitive substring match against the full path.
+                            - "" or "glob" (default): glob-style wildcard match against the FILENAME (basename) only, NOT the full path.
+                                            Use this for intuitive filename queries like "go.mod", "*.go", "Makefile".
                             - "regexp" / "re" / "regex": Golang-style regular expression match against the full path.
-                            - "glob" / "g": glob-style wildcard match against the FILENAME (basename) only, NOT the full path.
-                                            Use this for simple filename patterns like "go.mod", "*.go", "Makefile".
+                            - "substr": case-insensitive substring match against the full path.
   max             (int)     Maximum number of results to return. Default: 10.
                             The search stops early once this limit is reached.
   type            (string)  Filter by entry type:
@@ -54,30 +54,30 @@ Optional Parameters:
 The "pattern" field accepts EXACTLY ONE pattern string. It does NOT support multiple
 patterns separated by "|", "," or any other delimiter within the pattern itself.
 
-1. substr mode (default):
+1. glob mode (default):
+   - Standard glob wildcards: "*" matches any chars (except "/"), "?" matches one char,
+     "[abc]" matches character class.
+   - The glob is matched against the FILENAME ONLY (basename), NOT the full path.
+   - This means you can use simple patterns like "go.mod", "*.go", "*.md" directly.
+   - CORRECT:   {"pattern": "go.mod"}
+   - CORRECT:   {"pattern": "*.go"}
+   - CORRECT:   {"pattern": "*_result_summary.txt"}
+   - CORRECT:   {"pattern": "*.md"}
+   - WRONG:     {"pattern": "*.md|*.txt"}
+                 ("|" is not glob syntax; this is a single invalid glob)
+   - NOTE: If you need to match multiple filename patterns at once, use regexp mode instead.
+
+2. substr mode:
    - The pattern is a plain literal substring, matched case-insensitively.
    - No wildcards, no regex syntax, no special characters.
    - The entire pattern string must appear somewhere in the full absolute path.
    - CORRECT:   {"pattern": "result_summary", "pattern-type": "substr"}
-    - CORRECT:   {"pattern": "timeline_diff", "pattern-type": "substr"}
+   - CORRECT:   {"pattern": "timeline_diff", "pattern-type": "substr"}
    - CORRECT:   {"pattern": ".md", "pattern-type": "substr"}
    - WRONG:     {"pattern": "foo|bar", "pattern-type": "substr"}
                  ("|" is treated as a literal character, will match nothing)
    - WRONG:     {"pattern": "*.md", "pattern-type": "substr"}
                  ("*" is treated as a literal character, will match nothing)
-
-2. glob mode:
-   - Standard glob wildcards: "*" matches any chars (except "/"), "?" matches one char,
-     "[abc]" matches character class.
-   - The glob is matched against the FILENAME ONLY (basename), NOT the full path.
-   - This means you can use simple patterns like "go.mod", "*.go", "*.md" directly.
-   - CORRECT:   {"pattern": "go.mod", "pattern-type": "glob"}
-   - CORRECT:   {"pattern": "*.go", "pattern-type": "glob"}
-   - CORRECT:   {"pattern": "*_result_summary.txt", "pattern-type": "glob"}
-   - CORRECT:   {"pattern": "*.md", "pattern-type": "glob"}
-   - WRONG:     {"pattern": "*.md|*.txt", "pattern-type": "glob"}
-                 ("|" is not glob syntax; this is a single invalid glob)
-   - NOTE: If you need to match multiple filename patterns at once, use regexp mode instead.
 
 3. regexp mode:
    - Golang-style regular expression (re2 syntax).
@@ -142,8 +142,8 @@ USAGE_BLOCK
 yakit.AutoInitYakit()
 
 dirname = cli.String("dir", cli.setRequired(true), cli.setHelp("root directory to search recursively"))
-pattern = cli.String("pattern", cli.setRequired(true), cli.setHelp("pattern to match against the full absolute path, default is substr match"))
-patternMode = cli.String("pattern-type", cli.setHelp("one of [substr/regexp/glob], controls how 'pattern' is interpreted"))
+pattern = cli.String("pattern", cli.setRequired(true), cli.setHelp("pattern to match; default is glob match against filename (basename), use pattern-type=substr/regexp for full-path matching"))
+patternMode = cli.String("pattern-type", cli.setHelp("one of [glob/substr/regexp], default is glob; controls how 'pattern' is interpreted"))
 
 limit = cli.Int("max", cli.setDefault(10), cli.setRequired(true), cli.setHelp("maximum number of results to return"))
 findType = cli.String("type", cli.setDefault(""), cli.setHelp("'f' for files only, 'd' for directories only, '' for all"))
@@ -169,6 +169,11 @@ if !file.IsDir(dirname) {
 }
 
 yakit.Info("Find files in: %v, pattern: %v, pattern-type: %v", dirname, pattern, patternMode)
+
+normalizedPatternMode = str.TrimSpace(str.ToLower(patternMode))
+if normalizedPatternMode == "" {
+    normalizedPatternMode = "glob"
+}
 
 // Parse exclude name list
 excludeNames = {}
@@ -299,7 +304,7 @@ filesys.Recursive(dirname, filesys.onStat((isDir, name, info) => {
         findRes = append(findRes, name)
     }
 
-    switch str.TrimSpace(str.ToLower(patternMode)) {
+    switch normalizedPatternMode {
     case "re", "regex", "regexp":
         if str.MatchAllOfRegexp(name, pattern) {
             count++
@@ -337,4 +342,4 @@ println(buf.String())
 yakit.Info(buf.String())
 yakit.Info("total scanned: %v, matched: %v", total, count)
 
-yakit.File(dirname, yakit.fileFindAction("find-name", sprintf("patternmode:[%s] | pattern:[%s]", patternMode,pattern), findRes...))
+yakit.File(dirname, yakit.fileFindAction("find-name", sprintf("patternmode:[%s] | pattern:[%s]", normalizedPatternMode,pattern), findRes...))
