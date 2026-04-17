@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -16,7 +17,12 @@ func buildTimelineDumpWithMidtermMemory(react *ReAct, timeline *aicommon.Timelin
 	if timeline != nil {
 		baseTimeline = timeline.Dump()
 	}
-	midtermPrefix, err := buildMidtermTimelinePrefix(react)
+	queries := react.consumePendingMidtermTimelineQueries()
+	if len(queries) == 0 {
+		return baseTimeline
+	}
+
+	midtermPrefix, err := buildMidtermTimelinePrefix(react, queries)
 	if err != nil {
 		return baseTimeline
 	}
@@ -30,12 +36,52 @@ func buildTimelineDumpWithMidtermMemory(react *ReAct, timeline *aicommon.Timelin
 	return "timeline:\n" + midtermPrefix + body
 }
 
-func buildMidtermTimelinePrefix(react *ReAct) (string, error) {
+func (r *ReAct) ScheduleMidtermTimelineRecall(summary string) {
+	if r == nil {
+		return
+	}
+
+	summary = strings.TrimSpace(summary)
+	r.midtermRecallMutex.Lock()
+	defer r.midtermRecallMutex.Unlock()
+
+	if summary == "" {
+		r.pendingMidtermTimelineRecall = false
+		r.pendingMidtermTimelineQuery = ""
+		return
+	}
+
+	r.pendingMidtermTimelineRecall = true
+	r.pendingMidtermTimelineQuery = summary
+}
+
+func (r *ReAct) consumePendingMidtermTimelineQueries() []string {
+	if r == nil {
+		return nil
+	}
+
+	r.midtermRecallMutex.Lock()
+	defer r.midtermRecallMutex.Unlock()
+
+	if !r.pendingMidtermTimelineRecall {
+		return nil
+	}
+
+	query := strings.TrimSpace(r.pendingMidtermTimelineQuery)
+	r.pendingMidtermTimelineRecall = false
+	r.pendingMidtermTimelineQuery = ""
+	if query == "" {
+		return nil
+	}
+	return []string{query}
+}
+
+func buildMidtermTimelinePrefix(react *ReAct, queries []string) (string, error) {
 	if react == nil || react.config == nil || react.config.TimelineArchiveStore == nil {
 		return "", nil
 	}
 
-	queries := buildMidtermRecallQueryParts(react)
+	queries = deduplicateMidtermQueryParts(queries)
 	if len(queries) == 0 {
 		return "", nil
 	}
@@ -105,23 +151,35 @@ func buildMidtermRecallQueryParts(react *ReAct) []string {
 	return deduplicateMidtermQueryParts(parts)
 }
 
-func searchMidtermTimelineQueries(react *ReAct, queries []string) (*aicommon.TimelineArchiveSearchResult, error) {
+func searchMidtermTimelineQueries(react *ReAct, queries []string) (finalResult *aicommon.TimelineArchiveSearchResult, finalErr error) {
 	if react == nil || react.config == nil || react.config.TimelineArchiveStore == nil || len(queries) == 0 {
 		return nil, nil
 	}
 
+	totalStartedAt := time.Now()
 	archiveRefs := make([]*aicommon.TimelineArchiveRef, 0)
 	selectedMemories := make([]*aicommon.MemoryEntity, 0)
 	searchSummaries := make([]string, 0, len(queries))
+	searchedQueryCount := 0
 
 	seenArchiveIDs := make(map[string]struct{})
 	seenMemoryIDs := make(map[string]struct{})
+
+	defer func() {
+		if finalErr != nil {
+			log.Debugf("midterm timeline search finished with error: queries=%d total=%s err=%v", searchedQueryCount, time.Since(totalStartedAt), finalErr)
+			return
+		}
+		log.Debugf("midterm timeline search finished: queries=%d total=%s", searchedQueryCount, time.Since(totalStartedAt))
+	}()
 
 	for _, query := range queries {
 		query = strings.TrimSpace(query)
 		if query == "" {
 			continue
 		}
+		searchedQueryCount++
+		queryStartedAt := time.Now()
 		result, err := react.config.TimelineArchiveStore.SearchArchivedBatches(
 			react.config.GetContext(),
 			&aicommon.TimelineArchiveSearchQuery{
@@ -130,8 +188,10 @@ func searchMidtermTimelineQueries(react *ReAct, queries []string) (*aicommon.Tim
 			},
 		)
 		if err != nil {
+			log.Debugf("midterm timeline search query failed: query=%q duration=%s err=%v", utils.ShrinkString(query, 240), time.Since(queryStartedAt), err)
 			return nil, err
 		}
+		log.Debugf("midterm timeline search query finished: query=%q duration=%s", utils.ShrinkString(query, 240), time.Since(queryStartedAt))
 		if result == nil {
 			continue
 		}
@@ -172,13 +232,14 @@ func searchMidtermTimelineQueries(react *ReAct, queries []string) (*aicommon.Tim
 	}
 
 	totalContent := mergeMidtermMemoryContent(selectedMemories, midtermContextBytesLimit)
-	return &aicommon.TimelineArchiveSearchResult{
+	finalResult = &aicommon.TimelineArchiveSearchResult{
 		ArchiveRefs:    archiveRefs,
 		TotalContent:   totalContent,
 		ContentBytes:   len([]byte(totalContent)),
 		SearchSummary:  strings.Join(searchSummaries, " | "),
 		SelectedMemory: selectedMemories,
-	}, nil
+	}
+	return finalResult, nil
 }
 
 func mergeMidtermMemoryContent(memories []*aicommon.MemoryEntity, limit int) string {

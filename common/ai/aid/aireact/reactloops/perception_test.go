@@ -1,10 +1,60 @@
 package reactloops
 
 import (
+	"context"
 	"strings"
+	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	mockcfg "github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
+
+type perceptionMidtermSchedulerTestInvoker struct {
+	*mockcfg.MockInvoker
+	scheduledSummary string
+}
+
+func (i *perceptionMidtermSchedulerTestInvoker) InvokeSpeedPriorityLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
+	_ = ctx
+	_ = actionName
+	_ = prompt
+	_ = outputs
+	_ = opts
+	return aicommon.ExtractAction(`{
+		"@action": "perception",
+		"summary": "focused summary from perception",
+		"topics": ["http fuzzing"],
+		"keywords": ["header", "malformed"],
+		"changed": true,
+		"confidence": 0.92
+	}`, "perception")
+}
+
+func (i *perceptionMidtermSchedulerTestInvoker) ScheduleMidtermTimelineRecall(summary string) {
+	i.scheduledSummary = summary
+}
+
+func TestTriggerPerception_SchedulesMidtermRecallSummary(t *testing.T) {
+	invoker := &perceptionMidtermSchedulerTestInvoker{
+		MockInvoker: mockcfg.NewMockInvoker(context.Background()),
+	}
+
+	loop := NewMinimalReActLoop(invoker.GetConfig(), invoker)
+	loop.loopName = "perception-midterm-test"
+	loop.perception = newPerceptionController()
+	loop.maxIterations = 100
+	loop.actionHistory = make([]*ActionRecord, 0)
+	loop.actionHistoryMutex = new(sync.Mutex)
+
+	state := loop.TriggerPerception(PerceptionTriggerForced, true)
+	require.NotNil(t, state)
+	require.Equal(t, "focused summary from perception", state.OneLinerSummary)
+	require.Equal(t, "focused summary from perception", invoker.scheduledSummary)
+}
 
 func TestHashTopics_DeterministicAndOrderIndependent(t *testing.T) {
 	h1 := hashTopics([]string{"SQL Injection", "WAF Bypass"})

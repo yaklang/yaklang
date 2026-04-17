@@ -113,6 +113,10 @@ type perceptionController struct {
 	running int32 // atomic CAS guard to prevent concurrent AI calls
 }
 
+type midtermTimelineRecallScheduler interface {
+	ScheduleMidtermTimelineRecall(summary string)
+}
+
 func newPerceptionController() *perceptionController {
 	return &perceptionController{
 		minInterval:              perceptionDefaultMinInterval,
@@ -386,6 +390,16 @@ func (r *ReActLoop) TriggerPerception(reason string, force bool) *PerceptionStat
 
 	parsed.LastTrigger = reason
 	r.perception.applyResult(parsed)
+
+	if scheduler, ok := invoker.(midtermTimelineRecallScheduler); ok {
+		summaryForMidterm := strings.TrimSpace(parsed.OneLinerSummary)
+		if summaryForMidterm == "" {
+			if current := r.perception.getCurrent(); current != nil {
+				summaryForMidterm = strings.TrimSpace(current.OneLinerSummary)
+			}
+		}
+		scheduler.ScheduleMidtermTimelineRecall(summaryForMidterm)
+	}
 
 	invoker.AddToTimeline("perception",
 		fmt.Sprintf("Perception (epoch %d, trigger=%s): %s | topics=[%s]",

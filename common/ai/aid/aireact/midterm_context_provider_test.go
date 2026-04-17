@@ -136,13 +136,16 @@ func TestBuildMidtermRecallQuery_IncludesCurrentTaskDetails(t *testing.T) {
 	}
 }
 
-func TestBuildTimelineDumpWithMidtermMemory_PrependsMidtermMemory(t *testing.T) {
+func TestBuildTimelineDumpWithMidtermMemory_UsesPendingPerceptionSummaryOnce(t *testing.T) {
 	cfg := aicommon.NewConfig(context.Background())
-	cfg.TimelineArchiveStore = &mockMidtermArchiveStore{
-		result: &aicommon.TimelineArchiveSearchResult{
-			TotalContent: "important archived clue\nsecond line",
+	store := &mockMidtermArchiveStore{
+		results: map[string]*aicommon.TimelineArchiveSearchResult{
+			"perception summary about malformed headers": {
+				TotalContent: "important archived clue\nsecond line",
+			},
 		},
 	}
+	cfg.TimelineArchiveStore = store
 
 	timeline := aicommon.NewTimeline(nil, nil)
 	timeline.PushText(1, "live timeline item")
@@ -158,33 +161,35 @@ func TestBuildTimelineDumpWithMidtermMemory_PrependsMidtermMemory(t *testing.T) 
 		summary:   "need reproduce with retry",
 	})
 
+	dumpWithoutPerception := buildTimelineDumpWithMidtermMemory(react, timeline)
+	require.Equal(t, timeline.Dump(), dumpWithoutPerception)
+	require.Empty(t, store.queries)
+
+	react.ScheduleMidtermTimelineRecall("perception summary about malformed headers")
 	dump := buildTimelineDumpWithMidtermMemory(react, timeline)
 
 	require.True(t, strings.HasPrefix(dump, "timeline:\n--["))
 	require.Contains(t, dump, "midterm-memory:")
-	require.Contains(t, dump, "search-queries:")
+	require.Contains(t, dump, "search-query: perception summary about malformed headers")
 	require.Contains(t, dump, "important archived clue")
 	require.Contains(t, dump, "live timeline item")
 	require.Less(t, strings.Index(dump, "midterm-memory:"), strings.Index(dump, "live timeline item"))
+	require.Equal(t, []string{"perception summary about malformed headers"}, store.queries)
+
+	dumpAfterConsumption := buildTimelineDumpWithMidtermMemory(react, timeline)
+	require.Equal(t, timeline.Dump(), dumpAfterConsumption)
+	require.Equal(t, []string{"perception summary about malformed headers"}, store.queries)
 }
 
-func TestBuildMidtermTimelinePrefix_SearchesEachQueryPartOnce(t *testing.T) {
+func TestBuildMidtermTimelinePrefix_UsesPerceptionSummaryQuery(t *testing.T) {
 	store := &mockMidtermArchiveStore{
 		results: map[string]*aicommon.TimelineArchiveSearchResult{
-			"verify http flow": {
+			"perception summary about malformed headers": {
 				ArchiveRefs:  []*aicommon.TimelineArchiveRef{{ArchiveID: "archive-1"}},
-				TotalContent: "memory from task name",
+				TotalContent: "memory from perception summary",
 				SelectedMemory: []*aicommon.MemoryEntity{{
 					Id:      "memory-1",
-					Content: "memory from task name",
-				}},
-			},
-			"http fuzz regression": {
-				ArchiveRefs:  []*aicommon.TimelineArchiveRef{{ArchiveID: "archive-2"}},
-				TotalContent: "memory from retrieval target",
-				SelectedMemory: []*aicommon.MemoryEntity{{
-					Id:      "memory-2",
-					Content: "memory from retrieval target",
+					Content: "memory from perception summary",
 				}},
 			},
 		},
@@ -198,18 +203,11 @@ func TestBuildMidtermTimelinePrefix_SearchesEachQueryPartOnce(t *testing.T) {
 		id:     "task-1",
 		name:   "verify http flow",
 		origin: "collect and verify malformed header behavior",
-		info: &aicommon.AITaskRetrievalInfo{
-			Target: "http fuzz regression",
-		},
 	})
 
-	prefix, err := buildMidtermTimelinePrefix(react)
+	prefix, err := buildMidtermTimelinePrefix(react, []string{"perception summary about malformed headers"})
 	require.NoError(t, err)
-	require.Contains(t, prefix, "search-queries:")
-	require.Contains(t, prefix, "verify http flow")
-	require.Contains(t, prefix, "http fuzz regression")
-	require.Contains(t, prefix, "memory from task name")
-	require.Contains(t, prefix, "memory from retrieval target")
-	require.Contains(t, store.queries, "verify http flow")
-	require.Contains(t, store.queries, "http fuzz regression")
+	require.Contains(t, prefix, "search-query: perception summary about malformed headers")
+	require.Contains(t, prefix, "memory from perception summary")
+	require.Equal(t, []string{"perception summary about malformed headers"}, store.queries)
 }

@@ -97,6 +97,10 @@ type ReAct struct {
 	wg           *sync.WaitGroup
 	memoryTriage aicommon.MemoryTriage
 
+	midtermRecallMutex           sync.Mutex
+	pendingMidtermTimelineRecall bool
+	pendingMidtermTimelineQuery  string
+
 	pureInvokerMode bool // 纯调用者模式，不启动事件循环和队列处理器
 }
 
