@@ -61,6 +61,14 @@ type AIResponse struct {
 	httpHeaderReadyOnce sync.Once
 }
 
+func (a *AIResponse) SetHeaderReady() {
+	a.httpHeaderReadyOnce.Do(func() {
+		if a.httpHeaderReady != nil {
+			close(a.httpHeaderReady)
+		}
+	})
+}
+
 func (a *AIResponse) SetResponseStartTime(t time.Time) {
 	if a == nil {
 		return
@@ -149,11 +157,18 @@ func (a *AIResponse) SetRawHTTPResponseData(header []byte, body []byte) {
 	a.rawHTTPResponseBody = body
 	a.rawHTTPResponseHeaderMu.Unlock()
 
-	a.httpHeaderReadyOnce.Do(func() {
-		if a.httpHeaderReady != nil {
-			close(a.httpHeaderReady)
-		}
-	})
+	a.SetHeaderReady()
+}
+
+func (a *AIResponse) SetRawHTTPResponseHeader(header []byte) {
+	if a == nil {
+		return
+	}
+	a.rawHTTPResponseHeaderMu.Lock()
+	a.rawHTTPResponseHeader = header
+	a.rawHTTPResponseHeaderMu.Unlock()
+
+	a.SetHeaderReady()
 }
 
 func (a *AIResponse) GetRawHTTPResponseDump() string {
@@ -434,11 +449,7 @@ func (r *AIResponse) Close() {
 		}
 	}()
 
-	r.httpHeaderReadyOnce.Do(func() {
-		if r.httpHeaderReady != nil {
-			close(r.httpHeaderReady)
-		}
-	})
+	r.SetHeaderReady()
 	r.ch.Close()
 }
 

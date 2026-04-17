@@ -116,11 +116,15 @@ func mergeReasonIntoOutputStream(reason io.Reader, out io.Reader) io.Reader {
 // processAIResponse 处理流式响应
 // If toolCallCallback is not nil, tool_calls will be passed to the callback instead of being
 // converted to <|TOOL_CALL...|> format in the output stream.
-func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reasonWriter io.Writer, toolCallCallback func([]*ToolCall), rawResponseCallback func([]byte, []byte)) {
+func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reasonWriter io.Writer, toolCallCallback func([]*ToolCall), rawResponseHeaderCallback RawHTTPResponseHeaderCallback, rawResponseCallback func([]byte, []byte)) {
 	defer func() {
 		utils.CallGeneralClose(reasonWriter)
 		utils.CallGeneralClose(outWriter)
 	}()
+
+	if rawResponseHeaderCallback != nil {
+		rawResponseHeaderCallback(r)
+	}
 
 	var chunked bool
 	if te := lowhttp.GetHTTPPacketHeader(r, "transfer-encoding"); utils.IContains(te, "chunked") {
@@ -422,7 +426,7 @@ func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reas
 	}
 }
 
-func appendStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfigOption, toolCallCallback func([]*ToolCall), rawResponseCallback func([]byte, []byte)) (io.Reader, io.Reader, []poc.PocConfigOption, func()) {
+func appendStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfigOption, toolCallCallback func([]*ToolCall), rawResponseHeaderCallback RawHTTPResponseHeaderCallback, rawResponseCallback func([]byte, []byte)) (io.Reader, io.Reader, []poc.PocConfigOption, func()) {
 	outReader, outWriter := utils.NewBufPipe(nil)
 	reasonReader, reasonWriter := utils.NewBufPipe(nil)
 
@@ -432,7 +436,7 @@ func appendStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfigOption, t
 	}
 
 	opts = append(opts, poc.WithBodyStreamReaderHandler(func(r []byte, closer io.ReadCloser) {
-		processAIResponse(r, closer, outWriter, reasonWriter, toolCallCallback, rawResponseCallback)
+		processAIResponse(r, closer, outWriter, reasonWriter, toolCallCallback, rawResponseHeaderCallback, rawResponseCallback)
 	}))
 
 	opts = append(opts, poc.WithReplaceHttpPacketHeader("Content-Type", "application/json"))
@@ -447,7 +451,7 @@ func appendStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfigOption, t
 	return outReader, reasonReader, opts, cancelFunc
 }
 
-func appendResponsesStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfigOption, toolCallCallback func([]*ToolCall), rawResponseCallback func([]byte, []byte)) (io.Reader, io.Reader, []poc.PocConfigOption, func()) {
+func appendResponsesStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfigOption, toolCallCallback func([]*ToolCall), rawResponseHeaderCallback RawHTTPResponseHeaderCallback, rawResponseCallback func([]byte, []byte)) (io.Reader, io.Reader, []poc.PocConfigOption, func()) {
 	outReader, outWriter := utils.NewBufPipe(nil)
 	reasonReader, reasonWriter := utils.NewBufPipe(nil)
 
@@ -466,18 +470,22 @@ func appendResponsesStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfig
 	}
 
 	opts = append(opts, poc.WithBodyStreamReaderHandler(func(r []byte, closer io.ReadCloser) {
-		processAIResponseForResponses(r, closer, outWriter, reasonWriter, toolCallCallback, rawResponseCallback)
+		processAIResponseForResponses(r, closer, outWriter, reasonWriter, toolCallCallback, rawResponseHeaderCallback, rawResponseCallback)
 	}))
 
 	return outReader, reasonReader, opts, cancelFunc
 }
 
-func processAIResponseForResponses(r []byte, closer io.ReadCloser, outWriter io.Writer, reasonWriter io.Writer, toolCallCallback func([]*ToolCall), rawResponseCallback func([]byte, []byte)) {
+func processAIResponseForResponses(r []byte, closer io.ReadCloser, outWriter io.Writer, reasonWriter io.Writer, toolCallCallback func([]*ToolCall), rawResponseHeaderCallback RawHTTPResponseHeaderCallback, rawResponseCallback func([]byte, []byte)) {
 	defer func() {
 		utils.CallGeneralClose(closer)
 		utils.CallGeneralClose(reasonWriter)
 		utils.CallGeneralClose(outWriter)
 	}()
+
+	if rawResponseHeaderCallback != nil {
+		rawResponseHeaderCallback(r)
+	}
 
 	var chunked bool
 	if te := lowhttp.GetHTTPPacketHeader(r, "transfer-encoding"); utils.IContains(te, "chunked") {

@@ -120,6 +120,7 @@ func (g *Gateway) Chat(s string, f ...any) (string, error) {
 		aispec.WithChatBase_ToolCallCallback(g.Config.ToolCallCallback),
 		aispec.WithChatBase_Tools(g.Config.Tools),
 		aispec.WithChatBase_ToolChoice(g.Config.ToolChoice),
+		aispec.WithChatBase_RawHTTPResponseHeaderCallback(g.Config.RawHTTPResponseHeaderCallback),
 		aispec.WithChatBase_RawHTTPResponseCallback(g.Config.RawHTTPResponseCallback),
 		aispec.WithChatBase_RawHTTPRequestResponseCallback(g.Config.RawHTTPRequestResponseCallback),
 	)
@@ -137,6 +138,7 @@ func (g *Gateway) ChatStream(s string) (io.Reader, error) {
 		g.Config.HTTPErrorHandler,
 		g.Config.StreamHandler,
 		g.AIClient.BuildHTTPOptions,
+		aispec.WithChatBase_RawHTTPResponseHeaderCallback(g.Config.RawHTTPResponseHeaderCallback),
 		aispec.WithChatBase_RawHTTPResponseCallback(g.Config.RawHTTPResponseCallback),
 		aispec.WithChatBase_RawHTTPRequestResponseCallback(g.Config.RawHTTPRequestResponseCallback),
 	)
@@ -1028,6 +1030,7 @@ var Exports = map[string]any{
 	"toolCallCallback":               aispec.WithToolCallCallback,
 	"modelInfoCallback":              aispec.WithModelInfoCallback,
 	"modelInfoConfirmCallback":       aispec.WithModelInfoConfirmCallback,
+	"rawHTTPResponseHeaderCallback":  aispec.WithRawHTTPResponseHeaderCallback,
 	"rawHTTPResponseCallback":        aispec.WithRawHTTPResponseCallback,
 	"rawHTTPRequestResponseCallback": aispec.WithRawHTTPRequestResponseCallback,
 }

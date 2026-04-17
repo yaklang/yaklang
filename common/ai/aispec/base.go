@@ -211,6 +211,9 @@ type ChatBaseContext struct {
 	// RawHTTPResponseCallback is called after the AI HTTP response is fully consumed,
 	// providing the raw HTTP response header and a body preview for debugging.
 	RawHTTPResponseCallback func(headerBytes []byte, bodyPreview []byte)
+	// RawHTTPResponseHeaderCallback is called as soon as the raw HTTP response header
+	// is fully available, before the response body is consumed.
+	RawHTTPResponseHeaderCallback RawHTTPResponseHeaderCallback
 	// RawHTTPRequestResponseCallback is called after the AI HTTP response is fully consumed,
 	// providing the raw request bytes and response debug data for debugging.
 	RawHTTPRequestResponseCallback RawHTTPRequestResponseCallback
@@ -314,6 +317,12 @@ func WithChatBase_ToolCallCallback(cb func([]*ToolCall)) ChatBaseOption {
 func WithChatBase_RawHTTPResponseCallback(cb func(headerBytes []byte, bodyPreview []byte)) ChatBaseOption {
 	return func(c *ChatBaseContext) {
 		c.RawHTTPResponseCallback = cb
+	}
+}
+
+func WithChatBase_RawHTTPResponseHeaderCallback(cb RawHTTPResponseHeaderCallback) ChatBaseOption {
+	return func(c *ChatBaseContext) {
+		c.RawHTTPResponseHeaderCallback = cb
 	}
 }
 
@@ -483,6 +492,7 @@ type chatBaseStreamHandlerAppender func(
 	isStream bool,
 	opts []poc.PocConfigOption,
 	toolCallCallback func([]*ToolCall),
+	rawResponseHeaderCallback RawHTTPResponseHeaderCallback,
 	rawResponseCallback func([]byte, []byte),
 ) (io.Reader, io.Reader, []poc.PocConfigOption, func())
 
@@ -544,7 +554,7 @@ func executeChatBaseRequest(
 			ctx.RawHTTPRequestResponseCallback(requestPacket, headerBytes, bodyPreview)
 		}
 	}
-	pr, reasonPr, opts, cancel = appendHandler(handleStream, opts, ctx.ToolCallCallback, rawResponseCallback)
+	pr, reasonPr, opts, cancel = appendHandler(handleStream, opts, ctx.ToolCallCallback, ctx.RawHTTPResponseHeaderCallback, rawResponseCallback)
 	requestPacket = poc.BuildRequest(
 		lowhttp.UrlToRequestPacket(
 			"POST",
