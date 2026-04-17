@@ -33,49 +33,6 @@ func init() {
 	})
 }
 
-func buildTruncatedResponsePlaceholder(reqIns *http.Request) string {
-	if reqIns == nil {
-		return ""
-	}
-
-	if httpctx.GetResponseTooLarge(reqIns) {
-		sizeHint := httpctx.GetResponseTooLargeSize(reqIns)
-		if sizeHint <= 0 {
-			sizeHint = int64(httpctx.GetResponseMaxContentLength(reqIns))
-		}
-		if sizeHint > 0 {
-			return fmt.Sprintf(
-				"[[response too large(%s), truncated]] find more in web fuzzer history!",
-				utils.ByteSize(uint64(sizeHint)),
-			)
-		}
-		return "[[response too large, truncated]] find more in web fuzzer history!"
-	}
-
-	if httpctx.GetResponseReadTooSlow(reqIns) {
-		return "[[response read too slow, truncated]] find more in web fuzzer history!"
-	}
-
-	return ""
-}
-
-func buildStoredResponseForHTTPFlow(reqIns *http.Request, rspRaw []byte) []byte {
-	placeholder := buildTruncatedResponsePlaceholder(reqIns)
-	if placeholder == "" {
-		return rspRaw
-	}
-
-	headerPacket := httpctx.GetBareResponseBytes(reqIns)
-	if len(headerPacket) == 0 {
-		headerPacket = rspRaw
-	}
-	if len(headerPacket) == 0 {
-		return nil
-	}
-
-	return lowhttp.ReplaceHTTPPacketBodyFast(headerPacket, []byte(placeholder))
-}
-
 func SaveLowHTTPFlow(r *lowhttp.LowhttpResponse, forceSaveFlowSync bool) {
 	var (
 		https       = r.Https
@@ -362,7 +319,6 @@ func CreateHTTPFlow(opts ...CreateHTTPFlowOptions) (*schema.HTTPFlow, error) {
 	} else {
 		rspRaw = fixRspRaw
 	}
-	rspRaw = buildStoredResponseForHTTPFlow(c.reqIns, rspRaw)
 	if rspRaw == nil {
 		rspRaw = make([]byte, 0)
 	}
@@ -504,29 +460,18 @@ func createHTTPFlowFromHTTP(isHttps bool, req *http.Request, rsp *http.Response,
 
 	// 为了此处的响应与mitm的响应保持一致，需要重新从httpctx中获取
 	if rsp != nil {
-		if httpctx.GetResponseTooLarge(req) || httpctx.GetResponseReadTooSlow(req) {
-			plainResponse = buildStoredResponseForHTTPFlow(req, nil)
-			if len(plainResponse) <= 0 {
-				headerOnly, dumpErr := utils.HttpDumpWithBody(rsp, false)
-				if dumpErr != nil {
-					log.Errorf("dump response header failed: %s", dumpErr)
-				}
-				plainResponse = buildStoredResponseForHTTPFlow(req, headerOnly)
-			}
+		if httpctx.GetResponseIsModified(req) {
+			plainResponse = httpctx.GetHijackedResponseBytes(req)
 		} else {
-			if httpctx.GetResponseIsModified(req) {
-				plainResponse = httpctx.GetHijackedResponseBytes(req)
-			} else {
-				plainResponse = httpctx.GetPlainResponseBytes(req)
-				if len(plainResponse) <= 0 {
-					plainResponse = lowhttp.DeletePacketEncoding(httpctx.GetBareResponseBytes(req))
-				}
-			}
+			plainResponse = httpctx.GetPlainResponseBytes(req)
 			if len(plainResponse) <= 0 {
-				plainResponse, err = utils.HttpDumpWithBody(rsp, true)
-				if err != nil {
-					log.Errorf("dump response failed: %s", err)
-				}
+				plainResponse = lowhttp.DeletePacketEncoding(httpctx.GetBareResponseBytes(req))
+			}
+		}
+		if len(plainResponse) <= 0 {
+			plainResponse, err = utils.HttpDumpWithBody(rsp, true)
+			if err != nil {
+				log.Errorf("dump response failed: %s", err)
 			}
 		}
 	} else {

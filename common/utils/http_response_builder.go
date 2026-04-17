@@ -7,7 +7,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"net/http/httputil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -93,147 +92,6 @@ func ReadHTTPResponseFromBytes(raw []byte, req *http.Request) (*http.Response, e
 	}
 	rsp.Request = req
 	return rsp, nil
-}
-
-type responseBodyCollector struct {
-	req              *http.Request
-	headerBytes      []byte
-	rawPacket        *bytes.Buffer
-	bodyRawBuf       *bytes.Buffer
-	maxContentLength int
-	noBodyBuffer     bool
-
-	totalBodyBytes int64
-	spooledToDisk  bool
-	bodyFile       *os.File
-}
-
-func newResponseBodyCollector(
-	req *http.Request,
-	headerBytes []byte,
-	rawPacket *bytes.Buffer,
-	bodyRawBuf *bytes.Buffer,
-	maxContentLength int,
-	noBodyBuffer bool,
-) *responseBodyCollector {
-	return &responseBodyCollector{
-		req:              req,
-		headerBytes:      bytes.Clone(headerBytes),
-		rawPacket:        rawPacket,
-		bodyRawBuf:       bodyRawBuf,
-		maxContentLength: maxContentLength,
-		noBodyBuffer:     noBodyBuffer,
-	}
-}
-
-func (c *responseBodyCollector) Write(p []byte) (int, error) {
-	c.totalBodyBytes += int64(len(p))
-
-	if c.req != nil && c.maxContentLength > 0 && c.totalBodyBytes > int64(c.maxContentLength) {
-		httpctx.SetResponseTooLarge(c.req, true)
-	}
-
-	if c.noBodyBuffer {
-		return len(p), nil
-	}
-
-	if err := c.ensureSpoolingIfNeeded(); err != nil {
-		return 0, err
-	}
-	if c.spooledToDisk {
-		if c.bodyFile == nil {
-			return len(p), nil
-		}
-		_, err := c.bodyFile.Write(p)
-		return len(p), err
-	}
-
-	if c.rawPacket != nil {
-		_, _ = c.rawPacket.Write(p)
-	}
-	if c.bodyRawBuf != nil {
-		_, _ = c.bodyRawBuf.Write(p)
-	}
-	return len(p), nil
-}
-
-func (c *responseBodyCollector) WritePadding(size int) error {
-	if size <= 0 {
-		return nil
-	}
-	chunk := bytes.Repeat([]byte{'\n'}, 4096)
-	remaining := size
-	for remaining > 0 {
-		n := remaining
-		if n > len(chunk) {
-			n = len(chunk)
-		}
-		if _, err := c.Write(chunk[:n]); err != nil {
-			return err
-		}
-		remaining -= n
-	}
-	return nil
-}
-
-func (c *responseBodyCollector) ensureSpoolingIfNeeded() error {
-	if c.spooledToDisk || c.req == nil {
-		return nil
-	}
-	if !httpctx.GetResponseTooLarge(c.req) && !httpctx.GetResponseReadTooSlow(c.req) {
-		return nil
-	}
-	return c.startSpooling()
-}
-
-func (c *responseBodyCollector) startSpooling() error {
-	if c.spooledToDisk {
-		return nil
-	}
-	c.spooledToDisk = true
-
-	uid := ksuid.New().String()
-	suffix := fmt.Sprintf(`%v_%v`, time.Now().Format(DatetimePretty()), uid)
-
-	headerFile, err := OpenTempFile(fmt.Sprintf("large-response-header-%v.txt", suffix))
-	if err != nil {
-		return err
-	}
-	if _, err = headerFile.Write(c.headerBytes); err != nil {
-		headerFile.Close()
-		return err
-	}
-	if err = headerFile.Close(); err != nil {
-		return err
-	}
-	httpctx.SetResponseTooLargeHeaderFile(c.req, headerFile.Name())
-
-	bodyFile, err := OpenTempFile(fmt.Sprintf("large-response-body-%v.txt", suffix))
-	if err != nil {
-		return err
-	}
-	httpctx.SetResponseTooLargeBodyFile(c.req, bodyFile.Name())
-	if c.bodyRawBuf != nil && c.bodyRawBuf.Len() > 0 {
-		if _, err = bodyFile.Write(c.bodyRawBuf.Bytes()); err != nil {
-			bodyFile.Close()
-			return err
-		}
-		c.bodyRawBuf.Reset()
-	}
-	c.bodyFile = bodyFile
-	if c.rawPacket != nil && len(c.headerBytes) <= c.rawPacket.Len() {
-		c.rawPacket.Truncate(len(c.headerBytes))
-	}
-	return nil
-}
-
-func (c *responseBodyCollector) Close() error {
-	if c.bodyFile != nil {
-		err := c.bodyFile.Close()
-		c.bodyFile = nil
-		return err
-	}
-	return nil
 }
 
 func readHTTPResponseFromBufioReader(originReader io.Reader, fixContentLength bool, req *http.Request, conn net.Conn) (*http.Response, error) {
@@ -354,17 +212,13 @@ HandleExpect100Continue:
 		headerBytes = rawPacket.Bytes()
 		_, _ = ret.Write(rawPacket.Bytes())
 	}
-	if len(headerBytes) == 0 {
-		headerBytes = bytes.Clone(rawPacket.Bytes())
-	}
 
 	noBodyBuffer := httpctx.GetNoBodyBuffer(req)
-	maxContentLength := httpctx.GetResponseMaxContentLength(req)
 
 	var bodyReader io.Reader = originReader
 	if ret := httpctx.GetResponseHeaderCallback(req); ret != nil {
 		if len(headerBytes) <= 0 {
-			headerBytes = bytes.Clone(rawPacket.Bytes())
+			headerBytes = rawPacket.Bytes()
 		}
 		bodyReader, err = ret(rsp, headerBytes, bodyReader)
 		if err != nil {
@@ -378,8 +232,6 @@ HandleExpect100Continue:
 	}()
 
 	bodyRawBuf := new(bytes.Buffer)
-	bodyCollector := newResponseBodyCollector(req, headerBytes, rawPacket, bodyRawBuf, maxContentLength, noBodyBuffer)
-	defer bodyCollector.Close()
 	if fixContentLength {
 		// just for bytes condition
 		// by reader
@@ -422,23 +274,48 @@ HandleExpect100Continue:
 			// smuggle...
 			log.Debug("content-length and transfer-encoding chunked both exist, try smuggle? use content-length first!")
 			if contentLengthInt > 0 {
-				bodyLen, copyErr := io.Copy(io.Discard, io.TeeReader(io.LimitReader(bodyReader, int64(contentLengthInt)), bodyCollector))
-				if copyErr != nil && !errors.Is(copyErr, io.EOF) {
-					return nil, errors.Wrap(copyErr, "read body error")
+				// smuggle
+				bodyRaw := []byte{}
+				if noBodyBuffer {
+					io.Copy(io.Discard, io.LimitReader(bodyReader, int64(contentLengthInt)))
+				} else {
+					bodyRaw, _ = io.ReadAll(io.NopCloser(io.LimitReader(bodyReader, int64(contentLengthInt))))
 				}
-				if ret := contentLengthInt - int(bodyLen); ret > 0 {
-					if err := bodyCollector.WritePadding(ret); err != nil {
-						return nil, errors.Wrap(err, "write body padding error")
-					}
+				rawPacket.Write(bodyRaw)
+				bodyRawBuf.Write(bodyRaw)
+				if ret := contentLengthInt - len(bodyRaw); ret > 0 {
+					bodyRawBuf.WriteString(strings.Repeat("\n", ret))
 				}
 			} else {
-				if _, err = io.Copy(io.Discard, httputil.NewChunkedReader(io.TeeReader(bodyReader, bodyCollector))); err != nil && !errors.Is(err, io.EOF) {
+				// chunked
+				var fixed []byte
+				var err error
+				if noBodyBuffer {
+					_, _, _, err = codec.HTTPChunkedDecoderWithRestBytes(bodyReader)
+				} else {
+					_, fixed, _, err = codec.HTTPChunkedDecoderWithRestBytes(bodyReader)
+				}
+				rawPacket.Write(fixed)
+				if err != nil {
 					return nil, errors.Wrap(err, "chunked decoder error")
 				}
+				bodyRawBuf.Write(fixed)
 			}
 		} else if !useContentLength && useTransferEncodingChunked {
-			if _, err = io.Copy(io.Discard, httputil.NewChunkedReader(io.TeeReader(bodyReader, bodyCollector))); err != nil && !errors.Is(err, io.EOF) {
+			// handle chunked
+			var fixed []byte
+			var err error
+			if noBodyBuffer {
+				_, _, _, err = codec.HTTPChunkedDecoderWithRestBytes(bodyReader)
+			} else {
+				_, fixed, _, err = codec.HTTPChunkedDecoderWithRestBytes(bodyReader)
+			}
+			rawPacket.Write(fixed)
+			if err != nil {
 				return nil, errors.Wrap(err, "chunked decoder error")
+			}
+			if len(fixed) > 0 {
+				bodyRawBuf.Write(fixed)
 			}
 		} else {
 			// handle content-length as default
@@ -447,15 +324,19 @@ HandleExpect100Continue:
 					contentLengthInt = 100 * 1000 // no cl ,but maybe has body ,give 100k
 				}
 				if contentLengthInt > 0 {
-					bodyLen, copyErr := io.Copy(io.Discard, io.TeeReader(io.LimitReader(bodyReader, int64(contentLengthInt)), bodyCollector))
-					if copyErr != nil && copyErr != io.EOF {
-						return nil, errors.Wrap(copyErr, "read body error")
+					bodyRaw := []byte{}
+					if noBodyBuffer {
+						io.Copy(io.Discard, io.LimitReader(bodyReader, int64(contentLengthInt)))
+					} else {
+						bodyRaw, err = io.ReadAll(io.NopCloser(io.LimitReader(bodyReader, int64(contentLengthInt))))
 					}
-					if ret := contentLengthInt - int(bodyLen); ret > 0 {
-						if err := bodyCollector.WritePadding(ret); err != nil {
-							return nil, errors.Wrap(err, "write body padding error")
-						}
+					rawPacket.Write(bodyRaw)
+					if err != nil && err != io.EOF {
+						return nil, errors.Wrap(err, "read body error")
 					}
+					bodyLen := len(bodyRaw)
+					bodyRawBuf.Write(bodyRaw)
+					bodyRawBuf.WriteString(strings.Repeat("\n", contentLengthInt-bodyLen))
 				}
 			}
 		}
@@ -468,32 +349,27 @@ HandleExpect100Continue:
 		rsp.Body = io.NopCloser(bodyRawBuf)
 	}
 	if req != nil {
-		httpctx.SetResponseBodySize(req, bodyCollector.totalBodyBytes)
 		// set too large if greater than max content length
-		if maxContentLength > 0 && bodyCollector.totalBodyBytes > int64(maxContentLength) {
+		maxContentLength := httpctx.GetResponseMaxContentLength(req)
+		if maxContentLength > 0 && bodySize > maxContentLength {
 			httpctx.SetResponseTooLarge(req, true)
-		}
-		if (httpctx.GetResponseTooLarge(req) || httpctx.GetResponseReadTooSlow(req)) && bodyCollector.totalBodyBytes > 0 {
-			httpctx.SetResponseTooLargeSize(req, bodyCollector.totalBodyBytes)
 		}
 
 		if httpctx.GetResponseTooLarge(req) {
 			httpctx.SetBareResponseBytes(req, headerBytes)
-			if httpctx.GetResponseTooLargeHeaderFile(req) == "" || httpctx.GetResponseTooLargeBodyFile(req) == "" {
-				uid := ksuid.New().String()
-				suffix := fmt.Sprintf(`%v_%v`, time.Now().Format(DatetimePretty()), uid)
-				fp, _ := OpenTempFile(fmt.Sprintf("large-response-header-%v.txt", suffix))
-				if fp != nil {
-					fp.Write(headerBytes)
-					fp.Close()
-					httpctx.SetResponseTooLargeHeaderFile(req, fp.Name())
-				}
-				fp, _ = OpenTempFile(fmt.Sprintf("large-response-body-%v.txt", suffix))
-				if fp != nil {
-					fp.Write(bodyRawBuf.Bytes())
-					fp.Close()
-					httpctx.SetResponseTooLargeBodyFile(req, fp.Name())
-				}
+			uid := ksuid.New().String()
+			suffix := fmt.Sprintf(`%v_%v`, time.Now().Format(DatetimePretty()), uid)
+			fp, _ := OpenTempFile(fmt.Sprintf("large-response-header-%v.txt", suffix))
+			if fp != nil {
+				fp.Write(headerBytes)
+				fp.Close()
+				httpctx.SetResponseTooLargeHeaderFile(req, fp.Name())
+			}
+			fp, _ = OpenTempFile(fmt.Sprintf("large-response-body-%v.txt", suffix))
+			if fp != nil {
+				fp.Write(bodyRawBuf.Bytes())
+				fp.Close()
+				httpctx.SetResponseTooLargeBodyFile(req, fp.Name())
 			}
 		} else {
 			httpctx.SetBareResponseBytesForce(req, rawPacket.Bytes())
