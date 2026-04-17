@@ -484,3 +484,17 @@ func WithDisableLoopPerception(disable ...bool) ReActLoopOption {
 	}
 }
 
+// WithToolCallIntervalReviewExtraPrompt injects extra instructions into the prompt
+// used by interval review while tools are running.
+func WithToolCallIntervalReviewExtraPrompt(prompt string) ReActLoopOption {
+	return func(r *ReActLoop) {
+		if r == nil || r.config == nil {
+			return
+		}
+		if cfg, ok := r.config.(*aicommon.Config); ok {
+			_ = aicommon.WithToolCallIntervalReviewExtraPrompt(prompt)(cfg)
+			return
+		}
+		r.config.SetConfig(aicommon.ConfigKeyToolCallIntervalReviewExtraPrompt, prompt)
+	}
+}

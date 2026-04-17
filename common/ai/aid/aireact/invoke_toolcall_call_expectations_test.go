@@ -214,6 +214,83 @@ LOOP:
 		"verify-satisfaction prompt should contain call_expectations via timeline")
 }
 
+func TestReAct_ToolUse_IntervalReviewExtraPrompt(t *testing.T) {
+	in := make(chan *ypb.AIInputEvent, 10)
+	out := make(chan *ypb.AIOutputEvent, 10)
+
+	const extraPrompt = "Cancel if there is no meaningful delta across two interval reviews."
+
+	toolCalled := false
+	sleepTool, err := aitool.New(
+		"sleep_test",
+		aitool.WithNumberParam("seconds"),
+		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+			toolCalled = true
+			time.Sleep(200 * time.Millisecond)
+			return "done", nil
+		}),
+	)
+	require.NoError(t, err)
+
+	var intervalReviewPromptContainsExtraPrompt bool
+	_, err = NewTestReAct(
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			prompt := r.GetPrompt()
+			if utils.MatchAllOfSubString(prompt, "Interval Review") && strings.Contains(prompt, extraPrompt) {
+				intervalReviewPromptContainsExtraPrompt = true
+			}
+			return mockedToolCallingWithCallExpectations(i, r, "sleep_test")
+		}),
+		aicommon.WithEventInputChan(in),
+		aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
+			out <- e.ToGRPC()
+		}),
+		aicommon.WithTools(sleepTool),
+		aicommon.WithToolCallerIntervalReviewDuration(50*time.Millisecond),
+		aicommon.WithToolCallIntervalReviewExtraPrompt(extraPrompt),
+	)
+	require.NoError(t, err)
+
+	go func() {
+		in <- &ypb.AIInputEvent{
+			IsFreeInput: true,
+			FreeInput:   "test interval review extra prompt",
+		}
+	}()
+
+	after := time.After(15 * time.Second)
+	reviewed := false
+
+LOOP_EXTRA_PROMPT:
+	for {
+		select {
+		case e := <-out:
+			if e.Type == string(schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE) {
+				reviewed = true
+				iid := utils.InterfaceToString(jsonpath.FindFirst(string(e.Content), "$.id"))
+				in <- &ypb.AIInputEvent{
+					IsInteractiveMessage: true,
+					InteractiveId:        iid,
+					InteractiveJSONInput: `{"suggestion": "continue"}`,
+				}
+			}
+			if e.NodeId == "timeline_item" {
+				content := string(e.Content)
+				if strings.Contains(content, "ReAct Iteration Done") {
+					break LOOP_EXTRA_PROMPT
+				}
+			}
+		case <-after:
+			t.Fatal("timeout waiting for tool execution to complete")
+		}
+	}
+
+	require.True(t, toolCalled, "tool should be called")
+	require.True(t, reviewed, "tool use review should be triggered")
+	require.True(t, intervalReviewPromptContainsExtraPrompt,
+		"interval review prompt should contain the configured extra prompt")
+}
+
 func TestNormalizeIntervalReviewFieldContent(t *testing.T) {
 	t.Run("json string", func(t *testing.T) {
 		content, ok := normalizeIntervalReviewFieldContent(strings.NewReader(`"tool running normally"`))

@@ -35,6 +35,8 @@ type ConfigOption func(*Config) error
 
 var configOptionIDRegistry sync.Map
 
+const ConfigKeyToolCallIntervalReviewExtraPrompt = "tool_call_interval_review_extra_prompt"
+
 type configIDOptionMeta struct {
 	id  string
 	key uintptr
@@ -283,9 +285,10 @@ type Config struct {
 	// Interval review config for long-running tool execution
 	// By default, AI will periodically review tool execution progress
 	// Set DisableIntervalReview to true to disable this feature
-	DisableIntervalReview  bool          // Disable interval review during tool execution (default: false, meaning enabled)
-	IntervalReviewDuration time.Duration // Duration between reviews (default 20s)
-	ToolComposeConcurrency int           // Max concurrent tool calls in tool_compose DAG (default 2)
+	DisableIntervalReview             bool          // Disable interval review during tool execution (default: false, meaning enabled)
+	IntervalReviewDuration            time.Duration // Duration between reviews (default 20s)
+	ToolCallIntervalReviewExtraPrompt string        // Extra prompt injected into tool-call interval review
+	ToolComposeConcurrency            int           // Max concurrent tool calls in tool_compose DAG (default 2)
 
 	// iteration limit
 	MaxIterationCount int64
@@ -1602,6 +1605,22 @@ func WithToolCallerIntervalReviewDuration(duration time.Duration) ConfigOption {
 	}
 }
 
+// WithToolCallIntervalReviewExtraPrompt injects extra instructions into the interval review prompt
+// that runs while long-running tools are executing.
+func WithToolCallIntervalReviewExtraPrompt(prompt string) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		prompt = strings.TrimSpace(prompt)
+		c.m.Lock()
+		c.ToolCallIntervalReviewExtraPrompt = prompt
+		c.m.Unlock()
+		c.SetConfig(ConfigKeyToolCallIntervalReviewExtraPrompt, prompt)
+		return nil
+	}
+}
+
 func WithToolComposeConcurrency(n int) ConfigOption {
 	return func(c *Config) error {
 		if c.m == nil {
@@ -2866,6 +2885,13 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	}
 	if i.MaxIterationCount > 0 {
 		opts = append(opts, WithMaxIterationCount(i.MaxIterationCount))
+	}
+	opts = append(opts, WithDisableToolCallerIntervalReview(i.DisableIntervalReview))
+	if i.IntervalReviewDuration > 0 {
+		opts = append(opts, WithToolCallerIntervalReviewDuration(i.IntervalReviewDuration))
+	}
+	if i.ToolCallIntervalReviewExtraPrompt != "" {
+		opts = append(opts, WithToolCallIntervalReviewExtraPrompt(i.ToolCallIntervalReviewExtraPrompt))
 	}
 	if i.ToolComposeConcurrency > 0 {
 		opts = append(opts, WithToolComposeConcurrency(i.ToolComposeConcurrency))
