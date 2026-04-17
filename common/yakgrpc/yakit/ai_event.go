@@ -3,6 +3,7 @@ package yakit
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
@@ -68,15 +69,57 @@ func SaveStreamAIEvent(outDb *gorm.DB, event *schema.AiOutputEvent) error {
 
 func FilterEvent(db *gorm.DB, filter *ypb.AIEventFilter) *gorm.DB {
 	db = db.Model(&schema.AiOutputEvent{})
-	if len(filter.GetEventUUIDS()) > 0 {
-		db = db.Where("event_uuid IN (?)", filter.GetEventUUIDS())
+	if filter == nil {
+		return db
 	}
-	db = bizhelper.ExactQueryStringArrayOr(db, "coordinator_id", filter.GetCoordinatorId())
-	db = bizhelper.ExactQueryStringArrayOr(db, "type", filter.GetEventType())
-	db = bizhelper.ExactQueryStringArrayOr(db, "task_index", filter.GetTaskIndex())
-	db = bizhelper.ExactQueryStringArrayOr(db, "task_uuid", filter.GetTaskUUID())
-	db = bizhelper.ExactQueryStringArrayOr(db, "node_id", filter.GetNodeId())
-	db = bizhelper.ExactQueryString(db, "session_id", filter.GetSessionID())
+
+	if !filter.GetUseOR() {
+		if len(filter.GetEventUUIDS()) > 0 {
+			db = db.Where("event_uuid IN (?)", filter.GetEventUUIDS())
+		}
+		db = bizhelper.ExactQueryStringArrayOr(db, "coordinator_id", filter.GetCoordinatorId())
+		db = bizhelper.ExactQueryStringArrayOr(db, "type", filter.GetEventType())
+		db = bizhelper.ExactQueryStringArrayOr(db, "task_index", filter.GetTaskIndex())
+		db = bizhelper.ExactQueryStringArrayOr(db, "task_uuid", filter.GetTaskUUID())
+		db = bizhelper.ExactQueryStringArrayOr(db, "node_id", filter.GetNodeId())
+		db = bizhelper.ExactQueryString(db, "session_id", filter.GetSessionID())
+		return db
+	}
+
+	var clauses []string
+	var args []interface{}
+	if len(filter.GetEventUUIDS()) > 0 {
+		clauses = append(clauses, "(event_uuid IN (?))")
+		args = append(args, filter.GetEventUUIDS())
+	}
+	if len(filter.GetCoordinatorId()) > 0 {
+		clauses = append(clauses, "(coordinator_id IN (?))")
+		args = append(args, filter.GetCoordinatorId())
+	}
+	if len(filter.GetEventType()) > 0 {
+		clauses = append(clauses, "(`type` IN (?))")
+		args = append(args, filter.GetEventType())
+	}
+	if len(filter.GetTaskIndex()) > 0 {
+		clauses = append(clauses, "(task_index IN (?))")
+		args = append(args, filter.GetTaskIndex())
+	}
+	if len(filter.GetTaskUUID()) > 0 {
+		clauses = append(clauses, "(task_uuid IN (?))")
+		args = append(args, filter.GetTaskUUID())
+	}
+	if len(filter.GetNodeId()) > 0 {
+		clauses = append(clauses, "(node_id IN (?))")
+		args = append(args, filter.GetNodeId())
+	}
+	if sessionID := filter.GetSessionID(); sessionID != "" {
+		clauses = append(clauses, "(session_id = ?)")
+		args = append(args, sessionID)
+	}
+	if len(clauses) == 0 {
+		return db
+	}
+	db = db.Where(strings.Join(clauses, " OR "), args...)
 	return db
 }
 
