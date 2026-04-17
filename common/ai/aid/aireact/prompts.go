@@ -753,6 +753,7 @@ type IntervalReviewPromptData struct {
 
 	CallExpectations string
 	ExtraPrompt      string
+	Nonce            string
 }
 
 // GenerateIntervalReviewPrompt generates interval review prompt for long-running tool execution
@@ -784,6 +785,7 @@ func (pm *PromptManager) GenerateIntervalReviewPromptWithContext(
 		ReviewCount:      reviewCount,
 		CallExpectations: callExpectations,
 		ExtraPrompt:      strings.TrimSpace(pm.react.config.GetConfigString(aicommon.ConfigKeyToolCallIntervalReviewExtraPrompt)),
+		Nonce:            nonce(),
 	}
 
 	// Calculate elapsed duration

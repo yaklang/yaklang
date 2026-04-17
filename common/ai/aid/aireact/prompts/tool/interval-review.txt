@@ -78,7 +78,9 @@ Based on the above information, you need to decide whether to **continue** or **
 
 {{ if .ExtraPrompt }}
 ## Additional Review Instructions
+<|EXTRA_PROMPT_{{ .Nonce }}|>
 {{ .ExtraPrompt }}
+<|EXTRA_PROMPT_END_{{ .Nonce }}|>
 {{ end }}
 
 ## Response Format
