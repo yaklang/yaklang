@@ -46,6 +46,15 @@ func saveYakitPlugin(scriptName string, typeStr string, content interface{}) err
 	})
 }
 
+func saveYakitPluginWithSchema(script *schema.YakScript) error {
+	db := consts.GetGormProfileDatabase()
+	if db == nil {
+		return utils.Error("empty database")
+	}
+
+	return yakit.CreateOrUpdateYakScript(db, script)
+}
+
 func saveHTTPFlowFromRaw(url string, req, rsp []byte) error {
 	return saveHTTPFlowFromRawWithType(url, req, rsp, "basic-crawler")
 }
@@ -114,6 +123,7 @@ var DatabaseExports = map[string]interface{}{
 	"YAKIT_PLUGIN_TYPE_CODEC":       YAKIT_PLUGIN_TYPE_CODEC,
 	"YAKIT_PLUGIN_TYPE_PACKET_HACK": YAKIT_PLUGIN_TYPE_PACKET_HACK,
 	"SaveYakitPlugin":               saveYakitPlugin,
+	"SaveYakitPluginSchema":         saveYakitPluginWithSchema,
 
 	// HTTP
 	"QueryUrlsByKeyword":      queryUrlsByKeyword,
