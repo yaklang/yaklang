@@ -676,6 +676,20 @@ const (
 	buildYakGrpcServer   = "build yak grpc server failed"
 )
 
+func runCheckSecretCleanupWithTimeout(name string, timeout time.Duration, cleanup func()) {
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		cleanup()
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(timeout):
+		log.Warnf("%s timed out after %s, continue check-secret-local-grpc shutdown", name, timeout)
+	}
+}
+
 var checkSecretLocalGRPCServerCommand = cli.Command{
 	Name:  "check-secret-local-grpc",
 	Usage: "Check if local GRPC server with secret can be started and accessed",
@@ -898,7 +912,7 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 				log.Errorf("grpc serve error: %s", err)
 			}
 		}()
-		defer grpcTrans.Stop()
+		defer runCheckSecretCleanupWithTimeout("stop test grpc server", time.Second, grpcTrans.Stop)
 
 		// 等待服务器启动
 		if err := utils.WaitConnect(addr, 5); err != nil {
@@ -930,7 +944,9 @@ var checkSecretLocalGRPCServerCommand = cli.Command{
 			reason = dialGrpcServerFailed
 			return
 		}
-		defer conn.Close()
+		defer runCheckSecretCleanupWithTimeout("close test grpc client", time.Second, func() {
+			_ = conn.Close()
+		})
 
 		client := ypb.NewYakClient(conn)
 
