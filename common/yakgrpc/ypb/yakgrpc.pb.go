@@ -8925,6 +8925,7 @@ type AIEventFilter struct {
 	SessionID     string                 `protobuf:"bytes,6,opt,name=SessionID,proto3" json:"SessionID,omitempty"`
 	ProcessID     string                 `protobuf:"bytes,7,opt,name=ProcessID,proto3" json:"ProcessID,omitempty"`
 	NodeId        []string               `protobuf:"bytes,8,rep,name=NodeId,proto3" json:"NodeId,omitempty"`
+	UseOR         bool                   `protobuf:"varint,9,opt,name=UseOR,proto3" json:"UseOR,omitempty"` // 默认是 AND 关系，也就是多条件同时满足，如果 UseOR 是 true，那么就是满足任一条件即可
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -9013,6 +9014,13 @@ func (x *AIEventFilter) GetNodeId() []string {
 		return x.NodeId
 	}
 	return nil
+}
+
+func (x *AIEventFilter) GetUseOR() bool {
+	if x != nil {
+		return x.UseOR
+	}
+	return false
 }
 
 type AIEventQueryRequest struct {
@@ -35004,13 +35012,13 @@ type StartBruteParams struct {
 	Concurrent int64 `protobuf:"varint,8,opt,name=Concurrent,proto3" json:"Concurrent,omitempty"`
 	Retry      int64 `protobuf:"varint,9,opt,name=Retry,proto3" json:"Retry,omitempty"`
 	// 目标任务内并发
-	TargetTaskConcurrent int64 `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
-	OkToStop         bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
-	DelayMin         int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
-	DelayMax         int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
-	PluginScriptName string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	TargetTaskConcurrent int64  `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
+	OkToStop             bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
+	DelayMin             int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
+	DelayMax             int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
+	PluginScriptName     string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *StartBruteParams) Reset() {
@@ -44591,8 +44599,8 @@ type ExecHistoryRecord struct {
 	// Uid
 	Id string `protobuf:"bytes,9,opt,name=Id,proto3" json:"Id,omitempty"`
 	// 展示界面内容
-	Stdout []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
-	Stderr []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
+	Stdout        []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
+	Stderr        []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
 	RuntimeId     string `protobuf:"bytes,12,opt,name=RuntimeId,proto3" json:"RuntimeId,omitempty"`
 	FromYakModule string `protobuf:"bytes,13,opt,name=FromYakModule,proto3" json:"FromYakModule,omitempty"`
 	StdoutLen     int64  `protobuf:"varint,14,opt,name=StdoutLen,proto3" json:"StdoutLen,omitempty"`
@@ -69442,7 +69450,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\aKeyword\x18\x02 \x03(\tR\aKeyword\x12\x1c\n" +
 	"\tForgeName\x18\x03 \x03(\tR\tForgeName\x12\x1c\n" +
 	"\tSessionID\x18\x04 \x03(\tR\tSessionID\x12$\n" +
-	"\rCoordinatorId\x18\x05 \x03(\tR\rCoordinatorId\"\x81\x02\n" +
+	"\rCoordinatorId\x18\x05 \x03(\tR\rCoordinatorId\"\x97\x02\n" +
 	"\rAIEventFilter\x12\x1e\n" +
 	"\n" +
 	"EventUUIDS\x18\x01 \x03(\tR\n" +
@@ -69453,7 +69461,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\bTaskUUID\x18\x05 \x03(\tR\bTaskUUID\x12\x1c\n" +
 	"\tSessionID\x18\x06 \x01(\tR\tSessionID\x12\x1c\n" +
 	"\tProcessID\x18\a \x01(\tR\tProcessID\x12\x16\n" +
-	"\x06NodeId\x18\b \x03(\tR\x06NodeId\"\x8c\x01\n" +
+	"\x06NodeId\x18\b \x03(\tR\x06NodeId\x12\x14\n" +
+	"\x05UseOR\x18\t \x01(\bR\x05UseOR\"\x8c\x01\n" +
 	"\x13AIEventQueryRequest\x12*\n" +
 	"\x06Filter\x18\x01 \x01(\v2\x12.ypb.AIEventFilterR\x06Filter\x12\x1c\n" +
 	"\tProcessID\x18\x02 \x01(\tR\tProcessID\x12+\n" +
