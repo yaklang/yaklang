@@ -76,6 +76,11 @@ Based on the above information, you need to decide whether to **continue** or **
 3. Are there any error patterns in stderr that suggest failure?
 4. Should the user be informed about the current status?
 
+{{ if .ExtraPrompt }}
+## Additional Review Instructions
+{{ .ExtraPrompt }}
+{{ end }}
+
 ## Response Format
 
 Please output a JSON object that conforms to the following schema:

@@ -110,6 +110,28 @@ func TestConfig_ToolComposeConcurrencyPropagation(t *testing.T) {
 	require.Equal(t, 5, child.ToolComposeConcurrency)
 }
 
+func TestConfig_IntervalReviewConfigPropagation(t *testing.T) {
+	parent := NewConfig(
+		context.Background(),
+		WithDisableToolCallerIntervalReview(true),
+		WithToolCallerIntervalReviewDuration(7*time.Second),
+		WithToolCallIntervalReviewExtraPrompt("Cancel immediately if no heartbeat appears twice."),
+	)
+	child := NewConfig(context.Background(), ConvertConfigToOptions(parent)...)
+
+	require.True(t, child.DisableIntervalReview)
+	require.Equal(t, 7*time.Second, child.IntervalReviewDuration)
+	require.Equal(t,
+		"Cancel immediately if no heartbeat appears twice.",
+		child.ToolCallIntervalReviewExtraPrompt,
+	)
+	require.Equal(
+		t,
+		"Cancel immediately if no heartbeat appears twice.",
+		child.GetConfigString(ConfigKeyToolCallIntervalReviewExtraPrompt),
+	)
+}
+
 func TestConfig_ToolManagerPropagation(t *testing.T) {
 	parent := NewConfig(context.Background())
 	require.NotNil(t, parent.GetAiToolManager())

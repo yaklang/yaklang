@@ -825,6 +825,45 @@ func TestGenerateIntervalReviewPrompt_IncludesConcreteStringGuidance(t *testing.
 	}
 }
 
+func TestGenerateIntervalReviewPrompt_WithExtraPrompt(t *testing.T) {
+	const extraPrompt = "If the tool stops producing new output for two rounds, prefer cancel."
+
+	react, err := NewTestReAct(
+		aicommon.WithToolCallIntervalReviewExtraPrompt(extraPrompt),
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create ReAct instance: %v", err)
+	}
+
+	tool := aitool.NewWithoutCallback(
+		"network_diagnose",
+		aitool.WithStringParam("target"),
+	)
+
+	prompt, err := react.promptManager.GenerateIntervalReviewPromptWithContext(
+		tool,
+		aitool.InvokeParams{"target": "127.0.0.1"},
+		[]byte("partial output"),
+		nil,
+		time.Unix(0, 0),
+		1,
+		"expect structured diagnostics",
+	)
+	if err != nil {
+		t.Fatalf("Failed to generate interval review prompt: %v", err)
+	}
+
+	if !strings.Contains(prompt, extraPrompt) {
+		t.Fatalf("interval review prompt should contain extra prompt. Got:\n%s", prompt)
+	}
+}
+
 // TestPromptManager_GenerateAIBlueprintForgeParamsPrompt 测试 GenerateAIBlueprintForgeParamsPrompt 方法
 func TestPromptManager_GenerateAIBlueprintForgeParamsPrompt(t *testing.T) {
 	// 创建一个基本的 ReAct 实例来测试 GenerateAIBlueprintForgeParamsPrompt 方法

@@ -752,6 +752,7 @@ type IntervalReviewPromptData struct {
 	Schema string
 
 	CallExpectations string
+	ExtraPrompt      string
 }
 
 // GenerateIntervalReviewPrompt generates interval review prompt for long-running tool execution
@@ -782,6 +783,7 @@ func (pm *PromptManager) GenerateIntervalReviewPromptWithContext(
 		Schema:           intervalReviewSchemaJSON,
 		ReviewCount:      reviewCount,
 		CallExpectations: callExpectations,
+		ExtraPrompt:      strings.TrimSpace(pm.react.config.GetConfigString(aicommon.ConfigKeyToolCallIntervalReviewExtraPrompt)),
 	}
 
 	// Calculate elapsed duration
