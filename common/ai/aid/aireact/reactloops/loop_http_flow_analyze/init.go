@@ -34,21 +34,30 @@ func init() {
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 				reactloops.WithPersistentInstruction(persistentInstruction),
 				reactloops.WithReflectionOutputExample(outputExample),
+				reactloops.WithOverrideLoopAction(loopActionDirectlyAnswerHTTPFlowAnalyze),
 				reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
+					currentIter := loop.GetCurrentIterationIndex()
+					maxIter := loop.GetMaxIterations()
+					isLastIteration := currentIter+1 >= maxIter
+
 					renderMap := map[string]any{
-						"Nonce":            nonce,
-						"UserInput":        loop.GetCurrentTask().GetUserInput(),
-						"LastQuerySummary": loop.Get("last_query_summary"),
-						"LastMatchSummary": loop.Get("last_match_summary"),
-						"CurrentFlow":      loop.Get("current_flow"),
-						"FeedbackMessages": feedbacker.String(),
+						"Nonce":                nonce,
+						"UserInput":            loop.GetCurrentTask().GetUserInput(),
+						"Findings":             loop.Get(findingsKey),
+						"RecentActionsSummary": buildRecentActionsPrompt(loop),
+						"LastQuerySummary":     loop.Get("last_query_summary"),
+						"LastMatchSummary":     loop.Get("last_match_summary"),
+						"CurrentFlow":          loop.Get("current_flow"),
+						"FeedbackMessages":     feedbacker.String(),
+						"IsLastIteration":      isLastIteration,
 					}
 					return utils.RenderTemplate(reactiveData, renderMap)
 				}),
 				getHTTPFlowDetailAction(r),
 				filterAndMatchHTTPFlowsAction(r),
 				matchHTTPFlowsWithSimpleMatcherAction(r),
-				BuildOnPostIterationHook(r),
+				outputFindingsAction(r),
+				buildPostIterationHook(r),
 			}
 			preset = append(preset, opts...)
 			return reactloops.NewReActLoop(schema.AI_REACT_LOOP_ACTION_HTTP_FLOW_ANALYZE, r, preset...)

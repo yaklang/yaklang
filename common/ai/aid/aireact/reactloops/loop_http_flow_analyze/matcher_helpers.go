@@ -1,6 +1,8 @@
 package loop_http_flow_analyze
 
 import (
+	"strings"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/httptpl"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -55,4 +57,32 @@ func executeMatchers(matchers []*simpleMatcher, resp *httptpl.RespForMatch) (mat
 		}
 	}
 	return false, getErr()
+}
+
+func describeMatchers(matchers []*simpleMatcher) string {
+	if len(matchers) == 0 {
+		return "(none)"
+	}
+	parts := make([]string, 0, len(matchers))
+	for _, m := range matchers {
+		if m.matcher == nil {
+			continue
+		}
+		desc := m.matcher.MatcherType
+		if m.matcher.Scope != "" {
+			desc += "/" + m.matcher.Scope
+		}
+		if len(m.matcher.Group) > 0 {
+			groupPreview := strings.Join(m.matcher.Group, ", ")
+			if len(groupPreview) > 80 {
+				groupPreview = groupPreview[:80] + "..."
+			}
+			desc += " [" + groupPreview + "]"
+		}
+		if m.matcher.Negative {
+			desc += " (negative)"
+		}
+		parts = append(parts, desc)
+	}
+	return strings.Join(parts, "; ")
 }

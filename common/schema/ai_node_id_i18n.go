@@ -113,6 +113,10 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "意图感知",
 		En: "Perception",
 	},
+	"flow-findings": {
+		Zh: "流量分析发现",
+		En: "Flow Analysis Findings",
+	},
 	"intent": {
 		Zh: "意图识别",
 		En: "Intent Recognition",

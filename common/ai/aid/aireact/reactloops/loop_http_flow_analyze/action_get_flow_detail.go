@@ -36,6 +36,15 @@ var getHTTPFlowDetailAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActL
 				return
 			}
 
+			emitter := loop.GetEmitter()
+			taskID := ""
+			if task := loop.GetCurrentTask(); task != nil {
+				taskID = task.GetId()
+			}
+
+			locatorDesc := buildLocatorDesc(action)
+			emitter.EmitThoughtStream(taskID, "[get_http_flow_detail] loading flow: %s", locatorDesc)
+
 			var flow *schema.HTTPFlow
 			var err error
 
@@ -53,6 +62,8 @@ var getHTTPFlowDetailAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActL
 			if err != nil || flow == nil {
 				invoker.AddToTimeline("get_http_flow_detail", fmt.Sprintf("Failed to load HTTP flow: %v", err))
 				log.Errorf("get_http_flow_detail failed: %v", err)
+				emitter.EmitThoughtStream(taskID, "[get_http_flow_detail] failed to load (%s): %v", locatorDesc, err)
+				recordAction(loop, "get_http_flow_detail", locatorDesc, "failed: flow not found", "")
 				operator.Continue()
 				return
 			}
@@ -82,10 +93,33 @@ var getHTTPFlowDetailAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActL
 			}
 
 			summary := builder.String()
-			loop.GetInvoker().AddToTimeline("get_http_flow_detail", summary)
+			invoker.AddToTimeline("get_http_flow_detail", summary)
 			loop.Set("current_flow", summary)
+
+			flowBrief := fmt.Sprintf("#%d %s %d %s", flow.ID, flow.Method, flow.StatusCode, utils.ShrinkString(flow.Url, 80))
+			emitter.EmitThoughtStream(taskID,
+				"[get_http_flow_detail] loaded: %s (req=%d bytes, rsp=%d bytes, tags=%s, source=%s)",
+				flowBrief, len(req), len(rsp), shrinkTags(flow.Tags), flow.SourceType)
+			recordAction(loop, "get_http_flow_detail", locatorDesc, flowBrief, "")
 
 			operator.Feedback(summary)
 		},
 	)
+}
+
+func buildLocatorDesc(action *aicommon.Action) string {
+	var parts []string
+	if v := action.GetInt("id"); v > 0 {
+		parts = append(parts, fmt.Sprintf("id=%d", v))
+	}
+	if v := action.GetString("hash"); v != "" {
+		parts = append(parts, fmt.Sprintf("hash=%s", utils.ShrinkString(v, 20)))
+	}
+	if v := action.GetString("hidden_index"); v != "" {
+		parts = append(parts, fmt.Sprintf("hidden_index=%s", utils.ShrinkString(v, 30)))
+	}
+	if len(parts) == 0 {
+		return "(no locator)"
+	}
+	return strings.Join(parts, ", ")
 }
