@@ -12,94 +12,162 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// BuildOnPostIterationHook 创建迭代后的钩子函数，用于处理循环结束时的逻辑
-func BuildOnPostIterationHook(invoker aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
+func buildPostIterationHook(invoker aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 	return reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, operator *reactloops.OnPostIterationOperator) {
-		if isDone {
-			log.Infof("http_flow_analyze loop done at iteration %d", iteration)
+		if !isDone {
+			collectIterationFindings(loop)
+			return
+		}
 
-			// 检查是否因为超出迭代次数而结束
-			if reasonErr, ok := reason.(error); ok && strings.Contains(reasonErr.Error(), "max iterations") {
-				log.Infof("http_flow_analyze loop ended due to max iterations, generating final summary with AI")
-				// 生成 AI 总结并直接回答
-				generateFinalSummaryAndAnswer(loop, invoker, operator)
-				// 忽略错误，不让专注模式报错退出
-				operator.IgnoreError()
-			} else {
-				generateFinalSummaryAndAnswer(loop, invoker, operator)
-			}
+		log.Infof("http_flow_analyze loop done at iteration %d", iteration)
+		collectIterationFindings(loop)
+
+		if hasFinalAnswerDelivered(loop) || hasDirectlyAnswered(loop) || getLastAction(loop) == "directly_answer" {
+			log.Infof("http_flow_analyze: skip finalize because answer was already delivered")
+			return
+		}
+
+		contextMaterials := collectFinalizeContextMaterials(loop, reason)
+		deliverFinalAnswerFallback(loop, invoker, contextMaterials)
+
+		if reasonErr, ok := reason.(error); ok && strings.Contains(reasonErr.Error(), "max iterations") {
+			operator.IgnoreError()
 		}
 	})
 }
 
-// generateFinalSummaryAndAnswer 生成最终总结并调用 directly_answer
-func generateFinalSummaryAndAnswer(loop *reactloops.ReActLoop, invoker aicommon.AIInvokeRuntime, operator *reactloops.OnPostIterationOperator) {
-	userQuery := loop.GetCurrentTask().GetUserInput()
-	lastQuerySummary := loop.Get("last_query_summary")
-	lastMatchSummary := loop.Get("last_match_summary")
-	currentFlow := loop.Get("current_flow")
+func collectIterationFindings(loop *reactloops.ReActLoop) {
+	lastAction := loop.GetLastAction()
+	if lastAction == nil {
+		return
+	}
+	if lastAction.ActionType == "output_findings" || lastAction.ActionType == "" {
+		return
+	}
+	if lastAction.ActionParams == nil {
+		return
+	}
+	incoming := normalizeFindings(utils.InterfaceToString(lastAction.ActionParams[findingsFieldName]))
+	if incoming == "" {
+		return
+	}
+	if _, changed := appendFindings(loop, incoming); changed {
+		log.Infof("http_flow_analyze: post-iteration findings hook merged findings after action=%s", lastAction.ActionType)
+	}
+}
 
-	// 构建上下文信息
-	var contextBuilder strings.Builder
-	contextBuilder.WriteString("# HTTP 流量分析上下文\n\n")
+func collectFinalizeContextMaterials(loop *reactloops.ReActLoop, reason any) string {
+	var ctx strings.Builder
+	ctx.WriteString("# HTTP Flow Analysis Context\n\n")
 
-	contextBuilder.WriteString("## 用户问题\n\n")
-	contextBuilder.WriteString(userQuery)
-	contextBuilder.WriteString("\n\n")
-
-	if lastQuerySummary != "" {
-		contextBuilder.WriteString("## 查询结果摘要\n\n")
-		contextBuilder.WriteString(lastQuerySummary)
-		contextBuilder.WriteString("\n\n")
+	if task := loop.GetCurrentTask(); task != nil {
+		userInput := strings.TrimSpace(task.GetUserInput())
+		if userInput != "" {
+			ctx.WriteString("## User Query\n\n")
+			ctx.WriteString(userInput)
+			ctx.WriteString("\n\n")
+		}
 	}
 
-	if lastMatchSummary != "" {
-		contextBuilder.WriteString("## 匹配结果摘要\n\n")
-		contextBuilder.WriteString(lastMatchSummary)
-		contextBuilder.WriteString("\n\n")
+	if findings := strings.TrimSpace(loop.Get(findingsKey)); findings != "" {
+		ctx.WriteString("## Accumulated Findings\n\n")
+		ctx.WriteString(findings)
+		ctx.WriteString("\n\n")
 	}
 
-	if currentFlow != "" {
-		contextBuilder.WriteString("## 当前流量详情\n\n")
-		contextBuilder.WriteString(currentFlow)
-		contextBuilder.WriteString("\n\n")
+	if actionsSummary := strings.TrimSpace(buildRecentActionsPrompt(loop)); actionsSummary != "" {
+		ctx.WriteString("## Recent Actions\n\n")
+		ctx.WriteString(actionsSummary)
+		ctx.WriteString("\n\n")
 	}
 
-	contextInfo := contextBuilder.String()
+	if lastQuerySummary := strings.TrimSpace(loop.Get("last_query_summary")); lastQuerySummary != "" {
+		ctx.WriteString("## Last Query Summary\n\n")
+		ctx.WriteString(utils.ShrinkTextBlock(lastQuerySummary, 3000))
+		ctx.WriteString("\n\n")
+	}
 
-	// 使用 InvokeLiteForge 让 AI 生成总结
+	if lastMatchSummary := strings.TrimSpace(loop.Get("last_match_summary")); lastMatchSummary != "" {
+		ctx.WriteString("## Last Match Summary\n\n")
+		ctx.WriteString(utils.ShrinkTextBlock(lastMatchSummary, 3000))
+		ctx.WriteString("\n\n")
+	}
+
+	if currentFlow := strings.TrimSpace(loop.Get("current_flow")); currentFlow != "" {
+		ctx.WriteString("## Current Flow Detail\n\n")
+		ctx.WriteString(utils.ShrinkTextBlock(currentFlow, 2000))
+		ctx.WriteString("\n\n")
+	}
+
+	ctx.WriteString("## Exit Reason\n\n")
+	if reasonErr, ok := reason.(error); ok && reasonErr != nil {
+		ctx.WriteString(reasonErr.Error())
+	} else if reasonStr := strings.TrimSpace(utils.InterfaceToString(reason)); reasonStr != "" {
+		ctx.WriteString(reasonStr)
+	} else {
+		ctx.WriteString("Analysis phase completed normally.")
+	}
+
+	return strings.TrimSpace(ctx.String())
+}
+
+func deliverFinalAnswerFallback(loop *reactloops.ReActLoop, invoker aicommon.AIInvokeRuntime, contextMaterials string) {
+	contextMaterials = strings.TrimSpace(contextMaterials)
+	if contextMaterials == "" {
+		log.Infof("http_flow_analyze finalize: skip fallback because context materials are empty")
+		return
+	}
+
+	if hasFinalAnswerDelivered(loop) || hasDirectlyAnswered(loop) {
+		log.Infof("http_flow_analyze finalize: skip fallback because answer was already delivered")
+		return
+	}
+
+	userQuery := ""
+	if task := loop.GetCurrentTask(); task != nil {
+		userQuery = strings.TrimSpace(task.GetUserInput())
+	}
+
 	nonce := utils.RandStringBytes(8)
 	summaryPrompt := utils.MustRenderTemplate(`
 <|INSTRUCTION_{{ .Nonce }}|>
-你是一个 HTTP 流量分析专家。现在需要根据以下信息生成一个完整的分析报告。
+You are an HTTP traffic analysis expert. Based on the analysis context below, generate a complete analysis report for the user.
 
-要求：
-1. 总结已经收集到的流量信息
-2. 回答用户的问题（基于已有信息）
-3. 如果信息不足，说明已经尝试的分析步骤和可能的原因
-4. 给出具体的发现和建议
+Requirements:
+1. Summarize all collected traffic information and findings
+2. Answer the user's question based on available evidence
+3. If information is insufficient, explain what was attempted and possible reasons
+4. Provide concrete discoveries and actionable recommendations
+5. Use clear, professional Markdown formatting
 
-请用清晰、专业的方式组织报告，使用 Markdown 格式。
+CRITICAL LANGUAGE RULE: You MUST write the ENTIRE report in the SAME language as the user's query below. If the user wrote in Chinese, your report MUST be in Chinese. If the user wrote in English, your report MUST be in English. Do NOT mix languages.
+
+User's original query: {{ .UserQuery }}
 <|INSTRUCTION_END_{{ .Nonce }}|>
 
 <|CONTEXT_{{ .Nonce }}|>
-{{ .ContextInfo }}
+{{ .ContextMaterials }}
 <|CONTEXT_END_{{ .Nonce }}|>
 `, map[string]any{
-		"Nonce":       nonce,
-		"ContextInfo": contextInfo,
+		"Nonce":            nonce,
+		"UserQuery":        userQuery,
+		"ContextMaterials": contextMaterials,
 	})
 
-	log.Infof("generating final summary with AI, prompt length: %d", len(summaryPrompt))
+	log.Infof("http_flow_analyze finalize: generating forced AI answer, prompt length: %d", len(summaryPrompt))
 
-	// 调用 InvokeLiteForge 生成总结
-	action, err := invoker.InvokeLiteForge(
+	taskID := ""
+	if task := loop.GetCurrentTask(); task != nil {
+		taskID = task.GetId()
+	}
+
+	action, err := invoker.InvokeSpeedPriorityLiteForge(
 		loop.GetConfig().GetContext(),
-		"generate_http_flow_analysis_summary",
+		"http_flow_analyze_finalize_summary",
 		summaryPrompt,
 		[]aitool.ToolOption{
 			aitool.WithStringParam("summary",
-				aitool.WithParam_Description("完整的 HTTP 流量分析报告，使用 Markdown 格式"),
+				aitool.WithParam_Description("Complete HTTP traffic analysis report in Markdown format"),
 				aitool.WithParam_Required(true),
 			),
 		},
@@ -109,82 +177,63 @@ func generateFinalSummaryAndAnswer(loop *reactloops.ReActLoop, invoker aicommon.
 			if event, _ := loop.GetEmitter().EmitStreamEventWithContentType(
 				"re-act-loop-answer-payload",
 				utils.JSONStringReader(r),
-				loop.GetCurrentTask().GetId(),
+				taskID,
 				aicommon.TypeTextMarkdown,
-				func() {
-				},
+				func() {},
 			); event != nil {
 				streamId := event.GetStreamEventWriterId()
-				loop.GetEmitter().EmitTextReferenceMaterial(streamId, contextInfo)
+				loop.GetEmitter().EmitTextReferenceMaterial(streamId, contextMaterials)
 			}
 		}),
 	)
 
 	if err != nil {
-		log.Errorf("failed to generate summary with AI: %v", err)
-		// 如果 AI 生成失败，使用默认的总结
-		generateDefaultSummary(loop, invoker, contextInfo)
+		log.Errorf("http_flow_analyze finalize: AI summary generation failed: %v", err)
+		deliverRawContextFallback(loop, invoker, contextMaterials)
 		return
 	}
 
-	summary := action.GetString("summary")
+	summary := strings.TrimSpace(action.GetString("summary"))
 	if summary == "" {
-		log.Warnf("AI generated empty summary, using default summary")
-		generateDefaultSummary(loop, invoker, contextInfo)
+		log.Warnf("http_flow_analyze finalize: AI generated empty summary, using raw context fallback")
+		deliverRawContextFallback(loop, invoker, contextMaterials)
 		return
 	}
 
-	log.Infof("AI generated summary length: %d", len(summary))
-
-	//loop.GetEmitter().EmitStreamEventWithContentType(
-	//	"re-act-loop-answer-payload",
-	//	strings.NewReader(summary),
-	//	loop.GetCurrentTask().GetId(),
-	//	aicommon.TypeTextMarkdown,
-	//	func() {
-	//	},
-	//)
-
-	// 将 summary 设置到 loop context 中（directly_answer handler 会从这里读取）
-	loop.Set("directly_answer_payload", summary)
-	loop.Set("tag_final_answer", summary)
-
-	log.Infof("successfully called directly_answer handler with AI generated summary")
-
-	// 记录到时间线
-	invoker.AddToTimeline("http_flow_analysis_completed",
-		fmt.Sprintf("HTTP flow analysis completed after %d iterations with AI generated summary",
+	invoker.EmitResultAfterStream(summary)
+	markFinalAnswerDelivered(loop)
+	recordMetaAction(loop, "finalize_summary",
+		"forced AI answer at loop exit",
+		utils.ShrinkTextBlock(summary, 240))
+	invoker.AddToTimeline("http_flow_analysis_finalized",
+		fmt.Sprintf("HTTP flow analysis finalized after %d iterations with AI generated summary",
 			loop.GetCurrentIterationIndex()))
 }
 
-// generateDefaultSummary 生成默认的总结（当 AI 生成失败时使用）
-func generateDefaultSummary(loop *reactloops.ReActLoop, invoker aicommon.AIInvokeRuntime, contextInfo string) {
-	var defaultSummary strings.Builder
-	defaultSummary.WriteString("# HTTP 流量分析报告\n\n")
-	defaultSummary.WriteString("## 分析状态\n\n")
-	defaultSummary.WriteString("已达到最大迭代次数限制。以下是已收集的信息：\n\n")
-	defaultSummary.WriteString(contextInfo)
-	defaultSummary.WriteString("\n\n## 建议\n\n")
-	defaultSummary.WriteString("1. 可以尝试使用更精确的过滤条件重新分析\n")
-	defaultSummary.WriteString("2. 检查是否需要查看更多流量详情\n")
-	defaultSummary.WriteString("3. 考虑使用不同的匹配器规则\n")
+func deliverRawContextFallback(loop *reactloops.ReActLoop, invoker aicommon.AIInvokeRuntime, contextMaterials string) {
+	if hasFinalAnswerDelivered(loop) {
+		return
+	}
 
-	summary := defaultSummary.String()
+	taskID := ""
+	if task := loop.GetCurrentTask(); task != nil {
+		taskID = task.GetId()
+	}
 
-	loop.GetEmitter().EmitStreamEventWithContentType(
-		"re-act-loop-answer-payload",
-		strings.NewReader(summary),
-		loop.GetCurrentTask().GetId(),
-		aicommon.TypeTextMarkdown,
-		func() {
-		},
-	)
-	// 将 summary 设置到 loop context 中
-	loop.Set("directly_answer_payload", summary)
-	loop.Set("tag_final_answer", summary)
+	if emitter := loop.GetEmitter(); emitter != nil {
+		if _, err := emitter.EmitTextMarkdownStreamEvent(
+			"re-act-loop-answer-payload",
+			strings.NewReader(contextMaterials),
+			taskID,
+			func() {},
+		); err != nil {
+			log.Warnf("http_flow_analyze finalize: failed to emit raw context fallback: %v", err)
+		}
+	}
 
-	log.Infof("used default summary as fallback")
-	invoker.AddToTimeline("http_flow_analysis_completed_with_default",
-		fmt.Sprintf("HTTP flow analysis completed with default summary after %d iterations",
+	invoker.EmitResultAfterStream(contextMaterials)
+	markFinalAnswerDelivered(loop)
+	invoker.AddToTimeline("http_flow_analysis_finalized_raw",
+		fmt.Sprintf("HTTP flow analysis finalized with raw context after %d iterations",
 			loop.GetCurrentIterationIndex()))
 }

@@ -32,7 +32,6 @@ var matchHTTPFlowsWithSimpleMatcherAction = func(r aicommon.AIInvokeRuntime) rea
 			aitool.WithStringParam("source_type", aitool.WithParam_Description("Filter by source type, e.g. mitm/crawler/scan")),
 			aitool.WithIntegerParam("limit", aitool.WithParam_Description("Max result count (default 30, max 500)")),
 
-			// HTTPResponseMatcher 字段
 			aitool.WithStringParam("matcher_type", aitool.WithParam_Description("Matcher type: word/regex/status_code/binary/dsl/nuclei-dsl")),
 			aitool.WithStringParam("scope", aitool.WithParam_Description("Match scope: raw(default)/header/body/all/request/response/all_headers/all_bodies")),
 			aitool.WithStringParam("condition", aitool.WithParam_Description("Logical condition: and/or (when Group has multiple items)")),
@@ -47,7 +46,6 @@ var matchHTTPFlowsWithSimpleMatcherAction = func(r aicommon.AIInvokeRuntime) rea
 				return utils.Errorf("limit must be non-negative")
 			}
 
-			// 检查是否提供了 matcher 参数
 			matcherType := strings.TrimSpace(action.GetString("matcher_type"))
 			if matcherType == "" {
 				return utils.Errorf("matcher_type is required")
@@ -61,6 +59,30 @@ var matchHTTPFlowsWithSimpleMatcherAction = func(r aicommon.AIInvokeRuntime) rea
 				operator.Fail("project database is not available for matching HTTP flows")
 				return
 			}
+
+			emitter := loop.GetEmitter()
+			taskID := ""
+			if task := loop.GetCurrentTask(); task != nil {
+				taskID = task.GetId()
+			}
+
+			paramSummary := buildSearchParamSummary(action)
+			matcherType := action.GetString("matcher_type")
+			matcherScope := action.GetString("scope")
+			matcherGroup := action.GetString("group")
+			matcherCondition := action.GetString("condition")
+			matcherNegative := action.GetBool("negative")
+
+			matcherInfo := fmt.Sprintf("type=%s, scope=%s, group=%q", matcherType, matcherScope, matcherGroup)
+			if matcherCondition != "" {
+				matcherInfo += fmt.Sprintf(", condition=%s", matcherCondition)
+			}
+			if matcherNegative {
+				matcherInfo += ", negative=true"
+			}
+			emitter.EmitThoughtStream(taskID,
+				"[match_http_flows_with_matcher] search params: %s | matcher: %s",
+				paramSummary, matcherInfo)
 
 			req := buildQueryRequestFromAction(action, 30)
 			paging, flows, err := yakit.QueryHTTPFlow(db, req)
@@ -77,7 +99,6 @@ var matchHTTPFlowsWithSimpleMatcherAction = func(r aicommon.AIInvokeRuntime) rea
 				total = len(flows)
 			}
 
-			// 构建 HTTPResponseMatcher
 			matcher := &ypb.HTTPResponseMatcher{
 				MatcherType:   action.GetString("matcher_type"),
 				Scope:         action.GetString("scope"),
@@ -87,13 +108,11 @@ var matchHTTPFlowsWithSimpleMatcherAction = func(r aicommon.AIInvokeRuntime) rea
 				ExprType:      action.GetString("expr_type"),
 			}
 
-			// 解析 group 参数（逗号分隔）
 			groupStr := strings.TrimSpace(action.GetString("group"))
 			if groupStr != "" {
 				matcher.Group = splitMulti(groupStr)
 			}
 
-			// 如果 scope 为空，设置默认值
 			if matcher.Scope == "" {
 				matcher.Scope = "raw"
 			}
@@ -106,6 +125,11 @@ var matchHTTPFlowsWithSimpleMatcherAction = func(r aicommon.AIInvokeRuntime) rea
 
 			localMatcher := newSimpleMatcherFromGRPC(matcher)
 			localMatchers := []*simpleMatcher{localMatcher}
+			matcherDesc := describeMatchers(localMatchers)
+
+			emitter.EmitThoughtStream(taskID,
+				"[match_http_flows_with_matcher] DB returned %d flows (showing %d), applying matcher: %s",
+				total, len(flows), matcherDesc)
 
 			builder.WriteString(fmt.Sprintf("HTTP flow query returned %d items (showing %d); applying matcher (type=%s, scope=%s)\n",
 				total, len(flows), matcher.MatcherType, matcher.Scope))
@@ -113,16 +137,15 @@ var matchHTTPFlowsWithSimpleMatcherAction = func(r aicommon.AIInvokeRuntime) rea
 			pr, pw := utils.NewPipe()
 			defer pw.Close()
 
-			emitter := loop.GetEmitter()
 			var streamId string
-			if event, _ := emitter.EmitDefaultStreamEvent("thought", pr, loop.GetCurrentTask().GetId()); event != nil {
+			if event, _ := emitter.EmitDefaultStreamEvent("thought", pr, taskID); event != nil {
 				streamId = event.GetStreamEventWriterId()
 			}
 
-			pw.WriteString(fmt.Sprintf("Found [%v] HTTP flows...", len(flows)))
+			pw.WriteString(fmt.Sprintf("Matching [%v] HTTP flows with %s matcher...", len(flows), matcher.MatcherType))
 
 			if len(flows) <= 0 {
-				pw.WriteString(fmt.Sprintf("[DONE]"))
+				pw.WriteString("[DONE] No flows to match.")
 			}
 
 			for _, flow := range flows {
@@ -156,6 +179,8 @@ var matchHTTPFlowsWithSimpleMatcherAction = func(r aicommon.AIInvokeRuntime) rea
 
 			builder.WriteString(fmt.Sprintf("\nMatched %d flow(s); discarded %d after matcher filter.", matchedCount, discardCount))
 
+			pw.WriteString(fmt.Sprintf(" Done: matched=%d, discarded=%d", matchedCount, discardCount))
+
 			invoker := loop.GetInvoker()
 			fullSummary := builder.String()
 			summary := fullSummary
@@ -164,7 +189,6 @@ var matchHTTPFlowsWithSimpleMatcherAction = func(r aicommon.AIInvokeRuntime) rea
 				emitter.EmitTextReferenceMaterial(streamId, fullSummary)
 			}
 
-			// 总是保存到文件
 			var filename string
 			if invoker != nil {
 				loopDataDir := loop.GetLoopContentDir("data")
@@ -173,7 +197,6 @@ var matchHTTPFlowsWithSimpleMatcherAction = func(r aicommon.AIInvokeRuntime) rea
 				loop.GetEmitter().EmitPinFilename(filename)
 			}
 
-			// 只有超过限制时才修改 summary
 			if len(fullSummary) > maxHTTPFlowSummaryBytes && filename != "" {
 				preview := utils.ShrinkTextBlock(fullSummary, 2000)
 				summary = fmt.Sprintf("Summary length %d exceeded %d; saved to file: %s\nUse `read_reference_file` (or other file-reading tool) to load the full content.\n\nPreview:\n%s",
@@ -182,6 +205,14 @@ var matchHTTPFlowsWithSimpleMatcherAction = func(r aicommon.AIInvokeRuntime) rea
 
 			invoker.AddToTimeline("match_http_flows_with_matcher", summary)
 			loop.Set("last_match_summary", summary)
+
+			resultSummaryStr := fmt.Sprintf("total=%d, matched=%d, discarded=%d", total, matchedCount, discardCount)
+			recordAction(loop,
+				"match_http_flows_with_matcher",
+				paramSummary,
+				resultSummaryStr,
+				matcherDesc,
+			)
 
 			operator.Feedback(summary)
 		},

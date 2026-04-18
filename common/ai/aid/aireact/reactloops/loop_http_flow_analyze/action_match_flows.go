@@ -46,6 +46,44 @@ func parseMatchers(raw string) ([]*ypb.HTTPResponseMatcher, error) {
 	return nil, utils.Errorf("failed to parse matchers_json, expected HTTPResponseMatcher array or object")
 }
 
+func buildSearchParamSummary(action *aicommon.Action) string {
+	var parts []string
+	if v := action.GetString("keyword"); v != "" {
+		parts = append(parts, fmt.Sprintf("keyword=%q", v))
+	}
+	if v := action.GetString("keyword_type"); v != "" {
+		parts = append(parts, fmt.Sprintf("keyword_type=%s", v))
+	}
+	if v := action.GetString("methods"); v != "" {
+		parts = append(parts, fmt.Sprintf("methods=%s", v))
+	}
+	if v := action.GetString("status_code"); v != "" {
+		parts = append(parts, fmt.Sprintf("status=%s", v))
+	}
+	if v := action.GetString("url_contains"); v != "" {
+		parts = append(parts, fmt.Sprintf("url=%q", v))
+	}
+	if v := action.GetString("tags"); v != "" {
+		parts = append(parts, fmt.Sprintf("tags=%s", v))
+	}
+	if v := action.GetString("exclude_keywords"); v != "" {
+		parts = append(parts, fmt.Sprintf("exclude=%q", v))
+	}
+	if v := action.GetString("source_type"); v != "" {
+		parts = append(parts, fmt.Sprintf("source=%s", v))
+	}
+	if v := action.GetString("runtime_id"); v != "" {
+		parts = append(parts, fmt.Sprintf("runtime=%s", v))
+	}
+	if v := action.GetInt("limit"); v > 0 {
+		parts = append(parts, fmt.Sprintf("limit=%d", v))
+	}
+	if len(parts) == 0 {
+		return "(no filters)"
+	}
+	return strings.Join(parts, ", ")
+}
+
 var filterAndMatchHTTPFlowsAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 	return reactloops.WithRegisterLoopAction(
 		"filter_and_match_http_flows",
@@ -76,6 +114,15 @@ var filterAndMatchHTTPFlowsAction = func(r aicommon.AIInvokeRuntime) reactloops.
 				operator.Fail("project database is not available for matching HTTP flows")
 				return
 			}
+
+			emitter := loop.GetEmitter()
+			taskID := ""
+			if task := loop.GetCurrentTask(); task != nil {
+				taskID = task.GetId()
+			}
+
+			paramSummary := buildSearchParamSummary(action)
+			emitter.EmitThoughtStream(taskID, "[filter_and_match_http_flows] search params: %s", paramSummary)
 
 			req := buildQueryRequestFromAction(action, 30)
 			paging, flows, err := yakit.QueryHTTPFlow(db, req)
@@ -109,6 +156,18 @@ var filterAndMatchHTTPFlowsAction = func(r aicommon.AIInvokeRuntime) reactloops.
 				for _, m := range parsed {
 					localMatchers = append(localMatchers, newSimpleMatcherFromGRPC(m))
 				}
+			}
+
+			matcherDesc := ""
+			if len(localMatchers) > 0 {
+				matcherDesc = describeMatchers(localMatchers)
+				emitter.EmitThoughtStream(taskID,
+					"[filter_and_match_http_flows] DB returned %d flows (showing %d), applying %d matcher(s): %s",
+					total, len(flows), len(localMatchers), matcherDesc)
+			} else {
+				emitter.EmitThoughtStream(taskID,
+					"[filter_and_match_http_flows] DB returned %d flows (showing %d), no matchers to apply",
+					total, len(flows))
 			}
 
 			builder.WriteString(fmt.Sprintf("HTTP flow query returned %d items (showing %d)", total, len(flows)))
@@ -163,11 +222,20 @@ var filterAndMatchHTTPFlowsAction = func(r aicommon.AIInvokeRuntime) reactloops.
 				builder.WriteString(fmt.Sprintf("\nMatched %d flow(s); discarded %d after matcher filter.", matchedCount, discardCount))
 			}
 
+			resultSummaryStr := ""
+			if len(localMatchers) > 0 {
+				resultSummaryStr = fmt.Sprintf("total=%d, matched=%d, discarded=%d", total, matchedCount, discardCount)
+				emitter.EmitThoughtStream(taskID,
+					"[filter_and_match_http_flows] result: %d matched, %d discarded (total %d flows, matchers: %s)",
+					matchedCount, discardCount, len(flows), matcherDesc)
+			} else {
+				resultSummaryStr = fmt.Sprintf("total=%d, showing=%d", total, len(flows))
+			}
+
 			invoker := loop.GetInvoker()
 			fullSummary := builder.String()
 			summary := fullSummary
 
-			// 总是保存到文件
 			var filename string
 			if invoker != nil {
 				loopDataDir := loop.GetLoopContentDir("data")
@@ -179,7 +247,6 @@ var filterAndMatchHTTPFlowsAction = func(r aicommon.AIInvokeRuntime) reactloops.
 				loop.GetEmitter().EmitPinFilename(filename)
 			}
 
-			// 只有超过限制时才修改 summary
 			if len(fullSummary) > maxHTTPFlowSummaryBytes && filename != "" {
 				preview := utils.ShrinkTextBlock(fullSummary, 2000)
 				summary = fmt.Sprintf("Summary length %d exceeded %d; saved to file: %s\nUse `read_reference_file` (or other file-reading tool) to load the full content.\n\nPreview:\n%s",
@@ -191,6 +258,13 @@ var filterAndMatchHTTPFlowsAction = func(r aicommon.AIInvokeRuntime) reactloops.
 			if len(localMatchers) > 0 {
 				loop.Set("last_match_summary", summary)
 			}
+
+			recordAction(loop,
+				"filter_and_match_http_flows",
+				paramSummary,
+				resultSummaryStr,
+				matcherDesc,
+			)
 
 			operator.Feedback(summary)
 		},
