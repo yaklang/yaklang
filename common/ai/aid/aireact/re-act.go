@@ -315,6 +315,7 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 		return nil, err
 	}
 	cfg.DatabaseRecordID = dbId
+	cfg.FlushRestoredSessionEvidence()
 	// EmitPinDirectory is deferred to ensureWorkDirectory when user input arrives
 
 	if !react.config.DisallowMCPServers {

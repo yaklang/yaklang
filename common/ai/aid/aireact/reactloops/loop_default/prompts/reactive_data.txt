@@ -1,0 +1,9 @@
+{{ if .FeedbackMessages }}
+<|FEEDBACK_{{ .Nonce }}|>
+{{ .FeedbackMessages }}
+<|FEEDBACK_END_{{ .Nonce }}|>
+{{ end }}
+{{ if .IsLastIteration }}
+
+**警告：这是最后一次迭代。必须立即输出最终结果（directly_answer），不要再申请新工具。**
+{{ end }}

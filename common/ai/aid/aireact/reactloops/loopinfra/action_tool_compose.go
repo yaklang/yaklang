@@ -302,6 +302,9 @@ Example - Sequential file operations(With AI-Tag tags):
 				verifyResult.OutputFiles,
 				verifyResult.EvidenceOps,
 			)
+			if len(verifyResult.EvidenceOps) > 0 {
+				loop.GetConfig().ApplySessionEvidenceOps(verifyResult.EvidenceOps)
+			}
 
 			if verifyResult.Satisfied {
 				operator.Exit()

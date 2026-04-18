@@ -2395,6 +2395,39 @@ func (c *Config) AppendUserInputHistory(userInput string, timestamp time.Time) (
 	return c.GetSessionPromptState().AppendUserInputHistory(userInput, timestamp)
 }
 
+func (c *Config) GetSessionEvidenceRendered() string {
+	return c.GetSessionPromptState().GetSessionEvidenceRendered()
+}
+
+func (c *Config) ApplySessionEvidenceOps(ops []EvidenceOperation) {
+	if len(ops) == 0 {
+		return
+	}
+	quotedEvidence := c.GetSessionPromptState().ApplySessionEvidenceOps(ops)
+	if c.PersistentSessionId != "" && c.GetDB() != nil {
+		if err := yakit.UpdateAIAgentRuntimeEvidence(c.GetDB(), c.PersistentSessionId, quotedEvidence); err != nil {
+			log.Warnf("persist session evidence failed: %v", err)
+		}
+	}
+}
+
+// FlushRestoredSessionEvidence persists the in-memory session evidence (restored from
+// a previous runtime) to the current runtime's DB row. This must be called after
+// the runtime DB row is created, because restorePersistentSession runs before row creation.
+func (c *Config) FlushRestoredSessionEvidence() {
+	if c.PersistentSessionId == "" || c.GetDB() == nil {
+		return
+	}
+	raw := c.GetSessionPromptState().GetSessionEvidence()
+	if raw == "" {
+		return
+	}
+	quoted := c.GetSessionPromptState().quoteEvidence(raw)
+	if err := yakit.UpdateAIAgentRuntimeEvidence(c.GetDB(), c.PersistentSessionId, quoted); err != nil {
+		log.Warnf("flush restored session evidence failed: %v", err)
+	}
+}
+
 func (c *Config) FormatUserInputHistory() string {
 	history := c.GetUserInputHistory()
 	if len(history) == 0 {
@@ -2782,6 +2815,12 @@ func (c *Config) restorePersistentSession() {
 		c.SetUserInputHistory(history)
 		log.Infof("restored %d user input history entries from session [%s], latest: %.80s",
 			len(history), c.PersistentSessionId, c.GetPrevSessionUserInput())
+	}
+
+	if evidence := runtime.GetEvidence(); evidence != "" {
+		c.GetSessionPromptState().SetSessionEvidence(evidence)
+		log.Infof("restored session evidence from session [%s], length: %d runes",
+			c.PersistentSessionId, len([]rune(evidence)))
 	}
 
 	// Restore recent-tool cache from previous session

@@ -125,6 +125,9 @@ var loopAction_EnhanceKnowledgeAnswer = &reactloops.LoopAction{
 			return
 		}
 		loop.PushSatisfactionRecordWithCompletedTaskIndex(verifyResult.Satisfied, verifyResult.Reasoning, verifyResult.CompletedTaskIndex, verifyResult.NextMovements, verifyResult.Evidence, verifyResult.OutputFiles, verifyResult.EvidenceOps)
+		if len(verifyResult.EvidenceOps) > 0 {
+			loop.GetConfig().ApplySessionEvidenceOps(verifyResult.EvidenceOps)
+		}
 
 		if verifyResult.Satisfied {
 			invoker.AddToTimeline("knowledge_enhance_satisfied", `** 知识增强结果已经初步满足用户需求(Knowledge enhancement results have initially met the user's needs) **`)

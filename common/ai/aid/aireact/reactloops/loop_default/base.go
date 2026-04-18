@@ -1,12 +1,14 @@
 package loop_default
 
 import (
+	"bytes"
 	_ "embed"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 //go:embed prompts/instruction.txt
@@ -14,6 +16,9 @@ var instruction string
 
 //go:embed prompts/reflection_output_example.txt
 var outputExample string
+
+//go:embed prompts/reactive_data.txt
+var reactiveDataTemplate string
 
 const reActPostSummary = `
 请根据你刚才执行的所有步骤，以 **Markdown 格式** 输出一份结构化总结，格式如下：
@@ -34,6 +39,17 @@ const reActPostSummary = `
 
 `
 
+func buildDefaultReactiveDataBuilder() reactloops.ReActLoopOption {
+	return reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
+		renderMap := map[string]any{
+			"Nonce":           nonce,
+			"FeedbackMessages": feedbacker.String(),
+			"IsLastIteration":  loop.GetCurrentIterationIndex()+1 >= loop.GetMaxIterations(),
+		}
+		return utils.RenderTemplate(reactiveDataTemplate, renderMap)
+	})
+}
+
 func init() {
 	err := reactloops.RegisterLoopFactory(
 		schema.AI_REACT_LOOP_NAME_DEFAULT,
@@ -47,8 +63,9 @@ func init() {
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
 				reactloops.WithPersistentInstruction(instruction),
-				reactloops.WithReflectionOutputExample(outputExample),
-				reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, operator *reactloops.OnPostIterationOperator) {
+			reactloops.WithReflectionOutputExample(outputExample),
+			buildDefaultReactiveDataBuilder(),
+			reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, operator *reactloops.OnPostIterationOperator) {
 					if !isDone {
 						return
 					}
@@ -101,8 +118,9 @@ func init() {
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
 				reactloops.WithPersistentInstruction(instruction),
-				reactloops.WithReflectionOutputExample(outputExample),
-			}
+			reactloops.WithReflectionOutputExample(outputExample),
+			buildDefaultReactiveDataBuilder(),
+		}
 
 			// 检查是否有 GetEnableSelfReflection 方法（向后兼容）
 			if config := r.GetConfig(); config != nil {

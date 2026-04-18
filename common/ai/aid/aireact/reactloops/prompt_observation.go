@@ -215,6 +215,7 @@ func buildPromptSections(
 	schema string,
 	outputExample string,
 	extraCapabilities string,
+	sessionEvidence string,
 ) []*PromptSectionObservation {
 	return []*PromptSectionObservation{
 		buildBackgroundPromptSection(infos),
@@ -238,6 +239,13 @@ func buildPromptSections(
 			PromptSectionRoleSystemPrompt,
 			false,
 			persistent,
+		),
+		newPromptSectionObservation(
+			"session_evidence",
+			"Session Evidence",
+			PromptSectionRoleRuntimeCtx,
+			true,
+			sessionEvidence,
 		),
 		newPromptSectionObservation(
 			"skills_context",
