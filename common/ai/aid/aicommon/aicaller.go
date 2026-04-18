@@ -44,6 +44,8 @@ type AICallerConfigIf interface {
 	OriginOptions() []ConfigOption
 	GetOrCreateWorkDir() string
 	GetContextProviderManager() *ContextProviderManager
+	GetSessionEvidenceRendered() string
+	ApplySessionEvidenceOps(ops []EvidenceOperation)
 }
 
 func AIChatToAICallbackType(cb func(prompt string, opts ...aispec.AIConfigOption) (string, error)) AICallbackType {

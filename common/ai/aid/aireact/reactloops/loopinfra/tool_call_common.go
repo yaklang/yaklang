@@ -97,6 +97,10 @@ func handleToolCallResult(
 		verifyResult.EvidenceOps,
 	)
 
+	if len(verifyResult.EvidenceOps) > 0 {
+		loop.GetConfig().ApplySessionEvidenceOps(verifyResult.EvidenceOps)
+	}
+
 	// T2: perception after verification (async, non-blocking)
 	loop.MaybeTriggerPerceptionAfterVerification()
 

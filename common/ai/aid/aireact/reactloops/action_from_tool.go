@@ -208,6 +208,9 @@ func ConvertAIToolToLoopAction(tool *aitool.Tool) *LoopAction {
 					return
 				}
 				loop.PushSatisfactionRecordWithCompletedTaskIndex(verifyResult.Satisfied, verifyResult.Reasoning, verifyResult.CompletedTaskIndex, verifyResult.NextMovements, verifyResult.Evidence, verifyResult.OutputFiles, verifyResult.EvidenceOps)
+				if len(verifyResult.EvidenceOps) > 0 {
+					loop.GetConfig().ApplySessionEvidenceOps(verifyResult.EvidenceOps)
+				}
 
 				if verifyResult.Satisfied {
 					operator.Exit()

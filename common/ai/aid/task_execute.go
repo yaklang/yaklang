@@ -103,6 +103,7 @@ func (t *AiTask) execute() error {
 							}
 						}
 					}
+					t.ApplySessionEvidenceOps(allOps)
 				}
 			}
 
@@ -459,6 +460,7 @@ func (t *AiTask) generateTaskSummary(summary, nextMovements string) error {
 					}
 				}
 			}
+			t.ApplySessionEvidenceOps(summaryOps)
 		}
 	}
 

@@ -30,6 +30,9 @@ func renderRecentToolRoutingHint(nonce string) string {
 //go:embed prompts/loop_template.tpl
 var coreTemplate string
 
+//go:embed prompts/session_evidence.txt
+var sessionEvidenceTemplate string
+
 func (r *ReActLoop) generateSchemaString(disallowExit bool) (string, error) {
 	// loop
 	// build in code
@@ -178,6 +181,18 @@ func (r *ReActLoop) generateLoopPrompt(
 		extraCapabilities = r.extraCapabilities.Render(nonce)
 	}
 
+	var sessionEvidence string
+	if evidenceContent := r.config.GetSessionEvidenceRendered(); evidenceContent != "" {
+		sessionEvidence, err = utils.RenderTemplate(sessionEvidenceTemplate, map[string]any{
+			"Nonce":    nonce,
+			"Evidence": evidenceContent,
+		})
+		if err != nil {
+			log.Warnf("render session evidence template failed: %v", err)
+			sessionEvidence = ""
+		}
+	}
+
 	// Append CACHE_TOOL_CALL block only when summary is non-empty
 	if tm := r.config.GetAiToolManager(); tm != nil && tm.HasRecentlyUsedTools() {
 		r.syncRecentToolParamAITagFields(tm.GetRecentToolParamNames())
@@ -202,6 +217,7 @@ func (r *ReActLoop) generateLoopPrompt(
 	infos["OutputExample"] = outputExample
 	infos["SkillsContext"] = skillsContext
 	infos["ExtraCapabilities"] = extraCapabilities
+	infos["SessionEvidence"] = sessionEvidence
 	infos["Nonce"] = nonce
 	infos["UserQuery"] = userInput
 	infos["Schema"] = schema
@@ -216,6 +232,7 @@ func (r *ReActLoop) generateLoopPrompt(
 		schema,
 		outputExample,
 		extraCapabilities,
+		sessionEvidence,
 	)
 	prompt, err := utils.RenderTemplate(coreTemplate, infos)
 	if err != nil {

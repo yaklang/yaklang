@@ -90,6 +90,13 @@ func (m *MockedAIConfig) GetContextProviderManager() *aicommon.ContextProviderMa
 	return aicommon.NewContextProviderManager()
 }
 
+func (m *MockedAIConfig) GetSessionEvidenceRendered() string {
+	return ""
+}
+
+func (m *MockedAIConfig) ApplySessionEvidenceOps(ops []aicommon.EvidenceOperation) {
+}
+
 func (m *MockedAIConfig) IsCtxDone() bool {
 	select {
 	case <-m.Ctx.Done():

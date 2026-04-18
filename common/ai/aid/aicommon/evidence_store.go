@@ -1,11 +1,9 @@
-package aid
+package aicommon
 
 import (
 	"encoding/json"
 	"fmt"
 	"strings"
-
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 )
 
 type EvidenceItem struct {
@@ -25,7 +23,7 @@ func (s *EvidenceStore) IsEmpty() bool {
 	return len(s.Items) == 0
 }
 
-func (s *EvidenceStore) ApplyOperations(ops []aicommon.EvidenceOperation) {
+func (s *EvidenceStore) ApplyOperations(ops []EvidenceOperation) {
 	for _, op := range ops {
 		id := strings.TrimSpace(op.ID)
 		if id == "" {
@@ -90,7 +88,7 @@ func (s *EvidenceStore) Render() string {
 func (s *EvidenceStore) ShrinkToTokenBudget(budget int) {
 	for len(s.Items) > 1 {
 		rendered := s.Render()
-		if aicommon.MeasureTokens(rendered) <= budget {
+		if MeasureTokens(rendered) <= budget {
 			return
 		}
 		s.Items = s.Items[1:]
@@ -114,7 +112,6 @@ func UnmarshalEvidenceStore(data string) *EvidenceStore {
 	if err := json.Unmarshal([]byte(data), store); err == nil && len(store.Items) > 0 {
 		return store
 	}
-	// Fallback: treat as legacy markdown content
 	return &EvidenceStore{
 		Items: []EvidenceItem{{ID: "legacy", Content: data}},
 	}

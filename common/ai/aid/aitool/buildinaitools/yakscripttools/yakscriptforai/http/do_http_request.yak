@@ -92,6 +92,38 @@ Optional:
     show-request    (string)  Display and save the full request packet: "yes"/"no". Default: "no".
     proxy           (string)  Proxy URL. Example: "http://127.0.0.1:8080" or "socks5://127.0.0.1:1080".
 
+## Black-Box Experiment Methodology
+
+Every HTTP request is an experiment against a black box. Apply this cycle:
+
+1. **Define your variables**: Before sending, be explicit about what you are controlling
+   (which parameter, which channel, what value) and what you will observe (status code,
+   body content, body size, headers). If you change multiple variables at once, you
+   cannot attribute the outcome to any single change.
+
+2. **Establish a stable baseline**: Send a normal/empty request first. The response is
+   your "stable state." All subsequent experiments are perturbations from this baseline.
+   A response identical to baseline means your input had no observable effect on the
+   black box. A response that differs from baseline carries information.
+
+3. **Match your input channel to the black box's intake**: The black box reads from a
+   specific input channel (query string, POST body, headers, etc.). Your controlled
+   variable must enter through the same channel the black box reads. Otherwise your
+   perturbation never reaches the system under test — you are experimenting on a
+   different black box.
+
+4. **One experiment, one hypothesis**: Before each request, state what you expect to
+   observe and what it would mean. "If the response differs from baseline, it means
+   my input was processed by the downstream component." Without a hypothesis, you
+   cannot interpret the result and the experiment produces zero information.
+
+5. **Information gain per iteration**: Each request should shrink your uncertainty about
+   the black box. If two consecutive requests produce the same baseline response with
+   the same reasoning, you are in a zero-information loop. Change your experimental
+   design — vary a different controlled variable, or expand your observable variables
+   (e.g., use "show-request" to inspect the actual wire format, check response headers
+   you haven't looked at, use "keyword" or "regexp-match" to detect specific signals).
+
 ## Few-Shot Examples
 
 Replace {NONCE} with the actual nonce from the response format section.
