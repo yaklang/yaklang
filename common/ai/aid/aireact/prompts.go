@@ -139,6 +139,8 @@ type VerificationPromptData struct {
 	Schema         string
 	DynamicContext string
 	EnhanceData    []string
+	IterationIndex int
+	MaxIterations  int
 }
 
 // AIReviewPromptData contains data for AI tool call review prompt
@@ -430,6 +432,11 @@ func (pm *PromptManager) GenerateVerificationPrompt(originalQuery string, isTool
 		Schema:         verificationSchemaJSON,
 		DynamicContext: pm.DynamicContextWithNonce(nonce),
 		EnhanceData:    enhanceData,
+	}
+
+	if currentLoop := pm.react.GetCurrentLoop(); currentLoop != nil {
+		data.IterationIndex = currentLoop.GetCurrentIterationIndex()
+		data.MaxIterations = currentLoop.GetMaxIterations()
 	}
 
 	// Get timeline for context (without lock, assume caller handles it)
