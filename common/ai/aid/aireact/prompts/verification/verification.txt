@@ -46,6 +46,15 @@ User Raw INPUT/ReAction Thought/Observation:
 {{ .EnhanceData }}
 <|ENHANCE_DATA_END_{{ .Nonce }}|>{{ end }}
 
+{{ if gt .IterationIndex 0 }}
+## 迭代上下文
+当前子任务已执行 **{{ .IterationIndex }}** 次迭代（最大 {{ .MaxIterations }} 次）。
+{{ if gt .IterationIndex 5 }}
+**警告：当前子任务迭代次数已超过 5 次。请重点检查：**
+1. 当前子任务的目标是否实际上已经完成（包括否定结果）？
+2. Agent 是否已经漂移到其他子任务的领域？如果 INPUT 中的动作与 CURRENT_TASK 目标不相关，应判定当前子任务完成。
+3. 不要因为"漏洞未成功利用"就认为"验证类任务"未完成——"已验证不存在"也是完成。
+{{ end }}{{ end }}
 
 **## 核心决策逻辑**
 
@@ -132,6 +141,12 @@ User Raw INPUT/ReAction Thought/Observation:
     - **共轭控制思维**：当你发现无法在当前表示空间内直接达到目标时，思考是否存在一个变换 L，可以将问题转化到你有更多控制能力的空间。你的输入最终被哪个解释器处理？你的 payload 是在那个解释器的语法空间中构造的吗？如果输入进入解释器 A，但你的 payload 是解释器 B 的语法，这等价于向错误的黑箱发送了信号。
     - **正反馈检测**：如果连续多次尝试都得到相同的拒绝响应（目标差没有缩小），你处于正反馈循环中——同一类策略不断被同一个机制拒绝。此时应停止重试，回退到模型层面：你对黑箱的理解是否有误？可观察/可控制变量是否充分？是否存在你没有考虑的输入通道或输出信号？
 15. **输入通道作为可控制变量**：黑箱的输入端口（GET/POST/Header/Cookie/路径等）本身就是可控制变量的一部分。如果你的输入没有通过黑箱实际读取的端口进入，等价于实验中可控制变量未作用于被控对象——你观察到的输出与你的输入无关。在 evidence 中记录黑箱的输入端口作为实验条件。
+16. **任务漂移检测（防止死循环）**：当存在 `<|CURRENT_TASK_...|>` 时，将【INPUT】中工具调用的实际动作（identifier、命令内容、URL 目标、工具描述等）与 `<|CURRENT_TASK_...|>` 定义的目标领域进行对齐比较。如果当前执行的动作明显属于另一个子任务或父任务的范围（例如 CURRENT_TASK 是"FTP 后门登录尝试"但 INPUT 显示 agent 在测试 Web 端点命令注入），这是当前子任务已实质完成的**强信号**——agent 在当前子任务范围内已无可执行动作，因此自行越界到其他任务领域。此时应判定 `user_satisfied: true` 并设置 `completed_task_index`。
+    - 错误：CURRENT_TASK 是"FTP 后门验证"，agent 连续 5 轮在测试 /capture 端点的命令注入，判断为 false 因为"FTP 后门尚未成功利用"
+    - 正确：CURRENT_TASK 是"FTP 后门验证"，agent 已越界执行 Web 漏洞测试，说明 FTP 后门验证已完成（结果为否定），判断为 true
+17. **安全测试否定结果 = 子任务完成**：当安全测试子任务的目标是"尝试/验证/检测/测试"某个漏洞或攻击路径，且工具执行已返回**明确的否定结果**（如"backdoor not present"、"port closed"、"connection refused"、"not vulnerable"、"login incorrect"、"exploit failed"），应判定子任务完成，结果为否定。否定结果是安全测试的有效产出，"已验证漏洞不存在"与"已验证漏洞存在"对子任务而言同样是完成状态。不要将"漏洞未成功利用"等同于"任务未完成"。
+    - 错误：任务是"vsftpd 后门漏洞验证"，工具返回"port 6200 closed, backdoor not present"，判断为 false 因为"后门未成功触发"
+    - 正确：任务是"vsftpd 后门漏洞验证"，工具返回"port 6200 closed, backdoor not present"，判断为 true 因为验证已完成（结论：后门不存在）
 
 RESPONSE FORMAT: Respond with a JSON object following the schema below:
 
@@ -304,6 +319,36 @@ IMPORTANT GUIDELINES:
 ```json
 {"@action": "verify-satisfaction", "user_satisfied": false, "completed_task_index": "", "reasoning": "任务未完成：实验C的响应偏离拦截基线(信息量最大的观测)，黑箱内部有不同处理路径被触达，需沿此方向负反馈迭代", "next_movements": [{"op": "add", "id": "iterate_on_signal", "content": "实验C产生了偏离基线的响应信号，对比A/B/C的输入差异定位穿透条件，在C的输入空间附近做负反馈迭代(微调参数逼近目标)，不切换回A/B方向"}], "evidence": [{"op": "add", "id": "blackbox_model", "content": "主体: 目标黑箱的输入/输出映射模型\n动作: 三次实验分别从不同子空间构造输入\n观测: 实验A→基线拒绝(15B), 实验B→基线拒绝(15B), 实验C→非基线响应(60KB) — C的输入穿过了过滤层到达了下游处理器\n控制含义: C的输入构造方式处于黑箱的接受空间内, 可能性空间已从全集缩小到C附近的子空间, 后续实验应在此子空间内迭代"}, {"op": "add", "id": "interpreter_model", "content": "主体: 黑箱的下游处理器类型\n动作: 审计源码确认输入流经的解释器\n观测: 输入最终由特定类型的解释器处理\n控制含义: 后续payload必须是该解释器的合法语法, 其他解释器的语法在此黑箱内无意义(共轭控制的L变换必须匹配目标域)"}]}
 ```
+
+### 示例11：任务漂移检测（Agent 越界执行其他子任务）
+**场景**：父任务是"渗透测试与FLAG获取"，当前子任务 `1-1-1` 是"FTP 后门登录尝试"。Agent 在第2轮迭代已确认 FTP 后门不存在（port 6200 closed），但之后持续在测试 `/capture` 端点命令注入（这属于子任务 `1-2-1` 的目标）。当前是第8轮迭代，INPUT 显示 agent 执行了 `curl http://target/capture?cmd=;id`。
+
+**错误判断**：
+```json
+{"@action": "verify-satisfaction", "user_satisfied": false, "completed_task_index": "", "reasoning": "任务未完成：FTP 后门未成功利用，需要继续尝试其他方法"}
+```
+错误原因：把"漏洞未成功利用"等同于"任务未完成"；未检测到 agent 已漂移到完全不同的任务领域
+
+**正确判断**：
+```json
+{"@action": "verify-satisfaction", "user_satisfied": true, "completed_task_index": "1-1-1", "reasoning": "目标达成：当前子任务是FTP后门登录尝试，已在早期迭代确认后门不存在(port 6200 closed)。Agent已越界执行Web端点命令注入测试(属于其他子任务)，说明FTP后门验证已完成，结果为否定"}
+```
+正确原因：1) FTP 后门验证已有明确否定结果；2) Agent 越界执行说明当前任务范围内已无可执行动作
+
+### 示例12：安全测试否定结果即完成
+**场景**：当前子任务 `1-1-1` 是"vsftpd 3.0.3 后门漏洞验证"，Agent 使用 bash 执行了后门触发脚本，发送了 `USER user:)` 到 FTP 端口，检查后门端口 6200，返回结果为"Port 6200 is still closed. Backdoor likely not present or patched."
+
+**错误判断**：
+```json
+{"@action": "verify-satisfaction", "user_satisfied": false, "completed_task_index": "", "reasoning": "任务未完成：后门未成功触发，需要尝试其他触发方式或参数"}
+```
+错误原因：漏洞验证类任务的目标是"确认漏洞是否存在"，而非"必须成功利用漏洞"。否定结果已经达成了验证目标。
+
+**正确判断**：
+```json
+{"@action": "verify-satisfaction", "user_satisfied": true, "completed_task_index": "1-1-1", "reasoning": "目标达成：vsftpd后门漏洞验证已完成，结论为后门不存在(port 6200 closed, backdoor not present)。否定结果是有效的安全测试产出"}
+```
+正确原因：子任务目标是"验证"后门漏洞，"已验证不存在"与"已验证存在"同样是完成状态
 
 ## 典型响应格式
 
