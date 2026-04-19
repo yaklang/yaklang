@@ -26,6 +26,9 @@ var opHtml []byte
 //go:embed op1.html
 var op1Html []byte
 
+//go:embed op_safe.html
+var opSafeHtml []byte
+
 //go:embed success.html
 var secretHtml []byte
 
@@ -60,8 +63,9 @@ func Register(t *mux.Router) (*mux.Router, []string) {
 	verificationGroup := t.PathPrefix("/verification").Name("验证码场景").Subrouter()
 
 	const (
-		ordinaryCase1 = `{"Title":"有验证码拦截的表单提交", "Path":"/op", "DefaultQuery": "", "RiskDetected": false, "Headers": [], "ExpectedResult": {}}`
+		ordinaryCase1 = `{"Title":"验证码逻辑漏洞：未删除旧数据", "Path":"/op", "DefaultQuery": "", "RiskDetected": false, "Headers": [], "ExpectedResult": {}}`
 		ordinaryCase2 = `{"Title":"有验证码拦截的表单提交（逻辑问题）", "Path":"/bad/op", "DefaultQuery": "", "RiskDetected": false, "Headers": [], "ExpectedResult": {}}`
+		safeCase      = `{"Title":"有验证码拦截的表单提交（安全实现）", "Path":"/safe/op", "DefaultQuery": "", "RiskDetected": false, "Headers": [], "ExpectedResult": {}}`
 	)
 	// 最普通的案例
 	verificationGroup.HandleFunc("/op", func(writer http.ResponseWriter, request *http.Request) {
@@ -259,7 +263,103 @@ func Register(t *mux.Router) (*mux.Router, []string) {
 		}
 		return
 	})
+	const COOKIECONST_SAFE = "YSESSIONID_SAFE"
+	verificationGroup.HandleFunc("/safe/op", func(writer http.ResponseWriter, request *http.Request) {
+		defer func() {
+			if err := recover(); err != nil {
+				log.Errorf("panic: %v", err)
+				writer.WriteHeader(500)
+				writer.Write([]byte(`PANIC! Please contact the administrator!`))
+				return
+			}
+		}()
+		rawBytes, _ := utils.HttpDumpWithBody(request, true)
+		if request.Method == "POST" {
+			code := lowhttp.GetHTTPRequestPostParam(rawBytes, "code")
+			password := lowhttp.GetHTTPRequestPostParam(rawBytes, "password")
+			session := lowhttp.GetHTTPPacketCookie(rawBytes, COOKIECONST_SAFE)
+			val, ok := sessionCache.Get(session)
+			if !ok {
+				writer.WriteHeader(500)
+				writer.Write([]byte(`session not found`))
+				return
+			}
+			data, ok := val["code"].(*captcha.Data)
+			if !ok {
+				writer.WriteHeader(500)
+				writer.Write([]byte(`session-code not found`))
+				return
+			}
+			log.Infof("safe captcha data.Text: " + data.Text)
+			delete(val, "code")
+			if strings.ToLower(data.Text) != strings.ToLower(code) {
+				writer.WriteHeader(500)
+				writer.Write([]byte(`verification code not match`))
+				return
+			}
+
+			if password != defaultPass {
+				writer.WriteHeader(500)
+				writer.Write([]byte(`{"code":500,"msg":"密码错误"}`))
+				return
+			}
+			writer.Write(secretHtml)
+			return
+		}
+
+		if request.Method == "GET" {
+			headers := writer.Header()
+			headers.Set("Content-Type", "text/html; charset=UTF8")
+			uid := ksuid.New().String()
+			log.Infof("/verification/safe generate cookie: %v", uid)
+			http.SetCookie(writer, &http.Cookie{
+				Name:  COOKIECONST_SAFE,
+				Value: uid,
+			})
+			sessionCache.Set(uid, map[string]any{})
+			writer.Write(opSafeHtml)
+			return
+		}
+	}).Name(safeCase)
+	verificationGroup.HandleFunc("/safe/code", func(writer http.ResponseWriter, request *http.Request) {
+		reqRaw, _ := utils.HttpDumpWithBody(request, true)
+		session := lowhttp.GetHTTPPacketCookie(reqRaw, COOKIECONST_SAFE)
+		if session == "" {
+			writer.WriteHeader(502)
+			writer.Write([]byte(`{"code":500,"msg":"验证码生成失败(NO COOKIE)"}`))
+			return
+		}
+
+		kv, ok := sessionCache.Get(session)
+		if !ok {
+			writer.Write([]byte(`{"code":500,"msg":"验证码生成失败(COOKIE NOT GENERATED)"}`))
+			writer.WriteHeader(502)
+			return
+		}
+
+		data, ok := utils.MapGetRaw(kv, "code").(*captcha.Data)
+		if !ok {
+			var err error
+			data, err = captcha.New(150, 50)
+			if err != nil {
+				spew.Dump(err)
+				writer.Write([]byte(`{"code":500,"msg":"验证码生成失败(captch.New)"}`))
+				writer.WriteHeader(502)
+				return
+			}
+			kv["code"] = data
+		}
+
+		err := data.WriteImage(writer)
+		if err != nil {
+			writer.Write([]byte(fmt.Sprintf(`{"code":500,"msg":"验证码生成失败: %v"}`, strconv.Quote(err.Error()))))
+			writer.WriteHeader(502)
+			return
+		}
+		return
+	})
+
 	return verificationGroup, []string{
-		ordinaryCase1, ordinaryCase2,
+		ordinaryCase1, ordinaryCase2, safeCase,
 	}
 }
