@@ -75,7 +75,7 @@ func TestGenerateLoopPrompt_RecordsObservation(t *testing.T) {
 	require.Equal(t, "prompt-observation-loop", observation.LoopName)
 	require.Equal(t, "nonce1", observation.Nonce)
 	require.Equal(t, len(prompt), observation.PromptBytes)
-	require.Len(t, observation.Sections, 9)
+	require.Len(t, observation.Sections, 10)
 	require.Greater(t, observation.SectionCount, len(observation.Sections))
 
 	require.Equal(t, "background", observation.Sections[0].Key)
@@ -97,12 +97,15 @@ func TestGenerateLoopPrompt_RecordsObservation(t *testing.T) {
 	require.False(t, observation.Sections[1].Compressible)
 	require.Equal(t, "raw user input", observation.Sections[1].Content)
 
-	require.Equal(t, "reactive_data", observation.Sections[5].Key)
-	require.True(t, observation.Sections[5].IsIncluded())
-	require.True(t, observation.Sections[5].Compressible)
+	require.Equal(t, "session_evidence", observation.Sections[4].Key)
+	require.True(t, observation.Sections[4].Compressible)
 
-	require.Equal(t, "schema", observation.Sections[7].Key)
-	require.False(t, observation.Sections[7].Compressible)
+	require.Equal(t, "reactive_data", observation.Sections[6].Key)
+	require.True(t, observation.Sections[6].IsIncluded())
+	require.True(t, observation.Sections[6].Compressible)
+
+	require.Equal(t, "schema", observation.Sections[8].Key)
+	require.False(t, observation.Sections[8].Compressible)
 	require.NotZero(t, observation.Stats.UserInputBytes)
 	require.NotZero(t, observation.Stats.RuntimeCtxBytes)
 	require.NotZero(t, observation.Stats.SystemPromptBytes)

@@ -77,6 +77,8 @@ func (t *transactionTestConfig) GetOrCreateWorkDir() string                     
 func (t *transactionTestConfig) GetContextProviderManager() *ContextProviderManager {
 	return NewContextProviderManager()
 }
+func (t *transactionTestConfig) GetSessionEvidenceRendered() string        { return "" }
+func (t *transactionTestConfig) ApplySessionEvidenceOps([]EvidenceOperation) {}
 
 // --- tests ---
 
