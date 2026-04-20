@@ -371,19 +371,7 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 	baseOpts = append(baseOpts,
 		aicommon.WithID(uid),
 		aicommon.WithTimeline(r.config.Timeline),
-		func(cfg *aicommon.Config) error {
-			// Preserve the parent ReAct's full callback set for the Coordinator.
-			// Using WithAutoTieredAICallback would re-read from global tiered config,
-			// which may fail to load the intelligent model and silently fall back to
-			// the lightweight (light) model for ALL AI calls including verification
-			// and tool-parameter generation — those calls need the quality model.
-			cfg.OriginalAICallback = r.config.OriginalAICallback
-			cfg.QualityPriorityAICallback = r.config.QualityPriorityAICallback
-			cfg.SpeedPriorityAICallback = r.config.SpeedPriorityAICallback
-			cfg.AiServerName = r.config.AiServerName
-			cfg.AiModelName = r.config.AiModelName
-			return nil
-		},
+		aicommon.WithAutoTieredAICallback(r.config.OriginalAICallback),
 		aicommon.WithAllowPlanUserInteract(true),
 		aicommon.WithEventInputChanx(inputChannel),
 		aicommon.WithHotPatchOptionChan(hotpatchChan),
