@@ -142,6 +142,33 @@ func TestGRPCMUSTPASS_HookColorSkipsBinaryResponseBodyByContentType(t *testing.T
 	require.Len(t, extractedData, 0)
 }
 
+// 替换类规则（NoReplace=false）过去只走劫持替换，不写 extracted_data，导致 MITM 侧栏「规则」无数据。
+func TestGRPCMUSTPASS_HookColorHijackRuleStillExtractsForDB(t *testing.T) {
+	replacer := yakit.NewMITMReplacer()
+	replacer.SetRules(&ypb.MITMContentReplacer{
+		Rule:              `secret-key`,
+		NoReplace:         false,
+		Result:            `masked`,
+		EnableForResponse: true,
+		EnableForHeader:   true,
+		EnableForBody:     true,
+		VerboseName:       "hijack-extract-test",
+	})
+	responseBytes := []byte(`HTTP/1.1 200 OK
+Content-Type: text/plain
+Content-Length: 10
+
+secret-key`)
+	req, err := http.NewRequest("GET", "https://www.baidu.com", nil)
+	require.NoError(t, err)
+	flow := &schema.HTTPFlow{HiddenIndex: "trace-hijack-extract"}
+	extracted := replacer.HookColor([]byte(""), responseBytes, req, flow)
+	require.Len(t, extracted, 1)
+	require.Equal(t, "secret-key", extracted[0].Data)
+	require.Equal(t, "hijack-extract-test", extracted[0].RuleVerbose)
+	require.Equal(t, "trace-hijack-extract", extracted[0].TraceId)
+}
+
 // TestMatchScope match scope rule: scope =  opt1 ∩ ( ∪ { opt2s... } ), opt1 ∈ {request, response}, opt2 ∈ {uri, header, body}
 func TestGRPCMUSTPASS_MatchScope(t *testing.T) {
 	const (
@@ -955,7 +982,8 @@ Host: example.com
 	httpctx.SetMatchedRule(req, matchRules)
 
 	extractedData := replacer.HookColor(requestBytes, []byte(""), req, flow)
-	require.Len(t, extractedData, 1)
+	// 仅匹配规则 + 替换规则均命中时，二者都应写入提取数据（侧栏「规则」数据源）
+	require.Len(t, extractedData, 2)
 	require.Equal(t, "YAKIT_COLOR_RED|example", flow.Tags)
 }
 
@@ -1395,6 +1423,78 @@ foo1 foo2`), false)
 	require.Len(t, results, 2)
 	require.Equal(t, "foo:1", results[0].MatchResult)
 	require.Equal(t, "foo:2", results[1].MatchResult)
+}
+
+// TestMITMReplaceRule_SecondaryStages_PrimaryRegexpGroupZero 对应 Yakit 规则 UI：
+// 主正则 1a(2a)、按组号提取 0（整段匹配），二次正则 (2a) 仅在主阶段输出串上继续匹配。
+// 主阶段输出应为 1a2a，二次阶段默认取捕获组 1，得到 2a。
+//
+// MatchPacket 的 isReq 必须与真实报文一致：下列为请求包且命中在 URI（如 /?a=1a2a），须 isReq=true；
+// 若误用 isReq=false，会按响应解析且 EnableForURI 对响应无效，body 又为空，则无任何匹配。
+func TestMITMReplaceRule_SecondaryStages_PrimaryRegexpGroupZero(t *testing.T) {
+	reqPacket := []byte(`GET /?a=1a2a HTTP/1.1
+Host: baidu.com
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Accept-Encoding: gzip, deflate
+Accept-Language: zh-CN,zh;q=0.9
+Upgrade-Insecure-Requests: 1
+
+`)
+	rule := &yakit.MITMReplaceRule{
+		MITMContentReplacer: &ypb.MITMContentReplacer{
+			Rule:              `1a(2a)`,
+			RegexpGroups:      []int64{0},
+			EnableForRequest:  true,
+			EnableForURI:      true,
+			EnableForResponse: false,
+			EnableForHeader:   false,
+			EnableForBody:     false,
+			SecondaryStages: []*ypb.RegexOutputStage{
+				{
+					Regexp: `(2a)`,
+				},
+			},
+		},
+	}
+	_, results, err := rule.MatchPacket(reqPacket, true)
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	require.Equal(t, "2a", results[0].MatchResult)
+	require.NotNil(t, results[0].Match, "多阶段输出应携带最后一级 regexp2.Match，供 ExtractedData 索引")
+}
+
+// 二次正则命中时 Match 为 nil，ExtractedDataFromHTTPFlow 不得 panic，否则 HookColor 返回空、无高亮数据
+func TestGRPCMUSTPASS_HookColor_SecondaryStageProducesExtractedData(t *testing.T) {
+	replacer := yakit.NewMITMReplacer()
+	replacer.SetRules(&ypb.MITMContentReplacer{
+		Rule:              `1a(2a)`,
+		RegexpGroups:      []int64{0},
+		NoReplace:         true,
+		Color:             "red",
+		EnableForRequest:  true,
+		EnableForURI:      true,
+		EnableForResponse: false,
+		EnableForHeader:   false,
+		EnableForBody:     false,
+		VerboseName:       "sec-stage-rule",
+		SecondaryStages: []*ypb.RegexOutputStage{
+			{Regexp: `(2a)`},
+		},
+	})
+	reqPacket := []byte(`GET /?a=1a2a HTTP/1.1
+Host: baidu.com
+
+`)
+	req, err := http.NewRequest("GET", "http://baidu.com/?a=1a2a", nil)
+	require.NoError(t, err)
+	flow := &schema.HTTPFlow{HiddenIndex: "trace-secondary-hookcolor"}
+	out := replacer.HookColor(reqPacket, []byte(""), req, flow)
+	require.NotNil(t, out)
+	require.Len(t, out, 1)
+	require.Equal(t, "2a", out[0].Data)
+	require.Equal(t, "trace-secondary-hookcolor", out[0].TraceId)
+	require.Contains(t, flow.Tags, "YAKIT_COLOR_RED")
 }
 
 type secondaryOnlyMatchPrimaryOutputTestConfig struct {
