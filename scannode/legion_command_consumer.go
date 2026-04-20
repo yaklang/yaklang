@@ -29,7 +29,6 @@ func (b *legionJobBridge) Run(ctx context.Context) {
 	defer b.ruleSyncPublisher.Close()
 
 	go b.forwardCapabilityAlerts(ctx)
-	go b.forwardCapabilityObservations(ctx)
 
 	for {
 		if ctx.Err() != nil {
@@ -75,45 +74,6 @@ func (b *legionJobBridge) forwardCapabilityAlerts(ctx context.Context) {
 			}
 		}
 	}
-}
-
-func (b *legionJobBridge) forwardCapabilityObservations(ctx context.Context) {
-	if b == nil || b.agent == nil || b.agent.capabilityManager == nil {
-		return
-	}
-
-	observations := b.agent.capabilityManager.Observations()
-	if observations == nil {
-		return
-	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case observation, ok := <-observations:
-			if !ok {
-				return
-			}
-			if err := b.capabilityPublisher.PublishObservation(ctx, observation); err != nil {
-				if isCapabilityObservationSessionUnavailable(err) {
-					b.noteSuppressedObservationDrop()
-					continue
-				}
-				log.Errorf(
-					"publish hids observation failed: node_id=%s capability=%s type=%s err=%v",
-					b.agent.node.CurrentNodeID(),
-					observation.CapabilityKey,
-					observation.EventType,
-					err,
-				)
-			}
-		}
-	}
-}
-
-func isCapabilityObservationSessionUnavailable(err error) bool {
-	return errors.Is(err, ErrNodeSessionNotReady)
 }
 
 func (b *legionJobBridge) syncConsumer(parent context.Context) {

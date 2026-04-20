@@ -13,7 +13,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/node"
 	capabilityv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/capability/v1"
-	hidsv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/hids/v1"
 )
 
 type bootstrapSessionTransport struct {
@@ -173,92 +172,6 @@ func TestLegionJobBridgePublishesCapabilityAlertEvent(t *testing.T) {
 	}
 	if event.GetMetadata().GetEventId() == "" {
 		t.Fatal("expected non-empty event id")
-	}
-}
-
-func TestLegionJobBridgePublishesHIDSObservationEvent(t *testing.T) {
-	t.Parallel()
-
-	session := node.SessionState{
-		NodeID:             "node-1-canonical",
-		SessionID:          "session-1",
-		SessionToken:       "token-1",
-		NATSURL:            "nats://session-1.test",
-		CommandSubject:     "legion.command.node.node-1",
-		EventSubjectPrefix: "legion.event",
-	}
-	base, err := node.NewNodeBase(node.BaseConfig{
-		NodeID:             "node-1",
-		BaseDir:            t.TempDir(),
-		EnrollmentToken:    "enroll-1",
-		PlatformAPIBaseURL: "http://platform.test",
-		TransportClient:    &bootstrapSessionTransport{session: session},
-		HeartbeatInterval:  time.Hour,
-		TickerInterval:     time.Hour,
-		RequestTimeout:     time.Second,
-	})
-	if err != nil {
-		t.Fatalf("new node base: %v", err)
-	}
-	go base.Serve()
-	t.Cleanup(func() {
-		base.Shutdown()
-	})
-	waitForNodeSession(t, base)
-
-	manager := &CapabilityManager{
-		observations: make(chan CapabilityRuntimeObservation, 1),
-	}
-	bridge := newLegionJobBridge(&ScanNode{
-		node:              base,
-		capabilityManager: manager,
-	})
-	fakeJS := &fakeJetStreamContext{}
-	publisher, ok := bridge.capabilityPublisher.(*capabilityEventPublisher)
-	if !ok {
-		t.Fatalf("unexpected capability publisher type: %T", bridge.capabilityPublisher)
-	}
-	publisher.js = fakeJS
-	publisher.natsURL = session.NATSURL
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go bridge.forwardCapabilityObservations(ctx)
-
-	manager.observations <- CapabilityRuntimeObservation{
-		CapabilityKey: "hids",
-		SpecVersion:   "2026-03-28",
-		EventType:     "process.exec",
-		EventJSON:     []byte(`{"type":"process.exec","source":"ebpf","process":{"pid":42,"image":"/bin/bash"}}`),
-		ObservedAt:    time.Date(2026, 4, 9, 12, 1, 0, 0, time.UTC),
-	}
-
-	msg := fakeJS.waitForMessage(t)
-	if msg.Subject != "legion.hids.observation" {
-		t.Fatalf("unexpected subject: %s", msg.Subject)
-	}
-
-	var event hidsv1.HIDSObservation
-	if err := proto.Unmarshal(msg.Data, &event); err != nil {
-		t.Fatalf("unmarshal hids observation: %v", err)
-	}
-	if event.GetCapability().GetCapabilityKey() != "hids" {
-		t.Fatalf("unexpected capability key: %s", event.GetCapability().GetCapabilityKey())
-	}
-	if event.GetHidsEventType() != "process.exec" {
-		t.Fatalf("unexpected hids event type: %s", event.GetHidsEventType())
-	}
-	if string(event.GetEventJson()) != `{"type":"process.exec","source":"ebpf","process":{"pid":42,"image":"/bin/bash"}}` {
-		t.Fatalf("unexpected event json: %s", string(event.GetEventJson()))
-	}
-	if event.GetMetadata() == nil {
-		t.Fatal("expected observation metadata")
-	}
-	if event.GetMetadata().GetEventType() != legionEventHIDSObservation {
-		t.Fatalf("unexpected event type: %s", event.GetMetadata().GetEventType())
-	}
-	if event.GetMetadata().GetCorrelationId() != "node-1-canonical:hids" {
-		t.Fatalf("unexpected correlation id: %s", event.GetMetadata().GetCorrelationId())
 	}
 }
 
