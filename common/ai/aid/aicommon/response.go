@@ -45,6 +45,7 @@ type AIResponse struct {
 	respStartTime time.Time
 	reqStartTime  time.Time
 
+	modelInfoMu      sync.RWMutex
 	providerName     string
 	modelName        string
 	modelVerboseName string
@@ -101,6 +102,8 @@ func (a *AIResponse) SetModelInfo(provider, model string) {
 	if a == nil {
 		return
 	}
+	a.modelInfoMu.Lock()
+	defer a.modelInfoMu.Unlock()
 	a.providerName = provider
 	a.modelName = model
 	a.modelVerboseName = aispec.ModelVerboseName(model)
@@ -110,6 +113,8 @@ func (a *AIResponse) GetProviderName() string {
 	if a == nil {
 		return ""
 	}
+	a.modelInfoMu.RLock()
+	defer a.modelInfoMu.RUnlock()
 	return a.providerName
 }
 
@@ -117,6 +122,8 @@ func (a *AIResponse) GetModelName() string {
 	if a == nil {
 		return ""
 	}
+	a.modelInfoMu.RLock()
+	defer a.modelInfoMu.RUnlock()
 	return a.modelName
 }
 
@@ -124,7 +131,34 @@ func (a *AIResponse) GetModelVerboseName() string {
 	if a == nil {
 		return ""
 	}
+	a.modelInfoMu.RLock()
+	defer a.modelInfoMu.RUnlock()
 	return a.modelVerboseName
+}
+
+func (a *AIResponse) GetAIEventMeta() AIEventMeta {
+	if a == nil {
+		return AIEventMeta{}
+	}
+	a.modelInfoMu.RLock()
+	defer a.modelInfoMu.RUnlock()
+	return AIEventMeta{
+		Service:          a.providerName,
+		ModelName:        a.modelName,
+		ModelVerboseName: a.modelVerboseName,
+	}
+}
+
+func (a *AIResponse) BindEmitter(base *Emitter) *Emitter {
+	if base == nil {
+		return nil
+	}
+	if a == nil {
+		return base
+	}
+	return base.WithAIInfoProvider(func() AIEventMeta {
+		return a.GetAIEventMeta()
+	})
 }
 
 // WaitForHTTPHeaders blocks until the raw HTTP response headers have been set
@@ -362,6 +396,7 @@ func (a *AIResponse) GetUnboundStreamReader(haveReason bool) io.Reader {
 
 func (a *AIResponse) GetOutputStreamReader(nodeId string, system bool, emitter *Emitter) io.Reader {
 	pr, pw := utils.NewBufPipe(nil)
+	emitter = a.BindEmitter(emitter)
 	go func() {
 		cbBuffer := bytes.NewBuffer(make([]byte, 4096))
 		defer func() {
