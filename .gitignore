@@ -91,3 +91,8 @@ heap_profile_*.pb.gz
 # local agent/editor config (not part of the repo)
 .cursorrules
 CLAUDE.md
+
+# local legion node binaries
+/legion-node
+/legion-smoke-node
+/bin/
