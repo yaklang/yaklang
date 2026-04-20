@@ -5,6 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/url"
+	"sort"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/dlclark/regexp2"
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
@@ -17,16 +25,9 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
-	"github.com/yaklang/yaklang/common/utils/regexp-utils"
+	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"net/http"
-	"net/url"
-	"sort"
-	"strconv"
-	"strings"
-	"sync"
-	"time"
 )
 
 type Rules []*MITMReplaceRule
@@ -468,7 +469,7 @@ func (m *MITMReplaceRule) SplitPacket(packet []byte) (*PacketInfo, error) {
 		ungzip, err := utils.GzipDeCompress(bodyRaw)
 		if err == nil {
 			bodyRaw = ungzip
-			headerRaw = string(lowhttp.DeleteHTTPPacketHeader([]byte(headerRaw), info.ChunkedHeader))
+			headerRaw = string(lowhttp.DeleteHTTPPacketHeader([]byte(headerRaw), info.GzipHeader))
 		}
 	}
 
@@ -850,12 +851,12 @@ func StringForSettingColor(s []string, flow ColorFlow) {
 			flow.Grey()
 		}
 	}
-	return
 }
 
 // appendHookColorExtractions 对 rules 中每条规则做 MatchPacket，将命中写入 extracted。
 // applyColorAndTag 为 true 时同步累积颜色与 Tag（用于「仅匹配」镜像规则）；为 false 时只写库数据，
 // 避免与劫持路径 / GetMatchedRule 已处理的着色、标记重复。
+// ph 用于将 MatchResult 中的 __host__/__uri__/__url__ 展开为当前流上下文（与 grpc HTTPFlow 分析路径一致）。
 func (m *MitmReplacer) appendHookColorExtractions(
 	request, response []byte,
 	req *http.Request,
@@ -866,6 +867,7 @@ func (m *MitmReplacer) appendHookColorExtractions(
 	extracted []*schema.ExtractedData,
 	colorName []string,
 	tagNames []string,
+	ph MITMExtractPlaceholders,
 ) ([]*schema.ExtractedData, []string, []string) {
 	for _, rule := range rules {
 		if rule == nil {
@@ -919,7 +921,7 @@ func (m *MitmReplacer) appendHookColorExtractions(
 			extracted = append(extracted, ExtractedDataFromHTTPFlow(
 				hiddenIndex,
 				rule.VerboseName,
-				match,
+				CloneMatchResultWithMITMPlaceholders(match, ph),
 				rule.String(),
 			))
 		}
@@ -997,10 +999,12 @@ func (m *MitmReplacer) HookColor(request, response []byte, req *http.Request, fl
 		flow.AddTag(tagNames...)
 	}()
 
+	ph := BuildMITMExtractPlaceholders(req, flow)
+
 	extracted, colorName, tagNames = m.appendHookColorExtractions(
-		request, response, req, flow.HiddenIndex, skipResponseRuleMatch, m._mirrorRules, true, extracted, colorName, tagNames)
+		request, response, req, flow.HiddenIndex, skipResponseRuleMatch, m._mirrorRules, true, extracted, colorName, tagNames, ph)
 	extracted, colorName, tagNames = m.appendHookColorExtractions(
-		request, response, req, flow.HiddenIndex, skipResponseRuleMatch, m._hijackingRules, false, extracted, colorName, tagNames)
+		request, response, req, flow.HiddenIndex, skipResponseRuleMatch, m._hijackingRules, false, extracted, colorName, tagNames, ph)
 	// 将替换的规则提前，因为一般来说比较重要
 	if ret := httpctx.GetMatchedRule(req); len(ret) > 0 {
 		lastRule := ret[len(ret)-1]
@@ -1360,10 +1364,12 @@ func (m *MitmReplacer) HookColorLowhttp(flow *lowhttp.LowhttpResponse) []*schema
 		flow.AddTags(tagNames...)
 	}()
 
+	ph := BuildMITMExtractPlaceholdersLowhttp(req, flow.Url)
+
 	extracted, colorName, tagNames = m.appendHookColorExtractions(
-		request, response, req, flow.HiddenIndex, skipResponseRuleMatch, m._mirrorRules, true, extracted, colorName, tagNames)
+		request, response, req, flow.HiddenIndex, skipResponseRuleMatch, m._mirrorRules, true, extracted, colorName, tagNames, ph)
 	extracted, colorName, tagNames = m.appendHookColorExtractions(
-		request, response, req, flow.HiddenIndex, skipResponseRuleMatch, m._hijackingRules, false, extracted, colorName, tagNames)
+		request, response, req, flow.HiddenIndex, skipResponseRuleMatch, m._hijackingRules, false, extracted, colorName, tagNames, ph)
 	// 将替换的规则提前，因为一般来说比较重要
 	if ret := httpctx.GetMatchedRule(req); len(ret) > 0 {
 		lastRule := ret[len(ret)-1]
