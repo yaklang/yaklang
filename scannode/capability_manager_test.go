@@ -65,8 +65,6 @@ func (s *sessionReadyHooksStub) Apply(*CapabilityManager, capabilityHIDSApplyInp
 
 func (s *sessionReadyHooksStub) Alerts() <-chan CapabilityRuntimeAlert { return nil }
 
-func (s *sessionReadyHooksStub) Observations() <-chan CapabilityRuntimeObservation { return nil }
-
 func (s *sessionReadyHooksStub) CurrentStatus() (CapabilityRuntimeStatus, bool) {
 	return CapabilityRuntimeStatus{}, false
 }

@@ -21,10 +21,6 @@ func (hidsCapabilityHooksStub) Alerts() <-chan CapabilityRuntimeAlert {
 	return nil
 }
 
-func (hidsCapabilityHooksStub) Observations() <-chan CapabilityRuntimeObservation {
-	return nil
-}
-
 func (hidsCapabilityHooksStub) CurrentStatus() (CapabilityRuntimeStatus, bool) {
 	return CapabilityRuntimeStatus{}, false
 }
