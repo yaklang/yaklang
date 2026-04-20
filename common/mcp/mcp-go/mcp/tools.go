@@ -388,7 +388,9 @@ func WithStructArray(name string, opts []PropertyOption, itemsOpt ...ToolOption)
 			return true
 		})
 	}
-	items["required"] = temp.InputSchema.Required
+	if len(temp.InputSchema.Required) > 0 {
+		items["required"] = append([]string(nil), temp.InputSchema.Required...)
+	}
 	return WithRaw(name, schema, opts...)
 }
 
@@ -398,7 +400,9 @@ func WithStruct(name string, opts []PropertyOption, itemsOpt ...ToolOption) Tool
 	}
 	temp := NewTool("", itemsOpt...)
 	schema["properties"] = temp.InputSchema.Properties
-	schema["required"] = temp.InputSchema.Required
+	if len(temp.InputSchema.Required) > 0 {
+		schema["required"] = append([]string(nil), temp.InputSchema.Required...)
+	}
 	return WithRaw(name, schema, opts...)
 }
 
@@ -412,7 +416,9 @@ func WithOneOfStruct(name string, opts []PropertyOption, itemsOpt ...[]ToolOptio
 		temp := NewTool("", itemOpt...)
 		m := map[string]any{
 			"properties": temp.InputSchema.Properties,
-			"required":   temp.InputSchema.Required,
+		}
+		if len(temp.InputSchema.Required) > 0 {
+			m["required"] = append([]string(nil), temp.InputSchema.Required...)
 		}
 		oneOfArray = append(oneOfArray, m)
 	}
@@ -430,7 +436,9 @@ func WithAnyOfStruct(name string, opts []PropertyOption, itemsOpt ...[]ToolOptio
 		temp := NewTool("", itemOpt...)
 		m := map[string]any{
 			"properties": temp.InputSchema.Properties,
-			"required":   temp.InputSchema.Required,
+		}
+		if len(temp.InputSchema.Required) > 0 {
+			m["required"] = append([]string(nil), temp.InputSchema.Required...)
 		}
 		anyOfArray = append(anyOfArray, m)
 	}
