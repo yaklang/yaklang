@@ -152,6 +152,7 @@ func FilterExtractedData(db *gorm.DB, filter *ypb.ExtractedDataFilter) *gorm.DB 
 	}
 	return db
 }
+
 func QueryExtractedDataOnlyName(db *gorm.DB) ([]*schema.ExtractedData, error) {
 	var result []*schema.ExtractedData
 	db = db.Select("rule_verbose,trace_id").Find(&result)

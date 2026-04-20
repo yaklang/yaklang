@@ -1,4 +1,4 @@
-package yakit
+package mitmextractdb
 
 import (
 	"fmt"
@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -29,13 +30,13 @@ func TestQueryMITMExtractedAggregate(t *testing.T) {
 		SourceType:  schema.HTTPFlow_SourceType_MITM,
 	}
 	flow.SetRequest(fmt.Sprintf("GET /p HTTP/1.1\r\nHost: %s\r\n\r\n", host))
-	require.NoError(t, InsertHTTPFlow(db, flow))
+	require.NoError(t, yakit.InsertHTTPFlow(db, flow))
 	defer db.Unscoped().Where("id = ?", flow.ID).Delete(&schema.HTTPFlow{})
 
 	rule := "agg-rule-" + token
 	data := "agg-data-" + token
 	for i := 0; i < 2; i++ {
-		err := CreateOrUpdateExtractedData(db, 0, &schema.ExtractedData{
+		err := yakit.CreateOrUpdateExtractedData(db, 0, &schema.ExtractedData{
 			SourceType:  "httpflow",
 			TraceId:     trace,
 			RuleVerbose: rule,
@@ -46,10 +47,10 @@ func TestQueryMITMExtractedAggregate(t *testing.T) {
 	defer db.Unscoped().Where("trace_id = ?", trace).Delete(&schema.ExtractedData{})
 
 	p, rows, _, err := QueryMITMExtractedAggregate(db, &ypb.QueryMITMExtractedAggregateRequest{
-		Pagination:  &ypb.Paging{Page: 1, Limit: 10, OrderBy: "hit_count", Order: "desc"},
-		HostContains:  "mitm-agg-",
-		RuntimeId:     rt,
-		RuleVerbose:   []string{rule},
+		Pagination:   &ypb.Paging{Page: 1, Limit: 10, OrderBy: "hit_count", Order: "desc"},
+		HostContains: "mitm-agg-",
+		RuntimeId:    rt,
+		RuleVerbose:  []string{rule},
 	})
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, p.TotalRecord, 1)
@@ -84,7 +85,7 @@ func TestQueryMITMExtractedAggregateRuleGroups(t *testing.T) {
 		SourceType:  schema.HTTPFlow_SourceType_MITM,
 	}
 	flow.SetRequest(fmt.Sprintf("GET /p HTTP/1.1\r\nHost: %s\r\n\r\n", host))
-	require.NoError(t, InsertHTTPFlow(db, flow))
+	require.NoError(t, yakit.InsertHTTPFlow(db, flow))
 	defer db.Unscoped().Where("id = ?", flow.ID).Delete(&schema.HTTPFlow{})
 
 	g1Rule := "G1" + mitmExtractRuleGroupSep + "rule-a-" + token
@@ -92,7 +93,7 @@ func TestQueryMITMExtractedAggregateRuleGroups(t *testing.T) {
 	plain := "plain-uncat-" + token
 	data := "d-" + token
 	for _, rv := range []string{g1Rule, g1Other, plain} {
-		require.NoError(t, CreateOrUpdateExtractedData(db, 0, &schema.ExtractedData{
+		require.NoError(t, yakit.CreateOrUpdateExtractedData(db, 0, &schema.ExtractedData{
 			SourceType:  "httpflow",
 			TraceId:     trace,
 			RuleVerbose: rv,
@@ -109,8 +110,8 @@ func TestQueryMITMExtractedAggregateRuleGroups(t *testing.T) {
 
 	_, rowsAll, groups, err := QueryMITMExtractedAggregate(db, &ypb.QueryMITMExtractedAggregateRequest{
 		Pagination:                base.Pagination,
-		HostContains:                base.HostContains,
-		RuntimeId:                   base.RuntimeId,
+		HostContains:              base.HostContains,
+		RuntimeId:                 base.RuntimeId,
 		IncludeDistinctRuleGroups: true,
 	})
 	require.NoError(t, err)

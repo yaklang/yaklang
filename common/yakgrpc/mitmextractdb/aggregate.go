@@ -1,4 +1,4 @@
-package yakit
+package mitmextractdb
 
 import (
 	"strings"
@@ -16,11 +16,11 @@ const mitmAggregateTraceConcatMaxLen = 4096
 // mitmExtractRuleGroupSep separates 「规则组」与「规则名」并写入 rule_verbose，与 Yakit 展示约定一致。
 const mitmExtractRuleGroupSep = " / "
 
-// mitmExtractRuleGroupSQLLit is mitmExtractRuleGroupSep as a single-quoted SQL literal fragment.
-const mitmExtractRuleGroupSQLLit = `' / '`
+// Use bound parameter for separator to avoid manual SQL literal composition.
+const mitmExtractRuleGroupInstrExpr = `instr(trim(ed.rule_verbose), ?)`
 
 func mitmExtractRuleGroupSQLExpr() string {
-	return `trim(substr(trim(ed.rule_verbose), 1, instr(trim(ed.rule_verbose), ` + mitmExtractRuleGroupSQLLit + `) - 1))`
+	return `trim(substr(trim(ed.rule_verbose), 1, ` + mitmExtractRuleGroupInstrExpr + ` - 1))`
 }
 
 func mitmAggregateReqForDistinctRuleGroups(req *ypb.QueryMITMExtractedAggregateRequest) *ypb.QueryMITMExtractedAggregateRequest {
@@ -37,14 +37,15 @@ func mitmAggregateReqForDistinctRuleGroups(req *ypb.QueryMITMExtractedAggregateR
 
 func queryMITMExtractDistinctRuleGroups(db *gorm.DB, req *ypb.QueryMITMExtractedAggregateRequest) ([]string, error) {
 	tabReq := mitmAggregateReqForDistinctRuleGroups(req)
+	sep := mitmExtractRuleGroupSep
 	expr := mitmExtractRuleGroupSQLExpr()
 	type row struct {
 		RuleGroup string `gorm:"column:rule_group"`
 	}
 	var rows []row
 	q := mitmExtractAggregateBaseDB(db, tabReq).
-		Where(`instr(trim(ed.rule_verbose), `+mitmExtractRuleGroupSQLLit+`) > 0`).
-		Select(expr + ` AS rule_group`).
+		Where(mitmExtractRuleGroupInstrExpr+` > 0`, sep).
+		Select(expr+` AS rule_group`, sep).
 		Group("1").
 		Order("1")
 	if err := q.Scan(&rows).Error; err != nil {
@@ -68,10 +69,7 @@ type mitmExtractAggregateScan struct {
 }
 
 func mitmExtractAggregateBaseDB(db *gorm.DB, req *ypb.QueryMITMExtractedAggregateRequest) *gorm.DB {
-	q := db.Table("extracted_data AS ed").
-		Joins("INNER JOIN http_flows AS hf ON ed.trace_id = hf.hidden_index").
-		Where("ed.trace_id != ?", "").
-		Where("hf.hidden_index != ?", "")
+	q := JoinExtractedDataWithHTTPFlow(db)
 	if req == nil {
 		return q
 	}
@@ -91,13 +89,45 @@ func mitmExtractAggregateBaseDB(db *gorm.DB, req *ypb.QueryMITMExtractedAggregat
 		q = q.Where("ed.updated_at >= ?", time.Unix(req.GetUpdatedAtSince(), 0))
 	}
 	if req.GetOnlyUncategorizedRules() {
-		q = q.Where(`instr(trim(ed.rule_verbose), ` + mitmExtractRuleGroupSQLLit + `) = 0`)
+		q = q.Where(mitmExtractRuleGroupInstrExpr+` = 0`, mitmExtractRuleGroupSep)
 	} else if g := strings.TrimSpace(req.GetRuleGroup()); g != "" {
 		expr := mitmExtractRuleGroupSQLExpr()
-		q = q.Where(`instr(trim(ed.rule_verbose), `+mitmExtractRuleGroupSQLLit+`) > 0`).
-			Where(expr+` = ?`, g)
+		q = q.Where(mitmExtractRuleGroupInstrExpr+` > 0`, mitmExtractRuleGroupSep).
+			Where(expr+` = ?`, mitmExtractRuleGroupSep, g)
 	}
 	return q
+}
+
+// mitmAggregatePagingParams 归一化分页与排序字段（与 grpc 默认一致）。
+func mitmAggregatePagingParams(req *ypb.QueryMITMExtractedAggregateRequest) (page, limit, offset int, orderCol, orderDir string) {
+	params := req.GetPagination()
+	if params == nil {
+		params = &ypb.Paging{Page: 1, Limit: 30, OrderBy: "hit_count", Order: "desc"}
+	}
+	page = int(params.GetPage())
+	if page < 1 {
+		page = 1
+	}
+	limit = int(params.GetLimit())
+	if limit <= 0 {
+		limit = 30
+	}
+	offset = (page - 1) * limit
+
+	orderCol = "hit_count"
+	switch strings.ToLower(strings.TrimSpace(params.GetOrderBy())) {
+	case "latest_updated_at", "latest_unix":
+		orderCol = "latest_unix"
+	case "hit_count", "":
+		orderCol = "hit_count"
+	default:
+		orderCol = "hit_count"
+	}
+	orderDir = "DESC"
+	if strings.EqualFold(strings.TrimSpace(params.GetOrder()), "asc") {
+		orderDir = "ASC"
+	}
+	return page, limit, offset, orderCol, orderDir
 }
 
 func splitTraceConcat(s string, maxN int) []string {
@@ -129,33 +159,7 @@ func QueryMITMExtractedAggregate(db *gorm.DB, req *ypb.QueryMITMExtractedAggrega
 	if req == nil {
 		req = &ypb.QueryMITMExtractedAggregateRequest{}
 	}
-	params := req.GetPagination()
-	if params == nil {
-		params = &ypb.Paging{Page: 1, Limit: 30, OrderBy: "hit_count", Order: "desc"}
-	}
-	page := int(params.GetPage())
-	if page < 1 {
-		page = 1
-	}
-	limit := int(params.GetLimit())
-	if limit <= 0 {
-		limit = 30
-	}
-	offset := (page - 1) * limit
-
-	orderCol := "hit_count"
-	switch strings.ToLower(strings.TrimSpace(params.GetOrderBy())) {
-	case "latest_updated_at", "latest_unix":
-		orderCol = "latest_unix"
-	case "hit_count", "":
-		orderCol = "hit_count"
-	default:
-		orderCol = "hit_count"
-	}
-	orderDir := "DESC"
-	if strings.EqualFold(strings.TrimSpace(params.GetOrder()), "asc") {
-		orderDir = "ASC"
-	}
+	_, limit, offset, orderCol, orderDir := mitmAggregatePagingParams(req)
 
 	keySub := mitmExtractAggregateBaseDB(db, req).
 		Select("ed.rule_verbose, ed.data").
