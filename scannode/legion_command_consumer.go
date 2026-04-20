@@ -67,7 +67,7 @@ func (b *legionJobBridge) forwardCapabilityAlerts(ctx context.Context) {
 			if err := b.capabilityPublisher.PublishAlert(ctx, alert); err != nil {
 				log.Errorf(
 					"publish capability alert failed: node_id=%s capability=%s rule_id=%s err=%v",
-					b.agent.node.NodeId,
+					b.agent.node.CurrentNodeID(),
 					alert.CapabilityKey,
 					alert.RuleID,
 					err,
@@ -102,7 +102,7 @@ func (b *legionJobBridge) forwardCapabilityObservations(ctx context.Context) {
 				}
 				log.Errorf(
 					"publish hids observation failed: node_id=%s capability=%s type=%s err=%v",
-					b.agent.node.NodeId,
+					b.agent.node.CurrentNodeID(),
 					observation.CapabilityKey,
 					observation.EventType,
 					err,
@@ -149,7 +149,8 @@ func (b *legionJobBridge) startConsumer(
 	sessionID string,
 	commandSubject string,
 ) (*commandConsumer, error) {
-	conn, err := nats.Connect(natsURL, nats.Name("yak-node-commands-"+b.agent.node.NodeId))
+	currentNodeID := b.agent.node.CurrentNodeID()
+	conn, err := nats.Connect(natsURL, nats.Name("yak-node-commands-"+currentNodeID))
 	if err != nil {
 		return nil, fmt.Errorf("connect command nats: %w", err)
 	}
@@ -161,7 +162,7 @@ func (b *legionJobBridge) startConsumer(
 
 	subscription, err := js.PullSubscribe(
 		commandSubjectWildcard(commandSubject),
-		consumerNameForNode(b.agent.node.NodeId),
+		consumerNameForNode(currentNodeID),
 		nats.BindStream(legionCommandStream),
 		nats.ManualAck(),
 		nats.AckExplicit(),
@@ -180,7 +181,7 @@ func (b *legionJobBridge) startConsumer(
 		sub:       subscription,
 	}
 	go b.consumeLoop(ctx, consumer)
-	log.Infof("started legion command consumer: node_id=%s session_id=%s", b.agent.node.NodeId, sessionID)
+	log.Infof("started legion command consumer: node_id=%s session_id=%s", currentNodeID, sessionID)
 	return consumer, nil
 }
 
@@ -216,7 +217,7 @@ func (b *legionJobBridge) consumeLoop(ctx context.Context, consumer *commandCons
 			if isCommandConsumerResetError(err) {
 				log.Errorf(
 					"legion command consumer became invalid: node_id=%s session_id=%s err=%v diagnosis=%q",
-					b.agent.node.NodeId,
+					b.agent.node.CurrentNodeID(),
 					consumer.sessionID,
 					err,
 					"another process may be running with the same node_id, or the platform session/consumer was replaced",
@@ -226,7 +227,7 @@ func (b *legionJobBridge) consumeLoop(ctx context.Context, consumer *commandCons
 			}
 			log.Errorf(
 				"fetch legion commands failed: node_id=%s session_id=%s err=%v",
-				b.agent.node.NodeId,
+				b.agent.node.CurrentNodeID(),
 				consumer.sessionID,
 				err,
 			)

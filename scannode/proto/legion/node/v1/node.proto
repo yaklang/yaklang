@@ -52,6 +52,12 @@ message NodeHostFacts {
   string architecture = 5;
 }
 
+message NodeHostIdentity {
+  string machine_id = 1;
+  string system_uuid = 2;
+  string instance_id = 3;
+}
+
 message BootstrapRequest {
   string enrollment_token = 1;
   string node_id = 2;
@@ -61,6 +67,9 @@ message BootstrapRequest {
   repeated string capability_keys = 6;
   uint32 heartbeat_interval_seconds = 7;
   NodeHostFacts host_facts = 8;
+  string claimed_name = 9;
+  string agent_installation_id = 10;
+  NodeHostIdentity host_identity = 11;
 }
 
 message BootstrapResponse {
@@ -70,6 +79,7 @@ message BootstrapResponse {
   string command_subject = 4;
   string event_subject_prefix = 5;
   google.protobuf.Timestamp expires_at = 6;
+  string node_id = 7;
 }
 
 message ActiveAttemptHeartbeat {

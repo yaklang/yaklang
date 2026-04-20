@@ -25,7 +25,20 @@ func main() {
 		},
 		cli.StringFlag{
 			Name:  "id",
+			Usage: "Legacy node ID fallback; canonical node_id is assigned by platform",
+		},
+		cli.StringFlag{
+			Name:  "name",
+			Usage: "Display name reported to Legion",
 			Value: fmt.Sprintf("testnode-[%s]", runtime.GOOS+runtime.GOARCH),
+		},
+		cli.StringFlag{
+			Name:  "agent-installation-id",
+			Usage: "Override persisted agent installation ID",
+		},
+		cli.StringFlag{
+			Name:  "base-dir",
+			Usage: "Node local state base directory",
 		},
 		cli.DurationFlag{
 			Name:  "heartbeat-interval",
@@ -35,11 +48,14 @@ func main() {
 
 	app.Action = func(c *cli.Context) error {
 		nodeBase, err := node.NewNodeBase(node.BaseConfig{
-			NodeType:           spec.NodeType_Scanner,
-			NodeID:             c.String("id"),
-			EnrollmentToken:    c.String("enrollment-token"),
-			PlatformAPIBaseURL: c.String("api-url"),
-			HeartbeatInterval:  c.Duration("heartbeat-interval"),
+			NodeType:            spec.NodeType_Scanner,
+			NodeID:              c.String("id"),
+			DisplayName:         c.String("name"),
+			AgentInstallationID: c.String("agent-installation-id"),
+			BaseDir:             c.String("base-dir"),
+			EnrollmentToken:     c.String("enrollment-token"),
+			PlatformAPIBaseURL:  c.String("api-url"),
+			HeartbeatInterval:   c.Duration("heartbeat-interval"),
 		})
 		if err != nil {
 			return err

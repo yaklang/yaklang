@@ -420,6 +420,66 @@ func (x *NodeHostFacts) GetArchitecture() string {
 	return ""
 }
 
+type NodeHostIdentity struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	MachineId     string                 `protobuf:"bytes,1,opt,name=machine_id,json=machineId,proto3" json:"machine_id,omitempty"`
+	SystemUuid    string                 `protobuf:"bytes,2,opt,name=system_uuid,json=systemUuid,proto3" json:"system_uuid,omitempty"`
+	InstanceId    string                 `protobuf:"bytes,3,opt,name=instance_id,json=instanceId,proto3" json:"instance_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NodeHostIdentity) Reset() {
+	*x = NodeHostIdentity{}
+	mi := &file_legion_node_v1_node_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NodeHostIdentity) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NodeHostIdentity) ProtoMessage() {}
+
+func (x *NodeHostIdentity) ProtoReflect() protoreflect.Message {
+	mi := &file_legion_node_v1_node_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NodeHostIdentity.ProtoReflect.Descriptor instead.
+func (*NodeHostIdentity) Descriptor() ([]byte, []int) {
+	return file_legion_node_v1_node_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *NodeHostIdentity) GetMachineId() string {
+	if x != nil {
+		return x.MachineId
+	}
+	return ""
+}
+
+func (x *NodeHostIdentity) GetSystemUuid() string {
+	if x != nil {
+		return x.SystemUuid
+	}
+	return ""
+}
+
+func (x *NodeHostIdentity) GetInstanceId() string {
+	if x != nil {
+		return x.InstanceId
+	}
+	return ""
+}
+
 type BootstrapRequest struct {
 	state                    protoimpl.MessageState `protogen:"open.v1"`
 	EnrollmentToken          string                 `protobuf:"bytes,1,opt,name=enrollment_token,json=enrollmentToken,proto3" json:"enrollment_token,omitempty"`
@@ -430,13 +490,16 @@ type BootstrapRequest struct {
 	CapabilityKeys           []string               `protobuf:"bytes,6,rep,name=capability_keys,json=capabilityKeys,proto3" json:"capability_keys,omitempty"`
 	HeartbeatIntervalSeconds uint32                 `protobuf:"varint,7,opt,name=heartbeat_interval_seconds,json=heartbeatIntervalSeconds,proto3" json:"heartbeat_interval_seconds,omitempty"`
 	HostFacts                *NodeHostFacts         `protobuf:"bytes,8,opt,name=host_facts,json=hostFacts,proto3" json:"host_facts,omitempty"`
+	ClaimedName              string                 `protobuf:"bytes,9,opt,name=claimed_name,json=claimedName,proto3" json:"claimed_name,omitempty"`
+	AgentInstallationId      string                 `protobuf:"bytes,10,opt,name=agent_installation_id,json=agentInstallationId,proto3" json:"agent_installation_id,omitempty"`
+	HostIdentity             *NodeHostIdentity      `protobuf:"bytes,11,opt,name=host_identity,json=hostIdentity,proto3" json:"host_identity,omitempty"`
 	unknownFields            protoimpl.UnknownFields
 	sizeCache                protoimpl.SizeCache
 }
 
 func (x *BootstrapRequest) Reset() {
 	*x = BootstrapRequest{}
-	mi := &file_legion_node_v1_node_proto_msgTypes[4]
+	mi := &file_legion_node_v1_node_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -448,7 +511,7 @@ func (x *BootstrapRequest) String() string {
 func (*BootstrapRequest) ProtoMessage() {}
 
 func (x *BootstrapRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_legion_node_v1_node_proto_msgTypes[4]
+	mi := &file_legion_node_v1_node_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -461,7 +524,7 @@ func (x *BootstrapRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BootstrapRequest.ProtoReflect.Descriptor instead.
 func (*BootstrapRequest) Descriptor() ([]byte, []int) {
-	return file_legion_node_v1_node_proto_rawDescGZIP(), []int{4}
+	return file_legion_node_v1_node_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *BootstrapRequest) GetEnrollmentToken() string {
@@ -520,6 +583,27 @@ func (x *BootstrapRequest) GetHostFacts() *NodeHostFacts {
 	return nil
 }
 
+func (x *BootstrapRequest) GetClaimedName() string {
+	if x != nil {
+		return x.ClaimedName
+	}
+	return ""
+}
+
+func (x *BootstrapRequest) GetAgentInstallationId() string {
+	if x != nil {
+		return x.AgentInstallationId
+	}
+	return ""
+}
+
+func (x *BootstrapRequest) GetHostIdentity() *NodeHostIdentity {
+	if x != nil {
+		return x.HostIdentity
+	}
+	return nil
+}
+
 type BootstrapResponse struct {
 	state              protoimpl.MessageState `protogen:"open.v1"`
 	NodeSessionId      string                 `protobuf:"bytes,1,opt,name=node_session_id,json=nodeSessionId,proto3" json:"node_session_id,omitempty"`
@@ -528,13 +612,14 @@ type BootstrapResponse struct {
 	CommandSubject     string                 `protobuf:"bytes,4,opt,name=command_subject,json=commandSubject,proto3" json:"command_subject,omitempty"`
 	EventSubjectPrefix string                 `protobuf:"bytes,5,opt,name=event_subject_prefix,json=eventSubjectPrefix,proto3" json:"event_subject_prefix,omitempty"`
 	ExpiresAt          *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	NodeId             string                 `protobuf:"bytes,7,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
 
 func (x *BootstrapResponse) Reset() {
 	*x = BootstrapResponse{}
-	mi := &file_legion_node_v1_node_proto_msgTypes[5]
+	mi := &file_legion_node_v1_node_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -546,7 +631,7 @@ func (x *BootstrapResponse) String() string {
 func (*BootstrapResponse) ProtoMessage() {}
 
 func (x *BootstrapResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_legion_node_v1_node_proto_msgTypes[5]
+	mi := &file_legion_node_v1_node_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -559,7 +644,7 @@ func (x *BootstrapResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BootstrapResponse.ProtoReflect.Descriptor instead.
 func (*BootstrapResponse) Descriptor() ([]byte, []int) {
-	return file_legion_node_v1_node_proto_rawDescGZIP(), []int{5}
+	return file_legion_node_v1_node_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *BootstrapResponse) GetNodeSessionId() string {
@@ -604,6 +689,13 @@ func (x *BootstrapResponse) GetExpiresAt() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *BootstrapResponse) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
 type ActiveAttemptHeartbeat struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	AttemptId      string                 `protobuf:"bytes,1,opt,name=attempt_id,json=attemptId,proto3" json:"attempt_id,omitempty"`
@@ -619,7 +711,7 @@ type ActiveAttemptHeartbeat struct {
 
 func (x *ActiveAttemptHeartbeat) Reset() {
 	*x = ActiveAttemptHeartbeat{}
-	mi := &file_legion_node_v1_node_proto_msgTypes[6]
+	mi := &file_legion_node_v1_node_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -631,7 +723,7 @@ func (x *ActiveAttemptHeartbeat) String() string {
 func (*ActiveAttemptHeartbeat) ProtoMessage() {}
 
 func (x *ActiveAttemptHeartbeat) ProtoReflect() protoreflect.Message {
-	mi := &file_legion_node_v1_node_proto_msgTypes[6]
+	mi := &file_legion_node_v1_node_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -644,7 +736,7 @@ func (x *ActiveAttemptHeartbeat) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ActiveAttemptHeartbeat.ProtoReflect.Descriptor instead.
 func (*ActiveAttemptHeartbeat) Descriptor() ([]byte, []int) {
-	return file_legion_node_v1_node_proto_rawDescGZIP(), []int{6}
+	return file_legion_node_v1_node_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ActiveAttemptHeartbeat) GetAttemptId() string {
@@ -715,7 +807,7 @@ type NodeHeartbeat struct {
 
 func (x *NodeHeartbeat) Reset() {
 	*x = NodeHeartbeat{}
-	mi := &file_legion_node_v1_node_proto_msgTypes[7]
+	mi := &file_legion_node_v1_node_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -727,7 +819,7 @@ func (x *NodeHeartbeat) String() string {
 func (*NodeHeartbeat) ProtoMessage() {}
 
 func (x *NodeHeartbeat) ProtoReflect() protoreflect.Message {
-	mi := &file_legion_node_v1_node_proto_msgTypes[7]
+	mi := &file_legion_node_v1_node_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -740,7 +832,7 @@ func (x *NodeHeartbeat) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NodeHeartbeat.ProtoReflect.Descriptor instead.
 func (*NodeHeartbeat) Descriptor() ([]byte, []int) {
-	return file_legion_node_v1_node_proto_rawDescGZIP(), []int{7}
+	return file_legion_node_v1_node_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *NodeHeartbeat) GetMetadata() *EventMetadata {
@@ -832,7 +924,7 @@ type NodeLog struct {
 
 func (x *NodeLog) Reset() {
 	*x = NodeLog{}
-	mi := &file_legion_node_v1_node_proto_msgTypes[8]
+	mi := &file_legion_node_v1_node_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -844,7 +936,7 @@ func (x *NodeLog) String() string {
 func (*NodeLog) ProtoMessage() {}
 
 func (x *NodeLog) ProtoReflect() protoreflect.Message {
-	mi := &file_legion_node_v1_node_proto_msgTypes[8]
+	mi := &file_legion_node_v1_node_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -857,7 +949,7 @@ func (x *NodeLog) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NodeLog.ProtoReflect.Descriptor instead.
 func (*NodeLog) Descriptor() ([]byte, []int) {
-	return file_legion_node_v1_node_proto_rawDescGZIP(), []int{8}
+	return file_legion_node_v1_node_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *NodeLog) GetMetadata() *EventMetadata {
@@ -918,7 +1010,14 @@ const file_legion_node_v1_node_proto_rawDesc = "" +
 	"primary_ip\x18\x02 \x01(\tR\tprimaryIp\x12!\n" +
 	"\fip_addresses\x18\x03 \x03(\tR\vipAddresses\x12)\n" +
 	"\x10operating_system\x18\x04 \x01(\tR\x0foperatingSystem\x12\"\n" +
-	"\farchitecture\x18\x05 \x01(\tR\farchitecture\"\xb3\x03\n" +
+	"\farchitecture\x18\x05 \x01(\tR\farchitecture\"s\n" +
+	"\x10NodeHostIdentity\x12\x1d\n" +
+	"\n" +
+	"machine_id\x18\x01 \x01(\tR\tmachineId\x12\x1f\n" +
+	"\vsystem_uuid\x18\x02 \x01(\tR\n" +
+	"systemUuid\x12\x1f\n" +
+	"\vinstance_id\x18\x03 \x01(\tR\n" +
+	"instanceId\"\xd1\x04\n" +
 	"\x10BootstrapRequest\x12)\n" +
 	"\x10enrollment_token\x18\x01 \x01(\tR\x0fenrollmentToken\x12\x17\n" +
 	"\anode_id\x18\x02 \x01(\tR\x06nodeId\x12\x1b\n" +
@@ -928,10 +1027,14 @@ const file_legion_node_v1_node_proto_rawDesc = "" +
 	"\x0fcapability_keys\x18\x06 \x03(\tR\x0ecapabilityKeys\x12<\n" +
 	"\x1aheartbeat_interval_seconds\x18\a \x01(\rR\x18heartbeatIntervalSeconds\x12<\n" +
 	"\n" +
-	"host_facts\x18\b \x01(\v2\x1d.legion.node.v1.NodeHostFactsR\thostFacts\x1a9\n" +
+	"host_facts\x18\b \x01(\v2\x1d.legion.node.v1.NodeHostFactsR\thostFacts\x12!\n" +
+	"\fclaimed_name\x18\t \x01(\tR\vclaimedName\x122\n" +
+	"\x15agent_installation_id\x18\n" +
+	" \x01(\tR\x13agentInstallationId\x12E\n" +
+	"\rhost_identity\x18\v \x01(\v2 .legion.node.v1.NodeHostIdentityR\fhostIdentity\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x91\x02\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xaa\x02\n" +
 	"\x11BootstrapResponse\x12&\n" +
 	"\x0fnode_session_id\x18\x01 \x01(\tR\rnodeSessionId\x12#\n" +
 	"\rsession_token\x18\x02 \x01(\tR\fsessionToken\x12\x19\n" +
@@ -939,7 +1042,8 @@ const file_legion_node_v1_node_proto_rawDesc = "" +
 	"\x0fcommand_subject\x18\x04 \x01(\tR\x0ecommandSubject\x120\n" +
 	"\x14event_subject_prefix\x18\x05 \x01(\tR\x12eventSubjectPrefix\x129\n" +
 	"\n" +
-	"expires_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"\x95\x02\n" +
+	"expires_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x12\x17\n" +
+	"\anode_id\x18\a \x01(\tR\x06nodeId\"\x95\x02\n" +
 	"\x16ActiveAttemptHeartbeat\x12\x1d\n" +
 	"\n" +
 	"attempt_id\x18\x01 \x01(\tR\tattemptId\x12\x15\n" +
@@ -1005,7 +1109,7 @@ func file_legion_node_v1_node_proto_rawDescGZIP() []byte {
 }
 
 var file_legion_node_v1_node_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_legion_node_v1_node_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_legion_node_v1_node_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_legion_node_v1_node_proto_goTypes = []any{
 	(NodeLifecycleState)(0),        // 0: legion.node.v1.NodeLifecycleState
 	(LogLevel)(0),                  // 1: legion.node.v1.LogLevel
@@ -1013,39 +1117,41 @@ var file_legion_node_v1_node_proto_goTypes = []any{
 	(*CommandMetadata)(nil),        // 3: legion.node.v1.CommandMetadata
 	(*EventMetadata)(nil),          // 4: legion.node.v1.EventMetadata
 	(*NodeHostFacts)(nil),          // 5: legion.node.v1.NodeHostFacts
-	(*BootstrapRequest)(nil),       // 6: legion.node.v1.BootstrapRequest
-	(*BootstrapResponse)(nil),      // 7: legion.node.v1.BootstrapResponse
-	(*ActiveAttemptHeartbeat)(nil), // 8: legion.node.v1.ActiveAttemptHeartbeat
-	(*NodeHeartbeat)(nil),          // 9: legion.node.v1.NodeHeartbeat
-	(*NodeLog)(nil),                // 10: legion.node.v1.NodeLog
-	nil,                            // 11: legion.node.v1.BootstrapRequest.LabelsEntry
-	nil,                            // 12: legion.node.v1.NodeHeartbeat.LabelsEntry
-	nil,                            // 13: legion.node.v1.NodeLog.AttributesEntry
-	(*timestamppb.Timestamp)(nil),  // 14: google.protobuf.Timestamp
+	(*NodeHostIdentity)(nil),       // 6: legion.node.v1.NodeHostIdentity
+	(*BootstrapRequest)(nil),       // 7: legion.node.v1.BootstrapRequest
+	(*BootstrapResponse)(nil),      // 8: legion.node.v1.BootstrapResponse
+	(*ActiveAttemptHeartbeat)(nil), // 9: legion.node.v1.ActiveAttemptHeartbeat
+	(*NodeHeartbeat)(nil),          // 10: legion.node.v1.NodeHeartbeat
+	(*NodeLog)(nil),                // 11: legion.node.v1.NodeLog
+	nil,                            // 12: legion.node.v1.BootstrapRequest.LabelsEntry
+	nil,                            // 13: legion.node.v1.NodeHeartbeat.LabelsEntry
+	nil,                            // 14: legion.node.v1.NodeLog.AttributesEntry
+	(*timestamppb.Timestamp)(nil),  // 15: google.protobuf.Timestamp
 }
 var file_legion_node_v1_node_proto_depIdxs = []int32{
-	14, // 0: legion.node.v1.CommandMetadata.issued_at:type_name -> google.protobuf.Timestamp
-	14, // 1: legion.node.v1.CommandMetadata.expire_at:type_name -> google.protobuf.Timestamp
-	14, // 2: legion.node.v1.EventMetadata.emitted_at:type_name -> google.protobuf.Timestamp
+	15, // 0: legion.node.v1.CommandMetadata.issued_at:type_name -> google.protobuf.Timestamp
+	15, // 1: legion.node.v1.CommandMetadata.expire_at:type_name -> google.protobuf.Timestamp
+	15, // 2: legion.node.v1.EventMetadata.emitted_at:type_name -> google.protobuf.Timestamp
 	2,  // 3: legion.node.v1.EventMetadata.node:type_name -> legion.node.v1.NodeRef
-	11, // 4: legion.node.v1.BootstrapRequest.labels:type_name -> legion.node.v1.BootstrapRequest.LabelsEntry
+	12, // 4: legion.node.v1.BootstrapRequest.labels:type_name -> legion.node.v1.BootstrapRequest.LabelsEntry
 	5,  // 5: legion.node.v1.BootstrapRequest.host_facts:type_name -> legion.node.v1.NodeHostFacts
-	14, // 6: legion.node.v1.BootstrapResponse.expires_at:type_name -> google.protobuf.Timestamp
-	14, // 7: legion.node.v1.ActiveAttemptHeartbeat.last_activity_at:type_name -> google.protobuf.Timestamp
-	4,  // 8: legion.node.v1.NodeHeartbeat.metadata:type_name -> legion.node.v1.EventMetadata
-	0,  // 9: legion.node.v1.NodeHeartbeat.lifecycle_state:type_name -> legion.node.v1.NodeLifecycleState
-	12, // 10: legion.node.v1.NodeHeartbeat.labels:type_name -> legion.node.v1.NodeHeartbeat.LabelsEntry
-	8,  // 11: legion.node.v1.NodeHeartbeat.active_attempts:type_name -> legion.node.v1.ActiveAttemptHeartbeat
-	14, // 12: legion.node.v1.NodeHeartbeat.observed_at:type_name -> google.protobuf.Timestamp
-	5,  // 13: legion.node.v1.NodeHeartbeat.host_facts:type_name -> legion.node.v1.NodeHostFacts
-	4,  // 14: legion.node.v1.NodeLog.metadata:type_name -> legion.node.v1.EventMetadata
-	1,  // 15: legion.node.v1.NodeLog.level:type_name -> legion.node.v1.LogLevel
-	13, // 16: legion.node.v1.NodeLog.attributes:type_name -> legion.node.v1.NodeLog.AttributesEntry
-	17, // [17:17] is the sub-list for method output_type
-	17, // [17:17] is the sub-list for method input_type
-	17, // [17:17] is the sub-list for extension type_name
-	17, // [17:17] is the sub-list for extension extendee
-	0,  // [0:17] is the sub-list for field type_name
+	6,  // 6: legion.node.v1.BootstrapRequest.host_identity:type_name -> legion.node.v1.NodeHostIdentity
+	15, // 7: legion.node.v1.BootstrapResponse.expires_at:type_name -> google.protobuf.Timestamp
+	15, // 8: legion.node.v1.ActiveAttemptHeartbeat.last_activity_at:type_name -> google.protobuf.Timestamp
+	4,  // 9: legion.node.v1.NodeHeartbeat.metadata:type_name -> legion.node.v1.EventMetadata
+	0,  // 10: legion.node.v1.NodeHeartbeat.lifecycle_state:type_name -> legion.node.v1.NodeLifecycleState
+	13, // 11: legion.node.v1.NodeHeartbeat.labels:type_name -> legion.node.v1.NodeHeartbeat.LabelsEntry
+	9,  // 12: legion.node.v1.NodeHeartbeat.active_attempts:type_name -> legion.node.v1.ActiveAttemptHeartbeat
+	15, // 13: legion.node.v1.NodeHeartbeat.observed_at:type_name -> google.protobuf.Timestamp
+	5,  // 14: legion.node.v1.NodeHeartbeat.host_facts:type_name -> legion.node.v1.NodeHostFacts
+	4,  // 15: legion.node.v1.NodeLog.metadata:type_name -> legion.node.v1.EventMetadata
+	1,  // 16: legion.node.v1.NodeLog.level:type_name -> legion.node.v1.LogLevel
+	14, // 17: legion.node.v1.NodeLog.attributes:type_name -> legion.node.v1.NodeLog.AttributesEntry
+	18, // [18:18] is the sub-list for method output_type
+	18, // [18:18] is the sub-list for method input_type
+	18, // [18:18] is the sub-list for extension type_name
+	18, // [18:18] is the sub-list for extension extendee
+	0,  // [0:18] is the sub-list for field type_name
 }
 
 func init() { file_legion_node_v1_node_proto_init() }
@@ -1059,7 +1165,7 @@ func file_legion_node_v1_node_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_legion_node_v1_node_proto_rawDesc), len(file_legion_node_v1_node_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   12,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

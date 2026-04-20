@@ -30,9 +30,10 @@ var (
 )
 
 type CapabilityManagerConfig struct {
-	NodeID      string
-	BaseDir     string
-	RootContext context.Context
+	NodeID         string
+	NodeIDProvider func() string
+	BaseDir        string
+	RootContext    context.Context
 }
 
 type CapabilityApplyInput struct {
@@ -78,12 +79,13 @@ type CapabilityRuntimeStatus struct {
 }
 
 type CapabilityManager struct {
-	nodeID       string
-	storeDir     string
-	rootCtx      context.Context
-	hidsHooks    capabilityHIDSHooks
-	alerts       chan CapabilityRuntimeAlert
-	observations chan CapabilityRuntimeObservation
+	nodeID         string
+	nodeIDProvider func() string
+	storeDir       string
+	rootCtx        context.Context
+	hidsHooks      capabilityHIDSHooks
+	alerts         chan CapabilityRuntimeAlert
+	observations   chan CapabilityRuntimeObservation
 }
 
 type capabilityDocument struct {
@@ -115,11 +117,12 @@ func newCapabilityManager(cfg CapabilityManagerConfig) *CapabilityManager {
 		baseDir = consts.GetDefaultYakitBaseDir()
 	}
 	manager := &CapabilityManager{
-		nodeID:       strings.TrimSpace(cfg.NodeID),
-		storeDir:     filepath.Join(baseDir, "legion", "capabilities"),
-		rootCtx:      rootContextOrBackground(cfg.RootContext),
-		alerts:       make(chan CapabilityRuntimeAlert, 64),
-		observations: make(chan CapabilityRuntimeObservation, 128),
+		nodeID:         strings.TrimSpace(cfg.NodeID),
+		nodeIDProvider: cfg.NodeIDProvider,
+		storeDir:       filepath.Join(baseDir, "legion", "capabilities"),
+		rootCtx:        rootContextOrBackground(cfg.RootContext),
+		alerts:         make(chan CapabilityRuntimeAlert, 64),
+		observations:   make(chan CapabilityRuntimeObservation, 128),
 	}
 	manager.hidsHooks = newCapabilityHIDSHooks()
 	go manager.forwardRuntimeAlerts(manager.hidsHooks.Alerts())
@@ -150,7 +153,7 @@ func (m *CapabilityManager) Apply(input CapabilityApplyInput) (CapabilityApplyRe
 
 	now := time.Now().UTC()
 	document := capabilityDocument{
-		NodeID:        m.nodeID,
+		NodeID:        m.currentNodeID(),
 		CapabilityKey: key,
 		SpecVersion:   specVersion,
 		DesiredSpec:   desiredSpec,
@@ -182,12 +185,13 @@ func (m *CapabilityManager) RestorePersisted() ([]CapabilityApplyResult, error) 
 	}
 
 	results := make([]CapabilityApplyResult, 0, len(paths))
+	currentNodeID := m.currentNodeID()
 	for _, path := range paths {
 		document, err := loadCapabilityDocument(path)
 		if err != nil {
 			return results, fmt.Errorf("load persisted capability %s: %w", filepath.Base(path), err)
 		}
-		if document.NodeID != "" && document.NodeID != m.nodeID {
+		if document.NodeID != "" && currentNodeID != "" && document.NodeID != currentNodeID {
 			continue
 		}
 		if !isHIDSCapabilityKey(document.CapabilityKey) {
@@ -252,6 +256,18 @@ func (m *CapabilityManager) OnSessionReady(ctx context.Context) error {
 		return nil
 	}
 	return m.hidsHooks.OnSessionReady(ctx)
+}
+
+func (m *CapabilityManager) currentNodeID() string {
+	if m == nil {
+		return ""
+	}
+	if m.nodeIDProvider != nil {
+		if value := strings.TrimSpace(m.nodeIDProvider()); value != "" {
+			return value
+		}
+	}
+	return strings.TrimSpace(m.nodeID)
 }
 
 func normalizeCapabilityKey(value string) (string, error) {
