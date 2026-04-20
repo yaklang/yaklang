@@ -18,8 +18,8 @@ type nodeInstanceLock struct {
 	file *os.File
 }
 
-func acquireNodeInstanceLock(nodeID string) (*nodeInstanceLock, error) {
-	lockDir := filepath.Join(os.TempDir(), "legion-scannode-locks")
+func acquireNodeInstanceLock(baseDir string, nodeID string) (*nodeInstanceLock, error) {
+	lockDir := filepath.Join(identityBaseDir(baseDir), "legion", "locks")
 	if err := os.MkdirAll(lockDir, 0o755); err != nil {
 		return nil, fmt.Errorf("create node lock directory: %w", err)
 	}
