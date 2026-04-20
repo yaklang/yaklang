@@ -141,6 +141,10 @@ type Config struct {
 	runtimeID string
 	// js parser
 	enableJSParser bool
+
+	// ai js extract: independent toggle, can co-exist with enableJSParser
+	enableAIJSExtract bool
+	aiJSExtractConfig *AIJSExtractConfig
 }
 
 var configMutex = new(sync.Mutex)
@@ -682,5 +686,24 @@ func WithJSParser(enable ...bool) ConfigOpt {
 		} else {
 			c.enableJSParser = true
 		}
+	}
+}
+
+// aiJSExtract 启用基于 AI 辅助的 JS / HTML 文本路径与 URL 抽取通道，
+// 与现有 SSA / 回调通道并行（不互相影响）。
+// 该通道按以下三阶段工作：
+//  1. 宽松正则预筛选可疑窗口（URL / 路径风格）
+//  2. aireducer 按字节切片，DumpWithOverlap 跨切片折叠
+//  3. aiforge.LiteForge SpeedPriority 抽取结构化路径列表
+//
+// Example:
+// ```
+// crawler.Start("https://example.com", crawler.aiJSExtract()) // 启用，全部默认值
+// crawler.Start("https://example.com", crawler.aiJSExtract(crawler.aiJSMaxTokens(40000))) // 调整 token 上限
+// ```
+func WithAIJSExtract(opts ...AIJSExtractOption) ConfigOpt {
+	return func(c *Config) {
+		c.enableAIJSExtract = true
+		c.aiJSExtractConfig = NewAIJSExtractConfig(opts...)
 	}
 }

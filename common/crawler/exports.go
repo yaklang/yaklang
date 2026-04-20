@@ -31,4 +31,14 @@ var Exports = map[string]interface{}{
 	"jsParser":            WithJSParser,
 	"onUrlFound":          WithOnUrlFound,
 	"RequestsFromFlow":    HandleRequestResult,
+
+	// AI assisted JS / HTML path extraction
+	"aiJSExtract":      WithAIJSExtract,
+	"aiJSMaxTokens":    WithAIJS_MaxTokens,
+	"aiJSChunkBytes":   WithAIJS_ChunkBytes,
+	"aiJSOverlapBytes": WithAIJS_OverlapBytes,
+	"aiJSContextBytes": WithAIJS_ContextBytes,
+	"aiJSConcurrency":  WithAIJS_Concurrency,
+	"aiJSSkipBelow":    WithAIJS_SkipBelowBytes,
+	"aiJSAIOptions":    WithAIJS_AIOptions,
 }
