@@ -21,7 +21,6 @@ func (b *legionJobBridge) syncCapabilityStatuses(ctx context.Context) {
 	}
 	shouldSync, sessionChanged := b.shouldSyncCapabilityStatuses(session.SessionID)
 	if sessionChanged {
-		b.flushSuppressedObservationDrops(session.SessionID)
 		b.handleCapabilitySessionReady(ctx, session.SessionID)
 	}
 	if !shouldSync {
@@ -91,39 +90,4 @@ func (b *legionJobBridge) handleCapabilitySessionReady(ctx context.Context, sess
 			err,
 		)
 	}
-}
-
-func (b *legionJobBridge) noteSuppressedObservationDrop() {
-	if b == nil || b.agent == nil || b.agent.node == nil {
-		return
-	}
-	b.observationMu.Lock()
-	defer b.observationMu.Unlock()
-
-	b.suppressedObservationDrop++
-	if b.suppressedObservationDrop == 1 {
-		log.Warnf(
-			"node session unavailable; suppressing hids observation publication until session recovers: node_id=%s",
-			b.agent.node.CurrentNodeID(),
-		)
-	}
-}
-
-func (b *legionJobBridge) flushSuppressedObservationDrops(sessionID string) {
-	if b == nil || b.agent == nil || b.agent.node == nil {
-		return
-	}
-	b.observationMu.Lock()
-	defer b.observationMu.Unlock()
-
-	if b.suppressedObservationDrop == 0 {
-		return
-	}
-	log.Infof(
-		"node session restored; skipped %d hids observation(s) while session was unavailable: node_id=%s session_id=%s",
-		b.suppressedObservationDrop,
-		b.agent.node.CurrentNodeID(),
-		sessionID,
-	)
-	b.suppressedObservationDrop = 0
 }
