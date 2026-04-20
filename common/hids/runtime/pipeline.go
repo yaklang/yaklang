@@ -28,7 +28,7 @@ func newPipeline(engine *rule.Engine) *pipeline {
 		engine:       engine,
 		scanSandbox:  rule.NewSandbox(),
 		alerts:       make(chan model.Alert, 64),
-		observations: make(chan model.Event, 128),
+		observations: make(chan model.Event, runtimeObservationBufferSize),
 		processes:    newProcessTracker(),
 		networks:     newNetworkTracker(),
 		files:        newFileTracker(),

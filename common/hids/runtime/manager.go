@@ -13,6 +13,8 @@ type ApplyResult struct {
 	State model.RuntimeState
 }
 
+const runtimeObservationBufferSize = 4096
+
 type Manager struct {
 	mu           sync.Mutex
 	instance     *Instance
@@ -25,7 +27,7 @@ func NewManager() *Manager {
 	return &Manager{
 		health:       newHealth("stopped", "hids runtime is stopped"),
 		alerts:       make(chan model.Alert, 64),
-		observations: make(chan model.Event, 128),
+		observations: make(chan model.Event, runtimeObservationBufferSize),
 	}
 }
 

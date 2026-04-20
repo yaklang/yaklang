@@ -51,8 +51,9 @@ type EvidencePolicy struct {
 }
 
 type ReportingPolicy struct {
-	EmitCapabilityStatus bool `json:"emit_capability_status,omitempty"`
-	EmitCapabilityAlert  bool `json:"emit_capability_alert,omitempty"`
+	EmitCapabilityStatus     bool  `json:"emit_capability_status,omitempty"`
+	EmitCapabilityAlert      bool  `json:"emit_capability_alert,omitempty"`
+	EmitSnapshotObservations *bool `json:"emit_snapshot_observations,omitempty"`
 }
 
 type TemporaryRule struct {
@@ -185,6 +186,15 @@ func (s DesiredSpec) Validate() error {
 		}
 	}
 	return nil
+}
+
+// ShouldEmitSnapshotObservations returns whether platform-facing current-state
+// snapshot observations should be exported for this reporting policy.
+func (p ReportingPolicy) ShouldEmitSnapshotObservations() bool {
+	if p.EmitSnapshotObservations == nil {
+		return true
+	}
+	return *p.EmitSnapshotObservations
 }
 
 func normalizeTemporaryRules(rules []TemporaryRule) []TemporaryRule {
