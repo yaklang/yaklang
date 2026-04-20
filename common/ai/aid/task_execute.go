@@ -342,6 +342,7 @@ func (t *AiTask) generateTaskSummary(summary, nextMovements string) error {
 	t.planLoadingStatus(fmt.Sprintf("任务 [%s] 等待 AI 生成总结 / Task [%s] Waiting AI Summary...", t.Index, t.Index))
 	extractStart := time.Now()
 	err = t.CallAITransaction(summaryPromptWellFormed, func(summaryReader *aicommon.AIResponse) error { // 异步过程 使用无 id的 原始ai callback
+		boundEmitter := summaryReader.BindEmitter(t.GetEmitter())
 		action, err := aicommon.ExtractValidActionFromStream(t.Ctx, summaryReader.GetUnboundStreamReader(false), "summary",
 			aicommon.WithActionFieldStreamHandler(
 				[]string{"task_long_summary"},
@@ -374,7 +375,7 @@ func (t *AiTask) generateTaskSummary(summary, nextMovements string) error {
 							referenceEmittedOnce.Do(func() {
 								streamId := event.GetContentJSONPath(`$.event_writer_id`)
 								if streamId != "" {
-									_, refErr := t.EmitTextReferenceMaterial(streamId, summaryPromptWellFormed)
+									_, refErr := boundEmitter.EmitTextReferenceMaterial(streamId, summaryPromptWellFormed)
 									if refErr != nil {
 										log.Warnf("emit reference material for summary field [%s] failed: %v", key, refErr)
 									}
@@ -384,7 +385,7 @@ func (t *AiTask) generateTaskSummary(summary, nextMovements string) error {
 					}
 
 					// Emit stream event with callback for reference material
-					event, emitErr = t.EmitTextMarkdownStreamEvent(nodeId, teeReader, t.GetIndex(), onEnd)
+					event, emitErr = boundEmitter.EmitTextMarkdownStreamEvent(nodeId, teeReader, t.GetIndex(), onEnd)
 
 					if emitErr != nil {
 						log.Errorf("failed to emit %s stream event: %v", key, emitErr)

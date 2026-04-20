@@ -20,8 +20,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func (r *ReActLoop) buildActionTagOption(streamWG *sync.WaitGroup, taskIndex string, nonce string) []aicommon.ActionMakerOption {
-	var emitter = r.GetEmitter()
+func (r *ReActLoop) buildActionTagOption(emitter *aicommon.Emitter, streamWG *sync.WaitGroup, taskIndex string, nonce string) []aicommon.ActionMakerOption {
 	tagFields := r.aiTagFields.Copy()
 	for _, i := range r.GetAllActions() {
 		for _, field := range i.AITagStreamFields {
@@ -122,7 +121,6 @@ func (r *ReActLoop) Execute(taskId string, ctx context.Context, userInput string
 
 func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, nonce string) (*aicommon.Action, *LoopAction, error) {
 	var action *aicommon.Action
-	var emitter = r.emitter
 	var actionNames = r.GetAllActionNames()
 
 	getNextActionType := func(a *aicommon.Action) string { //legacy support
@@ -163,6 +161,7 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 			if ctxCanceled.IsSet() {
 				return nil
 			}
+			boundEmitter := resp.BindEmitter(r.config.GetEmitter())
 			stream := resp.GetOutputStreamReader(
 				r.loopName,
 				true,
@@ -171,7 +170,7 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 
 			buf := bytes.NewBuffer(make([]byte, 0))
 			stream = io.TeeReader(stream, buf)
-			tagOptions := r.buildActionTagOption(streamWg, resp.GetTaskIndex(), nonce)
+			tagOptions := r.buildActionTagOption(boundEmitter, streamWg, resp.GetTaskIndex(), nonce)
 			streamFields := r.streamFields.Copy()
 
 			for _, i := range r.GetAllActions() {
@@ -239,7 +238,7 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 							defaultNodeId = fieldIns.AINodeId
 						}
 
-						event, emitErr := emitter.EmitStreamEventWithContentType(
+						event, emitErr := boundEmitter.EmitStreamEventWithContentType(
 							defaultNodeId,
 							pr,
 							resp.GetTaskIndex(),
@@ -260,7 +259,7 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 							promptRefOnce.Do(func() {
 								streamId := event.GetContentJSONPath(`$.event_writer_id`)
 								if streamId != "" {
-									emitter.EmitTextReferenceMaterial(streamId, prompt)
+									boundEmitter.EmitTextReferenceMaterial(streamId, prompt)
 								}
 							})
 						}

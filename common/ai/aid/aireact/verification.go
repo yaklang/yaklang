@@ -55,18 +55,22 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 		})
 	}
 
-	emitVerificationReferenceMaterials := func(rawResponse string) {
+	emitVerificationReferenceMaterials := func(emitter *aicommon.Emitter, rawResponse string) {
+		if emitter == nil {
+			return
+		}
 		if strings.TrimSpace(referenceAnchorID) == "" {
 			log.Warnf("skip verification reference materials because no stream anchor was emitted")
 			return
 		}
-		aicommon.EmitAIRequestAndResponseReferenceMaterials(r.Emitter, referenceAnchorID, verificationPrompt, rawResponse)
+		aicommon.EmitAIRequestAndResponseReferenceMaterials(emitter, referenceAnchorID, verificationPrompt, rawResponse)
 	}
 
 	log.Infof("Verifying if user needs are satisfied and formatting results...")
 	transErr := aicommon.CallAITransaction(
 		r.config, verificationPrompt, r.config.CallAI,
 		func(rsp *aicommon.AIResponse) error {
+			boundEmitter := rsp.BindEmitter(r.Emitter)
 			stream := rsp.GetOutputStreamReader("re-act-verify", true, r.Emitter)
 
 			var rawResponse bytes.Buffer
@@ -78,7 +82,7 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 					reader = io.TeeReader(utils.JSONStringReader(utils.UTF8Reader(reader)), &out)
 					var event *schema.AiOutputEvent
 					var err error
-					event, err = r.Emitter.EmitDefaultStreamEvent(
+					event, err = boundEmitter.EmitDefaultStreamEvent(
 						"re-act-verify",
 						reader,
 						rsp.GetTaskIndex(),
@@ -101,7 +105,7 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 				taskID = r.GetCurrentTask().GetId()
 			}
 
-		action, err := aicommon.ExtractValidActionFromStream(
+			action, err := aicommon.ExtractValidActionFromStream(
 				ctx,
 				stream, "verify-satisfaction",
 				aicommon.WithActionNonce(nonce),
@@ -110,60 +114,60 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 					[]string{"reasoning"},
 					createReasonCallback("Reasoning"),
 				),
-			aicommon.WithActionFieldStreamHandler(
-				[]string{"evidence"},
-				func(key string, rd io.Reader) {
-					trimmedReader := utils.NewTrimLeftReader(utils.UTF8Reader(rd))
-					peekedReader := utils.NewPeekableReader(trimmedReader)
-					firstByte, err := peekedReader.Peek(1)
-					if err != nil && len(firstByte) == 0 {
-						log.Infof("no evidence provided in verification result, skipping evidence stream handling")
-						return
-					}
+				aicommon.WithActionFieldStreamHandler(
+					[]string{"evidence"},
+					func(key string, rd io.Reader) {
+						trimmedReader := utils.NewTrimLeftReader(utils.UTF8Reader(rd))
+						peekedReader := utils.NewPeekableReader(trimmedReader)
+						firstByte, err := peekedReader.Peek(1)
+						if err != nil && len(firstByte) == 0 {
+							log.Infof("no evidence provided in verification result, skipping evidence stream handling")
+							return
+						}
 
-					var displayReader io.Reader
-					if len(firstByte) > 0 && firstByte[0] == '[' {
-						pr, pw := utils.NewBufPipe(nil)
-						go func() {
-							defer pw.Close()
-							if err := writeEvidenceDisplayStream(peekedReader, pw); err != nil {
-								log.Errorf("failed to stream evidence display: %v", err)
+						var displayReader io.Reader
+						if len(firstByte) > 0 && firstByte[0] == '[' {
+							pr, pw := utils.NewBufPipe(nil)
+							go func() {
+								defer pw.Close()
+								if err := writeEvidenceDisplayStream(peekedReader, pw); err != nil {
+									log.Errorf("failed to stream evidence display: %v", err)
+								}
+							}()
+							displayReader = pr
+						} else {
+							var buf bytes.Buffer
+							io.Copy(&buf, peekedReader)
+							content := strings.TrimSpace(buf.String())
+							if content == "" {
+								log.Infof("evidence content is empty after trim, skipping emit")
+								return
 							}
-						}()
-						displayReader = pr
-					} else {
-						var buf bytes.Buffer
-						io.Copy(&buf, peekedReader)
-						content := strings.TrimSpace(buf.String())
-						if content == "" {
-							log.Infof("evidence content is empty after trim, skipping emit")
-							return
+							formatted := formatEvidenceOperationDisplayLine(aicommon.EvidenceOperation{
+								Op: "add", ID: "default", Content: content,
+							})
+							if strings.TrimSpace(formatted) == "" {
+								return
+							}
+							displayReader = strings.NewReader(formatted)
 						}
-						formatted := formatEvidenceOperationDisplayLine(aicommon.EvidenceOperation{
-							Op: "add", ID: "default", Content: content,
-						})
-						if strings.TrimSpace(formatted) == "" {
-							return
-						}
-						displayReader = strings.NewReader(formatted)
-					}
 
-					var out bytes.Buffer
-					var outputReader = io.TeeReader(displayReader, &out)
-					var event *schema.AiOutputEvent
-					event, err = r.Emitter.EmitDefaultStreamEvent(
-						"plan-evidence",
-						outputReader,
-						rsp.GetTaskIndex(),
-						func() {},
-					)
-					if err != nil {
-						log.Errorf("failed to emit evidence stream event: %v", err)
-						return
-					}
-					captureReferenceAnchor(event)
-				},
-			),
+						var out bytes.Buffer
+						var outputReader = io.TeeReader(displayReader, &out)
+						var event *schema.AiOutputEvent
+						event, err = boundEmitter.EmitDefaultStreamEvent(
+							"plan-evidence",
+							outputReader,
+							rsp.GetTaskIndex(),
+							func() {},
+						)
+						if err != nil {
+							log.Errorf("failed to emit evidence stream event: %v", err)
+							return
+						}
+						captureReferenceAnchor(event)
+					},
+				),
 				aicommon.WithActionFieldStreamHandler(
 					[]string{"next_movements"},
 					func(key string, rd io.Reader) {
@@ -192,7 +196,7 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 						var out bytes.Buffer
 						var outputReader = io.TeeReader(displayReader, &out)
 						var event *schema.AiOutputEvent
-						event, err = r.Emitter.EmitDefaultStreamEvent(
+						event, err = boundEmitter.EmitDefaultStreamEvent(
 							"next_movements",
 							outputReader,
 							rsp.GetTaskIndex(),
@@ -248,7 +252,7 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 				var out bytes.Buffer
 				var outputReader = io.TeeReader(strings.NewReader(markdownSnapshot), &out)
 				var event *schema.AiOutputEvent
-				event, err = r.Emitter.EmitTextMarkdownStreamEvent(
+				event, err = boundEmitter.EmitTextMarkdownStreamEvent(
 					"next_movements_snapshot",
 					outputReader,
 					taskID,
@@ -265,7 +269,7 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 				var out bytes.Buffer
 				var outputReader = io.TeeReader(strings.NewReader(deliveryFilesMarkdown), &out)
 				var event *schema.AiOutputEvent
-				event, err = r.Emitter.EmitDefaultStreamEvent(
+				event, err = boundEmitter.EmitDefaultStreamEvent(
 					"delivery_files_snapshot",
 					outputReader,
 					taskID,
@@ -282,7 +286,7 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 				r.EmitFileArtifactWithExt("delivery_files", ".md", deliveryFilesMarkdown)
 			}
 
-			emitVerificationReferenceMaterials(rawResponse.String())
+			emitVerificationReferenceMaterials(boundEmitter, rawResponse.String())
 			return nil
 		},
 	)
