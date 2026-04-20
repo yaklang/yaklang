@@ -6,7 +6,6 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
-	"sync"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
@@ -119,8 +118,6 @@ func MutateHookCaller(ctx context.Context, raw string, caller YakitCallerIf, par
 		mockHTTPRequestInstanceNumIn = ret.GetNumIn()
 	}
 
-	hookLock := new(sync.Mutex)
-
 	var hookBefore func(https bool, originReq []byte, req []byte) []byte = nil
 	var hookAfter func(https bool, originReq []byte, req []byte, originRsp []byte, rsp []byte) []byte = nil
 	var mirrorFlow func(req []byte, rsp []byte, handle map[string]string) map[string]string = nil
@@ -130,9 +127,6 @@ func MutateHookCaller(ctx context.Context, raw string, caller YakitCallerIf, par
 
 	if beforeRequestOk {
 		hookBefore = func(https bool, originReq []byte, req []byte) []byte {
-			hookLock.Lock()
-			defer hookLock.Unlock()
-
 			defer func() {
 				if err := recover(); err != nil {
 					log.Errorf("beforeRequest(ORIGIN) panic: %s", err)
@@ -140,12 +134,12 @@ func MutateHookCaller(ctx context.Context, raw string, caller YakitCallerIf, par
 			}()
 			if engine != nil {
 				var resultRequest any
+				var err error
 				if legacyBeforeRequest {
 					resultRequest, err = engine.CallYakFunction(context.Background(), "beforeRequest", []interface{}{req})
 				} else {
 					resultRequest, err = engine.CallYakFunction(context.Background(), "beforeRequest", []interface{}{https, originReq, req})
 				}
-
 				if err != nil {
 					log.Infof("eval beforeRequest hook failed: %s", err)
 				}
@@ -164,18 +158,14 @@ func MutateHookCaller(ctx context.Context, raw string, caller YakitCallerIf, par
 
 	if afterRequestOk {
 		hookAfter = func(https bool, originReq []byte, req []byte, originRsp []byte, rsp []byte) []byte {
-			hookLock.Lock()
-			defer hookLock.Unlock()
-
 			defer func() {
 				if err := recover(); err != nil {
 					log.Errorf("afterRequest(RESPONSE) panic: %s", err)
 				}
 			}()
-
 			if engine != nil {
-
 				var resultResponse any
+				var err error
 				if legacyAfterRequest {
 					resultResponse, err = engine.CallYakFunction(context.Background(), "afterRequest", []interface{}{rsp})
 				} else {
@@ -199,15 +189,11 @@ func MutateHookCaller(ctx context.Context, raw string, caller YakitCallerIf, par
 
 	if mirrorFlowOK {
 		mirrorFlow = func(req []byte, rsp []byte, existed map[string]string) map[string]string {
-			hookLock.Lock()
-			defer hookLock.Unlock()
-
 			defer func() {
 				if err := recover(); err != nil {
 					log.Errorf("mirrorHTTPFlow(request, response) data panic: %s", err)
 				}
 			}()
-
 			result := make(map[string]string)
 			if engine != nil {
 				params := []any{req, rsp}
@@ -218,7 +204,6 @@ func MutateHookCaller(ctx context.Context, raw string, caller YakitCallerIf, par
 				if err != nil {
 					log.Infof("eval afterRequest hook failed: %s", err)
 				}
-
 				if ret := utils.InterfaceToMap(mirrorResult); ret != nil {
 					for k, v := range ret {
 						result[k] = strings.Join(v, ",")
@@ -231,15 +216,11 @@ func MutateHookCaller(ctx context.Context, raw string, caller YakitCallerIf, par
 
 	if retryHandlerOk {
 		retryHandler = func(https bool, retryCount int, req []byte, rsp []byte, retryFunc func(...[]byte)) {
-			hookLock.Lock()
-			defer hookLock.Unlock()
-
 			defer func() {
 				if err := recover(); err != nil {
 					log.Errorf("retryHandler(request, response) data panic: %s", err)
 				}
 			}()
-
 			if engine != nil {
 				params := []any{https, retryCount, req, rsp, retryFunc}
 				if retryHandlerInstanceNumIn == 4 {
@@ -252,21 +233,16 @@ func MutateHookCaller(ctx context.Context, raw string, caller YakitCallerIf, par
 					log.Infof("eval retryHandler hook failed: %s", err)
 				}
 			}
-			return
 		}
 	}
 
 	if customFailureCheckerOk {
 		customFailureChecker = func(https bool, req []byte, rsp []byte, fail func(string)) {
-			hookLock.Lock()
-			defer hookLock.Unlock()
-
 			defer func() {
 				if err := recover(); err != nil {
 					log.Errorf("customFailureChecker(request, response) data panic: %s", err)
 				}
 			}()
-
 			if engine != nil {
 				params := []any{https, req, rsp, fail}
 				if customFailureCheckerInstanceNumIn == 3 {
@@ -284,15 +260,11 @@ func MutateHookCaller(ctx context.Context, raw string, caller YakitCallerIf, par
 
 	if mockHTTPRequestOk {
 		mockHTTPRequest = func(https bool, url string, req []byte, mockResponse func(rsp interface{})) {
-			hookLock.Lock()
-			defer hookLock.Unlock()
-
 			defer func() {
 				if err := recover(); err != nil {
 					log.Errorf("mockHTTPRequest(https, url, request, mockResponse) data panic: %s", err)
 				}
 			}()
-
 			if engine != nil {
 				params := []any{https, url, req, mockResponse}
 				if mockHTTPRequestInstanceNumIn == 3 {

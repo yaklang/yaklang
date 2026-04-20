@@ -31,6 +31,11 @@ func GetFlag(flags ...ExecFlag) ExecFlag {
 	return flag
 }
 
+// vmCurrentFrameKey is the context key for the current executing Frame.
+// Storing the frame in context makes sub-function calls goroutine-safe:
+// each call chain carries its own Frame reference instead of sharing VMStack.Peek().
+type vmCurrentFrameKey struct{}
+
 type YakitFeedbacker interface{}
 type (
 	BreakPointFactoryFun func(v *VirtualMachine) bool
@@ -39,8 +44,9 @@ type (
 		globalVar        *limitedmap.ReadOnlyMap
 		runtimeGlobalVar *limitedmap.SafeMap
 
-		VMStack   *vmstack.Stack
-		rootScope *Scope
+		VMStack     *vmstack.Stack
+		vmstackMu   sync.Mutex
+		rootScope   *Scope
 
 		// asyncWaitGroup
 		asyncWaitGroup *sync.WaitGroup
@@ -332,10 +338,7 @@ func (v *VirtualMachine) InlineExecYakCode(ctx context.Context, codes []*Code, f
 	}, Trace|Sub)
 }
 
-var vmstackLock = new(sync.Mutex)
-
 func (v *VirtualMachine) Exec(ctx context.Context, f func(frame *Frame), flags ...ExecFlag) error {
-	// 先检查 context 是否已取消
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
@@ -344,26 +347,27 @@ func (v *VirtualMachine) Exec(ctx context.Context, f func(frame *Frame), flags .
 
 	var frame *Frame
 	if flag&Sub == Sub {
-
-		vmstackLock.Lock()
-		topFrame := v.VMStack.Peek()
-		vmstackLock.Unlock()
-
-		if topFrame == nil {
+		// Get parent frame from context instead of VMStack.Peek().
+		// This makes concurrent calls goroutine-safe: each call chain carries its
+		// own Frame via context rather than competing on a shared VMStack.
+		parentFrame, _ := ctx.Value(vmCurrentFrameKey{}).(*Frame)
+		if parentFrame == nil {
 			log.Errorf("BUG: VMStack is empty(Sub)")
 			return utils.Error("BUG: VMStack is empty(Sub)")
 		}
-		frame = NewSubFrame(topFrame.(*Frame))
+		frame = NewSubFrame(parentFrame)
 	} else if flag&Inline == Inline {
-		vmstackLock.Lock()
+		// Inline mode reuses the current frame in-place (used by eval/debugger).
+		// It is not designed for concurrent use; keep VMStack-based lookup here.
+		v.vmstackMu.Lock()
 		topFrame := v.VMStack.Peek()
-		vmstackLock.Unlock()
+		v.vmstackMu.Unlock()
 
 		if topFrame == nil {
 			topFrame = NewFrame(v)
-			vmstackLock.Lock()
+			v.vmstackMu.Lock()
 			v.VMStack.Push(topFrame)
-			vmstackLock.Unlock()
+			v.vmstackMu.Unlock()
 			log.Debugf("VMStack is empty(Inline), we create new frame")
 		}
 
@@ -385,24 +389,29 @@ func (v *VirtualMachine) Exec(ctx context.Context, f func(frame *Frame), flags .
 		frame.coroutine = NewCoroutine()
 	}
 
-	vmstackLock.Lock()
+	// Store the current frame in context so nested Sub-mode calls (child function
+	// invocations) can find their correct parent frame without touching VMStack.
+	ctx = context.WithValue(ctx, vmCurrentFrameKey{}, frame)
+	// frame.ctx propagates the updated context to child calls via
+	// frame.CallYakFunction(vm.ctx, ...) in func.go.
+	frame.ctx = ctx
+
+	// Keep VMStack updated for inspection tools (GetVar, CurrentFM, debugger).
+	v.vmstackMu.Lock()
 	v.VMStack.Push(frame)
-	vmstackLock.Unlock()
+	v.vmstackMu.Unlock()
 
 	frame.debug = v.debug
-	// 初始化debugger
 	if v.debugMode && v.debugger != nil && v.debugger.initFunc != nil {
 		v.debugger.InitCallBack()
 	}
-	frame.ctx = ctx
 
 	f(frame)
 
-	// 未设置Trace时执行后出站
 	if flag&Trace != Trace {
-		vmstackLock.Lock()
+		v.vmstackMu.Lock()
 		v.VMStack.Pop()
-		vmstackLock.Unlock()
+		v.vmstackMu.Unlock()
 	}
 	if flag&Asnyc != Asnyc {
 		if lastPanic := frame.recover(); lastPanic != nil {
