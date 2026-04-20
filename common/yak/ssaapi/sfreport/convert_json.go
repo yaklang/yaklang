@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 
 	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -427,4 +428,36 @@ func (m *ImportSSARiskManager) importFilesFromReport(report *Report, cb func(str
 		}
 	}
 	return nil
+}
+
+// GenerateSSAReportMarkdownForTask matches gRPC Yak.GenerateSSAReport for the task-id path (in-process).
+func GenerateSSAReportMarkdownForTask(taskID, reportName string) (int, string, error) {
+	ctx := context.Background()
+	db := consts.GetGormSSAProjectDataBase()
+	if db == nil {
+		return 0, "", utils.Errorf("ssa project database is nil")
+	}
+	taskID = strings.TrimSpace(taskID)
+	if taskID == "" {
+		return 0, "", utils.Errorf("task id is empty")
+	}
+	task, err := schema.GetSyntaxFlowScanTaskById(db, taskID)
+	if err != nil {
+		return 0, "", utils.Wrapf(err, "get syntax flow scan task failed")
+	}
+	ssaReport, err := GenerateSSAProjectReportFromTask(ctx, task)
+	if err != nil {
+		return 0, "", utils.Wrapf(err, "generate ssa project report failed")
+	}
+	reportInstance := yakit.NewReport()
+	reportInstance.From("ssa-scan")
+	reportInstance.Title(strings.TrimSpace(reportName))
+	if err := GenerateYakitReportContent(reportInstance, ssaReport); err != nil {
+		return 0, "", utils.Wrapf(err, "generate yakit report content failed")
+	}
+	rid := reportInstance.SaveForIRify()
+	if rid == 0 {
+		return 0, "", utils.Errorf("save report failed")
+	}
+	return rid, schema.JoinReportItemsMarkdown(reportInstance.Items), nil
 }

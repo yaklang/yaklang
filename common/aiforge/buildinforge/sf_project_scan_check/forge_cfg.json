@@ -1,0 +1,9 @@
+{
+	"name": "sf_project_scan_check",
+	"verbose_name": "SSA项目检查",
+	"description": "先向会话推送扫描任务表与最新任务标识，再由 AI 协助解读表格、核对参数，并在无匹配时给出可操作的排查建议。适合「只想确认有哪些扫描任务、哪一条是最新」的场景；完整误报与 SSA 深度分析请用扫描风险分析蓝图。",
+	"tool_keywords": "SyntaxFlow,扫描任务,项目扫描,任务列表,最新任务,项目标识",
+	"tools": "",
+	"actions": "project_scan_check",
+	"tags": "SyntaxFlow,扫描,项目,任务表"
+}

@@ -3,8 +3,9 @@ package schema
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/samber/lo"
 	"strings"
+
+	"github.com/samber/lo"
 
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/jsonpath"
@@ -61,7 +62,6 @@ const (
 	AI_REACT_LOOP_NAME_SMART_QA            = "smart_qa"
 	AI_REACT_LOOP_NAME_DIR_EXPLORE         = "dir_explore"
 	AI_REACT_LOOP_NAME_INFOSEC_RECON       = "infosec_recon"
-	AI_REACT_LOOP_NAME_SCAN_RISK_ANALYSIS  = "scan_risk_analysis"
 )
 
 const (

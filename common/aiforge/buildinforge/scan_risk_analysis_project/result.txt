@@ -1,0 +1,16 @@
+# 结果输出
+默认使用**简体中文**总结。
+
+{{ .ContextProvider.OS }}-{{ .ContextProvider.Arch }}-{{ .ContextProvider.Now }}
+{{ .ContextProvider.Progress }}
+{{ .ContextProvider.PersistentMemory }}
+
+## 应包含的要点
+1. **任务对齐**：**latest_task_id**（或等价标识）及来源（摘要行 + 任务表）；若为 0 行则说明未对齐、勿编造 ID。  
+2. **SSA 依据**：说明依据的是流式 **ssa_scan_report**、钉选文件还是用户粘贴/附加说明；若证据不足须写明。  
+3. **误报分诊摘要**：哪些分组倾向 not_issue / suspicious / is_issue，各给一句依据。  
+4. **PoC 价值**：哪些更值得后续人工评估 PoC（仅建议）。  
+5. **合规**：仅限授权环境；利用类内容单独评估。
+
+## JSON 与格式
+若当前任务要求结构化输出，须严格符合给定 Schema；**只输出 JSON**，不要额外自然语言包裹。

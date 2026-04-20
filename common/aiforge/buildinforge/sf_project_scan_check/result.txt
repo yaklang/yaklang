@@ -1,0 +1,12 @@
+# 结果输出
+使用**简体中文**作简短结论；技术字段（task_id、scan_id）保持原样。
+
+{{ .ContextProvider.OS }}-{{ .ContextProvider.Arch }}-{{ .ContextProvider.Now }}
+{{ .ContextProvider.Progress }}
+{{ .ContextProvider.PersistentMemory }}
+
+## 应交代的内容
+1. **实际筛选条件**：摘要中的项目匹配片段、**scan_only**、**limit**（与流式 query 摘要一致）。
+2. **latest_task_id**：与流式 **done** 及表中首行 **task_id** 一致，勿臆测。
+3. **对话价值**：用一两句话概括帮用户理解了哪些列、是否已明确下一步（例如是否去开扫描风险分析蓝图）。
+4. **0 行匹配**：归纳可能原因与可操作建议（换 hint、确认入库、放宽 scan_only 等）。
