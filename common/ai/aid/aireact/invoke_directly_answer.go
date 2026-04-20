@@ -111,6 +111,7 @@ func (r *ReAct) DirectlyAnswer(ctx context.Context, query string, tools []*aitoo
 		prompt,
 		r.config.CallQualityPriorityAI,
 		func(rsp *aicommon.AIResponse) error {
+			boundEmitter := rsp.BindEmitter(r.Emitter)
 			stream := rsp.GetOutputStreamReader("directly_answer", true, r.Emitter)
 
 			hasAnswerPayloadKey := false
@@ -128,7 +129,7 @@ func (r *ReAct) DirectlyAnswer(ctx context.Context, query string, tools []*aitoo
 						reader = utils.JSONStringReader(reader)
 						reader = io.TeeReader(reader, &out)
 						var event *schema.AiOutputEvent
-						event, _ = r.Emitter.EmitTextMarkdownStreamEvent(
+						event, _ = boundEmitter.EmitTextMarkdownStreamEvent(
 							"re-act-loop-answer-payload",
 							reader,
 							rsp.GetTaskIndex(),

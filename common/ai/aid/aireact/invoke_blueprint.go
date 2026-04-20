@@ -156,7 +156,7 @@ func (r *ReAct) invokeBlueprint(forgeName string) (*schema.AIForge, aitool.Invok
 	err = aicommon.CallAITransaction(
 		r.config, prompt, r.config.CallAI,
 		func(rsp *aicommon.AIResponse) error {
-			emitter := r.config.GetEmitter()
+			emitter := rsp.BindEmitter(r.config.GetEmitter())
 			stream := rsp.GetOutputStreamReader("call-forge", true, emitter)
 
 			var response bytes.Buffer
