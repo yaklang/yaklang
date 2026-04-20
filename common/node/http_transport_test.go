@@ -23,6 +23,7 @@ func TestHTTPTransportBootstrap(t *testing.T) {
 			name:   "success",
 			status: http.StatusCreated,
 			response: `{
+				"node_id":"node-canonical-1",
 				"node_session_id":"session-1",
 				"session_token":"token-1",
 				"nats_url":"nats://127.0.0.1:4222",
@@ -56,6 +57,15 @@ func TestHTTPTransportBootstrap(t *testing.T) {
 				if request.NodeID != "node-1" {
 					t.Fatalf("unexpected node_id: %s", request.NodeID)
 				}
+				if request.ClaimedName != "display-node-1" {
+					t.Fatalf("unexpected claimed_name: %s", request.ClaimedName)
+				}
+				if request.AgentInstallationID != "agent-install-1" {
+					t.Fatalf("unexpected agent_installation_id: %s", request.AgentInstallationID)
+				}
+				if request.HostIdentity.MachineID != "machine-1" {
+					t.Fatalf("unexpected host_identity.machine_id: %s", request.HostIdentity.MachineID)
+				}
 				if request.HeartbeatIntervalSeconds != 30 {
 					t.Fatalf(
 						"unexpected heartbeat_interval_seconds: %d",
@@ -82,6 +92,9 @@ func TestHTTPTransportBootstrap(t *testing.T) {
 			session, err := transport.Bootstrap(context.Background(), BootstrapRequest{
 				EnrollmentToken:          "enroll-1",
 				NodeID:                   "node-1",
+				ClaimedName:              "display-node-1",
+				AgentInstallationID:      "agent-install-1",
+				HostIdentity:             HostIdentity{MachineID: "machine-1"},
 				NodeType:                 "scanner-agent",
 				HeartbeatIntervalSeconds: 30,
 				HostInfo: HostInfo{
@@ -103,6 +116,9 @@ func TestHTTPTransportBootstrap(t *testing.T) {
 			}
 			if session.SessionID != "session-1" {
 				t.Fatalf("unexpected session_id: %s", session.SessionID)
+			}
+			if session.NodeID != "node-canonical-1" {
+				t.Fatalf("unexpected node_id: %s", session.NodeID)
 			}
 			if session.SessionToken != "token-1" {
 				t.Fatalf("unexpected session_token: %s", session.SessionToken)
