@@ -2,6 +2,7 @@ package reactloops
 
 import (
 	"context"
+	"io"
 	"strings"
 	"sync"
 	"testing"
@@ -11,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	mockcfg "github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 )
 
 type perceptionMidtermSchedulerTestInvoker struct {
@@ -42,6 +44,31 @@ func (i *perceptionMidtermSchedulerTestInvoker) ScheduleMidtermTimelineRecallFro
 	i.scheduledKeywords = append([]string{}, keywords...)
 }
 
+type perceptionCapabilitySearchTestInvoker struct {
+	*mockcfg.MockInvoker
+	cfg aicommon.AICallerConfigIf
+}
+
+func (i *perceptionCapabilitySearchTestInvoker) GetConfig() aicommon.AICallerConfigIf {
+	return i.cfg
+}
+
+func (i *perceptionCapabilitySearchTestInvoker) InvokeSpeedPriorityLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
+	_ = ctx
+	_ = actionName
+	_ = prompt
+	_ = outputs
+	_ = opts
+	return aicommon.ExtractAction(`{
+		"@action": "perception",
+		"summary": "focused summary from perception",
+		"topics": ["http fuzzing"],
+		"keywords": ["header", "malformed"],
+		"changed": true,
+		"confidence": 0.92
+	}`, "perception")
+}
+
 func TestTriggerPerception_SchedulesMidtermRecallSummary(t *testing.T) {
 	invoker := &perceptionMidtermSchedulerTestInvoker{
 		MockInvoker: mockcfg.NewMockInvoker(context.Background()),
@@ -60,6 +87,67 @@ func TestTriggerPerception_SchedulesMidtermRecallSummary(t *testing.T) {
 	require.Equal(t, "focused summary from perception", invoker.scheduledSummary)
 	require.Equal(t, []string{"http fuzzing"}, invoker.scheduledTopics)
 	require.Equal(t, []string{"header", "malformed"}, invoker.scheduledKeywords)
+}
+
+func TestTriggerPerception_AppliesCapabilitySearchResultsToLoop(t *testing.T) {
+	tool, err := aitool.New(
+		"perception_tool",
+		aitool.WithDescription("tool discovered from perception"),
+		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+			return "ok", nil
+		}),
+	)
+	require.NoError(t, err)
+
+	toolManager := buildinaitools.NewToolManagerByToolGetter(
+		func() []*aitool.Tool { return []*aitool.Tool{tool} },
+		buildinaitools.WithExtendTools([]*aitool.Tool{tool}, true),
+	)
+
+	cfg := &aicommon.Config{
+		Ctx:                    context.Background(),
+		ContextProviderManager: aicommon.NewContextProviderManager(),
+		AiToolManager:          toolManager,
+	}
+	invoker := &perceptionCapabilitySearchTestInvoker{
+		MockInvoker: mockcfg.NewMockInvoker(context.Background()),
+		cfg:         cfg,
+	}
+
+	loop := NewMinimalReActLoop(cfg, invoker)
+	loop.loopName = "perception-capability-search-test"
+	loop.perception = newPerceptionController()
+	loop.extraCapabilities = NewExtraCapabilitiesManager()
+	loop.maxIterations = 100
+	loop.actionHistory = make([]*ActionRecord, 0)
+	loop.actionHistoryMutex = new(sync.Mutex)
+
+	originalSearcher := perceptionCapabilitySearcher
+	perceptionCapabilitySearcher = func(r aicommon.AIInvokeRuntime, loop *ReActLoop, input CapabilitySearchInput) (*CapabilitySearchResult, error) {
+		require.Equal(t, "focused summary from perception", input.Query)
+		require.Contains(t, input.Queries, "http fuzzing")
+		require.Contains(t, input.Queries, "header")
+		require.Contains(t, input.Queries, "malformed")
+		return &CapabilitySearchResult{
+			SearchResultsMarkdown:   "### Matched Tools\n- perception_tool\n",
+			ContextEnrichment:       "### Recommended Capabilities\n- perception_tool\n",
+			MatchedToolNames:        []string{"perception_tool"},
+			RecommendedCapabilities: []string{"perception_tool"},
+		}, nil
+	}
+	defer func() {
+		perceptionCapabilitySearcher = originalSearcher
+	}()
+
+	state := loop.TriggerPerception(PerceptionTriggerForced, true)
+	require.NotNil(t, state)
+	require.Equal(t, "perception_tool", loop.Get("perception_matched_tool_names"))
+	require.Equal(t, "perception_tool", loop.Get("perception_recommended_capabilities"))
+	require.Contains(t, loop.Get("perception_capability_context_enrichment"), "perception_tool")
+	require.True(t, toolManager.IsRecentlyUsedTool("perception_tool"))
+
+	rendered := loop.extraCapabilities.Render("nonce")
+	require.Contains(t, rendered, "`perception_tool`")
 }
 
 func TestHashTopics_DeterministicAndOrderIndependent(t *testing.T) {
