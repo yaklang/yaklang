@@ -74,8 +74,9 @@ func (b *legionJobBridge) handleSSARuleSyncExport(ctx context.Context, raw []byt
 		return fmt.Errorf("unmarshal SSA rule sync export command: %w", err)
 	}
 
-	ref := ssaRuleSyncCommandRefFromCommand(b.agent.node.NodeId, &command)
-	if err := validateSSARuleSyncExportCommand(b.agent.node.NodeId, &command); err != nil {
+	currentNodeID := b.agent.node.CurrentNodeID()
+	ref := ssaRuleSyncCommandRefFromCommand(currentNodeID, &command)
+	if err := validateSSARuleSyncExportCommand(currentNodeID, &command); err != nil {
 		return b.ruleSyncPublisher.PublishFailed(
 			ctx,
 			ref,
@@ -190,7 +191,7 @@ func (p *ssaRuleSyncEventPublisher) publish(
 		CorrelationId: ref.NodeID + ":ssa-rule-sync",
 		EmittedAt:     timestamppb.New(time.Now().UTC()),
 		Node: &nodev1.NodeRef{
-			NodeId:        p.node.NodeId,
+			NodeId:        p.node.CurrentNodeID(),
 			NodeSessionId: session.SessionID,
 		},
 	}
@@ -227,7 +228,7 @@ func (p *ssaRuleSyncEventPublisher) ensureJetStream(natsURL string) error {
 	if p.conn != nil {
 		p.conn.Close()
 	}
-	conn, err := nats.Connect(natsURL, nats.Name("yak-node-ssa-rule-sync-"+p.node.NodeId))
+	conn, err := nats.Connect(natsURL, nats.Name("yak-node-ssa-rule-sync-"+p.node.CurrentNodeID()))
 	if err != nil {
 		return fmt.Errorf("connect SSA rule sync nats: %w", err)
 	}
