@@ -2,6 +2,7 @@ package crawler
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"mime"
 	"net/http"
@@ -614,12 +615,72 @@ func (c *Crawler) handleReqResult(r *Req) {
 		log.Errorf("page information walker error: %s", err.Error())
 	}
 
+	// External JS contents are needed by both the SSA path (enableJSParser)
+	// and the AI extract path (enableAIJSExtract). Fetch once if either toggle
+	// is on; the helper is idempotent over content.IsCodeText.
+	if config.enableJSParser || config.enableAIJSExtract {
+		c.fetchExternalJSCodes(r, jsContents)
+	}
+
+	// AI assisted JS / HTML path extraction. Runs independently of jsParser,
+	// so users can opt-in to either or both. Each emitted path goes through
+	// the same submit() pipeline so deduplication / domain filters apply.
+	if config.enableAIJSExtract {
+		var combined bytes.Buffer
+		if len(r.responseBody) > 0 {
+			combined.Write(r.responseBody)
+			combined.WriteString("\n//---html-end---\n")
+		}
+		for _, j := range jsContents {
+			if j.IsCodeText && j.Code != "" {
+				combined.WriteString(j.Code)
+				combined.WriteString("\n//---js-chunk-end---\n")
+			}
+		}
+		if combined.Len() > 0 {
+			extractCtx, extractCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+			err := RunAIJSExtract(extractCtx, combined.String(), config.aiJSExtractConfig, func(p string) {
+				httpsR, reqBytes, err := NewHTTPRequest(r.IsHttps(), r.requestRaw, r.responseBody, p)
+				if err != nil {
+					log.Debugf("ai js extract: build http request failed for %q: %v", p, err)
+					return
+				}
+				submit(httpsR, reqBytes)
+			})
+			extractCancel()
+			if err != nil {
+				log.Warnf("ai js extract: pipeline error: %v", err)
+			}
+		}
+	}
+
 	if !config.enableJSParser {
 		return
 	}
 
-	// with JS Parse
+	var fullJSCode bytes.Buffer
 
+	for _, i := range jsContents {
+		if !i.IsCodeText {
+			continue
+		}
+		fullJSCode.WriteString(i.Code)
+		fullJSCode.WriteByte(';')
+		fullJSCode.WriteByte('\n')
+	}
+	utils.CallWithTimeout(30, func() {
+		HandleJSGetNewRequest(r.https, r.requestRaw, fullJSCode.String(), func(b bool, i []byte) {
+			submit(b, i)
+		})
+	})
+}
+
+// fetchExternalJSCodes pulls remote JS bodies referenced by jsContents (where
+// IsCodeText is false) and stamps them back as code text. The function is
+// idempotent: items that already carry inline code are skipped, so calling it
+// from multiple gates costs nothing extra.
+func (c *Crawler) fetchExternalJSCodes(r *Req, jsContents []*JavaScriptContent) {
+	config := c.config
 	jsConcurrent := config.concurrent / 2
 	if jsConcurrent <= 0 {
 		jsConcurrent = 3
@@ -652,29 +713,12 @@ func (c *Crawler) handleReqResult(r *Req) {
 				return
 			}
 
-			rspHeader, body := lowhttp.SplitHTTPPacketFast(rsp.RawPacket)
+			_, body := lowhttp.SplitHTTPPacketFast(rsp.RawPacket)
 			content.Code = string(body)
 			content.IsCodeText = true
-			_ = rspHeader
 		}()
 	}
 	swg.Wait()
-
-	var fullJSCode bytes.Buffer
-
-	for _, i := range jsContents {
-		if !i.IsCodeText {
-			continue
-		}
-		fullJSCode.WriteString(i.Code)
-		fullJSCode.WriteByte(';')
-		fullJSCode.WriteByte('\n')
-	}
-	utils.CallWithTimeout(30, func() {
-		HandleJSGetNewRequest(r.https, r.requestRaw, fullJSCode.String(), func(b bool, i []byte) {
-			submit(b, i)
-		})
-	})
 }
 
 var metaUrlExtractor = regexp.MustCompile(`(?i)url=\s*([^\s]+)`)
