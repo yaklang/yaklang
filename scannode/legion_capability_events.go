@@ -87,7 +87,7 @@ func (p *capabilityEventPublisher) PublishAlert(
 	alert CapabilityRuntimeAlert,
 ) error {
 	ref := capabilityCommandRef{
-		NodeID:        p.node.NodeId,
+		NodeID:        p.node.CurrentNodeID(),
 		CapabilityKey: alert.CapabilityKey,
 		SpecVersion:   alert.SpecVersion,
 	}
@@ -107,7 +107,7 @@ func (p *capabilityEventPublisher) PublishObservation(
 	observation CapabilityRuntimeObservation,
 ) error {
 	ref := capabilityCommandRef{
-		NodeID:        p.node.NodeId,
+		NodeID:        p.node.CurrentNodeID(),
 		CapabilityKey: observation.CapabilityKey,
 		SpecVersion:   observation.SpecVersion,
 	}
@@ -144,7 +144,7 @@ func (p *capabilityEventPublisher) publish(
 		CorrelationId: capabilityCorrelationID(ref.NodeID, ref.CapabilityKey),
 		EmittedAt:     timestamppb.New(time.Now().UTC()),
 		Node: &nodev1.NodeRef{
-			NodeId:        p.node.NodeId,
+			NodeId:        p.node.CurrentNodeID(),
 			NodeSessionId: session.SessionID,
 		},
 	}
@@ -189,7 +189,7 @@ func (p *capabilityEventPublisher) ensureJetStream(natsURL string) error {
 	}
 	p.closeLocked()
 
-	conn, err := nats.Connect(natsURL, nats.Name("yak-node-capability-events-"+p.node.NodeId))
+	conn, err := nats.Connect(natsURL, nats.Name("yak-node-capability-events-"+p.node.CurrentNodeID()))
 	if err != nil {
 		return fmt.Errorf("connect capability event nats: %w", err)
 	}

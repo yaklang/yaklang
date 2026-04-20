@@ -1,5 +1,11 @@
 # scannode
 
+## Legion HIDS
+
+- Linux HIDS packaging, host-readiness checks, desired spec validation, and degraded-host behavior are documented in `../docs/legion-linux-hids-readiness.md`.
+- The current Legion smoke entrypoint is `../cmd/legion-smoke-node`, and HIDS support requires building that binary with `-tags hids`.
+- 推荐优先使用 `task legion_smoke_node_build_hids_linux_amd64` 产出可部署的 Linux HIDS 二进制；`task legion_smoke_node_build_hids` 更适合已经在 Linux 主机上的原生调试构建。
+
 1. 本项目自带了一个脚本执行引擎，可以支持你想要的功能的编写，可以单独调试脚本，编写完成后复制到服务器即可
 2. 分布式脚本编写数据流依赖本系统自带的 mq 框架
 3. 现有的分布式指纹识别/爬虫是依赖服务器分发与控制的
@@ -50,8 +56,6 @@
 `reportFingerprint`
 
 支持本系统扫描指纹直接上报，非常好用了。
-
-
 
 
 

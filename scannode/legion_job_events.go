@@ -235,7 +235,7 @@ func (p *jobEventPublisher) publish(
 		CorrelationId: ref.AttemptID,
 		EmittedAt:     timestamppb.New(time.Now().UTC()),
 		Node: &nodev1.NodeRef{
-			NodeId:        p.node.NodeId,
+			NodeId:        p.node.CurrentNodeID(),
 			NodeSessionId: session.SessionID,
 		},
 	}
@@ -272,7 +272,7 @@ func (p *jobEventPublisher) ensureJetStream(natsURL string) error {
 	}
 	p.closeLocked()
 
-	conn, err := nats.Connect(natsURL, nats.Name("yak-node-events-"+p.node.NodeId))
+	conn, err := nats.Connect(natsURL, nats.Name("yak-node-events-"+p.node.CurrentNodeID()))
 	if err != nil {
 		return fmt.Errorf("connect event nats: %w", err)
 	}

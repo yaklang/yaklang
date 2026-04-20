@@ -969,13 +969,16 @@ var DistributionCommands = []*cli.Command{
 		After:  nil,
 		Action: func(c *cli.Context) error {
 			scanNode, err := scannode.NewScanNode(node.BaseConfig{
-				NodeType:           spec.NodeType_Scanner,
-				NodeID:             c.String("id"),
-				EnrollmentToken:    c.String("enrollment-token"),
-				PlatformAPIBaseURL: c.String("api-url"),
-				Version:            c.String("version"),
-				MaxRunningJobs:     uint32(c.Int("max-running-jobs")),
-				HeartbeatInterval:  c.Duration("heartbeat-interval"),
+				NodeType:            spec.NodeType_Scanner,
+				NodeID:              c.String("id"),
+				DisplayName:         c.String("name"),
+				AgentInstallationID: c.String("agent-installation-id"),
+				BaseDir:             c.String("base-dir"),
+				EnrollmentToken:     c.String("enrollment-token"),
+				PlatformAPIBaseURL:  c.String("api-url"),
+				Version:             c.String("version"),
+				MaxRunningJobs:      uint32(c.Int("max-running-jobs")),
+				HeartbeatInterval:   c.Duration("heartbeat-interval"),
 			})
 			if err != nil {
 				return err
@@ -1011,8 +1014,20 @@ var DistributionCommands = []*cli.Command{
 			},
 			cli.StringFlag{
 				Name:  "id",
-				Usage: "Node ID",
+				Usage: "Legacy node ID fallback; canonical node_id is assigned by platform",
+			},
+			cli.StringFlag{
+				Name:  "name",
+				Usage: "Display name reported to Legion",
 				Value: fmt.Sprintf("scannode-[%s]", runtime.GOOS+runtime.GOARCH),
+			},
+			cli.StringFlag{
+				Name:  "agent-installation-id",
+				Usage: "Override persisted agent installation ID",
+			},
+			cli.StringFlag{
+				Name:  "base-dir",
+				Usage: "Node local state base directory",
 			},
 			cli.StringFlag{
 				Name:  "version",

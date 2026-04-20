@@ -28,8 +28,9 @@ func (b *legionJobBridge) handleCapabilityApply(
 		return fmt.Errorf("unmarshal capability apply command: %w", err)
 	}
 
-	ref := capabilityCommandRefFromCommand(b.agent.node.NodeId, &command)
-	if err := validateApplyCapabilityCommand(b.agent.node.NodeId, &command); err != nil {
+	currentNodeID := b.agent.node.CurrentNodeID()
+	ref := capabilityCommandRefFromCommand(currentNodeID, &command)
+	if err := validateApplyCapabilityCommand(currentNodeID, &command); err != nil {
 		return b.capabilityPublisher.PublishFailed(
 			ctx,
 			ref,

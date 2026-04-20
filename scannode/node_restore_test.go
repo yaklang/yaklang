@@ -62,6 +62,7 @@ func TestLegionJobBridgeSyncCapabilityStatusesTriggersSessionReadyHooks(t *testi
 	t.Parallel()
 
 	session := node.SessionState{
+		NodeID:             "node-restore-canonical",
 		SessionID:          "session-restore",
 		SessionToken:       "token-restore",
 		NATSURL:            "nats://session-restore.test",
@@ -70,6 +71,7 @@ func TestLegionJobBridgeSyncCapabilityStatusesTriggersSessionReadyHooks(t *testi
 	}
 	base, err := node.NewNodeBase(node.BaseConfig{
 		NodeID:             "node-restore",
+		BaseDir:            t.TempDir(),
 		EnrollmentToken:    "enroll-restore",
 		PlatformAPIBaseURL: "http://platform.test",
 		TransportClient:    &bootstrapSessionTransport{session: session},

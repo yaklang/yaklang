@@ -2,6 +2,7 @@ package node
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"time"
 
@@ -24,7 +25,10 @@ func (n *NodeBase) bootstrapSession() error {
 
 	session, err := n.transport.Bootstrap(ctx, BootstrapRequest{
 		EnrollmentToken:          n.enrollmentToken,
-		NodeID:                   n.NodeId,
+		NodeID:                   n.LegacyNodeID(),
+		ClaimedName:              n.DisplayName(),
+		AgentInstallationID:      n.AgentInstallationID(),
+		HostIdentity:             n.hostIdentitySnapshot(),
 		NodeType:                 string(n.NodeType),
 		Version:                  n.version,
 		Labels:                   cloneStringMap(n.labels),
@@ -35,11 +39,15 @@ func (n *NodeBase) bootstrapSession() error {
 	if err != nil {
 		return err
 	}
+	if session.NodeID == "" {
+		return fmt.Errorf("bootstrap response node_id is required")
+	}
+	n.setCurrentNodeID(session.NodeID)
 
 	n.sessionMu.Lock()
 	n.session = session
 	n.sessionMu.Unlock()
-	log.Infof("node session established: node_id=%s session_id=%s", n.NodeId, session.SessionID)
+	log.Infof("node session established: node_id=%s session_id=%s", n.CurrentNodeID(), session.SessionID)
 	return nil
 }
 
@@ -48,6 +56,13 @@ func (n *NodeBase) hostInfoSnapshot() HostInfo {
 		return HostInfo{}
 	}
 	return normalizeHostInfo(n.hostInfoProvider.Snapshot())
+}
+
+func (n *NodeBase) hostIdentitySnapshot() HostIdentity {
+	if n == nil || n.hostIdentityProvider == nil {
+		return HostIdentity{}
+	}
+	return normalizeHostIdentity(n.hostIdentityProvider.Snapshot())
 }
 
 func (n *NodeBase) sleepWithContext(duration time.Duration) error {
