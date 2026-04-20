@@ -226,6 +226,39 @@ func TestRemoveSession_EdgeCases(t *testing.T) {
 	})
 }
 
+func TestDoWebSocket_ClientCreationFailureReturnsErrorWithoutPanic(t *testing.T) {
+	host, port := utils.DebugMockHTTP([]byte("HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 2\r\n\r\nok"))
+
+	var clientHandlerCalled int32
+	rawRequest := fmt.Sprintf(`GET / HTTP/1.1
+Host: %s
+Connection: Upgrade
+Upgrade: websocket
+Sec-WebSocket-Version: 13
+Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==
+
+`, utils.HostPort(host, port))
+
+	var rsp []byte
+	var req []byte
+	var err error
+	require.NotPanics(t, func() {
+		rsp, req, err = DoWebSocket(
+			rawRequest,
+			WithTimeout(1),
+			WithWebsocketClientHandler(func(c *lowhttp.WebsocketClient) {
+				atomic.StoreInt32(&clientHandlerCalled, 1)
+			}),
+		)
+	})
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "upgrade websocket failed")
+	require.Nil(t, rsp)
+	require.Nil(t, req)
+	require.Zero(t, atomic.LoadInt32(&clientHandlerCalled))
+}
+
 func TestWithPostParams(t *testing.T) {
 	tests := []struct {
 		name                string
