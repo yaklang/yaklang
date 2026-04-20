@@ -449,6 +449,7 @@ func (m *HTTPFlowAnalyzeManger) ExecReplacerRule(db *gorm.DB, flow *schema.HTTPF
 
 		var extractedData []schema.ExtractedData
 		filter := filter.NewFilter()
+		ph := yakit.BuildMITMExtractPlaceholders(nil, flow)
 		for _, matched := range matcheds {
 			// 如果开启了去重，检查是否已经存在相同的数据
 			if m.dedup {
@@ -460,7 +461,7 @@ func (m *HTTPFlowAnalyzeManger) ExecReplacerRule(db *gorm.DB, flow *schema.HTTPF
 			e := yakit.ExtractedDataFromHTTPFlow(
 				flow.HiddenIndex,
 				rule.VerboseName,
-				matched,
+				yakit.CloneMatchResultWithMITMPlaceholders(matched, ph),
 				pattern,
 			)
 			// save extracted data

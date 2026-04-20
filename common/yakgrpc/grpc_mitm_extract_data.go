@@ -23,6 +23,27 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+func (s *Server) QueryMITMExtractedAggregate(ctx context.Context, req *ypb.QueryMITMExtractedAggregateRequest) (*ypb.QueryMITMExtractedAggregateResponse, error) {
+	db := s.GetProjectDatabase()
+	p, rows, distinctGroups, err := yakit.QueryMITMExtractedAggregate(db, req)
+	if err != nil {
+		return nil, err
+	}
+	pg := req.GetPagination()
+	if pg == nil {
+		pg = &ypb.Paging{Page: 1, Limit: 30, OrderBy: "hit_count", Order: "desc"}
+	}
+	resp := &ypb.QueryMITMExtractedAggregateResponse{
+		Data:       rows,
+		Total:      int64(p.TotalRecord),
+		Pagination: pg,
+	}
+	if req != nil && req.GetIncludeDistinctRuleGroups() {
+		resp.DistinctRuleGroups = distinctGroups
+	}
+	return resp, nil
+}
+
 func (s *Server) QueryMITMRuleExtractedData(ctx context.Context, req *ypb.QueryMITMRuleExtractedDataRequest) (*ypb.QueryMITMRuleExtractedDataResponse, error) {
 	db := s.GetProjectDatabase()
 	f := req.GetFilter()

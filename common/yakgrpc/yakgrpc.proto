@@ -638,6 +638,8 @@ service Yak {
 
   // 从规则中提取数据
   rpc QueryMITMRuleExtractedData(QueryMITMRuleExtractedDataRequest) returns (QueryMITMRuleExtractedDataResponse);
+  // 按规则名 + 提取内容聚合（JOIN http_flows，可按 Host / RuntimeId 等过滤）
+  rpc QueryMITMExtractedAggregate(QueryMITMExtractedAggregateRequest) returns (QueryMITMExtractedAggregateResponse);
   rpc ExportMITMRuleExtractedData(ExportMITMRuleExtractedDataRequest) returns (stream ExportMITMRuleExtractedDataResponse);
   rpc DeleteMITMRuleExtractedData(DeleteMITMRuleExtractedDataRequest) returns (Empty);
   rpc DeduplicateMITMRuleExtractedData(DeduplicateMITMRuleExtractedDataRequest) returns (DeduplicateMITMRuleExtractedDataResponse); 
@@ -3325,6 +3327,41 @@ message DeduplicateMITMRuleExtractedDataRequest {
 
 message DeduplicateMITMRuleExtractedDataResponse {
   int64 DeletedCount = 1;
+}
+
+message QueryMITMExtractedAggregateRequest {
+  Paging Pagination = 1;
+  // 模糊匹配 http_flows.host；空则不过滤
+  string HostContains = 2;
+  // 精确匹配 http_flows.runtime_id；空则不过滤
+  string RuntimeId = 3;
+  // 精确匹配 rule_verbose（任一命中）；空则不过滤
+  repeated string RuleVerbose = 4;
+  // 模糊匹配 extracted_data.rule_verbose；空则不过滤
+  string RuleVerboseKeyword = 5;
+  // 仅统计 updated_at >= 该 Unix 秒数的记录；0 表示不过滤
+  int64 UpdatedAtSince = 6;
+  // 规则组：rule_verbose 形如「规则组 / 规则名」时按组名精确筛选；与 OnlyUncategorizedRules 互斥
+  string RuleGroup = 7;
+  // 仅统计无法解析出规则组的 rule_verbose（不含 " / " 分隔）
+  bool OnlyUncategorizedRules = 8;
+  // 为 true 时在响应中附带 DistinctRuleGroups（不受 RuleGroup/OnlyUncategorizedRules/RuleVerbose 影响，仍受 Host/Runtime/Keyword/Time 影响）
+  bool IncludeDistinctRuleGroups = 9;
+}
+
+message MITMExtractedAggregateRow {
+  string RuleVerbose = 1;
+  string DisplayData = 2;
+  int64 HitCount = 3;
+  int64 LatestUpdatedAt = 4;
+  repeated string SampleTraceIds = 5;
+}
+
+message QueryMITMExtractedAggregateResponse {
+  repeated MITMExtractedAggregateRow Data = 1;
+  int64 Total = 2;
+  Paging Pagination = 3;
+  repeated string DistinctRuleGroups = 4;
 }
 
 message ExportProjectRequest {
