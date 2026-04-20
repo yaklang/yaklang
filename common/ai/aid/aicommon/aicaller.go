@@ -65,12 +65,7 @@ func AIChatToAICallbackType(cb func(prompt string, opts ...aispec.AIConfigOption
 					resp.EmitReasonStream(reader)
 				}),
 				aispec.WithModelInfoCallback(func(provider, model string) {
-					resp.SetModelInfo(provider, model)
-					if cfg, ok := aicf.(interface{ UpdateAIModelInfo(string, string) }); ok {
-						cfg.UpdateAIModelInfo(provider, model)
-					}
-					log.Infof("ai request %v:%v is sent with request body: %v bytes",
-						provider, model, len(req.GetPrompt()))
+					resp.SetModelInfo(provider, model) // not update config model info, just set for response
 				}),
 				aispec.WithModelInfoConfirmCallback(func(provider, model string) {
 					resp.SetModelInfo(provider, model)

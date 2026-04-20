@@ -2752,10 +2752,14 @@ func (c *Config) UpdateAIModelInfo(provider, model string) {
 
 // EventFormat fills in common fields for AI output events
 func (c *Config) EventFormat(e *schema.AiOutputEvent) *schema.AiOutputEvent {
-	if c.AiServerName != "" {
-		e.AIService = c.AiServerName
+
+	if e.AIModelName == "" {
 		e.AIModelName = c.AiModelName
 		e.AIModelVerboseName = aispec.ModelVerboseName(c.AiModelName)
+	}
+
+	if e.AIService == "" {
+		e.AIService = c.AiServerName
 	}
 
 	if c.PersistentSessionId != "" {
