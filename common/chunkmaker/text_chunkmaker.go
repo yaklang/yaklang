@@ -134,9 +134,9 @@ func (cm *TextChunkMaker) loop(i chan struct{}) {
 		go func() { // Run flushing in a new goroutine to avoid deadlocks
 			defer tempDst.Close() // Close tempDst when flushing is done
 			if flushAllData {
-				bufferChunk.FlushAllChunkSizeTo(tempDst, cm.config.chunkSize, cm.config.separator, haveTheLastChunk)
+				bufferChunk.FlushAllChunkSizeToEx(tempDst, cm.config.chunkSize, cm.config.separator, haveTheLastChunk, cm.config.separatorAsBoundary)
 			} else {
-				bufferChunk.FlushFullChunkSizeTo(tempDst, cm.config.chunkSize, cm.config.separator)
+				bufferChunk.FlushFullChunkSizeToEx(tempDst, cm.config.chunkSize, cm.config.separator, cm.config.separatorAsBoundary)
 			}
 		}()
 		processAndLinkChunks(tempDst, haveTheLastChunk)

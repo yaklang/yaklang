@@ -1695,6 +1695,43 @@ func RuneIndex(s, sub []rune) int {
 	return -1
 }
 
+// RuneLastIndex returns the index of the last occurrence of sub in s, or -1
+// when not found. It mirrors bytes.LastIndex semantics at rune granularity.
+func RuneLastIndex(s, sub []rune) int {
+	n := len(sub)
+	switch {
+	case n == 0:
+		return len(s)
+	case n == 1:
+		for i := len(s) - 1; i >= 0; i-- {
+			if s[i] == sub[0] {
+				return i
+			}
+		}
+		return -1
+	case n == len(s):
+		if string(sub) == string(s) {
+			return 0
+		}
+		return -1
+	case n > len(s):
+		return -1
+	}
+	for i := len(s) - len(sub); i >= 0; i-- {
+		match := true
+		for j := 0; j < len(sub); j++ {
+			if s[i+j] != sub[j] {
+				match = false
+				break
+			}
+		}
+		if match {
+			return i
+		}
+	}
+	return -1
+}
+
 func CutBytesPrefixFunc(raw []byte, handle func(rune) bool) ([]byte, []byte, bool) {
 	index := bytes.IndexFunc(raw, handle)
 	if index < 0 {

@@ -147,15 +147,89 @@ func RuneHandler(data []rune, chunkSize int64, sep []rune, emitFunc func([]rune)
 	return data
 }
 
+// BytesHandlerBoundary packs data into chunks up to chunkSize. Within each
+// chunk window, if a separator is present, the handler prefers to end at the
+// LAST separator occurrence so that logical blocks remain intact. Data shorter
+// than chunkSize is left in the returned remainder (caller keeps it buffered
+// for the next fill round). Use for "separator-as-boundary" semantics.
+func BytesHandlerBoundary(data []byte, chunkSize int64, sep []byte, emitFunc func([]byte)) []byte {
+	if chunkSize <= 0 {
+		return data
+	}
+	sepLength := len(sep)
+	for int64(len(data)) >= chunkSize {
+		step := int(chunkSize)
+		if sepLength > 0 {
+			searchEnd := step
+			if searchEnd > len(data) {
+				searchEnd = len(data)
+			}
+			if idx := bytes.LastIndex(data[:searchEnd], sep); idx > 0 {
+				step = idx + sepLength
+			}
+		}
+		if step > len(data) {
+			break
+		}
+		if emitFunc != nil {
+			emitFunc(data[:step])
+		}
+		data = data[step:]
+	}
+	return data
+}
+
+// RuneHandlerBoundary is the rune-oriented counterpart of BytesHandlerBoundary.
+func RuneHandlerBoundary(data []rune, chunkSize int64, sep []rune, emitFunc func([]rune)) []rune {
+	if chunkSize <= 0 {
+		return data
+	}
+	sepLength := len(sep)
+	for int64(len(data)) >= chunkSize {
+		step := int(chunkSize)
+		if sepLength > 0 {
+			searchEnd := step
+			if searchEnd > len(data) {
+				searchEnd = len(data)
+			}
+			if idx := utils.RuneLastIndex(data[:searchEnd], sep); idx > 0 {
+				step = idx + sepLength
+			}
+		}
+		if step > len(data) {
+			break
+		}
+		if emitFunc != nil {
+			emitFunc(data[:step])
+		}
+		data = data[step:]
+	}
+	return data
+}
+
 func (c *BufferChunk) FlushFullChunkSizeTo(dst *chanx.UnlimitedChan[Chunk], chunkSize int64, sep string) {
+	c.FlushFullChunkSizeToEx(dst, chunkSize, sep, false)
+}
+
+// FlushFullChunkSizeToEx is the extended variant of FlushFullChunkSizeTo. When
+// separatorAsBoundary is true, the separator is treated as a preferred cut
+// boundary (last occurrence inside the chunkSize window). When false, the
+// legacy "every separator flushes a chunk" behavior is preserved.
+func (c *BufferChunk) FlushFullChunkSizeToEx(dst *chanx.UnlimitedChan[Chunk], chunkSize int64, sep string, separatorAsBoundary bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	if c.isUTF8 {
-		remainingData := RuneHandler([]rune(c.buffer.String()), chunkSize, []rune(sep), func(runes []rune) {
+		emitRunes := func(runes []rune) {
 			chunk := NewBufferChunk([]byte(string(runes)))
 			dst.SafeFeed(chunk)
-		})
+		}
+		var remainingData []rune
+		if separatorAsBoundary {
+			remainingData = RuneHandlerBoundary([]rune(c.buffer.String()), chunkSize, []rune(sep), emitRunes)
+		} else {
+			remainingData = RuneHandler([]rune(c.buffer.String()), chunkSize, []rune(sep), emitRunes)
+		}
 		c.buffer.Reset()
 		if len(remainingData) > 0 {
 			c.buffer.WriteString(string(remainingData))
@@ -167,10 +241,16 @@ func (c *BufferChunk) FlushFullChunkSizeTo(dst *chanx.UnlimitedChan[Chunk], chun
 		}
 		c.isUTF8 = true
 	} else {
-		remainingData := BytesHandler([]byte(c.buffer.String()), chunkSize, []byte(sep), func(dataBytes []byte) {
+		emitBytes := func(dataBytes []byte) {
 			chunk := NewBufferChunk(dataBytes)
 			dst.SafeFeed(chunk)
-		})
+		}
+		var remainingData []byte
+		if separatorAsBoundary {
+			remainingData = BytesHandlerBoundary([]byte(c.buffer.String()), chunkSize, []byte(sep), emitBytes)
+		} else {
+			remainingData = BytesHandler([]byte(c.buffer.String()), chunkSize, []byte(sep), emitBytes)
+		}
 		c.buffer.Reset()
 		if len(remainingData) > 0 {
 			c.buffer.Write(remainingData)
@@ -185,6 +265,12 @@ func (c *BufferChunk) FlushFullChunkSizeTo(dst *chanx.UnlimitedChan[Chunk], chun
 }
 
 func (c *BufferChunk) FlushAllChunkSizeTo(dst *chanx.UnlimitedChan[Chunk], chunkSize int64, sep string, haveTheLastChunk bool) {
+	c.FlushAllChunkSizeToEx(dst, chunkSize, sep, haveTheLastChunk, false)
+}
+
+// FlushAllChunkSizeToEx is the extended variant of FlushAllChunkSizeTo. See
+// FlushFullChunkSizeToEx for the semantics of separatorAsBoundary.
+func (c *BufferChunk) FlushAllChunkSizeToEx(dst *chanx.UnlimitedChan[Chunk], chunkSize int64, sep string, haveTheLastChunk bool, separatorAsBoundary bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -194,33 +280,40 @@ func (c *BufferChunk) FlushAllChunkSizeTo(dst *chanx.UnlimitedChan[Chunk], chunk
 	}
 
 	if c.isUTF8 {
-		// use runes size
 		totalRunes := []rune(c.buffer.String())
-		remainingData := RuneHandler(totalRunes, chunkSize, []rune(sep), func(runes []rune) {
+		emitRunes := func(runes []rune) {
 			chunk := NewBufferChunk([]byte(string(runes)))
 			emitChunk(chunk)
-		})
+		}
+		var remainingData []rune
+		if separatorAsBoundary {
+			remainingData = RuneHandlerBoundary(totalRunes, chunkSize, []rune(sep), emitRunes)
+		} else {
+			remainingData = RuneHandler(totalRunes, chunkSize, []rune(sep), emitRunes)
+		}
 		if len(remainingData) > 0 {
 			chunk := NewBufferChunk([]byte(string(remainingData)))
 			emitChunk(chunk)
 		}
-		// 完全重置buffer
 		c.buffer.Reset()
 		c.isUTF8 = true
 		c.bytesize = 0
 		c.runesize = 0
 	} else {
-		// use bytes size
-		remainingData := BytesHandler(c.buffer.Bytes(), chunkSize, []byte(sep), func(dataBytes []byte) {
+		emitBytes := func(dataBytes []byte) {
 			chunk := NewBufferChunk(dataBytes)
 			emitChunk(chunk)
-		})
+		}
+		var remainingData []byte
+		if separatorAsBoundary {
+			remainingData = BytesHandlerBoundary(c.buffer.Bytes(), chunkSize, []byte(sep), emitBytes)
+		} else {
+			remainingData = BytesHandler(c.buffer.Bytes(), chunkSize, []byte(sep), emitBytes)
+		}
 		if len(remainingData) > 0 {
 			chunk := NewBufferChunk(remainingData)
 			emitChunk(chunk)
 		}
-
-		// 完全重置buffer
 		c.buffer.Reset()
 		c.isUTF8 = false
 		c.bytesize = 0

@@ -65,7 +65,7 @@ func (c *Config) StartEventLoopEx(ctx context.Context, startCall func(), doneCal
 					})
 					select {
 					case <-validator:
-						log.Infof("coordinator validator working, (%v) start", c.id)
+						//log.Infof("coordinator validator working, (%v) start", c.id)
 						continue
 					case <-ticker.C:
 						tickerCallback()
@@ -85,7 +85,7 @@ func (c *Config) StartEventLoopEx(ctx context.Context, startCall func(), doneCal
 
 				select {
 				case <-validator:
-					log.Infof("coordinator validator working, (%v) start", c.id)
+					//log.Infof("coordinator validator working, (%v) start", c.id)
 					continue
 				case event, ok := <-c.EventInputChan.OutputChannel():
 					if !ok {

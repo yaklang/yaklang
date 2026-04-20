@@ -148,7 +148,7 @@ func (l *AutoSkillLoader) discoverSkills(rootFS fi.FileSystem) error {
 			}
 			l.mu.Unlock()
 
-			log.Infof("auto-discovered skill: %s from %s", meta.Name, pathname)
+			// log.Infof("auto-discovered skill: %s from %s", meta.Name, pathname)
 			return nil
 		}),
 	)

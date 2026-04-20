@@ -21,6 +21,7 @@ var Exports = map[string]any{
 	"context":                    WithContext,
 	"memory":                     WithMemory,
 	"separator":                  WithSeparatorTrigger,
+	"separatorAsBoundary":        WithSeparatorAsBoundary,
 	"chunkSize":                  WithChunkSize,
 	"lines":                      WithLines,
 	"lineNumber":                 WithEnableLineNumber,
