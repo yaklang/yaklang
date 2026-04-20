@@ -73,11 +73,15 @@ func (r *ReAct) SelectKnowledgeBase(ctx context.Context, originQuery string) (*a
 			aitool.WithParam_Description("选择这些知识库的理由"),
 			aitool.WithParam_Required(true),
 		),
-	}, aicommon.WithGeneralConfigStreamableFieldCallback([]string{
+	}, aicommon.WithGeneralConfigStreamableFieldEmitterCallback([]string{
 		"reason", "knowledge_bases",
-	}, func(key string, rd io.Reader) {
+	}, func(key string, rd io.Reader, emitter *aicommon.Emitter) {
+		if emitter == nil {
+			io.Copy(io.Discard, rd)
+			return
+		}
 		firstExec.DoOr(func() {
-			r.GetConfig().GetEmitter().EmitDefaultStreamEvent(
+			emitter.EmitDefaultStreamEvent(
 				"search-relative-knowledge-base", pr,
 				r.GetCurrentTaskId(),
 			)

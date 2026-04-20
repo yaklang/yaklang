@@ -52,7 +52,6 @@ func generateGuidanceDocument(loop *reactloops.ReActLoop, task aicommon.AIStatef
 	if task != nil {
 		taskIndex = task.GetId()
 	}
-	emitter := loop.GetEmitter()
 
 	action, err := invoker.InvokeQualityPriorityLiteForge(
 		ctx,
@@ -64,9 +63,9 @@ func generateGuidanceDocument(loop *reactloops.ReActLoop, task aicommon.AIStatef
 				aitool.WithParam_Required(true),
 			),
 		},
-		aicommon.WithGeneralConfigStreamableFieldCallback(
+		aicommon.WithGeneralConfigStreamableFieldEmitterCallback(
 			[]string{PlanDocumentFieldName},
-			func(key string, r io.Reader) {
+			func(key string, r io.Reader, emitter *aicommon.Emitter) {
 				r = utils.JSONStringReader(r)
 				if emitter == nil {
 					io.Copy(io.Discard, r)
@@ -139,7 +138,6 @@ func generatePlanFromDocument(loop *reactloops.ReActLoop, task aicommon.AIStatef
 	if task != nil {
 		taskIndex = task.GetId()
 	}
-	emitter := loop.GetEmitter()
 
 	action, err := invoker.InvokeQualityPriorityLiteForge(
 		ctx,
@@ -168,9 +166,9 @@ func generatePlanFromDocument(loop *reactloops.ReActLoop, task aicommon.AIStatef
 				),
 			),
 		},
-		aicommon.WithGeneralConfigStreamableFieldCallback(
+		aicommon.WithGeneralConfigStreamableFieldEmitterCallback(
 			[]string{"tasks"},
-			func(key string, r io.Reader) {
+			func(key string, r io.Reader, emitter *aicommon.Emitter) {
 				if emitter == nil {
 					io.Copy(io.Discard, r)
 					return

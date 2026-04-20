@@ -145,7 +145,7 @@ Skills: {{ .MatchedSkillNames }}
 			),
 		},
 		aicommon.WithGeneralConfigStreamableFieldWithNodeId("intent", "intent_summary"),
-		aicommon.WithGeneralConfigStreamableFieldCallback(
+		aicommon.WithGeneralConfigStreamableFieldEmitterCallback(
 			[]string{"recommended_capabilities"},
 			recommendedCapabilitiesStreamCallback(invoker),
 		),

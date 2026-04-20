@@ -19,7 +19,6 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/fstools"
-	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/ytoken"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -2752,16 +2751,6 @@ func (c *Config) UpdateAIModelInfo(provider, model string) {
 
 // EventFormat fills in common fields for AI output events
 func (c *Config) EventFormat(e *schema.AiOutputEvent) *schema.AiOutputEvent {
-
-	if e.AIModelName == "" {
-		e.AIModelName = c.AiModelName
-		e.AIModelVerboseName = aispec.ModelVerboseName(c.AiModelName)
-	}
-
-	if e.AIService == "" {
-		e.AIService = c.AiServerName
-	}
-
 	if c.PersistentSessionId != "" {
 		e.SessionId = c.PersistentSessionId
 	}

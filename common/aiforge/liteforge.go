@@ -86,16 +86,23 @@ func WithLiteForge_StreamableField(fieldKey string) LiteForgeOption {
 
 // FieldStreamCallback is a callback for handling streaming field data
 type FieldStreamCallback func(key string, r io.Reader)
+type FieldStreamEmitterCallback func(key string, r io.Reader, emitter *aicommon.Emitter)
 
 // fieldStreamCallbackItem stores callback info for streaming fields
 type fieldStreamCallbackItem struct {
 	FieldKeys []string
-	Callback  FieldStreamCallback
+	Callback  FieldStreamEmitterCallback
 }
 
 // WithLiteForge_FieldStreamCallback registers a callback to be invoked when specified fields stream data.
 // This enables extensibility for processing streaming JSON field data in real-time during LiteForge execution.
 func WithLiteForge_FieldStreamCallback(fieldKeys []string, callback FieldStreamCallback) LiteForgeOption {
+	return WithLiteForge_FieldStreamEmitterCallback(fieldKeys, func(key string, r io.Reader, _ *aicommon.Emitter) {
+		callback(key, r)
+	})
+}
+
+func WithLiteForge_FieldStreamEmitterCallback(fieldKeys []string, callback FieldStreamEmitterCallback) LiteForgeOption {
 	return func(l *LiteForge) error {
 		if l.fieldStreamCallbacks == nil {
 			l.fieldStreamCallbacks = make([]*fieldStreamCallbackItem, 0)
@@ -321,7 +328,11 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 			// add user-defined field stream callbacks
 			for _, item := range l.fieldStreamCallbacks {
 				item := item
-				actionOpts = append(actionOpts, aicommon.WithActionFieldStreamHandler(item.FieldKeys, item.Callback))
+				actionOpts = append(actionOpts, aicommon.WithActionFieldStreamHandler(item.FieldKeys, func(key string, r io.Reader) {
+					if item.Callback != nil {
+						item.Callback(key, r, boundEmitter)
+					}
+				}))
 			}
 
 			actionNames := []string{}
