@@ -30,10 +30,14 @@ func WithGeneralConfigStreamableField(fieldKey string) GeneralKVConfigOption {
 // r: io.Reader containing the streaming data for that field
 type StreamableFieldCallback func(key string, r io.Reader)
 
+// StreamableFieldEmitterCallback is like StreamableFieldCallback, but also
+// receives the emitter that has already been bound to the current AI response.
+type StreamableFieldEmitterCallback func(key string, r io.Reader, emitter *Emitter)
+
 // StreamableFieldCallbackItem stores the field keys and callback pair
 type StreamableFieldCallbackItem struct {
 	FieldKeys []string
-	Callback  StreamableFieldCallback
+	Callback  StreamableFieldEmitterCallback
 }
 
 // WithGeneralConfigStreamableFieldCallback registers a callback for streaming field data during LiteForge execution.
@@ -41,8 +45,15 @@ type StreamableFieldCallbackItem struct {
 // callback: function called when data streams into any of the monitored fields
 // This enables extensibility for processing streaming JSON data in real-time.
 func WithGeneralConfigStreamableFieldCallback(fieldKeys []string, callback StreamableFieldCallback) GeneralKVConfigOption {
+	return WithGeneralConfigStreamableFieldEmitterCallback(fieldKeys, func(key string, r io.Reader, _ *Emitter) {
+		callback(key, r)
+	})
+}
+
+// WithGeneralConfigStreamableFieldEmitterCallback registers a callback that
+// receives the response-bound emitter for correctly scoped AI event metadata.
+func WithGeneralConfigStreamableFieldEmitterCallback(fieldKeys []string, callback StreamableFieldEmitterCallback) GeneralKVConfigOption {
 	return func(c *GeneralKVConfig) {
-		// Get existing callbacks list
 		result, ok := c.config.Get("streamFieldCallbacks")
 		if !ok {
 			result = []*StreamableFieldCallbackItem{}
@@ -51,7 +62,6 @@ func WithGeneralConfigStreamableFieldCallback(fieldKeys []string, callback Strea
 		if !ok {
 			callbacks = []*StreamableFieldCallbackItem{}
 		}
-		// Append new callback item
 		callbacks = append(callbacks, &StreamableFieldCallbackItem{
 			FieldKeys: fieldKeys,
 			Callback:  callback,

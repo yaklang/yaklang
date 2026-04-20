@@ -70,7 +70,6 @@ func (i *Emitter) SetStreamNodeIdI18nProvider(p func(nodeId string) *schema.I18n
 	i.streamNodeIdI18nProvider = p
 }
 
-
 // WithAIInfoProvider returns a scoped emitter that resolves runtime AI metadata
 // on each emit, which is useful when the actual model/provider are determined
 // asynchronously after the emitter is bound.
@@ -101,7 +100,6 @@ func (i *Emitter) WithAIInfoProvider(provider AIEventMetaProvider) *Emitter {
 		return event
 	})
 }
-
 
 func (i *Emitter) AssociativeAIProcess(newProcess *schema.AiProcess) *Emitter {
 	err := yakit.CreateAIProcess(consts.GetGormProjectDatabase(), newProcess)

@@ -171,10 +171,14 @@ User's original query: {{ .UserQuery }}
 				aitool.WithParam_Required(true),
 			),
 		},
-		aicommon.WithGeneralConfigStreamableFieldCallback([]string{
+		aicommon.WithGeneralConfigStreamableFieldEmitterCallback([]string{
 			"summary",
-		}, func(key string, r io.Reader) {
-			if event, _ := loop.GetEmitter().EmitStreamEventWithContentType(
+		}, func(key string, r io.Reader, emitter *aicommon.Emitter) {
+			if emitter == nil {
+				io.Copy(io.Discard, r)
+				return
+			}
+			if event, _ := emitter.EmitStreamEventWithContentType(
 				"re-act-loop-answer-payload",
 				utils.JSONStringReader(r),
 				taskID,
@@ -182,7 +186,7 @@ User's original query: {{ .UserQuery }}
 				func() {},
 			); event != nil {
 				streamId := event.GetStreamEventWriterId()
-				loop.GetEmitter().EmitTextReferenceMaterial(streamId, contextMaterials)
+				emitter.EmitTextReferenceMaterial(streamId, contextMaterials)
 			}
 		}),
 	)

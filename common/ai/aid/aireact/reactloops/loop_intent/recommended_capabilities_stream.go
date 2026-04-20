@@ -67,8 +67,8 @@ func tryUnquoteRecommendedCapabilitiesString(raw string) (string, bool) {
 	return unquoted, true
 }
 
-func recommendedCapabilitiesStreamCallback(invoker aicommon.AIInvokeRuntime) aicommon.StreamableFieldCallback {
-	return func(_ string, reader io.Reader) {
+func recommendedCapabilitiesStreamCallback(invoker aicommon.AIInvokeRuntime) aicommon.StreamableFieldEmitterCallback {
+	return func(_ string, reader io.Reader, emitter *aicommon.Emitter) {
 		content, err := io.ReadAll(reader)
 		if err != nil {
 			log.Errorf("intent recommended_capabilities stream read failed: %v", err)
@@ -78,7 +78,10 @@ func recommendedCapabilitiesStreamCallback(invoker aicommon.AIInvokeRuntime) aic
 		if strings.TrimSpace(display) == "" {
 			return
 		}
-		_, err = invoker.GetConfig().GetEmitter().EmitDefaultStreamEvent(
+		if emitter == nil {
+			return
+		}
+		_, err = emitter.EmitDefaultStreamEvent(
 			"intent",
 			strings.NewReader(display),
 			invoker.GetCurrentTaskId(),
