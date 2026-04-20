@@ -856,7 +856,7 @@ func StringForSettingColor(s []string, flow ColorFlow) {
 // appendHookColorExtractions 对 rules 中每条规则做 MatchPacket，将命中写入 extracted。
 // applyColorAndTag 为 true 时同步累积颜色与 Tag（用于「仅匹配」镜像规则）；为 false 时只写库数据，
 // 避免与劫持路径 / GetMatchedRule 已处理的着色、标记重复。
-// ph 用于将 MatchResult 中的 __host__/__uri__/__url__ 展开为当前流上下文（与 grpc HTTPFlow 分析路径一致）。
+// ph 用于将 MatchResult 中的 MITM 提取占位符（MITMExtractPlaceholder*）展开为当前流上下文（与 grpc HTTPFlow 分析路径一致）。
 func (m *MitmReplacer) appendHookColorExtractions(
 	request, response []byte,
 	req *http.Request,

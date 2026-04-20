@@ -19,13 +19,14 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"github.com/yaklang/yaklang/common/yakgrpc/mitmextractdb"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func (s *Server) QueryMITMExtractedAggregate(ctx context.Context, req *ypb.QueryMITMExtractedAggregateRequest) (*ypb.QueryMITMExtractedAggregateResponse, error) {
 	db := s.GetProjectDatabase()
-	p, rows, distinctGroups, err := yakit.QueryMITMExtractedAggregate(db, req)
+	p, rows, distinctGroups, err := mitmextractdb.QueryMITMExtractedAggregate(db, req)
 	if err != nil {
 		return nil, err
 	}
