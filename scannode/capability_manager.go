@@ -70,6 +70,14 @@ type CapabilityRuntimeStatus struct {
 	ObservedAt    time.Time
 }
 
+type CapabilityRuntimeObservation struct {
+	CapabilityKey string
+	SpecVersion   string
+	HIDSEventType string
+	EventJSON     []byte
+	ObservedAt    time.Time
+}
+
 type CapabilityManager struct {
 	nodeID         string
 	nodeIDProvider func() string
@@ -77,6 +85,7 @@ type CapabilityManager struct {
 	rootCtx        context.Context
 	hidsHooks      capabilityHIDSHooks
 	alerts         chan CapabilityRuntimeAlert
+	observations   chan CapabilityRuntimeObservation
 }
 
 type capabilityDocument struct {
@@ -96,6 +105,7 @@ type capabilityHIDSApplyInput struct {
 type capabilityHIDSHooks interface {
 	Apply(m *CapabilityManager, input capabilityHIDSApplyInput) (CapabilityApplyResult, error)
 	Alerts() <-chan CapabilityRuntimeAlert
+	Observations() <-chan CapabilityRuntimeObservation
 	CurrentStatus() (CapabilityRuntimeStatus, bool)
 	OnSessionReady(context.Context) error
 	Close() error
@@ -112,9 +122,11 @@ func newCapabilityManager(cfg CapabilityManagerConfig) *CapabilityManager {
 		storeDir:       filepath.Join(baseDir, "legion", "capabilities"),
 		rootCtx:        rootContextOrBackground(cfg.RootContext),
 		alerts:         make(chan CapabilityRuntimeAlert, 64),
+		observations:   make(chan CapabilityRuntimeObservation, 2048),
 	}
 	manager.hidsHooks = newCapabilityHIDSHooks()
 	go manager.forwardRuntimeAlerts(manager.hidsHooks.Alerts())
+	go manager.forwardRuntimeObservations(manager.hidsHooks.Observations())
 	return manager
 }
 
@@ -219,6 +231,13 @@ func (m *CapabilityManager) Alerts() <-chan CapabilityRuntimeAlert {
 		return nil
 	}
 	return m.alerts
+}
+
+func (m *CapabilityManager) Observations() <-chan CapabilityRuntimeObservation {
+	if m == nil {
+		return nil
+	}
+	return m.observations
 }
 
 func (m *CapabilityManager) RuntimeStatuses() []CapabilityRuntimeStatus {
@@ -350,6 +369,18 @@ func (m *CapabilityManager) forwardRuntimeAlerts(alerts <-chan CapabilityRuntime
 	for alert := range alerts {
 		select {
 		case m.alerts <- alert:
+		default:
+		}
+	}
+}
+
+func (m *CapabilityManager) forwardRuntimeObservations(observations <-chan CapabilityRuntimeObservation) {
+	if m == nil || observations == nil {
+		return
+	}
+	for observation := range observations {
+		select {
+		case m.observations <- observation:
 		default:
 		}
 	}
