@@ -18,13 +18,7 @@ var outputFactsAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOpt
 				aitool.WithParam_Description("本轮新增 facts 的 Markdown 文本。系统会自动与历史 FACTS 合并。也可以不在 JSON 中传递该字段，而是使用 FACTS AITag 输出。"),
 			),
 		},
-		[]*reactloops.LoopStreamField{
-			{
-				FieldName:   PlanFactsFieldName,
-				AINodeId:    PlanFactsAINodeID,
-				ContentType: aicommon.TypeTextMarkdown,
-			},
-		},
+		[]*reactloops.LoopStreamField{},
 		func(l *reactloops.ReActLoop, action *aicommon.Action) error {
 			facts := normalizeFactsDocument(action.GetString(PlanFactsFieldName))
 			if facts == "" {
