@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -23,6 +24,27 @@ import (
 
 type BaseEmitter func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error)
 type EventProcesser func(e *schema.AiOutputEvent) *schema.AiOutputEvent
+type AIEventMetaProvider func() AIEventMeta
+
+// AIEventMeta carries the runtime AI metadata that should be attached to
+// events emitted within a specific AI call scope.
+type AIEventMeta struct {
+	Service          string
+	ModelName        string
+	ModelVerboseName string
+}
+
+func (m AIEventMeta) normalize() AIEventMeta {
+	if m.ModelVerboseName == "" && m.ModelName != "" {
+		m.ModelVerboseName = aispec.ModelVerboseName(m.ModelName)
+	}
+	return m
+}
+
+func (m AIEventMeta) empty() bool {
+	return m.Service == "" && m.ModelName == "" && m.ModelVerboseName == ""
+}
+
 type Emitter struct {
 	streamWG              *sync.WaitGroup
 	id                    string
@@ -47,6 +69,39 @@ func (i *Emitter) SetId(id string) {
 func (i *Emitter) SetStreamNodeIdI18nProvider(p func(nodeId string) *schema.I18n) {
 	i.streamNodeIdI18nProvider = p
 }
+
+
+// WithAIInfoProvider returns a scoped emitter that resolves runtime AI metadata
+// on each emit, which is useful when the actual model/provider are determined
+// asynchronously after the emitter is bound.
+func (i *Emitter) WithAIInfoProvider(provider AIEventMetaProvider) *Emitter {
+	if i == nil {
+		return nil
+	}
+	if provider == nil {
+		return i
+	}
+	return i.PushEventProcesser(func(event *schema.AiOutputEvent) *schema.AiOutputEvent {
+		if event == nil {
+			return nil
+		}
+		meta := provider().normalize()
+		if meta.empty() {
+			return event
+		}
+		if event.AIService == "" {
+			event.AIService = meta.Service
+		}
+		if event.AIModelName == "" {
+			event.AIModelName = meta.ModelName
+		}
+		if event.AIModelVerboseName == "" {
+			event.AIModelVerboseName = meta.ModelVerboseName
+		}
+		return event
+	})
+}
+
 
 func (i *Emitter) AssociativeAIProcess(newProcess *schema.AiProcess) *Emitter {
 	err := yakit.CreateAIProcess(consts.GetGormProjectDatabase(), newProcess)
