@@ -729,6 +729,38 @@ func WithTieredAICallback() ConfigOption {
 	}
 }
 
+// WithInheritTieredAICallback inherits tiered AI callbacks from a parent config if tiered config is enable
+// WithInheritTieredAICallback inherits tiered AI callbacks from a parent config if tiered config is enabled
+// This is used for child invokers to inherit the same tiered callbacks as the parent coordinator, ensuring consistent AI behavior across the call hierarchy.
+// If tiered config is not enabled, it falls back to inheriting the original callback for both priorities.
+func WithInheritTieredAICallback(parentConfig *Config, force bool) ConfigOption {
+	return func(c *Config) error {
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		if parentConfig == nil {
+			return utils.Error("parent config cannot be nil for inheriting tiered AI callbacks")
+		}
+		c.m.Lock()
+		c.OriginalAICallback = parentConfig.OriginalAICallback
+		c.m.Unlock()
+
+		if consts.GetTieredAIConfig().Enabled && !force {
+			if err := WithTieredAICallback()(c); err != nil {
+			if err :=  WithTieredAICallback()(c);err != nil {
+				log.Errorf("Failed to configure tiered AI callbacks: %v", err)
+		} else {
+		}else {
+			c.m.Lock()
+			c.QualityPriorityAICallback = parentConfig.QualityPriorityAICallback
+			c.SpeedPriorityAICallback = parentConfig.SpeedPriorityAICallback
+			c.m.Unlock()
+		}
+
+		return nil
+	}
+}
+
 // WithAutoTieredAICallback automatically configures tiered AI callbacks if tiered config is enabled
 // Otherwise, it falls back to the provided default callback
 func WithAutoTieredAICallback(defaultCallback AICallbackType) ConfigOption {
