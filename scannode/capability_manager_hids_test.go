@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	hidsmodel "github.com/yaklang/yaklang/common/hids/model"
 )
 
 func TestCapabilityManagerApplyStartsHIDSRuntimeWhenCompiled(t *testing.T) {
@@ -515,5 +517,65 @@ func TestCapabilityManagerRuntimeStatusesExposeStructuredDetail(t *testing.T) {
 	}
 	if filewatch["status"] != capabilityStatusRunning {
 		t.Fatalf("unexpected collector status: %#v", filewatch["status"])
+	}
+}
+
+func TestHIDSObservationForwarderPublishesSnapshotsAndSkipsUnknownTerminalEvents(t *testing.T) {
+	t.Parallel()
+
+	hooks := &hidsCapabilityHooks{
+		observations: make(chan CapabilityRuntimeObservation, 4),
+	}
+	state := newHIDSSnapshotObservationState()
+	config := hidsAlertConfig{
+		capabilityKey:            "hids",
+		specVersion:              "2026-04-20",
+		emitSnapshotObservations: true,
+	}
+	observedAt := time.Date(2026, 4, 20, 15, 10, 0, 0, time.UTC)
+
+	processEvent := hidsmodel.Event{
+		Type:      hidsmodel.EventTypeProcessExec,
+		Source:    "inventory.process",
+		Timestamp: observedAt,
+		Tags:      []string{"inventory"},
+		Process: &hidsmodel.Process{
+			PID:   123,
+			Name:  "nginx",
+			Image: "/usr/sbin/nginx",
+		},
+	}
+	observation, key, ok := hooks.convertObservation(processEvent, config, state)
+	if !ok {
+		t.Fatal("expected process inventory observation to be exported")
+	}
+	state.pending[key] = observation
+	hooks.flushPendingObservations(state)
+
+	select {
+	case output := <-hooks.Observations():
+		if output.HIDSEventType != hidsmodel.EventTypeProcessExec {
+			t.Fatalf("unexpected hids event type: %s", output.HIDSEventType)
+		}
+		if !json.Valid(output.EventJSON) {
+			t.Fatalf("expected json event payload: %s", string(output.EventJSON))
+		}
+	default:
+		t.Fatal("expected flushed observation")
+	}
+
+	unknownClose := hidsmodel.Event{
+		Type:      hidsmodel.EventTypeNetworkClose,
+		Timestamp: observedAt.Add(time.Second),
+		Network: &hidsmodel.Network{
+			Protocol:      "tcp",
+			SourceAddress: "127.0.0.1",
+			SourcePort:    50000,
+			DestAddress:   "127.0.0.1",
+			DestPort:      8080,
+		},
+	}
+	if _, _, ok := hooks.convertObservation(unknownClose, config, state); ok {
+		t.Fatal("expected unknown network close to be dropped")
 	}
 }
