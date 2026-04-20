@@ -11,7 +11,6 @@ type capabilityEventReporter interface {
 	PublishStatus(context.Context, capabilityCommandRef, CapabilityApplyResult) error
 	PublishFailed(context.Context, capabilityCommandRef, string, string) error
 	PublishAlert(context.Context, CapabilityRuntimeAlert) error
-	PublishObservation(context.Context, CapabilityRuntimeObservation) error
 }
 
 type legionJobBridge struct {
@@ -26,9 +25,6 @@ type legionJobBridge struct {
 	statusMu            sync.Mutex
 	lastStatusSessionID string
 	lastStatusSync      time.Time
-
-	observationMu             sync.Mutex
-	suppressedObservationDrop int
 }
 
 func newLegionJobBridge(agent *ScanNode) *legionJobBridge {
