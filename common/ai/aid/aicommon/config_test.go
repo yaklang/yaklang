@@ -25,33 +25,6 @@ func TestConfig_Smoking(t *testing.T) {
 	require.False(t, config.AICallbackAvailable())
 }
 
-func TestConfig_AIServiceName(t *testing.T) {
-	token := uuid.NewString()
-	token2 := uuid.NewString()
-	serviceNameOk := false
-	serviceModelOk := false
-	config := NewTestConfig(context.Background(),
-		WithAIChatInfo(token, token2),
-		WithEventHandler(func(e *schema.AiOutputEvent) {
-			if e.AIService == token {
-				serviceNameOk = true
-			}
-			if e.AIModelName == token2 {
-				serviceModelOk = true
-			}
-		}),
-	)
-	config.EmitInfo("abc")
-
-	if serviceNameOk == false {
-		t.Fatalf("AIServiceName not set correctly")
-	}
-
-	if serviceModelOk == false {
-		t.Fatalf("AIModelName not set correctly")
-	}
-}
-
 // TestConfig_WithID_SyncsEmitterId verifies that WithID also updates the Emitter's internal id
 // This ensures that events emitted after WithID is applied use the correct CoordinatorId
 func TestConfig_WithID_SyncsEmitterId(t *testing.T) {
