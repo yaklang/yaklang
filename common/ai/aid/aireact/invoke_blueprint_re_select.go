@@ -39,6 +39,7 @@ func (r *ReAct) invokeBlueprintReviewChangeBlueprint(
 	err = aicommon.CallAITransaction(
 		r.config, prompt, r.config.CallAI,
 		func(rsp *aicommon.AIResponse) error {
+			boundEmitter := rsp.BindEmitter(r.Emitter)
 			reader := rsp.GetOutputStreamReader(
 				"change-blueprint-selection",
 				false,
@@ -52,7 +53,7 @@ func (r *ReAct) invokeBlueprintReviewChangeBlueprint(
 					func(key string, reasonReader io.Reader) {
 						var reasonBuf bytes.Buffer
 						var reason = io.TeeReader(reasonReader, &reasonBuf)
-						r.Emitter.EmitTextMarkdownStreamEvent(
+						boundEmitter.EmitTextMarkdownStreamEvent(
 							"change-blueprint-reasoning",
 							reason,
 							r.GetCurrentTask().GetId(),

@@ -88,13 +88,14 @@ func (t *AiTask) DeepThink(suggestion string) error {
 	err = t.CallAITransaction(
 		prompt,
 		func(rsp *aicommon.AIResponse) error {
+			boundEmitter := rsp.BindEmitter(t.GetEmitter())
 			action, err := aicommon.ExtractValidActionFromStream(
 				t.Ctx,
 				rsp.GetUnboundStreamReader(false),
 				"plan",
 				aicommon.WithActionAlias("require-user-interact"),
 				aicommon.WithActionFieldStreamHandler([]string{"subtask_name"}, func(key string, r io.Reader) {
-					t.EmitDefaultStreamEvent("plan", r, t.GetIndex())
+					boundEmitter.EmitDefaultStreamEvent("plan", r, t.GetIndex())
 				}),
 			)
 			if err != nil {
@@ -134,21 +135,22 @@ func (t *AiTask) AdjustPlan(suggestion string) error {
 	err = t.CallAITransaction(
 		planPrompt,
 		func(response *aicommon.AIResponse) error {
+			boundEmitter := response.BindEmitter(t.GetEmitter())
 			// 读取 AI 的响应
 			responseReader := response.GetOutputStreamReader("dynamic-plan", false, t.GetEmitter())
 			taskResponse, err := io.ReadAll(responseReader)
 			if err != nil {
-				t.EmitError("error reading AI response: %v", err)
+				boundEmitter.EmitError("error reading AI response: %v", err)
 				return utils.Errorf("error reading AI response: %v", err)
 			}
 			nextPlanTask, err := ExtractNextPlanTaskFromRawResponse(t.Coordinator, string(taskResponse))
 			if err != nil {
-				t.EmitError("error extracting task from raw response: %v", err)
+				boundEmitter.EmitError("error extracting task from raw response: %v", err)
 				return utils.Errorf("error extracting task from raw response: %v", err)
 			}
 
 			if len(nextPlanTask) <= 0 {
-				t.EmitError("any task not found in next plan")
+				boundEmitter.EmitError("any task not found in next plan")
 				return utils.Errorf("any task not found in next plan task, re-do-plan")
 			}
 
@@ -162,7 +164,7 @@ func (t *AiTask) AdjustPlan(suggestion string) error {
 				}
 			}
 			if index == -1 {
-				t.EmitError("current task not found in parent task")
+				boundEmitter.EmitError("current task not found in parent task")
 				return utils.Error("current task not found in parent task")
 			}
 			// 保留之前的任务, 删除后续任务

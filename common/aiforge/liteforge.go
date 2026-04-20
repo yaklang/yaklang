@@ -48,13 +48,13 @@ type streamableField struct {
 
 // LiteForge 被设计只允许提取数据，生成结构化（单步），如果需要多步拆解，不能使用 LiteForge
 type LiteForge struct {
-	ForgeName            string
-	Prompt               string
-	RequireSchema        string
-	OutputSchema         string
-	OutputActionName     string
-	PreferSpeedPriority  bool
-	ExtendAIDOptions     []aicommon.ConfigOption
+	ForgeName           string
+	Prompt              string
+	RequireSchema       string
+	OutputSchema        string
+	OutputActionName    string
+	PreferSpeedPriority bool
+	ExtendAIDOptions    []aicommon.ConfigOption
 
 	streamFields         *omap.OrderedMap[string, *streamableField]
 	fieldStreamCallbacks []*fieldStreamCallbackItem // user-defined callbacks for streaming fields
@@ -290,6 +290,7 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 	}
 	transactionErr := aicommon.CallAITransaction(cod, buf.String(), aiCallback,
 		func(response *aicommon.AIResponse) error {
+			boundEmitter := response.BindEmitter(l.emitter)
 			if l.ForgeName == "" {
 				l.ForgeName = "LiteForge"
 			}
@@ -313,7 +314,7 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 					utils.Debug(func() {
 						r = io.TeeReader(r, os.Stdout)
 					})
-					l.emitter.EmitDefaultStreamEvent(i.AINodeId, r, response.GetTaskIndex())
+					boundEmitter.EmitDefaultStreamEvent(i.AINodeId, r, response.GetTaskIndex())
 				}))
 			}
 

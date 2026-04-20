@@ -264,6 +264,7 @@ func (r *ReActLoop) performAIReflection(ctx context.Context, reflection *ActionR
 		prompt,
 		config.CallSpeedPriorityAI,
 		func(rsp *aicommon.AIResponse) error {
+			boundEmitter := rsp.BindEmitter(emitter)
 			// 获取流式输出
 			stream := rsp.GetOutputStreamReader(
 				"self-reflection",
@@ -293,7 +294,7 @@ func (r *ReActLoop) performAIReflection(ctx context.Context, reflection *ActionR
 						json.Unmarshal(raw, &sgs)
 						for _, i := range sgs {
 							pr, pw := utils.NewPipe()
-							emitter.EmitDefaultStreamEvent(
+							boundEmitter.EmitDefaultStreamEvent(
 								"thought",
 								pr,
 								task.GetId(),
