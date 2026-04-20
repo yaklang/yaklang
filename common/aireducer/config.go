@@ -66,6 +66,11 @@ type Config struct {
 	ChunkSize           int64
 	SeparatorTrigger    string
 
+	// SeparatorAsBoundary switches the separator from a "trigger every
+	// occurrence" to a "preferred cut boundary within ChunkSize window".
+	// Useful when packing many pre-structured blocks into one AI call.
+	SeparatorAsBoundary bool
+
 	// lines trigger mean chunk trigger by line numbers, if set to 0, it will not trigger by lines.
 	LineTrigger int
 
@@ -151,6 +156,17 @@ func WithSeparatorTrigger(separator string) Option {
 	}
 }
 
+// WithSeparatorAsBoundary switches the separator semantics from "trigger every
+// occurrence" (default) to "use the separator as a preferred cut boundary".
+// When true, the reducer fills up to ChunkSize and, inside each chunk, cuts at
+// the LAST separator occurrence in the window so that pre-structured blocks
+// stay intact. Combine with WithSeparatorTrigger(sep) + WithChunkSize(n).
+func WithSeparatorAsBoundary(asBoundary bool) Option {
+	return func(c *Config) {
+		c.SeparatorAsBoundary = asBoundary
+	}
+}
+
 // WithLines sets the line trigger for chunking. When set to a positive value,
 // chunks will be created every N lines. If the N lines content is smaller than
 // ChunkSize, it will be kept intact. If larger than ChunkSize, it will be split
@@ -207,6 +223,7 @@ func (c *Config) ChunkMakerOption() []chunkmaker.Option {
 		chunkmaker.WithTimeTrigger(c.TimeTriggerInterval),
 		chunkmaker.WithChunkSize(c.ChunkSize),
 		chunkmaker.WithSeparatorTrigger(c.SeparatorTrigger),
+		chunkmaker.WithSeparatorAsBoundary(c.SeparatorAsBoundary),
 		chunkmaker.WithCtx(c.ctx),
 	}
 }

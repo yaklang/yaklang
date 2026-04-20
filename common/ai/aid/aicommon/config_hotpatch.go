@@ -21,7 +21,7 @@ func (c *Config) StartHotPatchLoop(ctx context.Context) {
 			for {
 				select {
 				case <-validator:
-					log.Infof("hotpatch loop for config %s started", c.Id)
+					//log.Infof("hotpatch loop for config %s started", c.Id)
 				case <-ctx.Done():
 					return
 				case hotPatchOption := <-c.HotPatchOptionChan.OutputChannel():

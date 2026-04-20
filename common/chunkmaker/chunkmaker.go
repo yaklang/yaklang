@@ -21,6 +21,16 @@ type Config struct {
 
 	// separator for chunk data
 	separator string
+
+	// separatorAsBoundary changes the separator semantics:
+	//   - false (default): the separator is a *trigger*; every occurrence flushes
+	//     a chunk (up to chunkSize). Good for structured logs / small records.
+	//   - true: the separator is a *boundary hint*; the chunk maker fills up to
+	//     chunkSize and, inside each chunk, prefers to cut at the LAST separator
+	//     occurrence so that logical blocks stay intact. Good for packing large
+	//     pre-structured payloads (e.g. "--- candidate ---" blocks) before an
+	//     AI call where per-chunk bytes should approach chunkSize.
+	separatorAsBoundary bool
 }
 
 type Option func(c *Config)
@@ -38,6 +48,18 @@ func WithTimeTrigger(interval time.Duration) Option {
 func WithSeparatorTrigger(separator string) Option {
 	return func(c *Config) {
 		c.separator = separator
+	}
+}
+
+// WithSeparatorAsBoundary switches the separator semantics from "trigger every
+// occurrence" (default) to "use the separator as a preferred split boundary".
+// When enabled, the chunk maker fills up to chunkSize and, inside each chunk,
+// cuts at the LAST separator occurrence in the window so that logical blocks
+// are not sliced in the middle. If no separator is found, the chunk is cut at
+// chunkSize. Used together with WithSeparatorTrigger(sep) + WithChunkSize(n).
+func WithSeparatorAsBoundary(asBoundary bool) Option {
+	return func(c *Config) {
+		c.separatorAsBoundary = asBoundary
 	}
 }
 

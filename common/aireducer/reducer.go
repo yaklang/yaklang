@@ -109,6 +109,7 @@ func NewReducerFromInputChunk(chunk *chanx.UnlimitedChan[chunkmaker.Chunk], opts
 		chunkmaker.WithTimeTrigger(config.TimeTriggerInterval),
 		chunkmaker.WithChunkSize(config.ChunkSize),
 		chunkmaker.WithSeparatorTrigger(config.SeparatorTrigger),
+		chunkmaker.WithSeparatorAsBoundary(config.SeparatorAsBoundary),
 	))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create chunk maker: %w", err)

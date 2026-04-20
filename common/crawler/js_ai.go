@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net"
+	"net/url"
 	"regexp"
 	"sort"
 	"strings"
@@ -17,6 +19,7 @@ import (
 	"github.com/yaklang/yaklang/common/chunkmaker"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -24,8 +27,9 @@ import (
 type AIJSExtractConfig struct {
 	// MaxTokens caps the size of one AI call payload. Defaults to 80K.
 	MaxTokens int
-	// ChunkBytes is the hard byte limit of each aireducer slice. Defaults to ~320KB
-	// (≈80K tokens * 4 bytes per token, a coarse upper bound for english code).
+	// ChunkBytes is the target byte size of each AI call slice. Defaults to 250KB.
+	// Candidate blocks are packed greedily up to this budget; a single oversized
+	// block may exceed it slightly but will still be token-shrunk by MaxTokens.
 	ChunkBytes int64
 	// OverlapBytes is how many bytes of the previous chunk are folded into the
 	// current chunk via DumpWithOverlap. Defaults to 2048.
@@ -40,6 +44,18 @@ type AIJSExtractConfig struct {
 	Concurrency int
 	// AIOptions are forwarded to the LiteForge coordinator (model/provider/etc).
 	AIOptions []aicommon.ConfigOption
+
+	// IsHTTPS records the scheme of the originating HTTP request. Together
+	// with RequestRaw it is injected into every AI call so the model can
+	// resolve relative paths into absolute URLs.
+	IsHTTPS bool
+	// RequestRaw is the raw HTTP request packet (method + URI + headers) of
+	// the page that produced the JS being analyzed. Only the request head
+	// (no body) is passed to the AI, and it is truncated to RequestHeadMaxBytes.
+	RequestRaw []byte
+	// RequestHeadMaxBytes caps how many bytes of RequestRaw are prepended to
+	// each AI call payload. Defaults to 4096.
+	RequestHeadMaxBytes int
 }
 
 // AIJSExtractOption mutates AIJSExtractConfig.
@@ -54,7 +70,7 @@ func WithAIJS_MaxTokens(n int) AIJSExtractOption {
 	}
 }
 
-// WithAIJS_ChunkBytes overrides the byte size of each reducer slice.
+// WithAIJS_ChunkBytes overrides the target byte size of each AI call slice.
 func WithAIJS_ChunkBytes(n int64) AIJSExtractOption {
 	return func(c *AIJSExtractConfig) {
 		if n > 0 {
@@ -107,15 +123,35 @@ func WithAIJS_AIOptions(opts ...aicommon.ConfigOption) AIJSExtractOption {
 	}
 }
 
+// WithAIJS_BaseRequest attaches the originating HTTP request scheme and raw
+// packet so that AI calls can resolve relative paths into absolute URLs.
+func WithAIJS_BaseRequest(isHTTPS bool, requestRaw []byte) AIJSExtractOption {
+	return func(c *AIJSExtractConfig) {
+		c.IsHTTPS = isHTTPS
+		c.RequestRaw = requestRaw
+	}
+}
+
+// WithAIJS_RequestHeadMaxBytes overrides the cap on how many bytes of the
+// originating request head are injected into each AI call payload.
+func WithAIJS_RequestHeadMaxBytes(n int) AIJSExtractOption {
+	return func(c *AIJSExtractConfig) {
+		if n > 0 {
+			c.RequestHeadMaxBytes = n
+		}
+	}
+}
+
 // NewAIJSExtractConfig builds a config with sane defaults.
 func NewAIJSExtractConfig(opts ...AIJSExtractOption) *AIJSExtractConfig {
 	c := &AIJSExtractConfig{
-		MaxTokens:      80 * 1024,
-		ChunkBytes:     320 * 1024,
-		OverlapBytes:   2048,
-		ContextBytes:   120,
-		SkipBelowBytes: 1024,
-		Concurrency:    2,
+		MaxTokens:           80 * 1024,
+		ChunkBytes:          250 * 1024,
+		OverlapBytes:        2048,
+		ContextBytes:        120,
+		SkipBelowBytes:      1024,
+		Concurrency:         2,
+		RequestHeadMaxBytes: 4096,
 	}
 	for _, o := range opts {
 		if o != nil {
@@ -255,10 +291,130 @@ func rawCandidateHits(text string) []string {
 	return out
 }
 
+// --- candidate sanitisation -------------------------------------------------
+
+// boundaryLeakNeedles are substrings that should never appear in a URL/path
+// emitted by either the AI step or the regex fast path. They are produced by
+// the crawler when concatenating HTML and JS sources and have leaked through
+// in the past (e.g. "http://---html-end---/" - a regression that motivated
+// this filter).
+var boundaryLeakNeedles = []string{
+	"yak-html-end",
+	"yak-js-end",
+	"---html-end---",
+	"---js-chunk-end---",
+	"--- candidate ---",
+	"--- end ---",
+}
+
+// looksLikeBoundaryLeak returns true if the candidate string contains any
+// known boundary marker. These markers are inserted by the crawler to glue
+// HTML and JS blobs together and must never propagate as a real path.
+func looksLikeBoundaryLeak(s string) bool {
+	if s == "" {
+		return false
+	}
+	low := strings.ToLower(s)
+	for _, n := range boundaryLeakNeedles {
+		if strings.Contains(low, n) {
+			return true
+		}
+	}
+	return false
+}
+
+// hostLabelRe matches a single DNS label (RFC 1035 friendly subset). We keep
+// it intentionally permissive: leading/trailing dashes are rejected, an
+// internal "---" is rejected (legitimate IDN xn-- prefixes use exactly two
+// dashes), and the label must contain at least one alphanumeric char.
+var hostLabelRe = regexp.MustCompile(`^[A-Za-z0-9](?:[A-Za-z0-9\-]{0,61}[A-Za-z0-9])?$`)
+
+// looksLikeValidHost returns true for plausibly real hostnames or IP literals.
+// It rejects boundary-marker leaks ("---html-end---"), bare single-label
+// non-localhost names ("app"), labels containing "---", and anything with
+// whitespace/quotes. Used as a sanity gate over AI-emitted absolute URLs.
+func looksLikeValidHost(host string) bool {
+	if host == "" {
+		return false
+	}
+	if strings.ContainsAny(host, " \t\r\n<>\"'`") {
+		return false
+	}
+	if looksLikeBoundaryLeak(host) {
+		return false
+	}
+	if net.ParseIP(host) != nil {
+		return true
+	}
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	// Multi-label hostname: must contain a dot AND every label must look DNS-y.
+	if !strings.Contains(host, ".") {
+		return false
+	}
+	for _, label := range strings.Split(host, ".") {
+		if label == "" {
+			return false
+		}
+		if strings.Contains(label, "---") {
+			return false
+		}
+		if !hostLabelRe.MatchString(label) {
+			return false
+		}
+	}
+	return true
+}
+
+// sanitizeAIURL validates an absolute URL string emitted by the AI step.
+// On success it returns the canonical URL with fragment stripped and the
+// scheme normalised to lowercase; the original query is preserved. Returns
+// ("", false) if the URL is malformed, has a non-http(s) scheme, has an
+// implausible host, or contains a boundary-marker leak.
+func sanitizeAIURL(raw string) (string, bool) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", false
+	}
+	if looksLikeBoundaryLeak(raw) {
+		return "", false
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		return "", false
+	}
+	scheme := strings.ToLower(u.Scheme)
+	if scheme != "http" && scheme != "https" {
+		return "", false
+	}
+	host := u.Hostname()
+	if !looksLikeValidHost(host) {
+		return "", false
+	}
+	u.Scheme = scheme
+	u.Fragment = ""
+	return u.String(), true
+}
+
 // --- LiteForge invocation ---------------------------------------------------
 
 const aiJSExtractPromptTpl = `# 角色
-你是一名 Web 应用资产识别助手。下面会提供从一段 JavaScript 或 HTML 文本中预筛选出的若干"可疑窗口"，每个窗口形如：
+你是一名 Web 应用资产识别助手。输入由两部分组成：
+
+1) 一个 "REQUEST CONTEXT" 块，描述当前正在被分析的页面的请求上下文，形如：
+
+    === REQUEST CONTEXT ===
+    scheme: https
+    base_url: https://example.com/app/index.html
+    host: example.com
+    request_head:
+    GET /app/index.html HTTP/1.1
+    Host: example.com
+    ...
+    === END REQUEST CONTEXT ===
+
+2) 若干 "candidate" 窗口，每个窗口从 JavaScript / HTML 源码里预筛选得到：
 
     --- candidate ---
     offset=START-END
@@ -266,20 +422,77 @@ const aiJSExtractPromptTpl = `# 角色
     --- end ---
 
 # 任务
-仅识别"业务可访问"的相对路径或绝对 URL，并按 SCHEMA 输出。
+基于 REQUEST CONTEXT 里的 scheme / base_url / host，识别候选窗口中"业务可访问"的 URL，并**直接输出完整的 http:// 或 https:// URL**（含 scheme 和 host）。
+
+# 拼接规则
+- 相对路径（以 "/" 开头）：用 REQUEST CONTEXT 的 scheme + host 拼接成 scheme://host/path
+- 相对路径（不以 "/" 开头，如 "static/app.js"）：基于 base_url 目录拼接
+- 协议相对 URL（以 "//" 开头）：补上 REQUEST CONTEXT 的 scheme
+- 已经是完整 URL（含 http:// 或 https://）：保持原样
+- 保留 query string，不改写
 
 # 必须剔除
 - 注释、版本号、UUID、CSS 选择器、字体/图片/音视频静态资源
-- mailto:/tel:/javascript:/data:/blob: 等非 HTTP 协议
+- mailto: / tel: / javascript: / data: / blob: 等非 HTTP 协议
 - #fragment 锚点
-- 第三方公共 CDN（如 jsdelivr/unpkg/cdnjs/google-analytics 等）
+- 第三方公共 CDN（jsdelivr/unpkg/cdnjs/google-analytics 等）
 - 模板占位符未替换的字符串（含 ${...} {{...}} :param 等）
 
 # 注意
-- 同一路径只输出一次
-- 输出原样字符串，不要补全前缀，不要 url-encode
-- 路径风格放在 kind=path，含 scheme/host 的放在 kind=url
-- 如果窗口里没有可信路径，不要硬编`
+- 同一 URL 只输出一次
+- 不要 url-encode
+- 如果候选窗口里没有可信路径，输出空数组
+- 对不确定能否拼到完整 host 的，丢弃而不是猜测`
+
+// buildRequestContextBlock renders the REQUEST CONTEXT header that is
+// prepended to every AI slice payload. It lets the model resolve relative
+// paths into absolute URLs using the scheme / base_url / host of the
+// originating HTTP request. Returns an empty string when no request context
+// is available, so the legacy "paths only" behavior is preserved.
+func buildRequestContextBlock(cfg *AIJSExtractConfig) string {
+	if cfg == nil || len(cfg.RequestRaw) == 0 {
+		return ""
+	}
+
+	scheme := "http"
+	if cfg.IsHTTPS {
+		scheme = "https"
+	}
+	baseURL := lowhttp.GetUrlFromHTTPRequest(scheme, cfg.RequestRaw)
+	host := lowhttp.GetHTTPPacketHeader(cfg.RequestRaw, "Host")
+
+	// strip body; only send request head (method + URI + headers) to the AI
+	headers, _ := lowhttp.SplitHTTPHeadersAndBodyFromPacket(cfg.RequestRaw)
+	headers = strings.TrimRight(headers, "\r\n")
+
+	limit := cfg.RequestHeadMaxBytes
+	if limit <= 0 {
+		limit = 4096
+	}
+	if len(headers) > limit {
+		headers = headers[:limit] + "\n... (truncated)"
+	}
+
+	var b strings.Builder
+	b.WriteString("=== REQUEST CONTEXT ===\n")
+	b.WriteString("scheme: ")
+	b.WriteString(scheme)
+	b.WriteByte('\n')
+	if baseURL != "" {
+		b.WriteString("base_url: ")
+		b.WriteString(baseURL)
+		b.WriteByte('\n')
+	}
+	if host != "" {
+		b.WriteString("host: ")
+		b.WriteString(host)
+		b.WriteByte('\n')
+	}
+	b.WriteString("request_head:\n")
+	b.WriteString(headers)
+	b.WriteString("\n=== END REQUEST CONTEXT ===\n\n")
+	return b.String()
+}
 
 // pathExtractFunc is the function-pointer indirection used by RunAIJSExtract
 // so that tests can swap the AI call for a deterministic stub. Production code
@@ -305,17 +518,13 @@ func invokeLiteForgeForPaths(ctx context.Context, cfg *AIJSExtractConfig, payloa
 		aiforge.WithLiteForge_SpeedPriority(true),
 		aiforge.WithLiteForge_OutputSchema(
 			aitool.WithStructArrayParam(
-				"paths",
+				"urls",
 				[]aitool.PropertyOption{
-					aitool.WithParam_Description("Paths or URLs identified from candidate windows"),
+					aitool.WithParam_Description("Absolute URLs identified from candidate windows"),
 				},
 				nil,
 				aitool.WithStringParam("value",
-					aitool.WithParam_Description("Raw path or URL string"),
-				),
-				aitool.WithStringParam("kind",
-					aitool.WithParam_EnumString("path", "url"),
-					aitool.WithParam_Description("path = relative path; url = absolute URL with scheme"),
+					aitool.WithParam_Description("Absolute URL starting with http:// or https://"),
 				),
 			),
 		),
@@ -337,13 +546,19 @@ func invokeLiteForgeForPaths(ctx context.Context, cfg *AIJSExtractConfig, payloa
 		return nil
 	}
 
-	items := result.GetInvokeParamsArray("paths")
+	items := result.GetInvokeParamsArray("urls")
 	for _, item := range items {
-		val := strings.TrimSpace(item.GetString("value"))
-		if val == "" {
+		raw := strings.TrimSpace(item.GetString("value"))
+		if raw == "" {
 			continue
 		}
-		onPath(val)
+		cleaned, ok := sanitizeAIURL(raw)
+		if !ok {
+			log.Debugf("ai js extract: drop invalid AI url candidate: %q", raw)
+			continue
+		}
+		log.Infof("AI found url in JS: %s", cleaned)
+		onPath(cleaned)
 	}
 	return nil
 }
@@ -383,31 +598,59 @@ func RunAIJSExtract(ctx context.Context, code string, cfg *AIJSExtractConfig, on
 	}
 	stream := streamBuf.String()
 
-	if streamBuf.Len() < cfg.SkipBelowBytes {
-		seen := make(map[string]struct{})
-		for _, hit := range rawCandidateHits(code) {
-			if _, ok := seen[hit]; ok {
-				continue
+	// emit canonicalises and dedupes a candidate produced by either the AI
+	// step or the fast path. The rules:
+	//
+	//   * boundary-marker leaks ("yak-html-end", "---html-end---", ...) are
+	//     always dropped (regression: leaked as "http://---html-end---/").
+	//   * candidates that declare a URI scheme (anything with ":" before the
+	//     first "/") MUST be a valid http(s) URL with a plausible host; this
+	//     blocks "javascript:", "mailto:", "data:", garbage hosts, and also
+	//     strips #fragments.
+	//   * scheme-less candidates (relative paths like "/api/v1") are passed
+	//     through unchanged so the downstream NewHTTPRequest can resolve
+	//     them against the originating page.
+	var emitMu sync.Mutex
+	emitted := make(map[string]struct{})
+	emit := func(raw string) {
+		raw = strings.TrimSpace(raw)
+		if raw == "" {
+			return
+		}
+		if looksLikeBoundaryLeak(raw) {
+			log.Debugf("ai js extract: drop boundary-marker leak: %q", raw)
+			return
+		}
+
+		canonical := raw
+		// Detect a URI scheme: ':' present AND no '/' precedes it. This
+		// avoids mis-identifying paths like "a.js?x=1:b" as a scheme.
+		if colon := strings.IndexByte(raw, ':'); colon > 0 {
+			if slash := strings.IndexByte(raw, '/'); slash < 0 || slash > colon {
+				cleaned, ok := sanitizeAIURL(raw)
+				if !ok {
+					log.Debugf("ai js extract: drop invalid scheme/url candidate: %q", raw)
+					return
+				}
+				canonical = cleaned
 			}
-			seen[hit] = struct{}{}
-			onPath(hit)
+		}
+
+		emitMu.Lock()
+		defer emitMu.Unlock()
+		if _, ok := emitted[canonical]; ok {
+			return
+		}
+		emitted[canonical] = struct{}{}
+		onPath(canonical)
+	}
+
+	if streamBuf.Len() < cfg.SkipBelowBytes {
+		for _, hit := range rawCandidateHits(code) {
+			emit(hit)
 		}
 		log.Debugf("ai js extract: stream %v < skip threshold %v, fast path", streamBuf.Len(), cfg.SkipBelowBytes)
 		return nil
-	}
-
-	// concurrency-bounded onPath wrapper with dedup so that overlap fold does
-	// not emit the same path multiple times
-	var emitMu sync.Mutex
-	emitted := make(map[string]struct{})
-	emit := func(p string) {
-		emitMu.Lock()
-		defer emitMu.Unlock()
-		if _, ok := emitted[p]; ok {
-			return
-		}
-		emitted[p] = struct{}{}
-		onPath(p)
 	}
 
 	concurrency := cfg.Concurrency
@@ -421,13 +664,20 @@ func RunAIJSExtract(ctx context.Context, code string, cfg *AIJSExtractConfig, on
 		aireducer.WithContext(ctx),
 		aireducer.WithChunkSize(cfg.ChunkBytes),
 		aireducer.WithSeparatorTrigger("\n--- end ---\n"),
+		// Pack candidate blocks to fill ChunkBytes instead of emitting one
+		// chunk per candidate - the "--- end ---" separator only acts as a
+		// preferred cut boundary within the chunkSize window.
+		aireducer.WithSeparatorAsBoundary(true),
 		aireducer.WithReducerCallback(func(rcfg *aireducer.Config, _ *aid.PromptContextProvider, ch chunkmaker.Chunk) error {
-			payload := ch.DumpWithOverlap(cfg.OverlapBytes)
+			body := ch.DumpWithOverlap(cfg.OverlapBytes)
+			payload := buildRequestContextBlock(cfg) + body
 			if cfg.MaxTokens > 0 {
 				if aicommon.MeasureTokens(payload) > cfg.MaxTokens {
 					payload = aicommon.ShrinkTextBlockByTokens(payload, cfg.MaxTokens)
 				}
 			}
+			log.Debugf("ai js extract: slice payload bytes=%d (chunk bytes=%d)", len(payload), ch.BytesSize())
+
 			swg.Add(1)
 			go func() {
 				defer swg.Done()

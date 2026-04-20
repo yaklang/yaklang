@@ -629,17 +629,28 @@ func (c *Crawler) handleReqResult(r *Req) {
 		var combined bytes.Buffer
 		if len(r.responseBody) > 0 {
 			combined.Write(r.responseBody)
-			combined.WriteString("\n//---html-end---\n")
+			// Block-end markers must NOT start with "//" or look like a path,
+			// otherwise both the regex pre-filter and the AI step will mis-read
+			// them as protocol-relative URLs (regression: leaked as
+			// "http://---html-end---/" downstream).
+			combined.WriteString("\n/* yak-html-end */\n")
 		}
 		for _, j := range jsContents {
 			if j.IsCodeText && j.Code != "" {
 				combined.WriteString(j.Code)
-				combined.WriteString("\n//---js-chunk-end---\n")
+				combined.WriteString("\n/* yak-js-end */\n")
 			}
 		}
 		if combined.Len() > 0 {
+			// Build a per-request shallow copy so that RequestRaw / IsHTTPS do
+			// not leak across concurrent crawler requests sharing the shared
+			// config.aiJSExtractConfig template.
+			extractCfg := *config.aiJSExtractConfig
+			extractCfg.IsHTTPS = r.IsHttps()
+			extractCfg.RequestRaw = r.requestRaw
+
 			extractCtx, extractCancel := context.WithTimeout(context.Background(), 5*time.Minute)
-			err := RunAIJSExtract(extractCtx, combined.String(), config.aiJSExtractConfig, func(p string) {
+			err := RunAIJSExtract(extractCtx, combined.String(), &extractCfg, func(p string) {
 				httpsR, reqBytes, err := NewHTTPRequest(r.IsHttps(), r.requestRaw, r.responseBody, p)
 				if err != nil {
 					log.Debugf("ai js extract: build http request failed for %q: %v", p, err)
@@ -720,8 +731,6 @@ func (c *Crawler) fetchExternalJSCodes(r *Req, jsContents []*JavaScriptContent) 
 	}
 	swg.Wait()
 }
-
-var metaUrlExtractor = regexp.MustCompile(`(?i)url=\s*([^\s]+)`)
 
 func handleReqResultEx(r *Req, reqHandler func(*Req) bool, urlHandler func(string) bool, extractionRulesHandler func(*Req) []interface{}) {
 	foundPathOrUrls := new(sync.Map)
