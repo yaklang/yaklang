@@ -42,4 +42,6 @@ var Exports = map[string]interface{}{
 		}, nil
 	},
 	"ImportSSARiskFromJSON": ImportSSARiskFromJSON,
+
+	"GenerateSSAReportMarkdownForTask": GenerateSSAReportMarkdownForTask,
 }

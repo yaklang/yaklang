@@ -1,0 +1,24 @@
+{
+  "@action": "plan",
+  "query": "-",
+  "main_task": "SSA项目检查（任务表解读）",
+  "main_task_goal": "用户侧先收到会话流式摘要与完整任务表；协调器阶段由模型读懂表、对齐 latest_task_id、在 0 行时给出排查建议；全程禁止编造 scan_id。",
+  "tasks": [
+    {
+      "subtask_name": "确认会话输入已就绪",
+      "subtask_goal": "在模型开始说话之前，用户侧应已看到：query 摘要行 → done（含 latest_task_id）→ report（Markdown 全表）。若用户表示没看到表，先引导其查看流式面板或重试会话，不要凭空描述表格内容。"
+    },
+    {
+      "subtask_name": "协调器首条 payload",
+      "subtask_goal": "协调器 `query` 中会包含与流式一致的摘要片段（program 匹配 hint、latest_task_id、scan_only、limit）以及同一套任务表正文。模型只依据这些可见内容作答。"
+    },
+    {
+      "subtask_name": "ReAct 首轮：强制 JSON",
+      "subtask_goal": "Init 后第一轮：仅输出一条 JSON，`@action` 必须为 `project_scan_check`；可带 human_readable_thought。禁止用长篇 Markdown 替代 JSON。"
+    },
+    {
+      "subtask_name": "解读与建议",
+      "subtask_goal": "说明表头与各列；指出首行通常为最新扫描；写出 latest_task_id 供复制。0 行时：结合 match hint 给出换关键词、确认是否扫过、是否放宽 scan_only 等建议。若用户要误报/SSA 全文，建议改用扫描风险分析蓝图。"
+    }
+  ]
+}

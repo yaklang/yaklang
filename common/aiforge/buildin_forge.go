@@ -180,6 +180,7 @@ func syncBuildInForgeInternal() error {
 	registerBuildInForge("hostscan") // 主机体检，主要用于测试
 	registerBuildInForge("ssapoc")
 	registerBuildInForge("ssa_vulnerability_analyzer")
+	registerBuildInForge("scan_risk_analysis_project")
 	registerBuildInForge("alert_denoising")
 	registerBuildInForge("sf_rule_completion")
 	registerBuildInForge("sf_project_scan_check")

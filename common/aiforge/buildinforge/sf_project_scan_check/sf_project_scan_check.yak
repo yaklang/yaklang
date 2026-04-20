@@ -1,0 +1,164 @@
+__DESC__ = "向会话推送扫描任务 Markdown 表与 latest_task_id，再由 AI 解读表格、核对参数并给出后续建议（不做误报/全量 SSA 分析）。"
+
+__VERBOSE_NAME__ = "SSA项目检查"
+
+__KEYWORDS__ = "SyntaxFlow,扫描任务,项目扫描,任务列表,最新任务,项目标识,scan_id"
+
+query = cli.String("query", cli.setVerboseName("项目标识"), cli.setRequired(false), cli.setHelp("一行程序/仓库名称或 slug；与扫描风险分析蓝图一致。多行或包装文本由蓝图解析为首行有效片段；与 --program_hint 二选一"))
+program_hint = cli.String("program_hint", cli.setVerboseName("项目标识（兼容）"), cli.setRequired(false), cli.setHelp("未传 --query 时使用；语义与 query 相同"))
+additional_context = cli.String("additional_context", cli.setVerboseName("附加说明"), cli.setRequired(false), cli.setHelp("可选；不并入协调器首条 query，仅在任务参数区供模型参考"))
+limit = cli.Int("limit", cli.setVerboseName("最多行数"), cli.setDefault(20), cli.setHelp("按 updated_at 倒序；最大 200"))
+scan_only = cli.Bool("scan_only", cli.setVerboseName("仅 kind=scan"), cli.setDefault(true))
+cli.check()
+
+forgePickRawQuery = func(params, cliFallback) {
+    v = ""
+    for p in params {
+        if p != nil && p.Key == "query" && str.TrimSpace(p.Value) != "" {
+            v = str.TrimSpace(p.Value)
+            break
+        }
+    }
+    if v == "" {
+        for p in params {
+            if p != nil && p.Key == "program_hint" && str.TrimSpace(p.Value) != "" {
+                v = str.TrimSpace(p.Value)
+                break
+            }
+        }
+    }
+    if v == "" {
+        v = str.TrimSpace(cliFallback)
+    }
+    return v
+}
+
+forgeUnwrapEngineQuery = func(raw) {
+    s = str.TrimSpace(str.ReplaceAll(raw, "\r\n", "\n"))
+    if s == "" {
+        return ""
+    }
+    if str.StartsWith(s, "{") && str.Contains(s, `"query"`) {
+        rg = re.Compile(`"(?i)query"\s*:\s*"([^"]+)"`)~
+        m = rg.FindSubmatch(s)
+        if len(m) > 1 && len(m[1]) > 0 {
+            s = str.TrimSpace(string(m[1]))
+        }
+    }
+    if !str.Contains(s, "<|用户原始需求_") && !str.Contains(s, "<|AI重写/优化后_") {
+        return s
+    }
+    // Yak 字符串切片按 rune 下标；str.Index 为字节偏移，禁止混用 s[i+len(...):]，改用 SplitN/Split。
+    if str.Contains(s, "<|AI重写/优化后_") {
+        mp = str.SplitN(s, "<|AI重写/优化后_", 2)
+        if len(mp) >= 2 {
+            rest = mp[1]
+            if str.Contains(rest, "|>") {
+                pp = str.SplitN(rest, "|>", 2)
+                if len(pp) >= 2 {
+                    innerBlock = str.TrimSpace(pp[1])
+                    if str.Contains(innerBlock, "<|AI重写/优化后_END_") {
+                        ep = str.SplitN(innerBlock, "<|AI重写/优化后_END_", 2)
+                        inner = str.TrimSpace(ep[0])
+                        if inner != "" {
+                            return inner
+                        }
+                    }
+                }
+            }
+        }
+    }
+    tail = ""
+    if str.Contains(s, "\n---\n") {
+        segs = str.Split(s, "\n---\n")
+        tail = str.TrimSpace(segs[len(segs)-1])
+    } else if str.Contains(s, "\n--- \n") {
+        segs = str.Split(s, "\n--- \n")
+        tail = str.TrimSpace(segs[len(segs)-1])
+    }
+    if tail != "" {
+        lines = str.Split(tail, "\n")
+        if len(lines) > 0 {
+            first = str.TrimSpace(lines[0])
+            if first != "" && !str.StartsWith(first, "<|") {
+                return first
+            }
+        }
+    }
+    return s
+}
+
+normalizeScanProjectSlug = func(primary) {
+    normP = str.ReplaceAll(str.TrimSpace(primary), "\r\n", "\n")
+    line0 = str.TrimSpace(str.Split(normP, "\n")[0])
+    h = line0
+    if str.Contains(line0, "\\") || str.Contains(line0, "/") {
+        b = str.TrimSpace(file.GetBase(line0))
+        if b != "" && b != "." && b != ".." {
+            h = b
+        }
+    }
+    if h == "" {
+        h = normP
+    }
+    return h
+}
+
+forgeHandle = func(params, opts...) {
+    cliFb = str.TrimSpace(query)
+    if cliFb == "" {
+        cliFb = str.TrimSpace(program_hint)
+    }
+    programHint = normalizeScanProjectSlug(forgeUnwrapEngineQuery(forgePickRawQuery(params, cliFb)))
+    if programHint == "" {
+        return nil, "需要 --query 或 --program_hint"
+    }
+
+    cod, err = aiagent.NewExecutor("sf_project_scan_check", nil)
+    if err != nil {
+        log.Error("sf_project_scan_check NewExecutor failed: %v", err)
+        return nil, err
+    }
+    aidConfig = cod.GetAIConfig()
+
+    lim = limit
+    if lim > 200 {
+        lim = 200
+    }
+    aidConfig.EmitDefaultStreamEvent("query", str.NewReader(sprintf("program_hint=%s scan_only=%v limit=%d", programHint, scan_only, lim)), "")
+
+    checkRes, err = syntaxflow.RunSyntaxFlowProjectScanCheck(programHint, scan_only, lim)
+    if err != nil {
+        msg = sprintf("check failed: %v", err)
+        log.Error("[sf_project_scan_check] %s", msg)
+        aidConfig.EmitDefaultStreamEvent("error", str.NewReader(msg), "")
+        return nil, msg
+    }
+    report = checkRes.ReportMarkdown
+    latestId = checkRes.LatestTaskID
+
+    aidConfig.EmitDefaultStreamEvent("done", str.NewReader(sprintf("latest_task_id=%s", latestId)), "")
+    aidConfig.EmitStreamEventWithContentType("report", str.NewReader(report), "", "text/markdown")
+
+    coordinatorQuery = sprintf("%s latest_task_id=%s scan_only=%v limit=%d", programHint, latestId, scan_only, lim)
+
+    mergedParams = []
+    for p in params {
+        if p == nil || p.Key == "additional_context" {
+            continue
+        }
+        if p.Key == "query" || p.Key == "program_hint" {
+            p.Value = coordinatorQuery
+        }
+        mergedParams = append(mergedParams, p)
+    }
+    if len(mergedParams) == 0 {
+        mergedParams = params
+    }
+
+    res, err = __DEFAULT_FORGE_HANDLE__(mergedParams, opts...)
+    if err != nil {
+        return nil, err
+    }
+    return res
+}

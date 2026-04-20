@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jinzhu/gorm"
@@ -293,6 +294,24 @@ func (r *ReportRecord) ToReport() (*Report, error) {
 		Items:      items,
 	}
 	return reportIns, nil
+}
+
+// JoinReportItemsMarkdown flattens markdown + divider items into one text blob (same layout as round-tripping through ReportRecord).
+func JoinReportItemsMarkdown(items []*ReportItem) string {
+	var b strings.Builder
+	for _, item := range items {
+		if item == nil {
+			continue
+		}
+		switch item.Type {
+		case REPORT_ITEM_TYPE_MARKDOWN:
+			b.WriteString(item.Content)
+			b.WriteString("\n\n")
+		case REPORT_ITEM_TYPE_DIVIDER:
+			b.WriteString("\n---\n\n")
+		}
+	}
+	return strings.TrimSpace(b.String())
 }
 
 func (r *Report) Save() int {

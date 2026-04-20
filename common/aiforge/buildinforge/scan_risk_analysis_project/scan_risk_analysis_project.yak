@@ -1,0 +1,278 @@
+__DESC__ = "按一行项目标识对齐最新 SyntaxFlow 扫描任务，向会话推送任务表并尽量推送 SSA 报告 Markdown（ssa_scan_report）与工作区钉选；供 AI 做误报分诊与 PoC 价值提示；不自动生成 PoC。"
+__VERBOSE_NAME__ = "按项目的扫描风险分析"
+__KEYWORDS__ = "SyntaxFlow,SSA,扫描,误报,风险分析,扫描报告,项目扫描"
+
+query = cli.String("query", cli.setVerboseName("项目标识"), cli.setRequired(true), cli.setHelp("一行程序/仓库名称或 slug。多行或包装文本由蓝图解析为首行有效片段；路径通常取末级名参与匹配"))
+additional_context = cli.String("additional_context", cli.setVerboseName("附加说明"), cli.setRequired(false), cli.setHelp("可选说明；附在协调器 payload 末尾；勿与 slug 混写在一行"))
+cli.check()
+
+// AI 协调器指引（与 init/persistent/plan 文案一致；改此处时请同步这些 txt）。
+scanRiskAIFormatGuide = `<<<AI_报告与误报分析指引>>>
+
+面向模型：以下用于对齐会话流式事件与协调器 payload，勿向用户原样复读标题。
+
+流式与标记
+- report：SyntaxFlow Project Scan Check 任务表（完整 Markdown）。
+- ssa_scan_report：SSA 扫描报告（完整 Markdown，若本次成功生成则会话内可见）。
+- 同次生成成功时，SSA Markdown 还会落到当前会话工作区 **scan_risk_analysis_project/** 并钉选（与 task_* 目录同级，便于在文件树打开）。
+- 协调器：<<<SyntaxFlow_Project_Scan_Check_Report_Excerpt>>> 任务表摘录；<<<SSA_Scan_Report_Excerpt>>> SSA 摘录（若有）；<<<User_Additional_Context>>> 用户附加说明。
+- 摘要行：program_hint、latest_task_id、ssa_report_r_id（报告列表中的整数编号，不是扫描任务 UUID）、scan_only、limit。
+
+任务表
+- 标题「SyntaxFlow Project Scan Check」；含 match hint、scan_only、matched rows；有数据时为 updated_at DESC 表格（task_id、kind、programs、risks 等），首行多为最新扫描。
+
+SSA 与误报
+- 优先 ssa_scan_report 全文或钉选 md；否则按 <<<SSA_报告说明>>> 请用户在本机客户端导出或写入 additional_context。
+- 勿仅凭规则名下结论；证据不足标 suspicious。
+
+事实与边界
+- 以本会话流式内容、协调器块与工作区文件为准；禁止虚构接口、禁止编造 scan_id；matched rows=0 时不得臆造任务或报告。
+- 勿为表格列 risk_id 批量调用 ssa-risk 或编造 id；单条深钻再按需 ssa-risk/ssapoc。
+
+输出
+- 误报结论尽量覆盖各分组；用户可见侧重误报与 PoC 价值（本蓝图不自动生成 PoC）。
+
+动作分层（与 persistent.txt 一致）
+- 主 ReAct Init 后首轮：@action 字面量 scan_risk_analysis（仅此场景）。
+- 计划子任务（1-1/1-2…）：每轮须可解析 JSON；@action 为当轮提示中的合法值，禁止 scan_risk_analysis；禁止无 JSON 的纯「新发现/总结/#summary」。收尾 directly_answer：第 1 行 JSON 无 answer_payload，同轮 FINAL_ANSWER 承载全文。`
+
+scanRiskSSAExportHint = `<<<SSA_报告说明>>>
+
+何时会有全文
+- 当摘要行里已有 **latest_task_id** 时，系统会尝试生成并推送 **ssa_scan_report**；**ssa_report_r_id** 为报告列表中的整数编号（不是任务 UUID）。
+
+失败或缺失
+- 可在本机客户端对应该扫描任务使用「生成报告」后导出 Markdown，或将正文粘贴到 **additional_context**。
+- 误报分诊以你能读到的 SSA 正文为准，勿编造漏洞段落。
+
+合规
+- 仅授权使用；利用与 PoC 单独评估。`
+
+// 与 sf_project_scan_check 保持一致：从 ExecParamItem + CLI 得到引擎用 query，再 unwrap ReAct 包装。
+forgePickRawQuery = func(params, cliFallback) {
+    v = ""
+    for p in params {
+        if p != nil && p.Key == "query" && str.TrimSpace(p.Value) != "" {
+            v = str.TrimSpace(p.Value)
+            break
+        }
+    }
+    if v == "" {
+        for p in params {
+            if p != nil && p.Key == "program_hint" && str.TrimSpace(p.Value) != "" {
+                v = str.TrimSpace(p.Value)
+                break
+            }
+        }
+    }
+    if v == "" {
+        v = str.TrimSpace(cliFallback)
+    }
+    return v
+}
+
+forgeUnwrapEngineQuery = func(raw) {
+    s = str.TrimSpace(str.ReplaceAll(raw, "\r\n", "\n"))
+    if s == "" {
+        return ""
+    }
+    if str.StartsWith(s, "{") && str.Contains(s, `"query"`) {
+        rg = re.Compile(`"(?i)query"\s*:\s*"([^"]+)"`)~
+        m = rg.FindSubmatch(s)
+        if len(m) > 1 && len(m[1]) > 0 {
+            s = str.TrimSpace(string(m[1]))
+        }
+    }
+    if !str.Contains(s, "<|用户原始需求_") && !str.Contains(s, "<|AI重写/优化后_") {
+        return s
+    }
+    // Yak 字符串切片按 rune 下标；str.Index 为字节偏移，禁止混用 s[i+len(...):]，改用 SplitN/Split。
+    if str.Contains(s, "<|AI重写/优化后_") {
+        mp = str.SplitN(s, "<|AI重写/优化后_", 2)
+        if len(mp) >= 2 {
+            rest = mp[1]
+            if str.Contains(rest, "|>") {
+                pp = str.SplitN(rest, "|>", 2)
+                if len(pp) >= 2 {
+                    innerBlock = str.TrimSpace(pp[1])
+                    if str.Contains(innerBlock, "<|AI重写/优化后_END_") {
+                        ep = str.SplitN(innerBlock, "<|AI重写/优化后_END_", 2)
+                        inner = str.TrimSpace(ep[0])
+                        if inner != "" {
+                            return inner
+                        }
+                    }
+                }
+            }
+        }
+    }
+    tail = ""
+    if str.Contains(s, "\n---\n") {
+        segs = str.Split(s, "\n---\n")
+        tail = str.TrimSpace(segs[len(segs)-1])
+    } else if str.Contains(s, "\n--- \n") {
+        segs = str.Split(s, "\n--- \n")
+        tail = str.TrimSpace(segs[len(segs)-1])
+    }
+    if tail != "" {
+        lines = str.Split(tail, "\n")
+        if len(lines) > 0 {
+            first = str.TrimSpace(lines[0])
+            if first != "" && !str.StartsWith(first, "<|") {
+                return first
+            }
+        }
+    }
+    return s
+}
+
+normalizeScanProjectSlug = func(primary) {
+    normP = str.ReplaceAll(str.TrimSpace(primary), "\r\n", "\n")
+    line0 = str.TrimSpace(str.Split(normP, "\n")[0])
+    h = line0
+    if str.Contains(line0, "\\") || str.Contains(line0, "/") {
+        b = str.TrimSpace(file.GetBase(line0))
+        if b != "" && b != "." && b != ".." {
+            h = b
+        }
+    }
+    if h == "" {
+        h = normP
+    }
+    return h
+}
+
+// 按行截断任务表摘录，避免协调器 prompt 过大（不依赖新增 Go API）。
+forgeExcerptByLines = func(s, maxLines) {
+    if maxLines <= 0 || s == "" {
+        return s
+    }
+    lines = str.Split(s, "\n")
+    if len(lines) <= maxLines {
+        return s
+    }
+    out = ""
+    count = 0
+    for line in lines {
+        if count >= maxLines {
+            break
+        }
+        if count > 0 {
+            out = out + "\n"
+        }
+        out = out + line
+        count = count + 1
+    }
+    return out + "\n\n<!-- excerpt: " + sprintf("%d", len(lines)-maxLines) + " more lines; full table in stream report -->\n"
+}
+
+// 将 SSA Markdown 写入会话工作区根下 scan_risk_analysis_project/ 并钉选（与 task_* 同级，避免 forge 早于 loop目录创建时写丢或路径过深）。
+forgeSaveSsaMdToAiWorkspace = func(aidConfig, workRoot, ssaRid, ssaMd) {
+    if aidConfig == nil || str.TrimSpace(ssaMd) == "" {
+        return
+    }
+    root = str.TrimSpace(workRoot)
+    if root == "" {
+        aidConfig.EmitDefaultStreamEvent("ssa_report_workspace", str.NewReader("[scan_risk_analysis_project] skip disk save: empty workdir"), "")
+        return
+    }
+    dir = file.Join(root, "scan_risk_analysis_project")
+    mkdirErr = file.MkdirAll(dir)
+    if mkdirErr != nil {
+        log.Warn("[scan_risk_analysis_project] MkdirAll artifact dir: %v", mkdirErr)
+        aidConfig.EmitDefaultStreamEvent("ssa_report_workspace", str.NewReader(sprintf("[scan_risk_analysis_project] MkdirAll failed: %v", mkdirErr)), "")
+        return
+    }
+    ssaReportFileName = sprintf("ssa_scan_report_r%d_%d.md", ssaRid, time.Now().Unix())
+    if ssaRid <= 0 {
+        ssaReportFileName = sprintf("ssa_scan_report_%d.md", time.Now().Unix())
+    }
+    outPath = file.Join(dir, ssaReportFileName)
+    saveErr = file.Save(outPath, ssaMd)
+    if saveErr != nil {
+        log.Warn("[scan_risk_analysis_project] save SSA md to AI workspace: %v", saveErr)
+        aidConfig.EmitDefaultStreamEvent("ssa_report_workspace", str.NewReader(sprintf("[scan_risk_analysis_project] file.Save failed: %v", saveErr)), "")
+        return
+    }
+    aidConfig.EmitPinFilename(outPath)
+    aidConfig.EmitDefaultStreamEvent("ssa_report_workspace", str.NewReader(sprintf("[scan_risk_analysis_project] saved+pinned %s", outPath)), "")
+}
+
+forgeHandle = func(params, opts...) {
+    programHint = normalizeScanProjectSlug(forgeUnwrapEngineQuery(forgePickRawQuery(params, str.TrimSpace(query))))
+    if programHint == "" {
+        return nil, "需要有效的项目标识 query"
+    }
+
+    mergedParams = []
+    for p in params {
+        if p == nil || p.Key == "additional_context" {
+            continue
+        }
+        mergedParams = append(mergedParams, p)
+    }
+    if len(mergedParams) == 0 {
+        mergedParams = params
+    }
+
+    cod, err = aiagent.NewExecutor("scan_risk_analysis_project", nil)
+    if err != nil {
+        log.Error("scan_risk_analysis_project NewExecutor failed: %v", err)
+        return nil, err
+    }
+    aidConfig = cod.GetAIConfig()
+    lim = 20
+    scanOnly = true
+    aidConfig.EmitDefaultStreamEvent("query", str.NewReader(sprintf("[sf_project_scan_check] program_hint=%s scan_only=%v limit=%d", programHint, scanOnly, lim)), "")
+
+    checkRes, err = syntaxflow.RunSyntaxFlowProjectScanCheck(programHint, scanOnly, lim)
+    if err != nil {
+        msg = sprintf("sf_project_scan_check failed: %v", err)
+        log.Error("[scan_risk_analysis_project] %s", msg)
+        aidConfig.EmitDefaultStreamEvent("error", str.NewReader(msg), "")
+        return nil, msg
+    }
+    report = checkRes.ReportMarkdown
+    latestId = checkRes.LatestTaskID
+    aidConfig.EmitDefaultStreamEvent("done", str.NewReader(sprintf("latest_task_id=%s", latestId)), "")
+    aidConfig.EmitStreamEventWithContentType("report", str.NewReader(report), "", "text/markdown")
+
+    ssaRid = 0
+    ssaMd = ""
+    if str.TrimSpace(latestId) != "" {
+        ssaRid, ssaMd, genErr = sfreport.GenerateSSAReportMarkdownForTask(latestId, sprintf("%s(%s)-SSA扫描报告", programHint, time.Now().Format("2006-01-02 15:04:05")))
+        if genErr != nil {
+            log.Warn("[scan_risk_analysis_project] GenerateSSAReportMarkdownForTask: %v", genErr)
+        } else if str.TrimSpace(ssaMd) != "" {
+            aidConfig.EmitStreamEventWithContentType("ssa_scan_report", str.NewReader(ssaMd), "", "text/markdown")
+            forgeSaveSsaMdToAiWorkspace(aidConfig, aidConfig.GetOrCreateWorkDir(), ssaRid, ssaMd)
+        }
+    }
+
+    reportExcerpt = forgeExcerptByLines(report, 120)
+
+    aiFormatGuide = scanRiskAIFormatGuide
+    ssaExportHint = scanRiskSSAExportHint
+
+    headLine = sprintf("program_hint=%s latest_task_id=%s ssa_report_r_id=%d scan_only=%v limit=%d", programHint, latestId, ssaRid, scanOnly, lim)
+    coordinatorPayload = headLine + "\n\n" + aiFormatGuide + "\n\n" + ssaExportHint + "\n\n<<<SyntaxFlow_Project_Scan_Check_Report_Excerpt>>>\n" + reportExcerpt
+    if str.TrimSpace(ssaMd) != "" {
+        coordinatorPayload = coordinatorPayload + "\n\n<<<SSA_Scan_Report_Excerpt>>>\n" + forgeExcerptByLines(ssaMd, 120)
+    }
+    extra = str.TrimSpace(additional_context)
+    if extra != "" {
+        coordinatorPayload = coordinatorPayload + "\n\n<<<User_Additional_Context>>>\n" + extra
+    }
+
+    for p in mergedParams {
+        if p != nil && p.Key == "query" {
+            p.Value = coordinatorPayload
+        }
+    }
+
+    res, err = __DEFAULT_FORGE_HANDLE__(mergedParams, opts...)
+    if err != nil {
+        return nil, err
+    }
+    return res
+}

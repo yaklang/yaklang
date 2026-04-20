@@ -1,0 +1,28 @@
+{
+  "@action": "plan",
+  "query": "-",
+  "main_task": "按项目完成 SyntaxFlow 扫描风险分析与误报分诊",
+  "main_task_goal": "在会话流式内容与协调器注入块中对齐最新扫描任务与 SSA 报告，完成误报分诊与 PoC 价值提示；不生成 PoC；禁止编造 scan_id。",
+  "tasks": [
+    {
+      "subtask_name": "确认可见输入",
+      "subtask_goal": "列出你将依赖的事实来源：流式 report 全表、摘要行 latest_task_id、可选 ssa_scan_report、协调器中的 <<<…>>> 摘录块、工作区 scan_risk_analysis_project 下钉选 md（若有）。缺 SSA 时按 <<<SSA_报告说明>>> 走用户导出或 additional_context，不假装已读全文。**本子任务若 directly_answer 收尾：一行 JSON（无 answer_payload）+ 同轮 FINAL_ANSWER（见 persistent）。**"
+    },
+    {
+      "subtask_name": "解析项目与任务对齐",
+      "subtask_goal": "从摘要行读取 program_hint 与 latest_task_id；与 Excerpt/全表核对。0 行时引导换关键词或确认是否扫过。**在 PE 子任务内：每轮合法 JSON + 提示中的 @action；禁止 scan_risk_analysis；禁止无 JSON 的纯总结。**"
+    },
+    {
+      "subtask_name": "阅读 SSA 与证据",
+      "subtask_goal": "以 ssa_scan_report 或钉选文件为主；摘录仅作导航。逐条风险看描述与位置，不凭规则名定论；证据不足标 suspicious。禁止臆造漏洞段落。"
+    },
+    {
+      "subtask_name": "误报分诊与结论",
+      "subtask_goal": "输出结构化分诊结论（覆盖各 group/规则分组）；用户可见部分突出误报判断与依据；PoC 价值仅作建议。"
+    },
+    {
+      "subtask_name": "收尾与后续",
+      "subtask_goal": "说明若缺全文则结论范围受限；需要单条 PoC 时指向 ssapoc 与真实 risk_id；强调授权与合规。"
+    }
+  ]
+}

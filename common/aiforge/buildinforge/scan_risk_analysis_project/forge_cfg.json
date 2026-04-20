@@ -1,0 +1,9 @@
+{
+    "name": "scan_risk_analysis_project",
+    "verbose_name": "按项目的扫描风险分析",
+    "description": "在会话中对齐某项目的最新 SyntaxFlow 扫描任务，尽量推送完整 SSA 报告 Markdown 供研判，并引导误报分诊与 PoC 价值评估（不在此蓝图内自动生成 PoC）。",
+    "tool_keywords": "SyntaxFlow,SSA,扫描,误报,风险分析,项目扫描,扫描报告",
+    "tools": "",
+    "actions": "scan_risk_analysis",
+    "tags": "SSA,扫描,误报,SyntaxFlow,风险"
+}
