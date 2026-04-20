@@ -8,6 +8,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func requireSchemaWithoutNullRequired(t *testing.T, schema any) map[string]any {
+	t.Helper()
+
+	raw, err := json.Marshal(schema)
+	require.NoError(t, err)
+	require.NotContains(t, string(raw), `"required":null`)
+
+	var parsed map[string]any
+	require.NoError(t, json.Unmarshal(raw, &parsed))
+	return parsed
+}
+
 func TestWithOneOf(t *testing.T) {
 	tool := NewTool("tool",
 		WithString("test"),
@@ -59,6 +71,7 @@ func TestMarshalInputSchema_EmptyPropertiesAlwaysObject(t *testing.T) {
 
 	raw, err := json.Marshal(tool.InputSchema)
 	require.NoError(t, err)
+	require.NotContains(t, string(raw), `"required":null`)
 
 	var parsed map[string]any
 	require.NoError(t, json.Unmarshal(raw, &parsed))
@@ -102,4 +115,121 @@ func TestMarshalInputSchema_NestedEmptyPropertiesAlwaysObject(t *testing.T) {
 	paginationProperties, ok := paginationSchema["properties"].(map[string]any)
 	require.True(t, ok, "pagination.properties should be object")
 	require.Len(t, paginationProperties, 0)
+
+	_, hasPaginationRequired := paginationSchema["required"]
+	require.False(t, hasPaginationRequired, "pagination.required should be omitted when empty")
+}
+
+func TestMarshalInputSchema_StructOptionalRequiredOmitted(t *testing.T) {
+	tool := NewTool("tool",
+		WithStruct("filter", nil,
+			WithStruct("pagination", nil),
+		),
+	)
+
+	parsed := requireSchemaWithoutNullRequired(t, tool.InputSchema)
+
+	rootProperties, ok := parsed["properties"].(map[string]any)
+	require.True(t, ok, "root properties should be object")
+
+	filterSchema, ok := rootProperties["filter"].(map[string]any)
+	require.True(t, ok, "filter should be object schema")
+
+	_, hasFilterRequired := filterSchema["required"]
+	require.False(t, hasFilterRequired, "filter.required should be omitted when empty")
+
+	filterProperties, ok := filterSchema["properties"].(map[string]any)
+	require.True(t, ok, "filter.properties should be object")
+
+	paginationSchema, ok := filterProperties["pagination"].(map[string]any)
+	require.True(t, ok, "pagination should be object schema")
+
+	_, hasPaginationRequired := paginationSchema["required"]
+	require.False(t, hasPaginationRequired, "pagination.required should be omitted when empty")
+}
+
+func TestMarshalInputSchema_OneOfOptionalRequiredOmitted(t *testing.T) {
+	tool := NewTool("tool",
+		WithOneOfStruct("option", nil,
+			[]ToolOption{
+				WithString("string", Description("string")),
+			},
+			[]ToolOption{
+				WithNumber("number", Description("number")),
+			},
+		),
+	)
+
+	parsed := requireSchemaWithoutNullRequired(t, tool.InputSchema)
+
+	rootProperties, ok := parsed["properties"].(map[string]any)
+	require.True(t, ok, "root properties should be object")
+
+	optionSchema, ok := rootProperties["option"].(map[string]any)
+	require.True(t, ok, "option should be object schema")
+
+	oneOf, ok := optionSchema["oneOf"].([]any)
+	require.True(t, ok, "option.oneOf should be array")
+	require.Len(t, oneOf, 2)
+
+	for _, item := range oneOf {
+		branch, ok := item.(map[string]any)
+		require.True(t, ok, "oneOf branch should be object")
+		_, hasRequired := branch["required"]
+		require.False(t, hasRequired, "oneOf branch required should be omitted when empty")
+	}
+}
+
+func TestMarshalInputSchema_AnyOfOptionalRequiredOmitted(t *testing.T) {
+	tool := NewTool("tool",
+		WithAnyOfStruct("option", nil,
+			[]ToolOption{
+				WithString("string", Description("string")),
+			},
+			[]ToolOption{
+				WithNumber("number", Description("number")),
+			},
+		),
+	)
+
+	parsed := requireSchemaWithoutNullRequired(t, tool.InputSchema)
+
+	rootProperties, ok := parsed["properties"].(map[string]any)
+	require.True(t, ok, "root properties should be object")
+
+	optionSchema, ok := rootProperties["option"].(map[string]any)
+	require.True(t, ok, "option should be object schema")
+
+	anyOf, ok := optionSchema["anyOf"].([]any)
+	require.True(t, ok, "option.anyOf should be array")
+	require.Len(t, anyOf, 2)
+
+	for _, item := range anyOf {
+		branch, ok := item.(map[string]any)
+		require.True(t, ok, "anyOf branch should be object")
+		_, hasRequired := branch["required"]
+		require.False(t, hasRequired, "anyOf branch required should be omitted when empty")
+	}
+}
+
+func TestMarshalInputSchema_StructArrayOptionalRequiredOmitted(t *testing.T) {
+	tool := NewTool("tool",
+		WithStructArray("items", nil,
+			WithString("name", Description("item name")),
+		),
+	)
+
+	parsed := requireSchemaWithoutNullRequired(t, tool.InputSchema)
+
+	rootProperties, ok := parsed["properties"].(map[string]any)
+	require.True(t, ok, "root properties should be object")
+
+	itemsSchema, ok := rootProperties["items"].(map[string]any)
+	require.True(t, ok, "items should be array schema")
+
+	itemSchema, ok := itemsSchema["items"].(map[string]any)
+	require.True(t, ok, "items.items should be object schema")
+
+	_, hasRequired := itemSchema["required"]
+	require.False(t, hasRequired, "array item required should be omitted when empty")
 }
