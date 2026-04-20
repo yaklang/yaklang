@@ -15,7 +15,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/node"
 	capabilityv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/capability/v1"
-	hidsv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/hids/v1"
 	nodev1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/node/v1"
 )
 
@@ -99,26 +98,6 @@ func (p *capabilityEventPublisher) PublishAlert(
 		Severity:   alert.Severity,
 		Title:      alert.Title,
 		DetailJson: cloneBytes(alert.DetailJSON),
-	})
-}
-
-func (p *capabilityEventPublisher) PublishObservation(
-	ctx context.Context,
-	observation CapabilityRuntimeObservation,
-) error {
-	ref := capabilityCommandRef{
-		NodeID:        p.node.CurrentNodeID(),
-		CapabilityKey: observation.CapabilityKey,
-		SpecVersion:   observation.SpecVersion,
-	}
-	return p.publish(ctx, legionEventHIDSObservation, ref, capabilityObservationEventID(observation), &hidsv1.HIDSObservation{
-		Capability: &capabilityv1.CapabilityRef{
-			CapabilityKey: observation.CapabilityKey,
-			SpecVersion:   observation.SpecVersion,
-		},
-		HidsEventType: observation.EventType,
-		ObservedAt:    timestamppb.New(observation.ObservedAt),
-		EventJson:     cloneBytes(observation.EventJSON),
 	})
 }
 
@@ -224,8 +203,6 @@ func attachCapabilityEventMetadata(
 		value.Metadata = metadata
 	case *capabilityv1.CapabilityFailed:
 		value.Metadata = metadata
-	case *hidsv1.HIDSObservation:
-		value.Metadata = metadata
 	default:
 		return fmt.Errorf("unsupported capability event message: %T", message)
 	}
@@ -250,16 +227,6 @@ func capabilityAlertEventID(alert CapabilityRuntimeAlert) string {
 	payload := append(cloneBytes(alert.DetailJSON), []byte("\x00"+alert.RuleID+"\x00"+alert.Title)...)
 	sum := sha1.Sum(payload)
 	return fmt.Sprintf("%s:alert:%d:%x", alert.CapabilityKey, observedAt.UnixNano(), sum[:6])
-}
-
-func capabilityObservationEventID(observation CapabilityRuntimeObservation) string {
-	observedAt := observation.ObservedAt.UTC()
-	if observedAt.IsZero() {
-		observedAt = time.Now().UTC()
-	}
-	payload := append(cloneBytes(observation.EventJSON), []byte("\x00"+observation.EventType)...)
-	sum := sha1.Sum(payload)
-	return fmt.Sprintf("%s:observation:%d:%x", observation.CapabilityKey, observedAt.UnixNano(), sum[:6])
 }
 
 func capabilityStatusEventID(result CapabilityApplyResult) string {

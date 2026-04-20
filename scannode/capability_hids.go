@@ -18,14 +18,13 @@ import (
 )
 
 type hidsCapabilityHooks struct {
-	once         sync.Once
-	applyMu      sync.Mutex
-	mu           sync.RWMutex
-	manager      *hidsruntime.Manager
-	alerts       chan CapabilityRuntimeAlert
-	observations chan CapabilityRuntimeObservation
-	config       hidsAlertConfig
-	appliedSpec  []byte
+	once        sync.Once
+	applyMu     sync.Mutex
+	mu          sync.RWMutex
+	manager     *hidsruntime.Manager
+	alerts      chan CapabilityRuntimeAlert
+	config      hidsAlertConfig
+	appliedSpec []byte
 }
 
 type hidsAlertConfig struct {
@@ -37,8 +36,7 @@ type hidsAlertConfig struct {
 
 func newCapabilityHIDSHooks() capabilityHIDSHooks {
 	return &hidsCapabilityHooks{
-		alerts:       make(chan CapabilityRuntimeAlert, 64),
-		observations: make(chan CapabilityRuntimeObservation, 128),
+		alerts: make(chan CapabilityRuntimeAlert, 64),
 	}
 }
 
@@ -127,13 +125,6 @@ func (h *hidsCapabilityHooks) Alerts() <-chan CapabilityRuntimeAlert {
 	return h.alerts
 }
 
-func (h *hidsCapabilityHooks) Observations() <-chan CapabilityRuntimeObservation {
-	if h == nil {
-		return nil
-	}
-	return h.observations
-}
-
 func (h *hidsCapabilityHooks) CurrentStatus() (CapabilityRuntimeStatus, bool) {
 	if h == nil || h.manager == nil {
 		return CapabilityRuntimeStatus{}, false
@@ -167,7 +158,6 @@ func (h *hidsCapabilityHooks) runtimeManager() *hidsruntime.Manager {
 	h.once.Do(func() {
 		h.manager = hidsruntime.NewManager()
 		go h.forwardAlerts(h.manager.Alerts())
-		go h.forwardObservations(h.manager.Observations())
 	})
 	return h.manager
 }
@@ -224,65 +214,6 @@ func (h *hidsCapabilityHooks) convertAlert(alert hidsmodel.Alert) (CapabilityRun
 		DetailJSON:    raw,
 		ObservedAt:    observedAt,
 	}, true
-}
-
-func (h *hidsCapabilityHooks) forwardObservations(observations <-chan hidsmodel.Event) {
-	if h == nil || observations == nil {
-		return
-	}
-	for observation := range observations {
-		capabilityObservation, ok := h.convertObservation(observation)
-		if !ok {
-			continue
-		}
-		select {
-		case h.observations <- capabilityObservation:
-		default:
-		}
-	}
-}
-
-func (h *hidsCapabilityHooks) convertObservation(event hidsmodel.Event) (CapabilityRuntimeObservation, bool) {
-	if !shouldExportObservationToPlatform(event.Type) {
-		return CapabilityRuntimeObservation{}, false
-	}
-
-	raw, err := json.Marshal(event)
-	if err != nil {
-		log.Warnf("marshal hids observation failed: type=%s err=%v", event.Type, err)
-		return CapabilityRuntimeObservation{}, false
-	}
-
-	observedAt := event.Timestamp.UTC()
-	if observedAt.IsZero() {
-		observedAt = time.Now().UTC()
-	}
-	config := h.alertConfig()
-	return CapabilityRuntimeObservation{
-		CapabilityKey: config.capabilityKey,
-		SpecVersion:   config.specVersion,
-		EventType:     event.Type,
-		EventJSON:     raw,
-		ObservedAt:    observedAt,
-	}, true
-}
-
-func shouldExportObservationToPlatform(eventType string) bool {
-	switch eventType {
-	case hidsmodel.EventTypeProcessExec,
-		hidsmodel.EventTypeProcessExit,
-		hidsmodel.EventTypeNetworkAccept,
-		hidsmodel.EventTypeNetworkConnect,
-		hidsmodel.EventTypeNetworkClose,
-		hidsmodel.EventTypeFileChange,
-		hidsmodel.EventTypeAudit,
-		hidsmodel.EventTypeAuditLoss:
-		return true
-	case hidsmodel.EventTypeNetworkState:
-		return false
-	default:
-		return false
-	}
 }
 
 func (h *hidsCapabilityHooks) alertConfig() hidsAlertConfig {
