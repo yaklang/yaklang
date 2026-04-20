@@ -33,6 +33,8 @@ const (
 	perceptionMaxInputTokens = 30000
 )
 
+var perceptionCapabilitySearcher = SearchCapabilities
+
 // PerceptionState holds the structured output of a single perception evaluation.
 // It captures what the user is currently doing in concise, searchable form.
 type PerceptionState struct {
@@ -147,9 +149,12 @@ func (pc *perceptionController) shouldSkipDueToInterval() bool {
 	return time.Since(pc.current.LastUpdateAt) < pc.currentInterval
 }
 
-func (pc *perceptionController) applyResult(newState *PerceptionState) {
+func (pc *perceptionController) applyResult(newState *PerceptionState) (*PerceptionState, bool) {
 	pc.mu.Lock()
 	defer pc.mu.Unlock()
+	if newState == nil {
+		return pc.current, false
+	}
 	pc.epoch++
 	newState.Epoch = pc.epoch
 	newState.LastUpdateAt = time.Now()
@@ -159,7 +164,7 @@ func (pc *perceptionController) applyResult(newState *PerceptionState) {
 		pc.current = newState
 		pc.consecutiveUnchanged = 0
 		pc.currentInterval = pc.minInterval
-		return
+		return pc.current, true
 	}
 
 	if pc.current.ShouldUpdate(newState) {
@@ -167,6 +172,7 @@ func (pc *perceptionController) applyResult(newState *PerceptionState) {
 		pc.current = newState
 		pc.consecutiveUnchanged = 0
 		pc.currentInterval = pc.minInterval
+		return pc.current, true
 	} else {
 		pc.current.Epoch = newState.Epoch
 		pc.current.LastUpdateAt = newState.LastUpdateAt
@@ -179,6 +185,7 @@ func (pc *perceptionController) applyResult(newState *PerceptionState) {
 			}
 		}
 	}
+	return pc.current, false
 }
 
 func (pc *perceptionController) getCurrent() *PerceptionState {
@@ -304,6 +311,92 @@ func (r *ReActLoop) buildPerceptionInput(trigger string) (string, map[string]str
 	return buf.String(), extra
 }
 
+func (r *ReActLoop) buildPerceptionCapabilitySearchInput(state *PerceptionState) CapabilitySearchInput {
+	if state == nil {
+		return CapabilitySearchInput{}
+	}
+
+	query := strings.TrimSpace(state.OneLinerSummary)
+	queries := normalizeCapabilityStrings(append(append([]string{}, state.Topics...), state.Keywords...))
+	if len(queries) > 8 {
+		queries = queries[:8]
+	}
+	if query == "" && len(queries) > 0 {
+		query = strings.Join(queries, " ")
+	}
+
+	return CapabilitySearchInput{
+		Query:               query,
+		Queries:             queries,
+		IncludeCatalogMatch: false,
+		Limit:               5,
+	}
+}
+
+func (r *ReActLoop) applyPerceptionCapabilitySearchResult(result *CapabilitySearchResult) {
+	if r == nil || result == nil {
+		return
+	}
+
+	if result.SearchResultsMarkdown != "" {
+		r.Set("perception_capability_search_results", result.SearchResultsMarkdown)
+	}
+	if result.ContextEnrichment != "" {
+		r.Set("perception_capability_context_enrichment", result.ContextEnrichment)
+	}
+	if len(result.MatchedToolNames) > 0 {
+		r.Set("perception_matched_tool_names", strings.Join(result.MatchedToolNames, ","))
+	}
+	if len(result.MatchedForgeNames) > 0 {
+		r.Set("perception_matched_forge_names", strings.Join(result.MatchedForgeNames, ","))
+	}
+	if len(result.MatchedSkillNames) > 0 {
+		r.Set("perception_matched_skill_names", strings.Join(result.MatchedSkillNames, ","))
+	}
+	if len(result.MatchedFocusModeNames) > 0 {
+		r.Set("perception_matched_focus_mode_names", strings.Join(result.MatchedFocusModeNames, ","))
+	}
+	if len(result.RecommendedCapabilities) > 0 {
+		r.Set("perception_recommended_capabilities", strings.Join(result.RecommendedCapabilities, ","))
+		PreloadSingleRecommendedTool(r, result.RecommendedCapabilities)
+	}
+
+	PopulateExtraCapabilitiesFromCapabilitySearchResult(r.GetInvoker(), r, result)
+}
+
+func (r *ReActLoop) refreshCapabilitiesFromPerception(state *PerceptionState) {
+	if r == nil || state == nil {
+		return
+	}
+
+	invoker := r.GetInvoker()
+	if utils.IsNil(invoker) {
+		return
+	}
+
+	input := r.buildPerceptionCapabilitySearchInput(state)
+	if strings.TrimSpace(input.Query) == "" && len(input.Queries) == 0 {
+		return
+	}
+
+	searchResult, err := perceptionCapabilitySearcher(invoker, r, input)
+	if err != nil {
+		log.Warnf("perception capability search failed (epoch=%d, trigger=%s): %v", state.Epoch, state.LastTrigger, err)
+		return
+	}
+	if searchResult == nil {
+		return
+	}
+
+	r.applyPerceptionCapabilitySearchResult(searchResult)
+
+	if len(searchResult.MatchedToolNames) > 0 || len(searchResult.MatchedForgeNames) > 0 || len(searchResult.MatchedSkillNames) > 0 || len(searchResult.MatchedFocusModeNames) > 0 {
+		invoker.AddToTimeline("perception_capabilities",
+			fmt.Sprintf("Perception capability search (epoch=%d): tools=%d, forges=%d, skills=%d, focus_modes=%d",
+				state.Epoch, len(searchResult.MatchedToolNames), len(searchResult.MatchedForgeNames), len(searchResult.MatchedSkillNames), len(searchResult.MatchedFocusModeNames)))
+	}
+}
+
 // perceptionOutputSchema defines the JSON Schema for perception AI output
 // via LiteForge's aitool.ToolOption mechanism.
 var perceptionOutputSchema = []aitool.ToolOption{
@@ -392,7 +485,10 @@ func (r *ReActLoop) TriggerPerception(reason string, force bool) *PerceptionStat
 	}
 
 	parsed.LastTrigger = reason
-	r.perception.applyResult(parsed)
+	currentState, updated := r.perception.applyResult(parsed)
+	if updated {
+		r.refreshCapabilitiesFromPerception(currentState)
+	}
 
 	if scheduler, ok := invoker.(midtermTimelineRecallScheduler); ok {
 		summaryForMidterm := strings.TrimSpace(parsed.OneLinerSummary)
