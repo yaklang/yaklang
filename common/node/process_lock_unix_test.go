@@ -22,9 +22,15 @@ func TestAcquireNodeInstanceLockRejectsAnotherProcess(t *testing.T) {
 
 	t.Parallel()
 
+	lockBaseDir := t.TempDir()
 	nodeID := fmt.Sprintf("node-lock-%d", time.Now().UnixNano())
 	cmd := exec.Command(os.Args[0], "-test.run=TestAcquireNodeInstanceLockRejectsAnotherProcess")
-	cmd.Env = append(os.Environ(), nodeLockHelperEnv+"=1", "LEGION_NODE_LOCK_NODE_ID="+nodeID)
+	cmd.Env = append(
+		os.Environ(),
+		nodeLockHelperEnv+"=1",
+		"LEGION_NODE_LOCK_BASE_DIR="+lockBaseDir,
+		"LEGION_NODE_LOCK_NODE_ID="+nodeID,
+	)
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -57,7 +63,7 @@ func TestAcquireNodeInstanceLockRejectsAnotherProcess(t *testing.T) {
 		t.Fatal("timed out waiting for helper to acquire node lock")
 	}
 
-	lock, err := acquireNodeInstanceLock(nodeID)
+	lock, err := acquireNodeInstanceLock(lockBaseDir, nodeID)
 	if err == nil {
 		_ = lock.Release()
 		t.Fatal("expected duplicate node lock acquisition to fail")
@@ -77,8 +83,9 @@ func TestSanitizeNodeIDForFilename(t *testing.T) {
 }
 
 func helperHoldNodeLock() {
+	baseDir := os.Getenv("LEGION_NODE_LOCK_BASE_DIR")
 	nodeID := os.Getenv("LEGION_NODE_LOCK_NODE_ID")
-	lock, err := acquireNodeInstanceLock(nodeID)
+	lock, err := acquireNodeInstanceLock(baseDir, nodeID)
 	if err != nil {
 		_, _ = fmt.Fprintln(os.Stdout, "lock-error:"+err.Error())
 		os.Exit(2)

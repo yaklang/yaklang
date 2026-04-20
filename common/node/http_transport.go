@@ -30,6 +30,9 @@ type SessionTransport interface {
 type BootstrapRequest struct {
 	EnrollmentToken          string            `json:"enrollment_token"`
 	NodeID                   string            `json:"node_id"`
+	ClaimedName              string            `json:"claimed_name"`
+	AgentInstallationID      string            `json:"agent_installation_id"`
+	HostIdentity             HostIdentity      `json:"host_identity"`
 	NodeType                 string            `json:"node_type"`
 	Version                  string            `json:"version"`
 	Labels                   map[string]string `json:"labels"`
@@ -40,6 +43,7 @@ type BootstrapRequest struct {
 
 // SessionState is the session material returned by the platform.
 type SessionState struct {
+	NodeID             string
 	SessionID          string
 	SessionToken       string
 	NATSURL            string
@@ -138,6 +142,7 @@ func (t *httpTransport) Bootstrap(
 	request BootstrapRequest,
 ) (SessionState, error) {
 	var response struct {
+		NodeID             string    `json:"node_id"`
 		NodeSessionID      string    `json:"node_session_id"`
 		SessionToken       string    `json:"session_token"`
 		NATSURL            string    `json:"nats_url"`
@@ -150,6 +155,7 @@ func (t *httpTransport) Bootstrap(
 		return SessionState{}, err
 	}
 	return SessionState{
+		NodeID:             strings.TrimSpace(response.NodeID),
 		SessionID:          response.NodeSessionID,
 		SessionToken:       response.SessionToken,
 		NATSURL:            response.NATSURL,

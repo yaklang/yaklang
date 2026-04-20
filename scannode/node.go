@@ -3,7 +3,6 @@ package scannode
 import (
 	"time"
 
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/node"
 	"github.com/yaklang/yaklang/common/spec"
@@ -38,9 +37,9 @@ func NewScanNode(cfg node.BaseConfig) (*ScanNode, error) {
 
 	agent.node = base
 	agent.capabilityManager = newCapabilityManager(CapabilityManagerConfig{
-		NodeID:      base.NodeId,
-		BaseDir:     consts.GetDefaultYakitBaseDir(),
-		RootContext: base.GetRootContext(),
+		NodeIDProvider: base.CurrentNodeID,
+		BaseDir:        base.BaseDir(),
+		RootContext:    base.GetRootContext(),
 	})
 	agent.ruleSyncClient = NewRuleSyncClient(&RuleSyncConfig{
 		ServerURL:   cfg.PlatformAPIBaseURL,

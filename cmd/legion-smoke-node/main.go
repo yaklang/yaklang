@@ -41,7 +41,10 @@ func runNode(args []string) error {
 	flags := flag.NewFlagSet("legion-smoke-node", flag.ContinueOnError)
 	apiURL := flags.String("api-url", "http://127.0.0.1:8080", "Legion platform HTTP API base URL")
 	enrollmentToken := flags.String("enrollment-token", "", "Legion node enrollment token")
-	nodeID := flags.String("id", "smoke-node", "Node ID")
+	nodeID := flags.String("id", "", "Legacy node ID fallback; canonical node_id is assigned by platform")
+	displayName := flags.String("name", "smoke-node", "Display name reported to Legion")
+	agentInstallationID := flags.String("agent-installation-id", "", "Override persisted agent installation ID")
+	baseDir := flags.String("base-dir", "", "Node local state base directory")
 	version := flags.String("version", "smoke", "Node version")
 	heartbeatInterval := flags.Duration(
 		"heartbeat-interval",
@@ -56,12 +59,15 @@ func runNode(args []string) error {
 	defer stop()
 
 	scanNode, err := scannode.NewScanNode(node.BaseConfig{
-		NodeType:           spec.NodeType_Scanner,
-		NodeID:             *nodeID,
-		EnrollmentToken:    *enrollmentToken,
-		PlatformAPIBaseURL: *apiURL,
-		Version:            *version,
-		HeartbeatInterval:  *heartbeatInterval,
+		NodeType:            spec.NodeType_Scanner,
+		NodeID:              *nodeID,
+		DisplayName:         *displayName,
+		AgentInstallationID: *agentInstallationID,
+		BaseDir:             *baseDir,
+		EnrollmentToken:     *enrollmentToken,
+		PlatformAPIBaseURL:  *apiURL,
+		Version:             *version,
+		HeartbeatInterval:   *heartbeatInterval,
 	})
 	if err != nil {
 		return err
