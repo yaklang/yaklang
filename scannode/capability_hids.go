@@ -18,25 +18,34 @@ import (
 )
 
 type hidsCapabilityHooks struct {
-	once        sync.Once
-	applyMu     sync.Mutex
-	mu          sync.RWMutex
-	manager     *hidsruntime.Manager
-	alerts      chan CapabilityRuntimeAlert
-	config      hidsAlertConfig
-	appliedSpec []byte
+	once         sync.Once
+	applyMu      sync.Mutex
+	mu           sync.RWMutex
+	manager      *hidsruntime.Manager
+	alerts       chan CapabilityRuntimeAlert
+	observations chan CapabilityRuntimeObservation
+	config       hidsAlertConfig
+	appliedSpec  []byte
 }
 
 type hidsAlertConfig struct {
-	capabilityKey        string
-	specVersion          string
-	emitCapabilityStatus bool
-	emitCapabilityAlert  bool
+	capabilityKey            string
+	specVersion              string
+	emitCapabilityStatus     bool
+	emitCapabilityAlert      bool
+	emitSnapshotObservations bool
 }
+
+const (
+	hidsSnapshotObservationFlushInterval = 2 * time.Second
+	hidsSnapshotObservationMinInterval   = 2 * time.Minute
+	hidsSnapshotObservationMaxPending    = 2048
+)
 
 func newCapabilityHIDSHooks() capabilityHIDSHooks {
 	return &hidsCapabilityHooks{
-		alerts: make(chan CapabilityRuntimeAlert, 64),
+		alerts:       make(chan CapabilityRuntimeAlert, 64),
+		observations: make(chan CapabilityRuntimeObservation, 2048),
 	}
 }
 
@@ -58,10 +67,11 @@ func (h *hidsCapabilityHooks) Apply(
 
 	previousConfig := h.alertConfig()
 	h.setAlertConfig(hidsAlertConfig{
-		capabilityKey:        input.CapabilityKey,
-		specVersion:          input.SpecVersion,
-		emitCapabilityStatus: spec.Reporting.EmitCapabilityStatus,
-		emitCapabilityAlert:  spec.Reporting.EmitCapabilityAlert,
+		capabilityKey:            input.CapabilityKey,
+		specVersion:              input.SpecVersion,
+		emitCapabilityStatus:     spec.Reporting.EmitCapabilityStatus,
+		emitCapabilityAlert:      spec.Reporting.EmitCapabilityAlert,
+		emitSnapshotObservations: spec.Reporting.ShouldEmitSnapshotObservations(),
 	})
 	result, reused := h.tryReuseRunningRuntime(normalizedSpec)
 	if !reused {
@@ -125,6 +135,13 @@ func (h *hidsCapabilityHooks) Alerts() <-chan CapabilityRuntimeAlert {
 	return h.alerts
 }
 
+func (h *hidsCapabilityHooks) Observations() <-chan CapabilityRuntimeObservation {
+	if h == nil {
+		return nil
+	}
+	return h.observations
+}
+
 func (h *hidsCapabilityHooks) CurrentStatus() (CapabilityRuntimeStatus, bool) {
 	if h == nil || h.manager == nil {
 		return CapabilityRuntimeStatus{}, false
@@ -158,6 +175,7 @@ func (h *hidsCapabilityHooks) runtimeManager() *hidsruntime.Manager {
 	h.once.Do(func() {
 		h.manager = hidsruntime.NewManager()
 		go h.forwardAlerts(h.manager.Alerts())
+		go h.forwardObservations(h.manager.Observations())
 	})
 	return h.manager
 }
@@ -176,6 +194,206 @@ func (h *hidsCapabilityHooks) forwardAlerts(alerts <-chan hidsmodel.Alert) {
 		default:
 		}
 	}
+}
+
+func (h *hidsCapabilityHooks) forwardObservations(observations <-chan hidsmodel.Event) {
+	if h == nil || observations == nil {
+		return
+	}
+
+	state := newHIDSSnapshotObservationState()
+	ticker := time.NewTicker(hidsSnapshotObservationFlushInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case event, ok := <-observations:
+			if !ok {
+				h.flushPendingObservations(state)
+				return
+			}
+			config := h.alertConfig()
+			observation, key, ok := h.convertObservation(event, config, state)
+			if !ok {
+				continue
+			}
+			state.pending[key] = observation
+			if len(state.pending) >= hidsSnapshotObservationMaxPending {
+				h.flushPendingObservations(state)
+			}
+		case <-ticker.C:
+			h.flushPendingObservations(state)
+		}
+	}
+}
+
+func newHIDSSnapshotObservationState() *hidsSnapshotObservationState {
+	return &hidsSnapshotObservationState{
+		pending:       make(map[string]CapabilityRuntimeObservation),
+		lastPublished: make(map[string]time.Time),
+	}
+}
+
+type hidsSnapshotObservationState struct {
+	pending       map[string]CapabilityRuntimeObservation
+	lastPublished map[string]time.Time
+}
+
+func (h *hidsCapabilityHooks) convertObservation(
+	event hidsmodel.Event,
+	config hidsAlertConfig,
+	state *hidsSnapshotObservationState,
+) (CapabilityRuntimeObservation, string, bool) {
+	if !config.emitSnapshotObservations ||
+		strings.TrimSpace(config.capabilityKey) == "" ||
+		state == nil {
+		return CapabilityRuntimeObservation{}, "", false
+	}
+
+	key, ok := hidsSnapshotObservationKey(event)
+	if !ok {
+		return CapabilityRuntimeObservation{}, "", false
+	}
+	if hidsSnapshotObservationIsTerminal(event) {
+		if _, exists := state.pending[key]; !exists {
+			if _, exists := state.lastPublished[key]; !exists {
+				return CapabilityRuntimeObservation{}, "", false
+			}
+		}
+	} else if hidsSnapshotObservationIsInventory(event) {
+		if lastPublished, exists := state.lastPublished[key]; exists &&
+			time.Since(lastPublished) < hidsSnapshotObservationMinInterval {
+			return CapabilityRuntimeObservation{}, "", false
+		}
+	}
+
+	observedAt := event.Timestamp.UTC()
+	if observedAt.IsZero() {
+		observedAt = time.Now().UTC()
+		event.Timestamp = observedAt
+	}
+	raw, err := json.Marshal(event)
+	if err != nil {
+		log.Warnf("marshal hids platform snapshot observation failed: type=%s err=%v", event.Type, err)
+		return CapabilityRuntimeObservation{}, "", false
+	}
+
+	return CapabilityRuntimeObservation{
+		CapabilityKey: config.capabilityKey,
+		SpecVersion:   config.specVersion,
+		HIDSEventType: event.Type,
+		EventJSON:     raw,
+		ObservedAt:    observedAt,
+	}, key, true
+}
+
+func (h *hidsCapabilityHooks) flushPendingObservations(state *hidsSnapshotObservationState) {
+	if h == nil || state == nil || len(state.pending) == 0 {
+		return
+	}
+	for key, observation := range state.pending {
+		select {
+		case h.observations <- observation:
+			state.lastPublished[key] = time.Now().UTC()
+			delete(state.pending, key)
+		default:
+			return
+		}
+	}
+}
+
+func hidsSnapshotObservationKey(event hidsmodel.Event) (string, bool) {
+	switch event.Type {
+	case hidsmodel.EventTypeProcessExec, hidsmodel.EventTypeProcessExit:
+		if event.Process == nil {
+			return "", false
+		}
+		if event.Process.PID > 0 {
+			return fmt.Sprintf("process:%d", event.Process.PID), true
+		}
+		return nonEmptyObservationKey(
+			"process",
+			event.Process.Image,
+			event.Process.Command,
+			event.Process.ParentName,
+		)
+	case hidsmodel.EventTypeNetworkAccept,
+		hidsmodel.EventTypeNetworkConnect,
+		hidsmodel.EventTypeNetworkState,
+		hidsmodel.EventTypeNetworkClose:
+		if event.Network == nil {
+			return "", false
+		}
+		processImage := ""
+		pid := 0
+		if event.Process != nil {
+			processImage = event.Process.Image
+			pid = event.Process.PID
+		}
+		return nonEmptyObservationKey(
+			"network",
+			fmt.Sprintf("%d", pid),
+			processImage,
+			event.Network.SourceAddress,
+			fmt.Sprintf("%d", event.Network.SourcePort),
+			event.Network.DestAddress,
+			fmt.Sprintf("%d", event.Network.DestPort),
+			event.Network.Protocol,
+		)
+	case hidsmodel.EventTypeFileChange:
+		if event.File == nil {
+			return "", false
+		}
+		return nonEmptyObservationKey("file", event.File.Path)
+	default:
+		return "", false
+	}
+}
+
+func nonEmptyObservationKey(prefix string, values ...string) (string, bool) {
+	parts := make([]string, 0, len(values)+1)
+	parts = append(parts, strings.TrimSpace(prefix))
+	hasValue := false
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed != "" && trimmed != "0" {
+			hasValue = true
+		}
+		parts = append(parts, strings.ToLower(trimmed))
+	}
+	if !hasValue {
+		return "", false
+	}
+	return strings.Join(parts, "\x00"), true
+}
+
+func hidsSnapshotObservationIsTerminal(event hidsmodel.Event) bool {
+	switch event.Type {
+	case hidsmodel.EventTypeProcessExit, hidsmodel.EventTypeNetworkClose:
+		return true
+	case hidsmodel.EventTypeFileChange:
+		if event.File == nil {
+			return false
+		}
+		operation := strings.ToUpper(strings.TrimSpace(event.File.Operation))
+		return strings.Contains(operation, "REMOVE") ||
+			strings.Contains(operation, "DELETE") ||
+			strings.Contains(operation, "UNLINK")
+	default:
+		return false
+	}
+}
+
+func hidsSnapshotObservationIsInventory(event hidsmodel.Event) bool {
+	if strings.HasPrefix(strings.TrimSpace(event.Source), "inventory.") {
+		return true
+	}
+	for _, tag := range event.Tags {
+		if strings.EqualFold(strings.TrimSpace(tag), "inventory") {
+			return true
+		}
+	}
+	return false
 }
 
 func (h *hidsCapabilityHooks) convertAlert(alert hidsmodel.Alert) (CapabilityRuntimeAlert, bool) {

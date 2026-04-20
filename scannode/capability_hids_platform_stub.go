@@ -21,6 +21,10 @@ func (hidsCapabilityHooksUnsupportedPlatform) Alerts() <-chan CapabilityRuntimeA
 	return nil
 }
 
+func (hidsCapabilityHooksUnsupportedPlatform) Observations() <-chan CapabilityRuntimeObservation {
+	return nil
+}
+
 func (hidsCapabilityHooksUnsupportedPlatform) CurrentStatus() (CapabilityRuntimeStatus, bool) {
 	return CapabilityRuntimeStatus{}, false
 }
