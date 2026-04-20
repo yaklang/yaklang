@@ -3,6 +3,7 @@ package node
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,22 +19,28 @@ type NodeBase struct {
 	rootCtx context.Context
 	cancel  context.CancelFunc
 
-	NodeType spec.NodeType
-	NodeId   string
+	identityMu sync.RWMutex
+	NodeType   spec.NodeType
+	NodeId     string
 
-	enrollmentToken string
-	version         string
-	labels          map[string]string
-	capabilityKeys  []string
-	maxRunningJobs  uint32
-	lifecycleState  string
-	requestTimeout  time.Duration
+	legacyNodeID        string
+	displayName         string
+	agentInstallationID string
+	baseDir             string
+	enrollmentToken     string
+	version             string
+	labels              map[string]string
+	capabilityKeys      []string
+	maxRunningJobs      uint32
+	lifecycleState      string
+	requestTimeout      time.Duration
 
-	transport         SessionTransport
-	statusProvider    RuntimeStatusProvider
-	hostInfoProvider  HostInfoProvider
-	heartbeatInterval time.Duration
-	tickerInterval    time.Duration
+	transport            SessionTransport
+	statusProvider       RuntimeStatusProvider
+	hostInfoProvider     HostInfoProvider
+	hostIdentityProvider HostIdentityProvider
+	heartbeatInterval    time.Duration
+	tickerInterval       time.Duration
 
 	tickerFuncs *sync.Map
 
@@ -55,34 +62,100 @@ func NewNodeBase(cfg BaseConfig) (*NodeBase, error) {
 	if err != nil {
 		return nil, err
 	}
-	instanceLock, err := acquireNodeInstanceLock(normalized.NodeID)
+	instanceLock, err := acquireNodeInstanceLock(
+		normalized.BaseDir,
+		normalized.AgentInstallationID,
+	)
 	if err != nil {
 		return nil, err
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	node := &NodeBase{
-		rootCtx:           ctx,
-		cancel:            cancel,
-		NodeType:          normalized.NodeType,
-		NodeId:            normalized.NodeID,
-		enrollmentToken:   normalized.EnrollmentToken,
-		version:           normalized.Version,
-		labels:            cloneStringMap(normalized.Labels),
-		capabilityKeys:    cloneStringSlice(normalized.CapabilityKeys),
-		maxRunningJobs:    normalized.MaxRunningJobs,
-		lifecycleState:    normalized.LifecycleState,
-		requestTimeout:    normalized.RequestTimeout,
-		transport:         transport,
-		statusProvider:    normalized.StatusProvider,
-		hostInfoProvider:  normalized.HostInfoProvider,
-		heartbeatInterval: normalized.HeartbeatInterval,
-		tickerInterval:    normalized.TickerInterval,
-		tickerFuncs:       new(sync.Map),
-		isRegistered:      abool.NewBool(false),
-		instanceLock:      instanceLock,
+		rootCtx:              ctx,
+		cancel:               cancel,
+		NodeType:             normalized.NodeType,
+		NodeId:               bootstrapNodeLogRef(normalized),
+		legacyNodeID:         normalized.NodeID,
+		displayName:          normalized.DisplayName,
+		agentInstallationID:  normalized.AgentInstallationID,
+		baseDir:              normalized.BaseDir,
+		enrollmentToken:      normalized.EnrollmentToken,
+		version:              normalized.Version,
+		labels:               cloneStringMap(normalized.Labels),
+		capabilityKeys:       cloneStringSlice(normalized.CapabilityKeys),
+		maxRunningJobs:       normalized.MaxRunningJobs,
+		lifecycleState:       normalized.LifecycleState,
+		requestTimeout:       normalized.RequestTimeout,
+		transport:            transport,
+		statusProvider:       normalized.StatusProvider,
+		hostInfoProvider:     normalized.HostInfoProvider,
+		hostIdentityProvider: normalized.HostIdentityProvider,
+		heartbeatInterval:    normalized.HeartbeatInterval,
+		tickerInterval:       normalized.TickerInterval,
+		tickerFuncs:          new(sync.Map),
+		isRegistered:         abool.NewBool(false),
+		instanceLock:         instanceLock,
 	}
 	return node, nil
+}
+
+func (n *NodeBase) CurrentNodeID() string {
+	if n == nil {
+		return ""
+	}
+	n.identityMu.RLock()
+	defer n.identityMu.RUnlock()
+	return strings.TrimSpace(n.NodeId)
+}
+
+func (n *NodeBase) LegacyNodeID() string {
+	if n == nil {
+		return ""
+	}
+	n.identityMu.RLock()
+	defer n.identityMu.RUnlock()
+	return n.legacyNodeID
+}
+
+func (n *NodeBase) DisplayName() string {
+	if n == nil {
+		return ""
+	}
+	n.identityMu.RLock()
+	defer n.identityMu.RUnlock()
+	return n.displayName
+}
+
+func (n *NodeBase) AgentInstallationID() string {
+	if n == nil {
+		return ""
+	}
+	n.identityMu.RLock()
+	defer n.identityMu.RUnlock()
+	return n.agentInstallationID
+}
+
+func (n *NodeBase) BaseDir() string {
+	if n == nil {
+		return ""
+	}
+	n.identityMu.RLock()
+	defer n.identityMu.RUnlock()
+	return n.baseDir
+}
+
+func (n *NodeBase) setCurrentNodeID(nodeID string) {
+	if n == nil {
+		return
+	}
+	n.identityMu.Lock()
+	defer n.identityMu.Unlock()
+	trimmed := strings.TrimSpace(nodeID)
+	if trimmed == "" {
+		return
+	}
+	n.NodeId = trimmed
 }
 
 func (n *NodeBase) IsRegistered() bool {
@@ -115,10 +188,10 @@ func (n *NodeBase) Shutdown() {
 		ObservedAt: time.Now().UTC(),
 	})
 	if err != nil && !errors.Is(err, context.Canceled) {
-		log.Errorf("shutdown node session failed: node_id=%s session_id=%s err=%v", n.NodeId, session.SessionID, err)
+		log.Errorf("shutdown node session failed: node_id=%s session_id=%s err=%v", n.CurrentNodeID(), session.SessionID, err)
 		return
 	}
-	log.Infof("node session ended: node_id=%s session_id=%s", n.NodeId, session.SessionID)
+	log.Infof("node session ended: node_id=%s session_id=%s", n.CurrentNodeID(), session.SessionID)
 }
 
 func (n *NodeBase) startDaemon() {
@@ -192,7 +265,7 @@ func (n *NodeBase) releaseInstanceLock() {
 	}
 
 	if err := n.instanceLock.Release(); err != nil {
-		log.Errorf("release node instance lock failed: node_id=%s err=%v", n.NodeId, err)
+		log.Errorf("release node instance lock failed: node_id=%s err=%v", n.CurrentNodeID(), err)
 	}
 	n.instanceLock = nil
 }
@@ -202,7 +275,7 @@ func (n *NodeBase) logHeartbeatFailure(err error) {
 	if IsSessionInactiveTransportError(err) {
 		log.Errorf(
 			"heartbeat rejected because node session is no longer active: node_id=%s session_id=%s err=%v diagnosis=%q",
-			n.NodeId,
+			n.CurrentNodeID(),
 			session.SessionID,
 			err,
 			"another process may be running with the same node_id and replaced this session",
@@ -212,8 +285,19 @@ func (n *NodeBase) logHeartbeatFailure(err error) {
 
 	log.Errorf(
 		"heartbeat failed, rebuilding session: node_id=%s session_id=%s err=%v",
-		n.NodeId,
+		n.CurrentNodeID(),
 		session.SessionID,
 		err,
 	)
+}
+
+func bootstrapNodeLogRef(cfg BaseConfig) string {
+	switch {
+	case strings.TrimSpace(cfg.NodeID) != "":
+		return strings.TrimSpace(cfg.NodeID)
+	case strings.TrimSpace(cfg.DisplayName) != "":
+		return strings.TrimSpace(cfg.DisplayName)
+	default:
+		return strings.TrimSpace(cfg.AgentInstallationID)
+	}
 }

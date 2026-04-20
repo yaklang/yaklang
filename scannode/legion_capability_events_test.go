@@ -77,6 +77,7 @@ func TestLegionJobBridgePublishesCapabilityAlertEvent(t *testing.T) {
 	t.Parallel()
 
 	session := node.SessionState{
+		NodeID:             "node-2-canonical",
 		SessionID:          "session-2",
 		SessionToken:       "token-2",
 		NATSURL:            "nats://session-2.test",
@@ -85,6 +86,7 @@ func TestLegionJobBridgePublishesCapabilityAlertEvent(t *testing.T) {
 	}
 	base, err := node.NewNodeBase(node.BaseConfig{
 		NodeID:             "node-2",
+		BaseDir:            t.TempDir(),
 		EnrollmentToken:    "enroll-2",
 		PlatformAPIBaseURL: "http://platform.test",
 		TransportClient:    &bootstrapSessionTransport{session: session},
@@ -160,13 +162,13 @@ func TestLegionJobBridgePublishesCapabilityAlertEvent(t *testing.T) {
 	if event.GetMetadata().GetEventType() != legionEventCapabilityAlert {
 		t.Fatalf("unexpected event type: %s", event.GetMetadata().GetEventType())
 	}
-	if event.GetMetadata().GetNode().GetNodeId() != "node-2" {
+	if event.GetMetadata().GetNode().GetNodeId() != "node-2-canonical" {
 		t.Fatalf("unexpected node id: %s", event.GetMetadata().GetNode().GetNodeId())
 	}
 	if event.GetMetadata().GetNode().GetNodeSessionId() != "session-2" {
 		t.Fatalf("unexpected node session id: %s", event.GetMetadata().GetNode().GetNodeSessionId())
 	}
-	if event.GetMetadata().GetCorrelationId() != "node-2:hids" {
+	if event.GetMetadata().GetCorrelationId() != "node-2-canonical:hids" {
 		t.Fatalf("unexpected correlation id: %s", event.GetMetadata().GetCorrelationId())
 	}
 	if event.GetMetadata().GetEventId() == "" {
@@ -178,6 +180,7 @@ func TestLegionJobBridgePublishesHIDSObservationEvent(t *testing.T) {
 	t.Parallel()
 
 	session := node.SessionState{
+		NodeID:             "node-1-canonical",
 		SessionID:          "session-1",
 		SessionToken:       "token-1",
 		NATSURL:            "nats://session-1.test",
@@ -186,6 +189,7 @@ func TestLegionJobBridgePublishesHIDSObservationEvent(t *testing.T) {
 	}
 	base, err := node.NewNodeBase(node.BaseConfig{
 		NodeID:             "node-1",
+		BaseDir:            t.TempDir(),
 		EnrollmentToken:    "enroll-1",
 		PlatformAPIBaseURL: "http://platform.test",
 		TransportClient:    &bootstrapSessionTransport{session: session},
@@ -253,7 +257,7 @@ func TestLegionJobBridgePublishesHIDSObservationEvent(t *testing.T) {
 	if event.GetMetadata().GetEventType() != legionEventHIDSObservation {
 		t.Fatalf("unexpected event type: %s", event.GetMetadata().GetEventType())
 	}
-	if event.GetMetadata().GetCorrelationId() != "node-1:hids" {
+	if event.GetMetadata().GetCorrelationId() != "node-1-canonical:hids" {
 		t.Fatalf("unexpected correlation id: %s", event.GetMetadata().GetCorrelationId())
 	}
 }
@@ -262,6 +266,7 @@ func TestCapabilityEventPublisherPublishesCapabilityStatusDetail(t *testing.T) {
 	t.Parallel()
 
 	session := node.SessionState{
+		NodeID:             "node-3-canonical",
 		SessionID:          "session-3",
 		SessionToken:       "token-3",
 		NATSURL:            "nats://session-3.test",
@@ -270,6 +275,7 @@ func TestCapabilityEventPublisherPublishesCapabilityStatusDetail(t *testing.T) {
 	}
 	base, err := node.NewNodeBase(node.BaseConfig{
 		NodeID:             "node-3",
+		BaseDir:            t.TempDir(),
 		EnrollmentToken:    "enroll-3",
 		PlatformAPIBaseURL: "http://platform.test",
 		TransportClient:    &bootstrapSessionTransport{session: session},
@@ -331,6 +337,7 @@ func TestCapabilityEventPublisherNormalizesStoppedCapabilityStatus(t *testing.T)
 	t.Parallel()
 
 	session := node.SessionState{
+		NodeID:             "node-4-canonical",
 		SessionID:          "session-4",
 		SessionToken:       "token-4",
 		NATSURL:            "nats://session-4.test",
@@ -339,6 +346,7 @@ func TestCapabilityEventPublisherNormalizesStoppedCapabilityStatus(t *testing.T)
 	}
 	base, err := node.NewNodeBase(node.BaseConfig{
 		NodeID:             "node-4",
+		BaseDir:            t.TempDir(),
 		EnrollmentToken:    "enroll-4",
 		PlatformAPIBaseURL: "http://platform.test",
 		TransportClient:    &bootstrapSessionTransport{session: session},
