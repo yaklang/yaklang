@@ -33,6 +33,10 @@ func (s *sessionReadyReporterStub) PublishAlert(context.Context, CapabilityRunti
 	return nil
 }
 
+func (s *sessionReadyReporterStub) PublishObservation(context.Context, CapabilityRuntimeObservation) error {
+	return nil
+}
+
 type sessionReadyHookStub struct {
 	called int
 }
@@ -40,7 +44,8 @@ type sessionReadyHookStub struct {
 func (s *sessionReadyHookStub) Apply(*CapabilityManager, capabilityHIDSApplyInput) (CapabilityApplyResult, error) {
 	return CapabilityApplyResult{}, nil
 }
-func (s *sessionReadyHookStub) Alerts() <-chan CapabilityRuntimeAlert { return nil }
+func (s *sessionReadyHookStub) Alerts() <-chan CapabilityRuntimeAlert             { return nil }
+func (s *sessionReadyHookStub) Observations() <-chan CapabilityRuntimeObservation { return nil }
 func (s *sessionReadyHookStub) CurrentStatus() (CapabilityRuntimeStatus, bool) {
 	return CapabilityRuntimeStatus{}, false
 }
