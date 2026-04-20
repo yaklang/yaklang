@@ -4,7 +4,7 @@ package node
 
 type nodeInstanceLock struct{}
 
-func acquireNodeInstanceLock(_ string) (*nodeInstanceLock, error) {
+func acquireNodeInstanceLock(_, _ string) (*nodeInstanceLock, error) {
 	return &nodeInstanceLock{}, nil
 }
 
