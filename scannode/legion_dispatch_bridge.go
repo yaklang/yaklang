@@ -22,7 +22,7 @@ func (b *legionJobBridge) handleDispatch(
 	}
 
 	ref := jobExecutionRefFromCommand(&command)
-	if err := validateDispatchCommand(b.agent.node.NodeId, &command); err != nil {
+	if err := validateDispatchCommand(b.agent.node.CurrentNodeID(), &command); err != nil {
 		return b.publishDispatchFailure(
 			ctx,
 			ref,
