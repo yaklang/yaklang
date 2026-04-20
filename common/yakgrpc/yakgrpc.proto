@@ -2073,6 +2073,8 @@ message AIForge {
   string ForgeVerboseName = 17; // 给用户看的展示名称
   string Author = 18;
   string SkillPath = 19; // local path used to import/export serialized skill filesystem
+  int64 CreatedAt = 20;
+  int64 UpdatedAt = 21;
 }
 
 message QueryAIForgeRequest {
