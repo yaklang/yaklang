@@ -13,6 +13,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/node"
 	capabilityv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/capability/v1"
+	hidsv1 "github.com/yaklang/yaklang/scannode/gen/legionpb/legion/hids/v1"
 )
 
 type bootstrapSessionTransport struct {
@@ -243,6 +244,85 @@ func TestCapabilityEventPublisherPublishesCapabilityStatusDetail(t *testing.T) {
 	}
 	if event.GetMetadata() == nil || event.GetMetadata().GetEventId() == "" {
 		t.Fatal("expected status metadata with event id")
+	}
+}
+
+func TestCapabilityEventPublisherPublishesHIDSSnapshotObservation(t *testing.T) {
+	t.Parallel()
+
+	session := node.SessionState{
+		NodeID:             "node-hids-canonical",
+		SessionID:          "session-hids",
+		SessionToken:       "token-hids",
+		NATSURL:            "nats://session-hids.test",
+		CommandSubject:     "legion.command.node.node-hids",
+		EventSubjectPrefix: "legion.event",
+	}
+	base, err := node.NewNodeBase(node.BaseConfig{
+		NodeID:             "node-hids",
+		BaseDir:            t.TempDir(),
+		EnrollmentToken:    "enroll-hids",
+		PlatformAPIBaseURL: "http://platform.test",
+		TransportClient:    &bootstrapSessionTransport{session: session},
+		HeartbeatInterval:  time.Hour,
+		TickerInterval:     time.Hour,
+		RequestTimeout:     time.Second,
+	})
+	if err != nil {
+		t.Fatalf("new node base: %v", err)
+	}
+	go base.Serve()
+	t.Cleanup(func() {
+		base.Shutdown()
+	})
+	waitForNodeSession(t, base)
+
+	publisher := newCapabilityEventPublisher(base)
+	fakeJS := &fakeJetStreamContext{}
+	publisher.js = fakeJS
+	publisher.natsURL = session.NATSURL
+
+	observedAt := time.Date(2026, 4, 20, 15, 10, 0, 0, time.UTC)
+	err = publisher.PublishObservation(context.Background(), CapabilityRuntimeObservation{
+		CapabilityKey: "hids",
+		SpecVersion:   "2026-04-20",
+		HIDSEventType: "process.exec",
+		EventJSON:     []byte(`{"type":"process.exec","source":"inventory.process","process":{"pid":123,"name":"nginx"}}`),
+		ObservedAt:    observedAt,
+	})
+	if err != nil {
+		t.Fatalf("publish hids observation: %v", err)
+	}
+
+	msg := fakeJS.waitForMessage(t)
+	if msg.Subject != "legion.hids.observation" {
+		t.Fatalf("unexpected subject: %s", msg.Subject)
+	}
+
+	var event hidsv1.HIDSObservation
+	if err := proto.Unmarshal(msg.Data, &event); err != nil {
+		t.Fatalf("unmarshal hids observation: %v", err)
+	}
+	if event.GetMetadata().GetEventType() != legionEventHIDSObservation {
+		t.Fatalf("unexpected event type: %s", event.GetMetadata().GetEventType())
+	}
+	if event.GetMetadata().GetNode().GetNodeId() != "node-hids-canonical" {
+		t.Fatalf("unexpected node id: %s", event.GetMetadata().GetNode().GetNodeId())
+	}
+	if event.GetMetadata().GetNode().GetNodeSessionId() != "session-hids" {
+		t.Fatalf("unexpected session id: %s", event.GetMetadata().GetNode().GetNodeSessionId())
+	}
+	if event.GetCapability().GetCapabilityKey() != "hids" {
+		t.Fatalf("unexpected capability: %s", event.GetCapability().GetCapabilityKey())
+	}
+	if event.GetHidsEventType() != "process.exec" {
+		t.Fatalf("unexpected hids event type: %s", event.GetHidsEventType())
+	}
+	if string(event.GetEventJson()) != `{"type":"process.exec","source":"inventory.process","process":{"pid":123,"name":"nginx"}}` {
+		t.Fatalf("unexpected event json: %s", string(event.GetEventJson()))
+	}
+	if !event.GetObservedAt().AsTime().Equal(observedAt) {
+		t.Fatalf("unexpected observed_at: %s", event.GetObservedAt().AsTime())
 	}
 }
 
