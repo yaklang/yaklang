@@ -11,6 +11,72 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+func TestEmitterWithAIInfoProvider_ResolvesDynamically(t *testing.T) {
+	var captured []*schema.AiOutputEvent
+	meta := AIEventMeta{}
+	emitter := NewEmitter("test-id", func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+		captured = append(captured, e)
+		return e, nil
+	})
+
+	scoped := emitter.WithAIInfoProvider(func() AIEventMeta {
+		return meta
+	})
+
+	if _, err := scoped.EmitInfo("before"); err != nil {
+		t.Fatalf("EmitInfo before update failed: %v", err)
+	}
+	meta = AIEventMeta{
+		Service:   "openai",
+		ModelName: "gpt-4o-mini",
+	}
+	if _, err := scoped.EmitInfo("after"); err != nil {
+		t.Fatalf("EmitInfo after update failed: %v", err)
+	}
+
+	if len(captured) != 2 {
+		t.Fatalf("expected 2 events, got %d", len(captured))
+	}
+	if captured[0].AIService != "" || captured[0].AIModelName != "" {
+		t.Fatal("expected first event to be emitted before metadata became available")
+	}
+	if captured[1].AIService != "openai" || captured[1].AIModelName != "gpt-4o-mini" {
+		t.Fatalf("expected provider-backed metadata on second event, got %q:%q", captured[1].AIService, captured[1].AIModelName)
+	}
+}
+
+func TestAIResponseBindEmitter_UsesDynamicModelInfo(t *testing.T) {
+	var captured []*schema.AiOutputEvent
+	emitter := NewEmitter("test-id", func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+		captured = append(captured, e)
+		return e, nil
+	})
+
+	rsp := NewUnboundAIResponse()
+	bound := rsp.BindEmitter(emitter)
+
+	if _, err := bound.EmitInfo("before model info"); err != nil {
+		t.Fatalf("EmitInfo before SetModelInfo failed: %v", err)
+	}
+	rsp.SetModelInfo("openai", "gpt-4o-mini")
+	if _, err := bound.EmitInfo("after model info"); err != nil {
+		t.Fatalf("EmitInfo after SetModelInfo failed: %v", err)
+	}
+
+	if len(captured) != 2 {
+		t.Fatalf("expected 2 events, got %d", len(captured))
+	}
+	if captured[0].AIService != "" || captured[0].AIModelName != "" {
+		t.Fatal("expected no AI metadata before response model info is available")
+	}
+	if captured[1].AIService != "openai" || captured[1].AIModelName != "gpt-4o-mini" {
+		t.Fatalf("expected bound emitter to resolve response model info dynamically, got %q:%q", captured[1].AIService, captured[1].AIModelName)
+	}
+	if captured[1].AIModelVerboseName == "" {
+		t.Fatal("expected dynamic binding to include model verbose name")
+	}
+}
+
 func TestEmitThoughtStream_Truncation(t *testing.T) {
 	testCases := []struct {
 		name    string
