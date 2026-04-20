@@ -213,9 +213,16 @@ func CountExtractedData(db *gorm.DB, filter *ypb.ExtractedDataFilter) (float64, 
 }
 
 func ExtractedDataFromHTTPFlow(hiddenIndex string, ruleName string, res *MatchResult, regexpStr ...string) *schema.ExtractedData {
+	if res == nil {
+		return nil
+	}
 	var r string
 	if len(regexpStr) > 0 {
 		r = strings.Join(regexpStr, ", ")
+	}
+	off := 0
+	if res.MetaInfo != nil {
+		off = res.MetaInfo.Offset
 	}
 
 	extractData := &schema.ExtractedData{
@@ -224,7 +231,7 @@ func ExtractedDataFromHTTPFlow(hiddenIndex string, ruleName string, res *MatchRe
 		Regexp:         r,
 		RuleVerbose:    ruleName,
 		Data:           res.MatchResult,
-		DataIndex:      res.Index + res.MetaInfo.Offset,
+		DataIndex:      res.Index + off,
 		Length:         res.Length,
 		IsMatchRequest: res.IsMatchRequest,
 	}
