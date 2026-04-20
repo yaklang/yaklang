@@ -437,6 +437,7 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 		request.SetTaskIndex(t.task.GetIndex())
 		return t.ai.CallAI(request)
 	}, func(rsp *AIResponse) error {
+		boundEmitter := rsp.BindEmitter(emitter)
 		pr, pw := utils.NewPipe()
 
 		stream := rsp.GetOutputStreamReader("call-tools", true, emitter)
@@ -462,9 +463,9 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 			log.Debugf("registered AITAG handlers for tool[%s] params: %v with nonce: %s", tool.Name, promptMeta.ParamNames, promptMeta.Nonce)
 		}
 
-		event, err := emitter.EmitDefaultStreamEvent("generating-tool-call-params", pr, t.task.GetIndex())
+		event, err := boundEmitter.EmitDefaultStreamEvent("generating-tool-call-params", pr, t.task.GetIndex())
 		if err != nil {
-			emitter.EmitError("error emit default stream event for tool[%s] params: %v", tool.Name, err)
+			boundEmitter.EmitError("error emit default stream event for tool[%s] params: %v", tool.Name, err)
 		}
 		_ = event
 
@@ -478,7 +479,7 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 				paramDuration = cost
 				rawAIResponse = response.String()
 				pw.WriteString(" [done] 耗时(Cost): " + fmt.Sprintf("%.2f", cost.Seconds()) + "s")
-				emitter.EmitTextReferenceMaterial(event.GetContentJSONPath(`$.event_writer_id`), rawAIResponse)
+				boundEmitter.EmitTextReferenceMaterial(event.GetContentJSONPath(`$.event_writer_id`), rawAIResponse)
 				pw.Close()
 			}),
 			WithActionFieldStreamHandler(paramNames, func(key string, r io.Reader) {
@@ -507,7 +508,7 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 
 		callToolAction, err := ExtractValidActionFromStream(t.config.GetContext(), stream, "call-tool", actionOpts...)
 		if err != nil {
-			emitter.EmitError("error extract tool params: %v", err)
+			boundEmitter.EmitError("error extract tool params: %v", err)
 			return utils.Errorf("error extracting action params: %v", err)
 		}
 

@@ -425,6 +425,10 @@ func (m *Timeline) batchCompressByTargetSize(targetSize int) {
 	var action *Action
 	var cumulativeSummary string
 	err = CallAITransaction(m.config, prompt, m.ai.CallSpeedPriorityAI, func(response *AIResponse) error {
+		var boundEmitter *Emitter
+		if m.config != nil {
+			boundEmitter = response.BindEmitter(m.config.GetEmitter())
+		}
 		var r io.Reader
 		if m.config == nil {
 			r = response.GetUnboundStreamReader(false)
@@ -443,7 +447,7 @@ func (m *Timeline) batchCompressByTargetSize(targetSize int) {
 				func(key string, reader io.Reader) {
 					var out bytes.Buffer
 					reducerMem := io.TeeReader(utils.JSONStringReader(reader), &out)
-					m.config.GetEmitter().EmitSystemStreamEvent(
+					boundEmitter.EmitSystemStreamEvent(
 						"memory-timeline",
 						time.Now(),
 						reducerMem,

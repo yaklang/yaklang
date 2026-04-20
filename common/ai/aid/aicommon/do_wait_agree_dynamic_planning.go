@@ -206,8 +206,8 @@ func normalizeReviewFieldText(raw string) string {
 	return raw
 }
 
-func emitReviewFieldStream(config *Config, nodeID, taskIndex string, reader io.Reader, formatter func(string) string) {
-	if config == nil || config.GetEmitter() == nil || reader == nil {
+func emitReviewFieldStream(emitter *Emitter, nodeID, taskIndex string, reader io.Reader, formatter func(string) string) {
+	if emitter == nil || reader == nil {
 		return
 	}
 	raw, err := io.ReadAll(utils.UTF8Reader(reader))
@@ -222,10 +222,10 @@ func emitReviewFieldStream(config *Config, nodeID, taskIndex string, reader io.R
 	if content == "" {
 		return
 	}
-	_, _ = config.GetEmitter().EmitDefaultStreamEvent(nodeID, strings.NewReader(content), taskIndex)
+	_, _ = emitter.EmitDefaultStreamEvent(nodeID, strings.NewReader(content), taskIndex)
 }
 
-func reviewFieldStreamOptions(config *Config, taskIndex string, specs ...reviewFieldStreamSpec) []ActionMakerOption {
+func reviewFieldStreamOptions(emitter *Emitter, taskIndex string, specs ...reviewFieldStreamSpec) []ActionMakerOption {
 	if len(specs) == 0 {
 		return nil
 	}
@@ -236,7 +236,7 @@ func reviewFieldStreamOptions(config *Config, taskIndex string, specs ...reviewF
 			continue
 		}
 		result = append(result, WithActionFieldStreamHandler([]string{spec.FieldKey}, func(_ string, reader io.Reader) {
-			emitReviewFieldStream(config, spec.NodeID, taskIndex, reader, spec.Formatter)
+			emitReviewFieldStream(emitter, spec.NodeID, taskIndex, reader, spec.Formatter)
 		}))
 	}
 	return result
@@ -319,12 +319,13 @@ func DefaultAITaskReviewControl(ctx context.Context, config *Config, ep *Endpoin
 	_, _ = emitReviewStatus(config, "task-review-status", "正在审查任务，以便任务动态规划 / start to do task/plan review for dynamic plan", ep.GetId())
 
 	err = CallAITransaction(config, prompt, config.CallQualityPriorityAI, func(rsp *AIResponse) error {
+		boundEmitter := rsp.BindEmitter(config.GetEmitter())
 		stream := rsp.GetOutputStreamReader("task-review", true, config.GetEmitter())
 		stream = io.TeeReader(stream, &rawResponse)
 		actionOpts := []ActionMakerOption{
 			WithActionAlias("object"),
 		}
-		actionOpts = append(actionOpts, reviewFieldStreamOptions(config, rsp.GetTaskIndex(),
+		actionOpts = append(actionOpts, reviewFieldStreamOptions(boundEmitter, rsp.GetTaskIndex(),
 			reviewFieldStreamSpec{FieldKey: "task_delta_summary", NodeID: "task-review-adjustment"},
 		)...)
 		action, err := ExtractActionFromStream(ctx, stream, "task_review", actionOpts...)

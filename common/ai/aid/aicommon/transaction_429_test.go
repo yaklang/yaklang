@@ -3,6 +3,7 @@ package aicommon
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -82,7 +83,7 @@ func (t *transactionTestConfig) AppendRelatedRuntimeID(string)                  
 func (t *transactionTestConfig) GetContextProviderManager() *ContextProviderManager {
 	return NewContextProviderManager()
 }
-func (t *transactionTestConfig) GetSessionEvidenceRendered() string        { return "" }
+func (t *transactionTestConfig) GetSessionEvidenceRendered() string          { return "" }
 func (t *transactionTestConfig) ApplySessionEvidenceOps([]EvidenceOperation) {}
 
 // --- tests ---
@@ -172,6 +173,49 @@ func TestCallAITransaction_Non429ErrorCountsRetry(t *testing.T) {
 	totalCalls := atomic.LoadInt64(&callCount)
 	assert.Equal(t, cfg.retryMax, totalCalls,
 		"non-429 errors should be counted, total calls should equal retry limit")
+}
+
+func TestCallAITransaction_PostHandlerErrorEmitsBoundAIInfo(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	cfg := newTransactionTestConfig(ctx)
+	cfg.retryMax = 1
+
+	var captured []*schema.AiOutputEvent
+	cfg.emitter = NewEmitter("txn-test", func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+		captured = append(captured, e)
+		return e, nil
+	})
+
+	callAi := func(req *AIRequest) (*AIResponse, error) {
+		rsp := NewUnboundAIResponse()
+		rsp.SetModelInfo("openai", "gpt-4o-mini")
+		rsp.Close()
+		return rsp, nil
+	}
+
+	postHandler := func(rsp *AIResponse) error {
+		return utils.Errorf("post handler failed")
+	}
+
+	err := CallAITransaction(cfg, "test prompt", callAi, postHandler)
+	require.Error(t, err)
+
+	var found bool
+	for _, event := range captured {
+		if event == nil || event.Type != schema.EVENT_TYPE_STRUCTURED {
+			continue
+		}
+		if !strings.Contains(string(event.Content), "postHandler error") {
+			continue
+		}
+		found = true
+		assert.Equal(t, "openai", event.AIService)
+		assert.Equal(t, "gpt-4o-mini", event.AIModelName)
+		assert.NotEmpty(t, event.AIModelVerboseName)
+	}
+	require.True(t, found, "expected postHandler error event to be emitted")
 }
 
 func TestIs429Response_Nil(t *testing.T) {
