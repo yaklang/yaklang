@@ -117,3 +117,16 @@ func TestDesiredSpecValidateAcceptsCoveredTemporaryRuleEventType(t *testing.T) {
 		t.Fatalf("unexpected validation error: %v", err)
 	}
 }
+
+func TestReportingPolicyDefaultsSnapshotObservationsOn(t *testing.T) {
+	t.Parallel()
+
+	if !(ReportingPolicy{}).ShouldEmitSnapshotObservations() {
+		t.Fatal("expected snapshot observation export to default on")
+	}
+
+	disabled := false
+	if (ReportingPolicy{EmitSnapshotObservations: &disabled}).ShouldEmitSnapshotObservations() {
+		t.Fatal("expected explicit false to disable snapshot observation export")
+	}
+}

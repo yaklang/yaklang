@@ -29,6 +29,7 @@ func (b *legionJobBridge) Run(ctx context.Context) {
 	defer b.ruleSyncPublisher.Close()
 
 	go b.forwardCapabilityAlerts(ctx)
+	go b.forwardCapabilityObservations(ctx)
 
 	for {
 		if ctx.Err() != nil {
@@ -41,6 +42,37 @@ func (b *legionJobBridge) Run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+		}
+	}
+}
+
+func (b *legionJobBridge) forwardCapabilityObservations(ctx context.Context) {
+	if b == nil || b.agent == nil || b.agent.capabilityManager == nil {
+		return
+	}
+
+	observations := b.agent.capabilityManager.Observations()
+	if observations == nil {
+		return
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case observation, ok := <-observations:
+			if !ok {
+				return
+			}
+			if err := b.capabilityPublisher.PublishObservation(ctx, observation); err != nil {
+				log.Errorf(
+					"publish hids snapshot observation failed: node_id=%s capability=%s type=%s err=%v",
+					b.agent.node.CurrentNodeID(),
+					observation.CapabilityKey,
+					observation.HIDSEventType,
+					err,
+				)
+			}
 		}
 	}
 }
