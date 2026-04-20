@@ -10009,6 +10009,8 @@ type AIForge struct {
 	ForgeVerboseName   string                 `protobuf:"bytes,17,opt,name=ForgeVerboseName,proto3" json:"ForgeVerboseName,omitempty"` // 给用户看的展示名称
 	Author             string                 `protobuf:"bytes,18,opt,name=Author,proto3" json:"Author,omitempty"`
 	SkillPath          string                 `protobuf:"bytes,19,opt,name=SkillPath,proto3" json:"SkillPath,omitempty"` // local path used to import/export serialized skill filesystem
+	CreatedAt          int64                  `protobuf:"varint,20,opt,name=CreatedAt,proto3" json:"CreatedAt,omitempty"`
+	UpdatedAt          int64                  `protobuf:"varint,21,opt,name=UpdatedAt,proto3" json:"UpdatedAt,omitempty"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -10174,6 +10176,20 @@ func (x *AIForge) GetSkillPath() string {
 		return x.SkillPath
 	}
 	return ""
+}
+
+func (x *AIForge) GetCreatedAt() int64 {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return 0
+}
+
+func (x *AIForge) GetUpdatedAt() int64 {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return 0
 }
 
 type QueryAIForgeRequest struct {
@@ -69116,7 +69132,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\aKeyword\x18\x03 \x01(\tR\aKeyword\x12\x10\n" +
 	"\x03Tag\x18\x04 \x03(\tR\x03Tag\x12\x0e\n" +
 	"\x02Id\x18\x05 \x01(\x03R\x02Id\x12$\n" +
-	"\rShowTemporary\x18\x06 \x01(\bR\rShowTemporary\"\xe9\x04\n" +
+	"\rShowTemporary\x18\x06 \x01(\bR\rShowTemporary\"\xa5\x05\n" +
 	"\aAIForge\x12\x0e\n" +
 	"\x02Id\x18\x01 \x01(\x03R\x02Id\x12\x1c\n" +
 	"\tForgeName\x18\x02 \x01(\tR\tForgeName\x12\"\n" +
@@ -69141,7 +69157,9 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\fResultPrompt\x18\x10 \x01(\tR\fResultPrompt\x12*\n" +
 	"\x10ForgeVerboseName\x18\x11 \x01(\tR\x10ForgeVerboseName\x12\x16\n" +
 	"\x06Author\x18\x12 \x01(\tR\x06Author\x12\x1c\n" +
-	"\tSkillPath\x18\x13 \x01(\tR\tSkillPath\"n\n" +
+	"\tSkillPath\x18\x13 \x01(\tR\tSkillPath\x12\x1c\n" +
+	"\tCreatedAt\x18\x14 \x01(\x03R\tCreatedAt\x12\x1c\n" +
+	"\tUpdatedAt\x18\x15 \x01(\x03R\tUpdatedAt\"n\n" +
 	"\x13QueryAIForgeRequest\x12+\n" +
 	"\n" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +

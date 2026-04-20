@@ -61,6 +61,8 @@ func TestGRPCMUSTPASS_AIForge_BaseCRUD(t *testing.T) {
 	require.Len(t, forge, 1)
 	require.Equal(t, name, forge[0].ForgeName)
 	require.Equal(t, content, forge[0].ForgeContent)
+	require.Greater(t, forge[0].GetCreatedAt(), int64(0))
+	require.Greater(t, forge[0].GetUpdatedAt(), int64(0))
 
 	forge, err = queryForge(ctx, client, &ypb.AIForgeFilter{
 		Keyword: content,
@@ -69,6 +71,8 @@ func TestGRPCMUSTPASS_AIForge_BaseCRUD(t *testing.T) {
 	require.Len(t, forge, 1)
 	require.Equal(t, name, forge[0].ForgeName)
 	require.Equal(t, content, forge[0].ForgeContent)
+	require.Greater(t, forge[0].GetCreatedAt(), int64(0))
+	require.Greater(t, forge[0].GetUpdatedAt(), int64(0))
 
 	newContent := uuid.New().String()
 	_, err = client.UpdateAIForge(ctx, &ypb.AIForge{
@@ -84,6 +88,8 @@ func TestGRPCMUSTPASS_AIForge_BaseCRUD(t *testing.T) {
 	require.Len(t, forge, 1)
 	require.Equal(t, name, forge[0].ForgeName)
 	require.Equal(t, newContent, forge[0].ForgeContent)
+	require.Greater(t, forge[0].GetCreatedAt(), int64(0))
+	require.Greater(t, forge[0].GetUpdatedAt(), int64(0))
 
 	newContent = uuid.New().String()
 	_, err = client.UpdateAIForge(ctx, &ypb.AIForge{
@@ -100,6 +106,8 @@ func TestGRPCMUSTPASS_AIForge_BaseCRUD(t *testing.T) {
 	require.Len(t, forge, 1)
 	require.Equal(t, name, forge[0].ForgeName)
 	require.Equal(t, newContent, forge[0].ForgeContent)
+	require.Greater(t, forge[0].GetCreatedAt(), int64(0))
+	require.Greater(t, forge[0].GetUpdatedAt(), int64(0))
 
 	_, err = client.DeleteAIForge(ctx, &ypb.AIForgeFilter{
 		ForgeName: name,
@@ -111,6 +119,55 @@ func TestGRPCMUSTPASS_AIForge_BaseCRUD(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Len(t, forge, 0)
+}
+
+func TestGRPCMUSTPASS_AIForge_AuthorAndTimeFields(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	name := uuid.New().String()
+	content := uuid.New().String()
+	author := "alice"
+
+	_, err = client.CreateAIForge(ctx, &ypb.AIForge{
+		ForgeName:    name,
+		ForgeType:    "yak",
+		ForgeContent: content,
+		Author:       author,
+	})
+	require.NoError(t, err)
+	defer func() {
+		_, err = client.DeleteAIForge(ctx, &ypb.AIForgeFilter{ForgeName: name})
+		require.NoError(t, err)
+	}()
+
+	created, err := client.GetAIForge(ctx, &ypb.GetAIForgeRequest{ForgeName: name})
+	require.NoError(t, err)
+	require.Equal(t, author, created.GetAuthor())
+	require.Greater(t, created.GetCreatedAt(), int64(0))
+	require.Greater(t, created.GetUpdatedAt(), int64(0))
+
+	_, err = client.UpdateAIForge(ctx, &ypb.AIForge{
+		ForgeName:    name,
+		ForgeType:    "yak",
+		ForgeContent: "updated-content",
+	})
+	require.NoError(t, err)
+
+	updated, err := client.GetAIForge(ctx, &ypb.GetAIForgeRequest{ForgeName: name})
+	require.NoError(t, err)
+	require.Equal(t, author, updated.GetAuthor())
+	require.Equal(t, created.GetCreatedAt(), updated.GetCreatedAt())
+	require.GreaterOrEqual(t, updated.GetUpdatedAt(), created.GetUpdatedAt())
+
+	list, err := queryForge(ctx, client, &ypb.AIForgeFilter{ForgeName: name})
+	require.NoError(t, err)
+	require.Len(t, list, 1)
+	require.Equal(t, author, list[0].GetAuthor())
+	require.Equal(t, updated.GetCreatedAt(), list[0].GetCreatedAt())
+	require.Equal(t, updated.GetUpdatedAt(), list[0].GetUpdatedAt())
 }
 
 func TestGRPCMUSTPASS_AIForge_GetByName(t *testing.T) {

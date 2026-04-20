@@ -36,6 +36,34 @@ type AIForge struct {
 	IsTemporary bool // for temporary use, will be cleaned up later
 }
 
+func (a *AIForge) ToUpdateMap() map[string]interface{} {
+	if a == nil {
+		return nil
+	}
+
+	return map[string]interface{}{
+		"forge_verbose_name":   a.ForgeVerboseName,
+		"forge_name":           a.ForgeName,
+		"forge_content":        a.ForgeContent,
+		"forge_type":           a.ForgeType,
+		"params_ui_config":     a.ParamsUIConfig,
+		"params":               a.Params,
+		"user_persistent_data": a.UserPersistentData,
+		"description":          a.Description,
+		"tools":                a.Tools,
+		"tool_keywords":        a.ToolKeywords,
+		"actions":              a.Actions,
+		"tags":                 a.Tags,
+		"init_prompt":          a.InitPrompt,
+		"persistent_prompt":    a.PersistentPrompt,
+		"plan_prompt":          a.PlanPrompt,
+		"result_prompt":        a.ResultPrompt,
+		"skill_path":           a.SkillPath,
+		"fs_bytes":             a.FSBytes,
+		"is_temporary":         a.IsTemporary,
+	}
+}
+
 func (a *AIForge) GetName() string {
 	return a.ForgeName
 }
@@ -83,6 +111,7 @@ func (a *AIForge) AfterDelete(tx *gorm.DB) (err error) {
 func (a *AIForge) ToGRPC() *ypb.AIForge {
 	return &ypb.AIForge{
 		Id:                 int64(a.ID),
+		CreatedAt:          a.CreatedAt.Unix(),
 		ForgeName:          a.ForgeName,
 		ForgeVerboseName:   a.ForgeVerboseName,
 		ForgeContent:       a.ForgeContent,
@@ -99,6 +128,7 @@ func (a *AIForge) ToGRPC() *ypb.AIForge {
 		PersistentPrompt:   a.PersistentPrompt,
 		PlanPrompt:         a.PlanPrompt,
 		ResultPrompt:       a.ResultPrompt,
+		UpdatedAt:          a.UpdatedAt.Unix(),
 		Author:             a.Author,
 		SkillPath:          a.SkillPath,
 	}
