@@ -118,7 +118,7 @@ func (c *Config) StartEventLoopEx(ctx context.Context, startCall func(), doneCal
 					tickerCallback()
 					continue
 				case <-ctx.Done():
-					log.Infof("event loop context cancelled for config %s, draining pending events", c.id)
+					//log.Infof("event loop context cancelled for config %s, draining pending events", c.id)
 					c.drainPendingEvents()
 					return
 				}
