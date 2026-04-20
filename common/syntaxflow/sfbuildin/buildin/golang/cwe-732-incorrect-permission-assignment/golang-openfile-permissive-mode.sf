@@ -8,6 +8,7 @@ desc(
 该规则检测 `os.OpenFile` 第四个权限参数使用过宽模式（如 0777、0666）。
 文件权限过宽可能导致敏感数据被任意读取或篡改。
 DESC
+	tags: "compliance"
 	rule_id: "d7fce78d-900a-4e9f-b793-72eb86bf6df7"
 	solution: <<<SOLUTION
 遵循最小权限原则，敏感文件建议使用 `0600`，普通可读配置建议 `0640/0644`。

@@ -49,6 +49,7 @@ REFERENCE
    - 合规性问题：使用不安全算法可能导致未能满足行业标准或法规要求（如 GDPR 或 PCI DSS）。
 
 DESC
+	tags: "compliance"
 	rule_id: "99bd33d2-7b63-4980-b70f-33ea3b69f553"
 	solution: <<<SOLUTION
 ### 修复建议

@@ -39,6 +39,7 @@ crypto.createDiffieHellman(1024);
 - **签名伪造**：获取签名私钥后可伪造任意数字签名，冒充合法身份
 - **合规违规**：PCI DSS、FIPS 140、NIST SP 800-131A 等标准明确要求最低密钥长度
 DESC
+	tags: "compliance"
 	rule_id: "c3d4e5f6-a7b8-9012-cdef-326000000001"
 	solution: <<<SOLUTION
 ### 修复建议

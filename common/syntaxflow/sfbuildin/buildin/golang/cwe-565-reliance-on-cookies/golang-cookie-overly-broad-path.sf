@@ -26,6 +26,7 @@ desc(
    - CSRF攻击：攻击者可以利用Cookie的广泛路径发起跨站点请求伪造攻击。
    - 信息泄露：Cookie可能在不需要的路径上被发送，增加了信息泄露的风险。
 DESC
+	tags: "compliance"
 	rule_id: "938d8c18-e87e-4ff2-85a4-5e2370a88feb"
 	solution: <<<SOLUTION
 ### 修复建议

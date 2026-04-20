@@ -8,6 +8,7 @@ desc(
 该规则检测 MD5/SHA1 的哈希调用。MD5 与 SHA1 已不适用于安全场景（密码、签名、完整性校验等），
 可能遭受碰撞攻击。
 DESC
+	tags: "compliance"
 	rule_id: "68f97b0f-4da0-4133-bd95-5a7c05dd0cbc"
 	solution: <<<SOLUTION
 优先使用 SHA-256/512 或更现代方案（如 HMAC-SHA256、Argon2、bcrypt）替代 MD5/SHA1。

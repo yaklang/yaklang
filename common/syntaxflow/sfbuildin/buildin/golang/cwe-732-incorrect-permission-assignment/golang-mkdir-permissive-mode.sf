@@ -8,6 +8,7 @@ desc(
 该规则检测 `os.Mkdir`/`os.MkdirAll` 使用过宽权限（如 0777、0775）。
 目录权限过宽会放大未授权读取、写入与横向移动风险。
 DESC
+	tags: "compliance"
 	rule_id: "df52ece5-ac58-4cd9-bda0-11ec7f40eea2"
 	solution: <<<SOLUTION
 目录应遵循最小权限原则，优先使用 `0700` 或按业务最小化授权。

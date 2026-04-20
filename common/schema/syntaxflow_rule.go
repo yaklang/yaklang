@@ -102,6 +102,11 @@ const (
 	SFR_RULE_TYPE_SF SyntaxFlowRuleType = "sf"
 )
 
+const (
+	SyntaxFlowRuleTagSeparator  = "|"
+	SyntaxFlowRuleComplianceTag = "compliance"
+)
+
 func ValidRuleType(i any) SyntaxFlowRuleType {
 	switch strings.ToLower(codec.AnyToString(i)) {
 	case "yak", "y", "yaklang":
@@ -406,6 +411,69 @@ type SyntaxFlowRule struct {
 	// 多对多关系，一个规则可以属于多个分组
 	// 通过中间表 syntax_flow_rule_and_group 关联
 	Groups []*SyntaxFlowGroup `gorm:"many2many:syntax_flow_rule_and_group;"`
+}
+
+func SplitSyntaxFlowRuleTags(raw string) []string {
+	parts := utils.PrettifyListFromStringSplitEx(raw, SyntaxFlowRuleTagSeparator, ",")
+	if len(parts) == 0 {
+		return nil
+	}
+	tags := make([]string, 0, len(parts))
+	seen := make(map[string]struct{}, len(parts))
+	for _, part := range parts {
+		tag := strings.TrimSpace(part)
+		if tag == "" {
+			continue
+		}
+		key := strings.ToLower(tag)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		tags = append(tags, tag)
+	}
+	return tags
+}
+
+func JoinSyntaxFlowRuleTags(tags ...string) string {
+	flat := make([]string, 0, len(tags))
+	for _, tag := range tags {
+		flat = append(flat, SplitSyntaxFlowRuleTags(tag)...)
+	}
+	return strings.Join(flat, SyntaxFlowRuleTagSeparator)
+}
+
+func (s *SyntaxFlowRule) GetTags() []string {
+	if s == nil {
+		return nil
+	}
+	return SplitSyntaxFlowRuleTags(s.Tag)
+}
+
+func (s *SyntaxFlowRule) HasTag(tag string) bool {
+	if s == nil || strings.TrimSpace(tag) == "" {
+		return false
+	}
+	for _, current := range s.GetTags() {
+		if strings.EqualFold(current, tag) {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *SyntaxFlowRule) SetTags(tags ...string) {
+	if s == nil {
+		return
+	}
+	s.Tag = JoinSyntaxFlowRuleTags(tags...)
+}
+
+func (s *SyntaxFlowRule) AppendTags(tags ...string) {
+	if s == nil {
+		return
+	}
+	s.Tag = JoinSyntaxFlowRuleTags(append(s.GetTags(), tags...)...)
 }
 
 func (s *SyntaxFlowRule) CalcHash() string {

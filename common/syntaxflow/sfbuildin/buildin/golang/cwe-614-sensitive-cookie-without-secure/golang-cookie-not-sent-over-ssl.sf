@@ -27,6 +27,7 @@ desc(
    - 敏感信息泄露：Cookie中可能包含用户凭证或其他敏感信息。
    - 违反安全合规要求：如PCI DSS等标准要求敏感数据必须加密传输。
 DESC
+	tags: "compliance"
 	rule_id: "b46ed5a9-041f-470a-8823-980191db0a2f"
 	solution: <<<SOLUTION
 ### 修复建议

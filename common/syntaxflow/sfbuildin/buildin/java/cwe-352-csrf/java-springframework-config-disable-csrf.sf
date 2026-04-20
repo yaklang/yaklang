@@ -31,6 +31,7 @@ http
 - 执行敏感的业务操作（如转账、发帖、删除数据）。
 - 可能导致账户被盗、数据泄露或其他业务损失。
 DESC
+	tags: "compliance"
 	rule_id: "e334c491-5e84-4f45-b13a-7b16e6d26e35"
 	solution: <<<SOLUTION
 ### 修复建议

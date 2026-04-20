@@ -41,6 +41,7 @@ const apiKey = Math.random().toString(16).slice(2);
 - **认证绕过**：可预测的 Token 导致安全验证形同虚设
 - **数据泄露**：可预测的密钥导致加密数据被破解
 DESC
+	tags: "compliance"
 	rule_id: "a1b2c3d4-e5f6-7890-abcd-338000000001"
 	solution: <<<SOLUTION
 ### 修复建议

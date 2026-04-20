@@ -33,6 +33,7 @@ private static final String JWT_PASSWORD = "bm5n3SkxCX4kKRy4"; // 硬编码的JW
 - **数据泄露或篡改**：攻击者可以通过伪造 JWT 获取或修改敏感数据。
 总而言之，不当的 JWT 使用可能严重破坏应用程序的安全性，允许攻击者获取未授权访问和控制。
 DESC
+	tags: "compliance"
 	rule_id: "98a8cf55-3355-463f-ad5d-9bbe8349e6c6"
 	solution: <<<SOLUTION
 ### 修复建议

@@ -27,6 +27,7 @@ desc(
    - **信任链破坏**: 攻击者利用受害者的身份进行恶意操作，会损害用户对该应用的信任。
    虽然在某些非交互式场景（如纯API服务）可以考虑禁用CSRF，但在大多数Web应用中，禁用CSRF会引入严重的安全风险。
 DESC
+	tags: "compliance"
 	rule_id: "08636dc3-aa6e-473f-ad31-3fac651af77d"
 	reference: <<<REFERENCE
 [CWE-352: Cross-Site Request Forgery (CSRF)](https://cwe.mitre.org/data/definitions/352.html)

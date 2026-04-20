@@ -8,6 +8,7 @@ desc(
 该规则用于检测 `golang.org/x/crypto/ssh` 中 `ssh.InsecureIgnoreHostKey()` 的使用。
 该函数会跳过 SSH 主机密钥校验，导致客户端无法验证服务端身份，容易受到中间人攻击（MITM）。
 DESC
+	tags: "compliance"
 	rule_id: "3b7f83c5-5c95-4b52-8fca-4d848cdb43a1"
 	solution: <<<SOLUTION
 避免使用 `ssh.InsecureIgnoreHostKey()`。

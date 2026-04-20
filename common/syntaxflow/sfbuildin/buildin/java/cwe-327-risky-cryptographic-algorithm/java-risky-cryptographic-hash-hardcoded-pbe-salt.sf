@@ -22,6 +22,7 @@ AlgorithmParameterSpec paramSpec = new PBEParameterSpec(FIXED_SALT, ITERATION_CO
 ### 规则目的
 该规则的目的在于识别并标记 Java 项目中使用了硬编码 PBE 盐值的情况，提醒开发者修复这一安全弱点，鼓励使用随机生成的盐值来增强密码学操作的安全性。
 DESC
+	tags: "compliance"
 	rule_id: "195c4be8-ab65-4755-9369-67df5911d6b3"
 	solution: <<<SOLUTION
 ### 修复建议

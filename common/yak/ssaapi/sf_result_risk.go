@@ -99,7 +99,7 @@ func buildSSARisk(
 		CWE:           rule.CWE,
 
 		FromRule:    rule.RuleName,
-		IsPotential: false,
+		IsPotential: rule.HasTag(schema.SyntaxFlowRuleComplianceTag),
 		ProgramName: progName,
 		// result
 		Variable: variable,

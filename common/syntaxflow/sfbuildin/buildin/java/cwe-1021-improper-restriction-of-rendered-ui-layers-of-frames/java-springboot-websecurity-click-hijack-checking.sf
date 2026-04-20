@@ -32,6 +32,7 @@ desc(
    - **绕过安全防护:** 在某些情况下，点击劫持可能被用于绕过CSRF防护。
 
 DESC
+	tags: "compliance"
 	rule_id: "e0e6ed1e-aa60-4522-a5c0-ae8f0b121b7e"
 	reference: <<<REFERENCE
 [CWE-1021: Improper Restriction of Rendered UI Layers or Frames](https://cwe.mitre.org/data/definitions/1021.html)

@@ -46,6 +46,7 @@ return Base64.getEncoder().encodeToString(encrypted);
 - 系统或应用因为加密算法的弱点而更容易受到其他类型的密码学攻击。
 - 不符合行业标准和合规性要求，导致法律和商业风险。
 DESC
+	tags: "compliance"
 	rule_id: "f6e60690-fd58-4130-bef5-ff86b1fd3ec4"
 	solution: <<<SOLUTION
 ### 修复建议

@@ -20,7 +20,54 @@ const (
 
 	FilterBuiltinRuleTrue  string = "buildIn"
 	FilterBuiltinRuleFalse string = "unBuildIn"
+
+	ComplianceModeInclude string = "include"
+	ComplianceModeExclude string = "exclude"
 )
+
+func normalizeSyntaxFlowTags(tags []string) []string {
+	cleaned := make([]string, 0, len(tags))
+	for _, tag := range tags {
+		if trimmed := strings.TrimSpace(tag); trimmed != "" {
+			cleaned = append(cleaned, trimmed)
+		}
+	}
+	return cleaned
+}
+
+func appendUniqueSyntaxFlowTags(base []string, extra ...string) []string {
+	if len(extra) == 0 {
+		return normalizeSyntaxFlowTags(base)
+	}
+	merged := make([]string, 0, len(base)+len(extra))
+	seen := make(map[string]struct{}, len(base)+len(extra))
+	for _, tag := range append(base, extra...) {
+		trimmed := strings.TrimSpace(tag)
+		if trimmed == "" {
+			continue
+		}
+		key := strings.ToLower(trimmed)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		merged = append(merged, trimmed)
+	}
+	return merged
+}
+
+func resolveSyntaxFlowRuleFilterTags(filter *ypb.SyntaxFlowRuleFilter) (includeTags []string, excludeTags []string, purposes []string) {
+	if filter == nil {
+		return nil, nil, nil
+	}
+	includeTags = normalizeSyntaxFlowTags(filter.GetTag())
+	excludeTags = normalizeSyntaxFlowTags(filter.GetExcludeTags())
+	purposes = filter.GetPurpose()
+	if len(purposes) == 0 && filter.GetComplianceMode() == ComplianceModeExclude {
+		purposes = []string{string(schema.SFR_PURPOSE_VULN)}
+	}
+	return includeTags, excludeTags, purposes
+}
 
 type SyntaxFlowRuleFilterOption func(*ypb.SyntaxFlowRuleFilter)
 
@@ -68,6 +115,35 @@ func NewSyntaxFlowRuleFilter(filter *ypb.SyntaxFlowRuleFilter, opt ...SyntaxFlow
 	return filter
 }
 
+func applySyntaxFlowTagFilter(db *gorm.DB, tags []string, negate bool) *gorm.DB {
+	cleaned := normalizeSyntaxFlowTags(tags)
+	if len(cleaned) == 0 {
+		return db
+	}
+
+	clauses := make([]string, 0, len(cleaned))
+	args := make([]interface{}, 0, len(cleaned)*7)
+	for _, tag := range cleaned {
+		clauses = append(clauses, "(syntax_flow_rules.tag = ? OR syntax_flow_rules.tag LIKE ? OR syntax_flow_rules.tag LIKE ? OR syntax_flow_rules.tag LIKE ? OR syntax_flow_rules.tag LIKE ? OR syntax_flow_rules.tag LIKE ? OR syntax_flow_rules.tag LIKE ?)")
+		args = append(
+			args,
+			tag,
+			tag+"|%",
+			"%|"+tag,
+			"%|"+tag+"|%",
+			tag+",%",
+			"%,"+tag,
+			"%,"+tag+",%",
+		)
+	}
+
+	condition := "(" + strings.Join(clauses, " OR ") + ")"
+	if negate {
+		return db.Where("NOT "+condition, args...)
+	}
+	return db.Where(condition, args...)
+}
+
 func FilterSyntaxFlowRule(db *gorm.DB, filter *ypb.SyntaxFlowRuleFilter, opt ...SyntaxFlowRuleFilterOption) *gorm.DB {
 	filter = NewSyntaxFlowRuleFilter(filter, opt...)
 
@@ -87,8 +163,10 @@ func FilterSyntaxFlowRule(db *gorm.DB, filter *ypb.SyntaxFlowRuleFilter, opt ...
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "severity", filter.GetSeverity())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "rule_name", filter.GetRuleNames())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "language", filter.GetLanguage())
-	db = bizhelper.ExactOrQueryStringArrayOr(db, "purpose", filter.GetPurpose())
-	db = bizhelper.ExactOrQueryStringArrayOr(db, "tag", filter.GetTag())
+	includeTags, excludeTags, purposes := resolveSyntaxFlowRuleFilterTags(filter)
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "purpose", purposes)
+	db = applySyntaxFlowTagFilter(db, includeTags, false)
+	db = applySyntaxFlowTagFilter(db, excludeTags, true)
 	//if !params.GetIncludeLibraryRule() {
 	//	db = db.Where("allow_included = ?", false)
 	//}
@@ -117,6 +195,7 @@ func FilterSyntaxFlowRule(db *gorm.DB, filter *ypb.SyntaxFlowRuleFilter, opt ...
 	case FilterLibRuleFalse:
 		db = bizhelper.QueryByBool(db, "allow_included", false)
 	}
+
 	return db
 }
 
@@ -219,7 +298,7 @@ func UpdateSyntaxFlowRule(db *gorm.DB, rule *ypb.SyntaxFlowRuleInput) (*schema.S
 	}
 	updateRule.Content = rule.GetContent()
 	if len(rule.GetTags()) > 0 {
-		updateRule.Tag = strings.Join(rule.GetTags(), ",")
+		updateRule.SetTags(rule.GetTags()...)
 	}
 	if rule.GetDescription() != "" {
 		updateRule.Description = rule.GetDescription()
@@ -289,7 +368,7 @@ func ParseSyntaxFlowInput(ruleInput *ypb.SyntaxFlowRuleInput) (*schema.SyntaxFlo
 	}
 
 	if len(ruleInput.Tags) > 0 {
-		rule.Tag = strings.Join(ruleInput.Tags, "|")
+		rule.SetTags(ruleInput.Tags...)
 	}
 	if strings.TrimSpace(ruleInput.Description) != "" {
 		rule.Description = ruleInput.Description

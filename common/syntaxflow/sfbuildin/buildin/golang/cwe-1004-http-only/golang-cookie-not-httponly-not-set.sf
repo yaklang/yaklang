@@ -27,6 +27,7 @@ desc(
    - 信息泄露：敏感信息可能通过Cookie被泄露。
    - 权限提升：攻击者可能利用窃取的Cookie获取更高权限。
 DESC
+	tags: "compliance"
 	rule_id: "5b485362-1df1-40df-afc4-a3252bee0150"
 	solution: <<<SOLUTION
 ### 修复建议

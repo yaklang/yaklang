@@ -35,6 +35,7 @@ desc(
    - 数据可能被篡改而不被检测。
    - 可能导致认证绕过或权限提升。
 DESC
+	tags: "compliance"
 	rule_id: "c0a39d53-a8ab-4c1f-be60-ab20e0f19f34"
 	solution: <<<SOLUTION
 ### 修复建议

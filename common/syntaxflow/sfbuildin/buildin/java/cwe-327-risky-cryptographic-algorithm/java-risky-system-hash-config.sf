@@ -29,6 +29,7 @@ String password = "mysecretpassword";
 * **密码泄露风险增加：** 存储弱哈希密码更容易被破解，导致用户账户被盗。
 * **法律合规问题：** 许多安全标准和法规要求使用强加密算法来保护数据。
 DESC
+	tags: "compliance"
 	rule_id: "5cecf8dd-4ba1-4de2-9b7c-2cb55bc7b0cd"
 	solution: <<<SOLUTION
 ### 修复建议

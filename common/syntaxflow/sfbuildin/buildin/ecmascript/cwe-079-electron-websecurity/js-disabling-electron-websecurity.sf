@@ -39,6 +39,7 @@ const mainWindow = new BrowserWindow({
 - **本地文件读取**：渲染进程可通过 `file://` 协议读取用户本地文件
 - **会话劫持**：攻击者窃取认证 Token、Cookie 等敏感凭据
 DESC
+	tags: "compliance"
 	rule_id: "a1b2c3d4-e5f6-7890-abcd-ef1234567891"
 	solution: <<<SOLUTION
 ### 修复建议

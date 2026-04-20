@@ -237,7 +237,7 @@ func CreateRuleByContentExWithDB(db *gorm.DB, ruleFileName string, content strin
 	rule.Type = ruleType
 	rule.RuleName = ruleFileName
 	rule.Language = language
-	rule.Tag = strings.Join(tags, "|")
+	rule.SetTags(append(rule.GetTags(), tags...)...)
 	rule.IsBuildInRule = buildIn
 	version, err := GetVersionFromEmbed(rule.RuleId)
 	if err == nil {

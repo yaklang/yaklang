@@ -35,6 +35,7 @@ desc(
    - 攻击者可以篡改传输中的数据。
    - 可能导致用户信任度下降，影响业务声誉。
 DESC
+	tags: "compliance"
 	rule_id: "d151f41e-648c-45dd-b5e7-eebe64f59225"
 	title_zh: "检测Golang不安全传输漏洞"
 	solution: <<<SOLUTION

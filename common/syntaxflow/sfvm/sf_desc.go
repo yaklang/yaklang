@@ -11,6 +11,7 @@ const (
 	SFDescKeyType_Title     SFDescKeyType = "title"
 	SFDescKeyType_Title_ZH  SFDescKeyType = "title_zh"
 	SFDescKeyType_Desc      SFDescKeyType = "desc"
+	SFDescKeyType_Tag       SFDescKeyType = "tag"
 	SFDescKeyType_Type      SFDescKeyType = "type"
 	SFDescKeyType_Lib       SFDescKeyType = "lib"
 	SFDescKeyType_Level     SFDescKeyType = "level"
@@ -33,6 +34,8 @@ func ValidDescItemKeyType(key string) SFDescKeyType {
 		return SFDescKeyType_Title_ZH
 	case "description", "desc", "note":
 		return SFDescKeyType_Desc
+	case "tag", "tags":
+		return SFDescKeyType_Tag
 	case "type", "purpose":
 		return SFDescKeyType_Type
 	case "lib", "allow_include", "as_library", "as_lib", "library_name":

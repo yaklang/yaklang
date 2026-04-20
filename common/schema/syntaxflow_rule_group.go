@@ -28,13 +28,18 @@ type SyntaxFlowGroup struct {
 	gorm.Model
 	GroupName string            `json:"group_name" gorm:"unique_index"`
 	IsBuildIn bool              `json:"is_build_in" gorm:"index"`
+	Count     int64             `json:"count" gorm:"-"`
 	Rules     []*SyntaxFlowRule `gorm:"many2many:syntax_flow_rule_and_group;"`
 }
 
 func (s *SyntaxFlowGroup) ToGRPCModel() *ypb.SyntaxFlowGroup {
+	count := s.Count
+	if count == 0 && s.Rules != nil {
+		count = int64(len(s.Rules))
+	}
 	return &ypb.SyntaxFlowGroup{
 		GroupName: s.GroupName,
 		IsBuildIn: s.IsBuildIn,
-		Count:     int32(len(s.Rules)),
+		Count:     int32(count),
 	}
 }

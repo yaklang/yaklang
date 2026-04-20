@@ -63,6 +63,7 @@ management.endpoints.web.exposure.exclude=env,beans
 4. **限制网络访问**
 在网络层面限制只有内部网络或特定的IP地址可以访问Actuator端点，不将其暴露在公共互联网上。
 SOLUTION
+	tags: "compliance"
 	rule_id: "084c0adc-69ef-42ed-aeb4-5c24603634af"
 	reference: <<<REFERENCE
 [Spring Boot Actuator文档](https://docs.spring.io/spring-boot/docs/current/reference/html/actuator.html)

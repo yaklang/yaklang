@@ -44,6 +44,7 @@ app.get('/login', (req, res) => {
 - **敏感信息泄露**：Cookie 中存储的用户数据被暴露
 - **违反合规要求**：PCI DSS、HIPAA 等标准要求敏感凭证必须加密传输
 DESC
+	tags: "compliance"
 	rule_id: "f3c8b2a1-7e4d-4f92-a5b6-0c1d9e3f7a28"
 	solution: <<<SOLUTION
 ### 修复建议

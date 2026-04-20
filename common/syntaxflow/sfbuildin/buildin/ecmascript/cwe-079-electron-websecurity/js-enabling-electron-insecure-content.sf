@@ -35,6 +35,7 @@ const mainWindow = new BrowserWindow({
 - **数据窃取**：注入的脚本可读取页面内容、Cookie、LocalStorage 等敏感数据
 - **供应链污染**：若应用依赖的第三方脚本通过 HTTP 加载，攻击者可替换这些脚本
 DESC
+	tags: "compliance"
 	rule_id: "b2c3d4e5-f6a7-8901-bcde-f12345678902"
 	solution: <<<SOLUTION
 ### 修复建议

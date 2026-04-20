@@ -38,6 +38,7 @@ desc(
    - 攻击者可篡改传输数据（如修改支付金额、注入恶意脚本）。
    - 违反数据安全合规要求（如PCI DSS、GDPR）。
 DESC
+	tags: "compliance"
 	rule_id: "bfb17df9-f448-49b8-9201-fe85843a86d8"
 	solution: <<<SOLUTION
 ### 修复建议

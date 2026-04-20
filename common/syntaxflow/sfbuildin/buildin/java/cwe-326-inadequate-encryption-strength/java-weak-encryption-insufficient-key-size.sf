@@ -33,6 +33,7 @@ KeyPair keyPair = keyPairGenerator.generateKeyPair();
 - 数字签名被伪造，从而影响数据完整性和身份认证。
 - 传输层安全（TLS/SSL）连接被降级或破解，导致中间人攻击。
 DESC
+	tags: "compliance"
 	rule_id: "238e7158-0746-4178-9d00-36ff473eeafd"
 	solution: <<<SOLUTION
 ### 修复建议

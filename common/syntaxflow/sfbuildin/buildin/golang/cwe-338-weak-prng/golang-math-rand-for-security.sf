@@ -8,6 +8,7 @@ desc(
 该规则检测 `math/rand` 在安全相关场景中的使用。`math/rand` 为伪随机生成器，输出可预测，
 不适用于 token、验证码、会话ID、密钥等安全用途。
 DESC
+	tags: "compliance"
 	rule_id: "8bf92ed2-6abf-4f45-b3b2-14f06a88eb36"
 	solution: <<<SOLUTION
 安全随机请使用 `crypto/rand`。例如用 `rand.Read` 生成随机字节并再编码为字符串。

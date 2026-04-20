@@ -28,6 +28,7 @@ desc(
    - 可能触发CSRF攻击，执行非预期的用户操作（如转账、修改密码等）。
    - 增加信息泄露风险，特别是在敏感操作（如银行交易）中。
 DESC
+	tags: "compliance"
 	rule_id: "dfb88d4d-1459-4045-a0f3-5a98083fee81"
 	solution: <<<SOLUTION
 ### 修复建议

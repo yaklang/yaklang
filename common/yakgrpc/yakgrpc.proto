@@ -7611,6 +7611,7 @@ message SyntaxFlowRuleFilter {
   repeated string Severity = 4;
   repeated string Purpose = 5;
   repeated string Tag = 6;
+  repeated string ExcludeTags = 18;
   string Keyword = 7;
   // 是否包含作为库的规则  这些规则只提供相关数据并被其他规则引用 默认不包含
   bool includeLibraryRule = 8; // default false // 废弃
@@ -7623,6 +7624,7 @@ message SyntaxFlowRuleFilter {
   string FilterLibRuleKind = 14; // "lib"library规则，"noLib"非library规则，空为所有规则
   repeated string RuleIds = 15;
   repeated uint64 Ids = 16 ;
+  string ComplianceMode = 17; // "include" 包含合规规则, "exclude" 排除合规规则, 空为未指定
 }
 
 message SSAProgram{
@@ -7767,6 +7769,9 @@ message SyntaxFlowRuleGroupFilter {
   // for fuzzing search
   string KeyWord = 1;
   string  FilterGroupKind = 3; // "buildIn"内置组，"unBuildIn"非内置组, 空为所有
+  string ComplianceMode = 4; // "include" 包含合规规则, "exclude" 排除合规规则, 空为未指定
+  repeated string Tag = 5;
+  repeated string ExcludeTags = 6;
 }
 
 message SyntaxFlowGroup{

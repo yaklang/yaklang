@@ -30,6 +30,7 @@ return "Processed";
 - 进一步渗透内网。
 - 拒绝服务（DoS）。
 DESC
+	tags: "compliance"
 	rule_id: "815144fa-b327-4842-b75d-a7bcc9e6ea6a"
 	solution: <<<SOLUTION
 ### 修复建议

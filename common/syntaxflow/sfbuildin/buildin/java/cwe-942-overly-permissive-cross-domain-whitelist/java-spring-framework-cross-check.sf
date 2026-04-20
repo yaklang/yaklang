@@ -27,6 +27,7 @@ public class SomeController {
 - **服务端资源滥用**: 攻击者可以利用此配置发起大量请求，对服务器资源造成压力。
 - **浏览器同源策略绕过**: 彻底绕过了浏览器的同源策略安全限制，允许任何外部脚本与应用程序进行交互。
 DESC
+	tags: "compliance"
 	rule_id: "bc50fb1a-9e00-46f8-985e-39f3a01a5853"
 	solution: <<<SOLUTION
 ### 修复建议

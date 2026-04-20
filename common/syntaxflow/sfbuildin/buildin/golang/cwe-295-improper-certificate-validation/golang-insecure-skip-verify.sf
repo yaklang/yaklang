@@ -28,6 +28,7 @@ desc(
    - **会话劫持**：攻击者获取未加密的会话Cookie后冒充用户。
    - **数据篡改**：拦截并修改传输中的业务数据（如订单金额）。
 DESC
+	tags: "compliance"
 	rule_id: "f8e9a1b2-c3d4-5e6f-a7b8-c9d0e1f2a3b4"
 	solution: <<<SOLUTION
 ### 修复建议

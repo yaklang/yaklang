@@ -52,6 +52,7 @@ REFERENCE
 - 目标语言：Java。
 - 检测内容：调用 `getInstance()` 方法时传入的参数是否属于危险算法（如 DES、3DES、RC4 等）。
 DESC
+	tags: "compliance"
 	rule_id: "fa6435fb-0def-4db7-9201-6223941859d4"
 	solution: <<<SOLUTION
 ### 修复建议

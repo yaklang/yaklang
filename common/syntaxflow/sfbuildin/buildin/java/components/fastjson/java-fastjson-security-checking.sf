@@ -29,6 +29,7 @@ public class UnsafeFastjsonDemo {
 - **系统破坏:** 攻击者可能删除文件、关闭服务或进行其他恶意操作，导致系统瘫痪。
 - **内网渗透:** 利用受攻击的服务器作为跳板，攻击者可能进一步攻击内网的其他系统。
 DESC
+	tags: "compliance"
 	rule_id: "a4abf901-de0e-4959-a310-5b0adbef046b"
 	solution: <<<SOLUTION
 ### 修复建议

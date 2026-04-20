@@ -33,6 +33,7 @@ desc(
    - 可能被用于进一步的攻击，如CSRF（跨站请求伪造）或会话劫持。
 
 DESC
+	tags: "compliance"
 	rule_id: "462d438a-5955-47c7-a0f9-1940a7f387c3"
 	reference: <<<REFERENCE
 [OWASP CORS Policy Misconfiguration](https://owasp.org/www-community/vulnerabilities/Cross-Origin_Resource_Sharing_CORS#CORS_Policy_Misconfiguration)

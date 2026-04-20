@@ -8,6 +8,7 @@ desc(
 该规则检测 `net/http/pprof` 的显式导入与 HTTP 服务启动组合。
 在生产环境暴露 pprof 端点可能泄露运行时信息（goroutine、heap、profile），可被攻击者用于侦察与性能打点攻击。
 DESC
+	tags: "compliance"
 	rule_id: "f34ff7d8-9bbd-4b35-8de2-4178289ce41f"
 	solution: <<<SOLUTION
 仅在内网或调试环境启用 pprof，生产环境建议关闭或放在鉴权与IP白名单之后。

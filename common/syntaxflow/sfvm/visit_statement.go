@@ -104,6 +104,8 @@ func (y *SyntaxFlowVisitor) VisitDescriptionStatement(raw sf.IDescriptionStateme
 			y.rule.TitleZh = value
 		case SFDescKeyType_Desc:
 			y.rule.Description = value
+		case SFDescKeyType_Tag:
+			y.rule.AppendTags(value)
 		case SFDescKeyType_Type:
 			y.rule.Purpose = schema.ValidPurpose(value)
 		case SFDescKeyType_Lib:
@@ -206,6 +208,8 @@ func (y *SyntaxFlowVisitor) VisitAlertStatement(raw sf.IAlertStatementContext) {
 						extra.TitleZh = value
 					case SFDescKeyType_Desc:
 						extra.Description = value
+					case SFDescKeyType_Tag:
+						extra.Tag = schema.JoinSyntaxFlowRuleTags(extra.Tag, value)
 					case SFDescKeyType_Type:
 						extra.Purpose = schema.ValidPurpose(value)
 					case SFDescKeyType_Level:

@@ -32,6 +32,7 @@ c.ServeJSON()
 - CSRF攻击：攻击者可能结合其他漏洞发起跨站请求伪造攻击，执行未经授权的操作。
 - 破坏应用隔离性：过度宽松的CORS策略可能导致不同域之间的隔离失效，引发更广泛的安全问题。
 DESC
+	tags: "compliance"
 	rule_id: "a9f2254c-7a3d-4ea9-9830-6ca98bde8cd8"
 	reference: <<<REFERENCE
 [CWE-942](https://cwe.mitre.org/data/definitions/942.html)
