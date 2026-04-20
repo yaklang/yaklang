@@ -38,6 +38,12 @@ func CallAITransaction(
 	var lastRsp *AIResponse
 
 	emitter := c.GetEmitter()
+	bindEmitter := func(rsp *AIResponse) *Emitter {
+		if rsp == nil {
+			return emitter
+		}
+		return rsp.BindEmitter(emitter)
+	}
 
 	requestOpts = append(requestOpts,
 		WithAIRequest_OnAcquireSeq(func(i int64) {
@@ -69,9 +75,10 @@ func CallAITransaction(
 		if err != nil {
 			lastErr = err
 			lastRsp = rsp
+			rspEmitter := bindEmitter(rsp)
 
 			if is429Response(c.GetContext(), rsp) {
-				emitter.EmitWarning("429 rate limit detected in transaction layer (seq=%d), will retry without counting attempt", seq)
+				rspEmitter.EmitWarning("429 rate limit detected in transaction layer (seq=%d), will retry without counting attempt", seq)
 				select {
 				case <-c.GetContext().Done():
 					return err
@@ -81,12 +88,12 @@ func CallAITransaction(
 			}
 
 			i++
-			emitter.EmitError("call ai api error (attempt %d/%d): %v", i, trcRetry, err)
+			rspEmitter.EmitError("call ai api error (attempt %d/%d): %v", i, trcRetry, err)
 			select {
 			case <-c.GetContext().Done():
 				return err
 			case <-time.After(100 * time.Millisecond):
-				emitter.EmitWarning("call ai transaction retry (attempt %d/%d)", i, trcRetry)
+				rspEmitter.EmitWarning("call ai transaction retry (attempt %d/%d)", i, trcRetry)
 				continue
 			}
 		}
@@ -98,12 +105,13 @@ func CallAITransaction(
 		if postHandlerErr != nil {
 			lastErr = postHandlerErr
 			i++
-			emitter.EmitError("ai transaction postHandler error (attempt %d/%d): %v", i, trcRetry, postHandlerErr)
+			rspEmitter := bindEmitter(rsp)
+			rspEmitter.EmitError("ai transaction postHandler error (attempt %d/%d): %v", i, trcRetry, postHandlerErr)
 			select {
 			case <-c.GetContext().Done():
 				return postHandlerErr
 			case <-time.After(100 * time.Millisecond):
-				emitter.EmitWarning("call ai transaction retry (attempt %d/%d)", i, trcRetry)
+				rspEmitter.EmitWarning("call ai transaction retry (attempt %d/%d)", i, trcRetry)
 				continue
 			}
 		}
@@ -143,7 +151,7 @@ func CallAITransaction(
 			finalErrMsg += "\n\n--- Last Raw HTTP Response ---\n" + utils.ShrinkString(rawDump, 4096)
 		}
 	}
-	emitter.EmitDefaultStreamEvent("ai-error", strings.NewReader(finalErrMsg), "")
+	bindEmitter(lastRsp).EmitDefaultStreamEvent("ai-error", strings.NewReader(finalErrMsg), "")
 
 	if lastErr != nil {
 		return utils.Errorf("max retry count[%v] reached in transaction, last error: %v", trcRetry, lastErr)
