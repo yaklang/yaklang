@@ -238,6 +238,7 @@ func DefaultAIAssistantRiskControl(ctx context.Context, config *Config, ep *Endp
 	var score float64
 	var action *Action
 	err = CallAITransaction(config, prompt, config.CallAI, func(rsp *AIResponse) error {
+		boundEmitter := rsp.BindEmitter(config.GetEmitter())
 		stream := rsp.GetOutputStreamReader("review", true, config.GetEmitter())
 		// stream = io.TeeReader(stream, os.Stdout)
 		var err error
@@ -247,7 +248,7 @@ func DefaultAIAssistantRiskControl(ctx context.Context, config *Config, ep *Endp
 			WithActionAlias("object"),
 			WithActionFieldStreamHandler([]string{"reason"}, func(key string, reader io.Reader) {
 				reader = utils.JSONStringReader(utils.UTF8Reader(reader))
-				config.GetEmitter().EmitDefaultStreamEvent(
+				boundEmitter.EmitDefaultStreamEvent(
 					"review",
 					reader,
 					rsp.GetTaskIndex(),
