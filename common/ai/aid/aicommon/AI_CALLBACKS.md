@@ -14,6 +14,8 @@
   推荐入口。如果启用了 tiered 配置，会尝试 `WithTieredAICallback` 填充质量/速度回调，同时把 `OriginalAICallback` 设为 `cb` 以保证异步任务可用。如果未启用 tiered 配置，等价于“单一回调”，会把 `cb` 设为 `OriginalAICallback`，并为质量/速度回调做 wrapper。
 - `WithTieredAICallback()`
   从全局 tiered 配置读取 intelligent/lightweight 模型回调。只设置质量/速度回调，不设置 `OriginalAICallback`。
+- `WithInheritTieredAICallback(parentConfig, force)`
+  子 invoker 继承父级回调的入口。会先继承父级的 `OriginalAICallback`；`force=true` 时直接沿用父级的质量/速度回调，`force=false` 且启用了 tiered 配置时，会按当前 tiered 配置重新生成质量/速度回调，但仍保留父级原始回调用于异步兜底。
 - `WithAICallback(cb)`
   粗粒度入口，仅建议用于测试或单一模型模块（例如知识库蒸馏）。会把 `cb` 设为 `OriginalAICallback`，并为质量/速度回调做 wrapper。
 - `WithFastAICallback(cb)`
@@ -32,6 +34,7 @@
 **推荐用法**
 
 - 主线 ReAct/Coordinator：优先使用 `WithAutoTieredAICallback`。
+- 父子调用链需要保持同一组回调时：使用 `WithInheritTieredAICallback`。
 - 需要强制单一模型的模块：使用 `WithAICallback`，但仅限测试或功能非常固定的场景。
 - LiteForge 或非主线的小任务：使用 `WithFastAICallback`。
 

@@ -371,7 +371,8 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 	baseOpts = append(baseOpts,
 		aicommon.WithID(uid),
 		aicommon.WithTimeline(r.config.Timeline),
-		aicommon.WithAutoTieredAICallback(r.config.OriginalAICallback),
+		//  由于 ReAct 到 PlanAndExecute 时是可能做异步执行的，所以这里在有 Tier Config 的情况下期望 PE 自己重建 AI Callback ，而不是完全继承。
+		aicommon.WithInheritTieredAICallback(r.config, false),
 		aicommon.WithAllowPlanUserInteract(true),
 		aicommon.WithEventInputChanx(inputChannel),
 		aicommon.WithHotPatchOptionChan(hotpatchChan),
