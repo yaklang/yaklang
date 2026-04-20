@@ -291,9 +291,9 @@ ALREADY_EXTRACTED 部分包含了之前已经提取过的内容。请注意：
 				aitool.WithNumberParam("score", aitool.WithParam_Description("相关性评分，0.0-1.0，越高越相关")),
 			),
 		},
-		aicommon.WithGeneralConfigStreamableFieldCallback([]string{
+		aicommon.WithGeneralConfigStreamableFieldEmitterCallback([]string{
 			"ranges",
-		}, func(key string, r io.Reader) {
+		}, func(key string, r io.Reader, emitter *aicommon.Emitter) {
 			jsonextractor.ExtractStructuredJSONFromStream(r, jsonextractor.WithObjectCallback(func(data map[string]interface{}) {
 				score := 0.0
 				score = utils.MapGetFloat64(data, "score")
@@ -318,8 +318,7 @@ ALREADY_EXTRACTED 部分包含了之前已经提取过的内容。请注意：
 				text := editor.GetTextFromPositionInt(startLine, 1, endLine, 1)
 				pw.WriteString(fmt.Sprintf("[权重：%v] 片段范围: %v-%v(切片大小:%v)；", score, startLine, endLine, utils.ByteSize(uint64(len(text)))))
 				// Start streaming output with unified nodeId
-				if invoker != nil {
-					emitter := invoker.GetConfig().GetEmitter()
+				if emitter != nil {
 					if event, _ := emitter.EmitDefaultStreamEvent(
 						"knowledge-compress",
 						pr,

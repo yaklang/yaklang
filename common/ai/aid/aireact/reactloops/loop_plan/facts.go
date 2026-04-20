@@ -417,7 +417,6 @@ func autoGenerateFacts(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask,
 	if task != nil {
 		taskIndex = task.GetId()
 	}
-	emitter := loop.GetEmitter()
 
 	action, err := invoker.InvokeSpeedPriorityLiteForge(
 		ctx,
@@ -426,9 +425,9 @@ func autoGenerateFacts(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask,
 		[]aitool.ToolOption{
 			aitool.WithStringParam(PlanFactsFieldName, aitool.WithParam_Description("增量 facts markdown；没有新增事实时返回空字符串")),
 		},
-		aicommon.WithGeneralConfigStreamableFieldCallback(
+		aicommon.WithGeneralConfigStreamableFieldEmitterCallback(
 			[]string{PlanFactsFieldName},
-			func(key string, r io.Reader) {
+			func(key string, r io.Reader, emitter *aicommon.Emitter) {
 				r = utils.JSONStringReader(r)
 				if emitter == nil {
 					io.Copy(io.Discard, r)

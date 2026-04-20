@@ -31,7 +31,9 @@ func (r *ReAct) invokeLiteForgeWithCallback(cb aicommon.AICallbackType, ctx cont
 	}
 	// add user-defined field stream callbacks from GeneralKVConfig
 	for _, item := range gconfig.GetStreamableFieldCallbacks() {
-		fopts = append(fopts, aiforge.WithLiteForge_FieldStreamCallback(item.FieldKeys, aiforge.FieldStreamCallback(item.Callback)))
+		if item.Callback != nil {
+			fopts = append(fopts, aiforge.WithLiteForge_FieldStreamEmitterCallback(item.FieldKeys, aiforge.FieldStreamEmitterCallback(item.Callback)))
+		}
 	}
 	fopts = append(fopts, aiforge.WithLiteForge_Emitter(r.config.Emitter))
 
