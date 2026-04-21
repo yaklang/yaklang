@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/fs"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -73,9 +74,7 @@ func (j *JarParser) GetJarFS() *javaclassparser.JarFS {
 // ListDirectory lists the contents of a directory within the JAR
 // Handles nested JAR paths like "lib/fastjson.jar/com/example" or "lib/outer.jar/libs/inner.jar/com/example"
 func (j *JarParser) ListDirectory(dirPath string) ([]fs.DirEntry, error) {
-	if dirPath == "" {
-		dirPath = "."
-	}
+	dirPath = normalizeJarInternalPath(dirPath)
 
 	// Handle multiple levels of nested JARs
 	jarPaths, finalPath, err := j.parseMultiLevelJarPath(dirPath)
@@ -124,6 +123,7 @@ func (j *JarParser) ListDirectory(dirPath string) ([]fs.DirEntry, error) {
 // GetDirectoryContents returns information about all entries in a directory
 // Also supports nested JAR paths like "lib/fastjson.jar/com/example"
 func (j *JarParser) GetDirectoryContents(dirPath string) ([]map[string]interface{}, error) {
+	dirPath = normalizeJarInternalPath(dirPath)
 	entries, err := j.ListDirectory(dirPath)
 	if err != nil {
 		return nil, err
@@ -202,6 +202,8 @@ func (j *JarParser) DecompileClass(className string) ([]byte, error) {
 	j.mutex.Lock()
 	defer j.mutex.Unlock()
 
+	className = normalizeJarInternalPath(className)
+
 	// Check if we've already decompiled this class
 	if data, ok := j.classCache[className]; ok {
 		return data, nil
@@ -278,6 +280,8 @@ func (j *JarParser) DecompileClass(className string) ([]byte, error) {
 // Example: "lib/outer.jar/libs/inner.jar/com/example/Main.class" returns
 // ["lib/outer.jar", "libs/inner.jar"], "com/example/Main.class", nil
 func (j *JarParser) parseMultiLevelJarPath(fullPath string) ([]string, string, error) {
+	fullPath = normalizeJarInternalPath(fullPath)
+
 	var jarPaths []string
 	remainingPath := fullPath
 
@@ -335,6 +339,8 @@ func (j *JarParser) GetNestedJarFS(nestedJarPath string) (*javaclassparser.JarFS
 // But "lib/outer.jar/libs/inner.jar/class.class" returns "lib/outer.jar", "libs/inner.jar/class.class", nil
 // which treats everything after the first .jar/ as a single path
 func (j *JarParser) ParseNestedJarPath(fullPath string) (string, string, error) {
+	fullPath = normalizeJarInternalPath(fullPath)
+
 	// Check if path contains .jar/
 	jarSeparatorIndex := strings.Index(fullPath, ".jar/")
 	if jarSeparatorIndex == -1 {
@@ -464,13 +470,14 @@ func (j *JarParser) findNestedJarClasses(jarPath, prefix string, classes *[]stri
 
 // FindInnerClasses finds all inner classes for a given outer class
 func (j *JarParser) FindInnerClasses(outerClassPath string) ([]string, error) {
+	outerClassPath = normalizeJarInternalPath(outerClassPath)
 	if !strings.HasSuffix(outerClassPath, ".class") {
 		return nil, utils.Errorf("not a class file: %s", outerClassPath)
 	}
 
 	// Get the directory and base name of the outer class
-	dir := filepath.Dir(outerClassPath)
-	baseName := filepath.Base(outerClassPath)
+	dir := path.Dir(outerClassPath)
+	baseName := path.Base(outerClassPath)
 	baseName = strings.TrimSuffix(baseName, ".class")
 
 	// Find all classes in the same directory
@@ -493,12 +500,24 @@ func (j *JarParser) FindInnerClasses(outerClassPath string) ([]string, error) {
 
 		// Check if this is an inner class of our outer class
 		if strings.HasPrefix(name, baseName+"$") {
-			innerClassPath := filepath.Join(dir, name)
+			innerClassPath := path.Join(dir, name)
 			innerClasses = append(innerClasses, innerClassPath)
 		}
 	}
 
 	return innerClasses, nil
+}
+
+func normalizeJarInternalPath(p string) string {
+	p = strings.ReplaceAll(filepath.ToSlash(strings.TrimSpace(p)), "\\", "/")
+	if p == "" || p == "." {
+		return "."
+	}
+	p = path.Clean(strings.TrimLeft(p, "/"))
+	if p == "" {
+		return "."
+	}
+	return p
 }
 
 // ExportDecompiledJar exports the JAR with all class files decompiled to .java files

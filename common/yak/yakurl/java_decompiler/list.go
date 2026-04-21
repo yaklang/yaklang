@@ -1,7 +1,7 @@
 package java_decompiler
 
 import (
-	"path/filepath"
+	"path"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/javaclassparser"
@@ -13,6 +13,9 @@ import (
 // listJarDirectory lists the contents of a directory in a JAR file
 // If hideInnerClasses is true, it will add hide=true and outerClass attributes to inner class resources
 func (a *Action) listJarDirectory(jarPath, dirPath string, currentDirPath string, jarFS *javaclassparser.JarFS, hideInnerClasses bool) (*ypb.RequestYakURLResponse, error) {
+	dirPath = normalizeJarInternalPath(dirPath)
+	currentDirPath = normalizeJarInternalPath(currentDirPath)
+
 	// List directory
 	entries, err := jarFS.ReadDir(currentDirPath)
 	if err != nil {
@@ -33,8 +36,8 @@ func (a *Action) listJarDirectory(jarPath, dirPath string, currentDirPath string
 					// Get the outer class name
 					outerClassName := className[:dollarIndex] + ".class"
 					// Add this inner class to the list for its outer class
-					entryPath := filepath.Join(currentDirPath, className)
-					outerClassPath := filepath.Join(currentDirPath, outerClassName)
+					entryPath := path.Join(currentDirPath, className)
+					outerClassPath := path.Join(currentDirPath, outerClassName)
 					innerClassesByOuter[outerClassPath] = append(innerClassesByOuter[outerClassPath], entryPath)
 				}
 			}
@@ -54,10 +57,7 @@ func (a *Action) listJarDirectory(jarPath, dirPath string, currentDirPath string
 			continue
 		}
 
-		entryPath := filepath.Join(dirPath, entry.Name())
-		if entryPath == "./" {
-			entryPath = entry.Name()
-		}
+		entryPath := path.Join(dirPath, entry.Name())
 
 		// Create a new URL for this resource
 		resourceURL := &ypb.YakURL{
@@ -91,7 +91,7 @@ func (a *Action) listJarDirectory(jarPath, dirPath string, currentDirPath string
 					Value: jarPath,
 				}, &ypb.KVPair{
 					Key:   "dir",
-					Value: filepath.Dir(entryPath),
+					Value: path.Dir(entryPath),
 				})
 			}
 		}
@@ -100,7 +100,7 @@ func (a *Action) listJarDirectory(jarPath, dirPath string, currentDirPath string
 
 		// For directories, check if they have children
 		if entry.IsDir() {
-			actualEntryPath := filepath.Join(currentDirPath, entry.Name())
+			actualEntryPath := path.Join(currentDirPath, entry.Name())
 			subEntries, err := jarFS.ReadDir(actualEntryPath)
 			if err == nil {
 				resource.HaveChildrenNodes = len(subEntries) > 0
