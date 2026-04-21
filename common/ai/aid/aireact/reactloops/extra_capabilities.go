@@ -195,7 +195,7 @@ func (ecm *ExtraCapabilitiesManager) Render(nonce string) string {
 
 	// Tools
 	if len(ecm.tools) > 0 {
-		sb.WriteString(fmt.Sprintf("## Additional Tools / 额外工具 (%d/%d)\n", len(ecm.tools), ecm.MaxExtraTools))
+		sb.WriteString(fmt.Sprintf("## Additional Tools / 额外工具 (%d/%d, titles marked as Core Tool / High Priority should be preferred)\n", len(ecm.tools), ecm.MaxExtraTools))
 		for _, t := range ecm.tools {
 			desc := t.Description
 			if len(desc) > 150 {

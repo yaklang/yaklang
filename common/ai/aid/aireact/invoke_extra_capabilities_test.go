@@ -9,6 +9,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	_ "github.com/yaklang/yaklang/common/aiforge" // register liteforge callback
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/jsonpath"
@@ -290,6 +291,13 @@ func TestReAct_ExtraCapabilities_Render(t *testing.T) {
 		Description: "A test focus mode for rendering verification " + testNonce,
 	})
 
+	// Add a core/high-priority tool to verify title and section hint rendering
+	ecm.AddTools(aitool.NewWithoutCallback(
+		"test_core_tool_render_"+testNonce,
+		aitool.WithVerboseName("Core Tool / 核心工具 / High Priority"),
+		aitool.WithDescription("Core render tool with very high priority "+testNonce),
+	))
+
 	// Render and verify all sections present
 	rendered := ecm.Render("test_nonce_123")
 	if rendered == "" {
@@ -299,6 +307,12 @@ func TestReAct_ExtraCapabilities_Render(t *testing.T) {
 	// Verify header
 	if !strings.Contains(rendered, "Extra Capabilities") {
 		t.Fatal("rendered output should contain 'Extra Capabilities' header")
+	}
+	if !strings.Contains(rendered, "Core Tool / High Priority should be preferred") {
+		t.Fatal("rendered output should mention core/high-priority tool preference in tools title")
+	}
+	if !strings.Contains(rendered, "Core Tool / 核心工具 / High Priority") {
+		t.Fatal("rendered output should contain core tool title marker")
 	}
 
 	// Verify forge section
