@@ -292,6 +292,22 @@ func TestMUSTPASS_MITM_Deduplicate_Extracted(t *testing.T) {
 		require.Equal(t, int64(3), c3, "包3应保持 3 条（未去重）")
 	})
 
+	t.Run("按规则名范围去重", func(t *testing.T) {
+		createTestData()
+		rsp, err := client.DeduplicateMITMRuleExtractedData(ctx, &ypb.DeduplicateMITMRuleExtractedDataRequest{
+			Filter: &ypb.ExtractedDataFilter{RuleVerbose: []string{ruleName}},
+		})
+		require.NoError(t, err)
+		require.Equal(t, int64(8), rsp.GetDeletedCount(), "按规则名去重应删 8 条")
+		var c1, c2, c3 int64
+		require.NoError(t, db.Model(&schema.ExtractedData{}).Where("trace_id = ?", traceID1).Count(&c1).Error)
+		require.NoError(t, db.Model(&schema.ExtractedData{}).Where("trace_id = ?", traceID2).Count(&c2).Error)
+		require.NoError(t, db.Model(&schema.ExtractedData{}).Where("trace_id = ?", traceID3).Count(&c3).Error)
+		require.Equal(t, int64(1), c1, "包1应剩 1 条")
+		require.Equal(t, int64(1), c2, "包2应剩 1 条")
+		require.Equal(t, int64(3), c3, "包3应保持 3 条（未去重）")
+	})
+
 	t.Run("全表去重_TraceID为空", func(t *testing.T) {
 		createTestData()
 		rsp, err := client.DeduplicateMITMRuleExtractedData(ctx, &ypb.DeduplicateMITMRuleExtractedDataRequest{

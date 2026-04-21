@@ -1142,3 +1142,176 @@ func TestKeywordType(t *testing.T) {
 	})
 
 }
+
+func TestFilterHTTPFlowMitmExtractAggregateFilterRows(t *testing.T) {
+	db := consts.GetGormProjectDatabase()
+	token := uuid.NewString()
+	host := "mefr-" + token + ".test"
+	traceKeep := uuid.NewString()
+	traceDrop := uuid.NewString()
+	rt := "rt-mefr-" + token
+
+	fKeep := &schema.HTTPFlow{
+		HiddenIndex: traceKeep,
+		Host:        host,
+		RuntimeId:   rt,
+		Url:         "https://" + host + "/a",
+		Path:        "/a",
+		Method:      "GET",
+		SourceType:  schema.HTTPFlow_SourceType_MITM,
+	}
+	fKeep.SetRequest("GET /a HTTP/1.1\r\nHost: " + host + "\r\n\r\n")
+	require.NoError(t, InsertHTTPFlow(db, fKeep))
+	defer db.Unscoped().Where("id = ?", fKeep.ID).Delete(&schema.HTTPFlow{})
+
+	fDrop := &schema.HTTPFlow{
+		HiddenIndex: traceDrop,
+		Host:        host,
+		RuntimeId:   rt,
+		Url:         "https://" + host + "/b",
+		Path:        "/b",
+		Method:      "GET",
+		SourceType:  schema.HTTPFlow_SourceType_MITM,
+	}
+	fDrop.SetRequest("GET /b HTTP/1.1\r\nHost: " + host + "\r\n\r\n")
+	require.NoError(t, InsertHTTPFlow(db, fDrop))
+	defer db.Unscoped().Where("id = ?", fDrop.ID).Delete(&schema.HTTPFlow{})
+
+	rule := "rule-mefr-" + token
+	require.NoError(t, CreateOrUpdateExtractedData(db, 0, &schema.ExtractedData{
+		SourceType:  "httpflow",
+		TraceId:     traceKeep,
+		RuleVerbose: rule,
+		Data:        "d1",
+	}))
+	require.NoError(t, CreateOrUpdateExtractedData(db, 0, &schema.ExtractedData{
+		SourceType:  "httpflow",
+		TraceId:     traceDrop,
+		RuleVerbose: "other-rule",
+		Data:        "x",
+	}))
+	defer db.Unscoped().Where("trace_id IN (?)", []string{traceKeep, traceDrop}).Delete(&schema.ExtractedData{})
+
+	q := FilterHTTPFlow(db.Model(&schema.HTTPFlow{}), &ypb.QueryHTTPFlowRequest{
+		RuntimeId: rt,
+		MitmExtractAggregateFilterRows: []*ypb.MITMExtractAggregateFlowFilterRow{
+			{RuleVerbose: rule, DisplayData: "d1"},
+		},
+	})
+	var ids []int64
+	require.NoError(t, q.Pluck("id", &ids).Error)
+	require.Contains(t, ids, int64(fKeep.ID))
+	require.NotContains(t, ids, int64(fDrop.ID))
+}
+
+func TestHTTPFlowRequestHasNonEmptyFilter(t *testing.T) {
+	require.False(t, HTTPFlowRequestHasNonEmptyFilter(nil))
+	require.False(t, HTTPFlowRequestHasNonEmptyFilter(&ypb.QueryHTTPFlowRequest{}))
+	require.False(t, HTTPFlowRequestHasNonEmptyFilter(&ypb.QueryHTTPFlowRequest{
+		Pagination: &ypb.Paging{Page: 1, Limit: 10},
+	}))
+	require.True(t, HTTPFlowRequestHasNonEmptyFilter(&ypb.QueryHTTPFlowRequest{Keyword: "x"}))
+}
+
+func TestFilterHTTPFlowMitmExtractAggregateFilterRowsOR(t *testing.T) {
+	db := consts.GetGormProjectDatabase()
+	token := uuid.NewString()
+	host := "mefr-or-" + token + ".test"
+	trace1 := uuid.NewString()
+	trace2 := uuid.NewString()
+	rt := "rt-mefr-or-" + token
+
+	f1 := &schema.HTTPFlow{
+		HiddenIndex: trace1,
+		Host:        host,
+		RuntimeId:   rt,
+		Url:         "https://" + host + "/1",
+		Path:        "/1",
+		Method:      "GET",
+		SourceType:  schema.HTTPFlow_SourceType_MITM,
+	}
+	f1.SetRequest("GET /1 HTTP/1.1\r\nHost: " + host + "\r\n\r\n")
+	require.NoError(t, InsertHTTPFlow(db, f1))
+	defer db.Unscoped().Where("id = ?", f1.ID).Delete(&schema.HTTPFlow{})
+
+	f2 := &schema.HTTPFlow{
+		HiddenIndex: trace2,
+		Host:        host,
+		RuntimeId:   rt,
+		Url:         "https://" + host + "/2",
+		Path:        "/2",
+		Method:      "GET",
+		SourceType:  schema.HTTPFlow_SourceType_MITM,
+	}
+	f2.SetRequest("GET /2 HTTP/1.1\r\nHost: " + host + "\r\n\r\n")
+	require.NoError(t, InsertHTTPFlow(db, f2))
+	defer db.Unscoped().Where("id = ?", f2.ID).Delete(&schema.HTTPFlow{})
+
+	r1 := "r1-" + token
+	r2 := "r2-" + token
+	require.NoError(t, CreateOrUpdateExtractedData(db, 0, &schema.ExtractedData{
+		SourceType:  "httpflow",
+		TraceId:     trace1,
+		RuleVerbose: r1,
+		Data:        "d1",
+	}))
+	require.NoError(t, CreateOrUpdateExtractedData(db, 0, &schema.ExtractedData{
+		SourceType:  "httpflow",
+		TraceId:     trace2,
+		RuleVerbose: r2,
+		Data:        "d2",
+	}))
+	defer db.Unscoped().Where("trace_id IN (?)", []string{trace1, trace2}).Delete(&schema.ExtractedData{})
+
+	q := FilterHTTPFlow(db.Model(&schema.HTTPFlow{}), &ypb.QueryHTTPFlowRequest{
+		RuntimeId: rt,
+		MitmExtractAggregateFilterRows: []*ypb.MITMExtractAggregateFlowFilterRow{
+			{RuleVerbose: r1, DisplayData: "d1"},
+			{RuleVerbose: r2, DisplayData: "d2"},
+		},
+	})
+	var ids []int64
+	require.NoError(t, q.Pluck("id", &ids).Error)
+	require.Contains(t, ids, int64(f1.ID))
+	require.Contains(t, ids, int64(f2.ID))
+}
+
+func TestFilterHTTPFlowMitmExtractAggregateFilterRowsRuleOnly(t *testing.T) {
+	db := consts.GetGormProjectDatabase()
+	token := uuid.NewString()
+	host := "mefr-rv-" + token + ".test"
+	trace := uuid.NewString()
+	rt := "rt-mefr-rv-" + token
+
+	f := &schema.HTTPFlow{
+		HiddenIndex: trace,
+		Host:        host,
+		RuntimeId:   rt,
+		Url:         "https://" + host + "/x",
+		Path:        "/x",
+		Method:      "GET",
+		SourceType:  schema.HTTPFlow_SourceType_MITM,
+	}
+	f.SetRequest("GET /x HTTP/1.1\r\nHost: " + host + "\r\n\r\n")
+	require.NoError(t, InsertHTTPFlow(db, f))
+	defer db.Unscoped().Where("id = ?", f.ID).Delete(&schema.HTTPFlow{})
+
+	rule := "onlyrv-" + token
+	require.NoError(t, CreateOrUpdateExtractedData(db, 0, &schema.ExtractedData{
+		SourceType:  "httpflow",
+		TraceId:     trace,
+		RuleVerbose: rule,
+		Data:        "any",
+	}))
+	defer db.Unscoped().Where("trace_id = ?", trace).Delete(&schema.ExtractedData{})
+
+	q := FilterHTTPFlow(db.Model(&schema.HTTPFlow{}), &ypb.QueryHTTPFlowRequest{
+		RuntimeId: rt,
+		MitmExtractAggregateFilterRows: []*ypb.MITMExtractAggregateFlowFilterRow{
+			{RuleVerbose: rule, DisplayData: ""},
+		},
+	})
+	var ids []int64
+	require.NoError(t, q.Pluck("id", &ids).Error)
+	require.Contains(t, ids, int64(f.ID))
+}
