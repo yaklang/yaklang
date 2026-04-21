@@ -87,10 +87,8 @@ var _ fs.File = (*zipDir)(nil)
 
 func zipPathClean(p string) string {
 	p = path.Clean(p)
-	if p == "." {
-		return "./"
-	}
-	if p == "/" {
+	p = strings.TrimLeft(p, "/")
+	if p == "." || p == "" {
 		return "./"
 	}
 	if !strings.HasPrefix(p, "./") {
@@ -102,6 +100,7 @@ func zipPathClean(p string) string {
 func (z *ZipFS) Open(name string) (fs.File, error) {
 	raw, err := z.ReadFile(name)
 	if err != nil {
+		name = z.Clean(name)
 		p, err := z.forest.Get(name)
 		if err != nil {
 			return nil, err
@@ -157,7 +156,7 @@ func (z *ZipFS) Stat(name string) (fs.FileInfo, error) {
 var _ fi.FileSystem = (*ZipFS)(nil)
 
 func (z *ZipFS) Clean(name string) string {
-	name = filepath.ToSlash(name)
+	name = strings.ReplaceAll(filepath.ToSlash(name), "\\", "/")
 	return zipPathClean(name)
 }
 

@@ -2,6 +2,7 @@ package java_decompiler
 
 import (
 	"bytes"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -22,7 +23,7 @@ func (a *Action) getJarFS(jarPath string) (*javaclassparser.JarFS, error) {
 	})
 }
 func (a *Action) getNestedJarFs(jarPath string, dirPath string) (*javaclassparser.JarFS, string, string, error) {
-	currentDirPath := dirPath
+	currentDirPath := normalizeJarInternalPath(dirPath)
 	currentJarPath := jarPath
 
 	ext := strings.ToLower(filepath.Ext(jarPath))
@@ -83,6 +84,8 @@ func (a *Action) getNestedJarFs(jarPath string, dirPath string) (*javaclassparse
 // parseNestedJarPath parses a path that may contain nested JAR files
 // Returns the physical jar path, the internal path within the jar, and any error
 func (a *Action) parseNestedJarPath(fullPath string) (string, string, error) {
+	fullPath = normalizeJarInternalPath(fullPath)
+
 	// Check if path contains .jar/
 	jarSeparatorIndex := strings.Index(fullPath, ".jar/")
 	if jarSeparatorIndex == -1 {
@@ -98,4 +101,16 @@ func (a *Action) parseNestedJarPath(fullPath string) (string, string, error) {
 	internalPath := fullPath[jarSeparatorIndex+5:] // skip the .jar/ part
 
 	return jarPath, internalPath, nil
+}
+
+func normalizeJarInternalPath(p string) string {
+	p = strings.ReplaceAll(filepath.ToSlash(strings.TrimSpace(p)), "\\", "/")
+	if p == "" || p == "." {
+		return "."
+	}
+	p = path.Clean(strings.TrimLeft(p, "/"))
+	if p == "" {
+		return "."
+	}
+	return p
 }

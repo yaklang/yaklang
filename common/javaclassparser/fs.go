@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"io/fs"
 	"os"
+	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -15,8 +17,8 @@ import (
 
 type JarFS struct {
 	*filesys.ZipFS
-	jarCache          *utils.SafeMapWithKey[string, *filesys.UnifiedFS]
-	recursiveParse    bool // 是否递归解析嵌套的jar文件，默认为true
+	jarCache       *utils.SafeMapWithKey[string, *filesys.UnifiedFS]
+	recursiveParse bool // 是否递归解析嵌套的jar文件，默认为true
 }
 
 var _ fs.FS = (*JarFS)(nil)
@@ -109,6 +111,7 @@ func (z *JarFS) Stat(name string) (fs.FileInfo, error) {
 }
 
 func isArchiveFile(path string) bool {
+	path = normalizeArchivePath(path)
 	lowerPath := strings.ToLower(path)
 	return strings.HasSuffix(lowerPath, ".jar") ||
 		strings.HasSuffix(lowerPath, ".war") ||
@@ -116,11 +119,13 @@ func isArchiveFile(path string) bool {
 }
 
 func isArchivePath(name string) bool {
+	name = normalizeArchivePath(name)
 	return strings.Contains(name, ".jar/") || strings.Contains(name, ".jar!") ||
 		strings.Contains(name, ".zip/") || strings.Contains(name, ".zip!")
 }
 
 func parseArchivePath(fullPath string) (archivePath, internalPath string, ok bool) {
+	fullPath = normalizeArchivePath(fullPath)
 	lowerPath := strings.ToLower(fullPath)
 
 	if strings.Contains(lowerPath, ".jar/") || strings.Contains(lowerPath, ".jar!") {
@@ -150,6 +155,19 @@ func parseJarOrZipPath(fullPath, ext string) (archivePath, internalPath string, 
 	archivePath = fullPath[:idx]
 	internalPath = strings.TrimPrefix(fullPath[idx:], "/")
 	return archivePath, internalPath, true
+}
+
+func normalizeArchivePath(name string) string {
+	name = strings.ReplaceAll(filepath.ToSlash(strings.TrimSpace(name)), "\\", "/")
+	if name == "" || name == "." {
+		return name
+	}
+	name = path.Clean(name)
+	name = strings.TrimLeft(name, "/")
+	if name == "" {
+		return "."
+	}
+	return name
 }
 
 func (z *JarFS) getNestedJarFS(jarPath string) (*filesys.UnifiedFS, error) {

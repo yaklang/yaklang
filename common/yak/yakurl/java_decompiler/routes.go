@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -33,9 +34,7 @@ func (a *Action) registerJarRoutes() {
 
 		// Get directory to list
 		dirPath, _ := getParam("dir")
-		if dirPath == "" {
-			dirPath = "."
-		}
+		dirPath = normalizeJarInternalPath(dirPath)
 
 		return a.listJarDirectory(jarPath, dirPath, dirPath, jarFS, false)
 	})
@@ -50,6 +49,7 @@ func (a *Action) registerJarRoutes() {
 		if err != nil {
 			return nil, utils.Errorf("dir parameter is required")
 		}
+		dirPath = normalizeJarInternalPath(dirPath)
 		jarParser, err := jar.NewJarParser(jarPath)
 		if err != nil {
 			return nil, err
@@ -70,8 +70,8 @@ func (a *Action) registerJarRoutes() {
 					// Get the outer class name
 					outerClassName := className[:dollarIndex] + ".class"
 					// Add this inner class to the list for its outer class
-					entryPath := filepath.Join(dirPath, className)
-					outerClassPath := filepath.Join(dirPath, outerClassName)
+					entryPath := path.Join(dirPath, className)
+					outerClassPath := path.Join(dirPath, outerClassName)
 					innerClassesByOuter[outerClassPath] = append(innerClassesByOuter[outerClassPath], entryPath)
 				}
 			}
@@ -95,14 +95,10 @@ func (a *Action) registerJarRoutes() {
 					{Key: "dir", Value: dirPath},
 				},
 			}
-			entryPath := filepath.Join(dirPath, entry.Name())
+			entryPath := path.Join(dirPath, entry.Name())
 			fileInfo, err := entry.Info()
 			if err != nil {
 				return nil, err
-			}
-
-			if entryPath == "./" {
-				entryPath = entry.Name()
 			}
 
 			// Update resource URL based on entry type
@@ -123,7 +119,7 @@ func (a *Action) registerJarRoutes() {
 				} else {
 					resourceURL.Query = []*ypb.KVPair{
 						{Key: "jar", Value: jarPath},
-						{Key: "dir", Value: filepath.Dir(entryPath)},
+						{Key: "dir", Value: path.Dir(entryPath)},
 					}
 				}
 			}
@@ -191,6 +187,7 @@ func (a *Action) registerClassRoutes() {
 		if err != nil {
 			return nil, utils.Error("class parameter is required")
 		}
+		className = normalizeJarInternalPath(className)
 
 		jarFs, actualJarPath, classPath, err := a.getNestedJarFs(jarPath, className)
 		if err != nil {
@@ -372,6 +369,7 @@ func (a *Action) registerClassRoutes() {
 		if err != nil {
 			return nil, utils.Error("class parameter is required")
 		}
+		className = normalizeJarInternalPath(className)
 
 		jarFs, actualJarPath, classPath, err := a.getNestedJarFs(jarPath, className)
 		if err != nil {
@@ -391,6 +389,7 @@ func (a *Action) registerClassRoutes() {
 			// Use explicitly provided inner classes
 			innerClassPaths := strings.Split(innerClassesParam, ",")
 			for _, innerClassPath := range innerClassPaths {
+				innerClassPath = normalizeJarInternalPath(innerClassPath)
 				// Parse nested JAR path for inner class if needed
 				innerJarFs, _, innerClassPathParsed, err := a.getNestedJarFs(jarPath, innerClassPath)
 				if err != nil {
@@ -403,7 +402,7 @@ func (a *Action) registerClassRoutes() {
 					continue
 				}
 
-				_, innerClassName := filepath.Split(innerClassPathParsed)
+				_, innerClassName := path.Split(innerClassPathParsed)
 				innerClassesMap[innerClassName] = innerClassData
 			}
 		}
