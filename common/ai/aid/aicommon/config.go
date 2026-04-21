@@ -745,12 +745,11 @@ func WithInheritTieredAICallback(parentConfig *Config, force bool) ConfigOption 
 		c.OriginalAICallback = parentConfig.OriginalAICallback
 		c.m.Unlock()
 
-		if consts.GetTieredAIConfig().Enabled && !force {
+		if consts.IsTieredAIModelConfigEnabled() && !force {
 			if err := WithTieredAICallback()(c); err != nil {
-			if err :=  WithTieredAICallback()(c);err != nil {
 				log.Errorf("Failed to configure tiered AI callbacks: %v", err)
+			}
 		} else {
-		}else {
 			c.m.Lock()
 			c.QualityPriorityAICallback = parentConfig.QualityPriorityAICallback
 			c.SpeedPriorityAICallback = parentConfig.SpeedPriorityAICallback
