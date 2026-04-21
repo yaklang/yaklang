@@ -37,11 +37,11 @@ func (e *Engine) RuntimeInfo(infoType string, params ...any) (res any, err error
 			err = fmt.Errorf("%v", e)
 		}
 	}()
-	frame := e.GetVM().VMStack.Peek()
+	frame := e.GetVM().CurrentFM()
 	if frame == nil {
 		return nil, fmt.Errorf("not found runtime.GetInfo")
 	}
-	runtimeLib, ok := frame.(*yakvm.Frame).GlobalVariables.Load("runtime")
+	runtimeLib, ok := frame.GlobalVariables.Load("runtime")
 	if !ok || runtimeLib == nil {
 		return nil, fmt.Errorf("current frame not import runtime lib")
 	}
