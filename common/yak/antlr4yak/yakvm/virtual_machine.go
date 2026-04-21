@@ -3,6 +3,9 @@ package yakvm
 import (
 	"context"
 	"fmt"
+	"runtime"
+	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/utils/limitedmap"
@@ -44,9 +47,11 @@ type (
 		globalVar        *limitedmap.ReadOnlyMap
 		runtimeGlobalVar *limitedmap.SafeMap
 
-		VMStack     *vmstack.Stack
-		vmstackMu   sync.Mutex
-		rootScope   *Scope
+		VMStack       *vmstack.Stack
+		vmstackMu     sync.Mutex
+		frameStacksMu sync.RWMutex
+		frameStacks   map[int64]*vmstack.Stack
+		rootScope     *Scope
 
 		// asyncWaitGroup
 		asyncWaitGroup *sync.WaitGroup
@@ -148,6 +153,7 @@ func NewWithSymbolTable(table *SymbolTable) *VirtualMachine {
 		// rootSymbol: table,
 		rootScope:        NewScope(table),
 		VMStack:          vmstack.New(),
+		frameStacks:      make(map[int64]*vmstack.Stack),
 		globalVar:        limitedmap.NewReadOnlyMap(map[string]any{}),
 		runtimeGlobalVar: limitedmap.NewSafeMap(map[string]any{}),
 		config:           NewVMConfig(),
@@ -220,8 +226,8 @@ func (n *VirtualMachine) GetVarWithoutFrame(name string) (any, bool) {
 }
 
 func (n *VirtualMachine) GetVar(name string) (interface{}, bool) {
-	ivm := n.VMStack.Peek()
-	if ivm == nil {
+	frame := n.peekCurrentFrame()
+	if frame == nil {
 		val, ok := n.rootScope.GetValueByName(name)
 		if ok {
 			return val.Value, true
@@ -229,8 +235,6 @@ func (n *VirtualMachine) GetVar(name string) (interface{}, bool) {
 		return n.GetVarWithoutFrame(name)
 	}
 
-	// ivm 存在的时候，从 frame 中找变量
-	frame := ivm.(*Frame)
 	val, ok := frame.CurrentScope().GetValueByName(name)
 	if ok {
 		return val.Value, true
@@ -293,35 +297,54 @@ func (v *VirtualMachine) ExecYakFunctionEx(ctx context.Context, f *Function, arg
 }
 
 func (v *VirtualMachine) ExecAsyncYakFunction(ctx context.Context, f *Function, args map[int]*Value) error {
-	return v.Exec(ctx, func(frame *Frame) {
-		if v.sandboxMode && f.defineFrame != nil {
-			frame = NewSubFrame(f.defineFrame)
-		}
-		name := f.GetActualName()
-		frame.SetVerbose("function: " + name)
-		frame.SetFunction(f)
-		frame.SetScope(f.scope)
-		frame.CreateAndSwitchSubScope(f.symbolTable)
-		for id, arg := range args {
-			frame.CurrentScope().NewValueByID(id, arg)
-		}
-		go func() {
-			defer func() {
-				v.AsyncEnd()
-				if err := frame.recover(); err != nil {
-					log.Errorf("yakvm async function panic: %v", err)
-					// utils.PrintCurrentGoroutineRuntimeStack()
-				}
-				if err := recover(); err != nil {
-					log.Errorf("yakvm async function panic: %v", err)
-					utils.PrintCurrentGoroutineRuntimeStack()
-				}
-			}()
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
 
-			frame.Exec(f.codes)
-			frame.ExitScope()
+	parentFrame, _ := ctx.Value(vmCurrentFrameKey{}).(*Frame)
+	if parentFrame == nil && !(v.sandboxMode && f.defineFrame != nil) {
+		log.Errorf("BUG: VMStack is empty(Sub)")
+		return utils.Error("BUG: VMStack is empty(Sub)")
+	}
+
+	var frame *Frame
+	if v.sandboxMode && f.defineFrame != nil {
+		frame = NewSubFrame(f.defineFrame)
+	} else {
+		frame = NewSubFrame(parentFrame)
+	}
+	frame.coroutine = NewCoroutine()
+
+	name := f.GetActualName()
+	frame.SetVerbose("function: " + name)
+	frame.SetFunction(f)
+	frame.SetScope(f.scope)
+	frame.CreateAndSwitchSubScope(f.symbolTable)
+	for id, arg := range args {
+		frame.CurrentScope().NewValueByID(id, arg)
+	}
+
+	ctx = context.WithValue(ctx, vmCurrentFrameKey{}, frame)
+	frame.ctx = ctx
+
+	go func() {
+		v.pushCurrentFrame(frame)
+		defer func() {
+			v.popCurrentFrame()
+			v.AsyncEnd()
+			if err := frame.recover(); err != nil {
+				log.Errorf("yakvm async function panic: %v", err)
+			}
+			if err := recover(); err != nil {
+				log.Errorf("yakvm async function panic: %v", err)
+				utils.PrintCurrentGoroutineRuntimeStack()
+			}
 		}()
-	}, Sub, Asnyc)
+
+		frame.Exec(f.codes)
+		frame.ExitScope()
+	}()
+	return nil
 }
 
 func (v *VirtualMachine) ExecYakCode(ctx context.Context, sourceCode string, codes []*Code, flags ...ExecFlag) error {
@@ -359,19 +382,15 @@ func (v *VirtualMachine) Exec(ctx context.Context, f func(frame *Frame), flags .
 	} else if flag&Inline == Inline {
 		// Inline mode reuses the current frame in-place (used by eval/debugger).
 		// It is not designed for concurrent use; keep VMStack-based lookup here.
-		v.vmstackMu.Lock()
-		topFrame := v.VMStack.Peek()
-		v.vmstackMu.Unlock()
+		topFrame := v.peekCurrentFrame()
 
 		if topFrame == nil {
 			topFrame = NewFrame(v)
-			v.vmstackMu.Lock()
-			v.VMStack.Push(topFrame)
-			v.vmstackMu.Unlock()
+			v.pushCurrentFrame(topFrame)
 			log.Debugf("VMStack is empty(Inline), we create new frame")
 		}
 
-		frame = topFrame.(*Frame)
+		frame = topFrame
 		codes := frame.codes
 		p := frame.codePointer
 
@@ -396,10 +415,7 @@ func (v *VirtualMachine) Exec(ctx context.Context, f func(frame *Frame), flags .
 	// frame.CallYakFunction(vm.ctx, ...) in func.go.
 	frame.ctx = ctx
 
-	// Keep VMStack updated for inspection tools (GetVar, CurrentFM, debugger).
-	v.vmstackMu.Lock()
-	v.VMStack.Push(frame)
-	v.vmstackMu.Unlock()
+	v.pushCurrentFrame(frame)
 
 	frame.debug = v.debug
 	if v.debugMode && v.debugger != nil && v.debugger.initFunc != nil {
@@ -409,9 +425,7 @@ func (v *VirtualMachine) Exec(ctx context.Context, f func(frame *Frame), flags .
 	f(frame)
 
 	if flag&Trace != Trace {
-		v.vmstackMu.Lock()
-		v.VMStack.Pop()
-		v.vmstackMu.Unlock()
+		v.popCurrentFrame()
 	}
 	if flag&Asnyc != Asnyc {
 		if lastPanic := frame.recover(); lastPanic != nil {
@@ -431,7 +445,75 @@ func (v *VirtualMachine) Exec(ctx context.Context, f func(frame *Frame), flags .
 }
 
 func (v *VirtualMachine) CurrentFM() *Frame {
-	return v.VMStack.Peek().(*Frame)
+	return v.peekCurrentFrame()
+}
+
+func currentGoroutineID() int64 {
+	buf := make([]byte, 64)
+	n := runtime.Stack(buf, false)
+	if n <= 0 {
+		return 0
+	}
+	fields := strings.Fields(string(buf[:n]))
+	if len(fields) < 2 {
+		return 0
+	}
+	id, err := strconv.ParseInt(fields[1], 10, 64)
+	if err != nil {
+		return 0
+	}
+	return id
+}
+
+func (v *VirtualMachine) getCurrentFrameStack(gid int64, create bool) *vmstack.Stack {
+	v.frameStacksMu.Lock()
+	defer v.frameStacksMu.Unlock()
+
+	stack, ok := v.frameStacks[gid]
+	if ok || !create {
+		return stack
+	}
+
+	stack = vmstack.New()
+	v.frameStacks[gid] = stack
+	return stack
+}
+
+func (v *VirtualMachine) pushCurrentFrame(frame *Frame) {
+	gid := currentGoroutineID()
+	stack := v.getCurrentFrameStack(gid, true)
+	stack.Push(frame)
+}
+
+func (v *VirtualMachine) popCurrentFrame() *Frame {
+	gid := currentGoroutineID()
+
+	v.frameStacksMu.Lock()
+	defer v.frameStacksMu.Unlock()
+
+	stack, ok := v.frameStacks[gid]
+	if !ok || stack == nil {
+		return nil
+	}
+	frame, _ := stack.Pop().(*Frame)
+	if stack.Len() == 0 {
+		delete(v.frameStacks, gid)
+	}
+	return frame
+}
+
+func (v *VirtualMachine) peekCurrentFrame() *Frame {
+	gid := currentGoroutineID()
+
+	v.frameStacksMu.RLock()
+	defer v.frameStacksMu.RUnlock()
+
+	stack, ok := v.frameStacks[gid]
+	if !ok || stack == nil {
+		return nil
+	}
+	frame, _ := stack.Peek().(*Frame)
+	return frame
 }
 
 func (v *VirtualMachine) GetConfig() *VirtualMachineConfig {

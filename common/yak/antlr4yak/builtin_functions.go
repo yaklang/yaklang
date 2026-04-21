@@ -18,7 +18,10 @@ import (
 // ```
 func (e *Engine) YakBuiltinEval(code string) {
 	vm := e.vm
-	topFrame := vm.VMStack.Peek().(*yakvm.Frame)
+	topFrame := vm.CurrentFM()
+	if topFrame == nil {
+		panic("current frame is empty")
+	}
 	ctx := topFrame.GetContext()
 	if utils.IsNil(ctx) {
 		ctx = context.Background()
