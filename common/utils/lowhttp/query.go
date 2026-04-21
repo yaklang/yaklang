@@ -255,13 +255,17 @@ func (q *QueryParams) Set(key, val string, forceNoEncode ...bool) {
 		noAutoEncode = forceNoEncode[0]
 	}
 
+	found := false
 	for i := 0; i < len(q.Items); i++ {
 		if q.Items[i].Key == key && q.Items[i].Position == q.Position {
 			q.Items[i].Value = val
 			q.Items[i].NoAutoEncode = noAutoEncode
 			q.Items[i].Position = q.Position
-			return
+			found = true
 		}
+	}
+	if found {
+		return
 	}
 	q.Items = append(q.Items,
 		&QueryParamItem{
