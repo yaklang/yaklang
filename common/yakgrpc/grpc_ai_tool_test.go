@@ -1103,3 +1103,55 @@ func TestGRPCMUSTPASS_UpdateAIToolWithZeroField(t *testing.T) {
 	require.NotNil(t, tool)
 	require.Equal(t, "", tool.Tools[0].Content)
 }
+
+func TestGRPCMUSTPASS_AITool_AuthorAndTimeFields(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	toolName := uuid.New().String()
+	author := "alice"
+
+	createResp, err := client.SaveAIToolV2(ctx, &ypb.SaveAIToolRequest{
+		Name:    toolName,
+		Content: "cli.String('test')",
+		Author:  author,
+	})
+	require.NoError(t, err)
+	require.True(t, createResp.GetIsSuccess())
+	require.Equal(t, author, createResp.GetAITool().GetAuthor())
+	require.Greater(t, createResp.GetAITool().GetCreatedAt(), int64(0))
+	require.Greater(t, createResp.GetAITool().GetUpdatedAt(), int64(0))
+	defer func() {
+		_, err = client.DeleteAITool(ctx, &ypb.DeleteAIToolRequest{
+			ToolNames: []string{toolName},
+		})
+		require.NoError(t, err)
+	}()
+
+	listResp, err := client.GetAIToolList(ctx, &ypb.GetAIToolListRequest{
+		ToolName: toolName,
+	})
+	require.NoError(t, err)
+	require.Len(t, listResp.GetTools(), 1)
+	require.Equal(t, author, listResp.GetTools()[0].GetAuthor())
+	require.Greater(t, listResp.GetTools()[0].GetCreatedAt(), int64(0))
+	require.Greater(t, listResp.GetTools()[0].GetUpdatedAt(), int64(0))
+
+	_, err = client.UpdateAITool(ctx, &ypb.UpdateAIToolRequest{
+		ID:      createResp.GetAITool().GetID(),
+		Name:    toolName,
+		Content: "cli.String('updated')",
+	})
+	require.NoError(t, err)
+
+	updatedResp, err := client.GetAIToolList(ctx, &ypb.GetAIToolListRequest{
+		ToolName: toolName,
+	})
+	require.NoError(t, err)
+	require.Len(t, updatedResp.GetTools(), 1)
+	require.Equal(t, author, updatedResp.GetTools()[0].GetAuthor())
+	require.Equal(t, listResp.GetTools()[0].GetCreatedAt(), updatedResp.GetTools()[0].GetCreatedAt())
+	require.GreaterOrEqual(t, updatedResp.GetTools()[0].GetUpdatedAt(), listResp.GetTools()[0].GetUpdatedAt())
+}

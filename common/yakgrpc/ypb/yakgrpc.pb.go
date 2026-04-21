@@ -7195,6 +7195,7 @@ type SaveAIToolRequest struct {
 	Content       string                 `protobuf:"bytes,3,opt,name=Content,proto3" json:"Content,omitempty"`
 	ToolPath      string                 `protobuf:"bytes,4,opt,name=ToolPath,proto3" json:"ToolPath,omitempty"`
 	Keywords      []string               `protobuf:"bytes,5,rep,name=Keywords,proto3" json:"Keywords,omitempty"`
+	Author        string                 `protobuf:"bytes,6,opt,name=Author,proto3" json:"Author,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -7262,6 +7263,13 @@ func (x *SaveAIToolRequest) GetKeywords() []string {
 		return x.Keywords
 	}
 	return nil
+}
+
+func (x *SaveAIToolRequest) GetAuthor() string {
+	if x != nil {
+		return x.Author
+	}
+	return ""
 }
 
 type SaveAIToolV2Response struct {
@@ -7574,6 +7582,9 @@ type AITool struct {
 	IsFavorite    bool                   `protobuf:"varint,6,opt,name=IsFavorite,proto3" json:"IsFavorite,omitempty"`
 	ID            int64                  `protobuf:"varint,7,opt,name=ID,proto3" json:"ID,omitempty"`
 	VerboseName   string                 `protobuf:"bytes,8,opt,name=VerboseName,proto3" json:"VerboseName,omitempty"` // 给用户看的展示名称
+	Author        string                 `protobuf:"bytes,9,opt,name=Author,proto3" json:"Author,omitempty"`
+	CreatedAt     int64                  `protobuf:"varint,10,opt,name=CreatedAt,proto3" json:"CreatedAt,omitempty"`
+	UpdatedAt     int64                  `protobuf:"varint,11,opt,name=UpdatedAt,proto3" json:"UpdatedAt,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -7662,6 +7673,27 @@ func (x *AITool) GetVerboseName() string {
 		return x.VerboseName
 	}
 	return ""
+}
+
+func (x *AITool) GetAuthor() string {
+	if x != nil {
+		return x.Author
+	}
+	return ""
+}
+
+func (x *AITool) GetCreatedAt() int64 {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return 0
+}
+
+func (x *AITool) GetUpdatedAt() int64 {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return 0
 }
 
 type GetAIToolListResponse struct {
@@ -68878,13 +68910,14 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x1eAIToolGenerateMetadataResponse\x12\x12\n" +
 	"\x04Name\x18\x01 \x01(\tR\x04Name\x12 \n" +
 	"\vDescription\x18\x02 \x01(\tR\vDescription\x12\x1a\n" +
-	"\bKeywords\x18\x03 \x03(\tR\bKeywords\"\x9b\x01\n" +
+	"\bKeywords\x18\x03 \x03(\tR\bKeywords\"\xb3\x01\n" +
 	"\x11SaveAIToolRequest\x12\x12\n" +
 	"\x04Name\x18\x01 \x01(\tR\x04Name\x12 \n" +
 	"\vDescription\x18\x02 \x01(\tR\vDescription\x12\x18\n" +
 	"\aContent\x18\x03 \x01(\tR\aContent\x12\x1a\n" +
 	"\bToolPath\x18\x04 \x01(\tR\bToolPath\x12\x1a\n" +
-	"\bKeywords\x18\x05 \x03(\tR\bKeywords\"s\n" +
+	"\bKeywords\x18\x05 \x03(\tR\bKeywords\x12\x16\n" +
+	"\x06Author\x18\x06 \x01(\tR\x06Author\"s\n" +
 	"\x14SaveAIToolV2Response\x12\x1c\n" +
 	"\tIsSuccess\x18\x01 \x01(\bR\tIsSuccess\x12\x18\n" +
 	"\aMessage\x18\x02 \x01(\tR\aMessage\x12#\n" +
@@ -68906,7 +68939,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\n" +
 	"IsFavorite\x18\x01 \x01(\bR\n" +
 	"IsFavorite\x12\x18\n" +
-	"\aMessage\x18\x02 \x01(\tR\aMessage\"\xe2\x01\n" +
+	"\aMessage\x18\x02 \x01(\tR\aMessage\"\xb6\x02\n" +
 	"\x06AITool\x12\x12\n" +
 	"\x04Name\x18\x01 \x01(\tR\x04Name\x12 \n" +
 	"\vDescription\x18\x02 \x01(\tR\vDescription\x12\x18\n" +
@@ -68917,7 +68950,11 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"IsFavorite\x18\x06 \x01(\bR\n" +
 	"IsFavorite\x12\x0e\n" +
 	"\x02ID\x18\a \x01(\x03R\x02ID\x12 \n" +
-	"\vVerboseName\x18\b \x01(\tR\vVerboseName\"}\n" +
+	"\vVerboseName\x18\b \x01(\tR\vVerboseName\x12\x16\n" +
+	"\x06Author\x18\t \x01(\tR\x06Author\x12\x1c\n" +
+	"\tCreatedAt\x18\n" +
+	" \x01(\x03R\tCreatedAt\x12\x1c\n" +
+	"\tUpdatedAt\x18\v \x01(\x03R\tUpdatedAt\"}\n" +
 	"\x15GetAIToolListResponse\x12!\n" +
 	"\x05Tools\x18\x01 \x03(\v2\v.ypb.AIToolR\x05Tools\x12+\n" +
 	"\n" +
