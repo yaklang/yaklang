@@ -155,17 +155,11 @@ Host: example.com
 	if len(req.GetPath()) > 0 {
 		freq = freq.FuzzPath(req.GetPath()...)
 	}
-	for _, p := range req.GetGetParams() {
-		freq = freq.FuzzGetParams(p.GetKey(), p.GetValue())
-	}
 	for _, p := range req.GetCookie() {
 		freq = freq.FuzzCookie(p.GetKey(), p.GetValue())
 	}
 	for _, p := range req.GetHeaders() {
 		freq = freq.FuzzHTTPHeader(p.GetKey(), p.GetValue())
-	}
-	for _, p := range req.GetPostParams() {
-		freq = freq.FuzzPostParams(p.GetKey(), p.GetValue())
 	}
 	for _, p := range req.GetMultipartParams() {
 		freq = freq.FuzzUploadKVPair(p.GetKey(), p.GetValue())
@@ -186,6 +180,12 @@ Host: example.com
 			if raw == nil || len(raw) <= 0 {
 				continue
 			}
+			if len(req.GetGetParams()) > 0 {
+				raw = appendQueryParamsToPacket(raw, req.GetGetParams())
+			}
+			if len(req.GetPostParams()) > 0 && len(req.GetBody()) == 0 && len(req.GetMultipartParams()) == 0 && len(req.GetMultipartFileParams()) == 0 {
+				raw = appendPostParamsToPacket(raw, req.GetPostParams())
+			}
 			raw = bytes.ReplaceAll(raw, []byte(tempTag), []byte("{{Hostname}}"))
 
 			results = append(results, &ypb.HTTPRequestBuilderResult{
@@ -193,7 +193,11 @@ Host: example.com
 				HTTPRequest: raw,
 			})
 
-			paths = append(paths, "{{BaseURL}}"+r.RequestURI)
+			requestURI := r.RequestURI
+			if urlIns, err := lowhttp.ExtractURLFromHTTPRequestRaw(raw, isHttps); err == nil && urlIns != nil {
+				requestURI = urlIns.RequestURI()
+			}
+			paths = append(paths, "{{BaseURL}}"+requestURI)
 			if method == "" {
 				method = r.Method
 			}
@@ -241,6 +245,42 @@ Host: example.com
 	encoder.Close()
 	templates := utils.EscapeInvalidUTF8Byte(buf.Bytes())
 	return &ypb.HTTPRequestBuilderResponse{Templates: templates, Results: results}, nil
+}
+
+func appendQueryParamsToPacket(packet []byte, params []*ypb.KVPair) []byte {
+	if len(packet) == 0 || len(params) == 0 {
+		return packet
+	}
+
+	_, requestURI, _ := lowhttp.GetHTTPPacketFirstLine(packet)
+	if requestURI == "" {
+		return packet
+	}
+
+	urlIns := lowhttp.ForceStringToUrl(requestURI)
+	queryParams := lowhttp.ParseQueryParams(urlIns.RawQuery)
+	for _, item := range params {
+		queryParams.Add(item.GetKey(), item.GetValue())
+	}
+	return lowhttp.ReplaceHTTPPacketQueryParamRaw(packet, queryParams.Encode())
+}
+
+func appendPostParamsToPacket(packet []byte, params []*ypb.KVPair) []byte {
+	if len(packet) == 0 || len(params) == 0 {
+		return packet
+	}
+
+	headers, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(packet)
+	postParams := lowhttp.ParseQueryParams(string(body))
+	for _, item := range params {
+		postParams.Add(item.GetKey(), item.GetValue())
+	}
+
+	packet = lowhttp.ReplaceHTTPPacketBody([]byte(headers), []byte(postParams.Encode()), false)
+	if lowhttp.GetHTTPPacketHeader(packet, "Content-Type") == "" {
+		packet = lowhttp.ReplaceHTTPPacketHeader(packet, "Content-Type", "application/x-www-form-urlencoded")
+	}
+	return packet
 }
 
 func (s *Server) PluginListGenerator(plugin *ypb.HybridScanPluginConfig, ctx context.Context) (res []string) {
