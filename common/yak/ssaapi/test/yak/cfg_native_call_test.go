@@ -581,6 +581,24 @@ $traceCfg<cfgReachable(target: "$sinkCfg")> as $reach
 			WantVarContains: map[string][]string{"reach": {"true"}},
 		})
 	})
+	t.Run("cfgReachable_implicit_getCfg_on_chain_and_target", func(t *testing.T) {
+		// 语法糖：链上与 target 均可为 SSA value，无需显式 <getCfg>；target 支持 target: $sym（与 target: "$sym" 等价帧解析）。
+		runSyntaxFlowExpect(t, `
+func dangerous(v) {
+	println(v)
+}
+
+x = 1
+println("trace")
+dangerous(x)
+`, `
+println(*?{have: "trace"} #-> as $traceArg)
+dangerous(* #-> as $sinkArg)
+$traceArg<cfgReachable(target: $sinkArg)> as $reach
+`, sfExpect{
+			WantVarContains: map[string][]string{"reach": {"true"}},
+		})
+	})
 	t.Run("filter_drop_when_branch_returns_before_dangerous", func(t *testing.T) {
 		// then 分支 println 后直接 return，无 CFG 路径到 dangerous；else 分支可达 dangerous。
 		runSyntaxFlowExpect(t, `
