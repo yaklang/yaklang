@@ -74,6 +74,32 @@ func yakScriptUsage(script *schema.YakScript, fallback string) string {
 	return fallback
 }
 
+const yakScriptCoreToolVerboseName = "Core Tool / 核心工具 / High Priority"
+
+func yakScriptToolVerboseName(script *schema.YakScript) string {
+	if script != nil && script.IsCorePlugin {
+		return yakScriptCoreToolVerboseName
+	}
+	return ""
+}
+
+func yakScriptToolDescription(script *schema.YakScript, pluginType string, desc string) string {
+	tags := []string{fmt.Sprintf("Yakit %s Plugin", pluginType)}
+	if script != nil && script.IsCorePlugin {
+		tags = append(tags, "Core Tool", "High Priority")
+	}
+
+	result := fmt.Sprintf("[%s]", strings.Join(tags, "]["))
+	desc = strings.TrimSpace(desc)
+	if desc != "" {
+		result += " " + desc
+	}
+	if script != nil && script.IsCorePlugin {
+		result += " This is a core tool with very high invocation priority. Prefer calling it first when it matches the task."
+	}
+	return result
+}
+
 // convertNativeYakPluginToAITool converts a native yak plugin to an AI tool.
 // It uses SSA to parse cli.* parameters from the script content and extracts
 // metadata (__DESC__, __KEYWORDS__, __USAGE__) for AI tool configuration.
@@ -116,11 +142,12 @@ func convertNativeYakPluginToAITool(script *schema.YakScript) (*aitool.Tool, err
 		usage = script.AIUsage
 	}
 
-	mcpTool.Description = fmt.Sprintf("[Yakit Native Plugin] %s", desc)
+	mcpTool.Description = yakScriptToolDescription(script, "Native", desc)
 
 	tool, err := aitool.NewFromMCPTool(
 		mcpTool,
 		aitool.WithKeywords(keywords),
+		aitool.WithVerboseName(yakScriptToolVerboseName(script)),
 		aitool.WithUsage(usage),
 		aitool.WithCallback(func(ctx context.Context, params aitool.InvokeParams, runtimeConfig *aitool.ToolRuntimeConfig, stdout io.Writer, stderr io.Writer) (any, error) {
 			return executeNativeYakPlugin(ctx, script, params, runtimeConfig, stdout, stderr)
@@ -296,8 +323,9 @@ func convertMitmPluginToAITool(script *schema.YakScript) (*aitool.Tool, error) {
 
 	tool, err := aitool.New(
 		script.ScriptName,
-		aitool.WithDescription(fmt.Sprintf("[Yakit MITM Plugin] %s", desc)),
+		aitool.WithDescription(yakScriptToolDescription(script, "MITM", desc)),
 		aitool.WithKeywords(keywords),
+		aitool.WithVerboseName(yakScriptToolVerboseName(script)),
 		aitool.WithUsage(usage),
 		aitool.WithStringParam("url",
 			aitool.WithParam_Description("Target URL. If requestPacket is empty, a GET request will be generated from this URL."),
@@ -506,8 +534,9 @@ func convertPortScanPluginToAITool(script *schema.YakScript) (*aitool.Tool, erro
 
 	tool, err := aitool.New(
 		script.ScriptName,
-		aitool.WithDescription(fmt.Sprintf("[Yakit Port-Scan Plugin] %s", desc)),
+		aitool.WithDescription(yakScriptToolDescription(script, "Port-Scan", desc)),
 		aitool.WithKeywords(keywords),
+		aitool.WithVerboseName(yakScriptToolVerboseName(script)),
 		aitool.WithUsage(usage),
 		aitool.WithStringParam("target",
 			aitool.WithParam_Description("Target host IP or domain."),

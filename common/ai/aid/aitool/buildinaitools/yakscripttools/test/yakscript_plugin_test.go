@@ -191,6 +191,25 @@ func TestConvertYakScriptPlugin_NativeYakType(t *testing.T) {
 	assert.Check(t, strings.Contains(tool.Description, "Native Plugin"), "description should indicate native type")
 }
 
+func TestConvertYakScriptPlugin_CorePluginAddsPriorityHints(t *testing.T) {
+	script := &schema.YakScript{
+		ScriptName:   "test-core-native-convert",
+		Type:         "yak",
+		Content:      `log.info("hello from core native plugin")`,
+		Help:         "Test core native Yak plugin",
+		AIDesc:       "Core native plugin for AI",
+		IsCorePlugin: true,
+	}
+
+	tool, err := yakscripttools.ConvertYakScriptPlugin(script)
+	assert.NilError(t, err)
+	assert.Check(t, tool != nil, "converted tool should not be nil")
+	assert.Equal(t, tool.VerboseName, "Core Tool / 核心工具 / High Priority")
+	assert.Check(t, strings.Contains(tool.Description, "Core Tool"), "description should indicate core tool")
+	assert.Check(t, strings.Contains(tool.Description, "High Priority"), "description should indicate high priority")
+	assert.Check(t, strings.Contains(tool.Description, "Prefer calling it first"), "description should explain priority behavior")
+}
+
 func TestConvertYakScriptPlugin_UnsupportedType(t *testing.T) {
 	script := &schema.YakScript{
 		ScriptName: "test-codec-convert",
