@@ -1,6 +1,7 @@
 package reactinit
 
 import (
+	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_ai_skill_audit"
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_code_security_audit"
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_default"
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_dir_explore"

@@ -1,0 +1,77 @@
+## 输出示例
+
+以下是合法的 JSON action 输出示例：
+
+### 读取 SKILL.md
+```json
+{
+  "@action": "read_file",
+  "human_readable_thought": "首先读取 SKILL.md 了解此 Skill 的声明功能",
+  "file": "/path/to/skill/SKILL.md"
+}
+```
+
+### 获取目录结构
+```json
+{
+  "@action": "tree",
+  "human_readable_thought": "枚举 Skill 目录下所有文件，识别可执行脚本",
+  "path": "/path/to/skill"
+}
+```
+
+### Grep 扫描网络相关代码
+```json
+{
+  "@action": "grep",
+  "human_readable_thought": "扫描 Category A — 检测网络连接和数据外传模式",
+  "pattern": "socket\\.connect|SOCK_STREAM|requests\\.(get|post)",
+  "path": "/path/to/skill",
+  "recursive": true
+}
+```
+
+### 读取可疑脚本
+```json
+{
+  "@action": "read_file",
+  "human_readable_thought": "grep 命中 scripts/helper.py，需要读取全文进行数据流追踪",
+  "file": "/path/to/skill/scripts/helper.py"
+}
+```
+
+### 写出审计笔记
+```json
+{
+  "@action": "write_file",
+  "human_readable_thought": "将审计过程和发现记录到审计工作目录",
+  "file": "/path/to/audit_workdir/skill_audit_notes.md",
+  "content": "# 审计笔记\n\n## 文件列表\n- SKILL.md\n- scripts/main.py\n\n## 扫描结果\n\n..."
+}
+```
+
+### 完成审计（无发现）
+```json
+{
+  "@action": "complete_skill_audit",
+  "human_readable_thought": "所有六个类别均已扫描完毕，未发现 Medium 及以上级别的安全问题",
+  "skill_name": "my-skill",
+  "risk_level": "Clean",
+  "alignment_table": "| 检查项 | 状态 | 简述 |\n|:---|:---|:---|\n| 恶意行为 | Pass | 未检测到恶意行为特征 |\n| 隐形行为 | Pass | 代码逻辑与 SKILL.md 声明完全一致 |\n| 功能意图 | Pass | 实现与描述相符 |",
+  "findings_summary": "扫描了 3 个脚本文件，覆盖 6 个检测类别，未发现 Medium 及以上安全问题。",
+  "findings_xml": ""
+}
+```
+
+### 完成审计（发现 Critical 漏洞）
+```json
+{
+  "@action": "complete_skill_audit",
+  "human_readable_thought": "发现反弹 Shell 代码，风险等级 Critical，立即上报",
+  "skill_name": "malicious-skill",
+  "risk_level": "Critical",
+  "alignment_table": "| 检查项 | 状态 | 简述 |\n|:---|:---|:---|\n| 恶意行为 | Critical | scripts/helper.py 中存在反弹 Shell 代码 |\n| 隐形行为 | Critical | SKILL.md 未声明网络连接行为 |\n| 功能意图 | Critical | 声明为'生成 commit message'，实际建立反向 Shell 连接 |",
+  "findings_summary": "在 scripts/helper.py 第 15-22 行发现反弹 Shell 代码，向 attacker.com:4444 建立反向连接。此行为与 SKILL.md 声明的功能完全不符。",
+  "findings_xml": "<vuln>\n  <title>Reverse Shell — scripts/helper.py</title>\n  <desc>\n## 漏洞详情\n\n**文件位置**: `scripts/helper.py`，第 15–22 行\n**风险类型**: Reverse Shell\n**风险等级**: Critical\n\n### 技术分析\n...\n  </desc>\n  <risk_type>Reverse Shell</risk_type>\n  <level>Critical</level>\n  <suggestion>\n## 修复建议\n删除 scripts/helper.py 中的 socket/os.dup2 相关代码。\n  </suggestion>\n</vuln>"
+}
+```
