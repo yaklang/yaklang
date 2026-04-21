@@ -1,10 +1,14 @@
-__DESC__ = "按一行项目标识对齐最新 SyntaxFlow 扫描任务，向会话推送任务表并尽量推送 SSA 报告 Markdown（ssa_scan_report）与工作区钉选；供 AI 做误报分诊与 PoC 价值提示；不自动生成 PoC。"
+__DESC__ = "按一行项目标识对齐最新 SyntaxFlow 扫描任务，推送任务表与 SSA 报告；AI 写入 risk_triage.v1.json 标出需复核的 risk；供误报分诊与 PoC 价值提示；不自动生成 PoC。"
 __VERBOSE_NAME__ = "按项目的扫描风险分析"
 __KEYWORDS__ = "SyntaxFlow,SSA,扫描,误报,风险分析,扫描报告,项目扫描"
 
 query = cli.String("query", cli.setVerboseName("项目标识"), cli.setRequired(true), cli.setHelp("一行程序/仓库名称或 slug。多行或包装文本由蓝图解析为首行有效片段；路径通常取末级名参与匹配"))
 additional_context = cli.String("additional_context", cli.setVerboseName("附加说明"), cli.setRequired(false), cli.setHelp("可选说明；附在协调器 payload 末尾；勿与 slug 混写在一行"))
 cli.check()
+
+// 与 persistent/init 中 risk_triage.v1.json 约定一致。
+scanRiskArtifactSubdir = "scan_risk_analysis_project"
+scanRiskTriageFileName = "risk_triage.v1.json"
 
 // AI 协调器指引（与 init/persistent/plan 文案一致；改此处时请同步这些 txt）。
 scanRiskAIFormatGuide = `<<<AI_报告与误报分析指引>>>
@@ -15,7 +19,7 @@ scanRiskAIFormatGuide = `<<<AI_报告与误报分析指引>>>
 - report：SyntaxFlow Project Scan Check 任务表（完整 Markdown）。
 - ssa_scan_report：SSA 扫描报告（完整 Markdown，若本次成功生成则会话内可见）。
 - 同次生成成功时，SSA Markdown 还会落到当前会话工作区 **scan_risk_analysis_project/** 并钉选（与 task_* 目录同级，便于在文件树打开）。
-- 协调器：<<<SyntaxFlow_Project_Scan_Check_Report_Excerpt>>> 任务表摘录；<<<SSA_Scan_Report_Excerpt>>> SSA 摘录（若有）；<<<User_Additional_Context>>> 用户附加说明。
+- 协调器：<<<SyntaxFlow_Project_Scan_Check_Report_Excerpt>>> 任务表摘录；<<<SSA_Scan_Report_Excerpt>>> SSA 摘录（若有）；<<<User_Additional_Context>>> 用户附加说明；<<<Risk_Triage_JSON_Instructions>>>（**write_file** 写入 triage 的绝对路径与 Schema）。
 - 摘要行：program_hint、latest_task_id、ssa_report_r_id（报告列表中的整数编号，不是扫描任务 UUID）、scan_only、limit。
 
 任务表
@@ -27,7 +31,7 @@ SSA 与误报
 
 事实与边界
 - 以本会话流式内容、协调器块与工作区文件为准；禁止虚构接口、禁止编造 scan_id；matched rows=0 时不得臆造任务或报告。
-- 勿为表格列 risk_id 批量调用 ssa-risk 或编造 id；单条深钻再按需 ssa-risk/ssapoc。
+- **triage**：用 **write_file** 写入 risk_triage.v1.json；**不要**为整张表无差别批量调用 ssa-risk；triage 列出的 risk 或单条深挖再用 **ssa-risk（get_full_code=true）** / **ssa-read-file**（见 persistent）。
 
 输出
 - 误报结论尽量覆盖各分组；用户可见侧重误报与 PoC 价值（本蓝图不自动生成 PoC）。
@@ -35,6 +39,23 @@ SSA 与误报
 动作分层（与 persistent.txt 一致）
 - 主 ReAct Init 后首轮：@action 字面量 scan_risk_analysis（仅此场景）。
 - 计划子任务（1-1/1-2…）：每轮须可解析 JSON；@action 为当轮提示中的合法值，禁止 scan_risk_analysis；禁止无 JSON 的纯「新发现/总结/#summary」。收尾 directly_answer：第 1 行 JSON 无 answer_payload，同轮 FINAL_ANSWER 承载全文。`
+
+forgeRiskTriageInstructionBlock = func(triageAbsPath) {
+    return sprintf(`<<<Risk_Triage_JSON_Instructions>>>
+
+你必须在输出最终误报结论之前，使用 **write_file** 工具写入以下绝对路径（**文件正文仅为 JSON**，UTF-8、无 BOM、不要用 Markdown 代码围栏包裹整文件）：
+
+**绝对路径**：%s
+
+**Schema（schema_version 固定为 1）**：
+{"schema_version":1,"program_hint":"与摘要行一致","latest_task_id":"与摘要行一致","items":[{"risk_id":123,"priority":"high","reason_zh":"中文说明","evidence_from_report":"可选"}]}
+
+规则：
+- items[].risk_id 必须来自 SSA 报告或任务表中的真实列；无可疑项时 "items": []。
+- priority 建议：high / medium / low。
+- 需要更多源码上下文时，对 triage 中的 risk_id 使用 **ssa-risk**（`get_full_code=true`）或 **ssa-read-file**；不要为整张表批量调用。
+`, triageAbsPath)
+}
 
 scanRiskSSAExportHint = `<<<SSA_报告说明>>>
 
@@ -263,6 +284,15 @@ forgeHandle = func(params, opts...) {
     if extra != "" {
         coordinatorPayload = coordinatorPayload + "\n\n<<<User_Additional_Context>>>\n" + extra
     }
+
+    workRoot = aidConfig.GetOrCreateWorkDir()
+    artDir = file.Join(str.TrimSpace(workRoot), scanRiskArtifactSubdir)
+    mkdirPre = file.MkdirAll(artDir)
+    if mkdirPre != nil {
+        log.Warn("[scan_risk_analysis_project] MkdirAll artifact (pre-coordinator): %v", mkdirPre)
+    }
+    triageAbsPath = file.Join(artDir, scanRiskTriageFileName)
+    coordinatorPayload = coordinatorPayload + "\n\n" + forgeRiskTriageInstructionBlock(triageAbsPath)
 
     for p in mergedParams {
         if p != nil && p.Key == "query" {
