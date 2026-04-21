@@ -729,7 +729,6 @@ func WithTieredAICallback() ConfigOption {
 	}
 }
 
-// WithInheritTieredAICallback inherits tiered AI callbacks from a parent config if tiered config is enable
 // WithInheritTieredAICallback inherits tiered AI callbacks from a parent config if tiered config is enabled
 // This is used for child invokers to inherit the same tiered callbacks as the parent coordinator, ensuring consistent AI behavior across the call hierarchy.
 // If tiered config is not enabled, it falls back to inheriting the original callback for both priorities.
