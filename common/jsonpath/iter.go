@@ -6,6 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strconv"
+	"strings"
+	"text/scanner"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -14,6 +17,23 @@ import (
 type iterKey struct {
 	Key      string
 	JsonPath string
+}
+
+func isSimpleObjectKey(key string) bool {
+	var s scanner.Scanner
+	s.Init(strings.NewReader(key))
+	s.Mode = scanner.ScanIdents
+	if s.Scan() != scanner.Ident {
+		return false
+	}
+	return s.Scan() == scanner.EOF
+}
+
+func buildObjectJSONPath(prefix, key string) string {
+	if isSimpleObjectKey(key) {
+		return prefix + key
+	}
+	return strings.TrimSuffix(prefix, ".") + "[" + strconv.Quote(key) + "]"
 }
 
 func iterKeys(l *list.List, raw any, prefix string) *list.List {
@@ -33,16 +53,18 @@ func iterKeys(l *list.List, raw any, prefix string) *list.List {
 	switch refType.Kind() {
 	case reflect.Map:
 		for k, v := range utils.InterfaceToMapInterface(raw) {
-			l.PushBack(&iterKey{Key: utils.InterfaceToString(k), JsonPath: prefix + k})
+			key := utils.InterfaceToString(k)
+			keyPath := buildObjectJSONPath(prefix, key)
+			l.PushBack(&iterKey{Key: key, JsonPath: keyPath})
 			fixedVal, err := utils.InterfaceToMapInterfaceE(v)
 			if err == nil {
-				iterKeys(l, fixedVal, prefix+k+".")
+				iterKeys(l, fixedVal, keyPath+".")
 				continue
 			}
 
 			if raw, err := utils.InterfaceToSliceInterfaceE(v); err == nil {
 				for index, val := range raw {
-					jp := prefix + fmt.Sprintf("%v[%v]", k, index)
+					jp := fmt.Sprintf("%s[%v]", keyPath, index)
 					l.PushBack(&iterKey{JsonPath: jp})
 					iterKeys(l, val, jp+".")
 				}
