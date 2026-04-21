@@ -18,6 +18,9 @@ func TestQueryParams1(t *testing.T) {
 	params.Add("c", "4")
 	test.Equal("a=22&b=2&c=3&c=4", params.Encode())
 
+	params.Set("c", "6")
+	test.Equal("a=22&b=2&c=6&c=6", params.Encode())
+
 	params.Del("c")
 	test.Equal("a=22&b=2", params.Encode())
 

@@ -1534,6 +1534,16 @@ Host: www.baidu.com
 Host: www.baidu.com
 `,
 		},
+		{
+			origin: `GET /user/id-b64-json?c=index&c=index2 HTTP/1.1
+Host: 127.0.0.1:8787
+`,
+			key:   "c",
+			value: "value",
+			expected: `GET /user/id-b64-json?c=value&c=value HTTP/1.1
+Host: 127.0.0.1:8787
+`,
+		},
 	}
 	for _, testcase := range testcases {
 		actual := ReplaceHTTPPacketQueryParam([]byte(testcase.origin), testcase.key, testcase.value)
@@ -1559,6 +1569,16 @@ Host: www.baidu.com
 			value: "%26",
 			expected: `GET /?a=%26&b=2 HTTP/1.1
 Host: www.baidu.com
+`,
+		},
+		{
+			origin: `GET /user/id-b64-json?c=index&c=index2 HTTP/1.1
+Host: 127.0.0.1:8787
+`,
+			key:   "c",
+			value: "%26",
+			expected: `GET /user/id-b64-json?c=%26&c=%26 HTTP/1.1
+Host: 127.0.0.1:8787
 `,
 		},
 	}
