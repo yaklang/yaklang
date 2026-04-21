@@ -1767,6 +1767,17 @@ a=1&b=2%3D`,
 			whitelists: []string{"\r\n\r\na=3%3D&b=2", "Content-Type: application/x-www-form-urlencoded"},
 			blacklists: []string{"a=1", "%25"},
 		},
+		{
+			origin: `POST /submit HTTP/1.1
+Host: 127.0.0.1:8787
+Content-Type: application/x-www-form-urlencoded
+
+c=index&c=index2`,
+			key:        "c",
+			value:      "value",
+			whitelists: []string{"\r\n\r\nc=value&c=value", "Content-Type: application/x-www-form-urlencoded"},
+			blacklists: []string{"c=index", "c=index2"},
+		},
 	}
 	for _, testcase := range testcases {
 
