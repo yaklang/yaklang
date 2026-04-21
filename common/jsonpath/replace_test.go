@@ -3,6 +3,7 @@ package jsonpath
 import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/utils"
+	"reflect"
 	"sort"
 	"strings"
 	"testing"
@@ -172,5 +173,23 @@ func TestReplace3List(t *testing.T) {
 		}
 		spew.Dump(result)
 		spew.Dump("h1", hash1, "h2", hash2)
+	}
+}
+
+func TestReplaceSpecialKey(t *testing.T) {
+	raw := `{"Api-Key":"v1","nested":{"X-Auth":"v2"},"list":[{"Set-Cookie":"v3"}]}`
+	result := RecursiveDeepReplaceString(raw, "112")
+	sort.Strings(result)
+	expected := []string{
+		`{"Api-Key":"112","list":[{"Set-Cookie":"v3"}],"nested":{"X-Auth":"v2"}}`,
+		`{"Api-Key":"v1","list":"112","nested":{"X-Auth":"v2"}}`,
+		`{"Api-Key":"v1","list":["112"],"nested":{"X-Auth":"v2"}}`,
+		`{"Api-Key":"v1","list":[{"Set-Cookie":"112"}],"nested":{"X-Auth":"v2"}}`,
+		`{"Api-Key":"v1","list":[{"Set-Cookie":"v3"}],"nested":"112"}`,
+		`{"Api-Key":"v1","list":[{"Set-Cookie":"v3"}],"nested":{"X-Auth":"112"}}`,
+	}
+	sort.Strings(expected)
+	if !reflect.DeepEqual(result, expected) {
+		t.Fatalf("unexpected replace results\nexpected: %#v\nactual: %#v", expected, result)
 	}
 }
