@@ -74,8 +74,10 @@ func TestRawCandidateHits_DedupAndStripQuotes(t *testing.T) {
 	}
 }
 
-func TestRunAIJSExtract_FastPathBelowSkipThreshold(t *testing.T) {
-	// AI must NOT be called when the candidate stream is smaller than SkipBelowBytes.
+func TestRunAIJSExtract_RawFallbackWhenDirectFeedDisabled(t *testing.T) {
+	// When the direct-feed fast path is disabled (SmallInputBytes=0) and the
+	// candidate stream is smaller than SkipBelowBytes, AI must NOT be called
+	// and raw regex hits are emitted directly.
 	originalFn := invokeLiteForgeForPathsFunc
 	defer func() { invokeLiteForgeForPathsFunc = originalFn }()
 
@@ -85,7 +87,11 @@ func TestRunAIJSExtract_FastPathBelowSkipThreshold(t *testing.T) {
 		return nil
 	}
 
-	cfg := NewAIJSExtractConfig(WithAIJS_SkipBelowBytes(1 << 20)) // huge threshold => always fast path
+	cfg := NewAIJSExtractConfig(
+		WithAIJS_SmallInputBytes(0),       // disable direct-feed
+		WithAIJS_SmallInputTokens(0),      // (both must be disabled together)
+		WithAIJS_SkipBelowBytes(1<<20),    // huge => always under threshold
+	)
 	var got []string
 	var mu sync.Mutex
 	err := RunAIJSExtract(context.Background(),
@@ -98,7 +104,7 @@ func TestRunAIJSExtract_FastPathBelowSkipThreshold(t *testing.T) {
 		},
 	)
 	assert.NoError(t, err)
-	assert.Equal(t, int32(0), atomic.LoadInt32(&aiCalls), "AI should not be called on fast path")
+	assert.Equal(t, int32(0), atomic.LoadInt32(&aiCalls), "AI should not be called on raw-fallback path")
 
 	mu.Lock()
 	defer mu.Unlock()
@@ -107,7 +113,9 @@ func TestRunAIJSExtract_FastPathBelowSkipThreshold(t *testing.T) {
 	assert.Contains(t, joined, "/api/v2/users")
 }
 
-func TestRunAIJSExtract_NoCandidatesNoCall(t *testing.T) {
+func TestRunAIJSExtract_NoCandidatesNoCallOnReducerPath(t *testing.T) {
+	// On the reducer path (direct-feed disabled), an input with no regex
+	// candidates must not reach the AI step at all.
 	originalFn := invokeLiteForgeForPathsFunc
 	defer func() { invokeLiteForgeForPathsFunc = originalFn }()
 
@@ -117,7 +125,26 @@ func TestRunAIJSExtract_NoCandidatesNoCall(t *testing.T) {
 		return nil
 	}
 
-	err := RunAIJSExtract(context.Background(), "no urls here at all just plain prose", nil, func(p string) {})
+	cfg := NewAIJSExtractConfig(
+		WithAIJS_SmallInputBytes(0),
+		WithAIJS_SmallInputTokens(0),
+	)
+	err := RunAIJSExtract(context.Background(), "no urls here at all just plain prose", cfg, func(p string) {})
+	assert.NoError(t, err)
+	assert.Equal(t, int32(0), atomic.LoadInt32(&aiCalls))
+}
+
+func TestRunAIJSExtract_EmptyInputNoCall(t *testing.T) {
+	// Empty input must never reach the AI, even on the direct-feed path.
+	originalFn := invokeLiteForgeForPathsFunc
+	defer func() { invokeLiteForgeForPathsFunc = originalFn }()
+
+	var aiCalls int32
+	invokeLiteForgeForPathsFunc = func(ctx context.Context, cfg *AIJSExtractConfig, payload string, onPath func(string)) error {
+		atomic.AddInt32(&aiCalls, 1)
+		return nil
+	}
+	err := RunAIJSExtract(context.Background(), "", nil, func(p string) {})
 	assert.NoError(t, err)
 	assert.Equal(t, int32(0), atomic.LoadInt32(&aiCalls))
 }
@@ -203,6 +230,8 @@ func TestNewAIJSExtractConfig_Defaults(t *testing.T) {
 	assert.Equal(t, 2048, c.OverlapBytes)
 	assert.Equal(t, 120, c.ContextBytes)
 	assert.Equal(t, 1024, c.SkipBelowBytes)
+	assert.Equal(t, 200*1024, c.SmallInputBytes)
+	assert.Equal(t, 50*1024, c.SmallInputTokens)
 	assert.Equal(t, 2, c.Concurrency)
 }
 
@@ -285,6 +314,8 @@ func TestNewAIJSExtractConfig_OptionsApplied(t *testing.T) {
 		WithAIJS_OverlapBytes(0),
 		WithAIJS_ContextBytes(60),
 		WithAIJS_SkipBelowBytes(2048),
+		WithAIJS_SmallInputBytes(64*1024),
+		WithAIJS_SmallInputTokens(20*1024),
 		WithAIJS_Concurrency(4),
 	)
 	assert.Equal(t, 40000, c.MaxTokens)
@@ -292,6 +323,8 @@ func TestNewAIJSExtractConfig_OptionsApplied(t *testing.T) {
 	assert.Equal(t, 0, c.OverlapBytes)
 	assert.Equal(t, 60, c.ContextBytes)
 	assert.Equal(t, 2048, c.SkipBelowBytes)
+	assert.Equal(t, 64*1024, c.SmallInputBytes)
+	assert.Equal(t, 20*1024, c.SmallInputTokens)
 	assert.Equal(t, 4, c.Concurrency)
 }
 
@@ -527,6 +560,10 @@ func TestRunAIJSExtract_PayloadPrefixedWithRequestContext(t *testing.T) {
 		WithAIJS_BaseRequest(true, raw),
 		WithAIJS_ChunkBytes(32*1024),
 		WithAIJS_OverlapBytes(0),
+		// This test exercises the reducer path; disable direct-feed so the
+		// 64KB fixture is sliced rather than shipped in one call.
+		WithAIJS_SmallInputBytes(0),
+		WithAIJS_SmallInputTokens(0),
 		WithAIJS_Concurrency(1),
 	)
 
@@ -582,6 +619,11 @@ func TestRunAIJSExtract_NoContextWhenRequestRawEmpty(t *testing.T) {
 		WithAIJS_ChunkBytes(4*1024),
 		WithAIJS_OverlapBytes(0),
 		WithAIJS_SkipBelowBytes(512),
+		// Force reducer path so this test still exercises the legacy
+		// payload format (raw candidate stream, no REQUEST CONTEXT) even
+		// after the small-input direct-feed default kicked in.
+		WithAIJS_SmallInputBytes(0),
+		WithAIJS_SmallInputTokens(0),
 		WithAIJS_Concurrency(1),
 	)
 
@@ -594,6 +636,287 @@ func TestRunAIJSExtract_NoContextWhenRequestRawEmpty(t *testing.T) {
 	for i, p := range payloads {
 		assert.False(t, strings.HasPrefix(p, "=== REQUEST CONTEXT ==="),
 			"payload %d must NOT have REQUEST CONTEXT prefix without WithAIJS_BaseRequest", i)
+	}
+}
+
+// TestLooksLikePathCandidate_AcceptsAndRejects verifies the heuristic that
+// guards emit() against AI hallucinations of bare identifiers as URL
+// candidates. Only multi-segment paths and references with a known file
+// extension pass; single-segment HTML tag names / HTTP methods / header
+// names are rejected.
+func TestLooksLikePathCandidate_AcceptsAndRejects(t *testing.T) {
+	for _, s := range []string{
+		"/api/v1/login",
+		"api/v1/users",
+		"/misc/response/fetch/basic.action",
+		"deep.js",
+		"/deep.js",
+		"sub/foo.json",
+		"list.do",
+		"a/b",
+		"static/img/logo.png",
+	} {
+		assert.True(t, looksLikePathCandidate(s), "expected %q to be a valid path candidate", s)
+	}
+	for _, s := range []string{
+		"",
+		"   ",
+		"POST",
+		"GET",
+		"HackedJS",
+		"AAA",
+		"div",
+		"body",
+		"script",
+		"/script",
+		"/div",
+		"/body",
+		"/app",
+		"?q=1",
+		"foo-bar-baz",
+	} {
+		assert.False(t, looksLikePathCandidate(s), "expected %q to be rejected as a path candidate", s)
+	}
+}
+
+// TestRunAIJSExtract_DropsAIHallucinatedBareIdentifiers verifies that when
+// the AI (mock) returns noisy bare identifiers - HTTP methods, header
+// names, HTML tag names, single-segment "/tag" paths - the emit filter
+// drops them before they reach onPath. The legitimate multi-segment URL
+// must still come through.
+func TestRunAIJSExtract_DropsAIHallucinatedBareIdentifiers(t *testing.T) {
+	originalFn := invokeLiteForgeForPathsFunc
+	defer func() { invokeLiteForgeForPathsFunc = originalFn }()
+
+	invokeLiteForgeForPathsFunc = func(ctx context.Context, cfg *AIJSExtractConfig, payload string, onPath func(string)) error {
+		for _, u := range []string{
+			"POST", "HackedJS", "AAA",
+			"script", "div", "body",
+			"/script", "/div", "/body", "/app",
+			"/misc/response/fetch/basic.action",
+			"deep.js",
+			"http://127.0.0.1:8787/misc/response/javascript-ssa-ir-basic/deep.js",
+		} {
+			onPath(u)
+		}
+		return nil
+	}
+
+	var (
+		mu      sync.Mutex
+		emitted []string
+	)
+	err := RunAIJSExtract(context.Background(), "var deepUrl = 'deep.js';", nil, func(p string) {
+		mu.Lock()
+		defer mu.Unlock()
+		emitted = append(emitted, p)
+	})
+	assert.NoError(t, err)
+
+	mu.Lock()
+	defer mu.Unlock()
+	joined := strings.Join(emitted, "|")
+	for _, bad := range []string{
+		"|POST|", "|HackedJS|", "|AAA|",
+		"|script|", "|div|", "|body|",
+		"|/script|", "|/div|", "|/body|", "|/app|",
+	} {
+		assert.NotContains(t, "|"+joined+"|", bad,
+			"bare-identifier hallucination must be filtered out")
+	}
+	assert.Contains(t, emitted, "/misc/response/fetch/basic.action",
+		"multi-segment path candidate must pass")
+	assert.Contains(t, emitted, "deep.js",
+		"file-extension bare candidate must pass")
+	assert.Contains(t, emitted, "http://127.0.0.1:8787/misc/response/javascript-ssa-ir-basic/deep.js",
+		"absolute URL candidate must pass")
+}
+
+// TestExtractURLLikeCandidates_FunctionAndAssignmentPatterns verifies the
+// expanded regex set added for the AI JS extractor: function-call style
+// triggers (fetch / xhr.open / axios / new XHR / new URL / new WebSocket /
+// import / require / $.ajax / ky / got / superagent / request), assignment
+// fields (url= / baseURL: / endpoint: / action: / src=), and the
+// quote-wrapped file-name fallback (`'deep.js'` with no leading slash).
+func TestExtractURLLikeCandidates_FunctionAndAssignmentPatterns(t *testing.T) {
+	src := `
+		// function-call style
+		fetch('/api/v1/login');
+		fetch("/api/v1/users?id=1", {method: 'GET'});
+		const xhr = new XMLHttpRequest();
+		xhr.open('POST', 'deep.js', true);
+		xhr.send('aaa=1');
+		axios.get('/api/users');
+		axios('/api/posts');
+		ky.post('/api/orders');
+		got('/api/items');
+		request.get('/api/search');
+		$.ajax({url: '/api/list'});
+		$.getJSON("/api/json/feed");
+		const ws = new WebSocket('wss://x.test/sock');
+		const u = new URL('/abs/path', base);
+		const es = new EventSource('/stream/events');
+		import('./async-chunk.js').then(_ => {});
+		const m = require('./helper.js');
+
+		// assignment-style
+		var apiUrl = '/auth/check.action';
+		const config = { baseURL: '/v2/api', endpoint: 'list.do', action: 'submit.do' };
+		element.src = '/static/img/logo.png';
+
+		// quoted file-name literal (no leading slash)
+		var deepUrl = 'deep.js';
+		var modPath = 'sub/foo.json';
+	`
+	blocks := extractURLLikeCandidates(src, 80)
+	assert.NotEmpty(t, blocks)
+
+	needles := []string{
+		"/api/v1/login",
+		"/api/v1/users",
+		"deep.js",
+		"/api/users",
+		"/api/posts",
+		"/api/orders",
+		"/api/items",
+		"/api/search",
+		"/api/list",
+		"/api/json/feed",
+		"wss://x.test/sock",
+		"/abs/path",
+		"/stream/events",
+		"./async-chunk.js",
+		"./helper.js",
+		"/auth/check.action",
+		"/v2/api",
+		"list.do",
+		"submit.do",
+		"foo.json",
+	}
+	for _, n := range needles {
+		assert.True(t, containsHit(blocks, n),
+			"expected expanded regex set to expose %q in candidate windows", n)
+	}
+}
+
+// TestRunAIJSExtract_SmallInputDirectFeed verifies the new direct-feed fast
+// path: when the raw input is small enough (under SmallInputBytes AND under
+// SmallInputTokens), RunAIJSExtract must skip the regex pre-filter and ship
+// the entire source code in a single AI call - this preserves the
+// cross-statement context (variable assignment + later use) that gets lost
+// after windowed slicing.
+func TestRunAIJSExtract_SmallInputDirectFeed(t *testing.T) {
+	originalFn := invokeLiteForgeForPathsFunc
+	defer func() { invokeLiteForgeForPathsFunc = originalFn }()
+
+	var (
+		mu        sync.Mutex
+		payloads  []string
+		callCount int32
+	)
+	invokeLiteForgeForPathsFunc = func(ctx context.Context, cfg *AIJSExtractConfig, payload string, onPath func(string)) error {
+		atomic.AddInt32(&callCount, 1)
+		mu.Lock()
+		defer mu.Unlock()
+		payloads = append(payloads, payload)
+		// emit a deterministic "good" URL the test can look for
+		onPath("http://127.0.0.1:8787/misc/response/javascript-ssa-ir-basic/deep.js")
+		return nil
+	}
+
+	// Page-A style code: a variable assignment whose value is later used by
+	// fetch and xhr.open. The whole body is well under 200KB / 50K tokens.
+	src := `var deepUrl = 'deep.js';
+fetch(deepUrl, {method: 'POST', headers: {'HackedJS': 'AAA'}});
+
+var xhr = new XMLHttpRequest();
+xhr.open('POST', deepUrl, true);
+xhr.setRequestHeader('HackedJS', 'AAA');
+xhr.send('aaa=1');
+console.log('done');`
+	raw := []byte("GET /misc/response/javascript-ssa-ir-basic/basic-fetch.html HTTP/1.1\r\n" +
+		"Host: 127.0.0.1:8787\r\n\r\n")
+
+	cfg := NewAIJSExtractConfig(WithAIJS_BaseRequest(false, raw))
+
+	var got []string
+	var gotMu sync.Mutex
+	err := RunAIJSExtract(context.Background(), src, cfg, func(p string) {
+		gotMu.Lock()
+		defer gotMu.Unlock()
+		got = append(got, p)
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, int32(1), atomic.LoadInt32(&callCount),
+		"direct-feed must call AI exactly once for a small input")
+
+	mu.Lock()
+	assert.Len(t, payloads, 1)
+	p := payloads[0]
+	mu.Unlock()
+
+	assert.True(t, strings.HasPrefix(p, "=== REQUEST CONTEXT ==="),
+		"direct-feed payload must still carry the REQUEST CONTEXT block")
+	assert.Contains(t, p, "host: 127.0.0.1:8787")
+	assert.Contains(t, p, "var deepUrl = 'deep.js';",
+		"direct-feed must include the original code verbatim")
+	assert.Contains(t, p, "xhr.open('POST', deepUrl, true);",
+		"direct-feed must preserve cross-statement context")
+	assert.NotContains(t, p, "--- candidate ---",
+		"direct-feed must NOT wrap the source into candidate windows")
+
+	gotMu.Lock()
+	defer gotMu.Unlock()
+	assert.Contains(t, got, "http://127.0.0.1:8787/misc/response/javascript-ssa-ir-basic/deep.js")
+}
+
+// TestRunAIJSExtract_DirectFeedDisabledWhenAboveThreshold confirms that an
+// input larger than SmallInputBytes falls back to the regex + reducer
+// pipeline instead of taking the direct-feed fast path.
+func TestRunAIJSExtract_DirectFeedDisabledWhenAboveThreshold(t *testing.T) {
+	originalFn := invokeLiteForgeForPathsFunc
+	defer func() { invokeLiteForgeForPathsFunc = originalFn }()
+
+	var (
+		mu       sync.Mutex
+		payloads []string
+	)
+	invokeLiteForgeForPathsFunc = func(ctx context.Context, cfg *AIJSExtractConfig, payload string, onPath func(string)) error {
+		mu.Lock()
+		defer mu.Unlock()
+		payloads = append(payloads, payload)
+		return nil
+	}
+
+	// Build ~120KB so it sits above the small SmallInputBytes we'll set.
+	var b strings.Builder
+	for i := 0; b.Len() < 120*1024; i++ {
+		b.WriteString("fetch('/api/v1/route/")
+		b.WriteString(strings.Repeat("a", 32))
+		b.WriteString("');\n")
+		b.WriteString(strings.Repeat(".", 256))
+		b.WriteString("\n")
+	}
+
+	cfg := NewAIJSExtractConfig(
+		WithAIJS_SmallInputBytes(64*1024),  // 64KB direct-feed cap
+		WithAIJS_SmallInputTokens(20*1024),
+		WithAIJS_ChunkBytes(32*1024),
+		WithAIJS_OverlapBytes(0),
+		WithAIJS_SkipBelowBytes(1024),
+		WithAIJS_Concurrency(1),
+	)
+
+	err := RunAIJSExtract(context.Background(), b.String(), cfg, func(p string) {})
+	assert.NoError(t, err)
+
+	mu.Lock()
+	defer mu.Unlock()
+	assert.GreaterOrEqual(t, len(payloads), 2,
+		"input above SmallInputBytes must take the reducer path and emit multiple slices, got %d", len(payloads))
+	for i, p := range payloads {
+		assert.Contains(t, p, "--- candidate ---",
+			"reducer-path payload %d must wrap matches in candidate windows", i)
 	}
 }
 

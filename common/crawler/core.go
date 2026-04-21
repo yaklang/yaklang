@@ -714,6 +714,13 @@ func (c *Crawler) fetchExternalJSCodes(r *Req, jsContents []*JavaScriptContent) 
 			urlIns, _ := lowhttp.ExtractURLFromHTTPRequestRaw(reqBytes, reqHttps)
 			if urlIns != nil {
 				log.Infof("Start to fetch JS(via URL): %v", urlIns.String())
+				// External JS <script src=...> is intentionally skipped by the
+				// HtmlTag-based submit pipeline (see handleResponse), so its URL
+				// would otherwise never reach onUrlFound. Report it here to keep
+				// the discovery channel complete.
+				if config.onUrlFound != nil {
+					config.onUrlFound(urlIns.String())
+				}
 			}
 			rsp, _, err := config.DoHTTPRequest(reqHttps, c.config.runtimeID, lowhttp.WithRequest(reqBytes))
 			if err != nil {
