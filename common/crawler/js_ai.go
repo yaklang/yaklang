@@ -37,9 +37,24 @@ type AIJSExtractConfig struct {
 	// ContextBytes is the half-window size taken around each regex hit when
 	// building candidate windows. Defaults to 120.
 	ContextBytes int
-	// SkipBelowBytes: when the candidate stream is smaller than this, the AI
-	// step is skipped and raw deduplicated hits are emitted directly.
+	// SkipBelowBytes: when the candidate stream is smaller than this AND the
+	// small-input direct-feed fast path is disabled (or did not apply), the
+	// AI step is skipped and raw deduplicated hits are emitted directly.
+	// In normal usage SmallInputBytes / SmallInputTokens take precedence and
+	// this branch is rarely reached.
 	SkipBelowBytes int
+	// SmallInputBytes: when the raw input source is smaller than this AND
+	// the token estimate is smaller than SmallInputTokens, RunAIJSExtract
+	// skips the regex pre-filter entirely and feeds the full source to the
+	// AI in a single call. This preserves cross-statement context (for
+	// example `var x = 'deep.js'` followed by `fetch(x)`) that would
+	// otherwise be lost after windowed slicing. Set to 0 to disable.
+	// Defaults to 200KB.
+	SmallInputBytes int
+	// SmallInputTokens: companion threshold to SmallInputBytes; both must
+	// be satisfied to take the direct-feed fast path. Set to 0 to disable.
+	// Defaults to 50K tokens.
+	SmallInputTokens int
 	// Concurrency caps parallel AI calls when reducing chunks. Defaults to 2.
 	Concurrency int
 	// AIOptions are forwarded to the LiteForge coordinator (model/provider/etc).
@@ -107,6 +122,26 @@ func WithAIJS_SkipBelowBytes(n int) AIJSExtractOption {
 	}
 }
 
+// WithAIJS_SmallInputBytes sets the raw input byte threshold for the
+// direct-feed fast path. Set to 0 to disable.
+func WithAIJS_SmallInputBytes(n int) AIJSExtractOption {
+	return func(c *AIJSExtractConfig) {
+		if n >= 0 {
+			c.SmallInputBytes = n
+		}
+	}
+}
+
+// WithAIJS_SmallInputTokens sets the raw input token threshold for the
+// direct-feed fast path. Set to 0 to disable.
+func WithAIJS_SmallInputTokens(n int) AIJSExtractOption {
+	return func(c *AIJSExtractConfig) {
+		if n >= 0 {
+			c.SmallInputTokens = n
+		}
+	}
+}
+
 // WithAIJS_Concurrency caps parallel AI calls.
 func WithAIJS_Concurrency(n int) AIJSExtractOption {
 	return func(c *AIJSExtractConfig) {
@@ -150,6 +185,8 @@ func NewAIJSExtractConfig(opts ...AIJSExtractOption) *AIJSExtractConfig {
 		OverlapBytes:        2048,
 		ContextBytes:        120,
 		SkipBelowBytes:      1024,
+		SmallInputBytes:     200 * 1024,
+		SmallInputTokens:    50 * 1024,
 		Concurrency:         2,
 		RequestHeadMaxBytes: 4096,
 	}
@@ -167,15 +204,75 @@ func NewAIJSExtractConfig(opts ...AIJSExtractOption) *AIJSExtractConfig {
 // the AI step (or the downstream NewHTTPRequest) will reject obvious garbage.
 // We never use grouping in a way that would require sub-match parsing - a
 // FindAllIndex on the full pattern is enough for surrounding-context capture.
+//
+// Order matters only weakly (overlapping windows are merged later), but we
+// still keep the highest-quality, most context-rich patterns first so that the
+// merged window centers on a useful anchor:
+//
+//  1. absolute / protocol-relative URLs (highest signal)
+//  2. function-call style HTTP triggers: fetch / xhr.open / axios / new URL / ...
+//  3. assignment-style fields:           url= / href= / endpoint: / baseURL: / ...
+//  4. path-style strings starting with / (still very common in routing tables)
+//  5. resource-suffix style:             foo.js / a/b.action
+//  6. router-registry style quoted multi-segment paths
+//  7. quoted file-name literals (no leading slash) - last-resort coverage for
+//     tokens like 'deep.js' that get assigned to a variable and only used by
+//     reference later, where no other anchor would catch them
 var aiJSCandidatePatterns = []*regexp.Regexp{
-	// absolute and protocol-relative URLs
+	// 1. absolute and protocol-relative URLs
 	regexp.MustCompile(`(?:https?://|//)[A-Za-z0-9._~:/?#\[\]@!$&'()*+,;=\-]{2,}`),
-	// path-style strings starting with /
+
+	// 2.a fetch('...')
+	regexp.MustCompile(`\bfetch\s*\(\s*['"` + "`" + `][^'"` + "`" + `\r\n]{1,1000}['"` + "`" + `]`),
+	// 2.b XHR-style: anything ".open('METHOD', '...')" - covers xhr.open and friends
+	regexp.MustCompile(`\.open\s*\(\s*['"` + "`" + `][A-Za-z]+['"` + "`" + `]\s*,\s*['"` + "`" + `][^'"` + "`" + `\r\n]{1,1000}['"` + "`" + `]`),
+	// 2.c new XMLHttpRequest / new URL('...') / new Request('...') / new WebSocket('...') / new EventSource('...')
+	regexp.MustCompile(`\bnew\s+(?:XMLHttpRequest|URL|Request|WebSocket|EventSource)\b(?:\s*\(\s*['"` + "`" + `][^'"` + "`" + `\r\n]{1,1000}['"` + "`" + `])?`),
+	// 2.d axios('...') / axios.get|post|put|delete|patch|head|options('...')
+	regexp.MustCompile(`\baxios(?:\s*\.\s*[a-z]+)?\s*\(\s*['"` + "`" + `][^'"` + "`" + `\r\n]{1,1000}['"` + "`" + `]`),
+	// 2.e other common HTTP libs: ky, got, request, superagent.<verb>
+	regexp.MustCompile(`\b(?:ky|got|request|superagent(?:\s*\.\s*[a-z]+)?)\s*\(\s*['"` + "`" + `][^'"` + "`" + `\r\n]{1,1000}['"` + "`" + `]`),
+	// 2.f jQuery $.get / $.post / $.ajax / $.getJSON / $.put / $.delete('...')
+	regexp.MustCompile(`\$\s*\.\s*(?:get|post|ajax|getJSON|put|delete|head|patch)\s*\(\s*['"` + "`" + `][^'"` + "`" + `\r\n]{1,1000}['"` + "`" + `]`),
+	// 2.g dynamic import('...') and require('...')
+	regexp.MustCompile(`\b(?:import|require)\s*\(\s*['"` + "`" + `][^'"` + "`" + `\r\n]{1,1000}['"` + "`" + `]`),
+
+	// 3. assignment-style: url|href|src|endpoint|api|apiUrl|baseURL|baseUrl|base_url|uri|path|action[: =]'value'
+	regexp.MustCompile(`\b(?:url|href|src|endpoint|api|apiUrl|baseURL|baseUrl|base_url|uri|path|action)\s*[:=]\s*['"` + "`" + `][^'"` + "`" + `\r\n]{1,1000}['"` + "`" + `]`),
+
+	// 4. path-style strings starting with /
 	regexp.MustCompile(`/[A-Za-z0-9._~\-/]{2,}(?:\?[^\s'"<>` + "`" + `]{0,200})?`),
-	// resource-suffix style (relative or fragment paths with known extensions)
+	// 5. resource-suffix style (relative or fragment paths with known extensions)
 	regexp.MustCompile(`[A-Za-z0-9_\-/]{1,}\.(?:js|mjs|cjs|json|action|do|php|asp|aspx|jsp)(?:\?[^\s'"<>` + "`" + `]{0,200})?`),
-	// router-registry style: words with at least one slash inside quotes/backticks
+	// 6. router-registry style: words with at least one slash inside quotes/backticks
 	regexp.MustCompile("['\"`](?:/?[A-Za-z0-9_\\-]+){2,}['\"`]"),
+
+	// 7. quoted file-name literals (no leading slash required) - this is what
+	//    catches `var deepUrl = 'deep.js'` so the AI can later see the
+	//    surrounding variable name and the call site that uses it.
+	regexp.MustCompile(`['"` + "`" + `][A-Za-z0-9_\-./]{1,128}\.(?:js|mjs|cjs|jsx|ts|tsx|json|action|do|php|asp|aspx|jsp|html|htm)['"` + "`" + `]`),
+}
+
+// aiJSRawSafePatterns is the subset of aiJSCandidatePatterns whose matches are
+// safe to emit as a raw path candidate (no enclosing function-call syntax,
+// no assignment-prefix like "url=" leaking into the match). These are used by
+// rawCandidateHits (and therefore by the direct-feed fast path) to hand
+// high-confidence path / URL strings straight to NewHTTPRequest without
+// going through an AI round trip.
+//
+// NOTE: the order here mirrors aiJSCandidatePatterns so the visual mapping
+// stays obvious.
+var aiJSRawSafePatterns = []*regexp.Regexp{
+	// 1. absolute and protocol-relative URLs
+	regexp.MustCompile(`(?:https?://|//)[A-Za-z0-9._~:/?#\[\]@!$&'()*+,;=\-]{2,}`),
+	// 4. path-style strings starting with /
+	regexp.MustCompile(`/[A-Za-z0-9._~\-/]{2,}(?:\?[^\s'"<>` + "`" + `]{0,200})?`),
+	// 5. resource-suffix style
+	regexp.MustCompile(`[A-Za-z0-9_\-/]{1,}\.(?:js|mjs|cjs|json|action|do|php|asp|aspx|jsp)(?:\?[^\s'"<>` + "`" + `]{0,200})?`),
+	// 6. router-registry style: words with at least one slash inside quotes
+	regexp.MustCompile("['\"`](?:/?[A-Za-z0-9_\\-]+){2,}['\"`]"),
+	// 7. quoted file-name literals
+	regexp.MustCompile(`['"` + "`" + `][A-Za-z0-9_\-./]{1,128}\.(?:js|mjs|cjs|jsx|ts|tsx|json|action|do|php|asp|aspx|jsp|html|htm)['"` + "`" + `]`),
 }
 
 // candidateWindow describes a single hit and the surrounding context.
@@ -263,20 +360,28 @@ func extractURLLikeCandidates(text string, contextBytes int) []string {
 }
 
 // rawCandidateHits returns the raw matched substrings (deduplicated, in
-// match order). Used as a fallback when input is too small for AI processing.
+// match order). Used as a fallback when input is too small for AI processing,
+// and as the "raw" leg of the direct-feed fast path.
+//
+// Only aiJSRawSafePatterns are scanned here. The function-call style and
+// assignment-style patterns in aiJSCandidatePatterns are intentionally
+// skipped: their matches include the function name, method argument, or
+// identifier prefix, so treating them as a raw path would produce garbage
+// URLs downstream. Those patterns still contribute to extractURLLikeCandidates
+// (where the surrounding window is attached before handing the slice to AI).
 func rawCandidateHits(text string) []string {
 	if text == "" {
 		return nil
 	}
 	seen := make(map[string]struct{})
 	var out []string
-	for _, p := range aiJSCandidatePatterns {
+	for _, p := range aiJSRawSafePatterns {
 		for _, idx := range p.FindAllStringIndex(text, -1) {
 			if len(idx) < 2 {
 				continue
 			}
 			hit := strings.TrimSpace(text[idx[0]:idx[1]])
-			// router-registry pattern wraps with quotes/backticks - strip them
+			// quote-wrapped patterns strip the enclosing ', ", or `
 			hit = strings.Trim(hit, "'\"`")
 			if hit == "" {
 				continue
@@ -305,6 +410,50 @@ var boundaryLeakNeedles = []string{
 	"---js-chunk-end---",
 	"--- candidate ---",
 	"--- end ---",
+}
+
+// pathCandidateExtRe matches a known file-like extension at the end of a
+// candidate, used by looksLikePathCandidate to decide whether a scheme-less
+// AI output is "pathy enough" to be worth sending through NewHTTPRequest.
+var pathCandidateExtRe = regexp.MustCompile(`\.(?i:js|mjs|cjs|jsx|ts|tsx|json|action|do|php|asp|aspx|jsp|html|htm|xml|txt|css|svg|png|jpg|jpeg|gif|pdf|zip|tar|gz)(?:\?.*)?$`)
+
+// looksLikePathCandidate decides whether a scheme-less candidate plausibly
+// refers to a URL path or a file. Rejects bare identifiers (HTTP methods,
+// header names, HTML tag names, generic English words) that AI models often
+// hallucinate as URL candidates when given free-form source, including the
+// "/script", "/div", "/body" class of hallucinations where the model prefixes
+// a single HTML-tag-like word with a slash.
+//
+// Rules:
+//   - Empty or whitespace-only candidates are rejected.
+//   - A candidate ending in a known file-like extension is accepted,
+//     which catches bare references such as `deep.js`, `/script.js`, or
+//     `list.json`.
+//   - A candidate with two or more non-empty path segments is accepted
+//     (e.g. `/api/users`, `a/b/c`), since a multi-segment path is unlikely
+//     to be a single stray identifier.
+//   - Everything else (bare identifiers "POST", "HackedJS"; single-segment
+//     paths like "/script", "/div", "/body"; query-only fragments "?q=1")
+//     is rejected.
+func looksLikePathCandidate(s string) bool {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return false
+	}
+	if pathCandidateExtRe.MatchString(s) {
+		return true
+	}
+	trimmed := strings.Trim(s, "/")
+	if trimmed == "" {
+		return false
+	}
+	nonempty := 0
+	for _, seg := range strings.Split(trimmed, "/") {
+		if seg != "" {
+			nonempty++
+		}
+	}
+	return nonempty >= 2
 }
 
 // looksLikeBoundaryLeak returns true if the candidate string contains any
@@ -565,14 +714,22 @@ func invokeLiteForgeForPaths(ctx context.Context, cfg *AIJSExtractConfig, payloa
 
 // --- public entry -----------------------------------------------------------
 
-// RunAIJSExtract drives the three-stage pipeline:
-//  1. broad regex pre-filter to candidate windows
-//  2. aireducer slicing with DumpWithOverlap folding
-//  3. LiteForge SpeedPriority extraction per slice
+// RunAIJSExtract drives the extraction pipeline. It picks one of two paths:
 //
-// Each accepted path is emitted through onPath. The function never returns the
-// AI errors of an individual slice - it logs and continues, so the upstream
-// crawler keeps running.
+//   - direct-feed fast path: when the raw input is small (under both
+//     SmallInputBytes and SmallInputTokens) the entire source is fed to
+//     the AI in one call, with no regex pre-filter. This preserves
+//     cross-statement context such as variable assignments referenced by
+//     a later fetch() call. This is the default for all small inputs.
+//
+//   - regex + reducer slow path: for larger inputs we run the broad regex
+//     pre-filter to build candidate windows, slice them with aireducer
+//     using DumpWithOverlap folding, and run LiteForge SpeedPriority
+//     extraction per slice in parallel.
+//
+// Each accepted path is emitted through onPath. The function never returns
+// the AI errors of an individual slice - it logs and continues, so the
+// upstream crawler keeps running.
 func RunAIJSExtract(ctx context.Context, code string, cfg *AIJSExtractConfig, onPath func(string)) error {
 	if onPath == nil {
 		return utils.Error("ai js extract: onPath is nil")
@@ -584,22 +741,8 @@ func RunAIJSExtract(ctx context.Context, code string, cfg *AIJSExtractConfig, on
 		ctx = context.Background()
 	}
 
-	candidates := extractURLLikeCandidates(code, cfg.ContextBytes)
-	if len(candidates) == 0 {
-		log.Debug("ai js extract: no candidates from regex pre-filter")
-		return nil
-	}
-
-	// concatenate candidate windows once; aireducer separator trigger will
-	// split exactly on block boundaries when possible
-	var streamBuf bytes.Buffer
-	for _, c := range candidates {
-		streamBuf.WriteString(c)
-	}
-	stream := streamBuf.String()
-
 	// emit canonicalises and dedupes a candidate produced by either the AI
-	// step or the fast path. The rules:
+	// step or the regex fast path. The rules:
 	//
 	//   * boundary-marker leaks ("yak-html-end", "---html-end---", ...) are
 	//     always dropped (regression: leaked as "http://---html-end---/").
@@ -623,6 +766,7 @@ func RunAIJSExtract(ctx context.Context, code string, cfg *AIJSExtractConfig, on
 		}
 
 		canonical := raw
+		schemeless := true
 		// Detect a URI scheme: ':' present AND no '/' precedes it. This
 		// avoids mis-identifying paths like "a.js?x=1:b" as a scheme.
 		if colon := strings.IndexByte(raw, ':'); colon > 0 {
@@ -633,7 +777,16 @@ func RunAIJSExtract(ctx context.Context, code string, cfg *AIJSExtractConfig, on
 					return
 				}
 				canonical = cleaned
+				schemeless = false
 			}
+		}
+		if schemeless && !looksLikePathCandidate(canonical) {
+			// AI models occasionally hallucinate bare identifiers as URL
+			// candidates (HTTP methods like "POST", header names like
+			// "HackedJS", HTML tag names like "div"/"body"/"script"). Drop
+			// anything that does not look like a path or file reference.
+			log.Debugf("ai js extract: drop non-pathy scheme-less candidate: %q", canonical)
+			return
 		}
 
 		emitMu.Lock()
@@ -644,6 +797,57 @@ func RunAIJSExtract(ctx context.Context, code string, cfg *AIJSExtractConfig, on
 		emitted[canonical] = struct{}{}
 		onPath(canonical)
 	}
+
+	// Direct-feed fast path: small enough to fit in one AI call without
+	// losing context. This is what makes simple SPAs (a handful of small
+	// JS files) work well - chopping them into windowed candidates would
+	// strip the surrounding variable assignments and call sites the AI
+	// needs to resolve a relative path against the page's base_url.
+	//
+	// We use a hybrid strategy here:
+	//
+	//   1. emit raw regex hits up front so high-confidence path / file-name
+	//      candidates (e.g. `var deepUrl = 'deep.js'`) reach the crawler
+	//      even if the AI step decides to omit them. The downstream
+	//      NewHTTPRequest resolves bare relative paths against the page's
+	//      base_url, so a hit like "deep.js" still becomes a real URL.
+	//
+	//   2. then call the AI on the full code so the model can also surface
+	//      structurally-implied URLs (e.g. an inline fetch with a string
+	//      literal that the regex might have missed) and dedup naturally
+	//      thanks to the shared `emit` closure.
+	if cfg.SmallInputBytes > 0 && cfg.SmallInputTokens > 0 &&
+		len(code) > 0 &&
+		len(code) < cfg.SmallInputBytes &&
+		aicommon.MeasureTokens(code) < cfg.SmallInputTokens {
+		for _, hit := range rawCandidateHits(code) {
+			emit(hit)
+		}
+
+		payload := buildRequestContextBlock(cfg) + code
+		if cfg.MaxTokens > 0 {
+			if aicommon.MeasureTokens(payload) > cfg.MaxTokens {
+				payload = aicommon.ShrinkTextBlockByTokens(payload, cfg.MaxTokens)
+			}
+		}
+		log.Debugf("ai js extract: small input bytes=%d, direct-feed fast path", len(code))
+		_ = invokeLiteForgeForPathsFunc(ctx, cfg, payload, emit)
+		return nil
+	}
+
+	candidates := extractURLLikeCandidates(code, cfg.ContextBytes)
+	if len(candidates) == 0 {
+		log.Debug("ai js extract: no candidates from regex pre-filter")
+		return nil
+	}
+
+	// concatenate candidate windows once; aireducer separator trigger will
+	// split exactly on block boundaries when possible
+	var streamBuf bytes.Buffer
+	for _, c := range candidates {
+		streamBuf.WriteString(c)
+	}
+	stream := streamBuf.String()
 
 	if streamBuf.Len() < cfg.SkipBelowBytes {
 		for _, hit := range rawCandidateHits(code) {

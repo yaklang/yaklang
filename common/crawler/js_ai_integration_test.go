@@ -93,6 +93,12 @@ func TestRunAIJSExtract_WebpackFixture_SliceSize(t *testing.T) {
 		WithAIJS_MaxTokens(80*1024),
 		WithAIJS_OverlapBytes(2048),
 		WithAIJS_SkipBelowBytes(1024),
+		// This test exercises the reducer slicing path; explicitly disable
+		// the direct-feed fast path so a sub-200KB fixture still goes
+		// through extractURLLikeCandidates + aireducer rather than being
+		// shipped in a single AI call.
+		WithAIJS_SmallInputBytes(0),
+		WithAIJS_SmallInputTokens(0),
 		WithAIJS_Concurrency(1),
 	)
 

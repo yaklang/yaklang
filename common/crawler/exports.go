@@ -33,12 +33,14 @@ var Exports = map[string]interface{}{
 	"RequestsFromFlow":    HandleRequestResult,
 
 	// AI assisted JS / HTML path extraction
-	"aiJSExtract":      WithAIJSExtract,
-	"aiJSMaxTokens":    WithAIJS_MaxTokens,
-	"aiJSChunkBytes":   WithAIJS_ChunkBytes,
-	"aiJSOverlapBytes": WithAIJS_OverlapBytes,
-	"aiJSContextBytes": WithAIJS_ContextBytes,
-	"aiJSConcurrency":  WithAIJS_Concurrency,
-	"aiJSSkipBelow":    WithAIJS_SkipBelowBytes,
-	"aiJSAIOptions":    WithAIJS_AIOptions,
+	"aiJSExtract":          WithAIJSExtract,
+	"aiJSMaxTokens":        WithAIJS_MaxTokens,
+	"aiJSChunkBytes":       WithAIJS_ChunkBytes,
+	"aiJSOverlapBytes":     WithAIJS_OverlapBytes,
+	"aiJSContextBytes":     WithAIJS_ContextBytes,
+	"aiJSConcurrency":      WithAIJS_Concurrency,
+	"aiJSSkipBelow":        WithAIJS_SkipBelowBytes,
+	"aiJSSmallInputBytes":  WithAIJS_SmallInputBytes,
+	"aiJSSmallInputTokens": WithAIJS_SmallInputTokens,
+	"aiJSAIOptions":        WithAIJS_AIOptions,
 }
