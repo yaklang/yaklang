@@ -949,6 +949,8 @@ service Yak {
   rpc UpdateAITool(UpdateAIToolRequest) returns(DbOperateMessage);
   rpc ToggleAIToolFavorite(ToggleAIToolFavoriteRequest) returns(ToggleAIToolFavoriteResponse);
   rpc AIToolGenerateMetadata(AIToolGenerateMetadataRequest) returns(AIToolGenerateMetadataResponse);
+  rpc ExportAITool(ExportAIToolRequest) returns (stream GeneralProgress);
+  rpc ImportAITool(ImportAIToolRequest) returns (stream GeneralProgress);
 
   // Local Model Management
   rpc IsLlamaServerReady(Empty) returns (IsLlamaServerReadyResponse);
@@ -1725,6 +1727,14 @@ message ToggleAIToolFavoriteResponse {
   string Message = 2;
 }
 
+message AIToolFilter {
+  string ToolName = 1;
+  repeated string ToolNames = 2;
+  string Keyword = 3;
+  bool OnlyFavorites = 4;
+  int64 ID = 5;
+}
+
 message AITool {
   string Name = 1;
   string Description = 2;
@@ -1749,6 +1759,22 @@ message GetAIToolListRequest {
   Paging Pagination = 3;
   bool OnlyFavorites = 4;
 }
+
+message ExportAIToolRequest {
+  repeated string ToolNames = 1;
+  string TargetPath = 2;
+  string Password = 3;
+  string OutputName = 4;
+  AIToolFilter Filter = 5;
+}
+
+message ImportAIToolRequest {
+  string InputPath = 1;
+  bool Overwrite = 2;
+  string NewToolName = 3;
+  string Password = 4;
+}
+
 message AIOutputEvent {
   string CoordinatorId = 1;
   string Type = 2;
