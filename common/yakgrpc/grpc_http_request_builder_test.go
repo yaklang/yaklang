@@ -361,6 +361,23 @@ Host: baidu.com
 	}
 
 	rsp, err = client.HTTPRequestBuilder(context.Background(), &ypb.HTTPRequestBuilderParams{
+		Method: "GET",
+		Path:   []string{"/dup"},
+		GetParams: []*ypb.KVPair{
+			{Key: "a", Value: "1"},
+			{Key: "a", Value: "2"},
+		},
+	})
+	require.NoError(t, err)
+	keepDuplicateQuery := false
+	for _, i := range rsp.Results {
+		if strings.Contains(string(i.HTTPRequest), "GET /dup?a=1&a=2 HTTP/1.1") {
+			keepDuplicateQuery = true
+		}
+	}
+	require.True(t, keepDuplicateQuery, "duplicate query should be kept in built request")
+
+	rsp, err = client.HTTPRequestBuilder(context.Background(), &ypb.HTTPRequestBuilderParams{
 		Method:              "GET",
 		Path:                []string{"a?c=1"},
 		Cookie:              []*ypb.KVPair{{Key: "aaa", Value: "111"}, {Key: "bbb", Value: "222"}},
@@ -445,6 +462,25 @@ Host: baidu.com
 	if !ceq1 {
 		t.Fatal("body no raw (using) path query not keep")
 	}
+
+	rsp, err = client.HTTPRequestBuilder(context.Background(), &ypb.HTTPRequestBuilderParams{
+		Method: "POST",
+		Path:   []string{"/dup-post"},
+		PostParams: []*ypb.KVPair{
+			{Key: "a", Value: "1"},
+			{Key: "a", Value: "2"},
+		},
+	})
+	require.NoError(t, err)
+	keepDuplicatePostParams := false
+	for _, i := range rsp.Results {
+		if strings.Contains(string(i.HTTPRequest), "POST /dup-post HTTP/1.1") &&
+			strings.Contains(string(i.HTTPRequest), "Content-Type: application/x-www-form-urlencoded") &&
+			strings.Contains(string(i.HTTPRequest), "a=1&a=2") {
+			keepDuplicatePostParams = true
+		}
+	}
+	require.True(t, keepDuplicatePostParams, "duplicate post params should be kept in built request")
 
 	// multipart
 	rsp, err = client.HTTPRequestBuilder(context.Background(), &ypb.HTTPRequestBuilderParams{
@@ -793,6 +829,38 @@ func TestBuild_Http_Request_Packet(t *testing.T) {
 	if count != 3 {
 		t.Fatal("build packet error")
 	}
+
+	targetInput = "http://www.example.com/test?a=1&a=2"
+	p = &ypb.HTTPRequestBuilderParams{
+		IsHttps:          false,
+		IsRawHTTPRequest: false,
+		Method:           "GET",
+	}
+	packets, err = BuildHttpRequestPacket(consts.GetGormProjectDatabase(), p, targetInput)
+	require.NoError(t, err)
+	packet, ok := <-packets
+	require.True(t, ok, "expected built packet")
+	require.Contains(t, packet.Url, "/test?a=1&a=2")
+	require.Contains(t, string(packet.Request), "GET /test?a=1&a=2 HTTP/1.1")
+
+	targetInput = "http://www.example.com/test-post"
+	p = &ypb.HTTPRequestBuilderParams{
+		IsHttps:          false,
+		IsRawHTTPRequest: false,
+		Method:           "POST",
+		PostParams: []*ypb.KVPair{
+			{Key: "a", Value: "1"},
+			{Key: "a", Value: "2"},
+		},
+	}
+	packets, err = BuildHttpRequestPacket(consts.GetGormProjectDatabase(), p, targetInput)
+	require.NoError(t, err)
+	packet, ok = <-packets
+	require.True(t, ok, "expected built packet")
+	require.Contains(t, packet.Url, "/test-post")
+	require.Contains(t, string(packet.Request), "POST /test-post HTTP/1.1")
+	require.Contains(t, string(packet.Request), "Content-Type: application/x-www-form-urlencoded")
+	require.Contains(t, string(packet.Request), "a=1&a=2")
 }
 
 func TestBuild_Http_Request_Packet_Smoking(t *testing.T) {

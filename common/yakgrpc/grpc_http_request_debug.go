@@ -17,6 +17,7 @@ import (
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/cli"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
@@ -470,12 +471,10 @@ func mergeBuildParams(params *ypb.HTTPRequestBuilderParams, t *url.URL) *ypb.HTT
 		res.Path = append(res.Path, t.Path)
 	}
 
-	for key, values := range t.Query() { // 插入所有的 get 参数
-		for _, value := range values {
-			res.GetParams = append(res.GetParams, &ypb.KVPair{
-				Key: key, Value: value,
-			})
-		}
+	for _, item := range lowhttp.ParseQueryParams(t.RawQuery).Items { // 按原始顺序插入所有的 get 参数
+		res.GetParams = append(res.GetParams, &ypb.KVPair{
+			Key: item.Key, Value: item.Value,
+		})
 	}
 
 	if t.Scheme != "" { // 目标标识优先级更高

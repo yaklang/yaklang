@@ -166,6 +166,99 @@ mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
 	}
 }
 
+func TestGRPCMUSTPASS_HTTP_Server_DebugPlugin_MITM_InputURLKeepDuplicateQuery(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	keepDuplicateQuery := false
+	host, port := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
+		writer.Write([]byte("hello"))
+		raw, _ := utils.HttpDumpWithBody(request, true)
+		if strings.Contains(string(raw), "GET /test?a=1&a=2 HTTP/1.1") {
+			keepDuplicateQuery = true
+			go func() {
+				time.Sleep(200 * time.Millisecond)
+				cancel()
+			}()
+		}
+	})
+
+	targetURL := "http://" + utils.HostPort(host, port) + "/test?a=1&a=2"
+	stream, err := client.DebugPlugin(ctx, &ypb.DebugPluginRequest{
+		Code: `
+mirrorFilteredHTTPFlow = func(isHttps, url, req, rsp, body) {
+    dump(url)
+}
+`,
+		PluginType: "mitm",
+		Input:      targetURL,
+	})
+	require.NoError(t, err)
+
+	for {
+		_, err := stream.Recv()
+		if err != nil {
+			break
+		}
+	}
+
+	require.True(t, keepDuplicateQuery, "duplicate query should be kept in mitm debug input URL")
+}
+
+func TestGRPCMUSTPASS_HTTP_Server_DebugPlugin_MITM_HTTPRequestTemplateKeepDuplicatePostParams(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	keepDuplicatePostParams := false
+	host, port := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
+		writer.Write([]byte("hello"))
+		raw, _ := utils.HttpDumpWithBody(request, true)
+		if strings.Contains(string(raw), "POST /test-post HTTP/1.1") &&
+			strings.Contains(string(raw), "Content-Type: application/x-www-form-urlencoded") &&
+			strings.Contains(string(raw), "a=1&a=2") {
+			keepDuplicatePostParams = true
+			go func() {
+				time.Sleep(200 * time.Millisecond)
+				cancel()
+			}()
+		}
+	})
+
+	targetURL := "http://" + utils.HostPort(host, port) + "/test-post"
+	stream, err := client.DebugPlugin(ctx, &ypb.DebugPluginRequest{
+		Code: `
+mirrorFilteredHTTPFlow = func(isHttps, url, req, rsp, body) {
+    dump(url)
+}
+`,
+		PluginType: "mitm",
+		Input:      targetURL,
+		HTTPRequestTemplate: &ypb.HTTPRequestBuilderParams{
+			Method: "POST",
+			PostParams: []*ypb.KVPair{
+				{Key: "a", Value: "1"},
+				{Key: "a", Value: "2"},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	for {
+		_, err := stream.Recv()
+		if err != nil {
+			break
+		}
+	}
+
+	require.True(t, keepDuplicatePostParams, "duplicate post params should be kept in mitm debug http request template")
+}
+
 //func TestGRPCMUSTPASS_HTTP_Server_DebugPlugin_MITM_WithRawPacket(t *testing.T) {
 //    client, err := NewLocalClient()
 //    if err != nil {
