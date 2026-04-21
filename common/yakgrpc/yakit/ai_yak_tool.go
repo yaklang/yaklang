@@ -12,7 +12,10 @@ import (
 
 func SaveAIYakTool(db *gorm.DB, tool *schema.AIYakTool) (int64, error) {
 	db = db.Model(&schema.AIYakTool{})
-	if db := db.Where("name = ?", tool.Name).Assign(tool).FirstOrCreate(&schema.AIYakTool{}); db.Error != nil {
+	if tool == nil {
+		return 0, utils.Error("ai tool is nil")
+	}
+	if db := db.Where("name = ?", tool.Name).Assign(tool.ToUpdateMap()).FirstOrCreate(tool); db.Error != nil {
 		return 0, utils.Errorf("create/update AIYakTool failed: %s", db.Error)
 	}
 	return db.RowsAffected, nil
@@ -27,15 +30,20 @@ func CreateAIYakTool(db *gorm.DB, tool *schema.AIYakTool) (int64, error) {
 }
 
 func UpdateAIYakToolByID(db *gorm.DB, tool *schema.AIYakTool) (int64, error) {
+	if tool == nil {
+		return 0, utils.Error("ai tool is nil")
+	}
+
 	// 先查询获取现有记录的 CreatedAt
 	var existing schema.AIYakTool
 	if err := db.Where("id = ?", tool.ID).First(&existing).Error; err != nil {
 		return 0, utils.Errorf("find AIYakTool failed: %s", err)
 	}
-	// 设置 CreatedAt 以确保执行 UPDATE 而不是 INSERT
+
 	tool.CreatedAt = existing.CreatedAt
+	tool.Author = existing.Author
 	tool.IsFavorite = existing.IsFavorite
-	if db := db.Save(tool); db.Error != nil {
+	if db := db.Model(&schema.AIYakTool{}).Where("id = ?", tool.ID).Updates(tool.ToUpdateMap()); db.Error != nil {
 		return 0, utils.Errorf("update AIYakTool failed: %s", db.Error)
 	}
 	return db.RowsAffected, nil
