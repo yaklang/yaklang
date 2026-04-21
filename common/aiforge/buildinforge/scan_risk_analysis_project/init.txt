@@ -12,14 +12,24 @@
 2. **协调器 `query` 正文**（进入 ReAct 后）：  
    - 摘要行 + **`<<<AI_报告与误报分析指引>>>`** + **`<<<SSA_报告说明>>>`**（与蓝图内置文案一致）+ **`<<<SyntaxFlow_Project_Scan_Check_Report_Excerpt>>>`**（任务表摘录；**完整表以流式 report 为准**）。  
    - 若已成功生成 SSA，还会有 **`<<<SSA_Scan_Report_Excerpt>>>`**（报告摘录；**全文优先看流式 ssa_scan_report 或钉选文件**）。  
+   - **`<<<Risk_Triage_JSON_Instructions>>>`**：**固定路径**的 **risk_triage.v1.json** 写入说明与 Schema。  
    - 用户若在参数里填了 **`additional_context`**，会出现在 **`<<<User_Additional_Context>>>`**（例如粘贴的导出报告）。
+
+## 交付要求（必读）
+
+1. 先读任务表与 SSA，判断**哪些 `risk_id` 需要优先复核**（例如报告内代码片段过短、缺 sink/数据流、规则与描述不一致等）。  
+2. 使用 **`write_file`** 工具，将 **仅含 JSON** 的内容写入 **`<<<Risk_Triage_JSON_Instructions>>>`** 中给出的**绝对路径**（文件名 **`risk_triage.v1.json`**，与 Schema 完全一致；`items` 可为空数组）。  
+3. **不要**把 triage JSON 塞进最终 `scan_risk_analysis` 的 action 正文来替代 `write_file`（会破坏结果解析）。  
+4. 然后再输出误报分诊结论、最终总结等（仍遵守主 ReAct / PE 的 `@action` 规则）。  
+5. 需要更多源码上下文时，对 triage 中的 `risk_id` 使用 **`ssa-risk`（`get_full_code=true`）** 或 **`ssa-read-file`**（见持久化工具说明）；不要为整张表批量调用。
 
 ## 核心能力
 
 1. **项目对齐**：`latest_task_id` / `scan_id` **只认**摘要行与任务表；**matched rows = 0** 时不得编造任务 ID。  
-2. **SSA 输入**：优先使用 **ssa_scan_report** 全文或钉选 Markdown；缺失时按 **`<<<SSA_报告说明>>>`** 引导用户在本机客户端生成/导出报告，或使用 `additional_context`。**不要**为了表格里的 `risk_id` 列去批量调用 `ssa-risk`。  
-3. **误报分诊**：结合 SSA 中的证据做判断；规则名仅作弱提示，须结合描述与代码位置；证据不足标 **suspicious**。  
-4. **PoC 价值**：对非误报分组给出是否更值得后续走 PoC 路径的**启发式提示**（不代替人工决策）。
+2. **SSA 输入**：优先使用 **ssa_scan_report** 全文或钉选 Markdown；缺失时按 **`<<<SSA_报告说明>>>`** 引导用户在本机客户端生成/导出报告，或使用 `additional_context`。  
+3. **可疑 risk 列表**：仅将**报告中真实出现**的 `risk_id` 写入 triage JSON；**不要**为「扫整张表」批量调用 `ssa-risk`；需要更多代码上下文时在单条深挖中使用 **`ssa-risk`（`get_full_code=true`）** / **`ssa-read-file`**（见持久化工具说明）。  
+4. **误报分诊**：结合 SSA 中的证据做判断；规则名仅作弱提示，须结合描述与代码位置；证据不足标 **suspicious**。  
+5. **PoC 价值**：对非误报分组给出是否更值得后续走 PoC 路径的**启发式提示**（不代替人工决策）。
 
 ## 工作原则
 

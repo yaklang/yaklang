@@ -11,8 +11,32 @@
    - **`<<<AI_报告与误报分析指引>>>`**、**`<<<SSA_报告说明>>>`**；  
    - **`<<<SyntaxFlow_Project_Scan_Check_Report_Excerpt>>>`**（任务表摘录；**完整表 = 流式 report**）；  
    - 若有 SSA：**`<<<SSA_Scan_Report_Excerpt>>>`**，且流式里应有 **ssa_scan_report**，工作区可能有 **`scan_risk_analysis_project/*.md`**；  
+   - **`<<<Risk_Triage_JSON_Instructions>>>`**：**risk_triage.v1.json** 的**绝对路径**与 **固定 Schema**（见下文）；  
    - 可选 **`<<<User_Additional_Context>>>`**。  
 4. **匹配不到任务**：引导用户换用库内真实出现的 `programs` 子串，**禁止**编造 `scan_id`。
+
+## risk_triage.v1.json（固定 Schema，由你写入）
+
+- **文件名**：`risk_triage.v1.json`（与 **`<<<Risk_Triage_JSON_Instructions>>>`** 中的绝对路径一致）。  
+- **文件内容**：**整文件仅为 JSON**，UTF-8、无 BOM，**不要**外包 Markdown 或说明文字。  
+- **Schema**：
+```json
+{
+  "schema_version": 1,
+  "program_hint": "与协调器摘要行一致",
+  "latest_task_id": "与协调器摘要行一致",
+  "items": [
+    {
+      "risk_id": 123,
+      "priority": "high",
+      "reason_zh": "为何需要优先复核（中文）",
+      "evidence_from_report": "可选：规则名/表内摘录等"
+    }
+  ]
+}
+```
+- **规则**：`risk_id` 必须来自 SSA/任务表**真实出现**的列；无可疑项时 **`items": []`**；`schema_version` 必须为 **1**。  
+- **与最终输出的关系**：triage 文件与 **result 阶段 `scan_risk_analysis` action 解析**分离；**务必**用 **`write_file`** 写入上述路径。
 
 ## 与「SSA 项目检查」蓝图的关系
 - 本蓝图会在同一会话里完成「任务表 +（尽量）SSA 报告」的注入，**一般不必**再单独开一次仅任务表蓝图。  
@@ -40,12 +64,23 @@
 <|FINAL_ANSWER_END_<nonce>|>
 ```
 
+## SSA 源码类工具（片段不足时按需扩写）
+
+与 **ssapoc** 一致，下列工具从 **SSA 数据库或本地回退** 取源码（**不要**用 `ls/cat` 扫盘代替）：
+
+1. **`ssa-risk`**：`risk_id`（int）、`get_full_code`（bool，**true** 时在可取时返回**更大代码上下文**）。  
+2. **`ssa-read-file`**：`program_name`、`file_path`（相对路径，不含 `/{ProgramName}/` 前缀）、可选 `start_line` / `line_count`。  
+3. **`ssa-project-info`** / **`ssa-list-files`** / **`ssa-grep`**：按需探索项目结构与路由（与 ssapoc 持久化说明一致）。
+
+**使用策略**：**不要**为「整张风险表」无差别批量调用 `ssa-risk`；**triage `items` 中的 id** 或你明确要深钻的**单条** risk 再调用 **`ssa-risk`（`get_full_code=true`）** 或 **`ssa-read-file`**。以报告内证据写 triage；需要更多源码时再按需调用上述工具。
+
 ## 分析流程（从模型视角）
 1. **读任务表**：确认 `latest_task_id`、programs、风险计数；0 行则停止编造，改做引导。  
-2. **读 SSA**：优先流式 **ssa_scan_report** 或钉选 **`scan_risk_analysis_project/*.md`**；没有全文则按 **`<<<SSA_报告说明>>>`** 让用户导出或填 `additional_context`。**勿**为表格列批量调 `ssa-risk`；单条深钻再按需使用 `ssa-risk` / **ssapoc**。  
-3. **误报分诊**：按 group/规则组织结论；弱证据标 suspicious。  
-4. **交付**：用户可见回复侧重误报结论与 PoC 价值；若引擎另有结构化工件，以实际钉选/提示为准。  
-5. **不做的事**：本模式**不**自动生成 PoC；需要 PoC 时在授权前提下另启 **ssapoc** 并指定真实 `risk_id`。
+2. **读 SSA**：优先流式 **ssa_scan_report** 或钉选 **`scan_risk_analysis_project/*.md`**；没有全文则按 **`<<<SSA_报告说明>>>`** 让用户导出或填 `additional_context`。  
+3. **写 triage JSON**：按 **`<<<Risk_Triage_JSON_Instructions>>>`** 路径与 Schema 使用 **`write_file`** 写入 **`risk_triage.v1.json`**。  
+4. **误报分诊**：按 group/规则组织结论；弱证据标 suspicious。  
+5. **交付**：用户可见回复侧重误报结论与 PoC 价值。  
+6. **不做的事**：本模式**不**自动生成 PoC；需要 PoC 时在授权前提下另启 **ssapoc** 并指定真实 `risk_id`。
 
 ## 输出与文风
 - 中间步骤简洁；长文进 FINAL_ANSWER 或用户可见终稿，避免无意义刷屏。  
