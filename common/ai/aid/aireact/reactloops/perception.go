@@ -1,6 +1,7 @@
 package reactloops
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -12,8 +13,10 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 const (
@@ -23,10 +26,11 @@ const (
 	PerceptionTriggerSpinDetected = "spin_detected"
 	PerceptionTriggerLoopSwitch   = "loop_switch"
 
-	perceptionDefaultMinInterval       = 30 * time.Second
-	perceptionMaxInterval              = 5 * time.Minute
-	perceptionDefaultIterationInterval = 2
-	perceptionMaxContextTokens         = 500
+	perceptionDefaultMinInterval        = 30 * time.Second
+	perceptionMaxInterval               = 5 * time.Minute
+	perceptionDefaultIterationInterval  = 2
+	perceptionMaxContextTokens          = 500
+	perceptionKnowledgeMaxContextTokens = 15 * 1024
 
 	// perceptionMaxInputTokens is the token budget for the entire perception input.
 	// Fields exceeding their share will be shrunk via ShrinkTextBlockByTokens.
@@ -34,6 +38,9 @@ const (
 )
 
 var perceptionCapabilitySearcher = SearchCapabilities
+var perceptionKnowledgeBaseNameLister = func() ([]string, error) {
+	return yakit.GetKnowledgeBaseNameList(consts.GetGormProfileDatabase())
+}
 
 // PerceptionState holds the structured output of a single perception evaluation.
 // It captures what the user is currently doing in concise, searchable form.
@@ -364,6 +371,274 @@ func (r *ReActLoop) applyPerceptionCapabilitySearchResult(result *CapabilitySear
 	PopulateExtraCapabilitiesFromCapabilitySearchResult(r.GetInvoker(), r, result)
 }
 
+func (r *ReActLoop) clearPerceptionKnowledgeSearchResult() {
+	if r == nil {
+		return
+	}
+	for _, key := range []string{
+		"perception_selected_knowledge_bases",
+		"perception_knowledge_query",
+		"perception_knowledge_context",
+	} {
+		r.Delete(key)
+	}
+}
+
+func (r *ReActLoop) allowPerceptionKnowledgeRefresh() bool {
+	if r == nil {
+		return false
+	}
+	if r.allowRAG == nil {
+		return false
+	}
+	return r.allowRAG()
+}
+
+func (r *ReActLoop) buildPerceptionKnowledgeSearchQuery(state *PerceptionState) string {
+	if state == nil {
+		return ""
+	}
+
+	var parts []string
+	if summary := strings.TrimSpace(state.OneLinerSummary); summary != "" {
+		parts = append(parts, summary)
+	}
+	if topics := normalizeCapabilityStrings(state.Topics); len(topics) > 0 {
+		parts = append(parts, "Topics: "+strings.Join(topics, ", "))
+	}
+	if keywords := normalizeCapabilityStrings(state.Keywords); len(keywords) > 0 {
+		parts = append(parts, "Keywords: "+strings.Join(keywords, ", "))
+	}
+
+	query := strings.TrimSpace(strings.Join(parts, "\n"))
+	if query == "" {
+		return ""
+	}
+	return aicommon.ShrinkTextBlockByTokens(query, 2048)
+}
+
+func (r *ReActLoop) buildPerceptionKnowledgeKeywordQuery(state *PerceptionState) string {
+	if state == nil {
+		return ""
+	}
+
+	values := normalizeCapabilityStrings(append(append([]string{}, state.Keywords...), state.Topics...))
+	if len(values) == 0 {
+		return ""
+	}
+	return strings.Join(values, " ")
+}
+
+func splitPerceptionKnowledgeBaseNames(raw string) []string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	return normalizeCapabilityStrings(strings.FieldsFunc(raw, func(r rune) bool {
+		return r == ',' || r == '\n'
+	}))
+}
+
+func (r *ReActLoop) resolvePerceptionKnowledgeBases(
+	ctx context.Context,
+	invoker aicommon.AIInvokeRuntime,
+	searchQuery string,
+) []string {
+	if r == nil || utils.IsNil(invoker) {
+		return nil
+	}
+
+	allKBNames, err := perceptionKnowledgeBaseNameLister()
+	if err != nil {
+		log.Warnf("perception knowledge: failed to load all knowledge base names: %v", err)
+	} else {
+		allKBNames = normalizeCapabilityStrings(allKBNames)
+		if len(allKBNames) > 0 {
+			return allKBNames
+		}
+	}
+
+	if kbNames := splitPerceptionKnowledgeBaseNames(r.Get("knowledge_bases")); len(kbNames) > 0 {
+		return kbNames
+	}
+
+	task := r.GetCurrentTask()
+	var knowledgeBases []string
+	includeAllKnowledgeBases := false
+	autoSelectKnowledgeBases := false
+	if task != nil {
+		for _, data := range task.GetAttachedDatas() {
+			if data == nil || data.Type != aicommon.CONTEXT_PROVIDER_TYPE_KNOWLEDGE_BASE {
+				continue
+			}
+			if data.Key == aicommon.CONTEXT_PROVIDER_KEY_SYSTEM_FLAG {
+				switch {
+				case data.Value == aicommon.CONTEXT_PROVIDER_VALUE_ALL_KNOWLEDGE_BASE:
+					includeAllKnowledgeBases = true
+					autoSelectKnowledgeBases = false
+					continue
+				case strings.HasPrefix(data.Value, aicommon.CONTEXT_PROVIDER_VALUE_AUTO_SELECT_KNOWLEDGE_BASE):
+					autoSelectKnowledgeBases = true
+					includeAllKnowledgeBases = false
+					continue
+				}
+			}
+			knowledgeBases = append(knowledgeBases, data.Value)
+		}
+	}
+
+	if includeAllKnowledgeBases {
+		knowledgeBases = append(knowledgeBases, allKBNames...)
+	}
+	if autoSelectKnowledgeBases {
+		knowledgeBases = nil
+	}
+
+	knowledgeBases = normalizeCapabilityStrings(knowledgeBases)
+	if len(knowledgeBases) > 0 {
+		return knowledgeBases
+	}
+
+	selectResult, err := invoker.SelectKnowledgeBase(ctx, searchQuery)
+	if err != nil {
+		log.Warnf("perception knowledge: select knowledge bases failed: %v", err)
+		return nil
+	}
+	if selectResult == nil {
+		return nil
+	}
+	return normalizeCapabilityStrings(selectResult.KnowledgeBases)
+}
+
+func formatPerceptionKnowledgeContext(query string, knowledgeBases []string, content string) string {
+	query = strings.TrimSpace(query)
+	content = strings.TrimSpace(content)
+	knowledgeBases = normalizeCapabilityStrings(knowledgeBases)
+
+	if query == "" || content == "" {
+		return ""
+	}
+
+	var buf strings.Builder
+	buf.WriteString("## Perception Knowledge\n")
+	buf.WriteString("This knowledge was refreshed after a perception update.\n")
+	if len(knowledgeBases) > 0 {
+		buf.WriteString("Knowledge Bases: ")
+		buf.WriteString(strings.Join(knowledgeBases, ", "))
+		buf.WriteString("\n")
+	}
+	buf.WriteString("Query: ")
+	buf.WriteString(query)
+	buf.WriteString("\n\n")
+	buf.WriteString(content)
+
+	result := buf.String()
+	if aicommon.MeasureTokens(result) > perceptionKnowledgeMaxContextTokens {
+		result = aicommon.ShrinkTextBlockByTokens(result, perceptionKnowledgeMaxContextTokens)
+	}
+	return strings.TrimSpace(result)
+}
+
+func (r *ReActLoop) applyPerceptionKnowledgeSearchResult(query string, knowledgeBases []string, content string) {
+	if r == nil {
+		return
+	}
+
+	r.clearPerceptionKnowledgeSearchResult()
+	query = strings.TrimSpace(query)
+	knowledgeBases = normalizeCapabilityStrings(knowledgeBases)
+	content = strings.TrimSpace(content)
+	if content == "" {
+		return
+	}
+
+	if query != "" {
+		r.Set("perception_knowledge_query", query)
+	}
+	if len(knowledgeBases) > 0 {
+		r.Set("perception_selected_knowledge_bases", strings.Join(knowledgeBases, ","))
+	}
+	r.Set("perception_knowledge_context", content)
+}
+
+func (r *ReActLoop) refreshKnowledgeFromPerception(state *PerceptionState) {
+	if r == nil || state == nil {
+		return
+	}
+
+	r.clearPerceptionKnowledgeSearchResult()
+	if !r.allowPerceptionKnowledgeRefresh() {
+		return
+	}
+
+	invoker := r.GetInvoker()
+	if utils.IsNil(invoker) {
+		return
+	}
+
+	task := r.GetCurrentTask()
+	if task == nil {
+		return
+	}
+
+	ctx := r.config.GetContext()
+	if taskCtx := task.GetContext(); !utils.IsNil(taskCtx) {
+		ctx = taskCtx
+	}
+
+	searchQuery := r.buildPerceptionKnowledgeSearchQuery(state)
+	if searchQuery == "" {
+		return
+	}
+
+	knowledgeBases := r.resolvePerceptionKnowledgeBases(ctx, invoker, searchQuery)
+	if len(knowledgeBases) == 0 {
+		log.Debugf("perception knowledge: no knowledge bases available for query: %s", utils.ShrinkString(searchQuery, 120))
+		return
+	}
+
+	usedQuery := searchQuery
+	enhancePlans := []string{"hypothetical_answer", "generalize_query", "split_query"}
+	enhanceData, err := invoker.EnhanceKnowledgeGetterEx(ctx, usedQuery, enhancePlans, knowledgeBases...)
+	if err != nil {
+		log.Warnf("perception knowledge search failed: %v", err)
+		return
+	}
+
+	if strings.TrimSpace(enhanceData) == "" {
+		if keywordQuery := r.buildPerceptionKnowledgeKeywordQuery(state); keywordQuery != "" && keywordQuery != usedQuery {
+			usedQuery = keywordQuery
+			enhanceData, err = invoker.EnhanceKnowledgeGetterEx(ctx, usedQuery, []string{"exact_keyword_search"}, knowledgeBases...)
+			if err != nil {
+				log.Warnf("perception knowledge keyword fallback failed: %v", err)
+				return
+			}
+		}
+	}
+
+	enhanceData = strings.TrimSpace(enhanceData)
+	if enhanceData == "" {
+		return
+	}
+
+	compressed, err := invoker.CompressLongTextWithDestination(ctx, enhanceData, usedQuery, perceptionKnowledgeMaxContextTokens)
+	if err != nil {
+		log.Warnf("perception knowledge compression failed: %v", err)
+		compressed = enhanceData
+	}
+	compressed = strings.TrimSpace(compressed)
+	if compressed == "" {
+		compressed = enhanceData
+	}
+
+	contextBlock := formatPerceptionKnowledgeContext(usedQuery, knowledgeBases, compressed)
+	if contextBlock == "" {
+		return
+	}
+
+	r.applyPerceptionKnowledgeSearchResult(usedQuery, knowledgeBases, contextBlock)
+}
+
 func (r *ReActLoop) refreshCapabilitiesFromPerception(state *PerceptionState) {
 	if r == nil || state == nil {
 		return
@@ -376,10 +651,12 @@ func (r *ReActLoop) refreshCapabilitiesFromPerception(state *PerceptionState) {
 
 	input := r.buildPerceptionCapabilitySearchInput(state)
 	if strings.TrimSpace(input.Query) == "" && len(input.Queries) == 0 {
+		writePerceptionDebugMarkdown(r, state, input, nil, nil)
 		return
 	}
 
 	searchResult, err := perceptionCapabilitySearcher(invoker, r, input)
+	defer writePerceptionDebugMarkdown(r, state, input, searchResult, err)
 	if err != nil {
 		log.Warnf("perception capability search failed (epoch=%d, trigger=%s): %v", state.Epoch, state.LastTrigger, err)
 		return
@@ -488,6 +765,7 @@ func (r *ReActLoop) TriggerPerception(reason string, force bool) *PerceptionStat
 	currentState, updated := r.perception.applyResult(parsed)
 	if updated {
 		r.refreshCapabilitiesFromPerception(currentState)
+		r.refreshKnowledgeFromPerception(currentState)
 	}
 
 	if scheduler, ok := invoker.(midtermTimelineRecallScheduler); ok {
@@ -579,6 +857,13 @@ func (r *ReActLoop) RegisterPerceptionContextProvider() {
 			return "", nil
 		}
 		return state.FormatForContext(), nil
+	})
+	mgr.RegisterTracedContent("perception_knowledge", func(
+		config aicommon.AICallerConfigIf,
+		emitter *aicommon.Emitter,
+		key string,
+	) (string, error) {
+		return strings.TrimSpace(r.Get("perception_knowledge_context")), nil
 	})
 	log.Infof("perception context provider registered for loop %s", r.loopName)
 }
