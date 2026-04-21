@@ -36,30 +36,26 @@ func extractCfgCtx(v sfvm.ValueOperator) (*CfgCtxValue, bool) {
 	return c, ok
 }
 
-func fetchProgramFromCfgValues(v sfvm.Values) (*Program, error) {
-	if p, err := fetchProgram(v); err == nil && p != nil {
-		return p, nil
-	}
-	var prog *Program
+// valuesPipeHasCfgCtx reports whether the value pipe already carries at least one non-empty CfgCtxValue.
+func valuesPipeHasCfgCtx(v sfvm.Values) bool {
+	found := false
 	_ = v.Recursive(func(op sfvm.ValueOperator) error {
-		if c, ok := op.(*CfgCtxValue); ok && c != nil && c.prog != nil {
-			prog = c.prog
+		if c, ok := extractCfgCtx(op); ok && c != nil && !c.IsEmpty() {
+			found = true
 			return utils.Error("abort")
 		}
 		return nil
 	})
-	if prog != nil {
-		return prog, nil
-	}
-	return nil, utils.Error("no parent program found")
+	return found
 }
 
-func nativeCallGetCFG(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
+// expandValuesToCfgCtxList maps each SSA *Value under v to a CfgCtxValue (same rules as <getCfg>).
+func expandValuesToCfgCtxList(v sfvm.Values) ([]sfvm.ValueOperator, *Program, error) {
 	prog, err := fetchProgram(v)
 	if err != nil {
-		return false, nil, err
+		return nil, nil, err
 	}
-	var out []sfvm.ValueOperator
+	var outs []sfvm.ValueOperator
 	_ = v.Recursive(func(op sfvm.ValueOperator) error {
 		val, ok := op.(*Value)
 		if !ok || val == nil || val.IsNil() {
@@ -81,11 +77,54 @@ func nativeCallGetCFG(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCal
 			InstID:  inst.GetId(),
 		}
 		ctx.SetAnchorBitVector(op.GetAnchorBitVector())
-		out = append(out, ctx)
+		outs = append(outs, ctx)
 		return nil
 	})
-	if len(out) == 0 {
-		return false, nil, utils.Error("no cfg ctx produced")
+	if len(outs) == 0 {
+		return nil, nil, utils.Error("no cfg ctx produced")
+	}
+	return outs, prog, nil
+}
+
+// coerceCfgCallInputs ensures the pipe carries CfgCtxValue: if it already does, returns v unchanged;
+// otherwise applies implicit <getCfg>-style expansion from SSA values.
+func coerceCfgCallInputs(v sfvm.Values) (sfvm.Values, *Program, error) {
+	if valuesPipeHasCfgCtx(v) {
+		prog, err := fetchProgramFromCfgValues(v)
+		if err != nil {
+			return nil, nil, err
+		}
+		return v, prog, nil
+	}
+	outs, prog, err := expandValuesToCfgCtxList(v)
+	if err != nil {
+		return nil, nil, err
+	}
+	return sfvm.NewValues(outs), prog, nil
+}
+
+func fetchProgramFromCfgValues(v sfvm.Values) (*Program, error) {
+	if p, err := fetchProgram(v); err == nil && p != nil {
+		return p, nil
+	}
+	var prog *Program
+	_ = v.Recursive(func(op sfvm.ValueOperator) error {
+		if c, ok := op.(*CfgCtxValue); ok && c != nil && c.prog != nil {
+			prog = c.prog
+			return utils.Error("abort")
+		}
+		return nil
+	})
+	if prog != nil {
+		return prog, nil
+	}
+	return nil, utils.Error("no parent program found")
+}
+
+func nativeCallGetCFG(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.Values, error) {
+	out, _, err := expandValuesToCfgCtxList(v)
+	if err != nil {
+		return false, nil, err
 	}
 	return true, sfvm.NewValues(out), nil
 }
@@ -124,6 +163,29 @@ func nativeCallCFGConditionValues(v sfvm.Values, frame *sfvm.SFFrame, params *sf
 	})
 }
 
+func firstCfgCtxFromSymbolValues(vals sfvm.Values) (*CfgCtxValue, error) {
+	var first *CfgCtxValue
+	_ = vals.Recursive(func(operator sfvm.ValueOperator) error {
+		if c, ok := operator.(*CfgCtxValue); ok && c != nil && !c.IsEmpty() {
+			first = c
+			return utils.Error("abort")
+		}
+		return nil
+	})
+	if first != nil {
+		return first, nil
+	}
+	outs, _, err := expandValuesToCfgCtxList(vals)
+	if err != nil {
+		return nil, err
+	}
+	c0, ok := outs[0].(*CfgCtxValue)
+	if !ok || c0 == nil {
+		return nil, utils.Error("cfg*: internal: expected CfgCtxValue from SSA value expansion")
+	}
+	return c0, nil
+}
+
 func resolveCfgTargetFromFrame(frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (*CfgCtxValue, error) {
 	if frame == nil {
 		return nil, utils.Error("cfg*: frame is nil")
@@ -136,20 +198,13 @@ func resolveCfgTargetFromFrame(frame *sfvm.SFFrame, params *sfvm.NativeCallActua
 		return nil, utils.Error("cfg*: 'target' parameter is required (e.g. target=$sinkCfg)")
 	}
 	targetVar = strings.TrimPrefix(targetVar, "$")
-	targetOp, ok := frame.GetSymbolByName(targetVar)
-	if !ok || targetOp == nil {
+	targetVals, ok := frame.GetSymbolByName(targetVar)
+	if !ok || targetVals == nil {
 		return nil, utils.Errorf("cfg*: variable '$%s' not found in current frame", targetVar)
 	}
-	var first *CfgCtxValue
-	_ = targetOp.Recursive(func(operator sfvm.ValueOperator) error {
-		if c, ok := operator.(*CfgCtxValue); ok && c != nil && !c.IsEmpty() {
-			first = c
-			return utils.Error("abort")
-		}
-		return nil
-	})
-	if first == nil {
-		return nil, utils.Errorf("cfg*: variable '$%s' contains no cfg ctx value (did you call <getCfg>?)", targetVar)
+	first, err := firstCfgCtxFromSymbolValues(targetVals)
+	if err != nil {
+		return nil, utils.Wrapf(err, "cfg*: variable '$%s' has no cfg anchor (use <getCfg> or an SSA value with func/block/inst)", targetVar)
 	}
 	return first, nil
 }
@@ -157,16 +212,16 @@ func resolveCfgTargetFromFrame(frame *sfvm.SFFrame, params *sfvm.NativeCallActua
 // mapCfgCtxAgainstTarget resolves `target` from the frame, then evaluates fn(prog, recv, targ)
 // for each cfg ctx recv on the value stack (SyntaxFlow pipeline cfg).
 func mapCfgCtxAgainstTarget(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams, opName string, fn func(prog *Program, recv, targ *CfgCtxValue) bool) (bool, sfvm.Values, error) {
-	prog, err := fetchProgramFromCfgValues(v)
+	pipe, prog, err := coerceCfgCallInputs(v)
 	if err != nil {
-		return false, nil, err
+		return false, nil, utils.Wrap(err, opName)
 	}
 	target, err := resolveCfgTargetFromFrame(frame, params)
 	if err != nil {
 		return false, nil, utils.Wrap(err, opName)
 	}
 	var out []sfvm.ValueOperator
-	_ = v.Recursive(func(op sfvm.ValueOperator) error {
+	_ = pipe.Recursive(func(op sfvm.ValueOperator) error {
 		receiver, ok := extractCfgCtx(op)
 		if !ok || receiver.IsEmpty() {
 			return nil
@@ -211,9 +266,13 @@ func nativeCallCFGReachable(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.Nat
 	if err != nil {
 		return false, nil, utils.Wrap(err, "cfgReachable")
 	}
+	pipe, _, err := coerceCfgCallInputs(v)
+	if err != nil {
+		return false, nil, utils.Wrap(err, "cfgReachable")
+	}
 	icfg := parseBoolParam(params, "icfg", false)
 	opt := reachableOptsFromParams(params, icfg)
-	return mapCfgCtxValues(v, "cfgReachable: no cfg ctx values", func(prog *Program, _ sfvm.ValueOperator, a *CfgCtxValue, out *[]sfvm.ValueOperator) {
+	return mapCfgCtxValues(pipe, "cfgReachable: no cfg ctx values", func(prog *Program, _ sfvm.ValueOperator, a *CfgCtxValue, out *[]sfvm.ValueOperator) {
 		*out = append(*out, prog.NewConstValue(reachableWithOptions(prog, a, target, opt)))
 	})
 }
@@ -223,9 +282,13 @@ func nativeCallCFGReachPath(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.Nat
 	if err != nil {
 		return false, nil, utils.Wrap(err, "cfgReachPath")
 	}
+	pipe, _, err := coerceCfgCallInputs(v)
+	if err != nil {
+		return false, nil, utils.Wrap(err, "cfgReachPath")
+	}
 	icfg := parseBoolParam(params, "icfg", false)
 	opt := reachableOptsFromParams(params, icfg)
-	return mapCfgCtxValues(v, "cfgReachPath: no cfg ctx values", func(prog *Program, _ sfvm.ValueOperator, a *CfgCtxValue, out *[]sfvm.ValueOperator) {
+	return mapCfgCtxValues(pipe, "cfgReachPath: no cfg ctx values", func(prog *Program, _ sfvm.ValueOperator, a *CfgCtxValue, out *[]sfvm.ValueOperator) {
 		s := cfgReachShortestPathString(prog, a, target, opt)
 		*out = append(*out, prog.NewConstValue(s))
 	})
