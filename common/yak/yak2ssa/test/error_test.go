@@ -5,10 +5,13 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	test "github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 	"github.com/yaklang/yaklang/common/yak/yak2ssa"
 )
 
@@ -1277,6 +1280,25 @@ func TestExternInstance(t *testing.T) {
 				"print": func(any) {},
 			},
 		})
+	})
+
+	t.Run("extern collision in parameter should report parameter position", func(t *testing.T) {
+		code := `
+		maxRetry = 3
+		retryHandler = func(https, retryCount, req, rsp, retry) {
+			if retryCount > maxRetry {
+				return
+			}
+		}
+		`
+		prog, err := ssaapi.Parse(code, static_analyzer.GetPluginSSAOpt("yak")...)
+		require.NoError(t, err)
+
+		errs := prog.GetErrors()
+		require.NotEmpty(t, errs)
+		require.Equal(t, ssa.ContAssignExtern("retry"), errs[0].Message)
+		require.Equal(t, "retry", errs[0].Pos.GetText())
+		require.Equal(t, 3, errs[0].Pos.GetStart().GetLine())
 	})
 }
 

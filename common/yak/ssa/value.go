@@ -4,8 +4,37 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
+
+func getAssignExternErrorPos(scope ScopeIF, variable *Variable) *memedit.Range {
+	if variable == nil {
+		return nil
+	}
+
+	name := variable.GetName()
+	for _, candidate := range GetAllVariablesFromScopeAndParent(scope, name) {
+		if candidate.DefRange != nil && strings.TrimSpace(candidate.DefRange.GetText()) == name {
+			return candidate.DefRange
+		}
+	}
+
+	current := variable
+	for current != nil {
+		if current.DefRange != nil && strings.TrimSpace(current.DefRange.GetText()) == name {
+			return current.DefRange
+		}
+
+		captured, ok := current.GetCaptured().(*Variable)
+		if !ok || captured == nil || captured.GetGlobalIndex() == current.GetGlobalIndex() {
+			break
+		}
+		current = captured
+	}
+
+	return variable.DefRange
+}
 
 // --------------- Read
 
@@ -285,7 +314,7 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 	}
 
 	if b.TryBuildExternValue(variable.GetName()) != nil {
-		b.NewErrorWithPos(Warn, SSATAG, b.CurrentRange, ContAssignExtern(variable.GetName()))
+		b.NewErrorWithPos(Warn, SSATAG, getAssignExternErrorPos(scope, variable), ContAssignExtern(variable.GetName()))
 	}
 
 	// if not freeValue, or not `a = a`(just create FreeValue)
