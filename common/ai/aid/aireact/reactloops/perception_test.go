@@ -69,6 +69,62 @@ func (i *perceptionCapabilitySearchTestInvoker) InvokeSpeedPriorityLiteForge(ctx
 	}`, "perception")
 }
 
+type perceptionKnowledgeSearchTestInvoker struct {
+	*mockcfg.MockInvoker
+	cfg                    aicommon.AICallerConfigIf
+	selectedKnowledgeBase  []string
+	enhanceResult          string
+	compressedResult       string
+	lastEnhanceQuery       string
+	lastEnhancePlans       []string
+	lastEnhanceCollections []string
+	lastCompressTarget     int64
+	selectCalls            int
+}
+
+func (i *perceptionKnowledgeSearchTestInvoker) GetConfig() aicommon.AICallerConfigIf {
+	return i.cfg
+}
+
+func (i *perceptionKnowledgeSearchTestInvoker) InvokeSpeedPriorityLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...aicommon.GeneralKVConfigOption) (*aicommon.Action, error) {
+	_ = ctx
+	_ = actionName
+	_ = prompt
+	_ = outputs
+	_ = opts
+	return aicommon.ExtractAction(`{
+		"@action": "perception",
+		"summary": "focused summary from perception",
+		"topics": ["http fuzzing"],
+		"keywords": ["header", "malformed"],
+		"changed": true,
+		"confidence": 0.92
+	}`, "perception")
+}
+
+func (i *perceptionKnowledgeSearchTestInvoker) SelectKnowledgeBase(ctx context.Context, originQuery string) (*aicommon.SelectedKnowledgeBaseResult, error) {
+	_ = ctx
+	_ = originQuery
+	i.selectCalls++
+	return aicommon.NewSelectedKnowledgeBaseResult("test selection", append([]string{}, i.selectedKnowledgeBase...)), nil
+}
+
+func (i *perceptionKnowledgeSearchTestInvoker) EnhanceKnowledgeGetterEx(ctx context.Context, userQuery string, enhancePlans []string, collections ...string) (string, error) {
+	_ = ctx
+	i.lastEnhanceQuery = userQuery
+	i.lastEnhancePlans = append([]string{}, enhancePlans...)
+	i.lastEnhanceCollections = append([]string{}, collections...)
+	return i.enhanceResult, nil
+}
+
+func (i *perceptionKnowledgeSearchTestInvoker) CompressLongTextWithDestination(ctx context.Context, input any, destination string, targetByteSize int64) (string, error) {
+	_ = ctx
+	_ = input
+	_ = destination
+	i.lastCompressTarget = targetByteSize
+	return i.compressedResult, nil
+}
+
 func TestTriggerPerception_SchedulesMidtermRecallSummary(t *testing.T) {
 	invoker := &perceptionMidtermSchedulerTestInvoker{
 		MockInvoker: mockcfg.NewMockInvoker(context.Background()),
@@ -148,6 +204,86 @@ func TestTriggerPerception_AppliesCapabilitySearchResultsToLoop(t *testing.T) {
 
 	rendered := loop.extraCapabilities.Render("nonce")
 	require.Contains(t, rendered, "`perception_tool`")
+}
+
+func TestTriggerPerception_AppliesKnowledgeSearchResultsToLoop(t *testing.T) {
+	cfg := &aicommon.Config{
+		Ctx:                    context.Background(),
+		ContextProviderManager: aicommon.NewContextProviderManager(),
+	}
+	invoker := &perceptionKnowledgeSearchTestInvoker{
+		MockInvoker:           mockcfg.NewMockInvoker(context.Background()),
+		cfg:                   cfg,
+		selectedKnowledgeBase: []string{"security_kb"},
+		enhanceResult:         "raw knowledge result",
+		compressedResult:      "compressed knowledge result",
+	}
+
+	loop := NewMinimalReActLoop(cfg, invoker)
+	loop.loopName = "perception-knowledge-search-test"
+	loop.perception = newPerceptionController()
+	loop.allowRAG = func() bool { return true }
+	loop.maxIterations = 100
+	loop.actionHistory = make([]*ActionRecord, 0)
+	loop.actionHistoryMutex = new(sync.Mutex)
+	loop.SetCurrentTask(aicommon.NewStatefulTaskBase("perception-knowledge-task", "help me fuzz this endpoint", context.Background(), cfg.GetEmitter(), true))
+	loop.RegisterPerceptionContextProvider()
+
+	originalKBLister := perceptionKnowledgeBaseNameLister
+	perceptionKnowledgeBaseNameLister = func() ([]string, error) {
+		return []string{"security_kb", "yaklang_docs"}, nil
+	}
+	defer func() {
+		perceptionKnowledgeBaseNameLister = originalKBLister
+	}()
+
+	state := loop.TriggerPerception(PerceptionTriggerForced, true)
+	require.NotNil(t, state)
+	require.Equal(t, "security_kb,yaklang_docs", loop.Get("perception_selected_knowledge_bases"))
+	require.Contains(t, loop.Get("perception_knowledge_query"), "focused summary from perception")
+	require.Contains(t, loop.Get("perception_knowledge_context"), "compressed knowledge result")
+	require.Equal(t, int64(perceptionKnowledgeMaxContextTokens), invoker.lastCompressTarget)
+	require.Equal(t, []string{"security_kb", "yaklang_docs"}, invoker.lastEnhanceCollections)
+	require.Equal(t, []string{"hypothetical_answer", "generalize_query", "split_query"}, invoker.lastEnhancePlans)
+	require.Equal(t, 0, invoker.selectCalls)
+
+	renderedDynamicContext := cfg.ContextProviderManager.Execute(cfg, cfg.GetEmitter())
+	require.Contains(t, renderedDynamicContext, "## Perception Knowledge")
+	require.Contains(t, renderedDynamicContext, "security_kb")
+	require.Contains(t, renderedDynamicContext, "yaklang_docs")
+	require.Contains(t, renderedDynamicContext, "compressed knowledge result")
+}
+
+func TestTriggerPerception_LimitsKnowledgeContextTo15K(t *testing.T) {
+	oversizedKnowledge := strings.Repeat("knowledge ", perceptionKnowledgeMaxContextTokens+2048)
+
+	cfg := &aicommon.Config{
+		Ctx:                    context.Background(),
+		ContextProviderManager: aicommon.NewContextProviderManager(),
+	}
+	invoker := &perceptionKnowledgeSearchTestInvoker{
+		MockInvoker:           mockcfg.NewMockInvoker(context.Background()),
+		cfg:                   cfg,
+		selectedKnowledgeBase: []string{"security_kb"},
+		enhanceResult:         "raw knowledge result",
+		compressedResult:      oversizedKnowledge,
+	}
+
+	loop := NewMinimalReActLoop(cfg, invoker)
+	loop.loopName = "perception-knowledge-size-limit-test"
+	loop.perception = newPerceptionController()
+	loop.allowRAG = func() bool { return true }
+	loop.maxIterations = 100
+	loop.actionHistory = make([]*ActionRecord, 0)
+	loop.actionHistoryMutex = new(sync.Mutex)
+	loop.SetCurrentTask(aicommon.NewStatefulTaskBase("perception-knowledge-limit-task", "help me fuzz this endpoint", context.Background(), cfg.GetEmitter(), true))
+
+	state := loop.TriggerPerception(PerceptionTriggerForced, true)
+	require.NotNil(t, state)
+
+	knowledgeContext := loop.Get("perception_knowledge_context")
+	require.NotEmpty(t, knowledgeContext)
+	require.LessOrEqual(t, aicommon.MeasureTokens(knowledgeContext), perceptionKnowledgeMaxContextTokens)
 }
 
 func TestHashTopics_DeterministicAndOrderIndependent(t *testing.T) {
