@@ -1,12 +1,14 @@
 package mitmextractdb
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"google.golang.org/protobuf/proto"
 )
@@ -29,6 +31,7 @@ func mitmAggregateReqForDistinctRuleGroups(req *ypb.QueryMITMExtractedAggregateR
 	}
 	c := proto.Clone(req).(*ypb.QueryMITMExtractedAggregateRequest)
 	c.RuleGroup = ""
+	c.RuleGroupKeyword = ""
 	c.OnlyUncategorizedRules = false
 	c.RuleVerbose = nil
 	c.IncludeDistinctRuleGroups = false
@@ -83,7 +86,7 @@ func mitmExtractAggregateBaseDB(db *gorm.DB, req *ypb.QueryMITMExtractedAggregat
 		q = q.Where("ed.rule_verbose IN (?)", rv)
 	}
 	if kw := strings.TrimSpace(req.GetRuleVerboseKeyword()); kw != "" {
-		q = bizhelper.FuzzSearchEx(q, []string{"ed.rule_verbose"}, kw, false)
+		q = bizhelper.FuzzSearchEx(q, []string{"ed.rule_verbose", "ed.data"}, kw, false)
 	}
 	if req.GetUpdatedAtSince() > 0 {
 		q = q.Where("ed.updated_at >= ?", time.Unix(req.GetUpdatedAtSince(), 0))
@@ -94,6 +97,14 @@ func mitmExtractAggregateBaseDB(db *gorm.DB, req *ypb.QueryMITMExtractedAggregat
 		expr := mitmExtractRuleGroupSQLExpr()
 		q = q.Where(mitmExtractRuleGroupInstrExpr+` > 0`, mitmExtractRuleGroupSep).
 			Where(expr+` = ?`, mitmExtractRuleGroupSep, g)
+	} else if gkw := strings.TrimSpace(req.GetRuleGroupKeyword()); gkw != "" {
+		expr := mitmExtractRuleGroupSQLExpr()
+		q = q.Where(mitmExtractRuleGroupInstrExpr+` > 0`, mitmExtractRuleGroupSep).
+			Where("("+expr+") LIKE ?", mitmExtractRuleGroupSep, fmt.Sprintf("%%%s%%", gkw))
+	}
+	if hf := req.GetHttpFlowFilter(); yakit.HTTPFlowRequestHasNonEmptyFilter(hf) {
+		flowQ := yakit.FilterHTTPFlow(db.New(), hf).Select("id")
+		q = q.Where("hf.id IN (?)", flowQ.QueryExpr())
 	}
 	return q
 }

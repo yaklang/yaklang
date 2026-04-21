@@ -93,16 +93,15 @@ func (s *Server) DeleteMITMRuleExtractedData(ctx context.Context, req *ypb.Delet
 	return &ypb.Empty{}, nil
 }
 
-// DeduplicateMITMRuleExtractedData 按 trace_id+规则名+规则数据去重，即对指定包内的提取数据去重，
-// 删除重复项（保留 id 最小的一条）。Filter 为空或 Filter.TraceID 为空时对全表去重。
+// DeduplicateMITMRuleExtractedData 按 trace_id+规则名+规则数据去重，
+// 删除重复项（保留 id 最小的一条）。支持通过 Filter（TraceID/RuleVerbose/Keyword 等）限定作用范围。
 func (s *Server) DeduplicateMITMRuleExtractedData(ctx context.Context, req *ypb.DeduplicateMITMRuleExtractedDataRequest) (*ypb.DeduplicateMITMRuleExtractedDataResponse, error) {
 	db := s.GetProjectDatabase()
-	filter := req.GetFilter()
-	var traceIds []string
-	if filter != nil {
-		traceIds = filter.GetTraceID()
+	var dataFilter *ypb.ExtractedDataFilter
+	if req != nil {
+		dataFilter = req.GetFilter()
 	}
-	deleted, err := yakit.DeduplicateExtractedData(db, traceIds...)
+	deleted, err := yakit.DeduplicateExtractedDataByFilter(db, dataFilter)
 	if err != nil {
 		return nil, err
 	}

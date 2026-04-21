@@ -99,13 +99,20 @@ func BatchDeleteExtractedDataByIDs(db *gorm.DB, ids []int64) error {
 // DeduplicateExtractedData 按 (trace_id, rule_verbose, data) 去重，即对指定包内的提取数据去重，
 // 每组保留 id 最小的一条。traceIds 为空时对全表去重；非空时仅处理指定 trace_id 的记录。
 func DeduplicateExtractedData(db *gorm.DB, traceIds ...string) (int64, error) {
+	if len(traceIds) == 0 {
+		return DeduplicateExtractedDataByFilter(db, nil)
+	}
+	return DeduplicateExtractedDataByFilter(db, &ypb.ExtractedDataFilter{TraceID: traceIds})
+}
+
+// DeduplicateExtractedDataByFilter 按 ExtractedDataFilter 先过滤数据，再对过滤结果按
+// (trace_id, rule_verbose, data) 去重，每组保留 id 最小的一条。
+func DeduplicateExtractedDataByFilter(db *gorm.DB, dataFilter *ypb.ExtractedDataFilter) (int64, error) {
 	if err := db.AutoMigrate(&schema.ExtractedData{}).Error; err != nil {
 		return 0, err
 	}
 	db = db.Model(&schema.ExtractedData{})
-	if len(traceIds) > 0 {
-		db = bizhelper.ExactQueryStringArrayOr(db, "trace_id", traceIds)
-	}
+	db = FilterExtractedData(db, dataFilter)
 	var list []schema.ExtractedData
 	if err := db.Select("id, trace_id, rule_verbose, data").Find(&list).Error; err != nil {
 		return 0, err
