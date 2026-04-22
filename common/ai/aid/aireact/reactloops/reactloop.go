@@ -120,10 +120,10 @@ type ReActLoop struct {
 	// verificationRuntimeSnapshot stores the last verification gate baseline so
 	// generic auto-verification can compare the current loop state against the
 	// previous accepted checkpoint.
-	periodicVerificationCount int // when == 0 , trigger every iteration;
-	verificationRuntimeSnapshot *VerificationRuntimeSnapshot
-	verificationMutex           *sync.Mutex
-	verificationWatchdogTimer   *time.Timer
+	periodicVerificationInterval int // when == 0 , trigger every iteration;
+	verificationRuntimeSnapshot  *VerificationRuntimeSnapshot
+	verificationMutex            *sync.Mutex
+	verificationWatchdogTimer    *time.Timer
 
 	// timeline differ for tracking changes during task execution
 	timelineDiffer        *aicommon.TimelineDiffer
@@ -367,31 +367,31 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 	config := invoker.GetConfig()
 
 	r := &ReActLoop{
-		invoker:                     invoker,
-		loopName:                    name,
-		config:                      config,
-		emitter:                     config.GetEmitter(),
-		maxIterations:               100,
-		periodicVerificationCount:   verificationIterationTriggerInterval,
-		verificationMutex:           new(sync.Mutex),
-		actions:                     omap.NewEmptyOrderedMap[string, *LoopAction](),
-		loopActions:                 omap.NewEmptyOrderedMap[string, LoopActionFactory](),
-		streamFields:                omap.NewEmptyOrderedMap[string, *LoopStreamField](),
-		aiTagFields:                 omap.NewEmptyOrderedMap[string, *LoopAITagField](),
-		vars:                        omap.NewEmptyOrderedMap[string, any](),
-		taskMutex:                   new(sync.Mutex),
-		currentMemories:             omap.NewEmptyOrderedMap[string, *aicommon.MemoryEntity](),
-		memorySizeLimit:             10 * 1024,
-		enableSelfReflection:        true,
-		historySatisfactionReasons:  make([]*SatisfactionRecord, 0),
-		actionHistory:               make([]*ActionRecord, 0),
-		actionHistoryMutex:          new(sync.Mutex),
-		currentIterationIndex:       0,
-		sameActionTypeSpinThreshold: 3, // 默认连续 3 次相同 Action 触发检测
-		sameLogicSpinThreshold:      3, // 默认连续 3 次相同逻辑触发 AI 检测
-		maxConsecutiveSpinWarnings:  3, // 默认连续 3 次 SPIN 警告后强制退出
-		extraCapabilities:           NewExtraCapabilitiesManager(),
-		perception:                  newPerceptionController(perceptionDefaultIterationInterval),
+		invoker:                      invoker,
+		loopName:                     name,
+		config:                       config,
+		emitter:                      config.GetEmitter(),
+		maxIterations:                100,
+		periodicVerificationInterval: verificationIterationTriggerInterval,
+		verificationMutex:            new(sync.Mutex),
+		actions:                      omap.NewEmptyOrderedMap[string, *LoopAction](),
+		loopActions:                  omap.NewEmptyOrderedMap[string, LoopActionFactory](),
+		streamFields:                 omap.NewEmptyOrderedMap[string, *LoopStreamField](),
+		aiTagFields:                  omap.NewEmptyOrderedMap[string, *LoopAITagField](),
+		vars:                         omap.NewEmptyOrderedMap[string, any](),
+		taskMutex:                    new(sync.Mutex),
+		currentMemories:              omap.NewEmptyOrderedMap[string, *aicommon.MemoryEntity](),
+		memorySizeLimit:              10 * 1024,
+		enableSelfReflection:         true,
+		historySatisfactionReasons:   make([]*SatisfactionRecord, 0),
+		actionHistory:                make([]*ActionRecord, 0),
+		actionHistoryMutex:           new(sync.Mutex),
+		currentIterationIndex:        0,
+		sameActionTypeSpinThreshold:  3, // 默认连续 3 次相同 Action 触发检测
+		sameLogicSpinThreshold:       3, // 默认连续 3 次相同逻辑触发 AI 检测
+		maxConsecutiveSpinWarnings:   3, // 默认连续 3 次 SPIN 警告后强制退出
+		extraCapabilities:            NewExtraCapabilitiesManager(),
+		perception:                   newPerceptionController(perceptionDefaultIterationInterval),
 	}
 
 	for _, action := range []*LoopAction{

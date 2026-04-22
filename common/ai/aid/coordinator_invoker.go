@@ -66,6 +66,7 @@ func (c *Coordinator) ExecuteLoopTask(taskTypeName string, task aicommon.AIState
 	defaultOptions := []reactloops.ReActLoopOption{
 		reactloops.WithMemoryTriage(c.MemoryTriage),
 		reactloops.WithMemoryPool(c.MemoryPool),
+		reactloops.WithPeriodicVerificationInterval(int(c.PeriodicVerificationInterval)),
 		reactloops.WithMemorySizeLimit(int(c.MemoryPoolSize)),
 		reactloops.WithEnableSelfReflection(c.EnableSelfReflection),
 		reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, operator *reactloops.OnPostIterationOperator) {

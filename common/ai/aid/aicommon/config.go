@@ -267,8 +267,9 @@ type Config struct {
 	PlanPrompt string
 
 	// result processer
-	GenerateReport  bool
-	MaxTaskContinue int64
+	GenerateReport               bool
+	MaxTaskContinue              int64
+	PeriodicVerificationInterval int64
 
 	// other
 	ExtendedActionCallback map[string]func(config *Config, action *Action)
@@ -477,6 +478,7 @@ func newConfig(ctx context.Context) *Config {
 		MemoryPoolSize:                     10 * 1024, // 10k tokens
 		MemoryPool:                         omap.NewOrderedMap(make(map[string]*MemoryEntity)),
 		MaxTaskContinue:                    3,
+		PeriodicVerificationInterval:       5,
 		GenerateReport:                     true,
 		DisallowMCPServers:                 false, // 默认启用 MCP Servers
 		MemoryTriageId:                     "default",
@@ -2089,6 +2091,21 @@ func WithMaxTaskContinue(n int64) ConfigOption {
 	}
 }
 
+func WithPeriodicVerificationInterval(n int64) ConfigOption {
+	return func(c *Config) error {
+		if n < 0 {
+			return nil
+		}
+		if c.m == nil {
+			c.m = &sync.Mutex{}
+		}
+		c.m.Lock()
+		c.PeriodicVerificationInterval = n
+		c.m.Unlock()
+		return nil
+	}
+}
+
 func WithAppendOtherOption(opts any) ConfigOption {
 	return func(c *Config) error {
 		if opts == nil {
@@ -2994,6 +3011,9 @@ func ConvertConfigToOptions(i *Config) []ConfigOption {
 	if i.MaxTaskContinue > 0 {
 		opts = append(opts, WithMaxTaskContinue(i.MaxTaskContinue))
 	}
+
+	opts = append(opts, WithPeriodicVerificationInterval(i.PeriodicVerificationInterval))
+
 	if i.PerTaskUserInteractiveLimitedTimes > 0 {
 		opts = append(opts, WithPerTaskUserInteractiveLimitedTimes(i.PerTaskUserInteractiveLimitedTimes))
 	}

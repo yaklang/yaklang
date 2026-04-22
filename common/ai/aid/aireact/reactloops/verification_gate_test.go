@@ -29,8 +29,8 @@ func TestShouldTriggerPeriodicCheckpointOnIteration_UsesLoopInterval(t *testing.
 		MockInvoker: mockcfg.NewMockInvoker(context.Background()),
 	}
 	loop := NewMinimalReActLoop(invoker.GetConfig(), invoker)
-	loop.periodicVerificationCount = 4
-	loop.perception = newPerceptionController(loop.periodicVerificationCount)
+	loop.periodicVerificationInterval = 4
+	loop.perception = newPerceptionController(loop.periodicVerificationInterval)
 
 	require.False(t, loop.ShouldTriggerPeriodicCheckpointOnIteration(2))
 	require.True(t, loop.ShouldTriggerPeriodicCheckpointOnIteration(4))
@@ -41,7 +41,7 @@ func TestShouldTriggerPeriodicCheckpointOnIteration_FallbackWithoutPerception(t 
 		MockInvoker: mockcfg.NewMockInvoker(context.Background()),
 	}
 	loop := NewMinimalReActLoop(invoker.GetConfig(), invoker)
-	loop.periodicVerificationCount = 2
+	loop.periodicVerificationInterval = 2
 	loop.perception = nil
 	loop.maxIterations = 5
 
@@ -55,8 +55,8 @@ func TestMaybeVerifyUserSatisfaction_UsesSharedCheckpointRule(t *testing.T) {
 		MockInvoker: mockcfg.NewMockInvoker(context.Background()),
 	}
 	loop := NewMinimalReActLoop(invoker.GetConfig(), invoker)
-	loop.periodicVerificationCount = 2
-	loop.perception = newPerceptionController(loop.periodicVerificationCount)
+	loop.periodicVerificationInterval = 2
+	loop.perception = newPerceptionController(loop.periodicVerificationInterval)
 	loop.historySatisfactionReasons = make([]*SatisfactionRecord, 0)
 	loop.SetLastPromptObservation(&PromptObservation{PromptTokens: 100})
 
@@ -84,8 +84,8 @@ func TestMaybeVerifyUserSatisfaction_SkipsWhenPromptDeltaIsSmall(t *testing.T) {
 		MockInvoker: mockcfg.NewMockInvoker(context.Background()),
 	}
 	loop := NewMinimalReActLoop(invoker.GetConfig(), invoker)
-	loop.periodicVerificationCount = 2
-	loop.perception = newPerceptionController(loop.periodicVerificationCount)
+	loop.periodicVerificationInterval = 2
+	loop.perception = newPerceptionController(loop.periodicVerificationInterval)
 	loop.historySatisfactionReasons = make([]*SatisfactionRecord, 0)
 
 	loop.currentIterationIndex = 2
@@ -111,8 +111,8 @@ func TestMaybeVerifyUserSatisfaction_TriggersWhenPromptDeltaIsLarge(t *testing.T
 		MockInvoker: mockcfg.NewMockInvoker(context.Background()),
 	}
 	loop := NewMinimalReActLoop(invoker.GetConfig(), invoker)
-	loop.periodicVerificationCount = 2
-	loop.perception = newPerceptionController(loop.periodicVerificationCount)
+	loop.periodicVerificationInterval = 2
+	loop.perception = newPerceptionController(loop.periodicVerificationInterval)
 	loop.historySatisfactionReasons = make([]*SatisfactionRecord, 0)
 	loop.setVerificationRuntimeSnapshot(&VerificationRuntimeSnapshot{
 		GeneratedAt:      time.Now(),
@@ -135,8 +135,8 @@ func TestMaybeVerifyUserSatisfaction_TriggersWhenIterationDeltaIsLarge(t *testin
 		MockInvoker: mockcfg.NewMockInvoker(context.Background()),
 	}
 	loop := NewMinimalReActLoop(invoker.GetConfig(), invoker)
-	loop.periodicVerificationCount = 3
-	loop.perception = newPerceptionController(loop.periodicVerificationCount)
+	loop.periodicVerificationInterval = 3
+	loop.perception = newPerceptionController(loop.periodicVerificationInterval)
 	loop.historySatisfactionReasons = make([]*SatisfactionRecord, 0)
 	loop.setVerificationRuntimeSnapshot(&VerificationRuntimeSnapshot{
 		GeneratedAt:      time.Now(),
@@ -159,8 +159,8 @@ func TestMaybeVerifyUserSatisfaction_TriggersWhenSnapshotIsStale(t *testing.T) {
 		MockInvoker: mockcfg.NewMockInvoker(context.Background()),
 	}
 	loop := NewMinimalReActLoop(invoker.GetConfig(), invoker)
-	loop.periodicVerificationCount = 2
-	loop.perception = newPerceptionController(loop.periodicVerificationCount)
+	loop.periodicVerificationInterval = 2
+	loop.perception = newPerceptionController(loop.periodicVerificationInterval)
 	loop.historySatisfactionReasons = make([]*SatisfactionRecord, 0)
 	loop.setVerificationRuntimeSnapshot(&VerificationRuntimeSnapshot{
 		GeneratedAt:      time.Now().Add(-verificationAutoTriggerMaxSnapshotAge - time.Second),
@@ -182,8 +182,8 @@ func TestMaybeVerifyUserSatisfaction_SkipsOnlyWhenAllSignalsAreWeak(t *testing.T
 		MockInvoker: mockcfg.NewMockInvoker(context.Background()),
 	}
 	loop := NewMinimalReActLoop(invoker.GetConfig(), invoker)
-	loop.periodicVerificationCount = 3
-	loop.perception = newPerceptionController(loop.periodicVerificationCount)
+	loop.periodicVerificationInterval = 3
+	loop.perception = newPerceptionController(loop.periodicVerificationInterval)
 	loop.historySatisfactionReasons = make([]*SatisfactionRecord, 0)
 	loop.setVerificationRuntimeSnapshot(&VerificationRuntimeSnapshot{
 		GeneratedAt:      time.Now(),
@@ -235,7 +235,7 @@ func TestVerificationWatchdog_ResetsWhenMaybeVerifyRuns(t *testing.T) {
 		MockInvoker: mockcfg.NewMockInvoker(context.Background()),
 	}
 	loop := NewMinimalReActLoop(invoker.GetConfig(), invoker)
-	loop.periodicVerificationCount = 100
+	loop.periodicVerificationInterval = 100
 	task := aicommon.NewStatefulTaskBase("watchdog-reset-task", "query", context.Background(), nil, true)
 	loop.SetCurrentTask(task)
 	loop.startVerificationWatchdog(task)

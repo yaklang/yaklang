@@ -49,7 +49,7 @@ func TestTriggerPerception_SchedulesMidtermRecallSummary(t *testing.T) {
 
 	loop := NewMinimalReActLoop(invoker.GetConfig(), invoker)
 	loop.loopName = "perception-midterm-test"
-	loop.perception = newPerceptionController(loop.periodicVerificationCount)
+	loop.perception = newPerceptionController(loop.periodicVerificationInterval)
 	loop.maxIterations = 100
 	loop.actionHistory = make([]*ActionRecord, 0)
 	loop.actionHistoryMutex = new(sync.Mutex)
