@@ -54,11 +54,6 @@ type ReActLoop struct {
 
 	maxIterations int
 
-	// periodicCheckpointInterval controls how often loop-level periodic
-	// checkpoint behaviors should run during iterations, such as perception
-	// and generic auto-verification.
-	periodicCheckpointInterval int
-
 	loopName string
 
 	persistentInstructionProvider   ContextProviderFunc
@@ -121,6 +116,14 @@ type ReActLoop struct {
 	// action history tracking
 	actionHistory      []*ActionRecord
 	actionHistoryMutex *sync.Mutex
+
+	// verificationRuntimeSnapshot stores the last verification gate baseline so
+	// generic auto-verification can compare the current loop state against the
+	// previous accepted checkpoint.
+	periodicVerificationCount int // when == 0 , trigger every iteration;
+	verificationRuntimeSnapshot *VerificationRuntimeSnapshot
+	verificationMutex           *sync.Mutex
+	verificationWatchdogTimer   *time.Timer
 
 	// timeline differ for tracking changes during task execution
 	timelineDiffer        *aicommon.TimelineDiffer
@@ -347,7 +350,7 @@ func NewMinimalReActLoop(cfg aicommon.AICallerConfigIf, invoker aicommon.AIInvok
 		config:                     cfg,
 		invoker:                    invoker,
 		emitter:                    cfg.GetEmitter(),
-		periodicCheckpointInterval: perceptionDefaultIterationInterval,
+		verificationMutex:          new(sync.Mutex),
 		vars:                       omap.NewEmptyOrderedMap[string, any](),
 		taskMutex:                  new(sync.Mutex),
 		historySatisfactionReasons: make([]*SatisfactionRecord, 0),
@@ -369,7 +372,8 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		config:                      config,
 		emitter:                     config.GetEmitter(),
 		maxIterations:               100,
-		periodicCheckpointInterval:  perceptionDefaultIterationInterval,
+		periodicVerificationCount:   verificationIterationTriggerInterval,
+		verificationMutex:           new(sync.Mutex),
 		actions:                     omap.NewEmptyOrderedMap[string, *LoopAction](),
 		loopActions:                 omap.NewEmptyOrderedMap[string, LoopActionFactory](),
 		streamFields:                omap.NewEmptyOrderedMap[string, *LoopStreamField](),
@@ -616,6 +620,9 @@ func (r *ReActLoop) FinishAsyncTask(t aicommon.AIStatefulTask, err error) {
 		return
 	}
 	t.Finish(err)
+	if t.IsFinished() {
+		r.stopVerificationWatchdogForTask(t)
+	}
 	if r.onAsyncTaskFinished != nil {
 		r.onAsyncTaskFinished(t)
 	}

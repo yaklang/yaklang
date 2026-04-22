@@ -476,6 +476,11 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 		}
 	}
 
+	r.startVerificationWatchdog(task)
+	defer func() {
+		r.stopVerificationWatchdogForTask(task) // 退出循环则停止验证看门狗，因为异步长任务不需要验证
+	}()
+
 	done := utils.NewOnce()
 	abort := func(err error) {
 		result := task.GetResult()
@@ -585,6 +590,7 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 LOOP:
 	for {
 		iterationCount++
+		r.currentIterationIndex = iterationCount
 		if iterationCount > maxIterations {
 			maxIterErr := utils.Errorf("reached max iterations (%d), stopping code generation loop", maxIterations)
 			postOp := r.finishIterationLoopWithError(iterationCount, task, maxIterErr)
@@ -633,7 +639,6 @@ LOOP:
 			needSummary.SetTo(true)
 			return finalError
 		}
-
 		// Save prompt to file in debug mode
 		if r.isDebugModeEnabled() {
 			r.savePromptToFile(task, iterationCount, prompt)
@@ -671,11 +676,10 @@ LOOP:
 
 		// 记录当前迭代索引和 Action 信息
 		r.actionHistoryMutex.Lock()
-		r.currentIterationIndex = iterationCount
 		actionRecord := &ActionRecord{
 			ActionType:     actionParams.ActionType(),
 			ActionName:     actionName,
-			ActionParams:   make(map[string]interface{}),
+			ActionParams:   actionParams.GetParams(),
 			IterationIndex: iterationCount,
 		}
 		// 复制 Action 参数（避免并发修改）
