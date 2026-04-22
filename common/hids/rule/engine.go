@@ -188,18 +188,24 @@ func buildAlert(
 
 func buildEvalContext(event model.Event) map[string]any {
 	process := map[string]any{
-		"pid":         0,
-		"parent_pid":  0,
-		"name":        "",
-		"username":    "",
-		"image":       "",
-		"command":     "",
-		"parent_name": "",
-		"artifact":    buildArtifactContext(nil),
+		"pid":                       0,
+		"parent_pid":                0,
+		"name":                      "",
+		"username":                  "",
+		"image":                     "",
+		"command":                   "",
+		"parent_name":               "",
+		"parent_image":              "",
+		"parent_command":            "",
+		"parent_start_time_unix_ms": int64(0),
+		"artifact":                  buildArtifactContext(nil),
 	}
 	parent := map[string]any{
-		"pid":  0,
-		"name": "",
+		"pid":                0,
+		"name":               "",
+		"image":              "",
+		"command":            "",
+		"start_time_unix_ms": int64(0),
 	}
 	file := map[string]any{
 		"path":      "",
@@ -261,9 +267,15 @@ func buildEvalContext(event model.Event) map[string]any {
 		process["image"] = event.Process.Image
 		process["command"] = event.Process.Command
 		process["parent_name"] = event.Process.ParentName
+		process["parent_image"] = event.Process.ParentImage
+		process["parent_command"] = event.Process.ParentCommand
+		process["parent_start_time_unix_ms"] = event.Process.ParentStartTimeUnixMillis
 		process["artifact"] = buildArtifactContext(event.Process.Artifact)
 		parent["pid"] = event.Process.ParentPID
 		parent["name"] = event.Process.ParentName
+		parent["image"] = event.Process.ParentImage
+		parent["command"] = event.Process.ParentCommand
+		parent["start_time_unix_ms"] = event.Process.ParentStartTimeUnixMillis
 	}
 	if event.File != nil {
 		file["path"] = event.File.Path
