@@ -203,13 +203,40 @@ func (t *AiTask) execute() error {
 {{ if .RecentActions }}最近执行动作: {{ .RecentActions }}{{ end }}
 {{ if gt .CurrentIteration 5 }}
 ** 警告: 当前子任务已执行 {{ .CurrentIteration }} 次迭代，请认真评估：
-  1. 任务目标是否实际上已经完成？如果工具已返回足够结果，请允许任务完成。
+  1. 任务目标是否实际上已经完成？如果工具已返回足够结果，请立即使用 "finish" 动作结束当前子任务。
   2. 当前策略是否有效？如果反复失败，请更换工具或方法。
   3. 不要重复执行相同的操作，这会浪费迭代次数。
-  4. 如果你当前执行的动作与 CURRENT_TASK 目标领域不相关（例如当前任务是 FTP 后门验证但你在做 Web 漏洞扫描），说明当前子任务实际已完成，应使用 directly_answer 输出任务总结并结束。
-  5. 安全测试中，"漏洞不存在"是有效的否定结论，不需要继续尝试——请直接总结结果并完成任务。**
+  4. 如果你当前执行的动作与 CURRENT_TASK 目标领域不相关（例如当前任务是 FTP 后门验证但你在做 Web 漏洞扫描），说明当前子任务实际已完成，应使用 "finish" 动作结束。
+  5. 安全测试中，"漏洞不存在"是有效的否定结论，不需要继续尝试——请直接用 "finish" 动作结束任务。**
 {{ end }}
 --- TASK_ITERATION_INFO_END ---
+
+--- SUBTASK_COMPLETION_GUIDE ---
+# 子任务完成动作指南（高优先级，始终适用）
+
+当 CURRENT_TASK 的 Done Criteria 已通过前序工具调用获得充分证据时，**必须在下一次动作直接结束子任务**。
+
+## 首选：{"@action": "finish"}
+- PE 子任务完成后，**系统会自动**基于 timeline + evidence 生成结构化总结并写入任务报告，你不需要也不应该自己再写一份总结文本。
+- 这是最节省迭代、也最符合系统设计的结束方式。
+- 无论证据多丰富、结论多复杂，"finish" 都足够。
+
+## 备选：{"@action": "directly_answer"} + FINAL_ANSWER 标签
+- 仅当**当下就需要把结构化 Markdown 结论呈现给用户**（例如最后的汇总报告子任务）时使用。
+- 必须**一次性**输出完整内容：
+    {"@action": "directly_answer"}
+    <|FINAL_ANSWER_{{ .Nonce }}|> ...markdown... <|FINAL_ANSWER_END_{{ .Nonce }}|>
+- 不允许在此之前再追加任何 echo / cat / tee / printf 的"准备"动作。
+
+## 严禁的反模式（会被视为浪费迭代）
+- **禁止**用 "directly_call_tool" + bash 执行仅包含 echo "=== Summary ==="、cat << EOF、printf 等只复述前面工具结果的命令。Tool 输出已经在 timeline 里，echo 不会产生任何新信息。
+- **禁止**把已经在 timeline 出现过的事实，再用 bash 打印一遍当作"保存" —— timeline 就是系统的记忆。
+- **禁止**先用 bash 拼一段 summary、再 "directly_answer" 复述相同内容 —— 这是最典型的冗余两步。
+- 如果确实有关键结论需要跨子任务复用，使用 "output_evidence"（若可用），而不是 bash echo。
+
+## 判断规则
+若你即将发起的动作只是在"重新组织 / 复述 / 回显"已存在的事实，没有获取任何新信息、也没有副作用，就**立刻改为 "finish"**。
+--- SUBTASK_COMPLETION_GUIDE_END ---
 
 - 进度信息语义约定：
   1) 任务树状态约定

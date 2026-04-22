@@ -70,6 +70,13 @@ func handleToolCallResult(
 		invoker.AddToTimeline("call["+toolPayload+"] error", result.Error)
 	}
 
+	n := len(loop.GetAllActions())
+	if n > 2 && n%5 == 0 {
+		// 每隔5轮，自动进行一次验证，看看是否满足了用户需求，避免过度循环
+		operator.Continue()
+		return
+	}
+
 	task := loop.GetCurrentTask()
 	verifyResult, verifyErr := invoker.VerifyUserSatisfaction(ctx, task.GetUserInput(), true, toolPayload)
 	if verifyErr != nil {

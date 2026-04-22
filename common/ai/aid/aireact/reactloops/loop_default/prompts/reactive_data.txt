@@ -5,5 +5,8 @@
 {{ end }}
 {{ if .IsLastIteration }}
 
-**警告：这是最后一次迭代。必须立即输出最终结果（directly_answer），不要再申请新工具。**
+**警告：这是最后一次迭代，必须立即结束，不要再申请新工具。**
+- 若证据已足够，优先使用 `{"@action": "finish"}`（系统会自动汇总 timeline）。
+- 仅当需要把结构化 Markdown 立即呈现给用户时，使用 `{"@action": "directly_answer"}` 一次性输出。
+- **禁止**再通过 `bash echo` 或任何工具调用去"整理 / 复述"已有结果。
 {{ end }}

@@ -56,7 +56,7 @@ func (l *LoopActionHandlerOperator) GetTask() aicommon.AIStatefulTask {
 
 func (l *LoopActionHandlerOperator) DisallowNextLoopExit() {
 	l.disallowLoopExitOnce.Do(func() {
-		l.disallowLoopExit = true
+		l.disallowLoopExit = false
 	})
 }
 
