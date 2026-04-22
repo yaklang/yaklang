@@ -270,6 +270,7 @@ func syncCorePluginEmbedInternal() error {
 		withPluginHelp("允许用户加载该插件修改 / 增加一个请求的 Header，可以设置 URL 关键字作为前提条件"),
 		withPluginAuthors("V1ll4n"),
 		withPluginEnableGenerateParam(true),
+		withPluginIgnore(true),
 		withPluginTags([]string{information.FORWARD_HTTP_PACKET}),
 	)
 	registerBuildInPlugin(
@@ -277,6 +278,7 @@ func syncCorePluginEmbedInternal() error {
 		withPluginHelp("允许用户加载该插件修改 / 增加一个请求的 Cookie，可以设置 URL 关键字作为前提条件"),
 		withPluginAuthors("V1ll4n"),
 		withPluginEnableGenerateParam(true),
+		withPluginIgnore(true),
 		withPluginTags([]string{information.FORWARD_HTTP_PACKET}),
 	)
 	registerBuildInPlugin(
