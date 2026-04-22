@@ -62,8 +62,12 @@ const (
 	AI_REACT_LOOP_NAME_INTERNET_RESEARCH   = "internet_research"
 	AI_REACT_LOOP_NAME_SMART_QA            = "smart_qa"
 	AI_REACT_LOOP_NAME_DIR_EXPLORE         = "dir_explore"
-	AI_REACT_LOOP_NAME_INFOSEC_RECON       = "infosec_recon"
-	AI_REACT_LOOP_NAME_AI_SKILL_AUDIT      = "ai_skill_audit"
+	AI_REACT_LOOP_NAME_INFOSEC_RECON        = "infosec_recon"
+	AI_REACT_LOOP_NAME_AI_SKILL_AUDIT       = "ai_skill_audit"
+	AI_REACT_LOOP_NAME_SYNTAXFLOW_SCAN      = "syntaxflow_scan"
+	AI_REACT_LOOP_NAME_SYNTAXFLOW_CODE_AUDIT = "syntaxflow_code_audit"
+	AI_REACT_LOOP_NAME_SSA_RISK_OVERVIEW    = "ssa_risk_overview"
+	AI_REACT_LOOP_NAME_SSA_RISK_REVIEW      = "ssa_risk_review"
 )
 
 const (

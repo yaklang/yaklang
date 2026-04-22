@@ -1,0 +1,11 @@
+## 数据库抽样与统计提示
+- **approx_total**: {{ .TotalHint }}
+
+<|SSA_RISK_OVERVIEW_PREFACE|>
+{{ .Preface }}
+<|SSA_RISK_OVERVIEW_PREFACE_END|>
+
+{{ if .FeedbackMessages }}
+## 上轮反馈
+{{ .FeedbackMessages }}
+{{ end }}

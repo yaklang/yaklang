@@ -1,0 +1,4 @@
+* 单条 SSA 风险解读示例：
+  {"@action": "require_tool", "tool": "ssa-risk", "params": {"risk_id": 123, "get_full_code": true}}
+* 切换解读目标：
+  {"@action": "set_ssa_risk_review_target", "human_readable_thought": "改看 id=456", "risk_id": 456}

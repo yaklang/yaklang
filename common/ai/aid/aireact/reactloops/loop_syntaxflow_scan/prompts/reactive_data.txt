@@ -1,0 +1,12 @@
+## 当前模式
+- **sf_scan_session_mode**: {{ .SessionMode }}
+- **task_id**: {{ .TaskID }}
+
+<|SF_SCAN_REVIEW_PREFACE|>
+{{ .Preface }}
+<|SF_SCAN_REVIEW_PREFACE_END|>
+
+{{ if .FeedbackMessages }}
+## 上轮反馈
+{{ .FeedbackMessages }}
+{{ end }}
