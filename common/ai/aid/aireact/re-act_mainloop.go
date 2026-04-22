@@ -244,6 +244,7 @@ func (r *ReAct) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTas
 		reactloops.WithMemoryPool(r.config.MemoryPool),
 		reactloops.WithMemorySizeLimit(int(r.config.MemoryPoolSize)),
 		reactloops.WithEnableSelfReflection(r.config.EnableSelfReflection),
+		reactloops.WithPeriodicVerificationInterval(int(r.config.PeriodicVerificationInterval)),
 		reactloops.WithOnAsyncTaskTrigger(func(i *reactloops.LoopAction, task aicommon.AIStatefulTask) {
 			r.SetCurrentPlanExecutionTask(task)
 		}),

@@ -91,7 +91,7 @@ func (r *ReActLoop) ShouldTriggerPeriodicCheckpointOnIteration(iterationIndex in
 	if r == nil {
 		return false
 	}
-	interval := r.periodicVerificationCount
+	interval := r.periodicVerificationInterval
 	if interval <= 0 {
 		return true
 	}
@@ -317,5 +317,5 @@ func (r *ReActLoop) getVerificationIterationTriggerInterval() int {
 	if r == nil {
 		return verificationIterationTriggerInterval
 	}
-	return r.periodicVerificationCount
+	return r.periodicVerificationInterval
 }

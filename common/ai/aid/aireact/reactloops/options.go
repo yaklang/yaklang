@@ -484,18 +484,15 @@ func WithDisableLoopPerception(disable ...bool) ReActLoopOption {
 	}
 }
 
-// WithPeriodicCheckpointInterval sets the shared iteration interval used by
-// loop-level periodic checkpoint behaviors such as perception and generic
+// WithPeriodicVerificationInterval sets the  iteration interval used by
+// loop-level periodic checkpoint behaviors
 // auto-verification.
-func WithPeriodicCheckpointInterval(interval int) ReActLoopOption {
+func WithPeriodicVerificationInterval(interval int) ReActLoopOption {
 	return func(r *ReActLoop) {
-		if r == nil || interval <= 0 {
+		if r == nil {
 			return
 		}
-		r.periodicVerificationCount = interval
-		if r.perception != nil {
-			r.perception.iterationTriggerInterval = interval
-		}
+		r.periodicVerificationInterval = interval
 	}
 }
 
