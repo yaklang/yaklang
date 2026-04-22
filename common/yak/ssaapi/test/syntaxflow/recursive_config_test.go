@@ -199,6 +199,31 @@ exclude_reachable: ` + "`$thenCfg`" + `,
 		ssatest.CheckSyntaxFlow(t, codeIfPhi, rule, map[string][]string{"outExc": {`"elseStr"`}}, ssaapi.WithLanguage(ssaconfig.Yak))
 	})
 
+	t.Run("exclude_reachable_two_same_key_lines", func(t *testing.T) {
+		// 同一 key 写两行时 native$call 曾用 map 覆盖；#{}-> 侧保留多条。结果应与只写一次 exclude 相同（冗余相同锚点）。
+		base := `
+println(* as $sink)
+a as $thenVal
+$thenVal<getCfg> as $thenCfg
+`
+		single := base + `
+$sink * #{
+include: ` + "`*`" + `,
+exclude_reachable: ` + "`$thenCfg`" + `,
+}-> as $out
+`
+		twoLines := base + `
+$sink * #{
+include: ` + "`*`" + `,
+exclude_reachable: ` + "`$thenCfg`" + `,
+exclude_reachable: ` + "`$thenCfg`" + `,
+}-> as $out
+`
+		want := map[string][]string{"out": {`"elseStr"`}}
+		ssatest.CheckSyntaxFlow(t, codeIfPhi, single, want, ssaapi.WithLanguage(ssaconfig.Yak))
+		ssatest.CheckSyntaxFlow(t, codeIfPhi, twoLines, want, ssaapi.WithLanguage(ssaconfig.Yak))
+	})
+
 	t.Run("if_flat_only_reachable_then_anchor", func(t *testing.T) {
 		rule := `
 println(* as $sink)
