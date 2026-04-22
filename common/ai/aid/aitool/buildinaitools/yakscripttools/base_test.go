@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/yaklang/yaklang/common/schema"
 	"gotest.tools/v3/assert"
 )
 
@@ -86,4 +87,8 @@ func TestLoadAllYakScriptFromEmbedFS(t *testing.T) {
 
 	// 额外检查：确保至少加载了一些工具
 	assert.Assert(t, actualCount > 0, "应该至少加载了一些工具")
+
+	for _, tool := range tools {
+		assert.Equal(t, tool.Author, schema.AIResourceAuthorBuiltin)
+	}
 }

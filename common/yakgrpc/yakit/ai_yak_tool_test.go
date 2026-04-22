@@ -44,6 +44,40 @@ func TestSaveAIYakTool_CreatePreservesAuthor(t *testing.T) {
 	require.Equal(t, "alice", got.Author)
 }
 
+func TestSaveAIYakTool_EmptyAuthorDefaultsToAnonymous(t *testing.T) {
+	db := newAIYakToolTestDB(t)
+
+	toolName := newAIYakToolTestName("save-empty-author-defaults")
+	require.NoError(t, func() error {
+		_, err := SaveAIYakTool(db, &schema.AIYakTool{
+			Name:        toolName,
+			Content:     "print('created')",
+			Description: "created-desc",
+		})
+		return err
+	}())
+
+	got, err := GetAIYakTool(db, toolName)
+	require.NoError(t, err)
+	require.Equal(t, schema.AIResourceAuthorAnonymous, got.Author)
+}
+
+func TestCreateAIYakTool_EmptyAuthorDefaultsToAnonymous(t *testing.T) {
+	db := newAIYakToolTestDB(t)
+
+	toolName := newAIYakToolTestName("create-empty-author-defaults")
+	_, err := CreateAIYakTool(db, &schema.AIYakTool{
+		Name:        toolName,
+		Content:     "print('created')",
+		Description: "created-desc",
+	})
+	require.NoError(t, err)
+
+	got, err := GetAIYakTool(db, toolName)
+	require.NoError(t, err)
+	require.Equal(t, schema.AIResourceAuthorAnonymous, got.Author)
+}
+
 func TestSaveAIYakTool_PreservesAuthorOnUpdateAndZeroValues(t *testing.T) {
 	db := newAIYakToolTestDB(t)
 

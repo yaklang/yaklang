@@ -1111,12 +1111,11 @@ func TestGRPCMUSTPASS_AITool_AuthorAndTimeFields(t *testing.T) {
 	defer cancel()
 
 	toolName := uuid.New().String()
-	author := "alice"
+	author := "anonymous"
 
 	createResp, err := client.SaveAIToolV2(ctx, &ypb.SaveAIToolRequest{
 		Name:    toolName,
 		Content: "cli.String('test')",
-		Author:  author,
 	})
 	require.NoError(t, err)
 	require.True(t, createResp.GetIsSuccess())
@@ -1154,4 +1153,34 @@ func TestGRPCMUSTPASS_AITool_AuthorAndTimeFields(t *testing.T) {
 	require.Equal(t, author, updatedResp.GetTools()[0].GetAuthor())
 	require.Equal(t, listResp.GetTools()[0].GetCreatedAt(), updatedResp.GetTools()[0].GetCreatedAt())
 	require.GreaterOrEqual(t, updatedResp.GetTools()[0].GetUpdatedAt(), listResp.GetTools()[0].GetUpdatedAt())
+}
+
+func TestGRPCMUSTPASS_AITool_EmptyAuthorDefaultsToAnonymous(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	toolName := uuid.New().String()
+
+	createResp, err := client.SaveAIToolV2(ctx, &ypb.SaveAIToolRequest{
+		Name:    toolName,
+		Content: "cli.String('test')",
+	})
+	require.NoError(t, err)
+	require.True(t, createResp.GetIsSuccess())
+	require.Equal(t, "anonymous", createResp.GetAITool().GetAuthor())
+	defer func() {
+		_, err = client.DeleteAITool(ctx, &ypb.DeleteAIToolRequest{
+			ToolNames: []string{toolName},
+		})
+		require.NoError(t, err)
+	}()
+
+	listResp, err := client.GetAIToolList(ctx, &ypb.GetAIToolListRequest{
+		ToolName: toolName,
+	})
+	require.NoError(t, err)
+	require.Len(t, listResp.GetTools(), 1)
+	require.Equal(t, "anonymous", listResp.GetTools()[0].GetAuthor())
 }
