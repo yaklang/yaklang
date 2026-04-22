@@ -12,6 +12,7 @@ type capabilityEventReporter interface {
 	PublishFailed(context.Context, capabilityCommandRef, string, string) error
 	PublishAlert(context.Context, CapabilityRuntimeAlert) error
 	PublishObservation(context.Context, CapabilityRuntimeObservation) error
+	PublishResponseActionResult(context.Context, HIDSResponseActionResultInput) error
 }
 
 type legionJobBridge struct {
