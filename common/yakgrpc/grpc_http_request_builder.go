@@ -180,12 +180,7 @@ Host: example.com
 			if raw == nil || len(raw) <= 0 {
 				continue
 			}
-			if len(req.GetGetParams()) > 0 {
-				raw = appendQueryParamsToPacket(raw, req.GetGetParams())
-			}
-			if len(req.GetPostParams()) > 0 && len(req.GetBody()) == 0 && len(req.GetMultipartParams()) == 0 && len(req.GetMultipartFileParams()) == 0 {
-				raw = appendPostParamsToPacket(raw, req.GetPostParams())
-			}
+			raw, requestURI := applyOrderedParamsToPacket(raw, req)
 			raw = bytes.ReplaceAll(raw, []byte(tempTag), []byte("{{Hostname}}"))
 
 			results = append(results, &ypb.HTTPRequestBuilderResult{
@@ -193,9 +188,8 @@ Host: example.com
 				HTTPRequest: raw,
 			})
 
-			requestURI := r.RequestURI
-			if urlIns, err := lowhttp.ExtractURLFromHTTPRequestRaw(raw, isHttps); err == nil && urlIns != nil {
-				requestURI = urlIns.RequestURI()
+			if requestURI == "" {
+				requestURI = r.RequestURI
 			}
 			paths = append(paths, "{{BaseURL}}"+requestURI)
 			if method == "" {
@@ -245,6 +239,23 @@ Host: example.com
 	encoder.Close()
 	templates := utils.EscapeInvalidUTF8Byte(buf.Bytes())
 	return &ypb.HTTPRequestBuilderResponse{Templates: templates, Results: results}, nil
+}
+
+// requestURI is the second token of the request line, e.g. "/test?a=1&a=2".
+func applyOrderedParamsToPacket(packet []byte, req *ypb.HTTPRequestBuilderParams) ([]byte, string) {
+	if len(packet) == 0 {
+		return packet, ""
+	}
+
+	if len(req.GetGetParams()) > 0 {
+		packet = appendQueryParamsToPacket(packet, req.GetGetParams())
+	}
+	if len(req.GetPostParams()) > 0 && len(req.GetBody()) == 0 && len(req.GetMultipartParams()) == 0 && len(req.GetMultipartFileParams()) == 0 {
+		packet = appendPostParamsToPacket(packet, req.GetPostParams())
+	}
+
+	_, requestURI, _ := lowhttp.GetHTTPPacketFirstLine(packet)
+	return packet, requestURI
 }
 
 func appendQueryParamsToPacket(packet []byte, params []*ypb.KVPair) []byte {
