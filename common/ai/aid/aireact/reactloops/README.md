@@ -1,288 +1,217 @@
-# ReActLoop 模块使用说明
+# ReActLoop 模块说明
 
 ## 模块概述
 
-`reactloops` 是 Yak AI 框架中的核心模块，实现了 ReAct (Reasoning and Acting) 循环执行逻辑。该模块负责：
+`reactloops` 是 Yak AI 框架中的 ReAct（Reasoning and Acting）循环实现：在多次迭代中调用模型、解析结构化 **Action**、在本地执行确定性逻辑、再把结果以 **Feedback** 与 **响应式 Prompt** 喂回模型，直到 `finish` / `directly_answer` 或达到迭代上限。
 
-1. **循环执行**: 通过迭代调用 AI 模型，执行多步骤任务
-2. **动作管理**: 注册和执行各种动作（Actions）
-3. **状态控制**: 管理任务状态转换（Pending, Processing, Completed, Aborted）
-4. **异步支持**: 支持同步和异步模式的动作执行
-5. **流处理**: 处理 AI 输出流，支持标签提取和镜像
+---
 
-## 核心组件
+## 第一部分：如何创建、注册与使用
 
-### 1. ReActLoop
+本部分说明**从零加一个新 Loop** 时要在仓库里动哪些地方，以及**产品侧 / 运行时时如何选 Loop**。若你只关心单轮里发生了什么，请看 **「第二部分：运行原理与内部机制」**。
 
-主要的循环执行器，负责协调整个执行流程。
+### 1.1 新 Loop 的落地清单（文件与命名）
 
-```go
-type ReActLoop struct {
-    loopName    string
-    config      AIInvokeRuntime
-    actions     *utils.OrderedMap[string, *LoopAction]
-    maxIterations int
-    // ... 其他字段
-}
-```
+按顺序做即可，漏一步通常表现为「`reactloop[xxx] not found`」或工厂从未执行。
 
-### 2. LoopAction
 
-定义可执行的动作。
+| 步骤         | 位置                                                   | 说明                                                                                                             |
+| ---------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| 1. 固定字符串名  | 例如 `common/schema/ai_event.go`                       | 增加常量，值为 **唯一** 的 loop 名（如 `my_feature = "my_feature"`）。`RegisterLoopFactory` 与 `NewReActLoop` 的**第一参数**必须与此一致。 |
+| 2. 新子包     | `common/ai/aid/aireact/reactloops/loop_<name>/`      | 一个 Loop 一个包，包内 `init()` 里注册。可参考 `loop_http_flow_analyze`、`loop_default`。                                       |
+| 3. 空白导入    | `common/ai/aid/aireact/reactloops/reactinit/init.go` | `import _ ".../loop_<name>"`，否则 `init()` 不跑，注册表里没有该名。                                                          |
+| 4. 元数据（推荐） | 与 `RegisterLoopFactory` 同级的选项                        | 供能力检索、Yakit 展示：中英文描述、用法提示、展示名、是否隐藏等。                                                                           |
 
-```go
-type LoopAction struct {
-    ActionType      string
-    Description     string
-    AsyncMode       bool
-    ActionVerifier  ActionVerifyHandler    // 验证动作参数
-    ActionHandler   ActionHandler          // 执行动作逻辑
-}
-```
 
-### 3. LoopActionHandlerOperator
+### 1.2 注册工厂：`RegisterLoopFactory`
 
-动作处理器中的操作符，用于控制循环流程。
+- **注册表**：`register.go` 中按 **字符串名** 保存 `LoopFactory`。
+- **创建**：`CreateLoopByName(name, invoker, opts...)` 调对应工厂，内部再 `NewReActLoop(name, invoker, preset...)`。
+- **元数据**（`WithLoopDescription`、`WithLoopDescriptionZh`、`WithLoopUsagePrompt`、`WithLoopOutputExample`、`WithVerboseName`、`WithLoopIsHidden` 等）挂在同一名字下，给意图识别、Schema 的 `x-@action-rules` 与前端用。
 
-```go
-type LoopActionHandlerOperator struct {
-    // 提供以下方法：
-    // - Continue()              // 继续下一次迭代
-    // - Fail(reason)           // 失败并终止
-    // - Feedback(message)      // 记录反馈
-    // - DisallowNextLoopExit() // 禁止下一次迭代退出
-}
-```
+**注意**：同一 `name` 只能注册一次；测试里用随机名避免冲突。
 
-## 使用方法
+### 1.3 工厂函数里应装配什么（重点）
 
-### 基本使用流程
+`LoopFactory` 形如 `func(r aicommon.AIInvokeRuntime, opts ...ReActLoopOption) (*ReActLoop, error)`。在返回 `NewReActLoop` 前，用 `ReActLoopOption` 把行为钉死。常见项：
 
-```go
-// 1. 创建 ReActLoop
-loop, err := NewReActLoop("my-loop", runtime, 
-    WithMaxIterations(10),
-    WithOnTaskCreated(func(task AIStatefulTask) {
-        // 任务创建回调
-    }),
-)
 
-// 2. 注册动作
-loop.actions.Set("custom_action", &LoopAction{
-    ActionType:  "custom_action",
-    Description: "执行自定义操作",
-    AsyncMode:   false,
-    ActionVerifier: func(loop *ReActLoop, action *Action) error {
-        // 验证动作参数
-        return nil
-    },
-    ActionHandler: func(loop *ReActLoop, action *Action, operator *LoopActionHandlerOperator) {
-        // 执行动作逻辑
-        operator.Continue() // 或 operator.Fail()
-    },
-})
+| 选项                                                                                 | 作用                                                                                               |
+| ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `WithMaxIterations`                                                                | 最大迭代轮数。                                                                                          |
+| `WithPersistentInstruction` 或 `WithPersistentInstructionProvider`                  | **长期**角色与规则（建议 `embed` 的 `prompts/persistent_instruction.txt`）。每轮进 Prompt 的 *Persistent* 区。      |
+| `WithReflectionOutputExample` 或对应 Provider                                         | **输出示例/长说明**（如 `prompts/reflection_output_example.txt`），进 *OutputExample* 区，补充 `Schema` 文字说明。    |
+| `WithReactiveDataBuilder`                                                          | **每轮动态上下文**：读 `loop.Get`、反馈缓冲区等，渲染 `prompts/reactive_data.tpl` 或自建模板。用于 FINDINGS、上一步结果摘要、当前中间状态。 |
+| `WithRegisterLoopAction` / `WithRegisterLoopActionWithStreamField`                 | 注册本 Loop 的 **业务 Action**；参数用 `aitool.*` 描述，会进入全局合并 Schema。                                       |
+| `WithOverrideLoopAction`                                                           | 覆盖默认的 `directly_answer` 等行为（如某 Loop 要发 artifact 再 `Exit`）。                                       |
+| `WithAllowRAG` / `WithAllowToolCall` / `WithAllowAIForge` / `WithAllowPlanAndExec` | 是否打开通用能力（RAG、工具、蓝图、计划执行等）。                                                                       |
+| `WithOnPostIteraction`                                                             | 每轮结束后的钩子（收 findings、强总结、改错误策略等）。                                                                 |
+| `WithInitTask`                                                                     | 首帧任务（同步跑子流程、建目录、预检等）。                                                                            |
+| `WithVar` / 工厂闭包                                                                   | 子 Loop 可注入路径、调试开关。                                                                               |
 
-// 3. 执行循环
-err = loop.Execute("task-id", context.Background(), "用户输入")
-```
 
-### 内置动作
+`opts ...ReActLoopOption` 会拼在 `preset` 后传入，便于调用方在 `CreateLoopByName` 时**覆盖**部分行为（测试或上层注入）。
 
-模块提供了两个内置动作：
+**最小心智模型**：*Persistent* = 不变的业务合同；*ReactiveData* = 每轮变的「世界状态」；*Schema* = 模型下一跳可发的 JSON 字段集（由 Action 的 `aitool` 自动合并，见 1.4）。
 
-1. **直接回答** (`directly_answer`): AI 直接回答用户问题
-2. **结束** (`finish`): 完成任务并退出循环
+### 1.4 Action 与 JSON Schema：模型怎么知道能发哪些字段
 
-### 核心文件说明
+不必手写整份 `jsonschema`：
 
-#### exec.go - 核心执行逻辑
+- 每个 `LoopAction` 的 `Options []aitool.ToolOption` 描述**业务参数**（如 `keyword`、`limit`）。
+- `action.go` 的 `buildSchema` 会合并：**公共字段**（`@action` 枚举当前 Loop 所有动作名、`identifier`、`human_readable_thought`）+ **各 Action 展开后的字段**。
+- 主模板 `prompts/loop_template.tpl` 中会把合并结果放在 `Schema` 代码块里；**每轮**都会带这份 Schema。
 
-主要函数：
-- `Execute()`: 创建任务并执行循环
-- `ExecuteWithExistedTask()`: 使用已有任务执行循环
-- `createMirrors()`: 创建流镜像处理器
+因此，**要扩展查询/操作能力 = 新注册一个 `WithRegisterLoopAction` 并写好 `aitool` 参数即可**；不需要改 `buildSchema` 核心逻辑。
 
-关键流程：
-1. 状态管理：`taskStartProcessing()` → `complete()` / `abort()`
-2. Prompt 生成：调用 `generateLoopPrompt()`
-3. AI 调用：通过 `CallAITransaction()` 调用 AI
-4. 动作提取：从流中提取 `next_action`
-5. 动作验证：`ActionVerifier`
-6. 动作执行：`ActionHandler`
+### 1.5 运行时时如何进入某个 Loop（产品 / 用户侧）
 
-#### prompt.go - Prompt 生成
+Loop **不会自动出现**，需把「当前主循环名」设成你注册时用的字符串（与 schema 常量一致）：
 
-主要函数：
-- `generateLoopPrompt()`: 生成循环提示词
-- `generateSchemaString()`: 生成动作 Schema
+1. **运行时 `config.Focus`**：默认主循环（空则回退到 `default`）。
+2. **任务级 `task.SetFocusMode(loopName)`**：优先级**高于**输入内嵌指令，适合 Yakit 里点选「某模式」。
+3. **用户输入内嵌**：`@__FOCUS__ <loop名>` 可在解析后剥掉并指定 focus（见 `re-act_mainloop.go` 中 `parseLoopDirectives`）。
 
-Prompt 组成：
-- 背景信息（Background）
-- 持久化指令（PersistentContext）
-- 输出示例（OutputExample）
-- 响应式数据（ReactiveData）- 包含反馈
-- 用户查询（UserQuery）
-- 动作 Schema（Schema）
+主路径：`ReAct.executeMainLoop` → `ExecuteLoopTask(loopName, task, opts...)` → `CreateLoopByName` → `ExecuteWithExistedTask`。
 
-## 状态转换
+**在代码里起子 Loop**（不经过用户点选）：`reactloops.CreateLoopByName(子Loop名, 同一 invoker, WithVar...)` 再 `ExecuteWithExistedTask` 或子任务，例如代码审计里嵌套 `dir_explore`。
 
-任务状态转换流程：
+### 1.6 单测 / 工具里直接用 `NewReActLoop`
 
-```
-Created → Processing → Completed/Aborted
-```
+不必每测都 `RegisterLoopFactory`：可对 **mock `AIInvokeRuntime`** 调 `NewReActLoop("test_"+nonce, r, options...)`，与生产工厂同一套 `WithRegisterLoopAction` 即可。全链路集成测再 `RegisterLoopFactory` 或调用 `CreateLoopByName`。
 
-- **Created**: 任务创建
-- **Processing**: 正在处理
-- **Completed**: 成功完成
-- **Aborted**: 失败中止
+### 1.7 新 Loop 自查表
 
-## 同步 vs 异步模式
+- `schema` 常量与 `RegisterLoopFactory` / `NewReActLoop` 名一致  
+- `reactinit` 已 `import _` 你的包  
+- 持久指令 +（可选）reactive 模板 + 需要时的 `WithOnPostIteraction`  
+- 每个 Action 有 `ActionVerifier`（参数）+ `ActionHandler`（`Continue`/`Exit`/`Fail`/`Feedback`）  
+- 元数据是否足以被意图/能力系统描述清楚
 
-### 同步模式 (AsyncMode = false)
-- 动作在主循环中执行完成
-- 状态由循环控制
-- 执行完立即进入下一次迭代
+---
 
-### 异步模式 (AsyncMode = true)
-- 动作触发后立即返回
-- 状态由异步回调控制
-- 通过 `WithOnAsyncTaskTrigger()` 注册异步回调
-- 主循环不会自动进入下一次迭代
+## 第二部分：运行原理与内部机制
 
-## 反馈机制
+本部分说明**一轮迭代里**从 Prompt 到 Action 再回 Prompt 的链路，以及与 **aireact、状态存储** 的关系。实现细节以 `exec.go`、`prompt.go`、`action.go`、`register.go` 为准。
 
-通过 `operator.Feedback()` 记录反馈，反馈会在下一次迭代时通过 `ReactiveData` 传递给 AI：
+### 2.1 与 `aireact` 的衔接
 
-```go
-ActionHandler: func(loop *ReActLoop, action *Action, operator *LoopActionHandlerOperator) {
-    operator.Feedback("步骤1完成，发现3个问题")
-    operator.Continue()
-}
-```
+- 任务入队后 `processReActTask` → `executeMainLoop`：根据 focus 选 **loop 名字符串** → `ExecuteLoopTask`。
+- `ExecuteLoopTask` 合并一批全局 `ReActLoopOption`（记忆、自反应、计划任务回调等）后 `CreateLoopByName` → `mainloop.ExecuteWithExistedTask(task)`。
 
-## Stream 处理和 Mirror
+### 2.2 单次迭代的执行链（从 Prompt 到 Handler）
 
-### AI Tag 字段
+1. **生成 Prompt**：`generateLoopPrompt` → 组装 `Background`、`UserQuery`、*Persistent*、*Reflection（ReactiveData）*、可选 `InjectedMemory`、*Schema*、*OutputExample* 等，再套 `loop_template.tpl`。
+2. **调用模型**：`CallAITransaction` 流式读模型输出。
+3. **解析 Action**：`aicommon.ExtractActionFromStream` 从流中抽出 JSON/`next_action` 等，得到 `*aicommon.Action`（并记录如 `last_ai_decision_response` 供排错）。
+4. **校验**：当前 Action 的 `ActionVerifier`。
+5. **执行**：`ActionHandler`；通过 `LoopActionHandlerOperator` 的 `Continue` / `Exit` / `Fail` / `Feedback` 控制是否进入下一轮、是否结束、是否把文本反馈写入下一轮 **ReactiveData**。
 
-通过注册 AI Tag 字段，可以从 AI 输出中提取特定标签内容：
+### 2.3 Prompt 各块职责（与「创建时」的选项对应）
 
-```go
-loop.aiTagFields.Set("yaklang-code", &LoopAITagField{
-    TagName:      "yaklang-code",
-    VariableName: "generated_code",
-})
-```
 
-当 AI 输出包含 `<yaklang-code>...</yaklang-code>` 时，内容会被提取并存储到 `generated_code` 变量中。
+| 区块                | 来源（典型）                                 | 作用                                 |
+| ----------------- | -------------------------------------- | ---------------------------------- |
+| UserQuery         | 当轮任务                                   | 用户目标                               |
+| PersistentContext | `WithPersistentInstruction`            | 稳定规则、工具说明                          |
+| ReactiveData      | `WithReactiveDataBuilder` + 反馈缓冲       | **上轮执行结果、FINDINGS、中间状态**（每轮重算）     |
+| Schema            | `buildSchema` + `generateSchemaString` | **机器可读**的下一跳 JSON 形状与 `@action` 枚举 |
+| OutputExample     | `WithReflectionOutputExample`          | 人读补充、长参数说明、示例（不替代 Schema）          |
+| InjectedMemory    | 运行时若启用                                 | RAG/记忆注入                           |
 
-### Stream 字段
 
-注册流字段可以实时处理 JSON 中的特定字段：
+**要点**：*Schema* 和 *OutputExample* 在**每一轮**都会再次出现在 Prompt 中，不是「会话说一次就结束」。
 
-```go
-loop.streamFields.Set("thought", &LoopStreamField{
-    FieldName: "thought",
-    Prefix:    "思考",
-})
-```
+### 2.4 状态、反馈与是否「都塞进 Prompt」
+
+- **Loop 内存**：`loop.Set` / `loop.Get` 存跨轮键（如某业务 Loop 的 `last_query_summary`、findings 文档串）。`operator.Feedback` 进缓冲区，下一轮打进 ReactiveData。
+- **超大中间结果**：可在 Handler 里写入工作目录，只在 Prompt 里给**短预览 + 路径**（并 pin 到前端），避免把整表流量贴进模型。
+- **业务真数据**：仍在你查询的 **DB/服务**（如 HTTP 流量在项目库的 `http_flow`）；Loop 不替代持久化，只把**摘要/结论**在对话状态与 Prompt 间传递。
+
+### 2.5 核心组件与文件索引
+
+- `**ReActLoop`**：主循环、迭代与状态。
+- `**LoopAction` + `buildSchema`**：声明动作与合并 Schema（`action.go`）。
+- `**exec.go`**：`Execute` / `ExecuteWithExistedTask`、流处理、`ExtractActionFromStream`、与 Handler 衔接。
+- `**prompt.go`**：`generateLoopPrompt` / `generateSchemaString`。
+- `**register.go**`：`RegisterLoopFactory`、`CreateLoopByName`、元数据表。
+
+#### 状态转换（任务）
+
+`Created → Processing → Completed/Aborted`（与 `aicommon` 任务状态一致）。
+
+#### 同步与异步动作
+
+- **同步**（默认 `AsyncMode: false`）：Handler 跑完再进下一轮。  
+- **异步**：Handler 早退，需通过 `WithOnAsyncTaskTrigger` 等于路径显式收束任务状态，否则主循环不会自动完成功能。
+
+#### 反馈
+
+`operator.Feedback` 的文本在下一轮经 ReactiveData 回到模型，减少「模型只记得自己上一段自由文本」的漂移。
+
+#### Stream / AI Tag
+
+`WithRegisterLoopActionWithStreamField` 及 `LoopAITagField` 可把流式字段或标签（如长 Markdown、代码块）解到 `loop` 变量并推到 Emitter；详见代码与同目录用例。
+
+---
 
 ## 测试说明
 
-### 测试策略
+本模块大量测试采用 **Mock Runtime + 受控流式 JSON** 驱动。要点：
 
-本模块的测试采用 mock AI response 驱动的方式：
+- 为 `*aicommon.Action` 提供合法 `@action` 与参数。  
+- 单测可优先 `NewReActLoop`；要测 `CreateLoopByName` 时先用唯一名 `RegisterLoopFactory`，或在 `reactloopstests` 用现成夹具。
 
-1. **Mock Runtime**: 模拟 AIInvokeRuntime
-2. **Mock Response**: 模拟 AI 返回的 JSON 格式动作
-3. **验证状态**: 检查任务状态转换
-4. **验证行为**: 检查动作处理器的调用
-
-### 测试覆盖
-
-主要测试场景：
-
-1. 基本执行流程
-2. 最大迭代次数限制
-3. 异步/同步模式
-4. ActionVerifier 和 ActionHandler
-5. 状态转换（Processing, Completed, Aborted）
-6. 错误处理和 Panic 恢复
-7. 反馈机制
-8. Prompt 生成
-9. Stream 处理和 Mirror
-10. 禁止退出循环
-
-### 运行测试
+**运行**：
 
 ```bash
-# 运行所有测试
-go test ./common/ai/aid/aireact/reactloops -v
-
-# 运行特定测试
-go test ./common/ai/aid/aireact/reactloops -v -run TestExecute_BasicFlow
-
-# 查看覆盖率
-go test ./common/ai/aid/aireact/reactloops -coverprofile=coverage.out
+go test ./common/ai/aid/aireact/reactloops/ -v
+go test ./common/ai/aid/aireact/reactloops/ -coverprofile=coverage.out
 go tool cover -html=coverage.out
 ```
 
-### Mock AI Response 示例
-
-```go
-runtime.callAIFunc = func(prompt string) (*AIResponse, error) {
-    resp := aicommon.NewUnboundAIResponse()
-    resp.SetTaskIndex("test-1")
-    resp.EmitOutputStream(strings.NewReader(`{
-        "thought": "我需要执行这个操作",
-        "next_action": {
-            "type": "custom_action",
-            "params": {"key": "value"}
-        }
-    }`))
-    resp.Close()
-    return resp, nil
-}
-```
+---
 
 ## 注意事项
 
-1. **迭代限制**: 默认最大迭代次数为 100，可通过 `WithMaxIterations()` 自定义
-2. **Emitter 必需**: 必须提供有效的 Emitter，否则执行会失败
-3. **动作注册**: 所有使用的动作必须提前注册
-4. **Panic 恢复**: 循环内部有 panic 恢复机制，会将任务标记为 Aborted
-5. **异步模式**: 异步模式下，主循环不会自动完成任务，需要在异步回调中手动设置状态
+1. **迭代限制**：用 `WithMaxIterations` 控制；避免 Handler 里忘记 `Exit` 导致打满。
+2. **Emitter**：生产路径需有效 Emitter 才能向 UI/时间线发事件。
+3. **动作名全局**：`@action` 必须对应当前 Loop 已注册的 `ActionType`。
+4. **Panic**：执行路径有恢复逻辑，但业务 Handler 仍应尽量不 panic。
+5. **异步子任务**：与计划执行相关时注意 `GetCurrentPlanExecutionTask` 对主循环 Action 的裁剪（见 `ExecuteLoopTask`）。
+
+---
 
 ## 最佳实践
 
-1. **错误处理**: ActionVerifier 中进行参数验证，ActionHandler 中进行业务逻辑处理
-2. **反馈信息**: 使用 `operator.Feedback()` 提供详细的执行信息，帮助 AI 做出更好的决策
-3. **状态管理**: 正确使用 `Continue()` 和 `Fail()` 控制循环流程
-4. **调试日志**: 使用 `common/log` 包输出调试信息
-5. **测试覆盖**: 为自定义动作编写单元测试，确保逻辑正确
+1. **持久 vs 动态** 分文件维护（`embed`），避免一坨字符串难 diff。
+2. **Verifier** 做所有参数与前置条件；**Handler** 专注副作用与给 AI 的反馈。
+3. **反馈可检索**：`Feedback` 里写清「查了什么、条数、错误原因」，少写空话。
+4. **大结果落盘** + Prompt 中引用路径，与现有 HTTP Flow 等 Loop 行为一致。
+5. 为新 Loop 写至少一条 **从工厂到单轮 Action** 的集成测。
+
+---
 
 ## 常见问题
 
-### Q: 循环无限执行怎么办？
-A: 设置合理的 `maxIterations`，并确保动作正确调用 `Continue()` 或 `Fail()`
 
-### Q: 如何调试 Prompt？
-A: 可以在 `generateLoopPrompt()` 中打印或记录生成的 prompt
+| 问题                         | 说明                                                                                    |
+| -------------------------- | ------------------------------------------------------------------------------------- |
+| `reactloop[xxx] not found` | 名拼错、未 `RegisterLoopFactory` 或未在 `reactinit` 中空白导入。                                    |
+| 模型总选错 Action               | 检查 `Description`/`UsagePrompt` 与 `OutputExample`；检查 Schema 里是否误禁用动作。                  |
+| 一轮里字段解析失败                  | 看 `last_ai_decision_response` 与 `ExtractActionFromStream` 错误；核对你的 `aitool` 与模型输出是否一致。 |
+| 异步 Loop 不结束                | 在回调里把任务设到 Completed，或别用异步除非确有需要。                                                      |
+| 调试 Prompt                  | 在 `generateLoopPrompt` 或调用侧打日志；注意 nonce 分块。                                           |
 
-### Q: 异步模式下如何完成任务？
-A: 在 `WithOnAsyncTaskTrigger()` 回调中手动调用 `task.SetStatus(AITaskState_Completed)`
 
-### Q: 如何处理超时？
-A: 通过 context.WithTimeout() 创建带超时的 context 传递给 Execute()
+---
 
-## 相关文档
+## 相关代码
 
-- AI Tag 解析：`common/ai/aid/aicommon/aitag/`
-- 动作提取：`common/ai/aid/aicommon/action_extractor.go`
-- Timeline 管理：`common/ai/aid/aicommon/timeline.go`
+- 动作提取：`common/ai/aid/aicommon/`（如 `action_extractor`、流式解析）  
+- 主入口衔接：`common/ai/aid/aireact/re-act_mainloop.go`（`ExecuteLoopTask`、`selectLoopForTask`）  
+- 空白导入汇聚：`common/ai/aid/aireact/reactloops/reactinit/init.go`
 
 ---
 
 **维护者**: Yaklang Team  
-**最后更新**: 2024年
-
