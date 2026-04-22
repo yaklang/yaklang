@@ -117,7 +117,7 @@ func (r *ReAct) DumpCurrentEnhanceData() string {
 	if r.config.EnhanceKnowledgeManager == nil {
 		return ""
 	}
-	data := r.config.EnhanceKnowledgeManager.DumpTaskAboutKnowledge(r.GetCurrentTask().GetId())
+	data := r.config.EnhanceKnowledgeManager.DumpTaskAboutKnowledge(r.GetCurrentTaskId())
 	if r.config.DebugEvent {
 		log.Infof("Dumped enhance data: %s", data)
 	}
