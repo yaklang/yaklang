@@ -304,12 +304,20 @@ func (h *hidsCapabilityHooks) flushPendingObservations(state *hidsSnapshotObserv
 
 func hidsSnapshotObservationKey(event hidsmodel.Event) (string, bool) {
 	switch event.Type {
-	case hidsmodel.EventTypeProcessExec, hidsmodel.EventTypeProcessExit:
+	case hidsmodel.EventTypeProcessExec, hidsmodel.EventTypeProcessExit, hidsmodel.EventTypeProcessState:
 		if event.Process == nil {
 			return "", false
 		}
+		if event.Process.PID > 0 && event.Process.StartTimeUnixMillis > 0 {
+			return nonEmptyObservationKey(
+				"process",
+				event.Process.BootID,
+				fmt.Sprintf("%d", event.Process.PID),
+				fmt.Sprintf("%d", event.Process.StartTimeUnixMillis),
+			)
+		}
 		if event.Process.PID > 0 {
-			return fmt.Sprintf("process:%d", event.Process.PID), true
+			return nonEmptyObservationKey("process", fmt.Sprintf("%d", event.Process.PID))
 		}
 		return nonEmptyObservationKey(
 			"process",
@@ -320,34 +328,55 @@ func hidsSnapshotObservationKey(event hidsmodel.Event) (string, bool) {
 	case hidsmodel.EventTypeNetworkAccept,
 		hidsmodel.EventTypeNetworkConnect,
 		hidsmodel.EventTypeNetworkState,
-		hidsmodel.EventTypeNetworkClose:
+		hidsmodel.EventTypeNetworkClose,
+		hidsmodel.EventTypeNetworkSocket:
 		if event.Network == nil {
 			return "", false
 		}
-		processImage := ""
-		pid := 0
-		if event.Process != nil {
-			processImage = event.Process.Image
-			pid = event.Process.PID
-		}
 		return nonEmptyObservationKey(
 			"network",
-			fmt.Sprintf("%d", pid),
-			processImage,
+			processBootID(event.Process),
+			processPIDKey(event.Process),
+			processStartTimeKey(event.Process),
+			fmt.Sprintf("%d", event.Network.FD),
 			event.Network.SourceAddress,
 			fmt.Sprintf("%d", event.Network.SourcePort),
 			event.Network.DestAddress,
 			fmt.Sprintf("%d", event.Network.DestPort),
 			event.Network.Protocol,
+			event.Network.Direction,
 		)
 	case hidsmodel.EventTypeFileChange:
 		if event.File == nil {
 			return "", false
 		}
 		return nonEmptyObservationKey("file", event.File.Path)
+	case hidsmodel.EventTypeHostUsers:
+		return nonEmptyObservationKey("host-users", "inventory")
 	default:
 		return "", false
 	}
+}
+
+func processBootID(process *hidsmodel.Process) string {
+	if process == nil {
+		return ""
+	}
+	return process.BootID
+}
+
+func processPIDKey(process *hidsmodel.Process) string {
+	if process == nil || process.PID <= 0 {
+		return ""
+	}
+	return fmt.Sprintf("%d", process.PID)
+}
+
+func processStartTimeKey(process *hidsmodel.Process) string {
+	if process == nil || process.StartTimeUnixMillis <= 0 {
+		return ""
+	}
+	return fmt.Sprintf("%d", process.StartTimeUnixMillis)
 }
 
 func nonEmptyObservationKey(prefix string, values ...string) (string, bool) {

@@ -7,13 +7,16 @@ import "time"
 const (
 	EventTypeProcessExec    = "process.exec"
 	EventTypeProcessExit    = "process.exit"
+	EventTypeProcessState   = "process.state"
 	EventTypeNetworkAccept  = "network.accept"
 	EventTypeNetworkConnect = "network.connect"
 	EventTypeNetworkClose   = "network.close"
 	EventTypeNetworkState   = "network.state"
+	EventTypeNetworkSocket  = "network.socket"
 	EventTypeFileChange     = "file.change"
 	EventTypeAudit          = "audit.event"
 	EventTypeAuditLoss      = "audit.loss"
+	EventTypeHostUsers      = "host.users"
 )
 
 type Event struct {
@@ -26,18 +29,34 @@ type Event struct {
 	Network   *Network          `json:"network,omitempty"`
 	File      *File             `json:"file,omitempty"`
 	Audit     *Audit            `json:"audit,omitempty"`
+	Users     []HostUser        `json:"users,omitempty"`
 	Data      map[string]any    `json:"data,omitempty"`
 }
 
 type Process struct {
-	PID        int       `json:"pid,omitempty"`
-	ParentPID  int       `json:"parent_pid,omitempty"`
-	Name       string    `json:"name,omitempty"`
-	Username   string    `json:"username,omitempty"`
-	Image      string    `json:"image,omitempty"`
-	Command    string    `json:"command,omitempty"`
-	ParentName string    `json:"parent_name,omitempty"`
-	Artifact   *Artifact `json:"artifact,omitempty"`
+	PID                       int       `json:"pid,omitempty"`
+	ParentPID                 int       `json:"parent_pid,omitempty"`
+	Name                      string    `json:"name,omitempty"`
+	Username                  string    `json:"username,omitempty"`
+	UID                       string    `json:"uid,omitempty"`
+	GID                       string    `json:"gid,omitempty"`
+	Image                     string    `json:"image,omitempty"`
+	Command                   string    `json:"command,omitempty"`
+	ParentName                string    `json:"parent_name,omitempty"`
+	ParentImage               string    `json:"parent_image,omitempty"`
+	ParentCommand             string    `json:"parent_command,omitempty"`
+	BootID                    string    `json:"boot_id,omitempty"`
+	StartTimeUnixMillis       int64     `json:"start_time_unix_ms,omitempty"`
+	ParentStartTimeUnixMillis int64     `json:"parent_start_time_unix_ms,omitempty"`
+	State                     string    `json:"state,omitempty"`
+	CPUPercent                float64   `json:"cpu_percent,omitempty"`
+	MemoryPercent             float64   `json:"memory_percent,omitempty"`
+	RSSBytes                  int64     `json:"rss_bytes,omitempty"`
+	VSZBytes                  int64     `json:"vsz_bytes,omitempty"`
+	ThreadCount               int       `json:"thread_count,omitempty"`
+	FDCount                   int       `json:"fd_count,omitempty"`
+	ChildrenPIDs              []int     `json:"children_pids,omitempty"`
+	Artifact                  *Artifact `json:"artifact,omitempty"`
 }
 
 type Network struct {
@@ -47,6 +66,11 @@ type Network struct {
 	SourcePort      int    `json:"source_port,omitempty"`
 	DestPort        int    `json:"dest_port,omitempty"`
 	ConnectionState string `json:"connection_state,omitempty"`
+	Direction       string `json:"direction,omitempty"`
+	FD              int    `json:"fd,omitempty"`
+	Family          string `json:"family,omitempty"`
+	SocketType      string `json:"socket_type,omitempty"`
+	Inode           string `json:"inode,omitempty"`
 }
 
 type File struct {
@@ -93,4 +117,16 @@ type Audit struct {
 	PreviousFileGID   string   `json:"previous_file_gid,omitempty"`
 	PreviousFileOwner string   `json:"previous_file_owner,omitempty"`
 	PreviousFileGroup string   `json:"previous_file_group,omitempty"`
+}
+
+type HostUser struct {
+	Username     string   `json:"username,omitempty"`
+	UID          string   `json:"uid,omitempty"`
+	GID          string   `json:"gid,omitempty"`
+	Home         string   `json:"home,omitempty"`
+	Shell        string   `json:"shell,omitempty"`
+	Groups       []string `json:"groups,omitempty"`
+	System       bool     `json:"system,omitempty"`
+	LoginEnabled bool     `json:"login_enabled,omitempty"`
+	Privileged   bool     `json:"privileged,omitempty"`
 }

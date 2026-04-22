@@ -222,6 +222,16 @@ func TestPipelineRunExecutesProcessTreeEvidenceRequests(t *testing.T) {
 		if !ok || processDetail["pid"] != 20 {
 			t.Fatalf("unexpected process detail: %#v", processTree["process"])
 		}
+		if processDetail["parent_image"] != "/usr/lib/systemd/systemd" {
+			t.Fatalf("unexpected parent image in process detail: %#v", processDetail["parent_image"])
+		}
+		if processDetail["parent_command"] != "/usr/lib/systemd/systemd" {
+			t.Fatalf("unexpected parent command in process detail: %#v", processDetail["parent_command"])
+		}
+		lineageRootImage, ok := lineage[0]["image"].(string)
+		if !ok || lineageRootImage != "/usr/lib/systemd/systemd" {
+			t.Fatalf("unexpected lineage root image: %#v", lineage[0]["image"])
+		}
 		children, ok := processTree["children"].([]map[string]any)
 		if !ok {
 			t.Fatalf("unexpected process tree children: %#v", processTree["children"])
@@ -1233,6 +1243,12 @@ func TestPipelineRunEnrichesProcessExecParentNameFromTrackedParent(t *testing.T)
 	if childObservation.Process.ParentName != "bash" {
 		t.Fatalf("unexpected parent name: %q", childObservation.Process.ParentName)
 	}
+	if childObservation.Process.ParentImage != "/bin/bash" {
+		t.Fatalf("unexpected parent image: %q", childObservation.Process.ParentImage)
+	}
+	if childObservation.Process.ParentCommand != "/bin/bash" {
+		t.Fatalf("unexpected parent command: %q", childObservation.Process.ParentCommand)
+	}
 	if childObservation.Process.Name != "curl" {
 		t.Fatalf("expected process name derived from image, got %q", childObservation.Process.Name)
 	}
@@ -1254,13 +1270,15 @@ func TestPipelineRunEnrichesNetworkProcessFromTrackedExec(t *testing.T) {
 		Timestamp: time.Date(2026, 4, 13, 11, 5, 0, 0, time.UTC),
 		Tags:      []string{"process", "ebpf"},
 		Process: &model.Process{
-			PID:        42,
-			ParentPID:  1,
-			Name:       "curl",
-			Username:   "alice",
-			Image:      "/usr/bin/curl",
-			Command:    "curl https://example.com",
-			ParentName: "bash",
+			PID:           42,
+			ParentPID:     1,
+			Name:          "curl",
+			Username:      "alice",
+			Image:         "/usr/bin/curl",
+			Command:       "curl https://example.com",
+			ParentName:    "bash",
+			ParentImage:   "/bin/bash",
+			ParentCommand: "/bin/bash",
 		},
 	}
 	events <- model.Event{
@@ -1312,6 +1330,12 @@ func TestPipelineRunEnrichesNetworkProcessFromTrackedExec(t *testing.T) {
 	}
 	if networkObservation.Process.ParentName != "bash" {
 		t.Fatalf("unexpected parent name: %q", networkObservation.Process.ParentName)
+	}
+	if networkObservation.Process.ParentImage != "/bin/bash" {
+		t.Fatalf("unexpected parent image: %q", networkObservation.Process.ParentImage)
+	}
+	if networkObservation.Process.ParentCommand != "/bin/bash" {
+		t.Fatalf("unexpected parent command: %q", networkObservation.Process.ParentCommand)
 	}
 }
 
@@ -1878,6 +1902,7 @@ func TestPipelineRunSkipsAlertsForInventoryObservations(t *testing.T) {
 type inventoryProviderStub struct {
 	processEvents []model.Event
 	networkEvents []model.Event
+	userEvents    []model.Event
 }
 
 func containsStringValue(values []string, want string) bool {
@@ -1895,6 +1920,10 @@ func (s inventoryProviderStub) ListProcessEvents(context.Context) ([]model.Event
 
 func (s inventoryProviderStub) ListNetworkEvents(context.Context) ([]model.Event, error) {
 	return s.networkEvents, nil
+}
+
+func (s inventoryProviderStub) ListHostUserEvents(context.Context) ([]model.Event, error) {
+	return s.userEvents, nil
 }
 
 func TestEmitInventoryObservationsSeedsProcessAndNetworkEvents(t *testing.T) {
@@ -1919,7 +1948,7 @@ func TestEmitInventoryObservationsSeedsProcessAndNetworkEvents(t *testing.T) {
 	}, inventoryProviderStub{
 		processEvents: []model.Event{
 			{
-				Type:      model.EventTypeProcessExec,
+				Type:      model.EventTypeProcessState,
 				Source:    "inventory.process",
 				Timestamp: time.Date(2026, 4, 10, 12, 0, 0, 0, time.UTC),
 				Tags:      []string{"process", "inventory", "baseline"},
@@ -1934,7 +1963,7 @@ func TestEmitInventoryObservationsSeedsProcessAndNetworkEvents(t *testing.T) {
 		},
 		networkEvents: []model.Event{
 			{
-				Type:      model.EventTypeNetworkConnect,
+				Type:      model.EventTypeNetworkSocket,
 				Source:    "inventory.network",
 				Timestamp: time.Date(2026, 4, 10, 12, 0, 1, 0, time.UTC),
 				Tags:      []string{"network", "inventory", "baseline"},
@@ -1955,11 +1984,20 @@ func TestEmitInventoryObservationsSeedsProcessAndNetworkEvents(t *testing.T) {
 				},
 			},
 		},
+		userEvents: []model.Event{
+			{
+				Type:      model.EventTypeHostUsers,
+				Source:    "inventory.users",
+				Timestamp: time.Date(2026, 4, 10, 12, 0, 2, 0, time.UTC),
+				Tags:      []string{"user", "inventory", "baseline"},
+			},
+		},
 	}, sink)
 
 	wantTypes := map[string]bool{
-		model.EventTypeProcessExec:    false,
-		model.EventTypeNetworkConnect: false,
+		model.EventTypeProcessState:  false,
+		model.EventTypeNetworkSocket: false,
+		model.EventTypeHostUsers:     false,
 	}
 	deadline := time.After(3 * time.Second)
 	for remaining := len(wantTypes); remaining > 0; {

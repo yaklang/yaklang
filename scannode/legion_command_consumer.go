@@ -256,6 +256,8 @@ func (b *legionJobBridge) handleMessage(
 		return b.handleCancel(message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandCapabilityApply):
 		return b.handleCapabilityApply(ctx, message.Data)
+	case strings.HasSuffix(message.Subject, "."+legionCommandHIDSResponseActionExecute):
+		return b.handleHIDSResponseActionExecute(ctx, message.Data)
 	case strings.HasSuffix(message.Subject, "."+legionCommandSSARuleSyncExport):
 		return b.handleSSARuleSyncExport(ctx, message.Data)
 	default:
